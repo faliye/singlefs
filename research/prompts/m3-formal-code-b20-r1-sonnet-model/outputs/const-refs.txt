@@ -1,0 +1,29 @@
+$ grep -rlF FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AREA_START --exclude-dir=target --exclude-dir=.git .   （只列文件名）
+records/2026-10-01-里程碑三形式化接入.md
+crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs
+research/prompts/_m3-formal-code-b19-r1-diff.md
+research/prompts/_m3-formal-code-b17-r1-diff.md
+research/prompts/m3-formal-code-b17-r1-opus-output.md
+research/prompts/_m3-formal-code-b20-r1-diff.md
+research/prompts/m3-root-ring-code-r2-snapshot/peer-formal-17-1-crates.patch
+
+$ grep -rnF FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AREA_START crates/ /tmp/claude-1000/m3-formal-code-b20-r1/tree/crates   （只列 crates 下的命中，仓里与冻结副本各一份）
+crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:54:const FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AREA_START: u64 = 4;
+crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:340:        unit_area_start_slot + FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AREA_START
+crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:646:                unit_area_start_slot + FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AR
+crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:650:                unit_area_start_slot + FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AR
+crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:654:                unit_area_start_slot + FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AR
+crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:658:                unit_area_start_slot + FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AR
+/tmp/claude-1000/m3-formal-code-b20-r1/tree/crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:54:const FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AREA_START: u64 = 4;
+/tmp/claude-1000/m3-formal-code-b20-r1/tree/crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:340:        unit_area_start_slot + FIRST_DATA_UNIT_SLOTS_PAST_THE_U
+/tmp/claude-1000/m3-formal-code-b20-r1/tree/crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:646:                unit_area_start_slot + FIRST_DATA_UNIT_SLOTS_PA
+/tmp/claude-1000/m3-formal-code-b20-r1/tree/crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:650:                unit_area_start_slot + FIRST_DATA_UNIT_SLOTS_PA
+/tmp/claude-1000/m3-formal-code-b20-r1/tree/crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:654:                unit_area_start_slot + FIRST_DATA_UNIT_SLOTS_PA
+/tmp/claude-1000/m3-formal-code-b20-r1/tree/crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:658:                unit_area_start_slot + FIRST_DATA_UNIT_SLOTS_PA
+
+$ grep -rn FIRST_DATA_UNIT_SLOTS crates --include=*.wgsl   （wgsl 里的命中数）
+0
+
+crash_judge_checker_common.wgsl 主仓与冻结副本逐字节同
+crash_judge_checker.wgsl 主仓与冻结副本逐字节同
+crash_judge_common.wgsl 主仓与冻结副本逐字节同

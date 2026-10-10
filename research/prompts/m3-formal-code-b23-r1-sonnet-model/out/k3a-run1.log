@@ -1,0 +1,71 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running tests/b23_k3a_probe.rs (/tmp/claude-1000/m3-formal-code-b23-r1-sonnet/target/debug/deps/b23_k3a_probe-c6a0f85ee45c32f3)
+
+running 1 test
+[384槽 1次覆盖写 (用例原样)] writes=83 segments=20 first_ow=58 root_ow=80 root_ff=55 ff_records=[53, 54] ff_rotation=[56, 57]
+[384槽 1次覆盖写 (用例原样)] 第一次崩溃那一段 index=13 段长=2 段首写=53
+[384槽 1次覆盖写 (用例原样)] 第一次崩溃镜像上可写挂载：Ok("Ok")
+[384槽 1次覆盖写 (用例原样)] 挂载写表 55 写 13 段；写行记录=[16, 17] 根=18 轮换=[19, 20]
+[384槽 1次覆盖写 (用例原样)] 第二截段 index=2 段首写=16 withheld=[0, 1, 3] count=4
+[384槽 1次覆盖写 (用例原样)] 恢复落点：第一次崩溃 Some((InstanceGeneration(1), CheckpointTxg(4)))，二次崩溃 Some((InstanceGeneration(2), CheckpointTxg(5)))，两者不同=true
+[384槽 1次覆盖写 (用例原样)] 再挂拒：NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } } })
+[384槽 1次覆盖写 (用例原样)] 接对(二次崩溃镜像落点) selected=Some((InstanceGeneration(2), CheckpointTxg(5))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [WitnessCriterionTrueOnACrashImageWithoutReadFaults(NeitherTheLastRecordOfTheSelectedVersionNorTheRecordAtTheWitnessedCounterReadable)] }
+[384槽 1次覆盖写 (用例原样)] 接错(第一次崩溃落点) selected=Some((InstanceGeneration(1), CheckpointTxg(4))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [CriterionFalseWhenRecomputedOnTheCrashImage] }
+[384槽 2次覆盖写] writes=108 segments=24 first_ow=58 root_ow=80 root_ff=55 ff_records=[53, 54] ff_rotation=[56, 57]
+[384槽 2次覆盖写] 第一次崩溃那一段 index=13 段长=2 段首写=53
+[384槽 2次覆盖写] 第一次崩溃镜像上可写挂载：Ok("Ok")
+[384槽 2次覆盖写] 挂载写表 55 写 13 段；写行记录=[16, 17] 根=18 轮换=[19, 20]
+[384槽 2次覆盖写] 第二截段 index=2 段首写=16 withheld=[0, 1, 3] count=4
+[384槽 2次覆盖写] 恢复落点：第一次崩溃 Some((InstanceGeneration(1), CheckpointTxg(4)))，二次崩溃 Some((InstanceGeneration(2), CheckpointTxg(5)))，两者不同=true
+[384槽 2次覆盖写] 再挂拒：NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } } })
+[384槽 2次覆盖写] 接对(二次崩溃镜像落点) selected=Some((InstanceGeneration(2), CheckpointTxg(5))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [WitnessCriterionTrueOnACrashImageWithoutReadFaults(NeitherTheLastRecordOfTheSelectedVersionNorTheRecordAtTheWitnessedCounterReadable)] }
+[384槽 2次覆盖写] 接错(第一次崩溃落点) selected=Some((InstanceGeneration(1), CheckpointTxg(4))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [CriterionFalseWhenRecomputedOnTheCrashImage] }
+[384槽 覆盖空内容] writes=83 segments=20 first_ow=58 root_ow=80 root_ff=55 ff_records=[53, 54] ff_rotation=[56, 57]
+[384槽 覆盖空内容] 第一次崩溃那一段 index=13 段长=2 段首写=53
+[384槽 覆盖空内容] 第一次崩溃镜像上可写挂载：Ok("Ok")
+[384槽 覆盖空内容] 挂载写表 55 写 13 段；写行记录=[16, 17] 根=18 轮换=[19, 20]
+[384槽 覆盖空内容] 第二截段 index=2 段首写=16 withheld=[0, 1, 3] count=4
+[384槽 覆盖空内容] 恢复落点：第一次崩溃 Some((InstanceGeneration(1), CheckpointTxg(4)))，二次崩溃 Some((InstanceGeneration(2), CheckpointTxg(5)))，两者不同=true
+[384槽 覆盖空内容] 再挂拒：NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } } })
+[384槽 覆盖空内容] 接对(二次崩溃镜像落点) selected=Some((InstanceGeneration(2), CheckpointTxg(5))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [WitnessCriterionTrueOnACrashImageWithoutReadFaults(NeitherTheLastRecordOfTheSelectedVersionNorTheRecordAtTheWitnessedCounterReadable)] }
+[384槽 覆盖空内容] 接错(第一次崩溃落点) selected=Some((InstanceGeneration(1), CheckpointTxg(4))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [CriterionFalseWhenRecomputedOnTheCrashImage] }
+[384槽 覆盖满载荷] writes=83 segments=20 first_ow=58 root_ow=80 root_ff=55 ff_records=[53, 54] ff_rotation=[56, 57]
+[384槽 覆盖满载荷] 第一次崩溃那一段 index=13 段长=2 段首写=53
+[384槽 覆盖满载荷] 第一次崩溃镜像上可写挂载：Ok("Ok")
+[384槽 覆盖满载荷] 挂载写表 55 写 13 段；写行记录=[16, 17] 根=18 轮换=[19, 20]
+[384槽 覆盖满载荷] 第二截段 index=2 段首写=16 withheld=[0, 1, 3] count=4
+[384槽 覆盖满载荷] 恢复落点：第一次崩溃 Some((InstanceGeneration(1), CheckpointTxg(4)))，二次崩溃 Some((InstanceGeneration(2), CheckpointTxg(5)))，两者不同=true
+[384槽 覆盖满载荷] 再挂拒：NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } } })
+[384槽 覆盖满载荷] 接对(二次崩溃镜像落点) selected=Some((InstanceGeneration(2), CheckpointTxg(5))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [WitnessCriterionTrueOnACrashImageWithoutReadFaults(NeitherTheLastRecordOfTheSelectedVersionNorTheRecordAtTheWitnessedCounterReadable)] }
+[384槽 覆盖满载荷] 接错(第一次崩溃落点) selected=Some((InstanceGeneration(1), CheckpointTxg(4))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [CriterionFalseWhenRecomputedOnTheCrashImage] }
+[256槽 1次覆盖写] writes=83 segments=20 first_ow=58 root_ow=80 root_ff=55 ff_records=[53, 54] ff_rotation=[56, 57]
+[256槽 1次覆盖写] 第一次崩溃那一段 index=13 段长=2 段首写=53
+[256槽 1次覆盖写] 第一次崩溃镜像上可写挂载：Ok("Ok")
+[256槽 1次覆盖写] 挂载写表 55 写 13 段；写行记录=[16, 17] 根=18 轮换=[19, 20]
+[256槽 1次覆盖写] 第二截段 index=2 段首写=16 withheld=[0, 1, 3] count=4
+[256槽 1次覆盖写] 恢复落点：第一次崩溃 Some((InstanceGeneration(1), CheckpointTxg(4)))，二次崩溃 Some((InstanceGeneration(2), CheckpointTxg(5)))，两者不同=true
+[256槽 1次覆盖写] 再挂拒：NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } } })
+[256槽 1次覆盖写] 接对(二次崩溃镜像落点) selected=Some((InstanceGeneration(2), CheckpointTxg(5))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [WitnessCriterionTrueOnACrashImageWithoutReadFaults(NeitherTheLastRecordOfTheSelectedVersionNorTheRecordAtTheWitnessedCounterReadable)] }
+[256槽 1次覆盖写] 接错(第一次崩溃落点) selected=Some((InstanceGeneration(1), CheckpointTxg(4))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [CriterionFalseWhenRecomputedOnTheCrashImage] }
+[240槽 1次覆盖写] writes=83 segments=20 first_ow=58 root_ow=80 root_ff=55 ff_records=[53, 54] ff_rotation=[56, 57]
+[240槽 1次覆盖写] 第一次崩溃那一段 index=13 段长=2 段首写=53
+[240槽 1次覆盖写] 第一次崩溃镜像上可写挂载：Ok("Ok")
+[240槽 1次覆盖写] 挂载写表 55 写 13 段；写行记录=[16, 17] 根=18 轮换=[19, 20]
+[240槽 1次覆盖写] 第二截段 index=2 段首写=16 withheld=[0, 1, 3] count=4
+[240槽 1次覆盖写] 恢复落点：第一次崩溃 Some((InstanceGeneration(1), CheckpointTxg(4)))，二次崩溃 Some((InstanceGeneration(2), CheckpointTxg(5)))，两者不同=true
+[240槽 1次覆盖写] 再挂拒：NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } } })
+[240槽 1次覆盖写] 接对(二次崩溃镜像落点) selected=Some((InstanceGeneration(2), CheckpointTxg(5))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [WitnessCriterionTrueOnACrashImageWithoutReadFaults(NeitherTheLastRecordOfTheSelectedVersionNorTheRecordAtTheWitnessedCounterReadable)] }
+[240槽 1次覆盖写] 接错(第一次崩溃落点) selected=Some((InstanceGeneration(1), CheckpointTxg(4))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [CriterionFalseWhenRecomputedOnTheCrashImage] }
+[4GiB 1次覆盖写] writes=91 segments=20 first_ow=62 root_ow=88 root_ff=59 ff_records=[57, 58] ff_rotation=[60, 61]
+[4GiB 1次覆盖写] 第一次崩溃那一段 index=13 段长=2 段首写=57
+[4GiB 1次覆盖写] 第一次崩溃镜像上可写挂载：Ok("Ok")
+[4GiB 1次覆盖写] 挂载写表 67 写 13 段；写行记录=[20, 21] 根=22 轮换=[23, 24]
+[4GiB 1次覆盖写] 第二截段 index=2 段首写=20 withheld=[0, 1, 3] count=4
+[4GiB 1次覆盖写] 恢复落点：第一次崩溃 Some((InstanceGeneration(1), CheckpointTxg(4)))，二次崩溃 Some((InstanceGeneration(2), CheckpointTxg(5)))，两者不同=true
+[4GiB 1次覆盖写] 再挂拒：NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(5) }, witness: NewerPublishWitness { witnessed_journal_counter: 3, comparison: Undecidable } } })
+[4GiB 1次覆盖写] 接对(二次崩溃镜像落点) selected=Some((InstanceGeneration(2), CheckpointTxg(5))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [WitnessCriterionTrueOnACrashImageWithoutReadFaults(NeitherTheLastRecordOfTheSelectedVersionNorTheRecordAtTheWitnessedCounterReadable)] }
+[4GiB 1次覆盖写] 接错(第一次崩溃落点) selected=Some((InstanceGeneration(1), CheckpointTxg(4))) => Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [CriterionFalseWhenRecomputedOnTheCrashImage] }
+test b23_k3a_state_and_the_judge_on_both_wirings ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.24s
+

@@ -1,0 +1,15 @@
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.06s
+     Running tests/zz_probe_b35.rs (/tmp/claude-1000/m3-formal-code-b35-r1-sonnet/target-opt/debug/deps/zz_probe_b35-210cb51a1160e8ca)
+
+running 1 test
+PROBE-P4 first_file_clean I-5.5=H
+PROBE-P4 after_overwrite(two versions) I-5.5=H
+PROBE-P4 mkfs_only I-5.5=N 回退候选集里每条根与由记录施加出来的那几版，没有一版是从 mkfs 水位第一次建树的那一版（树表非空、种类 1 条目的树 ID 是 65536、每条条目的诞生 txg 等于这一版的 txg）：一版都不判
+PROBE-P4 extent_root_zeroed I-5.5=N 认出了从 mkfs 水位第一次建树的那一版，但它们都没有数据单元（extent 树根全零或一条数据指针都没有）：一版都不判
+PROBE-P4 extent_root_zeroed red=[] partial=[]
+PROBE-P4 (data-pointer-zero variant skipped: extent leaf rewrite helper not in scope)
+test probe_p4_first_data_unit_verdicts_by_form ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 144 filtered out; finished in 23.26s
+
+exit=0

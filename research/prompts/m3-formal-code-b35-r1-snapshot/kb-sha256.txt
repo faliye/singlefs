@@ -1,0 +1,4 @@
+c88645bd94574acb052bd68312b764df546d94548423fcb3aeb7bfe0cdd076cd  .claude/kb/invariants.md
+7974746af520d75f9d4ed47b23d6ad03d4494703e402e057889751d55909d42d  .claude/kb/decisions/23-journal的角色与格式.md
+fe5908b3373a19ed686fbb90a6ca968db149863f974f439469c39ba4cd6e379e  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+f36336faa9f06ce05694ce2e589d7d6e1895c7f966237cbfe1fe9c1dc096c2c2  .claude/kb/checks-owed.md

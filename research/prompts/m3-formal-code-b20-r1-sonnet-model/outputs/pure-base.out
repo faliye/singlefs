@@ -1,0 +1,17 @@
+F5 first=2 n=3 得 6 要 6 绿
+F5 first=4 n=2 得 9 要 9 绿
+F5 first=3 n=1 得 4 要 4 绿
+F5 单测整体：绿
+F5 n=0 panic：true
+F2 用例入参 (段 3, 窗口 3, 扣下 [0]) → SecondCrashPoint { segment_index: 3, persisted_within_the_segment: [false, true, true], phase: RowPublish }
+F2 越过段尾：窗口 [18,19,20] 里 18 落段 3、19、20 是段 4 的写；持久 [false, true, true]
+F2 扣下 [1,2]（写 19、20），相位表里 19 记 Continuation → phase=Continuation（应取第一个被扣下的写 19）persisted=[true, false, false]
+F2 扣下 [2,1]（无序）→ phase=Continuation（min 取 1 → 写 19）
+F2 panic：段号越界(9) true
+F2 panic：窗口 0 true
+F2 panic：越过写表末尾（段 8 起数 3） true
+F2 panic：恰好到写表末尾（段 8 起数 2）不应 panic true
+F2 panic：扣下为空 true
+F2 panic：扣下越界（3 在 3 个写里） true
+F2 panic：扣下一个在内一个越界 [0,3] true
+F2 段内真子集形态（段 1，14 个写，扣下 [0,5]）→ persisted 假的下标 [0, 5]

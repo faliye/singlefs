@@ -1,0 +1,3 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：三方攻方腿与正推腿同会话各跑各的副本
+P3BATCH batch=1 dispatched=1 rc_files=1
+P3RESULT name=baseline rc=0 compiled_core=1 results=[test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 31.17s test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.01s ] failed=[]

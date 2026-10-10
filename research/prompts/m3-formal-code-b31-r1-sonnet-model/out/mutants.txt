@@ -1,0 +1,50 @@
+MUTANT a
+  C551新用例: test overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant ... FAILED
+  C551新用例: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 50.85s
+  C551新用例: error: test failed, to rerun pass `-p singlefs-harness --test root_ring_turn_in_the_make_filesystem_session`
+  812用例: test allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records ... FAILED
+  812用例: thread 'allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records' (3250660) panicked at crates/singlefs-harness/tests/overwrite_in_one_instance.rs:752:13:
+  812用例: assertion `left == right` failed: 第 22 次覆盖写（616 条分配记录，回收门槛 txg 2）盘 0：「已分配」要等于这一版不是已回收的分配记录的跨度之和
+  812用例:   left: 5799936
+  812用例:  right: 5816320
+  812用例: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 1.64s
+  812用例: error: test failed, to rerun pass `-p singlefs-harness --test overwrite_in_one_instance`
+MUTANT b
+  C551新用例: test overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant ... FAILED
+  C551新用例: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.37s
+  C551新用例: error: test failed, to rerun pass `-p singlefs-harness --test root_ring_turn_in_the_make_filesystem_session`
+  812用例: test allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records ... FAILED
+  812用例: thread 'allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records' (3251816) panicked at crates/singlefs-harness/tests/overwrite_in_one_instance.rs:752:13:
+  812用例: assertion `left == right` failed: 第 23 次覆盖写（644 条分配记录，回收门槛 txg 3）盘 0：「已分配」要等于这一版不是已回收的分配记录的跨度之和
+  812用例:   left: 6078464
+  812用例:  right: 6062080
+  812用例: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 1.69s
+  812用例: error: test failed, to rerun pass `-p singlefs-harness --test overwrite_in_one_instance`
+MUTANT c
+  C551新用例: test overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant ... FAILED
+  C551新用例: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.81s
+  C551新用例: error: test failed, to rerun pass `-p singlefs-harness --test root_ring_turn_in_the_make_filesystem_session`
+  812用例: test allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records ... FAILED
+  812用例: thread 'allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records' (3252920) panicked at crates/singlefs-harness/tests/overwrite_in_one_instance.rs:752:13:
+  812用例: assertion `left == right` failed: 第 2 次覆盖写（76 条分配记录，回收门槛 txg 0）盘 0：「已分配」要等于这一版不是已回收的分配记录的跨度之和
+  812用例:   left: 720896
+  812用例:  right: 737280
+  812用例: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.28s
+  812用例: error: test failed, to rerun pass `-p singlefs-harness --test overwrite_in_one_instance`
+MUTANT d
+  C551新用例: test overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant ... ok
+  C551新用例: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.37s
+  812用例: test allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records ... ok
+  812用例: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 1.97s
+MUTANT e
+  C551新用例: test overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant ... ok
+  C551新用例: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.11s
+  812用例: test allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records ... ok
+  812用例: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 1.88s
+MUTANT d 对已有用例 root_ring_turn_in_one_mount
+test an_overwrite_that_goes_out_after_a_remount_goes_out_in_the_same_mount_as_well ... ok
+test zero_unit_publish_the_caller_issued_before_the_first_file_version_is_recorded_into_the_root_ring ... ok
+test turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it ... FAILED
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.97s
+error: test failed, to rerun pass `-p singlefs-harness --test root_ring_turn_in_one_mount`
+python3: can't open file '/tmp/claude-1000/m3-formal-code-b31-r1-sonnet/tree/research/prompts/m3-formal-code-b31-r1-sonnet-model/tools/mutate_core_reclaim.py': [Errno 2] No such file or directory

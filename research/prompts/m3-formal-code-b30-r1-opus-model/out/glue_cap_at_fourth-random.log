@@ -1,0 +1,66 @@
+== random_histories
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：b30 攻方腿模型在自己的副本与编译目录里跑 harness 档
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b30-r1-opus/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.52s
+     Running tests/random_histories.rs (target/debug/deps/random_histories-2b3ff0709e68e63f)
+
+running 42 tests
+test allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_former_one_node_wall ... 
+thread 'a_random_history_worker_thread_count_of_zero_panics_naming_the_variable_and_the_value' (2558310) panicked at crates/singlefs-harness/src/numeric_environment_variable.rs:53:23:
+SINGLEFS_RANDOM_HISTORY_THREADS="0" 认不出（number would be zero for non-zero type）：要写一个 core::num::nonzero::NonZero<usize> 的取值，不当成没设、不退回没设时的那一档
+ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+thread 'a_random_history_seed_count_of_zero_panics_naming_the_variable_and_the_value' (2558309) panicked at crates/singlefs-harness/src/numeric_environment_variable.rs:53:23:
+SINGLEFS_RANDOM_HISTORY_SEEDS="0" 认不出（number would be zero for non-zero type）：要写一个 core::num::nonzero::NonZero<u64> 的取值，不当成没设、不退回没设时的那一档
+
+thread 'an_unreadable_random_history_first_seed_panics_naming_the_variable_and_the_value' (2558313) panicked at crates/singlefs-harness/src/numeric_environment_variable.rs:53:23:
+SINGLEFS_RANDOM_HISTORY_FIRST_SEED="ten" 认不出（invalid digit found in string）：要写一个 u64 的取值，不当成没设、不退回没设时的那一档
+test a_random_history_seed_count_of_zero_panics_naming_the_variable_and_the_value - should panic ... ok
+test a_random_history_worker_thread_count_of_zero_panics_naming_the_variable_and_the_value - should panic ... ok
+
+thread 'an_unreadable_random_history_seed_count_panics_naming_the_variable_and_the_value' (2558314) panicked at crates/singlefs-harness/src/numeric_environment_variable.rs:53:23:
+SINGLEFS_RANDOM_HISTORY_SEEDS="ten" 认不出（invalid digit found in string）：要写一个 core::num::nonzero::NonZero<u64> 的取值，不当成没设、不退回没设时的那一档
+test an_unreadable_random_history_first_seed_panics_naming_the_variable_and_the_value - should panic ... ok
+test crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_is_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test an_unreadable_random_history_seed_count_panics_naming_the_variable_and_the_value - should panic ... ok
+test cold_start_after_a_swallowed_root_slot_write_reads_back_the_version_its_applied_record_rebuilt_and_the_model_agrees ... ok
+test deleting_a_file_of_two_lower_leaves_publishes_a_batch_keeping_data_units_that_the_model_compares ... ok
+test newest_system_configuration_slot_zeros_sampling_mounts_writable_and_ends_only_in_known_red_forms ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test overwrites_raising_the_floor_and_rolling_back_past_812_allocation_records_all_succeed ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test random_histories_deleting_files_of_several_lower_leaves_compare_every_batch_and_the_walks_before_a_change ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起（没给就用这个测试周期写死的种子基），SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS（broad、reuse、rollback、wall、unit-area-wall），checker SINGLEFS_RANDOM_HISTORY_CHECKER（run、skip），盘宽 SINGLEFS_RANDOM_HISTORY_DEVICES（4gib、unit-area-384、unit-area-256、unit-area-240），空间准入 SINGLEFS_RANDOM_HISTORY_SPACE_ADMISSION（judged、skipped），收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+test reproduction_line_of_the_allocation_record_wall_sampling_regenerates_the_same_history_and_execution ... ok
+test reproduction_line_of_the_fast_tier_regenerates_the_same_history_and_execution ... ok
+test reproduction_line_of_the_reuse_sampling_regenerates_the_same_history_and_execution ... ok
+test reproduction_line_of_the_rollback_sampling_regenerates_the_same_history_and_execution ... ok
+test reproduction_line_of_the_unit_area_wall_sampling_with_the_space_admission_judged_regenerates_the_same_history_and_execution ... ok
+test reproduction_line_of_the_unit_area_wall_sampling_with_the_space_admission_skipped_regenerates_the_same_history_and_execution ... ok
+test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_red_forms ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test allocation_records_counted_on_the_image_are_one_per_unit_per_device_and_zero_without_a_file ... ok
+test rolling_back_to_a_root_crash_recovery_abandoned_without_a_system_configuration_witness_is_refused_on_the_abandoned_timeline ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test a_file_of_three_lower_leaves_grows_the_central_mapping_tree_below_its_root_and_the_model_compares_every_version ... ok
+test rolling_back_while_mounted_to_the_oldest_ring_root_on_a_small_device_and_overwriting_again_all_succeed ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test seed_4000000001_on_240_slot_devices_with_the_admission_skipped_raises_the_floor_to_7_in_two_publishes ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：照判红时打的「复现：」那一行设环境变量；SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，其余没设的取快档的（30 步、broad、run、4gib、judged），SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+test the_five_sampling_tiers_start_from_the_test_cycle_seed_base ... ok
+test deleting_a_file_of_two_lower_leaves_then_rolling_back_to_its_intent_walks_two_steps_before_the_next_change ... ok
+test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test turning_the_root_ring_with_overwrites_in_one_mount_runs_to_the_end_with_the_checker_green_after_every_step ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_the_end_with_the_checker_green_after_every_step ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test unit_area_wall_sampling_on_small_devices_with_the_space_admission_skipped_runs_to_the_end_without_reaching_the_placement_wall ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test rolling_back_below_the_effective_floor_is_refused_for_being_below_the_floor ... ok
+test rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_that_version ... ok
+test eighteen_empty_overwrites_on_240_slot_devices_with_the_admission_skipped_leave_room_for_a_writable_mount_with_one_warm_up ... ok
+test the_history_that_raised_the_floor_into_a_rollback_gap_completes_under_the_forward_rollback ... ok
+test seed_4000000045_on_240_slot_devices_with_the_admission_skipped_raises_the_floor_to_19_reclaiming_135_placements ... ok
+test a_mount_on_the_emptied_version_in_the_unit_area_wall_sampling_compares_its_row_and_warm_up_publishes ... ok
+
+test result: ok. 23 passed; 0 failed; 19 ignored; 0 measured; 0 filtered out; finished in 43.79s
+
+rc=0 target=random_histories

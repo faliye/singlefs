@@ -1,0 +1,5 @@
+     Running tests/model_compares_the_third_and_fourth_inode_leaf_containers.rs (/tmp/claude-1000/m3-formal-code-b30-r1-sonnet/target/debug/deps/model_compares_the_third_and_fourth_inode_leaf_containers-0e8e2338091e0e0c)
+test a_rollback_to_a_version_whose_third_inode_leaf_container_was_rewritten_since_then_creating_inodes_is_judged_by_the_model_container_by_container ... ok
+test a_rollback_to_a_version_without_the_fourth_inode_leaf_container_then_creating_inodes_is_judged_by_the_model_container_by_container ... ok
+test creating_inodes_one_at_a_time_into_the_fourth_inode_leaf_container_is_judged_by_the_model_container_by_container ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.42s

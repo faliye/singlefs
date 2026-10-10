@@ -1,0 +1,25 @@
+== b30_opus_glue_leaf_role_is_injective
+run-with-memory-cap: 上限 8G 超过实测峰值 419M 的 2 倍，照理由放行：派发提示定 cargo 一律给 8G
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：b30 攻方腿模型在自己的副本与编译目录里跑 harness 档
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b30-r1-opus/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.10s
+     Running tests/b30_opus_glue_leaf_role_is_injective.rs (target/debug/deps/b30_opus_glue_leaf_role_is_injective-fdb155e96d395feb)
+
+running 1 test
+
+thread 'every_inode_leaf_container_index_one_root_holds_maps_to_its_own_model_role' (2587925) panicked at crates/singlefs-harness/tests/b30_opus_glue_leaf_role_is_injective.rs:21:9:
+assertion `left == right` failed: 第 3 片映到模型的第 3 片
+  left: InodeLeafRightOfTheLeftmost(ModelInodeLeafContainerRightOfTheLeftmost { position_from_the_leftmost: 2 })
+ right: InodeLeafRightOfTheLeftmost(ModelInodeLeafContainerRightOfTheLeftmost { position_from_the_leftmost: 3 })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test every_inode_leaf_container_index_one_root_holds_maps_to_its_own_model_role ... FAILED
+
+failures:
+
+failures:
+    every_inode_leaf_container_index_one_root_holds_maps_to_its_own_model_role
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p singlefs-harness --test b30_opus_glue_leaf_role_is_injective`
+rc=101 target=b30_opus_glue_leaf_role_is_injective

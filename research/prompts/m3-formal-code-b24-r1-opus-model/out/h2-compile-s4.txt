@@ -1,0 +1,4 @@
+S=4 cargo_build_singlefs_harness_rc=101
+      1 error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      1 error[E0080]: evaluation panicked: mkfs 写的 S 碰到了区间的边（D22 已定项 1 字段表：4..16 之间取值不碰任何一条边）
+error[E0080]: evaluation panicked: mkfs 写的 S 碰到了区间的边（D22 已定项 1 字段表：4..16 之间取值不碰任何一条边）

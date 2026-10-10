@@ -1,0 +1,22 @@
+core_mutation=none targets_ok=145 targets_failed=0
+core_mutation=nlink targets_ok=140 targets_failed=5
+  failed_target `-p singlefs-harness --test admission_ring_window_and_tombstone_prepay_on_the_publish_path`
+  failed_target `-p singlefs-harness --test container_trees_grow_a_level_when_the_root_is_full`
+  failed_target `-p singlefs-harness --test core_review_geometry_back_chain_and_empty_inode`
+  failed_target `-p singlefs-harness --test many_inodes_write_and_read`
+  failed_target `-p singlefs-harness --test unlink_mount_continuation_and_the_emptied_version`
+  test a_new_empty_inode_opens_under_the_read_only_mount_with_no_data_unit ... FAILED
+  test a_tree_grown_under_the_capped_fanout_takes_the_next_container_under_the_product_fanout ... FAILED
+  test creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_end_and_reads_back_cold ... FAILED
+  test tag_six_of_the_first_file_version_is_three_slots_and_one_live_object_and_two_new_inodes_add_two_more ... FAILED
+  test the_fifth_tombstone_container_grows_the_tree_to_three_levels_and_rebuild_reads_it ... FAILED
+  test the_third_tombstone_container_grows_the_tree_and_keeps_the_old_root_in_place ... FAILED
+  test the_tombstone_prepay_of_an_overwrite_reads_the_tombstone_tree_height_from_the_root_node_header ... FAILED
+core_mutation=birth targets_ok=144 targets_failed=1
+  failed_target `-p singlefs-harness --test many_inodes_write_and_read`
+  test creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_end_and_reads_back_cold ... FAILED
+core_mutation=size targets_ok=143 targets_failed=2
+  failed_target `-p singlefs-harness --test core_review_geometry_back_chain_and_empty_inode`
+  failed_target `-p singlefs-harness --test many_inodes_write_and_read`
+  test a_new_empty_inode_opens_under_the_read_only_mount_with_no_data_unit ... FAILED
+  test creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_end_and_reads_back_cold ... FAILED

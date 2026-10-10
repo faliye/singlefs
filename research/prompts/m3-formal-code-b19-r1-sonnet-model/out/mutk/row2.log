@@ -1,0 +1,23 @@
+run-with-memory-cap: 上限 4G 超过实测峰值 598M 的 2 倍，照理由放行：副本上的变异跑法，峰值表按原命令键登记、这里编的是副本
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/ws/crates/singlefs-checker)
+warning: unreachable pattern
+    --> crates/singlefs-checker/src/walk.rs:3400:15
+     |
+3395 |             TREE_KIND_ACCOUNTING => Self::NotJudged,
+     |             -------------------- matches all the relevant values
+...
+3400 |             | TREE_KIND_ACCOUNTING
+     |               ^^^^^^^^^^^^^^^^^^^^ no value can reach this
+     |
+     = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/ws/crates/singlefs-harness)
+warning: `singlefs-checker` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.57s
+     Running tests/checker_known_bad_images.rs (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+
+running 1 test
+test each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; finished in 3.97s
+

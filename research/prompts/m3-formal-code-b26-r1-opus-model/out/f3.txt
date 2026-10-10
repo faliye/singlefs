@@ -1,0 +1,18 @@
+F3PROPOSED Shipped: C3=绿 B4=绿
+F3 Shipped: F3-c=绿 F3-d-A=绿 F3-d-B=绿 F3-d-C=绿 F3-e-A2=绿 F3-e-B3=绿 F3-e-C2=绿 | 长48扣一两个写 1176/1176 不同 | 长626扣一两个写 196251/196251 不同 | 战役种子基+0..80、段16长12 327600/327600 不同
+F3PROPOSED FoldFirst32: C3=绿 B4=红
+F3 FoldFirst32: F3-c=绿 F3-d-A=绿 F3-d-B=绿 F3-d-C=绿 F3-e-A2=绿 F3-e-B3=绿 F3-e-C2=绿 | 长48扣一两个写 529/1176 不同 | 长626扣一两个写 529/196251 不同 | 战役种子基+0..80、段16长12 327600/327600 不同
+F3PROPOSED FoldLast32: C3=绿 B4=红
+F3 FoldLast32: F3-c=绿 F3-d-A=绿 F3-d-B=绿 F3-d-C=绿 F3-e-A2=绿 F3-e-B3=绿 F3-e-C2=绿 | 长48扣一两个写 529/1176 不同 | 长626扣一两个写 529/196251 不同 | 战役种子基+0..80、段16长12 327600/327600 不同
+F3PROPOSED SeedBitsZeroAndSixtyThree: C3=红 B4=绿
+F3 SeedBitsZeroAndSixtyThree: F3-c=绿 F3-d-A=绿 F3-d-B=绿 F3-d-C=绿 F3-e-A2=绿 F3-e-B3=绿 F3-e-C2=绿 | 长48扣一两个写 1176/1176 不同 | 长626扣一两个写 196251/196251 不同 | 战役种子基+0..80、段16长12 8190/327600 不同
+F3PROPOSED SeedLowByteAndBitSixtyThree: C3=红 B4=绿
+F3 SeedLowByteAndBitSixtyThree: F3-c=绿 F3-d-A=绿 F3-d-B=绿 F3-d-C=绿 F3-e-A2=绿 F3-e-B3=绿 F3-e-C2=绿 | 长48扣一两个写 1176/1176 不同 | 长626扣一两个写 196251/196251 不同 | 战役种子基+0..80、段16长12 327600/327600 不同
+F3PROPOSED SeedModuloThree: C3=红 B4=绿
+F3 SeedModuloThree: F3-c=绿 F3-d-A=绿 F3-d-B=绿 F3-d-C=绿 F3-e-A2=绿 F3-e-B3=绿 F3-e-C2=绿 | 长48扣一两个写 1176/1176 不同 | 长626扣一两个写 196251/196251 不同 | 战役种子基+0..80、段16长12 12285/327600 不同
+F3PROPOSED M7aFoldLast12: C3=绿 B4=红
+F3 M7aFoldLast12: F3-c=绿 F3-d-A=绿 F3-d-B=绿 F3-d-C=绿 F3-e-A2=绿 F3-e-B3=红 F3-e-C2=绿 | 长48扣一两个写 79/1176 不同 | 长626扣一两个写 79/196251 不同 | 战役种子基+0..80、段16长12 327600/327600 不同
+F3PROPOSED M7dSegmentLowSixBits: C3=绿 B4=绿
+F3 M7dSegmentLowSixBits: F3-c=绿 F3-d-A=绿 F3-d-B=绿 F3-d-C=绿 F3-e-A2=红 F3-e-B3=绿 F3-e-C2=绿 | 长48扣一两个写 1176/1176 不同 | 长626扣一两个写 196251/196251 不同 | 战役种子基+0..80、段16长12 327600/327600 不同
+F3PROPOSED M7fSeedLowestBit: C3=红 B4=绿
+F3 M7fSeedLowestBit: F3-c=绿 F3-d-A=绿 F3-d-B=绿 F3-d-C=绿 F3-e-A2=绿 F3-e-B3=绿 F3-e-C2=红 | 长48扣一两个写 1176/1176 不同 | 长626扣一两个写 196251/196251 不同 | 战役种子基+0..80、段16长12 8190/327600 不同

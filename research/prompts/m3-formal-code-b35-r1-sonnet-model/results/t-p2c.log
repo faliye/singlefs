@@ -1,0 +1,16 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b35-r1-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [optimized + debuginfo] target(s) in 14.81s
+     Running tests/zz_probe_b35.rs (/tmp/claude-1000/m3-formal-code-b35-r1-sonnet/target-opt/debug/deps/zz_probe_b35-210cb51a1160e8ca)
+
+running 1 test
+PROBE-P2 F1c.clean(after overwrite) red=[] partial=[] na_watched=["I-4.1:所选根之上一次发布都不施加：重放之后那一版就是所", "I-9.18:走读到的每一版 deleted_inodes 里"]
+PROBE-P2 F1c.older_candidate_root_txg3_all_zero red=["I-2.1", "I-3.1", "I-4.8", "I-7.4"] partial=["I-5.4", "I-5.5", "I-9.28"] na_watched=["I-4.1:所选根之上一次发布都不施加：重放之后那一版就是所", "I-3.5:回退候选集里相邻两版之间一个新出现、头读得出的单", "I-9.5:走读到的某一版树表指针全零（core 照它读盘 ", "I-9.18:走读到的某一版树表指针全零（core 照它读盘 "]
+PROBE-P2-DETAIL F1c.older_candidate_root_txg3_all_zero I-2.1: 根（实例 1、txg 3）的树表（根记录里树表指针全零，照 core 的根记录读者读它那两条位置条目） 在盘 0 槽 0 的那一份与位置条目里的校验和对不上
+PROBE-P2-DETAIL F1c.older_candidate_root_txg3_all_zero I-3.1: 盘 0：记账的已分配 Some(507904)，遍历全部有效根得到 278528（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 4、环里自证过的根槽 5 个、最老的自证过的根 txg 0、遍历的候选根槽 5 个、并进遍历的由记录施加出来的版本 0 个、被
+PROBE-P2-DETAIL F1c.older_candidate_root_txg3_all_zero I-4.8: 候选根 txg 3 出发的遍历有单元对不上或读不出
+PROBE-P2-DETAIL F1c.older_candidate_root_txg3_all_zero I-7.4: 候选根 txg 3 引用的单元已被复用或抹头（校验和对不上或头用不了）
+test probe_p2_older_candidate_root_with_units_of_its_own_all_zero ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 144 filtered out; finished in 52.03s
+
+exit=0

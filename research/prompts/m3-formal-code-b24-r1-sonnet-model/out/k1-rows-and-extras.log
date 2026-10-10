@@ -1,0 +1,152 @@
+== variant=none exit=0
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== variant=row1 exit=101
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... FAILED
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+thread 'tests::first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently' (2136193) panicked at src/lib.rs:169:9:
+  left: 1
+ right: 4095
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `--lib`
+== variant=row2 exit=101
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... FAILED
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+thread 'tests::first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently' (2136283) panicked at src/lib.rs:169:9:
+  left: 1
+ right: 4095
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `--lib`
+== variant=row3 exit=101
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... FAILED
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... FAILED
+thread 'tests::first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently' (2136375) panicked at src/lib.rs:191:9:
+  left: 4096
+ right: 8190
+thread 'tests::first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments' (2136374) panicked at src/lib.rs:146:9:
+  left: 4096
+ right: 262080
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `--lib`
+== variant=row4 exit=101
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... FAILED
+thread 'tests::first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments' (2136464) panicked at src/lib.rs:147:9:
+  left: 4095
+ right: 262080
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `--lib`
+== variant=row5 exit=101
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... FAILED
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+thread 'tests::first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently' (2136557) panicked at src/lib.rs:192:9:
+  left: 4095
+ right: 8190
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `--lib`
+== variant=row6 exit=101
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... FAILED
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... FAILED
+thread 'tests::first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently' (2136647) panicked at src/lib.rs:192:9:
+  left: 5998
+ right: 8190
+thread 'tests::first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments' (2136646) panicked at src/lib.rs:147:9:
+  left: 13254
+ right: 262080
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `--lib`
+== variant=x_drop-salt exit=0
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== variant=x_history-seed-and-1 exit=0
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== variant=x_history-seed-and-63 exit=0
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== variant=x_or-segment-only exit=101
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... FAILED
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... FAILED
+thread 'tests::first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently' (2137022) panicked at src/lib.rs:192:9:
+  left: 5998
+ right: 8190
+thread 'tests::first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments' (2137021) panicked at src/lib.rs:147:9:
+  left: 30336
+ right: 262080
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `--lib`
+== variant=x_segment-and-255 exit=0
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== variant=x_segment-and-63 exit=0
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== variant=x_segment-as-u8 exit=0
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== variant=x_take24 exit=101
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... FAILED
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+thread 'tests::first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently' (2137393) panicked at src/lib.rs:169:9:
+  left: 256
+ right: 4095
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `--lib`
+== variant=x_take28 exit=0
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== variant=x_take29 exit=0
+all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently ... ok
+first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently ... ok
+first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently ... ok
+first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

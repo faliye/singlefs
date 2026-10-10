@@ -1,0 +1,1 @@
+LAYER0_RESUME progress_file=<directory>/layer0-progress-golden_new_pool_file_creation_stream-fingerprint0-0370ad26cad051266c57d7129a63840319034b488aefec9adebf007a9809b91e.txt restored_slices=0/46 half_lines_dropped=0 discarded_because=none

@@ -1,0 +1,6 @@
+thread 'overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant' (3382784) panicked at crates/singlefs-harness/tests/root_ring_turn_in_the_make_filesystem_session.rs:70:9:
+assertion `left == right` failed: 盘 DeviceIdentity(0)：分配器自己的账上 defer 里只剩释放代比环里最旧有效根（txg 7）新的槽
+  left: 374
+--
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+

@@ -1,0 +1,449 @@
+== y1-s1.log
+  states_judged=33 of 33 range=0..33 elapsed_secs=1.9
+  FIELD mount mount_version no_entries tt.accounting.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount mount_version no_entries tt.allocation.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount mount_version no_entries tt.deadlist.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount mount_version no_entries tt.livelist.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount mount_version no_entries tt.logged_ops.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount mount_version no_entries tt.sparse.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.accounting.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.allocation.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.deadlist.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.livelist.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.logged_ops.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.sparse.root = same (r1 absent -> r2 absent) count=33
+  I55 after_mount not_applicable:这个镜像上没有它判的对象 count=33
+  I55 first_crash not_applicable:这个镜像上没有它判的对象 count=33
+  REAL mount judged_all_held_or_not_judged count=33
+  REAL mount+publish judged_all_held_or_not_judged count=33
+== y1-ul@1-4.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=1.0
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_nonempty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount mount_version queue_nonempty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount mount_version queue_nonempty tt.deadlist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_nonempty tt.livelist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_nonempty tt.logged_ops.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_nonempty tt.sparse.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.deadlist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.livelist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.logged_ops.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.sparse.root = same (r1 zero -> r2 zero) count=12
+  I55 after_mount holds count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1-ul@5-8.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=72.0
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_nonempty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount mount_version queue_nonempty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount mount_version queue_nonempty tt.deadlist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_nonempty tt.livelist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_nonempty tt.logged_ops.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_nonempty tt.sparse.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.deadlist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.livelist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.logged_ops.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.sparse.root = same (r1 zero -> r2 zero) count=1
+  I55 after_mount holds count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1w384-ci@1-4.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  I55 after_mount holds count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1w384-fr@0-1.log
+  states_judged=9 of 9 range=0..9 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=9
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=9
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=9
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=9
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=9
+  I55 first_crash holds count=9
+  REAL mount judged_all_held_or_not_judged count=9
+  REAL mount+publish judged_all_held_or_not_judged count=9
+== y1w384-fr@2-5.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1w384-fr@6-9.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1w384-fr.log
+  states_judged=8223 of 8223 range=0..8223 elapsed_secs=30.7
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=8223
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=8223
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=8223
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=8223
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=8223
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=8223
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=8223
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=8223
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=8223
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=8223
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=8223
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=8223
+  I55 first_crash holds count=8223
+  REAL mount judged_all_held_or_not_judged count=8223
+  REAL mount+publish judged_all_held_or_not_judged count=8223
+== y1w384-ow@1-4.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  I55 after_mount holds count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1w384-rb@1-4.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  I55 after_mount holds count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1w384-rbow@1-4.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  I55 after_mount holds count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1w384-s1.log
+  states_judged=33 of 33 range=0..33 elapsed_secs=0.0
+  FIELD mount mount_version no_entries tt.accounting.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount mount_version no_entries tt.allocation.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount mount_version no_entries tt.deadlist.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount mount_version no_entries tt.livelist.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount mount_version no_entries tt.logged_ops.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount mount_version no_entries tt.sparse.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.accounting.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.allocation.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.deadlist.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.livelist.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.logged_ops.root = same (r1 absent -> r2 absent) count=33
+  FIELD mount+publish mount_version no_entries tt.sparse.root = same (r1 absent -> r2 absent) count=33
+  I55 first_crash not_applicable:这个镜像上没有它判的对象 count=33
+  REAL mount judged_all_held_or_not_judged count=33
+  REAL mount+publish judged_all_held_or_not_judged count=33
+== y1w384-s2@0-1.log
+  states_judged=9 of 9 range=0..9 elapsed_secs=0.0
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=9
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=9
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=9
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=9
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=9
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=9
+  I55 first_crash holds count=9
+  REAL mount judged_all_held_or_not_judged count=9
+  REAL mount+publish judged_all_held_or_not_judged count=9
+== y1w384-s2@2-5.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1w384-s2@6-9.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=13
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=13
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1w384-s2.log
+  states_judged=20511 of 20511 range=0..20511 elapsed_secs=46.6
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=20511
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=20511
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=20511
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=20511
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=20511
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=20511
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=20511
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=20511
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=20511
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=20511
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=20511
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=20511
+  I55 first_crash holds count=20511
+  REAL mount judged_all_held_or_not_judged count=20511
+  REAL mount+publish judged_all_held_or_not_judged count=20511
+== y1w384-ul@1-4.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_nonempty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount mount_version queue_nonempty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount mount_version queue_nonempty tt.deadlist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_nonempty tt.livelist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_nonempty tt.logged_ops.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_nonempty tt.sparse.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.deadlist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.livelist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.logged_ops.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.sparse.root = same (r1 zero -> r2 zero) count=12
+  I55 after_mount holds count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1w384-ul@5-8.log
+  states_judged=13 of 13 range=0..13 elapsed_secs=0.1
+  FIELD mount mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount mount_version queue_nonempty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount mount_version queue_nonempty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount mount_version queue_nonempty tt.deadlist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_nonempty tt.livelist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_nonempty tt.logged_ops.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount mount_version queue_nonempty tt.sparse.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount+publish mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=12
+  FIELD mount+publish mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=12
+  FIELD mount+publish mount_version queue_nonempty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.deadlist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.livelist.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.logged_ops.root = same (r1 zero -> r2 zero) count=1
+  FIELD mount+publish mount_version queue_nonempty tt.sparse.root = same (r1 zero -> r2 zero) count=1
+  I55 after_mount holds count=13
+  I55 first_crash holds count=13
+  REAL mount judged_all_held_or_not_judged count=13
+  REAL mount+publish judged_all_held_or_not_judged count=13
+== y1s2w384-fr-last.log
+  first_crash_ordinal=8222 r1=file queue_empty r1_rebuilt=false mount_writes=38 mount_segments=9 closed_form_two_state=20496 second_crash_states=20511
+  second_crash_states_judged=20511 elapsed_secs=58.2
+  FIELD second_crash mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=4116
+  FIELD second_crash mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=4116
+  FIELD second_crash mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash v1 queue_empty tt.accounting.root = same (r1 nonzero -> r2 nonzero) count=16395
+  FIELD second_crash v1 queue_empty tt.allocation.root = same (r1 nonzero -> r2 nonzero) count=16395
+  FIELD second_crash v1 queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=16395
+  I55 second_crash holds count=20511
+  REAL second_crash judged_all_held_or_not_judged count=20511
+== y1s2w384-rb@1-4-last.log
+  first_crash_ordinal=12 r1=file queue_empty r1_rebuilt=false mount_writes=38 mount_segments=9 closed_form_two_state=20496 second_crash_states=20511
+  second_crash_states_judged=20511 elapsed_secs=37.0
+  FIELD second_crash mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=4116
+  FIELD second_crash mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=4116
+  FIELD second_crash mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash v1 queue_empty tt.accounting.root = same (r1 nonzero -> r2 nonzero) count=16395
+  FIELD second_crash v1 queue_empty tt.allocation.root = same (r1 nonzero -> r2 nonzero) count=16395
+  FIELD second_crash v1 queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=16395
+  I55 second_crash holds count=20511
+  REAL second_crash judged_all_held_or_not_judged count=20511
+== y1s2w384-s1-0,last.log
+  first_crash_ordinal=0 r1=no_file no_entries r1_rebuilt=false mount_writes=12 mount_segments=7 closed_form_two_state=18 second_crash_states=33
+  first_crash_ordinal=32 r1=no_file no_entries r1_rebuilt=false mount_writes=20 mount_segments=8 closed_form_two_state=273 second_crash_states=288
+  second_crash_states_judged=321 elapsed_secs=0.1
+  FIELD second_crash mount_version no_entries tt.accounting.root = same (r1 absent -> r2 absent) count=42
+  FIELD second_crash mount_version no_entries tt.allocation.root = same (r1 absent -> r2 absent) count=42
+  FIELD second_crash mount_version no_entries tt.deadlist.root = same (r1 absent -> r2 absent) count=42
+  FIELD second_crash mount_version no_entries tt.livelist.root = same (r1 absent -> r2 absent) count=42
+  FIELD second_crash mount_version no_entries tt.logged_ops.root = same (r1 absent -> r2 absent) count=42
+  FIELD second_crash mount_version no_entries tt.sparse.root = same (r1 absent -> r2 absent) count=42
+  FIELD second_crash v1 no_entries tt.accounting.root = same (r1 absent -> r2 absent) count=279
+  FIELD second_crash v1 no_entries tt.allocation.root = same (r1 absent -> r2 absent) count=279
+  FIELD second_crash v1 no_entries tt.deadlist.root = same (r1 absent -> r2 absent) count=279
+  FIELD second_crash v1 no_entries tt.livelist.root = same (r1 absent -> r2 absent) count=279
+  FIELD second_crash v1 no_entries tt.logged_ops.root = same (r1 absent -> r2 absent) count=279
+  FIELD second_crash v1 no_entries tt.sparse.root = same (r1 absent -> r2 absent) count=279
+  I55 second_crash not_applicable:这个镜像上没有它判的对象 count=321
+  REAL second_crash judged_all_held_or_not_judged count=321
+== y1s2w384-s2-0.log
+  first_crash_ordinal=0 r1=file queue_empty r1_rebuilt=false mount_writes=38 mount_segments=9 closed_form_two_state=20496 second_crash_states=20511
+  second_crash_states_judged=20511 elapsed_secs=20.9
+  FIELD second_crash mount_version queue_empty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=4116
+  FIELD second_crash mount_version queue_empty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=4116
+  FIELD second_crash mount_version queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash mount_version queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash mount_version queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash mount_version queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=4116
+  FIELD second_crash v1 queue_empty tt.accounting.root = same (r1 nonzero -> r2 nonzero) count=16395
+  FIELD second_crash v1 queue_empty tt.allocation.root = same (r1 nonzero -> r2 nonzero) count=16395
+  FIELD second_crash v1 queue_empty tt.deadlist.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_empty tt.livelist.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_empty tt.logged_ops.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_empty tt.sparse.root = same (r1 zero -> r2 zero) count=16395
+  I55 second_crash holds count=20511
+  REAL second_crash judged_all_held_or_not_judged count=20511
+== y1s2w384-ul@1-4-last.log
+  first_crash_ordinal=12 r1=no_file queue_nonempty r1_rebuilt=false mount_writes=76 mount_segments=17 closed_form_two_state=90140 second_crash_states=90165
+  second_crash_states_judged=90165 elapsed_secs=196.2
+  FIELD second_crash mount_version queue_nonempty tt.accounting.root = diff (r1 nonzero -> r2 nonzero) count=73770
+  FIELD second_crash mount_version queue_nonempty tt.allocation.root = diff (r1 nonzero -> r2 nonzero) count=73770
+  FIELD second_crash mount_version queue_nonempty tt.deadlist.root = same (r1 zero -> r2 zero) count=73770
+  FIELD second_crash mount_version queue_nonempty tt.livelist.root = same (r1 zero -> r2 zero) count=73770
+  FIELD second_crash mount_version queue_nonempty tt.logged_ops.root = same (r1 zero -> r2 zero) count=73770
+  FIELD second_crash mount_version queue_nonempty tt.sparse.root = same (r1 zero -> r2 zero) count=73770
+  FIELD second_crash v1 queue_nonempty tt.accounting.root = same (r1 nonzero -> r2 nonzero) count=16395
+  FIELD second_crash v1 queue_nonempty tt.allocation.root = same (r1 nonzero -> r2 nonzero) count=16395
+  FIELD second_crash v1 queue_nonempty tt.deadlist.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_nonempty tt.livelist.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_nonempty tt.logged_ops.root = same (r1 zero -> r2 zero) count=16395
+  FIELD second_crash v1 queue_nonempty tt.sparse.root = same (r1 zero -> r2 zero) count=16395
+  I55 second_crash holds count=90165
+  REAL second_crash judged_all_held_or_not_judged count=90165

@@ -1,0 +1,4 @@
+run-with-memory-cap: 这个会话已有 7 条日常的在跑，照理由并行：派出去的正推腿与攻方腿各跑各的，同会话号
+PROBE stream=new_pool_file_creation calls=3 model_verdict_histogram={"Agrees": 1, "NotModelled": 2} model_stopped_at_call=None
+PROBE stream=fixed_script_through_e_then_unmount calls=15 model_verdict_histogram={"Agrees": 13, "NotModelled": 2} model_stopped_at_call=None
+PROBE stream=first_file_unlinked_then_inodes_across_one_leaf calls=240 model_verdict_histogram={"Agrees": 238, "NotModelled": 2} model_stopped_at_call=None

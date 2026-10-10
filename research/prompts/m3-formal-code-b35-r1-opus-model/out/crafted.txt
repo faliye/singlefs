@@ -1,0 +1,667 @@
+run-with-memory-cap: 上限 8G 超过实测峰值 46M 的 2 倍，照理由放行：同一个二进制按参数跑大小不同的几段历史
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-formal-code-b35-r1 攻方原型
+B35X A a_txg=3 b_txg=4 records_of_b=[(0, 4, 16789504), (0, 5, 16793600), (0, 6, 16797696), (1, 4, 16789504), (1, 5, 16793600), (1, 6, 16797696)]
+B35X label=A-s0-clean-crash new={} pre35={} mutr={} mutn={} mutz={} next_mount=Some((1, 4)) versions=[] replayed=Some((1, 4, 1))
+B35X   A-s0-clean-crash I-2.1 new=H[]
+B35X   A-s0-clean-crash I-3.1 new=H[]
+B35X   A-s0-clean-crash I-3.10 new=H[]
+B35X   A-s0-clean-crash I-4.1 new=H[]
+B35X   A-s0-clean-crash I-4.8 new=H[]
+B35X   A-s0-clean-crash I-5.4 new=H[]
+B35X   A-s0-clean-crash I-5.5 new=H[]
+B35X   A-s0-clean-crash I-7.2 new=H[]
+B35X   A-s0-clean-crash I-7.4 new=H[]
+B35X   A-s0-clean-crash I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   A-s0-clean-crash I-9.5 new=H[]
+B35X   A-s0-clean-crash I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   A-s0-clean-crash I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   A-s0-clean-crash I-3.4 new=H[]
+B35X   A-s0-clean-crash I-9.29 new=H[]
+B35X mount label=A-s0-clean-crash recover=FileRead (InstanceGeneration(1), CheckpointTxg(3)) bytes=65285 effective=Some((InstanceGeneration(1), CheckpointTxg(4))) writable=ok
+B35X A overlap leaf=Some(50259) stale_rewrote=2
+B35X label=A-s3-overlap-and-stale-first new={"I-5.4"} pre35={} mutr={"I-5.4"} mutn={} mutz={"I-5.4"} next_mount=Some((1, 4)) versions=[] replayed=Some((1, 4, 1))
+B35X   A-s3-overlap-and-stale-first I-2.1 new=H[]
+B35X   A-s3-overlap-and-stale-first I-3.1 new=H[]
+B35X   A-s3-overlap-and-stale-first I-3.10 new=H[]
+B35X   A-s3-overlap-and-stale-first I-4.1 new=H[]
+B35X   A-s3-overlap-and-stale-first I-4.8 new=H[]
+B35X   A-s3-overlap-and-stale-first I-5.4 new=V[下一次挂载先施加的那一版（实例 1、txg 4）那棵分配记录树、盘 0：槽 50176 跨 3 的记录与槽 50178 跨 1 的记录罩住同一个槽]
+B35X   A-s3-overlap-and-stale-first I-5.5 new=H[]
+B35X   A-s3-overlap-and-stale-first I-7.2 new=H[]
+B35X   A-s3-overlap-and-stale-first I-7.4 new=H[]
+B35X   A-s3-overlap-and-stale-first I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   A-s3-overlap-and-stale-first I-9.5 new=H[]
+B35X   A-s3-overlap-and-stale-first I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   A-s3-overlap-and-stale-first I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   A-s3-overlap-and-stale-first I-3.4 new=H[]
+B35X   A-s3-overlap-and-stale-first I-9.29 new=H[]
+B35X mount label=A-s3-overlap-and-stale-first recover=Failed Some((InstanceGeneration(1), CheckpointTxg(3))) AllocationRecordOutsideThePoolGeometry { what: "同一块盘上两条分配记录罩住同一个槽" } effective=Some((InstanceGeneration(1), CheckpointTxg(4))) writable=refused Recovery(AllocationRecordOutsideThePoolGeometry { what: "同一块盘上两条分配记录罩住同一个槽" })
+B35X A-subsets slots=[(0, 4), (0, 5), (0, 6), (1, 4), (1, 5), (1, 6)] states=64 new!=mutn=39
+B35X   A-subset 000010:new={}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 000100:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 000101:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 000110:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 000111:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 001100:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 001101:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 001110:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 001111:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 010000:new={}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 010010:new={}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 010100:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 010101:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 010110:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 010111:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 011100:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 011101:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 011110:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 011111:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 100000:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 100001:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 100010:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 100011:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 100100:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 100101:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 100110:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 100111:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 101000:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 101001:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 101010:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 101011:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 101100:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 101101:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 101110:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 101111:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 110000:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 110001:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 110010:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 110011:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 110100:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 110101:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 110110:new={"I-5.4"}/mutn={"I-5.4"}/pre35={"I-5.4"}
+B35X   A-subset 110111:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 111000:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 111001:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 111010:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 111011:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 111100:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 111101:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 111110:new={"I-5.4"}/mutn={}/pre35={}
+B35X   A-subset 111111:new={"I-5.4"}/mutn={}/pre35={}
+B35X B-clean legal outcomes=["ok", "ok raises=0"] constructed outcomes(recorded with B's root)=["ok", "ok raises=0"]
+B35X B-clean crash-image vs constructed-base differ: {"dev0 system_configuration_slot": 1, "dev1 system_configuration_slot": 1}
+B35X B-clean legal-end vs constructed-end differ: {"dev0 journal_record": 5, "dev0 root_record_fua": 3, "dev0 system_configuration_slot": 2, "dev0 unit_write": 1, "dev1 journal_record": 5, "dev1 root_record_fua": 1, "dev1 system_configuration_slot": 2, "dev1 unit_write": 1}
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=0 kind=system_configuration_slot ranges=[(155, 158), (469, 469)] a=[[d1, bf, a1, 98], [0a]] b=[[8a, 6f, 87, 4e], [09]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=4096 kind=system_configuration_slot ranges=[(147, 147), (155, 158), (469, 469)] a=[[09], [ee, b3, 23, cd], [09]] b=[[0b], [0d, f4, 3d, e6], [0a]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=1056768 kind=root_record_fua ranges=[(138, 141), (230, 233), (244, 247)] a=[[8a, 36, 8d, 4c], [4d, 6d, f1, 5c], [4d, 6d, f1, 5c]] b=[[5b, e4, ab, e1], [83, 3f, 89, 2c], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=7344128 kind=root_record_fua ranges=[(138, 141), (230, 233), (244, 247)] a=[[87, 63, 3f, ab], [4d, 6d, f1, 5c], [4d, 6d, f1, 5c]] b=[[56, b1, 19, 06], [83, 3f, 89, 2c], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=7348224 kind=root_record_fua ranges=[(138, 141), (230, 233), (244, 247)] a=[[5d, e6, af, e9], [4d, 6d, f1, 5c], [4d, 6d, f1, 5c]] b=[[8c, 34, 89, 44], [83, 3f, 89, 2c], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=16801792 kind=journal_record ranges=[(46, 49), (95, 98), (347, 350), (361, 364), (497, 500), (511, 511)] a=[[2c, ca, 91, 04], [b6, be, c9, f5], [4d, 6d, f1, 5c]] b=[[d6, 61, 24, 0e], [dd, 71, 95, 8f], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=16802304 kind=journal_record ranges=[(0, 2)] a=[[6d, f1, 5c]] b=[[3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=16805888 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[f6, ce, 1a, 98], [65, 37, fa, 54], [4d, 6d, f1, 5c]] b=[[d8, 20, e9, a1], [21, c4, 62, 6a], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=16809984 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[a0, 7d, 9f, 3c], [9d, 59, a3, 5f], [4d, 6d, f1, 5c]] b=[[46, e7, f5, 92], [90, ae, 73, e0], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=16814080 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[9f, f1, 3f, 6c], [b7, e5, 99, 70], [4d, 6d, f1, 5c]] b=[[e3, 2a, 1f, b2], [1e, 83, 5a, 0e], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev0 offset=824180736 kind=unit_write ranges=[(11, 13), (89, 92), (149, 149)] a=[[83, fc, 8d], [b6, 61, bb, 77], [04]] b=[[92, d1, 0d], [16, 46, c8, 27], [00]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev1 offset=0 kind=system_configuration_slot ranges=[(155, 158), (469, 469)] a=[[26, 9e, 43, 25], [0a]] b=[[7d, 4e, 65, f3], [09]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev1 offset=4096 kind=system_configuration_slot ranges=[(147, 147), (155, 158), (469, 469)] a=[[09], [19, 92, c1, 70], [09]] b=[[0b], [fa, d5, df, 5b], [0a]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev1 offset=4202496 kind=root_record_fua ranges=[(138, 141), (230, 233), (244, 247)] a=[[91, 77, 4f, 62], [4d, 6d, f1, 5c], [4d, 6d, f1, 5c]] b=[[40, a5, 69, cf], [83, 3f, 89, 2c], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev1 offset=16801792 kind=journal_record ranges=[(46, 49), (95, 98), (347, 350), (361, 364), (497, 500), (511, 511)] a=[[2c, ca, 91, 04], [b6, be, c9, f5], [4d, 6d, f1, 5c]] b=[[d6, 61, 24, 0e], [dd, 71, 95, 8f], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev1 offset=16802304 kind=journal_record ranges=[(0, 2)] a=[[6d, f1, 5c]] b=[[3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev1 offset=16805888 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[f6, ce, 1a, 98], [65, 37, fa, 54], [4d, 6d, f1, 5c]] b=[[d8, 20, e9, a1], [21, c4, 62, 6a], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev1 offset=16809984 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[a0, 7d, 9f, 3c], [9d, 59, a3, 5f], [4d, 6d, f1, 5c]] b=[[46, e7, f5, 92], [90, ae, 73, e0], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev1 offset=16814080 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[9f, f1, 3f, 6c], [b7, e5, 99, 70], [4d, 6d, f1, 5c]] b=[[e3, 2a, 1f, b2], [1e, 83, 5a, 0e], [83, 3f, 89, 2c]]
+B35D B-clean legal-end(a) vs constructed-end(b) dev1 offset=824180736 kind=unit_write ranges=[(11, 13), (89, 92), (149, 149)] a=[[83, fc, 8d], [b6, 61, bb, 77], [04]] b=[[92, d1, 0d], [16, 46, c8, 27], [00]]
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev0 offset=16801792 a=Some((InstanceGeneration(2), 7, CheckpointTxg(5), 0, true, LastRecordOfThePublish, 0, 9))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev0 offset=16801792 b=Some((InstanceGeneration(2), 7, CheckpointTxg(5), 0, true, LastRecordOfThePublish, 0, 9))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev0 offset=16805888 a=Some((InstanceGeneration(2), 8, CheckpointTxg(6), 0, true, LastRecordOfThePublish, 1425684325, 8))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev0 offset=16805888 b=Some((InstanceGeneration(2), 8, CheckpointTxg(6), 0, true, LastRecordOfThePublish, 1784857633, 8))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev0 offset=16809984 a=Some((InstanceGeneration(2), 9, CheckpointTxg(7), 0, true, LastRecordOfThePublish, 1604540829, 8))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev0 offset=16809984 b=Some((InstanceGeneration(2), 9, CheckpointTxg(7), 0, true, LastRecordOfThePublish, 3765677712, 8))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev0 offset=16814080 a=Some((InstanceGeneration(2), 10, CheckpointTxg(8), 1, true, LastRecordOfThePublish, 1889134007, 12))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev0 offset=16814080 b=Some((InstanceGeneration(2), 10, CheckpointTxg(8), 1, true, LastRecordOfThePublish, 240812830, 12))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev1 offset=16801792 a=Some((InstanceGeneration(2), 7, CheckpointTxg(5), 0, true, LastRecordOfThePublish, 0, 9))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev1 offset=16801792 b=Some((InstanceGeneration(2), 7, CheckpointTxg(5), 0, true, LastRecordOfThePublish, 0, 9))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev1 offset=16805888 a=Some((InstanceGeneration(2), 8, CheckpointTxg(6), 0, true, LastRecordOfThePublish, 1425684325, 8))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev1 offset=16805888 b=Some((InstanceGeneration(2), 8, CheckpointTxg(6), 0, true, LastRecordOfThePublish, 1784857633, 8))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev1 offset=16809984 a=Some((InstanceGeneration(2), 9, CheckpointTxg(7), 0, true, LastRecordOfThePublish, 1604540829, 8))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev1 offset=16809984 b=Some((InstanceGeneration(2), 9, CheckpointTxg(7), 0, true, LastRecordOfThePublish, 3765677712, 8))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev1 offset=16814080 a=Some((InstanceGeneration(2), 10, CheckpointTxg(8), 1, true, LastRecordOfThePublish, 1889134007, 12))
+B35D B-clean legal-end(a) vs constructed-end(b) journal dev1 offset=16814080 b=Some((InstanceGeneration(2), 10, CheckpointTxg(8), 1, true, LastRecordOfThePublish, 240812830, 12))
+B35D B-clean crash(a) vs constructed-base(b) dev0 offset=0 kind=system_configuration_slot ranges=[(147, 147), (155, 158), (469, 469)] a=[[04], [be, 59, 90, 4c], [02]] b=[[06], [d3, 87, cd, 83], [06]]
+B35D B-clean crash(a) vs constructed-base(b) dev1 offset=0 kind=system_configuration_slot ranges=[(147, 147), (155, 158), (469, 469)] a=[[04], [49, 78, 72, f1], [02]] b=[[06], [24, a6, 2f, 3e], [06]]
+B35X label=B-clean-legal-end new={} pre35={} mutr={} mutn={} mutz={} next_mount=None versions=[(1, 4)] replayed=None
+B35X   B-clean-legal-end I-2.1 new=H[]
+B35X   B-clean-legal-end I-3.1 new=H[]
+B35X   B-clean-legal-end I-3.10 new=H[]
+B35X   B-clean-legal-end I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   B-clean-legal-end I-4.8 new=H[]
+B35X   B-clean-legal-end I-5.4 new=H[]
+B35X   B-clean-legal-end I-5.5 new=H[]
+B35X   B-clean-legal-end I-7.2 new=H[]
+B35X   B-clean-legal-end I-7.4 new=H[]
+B35X   B-clean-legal-end I-9.28 new=H[]
+B35X   B-clean-legal-end I-9.5 new=H[]
+B35X   B-clean-legal-end I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   B-clean-legal-end I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   B-clean-legal-end I-3.4 new=H[]
+B35X   B-clean-legal-end I-9.29 new=H[]
+B35X mount label=B-clean-legal-end recover=FileRead (InstanceGeneration(2), CheckpointTxg(8)) bytes=22 effective=Some((InstanceGeneration(2), CheckpointTxg(8))) writable=ok
+B35X label=B-clean-constructed-end new={} pre35={} mutr={} mutn={} mutz={} next_mount=None versions=[(1, 4)] replayed=None
+B35X   B-clean-constructed-end I-2.1 new=H[]
+B35X   B-clean-constructed-end I-3.1 new=H[]
+B35X   B-clean-constructed-end I-3.10 new=H[]
+B35X   B-clean-constructed-end I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   B-clean-constructed-end I-4.8 new=H[]
+B35X   B-clean-constructed-end I-5.4 new=H[]
+B35X   B-clean-constructed-end I-5.5 new=H[]
+B35X   B-clean-constructed-end I-7.2 new=H[]
+B35X   B-clean-constructed-end I-7.4 new=H[]
+B35X   B-clean-constructed-end I-9.28 new=H[]
+B35X   B-clean-constructed-end I-9.5 new=H[]
+B35X   B-clean-constructed-end I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   B-clean-constructed-end I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   B-clean-constructed-end I-3.4 new=H[]
+B35X   B-clean-constructed-end I-9.29 new=H[]
+B35X mount label=B-clean-constructed-end recover=FileRead (InstanceGeneration(2), CheckpointTxg(8)) bytes=22 effective=Some((InstanceGeneration(2), CheckpointTxg(8))) writable=ok
+B35F label=B-clean-legal-mount-and-overwrite mutant=mutr segments=[2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2, 24, 2, 1, 2] closed_form=17170460 layer0_states=17170485
+B35F-SKIP label=B-clean-legal-mount-and-overwrite states=17170485
+B35F label=B-clean-constructed-mount-and-overwrite mutant=mutr segments=[2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2, 24, 2, 1, 2] closed_form=17170460 layer0_states=17170485
+B35F-SKIP label=B-clean-constructed-mount-and-overwrite states=17170485
+B35X B-stale-first constructed: rewrote 2 record writes
+B35X B-stale-first legal outcomes=["ok", "ok raises=0"] constructed outcomes(recorded with B's root)=["ok", "ok raises=0"]
+B35X B-stale-first crash-image vs constructed-base differ: {"dev0 system_configuration_slot": 1, "dev1 system_configuration_slot": 1}
+B35X B-stale-first legal-end vs constructed-end differ: {"dev0 journal_record": 5, "dev0 root_record_fua": 3, "dev0 system_configuration_slot": 2, "dev0 unit_write": 1, "dev1 journal_record": 5, "dev1 root_record_fua": 1, "dev1 system_configuration_slot": 2, "dev1 unit_write": 1}
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=0 kind=system_configuration_slot ranges=[(155, 158), (469, 469)] a=[[d1, bf, a1, 98], [0a]] b=[[8a, 6f, 87, 4e], [09]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=4096 kind=system_configuration_slot ranges=[(147, 147), (155, 158), (469, 469)] a=[[09], [ee, b3, 23, cd], [09]] b=[[0b], [0d, f4, 3d, e6], [0a]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=1056768 kind=root_record_fua ranges=[(138, 141), (230, 233), (244, 247)] a=[[8a, 36, 8d, 4c], [4d, 6d, f1, 5c], [4d, 6d, f1, 5c]] b=[[5b, e4, ab, e1], [83, 3f, 89, 2c], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=7344128 kind=root_record_fua ranges=[(138, 141), (230, 233), (244, 247)] a=[[87, 63, 3f, ab], [4d, 6d, f1, 5c], [4d, 6d, f1, 5c]] b=[[56, b1, 19, 06], [83, 3f, 89, 2c], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=7348224 kind=root_record_fua ranges=[(138, 141), (230, 233), (244, 247)] a=[[5d, e6, af, e9], [4d, 6d, f1, 5c], [4d, 6d, f1, 5c]] b=[[8c, 34, 89, 44], [83, 3f, 89, 2c], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=16801792 kind=journal_record ranges=[(46, 49), (95, 98), (347, 350), (361, 364), (497, 500), (511, 511)] a=[[2c, ca, 91, 04], [b6, be, c9, f5], [4d, 6d, f1, 5c]] b=[[d6, 61, 24, 0e], [dd, 71, 95, 8f], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=16802304 kind=journal_record ranges=[(0, 2)] a=[[6d, f1, 5c]] b=[[3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=16805888 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[f6, ce, 1a, 98], [65, 37, fa, 54], [4d, 6d, f1, 5c]] b=[[d8, 20, e9, a1], [21, c4, 62, 6a], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=16809984 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[a0, 7d, 9f, 3c], [9d, 59, a3, 5f], [4d, 6d, f1, 5c]] b=[[46, e7, f5, 92], [90, ae, 73, e0], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=16814080 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[9f, f1, 3f, 6c], [b7, e5, 99, 70], [4d, 6d, f1, 5c]] b=[[e3, 2a, 1f, b2], [1e, 83, 5a, 0e], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev0 offset=824180736 kind=unit_write ranges=[(11, 13), (89, 92), (149, 149)] a=[[83, fc, 8d], [b6, 61, bb, 77], [04]] b=[[92, d1, 0d], [16, 46, c8, 27], [00]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev1 offset=0 kind=system_configuration_slot ranges=[(155, 158), (469, 469)] a=[[26, 9e, 43, 25], [0a]] b=[[7d, 4e, 65, f3], [09]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev1 offset=4096 kind=system_configuration_slot ranges=[(147, 147), (155, 158), (469, 469)] a=[[09], [19, 92, c1, 70], [09]] b=[[0b], [fa, d5, df, 5b], [0a]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev1 offset=4202496 kind=root_record_fua ranges=[(138, 141), (230, 233), (244, 247)] a=[[91, 77, 4f, 62], [4d, 6d, f1, 5c], [4d, 6d, f1, 5c]] b=[[40, a5, 69, cf], [83, 3f, 89, 2c], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev1 offset=16801792 kind=journal_record ranges=[(46, 49), (95, 98), (347, 350), (361, 364), (497, 500), (511, 511)] a=[[2c, ca, 91, 04], [b6, be, c9, f5], [4d, 6d, f1, 5c]] b=[[d6, 61, 24, 0e], [dd, 71, 95, 8f], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev1 offset=16802304 kind=journal_record ranges=[(0, 2)] a=[[6d, f1, 5c]] b=[[3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev1 offset=16805888 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[f6, ce, 1a, 98], [65, 37, fa, 54], [4d, 6d, f1, 5c]] b=[[d8, 20, e9, a1], [21, c4, 62, 6a], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev1 offset=16809984 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[a0, 7d, 9f, 3c], [9d, 59, a3, 5f], [4d, 6d, f1, 5c]] b=[[46, e7, f5, 92], [90, ae, 73, e0], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev1 offset=16814080 kind=journal_record ranges=[(46, 49), (91, 94), (347, 350), (361, 364)] a=[[9f, f1, 3f, 6c], [b7, e5, 99, 70], [4d, 6d, f1, 5c]] b=[[e3, 2a, 1f, b2], [1e, 83, 5a, 0e], [83, 3f, 89, 2c]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) dev1 offset=824180736 kind=unit_write ranges=[(11, 13), (89, 92), (149, 149)] a=[[83, fc, 8d], [b6, 61, bb, 77], [04]] b=[[92, d1, 0d], [16, 46, c8, 27], [00]]
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev0 offset=16801792 a=Some((InstanceGeneration(2), 7, CheckpointTxg(5), 0, true, LastRecordOfThePublish, 0, 9))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev0 offset=16801792 b=Some((InstanceGeneration(2), 7, CheckpointTxg(5), 0, true, LastRecordOfThePublish, 0, 9))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev0 offset=16805888 a=Some((InstanceGeneration(2), 8, CheckpointTxg(6), 0, true, LastRecordOfThePublish, 1425684325, 8))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev0 offset=16805888 b=Some((InstanceGeneration(2), 8, CheckpointTxg(6), 0, true, LastRecordOfThePublish, 1784857633, 8))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev0 offset=16809984 a=Some((InstanceGeneration(2), 9, CheckpointTxg(7), 0, true, LastRecordOfThePublish, 1604540829, 8))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev0 offset=16809984 b=Some((InstanceGeneration(2), 9, CheckpointTxg(7), 0, true, LastRecordOfThePublish, 3765677712, 8))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev0 offset=16814080 a=Some((InstanceGeneration(2), 10, CheckpointTxg(8), 1, true, LastRecordOfThePublish, 1889134007, 12))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev0 offset=16814080 b=Some((InstanceGeneration(2), 10, CheckpointTxg(8), 1, true, LastRecordOfThePublish, 240812830, 12))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev1 offset=16801792 a=Some((InstanceGeneration(2), 7, CheckpointTxg(5), 0, true, LastRecordOfThePublish, 0, 9))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev1 offset=16801792 b=Some((InstanceGeneration(2), 7, CheckpointTxg(5), 0, true, LastRecordOfThePublish, 0, 9))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev1 offset=16805888 a=Some((InstanceGeneration(2), 8, CheckpointTxg(6), 0, true, LastRecordOfThePublish, 1425684325, 8))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev1 offset=16805888 b=Some((InstanceGeneration(2), 8, CheckpointTxg(6), 0, true, LastRecordOfThePublish, 1784857633, 8))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev1 offset=16809984 a=Some((InstanceGeneration(2), 9, CheckpointTxg(7), 0, true, LastRecordOfThePublish, 1604540829, 8))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev1 offset=16809984 b=Some((InstanceGeneration(2), 9, CheckpointTxg(7), 0, true, LastRecordOfThePublish, 3765677712, 8))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev1 offset=16814080 a=Some((InstanceGeneration(2), 10, CheckpointTxg(8), 1, true, LastRecordOfThePublish, 1889134007, 12))
+B35D B-stale-first legal-end(a) vs constructed-end(b) journal dev1 offset=16814080 b=Some((InstanceGeneration(2), 10, CheckpointTxg(8), 1, true, LastRecordOfThePublish, 240812830, 12))
+B35D B-stale-first crash(a) vs constructed-base(b) dev0 offset=0 kind=system_configuration_slot ranges=[(147, 147), (155, 158), (469, 469)] a=[[04], [be, 59, 90, 4c], [02]] b=[[06], [d3, 87, cd, 83], [06]]
+B35D B-stale-first crash(a) vs constructed-base(b) dev1 offset=0 kind=system_configuration_slot ranges=[(147, 147), (155, 158), (469, 469)] a=[[04], [49, 78, 72, f1], [02]] b=[[06], [24, a6, 2f, 3e], [06]]
+B35X label=B-stale-first-legal-end new={} pre35={"I-3.1", "I-3.5"} mutr={"I-3.1", "I-3.5"} mutn={} mutz={} next_mount=None versions=[(1, 4)] replayed=None
+B35X   B-stale-first-legal-end I-2.1 new=H[]
+B35X   B-stale-first-legal-end I-3.1 new=H[]
+B35X   B-stale-first-legal-end I-3.10 new=H[]
+B35X   B-stale-first-legal-end I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   B-stale-first-legal-end I-4.8 new=H[]
+B35X   B-stale-first-legal-end I-5.4 new=H[]
+B35X   B-stale-first-legal-end I-5.5 new=H[]
+B35X   B-stale-first-legal-end I-7.2 new=H[]
+B35X   B-stale-first-legal-end I-7.4 new=H[]
+B35X   B-stale-first-legal-end I-9.28 new=H[]
+B35X   B-stale-first-legal-end I-9.5 new=H[]
+B35X   B-stale-first-legal-end I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   B-stale-first-legal-end I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   B-stale-first-legal-end I-3.4 new=H[]
+B35X   B-stale-first-legal-end I-9.29 new=H[]
+B35X mount label=B-stale-first-legal-end recover=FileRead (InstanceGeneration(2), CheckpointTxg(8)) bytes=22 effective=Some((InstanceGeneration(2), CheckpointTxg(8))) writable=ok
+B35X label=B-stale-first-constructed-end new={} pre35={"I-3.1", "I-3.5"} mutr={"I-3.1", "I-3.5"} mutn={} mutz={} next_mount=None versions=[(1, 4)] replayed=None
+B35X   B-stale-first-constructed-end I-2.1 new=H[]
+B35X   B-stale-first-constructed-end I-3.1 new=H[]
+B35X   B-stale-first-constructed-end I-3.10 new=H[]
+B35X   B-stale-first-constructed-end I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   B-stale-first-constructed-end I-4.8 new=H[]
+B35X   B-stale-first-constructed-end I-5.4 new=H[]
+B35X   B-stale-first-constructed-end I-5.5 new=H[]
+B35X   B-stale-first-constructed-end I-7.2 new=H[]
+B35X   B-stale-first-constructed-end I-7.4 new=H[]
+B35X   B-stale-first-constructed-end I-9.28 new=H[]
+B35X   B-stale-first-constructed-end I-9.5 new=H[]
+B35X   B-stale-first-constructed-end I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   B-stale-first-constructed-end I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   B-stale-first-constructed-end I-3.4 new=H[]
+B35X   B-stale-first-constructed-end I-9.29 new=H[]
+B35X mount label=B-stale-first-constructed-end recover=FileRead (InstanceGeneration(2), CheckpointTxg(8)) bytes=22 effective=Some((InstanceGeneration(2), CheckpointTxg(8))) writable=ok
+B35F label=B-stale-first-legal-mount-and-overwrite mutant=mutr segments=[2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2, 24, 2, 1, 2] closed_form=17170460 layer0_states=17170485
+B35F-SKIP label=B-stale-first-legal-mount-and-overwrite states=17170485
+B35F label=B-stale-first-constructed-mount-and-overwrite mutant=mutr segments=[2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2, 24, 2, 1, 2] closed_form=17170460 layer0_states=17170485
+B35F-SKIP label=B-stale-first-constructed-mount-and-overwrite states=17170485
+B35X C1 rewrote 2 record writes
+B35X label=C1-new-pool-records-all-zero-before-root new={"I-4.1"} pre35={} mutr={"I-4.1"} mutn={"I-4.1"} mutz={} next_mount=Some((1, 3)) versions=[] replayed=Some((1, 3, 1))
+B35X   C1-new-pool-records-all-zero-before-root I-2.1 new=H[]
+B35X   C1-new-pool-records-all-zero-before-root I-3.1 new=N[最新的根下面还没有记账树（第 0 代树表）]
+B35X   C1-new-pool-records-all-zero-before-root I-3.10 new=N[候选集里没有一棵分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、位置对不上）]
+B35X   C1-new-pool-records-all-zero-before-root I-4.1 new=V[所选根（实例 1、txg 2）之上重放 1 次发布、1 条记录（末条计数器 3）施加出的那一版走不完：由记录施加出来的那一版（实例 1、txg 3）的树表（记录新根段里树表指针全零，照 core 的根记录读者读它那两条位置条目） 两份都读不到对得上的]
+B35X   C1-new-pool-records-all-zero-before-root I-4.8 new=H[]
+B35X   C1-new-pool-records-all-zero-before-root I-5.4 new=P[树表指针全零的版本（core 照它读盘 0 槽 0、读不出），认不出带不带树：根记录里分配记录树根全零那一格与它自己的分配记录树都没判（别的版本的树走到了叶不替它作保）：下一次挂载先施加的那一版（实例 1、txg 3）]
+B35X   C1-new-pool-records-all-zero-before-root I-5.5 new=N[回退候选集里每条根与由记录施加出来的那几版，没有一版是从 mkfs 水位第一次建树的那一版（树表非空、种类 1 条目的树 ID 是 65536、每条条目的诞生 txg 等于这一版的 txg）：一版都不判]
+B35X   C1-new-pool-records-all-zero-before-root I-7.2 new=H[]
+B35X   C1-new-pool-records-all-zero-before-root I-7.4 new=H[]
+B35X   C1-new-pool-records-all-zero-before-root I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   C1-new-pool-records-all-zero-before-root I-9.5 new=N[走读到的每一版树表里都没有 deleted_inodes 条目（树表 0 条）：没有队列可比]
+B35X   C1-new-pool-records-all-zero-before-root I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   C1-new-pool-records-all-zero-before-root I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   C1-new-pool-records-all-zero-before-root I-3.4 new=N[走读到的每一版树表里都没有记账树（树表 0 条）]
+B35X   C1-new-pool-records-all-zero-before-root I-9.29 new=N[走读到的每一版里都没有 inode 记录与谱系上的墓碑：没有号可比]
+B35X mount label=C1-new-pool-records-all-zero-before-root recover=Failed Some((InstanceGeneration(1), CheckpointTxg(2))) UnitUnreadable { slot: SlotNumber(0) } effective=Some((InstanceGeneration(1), CheckpointTxg(3))) writable=refused Recovery(UnitUnreadable { slot: SlotNumber(0) })
+B35X label=C1-new-pool-root-and-records-all-zero-end new={"I-2.1", "I-4.8", "I-7.2", "I-7.4"} pre35={"I-2.1", "I-4.8", "I-7.2", "I-7.4"} mutr={"I-2.1", "I-4.8", "I-7.2", "I-7.4"} mutn={"I-2.1", "I-4.8", "I-7.2", "I-7.4"} mutz={} next_mount=None versions=[] replayed=None
+B35X   C1-new-pool-root-and-records-all-zero-end I-2.1 new=V[根（实例 1、txg 3）的树表（根记录里树表指针全零，照 core 的根记录读者读它那两条位置条目） 在盘 0 槽 0 的那一份与位置条目里的校验和对不上]
+B35X   C1-new-pool-root-and-records-all-zero-end I-3.1 new=N[最新的根下面还没有记账树（第 0 代树表）]
+B35X   C1-new-pool-root-and-records-all-zero-end I-3.10 new=N[候选集里没有一棵分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、位置对不上）]
+B35X   C1-new-pool-root-and-records-all-zero-end I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   C1-new-pool-root-and-records-all-zero-end I-4.8 new=V[最新根（txg 3）出发的遍历有单元对不上或读不出]
+B35X   C1-new-pool-root-and-records-all-zero-end I-5.4 new=P[树表指针全零的版本（core 照它读盘 0 槽 0、读不出），认不出带不带树：根记录里分配记录树根全零那一格与它自己的分配记录树都没判（别的版本的树走到了叶不替它作保）：根（实例 1、txg 3）]
+B35X   C1-new-pool-root-and-records-all-zero-end I-5.5 new=P[判到的那几版落点都对得上；这几版没判：根（实例 1、txg 3）：树表指针全零（core 照它读盘 0 槽 0、读不出），认不出它是不是从 mkfs 水位第一次建树的那一版]
+B35X   C1-new-pool-root-and-records-all-zero-end I-7.2 new=V[最新的根走不完：根（实例 1、txg 3）的树表（根记录里树表指针全零，照 core 的根记录读者读它那两条位置条目） 两份都读不到对得上的]
+B35X   C1-new-pool-root-and-records-all-zero-end I-7.4 new=V[最新根（txg 3）引用的单元已被复用或抹头（校验和对不上或头用不了）]
+B35X   C1-new-pool-root-and-records-all-zero-end I-9.28 new=P[比到的 0 棵树诞生 txg 都对得上；这几条读得出、自证过的根树表条目没读全（树表指针全零、树表读不出或有条目比字段表短），没进比较：盘 0 上的根（实例 1、txg 3）：树表指针全零（core 的根记录读者照它读盘 0 槽 0、读不出）]
+B35X   C1-new-pool-root-and-records-all-zero-end I-9.5 new=N[走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了]
+B35X   C1-new-pool-root-and-records-all-zero-end I-4.7 new=N[走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了]
+B35X   C1-new-pool-root-and-records-all-zero-end I-4.6 new=N[走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了]
+B35X   C1-new-pool-root-and-records-all-zero-end I-3.4 new=N[走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了]
+B35X   C1-new-pool-root-and-records-all-zero-end I-9.29 new=N[走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了]
+B35X mount label=C1-new-pool-root-and-records-all-zero-end recover=Failed Some((InstanceGeneration(1), CheckpointTxg(3))) UnitUnreadable { slot: SlotNumber(0) } effective=Some((InstanceGeneration(1), CheckpointTxg(3))) writable=refused Recovery(UnitUnreadable { slot: SlotNumber(0) })
+B35F label=C1-new-pool-root-and-records-all-zero mutant=mutz segments=[24, 2, 1, 2] closed_form=16777223 layer0_states=16777228
+B35F-SKIP label=C1-new-pool-root-and-records-all-zero states=16777228
+B35X label=C2-crash-next-mount-version-all-zero new={"I-4.1"} pre35={} mutr={"I-4.1"} mutn={"I-4.1"} mutz={} next_mount=Some((1, 4)) versions=[] replayed=Some((1, 4, 1))
+B35X   C2-crash-next-mount-version-all-zero I-2.1 new=H[]
+B35X   C2-crash-next-mount-version-all-zero I-3.1 new=H[]
+B35X   C2-crash-next-mount-version-all-zero I-3.10 new=H[]
+B35X   C2-crash-next-mount-version-all-zero I-4.1 new=V[所选根（实例 1、txg 3）之上重放 1 次发布、3 条记录（末条计数器 6）施加出的那一版走不完：由记录施加出来的那一版（实例 1、txg 4）的树表（记录新根段里树表指针全零，照 core 的根记录读者读它那两条位置条目） 两份都读不到对得上的]
+B35X   C2-crash-next-mount-version-all-zero I-4.8 new=H[]
+B35X   C2-crash-next-mount-version-all-zero I-5.4 new=P[树表指针全零的版本（core 照它读盘 0 槽 0、读不出），认不出带不带树：根记录里分配记录树根全零那一格与它自己的分配记录树都没判（别的版本的树走到了叶不替它作保）：下一次挂载先施加的那一版（实例 1、txg 4）]
+B35X   C2-crash-next-mount-version-all-zero I-5.5 new=H[]
+B35X   C2-crash-next-mount-version-all-zero I-7.2 new=H[]
+B35X   C2-crash-next-mount-version-all-zero I-7.4 new=H[]
+B35X   C2-crash-next-mount-version-all-zero I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   C2-crash-next-mount-version-all-zero I-9.5 new=H[]
+B35X   C2-crash-next-mount-version-all-zero I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   C2-crash-next-mount-version-all-zero I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   C2-crash-next-mount-version-all-zero I-3.4 new=H[]
+B35X   C2-crash-next-mount-version-all-zero I-9.29 new=H[]
+B35X mount label=C2-crash-next-mount-version-all-zero recover=Failed Some((InstanceGeneration(1), CheckpointTxg(3))) UnitUnreadable { slot: SlotNumber(0) } effective=Some((InstanceGeneration(1), CheckpointTxg(4))) writable=refused Recovery(UnitUnreadable { slot: SlotNumber(0) })
+B35X C2 mount over all-zero records → refused Recovery(UnitUnreadable { slot: SlotNumber(0) })
+B35X label=C2-applied-only-by-records-all-zero-end new={"I-2.1", "I-3.1", "I-4.8", "I-7.4"} pre35={"I-3.1", "I-3.5"} mutr={"I-2.1", "I-3.1", "I-4.8", "I-7.4"} mutn={"I-2.1", "I-3.1", "I-4.8", "I-7.4"} mutz={"I-3.1", "I-3.5"} next_mount=None versions=[(1, 4)] replayed=None
+B35X   C2-applied-only-by-records-all-zero-end I-2.1 new=V[由记录施加出来的那一版（实例 1、txg 4）的树表（记录新根段里树表指针全零，照 core 的根记录读者读它那两条位置条目） 在盘 0 槽 0 的那一份与位置条目里的校验和对不上]
+B35X   C2-applied-only-by-records-all-zero-end I-3.1 new=V[盘 0：记账的已分配 Some(1245184)，遍历全部有效根得到 1114112（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、并进遍历的由记录施加出来的版本 1 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个]
+B35X   C2-applied-only-by-records-all-zero-end I-3.10 new=H[]
+B35X   C2-applied-only-by-records-all-zero-end I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   C2-applied-only-by-records-all-zero-end I-4.8 new=V[由记录施加出来的那一版（实例 1、txg 4）出发的遍历有单元对不上或读不出]
+B35X   C2-applied-only-by-records-all-zero-end I-5.4 new=P[树表指针全零的版本（core 照它读盘 0 槽 0、读不出），认不出带不带树：根记录里分配记录树根全零那一格与它自己的分配记录树都没判（别的版本的树走到了叶不替它作保）：由记录施加出来的那一版（实例 1、txg 4）]
+B35X   C2-applied-only-by-records-all-zero-end I-5.5 new=P[判到的那几版落点都对得上；这几版没判：由记录施加出来的那一版（实例 1、txg 4）：树表指针全零（core 照它读盘 0 槽 0、读不出），认不出它是不是从 mkfs 水位第一次建树的那一版]
+B35X   C2-applied-only-by-records-all-zero-end I-7.2 new=H[]
+B35X   C2-applied-only-by-records-all-zero-end I-7.4 new=V[由记录施加出来的那一版（实例 1、txg 4）引用的单元已被复用或抹头（校验和对不上或头用不了）]
+B35X   C2-applied-only-by-records-all-zero-end I-9.28 new=H[]
+B35X   C2-applied-only-by-records-all-zero-end I-9.5 new=N[走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了]
+B35X   C2-applied-only-by-records-all-zero-end I-4.7 new=N[走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了]
+B35X   C2-applied-only-by-records-all-zero-end I-4.6 new=N[走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了]
+B35X   C2-applied-only-by-records-all-zero-end I-3.4 new=N[走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了]
+B35X   C2-applied-only-by-records-all-zero-end I-9.29 new=N[走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了]
+B35X mount label=C2-applied-only-by-records-all-zero-end recover=FileRead (InstanceGeneration(2), CheckpointTxg(8)) bytes=22 effective=Some((InstanceGeneration(2), CheckpointTxg(8))) writable=ok
+B35X C2 suffix record writes of B rewritten=0
+B35F label=C2-applied-only-by-records-all-zero(base records zeroed) mutant=mutz segments=[2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2, 24, 2, 1, 2] closed_form=17170460 layer0_states=17170485
+B35F-SKIP label=C2-applied-only-by-records-all-zero(base records zeroed) states=17170485
+B35X label=D-two-publishes-above-the-root-clean new={} pre35={} mutr={} mutn={} mutz={} next_mount=Some((1, 4)) versions=[] replayed=Some((1, 5, 2))
+B35X   D-two-publishes-above-the-root-clean I-2.1 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-3.1 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-3.10 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-4.1 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-4.8 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-5.4 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-5.5 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-7.2 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-7.4 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   D-two-publishes-above-the-root-clean I-9.5 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   D-two-publishes-above-the-root-clean I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   D-two-publishes-above-the-root-clean I-3.4 new=H[]
+B35X   D-two-publishes-above-the-root-clean I-9.29 new=H[]
+B35X mount label=D-two-publishes-above-the-root-clean recover=FileRead (InstanceGeneration(1), CheckpointTxg(3)) bytes=10 effective=Some((InstanceGeneration(1), CheckpointTxg(5))) writable=ok
+B35X label=D-two-publishes-first-all-zero new={} pre35={} mutr={} mutn={} mutz={} next_mount=Some((1, 4)) versions=[] replayed=Some((1, 5, 2))
+B35X   D-two-publishes-first-all-zero I-2.1 new=H[]
+B35X   D-two-publishes-first-all-zero I-3.1 new=H[]
+B35X   D-two-publishes-first-all-zero I-3.10 new=H[]
+B35X   D-two-publishes-first-all-zero I-4.1 new=H[]
+B35X   D-two-publishes-first-all-zero I-4.8 new=H[]
+B35X   D-two-publishes-first-all-zero I-5.4 new=P[树表指针全零的版本（core 照它读盘 0 槽 0、读不出），认不出带不带树：根记录里分配记录树根全零那一格与它自己的分配记录树都没判（别的版本的树走到了叶不替它作保）：下一次挂载先施加的那一版（实例 1、txg 4）]
+B35X   D-two-publishes-first-all-zero I-5.5 new=H[]
+B35X   D-two-publishes-first-all-zero I-7.2 new=H[]
+B35X   D-two-publishes-first-all-zero I-7.4 new=H[]
+B35X   D-two-publishes-first-all-zero I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   D-two-publishes-first-all-zero I-9.5 new=H[]
+B35X   D-two-publishes-first-all-zero I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   D-two-publishes-first-all-zero I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   D-two-publishes-first-all-zero I-3.4 new=H[]
+B35X   D-two-publishes-first-all-zero I-9.29 new=H[]
+B35X mount label=D-two-publishes-first-all-zero recover=FileRead (InstanceGeneration(1), CheckpointTxg(3)) bytes=10 effective=Some((InstanceGeneration(1), CheckpointTxg(5))) writable=ok
+B35E width=FourGibibytes sequential=1 cut=records-2..3-of-3@40 newest_root_txg=3 records_of_next=[(0, 5, 16793600), (0, 6, 16797696), (1, 5, 16793600), (1, 6, 16797696)]
+B35X label=E-records-2..-crash new={} pre35={} mutr={} mutn={} mutz={} next_mount=Some((1, 4)) versions=[] replayed=None
+B35X   E-records-2..-crash I-2.1 new=H[]
+B35X   E-records-2..-crash I-3.1 new=H[]
+B35X   E-records-2..-crash I-3.10 new=H[]
+B35X   E-records-2..-crash I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   E-records-2..-crash I-4.8 new=H[]
+B35X   E-records-2..-crash I-5.4 new=H[]
+B35X   E-records-2..-crash I-5.5 new=H[]
+B35X   E-records-2..-crash I-7.2 new=H[]
+B35X   E-records-2..-crash I-7.4 new=H[]
+B35X   E-records-2..-crash I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   E-records-2..-crash I-9.5 new=H[]
+B35X   E-records-2..-crash I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   E-records-2..-crash I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   E-records-2..-crash I-3.4 new=H[]
+B35X   E-records-2..-crash I-9.29 new=H[]
+B35X mount label=E-records-2..-crash recover=FileRead (InstanceGeneration(1), CheckpointTxg(3)) bytes=6 effective=Some((InstanceGeneration(1), CheckpointTxg(3))) writable=ok
+B35E   E-records-2.. Mount cut=before-root@30 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-2.. Mount cut=one-copy@30 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-2.. Mount cut=before-root@57 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-2.. Mount cut=one-copy@57 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-2.. Mount cut=before-root@84 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-2.. Mount cut=one-copy@84 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E Mount → ok
+B35E Overwrite(31) → ok raises=0
+B35E SequentialWrite(7) → ok raises=0
+B35E-T records-2.. seq=1 I-5.5 H: = 16
+B35E-T records-2.. seq=1 images = 16
+B35E-T records-2.. seq=1 new I-4.1 replayed vs core: none = 9
+B35E-T records-2.. seq=1 new I-4.1 replayed vs core: same-bytes = 7
+B35E-T records-2.. seq=1 new next-mount vs core: checker-only = 4
+B35E-T records-2.. seq=1 new next-mount vs core: none = 5
+B35E-T records-2.. seq=1 new next-mount vs core: same-bytes = 7
+B35E-T records-2.. seq=1 pre35 I-4.1 replayed vs core: none = 9
+B35E-T records-2.. seq=1 pre35 I-4.1 replayed vs core: same-bytes = 7
+B35E-T records-2.. seq=1 pre35 next-mount vs core: checker-only = 6
+B35E-T records-2.. seq=1 pre35 next-mount vs core: none = 3
+B35E-T records-2.. seq=1 pre35 next-mount vs core: same-bytes = 7
+B35E-T records-2.. seq=1-FIRST I-5.5 H: :: E-records-2.. Mount cut=before-root@30 :: 
+B35E-T records-2.. seq=1-FIRST new I-4.1 replayed vs core: none :: E-records-2.. Mount cut=before-root@30 :: checker=None core=Some(((1, 3), None, None))
+B35E-T records-2.. seq=1-FIRST new I-4.1 replayed vs core: same-bytes :: E-records-2.. Mount cut=before-root@57 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-2.. seq=1-FIRST new next-mount vs core: checker-only :: E-records-2.. Mount cut=before-root@30 :: checker=Some((1, 4)) core=Some(((1, 3), None, None))
+B35E-T records-2.. seq=1-FIRST new next-mount vs core: none :: E-records-2.. Mount after :: checker=None core=Some(((2, 7), None, None))
+B35E-T records-2.. seq=1-FIRST new next-mount vs core: same-bytes :: E-records-2.. Mount cut=before-root@57 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-2.. seq=1-FIRST pre35 I-4.1 replayed vs core: none :: E-records-2.. Mount cut=before-root@30 :: checker=None core=Some(((1, 3), None, None))
+B35E-T records-2.. seq=1-FIRST pre35 I-4.1 replayed vs core: same-bytes :: E-records-2.. Mount cut=before-root@57 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-2.. seq=1-FIRST pre35 next-mount vs core: checker-only :: E-records-2.. Mount cut=before-root@30 :: checker=Some((1, 4)) core=Some(((1, 3), None, None))
+B35E-T records-2.. seq=1-FIRST pre35 next-mount vs core: none :: E-records-2.. Mount after :: checker=None core=Some(((2, 7), None, None))
+B35E-T records-2.. seq=1-FIRST pre35 next-mount vs core: same-bytes :: E-records-2.. Mount cut=before-root@57 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E width=UnitAreaOf256Slots sequential=1 cut=records-2..3-of-3@36 newest_root_txg=3 records_of_next=[(0, 5, 16793600), (0, 6, 16797696), (1, 5, 16793600), (1, 6, 16797696)]
+B35X label=E-records-2..-crash new={} pre35={} mutr={} mutn={} mutz={} next_mount=Some((1, 4)) versions=[] replayed=None
+B35X   E-records-2..-crash I-2.1 new=H[]
+B35X   E-records-2..-crash I-3.1 new=H[]
+B35X   E-records-2..-crash I-3.10 new=H[]
+B35X   E-records-2..-crash I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   E-records-2..-crash I-4.8 new=H[]
+B35X   E-records-2..-crash I-5.4 new=H[]
+B35X   E-records-2..-crash I-5.5 new=H[]
+B35X   E-records-2..-crash I-7.2 new=H[]
+B35X   E-records-2..-crash I-7.4 new=H[]
+B35X   E-records-2..-crash I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   E-records-2..-crash I-9.5 new=H[]
+B35X   E-records-2..-crash I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   E-records-2..-crash I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   E-records-2..-crash I-3.4 new=H[]
+B35X   E-records-2..-crash I-9.29 new=H[]
+B35X mount label=E-records-2..-crash recover=FileRead (InstanceGeneration(1), CheckpointTxg(3)) bytes=6 effective=Some((InstanceGeneration(1), CheckpointTxg(3))) writable=ok
+B35E   E-records-2.. Mount cut=before-root@26 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-2.. Mount cut=one-copy@26 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-2.. Mount cut=before-root@49 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-2.. Mount cut=one-copy@49 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-2.. Mount cut=before-root@72 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-2.. Mount cut=one-copy@72 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E Mount → ok
+B35E Overwrite(31) → ok raises=0
+B35E SequentialWrite(7) → ok raises=0
+B35E-T records-2.. seq=1 I-5.5 H: = 16
+B35E-T records-2.. seq=1 images = 16
+B35E-T records-2.. seq=1 new I-4.1 replayed vs core: none = 9
+B35E-T records-2.. seq=1 new I-4.1 replayed vs core: same-bytes = 7
+B35E-T records-2.. seq=1 new next-mount vs core: checker-only = 4
+B35E-T records-2.. seq=1 new next-mount vs core: none = 5
+B35E-T records-2.. seq=1 new next-mount vs core: same-bytes = 7
+B35E-T records-2.. seq=1 pre35 I-4.1 replayed vs core: none = 9
+B35E-T records-2.. seq=1 pre35 I-4.1 replayed vs core: same-bytes = 7
+B35E-T records-2.. seq=1 pre35 next-mount vs core: checker-only = 6
+B35E-T records-2.. seq=1 pre35 next-mount vs core: none = 3
+B35E-T records-2.. seq=1 pre35 next-mount vs core: same-bytes = 7
+B35E-T records-2.. seq=1-FIRST I-5.5 H: :: E-records-2.. Mount cut=before-root@26 :: 
+B35E-T records-2.. seq=1-FIRST new I-4.1 replayed vs core: none :: E-records-2.. Mount cut=before-root@26 :: checker=None core=Some(((1, 3), None, None))
+B35E-T records-2.. seq=1-FIRST new I-4.1 replayed vs core: same-bytes :: E-records-2.. Mount cut=before-root@49 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-2.. seq=1-FIRST new next-mount vs core: checker-only :: E-records-2.. Mount cut=before-root@26 :: checker=Some((1, 4)) core=Some(((1, 3), None, None))
+B35E-T records-2.. seq=1-FIRST new next-mount vs core: none :: E-records-2.. Mount after :: checker=None core=Some(((2, 7), None, None))
+B35E-T records-2.. seq=1-FIRST new next-mount vs core: same-bytes :: E-records-2.. Mount cut=before-root@49 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-2.. seq=1-FIRST pre35 I-4.1 replayed vs core: none :: E-records-2.. Mount cut=before-root@26 :: checker=None core=Some(((1, 3), None, None))
+B35E-T records-2.. seq=1-FIRST pre35 I-4.1 replayed vs core: same-bytes :: E-records-2.. Mount cut=before-root@49 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-2.. seq=1-FIRST pre35 next-mount vs core: checker-only :: E-records-2.. Mount cut=before-root@26 :: checker=Some((1, 4)) core=Some(((1, 3), None, None))
+B35E-T records-2.. seq=1-FIRST pre35 next-mount vs core: none :: E-records-2.. Mount after :: checker=None core=Some(((2, 7), None, None))
+B35E-T records-2.. seq=1-FIRST pre35 next-mount vs core: same-bytes :: E-records-2.. Mount cut=before-root@49 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E width=FourGibibytes sequential=1 cut=record-3-only-of-3@40 newest_root_txg=3 records_of_next=[(0, 6, 16797696), (1, 6, 16797696)]
+B35X label=E-record--crash new={} pre35={} mutr={} mutn={} mutz={} next_mount=Some((1, 4)) versions=[] replayed=None
+B35X   E-record--crash I-2.1 new=H[]
+B35X   E-record--crash I-3.1 new=H[]
+B35X   E-record--crash I-3.10 new=H[]
+B35X   E-record--crash I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   E-record--crash I-4.8 new=H[]
+B35X   E-record--crash I-5.4 new=H[]
+B35X   E-record--crash I-5.5 new=H[]
+B35X   E-record--crash I-7.2 new=H[]
+B35X   E-record--crash I-7.4 new=H[]
+B35X   E-record--crash I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   E-record--crash I-9.5 new=H[]
+B35X   E-record--crash I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   E-record--crash I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   E-record--crash I-3.4 new=H[]
+B35X   E-record--crash I-9.29 new=H[]
+B35X mount label=E-record--crash recover=FileRead (InstanceGeneration(1), CheckpointTxg(3)) bytes=6 effective=Some((InstanceGeneration(1), CheckpointTxg(3))) writable=ok
+B35E   E-record- Mount cut=before-root@30 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-record- Mount cut=one-copy@30 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-record- Mount cut=before-root@57 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-record- Mount cut=one-copy@57 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-record- Mount cut=before-root@84 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-record- Mount cut=one-copy@84 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E Mount → ok
+B35E Overwrite(31) → ok raises=0
+B35E-T record- seq=1 I-5.5 H: = 10
+B35E-T record- seq=1 images = 10
+B35E-T record- seq=1 new I-4.1 replayed vs core: none = 4
+B35E-T record- seq=1 new I-4.1 replayed vs core: same-bytes = 6
+B35E-T record- seq=1 new next-mount vs core: checker-only = 2
+B35E-T record- seq=1 new next-mount vs core: none = 2
+B35E-T record- seq=1 new next-mount vs core: same-bytes = 6
+B35E-T record- seq=1 pre35 I-4.1 replayed vs core: none = 4
+B35E-T record- seq=1 pre35 I-4.1 replayed vs core: same-bytes = 6
+B35E-T record- seq=1 pre35 next-mount vs core: checker-only = 2
+B35E-T record- seq=1 pre35 next-mount vs core: none = 2
+B35E-T record- seq=1 pre35 next-mount vs core: same-bytes = 6
+B35E-T record- seq=1-FIRST I-5.5 H: :: E-record- Mount cut=before-root@30 :: 
+B35E-T record- seq=1-FIRST new I-4.1 replayed vs core: none :: E-record- Mount cut=before-root@30 :: checker=None core=Some(((1, 3), None, None))
+B35E-T record- seq=1-FIRST new I-4.1 replayed vs core: same-bytes :: E-record- Mount cut=before-root@57 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T record- seq=1-FIRST new next-mount vs core: checker-only :: E-record- Mount cut=before-root@30 :: checker=Some((1, 4)) core=Some(((1, 3), None, None))
+B35E-T record- seq=1-FIRST new next-mount vs core: none :: E-record- Mount after :: checker=None core=Some(((2, 7), None, None))
+B35E-T record- seq=1-FIRST new next-mount vs core: same-bytes :: E-record- Mount cut=before-root@57 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T record- seq=1-FIRST pre35 I-4.1 replayed vs core: none :: E-record- Mount cut=before-root@30 :: checker=None core=Some(((1, 3), None, None))
+B35E-T record- seq=1-FIRST pre35 I-4.1 replayed vs core: same-bytes :: E-record- Mount cut=before-root@57 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T record- seq=1-FIRST pre35 next-mount vs core: checker-only :: E-record- Mount cut=before-root@30 :: checker=Some((1, 4)) core=Some(((1, 3), None, None))
+B35E-T record- seq=1-FIRST pre35 next-mount vs core: none :: E-record- Mount after :: checker=None core=Some(((2, 7), None, None))
+B35E-T record- seq=1-FIRST pre35 next-mount vs core: same-bytes :: E-record- Mount cut=before-root@57 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E width=UnitAreaOf256Slots sequential=1 cut=record-3-only-of-3@36 newest_root_txg=3 records_of_next=[(0, 6, 16797696), (1, 6, 16797696)]
+B35X label=E-record--crash new={} pre35={} mutr={} mutn={} mutz={} next_mount=Some((1, 4)) versions=[] replayed=None
+B35X   E-record--crash I-2.1 new=H[]
+B35X   E-record--crash I-3.1 new=H[]
+B35X   E-record--crash I-3.10 new=H[]
+B35X   E-record--crash I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   E-record--crash I-4.8 new=H[]
+B35X   E-record--crash I-5.4 new=H[]
+B35X   E-record--crash I-5.5 new=H[]
+B35X   E-record--crash I-7.2 new=H[]
+B35X   E-record--crash I-7.4 new=H[]
+B35X   E-record--crash I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   E-record--crash I-9.5 new=H[]
+B35X   E-record--crash I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   E-record--crash I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   E-record--crash I-3.4 new=H[]
+B35X   E-record--crash I-9.29 new=H[]
+B35X mount label=E-record--crash recover=FileRead (InstanceGeneration(1), CheckpointTxg(3)) bytes=6 effective=Some((InstanceGeneration(1), CheckpointTxg(3))) writable=ok
+B35E   E-record- Mount cut=before-root@26 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-record- Mount cut=one-copy@26 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-record- Mount cut=before-root@49 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-record- Mount cut=one-copy@49 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-record- Mount cut=before-root@72 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-record- Mount cut=one-copy@72 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E Mount → ok
+B35E Overwrite(31) → ok raises=0
+B35E-T record- seq=1 I-5.5 H: = 10
+B35E-T record- seq=1 images = 10
+B35E-T record- seq=1 new I-4.1 replayed vs core: none = 4
+B35E-T record- seq=1 new I-4.1 replayed vs core: same-bytes = 6
+B35E-T record- seq=1 new next-mount vs core: checker-only = 2
+B35E-T record- seq=1 new next-mount vs core: none = 2
+B35E-T record- seq=1 new next-mount vs core: same-bytes = 6
+B35E-T record- seq=1 pre35 I-4.1 replayed vs core: none = 4
+B35E-T record- seq=1 pre35 I-4.1 replayed vs core: same-bytes = 6
+B35E-T record- seq=1 pre35 next-mount vs core: checker-only = 2
+B35E-T record- seq=1 pre35 next-mount vs core: none = 2
+B35E-T record- seq=1 pre35 next-mount vs core: same-bytes = 6
+B35E-T record- seq=1-FIRST I-5.5 H: :: E-record- Mount cut=before-root@26 :: 
+B35E-T record- seq=1-FIRST new I-4.1 replayed vs core: none :: E-record- Mount cut=before-root@26 :: checker=None core=Some(((1, 3), None, None))
+B35E-T record- seq=1-FIRST new I-4.1 replayed vs core: same-bytes :: E-record- Mount cut=before-root@49 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T record- seq=1-FIRST new next-mount vs core: checker-only :: E-record- Mount cut=before-root@26 :: checker=Some((1, 4)) core=Some(((1, 3), None, None))
+B35E-T record- seq=1-FIRST new next-mount vs core: none :: E-record- Mount after :: checker=None core=Some(((2, 7), None, None))
+B35E-T record- seq=1-FIRST new next-mount vs core: same-bytes :: E-record- Mount cut=before-root@49 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T record- seq=1-FIRST pre35 I-4.1 replayed vs core: none :: E-record- Mount cut=before-root@26 :: checker=None core=Some(((1, 3), None, None))
+B35E-T record- seq=1-FIRST pre35 I-4.1 replayed vs core: same-bytes :: E-record- Mount cut=before-root@49 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T record- seq=1-FIRST pre35 next-mount vs core: checker-only :: E-record- Mount cut=before-root@26 :: checker=Some((1, 4)) core=Some(((1, 3), None, None))
+B35E-T record- seq=1-FIRST pre35 next-mount vs core: none :: E-record- Mount after :: checker=None core=Some(((2, 7), None, None))
+B35E-T record- seq=1-FIRST pre35 next-mount vs core: same-bytes :: E-record- Mount cut=before-root@49 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E width=FourGibibytes sequential=1 cut=records-1..1-of-3@40 newest_root_txg=3 records_of_next=[(0, 4, 16789504), (1, 4, 16789504)]
+B35X label=E-records-1..1-crash new={} pre35={} mutr={} mutn={} mutz={} next_mount=None versions=[] replayed=None
+B35X   E-records-1..1-crash I-2.1 new=H[]
+B35X   E-records-1..1-crash I-3.1 new=H[]
+B35X   E-records-1..1-crash I-3.10 new=H[]
+B35X   E-records-1..1-crash I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   E-records-1..1-crash I-4.8 new=H[]
+B35X   E-records-1..1-crash I-5.4 new=H[]
+B35X   E-records-1..1-crash I-5.5 new=H[]
+B35X   E-records-1..1-crash I-7.2 new=H[]
+B35X   E-records-1..1-crash I-7.4 new=H[]
+B35X   E-records-1..1-crash I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   E-records-1..1-crash I-9.5 new=H[]
+B35X   E-records-1..1-crash I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   E-records-1..1-crash I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   E-records-1..1-crash I-3.4 new=H[]
+B35X   E-records-1..1-crash I-9.29 new=H[]
+B35X mount label=E-records-1..1-crash recover=FileRead (InstanceGeneration(1), CheckpointTxg(3)) bytes=6 effective=Some((InstanceGeneration(1), CheckpointTxg(3))) writable=ok
+B35E   E-records-1..1 Mount cut=before-root@30 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-1..1 Mount cut=one-copy@30 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-1..1 Mount cut=before-root@57 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-1..1 Mount cut=one-copy@57 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-1..1 Mount cut=before-root@84 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-1..1 Mount cut=one-copy@84 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E Mount → ok
+B35E Overwrite(31) → ok raises=0
+B35E-T records-1..1 seq=1 I-5.5 H: = 10
+B35E-T records-1..1 seq=1 images = 10
+B35E-T records-1..1 seq=1 new I-4.1 replayed vs core: none = 4
+B35E-T records-1..1 seq=1 new I-4.1 replayed vs core: same-bytes = 6
+B35E-T records-1..1 seq=1 new next-mount vs core: none = 4
+B35E-T records-1..1 seq=1 new next-mount vs core: same-bytes = 6
+B35E-T records-1..1 seq=1 pre35 I-4.1 replayed vs core: none = 4
+B35E-T records-1..1 seq=1 pre35 I-4.1 replayed vs core: same-bytes = 6
+B35E-T records-1..1 seq=1 pre35 next-mount vs core: checker-only = 2
+B35E-T records-1..1 seq=1 pre35 next-mount vs core: none = 2
+B35E-T records-1..1 seq=1 pre35 next-mount vs core: same-bytes = 6
+B35E-T records-1..1 seq=1-FIRST I-5.5 H: :: E-records-1..1 Mount cut=before-root@30 :: 
+B35E-T records-1..1 seq=1-FIRST new I-4.1 replayed vs core: none :: E-records-1..1 Mount cut=before-root@30 :: checker=None core=Some(((1, 3), None, None))
+B35E-T records-1..1 seq=1-FIRST new I-4.1 replayed vs core: same-bytes :: E-records-1..1 Mount cut=before-root@57 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-1..1 seq=1-FIRST new next-mount vs core: none :: E-records-1..1 Mount cut=before-root@30 :: checker=None core=Some(((1, 3), None, None))
+B35E-T records-1..1 seq=1-FIRST new next-mount vs core: same-bytes :: E-records-1..1 Mount cut=before-root@57 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-1..1 seq=1-FIRST pre35 I-4.1 replayed vs core: none :: E-records-1..1 Mount cut=before-root@30 :: checker=None core=Some(((1, 3), None, None))
+B35E-T records-1..1 seq=1-FIRST pre35 I-4.1 replayed vs core: same-bytes :: E-records-1..1 Mount cut=before-root@57 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-1..1 seq=1-FIRST pre35 next-mount vs core: checker-only :: E-records-1..1 Mount cut=before-root@30 :: checker=Some((1, 4)) core=Some(((1, 3), None, None))
+B35E-T records-1..1 seq=1-FIRST pre35 next-mount vs core: none :: E-records-1..1 Mount after :: checker=None core=Some(((2, 7), None, None))
+B35E-T records-1..1 seq=1-FIRST pre35 next-mount vs core: same-bytes :: E-records-1..1 Mount cut=before-root@57 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E width=UnitAreaOf256Slots sequential=1 cut=records-1..1-of-3@36 newest_root_txg=3 records_of_next=[(0, 4, 16789504), (1, 4, 16789504)]
+B35X label=E-records-1..1-crash new={} pre35={} mutr={} mutn={} mutz={} next_mount=None versions=[] replayed=None
+B35X   E-records-1..1-crash I-2.1 new=H[]
+B35X   E-records-1..1-crash I-3.1 new=H[]
+B35X   E-records-1..1-crash I-3.10 new=H[]
+B35X   E-records-1..1-crash I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   E-records-1..1-crash I-4.8 new=H[]
+B35X   E-records-1..1-crash I-5.4 new=H[]
+B35X   E-records-1..1-crash I-5.5 new=H[]
+B35X   E-records-1..1-crash I-7.2 new=H[]
+B35X   E-records-1..1-crash I-7.4 new=H[]
+B35X   E-records-1..1-crash I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   E-records-1..1-crash I-9.5 new=H[]
+B35X   E-records-1..1-crash I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   E-records-1..1-crash I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   E-records-1..1-crash I-3.4 new=H[]
+B35X   E-records-1..1-crash I-9.29 new=H[]
+B35X mount label=E-records-1..1-crash recover=FileRead (InstanceGeneration(1), CheckpointTxg(3)) bytes=6 effective=Some((InstanceGeneration(1), CheckpointTxg(3))) writable=ok
+B35E   E-records-1..1 Mount cut=before-root@26 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-1..1 Mount cut=one-copy@26 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-1..1 Mount cut=before-root@49 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-1..1 Mount cut=one-copy@49 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-1..1 Mount cut=before-root@72 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E   E-records-1..1 Mount cut=one-copy@72 unapplied-publish units overwritten=[] I-3.10=H[] I-5.4=H[] reds={}
+B35E Mount → ok
+B35E Overwrite(31) → ok raises=0
+B35E-T records-1..1 seq=1 I-5.5 H: = 10
+B35E-T records-1..1 seq=1 images = 10
+B35E-T records-1..1 seq=1 new I-4.1 replayed vs core: none = 4
+B35E-T records-1..1 seq=1 new I-4.1 replayed vs core: same-bytes = 6
+B35E-T records-1..1 seq=1 new next-mount vs core: none = 4
+B35E-T records-1..1 seq=1 new next-mount vs core: same-bytes = 6
+B35E-T records-1..1 seq=1 pre35 I-4.1 replayed vs core: none = 4
+B35E-T records-1..1 seq=1 pre35 I-4.1 replayed vs core: same-bytes = 6
+B35E-T records-1..1 seq=1 pre35 next-mount vs core: checker-only = 2
+B35E-T records-1..1 seq=1 pre35 next-mount vs core: none = 2
+B35E-T records-1..1 seq=1 pre35 next-mount vs core: same-bytes = 6
+B35E-T records-1..1 seq=1-FIRST I-5.5 H: :: E-records-1..1 Mount cut=before-root@26 :: 
+B35E-T records-1..1 seq=1-FIRST new I-4.1 replayed vs core: none :: E-records-1..1 Mount cut=before-root@26 :: checker=None core=Some(((1, 3), None, None))
+B35E-T records-1..1 seq=1-FIRST new I-4.1 replayed vs core: same-bytes :: E-records-1..1 Mount cut=before-root@49 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-1..1 seq=1-FIRST new next-mount vs core: none :: E-records-1..1 Mount cut=before-root@26 :: checker=None core=Some(((1, 3), None, None))
+B35E-T records-1..1 seq=1-FIRST new next-mount vs core: same-bytes :: E-records-1..1 Mount cut=before-root@49 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-1..1 seq=1-FIRST pre35 I-4.1 replayed vs core: none :: E-records-1..1 Mount cut=before-root@26 :: checker=None core=Some(((1, 3), None, None))
+B35E-T records-1..1 seq=1-FIRST pre35 I-4.1 replayed vs core: same-bytes :: E-records-1..1 Mount cut=before-root@49 :: checker=Some((2, 6, 1)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35E-T records-1..1 seq=1-FIRST pre35 next-mount vs core: checker-only :: E-records-1..1 Mount cut=before-root@26 :: checker=Some((1, 4)) core=Some(((1, 3), None, None))
+B35E-T records-1..1 seq=1-FIRST pre35 next-mount vs core: none :: E-records-1..1 Mount after :: checker=None core=Some(((2, 7), None, None))
+B35E-T records-1..1 seq=1-FIRST pre35 next-mount vs core: same-bytes :: E-records-1..1 Mount cut=before-root@49 :: checker=Some((2, 6)) core=Some(((2, 5), Some(((2, 6), 1)), None))
+B35X label=Q4-empty-first-file new={} pre35={} mutr={} mutn={} mutz={} next_mount=None versions=[] replayed=None
+B35X   Q4-empty-first-file I-2.1 new=H[]
+B35X   Q4-empty-first-file I-3.1 new=H[]
+B35X   Q4-empty-first-file I-3.10 new=H[]
+B35X   Q4-empty-first-file I-4.1 new=N[所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2]
+B35X   Q4-empty-first-file I-4.8 new=H[]
+B35X   Q4-empty-first-file I-5.4 new=H[]
+B35X   Q4-empty-first-file I-5.5 new=H[]
+B35X   Q4-empty-first-file I-7.2 new=H[]
+B35X   Q4-empty-first-file I-7.4 new=H[]
+B35X   Q4-empty-first-file I-9.28 new=N[根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来]
+B35X   Q4-empty-first-file I-9.5 new=H[]
+B35X   Q4-empty-first-file I-4.7 new=N[走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）]
+B35X   Q4-empty-first-file I-4.6 new=N[走读到的每一版 inode 树里都没有 nlink = 0 的记录]
+B35X   Q4-empty-first-file I-3.4 new=H[]
+B35X   Q4-empty-first-file I-9.29 new=H[]
+B35X mount label=Q4-empty-first-file recover=FileRead (InstanceGeneration(1), CheckpointTxg(3)) bytes=0 effective=Some((InstanceGeneration(1), CheckpointTxg(3))) writable=ok

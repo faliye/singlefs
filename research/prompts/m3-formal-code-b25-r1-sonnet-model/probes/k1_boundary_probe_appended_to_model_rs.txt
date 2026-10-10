@@ -1,0 +1,18 @@
+
+#[cfg(test)]
+mod k1_boundary_probe {
+    use super::*;
+
+    #[test]
+    fn model_position_rule_boundaries() {
+        // 正推腿探针：模型的落点式子在 233 的倍数两侧与 135 片的边界上。
+        for (records_before, expected) in [(0u64, 0u64), (1, 0), (232, 0), (233, 1), (465, 1), (466, 2), (233 * 134 + 232, 134)] {
+            assert_eq!(inode_leaf_container_position_of_a_new_record(records_before), expected, "records_before={records_before}");
+        }
+        println!("PROBE model capacity = {}", index_node_entry_capacity(INODE_TREE_KEY_BYTES, INODE_INTERNAL_ENTRY));
+        let result = std::panic::catch_unwind(|| inode_leaf_container_position_of_a_new_record(233 * 135));
+        println!("PROBE model at records_before=233*135 panics={}", result.is_err());
+        let result = std::panic::catch_unwind(|| inode_leaf_container_position_of_a_new_record(233 * 135 - 1));
+        println!("PROBE model at records_before=233*135-1 -> {:?}", result.map_err(|_| "panic"));
+    }
+}

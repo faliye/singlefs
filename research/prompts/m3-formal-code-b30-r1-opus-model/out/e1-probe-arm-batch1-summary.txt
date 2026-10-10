@@ -1,0 +1,9 @@
+broad {'images': 651, 'i24_violated': 367, 'i54_new_partial': 0, 'unlink_applied': 11, 'rollback_applied': 41, 'mount_applied': 71, 'seeds': 21, 'i54_Holds': 616, 'i54_NotApplicable': 35}
+delete {'images': 651, 'i24_violated': 556, 'i54_new_partial': 0, 'unlink_applied': 25, 'rollback_applied': 156, 'mount_applied': 10, 'seeds': 21, 'i54_Holds': 651}
+rollback_floor {'images': 651, 'i24_violated': 464, 'i54_new_partial': 0, 'unlink_applied': 0, 'rollback_applied': 87, 'mount_applied': 56, 'seeds': 21, 'i54_Holds': 651}
+reuse_floor {'images': 651, 'i24_violated': 317, 'i54_new_partial': 0, 'unlink_applied': 13, 'rollback_applied': 12, 'mount_applied': 127, 'seeds': 21, 'i54_Holds': 651}
+ALL {'images': 2604, 'i24_violated': 1704, 'i54_new_partial': 0, 'unlink_applied': 49, 'rollback_applied': 296, 'mount_applied': 264, 'seeds': 84, 'i54_Holds': 2569, 'i54_NotApplicable': 35}
+B30PROBE_LINES 1704
+   1020 B30PROBE 墓碑树内部条目的子指针
+    684 B30PROBE 谱系树内部条目的子指针
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 63.25s

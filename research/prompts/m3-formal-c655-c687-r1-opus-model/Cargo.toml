@@ -1,0 +1,13 @@
+[package]
+name = "c655probe"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "m3-formal-c655-c687-r1 攻方腿原型：挂载透明表外字段的 R1/R2 关系（Y1）、I-5.5 在合法崩溃态上的判定与回落够不够得着（Y3）。只在冻结副本的拷贝上编、跑"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-checker = { path = "../singlefs-checker" }

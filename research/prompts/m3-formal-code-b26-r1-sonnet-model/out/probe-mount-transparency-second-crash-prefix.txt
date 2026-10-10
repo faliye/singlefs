@@ -1,0 +1,8 @@
+PROBE_SECOND_BASE_DONE base=after_make_filesystem writes=12
+PROBE_SECOND_BASE_DONE base=after_one_mount_without_file writes=20
+PROBE_SECOND_BASE_DONE base=after_the_first_file writes=38
+PROBE_SECOND_BASE_DONE base=left_by_an_unmount writes=55
+PROBE_SECOND_BASE_DONE base=rebuilt_from_a_record_of_an_overwrite writes=38
+PROBE_SECOND_BASE_DONE base=mount_raises_the_floor writes=95
+PROBE_SECOND_BASE_DONE base=crashed_right_after_the_unlink_intent writes=76
+PROBE_SECOND_TOTAL states=341 red=0

@@ -1,0 +1,48 @@
+## b29_l3_zero_slot_probe-6-0.log
+PROBE histories=24 second_level_mounts_refused=0
+PROBE first_cut no_read_fault_history states=128987 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1205
+PROBE first_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+PROBE second_cut no_read_fault_history states=19192 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1136
+PROBE second_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+## b29_l3_zero_slot_probe-6-12.log
+PROBE histories=24 second_level_mounts_refused=0
+PROBE first_cut no_read_fault_history states=116731 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1125
+PROBE first_cut read_fault_history states=6558 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=60
+PROBE second_cut no_read_fault_history states=19520 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1090
+PROBE second_cut read_fault_history states=900 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=50
+## b29_l3_zero_slot_probe-6-15.log
+PROBE histories=24 second_level_mounts_refused=0
+PROBE first_cut no_read_fault_history states=132276 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1240
+PROBE first_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+PROBE second_cut no_read_fault_history states=21600 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1200
+PROBE second_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+## b29_l3_zero_slot_probe-6-18.log
+PROBE histories=24 second_level_mounts_refused=0
+PROBE first_cut no_read_fault_history states=129892 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1260
+PROBE first_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+PROBE second_cut no_read_fault_history states=21600 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1216
+PROBE second_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+## b29_l3_zero_slot_probe-6-21.log
+PROBE histories=24 second_level_mounts_refused=0
+PROBE first_cut no_read_fault_history states=118772 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1190
+PROBE first_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+PROBE second_cut no_read_fault_history states=21600 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1248
+PROBE second_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+## b29_l3_zero_slot_probe-6-3.log
+PROBE histories=24 second_level_mounts_refused=0
+PROBE first_cut no_read_fault_history states=117856 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1140
+PROBE first_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+PROBE second_cut no_read_fault_history states=19192 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1096
+PROBE second_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+## b29_l3_zero_slot_probe-6-6.log
+PROBE histories=24 second_level_mounts_refused=0
+PROBE first_cut no_read_fault_history states=130644 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1220
+PROBE first_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+PROBE second_cut no_read_fault_history states=19192 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1128
+PROBE second_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+## b29_l3_zero_slot_probe-6-9.log
+PROBE histories=24 second_level_mounts_refused=0
+PROBE first_cut no_read_fault_history states=117409 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1185
+PROBE first_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0
+PROBE second_cut no_read_fault_history states=19312 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=1148
+PROBE second_cut read_fault_history states=0 disks_with_zero_valid_slots_states=0 min_one_valid_slot_states=0

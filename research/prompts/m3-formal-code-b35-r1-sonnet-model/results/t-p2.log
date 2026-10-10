@@ -1,0 +1,37 @@
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.54s
+     Running tests/zz_probe_b35.rs (/tmp/claude-1000/m3-formal-code-b35-r1-sonnet/target-opt/debug/deps/zz_probe_b35-210cb51a1160e8ca)
+
+running 1 test
+PROBE-P2 F0.clean(first file, rows written) red=[] partial=[] na_watched=["I-4.1:所选根之上一次发布都不施加：重放之后那一版就是所", "I-9.28:根环里读得出的根中，没有一棵树的树表条目出现在两", "I-9.18:走读到的每一版 deleted_inodes 里"]
+PROBE-P2 F1.root_ring_root_txg5 red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] partial=["I-5.4", "I-5.5", "I-9.28"] na_watched=["I-3.1:最新的根下面还没有记账树（第 0 代树表）", "I-4.1:所选根之上一次发布都不施加：重放之后那一版就是所", "I-9.5:走读到的某一版树表指针全零（core 照它读盘 ", "I-9.18:走读到的某一版树表指针全零（core 照它读盘 "]
+PROBE-P2-DETAIL F1.root_ring_root_txg5 I-2.1: 根（实例 2、txg 5）的树表（根记录里树表指针全零，照 core 的根记录读者读它那两条位置条目） 在盘 0 槽 0 的那一份与位置条目里的校验和对不上
+PROBE-P2-DETAIL F1.root_ring_root_txg5 I-4.8: 最新根（txg 5）出发的遍历有单元对不上或读不出
+PROBE-P2-DETAIL F1.root_ring_root_txg5 I-7.2: 最新的根走不完：根（实例 2、txg 5）的树表（根记录里树表指针全零，照 core 的根记录读者读它那两条位置条目） 两份都读不到对得上的
+PROBE-P2-DETAIL F1.root_ring_root_txg5 I-7.4: 最新根（txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）
+PROBE-P2 F1.root_ring_root_txg4 red=["I-2.1", "I-4.8", "I-7.4"] partial=["I-5.4", "I-5.5", "I-9.28"] na_watched=["I-4.1:所选根之上一次发布都不施加：重放之后那一版就是所", "I-9.5:走读到的某一版树表指针全零（core 照它读盘 ", "I-9.18:走读到的某一版树表指针全零（core 照它读盘 "]
+PROBE-P2-DETAIL F1.root_ring_root_txg4 I-2.1: 根（实例 2、txg 4）的树表（根记录里树表指针全零，照 core 的根记录读者读它那两条位置条目） 在盘 0 槽 0 的那一份与位置条目里的校验和对不上
+PROBE-P2-DETAIL F1.root_ring_root_txg4 I-4.8: 候选根 txg 4 出发的遍历有单元对不上或读不出
+PROBE-P2-DETAIL F1.root_ring_root_txg4 I-7.4: 候选根 txg 4 引用的单元已被复用或抹头（校验和对不上或头用不了）
+PROBE-P2 F1.root_ring_root_txg3 red=["I-2.1", "I-4.8", "I-7.4"] partial=["I-5.4", "I-5.5", "I-9.28"] na_watched=["I-4.1:所选根之上一次发布都不施加：重放之后那一版就是所", "I-9.5:走读到的某一版树表指针全零（core 照它读盘 ", "I-9.18:走读到的某一版树表指针全零（core 照它读盘 "]
+PROBE-P2-DETAIL F1.root_ring_root_txg3 I-2.1: 根（实例 2、txg 3）的树表（根记录里树表指针全零，照 core 的根记录读者读它那两条位置条目） 在盘 0 槽 0 的那一份与位置条目里的校验和对不上
+PROBE-P2-DETAIL F1.root_ring_root_txg3 I-4.8: 候选根 txg 3 出发的遍历有单元对不上或读不出
+PROBE-P2-DETAIL F1.root_ring_root_txg3 I-7.4: 候选根 txg 3 引用的单元已被复用或抹头（校验和对不上或头用不了）
+PROBE-P2 F2.clean(version applied only by its record) red=[] partial=[] na_watched=["I-4.1:所选根之上一次发布都不施加：重放之后那一版就是所", "I-9.18:走读到的每一版 deleted_inodes 里"]
+PROBE-P2 F2.applied_only_by_records_all_zero red=["I-2.1", "I-3.1", "I-4.8", "I-7.4"] partial=["I-5.4", "I-5.5"] na_watched=["I-4.1:所选根之上一次发布都不施加：重放之后那一版就是所", "I-9.5:走读到的某一版树表指针全零（core 照它读盘 ", "I-9.18:走读到的某一版树表指针全零（core 照它读盘 "]
+PROBE-P2-DETAIL F2.applied_only_by_records_all_zero I-2.1: 由记录施加出来的那一版（实例 1、txg 5）的树表（记录新根段里树表指针全零，照 core 的根记录读者读它那两条位置条目） 在盘 0 槽 0 的那一份与位置条目里的校验和对不上
+PROBE-P2-DETAIL F2.applied_only_by_records_all_zero I-3.1: 盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 901120（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、并进遍历的由记录施加出来的版本 1 个、
+PROBE-P2-DETAIL F2.applied_only_by_records_all_zero I-4.8: 由记录施加出来的那一版（实例 1、txg 5）出发的遍历有单元对不上或读不出
+PROBE-P2-DETAIL F2.applied_only_by_records_all_zero I-7.4: 由记录施加出来的那一版（实例 1、txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）
+PROBE-P2 F3.clean(crash before root of B) red=[] partial=[] na_watched=["I-9.28:根环里读得出的根中，没有一棵树的树表条目出现在两", "I-9.18:走读到的每一版 deleted_inodes 里"]
+PROBE-P2 F3.next_mount_version_all_zero red=["I-4.1"] partial=["I-5.4"] na_watched=["I-9.28:根环里读得出的根中，没有一棵树的树表条目出现在两", "I-9.18:走读到的每一版 deleted_inodes 里"]
+PROBE-P2-DETAIL F3.next_mount_version_all_zero I-4.1: 所选根（实例 1、txg 3）之上重放 1 次发布、1 条记录（末条计数器 4）施加出的那一版走不完：由记录施加出来的那一版（实例 1、txg 4）的树表（记录新根段里树表指针全零，照 core 的根记录读者读它那两条位置条目） 两份都读不到对得上的
+PROBE-P2 F3.core_outcome=refused(Recovery(UnitUnreadable { slot: SlotNumber(0) }))
+test probe_p2_matrix_of_the_all_zero_tree_table_pointer_forms has been running for over 60 seconds
+PROBE-P2 F4.clean(abandoned third root) red=[] partial=[] na_watched=["I-4.1:所选根之上一次发布都不施加：重放之后那一版就是所", "I-9.18:走读到的每一版 deleted_inodes 里"]
+PROBE-P2 F4.abandoned_root_all_zero red=["I-7.4"] partial=["I-9.28"] na_watched=["I-4.1:所选根之上一次发布都不施加：重放之后那一版就是所", "I-9.18:走读到的每一版 deleted_inodes 里"]
+PROBE-P2-DETAIL F4.abandoned_root_all_zero I-7.4: 被抛弃的根（实例 2、txg 8）走不完：根记录里树表指针全零，core 的根记录读者照它读盘 0 槽 0、读不出（这条根本身损坏，不只是它引用的单元被重新分配或抹头）：根（实例 2、txg 8）的树表（根记录里树表指针全零，照 core 的根记录读者读它那两条位置条目） 在盘 0 槽 0 的那一份
+test probe_p2_matrix_of_the_all_zero_tree_table_pointer_forms ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 143 filtered out; finished in 62.44s
+
+exit=0

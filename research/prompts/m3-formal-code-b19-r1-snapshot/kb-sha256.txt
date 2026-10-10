@@ -1,0 +1,5 @@
+6ff077d40240670546ae52cc1529e99ac25954d53dadfd3638aa43b88df8083c  .claude/kb/invariants.md
+2c23b3c2050d0db28be7c42a8b7fd1a53c3777772de4f6d0cada1fe5998bf66b  .claude/kb/decisions/03-空间分配.md
+e5efaab76ea74e3a49f2ee0304d7921f37563f2adc14ef2706c2f77dcbcdbcfc  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md
+0e89c01625226482b4783c077b8192892321c462d25ec174efc21d0066251cc2  .claude/kb/experiments/171-三oracle合谋测试.md
+21e1c0addce32d653a75a9998f050f2e04619c49e73bc13d46695f4ab678cb29  .claude/kb/checks-owed.md

@@ -1,0 +1,25 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方正推腿与同会话别的腿并行各跑各的小池探针
+
+running 1 test
+test y1_probe_sysconf_relations ... [after_mkfs] dev=0 gen_R1=1 gen_R2=4 sysconf_writes_to_dev=3 => gen_R2==gen_R1+n: true | tail_R1=0 tail_R2=2 max_counter_of_instance(1)=Some(2) => tail_R2==that: true
+[after_mkfs] dev=1 gen_R1=1 gen_R2=4 sysconf_writes_to_dev=3 => gen_R2==gen_R1+n: true | tail_R1=0 tail_R2=2 max_counter_of_instance(1)=Some(2) => tail_R2==that: true
+[after_mkfs+publish] dev=0 gen_R1=1 gen_R2=5 sysconf_writes_to_dev=4 => gen_R2==gen_R1+n: true | tail_R1=0 tail_R2=3 max_counter_of_instance(1)=Some(3) => tail_R2==that: true
+[after_mkfs+publish] dev=1 gen_R1=1 gen_R2=5 sysconf_writes_to_dev=4 => gen_R2==gen_R1+n: true | tail_R1=0 tail_R2=3 max_counter_of_instance(1)=Some(3) => tail_R2==that: true
+[after_first_file] dev=0 gen_R1=5 gen_R2=8 sysconf_writes_to_dev=3 => gen_R2==gen_R1+n: true | tail_R1=3 tail_R2=5 max_counter_of_instance(2)=Some(5) => tail_R2==that: true
+[after_first_file] dev=1 gen_R1=5 gen_R2=8 sysconf_writes_to_dev=3 => gen_R2==gen_R1+n: true | tail_R1=3 tail_R2=5 max_counter_of_instance(2)=Some(5) => tail_R2==that: true
+[after_first_file+publish] dev=0 gen_R1=5 gen_R2=9 sysconf_writes_to_dev=4 => gen_R2==gen_R1+n: true | tail_R1=3 tail_R2=6 max_counter_of_instance(2)=Some(6) => tail_R2==that: true
+[after_first_file+publish] dev=1 gen_R1=5 gen_R2=9 sysconf_writes_to_dev=4 => gen_R2==gen_R1+n: true | tail_R1=3 tail_R2=6 max_counter_of_instance(2)=Some(6) => tail_R2==that: true
+[left_by_unmount] dev=0 gen_R1=11 gen_R2=15 sysconf_writes_to_dev=4 => gen_R2==gen_R1+n: true | tail_R1=7 tail_R2=10 max_counter_of_instance(3)=Some(10) => tail_R2==that: true
+[left_by_unmount] dev=1 gen_R1=11 gen_R2=15 sysconf_writes_to_dev=4 => gen_R2==gen_R1+n: true | tail_R1=7 tail_R2=10 max_counter_of_instance(3)=Some(10) => tail_R2==that: true
+[rebuilt_from_record] dev=0 gen_R1=8 gen_R2=11 sysconf_writes_to_dev=3 => gen_R2==gen_R1+n: true | tail_R1=5 tail_R2=8 max_counter_of_instance(3)=Some(8) => tail_R2==that: true
+[rebuilt_from_record] dev=1 gen_R1=8 gen_R2=11 sysconf_writes_to_dev=3 => gen_R2==gen_R1+n: true | tail_R1=5 tail_R2=8 max_counter_of_instance(3)=Some(8) => tail_R2==that: true
+[raise_floor] dev=0 gen_R1=20 gen_R2=27 sysconf_writes_to_dev=7 => gen_R2==gen_R1+n: true | tail_R1=17 tail_R2=22 max_counter_of_instance(3)=Some(22) => tail_R2==that: true
+[raise_floor] dev=1 gen_R1=20 gen_R2=27 sysconf_writes_to_dev=7 => gen_R2==gen_R1+n: true | tail_R1=17 tail_R2=22 max_counter_of_instance(3)=Some(22) => tail_R2==that: true
+[unlink_continuation] dev=0 gen_R1=6 gen_R2=11 sysconf_writes_to_dev=5 => gen_R2==gen_R1+n: true | tail_R1=4 tail_R2=8 max_counter_of_instance(2)=Some(8) => tail_R2==that: true
+[unlink_continuation] dev=1 gen_R1=6 gen_R2=11 sysconf_writes_to_dev=5 => gen_R2==gen_R1+n: true | tail_R1=4 tail_R2=8 max_counter_of_instance(2)=Some(8) => tail_R2==that: true
+[after_mkfs_mount2] dev=0 gen_R1=4 gen_R2=7 sysconf_writes_to_dev=3 => gen_R2==gen_R1+n: true | tail_R1=2 tail_R2=4 max_counter_of_instance(2)=Some(4) => tail_R2==that: true
+[after_mkfs_mount2] dev=1 gen_R1=4 gen_R2=7 sysconf_writes_to_dev=3 => gen_R2==gen_R1+n: true | tail_R1=2 tail_R2=4 max_counter_of_instance(2)=Some(4) => tail_R2==that: true
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 1.12s
+

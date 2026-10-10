@@ -1,0 +1,489 @@
+diff -ruN pa/crates/singlefs-checker/src/walk.rs pb/crates/singlefs-checker/src/walk.rs
+--- pa/crates/singlefs-checker/src/walk.rs	2026-10-03 19:47:03.465517236 +0000
++++ pb/crates/singlefs-checker/src/walk.rs	2026-10-03 19:47:03.470720628 +0000
+@@ -9133,3 +9133,106 @@
+         );
+     }
+ }
++
++/// 第 19 批代码轮云端攻方原型（副本上加，不入库）：把 WGSL `c_first_data_unit_slot_the_allocation_records_leave_on_a_device`
++/// 的候选法照字面转写，与 CPU 逐对扫的 `first_data_unit_slot_the_allocation_records_leave_on_a_device` 在对抗取样上逐例比。
++#[cfg(test)]
++mod b19_opus_gpu_candidate_transliteration {
++    use super::*;
++
++    fn occupied(records: &[AllocationRecordView], device: u32, slot: u64, txg: u64) -> bool {
++        records.iter().any(|record| {
++            record.device == device
++                && !(!record.is_released && record.generation >= txg)
++                && record.slot <= slot
++                && slot < record.slot + record.span_slots
++        })
++    }
++
++    fn pair_is_free(records: &[AllocationRecordView], device: u32, candidate: u64, txg: u64, open: Option<u64>) -> bool {
++        if let Some(open_first) = open {
++            if open_first <= candidate && candidate < open_first + 64 {
++                return false;
++            }
++        }
++        !occupied(records, device, candidate, txg) && !occupied(records, device, candidate + 1, txg)
++    }
++
++    fn gpu(records: &[AllocationRecordView], device: u32, txg: u64, unit_area_start: u64, open: Option<u64>) -> u64 {
++        let mut expected = unit_area_start;
++        let mut found = pair_is_free(records, device, unit_area_start, txg, open);
++        if let Some(open_first) = open {
++            let past = open_first + 64;
++            if unit_area_start <= past && (!found || past < expected) && pair_is_free(records, device, past, txg, open) {
++                expected = past;
++                found = true;
++            }
++        }
++        for record in records {
++            if record.device != device || (!record.is_released && record.generation >= txg) {
++                continue;
++            }
++            let mut past = record.slot + record.span_slots;
++            if past % 2 != 0 && std::env::var("B19_GPU_MUTANT").is_err() {
++                past += 1;
++            }
++            if unit_area_start <= past && (!found || past < expected) && pair_is_free(records, device, past, txg, open) {
++                expected = past;
++                found = true;
++            }
++        }
++        expected
++    }
++
++    #[test]
++    fn b19_opus_gpu_candidates_agree_with_the_cpu_scan_on_adversarial_samples() {
++        let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
++        let mut next = move || {
++            state ^= state << 13;
++            state ^= state >> 7;
++            state ^= state << 17;
++            state
++        };
++        let unit_area_start = 1024u64;
++        let txg = 10u64;
++        let cases: u64 = std::env::var("B19_GPU_CASES").ok().map_or(200_000, |text| text.parse().expect("数"));
++        let mut disagreements = 0u64;
++        let mut first = None;
++        for case in 0..cases {
++            let record_count = next() % 40;
++            let mut records = Vec::new();
++            for _ in 0..record_count {
++                let slot = unit_area_start - 8 + next() % 220;
++                let span = [0u64, 1, 1, 1, 2, 2, 2, 3, 64][usize::try_from(next() % 9).expect("小")];
++                let generation = txg - 1 + next() % 3;
++                let device = u32::from(next() % 5 == 0);
++                records.push(AllocationRecordView {
++                    device,
++                    slot,
++                    span_slots: span,
++                    generation,
++                    is_released: next() % 3 == 0,
++                });
++            }
++            let open = match next() % 4 {
++                0 => None,
++                _ => Some(unit_area_start - 64 + 64 * (next() % 5)),
++            };
++            let cpu = first_data_unit_slot_the_allocation_records_leave_on_a_device(
++                &records,
++                0,
++                txg,
++                unit_area_start,
++                open.map(|first_slot| OpenClusterSegment { first_slot }),
++            );
++            let gpu = gpu(&records, 0, txg, unit_area_start, open);
++            if cpu != gpu {
++                disagreements += 1;
++                if first.is_none() {
++                    first = Some((case, cpu, gpu, open, records.clone()));
++                }
++            }
++        }
++        println!("name=gpu-transliteration cases={cases} disagreements={disagreements} first={first:?}");
++    }
++}
+diff -ruN pa/crates/singlefs-core/src/allocator.rs pb/crates/singlefs-core/src/allocator.rs
+--- pa/crates/singlefs-core/src/allocator.rs	2026-10-03 19:47:03.465045586 +0000
++++ pb/crates/singlefs-core/src/allocator.rs	2026-10-03 19:47:03.465978285 +0000
+@@ -739,17 +739,28 @@
+         cluster_segments: &BTreeSet<SlotNumber>,
+     ) -> Option<SlotNumber> {
+         // 起点在聚簇段边界上（`UnitAreaStart` 的不变量）⇒ 是偶数槽，按 2 槽步进的候选都 32768 对齐。
++        // 第 19 批攻方原型的坏实现（副本上加）：`B19_BAD` = h1_from_u_plus_4 / skip_first_free_pair / ignore_cluster_segments，缺省原实现。
++        let bad = std::env::var("B19_BAD").unwrap_or_default();
+         let mut candidate = self.unit_area_start.slot().0;
++        if bad == "h1_from_u_plus_4" {
++            candidate += 4;
++        }
++        let mut skipped_one = false;
+         let end = self.unit_area_end_slot();
+         while candidate + 1 < end {
+-            let inside_cluster_segment = cluster_segments.iter().any(|segment| {
+-                candidate >= segment.0 && candidate < segment.0 + CLUSTER_SEGMENT_SLOTS
+-            });
++            let inside_cluster_segment = bad != "ignore_cluster_segments"
++                && cluster_segments.iter().any(|segment| {
++                    candidate >= segment.0 && candidate < segment.0 + CLUSTER_SEGMENT_SLOTS
++                });
+             if !inside_cluster_segment
+                 && self.is_free(SlotNumber(candidate))
+                 && self.is_free(SlotNumber(candidate + 1))
+             {
+-                return Some(SlotNumber(candidate));
++                if bad == "skip_first_free_pair" && !skipped_one {
++                    skipped_one = true;
++                } else {
++                    return Some(SlotNumber(candidate));
++                }
+             }
+             candidate += 2;
+         }
+@@ -1727,7 +1738,13 @@
+         let candidates: Vec<AllocationRecord> = self
+             .records
+             .iter()
+-            .filter(|record| record.is_released && record.generation <= floor)
++            .filter(|record| {
++                // 第 19 批攻方原型的坏实现 H2（副本上加）：回收门槛放松 `B19_GATE_SLACK` 个 txg，缺省 0 = 原实现。
++                let slack: u64 = std::env::var("B19_GATE_SLACK")
++                    .ok()
++                    .map_or(0, |text| text.trim().parse().expect("数"));
++                record.is_released && record.generation.0 <= floor.0 + slack
++            })
+             .copied()
+             .collect();
+         for record in candidates {
+diff -ruN pa/crates/singlefs-harness/tests/b19_opus_probe.rs pb/crates/singlefs-harness/tests/b19_opus_probe.rs
+--- pa/crates/singlefs-harness/tests/b19_opus_probe.rs	1970-01-01 00:00:00.000000000 +0000
++++ pb/crates/singlefs-harness/tests/b19_opus_probe.rs	2026-10-03 19:47:03.472429687 +0000
+@@ -0,0 +1,324 @@
++//! 第 19 批代码轮第一轮云端攻方原型（副本上跑，不入库装置）：I-5.5 f2 判据在合法历史上的误红与漏判。
++//! 形 F：盘小到单元区没有全空聚簇段时，提交内生块回落到最小空槽（D3 已定项 8 第 2 条），树表单元落在 [U, U+64) 里，
++//! f2 拿树表单元所在段当开放段，把数据单元所在那一段整段排除。
++//! 形 Z：回收门槛过松的坏实现（ReuseWindow::ForcedToZero）把数据放进当场释放的槽，f2 把「这一版自己分配的」当空，照判成立。
++
++mod common;
++
++use common::{file_content, parameters, FIXED_WRITE_TIME_SECONDS};
++use singlefs_checker::image::{
++    InvariantVerdict, FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
++};
++use singlefs_checker::walk::check_pool_image;
++use singlefs_core::address::{CheckpointTxg, DeviceIdentity};
++use singlefs_core::allocator::{PoolAllocator, ReuseWindow};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::journal::back_chain_of;
++use singlefs_core::make_filesystem::{allocator_after_make_filesystem, make_filesystem};
++use singlefs_core::mount::{mount_writable, Mounted};
++use singlefs_core::transaction::{
++    acquire_instance, publish_first_file, publish_without_units, warm_up, FirstFile, PoolVersion,
++    PoolWriter, TransactionOutput, VersionWithoutFilePublishOutput, ZeroUnitPublishPlan,
++};
++use singlefs_format::SLOT_BYTES;
++use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
++use singlefs_harness::{RecordingBlockDevice, SharedStream};
++
++type MemoryDevice = RecordingBlockDevice<SparseBlockDevice>;
++
++/// 环长（MiB）：`B19_RING_MIB`，缺省 1 MiB（单元区起点按环长现算，D3 已定项 10 ④；环不超过盘的四分之一，D23 已定项 19）。
++fn ring_bytes() -> u64 {
++    std::env::var("B19_RING_MIB")
++        .ok()
++        .map_or(1, |text| text.trim().parse::<u64>().expect("数"))
++        << 20
++}
++
++fn params() -> singlefs_core::make_filesystem::MakeFilesystemParameters {
++    let mut parameters = parameters();
++    parameters.geometry.journal_ring_bytes = ring_bytes();
++    parameters
++}
++
++fn unit_area_start_slot() -> u64 {
++    singlefs_core::allocator::UnitAreaStart::following_the_journal_ring(ring_bytes())
++        .expect("环长让单元区起点落在段边界上")
++        .slot()
++        .0
++}
++
++fn devices_of(device_bytes: u64, stream: &SharedStream) -> Vec<(DeviceIdentity, MemoryDevice)> {
++    (0..2u32)
++        .map(|number| {
++            (
++                DeviceIdentity(number),
++                RecordingBlockDevice::with_shared_stream(
++                    DeviceIdentity(number),
++                    SparseBlockDevice::new(device_bytes, PhysicalBlockSizeInBytes(512)),
++                    stream.clone(),
++                ),
++            )
++        })
++        .collect()
++}
++
++fn pool_of(devices: &[(DeviceIdentity, MemoryDevice)], device_bytes: u64) -> MemoryPool {
++    MemoryPool {
++        devices: devices
++            .iter()
++            .map(|(identity, device)| (*identity, device.wrapped_device().image.clone()))
++            .collect(),
++        device_size_in_bytes: device_bytes,
++    }
++}
++
++/// I-5.5 的判定（缩成一个词）与池级 checker 红的那几条的名字。
++fn verdicts(image: &MemoryPool) -> (String, Vec<String>, String) {
++    let report = check_pool_image(image);
++    let mut placement = String::new();
++    let mut detail = String::new();
++    let mut red = Vec::new();
++    for (invariant, verdict) in report {
++        if invariant == FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK {
++            placement = match &verdict {
++                InvariantVerdict::Holds => "holds".to_string(),
++                InvariantVerdict::NotApplicable(reason) => {
++                    detail = format!("{reason:?}");
++                    "n/a".to_string()
++                }
++                InvariantVerdict::Violated(text) => {
++                    detail = text.clone();
++                    "RED".to_string()
++                }
++            };
++        }
++        if let InvariantVerdict::Violated(text) = verdict {
++            if std::env::var("B19_RED_DETAIL").is_ok() {
++                red.push(format!("{invariant}: {}", text.chars().take(220).collect::<String>()));
++            } else {
++                red.push(invariant.to_string());
++            }
++        }
++    }
++    (placement, red, detail)
++}
++
++fn slots_of(first_file: &TransactionOutput) -> (Vec<u64>, u64) {
++    let mut data: Vec<u64> = first_file
++        .data_pointers
++        .iter()
++        .map(|pointer| pointer.locations[0].slot.0)
++        .collect();
++    data.sort_unstable();
++    (data, first_file.root.tree_table.locations[0].slot.0)
++}
++
++fn segments_of(allocator: &PoolAllocator, unit_area_start: u64) -> String {
++    let open = allocator
++        .open_segment()
++        .map_or("none".to_string(), |slot| (slot.0 - unit_area_start).to_string());
++    let opened: Vec<u64> = allocator
++        .cluster_segments()
++        .iter()
++        .map(|slot| slot.0 - unit_area_start)
++        .collect();
++    format!("open_rel_U={open} cluster_segments_rel_U={opened:?}")
++}
++
++fn line(form: &str, knobs: &str, first_file: &TransactionOutput, image: &MemoryPool, unit_area_start: u64) {
++    let (data, tree_table) = slots_of(first_file);
++    let (placement, red, detail) = verdicts(image);
++    let relative: Vec<i64> = data
++        .iter()
++        .map(|slot| i64::try_from(*slot).expect("小") - i64::try_from(unit_area_start).expect("小"))
++        .collect();
++    println!(
++        "name={form} {knobs} txg={} data_rel_U={relative:?} tree_table_rel_U={} i55={placement} red={red:?} detail={detail}",
++        first_file.root.checkpoint_txg.0,
++        i64::try_from(tree_table).expect("小") - i64::try_from(unit_area_start).expect("小"),
++    );
++}
++
++/// 形 F0：mkfs 同一个进程里那条流（mkfs → 取号 → 暖机两代 → 第一个文件），盘的单元区只有 `unit_area_slots` 槽。
++fn new_pool_stream(unit_area_slots: u64, reuse_window: ReuseWindow, form: &str) {
++    let device_bytes = (unit_area_start_slot() + unit_area_slots) * SLOT_BYTES;
++    let stream = SharedStream::retaining_contents();
++    let mut devices = devices_of(device_bytes, &stream);
++    let genesis = match make_filesystem(&params(), &mut devices) {
++        Ok(genesis) => genesis,
++        Err(error) => {
++            println!("name={form} unit_area_slots={unit_area_slots} mkfs_refused={error:?}");
++            return;
++        }
++    };
++    let unit_area_start = genesis.unit_area_start.slot().0;
++    let mut allocator = allocator_after_make_filesystem(&params(), &devices, &genesis);
++    allocator.set_reuse_window(reuse_window);
++    let outcome = {
++        let publish_parameters = params();
++        let mut writer = PoolWriter::new(&publish_parameters, &mut devices);
++        let instance = acquire_instance(&mut writer).expect("取号");
++        let warmed_up = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
++        publish_first_file(
++            &mut writer,
++            &mut allocator,
++            warmed_up.roots.last().expect("暖机两代根"),
++            FirstFile {
++                content: &file_content(),
++                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
++            },
++            instance,
++            &warmed_up.last_record_bytes,
++        )
++    };
++    match outcome {
++        Ok(first_file) => line(
++            form,
++            &format!(
++                "unit_area_slots={unit_area_slots} reuse={} {}",
++                reuse_window.name(),
++                segments_of(&allocator, unit_area_start)
++            ),
++            &first_file,
++            &pool_of(&devices, device_bytes),
++            unit_area_start,
++        ),
++        Err(error) => println!("name={form} unit_area_slots={unit_area_slots} publish_refused={error:?}"),
++    }
++}
++
++fn zero_unit_publish(
++    devices: &mut [(DeviceIdentity, MemoryDevice)],
++    mounted: &Mounted,
++    current: &VersionWithoutFilePublishOutput,
++) -> VersionWithoutFilePublishOutput {
++    let publish_parameters = params();
++    let mut writer = PoolWriter::new(&publish_parameters, devices);
++    publish_without_units(
++        &mut writer,
++        &current.root,
++        ZeroUnitPublishPlan {
++            txg: CheckpointTxg(current.root.checkpoint_txg.0 + 1),
++            counter: current.record.counter + 1,
++            instance: mounted.output.instance,
++            back_chain: back_chain_of(&current.record_bytes),
++            rollback_floor: current.root.rollback_floor,
++            tree_identifier_watermark: current.root.tree_identifier_watermark,
++        },
++    )
++    .expect("零单元发布")
++}
++
++/// 形 F1 / 形 Z1：mkfs 之后可写挂载 `mounts` 次（只写行、暖机），最后一次挂载里推 `zero_unit_publishes` 次零单元发布，再写第一个文件。
++fn mounted_stream(
++    unit_area_slots: u64,
++    mounts: usize,
++    zero_unit_publishes: u64,
++    reuse_window: ReuseWindow,
++    form: &str,
++) {
++    let device_bytes = (unit_area_start_slot() + unit_area_slots) * SLOT_BYTES;
++    let knobs = format!(
++        "unit_area_slots={unit_area_slots} mounts={mounts} zero_unit_publishes={zero_unit_publishes} reuse={}",
++        reuse_window.name()
++    );
++    let stream = SharedStream::retaining_contents();
++    let mut devices = devices_of(device_bytes, &stream);
++    let genesis = match make_filesystem(&params(), &mut devices) {
++        Ok(genesis) => genesis,
++        Err(error) => {
++            println!("name={form} {knobs} mkfs_refused={error:?}");
++            return;
++        }
++    };
++    let unit_area_start = genesis.unit_area_start.slot().0;
++    let mut mounted = None;
++    for mount in 0..mounts {
++        match mount_writable(&params(), &mut devices) {
++            Ok(this_mount) => mounted = Some(this_mount),
++            Err(error) => {
++                println!("name={form} {knobs} mount_refused_at={} error={error:?}", mount + 1);
++                return;
++            }
++        }
++    }
++    let mounted = mounted.expect("至少挂载一次");
++    let PoolVersion::WithoutFile(version) = &mounted.current else {
++        panic!("只暖机过的池上现行那一版树表 0 条")
++    };
++    let mut current = version.clone();
++    for _ in 0..zero_unit_publishes {
++        current = zero_unit_publish(&mut devices, &mounted, &current);
++    }
++    let mut allocator: PoolAllocator = mounted.allocator.clone();
++    allocator.set_reuse_window(reuse_window);
++    let outcome = {
++        let publish_parameters = params();
++        let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
++        publish_first_file(
++            &mut writer,
++            &mut allocator,
++            &current.root,
++            FirstFile {
++                content: &file_content(),
++                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
++            },
++            mounted.output.instance,
++            &current.record_bytes,
++        )
++    };
++    match outcome {
++        Ok(first_file) => line(
++            form,
++            &format!("{knobs} {}", segments_of(&allocator, unit_area_start)),
++            &first_file,
++            &pool_of(&devices, device_bytes),
++            unit_area_start,
++        ),
++        Err(error) => println!("name={form} {knobs} publish_refused={error:?}"),
++    }
++}
++
++fn knob_list(name: &str, default: &str) -> Vec<u64> {
++    std::env::var(name)
++        .unwrap_or_else(|_| default.to_string())
++        .split(',')
++        .map(|item| item.trim().parse().expect("数"))
++        .collect()
++}
++
++#[test]
++fn b19_opus_form_f0_new_pool_stream_on_small_devices() {
++    for unit_area_slots in knob_list("B19_F0_SLOTS", "64,100,127,128,129,192,256") {
++        new_pool_stream(unit_area_slots, ReuseWindow::GatedByTheRollbackFloor, "F0");
++    }
++}
++
++#[test]
++fn b19_opus_form_f1_mounted_stream_on_small_devices() {
++    for unit_area_slots in knob_list("B19_F1_SLOTS", "128,256") {
++        for mounts in knob_list("B19_F1_MOUNTS", "1,2,3") {
++            for zero_unit_publishes in knob_list("B19_F1_ZERO", "0") {
++                mounted_stream(
++                    unit_area_slots,
++                    usize::try_from(mounts).expect("小"),
++                    zero_unit_publishes,
++                    ReuseWindow::GatedByTheRollbackFloor,
++                    "F1",
++                );
++            }
++        }
++    }
++}
++
++#[test]
++fn b19_opus_form_z_forced_to_zero_reuse_window() {
++    let big = knob_list("B19_Z_SLOTS", "211968")[0];
++    new_pool_stream(big, ReuseWindow::ForcedToZero, "Z0");
++    new_pool_stream(big, ReuseWindow::GatedByTheRollbackFloor, "Z0-control");
++    for mounts in knob_list("B19_Z_MOUNTS", "2,3") {
++        for reuse_window in [ReuseWindow::ForcedToZero, ReuseWindow::GatedByTheRollbackFloor] {
++            mounted_stream(big, usize::try_from(mounts).expect("小"), 0, reuse_window, "Z1");
++        }
++    }
++}

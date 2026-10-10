@@ -1,0 +1,11 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：三方正推腿与同会话别的腿并行各跑各的小池探针
+
+running 1 test
+test y3_probe_bad_images_second_batch ... [y3] b2 种类 1 两条，第二条头 ID 也写 65537: 红=[] 部分没判=[]
+[y3]     I-5.5=NotApplicable("有一版的树表里种类 1（extent 树）条目不止一条：认法 ① 读哪一条，I-5.5 那一行没写")
+[y3] d2 数据指针的位置条目是 (盘 0, 盘 2)，池里没有盘 2: 红=["I-2.1", "I-4.8", "I-7.4"] 部分没判=[]
+[y3]     I-5.5=NotApplicable("从 mkfs 水位第一次建树的那一版有数据单元、而池里有一块盘上一个都没有：那块盘上判不判，I-5.5 那一行没写")
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 6.47s
+

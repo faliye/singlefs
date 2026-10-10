@@ -1,0 +1,12 @@
+[package]
+name = "b35-checker-pre35"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "第 35 批代码轮第一轮攻方原型：singlefs-checker 的拷贝，walk.rs 反打 35-1 补丁（第 35 批之前的判法），加只记不判的探针"
+
+[lib]
+name = "singlefs_checker_pre35"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }

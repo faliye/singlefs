@@ -1,0 +1,22 @@
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/ws/crates/singlefs-checker)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.48s
+     Running unittests src/lib.rs (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/target/debug/deps/singlefs_checker-68797fa85c855dfd)
+
+running 1 test
+test walk::tests::an_extent_entry_naming_neither_of_two_inode_tree_entries_violates_the_head_identifier_relation ... FAILED
+
+failures:
+
+---- walk::tests::an_extent_entry_naming_neither_of_two_inode_tree_entries_violates_the_head_identifier_relation stdout ----
+
+thread 'walk::tests::an_extent_entry_naming_neither_of_two_inode_tree_entries_violates_the_head_identifier_relation' (298648) panicked at crates/singlefs-checker/src/walk.rs:9127:9:
+extent 树条目的头 ID 不等于表里任何一条 inode 树条目的树 ID：判红
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    walk::tests::an_extent_entry_naming_neither_of_two_inode_tree_entries_violates_the_head_identifier_relation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p singlefs-checker --lib`

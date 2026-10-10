@@ -1,0 +1,59 @@
+probes built
+PROBE clean checker_violated=[]
+PROBE clean checker_partially_judged=[]
+PROBE clean I-2.5=Holds
+PROBE clean recover.outcome=FileRead { root: (InstanceGeneration(1), CheckpointTxg(3)), content: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 
+PROBE clean recover.effective_root=Some((InstanceGeneration(1), CheckpointTxg(3))) prefix_applied=0
+PROBE clean mount_writable=Ok chosen_txg=CheckpointTxg(3) effective_txg=CheckpointTxg(3)
+exit=0
+PROBE newest zeroed_slots=1
+PROBE newest(txg3) checker_violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-8.10"]
+PROBE newest(txg3) checker_partially_judged=["I-5.4", "I-5.5", "I-9.28"]
+PROBE newest(txg3) I-2.5=Holds
+PROBE newest(txg3) recover.outcome=Failed { root: Some((InstanceGeneration(1), CheckpointTxg(3))), failure: UnitUnreadable { slot: SlotNumber(0) } }
+PROBE newest(txg3) recover.effective_root=Some((InstanceGeneration(1), CheckpointTxg(3))) prefix_applied=0
+PROBE newest(txg3) mount_writable=Err "Recovery(UnitUnreadable { slot: SlotNumber(0) })"
+exit=0
+PROBE older zeroed_slots=1
+PROBE older(txg2) checker_violated=["I-2.1", "I-4.8", "I-7.4", "I-8.10"]
+PROBE older(txg2) checker_partially_judged=["I-5.4", "I-5.5", "I-9.28"]
+PROBE older(txg2) I-2.5=Holds
+PROBE older(txg2) recover.outcome=FileRead { root: (InstanceGeneration(1), CheckpointTxg(3)), content: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 
+PROBE older(txg2) recover.effective_root=Some((InstanceGeneration(1), CheckpointTxg(3))) prefix_applied=0
+PROBE older(txg2) mount_writable=Ok chosen_txg=CheckpointTxg(3) effective_txg=CheckpointTxg(3)
+exit=0
+PROBE-I55 zero-length-first-file I-5.5=Holds
+PROBE-I55 3000-byte-first-file I-5.5=Holds
+exit=0
+PROBE-FLOOR floor_set_slots=1
+PROBE-FLOOR F=3 on newest(txg3), roots txg1..2 below floor violated=["I-3.1", "I-7.9", "I-7.12", "I-8.10"]
+PROBE-FLOOR F=3 on newest(txg3), roots txg1..2 below floor partially_judged=[]
+PROBE-FLOOR zeroed_slots=1
+PROBE-FLOOR F=3 and txg2 root tree-table pointer all-zero (txg2 is below the floor) violated=["I-3.1", "I-7.9", "I-7.12", "I-8.10"]
+PROBE-FLOOR F=3 and txg2 root tree-table pointer all-zero (txg2 is below the floor) partially_judged=[("I-9.28", "PartiallyJudged(\"比到的 0 棵树诞生 txg 都对得上；这几条读得出、自证过的根树表指针非零
+exit=0
+PROBE q1.clean violated=[]
+PROBE q1.clean partially_judged=[]
+PROBE q1.clean not_applicable_among_watched=["I-9.28:NotApplicable(\"根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来\")", "I-9.18:NotApplicable(\"走读到�
+PROBE q1.clean I-5.4=Holds
+PROBE q1 records_zeroed=2
+PROBE q1.zeroed_new_root_segment_tree_table_pointer(next-mount version) violated=[]
+PROBE q1.zeroed_new_root_segment_tree_table_pointer(next-mount version) partially_judged=["I-5.4"]
+PROBE q1.zeroed_new_root_segment_tree_table_pointer(next-mount version) not_applicable_among_watched=["I-9.28:NotApplicable(\"根环里读得出的根中，没有一棵树的树表条目出现在两个不同的树表单元里：�
+PROBE q1.zeroed_new_root_segment_tree_table_pointer(next-mount version) I-5.4=PartiallyJudged("树表指针全零的版本（core 照它读盘 0 槽 0、读不出），认不出带不带树：根记录里分配记录树根全零�
+PROBE q1 mount_writable=Err Recovery(UnitUnreadable { slot: SlotNumber(0) })
+exit=0
+PROBE q1b.clean violated=[]
+PROBE q1b.clean partially_judged=[]
+PROBE q1b.clean not_applicable_among_watched=["I-9.18:NotApplicable(\"走读到的每一版 deleted_inodes 里都没有号：没有队列里的号可判\")"]
+PROBE q1b.clean I-5.4=Holds
+PROBE q1b records_zeroed=2
+PROBE q1b.zeroed(applied-only version (1,5)) violated=["I-3.1", "I-3.5"]
+PROBE q1b.zeroed(applied-only version (1,5)) partially_judged=["I-5.4", "I-5.5"]
+PROBE q1b.zeroed(applied-only version (1,5)) not_applicable_among_watched=["I-9.5:NotApplicable(\"走读到的某一版树表指针全零（core 照它读盘 0 槽 0、读不出）：那一版的删除态射程里判不了\")", "I
+PROBE q1b.zeroed(applied-only version (1,5)) I-5.4=PartiallyJudged("树表指针全零的版本（core 照它读盘 0 槽 0、读不出），认不出带不带树：根记录里分配记录树根全零那一格与它自己的分�
+exit=0
+PROBE-PREFIX states=106 states_with_any_violation=0 i54_tally={"Holds": 106} first_op_count=82 total_ops=187
+exit=0
+PROBE-TALLY states=58 mkfs_ops=25 total_ops=82 i54_tally={"Holds": 9, "NotApplicable": 49} first_k={"Holds": 74, "NotApplicable": 25}
+exit=0

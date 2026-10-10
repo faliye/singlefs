@@ -1,0 +1,24 @@
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/ws/crates/singlefs-checker)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.36s
+     Running unittests src/lib.rs (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/target/debug/deps/singlefs_checker-68797fa85c855dfd)
+
+running 1 test
+test walk::tests::the_first_data_unit_slot_skips_the_open_cluster_segment_of_the_version ... FAILED
+
+failures:
+
+---- walk::tests::the_first_data_unit_slot_skips_the_open_cluster_segment_of_the_version stdout ----
+
+thread 'walk::tests::the_first_data_unit_slot_skips_the_open_cluster_segment_of_the_version' (327450) panicked at crates/singlefs-checker/src/walk.rs:9032:9:
+assertion `left == right` failed: U 那一段占满、下一段是开放段：落点是再下一段的起点
+  left: 50240
+ right: 50304
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    walk::tests::the_first_data_unit_slot_skips_the_open_cluster_segment_of_the_version
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p singlefs-checker --lib`

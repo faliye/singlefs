@@ -1,0 +1,16 @@
+[package]
+name = "opus-b33-proto"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "第 33 批代码轮攻方原型：树表 0 条一族的历史，按层 0 的枚举域每个崩溃状态跑池级 checker，数 I-5.4 的部分没判"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-harness = { path = "../singlefs-harness" }
+
+[[bin]]
+name = "b33_treeless_crash_states"
+path = "src/main.rs"

@@ -1,0 +1,6 @@
+rows=1656
+1618 WalkedToEmpty not-with-file Explained(UnitAreaWall) not-with-file not-with-file not-with-file ['128/0/14/1', '128/0/14/2', '128/0/20/1']
+15 mount-refused:PlacementRefusedBe - mount-refused:Explained(UnitArea mount-refused:"PlacementRefusedB mount-refused:"PlacementRefusedB mount-refused:"PlacementRefusedB ['128/3/14/2', '128/3/20/1', '128/3/8/2']
+10 short Some(0) Explained(UnitAreaWall) Explained(UnitAreaWall) Explained(UnitAreaWall) Unexplained ['128/1/20/2', '128/3/14/1', '128/3/4/2']
+10 short Some(0) Explained(UnitAreaWall) Explained(UnitAreaWall) Published Unexplained ['128/0/20/2', '128/1/20/1', '132/1/20/1']
+3 build-failed []

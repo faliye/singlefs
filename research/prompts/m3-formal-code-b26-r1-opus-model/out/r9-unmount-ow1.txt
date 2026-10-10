@@ -1,0 +1,12 @@
+UNMOUNT unmount/unit-area-384/ow1 segments=[2, 12, 2, 1, 2, 12, 2, 1, 2, 12, 2, 1, 2] states=Some(12330)
+LAYER0_PARALLEL_START states=12330 slices=112 states_per_slice=111 worker_threads=7 configured_worker_threads=7 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=112
+LAYER0_FINDINGS signatures=0 red_states=0 states=12330
+LAYER0_PARALLEL_FINISHED states=12330 slices=112 worker_threads=7 configured_worker_threads=7 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=112 progress_file_after_completion=none elapsed_seconds=26.8
+L0 unmount/unit-area-384/ow1 seed=0 states=12330 closed_form=12330 segments=13 faulted_steps=[] oracle_violations=0 root_without_record=0 checker_violated={} targets=I-9.16=12330/0/0,I-2.4=12330/0/0,I-5.4=12330/0/0,I-5.5=4/0/12326 ending=unmount after 1 overwrites
+UNMOUNTTOTAL unmount/unit-area-384/ow1 layer0_states=12330
+S2 mt-field-not-judged/clean/second/JournalScanReportOfASecondCrashImage=698838
+S2 mt-judged/clean/alone=12330
+S2 mt-judged/clean/publish=12330
+S2 mt-judged/clean/second=698838
+S2 second-crash/clean=698838
+S2 stage2/clean=12330

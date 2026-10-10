@@ -1,0 +1,43 @@
+# 腿自己的 N2 实验：草稿副本 core 记根回收时 eprintln RECLAIM_AT_RECORD（见 tools/instrument_core.py），逐个二进制 --nocapture 直接跑；post=第31批合入后，pre=SIM_PRE31=1（还原第31批之前：测试/装置不装表、没装表时记根静默返回）
+post 1-checker_known_bad_images.log events=9 exit=0 test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtere
+post 2-release_checksum_quarantine.log events=0 exit=0 test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtere
+post 3-commit_generated_units_fall_back_when_the_segment_runs_out.log events=0 exit=0 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
+post 4-publish_failure_resent_unchanged.log events=0 exit=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
+post 5-sequential_write_one_record_per_data_unit.log events=0 exit=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
+post 6-an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor.log events=0 exit=0 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
+post 7-test_only_switches_force_every_branch.log events=0 exit=0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
+post 8-unequal_devices.log events=0 exit=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
+post 9-row_publish_admission.log events=65 exit=0 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
+post 10-random_histories.log events=6 exit=0 test result: ok. 23 passed; 0 failed; 19 ignored; 0 measured; 0 filter
+post 11-overwrite_in_one_instance.log events=16 exit=0 test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtere
+post 12-root_ring_turn_in_the_make_filesystem_session.log events=5 exit=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
+post 13-root_ring_turn_in_one_mount.log events=60 exit=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
+pre 1-checker_known_bad_images.log events=9 exit=0 test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtere
+pre 9-row_publish_admission.log events=10 exit=0 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered
+pre 10-random_histories.log events=6 exit=0 test result: ok. 23 passed; 0 failed; 19 ignored; 0 measured; 0 filter
+pre 11-overwrite_in_one_instance.log events=0 exit=101 test result: FAILED. 11 passed; 1 failed; 0 ignored; 0 measured; 0 fil
+# 按测试名分（只列 post 里有事件的二进制）
+== post/1-checker_known_bad_images.log
+      9 thread=Some("version_applied_only_by_its_journal_record_leaves_the_walk_once_the_root_ring_has_turned_past_it_and_the_mount_reclaimed_its_units")
+== post/9-row_publish_admission.log
+     32 thread=Some("writable_mount_on_the_pool_whose_row_publish_used_to_be_refused_before_acquisition_succeeds")
+     33 thread=Some("writable_mount_on_the_pool_whose_second_warm_up_used_to_be_refused_before_acquisition_succeeds")
+== post/10-random_histories.log
+      6 thread=Some("seed_4000000045_on_240_slot_devices_with_the_admission_skipped_raises_the_floor_to_19_reclaiming_135_placements")
+== post/11-overwrite_in_one_instance.log
+      8 thread=Some("allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records")
+      8 thread=Some("repeated_overwrites_go_past_the_812_records_of_one_leaf_across_several_leaves_of_the_allocation_record_tree")
+== post/12-root_ring_turn_in_the_make_filesystem_session.log
+      5 thread=Some("overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant")
+== post/13-root_ring_turn_in_one_mount.log
+     58 thread=Some("an_overwrite_that_goes_out_after_a_remount_goes_out_in_the_same_mount_as_well")
+      2 thread=Some("turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it")
+# pre 里同样三个二进制
+== pre/1-checker_known_bad_images.log
+      9 thread=Some("version_applied_only_by_its_journal_record_leaves_the_walk_once_the_root_ring_has_turned_past_it_and_the_mount_reclaimed_its_units")
+== pre/9-row_publish_admission.log
+      4 thread=Some("writable_mount_on_the_pool_whose_row_publish_used_to_be_refused_before_acquisition_succeeds")
+      6 thread=Some("writable_mount_on_the_pool_whose_second_warm_up_used_to_be_refused_before_acquisition_succeeds")
+== pre/10-random_histories.log
+      6 thread=Some("seed_4000000045_on_240_slot_devices_with_the_admission_skipped_raises_the_floor_to_19_reclaiming_135_placements")
+== pre/11-overwrite_in_one_instance.log

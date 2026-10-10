@@ -1,0 +1,47 @@
+## check_sets：测试里写死的 14 份集合对点名的产物
+703、706 egment1-r1-legal-family.out 11 11 OK 
+710 egment1-r1-adversarial-family.out 7 7 OK 
+738 egment1-r2-multi-disk.out 4 4 OK 
+741 egment1-r2-table-both-legal-family.out 19 19 OK 
+744 egment1-r2-table-both-adversarial-family.out 9 9 OK 
+747 egment1-r2-table-both-multi-disk.out 6 6 OK 
+750 egment1-r2-reversed-disk-order-legal-family.out 19 19 OK 
+753 egment1-r2-reversed-disk-order-multi-disk.out 6 6 OK 
+763 egment1-r3-adversarial-family.out 8 8 OK 
+855 egment3-r5-legal-family.out 16 16 OK 
+858 egment3-r5-adversarial-family.out 8 8 OK 
+861 egment3-r5-multi-disk.out 4 4 OK 
+864 egment3-r5-odd-marker-legal-family.out 16 16 OK 
+867 egment3-r5-odd-marker-adversarial-family.out 8 8 OK 
+units 14 bad 0
+## model：源码谓词模型
+35 criteria; fam counts {'Adversarial': 8, 'LegalHistory': 23, 'MultiDisk': 4}
+r1 legal 11 model==product True
+r1 adv 7 model==product True
+r2 md 4 model==product True
+r2b legal 19 model==product True
+r2b adv 9 model==product True
+r2b md 6 model==product True
+r3 adv 8 model==product True
+r5 legal 16 model==product True
+r5 adv 8 model==product True
+r5 md 4 model==product True
+r2 legal direct 17
+r2 adv direct 7
+r3 legal (impossible-if-no-run) 17
+r2 legal direct 17
+r2 adv direct 7
+r2 odd legal 17
+r2 odd adv 7
+r1 light 11
+--- family-move mutants against the 14-unit test
+mutants 70 caught 66 missed [('T_table', 'Adversarial'), ('T_table', 'MultiDisk'), ('T_row', 'Adversarial'), ('T_row', 'MultiDisk')]
+old 5-profile test catches 18 of 70
+every_family= false new red True old red False
+every_family= all-true new red True old red False
+--- predicate mutants (is_judged_under arm swapped)
+{'changed': 197, 'unchanged': 13, 'unch_new_red': 0, 'unch_old5_red': 9, 'changed_new_red': 197}
+9 [('J7a_instance_table', 'compares'), ('J7a_allocation_record_tree_root', 'compares'), ('J7a_filesystem_identifier', 'compares'), ('J7b', 'compares'), ('J7c', 'compares'), ('J8a', 'splits'), ('J8a_unmount_marker', 'splits'), ('J8b', 'splits'), ('J8c', 'splits')]
+--- with 4 registered formal runs that have no replay.sh row (r5 prereg compare table rows 4-7)
+mutants changing some of 18 registered formal runs 202 ; missed by the 14-unit test 5 [('J7a_instance_table', 'compares'), ('J7a_allocation_record_tree_root', 'compares'), ('J7a_filesystem_identifier', 'compares'), ('J7b', 'compares'), ('J7c', 'compares')]
+family-move mutants missed by 14 but changing 18: []

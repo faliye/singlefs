@@ -1,0 +1,20 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-formal-c655-c687-r1 攻方腿在副本上跑探针，与正推腿各跑各的
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-c655-c687-r1-opus/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.50s
+     Running tests/checker_known_bad_images.rs (/tmp/claude-1000/m3-formal-c655-c687-r1-opus/target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+
+running 1 test
+name=c687-cell image=q1-tail-zero i55=Some(Holds) violated=[] partially_judged=[] turned_not_applicable=[] core_recover=file
+name=c655-sc-field image=q1-tail-zero slot_offset=0 writable_mount=mounted instance InstanceGeneration(2)
+name=c687-cell image=q2-tail-plus-100 i55=Some(Holds) violated=[] partially_judged=[] turned_not_applicable=[] core_recover=file
+name=c655-sc-field image=q2-tail-plus-100 slot_offset=0 writable_mount=refused NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S
+name=c687-cell image=q3-journal-instance-9 i55=Some(Holds) violated=[] partially_judged=[] turned_not_applicable=[] core_recover=file
+name=c655-sc-field image=q3-journal-instance-9 slot_offset=0 writable_mount=mounted instance InstanceGeneration(10)
+name=c687-cell image=q4-slot-generation-plus-10 i55=Some(Holds) violated=["I-7.16"] partially_judged=[] turned_not_applicable=[] core_recover=file
+name=c655-sc-field image=q4-slot-generation-plus-10 slot_offset=0 writable_mount=mounted instance InstanceGeneration(2)
+name=c687-cell image=q5-slot-generation-minus-1 i55=Some(Holds) violated=["I-7.16"] partially_judged=[] turned_not_applicable=[] core_recover=file
+name=c655-sc-field image=q5-slot-generation-minus-1 slot_offset=0 writable_mount=mounted instance InstanceGeneration(2)
+test c655_probe_system_configuration_runtime_quantities_written_wrong ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 72 filtered out; finished in 13.47s
+

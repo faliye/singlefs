@@ -1,0 +1,57 @@
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：三方攻方腿与正推腿同会话各跑各的副本
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b33-r1-opus/w3/p3w/baseline/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.91s
+     Running tests/overwrite_in_one_instance.rs (target/debug/deps/overwrite_in_one_instance-0b9fc9e578eee86a)
+
+running 2 tests
+test allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records ... B33C551 per_version txg=4 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=5 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=6 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=7 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=8 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=9 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=10 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=11 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=12 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=13 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=14 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=15 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=16 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=17 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=18 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=19 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=20 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=21 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=22 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=23 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=24 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=25 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=26 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=27 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-5.5:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=28 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-5.5:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=29 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-5.5:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=30 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-5.5:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=31 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-5.5:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=32 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-5.5:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+B33C551 per_version txg=33 not_holding=["I-7.9:NA", "I-8.8:NA", "I-3.12:NA", "I-4.1:NA", "I-5.5:NA", "I-4.7:NA", "I-4.6:NA", "I-4.4:NA", "I-9.17:NA", "I-9.18:NA", "I-9.19:NA", "I-9.20:NA", "I-9.21:NA", "I-9.22:NA", "I-9.23:NA"]
+ok
+test repeated_overwrites_go_past_the_812_records_of_one_leaf_across_several_leaves_of_the_allocation_record_tree ... B33C551 end_of_812 I-7.9 NotApplicable("根环里没有抬 F 的根：每条根带的 F 都不高于同一实例里它前一条根带的（回退与新实例的第一条根不算抬）")
+B33C551 end_of_812 I-8.8 NotApplicable("环里没有哪一组（同一块盘上实例代号与事务号都相同的非 0 记录）落了两条以上、也没有哪一组一条提交标记都没有：③ ④ 没有判的对象，提交标记字节单独成立不算这一条成立")
+B33C551 end_of_812 I-3.12 NotApplicable("根环里没有哪条根指着一张读得出、有行的实例表")
+B33C551 end_of_812 I-4.1 NotApplicable("所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2")
+B33C551 end_of_812 I-5.5 NotApplicable("这个镜像上没有它判的对象")
+B33C551 end_of_812 I-4.7 NotApplicable("走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）")
+B33C551 end_of_812 I-4.6 NotApplicable("走读到的每一版 inode 树里都没有 nlink = 0 的记录")
+B33C551 end_of_812 I-4.4 NotApplicable("第一版不适用：意图载体（nlink = 0 的记录、`deleted_inodes` 的 key、墓碑）没有可装增量的字段；logged_ops 有字段表时实现")
+B33C551 end_of_812 I-9.17 NotApplicable("走读到的每一版谱系树都是零根：没有谱系树内部条目可判")
+B33C551 end_of_812 I-9.18 NotApplicable("走读到的每一版 deleted_inodes 里都没有号：没有队列里的号可判")
+B33C551 end_of_812 I-9.19 NotApplicable("走读到的每一版里都没有在谱系上、而 inode 树里还有同号同对象出生代记录的墓碑")
+B33C551 end_of_812 I-9.20 NotApplicable("走读到的每一版墓碑树都是零根：没有墓碑记录可判")
+B33C551 end_of_812 I-9.21 NotApplicable("走读到的每一版墓碑树都是零根或只一片容器：没有非最右的容器")
+B33C551 end_of_812 I-9.22 NotApplicable("池级 checker 的旧入口，当没装只供测试的墓碑容量旋钮：旋钮那一条不判")
+B33C551 end_of_812 I-9.23 NotApplicable("走读到的每一版墓碑树都是零根：没有墓碑树内部条目可判")
+B33C551 end_of_812 holds=68 total=83
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 34.26s
+

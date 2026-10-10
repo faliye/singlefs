@@ -1,0 +1,12 @@
+CUSTOM custom/file/unit-area-384/p2/ow:s5,ow:s6,rbb:0,mount ending=Completed segments=[2, 14, 2, 1, 2, 12, 2, 1, 2] faulted_steps=[] after_each_step=[(StartingPoint, 78), (Operation(0), 109), (Operation(1), 140), (Operation(2), 140), (Operation(3), 192)] states=Some(20511)
+LAYER0_PARALLEL_START states=20511 slices=112 states_per_slice=184 worker_threads=7 configured_worker_threads=7 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=112
+LAYER0_FINDINGS signatures=0 red_states=0 states=20511
+LAYER0_PARALLEL_FINISHED states=20511 slices=112 worker_threads=7 configured_worker_threads=7 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=112 progress_file_after_completion=none elapsed_seconds=42.2
+L0 custom/file/unit-area-384/p2/ow:s5,ow:s6,rbb:0,mount seed=0 states=20511 closed_form=20511 segments=9 faulted_steps=[] oracle_violations=0 root_without_record=0 checker_violated={} targets=I-9.16=20511/0/0,I-2.4=20511/0/0,I-5.4=20511/0/0,I-5.5=20511/0/0 ending=Completed
+CUSTOMTOTAL custom/file/unit-area-384/p2/ow:s5,ow:s6,rbb:0,mount layer0_states=20511 elapsed_secs=160.0
+S2 mt-field-not-judged/clean/second/JournalScanReportOfASecondCrashImage=1005315
+S2 mt-judged/clean/alone=20511
+S2 mt-judged/clean/publish=20511
+S2 mt-judged/clean/second=1005315
+S2 second-crash/clean=1005315
+S2 stage2/clean=20511

@@ -1,0 +1,9 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-formal-code-b35-r1 复跑在自己的仓副本与自己的编译目录里，不与别的会话共用副本
+
+running 1 test
+PROBE-FLOW4 records_of_the_publish=2 states=60 by_red_set={[]: 50, ["I-2.1", "I-4.8", "I-7.2", "I-7.4"]: 6, ["I-4.1"]: 4}
+test probe_flow4_new_pool_publish_with_the_tree_table_pointer_of_the_root_and_its_records_all_zero ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 148 filtered out; finished in 0.15s
+
+exit=0

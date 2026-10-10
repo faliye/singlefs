@@ -1,0 +1,4 @@
+017b96a36bf94374f8dc6a9776cf8bd22186f5f03ba7cf2377ced9d6c9ad2cb3  .claude/kb/decisions/13-验证路线.md
+196b7fff002a50d2e01ec0634c14d896e3f19d0b0ddc24c7cf6d332841f50752  .claude/kb/invariants.md
+a1ba83004d8532317a63cc4951d79313347921a7ed13c92931810fcb6136ae7a  .claude/kb/checks-owed.md
+0e89c01625226482b4783c077b8192892321c462d25ec174efc21d0066251cc2  .claude/kb/experiments/171-三oracle合谋测试.md

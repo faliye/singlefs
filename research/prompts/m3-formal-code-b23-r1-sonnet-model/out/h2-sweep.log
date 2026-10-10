@@ -1,0 +1,100 @@
+run-with-memory-cap: 上限 8G 超过实测峰值 7M 的 2 倍，照理由放行：先前几次失败只量到脚本头部峰值，真跑是 cargo 编译与测试
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：正推腿与攻方腿是同一会话派出的两个 agent，各跑各的探针
+=== S=8 variant=orig ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... ok
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 34.87s
+rc(pipeline)=0
+run-with-memory-cap: 上限 8G 超过实测峰值 7M 的 2 倍，照理由放行：先前几次失败只量到脚本头部峰值，真跑是 cargo 编译与测试
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：正推腿与攻方腿是同一会话派出的两个 agent，各跑各的探针
+=== S=8 variant=slack1 ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... FAILED
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+thread 'the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim' (1721846) panicked at crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:587:5:
+  left: [(0, 50176), (1, 50176)]
+ right: [(0, 50180), (1, 50180)]
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 33.70s
+error: test failed, to rerun pass `-p singlefs-harness --test pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement`
+rc(pipeline)=101
+=== S=4 variant=orig ===
+error[E0080]: evaluation panicked: mkfs 写的 S 碰到了区间的边（D22 已定项 1 字段表：4..16 之间取值不碰任何一条边）
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+rc(pipeline)=101
+=== S=4 variant=slack1 ===
+error[E0080]: evaluation panicked: mkfs 写的 S 碰到了区间的边（D22 已定项 1 字段表：4..16 之间取值不碰任何一条边）
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+rc(pipeline)=101
+=== S=5 variant=orig ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... ok
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 20.24s
+rc(pipeline)=0
+=== S=5 variant=slack1 ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... FAILED
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+thread 'the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim' (1733671) panicked at crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:587:5:
+  left: [(0, 50176), (1, 50176)]
+ right: [(0, 50180), (1, 50180)]
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 22.38s
+error: test failed, to rerun pass `-p singlefs-harness --test pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement`
+rc(pipeline)=101
+=== S=6 variant=orig ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... ok
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 27.14s
+rc(pipeline)=0
+=== S=6 variant=slack1 ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... FAILED
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+thread 'the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim' (1739202) panicked at crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:587:5:
+  left: [(0, 50176), (1, 50176)]
+ right: [(0, 50180), (1, 50180)]
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 25.28s
+error: test failed, to rerun pass `-p singlefs-harness --test pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement`
+rc(pipeline)=101
+=== S=7 variant=orig ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... ok
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 32.73s
+rc(pipeline)=0
+=== S=7 variant=slack1 ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... FAILED
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+thread 'the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim' (1746723) panicked at crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:587:5:
+  left: [(0, 50176), (1, 50176)]
+ right: [(0, 50180), (1, 50180)]
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 39.98s
+error: test failed, to rerun pass `-p singlefs-harness --test pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement`
+rc(pipeline)=101
+=== S=12 variant=orig ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... ok
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 49.37s
+rc(pipeline)=0
+=== S=12 variant=slack1 ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... FAILED
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+thread 'the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim' (1763200) panicked at crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:587:5:
+  left: [(0, 50176), (1, 50176)]
+ right: [(0, 50180), (1, 50180)]
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 44.07s
+error: test failed, to rerun pass `-p singlefs-harness --test pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement`
+rc(pipeline)=101
+=== S=15 variant=orig ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... ok
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 45.05s
+rc(pipeline)=0
+=== S=15 variant=slack1 ===
+test the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim ... FAILED
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+thread 'the_first_file_after_nine_warm_up_only_mounts_lands_past_the_mkfs_instance_table_that_is_one_txg_short_of_reclaim' (1775026) panicked at crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs:587:5:
+  left: [(0, 50176), (1, 50176)]
+ right: [(0, 50180), (1, 50180)]
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 53.70s
+error: test failed, to rerun pass `-p singlefs-harness --test pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement`
+rc(pipeline)=101
+=== S=16 variant=orig ===
+error[E0080]: evaluation panicked: mkfs 写的 S 碰到了区间的边（D22 已定项 1 字段表：4..16 之间取值不碰任何一条边）
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+rc(pipeline)=101

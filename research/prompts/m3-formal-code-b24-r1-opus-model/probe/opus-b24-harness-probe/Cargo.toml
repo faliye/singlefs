@@ -1,0 +1,12 @@
+[package]
+name = "opus-b24-harness-probe"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "攻方 m3-formal-code-b24-r1 的 harness 档探针：只依赖 core、format、harness、checker，不依赖 checker 档"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

@@ -1,0 +1,6 @@
+     Running tests/mount_transparency_judged_field_by_field_after_a_writable_mount.rs (/tmp/claude-1000/m3-formal-code-b30-r1-sonnet/target/debug/deps/mount_transparency_judged_field_by_field_after_a_writable_mount-f3fc39dd2b77e6f6)
+test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.07s
+     Running tests/system_configuration_mutability_classes.rs (/tmp/claude-1000/m3-formal-code-b30-r1-sonnet/target/debug/deps/system_configuration_mutability_classes-408d12fa0dcda278)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs (/tmp/claude-1000/m3-formal-code-b30-r1-sonnet/target/debug/deps/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over-e6a0e571102b578a)
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.02s

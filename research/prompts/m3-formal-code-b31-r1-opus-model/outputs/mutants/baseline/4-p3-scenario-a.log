@@ -1,0 +1,5 @@
+name=scenario_a steps=201 steps_with_reclaimed_records=178 released_records_seen=156984 reclaimed_records_seen=39098 checker_runs=201 highest_txg=203 applied={"overwrite": 200} refused={} findings=0
+test scenario_a_the_session_of_the_812_record_case ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 50.70s
+

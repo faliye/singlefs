@@ -1,0 +1,4 @@
+# 摘自 /tmp/claude-1000/-home-fy5090-code-singlefs/8adc3bc8-1d0b-43bd-9a3f-9e63dae04aaf/scratchpad/head-tree-tests.log
+665:随机历史脚手架经没登记的库模块或 impl 头进了登记的崩溃枚举用例的判法代码（用例，引入者，判定）：[("crash_injection_campaign", JudgedRandomHistoryIntroducer { introducer: ReferencedBy { file: "crates/singlefs-harness/src/fault_injection.rs" }, verdict: UnregisteredLibraryModule }), ("crash_injection_campaign", JudgedRandomHistoryIntroducer { introducer: ReferencedBy { file: "crates/singlefs-harness/src/reference_filesystem_translation.rs" }, verdict: UnregisteredLibraryModule })]。拿随机历史当输入的用例在 RANDOM_HISTORY_THROUGH_LIBRA
+979:LAYER0_FINDINGS signatures=15 red_states=25 states=46
+983:至少四个签名、至少一个签名跨过 10 个状态：15 个签名，最多的 8 个状态

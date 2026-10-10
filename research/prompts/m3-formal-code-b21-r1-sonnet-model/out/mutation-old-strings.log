@@ -1,0 +1,8 @@
+7
+第21批 H2 回收门槛放松一个 txg（b19 判决 K2-1）：释放代比回收下界多 1 也回收，只暖机挂载 9 次之 old count 1 new!=old True cols 6
+第21批 I-9.27 写 0 的六种（b19 判决 K3-3）：种类 4（TREE_KIND_ACCOUNTING）不 old count 1 new!=old True cols 6
+第21批 I-9.27 写 0 的六种（b19 判决 K3-3）：种类 6（TREE_KIND_LIVELIST）不归  old count 1 new!=old True cols 6
+第21批 I-9.27 写 0 的六种（b19 判决 K3-3）：种类 7（TREE_KIND_SPARSE_SIDE_ old count 1 new!=old True cols 6
+第21批 I-9.27 写 0 的六种（b19 判决 K3-3）：种类 8（TREE_KIND_DEADLIST）不归  old count 1 new!=old True cols 6
+第21批 I-9.27 写 0 的六种（b19 判决 K3-3）：种类 11（TREE_KIND_LINEAGE）不归  old count 1 new!=old True cols 6
+第21批 I-9.27 写 0 的六种（b19 判决 K3-3）：种类 12（TREE_KIND_LOGGED_OPER old count 1 new!=old True cols 6

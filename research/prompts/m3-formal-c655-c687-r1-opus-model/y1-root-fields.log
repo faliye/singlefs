@@ -1,0 +1,26 @@
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：m3-formal-c655-c687-r1 攻方腿在副本上跑探针，与正推腿各跑各的
+run-with-memory-cap: 排队（已等 0 秒，至多 1800 秒）：slice 已占 36.9 GiB，这一条要 6.0 GiB（峰值表里没有这条，按它的上限 6G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排了 24 秒，起跑（singlefs-memory-cap-3088235-225789405）
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-formal-c655-c687-r1-opus/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-c655-c687-r1-opus/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.08s
+     Running tests/checker_known_bad_images.rs (/tmp/claude-1000/m3-formal-c655-c687-r1-opus/target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+
+running 1 test
+name=c687-cell image=after-overwrite-clean i55=Some(Holds) violated=[] partially_judged=[] turned_not_applicable=[] core_recover=file
+name=c687-cell image=m1-B-mapping-root-is-A-mapping-root i55=Some(Holds) violated=["I-3.1", "I-3.9", "I-3.11"] partially_judged=[] turned_not_applicable=[] core_recover=file
+name=c655-root-field image=m1-B-mapping-root-is-A-mapping-root recovered_root=Some((InstanceGeneration(1), CheckpointTxg(4))) posix_same_as_clean=true
+name=c687-cell image=m2-B-mapping-root-zeroed i55=Some(Holds) violated=["I-3.1", "I-3.11"] partially_judged=[] turned_not_applicable=[] core_recover=failed:UnitUnreadable { slot: SlotNumber(0) }
+name=c655-root-field image=m2-B-mapping-root-zeroed recovered_root=Some((InstanceGeneration(1), CheckpointTxg(4))) posix_same_as_clean=false
+name=c687-cell image=m3-B-allocation-record-tree-root-is-its-tree-table-pointer i55=Some(Holds) violated=["I-1.1", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] partially_judged=[] turned_not_applicable=["I-3.1", "I-3.9", "I-3.11", "I-5.2", "I-9.6"] core_recover=file
+name=c655-root-field image=m3-B-allocation-record-tree-root-is-its-tree-table-pointer recovered_root=Some((InstanceGeneration(1), CheckpointTxg(4))) posix_same_as_clean=true
+name=c687-cell image=m4-B-algorithm-1 i55=Some(Holds) violated=[] partially_judged=[] turned_not_applicable=[] core_recover=file
+name=c655-root-field image=m4-B-algorithm-1 recovered_root=Some((InstanceGeneration(1), CheckpointTxg(4))) posix_same_as_clean=true
+name=c687-cell image=m5-B-nonce-byte-5a i55=Some(Holds) violated=[] partially_judged=[] turned_not_applicable=[] core_recover=file
+name=c655-root-field image=m5-B-nonce-byte-5a recovered_root=Some((InstanceGeneration(1), CheckpointTxg(4))) posix_same_as_clean=true
+name=c687-cell image=m6-B-mac-byte-5a i55=Some(Holds) violated=[] partially_judged=[] turned_not_applicable=[] core_recover=file
+name=c655-root-field image=m6-B-mac-byte-5a recovered_root=Some((InstanceGeneration(1), CheckpointTxg(4))) posix_same_as_clean=true
+test c655_probe_root_fields_outside_the_table_written_wrong_on_a_file_version ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 71 filtered out; finished in 1.76s
+

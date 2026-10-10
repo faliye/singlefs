@@ -1,0 +1,11 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：正推腿与攻方腿是同一会话派出的两个 agent，各跑各的探针
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/b23_k3_comment_probe.rs (/tmp/claude-1000/m3-formal-code-b23-r1-sonnet/target/debug/deps/b23_k3_comment_probe-98f09514819809a0)
+
+running 1 test
+[健康盘面] 自证过的槽 journal_tail 按盘 [(DeviceIdentity(0), [2, 3]), (DeviceIdentity(1), [2, 3])]；c_见证=3；所选那一版 Some((InstanceGeneration(1), CheckpointTxg(3))) 末条记录计数器 Some(3)；c_见证 > 末条=false
+[盘0两槽撕裂] 自证过的槽 journal_tail 按盘 [(DeviceIdentity(0), []), (DeviceIdentity(1), [2, 3])]；c_见证=3；所选那一版 Some((InstanceGeneration(1), CheckpointTxg(3))) 末条记录计数器 Some(3)；c_见证 > 末条=false
+test witnessed_counter_on_the_image_with_both_slots_of_device_zero_torn ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+

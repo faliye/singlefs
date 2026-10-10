@@ -1,0 +1,42 @@
+== b30_opus_leaf_container_sweep
+test b_idx2_k1 ... ok
+test b_idx1_k3 ... ok
+test b_idx3_k0 ... ok
+test b_idx1_k0 ... ok
+test b_idx2_k8 ... ok
+test b_idx2_k0 ... ok
+SWEEP a_build_into_the_fifth base=936 rollback=None steps=701 completed=false rolled_back=None ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test a_build_into_the_fifth ... FAILED
+test b_idx3_k3 ... ok
+SWEEP c_idx2_k0 base=701 rollback=Some((2, 0)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test c_idx2_k0 ... FAILED
+SWEEP c_idx3_k0 base=701 rollback=Some((3, 0)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test c_idx3_k0 ... FAILED
+SWEEP c_idx1_k3 base=701 rollback=Some((1, 3)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test c_idx1_k3 ... FAILED
+SWEEP c_idx2_k8 base=701 rollback=Some((2, 8)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test c_idx2_k8 ... FAILED
+SWEEP c_idx2_k1 base=701 rollback=Some((2, 1)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test c_idx2_k1 ... FAILED
+SWEEP c_idx3_k3 base=701 rollback=Some((3, 3)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test c_idx3_k3 ... FAILED
+SWEEP d_idx2_k0 base=704 rollback=Some((2, 0)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test d_idx2_k0 ... FAILED
+SWEEP d_idx2_k3 base=704 rollback=Some((2, 3)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test d_idx2_k3 ... FAILED
+SWEEP d_idx3_k3 base=704 rollback=Some((3, 3)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test d_idx3_k3 ... FAILED
+SWEEP e_idx2_k3 base=934 rollback=Some((2, 3)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test e_idx2_k3 ... FAILED
+SWEEP e_idx2_k0 base=934 rollback=Some((2, 0)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test e_idx2_k0 ... FAILED
+SWEEP e_idx3_k3 base=934 rollback=Some((3, 3)) steps=701 completed=false rolled_back=Some(false) ending=NewFinding { signature: ModelDisagreement { aspect: "单元的分配代" }, observation: FailureObservation { position: Operation(700), operation_kind: Some(CreateInode), v
+test e_idx3_k3 ... FAILED
+test result: FAILED. 7 passed; 13 failed; 0 ignored; 0 measured; 0 filtered out;
+rc=101 target=b30_opus_leaf_container_sweep
+== model_compares_the_third_and_fourth_inode_leaf_containers
+test a_rollback_to_a_version_whose_third_inode_leaf_container_was_rewritten_since_then_creating_inodes_is_judged_by_the_model_container_by_container ... ok
+test creating_inodes_one_at_a_time_into_the_fourth_inode_leaf_container_is_judged_by_the_model_container_by_container ... FAILED
+test a_rollback_to_a_version_without_the_fourth_inode_leaf_container_then_creating_inodes_is_judged_by_the_model_container_by_container ... FAILED
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out;
+rc=101 target=model_compares_the_third_and_fourth_inode_leaf_containers

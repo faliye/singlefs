@@ -1,0 +1,21 @@
+run-with-memory-cap: 上限 8G 超过实测峰值 321M 的 2 倍，照理由放行：变异副本重编 harness 的峰值大于只跑测试的峰值，取 8G 默认上限
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b20-r1-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running tests/probe_k3.rs (/tmp/claude-1000/m3-formal-code-b20-r1-sonnet/target/debug/deps/probe_k3-66c3640255641d27)
+
+running 6 tests
+test an_unmount_that_pushes_empty_publishes_on_a_version_without_trees_is_reported_at_the_publish_count ... ok
+test an_unmount_whose_roots_carry_the_floor_of_the_current_version_instead_of_its_txg_is_reported_at_the_rollback_floor ... ok
+test probe_each_assertion_of_the_version_without_trees_unmount_case ... PROBE judge_and_advance=Ok(ModelJudgementCounts { required_refusals_matched: 0, permitted_refusals_taken: 0, successes_matched: 1, roots_compared: 0, allocation_records_compared: 0, rewritten_role_sets_compared: 0, file_contents_compared: 0, instance_tables_compared: 0, instance_tables_not_in_the_output: 0, cold_start_contents_compared: 0, ceilings_compared: 0, rollbacks_accepted_at_the_effective_floor: 0, unit_area_wall_refusals_in_the_interval: 0, deletion_batches_keeping_data_units_matched: 0, walks_of_several_steps_before_a_user_change_matched: 0, walks_before_a_user_change_refused_for_space_matched: 0 })
+PROBE A0 盘上逐字节不变 = true
+PROBE A1 对拍 (1,0) = true
+PROBE A2 会话关（!has_writable_session） = true
+PROBE A3 F 不动（卸载后 F == 卸载前 F） = true（前 ModelCheckpointTxg(0)，后 ModelCheckpointTxg(0)）
+PROBE A4 mkfs 之后 F 为 0 = true
+ok
+test unmount_on_a_version_without_trees_writes_nothing_and_the_model_answers_zero_roots_and_agrees ... ok
+test unmount_on_an_overwrite_at_txg_four_pushes_three_empty_publishes_carrying_floor_four_and_the_model_agrees ... ok
+test unmount_on_the_first_file_at_txg_three_pushes_two_empty_publishes_carrying_floor_three_and_the_model_agrees ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.86s
+

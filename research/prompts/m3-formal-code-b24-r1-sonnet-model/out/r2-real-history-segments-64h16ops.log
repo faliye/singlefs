@@ -1,0 +1,15 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running tests/b24_segment_probe.rs (/tmp/claude-1000/m3-formal-code-b24-r1-sonnet/target-rel/release/deps/b24_segment_probe-47f0d3d31cb6b9d2)
+
+running 1 test
+b24-segments width=384 histories=64 operations=16 candidates=3932 max_segment_index=100 candidates_with_index_over_63=532 histories_with_such=37 total_segments_max_in_one_history=101 longest_candidate=26 lengths_over_28=0 histogram={1: 968, 2: 2147, 8: 9, 12: 218, 14: 86, 16: 92, 18: 17, 20: 329, 22: 16, 24: 46, 26: 4}
+test candidate_segment_indexes_and_lengths_of_generated_histories has been running for over 60 seconds
+b24-segments width=4g histories=64 operations=16 candidates=3932 max_segment_index=100 candidates_with_index_over_63=532 histories_with_such=37 total_segments_max_in_one_history=101 longest_candidate=30 lengths_over_28=4 histogram={1: 968, 2: 2147, 12: 9, 16: 216, 18: 55, 20: 82, 22: 48, 24: 279, 26: 16, 28: 108, 30: 4}
+test candidate_segment_indexes_and_lengths_of_generated_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 84.56s
+
+
+real	1m24.823s
+user	1m24.660s
+sys	0m0.100s

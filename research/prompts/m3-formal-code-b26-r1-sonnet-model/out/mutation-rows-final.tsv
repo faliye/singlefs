@@ -1,0 +1,39 @@
+md行号	名字（前 40 字）	退出码	红绿	测试结果行
+470	C686：分配记录树同层节点按盘号倒序 bump（盘 1 的叶与第 1 层节点先	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.07s
+3664	26-3 I-9.16 ③ 每种至多一条恒判成立（判决 m3-formal-c6	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.25s
+3665	26-3 I-9.16 ③ 每种至多一条恒判成立：覆盖写之后那一版的树表（攻方 	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.35s
+3666	26-3 I-9.16 ③ 每种至多一条恒判成立：livelist 改成第二条 	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.29s
+3667	26-3 I-9.16 ③ 每种至多一条恒判成立：logged_ops 改成第二	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.25s
+3668	26-3 I-9.16 ④ 种类 1–4 各恰好一条恒判成立：去掉分配记录那一条	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.27s
+3669	26-3 I-9.16 ④ 种类 1–4 各恰好一条恒判成立：分配记录那一条改没	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.26s
+3670	26-3 I-5.5 没判的那几版不报部分没判：树表读不出（攻方 a1）	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.16s
+3671	26-3 I-5.5 没判的那几版不报部分没判：extent 树读不全（攻方 c	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.24s
+3672	26-3 I-5.5 没判的那几版不报部分没判：分配记录树读不全（攻方 e3）	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.21s
+3673	26-3 I-5.5 没有数据单元的那块盘不跳过、按槽 0 判（攻方 d1）	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.17s
+3674	26-3 I-2.4 根槽 428..457 不判（攻方 m4）	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.43s
+3675	26-3 I-2.4 根槽 428..457 不判（攻方 m5）	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.45s
+3676	26-3 I-2.4 根槽 428..457 不判（攻方 m6）	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.41s
+3677	26-3 I-5.4 带树一版的根记录分配记录树根不判全零	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.28s
+3678	26-3 分配器回落计数不加	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.08s
+3679	26-3 挂载透明 根记录字节表删掉 fsid 那一行	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+3680	26-3 挂载透明 续做规则的种类集合退回 {1, 2}	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.12s
+3681	26-3 挂载透明 journal_tail 去掉上界	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.12s
+3682	26-3 挂载透明 系统配置 journal 实例代号那一行整行跳过	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.12s
+3683	26-3 挂载透明 中央映射树根空性恒判成立	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.06s
+3684	26-3 挂载透明 R1 带树时 R2 分配记录树根不判全零	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.12s
+3685	26-3 挂载透明 系统运行配置不判内置默认	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.12s
+3686	26-3 挂载透明 字节表「必须相同」那几段不比	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.21s
+6084	第26批 C664：读阶段之后系统配置又读不出照旧并进判据 N-配置 的拒因（两	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 12.04s
+6085	第26批 C664 胶水：读阶段之后系统配置又读不出映射成「见证过比所选那一版新	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 81 filtered out; finished in 0.00s
+6086	第26批 C664 判法：注入过读故障时读阶段之后系统配置又读不出那一拒照样要判	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+6087	第26批 C664 判法：没注入读故障时也放过读阶段之后系统配置又读不出那一拒的	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+6088	第26批 C664 判法：读阶段之后系统配置又读不出那一拒当判据 N-配置 的拒	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+6089	第26批 C664 判法：读阶段之后系统配置又读不出那一拒的判据不认「某块盘一份	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.04s
+6090	第26批 C664 判法：复算判据 N-配置 仍把「某块盘一份自证过的系统配置都	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.04s
+6091	第26批 C696 生成：快档那一组比重带文件那张表里崩溃恢复抛弃根那一格换成读	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+6092	第26批 C696 执行：读回全 0 的可写挂载把每块盘两槽系统配置都藏了（双故	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 41 filtered out; finished in 47.92s
+6106	C554 乙：判不出（两条记录都读不出）按判据为假	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 13.81s
+6107	C579（用户 2026-09-27 定：乙判不出按真）：乙把「判不出」按假处置	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 3.36s
+6108	拒绝合法（11-4）：每块盘最新那一槽系统配置都报读错时 N-配置 复算成假（C	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.16s
+6109	挂载透明（11-4）：两棵树的根指针只看 R1 读不读得出、不比	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.19s
+6110	C673 ⑥ I-5.5 判法：落点判成恒成立（数据单元搬走的坏镜像不红）	101	红	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 12.69s

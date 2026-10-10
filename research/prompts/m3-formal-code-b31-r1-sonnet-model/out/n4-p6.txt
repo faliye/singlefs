@@ -1,0 +1,28 @@
+== N4 p6 补丁核
+6bfee6310e4824aaa883cf290a616ce50925755b
+3dd188c5e74f7712820ee3c36feaa8ceceaabe6b
+945e41c8d9f6ecc46aca843a1d2de617c52802f4d10625d472e23e8cb72c12e1  /tmp/claude-1000/m3-formal-31-2/device-945e41c8.rs
+dbef78ed3eede487d5e5bea46dc5eb0a58735faa6930ea6548889bc62d908ea2  /home/fy5090/code/singlefs/research/target/e171-r1-frozen-tree-revision-5-q5/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs
+cc73677273fd4a4f15c625d9c869d3e25621eac3549a2f6b2b00d5ce1ffb55d9  /tmp/claude-1000/m3-formal-code-b31-r1/tree/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs
+patching file /tmp/claude-1000/m3-formal-code-b31-r1-sonnet/rerun-draft/n4/q5-plus-p6.rs (read from /tmp/claude-1000/m3-formal-code-b31-r1-sonnet/rerun-draft/n4/q5.rs)
+2c933e2136f991a664ed3a7c319f60072c311d113cf6d6b89a7245d2ceedbcf9  /tmp/claude-1000/m3-formal-code-b31-r1-sonnet/rerun-draft/n4/q5-plus-p6.rs
+--- diff q5+p6 对仓里那份
+3475a3476,3479
+>         RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults => {
+>             "system_configuration_unreadable_after_the_read_stage_criterion_true_without_read_faults"
+>                 .to_string()
+>         }
+exit=1
+--- diff q5 对 945e41c8
+3437a3438,3441
+>         RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults => {
+>             "system_configuration_unreadable_after_the_read_stage_criterion_true_without_read_faults"
+>                 .to_string()
+>         }
+exit=1
+  832 /tmp/claude-1000/m3-formal-code-b31-r1-sonnet/rerun-draft/n4/a.txt
+  832 /tmp/claude-1000/m3-formal-code-b31-r1-sonnet/rerun-draft/n4/b.txt
+ 1664 total
+两份补丁去掉行号头之后逐字节相同
+/tmp/claude-1000/m3-formal-31-2/patch/crates.patch:20
+/tmp/claude-1000/m3-formal-31-2/patch/p6-on-dbef78ed.patch:20

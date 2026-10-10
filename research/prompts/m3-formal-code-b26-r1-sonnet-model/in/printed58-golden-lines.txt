@@ -1,0 +1,58 @@
+LAYER0_PARALLEL_START states=46 slices=3 states_per_slice=16 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller resumed_slices=0 freshly_run_slices=3
+LAYER0_PROGRESS slice=1/3 states=[0,16) segments=0..=3 finished_slices=1/3 finished_states=16/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=2/3 states=[16,32) segments=3..=6 finished_slices=2/3 finished_states=32/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=3/3 states=[32,46) segments=7..=all_persisted finished_slices=3/3 finished_states=46/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_FINDINGS signatures=0 red_states=0 states=46
+LAYER0_PARALLEL_FINISHED states=46 slices=3 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller resumed_slices=0 freshly_run_slices=3 progress_file_after_completion=none elapsed_seconds=<elapsed>
+GOLDEN_TALLY LAYER0_SHARDED states=46 exhaustive=true violations=0 root_persisted_states=9 no_file=34 file_read=12 failed=0 journal_differing=3 verification_ran=6 verification_failed=0 ignored_violations=0 record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=46/0/0 I-1.2=46/0/0 I-1.3=46/0/0 I-1.4=46/0/0 I-1.6=46/0/0 I-1.7=46/0/0 I-1.8=46/0/0 I-1.10=9/0/37 I-1.11=9/0/37 I-2.1=46/0/0 I-2.3=46/0/0 I-2.4=46/0/0 I-2.5=46/0/0 I-3.1=9/0/37 I-3.8=46/0/0 I-3.9=9/0/37 I-3.10=12/0/34 I-3.11=9/0/37 I-4.2=46/0/0 I-4.8=46/0/0 I-5.1=46/0/0 I-5.2=9/0/37 I-5.4=9/0/37 I-7.1=46/0/0 I-7.2=46/0/0 I-7.3=46/0/0 I-7.4=46/0/0 I-7.6=46/0/0 I-7.7=46/0/0 I-7.8=46/0/0 I-7.9=0/0/46 I-7.12=46/0/0 I-7.13=46/0/0 I-7.14=46/0/0 I-8.6=37/0/9 I-8.7=0/0/46 I-8.8=0/0/46 I-8.9=37/0/9 I-9.1=9/0/37 I-9.2=9/0/37 I-9.4=9/0/37 I-9.6=9/0/37 I-9.7=9/0/37 I-9.10=9/0/37 I-9.12=9/0/37 I-9.13=9/0/37 I-9.14=0/0/46 I-9.15=9/0/37 I-9.16=46/0/0 I-1.12=46/0/0 I-8.10=34/0/12 I-8.11=12/0/34 I-4.9=46/0/0 I-9.25=9/0/37 I-3.13=9/0/37 I-9.26=9/0/37 I-3.12=0/0/46 I-7.16=45/0/1 I-7.17=46/0/0 I-8.12=25/0/21 I-7.15=46/0/0 I-4.1=6/0/40 I-8.1=46/0/0 I-7.5=46/0/0 I-8.5=46/0/0 I-3.5=9/0/37 I-9.27=9/0/37 I-5.5=9/0/37 I-9.28=0/0/46 states_by_publish=[instance1_txg1=12 instance1_txg2=12 instance1_txg3=13 after_the_last_root=8 every_write_persisted=1] observed_states=46 observer_counts=[file_read_states=12,no_file_states=34] first_violation=none first_ignored_violation=none
+LAYER0_RESUME progress_file=<directory>/layer0-progress-golden_new_pool_file_creation_stream-fingerprint0-0370ad26cad051266c57d7129a63840319034b488aefec9adebf007a9809b91e.txt restored_slices=0/46 half_lines_dropped=0 discarded_because=none
+LAYER0_PARALLEL_START states=46 slices=46 states_per_slice=1 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller resumed_slices=0 freshly_run_slices=46
+LAYER0_PROGRESS slice=1/46 states=[0,1) segments=0..=0 finished_slices=1/46 finished_states=1/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=2/46 states=[1,2) segments=0..=0 finished_slices=2/46 finished_states=2/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=3/46 states=[2,3) segments=0..=0 finished_slices=3/46 finished_states=3/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=4/46 states=[3,4) segments=0..=0 finished_slices=4/46 finished_states=4/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=5/46 states=[4,5) segments=0..=0 finished_slices=5/46 finished_states=5/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=6/46 states=[5,6) segments=0..=0 finished_slices=6/46 finished_states=6/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=7/46 states=[6,7) segments=0..=0 finished_slices=7/46 finished_states=7/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=8/46 states=[7,8) segments=0..=0 finished_slices=8/46 finished_states=8/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=9/46 states=[8,9) segments=1..=1 finished_slices=9/46 finished_states=9/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=10/46 states=[9,10) segments=1..=1 finished_slices=10/46 finished_states=10/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=11/46 states=[10,11) segments=1..=1 finished_slices=11/46 finished_states=11/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=12/46 states=[11,12) segments=2..=2 finished_slices=12/46 finished_states=12/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=13/46 states=[12,13) segments=3..=3 finished_slices=13/46 finished_states=13/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=14/46 states=[13,14) segments=3..=3 finished_slices=14/46 finished_states=14/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=15/46 states=[14,15) segments=3..=3 finished_slices=15/46 finished_states=15/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=16/46 states=[15,16) segments=3..=3 finished_slices=16/46 finished_states=16/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=17/46 states=[16,17) segments=3..=3 finished_slices=17/46 finished_states=17/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=18/46 states=[17,18) segments=3..=3 finished_slices=18/46 finished_states=18/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=19/46 states=[18,19) segments=3..=3 finished_slices=19/46 finished_states=19/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=20/46 states=[19,20) segments=3..=3 finished_slices=20/46 finished_states=20/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=21/46 states=[20,21) segments=4..=4 finished_slices=21/46 finished_states=21/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=22/46 states=[21,22) segments=4..=4 finished_slices=22/46 finished_states=22/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=23/46 states=[22,23) segments=4..=4 finished_slices=23/46 finished_states=23/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=24/46 states=[23,24) segments=5..=5 finished_slices=24/46 finished_states=24/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=25/46 states=[24,25) segments=6..=6 finished_slices=25/46 finished_states=25/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=26/46 states=[25,26) segments=6..=6 finished_slices=26/46 finished_states=26/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=27/46 states=[26,27) segments=6..=6 finished_slices=27/46 finished_states=27/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=28/46 states=[27,28) segments=6..=6 finished_slices=28/46 finished_states=28/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=29/46 states=[28,29) segments=6..=6 finished_slices=29/46 finished_states=29/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=30/46 states=[29,30) segments=6..=6 finished_slices=30/46 finished_states=30/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=31/46 states=[30,31) segments=6..=6 finished_slices=31/46 finished_states=31/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=32/46 states=[31,32) segments=6..=6 finished_slices=32/46 finished_states=32/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=33/46 states=[32,33) segments=7..=7 finished_slices=33/46 finished_states=33/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=34/46 states=[33,34) segments=8..=8 finished_slices=34/46 finished_states=34/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=35/46 states=[34,35) segments=8..=8 finished_slices=35/46 finished_states=35/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=36/46 states=[35,36) segments=8..=8 finished_slices=36/46 finished_states=36/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=37/46 states=[36,37) segments=9..=9 finished_slices=37/46 finished_states=37/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=38/46 states=[37,38) segments=10..=10 finished_slices=38/46 finished_states=38/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=39/46 states=[38,39) segments=10..=10 finished_slices=39/46 finished_states=39/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=40/46 states=[39,40) segments=10..=10 finished_slices=40/46 finished_states=40/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=41/46 states=[40,41) segments=10..=10 finished_slices=41/46 finished_states=41/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=42/46 states=[41,42) segments=10..=10 finished_slices=42/46 finished_states=42/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=43/46 states=[42,43) segments=10..=10 finished_slices=43/46 finished_states=43/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=44/46 states=[43,44) segments=10..=10 finished_slices=44/46 finished_states=44/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=45/46 states=[44,45) segments=10..=10 finished_slices=45/46 finished_states=45/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_PROGRESS slice=46/46 states=[45,46) segments=all_persisted..=all_persisted finished_slices=46/46 finished_states=46/46 resumed_slices=0 elapsed_seconds=<elapsed>
+LAYER0_FINDINGS signatures=0 red_states=0 states=46
+LAYER0_PARALLEL_FINISHED states=46 slices=46 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller resumed_slices=0 freshly_run_slices=46 progress_file_after_completion=kept elapsed_seconds=<elapsed>
+GOLDEN_TALLY LAYER0_SHARDED states=46 exhaustive=true violations=0 root_persisted_states=9 no_file=34 file_read=12 failed=0 journal_differing=3 verification_ran=6 verification_failed=0 ignored_violations=0 record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=46/0/0 I-1.2=46/0/0 I-1.3=46/0/0 I-1.4=46/0/0 I-1.6=46/0/0 I-1.7=46/0/0 I-1.8=46/0/0 I-1.10=9/0/37 I-1.11=9/0/37 I-2.1=46/0/0 I-2.3=46/0/0 I-2.4=46/0/0 I-2.5=46/0/0 I-3.1=9/0/37 I-3.8=46/0/0 I-3.9=9/0/37 I-3.10=12/0/34 I-3.11=9/0/37 I-4.2=46/0/0 I-4.8=46/0/0 I-5.1=46/0/0 I-5.2=9/0/37 I-5.4=9/0/37 I-7.1=46/0/0 I-7.2=46/0/0 I-7.3=46/0/0 I-7.4=46/0/0 I-7.6=46/0/0 I-7.7=46/0/0 I-7.8=46/0/0 I-7.9=0/0/46 I-7.12=46/0/0 I-7.13=46/0/0 I-7.14=46/0/0 I-8.6=37/0/9 I-8.7=0/0/46 I-8.8=0/0/46 I-8.9=37/0/9 I-9.1=9/0/37 I-9.2=9/0/37 I-9.4=9/0/37 I-9.6=9/0/37 I-9.7=9/0/37 I-9.10=9/0/37 I-9.12=9/0/37 I-9.13=9/0/37 I-9.14=0/0/46 I-9.15=9/0/37 I-9.16=46/0/0 I-1.12=46/0/0 I-8.10=34/0/12 I-8.11=12/0/34 I-4.9=46/0/0 I-9.25=9/0/37 I-3.13=9/0/37 I-9.26=9/0/37 I-3.12=0/0/46 I-7.16=45/0/1 I-7.17=46/0/0 I-8.12=25/0/21 I-7.15=46/0/0 I-4.1=6/0/40 I-8.1=46/0/0 I-7.5=46/0/0 I-8.5=46/0/0 I-3.5=9/0/37 I-9.27=9/0/37 I-5.5=9/0/37 I-9.28=0/0/46 states_by_publish=[instance1_txg1=12 instance1_txg2=12 instance1_txg3=13 after_the_last_root=8 every_write_persisted=1] observed_states=46 observer_counts=[file_read_states=12,no_file_states=34] first_violation=none first_ignored_violation=none

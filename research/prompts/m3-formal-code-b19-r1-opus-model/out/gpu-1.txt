@@ -1,0 +1,1 @@
+name=gpu-transliteration cases=300000 disagreements=0 first=None

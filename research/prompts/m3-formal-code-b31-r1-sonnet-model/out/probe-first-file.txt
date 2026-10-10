@@ -1,0 +1,10 @@
+== 基线
+PROBE device=DeviceIdentity(0) allocated=17 deferred=1 free=211951
+PROBE device=DeviceIdentity(1) allocated=17 deferred=1 free=211951
+PROBE released_records=[AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50178), span_slots: 1, generation: CheckpointTxg(3), is_released: true }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50178), span_slots: 1, generation: CheckpointTxg(3), is_released: true }]
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 35.60s
+== 变异 d
+PROBE device=DeviceIdentity(0) allocated=16 deferred=0 free=211952
+PROBE device=DeviceIdentity(1) allocated=16 deferred=0 free=211952
+PROBE released_records=[AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50178), span_slots: 1, generation: CheckpointTxg(3), is_released: true }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50178), span_slots: 1, generation: CheckpointTxg(3), is_released: true }]
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.10s

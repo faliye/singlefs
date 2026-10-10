@@ -1,0 +1,37 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-formal-code-b35-r1 复跑在自己的仓副本与自己的编译目录里，不与别的会话共用副本
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-formal-code-b35-r1-sonnet/work/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b35-r1-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [optimized + debuginfo] target(s) in 12.33s
+     Running tests/zz_probe_b35.rs (/tmp/claude-1000/m3-formal-code-b35-r1-sonnet/target-opt/debug/deps/zz_probe_b35-210cb51a1160e8ca)
+
+running 1 test
+PROBE-P5 tree_table byte 0: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 tree_table byte 28: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 tree_table byte 29: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 tree_table byte 30: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 tree_table byte 32: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 tree_table byte 34: orig_zero_pointer=false core_takes_publish_root=true gpu_rule_takes_publish_root=true
+PROBE-P5 instance_table byte 0: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 instance_table byte 28: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 instance_table byte 29: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 instance_table byte 30: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 instance_table byte 32: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 instance_table byte 34: orig_zero_pointer=false core_takes_publish_root=true gpu_rule_takes_publish_root=true
+PROBE-P5 mapping_root byte 0: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 mapping_root byte 28: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 mapping_root byte 29: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 mapping_root byte 30: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 mapping_root byte 32: orig_zero_pointer=false core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 mapping_root byte 34: orig_zero_pointer=false core_takes_publish_root=true gpu_rule_takes_publish_root=true
+PROBE-P5 allocation_root byte 0: orig_zero_pointer=true core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 allocation_root byte 28: orig_zero_pointer=true core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 allocation_root byte 29: orig_zero_pointer=true core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 allocation_root byte 30: orig_zero_pointer=true core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 allocation_root byte 32: orig_zero_pointer=true core_takes_publish_root=false gpu_rule_takes_publish_root=false
+PROBE-P5 allocation_root byte 34: orig_zero_pointer=true core_takes_publish_root=true gpu_rule_takes_publish_root=true
+PROBE-P5 total=160 agree=160 disagree=0 core_rejects=136 gpu_rule_rejects=136 disagreements=[]
+test probe_p5_core_root_choice_against_the_gpu_rule_byte_by_byte ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 146 filtered out; finished in 0.03s
+
+exit=0

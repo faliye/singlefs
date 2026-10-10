@@ -1,0 +1,12 @@
+CUSTOM custom/mkfs/unit-area-384/p0/mount,pwu,mount,pwu,mount ending=Completed segments=[2, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 8, 2, 1, 2, 2, 1, 2, 2, 1, 2, 2, 8, 2, 1, 2, 2, 1, 2] faulted_steps=[] after_each_step=[(StartingPoint, 25), (Operation(0), 47), (Operation(1), 56), (Operation(2), 88), (Operation(3), 97), (Operation(4), 129)] states=Some(631)
+LAYER0_PARALLEL_START states=631 slices=40 states_per_slice=16 worker_threads=7 configured_worker_threads=7 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=40
+LAYER0_FINDINGS signatures=0 red_states=0 states=631
+LAYER0_PARALLEL_FINISHED states=631 slices=40 worker_threads=7 configured_worker_threads=7 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=40 progress_file_after_completion=none elapsed_seconds=0.3
+L0 custom/mkfs/unit-area-384/p0/mount,pwu,mount,pwu,mount seed=0 states=631 closed_form=631 segments=29 faulted_steps=[] oracle_violations=0 root_without_record=0 checker_violated={} targets=I-9.16=631/0/0,I-2.4=631/0/0,I-5.4=320/0/311,I-5.5=0/0/631 ending=Completed
+CUSTOMTOTAL custom/mkfs/unit-area-384/p0/mount,pwu,mount,pwu,mount layer0_states=631 elapsed_secs=3.0
+S2 mt-field-not-judged/clean/second/JournalScanReportOfASecondCrashImage=51107
+S2 mt-judged/clean/alone=631
+S2 mt-judged/clean/publish=631
+S2 mt-judged/clean/second=51107
+S2 second-crash/clean=51107
+S2 stage2/clean=631

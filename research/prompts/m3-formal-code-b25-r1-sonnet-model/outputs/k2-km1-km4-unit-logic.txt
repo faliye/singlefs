@@ -1,0 +1,5 @@
+RESULT name=KM1 类核对 ② 不计数（C 的写是根槽/系统配置槽/journal 记录写也不报） exit=0 stdout_same_as_unmutated=False differing_lines=2
+  NEW_LINE PROBE_UNIT D2 forbidden_kind=0 refinements=1 mismatching_states=0 stops_at_s13=false
+RESULT name=KM2 类核对 ① 不计数（逐态输入重算不一致也不报） exit=0 stdout_same_as_unmutated=True differing_lines=0
+RESULT name=KM3 类核对 ④ 后一半不计数（「C 全落」与类推出的不同也不报） exit=0 stdout_same_as_unmutated=True differing_lines=0
+RESULT name=KM4 类核对 ④ 前一半不计数（读者那一遍恢复与层 0 判的不同也不报） exit=0 stdout_same_as_unmutated=True differing_lines=0

@@ -1,0 +1,36 @@
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：三方攻方腿与正推腿同会话各跑各的副本
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running tests/checker_known_bad_images.rs (/tmp/claude-1000/m3-formal-code-b33-r1-opus/t-w4/debug/deps/checker_known_bad_images-fa5092303c98133d)
+
+running 1 test
+B33X label=a0-after-mount-clean violated=[] i54=Holds
+B33X label=a1-after-mount-record-version-tree-table-zeroed violated=["I-2.1", "I-3.1", "I-4.8", "I-7.4"] i54=PartiallyJudged("树表指针非零而树表读不出的版本，认不出带不带树：根记录里分配记录树根全零那一格与它自己的分配记录树都没判（别的版本的树走到了叶不替它作保）：由记录施加出来的那一版（实例 1、txg 5）")
+B33X-DETAIL label=a1-after-mount-record-version-tree-table-zeroed I-2.1: 树表单元 在盘 0 槽 50276 的那一份与位置条目里的校验和对不上
+B33X-DETAIL label=a1-after-mount-record-version-tree-table-zeroed I-3.1: 盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 917504（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、并进遍历的由记录施加出来的版本 1 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个
+B33X-DETAIL label=a1-after-mount-record-version-tree-table-zeroed I-4.8: 由记录施加出来的那一版（实例 1、txg 5）出发的遍历有单元对不上或读不出
+B33X-DETAIL label=a1-after-mount-record-version-tree-table-zeroed I-7.4: 由记录施加出来的那一版（实例 1、txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）
+B33X record_version=(1, 5) counter=5 allocation_root_slot=50273 allocation_root_rewritten=true rewritten_allocation_leaves=[50269, 50270]
+B33X label=a2-after-mount-record-version-allocation-root-zeroed violated=["I-2.1", "I-4.8", "I-7.4"] i54=PartiallyJudged("带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：由记录施加出来的那一版（实例 1、txg 5）")
+B33X-DETAIL label=a2-after-mount-record-version-allocation-root-zeroed I-2.1: 分配记录树（树 65538）的根 在盘 0 槽 50273 的那一份与位置条目里的校验和对不上
+B33X-DETAIL label=a2-after-mount-record-version-allocation-root-zeroed I-4.8: 由记录施加出来的那一版（实例 1、txg 5）出发的遍历有单元对不上或读不出
+B33X-DETAIL label=a2-after-mount-record-version-allocation-root-zeroed I-7.4: 由记录施加出来的那一版（实例 1、txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）
+B33X resealed_units_of_the_version=[(50269, 1121370944, 3100766710), (50271, 417360400, 957812300), (50273, 4187108849, 1800433464), (50275, 2425444125, 3138019324), (50276, 3462067076, 1613449002)]
+B33X a3_leaf=50269
+B33X label=a3-after-mount-record-version-overlapping-records violated=["I-5.4"] i54=Violated("txg 5 的根那棵分配记录树、盘 0：槽 50176 跨 3 的记录与槽 50178 跨 1 的记录罩住同一个槽")
+B33X-DETAIL label=a3-after-mount-record-version-overlapping-records I-5.4: txg 5 的根那棵分配记录树、盘 0：槽 50176 跨 3 的记录与槽 50178 跨 1 的记录罩住同一个槽
+B33X c3_leaf=50314
+B33X label=c3-after-mount-newest-version-overlapping-records violated=["I-5.4"] i54=Violated("txg 7 的根那棵分配记录树、盘 0：槽 50176 跨 3 的记录与槽 50178 跨 1 的记录罩住同一个槽")
+B33X-DETAIL label=c3-after-mount-newest-version-overlapping-records I-5.4: txg 7 的根那棵分配记录树、盘 0：槽 50176 跨 3 的记录与槽 50178 跨 1 的记录罩住同一个槽
+B33X label=b0-before-mount-clean violated=[] i54=Holds
+B33X mount label=b0-before-mount-clean outcome=ok chosen_txg=4 effective_txg=5 records_applied=1
+B33X label=b2-before-mount-next-version-allocation-root-zeroed violated=[] i54=PartiallyJudged("带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：下一次挂载先施加的那一版（实例 1、txg 5）")
+B33X mount label=b2-before-mount-next-version-allocation-root-zeroed outcome=ok chosen_txg=4 effective_txg=4 records_applied=0
+B33X resealed_units_of_the_version=[(50269, 1121370944, 3100766710), (50271, 417360400, 957812300), (50273, 4187108849, 1800433464), (50275, 2425444125, 3138019324), (50276, 3462067076, 1613449002)]
+B33X b3_leaf=50269
+B33X label=b3-before-mount-next-version-overlapping-records violated=["I-5.4"] i54=Violated("txg 5 的根那棵分配记录树、盘 0：槽 50176 跨 3 的记录与槽 50178 跨 1 的记录罩住同一个槽")
+B33X-DETAIL label=b3-before-mount-next-version-overlapping-records I-5.4: txg 5 的根那棵分配记录树、盘 0：槽 50176 跨 3 的记录与槽 50178 跨 1 的记录罩住同一个槽
+B33X mount label=b3-before-mount-next-version-overlapping-records outcome=err error=Recovery(AllocationRecordOutsideThePoolGeometry { what: "同一块盘上两条分配记录罩住同一个槽" })
+test b33x_versions_built_from_journal_records_against_the_disjointness_invariant ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 103 filtered out; finished in 42.57s
+

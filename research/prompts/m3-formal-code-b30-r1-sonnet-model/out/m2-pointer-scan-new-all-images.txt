@@ -1,0 +1,46 @@
+B30SCAN image=overwrite clean_violated=[]
+B30SCAN image=overwrite pointers=20 both_red=20 only_mac_red=0 only_extent_red=0 neither_red=0
+B30SCAN image=rollback clean_violated=[]
+B30SCAN image=rollback pointers=66 both_red=66 only_mac_red=0 only_extent_red=0 neither_red=0
+B30SCAN image=deletion-intent clean_violated=[]
+B30SCAN image=deletion-intent pointers=35 both_red=35 only_mac_red=0 only_extent_red=0 neither_red=0
+B30SCAN image=deletion-first-batch clean_violated=[]
+B30SCAN image=deletion-first-batch pointers=49 both_red=49 only_mac_red=0 only_extent_red=0 neither_red=0
+B30SCAN image=three-unit-file clean_violated=[]
+B30SCAN image=three-unit-file pointers=23 both_red=23 only_mac_red=0 only_extent_red=0 neither_red=0
+B30SCAN image=two-page-instance-table clean_violated=[]
+B30SCAN image=two-page-instance-table pointers=27 both_red=27 only_mac_red=0 only_extent_red=0 neither_red=0
+B30SCAN image=normal-unmount clean_violated=[]
+PTR image=normal-unmount unit_slot=50240 class=2 head_at=188 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50244 class=2 head_at=165 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50247 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50248 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50249 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50249 class=2 head_at=241 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50252 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50252 class=2 head_at=345 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50252 class=2 head_at=545 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50252 class=2 head_at=745 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50253 class=2 head_at=188 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50256 class=2 head_at=165 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50259 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50260 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50261 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50261 class=2 head_at=241 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50264 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50264 class=2 head_at=345 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50264 class=2 head_at=545 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50264 class=2 head_at=745 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50265 class=2 head_at=188 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50268 class=2 head_at=165 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50271 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50272 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50273 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50273 class=2 head_at=241 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50276 class=2 head_at=145 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50276 class=2 head_at=345 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50276 class=2 head_at=545 extent_red=false mac_red=false violated_by_extent_edit=[]
+PTR image=normal-unmount unit_slot=50276 class=2 head_at=745 extent_red=false mac_red=false violated_by_extent_edit=[]
+B30SCAN image=normal-unmount pointers=56 both_red=26 only_mac_red=0 only_extent_red=0 neither_red=30
+B30SCAN image=new-inodes-300 clean_violated=[]
+B30SCAN image=new-inodes-300 pointers=20 both_red=20 only_mac_red=0 only_extent_red=0 neither_red=0

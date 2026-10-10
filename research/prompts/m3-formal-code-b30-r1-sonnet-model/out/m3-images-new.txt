@@ -1,0 +1,4 @@
+B30SECTORS written_sectors=1172 same_sector_set_before_and_after=true changed_sectors=[]
+B30IMAGES t_time_as_built=5000 crc_as_built=1329175690 crc_after_writing_5000_into_every_slot=1329175690
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 0.02s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.01s

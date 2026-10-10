@@ -1,0 +1,91 @@
+--- /tmp/claude-1000/m3-formal-c655-c687-r1/tree/crates/singlefs-checker/src/walk.rs	2026-10-03 21:00:29.060576333 +0000
++++ work/crates/singlefs-checker/src/walk.rs	2026-10-04 18:35:20.251814381 +0000
+@@ -3495,6 +3495,28 @@
+         judgements.judge("I-9.16", true, String::new);
+         return;
+     }
++    // Y3 探针（正推腿副本，不入库）：③ 同一张树表里每种种类至多一条；④ 树表非空时种类 1、2、3、4 各恰好一条
++    // （读者重建一版时要的就是这四种：recovery.rs 的 pointer_of）。
++    if !tree_table_entries.is_empty() {
++        let count_of = |kind: u16| {
++            tree_table_entries
++                .iter()
++                .filter(|entry| read_u16(entry, TREE_TABLE_ENTRY_KIND_OFFSET) == kind)
++                .count()
++        };
++        let duplicated = TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER
++            .iter()
++            .find(|kind| count_of(**kind) > 1);
++        let missing = [TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_ALLOCATION, TREE_KIND_ACCOUNTING]
++            .iter()
++            .find(|kind| count_of(**kind) == 0);
++        judgements.judge("I-9.16", duplicated.is_none() && missing.is_none(), || {
++            format!(
++                "{version_name}的树表：种类 {:?} 出现不止一次（③），或种类 {:?} 一条都没有（④）",
++                duplicated, missing
++            )
++        });
++    }
+     // (种类, 下标, 树 ID)，按发号次序；树表里没有的种类跳过。同一种有两条时取先出现的那条（核心层把它判成损坏，这里不另立判定）。
+     let entries_in_the_issuing_order: Vec<(u16, usize, u64)> =
+         TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER
+@@ -4209,9 +4231,9 @@
+         let Some(tree_table) =
+             read_index_node_without_judging(reader, &tree_table_pointer, &mut cache)
+         else {
+-            judgements.part_of_the_range_not_judged(
++            judgements.partially_judged(
+                 invariant,
+-                "有一版的树表读不出：认不出它是不是从 mkfs 水位第一次建树的那一版",
++                format!("{}：树表读不出，认不出它是不是从 mkfs 水位第一次建树的那一版", version.name),
+             );
+             continue;
+         };
+@@ -4223,9 +4245,9 @@
+             .iter()
+             .any(|entry| entry.len() < tree_table_entry_bytes())
+         {
+-            judgements.part_of_the_range_not_judged(
++            judgements.partially_judged(
+                 invariant,
+-                "有一版的树表条目宽不到字段表的 200 字节：认不出它是不是从 mkfs 水位第一次建树的那一版",
++                format!("{}：树表条目宽不到 200 字节，认不出它是不是从 mkfs 水位第一次建树的那一版", version.name),
+             );
+             continue;
+         }
+@@ -4260,9 +4282,9 @@
+         let Some((_, data_pointers)) =
+             extent_tree_without_judging(reader, &extent_root, &mut cache)
+         else {
+-            judgements.part_of_the_range_not_judged(
++            judgements.partially_judged(
+                 invariant,
+-                "从 mkfs 水位第一次建树的那一版 extent 树读不全：它引用的数据单元数不全",
++                format!("{}：extent 树读不全，它引用的数据单元数不全", version.name),
+             );
+             continue;
+         };
+@@ -4297,9 +4319,9 @@
+             &parse_node_pointer(&allocation_entry[14..100]),
+             &mut cache,
+         ) else {
+-            judgements.part_of_the_range_not_judged(
++            judgements.partially_judged(
+                 invariant,
+-                "从 mkfs 水位第一次建树的那一版分配记录树读不全：落点算不出",
++                format!("{}：分配记录树读不全，落点算不出", version.name),
+             );
+             continue;
+         };
+@@ -4323,10 +4345,7 @@
+                         )
+                     });
+                 }
+-                None => judgements.part_of_the_range_not_judged(
+-                    invariant,
+-                    "从 mkfs 水位第一次建树的那一版有数据单元、而池里有一块盘上一个都没有：那块盘上判不判，I-5.5 那一行没写",
+-                ),
++                None => {}
+             }
+         }
+     }

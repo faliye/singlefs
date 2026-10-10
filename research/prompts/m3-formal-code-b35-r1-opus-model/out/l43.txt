@@ -1,0 +1,22 @@
+B35H seed=188022827 width=UnitAreaOf256Slots steps=7 :: Mount[ok] FirstFile(184665)[ok] Overwrite(852196)[ok raises=0] SequentialWrite(110953)[ok raises=0] Rollback(2)[ok to] Overwrite(525195)[ok raises=0] Rollback(6)[refused TargetNotACandidate]
+B35L0 seed=43 suffix=RaiseFloor(3)[ok F=3] segments=[2, 12, 2, 1, 2, 12, 2, 1, 2, 12, 2, 1, 2] record_writes=6 closed_form=12310 layer0_states=12330 ledger=[]
+B35L0-DONE seed=43 judged=12330 range=0..12330 of=12330 full=true seconds=111.0
+B35L0T seed=43 I-5.5 H: = 12330
+B35L0T seed=43 images = 12330
+B35L0T seed=43 new I-4.1 replayed vs core: none = 12321
+B35L0T seed=43 new I-4.1 replayed vs core: same-bytes = 9
+B35L0T seed=43 new next-mount vs core: none = 12321
+B35L0T seed=43 new next-mount vs core: same-bytes = 9
+B35L0T seed=43 pre35 I-4.1 replayed vs core: none = 12321
+B35L0T seed=43 pre35 I-4.1 replayed vs core: same-bytes = 9
+B35L0T seed=43 pre35 next-mount vs core: none = 12321
+B35L0T seed=43 pre35 next-mount vs core: same-bytes = 9
+B35L0T seed=43-FIRST I-5.5 H: :: seed=43 ordinal=0 :: 
+B35L0T seed=43-FIRST new I-4.1 replayed vs core: none :: seed=43 ordinal=0 :: checker=None core=Some(((1, 7), None, None))
+B35L0T seed=43-FIRST new I-4.1 replayed vs core: same-bytes :: seed=43 ordinal=4104 :: checker=Some((1, 8, 1)) core=Some(((1, 7), Some(((1, 8), 1)), None))
+B35L0T seed=43-FIRST new next-mount vs core: none :: seed=43 ordinal=0 :: checker=None core=Some(((1, 7), None, None))
+B35L0T seed=43-FIRST new next-mount vs core: same-bytes :: seed=43 ordinal=4104 :: checker=Some((1, 8)) core=Some(((1, 7), Some(((1, 8), 1)), None))
+B35L0T seed=43-FIRST pre35 I-4.1 replayed vs core: none :: seed=43 ordinal=0 :: checker=None core=Some(((1, 7), None, None))
+B35L0T seed=43-FIRST pre35 I-4.1 replayed vs core: same-bytes :: seed=43 ordinal=4104 :: checker=Some((1, 8, 1)) core=Some(((1, 7), Some(((1, 8), 1)), None))
+B35L0T seed=43-FIRST pre35 next-mount vs core: none :: seed=43 ordinal=0 :: checker=None core=Some(((1, 7), None, None))
+B35L0T seed=43-FIRST pre35 next-mount vs core: same-bytes :: seed=43 ordinal=4104 :: checker=Some((1, 8)) core=Some(((1, 7), Some(((1, 8), 1)), None))

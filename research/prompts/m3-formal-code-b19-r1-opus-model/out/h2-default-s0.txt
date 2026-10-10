@@ -1,0 +1,2 @@
+name=F1 unit_area_slots=211968 mounts=9 zero_unit_publishes=0 reuse=reuse_window_gated_by_the_rollback_floor open_rel_U=512 cluster_segments_rel_U=[512] txg=26 data_rel_U=[4] tree_table_rel_U=532 i55=holds red=[] detail=
+name=F1 unit_area_slots=211968 mounts=10 zero_unit_publishes=0 reuse=reuse_window_gated_by_the_rollback_floor open_rel_U=576 cluster_segments_rel_U=[576] txg=29 data_rel_U=[0] tree_table_rel_U=596 i55=holds red=[] detail=

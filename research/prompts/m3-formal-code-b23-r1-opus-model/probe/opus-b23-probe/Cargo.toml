@@ -1,0 +1,12 @@
+[package]
+name = "opus-b23-probe"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }
+singlefs-checker = { path = "../singlefs-checker" }

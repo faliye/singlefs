@@ -1,0 +1,11 @@
+cell slots=128 ow=3 units=14 batches=1 old_test=green new_premise_ok=false mutation_zero_red=false (zero-arm: Refused(Explained(UnitAreaWall), "PlacementRefused")) mutation_only_some_red=true
+cell slots=129 ow=3 units=14 batches=1 old_test=green new_premise_ok=false mutation_zero_red=false (zero-arm: Refused(Explained(UnitAreaWall), "PlacementRefused")) mutation_only_some_red=true
+cell slots=130 ow=3 units=14 batches=1 old_test=green new_premise_ok=false mutation_zero_red=false (zero-arm: Refused(Explained(UnitAreaWall), "PlacementRefused")) mutation_only_some_red=true
+cell slots=131 ow=3 units=14 batches=1 old_test=green new_premise_ok=false mutation_zero_red=false (zero-arm: Refused(Explained(UnitAreaWall), "PlacementRefused")) mutation_only_some_red=true
+cell slots=132 ow=3 units=14 batches=1 old_test=green new_premise_ok=false mutation_zero_red=false (zero-arm: Refused(Explained(UnitAreaWall), "PlacementRefused")) mutation_only_some_red=true
+cell slots=133 ow=3 units=14 batches=1 old_test=green new_premise_ok=false mutation_zero_red=false (zero-arm: Refused(Explained(UnitAreaWall), "PlacementRefused")) mutation_only_some_red=true
+cell slots=134 ow=3 units=14 batches=1 old_test=green new_premise_ok=true mutation_zero_red=true (zero-arm: Published) mutation_only_some_red=true
+cell slots=135 ow=3 units=14 batches=1 old_test=green new_premise_ok=true mutation_zero_red=true (zero-arm: Published) mutation_only_some_red=true
+cell slots=136 ow=3 units=14 batches=1 old_test=green new_premise_ok=true mutation_zero_red=true (zero-arm: Published) mutation_only_some_red=true
+cell slots=137 ow=3 units=14 batches=1 old_test=green new_premise_ok=true mutation_zero_red=true (zero-arm: Published) mutation_only_some_red=true
+cell slots=138 ow=3 units=14 batches=1 old_test=green new_premise_ok=true mutation_zero_red=true (zero-arm: Published) mutation_only_some_red=true

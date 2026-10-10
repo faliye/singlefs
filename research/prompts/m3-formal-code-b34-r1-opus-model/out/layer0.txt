@@ -1,0 +1,51 @@
+# 层 0 各段的行（原日志 /tmp/claude-1000/m3-formal-code-b34-r1-opus/l0-*.log、l0p-*.log；l0-57 是一次调用全 65548 个状态，l0-65a / l0-65b 两次调用并起来罩全 65548 个）
+l0-3.log: B34H seed=187957251 width=UnitAreaOf256Slots steps=6 :: Mount[ok] FirstFile(141977)[ok] Overwrite(1038755)[ok raises=0] Overwrite(741332)[ok raises=0] RaiseFloor(24)[ok F=0] Unmount[ok]
+l0-3.log: B34L0 seed=3 suffix=Mount[ok] RaiseFloor(13)[refused RollbackFloorAboveCeiling] segments=[2, 14, 2, 1, 2, 12, 2, 1, 2, 12, 2, 1, 2] closed_form=24598 layer0_states=24618
+l0-3.log: B34L0-DONE seed=3 judged=24618 seconds=203.0
+l0-3.log: B34L0T seed=3 images=24618 rv_images=0 next_mount_images=6 i54_on_rv_images={'H': 6} new_red={} differences={"I-5.5 N>N": 24618}
+l0-3.log: B34L0T seed=3-DIFF-FIRST I-5.5 N>N seed=3 ordinal=0 :: old=[这个镜像上没有它判的对象] new=[回退候选集里每条根与由记录施加出来的那几版，没有一版是从 mkfs 水位第一次建树的那一版（树表非空、种类 1 条目的树 ID 是 65536、每条条目的诞生 txg 等于这一版的 txg）：一版都不判]
+l0-41.log: B34H seed=187957289 width=UnitAreaOf256Slots steps=7 :: Mount[ok]!crash@root0 Mount[ok] FirstFile(398733)[ok] RaiseFloor(48)[ok F=0] Overwrite(931903)[ok raises=0]!crash@root0 Mount[ok] Overwrite(243694)[ok raises=0]!crash@root0
+l0-41.log: B34L0 seed=41 suffix=Mount[ok] segments=[2, 14, 2, 1, 2, 12, 2, 1, 2] closed_form=20496 layer0_states=20511
+l0-41.log: B34L0-DONE seed=41 judged=20511 range=0..20511 of=20511 full=true with_old=true seconds=169.9
+l0-41.log: B34L0T seed=41 images=20511 rv_images=20511 next_mount_images=16398 i54_on_rv_images={'H': 20511} new_red={} differences={}
+l0-45.log: B34H seed=187957293 width=UnitAreaOf384Slots steps=7 :: Mount[ok]!crash@root0 Mount[ok] FirstFile(608663)[ok]!crash@root0 Mount[ok]!crash@root1 Mount[ok]!crash@root0 Mount[ok]!crash@root0 Mount[ok]!crash@root0
+l0-45.log: B34L0 seed=45 suffix=Mount[ok] segments=[2, 14, 2, 1, 2, 12, 2, 1, 2, 12, 2, 1, 2] closed_form=24598 layer0_states=24618
+l0-45.log: B34L0-DONE seed=45 judged=24618 range=0..24618 of=24618 full=true with_old=true seconds=149.4
+l0-45.log: B34L0T seed=45 images=24618 rv_images=24618 next_mount_images=16401 i54_on_rv_images={'H': 24618} new_red={} differences={}
+l0-6.log: B34H seed=187957254 width=UnitAreaOf256Slots steps=7 :: Mount[ok] FirstFile(401674)[ok] Overwrite(719616)[ok raises=0] Overwrite(526114)[ok raises=0]!crash@root0 Mount[ok]!crash@root0 Mount[ok] Overwrite(658913)[ok raises=0]!crash@root0
+l0-6.log: B34L0 seed=6 suffix=Mount[ok] segments=[2, 14, 2, 1, 2, 12, 2, 1, 2] closed_form=20496 layer0_states=20511
+l0-6.log: B34L0-PROBE seed=6 base versions_applied_only_by_records=[(1, 5)] next_mount_version=true new_i54=Some('H')
+l0-6.log: B34L0-PROBE seed=6 end versions_applied_only_by_records=[(1, 5), (3, 9)] next_mount_version=false new_i54=Some('H')
+l0-6.log: B34L0-DONE seed=6 judged=20511 range=0..20511 of=20511 full=true with_old=true seconds=110.5
+l0-6.log: B34L0T seed=6 images=20511 i54_all={'H': 20511} rv_images=20511 next_mount_images=16398 i54_on_rv_images={'H': 20511} new_red={} differences={}
+l0-57.log: B34H seed=187957305 width=UnitAreaOf384Slots steps=7 :: Mount[ok]!crash@root1 Mount[ok] FirstFile(745282)[ok] Overwrite(803266)[ok raises=0]!crash@root0 Mount[ok]!crash@root0 Mount[ok] Overwrite(69752)[ok raises=0]
+l0-57.log: B34L0 seed=57 suffix=Rollback(4)[ok to] segments=[16, 2, 1, 2] closed_form=65543 layer0_states=65548
+l0-57.log: B34L0-DONE seed=57 judged=65548 range=0..65548 of=65548 full=true with_old=false seconds=238.8
+l0-57.log: B34L0T seed=57 images=65548 rv_images=0 next_mount_images=0 i54_on_rv_images={} new_red={} differences={}
+l0-65a.log: B34H seed=187957313 width=UnitAreaOf384Slots steps=7 :: Mount[ok] FirstFile(301171)[ok]!crash@root0 Mount[ok] Overwrite(755600)[ok raises=0] Overwrite(572628)[ok raises=0]!crash@root0 Mount[ok]!crash@root0 Mount[ok]
+l0-65a.log: B34L0 seed=65 suffix=Rollback(0)[ok to] segments=[16, 2, 1, 2] closed_form=65543 layer0_states=65548
+l0-65a.log: B34L0-PROBE seed=65 base versions_applied_only_by_records=[(1, 3), (2, 7)] next_mount_version=false new_i54=Some('H')
+l0-65a.log: B34L0-PROBE seed=65 end versions_applied_only_by_records=[(1, 3), (2, 7)] next_mount_version=false new_i54=Some('H')
+l0-65a.log: B34L0-DONE seed=65 judged=33000 range=0..33000 of=65548 full=false with_old=false seconds=83.2
+l0-65a.log: B34L0T seed=65 images=33000 i54_all={'H': 33000} rv_images=0 next_mount_images=0 i54_on_rv_images={} new_red={} differences={}
+l0-65b.log: B34H seed=187957313 width=UnitAreaOf384Slots steps=7 :: Mount[ok] FirstFile(301171)[ok]!crash@root0 Mount[ok] Overwrite(755600)[ok raises=0] Overwrite(572628)[ok raises=0]!crash@root0 Mount[ok]!crash@root0 Mount[ok]
+l0-65b.log: B34L0 seed=65 suffix=Rollback(0)[ok to] segments=[16, 2, 1, 2] closed_form=65543 layer0_states=65548
+l0-65b.log: B34L0-PROBE seed=65 base versions_applied_only_by_records=[(1, 3), (2, 7)] next_mount_version=false new_i54=Some('H')
+l0-65b.log: B34L0-PROBE seed=65 end versions_applied_only_by_records=[(1, 3), (2, 7)] next_mount_version=false new_i54=Some('H')
+l0-65b.log: B34L0-DONE seed=65 judged=32548 range=33000..65548 of=65548 full=false with_old=false seconds=82.6
+l0-65b.log: B34L0T seed=65 images=32548 i54_all={'H': 32548} rv_images=0 next_mount_images=0 i54_on_rv_images={} new_red={} differences={}
+l0p-57.log: B34H seed=187957305 width=UnitAreaOf384Slots steps=7 :: Mount[ok]!crash@root1 Mount[ok] FirstFile(745282)[ok] Overwrite(803266)[ok raises=0]!crash@root0 Mount[ok]!crash@root0 Mount[ok] Overwrite(69752)[ok raises=0]
+l0p-57.log: B34L0 seed=57 suffix=Rollback(4)[ok to] segments=[16, 2, 1, 2] closed_form=65543 layer0_states=65548
+l0p-57.log: B34L0-PROBE seed=57 base versions_applied_only_by_records=[(1, 2), (2, 6)] next_mount_version=false new_i54=Some('H')
+l0p-57.log: B34L0-PROBE seed=57 end versions_applied_only_by_records=[(1, 2), (2, 6)] next_mount_version=false new_i54=Some('H')
+l0p-57.log: B34L0-SKIP seed=57 states=65548 max=1000000 count_only=true
+l0p-65.log: B34H seed=187957313 width=UnitAreaOf384Slots steps=7 :: Mount[ok] FirstFile(301171)[ok]!crash@root0 Mount[ok] Overwrite(755600)[ok raises=0] Overwrite(572628)[ok raises=0]!crash@root0 Mount[ok]!crash@root0 Mount[ok]
+l0p-65.log: B34L0 seed=65 suffix=Rollback(0)[ok to] segments=[16, 2, 1, 2] closed_form=65543 layer0_states=65548
+l0p-65.log: B34L0-PROBE seed=65 base versions_applied_only_by_records=[(1, 3), (2, 7)] next_mount_version=false new_i54=Some('H')
+l0p-65.log: B34L0-PROBE seed=65 end versions_applied_only_by_records=[(1, 3), (2, 7)] next_mount_version=false new_i54=Some('H')
+l0p-65.log: B34L0-SKIP seed=65 states=65548 max=1000000 count_only=true
+l0p-6.log: B34H seed=187957254 width=UnitAreaOf256Slots steps=7 :: Mount[ok] FirstFile(401674)[ok] Overwrite(719616)[ok raises=0] Overwrite(526114)[ok raises=0]!crash@root0 Mount[ok]!crash@root0 Mount[ok] Overwrite(658913)[ok raises=0]!crash@root0
+l0p-6.log: B34L0 seed=6 suffix=Mount[ok] segments=[2, 14, 2, 1, 2, 12, 2, 1, 2] closed_form=20496 layer0_states=20511
+l0p-6.log: B34L0-PROBE seed=6 base versions_applied_only_by_records=[(1, 5)] next_mount_version=true new_i54=Some('H')
+l0p-6.log: B34L0-PROBE seed=6 end versions_applied_only_by_records=[(1, 5), (3, 9)] next_mount_version=false new_i54=Some('H')
+l0p-6.log: B34L0-SKIP seed=6 states=20511 max=1000000 count_only=true

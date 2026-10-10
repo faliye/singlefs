@@ -1,0 +1,3 @@
+crates/singlefs-harness/src/model.rs
+                        .map(|(role, written_at)| (*role, *written_at)),\n                );\n            }\n        }\n        let mut slots_written = 0;
+                        .map(|(role, written_at)| (*role, if *role == ModelUnitRole::inode_leaf_container_at(3) { ModelCheckpointTxg(written_at.0 + 1) } else { *written_at })),\n                );\n            }\n        }\n        let mut slots_written = 0;

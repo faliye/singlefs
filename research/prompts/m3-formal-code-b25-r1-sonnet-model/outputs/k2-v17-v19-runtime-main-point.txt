@@ -1,0 +1,6 @@
+RESULT name=E171R1 装置 V17 Q5 等价类的键去掉「C 至少落一个」那一位（登记修订 2 第 2.1 节候选二） exit=0 stdout_same_as_unmutated=True differing_lines=0
+RESULT name=E171R1 装置 V18 Q5 类核对 ③ 恒判不相交（登记修订 2 第 2.1 节候选二） exit=252 stdout_same_as_unmutated=False differing_lines=216
+RESULT name=E171R1 装置 V19 Q5「C 至少落一个」那一类的态数写成 2 的 C 写数次方（登记修订 2 第 2.1 节候 exit=3 stdout_same_as_unmutated=False differing_lines=207
+  NEW_LINE E7RESULT name=s1 stream=confirmed_loss_form check=confirmed_loss_states_of_a_class_with_in_flight_writes_landed local=16777215 crates=16777216 holds=false
+  NEW_LINE E7RESULT name=s1 stream=confirmed_loss_form check=confirmed_loss_class_states_sum_to_the_states local=1207959552 crates=1207959624 holds=false
+  NEW_LINE E7RESULT name=verdict s1_failed_checks=2 s13=equivalence_pairing q5_not_run=equivalence_pairing_failed

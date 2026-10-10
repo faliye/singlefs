@@ -1,0 +1,6 @@
+name=scenario_c steps=60 last_txg=63 violated_states=42 by_invariant={"I-7.17": 42} smallest_closed_form_state_count_of_one_publish=16777223
+first_violation=txg 22（第 19 次覆盖写，切在第 28 步）I-7.17：实例 1、txg 21 的根住在区域 0 槽 0：按 txg 算该在区域 Some(0)（第 0 代不判区域）槽 7
+test scenario_c_unit_writes_persisted_before_the_first_barrier_of_each_overwrite ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 7.50s
+

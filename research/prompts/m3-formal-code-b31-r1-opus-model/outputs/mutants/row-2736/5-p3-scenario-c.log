@@ -1,0 +1,6 @@
+name=scenario_c steps=60 last_txg=63 violated_states=0 by_invariant={} smallest_closed_form_state_count_of_one_publish=16777223
+first_violation=none
+test scenario_c_unit_writes_persisted_before_the_first_barrier_of_each_overwrite ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 8.18s
+

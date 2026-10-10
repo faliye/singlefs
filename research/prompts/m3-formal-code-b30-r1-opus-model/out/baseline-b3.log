@@ -1,0 +1,12 @@
+== b30_opus_glue_leaf_role_is_injective
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：b30 攻方腿模型在自己的副本与编译目录里跑 harness 档
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b30-r1-opus/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.39s
+     Running tests/b30_opus_glue_leaf_role_is_injective.rs (target/debug/deps/b30_opus_glue_leaf_role_is_injective-fdb155e96d395feb)
+
+running 1 test
+test every_inode_leaf_container_index_one_root_holds_maps_to_its_own_model_role ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+rc=0 target=b30_opus_glue_leaf_role_is_injective

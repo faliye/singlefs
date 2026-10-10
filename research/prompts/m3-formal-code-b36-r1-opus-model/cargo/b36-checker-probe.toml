@@ -1,0 +1,12 @@
+[package]
+name = "b36-checker-probe"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "第 36 批代码轮第一轮攻方原型：singlefs-checker 的拷贝，冻结副本今天的 walk.rs（第 36 批 R1）加只记不判的探针"
+
+[lib]
+name = "singlefs_checker_probe"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }

@@ -1,0 +1,12 @@
+[package]
+name = "b34-checker-fl"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "攻方原型：冻结副本今天的 singlefs-checker，两类由记录造出来的版本改取带末条标志的那条记录的新根段（改法 FL，零轮）"
+
+[lib]
+name = "singlefs_checker_fl"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }

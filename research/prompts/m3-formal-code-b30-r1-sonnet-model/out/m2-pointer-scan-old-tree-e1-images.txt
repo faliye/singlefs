@@ -1,0 +1,6 @@
+B30SCAN image=deletion-intent clean_violated=[]
+PTR image=deletion-intent unit_slot=50280 class=2 head_at=165 extent_red=false mac_red=true violated_by_extent_edit=[] zeroing_the_unit_changes_no_verdict=false
+B30SCAN image=deletion-intent pointers=35 both_red=34 only_mac_red=1 only_extent_red=0 neither_red=0
+B30SCAN image=rollback clean_violated=[]
+PTR image=rollback unit_slot=50354 class=2 head_at=165 extent_red=false mac_red=true violated_by_extent_edit=[] zeroing_the_unit_changes_no_verdict=false
+B30SCAN image=rollback pointers=66 both_red=65 only_mac_red=1 only_extent_red=0 neither_red=0

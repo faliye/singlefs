@@ -1,0 +1,10 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：m3-formal-code-b31-r1 攻方腿跑原型
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running tests/b31_opus_n3_reclaim_predicate_and_ring_table.rs (/tmp/claude-1000/m3-formal-code-b31-r1-opus/target/release/deps/b31_opus_n3_reclaim_predicate_and_ring_table-6a4ccb3101b66ea3)
+
+running 1 test
+name=scenario_b steps=244 steps_with_reclaimed_records=167 released_records_seen=141850 reclaimed_records_seen=58804 checker_runs=244 highest_txg=69 applied={"overwrite": 143, "raise_floor": 29, "roll_back": 34} refused={"raise_floor:RollbackFloorAboveCeiling": 22, "roll_back:TargetNotACandidate": 12} findings=0
+test scenario_b_user_actions_swept_after_the_build_pool_prefix ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 26.30s
+

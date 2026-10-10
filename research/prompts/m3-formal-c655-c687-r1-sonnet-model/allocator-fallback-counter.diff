@@ -1,0 +1,20 @@
+--- /tmp/claude-1000/m3-formal-c655-c687-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-03 21:00:29.061329041 +0000
++++ /tmp/claude-1000/m3-formal-c655-c687-r1-sonnet/work/crates/singlefs-core/src/allocator.rs	2026-10-04 18:21:10.732879497 +0000
+@@ -1646,6 +1646,9 @@
+                 Ok(self.record_bumped(slot, footprint, generation))
+             }
+             CommitGeneratedDeviceAnswer::FallBackToLowestFreeSlot(slot) => {
++                // Y3 探针（正推腿副本，不入库）：数回落次数与回落时的落点
++                FALLBACK_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
++                FALLBACK_LAST_SLOT.store(slot.0, std::sync::atomic::Ordering::SeqCst);
+                 // 回落之后没有段可 bump 了，但刚才那一段仍是聚簇段、仍装着这次提交的内生块：它留在 `cluster_segments` 里，
+                 // 用户数据照旧不许落进去（D3（空间分配） 已定项 8 第 2 条；增补 2 第 20c 行）。
+                 self.open_segment = None;
+@@ -2817,3 +2820,7 @@
+         stopped.record_root_written_by_this_process(CheckpointTxg(25));
+     }
+ }
++
++/// Y3 探针（正推腿副本，不入库）。
++pub static FALLBACK_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
++pub static FALLBACK_LAST_SLOT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);

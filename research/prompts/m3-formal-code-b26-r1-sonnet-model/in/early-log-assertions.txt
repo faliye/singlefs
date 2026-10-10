@@ -1,0 +1,95 @@
+# 摘自 /tmp/claude-1000/-home-fy5090-code-singlefs/8adc3bc8-1d0b-43bd-9a3f-9e63dae04aaf/scratchpad/checker-tier-integration-early.log（2026-10-04 主工作区 checker 档日志；每行前的数字是原文件行号）
+5	test a_barrier_failing_after_the_rotation_freezes_the_publish_and_the_resend_returns_only_after_its_rotation_is_durable ... FAILED
+6	test every_crash_point_after_a_publish_returns_keeps_a_system_configuration_witness_of_its_last_record ... FAILED
+7	test every_crash_point_after_a_publish_on_a_version_without_file_returns_keeps_the_witness ... FAILED
+8	
+9	failures:
+10	
+11	---- a_barrier_failing_after_the_rotation_freezes_the_publish_and_the_resend_returns_only_after_its_rotation_is_durable stdout ----
+12	
+13	thread 'a_barrier_failing_after_the_rotation_freezes_the_publish_and_the_resend_returns_only_after_its_rotation_is_durable' (2787563) panicked at crates/singlefs-checker-tier/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs:142:35:
+14	整段清零落在系统配置两槽上：见证值不再只由系统配置槽写定，这份判法不成立：RecordedOperation { device: DeviceIdentity(0), kind: WriteZeroes, offset: DeviceOffsetInBytes(0), length: 1048576, content_hash: 12206856185304982309 }
+15	note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+16	
+17	---- every_crash_point_after_a_publish_returns_keeps_a_system_configuration_witness_of_its_last_record stdout ----
+18	
+19	thread 'every_crash_point_after_a_publish_returns_keeps_a_system_configuration_witness_of_its_last_record' (2787565) panicked at crates/singlefs-checker-tier/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs:142:35:
+20	整段清零落在系统配置两槽上：见证值不再只由系统配置槽写定，这份判法不成立：RecordedOperation { device: DeviceIdentity(0), kind: WriteZeroes, offset: DeviceOffsetInBytes(0), length: 1048576, content_hash: 12206856185304982309 }
+21	
+22	---- every_crash_point_after_a_publish_on_a_version_without_file_returns_keeps_the_witness stdout ----
+23	
+24	thread 'every_crash_point_after_a_publish_on_a_version_without_file_returns_keeps_the_witness' (2787564) panicked at crates/singlefs-checker-tier/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs:142:35:
+25	整段清零落在系统配置两槽上：见证值不再只由系统配置槽写定，这份判法不成立：RecordedOperation { device: DeviceIdentity(0), kind: WriteZeroes, offset: DeviceOffsetInBytes(0), length: 1048576, content_hash: 12206856185304982309 }
+26	
+27	
+28	failures:
+29	    a_barrier_failing_after_the_rotation_freezes_the_publish_and_the_resend_returns_only_after_its_rotation_is_durable
+30	    every_crash_point_after_a_publish_on_a_version_without_file_returns_keeps_the_witness
+31	    every_crash_point_after_a_publish_returns_keeps_a_system_configuration_witness_of_its_last_record
+32	
+33	test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s
+385	running 6 tests
+386	test layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations ... ignored, 全量六千七百多万个状态，门禁 checker-tier-layer0-replay （.claude/gate.d/checker-tier-layer0-replay.sh）在 release 下跑，带断点续跑
+387	test removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker ... FAILED
+388	test applying_a_record_whose_units_are_missing_is_caught_by_the_record_checker ... ok
+389	test checker_report_on_the_final_image ... ok
+390	test layer0_quick_tier_matches_the_full_tally_shape ... FAILED
+391	test positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle ... ok
+392	
+393	failures:
+394	
+395	---- removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker stdout ----
+396	
+397	thread 'removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker' (2796638) panicked at crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs:771:5:
+398	assertion `left == right` failed: 记录两份与根槽并成一段（C577 之后暖机第二次的轮换 2 写自成一段，不与 A 的 24 个单元写同段）
+399	  left: [2, 2, 1, 2, 2, 1, 2, 24, 5]
+400	 right: [2, 2, 1, 2, 2, 1, 2, 24, 3, 2]
+401	note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+402	
+403	---- layer0_quick_tier_matches_the_full_tally_shape stdout ----
+404	LAYER0_PARALLEL_START states=46 slices=3 states_per_slice=16 worker_threads=3 configured_worker_threads=32 worker_threads_source=available_parallelism resumed_slices=0 freshly_run_slices=3
+405	LAYER0_PROGRESS slice=2/3 states=[16,32) segments=3..=6 finished_slices=1/3 finished_states=16/46 resumed_slices=0 elapsed_seconds=0.0
+406	LAYER0_PROGRESS slice=1/3 states=[0,16) segments=0..=3 finished_slices=2/3 finished_states=32/46 resumed_slices=0 elapsed_seconds=0.0
+407	LAYER0_PROGRESS slice=3/3 states=[32,46) segments=7..=all_persisted finished_slices=3/3 finished_states=46/46 resumed_slices=0 elapsed_seconds=0.1
+408	LAYER0_FINDINGS signatures=0 red_states=0 states=46
+409	LAYER0_PARALLEL_FINISHED states=46 slices=3 worker_threads=3 configured_worker_threads=32 worker_threads_source=available_parallelism resumed_slices=0 freshly_run_slices=3 progress_file_after_completion=none elapsed_seconds=0.1
+410	CHECKER record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=46/0 I-1.2=46/0 I-1.3=46/0 I-1.4=46/0 I-1.6=46/0 I-1.7=46/0 I-1.8=46/0 I-1.10=9/0 I-1.11=9/0 I-2.1=46/0 I-2.3=46/0 I-2.4=46/0 I-2.5=46/0 I-3.1=9/0 I-3.8=46/0 I-3.9=9/0 I-3.10=12/0 I-3.11=9/0 I-4.2=46/0 I-4.8=46/0 I-5.1=46/0 I-5.2=9/0 I-5.4=9/0 I-7.1=4
+411	CHECKER_FIRST {}
+412	
+413	thread 'layer0_quick_tier_matches_the_full_tally_shape' (2796636) panicked at crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs:179:9:
+414	assertion `left == right` failed: I-8.10 评估过的状态数（阴性结果要能和「代码没跑到」分开）
+415	  left: 34
+416	 right: 46
+417	
+418	
+419	failures:
+420	    layer0_quick_tier_matches_the_full_tally_shape
+421	    removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker
+422	
+423	test result: FAILED. 3 passed; 2 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.15s
+463	test unsharded_enumeration_prints_and_writes_byte_for_byte_what_it_did_before_sharding ... FAILED
+464	test print_the_unsharded_enumerations_for_the_golden_comparison ... ok
+465	test two_and_three_shards_merge_into_the_same_tally_and_count_line_as_one_unsharded_run ... ok
+466	
+467	failures:
+468	
+469	---- unsharded_enumeration_prints_and_writes_byte_for_byte_what_it_did_before_sharding stdout ----
+470	
+471	thread 'unsharded_enumeration_prints_and_writes_byte_for_byte_what_it_did_before_sharding' (2797954) panicked at crates/singlefs-checker-tier/tests/crash_enumeration_sharded_across_processes.rs:897:5:
+472	assertion `left == right` failed: 不分片时打印的行与钉值（来历见 GOLDEN_PRINTED_LINE_COUNT 的文档）不同：
+525	LAYER0_PROGRESS slice=44/46 states=[43,44) segments=10..=10 finished_slices=44/46 finished_states=44/46 resumed_slices=0 elapsed_seconds=<elapsed>
+526	LAYER0_PROGRESS slice=45/46 states=[44,45) segments=10..=10 finished_slices=45/46 finished_states=45/46 resumed_slices=0 elapsed_seconds=<elapsed>
+527	LAYER0_PROGRESS slice=46/46 states=[45,46) segments=all_persisted..=all_persisted finished_slices=46/46 finished_states=46/46 resumed_slices=0 elapsed_seconds=<elapsed>
+528	LAYER0_FINDINGS signatures=0 red_states=0 states=46
+529	LAYER0_PARALLEL_FINISHED states=46 slices=46 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller resumed_slices=0 freshly_run_slices=46 progress_file_after_completion=kept elapsed_seconds=<elapsed>
+530	GOLDEN_TALLY LAYER0_SHARDED states=46 exhaustive=true violations=0 root_persisted_states=9 no_file=34 file_read=12 failed=0 journal_differing=3 verification_ran=6 verification_failed=0 ignored_violations=0 record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=46/0/0 I-1.2=46/0/0 I-1.3=46/0/0 I-1.4=46/0/0 I-1.6=4
+531	
+532	  left: (58, "7e64a883680d9d609e033fd228790db29e8c32b3beb3798b920712f749d70ad4")
+533	 right: (58, "15867e366db44d88e7de85fafe40ab6940310fc9cfe1a75787846c39b1024212")
+534	
+535	
+536	failures:
+537	    unsharded_enumeration_prints_and_writes_byte_for_byte_what_it_did_before_sharding
+538	
+539	test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+540	

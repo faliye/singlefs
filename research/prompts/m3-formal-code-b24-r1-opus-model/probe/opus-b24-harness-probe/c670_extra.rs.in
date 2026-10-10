@@ -1,0 +1,32 @@
+
+/// 攻方探针（m3-formal-code-b24-r1 opus）：模块文档里「换一份盘面照常比可以为真」那一句。取只落了覆盖写那次轮换的盘面（见证判据为真），
+/// 再把盘 0 两个系统配置槽各改一个字节（同 `crash_image_where_both_system_configuration_slots_of_device_zero_are_torn` 的改法）：
+/// 盘 0 一份自证过的系统配置都没有，盘 1 那一槽带着覆盖写那次发布的 journal tail。打出拒因、C670 那一条与判定，不断言。
+#[test]
+fn opus_both_slots_of_device_zero_torn_on_the_disk_where_only_a_rotation_landed() {
+    let (healthy, rotated) = crash_image_where_only_the_rotation_of_an_overwrite_landed();
+    let slot_spacing = u64::from(SMALL.parameters().geometry.fixed_structure_slot_spacing);
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let mut crash_image = rotated.clone();
+    for slot in 0..SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE {
+        let offset = DeviceOffsetInBytes(slot * slot_spacing);
+        let mut bytes = rotated.read(DeviceIdentity(0), offset, slot_bytes).expect("读得出");
+        bytes[TORN_BYTE_INSIDE_THE_SYSTEM_CONFIGURATION_SLOT] ^= 0xFF;
+        crash_image.devices.get_mut(&DeviceIdentity(0)).expect("有盘 0").write(offset, &bytes);
+    }
+    let (error, after) = refused_writable_mount_on(&crash_image);
+    let fields = read_recovery_fields(&crash_image, ComparedVersion::TheRecoveredVersion);
+    let verdict = judge_writable_mount_refusal_of_a_crash_state(
+        &crash_image,
+        fields.report.effective_root,
+        &error,
+        disk_after(&crash_image, &after),
+        read_only_read_back_against_the_first_file(&healthy, &crash_image),
+        ReadFaultsInTheCrashState::NoneInjected,
+    );
+    println!(
+        "c670-other-disk comparison={:?} selected={:?} verdict={verdict:?}",
+        witnessed_counter_comparison_on_the_reread(&error),
+        fields.report.effective_root
+    );
+}

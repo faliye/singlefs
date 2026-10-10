@@ -1,0 +1,131 @@
+判据表 35 行（枚举起于第 6121 行）
+family() 起于第 6161 行： {'Adversarial': 8, 'LegalHistory': 23, 'MultiDisk': 4}
+judges_j6qn 第 340 行： ['WithJ6QnAndJ7', 'WithJ6QnAndJ7SplitByI812', 'WithJ6QnAndJ8SplitByI812']
+judges_j7 第 350 行： ['WithJ6QnAndJ7', 'WithJ6QnAndJ7SplitByI812']
+judges_j8 第 358 行： ['WithJ6QnAndJ8SplitByI812']
+splits_j6qn_by_i812 第 368 行： ['WithJ6QnAndJ7SplitByI812', 'WithJ6QnAndJ8SplitByI812']
+compares_the_two_record_tables 第 386 行：table_source = Both
+is_judged_under 起于第 6211 行；谓词分布： {'compares': 2, 'judges_j6qn': 5, 'judges_j7': 5, 'judges_j8': 4, 'splits_j6qn_by_i812': 1, 'true': 18}
+新单测数组大小： {'criteria_of_every_profile': 18, 'j6qn_and_multi_disk': 5, 'j7': 5, 'j8': 4, 'table_comparison': 2, 'split': 1} （单测函数起于第 18276 行）
+
+== C1 逐档：写死的集合 vs 登记规则 vs 代码谓词（is_judged_under 解析）
+r1       写死 18  登记规则 18  代码 18  写死=登记 True  写死=代码 True
+r2       写死 28  登记规则 28  代码 28  写死=登记 True  写死=代码 True
+r2-both  写死 30  登记规则 30  代码 30  写死=登记 True  写死=代码 True
+r3       写死 29  登记规则 29  代码 29  写死=登记 True  写死=代码 True
+r5       写死 28  登记规则 28  代码 28  写死=登记 True  写死=代码 True
+五档并起来罩全表： True （缺： [] ）
+
+== replay.sh 里起 E165 装置的正式跑（不含 root_choice / root_choice_faults 两族，它们有自己的对照）
+replay.sh 第 703 行  --family legal      --profile r1 --table direct only=None disk=None parity=None -> 对照 11 条，档 r1
+replay.sh 第 706 行  --family legal      --profile r1 --table direct only=None disk=None parity=None -> 对照 11 条，档 r1
+replay.sh 第 710 行  --family adversarial --profile r1 --table direct only=None disk=None parity=None -> 对照 7 条，档 r1
+replay.sh 第 738 行  --family multi_disk --profile r2 --table direct only=None disk=None parity=None -> 对照 4 条，档 r2
+replay.sh 第 741 行  --family legal      --profile r2 --table both   only=None disk=None parity=None -> 对照 19 条，档 r2-both
+replay.sh 第 744 行  --family adversarial --profile r2 --table both   only=None disk=None parity=None -> 对照 9 条，档 r2-both
+replay.sh 第 747 行  --family multi_disk --profile r2 --table both   only=None disk=None parity=None -> 对照 6 条，档 r2-both
+replay.sh 第 750 行  --family legal      --profile r2 --table both   only=R disk=reversed parity=None -> 对照 19 条，档 r2-both
+replay.sh 第 753 行  --family multi_disk --profile r2 --table both   only=M,MC disk=reversed parity=None -> 对照 6 条，档 r2-both
+replay.sh 第 763 行  --family adversarial --profile r3 --table direct only=None disk=None parity=None -> 对照 8 条，档 r3
+replay.sh 第 855 行  --family legal      --profile r5 --table direct only=None disk=None parity=None -> 对照 16 条，档 r5
+replay.sh 第 858 行  --family adversarial --profile r5 --table direct only=None disk=None parity=None -> 对照 8 条，档 r5
+replay.sh 第 861 行  --family multi_disk --profile r5 --table direct only=None disk=None parity=None -> 对照 4 条，档 r5
+replay.sh 第 864 行  --family legal      --profile r5 --table direct only=None disk=None parity=odd -> 对照 16 条，档 r5
+replay.sh 第 867 行  --family adversarial --profile r5 --table direct only=None disk=None parity=odd -> 对照 8 条，档 r5
+
+各档正式跑对照集合的并 vs 写死的集合：
+r1       正式跑的并 18 条，写死 18 条，并 ⊆ 写死：True，并 = 写死：True 
+r2       正式跑的并  4 条，写死 28 条，并 ⊆ 写死：True，并 = 写死：False  写死里正式跑不打印的 24 条
+r2-both  正式跑的并 30 条，写死 30 条，并 ⊆ 写死：True，并 = 写死：True 
+r3       正式跑的并  8 条，写死 29 条，并 ⊆ 写死：True，并 = 写死：False  写死里正式跑不打印的 21 条
+r5       正式跑的并 28 条，写死 28 条，并 ⊆ 写死：True，并 = 写死：True 
+
+== 2026-10-04 入库产物的 name=control 标签 vs 代码谓词算出的这一跑的集合（旧数据，旁证）
+r1       legal      产物 11 种标签，谓词算 11，相等：True
+r1       adversarial 产物  7 种标签，谓词算  7，相等：True
+r2       multi_disk 产物  4 种标签，谓词算  4，相等：True
+r2-both  legal      产物 19 种标签，谓词算 19，相等：True
+r2-both  adversarial 产物  9 种标签，谓词算  9，相等：True
+r2-both  multi_disk 产物  6 种标签，谓词算  6，相等：True
+r3       adversarial 产物  8 种标签，谓词算  8，相等：True
+r5       legal      产物 16 种标签，谓词算 16，相等：True
+r5       adversarial 产物  8 种标签，谓词算  8，相等：True
+r5       multi_disk 产物  4 种标签，谓词算  4，相等：True
+
+== C2 改坏 A：is_judged_under 里把某一判据的谓词换成另一个（35 x 6）
+改坏 210 个：正式跑某个跑丢一条对照（真缺口）170 个，只多一条对照 27 个，正式跑集合不变 13 个
+单测写法                                真缺口抓到/共         只多一条抓到/共        正式跑不变却红
+旧单测（并集）                          36/170           2/27              0/13
+新单测（五档各自核）                      170/170          27/27              9/13
+新单测去掉 r1 一档                     152/170          26/27              9/13
+新单测去掉 r2 一档                     170/170          27/27              9/13
+新单测去掉 r2-both 一档                168/170          27/27              9/13
+新单测去掉 r3 一档                     169/170          27/27              5/13
+新单测去掉 r5 一档                     161/170          22/27              9/13
+
+真缺口里各写法放过的条数与前几个例子（判据 -> 换成的谓词）：
+  旧单测（并集）：放过 134 个 [('J0Defined', 'judges_j6qn'), ('J0Defined', 'judges_j7'), ('J0Defined', 'judges_j8'), ('J0Defined', 'splits_j6qn_by_i812'), ('J0Defined', 'compares'), ('J1ReturnedRoot', 'judges_j6qn')]
+  新单测（五档各自核）：放过 0 个 
+  新单测去掉 r1 一档：放过 18 个 [('J0Defined', 'judges_j6qn'), ('J1ReturnedRoot', 'judges_j6qn'), ('J2RootPlusDisk', 'judges_j6qn'), ('J3WithinTheInFlightLimit', 'judges_j6qn'), ('J4FarthestVersion', 'judges_j6qn'), ('J5aAppliedSet', 'judges_j6qn')]
+  新单测去掉 r2 一档：放过 0 个 
+  新单测去掉 r2-both 一档：放过 2 个 [('TableComparisonSeesADifferentTable', 'false'), ('TableComparisonSeesADifferentRow', 'false')]
+  新单测去掉 r3 一档：放过 1 个 [('J6QnSplitByI812', 'judges_j8')]
+  新单测去掉 r5 一档：放过 9 个 [('J6QnFixedPoint', 'judges_j7'), ('J8aFieldsFromTheNewRootSegment', 'false'), ('J8aUnmountMarkerFromTheNewRootSegment', 'false'), ('J8bFilesystemIdentifierOfTheChosenRoot', 'false'), ('J8cNothingAppliedReturnsTheChosenRoot', 'false'), ('MultiDiskAnyCopyIsOnDisk', 'judges_j7')]
+
+== C2 改坏 B：只在一个档的一格上翻（变异行 3383、3407、3496 的形）
+r1                     判着的格 18，其中正式跑用到的 18；新单测抓到 18，旧单测抓到  0
+r2                     判着的格 28，其中正式跑用到的  4；新单测抓到  4，旧单测抓到  0
+r2-both                判着的格 30，其中正式跑用到的 30；新单测抓到 30，旧单测抓到  0
+r3                     判着的格 29，其中正式跑用到的  8；新单测抓到  8，旧单测抓到  0
+r5                     判着的格 28，其中正式跑用到的 28；新单测抓到 28，旧单测抓到  4
+r3-both(旧单测才有)         判着的格 31，其中正式跑用到的  0；新单测抓到  0，旧单测抓到  0
+合计 正式跑用到的格 88：新单测抓到 88，旧单测抓到 4
+旧单测抓到的格： [('r5', 'J8aFieldsFromTheNewRootSegment'), ('r5', 'J8aUnmountMarkerFromTheNewRootSegment'), ('r5', 'J8bFilesystemIdentifierOfTheChosenRoot'), ('r5', 'J8cNothingAppliedReturnsTheChosenRoot')]
+
+== C2 第三问：拿掉某一档，哪些判据失去（并集意义上的）唯一一份读数
+旧单测（r1、r2 只核全红；并集取 r3、r5、r3-both） 去掉 r3：并集里没有读数的判据 0 []
+旧单测（r1、r2 只核全红；并集取 r3、r5、r3-both） 去掉 r3-both：并集里没有读数的判据 2 ['T_row', 'T_table']
+旧单测（r1、r2 只核全红；并集取 r3、r5、r3-both） 去掉 r3+r3-both：并集里没有读数的判据 7 ['J7a_allocation_record_tree_root', 'J7a_filesystem_identifier', 'J7a_instance_table', 'J7b', 'J7c', 'T_row', 'T_table']
+新单测（五档） 去掉 r1：并集里没有读数的判据 0 []
+新单测（五档） 去掉 r2：并集里没有读数的判据 0 []
+新单测（五档） 去掉 r2-both：并集里没有读数的判据 2 ['T_row', 'T_table']
+新单测（五档） 去掉 r3：并集里没有读数的判据 0 []
+新单测（五档） 去掉 r5：并集里没有读数的判据 4 ['J8a', 'J8a_unmount_marker', 'J8b', 'J8c']
+
+== C2/C1 改坏 C：Criterion::family 把某一判据换到另一族（35 x 2）
+换族 70 个，改变某个正式跑的对照集合 66 个；新单测抓到 18，旧单测抓到 0，按正式跑逐个核的写法抓到 66
+例： []
+
+== 补 1：谓词换了、正式跑的对照集合一个都没变（13 个）里新单测红的那些，红在哪一档
+  J7a_instance_table                 -> compares             新单测红在 ['r2', 'r3']
+  J7a_allocation_record_tree_root    -> compares             新单测红在 ['r2', 'r3']
+  J7a_filesystem_identifier          -> compares             新单测红在 ['r2', 'r3']
+  J7b                                -> compares             新单测红在 ['r2', 'r3']
+  J7c                                -> compares             新单测红在 ['r2', 'r3']
+  J8a                                -> splits_j6qn_by_i812  新单测红在 ['r3']
+  J8a_unmount_marker                 -> splits_j6qn_by_i812  新单测红在 ['r3']
+  J8b                                -> splits_j6qn_by_i812  新单测红在 ['r3']
+  J8c                                -> splits_j6qn_by_i812  新单测红在 ['r3']
+  multi_disk_any_copy                -> true                 新单测红在 不红
+  J1_multi_disk                      -> true                 新单测红在 不红
+  J4_multi_disk                      -> true                 新单测红在 不红
+  J5_multi_disk                      -> true                 新单测红在 不红
+
+== 补 2：换族放过新单测的例子（按判据 -> 换到的族；改变了哪个正式跑）
+  J0 LegalHistory -> Adversarial：正式跑变了 [('r1', ['Adversarial']), ('r1', ['LegalHistory']), ('r2-both', ['Adversarial'])]
+  J1 LegalHistory -> Adversarial：正式跑变了 [('r1', ['Adversarial']), ('r1', ['LegalHistory']), ('r2-both', ['Adversarial'])]
+  J2 LegalHistory -> Adversarial：正式跑变了 [('r1', ['Adversarial']), ('r1', ['LegalHistory']), ('r2-both', ['Adversarial'])]
+  J3 LegalHistory -> Adversarial：正式跑变了 [('r1', ['Adversarial']), ('r1', ['LegalHistory']), ('r2-both', ['Adversarial'])]
+  J4 LegalHistory -> Adversarial：正式跑变了 [('r1', ['Adversarial']), ('r1', ['LegalHistory']), ('r2-both', ['Adversarial'])]
+  J5a LegalHistory -> Adversarial：正式跑变了 [('r1', ['Adversarial']), ('r1', ['LegalHistory']), ('r2-both', ['Adversarial'])]
+  放过新单测且改变正式跑的换族共 48 个
+
+== 补 3：开销（调用 positive_control_readings 的次数与每次的判据个数，不含各条对照自己的扫描量）
+旧单测 {'r1': 18, 'r2': 28, 'r3': 29, 'r5': 28, 'r3-both': 31} 共 5 次调用、 134 条判据的对照
+新单测 {'r1': 18, 'r2': 28, 'r2-both': 30, 'r3': 29, 'r5': 28} 共 5 次调用、 133 条判据的对照
+按正式跑逐个核（每个 (档, 族) 一次） 10 次调用、 92 条判据的对照
+
+== 补 4：四行变异里前三行（锚在 is_judged_under）在旧并集单测与新单测下的形（整组一起换，同变异表的原文替换文）
+3383 基础 18 条换成 !judges_j8（r5 档不判）：改变正式跑的对照集合 2 个丢、0 个多；旧并集单测红：False；新单测红：True；新单测红在 ['r5']
+3407 T_table、T_row 换成 compares && splits（r2 两份表都取不判）：改变正式跑的对照集合 3 个丢、0 个多；旧并集单测红：False；新单测红：True；新单测红在 ['r2-both']
+3496 基础 18 条换成 judges_j6qn（r1 档不判）：改变正式跑的对照集合 2 个丢、0 个多；旧并集单测红：False；新单测红：True；新单测红在 ['r1']

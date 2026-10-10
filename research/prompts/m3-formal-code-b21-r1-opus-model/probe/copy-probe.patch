@@ -1,0 +1,115 @@
+--- a/crates/singlefs-checker-tier/src/crash_injection.rs
++++ b/crates/singlefs-checker-tier/src/crash_injection.rs
+@@ -1879,15 +1879,15 @@
+                 }
+                 // 带文件的一版而第一个文件已删完（unlink 之后再建过 inode：树里只剩别的 inode）或正在删（nlink = 0）：覆盖写只写第一个文件，
+                 // 在这一版上被拒成写一个不在树里、或正在删的 inode（D8（核心索引结构） 已定项 16 第 4 条）；与删完那一版一样建一个 size 0 的 inode。
+-                PoolVersion::WithFile(current) => publish_new_inodes(
++                PoolVersion::WithFile(current) => { singlefs_core::transaction::opus_probe::ARM_ACTIVE.with(|c| c.set(true)); let opus_result = publish_new_inodes(
+                     &mut writer,
+                     &mut allocator,
+                     current,
+                     1,
+                     FIXED_WRITE_TIME_SECONDS,
+-                    mounted.output.instance,
++                    if std::env::var("OPUS_K2A_VARIANT").as_deref() == Ok("old-instance") { InstanceGeneration(mounted.output.instance.0 - 1) } else { mounted.output.instance },
+                 )
+-                .map(|_| ()),
++                .map(|_| ()); singlefs_core::transaction::opus_probe::ARM_ACTIVE.with(|c| c.set(false)); opus_result }
+                 // 删完那一版（D8（核心索引结构） 已定项 16 第 5 条：之后只许建 inode、写行与空发布）：建一个 size 0 的 inode
+                 // （随机历史的「建 inode」经会话建的也是一个）；覆盖写在这一版上被拒成写一个不在树里的 inode。
+                 PoolVersion::WithTreesAndNoFile(current) => publish_new_inodes(
+@@ -1979,6 +1979,9 @@
+ /// （`transaction::live_record_of_the_first_file`，D8（核心索引结构） 已定项 16 第 4 条）。unlink 之后再建过 inode 的一版仍归带文件的一版
+ /// （`TransactionOutput::is_a_version_with_trees_and_no_file` 为假），它的 `inode_record` 是 None。
+ fn first_file_is_a_live_record(version: &TransactionOutput) -> bool {
++    if std::env::var("OPUS_K2B_SOME").is_ok() {
++        return version.inode_record.is_some();
++    }
+     version
+         .inode_record
+         .as_ref()
+@@ -2804,6 +2807,13 @@
+ /// 第一次崩溃那个段内子集的指纹：段内第 k 个写持久了折 1、没持久折 0，逐个按 64 位 FNV-1a 折进去。只用来岔开二次崩溃的随机源，
+ /// 不进任何判定。
+ fn fingerprint_of_the_persisted_subset(persisted_within_the_segment: &[bool]) -> u64 {
++    match std::env::var("OPUS_F3_FP").as_deref() {
++        Ok("first-only") => return u64::from(persisted_within_the_segment.first().copied().unwrap_or(false)),
++        Ok("popcount") => return persisted_within_the_segment.iter().filter(|p| **p).count() as u64,
++        Ok("first-withheld") => return persisted_within_the_segment.iter().position(|p| !*p).unwrap_or(usize::MAX) as u64,
++        Ok("empty") => return PERSISTED_SUBSET_FINGERPRINT_OFFSET_BASIS,
++        _ => {}
++    }
+     persisted_within_the_segment.iter().fold(
+         PERSISTED_SUBSET_FINGERPRINT_OFFSET_BASIS,
+         |fingerprint, is_persisted| {
+@@ -3038,7 +3048,7 @@
+             &content_after_the_uninterrupted_mount,
+             &RefusalOnTheCrashImage {
+                 crash_image_materialized: &second_crash_image_materialized,
+-                version_landed_on_after_the_crash: report.effective_root,
++                version_landed_on_after_the_crash: if std::env::var("OPUS_K3_WIRING").as_deref() == Ok("first") { fields_read_after_the_first_crash.report.effective_root } else { report.effective_root },
+                 read_only_read_back: if disagreement.is_none() {
+                     ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet
+                 } else {
+@@ -6396,3 +6406,6 @@
+         );
+     }
+ }
++
++#[path = "opus_probe.rs"]
++pub mod opus_probe;
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -5800,6 +5800,8 @@
+     // 改动计数 = 最后一次改动所在发布的 checkpoint_txg（D8（核心索引结构） 已定项 6 偏移 88）；建出来那次就是这次发布。
+     let change_count = txg.0;
+     let transaction_number = previous.highest_transaction_number_in_this_instance + 1;
++    let opus_variant = opus_probe::variant();
++    let new_inode_count = if opus_variant.as_deref() == Some("zero") { 0 } else { new_inode_count };
+     let new_inode_records: Vec<InodeRecord> = (0..new_inode_count)
+         .map(|offset_from_the_watermark| InodeRecord {
+             inode: first_new_inode_number + offset_from_the_watermark,
+@@ -5812,6 +5814,22 @@
+             write_time_seconds,
+         })
+         .collect();
++    let new_inode_records: Vec<InodeRecord> = new_inode_records
++        .into_iter()
++        .map(|mut record| {
++            match opus_variant.as_deref() {
++                Some("reuse-first") => record.inode = FIRST_INODE_NUMBER,
++                Some("being-deleted") => record.nlink = NLINK_OF_AN_INODE_BEING_DELETED,
++                Some("old-birth") => record.object_birth = previous.root.checkpoint_txg,
++                Some("size") => record.size = 4096,
++                Some("skip-one") => record.inode += 1,
++                Some("change-zero") => record.change_count = 0,
++                Some("time-zero") => record.write_time_seconds = 0,
++                _ => {}
++            }
++            record
++        })
++        .collect();
+     publish_version(
+         pool,
+         allocator,
+@@ -9311,3 +9329,19 @@
+         );
+     }
+ }
++
++/// 攻方副本探针用（m3-formal-code-b21-r1 opus）：只在崩溃注入第二截那一支的调用里生效。
++pub mod opus_probe {
++    use std::cell::Cell;
++    thread_local! {
++        pub static ARM_ACTIVE: Cell<bool> = const { Cell::new(false) };
++    }
++    #[must_use]
++    pub fn variant() -> Option<String> {
++        if ARM_ACTIVE.with(Cell::get) {
++            std::env::var("OPUS_K2A_VARIANT").ok()
++        } else {
++            None
++        }
++    }
++}

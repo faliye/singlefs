@@ -1,0 +1,26 @@
+B36H seed=188088332 width=UnitAreaOf384Slots steps=7 :: Mount[ok] Unmount[ok] Mount[ok] FirstFile(825147)[ok] Rollback(3)[refused TargetNotACandidate] Rollback(6)[ok to] Overwrite(713421)[ok raises=0]!crash@one-copy@26
+B36L0 seed=12 suffix=Mount[ok] segments=[2, 14, 2, 1, 2, 12, 2, 1, 2, 12, 2, 1, 2] record_writes=6 closed_form=24598 layer0_states=24618
+B36L0-DONE seed=12 judged=24618 range=0..24618 of=24618 full=true seconds=111.6
+B36L0T seed=12 images = 24618
+B36L0T seed=12 new I-4.1 replayed vs core-last: none = 8217
+B36L0T seed=12 new I-4.1 replayed vs core-last: same-bytes = 16401
+B36L0T seed=12 new next-mount vs core-first: none = 8217
+B36L0T seed=12 new next-mount vs core-first: same-bytes = 16401
+B36L0T seed=12 new next-mount: same-instance-as-newest=true txg-minus-newest=1 = 16401
+B36L0T seed=12 new replay-kind: applied publishes=1 = 16401
+B36L0T seed=12 new replay-kind: nothing = 8217
+B36L0T seed=12 pre36 I-4.1 replayed vs core-last: none = 8217
+B36L0T seed=12 pre36 I-4.1 replayed vs core-last: same-bytes = 16401
+B36L0T seed=12 pre36 next-mount vs core-first: none = 8217
+B36L0T seed=12 pre36 next-mount vs core-first: same-bytes = 16401
+B36L0T seed=12-FIRST new I-4.1 replayed vs core-last: none :: seed=12 ordinal=16395 :: checker=None core=Some(((3, 8), None, 0))
+B36L0T seed=12-FIRST new I-4.1 replayed vs core-last: same-bytes :: seed=12 ordinal=0 :: checker=Some((2, 7, 1)) core=Some(((2, 6), Some((2, 7)), 1))
+B36L0T seed=12-FIRST new next-mount vs core-first: none :: seed=12 ordinal=16395 :: checker=None core=Some(((3, 8), None, None, 0, 0, None))
+B36L0T seed=12-FIRST new next-mount vs core-first: same-bytes :: seed=12 ordinal=0 :: checker=Some((2, 7)) core=Some(((2, 6), Some((2, 7)), Some((2, 7)), 1, 0, None))
+B36L0T seed=12-FIRST new next-mount: same-instance-as-newest=true txg-minus-newest=1 :: seed=12 ordinal=0 :: newest=(2, 6) next=(2, 7)
+B36L0T seed=12-FIRST new replay-kind: applied publishes=1 :: seed=12 ordinal=0 :: 
+B36L0T seed=12-FIRST new replay-kind: nothing :: seed=12 ordinal=16395 :: 
+B36L0T seed=12-FIRST pre36 I-4.1 replayed vs core-last: none :: seed=12 ordinal=16395 :: checker=None core=Some(((3, 8), None, 0))
+B36L0T seed=12-FIRST pre36 I-4.1 replayed vs core-last: same-bytes :: seed=12 ordinal=0 :: checker=Some((2, 7, 1)) core=Some(((2, 6), Some((2, 7)), 1))
+B36L0T seed=12-FIRST pre36 next-mount vs core-first: none :: seed=12 ordinal=16395 :: checker=None core=Some(((3, 8), None, None, 0, 0, None))
+B36L0T seed=12-FIRST pre36 next-mount vs core-first: same-bytes :: seed=12 ordinal=0 :: checker=Some((2, 7)) core=Some(((2, 6), Some((2, 7)), Some((2, 7)), 1, 0, None))

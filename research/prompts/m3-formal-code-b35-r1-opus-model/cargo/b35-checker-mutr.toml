@@ -1,0 +1,12 @@
+[package]
+name = "b35-checker-mutr"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "第 35 批代码轮第一轮攻方原型：singlefs-checker 的拷贝，变异：由记录施加出来的那一版照旧取先到的那条记录（mutations.tsv 第35批 35-1 FL 第二行同一改法），GPU 拼 R_DATA 那一行变异的 CPU 对应"
+
+[lib]
+name = "singlefs_checker_mutr"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }

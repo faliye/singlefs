@@ -1,0 +1,8 @@
+# 基线（未改的冻结副本）
+base-lib	test result: ok. 86 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 38.86s 
+base-kbi	test result: ok. 102 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.80s 
+base-overwrite	test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.66s 
+base-turn	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.44s 
+base-reuse	test result: FAILED. 15 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.24s 
+base-reuse-one	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 3.92s 
+probe-p4-build	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.09s 

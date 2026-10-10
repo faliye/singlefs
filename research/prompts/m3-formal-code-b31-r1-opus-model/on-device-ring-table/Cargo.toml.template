@@ -1,0 +1,14 @@
+# 攻方原型（第 31 批代码轮第一轮）：on_device_modes 内存里拼的根环表与 core 的逐项比。`@COPY@` 由 tools/rerun.sh 换成仓副本根。
+[package]
+name = "b31-opus-on-device-ring-table"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+singlefs-core = { path = "@COPY@/crates/singlefs-core" }
+singlefs-format = { path = "@COPY@/crates/singlefs-format" }
+singlefs-harness = { path = "@COPY@/crates/singlefs-harness" }
+singlefs-checker-tier = { path = "@COPY@/crates/singlefs-checker-tier" }
+
+[workspace]

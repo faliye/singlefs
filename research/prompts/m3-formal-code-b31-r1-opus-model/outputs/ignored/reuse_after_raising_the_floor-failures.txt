@@ -1,0 +1,6 @@
+thread 'raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it' (3023587) panicked at crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs:276:9:
+assertion `left == right` failed: I-5.5 在 E 之后的镜像上要成立
+  left: NotApplicable("这个镜像上没有它判的对象")
+--
+test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 86.77s
+

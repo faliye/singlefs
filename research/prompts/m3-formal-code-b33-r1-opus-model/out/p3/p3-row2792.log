@@ -1,0 +1,81 @@
+MUTANT row2792 applied to crates/singlefs-core/src/allocator.rs
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.2
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling convert_case v0.4.0
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.189
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m3-formal-code-b33-r1-opus/w3/p3w/row2792/crates/singlefs-format)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-formal-code-b33-r1-opus/w3/p3w/row2792/crates/singlefs-checker)
+   Compiling synstructure v0.13.2
+   Compiling singlefs-reference-filesystem v0.1.0 (/tmp/claude-1000/m3-formal-code-b33-r1-opus/w3/p3w/row2792/crates/singlefs-reference-filesystem)
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (/tmp/claude-1000/m3-formal-code-b33-r1-opus/w3/p3w/row2792/crates/singlefs-replay-prefix)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-formal-code-b33-r1-opus/w3/p3w/row2792/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b33-r1-opus/w3/p3w/row2792/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 49.56s
+     Running tests/overwrite_in_one_instance.rs (target/debug/deps/overwrite_in_one_instance-0b9fc9e578eee86a)
+
+running 2 tests
+test repeated_overwrites_go_past_the_812_records_of_one_leaf_across_several_leaves_of_the_allocation_record_tree ... FAILED
+test allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records has been running for over 60 seconds
+test allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records ... FAILED
+
+failures:
+
+---- repeated_overwrites_go_past_the_812_records_of_one_leaf_across_several_leaves_of_the_allocation_record_tree stdout ----
+
+thread 'repeated_overwrites_go_past_the_812_records_of_one_leaf_across_several_leaves_of_the_allocation_record_tree' (421884) panicked at crates/singlefs-harness/tests/overwrite_in_one_instance.rs:658:5:
+30 次覆盖写（txg 33，840 条分配记录）之后池级 checker 判红：[("I-3.1", Violated("盘 0：记账的已分配 Some(7913472)，遍历全部有效根得到 6291456（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 33、环里自证过的根槽 24 个、最老的自证过的根 txg 10、遍历的候选根槽 24 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个"))]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records stdout ----
+
+thread 'allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records' (421883) panicked at crates/singlefs-harness/tests/overwrite_in_one_instance.rs:744:9:
+第 23 次覆盖写（txg 26，644 条分配记录）之后池级 checker 判红：[("I-3.1", Violated("盘 0：记账的已分配 Some(6078464)，遍历全部有效根得到 6062080（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 26、环里自证过的根槽 24 个、最老的自证过的根 txg 3、遍历的候选根槽 24 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个"))]
+
+
+failures:
+    allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records
+    repeated_overwrites_go_past_the_812_records_of_one_leaf_across_several_leaves_of_the_allocation_record_tree
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 10 filtered out; finished in 61.07s
+
+error: test failed, to rerun pass `-p singlefs-harness --test overwrite_in_one_instance`
+     Running tests/root_ring_turn_in_one_mount.rs (target/debug/deps/root_ring_turn_in_one_mount-7f480bbba1f04e0e)
+
+running 3 tests
+test an_overwrite_that_goes_out_after_a_remount_goes_out_in_the_same_mount_as_well ... ok
+test zero_unit_publish_the_caller_issued_before_the_first_file_version_is_recorded_into_the_root_ring ... ok
+test turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it ... FAILED
+
+failures:
+
+---- turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it stdout ----
+
+thread 'turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it' (424092) panicked at crates/singlefs-harness/tests/root_ring_turn_in_one_mount.rs:108:9:
+盘 DeviceIdentity(0)：txg 26 盖掉 txg 2 之后 mkfs 那片树表按谓词回收，同一次挂载里就回到空闲
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.98s
+
+error: test failed, to rerun pass `-p singlefs-harness --test root_ring_turn_in_one_mount`
+error: 2 targets failed:
+    `-p singlefs-harness --test overwrite_in_one_instance`
+    `-p singlefs-harness --test root_ring_turn_in_one_mount`

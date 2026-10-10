@@ -1,0 +1,8 @@
+f3-model variant=entered(fnv1a) inline=green(4095) A=262080/262080 B=4095/4095 C=8190/8190
+f3-model variant=take(12) inline=green(4095) A=262080/262080 B=1/4095 C=8190/8190
+f3-model variant=take(16) inline=green(4095) A=262080/262080 B=1/4095 C=8190/8190
+f3-model variant=bitmask-shl inline=green(4095) A=4096/262080 B=4095/4095 C=4096/8190
+f3-model variant=drop-history-seed inline=green(4095) A=262080/262080 B=4095/4095 C=4095/8190
+f3-model variant=drop-segment inline=green(4095) A=4095/262080 B=4095/4095 C=8190/8190
+f3-model variant=or-not-xor inline=green(4095) A=13254/262080 B=4095/4095 C=5998/8190
+f3-model variant=take(1) inline=red(2) A=128/262080 B=1/4095 C=4/8190

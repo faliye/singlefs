@@ -1,0 +1,6 @@
+RESULT name=O1 跨叶容器（理想模型自身）：第二片晚一条才分出（一片按 234 条记，第 234 个 inode 的新记录与重写记成 anchor_hits=1 exit=101 outcome=caught failed=1 passed=0
+  FAILED_LINE test creating_inodes_one_at_a_time_past_the_first_leaf_container_is_judged_by_the_model_container_by_container ... FAILED
+RESULT name=O1 跨叶容器（胶水）：实现交回的每片叶容器都当成最左那片 anchor_hits=1 exit=101 outcome=caught failed=1 passed=0
+  FAILED_LINE test creating_inodes_one_at_a_time_past_the_first_leaf_container_is_judged_by_the_model_container_by_container ... FAILED
+RESULT name=O1 跨叶容器（理想模型自身）：新记录落在第二片时最左那片也记成这次重写（分配代按第一片记） anchor_hits=1 exit=101 outcome=caught failed=1 passed=0
+  FAILED_LINE test creating_inodes_one_at_a_time_past_the_first_leaf_container_is_judged_by_the_model_container_by_container ... FAILED

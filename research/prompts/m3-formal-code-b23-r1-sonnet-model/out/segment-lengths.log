@@ -1,0 +1,13 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b23-r1-sonnet/ws/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.50s
+     Running tests/b23_segment_lengths_probe.rs (/tmp/claude-1000/m3-formal-code-b23-r1-sonnet/target/debug/deps/b23_segment_lengths_probe-eeba36b4e2224851)
+
+running 1 test
+test segment_length_histogram_over_random_histories has been running for over 60 seconds
+segment-length histogram (len: count) = {1: 350, 2: 634, 4: 20, 12: 27, 14: 30, 16: 42, 18: 9, 20: 73, 22: 7, 24: 55, 26: 2, 28: 21}
+longest segment = 28 writes (seed 0, width 4GiB)
+segments longer than 12 = 239
+test segment_length_histogram_over_random_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 94.50s
+

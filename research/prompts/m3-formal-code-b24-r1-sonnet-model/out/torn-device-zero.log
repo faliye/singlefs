@@ -1,0 +1,7 @@
+test a_refusal_on_a_crash_image_without_read_faults_where_a_device_has_both_system_configuration_slots_torn_is_legal ... ok
+b24-torn refusal comparison = Some(AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 })
+test the_same_witness_refusal_in_a_crash_state_with_read_faults_injected_is_legal ... ok
+test a_witness_refusal_on_a_crash_image_without_read_faults_where_only_a_rotation_landed_is_illegal ... ok
+b24-torn verdict = Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [WitnessCriterionTrueOnACrashImageWithoutReadFaults(WitnessedCounterAboveTheLastRecordOfTheSelectedVersion)] }
+test b24_probe_a_torn_device_zero_with_the_rotation_landed_on_device_one_is_illegal ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s

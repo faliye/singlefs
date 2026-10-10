@@ -1,0 +1,271 @@
+## b29_l2_checker_sweep-6-10.log
+PROBE histories=24 checks=703
+PROBE I-1.1 Holds boundary 294
+PROBE I-1.1 Holds crash_state 409
+PROBE I-2.4 Holds boundary 294
+PROBE I-2.4 Holds crash_state 409
+PROBE I-5.4 Holds boundary 196
+PROBE I-5.4 Holds crash_state 361
+PROBE I-5.4 NotApplicable boundary 98
+PROBE I-5.4 NotApplicable crash_state 48
+PROBE I-5.5 Holds boundary 189
+PROBE I-5.5 Holds crash_state 353
+PROBE I-5.5 NotApplicable boundary 105
+PROBE I-5.5 NotApplicable crash_state 56
+PROBE I-9.16 Holds boundary 294
+PROBE I-9.16 Holds crash_state 409
+## b29_l2_checker_sweep-6-1.log
+PROBE histories=24 checks=680
+PROBE I-1.1 Holds boundary 287
+PROBE I-1.1 Holds crash_state 393
+PROBE I-2.4 Holds boundary 287
+PROBE I-2.4 Holds crash_state 393
+PROBE I-5.4 Holds boundary 191
+PROBE I-5.4 Holds crash_state 345
+PROBE I-5.4 NotApplicable boundary 96
+PROBE I-5.4 NotApplicable crash_state 48
+PROBE I-5.5 Holds boundary 191
+PROBE I-5.5 Holds crash_state 345
+PROBE I-5.5 NotApplicable boundary 96
+PROBE I-5.5 NotApplicable crash_state 48
+PROBE I-9.16 Holds boundary 287
+PROBE I-9.16 Holds crash_state 393
+## b29_l2_checker_sweep-6-30.log
+PROBE histories=24 checks=603
+PROBE_KIND CloseAndMountWritable 23
+PROBE_KIND ColdStartRecover 5
+PROBE_KIND CrashRecoveryAbandoningTheNewestRoot 1
+PROBE_KIND CreateInode 7
+PROBE_KIND OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable 1
+PROBE_KIND PublishFirstFile 11
+PROBE_KIND PublishOverwrite 66
+PROBE_KIND RaiseRollbackFloor 10
+PROBE_KIND RollBackWhileMounted 12
+PROBE_KIND Unlink 7
+PROBE_KIND WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros 1
+PROBE I-1.1 Holds boundary 264
+PROBE I-1.1 Holds crash_state 339
+PROBE I-2.4 Holds boundary 264
+PROBE I-2.4 Holds crash_state 339
+PROBE I-5.4 Holds boundary 165
+PROBE I-5.4 Holds crash_state 291
+PROBE I-5.4 NotApplicable boundary 99
+PROBE I-5.4 NotApplicable crash_state 48
+PROBE I-5.5 Holds boundary 159
+PROBE I-5.5 Holds crash_state 285
+PROBE I-5.5 NotApplicable boundary 105
+PROBE I-5.5 NotApplicable crash_state 54
+PROBE I-9.16 Holds boundary 264
+PROBE I-9.16 Holds crash_state 339
+## b29_l2_checker_sweep-6-33.log
+PROBE histories=24 checks=797
+PROBE_KIND CloseAndMountWritable 23
+PROBE_KIND ColdStartRecover 2
+PROBE_KIND CreateInode 2
+PROBE_KIND OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable 1
+PROBE_KIND PublishFirstFile 3
+PROBE_KIND PublishOverwrite 83
+PROBE_KIND RaiseRollbackFloor 7
+PROBE_KIND RollBackWhileMounted 20
+PROBE_KIND Unlink 3
+PROBE I-1.1 Holds boundary 323
+PROBE I-1.1 Holds crash_state 474
+PROBE I-2.4 Holds boundary 323
+PROBE I-2.4 Holds crash_state 474
+PROBE I-5.4 Holds boundary 227
+PROBE I-5.4 Holds crash_state 426
+PROBE I-5.4 NotApplicable boundary 96
+PROBE I-5.4 NotApplicable crash_state 48
+PROBE I-5.5 Holds boundary 227
+PROBE I-5.5 Holds crash_state 426
+PROBE I-5.5 NotApplicable boundary 96
+PROBE I-5.5 NotApplicable crash_state 48
+PROBE I-9.16 Holds boundary 323
+PROBE I-9.16 Holds crash_state 474
+## b29_l2_checker_sweep-6-36.log
+PROBE histories=24 checks=638
+PROBE_KIND CloseAndMountWritable 6
+PROBE_KIND ColdStartRecover 2
+PROBE_KIND CreateInode 2
+PROBE_KIND OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable 2
+PROBE_KIND PublishFirstFile 7
+PROBE_KIND PublishOverwrite 81
+PROBE_KIND RaiseRollbackFloor 26
+PROBE_KIND RollBackWhileMounted 10
+PROBE_KIND Unlink 8
+PROBE I-1.1 Holds boundary 271
+PROBE I-1.1 Holds crash_state 367
+PROBE I-2.4 Holds boundary 271
+PROBE I-2.4 Holds crash_state 367
+PROBE I-5.4 Holds boundary 175
+PROBE I-5.4 Holds crash_state 319
+PROBE I-5.4 NotApplicable boundary 96
+PROBE I-5.4 NotApplicable crash_state 48
+PROBE I-5.5 Holds boundary 175
+PROBE I-5.5 Holds crash_state 319
+PROBE I-5.5 NotApplicable boundary 96
+PROBE I-5.5 NotApplicable crash_state 48
+PROBE I-9.16 Holds boundary 271
+PROBE I-9.16 Holds crash_state 367
+## b29_l2_checker_sweep-6-39.log
+PROBE histories=24 checks=630
+PROBE_KIND CloseAndMountWritable 24
+PROBE_KIND ColdStartRecover 5
+PROBE_KIND CrashRecoveryAbandoningTheNewestRoot 1
+PROBE_KIND CreateInode 6
+PROBE_KIND OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable 2
+PROBE_KIND PublishFirstFile 6
+PROBE_KIND PublishOverwrite 63
+PROBE_KIND PublishWithoutUnits 6
+PROBE_KIND RaiseRollbackFloor 14
+PROBE_KIND RollBackWhileMounted 14
+PROBE_KIND Unlink 3
+PROBE I-1.1 Holds boundary 271
+PROBE I-1.1 Holds crash_state 359
+PROBE I-2.4 Holds boundary 271
+PROBE I-2.4 Holds crash_state 359
+PROBE I-5.4 Holds boundary 173
+PROBE I-5.4 Holds crash_state 309
+PROBE I-5.4 NotApplicable boundary 98
+PROBE I-5.4 NotApplicable crash_state 50
+PROBE I-5.5 Holds boundary 173
+PROBE I-5.5 Holds crash_state 309
+PROBE I-5.5 NotApplicable boundary 98
+PROBE I-5.5 NotApplicable crash_state 50
+PROBE I-9.16 Holds boundary 271
+PROBE I-9.16 Holds crash_state 359
+## b29_l2_checker_sweep-6-42.log
+PROBE histories=24 checks=730
+PROBE_KIND CloseAndMountWritable 24
+PROBE_KIND ColdStartRecover 2
+PROBE_KIND CreateInode 6
+PROBE_KIND OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable 4
+PROBE_KIND PublishFirstFile 9
+PROBE_KIND PublishOverwrite 63
+PROBE_KIND PublishWithoutUnits 2
+PROBE_KIND RaiseRollbackFloor 12
+PROBE_KIND RollBackWhileMounted 14
+PROBE_KIND Unlink 8
+PROBE I-1.1 Holds boundary 300
+PROBE I-1.1 Holds crash_state 430
+PROBE I-2.4 Holds boundary 300
+PROBE I-2.4 Holds crash_state 430
+PROBE I-5.4 Holds boundary 204
+PROBE I-5.4 Holds crash_state 382
+PROBE I-5.4 NotApplicable boundary 96
+PROBE I-5.4 NotApplicable crash_state 48
+PROBE I-5.5 Holds boundary 204
+PROBE I-5.5 Holds crash_state 382
+PROBE I-5.5 NotApplicable boundary 96
+PROBE I-5.5 NotApplicable crash_state 48
+PROBE I-9.16 Holds boundary 300
+PROBE I-9.16 Holds crash_state 430
+## b29_l2_checker_sweep-6-45.log
+PROBE histories=24 checks=664
+PROBE_KIND CloseAndMountWritable 14
+PROBE_KIND CrashRecoveryAbandoningTheNewestRoot 2
+PROBE_KIND CreateInode 5
+PROBE_KIND OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable 1
+PROBE_KIND PublishFirstFile 4
+PROBE_KIND PublishOverwrite 72
+PROBE_KIND PublishWithoutUnits 3
+PROBE_KIND RaiseRollbackFloor 20
+PROBE_KIND RollBackWhileMounted 14
+PROBE_KIND Unlink 7
+PROBE_KIND WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros 2
+PROBE I-1.1 Holds boundary 279
+PROBE I-1.1 Holds crash_state 385
+PROBE I-2.4 Holds boundary 279
+PROBE I-2.4 Holds crash_state 385
+PROBE I-5.4 Holds boundary 183
+PROBE I-5.4 Holds crash_state 337
+PROBE I-5.4 NotApplicable boundary 96
+PROBE I-5.4 NotApplicable crash_state 48
+PROBE I-5.5 Holds boundary 183
+PROBE I-5.5 Holds crash_state 337
+PROBE I-5.5 NotApplicable boundary 96
+PROBE I-5.5 NotApplicable crash_state 48
+PROBE I-9.16 Holds boundary 279
+PROBE I-9.16 Holds crash_state 385
+## b29_l2_checker_sweep-6-48.log
+PROBE histories=24 checks=669
+PROBE_KIND CloseAndMountWritable 7
+PROBE_KIND ColdStartRecover 2
+PROBE_KIND CreateInode 4
+PROBE_KIND OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable 3
+PROBE_KIND PublishFirstFile 2
+PROBE_KIND PublishOverwrite 95
+PROBE_KIND RaiseRollbackFloor 18
+PROBE_KIND RollBackWhileMounted 7
+PROBE_KIND Unlink 6
+PROBE I-1.1 Holds boundary 278
+PROBE I-1.1 Holds crash_state 391
+PROBE I-2.4 Holds boundary 278
+PROBE I-2.4 Holds crash_state 391
+PROBE I-5.4 Holds boundary 182
+PROBE I-5.4 Holds crash_state 343
+PROBE I-5.4 NotApplicable boundary 96
+PROBE I-5.4 NotApplicable crash_state 48
+PROBE I-5.5 Holds boundary 182
+PROBE I-5.5 Holds crash_state 343
+PROBE I-5.5 NotApplicable boundary 96
+PROBE I-5.5 NotApplicable crash_state 48
+PROBE I-9.16 Holds boundary 278
+PROBE I-9.16 Holds crash_state 391
+## b29_l2_checker_sweep-6-4.log
+PROBE histories=24 checks=658
+PROBE I-1.1 Holds boundary 279
+PROBE I-1.1 Holds crash_state 379
+PROBE I-2.4 Holds boundary 279
+PROBE I-2.4 Holds crash_state 379
+PROBE I-5.4 Holds boundary 179
+PROBE I-5.4 Holds crash_state 327
+PROBE I-5.4 NotApplicable boundary 100
+PROBE I-5.4 NotApplicable crash_state 52
+PROBE I-5.5 Holds boundary 179
+PROBE I-5.5 Holds crash_state 327
+PROBE I-5.5 NotApplicable boundary 100
+PROBE I-5.5 NotApplicable crash_state 52
+PROBE I-9.16 Holds boundary 279
+PROBE I-9.16 Holds crash_state 379
+## b29_l2_checker_sweep-6-51.log
+PROBE histories=24 checks=620
+PROBE_KIND CloseAndMountWritable 16
+PROBE_KIND ColdStartRecover 2
+PROBE_KIND CreateInode 4
+PROBE_KIND OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable 4
+PROBE_KIND PublishFirstFile 7
+PROBE_KIND PublishOverwrite 82
+PROBE_KIND RaiseRollbackFloor 14
+PROBE_KIND RollBackWhileMounted 11
+PROBE_KIND Unlink 4
+PROBE I-1.1 Holds boundary 263
+PROBE I-1.1 Holds crash_state 357
+PROBE I-2.4 Holds boundary 263
+PROBE I-2.4 Holds crash_state 357
+PROBE I-5.4 Holds boundary 167
+PROBE I-5.4 Holds crash_state 309
+PROBE I-5.4 NotApplicable boundary 96
+PROBE I-5.4 NotApplicable crash_state 48
+PROBE I-5.5 Holds boundary 167
+PROBE I-5.5 Holds crash_state 309
+PROBE I-5.5 NotApplicable boundary 96
+PROBE I-5.5 NotApplicable crash_state 48
+PROBE I-9.16 Holds boundary 263
+PROBE I-9.16 Holds crash_state 357
+## b29_l2_checker_sweep-6-7.log
+PROBE histories=24 checks=748
+PROBE I-1.1 Holds boundary 306
+PROBE I-1.1 Holds crash_state 442
+PROBE I-2.4 Holds boundary 306
+PROBE I-2.4 Holds crash_state 442
+PROBE I-5.4 Holds boundary 210
+PROBE I-5.4 Holds crash_state 394
+PROBE I-5.4 NotApplicable boundary 96
+PROBE I-5.4 NotApplicable crash_state 48
+PROBE I-5.5 Holds boundary 210
+PROBE I-5.5 Holds crash_state 394
+PROBE I-5.5 NotApplicable boundary 96
+PROBE I-5.5 NotApplicable crash_state 48
+PROBE I-9.16 Holds boundary 306
+PROBE I-9.16 Holds crash_state 442

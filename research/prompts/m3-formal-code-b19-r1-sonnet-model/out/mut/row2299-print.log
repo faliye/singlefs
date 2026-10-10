@@ -1,0 +1,33 @@
+run-with-memory-cap: 上限 4G 超过实测峰值 328M 的 2 倍，照理由放行：副本上的变异跑法，峰值表按原命令键登记、这里编的是副本
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：云端正推腿与云端攻方腿各跑各的探针，并行派出
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/ws/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.58s
+     Running tests/kbi_print.rs (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/target/debug/deps/kbi_print-8291e6d2d51f06d4)
+
+running 1 test
+IMG 0/22 I-1.12 -> ["I-1.12"]
+IMG 1/22 I-8.10 -> ["I-8.10"]
+IMG 2/22 I-9.25 -> ["I-9.25"]
+IMG 3/22 I-3.13 -> ["I-3.13"]
+IMG 4/22 I-9.26 -> ["I-9.26"]
+IMG 5/22 I-9.25 -> ["I-9.25"]
+IMG 6/22 I-9.26 -> ["I-9.26"]
+IMG 7/22 I-7.17 -> ["I-7.17"]
+IMG 8/22 I-8.10 -> ["I-8.10"]
+IMG 9/22 I-8.10 -> ["I-8.10"]
+IMG 10/22 I-8.10 -> ["I-8.10"]
+IMG 11/22 I-2.4 -> ["I-2.4"]
+IMG 12/22 I-2.4 -> ["I-2.4"]
+IMG 13/22 I-2.4 -> ["I-2.4"]
+IMG 14/22 I-7.17 -> ["I-7.17"]
+IMG 15/22 I-7.15 -> ["I-7.15"]
+IMG 16/22 I-2.4 -> ["I-2.4"]
+IMG 17/22 I-9.27 -> ["I-9.27"]
+IMG 18/22 I-9.27 -> ["I-9.27"]
+IMG 19/22 I-9.27 -> []
+IMG 20/22 I-9.27 -> ["I-9.27"]
+IMG 21/22 I-9.27 -> ["I-9.27"]
+test each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; finished in 3.65s
+

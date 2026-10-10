@@ -1,0 +1,204 @@
+--- /home/fy5090/code/singlefs/research/target/e171-r1-frozen-tree/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs	2026-10-04 22:44:24.298013369 +0000
++++ /tmp/claude-1000/m3-formal-code-b25-r1-sonnet/tree/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs	2026-10-04 23:36:40.466868771 +0000
+@@ -7499,6 +7499,66 @@
+                 "name=q5_partition sampling_point={sampling_point} {}",
+                 partition_fields(&classification, &evaluation.checks)
+             ));
++            {
++                // 正推腿探针：在主取样点的真流（C 24 个写）上，每种 K 取法各取：C 单个落、C 缺一个、随机子集若干，照原路径判，
++                // 与类里推出的恢复、两个崩溃子列、RefFS 一票比；同类里 O2 与层 0 判定的取值集合另报。
++                let per_assignment_random: u64 = std::env::var("PROBE_RANDOM_PER_ASSIGNMENT").ok().and_then(|v| v.parse().ok()).unwrap_or(20);
++                let mut chosen: BTreeSet<u64> = BTreeSet::new();
++                let mut seed: u64 = 0x9E37_79B9_7F4A_7C15;
++                let mut next = || { seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17; seed };
++                let class_weights: Vec<u64> = classification.partition.class_positions.iter().map(|p| digits.weights[*p]).collect();
++                for keyed_assignment in 0..classification.partition.keyed_assignments(&digits) {
++                    let base = classification.partition.representative_ordinal(&digits, keyed_assignment);
++                    for i in 0..class_weights.len() {
++                        chosen.insert(base + class_weights[i]);
++                        let all: u64 = class_weights.iter().sum();
++                        chosen.insert(base + all - class_weights[i]);
++                    }
++                    for _ in 0..per_assignment_random {
++                        let mask = next() & ((1u64 << class_weights.len()) - 1);
++                        let mut ordinal = base;
++                        for i in 0..class_weights.len() {
++                            if mask >> i & 1 == 1 { ordinal += class_weights[i]; }
++                        }
++                        chosen.insert(ordinal);
++                    }
++                }
++                let already: BTreeSet<u64> = export.observations.iter().map(|o| o.ordinal).collect();
++                chosen.retain(|o| !already.contains(o));
++                eprintln!("PROBE extra_states_chosen={}", chosen.len());
++                let extra = observe_sampled_states(
++                    &context,
++                    &SampledOrdinals { batches: [chosen, BTreeSet::new(), BTreeSet::new()], torn_scans: Vec::new() },
++                    RunSwitches::default(),
++                    ConsultedReports::Kept,
++                );
++                let mut mismatching = 0usize;
++                let mut mismatching_o1_or_ref = 0usize;
++                let mut o2_by_class: BTreeMap<ConfirmedLossClassKey, BTreeSet<String>> = BTreeMap::new();
++                let mut l0_by_class: BTreeMap<ConfirmedLossClassKey, BTreeSet<String>> = BTreeMap::new();
++                let mut example: Option<String> = None;
++                for observation in extra.iter().chain(export.observations.iter()) {
++                    let mut key = classification.partition.class_of_ordinal(&digits, observation.ordinal);
++                    if std::env::var("PROBE_BREAK_KEY").is_ok() {
++                        // 自证会红：把键里第一个 K 写的取法抹掉（一个分错的类），探针必须报出不同。
++                        key.keyed_assignment = key.keyed_assignment / digits.radixes[classification.partition.keyed_positions[0]] * digits.radixes[classification.partition.keyed_positions[0]];
++                    }
++                    o2_by_class.entry(key).or_default().insert(format!("{:?}", observation.pool_checker_red));
++                    l0_by_class.entry(key).or_default().insert(format!("{:?}", observation.verdict));
++                    if ClassColumns::of_the_observation(observation).as_ref() != evaluation.classes.get(&key).map(|class| &class.columns) {
++                        mismatching += 1;
++                        mismatching_o1_or_ref += 1;
++                        if example.is_none() {
++                            example = Some(format!("ordinal={} landing={} key={key:?}", observation.ordinal, observation.landing_vector));
++                        }
++                    }
++                }
++                let classes_diff_o2 = o2_by_class.values().filter(|v| v.len() > 1).count();
++                let classes_diff_l0 = l0_by_class.values().filter(|v| v.len() > 1).count();
++                let o2_all: BTreeSet<String> = o2_by_class.values().flatten().cloned().collect();
++                eprintln!("PROBE main_stream_extra_states={} mismatching_vs_class_columns={mismatching} (o1_or_ref={mismatching_o1_or_ref}) classes_seen={} classes_with_different_o2={classes_diff_o2} classes_with_different_layer0={classes_diff_l0} o2_values={:?}", extra.len(), o2_by_class.len(), o2_all);
++                if let Some(e) = example { eprintln!("PROBE first_mismatch {e}"); }
++            }
+             for class in evaluation.classes.values() {
+                 let lost = confirmed_root
+                     .and_then(|confirmed| {
+@@ -8595,6 +8655,40 @@
+                 != ClassColumns::of_the_observation(observation).as_ref()
+         })
+         .count();
++    {
++        // 正推腿探针：同一类里各态的 O2（池级 checker 的红名单）、层 0 判定、落地串、触达调用是不是相同。
++        let mut by_class: BTreeMap<ConfirmedLossClassKey, Vec<&StateObservation>> = BTreeMap::new();
++        for observation in &observations {
++            let key = classification.partition.class_of_ordinal(&digits, observation.ordinal);
++            by_class.entry(key).or_default().push(observation);
++        }
++        let mut classes_with_different_o2 = 0usize;
++        let mut classes_with_different_layer0 = 0usize;
++        let mut classes_with_more_than_one_member = 0usize;
++        let mut first_example: Option<String> = None;
++        for (key, members) in &by_class {
++            if members.len() > 1 {
++                classes_with_more_than_one_member += 1;
++            }
++            let o2_set: BTreeSet<String> = members.iter().map(|o| format!("{:?}", o.pool_checker_red)).collect();
++            let l0_set: BTreeSet<String> = members.iter().map(|o| format!("{:?}", o.verdict)).collect();
++            if o2_set.len() > 1 {
++                classes_with_different_o2 += 1;
++                if first_example.is_none() {
++                    first_example = Some(format!("key={key:?} members={} o2_values={:?} landings={:?}", members.len(), o2_set, members.iter().map(|o| o.landing_vector.clone()).collect::<Vec<_>>()));
++                }
++            }
++            if l0_set.len() > 1 {
++                classes_with_different_layer0 += 1;
++            }
++        }
++        eprintln!("PROBE classes={} multi_member_classes={classes_with_more_than_one_member} classes_with_different_o2={classes_with_different_o2} classes_with_different_layer0_verdict={classes_with_different_layer0}", by_class.len());
++        if let Some(example) = first_example {
++            eprintln!("PROBE first_o2_difference {example}");
++        }
++        let o2_all: BTreeSet<String> = observations.iter().map(|o| format!("{:?}", o.pool_checker_red)).collect();
++        eprintln!("PROBE o2_distinct_values_over_all_states={:?}", o2_all);
++    }
+     EquivalencePairing {
+         states: u64::try_from(observations.len()).expect("态数"),
+         product_of_the_choices,
+@@ -8617,6 +8711,15 @@
+     checks.extend(confirmed_loss_form_checks_against_the_crates());
+     for name in streams {
+         let stream = prepare_stream(*name, RunSwitches::default(), true);
++        {
++            let mut histogram: BTreeMap<String, usize> = BTreeMap::new();
++            for call in &stream.calls {
++                let text = format!("{:?}", call.model);
++                let word: String = text.chars().take_while(|c| c.is_alphanumeric()).collect();
++                *histogram.entry(word).or_insert(0) += 1;
++            }
++            eprintln!("PROBE stream={} calls={} model_verdict_histogram={histogram:?} model_stopped_at_call={:?}", name.directory_name(), stream.calls.len(), stream.model_stopped_at_call);
++        }
+         let tables = layer0_enumeration_tables(
+             &stream.base,
+             &stream.writes,
+@@ -8668,7 +8771,77 @@
+     }
+ }
+ 
++/// 正推腿探针（只在草稿副本里）：复刻内联用例 `equivalence_classes_reproduce_...` 与 `an_in_flight_write_over_a_journal_record_...`
++/// 的取样与断言口径，打印每一项读数，不判红绿。装置二进制里跑小规模（288 态那一形），不是内联单测。
++fn probe_unit_logic() {
++    let mut stream = {
++        confirmed_loss_prepared_stream(
++            second_stream_through_the_first_overwrite(RunSwitches::default()),
++            ConfirmedLossTruncation::AfterTheFirstInFlightWrites(EQUIVALENCE_PAIRING_IN_FLIGHT_WRITES_KEPT),
++        )
++        .0
++    };
++    let pairing = equivalence_pairing_of(&stream);
++    println!("PROBE_UNIT A states={} class_states_equal_product={} classes={} refinements={} checks_all_zero={} mismatching_states={} stops_at_s13={}",
++        pairing.states, pairing.class_states == pairing.product_of_the_choices, pairing.classes, pairing.classification.refinements,
++        pairing.checks.input_list_mismatches + pairing.checks.in_flight_writes_of_a_forbidden_kind + pairing.checks.recording_report_mismatches + pairing.checks.derived_class_mismatches + pairing.checks.class_landing_mismatches == 0,
++        pairing.mismatching_states, pairing.stops_at_s13());
++    stream.model_stopped_at_call = Some(CONFIRMED_LOSS_IN_FLIGHT_CALL);
++    let stopped = equivalence_pairing_of(&stream);
++    let not_applicable = stopped.observations.iter().filter(|o| o.crash_judge == CrashJudgeVerdict::NotApplicable).count();
++    println!("PROBE_UNIT B not_applicable_states={not_applicable} (unit test expects 216) mismatching_states={} stops_at_s13={}", stopped.mismatching_states, stopped.stops_at_s13());
++    let (main, _) = confirmed_loss_prepared_stream(
++        second_stream_through_the_first_overwrite(RunSwitches::default()),
++        ConfirmedLossTruncation::BeforeTheInFlightBarrier,
++    );
++    let main_tables = ObservationTables::of(&main);
++    let main_context = main_tables.context(&main);
++    let main_digits = LastSegmentDigits::of(&main, &main_tables.tables);
++    let (class_positions, keyed_positions): (Vec<usize>, Vec<usize>) = (0..main_digits.write_indexes.len())
++        .partition(|position| main_context.call_of_write[main_digits.write_indexes[*position]] == Some(CONFIRMED_LOSS_IN_FLIGHT_CALL));
++    let main_partition = ConfirmedLossPartition { keyed_positions, class_positions };
++    println!("PROBE_UNIT D main_sum={} local_states={}", main_partition.keyed_assignments(&main_digits) * (1 + main_partition.states_with_the_in_flight_writes_landed(&main_digits)), LOCAL_CONFIRMED_LOSS_STATES);
++    // C：第 3 次调用的第 1 个写挪到第 2 次调用第一个 journal 记录写的同一落点
++    let mut stream = confirmed_loss_prepared_stream(
++        second_stream_through_the_first_overwrite(RunSwitches::default()),
++        ConfirmedLossTruncation::AfterTheFirstInFlightWrites(EQUIVALENCE_PAIRING_IN_FLIGHT_WRITES_KEPT),
++    ).0;
++    let call_of_write = call_index_of_each_write(&stream);
++    let last_segment = stream.segments.last().cloned().expect("末段");
++    let journal_record_write = last_segment.iter().copied().find(|w| call_of_write[*w] == Some(CONFIRMED_LOSS_CONFIRMED_CALL) && stream.writes[*w].kind == StepKind::JournalRecord).expect("journal 写");
++    let first_in_flight_position = last_segment.iter().position(|w| call_of_write[*w] == Some(CONFIRMED_LOSS_IN_FLIGHT_CALL)).expect("C 写");
++    let first_in_flight_write = last_segment[first_in_flight_position];
++    stream.writes[first_in_flight_write].device = stream.writes[journal_record_write].device;
++    stream.writes[first_in_flight_write].offset = stream.writes[journal_record_write].offset;
++    let pairing = equivalence_pairing_of(&stream);
++    let tables = ObservationTables::of(&stream);
++    let digits = LastSegmentDigits::of(&stream, &tables.tables);
++    let weight = digits.weights[first_in_flight_position];
++    let by_ordinal: BTreeMap<u64, &StateObservation> = pairing.observations.iter().map(|o| (o.ordinal, o)).collect();
++    let differing = pairing.observations.iter().filter(|o| digits.digit_of(o.ordinal, first_in_flight_position) == 1).filter(|o| by_ordinal[&(o.ordinal - weight)].consulted_report != o.consulted_report).count();
++    {
++        // D：第 3 次调用的第 1 个写在录制里是系统配置槽那一档的写（偏移 0），写表里同样挪到偏移 0：类核对 ② 报一个、③ 细分一次。
++        let mut stream = confirmed_loss_prepared_stream(
++            second_stream_through_the_first_overwrite(RunSwitches::default()),
++            ConfirmedLossTruncation::AfterTheFirstInFlightWrites(EQUIVALENCE_PAIRING_IN_FLIGHT_WRITES_KEPT),
++        ).0;
++        let call_of_write = call_index_of_each_write(&stream);
++        let last_segment = stream.segments.last().cloned().expect("末段");
++        let w = last_segment.iter().copied().find(|w| call_of_write[*w] == Some(CONFIRMED_LOSS_IN_FLIGHT_CALL)).expect("C 写");
++        let op_index = stream.stream_indexes[w];
++        stream.operations[op_index].operation.offset = DeviceOffsetInBytes(0);
++        stream.writes[w].offset = DeviceOffsetInBytes(0);
++        let pairing = equivalence_pairing_of(&stream);
++        println!("PROBE_UNIT D2 forbidden_kind={} refinements={} mismatching_states={} stops_at_s13={}", pairing.checks.in_flight_writes_of_a_forbidden_kind, pairing.classification.refinements, pairing.mismatching_states, pairing.stops_at_s13());
++    }
++    println!("PROBE_UNIT C moved_positions={:?} (expects [{first_in_flight_position}]) refinements={} differing_when_that_write_lands={differing} mismatching_states={} stops_at_s13={}", pairing.classification.moved_positions, pairing.classification.refinements, pairing.mismatching_states, pairing.stops_at_s13());
++}
++
+ fn main() {
++    if std::env::var("PROBE_UNIT").is_ok() {
++        probe_unit_logic();
++        return;
++    }
+     let arguments: Vec<String> = std::env::args().skip(1).collect();
+     let Some(parsed) = parse_command_line(&arguments) else {
+         eprintln!(

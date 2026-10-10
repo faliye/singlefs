@@ -1,0 +1,31 @@
+--- pkg/walk-frozen.rs	2026-10-06 02:04:02.282224899 +0000
++++ tree/crates/b34-checker-fl/src/walk.rs	2026-10-06 01:57:14.370679194 +0000
+@@ -5517,7 +5517,9 @@
+     records_as_the_recovery_reads_them
+         .iter()
+         .find(|((_, counter), record)| {
+-            record.commit_marker == CommitMarker::Present
++            // 改法 FL（攻方原型）：恢复只在走到带末条标志的那一条时整次施加，取的是那一条的新根段。
++            record.record_flags_byte & RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH != 0
++                && record.commit_marker == CommitMarker::Present
+                 && record.instance == newest_root.instance
+                 && record.checkpoint_txg == next_txg
+                 && record_can_enter_a_replay_prefix(
+@@ -7744,9 +7746,14 @@
+             && at_or_above_the_floor
+             && its_units_are_not_reclaimable_yet
+         {
+-            versions
+-                .entry((record.instance, record.checkpoint_txg))
+-                .or_insert_with(|| record.new_root_segment.clone());
++            // 改法 FL（攻方原型）：取恢复施加的那一条——带末条标志的那条记录的新根段；没有带标志的才退回第一条。
++            if record.record_flags_byte & RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH != 0 {
++                versions.insert((record.instance, record.checkpoint_txg), record.new_root_segment.clone());
++            } else {
++                versions
++                    .entry((record.instance, record.checkpoint_txg))
++                    .or_insert_with(|| record.new_root_segment.clone());
++            }
+         }
+     }
+     versions

@@ -1,0 +1,5 @@
+bf7fb3454992809b583b87e12c32cd7999d769265a975b3997a51da986407da1  .claude/kb/invariants.md
+7a9601f47aeba5eb1851b616f6ea9cf7dfc6c24e15e353a1d08c78499ee7cdbc  .claude/kb/checks-owed.md
+1941a2e0d2f06aedf343b0229a6443bbf455043ee05835bc3f9cc1d2f19f55c0  .claude/kb/decisions/16-发布语义.md
+cf05cdd09ad6f8a686110d2165f081b2d814219522f2036ec627bd875de49f6b  .claude/kb/experiments/156-alloc-basis四条岔路的代价数.md
+0e89c01625226482b4783c077b8192892321c462d25ec174efc21d0066251cc2  .claude/kb/experiments/171-三oracle合谋测试.md

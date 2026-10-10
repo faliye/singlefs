@@ -1,0 +1,6 @@
+run-with-memory-cap: 这个会话已有 8 条日常的在跑，照理由并行：派出去的正推腿与攻方腿各跑各的，同会话号
+PROBE classes=144 multi_member_classes=72 classes_with_different_o2=0 classes_with_different_layer0_verdict=0
+PROBE o2_distinct_values_over_all_states={"Some([])"}
+PROBE extra_states_chosen=3600
+PROBE main_stream_extra_states=3600 mismatching_vs_class_columns=936 (o1_or_ref=936) classes_seen=72 classes_with_different_o2=0 classes_with_different_layer0=36 o2_values={"Some([])"}
+PROBE first_mismatch ordinal=16777320 landing=22222222222222222222222222222222222220000200000000000000000000000 key=ConfirmedLossClassKey { keyed_assignment: 0, in_flight_writes_landed: AtLeastOneLanded }

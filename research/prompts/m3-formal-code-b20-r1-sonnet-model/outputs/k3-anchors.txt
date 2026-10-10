@@ -1,0 +1,2 @@
+tsv:2368 命中 1 次  crates/singlefs-harness/src/model.rs  C673 ④ 理想模型给卸载的答（D16 已定项 1「正常卸载」）：模型答树表 0 条那一版上卸载之后会话照旧开着（判决
+tsv:2369 命中 1 次  crates/singlefs-harness/src/model.rs  C673 ④ 理想模型给卸载的答（D16 已定项 1「正常卸载」）：模型关会话时把现行那一版那条根带的 F 记成它的 t

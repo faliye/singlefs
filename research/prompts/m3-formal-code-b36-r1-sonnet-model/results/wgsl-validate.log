@@ -1,0 +1,13 @@
+   Compiling naga-check v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-formal-code-b36-r1-sonnet/rerun/naga-check)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
+walk-unmutated rc=0 OK /home/fy5090/.local/share/singlefs/work/m3-formal-code-b36-r1-sonnet/rerun/wgsl/walk-unmutated.wgsl functions=252 entry_points=1
+scan-unmutated rc=0 OK /home/fy5090/.local/share/singlefs/work/m3-formal-code-b36-r1-sonnet/rerun/wgsl/scan-unmutated.wgsl functions=231 entry_points=1
+mut-4-scan rc=0 OK /home/fy5090/.local/share/singlefs/work/m3-formal-code-b36-r1-sonnet/rerun/wgsl/mut-4-scan.wgsl functions=231 entry_points=1
+mut-5-walk rc=0 OK /home/fy5090/.local/share/singlefs/work/m3-formal-code-b36-r1-sonnet/rerun/wgsl/mut-5-walk.wgsl functions=252 entry_points=1
+mut-6-scan rc=0 OK /home/fy5090/.local/share/singlefs/work/m3-formal-code-b36-r1-sonnet/rerun/wgsl/mut-6-scan.wgsl functions=231 entry_points=1
+mut-7-walk rc=0 OK /home/fy5090/.local/share/singlefs/work/m3-formal-code-b36-r1-sonnet/rerun/wgsl/mut-7-walk.wgsl functions=252 entry_points=1
+total rc 0
+VALIDATE-FAIL /home/fy5090/.local/share/singlefs/work/m3-formal-code-b36-r1-sonnet/rerun/wgsl/walk-broken.wgsl
+walk-broken rc=3
+PARSE-FAIL /home/fy5090/.local/share/singlefs/work/m3-formal-code-b36-r1-sonnet/rerun/wgsl/scan-broken.wgsl
+scan-broken rc=2

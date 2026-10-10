@@ -1,0 +1,17 @@
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/ws/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/ws/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.42s
+     Running tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs (/tmp/claude-1000/m3-formal-code-b19-r1-sonnet/target/debug/deps/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement-c936ee7c382e79da)
+
+running 8 tests
+test a_new_pool_file_on_a_128_mebibyte_journal_ring_holds_the_first_data_unit_placement ... ok
+test a_new_pool_file_on_the_default_journal_ring_holds_the_first_data_unit_placement ... ok
+test a_new_pool_file_of_two_data_units_holds_the_first_data_unit_placement_on_the_smallest_slot_of_each_device ... ok
+test once_the_first_file_version_leaves_the_root_ring_the_overwrite_versions_are_not_judged_for_the_first_data_unit_placement ... ok
+test the_first_file_after_twenty_two_zero_unit_publishes_in_one_mount_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+test the_first_file_of_an_instance_after_a_warm_up_only_mount_is_recognized_and_holds_the_first_data_unit_placement ... ok
+test a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation ... ok
+test the_first_file_after_ten_warm_up_only_mounts_lands_on_the_reclaimed_unit_area_start_and_holds_the_first_data_unit_placement ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.04s
+

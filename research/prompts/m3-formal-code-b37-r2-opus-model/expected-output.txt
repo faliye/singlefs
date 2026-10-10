@@ -1,0 +1,93 @@
+== 判据 35 条；单测调用 5 个；replay.sh 里直接起装置、走判据表的正式跑 15 条
+== 核一：模型算的今天每条正式跑的对照集，与那条驱动登记的产物里 name=control 的判据集合逐条比
+  driver_e165                                                r1              L     模型 11 产物 11 相同
+  driver_e165_light                                          r1              L     模型 11 产物 11 相同
+  driver_e165_adversarial                                    r1              A     模型  7 产物  7 相同
+  driver_e165_r2_segment3_multi_disk                         r2              M     模型  4 产物  4 相同
+  driver_e165_r2_segment4_table_both_legal                   r2+both         L     模型 19 产物 19 相同
+  driver_e165_r2_segment4_table_both_adversarial             r2+both         A     模型  9 产物  9 相同
+  driver_e165_r2_segment4_table_both_multi_disk              r2+both         M     模型  6 产物  6 相同
+  driver_e165_r2_segment4_reversed_disk_order_legal          r2+both+reversed L     模型 19 产物 19 相同
+  driver_e165_r2_segment4_reversed_disk_order_multi_disk     r2+both+reversed M     模型  6 产物  6 相同
+  driver_e165_r3_segment1_adversarial                        r3              A     模型  8 产物  8 相同
+  driver_e165_r5_segment3_legal                              r5              L     模型 16 产物 16 相同
+  driver_e165_r5_segment3_adversarial                        r5              A     模型  8 产物  8 相同
+  driver_e165_r5_segment3_multi_disk                         r5              M     模型  4 产物  4 相同
+  driver_e165_r5_segment3_odd_marker_legal                   r5+odd          L     模型 16 产物 16 相同
+  driver_e165_r5_segment3_odd_marker_adversarial             r5+odd          A     模型  8 产物  8 相同
+   不同 0 条
+== C1：单测五个调用（族组合 main 起不起得出 / 正式跑里有没有同档同族的一条）
+  r1               r1       L+A    main 起得出：是；同档同族的正式跑：无；写死 18 条
+  r2               r2       L+A+M  main 起得出：否；同档同族的正式跑：无；写死 28 条
+  两份表都取的 r2        r2+both  L+A+M  main 起得出：否；同档同族的正式跑：无；写死 30 条
+  r3               r3       L+A+M  main 起得出：否；同档同族的正式跑：无；写死 29 条
+  r5               r5       L+A+M  main 起得出：否；同档同族的正式跑：无；写死 28 条
+== C1：正式跑按 (判据集, 两份表) 并起来的对照集，对单测写死的那一份
+  r1               写死 18；正式跑并起来 18；写了而正式跑这一档没有对照的 0 条：[]
+  r2               写死 28；正式跑并起来  4；写了而正式跑这一档没有对照的 24 条：['J0', 'J1', 'J2', 'J3', 'J4', 'J5a', 'J5b', 'J5a_vs_J5b', 'J6', 'IA1', 'IA2', 'A0', 'AS_whole_table', 'AS_consecutive_gap_continues', 'AS_consecutive_gap_stops', 'A_mutual', 'A_structure', 'A_limit', 'J6Qn', 'J7a_instance_table', 'J7a_allocation_record_tree_root', 'J7a_filesystem_identifier', 'J7b', 'J7c']
+  两份表都取的 r2        写死 30；正式跑并起来 30；写了而正式跑这一档没有对照的 0 条：[]
+  r3               写死 29；正式跑并起来  8；写了而正式跑这一档没有对照的 21 条：['J0', 'J1', 'J2', 'J3', 'J4', 'J5a', 'J5b', 'J5a_vs_J5b', 'J6', 'IA1', 'IA2', 'J6Qn', 'J7a_instance_table', 'J7a_allocation_record_tree_root', 'J7a_filesystem_identifier', 'J7b', 'J7c', 'multi_disk_any_copy', 'J1_multi_disk', 'J4_multi_disk', 'J5_multi_disk']
+  r5               写死 28；正式跑并起来 28；写了而正式跑这一档没有对照的 0 条：[]
+  只按 --profile 并：r1 18 条
+  只按 --profile 并：r2 30 条
+  只按 --profile 并：r3 8 条
+  只按 --profile 并：r5 28 条
+== 原样：改后单测 过；改前单测 过
+== 甲 `Criterion::family` 里一条判据挪到另一族：共 70 个；单测红 18；单测过而某条正式跑少了对照 48；单测过、正式跑只多不少 0；单测过、正式跑不变 4
+   单测过而某一档（按 --profile 把它的正式跑并起来）整档少了对照的 9 个：
+     A0 的族 A → L ⇒ [('r3', ['A0'])]
+     AS_whole_table 的族 A → L ⇒ [('r3', ['AS_whole_table'])]
+     AS_consecutive_gap_continues 的族 A → L ⇒ [('r3', ['AS_consecutive_gap_continues'])]
+     AS_consecutive_gap_stops 的族 A → L ⇒ [('r3', ['AS_consecutive_gap_stops'])]
+     A_mutual 的族 A → L ⇒ [('r3', ['A_mutual'])]
+     A_structure 的族 A → L ⇒ [('r3', ['A_structure'])]
+     A_limit 的族 A → L ⇒ [('r3', ['A_limit'])]
+     J6Qn_i812_split 的族 A → L ⇒ [('r3', ['J6Qn_i812_split'])]
+     J6Qn_i812_split 的族 A → M ⇒ [('r3', ['J6Qn_i812_split'])]
+   单测过、正式跑不变的：['T_table 的族 L → A', 'T_table 的族 L → M', 'T_row 的族 L → A', 'T_row 的族 L → M']
+  例：J0 的族 L → A ⇒ 单测过；少了对照的正式跑 6 条，第一条 driver_e165 少 ['J0']
+  例：J1 的族 L → A ⇒ 单测过；少了对照的正式跑 6 条，第一条 driver_e165 少 ['J1']
+  例：J2 的族 L → A ⇒ 单测过；少了对照的正式跑 6 条，第一条 driver_e165 少 ['J2']
+  例：J3 的族 L → A ⇒ 单测过；少了对照的正式跑 6 条，第一条 driver_e165 少 ['J3']
+== 乙 族过滤那一行与 `is_judged_in_every_family`：共 6 个；单测红 1；单测过而某条正式跑少了对照 3；单测过、正式跑只多不少 2；单测过、正式跑不变 0
+   单测过而某一档（按 --profile 把它的正式跑并起来）整档少了对照的 1 个：
+     族过滤写死成 &Family::LegalHistory ⇒ [('r3', ['A0', 'AS_consecutive_gap_continues', 'AS_consecutive_gap_stops', 'AS_whole_table', 'A_limit', 'A_mutual', 'A_structure', 'J6Qn_i812_split'])]
+  例：族过滤写死成 &Family::LegalHistory ⇒ 单测过；少了对照的正式跑 9 条，第一条 driver_e165_adversarial 少 ['A0', 'AS_consecutive_gap_continues', 'AS_consecutive_gap_stops', 'AS_whole_table', 'A_limit', 'A_mutual', 'A_structure']
+  例：族过滤写死成 &Family::Adversarial ⇒ 单测过；少了对照的正式跑 10 条，第一条 driver_e165 少 ['IA1', 'IA2', 'J0', 'J1', 'J2', 'J3', 'J4', 'J5a', 'J5a_vs_J5b', 'J5b', 'J6']
+  例：`is_judged_in_every_family` 交回 false ⇒ 单测过；少了对照的正式跑 3 条，第一条 driver_e165_r2_segment4_table_both_adversarial 少 ['T_row', 'T_table']
+== 丙 `is_judged_under` 一条臂多一个看盘次序或奇偶的条件：共 12 个；单测红 0；单测过而某条正式跑少了对照 8；单测过、正式跑只多不少 0；单测过、正式跑不变 4
+   单测过而某一档（按 --profile 把它的正式跑并起来）整档少了对照的 0 个：
+   单测过、正式跑不变的：['臂 judges_j7 加「奇偶取 odd 时不判」', '臂 judges_j8 加「盘次序反过来时不判」', '臂 splits_j6qn_by_i812 加「盘次序反过来时不判」', '臂 compares_the_two_record_tables 加「奇偶取 odd 时不判」']
+  例：臂 judges_j6qn 加「盘次序反过来时不判」 ⇒ 单测过；少了对照的正式跑 2 条，第一条 driver_e165_r2_segment4_reversed_disk_order_legal 少 ['J6Qn']
+  例：臂 judges_j6qn 加「奇偶取 odd 时不判」 ⇒ 单测过；少了对照的正式跑 1 条，第一条 driver_e165_r5_segment3_odd_marker_legal 少 ['J6Qn']
+  例：臂 judges_j7 加「盘次序反过来时不判」 ⇒ 单测过；少了对照的正式跑 1 条，第一条 driver_e165_r2_segment4_reversed_disk_order_legal 少 ['J7a_allocation_record_tree_root', 'J7a_filesystem_identifier', 'J7a_instance_table', 'J7b', 'J7c']
+  例：臂 judges_j8 加「奇偶取 odd 时不判」 ⇒ 单测过；少了对照的正式跑 1 条，第一条 driver_e165_r5_segment3_odd_marker_legal 少 ['J8a', 'J8a_unmount_marker', 'J8b', 'J8c']
+  例：臂 splits_j6qn_by_i812 加「奇偶取 odd 时不判」 ⇒ 单测过；少了对照的正式跑 1 条，第一条 driver_e165_r5_segment3_odd_marker_adversarial 少 ['J6Qn_i812_split']
+  例：臂 compares_the_two_record_tables 加「盘次序反过来时不判」 ⇒ 单测过；少了对照的正式跑 2 条，第一条 driver_e165_r2_segment4_reversed_disk_order_legal 少 ['T_row', 'T_table']
+  例：臂 base 加「盘次序反过来时不判」 ⇒ 单测过；少了对照的正式跑 1 条，第一条 driver_e165_r2_segment4_reversed_disk_order_legal 少 ['IA1', 'IA2', 'J0', 'J1', 'J2', 'J3', 'J4', 'J5a', 'J5a_vs_J5b', 'J5b', 'J6']
+  例：臂 base 加「奇偶取 odd 时不判」 ⇒ 单测过；少了对照的正式跑 2 条，第一条 driver_e165_r5_segment3_odd_marker_legal 少 ['IA1', 'IA2', 'J0', 'J1', 'J2', 'J3', 'J4', 'J5a', 'J5a_vs_J5b', 'J5b', 'J6']
+== 丁 判据标签撞上另一条的（单测按标签比集合）：共 1190 个；单测过 1190
+  丁 两步：J8a_unmount_marker 标签改成 J8a，同时它那一臂在 r5 档不判 ⇒ 单测 过；正式跑少了对照的驱动 2 条
+== C4：变异表里锚在这条单测上的三行（施加在 `is_judged_under` 上），改后 / 改前单测，与单测逐个去掉一个调用之后
+  第 3383 行 基础臂 → !judges_j8()：改后单测 红在 r5；改前单测 过；单独就能判红的调用 ['r5']
+  第 3407 行 T 臂 → compares && splits：改后单测 红在 两份表都取的 r2；改前单测 过；单独就能判红的调用 ['两份表都取的 r2']
+  第 3496 行 基础臂 → judges_j6qn()：改后单测 红在 r1；改前单测 过；单独就能判红的调用 ['r1']
+  去掉「r1」那个调用：三行里还活的 ['3496']
+  去掉「r2」那个调用：三行里还活的 无
+  去掉「两份表都取的 r2」那个调用：没改坏的代码上单测就红（「罩全表」那一条兜住，这一个调用去不掉）
+  去掉「r3」那个调用：三行里还活的 无
+  去掉「r5」那个调用：没改坏的代码上单测就红（「罩全表」那一条兜住，这一个调用去不掉）
+  拆行臂 → splits && judges_j8()（r3 档少拆行对照）：单测 红；单独判得红的调用 ['r3']；正式跑变了的驱动 ['driver_e165_r3_segment1_adversarial']
+  T 臂 → compares || (judges_j7 && !splits)（r2 档多跑 T 对照）：单测 红；单独判得红的调用 ['r2']；正式跑变了的驱动 ['driver_e165_r2_segment3_multi_disk']
+== 点名的一行写法（锚点在源码里各命中几次、单测过不过、正式跑少了对照的驱动、按 --profile 并起来整档少的）
+  第 6193 行 `| Self::J6QnSplitByI812 => Family::Adversarial,` 换成 `=> Family::LegalHistory,`：锚点命中 1 次；单测 过；少了对照的驱动 5 条 ['driver_e165_adversarial', 'driver_e165_r2_segment4_table_both_adversarial', 'driver_e165_r3_segment1_adversarial', 'driver_e165_r5_segment3_adversarial', 'driver_e165_r5_segment3_odd_marker_adversarial']；整档少的 [('r3', ['A0', 'AS_consecutive_gap_continues', 'AS_consecutive_gap_stops', 'AS_whole_table', 'A_limit', 'A_mutual', 'A_structure', 'J6Qn_i812_split'])]
+  第 6197 行 `| Self::MultiDiskAppliedSetAndLandedVersion => Family::MultiDisk,` 换成 `=> Family::LegalHistory,`：锚点命中 1 次；单测 过；少了对照的驱动 4 条 ['driver_e165_r2_segment3_multi_disk', 'driver_e165_r2_segment4_table_both_multi_disk', 'driver_e165_r2_segment4_reversed_disk_order_multi_disk', 'driver_e165_r5_segment3_multi_disk']；整档少的 []
+  第 6203–6206 行 `is_judged_in_every_family` 的 matches! 换成 `false`：锚点命中 1 次；单测 过；少了对照的驱动 3 条 ['driver_e165_r2_segment4_table_both_adversarial', 'driver_e165_r2_segment4_table_both_multi_disk', 'driver_e165_r2_segment4_reversed_disk_order_multi_disk']；整档少的 []
+  第 7758 行 `&criterion.family()` 换成 `&Family::LegalHistory`：锚点命中 1 次；单测 过；少了对照的驱动 9 条 ['driver_e165_adversarial', 'driver_e165_r2_segment3_multi_disk', 'driver_e165_r2_segment4_table_both_adversarial', 'driver_e165_r2_segment4_table_both_multi_disk', 'driver_e165_r2_segment4_reversed_disk_order_multi_disk', 'driver_e165_r3_segment1_adversarial', 'driver_e165_r5_segment3_adversarial', 'driver_e165_r5_segment3_multi_disk', 'driver_e165_r5_segment3_odd_marker_adversarial']；整档少的 [('r3', ['A0', 'AS_consecutive_gap_continues', 'AS_consecutive_gap_stops', 'AS_whole_table', 'A_limit', 'A_mutual', 'A_structure', 'J6Qn_i812_split'])]
+== 改法甲（被攻过零轮，只在这份模型上量过）：单测改成照正式跑的 (档, 族) 逐条钉，期望集写死成今天那条驱动产物里的判据集合
+   钉 15 个 (档, 族)；原样 过
+   甲 分族挪动：今天的单测放过且正式跑少了对照的 48 个，改法甲下仍放过 0 个 []
+   乙 族过滤：今天的单测放过且正式跑少了对照的 3 个，改法甲下仍放过 0 个 []
+   丙 盘次序 / 奇偶：今天的单测放过且正式跑少了对照的 8 个，改法甲下仍放过 0 个 []
+   C4 三行：今天的单测放过且正式跑少了对照的 0 个，改法甲下仍放过 0 个 []
+   丁 标签相撞：改法甲按标签比时放过 1190 / 1190（改用 BTreeSet<Criterion> 比，标签相撞不改集合；两步那一例改法甲下 过）

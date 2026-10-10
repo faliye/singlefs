@@ -1,0 +1,33 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方正推腿与同会话别的腿并行各跑各的小池探针
+
+running 1 test
+test y1_probe_with_trees_and_no_file ... ===== with_trees_and_no_file / mount alone =====
+[R1] root=Some((1, 5, 65548, 0, NotWrittenByTheUnmountSequence))
+[R1] mapping_root_zero=false alloc_root_zero=true
+[R1] sysconf(dev,gen,tail,inst,floor)=[(0, 6, 4, 1, 0), (0, 7, 5, 1, 0), (1, 6, 4, 1, 0), (1, 7, 5, 1, 0)]
+[R1] tree_table_entry_count=11
+[R2] root=Some((2, 7, 65548, 0, NotWrittenByTheUnmountSequence))
+[R2] mapping_root_zero=false alloc_root_zero=true
+[R2] sysconf(dev,gen,tail,inst,floor)=[(0, 10, 7, 2, 0), (0, 9, 6, 2, 0), (1, 10, 7, 2, 0), (1, 9, 6, 2, 0)]
+[R2] tree_table_entry_count=11
+[cmp] mapping_root_equal=false alloc_root_equal=true tree_table_ptr_equal=false instance_table_ptr_equal=false fsid_equal=true
+[cmp] entry kind=1 tree=65536 root_equal=true root_zero_before=false root_zero_after=false birth_txg 3->3 head 65537->65537
+[cmp] entry kind=2 tree=65537 root_equal=true root_zero_before=false root_zero_after=false birth_txg 3->3 head 65537->65537
+[cmp] entry kind=3 tree=65538 root_equal=false root_zero_before=false root_zero_after=false birth_txg 3->3 head 0->0
+[cmp] entry kind=4 tree=65539 root_equal=false root_zero_before=false root_zero_after=false birth_txg 3->3 head 0->0
+[cmp] entry kind=6 tree=65541 root_equal=true root_zero_before=true root_zero_after=true birth_txg 3->3 head 0->0
+[cmp] entry kind=7 tree=65542 root_equal=true root_zero_before=true root_zero_after=true birth_txg 3->3 head 0->0
+[cmp] entry kind=8 tree=65543 root_equal=true root_zero_before=true root_zero_after=true birth_txg 3->3 head 0->0
+[cmp] entry kind=9 tree=65544 root_equal=true root_zero_before=true root_zero_after=true birth_txg 3->3 head 65537->65537
+[cmp] entry kind=10 tree=65545 root_equal=true root_zero_before=false root_zero_after=false birth_txg 3->3 head 65537->65537
+[cmp] entry kind=11 tree=65546 root_equal=true root_zero_before=true root_zero_after=true birth_txg 3->3 head 0->0
+[cmp] entry kind=12 tree=65547 root_equal=true root_zero_before=true root_zero_after=true birth_txg 3->3 head 0->0
+[cmp] entries before=11 after=11
+[cmp] sysconf before=[(0, 6, 4, 1, 0), (0, 7, 5, 1, 0), (1, 6, 4, 1, 0), (1, 7, 5, 1, 0)]
+[cmp] sysconf after =[(0, 10, 7, 2, 0), (0, 9, 6, 2, 0), (1, 10, 7, 2, 0), (1, 9, 6, 2, 0)]
+[with_trees_and_no_file] dev=0 gen_R1=7 gen_R2=10 sysconf_writes_to_dev=3 => gen_R2==gen_R1+n: true | tail_R1=5 tail_R2=7 max_counter_of_instance(2)=Some(7) => tail_R2==that: true
+[with_trees_and_no_file] dev=1 gen_R1=7 gen_R2=10 sysconf_writes_to_dev=3 => gen_R2==gen_R1+n: true | tail_R1=5 tail_R2=7 max_counter_of_instance(2)=Some(7) => tail_R2==that: true
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.16s
+

@@ -1,0 +1,20 @@
+RESULT	0	CAUGHT failed=a_rollback_to_a_version_without_the_fourth_inode_leaf_contai,creating_inodes_one_at_a_time_into_the_fourth_inode_leaf_con	26s	m3-formal-30-1	O1 跨叶容器（胶水）：第 4 片及以后都当第 3 片（第 29 批攻方，判决 L1 第三行）
+RESULT	1	CAUGHT failed=creating_inodes_one_at_a_time_into_the_fourth_inode_leaf_con,a_rollback_to_a_version_without_the_fourth_inode_leaf_contai	26s	m3-formal-30-1	O1 跨叶容器（理想模型自身）：落点封顶在第 3 片（第 29 批攻方，判决 L1 第三行）
+RESULT	2	CAUGHT failed=a_rollback_to_a_version_whose_third_inode_leaf_container_was,a_rollback_to_a_version_without_the_fourth_inode_leaf_contai	28s	m3-formal-30-1	O1 跨叶容器回退（理想模型自身）：回退只取回目标那一版的第 2 片（第 29 批攻方，判决 L1 第三行）
+RESULT	3	CAUGHT failed=a_rollback_to_a_version_without_the_fourth_inode_leaf_contai	27s	m3-formal-30-1	O1 跨叶容器回退（理想模型自身）：回退只丢现行那一版的第 3 片、更右的留着（第 29 批攻方，判决 L1 第三行）
+RESULT	100	SURVIVED passed=3	19s	m3-formal-30-1	b30 腿加：胶水封顶第 4 片（min(3)）
+RESULT	101	SURVIVED passed=3	25s	m3-formal-30-1	b30 腿加：模型封顶第 4 片（min(3)）
+RESULT	102	SURVIVED passed=3	25s	m3-formal-30-1	b30 腿加：回退只取回目标那一版的第 2、3 片（不含第 4 片）
+RESULT	103	SURVIVED passed=3	23s	m3-formal-30-1	b30 腿加：回退只丢现行那一版的第 3、4 片（第 5 片及以后留着）
+RESULT	104	CAUGHT failed=a_rollback_to_a_version_without_the_fourth_inode_leaf_contai	20s	m3-formal-30-1	b30 腿加：回退只丢现行那一版的第 2、3 片（第 4 片及以后留着）
+RESULT	100	INVALID_COMPILE	0s	m3-formal-30-1	b30 腿加：胶水封顶第 4 片（min(3)）
+RESULT	100	SURVIVED passed=133	165s	m3-formal-30-1	b30 腿加：胶水封顶第 4 片（min(3)）
+RESULT	102	SURVIVED passed=133	163s	m3-formal-30-1	b30 腿加：回退只取回目标那一版的第 2、3 片（不含第 4 片）
+RESULT	103	SURVIVED passed=133	186s	m3-formal-30-1	b30 腿加：回退只丢现行那一版的第 3、4 片（第 5 片及以后留着）
+RESULT	101	CAUGHT failed=the_inode_leaf_container_position_reaches_the_last_of_135_le	32s	m3-formal-30-1	b30 腿加：模型封顶第 4 片（min(3)）
+RESULT	4	CAUGHT failed=an_extent_offset_on_the_container_pointer_of_the_tombstone_t	25s	m3-formal-30-2	第 30 批 30-2 池级 checker：墓碑树容器子指针不判 extent 偏移（E1）
+RESULT	5	CAUGHT failed=an_extent_offset_on_the_container_pointer_of_the_lineage_tre	17s	m3-formal-30-2	第 30 批 30-2 池级 checker：谱系树容器子指针不判 extent 偏移（E1）
+RESULT	6	CAUGHT failed=an_allocation_record_tree_of_the_newest_version_that_does_no	2s	m3-formal-30-2	第 30 批 30-2 池级 checker：I-5.4 带树一版根记录那一格改回任一版的分配记录树走到叶就计成立（L2 零轮收严撤回）
+RESULT	16	CAUGHT failed=an_allocation_record_tree_that_does_not_read_back_leaves_the	4s	m3-formal-30-2	第28批 I-5.4 带树一版根记录那一格不等分配记录树走到叶就计进评估（正推 C2）
+RESULT	17	CAUGHT failed=the_runtime_configuration_after_a_mount_alone_is_the_built_i	2s	m3-formal-30-3	第30批 30-3 T_time 盘上单位退回秒：core 的内置默认 5000 毫秒写回 5（挂载透明「R2 = 内置默认」的期望照条款写成毫秒才抓得到）
+RESULT	18	CAUGHT failed=the_runtime_configuration_after_a_mount_alone_is_the_built_i	1s	m3-formal-30-3	第28批 G1 攻方 MUT-A：core 的 T_time 内置默认 5 改 4（挂载透明「R2 = 内置默认」的期望照条款写死才抓得到）

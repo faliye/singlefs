@@ -1,0 +1,8 @@
+a1ba83004d8532317a63cc4951d79313347921a7ed13c92931810fcb6136ae7a  .claude/kb/checks-owed.md
+49721f00336c56212d2c92df1e9136797325f897cd5f96c3a027ac3c243ad557  .claude/kb/decisions/03-空间分配.md
+1941a2e0d2f06aedf343b0229a6443bbf455043ee05835bc3f9cc1d2f19f55c0  .claude/kb/decisions/16-发布语义.md
+196b7fff002a50d2e01ec0634c14d896e3f19d0b0ddc24c7cf6d332841f50752  .claude/kb/invariants.md
+0e89c01625226482b4783c077b8192892321c462d25ec174efc21d0066251cc2  .claude/kb/experiments/171-三oracle合谋测试.md
+7a8940f48b918481f41ef609bb6df8690b89dd4016bec95f6819974295c3e803  .claude/kb/experiments/170-O3规约执行器第一版.md
+9026c34b2bb40bab874bdb0dd193537c074263ef064ef63d143534092d4fc058  .claude/kb/experiments/156-alloc-basis四条岔路的代价数.md
+c72d6482cdc771677280e2de79767448dd01575fe0c9f341edc84ce665e1ccf3  .claude/kb/experiments/161-崩溃放量的去重与分段耗时.md

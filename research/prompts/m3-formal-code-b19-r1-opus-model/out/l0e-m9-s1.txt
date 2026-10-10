@@ -1,0 +1,6 @@
+name=history ring_mib=1 unit_area_slots=2000 mounts=9 gate_slack=1 txg=26 data_rel_U=0 writes=25 segments=[20, 2, 1, 2] closed_form_states=1048583
+name=layer0 mode=expand_from_segment_1 gate_slack=1 states=13 oracle_violations=0 root_persisted_states=9 failed_states=0 seconds=0.3
+name=checker-red gate_slack=1 invariant=I-2.1 red_states=4 first=实例表单元 在盘 0 槽 1088 的那一份与位置条目里的校验和对不上
+name=checker-red gate_slack=1 invariant=I-4.8 red_states=4 first=候选根 txg 2 出发的遍历有单元对不上或读不出
+name=checker-red gate_slack=1 invariant=I-7.4 red_states=4 first=候选根 txg 2 引用的单元已被复用或抹头（校验和对不上或头用不了）
+name=i55 gate_slack=1 evaluated=9 red=0 not_applicable=4

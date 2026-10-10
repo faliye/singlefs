@@ -1,0 +1,37 @@
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-formal-code-b30-r1-opus/tree/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-formal-code-b30-r1-opus/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.87s
+     Running tests/b30_opus_i54_probe.rs (target/debug/deps/b30_opus_i54_probe-3daaf4f865a7c802)
+
+running 1 test
+B30UNIT clean I-5.4=Holds
+B30UNIT slot=50176 len=32768 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50178 len=16384 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=PartiallyJudged(树表读不出的版本，分配记录树认不出、一格没判（别的版本的树走到了叶不替它作保）：根（实例 0、txg 0）、根（实例 1、txg 1）、根（实例 1、txg 2）)
+B30UNIT slot=50180 len=32768 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50182 len=32768 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50240 len=16384 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50242 len=32768 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50244 len=16384 violated=["I-2.1", "I-4.8", "I-7.4", "I-9.1"] I-5.4=Holds
+B30UNIT slot=50245 len=16384 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=PartiallyJudged(带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：根（实例 1、txg 3）)
+B30UNIT slot=50246 len=16384 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=PartiallyJudged(带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：根（实例 1、txg 3）)
+B30UNIT slot=50247 len=16384 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=PartiallyJudged(带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：根（实例 1、txg 3）)
+B30UNIT slot=50248 len=16384 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=PartiallyJudged(带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：根（实例 1、txg 3）)
+B30UNIT slot=50249 len=16384 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=PartiallyJudged(带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：根（实例 1、txg 3）)
+B30UNIT slot=50250 len=16384 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50251 len=16384 violated=["I-2.1", "I-4.8", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50252 len=16384 violated=["I-2.1", "I-3.1", "I-4.8", "I-7.4"] I-5.4=PartiallyJudged(树表读不出的版本，分配记录树认不出、一格没判（别的版本的树走到了叶不替它作保）：根（实例 1、txg 3）)
+B30UNIT slot=50253 len=16384 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50254 len=32768 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50256 len=16384 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.1"] I-5.4=Holds
+B30UNIT slot=50257 (B 的分配记录树叶) len=16384 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=PartiallyJudged(带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：根（实例 1、txg 4）)
+B30UNIT slot=50258 (B 的分配记录树叶) len=16384 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=PartiallyJudged(带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：根（实例 1、txg 4）)
+B30UNIT slot=50259 len=16384 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=PartiallyJudged(带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：根（实例 1、txg 4）)
+B30UNIT slot=50260 len=16384 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=PartiallyJudged(带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：根（实例 1、txg 4）)
+B30UNIT slot=50261 len=16384 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=PartiallyJudged(带树一版根记录里分配记录树根全零那一格成立而没计（那一版自己的分配记录树读不出、走不到叶，别的版本的树走到了叶不替它作保）：根（实例 1、txg 4）)
+B30UNIT slot=50262 len=16384 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50263 len=16384 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=Holds
+B30UNIT slot=50264 (B 的树表) len=16384 violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] I-5.4=PartiallyJudged(树表读不出的版本，分配记录树认不出、一格没判（别的版本的树走到了叶不替它作保）：根（实例 1、txg 4）)
+test b30_opus_i54_after_zeroing_each_unit_of_the_second_version ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 90 filtered out; finished in 3.27s
+

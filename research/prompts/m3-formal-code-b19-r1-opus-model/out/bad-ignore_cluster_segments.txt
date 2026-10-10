@@ -1,0 +1,4 @@
+name=F1 unit_area_slots=2000 mounts=1 zero_unit_publishes=0 reuse=reuse_window_gated_by_the_rollback_floor open_rel_U=64 cluster_segments_rel_U=[64] txg=3 data_rel_U=[4] tree_table_rel_U=74 i55=holds red=[] detail=
+name=F1 unit_area_slots=2000 mounts=2 zero_unit_publishes=0 reuse=reuse_window_gated_by_the_rollback_floor open_rel_U=64 cluster_segments_rel_U=[64] txg=5 data_rel_U=[4] tree_table_rel_U=78 i55=holds red=[] detail=
+name=F1 unit_area_slots=2000 mounts=9 zero_unit_publishes=0 reuse=reuse_window_gated_by_the_rollback_floor open_rel_U=512 cluster_segments_rel_U=[512] txg=26 data_rel_U=[4] tree_table_rel_U=526 i55=holds red=[] detail=
+name=F1 unit_area_slots=2000 mounts=10 zero_unit_publishes=0 reuse=reuse_window_gated_by_the_rollback_floor open_rel_U=576 cluster_segments_rel_U=[576] txg=29 data_rel_U=[0] tree_table_rel_U=594 i55=holds red=[] detail=
