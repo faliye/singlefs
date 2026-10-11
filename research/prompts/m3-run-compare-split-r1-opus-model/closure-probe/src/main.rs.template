@@ -1,0 +1,26 @@
+// 攻方腿草稿（m3-run-compare-split-r1）：照 crates/singlefs-checker-tier/build.rs 同一套（#[path] 引副本里的 judging_closure.rs 与 harness 的
+// sha256.rs、hexadecimal.rs，只用 std），在给定的仓根上算三种结论的代码摘要表，打出来比。不编 checker 档。
+// 用法：closure-probe <仓根>
+#[path = "COPY_ROOT/crates/singlefs-harness/src/hexadecimal.rs"]
+#[allow(dead_code)]
+mod hexadecimal;
+#[path = "COPY_ROOT/crates/singlefs-checker-tier/src/judging_closure.rs"]
+#[allow(dead_code)]
+mod judging_closure;
+#[path = "COPY_ROOT/crates/singlefs-harness/src/sha256.rs"]
+#[allow(dead_code)]
+mod sha256;
+
+use hexadecimal::hexadecimal_text;
+use sha256::{sha256_digest, DIGEST_BYTES};
+
+fn main() {
+    let root = std::path::PathBuf::from(std::env::args().nth(1).expect("给仓根"));
+    let mut reader = judging_closure::ClosureTreeReader::new(&root).unwrap_or_else(|error| panic!("{}", error.reason));
+    let table = judging_closure::ConclusionCodeDigestTable::of_the_tree(&mut reader).unwrap_or_else(|error| panic!("{}", error.reason));
+    print!("{}", table.to_table_text());
+    let gpu = reader.conclusion_code(&[judging_closure::GPU_JUDGE_ENTRY_FILE]).unwrap_or_else(|error| panic!("{}", error.reason));
+    for file in &gpu.files {
+        println!("GPU_JUDGE_CLOSURE_FILE {file}");
+    }
+}

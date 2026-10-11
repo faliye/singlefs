@@ -1,0 +1,5 @@
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.25s
+  Executable tests/checker_known_bad_images.rs (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+exit=0

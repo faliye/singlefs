@@ -1,0 +1,20 @@
+# 攻方原型（m3-batch60-61-code-r1 opus）：只在仓副本的工作区里加成一个成员（rerun.sh 拷进 crates/opus-probe-b6061 并改副本的根 Cargo.toml），
+# 不进主工作区。测试目标名不带 layer0；不开 gpu 特性。verdict-store 默认开（被拷进来的流水线用例文件头 #![cfg(feature = "verdict-store")] 认的是本包的特性）。
+[package]
+name = "opus-probe-b6061"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[features]
+default = ["verdict-store"]
+verdict-store = ["singlefs-checker-tier/verdict-store"]
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }
+# 与 singlefs-checker-tier 同一版：同一份 librocksdb，按线程的 PerfContext 数得到判定库的读
+rocksdb = { version = "=0.25.0" }

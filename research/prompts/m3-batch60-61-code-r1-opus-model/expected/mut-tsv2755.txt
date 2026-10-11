@@ -1,0 +1,11 @@
+command args=-p singlefs-harness --test system_configuration_slot_is_overwritten_only_after_a_barrier --test shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring rc=101
+binary shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring
+  failed raising_the_floor_isolates_no_slot_an_abandoned_root_unrecorded_in_the_root_ring_table_shares_with_valid_roots_left_in_the_holes_outside_the_one_revolution_window
+    thread 'raising_the_floor_isolates_no_slot_an_abandoned_root_unrecorded_in_the_root_ring_table_shares_with_valid_roots_left_in_the_holes_outside_the_one_revolution_window' panicked:
+    assertion `left == right` failed: 影子账按整个环的候选集豁免：窗口外的有效根与读盘得来的被抛弃根 24 同引用的 {(DeviceIdentity(0), 1088), (DeviceIdentity(1), 1088)} 不隔离
+      left: [(DeviceIdentity(0), 1088), (DeviceIdentity(1), 1088)]
+     right: []
+  failure-name raising_the_floor_isolates_no_slot_an_abandoned_root_unrecorded_in_the_root_ring_table_shares_with_valid_roots_left_in_the_holes_outside_the_one_revolution_window
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+binary system_configuration_slot_is_overwritten_only_after_a_barrier
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

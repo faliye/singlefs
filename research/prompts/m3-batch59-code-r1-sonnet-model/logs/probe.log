@@ -1,0 +1,68 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 30.3 GiB，这一条要 10.0 GiB（峰值表里没有这条，按它的上限 10G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排了 3 秒，起跑（singlefs-memory-cap-2828348-788817315）
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 11.70s
+     Running tests/probe_m1_ring.rs (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/target/release/deps/probe_m1_ring-805a76fc751e02a5)
+
+running 2 tests
+test probe_m1_a_short_container_before_a_full_one ... PROBE Tombstone write4 txg=12 counts=[2, 1, 1] alloc_records=240 released=202 base=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 12）：墓碑树（树 655
+PROBE Tombstone write5 txg=14 counts=[2, 1, 2] alloc_records=286 released=248 base=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 12）：墓碑树（树 655
+PROBE Tombstone write6 txg=16 counts=[2, 1, 2, 1] alloc_records=332 released=292 base=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 12）：墓碑树（树 655
+PROBE Tombstone L1-turn1 txg=17 counts=[2, 1, 2, 1] alloc_records=352 released=312 base=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 12）：墓碑树（树 655
+PROBE Tombstone L1-turn12 txg=28 counts=[2, 1, 2, 1] alloc_records=572 released=532 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L1-turn19 txg=35 counts=[2, 1, 2, 1] alloc_records=712 released=672 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L1-turn20 txg=36 counts=[2, 1, 2, 1] alloc_records=732 released=692 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 13）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L1-turn21 txg=37 counts=[2, 1, 2, 1] alloc_records=752 released=712 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 14）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L1-turn22 txg=38 counts=[2, 1, 2, 1] alloc_records=772 released=732 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L1-turn23 txg=39 counts=[2, 1, 2, 1] alloc_records=792 released=752 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L1-turn24 txg=40 counts=[2, 1, 2, 1] alloc_records=812 released=772 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L1-turn25 txg=41 counts=[2, 1, 2, 1] alloc_records=832 released=792 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L1-turn30 txg=46 counts=[2, 1, 2, 1] alloc_records=932 released=892 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Lineage write4 txg=8 counts=[2, 1, 1] alloc_records=128 released=94 base=I-9.37@根（实例 1、txg 8）：谱系树（树 6554 second_to_last=I-9.37@根（实例 1、txg 8）：谱系树（树 6554 k2=I-9.37@根（实例 1、txg 8）：谱系树（树 6554 k3=I-9.37@根（实例 1、txg 8）：谱系树（树 6554
+PROBE Lineage write5 txg=9 counts=[2, 1, 2] alloc_records=148 released=114 base=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 second_to_last=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k2=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k3=I-9.37@根（实例 1、txg 9）：谱系树（树 6554
+PROBE Lineage write6 txg=10 counts=[2, 1, 2, 1] alloc_records=168 released=132 base=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 second_to_last=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k2=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k3=I-9.37@根（实例 1、txg 9）：谱系树（树 6554
+PROBE Lineage L1-turn1 txg=11 counts=[2, 1, 2, 1] alloc_records=192 released=152 base=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 second_to_last=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k2=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k3=I-9.37@根（实例 1、txg 9）：谱系树（树 6554
+PROBE Lineage L1-turn12 txg=22 counts=[2, 1, 2, 1] alloc_records=416 released=376 base=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 second_to_last=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k2=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k3=I-9.37@根（实例 1、txg 9）：谱系树（树 6554
+PROBE Lineage L1-turn19 txg=29 counts=[2, 1, 2, 1] alloc_records=556 released=516 base=I-9.37@根（实例 1、txg 24）：谱系树（树 655 second_to_last=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k2=I-9.37@根（实例 1、txg 24）：谱系树（树 655 k3=I-9.37@根（实例 1、txg 24）：谱系树（树 655
+PROBE Lineage L1-turn20 txg=30 counts=[2, 1, 2, 1] alloc_records=576 released=536 base=I-9.37@根（实例 1、txg 24）：谱系树（树 655 second_to_last=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k2=I-9.37@根（实例 1、txg 24）：谱系树（树 655 k3=I-9.37@根（实例 1、txg 24）：谱系树（树 655
+PROBE Lineage L1-turn21 txg=31 counts=[2, 1, 2, 1] alloc_records=596 released=556 base=I-9.37@根（实例 1、txg 24）：谱系树（树 655 second_to_last=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k2=I-9.37@根（实例 1、txg 24）：谱系树（树 655 k3=I-9.37@根（实例 1、txg 24）：谱系树（树 655
+PROBE Lineage L1-turn22 txg=32 counts=[2, 1, 2, 1] alloc_records=616 released=576 base=I-9.37@根（实例 1、txg 24）：谱系树（树 655 second_to_last=I-9.37@根（实例 1、txg 9）：谱系树（树 6554 k2=I-9.37@根（实例 1、txg 24）：谱系树（树 655 k3=I-9.37@根（实例 1、txg 24）：谱系树（树 655
+PROBE Lineage L1-turn23 txg=33 counts=[2, 1, 2, 1] alloc_records=636 released=596 base=I-9.37@根（实例 1、txg 24）：谱系树（树 655 second_to_last=green k2=I-9.37@根（实例 1、txg 24）：谱系树（树 655 k3=I-9.37@根（实例 1、txg 24）：谱系树（树 655
+PROBE Lineage L1-turn24 txg=34 counts=[2, 1, 2, 1] alloc_records=656 released=616 base=I-9.37@根（实例 1、txg 24）：谱系树（树 655 second_to_last=green k2=I-9.37@根（实例 1、txg 24）：谱系树（树 655 k3=I-9.37@根（实例 1、txg 24）：谱系树（树 655
+PROBE Lineage L1-turn25 txg=35 counts=[2, 1, 2, 1] alloc_records=676 released=636 base=I-9.37@根（实例 1、txg 24）：谱系树（树 655 second_to_last=green k2=I-9.37@根（实例 1、txg 24）：谱系树（树 655 k3=I-9.37@根（实例 1、txg 24）：谱系树（树 655
+PROBE Lineage L1-turn30 txg=40 counts=[2, 1, 2, 1] alloc_records=776 released=736 base=I-9.37@根（实例 1、txg 24）：谱系树（树 655 second_to_last=green k2=I-9.37@根（实例 1、txg 24）：谱系树（树 655 k3=I-9.37@根（实例 1、txg 24）：谱系树（树 655
+PROBE Retirement write4 txg=15 counts=[2, 1, 1] alloc_records=314 released=272 base=I-9.37@根（实例 1、txg 15）：退役树（树 655 second_to_last=I-9.37@根（实例 1、txg 15）：退役树（树 655 k2=I-9.37@根（实例 1、txg 15）：退役树（树 655 k3=I-9.37@根（实例 1、txg 15）：退役树（树 655
+PROBE Retirement write5 txg=18 counts=[2, 1, 2] alloc_records=382 released=340 base=I-9.37@根（实例 1、txg 15）：退役树（树 655 second_to_last=I-9.37@根（实例 1、txg 15）：退役树（树 655 k2=I-9.37@根（实例 1、txg 15）：退役树（树 655 k3=I-9.37@根（实例 1、txg 15）：退役树（树 655
+PROBE Retirement write6 txg=21 counts=[2, 1, 2, 1] alloc_records=450 released=406 base=I-9.37@根（实例 1、txg 15）：退役树（树 655 second_to_last=I-9.37@根（实例 1、txg 15）：退役树（树 655 k2=I-9.37@根（实例 1、txg 15）：退役树（树 655 k3=I-9.37@根（实例 1、txg 15）：退役树（树 655
+PROBE Retirement L1-turn1 txg=22 counts=[2, 1, 2, 1] alloc_records=470 released=424 base=I-9.37@根（实例 1、txg 15）：退役树（树 655 second_to_last=I-9.37@根（实例 1、txg 15）：退役树（树 655 k2=I-9.37@根（实例 1、txg 15）：退役树（树 655 k3=I-9.37@根（实例 1、txg 15）：退役树（树 655
+PROBE Retirement L1-turn12 txg=33 counts=[2, 1, 2, 1] alloc_records=690 released=644 base=I-9.37@根（实例 1、txg 24）：退役树（树 655 second_to_last=I-9.37@根（实例 1、txg 15）：退役树（树 655 k2=I-9.37@根（实例 1、txg 24）：退役树（树 655 k3=I-9.37@根（实例 1、txg 24）：退役树（树 655
+PROBE Retirement L1-turn19 txg=40 counts=[2, 1, 2, 1] alloc_records=830 released=784 base=I-9.37@根（实例 1、txg 24）：退役树（树 655 second_to_last=I-9.37@根（实例 1、txg 18）：退役树（树 655 k2=I-9.37@根（实例 1、txg 24）：退役树（树 655 k3=I-9.37@根（实例 1、txg 24）：退役树（树 655
+PROBE Retirement L1-turn20 txg=41 counts=[2, 1, 2, 1] alloc_records=850 released=804 base=I-9.37@根（实例 1、txg 24）：退役树（树 655 second_to_last=I-9.37@根（实例 1、txg 18）：退役树（树 655 k2=I-9.37@根（实例 1、txg 24）：退役树（树 655 k3=I-9.37@根（实例 1、txg 24）：退役树（树 655
+PROBE Retirement L1-turn21 txg=42 counts=[2, 1, 2, 1] alloc_records=870 released=824 base=I-9.37@根（实例 1、txg 24）：退役树（树 655 second_to_last=I-9.37@根（实例 1、txg 19）：退役树（树 655 k2=I-9.37@根（实例 1、txg 24）：退役树（树 655 k3=I-9.37@根（实例 1、txg 24）：退役树（树 655
+PROBE Retirement L1-turn22 txg=43 counts=[2, 1, 2, 1] alloc_records=890 released=844 base=I-9.37@根（实例 1、txg 24）：退役树（树 655 second_to_last=I-9.37@根（实例 1、txg 20）：退役树（树 655 k2=I-9.37@根（实例 1、txg 24）：退役树（树 655 k3=I-9.37@根（实例 1、txg 24）：退役树（树 655
+PROBE Retirement L1-turn23 txg=44 counts=[2, 1, 2, 1] alloc_records=910 released=864 base=I-9.37@根（实例 1、txg 24）：退役树（树 655 second_to_last=green k2=I-9.37@根（实例 1、txg 24）：退役树（树 655 k3=I-9.37@根（实例 1、txg 24）：退役树（树 655
+PROBE Retirement L1-turn24 txg=45 counts=[2, 1, 2, 1] alloc_records=930 released=884 base=I-9.37@根（实例 1、txg 24）：退役树（树 655 second_to_last=green k2=I-9.37@根（实例 1、txg 24）：退役树（树 655 k3=I-9.37@根（实例 1、txg 24）：退役树（树 655
+PROBE Retirement L1-turn25 txg=46 counts=[2, 1, 2, 1] alloc_records=950 released=904 base=I-9.37@根（实例 1、txg 24）：退役树（树 655 second_to_last=green k2=I-9.37@根（实例 1、txg 24）：退役树（树 655 k3=I-9.37@根（实例 1、txg 24）：退役树（树 655
+PROBE Retirement L1-turn30 txg=51 counts=[2, 1, 2, 1] alloc_records=1050 released=1004 base=I-9.37@根（实例 1、txg 48）：退役树（树 655 second_to_last=green k2=I-9.37@根（实例 1、txg 48）：退役树（树 655 k3=I-9.37@根（实例 1、txg 48）：退役树（树 655
+ok
+test probe_m1_three_containers_left_of_the_rightmost ... PROBE Tombstone write4 txg=12 counts=[2, 1, 1] alloc_records=240 released=202 base=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 12）：墓碑树（树 655
+PROBE Tombstone write5 txg=14 counts=[2, 1, 2] alloc_records=286 released=248 base=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 12）：墓碑树（树 655
+PROBE Tombstone write6 txg=16 counts=[2, 1, 2, 1] alloc_records=332 released=292 base=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 12）：墓碑树（树 655
+PROBE Tombstone write7 txg=18 counts=[2, 1, 2, 2] alloc_records=378 released=338 base=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 12）：墓碑树（树 655
+PROBE Tombstone write8 txg=20 counts=[2, 1, 2, 2, 1] alloc_records=424 released=382 base=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 12）：墓碑树（树 655
+PROBE Tombstone L2-turn1 txg=21 counts=[2, 1, 2, 2, 1] alloc_records=444 released=402 base=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 12）：墓碑树（树 655
+PROBE Tombstone L2-turn12 txg=32 counts=[2, 1, 2, 2, 1] alloc_records=664 released=622 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k2=I-9.22@根（实例 1、txg 12）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L2-turn19 txg=39 counts=[2, 1, 2, 2, 1] alloc_records=804 released=762 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=I-9.22@根（实例 1、txg 18）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L2-turn20 txg=40 counts=[2, 1, 2, 2, 1] alloc_records=824 released=782 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=I-9.22@根（实例 1、txg 18）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L2-turn21 txg=41 counts=[2, 1, 2, 2, 1] alloc_records=844 released=802 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=I-9.22@根（实例 1、txg 18）：墓碑树（树 655 k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L2-turn22 txg=42 counts=[2, 1, 2, 2, 1] alloc_records=864 released=822 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=green k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L2-turn23 txg=43 counts=[2, 1, 2, 2, 1] alloc_records=884 released=842 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=green k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L2-turn24 txg=44 counts=[2, 1, 2, 2, 1] alloc_records=904 released=862 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=green k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L2-turn25 txg=45 counts=[2, 1, 2, 2, 1] alloc_records=924 released=882 base=I-9.22@根（实例 1、txg 24）：墓碑树（树 655 second_to_last=green k2=green k3=I-9.22@根（实例 1、txg 24）：墓碑树（树 655
+PROBE Tombstone L2-turn30 txg=50 counts=[2, 1, 2, 2, 1] alloc_records=1024 released=982 base=I-9.22@根（实例 1、txg 48）：墓碑树（树 655 second_to_last=green k2=green k3=I-9.22@根（实例 1、txg 48）：墓碑树（树 655
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.14s
+
+exit=0

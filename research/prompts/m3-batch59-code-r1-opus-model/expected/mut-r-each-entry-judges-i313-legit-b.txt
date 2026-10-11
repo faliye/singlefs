@@ -1,0 +1,7 @@
+command args=--release -p singlefs-harness --test rollback_lineage_record_and_its_checkpoint_cost_term --test writable_mount_takes_a_second_instance --test recovery_and_both_mounts_fall_back_to_the_version_the_system_configuration_witnessed rc=0
+binary recovery_and_both_mounts_fall_back_to_the_version_the_system_configuration_witnessed
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+binary rollback_lineage_record_and_its_checkpoint_cost_term
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+binary writable_mount_takes_a_second_instance
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

@@ -1,0 +1,14 @@
+# 攻方原型（m3-batch59-code-r1 opus）：只在仓副本的工作区里加成一个成员（rerun.sh 拷进 crates/opus-probe-b59 并改副本的根 Cargo.toml），
+# 不进主工作区。测试目标名不带 layer0；不开 gpu、verdict-store 特性（只用 crash.rs 的枚举与池级 checker 的带旋钮入口）。
+[package]
+name = "opus-probe-b59"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

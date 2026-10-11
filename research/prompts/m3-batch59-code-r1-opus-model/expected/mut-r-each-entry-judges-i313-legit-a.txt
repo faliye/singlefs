@@ -1,0 +1,9 @@
+command args=--release -p singlefs-harness --test accounting_and_mapping_tree_split --test many_inodes_write_and_read --test multi_record_publishes_of_transaction_zero --test random_histories rc=0
+binary accounting_and_mapping_tree_split
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+binary many_inodes_write_and_read
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+binary multi_record_publishes_of_transaction_zero
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+binary random_histories
+test result: ok. 23 passed; 0 failed; 19 ignored; 0 measured; 0 filtered out

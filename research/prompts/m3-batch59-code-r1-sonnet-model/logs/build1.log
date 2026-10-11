@@ -1,0 +1,27 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling convert_case v0.4.0
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.189
+   Compiling singlefs-format v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-format)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-reference-filesystem)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-checker)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-replay-prefix)
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 26.61s
+  Executable tests/checker_known_bad_images.rs (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+  Executable tests/core_review_tree_table_duplicates_and_slot_one_search.rs (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/target/debug/deps/core_review_tree_table_duplicates_and_slot_one_search-e8e716c12998330a)
+  Executable tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/target/debug/deps/corrupt_on_disk_content_is_refused_instead_of_panicking-79e7ec1a3362c126)
+exit=0

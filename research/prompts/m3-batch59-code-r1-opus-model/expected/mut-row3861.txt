@@ -1,0 +1,15 @@
+command args=--release -p singlefs-harness --test corrupt_on_disk_content_is_refused_instead_of_panicking --test core_review_tree_table_duplicates_and_slot_one_search rc=101
+binary core_review_tree_table_duplicates_and_slot_one_search
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+binary corrupt_on_disk_content_is_refused_instead_of_panicking
+  failed allocation_records_whose_generation_is_after_the_root_are_refused_before_the_mapping_entry_count_by_the_writable_mount
+    thread 'allocation_records_whose_generation_is_after_the_root_are_refused_before_the_mapping_entry_count_by_the_writable_mount' panicked:
+    可写挂载报分配记录的代晚于根，不报映射条目数：Recovery(InvariantViolated { invariant: "E142 走读同款", detail: "映射条目数不是 1 + extent 树、分配记录树、记账树的节点数 + inode 叶容器数 + 数据单元数" })
+  failure-name allocation_records_whose_generation_is_after_the_root_are_refused_before_the_mapping_entry_count_by_the_writable_mount
+test result: FAILED. 40 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+command args=--release -p singlefs-harness --test core_review_tree_table_duplicates_and_slot_one_search -- --nocapture --test-threads 1 opus_probe_b59_l4_constructions rc=0
+binary core_review_tree_table_duplicates_and_slot_one_search
+OPUS_M3 l4 construction=OwnRowRelabelledThirteen rows=16 keys=[(1, 0, 0, 4), (1, 0, 1, 4), (2, 0, 0, 4), (2, 0, 1, 4), (3, 0, 0, 4), (3, 0, 1, 4), (4, 0, 4294967295, 4), (5, 0, 0, 4), (5, 0, 1, 4), (6, 0, 4294967295, 4), (10, 0, 0, 4), (10, 0, 1, 4), (11, 0, 0, 4), (11, 0, 1, 4), (12, 65537, 4294967295, 3), (13, 65537, 4294967295, 4)] rebuild=Some(Walk(InodeNumberWatermarkRowMissingFromTheAccountingTree)) writable=Some(Recovery(InodeNumberWatermarkRowMissingFromTheAccountingTree))
+OPUS_M3 l4 construction=PreviousVersionsAllocatedBytesRow rows=16 keys=[(1, 0, 0, 3), (1, 0, 0, 4), (1, 0, 1, 4), (2, 0, 0, 4), (2, 0, 1, 4), (3, 0, 0, 4), (3, 0, 1, 4), (4, 0, 4294967295, 4), (5, 0, 0, 4), (5, 0, 1, 4), (6, 0, 4294967295, 4), (10, 0, 0, 4), (10, 0, 1, 4), (11, 0, 0, 4), (11, 0, 1, 4), (12, 65537, 4294967295, 3)] rebuild=Some(Walk(InodeNumberWatermarkRowMissingFromTheAccountingTree)) writable=Some(Recovery(InodeNumberWatermarkRowMissingFromTheAccountingTree))
+OPUS_M3 l4 construction=RegisteredStatisticSevenOfThisVersion rows=16 keys=[(1, 0, 0, 4), (1, 0, 1, 4), (2, 0, 0, 4), (2, 0, 1, 4), (3, 0, 0, 4), (3, 0, 1, 4), (4, 0, 4294967295, 4), (5, 0, 0, 4), (5, 0, 1, 4), (6, 0, 4294967295, 4), (7, 0, 4294967295, 4), (10, 0, 0, 4), (10, 0, 1, 4), (11, 0, 0, 4), (11, 0, 1, 4), (12, 65537, 4294967295, 3)] rebuild=Some(Walk(InodeNumberWatermarkRowMissingFromTheAccountingTree)) writable=Some(Recovery(InodeNumberWatermarkRowMissingFromTheAccountingTree))
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out

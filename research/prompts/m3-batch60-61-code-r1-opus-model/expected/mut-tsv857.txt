@@ -1,0 +1,11 @@
+command args=-p singlefs-harness --test system_configuration_slot_is_overwritten_only_after_a_barrier --test shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring rc=101
+binary shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+binary system_configuration_slot_is_overwritten_only_after_a_barrier
+  failed acquisition_after_a_rolled_back_acquisition_overwrites_the_older_slot_only_behind_a_barrier
+    thread 'acquisition_after_a_rolled_back_acquisition_overwrites_the_older_slot_only_behind_a_barrier' panicked:
+    assertion `left == right` failed: mkfs 之后没有一段里同一块盘写两次系统配置槽
+      left: [SecondSystemConfigurationWriteInOneSegment { operation_index: 86, device: DeviceIdentity(0) }]
+     right: []
+  failure-name acquisition_after_a_rolled_back_acquisition_overwrites_the_older_slot_only_behind_a_barrier
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out

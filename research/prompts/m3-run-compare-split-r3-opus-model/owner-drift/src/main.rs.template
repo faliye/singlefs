@@ -1,0 +1,47 @@
+// 攻方腿模型（m3-run-compare-split-r3）：核第二轮攻方 R8 那个数「两趟权重之间四成的块换主」。第二轮那一份是 Python 照抄；
+// 这里把副本 crash_amplification.rs 里 `WeightedShares`（结构与 impl，第 962–998 行）原样抽进来（run_owner_drift.sh 抽，不手抄），
+// 先拿原函数 `owner_of_block` 在 400 个位置上与整周期表逐个比（表由同一套平滑轮转一次走完整个周期得到），比上了才用表数换主比例。
+// 给定状态表的块号取指纹头 8 字节：这里用 splitmix64 造 20000 个替身（与第二轮那一份的替身不同）。
+// 用法：owner-drift <权重甲 a,b> <权重乙 a,b> [流水线块数 39917] [给定状态表数 20000]
+#![allow(dead_code)]
+include!("weighted_shares.rs");
+
+fn cycle(shares: &WeightedShares, weights: &[u64]) -> Vec<u8> {
+    let total: u64 = weights.iter().sum();
+    let mut current: Vec<i128> = vec![0; weights.len()];
+    let mut table = Vec::with_capacity(usize::try_from(total).unwrap());
+    for _ in 0..total {
+        for (i, w) in weights.iter().enumerate() { current[i] += i128::from(*w); }
+        let owner = (0..current.len()).max_by_key(|i| (current[*i], std::cmp::Reverse(*i))).unwrap();
+        current[owner] -= i128::from(total);
+        table.push(u8::try_from(owner).unwrap());
+    }
+    let mut state = 0x9E37_79B9_7F4A_7C15u64;
+    for _ in 0..400 {
+        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let position = state % total;
+        assert_eq!(shares.owner_of_block(position), usize::from(table[usize::try_from(position).unwrap()]), "整周期表与原函数在 {position} 上对不上");
+    }
+    table
+}
+
+fn splitmix(n: usize) -> Vec<u64> {
+    let mut x = 0x0123_4567_89AB_CDEFu64;
+    (0..n).map(|_| { x = x.wrapping_add(0x9E37_79B9_7F4A_7C15); let mut z = x; z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9); z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB); z ^ (z >> 31) }).collect()
+}
+
+fn main() {
+    let a: Vec<String> = std::env::args().collect();
+    let parse = |s: &str| -> Vec<u64> { s.split(',').map(|w| w.parse().unwrap()).collect() };
+    let (wa, wb) = (parse(&a[1]), parse(&a[2]));
+    let blocks: u64 = a.get(3).map_or(39917, |s| s.parse().unwrap());
+    let tables: usize = a.get(4).map_or(20000, |s| s.parse().unwrap());
+    let (sa, sb) = (WeightedShares::new(wa.clone()), WeightedShares::new(wb.clone()));
+    let (ta, tb) = (cycle(&sa, &wa), cycle(&sb, &wb));
+    let owner = |t: &Vec<u8>, k: u64| t[usize::try_from(k % u64::try_from(t.len()).unwrap()).unwrap()];
+    let moved = (0..blocks).filter(|k| owner(&ta, *k) != owner(&tb, *k)).count();
+    println!("OWNER_DRIFT_RUST kind=pipeline before={} after={} blocks={blocks} moved={moved} moved_fraction={:.4} checked_against_owner_of_block=400+400", a[1], a[2], moved as f64 / blocks as f64);
+    let fingerprints = splitmix(tables);
+    let moved = fingerprints.iter().filter(|k| owner(&ta, **k) != owner(&tb, **k)).count();
+    println!("OWNER_DRIFT_RUST kind=given_states before={} after={} tables={tables} moved={moved} moved_fraction={:.4}", a[1], a[2], moved as f64 / tables as f64);
+}

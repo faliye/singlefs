@@ -1,0 +1,11 @@
+[package]
+name = "history-writes"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+singlefs-harness = { path = "COPY_ROOT/crates/singlefs-harness" }
+singlefs-core = { path = "COPY_ROOT/crates/singlefs-core" }
+
+[workspace]

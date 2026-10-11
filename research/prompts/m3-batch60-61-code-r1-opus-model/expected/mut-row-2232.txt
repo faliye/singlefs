@@ -1,0 +1,11 @@
+command args=-p singlefs-harness --test pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement --test checker_known_bad_images -- a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation rc=101
+binary checker_known_bad_images
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 267 filtered out
+binary pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement
+  failed a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation
+    thread 'a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation' panicked:
+    assertion `left == right` failed: 树 ID 从根环水位发的合法镜像：池级 checker 一条都不红
+      left: [("I-9.27", "根（实例 3、txg 29）的树表：第 0 条（树 ID 65549、种类 1）的头 ID 是 65537，该等于同一张树表里种类 2 条目的树 ID（这张表里的种类 2 条目：[65550]）")]
+     right: []
+  failure-name a_first_file_version_issuing_its_trees_from_the_ring_watermark_after_a_recovery_keeps_the_head_identifier_relation
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out

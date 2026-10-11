@@ -1,0 +1,21 @@
+command args=-p opus-probe-b6061 --test pipeline_import_probe -- --nocapture --test-threads 1 --exact importing_the_other_share_names_its_blocks_and_reads_back_like_one_host_judging_the_whole_flow given_states_tables_of_another_host_are_imported_by_name_and_read_back_like_the_whole_library_import rc=0
+binary pipeline_import_probe
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out
+command args=-p opus-probe-b6061 --test pipeline_import_probe -- --nocapture --test-threads 1 opus_h02 opus_h03 rc=0
+binary pipeline_import_probe
+OPUS_P4 history=h02 OpusHistory { shares: 2, this_share_runs_first: true, peers_start_from_a_snapshot: false, warm_takes_the_peer_share: false, import_runs: 1, ignore_the_publish: false, verify: true } blocks=3 planned_states=45 closed_form_full=16777240
+OPUS_P4 history=h02 readback_lines=10 planned_vs_whole=0 planned_vs_one_host=0 whole_vs_one_host=0
+OPUS_P4 history=h02 step=after-whole-import share=0/2 checked=0 imported=0 unjudged=0 violations=0 stopped=false compared=45 without_verifier=0 without_judge=0 disagreements=0
+OPUS_P4 history=h02 step=one-host share=0/1 checked=3 imported=0 unjudged=0 violations=0 stopped=false compared=45 without_verifier=0 without_judge=0 disagreements=0
+OPUS_P4 history=h02 step=peer-1 share=1/2 checked=1 imported=0 unjudged=2 violations=0 stopped=false compared=12 without_verifier=0 without_judge=0 disagreements=0
+OPUS_P4 history=h02 step=planned-import-0 share=0/2 checked=0 imported=2 unjudged=0 violations=0 stopped=false compared=45 without_verifier=0 without_judge=0 disagreements=0
+OPUS_P4 history=h02 step=this-share share=0/2 checked=2 imported=0 unjudged=1 violations=0 stopped=false compared=33 without_verifier=0 without_judge=0 disagreements=0
+OPUS_P4 history=h03 OpusHistory { shares: 2, this_share_runs_first: true, peers_start_from_a_snapshot: true, warm_takes_the_peer_share: true, import_runs: 1, ignore_the_publish: false, verify: true } blocks=3 planned_states=45 closed_form_full=16777240
+OPUS_P4 history=h03 readback_lines=10 planned_vs_whole=0 planned_vs_one_host=0 whole_vs_one_host=0
+OPUS_P4 history=h03 step=after-whole-import share=0/2 checked=0 imported=0 unjudged=0 violations=0 stopped=false compared=45 without_verifier=0 without_judge=0 disagreements=0
+OPUS_P4 history=h03 step=one-host share=0/1 checked=3 imported=0 unjudged=0 violations=0 stopped=false compared=45 without_verifier=0 without_judge=0 disagreements=0
+OPUS_P4 history=h03 step=peer-1 share=1/2 checked=0 imported=0 unjudged=2 violations=0 stopped=false compared=12 without_verifier=0 without_judge=0 disagreements=0
+OPUS_P4 history=h03 step=planned-import-0 share=0/2 checked=0 imported=2 unjudged=0 violations=0 stopped=false compared=45 without_verifier=0 without_judge=0 disagreements=0
+OPUS_P4 history=h03 step=this-share share=0/2 checked=2 imported=0 unjudged=0 violations=0 stopped=false compared=45 without_verifier=0 without_judge=0 disagreements=0
+OPUS_P4 history=h03 step=warm share=1/2 checked=1 imported=0 unjudged=2 violations=0 stopped=false compared=12 without_verifier=0 without_judge=0 disagreements=0
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out

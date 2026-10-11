@@ -1,0 +1,9 @@
+command args=-p singlefs-harness --test sequential_write_split_into_one_unit_transactions -- the_second_extent_leaf_record_key_is_the_file_byte_offset_of_the_second_data_unit rc=101
+binary sequential_write_split_into_one_unit_transactions
+  failed the_second_extent_leaf_record_key_is_the_file_byte_offset_of_the_second_data_unit
+    thread 'the_second_extent_leaf_record_key_is_the_file_byte_offset_of_the_second_data_unit' panicked:
+    assertion `left == right` failed: 第二条叶记录的 key = (locality 0, inode 1, 文件字节偏移 32634)
+      left: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
+     right: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 122, 127, 0, 0, 0, 0, 0, 0]
+  failure-name the_second_extent_leaf_record_key_is_the_file_byte_offset_of_the_second_data_unit
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out

@@ -1,0 +1,3 @@
+command args=-p opus-probe-b6061 --test pipeline_import_probe -- --nocapture --test-threads 1 --exact importing_the_other_share_names_its_blocks_and_reads_back_like_one_host_judging_the_whole_flow given_states_tables_of_another_host_are_imported_by_name_and_read_back_like_the_whole_library_import rc=0
+binary pipeline_import_probe
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out

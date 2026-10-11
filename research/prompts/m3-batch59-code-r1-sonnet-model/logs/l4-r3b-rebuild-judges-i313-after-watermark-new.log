@@ -1,0 +1,11 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.62s
+     Running tests/core_review_tree_table_duplicates_and_slot_one_search.rs (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/target/debug/deps/core_review_tree_table_duplicates_and_slot_one_search-e8e716c12998330a)
+
+running 1 test
+test a_version_whose_own_inode_number_watermark_row_is_damaged_leaving_only_a_step_is_judged_damaged_by_the_rebuild_and_refused_by_the_writable_mount ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 2.56s
+
+exit=0

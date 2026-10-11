@@ -1,0 +1,9 @@
+command args=-p singlefs-harness --test write_accounting_per_structure -- new_pool_file_creation_and_overwrite_writes_by_kind rc=101
+binary write_accounting_per_structure
+  failed new_pool_file_creation_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_and_the_byte_table
+    thread 'new_pool_file_creation_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_and_the_byte_table' panicked:
+    assertion `left == right` failed: 新池新建文件按种类的合计 == 录制器在这段里记下的写
+      left: WriteCallsAndBytes { write_calls: 27, written_bytes: 410112 }
+     right: WriteCallsAndBytes { write_calls: 29, written_bytes: 475648 }
+  failure-name new_pool_file_creation_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_and_the_byte_table
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out

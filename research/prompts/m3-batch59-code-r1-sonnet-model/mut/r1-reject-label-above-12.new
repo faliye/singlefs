@@ -1,0 +1,4 @@
+    if entry.generation > root.checkpoint_txg || entry.sequence == 0 || entry.statistic > STATISTIC_INODE_WATERMARK {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: "E142 走读同款",
+            detail: "记账条目的代晚于根或 seq 为 0",

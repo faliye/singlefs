@@ -1,0 +1,4 @@
+839397bba58d902b700ea4a899da779b52e34a866704f6b0af63a24568d46d6f  .claude/kb/decisions/13-验证路线.md
+ba733394d2c5c1ec0f7d71d549764d360293c74401621f896b2a78e0d3a66545  .claude/kb/experiments/05-nonce唯一性×崩溃点重放.md
+e98e9b4461a1e5cffa2587d86ca5e0c2dc3862eacf5426e49d02bcc5680b44d8  .claude/kb/experiments/06-加密算法选型.md
+268e78ce3d2e820b420244191d64c70ab5706005959a8ceb3cdce154be590425  .claude/kb/experiments/07-离线索引harness.md

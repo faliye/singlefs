@@ -1,0 +1,2 @@
+HISTORY_WRITES steps=24 seed_offset=0 steps_run=24 ending=Discriminant(0) mkfs_data_writes=11 table_writes_at_step_24=614 table_writes_at_end=614 first_step_over_2048=none seconds=3.57
+HISTORY_WRITES steps=24 seed_offset=1 steps_run=24 ending=Discriminant(0) mkfs_data_writes=11 table_writes_at_step_24=334 table_writes_at_end=334 first_step_over_2048=none seconds=1.99

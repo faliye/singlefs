@@ -1,0 +1,7 @@
+command args=-p singlefs-harness --test corrupt_on_disk_content_is_refused_instead_of_panicking -- allocation_records_whose_generation_is_after_the_root rc=101
+binary corrupt_on_disk_content_is_refused_instead_of_panicking
+  failed allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_width_by_the_writable_mount
+    thread 'allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_width_by_the_writable_mount' panicked:
+    可写挂载报分配记录的代晚于根，不报记账条目窄于字段表：Recovery(EntryNarrowerThanItsFieldTable { what: "记账条目", entry_bytes: 22, field_table_bytes: 34 })
+  failure-name allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_width_by_the_writable_mount
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 35 filtered out

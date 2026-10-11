@@ -1,0 +1,4 @@
+                entry.statistic == STATISTIC_INODE_WATERMARK && entry.generation < root_txg
+            })
+        })
+        .count();

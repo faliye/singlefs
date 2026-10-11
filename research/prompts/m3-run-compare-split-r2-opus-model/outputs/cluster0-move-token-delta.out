@@ -1,0 +1,96 @@
+move-vs-base crash: 2631,2632c2631,2632
+move-vs-base crash: < TOKEN_COUNT 31311	(
+move-vs-base crash: < TOKEN_COUNT 31311	)
+move-vs-base crash: ---
+move-vs-base crash: > TOKEN_COUNT 31312	(
+move-vs-base crash: > TOKEN_COUNT 31312	)
+move-vs-base crash: 3168,3169c3168,3169
+move-vs-base crash: < TOKEN_COUNT 28184	:
+move-vs-base crash: < TOKEN_COUNT 11709	;
+move-vs-base crash: ---
+move-vs-base crash: > TOKEN_COUNT 28194	:
+move-vs-base crash: > TOKEN_COUNT 11712	;
+move-vs-base crash: 3384c3384
+move-vs-base crash: < TOKEN_COUNT 695	CheckpointTxg
+move-vs-base crash: ---
+move-vs-base crash: > TOKEN_COUNT 696	CheckpointTxg
+move-vs-base crash: 4213c4213
+move-vs-base crash: < TOKEN_COUNT 39	NODE_POINTER_BYTES
+move-vs-base crash: ---
+move-vs-base crash: > TOKEN_COUNT 40	NODE_POINTER_BYTES
+move-vs-base crash: 5453c5453
+move-vs-base crash: < TOKEN_COUNT 69	address
+move-vs-base crash: ---
+move-vs-base crash: > TOKEN_COUNT 70	address
+move-vs-base crash: 6240a6241
+move-vs-base crash: > TOKEN_COUNT 1	crash_rollback_floor
+move-vs-base crash: 6242c6243
+move-vs-base crash: < TOKEN_COUNT 603	crate
+move-vs-base crash: ---
+move-vs-base crash: > TOKEN_COUNT 605	crate
+move-vs-base crash: 8926c8927
+move-vs-base crash: < TOKEN_COUNT 2747	pub
+move-vs-base crash: ---
+move-vs-base crash: > TOKEN_COUNT 2748	pub
+move-vs-base crash: 9648c9649
+move-vs-base crash: < TOKEN_COUNT 2	rollback_floor_written_by
+move-vs-base crash: ---
+move-vs-base crash: > TOKEN_COUNT 3	rollback_floor_written_by
+move-vs-base crash: 9960,9961c9961,9962
+move-vs-base crash: < TOKEN_COUNT 28	singlefs_core
+move-vs-base crash: < TOKEN_COUNT 70	singlefs_format
+move-vs-base crash: ---
+move-vs-base crash: > TOKEN_COUNT 29	singlefs_core
+move-vs-base crash: > TOKEN_COUNT 71	singlefs_format
+move-vs-base crash: 10712c10713
+move-vs-base crash: < TOKEN_COUNT 494	use
+move-vs-base crash: ---
+move-vs-base crash: > TOKEN_COUNT 497	use
+move-vs-base crash_judge_gpu: 2740,2741c2740,2741
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 32761	(
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 32761	)
+move-vs-base crash_judge_gpu: ---
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 32762	(
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 32762	)
+move-vs-base crash_judge_gpu: 3294,3295c3294,3295
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 29596	:
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 12347	;
+move-vs-base crash_judge_gpu: ---
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 29606	:
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 12350	;
+move-vs-base crash_judge_gpu: 3517c3517
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 700	CheckpointTxg
+move-vs-base crash_judge_gpu: ---
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 701	CheckpointTxg
+move-vs-base crash_judge_gpu: 4389c4389
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 39	NODE_POINTER_BYTES
+move-vs-base crash_judge_gpu: ---
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 40	NODE_POINTER_BYTES
+move-vs-base crash_judge_gpu: 5678c5678
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 74	address
+move-vs-base crash_judge_gpu: ---
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 75	address
+move-vs-base crash_judge_gpu: 6504a6505
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 1	crash_rollback_floor
+move-vs-base crash_judge_gpu: 6506c6507
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 615	crate
+move-vs-base crash_judge_gpu: ---
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 617	crate
+move-vs-base crash_judge_gpu: 9299c9300
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 2932	pub
+move-vs-base crash_judge_gpu: ---
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 2933	pub
+move-vs-base crash_judge_gpu: 10032c10033
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 2	rollback_floor_written_by
+move-vs-base crash_judge_gpu: ---
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 3	rollback_floor_written_by
+move-vs-base crash_judge_gpu: 10358,10359c10359,10360
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 42	singlefs_core
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 71	singlefs_format
+move-vs-base crash_judge_gpu: ---
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 43	singlefs_core
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 72	singlefs_format
+move-vs-base crash_judge_gpu: 11144c11145
+move-vs-base crash_judge_gpu: < TOKEN_COUNT 527	use
+move-vs-base crash_judge_gpu: ---
+move-vs-base crash_judge_gpu: > TOKEN_COUNT 530	use

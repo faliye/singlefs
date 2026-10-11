@@ -1,0 +1,2 @@
+CHECK tree=move compiles=yes
+CHECK tree=move2 compiles=yes

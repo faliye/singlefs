@@ -1,0 +1,8 @@
+pair=base-move2 ITEMS mode=head-visibility-only entries=crates/singlefs-checker-tier/src/crash.rs items_a=2744 items_b=2754 only_in_a=4 only_in_b=14 verdict=differ
+pair=base-move2 ITEMS mode=head-visibility-only entries=crates/singlefs-checker-tier/src/crash_judge_gpu.rs items_a=2897 items_b=2907 only_in_a=4 only_in_b=14 verdict=differ
+pair=base-swap ITEMS mode=head-visibility-only entries=crates/singlefs-checker-tier/src/crash.rs items_a=2744 items_b=2744 only_in_a=1 only_in_b=1 verdict=differ
+pair=base-swap ITEMS mode=head-visibility-only entries=crates/singlefs-checker-tier/src/crash_judge_gpu.rs items_a=2897 items_b=2897 only_in_a=1 only_in_b=1 verdict=differ
+pair=base-move2 ITEMS mode=loose entries=crates/singlefs-checker-tier/src/crash.rs items_a=2522 items_b=2522 only_in_a=0 only_in_b=0 verdict=same
+pair=base-move2 ITEMS mode=loose entries=crates/singlefs-checker-tier/src/crash_judge_gpu.rs items_a=2662 items_b=2662 only_in_a=0 only_in_b=0 verdict=same
+pair=base-swap ITEMS mode=loose entries=crates/singlefs-checker-tier/src/crash.rs items_a=2522 items_b=2522 only_in_a=1 only_in_b=1 verdict=differ
+pair=base-swap ITEMS mode=loose entries=crates/singlefs-checker-tier/src/crash_judge_gpu.rs items_a=2662 items_b=2662 only_in_a=1 only_in_b=1 verdict=differ

@@ -1,0 +1,3 @@
+ITEM_ONLY_IN_A x1 fn unit_copy_is_missing_under_the_persisted_set ( reader : & dyn PoolReader , writes : & [ RetainedWrite
+ITEM_ONLY_IN_B x1 fn unit_copy_is_missing_under_the_persisted_set ( reader : & dyn PoolReader , writes : & [ RetainedWrite
+ITEMS mode=head-visibility-only entries=crates/singlefs-checker-tier/src/crash.rs items_a=2744 items_b=2744 only_in_a=1 only_in_b=1 verdict=differ

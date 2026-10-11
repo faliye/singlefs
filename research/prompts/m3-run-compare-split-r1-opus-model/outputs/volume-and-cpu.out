@@ -1,0 +1,32 @@
+VOLUME_RAW basis=states_full_body states=2616000000 blocks=39917 raw_144_gib=350.8 raw_160_gib=389.8 fits_once_in_free=True
+VOLUME_LZ4 basis=states_full_body assumed_ratio=2.0 on_disk_gib=194.9
+VOLUME_LZ4 basis=states_full_body assumed_ratio=5.0 on_disk_gib=78.0
+VOLUME_LZ4 basis=states_full_body assumed_ratio=20.0 on_disk_gib=19.5
+VOLUME_LZ4 basis=states_full_body assumed_ratio=94.0 on_disk_gib=4.1
+VOLUME_DICTIONARY basis=states_full_body on_disk_gib_before_lz4=5.56
+WRITE_VOLUME basis=states_full_body assumed_ratio=5.0 wal_plus_compaction_gib=1271
+WRITE_VOLUME basis=states_full_body assumed_ratio=94.0 wal_plus_compaction_gib=437
+TWO_HOST_COPIES basis=states_full_body assumed_ratio=5.0 library_gib=78.0 copies_per_item_run_gib=155.9 item_runs_until_disk_full=3.3 item_runs_until_disk_full_at_1843_gib=11.8
+TWO_HOST_COPIES basis=states_full_body assumed_ratio=20.0 library_gib=19.5 copies_per_item_run_gib=39.0 item_runs_until_disk_full=13.2 item_runs_until_disk_full_at_1843_gib=47.3
+TWO_HOST_COPIES basis=states_full_body assumed_ratio=94.0 library_gib=4.1 copies_per_item_run_gib=8.3 item_runs_until_disk_full=62.0 item_runs_until_disk_full_at_1843_gib=222.2
+TWO_HOST_COPIES_UNCOMPRESSED basis=states_full_body copies_per_item_run_gib=779.6 item_runs_until_disk_full=0.66 item_runs_until_disk_full_at_1843_gib=2.36
+VOLUME_RAW basis=states_full_run_0930 states=2563727926 blocks=39120 raw_144_gib=343.8 raw_160_gib=382.0 fits_once_in_free=True
+VOLUME_LZ4 basis=states_full_run_0930 assumed_ratio=2.0 on_disk_gib=191.0
+VOLUME_LZ4 basis=states_full_run_0930 assumed_ratio=5.0 on_disk_gib=76.4
+VOLUME_LZ4 basis=states_full_run_0930 assumed_ratio=20.0 on_disk_gib=19.1
+VOLUME_LZ4 basis=states_full_run_0930 assumed_ratio=94.0 on_disk_gib=4.1
+VOLUME_DICTIONARY basis=states_full_run_0930 on_disk_gib_before_lz4=5.45
+WRITE_VOLUME basis=states_full_run_0930 assumed_ratio=5.0 wal_plus_compaction_gib=1245
+WRITE_VOLUME basis=states_full_run_0930 assumed_ratio=94.0 wal_plus_compaction_gib=428
+TWO_HOST_COPIES basis=states_full_run_0930 assumed_ratio=5.0 library_gib=76.4 copies_per_item_run_gib=152.8 item_runs_until_disk_full=3.4 item_runs_until_disk_full_at_1843_gib=12.1
+TWO_HOST_COPIES basis=states_full_run_0930 assumed_ratio=20.0 library_gib=19.1 copies_per_item_run_gib=38.2 item_runs_until_disk_full=13.5 item_runs_until_disk_full_at_1843_gib=48.2
+TWO_HOST_COPIES basis=states_full_run_0930 assumed_ratio=94.0 library_gib=4.1 copies_per_item_run_gib=8.1 item_runs_until_disk_full=63.2 item_runs_until_disk_full_at_1843_gib=226.8
+TWO_HOST_COPIES_UNCOMPRESSED basis=states_full_run_0930 copies_per_item_run_gib=764.1 item_runs_until_disk_full=0.67 item_runs_until_disk_full_at_1843_gib=2.41
+CPU_KEEP_UP gpu_states_per_second_two_hosts=116900 per_thread_budget_ns_to_keep_up=530368
+CPU_RECORD cell=first_small ns_per_state=357353 thread_hours=260 hours_on_31=8.38 hours_on_62=4.19 vs_gpu_full_run=0.55 keeps_up_with_gpu=True
+CPU_RECORD cell=first_segment_head ns_per_state=159583 thread_hours=116 hours_on_31=3.74 hours_on_62=1.87 vs_gpu_full_run=0.25 keeps_up_with_gpu=True
+CPU_RECORD cell=first_quick ns_per_state=346528 thread_hours=252 hours_on_31=8.12 hours_on_62=4.06 vs_gpu_full_run=0.54 keeps_up_with_gpu=True
+CPU_RECORD cell=second_segment_head ns_per_state=605170 thread_hours=440 hours_on_31=14.19 hours_on_62=7.09 vs_gpu_full_run=0.94 keeps_up_with_gpu=False
+CPU_RECORD cell=second_quick ns_per_state=722596 thread_hours=525 hours_on_31=16.94 hours_on_62=8.47 vs_gpu_full_run=1.12 keeps_up_with_gpu=False
+CPU_KEEP_UP_SMALL_IMAGE_ITEM gpu_states_per_second_local=780738 per_thread_budget_ns_to_keep_up=39706
+MODEL_DONE

@@ -1,0 +1,19 @@
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 18.47s
+     Running tests/probe_m1_ring.rs (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/target/debug/deps/probe_m1_ring-e5655d7ef0da143e)
+
+running 2 tests
+test probe_m1_a_short_container_before_a_full_one ... PROBE Tombstone write1 txg=6 counts=[1] alloc_records=94 released=64 accounting=17 mapping_keys=12 red=[]
+PROBE Tombstone write2 txg=8 counts=[2] alloc_records=140 released=110 accounting=17 mapping_keys=12 red=[]
+PROBE Tombstone write3 txg=10 counts=[2, 1] alloc_records=190 released=154 accounting=17 mapping_keys=15 red=[]
+PROBE Tombstone write4 txg=12 counts=[2, 1, 1] alloc_records=240 released=202 accounting=17 mapping_keys=16 red=["I-9.22[根（实例 1、txg 12）：墓碑树（树 65545）里不是最右的容器 2 装了 1 条，不是旋钮值 2（满了才关）]"]
+PROBE Tombstone write5 txg=14 counts=[2, 1, 2] alloc_records=286 released=248 accounting=17 mapping_keys=16 red=["I-9.22[根（实例 1、txg 12）：墓碑树（树 65545）里不是最右的容器 2 装了 1 条，不是旋钮值 2（满了才关）]"]
+PROBE Tombstone write6 txg=16 counts=[2, 1, 2, 1] alloc_records=332 released=292 accounting=17 mapping_keys=17 red=["I-9.22[根（实例 1、txg 12）：墓碑树（树 65545）里不是最右的容器 2 装了 1 条，不是旋钮值 2（满了才关）]"]
+PROBE Tombstone L1-turn1 txg=17 counts=[2, 1, 2, 1] alloc_records=352 released=312 accounting=17 mapping_keys=17 red=["I-9.22[根（实例 1、txg 12）：墓碑树（树 65545）里不是最右的容器 2 装了 1 条，不是旋钮值 2（满了才关）]"]
+PROBE Tombstone L1-turn2 txg=18 counts=[2, 1, 2, 1] alloc_records=372 released=332 accounting=18 mapping_keys=17 red=["I-9.22[根（实例 1、txg 12）：墓碑树（树 65545）里不是最右的容器 2 装了 1 条，不是旋钮值 2（满了才关）]"]
+error: test failed, to rerun pass `-p singlefs-harness --test probe_m1_ring`
+
+Caused by:
+  process didn't exit successfully: `/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/target/debug/deps/probe_m1_ring-e5655d7ef0da143e --nocapture --test-threads 1` (signal: 15, SIGTERM: termination signal)
+exit=101

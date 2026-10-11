@@ -1,0 +1,10 @@
+ITEM_ONLY_IN_B x10 ;
+ITEM_ONLY_IN_A x1 impl < 'plan > Layer0StatePlan < 'plan > { fn new ( writes :
+ITEM_ONLY_IN_B x1 impl < 'plan > Layer0StatePlan < 'plan > { pub ( crate ) fn
+ITEM_ONLY_IN_A x1 impl WritesWithTornImages { fn of ( base : & MemoryPool , writes : &
+ITEM_ONLY_IN_B x1 impl WritesWithTornImages { pub ( crate ) fn of ( base : & MemoryPool
+ITEM_ONLY_IN_B x1 struct Layer0StatePlan < 'plan > { pub ( crate ) segments : & 'plan
+ITEM_ONLY_IN_A x1 struct Layer0StatePlan < 'plan > { segments : & 'plan [ Vec < usize
+ITEM_ONLY_IN_B x1 struct WritesWithTornImages { pub ( crate ) writes : Vec < RetainedWrite > ,
+ITEM_ONLY_IN_A x1 struct WritesWithTornImages { writes : Vec < RetainedWrite > , torn_image_by_write : BTreeMap <
+ITEMS mode=head-visibility-only entries=crates/singlefs-checker-tier/src/crash.rs items_a=2744 items_b=2754 only_in_a=4 only_in_b=14 verdict=differ

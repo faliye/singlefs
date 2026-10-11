@@ -1,0 +1,3 @@
+command args=--release -p singlefs-harness --test checker_known_bad_images -- knob judged_as_a_product_image_reddens_only_the_full_container_invariant --skip records_under_changing_knobs rc=0
+binary checker_known_bad_images
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 240 filtered out

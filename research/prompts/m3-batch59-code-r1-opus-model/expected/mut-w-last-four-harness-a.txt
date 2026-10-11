@@ -1,0 +1,9 @@
+command args=--release -p singlefs-checker --lib rc=0
+binary singlefs_checker
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+command args=--release -p singlefs-harness --test checker_known_bad_images -- records_under_changing_knobs rc=0
+binary checker_known_bad_images
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 255 filtered out
+command args=--release -p singlefs-harness --test container_trees_grow_a_level_when_the_root_is_full rc=0
+binary container_trees_grow_a_level_when_the_root_is_full
+test result: ok. 6 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out

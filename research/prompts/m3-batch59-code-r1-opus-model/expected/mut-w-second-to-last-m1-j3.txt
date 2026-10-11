@@ -1,0 +1,15 @@
+command args=--release -p opus-probe-b59 --test m1_gpu_flow_proxy -- --nocapture --test-threads 1 rc=0
+binary m1_gpu_flow_proxy
+OPUS_M1 by-root flow=lineage-2-1-1 root_txg:states/I-9.37_violated/I-9.37_held 0:12/0/0 1:9/0/0 2:12/0/0 3:12/0/0 4:12/0/0 5:12/0/9 6:12/0/12 7:12/0/12 8:12/9/3
+OPUS_M1 by-root flow=retirement-2-1-1 root_txg:states/I-9.37_violated/I-9.37_held 0:12/0/0 1:9/0/0 2:12/0/0 3:12/0/0 4:12/0/0 5:12/0/0 6:12/0/9 7:12/0/12 8:12/0/12 9:12/0/12 10:12/0/12 11:12/0/12 12:12/0/12 13:12/0/12 14:12/0/12 15:12/9/3
+OPUS_M1 by-root flow=tombstone-2-1-1 root_txg:states/I-9.22_violated/I-9.22_held 0:12/0/0 1:9/0/0 2:12/0/0 3:12/0/0 4:12/0/0 5:12/0/9 6:12/0/12 7:12/0/12 8:12/0/12 9:12/0/12 10:12/0/12 11:12/9/3 12:12/12/0
+OPUS_M1 judged flow=lineage-2-1-1 states=105 I-9.37_violated_states=9 I-9.37_held_states=36 states_with_any_violation=9 states_with_another_violation=0 digest=a32b2eb5875ac936
+OPUS_M1 judged flow=retirement-2-1-1 states=189 I-9.37_violated_states=9 I-9.37_held_states=108 states_with_any_violation=9 states_with_another_violation=0 digest=42dfa9c50dc3c16e
+OPUS_M1 judged flow=tombstone-2-1-1 states=153 I-9.22_violated_states=21 I-9.22_held_states=72 states_with_any_violation=21 states_with_another_violation=0 digest=59812ab889f3cb1b
+OPUS_M1 plan flow=lineage-2-1-1 domain=gpu-test writes=166 segments=31 longest_segment=24 closed_form_full=22020150 states=105
+OPUS_M1 plan flow=retirement-2-1-1 domain=gpu-test writes=387 segments=59 longest_segment=30 closed_form_full=1394606176 states=189
+OPUS_M1 plan flow=tombstone-2-1-1 domain=gpu-test writes=298 segments=47 longest_segment=30 closed_form_full=1312817230 states=153
+OPUS_M1 shape flow=lineage-2-1-1 written=[1]x1 [2]x1 [2, 1]x1 [2, 1, 1]x1 ring_turn_txgs=- ring_turn_shapes=- last_txg=8
+OPUS_M1 shape flow=retirement-2-1-1 written=[1]x1 [2]x1 [2, 1]x1 [2, 1, 1]x1 ring_turn_txgs=- ring_turn_shapes=- last_txg=15
+OPUS_M1 shape flow=tombstone-2-1-1 written=[1]x1 [2]x1 [2, 1]x1 [2, 1, 1]x1 ring_turn_txgs=- ring_turn_shapes=- last_txg=12
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

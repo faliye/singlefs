@@ -1,0 +1,16 @@
+[package]
+name = "history-enumerated"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+singlefs-harness = { path = "COPY_ROOT/crates/singlefs-harness" }
+singlefs-core = { path = "COPY_ROOT/crates/singlefs-core" }
+singlefs-checker-tier = { path = "COPY_ROOT/crates/singlefs-checker-tier", default-features = false }
+
+[profile.release]
+overflow-checks = true
+debug-assertions = true
+
+[workspace]

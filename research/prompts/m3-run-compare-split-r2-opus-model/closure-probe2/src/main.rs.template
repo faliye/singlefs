@@ -1,0 +1,214 @@
+// 攻方腿模型（m3-run-compare-split-r2）：照 crates/singlefs-checker-tier/build.rs 同一套（#[path] 引副本里的 judging_closure.rs 与 harness 的
+// sha256.rs、hexadecimal.rs，只用 std），在给定的仓根上算：整张结论代码摘要表、任意入口的闭包（文件清单与摘要）、闭包的词法单元
+// 多重集 / 串 / 按项多重集三种摘要、第一轮判决第三节第 3 条「读 *.wgsl 或自建管线的文件要么在某一把闭包里、要么登记」那条自证的仿写。不编 checker 档。
+// 用法：closure-probe2 table <仓根> | closure <仓根> <入口…> | tokens <仓根> <入口…> | selfproof2 <仓根>
+#[path = "COPY_ROOT/crates/singlefs-harness/src/hexadecimal.rs"]
+#[allow(dead_code)]
+mod hexadecimal;
+#[path = "COPY_ROOT/crates/singlefs-checker-tier/src/judging_closure.rs"]
+#[allow(dead_code)]
+mod judging_closure;
+#[path = "COPY_ROOT/crates/singlefs-harness/src/sha256.rs"]
+#[allow(dead_code)]
+mod sha256;
+
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
+
+use hexadecimal::hexadecimal_text;
+use sha256::{sha256_digest, DIGEST_BYTES};
+
+fn reader_of(root: &Path) -> judging_closure::ClosureTreeReader {
+    judging_closure::ClosureTreeReader::new(root).unwrap_or_else(|error| panic!("{}", error.reason))
+}
+
+fn closure_files(reader: &mut judging_closure::ClosureTreeReader, entries: &[&str]) -> judging_closure::ConclusionCode {
+    reader.conclusion_code(entries).unwrap_or_else(|error| panic!("{}", error.reason))
+}
+
+fn tokens_of(root: &Path, file: &str) -> Vec<String> {
+    let text = std::fs::read_to_string(root.join(file)).unwrap_or_else(|error| panic!("读不了 {file}：{error}"));
+    if file.ends_with(".rs") {
+        judging_closure::lexical_tokens(&text)
+    } else {
+        vec![format!("RAW:{}", hexadecimal_text(&sha256_digest(text.as_bytes())))]
+    }
+}
+
+/// 顶层项：按花括号深度切，深度回到 0 的 `}` 或深度 0 的 `;` 收一项；`use`、`mod x;` 两种项丢掉，项头的 `pub` / `pub(…)` 去掉。
+fn items_of(tokens: &[String]) -> Vec<Vec<String>> {
+    let mut items = Vec::new();
+    let mut current: Vec<String> = Vec::new();
+    let mut depth = 0i64;
+    for token in tokens {
+        current.push(token.clone());
+        match token.as_str() {
+            "{" => depth += 1,
+            "}" => {
+                depth -= 1;
+                if depth == 0 {
+                    items.push(std::mem::take(&mut current));
+                }
+            }
+            ";" if depth == 0 => items.push(std::mem::take(&mut current)),
+            _ => {}
+        }
+    }
+    if !current.is_empty() {
+        items.push(current);
+    }
+    let strip_visibility = |item: &[String]| -> Vec<String> {
+        let mut rest: Vec<String> = item.to_vec();
+        // 属性（#[…]）照留；只去紧跟在属性之后、项关键字之前的 pub / pub(…)
+        let mut position = 0;
+        while position + 1 < rest.len() && rest[position] == "#" && rest[position + 1] == "[" {
+            let mut bracket = 0i64;
+            while position < rest.len() {
+                if rest[position] == "[" { bracket += 1; }
+                if rest[position] == "]" { bracket -= 1; if bracket == 0 { position += 1; break; } }
+                position += 1;
+            }
+        }
+        if rest.get(position).map(String::as_str) == Some("pub") {
+            if rest.get(position + 1).map(String::as_str) == Some("(") {
+                let close = rest[position..].iter().position(|t| t == ")").map(|p| p + position).unwrap_or(position);
+                rest.drain(position..=close);
+            } else {
+                rest.remove(position);
+            }
+        }
+        rest
+    };
+    items
+        .into_iter()
+        .map(|item| strip_visibility(&item))
+        .filter(|item| {
+            let head = item.iter().find(|t| *t != "#").map(String::as_str);
+            !(head == Some("use") || (item.first().map(String::as_str) == Some("mod") && item.last().map(String::as_str) == Some(";")))
+        })
+        .collect()
+}
+
+fn digest_of_lines(lines: &[String]) -> String {
+    hexadecimal_text(&sha256_digest(lines.join("\n").as_bytes()))
+}
+
+fn main() {
+    let arguments: Vec<String> = std::env::args().collect();
+    let command = arguments.get(1).expect("给子命令").as_str();
+    let root = PathBuf::from(arguments.get(2).expect("给仓根"));
+    let entries: Vec<&str> = arguments[3..].iter().map(String::as_str).collect();
+    let mut reader = reader_of(&root);
+    match command {
+        "table" => {
+            let table = judging_closure::ConclusionCodeDigestTable::of_the_tree(&mut reader).unwrap_or_else(|error| panic!("{}", error.reason));
+            print!("{}", table.to_table_text());
+        }
+        "closure" => {
+            let code = closure_files(&mut reader, &entries);
+            let has = |needle: &str| code.files.iter().any(|file| file.ends_with(needle));
+            println!(
+                "CLOSURE entries={} files={} digest={} wgsl={} crash_rs={} crash_judge_gpu_rs={} harness_model_rs={} harness_history_rs={} reffs_lib_rs={} core_recovery_rs={} stopped_at={}",
+                entries.join(","),
+                code.files.len(),
+                hexadecimal_text(&code.digest),
+                code.files.iter().filter(|file| file.ends_with(".wgsl")).count(),
+                has("singlefs-checker-tier/src/crash.rs"),
+                has("singlefs-checker-tier/src/crash_judge_gpu.rs"),
+                has("singlefs-harness/src/model.rs"),
+                has("singlefs-harness/src/history.rs"),
+                has("singlefs-reference-filesystem/src/lib.rs"),
+                has("singlefs-core/src/recovery.rs"),
+                code.stopped_at.iter().cloned().collect::<Vec<_>>().join(",")
+            );
+            for file in &code.files {
+                println!("CLOSURE_FILE {file}");
+            }
+        }
+        "tokens" => {
+            let code = closure_files(&mut reader, &entries);
+            let mut all: Vec<String> = Vec::new();
+            let mut sequence: Vec<String> = Vec::new();
+            let mut items: Vec<String> = Vec::new();
+            for file in &code.files {
+                let tokens = tokens_of(&root, file);
+                sequence.push(format!("file {file}"));
+                sequence.extend(tokens.iter().cloned());
+                if file.ends_with(".rs") {
+                    for item in items_of(&tokens) {
+                        items.push(item.join(" "));
+                    }
+                } else {
+                    items.extend(tokens.iter().cloned());
+                }
+                all.extend(tokens);
+            }
+            all.sort();
+            items.sort();
+            println!(
+                "TOKENS entries={} files={} token_count={} multiset={} sequence={} item_multiset={} items={}",
+                entries.join(","),
+                code.files.len(),
+                all.len(),
+                digest_of_lines(&all),
+                digest_of_lines(&sequence),
+                digest_of_lines(&items),
+                items.len()
+            );
+            for token in all.iter().collect::<BTreeSet<_>>() {
+                let count = all.iter().filter(|t| *t == token).count();
+                println!("TOKEN_COUNT {count}\t{token}");
+            }
+        }
+        "selfproof2" => {
+            // 仿写第三节第 3 条第二条自证：src/ 下 include_str! 读 *.wgsl 或自建管线（create_compute_pipeline）的文件，要么在某一把闭包里、要么登记不判对错。
+            // 登记的是今天三份自建管线的文件（派活、单元校验和、事实核对），登记理由照 judging_closure.rs 的停止表与「判器不许引」表。
+            let registered: BTreeSet<&str> = [
+                "crates/singlefs-checker-tier/src/crash_judge_dispatch.rs",
+                "crates/singlefs-checker-tier/src/gpu_unit_checks.rs",
+                "crates/singlefs-checker-tier/src/crash_verify_gpu.rs",
+            ]
+            .into_iter()
+            .collect();
+            let table = judging_closure::ConclusionCodeDigestTable::of_the_tree(&mut reader).unwrap_or_else(|error| panic!("{}", error.reason));
+            let mut union: BTreeSet<String> = BTreeSet::new();
+            let mut per_kind: Vec<(String, BTreeSet<String>)> = Vec::new();
+            for entry in table.digest_of_each_entry.keys() {
+                let code = closure_files(&mut reader, &entry.entry_files());
+                union.extend(code.files.iter().cloned());
+                per_kind.push((format!("{entry:?}"), code.files));
+            }
+            let source_directory = root.join("crates/singlefs-checker-tier/src");
+            let mut red = 0usize;
+            let mut checked = 0usize;
+            let mut names: Vec<String> = std::fs::read_dir(&source_directory)
+                .expect("src 目录")
+                .flatten()
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .filter(|name| name.ends_with(".rs"))
+                .collect();
+            names.sort();
+            for name in names {
+                let file = format!("crates/singlefs-checker-tier/src/{name}");
+                let tokens = tokens_of(&root, &file);
+                let reads_wgsl = tokens.windows(4).any(|w| w[0] == "include_str" && w[1] == "!" && w[3].starts_with('"') && w[3].trim_matches('"').ends_with(".wgsl"));
+                let builds_pipeline = tokens.iter().any(|t| t == "create_compute_pipeline");
+                if !(reads_wgsl || builds_pipeline) {
+                    continue;
+                }
+                checked += 1;
+                let in_some_closure = union.contains(&file);
+                let observer_closures_holding = per_kind.iter().filter(|(kind, files)| kind.starts_with("ObserverCode") && files.contains(&file)).count();
+                let gpu_closure_holding = per_kind.iter().filter(|(kind, files)| kind.starts_with("GpuJudge") && files.contains(&file)).count();
+                let verdict = if in_some_closure || registered.contains(file.as_str()) { "green" } else { red += 1; "red" };
+                println!(
+                    "SELFPROOF2_FILE file={file} reads_wgsl={reads_wgsl} builds_pipeline={builds_pipeline} in_some_closure={in_some_closure} registered={} gpu_closures_holding_it={gpu_closure_holding} observer_closures_holding_it={observer_closures_holding} verdict={verdict}",
+                    registered.contains(file.as_str())
+                );
+            }
+            println!("SELFPROOF2 checked={checked} red={red} verdict={}", if red == 0 { "green" } else { "red" });
+        }
+        other => panic!("认不得的子命令 {other}"),
+    }
+    let _ = DIGEST_BYTES;
+}

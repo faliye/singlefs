@@ -1,0 +1,138 @@
+// 攻方腿模型（m3-run-compare-split-r3）：#[path] 引副本里的 judging_closure.rs（与 build.rs 同一套闭包算法），只用 std。
+// 用法：closure-probe3 closure <仓根> <入口…>        —— 闭包文件清单与几样标记
+//       closure-probe3 items <仓根A> <仓根B> <入口…>  —— 两棵树上同一组入口的闭包，按项多重集逐项比（第二轮判决第三节第 6 条的验收）
+#[path = "COPY_ROOT/crates/singlefs-harness/src/hexadecimal.rs"]
+#[allow(dead_code)]
+mod hexadecimal;
+#[path = "COPY_ROOT/crates/singlefs-checker-tier/src/judging_closure.rs"]
+#[allow(dead_code)]
+mod judging_closure;
+#[path = "COPY_ROOT/crates/singlefs-harness/src/sha256.rs"]
+#[allow(dead_code)]
+mod sha256;
+
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
+use hexadecimal::hexadecimal_text;
+use sha256::{sha256_digest, DIGEST_BYTES};
+
+#[allow(dead_code)]
+const _DIGEST: usize = DIGEST_BYTES;
+
+fn code_of(root: &Path, entries: &[&str]) -> judging_closure::ConclusionCode {
+    let mut reader = judging_closure::ClosureTreeReader::new(root).unwrap_or_else(|e| panic!("{}", e.reason));
+    reader.conclusion_code(entries).unwrap_or_else(|e| panic!("{}", e.reason))
+}
+
+/// 顶层项：花括号深度回到 0 的 `}` 或深度 0 的 `;` 收一项；丢 `use …;` 与 `mod x;`；去项头（属性之后）的 `pub` / `pub(…)`。
+fn items_of(tokens: &[String], loose: bool) -> Vec<String> {
+    let mut raw: Vec<Vec<String>> = Vec::new();
+    let mut current: Vec<String> = Vec::new();
+    let mut depth = 0i64;
+    for t in tokens {
+        current.push(t.clone());
+        if t == "{" { depth += 1; }
+        if t == "}" { depth -= 1; if depth == 0 { raw.push(std::mem::take(&mut current)); } }
+        if t == ";" && depth == 0 { raw.push(std::mem::take(&mut current)); }
+    }
+    if !current.is_empty() { raw.push(current); }
+    let mut out = Vec::new();
+    for mut item in raw {
+        let mut p = 0;
+        while p + 1 < item.len() && item[p] == "#" && item[p + 1] == "[" {
+            let mut b = 0i64;
+            while p < item.len() {
+                if item[p] == "[" { b += 1; }
+                if item[p] == "]" { b -= 1; if b == 0 { p += 1; break; } }
+                p += 1;
+            }
+        }
+        if item.get(p).map(String::as_str) == Some("pub") {
+            if item.get(p + 1).map(String::as_str) == Some("(") {
+                let close = item[p..].iter().position(|t| t == ")").map(|q| q + p).unwrap_or(p);
+                item.drain(p..=close);
+            } else { item.remove(p); }
+        }
+        let head = item.get(p).map(String::as_str);
+        if head == Some("use") { continue; }
+        if head == Some("mod") && item.last().map(String::as_str) == Some(";") { continue; }
+        if loose {
+            // 宽松读法：项里任何位置的 `pub` / `pub(…)` 都去掉；`use a::{…};` 切出来的孤立 `;` 不算项
+            let mut kept: Vec<String> = Vec::new();
+            let mut q = 0;
+            while q < item.len() {
+                if item[q] == "pub" {
+                    if item.get(q + 1).map(String::as_str) == Some("(") {
+                        let close = item[q..].iter().position(|t| t == ")").map(|r| r + q).unwrap_or(q);
+                        q = close + 1; continue;
+                    }
+                    q += 1; continue;
+                }
+                kept.push(item[q].clone()); q += 1;
+            }
+            if kept.len() == 1 && kept[0] == ";" { continue; }
+            out.push(kept.join(" "));
+            continue;
+        }
+        out.push(item.join(" "));
+    }
+    out
+}
+
+fn item_multiset(root: &Path, entries: &[&str], loose: bool) -> BTreeMap<String, i64> {
+    let code = code_of(root, entries);
+    let mut m = BTreeMap::new();
+    for file in &code.files {
+        let text = std::fs::read_to_string(root.join(file)).unwrap();
+        if file.ends_with(".rs") {
+            for item in items_of(&judging_closure::lexical_tokens(&text), loose) { *m.entry(item).or_insert(0) += 1; }
+        } else {
+            *m.entry(format!("RAW {file} {}", hexadecimal_text(&sha256_digest(text.as_bytes())))).or_insert(0) += 1;
+        }
+    }
+    m
+}
+
+fn short(item: &str) -> String { item.split(' ').take(14).collect::<Vec<_>>().join(" ") }
+
+fn main() {
+    let a: Vec<String> = std::env::args().collect();
+    match a[1].as_str() {
+        "closure" => {
+            let root = PathBuf::from(&a[2]);
+            let entries: Vec<&str> = a[3..].iter().map(String::as_str).collect();
+            let code = code_of(&root, &entries);
+            let has = |n: &str| code.files.iter().any(|f| f.ends_with(n));
+            let wgsl: Vec<&String> = code.files.iter().filter(|f| f.ends_with(".wgsl")).collect();
+            println!("CLOSURE entries={} files={} digest={} wgsl={} cpu_judge_entry_crash_rs={} gpu_judge_entry_crash_judge_gpu_rs={} crash_injection_rs={} crash_given_states_rs={} harness_model_rs={} harness_history_rs={} reffs_lib_rs={} core_recovery_rs={}",
+                entries.join(","), code.files.len(), hexadecimal_text(&code.digest), wgsl.len(),
+                has("singlefs-checker-tier/src/crash.rs"), has("singlefs-checker-tier/src/crash_judge_gpu.rs"),
+                has("singlefs-checker-tier/src/crash_injection.rs"), has("singlefs-checker-tier/src/crash_given_states.rs"),
+                has("singlefs-harness/src/model.rs"), has("singlefs-harness/src/history.rs"),
+                has("singlefs-reference-filesystem/src/lib.rs"), has("singlefs-core/src/recovery.rs"));
+            for w in &wgsl { println!("CLOSURE_WGSL {w}"); }
+            println!("CLOSURE_STOPPED_AT {}", code.stopped_at.iter().cloned().collect::<Vec<_>>().join(","));
+            for f in &code.files { println!("CLOSURE_FILE {f}"); }
+        }
+        "items" | "items-loose" => {
+            let loose = a[1] == "items-loose";
+            let ra = PathBuf::from(&a[2]);
+            let rb = PathBuf::from(&a[3]);
+            let entries: Vec<&str> = a[4..].iter().map(String::as_str).collect();
+            let ma = item_multiset(&ra, &entries, loose);
+            let mb = item_multiset(&rb, &entries, loose);
+            let mut only_a = 0i64; let mut only_b = 0i64;
+            let mut keys: Vec<&String> = ma.keys().chain(mb.keys()).collect(); keys.sort(); keys.dedup();
+            for k in keys {
+                let ca = *ma.get(k).unwrap_or(&0); let cb = *mb.get(k).unwrap_or(&0);
+                if ca > cb { only_a += ca - cb; println!("ITEM_ONLY_IN_A x{} {}", ca - cb, short(k)); }
+                if cb > ca { only_b += cb - ca; println!("ITEM_ONLY_IN_B x{} {}", cb - ca, short(k)); }
+            }
+            let total_a: i64 = ma.values().sum(); let total_b: i64 = mb.values().sum();
+            println!("ITEMS mode={} entries={} items_a={total_a} items_b={total_b} only_in_a={only_a} only_in_b={only_b} verdict={}",
+                if loose { "loose" } else { "head-visibility-only" }, entries.join(","), if only_a == 0 && only_b == 0 { "same" } else { "differ" });
+        }
+        other => panic!("认不得的子命令 {other}"),
+    }
+}

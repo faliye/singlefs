@@ -1,0 +1,33 @@
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 29s
+     Running tests/checker_known_bad_images.rs (/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+
+running 267 tests
+test a_data_pointer_with_no_location_on_one_device_skips_that_device_and_the_first_data_unit_invariant_holds ... ok
+test a_device_short_of_self_verified_system_configuration_slots_is_reported_aside_while_the_tail_slot_invariant_holds ... ok
+test a_file_version_whose_root_record_carries_a_non_zero_allocation_record_tree_root_reddens_the_disjointness_invariant_besides_the_walk ... ok
+test a_data_unit_with_another_object_whose_location_names_the_walked_extent_root_reddens_its_five_tuple_on_either_device ... ok
+test a_last_record_without_its_commit_marker_stops_the_replay_before_it ... ok
+test a_first_record_of_a_publish_whose_ordinal_is_not_one_stops_the_replay_before_it ... ok
+test a_chain_record_naming_a_next_page_through_a_pointer_whose_extent_offset_is_not_zero_on_the_newest_instance_table_does_not_decode has been running for over 60 seconds
+test a_chain_record_naming_a_next_page_through_a_pointer_whose_mac_is_not_zero_on_the_newest_instance_table_does_not_decode has been running for over 60 seconds
+test a_journal_record_whose_back_chain_does_not_match_is_not_walked_as_a_version_a_recovery_applied has been running for over 60 seconds
+test a_leaf_container_directly_shared_and_born_after_the_rollback_target_with_a_garbled_copy_reddens_the_birth_and_appearance_rules_on_either_device has been running for over 60 seconds
+test a_leaf_holding_the_same_inode_number_twice_reddens_only_the_container_number_invariant has been running for over 60 seconds
+test a_lineage_container_holding_more_records_than_the_knob_reddens_only_the_knob_capacity_invariant has been running for over 60 seconds
+test a_lineage_container_whose_location_names_the_shared_extent_root_judges_both_device_orders_alike has been running for over 60 seconds
+test a_lineage_container_whose_location_names_the_shared_inode_root_judges_both_device_orders_alike has been running for over 60 seconds
+test a_lineage_container_whose_record_width_is_not_the_registered_one_reddens_only_the_packed_container_invariant has been running for over 60 seconds
+test a_leaf_holding_the_same_inode_number_twice_reddens_only_the_container_number_invariant ... ok
+test a_lineage_container_holding_more_records_than_the_knob_reddens_only_the_knob_capacity_invariant ... ok
+test a_journal_record_whose_back_chain_does_not_match_is_not_walked_as_a_version_a_recovery_applied ... ok
+test a_lineage_container_with_a_wrong_record_width_beside_a_copy_verifying_as_a_node_reddens_the_packed_container_invariant_on_either_device has been running for over 60 seconds
+test a_lineage_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before has been running for over 60 seconds
+test a_lineage_container_with_a_wrong_record_width_whose_location_names_the_shared_extent_root_judges_both_device_orders_alike has been running for over 60 seconds
+test a_lineage_record_whose_watermark_rolled_back_from_is_below_the_last_step_reddens_only_the_watermark_step_invariant has been running for over 60 seconds
+error: test failed, to rerun pass `-p singlefs-harness --test checker_known_bad_images`
+
+Caused by:
+  process didn't exit successfully: `/home/fy5090/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/target/debug/deps/checker_known_bad_images-fa5092303c98133d` (signal: 15, SIGTERM: termination signal)
+exit=101

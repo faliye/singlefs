@@ -1,0 +1,5 @@
+command args=-p singlefs-harness --test system_configuration_slot_is_overwritten_only_after_a_barrier --test shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring rc=0
+binary shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+binary system_configuration_slot_is_overwritten_only_after_a_barrier
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
