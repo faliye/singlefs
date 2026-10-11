@@ -19,7 +19,7 @@
 #    为什么：门禁 doc-text 只在收尾跑整轮门禁时判，2026-09-24 实验设计员照样把这类名字写进三份重跑登记、执行员又抄进源码。
 #    字符集与 doc-text 同一份：../gate.d/lib-forbidden-notations.py 的 PRIME_MARKS，不在这里另抄；读不到就拒绝（不静默放行）。
 # 四、先编后换（Write、Edit、MultiEdit）：experiment-runner（名单是 COMPILE_FIRST_AGENTS）写主工作区 crates/ 下的 .rs（改已有的、新建的都算）一律拒绝，
-#    出路是在草稿目录的副本里改、经 research/scripts/compile-then-swap.py 编过再整份换进来。排在写范围那一道之前判，拒绝信息给的是这条出路。
+#    出路是在草稿目录的副本里改、经 scripts/hosts/compile-then-swap.py 编过再整份换进来。排在写范围那一道之前判，拒绝信息给的是这条出路。
 #    implementation-writer、主 agent、别的 agent 不判；草稿目录里的副本与 crates/ 下不是 .rs 的（crates/mutations.tsv）不判。
 #    为什么：执行员直接在主工作区改入库装置，改到一半编不过，别的会话带 --all-targets 的编译一起卡住
 #    （records/2026-09-16-subagent拆分提案.md 第四十节那张表第 51 行）。Bash 里的同一类写法归 bash-command-detector.sh 的 ⑨。
@@ -44,14 +44,14 @@
 #    后缀只认这两个：2026-10-03 拿 Edit 在草稿目录里各改一份 .md、.MD、.markdown、.mdown、.mkd、.txt（new_string 头一行以两个空格收尾），
 #    落盘只有 .md、.MD 留着那两个空格，.markdown、.mdown、.mkd 与 .txt 一样去掉了，所以它们照判、不并进 TRAILING_BLANK_EXEMPT_SUFFIXES。
 #    不判 old_string 中间行的行尾空白：new_string 那一行去掉的空白后面是换行，不会把两个词粘起来。
-#    出路：把框选范围收到不以空白结尾（多框到下一个非空白字符，或止于行尾）；确实要删行尾空白的，用 Bash 跑 research/scripts/replace-once.py。
+#    出路：把框选范围收到不以空白结尾（多框到下一个非空白字符，或止于行尾）；确实要删行尾空白的，用 Bash 跑 scripts/kb/replace-once.py。
 #
 # 八道判定合在这一个 hook 里：一至五、七、八各占文件头一段，六写在 --selftest 那一行的说明里。
 # 八道都判完再报：不成立的几道一次列全，每道带自己的出路；钟点与会话号逐处列出（行号与总数）。只有一处例外：
 # 先编后换那一道拒了，写范围那一道不再报（目标是同一个，先编后换的出路已经写了范围外的交回主 agent）。
 # 它们拒的是一次写，不停任务和脚本；拒绝时退出码 2、stderr 交给做这次写的模型，同时往检出记录
 # （默认工作根下的 agent-hook-detections.jsonl，lib_work_root.py 的 default_detections_path；环境变量 AGENT_HOOK_DETECTIONS 可改）追加一行，
-# 主 agent 的看门狗（research/scripts/agent-watch.py watch）读到就叫醒主 agent，由主 agent 判断怎么处理。
+# 主 agent 的看门狗（scripts/agents/agent-watch.py watch）读到就叫醒主 agent，由主 agent 判断怎么处理。
 # 这份源码里撇号类字符一律写成转义、lib-forbidden-notations.py 里用码位拼（门禁 doc-text 也扫它们）；改带转义的那几行用 Bash 里的 python，反斜杠拿 chr(92) 拼：
 # 2026-09-24 写这一道时实测，Write 的 content 里写的反斜杠 u 转义落盘成了字符本身，这道闸也会拒这样的写。
 #
@@ -66,7 +66,7 @@
 #                              #     「stdin:实现员写工作根下的报告」「stdin:七次拒绝都落进检出记录」（多出一次拒绝）
 #                              #   SINGLEFS_WORK_ROOT_BREAK=legacy-root-unknown（不认旧根）：「范围:过渡期旧根下的报告目录」
 #                              #   WRITE_GUARD_BREAK=scope-root-unanchored（展开时根后面不带 /）：「范围:工作根同名前缀的兄弟目录」
-#                              # 第六道：写进 .claude/hooks/、.claude/gate.d/、.claude/scripts/、research/scripts/ 下的 .sh 先过 bash -n、.py 先过 ast 解析，
+#                              # 第六道：写进 .claude/hooks/、.claude/gate.d/、.claude/scripts/、scripts/ 下的 .sh 先过 bash -n、.py 先过 ast 解析，
 #                              # 语法错的拒（带语法错误的钩子一上线，每一次 Bash 调用都收到它的报错）；
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键>（钟点的 date-zone-hour、date-zone-period、period-hour、hour-suffix、twelve-hour、
 #                              # bare-clock、iso-timestamp、zone-word，键写在 ../gate.d/lib-forbidden-notations.py）关掉一条判据行时，点名那一行的用例必须判红；
@@ -172,10 +172,10 @@ def decide_scope(hook_input, project_root, table_path):
                f"→ 它的写范围：{'、'.join(patterns)}（.claude/hooks/agent-write-scope.tsv；$SINGLEFS_WORK_ROOT 是工作根 ~/.local/share/singlefs/work，过渡期另认旧根 /tmp/claude-<uid>）。\n"
                f"→ 怎么办：范围外的改动不自己做，写进报告交回主 agent，由主 agent 改或派该写的 agent。{unexpanded}")
 
-# 四、先编后换：这几个项目 subagent 不直接写主工作区 crates/ 下的 .rs，出路是 research/scripts/compile-then-swap.py。
+# 四、先编后换：这几个项目 subagent 不直接写主工作区 crates/ 下的 .rs，出路是 scripts/hosts/compile-then-swap.py。
 # Bash 里的同一类写法由 bash-command-detector.sh 的 ⑨ 判，agent 名单与路径判据两边各写一份、改的时候一起改。
 COMPILE_FIRST_AGENTS = ("experiment-runner",)
-COMPILE_THEN_SWAP_SCRIPT = "research/scripts/compile-then-swap.py"
+COMPILE_THEN_SWAP_SCRIPT = "scripts/hosts/compile-then-swap.py"
 
 def decide_compile_first(hook_input, project_root):
     """四、登记在 COMPILE_FIRST_AGENTS 里的 agent 写主工作区 crates/ 下的 .rs。"""
@@ -190,7 +190,7 @@ def decide_compile_first(hook_input, project_root):
     return 2, (f"✗ {agent_type} 不直接写主工作区的 {relative}：入库装置先在草稿目录的副本里改，编过再整份换进主工作区，"
                "主工作区里任何时候都只放编得过的版本。\n"
                f"→ 怎么办：cp {relative} <草稿目录>/ 拷一份（新建的装置直接在草稿目录里建），在草稿目录那一份上用 Edit / Write 改；"
-               f"改完跑 bash research/scripts/capped.sh <线程上限> python3 {COMPILE_THEN_SWAP_SCRIPT} <草稿目录>/{os.path.basename(relative)} "
+               f"改完跑 bash scripts/hosts/capped.sh <线程上限> python3 {COMPILE_THEN_SWAP_SCRIPT} <草稿目录>/{os.path.basename(relative)} "
                f"{relative} --scratch <草稿目录>，它编过才整份换进来，编不过一个字节不写。\n"
                "→ 目标不是 crates/<crate>/src/bin/ 下的装置（crate 的库、测试）的，不归你改，写进报告交回主 agent。")
 
@@ -275,7 +275,7 @@ def decide_trailing_blank(hook_input):
                "  .md / .mdx 以外的目标，Edit 先去掉 new_string 每一行行尾的空格与制表符再施加：old_string 收尾的空白照样被换掉，"
                "new_string 里对应的那一个却没了，文件里紧跟着的字就粘上来（`python3 - \"$DEC\"` 落成 `python3 -\"$DEC\"`）。\n"
                "→ 怎么办：把 old_string 与 new_string 的框选范围收到不以空白结尾：两边一起往后多框到下一个非空白字符，或止于行尾（框到换行之前）。\n"
-               "→ 确实要删行尾空白的：用 Bash 跑 python3 research/scripts/replace-once.py <文件> <旧串> <新串>（旧串恰好命中一次才写）。")
+               "→ 确实要删行尾空白的：用 Bash 跑 python3 scripts/kb/replace-once.py <文件> <旧串> <新串>（旧串恰好命中一次才写）。")
 
 LIBRARY_UNREADABLE_PREFIX = "✗ 读不到"
 LISTED_HITS_LIMIT = 20
@@ -358,7 +358,7 @@ def decide_session_names(hook_input, project_root, library_path):
                "改过标题的会话（「会话「<标题>」」）同样不写标题。\n"
                "→ .sh、.py、.rs 里代码真要用这些字面（解析 ListAgents 输出的正则、造会话号的自检输入），在那一行写「# session-names:allow <理由>」（Rust 写「//」）")
 
-SYNTAX_CHECKED_DIRECTORIES = (".claude/hooks", ".claude/gate.d", ".claude/scripts", "research/scripts")
+SYNTAX_CHECKED_DIRECTORIES = (".claude/hooks", ".claude/gate.d", ".claude/scripts", "scripts")
 PYTHON_SYNTAX_CHECK = "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1])"
 
 def edited_content(hook_input, target):
@@ -528,8 +528,8 @@ def selftest(hook_dir):
             if agent:
                 hook_input["agent_type"] = agent
             return (label, want, decide(hook_input, work, table, library)[2])
-        os.makedirs(os.path.join(work, "research", "scripts"))
-        open(os.path.join(work, "research", "scripts", "y.sh"), "w").write("#!/usr/bin/env bash\necho ok\n")
+        os.makedirs(os.path.join(work, "scripts"))
+        open(os.path.join(work, "scripts", "y.sh"), "w").write("#!/usr/bin/env bash\necho ok\n")
         def content_case(label, tool_name, path, tool_input, want):
             hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=path)}
             return (label, want, decide(hook_input, work, table, library)[0])
@@ -542,8 +542,8 @@ def selftest(hook_dir):
             # 六、语法：钩子、门禁、项目脚本、研究脚本目录下的 .sh / .py
             content_case("语法:hooks 下写进语法错误的 .sh", "Write", f"{work}/.claude/hooks/x.sh", {"content": "if [ ; then\n  echo\n"}, 2),
             content_case("语法:hooks 下语法对的 .sh", "Write", f"{work}/.claude/hooks/x.sh", {"content": "#!/usr/bin/env bash\necho ok\n"}, 0),
-            content_case("语法:Edit 把研究脚本改出语法错误", "Edit", f"{work}/research/scripts/y.sh", {"old_string": "echo ok", "new_string": "if [ ; then"}, 2),
-            content_case("语法:Edit 研究脚本合法改动", "Edit", f"{work}/research/scripts/y.sh", {"old_string": "echo ok", "new_string": "echo fine"}, 0),
+            content_case("语法:Edit 把研究脚本改出语法错误", "Edit", f"{work}/scripts/y.sh", {"old_string": "echo ok", "new_string": "if [ ; then"}, 2),
+            content_case("语法:Edit 研究脚本合法改动", "Edit", f"{work}/scripts/y.sh", {"old_string": "echo ok", "new_string": "echo fine"}, 0),
             content_case("语法:门禁目录下语法错误的 .py", "Write", f"{work}/.claude/gate.d/z.py", {"content": "def (:\n"}, 2),
             content_case("语法:门禁目录下语法对的 .py", "Write", f"{work}/.claude/gate.d/z.py", {"content": "print(1)\n"}, 0),
             content_case("语法:别处的 .sh 不判", "Write", f"{work}/crates/run.sh", {"content": "if [ ; then\n"}, 0),
@@ -568,8 +568,8 @@ def selftest(hook_dir):
             case("范围:仓外别处", "Edit", "implementation-writer", "/etc/passwd", 2),
             case("范围:experiment-runner 登记", "Edit", "experiment-runner", f"{work}/research/prompts/e12-preregistration.md", 0),
             case("范围:experiment-runner 三方正文", "Edit", "experiment-runner", f"{work}/research/prompts/_e12-body.md", 2),
-            case("范围:experiment-runner replay.sh", "Edit", "experiment-runner", f"{work}/research/scripts/replay.sh", 0),
-            case("范围:experiment-runner mutate.sh", "Edit", "experiment-runner", f"{work}/research/scripts/mutate.sh", 2),
+            case("范围:experiment-runner replay.sh", "Edit", "experiment-runner", f"{work}/scripts/experiments/replay.sh", 0),
+            case("范围:experiment-runner mutate.sh", "Edit", "experiment-runner", f"{work}/scripts/mutation/mutate.sh", 2),
             case("范围:未登记的项目 agent", "Edit", "unscoped-writer", f"{work}/anything.md", 2),
             case("两道都中时先报覆盖", "Write", "kb-scribe", f"{work}/untracked.md", 2),
             # 四、实验执行员对主工作区 crates/ 下 .rs 的写：拒的那一道要是「绕过先编后换」，不是写范围那一道（出路不同）
@@ -796,7 +796,7 @@ def selftest(hook_dir):
                                   "tool_input": {"file_path": f"{work}/crates/singlefs-checker-tier/src/bin/e161_x.rs", "old_string": "a", "new_string": "b"}})
         cases.append(("stdin:experiment-runner 改主工作区的入库装置拒绝", 2, runner_entry.returncode))
         cases.append(("stdin:先编后换的拒绝点名那条脚本与草稿目录", True,
-                      all(fragment in runner_entry.stderr for fragment in ("research/scripts/compile-then-swap.py", "草稿目录", "→ 怎么办"))))
+                      all(fragment in runner_entry.stderr for fragment in ("scripts/hosts/compile-then-swap.py", "草稿目录", "→ 怎么办"))))
         prime_entry = run_entry({"tool_name": "Edit", "tool_input": {"file_path": f"{work}/crates/a.rs", "old_string": "B2", "new_string": "取 B2\u2032 的读法"}})
         cases.append(("stdin:Edit 写进角标", 2, prime_entry.returncode))
         cases.append(("stdin:角标的拒绝带字符、前后几个字与出路", True,

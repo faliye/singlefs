@@ -7,11 +7,11 @@ target/
 
 # research/ 入库（2026-08-29 用户定案）：实验代码、单测、变异脚本、原始产物都要进仓，
 # 因为决策正文把它们当依据引用——只在一台机器上的证据对第二个人不是证据。
-# 只有构建产物除外，它由上面那条 `target/` 兜住（research/target 有 315 MB）。
-/research/target/
+# 只有构建产物除外，它由上面那条 `target/` 兜住（scripts/experiments/target 有 315 MB）。
+/scripts/experiments/target/
 
 # run-with-memory-cap.sh 的峰值表：数只在本机成立，门禁 59 号跑的时候每条都写它（跟踪着会让 gate.sh 的工作区指纹开跑与收尾对不上）
-/research/scripts/memory-peaks.tsv
+/scripts/hosts/memory-peaks.tsv
 
 .env
 
@@ -24,7 +24,7 @@ target/
 # Python 字节码（门禁的 lib-*.py 被 import 时留下）
 __pycache__/
 
-# 打了 blklogwrites 补丁的 QEMU 装在哪（research/scripts/vm-bench.sh 读），本机路径，模板在仓根 qemu.env.example
+# 打了 blklogwrites 补丁的 QEMU 装在哪（scripts/devices/vm-bench.sh 读），本机路径，模板在仓根 qemu.env.example
 /qemu.env
 
 # E168 第一段产物：115 MB 超过 GitHub 单文件 100 MB 限制，不入库；本地文件保留

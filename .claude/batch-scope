@@ -17,4 +17,4 @@ crates/singlefs-checker-tier/src/crash_facts.rs	# shadow_unrelated 改名；判�
 crates/singlefs-checker-tier/src/crash_judge_common.wgsl	# 查版本按 64 位掩码比；判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行这一批（同步记录 research/prompts/m3-mask64-sync.md）
 crates/singlefs-checker-tier/src/crash_judge_dispatch.rs	# shadow_unrelated 改名；判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行这一批（同步记录 research/prompts/m3-mask64-sync.md）
 crates/singlefs-checker-tier/src/crash_judge_tables.rs	# 组合掩码 u64、一个落点 64 次写；判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行这一批（同步记录 research/prompts/m3-mask64-sync.md）
-research/scripts/e152-tables.py	# 六家表末尾加 singlefs 行；判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行这一批（同步记录 research/prompts/m3-mask64-sync.md）
+scripts/experiments/e152-tables.py	# 六家表末尾加 singlefs 行；判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行这一批（同步记录 research/prompts/m3-mask64-sync.md）

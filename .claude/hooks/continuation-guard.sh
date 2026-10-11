@@ -17,7 +17,7 @@
 #      不按字符串搜：每份会话记录开头的工具清单里都写着这个工具名，搜字符串会把没交回的也判成交回。
 #   ② 中断过：本会话记录里它最近一次任务通知是 failed 或 killed。中断过的不留「只差收尾」的口子（用户 2026-09-19：
 #      「按照你现在的方法实际上也是在让上下文白白膨胀，没有意义」）。
-# 两条的出路都是新派一个同类 agent：派发提示指到它的报告与产物；要它会话里的进度，用 research/scripts/agent-handover.py
+# 两条的出路都是新派一个同类 agent：派发提示指到它的报告与产物；要它会话里的进度，用 scripts/agents/agent-handover.py
 # 从会话记录里抽出来给新 agent 读。
 #
 # 上下文多大不拦（用户 2026-09-19：「不应该限制 280K，这个不可理。检测的看门狗不应该有终止的权利，subagent 也不应该有超过了
@@ -183,12 +183,12 @@ def decide(hook_input):
             return 0, None
         return 2, (f"✗ 子 agent {recipient} 已经交回过（它的会话记录里有一次送达的 SubagentHandback），交回之后不续做，新活一律新派。\n"
                    "→ 怎么办：不给它发消息。派一个新的同类 agent，派发提示指到它交回的报告与留下的产物；要它会话里的进度，跑 "
-                   f"`python3 research/scripts/agent-handover.py --agent {recipient} --out <交接摘要.md>` 抽出来给新 agent 读"
+                   f"`python3 scripts/agents/agent-handover.py --agent {recipient} --out <交接摘要.md>` 抽出来给新 agent 读"
                    "（交接摘要只给新的读，主 agent 不读它）。")
     reason =(f"✗ 子 agent {recipient} 最近一次任务通知是 {status}（撞限额、被停或报错），中断过的不续，新开一个接着做"
               f"（它最后一次调用的上下文 {last_context / 10000:.1f} 万，已被续做 {continuations} 次）。\n")
     return 2, (reason +
-               "→ 怎么办：不续这一个。跑 `python3 research/scripts/agent-handover.py --agent "
+               "→ 怎么办：不续这一个。跑 `python3 scripts/agents/agent-handover.py --agent "
                f"{recipient} --out <交接摘要.md>` 从它的会话记录里抽出派发提示、续做消息、写过的文件、跑过的命令与它最后说的话；"
                "派一个新的同类 agent，派发提示指到交接摘要与它留下的产物，第一步先核现场（编不编得过、产物是不是这一轮的），再接着做。"
                "交接摘要只给新的读，主 agent 不读它；接续非得经过主 agent 的上下文，就干脆从头重派。")

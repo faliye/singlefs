@@ -17,7 +17,7 @@
 #      判的只是这几种字面形，别的说法（「checker 档的用例你自己验一下」）认不出；执行时 heavy-test-guard.sh 与看门狗的进程一层照旧兜底。
 #   ⑫ 内置通用类型（general-purpose、claude，或不给 subagent_type）一律拒：一次性的活派项目定义 clerk（起步不带 CLAUDE.md 与规则），只读搜索派 Explore；
 #      确要派内置类型，提示里写一行「通用已判：<为什么 clerk 做不了>」放行。
-#   ⑬ 骨架的占位没填完：提示里还有 `<填 …>`（research/scripts/dispatch-prompt.py 打出来的占位）就拒，逐个列出那几行。
+#   ⑬ 骨架的占位没填完：提示里还有 `<填 …>`（scripts/agents/dispatch-prompt.py 打出来的占位）就拒，逐个列出那几行。
 #   ② 不读共用约束的类型（Explore、写了放行行的通用类型，或没有定义文件的类型）：提示里要有「开工先读」与 `.claude/agent-common.md`。
 #   ③ 输入齐不齐：`.claude/agents/<类型>.md` 的 frontmatter 有 `required-inputs:` 的，逐组查——组之间逗号分隔，组内 `|` 分隔的同义词在提示里出现一个就算；
 #      定义不在、没写这一行的不查。
@@ -35,11 +35,11 @@
 #      已有 SUBAGENT_CONCURRENCY_LIMIT 个（5，用户 2026-10-02 定）就拒，没有放行行。同一条消息里并行派的几个，后几个判的时候前几个可能还没写进主会话记录，数不到。另外，主会话记录里 8 天内有 failed 任务通知写着「resets <时刻> (<时区缩写>)」、它的
 #      「model sent to the API」与新派的同一族（opus / sonnet / haiku），而现在还没到那个时刻，拒；那次失败之后同一族又派出去、没再撞限额的
 #      算窗口已解开（换了账号或提前恢复），不拒；放行行「限额窗口已判：<理由>」。
-#   ⑧ 书记员：提示里点名的工作根或过渡期旧根下的规格文件逐份交给 research/scripts/kb-spec-check.py，红了拒；一份认得出的规格都没有也拒
+#   ⑧ 书记员：提示里点名的工作根或过渡期旧根下的规格文件逐份交给 scripts/kb/kb-spec-check.py，红了拒；一份认得出的规格都没有也拒
 #      （规格写在提示正文里的，把提示正文当规格判）；放行行「规格检查已判：<理由>」。
-#   ⑨ 设计员写重跑登记（提示里有 research/prompts/e<号>-r<n>-prereg.md）：`research/scripts/admission.py experiment <根> E<号>` 退 77
+#   ⑨ 设计员写重跑登记（提示里有 research/prompts/e<号>-r<n>-prereg.md）：`scripts/gate/admission.py experiment <根> E<号>` 退 77
 #      （输入自上次产物以来没变）就拒；没登记的实验（退 2）放行；放行行「准入已判：<理由>」。
-#   ⑩ 变异分诊员：提示里要有 `research/mutations/…tsv` 或 `crates/mutations.tsv`——不接没有表的广谱活动。
+#   ⑩ 变异分诊员：提示里要有 `scripts/mutation/tables/…tsv` 或 `crates/mutations.tsv`——不接没有表的广谱活动。
 #   ⑪ 执行员：提示里写着「只修锚点」或「只补落产物」的放行这一条；否则要有「这一段回答的岔路：<非空>」；登记对应的实验已经有实验页的算续做，
 #      还要有「上一段岔路表里还差：<非空>」，写「无 / 没有」的拒（一行都不差就该交岔路表，不续派）。
 #   ⑭ 设计员、执行员的预计挂钟与长活声明（判法在同目录 lib_long_run.py，判据 .claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」
@@ -51,7 +51,7 @@
 #
 #   runner-dispatch-guard.sh             # 从 stdin 读 hook 的 JSON
 #   runner-dispatch-guard.sh --check-prompt <提示文件> --type <类型> [--model <模型>] [--root <仓根>]
-#                                        # 派之前拿同一份判法核一份提示（research/scripts/dispatch-prompt.py --check 调它）：不成立的一次列全退 2，都成立退 0；
+#                                        # 派之前拿同一份判法核一份提示（scripts/agents/dispatch-prompt.py --check 调它）：不成立的一次列全退 2，都成立退 0；
 #                                        # 不读不写实现员登记、不读主会话记录，⑤ 撞文件与 ⑦ 并发、限额窗口写成「派的那一刻另判」
 #   runner-dispatch-guard.sh --selftest  # 在临时目录里走一遍放行与拒绝；下面每个弄坏开关单独打开时自检必须判红
 # 弄坏开关（一次设一个；自检里经 bash 起钩子的 stdin 那几项也带着同一个值）。逐个写开关名、弄坏哪一处、打开后自检哪几项红：
@@ -200,7 +200,7 @@
 # 改法加的三格在下面这几个开关下也红：disable-check 下三格都红（一次列全那一格实得 (0, False)，检查模式那一格实得 (0, True, False)）；
 # disable-heavy-test、placeholders-ignored 下「一次列全」那一格红（实得 (2, False)）；inputs-ignored 下「一次列全」与「输入:缺的输入…」两格红。
 # 长活声明判法的弄坏开关在同目录 lib_long_run.py（LIB_LONG_RUN_BREAK，一次设一个；经 bash 起钩子的 stdin 那几项也带着；
-# script-unresolved-accepted 与 wrappers-not-skipped 只 research/scripts/detached-run.sh 用，这里不红）：
+# script-unresolved-accepted 与 wrappers-not-skipped 只 scripts/hosts/detached-run.sh 用，这里不红）：
 #   LIB_LONG_RUN_BREAK=partial-accepted  三样写了一样就当齐了（⑭）
 #       长活:超过 2 小时只写了分片拒（半截声明）（应当返回 2，实际 0）；长活:分不了一行没点名缺的多机拒（应当返回 2，实际 0）；长活:分不了一行不到 8 个字拒（应当返回 2，实际 0）
 #   LIB_LONG_RUN_BREAK=hosts-unchecked  多机一行不看内容（⑭）
@@ -246,7 +246,7 @@ def labelled_value(prompt, label):
 
 HEAVY_TEST_OWNERS = set()   # 子 agent 一个都不跑重型测试：提交时的重阶段与整轮门禁由主 agent 跑
 GENERAL_PURPOSE_TYPES = {"general-purpose", "claude"}
-SKELETON_PLACEHOLDER = re.compile(r"<填[^>\n]*>")   # research/scripts/dispatch-prompt.py 骨架里没填的格   # 内置通用类型：继承项目 CLAUDE.md 与全部规则，起步约 13 万 token
+SKELETON_PLACEHOLDER = re.compile(r"<填[^>\n]*>")   # scripts/agents/dispatch-prompt.py 骨架里没填的格   # 内置通用类型：继承项目 CLAUDE.md 与全部规则，起步约 13 万 token
 # 写回员（kb-scribe）给判决自己起草规格时，提示里点名的判决文件
 VERDICT_MENTION = re.compile(r"research/prompts/[A-Za-z0-9][A-Za-z0-9_.\-]*-main-verification\.md")
 LINE_START = r"^[ \t>*_\-]*"
@@ -287,7 +287,7 @@ CRATES_FILES_LINE = re.compile(LINE_START + r"要动的\s*crates\s*文件[* \t]*
 CRATES_PATH = re.compile(r"crates/[^\s`'\"，。；：、（）()「」,;]+")
 SCOPE_MENTION = re.compile(r"(?:报告路径|报告写进|报告写到|写进|写到|更新)[*\s]*[：:]?[*\s]*`?(?P<path>(?:" + SCRATCH_MENTION_PREFIX + r"|research/|\.claude/|crates/|litmus/|records/)[^\s`'\"，。；：、（）()「」,;]*)")
 SCOPE_NEGATION = re.compile(r"不|别|禁止|勿")
-MUTATION_TABLE_MENTION = re.compile(r"research/mutations/[^\s`'\"]+\.tsv|crates/mutations\.tsv")
+MUTATION_TABLE_MENTION = re.compile(r"scripts/mutation/tables/[^\s`'\"]+\.tsv|crates/mutations\.tsv")
 RERUN_REGISTRATION = re.compile(r"research/prompts/e(\d+)-r\d+-prereg\.md")
 RESETS = re.compile(r"resets (?:(?P<month>[A-Z][a-z]{2}) (?P<day>\d{1,2}),? )?(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?(?P<half>am|pm) \(UTC\)")  # clock-times:allow 解析外部限额通知的原文，格式由对方定
 MODEL_SENT = re.compile(r"model sent to the API: ([\w.\-\[\]]+)")
@@ -551,7 +551,7 @@ def model_verdict(hook_input, prompt, subagent_type, fields, launches, ended, wi
 def kb_scribe_spec_verdict(prompt, project_root, hook_dir):
     if valve_reason(prompt, "规格检查已判") is not None or break_switch_is("spec-check-skipped"):
         return None
-    checker = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "research", "scripts", "kb-spec-check.py")
+    checker = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "scripts", "kb", "kb-spec-check.py")
     candidates = []
     for mention in sorted(set(SCRATCH_FILE_MENTION.findall(prompt))):
         path = expanded_mention(mention.rstrip("。，；：、."))
@@ -581,11 +581,11 @@ def kb_scribe_spec_verdict(prompt, project_root, hook_dir):
                 print(f"! kb-spec-check.py 退出码 {result.returncode}，规格这一条没判：{result.stdout[-200:]}{result.stderr[-200:]}", file=sys.stderr)
                 return None
         if problems:
-            return ("✗ 给书记员的规格会让门禁红（research/scripts/kb-spec-check.py）：\n" + "\n".join(f"  {line}" for line in problems[:20]) +
+            return ("✗ 给书记员的规格会让门禁红（scripts/kb/kb-spec-check.py）：\n" + "\n".join(f"  {line}" for line in problems[:20]) +
                     "\n→ 怎么办：改规格原文再派；判断不了的交用户；要写回员自己起草就给它判决与条目、不给规格。确要照这份派，提示里写一行「规格检查已判：<理由>」。")
         if recognized == 0:
             return ("✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡期旧根下的文件都不是 kb-spec-check.py 认的写法）。\n"
-                    "→ 怎么办：照 research/scripts/kb-spec-check.py 文件头「规格的两种写法」写，或给判决让写回员自己起草；确要照原样派，提示里写一行「规格检查已判：<理由>」。")
+                    "→ 怎么办：照 scripts/kb/kb-spec-check.py 文件头「规格的两种写法」写，或给判决让写回员自己起草；确要照原样派，提示里写一行「规格检查已判：<理由>」。")
         return None
     finally:
         if inline is not None:
@@ -597,14 +597,14 @@ def designer_admission_verdict(prompt, project_root, hook_dir):
     if match is None or break_switch_is("admission-ignored") or valve_reason(prompt, "准入已判") is not None:
         return None
     admission = (os.environ.get("RUNNER_DISPATCH_GUARD_ADMISSION_SCRIPT")
-                 or os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "research", "scripts", "admission.py"))
+                 or os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "scripts", "gate", "admission.py"))
     try:
         result = subprocess.run([sys.executable, admission, "experiment", project_root, f"E{int(match.group(1))}"], capture_output=True, text=True, timeout=50)
     except (OSError, subprocess.TimeoutExpired) as error:
         print(f"! 派发闸跑不了 admission.py，准入这一条没判：{error}", file=sys.stderr)
         return None
     if result.returncode == 77:
-        return (f"✗ E{int(match.group(1))} 的输入自上次产物以来没变（research/scripts/admission.py experiment 退 77），不写它的重跑登记。\n"
+        return (f"✗ E{int(match.group(1))} 的输入自上次产物以来没变（scripts/gate/admission.py experiment 退 77），不写它的重跑登记。\n"
                 "→ 怎么办：沿用上次产物与结论；要为别的原因重跑（换臂、换判据），在提示里写一行「准入已判：<哪一样变了>」。")
     return None
 
@@ -788,7 +788,7 @@ LONG_RUN_RULE = ("→ 规矩：预计挂钟超过 2 小时的活默认分片、�
                  "（.claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」）。\n")
 LONG_RUN_LINES = ("超过 2 小时的，同一份提示里写三行：「分片：<分片单元>」「续跑：<同一条命令重起只补没做完的，怎么认做完的>」"
                   "「多机：<台数从 layer0-shard-configuration-check.sh --emit-hosts 读、每台的线程与内存从 host-resources.py --json 现算，不写常量>」；"
-                  "分不了的写「分不了：<点名缺的分片 / 续跑 / 多机与为什么，至少 8 个字>」。骨架 python3 research/scripts/dispatch-prompt.py <类型> 带这几行。")
+                  "分不了的写「分不了：<点名缺的分片 / 续跑 / 多机与为什么，至少 8 个字>」。骨架 python3 scripts/agents/dispatch-prompt.py <类型> 带这几行。")
 
 def long_run_verdict(subagent_type, prompt):
     """⑭ 派设计员、执行员：预计挂钟一行，超过 2 小时时的分片、续跑、多机三行（判法在 lib_long_run.py）。交回拒绝说明，放行交 None。"""
@@ -834,7 +834,7 @@ def missing_inputs_message(subagent_type, missing):
     return (f"✗ 派 {subagent_type} 的提示缺它定义要的输入：{'、'.join(alternatives[0] for alternatives in groups)}（{definition} 的 required-inputs）。\n"
             f"→ 认法：每一组按字面子串在整份提示里找，写在哪一行都算，近义的说法不算（例：要的是「{example[0]}」，写「{example[1]}」不算）：\n"
             + "\n".join(found_by) + "\n"
-            f"→ 照抄这几行进提示，把 <填 …> 换成实际内容（骨架 python3 research/scripts/dispatch-prompt.py {subagent_type} 打的就是这几行）：\n"
+            f"→ 照抄这几行进提示，把 <填 …> 换成实际内容（骨架 python3 scripts/agents/dispatch-prompt.py {subagent_type} 打的就是这几行）：\n"
             + "\n".join(copy_lines) + "\n"
             f"→ 怎么办：每一样该写什么，照 {definition}「输入（主 agent 必须给）」一节。")
 
@@ -877,7 +877,7 @@ def combined_refusal(subagent_type, refusals):
         return refusals[0][1]
     blocks = [f"── 第 {number} 处（共 {len(refusals)} 处）──\n{message}" for number, (_, message) in enumerate(refusals, 1)]
     return (f"✗ 派 {subagent_type} 的提示有 {len(refusals)} 处不成立，各条都判完了，下面一次列全，逐处照各自的「→ 怎么办」改；"
-            f"改完可以先跑 python3 research/scripts/dispatch-prompt.py --check <提示文件> --type {subagent_type} 核一遍再派。\n" + "\n".join(blocks))
+            f"改完可以先跑 python3 scripts/agents/dispatch-prompt.py --check <提示文件> --type {subagent_type} 核一遍再派。\n" + "\n".join(blocks))
 
 def heavy_permission_object_counts(clause, match):
     """子句里提到的 checker 档 / --include-ignored / 重型测试算不算要跑的对象：前面紧挨否定（非、不带、不跑、拦……）、后面同一子句里有不跑、归提交、重型这类、
@@ -994,7 +994,7 @@ def judge_dispatch(hook_input, project_root, hook_dir=None, check_only=False):
     if unfilled and not break_switch_is("placeholders-ignored"):
         shown = "\n".join(f"  第 {number} 行：{line[:100]}" for number, line in unfilled[:8])
         refusals.append(("骨架占位", f"✗ 派 {subagent_type} 的提示骨架还有 {len(unfilled)} 处占位没填：\n{shown}\n"
-                   "→ 怎么办：把每处 <填 …> 换成实际内容，不适用的整行删掉；python3 research/scripts/dispatch-prompt.py --check <提示文件> 核到没有占位再派。"))
+                   "→ 怎么办：把每处 <填 …> 换成实际内容，不适用的整行删掉；python3 scripts/agents/dispatch-prompt.py --check <提示文件> 核到没有占位再派。"))
     fields = agent_definition_fields(project_root, subagent_type)
     if fields is None and not COMMON_CONSTRAINTS_READ.search(prompt) and not break_switch_is("general-purpose-free"):
         refusals.append(("开工先读共用约束", f"✗ {subagent_type} 不是项目定义的 agent，不读共用约束，提示里却没写「开工先读 `.claude/agent-common.md`」。\n"
@@ -1033,7 +1033,7 @@ def judge_dispatch(hook_input, project_root, hook_dir=None, check_only=False):
         if admission_message:
             refusals.append(("重跑登记准入", admission_message))
     if subagent_type == "mutation-triage" and not MUTATION_TABLE_MENTION.search(prompt) and not break_switch_is("mutation-table-free"):
-        refusals.append(("变异表", "✗ 派 mutation-triage 的提示里没有变异表（research/mutations/<名>.tsv 或 crates/mutations.tsv 的条目名）。\n"
+        refusals.append(("变异表", "✗ 派 mutation-triage 的提示里没有变异表（scripts/mutation/tables/<名>.tsv 或 crates/mutations.tsv 的条目名）。\n"
                    "→ 怎么办：给它表名与条目；没有表的广谱变异是实验，照 .claude/main-agent.md 那一行走 experiment-designer 登记。"))
     writer_files, writer_live_rows = None, []
     if subagent_type == "implementation-writer":
@@ -1186,9 +1186,9 @@ def selftest(hook_dir):
             # 提示正文里许可子 agent 跑 checker 档的句子：带着「重型测试：不跑」一行照拒（调度记录 records/2026-09-30-里程碑三开工第一轮.md 第 936 行那两腿的原句；
             # 开关 heavy-permission-unchecked 下前五格红）
             case("重型:正文许可跑不带 --include-ignored 的 checker 档快用例拒（第 936 行正推腿的原句）", "clerk",
-                 "可以拷仓副本跑 harness 档或不带 `--include-ignored` 的 checker 档快用例来核（经 research/scripts/run-with-memory-cap.sh，上限 ≤ 12G）；不跑门禁阶段、全量。", 2),
+                 "可以拷仓副本跑 harness 档或不带 `--include-ignored` 的 checker 档快用例来核（经 scripts/hosts/run-with-memory-cap.sh，上限 ≤ 12G）；不跑门禁阶段、全量。", 2),
             case("重型:正文把 checker 档单个用例列成可跑的拒（第 936 行攻方腿的原句）", "clerk",
-                 "能造反例的造反例：拷仓副本，在副本里改装置、跑 harness 档或小规模的 checker 档单个用例（经 research/scripts/run-with-memory-cap.sh，上限 ≤ 12G）。", 2),
+                 "能造反例的造反例：拷仓副本，在副本里改装置、跑 harness 档或小规模的 checker 档单个用例（经 scripts/hosts/run-with-memory-cap.sh，上限 ≤ 12G）。", 2),
             case("重型:正文要跑 checker 档就只跑快用例拒", "clerk", "要跑 checker 档用例就只跑不带 `--include-ignored` 的快用例，跑不了的写「核不动」。", 2),
             case("重型:正文许可跑 cargo test -p singlefs-checker-tier 拒", "clerk",
                  "装置单测可以跑：`cargo test --release -p singlefs-checker-tier --bin e168_delete_ring_window_borrow` 不带 `--include-ignored`，经内存包装。", 2),
@@ -1203,11 +1203,11 @@ def selftest(hook_dir):
             # 两档里的轻型（.claude/rules/verification.md「两档：轻型与重型」）：三条带 --quick 的许可子 agent 跑放行，重型写法拒
             # （开关 light-tier-commands-unchecked 下拒的三格红，light-tier-quick-counted 下放行的两格红）
             case("重型:正文许可子 agent 跑轻型三条放行", "clerk",
-                 "交回前跑轻型：`bash research/scripts/run-with-memory-cap.sh 4G bash research/scripts/crash-point-replay.sh --quick --item fixed-script`，"
+                 "交回前跑轻型：`bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/crash/crash-point-replay.sh --quick --item fixed-script`，"
                  "可以跑 `bash .claude/gate.d/checker-tier-formal-verification.sh --quick .` 与 `bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick .`。", 0),
             case("重型:否定句不跑崩溃点重放的重型跑法、只跑 --quick 放行", "clerk",
-                 "不跑 `bash research/scripts/crash-point-replay.sh --full`，只跑 `bash research/scripts/crash-point-replay.sh --quick`。", 0),
-            case("重型:正文许可跑崩溃点重放入口不带 --quick 拒", "clerk", "改完可以跑 `bash research/scripts/crash-point-replay.sh --item fixed-script` 看绿。", 2),
+                 "不跑 `bash scripts/crash/crash-point-replay.sh --full`，只跑 `bash scripts/crash/crash-point-replay.sh --quick`。", 0),
+            case("重型:正文许可跑崩溃点重放入口不带 --quick 拒", "clerk", "改完可以跑 `bash scripts/crash/crash-point-replay.sh --item fixed-script` 看绿。", 2),
             case("重型:正文直接写跑形式化那一道（不带 --quick）拒", "clerk", "改完跑 `bash .claude/gate.d/checker-tier-formal-verification.sh .` 核一遍。", 2),
             case("重型:正文许可跑 crates 变异那一道 --full 拒", "clerk", "允许跑 `bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --full .`。", 2),
             case("重型:harness 档带 --include-ignored 可以跑放行", "clerk",
@@ -1463,7 +1463,7 @@ def selftest(hook_dir):
     return 0
 
 CHECK_PROMPT_USAGE = ("  ✗ 用法：runner-dispatch-guard.sh --check-prompt <提示文件> --type <类型> [--model <模型>] [--root <仓根>]\n"
-                      "  → 怎么办：平时由 python3 research/scripts/dispatch-prompt.py --check <提示文件> --type <类型> 替你这样调")
+                      "  → 怎么办：平时由 python3 scripts/agents/dispatch-prompt.py --check <提示文件> --type <类型> 替你这样调")
 
 def check_prompt_main(arguments, hook_dir):
     """--check-prompt：派之前拿派发闸同一份判法（judge_dispatch，check_only）核一份提示，不成立的一次列全、退 2，都成立退 0；用法错退 2。"""

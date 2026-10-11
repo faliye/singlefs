@@ -22,7 +22,7 @@ python 的选项照解释器的语义切（python_invocation）：短选项可�
 剥掉包装之后命令词是一个脚本时，记下它是怎么起的（launcher：bash / sh 这类后面跟的、source / . 读进来的、python3 后面跟的）；
 经 `run-with-memory-cap.sh <上限>` 剥出来的命令记 memory_capped，连同它 `bash -c` 里的命令；调用方往里读它起的脚本时，把这个标记当 memory_capped 参数传回来。
 脚本文件本身不在这里读，要读的 hook 自己读，再把正文交回 commands_at_command_position。
-只有一处例外：detached_run_script 认 research/scripts/detached-run.sh（名字、符号链接、文件开头的签名行），读命令词那份文件的开头 4 KiB，两个 hook 共用这一份认法。
+只有一处例外：detached_run_script 认 scripts/hosts/detached-run.sh（名字、符号链接、文件开头的签名行），读命令词那份文件的开头 4 KiB，两个 hook 共用这一份认法。
 detached-run.sh 的参数先照它的 preflight 摘掉每一个 `--force`（连 `--` 之后的、连写在选项值位置上的），再切 start（detached_run_arguments_after_preflight）：
 闸看的那条命令与单元里真跑的逐字相同（弄坏开关 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 退回只跳过子命令前与选项之间的 --force，
 哪几份自证的哪几项红见「弄坏开关」一段）。
@@ -30,7 +30,7 @@ detached-run.sh 的参数先照它的 preflight 摘掉每一个 `--force`（连 
 喂给 shell 的 heredoc 正文里引号没配对时，其后的切词会错；heredoc 挂的命令从上一行续行过来时认不出它喂给谁（当数据剥掉）；heredoc 挂在命令替换或进程替换里面的命令上（`$(bash <<EOF`、`<(bash <<EOF`）认不出它喂给 shell（当数据剥掉）；圆括号子 shell 里的 cd 与 export 当成对后面的命令也生效；
 命令替换与进程替换里的命令按替换所在那条命令开始时的目录与 export 判（替换里的 cd 不影响外面）。
 弄坏开关（LIB_SHELL_WORDS_BREAK，几个用逗号连；只给自证判红用）。这一份没有自己的 --selftest，由导入它的几份的自证判红：
-lib_heavy_tests.py、heavy-test-guard.sh、bash-command-detector.sh、research/scripts/detached-run.sh 各自的 --selftest。
+lib_heavy_tests.py、heavy-test-guard.sh、bash-command-detector.sh、scripts/hosts/detached-run.sh 各自的 --selftest。
 逐项写开关名、弄坏哪一处、打开后哪几份自证的哪几项红（项名是那份自证的用例标签，括号里是失败行在标签之后的开头；
 失败行 lib_heavy_tests.py 以「✗ lib_heavy_tests 自检：」起头，heavy-test-guard.sh、bash-command-detector.sh 以「✗ 自检：」起头，
 detached-run.sh 以「✗ 自证格不对：」起头、标签之后不另写期望值；heavy-test-guard.sh 的自证还原样转出 lib_heavy_tests.py 自证的失败行）：
@@ -52,14 +52,14 @@ detached-run.sh 以「✗ 自证格不对：」起头、标签之后不另写期
         python3 -X dev 起广谱变异（「应当是 broad-mutation，实际 None」）
         python3 -BW default（合写、值另起一个词）起广谱变异（「应当是 broad-mutation，实际 None」）
         python3 --check-hash-based-pycs never 起广谱变异（「应当是 broad-mutation，实际 None」）
-        cd 进 research/scripts 再 python3 -m broad-mutation（「应当是 broad-mutation，实际 None」）
+        cd 进 scripts 再 python3 -m broad-mutation（「应当是 broad-mutation，实际 None」）
         python3 -m research.scripts.broad-mutation（命名空间包）（「应当是 broad-mutation，实际 None」）
         python3 -m runpy broad-mutation（「应当是 broad-mutation，实际 None」）
-        PYTHONPATH 指到 research/scripts 再 python3 -m broad-mutation（「应当是 broad-mutation，实际 None」）
+        PYTHONPATH 指到 scripts 再 python3 -m broad-mutation（「应当是 broad-mutation，实际 None」）
         python3 -c runpy.run_path 起广谱变异（「应当是 broad-mutation，实际 None」）
         python3 -c exec(open(驱动).read())（「应当是 broad-mutation，实际 None」）
         python3 -c runpy.run_module 按模块名起（「应当是 broad-mutation，实际 None」）
-        PYTHONPATH 指到 research/scripts 再 python3 -m 起判法脚本跑必红世界（「应当是 verus-stage，实际 None」）
+        PYTHONPATH 指到 scripts 再 python3 -m 起判法脚本跑必红世界（「应当是 verus-stage，实际 None」）
         export PYTHONPATH 再 python3 -m 起红例重放（「应当是 verus-stage，实际 None」）
         python3 -c runpy.run_path 起判法脚本跑必红世界（「应当是 verus-stage，实际 None」）
         经 PYTHONPATH 起判法脚本的 --selftest：不在登记表的位置上，照旧算提交时才跑的检查（「应当是 commit-check-selftest，实际 None」）
@@ -121,10 +121,10 @@ MAXIMUM_NESTING = 8
 WRAPPERS_TAKING_ONE_ARGUMENT = {"capped.sh", "run-with-memory-cap.sh"}
 # 其中给命令定内存上限的那一个：剥掉它的命令记 memory_capped（heavy-test-guard.sh 判子 agent 跑编译出来的代码经没经它）
 MEMORY_CAP_WRAPPER = "run-with-memory-cap.sh"
-# research/scripts/detached-run.sh（脱离会话长跑的入口）：两个 hook 都要认它，按名字（路径不论）、解到的真实路径（符号链接）与文件开头的签名行
+# scripts/hosts/detached-run.sh（脱离会话长跑的入口）：两个 hook 都要认它，按名字（路径不论）、解到的真实路径（符号链接）与文件开头的签名行
 # （行首 `# detached-run-script-signature:`，改名或拷走的一份）认；读文件开头这么多字节找签名行。这份文件自己的开头里没有以它起头的行
 DETACHED_RUN_SCRIPT_NAME = "detached-run.sh"
-DETACHED_RUN_SCRIPT_LOCATION = "research/scripts/detached-run.sh"
+DETACHED_RUN_SCRIPT_LOCATION = "scripts/hosts/detached-run.sh"
 DETACHED_RUN_SIGNATURE_LINE = re.compile(rb"^# detached-run-script-signature:", re.MULTILINE)
 DETACHED_RUN_HEAD_BYTES = 4096
 # 它的 start 带值的选项（`--wall-clock <within-2h|over-2h>`、`--label <名>`、`--log <文件>`、`--stop-timeout <秒>`，也可以写成 `--选项=值`）
@@ -547,8 +547,8 @@ def carries_detached_run_signature(head):
 
 
 def detached_run_script(word, directory, by_name_only=False):
-    """命令词是不是 research/scripts/detached-run.sh：是就交一句凭什么认出来的，不是交 None。三种办法：名字叫 detached-run.sh（路径不论）；
-    解到的文件的真实路径落在 research/scripts/detached-run.sh（符号链接）；文件开头有签名行（改名或拷走的一份）。
+    """命令词是不是 scripts/hosts/detached-run.sh：是就交一句凭什么认出来的，不是交 None。三种办法：名字叫 detached-run.sh（路径不论）；
+    解到的文件的真实路径落在 scripts/hosts/detached-run.sh（符号链接）；文件开头有签名行（改名或拷走的一份）。
     后两种读盘：相对路径按 directory 解（directory 是 None 时只认绝对路径），带没展开的变量、命令替换、通配的词不解；文件不在就认不出。
     by_name_only 为真时只按名字认（两个 hook 的弄坏开关用）。"""
     expanded = os.path.expanduser(word)

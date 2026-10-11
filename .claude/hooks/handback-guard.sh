@@ -11,13 +11,13 @@
 #   ④ 全部子 agent（输入里有 agent_id、不是 main；general-purpose 也判，主 agent 不判）：它自己起的后台任务（它会话记录
 #      <主会话记录去掉 .jsonl>/subagents/agent-<agent_id>.jsonl 里 run_in_background 的工具结果、或前台跑满超时被挪进后台的，带输出文件路径的那些）
 #      此刻还有进程开着输出文件，就是还在跑：拒，按任务列出最上层的进程号、已跑多久、命令与整棵子树从最底层往上的停止次序，
-#      出路是结束本轮等完成通知再交回，或按进程号逐个停掉再交回。认法与看门狗「交回之后后台还在跑」同一套，从 research/scripts/agent-watch.py 导入
+#      出路是结束本轮等完成通知再交回，或按进程号逐个停掉再交回。认法与看门狗「交回之后后台还在跑」同一套，从 scripts/agents/agent-watch.py 导入
 #      （background_start_in_result、own_background_tasks_still_running），不另抄一份。命令里自己用 `&`、`nohup` 放出去又改了输出去向的进程认不出（与看门狗同一处射程）。
 #      找不到它的会话记录、导入不了 agent-watch.py 就不判这一条，stderr 写一句。
 # 下面三条只判项目子 agent（`.claude/agents/<agent_type>.md` 在的）；主 agent、general-purpose 这类不判：
 #   ① 交回正文超过 HANDBACK_CHARACTER_LIMIT 个字符（按 python 的 len 数，默认 4000；原 2000 时 8 天里拒了 67 次，每次都在最大的上下文上重写整份交回）：全文写进报告文件，交回只写结论、报告路径与 sha256；
 #   ② three-way-forward / three-way-attack / three-way-defense / three-way-verifier：交回里点名的 research/prompts/…-output.md 逐份交给
-#      research/scripts/cite-check.py（--root 项目根，--unchanged-since 取这个子 agent 会话记录第一条的时刻），有对不上的拒；交回里一份报告都没点名也拒；
+#      scripts/agents/cite-check.py（--root 项目根，--unchanged-since 取这个子 agent 会话记录第一条的时刻），有对不上的拒；交回里一份报告都没点名也拒；
 #      找不到它的会话记录（认不出开工时刻）就不判这一条，stderr 写一句；
 #   ③ kb-scribe / experiment-runner：交回正文与它点名的报告文件（research/prompts/、工作根或过渡期旧根下的 .md；两个根怎么认只在同目录 lib_work_root.py）里，以 ✓ 起头的行没有数字、
 #      或写「查了 0 项」这类零项的，拒，逐行列出——绿行要连它报的查了多少项一起贴，0 项或没有数的按没判写。
@@ -203,9 +203,9 @@ def decide(hook_input, project_root, cite_check):
     if (agent_type in CITATION_CHECKED_AGENTS or BROKEN == "cite-any-agent") and BROKEN != "no-cite":
         problems = citation_problems(message, hook_input, project_root, cite_check)
         if problems:
-            return 2, ("✗ 报告里的引文对不上（research/scripts/cite-check.py）：\n" + "\n".join(f"  {line}" for line in problems[:20]) +
+            return 2, ("✗ 报告里的引文对不上（scripts/agents/cite-check.py）：\n" + "\n".join(f"  {line}" for line in problems[:20]) +
                        "\n→ 怎么办：按每处的提示改报告里的行号或引文——行号去被引文件里现查（grep -nF），不从背景材料里数；改完再跑一次 "
-                       "python3 research/scripts/cite-check.py <报告> 看它转绿，再交回。")
+                       "python3 scripts/agents/cite-check.py <报告> 看它转绿，再交回。")
     if agent_type in GREEN_COUNT_CHECKED_AGENTS:
         problems = green_count_problems(message, project_root)
         if problems:
@@ -223,7 +223,7 @@ def selftest(hook_dir):
     sleeper = None   # ④ 的样本：开着一个后台任务输出文件在睡的进程，自检自己起、自己停
     scratch_reports = []   # ③ 放在工作根与旧根下的报告目录，自检的 TMPDIR 之外
     try:
-        cite_check = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "research", "scripts", "cite-check.py")
+        cite_check = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "scripts", "agents", "cite-check.py")
         for agent in ("three-way-attack", "three-way-verifier", "kb-scribe", "experiment-runner", "sweep"):
             os.makedirs(os.path.join(work, ".claude", "agents"), exist_ok=True)
             open(os.path.join(work, ".claude", "agents", f"{agent}.md"), "w").write(f"# {agent}\n")
@@ -327,7 +327,7 @@ def main():
         print(f"! handback-guard 读不懂 hook 的 JSON，这一次放行：{error}", file=sys.stderr)
         return 0
     project_root = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(os.path.dirname(hook_dir))
-    cite_check = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "research", "scripts", "cite-check.py")
+    cite_check = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "scripts", "agents", "cite-check.py")
     if work_roots is None:
         print(f"! handback-guard 读不到 {os.path.join(hook_dir, 'lib_work_root.py')}（{work_roots_error!r}）：工作根与旧根下的报告这一次没判", file=sys.stderr)
     code, message = decide(hook_input, project_root, cite_check)

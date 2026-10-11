@@ -38,7 +38,7 @@ KILLED_PROCESS_LINE = re.compile(
     r"Killed process (?P<pid>\d+) \((?P<name>.*)\) total-vm:\d+kB, anon-rss:(?P<anon_rss_kibibytes>\d+)kB")
 # oom-kill 明细行：带被杀进程所在的 cgroup（task_memcg）与进程号，跟在 Killed process 行的前后
 OOM_KILL_DETAIL_LINE = re.compile(r"kernel: oom-kill:constraint=\S*?task_memcg=(?P<memcg>[^,]+),task=[^,]+,pid=(?P<pid>\d+)")
-# 显卡驱动报的显存不够：同一行既有 NVRM 又有 NV_ERR_NO_MEMORY（research/scripts/run-with-memory-cap.sh 命令退出之后认的是同一种行）
+# 显卡驱动报的显存不够：同一行既有 NVRM 又有 NV_ERR_NO_MEMORY（scripts/hosts/run-with-memory-cap.sh 命令退出之后认的是同一种行）
 GPU_MEMORY_LINE = re.compile(r"^(?P<timestamp>\S+) \S+ kernel: NVRM: (?:(?P<gpu>GPU\d+) )?.*NV_ERR_NO_MEMORY")
 SELFTEST_CGROUP_MARK = "singlefs_memory_selftest_"   # run-with-memory-cap.sh --selftest 给自己开的 slice 名（它文件头「slice 名」那一段）；那里的 OOM 是自检故意造的
 # journalctl 看不到别人的日志时退 0、只在 stderr 给这句提示：不认它，读不到就会被当成「没有 OOM」
@@ -66,7 +66,7 @@ def compact_reminder(hook_input, project_root):
         "【上下文刚压缩过，接着干活之前先对齐这几件】",
         f"- 分支 {branch}；工作区未提交 {len(status_lines)} 个路径（`git status --short` 看清哪些是这一轮的，别的会话的不碰）。",
         "- 最近动过的记录：" + ("、".join(f"records/{name}" for name in records) if records else "（没有）") + "；接续的状态以记录里的状态表与岔路单为准，不凭压缩摘要里的印象。",
-        f"- 派出过子 agent 的，先看还有没有在跑：`python3 research/scripts/agent-watch.py report --session-dir {session_dir}`；在跑的照 CLAUDE.md「派出去之后要盯住」重起看门狗。",
+        f"- 派出过子 agent 的，先看还有没有在跑：`python3 scripts/agents/agent-watch.py report --session-dir {session_dir}`；在跑的照 CLAUDE.md「派出去之后要盯住」重起看门狗。",
     ]
     return "\n".join(lines)
 
@@ -156,8 +156,8 @@ def gpu_memory_report(hours, events):
         f"【近 {hours:g} 小时显卡驱动报过 {len(events)} 次显存不够（journalctl -k 里的 NVRM … NV_ERR_NO_MEMORY 行）】",
         f"  - " + "、".join(f"{gpu} ×{count}" for gpu, count in sorted(counts.items())) + f"；头一次 {moment_text(min(event['moment'] for event in events))}，"
         f"末一次 {moment_text(max(event['moment'] for event in events))}",
-        "- 怎么办：先查那段时间谁在用卡（经 research/scripts/run-with-memory-cap.sh 起、命令退出之后认出显存不够的那几条退 245；同一段时间的 Killed process 行也看一眼），"
-        "查清之前别照原样重派同一件活；要上卡的经 research/scripts/host-dispatch.py --gpu 按各台显存余量派。"])
+        "- 怎么办：先查那段时间谁在用卡（经 scripts/hosts/run-with-memory-cap.sh 起、命令退出之后认出显存不够的那几条退 245；同一段时间的 Killed process 行也看一眼），"
+        "查清之前别照原样重派同一件活；要上卡的经 scripts/hosts/host-dispatch.py --gpu 按各台显存余量派。"])
 
 
 def format_size(kibibytes):
@@ -216,7 +216,7 @@ def oom_report(hours):
     if selftest_kills:
         lines.append(f"- 另有 {len(selftest_kills)} 次是 run-with-memory-cap.sh --selftest 故意造的（cgroup 名带 {SELFTEST_CGROUP_MARK}），不算事故、不列")
     lines.append("- 怎么办：先查这几个进程是谁起的、为什么涨（进程名对上是哪个实验二进制或测试，去派它的子 agent 的会话记录与变异表里找那一步），"
-                 "查清之前别照原样重派同一件活；重派时让那一步经 research/scripts/run-with-memory-cap.sh 带上限跑。")
+                 "查清之前别照原样重派同一件活；重派时让那一步经 scripts/hosts/run-with-memory-cap.sh 带上限跑。")
     if gpu_text:
         lines.append(gpu_text)
     return "\n".join(lines)

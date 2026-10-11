@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
 # run-condition: command python3
-# PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法（主 agent 经 research/scripts/detached-run.sh start 起的放行，子 agent 用它照拒）、run_in_background 里后面没有 wait 的单独 `&`、整份覆盖 `research/results/` 下未跟踪产物的写法、打得到别人进程的终止写法与在同一个 inode 上改已有脚本的写法在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。
+# PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法（主 agent 经 scripts/hosts/detached-run.sh start 起的放行，子 agent 用它照拒）、run_in_background 里后面没有 wait 的单独 `&`、整份覆盖 `research/results/` 下未跟踪产物的写法、打得到别人进程的终止写法与在同一个 inode 上改已有脚本的写法在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。
 # hook-events: PreToolUse:Bash
 # gate-similar: heavy-test-guard.sh 同挂 PreToolUse[Bash]、按同一个切词模块认命令位置，但它只判重型测试与内存包装；这里判等待循环、放出追踪、单独的 &、覆盖产物、终止进程、同 inode 改脚本、就地改仓内文件，判据没有一条相同
 # gate-similar: write-guard.sh 管 Write / Edit 的写范围与先编后换；这里 ⑧ 管有 Edit 的子 agent 绕到 Bash 里写仓内文件、⑨ 管执行员在 Bash 里写主工作区 crates/ 下的 .rs，两边判的工具不同
@@ -29,7 +29,7 @@
 #      判不到的：前台起的 `… &`（run_in_background 为假，hook 那一刻看不出之后会不会结束本轮去等；由看门狗那一侧的
 #      「结束本轮、手里没有在跑的后台任务、也没交回」告警兜）；引号里当数据用的 `&`（sed 替换串、URL 参数）会误记，
 #      不能一概跳过引号，`bash -c '… &'` 里的 `&` 是真放后台；`… & (wait)`、`bash -c '… &'; wait` 这种等不到的 `wait` 这里认不出（④ 按层、按圆括号认得出，拒了不再记）。
-# 主 agent 的看门狗（research/scripts/agent-watch.py watch）每 15 秒读一次检出记录，读到本会话的检出就退出、叫醒主 agent。
+# 主 agent 的看门狗（scripts/agents/agent-watch.py watch）每 15 秒读一次检出记录，读到本会话的检出就退出、叫醒主 agent。
 # 两种检出都先剥掉喂给非 shell 命令的 heredoc 正文（往笔记里写一段等待循环不是在跑它；2026-09-18 撞过，
 # `records/2026-09-16-subagent拆分提案.md` 第二十五节）；喂给 bash / sh 的 heredoc 正文照查。其余只看顶层命令文本，
 # 引号里当数据写的等待循环也会被记一条，主 agent 看了判断即可。
@@ -39,8 +39,8 @@
 #
 # 拒绝七种（退出 2，stderr 写原因与出路；拒了不记检出；一条命令同时踩几类的，几类都判完一次列全，每类带自己的出路）。它们拒的是一种危险写法、在执行之前，不停在跑的任务，
 # 是 .claude/singlefs-ai-sop/rules/command-safety.md「检出和处置分开」那一条写明的例外（「拒绝某一种危险写法的钩子不在此列」）。
-# ① 命令位置上起看门狗——`research/scripts/watch.sh`（带 `--selftest`、`--report`、`--dry-run` 的不盯，不算）
-#   或 `research/scripts/agent-watch.py watch`——而 run_in_background 不是 true，或整条命令里有单独的 `&`、`nohup`、`disown`、`setsid`、
+# ① 命令位置上起看门狗——`scripts/agents/watch.sh`（带 `--selftest`、`--report`、`--dry-run` 的不盯，不算）
+#   或 `scripts/agents/agent-watch.py watch`——而 run_in_background 不是 true，或整条命令里有单独的 `&`、`nohup`、`disown`、`setsid`、
 #   把输出重定向到 /dev/null：这样起的看门狗叫不醒主 agent，等于没盯。2026-09-24 主 agent 同一个会话里第三次这样起，
 #   `main-agent.md`「调用里不再加 `&`、`nohup`、`disown`」靠自觉守不住（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 5 行）。
 #   只认命令位置：按 shell 的规矩切词（引号与 # 注释去掉），`grep -n watch.sh`、`cat` / `tail` 读看门狗输出这类把名字当参数的不拦；
@@ -58,7 +58,7 @@
 #   或 python 代码里 open(<仓内路径字面量>, 'w' / 'a' / 'x')、Path(<仓内路径字面量>).write_text( / .write_bytes(。写范围闸只看 Write / Edit，这样写它看不见；
 #   草稿目录照写，定义点名的脚本（replace-once.py 这类）不在这一条里。路径放在变量里的认不出。
 # ⑨ 先编后换：experiment-runner（名单是 COMPILE_FIRST_AGENTS）在 Bash 里写主工作区 crates/ 下的 .rs：出路是在草稿目录的副本里改、
-#   经 research/scripts/compile-then-swap.py 编过再整份换进来。write-guard.sh「四、先编后换」判 Write / Edit 那一半，这里判 Bash 那一半；
+#   经 scripts/hosts/compile-then-swap.py 编过再整份换进来。write-guard.sh「四、先编后换」判 Write / Edit 那一半，这里判 Bash 那一半；
 #   agent 名单与路径判据两边各写一份、改的时候一起改。排在 ⑧ 之前判，执行员拿到的出路是这条脚本。
 #   为什么：执行员直接在主工作区改入库装置，改到一半编不过，别的会话带 --all-targets 的编译一起卡住（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 51 行）。
 #   认的写法：⑤ ⑦ 那一段 overwrite_steps 认的（>、>|、&>、>& 文件、不带 -a 的 tee、cp / mv / install 的目标、dd of=、truncate），every_write 时另认
@@ -66,7 +66,7 @@
 #   Path.write_text / write_bytes、shutil.copyfile / copy / copy2 / move 与 os.replace / os.rename 的目标。cd 与前面赋过值的变量跟着算，每一层都判；
 #   目标里有这一刻算不出的段的，按通配对主工作区已有的文件，对得上 crates/ 下的 .rs 就拒。前台、run_in_background 一样拒。
 #   放行：主 agent、implementation-writer 与别的 agent；草稿目录里的写；把主工作区那份拷进草稿目录；crates/ 下不是 .rs 的（crates/mutations.tsv）；
-#   `python3 research/scripts/compile-then-swap.py …`（脚本文件里的写这里本来就判不到）；引号里当数据写的、写进文件的 heredoc 正文、注释里的。
+#   `python3 scripts/hosts/compile-then-swap.py …`（脚本文件里的写这里本来就判不到）；引号里当数据写的、写进文件的 heredoc 正文、注释里的。
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、patch 与 git apply / checkout / restore、目标算不出又是新文件名的、
 #   python 里从运行期值来的路径与 os.open / os.write、经 subprocess 起的写法。
 #   「外面有 timeout」按包装的层次认：`timeout N bash -c '…'`、`capped.sh N timeout N bash -c '…'`、`timeout N bash <<EOF` 喂进去的正文里的循环算有；
@@ -83,17 +83,17 @@
 #   引号里当数据写的、写进文件的 heredoc 正文、注释里的不拒；`nohup` 不带 `&`、裸 `setsid`（不 fork）、`systemd-run --wait` 这类会等到结束的不拒；
 #   单独的 `&` 不在这一条：run_in_background 里之后没有 `wait` 的归 ④，其余照检出 ② 只记。
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、`start-stop-daemon -b`（只在 ② 里记）。
-#   放行口：research/scripts/detached-run.sh 的 `start --label <名> -- <命令>`（用户 2026-10-01 定「后台不能中断我们运行中的脚本」「后台只能上报」，
+#   放行口：scripts/hosts/detached-run.sh 的 `start --label <名> -- <命令>`（用户 2026-10-01 定「后台不能中断我们运行中的脚本」「后台只能上报」，
 #   records/2026-09-16-subagent拆分提案.md 第四十二节）：它把命令挂到用户级 systemd 的服务单元下，名字、退出码与日志登记在册，会话里由 `watch` 上报。
 #   这一条不读脚本正文，它本来就放；`--` 之后那条命令当一层接着判（wrapped_commands 剥开），里面的放出追踪、终止进程、覆盖产物照拒。
 #   它的参数先照它开头的 preflight 摘掉每一个 `--force`（连 `--` 之后的），判的就是单元里真跑的那条（共用模块的 detached_run_arguments_after_preflight）。
 #   start 与 stop 只给主 agent：子 agent（输入里有 agent_type）用就拒（detached_run_refusal，前台、run_in_background 一样；前缀、包装、bash -c 里的照认），
 #   经它起的活不在子 agent 的进程树里，交回之后没人认领；list、watch 只读，谁都放。
 #   认它按内容（共用模块 lib_shell_words 的 detached_run_script，
-#   与重型闸同一份）：命令词名叫 detached-run.sh（路径不论）、指到 research/scripts/detached-run.sh 的符号链接、开头带签名行（行首
+#   与重型闸同一份）：命令词名叫 detached-run.sh（路径不论）、指到 scripts/hosts/detached-run.sh 的符号链接、开头带签名行（行首
 #   `# detached-run-script-signature:`）的改名拷贝，bash / sh 起的、source / . 读进来的、直接执行的都认；同一条命令里前面 cp / install / ln / mv
 #   拷出来的按目标认（detached_run_copy_destinations）。相对路径从 hook 输入的 cwd 起算（没有就从仓库根），cd 跟着算。
-#   罩不住的写法在 research/scripts/detached-run.sh 文件头「谁能用」那一段；`--` 之后那条命令的剥开（③ 的放行口）仍只认名字。
+#   罩不住的写法在 scripts/hosts/detached-run.sh 文件头「谁能用」那一段；`--` 之后那条命令的剥开（③ 的放行口）仍只认名字。
 # ④ run_in_background 为 true 的命令里，有一个作业以单独的 `&` 收尾（不是 `&&`、`>&`、`&>`、`|&`），之后同一层、同一对圆括号里再没有 `wait`
 #   （不带参数的 `wait`，或带进程号的 `wait "$pid"`；只带选项的 `wait -n` 不算）：外层 shell 起完它就退出，完成通知当场发出，
 #   真跑完的那个进程叫不醒任何人。2026-09-25 一天里子 agent 至少三次在 run_in_background 里写 `… > 日志 2>&1 &`
@@ -146,7 +146,7 @@
 #   只读 cgroup.procs、只跑 pgrep 不发信号的；引号里当数据写的、写进文件的 heredoc 正文、注释里的。
 #   每一层（`bash -c '…'`、喂给 shell 的 heredoc 正文、命令替换）都判，nice / timeout / env / sudo / builtin 这类前缀、`capped.sh N`、`run-with-memory-cap.sh <上限>`、
 #   `bash 包装脚本` 与 `python3 脚本` 剥开往里找。
-#   同一份判定由门禁 code-tooling 的 research-gate-lint 格拿去扫 research/scripts/、.claude/hooks/、.claude/scripts/ 与 .claude/gate.d/ 下的脚本（本文件 --scan-scripts，按行号报；
+#   同一份判定由门禁 code-tooling 的 research-gate-lint 格拿去扫 scripts/、.claude/hooks/、.claude/scripts/ 与 .claude/gate.d/ 下的脚本（本文件 --scan-scripts，按行号报；
 #   不判「同一条命令里先挑再发」那一条，脚本里靠循环与命令替换两条）。脚本里确实要按 cgroup 批量发信号的（run-with-memory-cap.sh 的 TERM 风暴自测），
 #   先核 cgroup 路径是自己开的 singlefs-memory-cap-*.scope，那一行写 `# process-safety:own-scope <怎么核的>`，往上 40 行里要有核 `singlefs-memory-cap-*.scope` 的那一句；
 #   这个标注只放行循环与按 cgroup 挑进程两类，标了而那一行没有要放行的判红。别人正在改、这一轮动不了的脚本登记进 .claude/process-safety-pending
@@ -483,7 +483,7 @@ def is_sleep_command(words):
     skipped = shell_words.skip_prefixes(words)
     return skipped.command_position is not None and os.path.basename(words[skipped.command_position]) == "sleep"
 
-# research/scripts/detached-run.sh：start 把 `--` 之后那条命令挂到用户级 systemd 的服务单元下跑（主 agent 跑过后台时限的长活走它，③ 的放行口），
+# scripts/hosts/detached-run.sh：start 把 `--` 之后那条命令挂到用户级 systemd 的服务单元下跑（主 agent 跑过后台时限的长活走它，③ 的放行口），
 #   stop 只按登记的单元名停一个；这两样只给主 agent（detached_run_refusal）。list、watch 只读，谁都放。参数里的 --force 照 preflight 每一个都摘。
 #   认脚本（名字、符号链接、签名行）与切 start 的参数在共用模块（lib_shell_words 的 detached_run_script、detached_run_start_command），与重型闸同一份
 DETACHED_RUN_SCRIPT_NAME = "detached-run.sh"
@@ -780,7 +780,7 @@ def repository_in_place_edit_refusal(command, agent_type, repository_root):
 # ⑨ 先编后换：experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs。写法沿用 ⑤ ⑦ 的 overwrite_steps（every_write=True），
 #   mv 挪走、rm 删掉的源也算改。agent 名单与路径判据与 write-guard.sh「四、先编后换」各写一份、改的时候一起改。
 COMPILE_FIRST_AGENTS = ("experiment-runner",)
-COMPILE_THEN_SWAP_SCRIPT = "research/scripts/compile-then-swap.py"
+COMPILE_THEN_SWAP_SCRIPT = "scripts/hosts/compile-then-swap.py"
 
 def is_main_workspace_crate_source(path, repository_root):
     return path.endswith(".rs") and is_inside(path, os.path.join(repository_root, "crates"))
@@ -2108,15 +2108,15 @@ def selftest_in(hook_dir, work):
         ('bg-notify-r1 X01', 'nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 & echo "started pid $!"', 1, True),
         ('bg-notify-r1 X02', '(nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 &)', 1, True),
         ('bg-notify-r1 X03', 'nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 & echo "gate.sh started as pid $!; I will wait for the notification"', 1, True),
-        ('bg-notify-r1 X04', 'nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 & bash research/scripts/cache-keepalive.sh & wait $!', 1, True),
-        ('bg-notify-r1 X05', 'nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 & bash research/scripts/cache-keepalive.sh & wait -n', 1, True),
+        ('bg-notify-r1 X04', 'nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 & bash scripts/hosts/cache-keepalive.sh & wait $!', 1, True),
+        ('bg-notify-r1 X05', 'nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 & bash scripts/hosts/cache-keepalive.sh & wait -n', 1, True),
         ('bg-notify-r1 X06', '(nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 &); wait', 1, True),
         ('bg-notify-r1 X07', 'pid=$(nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 & echo $!); echo "gate pid $pid"; wait "$pid"', 1, True),
         ('bg-notify-r1 X08', 'coproc GATE { nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1; }', 1, True),
         ('bg-notify-r1 X09', "tmux new-session -d -s gate 'nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1'", 1, True),
         ('bg-notify-r1 X10', "screen -dmS gate bash -c 'nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1'", 1, True),
         ('bg-notify-r1 X11', 'systemd-run --user --collect --unit gate-run nice -n 19 bash .claude/scripts/gate.sh --staged', 1, True),
-        ('bg-notify-r1 X12', "nice -n 19 python3 - > /tmp/claude-1000/gate-triage-commit-0918/rerun.log 2>&1 <<'EOF' &\nimport subprocess\np = subprocess.Popen(['bash', 'research/scripts/replay.sh'])\np.wait()\nEOF", 1, True),
+        ('bg-notify-r1 X12', "nice -n 19 python3 - > /tmp/claude-1000/gate-triage-commit-0918/rerun.log 2>&1 <<'EOF' &\nimport subprocess\np = subprocess.Popen(['bash', 'scripts/experiments/replay.sh'])\np.wait()\nEOF", 1, True),
         ('bg-notify-r1 X13', 'nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 &', 0, False),
         ('bg-notify-r1 F01', 'nohup nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1', 0, True),
         ('bg-notify-r1 F02（第三种不记；它的轮询循环没有 timeout，记的是第二种）', 'nice -n 19 bash .claude/scripts/gate.sh --staged > /tmp/claude-1000/gate-triage-commit-0918/gate-run.log 2>&1 & pid=$!; while kill -0 "$pid" 2>/dev/null; do sleep 20; done; tail -3 /tmp/claude-1000/gate-triage-commit-0918/gate-run.log', 1, True),
@@ -2136,30 +2136,30 @@ def selftest_in(hook_dir, work):
         results.append((label, want, written))
     # 起看门狗：(说明, 命令, run_in_background, 该不该拒绝)
     watchdog_cases = [
-        ("前台起、输出丢进 /dev/null 还带 &", "bash research/scripts/watch.sh a1 > /dev/null 2>&1 &", False, 1),
-        ("run_in_background 起、只写 watch.sh", "bash research/scripts/watch.sh a1", True, 0),
-        ("run_in_background 起却又带 &", "bash research/scripts/watch.sh a1 &", True, 1),
+        ("前台起、输出丢进 /dev/null 还带 &", "bash scripts/agents/watch.sh a1 > /dev/null 2>&1 &", False, 1),
+        ("run_in_background 起、只写 watch.sh", "bash scripts/agents/watch.sh a1", True, 0),
+        ("run_in_background 起却又带 &", "bash scripts/agents/watch.sh a1 &", True, 1),
         ("前台 grep 把 watch.sh 当参数", "grep -n watch.sh records/x.md", False, 0),
-        ("前台 agent-watch.py report 不是看门狗", "python3 research/scripts/agent-watch.py report --session-dir x", False, 0),
-        ("前台起、什么都没加", "bash research/scripts/watch.sh a1,a2", False, 1),
-        ("前台起 agent-watch.py watch", "python3 research/scripts/agent-watch.py watch --agents a1", False, 1),
-        ("run_in_background 起 agent-watch.py watch", "python3 research/scripts/agent-watch.py watch --agents a1", True, 0),
-        ("run_in_background 起、带 --ack 与 cd", "cd ~/code/singlefs && bash research/scripts/watch.sh --ack a1:上下文过大 a1", True, 0),
-        ("run_in_background 起却挂 nohup", "nohup bash research/scripts/watch.sh a1", True, 1),
-        ("run_in_background 起却挂 setsid", "setsid bash research/scripts/watch.sh --processes", True, 1),
-        ("run_in_background 起却跟 disown", "bash research/scripts/watch.sh a1; disown", True, 1),
-        ("run_in_background 起却把输出丢进 /dev/null", "bash research/scripts/watch.sh a1 > /dev/null", True, 1),
-        ("前台起、写在 bash -c 里", "bash -c 'nice -n 19 ./research/scripts/watch.sh a1'", False, 1),
-        ("前台起、包在 capped.sh 里", "bash research/scripts/capped.sh 4 bash research/scripts/watch.sh a1", False, 1),
-        ("run_in_background 起、包在 capped.sh 里", "bash research/scripts/capped.sh 4 bash research/scripts/watch.sh a1", True, 0),
-        ("前台 watch.sh --selftest 不盯", "bash research/scripts/watch.sh --selftest", False, 0),
-        ("前台 watch.sh --report 不盯", "bash research/scripts/watch.sh --report", False, 0),
-        ("前台 bash -n 只查语法", "bash -n research/scripts/watch.sh", False, 0),
-        ("前台读看门狗输出", "tail -5 /tmp/claude-1000/x/tasks/b1.output; cat research/scripts/watch.sh | head", False, 0),
-        ("前台 echo 引号里当数据写", 'echo "bash research/scripts/watch.sh a1 &"', False, 0),
-        ("前台写进笔记的 heredoc 正文", "cat > note.md <<'EOF'\nbash research/scripts/watch.sh a1 > /dev/null 2>&1 &\nEOF", False, 0),
-        ("前台注释里写的", "ls  # bash research/scripts/watch.sh a1 &", False, 0),
-        ("前台 diff <(git show …watch.sh) watch.sh：进程替换之后的词是 diff 的参数", "diff <(git show HEAD:research/scripts/watch.sh) research/scripts/watch.sh", False, 0),
+        ("前台 agent-watch.py report 不是看门狗", "python3 scripts/agents/agent-watch.py report --session-dir x", False, 0),
+        ("前台起、什么都没加", "bash scripts/agents/watch.sh a1,a2", False, 1),
+        ("前台起 agent-watch.py watch", "python3 scripts/agents/agent-watch.py watch --agents a1", False, 1),
+        ("run_in_background 起 agent-watch.py watch", "python3 scripts/agents/agent-watch.py watch --agents a1", True, 0),
+        ("run_in_background 起、带 --ack 与 cd", "cd ~/code/singlefs && bash scripts/agents/watch.sh --ack a1:上下文过大 a1", True, 0),
+        ("run_in_background 起却挂 nohup", "nohup bash scripts/agents/watch.sh a1", True, 1),
+        ("run_in_background 起却挂 setsid", "setsid bash scripts/agents/watch.sh --processes", True, 1),
+        ("run_in_background 起却跟 disown", "bash scripts/agents/watch.sh a1; disown", True, 1),
+        ("run_in_background 起却把输出丢进 /dev/null", "bash scripts/agents/watch.sh a1 > /dev/null", True, 1),
+        ("前台起、写在 bash -c 里", "bash -c 'nice -n 19 ./scripts/agents/watch.sh a1'", False, 1),
+        ("前台起、包在 capped.sh 里", "bash scripts/hosts/capped.sh 4 bash scripts/agents/watch.sh a1", False, 1),
+        ("run_in_background 起、包在 capped.sh 里", "bash scripts/hosts/capped.sh 4 bash scripts/agents/watch.sh a1", True, 0),
+        ("前台 watch.sh --selftest 不盯", "bash scripts/agents/watch.sh --selftest", False, 0),
+        ("前台 watch.sh --report 不盯", "bash scripts/agents/watch.sh --report", False, 0),
+        ("前台 bash -n 只查语法", "bash -n scripts/agents/watch.sh", False, 0),
+        ("前台读看门狗输出", "tail -5 /tmp/claude-1000/x/tasks/b1.output; cat scripts/agents/watch.sh | head", False, 0),
+        ("前台 echo 引号里当数据写", 'echo "bash scripts/agents/watch.sh a1 &"', False, 0),
+        ("前台写进笔记的 heredoc 正文", "cat > note.md <<'EOF'\nbash scripts/agents/watch.sh a1 > /dev/null 2>&1 &\nEOF", False, 0),
+        ("前台注释里写的", "ls  # bash scripts/agents/watch.sh a1 &", False, 0),
+        ("前台 diff <(git show …watch.sh) watch.sh：进程替换之后的词是 diff 的参数", "diff <(git show HEAD:scripts/agents/watch.sh) scripts/agents/watch.sh", False, 0),
     ]
     for label, command, background, want in watchdog_cases:
         results.append((f"看门狗:{label}", want, 1 if watchdog_rejection(command, background)[0] else 0))
@@ -2179,8 +2179,8 @@ def selftest_in(hook_dir, work):
         ("timeout 60 bash 的 heredoc 里的循环", "timeout 60 bash <<'EOF'\nuntil grep -q x f; do sleep 10; done\nEOF", False, 0),
         ("capped.sh 与 nice 包着的 timeout", "nice -n 19 capped.sh 4 timeout 600 bash -c 'until grep -q x f; do sleep 10; done'", False, 0),
         ("前台 bash -c 里没有 timeout", "nice -n 19 bash -c 'until grep -q x f; do sleep 10; done'", False, 1),
-        ("前台 capped.sh 包着的 bash -c 里没有 timeout", "bash research/scripts/capped.sh 4 bash -c 'until grep -q x f; do sleep 10; done'", False, 1),
-        ("前台 run-with-memory-cap.sh 包着的 bash -c 里没有 timeout", "bash research/scripts/run-with-memory-cap.sh 4G bash -c 'until grep -q x f; do sleep 10; done'", False, 1),
+        ("前台 capped.sh 包着的 bash -c 里没有 timeout", "bash scripts/hosts/capped.sh 4 bash -c 'until grep -q x f; do sleep 10; done'", False, 1),
+        ("前台 run-with-memory-cap.sh 包着的 bash -c 里没有 timeout", "bash scripts/hosts/run-with-memory-cap.sh 4G bash -c 'until grep -q x f; do sleep 10; done'", False, 1),
         ("前台命令替换里的循环", "state=$(until grep -q x f; do sleep 1; done; echo ok)", False, 1),
         ("前台 if 里的循环", "if true; then while ! grep -q x f; do sleep 1; done; fi", False, 1),
         ("前台 echo 引号里当数据写", 'echo "until grep -q x f; do sleep 10; done"', False, 0),
@@ -2207,7 +2207,7 @@ def selftest_in(hook_dir, work):
         open(os.path.join(edit_repository, ".claude", "agents", "experiment-runner.md"), "w").write("---\ntools: Read, Edit, Write, Bash\n---\n")
         open(os.path.join(edit_repository, ".claude", "agents", "sweep.md"), "w").write("---\ntools: Read, Bash\n---\n")
         repository_edit_cases = [
-            ("执行员 sed -i 改仓内源文件", "experiment-runner", "sed -i 's/a/b/' research/e7-index-bench/src/bin/e1.rs", 1),
+            ("执行员 sed -i 改仓内源文件", "experiment-runner", "sed -i 's/a/b/' scripts/experiments/e1.rs", 1),
             ("执行员 python open(仓内路径, 'w')", "experiment-runner", "python3 -c \"open('crates/x/src/lib.rs', 'w').write('x')\"", 1),
             ("执行员 python Path(仓内绝对路径).write_text", "experiment-runner",
              f"python3 - <<'EOF'\nfrom pathlib import Path\nPath('{edit_repository}/.claude/kb/x.md').write_text('y')\nEOF", 1),
@@ -2249,7 +2249,7 @@ def selftest_in(hook_dir, work):
             ("执行员 python open(…, 'a')", "experiment-runner", f"python3 -c \"open('{bin_path}', 'a').write('x')\"", 1),
             ("执行员 python os.replace", "experiment-runner", f"python3 -c \"import os; os.replace('{draft_path}', '{bin_path}')\"", 1),
             ("执行员经先编后换脚本换进来放行", "experiment-runner",
-             f"bash research/scripts/capped.sh 16 python3 {COMPILE_THEN_SWAP_SCRIPT} {draft_path} {bin_path} --scratch {new_root}/runner-x", 0),
+             f"bash scripts/hosts/capped.sh 16 python3 {COMPILE_THEN_SWAP_SCRIPT} {draft_path} {bin_path} --scratch {new_root}/runner-x", 0),
             ("执行员把主工作区那份拷进草稿目录放行", "experiment-runner", f"cp {bin_path} {new_root}/runner-x/", 0),
             ("执行员在草稿目录里改放行", "experiment-runner", f"sed -i 's/a/b/' {draft_path}", 0),
             ("执行员追加 crates/mutations.tsv 放行", "experiment-runner", "printf 'x\\n' >> crates/mutations.tsv", 0),
@@ -2276,7 +2276,7 @@ def selftest_in(hook_dir, work):
         ("systemd-run 不等结束", "systemd-run --user --collect --unit gate-run bash gate.sh", 1),
         ("bash -c 里的 & disown", "bash -c 'bash long.sh & disown'", 1),
         ("命令替换里的 nohup … &", "pid=$(nohup bash long.sh > long.log 2>&1 & echo $!)", 1),
-        ("capped.sh 包着的 setsid -f", "bash research/scripts/capped.sh 4 setsid -f bash long.sh", 1),
+        ("capped.sh 包着的 setsid -f", "bash scripts/hosts/capped.sh 4 setsid -f bash long.sh", 1),
         ("喂给 bash 的 heredoc 里的 disown", "bash <<'EOF'\nbash long.sh &\ndisown\nEOF", 1),
         ("nohup 不带 &", "nohup bash long.sh > long.log 2>&1", 0),
         ("裸 setsid 不 fork", "setsid bash long.sh > long.log 2>&1 < /dev/null", 0),
@@ -2286,15 +2286,15 @@ def selftest_in(hook_dir, work):
         ("并行加 wait", "bash a.sh > a.log 2>&1 & bash b.sh > b.log 2>&1 & wait", 0),
         ("echo 引号里当数据写", 'echo "nohup bash x.sh & disown"', 0),
         ("grep 的参数里写着 disown", "grep -n 'disown\\|coproc' notes.md", 0),
-        # research/scripts/detached-run.sh start 是 ③ 的放行口（谁能用归 detached_run_refusal）；它 -- 之后那条命令照判（BASH_COMMAND_DETECTOR_BREAK=opaque-detached-run 下第二、三、四格红）
-        ("detached-run.sh start 本身不算放出追踪", "bash research/scripts/detached-run.sh start --label m -- sleep 1", 0),
-        ("detached-run.sh start 里面那条 bash -c 里的 & disown 照拒", "bash research/scripts/detached-run.sh start --label m -- bash -c 'bash long.sh & disown'", 1),
+        # scripts/hosts/detached-run.sh start 是 ③ 的放行口（谁能用归 detached_run_refusal）；它 -- 之后那条命令照判（BASH_COMMAND_DETECTOR_BREAK=opaque-detached-run 下第二、三、四格红）
+        ("detached-run.sh start 本身不算放出追踪", "bash scripts/hosts/detached-run.sh start --label m -- sleep 1", 0),
+        ("detached-run.sh start 里面那条 bash -c 里的 & disown 照拒", "bash scripts/hosts/detached-run.sh start --label m -- bash -c 'bash long.sh & disown'", 1),
         ("detached-run.sh --force start --label= --log 里面不等结束的 systemd-run 照拒",
-         "nice -n 19 bash /abs/research/scripts/detached-run.sh --force start --label=m --log /tmp/m.log -- systemd-run --user bash gate.sh", 1),
+         "nice -n 19 bash /abs/scripts/hosts/detached-run.sh --force start --label=m --log /tmp/m.log -- systemd-run --user bash gate.sh", 1),
         # -- 之后先写 --force：它的 preflight 摘掉它，单元里跑的是后面那条（共用模块的 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 下这一格红）
         ("detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒",
-         "bash research/scripts/detached-run.sh start --label m -- --force setsid -f bash long.sh", 1),
-        ("detached-run.sh list 不算", "bash research/scripts/detached-run.sh list", 0),
+         "bash scripts/hosts/detached-run.sh start --label m -- --force setsid -f bash long.sh", 1),
+        ("detached-run.sh list 不算", "bash scripts/hosts/detached-run.sh list", 0),
         ("写进笔记的 heredoc 正文", "cat > note.md <<'EOF'\nnohup bash long.sh &\ndisown\nEOF", 0),
         ("注释里写的", "ls  # nohup bash long.sh & disown", 0),
     ]
@@ -2304,8 +2304,8 @@ def selftest_in(hook_dir, work):
     unwaited_ampersand_cases = [
         ("结尾单独一个 &", "bash long.sh > long.log 2>&1 &", True, 1),
         ("& 之后接 echo $!", "bash long.sh > long.log 2>&1 & echo $!", True, 1),
-        ("& 在 capped.sh 前缀的那条命令上", "bash research/scripts/capped.sh 4 nice -n 19 cargo test --release > test.log 2>&1 &", True, 1),
-        ("& 在 capped.sh 包着的 bash -c 里", "bash research/scripts/capped.sh 4 bash -c 'cargo test --release > test.log 2>&1 &'", True, 1),
+        ("& 在 capped.sh 前缀的那条命令上", "bash scripts/hosts/capped.sh 4 nice -n 19 cargo test --release > test.log 2>&1 &", True, 1),
+        ("& 在 capped.sh 包着的 bash -c 里", "bash scripts/hosts/capped.sh 4 bash -c 'cargo test --release > test.log 2>&1 &'", True, 1),
         ("& 在 wait 之后", "wait; bash late.sh &", True, 1),
         ("圆括号子 shell 里的 &、wait 在外面", "(bash long.sh > long.log 2>&1 &); wait", True, 1),
         ("& 之后的 wait 在另一对圆括号里", "bash long.sh & (wait)", True, 1),
@@ -2429,7 +2429,7 @@ def selftest_in(hook_dir, work):
         ("nice 包着 kill -9 -1", "nice -n 19 kill -9 -1", 1),
         ("喂给 bash 的 heredoc 里 kill 0", "bash <<'EOF'\nkill 0\nEOF", 1),
         ("timeout 包着 kill 负进程号", "timeout 5 kill -TERM -4000", 1),
-        ("run-with-memory-cap.sh 包着 pkill", "bash research/scripts/run-with-memory-cap.sh 1G pkill cargo", 1),
+        ("run-with-memory-cap.sh 包着 pkill", "bash scripts/hosts/run-with-memory-cap.sh 1G pkill cargo", 1),
         ("shell 函数与变量里的脚本包着的 bash -c 里 kill 0", 'in_context bash "$target" 64M bash -c \'kill 0\'', 1),
         ("shell 函数包着的 python -c 里 os.killpg", "in_context python3 -c 'import os; os.killpg(1234, 15)'", 1),
         ("点名一个 kill \"$!\"", 'kill "$!"', 0),
@@ -2485,7 +2485,7 @@ def selftest_in(hook_dir, work):
         os.environ["BASH_COMMAND_DETECTOR_PRIVATE_CONFIG"] = private_config_before
     # 扫脚本（门禁 code-tooling 的 research-gate-lint 格那一路）：临时目录里造脚本，走 --scan-scripts 真实入口，看红绿与报的行号
     scan_root = os.path.join(work, "scan-root")
-    scan_scripts_directory = os.path.join(scan_root, "research", "scripts")
+    scan_scripts_directory = os.path.join(scan_root, "scripts")
     os.makedirs(scan_scripts_directory)
     os.makedirs(os.path.join(scan_root, ".claude"))
     scan_files = {
@@ -2511,30 +2511,30 @@ def selftest_in(hook_dir, work):
         with open(os.path.join(scan_scripts_directory, file_name), "w", encoding="utf-8") as handle:
             handle.write(content)
     def scan(root):
-        return subprocess.run(["bash", os.path.join(hook_dir, "bash-command-detector.sh"), "--scan-scripts", root, os.path.join(root, "research", "scripts")],
+        return subprocess.run(["bash", os.path.join(hook_dir, "bash-command-detector.sh"), "--scan-scripts", root, os.path.join(root, "scripts")],
                               capture_output=True, text=True)
     scanned = scan(scan_root)
     results.append(("扫脚本:有红就退出码 1", 1, scanned.returncode))
-    for label, marker in [("自己任务的进程组报在第 5 行", "research/scripts/group.sh:5"), ("循环里 kill 报在第 3 行", "research/scripts/loop.sh:3"),
-                          ("标了 own-scope 而没核 scope", "research/scripts/storm-unguarded.sh:3"), ("进程组标 own-scope 不放行", "research/scripts/wrong-kind.sh:3"),
-                          ("不起作用的 own-scope 标注", "research/scripts/stale-annotation.sh:3"), ("python 循环里 os.kill", "research/scripts/bad.py:3"),
-                          ("python os.killpg", "research/scripts/bad.py:4")]:
+    for label, marker in [("自己任务的进程组报在第 5 行", "scripts/group.sh:5"), ("循环里 kill 报在第 3 行", "scripts/loop.sh:3"),
+                          ("标了 own-scope 而没核 scope", "scripts/storm-unguarded.sh:3"), ("进程组标 own-scope 不放行", "scripts/wrong-kind.sh:3"),
+                          ("不起作用的 own-scope 标注", "scripts/stale-annotation.sh:3"), ("python 循环里 os.kill", "scripts/bad.py:3"),
+                          ("python os.killpg", "scripts/bad.py:4")]:
         results.append((f"扫脚本:{label}", 1, int(f"✗ {marker} " in scanned.stdout)))
     results.append(("扫脚本:核过 scope 又标了的、点名一个的、探活的、python 探活的都不报", 0,
-                    int(any(f"research/scripts/{name}" in scanned.stdout for name in ("storm-guarded.sh", "clean.sh", "good.py", "docs.sh", "docs.py")))))
+                    int(any(f"scripts/{name}" in scanned.stdout for name in ("storm-guarded.sh", "clean.sh", "good.py", "docs.sh", "docs.py")))))
     results.append(("扫脚本:拒绝带出路", 1, int("→ 怎么办：只停自己起的、点名的那一个" in scanned.stdout)))
     pending_path = os.path.join(scan_root, ".claude", "process-safety-pending")
     for file_name in ("storm-unguarded.sh", "wrong-kind.sh", "stale-annotation.sh"):
         os.remove(os.path.join(scan_scripts_directory, file_name))
     with open(pending_path, "w", encoding="utf-8") as handle:
-        handle.write("# 待改\nresearch/scripts/group.sh  # 自检：别人正在改\nresearch/scripts/loop.sh  # 自检：别人正在改\nresearch/scripts/bad.py  # 自检：别人正在改\n")
+        handle.write("# 待改\nscripts/group.sh  # 自检：别人正在改\nscripts/loop.sh  # 自检：别人正在改\nscripts/bad.py  # 自检：别人正在改\n")
     pending_green = scan(scan_root)
     results.append(("扫脚本:红的都登记进待改清单就退出码 0", 0, pending_green.returncode))
     results.append(("扫脚本:成功行报查了几个、放行了哪一处、逐个列出没判的", 1,
-                    int("查了 8 个脚本（.sh 5 个、.py 3 个）" in pending_green.stdout and "research/scripts/storm-guarded.sh:4" in pending_green.stdout
-                        and "research/scripts/group.sh（research/scripts/group.sh:5）" in pending_green.stdout)))
+                    int("查了 8 个脚本（.sh 5 个、.py 3 个）" in pending_green.stdout and "scripts/storm-guarded.sh:4" in pending_green.stdout
+                        and "scripts/group.sh（scripts/group.sh:5）" in pending_green.stdout)))
     with open(pending_path, "a", encoding="utf-8") as handle:
-        handle.write("research/scripts/clean.sh  # 自检：干净的也登记了\nresearch/scripts/gone.sh  # 自检：指向不存在的文件\n")
+        handle.write("scripts/clean.sh  # 自检：干净的也登记了\nscripts/gone.sh  # 自检：指向不存在的文件\n")
     pending_stale = scan(scan_root)
     results.append(("扫脚本:待改清单里一处都没排到的与指向不存在的判红", 1,
                     int(pending_stale.returncode == 1 and "clean.sh 里一处要放行的都没有" in pending_stale.stdout and "gone.sh 指向不存在的文件" in pending_stale.stdout)))
@@ -2582,7 +2582,7 @@ def selftest_in(hook_dir, work):
         ("cat 把 heredoc 写进未跟踪的产物", "cat > research/results/untracked.out <<'EOF'\n一行\nEOF", 1),
         ("花括号整组重定向", "{ echo a; echo b; } > research/results/untracked.out", 1),
         ("圆括号整组重定向", "(echo a; echo b) > research/results/untracked.out", 1),
-        ("timeout、capped.sh 包着的 bash -c 整条重定向", "timeout 60 bash research/scripts/capped.sh 4 bash -c 'cargo run' > research/results/untracked.out", 1),
+        ("timeout、capped.sh 包着的 bash -c 整条重定向", "timeout 60 bash scripts/hosts/capped.sh 4 bash -c 'cargo run' > research/results/untracked.out", 1),
         ("前面赋过值的变量代入", 'out=research/results/untracked.out; python3 x.py > "$out"', 1),
         ("export 过的变量代入", 'export OUT=research/results/untracked.out; python3 x.py > "${OUT}"', 1),
         ("cd 到变量路径算不出来、按仓库根解析", 'cd "$scratch" && python3 x.py > research/results/untracked.out', 1),
@@ -2641,20 +2641,20 @@ def selftest_in(hook_dir, work):
     results.append(("覆盖产物检出:git 判不了的那一条不拦", 0, int(bool(results_overwrite_refusal("python3 x.py > research/results/untracked.out", not_a_repository)[0]))))
     # ⑦ 在原 inode 上改已有脚本：在临时仓里造 .sh、.py、带执行位没后缀的、指向脚本的符号链接与不是脚本的文件，scratch 根换成临时目录；只判不执行
     scratch_root = os.path.join(work, "scratch-root")
-    os.makedirs(os.path.join(repository, "research", "scripts"))
+    os.makedirs(os.path.join(repository, "scripts"))
     os.makedirs(os.path.join(repository, "bin"))
     os.makedirs(os.path.join(scratch_root, "probe"))
-    for relative, mode in (("research/scripts/running.sh", 0o755), ("research/scripts/tool.py", 0o644), ("bin/runner", 0o755),
+    for relative, mode in (("scripts/running.sh", 0o755), ("scripts/tool.py", 0o644), ("bin/runner", 0o755),
                            ("notes.md", 0o644), ("data.txt", 0o644)):
         with open(os.path.join(repository, relative), "w", encoding="utf-8") as handle:
             handle.write("echo 旧内容\n")
         os.chmod(os.path.join(repository, relative), mode)
-    os.symlink("running.sh", os.path.join(repository, "research", "scripts", "link.sh"))
+    os.symlink("running.sh", os.path.join(repository, "scripts", "link.sh"))
     for path in (os.path.join(scratch_root, "probe", "step.sh"), os.path.join(work, "outside.sh")):
         with open(path, "w", encoding="utf-8") as handle:
             handle.write("echo 旧内容\n")
         os.chmod(path, 0o755)
-    running = "research/scripts/running.sh"
+    running = "scripts/running.sh"
     # (说明, 命令, 该不该拒绝)；目标按临时仓的根解析
     script_in_place_cases = [
         ("> 覆盖已有的 .sh", f"echo x > {running}", 1),
@@ -2668,17 +2668,17 @@ def selftest_in(hook_dir, work):
         ("cp 新 旧", f"cp /tmp/new.sh {running}", 1),
         ("cp -f", f"cp -f /tmp/new.sh {running}", 1),
         ("cp -a", f"cp -a /tmp/new.sh {running}", 1),
-        ("cp 进已有目录、文件名撞上", f"cp {sources}/running.sh research/scripts/", 1),
-        ("cp -t 目录", f"cp -t research/scripts {sources}/running.sh", 1),
+        ("cp 进已有目录、文件名撞上", f"cp {sources}/running.sh scripts/", 1),
+        ("cp -t 目录", f"cp -t scripts {sources}/running.sh", 1),
         ("dd of=", f"dd if=/tmp/new.sh of={running}", 1),
         ("dd conv=notrunc", f"dd if=/tmp/new.sh of={running} conv=notrunc", 1),
         ("truncate -s 0", f"truncate -s 0 {running}", 1),
-        ("truncate -cs 0（选项连写）", "truncate -cs 0 research/scripts/tool.py", 1),
-        ("写已有的 .py", "echo x > research/scripts/tool.py", 1),
+        ("truncate -cs 0（选项连写）", "truncate -cs 0 scripts/tool.py", 1),
+        ("写已有的 .py", "echo x > scripts/tool.py", 1),
         ("带执行位、没有后缀的", "cp /tmp/new bin/runner", 1),
-        ("经符号链接写它指向的脚本", "echo x > research/scripts/link.sh", 1),
+        ("经符号链接写它指向的脚本", "echo x > scripts/link.sh", 1),
         ("scratch 根下的脚本", f"cp /tmp/new.sh {scratch_root}/probe/step.sh", 1),
-        ("cd 进去之后写相对路径", "cd research/scripts && echo x > running.sh", 1),
+        ("cd 进去之后写相对路径", "cd scripts && echo x > running.sh", 1),
         ("bash -c 里的 >", f"bash -c 'echo x > {running}'", 1),
         ("喂给 bash 的 heredoc 正文里的 cp", f"bash <<'EOF'\ncp /tmp/new.sh {running}\nEOF", 1),
         ("命令替换里的 >", f"lines=$(echo x > {running}; echo done)", 1),
@@ -2686,15 +2686,15 @@ def selftest_in(hook_dir, work):
         ("nice、timeout 包着的 cp", f"timeout 60 nice -n 19 cp /tmp/new.sh {running}", 1),
         ("python3 -c 的 open(…, 'w')", f"python3 -c \"open('{running}', 'w').write('x')\"", 1),
         ("python3 -c 的 open(…, 'r+')", f"python3 -c \"open('{running}', 'r+').write('x')\"", 1),
-        ("python3 -c 的 open(…, mode='wb')", "python3 -c \"open('research/scripts/tool.py', mode='wb').write(b'x')\"", 1),
+        ("python3 -c 的 open(…, mode='wb')", "python3 -c \"open('scripts/tool.py', mode='wb').write(b'x')\"", 1),
         ("喂给 python 的 heredoc：只赋过一次的名字", f"python3 - <<'EOF'\npath = '{running}'\nwith open(path, 'w') as handle:\n    handle.write('x')\nEOF", 1),
         ("喂给 python 的 heredoc：Path(…) / '…' 的 write_text", "python3 - <<'EOF'\nfrom pathlib import Path\n(Path('research') / 'scripts' / 'tool.py').write_text('x')\nEOF", 1),
         ("喂给 python 的 heredoc：pathlib.Path(…).write_bytes", f"python3 <<'EOF'\nimport pathlib\npathlib.Path('{running}').write_bytes(b'x')\nEOF", 1),
         ("喂给 python 的 heredoc：Path(…).open('w')", f"python3 - <<'EOF'\nimport pathlib\nwith pathlib.Path('{running}').open('w') as handle:\n    handle.write('x')\nEOF", 1),
-        ("喂给 python 的 heredoc：os.path.join 与 io.open", "python3 - <<'EOF'\nimport io, os\nio.open(os.path.join('research', 'scripts', 'tool.py'), 'w')\nEOF", 1),
+        ("喂给 python 的 heredoc：os.path.join 与 io.open", "python3 - <<'EOF'\nimport io, os\nio.open(os.path.join('scripts', 'tool.py'), 'w')\nEOF", 1),
         ("喂给 python 的 heredoc：shutil.copyfile", f"python3 - <<'EOF'\nimport shutil\nshutil.copyfile('/tmp/new.sh', '{running}')\nEOF", 1),
-        ("喂给 python 的 heredoc：shutil.copy 进已有目录", "python3 - <<'EOF'\nimport shutil\nshutil.copy('/tmp/running.sh', 'research/scripts')\nEOF", 1),
-        ("cd 之后喂给 python 的相对路径", "cd research/scripts && python3 - <<'EOF'\nopen('running.sh', 'w').write('x')\nEOF", 1),
+        ("喂给 python 的 heredoc：shutil.copy 进已有目录", "python3 - <<'EOF'\nimport shutil\nshutil.copy('/tmp/running.sh', 'scripts')\nEOF", 1),
+        ("cd 之后喂给 python 的相对路径", "cd scripts && python3 - <<'EOF'\nopen('running.sh', 'w').write('x')\nEOF", 1),
         ("bash -c 里的 python3 -c", f"bash -c \"python3 -c \\\"open('{running}', 'w')\\\"\"", 1),
         (">> 追加", f"echo x >> {running}", 0),
         ("&>> 追加", f"make &>> {running}", 0),
@@ -2702,9 +2702,9 @@ def selftest_in(hook_dir, work):
         ("python 的 'a' 追加", f"python3 -c \"open('{running}', 'a').write('x')\"", 0),
         ("python 的 'x' 只建新文件", f"python3 -c \"open('{running}', 'x')\"", 0),
         ("python 读", f"python3 -c \"print(open('{running}').read())\"", 0),
-        ("写新文件名", "echo x > research/scripts/new-step.sh", 0),
-        ("写到同目录临时文件再 mv 换上", f"cat > research/scripts/.running.sh.new <<'EOF'\necho 新内容\nEOF\nchmod 755 research/scripts/.running.sh.new && mv research/scripts/.running.sh.new {running}", 0),
-        ("cp 成隐藏文件、chmod、mv 换上", f"cp /tmp/new.sh research/scripts/.running.sh.installing && chmod 755 research/scripts/.running.sh.installing && mv research/scripts/.running.sh.installing {running}", 0),
+        ("写新文件名", "echo x > scripts/new-step.sh", 0),
+        ("写到同目录临时文件再 mv 换上", f"cat > scripts/.running.sh.new <<'EOF'\necho 新内容\nEOF\nchmod 755 scripts/.running.sh.new && mv scripts/.running.sh.new {running}", 0),
+        ("cp 成隐藏文件、chmod、mv 换上", f"cp /tmp/new.sh scripts/.running.sh.installing && chmod 755 scripts/.running.sh.installing && mv scripts/.running.sh.installing {running}", 0),
         ("mv 新 旧", f"mv /tmp/new.sh {running}", 0),
         ("install 换 inode", f"install -m 755 /tmp/new.sh {running}", 0),
         ("cp --remove-destination 换 inode", f"cp --remove-destination /tmp/new.sh {running}", 0),
@@ -2714,7 +2714,7 @@ def selftest_in(hook_dir, work):
         ("sed -i 换 inode", f"sed -i 's/旧/新/' {running}", 0),
         ("同一条命令里先 rm 再写", f"rm {running} && echo x > {running}", 0),
         ("同一条命令里先挪走再写", f"mv {running} {running}.old && echo x > {running}", 0),
-        ("python 写到临时文件再 os.replace", f"python3 - <<'EOF'\nimport os\nopen('research/scripts/.running.sh.new', 'w').write('x')\nos.replace('research/scripts/.running.sh.new', '{running}')\nEOF", 0),
+        ("python 写到临时文件再 os.replace", f"python3 - <<'EOF'\nimport os\nopen('scripts/.running.sh.new', 'w').write('x')\nos.replace('scripts/.running.sh.new', '{running}')\nEOF", 0),
         ("写已有的非脚本文件（.md）", "echo x > notes.md", 0),
         ("写已有的、不带执行位的 .txt", "echo x > data.txt", 0),
         ("仓外、scratch 根外的脚本", f"echo x > {work}/outside.sh", 0),
@@ -2784,7 +2784,7 @@ def selftest_in(hook_dir, work):
     results.append(("stdin:cp 覆盖已有脚本拒绝（退出码 2）", 2, in_place.returncode))
     results.append(("stdin:拒绝时 stderr 写了出路（临时文件再 mv 换上、replace-once.py / insert-row.py 定点改）", 1,
                     int("✗" in in_place.stderr and "→" in in_place.stderr and f"cp {running}" in in_place.stderr
-                        and "写到同目录临时文件再 `mv` 换上" in in_place.stderr and "research/scripts/replace-once.py" in in_place.stderr)))
+                        and "写到同目录临时文件再 `mv` 换上" in in_place.stderr and "scripts/kb/replace-once.py" in in_place.stderr)))
     results.append(("stdin:就地改脚本拒了的不记检出", 0, in_place_recorded))
     python_in_place = through_entry(f"python3 - <<'EOF'\nopen('{running}', 'w').write('x')\nEOF", True)[0]
     results.append(("stdin:run_in_background 里喂给 python 的 open(…, 'w') 同样拒绝（退出码 2）", 2, python_in_place.returncode))
@@ -2814,53 +2814,53 @@ def selftest_in(hook_dir, work):
     results.append(("stdin:implementation-writer 同样的 cp 放行（退出码 0）", 0, writer_copy.returncode))
     # 走真实入口：detached-run.sh 的 start、stop 只给主 agent，子 agent 的拒绝（退出码 2）、stderr 给出路；list、watch 谁都放；主 agent 放行
     #   （BASH_COMMAND_DETECTOR_BREAK=allow-subagent-detached-run 下子 agent 拒绝的那五格红）
-    subagent_start = entry_as("implementation-writer", "bash research/scripts/detached-run.sh start --label m -- sleep 1")
+    subagent_start = entry_as("implementation-writer", "bash scripts/hosts/detached-run.sh start --label m -- sleep 1")
     results.append(("stdin:子 agent 经 detached-run.sh start 起长跑拒绝（退出码 2）", 2, subagent_start.returncode))
     results.append(("stdin:拒绝时 stderr 点名 detached-run.sh、写了交回主 agent 的写法", 1,
                     int("✗" in subagent_start.stderr and "→" in subagent_start.stderr and "detached-run.sh" in subagent_start.stderr
                         and "要主 agent 跑的命令" in subagent_start.stderr and "交回" in subagent_start.stderr)))
     results.append(("stdin:子 agent 带前缀、nice、绝对路径、--force 的 detached-run.sh start 同样拒绝（退出码 2）", 2,
-                    entry_as("clerk", "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash /abs/research/scripts/detached-run.sh --force start --label m -- sleep 1").returncode))
+                    entry_as("clerk", "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash /abs/scripts/hosts/detached-run.sh --force start --label m -- sleep 1").returncode))
     results.append(("stdin:子 agent 在 bash -c 里经 detached-run.sh start 同样拒绝（退出码 2）", 2,
-                    entry_as("clerk", "bash -c 'bash research/scripts/detached-run.sh start --label m -- sleep 1'").returncode))
-    results.append(("stdin:子 agent 的 detached-run.sh stop 拒绝（退出码 2）", 2, entry_as("clerk", "bash research/scripts/detached-run.sh stop m").returncode))
-    results.append(("stdin:子 agent 的 detached-run.sh list 放行（退出码 0）", 0, entry_as("clerk", "bash research/scripts/detached-run.sh list").returncode))
+                    entry_as("clerk", "bash -c 'bash scripts/hosts/detached-run.sh start --label m -- sleep 1'").returncode))
+    results.append(("stdin:子 agent 的 detached-run.sh stop 拒绝（退出码 2）", 2, entry_as("clerk", "bash scripts/hosts/detached-run.sh stop m").returncode))
+    results.append(("stdin:子 agent 的 detached-run.sh list 放行（退出码 0）", 0, entry_as("clerk", "bash scripts/hosts/detached-run.sh list").returncode))
     results.append(("stdin:子 agent 的 detached-run.sh watch 放行（退出码 0）", 0,
-                    entry_as("clerk", "bash research/scripts/detached-run.sh watch --every 600").returncode))
+                    entry_as("clerk", "bash scripts/hosts/detached-run.sh watch --every 600").returncode))
     results.append(("stdin:主 agent 经 detached-run.sh start 起长跑放行（退出码 0）", 0,
-                    entry_as(None, "cd /tmp/wt && SINGLEFS_HEAVY_TESTS=user-request bash /abs/research/scripts/detached-run.sh start --label m -- sleep 1").returncode))
-    results.append(("stdin:主 agent 的 detached-run.sh stop 放行（退出码 0）", 0, entry_as(None, "bash research/scripts/detached-run.sh stop m").returncode))
+                    entry_as(None, "cd /tmp/wt && SINGLEFS_HEAVY_TESTS=user-request bash /abs/scripts/hosts/detached-run.sh start --label m -- sleep 1").returncode))
+    results.append(("stdin:主 agent 的 detached-run.sh stop 放行（退出码 0）", 0, entry_as(None, "bash scripts/hosts/detached-run.sh stop m").returncode))
     # 走真实入口：按内容认 detached-run.sh——source / . 读进来的、开头带签名行的改名拷贝、指到它的符号链接、同一条命令里先 cp / ln -s 再起的，
     #   子 agent 的 start / stop 照拒（BASH_COMMAND_DETECTOR_BREAK=detached-run-by-name 下这六格红）；删掉签名行的拷贝认不出、list 放行
     detached_sample = "#!/usr/bin/env bash\n# detached-run-script-signature: 样本（bash-command-detector 自检造的）\necho sample\n"
-    os.makedirs(os.path.join(work, "research", "scripts"), exist_ok=True)
+    os.makedirs(os.path.join(work, "scripts"), exist_ok=True)
     os.makedirs(os.path.join(work, "elsewhere"), exist_ok=True)
-    for relative, text in (("dr-renamed.sh", detached_sample), ("research/scripts/detached-run.sh", "#!/usr/bin/env bash\necho 没有签名行的样本\n"),
+    for relative, text in (("dr-renamed.sh", detached_sample), ("scripts/hosts/detached-run.sh", "#!/usr/bin/env bash\necho 没有签名行的样本\n"),
                            ("dr-without-signature.sh", detached_sample.replace("# detached-run-script-signature:", "# 签名行删掉了："))):
         with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
             handle.write(text)
-    os.symlink(os.path.join(work, "research", "scripts", "detached-run.sh"), os.path.join(work, "elsewhere", "dr-link.sh"))
-    for label, command in (("source 读进来", "source research/scripts/detached-run.sh start --label m -- sleep 1"),
-                           (". 读进来", ". research/scripts/detached-run.sh start --label m -- sleep 1"),
+    os.symlink(os.path.join(work, "scripts", "hosts", "detached-run.sh"), os.path.join(work, "elsewhere", "dr-link.sh"))
+    for label, command in (("source 读进来", "source scripts/hosts/detached-run.sh start --label m -- sleep 1"),
+                           (". 读进来", ". scripts/hosts/detached-run.sh start --label m -- sleep 1"),
                            ("开头带签名行的改名拷贝", f"bash {work}/dr-renamed.sh start --label m -- sleep 1"),
                            ("指到它的符号链接 stop", f"bash {work}/elsewhere/dr-link.sh stop m"),
-                           ("同一条命令里先 cp 改名再起", f"cp research/scripts/detached-run.sh {work}/dr2.sh && bash {work}/dr2.sh start --label m -- sleep 1"),
-                           ("同一条命令里先 ln -s 再起", "ln -s detached-run.sh research/scripts/drl.sh; bash research/scripts/drl.sh start --label m -- sleep 1")):
+                           ("同一条命令里先 cp 改名再起", f"cp scripts/hosts/detached-run.sh {work}/dr2.sh && bash {work}/dr2.sh start --label m -- sleep 1"),
+                           ("同一条命令里先 ln -s 再起", "ln -s detached-run.sh scripts/drl.sh; bash scripts/drl.sh start --label m -- sleep 1")):
         results.append((f"stdin:子 agent 经{label}的 detached-run.sh 起或停拒绝（退出码 2）", 2, entry_as("clerk", command).returncode))
     # 同一条命令里 install / mv 拷出来再起的（BASH_COMMAND_DETECTOR_BREAK=detached-run-copy-by-cp-ln 下这两格红）；
     #   cd 之后按相对路径起改名拷贝（开头的当前目录里没有这个文件；BASH_COMMAND_DETECTOR_BREAK=detached-run-start-directory 下这一格红）
-    for label, command in (("同一条命令里先 install 改名再起", f"install -m 755 research/scripts/detached-run.sh {work}/dr4.sh && bash {work}/dr4.sh start --label m -- sleep 1"),
-                           ("同一条命令里先 mv 改名再起", f"mv research/scripts/detached-run.sh {work}/dr5.sh && bash {work}/dr5.sh start --label m -- sleep 1"),
+    for label, command in (("同一条命令里先 install 改名再起", f"install -m 755 scripts/hosts/detached-run.sh {work}/dr4.sh && bash {work}/dr4.sh start --label m -- sleep 1"),
+                           ("同一条命令里先 mv 改名再起", f"mv scripts/hosts/detached-run.sh {work}/dr5.sh && bash {work}/dr5.sh start --label m -- sleep 1"),
                            ("cd 之后按相对路径起的改名拷贝", f"cd {work} && bash ./dr-renamed.sh start --label m -- sleep 1")):
         results.append((f"stdin:子 agent 经{label}的 detached-run.sh 拒绝（退出码 2）", 2, entry_as("clerk", command).returncode))
     for label, agent_type, command in (("子 agent 起删掉签名行的拷贝认不出（罩不住的那一种，钉住现状）", "clerk", f"bash {work}/dr-without-signature.sh start --label m -- sleep 1"),
-                                       ("子 agent 先 cp 改名再 list", "clerk", f"cp research/scripts/detached-run.sh {work}/dr3.sh && bash {work}/dr3.sh list"),
-                                       ("子 agent source 读进来 watch", "clerk", "source research/scripts/detached-run.sh watch --every 600"),
-                                       ("主 agent source 读进来 start", None, "source research/scripts/detached-run.sh start --label m -- sleep 1")):
+                                       ("子 agent 先 cp 改名再 list", "clerk", f"cp scripts/hosts/detached-run.sh {work}/dr3.sh && bash {work}/dr3.sh list"),
+                                       ("子 agent source 读进来 watch", "clerk", "source scripts/hosts/detached-run.sh watch --every 600"),
+                                       ("主 agent source 读进来 start", None, "source scripts/hosts/detached-run.sh start --label m -- sleep 1")):
         results.append((f"stdin:{label}放行（退出码 0）", 0, entry_as(agent_type, command).returncode))
     unknown_break_items = [item for item in os.environ.get(DETECTOR_BREAK_VARIABLE, "").split(",") if item and item not in KNOWN_DETECTOR_BREAK_ITEMS]
     results.append((f"{DETECTOR_BREAK_VARIABLE} 里的项都认得（认得的：{'、'.join(KNOWN_DETECTOR_BREAK_ITEMS)}）", [], unknown_break_items))
-    renamed, renamed_recorded = through_entry(f"cp /tmp/new.sh research/scripts/.running.sh.installing && mv research/scripts/.running.sh.installing {running}")
+    renamed, renamed_recorded = through_entry(f"cp /tmp/new.sh scripts/.running.sh.installing && mv scripts/.running.sh.installing {running}")
     results.append(("stdin:写到临时文件再 mv 换上放行（退出码 0）、不记检出", (0, 0), (renamed.returncode, renamed_recorded)))
     # 同走 run_in_background 的那一条：只记检出
     results.append(("等待循环:同一条走 run_in_background 记一条检出", 1,
@@ -2870,12 +2870,12 @@ def selftest_in(hook_dir, work):
     script_for_watchdog = os.path.join(hook_dir, "bash-command-detector.sh")
     watchdog_environment = dict(os.environ, AGENT_HOOK_DETECTIONS=detections)
     foreground_watchdog = subprocess.run(["bash", script_for_watchdog], capture_output=True, text=True, env=watchdog_environment,
-                                         input=json.dumps({"tool_name": "Bash", "session_id": "s", "tool_input": {"command": "bash research/scripts/watch.sh a1 > /dev/null 2>&1 &"}}))
+                                         input=json.dumps({"tool_name": "Bash", "session_id": "s", "tool_input": {"command": "bash scripts/agents/watch.sh a1 > /dev/null 2>&1 &"}}))
     results.append(("stdin:前台起看门狗拒绝（退出码 2）", 2, foreground_watchdog.returncode))
     results.append(("stdin:拒绝时 stderr 写了出路（run_in_background: true 的起法）", 1,
                     int("run_in_background: true" in foreground_watchdog.stderr and "→" in foreground_watchdog.stderr)))
     background_watchdog = subprocess.run(["bash", script_for_watchdog], capture_output=True, text=True, env=watchdog_environment,
-                                         input=json.dumps({"tool_name": "Bash", "session_id": "s", "tool_input": {"command": "bash research/scripts/watch.sh a1", "run_in_background": True}}))
+                                         input=json.dumps({"tool_name": "Bash", "session_id": "s", "tool_input": {"command": "bash scripts/agents/watch.sh a1", "run_in_background": True}}))
     results.append(("stdin:run_in_background 起看门狗放行（退出码 0）", 0, background_watchdog.returncode))
     # 走真实入口：从标准输入喂 JSON，run_in_background 里没超时的等待循环退出码必须是 0（不拦），检出要落进文件
     script = os.path.join(hook_dir, "bash-command-detector.sh")
@@ -2964,7 +2964,7 @@ def selftest_in(hook_dir, work):
     shutil.copy(script, lonely_hook_directory)
     without_library = subprocess.run(["bash", os.path.join(lonely_hook_directory, "bash-command-detector.sh")], capture_output=True, text=True,
                                      env=dict(os.environ, AGENT_HOOK_DETECTIONS=detections),
-                                     input=json.dumps({"tool_name": "Bash", "session_id": "s", "tool_input": {"command": "bash research/scripts/watch.sh a1 > /dev/null 2>&1 &"}}))
+                                     input=json.dumps({"tool_name": "Bash", "session_id": "s", "tool_input": {"command": "bash scripts/agents/watch.sh a1 > /dev/null 2>&1 &"}}))
     recorded_after = sum(1 for _ in open(detections)) if os.path.exists(detections) else 0
     results.append(("stdin:读不到共用切词模块照常放行（退出码 0）", 0, without_library.returncode))
     results.append(("stdin:读不到共用切词模块时 stderr 点名它、记一条检出", 1,
@@ -3084,8 +3084,8 @@ def main():
               "几条活要并行就在同一条命令里每件把退出码写进自己的文件（`{ <命令>; echo \"$?\" > <草稿目录>/b<批号>-<件号>.rc; } &`，"
               "每批开跑前先删掉这一批的 .rc），最后单独一个不带参数的 `wait` 等齐，数一遍 .rc 与派出去的件数对不上整批作废，"
               "对得上再按派活的次序逐个读（共用约束 .claude/agent-common.md「执行前拒绝的写法」那一条的 ④）；"
-              "主 agent 要跑过后台时限的长活，经 `bash research/scripts/detached-run.sh start --label <名> -- <命令>` 起（挂到用户级 systemd 下，"
-              "会话被停也不停），会话里只用 run_in_background 起 `bash research/scripts/detached-run.sh watch` 上报")
+              "主 agent 要跑过后台时限的长活，经 `bash scripts/hosts/detached-run.sh start --label <名> -- <命令>` 起（挂到用户级 systemd 下，"
+              "会话被停也不停），会话里只用 run_in_background 起 `bash scripts/hosts/detached-run.sh watch` 上报")
     try:
         given_directory = hook_input.get("cwd")
         detached_calls = detached_run_refusal(tool_input.get("command") or "", hook_input.get("agent_type"),
@@ -3095,7 +3095,7 @@ def main():
         print(f"  ! bash-command-detector.sh 没判成 detached-run.sh 的起法（{error!r}），这条命令照常执行", file=sys.stderr)
         detached_calls = []
     if detached_calls:
-        refusal_lines.append(f"  ✗ {hook_input.get('agent_type')} 用 research/scripts/detached-run.sh 起或停脱离会话的长跑（认出的调用：{'；'.join(detached_calls)}）："
+        refusal_lines.append(f"  ✗ {hook_input.get('agent_type')} 用 scripts/hosts/detached-run.sh 起或停脱离会话的长跑（认出的调用：{'；'.join(detached_calls)}）："
               "这个入口只给主 agent，经它起的活不在你的进程树里，你交回之后没人认领")
         refusal_lines.append("     → 怎么办：要放后台等的活不起，把命令原样与预计多久写进交回报告「要主 agent 跑的命令」一节交回，主 agent 跑完再新派"
               "（共用约束 .claude/agent-common.md「长活交回主 agent」）。"
@@ -3152,7 +3152,7 @@ def main():
         refusal_lines.append(f"  ✗ 要在同一个 inode 上改一个已经存在的脚本（认出的写法与目标：{'；'.join(in_place_writes)}）："
               "正在跑它的 bash 按文件偏移往下读，改完会从新内容的同一偏移接着读，读到的是别的东西")
         refusal_lines.append("     → 怎么办：写到同目录临时文件再 `mv` 换上（`mv` 换 inode，正在跑它的进程读的还是旧内容），"
-              "或者用 `research/scripts/replace-once.py` / `insert-row.py` 定点改。追加（`>>`、`tee -a`）与新建不拦；"
+              "或者用 `scripts/kb/replace-once.py` / `insert-row.py` 定点改。追加（`>>`、`tee -a`）与新建不拦；"
               "Edit / Write 工具本来就换 inode。这一道只拒这种写法，不停你在跑的任何东西")
     try:
         crate_writes = compile_first_refusal(tool_input.get("command") or "", hook_input.get("agent_type"), repository_root_of(hook_dir))
@@ -3162,7 +3162,7 @@ def main():
     if crate_writes:
         refusal_lines.append(f"  ✗ {hook_input.get('agent_type')} 在 Bash 里写主工作区 crates/ 下的 .rs（认出的写法与目标：{'；'.join(crate_writes)}）："
               "入库装置先在草稿目录的副本里改，编过再整份换进主工作区，主工作区里任何时候都只放编得过的版本")
-        refusal_lines.append(f"     → 怎么办：在草稿目录那一份上改完，跑 `bash research/scripts/capped.sh <线程上限> python3 {COMPILE_THEN_SWAP_SCRIPT} "
+        refusal_lines.append(f"     → 怎么办：在草稿目录那一份上改完，跑 `bash scripts/hosts/capped.sh <线程上限> python3 {COMPILE_THEN_SWAP_SCRIPT} "
               "<草稿副本> crates/<crate>/src/bin/<名>.rs --scratch <草稿目录>`，它在仓副本里编过才整份换进来，编不过一个字节不写；"
               "把主工作区那份拷进草稿目录（`cp crates/… <草稿目录>/`）不拦。目标不是 crates/<crate>/src/bin/ 下的装置的，不归你改，"
               "写进报告交回主 agent。这一道只拒这种写法，不停你在跑的任何东西")
@@ -3178,8 +3178,8 @@ def main():
               "草稿目录（工作根 ~/.local/share/singlefs/work/ 下，过渡期另有 /tmp/claude-<uid>/）里随便写。这一道只拒这种写法，不停你在跑的任何东西")
     if reasons:
         refusal_lines.append(f"  ✗ 看门狗起法不对（{'；'.join(reasons)}；认出的调用：{'、'.join(calls)}）：这样起的看门狗叫不醒主 agent，等于没盯")
-        refusal_lines.append("     → 怎么办：看门狗用 Bash 的 run_in_background: true 起，命令只写 `bash research/scripts/watch.sh [--ack …] <agent 号，逗号分隔>`，"
-              "不加 `&`、`nohup`、`disown`，不重定向输出（只盯自己起的长进程写 `bash research/scripts/watch.sh --processes`）")
+        refusal_lines.append("     → 怎么办：看门狗用 Bash 的 run_in_background: true 起，命令只写 `bash scripts/agents/watch.sh [--ack …] <agent 号，逗号分隔>`，"
+              "不加 `&`、`nohup`、`disown`，不重定向输出（只盯自己起的长进程写 `bash scripts/agents/watch.sh --processes`）")
     if refusal_lines:
         blocks = [refusal_lines[index:index + 2] for index in range(0, len(refusal_lines), 2)]
         if detector_break_is_set("stop-at-first-refusal"):

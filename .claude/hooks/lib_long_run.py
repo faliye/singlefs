@@ -1,7 +1,7 @@
 """长活声明的判法：预计挂钟超过 2 小时的活，要说清分片单元、续跑入口、机器与额度取自多机配置与现查三样；分不了的写一行缺哪一段。
 判据：.claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」与「判定可复用：按输入存，按前缀剪」。
-三处用这一份：research/scripts/detached-run.sh 的 start（--wall-clock over-2h）与 long-run-check 判被起脚本的文件头；
-.claude/hooks/runner-dispatch-guard.sh 判派 experiment-designer、experiment-runner 的提示；research/scripts/host-dispatch.py 判派法占几台（started_script、script_header_declaration、judge）。
+三处用这一份：scripts/hosts/detached-run.sh 的 start（--wall-clock over-2h）与 long-run-check 判被起脚本的文件头；
+.claude/hooks/runner-dispatch-guard.sh 判派 experiment-designer、experiment-runner 的提示；scripts/hosts/host-dispatch.py 判派法占几台（started_script、script_header_declaration、judge）。
 
 声明的四个键（脚本文件头 / 派发提示的写法）：
   shards       # long-run-shards: <分片单元：按什么切、几片怎么定>                         分片：<…>
@@ -12,7 +12,7 @@
 
 判法（judge）：
   - 三样里值不空、不是「无 / 没有 / -」、不是 <…> 占位的算写了。
-  - hosts 写了的：要点名机器清单的读法 --emit-hosts（research/scripts/layer0-shard-configuration-check.sh）与现查余量的 host-resources.py，
+  - hosts 写了的：要点名机器清单的读法 --emit-hosts（scripts/crash/layer0-shard-configuration-check.sh）与现查余量的 host-resources.py，
     不许写死额度（HARD_CODED_QUOTA：数字后面跟线程、核、台、K/M/G/T，或 --threads N、-j N、--memory-cap N、--shard k/n、THREADS=N 这类）。
   - 三样缺的，要有 unshardable 一行：至少 UNSHARDABLE_MINIMUM_CHARACTERS 个字，并逐个点名缺的那几样的词（分片 / 续跑 / 多机）。
 脚本文件头：#! 之后连着的注释块（# 起头的行与空行，到第一行别的为止）；同一个键写了几行，按次序接起来。
@@ -216,7 +216,7 @@ def main(argv):
     if len(argv) >= 3 and argv[0] == "script" and argv[2] == "--" and len(argv) > 3:
         return script_main(argv[1], argv[3:])
     print("  ✗ 用法：lib_long_run.py script <命令的当前目录> -- <命令与参数…>", file=sys.stderr)
-    print("     → 怎么办：照文件头「用法」一段写；平常经 research/scripts/detached-run.sh long-run-check -- <命令…> 调", file=sys.stderr)
+    print("     → 怎么办：照文件头「用法」一段写；平常经 scripts/hosts/detached-run.sh long-run-check -- <命令…> 调", file=sys.stderr)
     return 2
 
 

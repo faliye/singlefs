@@ -6,7 +6,7 @@
   判红、抛异常 拉起被测脚本自己的子进程，环境里设角色变量（red / crash），TMPDIR 各指进一个探查目录；子进程在临时目录建好之后
                往里写一个文件，red 打一行判红、退 1，crash 抛异常；子进程退出之后探查目录必须是空的。
 弄坏开关：被测脚本在自己的弄坏开关设着时把 keep=True 传进来，临时目录走回 mkdtemp 不删，三格都必须判红。
-用它的：research/scripts/quote-kb.py、research/scripts/agent-watch.py、.claude/hooks/bash-command-detector.sh、.claude/hooks/session-start.sh。
+用它的：scripts/kb/quote-kb.py、scripts/agents/agent-watch.py、.claude/hooks/bash-command-detector.sh、.claude/hooks/session-start.sh。
 """
 import contextlib
 import os

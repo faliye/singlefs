@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always Claude Code 每一次触发都要现判这一条命令、现查各台此刻的资源，上一次查到的不替这一次作保
 # run-condition: command python3
-# PreToolUse hook（Bash）：认出要起重活或起 GPU 的命令时，先跑 research/scripts/host-resources.py 查各台此刻能用多少、带着这条命令判它放不放得下，
+# PreToolUse hook（Bash）：认出要起重活或起 GPU 的命令时，先跑 scripts/hosts/host-resources.py 查各台此刻能用多少、带着这条命令判它放不放得下，
 # 把那几行表与结论作为提醒交给发命令的一方（hookSpecificOutput.additionalContext，同一段另作 systemMessage 给人看）；命令照常放行，从不拒、不排队。
 # 用户 2026-10-06 定：「你写个脚本 每次跑之前必须运行 测一下双机的显卡和cpu 然后回报，提醒对话可以使用的最大的cpu资源数和gpu资源数」
 #   「先跑脚本获取资源数，然后根据资源数和自己的历史运行时间来确实能不能跑起来，如果可以就跑，如果不行就回报」；records/2026-09-16-subagent拆分提案.md 第五十五节。
@@ -16,7 +16,7 @@
 #   重活：lib_heavy_tests.classify 认出的重型测试（提交时才跑的检查那几类 COMMIT_CHECK_KINDS 不算：它们是 lint 与轻阶段），
 #         或 lib_heavy_tests.runs_compiled_code 认出的跑编译出来的代码（cargo test / run / bench、直接执行测试二进制与编出来的装置）。
 #   GPU：带 gpu 特性的 cargo（--features / -F 的值里有 gpu 或 <包>/gpu，或 --all-features；`--` 之后的不看）、
-#         research/scripts/gpu-quiesce-run.sh、research/scripts/crash-amplification*.sh、research/scripts/host-dispatch.py（按文件名认；source 进来的、
+#         scripts/crash/gpu-quiesce-run.sh、scripts/crash-amplification*.sh、scripts/hosts/host-dispatch.py（按文件名认；source 进来的、
 #         参数只有 --selftest 的不算）。认出 GPU 时报告脚本带 --gpu。
 #   报告脚本带着认出的那一条（剥掉包装之后的词，命令里设的 RUN_WITH_MEMORY_CAP_KEY 照传）跑：host-resources.py [--gpu] -- <那一条>。
 # 时限：报告脚本至多跑 REPORT_TIME_LIMIT_SECONDS 秒（HOST_RESOURCES_REMINDER_TIME_LIMIT 可换），到点只停自己起的那一个进程（按它的进程号），
@@ -105,7 +105,7 @@ def recognize(heavy_tests, text, directory, environment=None, depth=0):
 
 def run_report(hook_dir, command, gpu):
     """(提醒正文的第一行之后那几行, 说明这一次报告怎么样的一句)。报告脚本的输出落进临时文件：到点停它时不被它留下的子进程握着的管道卡住。"""
-    script = os.environ.get("HOST_RESOURCES_REMINDER_SCRIPT") or os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "research", "scripts", "host-resources.py")
+    script = os.environ.get("HOST_RESOURCES_REMINDER_SCRIPT") or os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "scripts", "hosts", "host-resources.py")
     limit = float(os.environ.get("HOST_RESOURCES_REMINDER_TIME_LIMIT") or REPORT_TIME_LIMIT_SECONDS)
     arguments = [sys.executable, "-B", script] + (["--gpu"] if gpu else []) + ["--", *command.words]
     environment = dict(os.environ)
@@ -140,7 +140,7 @@ def remind(hook_input, hook_dir, heavy_tests):
     command, heavy, gpu = found
     what = "、".join(piece for piece in [f"重活（{heavy}）" if heavy else "", "GPU" if gpu else ""] if piece) or "（弄坏开关 remind-everything）"
     stdout, problem = run_report(hook_dir, command, gpu)
-    head = (f"资源提醒：这条命令认出要起{what}，先跑了 research/scripts/host-resources.py{' --gpu' if gpu else ''} -- {shlex.join(command.words)[:200]}；"
+    head = (f"资源提醒：这条命令认出要起{what}，先跑了 scripts/hosts/host-resources.py{' --gpu' if gpu else ''} -- {shlex.join(command.words)[:200]}；"
             "命令照常放行（这道钩子不拒、不排队），放不放得下看下面的结论，跑不起来就回报")
     return "\n".join(piece for piece in [head, problem, stdout] if piece)
 
@@ -210,16 +210,16 @@ def selftest_cells(hook_dir, root):
     check("heavy-test", code == 0 and "资源提醒" in context and "结论：可以跑：在本机" in context and calls and "--gpu" not in calls[0]
           and calls[0].endswith("-- cargo test --release -p singlefs-checker-tier --test crash_enumeration_selftest_stream"),
           f"checker 档的 cargo test 应当出提醒、报告脚本不带 --gpu 带着这条命令跑、退 0；实际退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」")
-    code, context, calls, _ = feed("compiled-code", "bash research/scripts/run-with-memory-cap.sh 8G cargo test -p singlefs-harness --test selftest_target")
+    code, context, calls, _ = feed("compiled-code", "bash scripts/hosts/run-with-memory-cap.sh 8G cargo test -p singlefs-harness --test selftest_target")
     check("compiled-code", code == 0 and "资源提醒" in context and calls and calls[0].endswith("-- cargo test -p singlefs-harness --test selftest_target"),
           f"经内存包装的 harness 档 cargo test 应当出提醒、报告脚本拿剥掉包装的那一条；实际退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」")
-    code, context, calls, _ = feed("gpu-script", "cd research && bash scripts/gpu-quiesce-run.sh -- true")
+    code, context, calls, _ = feed("gpu-script", "cd scripts/experiments && bash ../gpu-quiesce-run.sh -- true")
     check("gpu-script", code == 0 and "GPU" in context and calls and calls[0].startswith("--gpu --"),
           f"清场包装应当认成 GPU、报告脚本带 --gpu、退 0；实际退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」")
     code, context, calls, _ = feed("gpu-feature", "cargo build --release -p singlefs-checker-tier --features verdict-store,gpu")
     check("gpu-feature", code == 0 and "GPU" in context and calls and calls[0].startswith("--gpu --"),
           f"带 gpu 特性的 cargo 应当认成 GPU、报告脚本带 --gpu、退 0；实际退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」")
-    code, context, calls, _ = feed("plain-command", "ls -l research/scripts && git status --short && bash research/scripts/gpu-quiesce-run.sh --selftest")
+    code, context, calls, _ = feed("plain-command", "ls -l scripts && git status --short && bash scripts/crash/gpu-quiesce-run.sh --selftest")
     check("plain-command", code == 0 and context == "" and not calls,
           f"普通命令（与清场包装的 --selftest）应当不出提醒、不跑报告脚本；实际退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」")
     code, context, calls, elapsed = feed("report-timeout", "cargo test -p singlefs-harness --test selftest_target", FAKE_REPORT_SLEEP="8",

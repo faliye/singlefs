@@ -1,6 +1,6 @@
 """一条命令是不是重型测试、属于哪一类。
 
-heavy-test-guard.sh（执行前拒绝）与看门狗（research/scripts/agent-watch.py，在进程这一层）共用这一份判定，各自按文件路径用 importlib 导入；
+heavy-test-guard.sh（执行前拒绝）与看门狗（scripts/agents/agent-watch.py，在进程这一层）共用这一份判定，各自按文件路径用 importlib 导入；
 同目录的 lib_shell_words.py（切词、剥前缀与包装）由这份自己导入，调用方从 `shell_words` 属性拿同一份。
 谁能跑哪一类、要带什么前缀，是 heavy-test-guard.sh 的事，不在这里。
 
@@ -19,14 +19,14 @@ heavy-test-guard.sh（执行前拒绝）与看门狗（research/scripts/agent-wa
       读不了当它没设）、strace 的 `-E NAME=VALUE` / `--env=NAME=VALUE` 设的变量写在交回那条命令的最前面
       （再切一遍时当它的环境变量，认别名要用；strace 的 `-E NAME` 只清变量，不带）。
       这张表不进 lib_shell_words 的前缀表：bash-command-detector.sh 要按命令词认出 systemd-run，判它等不等结束。
-      research/scripts/detached-run.sh 的 `start [--label <名>] [--log <文件>] [--stop-timeout <秒>] -- <命令…>`（参数里的 --force 照它的 preflight 每一个都摘）同样剥掉，交回 `--` 之后那条命令，
+      scripts/hosts/detached-run.sh 的 `start [--label <名>] [--log <文件>] [--stop-timeout <秒>] -- <命令…>`（参数里的 --force 照它的 preflight 每一个都摘）同样剥掉，交回 `--` 之后那条命令，
       当前目录与环境照外面那一条（它把调用方的 SINGLEFS_HEAVY_TESTS 与当前目录带进单元）；list、watch、stop 与没写 `--` 的不剥（command_under_detached_run）。
-      认它照 lib_shell_words 的 detached_run_script：名字叫 detached-run.sh（路径不论）、解到的真实路径落在 research/scripts/detached-run.sh（符号链接）、
+      认它照 lib_shell_words 的 detached_run_script：名字叫 detached-run.sh（路径不论）、解到的真实路径落在 scripts/hosts/detached-run.sh（符号链接）、
       文件开头有签名行（行首 `# detached-run-script-signature:`，改名或拷走的一份）；后两种按 directory 解相对路径、读盘，文件还不在就认不出
       （同一条命令里先 cp 再起的由 heavy-test-guard.sh 拿它记下的写出内容另判）。
   command_under_gpu_quiesce(words, directory=None) -> (list[str], None) | None
-      words[0] 是 research/scripts/gpu-quiesce-run.sh 而参数是 `-- <命令…>`（清场之后原样起那条命令；参数里的 --force 照它的 preflight 每一个都摘）时交回 `--` 之后那条命令，
-      当前目录与环境照外面那一条。认它照名字与位置：名字叫 gpu-quiesce-run.sh、又落在 research/scripts 这一层（路径尾部，同 located_in）；
+      words[0] 是 scripts/crash/gpu-quiesce-run.sh 而参数是 `-- <命令…>`（清场之后原样起那条命令；参数里的 --force 照它的 preflight 每一个都摘）时交回 `--` 之后那条命令，
+      当前目录与环境照外面那一条。认它照名字与位置：名字叫 gpu-quiesce-run.sh、又落在 scripts 这一层（路径尾部，同 located_in）；
       别处的同名拷贝不剥（heavy-test-guard.sh 照旧读它的正文）；--selftest 与没写 `--` 的不剥。不并进 command_under_launcher：
       host-resources-reminder.sh 按名字认 gpu-quiesce-run.sh 出 GPU 提醒，剥掉就认不出；heavy-test-guard.sh 与 classify_process 在 command_under_launcher 之后再试它。
   classify_process(argv, cwd) -> list[HeavyTest]
@@ -37,7 +37,7 @@ heavy-test-guard.sh（执行前拒绝）与看门狗（research/scripts/agent-wa
       一条已经剥掉前缀与包装的命令会不会跑编译出来的代码：cargo test / t / run / r / bench（test、bench 带 --no-run 的只编不跑，不算），
       或直接执行 cargo 编出来的二进制（测试二进制，与名字里带 target 的目录底下 debug / release 里的），
       或起轻型三条之一（下面「两档里的轻型」：light_tier_command）；会就交一句说明。
-      heavy-test-guard.sh 拿它判子 agent 跑这一类经没经 research/scripts/run-with-memory-cap.sh（与重型不重型无关）。
+      heavy-test-guard.sh 拿它判子 agent 跑这一类经没经 scripts/hosts/run-with-memory-cap.sh（与重型不重型无关）。
   judged_by_name(word, directory) -> bool
       这个命令词是不是按名字判的仓内脚本（.claude/gate.d/ 下的阶段、KNOWN_SCRIPT_LOCATIONS 里的脚本在它们的仓内位置上）：
       算不算重型、带什么参数才算，都在名字那一格判完了，要读脚本正文的一方不再读进去。
@@ -56,13 +56,13 @@ qemu-system-*、herd7，以及直接执行的测试二进制 `<target 目录>/[<
 checker 档包 singlefs-checker-tier（-p 点名它，-p 的值认光名字、name@version、pkgid URL 与通配；不挑包而范围含它；当前目录在它里面裸跑），
 不管挑哪个目标（--lib、--doc、--bin、--test、--tests 都算：整个包都是 checker 档，库单测与装置二进制的内联单测也在内），算重型；
 直接执行它的测试二进制（名字是它 tests/ 下的测试目标、src/bin/ 下的装置、或库本身 singlefs_checker_tier）也算。
-双机分片的驱动脚本 research/scripts/layer0-shard-run.sh（--selftest 照自证登记表判，见下面「自证」一段）按它开跑要读的那一行登记判（shard_driver_runs_checker_tier）：参数里的树根下
+双机分片的驱动脚本 scripts/crash/layer0-shard-run.sh（--selftest 照自证登记表判，见下面「自证」一段）按它开跑要读的那一行登记判（shard_driver_runs_checker_tier）：参数里的树根下
 .claude/gate.d/stage-inputs.tsv 里键那一行登记的包是 checker 档包、带 shard=across-machines 的算 checker 档；登记的是别的包的不算
-（驱动自检 research/scripts/layer0-shard-run-selftest.sh 在 mktemp 建的临时仓里登记的替身用例是 harness 档包，自检一趟趟起的驱动与假 cargo 都不算）；
+（驱动自检 scripts/crash/layer0-shard-run-selftest.sh 在 mktemp 建的临时仓里登记的替身用例是 harness 档包，自检一趟趟起的驱动与假 cargo 都不算）；
 树根里没有这一行、没登记分片的不算（驱动开跑就拒，什么都不跑）；键不是字面写的 crash-case:<名>、树根解不出或登记读不了的照算。
-门禁 checker-tier-crates-mutation-replay.sh 的双机分片驱动 research/scripts/mutation-shard-run.sh（--selftest 照自证登记表判）直接起就算重型，
+门禁 checker-tier-crates-mutation-replay.sh 的双机分片驱动 scripts/mutation/mutation-shard-run.sh（--selftest 照自证登记表判）直接起就算重型，
 与那一道同一类（crates-mutation-stage）：它在两台各跑一趟那一道；只由那一道调，那一道本身已按名字算。
-那一道的判法模块 research/scripts/crates-mutation-rows.py 带 --item 的（点名单跑几行，交给那一道的 --item）同一类；它别的用法（plan、row-plan、--list-items、
+那一道的判法模块 scripts/mutation/crates-mutation-rows.py 带 --item 的（点名单跑几行，交给那一道的 --item）同一类；它别的用法（plan、row-plan、--list-items、
 static-check、judge-version、records-directory、import、llvm-tools，与登记表里的单独 --selftest）只读或只用假 cargo，不算。
 不按「只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE」判：执行前的闸看不见进程环境，开着它也能拿登记成 checker 档的用例在本机真跑两片。
 harness 档（singlefs-harness）、core、format、池级 checker（singlefs-checker）的测试随时跑，不算重型；工作区全量（--workspace / --all、
@@ -78,7 +78,7 @@ checker-tier-broad-mutation.sh（广谱变异的提交门禁：判广谱变异�
 checker-tier-formal-verification.sh（起 Verus 这个外部验证器、编装置逐行重放钉住的红例，照 .claude/rules/verification.md 的归类判据归 checker 档；类名「Verus」）；
 直接起的 verus 与 cargo verus 不算重型：写证明的实现员改一处验一次，验一个 crate 是秒级（接回可行性那一趟量到 8–21 秒），与 cargo build / clippy 同一类，
 认成重型就验不了自己写的证明；只有门禁那一道（逐格验、空真与必红世界逐处起 Verus、编装置）算。
-这一道的两份判法脚本 research/scripts/verus-proof-check.py、research/scripts/e165-pin-red-examples.py 直接起（verus_judge_use）：先认出是这两份，再一律算这一类，
+这一道的两份判法脚本 scripts/gate/verus-proof-check.py、scripts/experiments/e165-pin-red-examples.py 直接起（verus_judge_use）：先认出是这两份，再一律算这一类，
 只放过字面写明的只读用法：verus-proof-check.py 的第一个参数是 toolchain（只读安装、Cargo.lock 与 cargo 缓存）、fingerprint、tool-versions、
 list-items（只读登记表、核与必红世界表，列可点名的项）之一；e165-pin-red-examples.py 照它文件头的用法判，起装置的只有 --replay：
 照它 main 的参数切法（e165_pin_mode：--check、--replay、--backfill、--list-items 里写在后面的那个定模式，带值的选项跳过它的值）落到追加、--check、
@@ -94,7 +94,7 @@ list-items（只读登记表、核与必红世界表，列可点名的项）之�
 不带参数与认不出的子命令同样算（接受的误拒）。判参数之前照两份脚本开头的 preflight 摘掉每一个整词 --force（preflight 在 main 之前从 sys.argv 里摘：
 `--replay --target --force --check` 真跑的是 --replay，`--force tool-versions` 真跑的是 tool-versions）。
 认这两份照广谱变异那一套（verus_judge_script）：名字与位置（当前目录与命令文本里设的 PYTHONPATH 各试一遍，
-`python3 -m verus-proof-check` 由切词交成这个名字）、命令词解到的文件的真实路径落在 research/scripts/<那一份>（符号链接）。
+`python3 -m verus-proof-check` 由切词交成这个名字）、命令词解到的文件的真实路径落在 scripts/<那一份>（符号链接）。
 `python3 -c '…'` 的代码里出现这两份的名字（verus-proof-check、e165-pin-red-examples：文件名与 __import__、importlib.import_module、runpy.run_module 的模块名都含它）
 就一律算这一类，不看代码之后的词（verus_judge_code_use：代码自己能改 sys.argv、直接调函数，执行前判不出）；只放过每一句都是 print(<字符串字面量>…) 的代码
 （ast 判，关键字参数的值也只许是字面量；别的写法哪怕只读也算，接受的误拒）。仓内位置上那一份的 --selftest 照自证登记表判，改名链接与 PYTHONPATH 起的 --selftest 照旧算提交时才跑的检查，
@@ -105,11 +105,11 @@ python -c 的代码里把名字拼出来的（"verus-" + "proof-check.py"）、`
 最后那一道（research 构建与单测、实验复跑两道合成）只有复跑那一格是重型：--check 只点名 research-unit-tests 的不算全部实验复跑。带 --list、--list-items 或 --tool-versions 的
 （只打格名表、逐项点名的清单、工具版本）哪一道都不算；带 --write 的（生成）不算。
 另一类「提交时才跑的检查」（COMMIT_CHECK_KINDS，类名 COMMIT_CHECK_CATEGORY；用户 2026-09-28 定：扫仓的门禁与各道 lint 只在提交前由主 agent 跑的
-research/scripts/gate-staged.sh 跑）：不重型的门禁阶段；.claude/singlefs-ai-sop/scripts/ 下的 doc-lint.sh、gate-lint.sh、shell-lint.sh、preflight-lint.py、
-gate-overlap.py（--list 查清单不算）、rules-lint.sh、hooks-registered.sh、stage-selftest.sh；research/scripts/gate-structure-check.py（它的 --selftest 照下一段判）；
+scripts/gate/gate-staged.sh 跑）：不重型的门禁阶段；.claude/singlefs-ai-sop/scripts/ 下的 doc-lint.sh、gate-lint.sh、shell-lint.sh、preflight-lint.py、
+gate-overlap.py（--list 查清单不算）、rules-lint.sh、hooks-registered.sh、stage-selftest.sh；scripts/gate/gate-structure-check.py（它的 --selftest 照下一段判）；
 自证里起重活的、没登记的那几份（下一段）。
-谁能跑这一类由 heavy-test-guard.sh 定（与重型同一套放行）；看门狗 research/scripts/agent-watch.py 在进程这一层不报这一类。
-自证（classify_selftest）：research/scripts/、.claude/hooks/ 下脚本的 --selftest 与 .claude/gate.d/lib/ 下共用库的直接执行（就是跑它的自证），
+谁能跑这一类由 heavy-test-guard.sh 定（与重型同一套放行）；看门狗 scripts/agents/agent-watch.py 在进程这一层不报这一类。
+自证（classify_selftest）：scripts/、.claude/hooks/ 下脚本的 --selftest 与 .claude/gate.d/lib/ 下共用库的直接执行（就是跑它的自证），
 按同目录的登记表 selftest-registry.tsv 判（上游 test-script-discipline.md「测试脚本自己也要被测试证明有效」：自证用假的驱动、不起编译与重活，拦重型测试的闸不拦自证）。
 表里一行一份：light（自证不起 cargo、编译、虚机、herd7、Verus）而命令写成单独一个 --selftest（门禁共用库：不带参数或单独一个 --selftest）的，不算哪一类，
 谁都能跑，selftest_judged_light 为真；heavy 的照旧算提交时才跑的检查（kind commit-check-selftest）；heavy-if-set:<变量> 在命令里把那个变量设成非空时算 heavy，
@@ -119,9 +119,9 @@ commit-check-selftest-unregistered，拒绝说明写怎么登记）。表读不�
 （selftest_registered_file），别的树（worktree、仓副本、临时仓）里路径尾部相同的脚本、相对路径而当前目录认不出的、路径写在变量里的不按这一行判，照旧算提交时才跑的检查
 （kind commit-check-selftest-unregistered，拒绝说明写「跑本仓那一份，写它在本仓的字面路径」）。命令词带通配（*、?、[）的照字面不当自证（SELFTEST_PATTERN_CHARACTERS）：
 classify 先照 bash 展开、按展开出来的那几份判（下面「命令词带通配」），照字面判时它不是哪一份自证；case 的模式行（`.claude/gate.d/lib/*.py) …`）被切成命令时也是这样的词，
-照字面不当成起门禁共用库（展开出来是登记成轻的那几份，放行）。不带通配的 case 模式行（`research/scripts/x.sh) …`）照旧被切成一条命令（lib_shell_words.py 不认 case，老口子）。
+照字面不当成起门禁共用库（展开出来是登记成轻的那几份，放行）。不带通配的 case 模式行（`scripts/x.sh) …`）照旧被切成一条命令（lib_shell_words.py 不认 case，老口子）。
 实验装置那一层（DEVICE_SELFTEST_PARENT 下正好一层的目录，今天登记的是 E171 装置目录里的编排与判法脚本，自证只用假驱动、假 multi-host-run 与临时目录）：
-登记表里键写 research/e7-index-bench/src/bin/<装置>/<文件> 的行照收；命令词解到本仓那一份、写成单独一个 --selftest、又登记了的，照登记的轻重判（light 放行、不读正文，
+登记表里键写 scripts/experiments/<装置>/<文件> 的行照收；命令词解到本仓那一份、写成单独一个 --selftest、又登记了的，照登记的轻重判（light 放行、不读正文，
 heavy 与设了变量的 heavy-if-set 算提交时才跑的检查）。这一层没登记的、带了 --selftest 之外参数的（`--selftest --cells <格>`）、别的树里路径尾部相同的不当自证，
 照没认这一层时那样按 classify 判：这一层不要求每份自证都登记，登记表外的不因此被拒（device_selftest_layer）。
 门禁样本（上游 test-script-discipline.md「测试脚本自己也要被测试证明有效」认的第三种自证形态：红绿样本目录）：同一份登记表里键是 .claude/gate.d/<阶段>.sh 的行登记
@@ -156,34 +156,34 @@ samples-heavy（样本档本身起真 cargo、Verus 这类重活）；逐道读�
   `[^…]` 换成 python 认的 `[!…]`，排好序；只是 `[`、`[[` 的不展开），再逐个判（pattern_expansion_use）：bash 真起的那一条（头一份当命令、其余几份接在写的参数前面）
   与每一份单独当命令、带写的参数（最多 PATTERN_EXPANSION_LIMIT 份）各判一遍，展开出来的那条当一段命令文本再切一遍、剥包装（写成通配的 capped.sh、nice、
   /usr/bin/time、detached-run.sh 也认）；有一条判成哪一类（重型、按名字判的重型脚本、门禁阶段、提交时才跑的检查）就照它拒，说明里写展开成了什么；
-  都不是、或零命中（bash 照字面起）、当前目录认不出的，照字面判。合法的通配（`ls research/scripts/*.sh`，命令词不带通配）不受影响。
-  接受的误拒：脚本里 case 的模式行被切成命令（lib_shell_words.py 不认 case），模式写成通配的同样展开，展开出重型的照拒（`*)` 在 research/scripts 里、
+  都不是、或零命中（bash 照字面起）、当前目录认不出的，照字面判。合法的通配（`ls scripts/*.sh`，命令词不带通配）不受影响。
+  接受的误拒：脚本里 case 的模式行被切成命令（lib_shell_words.py 不认 case），模式写成通配的同样展开，展开出重型的照拒（`*)` 在 scripts 里、
   `.claude/gate.d/*.sh)` 这一类），与不带通配的 case 模式行同一个老口子；几份里只要有一份单独当命令判成哪一类就拒，不管 bash 真起的是不是它。
   罩不住的：bash 按区域设置排序、头一份与这里排的不同时，
   真起的那一条只在「每一份单独判」里按写的参数判过；展开超过 PATTERN_EXPANSION_LIMIT 份时后面几份不单独判；
   展开出来的脚本不读正文（heavy-test-guard.sh 的 NOT_A_LITERAL_PATH 那一侧照旧）；cd 到变量路径之后的相对通配（当前目录认不出，照字面判）。
   方括号里的 POSIX 字符类、等价类、整理符号（[[:alpha:]]、[[=h=]]、[[.h.]]，连同 [a[:lower:]]、[![:digit:]] 这种夹在别的字符后面的；BASH_BRACKET_PATTERN 认 `[:`、`[=`、`[.`）
-  python glob 不认（test-script-align-r3 攻方 A1：`bash research/scripts/mutat[[:alpha:]].sh crates/mutations.tsv` 零命中、照字面放行，bash 起的却是 mutate.sh）：
+  python glob 不认（test-script-align-r3 攻方 A1：`bash scripts/mutat[[:alpha:]].sh crates/mutations.tsv` 零命中、照字面放行，bash 起的却是 mutate.sh）：
   带这几种写法的词（命令词与参数）交给 bash 自己展开（bash_pattern_expansions：`bash --norc --noprofile -c`、shopt -s nullglob，词经 $1 传进去、IFS 设空只做路径展开，
   当前目录是这条命令的当前目录，不起被判的命令），次序照 bash 的；零命中照字面判（bash 照字面起）。展不开或判不出的——相对路径而当前目录认不出、bash 起不来、
   bash 退出码不是 0、超过 BASH_PATTERN_TIMEOUT 秒——命令词按 pattern-unresolved（类名「判不出的通配」）拒，说明写「写成展开之后的字面路径再起」；参数照字面判。
   罩不住的：bash 用的是这里起的那一份的默认选项与这个进程的区域设置，会话 shell 里另开了 extglob、globstar、nocaseglob、dotglob 或区域设置不同的，展开出来的可能不同；
   参数里的这几种写法判不出时照字面（与参数里别的通配同一个口径）。
-花括号与参数里的通配（2026-10-01 主 agent 喂本仓钩子实测：`bash research/scripts/mutate.{sh,x} crates/mutations.tsv`、`bash .claude/gate.d/checker-tier-layer0-replay.{sh,} <根>`、
-  `bash research/scripts/mutate.sh crates/mutation?.tsv` 都放行，bash 展开后都是真重活）：classify 先做 bash 的两样展开（expanded_words）再判（word_expansion_use）。
+花括号与参数里的通配（2026-10-01 主 agent 喂本仓钩子实测：`bash scripts/mutate.{sh,x} crates/mutations.tsv`、`bash .claude/gate.d/checker-tier-layer0-replay.{sh,} <根>`、
+  `bash scripts/mutation/mutate.sh crates/mutation?.tsv` 都放行，bash 展开后都是真重活）：classify 先做 bash 的两样展开（expanded_words）再判（word_expansion_use）。
   ① 每个词（命令词与参数）照 bash 的花括号展开（brace_expansion，照 bash braces.c：{a,b}、嵌套、空的一份、序列 {1..3}、{a..e}、{01..10..3} 与补零；
   配不上的、里面最外层没有逗号又不是序列的照字面；`${…}` 不展开；打头的 `{}` 不算；展开出来的空串去掉），命令词展开成几份的，头一份是命令、其余接在参数前面；
   ② 再把参数里带 *、?、[ 的按这条命令的当前目录展开（expanded_arguments，与命令词同一个 command_word_expansions；零命中照字面）。
   展开结果与写的不同就判 bash 真起的那一条；命令词自己展开成几份的，再把每一份单独当命令、带展开过的参数各判一遍（与命令词带通配同一个口径），
   命令词展开过的那几条当一段命令文本再切一遍、剥包装（{bash,x.sh} 这种写在包装上的也认），只有参数展开过的直接 classify。
-  有一条判成哪一类就照它拒，说明里写展开成了什么；都不是再照字面判（照字面判出的照旧拒）。合法的写法（`ls research/scripts/{a,b}.sh`、`cat crates/*.toml`）展开之后照样不重型，放行。
+  有一条判成哪一类就照它拒，说明里写展开成了什么；都不是再照字面判（照字面判出的照旧拒）。合法的写法（`ls scripts/{a,b}.sh`、`cat crates/*.toml`）展开之后照样不重型，放行。
   接受的误拒：引号在切词时已经去掉，照字面写的花括号与通配（'{a,b}'、'crates/*.tsv'、\\{a,b\\}）这里也展开；命令词展开出的几份里只要有一份单独当命令判成哪一类就拒，
   不管 bash 真起的是不是它；argv 已经展开过的进程（看门狗那一侧）再展开一遍，同样只会多认、不会少认。
   罩不住的：一个词展开超过 WORD_EXPANSION_LIMIT 份的后面几份；一个词里配不上的花括号多到扫描超过 BRACE_SCAN_LIMIT 个记号的，这个词照字面；
   展开出来的文件名里本身带花括号或通配、要再套超过 WORD_EXPANSION_DEPTH_LIMIT 层的；cd 到变量路径之后的相对通配；赋值词（X={a,b}）与重定向目标照 bash 另有规矩，这里不分；
   花括号展开出来的脚本同样不读正文。
-证红脚本 research/scripts/prove-red.sh（prove_red_use；它在 python 里逐行起 cargo test，闸看不见）：命令文本给它设了 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
-  （命令前、env 的参数、同一行前面的 export）时它照跑点名行里重型的那几行，照它的切法取 --copy 与变异名、照 research/scripts/crates-mutation-rows.py 的 read_table
+证红脚本 scripts/mutation/prove-red.sh（prove_red_use；它在 python 里逐行起 cargo test，闸看不见）：命令文本给它设了 SINGLEFS_HEAVY_TESTS=commit 或 =user-request
+  （命令前、env 的参数、同一行前面的 export）时它照跑点名行里重型的那几行，照它的切法取 --copy 与变异名、照 scripts/mutation/crates-mutation-rows.py 的 read_table
   读副本里的 crates/mutations.tsv（同名取最后一行），点名的行有一行的 cargo test <参数> 照 classify 判成重型（prove-red 判「这一行重不重」调的同一个判法，当前目录是副本的根），
   就算那一行的类；副本或变异名里有没展开的词、副本是相对路径而当前目录认不出、表或那份模块读不了的，判不出，照 checker 档算。没设前缀的不算（它把重型的行逐行报本次未跑、
   一条都不起）；用法不对、副本里没有变异表的不算（它退 2、什么都不起）；点名行里有它整次拒绝的（不在表里、不成形、没挑目标）照判别的行（接受的误拒）。
@@ -218,7 +218,7 @@ cargo mutants -d 指到别处的树。
   broad-mutation-by-name-only（驱动只按名字与位置认：指到它的符号链接、带签名行的改名拷贝、python -c 的代码里点它的都放过去）、
   broad-mutation-read-only-counted（驱动 --check-ignored 与提交门禁 --check gate-verdict 照旧算广谱变异：「广谱变异 --check-ignored 只判忽略用例登记」
     「广谱变异的提交门禁经 nice 只跑判定那一格」两格红）、
-  detached-run-opaque（research/scripts/detached-run.sh start … -- <命令> 不剥，里面那条重型命令放过去）、
+  detached-run-opaque（scripts/hosts/detached-run.sh start … -- <命令> 不剥，里面那条重型命令放过去）、
   detached-run-by-name-only（detached-run.sh 只按名字认：指到它的符号链接、带签名行的改名拷贝、同一条命令里先拷再起的都不剥，里面那条重型命令放过去）、
   selftest-registry-ignored（不读自证登记表，自证一律照旧算提交时才跑的检查）：判自证的格里凡期望放行（None）或期望 commit-check-selftest-unregistered 的都红（判成了 commit-check-selftest）、
   selftest-heavy-rows-as-light（登记成 heavy 的行当 light 判）：「造出来的登记表：登记成 heavy 的 --selftest 算提交时才跑的检查」起的三格、「设了变量的条件行算起重活」、
@@ -266,7 +266,7 @@ cargo mutants -d 指到别处的树。
   brace-sequence-literal（{1..3}、{a..e} 这类序列不展开）：「花括号里的字母序列点到 crates 整表」「花括号里的整数序列展开成几份」两格与「花括号展开与 bash 一致」里的序列那几格红、
   argument-patterns-literal（参数里的通配不展开）：「参数里的通配点到 crates 整表」一格红、
   brace-command-words-bare（命令词展开过的那几条直接 classify，不再切词剥包装）：「花括号写在包装上」一格红。
-  下面几个照 research/scripts/mutate.sh 文件头的写法（开关一行，下一行起写打开后红的自证项；用户 2026-10-01 定 C625 取这种）：
+  下面几个照 scripts/mutation/mutate.sh 文件头的写法（开关一行，下一行起写打开后红的自证项；用户 2026-10-01 定 C625 取这种）：
   LIB_HEAVY_TESTS_BREAK=posix-brackets-by-python-glob  带 `[:`、`[=`、`[.` 的词照旧交给 python glob（POSIX 字符类、等价类、整理符号认不出，零命中照字面判）
       cargo 那张表里「POSIX 字符类起 mutate.sh 跑 crates 整表」到「cd 到变量路径之后 POSIX 字符类起脚本照拒」七格、「POSIX 字符类起崩溃放量全量」、
       「bash 起不来时 POSIX 字符类起脚本照拒」与「造出来的登记表：POSIX 字符类起登记成 heavy 的自证」共十格红；
@@ -286,7 +286,7 @@ cargo mutants -d 指到别处的树。
   三格 / 「工具实现员单独跑 crash-amplification.sh --selftest」、它的 stdin 那一格与「实现员单独跑分项驱动的自证」三格（崩溃放量入口的 --selftest 不按登记表判、
   落到按名字算重型；原先红的「工具实现员单独跑 crash-amplification.sh --selftest：读进去几份脚本」不再红，按名字判不读正文了）。
   heavy-test-guard.sh --selftest 里对应的几格（文件头写在各格旁边）在上面这几个开关下同样红。
-  LIB_HEAVY_TESTS_BREAK=qemu-build-unnamed  research/scripts/build-patched-qemu.sh 不按名字算真编 QEMU（不带参数、--rebuild 的真编放过去）
+  LIB_HEAVY_TESTS_BREAK=qemu-build-unnamed  scripts/devices/build-patched-qemu.sh 不按名字算真编 QEMU（不带参数、--rebuild 的真编放过去）
       cargo 那张表里「真编 QEMU（build-patched-qemu.sh 不带参数）」到「capped.sh 与 bash -c 包着真编 QEMU」五格红；
       heavy-test-guard.sh --selftest 里「实现员真编 QEMU（--rebuild）：照拒」到「主 agent 不带前缀经内存包装真编 QEMU：照拒」四格红；
       已有的开关 commit-checks-ignored、selftest-registry-ignored 下「真编 QEMU 的 --selftest 照登记表放行」与 heavy-test-guard.sh --selftest 里
@@ -335,36 +335,36 @@ cargo mutants -d 指到别处的树。
   「红例重放 --verdict-library 的值碰巧叫 --check、照算重放」两格；verus-judges-by-working-subcommand「判法脚本第一个参数写成变量照算」一格。
 两档里的轻型（.claude/rules/verification.md「两档：轻型与重型」；类名不另起，轻型不算哪一类）：
   三条命令带 --quick 是轻型，谁都能跑（子 agent 带不带 SINGLEFS_HEAVY_TESTS 前缀都放行，主 agent 不带前缀也放行）：
-  research/scripts/crash-point-replay.sh --quick（崩溃点重放入口）、.claude/gate.d/checker-tier-formal-verification.sh --quick [<根>]、
+  scripts/crash/crash-point-replay.sh --quick（崩溃点重放入口）、.claude/gate.d/checker-tier-formal-verification.sh --quick [<根>]、
   .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick [<根>]；三条都可以再带 `--item <项>`（给几次取并集：核心部分加上点名的项）。
   认法（light_tier_command / light_tier_arguments）：先照 preflight 摘掉每一个整词 --force；剩下的只许 --quick、`--item <项>`（项字面写、不以 - 起头）与根参数
   （两道门禁至多一个、入口不带；字面写，或 $PWD / ${PWD} 起头）；夹了别的词（--full、--check、--expand-up-to、`--item=<项>`、写成变量的项或根、多出的根）的照重型算。
-  入口按名字与位置认：名字叫 crash-point-replay.sh、又落在 research/scripts 这一层（路径尾部；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，不读正文）；
+  入口按名字与位置认：名字叫 crash-point-replay.sh、又落在 scripts 这一层（路径尾部；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，不读正文）；
   别处的同名拷贝带 --quick 也照重型算（接受的误拒）。两道门禁按文件名认，与重型那一格同一种认法。
   重型照旧（kind crash-point-replay，类名「崩溃点重放」，只有主 agent 带前缀能跑）：入口不带参数（剪枝）、带 --item 不带 --quick（逐条）、带 --full（全量），
   与不是上面那种写法的每一种；只有摘掉 --force 之后恰好一个 --list-items 的（只列可点名的项）与登记表里的单独 --selftest 不算。两道门禁的重型照 STAGE_KIND。
-  轻型三条在 runs_compiled_code 里算跑编译出来的代码（里面起 checker 档的 cargo 与 Verus）：子 agent 要经 research/scripts/run-with-memory-cap.sh 起，
-  heavy-test-guard.sh 照拒不经它的；要卡的经 research/scripts/gpu-quiesce-run.sh -- 起，command_under_gpu_quiesce 剥掉它，里面那条照这张表判。
+  轻型三条在 runs_compiled_code 里算跑编译出来的代码（里面起 checker 档的 cargo 与 Verus）：子 agent 要经 scripts/hosts/run-with-memory-cap.sh 起，
+  heavy-test-guard.sh 照拒不经它的；要卡的经 scripts/crash/gpu-quiesce-run.sh -- 起，command_under_gpu_quiesce 剥掉它，里面那条照这张表判。
   罩不住的：环境变量改轻型的范围（SINGLEFS_GATE_FULL、GATE_MUTATION_START_OVER 这类设在 --quick 那一条上的，闸不看）；入口与两道门禁正文里 --quick 实际跑的是什么（闸不读正文，靠两道门禁的样本与入口的自证）。
-崩溃放量的三份入口（test-script-align-r3 攻方 A2；类名「崩溃放量」，kind crash-amplification）：research/scripts/crash-amplification.sh（不带参数是崩溃放量全量，
+崩溃放量的三份入口（test-script-align-r3 攻方 A2；类名「崩溃放量」，kind crash-amplification）：scripts/crash/crash-amplification.sh（不带参数是崩溃放量全量，
   --item 点名分项、--expand-up-to 缩过规模的同算）、crash-amplification-item.sh（分项驱动）、crash-amplification-two-hosts.sh（双机驱动），每一种跑法都经
   crash-amplification-lib.sh 起 checker 档 cargo test；正文里的 cargo 拼在 bash 数组里、分项驱动经变量起，读正文看不见，所以按名字判（CRASH_AMPLIFICATION_SCRIPTS：
   名字是这三个就算，路径不论；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，那几份不读正文）。不算的：crash-amplification.sh 带 --list-items 的（只列分项，不清场、不跑）；
   仓内那几份单独一个 --selftest 的照自证登记表判（三份都登记成 light，放行）。别处同名拷贝的 --selftest 不在登记表里，
   按这一类算（接受的误拒）。子 agent 一律不跑；主 agent 带 =commit 或 =user-request 都能跑。
-真编 QEMU（类名「真编 QEMU」，kind qemu-build）：research/scripts/build-patched-qemu.sh 取源码、在 ${TMPDIR:-/tmp} 下约 1 GiB 的编译目录里按给的线程数编 QEMU、
+真编 QEMU（类名「真编 QEMU」，kind qemu-build）：scripts/devices/build-patched-qemu.sh 取源码、在 ${TMPDIR:-/tmp} 下约 1 GiB 的编译目录里按给的线程数编 QEMU、
   装进私有目录。按名字判（QEMU_BUILD_SCRIPT：名字是它就算，路径不论；KNOWN_SCRIPT_LOCATIONS 登记了仓内位置，那一份不读正文）：不带参数、--rebuild、别的参数都算，
   包装（bash -c、capped.sh、run-with-memory-cap.sh、nice 这类）里面的同样算。不算的只有仓内那一份单独一个 --selftest（照自证登记表判，登记成 light，放行）；
   --selftest 带了别的参数的照旧算提交时才跑的检查，别处同名拷贝的 --selftest 不在登记表里、按这一类算（接受的误拒）。
   子 agent 一律不跑，只有主 agent 带前缀能跑（heavy-test-guard.sh 的 refusal_reason）。
-广谱变异的逐条驱动 research/scripts/broad-mutation.py（类名「广谱变异」，kind broad-mutation）：它逐条改坏 core / checker 的源码，每条起 cargo，整趟要几天。
+广谱变异的逐条驱动 scripts/mutation/broad-mutation.py（类名「广谱变异」，kind broad-mutation）：它逐条改坏 core / checker 的源码，每条起 cargo，整趟要几天。
   算的：凡要起 cargo 或改库目录的——整趟、--shard、--from、--package、--item 点名（点几条、带不带 --skip-stage-two 都算）、--stage-two-only、
   --sync-tree（换全局的版本指针）、--import-results（往本机结果表里导入）；参数只认整词，argparse 认的缩写（--sum、--list）与贴着写的（--item=1）照算，接受的误拒。
   不算的：带 --list-items、--summary、--check-ignored、--help、-h 之一的（只读：驱动走查询那一支就返回，--check-ignored 只扫这一版树里的源码与排除表、不起 cargo）；
   仓内位置上的 --selftest 照自证登记表判，
   改名拷贝、符号链接、python -c 起的 --selftest 不在表里，照旧算提交时才跑的检查。
-  认驱动的三种办法（broad_mutation_driver）：名字是 broad-mutation.py 又落在 research/scripts（当前目录与命令文本里设的 PYTHONPATH 各试一遍，
-  `python3 -m broad-mutation` 由切词交成这个名字）；命令词解到的文件的真实路径落在 research/scripts/broad-mutation.py（符号链接）；
+  认驱动的三种办法（broad_mutation_driver）：名字是 broad-mutation.py 又落在 scripts（当前目录与命令文本里设的 PYTHONPATH 各试一遍，
+  `python3 -m broad-mutation` 由切词交成这个名字）；命令词解到的文件的真实路径落在 scripts/mutation/broad-mutation.py（符号链接）；
   文件开头 BROAD_MUTATION_HEAD_BYTES 里有驱动的签名行（行首 `# broad-mutation-driver-signature:`，改名或拷走的一份）。
   `python3 -c '…'` 的代码里出现 broad-mutation.py、或 run_module(…broad-mutation…) 的照驱动算（参数取代码之后的词）；代码里只是读它的也照算，接受的误拒。
   它是 python 脚本，闸不读它的正文，只按这里的名字、位置、签名行与参数判。
@@ -373,16 +373,16 @@ cargo mutants -d 指到别处的树。
   子 agent 一律不跑；主 agent 带前缀能跑（提交时先 --sync-tree、再 --changed-since HEAD 起驱动，再跑那一道），放的是整类，不按参数再分。
   罩不住的：同一条命令里先 cp / ln -s 再起（判的那一刻文件还不在）；删掉签名行的拷贝；python 代码里拼出来的路径、subprocess 起的；
   `python3 - < 脚本` 与 heredoc 喂给 python 的代码；uv run、pypy 这类别的解释器；multi-host-run.sh --、xargs、find -exec、eval（对每一类重型都在的老口子）。
-切词那一份的弄坏开关（lib_shell_words.py；开关几个用逗号连）下这里的自检同样必须判红，照 research/scripts/mutate.sh 文件头的写法逐个写：开关一行，
+切词那一份的弄坏开关（lib_shell_words.py；开关几个用逗号连）下这里的自检同样必须判红，照 scripts/mutation/mutate.sh 文件头的写法逐个写：开关一行，
 下一行起写打开后红的格（格名是 selftest 里的说明，失败行「✗ lib_heavy_tests 自检：<格名> 应当是 <应得>，实际 <实得>」以它起头，括号里是那几格的应得与实得）：
   LIB_SHELL_WORDS_BREAK=arguments-as-executed  `python3 -` 后面的词、`bash -n` 的目标当被执行的脚本
       「python3 - 后面的门禁文件名是参数（门禁目录里跑）」「bash -n 只查门禁的语法」两格红（应当是 None，实际 commit-check-stage）
   LIB_SHELL_WORDS_BREAK=python-options-by-dash  python 带值选项的值被当成脚本名，`python3 -W ignore <驱动>`、`-X`、`-m`、`-c` 起的放过去
       「python3 -W ignore 起广谱变异」「python3 -X dev 起广谱变异」「python3 -BW default（合写、值另起一个词）起广谱变异」
-      「python3 --check-hash-based-pycs never 起广谱变异」「cd 进 research/scripts 再 python3 -m broad-mutation」「python3 -m research.scripts.broad-mutation（命名空间包）」
-      「python3 -m runpy broad-mutation」「PYTHONPATH 指到 research/scripts 再 python3 -m broad-mutation」「python3 -c runpy.run_path 起广谱变异」
+      「python3 --check-hash-based-pycs never 起广谱变异」「cd 进 scripts 再 python3 -m broad-mutation」「python3 -m research.scripts.broad-mutation（命名空间包）」
+      「python3 -m runpy broad-mutation」「PYTHONPATH 指到 scripts 再 python3 -m broad-mutation」「python3 -c runpy.run_path 起广谱变异」
       「python3 -c exec(open(驱动).read())」「python3 -c runpy.run_module 按模块名起」十一格（应当是 broad-mutation，实际 None）；
-      「PYTHONPATH 指到 research/scripts 再 python3 -m 起判法脚本跑必红世界」「export PYTHONPATH 再 python3 -m 起红例重放」「python3 -c runpy.run_path 起判法脚本跑必红世界」
+      「PYTHONPATH 指到 scripts 再 python3 -m 起判法脚本跑必红世界」「export PYTHONPATH 再 python3 -m 起红例重放」「python3 -c runpy.run_path 起判法脚本跑必红世界」
       「python3 -c 里改 sys.argv 成 proof、代码之后写 tool-versions」「python3 -c 里改 sys.argv 成 --replay、代码之后不写词」「python3 -c 里 __import__ 按模块名起判法脚本验证明」
       「python3 -c 里 importlib.import_module 起红例重放」「python3 -c 里 spec_from_file_location 载入判法脚本再调 run_check、代码之后写 toolchain」
       「python3 -c 的 print 包着 __import__ 起判法脚本」「python3 -c 的 print 包着 __import__、代码只有这一句」「python3 -c runpy.run_path 起红例钉表、代码之后写 --check」
@@ -429,7 +429,7 @@ KIND_CATEGORY = {
     "qemu-build": "真编 QEMU",
 }
 # 提交时才跑的检查（用户 2026-09-28 定「现在改到提交时候才验证的部分 都删掉」「门禁是靠 脚本和 hook来解决的」）：
-# 扫仓的门禁阶段、上游的几道 lint、样本自检与阶段结构判法、自证里起重活的与没登记的那几份，都归提交前主 agent 跑的 research/scripts/gate-staged.sh
+# 扫仓的门禁阶段、上游的几道 lint、样本自检与阶段结构判法、自证里起重活的与没登记的那几份，都归提交前主 agent 跑的 scripts/gate/gate-staged.sh
 COMMIT_CHECK_CATEGORY = "提交时才跑的检查"
 # commit-check-selftest：登记表记它起重活的自证；commit-check-selftest-unregistered：表外的、或带了 --selftest 之外参数的（拒绝说明另写怎么登记）
 UNREGISTERED_SELFTEST_KIND = "commit-check-selftest-unregistered"
@@ -442,9 +442,9 @@ COMMIT_CHECK_SOP_DIRECTORY = ".claude/singlefs-ai-sop/scripts"
 COMMIT_CHECK_SOP_SCRIPTS = frozenset({"doc-lint.sh", "gate-lint.sh", "shell-lint.sh", "preflight-lint.py", "gate-overlap.py", "rules-lint.sh",
                                       "hooks-registered.sh", "stage-selftest.sh"})
 # 这几个目录下的脚本带 --selftest 跑是跑它的自证；.claude/gate.d/lib/ 下的共用库直接执行就是跑自证，带不带 --selftest 都算。轻重按登记表判（classify_selftest）
-COMMIT_CHECK_SELFTEST_DIRECTORIES = ("research/scripts", ".claude/hooks", ".claude/gate.d/lib")
+COMMIT_CHECK_SELFTEST_DIRECTORIES = ("scripts", ".claude/hooks", ".claude/gate.d/lib")
 # 实验装置那一层（文件头「实验装置那一层」）：这个目录下正好一层的目录，登记了的单独 --selftest 才当自证
-DEVICE_SELFTEST_PARENT = "research/e7-index-bench/src/bin"
+DEVICE_SELFTEST_PARENT = "scripts/experiments"
 GATE_LIBRARY_DIRECTORY = ".claude/gate.d/lib"
 # 自证登记表：一行 `<相对仓根的路径><制表符><判定><制表符># <理由>`，写法在表头。放在这份文件旁边；自证换成样本表时改这个变量
 SELFTEST_REGISTRY_NAME = "selftest-registry.tsv"
@@ -483,20 +483,20 @@ STAGE_KIND_BY_NUMBER = {"54": "layer0-stage", "55": "qemu-stage", "57": "herd7-s
 # 按名字判的仓内脚本：名字 → 它在仓里的位置。命令词是这个名字、又落在这个位置上，judged_by_name 为真
 KNOWN_SCRIPT_LOCATIONS = {
     "gate.sh": ".claude/scripts/gate.sh", "check.sh": ".claude/scripts/check.sh", "lkmm.sh": ".claude/scripts/lkmm.sh",
-    "gate-staged.sh": "research/scripts/gate-staged.sh", "mutate.sh": "research/scripts/mutate.sh",
-    "vm-bench.sh": "research/scripts/vm-bench.sh", "e152-run.sh": "research/scripts/e152-run.sh",
-    "capped.sh": "research/scripts/capped.sh", "run-with-memory-cap.sh": "research/scripts/run-with-memory-cap.sh",
-    "layer0-shard-run.sh": "research/scripts/layer0-shard-run.sh", "mutation-shard-run.sh": "research/scripts/mutation-shard-run.sh",
-    "broad-mutation.py": "research/scripts/broad-mutation.py",
-    "crash-amplification.sh": "research/scripts/crash-amplification.sh", "crash-amplification-item.sh": "research/scripts/crash-amplification-item.sh",
-    "crash-amplification-two-hosts.sh": "research/scripts/crash-amplification-two-hosts.sh",
-    "build-patched-qemu.sh": "research/scripts/build-patched-qemu.sh",
-    "crash-point-replay.sh": "research/scripts/crash-point-replay.sh",
+    "gate-staged.sh": "scripts/gate/gate-staged.sh", "mutate.sh": "scripts/mutation/mutate.sh",
+    "vm-bench.sh": "scripts/devices/vm-bench.sh", "e152-run.sh": "scripts/devices/e152-run.sh",
+    "capped.sh": "scripts/hosts/capped.sh", "run-with-memory-cap.sh": "scripts/hosts/run-with-memory-cap.sh",
+    "layer0-shard-run.sh": "scripts/crash/layer0-shard-run.sh", "mutation-shard-run.sh": "scripts/mutation/mutation-shard-run.sh",
+    "broad-mutation.py": "scripts/mutation/broad-mutation.py",
+    "crash-amplification.sh": "scripts/crash/crash-amplification.sh", "crash-amplification-item.sh": "scripts/crash/crash-amplification-item.sh",
+    "crash-amplification-two-hosts.sh": "scripts/crash/crash-amplification-two-hosts.sh",
+    "build-patched-qemu.sh": "scripts/devices/build-patched-qemu.sh",
+    "crash-point-replay.sh": "scripts/crash/crash-point-replay.sh",
     STAGE_SELFTEST_SCRIPT: ".claude/singlefs-ai-sop/scripts/stage-selftest.sh",
 }
-# 广谱变异的逐条驱动（research/scripts/broad-mutation.py）：带这几个参数之一的只读（列项、汇总、帮助），不起 cargo、不改库目录
+# 广谱变异的逐条驱动（scripts/mutation/broad-mutation.py）：带这几个参数之一的只读（列项、汇总、帮助），不起 cargo、不改库目录
 BROAD_MUTATION_SCRIPT_NAME = "broad-mutation.py"
-BROAD_MUTATION_SCRIPT_DIRECTORY = "research/scripts"
+BROAD_MUTATION_SCRIPT_DIRECTORY = "scripts"
 BROAD_MUTATION_QUERY_ARGUMENTS = frozenset({"--list-items", "--summary", "--check-ignored", "--help", "-h"})
 # 弄坏开关 broad-mutation-first-round-exemptions 下多放过去的（第一版的分类）：--sync-tree 当查询、「--item 加 --skip-stage-two」不算
 BROAD_MUTATION_FIRST_ROUND_QUERY_ARGUMENTS = BROAD_MUTATION_QUERY_ARGUMENTS | {"--sync-tree"}
@@ -506,7 +506,7 @@ BROAD_MUTATION_HEAD_BYTES = 4096
 # python -c 的代码里点到驱动：文件名，或 runpy.run_module 按模块名起它
 BROAD_MUTATION_CODE_REFERENCE = re.compile(r"broad-mutation\.py|run_module\s*\([^)]*broad-mutation")
 # Verus 那一道（checker-tier-formal-verification.sh）的两份判法脚本：直接起时干活的用法算 verus-stage（verus_judge_use）
-VERUS_JUDGE_DIRECTORY = "research/scripts"
+VERUS_JUDGE_DIRECTORY = "scripts"
 VERUS_PROOF_CHECK_SCRIPT = "verus-proof-check.py"
 # 它文件头「用法」里起 Verus 的三个子命令（main 只认第一个参数）；只在弄坏开关 verus-judges-by-working-subcommand 下当判据用
 VERUS_PROOF_CHECK_WORKING_SUBCOMMANDS = frozenset({"proof", "vacuity", "must-red-worlds"})
@@ -536,13 +536,13 @@ E165_PIN_LIGHT_MODES = frozenset({"append", "check", "backfill", "list-items"})
 # 参数里没展开的词展开成这几个之一时，这个词不在了（空词不成参数，--force 由它开头的 preflight 摘掉），后面的词往前挪一位
 E165_PIN_VANISHING_WORDS = ("", "--force")
 E165_PIN_READING_LIMIT = 6   # 可能不在了的没展开的词最多几处（每处两种读法，2^6 种）；超过的判不出
-# research/scripts/prove-red.sh：带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request 起时照跑点名行里重型的那几行（它从 python 里起 cargo，闸看不见）
+# scripts/mutation/prove-red.sh：带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request 起时照跑点名行里重型的那几行（它从 python 里起 cargo，闸看不见）
 PROVE_RED_SCRIPT = "prove-red.sh"
 PROVE_RED_OPTIONS_WITH_VALUE = ("--copy", "--memory")
 HEAVY_TESTS_OCCASION_VARIABLE = "SINGLEFS_HEAVY_TESTS"
 HEAVY_TESTS_OCCASIONS = frozenset({"commit", "user-request"})
 # prove-red 与门禁 checker-tier-crates-mutation-replay 切表用的那一份（read_table），按这份文件所在仓的路径载入
-MUTATION_ROWS_MODULE = os.path.join("research", "scripts", "crates-mutation-rows.py")
+MUTATION_ROWS_MODULE = os.path.join("scripts", "mutation", "crates-mutation-rows.py")
 MUTATION_TABLE = os.path.join("crates", "mutations.tsv")
 # 命令词里没展开的变量名（`$b`、`${b}`、`${b:-x}`）；往它的定义里找 checker 档测试目标名时最多往下点几层
 UNEXPANDED_VARIABLE_NAME = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)")
@@ -693,15 +693,15 @@ CRASH_AMPLIFICATION_QUERY_ARGUMENTS = frozenset({"--list-items"})
 QEMU_BUILD_SCRIPT = "build-patched-qemu.sh"
 # 两档里的轻型（文件头「两档里的轻型」）：崩溃点重放入口与两道门禁带 --quick（可带 --item <项>）是轻型，不算哪一类；别的写法照重型算
 CRASH_POINT_REPLAY_SCRIPT = "crash-point-replay.sh"
-CRASH_POINT_REPLAY_DIRECTORY = "research/scripts"
+CRASH_POINT_REPLAY_DIRECTORY = "scripts"
 CRASH_POINT_REPLAY_QUERY_ARGUMENTS = ["--list-items"]   # 只列可点名的项（摘掉 --force 之后恰好这一个词）
 LIGHT_TIER_OPTION = "--quick"
 LIGHT_TIER_ITEM_OPTION = "--item"
 LIGHT_TIER_STAGES = frozenset({"checker-tier-formal-verification.sh", "checker-tier-crates-mutation-replay.sh"})
 LIGHT_TIER_UNRESOLVED_CHARACTERS = set("$`")
-# research/scripts/gpu-quiesce-run.sh -- <命令…>：清场之后原样起那条命令（command_under_gpu_quiesce 剥掉它）
+# scripts/crash/gpu-quiesce-run.sh -- <命令…>：清场之后原样起那条命令（command_under_gpu_quiesce 剥掉它）
 GPU_QUIESCE_SCRIPT = "gpu-quiesce-run.sh"
-GPU_QUIESCE_DIRECTORY = "research/scripts"
+GPU_QUIESCE_DIRECTORY = "scripts"
 # 花括号展开与参数里的通配（classify 先照 bash 展开，文件头「花括号与参数里的通配」）：一个词最多展开成这么多份，超出的不判
 WORD_EXPANSION_LIMIT = 1024
 # 展开出来的命令再切一遍、再判时又带花括号或通配的（文件名里本身带这几个字符），最多再套这么多层
@@ -1097,7 +1097,7 @@ def light_tier_arguments(arguments, roots_allowed):
 
 def light_tier_command(words, directory):
     """一条剥掉前缀与包装的命令是不是轻型三条之一（文件头「两档里的轻型」）：是就交一句说明，不是交 None。
-    两道门禁按文件名认（gate_stage_name，同重型那一格），参数照 light_tier_arguments、至多一个根参数；崩溃点重放入口要名字是它、又落在 research/scripts 这一层
+    两道门禁按文件名认（gate_stage_name，同重型那一格），参数照 light_tier_arguments、至多一个根参数；崩溃点重放入口要名字是它、又落在 scripts 这一层
     （located_in；别处的同名拷贝不算轻型），参数照 light_tier_arguments、不带根参数。弄坏开关 light-tier-unrecognized 下一律交 None。"""
     if break_is_set("light-tier-unrecognized") or not words:
         return None
@@ -1134,7 +1134,7 @@ def classify_gate_stage(stage, arguments):
         return heavy_test(kind, f"门禁 {stage}")
     if "--write" in arguments or break_is_set("commit-checks-ignored"):
         return None
-    return heavy_test("commit-check-stage", f"门禁阶段 {stage}（扫仓的门禁归提交前主 agent 跑的 research/scripts/gate-staged.sh）")
+    return heavy_test("commit-check-stage", f"门禁阶段 {stage}（扫仓的门禁归提交前主 agent 跑的 scripts/gate/gate-staged.sh）")
 
 
 def classify_commit_check(name, word, arguments, directory, environment=None):
@@ -1154,8 +1154,8 @@ def classify_commit_check(name, word, arguments, directory, environment=None):
                                                    "单跑一道带假工具标记的样本：cd 进样本根、根参数写同一个目录直接起那一道，登记表 .claude/hooks/selftest-registry.tsv；"
                                                    "样本与暂存区不同的：改完的样本先交主 agent 暂存，或喂一份与暂存区相同的样本）")
         return heavy_test("commit-check-lint", f"{COMMIT_CHECK_SOP_DIRECTORY}/{name}")
-    if name == "gate-structure-check.py" and located_in(word, directory, "research/scripts"):
-        return heavy_test("commit-check-structure", "research/scripts/gate-structure-check.py（门禁阶段的结构）")
+    if name == "gate-structure-check.py" and located_in(word, directory, "scripts"):
+        return heavy_test("commit-check-structure", "scripts/gate/gate-structure-check.py（门禁阶段的结构）")
     return None
 
 
@@ -1766,7 +1766,7 @@ def assignments_of_environment_property(value):
     return []
 
 
-# research/scripts/detached-run.sh start [--wall-clock <within-2h|over-2h>] [--label <名>] [--log <文件>] [--stop-timeout <秒>] -- <命令…>：把那条命令挂到用户级 systemd 的服务单元下跑，
+# scripts/hosts/detached-run.sh start [--wall-clock <within-2h|over-2h>] [--label <名>] [--log <文件>] [--stop-timeout <秒>] -- <命令…>：把那条命令挂到用户级 systemd 的服务单元下跑，
 # 调用方的 SINGLEFS_HEAVY_TESTS 与当前目录带进去；它的 preflight 摘掉每一个 --force（连 `--` 之后的），切参数时照摘，判的就是单元里真跑的那条。
 # 没有 `--`、带认不出的选项的，它按用法错拒、什么都不跑。
 # 认脚本与切参数都在 lib_shell_words（detached_run_script、detached_run_start_command），bash-command-detector.sh 用同一份
@@ -1785,7 +1785,7 @@ def command_under_detached_run(words, directory=None, recognized=False):
 
 
 def command_under_gpu_quiesce(words, directory=None):
-    """words[0] 是 research/scripts 这一层的 gpu-quiesce-run.sh（名字与位置，located_in；别处的同名拷贝不剥）而参数照它开头的 preflight 摘掉每一个 --force 之后
+    """words[0] 是 scripts 这一层的 gpu-quiesce-run.sh（名字与位置，located_in；别处的同名拷贝不剥）而参数照它开头的 preflight 摘掉每一个 --force 之后
     是 `-- <命令…>` 时交回 (<命令…> 的词, None)：当前目录与环境照外面那一条；--selftest、没写 `--` 的交 None。弄坏开关 gpu-quiesce-opaque 下一律交 None。"""
     if break_is_set("gpu-quiesce-opaque") or not words or os.path.basename(words[0]) != GPU_QUIESCE_SCRIPT:
         return None
@@ -1803,8 +1803,8 @@ def command_under_launcher(words, directory=None):
     选项词怎么切见 launcher_option；LAUNCHER_ENVIRONMENT_OPTIONS 里的选项（systemd-run 的 -E / --setenv、strace 的 -E / --env）设的 NAME=VALUE，
     与 systemd-run -p / --property 的 Environment= / EnvironmentFile= 设的（assignments_of_environment_property）写在交回那条命令的最前面。
     flock 的 -c <字符串> 交回成 sh -c <字符串>。rustup 只认 rustup run，perf 只认 stat / record / trace 与 <组> record。
-    research/scripts/detached-run.sh 的 start 照 command_under_detached_run 剥（directory 是 words 的当前目录，认改名拷贝与符号链接时解相对路径用）。
-    research/scripts/gpu-quiesce-run.sh 不在这里剥（command_under_gpu_quiesce，调用方另试）。"""
+    scripts/hosts/detached-run.sh 的 start 照 command_under_detached_run 剥（directory 是 words 的当前目录，认改名拷贝与符号链接时解相对路径用）。
+    scripts/crash/gpu-quiesce-run.sh 不在这里剥（command_under_gpu_quiesce，调用方另试）。"""
     detached = command_under_detached_run(words, directory)
     if detached is not None:
         return detached
@@ -1855,7 +1855,7 @@ SHARD_DRIVER_REGISTRATION = os.path.join(".claude", "gate.d", "stage-inputs.tsv"
 
 
 def shard_driver_runs_checker_tier(arguments, directory):
-    """research/scripts/layer0-shard-run.sh 的参数（`<键> <树根>` 或 `--merged-log <键> <树根> …`）：按它开跑要读的那一行登记判这一趟跑不跑 checker 档
+    """scripts/crash/layer0-shard-run.sh 的参数（`<键> <树根>` 或 `--merged-log <键> <树根> …`）：按它开跑要读的那一行登记判这一趟跑不跑 checker 档
     （树根的 .claude/gate.d/stage-inputs.tsv 里键那一行，与驱动脚本同一处、同一个键）。
     True：登记的包是 checker 档包、带 shard=across-machines；False：登记的是别的包（驱动自检在临时仓里登记的替身用例），或树根里没有这一行、
     没登记 shard=across-machines（驱动开跑就拒，什么都不跑）；None：参数形态认不出、键不是字面写的、树根解不出或那份登记读不了（调用方照重型算）。"""
@@ -1997,7 +1997,7 @@ def e165_pin_mode(arguments):
 
 
 def prove_red_use(arguments, directory, environment=None):
-    """research/scripts/prove-red.sh 这一趟会不会起重型的行（它在 python 里逐行起 cargo test，闸看不见）：会就交那一类，不会交 None。
+    """scripts/mutation/prove-red.sh 这一趟会不会起重型的行（它在 python 里逐行起 cargo test，闸看不见）：会就交那一类，不会交 None。
     只在命令文本给它设了 SINGLEFS_HEAVY_TESTS=commit 或 =user-request 时才会（没设时它把重型的行逐行报本次未跑、那几行一条都不起）。
     设了就照它的切法（先照开头的 preflight 摘掉每一个 --force，再取 --copy / --memory，剩下 <crate> <变异名…>）取副本与变异名，
     照 crates-mutation-rows.py 的 read_table 读副本里的 crates/mutations.tsv（同名取最后一行），点名的每一行的 cargo test <参数> 照 classify 判
@@ -2017,7 +2017,7 @@ def prove_red_use(arguments, directory, environment=None):
         arguments = arguments[2:]
     if copy is None or len(arguments) < 2:
         return None
-    unreadable = f"research/scripts/prove-red.sh 带 {HEAVY_TESTS_OCCASION_VARIABLE}={occasion} 起（照跑点名行里 checker 档的那几行）"
+    unreadable = f"scripts/mutation/prove-red.sh 带 {HEAVY_TESTS_OCCASION_VARIABLE}={occasion} 起（照跑点名行里 checker 档的那几行）"
     if any(unexpanded_word_pattern(word) is not None for word in [copy, *arguments[1:]]):
         return heavy_test("checker-tier-cargo", f"{unreadable}：副本或变异名里有没展开的词，执行前判不出点名的是哪几行，照 checker 档算")
     copy_root = shell_words.resolve_path(directory, os.path.expanduser(copy))
@@ -2038,7 +2038,7 @@ def prove_red_use(arguments, directory, environment=None):
             continue   # 它整次拒绝、一条都不起；别的点名行照判
         found = classify(["cargo", "test", *row.arguments.split()], copy_root)
         if found is not None:
-            return heavy_test(found.kind, f"research/scripts/prove-red.sh 带 {HEAVY_TESTS_OCCASION_VARIABLE}={occasion} 起，点名的 {name} 那一行"
+            return heavy_test(found.kind, f"scripts/mutation/prove-red.sh 带 {HEAVY_TESTS_OCCASION_VARIABLE}={occasion} 起，点名的 {name} 那一行"
                                           f"（cargo test {row.arguments}）属于「{found.category}」：{found.detail}")
     return None
 
@@ -2047,7 +2047,7 @@ MUTATION_ROWS_CACHE = {}
 
 
 def load_mutation_rows_module():
-    """这份文件所在仓的 research/scripts/crates-mutation-rows.py（按路径载入，一个进程里只载一次）。"""
+    """这份文件所在仓的 scripts/mutation/crates-mutation-rows.py（按路径载入，一个进程里只载一次）。"""
     path = os.path.join(HOOK_REPOSITORY, MUTATION_ROWS_MODULE)
     if path not in MUTATION_ROWS_CACHE:
         specification = importlib.util.spec_from_file_location("crates_mutation_rows_for_lib_heavy_tests", path)
@@ -2111,7 +2111,7 @@ def unexpanded_command_word_use(words, directory, environment=None, definitions=
 
 def verus_judge_script(word, directory, environment=None):
     """命令词是不是 Verus 那一道的两份判法脚本之一：是就交 (脚本名, 凭什么认出来的)，不是交 None。认法照 broad_mutation_driver：
-    名字与位置（当前目录与命令文本里设的 PYTHONPATH 各试一遍）、解到的文件的真实路径落在 research/scripts/<那一份>（符号链接；读盘，文件不在就认不出）。"""
+    名字与位置（当前目录与命令文本里设的 PYTHONPATH 各试一遍）、解到的文件的真实路径落在 scripts/<那一份>（符号链接；读盘，文件不在就认不出）。"""
     expanded = os.path.expanduser(word)
     bases = [directory]
     for entry in ((environment or {}).get("PYTHONPATH") or "").split(os.pathsep):
@@ -2159,9 +2159,9 @@ def verus_judge_use(name, word, arguments, directory, environment=None):
         if not located_in(word, directory, VERUS_JUDGE_DIRECTORY):
             return None
         if name == VERUS_PROOF_CHECK_SCRIPT and arguments[:1] and arguments[0] in VERUS_PROOF_CHECK_WORKING_SUBCOMMANDS:
-            return heavy_test("verus-stage", f"research/scripts/{name} {arguments[0]}（门禁 checker-tier-formal-verification 那一格的判法，逐处起 Verus）")
+            return heavy_test("verus-stage", f"scripts/{name} {arguments[0]}（门禁 checker-tier-formal-verification 那一格的判法，逐处起 Verus）")
         if name == E165_PIN_SCRIPT and e165_pin_mode(arguments) == "replay":
-            return heavy_test("verus-stage", f"research/scripts/{name} --replay（门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格：编 checker 档装置、逐行重放）")
+            return heavy_test("verus-stage", f"scripts/{name} --replay（门禁 checker-tier-formal-verification 的 pinned-red-examples-replay 格：编 checker 档装置、逐行重放）")
         return None
     found = verus_judge_script(word, directory, environment)
     if found is None:
@@ -2458,7 +2458,7 @@ def classify(words, directory, environment=None, expand_patterns=True):
     if name.startswith("qemu-system"):
         return heavy_test("qemu-system", name)
     if name == "vm-bench.sh":
-        return heavy_test("vm-bench", "research/scripts/vm-bench.sh（--selftest 也起虚机）")
+        return heavy_test("vm-bench", "scripts/devices/vm-bench.sh（--selftest 也起虚机）")
     if not break_is_set("commit-checks-ignored"):
         is_selftest, selftest_use = classify_selftest(words[0], arguments, directory, environment)
         if is_selftest:
@@ -2479,43 +2479,43 @@ def classify(words, directory, environment=None, expand_patterns=True):
         for argument in arguments:
             resolved = shell_words.resolve_path(directory, argument) or argument
             if argument.endswith("crates/mutations.tsv") or resolved.endswith("/crates/mutations.tsv"):
-                return heavy_test("crates-mutation-mutate", "research/scripts/mutate.sh 跑 crates/mutations.tsv 整表")
+                return heavy_test("crates-mutation-mutate", "scripts/mutation/mutate.sh 跑 crates/mutations.tsv 整表")
         return None
     if name == CRASH_POINT_REPLAY_SCRIPT and not break_is_set("crash-point-replay-unnamed"):
         if [argument for argument in arguments if argument != "--force"] == CRASH_POINT_REPLAY_QUERY_ARGUMENTS:
             return None   # 只列可点名的项
         if light_tier_command(words, directory) is not None:
             return None   # 轻型（文件头「两档里的轻型」）
-        return heavy_test("crash-point-replay", f"research/scripts/{name} {' '.join(arguments[:4])}（崩溃点重放的重型：不带参数是剪枝、--item 是逐条、--full 是全量，"
+        return heavy_test("crash-point-replay", f"scripts/{name} {' '.join(arguments[:4])}（崩溃点重放的重型：不带参数是剪枝、--item 是逐条、--full 是全量，"
                                                 "只有仓内那一份带 --quick（可加 --item <项>）的轻型、单独的 --list-items 与登记表里的单独 --selftest 不算）")
     if name in CRASH_AMPLIFICATION_SCRIPTS and not break_is_set("crash-amplification-unnamed"):
         if name == CRASH_AMPLIFICATION_LISTING_SCRIPT and CRASH_AMPLIFICATION_QUERY_ARGUMENTS.intersection(arguments):
             return None   # 只列分项，不清场、不跑
-        return heavy_test("crash-amplification", f"research/scripts/{name}（崩溃放量：每一项经 crash-amplification-lib.sh 起 checker 档 cargo test；"
+        return heavy_test("crash-amplification", f"scripts/{name}（崩溃放量：每一项经 crash-amplification-lib.sh 起 checker 档 cargo test；"
                                                  "只有 crash-amplification.sh --list-items 与登记表里的单独 --selftest 不算）")
     if name == PROVE_RED_SCRIPT:
         proving = prove_red_use(arguments, directory, environment)
         if proving is not None:
             return proving
     if name == QEMU_BUILD_SCRIPT and not break_is_set("qemu-build-unnamed"):
-        return heavy_test("qemu-build", "research/scripts/build-patched-qemu.sh（真编 QEMU：取源码、在 TMPDIR 下约 1 GiB 的编译目录里按给的线程数编、装进私有目录；"
+        return heavy_test("qemu-build", "scripts/devices/build-patched-qemu.sh（真编 QEMU：取源码、在 TMPDIR 下约 1 GiB 的编译目录里按给的线程数编、装进私有目录；"
                                         "只有登记表里的单独 --selftest 不算）")
     if name == "check.sh":
         return heavy_test("check-sh", "check.sh（里面是全量 cargo test）")
     if name == "gate.sh":
         return heavy_test("gate-sh", " ".join(["gate.sh", *arguments]))
     if name == "gate-staged.sh":
-        return None if "--selftest" in arguments else heavy_test("gate-staged", "research/scripts/gate-staged.sh（跑 gate.sh --staged）")
+        return None if "--selftest" in arguments else heavy_test("gate-staged", "scripts/gate/gate-staged.sh（跑 gate.sh --staged）")
     if name == "layer0-shard-run.sh":
         if "--selftest" in arguments or (not break_is_set("shard-driver-by-name") and shard_driver_runs_checker_tier(arguments, directory) is False):
             return None
         return heavy_test(
-            "checker-tier-cargo", "research/scripts/layer0-shard-run.sh（两台各跑一片 checker 档登记的崩溃枚举用例、带 --include-ignored，再本机 merge）")
+            "checker-tier-cargo", "scripts/crash/layer0-shard-run.sh（两台各跑一片 checker 档登记的崩溃枚举用例、带 --include-ignored，再本机 merge）")
     if name == "crates-mutation-rows.py" and "--item" in arguments:
-        return heavy_test("crates-mutation-stage", "research/scripts/crates-mutation-rows.py --item（点名单跑几行 crates/mutations.tsv，交给门禁 checker-tier-crates-mutation-replay.sh --item）")
+        return heavy_test("crates-mutation-stage", "scripts/mutation/crates-mutation-rows.py --item（点名单跑几行 crates/mutations.tsv，交给门禁 checker-tier-crates-mutation-replay.sh --item）")
     if name == "mutation-shard-run.sh":
         return None if "--selftest" in arguments else heavy_test(
-            "crates-mutation-stage", "research/scripts/mutation-shard-run.sh（门禁 checker-tier-crates-mutation-replay.sh 的双机分片驱动：两台各跑一趟那一道、判 crates/mutations.tsv 的一部分）")
+            "crates-mutation-stage", "scripts/mutation/mutation-shard-run.sh（门禁 checker-tier-crates-mutation-replay.sh 的双机分片驱动：两台各跑一趟那一道、判 crates/mutations.tsv 的一部分）")
     if not break_is_set("broad-mutation-ignored"):
         driver = broad_mutation_driver(words[0], directory, environment)
         if driver is not None:
@@ -2580,7 +2580,7 @@ def build_sample_workspace(work):
         with open(path, "w", encoding="utf-8") as handle:
             handle.write(text)
     write("Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["crates/singlefs-core", "crates/singlefs-harness", "crates/singlefs-checker", "crates/singlefs-checker-tier"]\n'
-                        'exclude = ["research"]\n')
+                        'exclude = ["scripts/experiments"]\n')
     write("crates/singlefs-core/Cargo.toml", '[package]\nname = "singlefs-core"\nversion = "0.0.0"\n')
     write("crates/singlefs-core/tests/core_contract.rs", "")
     write("crates/singlefs-harness/Cargo.toml", '[package]\nname = "singlefs-harness"\nversion = "0.0.0"\n')
@@ -2595,8 +2595,8 @@ def build_sample_workspace(work):
     write("crates/singlefs-checker-tier/tests/checker_quick_stream.rs", "#[test]\nfn a_quick_case() {}\n")
     write("alias.env", '# 样本：systemd-run -p EnvironmentFile= 读的\nCARGO_ALIAS_XT="test -p singlefs-checker-tier"\n')
     write("plain.env", "# 样本\nRUST_BACKTRACE=1\n")
-    write("research/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["e7-index-bench"]\n')
-    write("research/e7-index-bench/Cargo.toml", '[package]\nname = "e7-index-bench"\nversion = "0.0.0"\n')
+    write("scripts/experiments/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["e7-index-bench"]\n')
+    write("scripts/experiments/Cargo.toml", '[package]\nname = "e7-index-bench"\nversion = "0.0.0"\n')
     write("mutants-sample/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["mutated", "other"]\n')
     write("mutants-sample/mutated/Cargo.toml", '[package]\nname = "mutated"\nversion = "0.0.0"\n')
     write("mutants-sample/other/Cargo.toml", '[package]\nname = "other"\nversion = "0.0.0"\n')
@@ -2605,31 +2605,31 @@ def build_sample_workspace(work):
     # 删掉签名行的拷贝（罩不住的那一种）、不相干的 python 脚本
     driver_sample = ("#!/usr/bin/env python3\n# admission: always 样本\n# run-condition: command python3\n"
                      "# broad-mutation-driver-signature: 样本（lib_heavy_tests 自检造的）\nprint('sample')\n")
-    write("research/scripts/broad-mutation.py", driver_sample)
-    write("research/scripts/renamed-driver-copy.py", driver_sample)
+    write("scripts/mutation/broad-mutation.py", driver_sample)
+    write("scripts/renamed-driver-copy.py", driver_sample)
     write("elsewhere/renamed-driver-copy.py", driver_sample)
     write("elsewhere/copy-without-signature.py", driver_sample.replace("# broad-mutation-driver-signature:", "# 签名行删掉了："))
     write("elsewhere/unrelated.py", "#!/usr/bin/env python3\nprint('broad-mutation-driver-signature: 不在行首的不算')\n")
     # detached-run.sh（样本只有文件头）：仓内位置上的一份、带签名行的改名拷贝（仓内、仓外）、指到仓内那一份的符号链接、删掉签名行的拷贝
     detached_sample = "#!/usr/bin/env bash\n# detached-run-script-signature: 样本（lib_heavy_tests 自检造的）\necho sample\n"
-    write("research/scripts/detached-run.sh", detached_sample)
-    write("research/scripts/dr-renamed.sh", detached_sample)
+    write("scripts/hosts/detached-run.sh", detached_sample)
+    write("scripts/dr-renamed.sh", detached_sample)
     write("elsewhere/dr-renamed.sh", detached_sample)
     write("elsewhere/dr-without-signature.sh", detached_sample.replace("# detached-run-script-signature:", "# 签名行删掉了："))
-    os.symlink(os.path.join(work, "research", "scripts", "detached-run.sh"), os.path.join(work, "elsewhere", "dr-link.sh"))
-    os.symlink("broad-mutation.py", os.path.join(work, "research", "scripts", "linked-driver.py"))
-    os.symlink(os.path.join(work, "research", "scripts", "broad-mutation.py"), os.path.join(work, "elsewhere", "linked-driver.py"))
+    os.symlink(os.path.join(work, "scripts", "hosts", "detached-run.sh"), os.path.join(work, "elsewhere", "dr-link.sh"))
+    os.symlink("broad-mutation.py", os.path.join(work, "scripts", "linked-driver.py"))
+    os.symlink(os.path.join(work, "scripts", "mutation", "broad-mutation.py"), os.path.join(work, "elsewhere", "linked-driver.py"))
     # Verus 那一道的两份判法脚本（样本只有文件头）：仓内位置上的各一份、仓外指到判法脚本的符号链接、仓内改名指到红例钉表的符号链接
-    write("research/scripts/verus-proof-check.py", "#!/usr/bin/env python3\n# 样本（lib_heavy_tests 自检造的）\nprint('sample')\n")
-    write("research/scripts/e165-pin-red-examples.py", "#!/usr/bin/env python3\n# 样本（lib_heavy_tests 自检造的）\nprint('sample')\n")
+    write("scripts/gate/verus-proof-check.py", "#!/usr/bin/env python3\n# 样本（lib_heavy_tests 自检造的）\nprint('sample')\n")
+    write("scripts/experiments/e165-pin-red-examples.py", "#!/usr/bin/env python3\n# 样本（lib_heavy_tests 自检造的）\nprint('sample')\n")
     # prove-red.sh 读的变异表：checker 档包一行、harness 档包一行、同名两行（取最后一行，是 harness 档的）
     write("crates/mutations.tsv", "# 样本（lib_heavy_tests 自检造的）\n"
           "tier-row\tcrates/singlefs-checker-tier/src/lib.rs\tjudge()\tjudge2()\t-p singlefs-checker-tier --lib -- judge\tjudge\n"
           "harness-row\tcrates/singlefs-harness/tests/overwrite_in_one_instance.rs\ta_daily_case\tb\t-p singlefs-harness --test overwrite_in_one_instance\ta_daily_case\n"
           "renamed-row\tcrates/singlefs-checker-tier/src/lib.rs\tjudge()\tjudge3()\t-p singlefs-checker-tier --lib -- judge\tjudge\n"
           "renamed-row\tcrates/singlefs-harness/tests/overwrite_in_one_instance.rs\ta_daily_case\tc\t-p singlefs-harness --test overwrite_in_one_instance\ta_daily_case\n")
-    os.symlink(os.path.join(work, "research", "scripts", "verus-proof-check.py"), os.path.join(work, "elsewhere", "linked-proof-check.py"))
-    os.symlink("e165-pin-red-examples.py", os.path.join(work, "research", "scripts", "linked-pin.py"))
+    os.symlink(os.path.join(work, "scripts", "gate", "verus-proof-check.py"), os.path.join(work, "elsewhere", "linked-proof-check.py"))
+    os.symlink("e165-pin-red-examples.py", os.path.join(work, "scripts", "linked-pin.py"))
     # 双机分片的驱动脚本读的登记表：驱动自检在临时仓里登记的那种（harness 档包的替身用例）、真跑的那种（checker 档包）、没登记分片的（驱动开跑就拒）
     # 门禁样本（文件头「门禁样本」）：这份文件所在仓里那几道阶段的原样拷贝（判「与登记的那一份相同」）、改过正文的 checker-tier-layer0-replay 拷贝、
     # 放了 .layer0-sample-tools 的样本根、没放标记的目录、crates 变异表那一道的样本根，与喂给 stage-selftest.sh 的四份阶段目录
@@ -2705,12 +2705,12 @@ def build_sample_workspace(work):
             write(f"{gate_directory}/.claude/gate.d/fixtures/doc-text.sh/{extra[0]}", extra[1])
     os.chmod(os.path.join(work, "gd-sample-mode", ".claude", "gate.d", "fixtures", "doc-text.sh", "red", "expect"), 0o755)
     # 自证登记表按真实路径认：别处树里路径尾部相同的拷贝（攻方 2026-10-01 的造法：正文起 checker 档）、仓副本里的同名拷贝、指到本仓那一份的符号链接
-    write("evil-tree/research/scripts/claim-experiment.sh", "#!/usr/bin/env bash\n# 改过的自证\ncargo test --release -p singlefs-checker-tier --lib --tests\n")
+    write("evil-tree/scripts/kb/claim-experiment.sh", "#!/usr/bin/env bash\n# 改过的自证\ncargo test --release -p singlefs-checker-tier --lib --tests\n")
     # 别处树里路径尾部相同的 stage-selftest.sh：不管 --item、--list-items，把每一道都喂
     write("evil-tree/.claude/singlefs-ai-sop/scripts/stage-selftest.sh", "#!/usr/bin/env bash\n# 样本：改过的 stage-selftest.sh，不认点名\n")
-    write("repository-copy/research/scripts/admission.py", "# 样本：仓副本里的同名拷贝\n")
-    os.makedirs(os.path.join(work, "linked-tree", "research", "scripts"))
-    os.symlink(os.path.join(HOOK_REPOSITORY, "research", "scripts", "admission.py"), os.path.join(work, "linked-tree", "research", "scripts", "admission.py"))
+    write("repository-copy/scripts/gate/admission.py", "# 样本：仓副本里的同名拷贝\n")
+    os.makedirs(os.path.join(work, "linked-tree", "scripts"))
+    os.symlink(os.path.join(HOOK_REPOSITORY, "scripts", "gate", "admission.py"), os.path.join(work, "linked-tree", "scripts", "gate", "admission.py"))
     # case 的模式行（攻方扫描脚本 light-selftest-scan.sh 那一行原样）：切词把模式切成一条命令
     write("case-pattern.sh", "#!/usr/bin/env bash\nkey=\"$1\"; root=\"$2\"\ncase \"$key\" in\n  .claude/gate.d/lib/*.py) cmd=(python3 \"$root/$key\") ;;\n"
                              "  *) cmd=(bash \"$root/$key\" --selftest) ;;\nesac\necho \"${cmd[@]}\"\n")
@@ -2725,32 +2725,32 @@ def build_sample_workspace(work):
 SAMPLE_INDEX_REFERENCE_NAME = "index-reference"
 SAMPLE_SELFTEST_REGISTRY = (
     "# 样本登记表（lib_heavy_tests 自证造的）\n"
-    "research/scripts/sample-light.sh\tlight\t# 样本：假驱动\n"
-    "research/scripts/sample-heavy.py\theavy\t# 样本：真编一个 crate\n"
-    "research/scripts/sample-conditional.sh\theavy-if-set:SAMPLE_REAL_TOOLS\t# 样本：设了变量换真家伙\n"
-    "research/scripts/sample-bad-weight.sh\tmedium\t# 样本：判定写坏了\n"
-    "research/scripts/sample-short-reason.sh\tlight\t# 短\n"
-    "research/scripts/sample-missing.sh\tlight\t# 样本：文件不在\n"
+    "scripts/sample-light.sh\tlight\t# 样本：假驱动\n"
+    "scripts/sample-heavy.py\theavy\t# 样本：真编一个 crate\n"
+    "scripts/sample-conditional.sh\theavy-if-set:SAMPLE_REAL_TOOLS\t# 样本：设了变量换真家伙\n"
+    "scripts/sample-bad-weight.sh\tmedium\t# 样本：判定写坏了\n"
+    "scripts/sample-short-reason.sh\tlight\t# 短\n"
+    "scripts/sample-missing.sh\tlight\t# 样本：文件不在\n"
     "elsewhere/sample-outside.sh\tlight\t# 样本：不在三处目录里\n"
-    "research/scripts/sample-light.sh\theavy\t# 样本：重复的一行\n"
+    "scripts/sample-light.sh\theavy\t# 样本：重复的一行\n"
     ".claude/gate.d/sample-stage.sh\tsamples-light-marker:.sample-tools\t# 样本：样本根放了假工具标记\n"
     ".claude/gate.d/sample-stage-wrong.sh\tlight\t# 样本：门禁阶段写成自证的判定\n"
     ".claude/gate.d/sample-stage-escape.sh\tsamples-light-marker:../outside\t# 样本：标记跳出样本根\n"
-    "research/scripts/sample-samples-misplaced.sh\tsamples-light\t# 样本：样本档的判定写在研究脚本上\n"
-    "research/e7-index-bench/src/bin/sample_device/sample_orchestrator.py\tlight\t# 样本：实验装置那一层的编排脚本，自证用假驱动\n"
-    "research/e7-index-bench/src/bin/sample_device/sample_heavy_orchestrator.py\theavy\t# 偏离上游：样本，实验装置那一层登记成 heavy\n"
-    "research/e7-index-bench/src/bin/sample_device/deeper/sample_too_deep.py\tlight\t# 样本：装置目录下面再深一层\n"
-    "research/e7-index-bench/src/bin/sample_top.py\tlight\t# 样本：直接放在 bin 下、不在哪个装置目录里\n")
+    "scripts/sample-samples-misplaced.sh\tsamples-light\t# 样本：样本档的判定写在研究脚本上\n"
+    "scripts/experiments/sample_device/sample_orchestrator.py\tlight\t# 样本：实验装置那一层的编排脚本，自证用假驱动\n"
+    "scripts/experiments/sample_device/sample_heavy_orchestrator.py\theavy\t# 偏离上游：样本，实验装置那一层登记成 heavy\n"
+    "scripts/experiments/sample_device/deeper/sample_too_deep.py\tlight\t# 样本：装置目录下面再深一层\n"
+    "scripts/experiments/sample_top.py\tlight\t# 样本：直接放在 bin 下、不在哪个装置目录里\n")
 # 样本表里该报出来的行（键）：判定认不出、理由太短、不在三处目录里、重复、文件不在
-SAMPLE_SELFTEST_REGISTRY_PROBLEM_KEYS = ["research/scripts/sample-bad-weight.sh", "research/scripts/sample-short-reason.sh", "elsewhere/sample-outside.sh",
-                                         "research/scripts/sample-light.sh", "research/scripts/sample-missing.sh", ".claude/gate.d/sample-stage-wrong.sh",
-                                         ".claude/gate.d/sample-stage-escape.sh", "research/scripts/sample-samples-misplaced.sh",
-                                         "research/e7-index-bench/src/bin/sample_device/deeper/sample_too_deep.py", "research/e7-index-bench/src/bin/sample_top.py"]
+SAMPLE_SELFTEST_REGISTRY_PROBLEM_KEYS = ["scripts/sample-bad-weight.sh", "scripts/sample-short-reason.sh", "elsewhere/sample-outside.sh",
+                                         "scripts/sample-light.sh", "scripts/sample-missing.sh", ".claude/gate.d/sample-stage-wrong.sh",
+                                         ".claude/gate.d/sample-stage-escape.sh", "scripts/sample-samples-misplaced.sh",
+                                         "scripts/experiments/sample_device/deeper/sample_too_deep.py", "scripts/experiments/sample_top.py"]
 # 样本登记表里实验装置那一层的那个装置目录（文件头「实验装置那一层」）
-SAMPLE_DEVICE_LAYER = "research/e7-index-bench/src/bin/sample_device/"
+SAMPLE_DEVICE_LAYER = "scripts/experiments/sample_device/"
 # 只含一行假 heavy 脚本的登记表：两份钩子自证里「登记为 heavy」的那几格拿它判（仓里登记的脚本自证都换成了假驱动，不拿真脚本当 heavy 样例）
 HEAVY_ONLY_REGISTRY_NAME = "heavy-only-selftest-registry.tsv"
-HEAVY_ONLY_SCRIPT = "research/scripts/sample-only-heavy.py"
+HEAVY_ONLY_SCRIPT = "scripts/sample-only-heavy.py"
 
 
 def build_heavy_only_registry(root):
@@ -2802,25 +2802,25 @@ def selftest_registry_cells(work, results):
     sample_registry = os.path.join(work, "sample-selftest-registry.tsv")
     with open(sample_registry, "w", encoding="utf-8") as handle:
         handle.write(SAMPLE_SELFTEST_REGISTRY)
-    for relative in ("research/scripts/sample-light.sh", "research/scripts/sample-heavy.py", "research/scripts/sample-conditional.sh",
-                     "research/scripts/sample-bad-weight.sh", "research/scripts/sample-short-reason.sh", "elsewhere/sample-outside.sh",
-                     ".claude/gate.d/sample-stage.sh", "elsewhere-tree/research/scripts/sample-light.sh",
+    for relative in ("scripts/sample-light.sh", "scripts/sample-heavy.py", "scripts/sample-conditional.sh",
+                     "scripts/sample-bad-weight.sh", "scripts/sample-short-reason.sh", "elsewhere/sample-outside.sh",
+                     ".claude/gate.d/sample-stage.sh", "elsewhere-tree/scripts/sample-light.sh",
                      *(SAMPLE_DEVICE_LAYER + name for name in ("sample_orchestrator.py", "sample_heavy_orchestrator.py", "deeper/sample_too_deep.py",
                                                                "sample_unregistered.py")),
-                     "research/e7-index-bench/src/bin/sample_top.py",
+                     "scripts/experiments/sample_top.py",
                      "elsewhere-tree/" + SAMPLE_DEVICE_LAYER + "sample_orchestrator.py"):
         os.makedirs(os.path.dirname(os.path.join(work, relative)), exist_ok=True)
         with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
             handle.write("# 样本\n")
     before = len(results)
     sample_cases = [
-        ("样本表：light 行单独 --selftest 放行", ["bash", "research/scripts/sample-light.sh", "--selftest"], None),
-        ("样本表：heavy 行算提交时才跑的检查", ["python3", "research/scripts/sample-heavy.py", "--selftest"], "commit-check-selftest"),
-        ("样本表：条件行没设变量算 light", ["bash", "research/scripts/sample-conditional.sh", "--selftest"], None),
-        ("样本表：设了变量的条件行算起重活", ["env", "SAMPLE_REAL_TOOLS=1", "bash", "research/scripts/sample-conditional.sh", "--selftest"], "commit-check-selftest"),
-        ("样本表：判定写坏的一行不算登记", ["bash", "research/scripts/sample-bad-weight.sh", "--selftest"], UNREGISTERED_SELFTEST_KIND),
-        ("样本表：理由太短的一行不算登记", ["bash", "research/scripts/sample-short-reason.sh", "--selftest"], UNREGISTERED_SELFTEST_KIND),
-        ("样本表：别的树里路径尾部相同的 light 脚本不算登记", ["bash", os.path.join(work, "elsewhere-tree", "research", "scripts", "sample-light.sh"), "--selftest"],
+        ("样本表：light 行单独 --selftest 放行", ["bash", "scripts/sample-light.sh", "--selftest"], None),
+        ("样本表：heavy 行算提交时才跑的检查", ["python3", "scripts/sample-heavy.py", "--selftest"], "commit-check-selftest"),
+        ("样本表：条件行没设变量算 light", ["bash", "scripts/sample-conditional.sh", "--selftest"], None),
+        ("样本表：设了变量的条件行算起重活", ["env", "SAMPLE_REAL_TOOLS=1", "bash", "scripts/sample-conditional.sh", "--selftest"], "commit-check-selftest"),
+        ("样本表：判定写坏的一行不算登记", ["bash", "scripts/sample-bad-weight.sh", "--selftest"], UNREGISTERED_SELFTEST_KIND),
+        ("样本表：理由太短的一行不算登记", ["bash", "scripts/sample-short-reason.sh", "--selftest"], UNREGISTERED_SELFTEST_KIND),
+        ("样本表：别的树里路径尾部相同的 light 脚本不算登记", ["bash", os.path.join(work, "elsewhere-tree", "scripts", "sample-light.sh"), "--selftest"],
          UNREGISTERED_SELFTEST_KIND),
     ]
     try:
@@ -2845,7 +2845,7 @@ def selftest_registry_cells(work, results):
         results.append(("样本表：别的树里装置那一层路径尾部相同的不当自证", (False, None),
                         classify_selftest(os.path.join(work, "elsewhere-tree", SAMPLE_DEVICE_LAYER + "sample_orchestrator.py"), ["--selftest"], work)))
         SELFTEST_REGISTRY_PATH = os.path.join(work, "no-such-registry.tsv")
-        found = classify_process(["bash", "research/scripts/sample-light.sh", "--selftest"], work)
+        found = classify_process(["bash", "scripts/sample-light.sh", "--selftest"], work)
         results.append(("登记表读不了：一律按表外拒", UNREGISTERED_SELFTEST_KIND, found[0].kind if found else None))
     finally:
         SELFTEST_REGISTRY_PATH, SELFTEST_REGISTRY_ROOT = real_registry, real_root
@@ -2948,30 +2948,30 @@ def selftest():
              work, "checker-tier-cargo"),
             # 按名字认的脚本与门禁阶段
             ("bash 起 checker-tier-layer0-replay", ["bash", ".claude/gate.d/checker-tier-layer0-replay.sh", "--full", "/tmp/wt"], work, "layer0-stage"),
-            ("bash 起双机分片的驱动脚本", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:sample", "/tmp/wt"], work, "checker-tier-cargo"),
-            ("双机分片的驱动脚本单独 --selftest：登记成没设 SINGLEFS_HEAVY_TESTS 时用假 cargo，放行", ["bash", "research/scripts/layer0-shard-run.sh", "--selftest"], repository, None),
+            ("bash 起双机分片的驱动脚本", ["bash", "scripts/crash/layer0-shard-run.sh", "crash-case:sample", "/tmp/wt"], work, "checker-tier-cargo"),
+            ("双机分片的驱动脚本单独 --selftest：登记成没设 SINGLEFS_HEAVY_TESTS 时用假 cargo，放行", ["bash", "scripts/crash/layer0-shard-run.sh", "--selftest"], repository, None),
             # 驱动按树根里键那一行判（shard_driver_runs_checker_tier）：驱动自检在临时仓里起的那几趟（登记的是 harness 档包）不重型，真跑（checker 档包、带 shard=across-machines）照算
-            ("驱动自检那样：树根里登记的分片用例是 harness 档包", ["bash", os.path.join(work, "research", "scripts", "layer0-shard-run.sh"), "crash-case:sharded-selftest", work],
+            ("驱动自检那样：树根里登记的分片用例是 harness 档包", ["bash", os.path.join(work, "scripts", "crash", "layer0-shard-run.sh"), "crash-case:sharded-selftest", work],
              "/", None),
-            ("驱动自检那样 --merged-log，树根相对当前目录写", ["bash", "research/scripts/layer0-shard-run.sh", "--merged-log", "crash-case:sharded-selftest", ".", "0123", "/tmp/m.log"],
+            ("驱动自检那样 --merged-log，树根相对当前目录写", ["bash", "scripts/crash/layer0-shard-run.sh", "--merged-log", "crash-case:sharded-selftest", ".", "0123", "/tmp/m.log"],
              work, None),
-            ("真跑没带前缀：树根里登记的分片用例是 checker 档包", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:sharded-checker", work], work, "checker-tier-cargo"),
-            ("真跑 --merged-log（checker-tier-layer0-replay 调的那一条）", ["bash", "research/scripts/layer0-shard-run.sh", "--merged-log", "crash-case:sharded-checker", work, "0123", "/tmp/m.log"],
+            ("真跑没带前缀：树根里登记的分片用例是 checker 档包", ["bash", "scripts/crash/layer0-shard-run.sh", "crash-case:sharded-checker", work], work, "checker-tier-cargo"),
+            ("真跑 --merged-log（checker-tier-layer0-replay 调的那一条）", ["bash", "scripts/crash/layer0-shard-run.sh", "--merged-log", "crash-case:sharded-checker", work, "0123", "/tmp/m.log"],
              work, "checker-tier-cargo"),
-            ("树根里这条没登记分片（驱动开跑就拒）", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:single-machine", work], work, None),
-            ("树根里没有这一行（驱动开跑就拒）", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:nowhere", work], work, None),
-            ("键是没展开的变量照算", ["bash", "research/scripts/layer0-shard-run.sh", "$case_key", work], work, "checker-tier-cargo"),
-            ("bash 起 checker-tier-crates-mutation-replay 的双机分片驱动", ["bash", "research/scripts/mutation-shard-run.sh", work], work, "crates-mutation-stage"),
-            ("checker-tier-crates-mutation-replay 的双机分片驱动经 nice 与绝对路径起", ["nice", "-n", "19", "bash", os.path.join(work, "research", "scripts", "mutation-shard-run.sh"), "/tmp/wt"], "/",
+            ("树根里这条没登记分片（驱动开跑就拒）", ["bash", "scripts/crash/layer0-shard-run.sh", "crash-case:single-machine", work], work, None),
+            ("树根里没有这一行（驱动开跑就拒）", ["bash", "scripts/crash/layer0-shard-run.sh", "crash-case:nowhere", work], work, None),
+            ("键是没展开的变量照算", ["bash", "scripts/crash/layer0-shard-run.sh", "$case_key", work], work, "checker-tier-cargo"),
+            ("bash 起 checker-tier-crates-mutation-replay 的双机分片驱动", ["bash", "scripts/mutation/mutation-shard-run.sh", work], work, "crates-mutation-stage"),
+            ("checker-tier-crates-mutation-replay 的双机分片驱动经 nice 与绝对路径起", ["nice", "-n", "19", "bash", os.path.join(work, "scripts", "mutation", "mutation-shard-run.sh"), "/tmp/wt"], "/",
              "crates-mutation-stage"),
-            ("checker-tier-crates-mutation-replay 的双机分片驱动单独 --selftest：登记成假 cargo，放行", ["bash", "research/scripts/mutation-shard-run.sh", "--selftest"], repository, None),
-            ("crates-mutation-rows.py --item 点名单跑一行：与那一道同一类", ["python3", "research/scripts/crates-mutation-rows.py", "--item", "5", work], work, "crates-mutation-stage"),
-            ("crates-mutation-rows.py plan：只读，放行", ["python3", "research/scripts/crates-mutation-rows.py", "plan", work], work, None),
-            ("crates-mutation-rows.py --list-items：只列，放行", ["python3", "research/scripts/crates-mutation-rows.py", "--list-items", work], work, None),
-            ("cargo run E152", ["cargo", "run", "--release", "--bin", "e152-file-system-benchmark"], os.path.join(work, "research"), "e152"),
+            ("checker-tier-crates-mutation-replay 的双机分片驱动单独 --selftest：登记成假 cargo，放行", ["bash", "scripts/mutation/mutation-shard-run.sh", "--selftest"], repository, None),
+            ("crates-mutation-rows.py --item 点名单跑一行：与那一道同一类", ["python3", "scripts/mutation/crates-mutation-rows.py", "--item", "5", work], work, "crates-mutation-stage"),
+            ("crates-mutation-rows.py plan：只读，放行", ["python3", "scripts/mutation/crates-mutation-rows.py", "plan", work], work, None),
+            ("crates-mutation-rows.py --list-items：只列，放行", ["python3", "scripts/mutation/crates-mutation-rows.py", "--list-items", work], work, None),
+            ("cargo run E152", ["cargo", "run", "--release", "--bin", "e152-file-system-benchmark"], os.path.join(work, "scripts", "experiments"), "e152"),
             # 广谱变异的逐条驱动按名字与参数认（开关 broad-mutation-ignored 下算的各格红）
             ("广谱变异整趟跑", ["python3", driver], work, "broad-mutation"),
-            ("广谱变异经 nice 与绝对路径、按分片跑", ["nice", "-n", "19", "python3", os.path.join(work, "research", "scripts", "broad-mutation.py"), "--shard", "0/2"], "/",
+            ("广谱变异经 nice 与绝对路径、按分片跑", ["nice", "-n", "19", "python3", os.path.join(work, "scripts", "mutation", "broad-mutation.py"), "--shard", "0/2"], "/",
              "broad-mutation"),
             ("广谱变异点名但两段都跑", ["python3", driver, "--item", "12"], work, "broad-mutation"),
             ("广谱变异只补第二段", ["python3", driver, "--stage-two-only"], work, "broad-mutation"),
@@ -3001,7 +3001,7 @@ def selftest():
             ("广谱变异单独 --selftest：登记成假一步驱动，放行（不落到按驱动判的 --selftest 那一支）", ["python3", driver, "--selftest"], repository, None),
             ("登记成轻的脚本带别的参数再带 --selftest 照拒：广谱变异 --selftest 混运行参数", ["python3", driver, "--selftest", "--shard", "0/2"], repository,
              UNREGISTERED_SELFTEST_KIND),
-            ("广谱变异的改名拷贝 --selftest 不在登记表里：照旧算提交时才跑的检查", ["python3", "research/scripts/renamed-driver-copy.py", "--selftest"], work,
+            ("广谱变异的改名拷贝 --selftest 不在登记表里：照旧算提交时才跑的检查", ["python3", "scripts/renamed-driver-copy.py", "--selftest"], work,
              UNREGISTERED_SELFTEST_KIND),
             ("广谱变异仓外的改名拷贝 --selftest：按驱动判的那一支，照旧算提交时才跑的检查", [os.path.join(work, "elsewhere", "renamed-driver-copy.py"), "--selftest"], "/",
              "commit-check-selftest"),
@@ -3015,29 +3015,29 @@ def selftest():
             ("python3 -X dev 起广谱变异", ["python3", "-X", "dev", driver], work, "broad-mutation"),
             ("python3 -BW default（合写、值另起一个词）起广谱变异", ["python3", "-BW", "default", driver], work, "broad-mutation"),
             ("python3 --check-hash-based-pycs never 起广谱变异", ["python3", "--check-hash-based-pycs", "never", driver], work, "broad-mutation"),
-            ("cd 进 research/scripts 再 python3 -m broad-mutation", ["bash", "-c", "cd research/scripts && python3 -m broad-mutation"], work, "broad-mutation"),
+            ("cd 进 scripts 再 python3 -m broad-mutation", ["bash", "-c", "cd scripts && python3 -m broad-mutation"], work, "broad-mutation"),
             ("python3 -m research.scripts.broad-mutation（命名空间包）", ["python3", "-m", "research.scripts.broad-mutation", "--shard", "0/2"], work, "broad-mutation"),
-            ("python3 -m runpy broad-mutation", ["python3", "-m", "runpy", "broad-mutation"], os.path.join(work, "research", "scripts"), "broad-mutation"),
-            ("PYTHONPATH 指到 research/scripts 再 python3 -m broad-mutation", ["env", "PYTHONPATH=research/scripts", "python3", "-m", "broad-mutation"], work,
+            ("python3 -m runpy broad-mutation", ["python3", "-m", "runpy", "broad-mutation"], os.path.join(work, "scripts"), "broad-mutation"),
+            ("PYTHONPATH 指到 scripts 再 python3 -m broad-mutation", ["env", "PYTHONPATH=scripts", "python3", "-m", "broad-mutation"], work,
              "broad-mutation"),
-            ("python3 -W ignore 起研究脚本的自证（登记成假 cargo，放行）", ["python3", "-W", "ignore", "research/scripts/admission.py", "--selftest"], repository, None),
-            ("python3 -m broad-mutation 带 --summary", ["python3", "-m", "broad-mutation", "--summary"], os.path.join(work, "research", "scripts"), None),
+            ("python3 -W ignore 起研究脚本的自证（登记成假 cargo，放行）", ["python3", "-W", "ignore", "scripts/gate/admission.py", "--selftest"], repository, None),
+            ("python3 -m broad-mutation 带 --summary", ["python3", "-m", "broad-mutation", "--summary"], os.path.join(work, "scripts"), None),
             ("python3 -u（不带值的选项）起广谱变异", ["python3", "-u", driver], work, "broad-mutation"),
             ("python3 -Wignore（值贴着写）起广谱变异", ["python3", "-Wignore", driver], work, "broad-mutation"),
             ("python3 -m py_compile 只查驱动的语法", ["python3", "-m", "py_compile", driver], work, None),
-            ("python3 -W ignore 起别的研究脚本照常用", ["python3", "-W", "ignore", "research/scripts/replace-once.py", "a.md", "x", "y"], work, None),
+            ("python3 -W ignore 起别的研究脚本照常用", ["python3", "-W", "ignore", "scripts/kb/replace-once.py", "a.md", "x", "y"], work, None),
             # python -c 的代码里点到驱动、指到它的符号链接、带签名行的改名拷贝（开关 broad-mutation-by-name-only 下前七格红）
             ("python3 -c runpy.run_path 起广谱变异", ["python3", "-c", f"import runpy; runpy.run_path('{driver}', run_name='__main__')", "--shard", "0/2"], work,
              "broad-mutation"),
             ("python3 -c exec(open(驱动).read())", ["python3", "-c", f"__file__='{driver}'; exec(open(__file__).read())"], work, "broad-mutation"),
             ("python3 -c runpy.run_module 按模块名起", ["python3", "-c", "import runpy; runpy.run_module('broad-mutation', run_name='__main__')"],
-             os.path.join(work, "research", "scripts"), "broad-mutation"),
-            ("仓内改名的符号链接指到驱动", ["python3", "research/scripts/linked-driver.py"], work, "broad-mutation"),
+             os.path.join(work, "scripts"), "broad-mutation"),
+            ("仓内改名的符号链接指到驱动", ["python3", "scripts/linked-driver.py"], work, "broad-mutation"),
             ("仓外的符号链接指到驱动、按分片跑", ["python3", os.path.join(work, "elsewhere", "linked-driver.py"), "--shard", "0/2"], "/", "broad-mutation"),
-            ("仓内改名拷贝（开头带签名行）", ["python3", "research/scripts/renamed-driver-copy.py"], work, "broad-mutation"),
+            ("仓内改名拷贝（开头带签名行）", ["python3", "scripts/renamed-driver-copy.py"], work, "broad-mutation"),
             ("仓外改名拷贝直接执行", [os.path.join(work, "elsewhere", "renamed-driver-copy.py"), "--item", "3", "--skip-stage-two"], "/", "broad-mutation"),
             ("python3 -c 的代码带 --summary", ["python3", "-c", f"import runpy; runpy.run_path('{driver}', run_name='__main__')", "--summary"], work, None),
-            ("符号链接带 --list-items", ["python3", "research/scripts/linked-driver.py", "--list-items"], work, None),
+            ("符号链接带 --list-items", ["python3", "scripts/linked-driver.py", "--list-items"], work, None),
             ("python3 -c 不相干的代码", ["python3", "-c", "print(1)"], work, None),
             ("签名行不在行首的不相干脚本", ["python3", os.path.join(work, "elsewhere", "unrelated.py")], work, None),
             ("删掉签名行的仓外拷贝认不出（罩不住的那一种，钉住现状）", ["python3", os.path.join(work, "elsewhere", "copy-without-signature.py")], work, None),
@@ -3069,126 +3069,126 @@ def selftest():
             # Verus 那一道只打工具版本不算（开关 tool-versions-counted 下这一格红）
             ("Verus 那一道 --tool-versions 只打工具版本", ["bash", ".claude/gate.d/checker-tier-formal-verification.sh", "--tool-versions"], work, None),
             # 两份判法脚本直接起：干活的用法算那一道（开关 verus-judges-by-stage-only 下前五格红），只读的不算
-            ("直接起判法脚本跑必红世界", ["python3", "research/scripts/verus-proof-check.py", "must-red-worlds", "."], work, "verus-stage"),
-            ("直接起判法脚本跑空真、经 nice 与绝对路径", ["nice", "-n", "19", "python3", os.path.join(work, "research", "scripts", "verus-proof-check.py"), "vacuity", work], "/",
+            ("直接起判法脚本跑必红世界", ["python3", "scripts/gate/verus-proof-check.py", "must-red-worlds", "."], work, "verus-stage"),
+            ("直接起判法脚本跑空真、经 nice 与绝对路径", ["nice", "-n", "19", "python3", os.path.join(work, "scripts", "gate", "verus-proof-check.py"), "vacuity", work], "/",
              "verus-stage"),
-            ("直接起判法脚本验证明", ["python3", "research/scripts/verus-proof-check.py", "proof", "."], work, "verus-stage"),
-            ("直接起红例重放", ["python3", "research/scripts/e165-pin-red-examples.py", "--replay", "--root", "."], work, "verus-stage"),
-            ("经内存包装起红例重放、--check 写在 --replay 前面", ["bash", "research/scripts/run-with-memory-cap.sh", "4G", "python3", "research/scripts/e165-pin-red-examples.py",
+            ("直接起判法脚本验证明", ["python3", "scripts/gate/verus-proof-check.py", "proof", "."], work, "verus-stage"),
+            ("直接起红例重放", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--root", "."], work, "verus-stage"),
+            ("经内存包装起红例重放、--check 写在 --replay 前面", ["bash", "scripts/hosts/run-with-memory-cap.sh", "4G", "python3", "scripts/experiments/e165-pin-red-examples.py",
                                                             "--check", "--replay"], work, "verus-stage"),
-            ("判法脚本只打工具版本", ["python3", "research/scripts/verus-proof-check.py", "tool-versions", "."], work, None),
-            ("判法脚本核版本一致（只读安装与缓存）", ["python3", "research/scripts/verus-proof-check.py", "toolchain", "."], work, None),
-            ("判法脚本打包源码指纹", ["python3", "research/scripts/verus-proof-check.py", "fingerprint", "/tmp/claude-1000/vstd"], work, None),
+            ("判法脚本只打工具版本", ["python3", "scripts/gate/verus-proof-check.py", "tool-versions", "."], work, None),
+            ("判法脚本核版本一致（只读安装与缓存）", ["python3", "scripts/gate/verus-proof-check.py", "toolchain", "."], work, None),
+            ("判法脚本打包源码指纹", ["python3", "scripts/gate/verus-proof-check.py", "fingerprint", "/tmp/claude-1000/vstd"], work, None),
             # 只列可点名的项不算；点名单跑一项照算（--item 的值碰巧叫 --check 也照重放算）
-            ("判法脚本只列可点名的项", ["python3", "research/scripts/verus-proof-check.py", "list-items", "."], work, None),
+            ("判法脚本只列可点名的项", ["python3", "scripts/gate/verus-proof-check.py", "list-items", "."], work, None),
             # 看门狗记下的那一次（records/2026-09-30-里程碑三开工第一轮.md 第 949 行）：第一个参数字面写成只读子命令，根写成变量也不算（开关 verus-read-only-needs-literal-arguments 下红）
-            ("判法脚本只列可点名的项、根写成 $PWD（看门狗记下的那一次）", ["python3", "research/scripts/verus-proof-check.py", "list-items", "$PWD"], work, None),
-            ("判法脚本第一个参数写成变量照算", ["python3", "research/scripts/verus-proof-check.py", "$S", "."], work, "verus-stage"),
+            ("判法脚本只列可点名的项、根写成 $PWD（看门狗记下的那一次）", ["python3", "scripts/gate/verus-proof-check.py", "list-items", "$PWD"], work, None),
+            ("判法脚本第一个参数写成变量照算", ["python3", "scripts/gate/verus-proof-check.py", "$S", "."], work, "verus-stage"),
             # 判定库的选项改名成 --verdict-library（带一个值，切参数时跳过它的值；开关 e165-pin-old-library-option 下这两格红）
             ("红例钉表 --check 后面 --verdict-library 的值碰巧叫 --replay、以 --check 为准",
-             ["python3", "research/scripts/e165-pin-red-examples.py", "--check", "--verdict-library", "--replay"], work, None),
+             ["python3", "scripts/experiments/e165-pin-red-examples.py", "--check", "--verdict-library", "--replay"], work, None),
             ("红例重放 --verdict-library 的值碰巧叫 --check、照算重放",
-             ["python3", "research/scripts/e165-pin-red-examples.py", "--replay", "--verdict-library", "--check"], work, "verus-stage"),
-            ("crates 变异判法模块打判法版本（judge-version）不算", ["python3", "research/scripts/crates-mutation-rows.py", "judge-version", "."], work, None),
-            ("红例钉表只列可点名的项", ["python3", "research/scripts/e165-pin-red-examples.py", "--list-items"], work, None),
-            ("判法脚本点名一处空真照算", ["python3", "research/scripts/verus-proof-check.py", "vacuity", ".", "--item", "vacuity:src/lib.rs:5"], work, "verus-stage"),
-            ("红例重放点名一行照算", ["python3", "research/scripts/e165-pin-red-examples.py", "--replay", "--item", "pinned:3"], work, "verus-stage"),
-            ("红例重放 --item 的值碰巧叫 --check、照算重放", ["python3", "research/scripts/e165-pin-red-examples.py", "--replay", "--item", "--check"], work, "verus-stage"),
-            ("红例钉表只核钉全", ["python3", "research/scripts/e165-pin-red-examples.py", "--check"], work, None),
-            ("红例钉表 --replay 写在 --check 前面、以 --check 为准", ["python3", "research/scripts/e165-pin-red-examples.py", "--replay", "--check"], work, None),
-            ("红例钉表 --root 的值碰巧叫 --replay", ["python3", "research/scripts/e165-pin-red-examples.py", "--check", "--root", "--replay"], work, None),
-            ("红例钉表追加", ["python3", "research/scripts/e165-pin-red-examples.py", "research/results/e165-sample-red-examples.tsv"], work, None),
+             ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--verdict-library", "--check"], work, "verus-stage"),
+            ("crates 变异判法模块打判法版本（judge-version）不算", ["python3", "scripts/mutation/crates-mutation-rows.py", "judge-version", "."], work, None),
+            ("红例钉表只列可点名的项", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--list-items"], work, None),
+            ("判法脚本点名一处空真照算", ["python3", "scripts/gate/verus-proof-check.py", "vacuity", ".", "--item", "vacuity:src/lib.rs:5"], work, "verus-stage"),
+            ("红例重放点名一行照算", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--item", "pinned:3"], work, "verus-stage"),
+            ("红例重放 --item 的值碰巧叫 --check、照算重放", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--item", "--check"], work, "verus-stage"),
+            ("红例钉表只核钉全", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--check"], work, None),
+            ("红例钉表 --replay 写在 --check 前面、以 --check 为准", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--check"], work, None),
+            ("红例钉表 --root 的值碰巧叫 --replay", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--check", "--root", "--replay"], work, None),
+            ("红例钉表追加", ["python3", "scripts/experiments/e165-pin-red-examples.py", "research/results/e165-sample-red-examples.tsv"], work, None),
             # 红例钉表照它文件头的用法判：只有 --replay 起装置；参数里的变量只在可能展开成它认的选项名、或判不出落到哪种用法时才算
             # （开关 e165-pin-unexpanded-as-replay 下前六格红；e165-pin-backfill-as-append 下「--replay 写在 --backfill 前面」那一格红）
-            ("红例钉表 --check --table 的值是变量拼的路径", ["bash", "-c", "D=/tmp/x; python3 research/scripts/e165-pin-red-examples.py --check --table $D/dry-2c.tsv"],
+            ("红例钉表 --check --table 的值是变量拼的路径", ["bash", "-c", "D=/tmp/x; python3 scripts/experiments/e165-pin-red-examples.py --check --table $D/dry-2c.tsv"],
              work, None),
             ("红例钉表 for 循环里 --check --root 的值是循环变量拼的路径",
-             ["bash", "-c", "for s in green red; do python3 research/scripts/e165-pin-red-examples.py --check --root $W/fixture-copies/$s; done"], work, None),
+             ["bash", "-c", "for s in green red; do python3 scripts/experiments/e165-pin-red-examples.py --check --root $W/fixture-copies/$s; done"], work, None),
             ("红例钉表 for 循环里 --backfill --root 的值是循环变量拼的路径",
-             ["bash", "-c", "for d in green red; do python3 research/scripts/e165-pin-red-examples.py --backfill --root /x/fixtures/$d; done"], work, None),
+             ["bash", "-c", "for d in green red; do python3 scripts/experiments/e165-pin-red-examples.py --backfill --root /x/fixtures/$d; done"], work, None),
             ("红例钉表追加带 --table、表与账都是变量拼的路径",
-             ["bash", "-c", "python3 research/scripts/e165-pin-red-examples.py --table $D/dry-2c.tsv $R-$L-red-examples.tsv"], work, None),
-            ("红例钉表 --check 的账是 $(…) 拼的路径", ["bash", "-c", "python3 research/scripts/e165-pin-red-examples.py --check research/results/$(date +%F)-red-examples.tsv"],
+             ["bash", "-c", "python3 scripts/experiments/e165-pin-red-examples.py --table $D/dry-2c.tsv $R-$L-red-examples.tsv"], work, None),
+            ("红例钉表 --check 的账是 $(…) 拼的路径", ["bash", "-c", "python3 scripts/experiments/e165-pin-red-examples.py --check research/results/$(date +%F)-red-examples.tsv"],
              work, None),
-            ("经内存包装起红例钉表 --check --table 的值是变量", ["bash", "-c", "bash research/scripts/run-with-memory-cap.sh 4G python3 research/scripts/e165-pin-red-examples.py "
+            ("经内存包装起红例钉表 --check --table 的值是变量", ["bash", "-c", "bash scripts/hosts/run-with-memory-cap.sh 4G python3 scripts/experiments/e165-pin-red-examples.py "
                                                        "--check --table \"$T\""], work, None),
-            ("红例钉表 --replay 写在 --backfill 前面、以 --backfill 为准", ["python3", "research/scripts/e165-pin-red-examples.py", "--replay", "--backfill"], work, None),
-            ("红例钉表 --backfill 写在 --replay 前面、以 --replay 为准", ["python3", "research/scripts/e165-pin-red-examples.py", "--backfill", "--replay"], work, "verus-stage"),
-            ("红例钉表 --replay 的值位都是变量拼的路径照算", ["bash", "-c", "python3 research/scripts/e165-pin-red-examples.py --replay --root $W/x"], work, "verus-stage"),
-            ("红例钉表 --check 后面接一个整词变量：可能展开成 --replay，照算", ["bash", "-c", "python3 research/scripts/e165-pin-red-examples.py --check --table $D/x $O"], work,
+            ("红例钉表 --replay 写在 --backfill 前面、以 --backfill 为准", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--backfill"], work, None),
+            ("红例钉表 --backfill 写在 --replay 前面、以 --replay 为准", ["python3", "scripts/experiments/e165-pin-red-examples.py", "--backfill", "--replay"], work, "verus-stage"),
+            ("红例钉表 --replay 的值位都是变量拼的路径照算", ["bash", "-c", "python3 scripts/experiments/e165-pin-red-examples.py --replay --root $W/x"], work, "verus-stage"),
+            ("红例钉表 --check 后面接一个整词变量：可能展开成 --replay，照算", ["bash", "-c", "python3 scripts/experiments/e165-pin-red-examples.py --check --table $D/x $O"], work,
              "verus-stage"),
             ("红例钉表 --replay --table 的值是整词变量：变量空着时 --check 成了 --table 的值，照算",
-             ["bash", "-c", "python3 research/scripts/e165-pin-red-examples.py --replay --table $X --check"], work, "verus-stage"),
-            ("红例钉表经函数转 \"${@:2}\" 照算", ["bash", "-c", 'p() { python3 research/scripts/e165-pin-red-examples.py --table "$1" "${@:2}"; }; p t.tsv --replay'], work,
+             ["bash", "-c", "python3 scripts/experiments/e165-pin-red-examples.py --replay --table $X --check"], work, "verus-stage"),
+            ("红例钉表经函数转 \"${@:2}\" 照算", ["bash", "-c", 'p() { python3 scripts/experiments/e165-pin-red-examples.py --table "$1" "${@:2}"; }; p t.tsv --replay'], work,
              "verus-stage"),
             # prove-red.sh 带前缀起时照跑点名行里重型的那几行：照它读的变异表与 classify 判（开关 prove-red-unjudged 下前三格红）
             ("prove-red 带 SINGLEFS_HEAVY_TESTS=commit、点名 checker 档包的行",
-             ["env", "SINGLEFS_HEAVY_TESTS=commit", "bash", "research/scripts/prove-red.sh", "--copy", work, "singlefs-checker-tier", "tier-row"], work, "checker-tier-cargo"),
+             ["env", "SINGLEFS_HEAVY_TESTS=commit", "bash", "scripts/mutation/prove-red.sh", "--copy", work, "singlefs-checker-tier", "tier-row"], work, "checker-tier-cargo"),
             ("prove-red 经内存包装、export 了 =user-request、--memory 写在 --copy 前面、点名的第二行是 checker 档包的",
-             ["bash", "-c", f"export SINGLEFS_HEAVY_TESTS=user-request; bash research/scripts/run-with-memory-cap.sh 4G bash research/scripts/prove-red.sh "
+             ["bash", "-c", f"export SINGLEFS_HEAVY_TESTS=user-request; bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/mutation/prove-red.sh "
                             f"--memory 4G --copy {work} singlefs-harness harness-row tier-row"], work, "checker-tier-cargo"),
-            ("prove-red 带前缀、副本写在变量里：判不出照算", ["bash", "-c", "SINGLEFS_HEAVY_TESTS=commit bash research/scripts/prove-red.sh --copy $C singlefs-checker-tier tier-row"],
+            ("prove-red 带前缀、副本写在变量里：判不出照算", ["bash", "-c", "SINGLEFS_HEAVY_TESTS=commit bash scripts/mutation/prove-red.sh --copy $C singlefs-checker-tier tier-row"],
              work, "checker-tier-cargo"),
-            ("prove-red 不带前缀：重型的行它自己报本次未跑", ["bash", "research/scripts/prove-red.sh", "--copy", work, "singlefs-checker-tier", "tier-row"], work, None),
-            ("prove-red 带前缀、点名的只有 harness 档包的行", ["env", "SINGLEFS_HEAVY_TESTS=commit", "bash", "research/scripts/prove-red.sh", "--copy", work, "singlefs-harness",
+            ("prove-red 不带前缀：重型的行它自己报本次未跑", ["bash", "scripts/mutation/prove-red.sh", "--copy", work, "singlefs-checker-tier", "tier-row"], work, None),
+            ("prove-red 带前缀、点名的只有 harness 档包的行", ["env", "SINGLEFS_HEAVY_TESTS=commit", "bash", "scripts/mutation/prove-red.sh", "--copy", work, "singlefs-harness",
                                                        "harness-row"], work, None),
-            ("prove-red 带前缀、同名两行取最后一行（harness 档包的）", ["env", "SINGLEFS_HEAVY_TESTS=commit", "bash", "research/scripts/prove-red.sh", "--copy", work,
+            ("prove-red 带前缀、同名两行取最后一行（harness 档包的）", ["env", "SINGLEFS_HEAVY_TESTS=commit", "bash", "scripts/mutation/prove-red.sh", "--copy", work,
                                                           "singlefs-harness", "renamed-row"], work, None),
-            ("prove-red 带前缀、副本里没有变异表（它退 2、什么都不起）", ["env", "SINGLEFS_HEAVY_TESTS=commit", "bash", "research/scripts/prove-red.sh", "--copy",
+            ("prove-red 带前缀、副本里没有变异表（它退 2、什么都不起）", ["env", "SINGLEFS_HEAVY_TESTS=commit", "bash", "scripts/mutation/prove-red.sh", "--copy",
                                                            os.path.join(work, "elsewhere"), "singlefs-checker-tier", "tier-row"], work, None),
-            ("判法脚本单独 --selftest：登记成假 Verus，放行", ["python3", "research/scripts/verus-proof-check.py", "--selftest"], repository, None),
+            ("判法脚本单独 --selftest：登记成假 Verus，放行", ["python3", "scripts/gate/verus-proof-check.py", "--selftest"], repository, None),
             ("仓外同名的判法脚本不按名字认", ["python3", "/tmp/claude-1000/elsewhere/verus-proof-check.py", "must-red-worlds", "."], work, None),
             # 认出是两份判法脚本就算、只放过字面写明的只读用法，认法照广谱变异那一套（开关 verus-judges-by-working-subcommand、verus-judges-by-stage-only
             # 下前十二格红，末两格照绿）
-            ("PYTHONPATH 指到 research/scripts 再 python3 -m 起判法脚本跑必红世界",
-             ["env", "PYTHONPATH=research/scripts", "python3", "-m", "verus-proof-check", "must-red-worlds", "."], work, "verus-stage"),
-            ("export PYTHONPATH 再 python3 -m 起红例重放", ["bash", "-c", "export PYTHONPATH=research/scripts; python3 -m e165-pin-red-examples --replay"], work, "verus-stage"),
+            ("PYTHONPATH 指到 scripts 再 python3 -m 起判法脚本跑必红世界",
+             ["env", "PYTHONPATH=scripts", "python3", "-m", "verus-proof-check", "must-red-worlds", "."], work, "verus-stage"),
+            ("export PYTHONPATH 再 python3 -m 起红例重放", ["bash", "-c", "export PYTHONPATH=scripts; python3 -m e165-pin-red-examples --replay"], work, "verus-stage"),
             ("python3 -c runpy.run_path 起判法脚本跑必红世界",
-             ["python3", "-c", "import runpy; runpy.run_path('research/scripts/verus-proof-check.py', run_name='__main__')", "must-red-worlds", "."], work, "verus-stage"),
+             ["python3", "-c", "import runpy; runpy.run_path('scripts/gate/verus-proof-check.py', run_name='__main__')", "must-red-worlds", "."], work, "verus-stage"),
             ("仓外的符号链接指到判法脚本、跑必红世界", ["python3", os.path.join(work, "elsewhere", "linked-proof-check.py"), "must-red-worlds", work], "/", "verus-stage"),
-            ("仓内改名的符号链接指到红例钉表、--replay", ["python3", "research/scripts/linked-pin.py", "--replay"], work, "verus-stage"),
-            ("判法脚本的子命令用命令替换写", ["bash", "-c", 'python3 research/scripts/verus-proof-check.py "$(echo must-red-worlds)" .'], work, "verus-stage"),
-            ("for 循环逐格跑判法脚本三格", ["bash", "-c", "for c in proof vacuity must-red-worlds; do python3 research/scripts/verus-proof-check.py $c .; done"], work,
+            ("仓内改名的符号链接指到红例钉表、--replay", ["python3", "scripts/linked-pin.py", "--replay"], work, "verus-stage"),
+            ("判法脚本的子命令用命令替换写", ["bash", "-c", 'python3 scripts/gate/verus-proof-check.py "$(echo must-red-worlds)" .'], work, "verus-stage"),
+            ("for 循环逐格跑判法脚本三格", ["bash", "-c", "for c in proof vacuity must-red-worlds; do python3 scripts/gate/verus-proof-check.py $c .; done"], work,
              "verus-stage"),
-            ("shell 函数转参数起判法脚本", ["bash", "-c", 'v() { python3 research/scripts/verus-proof-check.py "$@"; }; v must-red-worlds .'], work, "verus-stage"),
-            ("for 循环先核钉全再重放红例", ["bash", "-c", "for m in --check --replay; do python3 research/scripts/e165-pin-red-examples.py $m; done"], work, "verus-stage"),
-            ("只读子命令后面的参数写成变量不算（tool-versions $ROOT）", ["bash", "-c", "python3 research/scripts/verus-proof-check.py tool-versions $ROOT"], work, None),
-            ("判法脚本不带参数照算（接受的误拒）", ["python3", "research/scripts/verus-proof-check.py"], work, "verus-stage"),
+            ("shell 函数转参数起判法脚本", ["bash", "-c", 'v() { python3 scripts/gate/verus-proof-check.py "$@"; }; v must-red-worlds .'], work, "verus-stage"),
+            ("for 循环先核钉全再重放红例", ["bash", "-c", "for m in --check --replay; do python3 scripts/experiments/e165-pin-red-examples.py $m; done"], work, "verus-stage"),
+            ("只读子命令后面的参数写成变量不算（tool-versions $ROOT）", ["bash", "-c", "python3 scripts/gate/verus-proof-check.py tool-versions $ROOT"], work, None),
+            ("判法脚本不带参数照算（接受的误拒）", ["python3", "scripts/gate/verus-proof-check.py"], work, "verus-stage"),
             ("经 PYTHONPATH 起判法脚本的 --selftest：不在登记表的位置上，照旧算提交时才跑的检查",
-             ["env", "PYTHONPATH=research/scripts", "python3", "-m", "verus-proof-check", "--selftest"], work, "commit-check-selftest"),
+             ["env", "PYTHONPATH=scripts", "python3", "-m", "verus-proof-check", "--selftest"], work, "commit-check-selftest"),
             ("仓外的符号链接指到判法脚本、只打工具版本", ["python3", os.path.join(work, "elsewhere", "linked-proof-check.py"), "tool-versions", work], "/", None),
-            ("PYTHONPATH 再 python3 -m 起判法脚本核版本一致", ["env", "PYTHONPATH=research/scripts", "python3", "-m", "verus-proof-check", "toolchain", "."], work, None),
+            ("PYTHONPATH 再 python3 -m 起判法脚本核版本一致", ["env", "PYTHONPATH=scripts", "python3", "-m", "verus-proof-check", "toolchain", "."], work, None),
             # 判参数之前照两份脚本开头的 preflight 摘掉每一个整词 --force（开关 verus-judges-force-kept 下这三格红）
             ("红例钉表 --target 的值位写 --force、后面写 --check：preflight 摘掉 --force，真跑的是 --replay",
-             ["python3", "research/scripts/e165-pin-red-examples.py", "--replay", "--target", "--force", "--check"], work, "verus-stage"),
+             ["python3", "scripts/experiments/e165-pin-red-examples.py", "--replay", "--target", "--force", "--check"], work, "verus-stage"),
             ("红例钉表带 --root、--target 的值位写 --force、后面写 --check",
-             ["python3", "research/scripts/e165-pin-red-examples.py", "--root", ".", "--replay", "--target", "--force", "--check"], work, "verus-stage"),
+             ["python3", "scripts/experiments/e165-pin-red-examples.py", "--root", ".", "--replay", "--target", "--force", "--check"], work, "verus-stage"),
             ("判法脚本首参前写 --force、只打工具版本：preflight 摘掉之后是 tool-versions",
-             ["python3", "research/scripts/verus-proof-check.py", "--force", "tool-versions", "."], work, None),
+             ["python3", "scripts/gate/verus-proof-check.py", "--force", "tool-versions", "."], work, None),
             # python -c 的代码里出现两份判法脚本的名字就算那一道、不看代码之后的词（开关 verus-judges-code-by-later-words、verus-judges-by-working-subcommand、
             # verus-judges-by-stage-only 下前八格红；verus-judges-code-print-unchecked 下第七格红；末格照绿）
             ("python3 -c 里改 sys.argv 成 proof、代码之后写 tool-versions",
-             ["python3", "-c", "import runpy, sys; sys.argv = ['v', 'proof', '.']; runpy.run_path('research/scripts/verus-proof-check.py', run_name='__main__')",
+             ["python3", "-c", "import runpy, sys; sys.argv = ['v', 'proof', '.']; runpy.run_path('scripts/gate/verus-proof-check.py', run_name='__main__')",
               "tool-versions"], work, "verus-stage"),
             ("python3 -c 里改 sys.argv 成 --replay、代码之后不写词",
-             ["python3", "-c", "import runpy, sys; sys.argv = ['p', '--replay']; runpy.run_path('research/scripts/e165-pin-red-examples.py', run_name='__main__')"],
+             ["python3", "-c", "import runpy, sys; sys.argv = ['p', '--replay']; runpy.run_path('scripts/experiments/e165-pin-red-examples.py', run_name='__main__')"],
              work, "verus-stage"),
             ("python3 -c 里 __import__ 按模块名起判法脚本验证明",
-             ["python3", "-c", "import sys; sys.path.insert(0, 'research/scripts'); sys.exit(__import__('verus-proof-check').main(['proof', '.']))"], work, "verus-stage"),
+             ["python3", "-c", "import sys; sys.path.insert(0, 'scripts'); sys.exit(__import__('verus-proof-check').main(['proof', '.']))"], work, "verus-stage"),
             ("python3 -c 里 importlib.import_module 起红例重放",
-             ["python3", "-c", "import importlib, sys; sys.path.insert(0, 'research/scripts'); sys.exit(importlib.import_module('e165-pin-red-examples').main(['--replay']))"],
+             ["python3", "-c", "import importlib, sys; sys.path.insert(0, 'scripts'); sys.exit(importlib.import_module('e165-pin-red-examples').main(['--replay']))"],
              work, "verus-stage"),
             ("python3 -c 里 spec_from_file_location 载入判法脚本再调 run_check、代码之后写 toolchain",
-             ["python3", "-c", "import importlib.util as u; s = u.spec_from_file_location('v', 'research/scripts/verus-proof-check.py'); m = u.module_from_spec(s); "
+             ["python3", "-c", "import importlib.util as u; s = u.spec_from_file_location('v', 'scripts/gate/verus-proof-check.py'); m = u.module_from_spec(s); "
               "s.loader.exec_module(m); m.run_check('proof', '.', m.parse_options([])[1])", "toolchain"], work, "verus-stage"),
             ("python3 -c 的 print 包着 __import__ 起判法脚本",
-             ["python3", "-c", "import sys; sys.path.insert(0, 'research/scripts')\nprint(__import__('verus-proof-check').main(['proof', '.']))"], work, "verus-stage"),
+             ["python3", "-c", "import sys; sys.path.insert(0, 'scripts')\nprint(__import__('verus-proof-check').main(['proof', '.']))"], work, "verus-stage"),
             ("python3 -c 的 print 包着 __import__、代码只有这一句",
              ["python3", "-c", "print(__import__('verus-proof-check').main(['proof', '.']))"], work, "verus-stage"),
             ("python3 -c runpy.run_path 起红例钉表、代码之后写 --check",
-             ["python3", "-c", "import runpy; runpy.run_path('research/scripts/e165-pin-red-examples.py', run_name='__main__')", "--check"], work, "verus-stage"),
+             ["python3", "-c", "import runpy; runpy.run_path('scripts/experiments/e165-pin-red-examples.py', run_name='__main__')", "--check"], work, "verus-stage"),
             ("python3 -c 只 print 判法脚本的路径（字面字符串）：不算",
-             ["python3", "-c", "print('research/scripts/e165-pin-red-examples.py', 'research/scripts/verus-proof-check.py')"], work, None),
+             ["python3", "-c", "print('scripts/experiments/e165-pin-red-examples.py', 'scripts/gate/verus-proof-check.py')"], work, None),
             # lkmm.sh 只打 herd7 版本不算（开关 herd7-version-counted 下第一格红）；别的用法照旧算 herd7
             ("lkmm.sh 只打 herd7 版本", ["bash", ".claude/scripts/lkmm.sh", "--herd7-version"], work, None),
             ("lkmm.sh 整套判定", ["bash", ".claude/scripts/lkmm.sh"], work, "lkmm"),
@@ -3209,7 +3209,7 @@ def selftest():
             ("轻阶段 --write 是生成", ["bash", ".claude/gate.d/doc-decisions.sh", "--write"], work, None),
             # 上游规范副本里的几道 lint 与样本自检、阶段结构判法（开关 commit-checks-ignored 下这一类各格红）
             ("doc-lint.sh", ["bash", ".claude/singlefs-ai-sop/scripts/doc-lint.sh", "."], work, "commit-check-lint"),
-            ("gate-lint.sh 经 env 设变量", ["env", "GATE_LINT_DIR=research/scripts", "bash", ".claude/singlefs-ai-sop/scripts/gate-lint.sh"], work, "commit-check-lint"),
+            ("gate-lint.sh 经 env 设变量", ["env", "GATE_LINT_DIR=scripts", "bash", ".claude/singlefs-ai-sop/scripts/gate-lint.sh"], work, "commit-check-lint"),
             ("shell-lint.sh", ["bash", ".claude/singlefs-ai-sop/scripts/shell-lint.sh"], work, "commit-check-lint"),
             ("preflight-lint.py", ["python3", ".claude/singlefs-ai-sop/scripts/preflight-lint.py", "."], work, "commit-check-lint"),
             ("gate-overlap.py 判", ["python3", ".claude/singlefs-ai-sop/scripts/gate-overlap.py", "."], work, "commit-check-lint"),
@@ -3222,151 +3222,151 @@ def selftest():
             ("仓外同名的 doc-lint.sh 不算", ["bash", "/tmp/claude-1000/elsewhere/doc-lint.sh"], work, None),
             # 自证照登记表 selftest-registry.tsv 判（这几格读仓里那份表）：登记成不起重活的研究脚本单独 --selftest 放行
             # （开关 selftest-registry-ignored 下这一组 None 的格红，commit-checks-ignored 下这一组拒的格红）
-            ("登记成不起重活的研究脚本单独 --selftest 放行：admission.py", ["python3", "research/scripts/admission.py", "--selftest"], repository, None),
+            ("登记成不起重活的研究脚本单独 --selftest 放行：admission.py", ["python3", "scripts/gate/admission.py", "--selftest"], repository, None),
             ("登记成不起重活的研究脚本单独 --selftest 放行：crash-amplification.sh（2026-10-01 被拒的那一条，假分项驱动）",
-             ["bash", "research/scripts/crash-amplification.sh", "--selftest"], repository, None),
-            ("登记成不起重活的研究脚本单独 --selftest 放行：从 research 里相对着写的 stage-must-run.sh", ["bash", "scripts/stage-must-run.sh", "--selftest"],
-             os.path.join(repository, "research"), None),
+             ["bash", "scripts/crash/crash-amplification.sh", "--selftest"], repository, None),
+            ("登记成不起重活的研究脚本单独 --selftest 放行：从 research 里相对着写的 stage-must-run.sh", ["bash", "scripts/gate/stage-must-run.sh", "--selftest"],
+             os.path.join(repository, "scripts", "experiments"), None),
             ("登记成不起重活的钩子单独 --selftest 放行", ["bash", ".claude/hooks/heavy-test-guard.sh", "--selftest"], repository, None),
             ("登记成不起重活的门禁共用库直接执行（就是跑它的自证）放行", ["bash", ".claude/gate.d/lib/stage-cells.sh"], repository, None),
             ("登记成不起重活的门禁共用库单独带 --selftest 放行", ["bash", ".claude/gate.d/lib/stage-cells.sh", "--selftest"], repository, None),
-            ("登记成不起重活的 gate-staged.sh --selftest 放行（假 gate.sh）", ["bash", "research/scripts/gate-staged.sh", "--selftest"], repository, None),
-            ("登记成不起重活的 run-with-memory-cap.sh --selftest 放行（包装认不出上限，当它自己跑）", ["bash", "research/scripts/run-with-memory-cap.sh", "--selftest"],
+            ("登记成不起重活的 gate-staged.sh --selftest 放行（假 gate.sh）", ["bash", "scripts/gate/gate-staged.sh", "--selftest"], repository, None),
+            ("登记成不起重活的 run-with-memory-cap.sh --selftest 放行（包装认不出上限，当它自己跑）", ["bash", "scripts/hosts/run-with-memory-cap.sh", "--selftest"],
              repository, None),
-            ("登记成不起重活的 gate-structure-check.py --selftest 放行（替身 cargo），不落到阶段结构判法那一格", ["python3", "research/scripts/gate-structure-check.py", "--selftest"],
+            ("登记成不起重活的 gate-structure-check.py --selftest 放行（替身 cargo），不落到阶段结构判法那一格", ["python3", "scripts/gate/gate-structure-check.py", "--selftest"],
              repository, None),
             # 自证换成假驱动、登记成不起重活的两份单独 --selftest 放行（开关 selftest-registry-ignored 下这两格红，commit-checks-ignored 下第二格红：
             # 不读登记表时双机驱动落到崩溃放量按名字判）；登记成起重活的那一种拿造出来的登记表判（heavy_only_registry_cells）
-            ("登记成不起重活的 --selftest 放行：compile-then-swap.py（每项一份临时仓、PATH 最前面放假 cargo）", ["python3", "research/scripts/compile-then-swap.py", "--selftest"],
+            ("登记成不起重活的 --selftest 放行：compile-then-swap.py（每项一份临时仓、PATH 最前面放假 cargo）", ["python3", "scripts/hosts/compile-then-swap.py", "--selftest"],
              repository, None),
             ("登记成不起重活的 --selftest 放行：crash-amplification-two-hosts.sh（本机、第二台、清场与用例全是假的）",
-             ["bash", "research/scripts/crash-amplification-two-hosts.sh", "--selftest"], repository, None),
+             ["bash", "scripts/crash/crash-amplification-two-hosts.sh", "--selftest"], repository, None),
             # 条件行：命令里把变量设成非空时自证换真 cargo（开关 selftest-condition-ignored 与 selftest-heavy-rows-as-light 下第一格红）
             ("设了变量的条件行算起重活：带 SINGLEFS_HEAVY_TESTS 的 layer0-shard-run.sh --selftest 换真 cargo 跑 checker 档包",
-             ["env", "SINGLEFS_HEAVY_TESTS=commit", "bash", "research/scripts/layer0-shard-run.sh", "--selftest"], repository, "commit-check-selftest"),
-            ("条件行的变量设成空串算没设", ["env", "SINGLEFS_HEAVY_TESTS=", "bash", "research/scripts/layer0-shard-run.sh", "--selftest"], repository, None),
+             ["env", "SINGLEFS_HEAVY_TESTS=commit", "bash", "scripts/crash/layer0-shard-run.sh", "--selftest"], repository, "commit-check-selftest"),
+            ("条件行的变量设成空串算没设", ["env", "SINGLEFS_HEAVY_TESTS=", "bash", "scripts/crash/layer0-shard-run.sh", "--selftest"], repository, None),
             # 登记表外的 --selftest 照拒（开关 selftest-unregistered-as-light 下这两格红）
-            ("登记表外的 --selftest 照拒：research/scripts 下新写的脚本", ["python3", "research/scripts/brand-new-tool.py", "--selftest"], work, UNREGISTERED_SELFTEST_KIND),
+            ("登记表外的 --selftest 照拒：scripts 下新写的脚本", ["python3", "scripts/brand-new-tool.py", "--selftest"], work, UNREGISTERED_SELFTEST_KIND),
             ("登记表外的 --selftest 照拒：钩子目录下没有自证入口、也没登记的共用模块", ["python3", ".claude/hooks/lib_shell_words.py", "--selftest"], work,
              UNREGISTERED_SELFTEST_KIND),
             # 只认单独一个 --selftest（开关 selftest-extra-arguments-allowed 下这两格与上面广谱变异混运行参数那一格红）
             ("登记成轻的脚本带别的参数再带 --selftest 照拒：mutate.sh 只认头一个参数，这样跑的是 crates 整表",
-             ["bash", "research/scripts/mutate.sh", "x", "y", "crates/mutations.tsv", "--selftest"], repository, UNREGISTERED_SELFTEST_KIND),
+             ["bash", "scripts/mutation/mutate.sh", "x", "y", "crates/mutations.tsv", "--selftest"], repository, UNREGISTERED_SELFTEST_KIND),
             ("登记成轻的脚本带别的参数再带 --selftest 照拒：门禁共用库带认不出的参数", ["bash", ".claude/gate.d/lib/stage-cells.sh", "--other"], repository,
              UNREGISTERED_SELFTEST_KIND),
-            ("gate-structure-check.py", ["python3", "research/scripts/gate-structure-check.py"], work, "commit-check-structure"),
-            ("研究脚本不带 --selftest 照常用", ["python3", "research/scripts/replace-once.py", "a.md", "x", "y"], work, None),
+            ("gate-structure-check.py", ["python3", "scripts/gate/gate-structure-check.py"], work, "commit-check-structure"),
+            ("研究脚本不带 --selftest 照常用", ["python3", "scripts/kb/replace-once.py", "a.md", "x", "y"], work, None),
             ("仓外的 --selftest 不算", ["python3", "/tmp/claude-1000/elsewhere/tool.py", "--selftest"], work, None),
             # 登记表的键按解析后的真实路径认（开关 selftest-registry-by-path-tail 下前三格红）
             ("别处树里路径尾部相同的 claim-experiment.sh 照拒（攻方 2026-10-01：正文起 checker 档，带 --selftest 就放行）",
-             ["bash", os.path.join(work, "evil-tree", "research", "scripts", "claim-experiment.sh"), "--selftest"], work, UNREGISTERED_SELFTEST_KIND),
-            ("仓副本里的 admission.py 照拒（当前目录在副本里、相对着写）", ["python3", "research/scripts/admission.py", "--selftest"],
+             ["bash", os.path.join(work, "evil-tree", "scripts", "kb", "claim-experiment.sh"), "--selftest"], work, UNREGISTERED_SELFTEST_KIND),
+            ("仓副本里的 admission.py 照拒（当前目录在副本里、相对着写）", ["python3", "scripts/gate/admission.py", "--selftest"],
              os.path.join(work, "repository-copy"), UNREGISTERED_SELFTEST_KIND),
-            ("路径写在变量里的照拒（解不出是哪一份）", ["bash", "$R/research/scripts/claim-experiment.sh", "--selftest"], work, UNREGISTERED_SELFTEST_KIND),
-            ("指到本仓那一份的符号链接按指到的算，放行", ["python3", os.path.join(work, "linked-tree", "research", "scripts", "admission.py"), "--selftest"], work, None),
+            ("路径写在变量里的照拒（解不出是哪一份）", ["bash", "$R/scripts/kb/claim-experiment.sh", "--selftest"], work, UNREGISTERED_SELFTEST_KIND),
+            ("指到本仓那一份的符号链接按指到的算，放行", ["python3", os.path.join(work, "linked-tree", "scripts", "gate", "admission.py"), "--selftest"], work, None),
             # 命令词带通配的照 bash 展开、逐个判（test-script-align-r2 攻方 U1-1：一个 ? 就让真层 0、真 QEMU、真变异整表、重型自证一起放行；
             # 开关 pattern-command-words-literal 下放行四格之前的十格红（找不到 nice 时少「写成通配的 nice」那一格；通配起登记成重的自证那一格在 heavy_only_registry_cells，同样红），
             # pattern-expansions-bare 下「写成通配的 capped.sh」「写成通配的 detached-run.sh」「写成通配的 nice」三格红，
             # pattern-caret-negation-literal 下「[^…]」那一格红）
             ("通配起 checker-tier-layer0-replay", ["bash", ".claude/gate.d/checker-tier-layer0-replay.s?", repository], repository, "layer0-stage"),
             ("通配起 QEMU 那一道", ["bash", ".claude/gate.d/checker-tier-qemu-device-streams.s?", repository], repository, "qemu-stage"),
-            ("通配起 mutate.sh 跑 crates 整表", ["bash", "research/scripts/mutate.s?", "crates/mutations.tsv"], repository, "crates-mutation-mutate"),
-            ("通配起 vm-bench.sh --selftest", ["bash", "research/scripts/vm-bench*.sh", "--selftest"], repository, "vm-bench"),
+            ("通配起 mutate.sh 跑 crates 整表", ["bash", "scripts/mutate.s?", "crates/mutations.tsv"], repository, "crates-mutation-mutate"),
+            ("通配起 vm-bench.sh --selftest", ["bash", "scripts/vm-bench*.sh", "--selftest"], repository, "vm-bench"),
             ("绝对路径里带通配起 checker-tier-layer0-replay", ["bash", os.path.join(repository, ".claude", "gate.d", "checker-tier-layer0-*.sh"), repository], "/", "layer0-stage"),
-            ("展开成几份：bash 真起头一份、其余当参数（--selftest 之外还有参数）", ["bash", "research/scripts/crash-amplification*.sh", "--selftest"], repository,
+            ("展开成几份：bash 真起头一份、其余当参数（--selftest 之外还有参数）", ["bash", "scripts/crash-amplification*.sh", "--selftest"], repository,
              UNREGISTERED_SELFTEST_KIND),
             ("[^…] 写的字符类照 bash 认", ["bash", ".claude/gate.d/checker-tier-layer0-replay.[^x]h", repository], repository, "layer0-stage"),
-            ("写成通配的 capped.sh 包全量", ["bash", "research/scripts/capped.s?", "4", "cargo", "test", "--all"], repository, "full-cargo"),
-            ("写成通配的 detached-run.sh start 包全量", ["bash", "research/scripts/detached-run.s?", "start", "--label", "m", "--", "cargo", "test", "--all"],
+            ("写成通配的 capped.sh 包全量", ["bash", "scripts/capped.s?", "4", "cargo", "test", "--all"], repository, "full-cargo"),
+            ("写成通配的 detached-run.sh start 包全量", ["bash", "scripts/detached-run.s?", "start", "--label", "m", "--", "cargo", "test", "--all"],
              repository, "full-cargo"),
             *([("写成通配的 nice 包全量", [shutil.which("nice")[:-1] + "?", "-n", "19", "cargo", "test", "--all"], repository, "full-cargo")]
               if shutil.which("nice") else []),
-            ("通配起登记成轻的自证放行", ["bash", "research/scripts/admission*.py", "--selftest"], repository, None),
-            ("合法的通配：ls research/scripts/*.sh", ["ls", "research/scripts/*.sh"], repository, None),
-            ("零命中的通配照字面判", ["bash", "research/scripts/no-such-script-*.sh"], repository, None),
+            ("通配起登记成轻的自证放行", ["bash", "scripts/admission*.py", "--selftest"], repository, None),
+            ("合法的通配：ls scripts/*.sh", ["ls", "scripts/*.sh"], repository, None),
+            ("零命中的通配照字面判", ["bash", "scripts/no-such-script-*.sh"], repository, None),
             ("[ 内建命令不展开", ["[", "-f", "x", "]"], repository, None),
             # 方括号里的 POSIX 字符类、等价类、整理符号交给 bash 展开（test-script-align-r3 攻方 A1：python glob 零命中、照字面放行；
             # 开关 posix-brackets-by-python-glob 下前七格红，posix-brackets-unresolved-literal 下第七格红；POSIX 字符类起登记成重的自证那一格在 heavy_only_registry_cells）
-            ("POSIX 字符类起 mutate.sh 跑 crates 整表", ["bash", "research/scripts/mutat[[:alpha:]].sh", "crates/mutations.tsv"], repository, "crates-mutation-mutate"),
+            ("POSIX 字符类起 mutate.sh 跑 crates 整表", ["bash", "scripts/mutat[[:alpha:]].sh", "crates/mutations.tsv"], repository, "crates-mutation-mutate"),
             ("等价类起 checker-tier-layer0-replay", ["bash", ".claude/gate.d/checker-tier-layer0-replay.s[[=h=]]", repository], repository, "layer0-stage"),
             ("整理符号起 QEMU 那一道", ["bash", ".claude/gate.d/checker-tier-qemu-device-streams.s[[.h.]]", repository], repository, "qemu-stage"),
             ("POSIX 字符类夹在别的字符后面起 herd7 那一道（s[a[:lower:]]）", ["bash", ".claude/gate.d/checker-tier-lkmm.s[a[:lower:]]", repository], repository, "herd7-stage"),
-            ("绝对路径里带 POSIX 字符类起 vm-bench.sh", ["bash", os.path.join(repository, "research", "scripts", "vm-bench.s[[:alpha:]]"), "--selftest"], "/", "vm-bench"),
-            ("参数里的 POSIX 字符类点到 crates 整表（crates/mutation[[:alpha:]].tsv）", ["bash", "research/scripts/mutate.sh", "crates/mutation[[:alpha:]].tsv"], repository,
+            ("绝对路径里带 POSIX 字符类起 vm-bench.sh", ["bash", os.path.join(repository, "scripts", "vm-bench.s[[:alpha:]]"), "--selftest"], "/", "vm-bench"),
+            ("参数里的 POSIX 字符类点到 crates 整表（crates/mutation[[:alpha:]].tsv）", ["bash", "scripts/mutation/mutate.sh", "crates/mutation[[:alpha:]].tsv"], repository,
              "crates-mutation-mutate"),
-            ("cd 到变量路径之后 POSIX 字符类起脚本照拒", ["bash", "-c", 'cd "$X" && bash research/scripts/mutat[[:alpha:]].sh crates/mutations.tsv'], repository,
+            ("cd 到变量路径之后 POSIX 字符类起脚本照拒", ["bash", "-c", 'cd "$X" && bash scripts/mutat[[:alpha:]].sh crates/mutations.tsv'], repository,
              "pattern-unresolved"),
-            ("合法的 POSIX 字符类：ls research/scripts/[[:alpha:]]*.sh", ["ls", "research/scripts/[[:alpha:]]*.sh"], repository, None),
-            ("零命中的 POSIX 字符类照字面判", ["bash", "research/scripts/no-such-[[:alpha:]].sh"], repository, None),
-            ("POSIX 字符类起登记成轻的自证放行", ["python3", "research/scripts/admissio[[:alpha:]].py", "--selftest"], repository, None),
+            ("合法的 POSIX 字符类：ls scripts/[[:alpha:]]*.sh", ["ls", "scripts/[[:alpha:]]*.sh"], repository, None),
+            ("零命中的 POSIX 字符类照字面判", ["bash", "scripts/no-such-[[:alpha:]].sh"], repository, None),
+            ("POSIX 字符类起登记成轻的自证放行", ["python3", "scripts/admissio[[:alpha:]].py", "--selftest"], repository, None),
             # 崩溃放量的三份入口按名字算重型（test-script-align-r3 攻方 A2：真跑放行、同一道的 --selftest 倒照拒；开关 crash-amplification-unnamed 下前六格红，
             # posix-brackets-by-python-glob 下第六格红）
-            ("崩溃放量全量（crash-amplification.sh 不带参数）", ["bash", "research/scripts/crash-amplification.sh"], repository, "crash-amplification"),
-            ("崩溃放量点名分项", ["bash", "research/scripts/crash-amplification.sh", "--item", "fixed-script", "--threads", "4"], repository, "crash-amplification"),
-            ("崩溃放量的分项驱动", ["bash", "research/scripts/crash-amplification-item.sh", "crash_amplification_fixed_script_through_rollback"], repository,
+            ("崩溃放量全量（crash-amplification.sh 不带参数）", ["bash", "scripts/crash/crash-amplification.sh"], repository, "crash-amplification"),
+            ("崩溃放量点名分项", ["bash", "scripts/crash/crash-amplification.sh", "--item", "fixed-script", "--threads", "4"], repository, "crash-amplification"),
+            ("崩溃放量的分项驱动", ["bash", "scripts/crash/crash-amplification-item.sh", "crash_amplification_fixed_script_through_rollback"], repository,
              "crash-amplification"),
-            ("崩溃放量的双机驱动真跑", ["bash", "research/scripts/crash-amplification-two-hosts.sh", "crash_amplification_fixed_script_through_rollback"], repository,
+            ("崩溃放量的双机驱动真跑", ["bash", "scripts/crash/crash-amplification-two-hosts.sh", "crash_amplification_fixed_script_through_rollback"], repository,
              "crash-amplification"),
-            ("通配起崩溃放量全量（crash-amplificatio?.sh）", ["bash", "research/scripts/crash-amplificatio?.sh"], repository, "crash-amplification"),
-            ("POSIX 字符类起崩溃放量全量", ["bash", "research/scripts/crash-amplification.s[[:alpha:]]"], repository, "crash-amplification"),
-            ("崩溃放量只列分项（--list-items）放行", ["bash", "research/scripts/crash-amplification.sh", "--list-items"], repository, None),
-            ("崩溃放量分项驱动单独 --selftest 照登记表放行", ["bash", "research/scripts/crash-amplification-item.sh", "--selftest"], repository, None),
+            ("通配起崩溃放量全量（crash-amplificatio?.sh）", ["bash", "scripts/crash-amplificatio?.sh"], repository, "crash-amplification"),
+            ("POSIX 字符类起崩溃放量全量", ["bash", "scripts/crash-amplification.s[[:alpha:]]"], repository, "crash-amplification"),
+            ("崩溃放量只列分项（--list-items）放行", ["bash", "scripts/crash/crash-amplification.sh", "--list-items"], repository, None),
+            ("崩溃放量分项驱动单独 --selftest 照登记表放行", ["bash", "scripts/crash/crash-amplification-item.sh", "--selftest"], repository, None),
             # 两档里的轻型（文件头「两档里的轻型」）：三条带 --quick（可加 --item）的不算；重型的剪枝、逐条、全量与夹了别的词的照算
             # （开关 light-tier-unrecognized 下前七格红，light-tier-any-arguments 下「--quick 又带 --full」起四格红，crash-point-replay-unnamed 下「剪枝」起六格红，
             # gpu-quiesce-opaque 下 gpu-quiesce-run.sh 那三格红）
-            ("轻型：崩溃点重放入口 --quick", ["bash", "research/scripts/crash-point-replay.sh", "--quick"], work, None),
-            ("轻型：崩溃点重放入口 --quick 加点名两项", ["bash", "research/scripts/crash-point-replay.sh", "--quick", "--item", "fixed-script", "--item", "multi-record-publish"],
+            ("轻型：崩溃点重放入口 --quick", ["bash", "scripts/crash/crash-point-replay.sh", "--quick"], work, None),
+            ("轻型：崩溃点重放入口 --quick 加点名两项", ["bash", "scripts/crash/crash-point-replay.sh", "--quick", "--item", "fixed-script", "--item", "multi-record-publish"],
              work, None),
             ("轻型：形式化那一道 --quick <根>", ["bash", ".claude/gate.d/checker-tier-formal-verification.sh", "--quick", work], work, None),
             ("轻型：crates 变异那一道 --quick <根> --item <行>", ["bash", ".claude/gate.d/checker-tier-crates-mutation-replay.sh", "--quick", ".", "--item", "core-row-1"],
              work, None),
             ("轻型：--quick 与根之间夹的 --force 照 preflight 摘掉", ["bash", ".claude/gate.d/checker-tier-formal-verification.sh", "--quick", "--force", "."], work, None),
             ("轻型：根参数写成 $PWD", ["bash", ".claude/gate.d/checker-tier-crates-mutation-replay.sh", "--quick", "$PWD"], work, None),
-            ("轻型：经内存包装与 gpu-quiesce-run.sh 起崩溃点重放 --quick", ["bash", "research/scripts/run-with-memory-cap.sh", "4G", "bash", "research/scripts/gpu-quiesce-run.sh",
-                                                                  "--", "bash", "research/scripts/crash-point-replay.sh", "--quick"], work, None),
-            ("崩溃点重放入口只列可点名的项", ["bash", "research/scripts/crash-point-replay.sh", "--list-items"], work, None),
-            ("重型：崩溃点重放入口 --quick 又带 --full", ["bash", "research/scripts/crash-point-replay.sh", "--quick", "--full"], work, "crash-point-replay"),
+            ("轻型：经内存包装与 gpu-quiesce-run.sh 起崩溃点重放 --quick", ["bash", "scripts/hosts/run-with-memory-cap.sh", "4G", "bash", "scripts/crash/gpu-quiesce-run.sh",
+                                                                  "--", "bash", "scripts/crash/crash-point-replay.sh", "--quick"], work, None),
+            ("崩溃点重放入口只列可点名的项", ["bash", "scripts/crash/crash-point-replay.sh", "--list-items"], work, None),
+            ("重型：崩溃点重放入口 --quick 又带 --full", ["bash", "scripts/crash/crash-point-replay.sh", "--quick", "--full"], work, "crash-point-replay"),
             ("重型：crates 变异那一道 --quick 又带 --check 点格", ["bash", ".claude/gate.d/checker-tier-crates-mutation-replay.sh", "--quick", "--check", "rows", "."], work,
              "crates-mutation-stage"),
             ("重型：--quick 而点名的项写成变量", ["bash", ".claude/gate.d/checker-tier-formal-verification.sh", "--quick", "--item", "$X", "."], work, "verus-stage"),
             ("重型：--quick 带两个根参数", ["bash", ".claude/gate.d/checker-tier-crates-mutation-replay.sh", "--quick", ".", "/tmp/claude-1000/other"], work, "crates-mutation-stage"),
-            ("重型：崩溃点重放入口不带参数（剪枝）", ["bash", "research/scripts/crash-point-replay.sh"], work, "crash-point-replay"),
-            ("重型：崩溃点重放入口 --item 点名（逐条）", ["bash", "research/scripts/crash-point-replay.sh", "--item", "fixed-script"], work, "crash-point-replay"),
-            ("重型：崩溃点重放入口 --full（全量）", ["bash", "research/scripts/crash-point-replay.sh", "--full"], work, "crash-point-replay"),
+            ("重型：崩溃点重放入口不带参数（剪枝）", ["bash", "scripts/crash/crash-point-replay.sh"], work, "crash-point-replay"),
+            ("重型：崩溃点重放入口 --item 点名（逐条）", ["bash", "scripts/crash/crash-point-replay.sh", "--item", "fixed-script"], work, "crash-point-replay"),
+            ("重型：崩溃点重放入口 --full（全量）", ["bash", "scripts/crash/crash-point-replay.sh", "--full"], work, "crash-point-replay"),
             ("重型：别处同名的 crash-point-replay.sh 拷贝带 --quick", ["bash", "/tmp/claude-1000/somewhere/crash-point-replay.sh", "--quick"], work, "crash-point-replay"),
-            ("重型：gpu-quiesce-run.sh -- 包着崩溃点重放入口不带参数", ["bash", "research/scripts/gpu-quiesce-run.sh", "--", "bash", "research/scripts/crash-point-replay.sh"],
+            ("重型：gpu-quiesce-run.sh -- 包着崩溃点重放入口不带参数", ["bash", "scripts/crash/gpu-quiesce-run.sh", "--", "bash", "scripts/crash/crash-point-replay.sh"],
              work, "crash-point-replay"),
-            ("重型：gpu-quiesce-run.sh -- 包着崩溃放量全量", ["bash", "research/scripts/gpu-quiesce-run.sh", "--", "bash", "research/scripts/crash-amplification.sh"], work,
+            ("重型：gpu-quiesce-run.sh -- 包着崩溃放量全量", ["bash", "scripts/crash/gpu-quiesce-run.sh", "--", "bash", "scripts/crash/crash-amplification.sh"], work,
              "crash-amplification"),
-            ("gpu-quiesce-run.sh -- 之后写的 --force 照 preflight 摘掉", ["bash", "research/scripts/gpu-quiesce-run.sh", "--", "--force", "cargo", "test", "--all"], work, "full-cargo"),
+            ("gpu-quiesce-run.sh -- 之后写的 --force 照 preflight 摘掉", ["bash", "scripts/crash/gpu-quiesce-run.sh", "--", "--force", "cargo", "test", "--all"], work, "full-cargo"),
             ("重型：形式化那一道不带参数", ["bash", ".claude/gate.d/checker-tier-formal-verification.sh", work], work, "verus-stage"),
             ("重型：形式化那一道 --item（逐条）", ["bash", ".claude/gate.d/checker-tier-formal-verification.sh", "--item", "proof", work], work, "verus-stage"),
             ("重型：crates 变异那一道 --full", ["bash", ".claude/gate.d/checker-tier-crates-mutation-replay.sh", "--full", "."], work, "crates-mutation-stage"),
             ("别处的同名 gpu-quiesce-run.sh 不剥", ["bash", "/tmp/claude-1000/somewhere/gpu-quiesce-run.sh", "--", "cargo", "test", "--all"], work, None),
             # 真编 QEMU 按名字算重型、包装里面的同样算（开关 qemu-build-unnamed 下前五格红；commit-checks-ignored、selftest-registry-ignored 下末格红）
-            ("真编 QEMU（build-patched-qemu.sh 不带参数）", ["bash", "research/scripts/build-patched-qemu.sh"], repository, "qemu-build"),
-            ("真编 QEMU --rebuild", ["bash", "research/scripts/build-patched-qemu.sh", "--rebuild"], repository, "qemu-build"),
-            ("真编 QEMU 带别的参数（--force 由 preflight 摘掉，照编）", ["bash", "research/scripts/build-patched-qemu.sh", "--force"], repository, "qemu-build"),
-            ("run-with-memory-cap.sh 包着真编 QEMU --rebuild", ["bash", "research/scripts/run-with-memory-cap.sh", "8G", "bash", "research/scripts/build-patched-qemu.sh",
+            ("真编 QEMU（build-patched-qemu.sh 不带参数）", ["bash", "scripts/devices/build-patched-qemu.sh"], repository, "qemu-build"),
+            ("真编 QEMU --rebuild", ["bash", "scripts/devices/build-patched-qemu.sh", "--rebuild"], repository, "qemu-build"),
+            ("真编 QEMU 带别的参数（--force 由 preflight 摘掉，照编）", ["bash", "scripts/devices/build-patched-qemu.sh", "--force"], repository, "qemu-build"),
+            ("run-with-memory-cap.sh 包着真编 QEMU --rebuild", ["bash", "scripts/hosts/run-with-memory-cap.sh", "8G", "bash", "scripts/devices/build-patched-qemu.sh",
                                                             "--rebuild"], repository, "qemu-build"),
-            ("capped.sh 与 bash -c 包着真编 QEMU", ["nice", "-n", "19", "bash", os.path.join(repository, "research", "scripts", "capped.sh"), "16", "bash", "-c",
-                                                "bash " + os.path.join(repository, "research", "scripts", "build-patched-qemu.sh")], "/", "qemu-build"),
-            ("真编 QEMU 的 --selftest 照登记表放行", ["bash", "research/scripts/build-patched-qemu.sh", "--selftest"], repository, None),
+            ("capped.sh 与 bash -c 包着真编 QEMU", ["nice", "-n", "19", "bash", os.path.join(repository, "scripts", "hosts", "capped.sh"), "16", "bash", "-c",
+                                                "bash " + os.path.join(repository, "scripts", "devices", "build-patched-qemu.sh")], "/", "qemu-build"),
+            ("真编 QEMU 的 --selftest 照登记表放行", ["bash", "scripts/devices/build-patched-qemu.sh", "--selftest"], repository, None),
             # 花括号与参数里的通配照 bash 展开再判（2026-10-01 主 agent 喂本仓钩子：前三格那样写都放行；开关 brace-expansion-literal 下「花括号起 mutate.sh」
             # 到「花括号里的整数序列展开成几份」七格红，brace-sequence-literal 下两格序列红，argument-patterns-literal 下「参数里的通配」一格红，
             # brace-command-words-bare 下「花括号写在包装上」一格红）
-            ("花括号起 mutate.sh 跑 crates 整表（mutate.{sh,x}）", ["bash", "research/scripts/mutate.{sh,x}", "crates/mutations.tsv"], repository, "crates-mutation-mutate"),
+            ("花括号起 mutate.sh 跑 crates 整表（mutate.{sh,x}）", ["bash", "scripts/mutate.{sh,x}", "crates/mutations.tsv"], repository, "crates-mutation-mutate"),
             ("花括号起 checker-tier-layer0-replay （checker-tier-layer0-replay.{sh,}）", ["bash", ".claude/gate.d/checker-tier-layer0-replay.{sh,}", repository], repository, "layer0-stage"),
             ("参数里的花括号点到 checker 档包（-p singlefs-checker-{tier,x}）", ["cargo", "test", "-p", "singlefs-checker-{tier,x}"], work, "checker-tier-cargo"),
-            ("花括号写在包装上（{bash,-x} research/scripts/mutate.sh：展开成 bash -x 起它）", ["{bash,-x}", "research/scripts/mutate.sh", "crates/mutations.tsv"], repository,
+            ("花括号写在包装上（{bash,-x} scripts/mutation/mutate.sh：展开成 bash -x 起它）", ["{bash,-x}", "scripts/mutation/mutate.sh", "crates/mutations.tsv"], repository,
              "crates-mutation-mutate"),
-            ("花括号里的字母序列点到 crates 整表（mutations.ts{v..w}）", ["bash", "research/scripts/mutate.sh", "crates/mutations.ts{v..w}"], repository,
+            ("花括号里的字母序列点到 crates 整表（mutations.ts{v..w}）", ["bash", "scripts/mutation/mutate.sh", "crates/mutations.ts{v..w}"], repository,
              "crates-mutation-mutate"),
             ("命令词的花括号展开出的一份单独当命令（{x,mutate}.sh：bash 起的是 x.sh，mutate.sh 那一份照判）",
-             ["bash", "research/scripts/{x,mutate}.sh", "crates/mutations.tsv"], repository, "crates-mutation-mutate"),
+             ["bash", "scripts/{x,mutate}.sh", "crates/mutations.tsv"], repository, "crates-mutation-mutate"),
             ("花括号里的整数序列展开成几份（checker-tier-layer{0..1}-replay.sh）", ["bash", ".claude/gate.d/checker-tier-layer{0..1}-replay.sh", repository], repository, "layer0-stage"),
-            ("参数里的通配点到 crates 整表（crates/mutation?.tsv）", ["bash", "research/scripts/mutate.sh", "crates/mutation?.tsv"], repository, "crates-mutation-mutate"),
-            ("合法的花括号：ls research/scripts/{a,b}.sh", ["ls", "research/scripts/{a,b}.sh"], repository, None),
+            ("参数里的通配点到 crates 整表（crates/mutation?.tsv）", ["bash", "scripts/mutation/mutate.sh", "crates/mutation?.tsv"], repository, "crates-mutation-mutate"),
+            ("合法的花括号：ls scripts/{a,b}.sh", ["ls", "scripts/{a,b}.sh"], repository, None),
             ("合法的参数通配：cat crates/*.toml", ["cat", "crates/*.toml"], repository, None),
             ("参数的花括号照 bash 拆成两个词：-p singlefs-{harness,checker-tier} 只挑 harness 档、后一个是过滤词",
              ["cargo", "test", "-p", "singlefs-{harness,checker-tier}"], work, None),
@@ -3379,7 +3379,7 @@ def selftest():
              os.path.join(work, ".claude", "gate.d"), None),
             ("bash -n 只查门禁的语法", ["bash", "-n", ".claude/gate.d/code-tooling.sh"], work, None),
             ("grep 读门禁文件", ["grep", "-n", "gate-cell", ".claude/gate.d/checker-tier-lkmm.sh"], work, None),
-            ("python3 起的门禁共用库以外的脚本、门禁文件名只当它的参数", ["python3", "research/scripts/replace-once.py", ".claude/gate.d/code-tooling.sh", "a", "b"],
+            ("python3 起的门禁共用库以外的脚本、门禁文件名只当它的参数", ["python3", "scripts/kb/replace-once.py", ".claude/gate.d/code-tooling.sh", "a", "b"],
              work, None),
         ]
         # lib_shell_words 前缀表之外、包在命令外面照样起那条命令的程序（command_under_launcher）
@@ -3448,30 +3448,30 @@ def selftest():
             ("systemd-run -p Environment= 设的不是别名", ["systemd-run", "--user", "--wait", "--pipe", "-p", "Environment=RUST_BACKTRACE=1", "cargo", "xt"], work, None),
             ("systemd-run -p EnvironmentFile= 文件里设的不是别名", ["systemd-run", "--user", "--wait", "--pipe", "-p", "EnvironmentFile=" + os.path.join(work, "plain.env"),
                                                                "cargo", "xt"], work, None),
-            # research/scripts/detached-run.sh start … -- <命令>：剥掉之后里面那条照判（开关 detached-run-opaque 下前四格红）
-            ("bash 起 detached-run.sh start 包全量 cargo test", ["bash", "research/scripts/detached-run.sh", "start", "--label", "m", "--", "cargo", "test", "--all"],
+            # scripts/hosts/detached-run.sh start … -- <命令>：剥掉之后里面那条照判（开关 detached-run-opaque 下前四格红）
+            ("bash 起 detached-run.sh start 包全量 cargo test", ["bash", "scripts/hosts/detached-run.sh", "start", "--label", "m", "--", "cargo", "test", "--all"],
              work, "full-cargo"),
             ("detached-run.sh start --label= --log 文件 包 checker 档",
-             ["research/scripts/detached-run.sh", "start", "--label=m", "--log", "/tmp/m.log", "--", "cargo", "test", "-p", "singlefs-checker-tier"], work,
+             ["scripts/hosts/detached-run.sh", "start", "--label=m", "--log", "/tmp/m.log", "--", "cargo", "test", "-p", "singlefs-checker-tier"], work,
              "checker-tier-cargo"),
-            ("detached-run.sh --force start 包一层 nice 里的全量", ["bash", "research/scripts/detached-run.sh", "--force", "start", "--label", "m", "--",
+            ("detached-run.sh --force start 包一层 nice 里的全量", ["bash", "scripts/hosts/detached-run.sh", "--force", "start", "--label", "m", "--",
                                                           "nice", "-n", "19", "cargo", "test", "--workspace"], work, "full-cargo"),
-            ("detached-run.sh start 里面再套 /usr/bin/time", ["bash", "/abs/research/scripts/detached-run.sh", "start", "--label", "m", "--",
+            ("detached-run.sh start 里面再套 /usr/bin/time", ["bash", "/abs/scripts/hosts/detached-run.sh", "start", "--label", "m", "--",
                                                        "/usr/bin/time", "-v", "cargo", "test", "--all"], work, "full-cargo"),
-            ("detached-run.sh start 没写 --（它按用法错拒、什么都不跑）", ["bash", "research/scripts/detached-run.sh", "start", "--label", "m", "cargo", "test", "--all"],
+            ("detached-run.sh start 没写 --（它按用法错拒、什么都不跑）", ["bash", "scripts/hosts/detached-run.sh", "start", "--label", "m", "cargo", "test", "--all"],
              work, None),
-            ("detached-run.sh list 不起命令", ["bash", "research/scripts/detached-run.sh", "list"], work, None),
-            ("detached-run.sh start 包不重型的测试目标", ["bash", "research/scripts/detached-run.sh", "start", "--label", "m", "--",
+            ("detached-run.sh list 不起命令", ["bash", "scripts/hosts/detached-run.sh", "list"], work, None),
+            ("detached-run.sh start 包不重型的测试目标", ["bash", "scripts/hosts/detached-run.sh", "start", "--label", "m", "--",
                                                     "cargo", "test", "-p", "singlefs-core", "--test", "core_contract"], work, None),
-            ("detached-run.sh start 带 --stop-timeout 照剥", ["bash", "research/scripts/detached-run.sh", "start", "--label", "m", "--stop-timeout", "60", "--",
+            ("detached-run.sh start 带 --stop-timeout 照剥", ["bash", "scripts/hosts/detached-run.sh", "start", "--label", "m", "--stop-timeout", "60", "--",
                                                           "cargo", "test", "--all"], work, "full-cargo"),
-            ("detached-run.sh start 带 --wall-clock 照剥", ["bash", "research/scripts/detached-run.sh", "start", "--wall-clock", "over-2h", "--label", "m", "--",
+            ("detached-run.sh start 带 --wall-clock 照剥", ["bash", "scripts/hosts/detached-run.sh", "start", "--wall-clock", "over-2h", "--label", "m", "--",
                                                         "cargo", "test", "--all"], work, "full-cargo"),
             # 它的 preflight 摘掉每一个 --force，单元里跑的是后面那条（lib_shell_words 的 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 下这一格红）
-            ("detached-run.sh start 的 -- 之后先写 --force 照摘", ["bash", "research/scripts/detached-run.sh", "start", "--label", "m", "--",
+            ("detached-run.sh start 的 -- 之后先写 --force 照摘", ["bash", "scripts/hosts/detached-run.sh", "start", "--label", "m", "--",
                                                               "--force", "cargo", "test", "--all"], work, "full-cargo"),
             # 按内容认 detached-run.sh：开头带签名行的改名拷贝、指到它的符号链接、source 读进来的（开关 detached-run-by-name-only 下前三格红）
-            ("bash 起仓内改名的 detached-run.sh 拷贝包全量", ["bash", "research/scripts/dr-renamed.sh", "start", "--label", "m", "--", "cargo", "test", "--all"],
+            ("bash 起仓内改名的 detached-run.sh 拷贝包全量", ["bash", "scripts/dr-renamed.sh", "start", "--label", "m", "--", "cargo", "test", "--all"],
              work, "full-cargo"),
             ("直接执行仓外改名拷贝包 checker 档", [os.path.join(work, "elsewhere", "dr-renamed.sh"), "start", "--label", "m", "--",
                                                  "cargo", "test", "-p", "singlefs-checker-tier"], work, "checker-tier-cargo"),
@@ -3598,14 +3598,14 @@ def selftest():
         unexpanded_cases = [
             ("命令词是循环里 ls 出来的变量、经内存包装与 capped.sh 起（第 936 行那一次的形）",
              "D=$W/target/release/deps; for t in crash_enumeration_new_pool_file_creation_stream checker_quick_stream; do b=$(ls -t $D/$t-* | grep -v '\\.d$' | head -1); "
-             "nice -n 19 bash research/scripts/run-with-memory-cap.sh 6G bash research/scripts/capped.sh 7 $b zz_probe --nocapture; done", "checker-tier-binary"),
-            ("命令词是 $(ls …deps/<checker 档目标>-*)", "bash research/scripts/run-with-memory-cap.sh 4G $(ls -t target/release/deps/checker_quick_stream-* | head -1) --exact a",
+             "nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 6G bash scripts/hosts/capped.sh 7 $b zz_probe --nocapture; done", "checker-tier-binary"),
+            ("命令词是 $(ls …deps/<checker 档目标>-*)", "bash scripts/hosts/run-with-memory-cap.sh 4G $(ls -t target/release/deps/checker_quick_stream-* | head -1) --exact a",
              "checker-tier-binary"),
             ("命令词是写着字面路径的变量、带引号", 'B=target/release/deps/singlefs_checker_tier-0123456789abcdef; "$B"', "checker-tier-binary"),
             ("命令词变量再点到另一个变量", "N=e161_sample_device; B=target/debug/deps/${N}-0123456789abcdef; $B", "checker-tier-binary"),
             ("命令词变量、checker 档二进制只列用例", "b=$(ls target/release/deps/checker_quick_stream-*); $b --list", None),
-            ("命令词变量指到 harness 档的测试二进制", "b=$(ls target/release/deps/overwrite_in_one_instance-*); bash research/scripts/run-with-memory-cap.sh 4G $b", None),
-            ("命令词变量是 python，参数里写着 checker 档目标名", "PY=python3; $PY research/scripts/x.py checker_quick_stream", None),
+            ("命令词变量指到 harness 档的测试二进制", "b=$(ls target/release/deps/overwrite_in_one_instance-*); bash scripts/hosts/run-with-memory-cap.sh 4G $b", None),
+            ("命令词变量是 python，参数里写着 checker 档目标名", "PY=python3; $PY scripts/x.py checker_quick_stream", None),
             ("目标名只在别的变量里，命令词变量点不到它", "for t in checker_quick_stream; do echo $t; done; X=ls; $X", None),
         ]
         for label, text, want in unexpanded_cases:
@@ -3617,7 +3617,7 @@ def selftest():
         # bash 起不来时带 POSIX 字符类的命令词照拒（开关 posix-brackets-unresolved-literal 与 posix-brackets-by-python-glob 下这一格红）
         real_bash, BASH_FOR_PATTERNS = BASH_FOR_PATTERNS, os.path.join(work, "no-such-bash")
         try:
-            bash_missing_cases = [("bash 起不来时 POSIX 字符类起脚本照拒", ["bash", "research/scripts/mutat[[:alpha:]].sh", "crates/mutations.tsv"], repository,
+            bash_missing_cases = [("bash 起不来时 POSIX 字符类起脚本照拒", ["bash", "scripts/mutat[[:alpha:]].sh", "crates/mutations.tsv"], repository,
                                    "pattern-unresolved")]
             for label, argv, cwd, want in bash_missing_cases:
                 found = classify_process(argv, cwd)
@@ -3646,19 +3646,19 @@ def selftest():
             ("去了编号的门禁阶段按名字判", ".claude/gate.d/checker-tier-lkmm.sh", work, True),
             ("门禁目录顶层的共用库 lib-*.sh 不是阶段", ".claude/gate.d/lib-sample.sh", work, False),
             ("lib/ 底下的共用库不是阶段", ".claude/gate.d/lib/stage-cells.sh", work, False),
-            ("仓内位置上的 gate-staged.sh 按名字判", "research/scripts/gate-staged.sh", work, True),
-            ("仓内位置上的 layer0-shard-run.sh 按名字判", "research/scripts/layer0-shard-run.sh", work, True),
-            ("仓内位置上的 mutation-shard-run.sh 按名字判", "research/scripts/mutation-shard-run.sh", work, True),
-            ("仓内位置上的 broad-mutation.py 按名字判", "research/scripts/broad-mutation.py", work, True),
+            ("仓内位置上的 gate-staged.sh 按名字判", "scripts/gate/gate-staged.sh", work, True),
+            ("仓内位置上的 layer0-shard-run.sh 按名字判", "scripts/crash/layer0-shard-run.sh", work, True),
+            ("仓内位置上的 mutation-shard-run.sh 按名字判", "scripts/mutation/mutation-shard-run.sh", work, True),
+            ("仓内位置上的 broad-mutation.py 按名字判", "scripts/mutation/broad-mutation.py", work, True),
             ("规范副本里的 stage-selftest.sh 按名字判（放行时不读正文）", ".claude/singlefs-ai-sop/scripts/stage-selftest.sh", work, True),
             ("仓外的同名 broad-mutation.py 不按名字判", "/tmp/claude-1000/somewhere/broad-mutation.py", work, False),
-            ("从 research 里相对着写的 mutate.sh", "scripts/mutate.sh", os.path.join(work, "research"), True),
+            ("从 research 里相对着写的 mutate.sh", "scripts/mutation/mutate.sh", os.path.join(work, "research"), True),
             ("仓外的同名 mutate.sh 不按名字判", "/tmp/claude-1000/somewhere/mutate.sh", work, False),
-            ("仓内位置上的 crash-amplification.sh 按名字判（不读正文）", "research/scripts/crash-amplification.sh", work, True),
-            ("仓内位置上的 crash-amplification-item.sh 按名字判", "research/scripts/crash-amplification-item.sh", work, True),
-            ("仓内位置上的 crash-amplification-two-hosts.sh 按名字判", "research/scripts/crash-amplification-two-hosts.sh", work, True),
-            ("仓内位置上的 build-patched-qemu.sh 按名字判（不读正文）", "research/scripts/build-patched-qemu.sh", work, True),
-            ("仓内位置上的 crash-point-replay.sh 按名字判（不读正文）", "research/scripts/crash-point-replay.sh", work, True),
+            ("仓内位置上的 crash-amplification.sh 按名字判（不读正文）", "scripts/crash/crash-amplification.sh", work, True),
+            ("仓内位置上的 crash-amplification-item.sh 按名字判", "scripts/crash/crash-amplification-item.sh", work, True),
+            ("仓内位置上的 crash-amplification-two-hosts.sh 按名字判", "scripts/crash/crash-amplification-two-hosts.sh", work, True),
+            ("仓内位置上的 build-patched-qemu.sh 按名字判（不读正文）", "scripts/devices/build-patched-qemu.sh", work, True),
+            ("仓内位置上的 crash-point-replay.sh 按名字判（不读正文）", "scripts/crash/crash-point-replay.sh", work, True),
             ("没登记的脚本", "run-chain.sh", work, False),
         ]
         for label, word, directory, want in name_cases:
@@ -3685,14 +3685,14 @@ def selftest():
             ("cargo clippy", ["cargo", "clippy", "--all-targets"], False),
             ("cargo 只带全局选项", ["cargo", "--version"], False),
             ("直接执行测试二进制", [os.path.join("target", "debug", "deps", "overwrite_in_one_instance-0123456789abcdef")], True),
-            ("直接执行 research 里的实验二进制", ["research/target/release/e142_region_diff_independent"], True),
+            ("直接执行 research 里的实验二进制", ["scripts/experiments/target/release/e142_region_diff_independent"], True),
             ("直接执行名字里带 target 的自定编译目录里的二进制", ["/tmp/singlefs-crates-mutation-target/release/tiny"], True),
             ("带目标三元组的", ["./target/x86_64-unknown-linux-musl/release/new_pool_file_creation_on_device"], True),
             ("deps 下的 .d 依赖文件", [os.path.join("target", "release", "deps", "tiny.d")], False),
             ("名字只当参数", ["ls", "target/release/tiny"], False),
             ("不在 target 底下的程序", ["./prog"], False),
             # 轻型三条里面起 checker 档的 cargo 与 Verus：子 agent 要经内存包装（开关 light-tier-unrecognized、light-tier-memory-cap-unrequired 下前三格红）
-            ("轻型：崩溃点重放入口 --quick", ["research/scripts/crash-point-replay.sh", "--quick"], True),
+            ("轻型：崩溃点重放入口 --quick", ["scripts/crash/crash-point-replay.sh", "--quick"], True),
             ("轻型：形式化那一道 --quick <根>", [".claude/gate.d/checker-tier-formal-verification.sh", "--quick", "."], True),
             ("轻型：crates 变异那一道 --quick --item <行> <根>", [".claude/gate.d/checker-tier-crates-mutation-replay.sh", "--quick", "--item", "core-row-1", "."], True),
             ("别的门禁带 --quick 不算", [".claude/gate.d/doc-text.sh", "--quick"], False),
