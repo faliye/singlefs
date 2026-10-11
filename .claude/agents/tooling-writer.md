@@ -12,7 +12,7 @@ required-inputs: 草稿目录, 报告, 出口, 要改的文件
 
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
-在主工作区改。两种活：一是门禁阶段、钩子、研究脚本、看门狗（`.claude/gate.d/`、`.claude/hooks/`、`.claude/scripts/`、`research/scripts/`）；二是照判决或用户定案改 agent 定义、共用约束与项目规则（`.claude/agents/`、`.claude/agent-common.md`、`.claude/main-agent.md`、`.claude/rules/`）。
+在主工作区改。两种活：一是门禁阶段、钩子、研究脚本、看门狗（`.claude/gate.d/`、`.claude/hooks/`、`.claude/scripts/`、`scripts/`）；二是照判决或用户定案改 agent 定义、共用约束与项目规则（`.claude/agents/`、`.claude/agent-common.md`、`.claude/main-agent.md`、`.claude/rules/`）。
 开工先读：`.claude/singlefs-ai-sop/rules/sop-first.md`「每一条拒绝都必须给出下一步」「加门禁或钩子之前，先找已有的」；`.claude/singlefs-ai-sop/rules/command-safety.md`「并行不许把失败吃掉」「子 shell 里的赋值传不回父进程」「脚本改文件之后要回读确认，警告是免费的信号」「进程边界上的三种静默失效」；`.claude/singlefs-ai-sop/rules/preflight-discipline.md` 全篇；`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」；第二种活另读 `.claude/singlefs-ai-sop/rules/rules-discipline.md`「1. 正文只写四样」「7. 正文不许用位置指代，也不许自称」与 `.claude/rules/implementation-workflow.md`「改 agent 定义与共用约束，走同一条三步」。
 
 ## 输入（主 agent 必须给）
@@ -27,7 +27,7 @@ required-inputs: 草稿目录, 报告, 出口, 要改的文件
 
 1. 开跑前照共用约束「不做」一节看负载；动手前跑 `python3 .claude/singlefs-ai-sop/scripts/gate-overlap.py --list`，看要改的判据有没有已有的门禁或钩子在管。
 2. 每条改法先造一个该红的输入：给被改的脚本加弄坏开关或样本目录。说不出该红的输入，这一条停下交主 agent。
-3. 改已存在的脚本写同目录临时文件再 `mv`，或用 `research/scripts/replace-once.py` 定点改；不在同一个 inode 上就地改。改 `.claude/hooks/` 下的钩子只经 `research/scripts/hook-swap.py` 换上（草稿里先验、换上后再验、不对按反向定点替换回滚），不直接定点改。新建文件排他（Write 前先 `ls` 确认不存在）。
+3. 改已存在的脚本写同目录临时文件再 `mv`，或用 `scripts/kb/replace-once.py` 定点改；不在同一个 inode 上就地改。改 `.claude/hooks/` 下的钩子只经 `scripts/gate/hook-swap.py` 换上（草稿里先验、换上后再验、不对按反向定点替换回滚），不直接定点改。新建文件排他（Write 前先 `ls` 确认不存在）。
 4. 新门禁阶段与新钩子写 `# gate-similar:` 与 `# hook-events:`；新钩子在 `.claude/settings.json` 的 `hooks` 一节注册、带 `--selftest`（自证由上游 `hooks-registered.sh` 跑），注册在哪个 matcher 上的判据挂进 `.claude/gate.d/code-tooling.sh` 的 agent-write-scope 格；新研究脚本写 `admission:` / `run-condition:` 文件头、开头调 `preflight`，自证挂进 `.claude/gate.d/code-tooling.sh` 的 research-script-selftests 格的 runner 表（`SELFTEST_RUNNERS`）。
 5. 自证里只对自己起的进程号发信号（`kill "$!"`、`proc.py stop <pid>`），不按名字、cgroup 或进程组发。
 6. 第二种活：只写判决或规格给的改法，不另加条款；改完在报告里逐份列出改过的定义、共用约束与规则，交主 agent 开定义三方（门禁 doc-process-records 的 agent-def-adversarial-review 格）。
@@ -36,7 +36,7 @@ required-inputs: 草稿目录, 报告, 出口, 要改的文件
 
 ## 写范围
 
-- `.claude/hooks/**`、`.claude/gate.d/**`（含 fixtures 与 `stage-*.tsv`）、`.claude/scripts/**`、`research/scripts/**`、`.claude/settings.json`（只改 `hooks` 一节）、`~/.local/share/singlefs/work/` 下的报告文件与草稿目录。
+- `.claude/hooks/**`、`.claude/gate.d/**`（含 fixtures 与 `stage-*.tsv`）、`.claude/scripts/**`、`scripts/**`、`.claude/settings.json`（只改 `hooks` 一节）、`~/.local/share/singlefs/work/` 下的报告文件与草稿目录。
 - 第二种活另加 `.claude/agents/*.md`、`.claude/agent-common.md`、`.claude/main-agent.md`、`.claude/rules/*.md`。
 - 不写 `.claude/singlefs-ai-sop/**`（上游副本）、`.claude/kb/**`、`crates/**`、`research/prompts/**`、`research/results/**`。与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致。
 

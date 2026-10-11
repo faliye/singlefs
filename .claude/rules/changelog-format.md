@@ -35,12 +35,12 @@
 同一天可以先追加几个 `- ` 项；提交前主 agent 把当天的项整理成结论，门禁在 `--staged` 那一趟判。
 整理只许做四种：与标题同日的日期删掉、包装（快查、现状、`####`）删掉、改前原文换 git 引用、批量条目换指针；
 数、编号、限定词、「因为」引出的理由、引名一个都不删，改前没有的依据句也不加。整理前后跑
-`python3 research/scripts/history-consolidate.py loss-check <改前> <改后>`，退出码不是 0 不许暂存。
+`python3 scripts/kb/history-consolidate.py loss-check <改前> <改后>`，退出码不是 0 不许暂存。
 
 ## 门禁管哪一半
 
 门禁 doc-decisions（`.claude/gate.d/doc-decisions.sh`）的两格：`entry-added`（决策正文改了，`decisions-history.md` 要有新增的 `- ` 项或日期块）、
 `shape`（日期块住在自己的节、同节同一天只一块、两份变更史里不许 `#### `、快查行与现状行、新开的块不许空）。具体判据以那份脚本的文件头为准。
-数与编号有没有丢由 `research/scripts/history-consolidate.py loss-check` 判，暂存前跑。
+数与编号有没有丢由 `scripts/kb/history-consolidate.py loss-check` 判，暂存前跑。
 
 **它管不了的**：结论写得对不对、一条改动该点名的决策或实验有没有点全、整理时限定词丢没丢——这几样靠人。
