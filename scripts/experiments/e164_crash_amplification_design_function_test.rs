@@ -1154,7 +1154,7 @@ mod common {
                 let subcommand = arguments.iter().find(|argument| !argument.starts_with('-') && !argument.contains('='));
                 matches!(subcommand.map(String::as_str), Some("log" | "rev-list" | "ls-files" | "show" | "grep" | "diff" | "rev-parse" | "ls-tree"))
             }
-            "python3" => arguments.first().is_some_and(|script| script.ends_with("scripts/admission.py"))
+            "python3" => arguments.first().is_some_and(|script| script.ends_with("scripts/gate/admission.py"))
                 && arguments.get(1).is_some_and(|subcommand| subcommand == "crash-case-manifest"),
             _ => false,
         };
@@ -1358,7 +1358,7 @@ mod fingerprints {
     fn admission_manifest(copy_root: &Path, environment: &BTreeMap<String, String>, with_environment_lines: bool, scratch: &Path) -> (String, Vec<String>) {
         let manifest_path = scratch.join(format!("manifest-{}.txt", u8::from(with_environment_lines)));
         let mut arguments = vec![
-            copy_root.join("scripts/admission.py").display().to_string(),
+            copy_root.join("scripts/gate/admission.py").display().to_string(),
             "crash-case-manifest".to_string(),
             copy_root.display().to_string(),
             CASE_KEY.to_string(),

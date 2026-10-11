@@ -3,7 +3,7 @@
 # Z 族输入核对（含第一段乙没核的 impl-verdicts.tsv）、v2-487 判 Z1 批 1–3 / Z3 / Z4 / Z5 批 1–3、Q5-pc（v2 原样判 Z1 / Z5 批 1–2、Z3、Z4）、
 # Q5-e 第一项、Q5-d 与 Q4-fmt-487、照抄核对（Q5-i、Q5-pc3、XC8 / XC9）、Q5 比对器（含 B4-487、B15、B17、Q5-pc2）两趟。全是 Python，不编 Rust。
 # 跑法（在仓根，整条脚本经两层包装）：
-#   bash scripts/capped.sh <线程> bash scripts/run-with-memory-cap.sh 8G \
+#   bash scripts/hosts/capped.sh <线程> bash scripts/hosts/run-with-memory-cap.sh 8G \
 #     bash scripts/experiments/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh <日期标签> <工作进程数> <空的草稿目录> [产物目录]
 # 产物：research/results/e170-r2-o3-spec-executor-<日期标签>-s2-q5-*.out 与 -s2b-known-bad-recopy*.out，已存在就不覆盖（noclobber；Python 一侧用 open(…, "x")）。
 # 每一步的退出码记进 -s2-q5-run-status.out；一步失败不吞，照记、接着跑后面不依赖它的步。
@@ -23,7 +23,7 @@ S1B="$ROOT/research/results/e170-r2-o3-spec-executor-2026-10-04-s1b-executor.out
 V2_FREEZE="$ROOT/research/results/e170-r2-o3-spec-executor-2026-10-04-s1-executor.out"
 EXPORT_PRODUCT="$ROOT/research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export-r3.out"
 S2="$ROOT/research/results/e170-r2-o3-spec-executor-2026-10-04-s2"  # 第二段 Q1–Q3 那一趟：v2 在 311 冻结导出上的判定（Q5 的参照）
-TABLE="$ROOT/scripts/mutations/e170_o3_spec_executor_with_witness_predicates_journal_header_487.tsv"
+TABLE="$ROOT/scripts/mutation/tables/e170_o3_spec_executor_with_witness_predicates_journal_header_487.tsv"
 Z="$ROOT/scripts/experiments/target/e170-r2-today-dumps"
 Z1="$Z/e170-dump"; Z1R="$Z/e170-dump-repeat"; Z3="$Z/e170-bad-states-second-run"; Z4="$Z/e170-bad-states-copy-s2"; ZKB="$Z/known-bad-s2"; Z5="$Z/e171-baseline-run1"
 I2="$ROOT/scripts/experiments/target/e170-second-run-dumps"; I4="$ROOT/scripts/experiments/target/e171-dumps/e170-bad-states-copy-s2"; IKB="$ROOT/scripts/experiments/target/e171-dumps/known-bad-s2"

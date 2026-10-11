@@ -148,7 +148,7 @@ mod tests {
     /// 与「分块是一个划分」，都是**结构性质**，量出来的那个数没有任何东西钉它。
     ///
     /// 而这个数要跨语言比：CPU 侧是本文件（Rust），GPU 侧是
-    /// `scripts/e21-transfer.py`（Python，`gb = n / 1e9`）。
+    /// `scripts/experiments/e21-transfer.py`（Python，`gb = n / 1e9`）。
     /// **两侧任何一侧改成 GiB（2^30），比值就偏 7.4%**——
     /// 而 decisions.md D24（后台重活能不能卸给 GPU） 的判决恰恰落在这个量级上
     /// （CPU 64.91 对 GPU 端到端 50.3，净收益 0.78×）。

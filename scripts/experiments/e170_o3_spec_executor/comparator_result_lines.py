@@ -1,5 +1,5 @@
 """E170 第三段的比对器、坏状态判定与变异驱动共用的结果行协议：每行以 `E7RESULT ` 起头，收尾 `E7RESULT name=done emitted=N`
-（N 把 config 行与 done 行自己都算进去，同 scripts/replay.sh 的完整性闸 2）。不带耗时，两次跑逐字节相同才登记得进 replay。
+（N 把 config 行与 done 行自己都算进去，同 scripts/experiments/replay.sh 的完整性闸 2）。不带耗时，两次跑逐字节相同才登记得进 replay。
 
 文件名以 comparator 起头：executor_main.FILES_OUTSIDE_THE_FREEZE 认它在冻结之外（登记 5.6），冻结的 sha256 与种子不因它变。
 """

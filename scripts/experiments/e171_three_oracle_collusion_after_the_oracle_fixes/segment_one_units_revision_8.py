@@ -16,7 +16,7 @@
   step-0、step-1、step-2、step-2b 依次；之后 step-3-<十项>、step-4-<十项>、step-5、step-6、step-7、step-9、step-10-run-1、step-10-run-2 同时起，
   step-8 等 step-7，step-9-z1 等 step-7 与 step-9，step-10-z7 等第 10 步两次；第 0 步判 research_side_differs=true 时另排 research-mutations（等 step-0）。
   第 11–13 步：step-0、1、2、2b、7（与 research-mutations，排了的话）都绿就起 rows_orchestrator_revision_8.py run，它与还在跑的单元共用本机，按它现查的余量分配。
-次序与资源：本机每次起跑、续跑现查 scripts/host-resources.py --json：线程额度 = cpu.available_threads，内存额度 = min(memory.slice_room, memory.available)；
+次序与资源：本机每次起跑、续跑现查 scripts/hosts/host-resources.py --json：线程额度 = cpu.available_threads，内存额度 = min(memory.slice_room, memory.available)；
   每个单元占 THREADS（修订 6 跑法的 10）个线程（只比对的小单元 1 个）、内存照修订 6 跑法的 CAP_LARGE 6G（流三在里面的）/ CAP_SMALL 4G，
   第 4 步每项另加编译 3 GiB（驱动在单元里冷编一次）；放得下就起，放不下的排队；队首是 step-7，其余按推的用时从长到短（推的用时只排先后，不进判定）。
   逐行编排起了之后，每起一个单元之前再现查一次本机，此刻可用的线程与内存也要放得下。此刻一个单元都放不下（本机一个都没在跑）退 78。
@@ -327,7 +327,7 @@ class Budget:
 
 def idle_budget(settings: Settings) -> Budget | None:
     """干跑里另排一遍用的「本机空着时」的额度：核数与 min(slice 总量, 内存总量)（只给人看挂钟，起跑不用它）；读不到交回 None。"""
-    command = override("UNITS_R8_RESOURCES_COMMAND", "python3 scripts/host-resources.py --json")
+    command = override("UNITS_R8_RESOURCES_COMMAND", "python3 scripts/hosts/host-resources.py --json")
     completed = subprocess.run(["bash", "-c", command], cwd=settings.repo, capture_output=True, text=True)
     hosts = [host for host in json.loads(completed.stdout).get("hosts", []) if host.get("number") == 1] if completed.returncode == 0 else []
     if not hosts or not hosts[0].get("read") or "cores" not in hosts[0]["cpu"]:
@@ -337,7 +337,7 @@ def idle_budget(settings: Settings) -> Budget | None:
 
 
 def local_budget(settings: Settings) -> Budget:
-    command = override("UNITS_R8_RESOURCES_COMMAND", "python3 scripts/host-resources.py --json")
+    command = override("UNITS_R8_RESOURCES_COMMAND", "python3 scripts/hosts/host-resources.py --json")
     completed = subprocess.run(["bash", "-c", command], cwd=settings.repo, capture_output=True, text=True)
     if completed.returncode != 0:
         raise RunCondition(f"host-resources.py --json 退 {completed.returncode}")

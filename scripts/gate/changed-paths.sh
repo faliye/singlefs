@@ -24,7 +24,7 @@
 #     调用方按「拿不到改动范围」处理（通常退回全量判）。
 #
 # 阶段里的用法：
-#   LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/scripts/changed-paths.sh"
+#   LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/changed-paths.sh"
 #   source "$LIB_CHANGED_PATHS" || { echo "  ✗ …"; echo "     → …"; exit 1; }
 #   base="$(gate_diff_base gate)"
 #   changed="$(gate_changed_paths "$base" untracked)"
@@ -33,7 +33,7 @@
 # 阶段调用的共用 shell 脚本照 stage-must-run.sh、change-touches-crates.sh 的惯例放这里；自证由门禁 code-tooling 跑。
 # `--selftest` 在临时 git 仓里自证：三种来源（工作区改、暂存新增、未跟踪）各放一个中文路径，逐字核两个函数的输出。
 # 弄坏开关 LIB_CHANGED_PATHS_BREAK=<项>（只给证红用，一次给一个；打开时自证退 1）。
-# 逐项写开关名、弄坏哪一处、打开后自证哪几项红：项名是自证里 check 的标签，一行一项；失败行列在「✗ 共用库 scripts/changed-paths.sh 的自证没过」
+# 逐项写开关名、弄坏哪一处、打开后自证哪几项红：项名是自证里 check 的标签，一行一项；失败行列在「✗ 共用库 scripts/gate/changed-paths.sh 的自证没过」
 # 下面，句首就是标签，整行是「<标签>：期望「…」，实测「…」」，括号里抄那一行的实测（制表符写成 <制表符>）：
 #   LIB_CHANGED_PATHS_BREAK=quotepath  gate_changed_paths 与 gate_added_lines 的 git 调用漏掉 -c core.quotepath=false
 #       未跟踪也算、中文路径不转义（实测「"\345\267\262\350\267\237\350\270\252.md" | …」：中文路径成了带引号的八进制串）
@@ -61,8 +61,8 @@
 #   LIB_CHANGED_PATHS_BREAK=binary  未跟踪的二进制文件也整份读
 #       新增行：未跟踪的二进制文件不读（实测「1」）
 #
-#   bash scripts/changed-paths.sh --selftest      # 自证
-#   LIB_CHANGED_PATHS_BREAK=quotepath bash scripts/changed-paths.sh --selftest   # 必须判红
+#   bash scripts/gate/changed-paths.sh --selftest      # 自证
+#   LIB_CHANGED_PATHS_BREAK=quotepath bash scripts/gate/changed-paths.sh --selftest   # 必须判红
 
 gate_diff_base() {
   local mode="$1" merge_base
@@ -152,7 +152,7 @@ gate_added_lines() {
 # ── 直接跑（不是 source）时：只认 --selftest，在临时仓里自证 ─────────────────
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   set -uo pipefail
-  [[ "${1:-}" == "--selftest" ]] || { echo "  ✗ 用法：bash scripts/changed-paths.sh --selftest（平时由门禁阶段 source 它）"; echo "     → 怎么办：自证就带 --selftest；要取改动路径，在阶段里 source 它再调 gate_diff_base / gate_changed_paths。"; exit 2; }
+  [[ "${1:-}" == "--selftest" ]] || { echo "  ✗ 用法：bash scripts/gate/changed-paths.sh --selftest（平时由门禁阶段 source 它）"; echo "     → 怎么办：自证就带 --selftest；要取改动路径，在阶段里 source 它再调 gate_diff_base / gate_changed_paths。"; exit 2; }
   selftest_directory="$(mktemp -d)"
   trap 'rm -rf "${selftest_directory:?}"' EXIT
   selftest_output="$(
@@ -223,13 +223,13 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   check_count="$(grep -c '^PASS \|^FAIL ' <<<"$selftest_output")"
   failures="$(grep '^FAIL ' <<<"$selftest_output")"
   if [[ -n "$failures" || "$check_count" -ne 15 ]]; then
-    echo "  ✗ 共用库 scripts/changed-paths.sh 的自证没过（查了 $check_count 项，应当 15 项）："   # gate-lint:summary
+    echo "  ✗ 共用库 scripts/gate/changed-paths.sh 的自证没过（查了 $check_count 项，应当 15 项）："   # gate-lint:summary
     printf '%s\n' "$failures" | sed 's/^FAIL /      /'   # gate-lint:detail
     printf '%s\n' "$selftest_output" | grep -v '^PASS \|^FAIL ' | sed 's/^/      /'   # gate-lint:detail
     echo "     → 怎么办：看 gate_changed_paths / gate_added_lines 的 git 调用有没有带 -c core.quotepath=false、未跟踪文件那一支有没有加 ls-files --others，"
     echo "               gate_diff_base 的回退次序是不是 GATE_BASE → @{upstream} 的 merge-base → HEAD；门禁 doc-process-records、doc-experiments 与 doc-registries 的 invariant-anchors 那一格都靠它取改动范围。"
     exit 1
   fi
-  echo "  ✓ 共用库 scripts/changed-paths.sh 自证通过（$check_count 项：三种来源的中文路径逐字不转义、未跟踪可开关、diff-filter=A、新增行含未跟踪整份且只看给的路径、带空格路径与「++ 」开头的行、不读二进制、路径带制表符退非 0、基准解析不到退非 0、HEAD 没出生取空树、基准回退四档）"
+  echo "  ✓ 共用库 scripts/gate/changed-paths.sh 自证通过（$check_count 项：三种来源的中文路径逐字不转义、未跟踪可开关、diff-filter=A、新增行含未跟踪整份且只看给的路径、带空格路径与「++ 」开头的行、不读二进制、路径带制表符退非 0、基准解析不到退非 0、HEAD 没出生取空树、基准回退四档）"
   exit 0
 fi

@@ -11,25 +11,25 @@
   rows_orchestrator.py plan <同上>
       只现查机器与资源、算分配、按每行推的用时推各台挂钟，打出来；一行都不起，不写产物。
   rows_orchestrator.py --selftest [--cells 格,…]
-      假驱动、假 multi-host-run、假机器清单与资源走一遍各格（selftest_fakes/），末尾逐个打开弄坏开关核它红在点名的格。
+      假驱动、假 multi-host-run、假机器清单与资源走一遍各格（），末尾逐个打开弄坏开关核它红在点名的格。
 
 退出码：0 跑完（第 11–13 步都绿）；1 停机或某一行没跑成（日志与 sequence.log 写停在哪、为什么）；2 用法错；
   78 运行条件不满足（多机配置判不过、某台连不上或没读到资源、别的台的预检没过（工具链、Python、离线编译、盘）、此刻一条线道都放不下、
   跨机对照那一行此刻放不下）——不悄悄退回单机，出路是修好那台或改配置，再用同一条命令起；143 收到 TERM / INT / HUP，收完尾退出。
 
-机器：scripts/layer0-shard-configuration-check.sh --emit-hosts 解出的清单（本机是第 1 台，HOSTS 里依次是第 2、3…台；没写 HOSTS 就是 PEER_SSH_HOST
+机器：scripts/crash/layer0-shard-configuration-check.sh --emit-hosts 解出的清单（本机是第 1 台，HOSTS 里依次是第 2、3…台；没写 HOSTS 就是 PEER_SSH_HOST
   一台）。判法退 3（ENABLE_ACROSS_MACHINES 没开）只用本机、打一行；退 1 退 78。日志与产物里台名只写「本机」「第二台」……，不写别名与目录。
-  别的台每行经 scripts/multi-host-run.sh --peer 起；它只读配置的 PEER_*，所以不是 PEER_SSH_HOST 的那几台，这里按 --emit-hosts 的
+  别的台每行经 scripts/hosts/multi-host-run.sh --peer 起；它只读配置的 PEER_*，所以不是 PEER_SSH_HOST 的那几台，这里按 --emit-hosts 的
   MULTI_HOST_<号>_* 另写一份只给那一台用的配置（PEER_* 换成那一台的，草稿状态目录里、权限 600），经 SINGLEFS_MULTI_HOST_CONFIG 交给它；那一台没配仓目录或
   cargo 目录退 78。
-资源与分配（每次起跑、每次续跑都现查现算，写进日志）：scripts/host-resources.py --json 逐台读，读不到一台退 78。
+资源与分配（每次起跑、每次续跑都现查现算，写进日志）：scripts/hosts/host-resources.py --json 逐台读，读不到一台退 78。
   可用线程 = min(cpu.available_threads, 31)。每台槽数 = min(⌊可用线程 / 5⌋, ⌊memory.slice_room / 包装账⌋, ⌊memory.available / 实占⌋,
   ⌊那台配置的内存上限 / 包装账⌋)；每槽线程 = ⌊可用线程 / 槽数⌋（≥ 5：原跑法每道 5，限时基线在这个量级上量的）。
   包装账（内存包装 run-with-memory-cap.sh 在 slice 里排队按的量）：本机每槽 6G，就是装置与 O3 那一层包装的上限（原跑法 CAP_LARGE；行目录每行不同、
     峰值表里没有这条命令，包装按上限记账）；别的台每槽 10G，是那 6G 加外层包装 --memory-cap 4G（multi-host-run.sh 在那边把驱动与编译整个套进一层包装，
     它在 slice 账上一直占着 4G 减已用；4G 管驱动加一次编译）。配置的内存上限（PEER_MEMORY_CAP、HOST_<号>_MEMORY_CAP）卡的是那台各层包装之和。
   实占（memory.available：MemAvailable 减包装账上还没涨到量的那一截）：每槽 10 GiB = 6G + 编译 3 GiB（cargo build 不在装置包装里；峰值表
-    scripts/memory-peaks.tsv 里 capped.sh 10 cargo build --release --offline -p singlefs-checker-tier --bin e171_… 那一行 2.54 GiB，向上取整）
+    scripts/hosts/memory-peaks.tsv 里 capped.sh 10 cargo build --release --offline -p singlefs-checker-tier --bin e171_… 那一行 2.54 GiB，向上取整）
     + 驱动与杂项 1 GiB（推的）。本机的编译在 slice 外面，这一项防几道同时冷编译把 slice 外的余量吃光。
 行与派发：第 11 步 242、269（带探针）、第 12 步空变异 row-0 与 13 行、跨机对照 X（row-0 在另一台再跑一次），同进一个队列，第 11、12 步同时跑；
   每行一个单线道驱动（--lanes 1），哪一槽空了就从队列头取第一个放得下的（X 只放在第 12 步 row-0 那一台之外）；某一行没跑成就不再派新行，
@@ -1308,9 +1308,9 @@ def context_from_arguments(arguments: argparse.Namespace) -> Context:
         check=os.path.abspath(arguments.check), logs=os.path.abspath(arguments.logs), work_root=os.path.abspath(arguments.work_root),
         driver_path=os.path.abspath(driver_override) if driver_override else os.path.join(research_root, RESEARCH_RELATIVE, DRIVER_NAME),
         driver_overridden=bool(driver_override),
-        multi_host_run=environment.get("ROWS_ORCHESTRATOR_MULTI_HOST_RUN") or os.path.join(os.path.abspath(arguments.repo), "scripts/multi-host-run.sh"),
-        hosts_command=environment.get("ROWS_ORCHESTRATOR_HOSTS_COMMAND") or "bash scripts/layer0-shard-configuration-check.sh --emit-hosts",
-        resources_command=environment.get("ROWS_ORCHESTRATOR_RESOURCES_COMMAND") or "python3 scripts/host-resources.py --json",
+        multi_host_run=environment.get("ROWS_ORCHESTRATOR_MULTI_HOST_RUN") or os.path.join(os.path.abspath(arguments.repo), "scripts/hosts/multi-host-run.sh"),
+        hosts_command=environment.get("ROWS_ORCHESTRATOR_HOSTS_COMMAND") or "bash scripts/crash/layer0-shard-configuration-check.sh --emit-hosts",
+        resources_command=environment.get("ROWS_ORCHESTRATOR_RESOURCES_COMMAND") or "python3 scripts/hosts/host-resources.py --json",
         poll_seconds=float(environment.get("ROWS_ORCHESTRATOR_POLL_SECONDS") or 10),
         peer_compile_check=environment.get("ROWS_ORCHESTRATOR_PEER_COMPILE_CHECK", "1") != "0")
 
@@ -1394,7 +1394,7 @@ def cells_derived_configuration(scratch: str) -> list[tuple[str, bool, str]]:
     attempt = os.path.join(scratch, "derived")
     os.makedirs(attempt)
     path = configuration_for(dataclasses.replace(Context(*([""] * 8), "", "", "", "", "", False, "", "", "", 1.0, False), attempt_dir=attempt), hosts[2], values)
-    completed = subprocess.run(["bash", os.path.join(REAL_REPOSITORY, "scripts/layer0-shard-configuration-check.sh"), "--emit-hosts", REAL_REPOSITORY],
+    completed = subprocess.run(["bash", os.path.join(REAL_REPOSITORY, "scripts/crash/layer0-shard-configuration-check.sh"), "--emit-hosts", REAL_REPOSITORY],
                                capture_output=True, text=True, env=dict(os.environ, SINGLEFS_MULTI_HOST_CONFIG=path))
     emitted = parse_assignments(completed.stdout)
     good = (len(hosts) == 3 and not hosts[2].is_peer and completed.returncode == 0 and emitted.get("PEER_SSH_HOST") == "third.host"

@@ -37,7 +37,7 @@
 
 --cited 认编号时，正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号不当编号（代码围栏里的声明不算，与 doc-lint 同读法）；
 认编号的读法只有 cited_kb_sources() 一份：three-way-materials.py 收材料时调它的宽读法（不要求「（」），--cited 用严格读法，宽读法认出的是超集。
-退 5 时逐个写缺的文件是正文里哪个记号引出的，给一条能照抄的 `python3 scripts/kb-sections.py <文件> >> <清单>`，
+退 5 时逐个写缺的文件是正文里哪个记号引出的，给一条能照抄的 `python3 scripts/kb/kb-sections.py <文件> >> <清单>`，
 并写明接上的那几张要逐行标抄不抄、标完重跑。
 
 退出码：
@@ -346,7 +346,7 @@ def lacking_checklist_message(lacking, sources, checklist):
     lines = [f"quote-kb: 正文提到了 {len(lacking)} 个 kb 文件，清单里没有它们的小节清单："]
     if os.environ.get('QUOTE_KB_BREAK') == 'bare-lacking-hint':   # 弄坏开关：改前的说法，不点编号、不给命令
         lines += [f"    {m}" for m in lacking]
-        lines.append("  → 用 scripts/kb-sections.py 给这几个文件各生成一张清单，逐行判抄不抄再重跑（C234）")
+        lines.append("  → 用 scripts/kb/kb-sections.py 给这几个文件各生成一张清单，逐行判抄不抄再重跑（C234）")
         return lines
     present = [m for m in lacking if os.path.isfile(m)]
     absent = [m for m in lacking if not os.path.isfile(m)]
@@ -383,7 +383,7 @@ def selftest():
     exit_code, problems = scratch.run_with_scratch(
         selftest_in, 'quote-kb-selftest-', os.environ.get('QUOTE_KB_BREAK') == 'keepscratch',
         SELFTEST_ROLE_VARIABLE, [sys.executable, os.path.abspath(__file__), '--selftest'])
-    return scratch.merged_exit_code(exit_code, problems, 'scripts/quote-kb.py 的 selftest()', 'QUOTE_KB_BREAK=keepscratch')
+    return scratch.merged_exit_code(exit_code, problems, 'scripts/kb/quote-kb.py 的 selftest()', 'QUOTE_KB_BREAK=keepscratch')
 
 
 def selftest_in(work):

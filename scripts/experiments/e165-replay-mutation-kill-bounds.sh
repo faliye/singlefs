@@ -72,7 +72,7 @@
 #       逐行列变体（基线 1 个、crates/mutations.tsv 里 21 种不同的替换、自造 5 条，共 27 行），不编不跑。
 #   e165-replay-mutation-kill-bounds.sh --select-rows --output <产物>
 #       只做登记 r1 第九节的选行（RQ4）与标签比对（RQ5、RQ6）：照 23 个变异名在今天的 crates/mutations.tsv 里找行，核 4 条（恰 1 行、文件列是 recovery.rs 或 lib.rs、
-#       原文命中 1 次、命中处落在 9.2 的函数里），再把 scripts/mutations/e165_replay_bounded_enumeration_tags.tsv 里每行的标签集合与登记时的集合比；
+#       原文命中 1 次、命中处落在 9.2 的函数里），再把 scripts/mutation/tables/e165_replay_bounded_enumeration_tags.tsv 里每行的标签集合与登记时的集合比；
 #       写 <产物>（已存在就不写、退 2），不编不跑。选不到（RQ4 / RQ6 有一行不满足）退 1，逐行比对结果照写；核对输入对不上（停机条款 RH1）退 4、不写。
 #       r2 登记 9.1 不判标签（附带照报）：Z5 不在标签表里，它那一行的标签几列写 not_judged_in_r2，只按原文命中 1 次判选没选到。
 #   e165-replay-mutation-kill-bounds.sh --scratch <草稿目录> --output <产物> --ledger <红例账> [--item <变体>]… [--jobs <并行度>] [--threads <每个变体的线程数>]
@@ -124,8 +124,8 @@
 #   first_text_red_criteria=<域>:<N>:<判据>+<判据>;…——每个域上任一条判据的 name=violations 行文字与基线不同的最小 N，与那个 N 上文字不同的全部判据名
 #   （SQ5 要 Z5 的这一格；每个变体都报）。
 #
-# 并行：--jobs 个变体同时做，每个变体的编译与装置各用 --threads 条线程；经 scripts/capped.sh N 起时 jobs × threads 不许超过 N。
-# 内存：跑编译出来的二进制一律经 scripts/run-with-memory-cap.sh（上限 E165_KILL_BOUNDS_MEMORY_CAP，默认 512M：
+# 并行：--jobs 个变体同时做，每个变体的编译与装置各用 --threads 条线程；经 scripts/hosts/capped.sh N 起时 jobs × threads 不许超过 N。
+# 内存：跑编译出来的二进制一律经 scripts/hosts/run-with-memory-cap.sh（上限 E165_KILL_BOUNDS_MEMORY_CAP，默认 512M：
 #   2026-10-01 量到基线 --bounds segment1 --family legal 的峰值 47 MiB，变体的用量没逐个量过，留十倍）；退出码 245（显存不够：起止之间内核报了
 #   NV_ERR_NO_MEMORY，单独报「显存不够」）与 250–254 的那一次不算结果，那个变体不落行，整条退 1（判法 wrapper_own_problem，三套变体共用）。
 #   cargo build 不跑编出来的代码，不经包装。
@@ -171,7 +171,7 @@
 #       「选行 ②：同名两行应当报 more_than_one_row_with_this_name、退 1、不编」（实际退 0、编 0 次）
 #   E165_KILL_BOUNDS_BREAK=nodupcheck  同名多行时不报、取第一行
 #       「选行 ②：同名两行应当报 more_than_one_row_with_this_name、退 1、不编」（实际退 0、编 0 次）
-#   E165_KILL_BOUNDS_BREAK=owntablesplit  选行回到自己切 crates/mutations.tsv（四段以上就收、不看哪一段空着），不经 scripts/crates-mutation-rows.py 的 read_table
+#   E165_KILL_BOUNDS_BREAK=owntablesplit  选行回到自己切 crates/mutations.tsv（四段以上就收、不看哪一段空着），不经 scripts/mutation/crates-mutation-rows.py 的 read_table
 #       「选行 ⑧：登记名那一行不成形（cargo 参数那一段空着）应当报 no_row_with_this_name、点名第 2 行、退 1、不编」（实际退 0）
 #   E165_KILL_BOUNDS_BREAK=nolocationcheck  不核命中处在不在 9.2 的函数里
 #       「选行 ③：原文在 9.2 的函数之外应当报 outside_the_registered_functions、点名第 5 行、退 1、不编」（实际退 0、编 0 次）
@@ -214,8 +214,8 @@ RECOVERY_PATH = "crates/singlefs-core/src/recovery.rs"
 LIB_PATH = "crates/singlefs-replay-prefix/src/lib.rs"
 SOURCE_FILES = (RECOVERY_PATH, LIB_PATH)     # 变异改的文件取变异行第二列，只认这两份（r1 9.1）
 TABLE_PATH = "crates/mutations.tsv"
-CUSTOM_TABLE_PATH = "scripts/mutations/e165_replay_bounded_enumeration_custom.tsv"
-TAGS_TABLE_PATH = "scripts/mutations/e165_replay_bounded_enumeration_tags.tsv"   # r1 9.3：每个变体在两版源码上的判定标签集合与依据
+CUSTOM_TABLE_PATH = "scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv"
+TAGS_TABLE_PATH = "scripts/mutation/tables/e165_replay_bounded_enumeration_tags.tsv"   # r1 9.3：每个变体在两版源码上的判定标签集合与依据
 COPIED_ROOT_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates")
 WORK_DIRECTORY_NAME = "kill-bounds"
 # crates/mutations.tsv 的登记值在第一段收尾之前填不出（第一段要往表里加装置的行）：占位串让开工核对一律停在 RH1，填了真值才跑得起来。
@@ -551,7 +551,7 @@ class Setup:
         # r2 模式原来的冻结根自己带 research/（自造表、标签表、内存包装、第一段产物都从根里读）；--pins r5 的根是第一段根，只有 crates/ 那几样，
         # 这几样改取脚本所在的仓（登记 r5 第十一节「根、清单、在哪编」：驱动的自造表与 scripts 取脚本所在的仓）。
         self.research_root = self.script_root if pins == "r5" else root
-        self.memory_cap_runner = os.path.join(self.research_root if profile == "r2" else self.script_root, "scripts/run-with-memory-cap.sh")
+        self.memory_cap_runner = os.path.join(self.research_root if profile == "r2" else self.script_root, "scripts/hosts/run-with-memory-cap.sh")
 
     def bounds_arguments(self):
         """每次整份跑装置的界参数：r2 是 --bounds segment2；r3 是 --bounds segment1 --family root_choice（登记 r3 9.3 第 3 条）；
@@ -614,7 +614,7 @@ _CRATES_MUTATION_ROWS = []
 
 
 def mutation_table_rows(setup):
-    """crates/mutations.tsv 里成形的行：[(表行号, 各段原样)]。切表与成形照 scripts/crates-mutation-rows.py 的 read_table
+    """crates/mutations.tsv 里成形的行：[(表行号, 各段原样)]。切表与成形照 scripts/mutation/crates-mutation-rows.py 的 read_table
     （门禁 checker-tier-crates-mutation-replay 与 prove-red.sh 同一份）；弄坏开关 owntablesplit 下照改前自己切（四段以上就收）。"""
     if "owntablesplit" in BREAK:
         rows = []
@@ -669,7 +669,7 @@ def compare_tag_sets(registered, today):
 
 
 def load_tag_table(setup):
-    """scripts/mutations/e165_replay_bounded_enumeration_tags.tsv：键 → 版本 → [(标签们, 在不在, 依据)]；集合 = 标 yes 的标签。"""
+    """scripts/mutation/tables/e165_replay_bounded_enumeration_tags.tsv：键 → 版本 → [(标签们, 在不在, 依据)]；集合 = 标 yes 的标签。"""
     table = {}
     with open(os.path.join(setup.research_root, TAGS_TABLE_PATH), encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, 1):
@@ -1166,7 +1166,7 @@ def counter_difference(baseline_line, mutant_line):
 
 
 def rerun_command(item, options):
-    return (f"bash scripts/e165-replay-mutation-kill-bounds.sh{options.get('pins_text', '')} --scratch <草稿目录> --output {options['output_shown']} "
+    return (f"bash scripts/experiments/e165-replay-mutation-kill-bounds.sh{options.get('pins_text', '')} --scratch <草稿目录> --output {options['output_shown']} "
             f"--ledger {options['ledger_shown']} --recheck --item {item['name']}")
 
 
@@ -1716,7 +1716,7 @@ def baseline_item_line_r4(setup, item, baseline, options):
 
 
 def rerun_command_r4(item, options):
-    return (f"bash scripts/e165-replay-mutation-kill-bounds.sh --profile r4{options.get('pins_text', '')} --root <第一段根> --scratch <草稿目录> "
+    return (f"bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --profile r4{options.get('pins_text', '')} --root <第一段根> --scratch <草稿目录> "
             f"--output {options['output_shown']} --item {item['name']}")
 
 def process_item_r4(setup, item, baseline, options):
@@ -1885,7 +1885,7 @@ def baseline_item_line_r3(item, baseline, options):
 
 
 def rerun_command_r3(item, options):
-    return (f"bash scripts/e165-replay-mutation-kill-bounds.sh --profile r3{options.get('pins_text', '')} --root {'<r5 第一段根>' if options.get('pins_text') else '<第二段冻结根>'} --scratch <草稿目录> "
+    return (f"bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --profile r3{options.get('pins_text', '')} --root {'<r5 第一段根>' if options.get('pins_text') else '<第二段冻结根>'} --scratch <草稿目录> "
             f"--output {options['output_shown']} --item {item['name']}")
 
 
@@ -2452,7 +2452,7 @@ def measure(setup, options, name):
     directory = os.path.join(options["work"], "measure-" + name)
     binary, problem, build_seconds = prepare_and_build(setup, item, directory, options["threads"], wrap_build_for_measure=True)
     peak = "没读到"
-    peaks_path = os.path.join(setup.research_root, "scripts/memory-peaks.tsv")
+    peaks_path = os.path.join(setup.research_root, "scripts/hosts/memory-peaks.tsv")
     if os.path.exists(peaks_path):
         for line in open(peaks_path, encoding="utf-8"):
             fields = line.rstrip("\n").split("\t")
@@ -2484,7 +2484,7 @@ def build_row_selection(setup, output_shown):
     lines = [f"E7RESULT name=config experiment=E165 segment=2 part=row_selection registration=research/prompts/e165-r2-prereg.md "
              f"recovery_sha256={hashes[RECOVERY_PATH]} lib_sha256={hashes[LIB_PATH]} table_sha256={sha256_of_file(os.path.join(setup.root, TABLE_PATH))} "
              f"registered_names={len(setup.registered['names'])} custom_rows={len(customs)} function_ranges={len(ranges)} "
-             f"rerun=\"bash scripts/e165-replay-mutation-kill-bounds.sh --select-rows --output {output_shown}\""]
+             f"rerun=\"bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --select-rows --output {output_shown}\""]
     for (path, name, start, end), registered_entry in zip(ranges, setup.registered["functions"]):
         lines.append(f"E7RESULT name=function_range file={path} function={name} first={start} last={end} registered_first={registered_entry[2]} registered_last={registered_entry[3]}")
     item_of = {}
@@ -2883,13 +2883,13 @@ def selftest():
             return handle.read()
 
     with tempfile.TemporaryDirectory(prefix="e165-kill-bounds-selftest-") as temporary:
-        # 内存包装自己的结局：不是自证模式的 Setup（经包装起），包装换成假的（它所在的根下 scripts/run-with-memory-cap.sh 只退给定的码），
+        # 内存包装自己的结局：不是自证模式的 Setup（经包装起），包装换成假的（它所在的根下 scripts/hosts/run-with-memory-cap.sh 只退给定的码），
         # 走 run_segment_two 跑一趟，再照三套变体共用的 wrapper_own_problem 判
         wrapper_root = os.path.join(temporary, "wrapper-root")
         os.makedirs(os.path.join(wrapper_root, "scripts"))
         wrapper_codes = {}
         for wrapper_exit in (245, 252, 101):
-            write(os.path.join(wrapper_root, "scripts/run-with-memory-cap.sh"),
+            write(os.path.join(wrapper_root, "scripts/hosts/run-with-memory-cap.sh"),
                   f"#!/usr/bin/env bash\n# 自证用的假内存包装：什么都不起，退 {wrapper_exit}\nexit {wrapper_exit}\n")
             wrapper_log = os.path.join(temporary, f"wrapper-{wrapper_exit}")
             os.makedirs(wrapper_log)
@@ -2904,7 +2904,7 @@ def selftest():
         root = os.path.join(temporary, "root")
         os.makedirs(os.path.join(root, "crates/singlefs-core/src"))
         os.makedirs(os.path.join(root, "crates/singlefs-replay-prefix/src"))
-        os.makedirs(os.path.join(root, "scripts/mutations"))
+        os.makedirs(os.path.join(root, "scripts/mutation/tables"))
         recovery = "fn replay() {\n    let alpha = 1;\n    let beta = 2;\n    let gamma = 3;\n}\n"
         library = "fn core_one() {\n    let delta = 4;\n    let epsilon = 5;\n}\n\nfn outside_registered() {\n    let zeta = 6;\n}\n"
         write(os.path.join(root, RECOVERY_PATH), recovery)

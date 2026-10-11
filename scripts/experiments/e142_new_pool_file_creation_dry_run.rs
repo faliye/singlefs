@@ -5015,7 +5015,7 @@ fn layer0_main_arm_verdict(tally: &Layer0Tally, closed_form: u64, comparison: &P
     }
 }
 
-/// 并行度取 `SINGLEFS_THREAD_CAP`（`scripts/capped.sh` 给「登记不到专属变量的实验装置」的通用兜底，
+/// 并行度取 `SINGLEFS_THREAD_CAP`（`scripts/hosts/capped.sh` 给「登记不到专属变量的实验装置」的通用兜底，
 /// 见该脚本文件头注释；这份装置在 `scripts/experiments/` 下，不是 `crates/singlefs-harness`，不在它专属
 /// 变量表里）。没设或解析不出正整数就退回 1（串行）。
 fn thread_cap_from_env() -> usize {
@@ -7137,7 +7137,7 @@ fn emit(emitter: &mut Emitter, body: &str) {
 }
 
 fn main() {
-    // 准入（`.claude/gate.d/stage-inputs.tsv` 的 E142 与 E142/layer0 两行，判法在 `scripts/admission.py`）：
+    // 准入（`.claude/gate.d/stage-inputs.tsv` 的 E142 与 E142/layer0 两行，判法在 `scripts/gate/admission.py`）：
     // 输入自上次产物以来没变就不重跑（退 77），第二段的前提没齐就不跑（退 3）；放行时输入指纹打在产物最前面。
     let admission_key = std::env::var_os("E142_LAYER0_MAIN").map_or("E142", |_layer0_requested| "E142/layer0");
     for admission_header_line in e7_index_bench::admit_experiment_run_or_exit(admission_key) {

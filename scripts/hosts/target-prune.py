@@ -12,7 +12,7 @@
   访问时刻也算：cargo 对没变的依赖不重写产物、只在编的时候读它（挂载是 relatime 时一天至少记一次），只看修改时刻会把天天在用的依赖删掉、下一次整个重编。
   目录不看访问时刻：这里自己列目录就会把它刷新，看了它就永远删不掉。
   四处之外（target/debug 下的可执行文件、examples、build 之外的 tmp、CACHEDIR.TAG、.rustc_info.json、doc……）一律不碰。
-  N 在配置（默认 scripts/target-prune.conf）的 stale-days 一行，整数，至少 1。
+  N 在配置（默认 scripts/hosts/target-prune.conf）的 stale-days 一行，整数，至少 1。
 编译目录：<仓根>/target（--root 不给是这份脚本所在的仓）；只清这一份，不认 CARGO_TARGET_DIR（副本与别处的编译目录跟着副本删）。
 开跑前核在用：/proc 里进程名（comm）是 cargo、rustc、rustdoc、clippy-driver、cargo-clippy 的每个进程，
   环境里设了 CARGO_TARGET_DIR 或 CARGO_BUILD_TARGET_DIR（相对的按它的工作目录算）而指到这份编译目录或它底下；
@@ -486,7 +486,7 @@ def main(arguments):
     try:
         stale_days = read_stale_days(config)
     except ConfigProblem as problem:
-        print(f"  ✗ {problem}\n  → 怎么办：照 scripts/target-prune.conf 的写法改成 stale-days=<不小于 1 的整数>")
+        print(f"  ✗ {problem}\n  → 怎么办：照 scripts/hosts/target-prune.conf 的写法改成 stale-days=<不小于 1 的整数>")
         return 2
     return prune(root, stale_days, dry_run, print)
 

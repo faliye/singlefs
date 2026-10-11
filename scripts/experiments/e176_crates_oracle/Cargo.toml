@@ -2,12 +2,12 @@
 #
 # 只有它以路径依赖引 crates/ 的 singlefs-core、singlefs-format（只读，拿 inode_tree.rs 的两个纯函数当 M1 的参照，不改 crates/）。
 # 不挂在 scripts/experiments 的可选特性上：可选的路径依赖照样要 cargo 读到 ../../crates 下的 manifest，
-# scripts/mutate.sh 把 research/ 拷进临时目录编译时副本旁边没有 crates/，整个包每一张变异表的基线都编不过（2026-10-08 E176 执行员撞上）。
+# scripts/mutation/mutate.sh 把 research/ 拷进临时目录编译时副本旁边没有 crates/，整个包每一张变异表的基线都编不过（2026-10-08 E176 执行员撞上）。
 # 自己一个 workspace（下面的空 [workspace]），不进 research 的工作区，replay.sh 与门禁的研究构建都不编它。目录里没有 main.rs，
 # e7-index-bench 的 bin 自动发现也不会把它当成一个 bin。
 #
 # 编：cargo build --release --manifest-path scripts/experiments/e176_crates_oracle/Cargo.toml --target-dir scripts/experiments/target
-# 跑：bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 8 scripts/experiments/target/release/e176-inode-leaf-merge-crates-oracle
+# 跑：bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 8 scripts/experiments/target/release/e176-inode-leaf-merge-crates-oracle
 [package]
 name = "e176-crates-oracle"
 version = "0.1.0"

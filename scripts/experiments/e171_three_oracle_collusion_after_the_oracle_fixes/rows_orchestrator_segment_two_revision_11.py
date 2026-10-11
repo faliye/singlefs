@@ -352,7 +352,7 @@ def static_plan_lines(repo: str, tree: str) -> list[str]:
 
 # ── 自证：借第二段编排器的假世界（假驱动、假 multi-host-run、假机器清单与资源），假树补上算键要的几样，配置照修订 10 自证那一形逐遍另写；
 #    假驱动外面包一层，在 <工作根>/lane0 下放一份「这一次编译」的 dep-info 给 RC4 ──
-FAKE_DRIVER = os.path.join(HERE, "selftest_fakes", "fake_row_driver.py")
+FAKE_DRIVER = os.path.join(HERE, "fake_row_driver.py")
 FAKE_ROWS = tuple(range(1, 13))
 
 

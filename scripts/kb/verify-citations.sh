@@ -22,9 +22,9 @@
 # ckn 的命令只能拿 %ROOT% 指那棵树的根，命令里出现别的树的根照样判红。
 # 这就是为什么没有第二张「哪条断言属于哪棵树」的表——两处手抄会分叉。
 #
-# 复跑：bash scripts/verify-citations.sh
-# 自证：bash scripts/verify-citations.sh --selftest（合成两棵假树，不碰本机的真树）
-# 源码固定点由环境变量覆盖：FS_REFS=/path bash scripts/verify-citations.sh
+# 复跑：bash scripts/kb/verify-citations.sh
+# 自证：bash scripts/kb/verify-citations.sh --selftest（合成两棵假树，不碰本机的真树）
+# 源码固定点由环境变量覆盖：FS_REFS=/path bash scripts/kb/verify-citations.sh
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -33,7 +33,7 @@ REFS="${FS_REFS:-$HOME/code/fs-refs}"
 KERN="${KERNEL_TREE:-$HOME/kbuild/linux-om}"
 
 # ── 树登记表：一行一棵树，树名 | 根路径 | 固定点还是非固定点 ──────────────
-# 固定点＝scripts/fetch-refs.sh 按 URL + sha256 取回、放在 $FS_REFS 底下的那一份。
+# 固定点＝scripts/kb/fetch-refs.sh 按 URL + sha256 取回、放在 $FS_REFS 底下的那一份。
 # 非固定点＝由环境变量默认值指到的本机树：它随时会被别的活动升级、改动或删掉，
 # 所以它上面的「已核实」只在这台机器的今天成立。
 # 这张表登记的是**树**，不是断言——断言归哪棵树由它自己那一格说了算。
@@ -148,7 +148,7 @@ ckn() { # ckn <决策> <树名> <说的是什么> <期望数> <实测命令，�
 
 # ── 外部文献（PDF）──────────────────────────────────────────────────────
 # checks-owed.md C38 欠的另一半：源码那一侧 2026-08-29 已还，文献这一侧当时只还了 RFC 8439。
-# 取回方式 scripts/fetch-refs.sh（含 URL 与 sha256），抽取器 scripts/pdf-text.py。
+# 取回方式 scripts/kb/fetch-refs.sh（含 URL 与 sha256），抽取器 scripts/kb/pdf-text.py。
 # ⚠️ 抽取器只解 FlateDecode + 单字节字体。抽出乱码要当**抽取失败**处理，不许当成「原文没这句」——
 #    ZFS On-Disk Specification 就是这种（CID 字体），所以它不在那张表里，见 fetch-refs.sh 的说明。
 # 抽出的文本是跨轮复用的缓存，放 GATE_CROSS_RUN_TMPDIR：门禁每轮给阶段一个私有 TMPDIR，跑完里面剩下的判红并删掉
@@ -176,7 +176,7 @@ ckdoc() { # ckdoc <决策> <树名> <说的是什么> <文献名> <ERE 模式>
   mark_tree "$tree" "$d" "$what" || return
   rel_in_tree "$tree" "$d" "$what" "$name" || return
   if [[ ! -f "${TREE_ROOT[$tree]}/$name" ]]; then
-    printf '  ✗ %-6s %-42s 文献不在本机：%s ⇒ 跑 scripts/fetch-refs.sh\n' "$d" "$what" "${TREE_ROOT[$tree]}/$name"  # gate-lint:detail
+    printf '  ✗ %-6s %-42s 文献不在本机：%s ⇒ 跑 scripts/kb/fetch-refs.sh\n' "$d" "$what" "${TREE_ROOT[$tree]}/$name"  # gate-lint:detail
     score "$tree" fail; return
   fi
   txt="$(pdftxt "$tree" "$name")" || { printf '  ✗ %-6s %-42s 抽取失败：%s\n' "$d" "$what" "$name"; score "$tree" fail; return; }  # gate-lint:detail

@@ -10,7 +10,7 @@
 认的段头：`Running tests/<目标>.rs (…)` → `--test <目标>`；`Running unittests src/lib.rs (…)` → `--lib`；
 `Running unittests src/bin/<名>.rs (…)` → `--bin <名>`；`Doc-tests` 段不认（文档测试按名字重跑不了），有失败就判红要人看。
 完整性闸：每一段收到的 `test <名> ... FAILED` 条数要等于那一段 `test result:` 行报的 failed 数，对不上判红、stdout 不出命令。
-结果行与汇总行的解析在 scripts/lib_libtest_result_lines.py（全仓一份）：#[should_panic] 的用例那一段「 - should panic」不进名字。
+结果行与汇总行的解析在 scripts/gate/lib_libtest_result_lines.py（全仓一份）：#[should_panic] 的用例那一段「 - should panic」不进名字。
 一个失败都没有：打印「没有失败的用例」到 stderr、退出 0、stdout 为空。
 弄坏开关 RERUN_FAILED_TESTS_BREAK（只给自证证红用），一项一行，下一行起写打开后判错的自证格：
   merge-sections   段头之后的段并进第一段

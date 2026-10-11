@@ -14,7 +14,7 @@ driver_e171_r1_s1_revision_6_cross_host_check 跟着红）。这一层按路径�
   rows_orchestrator_segment_two.py plan <同上>
       只现查机器与资源、算分配、按每行推的用时推各台挂钟，打出来；一行都不起，不写产物。
   rows_orchestrator_segment_two.py --selftest [--cells 格,…]
-      假驱动、假 multi-host-run、假机器清单与资源走一遍各格（selftest_fakes/），连同第一段编排器自己的 --selftest；自证进程是子进程的收养者
+      假驱动、假 multi-host-run、假机器清单与资源走一遍各格（），连同第一段编排器自己的 --selftest；自证进程是子进程的收养者
       （PR_SET_CHILD_SUBREAPER），每一格之后收掉它起的、还活着的每个进程，末尾数一遍自己的进程树，临时目录（自证给子进程的 TMPDIR）删掉；
       末尾逐个打开弄坏开关核它红在点名的格。末行「自证 N 项，红 M」。
 

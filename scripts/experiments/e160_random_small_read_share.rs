@@ -204,10 +204,10 @@ const DECLARED_SEQUENTIAL_FILE_BYTES: i128 = 4 * 1024 * 1024 * 1024;
 /// 丙臂：顺序作业 `--bs=1M`。
 const DECLARED_SEQUENTIAL_REQUEST_BYTES: i128 = 1024 * 1024;
 /// M1 的错误来源：`write_sequential_large` 同样声明 `size=4G`（不该算进读的分母）。
-#[allow(dead_code, reason = "只被 scripts/mutations/e160_random_small_read_share.tsv 的 M1 替换文引用，基线的正确公式不用它")]
+#[allow(dead_code, reason = "只被 scripts/mutation/tables/e160_random_small_read_share.tsv 的 M1 替换文引用，基线的正确公式不用它")]
 const WRITE_SEQUENTIAL_JOB_BYTES: i128 = 4 * 1024 * 1024 * 1024;
 /// M10 的错误来源：两个 `control_buffered_read_*` 对照各 256 MiB（E152 实验页第 274 行；不该算进读的分母）。
-#[allow(dead_code, reason = "只被 scripts/mutations/e160_random_small_read_share.tsv 的 M10 替换文引用，基线的正确公式不用它")]
+#[allow(dead_code, reason = "只被 scripts/mutation/tables/e160_random_small_read_share.tsv 的 M10 替换文引用，基线的正确公式不用它")]
 const CONTROL_BUFFERED_READ_BYTES: i128 = 2 * 256 * 1024 * 1024;
 
 // ============================== 判据一侧：分档 ==============================

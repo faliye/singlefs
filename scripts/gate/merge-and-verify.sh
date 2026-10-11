@@ -7,7 +7,7 @@
 #   merge-and-verify.sh --selftest                     # 用假的 apply-writer-patch 与假 cargo 走一遍；MERGE_AND_VERIFY_BREAK=ignore-red 时必须判红
 #
 # --copy：不往这份脚本所在的仓里打，自己建一份副本在副本里打、编、验，收尾删掉它自己建的副本与编译目录（成功、失败、被 INT / TERM 停都删）：
-#   副本 <日志目录>/repo（scripts/source-stamp.py sync 拷：不拷 .git 与任意一层的 target、target-*，拷过去的 mtime 是此刻），
+#   副本 <日志目录>/repo（scripts/hosts/source-stamp.py sync 拷：不拷 .git 与任意一层的 target、target-*，拷过去的 mtime 是此刻），
 #   补丁经 apply-writer-patch.py --root <副本> 打；编译目录调用方设了 CARGO_TARGET_DIR 就用它、不删（不是这里建的），没设是 <日志目录>/target、收尾删。
 #   日志目录留着（日志小，汇总行指着它）。删完打一行「删了副本 … 与编译目录 …（共 …）」；删不成退 1、写明哪一份没删成。
 #   要留现场：MERGE_AND_VERIFY_KEEP_COPY=1，收尾不删，打出副本与编译目录的路径和删法，看完自己删（command-safety.md「测试镜像一律放临时目录」：
@@ -15,7 +15,7 @@
 #
 # 为什么：2026-09-20 起 8 天里「合入后验证」派了 3 个实现员、平均 14.3M 折算，是实现员里最贵的一种；它做的前三步（打补丁、编、逐个跑测试）
 # 是 apply-writer-patch.py 加几条命令，只有「红了改钉值」要判断——那一步红了才派实现员。
-# 做法：每个补丁目录经 scripts/apply-writer-patch.py 打（退 2 就整批停）；编之前经 scripts/source-stamp.py refresh 刷一次源码戳：
+# 做法：每个补丁目录经 scripts/gate/apply-writer-patch.py 打（退 2 就整批停）；编之前经 scripts/hosts/source-stamp.py refresh 刷一次源码戳：
 # 编译目录（CARGO_TARGET_DIR，不设是树根的 target）是复用的，cargo 按 mtime 判本地包新不新鲜，被 rsync -a 铺进来的新内容带着旧 mtime 会被当成已编
 # （records/2026-09-30-里程碑三开工第一轮.md「GPU 与 CPU 不一致调查员交回」那一行）；refresh 把内容或 mtime 与上一次不一样的源文件 touch 到此刻，
 # 编译目录里有东西而没有戳（头一次）就全 touch、重编一遍工作区的本地包。刷不成就不编、退 1。手工往副本里拷树用 source-stamp.py sync <源树> <副本>。
@@ -243,7 +243,7 @@ verify() {
     reds=$((reds+1))
     echo "  ✗ 红的测试 $(printf '%s\n' "$failed_tests" | wc -l) 条："
     printf '%s\n' "$failed_tests" | sed 's/^/      /'   # gate-lint:detail
-    echo "  → 怎么办：只重跑红的这几条：python3 scripts/rerun-failed-tests.py $logs/test.log -p <包>；照实现员报告里的算法改钉值，改完再只跑这几条"
+    echo "  → 怎么办：只重跑红的这几条：python3 scripts/gate/rerun-failed-tests.py $logs/test.log -p <包>；照实现员报告里的算法改钉值，改完再只跑这几条"
   elif [[ $rc -ne 0 && "${MERGE_AND_VERIFY_BREAK:-}" != "ignore-red" ]]; then
     reds=$((reds+1))
     echo "  ✗ cargo test 退 $rc 而一条 FAILED 都没抓到（编不过、或包装退 250–254）：$(tail -3 "$logs/test.log" | tr '\n' ' ')"

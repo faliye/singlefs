@@ -692,7 +692,7 @@ def orphan_count(kind, entries, rows, scope):
 def migration_note(kind, today, count, orphaned, sources):
     name = KIND_NAME[kind]
     return (f'- {today}：条目改按{name}分组：{sources}的 {count} 条原条目，{count - orphaned} 条原样搬进各自点名的 `## {kind}<n>（` 节'
-            f'（点名几{"条" if kind == "D" else "个"}就抄几份，`scripts/migrate-changelog-format.py` 自检过次数与正文）'
+            f'（点名几{"条" if kind == "D" else "个"}就抄几份，`scripts/kb/migrate-changelog-format.py` 自检过次数与正文）'
             + (f'，{orphaned} 条没点名任何{name}、没搬进来' if orphaned else '') + '。搬的时候只改了：标题去掉日期，'
             f'「（其N）」按节内同一天重新编号——别处写的「某日（其N）」是旧编号，按日期到这次改动之前的版本里找'
             f'（`git log -- {DECISIONS_HISTORY if kind == "D" else EXPERIMENTS_HISTORY}`）；正文里的 `####` 小标题降一级'
@@ -815,7 +815,7 @@ def single_file_part(root, digests, texts, problems, report, outputs):
 
 def orphans_text(orphans):
     out = ['# 没点名任何决策 / 实验的原条目', '',
-           '`scripts/migrate-changelog-format.py` 搬迁时认不出它们属于哪一节，原样列在这里，去处待定。', '']
+           '`scripts/kb/migrate-changelog-format.py` 搬迁时认不出它们属于哪一节，原样列在这里，去处待定。', '']
     for _, entry in orphans:
         out += [f'## {entry.path}:{entry.line}', '', entry.raw_heading] + entry.body + ['']
     return '\n'.join(out)

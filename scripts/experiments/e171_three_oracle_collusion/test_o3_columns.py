@@ -87,8 +87,8 @@ class ExecutorOutputTests(unittest.TestCase):
 
     def test_the_command_goes_through_the_wrapper_lists_only_the_given_streams_and_asks_for_batches_one_and_two(self) -> None:
         command = frozen_o3.executor_command("/repo", "/d", ["s1"], "1,2", 3, "/o", "4G")
-        self.assertEqual(command[:4], ["bash", "/repo/scripts/run-with-memory-cap.sh", "4G", "bash"])
-        self.assertEqual(command[4:7], ["/repo/scripts/capped.sh", "3", "nice"])
+        self.assertEqual(command[:4], ["bash", "/repo/scripts/hosts/run-with-memory-cap.sh", "4G", "bash"])
+        self.assertEqual(command[4:7], ["/repo/scripts/hosts/capped.sh", "3", "nice"])
         self.assertEqual(command[-10:], ["--dumps", "/d", "--streams", "s1", "--batches", "1,2", "--workers", "3", "--output", "/o"])
 
 

@@ -3,7 +3,7 @@
 # run-condition: none 它自己查要的抽取器，缺了逐份报出来，不交给调用方预判
 """把 PDF 的文字抽出来，供逐字复核外部文献引用。
 
-    python3 scripts/pdf-text.py <pdf> [> out.txt]
+    python3 scripts/kb/pdf-text.py <pdf> [> out.txt]
 
 本机没有 poppler-utils，也没有 pip（`sudo -n` 要密码、`python3 -m pip` 不存在），
 所以自带一个只依赖标准库 zlib 的抽取器。
@@ -164,7 +164,7 @@ if __name__ == '__main__':
             bad += 0 if hit else 1
         if bad:
             print(f'  ✗ 自检未通过：{bad} 处')
-            print('     → 怎么办：本机没有的文献先跑 scripts/fetch-refs.sh 固定下来；'
+            print('     → 怎么办：本机没有的文献先跑 scripts/kb/fetch-refs.sh 固定下来；'
                   '锚点抽不出的，去看这份 PDF 是不是用了双字节 CID 字体（抽取器只支持单字节），或者原文措辞变了要换一句还在的锚点。')
         sys.exit(1 if bad else 0)
     sys.stdout.write(pdf_text(sys.argv[1]))

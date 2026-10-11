@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 每次调都在这一刻的树与库上排派活计划、再跑；哪些块要重判由库里的块键与判法版本定，不在这里
 # run-condition: command bash cargo python3
-# run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
+# run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
 # 崩溃放量一个分项的一趟：配置定几台、用不用 GPU，这里照配置跑，做不到就报错退出，不退回少一台、不退回 CPU
 # （用户 2026-09-29 定：「配置中一台机器就要跑一台，配置中两台机器就要跑两台，配置中有gpu就一定要让GPU工作 如果不行就明确报错拒绝，不接受默认降级」）。
 #
@@ -31,7 +31,7 @@
 #      （它让第二台也量一次，两台按速度分）。第二台没跑成：原样退双机驱动的退出码（78、248、249 见下），不改在本机一台跑。
 #      第二台排计划那一趟借不到显存：双机驱动打 CRASH_AMPLIFICATION_NOT_RUN step=peer-placement 那一行、退 77，这里报本次未跑、原样退 77。
 #   本机一台跑的那一趟退非 0，照 run.log 分类：设备用不上 78、算法上判不了 248，别的原样退它的退出码。
-# 清场：开了 GPU 就清场，显卡的先后与额度一律用清场之后那一份。没带 --quiesced 时经 scripts/gpu-quiesce-run.sh 起自己（加 --quiesced）：
+# 清场：开了 GPU 就清场，显卡的先后与额度一律用清场之后那一份。没带 --quiesced 时经 scripts/crash/gpu-quiesce-run.sh 起自己（加 --quiesced）：
 #   照多机配置清场并回读、跑，跑完、跑红或被打断都不复原（包装打 GPU_QUIESCE step=restore result=not-restored；要复原由用户手动跑私有复原脚本，
 #   多机配置的 QUIESCE_START_COMMAND）；清场回读没过退 78（卡上有不归清场白名单的计算进程时就是这样：等那个进程跑完再起，这里不停它）。
 #   带了 --quiesced 是调用方清过场（崩溃放量入口经同一份包装这样调），这里不再清。没开 GPU 不清场。
@@ -54,17 +54,17 @@
 #            （开跑前由 run-condition: check 拒；带 --force 越过时 crash_amplification_prepare 照样退 78）、说是清过场却没写清场之后那一份，
 #            点名的卡用不了或显存装不下、结论的版本与树对不上（CRASH_POINT_REPLAY_NOT_WRITTEN_CONCLUSION_VERSION_DIFFERS_FROM_THE_BUILD 那一行，整趟不写库）、
 #            多机配置开了 GPU 而二进制没编进 gpu 特性（这三样都照日志分类，crash-amplification-lib.sh 的 crash_amplification_failure_kind），双机驱动退 78（第二台连不上、清场没过、库没取回），清场回读没过、多机配置没写全清场那两个键
-#            （scripts/gpu-quiesce-run.sh 判的，它打 GPU_QUIESCE step=command result=not-started）。出路：修好设备，或改配置
+#            （scripts/crash/gpu-quiesce-run.sh 判的，它打 GPU_QUIESCE step=command result=not-started）。出路：修好设备，或改配置
 #   247      排派活计划那一趟退 0，却一行 CRASH_AMPLIFICATION_PLACEMENT 都没打，日志里也认不出是设备还是算法，也没有产品路径借不到显存的那一行（那一种退 77，见上）
 #   248      算法上判不了：有状态 GPU 判不了（表越过内核容量）、内核展开超预算、GPU 判器建不出表（照日志分类，或双机驱动退 248）
 #   249      第二台排派活计划没量出速度、日志里认不出原因（双机驱动原样；第二台那一趟借不到显存的不在这里，见 77）
 #   245      内存包装认出的显存不够（那一趟退了非 0、起止之间内核报了 NV_ERR_NO_MEMORY）：那一趟的结果不算数，原样退，出路单独一句
-#   250–254  内存包装自己的结局（scripts/run-with-memory-cap.sh 文件头「退出码」）
+#   250–254  内存包装自己的结局（scripts/hosts/run-with-memory-cap.sh 文件头「退出码」）
 #   其余     跑的那一趟（cargo test）的退出码，原样
 # 重型：跑 checker 档用例，只在用户要求时跑（SINGLEFS_HEAVY_TESTS=user-request 由这里带给 cargo）。
 # 弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=<项>（只给 --selftest 证红用；格号是 run_selftest 里的第 1–25 格，判错的那一格打「✗ 自证第 <号> 格」）：
 #   gpu-without-quiesce                开了 GPU、没带 --quiesced 也不经清场包装，照不清场直接跑                     第 7 格、第 11 格、第 15 格、第 16 格、第 17 格、第 18 格、第 19 格
-#   （清场包装 scripts/gpu-quiesce-run.sh 的开关 GPU_QUIESCE_BREAK 带进这里的子进程也认：run-despite-failed-quiesce 红在第 16 格，
+#   （清场包装 scripts/crash/gpu-quiesce-run.sh 的开关 GPU_QUIESCE_BREAK 带进这里的子进程也认：run-despite-failed-quiesce 红在第 16 格，
 #    restore-after-run 红在第 7 格、第 11 格、第 15 格、第 16 格、第 17 格、第 18 格、第 19 格（这几格的调用次序里多出 quiesce-start））
 #   stay-local-when-across             双机开着也本机一台跑（「配置两台就跑两台」判错）                         第 1 格、第 7 格、第 19 格
 #   ignore-across-switch               双机没开也动用第二台（「配置一台就跑一台」判错）                         第 2 格、第 11 格、第 15 格、第 17 格、第 18 格、第 20 格
@@ -85,11 +85,11 @@
 #   （共用库 crash-amplification-lib.sh 里配置那几处的开关：cards-read-from-cards-file（显卡读退役的私有显卡配置 SINGLEFS_GPU_CARDS_CONFIG，不读多机配置）红在第 13 格、第 14 格；
 #    configuration-from-tree-root（多机配置按树根找、不按 git common-dir 找）红在第 21 格）
 #   （共用库的开关 given-states-run-condition-as-run-failure（给定状态表的判器借不到显存那一行 CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET 不认、不退 78）
-#    打开时这里 25 格一格不红：这里的格都不造那一行；它由 scripts/crash-amplification-two-hosts.sh --selftest 证红，红在 local-share-given-states-run-condition 格）
+#    打开时这里 25 格一格不红：这里的格都不造那一行；它由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红，红在 local-share-given-states-run-condition 格）
 #   version-differs-as-run-failure     日志里结论版本对不上那一行不认（不退 78）                               第 23 格
 #   gpu-feature-missing-as-run-failure 日志里「这份二进制没有编进 gpu 特性」不认（不退 78）                    第 24 格
 #   library-in-the-old-directory       没给 --library 时照改前用 <家目录>/library（按结论种类存之前的旧库）      第 25 格
-#   （多机配置判法 scripts/layer0-shard-configuration-check.sh 的开关 MULTI_HOST_CONFIGURATION_BREAK=gpu-card-keys-unknown 红在第 22 格）
+#   （多机配置判法 scripts/crash/layer0-shard-configuration-check.sh 的开关 MULTI_HOST_CONFIGURATION_BREAK=gpu-card-keys-unknown 红在第 22 格）
 # 只供测试：CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY=<造好的 placement.log> 时不编不跑，只拿那份日志判在哪跑、打 CRASH_AMPLIFICATION_DECISION 行就退
 #   （一块都没判那一种另打 CRASH_AMPLIFICATION_NOT_RUN 行、退 77；有流没借到的照样逐条打那一行）；
 #   CRASH_AMPLIFICATION_ITEM_SWITCHES=<gpu>,<双机> 代替读配置里的这两样；CRASH_AMPLIFICATION_ITEM_CARDS=<显卡配置的值> 代替读显卡配置；
@@ -419,7 +419,7 @@ STUB
       CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" "$@" \
       bash "$0" some-target --library "$work/library-quiesce-$cells" >"$work/quiesce-$cells.out" 2>&1; quiesce_exit=$?
     if [[ "$quiesce_exit" != "$want_exit" || "$(tr '\n' ' ' <"$work/calls")" != "$want_calls" ]]; then
-      selftest_cell_failed "$sentence（退 $quiesce_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」）" "看开了 GPU 而没带 --quiesced 时经 scripts/gpu-quiesce-run.sh 重起这里的那一段，与那份包装的 gpu_quiesce_leave"
+      selftest_cell_failed "$sentence（退 $quiesce_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」）" "看开了 GPU 而没带 --quiesced 时经 scripts/crash/gpu-quiesce-run.sh 重起这里的那一段，与那份包装的 gpu_quiesce_leave"
       return 1
     fi
   }
@@ -445,7 +445,7 @@ STUB
   done
   if [[ "$no_restore_exits" != "0 143 " || "$no_restore_calls" != "quiesce-stop placement local-run | quiesce-stop placement local-run | " || "$no_restore_lines" != 2 ]]; then
     selftest_cell_failed "跑完调了复原命令、或没照「清场、排计划、跑」走（照常跑完与被 TERM 打断两趟退「${no_restore_exits% }」，调用次序「$no_restore_calls」，GPU_QUIESCE step=restore result=not-restored 行 $no_restore_lines 趟有）" \
-      "看开了 GPU 而没带 --quiesced 时经 scripts/gpu-quiesce-run.sh 重起这里的那一段，与那份包装的 gpu_quiesce_leave：跑完不复原"
+      "看开了 GPU 而没带 --quiesced 时经 scripts/crash/gpu-quiesce-run.sh 重起这里的那一段，与那份包装的 gpu_quiesce_leave：跑完不复原"
   fi
   # 第 18 格：本机一台跑的那一趟经内存包装退 245（显存不够）⇒ 原样退 245、打显存不够的出路（不当成卡用不了，也不只打通用的那一句）
   cells=$((cells + 1))
@@ -543,7 +543,7 @@ STUB
   else
     selftest_cell_failed "临时目录里建不出主仓与 worktree（git init、commit、worktree add 有一步没成）" "看 git 在不在 PATH 上、TMPDIR 可不可写"
   fi
-  # 第 22 格：多机配置判法（scripts/layer0-shard-configuration-check.sh）认显卡的两个键、不认退役的 GPU_COMPUTATION_CLASSES：
+  # 第 22 格：多机配置判法（scripts/crash/layer0-shard-configuration-check.sh）认显卡的两个键、不认退役的 GPU_COMPUTATION_CLASSES：
   #   八个必写键加 GPU_CARDS_BY_PRIORITY、GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED、双机没开 ⇒ 退 3（判得过、双机：关，不连第二台）；再加一行 GPU_COMPUTATION_CLASSES ⇒ 退 1、点名这个键
   cells=$((cells + 1))
   local shard_check_exit shard_check_retired_exit
@@ -555,7 +555,7 @@ STUB
   SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-retired-key.env" bash "$item_script_directory/layer0-shard-configuration-check.sh" "$work" >"$work/shard-check-retired.out" 2>&1; shard_check_retired_exit=$?
   if [[ "$shard_check_exit" != 3 || "$shard_check_retired_exit" != 1 ]] || ! grep -q 'GPU_COMPUTATION_CLASSES 不认得' "$work/shard-check-retired.out"; then
     selftest_cell_failed "多机配置写了显卡的两个键却判不过、或写了退役的 GPU_COMPUTATION_CLASSES 却判得过（两个键退 $shard_check_exit，应当 3；加退役的键退 $shard_check_retired_exit，应当 1、点名它：$(tr '\n' ' ' <"$work/shard-check-retired.out" | cut -c1-160)）" \
-      "看 scripts/layer0-shard-configuration-check.sh 的 MULTI_HOST_GPU_CARD_KEYS 与认键那一段"
+      "看 scripts/crash/layer0-shard-configuration-check.sh 的 MULTI_HOST_GPU_CARD_KEYS 与认键那一段"
   fi
   # 第 23 格：排计划那一趟没打计划行，日志里是引擎打的结论版本对不上那一行（整趟不写库，引擎 E 报告第九节第 ① 条）⇒ 运行条件不满足，退 78
   cells=$((cells + 1))
@@ -617,7 +617,7 @@ if (( ! quiesced )) && ! item_break_is gpu-without-quiesce; then
   if [[ "$item_gpu_switch" == 1 ]]; then
     item_reexec_arguments=("${item_original_arguments[@]}" --quiesced)
     if [[ "${PREFLIGHT_FORCE_GIVEN:-0}" == 1 ]]; then item_reexec_arguments+=(--force); fi
-    echo "  · 开了 GPU、没带 --quiesced：经 scripts/gpu-quiesce-run.sh 清场，带 --quiesced 重起这一项，跑完不复原" >&2
+    echo "  · 开了 GPU、没带 --quiesced：经 scripts/crash/gpu-quiesce-run.sh 清场，带 --quiesced 重起这一项，跑完不复原" >&2
     bash "$item_script_directory/gpu-quiesce-run.sh" -- bash "$0" "${item_reexec_arguments[@]}"
     exit $?
   fi

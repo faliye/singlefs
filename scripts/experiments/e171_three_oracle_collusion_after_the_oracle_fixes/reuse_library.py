@@ -81,15 +81,15 @@ EXIT_RUN_CONDITION = 78
 RESEARCH_RELATIVE = "scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes"
 EXECUTOR_RELATIVE = "scripts/experiments/e170_o3_spec_executor_with_witness_predicates_journal_header_487"
 FREEZE_REFERENCE_RELATIVE = "research/results/e170-r2-o3-spec-executor-2026-10-04-s1b-executor.out"
-MUTATIONS_TABLE_RELATIVE = "scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv"
-ADMISSION_SCRIPT_RELATIVE = "scripts/admission.py"
+MUTATIONS_TABLE_RELATIVE = "scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv"
+ADMISSION_SCRIPT_RELATIVE = "scripts/gate/admission.py"
 DEVICE_BINARY = "e171_three_oracle_collusion_after_the_oracle_fixes"
 E170_BINARY = "e170_o3_spec_executor_export"
 DEFAULT_LIBRARY_ROOT = os.path.expanduser("~/.local/share/singlefs/reuse/e171-r1")
 KEY_SCHEMA_LINE = "schema e171-r1-reuse-key 1"
 SECTION_ORDER = ("kind", "build", "closure", "env", "mutation", "args", "limit", "upstream", "research", "python")
 UNIT_KINDS = ("device", "e170", "driver-row", "o3-executor", "mutation-driver")
-# scripts/capped.sh 第 22–31 行设的八个线程数变量：不进 [env]（线程数在键外，第 11.2 节「键外的几样」）
+# scripts/hosts/capped.sh 第 22–31 行设的八个线程数变量：不进 [env]（线程数在键外，第 11.2 节「键外的几样」）
 THREAD_COUNT_VARIABLES = ("CARGO_BUILD_JOBS", "RUST_TEST_THREADS", "SINGLEFS_LAYER0_THREADS", "SINGLEFS_CRASH_INJECTION_THREADS",
                           "SINGLEFS_FAULT_INJECTION_WORKER_THREADS", "SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS",
                           "SINGLEFS_RANDOM_HISTORY_THREADS", "SINGLEFS_THREAD_CAP")
@@ -193,7 +193,7 @@ _admission_module: dict[str, types.ModuleType] = {}
 
 
 def build_environment_lines(repo: str, tree: str) -> list[str]:
-    """scripts/admission.py 的 build_environment_lines（按路径载入、不写 .pyc）给的构建环境各行：「名字 内容的 sha256」。"""
+    """scripts/gate/admission.py 的 build_environment_lines（按路径载入、不写 .pyc）给的构建环境各行：「名字 内容的 sha256」。"""
     if "module" not in _admission_module:
         specification = importlib.util.spec_from_file_location("admission_for_reuse_keys", os.path.join(repo, ADMISSION_SCRIPT_RELATIVE))
         module = importlib.util.module_from_spec(specification)
@@ -1184,8 +1184,8 @@ def selfproof_run(repo: str, binary: str, threads: str, memory_cap: str, directo
     """RP2 的一次：装置 stream-constants --streams 1,2,3（只打 S1 常量），经内存包装与线程上限；产物是它的 E7RESULT 行。"""
     os.makedirs(directory)
     product = os.path.join(directory, "stream-constants.out")
-    command = ["nice", "-n", "19", "bash", os.path.join(repo, "scripts/run-with-memory-cap.sh"), memory_cap, "bash",
-               os.path.join(repo, "scripts/capped.sh"), threads, binary, "stream-constants", "--streams", "1,2,3"]
+    command = ["nice", "-n", "19", "bash", os.path.join(repo, "scripts/hosts/run-with-memory-cap.sh"), memory_cap, "bash",
+               os.path.join(repo, "scripts/hosts/capped.sh"), threads, binary, "stream-constants", "--streams", "1,2,3"]
     completed = subprocess.run(command, cwd=repo, capture_output=True, text=True,
                                env=dict(os.environ, RUN_WITH_MEMORY_CAP_PARALLEL_REASON="同一会话派出去的几个执行员各跑各的装置"))
     with open(product, "x", encoding="utf-8") as handle:

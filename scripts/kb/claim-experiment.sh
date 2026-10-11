@@ -3,9 +3,9 @@
 # run-condition: command git
 # 取实验号并当场占住：查号与建第一个文件在同一步里做，建文件用排他方式（noclobber）。
 #
-#   bash scripts/claim-experiment.sh --next              # 打印下一个没人用的实验号
-#   bash scripts/claim-experiment.sh E139 简称            # 占住 E139：建 research/prompts/e139-preregistration.md
-#   bash scripts/claim-experiment.sh --selftest
+#   bash scripts/kb/claim-experiment.sh --next              # 打印下一个没人用的实验号
+#   bash scripts/kb/claim-experiment.sh E139 简称            # 占住 E139：建 research/prompts/e139-preregistration.md
+#   bash scripts/kb/claim-experiment.sh --selftest
 #
 # 为什么要有它：2026-09-11 两个会话前后几分钟都取了 E137——一边查过号、隔几轮对话才写文件，
 # 另一边在这中间写了同名的未提交跑前登记，被 Write 整份盖掉（没进过 git），靠对话记录逐字复原。
@@ -26,7 +26,7 @@ used_numbers() {
     ls "$root/scripts" 2>/dev/null | sed -n 's/^e\([0-9][0-9]*\)[-_].*/\1/p'
     ls "$root/scripts/experiments" 2>/dev/null | sed -n 's/^e\([0-9][0-9]*\)_.*/\1/p'
     ls "$root/research/results" 2>/dev/null | sed -n 's/^e\([0-9][0-9]*\)-.*/\1/p'
-    ls "$root/scripts/mutations" 2>/dev/null | sed -n 's/^e\([0-9][0-9]*\)_.*/\1/p'
+    ls "$root/scripts/mutation/tables" 2>/dev/null | sed -n 's/^e\([0-9][0-9]*\)_.*/\1/p'
     ls "$root/.claude/kb/experiments" 2>/dev/null | sed -n 's/^\([0-9][0-9]*\)-.*/\1/p'
     sed -n 's/^| E\([0-9][0-9]*\)（.*/\1/p' "$root/.claude/kb/experiments.md" 2>/dev/null
   } | sort -un
@@ -42,7 +42,7 @@ claim() {
   local root="$1" tag="$2" short_name="$3" number file
   if [[ ! "$tag" =~ ^E([0-9]+)$ ]]; then
     echo "  ✗ 实验号要写成 E<数字>，拿到的是「$tag」"
-    echo "    → 例：bash scripts/claim-experiment.sh E139 某某的代价；不知道用几号先跑 --next"
+    echo "    → 例：bash scripts/kb/claim-experiment.sh E139 某某的代价；不知道用几号先跑 --next"
     return 2
   fi
   number="${BASH_REMATCH[1]}"
@@ -53,7 +53,7 @@ claim() {
   fi
   if [[ "${CLAIM_SKIP_USED_CHECK:-0}" != 1 ]] && grep -qx "$number" <<<"$(used_numbers "$root")"; then
     echo "  ✗ E$number 已经有人用了"
-    echo "    → 取下一个：bash scripts/claim-experiment.sh --next"
+    echo "    → 取下一个：bash scripts/kb/claim-experiment.sh --next"
     return 1
   fi
   file="$root/research/prompts/e$number-preregistration.md"
@@ -61,7 +61,7 @@ claim() {
   if ! ( set -C; printf '# E%s 跑前登记：%s\n\n写于 %s，装置写之前。\n' "$number" "$short_name" \
          "$(TZ=Asia/Tokyo date +%F)" > "$file" ) 2>/dev/null; then
     echo "  ✗ $file 已经存在（刚被别的会话占了）"
-    echo "    → 取下一个：bash scripts/claim-experiment.sh --next"
+    echo "    → 取下一个：bash scripts/kb/claim-experiment.sh --next"
     return 1
   fi
   echo "  ✓ 占住 E$number：$file"
@@ -94,6 +94,6 @@ selftest() {
 case "${1:-}" in
   --selftest) selftest; exit $? ;;
   --next) next_number "${CLAIM_ROOT:-$(git rev-parse --show-toplevel)}"; exit 0 ;;
-  "") echo "  ✗ 缺参数"; echo "    → bash scripts/claim-experiment.sh --next，或 … E<数字> 简称"; exit 2 ;;
+  "") echo "  ✗ 缺参数"; echo "    → bash scripts/kb/claim-experiment.sh --next，或 … E<数字> 简称"; exit 2 ;;
   *) claim "${CLAIM_ROOT:-$(git rev-parse --show-toplevel)}" "$1" "${*:2}"; exit $? ;;
 esac

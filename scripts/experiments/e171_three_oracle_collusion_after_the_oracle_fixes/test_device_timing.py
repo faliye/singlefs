@@ -1,5 +1,5 @@
 """`device_timing.py` 的单测（登记 `research/prompts/e171-r1-prereg.md` 修订 2 第 2.5、2.6 节）：逐行限时的算法、基线 `-timing` 产物的读法与包含自检、
-`run` 补的那一行。变异表 `scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv` 的 R9–R13 落在这几条上。"""
+`run` 补的那一行。变异表 `scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv` 的 R9–R13 落在这几条上。"""
 
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 编一份打了 scripts/qemu/blklogwrites-linearize-over-iov-max.patch 的 QEMU，装进私有目录；系统的 qemu-system-x86 包不动。
+# 编一份打了 scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch 的 QEMU，装进私有目录；系统的 qemu-system-x86 包不动。
 # 源码是 Ubuntu 源码包 qemu，版本与本机 qemu-system-x86 包相同（QEMU_SOURCE_VERSION），带 Ubuntu 自己的补丁，再打我们那一份。
-# scripts/vm-bench.sh 的 blklogwrites 一支经仓根 qemu.env（模板 qemu.env.example）用这里装的 qemu-system-x86_64。
+# scripts/devices/vm-bench.sh 的 blklogwrites 一支经仓根 qemu.env（模板 qemu.env.example）用这里装的 qemu-system-x86_64。
 #
 #   build-patched-qemu.sh             装过、输入没变、装的那份过 qemu-blklogwrites-check.sh 就什么都不做；否则取源码、核、打补丁、编、核、装
 #   build-patched-qemu.sh --rebuild   不管装没装过，照编照装
@@ -12,12 +12,12 @@
 # 构建：configure --without-default-features，只开 vm-bench.sh 用得到的（kvm、linux-aio、slirp、pixman、tools），x86_64-softmmu，不编 tcg、文档；
 # 固件路径与 Ubuntu 包相同（QEMU_FIRMWARE_PATH，用系统 seabios、ipxe 的固件，不装自带的）。本机没装 libaio-dev、libfdt-dev 时，apt-get download 取与已装运行库
 # 同版本的开发包解进编译目录，只拿头文件（不 sudo、不装进系统），链接本机已装的运行库（系统 QEMU 也链这两个）。
-# 装：make install 先装进编译目录里的暂存根，拿暂存的 qemu-io 跑 scripts/qemu-blklogwrites-check.sh，绿了才换进私有目录，换完拿装好的再核一次。
+# 装：make install 先装进编译目录里的暂存根，拿暂存的 qemu-io 跑 scripts/devices/qemu-blklogwrites-check.sh，绿了才换进私有目录，换完拿装好的再核一次。
 # 私有目录里写 singlefs-build-stamp.txt（版本、.dsc 与补丁的 sha256、configure 参数）；已有的私有目录里没有这份就不动它、拒绝。
 #
 # 环境变量：
 #   SINGLEFS_QEMU_HOME         私有目录，默认 $HOME/.local/share/singlefs/qemu；不许落在开机会清空的目录（/tmp、/run、/dev/shm、XDG_RUNTIME_DIR、tmpfs、ramfs）
-#   SINGLEFS_THREAD_CAP        make 的并行数（scripts/capped.sh 设它），没设取 nproc
+#   SINGLEFS_THREAD_CAP        make 的并行数（scripts/hosts/capped.sh 设它），没设取 nproc
 #   BUILD_PATCHED_QEMU_PATCH   补丁路径，默认仓里那一份；只给补丁还没进仓时用
 #   BUILD_PATCHED_QEMU_KEEP=1  编译目录留着（默认装完、失败都删），打印路径
 # 编译目录在 ${TMPDIR:-/tmp} 下，约 1 GiB。
@@ -69,7 +69,7 @@ CONFIGURE_ARGUMENTS=(
 )
 BREAK_ITEMS=(skip-dsc-checksum skip-file-checksum allow-volatile-home skip-version-match skip-patch-readback stamp-ignores-patch)
 
-patch_path="${BUILD_PATCHED_QEMU_PATCH:-$repository_root/scripts/qemu/blklogwrites-linearize-over-iov-max.patch}"
+patch_path="${BUILD_PATCHED_QEMU_PATCH:-$repository_root/scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch}"
 install_home="${SINGLEFS_QEMU_HOME:-$HOME/.local/share/singlefs/qemu}"
 build_threads="${SINGLEFS_THREAD_CAP:-$(nproc)}"
 build_break="${BUILD_PATCHED_QEMU_BREAK:-}"
@@ -301,7 +301,7 @@ case "${1:-}" in
   *) die "认不出的参数 $1" "用法：build-patched-qemu.sh [--rebuild]，或 build-patched-qemu.sh --selftest" ;;
 esac
 [[ $# -eq 0 ]] || die "多给了参数：$*" "用法：build-patched-qemu.sh [--rebuild]，或 build-patched-qemu.sh --selftest"
-[[ "$build_threads" =~ ^[1-9][0-9]*$ ]] || die "并行数「$build_threads」不是正整数" "SINGLEFS_THREAD_CAP 设成正整数，或经 scripts/capped.sh <上限> 起这个脚本"
+[[ "$build_threads" =~ ^[1-9][0-9]*$ ]] || die "并行数「$build_threads」不是正整数" "SINGLEFS_THREAD_CAP 设成正整数，或经 scripts/hosts/capped.sh <上限> 起这个脚本"
 
 system_version="$(dpkg-query -W -f='${Version}' "$SYSTEM_QEMU_PACKAGE" 2>/dev/null)" || system_version="（没装）"
 problem="$(system_version_problem "$system_version")" \
@@ -310,8 +310,8 @@ problem="$(install_home_problem "$install_home")" \
   || die "$problem" "把 SINGLEFS_QEMU_HOME 设到开机不清空的地方（默认 \$HOME/.local/share/singlefs/qemu），qemu.env 里写同一个路径"
 problem="$(install_home_takeover_problem "$install_home")" \
   || die "$problem" "换一个 SINGLEFS_QEMU_HOME，或确认那个目录没人用之后自己挪走它"
-[[ -f "$patch_path" ]] || die "补丁 $patch_path 不在" "补丁在仓里 scripts/qemu/blklogwrites-linearize-over-iov-max.patch；还没进仓时设 BUILD_PATCHED_QEMU_PATCH 指到它"
-[[ -f "$check_script" ]] || die "核查脚本 $check_script 不在" "它与本脚本在同一个目录（scripts/qemu-blklogwrites-check.sh），从仓里取回来再跑"
+[[ -f "$patch_path" ]] || die "补丁 $patch_path 不在" "补丁在仓里 scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch；还没进仓时设 BUILD_PATCHED_QEMU_PATCH 指到它"
+[[ -f "$check_script" ]] || die "核查脚本 $check_script 不在" "它与本脚本在同一个目录（scripts/devices/qemu-blklogwrites-check.sh），从仓里取回来再跑"
 patch_sha256="$(sha256sum "$patch_path" | cut -d' ' -f1)"
 
 if (( ! rebuild )) && stamp_is_current "$install_home" "$patch_sha256"; then

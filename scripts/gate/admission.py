@@ -6,14 +6,14 @@
 登记表是 .claude/gate.d/stage-inputs.tsv（唯一登记位，门禁阶段与实验各占几行）。一行一条，制表符分隔：
     <键> <制表符> <读的路径，空格分隔> [<制表符> <准入条件，空格分隔>] <制表符> #<为什么是这几条>
   键：门禁阶段写文件名（checker-tier-crates-mutation-replay.sh）；实验写实验号（E142），同一个实验另有一种调用方式的写
-      实验号加斜杠加方式名（E142/layer0）；复跑表（scripts/replay.sh）里同一个实验不止一行的，每一行在 replay.sh 的
+      实验号加斜杠加方式名（E142/layer0）；复跑表（scripts/experiments/replay.sh）里同一个实验不止一行的，每一行在 replay.sh 的
       ADMISSION_ROW_KEYS 里指明它问哪个键（见「复跑表按行的准入键」一段）。阶段里的一格各登记自己读的输入的写 <阶段文件名>:<格名>（checker-tier-formal-verification.sh:verus-proof，
       按格复用：阶段每格各问一次 stage-must-run.sh，gate-reuse / stage-fingerprint / stage-marker-write / gate-record-environment 的阶段参数就写这个键；
       进比对的阶段脚本是冒号之前那一份，整张登记表不进比对、这一格自己的登记行（键、路径、第三列）进，全绿标记与环境记录的文件名带着整个键）。
   路径：从仓库根起；目录写成带斜杠的前缀。写成 @<别的键> 就是「那个键登记的全部路径」（只在实验行里用）。
   准入条件（第三列）：实验行认两种：
       question-row=<文件>#<行号>:<正则>          那份文件里第一列是 <行号> 的表格行，最后一格（状态）要匹配正则
-      product-field=<实验键>:<行名>:<字段>=<值>   scripts/replay.sh 登记给那个实验键的产物里（准入键是它的那一行），
+      product-field=<实验键>:<行名>:<字段>=<值>   scripts/experiments/replay.sh 登记给那个实验键的产物里（准入键是它的那一行），
                                                   最后一行 `E7RESULT name=<行名>` 的 <字段> 要等于 <值>
     门禁行认五种：
       closure=<包>:<bin>                  不是前提，是输入的来源：这个包的这个 bin 编译读的 crate 目录（cargo 依赖闭包），现算后接在第二列路径之后，不手列 crate。
@@ -46,17 +46,17 @@
                                          （盖掉调用方环境里的），标记里 configured_worker_threads= 记它
       features=<特性,特性…>              至多一条：用例要编进的 cargo 特性（逗号隔开，各为小写字母、数字、_、-），crash-case-command 在 -p <包> 之后带 --features；
                                          要经引擎、进判定库的用例（崩溃注入的两项随机历史）才登记，不带它的行命令照旧。多机配置（${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，
-                                         按 git common-dir 找）写了 ENABLE_GPU=1 而特性里有 verdict-store 的，另加 gpu（与 scripts/crash-point-replay.sh 快档同一个做法）；
-                                         最后的特性里有 gpu 且 ENABLE_GPU=1 的，整条经 scripts/gpu-quiesce-run.sh 起（照多机配置清场、跑完不复原），
+                                         按 git common-dir 找）写了 ENABLE_GPU=1 而特性里有 verdict-store 的，另加 gpu（与 scripts/crash/crash-point-replay.sh 快档同一个做法）；
+                                         最后的特性里有 gpu 且 ENABLE_GPU=1 的，整条经 scripts/crash/gpu-quiesce-run.sh 起（照多机配置清场、跑完不复原），
                                          环境里交清场之后那一份显卡先后（GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED，没写取 GPU_CARDS_BY_PRIORITY，都没写清掉）、清掉 GPU_COMPUTATION_CLASSES 与退役的 SINGLEFS_GPU_CARDS_CONFIG；
-                                         带 features= 的另设 BINDGEN_EXTRA_CLANG_ARGS（librocksdb-sys 的 bindgen 找头文件，取 scripts/crash-amplification-lib.sh 的
+                                         带 features= 的另设 BINDGEN_EXTRA_CLANG_ARGS（librocksdb-sys 的 bindgen 找头文件，取 scripts/crash/crash-amplification-lib.sh 的
                                          CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS，读不到照调用方环境，编不过时 cargo 自己红）。不与 shard=across-machines 并存：
                                          分片的驱动脚本自己拼 cargo、不带特性，并存时分片那一趟会漏掉特性，登记就拒
       shard=across-machines              至多一条：这条用例的枚举认双机分片开关（SINGLEFS_LAYER0_SHARD，crates/singlefs-checker-tier/src/layer0_progress.rs），
-                                         门禁 checker-tier-layer0-replay --full 在本地分片配置可用时把它交给 scripts/layer0-shard-run.sh 两台各跑一片再 merge；
+                                         门禁 checker-tier-layer0-replay --full 在本地分片配置可用时把它交给 scripts/crash/layer0-shard-run.sh 两台各跑一片再 merge；
                                          登记了它的用例，驱动脚本与它 eval 的配置判法（SHARD_DRIVER_FILES）按内容进这条用例的输入清单
 
-复跑表按行的准入键（scripts/replay.sh 里 ADMISSION_ROW_KEYS 那一段 heredoc；replay-row-keys、experiment 与 product-field= 都读它）：
+复跑表按行的准入键（scripts/experiments/replay.sh 里 ADMISSION_ROW_KEYS 那一段 heredoc；replay-row-keys、experiment 与 product-field= 都读它）：
   一行一条，制表符分隔：<准入键> <制表符> <复跑表那一行的前三列，原样抄：实验号|二进制|参数> <制表符> <产物头谁写>
     产物头谁写：device  那一行跑的装置自己问准入、把 E7INPUT 行打在产物最前面（装置入口传的键要与这里的键逐字相同）；
                replay  那一行跑的东西不接准入（crates 的导出 bin 这一类），replay.sh 把准入放行时给的 E7INPUT 行接在新产物最前面。
@@ -68,7 +68,7 @@
   仓根与它往上每一层目录的 .cargo/config、.cargo/config.toml、rust-toolchain、rust-toolchain.toml，CARGO_HOME（没设取 ~/.cargo）下的
   config、config.toml——在的才进，按内容进，名字里不带绝对路径（同一批内容在主工作区与临时 worktree 里算出同一个数）；
   环境变量 RUSTFLAGS、CARGO_ENCODED_RUSTFLAGS、CARGO_PROFILE_*、CARGO_BUILD_*（CARGO_BUILD_JOBS 除外：只定编译并行度，
-  scripts/capped.sh 与 mutate.sh 会设它）、CARGO_TARGET_*_RUSTFLAGS、CARGO_TARGET_*_RUNNER、RUSTC_WRAPPER、
+  scripts/hosts/capped.sh 与 mutate.sh 会设它）、CARGO_TARGET_*_RUSTFLAGS、CARGO_TARGET_*_RUNNER、RUSTC_WRAPPER、
   RUSTC_WORKSPACE_WRAPPER，设了的才进；RUSTC 设了的进它的值与 `$RUSTC -V`。
   runner、wrapper 与编译器指的可执行文件另进一行：环境变量 CARGO_TARGET_*_RUNNER、RUSTC_WRAPPER、RUSTC_WORKSPACE_WRAPPER、
   CARGO_BUILD_RUSTC_WRAPPER、CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER，与上面那几份配置文件里的 target.<三元组或 cfg>.runner、
@@ -80,7 +80,7 @@
 
 准入条件分三类，这里管前两类：
   ① 输入没变 ⇒ 不跑，沿用上次结论。门禁：登记的路径在 refs/sop/staged-green 那棵树与这一次的暂存树之间 git 说没变
-     （gate-reuse，scripts/stage-must-run.sh 转到这里，判法与原来那份逐格相同）。
+     （gate-reuse，scripts/gate/stage-must-run.sh 转到这里，判法与原来那份逐格相同）。
      登记了 environment= 的门禁另要两样：环境与这一道上一次判绿时记下的相同（阶段判绿之后调 gate-record-environment，
      记进 git common-dir 的 singlefs-gate-environment.<阶段>），且记下的那一趟判的树在这几条路径上与这一次的暂存树相同；
      没记下、取不出、对不上都按要跑处理。全绿标记那一条路（stage-marker-check、gate-reuse 先看的那一格）同样比环境：
@@ -221,7 +221,7 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 REGISTRATION_TABLE = ".claude/gate.d/stage-inputs.tsv"
-REPLAY_SCRIPT = "scripts/replay.sh"
+REPLAY_SCRIPT = "scripts/experiments/replay.sh"
 RESULTS_DIRECTORY = "research/results"
 GATE_REUSE_REFERENCE = "refs/sop/staged-green"
 FORCE_RERUN_VARIABLE = "SINGLEFS_EXPERIMENT_RERUN_REASON"
@@ -274,8 +274,8 @@ VERDICT_STORE_FEATURE = "verdict-store"
 GPU_FEATURE = "gpu"
 MULTI_HOST_CONFIGURATION_VARIABLE = "SINGLEFS_MULTI_HOST_CONFIG"
 MULTI_HOST_CONFIGURATION_NAME = "multi-host.env"
-GPU_QUIESCE_SCRIPT = "scripts/gpu-quiesce-run.sh"
-BINDGEN_LIBRARY_SCRIPT = "scripts/crash-amplification-lib.sh"
+GPU_QUIESCE_SCRIPT = "scripts/crash/gpu-quiesce-run.sh"
+BINDGEN_LIBRARY_SCRIPT = "scripts/crash/crash-amplification-lib.sh"
 BINDGEN_VARIABLE = "BINDGEN_EXTRA_CLANG_ARGS"
 BINDGEN_ASSIGNMENT_FORM = re.compile(r'^CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS="([^"]*)"', re.MULTILINE)
 # threads-variable= 的值：用例读线程数的环境变量名
@@ -284,7 +284,7 @@ THREADS_VARIABLE_FORM = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 CRASH_CASE_SHARD_ACROSS_MACHINES = "across-machines"
 # 登记了 shard=across-machines 的用例，checker-tier-layer0-replay --full 在分片开着时交给驱动脚本跑：它自己起两片与 merge 的 cargo、判两片与账本，不经 crash-case-command，
 # 起法不在判法摘要里；它 eval 配置判法打出的赋值。这两份按内容进这条用例的输入清单（路径从被判的仓根起；不在的进「找不到」一句）
-SHARD_DRIVER_FILES = ("scripts/layer0-shard-run.sh", "scripts/layer0-shard-configuration-check.sh")
+SHARD_DRIVER_FILES = ("scripts/crash/layer0-shard-run.sh", "scripts/crash/layer0-shard-configuration-check.sh")
 # crash-case-command 起用例时从调用方环境里清掉的分片开关：调用方设着它，单机跑的那一趟会只跑一片或去 merge
 LAYER0_SHARD_VARIABLE = "SINGLEFS_LAYER0_SHARD"
 CRASH_CASE_TEST_FORM = re.compile(r"^(?P<package>[A-Za-z0-9_-]+):(?P<target>[A-Za-z0-9_]+):(?P<function>[A-Za-z_][A-Za-z0-9_]*)$")
@@ -334,7 +334,7 @@ BUILD_ENVIRONMENT_EXACT_VARIABLES = ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RU
 BUILD_ENVIRONMENT_VARIABLE_FORMS = (re.compile(r"^CARGO_PROFILE_"), re.compile(r"^CARGO_BUILD_"),
                                     re.compile(r"^CARGO_TARGET_.+_RUSTFLAGS$"), re.compile(r"^CARGO_TARGET_.+_RUNNER$"))
 # 名字对得上而不进指纹的：它们不改编出来的东西，而本仓的包装会设它们，进了指纹同一批输入在包装里外算出两个数、全绿标记永远对不上
-BUILD_ENVIRONMENT_VARIABLES_LEFT_OUT = {"CARGO_BUILD_JOBS": "只定编译并行度；scripts/capped.sh 与 mutate.sh 会设它"}
+BUILD_ENVIRONMENT_VARIABLES_LEFT_OUT = {"CARGO_BUILD_JOBS": "只定编译并行度；scripts/hosts/capped.sh 与 mutate.sh 会设它"}
 # 指一个程序的环境变量（值的首词是程序）：那个程序按内容另进一行——换了 runner、wrapper 的内容而值不变，编出来或跑起来的就不是同一样
 BUILD_ENVIRONMENT_PROGRAM_VARIABLES = ("RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_RUSTC_WRAPPER", "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER")
 BUILD_ENVIRONMENT_PROGRAM_VARIABLE_FORMS = (re.compile(r"^CARGO_TARGET_.+_RUNNER$"),)
@@ -466,7 +466,7 @@ def parse_gate_condition(token):
 
 def self_invalidating_input_paths(input_paths):
     """实验登记的路径里会罩住「存产物」那一步本身要改的文件的：research/results/ 整个目录（新产物存进来就改了它），
-    与 scripts/replay.sh（跑完要把登记行指到新产物）。罩住了，新产物一存进来指纹就对不上自己，准入永远判不了「没变」。"""
+    与 scripts/experiments/replay.sh（跑完要把登记行指到新产物）。罩住了，新产物一存进来指纹就对不上自己，准入永远判不了「没变」。"""
     self_edited_targets = (RESULTS_DIRECTORY + "/", REPLAY_SCRIPT)
     return [input_path for input_path in input_paths
             if any(input_path == target or (input_path.endswith("/") and target.startswith(input_path)) for target in self_edited_targets)]
@@ -883,7 +883,7 @@ def replay_row_key_entries(text):
 
 
 def replay_rows_with_keys(root):
-    """scripts/replay.sh 复跑表的每一行连同它的准入键：返回 ([ReplayRow], 按行的准入键那一段写错的说明)。
+    """scripts/experiments/replay.sh 复跑表的每一行连同它的准入键：返回 ([ReplayRow], 按行的准入键那一段写错的说明)。
     没被那一段指明的行，键是实验号、产物头由装置写。弄坏开关 ignore-row-keys 下那一段整个不认（改前的样子）。"""
     replay_path = os.path.join(root, REPLAY_SCRIPT)
     if not os.path.isfile(replay_path):
@@ -913,7 +913,7 @@ def replay_rows_with_keys(root):
 
 
 def replay_products_of(root, experiment_key):
-    """scripts/replay.sh 登记表里准入键是这个键的那几行的留存产物（仓库根起的路径）；按行的准入键那一段写错抛 RegistrationError。"""
+    """scripts/experiments/replay.sh 登记表里准入键是这个键的那几行的留存产物（仓库根起的路径）；按行的准入键那一段写错抛 RegistrationError。"""
     rows, problems = replay_rows_with_keys(root)
     if problems:
         raise RegistrationError("；".join(problems))
@@ -1036,7 +1036,7 @@ def admit_experiment(root, key):
     except RegistrationError as error:
         say(f"  ✗ {key} 的准入登记有错：{error}")
         say(f"     → 怎么办：改 {REGISTRATION_TABLE} 里 {key} 那一行（路径拼错、目录少了斜杠、指到不存在的文件、条件写错），"
-            "改到 python3 scripts/admission.py paths <根> <键> 列得出、这里不再报错为止")
+            "改到 python3 scripts/gate/admission.py paths <根> <键> 列得出、这里不再报错为止")
         return EXIT_REGISTRATION_ERROR, []
     except InputManifestError as error:
         say(f"  ✗ 算不出 {key} 的输入指纹：{error}")
@@ -1235,7 +1235,7 @@ def record_gate_environment(root, stage):
         record_path = gate_environment_record_path(root, stage)
         if record_path is None:
             raise InputManifestError("取不到 git common-dir")
-        record_text = (f"# 门禁 {stage} 上一次判绿时的环境：scripts/admission.py gate-record-environment 写、gate-reuse 读。不进工作树，别手改。\n"
+        record_text = (f"# 门禁 {stage} 上一次判绿时的环境：scripts/gate/admission.py gate-record-environment 写、gate-reuse 读。不进工作树，别手改。\n"
                        f"stage={stage}\ntree={judged_tree}\nenvironment_sha256={environment_digest}\n"
                        f"recorded_utc={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
                        + "".join(f"environment_line={token} → {first_line}\n" for token, first_line in environment_lines))
@@ -2316,7 +2316,7 @@ def write_crash_case_marker(root, case, fingerprint, manifest_text, recorded_lin
     marker_path = crash_case_marker_path(root, case, fingerprint)
     if marker_path is None:
         raise InputManifestError(f"{root} 不是 git 工作树（取不到 git common-dir），全绿标记没处写")
-    text = ("# 崩溃枚举用例的全绿标记：.claude/gate.d/checker-tier-layer0-replay.sh --full 判绿之后经 scripts/admission.py crash-case-record 写，"
+    text = ("# 崩溃枚举用例的全绿标记：.claude/gate.d/checker-tier-layer0-replay.sh --full 判绿之后经 scripts/gate/admission.py crash-case-record 写，"
             "按用例与它的输入指纹分格；整轮门禁的快档与下一趟 --full 按这一格判复用。不进工作树，别手改。\n"
             f"case={case.key}\ntest={case.test_text()}\ninput_hash={fingerprint}\n"
             + "".join(f"{name}={value}\n" for name, value in details)
@@ -2375,10 +2375,10 @@ def crash_case_launch(root, case, fingerprint, start_over, environment):
     命令是 env 设好续跑的三个变量与线程数再起 cargo test --release -p <包> --test <测试目标> -- --include-ignored --exact <用例函数> --nocapture：
     进度目录 <git common-dir>/singlefs-layer0-progress/<这批输入的指纹>、SINGLEFS_LAYER0_INPUT_FINGERPRINT=<指纹>；start_over 时
     SINGLEFS_LAYER0_START_OVER=1，不然从调用方的环境里清掉它；调用方环境里的分片开关 SINGLEFS_LAYER0_SHARD 一律清掉（这一趟单机跑整条流，
-    分片只由 scripts/layer0-shard-run.sh 自己设）；线程数设进 SINGLEFS_LAYER0_THREADS，这条用例读的线程变量（登记行的 threads-variable=）
+    分片只由 scripts/crash/layer0-shard-run.sh 自己设）；线程数设进 SINGLEFS_LAYER0_THREADS，这条用例读的线程变量（登记行的 threads-variable=）
     不是它时另设成同一个数，盖掉调用方环境里的（弄坏开关 thread-variable-ignored 下只设 SINGLEFS_LAYER0_THREADS）。
     登记行有 features= 的：cargo test 在 -p <包> 之后带 --features <特性>，env 里另设 BINDGEN_EXTRA_CLANG_ARGS；多机配置写了 ENABLE_GPU=1 的，特性里有 verdict-store 就加 gpu，
-    特性里有 gpu 的整条前面接 bash scripts/gpu-quiesce-run.sh --（清场、不复原），环境里交清场之后的显卡先后（crash_case_cargo_features）。
+    特性里有 gpu 的整条前面接 bash scripts/crash/gpu-quiesce-run.sh --（清场、不复原），环境里交清场之后的显卡先后（crash_case_cargo_features）。
     取不到 common-dir、线程数取不到、多机配置在而读不了抛 InputManifestError。"""
     common_directory = git_common_directory(root)
     if common_directory is None:
@@ -2412,7 +2412,7 @@ def crash_case_launch(root, case, fingerprint, start_over, environment):
 
 
 def multi_host_configuration_file(root, environment):
-    """多机配置在哪（同 scripts/crash-amplification-lib.sh 的 crash_amplification_multi_host_configuration_file）：
+    """多机配置在哪（同 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_multi_host_configuration_file）：
     调用方环境里 SINGLEFS_MULTI_HOST_CONFIG 设了照它；没设取 <root> 的 git common-dir 的上一层（主工作树的根）下的 multi-host.env，取不到 common-dir 退回 <root>/multi-host.env。
     文件在不在不判。"""
     configured = environment.get(MULTI_HOST_CONFIGURATION_VARIABLE)
@@ -2605,7 +2605,7 @@ def crash_case_judging_digest_line():
 
 def stage_fingerprint(root, stage):
     """一道门禁阶段的输入指纹：登记路径下逐文件清单 + 登记表 + 阶段脚本自己 + 登记行 + 工具链 + 构建环境，登记了 environment= 的再加此刻环境的 sha256。
-    判法版本在这里不单列一列（判定库 scripts/lib_verdict_library.py 文件头「键分两列」）：阶段脚本与登记的判法脚本照登记路径按内容进这一个指纹，
+    判法版本在这里不单列一列（判定库 scripts/crash/lib_verdict_library.py 文件头「键分两列」）：阶段脚本与登记的判法脚本照登记路径按内容进这一个指纹，
     改了判法与改了输入一样让旧标记对不上。返回 (sha256, 文件数, 路径)。
     与 gate_reuse 比对的路径同一份（少一条输入就永远不重跑的那个理由同样成立）。"""
     stage_rows = rows_of_key(read_registration_rows(root), stage)
@@ -2652,7 +2652,7 @@ def write_stage_marker(root, stage, fingerprint, file_count):
     if marker_path is None:
         raise InputManifestError(f"{root} 不是 git 工作树（取不到 git common-dir），全绿标记没处写")
     text = ("# 门禁阶段的全绿标记：checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification "
-            "判绿之后经 scripts/admission.py stage-marker-write 写，按阶段与它登记输入（登记了 environment= 的连同环境）的指纹分格；"
+            "判绿之后经 scripts/gate/admission.py stage-marker-write 写，按阶段与它登记输入（登记了 environment= 的连同环境）的指纹分格；"
             "gate-reuse 按这一格判复用。不进工作树，别手改。\n"
             f"stage={stage}\ninput_hash={fingerprint}\ninput_file_count={file_count}\n"
             f"finished_utc={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\njudged_root={os.path.abspath(root)}\n"
@@ -2822,7 +2822,7 @@ def command_manifest(arguments):
 def command_gate_preconditions(arguments):
     if len(arguments) != 2 or not arguments[0] or not arguments[1]:
         print("  ✗ 用法：admission.py gate-preconditions <阶段所在的仓根> <阶段文件名>")
-        print("     → 怎么办：阶段里写成 python3 <仓根>/scripts/admission.py gate-preconditions <仓根> \"$(basename \"$0\")\"")
+        print("     → 怎么办：阶段里写成 python3 <仓根>/scripts/gate/admission.py gate-preconditions <仓根> \"$(basename \"$0\")\"")
         return EXIT_REGISTRATION_ERROR
     root, stage = arguments
     try:
@@ -2833,11 +2833,11 @@ def command_gate_preconditions(arguments):
     except RegistrationError as error:
         print(f"  ✗ {stage} 的准入登记有错：{error}")
         print(f"     → 怎么办：在 {REGISTRATION_TABLE} 给 {stage} 登记一行，或改那一行（门禁行第三列只认 command=、readwrite=、probe=、environment=，"
-              "写法见 scripts/admission.py 文件头）；python3 scripts/admission.py --selftest 的最后一格点得出登记表哪一行写错")
+              "写法见 scripts/gate/admission.py 文件头）；python3 scripts/gate/admission.py --selftest 的最后一格点得出登记表哪一行写错")
         return EXIT_REGISTRATION_ERROR
     except Exception as error:  # 判不出前提就不开跑：出错就放行等于把前提这一道关掉
         print(f"  ✗ 判不出 {stage} 的前提：准入模块出错（{type(error).__name__}：{error}）")
-        print("     → 怎么办：单跑 python3 scripts/admission.py gate-preconditions <仓根> <阶段文件名> 看报错，修准入模块或登记表那一行")
+        print("     → 怎么办：单跑 python3 scripts/gate/admission.py gate-preconditions <仓根> <阶段文件名> 看报错，修准入模块或登记表那一行")
         return EXIT_GATE_PRECONDITION_MISSING
     if missing:
         why = "；".join(row.comment for row in stage_rows if row.comment) or "那一行没写注释"
@@ -2901,7 +2901,7 @@ def command_replay_row_keys(arguments):
         for problem in problems:
             print(f"       {problem}")  # gate-lint:detail
         print(f"     → 怎么办：照上面每一条改 {REPLAY_SCRIPT} 里 ADMISSION_ROW_KEYS 那一段（键、复跑表那一行的前三列原样抄、产物头谁写 device 或 replay），"
-              f"指明的键在 {REGISTRATION_TABLE} 各登记一行它那一行读的输入；写法见 {os.path.join('scripts', 'admission.py')} 文件头「复跑表按行的准入键」")
+              f"指明的键在 {REGISTRATION_TABLE} 各登记一行它那一行读的输入；写法见 {os.path.join('scripts', 'gate', 'admission.py')} 文件头「复跑表按行的准入键」")
     for key, count in shared:
         print(f"  ✗ {key} 登记了准入，而这张复跑表里它有 {count} 行：准入只按实验号比产物，分不清哪一行对哪一份")
         print("     → 怎么办：给每一行起一个带方式的准入键（照 .claude/gate.d/stage-inputs.tsv 的 E142/layer0 写），在准入模块里按行认键之后再登记："
@@ -3295,16 +3295,16 @@ class FormalWorld:
         write_text(os.path.join(work, "crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs"), "fn main() {}\n")
         write_text(os.path.join(work, "crates/singlefs-checker-tier/src/bin/other_tool.rs"), "fn main() {}\n")
         write_text(os.path.join(work, "crates/singlefs-checker-tier/tests/crash.rs"), "// 别的测试目标\n")
-        for shared in ("crates/singlefs-replay-prefix/verus-must-red-worlds.tsv", "crates/mutations.tsv", "scripts/mutations/e165_replay_bounded_enumeration_custom.tsv",
+        for shared in ("crates/singlefs-replay-prefix/verus-must-red-worlds.tsv", "crates/mutations.tsv", "scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv",
                        ".claude/gate.d/e165-pinned-red-examples.tsv", ".claude/gate.d/e165-void-red-example-ledgers.tsv", ".claude/gate.d/verus-pins.tsv",
                        "research/results/e165-selftest-red-examples.tsv",
-                       "research/results/e165-selftest-kill-bounds.out", "Cargo.lock", "scripts/run-with-memory-cap.sh", "scripts/capped.sh",
-                       "scripts/lib_atomic_replace.py", "scripts/lib_verdict_library.py"):
+                       "research/results/e165-selftest-kill-bounds.out", "Cargo.lock", "scripts/hosts/run-with-memory-cap.sh", "scripts/hosts/capped.sh",
+                       "scripts/kb/lib_atomic_replace.py", "scripts/crash/lib_verdict_library.py"):
             write_text(os.path.join(work, shared), "# 样本\n")
-        shutil.copy(module, os.path.join(work, "scripts/admission.py"))
-        shutil.copy(os.path.join(SELFTEST_HERE, "stage-must-run.sh"), os.path.join(work, "scripts/stage-must-run.sh"))
-        write_text(os.path.join(work, "scripts/verus-proof-check.py"), FORMAL_FAKE_VERUS_DRIVER)
-        write_text(os.path.join(work, "scripts/e165-pin-red-examples.py"), FORMAL_FAKE_PIN_DRIVER)
+        shutil.copy(module, os.path.join(work, "scripts/gate/admission.py"))
+        shutil.copy(os.path.join(SELFTEST_HERE, "stage-must-run.sh"), os.path.join(work, "scripts/gate/stage-must-run.sh"))
+        write_text(os.path.join(work, "scripts/gate/verus-proof-check.py"), FORMAL_FAKE_VERUS_DRIVER)
+        write_text(os.path.join(work, "scripts/experiments/e165-pin-red-examples.py"), FORMAL_FAKE_PIN_DRIVER)
         self.gate = os.path.join(work, ".claude/gate.d", FORMAL_STAGE_FILE)
         shutil.copy(os.path.join(repository_root, ".claude/gate.d", FORMAL_STAGE_FILE), self._prepared(self.gate))
         shutil.copy(os.path.join(repository_root, ".claude/gate.d/lib/stage-cells.sh"), self._prepared(os.path.join(work, ".claude/gate.d/lib/stage-cells.sh")))
@@ -3460,7 +3460,7 @@ def run_formal_cell_reuse_cells(selftest, module):
         exit_code, output, ran = world.run(extra_environment={"SINGLEFS_GATE_FULL": "1"})
         selftest.expect("SINGLEFS_GATE_FULL=1：六格全跑（强制）", exit_code == 0 and ran == all_cells, f"退 {exit_code}，跑了 {ran}")
         # 判定脚本自己坏了（退 2）：这一道判红、一格不跑，不能当成可跳过
-        judge_path = os.path.join(world.work, "scripts/stage-must-run.sh")
+        judge_path = os.path.join(world.work, "scripts/gate/stage-must-run.sh")
         with open(judge_path, encoding="utf-8") as handle:
             judge_text = handle.read()
         write_executable(judge_path + ".new", "#!/usr/bin/env bash\necho 判定坏了\nexit 2\n")
@@ -3699,7 +3699,7 @@ def run_real_formal_rows_cells(selftest, repository_root, rows):
     selftest.expect("真仓登记表：红例两格登记了 closure=singlefs-checker-tier:e165_replay_bounded_enumeration、没手列 crate、不含 Verus 的判法与登记表",
                     all(formal_rows[cell].conditions == ["closure=singlefs-checker-tier:e165_replay_bounded_enumeration"]
                         and not any(path.startswith("crates/") and path != "crates/mutations.tsv" for path in formal_rows[cell].input_paths)
-                        and "scripts/verus-proof-check.py" not in formal_rows[cell].input_paths
+                        and "scripts/gate/verus-proof-check.py" not in formal_rows[cell].input_paths
                         and ".claude/gate.d/verus-pins.tsv" not in formal_rows[cell].input_paths for cell in FORMAL_RED_CELLS if cell in formal_rows), "红例两格的登记不对")
     selftest.expect("真仓登记表：pinned-red-examples-complete 登记了作废红例账登记表 .claude/gate.d/e165-void-red-example-ledgers.tsv（--check 读它）",
                     ".claude/gate.d/e165-void-red-example-ledgers.tsv" in getattr(formal_rows.get("pinned-red-examples-complete"), "input_paths", []), "没登记")
@@ -3914,7 +3914,7 @@ def staged_tree_of(work):
 
 
 def mark_tree_green(work, tree):
-    """照 scripts/gate-staged.sh 的做法：refs/sop/staged-green 指一个包着那棵暂存树的提交。"""
+    """照 scripts/gate/gate-staged.sh 的做法：refs/sop/staged-green 指一个包着那棵暂存树的提交。"""
     _exit_code, commit, _messages = run_quietly(["git", "-C", work, "commit-tree", tree, "-m", "green"], GIT_IDENTITY)
     run_quietly(["git", "-C", work, "update-ref", GATE_REUSE_REFERENCE, commit.strip()])
 
@@ -4089,12 +4089,12 @@ REPLAY_SELFTEST_DRIVERS = r'''
 # ── admission.py --selftest 拼进来的桩驱动（真仓的 replay.sh 没有这一段）──
 driver_e900() {
   : >"$OUT_DIR/driver-ran-E900"
-  python3 scripts/admission.py experiment .. E900 || return $?
+  python3 scripts/gate/admission.py experiment .. E900 || return $?
   printf 'E7RESULT name=verdict control_ok=true\nE7RESULT name=done emitted=2\n'
 }
 driver_e901() {
   : >"$OUT_DIR/driver-ran-E901"
-  python3 scripts/admission.py experiment .. E901 || return $?
+  python3 scripts/gate/admission.py experiment .. E901 || return $?
   printf 'E7RESULT name=verdict control_ok=true\nE7RESULT name=done emitted=2\n'
 }
 driver_e902() {
@@ -4103,7 +4103,7 @@ driver_e902() {
 }
 driver_e903() {
   : >"$OUT_DIR/driver-ran-E903"
-  python3 scripts/admission.py experiment .. E903 || return $?
+  python3 scripts/gate/admission.py experiment .. E903 || return $?
   printf 'E7RESULT name=verdict control_ok=true\nE7RESULT name=done emitted=2\n'
 }
 driver_e903_second() {
@@ -4162,7 +4162,7 @@ def run_replay_cells(selftest, module):
         write_executable(os.path.join(tools, "cargo"), '#!/usr/bin/env bash\n[[ "${1:-}" == -V ]] && echo "cargo 0.0.0-selftest"\nexit 0\n')
         write_executable(os.path.join(tools, "rustc"), '#!/usr/bin/env bash\n[[ "${1:-}" == -V ]] && echo "rustc 0.0.0-selftest"\nexit 0\n')
         os.makedirs(os.path.join(work, "scripts"), exist_ok=True)
-        shutil.copy(module, os.path.join(work, "scripts/admission.py"))
+        shutil.copy(module, os.path.join(work, "scripts/gate/admission.py"))
         write_text(os.path.join(work, REGISTRATION_TABLE),
                    "E900\tresearch/src/e900.txt\t# 样本\n"
                    "E901\tresearch/src/e901.txt\tquestion-row=research/questions.md#6:够判\t# 样本：前提没齐\n"
@@ -4238,7 +4238,7 @@ def run_replay_row_key_cells(selftest, module):
         for name, script in FAKE_TOOLCHAIN_SCRIPTS.items():
             write_executable(os.path.join(tools, name), script)
         os.makedirs(os.path.join(work, "scripts"), exist_ok=True)
-        shutil.copy(module, os.path.join(work, "scripts/admission.py"))
+        shutil.copy(module, os.path.join(work, "scripts/gate/admission.py"))
         write_text(os.path.join(work, REGISTRATION_TABLE),
                    "E903\tresearch/src/e903.txt\t# 样本：E903 两行里默认那一种（装置自己打产物头）\n"
                    "E903/second\tresearch/src/e903-second.txt\t# 样本：E903 第二行（跑的东西不接准入，产物头由 replay.sh 写）\n"
@@ -4296,7 +4296,7 @@ def run_replay_row_key_cells(selftest, module):
                         exit_code == 2 and "「E903|@driver_e903_missing|」在复跑表里有 0 行，要恰好一行" in output and not ran,
                         f"退 {exit_code}，跑了 {ran}，输出：{output.strip()[-600:]}")
         write_text(os.path.join(work, REPLAY_SCRIPT), replay_copy_text(table_rows, False, row_keys))
-        exit_code, _output, messages = run_quietly(["python3", os.path.join(work, "scripts/admission.py"), "experiment", work, "E903/third"])
+        exit_code, _output, messages = run_quietly(["python3", os.path.join(work, "scripts/gate/admission.py"), "experiment", work, "E903/third"])
         selftest.expect("复跑表按行的准入键：product-field=E903 只认键是 E903 的那一行产物（复跑表里 E903 两行），前提判得出、放行",
                         exit_code == 0 and "e903-2026-09-01.out 的 name=verdict control_ok=true" in messages, f"退 {exit_code}，stderr：{messages.strip()[-600:]}")
     except RegistrationError as error:
@@ -5353,7 +5353,7 @@ def run_layer0_stage_cells(selftest, module):
                  for key, target, function, conditions in LAYER0_STAGE_CASES]
         write_text(os.path.join(work, REGISTRATION_TABLE), "".join(row + "\n" for row in rows))
         os.makedirs(os.path.join(work, "scripts"))
-        shutil.copy(module, os.path.join(work, "scripts/admission.py"))
+        shutil.copy(module, os.path.join(work, "scripts/gate/admission.py"))
         for helper in ("stage-must-run.sh", "change-touches-crates.sh", "stage-run-or-skip.sh"):
             shutil.copy(os.path.join(SELFTEST_HERE, helper), os.path.join(work, "scripts", helper))
         stage_copy = os.path.join(work, ".claude/stage-under-test/checker-tier-layer0-replay.sh")
@@ -5401,7 +5401,7 @@ def run_layer0_stage_cells(selftest, module):
 
         def expected_fingerprint(key):
             _exit_code, output, _messages = run_in_environment(
-                [sys.executable, os.path.join(work, "scripts/admission.py"), "crash-case-manifest", work, key,
+                [sys.executable, os.path.join(work, "scripts/gate/admission.py"), "crash-case-manifest", work, key,
                  os.path.join(control, "expected-manifest"), "--judging-digest", "--toolchain", "--build-environment"], environment)
             return output.split()[0] if output.split() else ""
 
@@ -5546,7 +5546,7 @@ def run_layer0_stage_cells(selftest, module):
         selftest.expect("checker-tier-layer0-replay 快档（不带 SINGLEFS_GATE_FULL=1）：提交之后一个改动都没有，范围那一问答「没碰」，退 77", exit_code == 77,
                         f"退 {exit_code}，输出尾部：{output.strip()[-600:]}")
         every_case = [key for key, _target, _function, _conditions in LAYER0_STAGE_CASES]
-        copied_module = os.path.join(work, "scripts/admission.py")
+        copied_module = os.path.join(work, "scripts/gate/admission.py")
         # (说明, 改哪份, 怎么改, 该判红点名的用例；空表是标记照样作数、判绿)
         scope_cells = [
             ("只改登记表（stream-b 那一行第三列去掉 threads=LAYER0B）", os.path.join(work, REGISTRATION_TABLE),
@@ -5665,8 +5665,8 @@ def run_crash_case_command_shard_switch_cells(selftest, work):
 def run_layer0_stage_shard_cells(selftest, work, control, stage, full_runs, markers, set_logs, expected_fingerprint, common_directory):
     """checker-tier-layer0-replay --full 在分片开着时：登记了 shard=across-machines 的 stream-a 交给驱动脚本 --merged-log（参数是键、树根、这批输入的指纹、日志文件），
     另两条照旧单机跑；驱动脚本交回的日志照单机的判法判、写同一格标记；驱动脚本退非 0 判红、删那一格。假的检查与驱动脚本放进临时仓，跑完删掉。"""
-    check_path = os.path.join(work, "scripts/layer0-shard-configuration-check.sh")
-    driver_path = os.path.join(work, "scripts/layer0-shard-run.sh")
+    check_path = os.path.join(work, "scripts/crash/layer0-shard-configuration-check.sh")
+    driver_path = os.path.join(work, "scripts/crash/layer0-shard-run.sh")
     invocations_path = os.path.join(control, "driver-invocations")
     rows = read_registration_rows(work)
     sharded_case, unsharded_case = crash_case_of_key(rows, "crash-case:stream-a"), crash_case_of_key(rows, "crash-case:stream-b")

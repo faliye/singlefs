@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # admission: always 判的是此刻的合表、按段登记文件、stage-inputs.tsv 与 crash-amplification.sh 的 ITEMS，几毫秒读完；每次改其中一份都现判
 # run-condition: none 只读仓里的三份文本，除了 python3 之外没有环境要求
-"""崩溃点重放合表的读法与核法（一份判法，入口 scripts/crash-point-replay.sh 与 scripts/crash-case-check.py 的 placement 共用）。
+"""崩溃点重放合表的读法与核法（一份判法，入口 scripts/crash/crash-point-replay.sh 与 scripts/crash/crash-case-check.py 的 placement 共用）。
 
 合表 .claude/gate.d/crash-point-replay-items.tsv（写法在它的表头）：一项一条流，点名它在重型里的两部分——
-  层 0 那一套（.claude/gate.d/stage-inputs.tsv 的 crash-case: 行）与放量那一套（scripts/crash-amplification.sh 的 ITEMS），
+  层 0 那一套（.claude/gate.d/stage-inputs.tsv 的 crash-case: 行）与放量那一套（scripts/crash/crash-amplification.sh 的 ITEMS），
   再写轻型取自重型的哪几个测试目标。
 
 用法：
@@ -12,10 +12,10 @@
                                                      合表核不过时不打，打问题、退 1
     lib_crash_point_replay_items.py check [仓根]     只核，核过打一句成功句（核了几项、几条 crash-case、几个放量分项、几个轻型测试目标）
     lib_crash_point_replay_items.py segments [仓根]  只核按段登记文件（见下「按段登记」），核过打一句成功句（几行、几项）；门禁 code-source-discipline 的
-                                                     crash-point-replay-segments 格与入口 scripts/crash-point-replay.sh 开跑前都调它
+                                                     crash-point-replay-segments 格与入口 scripts/crash/crash-point-replay.sh 开跑前都调它
   被 import 时用 read_items(root)、crash_case_rows(root)、pipeline_items(root)、problems(root)、crash_cases_named(root)、
   registered_functions(root)（合表点名的重型部分落到哪几个「测试目标、用例函数」，crash-case-check.py 的 placement 用）、segment_problems(root)；
-  核法的判别力由 selftest_cells() 拿造出来的小仓核，它由 scripts/crash-case-check.py --selftest 起（placement 读的就是这一份核法）。
+  核法的判别力由 selftest_cells() 拿造出来的小仓核，它由 scripts/crash/crash-case-check.py --selftest 起（placement 读的就是这一份核法）。
 
 按段登记（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J10、M4 第 15 条；与引擎那一路实现 E2 的接口约定）：
   文件 .claude/gate.d/crash-point-replay-segments.tsv，一行 <项名>\t<段号>\t<段写数>\t<段写表摘要>（可再加一段 # 说明），# 开头的行是注释。
@@ -33,7 +33,7 @@
   （合表点名了放量分项的那几项照样报「不是 ITEMS 里的分项」；层 0 门禁的样本根里只有合表、没有放量入口）。
 退出码：0 核过（list 打全表）；1 有问题（逐处列）；2 用法错。
 
-弄坏开关（只给自证证红用）。逐项写开关名、弄坏哪一处、打开后 scripts/crash-case-check.py --selftest 哪几格红
+弄坏开关（只给自证证红用）。逐项写开关名、弄坏哪一处、打开后 scripts/crash/crash-case-check.py --selftest 哪几格红
 （格名是 selftest_cells() 里的格名，那份自证打「✗ 自检：合表核法 <格名>：…」）：
   CRASH_POINT_REPLAY_ITEMS_BREAK=unknown-part-accepted  ② 不核点名的键与分项在不在
       unknown-crash-case、unknown-pipeline-item
@@ -69,7 +69,7 @@ from preflight import preflight  # noqa: E402
 BROKEN = os.environ.get("CRASH_POINT_REPLAY_ITEMS_BREAK", "")
 ITEMS_TABLE = os.path.join(".claude", "gate.d", "crash-point-replay-items.tsv")
 REGISTRATION_TABLE = os.path.join(".claude", "gate.d", "stage-inputs.tsv")
-PIPELINE_ENTRY = os.path.join("scripts", "crash-amplification.sh")
+PIPELINE_ENTRY = os.path.join("scripts", "crash", "crash-amplification.sh")
 TIER_TESTS = os.path.join("crates", "singlefs-checker-tier", "tests")
 ITEM_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 RETIRED_WORDS = ("layer0", "amplification")
@@ -268,7 +268,7 @@ def command_segments(root):
         for problem in found:
             print(f"  ✗ {problem}")  # gate-lint:detail
         print(f"  ✗ 按段登记文件 {SEGMENTS_TABLE} 有 {len(found)} 处不对（逐处列在上面）")  # gate-lint:summary
-        print(f"  → 怎么办：照那几处改 {SEGMENTS_TABLE}（写法在它的表头与 scripts/lib_crash_point_replay_items.py 文件头「按段登记」）：项名照合表写，"
+        print(f"  → 怎么办：照那几处改 {SEGMENTS_TABLE}（写法在它的表头与 scripts/crash/lib_crash_point_replay_items.py 文件头「按段登记」）：项名照合表写，"
               "段号与段写数写十进制整数、段写数大于 0，摘要写段写表的 sha256（64 位小写十六进制），同一项同一段只留一行")
         return 1
     rows, _ = read_segments(root)
@@ -351,7 +351,7 @@ def selftest_cells():
     expect("unknown-crash-case", world("unknown-crash-case", good + [["ghost", "crash-case:ghost", "-", "stream_one"]], cases, pipeline_rows, targets),
            "不是 .claude/gate.d/stage-inputs.tsv 里 crash-case: 的键")
     expect("unknown-pipeline-item", world("unknown-pipeline-item", good + [["ghost", "-", "ghost-piped", "stream_one"]], cases, pipeline_rows, targets),
-           "不是 scripts/crash-amplification.sh 的 ITEMS 里的分项")
+           "不是 scripts/crash/crash-amplification.sh 的 ITEMS 里的分项")
     expect("unreferenced-crash-case", world("unreferenced-crash-case", good[1:], cases, pipeline_rows, targets), "crash-case:stream-one 没有被合表里哪一项点名")
     expect("unreferenced-pipeline-item",
            world("unreferenced-pipeline-item", [good[0], ["stream-two", "crash-case:stream-two", "-", "stream_two"]], cases, pipeline_rows, targets),
@@ -416,7 +416,7 @@ def main(arguments):
         root = os.path.abspath(arguments[1]) if len(arguments) == 2 else REPOSITORY_ROOT
         return {"list": command_list, "check": command_check, "segments": command_segments}[arguments[0]](root)
     print(f"  ✗ 认不出的参数 {' '.join(arguments) or '（没给）'}")
-    print("  → 怎么办：lib_crash_point_replay_items.py list [仓根] | check [仓根] | segments [仓根]（核法的自证在 scripts/crash-case-check.py --selftest）")
+    print("  → 怎么办：lib_crash_point_replay_items.py list [仓根] | check [仓根] | segments [仓根]（核法的自证在 scripts/crash/crash-case-check.py --selftest）")
     return 2
 
 

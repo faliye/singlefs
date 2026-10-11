@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # admission: always 每次调都在这一刻的树上跑点名的档；哪些判定复用由背后两套驱动各自的全绿标记与判定库定，不在这里
 # run-condition: command bash cargo python3
-# run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
-# 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/detached-run.sh start --wall-clock over-2h 与 long-run-check 读这几行）：
-# long-run-shards: 按合表 .claude/gate.d/crash-point-replay-items.tsv 的项逐项跑；每项的层 0 部分交门禁 checker-tier-layer0-replay --full（登记了 shard=across-machines 的用例按多机配置两台各跑一片），放量部分交 scripts/crash-amplification.sh（双机开着时每一项的状态块按两台量到的速度分两份）
+# run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
+# 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/hosts/detached-run.sh start --wall-clock over-2h 与 long-run-check 读这几行）：
+# long-run-shards: 按合表 .claude/gate.d/crash-point-replay-items.tsv 的项逐项跑；每项的层 0 部分交门禁 checker-tier-layer0-replay --full（登记了 shard=across-machines 的用例按多机配置两台各跑一片），放量部分交 scripts/crash/crash-amplification.sh（双机开着时每一项的状态块按两台量到的速度分两份）
 # long-run-resume: 重起同一条命令就是续跑：层 0 部分照全绿标记复用、进度文件接着跑（git common-dir 的 singlefs-layer0-progress/），放量部分照判定库（${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library-by-conclusion-kind）同一判法版本下判过的块复用
 # long-run-unshardable: 多机：这一份不自己分台，台数与额度全由背后两套驱动照多机配置的双机开关取（至多本机与 PEER_SSH_HOST 两台，不读 layer0-shard-configuration-check.sh --emit-hosts 的清单、不调 host-resources.py 现算），快档那一段只在本机跑——经给定状态引擎的测试目标除外：配了双机时交双机驱动 crash-amplification-two-hosts.sh 两台各判一份（文件头「双机」）
 # 崩溃点重放的入口（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J2「一张表、一个入口、一道门禁」与 J9「两档」；
 # 用户 2026-10-10 定的两档见 .claude/rules/verification.md「两档：轻型与重型」）。登记表是合表 .claude/gate.d/crash-point-replay-items.tsv（写法在它的表头，
-# 一项一条流），读法与核法在 scripts/lib_crash_point_replay_items.py。这一批背后照调今天的两套驱动：层 0 那一套（门禁 checker-tier-layer0-replay
-# 的 --full：逐条照全绿标记复用）与放量分项驱动（scripts/crash-amplification.sh）；引擎合并之后由引擎那一路换成一套。
+# 一项一条流），读法与核法在 scripts/crash/lib_crash_point_replay_items.py。这一批背后照调今天的两套驱动：层 0 那一套（门禁 checker-tier-layer0-replay
+# 的 --full：逐条照全绿标记复用）与放量分项驱动（scripts/crash/crash-amplification.sh）；引擎合并之后由引擎那一路换成一套。
 #
 #   crash-point-replay.sh                       重型·剪枝：全部项，层 0 部分照全绿标记复用、放量部分照判定库复用，加上快档那一段与两档都跑的那几类
 #   crash-point-replay.sh --item <项> […]       重型·逐条：只跑点名的项（给几次取并集），快档那一段只跑这几项的测试目标，两档都跑的那几类不跑
@@ -21,7 +21,7 @@
 #   上面前四种跑法可再带 --cross-check-skipped-by-the-user：这一趟跳过 GPU 判与 CPU 判的对照（判决 J6、第三轮正文 H6）。只在用户当场授权时由主 agent 给；
 #     给了才往引擎送 SINGLEFS_CRASH_POINT_REPLAY_CROSS_CHECK_SKIPPED_BY_THE_USER=1、成功句写「对照：用户授权跳过」；没给就不送，调用方环境里带着这个变量也先清掉。
 #   不带 --quick 的跑法是重型，只由带 SINGLEFS_HEAVY_TESTS 前缀的主 agent 跑（.claude/hooks/heavy-test-guard.sh 判）；轻型经
-#   scripts/run-with-memory-cap.sh 起，谁都能跑。
+#   scripts/hosts/run-with-memory-cap.sh 起，谁都能跑。
 #
 # 两个域的写法（.claude/rules/verification.md「两档：轻型与重型」点名这里）：
 #   「甲二」 = 每项第四列的测试目标不带 --ignored 跑到的那些用例（checker 档快档：按甲二展开的小域，crash::Layer0SegmentExpansion）；
@@ -38,7 +38,7 @@
 #
 # GPU（.claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」）：多机配置（crash-amplification-lib.sh 文件头「配置」：
 #   ${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，按 git common-dir 找）写了 ENABLE_GPU=1 时快档那一段带 --features verdict-store,gpu 编，
-#   每一趟 cargo test 经 scripts/gpu-quiesce-run.sh 清场再起（跑完不复原），环境里交清场之后那一份显卡先后
+#   每一趟 cargo test 经 scripts/crash/gpu-quiesce-run.sh 清场再起（跑完不复原），环境里交清场之后那一份显卡先后
 #   （多机配置的 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED，没写取 GPU_CARDS_BY_PRIORITY）；走 GPU 的计算类不送（引擎开了 GPU 就三类全走 GPU、不读
 #   GPU_COMPUTATION_CLASSES，crash-amplification-lib.sh 文件头「配置」）。
 #   没开只带 --features verdict-store，挂 gpu 特性的对拍编进来 0 条、报本次未跑。放量部分的 GPU 与清场由 crash-amplification.sh 自己照同一份配置办。
@@ -50,8 +50,8 @@
 # 双机（E4 报告第三节第 2 条：给定状态引擎读 SINGLEFS_CRASH_AMPLIFICATION_SHARE、…_HOST_WEIGHTS、…_LIBRARY、…_IMPORT，与放量流水线同一种读法）：
 #   「经给定状态引擎的项」= 合表第二列点名的 crash-case 键在 .claude/gate.d/stage-inputs.tsv 里登记了 features= 的项（要经引擎、进判定库的才登记；今天是
 #   crash-injection-fast-tier 与 read-faulted-states-never-hold-the-witness-criterion），它们第四列的测试目标在快档里这样跑：
-#   多机配置写了 ENABLE_ACROSS_MACHINES=1 时先经 scripts/layer0-shard-configuration-check.sh 判（双机开没开、键齐不齐、第二台连不连得上）：
-#     退 0（双机开）：每个这样的测试目标一趟 scripts/crash-amplification-two-hosts.sh <测试目标> --library <新建的空库> --label <标签>，照它的三步跑——
+#   多机配置写了 ENABLE_ACROSS_MACHINES=1 时先经 scripts/crash/layer0-shard-configuration-check.sh 判（双机开没开、键齐不齐、第二台连不连得上）：
+#     退 0（双机开）：每个这样的测试目标一趟 scripts/crash/crash-amplification-two-hosts.sh <测试目标> --library <新建的空库> --label <标签>，照它的三步跑——
 #       本机 SHARE=0/2、第二台 SHARE=1/2 经 multi-host-run.sh 跑完取回库、本机带 SINGLEFS_CRASH_AMPLIFICATION_IMPORT=<取回的库> 再跑一趟；
 #       库放 <放量的家目录>/crash-point-replay-fast-tier/<时戳>-<进程号>/<测试目标>/library（不放开机会清的目录，引擎拒那里的库），跑完连同取回的那一份删掉、
 #       双机驱动的日志留在 <放量的家目录>/runs/<标签>/。开了 GPU 整条经 gpu-quiesce-run.sh 清场再起、带 --quiesced。
@@ -59,12 +59,12 @@
 #       与内存包装的结局 245、251、252、254 记 not-run、退 78；退 77 记 not-run；别的照导入那一趟的结果记红。
 #     退 3（双机关）：照旧本机一趟；别的退出码（判不过，含第二台连不上）：这几个测试目标一趟都不起，记 not-run、退 78、原因写判法那一句。
 #   没写 ENABLE_ACROSS_MACHINES=1 的（配置不在、没写、写 0）不调判法，照旧本机一趟。别的测试目标一律本机一趟。
-# 内存包装：套在 scripts/run-with-memory-cap.sh 里跑时（轻型照规则这样起），包装给命令设了 RUN_WITH_MEMORY_CAP_OUTER_CAP=<外层的上限>
+# 内存包装：套在 scripts/hosts/run-with-memory-cap.sh 里跑时（轻型照规则这样起），包装给命令设了 RUN_WITH_MEMORY_CAP_OUTER_CAP=<外层的上限>
 #   （run-with-memory-cap.sh 文件头「套在包装里」）；这一趟把它照原样给放量入口与双机驱动的 --memory-cap：里层上限比外层大，包装按用法错退 251。没设不给（各用各的默认）。
 #
 # 往引擎送的两个变量（快档、层 0 部分与放量部分都从这一趟的环境继承；放量部分双机时第二台那几趟只看双机驱动送过去的环境，这两个不在里面）：
 #   SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<仓根>/.claude/gate.d/crash-point-replay-segments.tsv（按段登记文件的绝对路径，判决 J10、M4 第 15 条）：
-#     每一趟都送；开跑前先经 scripts/lib_crash_point_replay_items.py segments 核它（核不过退 2、什么都不起；写法与核法在那份库文件头「按段登记」）。
+#     每一趟都送；开跑前先经 scripts/crash/lib_crash_point_replay_items.py segments 核它（核不过退 2、什么都不起；写法与核法在那份库文件头「按段登记」）。
 #   SINGLEFS_CRASH_POINT_REPLAY_CROSS_CHECK_SKIPPED_BY_THE_USER=1：只在给了 --cross-check-skipped-by-the-user 的那一趟送（见「用法」），没给先清掉。
 #
 # 输出：背后每一趟的输出边跑边转打，同时进这一趟的日志目录 <放量的家目录>/runs/crash-point-replay-<时戳>-<进程号>/（跑完不删）。每项（与两档都跑的每一类）
@@ -90,7 +90,7 @@
 #   77  派出的项全是本次未跑，也没有红
 #   78  运行条件不满足：preflight 判的（文件头两条 run-condition），或背后有一段退 78（显卡、第二台、清场用不上，给定状态表的判器借不到显存，
 #       多机配置开了双机而判法判不过）而这一趟没有红
-# 弄坏开关 CRASH_POINT_REPLAY_BREAK=<项>（几个用逗号连；只在自证起的子进程里认）。写法同 scripts/crash-amplification.sh 文件头「弄坏开关」一段：
+# 弄坏开关 CRASH_POINT_REPLAY_BREAK=<项>（几个用逗号连；只在自证起的子进程里认）。写法同 scripts/crash/crash-amplification.sh 文件头「弄坏开关」一段：
 #   一行「#   CRASH_POINT_REPLAY_BREAK=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头写点名的格（、隔开；括号里是失败行的句首，开关轮不读）。
 #   --selftest 末尾那一轮（开关轮，crash-amplification-lib.sh 的 crash_amplification_switch_wheel）从这张表现读，表里的开关与代码里 replay_break_is 认的要相等：
 #   CRASH_POINT_REPLAY_BREAK=accept-unknown-item  认不得的项名悄悄丢掉、照跑
@@ -153,7 +153,7 @@
 #   （那三份是自证写的假的：只记一行参数、照环境变量打结果）。
 #   「自证起的子进程」的标记：CRASH_POINT_REPLAY_SELFTEST_MARK=<文件>，那份文件在、内容是 SELFTEST_MARK_CONTENT 那一行；只有 run_selftest 设它。
 #   这三个变量读完就从环境里清掉，不传给背后的驱动。自证里的 cargo 是 PATH 最前面的假 cargo（起之前核 PATH 上解到的就是它，不是就不起）；
-#   清场走真的 scripts/gpu-quiesce-run.sh，多机配置指到临时目录里只写了假清场命令的一份，状态与日志目录都在临时目录里。
+#   清场走真的 scripts/crash/gpu-quiesce-run.sh，多机配置指到临时目录里只写了假清场命令的一份，状态与日志目录都在临时目录里。
 # 自证末尾的开关轮并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS，没给取 SINGLEFS_THREAD_CAP，再没给按 nproc（同 crash-amplification-lib.sh 文件头「弄坏开关轮」）。
 #
 # gate-similar: crash-amplification.sh 它是放量分项的登记表与全量循环；这里是合表的入口，放量部分每趟调它一次，层 0 部分调门禁 checker-tier-layer0-replay
@@ -352,7 +352,7 @@ run_fast_tier_target_on_two_hosts() { # <测试目标> <记给哪几项>
   [[ -n "$outer_memory_cap" ]] && two_hosts_arguments+=(--memory-cap "$outer_memory_cap")
   (( gpu_switch )) && two_hosts_arguments+=(--quiesced)
   two_hosts_log="$run_directory/fast-tier.$target.two-hosts.log"
-  echo "── 快档（两台分片）：bash scripts/crash-amplification-two-hosts.sh ${two_hosts_arguments[*]}（本机 0/2、第二台 1/2 取回库、本机带 IMPORT 再跑${quiesce_prefix[*]:+；经 scripts/gpu-quiesce-run.sh 清场再起}）"
+  echo "── 快档（两台分片）：bash scripts/crash/crash-amplification-two-hosts.sh ${two_hosts_arguments[*]}（本机 0/2、第二台 1/2 取回库、本机带 IMPORT 再跑${quiesce_prefix[*]:+；经 scripts/crash/gpu-quiesce-run.sh 清场再起}）"
   run_logged "$two_hosts_log" ${quiesce_prefix[@]+"${quiesce_prefix[@]}"} "${two_hosts_environment[@]}" bash "$replay_script_directory/crash-amplification-two-hosts.sh" "${two_hosts_arguments[@]}"
   two_hosts_exit="$(cat "$two_hosts_log.exit" 2>/dev/null || echo 255)"
   # 这一趟的库不复用（快档没有判定复用这一层）：连同取回的那一份、送第二台的快照一起删，日志留着
@@ -370,7 +370,7 @@ run_fast_tier_target_on_two_hosts() { # <测试目标> <记给哪几项>
       fi ;;
     245|251|252|254)
       fast_state=not-run; fast_exit=78; fast_tests=0; fast_red=0
-      fast_reason="运行条件不满足：双机驱动退 $two_hosts_exit（内存包装自己的结局或显存不够，这一次的输出不算结果：scripts/run-with-memory-cap.sh 文件头「退出码」；日志 $two_hosts_log、$two_hosts_runs/）" ;;
+      fast_reason="运行条件不满足：双机驱动退 $two_hosts_exit（内存包装自己的结局或显存不够，这一次的输出不算结果：scripts/hosts/run-with-memory-cap.sh 文件头「退出码」；日志 $two_hosts_log、$two_hosts_runs/）" ;;
     77)
       fast_state=not-run; fast_exit=77; fast_tests=0; fast_red=0
       fast_reason="双机驱动退 77（本次未跑；日志 $two_hosts_log、$two_hosts_runs/）" ;;
@@ -460,7 +460,7 @@ run_fast_tier() { # <计划文件>：快档那一段（fast-tier 的件），一
     replay_break_is fast-tier-classes-sent && environment+=("GPU_COMPUTATION_CLASSES=gpu_unit_checks crash_verify_gpu crash_judge_gpu")   # 弄坏开关：改前送的三类
     replay_break_is gpu-without-quiesce || quiesce_prefix=(bash "$replay_script_directory/gpu-quiesce-run.sh" --)
   fi
-  echo "── 快档那一段：${#targets[@]} 个测试目标，cargo test --release -p singlefs-checker-tier --features $features（不带 --ignored${quiesce_prefix[*]:+；每一趟经 scripts/gpu-quiesce-run.sh 清场再起}）"
+  echo "── 快档那一段：${#targets[@]} 个测试目标，cargo test --release -p singlefs-checker-tier --features $features（不带 --ignored${quiesce_prefix[*]:+；每一趟经 scripts/crash/gpu-quiesce-run.sh 清场再起}）"
   build_log="$run_directory/fast-tier-build.log"
   started=$SECONDS
   run_logged "$build_log" "${environment[@]}" cargo test --release -p singlefs-checker-tier --features "$features" --no-run "${target_arguments[@]}"
@@ -493,9 +493,9 @@ run_enumeration_part() { # <项> <crash-case: 键…>：交门禁 checker-tier-l
     arguments+=(--start-over)
     for key in "$@"; do
       manifest="$run_directory/manifest.${key#crash-case:}"
-      if summary="$(python3 "$repository_root/scripts/admission.py" crash-case-manifest "$repository_root" "$key" "$manifest" --judging-digest --toolchain --build-environment)" \
+      if summary="$(python3 "$repository_root/scripts/gate/admission.py" crash-case-manifest "$repository_root" "$key" "$manifest" --judging-digest --toolchain --build-environment)" \
          && read -r fingerprint _ <<<"$summary" && [[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]] \
-         && marker="$(python3 "$repository_root/scripts/admission.py" crash-case-marker-path "$repository_root" "$key" "$fingerprint")"; then
+         && marker="$(python3 "$repository_root/scripts/gate/admission.py" crash-case-marker-path "$repository_root" "$key" "$fingerprint")"; then
         if [[ -n "$marker" && -e "$marker" ]]; then rm -f -- "${marker:?}"; echo "  · 全量（清空复用）：删掉 $key 这批输入的全绿标记 $marker"; fi
       else
         echo "  ! 全量（清空复用）：算不出 $key 这批输入的指纹或标记路径（admission.py crash-case-manifest / crash-case-marker-path 没成），这一条的全绿标记没删，门禁照它复用" >&2
@@ -556,9 +556,9 @@ run_pipeline_part() { # <计划文件>：放量部分（pipeline-* 的件）一�
   # 套在内存包装里：外层的上限给放量入口（文件头「内存包装」）
   [[ -n "$outer_memory_cap" ]] && arguments+=(--memory-cap "$outer_memory_cap")
   log="$run_directory/pipeline.log"
-  echo "── 放量部分：bash scripts/crash-amplification.sh ${arguments[*]}"
+  echo "── 放量部分：bash scripts/crash/crash-amplification.sh ${arguments[*]}"
   started=$SECONDS
-  run_logged "$log" bash "$repository_root/scripts/crash-amplification.sh" ${arguments[@]+"${arguments[@]}"}
+  run_logged "$log" bash "$repository_root/scripts/crash/crash-amplification.sh" ${arguments[@]+"${arguments[@]}"}
   exit_code="$(cat "$log.exit" 2>/dev/null || echo 255)"
   if [[ "$kind" == pipeline-expand-* && -n "$library" ]]; then
     rm -rf -- "${library:?}"
@@ -667,9 +667,9 @@ if red or count_mismatch:
     print(f"  ✗ 崩溃点重放{tier_title}：{len(red)} 项红（{'、'.join(red) or '无'}）", file=sys.stderr)  # gate-lint:summary
     nameable = [item for item in red if not item.startswith("both-tiers:")]
     if tier == "quick":
-        rerun = "轻型每次跑全部项，改完整趟重跑：bash scripts/run-with-memory-cap.sh <上限> bash scripts/crash-point-replay.sh --quick"
+        rerun = "轻型每次跑全部项，改完整趟重跑：bash scripts/hosts/run-with-memory-cap.sh <上限> bash scripts/crash/crash-point-replay.sh --quick"
     elif nameable:
-        rerun = ("只重跑红的那 %d 项：SINGLEFS_HEAVY_TESTS=<commit|user-request> bash scripts/crash-point-replay.sh %s%s"
+        rerun = ("只重跑红的那 %d 项：SINGLEFS_HEAVY_TESTS=<commit|user-request> bash scripts/crash/crash-point-replay.sh %s%s"
                  % (len(nameable), "--full " if tier == "full" else "", " ".join(f"--item {item}" for item in nameable)))
         if len(nameable) != len(red):
             rerun += "（两档都跑的那几类不能点名，只在不带 --item 的跑法里跑）"
@@ -714,7 +714,7 @@ run_selftest() {
   : >"$root/crates/singlefs-checker-tier/tests/alpha.rs"; : >"$root/crates/singlefs-checker-tier/tests/beta.rs"; : >"$root/crates/singlefs-checker-tier/tests/gamma_amp.rs"
   # 按段登记文件：一行登记（alpha 第 0 段），segments-registry-refused 那一格临时换成核不过的一份、跑完换回
   printf '%s\n' "# 自证的按段登记" "alpha	0	7	$(printf '0123456789abcdef%.0s' 1 2 3 4)" >"$root/.claude/gate.d/crash-point-replay-segments.tsv"
-  cat >"$root/scripts/crash-amplification.sh" <<'STUB'
+  cat >"$root/scripts/crash/crash-amplification.sh" <<'STUB'
 #!/usr/bin/env bash
 # 假的崩溃放量入口（自证用）：ITEMS 给合表核法读；起它时记一行参数，按 --item（没给就 ITEMS 全部）逐项打 CRASH_AMPLIFICATION_ITEM 行
 ITEMS=(
@@ -760,7 +760,7 @@ for argument in "$@"; do
 done
 exit "${STUB_LAYER0_EXIT:-0}"
 STUB
-  cat >"$root/scripts/admission.py" <<'STUB'
+  cat >"$root/scripts/gate/admission.py" <<'STUB'
 # 假的准入模块（自证用）：记一行参数；crash-case-manifest 打一份假指纹，crash-case-marker-path 打 STUB_MARKERS 下以键为名的标记
 import os, sys
 open(os.environ["STUB_CALLS"], "a").write("admission " + " ".join(sys.argv[1:]) + "\n")
@@ -804,7 +804,7 @@ STUB
   printf '%s\n' PEER_SSH_HOST=peer-selftest PEER_REPOSITORY_DIRECTORY=/nonexistent/peer-tree PEER_CARGO_BIN_DIRECTORY=/nonexistent/bin PEER_MEMORY_CAP=4G \
     QUIESCE_STOP_COMMAND= QUIESCE_STOPPED_CHECK_COMMAND= QUIESCE_START_COMMAND= QUIESCE_STARTED_CHECK_COMMAND= ENABLE_ACROSS_MACHINES=1 >"$work/multi-host-two-hosts.env"
   printf '%s\n' ENABLE_ACROSS_MACHINES=1 PEER_SSH_HOST=peer-selftest >"$work/multi-host-two-hosts-broken.env"
-  # 双机驱动是真的 scripts/crash-amplification-two-hosts.sh，只换掉它本机那一趟与第二台那一趟（它文件头「只供测试」的两个变量，entry 每一格都设上）
+  # 双机驱动是真的 scripts/crash/crash-amplification-two-hosts.sh，只换掉它本机那一趟与第二台那一趟（它文件头「只供测试」的两个变量，entry 每一格都设上）
   cat >"$work/two-hosts-local.sh" <<'STUB'
 #!/usr/bin/env bash
 # 假的双机驱动本机那一趟（自证用，CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_RUN）：调法 <share> <库目录> <日志> [<附加环境 键=值>…]，环境由双机驱动照真的那一趟组。
@@ -963,7 +963,7 @@ STUB
   # enumeration-red：层 0 那一道退 1 ⇒ alpha、beta 红，退 1
   entry STUB_LAYER0_EXIT=1 -- --item alpha --item beta
   if [[ "$exit_code" != 1 ]] || ! item_has alpha 'verdict=red' || ! item_has beta 'enumeration_red=1' \
-     || ! out_has "只重跑红的那 2 项：SINGLEFS_HEAVY_TESTS=<commit|user-request> bash scripts/crash-point-replay.sh --item alpha --item beta"; then
+     || ! out_has "只重跑红的那 2 项：SINGLEFS_HEAVY_TESTS=<commit|user-request> bash scripts/crash/crash-point-replay.sh --item alpha --item beta"; then
     cell_failed enumeration-red "层 0 那一道红了，那一项应当红、出路给出只重跑那两项的命令" "看 run_enumeration_part 判 exit_code 那一段与 summarize 的出路"
   fi
   # pipeline-red：放量 alpha-amp red=2 ⇒ alpha 红

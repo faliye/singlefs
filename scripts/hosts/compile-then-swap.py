@@ -16,9 +16,9 @@
      把草稿副本放到目标在副本里的位置；主工作区一个字节不碰。
   2. 在副本里 `nice -n 19 cargo build --offline -p <crate> --bin <名>` 与 `cargo test --offline --no-run -p <crate> --bin <名>`
      （后一条编 bin 里的 #[cfg(test)]），CARGO_TARGET_DIR 放 <草稿目录>/compile-then-swap/target。线程数照环境里的
-     CARGO_BUILD_JOBS（经 scripts/capped.sh N 起时就是 N）。编译输出落 <草稿目录>/compile-then-swap/build-*.log。
+     CARGO_BUILD_JOBS（经 scripts/hosts/capped.sh N 起时就是 N）。编译输出落 <草稿目录>/compile-then-swap/build-*.log。
   3. 两条都编过，再核主工作区那份在编的这段时间里没被改过（开跑时记的字节与此刻相同，或开跑时与此刻都不存在）。
-  4. 换上：目标已有的，同目录临时文件写完、fsync、照原权限位改名盖上（scripts/lib_atomic_replace.py）；目标还没有的，
+  4. 换上：目标已有的，同目录临时文件写完、fsync、照原权限位改名盖上（scripts/kb/lib_atomic_replace.py）；目标还没有的，
      同目录临时文件写完再硬链接到目标名（目标名这时被别人占了就失败）、删临时文件。换上之后回读，与草稿副本逐字节相同。
   5. 删掉仓副本，编译目录留着给下一次增量编；收工前 --clean。
 编不过、目标被改过、参数不对，都在换上之前停下：主工作区那份一个字节不动。

@@ -3,9 +3,9 @@
 # run-condition: none 只读一份文本、打印取出的用例名，不起子进程，也不碰仓里的文件
 """libtest（cargo test 起的测试二进制与 rustdoc）打的结果行与汇总行，全仓只在这里解析一份。
 
-调它的：scripts/crates-mutation-rows.py（门禁 checker-tier-crates-mutation-replay 的判法 results_by_test）、
-scripts/prove-red.sh（经 crates-mutation-rows.py 的 verdict_of_run）、scripts/rerun-failed-tests.py、
-scripts/mutate.sh（经下面的命令行 failed-names）、scripts/broad-mutation.py（取第一条红的测试名与进度行里的条数，libtest_outcome / libtest_failed_name）。各自按文件路径用 importlib 导入（调用方的 sys.path 不一定有本目录）。
+调它的：scripts/mutation/crates-mutation-rows.py（门禁 checker-tier-crates-mutation-replay 的判法 results_by_test）、
+scripts/mutation/prove-red.sh（经 crates-mutation-rows.py 的 verdict_of_run）、scripts/gate/rerun-failed-tests.py、
+scripts/mutation/mutate.sh（经下面的命令行 failed-names）、scripts/mutation/broad-mutation.py（取第一条红的测试名与进度行里的条数，libtest_outcome / libtest_failed_name）。各自按文件路径用 importlib 导入（调用方的 sys.path 不一定有本目录）。
 
 认的行（行尾多出的空白不算）：
   结果行  `test <全名> ... <结局>`。全名是带模块路径的用例名；rustdoc 的是 `<源文件> - <条目> (line <N>)`，中间有空格，照样整段算全名。

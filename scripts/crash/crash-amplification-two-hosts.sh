@@ -10,11 +10,11 @@
 #                                                    末尾一轮（开关轮）从下面「弄坏开关」那张表现读开关与点名的格，逐个打开再跑一遍 --selftest，核红的格与点名的逐格相等
 #
 # 测试目标是 crates/singlefs-checker-tier/tests/ 下一条走 crash_amplification::run_from_environment 的用例（例 crash_amplification_fixed_script_through_rollback），
-# 或经给定状态引擎判的随机历史用例（崩溃点重放入口 scripts/crash-point-replay.sh 的快档开了双机时照这三步起它们：引擎读同样的 SHARE、LIBRARY、IMPORT）。
+# 或经给定状态引擎判的随机历史用例（崩溃点重放入口 scripts/crash/crash-point-replay.sh 的快档开了双机时照这三步起它们：引擎读同样的 SHARE、LIBRARY、IMPORT）。
 # 步骤：① 本机 SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/2、库写到 --library（没给用 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library-by-conclusion-kind，
 #          crash-amplification-lib.sh 文件头「判定库」：按结论种类存之前的旧库 <家目录>/library 引擎开库就拒，不删、不读；
 #          在 /tmp 之外：重启不清、重跑同一条命令就是续跑；用例里的 run_from_environment 拒绝落在 /tmp、/var/tmp、/dev/shm、/run 下的库），后台跑（先 6 路并行只编、再按线程数跑）；
-#       ② 第二台 SHARE=1/2、库写到那棵树副本树根下的 crash-amplification-library/（相对路径由测试按仓根解析），经 scripts/multi-host-run.sh --peer --fetch 跑并取回
+#       ② 第二台 SHARE=1/2、库写到那棵树副本树根下的 crash-amplification-library/（相对路径由测试按仓根解析），经 scripts/hosts/multi-host-run.sh --peer --fetch 跑并取回
 #          （树怎么拷、内存上限、工具链比对、脱离 ssh 会话、私有字换成「第二台」都归它）；树副本不带 multi-host.env，
 #          两个开关 ENABLE_ACROSS_MACHINES / ENABLE_GPU 随命令的环境送过去（测试在配置不在时读同名环境变量）；
 #       ③ 等本机那一份；④ 本机再跑一趟 SHARE=0/2 带 SINGLEFS_CRASH_AMPLIFICATION_IMPORT=<取回的库>：导入第二台的块、对账、读违例——
@@ -34,7 +34,7 @@
 #   SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY（本机设了就把那份按段登记文件拷一份快照经 --send 送进第二台那棵树的 crash-amplification-segments-registry/，
 #   变量值在第二台上是那一份的绝对路径）：第二台排计划、分份那两趟都送；本机那几趟从调用方环境继承。
 # 线程（crash-amplification-lib.sh 文件头「现算线程」）：第二台排计划、分份那两趟起 capped.sh 的线程数与那两趟判的线程数（SINGLEFS_CRASH_AMPLIFICATION_THREADS），
-#   各在起那一趟之前现算、两样取同一个数：CRASH_AMPLIFICATION_PEER_THREADS 给了就用它（正整数），没给取 scripts/host-resources.py --json
+#   各在起那一趟之前现算、两样取同一个数：CRASH_AMPLIFICATION_PEER_THREADS 给了就用它（正整数），没给取 scripts/hosts/host-resources.py --json
 #   里第二台此刻的可用线程（至少 1）；--threads 只管本机跑的那一步（没给是本机核数减一），不带给第二台。
 #   本机只编那一步同样现算（CRASH_AMPLIFICATION_BUILD_THREADS）。算不出退 78，那一趟与本机先判着、本机那一份都还没起。
 # ENABLE_ACROSS_MACHINES 不是 1 由 multi-host-run.sh 拒（退 255），这里不偷偷退回单机。
@@ -67,7 +67,7 @@
 #   CRASH_AMPLIFICATION_TWO_HOSTS_PEER_HOST_LIB=<文件>  换掉 peer-host-lib.sh（--quiesce 用的 peer_host_load_configuration、peer_host_quiesce、peer_host_quiesce_left）。
 #   CRASH_AMPLIFICATION_TWO_HOSTS_SWITCH_TABLE=<文件>   --selftest 末尾的开关轮从这份文件的文件头读开关表（不设读本脚本自己的），代码里认的开关照旧从本脚本取：
 #                                                       拿一份改坏了表的拷贝（删一格、多一格、格名写错、漏一个开关）证开关轮会红。只在 --selftest 的开关轮里读。
-#   CRASH_AMPLIFICATION_HOST_RESOURCES=<脚本>           换掉 scripts/host-resources.py（crash-amplification-lib.sh 文件头「现算线程」）：
+#   CRASH_AMPLIFICATION_HOST_RESOURCES=<脚本>           换掉 scripts/hosts/host-resources.py（crash-amplification-lib.sh 文件头「现算线程」）：
 #                                                       --selftest 给每一趟里层设成一份假的（python3 <脚本> --json 打造出来的两台，STUB_LOCAL_THREADS、STUB_PEER_THREADS
 #                                                       是两台的 available_threads，STUB_HOST_RESOURCES=fails 退 1、=peer-unread 第二台记没读到）。
 #   CRASH_AMPLIFICATION_TWO_HOSTS_STOP_DECIDED=<文件>   第二台量完速度、叫停本机先判着那一趟的那一步（建停下文件，或不建）走过之后建这份文件：
@@ -375,7 +375,7 @@ assignments=()
 while (($# > 0)) && [[ "$1" == *=* ]]; do assignments+=("$1"); shift; done
 placement=0
 case " ${assignments[*]} " in *" SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1 "*) placement=1 ;; esac
-# 送过去的命令是 bash scripts/capped.sh <线程数> cargo …：线程数记进 <调用记录>.threads（现算线程那几格读）
+# 送过去的命令是 bash scripts/hosts/capped.sh <线程数> cargo …：线程数记进 <调用记录>.threads（现算线程那几格读）
 [[ "${1:-}" == bash && "${2:-}" == */capped.sh ]] && echo "placement=$placement threads=${3:-}" >>"${STUB_CALLS:?}.threads"
 if { ((placement)) && [[ "${STUB_PEER_PLACEMENT:-ok}" == unreachable ]]; } || { ((!placement)) && [[ "${STUB_PEER_EXIT:-}" == 255 ]]; }; then
   echo "peer unreachable placement=$placement" >>"${STUB_CALLS:?}"
@@ -412,7 +412,7 @@ peer_host_quiesce() { echo "quiesce" >>"${STUB_CALLS:?}"; [[ "${STUB_QUIESCE:-ok
 peer_host_quiesce_left() { echo "quiesce-left" >>"${STUB_CALLS:?}"; }
 STUB
   cat >"$work/host-resources.py" <<'STUB'
-# 假的 scripts/host-resources.py（自证用，python3 <它> --json 起）：打造出来的两台；STUB_LOCAL_THREADS、STUB_PEER_THREADS 是两台此刻的可用线程（默认 11、5），
+# 假的 scripts/hosts/host-resources.py（自证用，python3 <它> --json 起）：打造出来的两台；STUB_LOCAL_THREADS、STUB_PEER_THREADS 是两台此刻的可用线程（默认 11、5），
 # STUB_HOST_RESOURCES=fails 退 1、什么都不打；=peer-unread 第二台记没读到（read 是 false、不带 cpu）
 import json, os, sys
 mode = os.environ.get("STUB_HOST_RESOURCES") or "ok"
@@ -716,8 +716,8 @@ STUB
     mkdir -p "$cell_directory/root/scripts"
     : >"$cell_directory/calls"
     cells=$((cells + 1))
-    printf '%s\n' '#!/usr/bin/env bash' 'shift; exec "$@"' >"$cell_directory/root/scripts/run-with-memory-cap.sh"
-    printf '%s\n' '#!/usr/bin/env bash' 'step=test; [[ " $* " == *" --no-run "* ]] && step=build' 'echo "threads=$1 step=$step" >>"${STUB_CALLS:?}"' >"$cell_directory/root/scripts/capped.sh"
+    printf '%s\n' '#!/usr/bin/env bash' 'shift; exec "$@"' >"$cell_directory/root/scripts/hosts/run-with-memory-cap.sh"
+    printf '%s\n' '#!/usr/bin/env bash' 'step=test; [[ " $* " == *" --no-run "* ]] && step=build' 'echo "threads=$1 step=$step" >>"${STUB_CALLS:?}"' >"$cell_directory/root/scripts/hosts/capped.sh"
     env -u CRASH_AMPLIFICATION_BUILD_THREADS STUB_HOST_RESOURCES= STUB_LOCAL_THREADS= STUB_PEER_THREADS= STUB_CALLS="$cell_directory/calls" "$@" \
       bash -c 'repository_root="$1"; source "$2" || exit 3; threads=7; memory_cap=1G; common_environment=(); gpu_cards_by_priority=""
                cargo_build_arguments=(test --no-run); cargo_test_arguments=(test)
@@ -983,7 +983,7 @@ if [[ -z "$host_weights" && -n "$local_states_per_second" ]]; then
   [[ -n "$peer_memory_cap" ]] && placement_arguments+=(--memory-cap "$peer_memory_cap")
   bash "$multi_host_runner" "${placement_arguments[@]}" -- \
     "${peer_tree_path_prefix[@]+"${peer_tree_path_prefix[@]}"}" env "${peer_run_environment[@]}" SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1 SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/1 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=crash-amplification-library \
-    bash scripts/capped.sh "$peer_threads" cargo "${cargo_test_arguments[@]}" >"$run_directory/peer-placement.log" 2>&1
+    bash scripts/hosts/capped.sh "$peer_threads" cargo "${cargo_test_arguments[@]}" >"$run_directory/peer-placement.log" 2>&1
   peer_placement_exit=$?
   two_hosts_break_is never-stop-warm-run || : > "$warm_stop_file"
   # 只供测试（文件头「只供测试」CRASH_AMPLIFICATION_TWO_HOSTS_STOP_DECIDED）：叫停这一步走过了，在停下文件之后建
@@ -1060,7 +1060,7 @@ peer_share=1/2
 two_hosts_break_is same-share-on-both-hosts && peer_share=0/2
 MULTI_HOST_RUN_FETCH_DIRECTORY="$fetch_directory" bash "$multi_host_runner" "${peer_arguments[@]}" -- \
   "${peer_tree_path_prefix[@]+"${peer_tree_path_prefix[@]}"}" env "${peer_run_environment[@]}" "${weights_environment[@]+"${weights_environment[@]}"}" "SINGLEFS_CRASH_AMPLIFICATION_SHARE=$peer_share" SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=crash-amplification-library \
-  bash scripts/capped.sh "$peer_threads" cargo "${cargo_test_arguments[@]}" >"$run_directory/share-1.log" 2>&1
+  bash scripts/hosts/capped.sh "$peer_threads" cargo "${cargo_test_arguments[@]}" >"$run_directory/share-1.log" 2>&1
 peer_exit=$?
 wait "$local_pid"; local_exit=$?
 grep -hE '^CRASH_AMPLIFICATION(_GPU_CARD|_GPU_TOTAL)? ' "$run_directory/share-0.log" "$run_directory/share-1.log" 2>/dev/null

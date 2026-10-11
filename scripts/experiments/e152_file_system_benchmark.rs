@@ -5,7 +5,7 @@
 //!   宿主：e152-file-system-benchmark summarize <产物>
 //!
 //! 负载、次序、判据与作废条款照跑前登记 `research/prompts/e152-preregistration.md`（含第十节的修订与第十一节的两盘镜像）逐条写；
-//! 驱动在 `scripts/e152-run.sh`，附加根在 `scripts/e152-stage-root.sh`。
+//! 驱动在 `scripts/devices/e152-run.sh`，附加根在 `scripts/devices/e152-stage-root.sh`。
 //! 这个二进制自己只判两件事：块层读数与 fio 读数对不对得上（登记第六节），以及同一个判定函数在对照上会不会红。
 
 use std::collections::BTreeMap;
@@ -121,7 +121,7 @@ impl Configuration {
         }
     }
 
-    /// `scripts/e152-stage-root.sh` 写的模块次序文件名；ext4 编进内核，单盘裸盘与 singlefs 不要模块，md 配置都要 raid1。
+    /// `scripts/devices/e152-stage-root.sh` 写的模块次序文件名；ext4 编进内核，单盘裸盘与 singlefs 不要模块，md 配置都要 raid1。
     fn module_order_name(self) -> Option<&'static str> {
         match self {
             Self::Xfs => Some("xfs"),

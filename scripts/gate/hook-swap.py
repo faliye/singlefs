@@ -8,7 +8,7 @@
   hook-swap.py <规格.json> --hook <钩子> --scratch <草稿目录> [--feeds <喂法.json>] [--root <仓根>] [--dry-run]
   hook-swap.py --selftest        # HOOK_SWAP_BREAK=<项> 时必须判红
 
-<规格.json> 同 scripts/replace-batch.py：JSON 数组，每项 {"file": 路径, "old": 旧串, "new": 新串, "count": 可省，默认 1}，
+<规格.json> 同 scripts/kb/replace-batch.py：JSON 数组，每项 {"file": 路径, "old": 旧串, "new": 新串, "count": 可省，默认 1}，
   同一个文件的多处按数组次序依次施加；file 写相对仓根的路径或绝对路径，只收 <仓根>/.claude/hooks/ 这一层里已有的普通文件；旧串、新串都不许空。
 <钩子> 是要喂 JSON 的那一份（.claude/hooks/ 下的 .sh），不在规格里也照样做语法检查与喂法。
 <喂法.json>：JSON 数组，每项 {"label": 说明, "command": Bash 命令, "exit": 0 或 2, "agent_type": 可省（省了是主 agent）, "cwd": 可省（默认 {root}），
@@ -27,7 +27,7 @@
      逐条喂 <喂法>（CLAUDE_PROJECT_DIR 设成草稿树、检出记录写草稿目录、不带 SINGLEFS_HEAVY_TESTS），退出码要等于写的那一个，
      stderr 里不许有「没判成」「读不到共用模块」（钩子坏了放行时说的话）。有一条不对就停，主工作区一个字节不写。--dry-run 停在这里。
   4. 再读主工作区那几份，要与第 1 步记的逐字节相同（这段时间里别的会话改了就停，一个字节不写）；整批先预演一遍（同目录临时文件写完、fsync，
-     改名之前停下），全过了逐份改名换上（scripts/lib_atomic_replace.py），回读。
+     改名之前停下），全过了逐份改名换上（scripts/kb/lib_atomic_replace.py），回读。
   5. 主工作区里照第 3 步再验一遍（CLAUDE_PROJECT_DIR 设成仓根）。不对就回滚：逐份在此刻的内容上做反向定点替换（每处要恰好命中 count 次），
      改名换上；再对回滚后的文件做语法检查、喂标了 neutral 的几条。
   草稿树跑完就删；喂法的输出与检出记录留在 <草稿目录>/hook-swap/ 下。
@@ -85,9 +85,9 @@ BUILTIN_FEEDS = {
         {"label": "主 agent 跑 ls -la 放行", "command": "ls -la", "exit": 0, "neutral": True},
         {"label": "实现员跑 git status 放行", "agent_type": WRITER, "command": "git status --short", "exit": 0, "neutral": True},
         {"label": "实现员跑 cargo test --all 照拒", "agent_type": WRITER, "command": "cargo test --all", "exit": 2, "neutral": True},
-        {"label": "实现员跑 checker 档包照拒", "agent_type": WRITER, "command": "bash scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier",
+        {"label": "实现员跑 checker 档包照拒", "agent_type": WRITER, "command": "bash scripts/hosts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier",
          "exit": 2, "neutral": True},
-        {"label": "实现员单独跑登记成轻的自证放行", "agent_type": WRITER, "command": "python3 scripts/admission.py --selftest", "exit": 0, "neutral": True},
+        {"label": "实现员单独跑登记成轻的自证放行", "agent_type": WRITER, "command": "python3 scripts/gate/admission.py --selftest", "exit": 0, "neutral": True},
         {"label": "实现员 ls 合法的通配放行", "agent_type": WRITER, "command": "ls scripts/*.sh", "exit": 0},
         {"label": "实现员通配起 checker-tier-layer0-replay 照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-layer0-replay.s? {root}", "exit": 2},
         {"label": "实现员通配起 QEMU 那一道照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-qemu-device-streams.s? {root}", "exit": 2},
@@ -102,13 +102,13 @@ BUILTIN_FEEDS = {
         {"label": "实现员等价类起 checker-tier-layer0-replay 照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-layer0-replay.s[[=h=]] {root}", "exit": 2},
         {"label": "实现员整理符号起 QEMU 那一道照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-qemu-device-streams.s[[.h.]] {root}", "exit": 2},
         {"label": "实现员合法的 POSIX 字符类 ls 放行", "agent_type": WRITER, "command": "ls scripts/[[:alpha:]]*.sh", "exit": 0, "neutral": True},
-        {"label": "实现员起崩溃放量全量照拒", "agent_type": WRITER, "command": "bash scripts/crash-amplification.sh", "exit": 2},
+        {"label": "实现员起崩溃放量全量照拒", "agent_type": WRITER, "command": "bash scripts/crash/crash-amplification.sh", "exit": 2},
         {"label": "实现员起崩溃放量分项驱动照拒", "agent_type": WRITER,
-         "command": "bash scripts/crash-amplification-item.sh crash_amplification_fixed_script_through_rollback", "exit": 2},
-        {"label": "实现员起崩溃放量双机驱动照拒", "agent_type": WRITER, "command": "bash scripts/crash-amplification-two-hosts.sh", "exit": 2},
-        {"label": "实现员单独跑 crash-amplification.sh --selftest 放行", "agent_type": WRITER, "command": "bash scripts/crash-amplification.sh --selftest",
+         "command": "bash scripts/crash/crash-amplification-item.sh crash_amplification_fixed_script_through_rollback", "exit": 2},
+        {"label": "实现员起崩溃放量双机驱动照拒", "agent_type": WRITER, "command": "bash scripts/crash/crash-amplification-two-hosts.sh", "exit": 2},
+        {"label": "实现员单独跑 crash-amplification.sh --selftest 放行", "agent_type": WRITER, "command": "bash scripts/crash/crash-amplification.sh --selftest",
          "exit": 0, "neutral": True},
-        {"label": "实现员列崩溃放量的分项放行", "agent_type": WRITER, "command": "bash scripts/crash-amplification.sh --list-items", "exit": 0, "neutral": True},
+        {"label": "实现员列崩溃放量的分项放行", "agent_type": WRITER, "command": "bash scripts/crash/crash-amplification.sh --list-items", "exit": 0, "neutral": True},
     ],
 }
 

@@ -4,9 +4,9 @@
 # 起法：detached-run.sh start --wall-clock over-2h --label … -- env RUN_SUFFIX=-r6-r3 RUN_DATE=2026-10-05 FROM_STEP=11 RESUME_TAG=<新的> RESUME_LOG=… RESUME_MANIFEST=… bash <这一份>；同一条命令就是续跑命令。
 # long-run-shards: 第 11–13 步按行切：每行一个单线道逐行驱动，行从按推的用时最长先做的队列里派到各台空出来的槽（rows_orchestrator.py 文件头「行与派发」）
 # long-run-resume: 同一条命令再起就是续跑：第 0–10 步经 resume_check.py 核过才跳过；第 11–13 步只补行目录里还没有 row-result.tsv 的行，别的台被停时取回的行先收进来、写到一半的重做
-# long-run-hosts: 台从 scripts/layer0-shard-configuration-check.sh --emit-hosts 读，每台槽数与每槽线程从 scripts/host-resources.py --json 现查现算（rows_orchestrator.py 文件头「资源与分配」），不写死
+# long-run-hosts: 台从 scripts/crash/layer0-shard-configuration-check.sh --emit-hosts 读，每台槽数与每槽线程从 scripts/hosts/host-resources.py --json 现查现算（rows_orchestrator.py 文件头「资源与分配」），不写死
 # E171 第 1 次重跑第一段·修订 6 树：照登记修订 6 第 6.4 节从第 0 步起全部重跑，次序照修订 2 第 2.7 节（登记 research/prompts/e171-r1-prereg.md，修订 6、修订 7）。
-# 主 agent 用脱离单元起，在仓根跑：bash scripts/detached-run.sh start --label e171-r1-s1-revision-6 -- bash /home/fy5090/.local/share/singlefs/work/e171-r1-segment1-rev6/run_segment_one_on_the_revision_6_tree.sh
+# 主 agent 用脱离单元起，在仓根跑：bash scripts/hosts/detached-run.sh start --label e171-r1-s1-revision-6 -- bash /home/fy5090/.local/share/singlefs/work/e171-r1-segment1-rev6/run_segment_one_on_the_revision_6_tree.sh
 # 形照第一段新树那一份按序脚本（原在 /tmp，整机重启后逐字节复原在 /home/fy5090/.local/share/singlefs/work/e171-r1-segment1-rev6/exact-reconstruction/run_segment_one_on_the_new_tree.sh）；改的：指修订 6 树与它编出的两个二进制、
 # 产物名带 RUN_SUFFIX（默认 -r6）、导出目录另起、第 0 步把冻结树产物与 stream-constants、S3/S11 自检做成产物、第 6、10 步换成修订 5 第 5.6 节的判法，
 # 第 1、6、7、10 步之后接 S15 ⑤、④、⑥⑤、④ 的比对（修订 6 第 6.6 节；比法 s15_compare.py）。一步红就停、后面的不跑，进度追加进 $LOGS/sequence.log。
@@ -33,7 +33,7 @@ E170_BIN=$TREE/target/release/e170_o3_spec_executor_export
 DEVICE_SOURCE=crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs
 RESEARCH=scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes
 TIMING=$RESEARCH/device_timing.py
-# 编排器、check_product.py（与编排器同目录的 peer_side.py、selftest_fakes/ 由编排器按它自己的目录取）用仓里入库的那一份（与草稿里的逐字节相同）；
+# 编排器、check_product.py（与编排器同目录的 peer_side.py、 由编排器按它自己的目录取）用仓里入库的那一份（与草稿里的逐字节相同）；
 # s2_compare.py、s15_compare.py、frozen_tree_lines_revision_6.py、resume_check.py 没入库，照旧在草稿里
 CHECK=$RESEARCH/check_product.py
 S2_COMPARE=$SCRATCH/s2_compare.py
@@ -94,7 +94,7 @@ device_step() {
   product=$(product_of "$name"); timing=$(timing_of "$name")
   [ -e "$product" ] || [ -e "$timing" ] && stop "产物已存在：$product 或 $timing（同一天再跑给 RUN_SUFFIX）"
   snapshot_check
-  nice -n 19 bash scripts/run-with-memory-cap.sh "$cap" bash scripts/capped.sh "$THREADS" \
+  nice -n 19 bash scripts/hosts/run-with-memory-cap.sh "$cap" bash scripts/hosts/capped.sh "$THREADS" \
     python3 -B "$TIMING" run -- "$binary" "$@" > "$LOGS/$name.stdout" 2> "$LOGS/$name.stderr"
   code=$?
   echo "$code" > "$LOGS/$name.exit"
@@ -214,7 +214,7 @@ if begin 3 "阳性对照（基线那一趟）"; then
   # O3：流一全持久态叠 P1 补丁交冻结的执行器，要判「不在」（不是装置，没有 -timing）
   freeze_check
   [ -e "$(product_of positive-control-o3-p1)" ] && stop "产物已存在：$(product_of positive-control-o3-p1)"
-  nice -n 19 bash scripts/run-with-memory-cap.sh "$CAP_SMALL" bash scripts/capped.sh "$THREADS" python3 -B "$RESEARCH/o3_bad_image_judge.py" control \
+  nice -n 19 bash scripts/hosts/run-with-memory-cap.sh "$CAP_SMALL" bash scripts/hosts/capped.sh "$THREADS" python3 -B "$RESEARCH/o3_bad_image_judge.py" control \
     --repo-root "$REPO" --dumps "$DUMPS/$S2_BASELINE" --e170-dumps "$E170_BAD_STATES" --row-name P1-F --output "$(product_of positive-control-o3-p1)" \
     > "$LOGS/positive-control-o3-p1.log" 2>&1 || stop "O3 阳性对照没跑完（日志 $LOGS/positive-control-o3-p1.log）"
   freeze_check

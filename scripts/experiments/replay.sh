@@ -3,7 +3,7 @@
 # run-condition: command cargo git
 # 复跑已入库的实验，把今天的输出和 research/results/ 里那份逐字节比对。
 #
-#   bash scripts/replay.sh [实验号...]      # 不给参数就全跑
+#   bash scripts/experiments/replay.sh [实验号...]      # 不给参数就全跑
 #
 # 为什么要有它：kb-discipline.md「所有历史数据都只是参考」——每条实测都绑在当时那个
 # 构建上，要拿它支撑新结论，先复跑一遍确认它今天还成立。手工比对会被抄第二遍，所以做成脚本。
@@ -14,15 +14,15 @@
 #      （口径：emitted 把 config 行与 done 行自己都算进去，2026-08-29 对 8 份入库产物逐份核过）；
 #   3. 退出码非 0 一律判红，不许当成「跑过了」。
 #
-# 准入（门禁与实验共用 scripts/admission.py，登记表 .claude/gate.d/stage-inputs.tsv）：登记了准入的实验，
+# 准入（门禁与实验共用 scripts/gate/admission.py，登记表 .claude/gate.d/stage-inputs.tsv）：登记了准入的实验，
 # 每一行开跑之前先问一次，输入自上次产物以来没变就记「输入没变」、不跑也不判红；产物头的 `E7INPUT` 行比对前删掉。
 # 每一行按自己的准入键问、比自己的产物：键在准入那一段的 ADMISSION_ROW_KEYS 里按行指明，没指明的是实验号；同一个实验几行又登记了准入的，各行各指一个键。
-#   bash scripts/replay.sh --admission-only [实验号...]   只问准入，不编、不跑、不比
-#   bash scripts/replay.sh --selftest                    假 cargo 演构建的两种结局（replay_selftest），不编、不跑实验
+#   bash scripts/experiments/replay.sh --admission-only [实验号...]   只问准入，不编、不跑、不比
+#   bash scripts/experiments/replay.sh --selftest                    假 cargo 演构建的两种结局（replay_selftest），不编、不跑实验
 # 开跑前的构建输出落进 $OUT_DIR/build.log；构建失败退 2，stderr 打第一处 error、日志末尾 20 行、日志路径与单独重现的命令。
 set -uo pipefail
 # 每个驱动跑的都是编译出来的代码（cargo run 或直接执行 release 二进制），子 agent 经它跑要经
-# scripts/run-with-memory-cap.sh（.claude/hooks/heavy-test-guard.sh 执行前拒不经它的直接执行/cargo run；
+# scripts/hosts/run-with-memory-cap.sh（.claude/hooks/heavy-test-guard.sh 执行前拒不经它的直接执行/cargo run；
 # records/2026-09-16-subagent拆分提案.md 第四十节第 35 行，来历见第 30 行）。上限没有按驱动分别量过，
 # 给一个统一默认值（run-with-memory-cap.sh 文件头「默认值由调用方定，写在调用方的脚本头」），
 # REPLAY_MEMORY_CAP 环境变量能覆盖。
@@ -64,11 +64,11 @@ admission_key_of_row() {
   fi
 }
 
-# 自证（bash scripts/replay.sh --selftest）：PATH 最前面放一个假 cargo，只演 build_research_binaries 的两种结局，不编、不跑任何实验。
+# 自证（bash scripts/experiments/replay.sh --selftest）：PATH 最前面放一个假 cargo，只演 build_research_binaries 的两种结局，不编、不跑任何实验。
 #   build-red    假 cargo 打一行 error[E0425] 退 101：要返回 2，stderr 有第一处错、日志末尾、日志路径与重现命令，日志落了盘
 #   build-green  假 cargo 退 0：要返回 0，stderr 一个字都没有
 #   row-key      一张两行的假键表（E1 第二行指明 E1/second）：admission_key_of_row 给第二行的键要是 E1/second，不是实验号
-#   整条按行认键（replay-row-keys 判红、按行问准入、产物头由这里写）在临时仓里跑的那几格在 python3 scripts/admission.py --selftest 的「复跑表按行的准入键」
+#   整条按行认键（replay-row-keys 判红、按行问准入、产物头由这里写）在临时仓里跑的那几格在 python3 scripts/gate/admission.py --selftest 的「复跑表按行的准入键」
 # 弄坏开关：
 #   REPLAY_BREAK=build-output-dropped  构建输出丢进 /dev/null、红了只说「replay: 构建失败」（改前的样子）
 #       build-red（「✗ 自检：构建失败时应当返回 2、打第一处错」）
@@ -583,7 +583,7 @@ check_claims() {
 # 2026-08-29 审计时按产物里的 config 行反推出来，重建结果与入库产物**逐字节一致**。
 # 25 次调用整条包一层（不是每次调用各包一层）：省掉 24 次多余的 systemd scope 建立。
 driver_e9() {
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" bash -c '
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" bash -c '
     device="$1"
     for r in 0 500 2000 5000 20000; do
       for s in 3 7 11 13 17; do
@@ -628,8 +628,8 @@ driver_e9() {
 driver_e142() {
   local impl_snapshot="$OUT_DIR/e142-crates-write-dump.tmp"
   local arm_n15_reference="research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r16-arm-n15.out"
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump) >"$impl_snapshot" || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e142-new-pool-file-creation-dry-run "$impl_snapshot" "$arm_n15_reference" || return 1
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump) >"$impl_snapshot" || return 1
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e142-new-pool-file-creation-dry-run "$impl_snapshot" "$arm_n15_reference" || return 1
   cat "$impl_snapshot"
 }
 
@@ -638,7 +638,7 @@ driver_e142() {
 # 装置那一侧的 P8G 一段已在 `driver_e142` 的产物里（`name=p8g_` 打头的行），这一份是它要比的另一半，比对脚本 `p8g_region_compare.py`
 # 在 `research/results/e142-r22-s2-comparisons-2026-10-05.out` 的附录里。
 driver_e142_p8g_crates_dump() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump -- --device-bytes 8589934592) || return 1
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump -- --device-bytes 8589934592) || return 1
 }
 
 # E156（入库装置，跑前登记「一」读法写死第 1 行；重跑登记 `research/prompts/e156-r2-prereg.md`「五、5.7」
@@ -694,28 +694,28 @@ driver_e142_p8g_crates_dump() {
 # crates 的层 0 枚举（S3、S4 对拍时调的）往标准输出打 LAYER0_* 进度行（带墙钟秒数），产物只留 E7RESULT 行。
 # 计时字段一律以 _elapsed_ns 或 _ratio 结尾，按 timing 比结构；PC3 的判定行随计时可能翻，翻了是新观测。线程数钉 10；内存上限跟 REPLAY_MEMORY_CAP（默认 8G，2026-09-27 收窄前曾写死 16G，改成跟脚本头默认值一致）。
 driver_e161_feasibility() {
-  (cd .. && set -o pipefail && E161_THREADS=10 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e161_crash_state_dedup_and_time_split -- feasibility | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E161_THREADS=10 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e161_crash_state_dedup_and_time_split -- feasibility | grep '^E7RESULT ')
 }
 
 # E165（恢复重放有界穷举与变异杀伤界）第一段（登记 `research/prompts/e165-preregistration.md` 5.5）：入库装置，只跑合法历史一族
 # （`--family legal`；对抗一族停在登记停机条款 H4，见登记第十二节修订 7，数没入库）。装置另打 `E7TIMING` 耗时行，产物只留 E7RESULT 行；
 # 计数与线程数无关（10 线程与 7 线程两遍逐字节相同），线程数钉 10。`driver_e165_light` 是 `--bounds light` 那一档。
 driver_e165() {
-  (cd .. && set -o pipefail && E165_THREADS=10 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=10 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal | grep '^E7RESULT ')
 }
 driver_e165_light() {
-  (cd .. && set -o pipefail && E165_THREADS=10 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds light --family legal | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=10 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds light --family legal | grep '^E7RESULT ')
 }
 # 第一段对抗一族（登记修订第 9 条收窄 H4 之后，2026-10-01 入库；16 线程与 7 线程两遍逐字节相同）。
 driver_e165_adversarial() {
-  (cd .. && set -o pipefail && E165_THREADS=10 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=10 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial | grep '^E7RESULT ')
 }
 # 第二段（第 2 次重跑 r2 登记 `research/prompts/e165-r2-prereg.md` 5.6、9.1–9.5，补跑 2c）：26 个变体各一份副本、各编一次，整段约 15 分钟（2026-10-02 同机负载 12–30，--jobs 2 --threads 4；26 个变体都跑，估计 15 至 20 分钟，没整轮量过）。
 # 驱动在副本里改 recovery.rs、自己经内存包装跑每个二进制，这里不再包一层。产物里每行的复跑命令写的是 research/results/ 下的路径，
 # 这里的输出落在临时目录，比对前把两个文件名换回那个写法；红例账的 sha256 在产物的 name=verdict 行里，账一字不差才对得上。
 # 驱动的 REGISTERED 钉的是第四段冻结根的表（`crates/mutations.tsv` 9d5fd9fc…）与 recovery.rs、lib.rs 的哈希，主工作区的 crates/ 变了它就停在 RH1，
 # 所以复跑要 --root 指冻结根：默认 /tmp/claude-1000/e165-r2-segment4/root（清单与建法见登记 r2 修订 4，第 819–820 行一带），那份没了就照修订 4 重建一份、
-# 用 E165_R2_FROZEN_ROOT 指过去；根里要有 scripts、scripts/mutations、第一段 r2 的 segment1b 两份产物与 .claude/scripts/preflight.sh。
+# 用 E165_R2_FROZEN_ROOT 指过去；根里要有 scripts、scripts/mutation/tables、第一段 r2 的 segment1b 两份产物与 .claude/scripts/preflight.sh。
 # 驱动 --selftest 不带 --root；这一份基线是 1373 行（修订 4 挪了三项自检之后），同一棵根上复得出，别的树复不出来先对冻结根清单。
 driver_e165_segment2() {
   local scratch="$OUT_DIR/e165-segment2"
@@ -723,7 +723,7 @@ driver_e165_segment2() {
   local frozen_root="${E165_R2_FROZEN_ROOT:-/tmp/claude-1000/e165-r2-segment4/root}"
   mkdir -p "$scratch/out"
   (cd .. && E165_KILL_BOUNDS_MEMORY_CAP=8G RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="变体与基线装置峰值只量过合法历史一族，留十倍余量" \
-      bash scripts/e165-replay-mutation-kill-bounds.sh --root "$frozen_root" --scratch "$scratch" \
+      bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --root "$frozen_root" --scratch "$scratch" \
       --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-kill-bounds.out" \
       --ledger "$scratch/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-red-examples.tsv" --jobs 2 --threads 4 >&2) || return 1
   sed -e 's#--output e165-#--output research/results/e165-#' -e 's#--ledger e165-#--ledger research/results/e165-#' \
@@ -736,22 +736,22 @@ driver_e165_segment2() {
 # 这里在主工作区上 `cargo run`：`crates/` 里的文件主工作区与第一段根可能不同（别的会话在改），那样复出来对不上是新观测，先对着第一段根的清单查。
 # 计数与线程数无关（第 2 次重跑多盘一族 8 与 4 线程两遍逐字节相同），线程数钉 8。
 driver_e165_r2_segment3_multi_disk() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r2 | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r2 | grep '^E7RESULT ')
 }
 driver_e165_r2_segment4_table_both_legal() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r2 --table both | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r2 --table both | grep '^E7RESULT ')
 }
 driver_e165_r2_segment4_table_both_adversarial() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r2 --table both | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r2 --table both | grep '^E7RESULT ')
 }
 driver_e165_r2_segment4_table_both_multi_disk() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r2 --table both | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r2 --table both | grep '^E7RESULT ')
 }
 driver_e165_r2_segment4_reversed_disk_order_legal() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --only R --profile r2 --table both --disk-order reversed | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --only R --profile r2 --table both --disk-order reversed | grep '^E7RESULT ')
 }
 driver_e165_r2_segment4_reversed_disk_order_multi_disk() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --only M,MC --profile r2 --table both --disk-order reversed | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --only M,MC --profile r2 --table both --disk-order reversed | grep '^E7RESULT ')
 }
 # 第 3 次重跑（登记 `research/prompts/e165-r3-prereg.md`）：`--profile r3`，入库装置；第一段是对抗一族按「同一实例里 journal 记录的 txg 随计数器不减」拆行（5.6），
 # 第二段是择根与重放合判一族 `--family root_choice`（5.3、5.5），计数与线程数无关（两段都是 8 与 4 线程两遍整份逐字节相同），线程数钉 8。
@@ -761,10 +761,10 @@ driver_e165_r2_segment4_reversed_disk_order_multi_disk() {
 # 这里在主工作区上 `cargo run`，`crates/` 里的文件（别的会话在改）与两份根可能不同，复出来对不上是新观测，先对着根的清单查（对抗一族：第 5 次第一段
 # `root-manifest-at-start.sha256`；择根：第 3 次第二段 `/tmp/claude-1000/e165-r3-segment2/segment2-root-after-overlay.sha256`）。
 driver_e165_r3_segment1_adversarial() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r3 | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r3 | grep '^E7RESULT ')
 }
 driver_e165_r3_segment2_root_choice() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice --profile r3 | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice --profile r3 | grep '^E7RESULT ')
 }
 # 第 6 次重跑（登记 `research/prompts/e165-r6-prereg.md`）：入库装置，`--profile r3 --family legal`（偶数卸载记号、直接建表、盘次序照常），r3 档合法一族的正式跑，
 # J6Qn 与 J7 五行的阳性对照在这一档只在这一跑里出。产物是 2026-10-09 开工那一刻主工作区 Cargo.toml、Cargo.lock、.cargo/、crates/ 的拷贝
@@ -772,7 +772,7 @@ driver_e165_r3_segment2_root_choice() {
 # 计数与线程数无关（8 与 4 线程两遍整份逐字节相同，`…-r6-r3-legal-family-threads-second.out`），线程数钉 8。同一份根上的 r2 合法一族只当比较对象，不登记复跑。
 # 这里在主工作区上 `cargo run`，`crates/` 里的文件（别的会话在改）与那份根可能不同，复出来对不上是新观测，先对着根的清单查。
 driver_e165_r6_r3_legal() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r3 | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r3 | grep '^E7RESULT ')
 }
 # 第 3 次重跑第三段（登记 `research/prompts/e165-r3-prereg.md` 5.8、9.1、9.3）：变体 1822–1827 各一份副本、各编一次，驱动带 --profile r3 调装置
 # （--profile r3 --bounds segment1 --family root_choice），不落红例账。驱动在副本里改 recovery.rs 或 lib.rs、自己经内存包装跑每个二进制，这里不再包一层；
@@ -787,7 +787,7 @@ driver_e165_r3_segment3_root_choice_kill_bounds() {
   local frozen_root="${E165_R3_FROZEN_ROOT:-/tmp/claude-1000/e165-r3-segment2/root}"
   mkdir -p "$scratch/out"
   (cd .. && E165_KILL_BOUNDS_MEMORY_CAP=1G RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="装置峰值只在基线上量过（第二段 446 MiB），变体留余量" \
-      bash scripts/e165-replay-mutation-kill-bounds.sh --profile r3 --root "$frozen_root" --scratch "$scratch" \
+      bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --profile r3 --root "$frozen_root" --scratch "$scratch" \
       --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r3-segment3-root-choice-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r3-segment3-root-choice-kill-bounds.out"
 }
@@ -797,7 +797,7 @@ driver_e165_r3_segment3_root_choice_kill_bounds() {
 # 这里在主工作区上 `cargo run`，`crates/` 里别的文件（别的会话在改，尤其 `mount.rs`、`transaction.rs`：条款改取 R2 之后实现一落地，这一族要重跑、产物会变）与那份根可能不同，
 # 复出来对不上是新观测，先对着根清单查。
 driver_e165_r4_segment1_root_choice_faults() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice_faults --profile r4 | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice_faults --profile r4 | grep '^E7RESULT ')
 }
 # 第 4 次重跑第二段（登记 `research/prompts/e165-r4-prereg.md` 9.1、9.3 与修订 3）：变体 v1822–v1827（根里 `crates/mutations.tsv` 的第 1821–1826 行）各一份副本、各编一次，
 # 驱动带 --profile r4 调装置（--profile r4 --bounds segment1 --family root_choice_faults），不落红例账。驱动在副本里改 recovery.rs 或 lib.rs、自己经内存包装跑每个二进制，这里不再包一层。
@@ -813,7 +813,7 @@ driver_e165_r4_segment2_root_choice_faults_kill_bounds() {
   local frozen_root="${E165_R4_FROZEN_ROOT:-/tmp/claude-1000/e165-r4-segment1b/root}"
   mkdir -p "$scratch/out"
   (cd .. && E165_KILL_BOUNDS_MEMORY_CAP=8G RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="装置峰值只在基线上量过（第一段约 1.66 GB），tsv-1823 在 4G 撞过顶，留余量" \
-      bash scripts/e165-replay-mutation-kill-bounds.sh --profile r4 --root "$frozen_root" --scratch "$scratch" \
+      bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --profile r4 --root "$frozen_root" --scratch "$scratch" \
       --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out"
 }
@@ -829,7 +829,7 @@ driver_e165_r5_segment2_r2_mode_kill_bounds() {
   local root="${E165_R5_SEGMENT1_ROOT:-/tmp/claude-1000/e165-r5-segment1/root}"
   mkdir -p "$scratch/out"
   (cd .. && E165_KILL_BOUNDS_MEMORY_CAP=8G RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="变体与基线装置峰值只量过合法历史一族，留十倍余量" \
-      bash scripts/e165-replay-mutation-kill-bounds.sh --pins r5 --root "$root" --scratch "$scratch" \
+      bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --pins r5 --root "$root" --scratch "$scratch" \
       --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r2-mode-kill-bounds.out" \
       --ledger "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r2-mode-red-examples.tsv" --jobs 2 --threads 3 >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r2-mode-kill-bounds.out"
@@ -840,7 +840,7 @@ driver_e165_r5_segment2_r3_mode_kill_bounds() {
   local root="${E165_R5_SEGMENT1_ROOT:-/tmp/claude-1000/e165-r5-segment1/root}"
   mkdir -p "$scratch/out"
   (cd .. && E165_KILL_BOUNDS_MEMORY_CAP=1G RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="装置峰值只在基线上量过（r3 第二段 446 MiB），变体留余量" \
-      bash scripts/e165-replay-mutation-kill-bounds.sh --profile r3 --pins r5 --root "$root" --scratch "$scratch" \
+      bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --profile r3 --pins r5 --root "$root" --scratch "$scratch" \
       --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r3-mode-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r3-mode-kill-bounds.out"
 }
@@ -850,7 +850,7 @@ driver_e165_r5_segment2_r4_mode_kill_bounds() {
   local root="${E165_R5_SEGMENT1_ROOT:-/tmp/claude-1000/e165-r5-segment1/root}"
   mkdir -p "$scratch/out"
   (cd .. && E165_KILL_BOUNDS_MEMORY_CAP=8G RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="装置峰值只在基线上量过（约 1.66 GB），第 4 次 tsv-1823 在 4G 撞过顶" \
-      bash scripts/e165-replay-mutation-kill-bounds.sh --profile r4 --pins r5 --root "$root" --scratch "$scratch" \
+      bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --profile r4 --pins r5 --root "$root" --scratch "$scratch" \
       --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r4-mode-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r4-mode-kill-bounds.out"
 }
@@ -861,22 +861,22 @@ driver_e165_r5_segment2_r4_mode_kill_bounds() {
 # 这里在主工作区上 `cargo run`，`crates/` 里别的文件（别的会话在改）与那两份根可能不同，复出来对不上是新观测，先对着根清单查。
 # 计数与线程数无关（合法历史、对抗两族 7 与 3 线程逐字节相同；R2 一族 7 与 3 线程逐字节相同，`…-threads-second.out`），线程数钉 8；R2 一族整遍峰值没读到，REPLAY_MEMORY_CAP 默认 8G 跑过。
 driver_e165_r5_segment3_legal() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r5 | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r5 | grep '^E7RESULT ')
 }
 driver_e165_r5_segment3_adversarial() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r5 | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r5 | grep '^E7RESULT ')
 }
 driver_e165_r5_segment3_multi_disk() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r5 | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r5 | grep '^E7RESULT ')
 }
 driver_e165_r5_segment3_odd_marker_legal() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r5 --marker-parity odd | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r5 --marker-parity odd | grep '^E7RESULT ')
 }
 driver_e165_r5_segment3_odd_marker_adversarial() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r5 --marker-parity odd | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r5 --marker-parity odd | grep '^E7RESULT ')
 }
 driver_e165_r5_segment5_r2_gate_root_choice_faults() {
-  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice_faults --profile r4 --gate r2 | grep '^E7RESULT ')
+  (cd .. && set -o pipefail && E165_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice_faults --profile r4 --gate r2 | grep '^E7RESULT ')
 }
 # 第 5 次重跑第五段 5-乙（登记修订 1 修1.九乙）：驱动 r4 模式 `--pins r5 --gate r2`，变体 v1822–v1827 在 R2 那一族上各编各跑。驱动的 R5_GATE_R2_PINS 钉的是 5-甲 的根
 # （/tmp/claude-1000/e165-r5-segment3/root5：第一段根盖上装置 8006b251… 与 crates/mutations.tsv c9a03eb4…，清单 `root5-manifest-after-overlay.sha256`，sha256 47c6d349…），
@@ -889,7 +889,7 @@ driver_e165_r5_segment5b_r4_gate_r2_mode_kill_bounds() {
   local root="${E165_R5_SEGMENT5_ROOT:-/tmp/claude-1000/e165-r5-segment3/root5}"
   mkdir -p "$scratch/out"
   (cd .. && E165_KILL_BOUNDS_MEMORY_CAP=16G RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="第一趟 8G、--jobs 2 时 tsv-1812 撞过顶，第二趟 16G 补跑才得出结果" \
-      bash scripts/e165-replay-mutation-kill-bounds.sh --profile r4 --pins r5 --gate r2 --root "$root" --scratch "$scratch" \
+      bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --profile r4 --pins r5 --gate r2 --root "$root" --scratch "$scratch" \
       --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment5b-r4-gate-r2-mode-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment5b-r4-gate-r2-mode-kill-bounds.out"
 }
@@ -899,7 +899,7 @@ driver_e165_r5_segment5b_r4_gate_r2_mode_kill_bounds() {
 # 照 driver_e163_r1_merge 的先例在驱动里包一层（e168_wrap：行首 `E name=` 换成 `E7RESULT name=`，收尾行补 `emitted=`），入库产物就是包过的样子，
 # 换回去与装置的原样输出逐字节相同（2026-10-03 四份逐份核过）。
 # s1-history 在主工作区上跑（不调删除入口）。positive-controls 与 segment1 要删除入口，主工作区那一份是桩、一调就打停机行退 3，
-# positive-controls 在临时目录里拷一份 `crates/`、套删除路径补丁表 `scripts/mutations/e168_delete_ring_window_borrow_delete_path.tsv`
+# positive-controls 在临时目录里拷一份 `crates/`、套删除路径补丁表 `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv`
 # （每行旧串恰好命中一次，不中就整行跑不了：登记停机条款 S2）再编、跑（先例：driver_e165_segment2 在副本里改了再编）。segment1 一遍约 9 小时、36G，不进登记表（用户 2026-10-03 定），复跑照实验页「复跑」那一节手工步骤、由用户点名跑。
 # 入库产物是 2026-10-03 那一次（第一段 r8）在当时主工作区 `crates/` 的快照上编、跑的，快照逐文件的 sha256 在
 # `e168-delete-ring-window-borrow-segment1-tree-2026-10-03.sha256`（不含补丁表）；之后别的会话改过 `crates/singlefs-core/` 里的几份文件
@@ -922,13 +922,13 @@ for line in open(sys.argv[1],encoding="utf-8"):
     _,path,old,new=line.split("\t"); old=old.replace("\\n","\n"); new=new.replace("\\n","\n")
     text=open(root+"/"+path,encoding="utf-8").read(); hits=text.count(old); print(path,hits); bad+=hits!=1
     if hits==1: open(root+"/"+path,"w",encoding="utf-8").write(text.replace(old,new,1))
-sys.exit(1 if bad else 0)' scripts/mutations/e168_delete_ring_window_borrow_delete_path.tsv "$tree") >&2
+sys.exit(1 if bad else 0)' scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv "$tree") >&2
 }
 driver_e168_s1_history() {
-  (cd .. && set -o pipefail && bash scripts/run-with-memory-cap.sh "${E168_S1_HISTORY_MEMORY_CAP:-4G}" cargo run -q --release -p singlefs-checker-tier --bin e168_delete_ring_window_borrow -- s1-history | e168_wrap)
+  (cd .. && set -o pipefail && bash scripts/hosts/run-with-memory-cap.sh "${E168_S1_HISTORY_MEMORY_CAP:-4G}" cargo run -q --release -p singlefs-checker-tier --bin e168_delete_ring_window_borrow -- s1-history | e168_wrap)
 }
 driver_e168_positive_controls() {
-  local tree="$OUT_DIR/e168-positive-controls-tree" wrapper="$PWD/scripts/run-with-memory-cap.sh"
+  local tree="$OUT_DIR/e168-positive-controls-tree" wrapper="$PWD/scripts/hosts/run-with-memory-cap.sh"
   e168_patched_tree "$tree" || return 1
   (cd "$tree" && set -o pipefail && E168_THREADS=4 E168_LARGE_SLICE_THREADS=1 bash "$wrapper" "${E168_POSITIVE_CONTROLS_MEMORY_CAP:-20G}" cargo run -q --release -p singlefs-checker-tier --bin e168_delete_ring_window_borrow -- positive-controls | e168_wrap)
 }
@@ -948,7 +948,7 @@ driver_e168_positive_controls() {
 e170_r2_cargo_run() { # <bin> <参数…>：在仓根照今天的 crates/ 起入库装置
   local bin="$1"; shift
   RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
-    bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin "$bin" -- "$@"
+    bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin "$bin" -- "$@"
 }
 e170_r2_build_exports_e170() {
   local directory="$1"
@@ -983,7 +983,7 @@ e170_r2_shared_exports() { # <组：e170 或 e171>：同一组只造一次，打
 }
 e170_r2_python() { # 在 research/ 下起 Python，经内存包装
   PYTHONDONTWRITEBYTECODE=1 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
-    bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" python3 "$@"
+    bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" python3 "$@"
 }
 e170_r2_bin() { printf '%s\n' "$PWD/scripts/experiments/$1"; }
 e170_r2_wrap() { # <原始输出> <产物>：改写成结果行再打出来
@@ -1012,7 +1012,7 @@ driver_e170_r2_v1_487_unit_tests() { e170_r2_unit_tests v1-487 e170_second_run_o
 e170_r2_unit_level_mutations() { # <臂名> <执行器目录名>
   local scratch="$OUT_DIR/e170-r2-unit-level-mutations-$1" table="e170_o3_spec_executor_with_witness_predicates_journal_header_487"
   rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
-  awk -F'\t' '$1 !~ /^XC[0-9]+_/' "scripts/mutations/$table.tsv" >"$scratch/$table-without-xc-rows.tsv" || return 1
+  awk -F'\t' '$1 !~ /^XC[0-9]+_/' "scripts/mutation/tables/$table.tsv" >"$scratch/$table-without-xc-rows.tsv" || return 1
   e170_r2_python "$(e170_r2_bin e170_o3_spec_executor_with_witness_predicates)/mutation_driver_unit_level.py" --executor-directory "$(e170_r2_bin "$2")" \
     --table "$scratch/$table-without-xc-rows.tsv" --scratch "$scratch/work" --output "$scratch/raw.out" >&2 || return 1
   e170_r2_wrap "$scratch/raw.out" "$scratch/result.out"
@@ -1053,11 +1053,11 @@ driver_e170_r2_v2_487_z4_images() { e170_r2_judge_images Z4 e171 e170-bad-states
 # 0000000000000000（P、N 行与种子无关），第二段的盲测族用冻结执行器的种子（见下）。它在 E170 第 1 次重跑里加了第二套表，第一套的输出与加之前逐字节相同。
 e171_device() {
   RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
-    bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e171_three_oracle_collusion -- "$@"
+    bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e171_three_oracle_collusion -- "$@"
 }
 e171_e170_exporter() {
   RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
-    bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- "$@"
+    bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- "$@"
 }
 driver_e171_s1_baseline() {
   local scratch="$OUT_DIR/e171-baseline"
@@ -1094,7 +1094,7 @@ e171_s2_known_bad() {
 }
 e171_s2_python() {
   PYTHONDONTWRITEBYTECODE=1 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
-    bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" python3 "$@"
+    bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" python3 "$@"
 }
 driver_e171_s2_bad_states_export() {
   local scratch="$OUT_DIR/e171-s2-bad-states"
@@ -1146,7 +1146,7 @@ driver_e171_s2_comparator() {
          --dumps "$dumps/baseline-run1" --e170-dumps "$dumps/e170-bad-states-copy-s2" --row-name P1-F --output "$scratch/o3-control-baseline.out" >&2 \
     && (root="$PWD" && cd scripts/experiments/e170_second_run_o3_spec_executor && PYTHONDONTWRITEBYTECODE=1 \
           RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
-          bash "$root/scripts/run-with-memory-cap.sh" "$REPLAY_MEMORY_CAP" python3 executor_main.py --dumps "$dumps/baseline-run1" \
+          bash "$root/scripts/hosts/run-with-memory-cap.sh" "$REPLAY_MEMORY_CAP" python3 executor_main.py --dumps "$dumps/baseline-run1" \
           --batches 1,2 --workers 6 --output "$scratch/o3-baseline.out" >&2)) || return 1
   for control in O1-对拍 O1-崩溃判官 O2; do
     (cd .. && e171_device baseline --output-directory "$dumps/control-baseline-$control" --positive-control "$control" >/dev/null \
@@ -1186,7 +1186,7 @@ driver_e171_s3_comparator_mutations() {
   local scratch="$OUT_DIR/e171-s3-comparator-mutations" repository_root="$PWD"
   rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiments/e171_three_oracle_collusion" && PYTHONDONTWRITEBYTECODE=1 python3 mutation_driver.py \
-      --table "$repository_root/scripts/mutations/e171_three_oracle_collusion.tsv" --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion.tsv" --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   grep '^E7RESULT ' "$scratch/mutations.out"
 }
 # E171 s4 整表（登记修订 5）：第二段比对器那一串前置（基线两趟、E170 导出装置 dump 与 bad-states、已知坏镜像、关一条两趟、冻结执行器在基线与坏镜像上、
@@ -1214,7 +1214,7 @@ driver_e171_s4_comparator() {
          --dumps "$dumps/baseline-run1" --e170-dumps "$dumps/e170-bad-states-copy-s2" --row-name P1-F --output "$scratch/o3-control-baseline.out" >&2 \
     && (root="$PWD" && cd scripts/experiments/e170_second_run_o3_spec_executor && PYTHONDONTWRITEBYTECODE=1 \
           RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
-          bash "$root/scripts/run-with-memory-cap.sh" "$REPLAY_MEMORY_CAP" python3 executor_main.py --dumps "$dumps/baseline-run1" \
+          bash "$root/scripts/hosts/run-with-memory-cap.sh" "$REPLAY_MEMORY_CAP" python3 executor_main.py --dumps "$dumps/baseline-run1" \
           --batches 1,2 --workers 6 --output "$scratch/o3-baseline.out" >&2)) || return 1
   for control in O1-对拍 O1-崩溃判官 O2; do
     (cd .. && e171_device baseline --output-directory "$dumps/control-baseline-$control" --positive-control "$control" >/dev/null \
@@ -1357,7 +1357,7 @@ driver_e171_r1_s1_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-s1-research-mutations" repository_root="$PWD"
   rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 nice -n 19 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv" --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv" --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
 # E171 第 1 次重跑第二段（整表）·修订 6 树：比对器只读已有的导出与合成产物重出（不起装置、不起 cargo、不碰别的台）。基线是修订 6 那一趟第 1 步
@@ -1380,7 +1380,7 @@ driver_e171_r1_s2_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-s2-research-mutations" repository_root="$PWD"
   rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 nice -n 19 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes_segment_two.tsv" --unit-test-module test_segment_two \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_segment_two.tsv" --unit-test-module test_segment_two \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
@@ -1388,7 +1388,7 @@ driver_e171_r1_s1_revision_8_tools_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-s1-revision-8-tools-research-mutations" repository_root="$PWD"
   rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 nice -n 19 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes_revision_8.tsv" --unit-test-module test_revision_8 \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_8.tsv" --unit-test-module test_revision_8 \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
@@ -1396,7 +1396,7 @@ driver_e171_r1_s2_revision_10_tools_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-s2-revision-10-tools-research-mutations" repository_root="$PWD"
   rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 nice -n 19 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes_revision_10.tsv" --unit-test-module test_revision_10 \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_10.tsv" --unit-test-module test_revision_10 \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
@@ -1405,13 +1405,13 @@ driver_e171_r1_revision_11_tools_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-revision-11-tools-research-mutations" repository_root="$PWD"
   rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 nice -n 19 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv" --unit-test-module test_revision_11 \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv" --unit-test-module test_revision_11 \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
 
 driver_e156() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin e156_allocation_basis_counts)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin e156_allocation_basis_counts)
 }
 
 # E158（第一段，入库装置，跑前登记「装置写在哪」写死第 5 行）：同 E156 的先例，两个 cargo workspace
@@ -1431,7 +1431,7 @@ driver_e156() {
 # `driver_e158`/`pc3` 这条路径），是不是要等 `crates/` 落定后再复核一遍交主 agent 定，详见跑前
 # 登记「十二、修订」session s10 条目第 6 条与交回报告。
 driver_e158() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- all)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- all)
 }
 
 # E158 第二段 Q3-1（岔路 3 候选 3 那一半，2026-09-24）：`q3-1-g0` 模式只跑 G0 几何上的
@@ -1449,23 +1449,23 @@ driver_e158() {
 # 重出的产物按日期另存 `e158-root-choice-repair-2026-09-25-{q3-1-g0,q3-1-s16,q3-1-small-ring,
 # q3-1-s4}.out`，`…-09-24-…` 原样留着，登记表已改指向新文件。
 driver_e158_q3_1_g0() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q3-1-g0)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q3-1-g0)
 }
 # 第八节敏感性（行 3）三个取样点：S16、小环（环长现算，产物里的 `small_ring_search` 那行同时钉住取到的环长）、
 # S4（`sigma_length_limit=4`，比其余三点多穷举一层，代价数量级最大，real 约 18 分钟，2026-09-24 现查）。
 driver_e158_q3_1_s16() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q3-1-s16)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q3-1-s16)
 }
 driver_e158_q3_1_small_ring() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q3-1-small-ring)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q3-1-small-ring)
 }
 driver_e158_q3_1_s4() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q3-1-s4)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q3-1-s4)
 }
 # E158 岔路单第 1 行（C393）：`q1-g0` 模式在今天的 `crates/`（候选 (c)）上跑 H1 家族 + Φ1 故障注入 +
 # PC1-a/PC1-b，只跑 G0 几何（2026-09-24 session s3，见实验页）。候选 (a)（A1 副本）的同一份数只存产物
 # `e158-root-choice-repair-2026-09-24-q1-g0-a1-arm.out`，**不登记在这张表里**：它要在
-# `scripts/mutations/e158_arms.tsv` 描述的副本上重新编译才跑得出来，这张表假设「跑这一行就等于跑今天
+# `scripts/mutation/tables/e158_arms.tsv` 描述的副本上重新编译才跑得出来，这张表假设「跑这一行就等于跑今天
 # committed 的 crates/」，副本不满足这个假设；复跑它的步骤见实验页「复跑」一节。session s9 起产物里
 # 多了 171 格差集的分类诊断（`q1_2_subset_diff_pair*`，根因是 `RootRecord::instance_table` 没被走
 # 全版本走到）与 op1 起三步挂载的持续/瞬时故障轨迹（`q1_1a_op1_trajectory`），纯增量追加。
@@ -1480,7 +1480,7 @@ driver_e158_q3_1_s4() {
 # 改动无关，是现查到的既有漂移（与 session s9 报告的方向一致）。今天重出的产物按日期另存
 # `e158-root-choice-repair-2026-09-25-{q1-g0-today,q1-s16,q1-s4}.out`，`…-09-24-…` 原样留着。
 driver_e158_q1_g0() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q1-g0)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q1-g0)
 }
 # E158 岔路单第 2 行 ①（C331 修法，session s4，2026-09-24 session s5 起废弃，见下）：`q2-1-g0` 在
 # 今天的 `crates/`（丙 = 甲-jsn）上跑 H2 主族（op2=`mount_writable`，只 n1∈{0,1,2,3}、n2=1）的穷举
@@ -1490,7 +1490,7 @@ driver_e158_q1_g0() {
 # 这条产物与它对应的 `driver_e158_q2_1_g0` 不能再当「今天/丙 0 命中」的依据引用，只留着当「bug 修前
 # 长什么样」的历史对照。承重的是下面 `driver_e158_q2_1_g0_session_s5`。
 driver_e158_q2_1_g0() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-1-g0)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-1-g0)
 }
 # E158 岔路单第 2 行 ②（每条修法每次发布多写几字节，session s4）：`q2-2a-g0` 在今天的 `crates/` 上跑
 # 固定脚本，按结构种类报每次发布写的字节。甲-txg 臂的同一份数只存产物，同上不登记在这张表里。
@@ -1500,14 +1500,14 @@ driver_e158_q2_1_g0() {
 # （`allocator.rs`/`allocation_record_tree.rs`，另一条并行线，非本轮 e158 装置改动）。今天重出的
 # 产物按日期另存 `e158-root-choice-repair-2026-09-25-q2-2a-g0-today.out`，`…-09-24-…` 原样留着。
 driver_e158_q2_2a_g0() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-2a-g0)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-2a-g0)
 }
 # E158 岔路单第 2 行 PC2（阳性对照，session s5）：复现判决 K2 的两个具体构造（甲-txg 4 个瞬时根槽
 # 读失败、乙-只配置 0 个注入故障 + 1 个崩溃点），不靠穷举——见跑前登记「十二、修订」session s5。
 # 乙-只配置候选的同一份数只存产物（副本上的数，副本没有 `published_txg` 字段就编不过，不登记在这张
-# 表里，复跑步骤见实验页与 `scripts/mutations/e158_arms.tsv`）。
+# 表里，复跑步骤见实验页与 `scripts/mutation/tables/e158_arms.tsv`）。
 driver_e158_q2_1_pc2() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-1-pc2)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-1-pc2)
 }
 # E158 岔路单第 2 行 ①（C331 修法，2026-09-24 session s5，承重）：修好故障装配 bug 之后，`q2-1-g0`
 # 在今天的 `crates/`（丙 = 甲-jsn）上重跑 H2 主族，n1 范围从 {0,1,2,3} 补齐到跑前登记 5.1 要求的
@@ -1522,24 +1522,24 @@ driver_e158_q2_1_pc2() {
 # 路径，H2 主族的穷举下界搜索走的是 `first_txg_of_new_instance`/`next_counter`/根环读取，不经过
 # 那几处改动），行 2「够判」的结论不受这一刻 crates/ 波动影响。
 driver_e158_q2_1_g0_session_s5() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-1-g0)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-1-g0)
 }
 # 第八节几何敏感性（行 1，2026-09-24 session s6）：岔路单第 1 行判决格 = Q1-1a 的 N_trig，S16（根环
 # 大一倍）与 S4（根环小一半）两个方向相反的取样点，复用 H1 装置代码（`run_ledger_fault_family` 本身
 # 就是几何参数化的）。两点都与 G0 逐字节等值（N_trig=798），判定不翻面，判别力自证「两点同值，自证
 # 不适用」。
 driver_e158_q1_s16() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q1-s16)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q1-s16)
 }
 driver_e158_q1_s4() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q1-s4)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q1-s4)
 }
 # H-C1 直接构造（2026-09-24 session s6，岔路单第 2 行 ①，丙的具体历史）：判决 K2 说丙需要 12 个
 # 故障（4 根槽 + 4 条记录各两块盘）才打得中；`run_rootback_tolerance_family` 的穷举在 n1∈{4,5,6}
 # 会撞 `SUBSET_ENUMERATION_CAP`，这里不靠穷举，直接按这个具体构造跑一次（hit=true, weight=12），
 # 附一个只挡 4 条根槽、不挡记录的负对照（hit=false，证明「只挡根环挡不住丙」）。
 driver_e158_q2_1_hc1() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-1-hc1)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-1-hc1)
 }
 # H-C1 下界探针（2026-09-24 session s6；session s9 改参数为 weight_ceiling）：在同一个 n1=4 节点
 # 上，穷举权重 0..11 的全部组合（`subsets_tried=22558`，`full_space_subset_count=32768`，没有撞
@@ -1548,36 +1548,36 @@ driver_e158_q2_1_hc1() {
 # 空间只有 2^15=32768，在 `FEASIBLE_FULL_SEARCH_SUBSET_BUDGET`=100000 预算内，`None` 就等于穷举到
 # 完整空间的顶，与 session s6 当年手动调高到 60000 效果相同（60000 > 这段历史任何可能的权重值）。
 driver_e158_q2_1_hc1_lower_bound() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-1-hc1-lower-bound)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- q2-1-hc1-lower-bound)
 }
 # E158 第 2 次跑第一段（重跑登记 `research/prompts/e158-r2-prereg.md`，2026-09-26）：`r2-all` 在工作树的 `crates/`（今天那一臂）上
 # 跑第 2 次跑的开跑检查、H1d、Q1-0、PC1-a/b/c 与实七两段复现历史。另外七臂（A1、甲-txg、乙F-留环、乙 / 丁四臂）的产物
-# `e158-root-choice-repair-2026-09-26-r2-all-<臂>.out` 要在 `scripts/mutations/e158_arms.tsv` 套出来的副本上重编才跑得出来，
+# `e158-root-choice-repair-2026-09-26-r2-all-<臂>.out` 要在 `scripts/mutation/tables/e158_arms.tsv` 套出来的副本上重编才跑得出来，
 # 不登记在这张表里（同第一次跑 A1 产物的先例）；`…-r2-all-today-snapshot.out` 是同一装置在那几份副本共用的快照上跑的今天那一臂，
 # 与这一行的产物只在实七崩溃注入那一段不同（快照之后 harness 的记录核对器改过，实验页写明）。
 driver_e158_r2_all() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- r2-all)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- r2-all)
 }
 # E158 第 3 次跑第一段（重跑登记 `research/prompts/e158-r3-prereg.md`，2026-09-27）：`r2-all` 那一行 2026-09-27 在
 # 开工快照上重出（工作树的 `crates/` 那一刻与快照逐字节相同，登记 S8），改指 `…-2026-09-27-r2-all-today.out`，旧产物原样留着。
 # `r3-seg1` 在九份臂副本上各跑一遍，这里只登记今天那一臂（工作树的 `crates/` 就是它）；另外八臂的产物
-# `e158-root-choice-repair-2026-09-27-r3-seg1-<臂>.out` 要在 `scripts/mutations/e158_arms.tsv` 的 r3 行套出来的副本上重编才跑得出来，
+# `e158-root-choice-repair-2026-09-27-r3-seg1-<臂>.out` 要在 `scripts/mutation/tables/e158_arms.tsv` 的 r3 行套出来的副本上重编才跑得出来，
 # 不登记（同第 2 次跑的先例）。`r3-compare` 只读 `research/results/` 下九份产物、不碰 `crates/`，复跑逐字节可比。
 # 产物头的 `E7INPUT name=crates_snapshot` 那一行是开工快照的汇总 sha256，比对前删掉。工作树的 `crates/` 在快照之后又被改过，
 # 这两行里读 `crates/` 的那一行（r3-seg1 今天、r2-all）会随之漂，不归这一次（登记第一节「上一次执行员交来的两件」）。
 driver_e158_r3_seg1_today() {
-  (cd .. && SINGLEFS_E158_ARM=today bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- r3-seg1)
+  (cd .. && SINGLEFS_E158_ARM=today bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- r3-seg1)
 }
 driver_e158_r3_seg1_compare() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- r3-compare research/results/e158-root-choice-repair-2026-09-27-r3-seg1)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- r3-compare research/results/e158-root-choice-repair-2026-09-27-r3-seg1)
 }
 # E158 第 4 次跑（重跑登记 `research/prompts/e158-r4-prereg.md`，2026-09-27）：五段（seg1、seg2b、seg3、seg4、seg5）的臂产物都在
-# `scripts/mutations/e158_arms.tsv` 的 r4 行套出来的快照副本上编、跑，今天那一臂也是快照副本（工作树的 `crates/` 在快照之后
+# `scripts/mutation/tables/e158_arms.tsv` 的 r4 行套出来的快照副本上编、跑，今天那一臂也是快照副本（工作树的 `crates/` 在快照之后
 # 已合进 C554 乙，不再是「今天那一臂」），各段的臂产物都不登记（同第 2、3 次跑的先例）。这里只登记五段合并的 `r4-compare`：
 # 它只读 `research/results/` 下那五组臂产物、不碰 `crates/`，复跑逐字节可比；第二段以装置撞键修过之后重跑的 seg2b 为准，
 # 撞键之前那一份 seg2 不喂进来。产物头的 `E7INPUT name=crates_snapshot` 那一行比对前删掉。
 driver_e158_r4_compare() {
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- r4-compare research/results/e158-root-choice-repair-2026-09-27-r4-seg1 research/results/e158-root-choice-repair-2026-09-27-r4-seg2b research/results/e158-root-choice-repair-2026-09-27-r4-seg3 research/results/e158-root-choice-repair-2026-09-27-r4-seg4 research/results/e158-root-choice-repair-2026-09-27-r4-seg5)
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e158_root_choice_repair -- r4-compare research/results/e158-root-choice-repair-2026-09-27-r4-seg1 research/results/e158-root-choice-repair-2026-09-27-r4-seg2b research/results/e158-root-choice-repair-2026-09-27-r4-seg3 research/results/e158-root-choice-repair-2026-09-27-r4-seg4 research/results/e158-root-choice-repair-2026-09-27-r4-seg5)
 }
 
 # E162（崩溃放量判定块存储选型）：只登记确定性的 anchors（跑前登记 7.2 的锚点）。S1、S2 与几何取样点的产物带杀点与计时，
@@ -1586,7 +1586,7 @@ driver_e158_r4_compare() {
 driver_e162_anchors() {
   BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/gcc/x86_64-linux-gnu/13/include}" \
     cargo build -q --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store >/dev/null 2>&1 || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e162-crash-verdict-block-store anchors
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e162-crash-verdict-block-store anchors
 }
 
 # E162 第四段 S4 掉电装置：只登记确定性的 selftest（登记 7.2 A1–A6 与补 7 B 系列锚点）。s4-drive 起 QEMU 虚机（重型），
@@ -1594,7 +1594,7 @@ driver_e162_anchors() {
 driver_e162_power_cut_selftest() {
   BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/gcc/x86_64-linux-gnu/13/include}" \
     cargo build -q --release -p e7-index-bench --features e162-block-stores --bin e162-verdict-store-power-cut >/dev/null 2>&1 || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e162-verdict-store-power-cut --role selftest
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e162-verdict-store-power-cut --role selftest
 }
 
 # E163（GPU多卡算单元校验和）：只登记 R1（单机两张卡）的 merge 输出——它是唯一不含计时字段、
@@ -1608,11 +1608,11 @@ driver_e163_r1_merge() {
   local input="$OUT_DIR/e163-r1-merge-input.bin"
   local shard0="$OUT_DIR/e163-r1-merge-shard0.out"
   local shard1="$OUT_DIR/e163-r1-merge-shard1.out"
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" gen-input --output "$input" --units 2560 --seed 0xE163092700000001 >/dev/null || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" run-shard --input "$input" --start 0 --count 1280 --adapter-index 0 --output "$shard0" >/dev/null || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" run-shard --input "$input" --start 1280 --count 1280 --adapter-index 1 --output "$shard1" >/dev/null || return 1
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" gen-input --output "$input" --units 2560 --seed 0xE163092700000001 >/dev/null || return 1
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" run-shard --input "$input" --start 0 --count 1280 --adapter-index 0 --output "$shard0" >/dev/null || return 1
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" run-shard --input "$input" --start 1280 --count 1280 --adapter-index 1 --output "$shard1" >/dev/null || return 1
   local merge_output line_count
-  merge_output="$(bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" merge --original-input "$input" --total-units 2560 --shard "$shard0" --shard "$shard1")" || return 1
+  merge_output="$(bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" merge --original-input "$input" --total-units 2560 --shard "$shard0" --shard "$shard1")" || return 1
   line_count=$(printf '%s\n' "$merge_output" | grep -c .)
   printf '%s\n' "$merge_output" | awk '{print "E7RESULT name=merge_line body=" $0}'
   echo "E7RESULT name=done emitted=$((line_count + 1))"
@@ -1624,12 +1624,12 @@ driver_e163_r1_merge() {
 # 这个 bin 挂在不默认打开的特性 e174-gpu 上（wgpu、pollster），写法照 driver_e163_r1_merge；这两个子命令不碰卡。
 driver_e174_checks() {
   cargo build -q --release -p e7-index-bench --features e174-gpu --bin e174-lease-drop-wait-memory-return >/dev/null 2>&1 || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e174-lease-drop-wait-memory-return checks
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e174-lease-drop-wait-memory-return checks
 }
 
 driver_e174_simulated_judge() {
   cargo build -q --release -p e7-index-bench --features e174-gpu --bin e174-lease-drop-wait-memory-return >/dev/null 2>&1 || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e174-lease-drop-wait-memory-return judge \
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e174-lease-drop-wait-memory-return judge \
     --input research/results/e174-lease-drop-wait-memory-return-simulated-second-2026-10-08.out --scope second
 }
 
@@ -1637,13 +1637,13 @@ driver_e174_simulated_judge() {
 # 登记的是判法对着入库产物的输出（第一段 `--scope first`，第二段 `--scope second`）。
 driver_e174_segment_one_judge() {
   cargo build -q --release -p e7-index-bench --features e174-gpu --bin e174-lease-drop-wait-memory-return >/dev/null 2>&1 || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e174-lease-drop-wait-memory-return judge \
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e174-lease-drop-wait-memory-return judge \
     --input research/results/e174-lease-drop-wait-memory-return-segment-one-2026-10-08.out --scope first
 }
 
 driver_e174_segment_two_judge() {
   cargo build -q --release -p e7-index-bench --features e174-gpu --bin e174-lease-drop-wait-memory-return >/dev/null 2>&1 || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e174-lease-drop-wait-memory-return judge \
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e174-lease-drop-wait-memory-return judge \
     --input research/results/e174-lease-drop-wait-memory-return-segment-two-2026-10-08.out --scope second
 }
 
@@ -1656,9 +1656,9 @@ driver_e174_segment_two_judge() {
 driver_e172() {
   local h1h2_snapshot="$OUT_DIR/e172-r2-deletion-write-dump-h1h2.tmp"
   local h3_snapshot="$OUT_DIR/e172-r2-deletion-write-dump-h3.tmp"
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin deletion_write_dump) >"$h1h2_snapshot" || return 1
-  (cd .. && bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin deletion_write_dump -- --history h3) >"$h3_snapshot" || return 1
-  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e172-deletion-write-dry-run "$h1h2_snapshot" "$h3_snapshot" || return 1
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin deletion_write_dump) >"$h1h2_snapshot" || return 1
+  (cd .. && bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-checker-tier --bin deletion_write_dump -- --history h3) >"$h3_snapshot" || return 1
+  bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/e172-deletion-write-dry-run "$h1h2_snapshot" "$h3_snapshot" || return 1
 }
 
 # E175（产品路径上 inode 号水位退回与重发号）：仓副本装置（跑前登记 research/prompts/e175-preregistration.md 第五节「装置写在哪」写死，
@@ -1673,11 +1673,11 @@ driver_e175() {
   binary="$(find "$scratch/target/release/deps" -maxdepth 1 -type f -executable -name 'e175_product_path_inode_watermark_regression-*' | head -n 1)"
   [[ -n "$binary" ]] || return 1
   E175_ARM=P E175_FAMILY=D E175_RESULT_FILE="$scratch/d-P.out" E175_WORKER_THREADS=4 E175_TIME_BUDGET_SECONDS=600 \
-    bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$binary" --ignored --exact run_one_family_on_one_arm_into_the_result_file >&2 || return 1
+    bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$binary" --ignored --exact run_one_family_on_one_arm_into_the_result_file >&2 || return 1
   awk '/^E7RESULT /{print; n++} END{print "E7RESULT name=done emitted=" n + 1}' "$scratch/d-P.out"
 }
 
-# --admission-only：只问准入（scripts/admission.py，登记表 .claude/gate.d/stage-inputs.tsv），不编、不跑、不比。
+# --admission-only：只问准入（scripts/gate/admission.py，登记表 .claude/gate.d/stage-inputs.tsv），不编、不跑、不比。
 ADMISSION_ONLY=0
 ONLY=()
 for replay_argument in "$@"; do
@@ -1687,7 +1687,7 @@ done
 for wanted in ${ONLY[@]+"${ONLY[@]}"}; do
   if [[ "$wanted" =~ ^[0-9]+$ ]]; then
     echo "  ✗ 实验号 $wanted 没带 E：这样匹配不到任何一行，跑出来全是零" >&2
-    echo "     → 怎么办：写成 E$wanted，例：bash scripts/replay.sh E$wanted" >&2
+    echo "     → 怎么办：写成 E$wanted，例：bash scripts/experiments/replay.sh E$wanted" >&2
     exit 2
   fi
 done
@@ -1705,11 +1705,11 @@ if [[ -n "$bad_rows" ]]; then
   exit 2
 fi
 
-# ── 准入（门禁与实验共用的 scripts/admission.py，登记表 .claude/gate.d/stage-inputs.tsv）──────────
+# ── 准入（门禁与实验共用的 scripts/gate/admission.py，登记表 .claude/gate.d/stage-inputs.tsv）──────────
 # 登记了准入的实验，每一行开跑之前先问一次（driver_e142 这类驱动在装置之前还要编、要跑 crates 的导出，先问省掉这一截）；
 # 装置入口自己还会再问一次，并把输入指纹打在产物最前面（`E7INPUT` 开头，比对前删掉，`name=done` 的条数不数它们）。
 # 退 77（输入自上次产物以来没变）记「输入没变」，不跑、不判红，沿用留存产物的结论；别的非 0 记「跑不了」。
-# 每一行问哪个准入键：下面 ADMISSION_ROW_KEYS 指明了的用指明的，没指明的用实验号（写法见 scripts/admission.py 文件头「复跑表按行的准入键」）。
+# 每一行问哪个准入键：下面 ADMISSION_ROW_KEYS 指明了的用指明的，没指明的用实验号（写法见 scripts/gate/admission.py 文件头「复跑表按行的准入键」）。
 # 同一个实验在这张表里不止一行、又登记了准入的，每一行都要在这里指明一个键、在 .claude/gate.d/stage-inputs.tsv 各登记一行它读的输入，
 # 每一行按自己的键问准入、比自己的产物；不然准入分不清哪一行对哪一份，admission.py replay-row-keys 判红、整份不开跑。
 # 一行一条，制表符分隔：<准入键> <复跑表那一行的前三列，原样抄> <产物头谁写>。产物头谁写：device 是装置自己问准入、自己打 E7INPUT 行；
@@ -1721,7 +1721,7 @@ E142	E142|@driver_e142|	device
 E142/p8g-crates-dump	E142|@driver_e142_p8g_crates_dump|	replay
 TSV
 )
-ADMISSION_MODULE="scripts/admission.py"
+ADMISSION_MODULE="scripts/gate/admission.py"
 if ! admission_rows_text="$(python3 "$ADMISSION_MODULE" replay-row-keys ..)"; then
   printf '%s\n' "$admission_rows_text" >&2
   echo "  ✗ 定不下复跑表每一行的准入键（python3 $ADMISSION_MODULE replay-row-keys ..），一行都没跑" >&2
@@ -1743,7 +1743,7 @@ done <<<"$TABLE"
 if (( ${#admission_rows_unkeyed[@]} )); then
   echo "  ✗ 复跑表有 ${#admission_rows_unkeyed[@]} 行准入模块没给出准入键（它只认「编号|二进制|参数|产物|exact 或 timing」形状的行）：" >&2
   printf '      %s\n' "${admission_rows_unkeyed[@]}" >&2   # gate-lint:detail
-  echo "     → 怎么办：把那几行改成这个形状（第 5 列只写 exact 或 timing），python3 scripts/admission.py replay-row-keys . 列得出每一行再跑" >&2
+  echo "     → 怎么办：把那几行改成这个形状（第 5 列只写 exact 或 timing），python3 scripts/gate/admission.py replay-row-keys . 列得出每一行再跑" >&2
   exit 2
 fi
 
@@ -1805,7 +1805,7 @@ replay_one() {
     "${bin#@}" >"$fresh" 2>"$OUT_DIR/$tag.err"
   else
     # shellcheck disable=SC2086
-    bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/"$bin" $args >"$fresh" 2>"$OUT_DIR/$tag.err"
+    bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./scripts/experiments/target/release/"$bin" $args >"$fresh" 2>"$OUT_DIR/$tag.err"
   fi
   rc=$?
   if [[ $rc -ne 0 ]]; then                          # 闸 3
@@ -1922,8 +1922,8 @@ echo "字节一致 $pass ／ 仅计时不同 $timing_only ／ 对不上 $drift �
 echo "本轮输出：$OUT_DIR"
 if [[ $unchanged -ne 0 ]]; then
   echo "  ! 「输入没变」$unchanged 行没跑：${UNCHANGED_ROWS[*]}。输入（.claude/gate.d/stage-inputs.tsv 登记的路径、登记行、工具链）"
-  echo "     与留存产物头上的指纹相同，准入（scripts/admission.py）拒绝重跑，结论沿用留存产物；结论区间断言照常对留存产物判。"
-  echo "     这不是判绿也不是判红。确要重跑：SINGLEFS_EXPERIMENT_RERUN_REASON=<理由> bash scripts/replay.sh <实验号>，理由写进新产物头。"
+  echo "     与留存产物头上的指纹相同，准入（scripts/gate/admission.py）拒绝重跑，结论沿用留存产物；结论区间断言照常对留存产物判。"
+  echo "     这不是判绿也不是判红。确要重跑：SINGLEFS_EXPERIMENT_RERUN_REASON=<理由> bash scripts/experiments/replay.sh <实验号>，理由写进新产物头。"
 fi
 if [[ $archived -ne 0 ]]; then
   echo "  ! 「产物已归档」$archived 行：留存产物按「每次提交删上一次的实验记录」归档进了版本库，逐字节这一档没有对照物。"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E152（按里程碑对比六家文件系统的文件性能）：把产物里的 name=summary 行渲染成 scripts/perf-by-milestone.md 用的表。
+"""E152（按里程碑对比六家文件系统的文件性能）：把产物里的 name=summary 行渲染成 scripts/experiments/perf-by-milestone.md 用的表。
 
   e152-tables.py <产物>        打印 markdown 表（每个维度一张，行是配置，格子是 5 轮中位）
   e152-tables.py --selftest    拿一份造出来的汇总行核渲染结果

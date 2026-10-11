@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 门禁 checker-tier-crates-mutation-replay（crates 变异表复跑）的双机分片驱动：本机没有作数记录的行按用时表分成两堆，本机与第二台各跑一趟 checker-tier-crates-mutation-replay、只判自己那一堆
-# （GATE_MUTATION_ROW_SELECTION），第二台的判定库记录拷回本机，经 scripts/crates-mutation-rows.py import 逐条核过再导入。判定不在这里：
+# （GATE_MUTATION_ROW_SELECTION），第二台的判定库记录拷回本机，经 scripts/mutation/crates-mutation-rows.py import 逐条核过再导入。判定不在这里：
 # 驱动退出之后 checker-tier-crates-mutation-replay 在本机整张判一遍（命中判定库记录的复用、缺的现跑），判定与单机逐字相同（复用的报数不同），全绿标记照旧由本机写。
 #
 #   mutation-shard-run.sh <树根>       门禁 checker-tier-crates-mutation-replay（.claude/gate.d/checker-tier-crates-mutation-replay.sh）在本地多机配置写了 ENABLE_ACROSS_MACHINES=1
@@ -11,7 +11,7 @@
 #                                      假 cargo、真的内存包装，逐格见文件末尾 mutation_shard_selftest 的说明；格数由成功行现算
 #
 # 步骤：
-# ① 配置照 scripts/layer0-shard-configuration-check.sh --emit-assignments（只调，与层 0 分片同一份）；判不过退 1，原因不在这里打；
+# ① 配置照 scripts/crash/layer0-shard-configuration-check.sh --emit-assignments（只调，与层 0 分片同一份）；判不过退 1，原因不在这里打；
 #    判法退 3（配置没写 ENABLE_ACROSS_MACHINES=1）报一行「双机：关」、退 0，什么都不分（checker-tier-crates-mutation-replay 在本机整张判）。
 # ② 两台工具链相同：rustc -Vv 前三行与 host 行、cargo -V。
 # ③ 分行：crates-mutation-rows.py row-plan 列出每一行有没有作数的抓到记录与上一次现跑的用时；没有作数记录的行按用时从长到短，
@@ -42,8 +42,8 @@
 #   都连同全部后代逐个按进程号冻住、从最底层起 TERM、放开，至多等 30 秒，还在的 KILL，回读一个不剩——再照 EXIT 上那一套删第二台这一趟的树，做完才退。
 #   前台那几步（rsync、算判法版本）里收到的，等那一步跑完再收尾；KILL 接不住，那时第二台上这一趟的树留着，手动删。
 # 两份的输出存进 <树根的 git common-dir>/singlefs-mutation-shard-logs/<这一趟>/（local.log、peer.log，只留最新 3 趟）。
-# 驱动打的每一行、存下的输出都不写配置里的主机、目录与清场命令：第二台上的错误输出与 peer.log 经 scripts/peer-host-lib.sh 的 peer_host_redact 换成「第二台」。
-# 第二台共用的那几段（跑命令、拷文件、脱离会话起与轮询、按进程号停、清场）在 scripts/peer-host-lib.sh。
+# 驱动打的每一行、存下的输出都不写配置里的主机、目录与清场命令：第二台上的错误输出与 peer.log 经 scripts/hosts/peer-host-lib.sh 的 peer_host_redact 换成「第二台」。
+# 第二台共用的那几段（跑命令、拷文件、脱离会话起与轮询、按进程号停、清场）在 scripts/hosts/peer-host-lib.sh。
 # 重型：真跑是两台各跑一部分 crates/mutations.tsv，与 checker-tier-crates-mutation-replay 同一类（.claude/hooks/lib_heavy_tests.py 按名字认它）；--selftest 不算重型，在 .claude/hooks/selftest-registry.tsv 登记为 light，改了就跑（同一份判定）。
 #
 # 弄坏开关 MUTATION_SHARD_RUN_BREAK=<项>（只给证红用，逗号分隔可给几个；打开时自证退 1）。只在 --selftest 起的进程里生效：自证在它的临时目录里放一份标记文件，
@@ -201,8 +201,8 @@ mutation_shard_main() {
   tree_root="$(cd "$tree_root" && pwd)"
   stage_repository="$(cd "$mutation_shard_script_directory/../.." && pwd)"
   stage_script="$stage_repository/.claude/gate.d/checker-tier-crates-mutation-replay.sh"
-  rows_module="$stage_repository/scripts/crates-mutation-rows.py"
-  if [[ -z "${GATE_MUTATION_MEMORY_CAP_RUNNER:-}" ]]; then GATE_MUTATION_MEMORY_CAP_RUNNER="$stage_repository/scripts/run-with-memory-cap.sh"; fi
+  rows_module="$stage_repository/scripts/mutation/crates-mutation-rows.py"
+  if [[ -z "${GATE_MUTATION_MEMORY_CAP_RUNNER:-}" ]]; then GATE_MUTATION_MEMORY_CAP_RUNNER="$stage_repository/scripts/hosts/run-with-memory-cap.sh"; fi
   export GATE_MUTATION_MEMORY_CAP_RUNNER
   poll_seconds="${MUTATION_SHARD_RUN_POLL_SECONDS:-5}"
   peer_wrapper_cap="${MUTATION_SHARD_PEER_MEMORY_CAP:-4G}"
@@ -245,7 +245,7 @@ mutation_shard_main() {
   # ③ 分行
   local plan_file="$mutation_shard_scratch/plan.tsv" split_summary
   python3 "$rows_module" row-plan "$tree_root" > "$plan_file" \
-    || mutation_shard_fail "本机列不出每一行的记录与用时（crates-mutation-rows.py row-plan 退非 0：$(tail -2 "$plan_file" | tr '\n' ' ')）" "单跑 python3 scripts/crates-mutation-rows.py row-plan <树根> 看它报什么"
+    || mutation_shard_fail "本机列不出每一行的记录与用时（crates-mutation-rows.py row-plan 退非 0：$(tail -2 "$plan_file" | tr '\n' ' ')）" "单跑 python3 scripts/mutation/crates-mutation-rows.py row-plan <树根> 看它报什么"
   split_summary="$(python3 - "$plan_file" "$mutation_shard_scratch/local.selection" "$mutation_shard_scratch/peer.selection" "$mutation_shard_scratch/keys" <<'PY_SPLIT'
 import statistics, sys
 plan_path, local_path, peer_path, keys_path = sys.argv[1:]
@@ -302,8 +302,8 @@ PY_SPLIT
     || mutation_shard_fail "第二台那一堆的选行文件拷不过去" "看第二台盘满没满"
   echo "  · ④ 树拷到第二台这一趟的目录、在那里 git init（规范副本另拷）"
   local_base="$(python3 "$rows_module" judge-version "$tree_root")" \
-    || mutation_shard_fail "本机算不出判法版本：$local_base" "单跑 python3 scripts/crates-mutation-rows.py judge-version <树根> 看它报什么"
-  peer_base="$(peer_host_run "$peer_run_directory" "python3 scripts/crates-mutation-rows.py judge-version .")" \
+    || mutation_shard_fail "本机算不出判法版本：$local_base" "单跑 python3 scripts/mutation/crates-mutation-rows.py judge-version <树根> 看它报什么"
+  peer_base="$(peer_host_run "$peer_run_directory" "python3 scripts/mutation/crates-mutation-rows.py judge-version .")" \
     || mutation_shard_fail "第二台算不出判法版本" "在第二台那棵树里单跑同一条 judge-version 看它报什么"
   local_base="${local_base%% *}"
   peer_base="${peer_base%% *}"
@@ -341,7 +341,7 @@ PY_SPLIT
     echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=peer-without-memory-cap：第二台那一份不经 run-with-memory-cap.sh 起"
     peer_share_text="不经内存包装"
   else
-    peer_command+=" RUN_WITH_MEMORY_CAP_KEY=$(printf '%q' "$MUTATION_SHARD_PEER_WRAPPER_KEY") bash scripts/run-with-memory-cap.sh $(printf '%q' "$peer_wrapper_cap")"
+    peer_command+=" RUN_WITH_MEMORY_CAP_KEY=$(printf '%q' "$MUTATION_SHARD_PEER_WRAPPER_KEY") bash scripts/hosts/run-with-memory-cap.sh $(printf '%q' "$peer_wrapper_cap")"
     peer_share_text="整份经 run-with-memory-cap.sh $peer_wrapper_cap 起"
   fi
   peer_command+=" bash .claude/gate.d/checker-tier-crates-mutation-replay.sh $(printf '%q' "$peer_run_directory")"
@@ -473,7 +473,7 @@ mutation_shard_selftest() {
   rsync -a --exclude __pycache__ "$repository_root/.claude/gate.d/lib/" "$template/.claude/gate.d/lib/"   # checker-tier-crates-mutation-replay source 的格共用库
   rsync -a --exclude __pycache__ --exclude memory-peaks.tsv "$repository_root/scripts/" "$template/scripts/"
   ln -s "$repository_root/.claude/singlefs-ai-sop" "$template/.claude/singlefs-ai-sop"
-  printf 'target/\n__pycache__/\n/multi-host.env\n/scripts/memory-peaks.tsv\n/.claude/singlefs-ai-sop\n' > "$template/.gitignore"
+  printf 'target/\n__pycache__/\n/multi-host.env\n/scripts/hosts/memory-peaks.tsv\n/.claude/singlefs-ai-sop\n' > "$template/.gitignore"
   printf '[workspace]\nmembers = ["crates/tiny"]\n' > "$template/Cargo.toml"
   printf '[package]\nname = "tiny"\nversion = "0.1.0"\n' > "$template/crates/tiny/Cargo.toml"
   cat > "$template/crates/tiny/src/lib.rs" <<'SAMPLE_SOURCE'
@@ -561,7 +561,7 @@ FAKE_CARGO
   chmod +x "$work/fake/cargo"
   # 假 llvm 工具：取 crates-mutation-rows.py 里那一份（FAKE_LLVM_TOOL），两个名字各一份
   mkdir -p "$work/llvm"
-  python3 - "$repository_root/scripts/crates-mutation-rows.py" "$work/llvm" <<'FAKE_LLVM' || { echo "  ✗ 写不出假 llvm 工具"; echo "     → 怎么办：单跑 python3 scripts/crates-mutation-rows.py --selftest 看共用模块读不读得进来"; return 1; }
+  python3 - "$repository_root/scripts/mutation/crates-mutation-rows.py" "$work/llvm" <<'FAKE_LLVM' || { echo "  ✗ 写不出假 llvm 工具"; echo "     → 怎么办：单跑 python3 scripts/mutation/crates-mutation-rows.py --selftest 看共用模块读不读得进来"; return 1; }
 import importlib.util, os, sys
 specification = importlib.util.spec_from_file_location("crates_mutation_rows_for_shard_selftest", sys.argv[1])
 module = importlib.util.module_from_spec(specification)
@@ -641,9 +641,9 @@ FAKE_LLVM
   # ① 主流程，连同 ② import 拒行键对不上的
   prepare_scene main
   local plan_line bogus_key base
-  plan_line="$(scene_environment main python3 "$work/main/repo/scripts/crates-mutation-rows.py" row-plan "$work/main/repo" | head -1)"
-  base="$(scene_environment main env GATE_MUTATION_MEMORY_CAP_RUNNER="$work/main/repo/scripts/run-with-memory-cap.sh" \
-    python3 "$work/main/repo/scripts/crates-mutation-rows.py" judge-version "$work/main/repo" | cut -d' ' -f1)"
+  plan_line="$(scene_environment main python3 "$work/main/repo/scripts/mutation/crates-mutation-rows.py" row-plan "$work/main/repo" | head -1)"
+  base="$(scene_environment main env GATE_MUTATION_MEMORY_CAP_RUNNER="$work/main/repo/scripts/hosts/run-with-memory-cap.sh" \
+    python3 "$work/main/repo/scripts/mutation/crates-mutation-rows.py" judge-version "$work/main/repo" | cut -d' ' -f1)"
   bogus_key="$(printf 'bogus' | sha256sum | cut -c1-64)"
   local planted_directory="$work/main/peer-home/mutation-kept/records/singlefs-mutation-rows/$base" planted_key
   planted_key="$(cut -f2 <<< "$plan_line")"
@@ -686,8 +686,8 @@ FAKE_LLVM
     "$(! grep -qE 'selftest-peer-host-name|peer-home|peer-bin|quiesce-marker-selftest' "$work/main/stdout" "$main_stderr" "$(dirname "$main_logs")/peer.log" 2>/dev/null; echo $?)" \
     "$(grep -lE 'selftest-peer-host-name|peer-home|peer-bin|quiesce-marker-selftest' "$work/main/stdout" "$main_stderr" "$(dirname "$main_logs")/peer.log" 2>/dev/null | sed "s|^$work/||" | tr '\n' ' ')里有"
   local local_records_directory
-  local_records_directory="$(scene_environment main env GATE_MUTATION_MEMORY_CAP_RUNNER="$work/main/repo/scripts/run-with-memory-cap.sh" \
-    python3 "$work/main/repo/scripts/crates-mutation-rows.py" records-directory "$work/main/repo")"
+  local_records_directory="$(scene_environment main env GATE_MUTATION_MEMORY_CAP_RUNNER="$work/main/repo/scripts/hosts/run-with-memory-cap.sh" \
+    python3 "$work/main/repo/scripts/mutation/crates-mutation-rows.py" records-directory "$work/main/repo")"
   expect "② import 拒了行键对不上的那一条、逐条列出" \
     "$(grep -q "拒了 1 条另一台的判定库记录" "$main_stderr" && grep -q "mutation.$planted_key：文件名与记录里的类别、行键对不上" "$main_stderr"; echo $?)" \
     "stderr 里导入那几行：$(grep -A2 '导入：' "$main_stderr" | head -3 | tr '\n' ' ')"
@@ -735,7 +735,7 @@ FAKE_LLVM
   printf '#!/usr/bin/env bash\nprintf "rustc 0.0.0-other\\nbinary: rustc\\ncommit-hash: 0000\\nhost: other-host\\n"\n' > "$work/toolchain/peer-bin/rustc"
   chmod +x "$work/toolchain/peer-bin/rustc"
   local toolchain_exit
-  if scene_environment toolchain bash "$work/toolchain/repo/scripts/mutation-shard-run.sh" "$work/toolchain/repo" > "$work/toolchain/driver.out" 2>&1; then toolchain_exit=0; else toolchain_exit=$?; fi
+  if scene_environment toolchain bash "$work/toolchain/repo/scripts/mutation/mutation-shard-run.sh" "$work/toolchain/repo" > "$work/toolchain/driver.out" 2>&1; then toolchain_exit=0; else toolchain_exit=$?; fi
   expect "⑤ 两台的工具链不同：驱动拒，第二台这一趟的目录没建" \
     "$([[ "$toolchain_exit" == 1 ]] && grep -q '两台的工具链不同' "$work/toolchain/driver.out" && [[ ! -d "$work/toolchain/peer-home/mutation-runs" ]]; echo $?)" \
     "退 $toolchain_exit；输出：$(tail -3 "$work/toolchain/driver.out" | tr '\n' ' ')"
@@ -746,7 +746,7 @@ FAKE_LLVM
   local driver_pid signalled_exit waited hanging_pids=() hanging_file survivors=""
   # env 起的就是驱动本身（env exec 过去）：$! 是驱动的进程号，TERM 只发给它
   scene_command_for signalled
-  "${scene_command[@]}" bash "$work/signalled/repo/scripts/mutation-shard-run.sh" "$work/signalled/repo" > "$work/signalled/driver.out" 2>&1 &
+  "${scene_command[@]}" bash "$work/signalled/repo/scripts/mutation/mutation-shard-run.sh" "$work/signalled/repo" > "$work/signalled/driver.out" 2>&1 &
   driver_pid=$!
   for (( waited = 0; waited < 1200; waited++ )); do
     compgen -G "$work/signalled/local-bin/hanging.*" >/dev/null && compgen -G "$work/signalled/peer-bin/hanging.*" >/dev/null && break
@@ -767,7 +767,7 @@ FAKE_LLVM
 
   # ⑦ 选行模式下调驱动
   local selection_exit
-  if scene_environment single env GATE_MUTATION_ROW_SELECTION="$work/single/stdout" bash "$work/single/repo/scripts/mutation-shard-run.sh" "$work/single/repo" > "$work/single/driver.out" 2>&1; then
+  if scene_environment single env GATE_MUTATION_ROW_SELECTION="$work/single/stdout" bash "$work/single/repo/scripts/mutation/mutation-shard-run.sh" "$work/single/repo" > "$work/single/driver.out" 2>&1; then
     selection_exit=0
   else
     selection_exit=$?
@@ -777,7 +777,7 @@ FAKE_LLVM
 
   # ⑧ 驱动直接起、配置没开双机（单机那一趟的场景）：判法退 3
   local switched_off_exit
-  if scene_environment single bash "$work/single/repo/scripts/mutation-shard-run.sh" "$work/single/repo" > "$work/single/switched-off.out" 2>&1; then
+  if scene_environment single bash "$work/single/repo/scripts/mutation/mutation-shard-run.sh" "$work/single/repo" > "$work/single/switched-off.out" 2>&1; then
     switched_off_exit=0
   else
     switched_off_exit=$?
@@ -789,7 +789,7 @@ FAKE_LLVM
   # ⑨ ⑩ 弄坏开关设在自证之外（起时去掉自证的标记，弄坏开关照调用方的再各加一项）：驱动拒、退 2；checker-tier-crates-mutation-replay 判红、退 1
   local outside_driver_exit outside_stage_exit
   if scene_environment single env -u MUTATION_SHARD_RUN_SELFTEST_MARK MUTATION_SHARD_RUN_BREAK="${MUTATION_SHARD_RUN_BREAK:+$MUTATION_SHARD_RUN_BREAK,}import-skipped" \
-       bash "$work/single/repo/scripts/mutation-shard-run.sh" "$work/single/repo" > "$work/single/outside-driver.out" 2>&1; then
+       bash "$work/single/repo/scripts/mutation/mutation-shard-run.sh" "$work/single/repo" > "$work/single/outside-driver.out" 2>&1; then
     outside_driver_exit=0
   else
     outside_driver_exit=$?
@@ -804,7 +804,7 @@ FAKE_LLVM
     outside_stage_exit=$?
   fi
   expect "⑩ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外：checker-tier-crates-mutation-replay 判红（退 1）、说设在 --selftest 之外" \
-    "$([[ "$outside_stage_exit" == 1 ]] && grep -q '设在 scripts/mutation-shard-run.sh --selftest 之外' "$work/single/outside-stage.out"; echo $?)" \
+    "$([[ "$outside_stage_exit" == 1 ]] && grep -q '设在 scripts/mutation/mutation-shard-run.sh --selftest 之外' "$work/single/outside-stage.out"; echo $?)" \
     "退 $outside_stage_exit；输出：$(tail -3 "$work/single/outside-stage.out" | tr '\n' ' ')"
 
   # ⑪ 第二台那一份的结局逐个判（mutation_shard_peer_problem，⑥ 收两份时调的那一个）：那边的内存包装退 245 报显存不够、退 252 报包装自己的结局、退 3 不报
@@ -832,7 +832,7 @@ FAKE_LLVM
 
   if (( failures > 0 )); then
     echo "  ✗ mutation-shard-run.sh 自证有 $failures 格判错（共 $checked 格）"
-    echo "     → 怎么办：设了 MUTATION_SHARD_RUN_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看驱动与 scripts/peer-host-lib.sh"
+    echo "     → 怎么办：设了 MUTATION_SHARD_RUN_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看驱动与 scripts/hosts/peer-host-lib.sh"
     return 1
   fi
   echo "  ✓ mutation-shard-run.sh 自证 $checked 格都对（两台各判一份、拷回核过再导入（连同覆盖记录）、最后一趟全部复用且判定与单机逐字相同、第二台中途停了补跑、行键对不上被拒、判法版本与工具链不同就拒、收到 TERM 先停两份、场景跑完不留 singlefs-mutation-replay-*、配置没开双机就报双机：关不分、环境变量开不了双机、弄坏开关设在自证之外驱动与门禁都拒、第二台那一份退 245 报显存不够）"
@@ -844,7 +844,7 @@ if [[ "${1:-}" == --selftest ]]; then
 fi
 if [[ -n "${MUTATION_SHARD_RUN_BREAK:-}" ]] && ! mutation_shard_break_is break-honored-anywhere && ! mutation_shard_inside_selftest; then
   echo "  ✗ MUTATION_SHARD_RUN_BREAK=$MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外：弄坏开关只在自证起的进程里生效，这一次什么都没分（退 2）"
-  echo "     → 怎么办：去掉它再跑（env -u MUTATION_SHARD_RUN_BREAK …）；要证红就跑 MUTATION_SHARD_RUN_BREAK=<项> bash scripts/mutation-shard-run.sh --selftest"
+  echo "     → 怎么办：去掉它再跑（env -u MUTATION_SHARD_RUN_BREAK …）；要证红就跑 MUTATION_SHARD_RUN_BREAK=<项> bash scripts/mutation/mutation-shard-run.sh --selftest"
   exit 2
 fi
 mutation_shard_main "$@"

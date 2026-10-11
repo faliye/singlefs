@@ -1,6 +1,6 @@
 """E171 逐行驱动（登记 5.3「研究一侧」、5.7）：坏实现表的每一行——拷仓、改坏、编、跑装置（`row` 模式）、跑冻结的 O3 执行器、留下导出目录与一份 `row-result.tsv`。
 
-跑法（在仓根，经 `scripts/capped.sh`；装置与执行器本身经 `run-with-memory-cap.sh`）：
+跑法（在仓根，经 `scripts/hosts/capped.sh`；装置与执行器本身经 `run-with-memory-cap.sh`）：
   python3 row_driver.py --repo-root <仓根> --work-root <草稿目录> --output-root <输出根> --rows 1,6 [--empty-mutation]
       [--threads 6] [--memory-cap 4G] [--lanes 1] [--positive-control O1-对拍|O1-崩溃判官|O2|O3] [--disable-oracle O1|O2]
       [--no-executor] [--o3-control-bad-states <E170 bad-states 的导出目录>] [--skip-finished] [--snapshot-from <冻住的树>]
@@ -241,7 +241,7 @@ def run_compile(lane_tree: str, lane_target: str, repo_root: str, threads: int, 
     """`cargo build --release --offline --message-format=json-render-diagnostics -p singlefs-checker-tier --bin e171_three_oracle_collusion`
     （只编不跑，不是重型测试）：诊断照常写进 `log_path`，每个编译单元的 JSON 消息（带 `fresh`）写进 `artifacts_path`。交回 (退出码, 耗时 ns)。"""
     environment = dict(os.environ, CARGO_TARGET_DIR=lane_target)
-    command = ["bash", os.path.join(repo_root, "scripts/capped.sh"), str(threads), "nice", "-n", "19", "cargo", "build", "--release",
+    command = ["bash", os.path.join(repo_root, "scripts/hosts/capped.sh"), str(threads), "nice", "-n", "19", "cargo", "build", "--release",
                "--offline", "--message-format=json-render-diagnostics", "-p", DEVICE_PACKAGE, "--bin", DEVICE_BINARY_NAME]
     started = now_ns()
     with open(log_path, "w", encoding="utf-8") as log, open(artifacts_path, "w", encoding="utf-8") as artifacts:
@@ -250,8 +250,8 @@ def run_compile(lane_tree: str, lane_target: str, repo_root: str, threads: int, 
 
 
 def device_command(repo_root: str, binary: str, dump_directory: str, threads: int, memory_cap: str, extra: list[str]) -> list[str]:
-    return ["bash", os.path.join(repo_root, "scripts/run-with-memory-cap.sh"), memory_cap, "bash",
-            os.path.join(repo_root, "scripts/capped.sh"), str(threads), binary, "row", "--output-directory", dump_directory] + extra
+    return ["bash", os.path.join(repo_root, "scripts/hosts/run-with-memory-cap.sh"), memory_cap, "bash",
+            os.path.join(repo_root, "scripts/hosts/capped.sh"), str(threads), binary, "row", "--output-directory", dump_directory] + extra
 
 
 def run_device(repo_root: str, binary: str, row_directory: str, threads: int, memory_cap: str, extra: list[str]) -> tuple[int, int]:
@@ -288,8 +288,8 @@ def run_image_control(arguments: argparse.Namespace, row_directory: str) -> tupl
     交回 (退出码, 耗时 ns)。"""
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", RUN_WITH_MEMORY_CAP_PARALLEL_REASON=frozen_o3.PARALLEL_REASON,
                        RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="O3 阳性对照，峰值表里没有这条命令")
-    command = ["bash", os.path.join(arguments.repo_root, "scripts/run-with-memory-cap.sh"), arguments.memory_cap, "bash",
-               os.path.join(arguments.repo_root, "scripts/capped.sh"), str(arguments.threads), "nice", "-n", "19", sys.executable,
+    command = ["bash", os.path.join(arguments.repo_root, "scripts/hosts/run-with-memory-cap.sh"), arguments.memory_cap, "bash",
+               os.path.join(arguments.repo_root, "scripts/hosts/capped.sh"), str(arguments.threads), "nice", "-n", "19", sys.executable,
                IMAGE_JUDGE_SCRIPT, "control", "--repo-root", arguments.repo_root, "--dumps", os.path.join(row_directory, "dump"),
                "--e170-dumps", arguments.o3_control_bad_states, "--row-name", O3_CONTROL_ROW_NAME, "--output", os.path.join(row_directory, "o3-control.out")]
     started = now_ns()

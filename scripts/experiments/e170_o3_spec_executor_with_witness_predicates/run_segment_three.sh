@@ -4,7 +4,7 @@
 # X22–X26、X28–X31 批层，XC3–XC7）、冻结行收尾核对。全部写进同一份产物 research/results/e170-r2-o3-spec-executor-<日期标签>-s3-mutations.out，
 # 已存在就不覆盖（noclobber）。前台跑得完则前台跑；超过 240 秒的交主 agent 用 run_in_background 起。
 # 跑法（在仓根，整条脚本经两层包装）：
-#   bash scripts/capped.sh <线程> bash scripts/run-with-memory-cap.sh <上限> \
+#   bash scripts/hosts/capped.sh <线程> bash scripts/hosts/run-with-memory-cap.sh <上限> \
 #     bash scripts/experiments/e170_o3_spec_executor_with_witness_predicates/run_segment_three.sh <日期标签> <工作进程数> <草稿目录> [产物目录]
 set -u -o pipefail -o noclobber
 TAG="${1:?日期标签}"

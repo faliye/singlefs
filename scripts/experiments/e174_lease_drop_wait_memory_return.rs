@@ -3342,7 +3342,7 @@ fn main() {
     std::process::exit(exit_code);
 }
 
-// ============================== 单测（不起卡；变异表 scripts/mutations/e174_lease_drop_wait_memory_return.tsv 的变异由它们抓） ==============================
+// ============================== 单测（不起卡；变异表 scripts/mutation/tables/e174_lease_drop_wait_memory_return.tsv 的变异由它们抓） ==============================
 
 #[cfg(test)]
 mod tests {

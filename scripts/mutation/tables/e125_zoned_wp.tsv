@@ -1,5 +1,5 @@
 # E125 顺序区写指针之上读到什么 —— 变异表
-# 被测装置是 shell 探针 scripts/e125-zoned-wp-probe.sh（不是 Rust 二进制），
+# 被测装置是 shell 探针 scripts/devices/e125-zoned-wp-probe.sh（不是 Rust 二进制），
 # 复跑方式：把「原文」换成「替换文」，跑一遍脚本，必须出现 name=fatal。
 # 每行三段：变异名<TAB>原文<TAB>替换文
 slot_width_expect	[ "$SLOT" = 4096 ]	[ "$SLOT" = 512 ]

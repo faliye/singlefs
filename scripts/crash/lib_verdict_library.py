@@ -3,12 +3,12 @@
 
 Python 一侧这一个概念只叫「判定库」（类名 VerdictLibrary）。Rust 一侧 crates/singlefs-checker-tier 的判定存储（verdict_store 模块）是另一份存法，不在这里。
 用它的两份：
-  门禁 checker-tier-formal-verification 的两份判法（scripts/verus-proof-check.py、scripts/e165-pin-red-examples.py）用整套：
+  门禁 checker-tier-formal-verification 的两份判法（scripts/gate/verus-proof-check.py、scripts/experiments/e165-pin-red-examples.py）用整套：
     VerdictLibrary 存放与按键读、write_atomically 原子写、Tally 现判与复用分开报。
-  门禁 checker-tier-crates-mutation-replay 的判法（scripts/crates-mutation-rows.py）用 write_atomically、read_text 与 Tally；
+  门禁 checker-tier-crates-mutation-replay 的判法（scripts/mutation/crates-mutation-rows.py）用 write_atomically、read_text 与 Tally；
     它的判定库每条还挂覆盖记录、快照与源码副本，存放布局与复用判据写在它文件头「判定库」一段。
-不用它、各自留一份的（gate-overlap:copy-kept 写在它们那里）：全绿标记（scripts/admission.py，一道阶段或一格一个标记文件，在就复用）、
-  广谱变异的结论表（scripts/broad-mutation.py，只追加的 TSV，按变异的函数键取最后一行）。
+不用它、各自留一份的（gate-overlap:copy-kept 写在它们那里）：全绿标记（scripts/gate/admission.py，一道阶段或一格一个标记文件，在就复用）、
+  广谱变异的结论表（scripts/mutation/broad-mutation.py，只追加的 TSV，按变异的函数键取最后一行）。
 
 键分两列：
   输入指纹  这一项被判的全部输入（被判的代码、表里这一行、工具链、限时……）各自的摘要（components：[(名字, 摘要)]，名字是给人看的「核 crate」「这一行」这类）

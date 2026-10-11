@@ -20,7 +20,7 @@ CPU 一侧用的是旧 walk.rs 编出来的库（records/2026-09-30-里程碑三
       按内容比，内容变了的才拷、拷过去的 mtime 是此刻，没变的不动；再对副本做一次 refresh（拷之前被别人 rsync -a 过的也一并补上）。
       手敲 rsync -a 之后跑 refresh 同样拦得住，只是 rsync -a 把 touch 过的文件改回旧 mtime，下一次 refresh 会再 touch 它们、多重编一次。
   source-stamp.py --selftest
-  source-stamp.py --write-selftest-cargo <路径>   只给自证（这一份与 scripts/merge-and-verify.sh 的）：写一份照 mtime 判新不新鲜的假 cargo
+  source-stamp.py --write-selftest-cargo <路径>   只给自证（这一份与 scripts/gate/merge-and-verify.sh 的）：写一份照 mtime 判新不新鲜的假 cargo
 编译目录：--target-dir 给了用它；不给用 CARGO_TARGET_DIR（相对路径按树根算）；都没有用 <树>/target。
 源文件：--include 给了就是点名的那几处（文件或目录），不给是树根的 Cargo.toml、Cargo.lock、.cargo/ 与 crates/ 里存在的那几处；
   目录里的每个普通文件都算，不进名叫 .git、target、target-*、__pycache__ 的目录。
@@ -56,7 +56,7 @@ STAMP_NAME = ".singlefs-source-stamp.tsv"
 DEFAULT_INCLUDES = ("Cargo.toml", "Cargo.lock", ".cargo", "crates")
 SKIPPED_DIRECTORY_NAMES = (".git", "__pycache__")
 STAMP_HEADER = [
-    "# 源码戳：scripts/source-stamp.py refresh 上一次编之前看到的每个源文件（touch 之后的样子），别手改。",
+    "# 源码戳：scripts/hosts/source-stamp.py refresh 上一次编之前看到的每个源文件（touch 之后的样子），别手改。",
     "# 列（制表符分隔）：mtime（纳秒）、sha256、相对树根的路径。",
 ]
 EXIT_REFUSED = 1

@@ -46,20 +46,20 @@ BREAK_NAMED_CHECK = {
 SAMPLE_PRODUCT = "\n".join([
     "E7RESULT name=config experiment=E165 segment=2 bounds=segment2 items=4 table_rows=3 custom_rows=1 widening=none",
     'E7RESULT name=kill_bound item=baseline table=none table_row=none rows_sharing_this_replacement=none outcome=baseline result_rows=9 run_exit=0 '
-    'rerun="bash scripts/e165-replay-mutation-kill-bounds.sh --recheck --item baseline" title=基线（不改） complete=yes',
+    'rerun="bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --recheck --item baseline" title=基线（不改） complete=yes',
     'E7RESULT name=kill_bound item=tsv-23 table=crates/mutations.tsv table_row=23 rows_sharing_this_replacement=23 outcome=red first_clause_red=X:2:J1+J2 '
     'first_anchor_red=none other_difference_before_any_red=none not_red_domains=L(≤8),C(≤5) legal_family_minimum=2 adversarial_family_minimum=none run_exit=0 '
-    'copy_restored=true rerun="bash scripts/e165-replay-mutation-kill-bounds.sh --recheck --item tsv-23" title=合成变体一 complete=yes',
+    'copy_restored=true rerun="bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --recheck --item tsv-23" title=合成变体一 complete=yes',
     'E7RESULT name=kill_bound item=tsv-40 table=crates/mutations.tsv table_row=40 rows_sharing_this_replacement=40 outcome=red first_clause_red=L:3:J4;X:2:J1 '
     'first_anchor_red=L:2:failed_states other_difference_before_any_red=none not_red_domains=none legal_family_minimum=3 adversarial_family_minimum=2 run_exit=0 '
-    'copy_restored=true rerun="bash scripts/e165-replay-mutation-kill-bounds.sh --recheck --item tsv-40" title=合成变体二 complete=yes',
-    'E7RESULT name=kill_bound item=Z1 table=scripts/mutations/e165_replay_bounded_enumeration_custom.tsv table_row=2 rows_sharing_this_replacement=2 '
+    'copy_restored=true rerun="bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --recheck --item tsv-40" title=合成变体二 complete=yes',
+    'E7RESULT name=kill_bound item=Z1 table=scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv table_row=2 rows_sharing_this_replacement=2 '
     'outcome=red_only_by_implementation_anchor first_clause_red=none first_anchor_red=U_verify_off:2:IA2 other_difference_before_any_red=none '
     'not_red_domains=X(≤5) legal_family_minimum=none adversarial_family_minimum=none run_exit=0 copy_restored=true '
-    'rerun="bash scripts/e165-replay-mutation-kill-bounds.sh --recheck --item Z1" title=合成变体三 complete=yes',
+    'rerun="bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --recheck --item Z1" title=合成变体三 complete=yes',
     'E7RESULT name=kill_bound item=tsv-50 table=crates/mutations.tsv table_row=50 rows_sharing_this_replacement=50 outcome=not_red_within_bounds '
     'first_clause_red=none first_anchor_red=none other_difference_before_any_red=none not_red_domains=X(≤5),L(≤8) legal_family_minimum=none '
-    'adversarial_family_minimum=none run_exit=0 copy_restored=true rerun="bash scripts/e165-replay-mutation-kill-bounds.sh --recheck --item tsv-50" '
+    'adversarial_family_minimum=none run_exit=0 copy_restored=true rerun="bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --recheck --item tsv-50" '
     'title=合成变体四 complete=yes',
     "E7RESULT name=verdict scope=segment2 variants=5 variants_excluding_baseline=4 red=2 red_only_by_implementation_anchor=1 not_red_within_bounds=1 invalid=0 run_did_not_finish=0",
     "E7RESULT name=done emitted=8",

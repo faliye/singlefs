@@ -1,5 +1,5 @@
 """E171（三oracle合谋测试） 比对器与驱动共用的结果行协议：每行以 `E7RESULT ` 起头，收尾 `E7RESULT name=done emitted=N`
-（N 把 config 行与 done 行自己都算进去，同 scripts/replay.sh 的完整性闸 2）。不带耗时的行两次跑逐字节相同才登记得进 replay；
+（N 把 config 行与 done 行自己都算进去，同 scripts/experiments/replay.sh 的完整性闸 2）。不带耗时的行两次跑逐字节相同才登记得进 replay；
 耗时行以 `E7TIMING ` 起头，不计数、不进入库产物。
 """
 

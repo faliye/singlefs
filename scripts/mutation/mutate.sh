@@ -2,7 +2,7 @@
 # admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
 # run-condition: command cargo git python3
 # 证明「这些测试会红」：逐条注入一个已知的破坏，跑测试，记下红了哪几个，然后还原。
-# 红了哪几个（libtest 的「test <名字>[ - should panic] ... FAILED」行）与汇总行报没报失败，经 scripts/lib_libtest_result_lines.py failed-names 取（全仓一份解析）：
+# 红了哪几个（libtest 的「test <名字>[ - should panic] ... FAILED」行）与汇总行报没报失败，经 scripts/gate/lib_libtest_result_lines.py failed-names 取（全仓一份解析）：
 #   #[should_panic] 的用例那一段「 - should panic」不进名字；汇总行报了失败而一个名字都没取到，它退 3，这里记「抓名字的规则有盲区」。
 #
 #   mutate.sh <bin 名> <源文件> <变异表>      # 在 research/ 里跑；参数不够三个退 2，打用法与一条例子
@@ -27,8 +27,8 @@
 #   不带的话 cargo 不编这个 bin、直接退 101，基线停在「基线就是红的」，一条变异都没跑。
 #   那几个 feature 的依赖要的环境（E162 的 rocksdb 要 BINDGEN_EXTRA_CLANG_ARGS）由调用方设，原样传给 cargo。
 #
-# gate-overlap:copy-kept scripts/crates-mutation-rows.py 开几个工作进程（worker_count_and_head_line）照那边的 worker_count_for 写：各项取最小、至少 1、核数一半至多 16；两边的项不同（这里 MUTATE_JOBS 只能压小、第二项是表里的条数、另算每个 cargo 的编译并行度；那边 GATE_MUTATION_WORKERS 顶掉核数那一项、第二项是要现跑的条数），派活一边是 bash 子 shell 按目录认领、一边是 python 进程池，共用的只剩一个取最小值，抽成共用要这里每趟多起一个 python 只为算一个数、两边头一行的字也不同
-# 并行（command-safety.md「一个脚本里的检测项，能并行就并行」，形态照 .claude/gate.d/checker-tier-crates-mutation-replay.sh 与它的判法 scripts/crates-mutation-rows.py）：
+# gate-overlap:copy-kept scripts/mutation/crates-mutation-rows.py 开几个工作进程（worker_count_and_head_line）照那边的 worker_count_for 写：各项取最小、至少 1、核数一半至多 16；两边的项不同（这里 MUTATE_JOBS 只能压小、第二项是表里的条数、另算每个 cargo 的编译并行度；那边 GATE_MUTATION_WORKERS 顶掉核数那一项、第二项是要现跑的条数），派活一边是 bash 子 shell 按目录认领、一边是 python 进程池，共用的只剩一个取最小值，抽成共用要这里每趟多起一个 python 只为算一个数、两边头一行的字也不同
+# 并行（command-safety.md「一个脚本里的检测项，能并行就并行」，形态照 .claude/gate.d/checker-tier-crates-mutation-replay.sh 与它的判法 scripts/mutation/crates-mutation-rows.py）：
 #   每个工作进程一份被测装置的副本（research/ 里编译要用的那部分）、一个自己的 CARGO_TARGET_DIR，不在同一份源码上并发改：
 #   第 1 个用 MUTATE_TARGET_DIR（跨轮热着），第 i 个用它后面加 -w<i>（跨轮复用，第一次要冷编译）。
 #   工作进程数取 min(核数的一半且至多 16、表里的条数)，至少 1；MUTATE_JOBS 只能压小、不能加大（设成 1 就是原来的串行跑法）。
@@ -53,7 +53,7 @@
 #   基线就是红的（退 2）：stderr 点出红的测试名（libtest 的「test <名字> ... FAILED」行）、打基线输出末尾 15 行，
 #   整份基线输出拷到 ${TMPDIR:-/tmp}/singlefs-mutate-baseline-XXXXXX.log 留着（点出路径，看完自己删），再给单独重现的命令。
 #
-# 每次 cargo test（基线、每条变异、还原之后那一次）都放进内存上限里跑（scripts/run-with-memory-cap.sh：systemd 的临时 scope，
+# 每次 cargo test（基线、每条变异、还原之后那一次）都放进内存上限里跑（scripts/hosts/run-with-memory-cap.sh：systemd 的临时 scope，
 # MemoryMax=<上限>、MemorySwapMax=0），撞上限只杀这一次 cargo test 里的进程，不把整机拖进 OOM
 # （2026-09-25 两次整机 OOM 连带杀掉本地模型服务与 Claude Code 会话，records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。
 #   MUTATE_MEMORY_MAX  上限，systemd 写法，默认 16G。依据：本机 60 GiB 内存，本地模型服务连同会话常驻约 12 GiB
@@ -247,7 +247,7 @@ FAKE_DAILY_WRAPPER
   # $2 被测源码里写的 BEHAVIOR（默认 PASS）；$3 bin 那一节追加的一行（默认不加，required-features 那一例给它挂 feature）
   prepare_case() {
     local case_directory="$scratch/$1" behavior="${2:-PASS}" bin_extra_line="${3:-}"
-    mkdir -p "$case_directory/bin" "$case_directory/research/bench/src/bin" "$case_directory/scripts/mutations" "$case_directory/memory-cap-state"
+    mkdir -p "$case_directory/bin" "$case_directory/research/bench/src/bin" "$case_directory/scripts/mutation/tables" "$case_directory/memory-cap-state"
     cat >"$case_directory/bin/cargo" <<'FAKE_CARGO'
 #!/usr/bin/env bash
 # 假 cargo：只认 mutate.sh 调的 `cargo test --release --bin <名字>`，按被测源码里的 BEHAVIOR 演一种结局；
@@ -283,7 +283,7 @@ FAKE_CARGO
     printf '[package]\nname = "bench"\n\n[[bin]]\nname = "fake-bench"\npath = "src/bin/fake_bench.rs"\n' >"$case_directory/research/bench/Cargo.toml"
     [[ -n "$bin_extra_line" ]] && printf '%s\n' "$bin_extra_line" >>"$case_directory/research/bench/Cargo.toml"
     printf '// 注释行\nfn main() {} // BEHAVIOR: %s\n' "$behavior" >"$case_directory/research/bench/src/bin/fake_bench.rs"
-    local tables="$case_directory/scripts/mutations"
+    local tables="$case_directory/scripts/mutation/tables"
     printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n没红\t// 注释行\t// 改过的注释行\n撞内存\tBEHAVIOR: PASS\tBEHAVIOR: HOG\n超时\tBEHAVIOR: PASS\tBEHAVIOR: HANG\n无效\tBEHAVIOR: PASS\tBEHAVIOR: BROKEN\n' \
       >"$tables/every-outcome.tsv"
     printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n撞内存\tBEHAVIOR: PASS\tBEHAVIOR: HOG\n' >"$tables/caught-and-memory.tsv"
@@ -517,7 +517,7 @@ FAKE_CARGO
   checked=$((checked + 1))
   status="$(cat "$scratch/usage.rc")"
   if [[ "$status" != 2 ]] || ! grep -qF "要三个参数，给了 1 个" "$scratch/usage.stderr" \
-     || ! grep -qF "→ 怎么办：在 research/ 目录里照这个例子跑：bash scripts/mutate.sh " "$scratch/usage.stderr" \
+     || ! grep -qF "→ 怎么办：在 research/ 目录里照这个例子跑：bash scripts/mutation/mutate.sh " "$scratch/usage.stderr" \
      || grep -qF "unbound variable" "$scratch/usage.stderr" || [[ -s "$scratch/usage.cargo" ]]; then
     fail "参数不够三个时应当退 2、打用法与一条例子、不报 unbound variable、一次 cargo 都不调，实际退 $status：$(cat "$scratch/usage.stderr")"
   fi
@@ -597,7 +597,7 @@ FAKE_CARGO
     mkdir -p "$tooling/scripts" "$scratch/$label/daily-ledger"
     ln -s "$repository_root/.claude" "$tooling/.claude"
     if [[ -n "$BROKEN_JUDGEMENT" ]]; then
-      BAKED="$BROKEN_JUDGEMENT" SOURCE="$SELF_PATH" DESTINATION="$tooling/scripts/mutate.sh" python3 - <<'PY' || return 1
+      BAKED="$BROKEN_JUDGEMENT" SOURCE="$SELF_PATH" DESTINATION="$tooling/scripts/mutation/mutate.sh" python3 - <<'PY' || return 1
 import os, shlex, sys
 old = 'BROKEN_JUDGEMENT="${MUTATE_BREAK:-}"\n'
 with open(os.environ["SOURCE"], encoding="utf-8") as handle:
@@ -608,16 +608,16 @@ with open(os.environ["DESTINATION"], "w", encoding="utf-8") as handle:
     handle.write(text.replace(old, "BROKEN_JUDGEMENT=%s\n" % shlex.quote(os.environ["BAKED"])))
 PY
     else
-      cp -- "$SELF_PATH" "$tooling/scripts/mutate.sh" || return 1
+      cp -- "$SELF_PATH" "$tooling/scripts/mutation/mutate.sh" || return 1
     fi
-    cp -- "$scratch/fake-daily-memory-cap.sh" "$tooling/scripts/run-with-memory-cap.sh" || return 1
-    cp -- "$LIBTEST_RESULT_LINES" "$tooling/scripts/lib_libtest_result_lines.py" || return 1   # 副本取红了哪几个要它
+    cp -- "$scratch/fake-daily-memory-cap.sh" "$tooling/scripts/hosts/run-with-memory-cap.sh" || return 1
+    cp -- "$LIBTEST_RESULT_LINES" "$tooling/scripts/gate/lib_libtest_result_lines.py" || return 1   # 副本取红了哪几个要它
     printf 'mutate-selftest-session %s\n' "$$" >"$scratch/$label/daily-ledger/already-running.entry"
   }
   run_daily_case() {
     local label="$1" table="$2"
     shift 2
-    case_script="$scratch/$label/tooling/scripts/mutate.sh"
+    case_script="$scratch/$label/tooling/scripts/mutation/mutate.sh"
     run_case "$label" "$table" "${daily_environment[@]}" FAKE_DAILY_LEDGER="$scratch/$label/daily-ledger" FAKE_DAILY_LOG="$scratch/$label.daily" "$@"
     case_script="$SELF_PATH"
     touch "$scratch/$label.daily"
@@ -734,7 +734,7 @@ fi
 if (($# < 3)) && ! is_broken bareusage; then
   echo "mutate: 要三个参数，给了 $# 个；用法：mutate.sh <bin 名> <源文件> <变异表>" >&2
   echo "        <bin 名> 是 Cargo.toml 里 [[bin]] 的 name（没写 [[bin]] 的是源文件名去掉 .rs）；<源文件> 与 <变异表> 都相对当前目录（research/）" >&2
-  echo "        → 怎么办：在 research/ 目录里照这个例子跑：bash scripts/mutate.sh e172-deletion-write-dry-run scripts/experiments/e172_deletion_write_dry_run.rs mutations/e172_deletion_write_dry_run.tsv" >&2
+  echo "        → 怎么办：在 research/ 目录里照这个例子跑：bash scripts/mutation/mutate.sh e172-deletion-write-dry-run scripts/experiments/e172_deletion_write_dry_run.rs mutations/e172_deletion_write_dry_run.tsv" >&2
   exit 2
 fi
 BIN="$1"; SRC="$2"; TABLE="$3"
@@ -1313,7 +1313,7 @@ fi
 echo "计数：内存撞顶 $memory_hit_count 条（上限 $MEMORY_MAX）、超时 $timeout_count 条、排不上 $queue_full_count 条、被总上限挤掉 $squeezed_count 条、显存不够 $gpu_memory_count 条"
 if ((queue_full_count + squeezed_count + gpu_memory_count)); then
   echo "mutate: $queue_full_count 条排不上（包装退 $MEMORY_ADMISSION_REFUSED_EXIT）、$squeezed_count 条被总上限挤掉（包装退 $SLICE_TOTAL_HIT_EXIT）、$gpu_memory_count 条显存不够（包装退 $GPU_MEMORY_HIT_EXIT），这几条没判，整轮判失败" >&2
-  echo "        → 怎么办：bash scripts/run-with-memory-cap.sh --status 看 slice 里谁占着，等它们跑完再整张表重跑；不许拿掉上限去跑" >&2
+  echo "        → 怎么办：bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 里谁占着，等它们跑完再整张表重跑；不许拿掉上限去跑" >&2
 fi
 
 # 还原之后那一次：每个工作进程领完之后在自己的副本上各跑了一次

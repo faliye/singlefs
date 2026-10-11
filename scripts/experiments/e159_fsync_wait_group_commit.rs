@@ -3065,7 +3065,7 @@ fn jia_outcome_single_device_bytes(outcome: &JiaPublishOutcome) -> u64 {
 
 /// 诊断用：把 B1–B4 用到的几格期望值打出来，供人眼核对；判据本身钉在单测里
 /// （`anchors_match_prereg_section_seven` 等，第七节 7.2），不靠这条命令的输出。
-/// 纯算术、不碰真设备、不含任何计时字段——`scripts/replay.sh` 拿它逐字节复跑
+/// 纯算术、不碰真设备、不含任何计时字段——`scripts/experiments/replay.sh` 拿它逐字节复跑
 /// （E159 装置还没有正式计时产物时，这是唯一能稳定逐字节复现的一份）。
 fn print_anchors() {
     let mut emitter = Emitter::new();
@@ -3099,7 +3099,7 @@ struct CliArguments {
 }
 const KNOWN_SUBCOMMANDS: [&str; 3] = ["anchors", "cell", "probe-device"];
 
-/// `scripts/vm-bench.sh` 按 `.claude/kb/vm-harness.md`「挂几块盘」的约定，
+/// `scripts/devices/vm-bench.sh` 按 `.claude/kb/vm-harness.md`「挂几块盘」的约定，
 /// 把设备路径按顺序当成前缀参数塞在最前面、我们自己的参数跟在后面——
 /// 所以在找到第一个认得出的子命令之前，把前面的位置参数都当成设备路径，
 /// 第一个当默认 `--device`（后面出现的 `--device` 可以覆盖它）。

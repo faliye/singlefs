@@ -27,7 +27,7 @@ r"""全仓术语改名：把一个概念的旧名换成新名，源码、文档�
 指向不存在的路径、行内锚命中 0 行或不止一行，都退 2（不起作用的豁免项会让人以为那批文件已经被绕开了，判据与 `.claude/doc-lint-exclude` 同）。
 
 扫哪些文件：根在 git 工作树里时只扫 `git ls-files --cached --others --exclude-standard` 列出的（跟踪的，加未跟踪而未忽略的），
-git 忽略的（`multi-host.env`、`scripts/memory-peaks.tsv` 这类本机私有的）不读、不改；不在 git 工作树里时走整棵目录树
+git 忽略的（`multi-host.env`、`scripts/hosts/memory-peaks.tsv` 这类本机私有的）不读、不改；不在 git 工作树里时走整棵目录树
 （跳过 .git、target、node_modules）。根下有 `.git` 而 git 起不来、判不出是不是工作树，或 `git ls-files` 失败：退 2，不退回走整棵树。
 
 已归档产物的文件名不换也不报：一个文件名形态的串（`名字.out` / `.log` / `.txt` / `.tsv` / `.json` / `.csv`，名字从一段 `[A-Za-z0-9_.-]` 连续串的开头起认），
@@ -421,14 +421,14 @@ def sweep(root, apply_changes, defer=(), tally=None):
             print("     → 怎么办：按每份后面那行「→ 怎么办」处理（多半是有多个硬链接或当前用户只读），再跑一次 --apply；")
             print("               已经换好的那些搜不出旧名，不会重复换。")
             return 3
-        print("     → 下一步：cargo build 与 cargo test --workspace，再 bash scripts/replay.sh 全量复跑，")
+        print("     → 下一步：cargo build 与 cargo test --workspace，再 bash scripts/experiments/replay.sh 全量复跑，")
         print("               产物必须仍然逐字节一致 —— 源码与产物一起换，这一条才成立，要跑出来看，不能声称。")
         return 0
     if occurrences:
         for count, relative in sorted(worst, reverse=True)[:20]:   # gate-lint:detail
             print("      %-72s %d 处" % (relative, count))
         print("  ✗ 全仓还有 %d 份文件、%d 处旧名（登记的改名 %d 条、豁免 %d 条与按行豁免 %d 行不算；范围：%s）" % (files, occurrences, len(pairs), len(entries), exempt_line_count, listing_note))
-        print("     → 怎么办：跑 python3 scripts/sweep-term.py --apply 换掉；")
+        print("     → 怎么办：跑 python3 scripts/kb/sweep-term.py --apply 换掉；")
         print("               确实该留旧名的，登记进 .claude/term-rename-exempt 并写明为什么：整份都该留的写路径，")
         print("               只有一句该留的写 <路径>:「<那一行里的一段原文>」只豁免那一行。")
         return 1
@@ -727,7 +727,7 @@ def check_git_listing():
     with tempfile.TemporaryDirectory() as root:
         write_selftest_tables(root, [("超级块", "系统配置", "整串", "中文")], [])
         ignored = {"multi-host.env": "PEER_REPOSITORY_DIRECTORY=/home/peer/超级块\n",
-                   os.path.join("scripts", "memory-peaks.tsv"): "超级块\t1G\n"}
+                   os.path.join("scripts", "hosts", "memory-peaks.tsv"): "超级块\t1G\n"}
         os.makedirs(os.path.join(root, "scripts"))
         with open(os.path.join(root, ".gitignore"), "w", encoding="utf-8") as handle:
             handle.write("multi-host.env\nmemory-peaks.tsv\n")

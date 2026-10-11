@@ -63,11 +63,11 @@ device_step() {
   product=$(own "$name"); timing=$(own_timing "$name")
   refuse_existing "$product"; refuse_existing "$timing"
   if [ "$PRINT_ONLY" = 1 ]; then
-    show nice -n 19 bash scripts/run-with-memory-cap.sh "$cap" bash scripts/capped.sh "$THREADS" python3 -B "$TIMING" run -- "$binary" "$@"
+    show nice -n 19 bash scripts/hosts/run-with-memory-cap.sh "$cap" bash scripts/hosts/capped.sh "$THREADS" python3 -B "$TIMING" run -- "$binary" "$@"
     echo "    → 产物 $product，计时 $timing"; return "$EXPECTED_EXIT"
   fi
   snapshot_check
-  nice -n 19 bash scripts/run-with-memory-cap.sh "$cap" bash scripts/capped.sh "$THREADS" \
+  nice -n 19 bash scripts/hosts/run-with-memory-cap.sh "$cap" bash scripts/hosts/capped.sh "$THREADS" \
     python3 -B "$TIMING" run -- "$binary" "$@" > "$UNIT_LOG.$name.stdout" 2> "$UNIT_LOG.$name.stderr"
   code=$?
   ( set -o noclobber; grep '^E7RESULT' "$UNIT_LOG.$name.stdout" > "$product"; grep '^E7TIMING' "$UNIT_LOG.$name.stdout" > "$timing" )
@@ -202,7 +202,7 @@ unit_step_3() {
       local product
       product=$(own positive-control-o3-p1); refuse_existing "$product"
       freeze_check
-      logged nice -n 19 bash scripts/run-with-memory-cap.sh "$CAP_SMALL" bash scripts/capped.sh "$THREADS" python3 -B "$RESEARCH/o3_bad_image_judge.py" control \
+      logged nice -n 19 bash scripts/hosts/run-with-memory-cap.sh "$CAP_SMALL" bash scripts/hosts/capped.sh "$THREADS" python3 -B "$RESEARCH/o3_bad_image_judge.py" control \
         --repo-root "$REPO" --dumps "$DUMPS/$S2_BASELINE" --e170-dumps "$DUMPS/$E170_SECOND_RUN" --row-name P1-F --output "$product" \
         || stop "O3 阳性对照没跑完（日志 $UNIT_LOG）"
       note_product "$product"
@@ -349,8 +349,8 @@ unit_research_mutations() {
   product=$(own research-mutations); refuse_existing "$product"
   x mkdir -p "$WORK_ROOT"
   [ "$PRINT_ONLY" = 1 ] && show cd "$RESEARCH"
-  ( { [ "$PRINT_ONLY" = 1 ] || cd "$RESEARCH"; } && logged nice -n 19 bash "$REPO/scripts/capped.sh" "$THREADS" python3 -B mutation_driver.py \
-      --table "$REPO/scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv" --scratch "$WORK_ROOT" --output "$REPO/$product" ) \
+  ( { [ "$PRINT_ONLY" = 1 ] || cd "$RESEARCH"; } && logged nice -n 19 bash "$REPO/scripts/hosts/capped.sh" "$THREADS" python3 -B mutation_driver.py \
+      --table "$REPO/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv" --scratch "$WORK_ROOT" --output "$REPO/$product" ) \
     || stop "研究一侧变异表没过（见 $product 的 verdict 行）"
   note_product "$product"
 }

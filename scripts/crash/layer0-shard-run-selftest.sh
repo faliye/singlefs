@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/layer0-shard-run.sh --selftest 的本体：不碰第二台。拷一份仓进临时目录、git init，登记一条 shard=across-machines 的用例，
+# scripts/crash/layer0-shard-run.sh --selftest 的本体：不碰第二台。拷一份仓进临时目录、git init，登记一条 shard=across-machines 的用例，
 # 「第二台」是本机上的另一个目录（只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1），本机两个进程各跑一片，走驱动脚本同一条路：
 # 工具链与输入指纹两边比、清场（回读；跑完不复原）、两片、拷账本、merge、判、写 checker-tier-layer0-replay 那一格全绿标记。
 # 默认用假 cargo（不编译、不跑用例）：登记的是临时仓里新写的一条标了 #[ignore] 的替身用例，三趟都不带 --include-ignored，不算重型；
@@ -15,7 +15,7 @@
 #   ⑦ 发现日志：--merged-log 时三趟各有一份，merge 那一份是 <日志文件>.findings.tsv（一节、begin 行不带 shard=、有 summary），
 #      两片的在各自日志旁边（begin 行带 shard=0/2、shard=1/2），第二台上那一份拷回之后删了，三份路径都打进驱动的输出；单独跑时三份在 common-dir 下这一趟的目录里
 # 假 cargo 设了 SINGLEFS_LAYER0_FINDINGS_FILE 就往里追加一节（行格式照 crates/singlefs-checker-tier/src/crash.rs 的发现日志），标准输出另打一行 LAYER0_FINDINGS。
-#   ⑧ 第二台那一片经 scripts/run-with-memory-cap.sh 起（上限是配置的 PEER_MEMORY_CAP）：假 cargo 在 1/2 那一片记下自己的 cgroup，
+#   ⑧ 第二台那一片经 scripts/hosts/run-with-memory-cap.sh 起（上限是配置的 PEER_MEMORY_CAP）：假 cargo 在 1/2 那一片记下自己的 cgroup，
 #      要在 singlefs-memory-cap- 那个 scope 里；驱动的输出里那一行写着经它起；配置缺 PEER_MEMORY_CAP、写成不带单位的数，配置判法拒
 #   ⑨ 树里没有规范副本 .claude/singlefs-ai-sop/（HEAD + 暂存区的 worktree 就是这样：它在 .gitignore 里）：树是临时仓的一个 orphan worktree，
 #      「第二台」那棵树 git init 过、找不回主仓；驱动在 ② 把驱动所在主仓（临时仓）的规范副本拷过去，第二台算得出同一个输入指纹，判绿，这一趟的树删了
@@ -54,7 +54,7 @@
 # 自证起的命令不算进调用方会话的「日常一条」：开头清掉 CLAUDE_CODE_SESSION_ID（照 run-with-memory-cap.sh 自证 in_context 的写法；本机当第二台时
 #   驱动起的那几条包装带着整份环境，调用方的会话里已有一条日常的在跑就退 252）。为了每次都判得到，假 cargo 模式下自证用假会话号经真包装占一条
 #   日常的（16M 的 sleep），① 那一趟前后都在跑。
-#   ⑭ 双机开关（定义在 scripts/layer0-shard-configuration-check.sh）：配置齐、「第二台」连得上、写了 ENABLE_ACROSS_MACHINES=1 ⇒ 判法退 0、报「双机：开，GPU：关」，
+#   ⑭ 双机开关（定义在 scripts/crash/layer0-shard-configuration-check.sh）：配置齐、「第二台」连得上、写了 ENABLE_ACROSS_MACHINES=1 ⇒ 判法退 0、报「双机：开，GPU：关」，
 #      --emit-assignments 打 ENABLE_ACROSS_MACHINES=1 与没写的 ENABLE_GPU=0；去掉那一行（没写开关）⇒ 判法报「双机：关」退 3（不是「不能用」的报错），
 #      --emit-assignments 同样退 3、不打赋值
 #   ⑮ 开关写了 0、1 之外的值（ENABLE_ACROSS_MACHINES=yes、ENABLE_GPU=2）⇒ 判不过（退 1），说出是哪个键
@@ -350,8 +350,8 @@ else
   session_settings=(-u CLAUDE_CODE_SESSION_ID)
 fi
 unset CLAUDE_CODE_SESSION_ID
-driver="$copy/scripts/layer0-shard-run.sh"
-admission_module="$copy/scripts/admission.py"
+driver="$copy/scripts/crash/layer0-shard-run.sh"
+admission_module="$copy/scripts/gate/admission.py"
 
 # 不分片跑一次那条用例：计数行是 merge 之后要逐字相同的那一行
 (cd "$copy" && cargo test --release -p "$selftest_package" --test "$selftest_target" -- --exact "$selftest_function" --nocapture) > "$work/unsharded.log" 2>&1
@@ -367,7 +367,7 @@ if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
   # 假会话号里先占一条日常的（明写等待上限：slice 一时放不下就排队），① 那一趟前后都在跑
   env -u SINGLEFS_HEAVY_TESTS CLAUDE_CODE_SESSION_ID="$fake_session" RUN_WITH_MEMORY_CAP_WAIT_SECONDS=600 RUN_WITH_MEMORY_CAP_PEAKS="$work/holder-peaks.tsv" \
     RUN_WITH_MEMORY_CAP_KEY="layer0-shard-run.sh 自证 ①：同一个会话里先占着的一条" \
-    bash "$copy/scripts/run-with-memory-cap.sh" 16M bash -c 'echo "$$" > "$0"; exec sleep 600' "$work/holder.pid" > "$work/holder.out" 2>&1 &
+    bash "$copy/scripts/hosts/run-with-memory-cap.sh" 16M bash -c 'echo "$$" > "$0"; exec sleep 600' "$work/holder.pid" > "$work/holder.out" 2>&1 &
   holder_pid=$!
   for ((holder_rounds = 0; holder_rounds < 6100; holder_rounds++)); do
     [[ -s "$work/holder.pid" ]] && break
@@ -413,12 +413,12 @@ expect "① 清了场（回读过），第二台这一趟的目录删了" \
 
 # ⑧ 第二台那一片经内存包装起
 peer_cap_problems=()
-grep -qF "第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 bash scripts/run-with-memory-cap.sh $peer_memory_cap 起" "$work/standalone.log" \
+grep -qF "第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 bash scripts/hosts/run-with-memory-cap.sh $peer_memory_cap 起" "$work/standalone.log" \
   || peer_cap_problems+=("驱动的输出里 ④ 那一行没写第二台那一片经 run-with-memory-cap.sh $peer_memory_cap 起")
 if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]] && ! grep -q 'singlefs-memory-cap-' "$work/peer-cgroup" 2>/dev/null; then
   peer_cap_problems+=("假 cargo 在第二台那一片记下的 cgroup 不在 singlefs-memory-cap- 的 scope 里：$(tr '\n' ' ' < "$work/peer-cgroup" 2>/dev/null)")
 fi
-expect "⑧ 第二台那一片经 scripts/run-with-memory-cap.sh 起（上限是配置的 PEER_MEMORY_CAP=$peer_memory_cap）" "${#peer_cap_problems[@]}" \
+expect "⑧ 第二台那一片经 scripts/hosts/run-with-memory-cap.sh 起（上限是配置的 PEER_MEMORY_CAP=$peer_memory_cap）" "${#peer_cap_problems[@]}" \
   "$(IFS='；'; echo "${peer_cap_problems[*]}")"
 unset LAYER0_SHARD_SELFTEST_PEER_CGROUP
 
@@ -432,7 +432,7 @@ else
   [[ "$peer_build_record" == *" memory.max=$(gibibytes_in_bytes "$peer_build_memory_cap")" ]] \
     || build_cap_problems+=("第二台编译那一趟的 memory.max 不是编译的上限 $peer_build_memory_cap（$(gibibytes_in_bytes "$peer_build_memory_cap") 字节）：$peer_build_record")
 fi
-grep -qF "第二台的编译经 bash scripts/run-with-memory-cap.sh $peer_build_memory_cap）" "$work/standalone.log" \
+grep -qF "第二台的编译经 bash scripts/hosts/run-with-memory-cap.sh $peer_build_memory_cap）" "$work/standalone.log" \
   || build_cap_problems+=("驱动 ④ 那一行没写第二台的编译经 run-with-memory-cap.sh $peer_build_memory_cap")
 expect "⑯ 第二台编测试二进制经 run-with-memory-cap.sh、在编译的上限 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP=$peer_build_memory_cap 里，不在那一片的 PEER_MEMORY_CAP=$peer_memory_cap 里" \
   "${#build_cap_problems[@]}" "$(IFS='；'; echo "${build_cap_problems[*]}")"
@@ -528,7 +528,7 @@ expect "⑧ 配置缺 PEER_MEMORY_CAP、写成不带单位的 16 ⇒ 配置判�
   "缺键退 $missing_memory_cap_exit（$(tail -3 "$work/missing-memory-cap.log" | tr '\n' '|')），不带单位退 $unitless_memory_cap_exit（$(tail -3 "$work/unitless-memory-cap.log" | tr '\n' '|')）"
 
 # ⑭ 双机开关：写了 1 ⇒ 开；没写 ⇒ 双机：关（退 3，不是判不过）
-configuration_check="$copy/scripts/layer0-shard-configuration-check.sh"
+configuration_check="$copy/scripts/crash/layer0-shard-configuration-check.sh"
 SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" bash "$configuration_check" "$copy" > "$work/switch-on.log" 2>&1
 switch_on_exit=$?
 SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" bash "$configuration_check" --emit-assignments "$copy" > "$work/switch-on-emit.log" 2>&1
@@ -565,12 +565,12 @@ expect "⑥ 没登记 shard=across-machines 的用例 ⇒ 拒（退 1），出�
   "退 $not_shardable_exit；输出：$(tail -3 "$work/not-shardable.log" | tr '\n' '|')"
 
 # ⑨ 树里没有规范副本、「第二台」那棵树找不回主仓：树是临时仓的 orphan worktree（git common-dir 指回临时仓，本机的准入模块从临时仓找得到规范副本），
-# 文件按硬链接从临时仓铺过去、不带规范副本；驱动用这棵树里的那一份（与门禁 checker-tier-layer0-replay --full 调 $ROOT/scripts/layer0-shard-run.sh 同形）
+# 文件按硬链接从临时仓铺过去、不带规范副本；驱动用这棵树里的那一份（与门禁 checker-tier-layer0-replay --full 调 $ROOT/scripts/crash/layer0-shard-run.sh 同形）
 tree_without_sop_copy="$work/tree-without-sop-copy"
 peer_runs_before_sop_cell="$(ls -A "$work/peer/runs" 2>/dev/null)"
 if git -C "$copy" worktree add -q --orphan -b layer0-shard-selftest-tree "$tree_without_sop_copy" > "$work/worktree-add.log" 2>&1 \
     && rsync -a --link-dest="$copy" --exclude target --exclude .git --exclude /.claude/singlefs-ai-sop "$copy/" "$tree_without_sop_copy/" >> "$work/worktree-add.log" 2>&1; then
-  bash "$tree_without_sop_copy/scripts/layer0-shard-run.sh" "$selftest_case_key" "$tree_without_sop_copy" > "$work/without-sop-copy.log" 2>&1
+  bash "$tree_without_sop_copy/scripts/crash/layer0-shard-run.sh" "$selftest_case_key" "$tree_without_sop_copy" > "$work/without-sop-copy.log" 2>&1
   without_sop_copy_exit=$?
 else
   without_sop_copy_exit="worktree-not-built（$(tail -3 "$work/worktree-add.log" | tr '\n' '|')）"
@@ -609,9 +609,9 @@ unitless_peer_cap_exit=$?
 unset LAYER0_SHARD_SELFTEST_PEER_CGROUP
 reserve_problems=()
 [[ $overridden_exit == 0 ]] || reserve_problems+=("设了两样那一趟退 $overridden_exit：$(tail -4 "$work/overridden.log" | tr '\n' '|')")
-grep -q '第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 RUN_WITH_MEMORY_CAP_RESERVE=10G bash scripts/run-with-memory-cap.sh ' "$work/overridden.log" \
+grep -q '第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 RUN_WITH_MEMORY_CAP_RESERVE=10G bash scripts/hosts/run-with-memory-cap.sh ' "$work/overridden.log" \
   || reserve_problems+=("设了余量那一趟，驱动 ④ 那一行没写第二台经 RUN_WITH_MEMORY_CAP_RESERVE=10G 起包装")
-grep -q '第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 bash scripts/run-with-memory-cap.sh ' "$work/standalone.log" \
+grep -q '第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 bash scripts/hosts/run-with-memory-cap.sh ' "$work/standalone.log" \
   || reserve_problems+=("没设余量的 ① 那一趟，驱动 ④ 那一行带了余量（或没经包装）")
 if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
   grep -qx 'reserve=10G' "$work/peer-cgroup-overridden" 2>/dev/null || reserve_problems+=("设了余量那一趟，第二台那一片记下的：$(grep '^reserve=' "$work/peer-cgroup-overridden" 2>/dev/null)")
@@ -620,7 +620,7 @@ fi
 expect "⑪ 本机设了 RUN_WITH_MEMORY_CAP_RESERVE=10G ⇒ 第二台那一条 run-with-memory-cap.sh 带同一个值；没设就不带" "${#reserve_problems[@]}" \
   "$(IFS='；'; echo "${reserve_problems[*]}")"
 peer_cap_override_problems=()
-grep -qF "第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 RUN_WITH_MEMORY_CAP_RESERVE=10G bash scripts/run-with-memory-cap.sh $peer_memory_cap_override 起" "$work/overridden.log" \
+grep -qF "第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 RUN_WITH_MEMORY_CAP_RESERVE=10G bash scripts/hosts/run-with-memory-cap.sh $peer_memory_cap_override 起" "$work/overridden.log" \
   || peer_cap_override_problems+=("设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=$peer_memory_cap_override 那一趟，驱动 ④ 那一行上限不是 $peer_memory_cap_override")
 if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
   grep -qx "memory.max=$(gibibytes_in_bytes "$peer_memory_cap_override")" "$work/peer-cgroup-overridden" 2>/dev/null \
@@ -834,7 +834,7 @@ fi
 
 if (( failures > 0 || not_run > 0 )); then
   echo "  ✗ layer0-shard-run.sh 自证没过：${failures} 格判错、${not_run} 格没跑成（共 ${checked} 格；没跑成的不算通过，照那一行写的原因重跑）"
-  echo "     → 怎么办：照上面每一格的说明改驱动脚本（scripts/layer0-shard-run.sh）或分片那一段（crates/singlefs-checker-tier/src/layer0_progress.rs、crash.rs）"
+  echo "     → 怎么办：照上面每一格的说明改驱动脚本（scripts/crash/layer0-shard-run.sh）或分片那一段（crates/singlefs-checker-tier/src/layer0_progress.rs、crash.rs）"
   exit 1
 fi
 echo "  ✓ layer0-shard-run.sh 自证通过：${checked} 格都对（${cargo_mode}；第二台是本机上的另一个目录，没碰真的第二台）"

@@ -1,5 +1,5 @@
-"""内存峰值表、取键与「这台此刻还放得下多少」的共用库：scripts/run-with-memory-cap.sh（内存包装）与
-scripts/host-dispatch.py（统一派发器）都 import 它，取键、读峰值表、读账、算余量只在这一份里写。
+"""内存峰值表、取键与「这台此刻还放得下多少」的共用库：scripts/hosts/run-with-memory-cap.sh（内存包装）与
+scripts/hosts/host-dispatch.py（统一派发器）都 import 它，取键、读峰值表、读账、算余量只在这一份里写。
 
 被 import 的库，不单独跑、不写准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md「不判的三类」）；
 import 本身不起子进程、不开文件。用法（脚本按路径跑时 sys.path[0] 就是这个目录；bash 里写 python3 -B -c 'import sys; sys.path.insert(0, <目录>); …'）：
@@ -11,8 +11,8 @@ import 本身不起子进程、不开文件。用法（脚本按路径跑时 sys
   两种都把制表符、换行换成空格，截到 KEY_LENGTH_LIMIT 个字。
 峰值表的口径与列见 run-with-memory-cap.sh 文件头「峰值表」一段；这里只读不写（写在包装那一边，同一把锁里）。
 账（${状态目录}/ledger/<unit>.json）与「还没涨到量的那一截」的算法见 run-with-memory-cap.sh 文件头「排队」一段；这里的函数就是那一段的实现。
-用时表（每条命令上一次跑了多久）：scripts/host-dispatch.py 派出去、跑完的那一条由它经 record_duration 记一行；
-  派发器与 scripts/host-resources.py 经 recorded_duration 读，判「历史用时超过 LONG_RUN_SECONDS 而只派到一台」。
+用时表（每条命令上一次跑了多久）：scripts/hosts/host-dispatch.py 派出去、跑完的那一条由它经 record_duration 记一行；
+  派发器与 scripts/hosts/host-resources.py 经 recorded_duration 读，判「历史用时超过 LONG_RUN_SECONDS 而只派到一台」。
   默认 ${XDG_STATE_HOME:-~/.local/state}/singlefs/run-durations.tsv（跨重启、不进仓），HOST_DISPATCH_DURATIONS 可换；键同峰值表。
   列见 DURATION_TABLE_HEADER；同一个键只留最近一次。峰值表不加这一列：在跑的旧包装只认四列与五列的峰值表。
 """
@@ -27,8 +27,8 @@ MEBIBYTE = 1024 * 1024
 KEY_LENGTH_LIMIT = 300
 TEST_BINARY_HASH = re.compile(r"-[0-9a-f]{16}\b")
 SIZE_UNITS = {"K": 1024, "M": MEBIBYTE, "G": 1024 * MEBIBYTE, "T": MEBIBYTE * MEBIBYTE}
-# 峰值表里查不到这条命令时按多少算（包装的 auto、派发器的预测都用它）：取 scripts/replay.sh 的 REPLAY_MEMORY_CAP 默认值，
-# 与 scripts/multi-host-run.sh 本机默认上限同一个数；本仓日常的 cargo test 与实验装置的峰值表里绝大多数在它以下。推的，没逐条量过
+# 峰值表里查不到这条命令时按多少算（包装的 auto、派发器的预测都用它）：取 scripts/experiments/replay.sh 的 REPLAY_MEMORY_CAP 默认值，
+# 与 scripts/hosts/multi-host-run.sh 本机默认上限同一个数；本仓日常的 cargo test 与实验装置的峰值表里绝大多数在它以下。推的，没逐条量过
 DEFAULT_MEMORY_PREDICTION_TEXT = "8G"
 DEFAULT_SLICE = "singlefs-heavy.slice"
 DEFAULT_RESERVE_TEXT = "20G"          # 与 run-with-memory-cap.sh 的 DEFAULT_RESERVE 同一个数，依据写在它文件头「余量」一段
@@ -36,7 +36,7 @@ DEFAULT_RESERVE_TEXT = "20G"          # 与 run-with-memory-cap.sh 的 DEFAULT_R
 # （records/2026-09-16-subagent拆分提案.md 第五十九节第 5 条）
 LONG_RUN_SECONDS = 2 * 3600
 DURATION_TABLE_HEADER = [
-    "# 每条命令上一次经 scripts/host-dispatch.py 派出去、跑完时的用时：派发器建、写，派发器与 scripts/host-resources.py 读（判长活只派一台），别手改。",
+    "# 每条命令上一次经 scripts/hosts/host-dispatch.py 派出去、跑完时的用时：派发器建、写，派发器与 scripts/hosts/host-resources.py 读（判长活只派一台），别手改。",
     "# 口径：派发器起派活那条链（multi-host-run.sh，带 --gpu 时连同清场包装）到它退出的挂钟秒数，向上取整；含拷树、排队与取回，偏大不偏小。",
     "#   那条链退 2、251、252、255（命令没跑成）或派发器收到 TERM / INT / HUP（跑到一半）的不记。只在派它的那台成立，不进仓。",
     "# 列（制表符分隔）：用时秒数、量的时刻（ISO 8601，Z 结尾）、那条链的退出码、跑在哪台（local / peer）、键（同内存峰值表）。",
@@ -67,7 +67,7 @@ def human(byte_count):
 
 
 def default_peak_table(script_directory):
-    """主仓的 scripts/memory-peaks.tsv（从 git worktree 里跑也读写主仓那一份）；不在 git 仓里用脚本所在目录的。"""
+    """主仓的 scripts/hosts/memory-peaks.tsv（从 git worktree 里跑也读写主仓那一份）；不在 git 仓里用脚本所在目录的。"""
     try:
         common_directory = subprocess.run(["git", "-C", script_directory, "rev-parse", "--path-format=absolute", "--git-common-dir"],
                                           capture_output=True, text=True, stdin=subprocess.DEVNULL).stdout.strip()
@@ -75,7 +75,7 @@ def default_peak_table(script_directory):
         common_directory = ""
     if common_directory and os.path.basename(common_directory) == ".git" \
             and os.path.isdir(os.path.join(os.path.dirname(common_directory), "scripts")):
-        return os.path.join(os.path.dirname(common_directory), "scripts", "memory-peaks.tsv")
+        return os.path.join(os.path.dirname(common_directory), "scripts", "hosts", "memory-peaks.tsv")
     return os.path.join(script_directory, "memory-peaks.tsv")
 
 

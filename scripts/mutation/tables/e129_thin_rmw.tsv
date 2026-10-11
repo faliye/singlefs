@@ -1,5 +1,5 @@
 # E129 判据 2 甲段（块内 COW 放大）—— 变异表
-# 被测装置是 shell 探针 scripts/e129-thin-rmw.sh。
+# 被测装置是 shell 探针 scripts/devices/e129-thin-rmw.sh。
 # 复跑方式：把「原文」换成「替换文」，跑一遍脚本，必须出现 name=fatal 且退出码非 0。
 M1_共享格不建快照	if [ "$shared" = 1 ]; then	if [ "$shared" = 2 ]; then
 # ⚠️ 等价变异留档：把 BLK_SECT 从 128 改成 256（块 64 KiB → 128 KiB）**抓不到，而且不该抓**——

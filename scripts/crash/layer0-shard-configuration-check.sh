@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 层 0 崩溃重放双机分片的本地配置：在不在、键齐不齐、写得对不对、
-# 第二台连不连得上、它上面有没有 cargo，双机与 GPU 两个开关开没开。门禁 checker-tier-layer0-replay --full 拿它定走不走分片；scripts/layer0-shard-run.sh 拿它当运行条件；
-# 门禁 checker-tier-crates-mutation-replay 的双机驱动 scripts/mutation-shard-run.sh 与通用跨机脚本 scripts/multi-host-run.sh --peer 读同一份。
-# PEER_MEMORY_CAP 是第二台那一片的内存上限（驱动脚本在第二台上经 scripts/run-with-memory-cap.sh 起那一片；本机那一片由起 checker-tier-layer0-replay 的那一层包装管），
+# 第二台连不连得上、它上面有没有 cargo，双机与 GPU 两个开关开没开。门禁 checker-tier-layer0-replay --full 拿它定走不走分片；scripts/crash/layer0-shard-run.sh 拿它当运行条件；
+# 门禁 checker-tier-crates-mutation-replay 的双机驱动 scripts/mutation/mutation-shard-run.sh 与通用跨机脚本 scripts/hosts/multi-host-run.sh --peer 读同一份。
+# PEER_MEMORY_CAP 是第二台那一片的内存上限（驱动脚本在第二台上经 scripts/hosts/run-with-memory-cap.sh 起那一片；本机那一片由起 checker-tier-layer0-replay 的那一层包装管），
 # 写法照 run-with-memory-cap.sh：正整数加 K / M / G / T，单位必写。
 #
 #   layer0-shard-configuration-check.sh [<仓根>]
@@ -12,7 +12,7 @@
 #       判法同上；双机开着时 stdout 改打配置里每个键的 bash 赋值（printf %q，调用方 eval；两个开关键没写的打成 0），不打那一句；
 #       双机关着时照样打「双机：关」那一句、退 3，不打赋值。
 #   layer0-shard-configuration-check.sh --emit-hosts [<仓根>]
-#       判法同上，只是不连任何一台（PEER_SSH_HOST 也不连）：清单里每一台连不连得上由调用方逐台报（scripts/host-resources.py 报「没读到」），
+#       判法同上，只是不连任何一台（PEER_SSH_HOST 也不连）：清单里每一台连不连得上由调用方逐台报（scripts/hosts/host-resources.py 报「没读到」），
 #       一台连不上不算整份配置坏。双机开着时 stdout 打 --emit-assignments 那几行，另打机器清单（下面「机器清单」）解出来的每一台：
 #       MULTI_HOST_COUNT=<除本机外几台>，以及第 2 台起每台的 MULTI_HOST_<号>_SSH_HOST、MULTI_HOST_<号>_REPOSITORY_DIRECTORY、
 #       MULTI_HOST_<号>_CARGO_BIN_DIRECTORY、MULTI_HOST_<号>_MEMORY_CAP（没写的打空串）、MULTI_HOST_<号>_IS_PEER（这台就是 PEER_SSH_HOST 打 1）。
@@ -23,7 +23,7 @@
 #   两个键只许写 0 或 1，写别的值判不过（退 1，说清是哪个键）。别的键缺一个都判不过，与开关开没开无关。
 #
 # 显卡的两个键（可以不写；用户 2026-10-10 定多机配置合成一份，私有显卡配置并进这一份）：GPU_CARDS_BY_PRIORITY、GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED。
-#   这里只认这两个键名、不判值（值的写法与判法在 scripts/crash-amplification-lib.sh 文件头「配置」与 crates/singlefs-checker-tier/src/gpu_card_configuration.rs），
+#   这里只认这两个键名、不判值（值的写法与判法在 scripts/crash/crash-amplification-lib.sh 文件头「配置」与 crates/singlefs-checker-tier/src/gpu_card_configuration.rs），
 #   --emit-assignments、--emit-hosts 不打它们。退役的 GPU_COMPUTATION_CLASSES 写进来照不认得的键判不过（开了 GPU 就三类全走 GPU，不再有正表）。
 #
 # 机器清单（可以不写；用户 2026-10-06 定「这样就不用限制多少台机器了」，键的定义只在这一份里）：
@@ -32,7 +32,7 @@
 #   HOST_<号>_REPOSITORY_DIRECTORY、HOST_<号>_CARGO_BIN_DIRECTORY   第 <号> 台上的目录（绝对路径），意思同 PEER_ 那两个；
 #   HOST_<号>_MEMORY_CAP          第 <号> 台的内存上限，写法同 PEER_MEMORY_CAP。三个都可以不写；<号> 从 2 起、不带前导 0、不超过清单的台数。
 #                                别名就是 PEER_SSH_HOST 的那一台，没写的按 PEER_ 那三个取。
-#   层 0 分片、变异分片与 multi-host-run.sh --peer 照旧只读 PEER_*（两台的老用法不变）；清单只给按台查资源的 scripts/host-resources.py 读（经 --emit-hosts）。
+#   层 0 分片、变异分片与 multi-host-run.sh --peer 照旧只读 PEER_*（两台的老用法不变）；清单只给按台查资源的 scripts/hosts/host-resources.py 读（经 --emit-hosts）。
 #
 # 配置文件：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}。主工作树的根按 git common-dir 取（在 HEAD + 暂存区的
 # 临时 worktree 里跑也读主工作树那一份）；文件 git 忽略、不进仓，模板是仓根的 multi-host.env.example。
@@ -41,7 +41,7 @@
 # 清场一对（QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND）与复原一对（QUIESCE_START_COMMAND、QUIESCE_STARTED_CHECK_COMMAND）各自要么都写、要么都空；
 #   两对之间不要求成对：各脚本清场之后都不复原，复原那一对只给用户手动复原用，写不写都判得过。
 # 弄坏开关 MULTI_HOST_CONFIGURATION_BREAK=<项>（只给证红用；打开时调用方的自证退 1）。这一份没有自证，红在两份调用方的 --selftest 里：
-#   scripts/layer0-shard-run.sh 与 scripts/multi-host-run.sh，两份的失败行都是「✗ <格名>：<细节>」。
+#   scripts/crash/layer0-shard-run.sh 与 scripts/hosts/multi-host-run.sh，两份的失败行都是「✗ <格名>：<细节>」。
 # 逐项写开关名、弄坏哪一处、打开后哪一份自证的哪几格红（项名是格名，前面写是哪一份；括号里抄细节的句首，随跑变的路径写成 …）：
 #   MULTI_HOST_CONFIGURATION_BREAK=switch-off-is-on  ENABLE_ACROSS_MACHINES 没写或写 0 也按开判
 #       layer0-shard-run.sh 的「⑭ 写了 ENABLE_ACROSS_MACHINES=1 ⇒ 退 0、双机：开，GPU：关，赋值里 ENABLE_GPU=0；没写开关 ⇒ 判法报「双机：关」退 3（不是判不过），
@@ -51,12 +51,12 @@
 #       layer0-shard-run.sh 的「⑮ 开关写了 0、1 之外的值（ENABLE_ACROSS_MACHINES=yes、ENABLE_GPU=2）⇒ 判不过（退 1），说出是哪个键」
 #         （「ENABLE_ACROSS_MACHINES=yes 退 3（双机：关（…）），ENABLE_GPU=2 退 0（双机：开，…）」）；multi-host-run.sh 的自证不红（没有写别的值的那一格）
 #   MULTI_HOST_CONFIGURATION_BREAK=hosts-key-unknown  HOSTS 与 HOST_<号>_* 当不认得的键（改前的样子）
-#       scripts/host-resources.py --selftest 的「hosts-list」「fits-on-host」两格（「…只报了 本机」「…实际结论「跑不起来：…」」）：配置判不过，只剩本机
+#       scripts/hosts/host-resources.py --selftest 的「hosts-list」「fits-on-host」两格（「…只报了 本机」「…实际结论「跑不起来：…」」）：配置判不过，只剩本机
 #   MULTI_HOST_CONFIGURATION_BREAK=hosts-reach-refuses  --emit-hosts 也逐台 ssh，清单里有一台连不上就判整份配置坏
-#       scripts/host-resources.py --selftest 的「hosts-list」「peer-unreachable」「host-timeout」三格（「…只报了 本机」「第二台应当没读到…」「时限 1 秒…」）
+#       scripts/hosts/host-resources.py --selftest 的「hosts-list」「peer-unreachable」「host-timeout」三格（「…只报了 本机」「第二台应当没读到…」「时限 1 秒…」）
 #   这两个开关打开时 layer0-shard-run.sh 与 multi-host-run.sh 的自证不红（它们的配置里没有 HOSTS，也不用 --emit-hosts）。
 #   MULTI_HOST_CONFIGURATION_BREAK=gpu-card-keys-unknown  显卡的两个键当不认得的键（并进多机配置之前的样子）
-#       scripts/crash-amplification-item.sh --selftest 的第 22 格（「多机配置写了显卡的两个键却判不过…」）；layer0-shard-run.sh 与 multi-host-run.sh 的自证不红（它们的配置里没有这两个键）
+#       scripts/crash/crash-amplification-item.sh --selftest 的第 22 格（「多机配置写了显卡的两个键却判不过…」）；layer0-shard-run.sh 与 multi-host-run.sh 的自证不红（它们的配置里没有这两个键）
 # 只供测试的开关：SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1 时不连第二台、不查它的 cargo（layer0-shard-run.sh --selftest 用，
 # 那时「第二台」是本机上的另一个目录）。
 #

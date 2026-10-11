@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 崩溃放量的两个驱动共用的那几段：读配置的开关与显卡配置、组 cargo 的参数与环境、在本机跑一趟用例、从日志里取派活计划的数。
-# 被 source 的函数库，只定义函数、不改 shell 选项，不单独调；scripts/crash-amplification-item.sh（一个分项的一趟）与
-# scripts/crash-amplification-two-hosts.sh（两台各领一份）source 它。
+# 被 source 的函数库，只定义函数、不改 shell 选项，不单独调；scripts/crash/crash-amplification-item.sh（一个分项的一趟）与
+# scripts/crash/crash-amplification-two-hosts.sh（两台各领一份）source 它。
 # gate-similar: peer-host-lib.sh 它管第二台那几段（读多机配置、在第二台上跑命令、清场，不复原）；这里管本机那一趟与派活计划的数，不连第二台
 #
 # 调用方先设好这几个变量再调 crash_amplification_prepare：
@@ -27,23 +27,23 @@
 #       algorithm（算法上判不了：有状态 GPU 判不了、内核展开超预算、建不出表，调用方退 248），都不是打空串；几类都有时先 device、再 build
 #   crash_amplification_exit_code_of_a_failed_run <那一趟的退出码> <日志…>   打调用方该退的码：device 与 build 78、algorithm 248，别的原样
 #     （内存包装退的 245 显存不够照原样，出路由 crash_amplification_explain_exit_code 的 245 那一支打）
-#   弄坏开关读 CRASH_AMPLIFICATION_ITEM_BREAK（开关表与该红的格在 scripts/crash-amplification-item.sh 文件头）：
+#   弄坏开关读 CRASH_AMPLIFICATION_ITEM_BREAK（开关表与该红的格在 scripts/crash/crash-amplification-item.sh 文件头）：
 #   accept-missing-peer-cards、accept-peer-cards-without-across、accept-missing-card-list、device-unusable-as-run-failure、algorithm-refusal-as-run-failure、
 #   version-differs-as-run-failure、gpu-feature-missing-as-run-failure、library-in-the-old-directory。
-#   given-states-run-condition-as-run-failure（给定状态表借不到显存那一行不认、不退 78）只由 scripts/crash-amplification-two-hosts.sh --selftest 证红
+#   given-states-run-condition-as-run-failure（给定状态表借不到显存那一行不认、不退 78）只由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红
 #   （红在哪一格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
-#   其中 device-unusable-as-run-failure、algorithm-refusal-as-run-failure 打开时 scripts/crash-amplification-two-hosts.sh --selftest 也红
+#   其中 device-unusable-as-run-failure、algorithm-refusal-as-run-failure 打开时 scripts/crash/crash-amplification-two-hosts.sh --selftest 也红
 #   （红在哪几格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
-#   走 GPU 的计算类那几处的开关同样读 CRASH_AMPLIFICATION_ITEM_BREAK，只由 scripts/crash-amplification-two-hosts.sh --selftest 证红
+#   走 GPU 的计算类那几处的开关同样读 CRASH_AMPLIFICATION_ITEM_BREAK，只由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红
 #   （开关表与该红的格在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）：
 #   inherited-classes-kept、classes-sent-again、configuration-from-tree-root。
-#   配置那几处的开关 cards-read-from-cards-file 由 scripts/crash-amplification-item.sh --selftest 证红（表与该红的格在那份文件头）。
+#   配置那几处的开关 cards-read-from-cards-file 由 scripts/crash/crash-amplification-item.sh --selftest 证红（表与该红的格在那份文件头）。
 #
 # 弄坏开关轮（崩溃放量入口与双机驱动的 --selftest 末尾共用；.claude/singlefs-ai-sop/rules/test-script-discipline.md「测试脚本自己也要被测试证明有效」：
 # 复跑的一方逐个打开开关、看它红在点名的那一项）：
 #   crash_amplification_read_switch_table <脚本文件> <变量名…>
 #       读那份文件头的开关表（第一行代码之前的注释块），一个开关打一行「<变量>=<开关名> <TAB> <点名的格，空格隔开>」，照表里的次序。表的写法（B 写法，
-#       scripts/mutate.sh 文件头「弄坏开关」一段是样板）：一行「#   <变量>=<开关名>  <弄坏哪一处>」（变量是给的变量名之一），下一行起以「#       」
+#       scripts/mutation/mutate.sh 文件头「弄坏开关」一段是样板）：一行「#   <变量>=<开关名>  <弄坏哪一处>」（变量是给的变量名之一），下一行起以「#       」
 #       开头写点名的格（、隔开；括号里是说明与失败行的句首，不读，括号外的每一段都算一格）。「第 N 格」读成 N（崩溃放量入口的格是编号的）；
 #       写错的格名照样读进来，开关轮比格时红。崩溃放量入口与双机驱动的 --selftest 都经它读表。
 #   crash_amplification_switch_wheel <放输出的目录> <取格的正则> <只比退出码 0/1> -- <自证命令…>
@@ -51,7 +51,7 @@
 #       switch_wheel_expected 那个开关点名的格，空白隔开，写成「-」表示表里没列它、打开后应当退 0、一格不红。
 #       每个开关一个子进程：先 env -u 清掉数组里出现过的每个变量、只设这一个，再设 CRASH_AMPLIFICATION_SWITCH_WHEEL_INNER（指到这一轮写的标记文件；
 #       调用方用 crash_amplification_switch_wheel_inner 认它，认出来就不再起开关轮），跑自证命令，标准输出与标准错误并进 <目录>/switch-wheel-<序号>.out，
-#       一批一批起、逐个 wait 收退出码。并行度：CRASH_AMPLIFICATION_SELFTEST_JOBS（正整数），没给取 SINGLEFS_THREAD_CAP（scripts/capped.sh 设的），再没给取 nproc。
+#       一批一批起、逐个 wait 收退出码。并行度：CRASH_AMPLIFICATION_SELFTEST_JOBS（正整数），没给取 SINGLEFS_THREAD_CAP（scripts/hosts/capped.sh 设的），再没给取 nproc。
 #       对上的逐个打 ·（标准输出），对不上的逐个打 ✗（标准错误，出路由调用方的汇总句给）；交回之后 switch_wheel_failures 是对不上的处数
 #       （含派出收回对不上）、switch_wheel_collected 是收回的个数。
 #   crash_amplification_switch_wheel_verdict <点名的格> <退出码> <输出文件> <取格的正则> <只比退出码 0/1>
@@ -62,17 +62,17 @@
 # 现算线程（crash_amplification_threads_now <local|peer> [<显式给的线程数>]）：本机只编那一步（crash_amplification_run_on_this_host）与
 #   双机驱动送第二台的那两趟（排计划、分份）起 capped.sh 的线程数不写死，开起那一步之前现算：调用方显式给了就用它（要是正整数；
 #   本机只编那一步读环境变量 CRASH_AMPLIFICATION_BUILD_THREADS，第二台那两趟读 CRASH_AMPLIFICATION_PEER_THREADS），没给就读
-#   scripts/host-resources.py --json 里那一台的 cpu.available_threads（local 取 is_local 那一台、peer 取 is_peer 那一台；
+#   scripts/hosts/host-resources.py --json 里那一台的 cpu.available_threads（local 取 is_local 那一台、peer 取 is_peer 那一台；
 #   那一份「可用线程」= 核数 − 此刻在用的核），不到 1 取 1。只供测试：CRASH_AMPLIFICATION_HOST_RESOURCES=<脚本> 换掉 host-resources.py
 #   （python3 <脚本> --json 起，平常跑时设了也照认）。算不出（显式给的不是正整数、host-resources.py 退非 0、输出里读不出那一台）打 ✗ 与出路、交回 1，
 #   不退回写死的数：本机只编那一步交回 78、不起 cargo；双机驱动退 78、第二台那一趟不起。
-#   弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=build-threads-fixed：本机只编那一步照改前写死 6 路，由 scripts/crash-amplification-two-hosts.sh --selftest 证红
+#   弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=build-threads-fixed：本机只编那一步照改前写死 6 路，由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红
 #   （红在哪几格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
 #
 # 配置（用户 2026-10-10 定：多机配置合成一份，不零散配置；判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J5、J11）：
 #   只读一份多机配置 ${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}（git 忽略、这台机器一份；模板是仓根的 multi-host.env.example）。
-#   主工作树的根按 git common-dir 取（crash_amplification_multi_host_configuration_file，找法与 scripts/layer0-shard-configuration-check.sh、
-#   scripts/gpu-quiesce-run.sh 相同）：在 HEAD + 暂存区的临时 worktree 里跑也读主工作树那一份；树不是 git 工作树时退回 <树根>/multi-host.env。
+#   主工作树的根按 git common-dir 取（crash_amplification_multi_host_configuration_file，找法与 scripts/crash/layer0-shard-configuration-check.sh、
+#   scripts/crash/gpu-quiesce-run.sh 相同）：在 HEAD + 暂存区的临时 worktree 里跑也读主工作树那一份；树不是 git 工作树时退回 <树根>/multi-host.env。
 #   开关 ENABLE_GPU、ENABLE_ACROSS_MACHINES 的判法不改（没写或写 0 算关，键的定义只在 layer0-shard-configuration-check.sh）。
 #   显卡的两个键也写在这一份里：GPU_CARDS_BY_PRIORITY（不清场时显卡的先后与每张卡的显存额度，读法在
 #   crates/singlefs-checker-tier/src/gpu_card_configuration.rs 的 parse_cards_by_priority）、GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED（清场之后的先后与额度，同一种写法；
@@ -87,12 +87,12 @@
 # 判定库（分项驱动与双机驱动共用；崩溃放量入口与崩溃点重放入口经它们用）：没给 --library 时用 <家目录>/<CRASH_AMPLIFICATION_LIBRARY_SUBDIRECTORY>，
 #   家目录是 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}，子目录今天是 library-by-conclusion-kind；
 #   crash_amplification_default_library <家目录> 打这个路径。按结论种类存之前的旧库（<家目录>/library）引擎开库就拒，所以换成这个新子目录；
-#   旧目录不删、不读。弄坏开关 library-in-the-old-directory：照改前打 <家目录>/library，由 scripts/crash-amplification-item.sh --selftest 证红（表与该红的格在那份文件头）。
+#   旧目录不删、不读。弄坏开关 library-in-the-old-directory：照改前打 <家目录>/library，由 scripts/crash/crash-amplification-item.sh --selftest 证红（表与该红的格在那份文件头）。
 
 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS="-I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/lib/gcc/x86_64-linux-gnu/14/include"  # librocksdb-sys 的 bindgen 找 stdbool.h；哪个版本的目录在就用哪个，不在的 -I 无害
 CRASH_AMPLIFICATION_LIBRARY_SUBDIRECTORY="library-by-conclusion-kind"  # 默认判定库在家目录下的子目录（文件头「判定库」）：按结论种类存的库；旧的 library 引擎开库就拒
 # 给定状态表的判器借不到显存时引擎打的那一行的行首（crates/singlefs-checker-tier/src/crash_amplification.rs 的 GIVEN_STATES_RUN_CONDITION_NOT_MET_LINE_PREFIX）：
-# 运行条件不满足，调用方退 78；crash_amplification_failure_kind 的 device 那一组与崩溃点重放入口 scripts/crash-point-replay.sh 的快档都照这一份认
+# 运行条件不满足，调用方退 78；crash_amplification_failure_kind 的 device 那一组与崩溃点重放入口 scripts/crash/crash-point-replay.sh 的快档都照这一份认
 CRASH_AMPLIFICATION_GIVEN_STATES_RUN_CONDITION_LINE_PREFIX="CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET"
 
 crash_amplification_default_library() { # <家目录>：打没给 --library 时的判定库路径（文件头「判定库」）
@@ -191,17 +191,17 @@ crash_amplification_environment_for_this_host() { # <share> <库目录> [<附加
 # 这一刻那一台能开多少线程（文件头「现算线程」）：打一个正整数；算不出打 ✗ 与出路、交回 1
 crash_amplification_threads_now() { # <local|peer> [<显式给的线程数>]
   local host="$1" given="${2:-}" name=本机 report=""
-  local resources="${CRASH_AMPLIFICATION_HOST_RESOURCES:-$repository_root/scripts/host-resources.py}"
+  local resources="${CRASH_AMPLIFICATION_HOST_RESOURCES:-$repository_root/scripts/hosts/host-resources.py}"
   [[ "$host" == peer ]] && name=第二台
   if [[ -n "$given" ]]; then
     if [[ "$given" =~ ^[1-9][0-9]*$ ]]; then echo "$given"; return 0; fi
     echo "  ✗ 显式给的${name}线程数「$given」不是正整数" >&2
-    echo "  → 怎么办：写成正整数，或不给、按 scripts/host-resources.py --json 现算（crash-amplification-lib.sh 文件头「现算线程」）" >&2
+    echo "  → 怎么办：写成正整数，或不给、按 scripts/hosts/host-resources.py --json 现算（crash-amplification-lib.sh 文件头「现算线程」）" >&2
     return 1
   fi
   if ! report="$(python3 "$resources" --json 2>/dev/null)"; then
     echo "  ✗ 现算${name}线程数：python3 $resources --json 退了非 0" >&2
-    echo "  → 怎么办：单跑 python3 scripts/host-resources.py 看哪一台、哪一项没读到（第二台连不上就修好它或改多机配置）；要绕开现算就显式给线程数（crash-amplification-lib.sh 文件头「现算线程」）" >&2
+    echo "  → 怎么办：单跑 python3 scripts/hosts/host-resources.py 看哪一台、哪一项没读到（第二台连不上就修好它或改多机配置）；要绕开现算就显式给线程数（crash-amplification-lib.sh 文件头「现算线程」）" >&2
     return 1
   fi
   python3 -c '
@@ -219,7 +219,7 @@ for entry in hosts:
             sys.exit(0)
 sys.exit(1)' "$host" <<<"$report" && return 0
   echo "  ✗ 现算${name}线程数：$resources --json 的输出里读不出${name}此刻的可用线程（hosts[] 里 $([[ "$host" == peer ]] && echo is_peer || echo is_local) 那一台的 cpu.available_threads；那一台没读到也是这样）" >&2
-  echo "  → 怎么办：单跑 python3 scripts/host-resources.py --json 看那一台的 read 与 problem；要绕开现算就显式给线程数（crash-amplification-lib.sh 文件头「现算线程」）" >&2
+  echo "  → 怎么办：单跑 python3 scripts/hosts/host-resources.py --json 看那一台的 read 与 problem；要绕开现算就显式给线程数（crash-amplification-lib.sh 文件头「现算线程」）" >&2
   return 1
 }
 
@@ -243,8 +243,8 @@ crash_amplification_run_on_this_host() { # <share> <库目录> <日志> [<附加
   crash_amplification_environment_for_this_host "$share" "$library" "$@"
   local local_environment=("${this_host_environment[@]}")
   ( cd "$repository_root" \
-    && env "${local_environment[@]}" bash scripts/run-with-memory-cap.sh "$memory_cap" bash scripts/capped.sh "$build_threads" cargo "${cargo_build_arguments[@]}" \
-    && env "${local_environment[@]}" bash scripts/run-with-memory-cap.sh "$memory_cap" bash scripts/capped.sh "$cores" cargo "${cargo_test_arguments[@]}" ) >"$log" 2>&1
+    && env "${local_environment[@]}" bash scripts/hosts/run-with-memory-cap.sh "$memory_cap" bash scripts/hosts/capped.sh "$build_threads" cargo "${cargo_build_arguments[@]}" \
+    && env "${local_environment[@]}" bash scripts/hosts/run-with-memory-cap.sh "$memory_cap" bash scripts/hosts/capped.sh "$cores" cargo "${cargo_test_arguments[@]}" ) >"$log" 2>&1
 }
 
 # 一台机器判这一趟的总速度（态/秒，取整）：各条流要判的状态加起来 ÷ 各条流估的用时加起来。一条用例里几条流各打一行，

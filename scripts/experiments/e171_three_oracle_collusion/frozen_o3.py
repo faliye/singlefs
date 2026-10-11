@@ -145,8 +145,8 @@ def executor_command(repo_root: str, dumps: str, streams: list[str], batches: st
     """登记 5.4 的命令：`python3 executor_main.py --dumps <导出> --batches 1,2 --workers N --output <新文件>`，经 `capped.sh` 与 `run-with-memory-cap.sh`。
     `--streams` 只列这一趟导出了的流（没导出的流没有文件可读）。"""
     script = os.path.join(repo_root, FROZEN_DIRECTORY_RELATIVE, EXECUTOR_SCRIPT)
-    return ["bash", os.path.join(repo_root, "scripts/run-with-memory-cap.sh"), memory_cap, "bash",
-            os.path.join(repo_root, "scripts/capped.sh"), str(workers), "nice", "-n", "19", "python3", script,
+    return ["bash", os.path.join(repo_root, "scripts/hosts/run-with-memory-cap.sh"), memory_cap, "bash",
+            os.path.join(repo_root, "scripts/hosts/capped.sh"), str(workers), "nice", "-n", "19", "python3", script,
             "--dumps", dumps, "--streams", ",".join(streams), "--batches", batches, "--workers", str(workers), "--output", output]
 
 

@@ -8,14 +8,14 @@
 #   ③ 起跑前判内存量：拿一把锁，算「slice 里已占的 + 这一条按预测要的」，不超过总上限才起；放不下就放锁、隔一会儿再判，等满上限报「排不上」退出；
 #      账上没有在跑的而放不下（没有哪一条跑完会放出来），不排队、当场报「排不上」退出。
 #   只判「这台会不会 OOM」（用户 2026-10-06 定，records/2026-09-16-subagent拆分提案.md 第五十五节）：开跑前只在按预测这台放不下时排队、不为手续拒；
-#   运行时认撞了这一条的上限、被总上限挤掉、超时与显存不够。选哪台机器、按历史预测要多少归统一派发器 scripts/host-dispatch.py。
-# 变异跑道 scripts/mutate.sh 与门禁 checker-tier-crates-mutation-replay 每条变异都经它跑；子 agent 跑 cargo test / cargo run / 实验二进制也要经它
+#   运行时认撞了这一条的上限、被总上限挤掉、超时与显存不够。选哪台机器、按历史预测要多少归统一派发器 scripts/hosts/host-dispatch.py。
+# 变异跑道 scripts/mutation/mutate.sh 与门禁 checker-tier-crates-mutation-replay 每条变异都经它跑；子 agent 跑 cargo test / cargo run / 实验二进制也要经它
 # （.claude/hooks/heavy-test-guard.sh 在执行前拒不经它的）。提交时的重阶段整条经它跑，例：
-#   SINGLEFS_HEAVY_TESTS=commit bash scripts/run-with-memory-cap.sh 16G bash <根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <根>
+#   SINGLEFS_HEAVY_TESTS=commit bash scripts/hosts/run-with-memory-cap.sh 16G bash <根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <根>
 #
 #   run-with-memory-cap.sh <上限> <命令> [参数…]   排队，在上限里跑那条命令；退出码见下
 #   run-with-memory-cap.sh auto <命令> [参数…]     上限取峰值表里这条命令实测峰值的 1.5 倍（按 MiB 向上取整）；表里没有这条取保守默认值
-#                                                  （scripts/memory_peaks_lib.py 的 DEFAULT_MEMORY_PREDICTION_TEXT，8G），stderr 报一行
+#                                                  （scripts/hosts/memory_peaks_lib.py 的 DEFAULT_MEMORY_PREDICTION_TEXT，8G），stderr 报一行
 #   run-with-memory-cap.sh --check <上限>          只试 slice 的总上限设不设得上、带同样上限的 scope 起不起得来（在 slice 里跑 true，不排队）；起不来退 251
 #   run-with-memory-cap.sh --status                现量：整机内存、余量、slice 总上限与已占、账上在跑的每一条、slice 外面的用量
 #   run-with-memory-cap.sh --selftest              自证（每一例在自己的临时 slice 里，总上限几百 M，吃不满机器）
@@ -42,7 +42,7 @@
 #   （MemTotal − MemAvailable，那时 slice 里几乎是空的），其中本地模型服务 7.4 GiB anon + 0.6 GiB shmem（它 cgroup 的 memory.stat；
 #   systemctl status 报它的 Memory 37.9G，其中 30.3 GiB 是模型文件的页缓存，回收得掉），user.slice 2.4 GiB anon（Claude Code 会话与它们起的进程），
 #   其余约 3 GiB 是内核（Slab 1.9 GiB、页表）与别的服务。20G 比 13.4 GiB 多约 6.6 GiB，给会话变多、本地模型服务在负载下涨、门禁在包装外面的 python 进程留着；
-#   本机 slice 总上限因此约 40 GiB。怎么现量：bash scripts/run-with-memory-cap.sh --status 打出上面每一项此刻的数。
+#   本机 slice 总上限因此约 40 GiB。怎么现量：bash scripts/hosts/run-with-memory-cap.sh --status 打出上面每一项此刻的数。
 #   本地模型服务的 cgroup 不写进仓（单元名是本机的私有信息）：--status 从仓外的私有配置读，文件是 RUN_WITH_MEMORY_CAP_PRIVATE_CONFIG，
 #   默认 ${XDG_CONFIG_HOME:-~/.config}/singlefs/run-with-memory-cap.env；一行一条「键=值」，# 起头的行与空行不看，不 source。
 #   读的键是 OUTSIDE_SERVICE_CGROUP=<它的 cgroup，相对 cgroup 根，形如 system.slice/<单元名>.service>，读那里 memory.stat 的 anon + shmem。
@@ -75,7 +75,7 @@
 #   排队时包装被 KILL / HUP 停：排队那一步每轮重判之前先核自己的父进程还是不是包装，不是就退出、不记账，调用方的管道随之关上，至多晚一个重判间隔。
 #   HUP 不设 trap：这一核照样接得住；设了还得在起 scope 时换掉，改动就伸进放行之后那一段，省下的只是一个重判间隔。
 #
-# 峰值表（RUN_WITH_MEMORY_CAP_PEAKS，默认主仓的 scripts/memory-peaks.tsv；从 git worktree 里跑的也读写主仓那一份）：一行一条命令，文件头的 # 行写口径，
+# 峰值表（RUN_WITH_MEMORY_CAP_PEAKS，默认主仓的 scripts/hosts/memory-peaks.tsv；从 git worktree 里跑的也读写主仓那一份）：一行一条命令，文件头的 # 行写口径，
 #   由这个脚本建、读、写（写在同一把锁里，先写临时文件再改名；按 MiB 向上取整，与表里记的相同就不写）。口径：scope 里那个外壳 bash 在命令退出之后读自己 cgroup 的 memory.peak（字节）。
 #   外壳不 exec 命令、留下来读，是因为 scope 一收尾它的 cgroup 就删了、systemd 也不留（2026-09-25 实测命令退出之后 MemoryPeak=[not set]）。
 #   含页缓存（cargo 写编译产物的那些）与外壳 bash 自己，偏大不偏小。撞了这一条自己的上限记成上限；按峰值表放进来（要的量小于上限）又被总上限挤掉的也记成上限
@@ -83,7 +83,7 @@
 #   不进 git（.gitignore）：数只在本机成立；而且门禁 checker-tier-crates-mutation-replay 跑的时候每条都写它，放在被跟踪的地方，gate.sh 开跑与收尾的工作区指纹就对不上、整轮判红
 #   （.claude/singlefs-ai-sop/scripts/lib.sh 的 worktree_fingerprint 用 git add -A 算，被忽略的文件不算）。
 #   键：RUN_WITH_MEMORY_CAP_KEY 给了就用它；不给就把命令的各个词用空格接起来（制表符、换行换成空格，测试二进制名里 -<16 位十六进制> 的哈希去掉，截到 300 字）。
-#   取键、读表在 scripts/memory_peaks_lib.py（command_key、read_peak_table），统一派发器 scripts/host-dispatch.py 按同一份取键、预测。
+#   取键、读表在 scripts/hosts/memory_peaks_lib.py（command_key、read_peak_table），统一派发器 scripts/hosts/host-dispatch.py 按同一份取键、预测。
 #   线程数（第五列）：命令里经 capped.sh <N> 跑的记 N（它把线程变量一律设成 N，盖过外面的）；否则看包装自己环境里 capped.sh 设的那几个线程变量
 #   （名单取 capped.sh --print）：设了的都相同记那个数，不同就逐个记「名=值」，一个都没设记「未设（整机 N 核）」。「量过的」上限只认线程数相同的那一行
 #   （.claude/skills/crash-test/commit-stages.md「跑之前定下来」一节）；排队照旧只按键取峰值。加这一列之前记的行照原样留四列写回：只认四列的旧包装还在跑时读得到它们，
@@ -113,17 +113,17 @@
 #   RUN_WITH_MEMORY_CAP_CGROUP_ROOT    cgroup v2 挂在哪，默认 /sys/fs/cgroup
 #   RUN_WITH_MEMORY_CAP_SELFTEST_ADMIT_PAUSE  判完放得下、记账之前停这么多秒：只给自证把「几条同时来」的竞态撑开
 #   RUN_WITH_MEMORY_CAP_SELFTEST_TARGET       --selftest 测哪一份包装，默认自己：拿改前那一份跑新的自证，看它判错
-# 套在包装里（包装里再经包装跑的：主 agent 照规则 run-with-memory-cap.sh 16G bash scripts/crash-point-replay.sh --quick 起，里面放量那几项再经它；
+# 套在包装里（包装里再经包装跑的：主 agent 照规则 run-with-memory-cap.sh 16G bash scripts/crash/crash-point-replay.sh --quick 起，里面放量那几项再经它；
 #   run-with-memory-cap.sh <上限> bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick 里每条变异再经它）：外层起 scope 时给命令设两个标记
 #   RUN_WITH_MEMORY_CAP_OUTER_UNIT=<这一条的 scope 单元名>、RUN_WITH_MEMORY_CAP_OUTER_CAP=<这一条的上限>。里层这一条两个标记都在、上限写法认得、
 #   而且自己此刻就在那个 scope 的 cgroup 里（/proc/self/cgroup 的末段是 <单元名>.scope；标记随环境漏到别处的进程不算），就算套在外层里：
 #   外层已经照它要的量占着账，里层不另记账、不排队（不再因外层占着账而自己排不进、等满退 252），照样另起自己的 scope、挪出外层、挂在同一个 slice 里：
 #   自己的 MemoryMax、限时、撞了自己的上限退 250、被总上限挤掉退 254、超时退 253、显存不够退 245 与峰值表都照旧（门禁 checker-tier-crates-mutation-replay、
-#   scripts/mutate.sh、scripts/verus-proof-check.py、scripts/broad-mutation.py 这些调用方靠每一条自己的 scope 分 250 / 253 / 254，
+#   scripts/mutation/mutate.sh、scripts/gate/verus-proof-check.py、scripts/mutation/broad-mutation.py 这些调用方靠每一条自己的 scope 分 250 / 253 / 254，
 #   不并进外层的 scope）；它起的命令拿到的两个标记换成它自己的。里层的上限比外层大（外层装不下它）：按用法错退 251、命令没跑，出路写把上限写到外层以内。
 #   外层的结局判法不变。里层不排队，几条里层同时跑、合起来超过外层上限时只有 slice 的总上限兜着（被挤掉的退 254）：同时起几条、各给多少，由调用方按外层的上限分。
 #   别的不套着的一条照旧排队：外层账上那一笔与里层 scope 实占的都算进 slice 已占（偏多不偏少）。
-#   调用方要知道外层给了多少（例 scripts/crash-point-replay.sh 把它转给放量入口与双机驱动的 --memory-cap），读 RUN_WITH_MEMORY_CAP_OUTER_CAP。
+#   调用方要知道外层给了多少（例 scripts/crash/crash-point-replay.sh 把它转给放量入口与双机驱动的 --memory-cap），读 RUN_WITH_MEMORY_CAP_OUTER_CAP。
 #
 # 弄坏开关 RUN_WITH_MEMORY_CAP_BREAK=<项>（只给 --selftest 证明它会红用，一次给一个；打开时自证退 1）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
 # （自证的例没有标签，项名直接写那条「✗ 自检：」失败行的句首、到「，实际」之前，长的截到能认出是哪一例；括号里写那一行接着报的。
@@ -453,7 +453,7 @@ default_peak_table() {
   local common_directory
   if common_directory="$(git -C "$SCRIPT_DIRECTORY" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
       && [[ "$(basename "$common_directory")" == ".git" && -d "$(dirname "$common_directory")/scripts" ]]; then
-    echo "$(dirname "$common_directory")/scripts/memory-peaks.tsv"
+    echo "$(dirname "$common_directory")/scripts/hosts/memory-peaks.tsv"
   else
     echo "$SCRIPT_DIRECTORY/memory-peaks.tsv"
   fi
@@ -556,7 +556,7 @@ lock_path = os.path.join(state_directory, "lock")
 peak_table_path = os.environ["RUN_WITH_MEMORY_CAP_PEAKS_RESOLVED"]
 broken = os.environ.get("RUN_WITH_MEMORY_CAP_BREAK", "")
 PEAK_TABLE_HEADER = [
-    "# 每条命令上一次实测的内存峰值：scripts/run-with-memory-cap.sh 建、读、写（排队时按它算「这条要的量」），别手改。",
+    "# 每条命令上一次实测的内存峰值：scripts/hosts/run-with-memory-cap.sh 建、读、写（排队时按它算「这条要的量」），别手改。",
     "# 口径：scope 里的外壳 bash 在命令退出之后读自己 cgroup 的 memory.peak，按 MiB 向上取整的字节数；含页缓存（cargo 写编译产物的那些）与外壳 bash 自己，偏大不偏小。",
     "#   撞了这一条自己的上限的记成上限；超时、被停、被总上限挤掉的不记（量到的是半截）。只在本机成立，换机器要重量，所以不进 git（.gitignore）。",
     "# 列（制表符分隔）：峰值字节、量的时刻（ISO 8601，Z 结尾）、那一次的上限、键（命令的各个词用空格接起来，测试二进制名里的 16 位哈希去掉；RUN_WITH_MEMORY_CAP_KEY 可以指定）、"
@@ -645,7 +645,7 @@ def admit(unit, cap_bytes, cap_text, total_bytes, slice_directory, key, wrapper_
         need, need_text = need_of(key, cap_bytes, cap_text)
     if need > total_bytes:
         print(f"  ✗ 内存不够排不上：这一条要 {human(need)}（{need_text}），比 slice 的总上限 {human(total_bytes)} 还大，等多久都放不下；命令没跑", file=sys.stderr)
-        print("  → 怎么办：上限写小一点再跑（真要这么多就先调小余量 RUN_WITH_MEMORY_CAP_RESERVE，依据写在 scripts/run-with-memory-cap.sh 文件头）", file=sys.stderr)
+        print("  → 怎么办：上限写小一点再跑（真要这么多就先调小余量 RUN_WITH_MEMORY_CAP_RESERVE，依据写在 scripts/hosts/run-with-memory-cap.sh 文件头）", file=sys.stderr)
         return MEMORY_ADMISSION_REFUSED_EXIT
     started = time.monotonic()
     last_report = None
@@ -690,7 +690,7 @@ def admit(unit, cap_bytes, cap_text, total_bytes, slice_directory, key, wrapper_
                 print(f"  ✗ 内存不够排不上：这一条要 {human(need)}（{need_text}），slice 里回收不掉的用量 {human(slice_used)}，合起来超过总上限 {human(total_bytes)}；"
                       "账上没有在跑的，没有哪一条跑完会放出来，等多久都放不下，不排队；命令没跑", file=sys.stderr)
                 print(f"  → 怎么办：上限写小一点再跑（要 {human(need)}、放得下的最多 {human(fits_at_most)}，即上限不超过 {fits_at_most // MEBIBYTE}M）；"
-                      f"slice 里那 {human(slice_used)} 不在账上，bash scripts/run-with-memory-cap.sh --status 看是谁；"
+                      f"slice 里那 {human(slice_used)} 不在账上，bash scripts/hosts/run-with-memory-cap.sh --status 看是谁；"
                       "真要这么多就先调小余量 RUN_WITH_MEMORY_CAP_RESERVE（依据写在文件头）", file=sys.stderr)
                 return MEMORY_ADMISSION_REFUSED_EXIT
         now = time.monotonic()
@@ -1068,7 +1068,7 @@ run_capped() {
     case "$gpu_verdict" in
       hit\ *)
         echo "run-with-memory-cap: 显存不够（命令退 $exit_code；它起止之间内核日志里有 NVRM … NV_ERR_NO_MEMORY：${gpu_verdict#hit }）" >&2
-        echo "run-with-memory-cap: → 这一条的结果不算数（退 $GPU_MEMORY_HIT_EXIT）：看同一段时间谁在用卡（nvidia-smi），少给这一条或同时在跑的几条一些显存再重跑；经统一派发器 scripts/host-dispatch.py --gpu 起的按显存余量挑机器" >&2
+        echo "run-with-memory-cap: → 这一条的结果不算数（退 $GPU_MEMORY_HIT_EXIT）：看同一段时间谁在用卡（nvidia-smi），少给这一条或同时在跑的几条一些显存再重跑；经统一派发器 scripts/hosts/host-dispatch.py --gpu 起的按显存余量挑机器" >&2
         return "$GPU_MEMORY_HIT_EXIT" ;;
       unreadable\ *)
         echo "run-with-memory-cap: 显存 OOM 没查成（${gpu_verdict#unreadable }）：命令退 $exit_code，判不了是不是显存不够，不当成没撞；手动 journalctl -k | grep NV_ERR_NO_MEMORY 看一眼" >&2 ;;

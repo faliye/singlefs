@@ -9,7 +9,7 @@
 #   layer0-shard-run.sh --merged-log <崩溃枚举用例的键> <树根> <输入指纹> <日志文件>
 #       门禁 checker-tier-layer0-replay --full 在分片开着时调：只做两片与 merge，merge 那一趟的整段输出写进日志文件，退出码是那一趟的；判与写标记归 checker-tier-layer0-replay。
 #   layer0-shard-run.sh --selftest
-#       转给 scripts/layer0-shard-run-selftest.sh：不碰第二台，本机两个进程各跑一片走同一条路（含 merge、判与标记）。
+#       转给 scripts/crash/layer0-shard-run-selftest.sh：不碰第二台，本机两个进程各跑一片走同一条路（含 merge、判与标记）。
 #
 # 步骤：① 两台各 rustc -Vv、cargo -V、nproc，rustc -Vv 前三行与 host 行、cargo -V 不同就拒；② 树 rsync 到第二台
 # <PEER_REPOSITORY_DIRECTORY>/runs/<这一趟>/（新建的空目录，不带 --delete），在那里 git init（算输入指纹要 git 列文件）；规范副本
@@ -33,13 +33,13 @@
 # 线程：本机那一片取 SINGLEFS_LAYER0_THREADS（没设取本机 nproc），第二台那一片取第二台的 nproc；两台的 nproc 都清掉 OMP_NUM_THREADS、
 # OMP_THREAD_LIMIT 再跑（nproc 认这两个变量，漏进来就把核数压成它们的值）。SINGLEFS_LAYER0_START_OVER=1 交给两片，
 # merge 那一趟不带。只接登记了 shard=across-machines 的用例（它的枚举经 Layer0Resume::from_environment 认分片开关）。
-# 内存：第二台那一片在第二台上经那棵树副本里的 scripts/run-with-memory-cap.sh 起，上限取配置的 PEER_MEMORY_CAP（第二台不在本机的进程树里，
+# 内存：第二台那一片在第二台上经那棵树副本里的 scripts/hosts/run-with-memory-cap.sh 起，上限取配置的 PEER_MEMORY_CAP（第二台不在本机的进程树里，
 # 本机包在外面的那一层罩不到它）；本机那一片与 merge 照旧，由起 checker-tier-layer0-replay / 这个驱动的那一层包装管。第二台那一片退 250–254 是包装自己的结局
 # （含义见 run-with-memory-cap.sh 文件头「退出码」），那一片的输出不算结果，判红；退 245 是那边的包装认出显存不够（起止之间内核报了 NV_ERR_NO_MEMORY），
 # 单报「显存不够」，同样不算结果、判红。
 # PEER_MEMORY_CAP 只罩第二台跑测试二进制那一趟；第二台编测试二进制（cargo test --release --no-run）另经同一个包装、上限
 # SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP（写法同 PEER_MEMORY_CAP，默认 16G：本机 60 GiB 减去常驻约 12 GiB、同时至多 3 件重活，每件 16 GiB，
-# 与 scripts/mutate.sh 的 MUTATE_MEMORY_MAX 同一个算法；峰值表里 singlefs-checker-tier release --no-run 量到的最大一条是 4.29 GiB；
+# 与 scripts/mutation/mutate.sh 的 MUTATE_MEMORY_MAX 同一个算法；峰值表里 singlefs-checker-tier release --no-run 量到的最大一条是 4.29 GiB；
 # 第二台的内存与本机不同时要重算）。两台对称：本机编测试二进制也不在那一片的上限里。编译撞了这个上限（包装退 250）报明「编译上限太小」；
 # 编译那一趟包装退 245 报明「第二台编测试二进制那一趟显存不够」（出路句不提编译上限：两支的判别串各只在自己那一支里出现，--selftest 的 ⑰ ⑲ 凭它们分）。
 # 环境变量 SINGLEFS_LAYER0_PEER_MEMORY_CAP 设了就覆盖配置的 PEER_MEMORY_CAP（写法同它：正整数加 K / M / G / T），没设照配置。
@@ -53,8 +53,8 @@
 # 不看删第二台这一趟的东西快不快（改前停固定 5 秒，负载高时删一趟要 4–12 秒，删得比外层写得晚，退出码文件随着一起删掉，这个开关就判不红）。
 #
 # 配置（本地、git 忽略）：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，键与写法见仓根 multi-host.env.example；
-# 在不在、齐不齐、第二台连不连得上由 scripts/layer0-shard-configuration-check.sh 判（门禁 checker-tier-layer0-replay 拿同一份判走不走分片）。
-# 这一份与配置判法按内容进登记了 shard=across-machines 的用例的输入指纹（scripts/admission.py 的 SHARD_DRIVER_FILES）：两片与 merge 的
+# 在不在、齐不齐、第二台连不连得上由 scripts/crash/layer0-shard-configuration-check.sh 判（门禁 checker-tier-layer0-replay 拿同一份判走不走分片）。
+# 这一份与配置判法按内容进登记了 shard=across-machines 的用例的输入指纹（scripts/gate/admission.py 的 SHARD_DRIVER_FILES）：两片与 merge 的
 # cargo 由这里起、不经 admission.py crash-case-command，改了这里那几条用例的旧全绿标记不再作数。
 # 重型：跑的是标了 ignore 的崩溃枚举用例（--include-ignored），只在提交时（SINGLEFS_HEAVY_TESTS=commit）或用户要求时跑；--selftest 不算。
 #
@@ -68,9 +68,9 @@
 # peer-build-cap-unexplained 编译撞了编译上限也只报「第二台编测试二进制失败」、不说上限太小（改前的报法），打开时 --selftest 的 ⑰ 那一格判错。
 # no-peer-cleanup-on-failure 失败退出时不删第二台上这一趟的树，打开时 --selftest 的 ⑩、⑬、⑰ 与 ⑲ 两格共五格判错（都看第二台 runs/ 下这一趟的东西删没删；
 #   ⑲ 两格比的都是 ⑲ 开跑之前那一份 runs/，第一格编译那一趟失败退出留下的树，第二格也看得见）。
-# 下面四项照 scripts/mutate.sh 的写法：开关一行写弄坏哪一处，下一行起写打开后 --selftest 判错的格（「格名开头」，括号里写失败行格名之后的句首）：
+# 下面四项照 scripts/mutation/mutate.sh 的写法：开关一行写弄坏哪一处，下一行起写打开后 --selftest 判错的格（「格名开头」，括号里写失败行格名之后的句首）：
 #   LAYER0_SHARD_RUN_BREAK=peer-without-memory-cap  第二台那一片不经 run-with-memory-cap.sh 起
-#       「⑧ 第二台那一片经 scripts/run-with-memory-cap.sh 起」（驱动的输出里 ④ 那一行没写第二台那一片经 run-with-memory-cap.sh）
+#       「⑧ 第二台那一片经 scripts/hosts/run-with-memory-cap.sh 起」（驱动的输出里 ④ 那一行没写第二台那一片经 run-with-memory-cap.sh）
 #       「⑪ 本机设了 RUN_WITH_MEMORY_CAP_RESERVE=10G」（设了余量那一趟，驱动 ④ 那一行没写第二台经 RUN_WITH_MEMORY_CAP_RESERVE=10G 起包装）
 #       「⑫ 设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=12G」（设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=12G 那一趟，驱动 ④ 那一行上限不是 12G）
 #       「⑲ 第二台那一片内存包装退 245」（退 1；输出尾部：…第二台那一片退 3…：那一片不经包装，没人认显存不够）
@@ -94,7 +94,7 @@
 #       「㉑ 第二台那一片的外层没留退出码文件就没了」（外层没了 90 秒驱动还没退）
 #
 # 配置在不在、判不判得过不写成运行条件（--selftest 不要配置）：开跑之后第一件事调配置判法，判不过照它的原因与出路退 1。
-# 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/detached-run.sh start --wall-clock over-2h 与 long-run-check、scripts/host-dispatch.py 文件头 ⓪ 都读这几行）：
+# 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/hosts/detached-run.sh start --wall-clock over-2h 与 long-run-check、scripts/hosts/host-dispatch.py 文件头 ⓪ 都读这几行）：
 # long-run-shards: 按 SINGLEFS_LAYER0_SHARD 切两片（切法与账本在 crates/singlefs-checker-tier/src/layer0_progress.rs）：本机跑第 0/2 片、多机配置的 PEER_SSH_HOST 跑第 1/2 片，本机 merge/2 按切片序号并
 # long-run-resume: 两片的进度目录（本机 <git common-dir>/singlefs-layer0-progress/<输入指纹>、第二台 <PEER_REPOSITORY_DIRECTORY>/progress/<输入指纹>）跑完、跑红、被停都留着，重起同一条命令接着跑没做完的切片；SINGLEFS_LAYER0_START_OVER=1 才从头
 # long-run-unshardable: 多机：台数固定两台（本机与多机配置的 PEER_SSH_HOST，经 layer0-shard-configuration-check.sh --emit-assignments 判，不读 --emit-hosts 的清单）；本机那一片线程取 SINGLEFS_LAYER0_THREADS 或本机 nproc、第二台那一片取它的 nproc，第二台内存上限取配置的 PEER_MEMORY_CAP，都不按 host-resources.py --json 现算
@@ -122,7 +122,7 @@ if (( ! usage_ok )); then
   exit 2
 fi
 tree_root="$(cd "$tree_root" && pwd)"
-admission_module="$tree_root/scripts/admission.py"
+admission_module="$tree_root/scripts/gate/admission.py"
 
 fail() { # fail <原因> <出路>
   echo "  ✗ $case_key 双机分片：$1"
@@ -167,7 +167,7 @@ registration_row="$(awk -F'\t' -v key="$case_key" '$1 == key' "$tree_root/.claud
 test_token="$(tr ' ' '\n' <<< "$(cut -f3 <<< "$registration_row")" | grep '^test=' | head -1)"
 IFS=: read -r case_package case_target case_function <<< "${test_token#test=}"
 [[ -n "$registration_row" && -n "$case_package" && -n "$case_target" && -n "$case_function" ]] \
-  || fail "stage-inputs.tsv 里找不到这一行或它的 test=<包>:<测试目标>:<用例函数>" "照 scripts/admission.py 文件头「崩溃枚举用例行」登记"
+  || fail "stage-inputs.tsv 里找不到这一行或它的 test=<包>:<测试目标>:<用例函数>" "照 scripts/gate/admission.py 文件头「崩溃枚举用例行」登记"
 python3 "$admission_module" crash-case-shardable "$tree_root" "$case_key" >/dev/null \
   || fail "这条用例没登记 shard=across-machines（它的枚举不认分片开关，分了片也是每台各跑全量）" "单机跑它：bash .claude/gate.d/checker-tier-layer0-replay.sh --full <树根>；要分片先让用例经 Layer0Resume::from_environment 取续跑设置，再在登记行第三列加 shard=across-machines"
 
@@ -377,9 +377,9 @@ echo "  · ② 树拷到第二台 $peer_run_directory；$sop_copy_text"
 # 这一份驱动脚本与配置判法由准入模块按内容加进清单）
 local_manifest="$scratch_directory/manifest.local"
 local_summary="$(python3 "$admission_module" crash-case-manifest "$tree_root" "$case_key" "$local_manifest" \
-  --judging-digest --toolchain --build-environment)" || fail "本机算不出输入指纹：$local_summary" "单跑 python3 scripts/admission.py crash-case-manifest <树根> $case_key <清单文件> --judging-digest --toolchain --build-environment 看它报什么"
+  --judging-digest --toolchain --build-environment)" || fail "本机算不出输入指纹：$local_summary" "单跑 python3 scripts/gate/admission.py crash-case-manifest <树根> $case_key <清单文件> --judging-digest --toolchain --build-environment 看它报什么"
 read -r local_fingerprint local_file_count local_excluded_count <<< "$local_summary"
-peer_summary="$(run_on_peer "$peer_run_directory" "python3 scripts/admission.py crash-case-manifest . $(printf '%q' "$case_key") .layer0-shard-manifest \
+peer_summary="$(run_on_peer "$peer_run_directory" "python3 scripts/gate/admission.py crash-case-manifest . $(printf '%q' "$case_key") .layer0-shard-manifest \
   --judging-digest --toolchain --build-environment")" || fail "第二台算不出输入指纹：$peer_summary" "在第二台 $peer_run_directory 里单跑同一条 crash-case-manifest 看它报什么"
 peer_fingerprint="${peer_summary%% *}"
 [[ "$local_fingerprint" == "$peer_fingerprint" ]] \
@@ -411,16 +411,16 @@ libtest_arguments=(--exact "$case_function" --nocapture)
 # 第二台那一片经那棵树副本里的内存包装起（上限 PEER_MEMORY_CAP）；弄坏开关 peer-without-memory-cap 下不经它
 peer_memory_reserve_text=""
 if [[ -n "${RUN_WITH_MEMORY_CAP_RESERVE:-}" ]]; then peer_memory_reserve_text="RUN_WITH_MEMORY_CAP_RESERVE=$(printf '%q' "$RUN_WITH_MEMORY_CAP_RESERVE") "; fi
-peer_memory_cap_text="${peer_memory_reserve_text}bash scripts/run-with-memory-cap.sh $(printf '%q' "$peer_memory_cap") "
+peer_memory_cap_text="${peer_memory_reserve_text}bash scripts/hosts/run-with-memory-cap.sh $(printf '%q' "$peer_memory_cap") "
 if [[ "$layer0_shard_break" == peer-without-memory-cap ]]; then
   peer_memory_cap_text=""
   echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=peer-without-memory-cap：第二台那一片不经 run-with-memory-cap.sh 起"
 fi
 # 第二台编测试二进制另经同一个包装、上限是编译的 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP，不在那一片的 PEER_MEMORY_CAP 里（两台对称：本机编译也不在）；
 #   弄坏开关 peer-build-under-shard-cap 下照改前放进那一片的上限里
-peer_build_cap_text="${peer_memory_reserve_text}bash scripts/run-with-memory-cap.sh $(printf '%q' "$peer_build_memory_cap") "
+peer_build_cap_text="${peer_memory_reserve_text}bash scripts/hosts/run-with-memory-cap.sh $(printf '%q' "$peer_build_memory_cap") "
 if [[ "$layer0_shard_break" == peer-build-under-shard-cap ]]; then
-  peer_build_cap_text="${peer_memory_reserve_text}bash scripts/run-with-memory-cap.sh $(printf '%q' "$peer_memory_cap") "
+  peer_build_cap_text="${peer_memory_reserve_text}bash scripts/hosts/run-with-memory-cap.sh $(printf '%q' "$peer_memory_cap") "
   echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=peer-build-under-shard-cap：第二台编测试二进制放进那一片的上限 PEER_MEMORY_CAP=$peer_memory_cap 里"
 fi
 case "${SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED:-1}" in
@@ -476,7 +476,7 @@ if [[ "$peer_build_exit" != 0 ]]; then
   run_on_peer "$peer_run_directory" "tail -n 12 .layer0-shard-build.log" 2>/dev/null | sed 's/^/      /'
   if [[ "$peer_build_exit" == 250 && "$layer0_shard_break" != peer-build-cap-unexplained ]]; then
     fail "第二台编测试二进制撞了编译的内存上限 ${peer_build_memory_cap}（cargo test --no-run 那一趟，包装退 250）：编译上限太小" \
-      "调大 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP 再跑（写法同 PEER_MEMORY_CAP，默认 16G 的依据在 scripts/layer0-shard-run.sh 文件头「内存」一段）"
+      "调大 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP 再跑（写法同 PEER_MEMORY_CAP，默认 16G 的依据在 scripts/crash/layer0-shard-run.sh 文件头「内存」一段）"
   fi
   if [[ "$peer_build_exit" == 245 && "$layer0_shard_break" != gpu-memory-unexplained ]]; then
     fail "第二台编测试二进制那一趟显存不够（cargo test --no-run 那一趟退了非 0，第二台的内存包装认出它起止之间内核报了 NV_ERR_NO_MEMORY，退 245）：这一趟不算结果" \

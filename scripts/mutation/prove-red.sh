@@ -7,8 +7,8 @@
 #   prove-red.sh --selftest            # 用假的 cargo 走一遍；PROVE_RED_BREAK=<项> 时必须判红
 #
 # 判法只有一份，与门禁 checker-tier-crates-mutation-replay 同用（这里不另写）：
-#   切表与成形照 scripts/crates-mutation-rows.py 的 read_table（malformed_reason）；一条跑完判哪一档照它的 verdict_of_run；
-#   libtest 的结果行在那里经 scripts/lib_libtest_result_lines.py 解析。一行算不算重型照 .claude/hooks/lib_heavy_tests.py 的 classify（重型测试闸同一份，只读调用）。
+#   切表与成形照 scripts/mutation/crates-mutation-rows.py 的 read_table（malformed_reason）；一条跑完判哪一档照它的 verdict_of_run；
+#   libtest 的结果行在那里经 scripts/gate/lib_libtest_result_lines.py 解析。一行算不算重型照 .claude/hooks/lib_heavy_tests.py 的 classify（重型测试闸同一份，只读调用）。
 #
 # 弄坏开关 PROVE_RED_BREAK（只给 --selftest 证明它会红用）。一项一行，下一行起写打开后判错的自证项：
 #   any-target  放过不挑目标的参数
@@ -47,14 +47,14 @@
 # 判法与次序：
 #   ① --copy 必须是一份副本：目录在、里面有 crates/mutations.tsv、不是这份脚本所在的主工作区（在主工作区上改坏源码会波及别的会话）；
 #   ⓪ 过了 ① 就在副本根上拿副本锁 <副本>/.prove-red.lock（排他 flock、不等），一直拿到这一次返回；拿不到（别的证红在跑）整次拒绝、退 2、一条都不跑。
-#      scripts/apply-writer-patch.py --root <副本> 开头试拿同一把锁，拿不到就不打补丁（主 agent 2026-10-10 往正在证红的副本打过补丁）；
+#      scripts/gate/apply-writer-patch.py --root <副本> 开头试拿同一把锁，拿不到就不打补丁（主 agent 2026-10-10 往正在证红的副本打过补丁）；
 #      锁的写法只在 apply-writer-patch.py 的 hold_copy_lock / release_copy_lock（这里按路径载入它）。正常收尾删掉锁文件；被打断时内核随进程放锁、文件留着不碍下一次拿；
 #   ② 逐个找变异名对应的行（read_table 读成形的行；同名的取表里最后一行）；找不到、那一行不成形、参数里没有 -p <crate>、
 #      没有 --lib / --test / --bin 之一的，整次拒绝（一条都不跑，退 2）——不挑目标的 cargo test 会把这个包的全部测试目标都编、都跑；
 #   ③ 这一行的 cargo test <参数> 照 lib_heavy_tests.classify 判（当前目录是副本的根）：重型的（checker 档包 singlefs-checker-tier 的每一行都是）
 #      只在 SINGLEFS_HEAVY_TESTS 是 commit 或 user-request（主 agent 带前缀起的）时照跑；别的时候（子 agent 起的）不跑、逐行报「本次未跑」与判成什么；
 #   ④ 每组不同的参数先跑一次基线（不改源码），基线红就停（退 2）；
-#   ⑤ 每条变异：原文在文件里恰好命中一次才改，经 scripts/run-with-memory-cap.sh <上限> 跑 cargo test <参数>，
+#   ⑤ 每条变异：原文在文件里恰好命中一次才改，经 scripts/hosts/run-with-memory-cap.sh <上限> 跑 cargo test <参数>，
 #      跑完照 verdict_of_run 判：抓到（退出码非 0、点名的测试恰好对上一个用例且有 FAILED；#[should_panic] 的结果行多一段「 - should panic」同样认）、
 #      无效（点名的一行都没出现而有 error 行或 could not compile）、没红（其余；点名省掉模块路径而对上两个用例也算）、
 #      本次未跑（点名的测试 ok 又打了 NOT_RUN_NO_GPU_ADAPTER）；跑完把原文件写回并 touch。

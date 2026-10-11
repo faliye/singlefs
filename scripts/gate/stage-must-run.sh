@@ -9,7 +9,7 @@
 # 名字说的是哪一边为真：**要不要跑**。退 0 = 要跑（输入变了、判不出来、或不许复用），退 1 = 可跳过。
 # 与 change-touches-crates.sh 同极性（那边 0 = 碰了 = 要跑），接法也一样，阶段里照抄那四行就行。
 #
-# 判法住在门禁与实验共用的准入模块里：scripts/admission.py 的 gate-reuse（登记表同一份，
+# 判法住在门禁与实验共用的准入模块里：scripts/gate/admission.py 的 gate-reuse（登记表同一份，
 # .claude/gate.d/stage-inputs.tsv）。这一份只做两件事：把模块的「可跳过」（退 10）翻成这里的 1，
 # 以及**模块自己出错一律按要跑处理**——python 起不来、抛异常退 1，都不许被读成「可跳过」，那等于把这道门禁关掉。
 #
@@ -32,7 +32,7 @@
 # 为什么只认暂存树，不看工作区：
 #   几个会话共写一个仓时，工作区随时被别人改，它不代表任何人打算提交的东西
 #   （共享 gate.sh 的「跑的过程中工作区变没变」那道指纹检查立的就是这个理由）。
-#   所以这一道只在 `SINGLEFS_STAGED_TREE` 给了树对象时才许复用——那个值由 scripts/gate-staged.sh 算一次、
+#   所以这一道只在 `SINGLEFS_STAGED_TREE` 给了树对象时才许复用——那个值由 scripts/gate/gate-staged.sh 算一次、
 #   传给整轮、跑绿之后前移同一棵。没有这个变量（有人直接跑 gate.sh）一律当成要跑。
 #
 # 复用只看两样：输入变没变、上次判绿作不作数（全绿标记在，或上次整轮全绿那棵暂存树），不看判绿那一次是多久以前。
@@ -53,6 +53,6 @@ if reuse_reason="$(python3 "$HERE/admission.py" gate-reuse "$@")"; then reuse_rc
 case "$reuse_rc" in
   0)  printf '%s\n' "$reuse_reason"; exit 0 ;;   # 要跑
   10) printf '%s\n' "$reuse_reason"; exit 1 ;;   # 可跳过
-  *)  printf '%s\n' "判不出来：准入模块 scripts/admission.py 退 ${reuse_rc}（python 起不来或出了异常，stderr 里有原因），按要跑处理"
+  *)  printf '%s\n' "判不出来：准入模块 scripts/gate/admission.py 退 ${reuse_rc}（python 起不来或出了异常，stderr 里有原因），按要跑处理"
       exit 0 ;;
 esac

@@ -3498,7 +3498,7 @@ fn run_check_point_role(arguments: &RoleArguments) -> i32 {
     0
 }
 
-// ============================== 宿主：附加根（照 scripts/e152-stage-root.sh:59-75、:88、:133-137 的办法） ==============================
+// ============================== 宿主：附加根（照 scripts/devices/e152-stage-root.sh:59-75、:88、:133-137 的办法） ==============================
 
 fn find_on_path(program: &str) -> Option<PathBuf> {
     std::env::var_os("PATH")

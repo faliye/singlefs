@@ -847,7 +847,7 @@ def cell_after_sha256_last_wins(scratch: str) -> tuple[bool, str]:
 
 
 def cell_merge_process(scratch: str) -> tuple[bool, str]:
-    running = merge_verification_processes(["  12 bash scripts/merge-and-verify.sh --batch 40", "  13 python3 other.py"])
+    running = merge_verification_processes(["  12 bash scripts/gate/merge-and-verify.sh --batch 40", "  13 python3 other.py"])
     idle = merge_verification_processes(["  13 python3 other.py"])
     return len(running) == 1 and not idle, f"有一条合入验证：数出 {len(running)}；没有：{len(idle)}"
 

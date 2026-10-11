@@ -197,7 +197,7 @@ KERNEL="$(find_kernel)" || die "找不到可读的内核镜像。SINGLEFS_KERNEL
 ok "内核 $KERNEL"
 ok "虚机 ${VM_MEM}M 内存 / ${VM_CPUS} vCPU / ${VM_DISK_MB}M virtio 盘"
 if [[ -n "${VM_EXTRA_ROOT:-}" ]]; then
-  [[ -d "$VM_EXTRA_ROOT" ]] || die "VM_EXTRA_ROOT 指的不是目录：$VM_EXTRA_ROOT" "→ 先用 scripts/e152-stage-root.sh 生成附加根，或者不设这个变量"
+  [[ -d "$VM_EXTRA_ROOT" ]] || die "VM_EXTRA_ROOT 指的不是目录：$VM_EXTRA_ROOT" "→ 先用 scripts/devices/e152-stage-root.sh 生成附加根，或者不设这个变量"
   ok "initramfs 附加根 $VM_EXTRA_ROOT（$(du -sh "$VM_EXTRA_ROOT" | cut -f1)）"
 fi
 if [[ "${VM_DISK_PREALLOCATE:-0}" == 1 ]]; then
@@ -206,13 +206,13 @@ if [[ "${VM_DISK_PREALLOCATE:-0}" == 1 ]]; then
 fi
 
 # blklogwrites 一支（run_one 里 VM_IOPS 为空、VM_BLKLOGWRITES_DIR 非空才走它）用打了补丁的 QEMU：系统 QEMU 8.2.2 的 blklogwrites 在数据段数
-# ≥ 1023 时写日志回 EINVAL、来宾拿到 EIO（scripts/qemu/blklogwrites-linearize-over-iov-max.patch）。路径来自主工作树根的本地配置 qemu.env
+# ≥ 1023 时写日志回 EINVAL、来宾拿到 EIO（scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch）。路径来自主工作树根的本地配置 qemu.env
 # （模板 qemu.env.example；SINGLEFS_QEMU_CONFIG 可另指一份），配置缺、二进制缺、开跑前 qemu-blklogwrites-check.sh 判红都拒绝，不退回系统 QEMU。
 # 别的分支照用 PATH 上的 qemu-system-x86_64。
 QEMU_SYSTEM_BINARY=qemu-system-x86_64
 if [[ -z "${VM_IOPS:-}" && -n "${VM_BLKLOGWRITES_DIR:-}" ]]; then
   vm_bench_script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  patched_qemu_howto="跑 scripts/build-patched-qemu.sh 装补好的 QEMU，照仓根 qemu.env.example 建 qemu.env、写上它最后打印的 SINGLEFS_QEMU_HOME=…，再重跑"
+  patched_qemu_howto="跑 scripts/devices/build-patched-qemu.sh 装补好的 QEMU，照仓根 qemu.env.example 建 qemu.env、写上它最后打印的 SINGLEFS_QEMU_HOME=…，再重跑"
   if [[ -n "${SINGLEFS_QEMU_CONFIG:-}" ]]; then
     qemu_configuration_file="$SINGLEFS_QEMU_CONFIG"
   else

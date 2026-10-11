@@ -4,12 +4,12 @@
 # 跑 `gate.sh --staged`，整轮全绿才把 `refs/sop/staged-green` 前移到这一次被判的那棵暂存树。
 #
 #   gate-staged.sh [项目根] [传给 gate.sh 的别的参数…]
-#   gate-staged.sh --selftest   自证：转给 scripts/gate-staged-selftest.sh（临时仓 + 假 gate.sh，全绿 / 有红 / 跑的过程中暂存区变了，格数由它的成功行现算）
+#   gate-staged.sh --selftest   自证：转给 scripts/gate/gate-staged-selftest.sh（临时仓 + 假 gate.sh，全绿 / 有红 / 跑的过程中暂存区变了，格数由它的成功行现算）
 #
 # 为什么前移放在外壳里：共享 `gate.sh` 在上游（`.claude/singlefs-ai-sop/scripts/`），本仓的
 # `.claude/scripts/gate.sh` 只是 `exec` 转发，中间没有钩子。前移那一句只能由**起门禁的人**来做。
 #
-# 三条规矩（`scripts/stage-must-run.sh` 的文件头写了为什么）：
+# 三条规矩（`scripts/gate/stage-must-run.sh` 的文件头写了为什么）：
 #   ① 只认暂存树：`git write-tree` 算出来的那一棵，别的会话未暂存的改动进不来。
 #   ② 只有整轮**全绿**才前移；有红不动——红的那一趟什么也没证明。
 #   ③ 不带 `--staged` 跑不许前移，所以这个外壳只做 `--staged` 这一条路。

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E171 第一段多机跑法的第二台（及以后各台）那一头：rows_orchestrator.py 经 scripts/multi-host-run.sh --peer 把它与 expected.json
+"""E171 第一段多机跑法的第二台（及以后各台）那一头：rows_orchestrator.py 经 scripts/hosts/multi-host-run.sh --peer 把它与 expected.json
 送进那边的树（research/e171-s1-peer-kit/），在那棵树的树根跑。只用标准库与树里的 row_driver、frozen_o3。
 
   peer_side.py preflight  --expected <json> --slots N --threads T [--compile]
@@ -93,7 +93,7 @@ def preflight(arguments: argparse.Namespace, expected: dict) -> int:
         log_path = os.path.join(out, "preflight-compile.log")
         environment = dict(os.environ, CARGO_TARGET_DIR=os.path.join(os.getcwd(), PREFLIGHT_TARGET_RELATIVE))
         with open(log_path, "w", encoding="utf-8") as log:
-            code = subprocess.run(["bash", os.path.join(os.getcwd(), "scripts/capped.sh"), str(arguments.threads), "nice", "-n", "19", "cargo",
+            code = subprocess.run(["bash", os.path.join(os.getcwd(), "scripts/hosts/capped.sh"), str(arguments.threads), "nice", "-n", "19", "cargo",
                                    "build", "--release", "--offline", "-p", DEVICE_PACKAGE, "--bin", DEVICE_BINARY_NAME],
                                   cwd=PREFLIGHT_TREE_RELATIVE, env=environment, stdout=log, stderr=subprocess.STDOUT).returncode
         checks.append(("offline_compile", code == 0, f"cargo_exit={code}"))

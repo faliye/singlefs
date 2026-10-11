@@ -2,7 +2,7 @@ blklogwrites: linearize the data when a write would exceed IOV_MAX
 
 Applies with `patch -p1` on top of the Ubuntu source package qemu
 1:8.2.2+ds-0ubuntu1.18 (after its own debian/patches);
-scripts/build-patched-qemu.sh does that and installs the result
+scripts/devices/build-patched-qemu.sh does that and installs the result
 into a private prefix.
 
 What it fixes: blk_log_writes_co_log() writes each log entry as one request
@@ -27,7 +27,7 @@ merging requests above the limit. A single request that already has 1023+
 iovecs (qemu-io `writev` with 1023 buffers, or any other front end) still
 reaches blk_log_writes_co_log() and still fails.
 
-Check: scripts/qemu-blklogwrites-check.sh <qemu-io> writes 1022,
+Check: scripts/devices/qemu-blklogwrites-check.sh <qemu-io> writes 1022,
 1023, 1024 and 2048 iovecs of 4 KiB through blklogwrites and compares the
 logged data and the data disk with what was written.
 

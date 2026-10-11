@@ -7,8 +7,8 @@
 删的时候最容易出的错是顺手带走一句谁也没注意到的判据——删了不会有任何东西报警。
 这个脚本拿 git 里的那一版当基准，逐片段查它今天还在不在。
 
-  python3 scripts/rules-sweep-audit.py .claude/rules/x.md [--base HEAD]
-  python3 scripts/rules-sweep-audit.py --selftest
+  python3 scripts/kb/rules-sweep-audit.py .claude/rules/x.md [--base HEAD]
+  python3 scripts/kb/rules-sweep-audit.py --selftest
 
 退出码：0 = 每个片段都找得到；1 = 有片段找不到，逐条列出；2 = 用法或环境不对。
 找不到不等于错：删掉日期、把「（2026-09-17 用户定）」整个去掉，都会让那一句对不上。

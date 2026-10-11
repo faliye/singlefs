@@ -1,5 +1,5 @@
 """E171 第 1 次重跑·修订 10（修订 8 那一趟的第二段整表）几份装置的单测（研究一侧变异表
-scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes_revision_10.tsv 经 mutation_driver.py --unit-test-module test_revision_10 跑）。
+scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_10.tsv 经 mutation_driver.py --unit-test-module test_revision_10 跑）。
 每条用例一个场景、自己建自己删临时目录；只调纯函数与进程内的小件，不起装置、不编、不连别的台、不起编排器。"""
 from __future__ import annotations
 

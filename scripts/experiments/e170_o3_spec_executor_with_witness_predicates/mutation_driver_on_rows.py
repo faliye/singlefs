@@ -1,6 +1,6 @@
 """E170 第 2 次重跑第二段：X21（W 恒假）在第 242、269 行、X27（T 恒真）在第 270 行各跑一趟（`research/prompts/e170-r2-prereg.md` 第六节 Q2-pc、Q3-pc，第九节）。
 
-在草稿目录里拷一份 v2 的冻结文件，照变异表 `scripts/mutations/e170_o3_spec_executor_with_witness_predicates.tsv`（每行：名字、原文、替换文）
+在草稿目录里拷一份 v2 的冻结文件，照变异表 `scripts/mutation/tables/e170_o3_spec_executor_with_witness_predicates.tsv`（每行：名字、原文、替换文）
 把名字以 `--mutation` 起头的那一条施加上去：原文在拷贝的 .py 文件里合起来恰好命中一次才施加，否则退 3、不跑。施加之后在拷贝里跑
 `executor_main.py`，产物写到 `--output`。驱动只打命中的文件名与次数，不打原文与替换文（第二段写参照谓词的人不读 v2 的 W、T 判法，5.4）。
 v2 目录本身一个字节不动；拷贝跑完删掉。文件名以 mutation_driver 起头，不进 v2 冻结的 sha256。

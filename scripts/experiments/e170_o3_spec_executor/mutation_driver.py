@@ -1,6 +1,6 @@
-"""E170（O3规约执行器第一版） 第三段：执行器与比对器的变异驱动（登记第九节 X1–X11、XC1；表 scripts/mutations/e170_o3_spec_executor.tsv）。
+"""E170（O3规约执行器第一版） 第三段：执行器与比对器的变异驱动（登记第九节 X1–X11、XC1；表 scripts/mutation/tables/e170_o3_spec_executor.tsv）。
 
-scripts/mutate.sh 只跑 cargo，这一侧照它的形态写（登记第九节）：派活之前逐条核锚点——原文（\\n 还原成换行）在本目录全部 .py
+scripts/mutation/mutate.sh 只跑 cargo，这一侧照它的形态写（登记第九节）：派活之前逐条核锚点——原文（\\n 还原成换行）在本目录全部 .py
 （本文件除外）里合起来恰好命中一次，不是就退 3、一条不跑；每条在草稿目录的一份副本上替换、编译（compile）、跑单测与检查
 （comparator_mutation_checks.py）、删副本；收尾在一份新副本上重跑基线，核「已还原，基线仍全绿」，并核本目录在跑前跑后逐字节相同。
 结局照 .claude/rules/mutation-sampling.md 的符号：✅ 抓到（单测红，或基线上为真的检查转假）、⏭ 无效（替换之后编不过）、❌ 没红、

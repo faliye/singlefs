@@ -65,7 +65,7 @@ for variant in broken missing; do
   mkdir -p "$D/$variant/scripts" "$D/$variant/.claude"
   ln -s "$ASK_LOCAL_REPOSITORY_ROOT/.claude/scripts" "$D/$variant/.claude/scripts"
   ln -s "$ASK_LOCAL_REPOSITORY_ROOT/.claude/singlefs-ai-sop" "$D/$variant/.claude/singlefs-ai-sop"
-  cp "$ASK_LOCAL" "$D/$variant/scripts/ask-local.sh"
+  cp "$ASK_LOCAL" "$D/$variant/scripts/agents/ask-local.sh"
 done
 for checker in corruption-check.py oov-check.py; do printf 'import sys\nsys.exit(2)\n' > "$D/broken/scripts/$checker"; done
 case_count=2; assertion_count=5   # ①② 两个用例、5 条断言；下面每个变体加 1 个用例、3 条断言
@@ -73,7 +73,7 @@ for variant in broken missing; do
   case_count=$((case_count + 1)); assertion_count=$((assertion_count + 3))
   if [[ $variant == broken ]]; then label="崩了"; else label="找不到"; fi
   printf 'ask-local selftest prompt %s.\n' "$variant" > "$D/case-$variant-prompt.md"
-  ASK_LOCAL_FAKE_TEXT="$D/clean.txt" bash "$D/$variant/scripts/ask-local.sh" "$D/case-$variant-prompt.md" >"$D/o-$variant" 2>"$D/e-$variant"
+  ASK_LOCAL_FAKE_TEXT="$D/clean.txt" bash "$D/$variant/scripts/agents/ask-local.sh" "$D/case-$variant-prompt.md" >"$D/o-$variant" 2>"$D/e-$variant"
   rc=$?
   [[ $rc -eq 6 ]] || { say ✗ "检测器${label}时应退 6，实际 $rc——没验过的一份会被当成过了闸"; fail=1; }
   [[ ! -s "$D/o-$variant" ]] || { say ✗ "检测器${label}时 stdout 却有正文——没验过的输出会顶着合法名字落盘"; fail=1; }

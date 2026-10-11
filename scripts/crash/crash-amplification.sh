@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # admission: always 每次调都在这一刻的树上跑全量或点名的分项；哪些块要重判由库里的块键与判法版本定，不在这里
 # run-condition: command bash cargo python3
-# run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
-# 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/detached-run.sh start --wall-clock over-2h 与 long-run-check、scripts/host-dispatch.py 文件头 ⓪ 都读这几行）：
+# run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
+# 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/hosts/detached-run.sh start --wall-clock over-2h 与 long-run-check、scripts/hosts/host-dispatch.py 文件头 ⓪ 都读这几行）：
 # long-run-shards: 按登记表 ITEMS 的分项逐项跑；多机配置开着双机时，每一项由 crash-amplification-two-hosts.sh 把它的状态块按两台量到的速度分成两份（SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/2、1/2），第二台那一份取回、导入本机库并成一份
 # long-run-resume: 一份库装全部分项（${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library-by-conclusion-kind，在 /tmp 之外）；重起同一条命令就是续跑：同一判法版本下判过的块全部复用、只判没判过的，第二台判到一半被停也先导入再退
 # long-run-unshardable: 多机：台数只认多机配置的双机开关（至多本机与 PEER_SSH_HOST 两台，不读 layer0-shard-configuration-check.sh --emit-hosts 的清单）；跑的那一步线程取 --threads 或本机核数减一、内存上限取 --memory-cap 与 --peer-memory-cap（本机默认 38G），只有本机只编那一步与第二台那两趟的线程按 host-resources.py --json 现算
@@ -18,21 +18,21 @@
 #                                                           末尾一轮从下面「弄坏开关」那张表现读开关、逐个打开，核它红在点名的那几格
 #   其余参数原样交给每一项的分项驱动：[--threads <N>] [--memory-cap <上限>] [--peer-memory-cap <上限>] [--library <库目录>] [--label <标签>]
 #
-# 崩溃点重放的合表（.claude/gate.d/crash-point-replay-items.tsv，入口 scripts/crash-point-replay.sh）一项一条流，每项点名它在这里的分项（第三列）：
-#   这 8 项都要在合表里恰好被一项点名（合表那一份的判法 scripts/lib_crash_point_replay_items.py 核），入口照合表逐项调这里的 --item。
+# 崩溃点重放的合表（.claude/gate.d/crash-point-replay-items.tsv，入口 scripts/crash/crash-point-replay.sh）一项一条流，每项点名它在这里的分项（第三列）：
+#   这 8 项都要在合表里恰好被一项点名（合表那一份的判法 scripts/crash/lib_crash_point_replay_items.py 核），入口照合表逐项调这里的 --item。
 # 分项登记在 ITEMS：一行「分项名 <TAB> 测试目标 <TAB> 用例函数 <TAB> 档位」，一个分项就是 crates/singlefs-checker-tier/tests/ 下一条走
 # crash_amplification::run_from_environment 的用例（用例函数经分项驱动的 --test-filter 点名，cargo test 的 --exact）。档位今天只有「全量」：
 # 每一项都是穷举、要 checker 档的重活，只在全量里跑，不在快档（--list-items 写成「全量（不在快档）」）。
 # 崩溃注入（crash_injection_campaign）不在表里：它是随机历史上的抽样、没有固定的点序列与树，是轻测，归普通 cargo test。
 # 一份库装全部分项（默认 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library-by-conclusion-kind，在 /tmp 之外；
-# 子目录名与「按结论种类存之前的旧库 <家目录>/library 引擎开库就拒、不删不读」见 scripts/crash-amplification-lib.sh 文件头「判定库」）：
+# 子目录名与「按结论种类存之前的旧库 <家目录>/library 引擎开库就拒、不删不读」见 scripts/crash/crash-amplification-lib.sh 文件头「判定库」）：
 # 几条流共前缀，同一份库里前缀节点只判一次；重跑同一条命令就是续跑——同一判法版本下判过的块全部复用，判法版本变了旧行留作历史、这一版从头判。
-# 每项交 scripts/crash-amplification-item.sh 跑：配置几台就跑几台、配置开了 GPU 就由 GPU 判，做不到那一项报错
+# 每项交 scripts/crash/crash-amplification-item.sh 跑：配置几台就跑几台、配置开了 GPU 就由 GPU 判，做不到那一项报错
 # （用户 2026-09-29 定：「配置中一台机器就要跑一台，配置中两台机器就要跑两台，配置中有gpu就一定要让GPU工作 如果不行就明确报错拒绝，不接受默认降级」）。
 # 运行条件：配置上判得了的（多机配置开了 GPU 却一份卡都没写、点名的卡与双机开关对不上）由文件头 run-condition: check 在开跑之前判（同分项驱动，判法在
 #   crash-amplification-lib.sh 的 crash_amplification_run_condition_holds）；跑起来才知道的退 78：开跑前清场回读没过或多机配置没写全清场那两个键、某一项的驱动退 78
 #   （显卡或第二台用不上）。出路都是「修好设备，或改配置」。
-# 清场（用户 2026-09-29 定「每次一定全量要清场」）：选好分项之后经 scripts/gpu-quiesce-run.sh 重起自己（同一组参数）：照多机配置清场并回读
+# 清场（用户 2026-09-29 定「每次一定全量要清场」）：选好分项之后经 scripts/crash/gpu-quiesce-run.sh 重起自己（同一组参数）：照多机配置清场并回读
 # （回读没过退 78、一项都不跑；卡上有不归清场白名单的计算进程时就是这样，等它跑完再起，这里不停它），每一项都带 --quiesced 跑（显卡用清场之后那一份先后与额度），
 # 整趟跑完、跑红或被打断都不复原（那份包装打 GPU_QUIESCE step=restore result=not-restored；要复原由用户手动跑私有复原脚本，多机配置的 QUIESCE_START_COMMAND）。
 # 重起的那一趟认包装交下来的 GPU_QUIESCE_HOLDER（文件在、文件名以父进程号加「-」起头），不再清。
@@ -78,7 +78,7 @@
 #     分份行：share=<i>/<n>、n>1 的行，与不带 share= 而 mode=two_hosts_* 的 flow= 行（tests/common_crash_points/mod.rs 的 amplify_prepared_flow 打的，
 #     两台各领一份时它的 unjudged_blocks 含对方那一份）；导入行（行尾 import_run=true，或带 imported_blocks>0）不是分份行，它留的块照算。
 #     本机先判着、被有意叫停的那一行（行尾 warm_up=true，双机驱动加的）也不算。
-#     分项驱动退 77（一项都没跑到：排派活计划那一趟借不到显存、一块都没判，或第二台排计划那一趟借不到显存；scripts/crash-amplification-item.sh 文件头「退出码」）
+#     分项驱动退 77（一项都没跑到：排派活计划那一趟借不到显存、一块都没判，或第二台排计划那一趟借不到显存；scripts/crash/crash-amplification-item.sh 文件头「退出码」）
 #     也是 not-run，不按「驱动退非 0」判红；原因写它打的 CRASH_AMPLIFICATION_NOT_RUN 行的 reason=（没打那一行的照写没打）。
 #     驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN 行（一条用例几条流，没借到显存的那几条各一行，借到的照判）同样是 not-run，原因写几条流没判与第一行的 reason=：
 #     这一项不算通过。这两种都不按「驱动退 0 却 0 行」判红，全量里也不按「现判 0 态、复用 0 态」判红；行里报了红照样记 red。
@@ -123,15 +123,15 @@
 #       平常跑时带了只给自证用的变量（见「只供自证」）
 #   77  派出的项一项都没判完（全是 not-run），也没有红
 #   78  运行条件不满足（出路：修好设备，或改配置）：preflight 判的（文件头两条 run-condition；含开了 GPU 而多机配置里一份卡都没写）、
-#       开跑前清场回读没过或多机配置没写全清场那两个键（scripts/gpu-quiesce-run.sh 判的，它打 GPU_QUIESCE step=command result=not-started）、
+#       开跑前清场回读没过或多机配置没写全清场那两个键（scripts/crash/gpu-quiesce-run.sh 判的，它打 GPU_QUIESCE step=command result=not-started）、
 #       建不了放每项输出的目录、某一项的驱动退 78（这一趟没有红时）
 #   preflight 自己判不了条件（声明写坏）时退 1，见 .claude/singlefs-ai-sop/rules/preflight-discipline.md「不满足时」。没有别的退出码。
 # 弄坏开关 CRASH_AMPLIFICATION_BREAK=<项>（几个用逗号连；只在自证起的子进程里认）。逐项写开关名、弄坏哪一处、打开后 --selftest 哪几格该红
 #   （格号是 run_selftest 里的第 1–33 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
-# 写法（B 写法，样板是 scripts/mutate.sh 文件头「弄坏开关」一段）：一行「#   CRASH_AMPLIFICATION_BREAK=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头
+# 写法（B 写法，样板是 scripts/mutation/mutate.sh 文件头「弄坏开关」一段）：一行「#   CRASH_AMPLIFICATION_BREAK=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头
 #   写点名的格「第 N 格」（、隔开；括号里是那一格失败行的句首，开关轮不读，括号外的每一段都算一格）。--selftest 末尾那一轮（开关轮）从这张表现读
 #   （crash-amplification-lib.sh 的 crash_amplification_read_switch_table，与双机驱动同一份读法）：表里 CRASH_AMPLIFICATION_BREAK 的开关与代码里认的开关要相等
-#   （表里另列清场包装 scripts/gpu-quiesce-run.sh 的 GPU_QUIESCE_BREAK 开关，它们在那份包装里认，经重起的那一趟带进去），
+#   （表里另列清场包装 scripts/crash/gpu-quiesce-run.sh 的 GPU_QUIESCE_BREAK 开关，它们在那份包装里认，经重起的那一趟带进去），
 #   每个逐个打开、要退 1、红的格与点名的逐格相等：
 #   CRASH_AMPLIFICATION_BREAK=swallow-exit  分项驱动退非 0 也记 0
 #       第 8 格（「驱动退非 0 没记成红」）、第 20 格（「驱动退 78 却没停下退 78」）、第 22 格（「有红又有一项退 78 时没退 1」）、
@@ -204,10 +204,10 @@
 #   CRASH_AMPLIFICATION_ITEM_DRIVER=<脚本> 换掉分项驱动（自证用假的）。
 #   「自证起的子进程」的标记：CRASH_AMPLIFICATION_SELFTEST_MARK=<文件>，那份文件在、内容是 SELFTEST_MARK_CONTENT 那一行；只有 run_selftest 设它。
 #   这五个变量读完就从环境里清掉，不传给分项驱动；经清场包装重起的那一趟由这里原样交回去（只在自证起的子进程里）。
-#   清场走真的 scripts/gpu-quiesce-run.sh：自证把多机配置指到临时目录里只写了假清场命令的一份、状态目录指到临时目录，不碰真的清场命令。
+#   清场走真的 scripts/crash/gpu-quiesce-run.sh：自证把多机配置指到临时目录里只写了假清场命令的一份、状态目录指到临时目录，不碰真的清场命令。
 #   CRASH_AMPLIFICATION_SWITCH_TABLE=<文件>：--selftest 末尾的开关轮从这份文件的文件头读开关表（不设读本脚本自己的），代码里认的开关照旧从本脚本取；
 #     拿一份改坏了表的拷贝（删一格、多一格、格名写错）证开关轮会红。只在 --selftest 的开关轮里读：平常跑不读它，不在上面拒跑的四个之列。
-# 自证末尾那一轮（开关轮）走 scripts/crash-amplification-lib.sh 的 crash_amplification_switch_wheel（与双机驱动共用，判法与并行度见那份文件头「弄坏开关轮」）：
+# 自证末尾那一轮（开关轮）走 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_switch_wheel（与双机驱动共用，判法与并行度见那份文件头「弄坏开关轮」）：
 #   并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS（正整数），没给取 SINGLEFS_THREAD_CAP，再没给按 nproc；一个开关一个进程，各写各的输出文件，逐个 wait 收。
 #
 # gate-similar: crash-amplification-item.sh 它跑一个分项的一趟（排派活计划、定在哪跑）；这里是分项登记表与全量的循环，每项调它
@@ -914,7 +914,7 @@ fi
 unset CRASH_AMPLIFICATION_BREAK CRASH_AMPLIFICATION_SELFTEST_RED_ITEM CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT CRASH_AMPLIFICATION_ITEM_DRIVER
 
 driver="${test_item_driver:-$crash_amplification_script_directory/crash-amplification-item.sh}"
-[[ -f "$driver" ]] || { echo "  ✗ 分项驱动不在：$driver" >&2; echo "  → 怎么办：scripts/crash-amplification-item.sh 要在；自证起的子进程用 CRASH_AMPLIFICATION_ITEM_DRIVER 指假的" >&2; exit 2; }
+[[ -f "$driver" ]] || { echo "  ✗ 分项驱动不在：$driver" >&2; echo "  → 怎么办：scripts/crash/crash-amplification-item.sh 要在；自证起的子进程用 CRASH_AMPLIFICATION_ITEM_DRIVER 指假的" >&2; exit 2; }
 
 # 选分项：没点名就是全量；点名的每个都要在登记表里，重名只取一次
 rows_to_run=()
@@ -948,7 +948,7 @@ driver_arguments+=(--expand-up-to "$requested_expand_up_to")
 quiesced_arguments=()
 if [[ -n "${GPU_QUIESCE_HOLDER:-}" && -e "${GPU_QUIESCE_HOLDER:-}" && "${GPU_QUIESCE_HOLDER##*/}" == "$PPID-"* ]]; then
   quiesced_arguments=(--quiesced)
-  echo "  · 清了场（经 scripts/gpu-quiesce-run.sh）：每一项带 --quiesced 跑，跑完不复原（要复原手动跑私有复原脚本，多机配置的 QUIESCE_START_COMMAND）"
+  echo "  · 清了场（经 scripts/crash/gpu-quiesce-run.sh）：每一项带 --quiesced 跑，跑完不复原（要复原手动跑私有复原脚本，多机配置的 QUIESCE_START_COMMAND）"
 elif ! crash_amplification_break_is no-quiesce; then
   reexec_environment=()
   if (( running_under_selftest )); then
@@ -960,7 +960,7 @@ elif ! crash_amplification_break_is no-quiesce; then
   fi
   reexec_arguments=(${entry_original_arguments[@]+"${entry_original_arguments[@]}"})
   if [[ "${PREFLIGHT_FORCE_GIVEN:-0}" == 1 ]]; then reexec_arguments+=(--force); fi
-  echo "  · 经 scripts/gpu-quiesce-run.sh 清场，带同一组参数重起这一趟，跑完不复原" >&2
+  echo "  · 经 scripts/crash/gpu-quiesce-run.sh 清场，带同一组参数重起这一趟，跑完不复原" >&2
   exec env ${reexec_environment[@]+"${reexec_environment[@]}"} bash "$crash_amplification_script_directory/gpu-quiesce-run.sh" -- bash "$0" ${reexec_arguments[@]+"${reexec_arguments[@]}"}
 fi
 

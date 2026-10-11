@@ -15,7 +15,7 @@ mutation-light-rows 格调 check，门禁 checker-tier-crates-mutation-replay �
 
 核法（problems）：
   ① 登记表每一行两段（再加 # 说明）、变异名不空、同一个变异名不登记两次；
-  ② 点名的变异名在 crates/mutations.tsv 里有成形的一行（成形照 scripts/crates-mutation-rows.py 的 read_table，同一份判法）；
+  ② 点名的变异名在 crates/mutations.tsv 里有成形的一行（成形照 scripts/mutation/crates-mutation-rows.py 的 read_table，同一份判法）；
   ③ 写的测试目标与那一行第五列 ` -- ` 之前那一段相同；
   ④ crates/mutations.tsv 里改坏对象在 crates/singlefs-core/src/ 下的成形的行，它们出现过的每个测试目标，登记表里恰好一行：缺的逐个列出、
      并给出照挑法该补的那一行（那些核心行里行号最小的那一条）；一个测试目标登记了两行以上的也红。核心行之外的测试目标不要求登记；

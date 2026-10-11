@@ -59,7 +59,7 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 REPOSITORY_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
-SCRIPT_RELATIVE_PATH = 'scripts/test-environment-check.py'
+SCRIPT_RELATIVE_PATH = 'scripts/hosts/test-environment-check.py'
 BREAK_SWITCH_VARIABLE = 'TEST_ENVIRONMENT_CHECK_BREAK'
 BREAK_SWITCH_NAMES = ('aliveowner', 'allowlist', 'openfile', 'pidreuse', 'recent',
                       'readonly', 'freespace', 'kernellog', 'loopbacking', 'deleteguard', 'gaterunscanned', 'crossrununscanned')
@@ -75,22 +75,22 @@ PROCESS_IDENTIFIER_REUSE_SLACK_SECONDS = 2.0
 ALLOWLIST = (
     (re.compile(r'^singlefs-crates-mutation-target(-w[0-9]+)?(-coverage)?$'),
      '门禁 checker-tier-crates-mutation-replay 的 cargo 编译产物目录，跨轮复用；带 -w<片号> 的是它分片并发跑时每片各自的那一个，带 -coverage 的是那一片记覆盖的插桩编译'
-     '（scripts/crates-mutation-rows.py 的 prepare_shard 与 default_shared_target_directory）。'
+     '（scripts/mutation/crates-mutation-rows.py 的 prepare_shard 与 default_shared_target_directory）。'
      '只在设了 GATE_CROSS_RUN_TMPDIR（gate.sh 设成它开跑前的 TMPDIR）时落在临时目录下，都没设落在 ~/.local/share/singlefs/cross-run-cache/ 下；'
      '片号大于那一趟工作进程数的由它自己开跑时回收（有进程在用的不删），这里不判残留、clean 不碰'),
     (re.compile(r'^singlefs-mutate-target$'),
-     'mutate.sh 的 cargo 编译产物目录，跨轮复用（scripts/mutate.sh 的 MUTATE_TARGET）'),
+     'mutate.sh 的 cargo 编译产物目录，跨轮复用（scripts/mutation/mutate.sh 的 MUTATE_TARGET）'),
     (re.compile(r'^singlefs-e152-packages$'),
-     'E152 六家文件系统的下载包缓存（scripts/e152-stage-root.sh 第 16 行）'),
+     'E152 六家文件系统的下载包缓存（scripts/devices/e152-stage-root.sh 第 16 行）'),
     (re.compile(r'^singlefs-pdftext-[0-9]+$'),
-     '引文核对的 PDF 抽文本缓存，名字里是 uid 不是 pid（scripts/verify-citations.sh 的 PDFTXT_CACHE）'),
+     '引文核对的 PDF 抽文本缓存，名字里是 uid 不是 pid（scripts/kb/verify-citations.sh 的 PDFTXT_CACHE）'),
     (re.compile(r'^singlefs-vmlinuz(-.+)?$'),
-     '给 QEMU 用的可读内核副本（scripts/vm-kernel.sh 第 19、36 行）'),
+     '给 QEMU 用的可读内核副本（scripts/devices/vm-kernel.sh 第 19、36 行）'),
 )
 
 # 名字里带创建者 pid 的形态：按 pid 判创建者在不在。第一个捕获组是 pid。
 PROCESS_IDENTIFIER_NAME_PATTERNS = (
-    (re.compile(r'^singlefs-replay-([0-9]+)$'), 'scripts/replay.sh 第 16 行'),
+    (re.compile(r'^singlefs-replay-([0-9]+)$'), 'scripts/experiments/replay.sh 第 16 行'),
     (re.compile(r'^singlefs-step[0-9]+-.+-([0-9]+)-[0-9]+-dev[0-9]+\.img$'),
      'crates/singlefs-harness/tests/ 的 image_path'),
     (re.compile(r'^singlefs-core-fake-sysfs-([0-9]+)$'), 'crates/singlefs-core/src/block_device.rs 第 562 行'),

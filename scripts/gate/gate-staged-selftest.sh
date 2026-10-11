@@ -150,11 +150,11 @@ for mutation_index in "${!MUTATION_NAMES[@]}"; do
   mkdir -p "$scratch/scripts" "$scratch/.claude"
   ln -s "$(cd "$(dirname "$TARGET")/../.." && pwd)/.claude/singlefs-ai-sop" "$scratch/.claude/singlefs-ai-sop"
   ln -s "$(cd "$(dirname "$TARGET")/../.." && pwd)/.claude/scripts" "$scratch/.claude/scripts"
-  if ! occurrences="$(apply_mutation "$TARGET" "$scratch/scripts/gate-staged.sh" "${MUTATION_ORIGINALS[$mutation_index]}" "${MUTATION_REPLACEMENTS[$mutation_index]}")"; then
+  if ! occurrences="$(apply_mutation "$TARGET" "$scratch/scripts/gate/gate-staged.sh" "${MUTATION_ORIGINALS[$mutation_index]}" "${MUTATION_REPLACEMENTS[$mutation_index]}")"; then
     echo "  ✗ 改坏「$name」没施加上：原文在 $TARGET 里命中 ${occurrences:-?} 次（要恰好 1 次），这一格的判别力没证"   # gate-lint:detail
     failures=$((failures + 1)); continue
   fi
-  run_cells "$scratch/scripts/gate-staged.sh" "$scratch/results.tsv" "$scratch"
+  run_cells "$scratch/scripts/gate/gate-staged.sh" "$scratch/results.tsv" "$scratch"
   if ! grep -qF "FAIL	$cell	" "$scratch/results.tsv"; then
     echo "  ✗ 改坏「$name」之后，「$cell」那一格照样过——这一格分不出好坏"   # gate-lint:detail
     failures=$((failures + 1))

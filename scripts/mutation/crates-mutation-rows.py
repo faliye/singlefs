@@ -26,7 +26,7 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
                                         下一行「→ 怎么办」，退 2
   judge-version <根>              这棵树此刻的判法版本（见「判定库」）：打「<sha256> <项数>」；算不出退 2
   records-directory <根>                这棵树此刻那一格判定库记录目录的路径（双机分片的驱动拷记录用）；算不出退 2
-  row-plan <根>                         双机分片的驱动（scripts/mutation-shard-run.sh）分行用：每一条成形的变异打一行
+  row-plan <根>                         双机分片的驱动（scripts/mutation/mutation-shard-run.sh）分行用：每一条成形的变异打一行
                                           <行号> <行键> <这一趟会不会复用，1 或 0> <上一次现跑的秒数，没记过写 ->
                                         （制表符分隔；「会不会复用」与 run_stage 同一份判法 reuse_decision，SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1 时一律 0）；
                                         退 0；读不了表、上限写错、算不出判法版本退 2
@@ -49,14 +49,14 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   副本里编得过就在）；指到仓根本身（"../../" 这一类）按不在范围里算（之后拼上的是哪一份判不出）。
 
 判定库（checker-tier-crates-mutation-replay 每条判完立刻写，下一趟按「复用判据」逐行判复用还是现跑）：
-  Python 一侧判定库的共用部分在 scripts/lib_verdict_library.py（原子写 write_atomically、按键读 read_text、现判与复用分开报 Tally），这里调它；
+  Python 一侧判定库的共用部分在 scripts/crash/lib_verdict_library.py（原子写 write_atomically、按键读 read_text、现判与复用分开报 Tally），这里调它；
     这一份每条另挂覆盖记录、快照与源码副本，存放布局与复用判据在这里，不在共用部分。
   键分两列（判定库文件头「键分两列」）：判法版本定这一格目录，行键（这一行的输入指纹里不随源码变的那一段）定一条记录；
     这一行改坏的源码与它执行过的函数不进行键，由快照与覆盖记录按「复用判据」比。
   放在被判那棵树的 git common-dir 下 singlefs-mutation-rows/<判法版本>/：一条一个文件 mutation.<行键>（变异的判定）、baseline.<行键>（基线），
     子目录 coverage/<覆盖号>.json.gz（覆盖记录）、snapshots/<快照号>.json.gz（快照）、blobs/<sha256>（源码副本，zlib 压过）。
-  判法版本 = 登记行 + 阶段脚本 + 本模块 + scripts/mutation-prune.py（切词与切 fn 项）+ scripts/lib_libtest_result_lines.py（libtest 结果行）
-    + scripts/lib_verdict_library.py（判定库共用部分）+ 这一趟用的内存包装，连同构建环境（admission.py 的 build_environment_lines：照理是输入，
+  判法版本 = 登记行 + 阶段脚本 + 本模块 + scripts/mutation/mutation-prune.py（切词与切 fn 项）+ scripts/gate/lib_libtest_result_lines.py（libtest 结果行）
+    + scripts/crash/lib_verdict_library.py（判定库共用部分）+ 这一趟用的内存包装，连同构建环境（admission.py 的 build_environment_lines：照理是输入，
     对每一行都一样，变了整张重判，所以放进这一列），不含被测源码；阶段脚本、本模块、mutation-prune.py、lib_libtest_result_lines.py、lib_verdict_library.py 与内存包装按内容进（名字里不带绝对路径，主工作区与临时 worktree、两台机器上算出同一个数）。这几样变了换一格目录，旧记录一条都不用。
   行键 = sha256（这一行六段原样用制表符接起来 + 这一趟的每条内存上限 + 每条限时 + 工具链：cargo -V 与 rustc -V 原样，toolchain_text）。
   快照 = 拷贝范围里 research/ 之外每个文件（跳过 target 与 crates/mutations.tsv，照 prepare_shard 拷的那样走）的「路径 → sha256」；快照号是它的 sha256。
@@ -71,7 +71,7 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
     ② cargo test -- <开关> --exact <用例全名>，LLVM_PROFILE_FILE=<这一格的 TMPDIR>/cov-%p-%m.profraw；点名用例要恰好一行 ok；
     ③ llvm-profdata merge -sparse，llvm-cov export -format=text -skip-expansions，对象是 ① 编出来的本仓每个可执行文件（测试与 bin）；
     ④ 记：编进去的文件（① 里本仓每个编译单元的 cargo dep-info，proc-macro 与构建脚本的单元另记成编译期）、涉及的包目录、
-       执行过的函数（计数 > 0 的函数按它第一段代码区域落进哪个最外层 fn 项，照 scripts/mutation-prune.py 的 covered_containers：
+       执行过的函数（计数 > 0 的函数按它第一段代码区域落进哪个最外层 fn 项，照 scripts/mutation/mutation-prune.py 的 covered_containers：
        「文件 + 限定名」，落在 fn 项之外记 <函数外>、文件切不开记 <整个文件>），编进去的每个 .rs 存一份源码副本。
     ①–③ 经内存包装、上限与限时同变异；有一步不成这一组合不记（下一趟照「没有覆盖记录」现跑），成功句另报「覆盖没记成 N 组」，不判红。
     记成之后把这一趟判成抓到、所判快照与它相同的同组各行改指到它（复用来的保留原来的 finished_utc）。
@@ -107,14 +107,14 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
     import 不导用时（另一台的快慢不代表本机）。
   用时从包装起跑到返回分两段记：排队（调包装到命令在 scope 里起来）与跑（起来到返回）。命令起来的那一刻由包在命令外面的一层 bash 记进
     这一趟源码副本总目录底下的一个文件（不在那一条的 TMPDIR 里，不进「删前留有几个文件」）；包装的峰值表仍按原命令记键（RUN_WITH_MEMORY_CAP_KEY）。
-  包装排队时每 60 秒往 stderr 报一行（scripts/run-with-memory-cap.sh 的 WAITING_REPORT_EVERY_SECONDS）；这里收包装的 stderr 判结局，
+  包装排队时每 60 秒往 stderr 报一行（scripts/hosts/run-with-memory-cap.sh 的 WAITING_REPORT_EVERY_SECONDS）；这里收包装的 stderr 判结局，
     那几行（WRAPPER_QUEUE_LINE）边跑边另转打到本进程的 stderr，行首带是哪一行变异或哪一批基线（run_forwarding_queue_lines）；收进来判结局的输出与 stdout 都不变。
 
 并行理由（包装文件头「日常一条」：包装 2026-10-06 撤了「同一个会话同时只许一条」，并行理由它已经不看；下面照旧设着，无害）：
   这里起的每次包装（基线的批与每条变异）都带 RUN_WITH_MEMORY_CAP_PARALLEL_REASON=「同一次 checker-tier-crates-mutation-replay（本模块进程 <pid>）的第 <i> 个工作进程，
   各用各的源码副本与编译目录（这一轮共 <n> 个）」，<i> 是那个工作进程的片号（编译目录 -w<i> 那个号）；不设的话会话里平常跑时第 2 个工作进程起就排不上、记成「排不上没跑」。
   调用方已经设了（非空）的照原样传、不覆盖。只设在那一次包装的环境里（run_under_wrapper），不进本进程与 --check 那一次的环境；包装把它清掉之后才起 cargo。
-  做法照 scripts/mutate.sh 文件头「并行」那一段。提交时的门禁带 SINGLEFS_HEAVY_TESTS=commit，不算日常，不受这条影响。
+  做法照 scripts/mutation/mutate.sh 文件头「并行」那一段。提交时的门禁带 SINGLEFS_HEAVY_TESTS=commit，不算日常，不受这条影响。
 
 基线（派变异之前，按批在没改坏的副本上跑一遍点名的测试）：
   批的键 = 这一行 cargo 参数里 `--` 之前那一段 + `--` 之后以 `--` 起头的开关；过滤词取这一批要跑基线的各行 `--` 之后非开关词的并集，
@@ -170,7 +170,7 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   删之前核没人在用——有进程的工作目录在它底下、命令行里有它底下的路径、环境里 CARGO_TARGET_DIR 指到它底下，或那一片的在用标记
   （工作进程活着时在自己的编译目录里拿着 .singlefs-mutation-worker.lock 的共享锁，回收一侧试拿排他锁拿不到）被别的进程拿着，就留着、逐份写明谁在用。
   代价：这一趟工作进程少（--item 只点一两行）之后，下一趟整张跑时多出来的那几片要从头冷编一次。
-libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）与汇总行只在 scripts/lib_libtest_result_lines.py 解析一份（results_by_test 调它），
+libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）与汇总行只在 scripts/gate/lib_libtest_result_lines.py 解析一份（results_by_test 调它），
   它的弄坏开关 LIBTEST_RESULT_LINES_BREAK 写在它文件头；本模块自证里认得它的那一格：
   LIBTEST_RESULT_LINES_BREAK=should-panic-in-name  本模块自证「should panic 的用例红了判抓到、点名省掉模块路径只对上那一个」那一格必须判错
 下面两个开关一行一个，下一行起写打开后必须判错的自证项：
@@ -253,8 +253,8 @@ BASE_DIRECTORIES_KEPT = 3
 FINGERPRINT_FORM = re.compile(r"[0-9a-f]{64}")
 RECORD_KINDS = ("mutation", "baseline")
 REUSABLE_VERDICT = {"mutation": "caught", "baseline": "ok"}
-RECORD_HEADER = ("# 门禁 checker-tier-crates-mutation-replay 的判定库记录（scripts/crates-mutation-rows.py 写，一条一个文件）：只有「抓到」与基线 ok 的、"
-                 "照复用判据判过的复用（scripts/crates-mutation-rows.py 文件头「复用判据」）。不进工作树，别手改。\n")
+RECORD_HEADER = ("# 门禁 checker-tier-crates-mutation-replay 的判定库记录（scripts/mutation/crates-mutation-rows.py 写，一条一个文件）：只有「抓到」与基线 ok 的、"
+                 "照复用判据判过的复用（scripts/mutation/crates-mutation-rows.py 文件头「复用判据」）。不进工作树，别手改。\n")
 # 拷目录时跳过的名字（各 crate 自己的编译目录）。拷贝范围由它与登记的路径一起定：prepare_shard 照它们拷，is_copied_into_each_shard 照它们判。
 IGNORED_WHEN_COPYING_INTO_EACH_SHARD = ["target"]
 # 拷贝范围里的 cargo 配置目录：.cargo/config.toml 的 [env] BINDGEN_EXTRA_CLANG_ARGS 给 librocksdb-sys 的 bindgen 指头文件；副本在 /tmp 下、往上找不到仓里那一份，
@@ -306,7 +306,7 @@ _ADMISSION_MODULE = []
 
 
 def admission_module():
-    """scripts/admission.py（判法版本里的构建环境与清单算法、git common-dir、登记表都用它的），第一次用到时才读进来。"""
+    """scripts/gate/admission.py（判法版本里的构建环境与清单算法、git common-dir、登记表都用它的），第一次用到时才读进来。"""
     if not _ADMISSION_MODULE:
         specification = importlib.util.spec_from_file_location("admission_for_crates_mutation_rows", os.path.join(SCRIPT_DIRECTORY, "..", "gate", "admission.py"))
         module = importlib.util.module_from_spec(specification)
@@ -548,10 +548,10 @@ def judge_version(root, environment, memory_cap_runner):
     try:
         named_lines = [(f"<登记行：{STAGE}>", registration_text),
                        (f"<阶段脚本：.claude/gate.d/{STAGE}>", read_bytes(STAGE_SCRIPT)),
-                       ("<共用模块：scripts/crates-mutation-rows.py>", read_bytes(MODULE_PATH)),
-                       ("<切词与切 fn 项：scripts/mutation-prune.py>", read_bytes(os.path.join(SCRIPT_DIRECTORY, "mutation-prune.py"))),
-                       ("<libtest 结果行：scripts/lib_libtest_result_lines.py>", read_bytes(LIBTEST_RESULT_LINES_PATH)),
-                       ("<判定库共用部分：scripts/lib_verdict_library.py>", read_bytes(VERDICT_LIBRARY_PATH)),
+                       ("<共用模块：scripts/mutation/crates-mutation-rows.py>", read_bytes(MODULE_PATH)),
+                       ("<切词与切 fn 项：scripts/mutation/mutation-prune.py>", read_bytes(os.path.join(SCRIPT_DIRECTORY, "mutation-prune.py"))),
+                       ("<libtest 结果行：scripts/gate/lib_libtest_result_lines.py>", read_bytes(LIBTEST_RESULT_LINES_PATH)),
+                       ("<判定库共用部分：scripts/crash/lib_verdict_library.py>", read_bytes(VERDICT_LIBRARY_PATH)),
                        ("<内存包装：这一趟每条经它跑的那一份>", read_bytes(memory_cap_runner))] + admission.build_environment_lines(root, environment)
     except OSError as error:
         raise admission.InputManifestError(f"读不了判法版本的一项：{error}") from error
@@ -803,7 +803,7 @@ _PRUNE_LIBRARY = []
 
 
 def prune_library():
-    """scripts/mutation-prune.py（切词、切 fn 项、读覆盖），第一次用到时才读进来；它的弄坏开关不在这里认。"""
+    """scripts/mutation/mutation-prune.py（切词、切 fn 项、读覆盖），第一次用到时才读进来；它的弄坏开关不在这里认。"""
     if not _PRUNE_LIBRARY:
         specification = importlib.util.spec_from_file_location("mutation_prune_for_crates_mutation_rows", os.path.join(SCRIPT_DIRECTORY, "mutation-prune.py"))
         module = importlib.util.module_from_spec(specification)
@@ -1841,7 +1841,7 @@ def record_coverage(job, identity, overrides, configuration, temporary_directory
 
 # ── 整道 ──────────────────────────────────────────────────────────────────────
 
-# gate-overlap:copy-kept scripts/mutate.sh 那边的 worker_count_and_head_line 照这里的「各项取最小、至少 1、核数一半至多 16」写了一份 bash：两边的项不同（这里 GATE_MUTATION_WORKERS 顶掉核数那一项、第二项是要现跑的条数；那边 MUTATE_JOBS 只能压小、第二项是表里的条数、另算每个 cargo 的编译并行度），派活一边是本进程的进程池、一边是 bash 子 shell 按目录认领，共用的只剩一个取最小值，抽成共用要让 mutate.sh 每趟多起一个 python 只为算一个数、两边头一行的字也不同
+# gate-overlap:copy-kept scripts/mutation/mutate.sh 那边的 worker_count_and_head_line 照这里的「各项取最小、至少 1、核数一半至多 16」写了一份 bash：两边的项不同（这里 GATE_MUTATION_WORKERS 顶掉核数那一项、第二项是要现跑的条数；那边 MUTATE_JOBS 只能压小、第二项是表里的条数、另算每个 cargo 的编译并行度），派活一边是本进程的进程池、一边是 bash 子 shell 按目录认领，共用的只剩一个取最小值，抽成共用要让 mutate.sh 每趟多起一个 python 只为算一个数、两边头一行的字也不同
 def worker_count_for(row_count, environment):
     """开几个工作进程，连同头一行要报的话。两项取最小、至少 1：核数的一半（至多 16，GATE_MUTATION_WORKERS 顶掉它）、这一趟要现跑的条数。
     一条变异的挂钟 = 重编译那几个 crate + 跑点名的那个测试，测试那一段是单线程的，所以开得比核数 ÷ 4 多，再用 GATE_MUTATION_CARGO_JOBS
@@ -1989,7 +1989,7 @@ def prechecks(root, rows, malformed, environment):
         reason = "那一行一条路径都没登记"
     if not copied:
         print_rejection(f"读不到 .claude/gate.d/stage-inputs.tsv 里 {STAGE} 那一行登记的路径（{reason}）：判不出每片的源码副本该拷哪些", [],
-                        [f"单独执行 python3 scripts/admission.py paths \"{STAGE_REPOSITORY}\" {STAGE} 看它报什么；那一行不在就照别的行给本阶段登记它读的路径。"])
+                        [f"单独执行 python3 scripts/gate/admission.py paths \"{STAGE_REPOSITORY}\" {STAGE} 看它报什么；那一行不在就照别的行给本阶段登记它读的路径。"])
         return None, True
     # 锚点只在真仓上核：文件落在拷贝范围之外时，工作进程在自己那份副本里打不开它，所以拷贝范围也在派活之前判。有一样红就一个工作进程都不起。
     problems = row_problems(root, rows, malformed, copied)
@@ -2046,7 +2046,7 @@ def run_stage(root, environment=None):
     for variable, default in (("GATE_MUTATION_LONG_ROW_SECONDS", DEFAULT_LONG_ROW_SECONDS), ("GATE_MUTATION_STOP_AFTER_ROWS", "")):
         text = environment.get(variable, "").strip() or default
         if text and not re.fullmatch(r"[1-9][0-9]*", text):
-            print_rejection(f"{variable} 写成了「{text}」，不是正整数", [], [f"写成正整数（{variable} 的意思见 scripts/crates-mutation-rows.py 文件头），或者不设它。"])
+            print_rejection(f"{variable} 写成了「{text}」，不是正整数", [], [f"写成正整数（{variable} 的意思见 scripts/mutation/crates-mutation-rows.py 文件头），或者不设它。"])
             return 1
         numeric_settings[variable] = int(text) if text else None
     selection_path = environment.get("GATE_MUTATION_ROW_SELECTION", "").strip()
@@ -2068,7 +2068,7 @@ def run_stage(root, environment=None):
     except (admission.RegistrationError, admission.InputManifestError, OSError) as error:
         print_rejection(f"算不出判法版本或工具链（{error}），判定库记录没处对：一条都没跑", [],
                         ["被判的要是 git 工作树、cargo -V 与 rustc -V 跑得通、.claude/gate.d/stage-inputs.tsv 里有本阶段那一行；",
-                         f"单跑 python3 scripts/crates-mutation-rows.py judge-version {root} 看它报什么。"])
+                         f"单跑 python3 scripts/mutation/crates-mutation-rows.py judge-version {root} 看它报什么。"])
         return 1
     records_root = os.path.join(common_directory, RECORDS_DIRECTORY_NAME)
     records_directory = os.path.join(records_root, judging)
@@ -2164,7 +2164,7 @@ def run_stage(root, environment=None):
     if outcome["submitted"] != outcome["received"]:
         print_rejection(f"派出去 {outcome['submitted']} 格（基线的批、变异与覆盖），只收回 {outcome['received']} 格", [],
                         ["这是分片并发自己的完整性闸红了，不是变异的问题；把 GATE_MUTATION_WORKERS=1 再跑一遍看串行下是不是全的，",
-                         "是就去查领活与收束那一段（scripts/crates-mutation-rows.py 的 run_pool）。"])
+                         "是就去查领活与收束那一段（scripts/mutation/crates-mutation-rows.py 的 run_pool）。"])
         return 1
     if outcome["stopped"]:
         print_rejection(f"只供测试的开关 GATE_MUTATION_STOP_AFTER_ROWS={numeric_settings['GATE_MUTATION_STOP_AFTER_ROWS']}："
@@ -2381,12 +2381,12 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
           "结束得了就调大限时（表头「# 每条变异的超时秒数：…」或 GATE_MUTATION_TIMEOUT），别把它记成抓到。"]),
         (squeezed, f"有变异被 slice 的总上限挤掉（被总上限挤掉 {len(squeezed)} 条；这几条没撞各自的上限 {memory_max}，是 slice 里合起来满了）：",
          ["这几条的结果不算数，重跑（抓到的有判定库记录，只重跑没作数的）；常这样说明包装的峰值表记少了（同时跑的几条实际占的比表里记的多），",
-          "跑的时候 bash scripts/run-with-memory-cap.sh --status 看 slice 里是谁在占，别拿掉包装去跑。"]),
+          "跑的时候 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 里是谁在占，别拿掉包装去跑。"]),
         (gpu_memory, f"有变异显存不够（显存不够 {len(gpu_memory)} 条；内存包装认出它们起止之间内核报了 NV_ERR_NO_MEMORY）：",
          ["这几条的结果不算数，重跑（抓到的有判定库记录，只重跑没作数的）；先看同一段时间谁在用卡（nvidia-smi），少给这几条或同时在跑的几条一些显存，",
-          "上卡的跑法经 scripts/host-dispatch.py --gpu 按各台显存余量派；别把它记成抓到。"]),
+          "上卡的跑法经 scripts/hosts/host-dispatch.py --gpu 按各台显存余量派；别把它记成抓到。"]),
         (refused, f"有变异排不上没跑（排不上没跑 {len(refused)} 条；包装等满了等待上限，slice 还是放不下）：",
-         ["bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，等那几件重活跑完再重跑；", "别拿掉包装去跑——排不上说明此刻整机放不下。"]),
+         ["bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，等那几件重活跑完再重跑；", "别拿掉包装去跑——排不上说明此刻整机放不下。"]),
         (unavailable, f"跑到一半带内存上限的 scope 起不来了（{len(unavailable)} 条没跑）：",
          ["修好用户级 systemd / D-Bus（systemctl --user status）再重跑；不许拿掉上限去跑。"]),
     ]
@@ -2471,14 +2471,14 @@ def write_stage_marker_with_counts(root, counts):
 def static_check_usage_problem(arguments):
     """static-check 的参数哪里不对：→ None（对）或 (原因, 下一步)。"""
     if not arguments:
-        return "缺 <根>（被判那棵树的仓根）", 'python3 scripts/crates-mutation-rows.py static-check "$PWD"（在仓根跑）'
+        return "缺 <根>（被判那棵树的仓根）", 'python3 scripts/mutation/crates-mutation-rows.py static-check "$PWD"（在仓根跑）'
     if arguments[0].startswith("-"):
-        return f"第一个参数要是 <根>，给的是选项 {arguments[0]}", 'python3 scripts/crates-mutation-rows.py static-check "$PWD" [--table <变异表>]'
+        return f"第一个参数要是 <根>，给的是选项 {arguments[0]}", 'python3 scripts/mutation/crates-mutation-rows.py static-check "$PWD" [--table <变异表>]'
     if len(arguments) == 2 and arguments[1] == "--table":
-        return "--table 后面没给变异表的路径", f"python3 scripts/crates-mutation-rows.py static-check {arguments[0]} --table <变异表>"
+        return "--table 后面没给变异表的路径", f"python3 scripts/mutation/crates-mutation-rows.py static-check {arguments[0]} --table <变异表>"
     if len(arguments) not in (1, 3) or (len(arguments) == 3 and arguments[1] != "--table"):
         return (f"参数个数或写法不对（给了 {len(arguments)} 个：{' '.join(arguments)}；只认 <根> 与可选的 --table <变异表>）",
-                f"python3 scripts/crates-mutation-rows.py static-check {arguments[0]} [--table <变异表>]")
+                f"python3 scripts/mutation/crates-mutation-rows.py static-check {arguments[0]} [--table <变异表>]")
     if not os.path.isdir(arguments[0]):
         return f"<根> {arguments[0]} 不是一个目录", "<根> 写被判那棵树的仓根（git 工作树），例如 \"$PWD\""
     return None
@@ -3590,7 +3590,7 @@ def run_selftest_cells(selftest, work):
     # static-check 的失败那一路：缺 <根> 时 ERROR 行写原因、下一行给照抄的「→ 怎么办」；--table 指的文件不在时 ERROR 退 2，不报「CHECKED 0 …」退 0
     bare = run_command_capturing(command_static_check, [])
     selftest.check("static-check 缺 <根>：ERROR 行写原因、下一行给 → 怎么办、退 2",
-                   bare[0] == 2 and "ERROR\t缺 <根>" in bare[1] and "→ 怎么办：python3 scripts/crates-mutation-rows.py static-check \"$PWD\"" in bare[1],
+                   bare[0] == 2 and "ERROR\t缺 <根>" in bare[1] and "→ 怎么办：python3 scripts/mutation/crates-mutation-rows.py static-check \"$PWD\"" in bare[1],
                    bare[1])
     missing_table = run_command_capturing(command_static_check, [static_root, "--table", os.path.join(work, "no-such-table.tsv")])
     selftest.check("static-check --table 指的文件不在：ERROR 退 2，不报 CHECKED", missing_table[0] == 2

@@ -6,7 +6,7 @@
 ✅ 抓到（单测有红：失败、出错，含载入时断言红）；⏭ 无效（替换之后编不过）；❌ 没红；⏱ 超时。原目录一个字节不动，
 收尾核原目录逐文件 sha256 与开跑前相同、再在新副本上跑一遍基线，都过才打「已还原，基线仍全绿」。
 每一行都以 name= 起头、不带耗时与绝对路径（目录与表只写末一段名字，副本路径写成 .），
-`scripts/replay.sh` 的 E170 几行经 run_replay_result_lines.py wrap 把它改写成 E7RESULT 结果行逐字节比。
+`scripts/experiments/replay.sh` 的 E170 几行经 run_replay_result_lines.py wrap 把它改写成 E7RESULT 结果行逐字节比。
 
 用法：python3 mutation_driver_unit_level.py --executor-directory <目录> --table <变异表> --scratch <草稿目录> --output <新文件>
 """

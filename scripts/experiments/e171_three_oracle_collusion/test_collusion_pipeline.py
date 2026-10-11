@@ -353,8 +353,8 @@ class ComparatorSectionTests(unittest.TestCase):
 class DriverArgumentTests(unittest.TestCase):
     def test_the_device_command_goes_through_the_memory_wrapper_with_the_thread_cap(self) -> None:
         command = row_driver.device_command("/repo", "/bin/dev", "/out/dump", 6, "4G", ["--positive-control", "O2"])
-        self.assertEqual(command[:4], ["bash", "/repo/scripts/run-with-memory-cap.sh", "4G", "bash"])
-        self.assertEqual(command[4:7], ["/repo/scripts/capped.sh", "6", "/bin/dev"])
+        self.assertEqual(command[:4], ["bash", "/repo/scripts/hosts/run-with-memory-cap.sh", "4G", "bash"])
+        self.assertEqual(command[4:7], ["/repo/scripts/hosts/capped.sh", "6", "/bin/dev"])
         self.assertEqual(command[7:], ["row", "--output-directory", "/out/dump", "--positive-control", "O2"])
         self.assertIsInstance(argparse.Namespace(), argparse.Namespace)
 

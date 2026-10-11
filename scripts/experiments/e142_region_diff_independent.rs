@@ -82,7 +82,7 @@ fn parse_model_side_device_region_bytes_lines(text: &str, source_label: &str) ->
 /// position 推过去）。`research/prompts/oom-2026-09-25/report.md` 记的两次整机 OOM 就是这个位置的
 /// 外层判断被变异成 `==` 之后，卡在同一个 position 上无限推长度 0 的段：外层循环最多跑 `longer_length` 轮，
 /// 加一道次数上界断言，让这种破坏在几轮之内变成一次 panic，不再无界地往 `segments` 里塞东西
-/// （E142 第十六次跑第一段，`scripts/mutations/e142_region_diff_independent.tsv` 的
+/// （E142 第十六次跑第一段，`scripts/mutation/tables/e142_region_diff_independent.tsv` 的
 /// M2_diff_segments_equality_flipped 那一条）。
 fn diff_segments(left: &[u8], right: &[u8]) -> Vec<(usize, usize)> {
     let mut segments = Vec::new();

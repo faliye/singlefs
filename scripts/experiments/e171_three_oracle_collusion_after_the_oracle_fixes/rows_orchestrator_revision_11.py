@@ -303,7 +303,7 @@ def main(argument_list: list[str]) -> int:
 # ── 自证：借第一段编排器的假世界（假驱动、假 multi-host-run、假机器清单与资源；这里只用本机一台），假树补上算键要的几样；
 #    假驱动外面包一层，在 <工作根>/lane0 下放一份「这一次编译」的 dep-info 给 RC4 ──
 FAKE_RUN_DATE = "2026-10-09"
-FAKE_DRIVER = os.path.join(HERE, "selftest_fakes", "fake_row_driver.py")
+FAKE_DRIVER = os.path.join(HERE, "fake_row_driver.py")
 
 
 @dataclasses.dataclass

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """E56 汇总：每 (mode, cache, nleaf, arm, eps) 取种子中位数与极差。
 
-用法：python3 scripts/e56-report.py <跑批输出>
+用法：python3 scripts/experiments/e56-report.py <跑批输出>
 """
 import sys, re, statistics as st
 from collections import defaultdict

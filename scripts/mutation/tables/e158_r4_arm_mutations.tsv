@@ -1,5 +1,5 @@
 # E158（择根与修复四岔路） 第 4 次跑登记第九节里改臂表的变异（第 3 次跑的 M2、M4、M11、M15 照 r4 行重做；新加 M17、M23；M3 的臂那一半、M7）：七列，制表符分隔——变异名、臂、文件、原文、替换文、取样点、应当看到
-# 这几条改的是 scripts/mutations/e158_arms.tsv 的 r4 行套到草稿副本之后的臂代码（门禁 59 号跑不到：它只在 crates/ 工作区上改），由执行员在臂的副本里改坏、编译、跑点名的模式、看点名的句子；实际看到什么写在执行员报告里。
+# 这几条改的是 scripts/mutation/tables/e158_arms.tsv 的 r4 行套到草稿副本之后的臂代码（门禁 59 号跑不到：它只在 crates/ 工作区上改），由执行员在臂的副本里改坏、编译、跑点名的模式、看点名的句子；实际看到什么写在执行员报告里。
 M2	jia-cfg	crates/singlefs-core/src/mount.rs	        return (\n            witnessed_tail > counter,	        return (\n            witnessed_tail >= counter,	PC-N0（L0 全部 8 格，r4-pc）	PC-N0 fail：甲-配置 在不注入的格上拒（sentence_arm_ok_k0=fail）
 M4	yi-cfg	crates/singlefs-core/src/mount.rs	const R3_REREAD_ROUNDS: u32 = 1;	const R3_REREAD_ROUNDS: u32 = 0;	PC-N-环、PC-N-盖 的 T(δ) 格（r4-pc）	T1 格 sentence_arm_ok_after_one_round_chosen_hidden_no_rollback=fail
 M11	jia-slot	crates/singlefs-core/src/mount.rs	            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {}\n        }\n    }\n    let chosen_root = best.ok_or(RecoveryFailure::NoValidRoot)?;	            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {\n                unreadable_ring_slots += 1;\n            }\n        }\n    }\n    let chosen_root = best.ok_or(RecoveryFailure::NoValidRoot)?;	PC-N0（L0：新池上没写过的根槽都是全零，r4-pc）	PC-N0 fail 或 not_constructible：甲-槽 在不注入的格上拒（前缀里的挂载就被拒时摆不出）

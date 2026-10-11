@@ -2,7 +2,7 @@
 //!
 //! 跑前登记：`research/prompts/e154-preregistration.md`。纯计数模型：没有 I/O、没有并发、
 //! 没有随机源，同一份输入跑 N 遍必然一样；证据强度来自本文件的绝对值单测与变异表
-//! （`scripts/mutations/e154_two_gates_serial_rejudge_and_reclaim_timing.tsv`），不靠重跑轮数。
+//! （`scripts/mutation/tables/e154_two_gates_serial_rejudge_and_reclaim_timing.tsv`），不靠重跑轮数。
 //!
 //! 输出体量说明（技术实现细节，不改登记「六、七、九」的判据）：六节要求「臂 × 历史 × 格」
 //! 逐格报判定，本文件对全部 48 格 × 24 臂 × 12 历史都算出并报出 `RUN` 汇总行（Q1–Q8 与

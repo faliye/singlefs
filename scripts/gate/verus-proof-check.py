@@ -36,9 +36,9 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
   通用选项：--verus-root 目录（默认 $SINGLEFS_VERUS_ROOT，再默认 ${XDG_DATA_HOME:-~/.local/share}/<登记表 release 行第五列>）
             --timeout 秒（默认 $GATE_VERUS_TIMEOUT_SECONDS，再默认 600）  --threads N（默认 $SINGLEFS_THREAD_CAP，再默认 nproc）
             --jobs J（空真与必红世界几处同时验，默认 $GATE_VERUS_JOBS，再默认 min(处数, max(1, N / 4))；每一处的 Verus 取 N / J 条线程）
-            --memory-cap 上限（每次 Verus 经 scripts/run-with-memory-cap.sh，默认 $GATE_VERUS_MEMORY_MAX，再默认 4G；
+            --memory-cap 上限（每次 Verus 经 scripts/hosts/run-with-memory-cap.sh，默认 $GATE_VERUS_MEMORY_MAX，再默认 4G；
               限时交给它的 RUN_WITH_MEMORY_CAP_TIME_LIMIT，退 253 就是超时；退 245、250、251、252、254 是包装自己的结局，那一处判「没跑成」：
-              这一格退 1，✗ 行写「没跑成：内存包装 scripts/run-with-memory-cap.sh 退 <码>」，行尾原样带上包装自己往 stderr 打的 ✗ 与 → 那几行，
+              这一格退 1，✗ 行写「没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 <码>」，行尾原样带上包装自己往 stderr 打的 ✗ 与 → 那几行，
               → 照包装文件头「退出码」一段、按码给，不指向证明、核或必红世界表；252 分两种成因各给一种：包装说「等多久都放不下」的（这一处要的量比总上限还大）
               给「上限写小」，别的（排队等满）给「看 --status、空出来再重跑」）
               Verus 被信号停了的（直接起时 subprocess 交负的信号号，经包装起时退 128 + 信号号、不在 250–254 里，例 137 = 外面 kill -9）：那一处判红，
@@ -57,7 +57,7 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
       只读登记表、核与必红世界表，不起 Verus、不编；核没进仓时只列 toolchain 与 proof；登记表或表写坏了判红退 1。
   逐项点名与按条复用（vacuity、must-red-worlds 收 --item；proof 与 toolchain 各只有一项，给 --item 退 2）：
       --item <项>（可给多次，取并集）只判点名的项，项名写错或缺项名退 2 并列出这一格可点名的项；点名单跑一项与它在整格里跑的判定相同（自证 item-alone-equals-whole-*）。
-      --verdict-library <目录> 给了就按条记判定（判定库 scripts/lib_verdict_library.py）：proof、vacuity、must-red-worlds 每一项判绿当场原子落盘，
+      --verdict-library <目录> 给了就按条记判定（判定库 scripts/crash/lib_verdict_library.py）：proof、vacuity、must-red-worlds 每一项判绿当场原子落盘，
         下一趟这一项的键相同就复用、不起 Verus；--no-reuse 只记不读（照样全部现判）。不给 --verdict-library 不读不写。toolchain 每趟现核、不复用。
       键分两列（判定库文件头「键分两列」）：
         判法版本：这份脚本与 lib_verdict_library.py 两份内容的摘要（judge_version）；变了整格每一项都现判，原因写「判法版本 变了」。
@@ -236,24 +236,24 @@ WRAPPER_OWN_EXITS = {245: "显存不够（起止之间内核报了 NV_ERR_NO_MEM
                      254: "被总上限挤掉"}
 MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "run-with-memory-cap.sh")
 # 包装自己的结局（WRAPPER_OWN_EXITS）那一处没跑成时给的出路，照 run-with-memory-cap.sh 文件头「退出码」一段、按码给（wrapper_howto）
-WRAPPER_HOWTO_HEAD = "照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办："
+WRAPPER_HOWTO_HEAD = "照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办："
 WRAPPER_HOWTO_TAIL = "；不拿掉包装跑，不改证明、核或必红世界表"
 WRAPPER_HOWTO_BY_EXIT = {
     250: "250 是这一处要的比上限多，把 GATE_VERUS_MEMORY_MAX（或 --memory-cap）设大再跑",
     251: "251 是包装用法错或起不了 scope：照包装自己打的 → 修（systemctl --user status 看用户级 systemd 在不在），修好再重跑这一格",
-    252: "252 是排队等满还放不下：先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格",
-    254: "254 是 slice 满了被挤掉：先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格",
+    252: "252 是排队等满还放不下：先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格",
+    254: "254 是 slice 满了被挤掉：先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格",
     245: "245 是这一处退了非 0 而同一段时间内核报了显存不够（Verus 不上卡，多半是别的进程撞的）：nvidia-smi 看谁在用卡，等它跑完再重跑这一格",
 }
 # 252 的另一种成因：包装打「等多久都放不下」（这一处要的量比 slice 的总上限还大，不等），重跑多少次都一样
 WRAPPER_TOO_BIG_MARK = "等多久都放不下"
 WRAPPER_TOO_BIG_HOWTO = ("252 是这一处要的量比 slice 的总上限还大、等多久都放不下：把 GATE_VERUS_MEMORY_MAX（或 --memory-cap）写小到总上限以内再跑"
-                         "（总上限看 bash scripts/run-with-memory-cap.sh --status）；真要这么多，先照包装文件头「余量」一段调 RUN_WITH_MEMORY_CAP_RESERVE")
+                         "（总上限看 bash scripts/hosts/run-with-memory-cap.sh --status）；真要这么多，先照包装文件头「余量」一段调 RUN_WITH_MEMORY_CAP_RESERVE")
 # Verus 被信号停了（不在 250–254 里的 128 + 信号号，或直接起时负的信号号）那一处的出路：照包装文件头，不写修证明（killed_signal）
-KILLED_HOWTO = ("照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：撞了这一条自己的上限由包装认成 250，外面 kill -9 同样退 137——这一次是外面停的："
+KILLED_HOWTO = ("照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办：撞了这一条自己的上限由包装认成 250，外面 kill -9 同样退 137——这一次是外面停的："
                 "查是谁在那一刻停了它（同一时刻的 ps、journalctl --user、看门狗的记录），那件事不再发生之后重跑这一格；不拿掉包装跑，不改证明、核或必红世界表")
 # 一处没跑成那一条 ✗ 的开头：一格里有它又有别的 ✗ 的，按红记（report_cell）
-NOT_RUN_MARK = "没跑成：内存包装 scripts/run-with-memory-cap.sh 退 "
+NOT_RUN_MARK = "没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 "
 # 同一道里已有一处拿到内存包装的 252（排不上），这一处没起包装、没排队（QueueRefusal）；report_cell 把这几处并成一条 ✗
 QUEUE_SKIPPED_MARK = "没跑成：内存包装排不上，没再排队"
 # 门禁给的一份文件：一格里第一处拿到 252 就写一行「哪一处<TAB>出路」，后面几格开跑前读到就不再排队（QueueRefusal）
@@ -443,7 +443,7 @@ def check_dependencies(registry, manifest):
     others = sorted(name for name in manifest.get("dependencies", {}) if name != "vstd")
     if others:
         raise Red(f"{registry.crate_directory}/Cargo.toml 除 vstd 之外还依赖 {' '.join(others)}：直接起的 Verus 只带它自带的 vstd，编不了别的 crate",
-                  "核的 crate 只依赖 vstd：要用的东西搬进核，或留在调用核的那一侧；确要加依赖，先给 scripts/verus-proof-check.py "
+                  "核的 crate 只依赖 vstd：要用的东西搬进核，或留在调用核的那一侧；确要加依赖，先给 scripts/gate/verus-proof-check.py "
                   "补上用 Verus 钉的工具链编依赖、交给 --extern 的一步（旧写法 git log -S prepare_externs 找得到）")
 
 
@@ -920,7 +920,7 @@ def requires_insertion_points(text):
                 break
         if brace is None:
             raise Red(f"第 {index + 1} 行的 requires 找不到函数体的 {{（没有函数体，或 {{ 没单独起行）",
-                      "把函数体的 { 单独起一行（verusfmt 的写法）；确是没有函数体的声明，把判法补进 scripts/verus-proof-check.py 的 requires_insertion_points")
+                      "把函数体的 { 单独起一行（verusfmt 的写法）；确是没有函数体的声明，把判法补进 scripts/gate/verus-proof-check.py 的 requires_insertion_points")
         owner = next((FUNCTION_LINE.match(strip_line_comment(lines[back])).group(5) for back in range(index, -1, -1)
                       if FUNCTION_LINE.match(strip_line_comment(lines[back]))), "?")
         inline = lines[brace].split("{", 1)[1].strip()
@@ -1129,7 +1129,7 @@ def must_red_row_problems(row, outcome, options, registry):
         return [(f"第 {row['number']} 行「{row['name']}」：Verus 的 JSON 里没有整数的 verified 与 errors（读到 verified {results.get('verified')!r}、"
                  f"errors {results.get('errors')!r}、vir 错 {results.get('encountered-vir-error')}），判不出这一行红没红",
                  "vir 错是改坏的副本没走到验证（类型或模式错）：换一处只改判定的改法；没有 vir 错就是 Verus 换了 JSON 的写法："
-                 "照新写法改 scripts/verus-proof-check.py 的 integer_counts")], ""
+                 "照新写法改 scripts/gate/verus-proof-check.py 的 integer_counts")], ""
     rlimit_exhausted = RLIMIT_EXHAUSTED in outcome["diagnostics"]
     proof_errors = proof_error_messages(outcome["diagnostics"])
     counted = proof_error_messages(outcome["diagnostics"], count_rlimit="rlimit-counted-in-proof-errors" in BREAK)
@@ -1863,8 +1863,8 @@ def selftest():
         saved_runner, saved_launcher = MEMORY_CAP_RUNNER, options["launcher"]
         MEMORY_CAP_RUNNER, options["launcher"] = fake_wrapper, None
         try:
-            expect("proof-wrapper-exit", "proof", green, 1, "没跑成：内存包装 scripts/run-with-memory-cap.sh 退 250")
-            expect("must-red-wrapper-exit", "must-red-worlds", green, 1, "→ 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办")
+            expect("proof-wrapper-exit", "proof", green, 1, "没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 250")
+            expect("must-red-wrapper-exit", "must-red-worlds", green, 1, "→ 怎么办：照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办")
         finally:
             MEMORY_CAP_RUNNER, options["launcher"] = saved_runner, saved_launcher
         # 内存包装退 245（显存不够）：同样判「没跑成」、点名显存不够，不报成证明的问题（开关 wrapper-exit-as-proof-red 下这一格同样判错）
@@ -1874,7 +1874,7 @@ def selftest():
         saved_runner, saved_launcher = MEMORY_CAP_RUNNER, options["launcher"]
         MEMORY_CAP_RUNNER, options["launcher"] = gpu_wrapper, None
         try:
-            expect("proof-wrapper-245", "proof", green, 1, "没跑成：内存包装 scripts/run-with-memory-cap.sh 退 245（显存不够")
+            expect("proof-wrapper-245", "proof", green, 1, "没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 245（显存不够")
         finally:
             MEMORY_CAP_RUNNER, options["launcher"] = saved_runner, saved_launcher
         # 经包装起、命令被外面 kill -9（包装退 137，不在 250–254 里）：判红，✗ 写 Verus 被信号停了，出路照包装文件头（开关 killed-as-proof-red 下判错）
@@ -1883,7 +1883,7 @@ def selftest():
             handle.write("#!/usr/bin/env bash\n# 自证用的假内存包装：什么都不起，退 137（命令被外面 kill -9）\nexit 137\n")
         MEMORY_CAP_RUNNER, options["launcher"] = killed_wrapper, None
         try:
-            killed = expect("proof-killed", "proof", green, 1, ("Verus 被信号停了（退 137，信号 9）", "→ 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办"))
+            killed = expect("proof-killed", "proof", green, 1, ("Verus 被信号停了（退 137，信号 9）", "→ 怎么办：照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办"))
             cases += 1
             if "照 Verus 报错的位置修" in killed or "看上面 Verus 的报错" in killed:
                 wrong.append("proof-killed-no-proof-howto")
@@ -1914,7 +1914,7 @@ def selftest():
             expect("must-red-wrapper-lines-carried", "must-red-worlds", mixed, 1, "包装自己打的：「✗ 内存不够排不上：等了 0 秒")
             # 252 的另一种成因（要的量比总上限还大）给「上限写小」，不给「空出来再重跑」（开关 wrapper-252-one-howto 下判错）；整格只有没跑成，不打按红记那一行
             too_big = expect("proof-wrapper-too-big", "proof", make_root("toobig", kernel=SELFTEST_KERNEL + "// SELFTEST_WRAPPER_TOO_BIG\n"), 1,
-                             ("没跑成：内存包装 scripts/run-with-memory-cap.sh 退 252", "等多久都放不下：把 GATE_VERUS_MEMORY_MAX"))
+                             ("没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252", "等多久都放不下：把 GATE_VERUS_MEMORY_MAX"))
             cases += 1
             if "按红记" in too_big:
                 wrong.append("proof-wrapper-too-big-only-not-run")

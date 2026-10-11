@@ -23,7 +23,7 @@
   四个 path，减去前三条数据行已经占用的三个，剩下那一个按排除法归给这句提示；
   减出来的路径集合大小若不是恰好一个，直接判成结构性错误（八节的写法变了，这段解析要跟着改），
   不猜、不悄悄跳过。
-- 产物路径本身也不写死：从 `scripts/replay.sh` 的复跑登记表里找 `E142|...` 那一行，
+- 产物路径本身也不写死：从 `scripts/experiments/replay.sh` 的复跑登记表里找 `E142|...` 那一行，
   取它的「入库产物」那一列，这样产物重跑之后换了文件名，这个脚本自动跟着换，不用改代码。
 
 自证会红：`--selftest` 把当前这份 layout/01-first-txn.md 与 replay.sh 指向的真实产物，
@@ -45,7 +45,7 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 LAYOUT_RELATIVE_PATH = pathlib.Path('.claude/kb/layout/01-first-txn.md')
-REPLAY_SCRIPT_RELATIVE_PATH = pathlib.Path('scripts/replay.sh')
+REPLAY_SCRIPT_RELATIVE_PATH = pathlib.Path('scripts/experiments/replay.sh')
 RESULTS_DIRECTORY_RELATIVE_PATH = pathlib.Path('research/results')
 
 SECTION_EIGHT_HEADING_PATTERN = re.compile(r'^## 八、.*$', re.MULTILINE)
@@ -553,7 +553,7 @@ def perform_check(repository_root):
             lines.append(f'     {mismatch}')
         lines.append('     → 怎么办：表是抄错了，就照产物改 .claude/kb/layout/01-first-txn.md 那一行；')
         lines.append('       产物是过期了，就重跑 E142（新池新建文件的干跑），更新 research/results/ 下的文件，')
-        lines.append('       再让 scripts/replay.sh 里 E142 那一行的入库产物名字跟上。')
+        lines.append('       再让 scripts/experiments/replay.sh 里 E142 那一行的入库产物名字跟上。')
         return 1, lines
 
     compared_total_count = compared_table_row_count + compared_note_count

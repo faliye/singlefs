@@ -21,9 +21,9 @@
   ② 它要住在 crates/singlefs-checker-tier/tests/（checker 档，D13 已定项 15，.claude/rules/verification.md「崩溃枚举用例住哪、怎么登记」）：
      写在别的包（harness 这类日常测试包）里判红，那会让 cargo test 那个包的人跑到全量枚举；
   ③ checker 档包里标了 #[ignore] 的（全量那条）要登记进崩溃点重放：崩溃点重放合表 .claude/gate.d/crash-point-replay-items.tsv（入口
-     scripts/crash-point-replay.sh 照它跑）有一项点名的重型部分落到 <测试目标>:<这个函数名>（测试目标是文件名去掉 .rs）——
+     scripts/crash/crash-point-replay.sh 照它跑）有一项点名的重型部分落到 <测试目标>:<这个函数名>（测试目标是文件名去掉 .rs）——
      点名的 crash-case: 行（.claude/gate.d/stage-inputs.tsv 里键是 crash-case:<名>、第三列 test=singlefs-checker-tier:<测试目标>:<函数名>），
-     或点名的放量分项（scripts/crash-amplification.sh 的 ITEMS 里那一行的测试目标与用例函数）。读法在 scripts/lib_crash_point_replay_items.py
+     或点名的放量分项（scripts/crash/crash-amplification.sh 的 ITEMS 里那一行的测试目标与用例函数）。读法在 scripts/crash/lib_crash_point_replay_items.py
      的 registered_functions。标了 ignore 又没登记的入口不跑，谁都不跑；
      不标 #[ignore] 的是 checker 档的快档（小流、几步的合成流），随 cargo test -p singlefs-checker-tier 跑，不要求登记。
   ④ 合表本身核得过（同一份核法 lib_crash_point_replay_items.py 的 problems：每条 crash-case: 与每个放量分项恰好被一项点名、
@@ -83,7 +83,7 @@
       合表点名的放量分项（「✗ 自检：标了 ignore、只由合表点名的放量分项登记的用例不该报缺登记」）
   CRASH_CASE_CHECK_BREAK=items-table-unchecked  problems_in() 不报合表的问题（④）
       合表没点名的 crash-case（「✗ 自检：登记了 crash-case: 却没被合表点名，placement 应当报出来」）
-  合表核法自己的开关 CRASH_POINT_REPLAY_ITEMS_BREAK（表在 scripts/lib_crash_point_replay_items.py 文件头）也由这份自证证红：
+  合表核法自己的开关 CRASH_POINT_REPLAY_ITEMS_BREAK（表在 scripts/crash/lib_crash_point_replay_items.py 文件头）也由这份自证证红：
   每一格判错打「✗ 自检：合表核法 <格名>：…」，汇总行同上。
 """
 import glob
@@ -98,7 +98,7 @@ REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
 BROKEN = os.environ.get("CRASH_CASE_CHECK_BREAK", "")
-# 崩溃点重放合表的读法与核法只在这一份库里（入口 scripts/crash-point-replay.sh 用同一份）
+# 崩溃点重放合表的读法与核法只在这一份库里（入口 scripts/crash/crash-point-replay.sh 用同一份）
 sys.path.insert(0, SCRIPT_DIRECTORY)
 import lib_crash_point_replay_items as replay_items  # noqa: E402
 
@@ -232,7 +232,7 @@ def problems_in(root):
         if ignored and (target, function) not in registered_targets and BROKEN != "rows-ignored":
             problems.append(f"{where} {function}：标了 #[ignore] 却没有登记成 crash-case、由崩溃点重放合表点名（.claude/gate.d/stage-inputs.tsv 里没有 "
                             f"test={CHECKER_PACKAGE}:{target}:{function} 的 crash-case: 行，或那一行与放量分项都没被 {replay_items.ITEMS_TABLE} 的一项点名），"
-                            "入口 scripts/crash-point-replay.sh 不跑它，谁都不跑它")
+                            "入口 scripts/crash/crash-point-replay.sh 不跑它，谁都不跑它")
     if BROKEN != "items-table-unchecked":
         problems += [f"崩溃点重放合表：{problem}" for problem in replay_items.problems(root)]
     return tests, problems
@@ -424,7 +424,7 @@ def placement_world(work, name, stage_rows, table_rows, pipeline_rows):
         "#[test]\n#[ignore]\nfn streamy_full() {\n    enumerate_layer0(&stream);\n}\n")
     open(os.path.join(root, ".claude", "gate.d", "stage-inputs.tsv"), "w").write("# 样本\n" + "".join(row + "\t# 样本\n" for row in stage_rows))
     open(os.path.join(root, ".claude", "gate.d", "crash-point-replay-items.tsv"), "w").write("# 样本\n" + "".join(row + "\t# 样本\n" for row in table_rows))
-    open(os.path.join(root, "scripts", "crash-amplification.sh"), "w").write(
+    open(os.path.join(root, "scripts", "crash", "crash-amplification.sh"), "w").write(
         "ITEMS=(\n" + "".join(f"  $'{row}\\t全量'\n" for row in pipeline_rows) + ")\n")
     return root
 

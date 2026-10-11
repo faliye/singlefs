@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # admission: always 只读给它的源码文本与覆盖输出现算，不记上一次的结果；--selftest 判的是此刻这份规则
 # run-condition: command python3
-"""广谱变异驱动（scripts/broad-mutation.py）的剪枝规则库：判「这次改到的」、结论能不能沿用、版本内按覆盖挑哪些测试。
+"""广谱变异驱动（scripts/mutation/broad-mutation.py）的剪枝规则库：判「这次改到的」、结论能不能沿用、版本内按覆盖挑哪些测试。
 
 依据（三轮设计判决，后一轮覆盖前一轮的同一格）：research/prompts/tooling-broad-mutation-prune-r1-main-verification.md（B1–B8）、
 …-r2-main-verification.md（方向：只判改到的函数 + 版本内按覆盖挑测试）、…-r3-main-verification.md（C1–C6 加 E1–E6）。
@@ -1183,7 +1183,7 @@ if __name__ == "__main__":
         sys.exit(0)
     if sys.argv[1:] != ["--selftest"]:
         print("  ✗ 用法：mutation-prune.py --selftest | --index <树> [文件…]", file=sys.stderr)
-        print("  → 怎么办：看文件头的用法；这份库平时由 scripts/broad-mutation.py 载入", file=sys.stderr)
+        print("  → 怎么办：看文件头的用法；这份库平时由 scripts/mutation/broad-mutation.py 载入", file=sys.stderr)
         sys.exit(2)
     BREAKS = frozenset(name for name in os.environ.get("BROAD_MUTATION_BREAK", "").split(",") if name)
     sys.exit(run_selftest())

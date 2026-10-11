@@ -15,7 +15,7 @@
      cargo 的 bin 目录（${CARGO_HOME:-~/.cargo}/bin）之下，或正是 PATH 上 cargo、rustc 解到的那一份，参数又不是版本查询
      （-V、--version、-vV、version 这几种，前面可以带 +<工具链>；rustc 的 --print <项> 也算查询）。
      另在 PATH 最前面放 cargo、rustc 两个替身：版本查询交给真的那一份，别的一律拒（退 97，真的那一份不起）、记一笔，记到的也判红。
-  ② 真清场：起的脚本是某棵仓树里的 scripts/gpu-quiesce-run.sh（路径以这一段结尾；单独一个 --selftest 的除外），
+  ② 真清场：起的脚本是某棵仓树里的 scripts/crash/gpu-quiesce-run.sh（路径以这一段结尾；单独一个 --selftest 的除外），
      它环境里的 SINGLEFS_MULTI_HOST_CONFIG 没设、是空的，或解开之后正是主工作树根的 multi-host.env（它读的就是真多机配置里的清场命令）。
   ③ 私有清场脚本：参数里有一段落在 ~/.config/singlefs/quiesce 开头的路径上（私有的清场、回读、复原脚本放在那里）。
   假的不算：自证自己的样本工具目录里的假 cargo（解释器起的脚本、可执行文件不在上面那几处），别处路径上叫 gpu-quiesce-run.sh 的替身，
@@ -83,7 +83,7 @@ SHIM_REFUSED_EXIT = 97
 FINDINGS_EXIT = 3
 USAGE_EXIT = 2
 DEFAULT_INTERVAL_SECONDS = 0.1
-QUIESCE_WRAPPER_SUFFIX = os.path.join("scripts", "gpu-quiesce-run.sh")
+QUIESCE_WRAPPER_SUFFIX = os.path.join("scripts", "crash", "gpu-quiesce-run.sh")
 PRIVATE_QUIESCE_PREFIX = "quiesce"
 SHELL_NAMES = {"bash", "sh", "dash", "zsh", "ksh"}
 VERSION_QUERIES = {("-V",), ("--version",), ("-vV",), ("-Vv",), ("-V", "-v"), ("-v", "-V"),
@@ -584,7 +584,7 @@ def selftest_cells(work, broken):
     if not (exit_code == FINDINGS_EXIT and any(kind == "真工具链" and toolchain_rustc in text for _pid, kind, text in findings)):
         failures.append((4, f"绝对路径起的真工具链（{toolchain_rustc} 0.4）应当扫到、判红退 3（实际退 {exit_code}，扫到 {findings}）"))
 
-    # 第 5 格：真清场（某棵仓树的 scripts/gpu-quiesce-run.sh，配置没设或是主工作树根的那一份）判红；指到假配置的、别处叫这个名字的替身不判
+    # 第 5 格：真清场（某棵仓树的 scripts/crash/gpu-quiesce-run.sh，配置没设或是主工作树根的那一份）判红；指到假配置的、别处叫这个名字的替身不判
     wrapper = os.path.join(work, "tree", QUIESCE_WRAPPER_SUFFIX)
     selftest_write(wrapper, "#!/usr/bin/env bash\nsleep 0.4\n", executable=True)
     lookalike = os.path.join(work, "tools", "gpu-quiesce-run.sh")

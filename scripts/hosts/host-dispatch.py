@@ -11,13 +11,13 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
   host-dispatch.py --selftest                     假的 /proc/meminfo、假 nvidia-smi、假 ssh、假峰值表与假的派活脚本走一遍各格，末尾逐个打开弄坏开关核它红在点名的格
   --shard <k>/<n>：这一趟是调用方切好的 n 片里的第 k 片（1 ≤ k ≤ n），每片各派一次；--estimated-hours：调用方给的预计挂钟（小时，可带小数），没有历史用时时按它判 ⓪。
 
-⓪ 长活不单机派（records/2026-09-16-subagent拆分提案.md 第五十九节第 5 条）：在 ① 读完多机配置之后、②–④ 之前判，判法 long_run_check（scripts/host-resources.py 用同一份）。
+⓪ 长活不单机派（records/2026-09-16-subagent拆分提案.md 第五十九节第 5 条）：在 ① 读完多机配置之后、②–④ 之前判，判法 long_run_check（scripts/hosts/host-resources.py 用同一份）。
      用时：用时表（memory_peaks_lib.py 文件头「用时表」，键同峰值表）里这条命令上一次的用时；没有这条就用 --estimated-hours；两样都没有不判。
      派法占几台（hosts_of_dispatch）：
        给了 --shard <k>/<n>、n ≥ 2，而此刻能派的机器至少两台（本机与多机配置开着、判得过的第二台）⇒ 多台；
        否则读被起脚本文件头的长活声明（四个键 # long-run-shards: / # long-run-resume: / # long-run-hosts: / # long-run-unshardable:）。
          找脚本、读文件头、判齐不齐都用 .claude/hooks/lib_long_run.py 那一份（started_script、script_header_declaration、judge；
-         scripts/detached-run.sh 的 start --wall-clock over-2h 与 long-run-check 判的也是它），被起的脚本按仓根找：
+         scripts/hosts/detached-run.sh 的 start --wall-clock over-2h 与 long-run-check 判的也是它），被起的脚本按仓根找：
          judge 判齐了、shards 与 hosts 两键都写了 ⇒ 多台（它自己分片、按多机配置派到几台）；
          judge 判齐了、缺的那几样由 unshardable 一行点名 ⇒ 分不了，放行，打一行理由（例 layer0-shard-run.sh、crash-amplification.sh、broad-mutation.py：台数与额度不按 --emit-hosts 与 host-resources.py 现算）；
          judge 判不齐（一行都没写、半截声明、hosts 一行没点名两份现查或写死额度）⇒ 只占一台，判出的问题写进理由。
@@ -27,7 +27,7 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
        现算的两台分片（每片各派一次，带 --shard <k>/<n>），或在被起脚本的文件头补齐长活声明（分不了的写 # long-run-unshardable: <缺哪一段、为什么分不了>）。
 
 五步：
-  ① 机器：本机总在；第二台从多机配置读（仓根 multi-host.env，不进仓；判法 scripts/layer0-shard-configuration-check.sh，读法 scripts/peer-host-lib.sh
+  ① 机器：本机总在；第二台从多机配置读（仓根 multi-host.env，不进仓；判法 scripts/crash/layer0-shard-configuration-check.sh，读法 scripts/hosts/peer-host-lib.sh
      的 peer_host_load_configuration）。配置里双机开关 ENABLE_ACROSS_MACHINES 没开（判法退 3）就只有本机；配置判不过同样只有本机，打一行原因。
   ② 现查每台此刻的余量（每一轮都重查，不按声明的上限记账）：
      内存：/proc/meminfo 的 MemAvailable 减去那台内存包装账上在跑的、还没涨到预测峰值的那一截（memory_peaks_lib.headroom，算法同包装的排队），
@@ -38,7 +38,7 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
        再减 GPU_MARGIN_MEBIBYTES 与派发器账上别的 --gpu 那几趟预测了而还没用到的那一截。
      第二台经 ssh 读：把 memory_peaks_lib.py 的源码与本文件里取显存的两个函数送过去（python3 -c，base64 编码），用 peer-host-lib.sh 的 peer_host_run 跑。
   ③ 按历史预测这一条要多少：
-     内存：峰值表 scripts/memory-peaks.tsv（RUN_WITH_MEMORY_CAP_PEAKS 可换），键与内存包装同一份取法（memory_peaks_lib.command_key，
+     内存：峰值表 scripts/hosts/memory-peaks.tsv（RUN_WITH_MEMORY_CAP_PEAKS 可换），键与内存包装同一份取法（memory_peaks_lib.command_key，
        RUN_WITH_MEMORY_CAP_KEY 给了就用它）。有真峰值用峰值；撞过顶的（记的峰值到了那一次的上限）按记的上限 × CAP_FACTOR；查不到用默认值
        （memory_peaks_lib.DEFAULT_MEMORY_PREDICTION_TEXT，8G）。
      显存：派发器自己记的显存峰值表（默认 ${XDG_STATE_HOME:-~/.local/state}/singlefs/gpu-memory-peaks.tsv，跨重启、不进仓；
@@ -50,9 +50,9 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
      HOST_DISPATCH_WAIT_SECONDS 给了就至多等那么久，到点退 242，不给就一直等到放得下。
      哪台都等多久也放不下（包装要记的量比每台的 slice 总上限都大、或预测加余量比每台的整机内存都大、或显存预测比每台卡的总量减余量都大）当场退 241。
      判与记账在同一把锁里（状态目录 HOST_DISPATCH_STATE_DIR，默认 ${XDG_RUNTIME_DIR:-/tmp}/singlefs-host-dispatch），几条同时来的一条一条判。
-  ⑤ 派：本机 bash scripts/multi-host-run.sh --memory-cap <上限> --label <标签> [--fetch …] -- <命令…>（不带 --peer：在本机仓根经内存包装
-     scripts/run-with-memory-cap.sh 起）；第二台同一条带 --peer（拷树过去经那边的内存包装起，--fetch 点名的取回本机）。
-     带 --gpu 的整条套在清场包装外面：bash scripts/gpu-quiesce-run.sh -- <上面那条>（清场命令照多机配置在本机跑、两台的卡都管）。
+  ⑤ 派：本机 bash scripts/hosts/multi-host-run.sh --memory-cap <上限> --label <标签> [--fetch …] -- <命令…>（不带 --peer：在本机仓根经内存包装
+     scripts/hosts/run-with-memory-cap.sh 起）；第二台同一条带 --peer（拷树过去经那边的内存包装起，--fetch 点名的取回本机）。
+     带 --gpu 的整条套在清场包装外面：bash scripts/crash/gpu-quiesce-run.sh -- <上面那条>（清场命令照多机配置在本机跑、两台的卡都管）。
      清场包装是另一个工具实现员在做的；这里只照它文件头写的接口调（参数只有 -- <命令…>，退出码交回命令的，78 没起；跑完不复原），不改它。
      跑的时候按 GPU_SAMPLE_SECONDS（第二台 GPU_SAMPLE_SECONDS_PEER）秒读一次那台卡上的计算进程（nvidia-smi --query-compute-apps），
      派之前就在的进程不算，之后冒出来的那几个的显存相加，取最大的记成这一条的显存峰值（偏大不偏小：同一段时间别人新起的也算进来）；
@@ -154,7 +154,7 @@ NOT_RUN_EXITS = (EXIT_USAGE, 251, 252, 255)   # 派活那条链退这几个是�
 PROBE_MARK = "HOST_DISPATCH_PROBE "
 SELFTEST_MEASURED_AT = "2026-10-06T00:00:00Z"   # clock-times:allow 自证造的峰值表时刻，格式照真表
 GPU_PEAK_TABLE_HEADER = [
-    "# 每条命令上一次经 scripts/host-dispatch.py --gpu 跑时量到的显存峰值：派发器建、读、写（预测这一条要多少显存），别手改。",
+    "# 每条命令上一次经 scripts/hosts/host-dispatch.py --gpu 跑时量到的显存峰值：派发器建、读、写（预测这一条要多少显存），别手改。",
     "# 口径：跑的时候按间隔读那台卡上的计算进程，派之前就在的不算，之后冒出来的那几个 used_memory 相加取最大（MiB）；偏大不偏小。",
     "# 列（制表符分隔）：峰值 MiB、量的时刻（ISO 8601，Z 结尾）、撞过顶（1：内存包装认出显存不够，真峰值不小于记的这个数）、量在哪台（local / peer）、键（同内存峰值表）。",
 ]
@@ -465,7 +465,7 @@ class Verdict:
     never: bool
     cap: int
     why: str
-    memory_short: int = 0        # 字节：内存还差多少（放得下是 0）；scripts/host-resources.py 报差额读它
+    memory_short: int = 0        # 字节：内存还差多少（放得下是 0）；scripts/hosts/host-resources.py 报差额读它
     gpu_short: object = 0        # MiB：显存还差多少（放得下或没带 --gpu 是 0，读不到卡是 None）
 
 
@@ -578,7 +578,7 @@ def hosts_of_dispatch(command, shard, usable_hosts, repository_root):
 
 
 def long_run_check(settings, command, key, shard, estimated_hours, usable_hosts, use_history=True):
-    """文件头 ⓪：交 LongRun。scripts/host-resources.py 带命令时调同一份（use_history 只给它的弄坏开关关掉历史那一半）。"""
+    """文件头 ⓪：交 LongRun。scripts/hosts/host-resources.py 带命令时调同一份（use_history 只给它的弄坏开关关掉历史那一半）。"""
     seconds, measured_on = (None, None)
     if use_history and not broken("long-history-ignored"):
         seconds, measured_on = peaks.recorded_duration(settings.duration_table, key)
@@ -674,7 +674,7 @@ def decide(settings, request, prediction, peer, plan=False):
                 return Decision(chosen.host, cap=chosen.cap, entry_path=entry_path, probes=probes)
             if verdicts and all(verdict.never for verdict in verdicts) and not broken("wait-on-hopeless"):
                 settings.tell("  ✗ 哪台都等多久也放不下：" + "；".join(f"{host_name(verdict.host)}：{verdict.why}" for verdict in verdicts))
-                settings.tell("  → 怎么办：这一条要的比每台都大——先查它为什么要这么多（峰值表 scripts/memory-peaks.tsv 里键「"
+                settings.tell("  → 怎么办：这一条要的比每台都大——先查它为什么要这么多（峰值表 scripts/hosts/memory-peaks.tsv 里键「"
                               f"{prediction.key[:80]}」那一行、显存峰值表 {settings.gpu_peak_table}），或拆小再派；不绕开派发器硬起")
                 return Decision(None, exit_code=EXIT_NEVER_FITS, probes=probes)
         if plan:

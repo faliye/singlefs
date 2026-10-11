@@ -2,7 +2,7 @@
 # E170 第 2 次重跑第二段（`research/prompts/e170-r2-prereg.md` 5.3、5.4、5.8 第二段那一行）：输入核对、v1 现跑与入库产物比、
 # v2 判 I1–I4 / s4 三行 / 几何点、I5、参照谓词 W_ref 与 T_ref、X21 / X27 在 s4 行上各一趟、两份比对器。全是 Python，不编 Rust。
 # 跑法（在仓根，整条脚本经两层包装）：
-#   bash scripts/capped.sh <线程> bash scripts/run-with-memory-cap.sh 8G \
+#   bash scripts/hosts/capped.sh <线程> bash scripts/hosts/run-with-memory-cap.sh 8G \
 #     bash scripts/experiments/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh <日期标签> <工作进程数> <草稿目录> [产物目录]
 # 产物：research/results/e170-r2-o3-spec-executor-<日期标签>-s2-*.out，已存在就不覆盖（noclobber，executor_main 自己也拒绝）。
 # 每一步的退出码记进 -s2-run-status.out；一步失败不吞，照记、接着跑后面不依赖它的步（依赖它的那一步会因输入缺失自己失败、同样记下）。
@@ -19,7 +19,7 @@ RESULTS_DIRECTORY="${4:-$ROOT/research/results}"  # 第 4 个参数只给试跑�
 P="$RESULTS_DIRECTORY/e170-r2-o3-spec-executor-$TAG-s2"
 V1_FREEZE="$ROOT/research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out"
 V2_FREEZE="$ROOT/research/results/e170-r2-o3-spec-executor-2026-10-04-s1-executor.out"
-TABLE="$ROOT/scripts/mutations/e170_o3_spec_executor_with_witness_predicates.tsv"
+TABLE="$ROOT/scripts/mutation/tables/e170_o3_spec_executor_with_witness_predicates.tsv"
 I1="$TARGET/e170-dumps"; I2="$TARGET/e170-second-run-dumps"; I4="$TARGET/e171-dumps/e170-bad-states-copy-s2"
 KNOWN_BAD="$TARGET/e171-dumps/known-bad-s2"; BASELINE="$TARGET/e171-dumps/baseline-run1"; ROWS="$TARGET/e171-dumps/rows-s4-f4"
 STREAMS="new_pool_file_creation fixed_script_through_e_then_unmount"

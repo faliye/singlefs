@@ -1,6 +1,6 @@
-"""E171 比对器与驱动那一侧的变异驱动（登记第九节 X1–X3、X7–X12；表 scripts/mutations/e171_three_oracle_collusion.tsv）。
+"""E171 比对器与驱动那一侧的变异驱动（登记第九节 X1–X3、X7–X12；表 scripts/mutation/tables/e171_three_oracle_collusion.tsv）。
 
-scripts/mutate.sh 只跑 cargo，这一侧照 E170 的先例自己写（登记第九节写的是「经 mutate.sh 跑」，这里改成本驱动：它起不了 Python 的单测）：
+scripts/mutation/mutate.sh 只跑 cargo，这一侧照 E170 的先例自己写（登记第九节写的是「经 mutate.sh 跑」，这里改成本驱动：它起不了 Python 的单测）：
 派活之前逐条核锚点——原文（`\\n` 还原成换行）在本目录的源文件（本文件与 `test_*.py` 除外）里合起来恰好命中一次，不是就退 3、一条不跑；
 每条在草稿目录的一份副本上替换、先 `py_compile`（编不过记无效）、再跑本目录的全部单测，单测红记抓到、全绿记没红；每条在新副本上做；
 收尾在一份新副本上重跑基线，核「已还原，基线仍全绿」，并核本目录在跑前跑后逐字节相同。结局符号照 .claude/rules/mutation-sampling.md：
@@ -24,9 +24,9 @@ from result_lines import ResultLines, field
 
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 THIS_FILE = os.path.basename(__file__)
-# 第 1 次重跑（表 scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv）：比对器的单测，与逐行限时、进程挂钟的单测（修订 2 第 2.5、2.6 节）
+# 第 1 次重跑（表 scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv）：比对器的单测，与逐行限时、进程挂钟的单测（修订 2 第 2.5、2.6 节）
 TEST_MODULES = ("test_segment_one", "test_device_timing")
-# 第二段比对器的表（scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes_segment_two.tsv）给 `--unit-test-module test_segment_two`；
+# 第二段比对器的表（scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_segment_two.tsv）给 `--unit-test-module test_segment_two`；
 # 不给时照旧跑上面两个（第一段那张表的复跑产物逐字节不变）
 TIMEOUT_SECONDS = 300
 CAUGHT, INVALID, SURVIVED, TIMED_OUT = "✅", "⏭", "❌", "⏱"

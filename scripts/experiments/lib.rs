@@ -87,7 +87,7 @@ impl Emitter {
     }
 }
 
-/// 准入模块（`scripts/admission.py`）用来说「登记或调用有错」的退出码；准入模块被信号杀掉、
+/// 准入模块（`scripts/gate/admission.py`）用来说「登记或调用有错」的退出码；准入模块被信号杀掉、
 /// 放行却没给指纹行时装置也照这个码退出。
 const ADMISSION_REGISTRATION_ERROR_EXIT_CODE: i32 = 2;
 
@@ -126,7 +126,7 @@ pub fn admission_decision_of(exit_code: Option<i32>, admission_stdout: &str) -> 
     }
 }
 
-/// 装置开跑之前问准入模块这一趟该不该跑（门禁与实验共用 `scripts/admission.py`，
+/// 装置开跑之前问准入模块这一趟该不该跑（门禁与实验共用 `scripts/gate/admission.py`，
 /// 登记表是 `.claude/gate.d/stage-inputs.tsv`）。放行就返回要打在产物最前面的几行；不放行就照准入模块的
 /// 退出码退出进程。手敲命令、`cargo run`、`replay.sh` 走的都是装置 `main` 里这一个入口，绕不过去。
 /// 说明由准入模块直接打到 stderr。仓库根在编译时写进二进制（`CARGO_MANIFEST_DIR` 往上两级）。
@@ -144,7 +144,7 @@ pub fn admit_experiment_run_or_exit(admission_key: &str) -> Vec<String> {
         Ok(admission_output) => admission_output,
         Err(error) => {
             eprintln!("  ✗ 准入模块起不来（python3 {}）：{error}", admission_script.display());
-            eprintln!("     → 怎么办：装好 python3、确认仓库里有 scripts/admission.py；仓库挪了目录就重新编一次装置");
+            eprintln!("     → 怎么办：装好 python3、确认仓库里有 scripts/gate/admission.py；仓库挪了目录就重新编一次装置");
             std::process::exit(ADMISSION_REGISTRATION_ERROR_EXIT_CODE);
         }
     };
@@ -154,7 +154,7 @@ pub fn admit_experiment_run_or_exit(admission_key: &str) -> Vec<String> {
         AdmissionDecision::Refused { exit_code } => {
             if exit_code == ADMISSION_REGISTRATION_ERROR_EXIT_CODE && admission_output.status.success() {
                 eprintln!("  ✗ 准入模块退 0 却没给出输入指纹行（stdout：{admission_stdout:?}）");
-                eprintln!("     → 怎么办：python3 scripts/admission.py experiment <仓库根> {admission_key} 单跑一次看它打了什么，修准入模块");
+                eprintln!("     → 怎么办：python3 scripts/gate/admission.py experiment <仓库根> {admission_key} 单跑一次看它打了什么，修准入模块");
             }
             std::process::exit(exit_code)
         }

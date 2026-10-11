@@ -7,7 +7,7 @@
 #      点查那一列在高 ε 上贵起来，是「内部节点数逼近缓存容量」造成的，
 #      不是消息缓冲本身让单次查询变贵。不扫缓存就分不开这两件事。
 #
-#   bash scripts/e56-sweep.sh <输出文件>
+#   bash scripts/experiments/e56-sweep.sh <输出文件>
 #
 # 三条完整性闸（command-safety.md「结果抓取要有完整性闸」）：
 #   1. 跑前删本轮输出，不许跨轮复用；

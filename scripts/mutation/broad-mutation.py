@@ -2,7 +2,7 @@
 # admission: always 每次调都判此刻库目录里那棵树与它这一版的结果表；哪些条要跑由结果表定，上一次的结论不替这一次作保
 # run-condition: command git python3
 # broad-mutation-driver-signature: singlefs 广谱变异逐条驱动（重型测试闸 .claude/hooks/lib_heavy_tests.py 按这一行认改名或拷走的一份，别删）
-# 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/detached-run.sh start --wall-clock over-2h 与 long-run-check、scripts/host-dispatch.py 文件头 ⓪ 都读这几行）：
+# 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/hosts/detached-run.sh start --wall-clock over-2h 与 long-run-check、scripts/hosts/host-dispatch.py 文件头 ⓪ 都读这几行）：
 # long-run-shards: 按清单序号切：--shard <k>/<n> 只跑「序号 mod n == k」的条（n 由调用方给，两台各起一趟 --shard k/2），跑完在一台上 --import-results <另一台那一版的目录> 并成一份
 # long-run-resume: 重起同一条命令就是续跑：结果表里已有定论的条跳过，超时、内存撞顶、驱动错与被打断的那一条照样再选中重跑（被打断的先照在途记录拷回原件）
 # long-run-unshardable: 多机：--shard 的片数、在哪几台起、每台的 --threads 与 --memory-cap 都由调用方手给（--threads 默认 SINGLEFS_THREAD_CAP 或核数减一，--memory-cap 默认 24G），驱动不读 layer0-shard-configuration-check.sh --emit-hosts 的清单、也不按 host-resources.py --json 现算
@@ -16,7 +16,7 @@
   broad-mutation.py --summary                      这一版八栏条数，加起来要等于清单条数，对不上判红退 1；没红的与驱动错的逐条列名
   broad-mutation.py --check-ignored                只判这一版树里 harness 档的 #[ignore] 用例登记得对不对（见下「忽略用例登记」），打第二段慢档用例那一步的命令；不编不跑、不要前缀
   broad-mutation.py --unit-environment             只打一行：此刻环境里全局键与工具链认的变量（拿掉它全局键里的构建环境就变、或在树里起的 rustc -Vv 就变的那几个，
-                                                   例 RUSTUP_TOOLCHAIN；scripts/detached-run.sh 本来就带进单元的 UNIT_CARRIED_VARIABLES 除外），
+                                                   例 RUSTUP_TOOLCHAIN；scripts/hosts/detached-run.sh 本来就带进单元的 UNIT_CARRIED_VARIABLES 除外），
                                                    写成 `env 名=值 …`（按 shell 引好）；一个都没有打空行。不编（只起 rustc -Vv）、不跑、不改库目录。
                                                    提交流程 ③ 经 detached-run.sh 起单元之前跑它，把这一行原样接在 `--` 后面（.claude/skills/crash-test/commit-stages.md 第 2b 步）
   broad-mutation.py [选哪些条] [怎么跑]             跑；重跑同一条命令就是续跑
@@ -33,8 +33,8 @@
   --skip-stage-two        只跑第一段；第一段没红的记「只过了第一段」（stage-one-only），不算「没红」定论
   --stage-two-only        只给过了第一段的条补第二段；点名的条没过过第一段（这一版里没有它的 stage-one-only 行）拒，退 2
   --stage-two-eatmydata   第二段的文档测试与 checker 档快档也经 eatmydata 跑（默认不经；harness 慢档用例那一步与第一段同一种起法，一直经）
-  --threads <N>           线程数，默认取 SINGLEFS_THREAD_CAP，没设取核数减 1；编译与测试都照它（经 scripts/capped.sh）
-  --memory-cap <上限>     每条命令的内存上限（scripts/run-with-memory-cap.sh 的写法），默认 BROAD_MUTATION_MEMORY_CAP，没设 24G
+  --threads <N>           线程数，默认取 SINGLEFS_THREAD_CAP，没设取核数减 1；编译与测试都照它（经 scripts/hosts/capped.sh）
+  --memory-cap <上限>     每条命令的内存上限（scripts/hosts/run-with-memory-cap.sh 的写法），默认 BROAD_MUTATION_MEMORY_CAP，没设 24G
   --timeout-floor <秒>    单步超时的地板，默认 900；--timeout-multiplier <倍> 默认 5。单步超时 = max(地板, 倍数 × 这一版基线里这一步的秒数)：
                           基线是开跑时在这台机器当时的负载下量的（.claude/kb/tooling.md「超时地板按空闲机器标定，就会把「机器上还有别的活」记成「变异抓不到」」）
   --suspect-streak <K>    连续 K 条「无效」、或连续 K 条「测试那一步不到 --suspect-test-seconds 秒就红的抓到」，就在没改过的树上把那一步重跑一遍：
@@ -57,7 +57,7 @@
     全局键在 --sync-tree 时按那一次的参数（限时参数、--llvm-bin）现算，全文写进这一版的 global-key.txt、sha256 写进 tree.source 的 global_key。
     全局键全文一行一样，次序固定（global_key_lines，驱动与提交门禁都调它）：rules <判法版本>；toolchain <rustc -Vv 各行用 | 接>；
       file <路径> <sha256>（导出树里每份 Cargo.toml、Cargo.lock 与 .cargo/ 下的）；build <sha256> <名字>（构建环境，build_environment_of：
-      scripts/admission.py 的 build_environment_lines 在树上算的那一份——目录层级与 CARGO_HOME 下的 cargo 配置与它们指的程序、编译变量
+      scripts/gate/admission.py 的 build_environment_lines 在树上算的那一份——目录层级与 CARGO_HOME 下的 cargo 配置与它们指的程序、编译变量
       RUSTFLAGS / CARGO_ENCODED_RUSTFLAGS / RUSTC_WRAPPER / CARGO_PROFILE_* / CARGO_BUILD_* / CARGO_TARGET_*_RUSTFLAGS / CARGO_TARGET_*_RUNNER 与它们指的程序、RUSTC；
       驱动另加文档测试那一步才读的 DOC_TEST_VARIABLES（admission 那一份不管文档测试），名字写「<文档测试：环境变量 名>」）；
       tool <nextest / cargo-mutants / llvm-profdata 的版本>；exclusions <排除表的 sha256>；limits <限时参数>；escalation <升档常量>（见下「升档」）。
@@ -67,7 +67,7 @@
     判法版本进指纹之前建的版本目录（名字是源码指纹、或 sha256(源码指纹、换行、工具链)，例 versions/19c45e02…）与全局键进指纹之前建的（tree.source 里没有 global_key）
     不再认：真跑退 7、提交门禁判红，同一个提交重做 --sync-tree 是另一版；全局键全文的写法没变，结论表里键相同的结论照沿用。
     提交流程（.claude/skills/crash-test/commit-stages.md 第 2b 步）② 先 --sync-tree：这样的旧版本在 ② 就换成新的一版（新版本目录、整版现判），③ 不落在旧版上退 7。
-  导出范围取门禁 checker-tier-crates-mutation-replay 登记的拷贝范围（scripts/crates-mutation-rows.py 的 copied_paths，去掉 research/ 下的）加 .cargo/（拷贝范围里已登记了它就不重复加）。
+  导出范围取门禁 checker-tier-crates-mutation-replay 登记的拷贝范围（scripts/mutation/crates-mutation-rows.py 的 copied_paths，去掉 research/ 下的）加 .cargo/（拷贝范围里已登记了它就不重复加）。
 
 一条一条跑：每条变异一次独立的判定，判完立刻往 results.tsv 追加一行并 fsync（驱动自己不经 eatmydata，只有测试命令经它）。一行十二段，制表符分隔：
   序号、包、变异名、结局、哪一段判的（one / two）、抓到它的第一条测试名、编译秒数、测试秒数、时刻、这一版的指纹、备注、校验列
@@ -95,7 +95,7 @@
   都没红才记 missed。checker 档标了 #[ignore] 的全量崩溃枚举不在这里（另列第三段，驱动还没做）。第二段被打断的条，续跑时只补第二段。
 忽略用例登记：harness 档四个包（crates/<包>/src 与 tests 下）里每一条 #[ignore] 用例只有两种归宿，要跑第二段的这一趟开跑前（基线之前）按这一版树里的源码逐条判：
   理由以「harness 慢档用例：」开头的，进第二段慢档用例那一步；按环境变量起的大档与工具（没给环境变量就红、或规模由环境变量定）写在排除表
-  scripts/broad-mutation-ignored-exclusions.tsv，一行一条：<二进制 id><空格><用例名><TAB><理由>，二进制 id 与用例名照 cargo nextest list 的写法，
+  scripts/mutation/broad-mutation-ignored-exclusions.tsv，一行一条：<二进制 id><空格><用例名><TAB><理由>，二进制 id 与用例名照 cargo nextest list 的写法，
   第二段那一步用 -E 'not ((binary_id(=…) & test(=…)) | …)' 把它们排掉。下面每一种判红退 1、一步不跑：
   新加的忽略用例两样都不是（没登记）、排除表指着树里没有的用例、排除表里的用例理由又写着「harness 慢档用例：」（两边都在）、排除表有写坏（不是两段、名字里有不认的字符、理由是空）或重复的行、
   认不出写法的 #[ignore]（多行的、带条件的）。只跑第一段的趟（--skip-stage-two）不判。--check-ignored 只做这一判、打第二段那一步的完整命令。
@@ -112,13 +112,13 @@
   都不早于版本指针的 synced_at_ns（没有这一项的树同样拒），核不过退 5，出路是重做 --sync-tree。
   每次重起（这一趟没现跑基线的那一段）先在没改过的树上把编译那几步各跑一遍，红了退 6：基线绿过之后环境坏了要在落行之前发现。
   编译那一步退 101 而日志里没有带源码位置的编译错误（磁盘满、锁文件不符这一类），不记无效，记 driver-error 并当场在没改过的树上验一次编译。
-内存：每一步命令各自经 scripts/run-with-memory-cap.sh 跑（与 mutate.sh、门禁 checker-tier-crates-mutation-replay 同一种套法），
+内存：每一步命令各自经 scripts/hosts/run-with-memory-cap.sh 跑（与 mutate.sh、门禁 checker-tier-crates-mutation-replay 同一种套法），
   驱动自己不在 scope 里：整条包一层的话一条无界分配的变异会连驱动一起杀掉，续跑又撞同一条、永远过不去。
   撞这一步自己的上限（退 250）：systemd 只停这一步的 scope，记 memory-cap（再照「升档」重跑一次）。
   撞 slice 的总上限（几条合起来超了）：内核在整个 slice 里挑一条杀，挑中的可能是 slice 里别人那一条（别的会话的重活）。所以：
     改坏了源码的那几步带 RUN_WITH_MEMORY_CAP_OOM_FIRST（MUTATION_STEP_OOM_REASON），包装把它的 oom_score_adj 写成 1000，撞总上限时内核先杀它；
     升档那趟带 RUN_WITH_MEMORY_CAP_QUEUE_BY_CAP（ESCALATED_QUEUE_REASON），包装按它自己的上限排队（不按峰值表里的小峰值），放不下就等、等满或按上限算
-    比 slice 总上限还大就退 252，不放进去再撞总上限；撞过顶的键包装也按上限排队（scripts/run-with-memory-cap.sh 文件头「排队」）。
+    比 slice 总上限还大就退 252，不放进去再撞总上限；撞过顶的键包装也按上限排队（scripts/hosts/run-with-memory-cap.sh 文件头「排队」）。
     基线与验环境那几步两样都不带。变异步被总上限挤掉（退 254）是包装自己的结局，照「退出码」3 办；重跑时那个键已记成撞过顶、按上限排队。
   超时用包装的 RUN_WITH_MEMORY_CAP_TIME_LIMIT（退 253）。
   基线那几步另把 RUN_WITH_MEMORY_CAP_PEAKS 指到这一版的 baseline-peaks.<线程数>.tsv、键 broad-mutation baseline <步名>（BASELINE_PEAK_KEY_PREFIX；格式是包装的峰值表）：
@@ -155,7 +155,7 @@
 前缀：起 cargo 的与改库目录的（跑、--sync-tree、--import-results）都要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，不带退 2；
   --list-items、--summary、--check-ignored、--help（-h）、--selftest 不要。重型测试闸同样这样分（.claude/hooks/lib_heavy_tests.py 文件头「广谱变异的逐条驱动」）。
 
-剪枝（三轮设计判决 research/prompts/tooling-broad-mutation-prune-r{1,2,3}-main-verification.md：C1–C6 加 E1–E6；规则在 scripts/mutation-prune.py）：
+剪枝（三轮设计判决 research/prompts/tooling-broad-mutation-prune-r{1,2,3}-main-verification.md：C1–C6 加 E1–E6；规则在 scripts/mutation/mutation-prune.py）：
   --changed-since <提交>  只现判「这次改到的」（C1：对着那个提交，被改的 fn 项、函数外部分变了的文件里全部、新加的函数、宏与 include 依赖变了的文件），
                           加结论表里沿用不了的（没有记录、全局键变了、无效、没红、抓到它的测试的 fn 项指纹变了）；其余落 carried 行沿用（C3）。
                           要现判的条里这一版已经是超时、内存撞顶的（环境型结局，提交门禁算没结论）也重跑一遍（用户 2026-10-02 定：照旧算没结论、门禁红，出路要走得通）；
@@ -179,7 +179,7 @@
     另存结局、抓到它的测试与那条测试 fn 项的指纹（E3）、fn 项与函数外部分的词法单元指纹（E2）、宏与 include 依赖的指纹、全局键（E4：工具链、
     Cargo.toml、Cargo.lock、.cargo/、构建环境、nextest / cargo-mutants / llvm-tools 版本、排除表、限时参数、升档常量、判法版本 JUDGE_RULES_VERSION；全文在这一版的 global-key.txt，
     sha256 进这一版的指纹，见上「指纹」）。
-  判定库（scripts/lib_verdict_library.py 文件头「键分两列」；广谱变异这一份是结论表与这一版的结果表，形态不同、不调那份共用部分）：
+  判定库（scripts/crash/lib_verdict_library.py 文件头「键分两列」；广谱变异这一份是结论表与这一版的结果表，形态不同、不调那份共用部分）：
     判法版本 = JUDGE_RULES_VERSION（全局键第一行 rules，进这一版的指纹）；输入指纹 = 源码指纹、rustc -Vv 与全局键里判法版本之外的几类
     （Cargo 清单与锁、.cargo/、构建环境、工具版本、排除表、限时参数、升档常量），每条另加 fn 项、函数外部分与依赖的指纹（E2、E3）。两列有一样变了就现判。
     判法版本此刻是 prune-r3-e1-e6-fresh-build-mac（fresh-build：换树后编译目录不留过时的工作区产物；mac：结果行带密钥校验、基线按线程数分开记）：它之前落的结论（结论表里记着旧全局键的、旧版目录里的结果行）一条都不沿用，全部重判。
@@ -433,7 +433,7 @@ REAL_SELF_PATH = os.path.realpath(__file__)
 MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "run-with-memory-cap.sh")
 THREAD_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "capped.sh")
 DEFAULT_HOME = "~/.local/share/singlefs/broad-mutation"
-DEFAULT_MEMORY_CAP = "24G"        # 2026-09-30 派发给的上限；各步的实测峰值由内存包装记在 scripts/memory-peaks.tsv（键 broad-mutation <步名>）
+DEFAULT_MEMORY_CAP = "24G"        # 2026-09-30 派发给的上限；各步的实测峰值由内存包装记在 scripts/hosts/memory-peaks.tsv（键 broad-mutation <步名>）
 DEFAULT_TIMEOUT_FLOOR_SECONDS = 900
 DEFAULT_TIMEOUT_MULTIPLIER = 5
 DEFAULT_LOCK_WAIT_SECONDS = 120
@@ -490,7 +490,7 @@ MEMORY_CAP_FORM = re.compile(r"^([1-9][0-9]*)([KMGT])$")  # run-with-memory-cap.
 MEMORY_CAP_UNITS = {"K": 1024, "M": 1024 ** 2, "G": 1024 ** 3, "T": 1024 ** 4}
 # 构建环境里 admission.py 那一份不管、驱动另加的：文档测试那一步（cargo test --doc）读 rustdoc 的标志
 DOC_TEST_VARIABLES = ("RUSTDOCFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS")
-# scripts/detached-run.sh 本来就带进单元的变量：--unit-environment 不再打它们
+# scripts/hosts/detached-run.sh 本来就带进单元的变量：--unit-environment 不再打它们
 UNIT_CARRIED_VARIABLES = ("SINGLEFS_HEAVY_TESTS", "PATH", "HOME", "CARGO_HOME", "RUSTUP_HOME")
 # 弄坏开关 unit-environment-fixed-list 下认的那几个（全局键改调构建环境之前驱动自己写的那一份）
 FIXED_LIST_VARIABLES = ("RUSTFLAGS", "RUSTDOCFLAGS", "CARGO_BUILD_RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")
@@ -535,7 +535,7 @@ BASELINE_SEQUENCE = 0
 ENVIRONMENT_SEQUENCE = "environment"      # 在没改过的树上验环境的那几步，日志与假一步的调用记录里用这个名字
 # 旧版驱动恢复原件时把临时件建在树里，半途被杀会留下 <源文件>.restore.<进程号>：核树时认出来删掉
 RESTORE_LEFTOVER = re.compile(r"^(?P<path>.+)\.restore\.\d+$")
-# 内存包装给一步开的 scope：名字里第一段数字是包装自己的进程号（scripts/run-with-memory-cap.sh 的 unit="singlefs-memory-cap-$$-…"）
+# 内存包装给一步开的 scope：名字里第一段数字是包装自己的进程号（scripts/hosts/run-with-memory-cap.sh 的 unit="singlefs-memory-cap-$$-…"）
 OWN_SCOPE_UNIT = re.compile(r"/(singlefs-memory-cap-(\d+)-\d+\.scope)\s*$")
 SELFTEST_WORK_VARIABLE = "BROAD_MUTATION_SELFTEST_WORK"
 TEST_ONLY_VARIABLES = ("BROAD_MUTATION_STEP_DRIVER", "BROAD_MUTATION_STEP_VIA_WRAPPER", "BROAD_MUTATION_LIST_DRIVER", "BROAD_MUTATION_TREE_SOURCE",
@@ -973,7 +973,7 @@ def export_paths():
     try:
         copied = module.copied_paths(REPOSITORY)
     except Exception as error:  # 登记表读不了、没有那一行
-        refuse(f"读不出导出范围（scripts/crates-mutation-rows.py 的 copied_paths）：{error}",
+        refuse(f"读不出导出范围（scripts/mutation/crates-mutation-rows.py 的 copied_paths）：{error}",
                "看 .claude/gate.d/stage-inputs.tsv 里 checker-tier-crates-mutation-replay.sh 那一行还在不在、成不成形")
     paths = [path for path in copied if not path.startswith("research/")]
     if ".cargo" not in paths:
@@ -1908,7 +1908,7 @@ def memory_cap_bytes(text):
 
 
 def wrapper_hit_text(exit_code, limit_text):
-    """包装撞上限时往 stderr 打的那一句里认的一段（scripts/run-with-memory-cap.sh 文件头「退出码」的 253、250）。"""
+    """包装撞上限时往 stderr 打的那一句里认的一段（scripts/hosts/run-with-memory-cap.sh 文件头「退出码」的 253、250）。"""
     return f"超过限时 {limit_text} 秒" if exit_code == TIME_LIMIT_HIT_EXIT else f"撞了内存上限 {limit_text}"
 
 
@@ -2244,7 +2244,7 @@ class Runner:
                                                      f"证据登记在 {ESCALATION_REGISTRY}", "")
 
     def stop_for_infrastructure(self, step_name, sequence, exit_code):
-        who = "nvidia-smi 看谁在用卡" if exit_code == GPU_MEMORY_HIT_EXIT else "bash scripts/run-with-memory-cap.sh --status 看谁占着"
+        who = "nvidia-smi 看谁在用卡" if exit_code == GPU_MEMORY_HIT_EXIT else "bash scripts/hosts/run-with-memory-cap.sh --status 看谁占着"
         refuse(f"第 {sequence} 条的 {step_name} 退 {exit_code}（{WRAPPER_INFRASTRUCTURE_EXITS[exit_code]}）：这是内存包装自己的结局，不是这条变异的结局，不落行",
                f"看日志 {self.log_path(sequence, step_name)}（{who}），"
                "修好或等别的重活退了，重跑同一条命令接着跑", EXIT_INFRASTRUCTURE)
@@ -2780,7 +2780,7 @@ def import_results(library, source):
     return 0
 
 
-# ── 剪枝（三轮设计判决 C1–C6、E1–E6；规则本身在 scripts/mutation-prune.py） ─────────────────────────────
+# ── 剪枝（三轮设计判决 C1–C6、E1–E6；规则本身在 scripts/mutation/mutation-prune.py） ─────────────────────────────
 
 PRUNE_BREAKS = ("regex-function-text", "body-only-function-text", "innermost-function-key", "outside-changes-ignored", "macro-dependencies-ignored",
                 "include-dependencies-ignored", "test-fingerprint-ignored", "global-key-ignored", "unviable-carried", "missed-carried", "key-by-bare-name",
@@ -2836,7 +2836,7 @@ ADMISSION_MODULE = None
 
 
 def admission_module():
-    """scripts/admission.py（构建环境的定义只认它那一份 build_environment_lines）。"""
+    """scripts/gate/admission.py（构建环境的定义只认它那一份 build_environment_lines）。"""
     global ADMISSION_MODULE
     if ADMISSION_MODULE is None:
         specification = importlib.util.spec_from_file_location("admission_for_broad_mutation", os.path.join(SCRIPT_DIRECTORY, "..", "gate", "admission.py"))
@@ -2853,7 +2853,7 @@ def build_environment_of(root, environment):
     try:
         lines = admission.build_environment_lines(root, environment)
     except admission.InputManifestError as error:
-        refuse(f"算不出构建环境（scripts/admission.py 的 build_environment_lines）：{error}",
+        refuse(f"算不出构建环境（scripts/gate/admission.py 的 build_environment_lines）：{error}",
                "看报错里点的那份 cargo 配置或那个编译器：配置文件要读得了，RUSTC / build.rustc 指的编译器要跑得出 -V")
     return list(lines) + [(f"<文档测试：环境变量 {name}>", environment[name].encode("utf-8", "surrogateescape"))
                           for name in DOC_TEST_VARIABLES if name in environment]
@@ -4595,7 +4595,7 @@ def selftest_global_key_class_cells(selftest):
         selftest.check(changed.returncode == EXIT_TOOLCHAIN and calls == 0,
                        f"--sync-tree 之后换了{category}，真跑没退 7（换的是 {detail}；退 {changed.returncode}、调了 {calls} 步）：{changed.stderr[-300:]}",
                        "看 check_toolchain 与 check_global_key：工具链、工具版本、限时参数、构建环境（build_environment_of）任一样与这一版记的不同都退 7")
-    # 构建环境另七类（治理第三轮判决第 6 行）：scripts/admission.py 的 build_environment_lines 逐类写错时，各让下面至少一格翻红
+    # 构建环境另七类（治理第三轮判决第 6 行）：scripts/gate/admission.py 的 build_environment_lines 逐类写错时，各让下面至少一格翻红
     fake_compiler = os.path.join(work, "fake-rustc-v")
     with open(fake_compiler, "w") as handle:
         handle.write('#!/usr/bin/env bash\necho "rustc 0.0.0-selftest (自证的编译器)"\n')
@@ -4618,7 +4618,7 @@ def selftest_global_key_class_cells(selftest):
         calls = len(selftest.calls())
         selftest.check(changed.returncode == EXIT_TOOLCHAIN and calls == 0,
                        f"--sync-tree 之后换了构建环境的「{what}」，真跑没退 7（退 {changed.returncode}、调了 {calls} 步）：{changed.stderr[-300:]}",
-                       "看 scripts/admission.py 的 build_environment_lines：CARGO_PROFILE_*、RUSTC 的值与 -V、CARGO_ENCODED_RUSTFLAGS、"
+                       "看 scripts/gate/admission.py 的 build_environment_lines：CARGO_PROFILE_*、RUSTC 的值与 -V、CARGO_ENCODED_RUSTFLAGS、"
                        "从树往上每一层的 rust-toolchain(.toml) 都进构建环境")
     # 指的程序按内容进、往上层走、配置里指的程序：另一份库，换树时库目录那一层（树的上层）就有 .cargo/config.toml（build.rustc-wrapper 指一个程序），会话里 RUSTC_WRAPPER 指另一个程序
     programs_home = os.path.join(work, "classes-programs")
@@ -4656,7 +4656,7 @@ def selftest_global_key_class_cells(selftest):
         calls = len(selftest.calls())
         selftest.check(changed.returncode == EXIT_TOOLCHAIN and calls == 0,
                        f"--sync-tree 之后{what}，真跑没退 7（退 {changed.returncode}、调了 {calls} 步）：{changed.stderr[-300:]}",
-                       "看 scripts/admission.py 的 build_environment_lines：指程序的变量与配置里指的程序按内容进、cargo 配置从树往上每一层都读")
+                       "看 scripts/gate/admission.py 的 build_environment_lines：指程序的变量与配置里指的程序按内容进、cargo 配置从树往上每一层都读")
     # 源码指纹算路径：同一份内容换个文件名是另一版
     first_path = os.path.join(selftest.source, "crates/singlefs-format/src/renamed_a.rs")
     second_path = os.path.join(selftest.source, "crates/singlefs-format/src/renamed_b.rs")

@@ -20,7 +20,7 @@
 退出码：0 被看的子 agent 全部交回或被停、没有告警；3 有告警；4 定时回报（没有告警、子 agent 还在跑，到点叫醒主 agent 看一眼）；2 用法错。
 带 --processes-only 时 0 是看门狗起的时候就在跑的那些进程都退出了（起的时候一个都没有也退 0，报告里写明是哪一种）。
 退出时出路句印的重起命令是 watch.sh 认得的写法（主 agent 经它起看门狗，它不认这里的 --agents / --processes-only）：盯点名的子 agent 印
-`bash scripts/watch.sh <agent 号>,…`，--discover 印不带 agent 号的 `bash scripts/watch.sh`，--processes-only 印 `bash scripts/watch.sh --processes`。
+`bash scripts/agents/watch.sh <agent 号>,…`，--discover 印不带 agent 号的 `bash scripts/agents/watch.sh`，--processes-only 印 `bash scripts/agents/watch.sh --processes`。
 AGENT_WATCH_BREAK=restarthint 印回这里自己的选项，自检里出路句那两格必须判错。
 「交回」按交回工具（SubagentHandback）成功返回判：只结束本轮、没交回的子 agent 还在等后台任务，不算结束。
 交回之后只有新指令撤销它（续做消息，认法见 is_new_instruction）；交回之后被自己后台任务的完成通知叫醒、又调了工具再结束本轮的，仍算交回。
@@ -71,7 +71,7 @@ queued_command），与主会话记录里 SendMessage 发给它的成功结果�
 下一步给整棵子树从最底层往上逐个停的次序。归属照「交回之后后台还在跑」那套：它或它的上层开着哪个子 agent（或主 agent）后台任务的输出文件，
 认不出写认不出。读不到 cmdline、cwd、environ 的（进程刚退出、权限不够）跳过不报；lib_heavy_tests.py 导入失败时报告里写明这一类没查。
 --ack 进程:PID 确认。双机分片的驱动脚本 layer0-shard-run.sh 按它参数里树根下键那一行登记判（lib_heavy_tests.py 文件头）：
-驱动自检（scripts/layer0-shard-run-selftest.sh）在临时仓里登记 harness 档包的替身用例；树根里那一行读不到的（lib_heavy_tests.py 照重型算）靠下一段放行。
+驱动自检（scripts/crash/layer0-shard-run-selftest.sh）在临时仓里登记 harness 档包的替身用例；树根里那一行读不到的（lib_heavy_tests.py 照重型算）靠下一段放行。
 登记成轻的自证底下不判：一个进程起的脚本（bash / sh、python 后面那个，直接执行的取它自己）照 lib_heavy_tests.py 的 classify_selftest 判
 （同一份登记表 .claude/hooks/selftest-registry.tsv，命令词要解到本仓那一份），是登记成 light、或 heavy-if-set:<变量> 而它环境里那个变量没设的自证，
 它自己照判，它底下整棵不判。`<名>.sh --selftest` 先 exec 进同目录 `<名>-selftest.sh` 本体的（layer0-shard-run.sh、gate-staged.sh、stage-must-run.sh；
@@ -98,7 +98,7 @@ AGENT_WATCH_BREAK=heavycommitcheck 把这一类照重型报，自检里「不重
 （/proc/<pid>/statm 第二列乘页大小）超过 --process-rss-gibibytes（默认 8 GiB，依据见那个选项；写 0 不查）就报，叫醒主 agent：
 写进程号、命令、常驻内存、已跑多久、归属（照「交回之后后台还在跑」那套认开着输出文件的子 agent，认不出写认不出）与「怎么办」。
 整查（--interval-seconds）之外，watch 与 --processes-only 两次整查之间每隔 --detection-poll-seconds 再单查一遍常驻内存，过线就马上整查一次、叫醒主 agent：
-涨得慢的等不到下一次整查；涨得快的（E142 那条变异每秒约 5 GB、十几秒吃满整机）单查也来不及，只有内存上限（scripts/run-with-memory-cap.sh）挡得住，
+涨得慢的等不到下一次整查；涨得快的（E142 那条变异每秒约 5 GB、十几秒吃满整机）单查也来不及，只有内存上限（scripts/hosts/run-with-memory-cap.sh）挡得住，
 这一类告警是它之外的第二道。它只报不杀（同一份文件头「只看、只报」）；--ack 进程:PID 确认。
 2026-09-25 两次整机 OOM：E142 的变异跑道里一条变异让测试无界分配，涨到 53.6 GiB 与 56.6 GiB 才被内核杀掉，连带杀了本地模型服务与 Claude Code 会话
 （records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。
@@ -151,7 +151,7 @@ selftest_heavy_tests、selftest_heavy_selftest_tree、selftest_light_tier_tree�
       selftest_session_watch_in（「✗ 自检：--discover 时会话里的子 agent 都交回了应当接着盯到点退 4、不报全部交回」）
   AGENT_WATCH_BREAK=discovernone  discovered_agent_ids() 一个都找不出来
       selftest_session_watch_in（「✗ 自检：--discover 应当自己找出没结束的 discoveredlong、确认过的不叫醒、到点退 4」、
-      「✗ 自检：--discover 的出路句应当是不带 agent 号的 bash scripts/watch.sh」、「✗ 自检：--ack 应当落进状态目录、下一次起不带 --ack 也读回」、「✗ 自检：条件类告警的确认」）
+      「✗ 自检：--discover 的出路句应当是不带 agent 号的 bash scripts/agents/watch.sh」、「✗ 自检：--ack 应当落进状态目录、下一次起不带 --ack 也读回」、「✗ 自检：条件类告警的确认」）
   AGENT_WATCH_BREAK=display  command_for_display() 不剥 Bash 工具的那层包装，原样显示
       selftest_in（「✗ 自检：Bash 工具包着的命令在报告里应当显示成「cargo test --release」」、「✗ 自检：Bash 工具包着的命令在报告里应当显示成「grep 'x' f」」）
   AGENT_WATCH_BREAK=finished  AgentTranscript._read() 调过交回工具、没有未完的工具调用也不记成已交回
@@ -170,7 +170,7 @@ selftest_heavy_tests、selftest_heavy_selftest_tree、selftest_light_tier_tree�
       「✗ 自检：子 agent textsettled 的状态应当是「本轮结束、没交回」」、「✗ 自检：子 agent stopsequence 的状态应当是「本轮结束、没交回」」、「✗ 自检：子 agent waiting 应当不算交回或被停」、
       「✗ 自检：子 agent nowake 应当不算交回或被停」、「✗ 自检：子 agent wokenup 应当不算交回或被停」、「✗ 自检：子 agent waitinglong 应当不算交回或被停」、「✗ 自检：子 agent movedbackground 应当不算交回或被停」、
       「✗ 自检：子 agent queuedresume 应当不算交回或被停」、「✗ 自检：前台命令超时被挪进后台」、「✗ 自检：一个结束本轮没交回、一个已交回时看门狗应当退出码 4 并列出「还没交回、没被停的子 agent（1 个，另有还没会话记录的 0 个）：waiting」」、
-      「✗ 自检：定时回报的出路句应当是「→ 接着盯就用 run_in_background 再起一个看门狗：bash scripts/watch.sh waiting」」、「✗ 自检：复检间隔 240 秒、回报周期 3 秒时看门狗应当到点退出码 4」）、
+      「✗ 自检：定时回报的出路句应当是「→ 接着盯就用 run_in_background 再起一个看门狗：bash scripts/agents/watch.sh waiting」」、「✗ 自检：复检间隔 240 秒、回报周期 3 秒时看门狗应当到点退出码 4」）、
       selftest_session_watch_in（「✗ 自检：子 agent progressstale」）、selftest_leftover_background（「✗ 自检：「交回之后后台还在跑」应当只报交回、被 TaskStop 停掉、任务通知 failed 的三个」、
       「✗ 自检：「交回之后后台还在跑」的进程都用 --ack 进程:<pid> 确认过时不该叫醒」）
   AGENT_WATCH_BREAK=handoveranytype  agent_alerts() 不分类型，所有子 agent 上下文过线都报「该交接」
@@ -309,8 +309,8 @@ selftest_heavy_tests、selftest_heavy_selftest_tree、selftest_light_tier_tree�
   AGENT_WATCH_BREAK=repeat  agent_alerts() 不报同一命令反复且输出不变
       selftest_in（「✗ 自检：子 agent repeat」）
   AGENT_WATCH_BREAK=restarthint  restart_command() 与 run_processes_only() 的出路句印回本脚本自己的选项，不印 watch.sh 认得的写法
-      selftest_in（「✗ 自检：定时回报的出路句应当是「→ 接着盯就用 run_in_background 再起一个看门狗：bash scripts/watch.sh waiting」」）、
-      selftest_session_watch_in（「✗ 自检：--discover 的出路句应当是不带 agent 号的 bash scripts/watch.sh」）
+      selftest_in（「✗ 自检：定时回报的出路句应当是「→ 接着盯就用 run_in_background 再起一个看门狗：bash scripts/agents/watch.sh waiting」」）、
+      selftest_session_watch_in（「✗ 自检：--discover 的出路句应当是不带 agent 号的 bash scripts/agents/watch.sh」）
   AGENT_WATCH_BREAK=resume  AgentTranscript._read() 交回之后的续做消息不撤销交回
       selftest_in（「✗ 自检：子 agent queuedresume」、「✗ 自检：子 agent continued 应当不算交回或被停」、「✗ 自检：子 agent resumedthinking 应当不算交回或被停」、
       「✗ 自检：子 agent queuedresume 应当不算交回或被停」）
@@ -1992,7 +1992,7 @@ def memory_report(root_pid, excluded_pids, session_dirs, thresholds, attribute_o
                        f"已跑 {format_duration(uptime_seconds - table[pid]['start_ticks'] / ticks_per_second)}：{command_for_display(table[pid]['command'])[:140]}；"
                        f"归属：{owners.get(pid, '认不出') if attribute_owners else '（单查不认归属）'}",
                        f"先看它还涨不涨（隔几秒再读一次 `grep VmRSS /proc/{pid}/status`）：还在涨多半是无界分配，按进程号停它（`{PROCESS_STOP_COMMAND} {pid}`）"
-                       f"或给归属的那个子 agent 发消息让它停；查清为什么涨之前别照原样重派同一件活，重派时让那一步经 scripts/run-with-memory-cap.sh 带上限跑；"
+                       f"或给归属的那个子 agent 发消息让它停；查清为什么涨之前别照原样重派同一件活，重派时让那一步经 scripts/hosts/run-with-memory-cap.sh 带上限跑；"
                        f"确实要用这么多就 --ack 进程:{pid}"))
     largest_text = (f"常驻内存最大的是进程 {largest[0]} {largest[1] / BYTES_PER_GIBIBYTE:.2f} GiB" if largest else "一个都没读到")
     summary = (f"{MEMORY_ALERT}：查了这个 Claude 实例底下 {examined} 个进程，{largest_text}（阈值 {threshold_gibibytes:g} GiB），报 {len(alerts)} 条")
@@ -2115,7 +2115,7 @@ def run_processes_only(arguments, process_root_pid, excluded_pids):
             print_report(lines, alerts)
             print(f"定时回报：已经看了 {arguments.max_minutes:g} 分钟，没有告警，盯着的进程还有 {len(running)} 个没退出。")
             print("   → 接着盯就用 run_in_background 再起一个看门狗："
-                  f"{'--processes-only' if BROKEN_DETECTION == 'restarthint' else 'bash scripts/watch.sh --processes'}")
+                  f"{'--processes-only' if BROKEN_DETECTION == 'restarthint' else 'bash scripts/agents/watch.sh --processes'}")
             return 4
         next_check_in = min(arguments.interval_seconds, report_deadline - time.time())
         if leftover_pending_until is not None:
@@ -2287,8 +2287,8 @@ def restart_command(active_ids, unstarted_ids, discover):
     if BROKEN_DETECTION == "restarthint":
         return f"--agents {','.join(active_ids + unstarted_ids)}"
     if discover:
-        return "bash scripts/watch.sh"
-    return f"bash scripts/watch.sh {','.join(active_ids + unstarted_ids)}"
+        return "bash scripts/agents/watch.sh"
+    return f"bash scripts/agents/watch.sh {','.join(active_ids + unstarted_ids)}"
 
 
 def print_active_list(active_ids, unstarted_ids, discover=False):
@@ -2446,7 +2446,7 @@ def run(arguments):
         return 2
     if getattr(arguments, "discover", False) and (not arguments.session_dir or arguments.agents or arguments.processes_only or arguments.mode != "watch"):
         print("✗ --discover 只和 watch、--session-dir 一起用，不给 --agents、--processes-only\n"
-              "→ 怎么办：bash scripts/watch.sh 不带 agent 号（它从 CLAUDE_CODE_SESSION_ID 找会话目录）", file=sys.stderr)
+              "→ 怎么办：bash scripts/agents/watch.sh 不带 agent 号（它从 CLAUDE_CODE_SESSION_ID 找会话目录）", file=sys.stderr)
         return 2
     agent_ids = [item for item in (arguments.agents or "").split(",") if item]
     discover = bool(getattr(arguments, "discover", False))
@@ -2868,7 +2868,7 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
         os.makedirs(os.path.join(tree, "scripts"))
         with open(os.path.join(tree, ".claude", "gate.d", "stage-inputs.tsv"), "w") as handle:
             handle.write(f"{key}\tcrates/\ttest={package}:a_target:a_case shard=across-machines\t# 看门狗自检的样本\n")
-        with open(os.path.join(tree, "scripts", "layer0-shard-run.sh"), "w") as handle:
+        with open(os.path.join(tree, "scripts", "crash", "layer0-shard-run.sh"), "w") as handle:
             handle.write("sleep 60\n")
         driver_trees[label] = (key, tree)
     # 样本自检：假的 stage-selftest.sh 与带 --selftest 的假脚本各在底下起一个 crates 变异表那一道（checker-tier-crates-mutation-replay，这里只是睡），都不报；
@@ -2912,7 +2912,7 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
         start("timeout 包着没带前缀的", ["timeout", "60", fake_script])
         start("另一个看门狗的自检底下没带前缀的", [sys.executable, fake_watchdog, fake_binary])
         for label, (key, tree) in driver_trees.items():
-            start(f"{label}里起的双机分片驱动", ["bash", os.path.join(tree, "scripts", "layer0-shard-run.sh"), key, tree])
+            start(f"{label}里起的双机分片驱动", ["bash", os.path.join(tree, "scripts", "crash", "layer0-shard-run.sh"), key, tree])
         start("stage-selftest.sh 拿样本起的 checker-tier-crates-mutation-replay", ["bash", sample_runner, sample_stage, sample_tree])
         start("带 --selftest 的脚本底下起的 checker-tier-crates-mutation-replay", ["bash", selftest_runner, "--selftest", sample_stage])
         start("不带前缀直接起的 checker-tier-crates-mutation-replay", ["bash", sample_stage, sample_tree])
@@ -3024,9 +3024,9 @@ def selftest_heavy_selftest_tree(work, failures, probed_processes):
     front_text = '[[ "${1:-}" != --selftest ]] || exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sample-shard-run-selftest.sh"\nexit 0\n'
     body_text = ('work="$(mktemp -d)"\n'
                  'mkdir -p "$work/repository/scripts"\n'
-                 "printf 'sleep 60\\n' > \"$work/repository/scripts/layer0-shard-run.sh\"\n"
+                 "printf 'sleep 60\\n' > \"$work/repository/scripts/crash/layer0-shard-run.sh\"\n"
                  "printf '%s\\n' \"$work\" > \"$SAMPLE_SELFTEST_TREE_READY\"\n"
-                 'bash "$work/repository/scripts/layer0-shard-run.sh" crash-case:sharded-selftest "$work/repository"\n')
+                 'bash "$work/repository/scripts/crash/layer0-shard-run.sh" crash-case:sharded-selftest "$work/repository"\n')
     for root in (registered_root, copy_root):
         scripts = os.path.join(root, "scripts")
         os.makedirs(scripts)
@@ -3051,7 +3051,7 @@ def selftest_heavy_selftest_tree(work, failures, probed_processes):
 
     def driver_command(tree):
         repository = os.path.join(tree, "repository")
-        return ["bash", os.path.join(repository, "scripts", "layer0-shard-run.sh"), "crash-case:sharded-selftest", repository]
+        return ["bash", os.path.join(repository, "scripts", "crash", "layer0-shard-run.sh"), "crash-case:sharded-selftest", repository]
 
     table = {}
 
@@ -3073,7 +3073,7 @@ def selftest_heavy_selftest_tree(work, failures, probed_processes):
         start_selftest("仓副本里的自证", copy_root)
         standalone_tree = tempfile.mkdtemp(dir=temporary_base)
         os.makedirs(os.path.join(standalone_tree, "repository", "scripts"))
-        with open(os.path.join(standalone_tree, "repository", "scripts", "layer0-shard-run.sh"), "w") as handle:
+        with open(os.path.join(standalone_tree, "repository", "scripts", "crash", "layer0-shard-run.sh"), "w") as handle:
             handle.write("sleep 60\n")
         start("没有自证祖先的驱动", driver_command(standalone_tree))
         wait_until(selftests_running)
@@ -3436,8 +3436,8 @@ def selftest_session_watch_in(work, session, scratch, thresholds, failures, watc
     checks += 1
     if first.returncode != 4 or "discoveredlong" not in first.stdout or "还没交回、没被停的子 agent" not in first.stdout:
         failures.append(f"--discover 应当自己找出没结束的 discoveredlong、确认过的不叫醒、到点退 4，实际 {first.returncode}：{first.stdout[-500:]}")
-    if "   → 接着盯就用 run_in_background 再起一个看门狗：bash scripts/watch.sh\n" not in first.stdout:
-        failures.append(f"--discover 的出路句应当是不带 agent 号的 bash scripts/watch.sh（一个会话一个看门狗），实际：{first.stdout[-300:]}")
+    if "   → 接着盯就用 run_in_background 再起一个看门狗：bash scripts/agents/watch.sh\n" not in first.stdout:
+        failures.append(f"--discover 的出路句应当是不带 agent 号的 bash scripts/agents/watch.sh（一个会话一个看门狗），实际：{first.stdout[-300:]}")
     second = discover_watch(["--max-minutes", "0.03"])
     checks += 1
     if second.returncode != 4 or "已确认接着盯（--ack discoveredlong:工具调用过长）" not in second.stdout:
@@ -3493,7 +3493,7 @@ def selftest():
     exit_code, problems = scratch.run_with_scratch(
         selftest_in, "agent-watch-selftest-", BROKEN_DETECTION == "keepscratch",
         SELFTEST_ROLE_VARIABLE, [sys.executable, os.path.abspath(__file__), "--selftest"])
-    return scratch.merged_exit_code(exit_code, problems, "scripts/agent-watch.py 的 selftest()", "AGENT_WATCH_BREAK=keepscratch")
+    return scratch.merged_exit_code(exit_code, problems, "scripts/agents/agent-watch.py 的 selftest()", "AGENT_WATCH_BREAK=keepscratch")
 
 
 def selftest_in(work):
@@ -3825,7 +3825,7 @@ def selftest_in(work):
         failures.append(f"一个结束本轮没交回、一个已交回时看门狗应当退出码 4 并列出「{wanted_active_line}」，"
                         f"实际退出码 {watched.returncode}，输出：{watched.stdout[-300:]}")
     # 出路句印的是 watch.sh 认得的写法（照抄能起），不是 agent-watch.py 自己的 --agents（watch.sh 退 2「不认识的选项」）
-    wanted_restart_line = "   → 接着盯就用 run_in_background 再起一个看门狗：bash scripts/watch.sh waiting\n"
+    wanted_restart_line = "   → 接着盯就用 run_in_background 再起一个看门狗：bash scripts/agents/watch.sh waiting\n"
     if wanted_restart_line not in watched.stdout:
         failures.append(f"定时回报的出路句应当是「{wanted_restart_line.strip()}」，实际输出：{watched.stdout[-300:]}")
     try:
@@ -4007,7 +4007,7 @@ def main():
                         help="这个 Claude 实例底下任一进程常驻内存超过这么多 GiB 就报「进程常驻内存过线」，写 0 不查；默认 8 GiB。"
                              "依据：本机 60 GiB 内存，本地模型服务连同会话常驻约 12 GiB（2026-09-25 free -g 的 used 列），同时可能有 3 件重活，"
                              "每件分 (60 − 12) ÷ 3 = 16 GiB，阈值取一件的一半；换机器要重算。它管涨得慢的：E142 那条无界分配的变异每秒约 5 GB、十几秒吃满整机，"
-                             "快过任何复检间隔，那一类只有内存上限（scripts/run-with-memory-cap.sh）挡得住")
+                             "快过任何复检间隔，那一类只有内存上限（scripts/hosts/run-with-memory-cap.sh）挡得住")
     parser.add_argument("--ack", action="append", default=[],
                         help="主 agent 看过、判定只是慢接着盯的告警：子agent id:告警名，进程告警写 进程:PID，"
                              "「跑满 N 小时要主 agent 问一次」可写 子agent id:跑满 N 小时（只确认那一格）；可给多次；不带 --discover 时只在这一次看门狗里有效")

@@ -10,7 +10,7 @@
 #   gpu-quiesce-run.sh --selftest     拿假的清场命令（换掉多机配置）与假的命令走一遍各格，末尾一轮逐个打开弄坏开关、核它红在点名的格
 #
 # 清场：读多机配置（${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，模板仓根 multi-host.env.example；主工作树的根按 git common-dir 取，
-#   同 scripts/layer0-shard-configuration-check.sh）的两个键 QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND，两个都要写；
+#   同 scripts/crash/layer0-shard-configuration-check.sh）的两个键 QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND，两个都要写；
 #   QUIESCE_START_COMMAND、QUIESCE_STARTED_CHECK_COMMAND 留给手动复原，这一份不读、写没写都照跑。
 #   两条命令各用 bash -c 在调用方的工作目录里跑，命令与输出都不打到标准错误上（里面有私有的服务名）。
 #   输出逐条追加进这一趟的本机日志 <日志目录>/<日期>-<登记名>.log（目录 700、文件 600，每条前后各一行「== <键> 起 <UTC 时刻>」「== <键> 退 <码>」）：
@@ -59,7 +59,7 @@
 #   2         用法错：没给 -- 或 -- 后面没有命令
 #   78        命令没起：多机配置里 QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND 没写全、状态目录或本机日志建不了（含取不到工作根）、锁等不到、清场回读没过；
 #             收到 INT/TERM/HUP 而命令还没起时退 128+信号号
-# 弄坏开关 GPU_QUIESCE_BREAK=<项>（只给证红用，逗号连几个；--selftest 末尾那一轮从这张表现读，写法同 scripts/crash-amplification.sh 文件头「弄坏开关」一段，
+# 弄坏开关 GPU_QUIESCE_BREAK=<项>（只给证红用，逗号连几个；--selftest 末尾那一轮从这张表现读，写法同 scripts/crash/crash-amplification.sh 文件头「弄坏开关」一段，
 #   格名是 run_selftest 里「✗ 自证 <格名>：」的那一段）：
 #   GPU_QUIESCE_BREAK=run-despite-failed-quiesce  清场回读没过也起命令
 #       quiesce-read-back-fails（「清场回读没过却起了命令」）
@@ -87,9 +87,9 @@
 #       used-card-outsider（「这一趟用卡 0，卡 0 上的外人却没挡住回读」）
 #   GPU_QUIESCE_BREAK=keep-inherited-check-variables  调用方带进来的 GPU_QUIESCE_CHECK_LOCAL_CARDS、GPU_QUIESCE_CHECK_EXEMPT_PIDS 不清掉，这一份没设的那一样照它们传给回读
 #       used-card-outsider（「这一趟用卡 0，卡 0 上的外人却没挡住回读」）
-#   这几个开关别的脚本的自证也认（它们起的命令经这一份）：崩溃放量入口 scripts/crash-amplification.sh、分项驱动 scripts/crash-amplification-item.sh
+#   这几个开关别的脚本的自证也认（它们起的命令经这一份）：崩溃放量入口 scripts/crash/crash-amplification.sh、分项驱动 scripts/crash/crash-amplification-item.sh
 #   与门禁 checker-tier-layer0-replay 的样本，各红在哪一格写在那三份文件头。
-# 自证末尾那一轮走 scripts/crash-amplification-lib.sh 的 crash_amplification_switch_wheel（并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS，没给取 SINGLEFS_THREAD_CAP，再没给按 nproc）。
+# 自证末尾那一轮走 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_switch_wheel（并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS，没给取 SINGLEFS_THREAD_CAP，再没给按 nproc）。
 #
 # gate-similar: peer-host-lib.sh 它的 peer_host_quiesce / peer_host_quiesce_left 只在双机配置开着时读得到清场命令，也不管几趟同时用卡；改它会废掉层 0 双机分片三条用例的全绿标记（admission.py 的 SHARD_DRIVER_FILES），所以这里另写清场与登记
 # gate-similar: crash-amplification-two-hosts.sh 它的 --quiesce 经 peer-host-lib.sh 清场，只给单跑双机驱动时用；分项驱动与崩溃放量入口经这一份

@@ -1,4 +1,4 @@
-"""E170 第 2 次重跑进复跑（`scripts/replay.sh` 的 E170 几行）用的结果行出口。文件名以 run_ 起头，不进冻结（登记 5.6）。
+"""E170 第 2 次重跑进复跑（`scripts/experiments/replay.sh` 的 E170 几行）用的结果行出口。文件名以 run_ 起头，不进冻结（登记 5.6）。
 
 产物都走 replay.sh 的 E7RESULT 协议：每行 `E7RESULT name=…`，末行 `E7RESULT name=done emitted=N`，
 N 连 done 行自己一起数（replay.sh 文件头闸 2 的口径）。两个子命令：

@@ -9,7 +9,7 @@
 //! 本文件从第二次的二进制原样带过来的部分：常量、K1–K4 容量与树高、5.3 组公式、fixed_point_core、
 //! 甲 / wal_full / 乙-M 三条臂的单发与批量函数、legacy 模块、row6 主表与它的 8.2 / 判别力自证、
 //! row7_group_commit_tests（第二段留下的单测，照跑）——这些函数与单测不属于这一次的判据，留着
-//! 只是为了让第二次的变异表（`scripts/mutations/e155_second_run_fsync_write_volume.tsv`）能在
+//! 只是为了让第二次的变异表（`scripts/mutation/tables/e155_second_run_fsync_write_volume.tsv`）能在
 //! 这个新二进制上照跑一遍（登记第九节）。
 //!
 //! 这一次改的只有两处：
@@ -2817,7 +2817,7 @@ mod fourth_run_interval_and_saturation_tests {
         assert_eq!(jia.fua_count, 1);
     }
 
-    // ---- M1–M6 变异目标（数值锚点在 `scripts/mutations/e155_fourth_run_group_commit_concurrency.tsv`）----
+    // ---- M1–M6 变异目标（数值锚点在 `scripts/mutation/tables/e155_fourth_run_group_commit_concurrency.tsv`）----
 
     /// M1 的正确性锚点：`batches_in_interval_for_concurrent_fsync_count` 在 k > N 时必须是 1，不是 N/k。
     #[test]

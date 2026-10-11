@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 核一份 qemu-io 的 blklogwrites 过滤节点能不能把多段 writev 完整记进日志。QEMU 8.2.2 原版写日志那一笔是「条目头 2 段 + 数据全部段」，
-# 数据段数 ≥ 1023 时超过 IOV_MAX=1024，日志文件的 pwritev 回 EINVAL，来宾拿到 EIO；补丁 scripts/qemu/blklogwrites-linearize-over-iov-max.patch，
-# 装补好的版本用 scripts/build-patched-qemu.sh（装完前拿它核一次），scripts/vm-bench.sh 的 blklogwrites 一支开跑前也调它。
+# 数据段数 ≥ 1023 时超过 IOV_MAX=1024，日志文件的 pwritev 回 EINVAL，来宾拿到 EIO；补丁 scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch，
+# 装补好的版本用 scripts/devices/build-patched-qemu.sh（装完前拿它核一次），scripts/devices/vm-bench.sh 的 blklogwrites 一支开跑前也调它。
 #
 #   qemu-blklogwrites-check.sh <qemu-io 路径>   逐条跑 1022、1023、1024、2048 段，全过退 0；任一条不成立退 1，点名哪一条、哪一项不成立
 #   qemu-blklogwrites-check.sh --selftest       不起真 qemu-io：用手造的日志与数据盘核每一项判法，再用假 qemu-io（原版与补好两种形状）走一遍整条路
@@ -42,7 +42,7 @@ case "$1" in
   -*) die "认不出的选项 $1" "$usage_howto" ;;
   *)
     check_mode=check; qemu_io_path="$1"
-    [[ -x "$qemu_io_path" && ! -d "$qemu_io_path" ]] || die "$qemu_io_path 不是可执行文件" "给 qemu-io 的路径：系统的是 /usr/bin/qemu-io，补好的在 scripts/build-patched-qemu.sh 装进的私有目录的 bin/qemu-io"
+    [[ -x "$qemu_io_path" && ! -d "$qemu_io_path" ]] || die "$qemu_io_path 不是可执行文件" "给 qemu-io 的路径：系统的是 /usr/bin/qemu-io，补好的在 scripts/devices/build-patched-qemu.sh 装进的私有目录的 bin/qemu-io"
     ;;
 esac
 
@@ -135,8 +135,8 @@ sys.exit(fake_main(sys.argv[1:]))
 CASE_SEGMENT_COUNTS = (1022, 1023, 1024, 2048)
 BREAK_ITEMS = ("skip-qemu-io-status", "skip-superblock-count", "skip-entry-shape", "skip-payload-compare", "skip-disk-compare")
 QEMU_IO_TIMEOUT_SECONDS = 120
-FIX_HOWTO = ("这份 qemu-io 的 blklogwrites 没打 scripts/qemu/blklogwrites-linearize-over-iov-max.patch，或打了没生效；"
-             "跑 scripts/build-patched-qemu.sh 装补好的版本，再拿它装进的私有目录的 bin/qemu-io 重核")
+FIX_HOWTO = ("这份 qemu-io 的 blklogwrites 没打 scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch，或打了没生效；"
+             "跑 scripts/devices/build-patched-qemu.sh 装补好的版本，再拿它装进的私有目录的 bin/qemu-io 重核")
 
 break_item = os.environ.get("QEMU_BLKLOGWRITES_CHECK_BREAK", "")
 if break_item and break_item not in BREAK_ITEMS:

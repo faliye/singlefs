@@ -4,7 +4,7 @@
 每个里程碑一节，写 singlefs 在那个里程碑上能跑哪几维、和六家差多少、跑不了的维还缺什么能力。给人从头读；六家的数是基线，singlefs 那一列随里程碑往下长。
 
 **数从哪来**：全部来自 E152（按里程碑对比六家文件系统的文件性能） 的四次正式跑：单盘 `research/results/e152-file-system-benchmark-2026-09-15.out`、两盘镜像 `research/results/e152-file-system-benchmark-mirror-2026-09-15.out`、里程碑「覆盖写、释放、回退与复用」上只重跑 singlefs 一臂的 `research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out` 与收尾时再跑的 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`；
-第二节与第二·二节的表由 `python3 scripts/e152-tables.py <产物>` 从产物生成，不手抄。
+第二节与第二·二节的表由 `python3 scripts/experiments/e152-tables.py <产物>` 从产物生成，不手抄。
 实验的口径与复跑命令在 `.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md`，跑前登记（含正式跑之前的六次修订与四次冒烟跑）在 `research/prompts/e152-preregistration.md`。
 
 **只出观测**：这份文件回答「差多少、差在哪一维」，不回答「singlefs 该怎么改」——那是设计推论，要按 `.claude/rules/three-way-inference.md` 另走三方论证。
@@ -371,7 +371,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 ## 三·二、里程碑「覆盖写、释放、回退与复用」（2026-09-17，步 7 的重跑）
 
-只重跑 singlefs 那一臂（`E152_CONFIGURATIONS=singlefs bash scripts/e152-run.sh research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out`，5 轮，宿主 1 分钟负载 1.28–1.69，跑前登记第十二节），六家的基线不重跑（内核、测试台、负载都没变，第二节与第二·二节照旧）。
+只重跑 singlefs 那一臂（`E152_CONFIGURATIONS=singlefs bash scripts/devices/e152-run.sh research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out`，5 轮，宿主 1 分钟负载 1.28–1.69，跑前登记第十二节），六家的基线不重跑（内核、测试台、负载都没变，第二节与第二·二节照旧）。
 这个里程碑上 singlefs 多了「同一个进程里再发布一次」：真设备二进制的 `file-overwrite` 模式在新池新建文件之后再覆盖写一次（4100 字节的第二版，发布 B），冷重开读回第二版。挂钟从两段切成三段，覆盖写、释放、回退与复用那一段才是稳态的每次代价。
 
 ### singlefs 今天能跑哪几维
@@ -383,7 +383,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 | 格式化与可用容量 | 写量与容量能算，挂钟拆不出来 | 真设备整环写 0 还没做 |
 | 大文件顺序读写、4K 随机读写、元数据 | 不能 | 与第三节相同：一个文件一个数据单元、没有按偏移读的接口、没有目录 |
 
-### 表（`python3 scripts/e152-tables.py research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out`）
+### 表（`python3 scripts/experiments/e152-tables.py research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out`）
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 覆盖写、释放、回退与复用（覆盖写 B）ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 | B 两盘写请求 | B 两盘写字节 | B 两盘屏障 | B 两盘 FUA 写 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -465,9 +465,9 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 产物 `research/results/e152-file-system-benchmark-mirror-2026-09-28.out`（1026 行，末行 `E7RESULT name=summary_done emitted=180`），40 次虚机跑全部 `vm_exit=0`、没有重试；
 宿主 1 分钟负载 1.59–2.55（本机的崩溃核对进程在跑之前 `kill -STOP` 暂停，跑完复原）。命令：
-`E152_CONFIGURATIONS="raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror singlefs" bash scripts/e152-run.sh research/results/e152-file-system-benchmark-mirror-2026-09-28.out`。
+`E152_CONFIGURATIONS="raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror singlefs" bash scripts/devices/e152-run.sh research/results/e152-file-system-benchmark-mirror-2026-09-28.out`。
 
-### 表（`python3 scripts/e152-tables.py research/results/e152-file-system-benchmark-mirror-2026-09-28.out`，整份原样）
+### 表（`python3 scripts/experiments/e152-tables.py research/results/e152-file-system-benchmark-mirror-2026-09-28.out`，整份原样）
 
 #### 大文件顺序写与顺序读（MiB/s，越大越好）
 
@@ -590,9 +590,9 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 产物 `research/results/e152-file-system-benchmark-mirror-2026-09-29.out`（1026 行，末行 `E7RESULT name=summary_done emitted=180`），40 次虚机跑全部 `vm_exit=0`、没有重试；
 跑之前清过场（两台上的推理与语音服务停了、两台显卡全空），本机没有别的编译与测试在跑；产物里每次虚机跑的宿主 1 分钟负载 0.50–9.61（高的那几次在 OpenZFS 那几轮）。
 singlefs 一臂的代码与 9 月 28 日那次同一个提交（dbcc0d2f，核心代码工作区没有改动）。命令：
-`E152_CONFIGURATIONS="raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror singlefs" bash scripts/e152-run.sh research/results/e152-file-system-benchmark-mirror-2026-09-29.out`。
+`E152_CONFIGURATIONS="raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror singlefs" bash scripts/devices/e152-run.sh research/results/e152-file-system-benchmark-mirror-2026-09-29.out`。
 
-### 表（`python3 scripts/e152-tables.py research/results/e152-file-system-benchmark-mirror-2026-09-29.out`，整份原样）
+### 表（`python3 scripts/experiments/e152-tables.py research/results/e152-file-system-benchmark-mirror-2026-09-29.out`，整份原样）
 
 #### 大文件顺序写与顺序读（MiB/s，越大越好）
 
@@ -725,7 +725,7 @@ singlefs 一臂（整行抄自两份产物的 `singlefs_timing` 行）：
 
 ## 四、以后的里程碑怎么往下接
 
-每过一个里程碑，给 singlefs 重跑一遍（`E152_CONFIGURATIONS=singlefs bash scripts/e152-run.sh <产物>`），在这份文件里加一节，格式照第三节：能跑哪几维、差多少、还缺什么。
+每过一个里程碑，给 singlefs 重跑一遍（`E152_CONFIGURATIONS=singlefs bash scripts/devices/e152-run.sh <产物>`），在这份文件里加一节，格式照第三节：能跑哪几维、差多少、还缺什么。
 六家的基线只在内核、测试台或负载变了的时候重跑，重跑就是新一次正式跑，要另写跑前登记。
 
 里程碑规划到覆盖写、释放、回退与复用（`.claude/kb/milestone/02-second-txn.md`，2026-09-16 建档：同一个池里再发布一次、释放、延迟重用、第二个可写实例、管理员回退，一个文件跨多个单元与目录都不在里面），所以哪一维什么时候能跑，按缺的能力写，不按里程碑名写：

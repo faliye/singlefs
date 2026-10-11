@@ -14,7 +14,7 @@
 
 判据（机械，不靠人记）：
   删 —— `research/results/` 与 `research/prompts/` 下，**在 HEAD 里有、且这一轮没碰过**的文件；
-        「这一轮」的起点与门禁 doc-process-records 的 knowledge-sync 格同一个基准：`scripts/changed-paths.sh` 的 `gate_diff_base gate`
+        「这一轮」的起点与门禁 doc-process-records 的 knowledge-sync 格同一个基准：`scripts/gate/changed-paths.sh` 的 `gate_diff_base gate`
         （`GATE_BASE`，否则 `@{upstream}` 的 merge-base，都没有就 HEAD），见 base_of 的说明。
         没改过 = 它是上一次提交固化下来的，属于上一轮及更早。
   留 —— 工作区里新加或改过的（本轮在产生的）、三方判决 `*-main-verification.md`（kb 的依据指着它）、
@@ -54,7 +54,7 @@ class BaseUnavailable(Exception):
 def base_of(root="."):
     """「这一轮」的起点。与门禁 doc-process-records 的 knowledge-sync 格（改了规则、agent、hook、门禁、脚本或实现之后有没有写阶段同步记录）
     取同一个基准——两道对同一批文件判相反的事，基准必须是同一个。取法不在这里另写一份，
-    直接调那一格用的那一份：`scripts/changed-paths.sh` 的 `gate_diff_base gate`
+    直接调那一格用的那一份：`scripts/gate/changed-paths.sh` 的 `gate_diff_base gate`
     （GATE_BASE，否则 @{upstream} 的 merge-base，都没有就 HEAD）。只认「GATE_BASE，否则 HEAD」时，
     没设 GATE_BASE 又有没推的提交，两道的窗口就不一样（C450 那一形）。
 
@@ -220,7 +220,7 @@ def run(root, apply_changes):
     # `--check` 不拦：它只读不写，而门禁就是不带 GATE_BASE 单跑它也要能报出现状。
     if apply_changes and not os.environ.get("GATE_BASE", ""):
         print("  ✗ --apply 不许在没给 GATE_BASE 的时候跑：不给基准它按 HEAD 算，会把这一次提交要带的同步记录也当上一轮的删掉")
-        print("     → 怎么办：跑 GATE_BASE=<门禁那一行「diff 基准 <sha>」报的那个提交> python3 scripts/archive-past-rounds.py --apply；")
+        print("     → 怎么办：跑 GATE_BASE=<门禁那一行「diff 基准 <sha>」报的那个提交> python3 scripts/kb/archive-past-rounds.py --apply；")
         print("               基准要与门禁跑的时候一样（`gate.sh` 开头打的那一行「diff 基准 <sha>」就是它）。")
         print("               真要按 HEAD 算（只有手里一个提交都没暂存时才成立），显式写 GATE_BASE=HEAD。")
         return 2
@@ -228,7 +228,7 @@ def run(root, apply_changes):
         doomed = past_round_files(root)
     except BaseUnavailable as error:
         print(f"  ✗ 取不到「这一轮」的起点（{error}），分不出哪些实验记录是上一轮的")
-        print("     → 怎么办：在仓根跑、确认 scripts/changed-paths.sh 在；基准取法与门禁 doc-process-records 的 knowledge-sync 格是同一份，那一份坏了两边一起坏。")
+        print("     → 怎么办：在仓根跑、确认 scripts/gate/changed-paths.sh 在；基准取法与门禁 doc-process-records 的 knowledge-sync 格是同一份，那一份坏了两边一起坏。")
         return 1
     inputs = still_an_input(root, doomed)
     doomed = [p for p in doomed if p not in inputs]
@@ -257,7 +257,7 @@ def run(root, apply_changes):
         # 当场红（触发文件没人点名），实测 2026-09-22 多删两份、白跑一轮全量门禁。
         given_base = os.environ.get("GATE_BASE", "")
         shown_base = given_base if given_base else "<门禁那一行「diff 基准 <sha>」报的那个提交>"
-        print("     → 怎么办：跑 GATE_BASE=%s python3 scripts/archive-past-rounds.py --apply 删掉，" % shown_base)
+        print("     → 怎么办：跑 GATE_BASE=%s python3 scripts/kb/archive-past-rounds.py --apply 删掉，" % shown_base)
         print("               这个基准要与门禁跑的时候一样（`gate.sh` 开头打的那一行「diff 基准 <sha>」就是它）；")
         print("               不给基准它会按 HEAD 算，把这一次提交要带的同步记录也当上一轮的删掉，删完门禁 doc-process-records 的 knowledge-sync 格当场红；")
         print("               它同时把别处指向这些文件的引用改成只留文件名、不留路径；")
@@ -419,7 +419,7 @@ def selftest_in_temporary_directory():
         subprocess.run(["git", "commit", "-qm", "没推的一次提交"], cwd=work, check=True)
         if any(name.endswith("r2-sync.md") for name in past_round_files(work)):
             print("  ✗ 自检失败：没设 GATE_BASE、有没推的提交时，那次提交里写的记录被判成上一轮的")
-            print("     → 怎么办：看 base_of —— 它要调 scripts/changed-paths.sh 的 gate_diff_base gate（与门禁 doc-process-records 的 knowledge-sync 格同一份），")
+            print("     → 怎么办：看 base_of —— 它要调 scripts/gate/changed-paths.sh 的 gate_diff_base gate（与门禁 doc-process-records 的 knowledge-sync 格同一份），")
             print("               那一份没设 GATE_BASE 时取 @{upstream} 的 merge-base；只认「GATE_BASE，否则 HEAD」就会在这里判错。")
             return 1
 

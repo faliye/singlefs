@@ -2,18 +2,18 @@
 # admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
 # run-condition: none 只读会话记录与 /proc，除了 bash 与 python3 之外没有环境要求
 # 看门狗的调用入口：主 agent 每次派发（含续做）之后照 .claude/main-agent.md「派出去之后」起它，调用时只填要盯的 agent 号，
-# 会话目录由 agent-watch.py 按 agent 号自己找，阈值从 scripts/watch.conf 读——不在命令行上手敲。
+# 会话目录由 agent-watch.py 按 agent 号自己找，阈值从 scripts/agents/watch.conf 读——不在命令行上手敲。
 #
 # 一律放进 Bash 工具的 run_in_background；这里不再自己放后台（放了之后跑完的那个叫不醒主 agent）。
-#   bash scripts/watch.sh                                       一个会话一个看门狗：从 CLAUDE_CODE_SESSION_ID 找会话目录，每次检查自己找还没结束的子 agent
+#   bash scripts/agents/watch.sh                                       一个会话一个看门狗：从 CLAUDE_CODE_SESSION_ID 找会话目录，每次检查自己找还没结束的子 agent
 #                                                                        （新派的自动接上，不用停旧的起新的）；已有一个在盯就退 5；--ack 记进这个会话的状态目录，下一次起读回
-#   bash scripts/watch.sh <agent 号>[,<agent 号>…] [<agent 号> …]   只盯这几个子 agent 与它们起的长进程（--ack 只在这一次有效）
-#   bash scripts/watch.sh --processes                           只盯这个 Claude 实例底下已经在跑的长进程（主 agent 自己起的长命令）；
+#   bash scripts/agents/watch.sh <agent 号>[,<agent 号>…] [<agent 号> …]   只盯这几个子 agent 与它们起的长进程（--ack 只在这一次有效）
+#   bash scripts/agents/watch.sh --processes                           只盯这个 Claude 实例底下已经在跑的长进程（主 agent 自己起的长命令）；
 #                                                                        找得到当前会话（CLAUDE_CODE_SESSION_ID）就同时查交回之后后台还在跑
-#   bash scripts/watch.sh --report                              当前会话的全部子 agent 现在是什么样，报一次就退
-#   bash scripts/watch.sh … --ack <agent 号>:<告警名>            看过、判定只是慢的那一条告警，这一次看门狗里不再为它叫醒（可给多次；进程告警——含「重型测试没带前缀」——写 --ack 进程:<pid>）
-#   bash scripts/watch.sh --dry-run …                           只打印要跑的命令，不跑
-#   bash scripts/watch.sh --selftest
+#   bash scripts/agents/watch.sh --report                              当前会话的全部子 agent 现在是什么样，报一次就退
+#   bash scripts/agents/watch.sh … --ack <agent 号>:<告警名>            看过、判定只是慢的那一条告警，这一次看门狗里不再为它叫醒（可给多次；进程告警——含「重型测试没带前缀」——写 --ack 进程:<pid>）
+#   bash scripts/agents/watch.sh --dry-run …                           只打印要跑的命令，不跑
+#   bash scripts/agents/watch.sh --selftest
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -105,7 +105,7 @@ selftest() {
   checked=$((checked + 1))
   rm -rf "${scratch:?}"
   if ((fail)); then
-    echo "  → 怎么办：按上面那一条改 scripts/watch.sh 里对应的那段"
+    echo "  → 怎么办：按上面那一条改 scripts/agents/watch.sh 里对应的那段"
     exit 1
   fi
   echo "  ✓ watch.sh 自检通过：配置转选项、拼错的 key 拒绝、不像 agent 号的参数拒绝、--processes 只盯进程（找得到当前会话就带上会话目录）、--ack 原样转过去且形态不对就拒绝、重型测试与书记员汇总两类告警的 --ack 照旧转过去、不给 agent 号找得到会话就走 --discover 找不到就拒绝（判了 $checked 条）"

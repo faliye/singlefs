@@ -39,7 +39,7 @@ E1	CLAUDE.md 逐字写着「层 0 崩溃点重放（门禁 54 号）的负载还
 D13	步 3 / 步 5 现状的树表条目宽	树表条目 148 → 200 落地：milestone/01-first-txn.md 步 3 / 步 5「现状」的条目宽改成 200；2026-09-14 那条历史条目里的 148 字节原样保留	条目宽	H40
 D14	只改路径	只改措辞：从 `.claude/kb/milestone-first-txn.md` 搬进 `.claude/kb/milestone/` 文件夹、改名 `01-first-txn.md`，正文一个字没动，只改了相对链接的层级	make_filesystem	H41
 F1	CLAUDE.md 逐字写着「层 0 崩溃点重放（门禁 54 号）的负载还只有新池新建文件，覆盖写、释放、多次挂载、回退都没进来，checker 也只判第一版那部分不变量」	建档：题面从仓里各处「要覆盖写、释放、回退与复用」的地方收来，八步照 01-first-txn.md 的形态写；「抬 F 排在回退之后」是未过三方论证的推论	多次挂载	H61
-F2	scripts/perf-by-milestone.md 写着「singlefs 在这个里程碑上八维里只比得了三维：小文件持久化、冷挂载、格式化与容量。大文件顺序读写、4K 随机读写、元数据都跑不了——一个池只能写出一个文件，没有覆盖写、释放、回退与复用，也不挂载」	加「与主线并行的四条线」一节：多单元文件、挂载态按偏移读、多个 inode、真设备补齐四条线，现状都是未开工	4K 随机读	H60
+F2	scripts/experiments/perf-by-milestone.md 写着「singlefs 在这个里程碑上八维里只比得了三维：小文件持久化、冷挂载、格式化与容量。大文件顺序读写、4K 随机读写、元数据都跑不了——一个池只能写出一个文件，没有覆盖写、释放、回退与复用，也不挂载」	加「与主线并行的四条线」一节：多单元文件、挂载态按偏移读、多个 inode、真设备补齐四条线，现状都是未开工	4K 随机读	H60
 F3	无「开工前 树表条目 148 → 200」一节	加并落地「开工前 树表条目 148 → 200」一节：预留 24 → 76、每单元 109 → 81 棵，常量、四份装置、字节表与三个实验产物一次改完	TREE_TABLE_ENTRY_BYTES|每单元.*81 棵	H56;H57
 F4	CLAUDE.md 逐字写着「层 0 崩溃点重放（门禁 54 号）的负载还只有新池新建文件，覆盖写、释放、多次挂载、回退都没进来，checker 也只判第一版那部分不变量」	三方第一轮定案：影子账取窄读法（D23 已定项 14 同日改写）；C310（事务切分纪律与记录数口径打架） 取「一条记录装一个事务连同它的元数据」；层 0 取主线全量加并行线各一个小负载；字节登记位另开 layout/02-second-txn.md；步 0 按整条流切段（约 225 万状态）等多处改写	释放	H58;H59
 F5	CLAUDE.md 逐字写着「层 0 崩溃点重放（门禁 54 号）的负载还只有新池新建文件，覆盖写、释放、多次挂载、回退都没进来，checker 也只判第一版那部分不变量」	步 1 / 步 2（覆盖写、释放，发布 B）落地：`publish_file_version`、`allocator` 的 `release`；三方两轮写回，攻方打中八处，立 `crates/mutations.tsv` 与门禁 59 号；改动计数与 D8 已定项 6 字段表口径核过	覆盖写	H52;H53;H54;H55
@@ -55,7 +55,7 @@ G2	新立：「本机 grep/find 不是 GNU」「复跑与变异脚本要在 rese
 G3	verification-build.md 口径：三样东西是零代码，crates/ 不存在	verification-build.md 按代码现状改写：crates/ 下四个 crate 已实现，新池新建文件从 mkfs 到恢复跑通，层 0 崩溃点重放由门禁 54 号覆盖两条流	crates	H64
 G4	新立：「计时不在转发输出的循环里打时间戳」「来宾块层计数与程序计数」这两节	vm-harness.md 加两节：门禁 65 号 relay-timing-lint.py 拦转发输出时打时间戳；块层写请求数 = 程序写调用 + 屏障数 + FUA 写数	relay-timing-lint	H65
 H1	新立：.claude/agents/ 这批 agent 定义、.claude/main-agent.md 这份文件	.claude/agents/ 下新立 16 份 agent 定义（各只写怎么做）；主 agent 任务入口拆进 .claude/main-agent.md	主 agent：任务入口与职责	提交 39da7ca;提交 dddbabf
-H2	新立：.claude/hooks/write-guard.sh、scripts/agent-watch.py 这两个脚本	两道写 hook 合成 .claude/hooks/write-guard.sh；新立 scripts/agent-watch.py 看门狗定时复检子 agent	write-guard|agent-watch	提交 f0e2185;提交 81df09b;提交 dddbabf
+H2	新立：.claude/hooks/write-guard.sh、scripts/agents/agent-watch.py 这两个脚本	两道写 hook 合成 .claude/hooks/write-guard.sh；新立 scripts/agents/agent-watch.py 看门狗定时复检子 agent	write-guard|agent-watch	提交 f0e2185;提交 81df09b;提交 dddbabf
 H3	新立：门禁 56 到 72 号这批阶段	门禁新增多个阶段（.claude/gate.d/ 从 269 个文件扩到 401 个），含定义改动走三方（71、72 号）、字节布局表挂钩（64 号）、三方轮次撂下检查（66 号）、里程碑收口表欠账（67 号）、阶段同步记录（68 号）、产物依据不许只在 /tmp（69 号）	门禁 6[4-9] 号|门禁 7[1-2] 号	提交 d704051;提交 dddbabf;提交 00c9d4f
 H4	singlefs-ai-sop 管 QEMU 与 herd7 相关记录	singlefs-ai-sop 0.0.50 移交：不再管 QEMU 与 herd7，相关记录原样交到 .claude/handover/qemu-herd7/	QEMU|herd7	提交 fbae43e;提交 242ec98;提交 d2aeb7d
 F7b	C314（回退可以复用被抛弃的根引用的单元） 记着「检查仍欠：崩溃点重放 harness（多次挂载的录制流）」——复用被抛弃的根引用的单元这条路径还没有实做	步 5（抬回退下界 F 之后复用第一个数据单元的落点）落地：`raise_rollback_floor`、`reclaim_released_up_to`；层 0 固定脚本到 E（54 段、2104413 个状态）	复用	H43;H44;H45;H46;H48;H49;H50

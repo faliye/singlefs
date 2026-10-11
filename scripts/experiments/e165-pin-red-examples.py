@@ -21,7 +21,7 @@
       ⑥ 写「<表>#<变异名>」，换名与 --check 同一套：每份账配同一趟的 kill-bounds 产物，不给 --kill-bounds 按文件名配（与 --check 相同），
       给了就逐份对应（第 i 个产物配第 i 份账，个数要相等；第二段驱动收尾时这样调）；配对的四样（见 --check 一节）有一样不过就判红、一行都不钉，不退回按今天的行号换名；
       配上了取产物里这个变体那一行（item= 等于账第 1 列、table_row= 等于账第 2 列的第一个表行）的
-      table= 与 title=，table= 要是这种变体的表（tsv-<行号> 是 crates/mutations.tsv，Z<n> 是 scripts/mutations/e165_replay_bounded_enumeration_custom.tsv），
+      table= 与 title=，table= 要是这种变体的表（tsv-<行号> 是 crates/mutations.tsv，Z<n> 是 scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv），
       在今天的那张表里找第 1 列（空格记成 _）等于 title= 的数据行，恰好一行就用它的变异名：那一趟之后变异表增删过行也对得上，不按今天的行号换。
       table= 不对、按名字找不到、找到不止一行的，逐行报出来、不钉，别的行照钉，退 1。
       同一个（①, ⑥, ㉒）在表里（或这一次前面的账里）的 ⑦ 与账里的不同：一行都不钉、判红。
@@ -49,7 +49,7 @@
       账的每一行按（第 1 列变体, 第 2 列的第一个表行）在产物里有 E7RESULT name=kill_bound 那一行（item=、table_row=），带 title=。
       ⑥ 的表（# 之前）等于那一行的 table=、变异名（# 之后，空格记成 _）等于它的 title=，才算同一个变异。
       门禁那一格照原样起（--check --root <根>），按账的文件名找产物，不多传参数；--check 不收 --kill-bounds。
-      没钉全的出路逐份给 python3 scripts/e165-pin-red-examples.py <账>：追加按同一趟产物的 title= 到今天的变异表里按名字找变异，
+      没钉全的出路逐份给 python3 scripts/experiments/e165-pin-red-examples.py <账>：追加按同一趟产物的 title= 到今天的变异表里按名字找变异，
       那一趟之后变异表增删过行也钉得进；按名字找不到或找到几行的逐行报出来、不钉，不钉进错的名字。
       表自己也判（--check、--replay 与追加都先判）：每行 22 段（8 段的旧行报「没整行抄红例账」、21 段的报「没写档」，出路都给 --backfill）、① 是 64 位十六进制、
       ① 等于拿 ②③⑦ 重算的指纹、⑪⑫⑬ 与 ②③④ 相同、⑳㉑ 与 ⑦⑧ 相同（不同的点名哪一行哪一段，与装置 --pinned-cases 同一种报法）、
@@ -68,8 +68,8 @@
       不给 --binary 时：装置源码（crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs）里没有 --pinned-cases 就退 77
       （变异那一半照判，红了照红）；有就 cargo build --release --locked -p singlefs-checker-tier --bin e165_replay_bounded_enumeration
       （CARGO_TARGET_DIR 默认 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-e165-pinned-target）再跑。
-      装置经 scripts/run-with-memory-cap.sh（上限默认 $GATE_E165_PINNED_MEMORY_MAX，再默认 2G）与 capped.sh N 起；--memory-cap none 直接起（样本的桩用）；
-      经包装起而包装自己退 245 或 250–254 的，判「没跑成」：退 1，✗ 行写「没跑成：内存包装 scripts/run-with-memory-cap.sh 退 <码>」，
+      装置经 scripts/hosts/run-with-memory-cap.sh（上限默认 $GATE_E165_PINNED_MEMORY_MAX，再默认 2G）与 capped.sh N 起；--memory-cap none 直接起（样本的桩用）；
+      经包装起而包装自己退 245 或 250–254 的，判「没跑成」：退 1，✗ 行写「没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 <码>」，
       → 照包装文件头「退出码」一段，不指向变异行或实现；
       装置被信号停了的（直接起时 subprocess 交负的信号号，经包装或 bash 起时退 128 + 信号号、不在 250–254 里，例 137 = 外面 kill -9），判红，
       ✗ 行写「装置被信号停了」、这一次的输出不算判定，→ 照包装文件头「退出码」一段（撞自己上限的由包装认成 250，外面停的同样退 137），不写修实现；
@@ -85,15 +85,15 @@
         一行的判定只看它自己打的那一行与 ⑦ 相同、装置的报错里没点它的行号；同一块里别的行红不连累它。
       --block-rows N（默认 DEFAULT_BLOCK_ROWS）一块交给装置几行；一块判完，那一块里判绿的行当场落盘（装置退 0、行数对得上的块才记），
         被打断或包装没跑成之后同一条命令重跑，判过的块复用、只补没判的。
-      --verdict-library <目录> 给了就按条记判定（判定库 scripts/lib_verdict_library.py）：每一行的键相同就复用，一行都不用现判时不编装置、不起重放；
+      --verdict-library <目录> 给了就按条记判定（判定库 scripts/crash/lib_verdict_library.py）：每一行的键相同就复用，一行都不用现判时不编装置、不起重放；
         --no-reuse 只记不读。不给 --verdict-library 不读不写。complete（--check）每趟现判、不复用。
       键分两列（判定库文件头「键分两列」）：
         判法版本：这份脚本与 lib_verdict_library.py 两份内容的摘要（judge_version）；变了整格每一行都现判，原因写「判法版本 变了」。
-        输入指纹（逐样摘要按名字排好再取 sha256）——共用的一样：装置（e165_replay_bounded_enumeration 的 cargo 依赖闭包，scripts/admission.py 的 cargo_closure_input_paths 现算，
+        输入指纹（逐样摘要按名字排好再取 sha256）——共用的一样：装置（e165_replay_bounded_enumeration 的 cargo 依赖闭包，scripts/gate/admission.py 的 cargo_closure_input_paths 现算，
           crate 根下 cargo 不读的文件不在里面，例 crates/singlefs-replay-prefix/verus-must-red-worlds.tsv；
           input_manifest 逐文件取内容，加仓根 Cargo.toml、Cargo.lock 与 cargo -V、rustc -V；给了 --binary 的另加那份可执行文件的内容，这时闭包算不出就记一句原因；
           不给 --binary 而闭包算不出判红）；变了整格每一行都现判。
-        输入指纹里每一行另加：这一行（22 段原样）、档（㉒，单列一样，变了原因写「档 变了」）、引的变异行（⑥ 点名的每一条变异在 crates/mutations.tsv 或 scripts/mutations/e165_replay_bounded_enumeration_custom.tsv 里那一行原样）。
+        输入指纹里每一行另加：这一行（22 段原样）、档（㉒，单列一样，变了原因写「档 变了」）、引的变异行（⑥ 点名的每一条变异在 crates/mutations.tsv 或 scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv 里那一行原样）。
       只记绿。每行一行「· pinned:<行号>：绿|红，现判（<原因>）|复用（<记下的日期与一句判定>）」，末了「· 按条：现判 N、复用 M（现判的原因：…）」；
         环境里有 FORMAL_ITEM_TALLY_FILE 的（门禁给的）另往那份文件追加一行「格<TAB>现判数<TAB>复用数<TAB>原因分栏」。
   e165-pin-red-examples.py --selftest
@@ -164,7 +164,7 @@
       自证 item-select-one、item-unknown 判错；reuse-row-own-key 跟着判错
   reuse-key-without-closure  键里不带装置的 cargo 依赖闭包（装置依赖的 crate 改了照旧复用）
       自证 reuse-closure-changed 判错
-  （闭包减掉 crate 根下 cargo 不读的文件归 scripts/admission.py：它的 ADMISSION_BREAK=closure-keeps-crate-root-files 下
+  （闭包减掉 crate 根下 cargo 不读的文件归 scripts/gate/admission.py：它的 ADMISSION_BREAK=closure-keeps-crate-root-files 下
       自证 reuse-crate-root-file-unchanged 判错：依赖 crate 根下放一份、改一行 verus-must-red-worlds.tsv，三行全现判）
   reuse-key-without-row  键里不带这一行自己（同一个 ⑥、同一个 ⑦ 的两行共用一个键，只判过一行就拿它的判定当另一行的）
       自证 reuse-row-own-key 判错
@@ -238,10 +238,10 @@ VOID_LEDGERS_HOWTO = (f"照 {VOID_LEDGERS_TABLE} 的文件头改那一行：账�
 SUPERSEDED_LEDGERS_HOWTO = (f"照 {SUPERSEDED_LEDGERS_TABLE} 的文件头改那一行：缺段、理由不到 8 个字、出处不是「文件:行号」的补全；账不在的路径写错就改对、账已删就删掉那一行；"
                             "两份写成同一份、登记两次、也登记在作废表里的删掉多的那一行；取代它的账自己登记了作废或被取代的，第二段改成真正取代它、照常钉全的那一份；"
                             "两份账的档不同（各自同一趟产物的 device_arguments=）或取不到档的，不是同档取代：删掉那一行，被取代的那份照常钉全"
-                            "（python3 scripts/e165-pin-red-examples.py <被取代的账>；同档 ⑦ 冲突照追加的出路办）；"
+                            "（python3 scripts/experiments/e165-pin-red-examples.py <被取代的账>；同档 ⑦ 冲突照追加的出路办）；"
                             "被取代的账有行在取代它的账里没有同一个（域, N, 枚举序号, ①）的，取代它的账没覆盖它：删掉那一行，被取代的那份照常钉全，或交主 agent 定重跑出一份覆盖它的账再登记")
 CRATES_TABLE = "crates/mutations.tsv"
-CUSTOM_TABLE = "scripts/mutations/e165_replay_bounded_enumeration_custom.tsv"
+CUSTOM_TABLE = "scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv"
 DEVICE_SOURCE = "crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs"
 DEVICE_BINARY = "e165_replay_bounded_enumeration"
 DEVICE_FLAG = "--pinned-cases"
@@ -254,7 +254,7 @@ TABLE_COLUMNS = DEVICE_COLUMNS + 1
 COLUMN_MARKS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑㉒"
 # 抄来的账行与钉表自己的段要相同的几对：（账的第几段, 钉表自己的第几段）；账第 3、4、5 段是域、N、序号，第 12、13 段是两条逐态行
 COPIED_PAIRS = ((3, 2), (4, 3), (5, 4), (12, 7), (13, 8))
-TABLE_PROBLEMS_HOWTO = ("8 段的旧行（没整行抄红例账）与 21 段的行（没写档）跑 python3 scripts/e165-pin-red-examples.py --backfill 补成 22 段"
+TABLE_PROBLEMS_HOWTO = ("8 段的旧行（没整行抄红例账）与 21 段的行（没写档）跑 python3 scripts/experiments/e165-pin-red-examples.py --backfill 补成 22 段"
                         "（按 ⑤ 回账里取原行、回同一趟的 kill-bounds 产物取档）；别的是手改坏了：表只由这份脚本写，从 git 找回再钉")
 # 档（㉒）：装置 split_off_the_profile_options 认的四个参数进档；只选域与 N 的四个不进；别的认不出、判红（文件头「档」一段）
 PROFILE_OPTIONS = ("--profile", "--marker-parity", "--table", "--disk-order")
@@ -433,7 +433,7 @@ def first_table_row(ledger_path, row):
     return int(first_row)
 
 
-RUN_PAIRING_HOWTO = ("账与同一趟的产物按文件名配对（<前缀>-red-examples.tsv 配同一目录的 <前缀>-kill-bounds.out，驱动 scripts/e165-replay-mutation-kill-bounds.sh 一趟写这一对）："
+RUN_PAIRING_HOWTO = ("账与同一趟的产物按文件名配对（<前缀>-red-examples.tsv 配同一目录的 <前缀>-kill-bounds.out，驱动 scripts/experiments/e165-replay-mutation-kill-bounds.sh 一趟写这一对）："
                      "产物或账被删、被改了从 git 找回同一趟的原样（git log --all --diff-filter=D --name-only -- '*<文件名>*'，git show <提交>:<路径>）；"
                      "找不回的重跑那一趟再钉；没有同一趟产物的账（手造的、改过名的）不放进 research/results/")
 
@@ -1062,7 +1062,7 @@ def check(root, table, ledgers):
     if missing and "check-ignores-missing" not in BREAK:
         for _ledger, origin in missing[:10]:
             print(f"     没钉：{origin}")  # gate-lint:detail
-        commands = [f"python3 scripts/e165-pin-red-examples.py {shown_path(ledger, root)}"
+        commands = [f"python3 scripts/experiments/e165-pin-red-examples.py {shown_path(ledger, root)}"
                     for ledger in sorted({ledger for ledger, _origin in missing})]
         whole_note = f"（其中 {whole_row_differs} 行表里钉着同一个输入，但没有一行 ⑨ 起与账那一行逐字节相同）" if whole_row_differs else ""
         if profile_differs:
@@ -1124,7 +1124,7 @@ class UsageError(Exception):
 
 
 def admission_module():
-    """scripts/admission.py（装置的 cargo 依赖闭包 cargo_closure_input_paths、逐文件清单 input_manifest、工具链 toolchain_line），第一次用到时才读进来。"""
+    """scripts/gate/admission.py（装置的 cargo 依赖闭包 cargo_closure_input_paths、逐文件清单 input_manifest、工具链 toolchain_line），第一次用到时才读进来。"""
     if not _ADMISSION_MODULE:
         specification = importlib.util.spec_from_file_location("admission_for_e165_pin_red_examples", os.path.join(SCRIPT_DIRECTORY, "..", "gate", "admission.py"))
         module = importlib.util.module_from_spec(specification)
@@ -1177,7 +1177,7 @@ def device_inputs_digest(root, binary):
         except (admission.RegistrationError, admission.InputManifestError) as error:
             if not binary:
                 raise Red(f"算不出装置 {DEVICE_BINARY} 的 cargo 依赖闭包（{error}），按条判定的键罩不全",
-                          "先让 python3 scripts/admission.py paths <根> checker-tier-formal-verification.sh:pinned-red-examples-replay 列得出路径；不给判定库（去掉 --verdict-library）照旧整格现判")
+                          "先让 python3 scripts/gate/admission.py paths <根> checker-tier-formal-verification.sh:pinned-red-examples-replay 列得出路径；不给判定库（去掉 --verdict-library）照旧整格现判")
             parts.append(digest_text(f"算不出闭包：{error}"))
     return digest_text("\n".join(parts))
 
@@ -1253,17 +1253,17 @@ def run_device_block(root, table_text, block, binary, options, work, profile):
     completed = run_reporting_progress(command, root, environment, f"装置 {DEVICE_FLAG} 逐行重放钉住的 {len(block)} 行（档 {profile}，第 {block[0]['number']} 行起这一块）", len(block))
     if wrapped and completed.returncode in WRAPPER_OWN_EXITS and "wrapper-exit-as-replay-red" not in BREAK:
         tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-4:] if line.strip())
-        raise Red(f"没跑成：内存包装 scripts/run-with-memory-cap.sh 退 {completed.returncode}（{WRAPPER_OWN_EXITS[completed.returncode]}，上限 {options['memory_cap']}），"
+        raise Red(f"没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 {completed.returncode}（{WRAPPER_OWN_EXITS[completed.returncode]}，上限 {options['memory_cap']}），"
                   f"钉住的 {len(block)} 行这一次的输出不算判定{'（' + tail[:300] + '）' if tail else ''}",
-                  "照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；"
-                  "251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；"
+                  "照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；"
+                  "251、252、254 先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；"
                   "253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；245 是同一段时间内核报了显存不够：nvidia-smi 看谁在用卡，等它跑完再重跑这一格；"
                   "不拿掉包装跑，不改钉住的表、变异行或实现")
     signal_number = -completed.returncode if completed.returncode < 0 else completed.returncode - 128 if 128 < completed.returncode <= 128 + 64 else None
     if signal_number is not None and "killed-as-regression" not in BREAK:
         tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-4:] if line.strip())
         raise Red(f"装置被信号停了（退 {completed.returncode}，信号 {signal_number}）：钉住的 {len(block)} 行这一次没判完，输出不算判定{'（' + tail[:300] + '）' if tail else ''}",
-                  "照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：撞了这一条自己的上限由包装认成 250，外面 kill -9 同样退 137——这一次是外面停的："
+                  "照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办：撞了这一条自己的上限由包装认成 250，外面 kill -9 同样退 137——这一次是外面停的："
                   "查是谁在那一刻停了它（同一时刻的 ps、journalctl --user、看门狗的记录），那件事不再发生之后重跑这一格；不拿掉包装跑，不改钉住的表、变异行或实现")
     return completed
 
@@ -1434,7 +1434,7 @@ def main(arguments):
         return EXIT_USAGE
     if options["items"] and mode != "replay":
         report_red(f"--item 只给 --replay 用（--{mode} 不收）：pinned-red-examples-complete 只有一项（complete）",
-                   "去掉 --item；可点名的项：python3 scripts/e165-pin-red-examples.py --list-items")
+                   "去掉 --item；可点名的项：python3 scripts/experiments/e165-pin-red-examples.py --list-items")
         return EXIT_USAGE
     if mode == "list-items":
         if ledgers:
@@ -1450,10 +1450,10 @@ def main(arguments):
             return EXIT_RED
     if mode == "backfill" and ledgers:
         report_red("--backfill 不收红例账：每行按自己的 ⑤ 回 research/results/ 取原行",
-                   "去掉位置参数再跑：python3 scripts/e165-pin-red-examples.py --backfill")
+                   "去掉位置参数再跑：python3 scripts/experiments/e165-pin-red-examples.py --backfill")
         return EXIT_USAGE
     if mode == "append" and not ledgers:
-        report_red("追加要至少一份红例账", "例：python3 scripts/e165-pin-red-examples.py research/results/<某一趟>-red-examples.tsv")
+        report_red("追加要至少一份红例账", "例：python3 scripts/experiments/e165-pin-red-examples.py research/results/<某一趟>-red-examples.tsv")
         return EXIT_USAGE
     missing = [ledger for ledger in ledgers + options["kill_bounds"] if not os.path.isfile(ledger)]
     if missing:
@@ -1489,7 +1489,7 @@ def selftest():
     import io
     with tempfile.TemporaryDirectory(prefix="e165-pin-selftest-") as work:
         root = os.path.join(work, "root")
-        for directory in (".claude/gate.d", "crates", "scripts/mutations", "research/results"):
+        for directory in (".claude/gate.d", "crates", "scripts/mutation/tables", "research/results"):
             os.makedirs(os.path.join(root, directory))
 
         def write(relative, text):
@@ -1929,7 +1929,7 @@ def selftest():
             handle.write("#!/usr/bin/env bash\n# 自证用的假内存包装：什么都不起，退 252（内存不够排不上）\nexit 252\n")
         saved_runner, MEMORY_CAP_RUNNER = MEMORY_CAP_RUNNER, fake_wrapper
         try:
-            expect("replay-wrapper-exit", ["--replay", "--binary", stub, "--memory-cap", "1G"], 1, "没跑成：内存包装 scripts/run-with-memory-cap.sh 退 252")
+            expect("replay-wrapper-exit", ["--replay", "--binary", stub, "--memory-cap", "1G"], 1, "没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252")
         finally:
             MEMORY_CAP_RUNNER = saved_runner
         # 包装退 245（显存不够）：同样判「没跑成」、点名显存不够，不报回归（开关 wrapper-exit-as-replay-red 下这一格同样判错）
@@ -1939,11 +1939,11 @@ def selftest():
         saved_runner, MEMORY_CAP_RUNNER = MEMORY_CAP_RUNNER, gpu_wrapper
         try:
             expect("replay-wrapper-245", ["--replay", "--binary", stub, "--memory-cap", "1G"], 1,
-                   "没跑成：内存包装 scripts/run-with-memory-cap.sh 退 245（显存不够")
+                   "没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 245（显存不够")
         finally:
             MEMORY_CAP_RUNNER = saved_runner
         # 装置被信号停了（直接起时 kill -9 自己；经包装起时包装退 137，外面 kill -9 就是这样）：出路照包装文件头，不写修实现（开关 killed-as-regression 下这两格判错）
-        killed_howto = "照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办"
+        killed_howto = "照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办"
         killed = expect("replay-killed", ["--replay", "--binary", stub, "--memory-cap", "none"], 1, "装置被信号停了（退 -9，信号 9）", {"STUB_MODE": "killed"})
         if killed_howto not in killed or "修实现" in killed:
             wrong.append("replay-killed-howto")

@@ -1,10 +1,10 @@
 """E170 第 1 次重跑第三段：执行器与比对器的变异驱动（登记 `research/prompts/e170-r1-prereg.md` 第九节 X1–X20、XC1、XC2；
-表 scripts/mutations/e170_second_run_o3_spec_executor.tsv）。从第一次的驱动（`e170_o3_spec_executor/mutation_driver.py`）拷来改：
+表 scripts/mutation/tables/e170_second_run_o3_spec_executor.tsv）。从第一次的驱动（`e170_o3_spec_executor/mutation_driver.py`）拷来改：
 单测要 E170_TEST_SCRATCH 指到草稿目录里的 testscratch；检查脚本是 comparator_mutation_checks.py（批 1 重判、坏状态、锚点、两个比对器阳性对照）；
 第一段的单测层驱动 `mutation_driver.py` 不动（它出的是 `e170-r1-o3-spec-executor-2026-10-03-s1-unit-level-mutations.out`，只跑单测）。
 下面是第一次那份的说明，口径照旧：
 
-scripts/mutate.sh 只跑 cargo，这一侧照它的形态写（登记第九节）：派活之前逐条核锚点——原文（\\n 还原成换行）在本目录全部 .py
+scripts/mutation/mutate.sh 只跑 cargo，这一侧照它的形态写（登记第九节）：派活之前逐条核锚点——原文（\\n 还原成换行）在本目录全部 .py
 （本文件除外）里合起来恰好命中一次，不是就退 3、一条不跑；每条在草稿目录的一份副本上替换、编译（compile）、跑单测与检查
 （comparator_mutation_checks.py）、删副本；收尾在一份新副本上重跑基线，核「已还原，基线仍全绿」，并核本目录在跑前跑后逐字节相同。
 结局照 .claude/rules/mutation-sampling.md 的符号：✅ 抓到（单测红，或基线上为真的检查转假）、⏭ 无效（替换之后编不过）、❌ 没红、

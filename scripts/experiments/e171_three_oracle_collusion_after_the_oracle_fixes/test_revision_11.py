@@ -1,4 +1,4 @@
-"""E171 第 1 次重跑·修订 11（按输入复用）的单测：研究一侧变异表 scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv
+"""E171 第 1 次重跑·修订 11（按输入复用）的单测：研究一侧变异表 scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv
 （RV1–RV15，登记修订 11 第 11.8 节）经 mutation_driver.py --unit-test-module test_revision_11 跑。
 每条用例一个场景、自己建自己删临时目录；调 reuse_library.py 与 segment_one_units_revision_11.py 自证的那几格（假树、假装置、假驱动行、假单元脚本，
 另有一格起真的修订 11 单元脚本取用一份造好的条目），不起装置、不编、不连别的台。"""

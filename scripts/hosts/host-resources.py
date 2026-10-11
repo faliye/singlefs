@@ -15,11 +15,11 @@
 退出码：0 报完（给了命令时：此刻有一台放得下）；1 给了命令而此刻哪台都放不下（或都没读到）；2 用法错。
 
 机器：本机总在；别的从多机配置读（${SINGLEFS_MULTI_HOST_CONFIG:-主工作树的根/multi-host.env}，不进仓）：
-  scripts/layer0-shard-configuration-check.sh --emit-hosts 判配置、解出机器清单（键 HOSTS 与 HOST_<号>_*，定义在那一份文件头「机器清单」；
+  scripts/crash/layer0-shard-configuration-check.sh --emit-hosts 判配置、解出机器清单（键 HOSTS 与 HOST_<号>_*，定义在那一份文件头「机器清单」；
   没写 HOSTS 时清单就是 PEER_SSH_HOST 一台）。它不连任何一台，连不上的那一台在这里报「没读到」，不算整份配置坏。
   判法退 3（跨机开关 ENABLE_ACROSS_MACHINES 没开）或判不过时只报本机，打一行原因。
-  别的那几台经 scripts/peer-host-lib.sh 的 peer_host_run 用 ssh 读（错误输出里的主机名、目录换成「第二台」那几个字），
-  把 scripts/memory_peaks_lib.py 的源码与本文件的 probe_this_host 一段送过去跑（python3 -c，base64），同 host-dispatch.py 读第二台的办法。
+  别的那几台经 scripts/hosts/peer-host-lib.sh 的 peer_host_run 用 ssh 读（错误输出里的主机名、目录换成「第二台」那几个字），
+  把 scripts/hosts/memory_peaks_lib.py 的源码与本文件的 probe_this_host 一段送过去跑（python3 -c，base64），同 host-dispatch.py 读第二台的办法。
   各台并行读，每台至多等 HOST_RESOURCES_HOST_TIMEOUT_SECONDS 秒（默认 HOST_TIMEOUT_SECONDS），到点那台记「没读到」；到点只停自己起的那一个 bash，
   它起的 ssh 由 ssh 自己的超时收尾。台名只写「本机」「第二台」「第三台」……（清单里的次序），不写别名。
 每台现查：
@@ -33,7 +33,7 @@
     别的计算进程（别的会话的活、归不到清场服务的）照占着算，逐个列进程号与占用。
   合计：读到的那几台相加；哪一台哪一项没读到，合计里写明不含它。
 给了命令：
-  历史：内存峰值表（RUN_WITH_MEMORY_CAP_PEAKS，默认 scripts/memory-peaks.tsv）与派发器的显存峰值表（HOST_DISPATCH_GPU_PEAKS），
+  历史：内存峰值表（RUN_WITH_MEMORY_CAP_PEAKS，默认 scripts/hosts/memory-peaks.tsv）与派发器的显存峰值表（HOST_DISPATCH_GPU_PEAKS），
     键同内存包装（memory_peaks_lib.command_key；RUN_WITH_MEMORY_CAP_KEY 给了就用它）；
     用时取用时表（memory_peaks_lib.py 文件头「用时表」：只有经 host-dispatch.py 派出去、跑完的才记），没有这条报「没有历史」。
   长活提醒：host-dispatch.py 的 long_run_check（文件头 ⓪，同一份判法）：用时表里的历史用时，没有就按 --estimated-hours；
@@ -111,7 +111,7 @@ _dispatcher = None
 
 
 def dispatcher():
-    """scripts/host-dispatch.py（文件名带减号，按路径导入）：预测、判放不放得下、派发器自己的账都用它那一份。"""
+    """scripts/hosts/host-dispatch.py（文件名带减号，按路径导入）：预测、判放不放得下、派发器自己的账都用它那一份。"""
     global _dispatcher
     if _dispatcher is None:
         spec = importlib.util.spec_from_file_location("host_dispatch", os.path.join(SCRIPT_DIRECTORY, "host-dispatch.py"))
@@ -269,7 +269,7 @@ def load_machines(options):
         return machines, {}, "多机配置里跨机开关 ENABLE_ACROSS_MACHINES 没开：只报本机"
     if completed.returncode != 0:
         return machines, {}, (f"多机配置判不过（判法 {os.path.basename(options.configuration_check)} 退 {completed.returncode}；"
-                              "单跑 bash scripts/layer0-shard-configuration-check.sh --emit-hosts 看原因）：只报本机")
+                              "单跑 bash scripts/crash/layer0-shard-configuration-check.sh --emit-hosts 看原因）：只报本机")
     values = dict(item.split("=", 1) for item in completed.stdout.split("\0") if "=" in item)
     count = int(values.get("MULTI_HOST_COUNT") or 0)
     for number in range(2, count + 2):

@@ -3,7 +3,7 @@
 # run-condition: none 带 --check 只查本机已有的几份、不用 curl；下载时缺 curl 在那一步逐份判红
 # 把被当作证据引用的外部文献重新固定到本机，并留下取得方式与 sha256。
 #
-#   bash scripts/fetch-refs.sh [--check]
+#   bash scripts/kb/fetch-refs.sh [--check]
 #
 # 为什么要有它：checks-owed.md C38（外部文献不可复核）——一批标着「本机 PDF 逐字核实」的文献
 # 今天已不在本机，引用它们的结论却仍标着「已核实」。文献没了，那些引用就只是线索。
@@ -63,7 +63,7 @@ echo "在本机 $ok 份／缺 $miss 份  目录 $DEST"
 if [[ $miss -ne 0 ]]; then
   echo "  → 怎么办：对着上面逐条列出的 ✗，下载失败的重跑一遍（网络问题多试几次）；" \
        "下回来不是 PDF 的，去本脚本 LIST 里那一行对应的 URL 手动看一眼是不是页面搬家了，换成新地址；" \
-       "本机没有的那几份先跑 'bash scripts/fetch-refs.sh'（不带 --check）去下载。"
+       "本机没有的那几份先跑 'bash scripts/kb/fetch-refs.sh'（不带 --check）去下载。"
   exit 1
 fi
 echo "  ✓ 承重文献在本机 $ok 份，一份不缺"

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # E152（按里程碑对比六家文件系统的文件性能）：八个配置轮流跑 N 轮，每轮一个新虚机、一块新盘。
 #
-#   bash scripts/e152-run.sh <产物路径>
-#   E152_ROUNDS=1 E152_CONFIGURATIONS="ext4" bash scripts/e152-run.sh <产物路径>   # 冒烟
+#   bash scripts/devices/e152-run.sh <产物路径>
+#   E152_ROUNDS=1 E152_CONFIGURATIONS="ext4" bash scripts/devices/e152-run.sh <产物路径>   # 冒烟
 #
 # 口径、判据与作废条款都在跑前登记 research/prompts/e152-preregistration.md；这里只照着跑、照着记。
 # 纪律（.claude/singlefs-ai-sop/rules/command-safety.md）：
@@ -23,7 +23,7 @@ fail() { echo "  ✗ $1" >&2; echo "    → $2" >&2; exit 1; }
 case "$OUTPUT" in /*) ;; *) OUTPUT="$PWD/$OUTPUT" ;; esac
 cd "$RESEARCH" || fail "进不了 $RESEARCH" "从仓里跑"
 KERNEL="$(bash ../vm-kernel.sh --release "$RELEASE")" \
-  || fail "拿不到 $RELEASE 的内核镜像" "单跑 bash scripts/vm-kernel.sh --release $RELEASE 看报错"
+  || fail "拿不到 $RELEASE 的内核镜像" "单跑 bash scripts/devices/vm-kernel.sh --release $RELEASE 看报错"
 cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark >/dev/null 2>&1 \
   || fail "来宾二进制编不过" "cd scripts/experiments && cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark"
 cargo build --release --bin e152-file-system-benchmark >/dev/null 2>&1 \
@@ -39,9 +39,9 @@ trap 'rm -rf "${WORK:?}"' EXIT
 # 起跑时把要调的脚本复制一份，之后只调副本：bash 边读边执行脚本，仓里的原件中途被别的会话一改，
 # 正在跑的那一次就会读到错位的内容（2026-09-15 第二次正式跑实测：vm-bench.sh 开头注释被改，那一次报语法错退出）。
 mkdir -p "$WORK/scripts"
-cp scripts/vm-bench.sh scripts/e152-stage-root.sh "$WORK/scripts/" || fail "复制不了测试台脚本" "看 $WORK 的权限"
-bash "$WORK/scripts/e152-stage-root.sh" "$WORK/root" "$RELEASE" "$SINGLEFS_BINARY" \
-  || fail "附加根没建成" "单跑 bash scripts/e152-stage-root.sh <新的空目录> $RELEASE $SINGLEFS_BINARY"
+cp scripts/devices/vm-bench.sh scripts/devices/e152-stage-root.sh "$WORK/scripts/" || fail "复制不了测试台脚本" "看 $WORK 的权限"
+bash "$WORK/scripts/devices/e152-stage-root.sh" "$WORK/root" "$RELEASE" "$SINGLEFS_BINARY" \
+  || fail "附加根没建成" "单跑 bash scripts/devices/e152-stage-root.sh <新的空目录> $RELEASE $SINGLEFS_BINARY"
 
 PARTIAL="$OUTPUT.partial"
 rm -f "$OUTPUT" "$PARTIAL"   # 本轮输出不许跨轮复用
@@ -58,7 +58,7 @@ for ((round = 1; round <= ROUNDS; round++)); do
       run_output="$WORK/$configuration-$round-$attempt.txt"
       SINGLEFS_KERNEL="$KERNEL" VM_EXTRA_ROOT="$WORK/root" VM_DISKS="$disks" VM_DISK_MB=16384 VM_MEM=4096 VM_CPUS=4 \
         VM_DISK_PREALLOCATE=1 VM_TIMEOUT=1500 \
-        bash "$WORK/scripts/vm-bench.sh" "$GUEST_BINARY" "$configuration" "$round" > "$run_output" 2>&1
+        bash "$WORK/scripts/devices/vm-bench.sh" "$GUEST_BINARY" "$configuration" "$round" > "$run_output" 2>&1
       vm_exit=$?
       {
         echo "E152RUN configuration=$configuration round=$round attempt=$attempt host_load1=$host_load vm_exit=$vm_exit"
