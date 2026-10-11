@@ -1,4 +1,4 @@
-# Verus 的登记表：门禁 checker-tier-formal-verification 的四格 Verus 判法（research/scripts/verus-proof-check.py）从这里取钉住的版本、被验的 crate、核与必红世界表。
+# Verus 的登记表：门禁 checker-tier-formal-verification 的四格 Verus 判法（scripts/gate/verus-proof-check.py）从这里取钉住的版本、被验的 crate、核与必红世界表。
 # 一行一条，制表符分隔，第一段是种类：
 #   release	<Verus 发布 tag>	<它出自的提交（40 位）>	<发布包 zip 的 sha256：本机那一份放在安装目录旁、名叫 verus.zip，在就核，不在只报一句>	<安装目录，相对 ${XDG_DATA_HOME:-~/.local/share}；SINGLEFS_VERUS_ROOT 盖过它>
 #   package	<crates.io 包名>	<版本>	<包里 .cargo_vcs_info.json 的 git.sha1>	<它的 path_in_vcs>	<包源码的内容指纹：去掉顶层 Cargo.toml、Cargo.toml.orig、.cargo_vcs_info.json、.cargo-ok，算法见 verus-proof-check.py 文件头>

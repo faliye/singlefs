@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
+# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 scripts/gate/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
 # gate-stage: 内存序（herd7 + litmus/，本工程自己的阶段）
 # gate-category: checker-tier 类
 # gate-similar: checker-tier-qemu-device-streams.sh 同是 checker-tier 类里要外部工具的那几道之一，但它起 QEMU 判真设备上收到的写；这里起 herd7 判 litmus 的内存序声明，工具、登记的输入与失败方式都不同
@@ -14,8 +14,8 @@
 # 样本根放 .lkmm-static-only 时只跑不需要 herd7 的静态层（只供测试的开关：.claude/rules/fs-design.md 五条硬要求第 2 条），
 # 全过这一格退 77，绿样本的 expect 写 exit=77；这一档不问复用、不判前提、不记环境。
 #
-# 准入（登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行，判法在 research/scripts/admission.py）：
-#   ① 复用（research/scripts/stage-must-run.sh）：登记的路径在 refs/sop/staged-green 与这一次的暂存树之间没变，
+# 准入（登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行，判法在 scripts/gate/admission.py）：
+#   ① 复用（scripts/gate/stage-must-run.sh）：登记的路径在 refs/sop/staged-green 与这一次的暂存树之间没变，
 #      且 herd7 版本（第三列 environment=）与上次判绿时记下的相同，才退 77。版本不在 git 树里，判绿后经 gate-record-environment 记进 git common-dir。
 #   ② 前提（第三列 probe=：找得到 herd7）没齐判红，不退 77。
 #   内核树里的 tools/memory-model 不进复用判定（不在 git 树里、可能要联网取）；它换了要重判，设 SINGLEFS_GATE_FULL=1 再跑。
@@ -27,7 +27,7 @@ set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
-ADMISSION_MODULE="$STAGE_REPOSITORY/research/scripts/admission.py"
+ADMISSION_MODULE="$STAGE_REPOSITORY/scripts/gate/admission.py"
 LKMM="$(cd "$(dirname "$0")/../scripts" && pwd)/lkmm.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
 stage_cell litmus-verdicts cell_litmus_verdicts "litmus/ 下每条 Never 有对照组、绑到代码，herd7 判定与声明相符" \
@@ -53,8 +53,8 @@ cell_litmus_verdicts() {
 static_only=()
 [[ -f "$ROOT/.lkmm-static-only" ]] && static_only=(--static-only)
 if [[ ${#static_only[@]} -eq 0 ]]; then
-  source "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
-  stage_run_or_skip "$STAGE_REPOSITORY/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
+  source "$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
+  stage_run_or_skip "$STAGE_REPOSITORY/scripts/gate/stage-must-run.sh" "复用上一次整轮全绿的判定" \
     "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径、herd7 的版本怎么进判定见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
   python3 "$ADMISSION_MODULE" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1
 fi

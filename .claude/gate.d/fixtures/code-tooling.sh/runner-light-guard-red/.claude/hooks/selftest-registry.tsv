@@ -1,2 +1,2 @@
 # 样本自己的登记表（research-script-selftests 格经 light-selftest-guard.py --registry-root <样本根> 读它）：一行一份
-research/scripts/sample-light-real-cargo.sh	light	# 样本：登记成 light，自证里却经 PATH 起 cargo build（清单不在）
+scripts/sample-light-real-cargo.sh	light	# 样本：登记成 light，自证里却经 PATH 起 cargo build（清单不在）

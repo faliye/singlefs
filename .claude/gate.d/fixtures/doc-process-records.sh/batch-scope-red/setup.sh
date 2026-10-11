@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # batch-scope 格本该判红，一份样本同时放四种坏法：
-#   ① 一个触发文件（research/scripts/sneak.py）一个字都没登记——「顺手修」就长这样；
+#   ① 一个触发文件（scripts/sneak.py）一个字都没登记——「顺手修」就长这样；
 #   ② 登记了 .claude/agents/gone.md，而这一批根本没碰它（上一批提交完没清表，下一批就白放行）；
 #   ③ 一行登记只写路径、# 后面空着，没写为什么这一批非碰它不可；
 #   ④ 一行登记写成 ./ 开头，不是从仓库根起。
@@ -10,23 +10,23 @@
 set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 git init -q -b master .
-mkdir -p .claude/gate.d .claude/agents research/scripts
+mkdir -p .claude/gate.d .claude/agents scripts
 cat > .claude/gate.d/knowledge-sync-triggers.tsv <<'EOF'
 # 子集：够跑这份夹具的几条
 ^\.claude/agents/	# agent 定义
-^research/scripts/	# 研究与协作脚本
+^scripts/	# 研究与协作脚本
 EOF
 printf '# demo\n\n第一版\n' > .claude/agents/demo.md
-printf 'print("old")\n' > research/scripts/kept.py
+printf 'print("old")\n' > scripts/kept.py
 git add -A && git commit -qm base
 printf '# demo\n\n第二版\n' > .claude/agents/demo.md
-printf 'print("new")\n' > research/scripts/kept.py
-printf 'print("sneak")\n' > research/scripts/sneak.py
+printf 'print("new")\n' > scripts/kept.py
+printf 'print("sneak")\n' > scripts/sneak.py
 cat > .claude/batch-scope <<'EOF'
 # 这一批要碰的触发文件
 
 .claude/agents/demo.md	# 这一批改的就是它的定义
 .claude/agents/gone.md	# 上一批留下的，这一批根本没碰它
-research/scripts/kept.py	#
-./research/scripts/kept.py	# 路径写歪了，不是从仓库根起
+scripts/kept.py	#
+./scripts/kept.py	# 路径写歪了，不是从仓库根起
 EOF

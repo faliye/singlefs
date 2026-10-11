@@ -15,14 +15,14 @@
 # 判据（广谱变异剪枝设计轮判决 research/prompts/tooling-broad-mutation-prune-r3-main-verification.md 第四节、正文 research/prompts/_tooling-broad-mutation-prune-r3-body.md 第三节 C6；
 #   治理轮判决 research/prompts/m3-broad-gate-gov-r1-main-verification.md 第二节第 1–10 行）：
 #   这次改到的变异每一条都有这一版的结论，沿用的结论都在，有任何一条没红就红。
-#   「这一版」是驱动 research/scripts/broad-mutation.py 的库目录（${SINGLEFS_BROAD_MUTATION_HOME:-~/.local/share/singlefs/broad-mutation}）里
+#   「这一版」是驱动 scripts/mutation/broad-mutation.py 的库目录（${SINGLEFS_BROAD_MUTATION_HOME:-~/.local/share/singlefs/broad-mutation}）里
 #   tree.source 指的那一版：源码指纹（导出范围逐文件 sha256）、rustc -Vv、判法版本与全局键（驱动文件头「指纹」）。
 #   开格之前把 tree.source 拷一份钉住，两格都判钉住的那一版；两格跑完再读一次，与钉住的不同（别的会话这段时间里 --sync-tree 换了版本指针）判红。
 #   library-version-is-staged-tree：被判仓的 git 索引（主工作区就是暂存区，--staged 下是临时 worktree 的索引）在导出范围上的逐文件 sha256
 #     与那一版的 manifest.tsv 逐文件相同（索引里有合并冲突判红）、逐文件算出的源码指纹等于 tree.source 记的；导出范围按驱动的 export_paths 在被判仓上现算，
 #     与 tree.source 记的相同；那一版 toolchain.txt 与此刻 rustc -Vv（在库目录的 tree/ 里起，与驱动同一处）相同；
 #     那一版记了全局键（tree.source 的 global_key 与 global-key.txt 是同一次写的），此刻现算的全局键（驱动的 global_key_lines：工具链、Cargo.toml / Cargo.lock / .cargo、
-#     构建环境（驱动的 build_environment_of：research/scripts/admission.py 的 build_environment_lines 在库目录的 tree/ 上按此刻的环境算，加文档测试的 RUSTDOCFLAGS）、
+#     构建环境（驱动的 build_environment_of：scripts/gate/admission.py 的 build_environment_lines 在库目录的 tree/ 上按此刻的环境算，加文档测试的 RUSTDOCFLAGS）、
 #     cargo nextest / cargo mutants / llvm-profdata 的版本、驱动旁边的忽略用例排除表、升档常量、判法版本；限时参数取那一版记的）与它逐行相同；
 #     按驱动的 version_key 算出来的指纹等于 tree.source 记的。tree.source.pending 在判红。
 #   gate-verdict：驱动 --summary（--home 指到同一个库目录）打恰好一行 BROAD_MUTATION_SUMMARY、一行 BROAD_MUTATION_GATE；
@@ -160,8 +160,8 @@ set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
-DRIVER="$STAGE_REPOSITORY/research/scripts/broad-mutation.py"
-ADMISSION_MODULE="$STAGE_REPOSITORY/research/scripts/admission.py"
+DRIVER="$STAGE_REPOSITORY/scripts/mutation/broad-mutation.py"
+ADMISSION_MODULE="$STAGE_REPOSITORY/scripts/gate/admission.py"
 SAMPLE_MARKER=".broad-mutation-sample"
 SAMPLE_DIRECTORY=".broad-sample"
 RUN_DRIVER_HOWTO="主 agent 照 .claude/skills/crash-test/commit-stages.md 第 2b 步起驱动：先 --sync-tree --commit 到包着这一次暂存树的提交，再 --changed-since HEAD 现判改到的、沿用其余的，跑完再跑这一道"
@@ -462,7 +462,7 @@ if summary_exit not in (0, 8):
 if len(summaries) != 1 or (len(gates) != 1 and not ("gate-line-optional" in broken and not gates and summary_exit == 0)):
     print(f"  ✗ 驱动 --summary 打了 {len(summaries)} 行 BROAD_MUTATION_SUMMARY、{len(gates)} 行 BROAD_MUTATION_GATE，各该恰好一行：判不了提交门禁；输出末几行：")
     print(tail())
-    print("     → 怎么办：没有判定行是驱动还是加剪枝之前的版本：research/scripts/broad-mutation.py 从 git 取今天的那一份；行数多了是输出被拼进了别的东西。")
+    print("     → 怎么办：没有判定行是驱动还是加剪枝之前的版本：scripts/mutation/broad-mutation.py 从 git 取今天的那一份；行数多了是输出被拼进了别的东西。")
     sys.exit(1)
 summary = summaries[0]
 gate = gates[0] if gates else {"verdict": "green", "total": summary.get("total", "0"), "concluded": summary.get("total", "0"),
@@ -486,7 +486,7 @@ def number(key, source=gate):
 total, concluded, missed, without = number("total"), number("concluded"), number("missed"), number("without_conclusion")
 if None in (total, concluded, missed, without):
     print(f"  ✗ 判定行的计数读不出：{gate}")
-    print("     → 怎么办：驱动打的判定行坏了，research/scripts/broad-mutation.py 从 git 取今天的那一份再跑。")
+    print("     → 怎么办：驱动打的判定行坏了，scripts/mutation/broad-mutation.py 从 git 取今天的那一份再跑。")
     sys.exit(1)
 verdict = gate.get("verdict")
 if verdict == "red" and summary_exit == 8 and "summary-red-passes" not in broken:
@@ -543,7 +543,7 @@ if inconsistent:
     print("  ✗ 驱动 --summary 的判定行、汇总行、计数、明细与退出码对不上（驱动的提交门禁判法失灵）：")  # gate-lint:summary
     for entry in inconsistent:
         print(f"     {entry}")  # gate-lint:detail
-    print("     → 怎么办：这是驱动的毛病，不是这一版的结论：交工具实现员查 research/scripts/broad-mutation.py 的 summarise（它的 --selftest 有 summary-gate-silent 那一格）；修好前不提交。")
+    print("     → 怎么办：这是驱动的毛病，不是这一版的结论：交工具实现员查 scripts/mutation/broad-mutation.py 的 summarise（它的 --selftest 有 summary-gate-silent 那一格）；修好前不提交。")
     sys.exit(1)
 # 升档判的抓到（驱动文件头「升档」）：逐行复核库目录登记表里这一版的行，每一条 ESCALATED 都要有一行复核过的这一版登记行
 specification = importlib.util.spec_from_file_location("broad_mutation_driver_for_gate_verdict", driver_path)
@@ -605,7 +605,7 @@ if mac_problems:
         print(f"     {entry}")  # gate-lint:detail
     print("     → 怎么办：没有校验列或校验列对不上的行是手写或拷来的：照驱动 --summary 打的出路把结果表拷一份留底、删掉点到的那几行，再让驱动点名重判那几条"
           "（--item <序号> --rerun，前缀与起法照 .claude/skills/crash-test/commit-stages.md 第 2b 步 ③），跑完再跑这一道；"
-          "密钥不在、权限不对，或每一行都校验不过（库目录是有校验列之前建的、密钥丢了或换了），照 research/scripts/broad-mutation.py 文件头「结果行的校验列」整库重建")
+          "密钥不在、权限不对，或每一行都校验不过（库目录是有校验列之前建的、密钥丢了或换了），照 scripts/mutation/broad-mutation.py 文件头「结果行的校验列」整库重建")
     sys.exit(1)
 cap_form, cap_units = re.compile(r"^([1-9][0-9]*)([KMGT])$"), {"K": 1024, "M": 1024 ** 2, "G": 1024 ** 3, "T": 1024 ** 4}
 
@@ -822,8 +822,8 @@ else
   real_run=0
 fi
 if ((real_run)); then
-  source "$STAGE_REPOSITORY/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
-  if ( stage_run_or_skip "$STAGE_REPOSITORY/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
+  source "$STAGE_REPOSITORY/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
+  if ( stage_run_or_skip "$STAGE_REPOSITORY/scripts/gate/stage-must-run.sh" "复用上一次整轮全绿的判定" \
          "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径、工具版本怎么进判定见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")" ); then
     reuse_exit=0
   else

@@ -54,7 +54,7 @@
 # .rs 的值按空白归一后的原文比、不要求整数字面量：常量模块里有 `DATA_UNIT_HEADER_BYTES + …` 这类算出来的常量。
 # 变更探测器暂用「常量名 → 值」集合，不是 D15（格式冻结政策） 已定项 3 的 spec_hash：format-spec/<组件>.toml 还没有
 # （C119（冻结组件没有 spec 文件）），有了就把抽取源换过去。
-# 改动范围取 research/scripts/changed-paths.sh 的 gate_diff_base gate 与 gate_changed_paths（带未跟踪文件）；
+# 改动范围取 scripts/gate/changed-paths.sh 的 gate_diff_base gate 与 gate_changed_paths（带未跟踪文件）；
 # git 调用带 `-c core.quotepath=false`，否则中文路径被打成八进制引号串，与布局清单比不上。
 # 滞后表指的欠账号按 lib-owed.py 读 checks-owed.md：「### 已还清」整行标题之前算开着，认不出那个标题判红。
 #
@@ -498,9 +498,9 @@ cell_layout_checker_sync() {
   local LIBRARY_DIRECTORY LIB_CHANGED_PATHS base
   LIBRARY_DIRECTORY="$STAGE_DIR"
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $ROOT 不是 git 仓，这一格本次无对象可判"; exit 77; }
-  LIB_CHANGED_PATHS="$REPO_ROOT/research/scripts/changed-paths.sh"
-  # shellcheck source=../../research/scripts/changed-paths.sh
-  source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"; echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
+  LIB_CHANGED_PATHS="$REPO_ROOT/scripts/gate/changed-paths.sh"
+  # shellcheck source=../../scripts/gate/changed-paths.sh
+  source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"; echo "     → 怎么办：它随仓走（scripts/gate/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
   base="$(gate_diff_base gate)"
   CHANGED_PATHS="$(mktemp)"
   trap 'rm -f "$CHANGED_PATHS"' EXIT

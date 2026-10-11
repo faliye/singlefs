@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 它调的 research/scripts/test-environment-check.py 读内核日志、SMART 这类宿主信息，读不到的那一类它自己记「没查成」
+# run-condition: none 它调的 scripts/hosts/test-environment-check.py 读内核日志、SMART 这类宿主信息，读不到的那一类它自己记「没查成」
 # gate-stage: 跑完测试之后机器还干不干净（残留测试设备、临时目录残留、宿主盘）
 # gate-category: harness 类
 # gate-similar: harness-model-differential-and-scenarios.sh 同属 harness 类，它跑 crates/singlefs-harness 的测试并判模型对拍；这一道不跑测试，判的是测试跑完之后留在机器上的东西
@@ -17,7 +17,7 @@
 # 残留设备、挂载、qemu 进程、宿主盘判的是这一道开跑那一刻的机器。新加或改名跑测试的阶段，名字要排在它前面；
 # 次序由门禁 code-tooling 的 stage-order 格判。
 #
-# 判据：`research/scripts/test-environment-check.py check` 汇总行里「判红 N 类」不是 0 红，「没查成 N 类」不是 0 也红，
+# 判据：`scripts/hosts/test-environment-check.py check` 汇总行里「判红 N 类」不是 0 红，「没查成 N 类」不是 0 也红，
 # 汇总行读不到也红；真跑时它的退出码（1 有判红、3 只有没查成、0 干净）与汇总对不上，红。
 # 射程：只看机器此刻的样子，不查这一轮有没有重新 mkfs（那由用例的排他创建守）。不给 --smart，SMART 由它逐个列为没跑。
 # 在 gate.sh 里（GATE_NOT_RUN_FILE 所在的目录正是此刻的 TMPDIR，gate.sh 把这一轮的临时目录发给各阶段的那一份）：把这个 TMPDIR 交给
@@ -29,7 +29,7 @@
 # `test-environment-check-output.log` 时，只判这份录好的输出：
 #   machine-clean-red    判红 1 类（临时目录残留）、没查成 1 类
 #   machine-clean-green  10 类都查过、判红 0 类
-#   machine-clean-gate-run-green  放一份只核参数的替身 research/scripts/test-environment-check.py：在 gate.sh 里该带
+#   machine-clean-gate-run-green  放一份只核参数的替身 scripts/hosts/test-environment-check.py：在 gate.sh 里该带
 #                        --gate-run-temporary-directory <TMPDIR>、单跑时不带，对上了报判红 0 类，判绿
 #   machine-clean-cross-run-green  放一份只核参数的替身：GATE_CROSS_RUN_TMPDIR 设了该带 --cross-run-temporary-directory <它>、没设不带，
 #                        对上了报判红 0 类，判绿
@@ -52,7 +52,7 @@ STAGE_NAME="$(basename "$0")"
 source "$STAGE_DIR/lib/stage-cells.sh"
 
 stage_cell machine-clean cell_machine_clean "跑完测试之后机器还干不干净" \
-  "残留那几类先跑 python3 research/scripts/test-environment-check.py clean 看计划，确认没有正在跑的活在用它们之后加 --yes 再跑；宿主盘那几类（只读挂载、剩余空间、ext4 错误计数、内核日志）要人看；没查成的按它每一类后面那句「怎么办」补上再跑"
+  "残留那几类先跑 python3 scripts/hosts/test-environment-check.py clean 看计划，确认没有正在跑的活在用它们之后加 --yes 再跑；宿主盘那几类（只读挂载、剩余空间、ext4 错误计数、内核日志）要人看；没查成的按它每一类后面那句「怎么办」补上再跑"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -68,7 +68,7 @@ done
 ROOT="${root_argument:-$(cd "$STAGE_DIR/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 
-SCRIPT="research/scripts/test-environment-check.py"
+SCRIPT="scripts/hosts/test-environment-check.py"
 
 # 祖先 gate.sh 的启动时刻（epoch 秒）：晚于它的临时条目是这一趟门禁自己产生的，单列不判红。
 # 不用本道开跑时刻：这一道排最后，那样会把前面各阶段的残留都放过。单跑（祖先里没有 gate.sh）不给分界、全判。

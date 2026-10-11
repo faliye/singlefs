@@ -1,12 +1,12 @@
 # 崩溃点重放的合表（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J2：一张表、一个入口；一项一条流，
-# .claude/gate.d/stage-inputs.tsv 的 13 条 crash-case: 与 research/scripts/crash-amplification.sh 的 8 项按流去重之后合表）。入口 research/scripts/crash-point-replay.sh 照这张表跑。
+# .claude/gate.d/stage-inputs.tsv 的 13 条 crash-case: 与 scripts/crash/crash-amplification.sh 的 8 项按流去重之后合表）。入口 scripts/crash/crash-point-replay.sh 照这张表跑。
 # 一行一项，制表符分隔四列，再加一列 # 说明：
 #   ① 项名：小写字母、数字、-；不用 layer0、amplification 这两个退役的词（判决第三节 J1）
 #   ② 重型里层 0 那一套的部分：stage-inputs.tsv 里 crash-case: 的键，几条空格隔开（同一条流的几条用例并在一项里）；没有写 -
 #   ③ 重型里放量那一套的部分：crash-amplification.sh 的 ITEMS 里的分项名，几项空格隔开；没有写 -
 #   ④ 轻型取自重型的哪一项：轻型在「甲二」∪ 展开 6 两个域上跑的测试目标（crates/singlefs-checker-tier/tests/ 下的文件名去掉 .rs），几个空格隔开；
 #      每一个都要是这一项 ② ③ 点名的部分里的测试目标（轻型是重型的子集：写测试先写重型，再把关键步骤拿进轻型，用户 2026-10-10 定）
-# 核法在 research/scripts/lib_crash_point_replay_items.py（入口、crash-case-check.py 的 placement 共用一份）：② 的每个键在 stage-inputs.tsv 里、
+# 核法在 scripts/crash/lib_crash_point_replay_items.py（入口、crash-case-check.py 的 placement 共用一份）：② 的每个键在 stage-inputs.tsv 里、
 #   ③ 的每一项在 ITEMS 里；stage-inputs.tsv 的每一条 crash-case: 与 ITEMS 的每一项都恰好被一项点名；④ 不空、都在 ② ③ 的测试目标里、测试文件在。
 # 次序就是入口重型的跑序。
 new-pool-file-creation	crash-case:layer0-first-stream	-	crash_enumeration_new_pool_file_creation_stream	# mkfs 后取号 → 暖机 → A（新池新建文件），是放量四项的公共前缀

@@ -29,7 +29,7 @@ EOF
 cat > .claude/kb/experiments/01-样本一.md <<'EOF'
 ## E1 样本实验一 —— 已跑
 
-正文提到 D1（甲）。产物 `research/results/e1-sample.out`，复跑经 `research/scripts/replay.sh`。
+正文提到 D1（甲）。产物 `research/results/e1-sample.out`，复跑经 `scripts/experiments/replay.sh`。
 
 ### 2026-09-18：第一段
 
@@ -61,7 +61,7 @@ git add -A && git commit -qm base
 cat > .claude/kb/experiments/01-样本一.md <<'EOF'
 ## E1 样本实验一 —— 已跑
 
-正文提到 D1（甲）。产物 `research/results/e1-sample.out`，复跑经 `research/scripts/replay.sh`。
+正文提到 D1（甲）。产物 `research/results/e1-sample.out`，复跑经 `scripts/experiments/replay.sh`。
 
 ### 2026-09-18：第一段
 

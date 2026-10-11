@@ -5,7 +5,7 @@
 set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 git init -q -b master .
-mkdir -p .claude/agents .claude/gate.d .claude/hooks .claude/kb records research/prompts research/scripts
+mkdir -p .claude/agents .claude/gate.d .claude/hooks .claude/kb records research/prompts scripts
 printf '# demo\n\n还没在真活里用过。\n' > .claude/agents/demo.md
 printf '# 记录\n\n看门狗还没用过。\n' > records/2026-09-16-拆分提案.md
 printf '# 坑\n' > .claude/kb/pitfalls.md
@@ -20,7 +20,7 @@ cat > .claude/gate.d/knowledge-sync-triggers.tsv <<'TRIGGERS'
 ^\.claude/settings\.json$	# 钩子的注册处
 ^\.claude/gate\.d/[^/]+\.(sh|py|tsv)$	# 门禁阶段与它们读的数据表
 ^\.claude/rules/	# 项目本地规则
-^research/scripts/	# 研究与协作脚本
+^scripts/	# 研究与协作脚本
 ^crates/[^/]+/src/	# 实现
 ^CLAUDE\.md$	# 项目说明
 TRIGGERS
@@ -30,7 +30,7 @@ TRIGGERS
 cat > .claude/batch-scope <<'SCOPE'
 .claude/agents/demo.md	# 样本：这一批改它的说法
 .claude/hooks/demo.sh	# 样本：这一批新建的钩子
-research/scripts/demo.py	# 样本：这一批新建的脚本
+scripts/demo.py	# 样本：这一批新建的脚本
 SCOPE
 printf '.claude/agents/demo.md\t%s\t样本：这份样本验 knowledge-sync 格，定义的三方不归它\n' \
   "$(printf '# demo\n\n在 E153 派发里用过。\n' | sha256sum | cut -d' ' -f1)" > .claude/agent-def-review-exempt
@@ -38,7 +38,7 @@ git add -A && git commit -qm base
 printf '# demo\n\n在 E153 派发里用过。\n' > .claude/agents/demo.md
 printf '#!/usr/bin/env bash\nexit 0\n' > .claude/hooks/demo.sh
 git add .claude/hooks/demo.sh
-printf 'print("demo")\n' > research/scripts/demo.py
+printf 'print("demo")\n' > scripts/demo.py
 printf '# 记录\n\n看门狗在 E153 里用过。\n' > records/2026-09-16-拆分提案.md
 printf '# 坑\n\n- 用过之后回头改「没用过」的句子。\n' > .claude/kb/pitfalls.md
 # 这一阶段的原始材料跟着记录一起入库：事实表、候选表、逐行判定报告。
@@ -85,7 +85,7 @@ cat > research/prompts/second-sync.md <<'EOF'
 <!-- knowledge-sync -->
 # 第二批阶段同步
 
-触发文件：research/scripts/demo.py
+触发文件：scripts/demo.py
 
 ## 搜索
 

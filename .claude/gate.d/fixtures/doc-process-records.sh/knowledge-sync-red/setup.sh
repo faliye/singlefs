@@ -23,7 +23,7 @@ cat > .claude/gate.d/knowledge-sync-triggers.tsv <<'TRIGGERS'
 ^\.claude/settings\.json$	# 钩子的注册处
 ^\.claude/gate\.d/[^/]+\.(sh|py|tsv)$	# 门禁阶段与它们读的数据表
 ^\.claude/rules/	# 项目本地规则
-^research/scripts/	# 研究与协作脚本
+^scripts/	# 研究与协作脚本
 ^crates/[^/]+/src/	# 实现
 ^CLAUDE\.md$	# 项目说明
 TRIGGERS

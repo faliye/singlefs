@@ -18,7 +18,7 @@
 #
 # 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就十一格按下面的次序全跑，格名写错退 2）：
 # gate-cell: research-script-selftests runner 表里每一条研究脚本与共用库的自证都通过（分批并行跑）
-# gate-cell: research-script-selftest-coverage research/scripts/ 里代码实现了 --selftest 的脚本，都有门禁阶段在跑或登记了为什么不跑
+# gate-cell: research-script-selftest-coverage scripts/ 里代码实现了 --selftest 的脚本，都有门禁阶段在跑或登记了为什么不跑
 # gate-cell: rules-manifest 项目规则文件与 CLAUDE.md 的 @ 引用逐项相等
 # gate-cell: stage-owners 阶段归属表与各道门禁的格逐格一致、派给的 agent 有定义，每道阶段认第一个参数当项目根
 # gate-cell: agent-write-scope 项目钩子注册在要的 matcher 上，写范围表与定义双向一致，定义头齐全，共用模块不另写一份
@@ -75,7 +75,7 @@ source "$STAGE_DIRECTORY/lib/stage-cells.sh"
 
 stage_cell research-script-selftests cell_research_script_selftests "runner 表里每一条研究脚本与共用库的自证都通过（分批并行跑）" \
   "按红的那条自证给的下一步修被测脚本，再单独跑那一条命令看它转绿；runner 表在这一道的 SELFTEST_RUNNERS"
-stage_cell research-script-selftest-coverage cell_research_script_selftest_coverage "research/scripts/ 里代码实现了 --selftest 的脚本，都有门禁阶段在跑或登记了为什么不跑" \
+stage_cell research-script-selftest-coverage cell_research_script_selftest_coverage "scripts/ 里代码实现了 --selftest 的脚本，都有门禁阶段在跑或登记了为什么不跑" \
   "把没人跑的自证加进这一道的 SELFTEST_RUNNERS；确实不该每轮跑的登记进 NOT_RUN_HERE 并写明为什么；过期的豁免删掉"
 stage_cell rules-manifest cell_rules_manifest "项目规则文件与 CLAUDE.md 的 @ 引用逐项相等" \
   "补上 CLAUDE.md 里缺的 @.claude/rules/<文件> 引用（写在代码围栏与行内代码之外），或删掉悬空引用；两侧逐项相等"
@@ -84,7 +84,7 @@ stage_cell stage-owners cell_stage_owners "阶段归属表与各道门禁的格�
 stage_cell agent-write-scope cell_agent_write_scope "项目钩子注册在要的 matcher 上，写范围表与定义双向一致，定义头齐全，共用模块不另写一份" \
   "照上面逐条的出路改 .claude/settings.json 的 hooks、.claude/hooks/agent-write-scope.tsv 或定义的 frontmatter；共用模块的函数从模块导入，不另写一份"
 stage_cell change-range-single-source cell_change_range_single_source "门禁阶段不自己算 diff 基准，列路径带 quotepath，调共用取法判退出码" \
-  "基准与改动范围只经 research/scripts/changed-paths.sh 的 gate_diff_base / gate_changed_paths / gate_added_lines 取，列路径的 git 带 -c core.quotepath=false，调共用取法判退出码"
+  "基准与改动范围只经 scripts/gate/changed-paths.sh 的 gate_diff_base / gate_changed_paths / gate_added_lines 取，列路径的 git 带 -c core.quotepath=false，调共用取法判退出码"
 stage_cell research-gate-lint cell_research_gate_lint "研究脚本、钩子与 .claude/scripts 的拒绝出路、shell 纪律、执行位，终止进程只许点名一个" \
   "拒绝补出路（sop-first.md「每一条拒绝都必须给出下一步」），shell 纪律照 command-safety.md，终止进程照 .claude/hooks/bash-command-detector.sh 文件头 ⑥ 只点名一个自己起的"
 stage_cell fixture-claims cell_fixture_claims "阶段头部声称的样本真的在；文件名与样本正文里的日期不许是编的" \
@@ -182,13 +182,13 @@ PY_CODE_WITHOUT_TEXT
 # ── 格 research-script-selftests：runner 表里每一条研究脚本与共用库的自证都通过（分批并行跑）
 #
 # 判据：SELFTEST_RUNNERS 里每一条自证都退 0；表全不全归 research-script-selftest-coverage 格。lib/stage-cells.sh 不是阶段，它的自证只在这张表里跑。
-#   每一条经 research/scripts/light-selftest-guard.py --only-if-light 起（登记表取被判那棵树的 .claude/hooks/selftest-registry.tsv）：登记成 light 的，
+#   每一条经 scripts/gate/light-selftest-guard.py --only-if-light 起（登记表取被判那棵树的 .claude/hooks/selftest-registry.tsv）：登记成 light 的，
 #   跑的时候它整棵进程树里起了真 cargo / rustc（版本查询之外）、真清场（gpu-quiesce-run.sh 读真多机配置）或私有清场脚本，守卫退 3，这一条照没过记；
 #   经 PATH 起的 cargo、rustc 被守卫的替身当场拒、真的那一份不起。判据、射程与本次未查写在守卫文件头。别的（登记成 heavy、heavy-if-set 而变量设了、
 #   表外的、不是单独一个 --selftest 的）守卫原样 exec、本次未盯，成功句逐条列名。每条的判定写 <序号>.guard，按表次序回读、数份数，缺一份整格红。
 #
 # 分批并行：SELFTEST_RUNNERS_STARTED_ALONE 里最慢的那几条先各自单独起、跑到完；其余按表次序每批 N 条并行，一批收齐再起下一批，
-#   N = SINGLEFS_THREAD_CAP（research/scripts/capped.sh 设的；不设或不是正整数取 nproc）减去单独起的条数，至少 1。
+#   N = SINGLEFS_THREAD_CAP（scripts/hosts/capped.sh 设的；不设或不是正整数取 nproc）减去单独起的条数，至少 1。
 #   每条的输出与退出码各写自己的文件，跑完按表次序回读、数份数（.claude/singlefs-ai-sop/rules/command-safety.md「并行不许把失败吃掉」）。
 #   几份自证抢同一份状态（同一个临时路径、同一个端口）的，只在并行下红：那一条挪进 SELFTEST_RUNNERS_STARTED_ALONE 单独起，或让它的自证各用各的临时目录。
 #
@@ -199,53 +199,54 @@ PY_CODE_WITHOUT_TEXT
 #   red 那一份经 PATH 起 cargo build（清单不在），必须被守卫的替身拒、这一条退 3 判红，报 2 条里 1 条没过；green 那一份只用样本自己的假 cargo，
 #   判绿并报盯了 1 条、本次未盯 1 条（另一条没登记）。
 SELFTEST_RUNNERS=(
-  "bash research/scripts/ask-local-selftest.sh" "python3 research/scripts/checklist-specs.py --selftest"
-  "python3 research/scripts/quote-kb.py --selftest" "python3 research/scripts/kb-sections.py --selftest"
-  "python3 research/scripts/check-segment-registry.py --selftest" "python3 research/scripts/replace-once.py --selftest"
-  "python3 research/scripts/replace-batch.py --selftest" "python3 research/scripts/e152-tables.py --selftest"
-  "python3 research/scripts/agent-watch.py --selftest" "python3 research/scripts/quote-rust-items.py --selftest"
-  "python3 research/scripts/sweep-term.py --selftest" "python3 research/scripts/archive-past-rounds.py --selftest"
-  "python3 research/scripts/insert-row.py --selftest" "bash research/scripts/cache-keepalive.sh --selftest"
-  "bash research/scripts/watch.sh --selftest" "python3 research/scripts/stale-candidates.py --selftest"
-  "python3 research/scripts/stale-candidates.py --benchmark" "python3 research/scripts/test-environment-check.py --selftest"
-  "bash research/scripts/change-touches-crates.sh --selftest" "bash research/scripts/verify-citations.sh --selftest"
-  "python3 research/scripts/agent-handover.py --selftest" "python3 research/scripts/decision-slim-check.py --selftest"
-  "python3 research/scripts/pdf-text.py --selftest" "python3 research/scripts/rules-sweep-audit.py --selftest"
-  "python3 research/scripts/dispatch-prompt.py --selftest" "python3 research/scripts/three-way-materials.py --selftest"
-  "bash research/scripts/merge-and-verify.sh --selftest"
-  "python3 research/scripts/agent-cost.py --selftest" "bash research/scripts/snapshot-check.sh --selftest"
-  "bash research/scripts/stage-must-run.sh --selftest" "bash research/scripts/changed-paths.sh --selftest"
-  "bash research/scripts/gate-staged.sh --selftest" "python3 research/scripts/admission.py --selftest"
-  "bash research/scripts/capped.sh --selftest" "bash research/scripts/stage-run-or-skip.sh --selftest"
-  "bash research/scripts/layer0-shard-run.sh --selftest" "bash research/scripts/mutation-shard-run.sh --selftest"
-  "bash research/scripts/multi-host-run.sh --selftest" "bash research/scripts/run-with-memory-cap.sh --selftest"
-  "bash research/scripts/detached-run.sh --selftest" "bash research/scripts/replay.sh --selftest"
-  "bash research/scripts/mutate.sh --selftest" "python3 research/scripts/cite-check.py --selftest"
-  "python3 research/scripts/kb-spec-check.py --selftest" "python3 research/scripts/crash-case-check.py --selftest"
-  "bash research/scripts/prove-red.sh --selftest" "python3 research/scripts/apply-writer-patch.py --selftest"
-  "python3 research/scripts/lib_libtest_result_lines.py --selftest" "python3 research/scripts/rerun-failed-tests.py --selftest"
-  "python3 research/scripts/closeout-status.py --selftest" "python3 research/scripts/compile-then-swap.py --selftest"
-  "python3 research/scripts/corruption-check.py --selftest" "python3 research/scripts/crates-mutation-rows.py --selftest"
-  "bash .claude/gate.d/lib/stage-cells.sh --selftest" "python3 research/scripts/gate-structure-check.py --selftest"
-  "python3 research/scripts/migrate-changelog-format.py --selftest"
-  "bash research/scripts/crash-amplification.sh --selftest"
-  "bash research/scripts/crash-amplification-item.sh --selftest"
-  "bash research/scripts/crash-amplification-two-hosts.sh --selftest"
-  "bash research/scripts/gpu-quiesce-run.sh --selftest"
-  "bash research/scripts/crash-point-replay.sh --selftest"
-  "python3 research/scripts/crates-mutation-light-rows.py --selftest" "python3 research/scripts/gpu-exemptions-check.py --selftest"
-  "python3 research/scripts/broad-mutation.py --selftest" "python3 research/scripts/mutation-prune.py --selftest"
-  "python3 research/scripts/verus-proof-check.py --selftest" "python3 research/scripts/e165-pin-red-examples.py --selftest"
-  "bash research/scripts/e165-replay-mutation-kill-bounds.sh --selftest"
-  "python3 research/scripts/e165-compare-kill-bounds.py --selftest"
-  "python3 research/scripts/hook-swap.py --selftest" "python3 research/scripts/host-dispatch.py --selftest"
-  "python3 research/scripts/light-selftest-guard.py --selftest"
-  "python3 research/scripts/host-resources.py --selftest" "python3 research/scripts/source-stamp.py --selftest"
-  "bash research/scripts/qemu-blklogwrites-check.sh --selftest" "bash research/scripts/build-patched-qemu.sh --selftest"
-  "python3 research/scripts/oov-check.py --selftest" "python3 research/scripts/stage-mine.py --selftest"
-  "python3 research/scripts/relabel-item.py --selftest" "bash research/scripts/claim-experiment.sh --selftest"
+  "bash scripts/agents/ask-local-selftest.sh" "python3 scripts/agents/checklist-specs.py --selftest"
+  "python3 scripts/kb/quote-kb.py --selftest" "python3 scripts/kb/kb-sections.py --selftest"
+  "python3 scripts/crash/check-segment-registry.py --selftest" "python3 scripts/kb/replace-once.py --selftest"
+  "python3 scripts/kb/replace-batch.py --selftest" "python3 scripts/experiments/e152-tables.py --selftest"
+  "python3 scripts/agents/agent-watch.py --selftest" "python3 scripts/kb/quote-rust-items.py --selftest"
+  "python3 scripts/kb/sweep-term.py --selftest" "python3 scripts/kb/archive-past-rounds.py --selftest"
+  "python3 scripts/kb/insert-row.py --selftest" "bash scripts/hosts/cache-keepalive.sh --selftest"
+  "bash scripts/agents/watch.sh --selftest" "python3 scripts/kb/stale-candidates.py --selftest"
+  "python3 scripts/kb/stale-candidates.py --benchmark" "python3 scripts/hosts/test-environment-check.py --selftest"
+  "bash scripts/gate/change-touches-crates.sh --selftest" "bash scripts/kb/verify-citations.sh --selftest"
+  "python3 scripts/agents/agent-handover.py --selftest" "python3 scripts/kb/decision-slim-check.py --selftest"
+  "python3 scripts/kb/pdf-text.py --selftest" "python3 scripts/kb/rules-sweep-audit.py --selftest"
+  "python3 scripts/agents/dispatch-prompt.py --selftest" "python3 scripts/agents/three-way-materials.py --selftest"
+  "bash scripts/gate/merge-and-verify.sh --selftest"
+  "python3 scripts/agents/agent-cost.py --selftest" "bash scripts/devices/snapshot-check.sh --selftest"
+  "bash scripts/gate/stage-must-run.sh --selftest" "bash scripts/gate/changed-paths.sh --selftest"
+  "bash scripts/gate/gate-staged.sh --selftest" "python3 scripts/gate/admission.py --selftest"
+  "bash scripts/hosts/capped.sh --selftest" "bash scripts/gate/stage-run-or-skip.sh --selftest"
+  "bash scripts/crash/layer0-shard-run.sh --selftest" "bash scripts/mutation/mutation-shard-run.sh --selftest"
+  "bash scripts/hosts/multi-host-run.sh --selftest" "bash scripts/hosts/run-with-memory-cap.sh --selftest"
+  "bash scripts/hosts/detached-run.sh --selftest" "bash scripts/experiments/replay.sh --selftest"
+  "bash scripts/mutation/mutate.sh --selftest" "python3 scripts/agents/cite-check.py --selftest"
+  "python3 scripts/kb/kb-spec-check.py --selftest" "python3 scripts/crash/crash-case-check.py --selftest"
+  "bash scripts/mutation/prove-red.sh --selftest" "python3 scripts/gate/apply-writer-patch.py --selftest"
+  "python3 scripts/gate/lib_libtest_result_lines.py --selftest" "python3 scripts/gate/rerun-failed-tests.py --selftest"
+  "python3 scripts/gate/closeout-status.py --selftest" "python3 scripts/hosts/compile-then-swap.py --selftest"
+  "python3 scripts/crash/corruption-check.py --selftest" "python3 scripts/mutation/crates-mutation-rows.py --selftest"
+  "bash .claude/gate.d/lib/stage-cells.sh --selftest" "python3 scripts/gate/gate-structure-check.py --selftest"
+  "python3 scripts/kb/migrate-changelog-format.py --selftest"
+  "bash scripts/crash/crash-amplification.sh --selftest"
+  "bash scripts/crash/crash-amplification-item.sh --selftest"
+  "bash scripts/crash/crash-amplification-two-hosts.sh --selftest"
+  "bash scripts/crash/gpu-quiesce-run.sh --selftest"
+  "bash scripts/crash/crash-point-replay.sh --selftest"
+  "python3 scripts/mutation/crates-mutation-light-rows.py --selftest" "python3 scripts/crash/gpu-exemptions-check.py --selftest"
+  "python3 scripts/mutation/broad-mutation.py --selftest" "python3 scripts/mutation/mutation-prune.py --selftest"
+  "python3 scripts/gate/verus-proof-check.py --selftest" "python3 scripts/experiments/e165-pin-red-examples.py --selftest"
+  "bash scripts/experiments/e165-replay-mutation-kill-bounds.sh --selftest"
+  "python3 scripts/experiments/e165-compare-kill-bounds.py --selftest"
+  "python3 scripts/gate/hook-swap.py --selftest" "python3 scripts/hosts/host-dispatch.py --selftest"
+  "python3 scripts/gate/light-selftest-guard.py --selftest"
+  "python3 scripts/hosts/host-resources.py --selftest" "python3 scripts/hosts/source-stamp.py --selftest"
+  "bash scripts/devices/qemu-blklogwrites-check.sh --selftest" "bash scripts/devices/build-patched-qemu.sh --selftest"
+  "python3 scripts/kb/oov-check.py --selftest" "python3 scripts/gate/stage-mine.py --selftest"
+  "python3 scripts/kb/relabel-item.py --selftest" "bash scripts/kb/claim-experiment.sh --selftest"
+  "python3 scripts/hosts/target-prune.py --selftest"
 )
-SELFTEST_RUNNERS_STARTED_ALONE=("bash research/scripts/layer0-shard-run.sh --selftest" "python3 research/scripts/agent-watch.py --selftest")
+SELFTEST_RUNNERS_STARTED_ALONE=("bash scripts/crash/layer0-shard-run.sh --selftest" "python3 scripts/agents/agent-watch.py --selftest")
 
 cell_research_script_selftests() {
 runners=("${SELFTEST_RUNNERS[@]}")
@@ -286,7 +287,7 @@ batch_size=$((thread_cap - ${#alone_set[@]}))
 
 scratch="$(mktemp -d)" || { echo "  ✗ 建不了放逐条输出与退出码的临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格；一条自证都没跑。"; exit 1; }
 started_pids=()
-light_selftest_guard="$STAGE_REPOSITORY/research/scripts/light-selftest-guard.py"
+light_selftest_guard="$STAGE_REPOSITORY/scripts/gate/light-selftest-guard.py"
 # start_selftest <表里的序号> <命令>：后台起一条，输出写 <序号>.out、退出码写 <序号>.exit、守卫的判定写 <序号>.guard，进程号记进 started_pids
 start_selftest() {
   # runner 表每条是「解释器 脚本 参数」，按空白切词起，与原来逐条顺序跑时同一个起法；经守卫起：登记成 light 的盯着它的进程树，别的守卫原样 exec
@@ -348,8 +349,8 @@ if ((collected != ${#runners[@]})); then
   exit 1
 fi
 if ((${#unjudged[@]})); then
-  echo "  ✗ research/scripts/light-selftest-guard.py 没给 ${#unjudged[@]} 条写判定（盯没盯说不清）：$(printf '「%s」' "${unjudged[@]}")"
-  echo "     → 怎么办：单跑 python3 research/scripts/light-selftest-guard.py --only-if-light --verdict-file <文件> -- <那条命令> 看它报什么；判定不全的一轮不算判过。"
+  echo "  ✗ scripts/gate/light-selftest-guard.py 没给 ${#unjudged[@]} 条写判定（盯没盯说不清）：$(printf '「%s」' "${unjudged[@]}")"
+  echo "     → 怎么办：单跑 python3 scripts/gate/light-selftest-guard.py --only-if-light --verdict-file <文件> -- <那条命令> 看它报什么；判定不全的一轮不算判过。"
   exit 1
 fi
 if ((failed_count)); then
@@ -362,9 +363,9 @@ unwatched_text=""
 echo "  ✓ research 脚本的自证都通过（这一格跑了 ${#runners[@]} 条，表取自 $table_source；单独起 ${#alone_pids[@]} 条，其余 $((${#runners[@]} - ${#alone_pids[@]})) 条按每批至多 $batch_size 条并行、共 $batches 批；登记成 light 的 $watched_count 条经 light-selftest-guard.py 盯着进程树、没起真 cargo / rustc 与真清场，本次未盯 ${#unwatched[@]} 条$unwatched_text）"
 }
 
-# ── 格 research-script-selftest-coverage：research/scripts/ 里代码实现了 --selftest 的脚本，都有门禁阶段在跑或登记了为什么不跑
+# ── 格 research-script-selftest-coverage：scripts/ 里代码实现了 --selftest 的脚本，都有门禁阶段在跑或登记了为什么不跑
 #
-# 判据：research/scripts/ 里实现了 --selftest 的脚本，要么有阶段在调它（脚本名后直接跟 --selftest，或先赋给变量再 "$变量" --selftest），
+# 判据：scripts/ 里实现了 --selftest 的脚本，要么有阶段在调它（脚本名后直接跟 --selftest，或先赋给变量再 "$变量" --selftest），
 #   要么登记进 NOT_RUN_HERE 写明为什么；NOT_RUN_HERE 里那份脚本已经有阶段在跑、或不再实现 --selftest 的，是过期豁免，也红。
 # 「实现了」只认 .sh / .py 经 code_of 去掉注释与出路文字之后的代码，不列具体写法（==、case、match 都认）；「有阶段在调」同样只认 code_of 之后的代码。
 # 阶段取门禁目录顶层全部 *.sh，与 gate.sh 起的是同一批。
@@ -373,7 +374,7 @@ echo "  ✓ research 脚本的自证都通过（这一格跑了 ${#runners[@]} �
 #   coverage-claims-green 放一份只在注释与出路里提 --selftest 的 .py、一份提到它的 .tsv（都不算实现了）与一份由不带编号的阶段 tooling-runs.sh 在跑的 .sh，
 #   判绿并报 2 份中 1 份（另一份是 NOT_RUN_HERE 那一份）；coverage-claims-red 放一份用 match 语句实现 --selftest、没人跑的 .py，必须报它没人跑。
 NOT_RUN_HERE=(
-  "research/scripts/vm-bench.sh	自证要连起三次虚机，挂钟太重，不进每轮门禁"
+  "scripts/devices/vm-bench.sh	自证要连起三次虚机，挂钟太重，不进每轮门禁"
 )
 cell_research_script_selftest_coverage() {
 coverage="$(python3 - "$CODE_WITHOUT_TEXT_LIBRARY" "${CODE_TOOLING_BREAK:-}" "${NOT_RUN_HERE[@]}" <<'PY_COVERAGE'
@@ -388,7 +389,7 @@ def implements_selftest(path):
     if broken == "claims-any-file":
         return "--selftest" in text
     return path.endswith((".sh", ".py")) and "--selftest" in code_of(text)
-claimed = sorted(path for path in glob.glob("research/scripts/*")
+claimed = sorted(path for path in glob.glob("scripts/*")
                  if os.path.isfile(path) and implements_selftest(path))
 run = set()
 stage_pattern = "[0-9][0-9]-*.sh" if broken == "numbered-stages-only" else "*.sh"
@@ -426,7 +427,7 @@ if grep -q '^STALE' <<<"$coverage"; then
   exit 1
 fi
 read -r _ claimed_count _ run_count < <(grep '^CLAIMED' <<<"$coverage")
-echo "  ✓ research/scripts/ 里声称有 --selftest 的 $claimed_count 份中 $run_count 份有门禁阶段在跑（只认 .sh / .py 代码里的 --selftest）"
+echo "  ✓ scripts/ 里声称有 --selftest 的 $claimed_count 份中 $run_count 份有门禁阶段在跑（只认 .sh / .py 代码里的 --selftest）"
 echo "    没跑的 $(grep -c '^EXEMPT' <<<"$coverage") 份（登记在这一格的 NOT_RUN_HERE）："
 grep '^EXEMPT' <<<"$coverage" | cut -f2,3 | sed 's/\t/：/; s/^/      /'
 }
@@ -500,7 +501,7 @@ PY
 #   目录里有一格没登记、一道没有格名表、一道 --list 退 1、一道不认第一个参数，必须逐个报出；
 #   stage-owners-green 两道门禁三格逐格登记，判绿并报门禁数、格数与 agent 数。
 cell_stage_owners() {
-python3 - "$MANIFEST_LIBRARY" "$STAGE_REPOSITORY/research/scripts/gate-structure-check.py" "${CODE_TOOLING_BREAK:-}" <<'PY'
+python3 - "$MANIFEST_LIBRARY" "$STAGE_REPOSITORY/scripts/gate/gate-structure-check.py" "${CODE_TOOLING_BREAK:-}" <<'PY'
 import glob, importlib.util, os, re, shutil, sys, tempfile, types
 sys.dont_write_bytecode = True
 manifest = types.ModuleType("lib_manifest")
@@ -843,7 +844,7 @@ if bad_models:
     print("  ✗ 这些定义的 frontmatter 里 model 不是 opus、sonnet、haiku、inherit 之一——派发时报 model_not_found，这一类 agent 起不来：")  # gate-lint:summary
     for line in bad_models:
         print(f"     {line}")  # gate-lint:detail
-    print("     → 怎么办：改成 opus、sonnet、haiku 或 inherit（行尾可以带 # 注释）；要用本地模型的腿照定义走 research/scripts/ask-local.sh，不写进 model。")
+    print("     → 怎么办：改成 opus、sonnet、haiku 或 inherit（行尾可以带 # 注释）；要用本地模型的腿照定义走 scripts/agents/ask-local.sh，不写进 model。")
 if missing_omit:
     failed = True
     print("  ✗ 这些定义的 frontmatter 没有 omitClaudeMd: true——每次派发都白带约 10 万 token 的 CLAUDE.md 与规则：")  # gate-lint:summary
@@ -937,7 +938,7 @@ echo "  ✓ 写范围闸、Bash 检出 hook、重型测试闸、续派闸、续�
 # ── 格 change-range-single-source：改动范围只许一份取法：阶段不自己算 diff 基准，列路径的 git 调用都带 core.quotepath=false
 #
 # 判据（射程 .claude/gate.d/ 顶层的 *.sh 与 *.py；这一道文件里只除掉这一格自己：从这一格的标题行到下一格的标题行按空行判），任一条不成立判红：
-#   ① 算 diff 基准只许在 research/scripts/changed-paths.sh 里：代码行出现 merge-base（--is-ancestor 核祖先除外）、@{upstream} 或 @{u}、gate-ok、
+#   ① 算 diff 基准只许在 scripts/gate/changed-paths.sh 里：代码行出现 merge-base（--is-ancestor 核祖先除外）、@{upstream} 或 @{u}、gate-ok、
 #      读 GATE_BASE 或 GATE_DIFF_BASE，或者跑 git 的那一行写死 HEAD~N、HEAD^（HEAD^{tree} 不算）、用三点号（A...B 就是取 merge-base）的，红。
 #   ② 列路径的 git 调用（--name-only、--name-status、ls-files）要带 -c core.quotepath=false：同一行带，或经同一个文件里带着它的变量 / 列表、
 #      包装函数调，或 git 带 -z；参数列表换了行、这一行以引号开头的，往上看三行找调用前缀。不带时中文路径被转成带引号的八进制串，git 不报错。
@@ -1058,10 +1059,10 @@ for path in scanned:
 failed = False
 if base_bad:
     failed = True
-    print(f'  ✗ {len(base_bad)} 行在阶段里自己算 diff 基准（改动范围只许一份取法：research/scripts/changed-paths.sh）：')
+    print(f'  ✗ {len(base_bad)} 行在阶段里自己算 diff 基准（改动范围只许一份取法：scripts/gate/changed-paths.sh）：')
     for path, number, line in base_bad:
         print(f'      {path}:{number}  {line[:120]}')   # gate-lint:detail
-    print('     → 怎么办：阶段里 source research/scripts/changed-paths.sh，基准写 base="$(gate_diff_base gate)"（问「这一次提交带哪些」的写 head），')
+    print('     → 怎么办：阶段里 source scripts/gate/changed-paths.sh，基准写 base="$(gate_diff_base gate)"（问「这一次提交带哪些」的写 head），')
     print('               路径写 gate_changed_paths、新增行写 gate_added_lines；共用脚本缺哪种取法就往它里面加，连同它的 --selftest 一起改。')
 if list_bad:
     failed = True
@@ -1081,9 +1082,9 @@ if failed:
     sys.exit(1)
 
 outside = []
-for pattern in ('research/scripts/*.sh', 'research/scripts/*.py', '.claude/scripts/*', '.claude/hooks/*'):
+for pattern in ('scripts/*.sh', 'scripts/*.py', '.claude/scripts/*', '.claude/hooks/*'):
     for path in sorted(glob.glob(pattern)):
-        if os.path.isfile(path) and path != 'research/scripts/changed-paths.sh':
+        if os.path.isfile(path) and path != 'scripts/gate/changed-paths.sh':
             base_hits, list_hits, status_hits = judge(path)
             if base_hits or list_hits or status_hits:
                 outside.append(f'{path}（算基准 {len(base_hits)} 行、不带 quotepath 的列路径 {len(list_hits)} 行、不判退出码 {len(status_hits)} 处）')
@@ -1091,11 +1092,11 @@ print(f'  ✓ 查了 .claude/gate.d/ 下 {len(scanned)} 份：没有阶段自己
 if outside:
     print(f'     没扫的 {len(outside)} 份（不是门禁阶段，射程之外）：' + '；'.join(outside))
 else:
-    print('     没扫的：research/scripts/、.claude/scripts/、.claude/hooks/ 下没有碰到这两条的脚本')
+    print('     没扫的：scripts/、.claude/scripts/、.claude/hooks/ 下没有碰到这两条的脚本')
 PY
 }
 
-# ── 格 research-gate-lint：research/scripts/、.claude/hooks/ 与 .claude/scripts/ 里每一条拒绝都带出路、守 shell 纪律；前两个目录的执行位不丢；连同 .claude/gate.d/，终止进程只许点名一个
+# ── 格 research-gate-lint：scripts/、.claude/hooks/ 与 .claude/scripts/ 里每一条拒绝都带出路、守 shell 纪律；前两个目录的执行位不丢；连同 .claude/gate.d/，终止进程只许点名一个
 #
 # 共享门禁的「门禁自检」只把 SOP 自己的脚本与 .claude/gate.d/ 交给 gate-lint 与 shell-lint，这三个目录不在它的射程里，这里补上
 #   （.claude/singlefs-ai-sop/rules/show-me-test.md「射程只到 .claude/gate.d/」）；两个 lint 都跑完再判，不在第一个红就停。
@@ -1103,10 +1104,10 @@ PY
 # 进程安全（终止只许点名一个自己起的进程号或任务号）：判定只有一份，在 .claude/hooks/bash-command-detector.sh（拒绝 ⑥），
 #   这里经它的 --scan-scripts 扫，射程比两个 lint 多一个 .claude/gate.d/（它的样本目录不扫）。
 # 样本：research-gate-lint-red 放一个只带一句话的 die 和一个靠子 shell 赋值往外带值的函数；它的 .claude/scripts/ 里再放一个不带出路的拒绝和一处 pkill -f
-#   （这个目录进了射程才报得出来）；进程安全那一路有 research/scripts/stop-processes.sh（自己任务的进程组、循环里 kill、systemctl 带通配）、
-#   research/scripts/stop.py（循环 os.kill、os.killpg）与 .claude/gate.d/50-stop-group.sh（按 cgroup.procs 批量发、没核 scope 也没标），都必须逐处报出。
+#   （这个目录进了射程才报得出来）；进程安全那一路有 scripts/stop-processes.sh（自己任务的进程组、循环里 kill、systemctl 带通配）、
+#   scripts/stop.py（循环 os.kill、os.killpg）与 .claude/gate.d/50-stop-group.sh（按 cgroup.procs 批量发、没核 scope 也没标），都必须逐处报出。
 #   research-gate-lint-green 的 die 带第二个参数、不靠子 shell 带值，.claude/scripts/ 里放一个干净的包装（成功行的脚本数要把它数进去），
-#   research/scripts/stop-own.sh 只停点名的一个、按 cgroup 批量发的那一段核过 singlefs-memory-cap-*.scope 又标了 own-scope，必须判绿。
+#   scripts/stop-own.sh 只停点名的一个、按 cgroup 批量发的那一段核过 singlefs-memory-cap-*.scope 又标了 own-scope，必须判绿。
 cell_research_gate_lint() {
 LINT="$(cd "$STAGE_DIRECTORY/../.." && pwd)/.claude/singlefs-ai-sop/scripts/gate-lint.sh"
 SHELL_LINT="$(dirname "$LINT")/shell-lint.sh"
@@ -1116,37 +1117,37 @@ done
 TARGETS=()
 MODE_TARGETS=()
 ABSENT=()
-for directory in "$ROOT/research/scripts" "$ROOT/.claude/hooks" "$ROOT/.claude/scripts"; do
+for directory in "$ROOT/scripts" "$ROOT/.claude/hooks" "$ROOT/.claude/scripts"; do
   [[ -d "$directory" ]] || { ABSENT+=("${directory#"$ROOT"/}"); continue; }
   TARGETS+=("$directory")
   [[ "$directory" == "$ROOT/.claude/scripts" ]] || MODE_TARGETS+=("$directory")
 done
-((${#TARGETS[@]})) || { echo "  ! 没有 research/scripts/、.claude/hooks/ 也没有 .claude/scripts/，这一格无对象可判"; exit 77; }
+((${#TARGETS[@]})) || { echo "  ! 没有 scripts/、.claude/hooks/ 也没有 .claude/scripts/，这一格无对象可判"; exit 77; }
 # GATE_LINT_DIR 指到第一个目标目录：不设它，共享脚本默认还会扫 SOP 自己的包，样本目录里红绿就靠那个包碰巧干净来分。
 failed=0
 if ! GATE_LINT_DIR="${TARGETS[0]}" bash "$LINT" "${TARGETS[@]:1}"; then
-  echo "  ✗ research/scripts/、.claude/hooks/ 或 .claude/scripts/ 里有不带出路的拒绝（上面逐处列出）"
+  echo "  ✗ scripts/、.claude/hooks/ 或 .claude/scripts/ 里有不带出路的拒绝（上面逐处列出）"
   echo "     → 怎么办：照 .claude/singlefs-ai-sop/rules/sop-first.md「每一条拒绝都必须给出下一步」补出路：die 加第二个参数，bad 后五行内写 howto，直接打印的拒绝之后跟一行以箭头开头的出路"
   failed=1
 fi
 # 执行位也一起：共享门禁的「脚本执行位」阶段只扫 .claude/gate.d 与 .claude/scripts，
-# research/scripts 与 .claude/hooks 不在它的射程里（同 gate-lint / shell-lint 那两条的理由）；.claude/scripts 已在那一道里，不重复扫。
+# scripts 与 .claude/hooks 不在它的射程里（同 gate-lint / shell-lint 那两条的理由）；.claude/scripts 已在那一道里，不重复扫。
 MODES="$(dirname "$LINT")/script-modes.sh"
 modes_note=""
 if [[ ! -f "$MODES" ]]; then
-  echo "  ✗ 找不到共享脚本 $MODES，research/scripts/ 与 .claude/hooks/ 的执行位这一项没判"
+  echo "  ✗ 找不到共享脚本 $MODES，scripts/ 与 .claude/hooks/ 的执行位这一项没判"
   echo "     → 怎么办：规范副本缺了这一份，把 singlefs-ai-sop-<语言> 仓重新拷进 .claude/singlefs-ai-sop/ 再跑它的 install.sh；别让这一项静默不判"
   failed=1
   modes_note="执行位：没判（找不到 script-modes.sh，上面已判红）"
 elif ((${#MODE_TARGETS[@]} == 0)); then
-  modes_note="执行位：本次无对象可判（射程里没有 research/scripts/ 也没有 .claude/hooks/）"
+  modes_note="执行位：本次无对象可判（射程里没有 scripts/ 也没有 .claude/hooks/）"
 else
   modes_rc=0
   bash "$MODES" "${MODE_TARGETS[@]}" || modes_rc=$?
   if (( modes_rc == 77 )); then
     modes_note="执行位：本次未判（script-modes.sh 退 77，原因见它上面那一句）"
   elif (( modes_rc != 0 )); then
-    echo "  ✗ research/scripts/ 或 .claude/hooks/ 里的脚本执行位在暂存区里不对（上面逐处列出）"
+    echo "  ✗ scripts/ 或 .claude/hooks/ 里的脚本执行位在暂存区里不对（上面逐处列出）"
     echo "     → 怎么办：用 git update-index --chmod=+x <路径>（或 -x）改暂存区里的模式，让它与工作区一致"
     failed=1
     modes_note="执行位：判红"
@@ -1163,7 +1164,7 @@ if [[ ! -f "$DETECTOR" ]]; then
   echo "     → 怎么办：恢复 .claude/hooks/bash-command-detector.sh（判定只有那一份，门禁与执行前的钩子共用），再跑这一格：bash .claude/gate.d/${STAGE_NAME} --check research-gate-lint"
   failed=1
 elif ! bash "$DETECTOR" --scan-scripts "$ROOT" "${SAFETY_TARGETS[@]}"; then
-  echo "  ✗ research/scripts/、.claude/hooks/、.claude/scripts/ 或 .claude/gate.d/ 里有打得到别人进程的终止写法（上面逐处列出）"
+  echo "  ✗ scripts/、.claude/hooks/、.claude/scripts/ 或 .claude/gate.d/ 里有打得到别人进程的终止写法（上面逐处列出）"
   echo "     → 怎么办：照上面那句「怎么办」改；规矩是「后面的脚本不能终止前面的脚本」「不能动 ssh」「终止要按照任务号终止 禁止终止所有」，写法见 .claude/hooks/bash-command-detector.sh 文件头 ⑥"
   failed=1
 fi
@@ -1209,7 +1210,7 @@ exit "$failed"
 cell_fixture_claims() {
 LIB="$(cd "$STAGE_DIRECTORY/../.." && pwd)/.claude/singlefs-ai-sop/scripts/lib.sh"
 python_rc=0
-python3 - "${CODE_TOOLING_BREAK:-}" "$STAGE_REPOSITORY/research/scripts/gate-structure-check.py" <<'PY' || python_rc=$?
+python3 - "${CODE_TOOLING_BREAK:-}" "$STAGE_REPOSITORY/scripts/gate/gate-structure-check.py" <<'PY' || python_rc=$?
 import glob, importlib.util, os, re, sys
 sys.dont_write_bytecode = True
 
@@ -1614,14 +1615,14 @@ PY
 
 # ── 格 gate-structure：每道门禁有格名表，--list 与表一致且不起重活，--check 写错格名退 2
 #
-# 判据与起法都在 research/scripts/gate-structure-check.py（规则：.claude/rules/verification.md「门禁的结构」），这一格只调它、按它的退出码记：
+# 判据与起法都在 scripts/gate/gate-structure-check.py（规则：.claude/rules/verification.md「门禁的结构」），这一格只调它、按它的退出码记：
 #   0 绿；77（门禁目录里一道都没有）本次未跑；别的（1 结构不对、2 参数错、78 它自己的准入与运行条件没满足）都按红记。
 # 脚本取这一道所在的仓里那一份（取自 $0 的目录，不取项目根），判的是被判的根：样本仓里放坏的脚本碰不到它。判不了的见它文件头「判不了的」。
 # 样本：gate-structure-red 的 gate.d 里一道没有格名表、一道 --check 写错格名照跑退 0、一道 --list 打的与格名表不一致，必须逐道点名判红；
 #   gate-structure-green 两道都照规矩（格名表、--list 与表一致、--check 写错退 2），判绿并报查了 2 道。
 cell_gate_structure() {
-structure_check="$STAGE_REPOSITORY/research/scripts/gate-structure-check.py"
-[[ -f "$structure_check" ]] || { echo "  ✗ 找不到 $structure_check"; echo "     → 怎么办：它随仓走（research/scripts/gate-structure-check.py），被删了就从 git 找回来；别在这一格另写一份判法。"; exit 1; }
+structure_check="$STAGE_REPOSITORY/scripts/gate/gate-structure-check.py"
+[[ -f "$structure_check" ]] || { echo "  ✗ 找不到 $structure_check"; echo "     → 怎么办：它随仓走（scripts/gate/gate-structure-check.py），被删了就从 git 找回来；别在这一格另写一份判法。"; exit 1; }
 structure_exit=0
 python3 "$structure_check" "$ROOT" || structure_exit=$?
 [[ "${CODE_TOOLING_BREAK:-}" == structure-exit-ignored ]] && structure_exit=0

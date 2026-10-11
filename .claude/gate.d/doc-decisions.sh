@@ -143,7 +143,7 @@ GATE_DIRECTORY="$STAGE_DIR"
 REPO_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
 STAGE_RELATIVE_PATH=".claude/gate.d/$(basename "${BASH_SOURCE[0]}")"
 LIB_ITEM_REF_STATUS="$GATE_DIRECTORY/lib-item-ref-status.py"
-LIB_CHANGED_PATHS="$REPO_ROOT/research/scripts/changed-paths.sh"
+LIB_CHANGED_PATHS="$REPO_ROOT/scripts/gate/changed-paths.sh"
 # 生成器按本脚本所在的仓取、不按项目根：样本根里没有 .claude/scripts/（坑见格 blocking-verdict）
 GENERATOR="$REPO_ROOT/.claude/scripts/gen-decision-items.py"
 DECISION_ITEMS_WRITE=0
@@ -158,7 +158,7 @@ howto() { printf '     → %s\n' "$*"; }
 stage_cell kb-shape judge_kb_shape "kb 形状：分项只许一种叫法、kb 文件不链回自己、规则路径带 .claude/、决策标题与分项两节、索引页分项计数与正文相符" \
   "照这一格各段红行下面的出路改（分项叫法、自指链接、规则路径、决策标题与分项两节、索引页状态列）；状态列的计数以正文两节为准"
 stage_cell item-ref-status judge_item_ref_status "每一处「D<n>（简称） 已定项 k / 未定项 k」写的状态与正文分项表相符" \
-  "照红行把引用处写的「已定项 / 未定项」改成与那条决策正文分项表一致；分项改了号的，引用处跟着改号（research/scripts/relabel-item.py）"
+  "照红行把引用处写的「已定项 / 未定项」改成与那条决策正文分项表一致；分项改了号的，引用处跟着改号（scripts/kb/relabel-item.py）"
 stage_cell status-redundancy judge_status_redundancy "状态别说两遍：小节标题不带「—— 已定」、条目不同时写破折号与「状态：」、分项索引行挂在对的节" \
   "状态只在一处说：删掉小节标题里的「—— 已定」与条目里多出的那一种写法，挂错节的分项挪到它状态对应的那一节"
 stage_cell cross-decision-status judge_cross_decision_status "紧贴「D<n>（简称）」写「未定」，而那条决策的状态行不是待定" \
@@ -757,7 +757,7 @@ PY
 
 # ════ 格「分项引用状态」════
 # 每一处「D<n>（简称） 已定项 k / 未定项 k」都在断言那条分项的状态，权威是正文两节的索引表；扫 kb / records / research / crates 全域，含 .rs 注释。
-# 判据、出路与成功行在 lib-item-ref-status.py 的 main（格「冻结层归属登记表」与 research/scripts/relabel-item.py 也用这份库）。
+# 判据、出路与成功行在 lib-item-ref-status.py 的 main（格「冻结层归属登记表」与 scripts/kb/relabel-item.py 也用这份库）。
 # 样本：item-ref-status-red 判红。
 grid_item_ref_status() (
   python3 "$LIB_ITEM_REF_STATUS"
@@ -1167,8 +1167,8 @@ grid_settled_same_file() (
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，这一格跳过"; exit 77; }
 
   # 改动范围取共用脚本 changed-paths.sh，不另算一份（code-tooling 的 change-range-single-source 格判）；名单带未跟踪文件
-  # shellcheck source=../../research/scripts/changed-paths.sh
-  source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"; echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
+  # shellcheck source=../../scripts/gate/changed-paths.sh
+  source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"; echo "     → 怎么办：它随仓走（scripts/gate/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
   BASE="$(gate_diff_base gate)"
 
   # 名单先落到变量、判过退出码再读：git 失败时名单是空的，会被读成「本次没有新增已定小节」
@@ -2233,8 +2233,8 @@ load_diff_base() {
   local LIB_CHANGED_PATHS
   diff_base=""
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-  LIB_CHANGED_PATHS="$REPO_ROOT/research/scripts/changed-paths.sh"
-  # shellcheck source=../../research/scripts/changed-paths.sh
+  LIB_CHANGED_PATHS="$REPO_ROOT/scripts/gate/changed-paths.sh"
+  # shellcheck source=../../scripts/gate/changed-paths.sh
   source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用库 $LIB_CHANGED_PATHS"; echo "     → 怎么办：改动范围的取法只有那一份，恢复它，别在阶段里再抄一份。"; exit 1; }
   diff_base="$(gate_diff_base gate)" || { echo "  ✗ 共用库算不出 diff 基准"; echo "     → 怎么办：照上面 gate_diff_base 的报错修（多半是 GATE_BASE 写错了），再跑。"; exit 1; }
 }
@@ -2303,7 +2303,7 @@ cell_entry_added() {
 
 # ── history-loss：变更史整理不许丢 ──
 # 整理变更项（.claude/rules/changelog-format.md）不许丢数、编号、产物名、别的日期、引名。两份变更史各拿基准里那一版与现在的比：
-# research/scripts/history-consolidate.py loss-check（判法与出路在它的文件头），任一份退非 0 判红；都与基准无差异或基准里没有退 77。
+# scripts/kb/history-consolidate.py loss-check（判法与出路在它的文件头），任一份退非 0 判红；都与基准无差异或基准里没有退 77。
 cell_history_loss() {
   local diff_base checked=0 failed=0 hist base_copy rc
   if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -2318,7 +2318,7 @@ cell_history_loss() {
     base_copy="$(mktemp "${TMPDIR:-/tmp}/history-loss-base.XXXXXX")"
     git show "$diff_base:$hist" > "$base_copy"
     rc=0
-    python3 "$REPO_ROOT/research/scripts/history-consolidate.py" loss-check "$base_copy" "$hist" --repo "$PWD" --force > "$base_copy.out" 2>&1 || rc=$?
+    python3 "$REPO_ROOT/scripts/kb/history-consolidate.py" loss-check "$base_copy" "$hist" --repo "$PWD" --force > "$base_copy.out" 2>&1 || rc=$?
     checked=$((checked + 1))
     if ((rc != 0)); then
       failed=$((failed + 1))
@@ -2328,7 +2328,7 @@ cell_history_loss() {
     rm -f "$base_copy" "$base_copy.out"
   done
   if ((failed)); then
-    howto "红行列出的数或编号逐个补回那一块、改成指针或 git 引用；判法与出路在 research/scripts/history-consolidate.py 文件头。"
+    howto "红行列出的数或编号逐个补回那一块、改成指针或 git 引用；判法与出路在 scripts/kb/history-consolidate.py 文件头。"
     exit 1
   fi
   if ((checked == 0)); then

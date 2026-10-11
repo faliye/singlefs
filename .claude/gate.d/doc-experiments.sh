@@ -4,7 +4,7 @@
 # gate-stage: 实验页与产物（十格：索引行与正文标题、产物写回、产物与依据落在仓里、决策与实验双向登记、判决行的 false 被点名、复跑命令、实验号有正文、整行抄的产物行、上一轮记录已归档、多路径互证的登记）
 # gate-category: 文档类
 # 不声明 gate-covers：未实现清单（.claude/gate-not-implemented.tsv）里的两项判被测代码的行为，这一道只判文本。
-# gate-similar: checker-tier-research-build-and-replay.sh 它的 experiment-replay 格按 research/scripts/replay.sh 登记表逐条复跑装置、逐字节比产物，要编译、归重型；这一道只读登记表、实验页与产物的文本，判产物有没有被点名、判决行的 false 有没有被解释、整行抄的产物行找不找得到，不跑装置
+# gate-similar: checker-tier-research-build-and-replay.sh 它的 experiment-replay 格按 scripts/experiments/replay.sh 登记表逐条复跑装置、逐字节比产物，要编译、归重型；这一道只读登记表、实验页与产物的文本，判产物有没有被点名、判决行的 false 有没有被解释、整行抄的产物行找不找得到，不跑装置
 # gate-similar: doc-registries.sh 它的 experiment-refs 格判全 kb 里的实验号引用有定义，对象是引用；audit-contradictions 格核欠账表与里程碑收口表的引文在 kb 里找得到，方向是记录到 kb；segment-registry 格拿段序列登记表与 E142 的产物逐字比，对象是一份登记表。这一道判实验页、实验索引与产物本身，实验与决策之间的双向登记归这里的 decision-links 格，quoted-result-lines 格方向是 kb 与 research 正文到产物，multipath-registry 格还着 C48 可机检的那一半而不判欠账表本身
 # gate-similar: doc-process-records.sh 也用 gate 取法的改动范围、也读 research/prompts/，但它判三方与同步留下的记录写没写、点没点名；这一道判产物与依据落没落进仓、新判决回看没回看决策、上一轮记录归没归档
 # gate-similar: code-source-discipline.sh 它判每个实验二进制都有变异表、变异条目锚得住、钉绝对值的断言与读数纪律，对象是实验源码与变异表的内容；这一道的 evidence-in-repo 格只看这一轮改过的装置与变异表有没有一份不比它旧的产物
@@ -44,8 +44,8 @@ preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT
 
 STAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_REPOSITORY_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
-LIB_CHANGED_PATHS="$SCRIPT_REPOSITORY_ROOT/research/scripts/changed-paths.sh"
-ARCHIVE_SCRIPT="$SCRIPT_REPOSITORY_ROOT/research/scripts/archive-past-rounds.py"
+LIB_CHANGED_PATHS="$SCRIPT_REPOSITORY_ROOT/scripts/gate/changed-paths.sh"
+ARCHIVE_SCRIPT="$SCRIPT_REPOSITORY_ROOT/scripts/kb/archive-past-rounds.py"
 source "$STAGE_DIR/lib/stage-cells.sh"
 # 要「这次改动」的六格：选中的格里有它们之一，才去取改动范围
 CHANGE_RANGE_CELLS=" results-cited evidence-in-repo decision-links quoted-result-lines archive-past-rounds multipath-registry "
@@ -55,7 +55,7 @@ stage_cell index-sync cell_index_sync "实验索引行与正文标题说的是�
 stage_cell results-cited cell_results_cited "实验产物有没有写回" \
   "在 experiments.md 对应实验的口径段点名 research/results/ 下的产物；确实留不下的写明「原始输出未留存」与原因；点名了而树里与历史里都没有的改成现存的名字"
 stage_cell evidence-in-repo cell_evidence_in_repo "跑出来的产物与引来的依据都要落在仓里，不许只留在 /tmp" \
-  "跑一次把产物存进 research/results/ 并在 research/scripts/replay.sh 指到它；把 /tmp 下当依据的东西拷进仓里（报告进 research/prompts/，数进 research/results/），引用改指仓内路径"
+  "跑一次把产物存进 research/results/ 并在 scripts/experiments/replay.sh 指到它；把 /tmp 下当依据的东西拷进仓里（报告进 research/prompts/，数进 research/results/），引用改指仓内路径"
 stage_cell decision-links cell_decision_links "决策与实验双向登记，实验或结论变了之后回看过决策" \
   "实验页补「### 影响的决策」表、决策分项的「**依据**」段引回实验，实验或结论变了就回看并在表里写日期与「改了 / 不受影响：理由」：.claude/rules/format-evolution.md「决策与实验双向登记」"
 stage_cell verdict-false-named cell_verdict_false_named "实验产物判决行里的 false 字段有没有被实验页点名" \
@@ -67,7 +67,7 @@ stage_cell experiment-orphans cell_experiment_orphans "research 里的实验号�
 stage_cell quoted-result-lines cell_quoted_result_lines "kb 与 research 正文里整行抄的产物行，产物里逐字找得到" \
   "打开这个实验复跑命令登记的那份产物，把对应的 E7RESULT 行原样抄回来，别手改数；产物换了就连同引它的正文一起换"
 stage_cell archive-past-rounds cell_archive_past_rounds "上一轮及更早的实验记录已经归档进版本库，工作区里不留" \
-  "照这一格打出来的基准跑 python3 research/scripts/archive-past-rounds.py --apply 删掉上一轮的记录（不带基准会把这一次提交要带的也删掉）"
+  "照这一格打出来的基准跑 python3 scripts/kb/archive-past-rounds.py --apply 删掉上一轮的记录（不带基准会把这一次提交要带的也删掉）"
 stage_cell multipath-registry cell_multipath_registry "多条路径互证的实验，路径与共用项要登记且指得到" \
   "在实验页写「### 路径与结论登记」一节（形态见 .claude/rules/format-evolution.md），源码落点写现存路径、共用项写实；multipath-registry-lag.tsv 只缩不涨，补齐的删行"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
@@ -95,7 +95,7 @@ ROOT="${root_argument:-$SCRIPT_REPOSITORY_ROOT}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 ROOT="$(pwd)"
 
-# ── 改动范围：经共用库 research/scripts/changed-paths.sh 只取一次（基准 gate_diff_base gate），六格共用。
+# ── 改动范围：经共用库 scripts/gate/changed-paths.sh 只取一次（基准 gate_diff_base gate），六格共用。
 # 各格在自己的子 shell 里跑，所以在父进程里取、落进文件，各格只读。按 --check 选中的格判要不要取；样本根的 .gate-cells 在这之后才生效，那时按全部格取。
 # 取新增行失败时：results-cited 与 quoted-result-lines 退回全量判，evidence-in-repo 判红。
 # 没有上游、也没设 GATE_BASE 时基准是 HEAD，窗口只含工作区与暂存区：已提交没推的那几次不在里面。
@@ -117,7 +117,7 @@ for cell in "${STAGE_CELLS_SELECTED[@]}"; do
   [[ "$CHANGE_RANGE_CELLS" == *" $cell "* ]] && change_range_needed=1
 done
 if ((change_range_needed)); then
-  # shellcheck source=../../research/scripts/changed-paths.sh
+  # shellcheck source=../../scripts/gate/changed-paths.sh
   if source "$LIB_CHANGED_PATHS"; then changed_paths_library_loaded=1; fi
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     in_git_work_tree=1
@@ -249,7 +249,7 @@ cell_results_cited() {
   # replay.sh 登记的入库产物（行形状 编号|二进制|参数|产物|exact 或 timing，与 verdict-false-named、quoted-result-lines 格和
   # checker-tier-research-build-and-replay.sh 的 experiment-replay 格同一份）：名字像逐轮中间件（*.r<一位数>.out）的，登记了照样要被点名；
   # 读不了 replay.sh 时这种名字的产物全会被当成中间件跳过，所以有这种产物就判红。
-  REPLAY_TABLE=research/scripts/replay.sh
+  REPLAY_TABLE=scripts/experiments/replay.sh
   replay_table_readable=1
   REGISTERED=""
   if [[ -r "$REPLAY_TABLE" && -f "$REPLAY_TABLE" ]]; then
@@ -339,7 +339,7 @@ cell_results_cited() {
   # 少了这一道，第二道就退化成「正文里写个像文件名的串」：从没存在过的文件名与归档进历史的产物在正文里长得一样。
   if ((! changed_paths_library_loaded)); then
     echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"
-    echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"
+    echo "     → 怎么办：它随仓走（scripts/gate/changed-paths.sh），被删了就从 git 找回来。"
     exit 1
   fi
   BASE="" touched="" scope_note="全部的行（不在 git 仓里，判全部）"
@@ -408,12 +408,12 @@ cell_results_cited() {
 
 # ── 格 evidence-in-repo：跑出来的产物与引来的依据都要落在仓里，不许只留在 /tmp
 #
-# 判据一「实验跑了没留存」：改动范围里还在盘上的 research/e7-index-bench/src/bin/e<号>_*.rs 或 research/mutations/e<号>_*.tsv，
+# 判据一「实验跑了没留存」：改动范围里还在盘上的 scripts/experiments/e<号>_*.rs 或 scripts/mutation/tables/e<号>_*.tsv，
 #   research/results/ 下（含子目录）要有一份这个实验号的产物（文件名 e<号> 后面跟非数字或到头），且 mtime 不早于源码。
 #   登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）先按产物头的输入指纹判（admission.py 的 stored_product_status）：
 #   对得上就绿、对不上就红，mtime 不作数；一份带指纹的产物都没有才按 mtime 判。mtime 会被 git checkout / stash pop 刷新，指纹不会。
 #   只改了 // 注释的装置源码不判、成功行列名：按 path-moves.md 改注释里的路径碰不到产物。
-#   按要求才跑的实验（research/on-request-experiments.tsv 登记的）不要求新产物：装置比产物新时，实验页这一轮新加的行里要写
+#   按要求才跑的实验（scripts/experiments/on-request-experiments.tsv 登记的）不要求新产物：装置比产物新时，实验页这一轮新加的行里要写
 #   「没有正式跑」或「未正式跑」；页里早先那句说的是上一次改装置，不算。
 # 判据二「证据指向仓外」：.claude/kb/ 下全部 .md 与 research/prompts/ 下这一轮新写（新增或未跟踪）的 .md 里，
 #   依据词（citation_form）后面接 /tmp/ 路径就红。
@@ -475,13 +475,13 @@ from zoneinfo import ZoneInfo
 base = sys.argv[1]
 # argv[6] 为 1：在链接 worktree 里，修改时刻是检出时写的
 timestamps_from_checkout = sys.argv[6] == "1"
-# 输入指纹的算法只有 research/scripts/admission.py 一份（门禁与实验共用），不在这里另算。
+# 输入指纹的算法只有 scripts/gate/admission.py 一份（门禁与实验共用），不在这里另算。
 sys.path.insert(0, sys.argv[4])
 try:
     import admission
 except Exception as error:
     print(f"  ✗ 读不到准入模块 {sys.argv[4]}/admission.py：{error}")
-    print("     → 怎么办：恢复 research/scripts/admission.py（判「产物跟不跟得上输入」的指纹只有那一份算法），再跑这一格。")
+    print("     → 怎么办：恢复 scripts/gate/admission.py（判「产物跟不跟得上输入」的指纹只有那一份算法），再跑这一格。")
     sys.exit(1)
 
 def read_list(path):
@@ -496,11 +496,11 @@ kb_dir = ".claude/kb"
 prompts_dir = "research/prompts"
 
 source_forms = (
-    (re.compile(r"^research/e7-index-bench/src/bin/e([0-9]+)_[^/]*\.rs$"), "装置源码"),
-    (re.compile(r"^research/mutations/e([0-9]+)_[^/]*\.tsv$"), "变异表"),
+    (re.compile(r"^scripts/experiments/e([0-9]+)_[^/]*\.rs$"), "装置源码"),
+    (re.compile(r"^scripts/mutation/tables/e([0-9]+)_[^/]*\.tsv$"), "变异表"),
 )
 product_form = re.compile(r"^e([0-9]+)(?![0-9])")
-on_request_list = "research/on-request-experiments.tsv"
+on_request_list = "scripts/experiments/on-request-experiments.tsv"
 on_request_numbers = set()
 if os.path.isfile(on_request_list):
     with open(on_request_list, encoding="utf-8") as handle:
@@ -664,7 +664,7 @@ if unstored_runs:
     print("  ✗ 这些实验装置与变异表这一轮改了，research/results/ 里却没有一份不比它旧的产物——这一跑多半只留在 /tmp 的草稿里：")  # gate-lint:summary
     for entry in unstored_runs:
         print(f"     {entry}")  # gate-lint:detail
-    print(f"     → 怎么办：跑一次把产物存进 {results_dir}/，并在 research/scripts/replay.sh 把这个实验的登记行指到它。")
+    print(f"     → 怎么办：跑一次把产物存进 {results_dir}/，并在 scripts/experiments/replay.sh 把这个实验的登记行指到它。")
     print("               这一跑已经跑过、产物还在 /tmp 的草稿目录里，就现在拷进来（会话一重启那个目录就没了）；")
     print("               只改了 // 注释的装置这一格不判；改了字符串里的路径，照 .claude/rules/path-moves.md 第 4 条连同留存产物一起改，复跑仍逐字相同。")
     print("               登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）按产物头的输入指纹判：指纹对不上就是产物跟不上今天的输入，")
@@ -674,14 +674,14 @@ if fingerprint_errors:
     print("  ✗ 这些实验登记了准入，却算不出输入指纹，判不了产物跟不跟得上：")  # gate-lint:summary
     for entry in fingerprint_errors:
         print(f"     {entry}")  # gate-lint:detail
-    print("     → 怎么办：单跑 python3 research/scripts/admission.py experiment . E<号> 看它报什么；多半是 .claude/gate.d/stage-inputs.tsv 那一行的路径写错，")
+    print("     → 怎么办：单跑 python3 scripts/gate/admission.py experiment . E<号> 看它报什么；多半是 .claude/gate.d/stage-inputs.tsv 那一行的路径写错，")
     print("               或 cargo -V / rustc -V 跑不出来（bash .claude/scripts/env.sh 报缺什么）。")
 if on_request_missing_note:
     failed = True
     print("  ✗ 这些按要求才跑的实验装置改了、没有新产物，实验页也没写明之后没有正式跑：")  # gate-lint:summary
     for entry in on_request_missing_note:
         print(f"     {entry}")  # gate-lint:detail
-    print("     → 怎么办：不用跑（research/on-request-experiments.tsv 里的实验只在用户说跑时才跑）；")
+    print("     → 怎么办：不用跑（scripts/experiments/on-request-experiments.tsv 里的实验只在用户说跑时才跑）；")
     print("               这一轮在实验页新写一句「装置某日改过（改了什么），之后没有正式跑」，要数的时候等用户说跑；页里早先那句说的是上一次改装置，不算。")
 if outside_citations:
     failed = True
@@ -705,7 +705,7 @@ if failed:
 
 print(f"  ✓ 产物与依据都落在仓里（判了 {len(changed_sources) - len(timestamp_unjudged)} 份这一轮改过的实验装置与变异表、{len(set(scanned_files))} 份 .md，扫到 {tmp_mentions} 处 /tmp 路径、没有一处是引依据；基准 {base}）")
 if not changed_sources:
-    print("    没判：这次改动没碰 research/e7-index-bench/src/bin/ 与 research/mutations/，判据一这一半没有对象")
+    print("    没判：这次改动没碰 scripts/experiments/ 与 scripts/mutation/tables/，判据一这一半没有对象")
 print(f"    没判 {skipped_prompt_files} 份 {prompts_dir} 下这一轮没新写的 .md（登记在 .claude/doc-lint-exclude 的原样保存证据，改不得）")
 if comment_only_sources:
     print(f"    没判 {len(comment_only_sources)} 份只改了 // 注释的装置源码（碰不到产物，不要求重跑）：{'、'.join(comment_only_sources)}")
@@ -750,7 +750,7 @@ PY
 # 管不到的：回看写的理由对不对、关系判得对不对（支撑写成不影响也过得了③以外的判据），靠人与抽查；
 # 实验正文只用编号不用「D<号>（」形态提到的决策，①看不见。
 #
-# 只删与所属标题相同的行内日期、只把同一天的第二个小节并进第一个的改动，不算「正文改了」（判法借 research/scripts/doc-consolidate.py，
+# 只删与所属标题相同的行内日期、只把同一天的第二个小节并进第一个的改动，不算「正文改了」（判法借 scripts/kb/doc-consolidate.py，
 # 两版整理后的正文按行排序逐字相同就是），样本 decision-links-formatting-green 判绿、成功行报「不算正文改了 1 份」。
 # 样本：decision-links-red 在一个临时仓里把上面每一条各犯一次（want 逐条点名）；decision-links-green 放瘦身的与没瘦身的决策、
 # 待回填清单、结论作废的实验、这次改动改了正文与产物又回看了表、新判决带「## 回看决策」、搬了家的实验页，必须判绿并报对数。
@@ -767,7 +767,7 @@ cell_decision_links() {
     in_git=1
     if ((! changed_paths_library_loaded)); then
       echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"
-      echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"
+      echo "     → 怎么办：它随仓走（scripts/gate/changed-paths.sh），被删了就从 git 找回来。"
       exit 1
     fi
     base="$shared_base"
@@ -778,7 +778,7 @@ cell_decision_links() {
     fi
     changed_list="$SHARED_CHANGED_PATHS"
   fi
-  # 只删同日日期、只并同日小节的改动不算「正文改了」：判法借 research/scripts/doc-consolidate.py（门禁 doc-text 的 date-once 格用同一份）
+  # 只删同日日期、只并同日小节的改动不算「正文改了」：判法借 scripts/kb/doc-consolidate.py（门禁 doc-text 的 date-once 格用同一份）
   DOC_CONSOLIDATE="$(dirname "$LIB_CHANGED_PATHS")/doc-consolidate.py"
   export DOC_CONSOLIDATE
   python3 - "$ROOT" "$base" "$in_git" "$changed_list" <<'PY'
@@ -1151,7 +1151,7 @@ _consolidate = None
 
 
 def consolidate_module():
-    """research/scripts/doc-consolidate.py：读不到就当没有这一层判法（改动照样算正文改了）。"""
+    """scripts/kb/doc-consolidate.py：读不到就当没有这一层判法（改动照样算正文改了）。"""
     global _consolidate
     if _consolidate is None:
         path = os.environ.get('DOC_CONSOLIDATE', '')
@@ -1290,7 +1290,7 @@ PY
 
 # ── 格 verdict-false-named：实验产物判决行里的 false 字段有没有被实验页点名
 #
-# 判据：research/scripts/replay.sh 登记的入库产物（在 research/results/ 下的）里，以 `E7RESULT name=verdict ` 开头的判决行，
+# 判据：scripts/experiments/replay.sh 登记的入库产物（在 research/results/ 下的）里，以 `E7RESULT name=verdict ` 开头的判决行，
 # 每个 `字段=false` 都要在对应实验号的实验页（.claude/kb/experiments/<号>-*.md）里被点名，否则判红。不开豁免。
 # 射程只认这个字面形式：源码里有 name=verdict_candidate / _base / _unit 这几种变体，没落进入库产物，出现了这一格看不见。
 #
@@ -1302,7 +1302,7 @@ PY
 # 样本：verdict-false-named-red 里三个没点名的 false（一个在正文里只写字段名、一个点名的那一行标着上一次跑、一个根本没提）；
 # verdict-false-named-green 里一个在最新历史条目点名、一个实验页文件名补了零；verdict-false-named-zero 的登记表一行都读不到。
 cell_verdict_false_named() {
-  REPLAY=research/scripts/replay.sh
+  REPLAY=scripts/experiments/replay.sh
   [[ -f "$REPLAY" ]] || { echo "  ! 找不到 $REPLAY，这一格无对象可判"; exit 77; }
 
   python3 - "$REPLAY" <<'PY'
@@ -1461,14 +1461,14 @@ PY
 # ── 格 repro-command：跑过的实验有没有留下复跑命令
 #
 # 判据：实验页点名了 research/results/ 里的产物，就要写出怎么把它跑出来：一条 `cargo run --release --bin X`，
-# 或者点名复跑入口 research/scripts/replay.sh / research/scripts/vm-bench.sh；提到 mutate.sh 这类别的脚本不算，它们跑不出那份产物。
+# 或者点名复跑入口 scripts/experiments/replay.sh / scripts/devices/vm-bench.sh；提到 mutate.sh 这类别的脚本不算，它们跑不出那份产物。
 # 写明「原始输出未留存」的页不判、成功行列名。读不了的页判红（grep 出错与「没点产物」不是一回事）；一页 .md 都没有、或没有一页点产物，退 77。
 # 样本：repro-command-red 里一页点了产物却只提到变异脚本；repro-command-green 里一页写了 cargo run、一页写明原始输出未留存。
 cell_repro_command() {
   EXP_DIR=.claude/kb/experiments
   [[ -d "$EXP_DIR" ]] || { echo "  ! 找不到 $EXP_DIR，这一格跳过"; exit 77; }
   PRODUCT_RE='research/results/[A-Za-z0-9._-]+\.out'
-  REPRO_RE='cargo run --release --bin |research/scripts/(replay|vm-bench)\.sh'
+  REPRO_RE='cargo run --release --bin |scripts/(replay|vm-bench)\.sh'
 
   bad=(); unreadable=(); exempt=(); pointing=0
   for f in "$EXP_DIR"/*.md; do
@@ -1494,11 +1494,11 @@ cell_repro_command() {
     echo "  ✗ 这些实验点了产物却没写复跑命令，读的人只能靠反推："
     printf '      %s\n' "${bad[@]}"
     echo "  → 怎么办：在正文的口径一节补一句，格式与别处一致——"
-    echo "    代码 \`research/e7-index-bench/src/bin/eNN_xxx.rs\`（\`cargo run --release --bin eNN-xxx\`），"
+    echo "    代码 \`scripts/experiments/eNN_xxx.rs\`（\`cargo run --release --bin eNN-xxx\`），"
     echo "    原始输出 \`research/results/eNN-xxx-YYYY-MM-DD.out\`。"
     echo "    多次运行拼起来的产物，要把那个循环也写出来（种子、参数各扫了哪些值）。"
     echo "    要真设备 / 虚机因而没留产物的，正文写明「原始输出未留存」，这一格就不管它。"
-    echo "    复跑入口只认 cargo run --release --bin 与 research/scripts/replay.sh、research/scripts/vm-bench.sh；提到 mutate.sh 这类别的脚本不算。"
+    echo "    复跑入口只认 cargo run --release --bin 与 scripts/experiments/replay.sh、scripts/devices/vm-bench.sh；提到 mutate.sh 这类别的脚本不算。"
     exit 1
   fi
   if ((pointing == 0)); then
@@ -1514,7 +1514,7 @@ cell_repro_command() {
 # 判据：research/ 下（逐层往下扫，target/ 不扫）以 eNN 命名的东西（提示、产物、源码、变异表、数据），以及
 # crates/singlefs-checker-tier/src/bin/ 下的实验装置（eNN_*.rs），kb/experiments/ 里都要有对应编号的正文：跑过的东西没入库，
 # 会以「我们量过」的形式活在对话里，谁也复核不了。results-cited 格按名字排除的（*local* 这类）也在这里判到。
-# 样本：experiment-orphans-red 里 research/data/ 与 crates/singlefs-checker-tier/src/bin/ 下各一个 kb 里没有正文的实验号；
+# 样本：experiment-orphans-red 里 scripts/data/ 与 crates/singlefs-checker-tier/src/bin/ 下各一个 kb 里没有正文的实验号；
 # experiment-orphans-green 里的实验号都有正文。
 cell_experiment_orphans() {
   EXP_DIR=.claude/kb/experiments
@@ -1522,7 +1522,7 @@ cell_experiment_orphans() {
 
   have=$(ls "$EXP_DIR" | grep -oE '^[0-9]+' | sed 's/^0*//' | sort -un)
   # 射程逐个目录报：不在的列进成功行，读不了的（find 出错）判红——射程静默缩小与判过了在输出里长得一样
-  SCOPE_DIRS=(research crates/singlefs-checker-tier/src/bin)
+  SCOPE_DIRS=(research scripts/experiments scripts/mutation/tables crates/singlefs-checker-tier/src/bin)
   absent=(); names_file="$(mktemp)"; errors_file="$(mktemp)"
   trap 'rm -f "$names_file" "$errors_file"' EXIT
   for d in "${SCOPE_DIRS[@]}"; do
@@ -1567,7 +1567,7 @@ cell_experiment_orphans() {
 # 射程（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）：
 #   1. 只认整行。句中反引号里的片段、按字段转述成一句话的数，一概不判。
 #   2. 不按实验号配对：正文允许引别的实验的产物（E152 引 E142 的 write_list）。代价是两个实验恰好吐出同一行时，
-#      引错了实验认不出来。**这次改动新增或改写的行只对照 `research/scripts/replay.sh` 登记着的产物**
+#      引错了实验认不出来。**这次改动新增或改写的行只对照 `scripts/experiments/replay.sh` 登记着的产物**
 #      （树里还留着的旧一轮产物不算：登记的已经是新一轮，正文却新抄了旧一轮的行，就是「重跑之后正文没跟」）；
 #      登记的产物已归档出了树的，去版本库历史里取它最后那一版。退回全量判时照旧对照全部产物加全部归档。
 #   3. 历史节里的旧行不判：旧产物被删掉之后，历史节里留着当时抄的那一行是对的。
@@ -1581,7 +1581,7 @@ cell_quoted_result_lines() {
   # 改动范围用这一道开头取的那一份（新增行里未跟踪的文件整份算新增）。
   if ((! changed_paths_library_loaded)); then
     echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"
-    echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"
+    echo "     → 怎么办：它随仓走（scripts/gate/changed-paths.sh），被删了就从 git 找回来。"
     exit 1
   fi
   SCOPE_BASE=""
@@ -1594,7 +1594,7 @@ cell_quoted_result_lines() {
   python3 - <<'PY'
 import glob, os, subprocess, sys
 
-# 射程含 research/ 下的正文（research/perf-by-milestone.md 也整行抄产物）；冻结证据目录不判：
+# 射程含 research/ 下的正文（scripts/experiments/perf-by-milestone.md 也整行抄产物）；冻结证据目录不判：
 # research/prompts/ 按 evidence-discipline 不许事后改，research/results/ 是被比对的一方。
 import re
 kb = sorted(f for f in glob.glob('.claude/kb/**/*.md', recursive=True)
@@ -1629,7 +1629,7 @@ if not quoted:
     sys.exit(77)
 
 # 登记的产物：replay.sh 登记表每一行的第 4 列（与 verdict-false-named 格、experiment-replay 格同一个形状）
-REPLAY = 'research/scripts/replay.sh'
+REPLAY = 'scripts/experiments/replay.sh'
 ROW_RE = re.compile(r'^(E[0-9]+)\|([^|]*)\|([^|]*)\|([^|]*)\|(exact|timing)$')
 registered = None
 if os.path.isfile(REPLAY):
@@ -1736,7 +1736,7 @@ PY
 
 # ── 格 archive-past-rounds：上一轮及更早的实验记录已经归档进版本库，工作区里不留
 #
-# 规则：.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」之下那三段；判法与保留哪几类在 research/scripts/archive-past-rounds.py。
+# 规则：.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」之下那三段；判法与保留哪几类在 scripts/kb/archive-past-rounds.py。
 # 基准是这一道开头取的 gate_diff_base gate（与 doc-process-records.sh 的 knowledge-sync 格同一个），经 GATE_BASE 交给脚本，出路里打出的基准就是这个提交。
 # 判别力：fixtures/doc-experiments.sh/archive-past-rounds-red 是一个留着上一轮产物的小仓，必须判红；
 # archive-past-rounds-green 只有本轮的，必须判绿。
@@ -1788,7 +1788,7 @@ cell_multipath_registry() {
   if ((in_git_work_tree)); then
     if ((! changed_paths_library_loaded)); then
       echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"
-      echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"
+      echo "     → 怎么办：它随仓走（scripts/gate/changed-paths.sh），被删了就从 git 找回来。"
       exit 1
     fi
     base="$shared_base"

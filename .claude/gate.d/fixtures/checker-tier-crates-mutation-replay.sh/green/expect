@@ -14,6 +14,6 @@ want=判定库记录：复用抓到 0 条、复用基线 ok 0 行
 want=复用：现判 5 条（一律现跑 0、行新加或改了 0、没有覆盖记录 5、被变异的函数变了 0、执行过的函数变了 0、函数外有改动 0）、按覆盖复用 0 条
 want=覆盖：这一趟记了 4 组（cargo 参数 + 点名用例），那份快照上已有、沿用 0 组，没记成 0 组
 want=✓ add-becomes-multiply：adds_two_and_three_to_five 红了（现判：没有覆盖记录）
-want=双机分片：没分（本地配置判不过；单跑 bash research/scripts/layer0-shard-configuration-check.sh 看原因），整张表在本机判
+want=双机分片：没分（本地配置判不过；单跑 bash scripts/crash/layer0-shard-configuration-check.sh 看原因），整张表在本机判
 want=── 汇总：checker-tier-crates-mutation-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
 want=crates-mutation-rows：绿

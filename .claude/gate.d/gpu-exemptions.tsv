@@ -5,7 +5,7 @@
 #   ② 代码标记名：写在代码里的那一整句，恰好是「// gpu-exempt: <截名>」；写在那一截不走 GPU 的计算的函数上一行（标记由实现那一路加）
 #   ③ 为什么上不了 GPU：至少 8 个字
 #   ④ 用户点头日期：YYYY-MM-DD。每加一行都要用户点头（用户「除非明确的豁免」）；记录核对器判一张镜像，照「能走 GPU 的必须走」上 GPU，不进这张表
-# 核法在 research/scripts/gpu-exemptions-check.py（门禁 code-source-discipline 的 gpu-exemptions 格调它）：代码里每一处标记都有表行、每一行都有标记。
+# 核法在 scripts/crash/gpu-exemptions-check.py（门禁 code-source-discipline 的 gpu-exemptions 格调它）：代码里每一处标记都有表行、每一行都有标记。
 writable-mount	// gpu-exempt: writable-mount	要在崩溃态上真跑 Rust 实现的可写挂载路径（singlefs-core 的挂载），被测对象就是这段实现，GPU 上没有它的另一份	2026-10-10	# 可写挂载
 continuation	// gpu-exempt: continuation	挂载之后接着做的续做（删除续做这一类）是真跑 Rust 实现的写路径，被测对象就是它	2026-10-10	# 续做
 second-crash-during-mount	// gpu-exempt: second-crash-during-mount	要录下可写挂载那一趟 Rust 实现发出的写、再在它上面造第二次崩溃，那一份写表只有在 CPU 上真跑实现才录得到	2026-10-10	# 挂载途中二次崩溃

@@ -6,4 +6,4 @@ want=旧名
 want=── 汇总：doc-text.sh 跑了 1 格（样本根的 .gate-cells 点名）
 want=  term-renames：红（退出 1）
 want=doc-text.sh：1 格里 1 格红（term-renames）
-want=→ term-renames：python3 research/scripts/sweep-term.py --apply 一次换完
+want=→ term-renames：python3 scripts/kb/sweep-term.py --apply 一次换完

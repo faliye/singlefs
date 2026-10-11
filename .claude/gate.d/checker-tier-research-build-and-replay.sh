@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 要 cargo：缺了就在单测那一格判红、复跑那一格由它调的 research/scripts/replay.sh 编实验二进制时判红，不交给 gate.sh 预判；此外只要跑门禁本身就要的 bash、git、python3
+# run-condition: none 要 cargo：缺了就在单测那一格判红、复跑那一格由它调的 scripts/experiments/replay.sh 编实验二进制时判红，不交给 gate.sh 预判；此外只要跑门禁本身就要的 bash、git、python3
 # gate-stage: research 工作区的构建与单测；入库的实验数今天还复现得出来吗
 # gate-category: checker-tier 类
 # gate-similar: harness-model-differential-and-scenarios.sh 它也经内存包装跑 release 的 cargo test，但编的是仓根的 crates 工作区、判的是模型对拍那几段；这里编的是 research 工作区，两个工作区互相看不到对方，编译产物不共用，并进来反而要多编一份
@@ -13,15 +13,15 @@
 #   research-unit-tests  每次都跑：cargo build --release 编整个 research 工作区，再 cargo test --release。
 #                        上游「构建与单测」只编 crates/，kb 里实测结论背后的实验二进制只有这一格编。
 #   experiment-replay    .claude/gate.d/stage-inputs.tsv 里本阶段那一行的路径相对上次整轮全绿那棵暂存树没变就退 77
-#                        （为什么按树、按一条 ref、不看工作区，写在 research/scripts/stage-must-run.sh 文件头）；
+#                        （为什么按树、按一条 ref、不看工作区，写在 scripts/gate/stage-must-run.sh 文件头）；
 #                        再问 change-touches-crates.sh，前缀不含 research/prompts/（冻结证据改不了实验输出）。
-#                        派给 research/scripts/replay.sh 的是表里的 exact 行减掉 SLOW；SLOW 里的与表里每一行 timing 都逐个列成「没派」。
+#                        派给 scripts/experiments/replay.sh 的是表里的 exact 行减掉 SLOW；SLOW 里的与表里每一行 timing 都逐个列成「没派」。
 #                        对不上不一定是代码坏了，也可能是产物该更新，两种都要人判，所以判红。
 #                        C8（门禁范围判不出来）还欠按布局算受影响集合，这里按前缀判只是它的粗粒度前身。
 # 格结构经 lib/stage-cells.sh。
 #
 # 读的环境变量：
-#   GATE_RESEARCH_BUILD_MEMORY_MAX  cargo test 经 research/scripts/run-with-memory-cap.sh 跑的内存上限，没设取 8G；谁跑这一道外面都不再包一层。
+#   GATE_RESEARCH_BUILD_MEMORY_MAX  cargo test 经 scripts/hosts/run-with-memory-cap.sh 跑的内存上限，没设取 8G；谁跑这一道外面都不再包一层。
 #                                   包装退 245 或 250–254 不是单测的判定，单独判红、单独给出路。cargo build 不跑编出来的代码，不经包装。
 #   GATE_REPLAY_FULL=1              复跑那一格连 SLOW 与 timing 行一起跑
 #
@@ -34,7 +34,7 @@
 #
 # 样本：fixtures/checker-tier-research-build-and-replay.sh/ 下四份，各放 .gate-cells 只点名它判的那一格：
 #   research-unit-tests-red    research 工作区里有一条单测红着的小仓，判红
-#   research-unit-tests-green  一条单测全绿、research/scripts/ 下一份脚本都没有，判绿，成功行报一个测试批次
+#   research-unit-tests-green  一条单测全绿、scripts/ 下一份脚本都没有，判绿，成功行报一个测试批次
 #   green                      带假 replay.sh 的小仓，表里一行快的 exact、一行 SLOW 里的 exact、一行 SLOW 里只有 timing 的；
 #                              快的那行派给 replay.sh，另两行逐个列进「没派」
 #   red                        表一行都没有，判红
@@ -75,8 +75,8 @@ while (($#)); do
 done
 ROOT="${root_argument:-$STAGE_REPOSITORY}"
 cd "$ROOT" || exit 2
-R=research
-REPLAY_SCRIPT="$R/scripts/replay.sh"
+R=scripts/experiments
+REPLAY_SCRIPT="scripts/experiments/replay.sh"
 
 # replay.sh 表里的行：编号|二进制|参数|产物|exact 或 timing。门禁靠这个形状取行，改表格式要同时改这里。
 replay_rows_of_kind() { sed -n "s/^\(E[0-9]*\)|[^|]*|[^|]*|[^|]*|$1\$/\1/p" "$REPLAY_SCRIPT" 2>/dev/null; }
@@ -127,7 +127,7 @@ cell_research_unit_tests() {
     echo "     → 怎么办：装 Rust 工具链（curl https://sh.rustup.rs -sSf | sh），"
     echo "               或把已装的 cargo 放进 PATH。跳过这一步等于 research/ 的数字没人验过。"
     exit 1; }
-  MEMORY_CAP_RUNNER="$STAGE_REPOSITORY/research/scripts/run-with-memory-cap.sh"
+  MEMORY_CAP_RUNNER="$STAGE_REPOSITORY/scripts/hosts/run-with-memory-cap.sh"
   RESEARCH_BUILD_MEMORY_MAX="${GATE_RESEARCH_BUILD_MEMORY_MAX:-8G}"
   if [[ ! "$RESEARCH_BUILD_MEMORY_MAX" =~ ^[1-9][0-9]*[KMGT]$ ]]; then
     echo "  ✗ GATE_RESEARCH_BUILD_MEMORY_MAX 写成了「$RESEARCH_BUILD_MEMORY_MAX」，内存包装不认（或认成字节数）：这一格没跑"
@@ -148,9 +148,9 @@ cell_research_unit_tests() {
   rc=$?
   if (( rc == 245 || (rc >= 250 && rc <= 254) )); then
     tail -8 <<<"$out" | sed 's/^/     /'
-    echo "  ✗ research 的构建与单测没判出结果：内存包装 research/scripts/run-with-memory-cap.sh 退 $rc（上限 $RESEARCH_BUILD_MEMORY_MAX），这一次的输出不算判定"
+    echo "  ✗ research 的构建与单测没判出结果：内存包装 scripts/hosts/run-with-memory-cap.sh 退 $rc（上限 $RESEARCH_BUILD_MEMORY_MAX），这一次的输出不算判定"
     echo "     → 怎么办：照包装文件头「退出码」一段办：250 是这一格要的比上限多，把 GATE_RESEARCH_BUILD_MEMORY_MAX 设大再跑；"
-    echo "               251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；不拿掉包装跑。"
+    echo "               251、252、254 先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；不拿掉包装跑。"
     echo "               253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑。245 是同一段时间内核报了显存不够：nvidia-smi 看谁在用卡，等它跑完再重跑这一格。"
     exit 1
   fi
@@ -181,17 +181,17 @@ cell_experiment_replay() {
     echo "  ✓ 只复跑了点名的 ${#named_experiments[@]} 个实验：${named_experiments[*]}（其中准入判「输入没变」而没跑的，见上面 replay.sh 汇总里那一行）；这不是整格结论"
     exit 0
   fi
-  source "$STAGE_REPOSITORY/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一格要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一格按红记。"; exit 1; }
-  stage_run_or_skip "$STAGE_REPOSITORY/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
+  source "$STAGE_REPOSITORY/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一格要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一格按红记。"; exit 1; }
+  stage_run_or_skip "$STAGE_REPOSITORY/scripts/gate/stage-must-run.sh" "复用上一次整轮全绿的判定" \
     "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一格读哪几条路径见 .claude/gate.d/stage-inputs.tsv 里 ${STAGE_NAME} 那一行。" -- "$ROOT" "$STAGE_NAME"
-  stage_run_or_skip "$STAGE_REPOSITORY/research/scripts/change-touches-crates.sh" "这次改动没碰它判的东西" \
-    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；判据与前缀见 research/scripts/change-touches-crates.sh。" \
-    -- "$ROOT" crates/ research/e7-index-bench/ research/scripts/ research/results/
+  stage_run_or_skip "$STAGE_REPOSITORY/scripts/gate/change-touches-crates.sh" "这次改动没碰它判的东西" \
+    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；判据与前缀见 scripts/gate/change-touches-crates.sh。" \
+    -- "$ROOT" crates/ scripts/experiments/ scripts/ research/results/
   # 跑哪些、没跑哪些都从 replay.sh 的表里现算，不写死清单：写死的清单漏掉新加的实验，「没跑」那句就成了假话
   # （.claude/singlefs-ai-sop/rules/show-me-test.md「门禁不许假装通过」）。
   mapfile -t ALL_EXACT < <(replay_rows_of_kind exact)
   if ((${#ALL_EXACT[@]} == 0)); then
-    echo "  ✗ 从 research/scripts/replay.sh 里一行都没读到——表的格式变了？"
+    echo "  ✗ 从 scripts/experiments/replay.sh 里一行都没读到——表的格式变了？"
     echo "    → 本阶段靠 '编号|二进制|参数|产物|exact' 这个形状取行，改表格式要同时改这里。"
     exit 1
   fi

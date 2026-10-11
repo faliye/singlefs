@@ -5,7 +5,7 @@
 #   这些行里出现过的每个测试目标恰好一行；改坏对象不在核心代码下的行不登记，它们的测试目标也不要求登记。
 #   新出现的测试目标取它在核心行里行号最小的那一条成形的行。已登记的那一行还在、仍在核心代码下、测试目标没变就不跟着变异表的次序换；
 #   那一行被删、改名、改了测试目标或改坏对象挪出了核心代码，换成同一个测试目标在核心行里剩下行号最小的那一条。
-#   核法与缺行时该补哪一行：python3 research/scripts/crates-mutation-light-rows.py check（门禁 code-source-discipline 的 mutation-light-rows 格调它）。
+#   核法与缺行时该补哪一行：python3 scripts/mutation/crates-mutation-light-rows.py check（门禁 code-source-discipline 的 mutation-light-rows 格调它）。
 # 2026-10-10 照挑法生成：变异表 3774 条成形的行里 1396 条改坏对象在 crates/singlefs-core/src/ 下，涉及 171 个测试目标，171 行。
 逐盘核退回只核总数	-p singlefs-core --lib
 空闲不随分配减（I-5.2 要红）	-p singlefs-harness --test overwrite_in_one_instance
@@ -51,7 +51,7 @@ C318 实现：准入读数的「被抛弃根独占量」不取影子账隔离的
 C394（释放判定不核映射条目位置项里的单元校验和）：释放之前读盘核校验和那一核拿掉（位置项的校验和比不比都当对得上），被改坏的那一份照常回到空闲池	-p singlefs-harness --test release_checksum_quarantine
 并行线一：C490：extent 叶记录 key 的 offset 段写成单元序号（并行线一验收第 4 条第二个变异：读回错位判红）	-p singlefs-harness --test sequential_write_split_into_one_unit_transactions
 K2：extent 树下段根的层级取「罩的单元数大于单元数」的最低一层（144 个单元装满一片叶时白长一层）	-p singlefs-harness --test multi_unit_file_write_and_read
-并行线一：层 0：共享内生块挪到第一条记录里点名（里程碑并行线一验收第 4 条第一个变异「提交标记提前到第一条记录」在一事务一记录下的形态：半次发布施加上去）	-p singlefs-checker-tier --test crash_enumeration_multi_record_publish_stream
+并行线一：层 0：一次多条记录的发布每条记录都带末条标志（里程碑并行线一验收第 4 条第一个变异「提交标记提前到第一条记录」：崩在记录之间时半次发布施加上去）	-p singlefs-checker-tier --test crash_enumeration_multi_record_publish_stream
 C518（一次挂载之内环转过一圈之后不回收）：挂载内不按根环表回收（表照记、谓词放行的槽留在 defer 里）	-p singlefs-harness --test root_ring_turn_in_one_mount
 C518（一次挂载之内环转过一圈之后不回收）：挂载内不回收时，环转过 (1, 5) 之后那一版的记账又多于遍历（C518 那一处）	-p singlefs-harness --test checker_known_bad_images
 增补 2 收口表第 39 行那一族：取号之前的预演取不到落点也照样取号（240 槽小盘上可写挂载取号之后才被落点拒绝、盘上已经写了）	-p singlefs-harness --test admission_raises_the_floor_before_refusing
@@ -178,3 +178,4 @@ I-2.4 根记录的树表指针只判 extent 偏移（树表指针算法类型 1 
 第49批 W3 补做 ckpt_cost：记账树那一项退回拿上一版的节点数（台阶行跨过一片叶那次少算）	-p singlefs-harness --test accounting_tree_grows_a_level_when_inode_number_watermark_steps_cross_one_leaf
 第 50 批 R1：退役记录的死亡 txg 取这次发布的前一个 txg（不是身份消失那一次）	-p singlefs-harness --test inode_leaf_absorb_and_borrow_on_the_unlink_path
 第53批 F1 M3 先查左邻：随机历史上发布路径与按条款另写的叶形状参照逐次比（攻方 M4）	-p singlefs-harness --test inode_leaf_merge_and_borrow_against_an_independent_reference
+第57批 H1 写侧早关一片（攻方 w-close-one-early：旋钮 K ≥ 2 装 K − 1 条就开新片）	-p singlefs-harness --release --test container_trees_grow_a_level_when_the_root_is_full

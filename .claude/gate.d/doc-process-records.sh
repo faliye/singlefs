@@ -22,7 +22,7 @@
 #   bash .claude/gate.d/doc-process-records.sh --list                                逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-process-records.sh --check <格名>[,<格名>…] [项目根]     只跑点名的格（例：材料员开工只跑 implementation-premise）
 #
-# 改动范围只经 research/scripts/changed-paths.sh 取（基准怎么定见它的 gate_diff_base），每种取法这一趟只取一次、各格共用：
+# 改动范围只经 scripts/gate/changed-paths.sh 取（基准怎么定见它的 gate_diff_base），每种取法这一趟只取一次、各格共用：
 #   gate 取法（含工作区、暂存区与未跟踪）：verdict-names-local-samples 只用其中新增的，crates-adversarial-review、knowledge-sync、agent-def-adversarial-review 用全部；
 #   head 取法（基准 HEAD）：batch-scope；
 #   gate_added_lines（同步记录这一轮新增的行）：knowledge-sync。
@@ -112,7 +112,7 @@
 #   <!-- knowledge-sync -->
 #   # <阶段> 阶段同步
 #
-#   触发文件：.claude/agents/sweep.md、research/scripts/agent-watch.py（这一阶段改动范围里的触发文件，逐个按路径写全）
+#   触发文件：.claude/agents/sweep.md、scripts/agents/agent-watch.py（这一阶段改动范围里的触发文件，逐个按路径写全）
 #
 #   ## 搜索
 #   回扫用的每条命令与它的命中计数，例：grep -rn "<旧说法>" .claude records research | wc -l → 3
@@ -220,8 +220,8 @@ ROOT="${root_argument:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 inside_git=0
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 && inside_git=1
-LIB_CHANGED_PATHS="$(cd "$STAGE_DIR/../.." && pwd)/research/scripts/changed-paths.sh"
-# shellcheck source=../../research/scripts/changed-paths.sh
+LIB_CHANGED_PATHS="$(cd "$STAGE_DIR/../.." && pwd)/scripts/gate/changed-paths.sh"
+# shellcheck source=../../scripts/gate/changed-paths.sh
 source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用库 $LIB_CHANGED_PATHS"; echo "     → 怎么办：改动范围的取法只有那一份，恢复它，别在阶段里另抄一份。"; exit 1; }
 
 # ── 共用的改动范围：每种取法这一趟只取一次，结果留在这几个变量里（在当前 shell 里调，不经 $( ) 子 shell） ──

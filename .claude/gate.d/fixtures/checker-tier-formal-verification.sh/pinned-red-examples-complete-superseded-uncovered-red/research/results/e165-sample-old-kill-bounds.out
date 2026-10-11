@@ -1,7 +1,7 @@
 E7RESULT name=kill_bound item=baseline table=none table_row=none outcome=baseline title=基线（不改） complete=yes
 E7RESULT name=kill_bound item=tsv-4 table=crates/mutations.tsv table_row=4 outcome=red red_examples=1 title=链首锚点错一位 complete=yes
 E7RESULT name=kill_bound item=tsv-5 table=crates/mutations.tsv table_row=5 outcome=red red_examples=1 title=每条记录都当末条 complete=yes
-E7RESULT name=kill_bound item=Z1 table=research/mutations/e165_replay_bounded_enumeration_custom.tsv table_row=2 outcome=red red_examples=1 title=Z1_一条都不施加 complete=yes
+E7RESULT name=kill_bound item=Z1 table=scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv table_row=2 outcome=red red_examples=1 title=Z1_一条都不施加 complete=yes
 E7RESULT name=kill_bound item=tsv-6 table=crates/mutations.tsv table_row=6 outcome=red red_examples=1 title=多出来的一条 complete=yes
 E7RESULT name=verdict scope=segment2 variants=5 variants_excluding_baseline=4 red=4 ledger_sha256=3b80d599e1f03a53d9c8a1c47164ce23523c2e1ca3ac2b70ac9cb8d17a46ab01
 E7RESULT name=done emitted=7

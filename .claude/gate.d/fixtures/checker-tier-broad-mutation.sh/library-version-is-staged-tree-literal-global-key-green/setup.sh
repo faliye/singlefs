@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 样本现场（情形 literal-global-key）：暂存区与别的 library-version-is-staged-tree 样本相同；库目录里的那一版不经 prepare.py、不调驱动的任何函数，
-# tree.source、manifest.tsv、toolchain.txt、global-key.txt 与版本指纹都照写死的字面值写（十六进制在驱动与 research/scripts/admission.py 之外现算：
+# tree.source、manifest.tsv、toolchain.txt、global-key.txt 与版本指纹都照写死的字面值写（十六进制在驱动与 scripts/gate/admission.py 之外现算：
 # 照它们文件头写的口径用 sha256 逐行算，sha256 的输入就是下面 printf 写的内容；全局键一行一行的写法见驱动文件头「指纹」）。
 # 驱动的 global_key_lines（丢一类行、换次序、换写法）、fingerprint_of_manifest（不算路径或内容）、build_environment_of、version_key 改了，这一份就红；
 # admission.py 的 build_environment_lines 逐类写错也红：构建环境里放齐了这几类——从库目录的 tree/ 往上每一层的 .cargo/config.toml（tree/、库目录那一层、样本根）、

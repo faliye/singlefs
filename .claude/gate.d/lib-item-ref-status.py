@@ -12,7 +12,7 @@
 
 **归属规则只有这一份**：门禁 doc-decisions（`doc-decisions.sh`）的格「分项引用状态」跑这里的 main，
 格「引用写已定紧跟说没定」（引用写着已定项、紧跟着却说它没定）、格「冻结层归属登记表」（查依据点名的分项是不是已定）与
-`research/scripts/relabel-item.py`（分项翻状态之后改写全仓引用）都 import 这里的函数，
+`scripts/kb/relabel-item.py`（分项翻状态之后改写全仓引用）都 import 这里的函数，
 不各抄一份——两份归属规则一旦分叉，工具改写的与门禁判的就不是同一批引用。
 """
 import re, glob, sys, os
@@ -189,7 +189,7 @@ def main():
         for b in bad[:40]: print("    ", b)
         print("     → 权威是各决策正文的「### 已定项 / ### 未定项」两张表；改引用处，或先改正文再改引用。")
         print("     → 报「指名 Dn 而它没有第 k 条」的：那个编号引不到任何东西，去查它本来想指哪一条。")
-        print("     → 一条分项刚翻了状态、引用一大片对不上的：用 research/scripts/relabel-item.py D<n> <k> 按同一份归属规则改写。")
+        print("     → 一条分项刚翻了状态、引用一大片对不上的：用 scripts/kb/relabel-item.py D<n> <k> 按同一份归属规则改写。")
     if bad or unreadable:
         sys.exit(1)
     n = sum(len(v) for v in item_map.values())

@@ -26,7 +26,7 @@ decisions-history.md、experiments-history.md、CHANGELOG.md 三种变更史；r
      「门禁 <名>」（名是小写字母、数字与连字符、至少带一个连字符，可带 .sh、可套反引号）里的名要是门禁目录顶层的一道门禁，
      或上游规范副本 .claude/singlefs-ai-sop/scripts/ 下的一份脚本（共享门禁的阶段，「门禁 doc-lint」这类）；
      「<门禁名> 的 <格名> 格」（「那一格」「这一格」同）与反引号里「gate.d/<门禁名>.sh … --check <格名>[,<格名>…]」里的格名，
-     要在那道门禁文件头的格名表里（`# gate-cell:` 行，经 research/scripts/gate-structure-check.py 的 header_cells 读）。
+     要在那道门禁文件头的格名表里（`# gate-cell:` 行，经 scripts/gate/gate-structure-check.py 的 header_cells 读）。
      「<名> 的 <x> 格」里 <名> 不是门禁目录里的门禁的不判（分不清是不是在说门禁）。
   ⑤ 用旧编号称呼门禁：「NN 号」（排除与 ① 相同）、「门禁 NN」、「gate.d/NN-…」（含 gate.d/fixtures/NN-…），NN 是下面 OLD_GATES 里的旧号。出路给那个旧号今天在哪道门禁、哪几格。
      「NN 号」「门禁 NN」两种写法先把带目录的文件路径与「日期-」起头的记录文件名遮掉再找（`records/2026-09-28-门禁59号提速与双机分片.md`
@@ -65,7 +65,7 @@ sys.dont_write_bytecode = True
 GATE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 REPOSITORY_OF_GATES = os.path.dirname(os.path.dirname(GATE_DIRECTORY))
 UPSTREAM_SCRIPTS = os.path.join(REPOSITORY_OF_GATES, ".claude", "singlefs-ai-sop", "scripts")
-STRUCTURE_CHECK = os.path.join(REPOSITORY_OF_GATES, "research", "scripts", "gate-structure-check.py")
+STRUCTURE_CHECK = os.path.join(REPOSITORY_OF_GATES, "scripts", "gate", "gate-structure-check.py")
 BROKEN = os.environ.get("GOVERNANCE_REFS_BREAK", "")
 CARRIER_PATTERNS = ["CLAUDE.md", ".claude/main-agent.md", ".claude/agent-common.md",
                     ".claude/agents/*.md", ".claude/rules/*.md", ".claude/skills/*/SKILL.md"]

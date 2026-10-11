@@ -3,7 +3,7 @@
 raise-rollback-floor）、115 项检查全过」），GATE55_KEEP_WORK=1（那时的变量名，今天改名为 GATE_QEMU_DEVICE_STREAMS_KEEP_WORK）留下的现场 /tmp/singlefs-gate55.KnIwjf/<模式>/。
 
 1. 六档的 out.txt、vm-exit、check.txt、check-exit 是那份现场的原样字节（cp 之后逐份 cmp 过）。
-   - 虚机：VM_DISKS=2 VM_DISK_MB=4096、VM_LOG_MB 取默认 4096，research/scripts/vm-bench.sh 送进 QEMU；
+   - 虚机：VM_DISKS=2 VM_DISK_MB=4096、VM_LOG_MB 取默认 4096，scripts/devices/vm-bench.sh 送进 QEMU；
      blklogwrites 一支用补好的 QEMU ~/.local/share/singlefs/qemu
      （qemu-io version 8.2.2 (singlefs blklogwrites patch f4ecee61df60)）。
    - 虚机二进制 new_pool_file_creation_on_device（musl 静态）与宿主检查 new_pool_file_creation_device_log_check
@@ -14,7 +14,7 @@ raise-rollback-floor）、115 项检查全过」），GATE55_KEEP_WORK=1（那�
 2. research/results/e142-trimmed.out：今天 replay.sh 里 E142 那一行登记的产物
    research/results/e142-new-pool-file-creation-dry-run-2026-09-28-r19-main-2026-09-28.out 里本阶段会读的那几行，
    原样取第 35–39 行（name=segments 五行）与第 59 行（name=root_record 一行）。
-   research/scripts/replay.sh 只留 E142 的两行（2026-10-08 起与真仓同形）：@driver_e142 那一行第 4 列换成 e142-trimmed.out，
+   scripts/experiments/replay.sh 只留 E142 的两行（2026-10-08 起与真仓同形）：@driver_e142 那一行第 4 列换成 e142-trimmed.out，
    @driver_e142_p8g_crates_dump 那一行第 4 列照真仓写 e142-r24-p8g-crates-dump-2026-10-05.out（样本里没有这个文件，也不该被读）；别的列与真仓里那两行相同。
    本阶段从这两处现取段序列与反向链（back_chain=3937788698）。
 3. .gate-cells（点名 device-streams）与 .qemu-prerecorded（空文件）照旧。

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# evidence-in-repo 格在链接 worktree 里的红样本（research/scripts/gate-staged.sh 与 --staged 的临时树就是链接 worktree）：
+# evidence-in-repo 格在链接 worktree 里的红样本（scripts/gate/gate-staged.sh 与 --staged 的临时树就是链接 worktree）：
 # 样本根里建一个主仓 .origin-repository/，给它加一个链接 worktree，再把那个 worktree 整个搬到样本根，
 # 于是样本根的 git rev-parse --git-dir 落在 .origin-repository/.git/worktrees/ 下。
 # 搬过来之后这一轮改了：kb 里把还清依据写成 /tmp 下的报告、新写的提示里把实现员报告引成 /tmp 下的文件（判据二，不看时间戳，必须判红）；
@@ -9,8 +9,8 @@ set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 here="$PWD"
 git init -q -b master .origin-repository
-mkdir -p .origin-repository/research/e7-index-bench/src/bin .origin-repository/research/results .origin-repository/.claude/kb
-printf 'fn main() { println!("e920"); }\n' > .origin-repository/research/e7-index-bench/src/bin/e920_worktree_stale.rs
+mkdir -p .origin-repository/scripts/experiments .origin-repository/research/results .origin-repository/.claude/kb
+printf 'fn main() { println!("e920"); }\n' > .origin-repository/scripts/experiments/e920_worktree_stale.rs
 printf 'E7RESULT name=e920 rows=1\n' > .origin-repository/research/results/e920-worktree-stale-2026-09-01.out
 printf '# 欠账\n\n| C920 | 样本欠账 | 还没还 |\n\n## 历史版本\n' > .origin-repository/.claude/kb/worktree-owed.md
 git -C .origin-repository add -A
@@ -22,7 +22,7 @@ administrative_directory="$(sed -n 's/^gitdir: //p' .git)"
 printf '%s\n' "$here/.git" > "$administrative_directory/gitdir"
 mkdir -p .origin-repository/.git/info
 printf '.origin-repository/\n' >> .origin-repository/.git/info/exclude
-printf 'fn main() { println!("e920 改过了"); }\n' > research/e7-index-bench/src/bin/e920_worktree_stale.rs
+printf 'fn main() { println!("e920 改过了"); }\n' > scripts/experiments/e920_worktree_stale.rs
 cat > .claude/kb/worktree-owed.md <<'EOF'
 # 欠账
 
@@ -39,4 +39,4 @@ cat > research/prompts/worktree-r1-opus.md <<'EOF'
 2. 实现员报告 `/tmp/claude-1000/worktree-impl/report.md`（它自己列的设计判断）。
 EOF
 TZ=Asia/Tokyo touch -d 2026-09-01 research/results/e920-worktree-stale-2026-09-01.out
-TZ=Asia/Tokyo touch -d 2026-09-05 research/e7-index-bench/src/bin/e920_worktree_stale.rs
+TZ=Asia/Tokyo touch -d 2026-09-05 scripts/experiments/e920_worktree_stale.rs

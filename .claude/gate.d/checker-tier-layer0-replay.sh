@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
+# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 scripts/gate/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
 # gate-stage: 层 0 崩溃点重放与登记的崩溃枚举用例（快档跑 checker 档包不标 ignored 的用例、核每条用例的全绿标记；--full 逐条照复用判定跑全量）
 # gate-category: checker-tier 类
-# gate-similar: code-source-discipline.sh 与 harness-model-differential-and-scenarios.sh 也调 research/scripts/crash-case-check.py，但调的是 file-names、one-scenario 两样，分归代码类与 harness 类；这里开跑前只调 placement、modules 两样，判的是崩溃枚举用例与 checker 档测试文件，红了就不起 cargo
+# gate-similar: code-source-discipline.sh 与 harness-model-differential-and-scenarios.sh 也调 scripts/crash/crash-case-check.py，但调的是 file-names、one-scenario 两样，分归代码类与 harness 类；这里开跑前只调 placement、modules 两样，判的是崩溃枚举用例与 checker 档测试文件，红了就不起 cargo
 # gate-covers: 崩溃点重放
 # gate-cell: layer0-replay 快档跑 checker 档包不标 ignored 的用例、逐条核崩溃枚举用例的全绿标记；--full 逐条照复用判定跑
 # gate-cell: feature-gated-tests 快档带上 checker 档 tests/ 里 cfg 点到的特性另跑一趟：挂特性的测试文件逐个跑到的用例不为 0，GPU 对拍没卡打的 NOT_RUN_NO_GPU_ADAPTER 逐条记本次未跑
@@ -38,8 +38,8 @@
 #   两趟 --full 同时跑同一条用例、同一个指纹时不加锁：后跑完的判红会删掉先跑完的绿标记，只会假红、不会假绿（.claude/skills/crash-test/commit-stages.md 里「另有 --full 在跑时不起」挡着）。
 #   续跑的进度在 <common-dir>/singlefs-layer0-progress/<输入指纹>/，不随 worktree 删；变量由 crash-case-command 设，判法在 crates/singlefs-checker-tier/src/layer0_progress.rs。
 #   线程数 SINGLEFS_LAYER0_THREADS 没设取本机核数（admission.py 的 crash_case_worker_threads）；只起 1 个线程怎么判红、标记里线程怎么记，判法在 admission.py crash-case-judge。
-#   双机分片默认关：本地配置 ${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}（模板 multi-host.env.example）经 research/scripts/layer0-shard-configuration-check.sh
-#   判得过才开；开着时登记了 shard=across-machines 的用例交 research/scripts/layer0-shard-run.sh --merged-log，merge 那一趟的日志照单机判、写同一格标记。
+#   双机分片默认关：本地配置 ${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}（模板 multi-host.env.example）经 scripts/crash/layer0-shard-configuration-check.sh
+#   判得过才开；开着时登记了 shard=across-machines 的用例交 scripts/crash/layer0-shard-run.sh --merged-log，merge 那一趟的日志照单机判、写同一格标记。
 #   日志：每趟一个新目录 <common-dir>/singlefs-layer0-logs/<开跑时刻>-<pid>/，跑完不删；log.<用例名> 是全量日志，同名加 .findings.tsv 是发现日志
 #   （行格式以 crates/singlefs-checker-tier/src/crash.rs 为准）。发现日志判红：某节没有 summary、red_states 不是 0、定稿行数与 signatures= 对不上，
 #   或发现日志空而全量日志里有 LAYER0_FINDINGS 行。发现表超过 30 个签名只打前 30 行。全绿标记不带发现表。
@@ -49,13 +49,13 @@
 # 快档 feature-gated-tests 格（C604（快档不开特性，崩溃放量与 GPU 对拍编进来零条））：特性从 checker 档 tests/ 顶层每个 .rs 的 cfg 现读，不另抄名单；
 #   挂特性的文件跑到 0 条、每处 NOT_RUN_NO_GPU_ADAPTER（GPU 对拍没卡时打这一行后返回成功）都报「本次未跑」、不判红；一个挂特性的文件都没有，记无对象可判。
 #   清掉调用方的 SINGLEFS_CRASH_AMPLIFICATION_* 与 SINGLEFS_LAYER0_FINDINGS_FILE：快档不写真的判定库、不按全量的规模跑。
-#   特性里有 gpu 时这一趟经 research/scripts/gpu-quiesce-run.sh 起：照多机配置清场并回读、跑，跑完不复原（包装打 step=restore result=not-restored；
+#   特性里有 gpu 时这一趟经 scripts/crash/gpu-quiesce-run.sh 起：照多机配置清场并回读、跑，跑完不复原（包装打 step=restore result=not-restored；
 #   要复原由用户手动跑私有复原脚本），它打的 GPU_QUIESCE 行逐行转打；清场回读没过（包装退 78、打 step=command result=not-started）判红、写出路，
 #   卡上有不归清场白名单的计算进程时出路是等它跑完再只重跑这一格，这里不停它。样本档里清场配置只认样本根 .layer0-sample-tools/multi-host.env
 #   （只写假清场命令），没有就判红、不起包装；包装的登记与本机日志放这一趟的临时目录，不落进真工作根。
 #
 # 自证：这一份的流程（逐条复用、只重跑输入变了的那一条、续跑的三个环境变量、--start-over、快档缺一格判红、跑的过程中输入变了不写标记）由
-#   research/scripts/admission.py --selftest 的「checker-tier-layer0-replay」那几格核：把这一份拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑；
+#   scripts/gate/admission.py --selftest 的「checker-tier-layer0-replay」那几格核：把这一份拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑；
 #   日志与标记怎么判、输入指纹怎么算，由同一份自证的「崩溃枚举用例」那几格拿合成日志与临时仓核。
 # 样本档：样本根上有 .layer0-sample-tools/ 就进样本档，把它放到 PATH 最前面（里面的假 cargo、假 rustc 照 cases/<测试目标>.log 打日志，
 #   设了 SINGLEFS_LAYER0_FINDINGS_FILE 时把 cases/<测试目标>.findings.tsv 追加进去），不管带没带 --full 都走 --full 那一路；判绿退 3，判红照常退 1。
@@ -104,13 +104,13 @@
 #   GATE_LAYER0_BREAK=gpu-pass-unquiesced  特性里有 gpu 也不经清场包装、直接起 cargo
 #       quick-features-green、quick-features-red、quick-features-interrupted（输出里找不到「GPU_QUIESCE step=…」）；
 #       quick-features-quiesce-red、quick-features-no-quiesce-config（期望退出 1，实测 3）
-#   GPU_QUIESCE_BREAK=run-despite-failed-quiesce  清场包装（research/scripts/gpu-quiesce-run.sh）清场回读没过也起命令
+#   GPU_QUIESCE_BREAK=run-despite-failed-quiesce  清场包装（scripts/crash/gpu-quiesce-run.sh）清场回读没过也起命令
 #       quick-features-quiesce-red（期望退出 1，实测 3）
 #   GPU_QUIESCE_BREAK=restore-after-run  清场包装出去时又照多机配置复原
 #       quick-features-green、quick-features-red、quick-features-interrupted、quick-features-quiesce-red（输出里找不到「GPU_QUIESCE step=restore result=not-restored holders=0」）
 #   GATE_LAYER0_BREAK=sample-tools-unchecked  不核标记目录里的假工具
 #       sample-cargo-not-executable（期望退出 2，实测 1）
-#   CRASH_CASE_CHECK_BREAK=rows-ignored  判法那一份（research/scripts/crash-case-check.py）不报没登记的那一条
+#   CRASH_CASE_CHECK_BREAK=rows-ignored  判法那一份（scripts/crash/crash-case-check.py）不报没登记的那一条
 #       static-check-red（输出里找不到「forgot_to_register_full：标了 #[i…」）
 set -uo pipefail
 layer0_tier="quick"
@@ -202,7 +202,7 @@ ROOT="${root_argument:-$(cd "$(dirname "$0")/../.." && pwd)}"
 layer0_stage_script_path="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 # 准入模块：读登记表、算指纹、判前提、判日志、读写全绿标记都经它（子命令见它的文件头）
 layer0_stage_repository="$(cd "$(dirname "$0")/../.." && pwd)"
-layer0_admission_module="$layer0_stage_repository/research/scripts/admission.py"
+layer0_admission_module="$layer0_stage_repository/scripts/gate/admission.py"
 cd "$ROOT" 2>/dev/null || exit 2
 # 样本档（写法见文件头「样本档」）
 layer0_sample_mode=0
@@ -245,11 +245,11 @@ if [[ "$layer0_sample_mode" == 1 && "$layer0_break" != sample-tools-unchecked ]]
   fi
 fi
 
-# 开跑前的静态判据（placement、modules；判法在 research/scripts/crash-case-check.py）：快档、--full、样本档都在复用判定之前判，红了不起 cargo。
+# 开跑前的静态判据（placement、modules；判法在 scripts/crash/crash-case-check.py）：快档、--full、样本档都在复用判定之前判，红了不起 cargo。
 # 判法脚本不在（admission.py --selftest 拷这一份去的临时仓没有它）报一行本次未跑、往下走，不判绿也不判红。
-layer0_static_judge="$layer0_stage_repository/research/scripts/crash-case-check.py"
+layer0_static_judge="$layer0_stage_repository/scripts/crash/crash-case-check.py"
 if [[ -d crates && "$layer0_break" != static-check-skipped && ! -f "$layer0_static_judge" ]]; then
-  echo "  ! 开跑前的静态判据没跑：判法脚本 $layer0_static_judge 不在（这一份 checker-tier-layer0-replay 被拷到了不带 research/scripts/ 的树里），往 GATE_NOT_RUN_FILE 报一行"
+  echo "  ! 开跑前的静态判据没跑：判法脚本 $layer0_static_judge 不在（这一份 checker-tier-layer0-replay 被拷到了不带 scripts/ 的树里），往 GATE_NOT_RUN_FILE 报一行"
   if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then
     printf '%s\n' "checker-tier-layer0-replay.sh 开跑前的静态判据（placement、modules）没跑：$layer0_static_judge 不在" >> "$GATE_NOT_RUN_FILE"
   fi
@@ -259,7 +259,7 @@ elif [[ -d crates && "$layer0_break" != static-check-skipped ]]; then
   if [[ "$layer0_static_exit" != 0 && "$layer0_static_exit" != 77 ]]; then
     echo "  ✗ 开跑前的静态判据：crash-case-check --only placement,modules 退 $layer0_static_exit（逐处列在上面），这一趟不起 cargo"
     echo "     → 怎么办：照上面那一句出路改（崩溃枚举用例挪进 crates/singlefs-checker-tier/tests/、全量那条登记进 .claude/gate.d/stage-inputs.tsv 的 crash-case: 行；"
-    echo "                checker 档测试文件第一行写「//! checker 档模块：…」）；改完先单跑 python3 research/scripts/crash-case-check.py --only placement,modules 到它退 0，再跑这一道。"
+    echo "                checker 档测试文件第一行写「//! checker 档模块：…」）；改完先单跑 python3 scripts/crash/crash-case-check.py --only placement,modules 到它退 0，再跑这一道。"
     exit 1
   fi
 fi
@@ -294,12 +294,12 @@ if [[ "$layer0_tier" == quick && "$layer0_sample_mode" == 0 ]]; then
     echo "                在项目根跑 git ls-files -co --exclude-standard -- <那一条>，改到列得出文件为止。全部列不出时先看这里是不是 git 工作树。"
     exit 1
   fi
-  source "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
-  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
+  source "$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
+  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/stage-must-run.sh" "复用上一次整轮全绿的判定" \
     "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
   layer0_judge_paths=(.claude/gate.d/stage-inputs.tsv "$(realpath -m --relative-to="$ROOT" "$layer0_stage_script_path")" "$(realpath -m --relative-to="$ROOT" "$layer0_admission_module")")
-  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "这次改动没碰它判的东西" \
-    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${layer0_input_paths_text}，加 ${layer0_judge_paths[*]}，判据见 research/scripts/change-touches-crates.sh。" \
+  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/change-touches-crates.sh" "这次改动没碰它判的东西" \
+    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${layer0_input_paths_text}，加 ${layer0_judge_paths[*]}，判据见 scripts/gate/change-touches-crates.sh。" \
     -- "$ROOT" "${layer0_registered_input_paths[@]}" "${layer0_judge_paths[@]}"
 fi
 [[ -f Cargo.toml && -d crates/singlefs-checker-tier ]] || { echo "  ! 没有 crates/singlefs-checker-tier（checker 档包），本阶段跳过"; exit 77; }
@@ -318,15 +318,15 @@ trap 'rm -rf -- "${layer0_scratch_directory:?}"' EXIT
 if ! crash_case_listing="$(python3 "$layer0_admission_module" crash-cases "$ROOT")"; then
   printf '%s\n' "$crash_case_listing" | sed 's/^/       /'
   echo "  ✗ .claude/gate.d/stage-inputs.tsv 里 crash-case: 那几行登记有错（上面逐条列出）：判不出要跑、要核哪几条崩溃枚举用例"
-  echo "     → 怎么办：照 research/scripts/admission.py 文件头「崩溃枚举用例行」改那几行（test=<包>:<测试目标>:<用例函数> 恰好一条，用例函数在测试目标里找得到）；"
-  echo "                单跑 python3 research/scripts/admission.py crash-cases <项目根>，改到它退 0 为止。"
+  echo "     → 怎么办：照 scripts/gate/admission.py 文件头「崩溃枚举用例行」改那几行（test=<包>:<测试目标>:<用例函数> 恰好一条，用例函数在测试目标里找得到）；"
+  echo "                单跑 python3 scripts/gate/admission.py crash-cases <项目根>，改到它退 0 为止。"
   exit 1
 fi
 crash_case_rows=()
 if [[ -n "$crash_case_listing" ]]; then mapfile -t crash_case_rows <<< "$crash_case_listing"; fi
 if (( ${#crash_case_rows[@]} == 0 )); then
   echo "  ✗ .claude/gate.d/stage-inputs.tsv 里一条崩溃枚举用例（键是 crash-case: 的行）都没登记：层 0 全量没有东西可跑、可核"
-  echo "     → 怎么办：两条流的层 0 全量至少各登记一行，写法见 research/scripts/admission.py 文件头「崩溃枚举用例行」。"
+  echo "     → 怎么办：两条流的层 0 全量至少各登记一行，写法见 scripts/gate/admission.py 文件头「崩溃枚举用例行」。"
   exit 1
 fi
 if (( ${#layer0_named_cases[@]} > 0 )); then
@@ -376,7 +376,7 @@ delete_crash_case_marker() {
   return 0
 }
 
-# run_checker_package_tests <日志>：只跑不标 ignored 的用例（src/bin/ 的内联单测归变异表与实验复跑），cargo 的整段输出进日志；
+# run_checker_package_tests <日志>：只跑不标 ignored 的用例（--tests 连 src/bin/ 的内联单测一起带上），cargo 的整段输出进日志；
 # 快档不写发现日志，清掉调用方的 SINGLEFS_LAYER0_FINDINGS_FILE。
 run_checker_package_tests() {
   env -u SINGLEFS_LAYER0_FINDINGS_FILE cargo test --release -p singlefs-checker-tier --lib --tests -- --nocapture 2>&1 \
@@ -535,7 +535,7 @@ print_staged_worktree_full_commands() {
   echo '                在项目根、暂存之后，把下面三行命令放进同一次 Bash 调用（三行共用 layer0_full_base 这个变量，分开跑它就是空的；这次调用的退出码是经内存包装的那条 --full 命令的，250–254 是包装自己的结局）：'
   echo '                layer0_tree_ready=; layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"'
   echo '                git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; } && layer0_tree_ready=1'
-  echo '                if [ "$layer0_tree_ready" = 1 ]; then SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash "${layer0_full_base:?}/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "${layer0_full_base:?}/tree"; layer0_full_rc=$?; else echo "worktree 没建好或暂存区的 diff 套不上，--full 没跑"; layer0_full_rc=1; fi; git worktree remove --force "${layer0_full_base:?}/tree" 2>/dev/null; rm -rf "${layer0_full_base:?}"; ( exit "$layer0_full_rc" )'
+  echo '                if [ "$layer0_tree_ready" = 1 ]; then SINGLEFS_HEAVY_TESTS=commit bash scripts/hosts/run-with-memory-cap.sh 16G bash "${layer0_full_base:?}/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "${layer0_full_base:?}/tree"; layer0_full_rc=$?; else echo "worktree 没建好或暂存区的 diff 套不上，--full 没跑"; layer0_full_rc=1; fi; git worktree remove --force "${layer0_full_base:?}/tree" 2>/dev/null; rm -rf "${layer0_full_base:?}"; ( exit "$layer0_full_rc" )'
 }
 
 # run_checker_quick_tier：快档跑 checker 档包不标 ignored 的用例。判红打出路、返回 1；判绿把每个测试二进制那一行 test result 的 passed / ignored 加总进 quick_tier_report。
@@ -696,7 +696,7 @@ gpu_adapter_not_run_lines() {
 # run_feature_gated_tests_cell <layer0-replay 格那一趟的日志，没跑传空串>：判红打出路、返回 1；不红返回 0，结论放进 feature_cell_state。
 run_feature_gated_tests_cell() {
   local tests_directory="crates/singlefs-checker-tier/tests" listing feature_list feature_log feature_exit=0 bindgen_arguments=""
-  local amplification_library="$layer0_stage_repository/research/scripts/crash-amplification-lib.sh"
+  local amplification_library="$layer0_stage_repository/scripts/crash/crash-amplification-lib.sh"
   local counts_file="$layer0_scratch_directory/feature-gated-counts"
   local row file_name file_scope file_features scope_text count ran_total=0 environment_name gpu_where gpu_line not_run_total
   local -a gated_rows=() features=() target_arguments=() bindgen_setting=() cleared_environment=(-u SINGLEFS_LAYER0_FINDINGS_FILE) zero_files=() gpu_not_run=()
@@ -721,7 +721,7 @@ run_feature_gated_tests_cell() {
   # 特性里有 gpu：这一趟经清场包装起（文件头「快档 feature-gated-tests 格」）；样本档只认样本里只写假清场命令的那份多机配置
   local -a quiesce_prefix=() quiesce_environment=()
   if [[ ",$feature_list," == *,gpu,* && "$layer0_break" != gpu-pass-unquiesced ]]; then
-    quiesce_prefix=(bash "$layer0_stage_repository/research/scripts/gpu-quiesce-run.sh" --)
+    quiesce_prefix=(bash "$layer0_stage_repository/scripts/crash/gpu-quiesce-run.sh" --)
     if [[ "$layer0_sample_mode" == 1 ]]; then
       if [[ ! -f "$PWD/.layer0-sample-tools/multi-host.env" ]]; then
         echo "  ✗ $LAYER0_FEATURE_CELL_NAME：样本档里没有假的清场配置 $PWD/.layer0-sample-tools/multi-host.env，带 gpu 特性那一趟不起（起了就是照真的多机配置清场）"
@@ -731,7 +731,7 @@ run_feature_gated_tests_cell() {
       quiesce_environment=("SINGLEFS_MULTI_HOST_CONFIG=$PWD/.layer0-sample-tools/multi-host.env" "GPU_QUIESCE_STATE_DIRECTORY=$layer0_scratch_directory/gpu-quiesce-state"
         "GPU_QUIESCE_LOG_DIRECTORY=$layer0_scratch_directory/gpu-quiesce-logs")
     fi
-    echo "  · $LAYER0_FEATURE_CELL_NAME：特性里有 gpu，这一趟经 research/scripts/gpu-quiesce-run.sh 照多机配置清场再起，跑完不复原（要复原手动跑私有复原脚本，多机配置的 QUIESCE_START_COMMAND）"
+    echo "  · $LAYER0_FEATURE_CELL_NAME：特性里有 gpu，这一趟经 scripts/crash/gpu-quiesce-run.sh 照多机配置清场再起，跑完不复原（要复原手动跑私有复原脚本，多机配置的 QUIESCE_START_COMMAND）"
   fi
 # librocksdb-sys 的 bindgen 要的头文件目录：与崩溃放量取同一个值，编译产物才共用。在子 shell 里 source 那份库、只读这一个变量。
   if [[ -f "$amplification_library" ]]; then
@@ -856,8 +856,8 @@ if ! mkdir -p -- "$layer0_log_directory"; then
   exit 1
 fi
 echo "  · 这一趟的全量日志与发现日志放 ${layer0_log_directory}/（log.<用例名> 与 log.<用例名>.findings.tsv，跑完不删）"
-layer0_shard_driver="$ROOT/research/scripts/layer0-shard-run.sh"
-if layer0_shard_configuration_note="$(bash "$ROOT/research/scripts/layer0-shard-configuration-check.sh" "$ROOT" 2>&1)"; then
+layer0_shard_driver="$ROOT/scripts/crash/layer0-shard-run.sh"
+if layer0_shard_configuration_note="$(bash "$ROOT/scripts/crash/layer0-shard-configuration-check.sh" "$ROOT" 2>&1)"; then
   layer0_sharded=1
   echo "  · 双机分片：开（${layer0_shard_configuration_note//$'\n'/；}）；登记了 shard=across-machines 的用例两台各跑一片、本机 merge，别的单机跑"
 else
@@ -874,7 +874,7 @@ for crash_case_row in "${crash_case_rows[@]}"; do
   if ! write_crash_case_manifest "$case_key" "$manifest_at_start"; then
     echo "  ✗ $case_key：算不出这批输入的指纹：$case_manifest_problem"
     echo "     → 怎么办：在项目根跑 git ls-files -co --exclude-standard -- ${layer0_input_paths_text} 看列不列得出文件，再跑 cargo -V && rustc -V；"
-    echo "                单跑 python3 research/scripts/admission.py crash-case-manifest <根> $case_key <清单文件> --judging-digest --toolchain --build-environment 看它报什么。"
+    echo "                单跑 python3 scripts/gate/admission.py crash-case-manifest <根> $case_key <清单文件> --judging-digest --toolchain --build-environment 看它报什么。"
     red_cases+=("$case_key")
     continue
   fi
@@ -889,7 +889,7 @@ for crash_case_row in "${crash_case_rows[@]}"; do
   fi
   if ! read_crash_case_command "$case_key" "$fingerprint_at_start"; then
     echo "  ✗ $case_key：准入模块交不出起用例的命令：$case_command_problem"
-    echo "     → 怎么办：单跑 python3 research/scripts/admission.py crash-case-command <根> $case_key <指纹> 看它报什么（取不到 git common-dir、"
+    echo "     → 怎么办：单跑 python3 scripts/gate/admission.py crash-case-command <根> $case_key <指纹> 看它报什么（取不到 git common-dir、"
     echo "                nproc 起不来、SINGLEFS_LAYER0_THREADS 不是正整数都在这里报）；修好之后重跑 --full。"
     red_cases+=("$case_key")
     continue
@@ -905,7 +905,7 @@ for crash_case_row in "${crash_case_rows[@]}"; do
   if [[ "$layer0_sharded" == 1 ]] && python3 "$layer0_admission_module" crash-case-shardable "$ROOT" "$case_key" >/dev/null; then case_sharded=1; fi
   case_way="单机跑：${case_command[*]}"
   if [[ "$case_sharded" == 1 ]]; then
-    case_way="双机分片跑（本机 0/2、第二台 1/2，本机 merge/2；bash research/scripts/layer0-shard-run.sh --merged-log $case_key <树根> <指纹> <日志>）"
+    case_way="双机分片跑（本机 0/2、第二台 1/2，本机 merge/2；bash scripts/crash/layer0-shard-run.sh --merged-log $case_key <树根> <指纹> <日志>）"
     case_threads_note="本机那一片 ${case_threads_note}，第二台那一片取第二台的核数（逐片的数在 merge 那一行 LAYER0_PARALLEL_FINISHED 的 shard_…= 里）"
   fi
   echo "  · $case_key 开跑（${case_started_utc}；${case_way}；${case_threads_note}；这批输入的指纹 ${fingerprint_at_start:0:16}…，${file_count_at_start} 个文件，减去用例读不到的 ${excluded_count_at_start} 个）："
@@ -950,7 +950,7 @@ for crash_case_row in "${crash_case_rows[@]}"; do
     echo "  ✗ $case_key 的用例跑过了、日志也判得绿，发现日志却判红（上面发现表里的「问题：」逐条列出）"
     echo "     → 怎么办：「这一趟没跑完」看全量日志 $case_log 的尾部是 panic 还是被杀；red_states 不是 0 是有状态判红而用例没红，"
     echo "                对一对用例的计数断言与 crates/singlefs-checker-tier/src/crash.rs 的发现表；发现日志不在而全量日志里有 LAYER0_FINDINGS 行，"
-    echo "                是 SINGLEFS_LAYER0_FINDINGS_FILE 没传进用例（单机看本阶段 run_crash_case，双机看 research/scripts/layer0-shard-run.sh 给 merge 那一趟的设置）。"
+    echo "                是 SINGLEFS_LAYER0_FINDINGS_FILE 没传进用例（单机看本阶段 run_crash_case，双机看 scripts/crash/layer0-shard-run.sh 给 merge 那一趟的设置）。"
     red_cases+=("$case_key")
     continue
   fi

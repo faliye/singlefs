@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
+# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 scripts/gate/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
 # gate-stage: QEMU 真设备上的新池新建文件、发布 B、第二个实例、发布 D 与抬 F（两块 virtio 盘、设备侧独立录制、漏一道屏障与走页缓存两个对照必须判红）
 # gate-category: checker-tier 类
 # gate-similar: checker-tier-layer0-replay.sh 它也验 crates 写路的崩溃一致性、也是 checker-tier 类，但在宿主上枚举崩溃状态、判录制流截断重放；这里起 QEMU 虚机在两块 virtio 盘上跑真负载、判设备侧独立录制与程序录制逐项相同，要 QEMU、/dev/kvm 与内核镜像，前提、登记的输入与失败方式都不同
@@ -33,12 +33,12 @@
 #   e142-row-missing-red（@driver_e142 那一行缺了）取到别的行的文件名，过了这一处，红不在「第 2 列是 @driver_e142 的 E142 行取到 0 行」。
 #
 # 准入：读的路径与三个前提（QEMU、/dev/kvm、内核镜像）都登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行，复用判定与改动范围都从它取，
-# 那一行不在判红；判法在 research/scripts/admission.py。
+# 那一行不在判红；判法在 scripts/gate/admission.py。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
-ADMISSION_MODULE="$STAGE_REPOSITORY/research/scripts/admission.py"
+ADMISSION_MODULE="$STAGE_REPOSITORY/scripts/gate/admission.py"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
 stage_cell device-streams cell_device_streams "QEMU 真设备上各档负载跑完，设备侧独立录制与程序录制逐项相同、两个对照红在该红的地方" \
   "照上面那句「怎么办」改；单跑一档：bash .claude/gate.d/checker-tier-qemu-device-streams.sh --item <模式>（模式用 --list-items 看）"
@@ -200,9 +200,9 @@ if ((prerecorded == 0)); then
   echo "  · 只跑点名的 ${#MODES[@]} 档（${MODES[*]}）：不问整道的复用判定与改动范围，跑完不写全绿标记"
  else
   # 先问能不能复用上一次整轮全绿的判定，再问这次改动碰没碰它判的东西（前缀含本阶段脚本自己）；两样都退 77（本次未跑），不退 0。
-  # 判法在 research/scripts/stage-must-run.sh 与 change-touches-crates.sh 的文件头。范围判定只摘得掉零行代码的改动，细的那一半欠在 C8（门禁范围判不出来）。
-  source "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
-  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
+  # 判法在 scripts/gate/stage-must-run.sh 与 change-touches-crates.sh 的文件头。范围判定只摘得掉零行代码的改动，细的那一半欠在 C8（门禁范围判不出来）。
+  source "$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
+  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/stage-must-run.sh" "复用上一次整轮全绿的判定" \
     "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
   # 改动范围的前缀：登记表本阶段那一行的路径（admission.py paths，不另抄一份），加本阶段脚本自己
   qemu_registered_input_paths=()
@@ -213,8 +213,8 @@ if ((prerecorded == 0)); then
     fail "$ROOT/.claude/gate.d/stage-inputs.tsv 里没有 $(basename "$0") 这一行（或读不到这份表）：判不出这一道读哪些路径" \
          "在 .claude/gate.d/stage-inputs.tsv 里给本阶段登记它读的路径（制表符分隔，照别的行写）。"
   fi
-  stage_run_or_skip "$STAGE_REPOSITORY/research/scripts/change-touches-crates.sh" "这次改动没碰它判的东西" \
-    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${qemu_registered_input_paths[*]} 加本阶段脚本，判据见 research/scripts/change-touches-crates.sh。" \
+  stage_run_or_skip "$STAGE_REPOSITORY/scripts/gate/change-touches-crates.sh" "这次改动没碰它判的东西" \
+    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${qemu_registered_input_paths[*]} 加本阶段脚本，判据见 scripts/gate/change-touches-crates.sh。" \
     -- "$ROOT" "${qemu_registered_input_paths[@]}" ".claude/gate.d/$(basename "$0")"
  fi
   [[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
@@ -233,14 +233,14 @@ fi
 # 复跑表里 E142 有不止一行（第 2 列 @driver_e142 与 @driver_e142_p8g_crates_dump 等）：只取第 2 列恰是 @driver_e142 的那一行的第 4 列，不取全部 E142 行。
 e142_row_filter='$1=="E142" && $2=="@driver_e142"'
 [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == e142-all-rows ]] && e142_row_filter='$1=="E142"'
-e142_product_names="$(awk -F'|' "$e142_row_filter"'{print $4}' research/scripts/replay.sh)"
+e142_product_names="$(awk -F'|' "$e142_row_filter"'{print $4}' scripts/experiments/replay.sh)"
 e142_product_row_count="$(grep -c . <<<"$e142_product_names")"
 if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != e142-all-rows && "$e142_product_row_count" != 1 ]]; then
-  fail "research/scripts/replay.sh 里第 2 列是 @driver_e142 的 E142 行取到 $e142_product_row_count 行（要恰好 1 行；0 行是这一行被删或改了名，多于 1 行是被重复登记）" \
-       "看 research/scripts/replay.sh 里 E142|@driver_e142| 开头的行：留一行，第 4 列写这一道对照的 E142 产物文件名；驱动改了名，这里的 @driver_e142 跟着改。"
+  fail "scripts/experiments/replay.sh 里第 2 列是 @driver_e142 的 E142 行取到 $e142_product_row_count 行（要恰好 1 行；0 行是这一行被删或改了名，多于 1 行是被重复登记）" \
+       "看 scripts/experiments/replay.sh 里 E142|@driver_e142| 开头的行：留一行，第 4 列写这一道对照的 E142 产物文件名；驱动改了名，这里的 @driver_e142 跟着改。"
 fi
 PRODUCT="research/results/$e142_product_names"
-[[ -f "$PRODUCT" ]] || fail "从 replay.sh 的 @driver_e142 那一行解析不出产物文件（得到 $PRODUCT）" "看 research/scripts/replay.sh 里 E142|@driver_e142| 那一行的第 4 列，对应的文件在不在 research/results/ 下。"
+[[ -f "$PRODUCT" ]] || fail "从 replay.sh 的 @driver_e142 那一行解析不出产物文件（得到 $PRODUCT）" "看 scripts/experiments/replay.sh 里 E142|@driver_e142| 那一行的第 4 列，对应的文件在不在 research/results/ 下。"
 # 反向链从产物里现取，不写死：写死的数在格式常量一改就过期，红起来像是写路错了。
 EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$PRODUCT" | head -1)"
 [[ -n "$EXPECTED_BACK_CHAIN" ]] || fail "产物里取不出 name=root_record 的 back_chain（$PRODUCT）" "看 $PRODUCT 有没有 name=root_record 那一行、它的 back_chain 字段还在不在。"
@@ -275,7 +275,7 @@ else
   pids=()
   for mode in "${MODES[@]}"; do
     mkdir -p "$work/$mode"
-    ( VM_DISKS=2 VM_DISK_MB=4096 VM_LOG_MB="$QEMU_DEVICE_LOG_MEGABYTES" VM_BLKLOGWRITES_DIR="$work/$mode" bash research/scripts/vm-bench.sh "$BIN" "$mode" >"$work/$mode/out.txt" 2>&1
+    ( VM_DISKS=2 VM_DISK_MB=4096 VM_LOG_MB="$QEMU_DEVICE_LOG_MEGABYTES" VM_BLKLOGWRITES_DIR="$work/$mode" bash scripts/devices/vm-bench.sh "$BIN" "$mode" >"$work/$mode/out.txt" 2>&1
       echo "$?" >"$work/$mode/vm-exit" ) &
     pids+=("$!")
   done
@@ -287,7 +287,7 @@ for mode in "${MODES[@]}"; do
   out="$work/$mode/out.txt"
   if [[ "$(cat "$work/$mode/vm-exit")" != 0 ]]; then
     tail -15 "$out" | sed 's/^/        /'
-    fail "虚机跑 $mode 没过（vm-bench.sh 的退出码或条数闸）" "单跑：VM_DISKS=2 VM_DISK_MB=4096 VM_LOG_MB=$QEMU_DEVICE_LOG_MEGABYTES VM_BLKLOGWRITES_DIR=<目录> bash research/scripts/vm-bench.sh <musl 二进制> $mode"
+    fail "虚机跑 $mode 没过（vm-bench.sh 的退出码或条数闸）" "单跑：VM_DISKS=2 VM_DISK_MB=4096 VM_LOG_MB=$QEMU_DEVICE_LOG_MEGABYTES VM_BLKLOGWRITES_DIR=<目录> bash scripts/devices/vm-bench.sh <musl 二进制> $mode"
   fi
   checks=$((checks + 1))
   if ! diff <(grep -ao 'E7RESULT name=segments .*' "$PRODUCT" | tr -d '\r') <(grep -ao 'E7RESULT name=segments .*' "$out" | tr -d '\r') >/dev/null; then

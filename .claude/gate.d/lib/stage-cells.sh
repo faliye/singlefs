@@ -9,7 +9,7 @@
 # gate-similar: doc-decisions.sh 它是第一道改用这份库的阶段，只留格的判法
 #
 # 门禁阶段共用的格结构：登记格、解析 --list / --check、样本只跑点名的格、每格一个子 shell、逐格汇总。
-# 规则：.claude/rules/verification.md「门禁的结构」。research/scripts/stage-run-or-skip.sh 判的是整道要不要跑，不管格。
+# 规则：.claude/rules/verification.md「门禁的结构」。scripts/gate/stage-run-or-skip.sh 判的是整道要不要跑，不管格。
 #
 # 阶段里的写法（preflight 那一行之后）：
 #   source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
@@ -18,7 +18,7 @@
 #   …阶段自己解析剩下的参数（项目根、--write 这类），cd 到项目根…
 #   stage_cells_run "$ROOT"                                       跑选中的格、汇总、按汇总退出，不返回
 # 文件头的格名表每格一行 `# gate-cell: <格名> <判什么的一句>`，与 stage_cell 登记的逐格相同、次序相同
-# （research/scripts/gate-structure-check.py 判）。格函数不带参数调，里面 exit 只结束那一格。
+# （scripts/gate/gate-structure-check.py 判）。格函数不带参数调，里面 exit 只结束那一格。
 #
 # stage_cells_parse：
 #   --list                     逐行打「格名<制表符>判什么」到 stdout，退 0，不跑任何格

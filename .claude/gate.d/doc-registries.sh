@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 只读仓里的文本与 git 记录；外部引用那一格调的 research/scripts/verify-citations.sh 要本机固定下来的外部文献树，缺了在那一格判红，不交给 gate.sh 预判
+# run-condition: none 只读仓里的文本与 git 记录；外部引用那一格调的 scripts/kb/verify-citations.sh 要本机固定下来的外部文献树，缺了在那一格判红，不交给 gate.sh 预判
 # gate-stage: 登记表与引用（二十一格：字段与布局登记表之间的账；欠账表与收口表的形状与去向；实验号、决策号、门禁名、路径、小节与外部引用指得到；不变量条数与字段落点）
 # gate-category: 文档类
 # gate-similar: link-targets.py 它只解析 ](相对路径) 链接与「第 N 节」，不看反引号里的路径、「门禁 N 号」与「小节」名；这三类与 experiment-refs、decision-refs 两格同是「引用了不存在的东西」，并在这里
@@ -32,7 +32,7 @@
 # gate-cell: declared-counts invariants.md 自己那句「现共 N 条在用」与表里条数对得上；欠账表数得出条数
 # gate-cell: governance-refs 治理文档、kb 与仓根 README.md 里按全名指的门禁与格都在、不用旧编号称呼门禁，治理文档里「门禁 N 号」有对应阶段、反引号里的仓内路径存在、`文件「小节」` 在那份文件里找得到
 # gate-cell: invariant-count-elsewhere invariants.md 之外的 kb 文件里写「N 条在用」的地方，N 等于实际在用条数
-# gate-cell: citations kb 里承重的外部逐行引用还核得动（调 research/scripts/verify-citations.sh）
+# gate-cell: citations kb 里承重的外部逐行引用还核得动（调 scripts/kb/verify-citations.sh）
 # gate-cell: invariant-anchors 这次改动新写或改写的不变量行，点名它判的字段住在哪条已定分项
 #
 # 参数解析、样本根的 .gate-cells、逐格汇总与退出码经共用库 lib/stage-cells.sh（写法在它的文件头）。退出码：
@@ -96,7 +96,7 @@
 #   DOC_REGISTRIES_BREAK=invariant-count-elsewhere  invariant-count-elsewhere 格不跑、按判过了记
 #       references-green（输出里找不到「不变量条数跨文件一致：实际在用 1 条，扫了 6 份 kb…」）；references-red（输出里找不到「写「99 条在用」，而 invariants.md 实际在用…」）
 #   DOC_REGISTRIES_BREAK=citations  citations 格不跑、按判过了记
-#       references-green（输出里找不到「样本替身：3 条命中，0 条未命中」）；references-red（输出里找不到「找不到 research/scripts/verify-ci…」）
+#       references-green（输出里找不到「样本替身：3 条命中，0 条未命中」）；references-red（输出里找不到「找不到 scripts/verify-ci…」）
 #   DOC_REGISTRIES_BREAK=invariant-anchors  invariant-anchors 格不跑、按判过了记
 #       references-green（输出里找不到「这次改动新写或改写的 1 行不变量都点名了已定分项」）；references-red（输出里找不到「这次改动新写或改写的 1 行不变量，没有点名它判的字段住在哪…」）
 #   GOVERNANCE_REFS_BREAK=old-numbers-ignored  lib-governance-refs.py 的 ⑤ 整条不判（用旧编号称呼门禁）
@@ -118,7 +118,7 @@
 #       second-txn-hooks-red、segment-registry-red、tree-table-reserve-red（输出里找不到「doc-registries.sh：1 格里 1 格红…」）；checks-owed-green、field-registry-green、
 #       governance-refs-green、references-green（期望退出 0，实测 1）；checks-owed-red（输出里找不到「doc-registries.sh：5 格里 5 格红…」）；
 #       references-red（输出里找不到「doc-registries.sh：7 格里 7 格红…」）；references-unreadable-red（输出里找不到「doc-registries.sh：2 格里 2 格红…」）
-#   LIB_CHANGED_PATHS_BREAK=untracked  research/scripts/changed-paths.sh 丢掉未跟踪文件：invariant-anchors 看不见未跟踪的清单
+#   LIB_CHANGED_PATHS_BREAK=untracked  scripts/gate/changed-paths.sh 丢掉未跟踪文件：invariant-anchors 看不见未跟踪的清单
 #       references-red（输出里找不到「这次改动新写或改写的 1 行不变量，没有点名它判的字段住在哪…」）
 #
 #   bash .claude/gate.d/doc-registries.sh [项目根]                                   二十一格都跑
@@ -136,7 +136,7 @@ GATE_DIRECTORY="$STAGE_DIRECTORY"
 REPOSITORY="$(cd "$STAGE_DIRECTORY/../.." && pwd)"
 OWED_LIBRARY="$STAGE_DIRECTORY/lib-owed.py"
 FORMAT_CONST_LIBRARY="$STAGE_DIRECTORY/lib-format-const.py"
-SEGMENT_REGISTRY_SCRIPT="$REPOSITORY/research/scripts/check-segment-registry.py"
+SEGMENT_REGISTRY_SCRIPT="$REPOSITORY/scripts/crash/check-segment-registry.py"
 BREAK_SWITCH="${DOC_REGISTRIES_BREAK:-}"
 # 握手变量只留给共用库在汇总时写，不导出给各格起的子进程（command-safety.md「进程边界上的三种静默失效」）
 export -n GATE_NOT_RUN_FILE 2>/dev/null || true
@@ -153,7 +153,7 @@ stage_cell first-txn-hooks judge_first_txn_hooks "新池新建文件的三份文
 stage_cell admission-terms judge_admission_terms "准入不等式的每一项都有人维护（统计量，或写明的例外）" \
   "给式子里多出来的那一项在对照表里补一行（统计量或写明的例外），副本与权威那一行逐字对齐"
 stage_cell segment-registry judge_segment_registry "段序列登记表与 E142 产物逐字比对" \
-  "照 research/scripts/check-segment-registry.py 打出的逐行差异改 kb 的「八、」登记表，或重跑 E142 让产物跟上；出处指的用例文件与函数要在"
+  "照 scripts/crash/check-segment-registry.py 打出的逐行差异改 kb 的「八、」登记表，或重跑 E142 让产物跟上；出处指的用例文件与函数要在"
 stage_cell format-const-placeholders judge_format_const_placeholders "格式常量文件里的占位，每个都指得到一条真实存在的分项或欠账" \
   "占位那一行写成「// placeholder: D<n>（简称） 已定项 k —— 为什么还是预想」或「// placeholder: C<n>（简称） —— …」，编号要指得到"
 stage_cell second-txn-hooks judge_second_txn_hooks "覆盖写、释放、回退与复用的三处互相挂钩（layout/02 登记表 / 里程碑各步「写出的字节」/ layout/01 段序列登记表）" \
@@ -165,7 +165,7 @@ stage_cell table-shape judge_table_shape "欠账表两张登记表的行形状�
 stage_cell closeout-collects-open judge_closeout_collects_open "里程碑收口表收全了文件里点名、还开着的欠账号，行号只许是顺序号" \
   "漏收的开着编号在收口表里给一行，或在表后加一行「- 不收口 C<编号>（简称）：为什么不收」；已经还了就先把欠账表那一行挪进「### 已还清」；行号改成没被占用的顺序号，不加撇号或字母"
 stage_cell paid-cited-tests judge_paid_cited_tests "已还清的欠账行里点名的测试名，仓里还在不在" \
-  "先 grep 那个测试今天叫什么，用 research/scripts/replace-once.py 把行里的旧名字定点换成现在的名字；它被删掉了，那笔欠账没还清，整行挪回欠着的那张表"
+  "先 grep 那个测试今天叫什么，用 scripts/kb/replace-once.py 把行里的旧名字定点换成现在的名字；它被删掉了，那笔欠账没还清，整行挪回欠着的那张表"
 stage_cell audit-contradictions judge_audit_contradictions "最近一次总审核登记的文档级矛盾，每一行都要有去向" \
   "给这一行一个去向：改了就把处置列写成「已改…」、用「」引一句今天正文里的原文并点名它住在哪份文件；还没改就在 checks-owed.md 开着的那张表里立一笔账、把编号写进处置列"
 stage_cell closeout-row27-preconditions judge_closeout_row27_preconditions "里程碑收口表第 27 行那几笔欠账的前置有没有进来（进来了就得补会红的用例）" \
@@ -180,7 +180,7 @@ stage_cell governance-refs judge_governance_refs "治理文档、kb 与仓根 RE
   "按红行把门禁改成按全名称呼（旧编号照红行给的今天的名字）、格名照那道门禁的 --list、路径与「小节」名改成今天存在的（判据与够不着的写法在 .claude/gate.d/lib-governance-refs.py 文件头）"
 stage_cell invariant-count-elsewhere judge_invariant_count_elsewhere "invariants.md 之外的 kb 文件里写「N 条在用」的地方，N 等于实际在用条数" \
   "把那几处的 N 改成 invariants.md 表里实际在用的条数，或者改成引用 invariants.md 而不抄数"
-stage_cell citations judge_citations "kb 里承重的外部逐行引用还核得动（调 research/scripts/verify-citations.sh）" \
+stage_cell citations judge_citations "kb 里承重的外部逐行引用还核得动（调 scripts/kb/verify-citations.sh）" \
   "按 verify-citations.sh 自己打印的下一步处置；未命中不等于 kb 写错，也可能是源码固定点没了或版本变了；脚本不在就从 git 找回"
 stage_cell invariant-anchors judge_invariant_anchors "这次改动新写或改写的不变量行，点名它判的字段住在哪条已定分项" \
   "在那一行正文里点名一条「D<n>（简称） 已定项 k」，那是这条不变量要判的字段的落点；点不出来先去补分项"
@@ -1021,7 +1021,7 @@ PY
 
 # ── 格 segment-registry：段序列登记表与 E142 产物逐字比对
 # 落的是 C316（提交步骤的登记位有四处且互不相同） 的第①半：layout/01-first-txn.md「八、」登记表的段序列是人从 E142 产物里抄的。
-# 转发给 research/scripts/check-segment-registry.py，判法不写第二份（在它的文档字符串里）；它退 1（对不上）与 2（结构认不出、文件不在）都记红。
+# 转发给 scripts/crash/check-segment-registry.py，判法不写第二份（在它的文档字符串里）；它退 1（对不上）与 2（结构认不出、文件不在）都记红。
 # 它的 --selftest 由 code-tooling 跑，这里不重复跑。
 # 脚本按本阶段自己的位置取（$SEGMENT_REGISTRY_SCRIPT），不按 cwd 取，`--root` 指被判的仓：样本会把 cwd 换成样本目录，
 #   按 cwd 取到的是样本里的拷贝，仓里的脚本退化了样本照样判对。脚本不在退 1 不退 77：它随仓走，不在就是被删了或挪了。
@@ -1031,7 +1031,7 @@ PY
 cell_segment_registry() {
   if [[ ! -f "$SEGMENT_REGISTRY_SCRIPT" ]]; then
     echo "  ✗ 找不到 $SEGMENT_REGISTRY_SCRIPT"
-    echo "     → 怎么办：它随仓走（research/scripts/ 下），不在就是被删了或挪了：从 git 找回来，挪了就改这个阶段里 SEGMENT_REGISTRY_SCRIPT 那一行的路径。"
+    echo "     → 怎么办：它随仓走（scripts/ 下），不在就是被删了或挪了：从 git 找回来，挪了就改这个阶段里 SEGMENT_REGISTRY_SCRIPT 那一行的路径。"
     exit 1
   fi
   python3 "$SEGMENT_REGISTRY_SCRIPT" --root "$ROOT" || exit 1
@@ -1692,7 +1692,7 @@ if missing:
         print(f"  ✗ {number} 引的 `{name}` 在仓里的 .rs / .py / .sh 里一处都找不到")  # gate-lint:detail
     print(f"  ✗ 已还清的行里有 {len(missing)} 个点名的标识符已经不在仓里了")  # gate-lint:summary
     print("     → 怎么办：那条欠账是靠这个测试还清的。先 grep 它今天叫什么（多半是改了名），")
-    print("               用 research/scripts/replace-once.py 把行里的旧名字定点换成现在的名字；")
+    print("               用 scripts/kb/replace-once.py 把行里的旧名字定点换成现在的名字；")
     print("               它要是被删掉了，那这条欠账并没有还清，把整行挪回欠着的那张表。")
     raise SystemExit(1)
 
@@ -2289,7 +2289,7 @@ PY
 # 源码树不在也判红，不当跳过：跳过正是让上一批文献无声蒸发的那个行为。
 # 真 verify-citations.sh 的判别力不在这里测：它读两个本机绝对路径下的源码树（FS_REFS、KERNEL_TREE 的默认值），装不进密封的样本目录；
 # 它自己的 --selftest 合成两棵假树测，由 code-tooling 跑。
-CITATIONS_SCRIPT=research/scripts/verify-citations.sh
+CITATIONS_SCRIPT=scripts/kb/verify-citations.sh
 citations_pid=""
 start_citations() {
   [[ -f "$CITATIONS_SCRIPT" ]] || return 0
@@ -2321,15 +2321,15 @@ cell_citations() {
 # 射程只到这次改动的行：存量里点不出分项的行一次全判会挡住每一次提交；存量那笔账仍欠着（C69（已定不变量没有字段可判）），
 # 所以成功那句每轮都把存量的条数现算着报出来。不判点名的那条分项里到底有没有这个字段、宽度对不对。
 # 改动范围：GATE_BASE 给了就与它比，否则与 @{upstream} 的 merge-base 比，都没有就与 HEAD 比；工作区、暂存区与未跟踪文件都算
-# （基准用共用库 research/scripts/changed-paths.sh 的 gate 取法）。两份 diff 任一份 git 失败判红，不当成「一行没改」。
+# （基准用共用库 scripts/gate/changed-paths.sh 的 gate 取法）。两份 diff 任一份 git 失败判红，不当成「一行没改」。
 # 这次改动没有新写或改写任何不变量行，退 77（存量条数照样报出来）。
 cell_invariant_anchors() {
   cell_failed=0
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $PWD 不是 git 仓，这一格本次无对象可判"; return 77; }
   [[ -f "$KB/invariants.md" ]] || { echo "  ! 没有 $KB/invariants.md，这一格本次无对象可判"; return 77; }
   local LIB_CHANGED_PATHS base added added_path file_is_new=0 anchors_rc=0
-  LIB_CHANGED_PATHS="$(cd "$GATE_DIRECTORY/../.." && pwd)/research/scripts/changed-paths.sh"
-  # shellcheck source=../../research/scripts/changed-paths.sh
+  LIB_CHANGED_PATHS="$(cd "$GATE_DIRECTORY/../.." && pwd)/scripts/gate/changed-paths.sh"
+  # shellcheck source=../../scripts/gate/changed-paths.sh
   source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用库 $LIB_CHANGED_PATHS"; echo "     → 怎么办：改动范围的取法只有那一份，恢复它，别在阶段里再抄一份。"; return 1; }
   base="$(gate_diff_base gate)"
   added="$(gate_changed_paths "$base" untracked A)" || {

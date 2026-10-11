@@ -1,5 +1,5 @@
 # E165 被取代红例账登记表：登记在这里的账是完整的一趟（有收尾行、ledger_sha256 对得上），但被同档的后一趟取代了；
-# 门禁 checker-tier-formal-verification 的 pinned-red-examples-complete 格（research/scripts/e165-pin-red-examples.py --check）跳过它，不要求它的每一行钉进 e165-pinned-red-examples.tsv；
+# 门禁 checker-tier-formal-verification 的 pinned-red-examples-complete 格（scripts/experiments/e165-pin-red-examples.py --check）跳过它，不要求它的每一行钉进 e165-pinned-red-examples.tsv；
 # 取代它的账照常要钉全（--check 只点名被取代的账时，把取代它的账补进这一次判的账）。成功那句报「跳过作废账 N 份、被取代的账 M 份：逐个列名（被取代的写取代它的是哪份）」。
 # 没跑完的一趟（没有收尾行）不登记在这里，登记进作废表 .claude/gate.d/e165-void-red-example-ledgers.tsv。
 # 一行一份，四段，制表符分隔，都不许空：
