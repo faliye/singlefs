@@ -56,7 +56,7 @@ D8（核心索引结构） 正文明写「flush 时按 key 排序**丢弃时间�
 **口径**：纯 CPU/内存实验，无设备、无虚机。400 万条目 / 4096 个目标叶 /
 key 空间为叶数的 64 倍（保证有重复可去）/ 条目 24 字节（key + seq + value）/
 每档取 5 轮最好值。机器：AMD Ryzen 9 9950X，16 核 32 线程。
-代码 `research/e7-index-bench/src/bin/e17_merge.rs`，`cargo run --release --bin e17-merge`，
+代码 `scripts/experiments/e17_merge.rs`，`cargo run --release --bin e17-merge`，
 原始输出 `e17-merge-2026-08-28.out`。
 
 **非平凡性保证**：两条臂**共用同一份输入**，且**输出必须与真值逐位相同**，不同即整轮作废。

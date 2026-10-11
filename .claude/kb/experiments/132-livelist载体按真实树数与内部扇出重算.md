@@ -13,12 +13,12 @@
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-cd research && bash scripts/replay.sh E132
+bash scripts/experiments/replay.sh E132
 # 直接跑装置：
-cd research && cargo run --release --bin e132_livelist_carrier_recount
+cd scripts/experiments && cargo run --release --bin e132_livelist_carrier_recount
 ```
 
-代码 `research/e7-index-bench/src/bin/e132_livelist_carrier_recount.rs`，
+代码 `scripts/experiments/e132_livelist_carrier_recount.rs`，
 原始输出 `e132-livelist-carrier-recount-2026-09-10.out`（一次运行，扫的格写在「臂与口径」那一节）。
 
 ### 这是计数模型，不是实现
@@ -61,7 +61,7 @@ cd research && cargo run --release --bin e132_livelist_carrier_recount
 
 ### 变异
 
-14 条，**全部被抓**，表在 `research/mutations/e132_livelist_carrier_recount.tsv`。
+14 条，**全部被抓**，表在 `scripts/mutation/tables/e132_livelist_carrier_recount.tsv`。
 ⚠️ 第一轮 M9（共享臂的 key 漏加树 ID）没红，按 `.claude/rules/mutation-sampling.md` 判为**第三类取样点不敏感**：
 唯一钉绝对值的那一格在宽 24 与宽 32 下恰好都是 4 层。补了一个跨两层边界的取样点——两层能装的条数宽 24 是 680 × 196 = 133280、
 宽 32 是 510 × 179 = 91290，取 10 万条时一边 2 层一边 3 层——M9 当场被抓。

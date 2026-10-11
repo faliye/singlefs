@@ -132,7 +132,7 @@ CRC 把它线性地映到 GF(2)³²。**碰撞数恰好为 0 ⟺ 该线性映射
 
 ### 口径与复跑
 
-- 代码 `research/e7-index-bench/src/bin/e61_chain_hash.rs`
+- 代码 `scripts/experiments/e61_chain_hash.rs`
   （`cargo run --release --bin e61-chain-hash`）。
 - 产物 `e61-chain-hash-2026-08-31.out`（24 行，收尾行 `emitted=24`）。
 - ⚠️ **三轮逐字节一致，但那只证明「没有隐藏状态」，不是统计稳定性**：

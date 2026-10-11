@@ -29,6 +29,6 @@
 <!-- doc-lint:not-numbers L1 L2 L3 AES-256 AES256 SHA256 SHA-256 SHA512 CRC32 CRC32C CRC64 RAID5 RAID6 OCFS2 Z3 T10 M1 M2 M3 M4 M5 M6 M7 M8 M9 M12 M13 M25 M26 F41 -->
 
 `M1`–`M9` 是**变异表里的行名**，不是本工程的编号。它们的登记位是
-`research/mutations/<bin>.tsv`——每张表的第一列，与那个二进制一一对应。
+`scripts/mutation/tables/<bin>.tsv`——每张表的第一列，与那个二进制一一对应。
 引用它们时要带上所属的二进制（例如「`e39_back_chain` 的 `M8_退回第一版哈希`」），
 因为**同一个 `M8` 在不同表里指不同的东西**。

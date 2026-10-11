@@ -99,10 +99,10 @@ COW 那一侧**恒为 0**。
 写量从 110 000 降到 80 000 ⇒ 模型确实在量 COW 那部分代价。
 
 **口径**：10 000 次提交 × 每次 8 叶；池 4 GiB / 64 GiB / 1 TiB 三档 × 四档树几何 × 两种摊法。
-代码 `research/e7-index-bench/src/bin/e38_accounting_copy_on_write.rs`
+代码 `scripts/experiments/e38_accounting_copy_on_write.rs`
 （`cargo run --release --bin e38_accounting_copy_on_write`），
 原始输出 `e38-accounting-cow-2026-08-29.out`，
-变异表 `research/mutations/e38_accounting_copy_on_write.tsv`。
+变异表 `scripts/mutation/tables/e38_accounting_copy_on_write.tsv`。
 **13 个单测，8 条变异逐条命中、0 个盲区。** 绝对值断言：
 碰一个叶恰写 `1 + 树高`；碰满一个父下的 F 个叶恰写 `F + 树高`；
 节点总数由几何直接算出；占比单位是万分之一（`8322 / 1048576 = 79 bp`）。

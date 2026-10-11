@@ -5,14 +5,14 @@
 
 ## 本地 LLM（三方论证 2026-09-29 起不再派它当腿）
 
-三方论证起只派两条云端腿加主 agent 判决，不再派本地模型的腿；网关、模型与损坏闸的事实照留，脚本 `research/scripts/ask-local.sh`、`corruption-check.py`、`oov-check.py` 还在仓里。
+三方论证起只派两条云端腿加主 agent 判决，不再派本地模型的腿；网关、模型与损坏闸的事实照留，脚本 `scripts/agents/ask-local.sh`、`corruption-check.py`、`oov-check.py` 还在仓里。
 
 | 项 | 值 | 口径 |
 |---|---|---|
 | 入口 | `~/code/ai-center` 的 OpenAI 兼容网关，`http://127.0.0.1:8200/v1/chat/completions` | 实测 2026-08-26 |
 | 鉴权 | 请求头 `X-Api-Key`，取值来自 `~/code/ai-center/.env.tenants` 的 `AI_CENTER_KEY_VSCODE_CHAT` | 实测 |
 | 模型 | `local` → `Qwen3-Next-80B-A3B-Thinking-AWQ-4bit`，本地模型服务承载，`max_model_len` 262144 | 网关 `/v1/models` 实测返回 |
-| 调用脚本 | `bash research/scripts/ask-local.sh <提示文件>` | —— |
+| 调用脚本 | `bash scripts/agents/ask-local.sh <提示文件>` | —— |
 | 单轮耗时 | 一句话问题 41 秒；一个含 54 行背景 + 两张清单的论证任务约 60 秒 | 实测 2026-08-26，两次采样，**不满足 N≥5，只作量级参考** |
 | 预算 | **不许传 `max_tokens` 或 `thinking_token_budget`**——网关按两本账补值并按形状学习，传偏小的值等于把自己按死在那个值上 | 依据 `~/code/ai-center/.claude/kb/token-budget.md` |
 
@@ -26,8 +26,8 @@
 `content` / `reasoning` 里，替换字符也是。（只看 `ask-local.sh` 的输出，
 「模型坏」与「我们解错」长得一模一样，所以必须存原始字节才能分开。）
 
-**实测**（同一份内容的中英文提示各跑 N 轮，检测器 `research/scripts/corruption-check.py`，
-汇总 `research/scripts/corruption-summary.py`）：
+**实测**（同一份内容的中英文提示各跑 N 轮，检测器 `scripts/crash/corruption-check.py`，
+汇总 `scripts/crash/corruption-summary.py`）：
 
 | 条件 | 轮 | 判红 | 正文汉字 | 正文复读 | /千字 | 正文英词 | 英词复读 | 推理复读 | 替换字符 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -148,7 +148,7 @@
 **修法**：判红时把正文另存到提示旁边，命名 `<提示名去掉 -prompt>-output-void<N>.md`，
 `N` 自动避让已有文件；两个检测器都判红时只留一份。留存路径打到 stderr。
 
-**它自己怎么验的**：`research/scripts/ask-local-selftest.sh`，两个用例走同一条路径、只有正文不同——
+**它自己怎么验的**：`scripts/agents/ask-local-selftest.sh`，两个用例走同一条路径、只有正文不同——
 损坏正文必须退 5 且留下 void 文件（内容要对得上），干净正文必须退 0 且不许留。
 判红那条分支此前**进不去**（要靠模型恰好吐出损坏输出才走得到），所以加了测试缝
 `ASK_LOCAL_FAKE_TEXT`：指向一份现成正文时跳过网关，
@@ -191,7 +191,7 @@
 ⚠️ **这是「门禁不许假装通过」的一个实例**（`.claude/singlefs-ai-sop/rules/show-me-test.md`）：
 门禁报「106 个测试批次、1066 个单测全绿」，而同一批测试在 debug 下有一个是红的。
 
-**修法**：`research/Cargo.toml`（**工作区根**，写在成员 manifest 里会被忽略并只给一句
+**修法**：`scripts/experiments/Cargo.toml`（**工作区根**，写在成员 manifest 里会被忽略并只给一句
 `unused manifest key` 警告）的 `[profile.release]` 加 `overflow-checks = true`。
 打开之后 106 个测试批次全绿，爆炸半径只有那一处；那一处按 `r.saturating_sub(1)` 改掉。
 
@@ -490,7 +490,7 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 
 | 项 | 值 | 口径 |
 |---|---|---|
-| 脚本 | `bash research/scripts/vm-bench.sh <静态二进制>` / `--selftest` | 在 `research/`，**不进仓库**（研究性脚本留本地） |
+| 脚本 | `bash scripts/devices/vm-bench.sh <静态二进制>` / `--selftest` | 在 `research/`，**不进仓库**（研究性脚本留本地） |
 | 它是什么 | 项目自己的虚机装置（共享门禁不带虚机装置）：给虚机挂 virtio 盘（稀疏文件落 `TMPDIR`）并把二进制塞进 initramfs | —— |
 | 自检 | **通过**：成功用例回 0、失败用例回 7、盘用例在虚机里看到 `/dev/vda` 4294967296 字节 | 实测 2026-08-26 |
 | 完整性闸 | 被测程序收尾行报 `name=done emitted=N`，宿主抓到的条数必须等于 N，否则整轮作废 | **已证明会红**：喂一个声称 4 条只发 3 条的假二进制，harness 判红 |
@@ -583,7 +583,7 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 
 ## 变异测试脚本的两个自身缺陷（2026-08-29 修）
 
-`research/scripts/mutate.sh` 的职责是「证明这些测试会红」。它自己错了两次，
+`scripts/mutation/mutate.sh` 的职责是「证明这些测试会红」。它自己错了两次，
 两次都会**让人去改测试，而测试本来是对的**：
 
 | 缺陷 | 症状 | 判据改成什么 |
@@ -620,7 +620,7 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 
 | 事 | 怎么做 |
 |---|---|
-| 只暂存自己的块 | `research/scripts/stage-mine.py --match 我的标记 --foreign 别人的标记 文件…`，先 `--dry-run` 看它挑了哪几块 |
+| 只暂存自己的块 | `scripts/gate/stage-mine.py --match 我的标记 --foreign 别人的标记 文件…`，先 `--dry-run` 看它挑了哪几块 |
 | 暂存区也是共用的 | 暂存前先确认 `git diff --cached --name-only` 为空；暂存完、提交前再核一遍名单与逐文件 cached diff，然后不带路径地 `git commit`。2026-09-12 一次只 `git add` 了显式路径，提交时另一个会话放进暂存区的 `.singlefs-ai-sop-version` 一起进了提交 |
 | 不要 `git commit -- <路径>` | 带路径时 git 提交的是这些路径在工作区里的内容，不是暂存区——同一份文件里夹着别人没提交的改动时正好一起带走 |
 | 同一行两边都改了 | stage-mine 报「进暂存区的一块里有命中 --foreign 的行」时一行切不开：对方在那份文件里只做了可逆替换（改名）的，拿工作区版本把对方的替换反做一遍、与 `git show HEAD:文件` 比 diff 确认只剩自己的，再 `git hash-object -w` + `git update-index --cacheinfo 100644,<sha>,<路径>` 放进暂存区，工作区不动 |
@@ -630,7 +630,7 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 
 ## 复跑与变异脚本要在 `research/` 下跑
 
-`research/scripts/mutate.sh` 里的 `cargo test --release --bin` 在 cwd 跑，仓根没有 `Cargo.toml`：从仓根调用会把基线判红（「基线就是红的，先修好再来」，退出码 2）而实际测试是绿的——2026-09-05 在 E103（inode 打包路 ① 的更新代价） 上踩过两次。脚本现在自己判 cwd（不在 `research/` 下就退出码 2 并说明）；kb 里写的复跑命令是仓根相对路径，照抄要先 `cd research`。`replay.sh` 只认带 E 的实验号（`E` 加数字，与登记表一致），裸数字 2026-09-16 起被它拒绝（退出码 2）。release 二进制在 `research/target/release/`，不在 `research/e7-index-bench/target/`。
+`scripts/mutation/mutate.sh` 里的 `cargo test --release --bin` 在 cwd 跑，仓根没有 `Cargo.toml`：从仓根调用会把基线判红（「基线就是红的，先修好再来」，退出码 2）而实际测试是绿的——2026-09-05 在 E103（inode 打包路 ① 的更新代价） 上踩过两次。脚本现在自己判 cwd（不在 `research/` 下就退出码 2 并说明）；kb 里写的复跑命令是仓根相对路径，照抄要先 `cd research`。`replay.sh` 只认带 E 的实验号（`E` 加数字，与登记表一致），裸数字 2026-09-16 起被它拒绝（退出码 2）。release 二进制在 `scripts/experiments/target/release/`，不在 `scripts/experiments/target/`。
 
 ## 批量立 / 定分项时门禁会红的形态（2026-09-13 / 14 实测）
 
@@ -643,14 +643,14 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 | doc-lint | `F` 加数字这类审核编号被当成没有登记位的编号；简称后面加逗号注判「名字不符」 | 写「发现 1」「提议 2」；括注另起一对括号，写成「编号（简称）（条款已写）」，不塞进简称的括号里 |
 | doc-registries 的 table-shape 格（欠账表形状） | 新的六列欠账行接在文件末尾，而那里是「已还清」那张 4 列表；欠着那张里一格开头写「已还（…）」或「销账」；欠着那张中间夹一个空行 | 接在第一张表最后一行后面：第一个五竖线的 `\|---\|` 之前、最后一行以 `\| C` 开头且竖线 ≥ 7 的行；还清了就按四列挪进已还清表，只还一部分的开头写「已还一半」「决策已定、检查仍欠」「前置已还」；表中间不留空行 |
 | doc-registries 的 segment-registry 格（段序列登记表） | `--selftest` 要「mkfs 种根」那一行的段序列串在整份 `layout/01-first-txn.md` 里只出现一次，历史版本里写同一串就红；只有一段的路径（取号 `2`）正则不认 | 历史里用「4 + 1 + 1 + 1 + 4」带空格的写法；把 `check-segment-registry.py` 的正则改成 `*` |
-| 门禁 doc-decisions 的变更史两格（entry-added、shape） | 变更史改成「条目 → 日期 → 变更清单」之后，「（其N）」撞号、快查两行与节顶现状行都不再存在 | 写法与判法在 `.claude/rules/changelog-format.md`；整理前后的丢失度由 `research/scripts/history-consolidate.py loss-check` 判 |
+| 门禁 doc-decisions 的变更史两格（entry-added、shape） | 变更史改成「条目 → 日期 → 变更清单」之后，「（其N）」撞号、快查两行与节顶现状行都不再存在 | 写法与判法在 `.claude/rules/changelog-format.md`；整理前后的丢失度由 `scripts/kb/history-consolidate.py loss-check` 判 |
 | code-source-discipline 的 format-constants 格（格式常量） | kb 标记改值后，`research/**/*.rs` 里每一份同名 `const` 都要跟（JOURNAL_HEADER_BYTES 95 → 277 时 E43（扩展点字节上限）、E116（打包容器的账·补元数据写与整理策略） 两份装置都重跑换产物）；`stale=` 列的旧值串不许再出现在 kb 正文 | 别把仍在别处合法出现的串（`base = 95`）加进 `stale=` |
 | clippy `shadow_unrelated` | 同一个测试函数里第二次 `let reader = …` / `let segments = …` 判红，rustfmt 重排之后用正则替换还会漏改后半段（2026-09-14 三次返工） | 每个读者 / 段 / 报告起不同的名字（`extent_reader`、`warm_up_segments`、`control_report`） |
 | naming-lint | 「字母 + 数字」当单字母：`read_u48` 判红，测试名以 `a_` 开头判红；它扫全仓的 .rs，连 `research/prompts` 里云端腿写的模型源码也扫 | 写 `read_six_byte_unsigned`；`research/prompts` 2026-09-14 起在 `.claude/naming-lint-exclude`（证据目录，不回收），腿的模型写到别的目录照查 |
 | checker-tier-layer0-replay（层 0 全量） | 用例标 `#[ignore]`、住 `crates/singlefs-checker-tier/tests/`（D13（验证路线） 已定项 15），`cargo test -p singlefs-checker-tier` 报几条 ignored 是正常的；harness 档 `cargo test -p singlefs-harness` 跑不到它们 | 门禁在 release 下跑它，每个状态加池级 checker 与记录核对器后约 171 s；全量在跑时换 `CARGO_TARGET_DIR` 就能同时编别的测试 |
 | 变异证明 | rustfmt 之后多行调用的整串匹配「没命中」 | 按「找到含关键串的行、删到以 `);` 收尾的那一行」做；改完复原并 `assert` 文件逐字节等于原文 |
 | checker 新判定 | 只在对象已经过了同一关之后才判的判定永远判不红：2026-09-14 checker「根是码 2」那条第一稿只在根按码 2 读通之后才判，坏镜像语料当场让它报「不适用」 | 每条新判定配一份坏镜像（`checker_known_bad_images.rs` 的形态），不许只看干净镜像全绿 |
-| 批量定点替换 | 逐条写盘会在一处锚点不中时留下半套改动（2026-09-14 写回 54 处，一处原文「没被」锚点写成「没有被」） | 用 `research/scripts/replace-batch.py`：全部替换先在内存里核「恰好命中 1 次」，全过了才写盘 |
+| 批量定点替换 | 逐条写盘会在一处锚点不中时留下半套改动（2026-09-14 写回 54 处，一处原文「没被」锚点写成「没有被」） | 用 `scripts/kb/replace-batch.py`：全部替换先在内存里核「恰好命中 1 次」，全过了才写盘 |
 
 ## 本机 Claude Code 会话里的 `grep` 与 `find` 不是 GNU 那两个
 

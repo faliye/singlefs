@@ -14,12 +14,12 @@ D6（快照实现模型） 九条判据第 5 条「**有界销毁**：可分批�
 **复跑命令**（登记成 `exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-cd research && bash scripts/replay.sh E130
+bash scripts/experiments/replay.sh E130
 # 直接跑装置：
-cd research && cargo run --release --bin e130_livelist_bounded_destroy
+cd scripts/experiments && cargo run --release --bin e130_livelist_bounded_destroy
 ```
 
-代码 `research/e7-index-bench/src/bin/e130_livelist_bounded_destroy.rs`，原始输出 `e130-livelist-bounded-destroy-2026-09-10.out`（一次运行，无参数扫描）。
+代码 `scripts/experiments/e130_livelist_bounded_destroy.rs`，原始输出 `e130-livelist-bounded-destroy-2026-09-10.out`（一次运行，无参数扫描）。
 
 ### 这是计数模型，不是实现——它证明不了什么
 
@@ -78,7 +78,7 @@ cd research && cargo run --release --bin e130_livelist_bounded_destroy
 
 ### 变异
 
-15 条，**全部被抓**，表在 `research/mutations/e130_livelist_bounded_destroy.tsv`。
+15 条，**全部被抓**，表在 `scripts/mutation/tables/e130_livelist_bounded_destroy.tsv`。
 
 ⚠️ **其中一条第一轮没被抓，按 `.claude/rules/mutation-sampling.md` 三分判为第三类
 「取样点不敏感」，补了取样点而不是记成等价变异**：M8（condense 判据放宽成恒触发）

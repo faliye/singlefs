@@ -90,9 +90,9 @@ E7RESULT name=verdict inject_not_torn=0 negcontrol_damaged=0
 要 `sudo`，口令从 `.env` 读、不打印；设备名全部来自变量，`EXIT` 时按记录下来的名字逐个拆除。
 
 ```bash
-bash research/scripts/e129-tear-injector.sh      # 结论一
-bash research/scripts/e129-thin-rmw.sh           # 结论二
-bash research/scripts/e129-thin-neighbour.sh     # 结论三
+bash scripts/devices/e129-tear-injector.sh      # 结论一
+bash scripts/devices/e129-thin-rmw.sh           # 结论二
+bash scripts/devices/e129-thin-neighbour.sh     # 结论三
 ```
 
 三份原始输出：
@@ -110,8 +110,8 @@ bash research/scripts/e129-thin-neighbour.sh     # 结论三
 
 ### 变异
 
-三张表共 9 条，全部被抓：`research/mutations/e129_tear_injector.tsv`（3）、
-`research/mutations/e129_thin_rmw.tsv`（3）、`research/mutations/e129_thin_neighbour.tsv`（3）。
+三张表共 9 条，全部被抓：`scripts/mutation/tables/e129_tear_injector.tsv`（3）、
+`scripts/mutation/tables/e129_thin_rmw.tsv`（3）、`scripts/mutation/tables/e129_thin_neighbour.tsv`（3）。
 被测装置是 shell 探针不是 Rust 二进制，跑法写在各表头部：把「原文」换成「替换文」，
 跑一遍脚本，**必须出现 `name=fatal` 且退出码非 0**。
 

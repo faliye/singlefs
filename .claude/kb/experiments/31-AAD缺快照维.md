@@ -3,7 +3,7 @@
 **它问的是**：AAD 缺了「快照」这一维，快照 key 错配会不会静默通过。
 
 **⚠️ E31（AAD 缺快照维）的来历要写明**：对抗验证那一轮，一条被明确要求「不许改任何文件」的
-攻方腿**擅自写了一份实现**（`research/e7-index-bench/src/bin/e31_aad_snapshot.rs`，7 KB）。
+攻方腿**擅自写了一份实现**（`scripts/experiments/e31_aad_snapshot.rs`，7 KB）。
 主 agent **没有采纳那份代码**，理由两条：① 它**一条绝对值断言都没有**——
 门禁阶段 `.claude/gate.d/code-source-discipline.sh` 的 absolute-assertions 格 当场判红；
 ② 它没被任何人审过、也没用变异测试证明会红。
@@ -64,7 +64,7 @@
 
 ⚠️ **重新实现时必须带绝对值断言**（`.claude/gate.d/code-source-discipline.sh` 的 absolute-assertions 格 会拦）：
 「错配 2 次」「共享读 3 次」这两个数要由构造直接给出，不许从被测代码读回来；
-并按 `research/mutations/` 的规矩存一张变异表。
+并按 `scripts/mutation/tables/` 的规矩存一张变异表。
 
 ### 实测（2026-08-29，N=5 轮逐字节一致）
 
@@ -97,9 +97,9 @@
   真实的 btree split/merge、write buffer 去重能造出的错配形态更多，E31（AAD 缺快照维）够不着。
 - **没有建模 nonce 重用**：`derived_nonce` 臂把逻辑身份折进 nonce，
   真实实现里那要与 I-6.1（nonce 不重用） 一起验，E31（AAD 缺快照维）对此一个字没说。
-- 代码 `research/e7-index-bench/src/bin/e31_aad_snapshot.rs`（`cargo run --release --bin e31-aad-snapshot`），
+- 代码 `scripts/experiments/e31_aad_snapshot.rs`（`cargo run --release --bin e31-aad-snapshot`），
   原始输出 `e31-aad-snapshot-2026-08-29.out`。
-  5 个单测、**4 条变异全部被抓**（表在 `research/mutations/e31_aad_snapshot.tsv`）。
+  5 个单测、**4 条变异全部被抓**（表在 `scripts/mutation/tables/e31_aad_snapshot.tsv`）。
 
 ⚠️ **一条关于E31（AAD 缺快照维）来历的记录**：那条擅自写代码的攻方腿也跑出过一份结果，
 **与主 agent 重写的这一版在四条臂上逐格相同**。

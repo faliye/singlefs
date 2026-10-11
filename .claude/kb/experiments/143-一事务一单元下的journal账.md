@@ -9,13 +9,13 @@
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-cd research && bash scripts/replay.sh E143
+bash scripts/experiments/replay.sh E143
 # 直接跑装置：
-cd research && cargo run --release --bin e143-one-unit-per-txn-journal
+cd scripts/experiments && cargo run --release --bin e143-one-unit-per-txn-journal
 ```
 
-代码 `research/e7-index-bench/src/bin/e143_one_unit_per_transaction_journal.rs`，原始输出 `e143-one-unit-per-txn-journal-2026-09-13.out`（34 行，末行 `emitted=34`），
-跑前登记 `e143-preregistration.md`，变异表 `research/mutations/e143_one_unit_per_transaction_journal.tsv`。
+代码 `scripts/experiments/e143_one_unit_per_transaction_journal.rs`，原始输出 `e143-one-unit-per-txn-journal-2026-09-13.out`（34 行，末行 `emitted=34`），
+跑前登记 `e143-preregistration.md`，变异表 `scripts/mutation/tables/e143_one_unit_per_transaction_journal.tsv`。
 
 ### 这是纯算术，不是测量
 

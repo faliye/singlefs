@@ -71,7 +71,7 @@
 条目第二个 8 字节存子节点号（形成依赖式载入链）。**固定 key 数、不固定工作集**——
 条目变宽 ⇒ 工作集变大 ⇒ 被挤出缓存，这才是要问的。
 本机每核 L1d 48 KiB、L2 1 MiB、L3 32 MiB、缓存行 64 字节。
-代码 `research/e7-index-bench/src/bin/e20_fanout.rs`（`cargo run --release --bin e20-fanout`），
+代码 `scripts/experiments/e20_fanout.rs`（`cargo run --release --bin e20-fanout`），
 原始输出 `e20-fanout-2026-08-28.out`（两档首版）与
 `e20-sweep-2026-08-29.out`（六档 × 三轮）。
 
@@ -126,7 +126,7 @@ E20（指针变宽的 CPU 缓存代价）的阳性对照此前硬编码在 **`en
 | 第四版 | **3.03** ✓ | 修法：计时区外预生成 key、查找之间串行依赖、每个节点同值域按层取 key 位段 |
 
 ⚠️ **没有这个对照，前三版的表会被当成「指针变宽没有代价」发出去。**
-六条单测经定向破坏证明会红（2026-09-03 变异表 `research/mutations/e20_fanout.tsv` 五条全抓）：
+六条单测经定向破坏证明会红（2026-09-03 变异表 `scripts/mutation/tables/e20_fanout.tsv` 五条全抓）：
 `lookups_spread_across_nodes` 专门抓第三版那个布局错；补的两条钉住此前的盲区——
 二分命中位置（比较方向写反原本不红）与子指针不与 key 重叠（指针追逐读错位原本不红）。
 

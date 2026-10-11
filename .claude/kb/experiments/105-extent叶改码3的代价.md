@@ -52,9 +52,9 @@
 
 ### 口径与复跑
 
-- 代码 `research/e7-index-bench/src/bin/e105_extent_leaf_packed.rs`（`cargo run --release --bin e105-extent-leaf-packed`，在 `research/` 下跑），原始输出 `e105-extent-leaf-packed-2026-09-12.out`（116 行，收尾行 `emitted=116`；容器头 107 的那一版，与留在 results/ 的上一版 `e105-extent-leaf-packed-2026-09-05.out` 只差 config 行；变异复跑 `e105-mutate-2026-09-12.log` 5 条全抓）。
-- 变异表 `research/mutations/e105_extent_leaf_packed.tsv`，日志 `e105-mutate-2026-09-05.log`（`cd research && bash scripts/mutate.sh e105-extent-leaf-packed e7-index-bench/src/bin/e105_extent_leaf_packed.rs mutations/e105_extent_leaf_packed.tsv`）。
-- 复跑比对：`bash research/scripts/replay.sh` 的 E105（extent 叶改码 3 的代价） 那一行。
+- 代码 `scripts/experiments/e105_extent_leaf_packed.rs`（`cargo run --release --bin e105-extent-leaf-packed`，在 `research/` 下跑），原始输出 `e105-extent-leaf-packed-2026-09-12.out`（116 行，收尾行 `emitted=116`；容器头 107 的那一版，与留在 results/ 的上一版 `e105-extent-leaf-packed-2026-09-05.out` 只差 config 行；变异复跑 `e105-mutate-2026-09-12.log` 5 条全抓）。
+- 变异表 `scripts/mutation/tables/e105_extent_leaf_packed.tsv`，日志 `e105-mutate-2026-09-05.log`（`cd scripts/experiments && bash ../mutate.sh e105-extent-leaf-packed e105_extent_leaf_packed.rs ../mutations/e105_extent_leaf_packed.tsv`）。
+- 复跑比对：`bash scripts/experiments/replay.sh` 的 E105（extent 叶改码 3 的代价） 那一行。
 - 容器头常量在源码里叫 `PACKED_UNIT_HEADER_BYTES`，与 kb 的登记名同名 ⇒ `.claude/gate.d/code-source-discipline.sh` 的 format-constants 格 绑得住它。
   （2026-09-05 跑的时候它临时叫 `PACKED_HDR_WITH_WSEQ`，为的是不让门禁把 103 当成当时登记值 93 的漂移；
   C113（扫描重建时多版单元的现行版本判定无输入） 定案当日已把登记值改成 103，2026-09-06 改回登记名，产物逐字节不变。）

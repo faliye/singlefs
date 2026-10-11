@@ -94,11 +94,11 @@
 
 ### 口径与复跑
 
-- 代码 `research/e7-index-bench/src/bin/e90_tree_aad.rs`
+- 代码 `scripts/experiments/e90_tree_aad.rs`
   （`cargo run --release --bin e90-tree-aad`），产物
   `e90-tree-aad-2026-09-03.out`（5 行，收尾 `emitted=5`）。
-  复跑把 E90（树 ID 进 AAD 与跨头共享）的编号传给 `research/scripts/replay.sh`，字节比对。
-- **9 个单测全绿；9 条变异全部被抓**（`research/mutations/e90_tree_aad.tsv`），
+  复跑把 E90（树 ID 进 AAD 与跨头共享）的编号传给 `scripts/experiments/replay.sh`，字节比对。
+- **9 个单测全绿；9 条变异全部被抓**（`scripts/mutation/tables/e90_tree_aad.tsv`），
   含验收边界改开、验收跳过、祖先链不夹 min、祖先臂不绑 txg、读者树臂偷看指针、
   共享夹具挪到克隆点后、对照翻了个寂寞。
 - 确定性模型：5 遍 md5 逐字节一致（只证无隐藏状态，不冒充统计稳定性）。

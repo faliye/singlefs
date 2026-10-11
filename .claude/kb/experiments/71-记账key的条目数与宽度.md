@@ -137,12 +137,12 @@ E53（丢一整块盘之后根环还挂不挂得上） 真设备实测的最坏�
 
 ### 口径与复跑
 
-- 代码 `research/e7-index-bench/src/bin/e71_accounting_keys.rs`
+- 代码 `scripts/experiments/e71_accounting_keys.rs`
   （`cargo run --release --bin e71-accounting-keys`），
   原始输出 `e71-accounting-keys-2026-09-01.out`（209 行，收尾行 `emitted=209`）。
 - **N=5 轮逐字节一致**（同一个 md5）。**12 个单测，8 条变异逐条命中、0 个盲区**，
-  变异表 `research/mutations/e71_accounting_keys.tsv`
-  （`bash research/scripts/mutate.sh e71-accounting-keys research/e7-index-bench/src/bin/e71_accounting_keys.rs research/mutations/e71_accounting_keys.tsv`）。
+  变异表 `scripts/mutation/tables/e71_accounting_keys.tsv`
+  （`bash scripts/mutation/mutate.sh e71-accounting-keys scripts/experiments/e71_accounting_keys.rs scripts/mutation/tables/e71_accounting_keys.tsv`）。
 
 ### 影响的决策
 

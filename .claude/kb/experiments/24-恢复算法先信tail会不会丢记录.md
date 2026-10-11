@@ -44,7 +44,7 @@
 - 只建模了一个窗口（checkpoint 完成 → tail 写），**没有建模多个 checkpoint 交错**。
 - `spurious` 的代价没有量化，只数了条数——重放一条已生效记录的实际后果取决于幂等性，
   而幂等性本工程未定。
-- 代码 `research/e7-index-bench/src/bin/e24_recovery.rs`（`cargo run --release --bin e24_recovery`），
+- 代码 `scripts/experiments/e24_recovery.rs`（`cargo run --release --bin e24_recovery`），
   原始输出 `e24-recovery-2026-08-29.out`。三轮字节一致。
 
 ### 08-29 那一轮踩的三个坑，都由测试自己抓出来

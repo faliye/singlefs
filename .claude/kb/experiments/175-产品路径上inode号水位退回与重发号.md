@@ -31,16 +31,16 @@ F=~/.local/share/singlefs/work/e175-frozen-crates-2/repo; R=$PWD/research/result
 (cd $F && sha256sum -c --quiet $R/baseline-frozen-crates.sha)
 cp $R/device-source.rs $F/crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs
 # 每一臂：施加补丁（P 不施加；V1、V2 照 $R/patch-V1.diff、$R/patch-V2.diff）、编、拷出二进制、还原，再核一次清单
-ROOT=$PWD; (cd $F && CARGO_TARGET_DIR=<编译目录> bash $ROOT/research/scripts/capped.sh 5 cargo test --release -p singlefs-harness --test e175_product_path_inode_watermark_regression --no-run)
-E175_ARM=P bash research/scripts/capped.sh 5 bash research/scripts/run-with-memory-cap.sh 8G <测试二进制> --test-threads 5
+ROOT=$PWD; (cd $F && CARGO_TARGET_DIR=<编译目录> bash $ROOT/scripts/hosts/capped.sh 5 cargo test --release -p singlefs-harness --test e175_product_path_inode_watermark_regression --no-run)
+E175_ARM=P bash scripts/hosts/capped.sh 5 bash scripts/hosts/run-with-memory-cap.sh 8G <测试二进制> --test-threads 5
 E175_ARM=P E175_FAMILY=F2 E175_RESULT_FILE=$R/f2-P.out E175_CODE_BASELINE=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb E175_WORKER_THREADS=5 E175_TIME_BUDGET_SECONDS=170 \
-  bash research/scripts/capped.sh 5 bash research/scripts/run-with-memory-cap.sh 8G <测试二进制> --ignored --exact run_one_family_on_one_arm_into_the_result_file
+  bash scripts/hosts/capped.sh 5 bash scripts/hosts/run-with-memory-cap.sh 8G <测试二进制> --ignored --exact run_one_family_on_one_arm_into_the_result_file
 # 族名：D、F3a、F2、F1-broad、F1-reuse-after-raising-the-floor、F1-deleting-files-of-several-lower-leaves、
 #       F1-newest-system-configuration-slot-reading-zeros、G-long、G-small、G-draw、G-long-F1
 # 汇总（两段各一份）
 E175_SUMMARY_INPUTS=<逗号分隔的结果文件> E175_SUMMARY_FILE=<新文件> E175_CODE_BASELINE=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb <测试二进制> --ignored --exact summarize_the_result_files
-# 登记的复跑（research/scripts/replay.sh 一行 E175|@driver_e175：拷今天的 crates/ 进副本、放进 device-source.rs、跑 D 族 P 臂）
-bash research/scripts/replay.sh E175
+# 登记的复跑（scripts/experiments/replay.sh 一行 E175|@driver_e175：拷今天的 crates/ 进副本、放进 device-source.rs、跑 D 族 P 臂）
+bash scripts/experiments/replay.sh E175
 ```
 
 ### 产物清单
@@ -183,7 +183,7 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 - 崩溃恢复抛弃根（双故障形，F3b）与写 / 刷盘故障注入后建 inode（F4）是登记第三段附带，够判后未跑；历史里抽到的 `CrashRecoveryAbandoningTheNewestRoot` 在 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙之后挂载被拒、不造被抛弃根，Q3b 的 0 不说明跨被抛弃时间线的重发不存在。装置没有数「判成被抛弃的根」的次数，两段里 S3 有没有判出过一条被抛弃根，页上不下结论。
 - Q6 的读法有一处局限：现行那一版取自这一步可读根里最新的那条，回退之前它自己就在环里读得出，Q6 > 0 只可能在现行那一版自己重建不出时出现；无读故障的历史里 Q6 = 0 由这个读法推得出，不是独立的观测。V717 因此在每一族都没跑，「回退取 max」那条护栏在这些历史里有没有被走到，这一页答不了。
 - 「活记录被原地换」那一形 I-9.29（同号只许一个出生代） 看不见：阳性对照 V1 臂 G-long 序号 24 的两次重发（`g-long-V1.out` 第 389、390 行）那两步 I-9.29 判成立。产品臂上没造出这一形，所以这一页答不了「产品路径上出现了 I-9.29 能不能抓」，只说 P 臂上它 0 次。
-- 「仓副本装置、冻结副本」：数出自 2026-10-08 拷的第二份冻结副本（`baseline-frozen-crates.out`），没在入库装置上重做过。拷完之后主工作区 `crates/` 又变了 6 个文件（`baseline-frozen-crates.out` 的 `name=main_drift_after_copy`），其中 `crates/singlefs-core/src/mount.rs` 与 `crates/singlefs-harness/src/gpu_memory_ledger.rs` 编进这个装置；F3a、F2、F1、几何点这些族没在漂移后的代码上重跑，只有 `research/scripts/replay.sh` 的 `driver_e175` 在漂移后的主工作区上编、跑 D 族 P 臂一次，输出去掉 `elapsed_ns` 与 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 相同。
+- 「仓副本装置、冻结副本」：数出自 2026-10-08 拷的第二份冻结副本（`baseline-frozen-crates.out`），没在入库装置上重做过。拷完之后主工作区 `crates/` 又变了 6 个文件（`baseline-frozen-crates.out` 的 `name=main_drift_after_copy`），其中 `crates/singlefs-core/src/mount.rs` 与 `crates/singlefs-harness/src/gpu_memory_ledger.rs` 编进这个装置；F3a、F2、F1、几何点这些族没在漂移后的代码上重跑，只有 `scripts/experiments/replay.sh` 的 `driver_e175` 在漂移后的主工作区上编、跑 D 族 P 臂一次，输出去掉 `elapsed_ns` 与 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 相同。
 - 什么现象会推翻页上的读数：同一份冻结副本、同一装置重跑出任何一段 P 臂结果行与产物不同（续跑与多线程合并在快档对拍过）；或第三段 F3b / F4、或登记之外的历史里出现同一条时间线上 Q1 ≥ 1、I-9.29（同号只许一个出生代） 红。
 
 ### 路径与结论登记
@@ -220,4 +220,4 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 
 ### 2026-10-08：建页，第一段已跑
 
-仓副本装置写好（单测 17 条，快档三臂各 15 过、2 条大规模入口忽略），跑前登记第十二节写了修订 1–8；第一段（D、F3a、F2 三族在 P、V1、V2 三臂上）跑完、汇总，状态「部分已跑（第一段；第二段待点名）」。`research/scripts/replay.sh` 登记一行 `E175|@driver_e175`，抽出驱动试跑一次，输出与 `d-P.out` 的 E7RESULT 行逐行相同、落成 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out`。
+仓副本装置写好（单测 17 条，快档三臂各 15 过、2 条大规模入口忽略），跑前登记第十二节写了修订 1–8；第一段（D、F3a、F2 三族在 P、V1、V2 三臂上）跑完、汇总，状态「部分已跑（第一段；第二段待点名）」。`scripts/experiments/replay.sh` 登记一行 `E175|@driver_e175`，抽出驱动试跑一次，输出与 `d-P.out` 的 E7RESULT 行逐行相同、落成 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out`。

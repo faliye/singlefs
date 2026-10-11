@@ -95,7 +95,7 @@ E16（journal 的角色：WAL vs 意图日志）改的是那条决策里「③ �
 <!-- doc-lint:not-numbers G0（主几何点） G1 G2 G3 G4 G5 -->
 以下 G0（主几何点）–G5 是跑前登记 `e16-r5-prereg.md` 第五节给的几何点本地标号，不是 kb 编号。
 
-**独立装置**：`research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs`（不与 `crates/` 共用代码，只把两条臂的语义原样搬过来，换成今天的扇出 144/147、今天的树高（按文件大小算出的旋钮）、今天的记录宽——装置今天是 64 项/条，第五次跑当时是 67 项/条，第六次跑一节写这一次换值）。原装置 `sweep()` 一个字没改，`e16-journal sweep` 现跑一遍当阳性对照（PC1），产物 `e16-journal-2026-09-28.out`，与 2026-08-28 那次的 56 格逐格一致。
+**独立装置**：`scripts/experiments/e16_fifth_run_peak_under_today_widths.rs`（不与 `crates/` 共用代码，只把两条臂的语义原样搬过来，换成今天的扇出 144/147、今天的树高（按文件大小算出的旋钮）、今天的记录宽——装置今天是 64 项/条，第五次跑当时是 67 项/条，第六次跑一节写这一次换值）。原装置 `sweep()` 一个字没改，`e16-journal sweep` 现跑一遍当阳性对照（PC1），产物 `e16-journal-2026-09-28.out`，与 2026-08-28 那次的 56 格逐格一致。
 
 **今天扇出 144/147 下，树高由文件大小定**（`.claude/kb/decisions/08-核心索引结构.md` 已定项 14）：G1=4 GiB（L=3）、G2=1 TiB（L=4，真实基线）、G4=16 TiB（L=5）。
 
@@ -111,7 +111,7 @@ E16（journal 的角色：WAL vs 意图日志）改的是那条决策里「③ �
 
 记录宽旋钮的三个点（第五次跑当时的今天 67 项/条（2026-10-04 起装置是 64 项/条）、`record_width_knob_minimum`=1 项/条、`record_width_knob_maximum`=100 万项/条）里，1 项/条那一点全部 21 行都已经是丙行（乙的记录开销被这个旋钮拉得很高，把甲相对乙的优势从批=1 就已经吃光）；100 万项/条那一点与当时的今天（67 项/条）的分类逐行相同（64 项/条的新产物里也逐行相同）——记录宽只要不是「小到几乎每个单元一条记录」，对峰值落点这件事影响不大。
 
-产物：`e16-fifth-run-peak-under-today-widths-2026-09-28.out`（第一段全网格，G1/G2/G4 × 21 流数 × 平均 54 批 = 3423 格）、`research/results/e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out`（PC3 对拍）、`e16-fifth-run-peak-under-today-widths-second-segment-2026-09-28.out`（第二段，三个旋钮分组 × 共 11 个几何点 × 21 流数 × 平均 54 批 = 12551 格）。复跑：`bash research/scripts/replay.sh E16R5`。变异表 `research/mutations/e16_fifth_run_peak_under_today_widths.tsv`，第五次跑那一次 17 条全部抓到（2026-10-04 起表是 18 条，见第六次跑一节）（`cd research && bash scripts/mutate.sh e16-fifth-run-peak-under-today-widths e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs mutations/e16_fifth_run_peak_under_today_widths.tsv`；新增的第 17 条锚定第二段记录宽旋钮新增的 `RecordFormat` 分支）。
+产物：`e16-fifth-run-peak-under-today-widths-2026-09-28.out`（第一段全网格，G1/G2/G4 × 21 流数 × 平均 54 批 = 3423 格）、`research/results/e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out`（PC3 对拍）、`e16-fifth-run-peak-under-today-widths-second-segment-2026-09-28.out`（第二段，三个旋钮分组 × 共 11 个几何点 × 21 流数 × 平均 54 批 = 12551 格）。复跑：`bash scripts/experiments/replay.sh E16R5`。变异表 `scripts/mutation/tables/e16_fifth_run_peak_under_today_widths.tsv`，第五次跑那一次 17 条全部抓到（2026-10-04 起表是 18 条，见第六次跑一节）（`cd scripts/experiments && bash ../mutate.sh e16-fifth-run-peak-under-today-widths e16_fifth_run_peak_under_today_widths.rs ../mutations/e16_fifth_run_peak_under_today_widths.tsv`；新增的第 17 条锚定第二段记录宽旋钮新增的 `RecordFormat` 分支）。
 
 **它答不了的**：`crates/` 今天的发布点名每一个重写的单元（不只脏叶）、一次写还动别的几棵树（上段叶、树表、中央映射树、分配记录树、记账树）——这两处结构差异这次没建模，会改每次 fsync 的实际块数，但不是「宽度」，不在这一题的范围里；Q1 归类的「加密」重判步骤（批轴相邻取值间逐个整数加密，确认分类不是采样伪影）没做，只人工抽查了两处最可能踩边界的地方，没有系统性证明；根下孩子数这个变量在中间取值（比如 30、50）上是不是也线性影响丙行起点，没有扫描——只取了 2、11、17、147 四个点，够判「主导变量是谁」，不够判「具体是什么函数关系」。
 
@@ -122,10 +122,10 @@ PC1–PC4、F7、S1、V7 是跑前登记 `e16-r5-prereg.md` 与 `research/prompt
 D23（journal 的角色与格式） 已定项 4 今天的记录头是 487（新根段 364），一条 4096 记录装 64 个点名项（已定项 12、17），装置里乙一次 fsync 点名 k 片叶写 ⌈k ÷ 64⌉ 条记录（第五次跑时是 ⌈k ÷ 67⌉）。几何点、两条臂的语义、判据、容差、带宽一字不改；重跑登记 `research/prompts/e16-r6-prereg.md`，复跑键仍是 `E16R5`，问题单 `research/prompts/m3-r1-batch9-reruns-questions.md` 第 4 行。
 改了的只有：`JOURNAL_HEADER_BYTES` 487 与 `JOURNAL_NAMED_ENTRIES_PER_RECORD` 64（连同三段注释）、批轴并上 63 与 65（批轴取值共 81 个，两个点在新门槛 64 / 65 两侧）、四条单测的钉值（点名项、乙在 B = 63 到 73 九个批上的块数、头宽、PC4 批集合 {1, 2, 5, 10, 20, 50, 64, 65, 67}）、变异表（删「67→72」，加「64→72」「64→67」两条，18 条）。单测 23 条全绿（`cargo test --release --bin e16-fifth-run-peak-under-today-widths` 输出 `test result: ok. 23 passed`）。
 
-**基线与停机条款**：改装置之前，`bash research/scripts/replay.sh E16R5` 三行都判「字节一致」（装置 311 / 67、`crates/` 487 / 64，登记写死的例外：只当比较基线，不出结论）；改完装置之后、出产物之前，`grep -nE '^pub const (DATA_UNIT_BYTES|DATA_UNIT_PAYLOAD_OFFSET|EXTENT_TREE_INTERNAL_FANOUT|EXTENT_TREE_LOWER_LEAF_DATA_UNITS|JOURNAL_RECORD_BYTES|JOURNAL_HEADER_BYTES|JOURNAL_NAMED_ENTRY_BYTES|JOURNAL_NAMED_ENTRIES_PER_RECORD|TEST_IMAGE_DEFAULT_BYTES):' crates/singlefs-format/src/lib.rs` 的九行输出与登记第十三节命令二的九行逐字相同（S1 过）。
+**基线与停机条款**：改装置之前，`bash scripts/experiments/replay.sh E16R5` 三行都判「字节一致」（装置 311 / 67、`crates/` 487 / 64，登记写死的例外：只当比较基线，不出结论）；改完装置之后、出产物之前，`grep -nE '^pub const (DATA_UNIT_BYTES|DATA_UNIT_PAYLOAD_OFFSET|EXTENT_TREE_INTERNAL_FANOUT|EXTENT_TREE_LOWER_LEAF_DATA_UNITS|JOURNAL_RECORD_BYTES|JOURNAL_HEADER_BYTES|JOURNAL_NAMED_ENTRY_BYTES|JOURNAL_NAMED_ENTRIES_PER_RECORD|TEST_IMAGE_DEFAULT_BYTES):' crates/singlefs-format/src/lib.rs` 的九行输出与登记第十三节命令二的九行逐字相同（S1 过）。
 PC1、PC2（原装置现跑与误差分母核定）没重跑：原装置一字没改、不读点名项数。PC3 过：`pc3` 模式产物与登记的 `e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out` 逐字节相同（58 行），所以不出新 pc3 产物，`replay.sh` 的 pc3 那一行不动。
 
-**产物**（改完 `replay.sh` 登记行之后，`bash research/scripts/replay.sh E16R5` 三行都判「字节一致」，V7 不触发）：
+**产物**（改完 `replay.sh` 登记行之后，`bash scripts/experiments/replay.sh E16R5` 三行都判「字节一致」，V7 不触发）：
 
 ```
 $ grep -oE '^E7RESULT name=[a-z_0-9]*' research/results/e16-fifth-run-peak-under-today-widths-2026-10-04-h487.out | sort | uniq -c
@@ -168,7 +168,7 @@ research/results/e16-fifth-run-peak-under-today-widths-second-segment-2026-10-04
 记录宽旋钮上 Q1 的判定在 67 与 64 之间翻不翻面：G1、G2 不翻，G4 流数 128 一行翻（随记录宽变，见上），第二段六个取样点不翻。跨几何的稳定性行（`name=geometry_sensitivity`）21 行里 20 行逐字不变，`streams=128` 一行的 `sixteen_tebibyte_file` 由宽平台变乙行，`stable=false` 照旧；`stable=true` 的行数两次都是 6（第二段 27）。
 Q1 末句的「加密重判」这一次同样没做（第五次跑起一直没做）。
 
-**变异**：变异表 18 条改前（旧装置、旧表 17 条）与改后两次整表复跑由主 agent 跑，日志 `research/results/e16-mutate-before-2026-10-04-h487.log`、`research/results/e16-mutate-after-2026-10-04-h487.log`，命令：`cd research && bash scripts/mutate.sh e16-fifth-run-peak-under-today-widths e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs mutations/e16_fifth_run_peak_under_today_widths.tsv`。
+**变异**：变异表 18 条改前（旧装置、旧表 17 条）与改后两次整表复跑由主 agent 跑，日志 `research/results/e16-mutate-before-2026-10-04-h487.log`、`research/results/e16-mutate-after-2026-10-04-h487.log`，命令：`cd scripts/experiments && bash ../mutate.sh e16-fifth-run-peak-under-today-widths e16_fifth_run_peak_under_today_widths.rs ../mutations/e16_fifth_run_peak_under_today_widths.tsv`。
 
 ```
 $ for p in before after; do f=research/results/e16-mutate-$p-2026-10-04-h487.log; echo "$p: $(for s in '✅' '⏭' '❌' '💥' '⚠️' '⏱' '🧱'; do printf '%s=%s ' "$s" "$(grep -c "^$s" $f)"; done)"; done
@@ -323,7 +323,7 @@ metaheavy 的 5.937 是按概率算出来的，不是反解：热区 = 叶子总
   两条变异（把流号写死成 0、把流与偏移的位置对调）逐条证明它会红。
 - **阳性对照 1 对每一条臂都跑**：不 fsync 时三臂的 COW 写与根槽写必须逐格相等。
 - **故障注入对每一条臂都做**：注入「不写 journal」后守恒检查必须判红，三臂全部判红。
-- **24 个单测全部用变异测试证明会红**；入库的变异表 `research/mutations/e16_journal.tsv`
+- **24 个单测全部用变异测试证明会红**；入库的变异表 `scripts/mutation/tables/e16_journal.tsv`
   现有 9 条全部被抓（08-31 祖先计数轮 3 条 + 2026-09-03 字节口径 3 条 +
   按测试注释重建的 08-28 历史变异 3 条：区间乘 2、记录按脏叶计费、不发根也清环）。
   ⚠️ 08-28 那轮口头记的「14 条逐条命中」只有按测试注释重建的那 3 条今天还在表里可复跑——
@@ -331,11 +331,11 @@ metaheavy 的 5.937 是按概率算出来的，不是反解：热区 = 叶子总
   ⚠️ 变异跑了三轮，每轮都有「一个测试都没红」的条目，暴露的都是同一种盲区（只互比、不钉绝对值）。
 - 两轮运行**逐字节相同**；完整性闸 `emitted=60` == 抓到 60 行。
 
-代码 `research/e7-index-bench/src/bin/e16_journal.rs`，`cargo run --release --bin e16-journal`；
+代码 `scripts/experiments/e16_journal.rs`，`cargo run --release --bin e16-journal`；
 输出 `e16-journal-2026-08-31.out`（含 2026-08-31 新增的祖先块计数器；
 去掉该字段后与 `e16-journal-2026-08-28.out` 逐字节相同）
 与 `e16-sweep-2026-08-28.out`（56 格扫描）。
-复跑：把E16（journal 的角色：WAL vs 意图日志）的编号作为参数传给 `research/scripts/replay.sh`。
+复跑：把E16（journal 的角色：WAL vs 意图日志）的编号作为参数传给 `scripts/experiments/replay.sh`。
 
 ### 字节口径（2026-09-03 补测，C27（块数口径定格式参数）的前置）
 

@@ -163,7 +163,7 @@ E7（离线索引 harness）把「一次节点读」记为 1 次设备 I/O，**�
 **口径**：本机没有旋转盘（`lsblk` 确认只有 nvme0n1，ROTA=0），所以这是
 **模型化设备上的实测，不是旋转盘实测**。模型 = QEMU `throttle-group x-iops-total=4000`，
 不设 `x-iops-size` ⇒ **每次 I/O 代价相同、与请求大小无关**，即寻道主导的极端。
-复跑：`VM_IOPS=4000 bash research/scripts/vm-bench.sh <musl 二进制> 11 none <cache> <node_pages>`。
+复跑：`VM_IOPS=4000 bash scripts/devices/vm-bench.sh <musl 二进制> 11 none <cache> <node_pages>`。
 ⚠️ **原始输出未留存**：E7（离线索引 harness）跑在 QEMU 里，当时没有把宿主抓回的结果落盘。
 
 ### 2026-08-29 复跑：数字复现了，但**校验路径没有复现**
@@ -186,7 +186,7 @@ E7（离线索引 harness）把「一次节点读」记为 1 次设备 I/O，**�
 ### 同日在虚机里复跑：那条校验路径也复现了
 
 产物 `e7-index-2026-08-29-vm.out`。
-跑法见 [vm-harness.md](../vm-harness.md)：musl 静态编译 + `scripts/vm-bench.sh` 送进
+跑法见 [vm-harness.md](../vm-harness.md)：musl 静态编译 + `scripts/devices/vm-bench.sh` 送进
 QEMU/KVM，来宾里是一块真的 virtio 盘（`/dev/vda`），`blkstat=true`。
 
 | 臂 | 程序读 = 块层读 | 程序写 = 块层写 |
@@ -292,7 +292,7 @@ E7（离线索引 harness）列的第三条独立校验路径是「两条解析�
 补了一条 `the_no_batching_control_arm_has_an_analytic_io_per_op_of_1_9375`：
 `1 + (1 − 64/1024) = 1.9375`，并钉住 `LEAF_COUNT == 1024` 与 `FANOUT² == LEAF_COUNT`。
 ⚠️ **它钉的是解析式与几何常量，不是实测值**——实测要设备与虚机，单测里跑不了，
-两者的比对仍然只能靠复跑。变异表存在 `research/mutations/e7_index.tsv`。
+两者的比对仍然只能靠复跑。变异表存在 `scripts/mutation/tables/e7_index.tsv`。
 
 ### 三条从 E12（攒批的顺序追加 vs 不攒批的随机页读改写） 学来的硬要求（不满足就别开跑）
 

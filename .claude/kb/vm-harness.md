@@ -9,7 +9,7 @@
 ```bash
 cd research
 cargo build --release --target x86_64-unknown-linux-musl --bin <实验二进制名>
-bash scripts/vm-bench.sh target/x86_64-unknown-linux-musl/release/<名> /dev/vda <参数...>
+bash scripts/devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/<名> /dev/vda <参数...>
 ```
 
 ## 挂几块盘
@@ -18,7 +18,7 @@ bash scripts/vm-bench.sh target/x86_64-unknown-linux-musl/release/<名> /dev/vda
 **全部设备路径按顺序作为前缀参数传给二进制**，二进制自己的参数跟在后面。
 
 ```bash
-VM_DISKS=4 VM_DISK_MB=64 bash scripts/vm-bench.sh <静态二进制>
+VM_DISKS=4 VM_DISK_MB=64 bash scripts/devices/vm-bench.sh <静态二进制>
 ```
 
 多盘是 E53（丢一整块盘之后根环还挂不挂得上） 要的：「丢一整块盘之后还挂不挂得上」
@@ -32,7 +32,7 @@ VM_DISKS=4 VM_DISK_MB=64 bash scripts/vm-bench.sh <静态二进制>
 | 前置 | 怎么查 | 不满足怎么办 |
 |---|---|---|
 | **KVM 可读写** | `id -nG \| grep -w kvm`，再实测 `[ -r /dev/kvm ] && [ -w /dev/kvm ]` | 本机靠 **`kvm` 组成员身份**拿权限。不满足就 `sudo usermod -aG kvm $USER`（口令在 `.env` 的 `SUDO_PASS_A`）；当前 shell 用 `sg kvm -c '<命令>'` 立即取得，新会话自动带上 |
-| **内核镜像可读** | `bash scripts/vm-kernel.sh --check` | 跑 `bash scripts/vm-kernel.sh`，它打印一个可用路径；必要时用 `.env` 里的口令从 `/boot` 复制一份到 `TMPDIR` 并 chown。要量时间就跑 `bash scripts/vm-kernel.sh --release $(uname -r)`：它只认 `/boot/vmlinuz-<版本>`，复制成 `TMPDIR` 下的 `singlefs-vmlinuz-<版本>`，不会先撞上 lockdep 那个 |
+| **内核镜像可读** | `bash scripts/devices/vm-kernel.sh --check` | 跑 `bash scripts/devices/vm-kernel.sh`，它打印一个可用路径；必要时用 `.env` 里的口令从 `/boot` 复制一份到 `TMPDIR` 并 chown。要量时间就跑 `bash scripts/devices/vm-kernel.sh --release $(uname -r)`：它只认 `/boot/vmlinuz-<版本>`，复制成 `TMPDIR` 下的 `singlefs-vmlinuz-<版本>`，不会先撞上 lockdep 那个 |
 | **二进制是静态的** | `file <二进制>` | 用 `--target x86_64-unknown-linux-musl` 编。musl 目标已装（`rustup target list --installed`） |
 
 ⚠️ **判断 KVM 前置一律查组并实测读写，不许查 ACL，也不许用 `setfacl` 去补。**
@@ -67,7 +67,7 @@ losetup -a                                                    # 残留 loop
 ## harness 自己要先自检
 
 ```bash
-bash scripts/vm-bench.sh --selftest
+bash scripts/devices/vm-bench.sh --selftest
 ```
 
 它跑三个用例：必然成功的、必然失败的、以及查得到 `/dev/vda` 的。
@@ -124,7 +124,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 来宾发到盘上的每个写（带数据）与每个 FLUSH 按 dm-log-writes 格式记进 `<目录>/log<d>.img`；数据盘也放在同一个目录（`disk<d>.img`），跑完不删。
 录制在来宾之外，与被测程序自己的录制器不共享代码。解析与比对在 `crates/singlefs-checker-tier/src/device_log.rs`，判据在门禁 checker-tier-qemu-device-streams（`.claude/gate.d/checker-tier-qemu-device-streams.sh`）。
 
-⚠️ **blklogwrites 一支只用打了补丁的 QEMU**：本机系统 QEMU 8.2.2（Ubuntu `1:8.2.2+ds-0ubuntu1.18`）的 `block/blklogwrites.c` 写日志条目时，把数据的全部 iovec 接在 2 段条目头后面（`qemu_iovec_init(&log_qiov, niov + 2)`）；数据段数到 1023 以上时日志那一笔超过 IOV_MAX = 1024，宿主 `pwritev` 回 EINVAL，来宾拿到 EIO。mkfs 按 4 MiB 一块写零、virtio-blk 把相邻请求合并成 1024 段时就会撞上，现象是 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`。2026-10-01 实测：6 台虚机并行，原样 QEMU 两轮 12 / 12 在 mkfs 报 EIO，补好的两轮 0 / 12；qemu-io 直接交 1023 段，原样报 `writev failed: Invalid argument`，1022 段过；上游 master 同一行没改，没向上游报。补丁在 `research/qemu/blklogwrites-linearize-over-iov-max.patch`（段数加 2 超过 IOV_MAX 时先拷进一块连续缓冲区再记日志）；`research/scripts/build-patched-qemu.sh` 取同版本的 Ubuntu 源码、打补丁、装进私有目录（默认 `~/.local/share/singlefs/qemu`），仓根 `qemu.env`（git 忽略，模板 `qemu.env.example`）写一行 `SINGLEFS_QEMU_HOME=<绝对路径>`。`vm-bench.sh` 只在 `VM_BLKLOGWRITES_DIR` 那一支读它，开跑前用 `research/scripts/qemu-blklogwrites-check.sh` 核 1022 / 1023 / 1024 / 2048 段，配置缺或核不过就拒绝跑、不退回系统 QEMU；别的分支照用系统 QEMU，被测条件不变。换机器或系统 QEMU 升级之后，先重跑 `build-patched-qemu.sh`。
+⚠️ **blklogwrites 一支只用打了补丁的 QEMU**：本机系统 QEMU 8.2.2（Ubuntu `1:8.2.2+ds-0ubuntu1.18`）的 `block/blklogwrites.c` 写日志条目时，把数据的全部 iovec 接在 2 段条目头后面（`qemu_iovec_init(&log_qiov, niov + 2)`）；数据段数到 1023 以上时日志那一笔超过 IOV_MAX = 1024，宿主 `pwritev` 回 EINVAL，来宾拿到 EIO。mkfs 按 4 MiB 一块写零、virtio-blk 把相邻请求合并成 1024 段时就会撞上，现象是 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`。2026-10-01 实测：6 台虚机并行，原样 QEMU 两轮 12 / 12 在 mkfs 报 EIO，补好的两轮 0 / 12；qemu-io 直接交 1023 段，原样报 `writev failed: Invalid argument`，1022 段过；上游 master 同一行没改，没向上游报。补丁在 `scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch`（段数加 2 超过 IOV_MAX 时先拷进一块连续缓冲区再记日志）；`scripts/devices/build-patched-qemu.sh` 取同版本的 Ubuntu 源码、打补丁、装进私有目录（默认 `~/.local/share/singlefs/qemu`），仓根 `qemu.env`（git 忽略，模板 `qemu.env.example`）写一行 `SINGLEFS_QEMU_HOME=<绝对路径>`。`vm-bench.sh` 只在 `VM_BLKLOGWRITES_DIR` 那一支读它，开跑前用 `scripts/devices/qemu-blklogwrites-check.sh` 核 1022 / 1023 / 1024 / 2048 段，配置缺或核不过就拒绝跑、不退回系统 QEMU；别的分支照用系统 QEMU，被测条件不变。换机器或系统 QEMU 升级之后，先重跑 `build-patched-qemu.sh`。
 
 | 现象（2026-09-14 实测，新池新建文件） | 口径 |
 |---|---|
@@ -140,7 +140,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 
 | 开关 | 做什么 | 口径 |
 |---|---|---|
-| `VM_EXTRA_ROOT=<目录>` | 目录里的东西原样并进 initramfs 的根 | E152（按里程碑对比六家文件系统的文件性能） 用 `research/scripts/e152-stage-root.sh` 生成它：fio、各家格式化与挂载工具连同 ldd 解出的全部库、解压过的内核模块与加载次序，共 129 MB；initramfs 按 gzip -1 打包，每次起虚机多几秒 |
+| `VM_EXTRA_ROOT=<目录>` | 目录里的东西原样并进 initramfs 的根 | E152（按里程碑对比六家文件系统的文件性能） 用 `scripts/devices/e152-stage-root.sh` 生成它：fio、各家格式化与挂载工具连同 ldd 解出的全部库、解压过的内核模块与加载次序，共 129 MB；initramfs 按 gzip -1 打包，每次起虚机多几秒 |
 | `VM_DISK_PREALLOCATE=1` | 盘镜像用 fallocate 预分配，不用 truncate 出稀疏文件 | 宿主 ext4 不在来宾写的时候边写边分配；预分配失败就不跑这一次，不退回稀疏文件 |
 
 ⚠️ **往附加根里放动态链接的程序，库（尤其 `/lib64/ld-linux-x86-64.so.2`）要带执行位。**
@@ -151,7 +151,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 ## 计时不在转发输出的循环里打时间戳
 
 来宾里常由一个包装程序把被测程序起成子进程（`Stdio::piped()`），读它的结果行、转打到自己的标准输出，宿主从串口抓。**不许拿「读一行、打时间戳、转打这一行、再读下一行」那个循环里行到达的时刻当分段挂钟。**
-来宾的标准输出是串口 ttyS0（`research/scripts/vm-bench.sh` 的 `-serial mon:stdio` 与 `console=ttyS0`），转打一行要阻塞几毫秒；子进程往管道里写不被挡，于是后面每一行的时间戳都带着前面几行的打印积压，而且积压忽大忽小，看着像虚机调度的抖动。
+来宾的标准输出是串口 ttyS0（`scripts/devices/vm-bench.sh` 的 `-serial mon:stdio` 与 `console=ttyS0`），转打一行要阻塞几毫秒；子进程往管道里写不被挡，于是后面每一行的时间戳都带着前面几行的打印积压，而且积压忽大忽小，看着像虚机调度的抖动。
 
 实测（2026-09-17，E152（按里程碑对比六家文件系统的文件性能） 2026-09-17 两次正式跑）：子进程连着打出、中间只有几微秒计算的几行，时间戳跨了 21.7–25.8 ms；两次跑 10 轮里 9 轮外层切出的覆盖写、释放、回退与复用挂钟小于子进程自己计的纳秒，物理上不可能；前两次跑第一段挂钟「分两群」也是这个积压。逐轮数在 E152（按里程碑对比六家文件系统的文件性能） 实验页「这几个数说明什么（覆盖写、释放、回退与复用，与两盘镜像的六家比）」一节第 4 条。
 装置改成先读完再转打之后，同一台机器上冒烟跑一轮，那几行 9 行跨 24 µs，外层 6 632 915 ns 包住子进程自己计的 6 575 144 ns（`e152-preregistration.md` 第十四节）。

@@ -113,7 +113,7 @@ I-1.2（块头写序已发布）是扫描方向独立于遍历方向的判据，
 它与实现之间允许共享的只有一份从 kb 生成的常量模块（D13（验证路线） 已定项 5，「待定案」第 2 问）；今天 `singlefs-checker` 只依赖 `singlefs-format`。
 
 **它自己要先证明会红**：每条已实现的不变量配至少一份「改坏了正好触发它」的镜像，
-做成与 `research/mutations/` 同型的变异表，由门禁复跑（C13（checker 判定失效）要的正是这个：
+做成与 `scripts/mutation/tables/` 同型的变异表，由门禁复跑（C13（checker 判定失效）要的正是这个：
 跑了、全绿、但已经不做事，与没跑长得一样）。C88（根环的时间线判别未实现）的双根镜像、
 C47（根槽没按判定宽度对齐）的偏移半个槽镜像，是这份语料最早的两条。
 
@@ -171,7 +171,7 @@ C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失�
 
 | 东西 | 在哪 | 给谁用 |
 |---|---|---|
-| 崩溃状态枚举器、恢复模型、独立审计 | `research/e7-index-bench/src/bin/e77_publish_order.rs` | 崩溃点重放 harness 的骨架 |
+| 崩溃状态枚举器、恢复模型、独立审计 | `scripts/experiments/e77_publish_order.rs` | 崩溃点重放 harness 的骨架 |
 | 四条恢复算法与「重放窗口内失配数」闭式 | `e78_replay_start.rs`（E78（重放的起点）） | 恢复路径的对照模型 |
 | 全环扫描 vs 先信 tail 的模型 | `e24_recovery.rs`（E24（恢复算法：先信 tail 会不会丢记录）） | 恢复路径的阳性对照 |
 | 前缀枚举 + 发布边界过滤（D16（发布语义） 已定项 4：一次发布整体施加或整体不施加） | `e42_transaction_records.rs`（E42（一事务几条记录）） | 记录核对器的前缀判定 |
@@ -179,8 +179,8 @@ C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失�
 | 单元头需求矩阵（跑时 91、现行 105）、认领规则夹具 | `e85_unit_header.rs`（E85（单元头的字段表））、`e88_impostor_orphan.rs`（E88（冒名单元与孤儿单元的判别）） | checker 扫描方向 |
 | 根记录容量算术、固定结构放置的 8 种失效组合 | `e79_root_record.rs`（E79（根记录的容量））、`e87_fixed_placement.rs`（E87（固定结构的放置）） | mkfs 与 I-7（根环）类 |
 | O_DIRECT 打开设备、fdatasync 到设备的阳性对照 | `e44_jsn_width.rs`（E44（序号位宽的本机实测与代价））及另外 8 个用 O_DIRECT 的实验 | 块设备抽象的真设备实现 |
-| 结果行发射器与条数完整性闸 | `research/e7-index-bench/src/lib.rs` 的 `Emitter`、`research/scripts/vm-bench.sh` | 虚机档的结果抓取 |
-| 变异表机制与复跑脚本 | `research/scripts/mutate.sh`、`research/scripts/replay.sh`、`.claude/gate.d/code-source-discipline.sh` 的 mutation-tables 格 | checker 的已知坏镜像语料照这个形态做 |
+| 结果行发射器与条数完整性闸 | `scripts/experiments/lib.rs` 的 `Emitter`、`scripts/devices/vm-bench.sh` | 虚机档的结果抓取 |
+| 变异表机制与复跑脚本 | `scripts/mutation/mutate.sh`、`scripts/experiments/replay.sh`、`.claude/gate.d/code-source-discipline.sh` 的 mutation-tables 格 | checker 的已知坏镜像语料照这个形态做 |
 | 格式常量同步门禁 | `.claude/gate.d/code-source-discipline.sh` 的 format-constants 格 | 实现与 checker 各自的常量都得挂进去 |
 
 ⚠️ **一道闸要拦「两份工件不一致」，就得是相等性检查；哈希只拦「变了没声张」。**
@@ -201,7 +201,7 @@ C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失�
 | herd7 | 7.58，内核树 `~/linux-bug-fix/linux` | 门禁 LKMM 阶段输出 |
 | 宿主内核 6.17.0-1028-oem | `dm-log-writes`、`dm-flakey` 为模块，已装在 `/lib/modules/6.17.0-1028-oem/kernel/drivers/md/` | `grep /boot/config-*`、`ls /lib/modules/...` |
 | 虚机内核 6.17.0-lockdep | `CONFIG_BLK_DEV_DM=y`，`dm-log-writes.ko`、`dm-flakey.ko`、`nbd.ko`、`ublk_drv.ko` 都在 `/lib/modules/6.17.0-lockdep/`，`CONFIG_FUSE_FS=y` | 同上 |
-| `vm-bench.sh` 的 initramfs | 只装 busybox 与被测二进制，**不带内核模块**（`grep modprobe` 零命中） | 读 `research/scripts/vm-bench.sh` |
+| `vm-bench.sh` 的 initramfs | 只装 busybox 与被测二进制，**不带内核模块**（`grep modprobe` 零命中） | 读 `scripts/devices/vm-bench.sh` |
 | 虚机里的时间 | 不可与宿主比（lockdep 内核），计数类指标不受影响 | [vm-harness.md](vm-harness.md) |
 
 ⇒ 要在虚机里用 `dm-log-writes` 验 C6（块层语义假设写错），得给 initramfs 加装模块拷贝与 `insmod`，

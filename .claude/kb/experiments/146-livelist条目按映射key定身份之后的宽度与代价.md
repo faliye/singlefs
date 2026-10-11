@@ -12,14 +12,14 @@ E132（livelist 载体·按真实树数与内部扇出重算） 的 21 个规模
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-cd research && bash scripts/replay.sh E146
+bash scripts/experiments/replay.sh E146
 # 直接跑装置：
-cd research && cargo run --release --bin e146-livelist-entry-width
+cd scripts/experiments && cargo run --release --bin e146-livelist-entry-width
 ```
 
-代码 `research/e7-index-bench/src/bin/e146_livelist_entry_width.rs`，原始输出 `e146-livelist-entry-width-2026-09-16-tree-table-200.out`（130 行，末行 `emitted=130`；树表条目按 200 算的那一版，上一版 `e146-livelist-entry-width-2026-09-14-round2.out` 按 148 算、与它只差 6 行（`name=config` 1 行与 5 行 `name=new_pool_file_creation`），再上一版 `e146-livelist-entry-width-2026-09-13.out` 按 145 算，两版都原样保留；变异复跑 `e146_livelist_entry_width-mutate-2026-09-16-tree-table-200.log`，12 条全抓），
-跑前登记 `e146-preregistration.md`，变异表 `research/mutations/e146_livelist_entry_width.tsv`（12 条全抓，
-`bash research/scripts/mutate.sh e146-livelist-entry-width research/e7-index-bench/src/bin/e146_livelist_entry_width.rs research/mutations/e146_livelist_entry_width.tsv`）。
+代码 `scripts/experiments/e146_livelist_entry_width.rs`，原始输出 `e146-livelist-entry-width-2026-09-16-tree-table-200.out`（130 行，末行 `emitted=130`；树表条目按 200 算的那一版，上一版 `e146-livelist-entry-width-2026-09-14-round2.out` 按 148 算、与它只差 6 行（`name=config` 1 行与 5 行 `name=new_pool_file_creation`），再上一版 `e146-livelist-entry-width-2026-09-13.out` 按 145 算，两版都原样保留；变异复跑 `e146_livelist_entry_width-mutate-2026-09-16-tree-table-200.log`，12 条全抓），
+跑前登记 `e146-preregistration.md`，变异表 `scripts/mutation/tables/e146_livelist_entry_width.tsv`（12 条全抓，
+`bash scripts/mutation/mutate.sh e146-livelist-entry-width scripts/experiments/e146_livelist_entry_width.rs scripts/mutation/tables/e146_livelist_entry_width.tsv`）。
 
 ### 这是计数模型，不是实现
 

@@ -62,7 +62,7 @@ depth-first 创建（解压 tar 的形态）时 `Inode` 与 `Locality` **逐位�
 目录树 4 层 × 每层 6 个子目录 = 1296 个叶目录，每目录 24 个文件，共 31104 个对象；
 每叶 255 个 (key,val) 槽；`O_DIRECT`，镜像落临时目录（512 MiB，不进仓库）。
 5 个种子（3/7/11/13/17）取中位数。
-代码 `research/e7-index-bench/src/bin/e9_keylayout.rs`，
+代码 `scripts/experiments/e9_keylayout.rs`，
 调用 `cargo run --release --bin e9-keylayout -- <镜像> <种子> interleave <cache_leaves> <改名次数>`；
 输出 `e9-keylayout-2026-08-28.out`（25 轮，完成标记 25 个）。
 
@@ -79,8 +79,8 @@ done
 ```
 
 2026-08-29 按这个循环重跑，与入库产物**逐字节一致**（150 行、25 个完成标记全部对上）。
-现在它由 `research/scripts/replay.sh` 的 `driver_e9` 承载，
-复跑只需把E9（key 编码对遍历局部性的影响）的编号作为参数传给它：`bash research/scripts/replay.sh <E9（key 编码对遍历局部性的影响）编号>`。
+现在它由 `scripts/experiments/replay.sh` 的 `driver_e9` 承载，
+复跑只需把E9（key 编码对遍历局部性的影响）的编号作为参数传给它：`bash scripts/experiments/replay.sh <E9（key 编码对遍历局部性的影响）编号>`。
 
 ### ⚠️ E9（key 编码对遍历局部性的影响）此前一条绝对值断言都没有（2026-08-29 对抗验证补上）
 
@@ -108,7 +108,7 @@ done
 于是改坏生产侧那一行时一个测试都没红——正是本 kb 在 E28（明文映射层能不能只靠单元自描述重建）
 记过的同一个错（「那条测试自己算 wrong、绕开了被测代码」）。
 改法是把叶归属抽成 `assign_leaves()`，测试与生产走同一份。
-变异表存在 `research/mutations/e9_keylayout.tsv`，三条变异全被杀。
+变异表存在 `scripts/mutation/tables/e9_keylayout.tsv`，三条变异全被杀。
 
 **E9（key 编码对遍历局部性的影响）有 11 个单测**，钉住的是这些性质（各由变异测试证明会红）：
 树的形状与声明相符、全路径 key 让每个目录连续、locality key 的高位就是 locality、

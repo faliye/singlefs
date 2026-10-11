@@ -12,12 +12,12 @@
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-cd research && bash scripts/replay.sh E131
+bash scripts/experiments/replay.sh E131
 # 直接跑装置：
-cd research && cargo run --release --bin e131_livelist_carrier
+cd scripts/experiments && cargo run --release --bin e131_livelist_carrier
 ```
 
-代码 `research/e7-index-bench/src/bin/e131_livelist_carrier.rs`，
+代码 `scripts/experiments/e131_livelist_carrier.rs`，
 原始输出 `e131-livelist-carrier-2026-09-10.out`（一次运行，扫的格写在「臂与口径」那一节）。
 
 ### 这是计数模型，不是实现——它证明不了什么
@@ -75,7 +75,7 @@ cd research && cargo run --release --bin e131_livelist_carrier
 
 ### 变异
 
-15 条，**全部被抓**，表在 `research/mutations/e131_livelist_carrier.tsv`。
+15 条，**全部被抓**，表在 `scripts/mutation/tables/e131_livelist_carrier.tsv`。
 ⚠️ 第一轮有两条没红，**按 `.claude/rules/mutation-sampling.md` 分开处置**：
 M8（`per_head` 的点查按全池算）是**真盲区**——当时两条下降断言都只做臂间互比，
 所有臂一起错时互比看不见，补了钉绝对值的断言；
