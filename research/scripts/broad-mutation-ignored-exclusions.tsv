@@ -1,7 +1,0 @@
-# 广谱变异（research/scripts/broad-mutation.py）第二段「harness 慢档用例」那一步排掉的 #[ignore] 用例。
-# 一行一条：<二进制 id><空格><用例名><TAB><理由>；二进制 id 与用例名照 cargo nextest list 的写法（tests/<文件名>.rs 的二进制 id 是 <包>::<文件名>，模块里的用例名带模块路径）。
-# 归宿的判法：harness 档四个包里每条 #[ignore] 用例，理由以「harness 慢档用例：」开头的进第二段，不是的必须在这里写一行；新加的忽略用例两边都不在、这里指着不存在的用例，驱动开跑前判红（文件头「忽略用例登记」）。
-# 这三条都不是慢档用例：规模或输入由环境变量定，不给环境变量就用默认、或直接红，单条变异拿它判没有意义。
-singlefs-harness::random_histories random_histories_large_tier_seeds_and_length_from_the_environment	大档：种子段数、步数、线程、比重等全从 SINGLEFS_RANDOM_HISTORY_* 环境变量取，源码里的 #[ignore] 理由写明 release 下后台跑
-singlefs-harness::random_histories shrink_one_failing_seed_from_the_environment	收缩一个种子的工具：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，不给种子就红
-singlefs-harness::fault_injection_fast_tier fault_injection_large_tier_from_the_environment	大档：规模从 SINGLEFS_FAULT_INJECTION_* 环境变量取，按里程碑增补 3 后台跑；它报的新发现记在 .claude/kb/checks-owed.md 的 C600，不是某条变异的判据

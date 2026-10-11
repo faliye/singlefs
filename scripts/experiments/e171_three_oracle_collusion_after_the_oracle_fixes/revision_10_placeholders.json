@@ -1,0 +1,45 @@
+{
+ "about": "E171 第 1 次重跑·修订 10（修订 8 那一趟的第二段整表）的占位 H21–H29（登记 research/prompts/e171-r1-prereg.md 修订 10 第 10.6 节表）。值是 null 的就是还没填；照表的时刻由执行员与主 agent 填，revision_10_placeholders.py check 核。修订 8 那一趟的占位（树、H3、H8、H16、H18）不在这里重抄：照 revision_8_config 点名的那一份读、调修订 8 的核对函数核。路径不是绝对路径的都相对仓根。",
+ "dry_run": false,
+ "dry_run_note": null,
+ "revision_8_config": "scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/revision_8_placeholders.json",
+ "H21": "编排层每次起跑、续跑从修订 8 那一趟的序列日志现取（step-1 绿行的 TAG、计时产物路径与 sha256、process_wall、逐行限时），写进第二段日志与 <H23 导出根>/run-values.tsv",
+ "H22": {
+  "baseline": null,
+  "stability_baseline_run1": null,
+  "stability_baseline_run2": null
+ },
+ "H23": {
+  "run_date": null,
+  "run_suffix": "-r8",
+  "dumps_root": null,
+  "logs_directory": null,
+  "work_root": null
+ },
+ "H24": {
+  "peer_kit": "research/e171-s2-final-peer-kit",
+  "peer_snapshot": "research/e171-s2-final-frozen-snapshot",
+  "peer_out": "scripts/experiments/target/e171-s2-final-peer-out",
+  "peer_launch": "research/e171-s2-final-launch",
+  "label_prefix": "e171s2r8"
+ },
+ "H25": {
+  "files": null
+ },
+ "H26": "编排层在第一趟开跑那一刻写进 <H23 导出根>/inputs.sha256（文件与 sha256）与 run-values.tsv（树、H3、H8、T₂、落点）；续跑先核，对不上就停",
+ "H27": {
+  "yield_implemented": true,
+  "how": "编排层见到修订 8 的逐行编排在跑（修订 8 序列日志里最后一行「逐行编排起」在最后一行「逐行编排退」「收到停止信号」之后）而第 11、12 步与跨机对照 X 还有既没做完、也没在跑的行时，第二段在各台都不起新行，在跑的跑完；第 13 步超时重跑那几行不看"
+ },
+ "H28": {
+  "comparator_product": null,
+  "driver_product": null,
+  "driver_timing": null,
+  "rows_root": null,
+  "rows_hosts_ledger": null,
+  "product_prefix": null,
+  "product_suffix": null,
+  "sha256": null
+ },
+ "H29": "编排层每次起跑、续跑、加槽现查现算（第二段日志里「分配」「加槽」那几行）"
+}
