@@ -13,7 +13,7 @@
   - `research/prompts/m2-closeout-code-r3-local-attack-output-void1.md`：损坏闸留下的作废副本，参考。八组数与 s1 逐格相同，损坏在第 64 行「Wholewhole-line」，没有打中。
 
 **主 agent 的核查**（五步）：
-1. `python3 scripts/cite-check.py` 核两条云端腿的报告，`--root` 取快照（`git archive` 解出 `crates/`、`litmus/`，再解 HEAD 的 `.claude/kb/`），`--background` 取背景材料：「核了 16 处引文，对上 16 处，没判 0 处」。脚本认不出的写法（「快照 `文件` 第 N 行」）没有逐处人工核；判决引到的那几处按下面第 2 步在产物里核。
+1. `python3 scripts/agents/cite-check.py` 核两条云端腿的报告，`--root` 取快照（`git archive` 解出 `crates/`、`litmus/`，再解 HEAD 的 `.claude/kb/`），`--background` 取背景材料：「核了 16 处引文，对上 16 处，没判 0 处」。脚本认不出的写法（「快照 `文件` 第 N 行」）没有逐处人工核；判决引到的那几处按下面第 2 步在产物里核。
 2. 产物：攻方报告「复跑命令与文件哈希」表 44 份文件 `sha256sum -c` 全对。判定一览引的几行在日志里逐字找到：`logs/x5-analysis-sweep.txt` 的 `RUNS 17516`、`logs/x5-analysis-enum.txt` 的 `ENUM_STATES_TOTAL 721617`、`logs/x6-snapshot.log` 第 2100 行 `STALE accepted=312 refused=956 flagged=58`、`logs/mutTree.log` 第 40、69 行两份用例 22、23 条全过、`logs/mut736-old-target.log` 第 7 行 `0 passed … 22 filtered out`。
 3. 复跑没做：`rerun.sh` 约 75 分钟，要在快照副本上跑崩溃枚举（重型），与本机在跑的提交前全量抢机器。判决只引日志里的原样行，不引复跑数。
 4. 本地腿译文核对表 22 条：它点名的快照行 15 处逐处对上（数组、常量、注释原句），引实现员报告的两处（合入后验证一报告第 239–242 行）引文里的省略号只省了行号清单，没丢限定词；表里自己记的两处译文少了限定词（第 2 条「只有」、第 3 条单元写的括注）与一处多出来的说明句（第 5 条），都不影响要算的数。

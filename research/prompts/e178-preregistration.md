@@ -43,7 +43,7 @@
 
 ## 二、被测条款与它引的定义
 
-`scripts/quote-kb.py` 整段抽出（草稿目录 `section2.md`，回读逐字节一致），原样追加。D8 已定项 16 与 D18 已定项 8 不在派发提示点名的条款里，X3 的「意图」「最后一批」与墓碑的来历由它们定，一并抄。I-9.13、I-9.18 同理（底座的「删空」与「按谱系滤」的定义）。
+`scripts/kb/quote-kb.py` 整段抽出（草稿目录 `section2.md`，回读逐字节一致），原样追加。D8 已定项 16 与 D18 已定项 8 不在派发提示点名的条款里，X3 的「意图」「最后一批」与墓碑的来历由它们定，一并抄。I-9.13、I-9.18 同理（底座的「删空」与「按谱系滤」的定义）。
 
 **出处 `.claude/kb/decisions/08-核心索引结构.md:152-224`（整段抄，未转述）**
 
@@ -615,7 +615,7 @@
 
 ## 九、变异
 
-给执行员的变异表（`scripts/mutations/e178_leaf_and_record_death_counts.tsv`，锚点在装置源码里唯一命中）。每条写明在哪个取样点上改变输出；执行员跑完逐条核「在那个取样点上真的变了」，没变的按 `.claude/rules/mutation-sampling.md` 三分，不直接记盲区或等价。
+给执行员的变异表（`scripts/mutation/tables/e178_leaf_and_record_death_counts.tsv`，锚点在装置源码里唯一命中）。每条写明在哪个取样点上改变输出；执行员跑完逐条核「在那个取样点上真的变了」，没变的按 `.claude/rules/mutation-sampling.md` 三分，不直接记盲区或等价。
 
 | # | 改坏什么 | 在哪个取样点上改变输出 |
 |---|---|---|
@@ -724,7 +724,7 @@
 
 #### 修订 2 之二：补抄的条款与要改的条款句
 
-派发提示把 I-9.19 列在被测条款里，第二节没有抄它；B-tsz 的「整对象墓碑在所有版本里不收」与它管的是同一件事（谱系上的墓碑与 inode 记录的关系），补抄（`scripts/quote-kb.py` 抽进草稿目录 `~/.local/share/singlefs/work/e178-designer-r1/quote-i919.md`，回读逐字节一致，sha256 `21aadc9e50a13c4f15e2c2b244ca15f795b2f9e6152d42419affe304461b137a`，原样贴在下面）：
+派发提示把 I-9.19 列在被测条款里，第二节没有抄它；B-tsz 的「整对象墓碑在所有版本里不收」与它管的是同一件事（谱系上的墓碑与 inode 记录的关系），补抄（`scripts/kb/quote-kb.py` 抽进草稿目录 `~/.local/share/singlefs/work/e178-designer-r1/quote-i919.md`，回读逐字节一致，sha256 `21aadc9e50a13c4f15e2c2b244ca15f795b2f9e6152d42419affe304461b137a`，原样贴在下面）：
 
 **出处 `.claude/kb/invariants.md:307-307`（整段抄，未转述）**
 
@@ -835,7 +835,7 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 - 几何取样点照第八节那张表：Q-Bs-1 至 Q-Bs-4、Q-Bt-1、Q-Bt-2、Q-Bt-4 在 W、θ、容量、b 四个旋钮上各取方向相反的两点；Q-Bs-5、Q-Bs-6 是写路径上的数，与 W 无关，在 θ、容量两个旋钮上各报两点（另报 θ = 0），b 两档各报。判定在一对取样点上翻面记「不稳定」。
 - 判别力自证照第八节：新判定函数的门槛挪到两点之间，判定由绿转红，进单测。
 
-#### 修订 2 之十：变异（补；进 `scripts/mutations/e178_leaf_and_record_death_counts.tsv`，锚点在装置源码里唯一命中）
+#### 修订 2 之十：变异（补；进 `scripts/mutation/tables/e178_leaf_and_record_death_counts.tsv`，锚点在装置源码里唯一命中）
 
 | # | 改坏什么 | 在哪个取样点上改变输出 |
 |---|---|---|
@@ -886,7 +886,7 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 - 预计挂钟：超过 2 小时
 - 分片：工作项 = (历史段, 写路径格)：H51 51 段 + F10 28 段 + F11 4 段，各 × 12 格，共 996 项，加 PC-B2-direct 构造 1 项，共 997 项；每项里两条写路径一起跑、逐次扫描配对，项与项之间不共享状态；进程内按 `E178_THREADS` 并行（装置已有的 `run_in_parallel`），产物按项的次序输出，与线程数、机器数无关。
 - 续跑：装置今天没有续跑（第二、三段是一次跑完）。第四段加：每项算完把它的产物行原子写进 `~/.local/share/singlefs/work/e178-segment-four/items/<项名>.out`（同目录临时文件写完、fsync、改名），文件第一行是键（项名、装置源文件 sha256、几何参数）；同一条命令重起，键相同的项直接读回、不重算，只补没做完的；997 项齐了才按项的次序拼出 `research/results/e178-leaf-and-record-death-counts-segment-four.out`，成功行报「现判 N、复用 M」；小输入上关掉复用跑一遍、产物逐字节相同，进单测。
-- 多机：台数开跑前现读 `bash scripts/layer0-shard-configuration-check.sh --emit-hosts`，各台线程额度现读 `python3 scripts/host-resources.py --json` 的 `available_threads`，都不写常量；项按序号对台数取模分给各台（`segment-four --shard i/k`），各台在自己的仓目录（`--emit-hosts` 给的 `MULTI_HOST_<k>_REPOSITORY_DIRECTORY`）用 sha256 相同的装置源跑，项文件拷回本机的 items 目录，由本机拼产物；拼之前数项文件，不是 997 不拼。
+- 多机：台数开跑前现读 `bash scripts/crash/layer0-shard-configuration-check.sh --emit-hosts`，各台线程额度现读 `python3 scripts/hosts/host-resources.py --json` 的 `available_threads`，都不写常量；项按序号对台数取模分给各台（`segment-four --shard i/k`），各台在自己的仓目录（`--emit-hosts` 给的 `MULTI_HOST_<k>_REPOSITORY_DIRECTORY`）用 sha256 相同的装置源跑，项文件拷回本机的 items 目录，由本机拼产物；拼之前数项文件，不是 997 不拼。
 
 ### 修订 3（执行员，2026-10-08，第四段装置单测跑完、第四段产物一次没跑之前）
 
@@ -933,25 +933,25 @@ B-stub-lin-off 与 PC-Bt2、PC-Bt3 的变体读者只在阳性对照那几次扫
 | `crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs` | 820-975；943-947 |
 | `crates/singlefs-harness/tests/pool_checker_judges_the_deletion_state_of_every_walked_version.rs` | 1345-1380 |
 | 其余 grep 命中行 | `crates/` 下引 I-9.4 的文件名清单与 `"I-9.4"` 命中行（`image.rs:139`、`crash_judge_gpu.rs:80`、`crash_judge_gpu_agrees...rs:19、6562-6563、8140`、`e171_three_oracle_collusion*.rs` 两处、`inode_tree.rs:516、550`、`writable_mount_of_a_formatted_pool.rs:599、655、739`、`recovery.rs:2503、4840、4881`、`many_inodes_write_and_read.rs:302`）；`crates/singlefs-core/src` 下「退役」「retire」「区间起」等 grep 命中（`instance_table.rs`、`instance_table_sweep.rs`、`write_request_split.rs`、`system_configuration.rs` 那几行，与本题无关） |
-| `scripts/claim-experiment.sh` | 1-40 |
-| `scripts/quote-kb.py`、`scripts/replace-once.py` | `--help` 输出 |
+| `scripts/kb/claim-experiment.sh` | 1-40 |
+| `scripts/kb/quote-kb.py`、`scripts/kb/replace-once.py` | `--help` 输出 |
 | `.claude/format-constants-exclude` | 1-4 |
-| `.claude/scripts/gen-decision-items.py`、`scripts/kb-spec-check.py` | `not-numbers` 的 grep 命中行（51、69、83；62） |
+| `.claude/scripts/gen-decision-items.py`、`scripts/kb/kb-spec-check.py` | `not-numbers` 的 grep 命中行（51、69、83；62） |
 | `research/results/` | 只有 `ls \| grep -i e177` 列出的三个文件名，内容没读 |
 
-全仓按用词搜（排除实验、产物、提示目录与实验索引两份文件）只搜过一次：「发布占比\|多写的发布\|每次借多写\|退役记录数」，零命中。`records/`、`.claude/kb/decisions-history.md`、`scripts/perf-by-milestone.md` 没读到任何结果行。
+全仓按用词搜（排除实验、产物、提示目录与实验索引两份文件）只搜过一次：「发布占比\|多写的发布\|每次借多写\|退役记录数」，零命中。`records/`、`.claude/kb/decisions-history.md`、`scripts/experiments/perf-by-milestone.md` 没读到任何结果行。
 
 ### 13.2 跑过的命令（原样；工作目录仓根，草稿目录 `~/.local/share/singlefs/work/leaf-death-designer/`）
 
 ```
-bash scripts/claim-experiment.sh --next
-bash scripts/claim-experiment.sh E178 叶容器与记录死亡的计数
+bash scripts/kb/claim-experiment.sh --next
+bash scripts/kb/claim-experiment.sh E178 叶容器与记录死亡的计数
 grep -o '^| E[0-9]*' .claude/kb/experiments.md | sort -t E -k2 -n | tail -3
 ls research/results | grep -i e177 | head
 grep -rn '退役记录\|PACKED_TYPE_RETIRE' crates/singlefs-core/src crates/singlefs-format/src | wc -l      # 0
 grep -rn '扫描重建\|扫盘重建' crates/singlefs-core/src | wc -l                                          # 0
 grep -rn '发布占比\|多写的发布\|每次借多写\|退役记录数' --exclude-dir=experiments --exclude-dir=results --exclude-dir=prompts --exclude=experiments.md --exclude=experiments-history.md .   # 零命中
-python3 scripts/quote-kb.py $D/section2.md "$D8@#### 已定项 6：…" "$D8@#### 已定项 16：…" "$D18@#### 已定项 8：…" "$D18@#### 已定项 10：…" "$D18@#### 已定项 11：…" "$D18@#### 已定项 24：…" "$INV~^\| I-9\.4 \|" "$INV~^\| I-9\.12 \|" "$INV~^\| I-9\.13 \|" "$INV~^\| I-9\.18 \|" "$INV~^\| I-9\.20 \|"
+python3 scripts/kb/quote-kb.py $D/section2.md "$D8@#### 已定项 6：…" "$D8@#### 已定项 16：…" "$D18@#### 已定项 8：…" "$D18@#### 已定项 10：…" "$D18@#### 已定项 11：…" "$D18@#### 已定项 24：…" "$INV~^\| I-9\.4 \|" "$INV~^\| I-9\.12 \|" "$INV~^\| I-9\.13 \|" "$INV~^\| I-9\.18 \|" "$INV~^\| I-9\.20 \|"
     # （标题照第二节各段第一行逐字；输出「✓ 11 段整抄进 …section2.md，回读逐字节一致」，退出 0）
 python3 anchors.py > anchors.out
 python3 anchors2.py > anchors2.out
@@ -1102,19 +1102,19 @@ A7 n_u=300 b=144 in_window_scans=3 extent_m_peak=300 first=[300, 156, 12] last=1
 | `.claude/kb/invariants.md` | 301、307（grep 命中） |
 | `crates/singlefs-checker/src/walk.rs` | grep `I-9\.13` 命中 3017、3056；grep `I-9\.19` 命中 10000、10028、10304；3054-3058 |
 | `crates/singlefs-core/src/inode_tree.rs` | grep `is_empty()` 命中 132、301、762、801、802；296-310 |
-| `scripts/replace-once.py` | `--help` 输出 |
+| `scripts/kb/replace-once.py` | `--help` 输出 |
 
 全仓按用词搜没做（这一条修订不新报一个仓里可能另有口径的量：Q-Bs-5、Q-Bs-6 的分母同第一节读法 3）。
 
 ```
 ps -o pid,etime,args -u "$(id -u)" | grep -i 'e178\|leaf-and-record' | grep -v grep
-bash scripts/layer0-shard-configuration-check.sh --emit-hosts | tail -5
-python3 scripts/host-resources.py --json | head -c 1500
+bash scripts/crash/layer0-shard-configuration-check.sh --emit-hosts | tail -5
+python3 scripts/hosts/host-resources.py --json | head -c 1500
 sha256sum research/prompts/m3-leaf-death-forks.md research/prompts/e178-preregistration.md scripts/experiments/e178_leaf_and_record_death_counts.rs
-python3 scripts/quote-kb.py $D/quote-i919.md ".claude/kb/invariants.md~^\| I-9\.19 \|"     # ✓ 1 段整抄，回读逐字节一致，退出 0
+python3 scripts/kb/quote-kb.py $D/quote-i919.md ".claude/kb/invariants.md~^\| I-9\.19 \|"     # ✓ 1 段整抄，回读逐字节一致，退出 0
 python3 anchors3.py > anchors3.out      # 退出 0
 python3 anchors4.py > anchors4.out      # 退出 0
-python3 scripts/replace-once.py research/prompts/e178-preregistration.md <旧串> <新串>   # 修订 2 分六次写进来，每次「命中 1 次」
+python3 scripts/kb/replace-once.py research/prompts/e178-preregistration.md <旧串> <新串>   # 修订 2 分六次写进来，每次「命中 1 次」
 ```
 
 修订 2 写进来之前的登记 sha256 `ca49c4fe6fbee5bb53525b2336ba83f2e8d89ab14a941d85a7c961b1c8b2b38b`；装置源文件这次读时的 sha256 `e0512d3f1b301c6094b3838011689d8535e8d971171ece38faf3052c657e1897`（没改）。

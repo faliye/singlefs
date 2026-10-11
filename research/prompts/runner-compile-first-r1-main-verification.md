@@ -1,6 +1,6 @@
 # 实验执行员「入库装置先编后换」三方第一轮判决（2026-09-27）
 
-正文 `research/prompts/_runner-compile-first-r1-body.md`；背景材料 `research/prompts/_runner-compile-first-r1-background.md`；附录二 `research/prompts/_runner-compile-first-r1-diff.md`。被判的四份：`.claude/agents/experiment-runner.md`（第 2 步第 ④ 条）、`.claude/hooks/write-guard.sh`（「四、先编后换」）、`.claude/hooks/bash-command-detector.sh`（⑨）、`scripts/compile-then-swap.py`。开工快照 `research/prompts/runner-compile-first-r1-snapshot/sha256sums.txt`，腿跑着的时候主 agent 没改这四份。
+正文 `research/prompts/_runner-compile-first-r1-body.md`；背景材料 `research/prompts/_runner-compile-first-r1-background.md`；附录二 `research/prompts/_runner-compile-first-r1-diff.md`。被判的四份：`.claude/agents/experiment-runner.md`（第 2 步第 ④ 条）、`.claude/hooks/write-guard.sh`（「四、先编后换」）、`.claude/hooks/bash-command-detector.sh`（⑨）、`scripts/hosts/compile-then-swap.py`。开工快照 `research/prompts/runner-compile-first-r1-snapshot/sha256sums.txt`，腿跑着的时候主 agent 没改这四份。
 
 ## 一、各条腿
 
@@ -16,11 +16,11 @@
 
 | 格 | 判定 | 依据 |
 |---|---|---|
-| R1-a 经脚本文件间接写 | **打中（主 agent 现查，事实）**：执行员先在草稿目录写一个脚本、再执行它，由脚本写主工作区 `crates/` 下的 `.rs`，⑨ 看不见 | `.claude/hooks/bash-command-detector.sh:66` 原文「`python3 scripts/compile-then-swap.py …`（脚本文件里的写这里本来就判不到）」；同一天 E161 执行员用自己写的 `/tmp/claude-1000/e161-runner2/append-mutations.sh` 追加变异表，是这种写法的实例 |
+| R1-a 经脚本文件间接写 | **打中（主 agent 现查，事实）**：执行员先在草稿目录写一个脚本、再执行它，由脚本写主工作区 `crates/` 下的 `.rs`，⑨ 看不见 | `.claude/hooks/bash-command-detector.sh:66` 原文「`python3 scripts/hosts/compile-then-swap.py …`（脚本文件里的写这里本来就判不到）」；同一天 E161 执行员用自己写的 `/tmp/claude-1000/e161-runner2/append-mutations.sh` 追加变异表，是这种写法的实例 |
 | R1-b `git apply` / `patch` / `git checkout -- <文件>` / `git restore` | **打中（主 agent 现查，事实）**：不在 ⑨ 认的写法里 | `.claude/hooks/bash-command-detector.sh:61-63` 列的写法清单 |
 | R1-c `crates/` 下的非 `.rs` | **打中（主 agent 现查，事实）**：`Cargo.toml` 这类改坏同样让全仓编不过，两道钩子都只认 `.rs` | `.claude/hooks/bash-command-detector.sh:65`「crates/ 下不是 .rs 的（crates/mutations.tsv）」放行；`is_main_workspace_crate_source` 判 `path.endswith(".rs")` |
-| R1-d 编译标准不带 `-D warnings` | **不算缺口**：多一条警告不让别人编不过，第 51 行防的是编不过 | `scripts/compile-then-swap.py:142-143` 只跑 `cargo build` 与 `cargo test --no-run` |
-| R1-e 竞态只核目标那一份 | **不算缺口**：别的会话同时改了库导致不兼容，是对方的改动，不归这一条 | `scripts/compile-then-swap.py:20` |
+| R1-d 编译标准不带 `-D warnings` | **不算缺口**：多一条警告不让别人编不过，第 51 行防的是编不过 | `scripts/hosts/compile-then-swap.py:142-143` 只跑 `cargo build` 与 `cargo test --no-run` |
+| R1-e 竞态只核目标那一份 | **不算缺口**：别的会话同时改了库导致不兼容，是对方的改动，不归这一条 | `scripts/hosts/compile-then-swap.py:20` |
 | R2-a 共用约束没跟上 | **打中（正推腿，主 agent 复核属实）**：`.claude/agent-common.md` 里 `compile-then-swap`、`先编后换` 零命中；「执行前拒绝的写法」Bash 检出一条列到 ⑧ 没有 ⑨；写闸一条只列三道判定，没有「四、先编后换」；脚本清单没收 `compile-then-swap.py` | `grep -c 'compile-then-swap\|COMPILE_FIRST\|先编后换' .claude/agent-common.md` → 0 |
 | R2-b「交回前跑 `--clean`」没有代码核 | **打中（正推腿，主 agent 复核属实）**：两个钩子里 `--clean` 零命中；上游交回闸能不能兜底没核（推的） | `grep -c -- '--clean' .claude/hooks/write-guard.sh .claude/hooks/bash-command-detector.sh` → 0、0 |
 | R2 其余 | 站住：第 ④ 条前四句在两个钩子与脚本里都有落点，拒绝信息与定义逐字一致 | 正推腿报告第四节 |

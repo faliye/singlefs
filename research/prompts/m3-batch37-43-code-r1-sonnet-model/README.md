@@ -33,7 +33,7 @@ bash compare.sh OUT expected
 export CARGO_TARGET_DIR=<编译目录> PROVE_RED_LOG_DIRECTORY=<日志目录>
 cd <仓副本>   # 副本里改过的文件要 touch 一下再跑：cp -p 回原样的源文件 mtime 比编译产物旧，cargo 不重编（我踩过一次）
 mapfile -t N < <(sed -n '2,12p' names.txt)
-bash <主仓>/scripts/prove-red.sh --copy "$PWD" --memory 6G singlefs-harness "${N[@]}"
+bash <主仓>/scripts/mutation/prove-red.sh --copy "$PWD" --memory 6G singlefs-harness "${N[@]}"
 ```
 
 三段的输出在 `prove-red-run/chunk-*.txt`：第 2–12 行 11 条、第 1 行与 13–26 行 15 条、第 27–39 行 13 条，合计 39 条，「跑的都抓到了」。

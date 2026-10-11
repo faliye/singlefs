@@ -12,7 +12,7 @@
 REPO=$PWD FROZEN=/tmp/claude-1000/m3-formal-c655-c687-r1/tree WORK=<草稿目录> THREADS=10 bash research/prompts/m3-formal-c655-c687-r1-opus-model/tools/rerun.sh [harness y1-4g y1-384-check y1-384 y1s2 fallback]
 ```
 
-它在冻结副本的拷贝上打 `probe-core.patch`、把 `harness-probe-tests.rs` 接到 `crates/singlefs-harness/tests/checker_known_bad_images.rs` 末尾、加 crate `c655probe`（`Cargo.toml`、`main.rs`），经 `scripts/run-with-memory-cap.sh` 编、逐件跑，最后把每份日志与模型目录里的同名日志逐行比（去掉耗时、排队、编译行与取样的例子行），三份汇总重出再比。checker 档的测试一个不跑。我自己照它跑过 `fallback`、`harness`、`y1-384-check`、`y1-384` 四件，26 份日志逐行相同；`y1-4g`、`y1s2` 两件没经它复跑（`y1s2` 单件约 5 分钟，超过我前台一条命令的时限）。
+它在冻结副本的拷贝上打 `probe-core.patch`、把 `harness-probe-tests.rs` 接到 `crates/singlefs-harness/tests/checker_known_bad_images.rs` 末尾、加 crate `c655probe`（`Cargo.toml`、`main.rs`），经 `scripts/hosts/run-with-memory-cap.sh` 编、逐件跑，最后把每份日志与模型目录里的同名日志逐行比（去掉耗时、排队、编译行与取样的例子行），三份汇总重出再比。checker 档的测试一个不跑。我自己照它跑过 `fallback`、`harness`、`y1-384-check`、`y1-384` 四件，26 份日志逐行相同；`y1-4g`、`y1s2` 两件没经它复跑（`y1s2` 单件约 5 分钟，超过我前台一条命令的时限）。
 
 每个文件的 sha256：
 
@@ -264,7 +264,7 @@ core 读根只读到偏移 428（`crates/singlefs-core/src/root_record.rs:156`�
 
 ## 引文核对
 
-`python3 scripts/cite-check.py research/prompts/m3-formal-c655-c687-r1-opus-output.md --root /tmp/claude-1000/m3-formal-c655-c687-r1/tree --root . --background research/prompts/_m3-formal-c655-c687-r1-background.md` 末行：
+`python3 scripts/agents/cite-check.py research/prompts/m3-formal-c655-c687-r1-opus-output.md --root /tmp/claude-1000/m3-formal-c655-c687-r1/tree --root . --background research/prompts/_m3-formal-c655-c687-r1-background.md` 末行：
 
 ```
   ✓ 核了 21 处引文，对上 21 处，没判 0 处（逐处列在上面）

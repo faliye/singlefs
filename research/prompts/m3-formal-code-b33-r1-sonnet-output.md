@@ -9,7 +9,7 @@
 ## 零、方法与不作数的东西
 
 - 全部是 harness 档：`cargo test -p singlefs-harness`（`--lib`、`--test …`）。每份副本自己的 `CARGO_TARGET_DIR=…/work/target`；每一趟编完核日志里被测包确有 `Compiling`（`tools/lib.sh` 的 `cg` 每段末尾打 `compiled:` 行；变异跑的日志里 `Compiling singlefs-checker`、`singlefs-core` 或 `singlefs-harness` 都在）。没有 `Compiling` 的趟不算：变异趟都有；仅有的无 `Compiling` 的两趟（`probe-p4-base-all`、`base-reuse-one`）是同一份源码上紧接着重跑已编好的二进制，不是变异趟。
-- cargo 与编出来的二进制都经 `scripts/run-with-memory-cap.sh` 加 `scripts/capped.sh`（10 线程，扫整个套件时 3 个并行 × 3 线程），设了 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`。包装退 252（排不上）的那一遍扫描（124 个二进制）输出不算结果，没绕开包装，改成 3G 上限重跑到全部有结果。
+- cargo 与编出来的二进制都经 `scripts/hosts/run-with-memory-cap.sh` 加 `scripts/hosts/capped.sh`（10 线程，扫整个套件时 3 个并行 × 3 线程），设了 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`。包装退 252（排不上）的那一遍扫描（124 个二进制）输出不算结果，没绕开包装，改成 3G 上限重跑到全部有结果。
 - checker 档一律没跑：`singlefs-checker-tier` 的测试与装置内联单测、GPU 对拍、E156 装置、层 0、`crates/mutations.tsv` 整表。涉及它们的结论写「推的」。
 - 33-b 那条 checker 档用例的造法，我把用例文件拷成 harness 档的探针（`probes/make_probe_rollback_floor.py`：删掉唯一的 `singlefs_checker_tier` 的 use 与最后一条用到它的用例，其余原样），在 `singlefs-harness` 包里编、跑。这不是 checker 档包自己的测试二进制；它回答「新造法在今天的 core 上量到什么」，不回答「checker 档那条用例本身绿不绿」。
 - 冻结副本只有 `crates/` 与两份 Cargo 文件，几条用例读 `../../litmus`，我从主工作区拷了一份 `litmus/`（这一轮的改动不碰它）。
@@ -315,8 +315,8 @@ control 是在副本里把 core 的 `mount.rs` 一行换成「挂载时一个全
 **（a）（b）静态核**（`tools/rerun.sh static`，原样）：
 
 ```
-$ python3 scripts/crates-mutation-rows.py static-check <冻结副本拷贝>
-COPIED	crates Cargo.toml Cargo.lock litmus scripts/run-with-memory-cap.sh scripts/crates-mutation-rows.py
+$ python3 scripts/mutation/crates-mutation-rows.py static-check <冻结副本拷贝>
+COPIED	crates Cargo.toml Cargo.lock litmus scripts/hosts/run-with-memory-cap.sh scripts/mutation/crates-mutation-rows.py
 CHECKED	2817	299	9
 ```
 
@@ -372,7 +372,7 @@ baseline（harness 档，`out/baseline-runs.txt`）：`--lib` 86 过 1 忽略、
 ## 要主 agent 跑的命令
 
 1. 慢档里一次调用 225 秒内没跑完的 6 条合法历史（探针版）：`REPO=$PWD FROZEN=/tmp/claude-1000/m3-formal-code-b33-r1/tree WORK=<草稿目录> CAP=10 MEM=8G bash research/prompts/m3-formal-code-b33-r1-sonnet-model/tools/rerun.sh setup sweep sweep-slow`（后台跑，不设超时；`sweep-slow` 的单任务时限 `BUDGET` 默认 3000 秒）。看 `$WORK/sweep-ignored/*.rc` 与 `grep -h '^B33' $WORK/sweep-ignored/*.log`：任何一行 B33F1 / B33C 出现在不是故意弄坏树表的测试上，就是 P2（a）被推翻。没跑完的是 `fault_injection_large_tier_from_the_environment`、`one_fixed_history_injects_twelve_faults_and_none_of_them_panics`、`allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_former_one_node_wall`、`random_histories_large_tier_seeds_and_length_from_the_environment`、两条 `unit_area_wall_sampling_on_small_devices_…`。
-2. checker 档（我不跑）：U11 与 E156 内联单测：`SINGLEFS_HEAVY_TESTS=commit bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 10 cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts` 看 `19 passed`，另 `--bin e171_three_oracle_collusion_after_the_oracle_fixes -- the_third_stream_past_one_turn_of_the_root_ring_holds_i_3_1`；33-a 的 ① 与 33-b 的 ② 两条用例主 agent 已跑过，我没复核。
+2. checker 档（我不跑）：U11 与 E156 内联单测：`SINGLEFS_HEAVY_TESTS=commit bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 10 cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts` 看 `19 passed`，另 `--bin e171_three_oracle_collusion_after_the_oracle_fixes -- the_third_stream_past_one_turn_of_the_root_ring_holds_i_3_1`；33-a 的 ① 与 33-b 的 ② 两条用例主 agent 已跑过，我没复核。
 3. 抬 F 慢档用例今天是否红：`cargo test -p singlefs-harness --test reuse_after_raising_the_floor -- --ignored --exact raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it`（在主工作区单跑），看是不是 `I-9.18 在 E 之后的镜像上要成立`。
 
 ## 没做什么
@@ -387,6 +387,6 @@ baseline（harness 档，`out/baseline-runs.txt`）：`--lib` 86 过 1 忽略、
 
 ## cite-check 末行
 
-命令：`python3 scripts/cite-check.py research/prompts/m3-formal-code-b33-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b33-r1/tree --root . --background research/prompts/_m3-formal-code-b33-r1-background.md`
+命令：`python3 scripts/agents/cite-check.py research/prompts/m3-formal-code-b33-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b33-r1/tree --root . --background research/prompts/_m3-formal-code-b33-r1-background.md`
 
 末行：`✓ 核了 79 处引文，对上 79 处，没判 0 处（逐处列在上面）`

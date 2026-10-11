@@ -11,7 +11,7 @@ for spec in today:not-counted jia:not-counted yi_adjust:not-counted yi_refuse:no
   candidate=${spec%%:*}
   floor_mode=${spec##*:}
   started=$(date +%s)
-  AF_CANDIDATE=$candidate AF_ABANDONED_F=$floor_mode nice -n 19 bash /home/fy5090/code/singlefs/scripts/capped.sh 16 \
+  AF_CANDIDATE=$candidate AF_ABANDONED_F=$floor_mode nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 16 \
     "$CARGO_TARGET_DIR"/release/deps/abandoned_floor_candidates-"$BINARY_HASH" --nocapture --test-threads 16 e9_ e10_ \
     > "$runs/b2-$index-$candidate-$floor_mode.log" 2>&1
   echo "$?" > "$runs/b2-$index.rc"

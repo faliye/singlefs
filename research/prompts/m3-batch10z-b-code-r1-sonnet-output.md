@@ -80,7 +80,7 @@
 故障三档（只动 R 的树表、中央映射树根的位置条目，设备报读错）：账无故障；仅 M1 时读错；M1 之后读错（挂着时坏）。M1 之后会话覆盖写到 60 次，写满前准入推抬 F，最后正常卸载。
 **C 臂**：在副本里加的开关（`SINGLEFS_ARM_C`，diff 在模型目录 `k2/c-arm-mount.rs.diff`、`k2/c-arm-allocator.rs.diff`），抬 F 那一遍对表里没记着、又是「挂载那一刻记成有效根（txg 对得上）、同槽上 C 圈有按槽记的落点」的被抛弃根，取那一圈的落点；别的照旧。我给它多加了一条「那一槽记的是有效根且 txg 相同」的认同条件，因为 C 圈只按槽号存、不带 (实例, txg)。
 复跑（线程 8，内存 12G，`nice -n 19`）：
-`SWEEP_MOD=3 SWEEP_REM=<0|1|2> [SINGLEFS_ARM_C=1] CARGO_TARGET_DIR=…/target bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 8 cargo test --offline -p singlefs-harness --test k2_arms_probe -- --nocapture --test-threads 8 s_ [m_]`，每臂三次，合并后 50 个例子（46 个读零 R 单元的例子 + 4 个无读零的 M 例子）。统计脚本 `k2/an.py`，原样输出在 `k2/an-output.txt`，逐例原始行在 `k2/sweep-today-arm.txt`、`k2/sweep-c-arm.txt`。`an.py` 输出里与判定有关的行（原样）：
+`SWEEP_MOD=3 SWEEP_REM=<0|1|2> [SINGLEFS_ARM_C=1] CARGO_TARGET_DIR=…/target bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 8 cargo test --offline -p singlefs-harness --test k2_arms_probe -- --nocapture --test-threads 8 s_ [m_]`，每臂三次，合并后 50 个例子（46 个读零 R 单元的例子 + 4 个无读零的 M 例子）。统计脚本 `k2/an.py`，原样输出在 `k2/an-output.txt`，逐例原始行在 `k2/sweep-today-arm.txt`、`k2/sweep-c-arm.txt`。`an.py` 输出里与判定有关的行（原样）：
 
 ```
 cases today 50 c 50 same labels True
@@ -185,7 +185,7 @@ cases today 50 c 50 same labels True
 
 ## 要主 agent 跑的命令
 
-- checker 档的 e158 单元测试（K2-3 的读码推断要它来证）：`cd <仓> && SINGLEFS_HEAVY_TESTS=commit bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 8 cargo test -p singlefs-checker-tier --bin e158_root_choice_repair mount_writable_then_raise_floor_reaches_the_injected_fault`，看这一条红不红、红的话断言文字是不是 `抬 F 重算影子账要数到这条读不出账的被抛弃根`。
+- checker 档的 e158 单元测试（K2-3 的读码推断要它来证）：`cd <仓> && SINGLEFS_HEAVY_TESTS=commit bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 8 cargo test -p singlefs-checker-tier --bin e158_root_choice_repair mount_writable_then_raise_floor_reaches_the_injected_fault`，看这一条红不红、红的话断言文字是不是 `抬 F 重算影子账要数到这条读不出账的被抛弃根`。
 - K2-2 的数要在入库装置上重做才能引（`.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」一节）：把 `research/prompts/m3-batch10z-b-code-r1-sonnet-model/k2/k2_arms_probe.rs` 与两份 `c-arm-*.diff` 做成入库装置的新一次跑，再引。
 
 ## 草稿目录与模型目录

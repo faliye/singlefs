@@ -8,7 +8,7 @@ mkdir -p "$scratch/w/.claude/scripts" "$scratch/w/.claude/singlefs-ai-sop/script
 cp "$repository/.claude/scripts/project_preflight.py" "$scratch/w/.claude/scripts/"
 cp "$repository/.claude/singlefs-ai-sop/scripts/preflight.py" "$scratch/w/.claude/singlefs-ai-sop/scripts/"
 cp "$repository/.claude/hooks/lib_heavy_tests.py" "$repository/.claude/hooks/lib_shell_words.py" "$scratch/w/.claude/hooks/"
-cp "$repository/scripts/broad-mutation.py" "$scratch/w/drv/bin/"
+cp "$repository/scripts/mutation/broad-mutation.py" "$scratch/w/drv/bin/"
 cd "$repository"
 nice -n 19 python3 "$model/classify_probe.py" "$scratch/w" "$repository"
 nice -n 19 python3 "$model/resume_probe.py" "$scratch/w/drv/bin/broad-mutation.py" "$scratch/run"

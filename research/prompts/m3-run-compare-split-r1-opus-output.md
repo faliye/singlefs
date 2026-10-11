@@ -5,16 +5,16 @@
 
 ## 复跑命令与模型文件
 
-模型目录 `research/prompts/m3-run-compare-split-r1-opus-model/`。先建副本：`rsync -a --exclude target --exclude 'target-*' <主工作区>/ <副本>/`，依次 `python3 scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-merge-impl/<名>/patch --root <副本>`（v e e2 e3 e4 e5）。
+模型目录 `research/prompts/m3-run-compare-split-r1-opus-model/`。先建副本：`rsync -a --exclude target --exclude 'target-*' <主工作区>/ <副本>/`，依次 `python3 scripts/gate/apply-writer-patch.py ~/.local/share/singlefs/work/m3-merge-impl/<名>/patch --root <副本>`（v e e2 e3 e4 e5）。
 
 ```
 # 体量与 CPU 的算术（纯 Python，不读库）
 python3 -I research/prompts/m3-run-compare-split-r1-opus-model/volume_and_cpu.py
 # 内核展开量（只依赖 naga 30.0.1 的小程序；先量三个现成内核、与钉值比上才信探针）
-bash scripts/run-with-memory-cap.sh 6G nice -n 19 bash scripts/capped.sh 8 \
+bash scripts/hosts/run-with-memory-cap.sh 6G nice -n 19 bash scripts/hosts/capped.sh 8 \
   bash research/prompts/m3-run-compare-split-r1-opus-model/kernel_measure.sh <副本> <草稿目录>
 # 判法闭包探针（照 build.rs 同一套，#[path] 引副本的 judging_closure.rs；探针树建在草稿目录）
-bash scripts/run-with-memory-cap.sh 6G nice -n 19 bash scripts/capped.sh 8 \
+bash scripts/hosts/run-with-memory-cap.sh 6G nice -n 19 bash scripts/hosts/capped.sh 8 \
   bash research/prompts/m3-run-compare-split-r1-opus-model/closure_probe_trees.sh <副本> <草稿目录>
 ```
 
@@ -100,7 +100,7 @@ P8 只点名 `judge_by_model` 19 处。同一个循环里另有两样判，判�
 
 ### A5 射程判据（第 1 问后半，给判据，不算打中）
 
-读码得出的判据：被 `scripts/crash-point-replay.sh` 起到的测试目标（合表第 ②③④ 列点到的与 `BOTH_TIERS_GROUPS` 的）连同它们经模块引用够到的代码，在射程里；`crates/singlefs-harness/tests/` 是 harness 档，不经这个入口，不在；`src/bin/` 实验装置归实验复跑，不经这个入口，不在——但 e161 装置调的是同一个旧引擎（A4），丁二若删旧引擎它就编不过，所以它在「改动的射程」里、不在「两段形态的射程」里。`crash_segments_per_device_and_torn_in_place_overwrites.rs` 不在合表、不在 `stage-inputs.tsv`（`grep` 命中 0），只在 checker 档快档里跑：按这条判据它不在两段形态的射程里，但会被丁二的改动打到。推翻条件：入口或门禁 `checker-tier-layer0-replay` 的快档起到了这份文件之外别的 checker 档目标而它有对比。
+读码得出的判据：被 `scripts/crash/crash-point-replay.sh` 起到的测试目标（合表第 ②③④ 列点到的与 `BOTH_TIERS_GROUPS` 的）连同它们经模块引用够到的代码，在射程里；`crates/singlefs-harness/tests/` 是 harness 档，不经这个入口，不在；`src/bin/` 实验装置归实验复跑，不经这个入口，不在——但 e161 装置调的是同一个旧引擎（A4），丁二若删旧引擎它就编不过，所以它在「改动的射程」里、不在「两段形态的射程」里。`crash_segments_per_device_and_torn_in_place_overwrites.rs` 不在合表、不在 `stage-inputs.tsv`（`grep` 命中 0），只在 checker 档快档里跑：按这条判据它不在两段形态的射程里，但会被丁二的改动打到。推翻条件：入口或门禁 `checker-tier-layer0-replay` 的快档起到了这份文件之外别的 checker 档目标而它有对比。
 
 ## 二、对比那一段只读库重建不出的输入（第 2 问）
 
@@ -187,7 +187,7 @@ TWO_HOST_COPIES_UNCOMPRESSED basis=states_full_body copies_per_item_run_gib=779.
 
 算法：`01` 每态 160 字节（事实表按字段推的数）× 26.16 亿态 = 389.8 GiB（十进制 418.6 GB，正文的「约 420 GB」）。压缩比没有现成的数，取一个实测参照：库的 `LOG` 末次统计（`~/.local/share/singlefs/crash-amplification/library/LOG` 第 5888 行 `ingest: 17.56 GB`、第 5901 行 Sum 一行 `186.79 MB`、W-Amp 11.3）给出今天结论表 LZ4 之后约 94 倍——但结论表每态只是一个字节的判定向量编号与八个小整数，`01` 里有 32 字节的读回摘要，压缩比只会更低；94 当上界，5 与 20 是我取的两档（推的）。
 
-打中的那一格不是「一份放不放得下」，是双机的拷库办法：`scripts/crash-amplification-two-hosts.sh:1040`「cp -a -- "$local_library" "$library_for_peer" || two_hosts_break_is ignore-snapshot-failure || { echo "  ✗ 拷不了库的快照给第二台" >&2; echo "  → 怎么办：看 $run_directory 可不可写" >&2; exit 2; }」——每跑一项，先把整份本机库拷一份送第二台，再把第二台整份库取回（`fetched/`），两份都留在 `runs/<运行目录>/` 下不删（今天 67 个目录，其中 `crash-amplification-20261008T074510Z-2688179-two-hosts` 那一个 `library-for-peer` 206M、`fetched` 203M）。一份库装全部分项（`.claude/rules/verification.md` 崩溃放量全量那一行），所以每一项都拷整份。录入进了同一份库之后：压缩比 5 时每跑一项拷 155.9 GiB，一趟全量七项拷 1091 GiB，514 GiB 的盘 3.3 项就满、1843 GiB 的 11.8 项就满；不压缩时 514 GiB 一项都撑不完。今天的 `runs/` 从不清，所以压缩比再高也只是推迟：到 94 倍是 62 项（514）或 222 项（1843），按今天「一趟全量七项」算是 9 趟到 32 趟全量。
+打中的那一格不是「一份放不放得下」，是双机的拷库办法：`scripts/crash/crash-amplification-two-hosts.sh:1040`「cp -a -- "$local_library" "$library_for_peer" || two_hosts_break_is ignore-snapshot-failure || { echo "  ✗ 拷不了库的快照给第二台" >&2; echo "  → 怎么办：看 $run_directory 可不可写" >&2; exit 2; }」——每跑一项，先把整份本机库拷一份送第二台，再把第二台整份库取回（`fetched/`），两份都留在 `runs/<运行目录>/` 下不删（今天 67 个目录，其中 `crash-amplification-20261008T074510Z-2688179-two-hosts` 那一个 `library-for-peer` 206M、`fetched` 203M）。一份库装全部分项（`.claude/rules/verification.md` 崩溃放量全量那一行），所以每一项都拷整份。录入进了同一份库之后：压缩比 5 时每跑一项拷 155.9 GiB，一趟全量七项拷 1091 GiB，514 GiB 的盘 3.3 项就满、1843 GiB 的 11.8 项就满；不压缩时 514 GiB 一项都撑不完。今天的 `runs/` 从不清，所以压缩比再高也只是推迟：到 94 倍是 62 项（514）或 222 项（1843），按今天「一趟全量七项」算是 9 趟到 32 趟全量。
 用户动作放开扫：配置写 `ENABLE_ACROSS_MACHINES=1`（今天 `multi-host.env` 就这样）——中；单机——不拷，不中；`--full` 换新库——新库同样每项拷两份，中。
 四句：分辨臂——分（「录入与结论同库」对「录入另起一份不随双机拷的库」）；系统看得到——驱动看得见库多大，今天不看；分句——第 4 问「算出数，给出能落得下的形态」；跑前改法——正文给的三个例（只存摘要、按块滚动删、压缩）都不碰拷库这一步：压缩只把满的时点往后推、只存摘要同理、按块滚动删删的是录入不是 `runs/` 下的拷贝，三个在这一格上都还中。
 落得下的形态（推的、零轮）与它丢什么：

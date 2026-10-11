@@ -16,7 +16,7 @@
 
 - 冻结副本 `/tmp/claude-1000/m3-formal-code-b31-r1/tree/`（主仓第 31 批合入后的 `crates/`、`Cargo.toml`、`Cargo.lock`，sha256 清单同目录 `crates-sha256.txt`，310 行）。代码引文读冻结副本，写 `crates/…` 相对路径与那棵树里的行号。要编就拷到自己的草稿目录。
 - 合入验证 `/tmp/claude-1000/merge-and-verify/2026-10-05-2822486/`：harness 档 165 个测试二进制全绿；fmt、`--all-targets --all-features` clippy、单开 gpu / verdict-store 两种 clippy、musl release `new_pool_file_creation_on_device` 都过。checker 档一条没跑：checker 档经 `build_pool` 一族搭的流（31-1 报告第 9 节：29 份测试文件与 E161 装置）在 mkfs 同进程里发布超过 23 次的，落点 / 写流 / 崩溃态数可能变（读码，没逐份数）；E171 新装置的 U10–U16、各装置的变异行、QEMU 那道门禁都只编过。
-- 已知、已记的：旧 E171 装置比对器那几份复跑（`scripts/replay.sh` 第 270、272–274 行）与 s4 坏实现表第 95 行结局会变（31-3 报告第 2 条）；E156 W7 那一格阳性对照今天在第一次记根时 panic，归 E156 第 5 次重跑；`overwrite_in_one_instance.rs` 第 605–612 行那条 812 用例的说明过时，归下一批。
+- 已知、已记的：旧 E171 装置比对器那几份复跑（`scripts/experiments/replay.sh` 第 270、272–274 行）与 s4 坏实现表第 95 行结局会变（31-3 报告第 2 条）；E156 W7 那一格阳性对照今天在第一次记根时 panic，归 E156 第 5 次重跑；`overwrite_in_one_instance.rs` 第 605–612 行那条 812 用例的说明过时，归下一批。
 
 方案按 `crates/` 今天的实现来谈。
 

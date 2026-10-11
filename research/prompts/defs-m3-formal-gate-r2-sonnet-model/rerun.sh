@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 只读探针：不起 Verus、不编装置、不起真包装、不执行被判的命令。在仓根跑（派发的上限 4G、线程 4）：
-#   RUN_WITH_MEMORY_CAP_PARALLEL_REASON="派出去的辩方腿各跑各的探针，与别的会话互不相干" bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 4 nice -n 19 bash research/prompts/defs-m3-formal-gate-r2-sonnet-model/rerun.sh
+#   RUN_WITH_MEMORY_CAP_PARALLEL_REASON="派出去的辩方腿各跑各的探针，与别的会话互不相干" bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 4 nice -n 19 bash research/prompts/defs-m3-formal-gate-r2-sonnet-model/rerun.sh
 set -uo pipefail
 root="$(cd "$(dirname "$0")/../../.." && pwd)"
 scratch="${SCRATCH:-/tmp/claude-1000/defs-m3-formal-gate-r2-sonnet}"

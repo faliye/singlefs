@@ -11,7 +11,7 @@ if hits != 1:
     print(f'ADHOC ANCHOR-HITS={hits}'); sys.exit(2)
 try:
     open(p, 'w', encoding='utf-8').write(orig.replace(o, n))
-    cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/scripts/run-with-memory-cap.sh', '8G', 'bash', scripts_repo + '/scripts/capped.sh', '7', 'cargo', 'test', '--offline'] + args
+    cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/scripts/hosts/run-with-memory-cap.sh', '8G', 'bash', scripts_repo + '/scripts/hosts/capped.sh', '7', 'cargo', 'test', '--offline'] + args
     r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=230)
     out = r.stdout + r.stderr
 finally:

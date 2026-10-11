@@ -12,8 +12,8 @@ mkdir -p "$work/repo" "$work/out"
 cp -r "$tree/." "$work/repo/"
 cp "$here/probe/sonnet_probe_b33t.rs" "$work/repo/crates/singlefs-harness/tests/sonnet_probe_b33t.rs"
 export CARGO_TARGET_DIR="$work/target"
-wrap=(nice -n 19 bash "$SINGLEFS_REPO/scripts/run-with-memory-cap.sh")
-capped=(bash "$SINGLEFS_REPO/scripts/capped.sh" 10)
+wrap=(nice -n 19 bash "$SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh")
+capped=(bash "$SINGLEFS_REPO/scripts/hosts/capped.sh" 10)
 cd "$work/repo"
 "${wrap[@]}" 6G "${capped[@]}" cargo test -p singlefs-harness --test sonnet_probe_b33t --no-run > "$work/build.log" 2>&1
 "${wrap[@]}" 4G "${capped[@]}" cargo test -p singlefs-harness --test sonnet_probe_b33t -- --nocapture --test-threads=1 > "$work/probes.log" 2>&1

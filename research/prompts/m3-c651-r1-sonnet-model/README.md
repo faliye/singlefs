@@ -10,9 +10,9 @@
 
 跑法（不跑 checker 档）：
     cp -r <冻结副本> <草稿目录>/tree; cp c651_probe.rs <草稿目录>/tree/crates/singlefs-harness/tests/
-    cd <草稿目录>/tree && bash scripts/capped.sh 8 cargo test --offline -p singlefs-harness --test c651_probe --no-run
-    bash scripts/run-with-memory-cap.sh <上限> bash scripts/capped.sh 8 target/debug/deps/c651_probe-<哈希> --nocapture --test-threads=1
-    cd scripts/experiments/e170_o3_spec_executor && bash <仓根>/scripts/run-with-memory-cap.sh <上限> bash <仓根>/scripts/capped.sh 8 python3 <模型目录>/count_slot0_b.py
+    cd <草稿目录>/tree && bash scripts/hosts/capped.sh 8 cargo test --offline -p singlefs-harness --test c651_probe --no-run
+    bash scripts/hosts/run-with-memory-cap.sh <上限> bash scripts/hosts/capped.sh 8 target/debug/deps/c651_probe-<哈希> --nocapture --test-threads=1
+    cd scripts/experiments/e170_o3_spec_executor && bash <仓根>/scripts/hosts/run-with-memory-cap.sh <上限> bash <仓根>/scripts/hosts/capped.sh 8 python3 <模型目录>/count_slot0_b.py
 
 - `c651_probe_b.rs` / `c651_probe_b.out`：同一份探针再加一行 `recover(image, JournalPolicy::Consult).outcome`（择到旧池残留之后恢复走到哪），
   输出的上限用 `run-with-memory-cap.sh 256M`（前一份的峰值表条目是 11M；第一次写 8G 被「内存不够排不上」退 252，没跑，换小上限重跑，输出是重跑那一次的）。

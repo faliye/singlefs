@@ -19,7 +19,7 @@ bash research/prompts/m3-batch10o-code-r1-opus-model/rerun.sh hb <草稿目录>
 bash research/prompts/m3-batch10o-code-r1-opus-model/rerun.sh summary <草稿目录>   # 与 out/ 里的原件比 SUMMARY 行
 ```
 
-每段经 `scripts/run-with-memory-cap.sh`（原型 3G、K4 用例 2G、H-b 用例 4G）与 `capped.sh 15`；原型 14 个工作线程。
+每段经 `scripts/hosts/run-with-memory-cap.sh`（原型 3G、K4 用例 2G、H-b 用例 4G）与 `capped.sh 15`；原型 14 个工作线程。
 
 | 文件 | sha256 |
 |---|---|

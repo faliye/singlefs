@@ -23,7 +23,7 @@ def main():
             env['RUN_WITH_MEMORY_CAP_WAIT_SECONDS'] = '150'
             env['RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON'] = 'b30 正推腿 M1 网格，上限取派发给的 8G'
             env['RUN_WITH_MEMORY_CAP_PARALLEL_REASON'] = '同会话别的子 agent 在跑，b30 云端正推腿'
-            cmd = ['nice', '-n', '19', 'bash', f'{repo}/scripts/run-with-memory-cap.sh', '8G', 'bash', f'{repo}/scripts/capped.sh', '7',
+            cmd = ['nice', '-n', '19', 'bash', f'{repo}/scripts/hosts/run-with-memory-cap.sh', '8G', 'bash', f'{repo}/scripts/hosts/capped.sh', '7',
                    'cargo', 'test', '--offline', '-p', 'singlefs-harness', '--test', 'b30_m1_rollback_grid', '--', '--nocapture']
             p = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True, timeout=int(os.environ.get('GRID_TIMEOUT', '230')))
             out = p.stdout + p.stderr

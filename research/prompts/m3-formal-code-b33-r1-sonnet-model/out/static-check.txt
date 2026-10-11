@@ -1,2 +1,2 @@
-COPIED	crates Cargo.toml Cargo.lock litmus scripts/run-with-memory-cap.sh scripts/crates-mutation-rows.py
+COPIED	crates Cargo.toml Cargo.lock litmus scripts/hosts/run-with-memory-cap.sh scripts/mutation/crates-mutation-rows.py
 CHECKED	2817	299	9

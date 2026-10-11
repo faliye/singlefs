@@ -31,8 +31,8 @@ def main():
                 out.write(f'MUT {name} => 锚点命中 {hits} 次，没跑\n'); out.flush(); continue
             open(file_path, 'w', encoding='utf-8').write(original.replace(unescape(old), unescape(new)))
             try:
-                command = ['nice', '-n', '19', 'bash', f'{REPO}/scripts/run-with-memory-cap.sh', '4G',
-                           'bash', f'{REPO}/scripts/capped.sh', '7', 'cargo', 'test', '--offline'] + args.split()
+                command = ['nice', '-n', '19', 'bash', f'{REPO}/scripts/hosts/run-with-memory-cap.sh', '4G',
+                           'bash', f'{REPO}/scripts/hosts/capped.sh', '7', 'cargo', 'test', '--offline'] + args.split()
                 result = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True)
                 text = result.stdout + result.stderr
                 if f'test {must_red} ... FAILED' in text:

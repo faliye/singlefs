@@ -1,6 +1,6 @@
 # m3-batch16-code-r1 快照倒推记录（2026-10-04）
 
-`bash scripts/snapshot-check.sh m3-batch16-code-r1`：9 个文件里 3 个对不上。
+`bash scripts/devices/snapshot-check.sh m3-batch16-code-r1`：9 个文件里 3 个对不上。
 
 | 文件 | 怎么倒推 | 结果 |
 |---|---|---|
@@ -8,4 +8,4 @@
 | `.claude/kb/checks-owed.md` | 快照之后只在 C695 之后插行（C696–C708） | 正推引的 C692 在第 548 行，插行在它之后，行号没动 |
 | `crates/mutations.tsv` | 快照之后只在末尾追加 | 腿引的第 2386–2393 行没动 |
 
-`python3 scripts/cite-check.py`（两份腿报告，根：冻结副本与仓根）：「✓ 核了 57 处引文，对上 57 处，没判 0 处」。
+`python3 scripts/agents/cite-check.py`（两份腿报告，根：冻结副本与仓根）：「✓ 核了 57 处引文，对上 57 处，没判 0 处」。

@@ -15,7 +15,7 @@ export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="同一轮派出的正推腿与攻方
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="变异副本重编 harness 的峰值大于只跑测试的峰值，取 8G 默认上限"
 run() {  # $1 标签
   for tgt in model_answers_unmount_with_the_floor_at_the_current_version probe_k3; do
-    bash $R/scripts/run-with-memory-cap.sh 8G bash $R/scripts/capped.sh 10 nice -n 19 \
+    bash $R/scripts/hosts/run-with-memory-cap.sh 8G bash $R/scripts/hosts/capped.sh 10 nice -n 19 \
       cargo test --offline -p singlefs-harness --test $tgt -- --nocapture --test-threads=1 > "$OUT/$1.$tgt.log" 2>&1
     echo "$1 $tgt rc=$?" >> "$OUT/summary.txt"
   done

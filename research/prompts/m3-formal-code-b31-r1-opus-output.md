@@ -277,7 +277,7 @@ R4 的机理（读码 + ⑤ 量过）：
 
 ## cite-check
 
-命令：`python3 scripts/cite-check.py research/prompts/m3-formal-code-b31-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b31-r1/tree --root . --background research/prompts/_m3-formal-code-b31-r1-background.md`，末行原样：
+命令：`python3 scripts/agents/cite-check.py research/prompts/m3-formal-code-b31-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b31-r1/tree --root . --background research/prompts/_m3-formal-code-b31-r1-background.md`，末行原样：
 
 ```
   ✓ 核了 18 处引文，对上 18 处，没判 0 处（逐处列在上面）

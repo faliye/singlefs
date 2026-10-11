@@ -9,8 +9,8 @@ ROOT=/home/fy5090/code/singlefs
 MODEL=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 FROZEN=$HOME/.local/share/singlefs/work/m3-batch10z-tu-code-r1/tree
 WORK=${1:-$HOME/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus-rerun}
-CAP=$ROOT/scripts/run-with-memory-cap.sh
-THREADS=$ROOT/scripts/capped.sh
+CAP=$ROOT/scripts/hosts/run-with-memory-cap.sh
+THREADS=$ROOT/scripts/hosts/capped.sh
 OUT=${WORK:?}/runs
 mkdir -p "$WORK" "$OUT"
 run3() { bash "$CAP" 3G "$@"; }

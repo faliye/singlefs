@@ -194,7 +194,7 @@ y2 就是正文第二节已记那一形（checker 只在 `crates/singlefs-checke
 
 ## P6　变异行
 
-副本上 `python3 scripts/crates-mutation-rows.py static-check .` 末行原样：「CHECKED	2817	298	9」，只报一行问题：第 1352 行 litmus 文件不在冻结副本里（副本只有 `crates/` 与两份 Cargo 文件，不是这一轮的行）（`research/prompts/m3-formal-code-b33-r1-opus-model/out/mutation-rows-static-check.log:2`：「文件 litmus/publish-returns-after-the-rotation-barrier.litmus 不存在」）。按名字挑出的这一轮 25 行（第 2745、2746、2774–2791、2793–2795、2821、2822 行），点名的测试函数各在 1 个文件里。原文相同的几组：F1 三行（第 2777–2779 行）同一处改法分别点名 B、A、第 0 代三条用例；R3 两行（第 2788、2793 行）、B3 两行（第 2789、2794 行）同一处改法分别点名两条 812 用例——P3 表里这几种改法下各自点名的用例都红，没有一组是靠同一条用例一起错。没打中。
+副本上 `python3 scripts/mutation/crates-mutation-rows.py static-check .` 末行原样：「CHECKED	2817	298	9」，只报一行问题：第 1352 行 litmus 文件不在冻结副本里（副本只有 `crates/` 与两份 Cargo 文件，不是这一轮的行）（`research/prompts/m3-formal-code-b33-r1-opus-model/out/mutation-rows-static-check.log:2`：「文件 litmus/publish-returns-after-the-rotation-barrier.litmus 不存在」）。按名字挑出的这一轮 25 行（第 2745、2746、2774–2791、2793–2795、2821、2822 行），点名的测试函数各在 1 个文件里。原文相同的几组：F1 三行（第 2777–2779 行）同一处改法分别点名 B、A、第 0 代三条用例；R3 两行（第 2788、2793 行）、B3 两行（第 2789、2794 行）同一处改法分别点名两条 812 用例——P3 表里这几种改法下各自点名的用例都红，没有一组是靠同一条用例一起错。没打中。
 
 ## P1　32-1 的 B3、B4
 
@@ -234,6 +234,6 @@ y2 就是正文第二节已记那一形（checker 只在 `crates/singlefs-checke
 
 ## 引文核对
 
-`python3 scripts/cite-check.py research/prompts/m3-formal-code-b33-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b33-r1/tree --root . --background research/prompts/_m3-formal-code-b33-r1-background.md` 末行见下一行（交回前现跑）。
+`python3 scripts/agents/cite-check.py research/prompts/m3-formal-code-b33-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b33-r1/tree --root . --background research/prompts/_m3-formal-code-b33-r1-background.md` 末行见下一行（交回前现跑）。
 
 「✓ 核了 49 处引文，对上 49 处，没判 0 处（逐处列在上面）」

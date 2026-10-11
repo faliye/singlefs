@@ -7,6 +7,6 @@ REPO=/home/fy5090/code/singlefs
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="复跑正推腿原型，与别的会话并行"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="原型各子命令与线程数不同，峰值表里那一次是另一种"
 W=${1:?草稿目录}; name=${2:?阶段名}; envs=${3:?环境变量串}; sp=${4:?起点}
-env $envs OPUS_WORKERS=14 nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 3G bash "$REPO/scripts/capped.sh" 15 \
+env $envs OPUS_WORKERS=14 nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 3G bash "$REPO/scripts/hosts/capped.sh" 15 \
   "$W/tree/target/release/t2-arm-probe" s1grid "$sp" > "$W/out/$name.log" 2>&1
 echo "rc=$? $name"

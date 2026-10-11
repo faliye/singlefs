@@ -44,7 +44,7 @@ exit=1
   → 怎么办：照 systemd 的 MemoryMax 写法给；默认值与依据写在文件头
   ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）
      → 怎么办：单跑看细节（经内存包装，上限同这一道）：
-                bash scripts/run-with-memory-cap.sh 12GiB cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+                bash scripts/hosts/run-with-memory-cap.sh 12GiB cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
                 签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样：先看模型那一格引的条款，再判改实现还是改模型。
 exit=1
 == 15 号，GATE_RESEARCH_BUILD_MEMORY_MAX=16GB
@@ -56,7 +56,7 @@ exit=1
   → 怎么办：照 systemd 的 MemoryMax 写法给；默认值与依据写在文件头
   ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）
      → 怎么办：单跑看细节（经内存包装，上限同这一道）：
-                bash scripts/run-with-memory-cap.sh 16GB cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+                bash scripts/hosts/run-with-memory-cap.sh 16GB cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
                 签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样：先看模型那一格引的条款，再判改实现还是改模型。
 exit=1
 == 15 号，GATE_RESEARCH_BUILD_MEMORY_MAX=8g
@@ -68,22 +68,22 @@ exit=1
   → 怎么办：照 systemd 的 MemoryMax 写法给；默认值与依据写在文件头
   ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）
      → 怎么办：单跑看细节（经内存包装，上限同这一道）：
-                bash scripts/run-with-memory-cap.sh 8g cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+                bash scripts/hosts/run-with-memory-cap.sh 8g cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
                 签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样：先看模型那一格引的条款，再判改实现还是改模型。
 exit=1
 == 15 号，GATE_RESEARCH_BUILD_MEMORY_MAX=16
        ✗ 带内存上限的 scope 起不来：systemd-run --user --scope 退出码 137，命令一行都没跑（上面是 systemd-run 自己的报错）
        → 怎么办：查用户级 systemd 与 D-Bus（systemctl --user status、echo $DBUS_SESSION_BUS_ADDRESS $XDG_RUNTIME_DIR）；起不来就别跑这一步，不许退回无上限去跑
-  ✗ research 的构建与单测没判出结果：内存包装 scripts/run-with-memory-cap.sh 退 251（上限 16），这一次的输出不算判定
+  ✗ research 的构建与单测没判出结果：内存包装 scripts/hosts/run-with-memory-cap.sh 退 251（上限 16），这一次的输出不算判定
      → 怎么办：照包装文件头「退出码」一段办：250 是这一道要的比上限多，把 GATE_RESEARCH_BUILD_MEMORY_MAX 设大再跑；
-               251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。
+               251、252、254 先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。
 exit=1
 == 74 号，GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=16
   ✗ 带内存上限的 scope 起不来：systemd-run --user --scope 退出码 137，命令一行都没跑（上面是 systemd-run 自己的报错）
   → 怎么办：查用户级 systemd 与 D-Bus（systemctl --user status、echo $DBUS_SESSION_BUS_ADDRESS $XDG_RUNTIME_DIR）；起不来就别跑这一步，不许退回无上限去跑
-  ✗ 随机历史的测试二进制没判出结果：内存包装 scripts/run-with-memory-cap.sh 退 251（上限 16），这一次的输出不算判定
+  ✗ 随机历史的测试二进制没判出结果：内存包装 scripts/hosts/run-with-memory-cap.sh 退 251（上限 16），这一次的输出不算判定
      → 怎么办：照包装文件头「退出码」一段办：250 是这一道要的比上限多，把 GATE_MODEL_DIFFERENTIAL_MEMORY_MAX 设大再跑；
-                251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。
+                251、252、254 先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。
 exit=1
 == 包装本身，上限 12GiB（命令是 true）
   ✗ 内存上限要写成 正整数[K|M|G|T]（例 16G、512M），收到的是「12GiB」

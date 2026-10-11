@@ -4,7 +4,7 @@
 #     device-k1a（G-long V1 第 24 段逐步打印）、device-k1b（F2 V1 四段 Gone、定制族 V1 两段逐步打印）、model-1 / model-2 / model-3（抽象模型）、
 #     compare（bash compare.sh 期望目录 <工作目录>/out），
 #     可选的长段 glong-v1-a、glong-v1-b、f2-v1、glong-p-1..4、f2-p-1..4、crafted-v1-1..3（副本装置全量，合计约 35 分钟）。
-# 每段一条前台命令跑得完（4 分钟以内）；编译与跑都经 scripts/run-with-memory-cap.sh（编译 6G、跑 4G），线程 6。
+# 每段一条前台命令跑得完（4 分钟以内）；编译与跑都经 scripts/hosts/run-with-memory-cap.sh（编译 6G、跑 4G），线程 6。
 # 冻结树取 FROZEN_TREE（默认 ~/.local/share/singlefs/work/m3-w3-r1/tree），对 $SINGLEFS_REPO/research/prompts/m3-w3-r1-snapshot/tree-sha256.txt 核。
 set -euo pipefail
 W=${1:?工作目录}; PART=${2:?段}
@@ -12,8 +12,8 @@ R=${SINGLEFS_REPO:?设 SINGLEFS_REPO 为仓根}
 M=$(cd "$(dirname "$0")" && pwd)
 FROZEN=${FROZEN_TREE:-$HOME/.local/share/singlefs/work/m3-w3-r1/tree}
 E=$R/research/results/e175-product-path-inode-watermark-regression-2026-10-08
-CAP="bash $R/scripts/run-with-memory-cap.sh"
-THREADS="bash $R/scripts/capped.sh 6"
+CAP="bash $R/scripts/hosts/run-with-memory-cap.sh"
+THREADS="bash $R/scripts/hosts/capped.sh 6"
 mkdir -p "$W/out" "$W/bin"
 device() { # $1 臂 $2.. 环境变量赋值；跑一族的一组序号进结果文件
   local arm=$1; shift

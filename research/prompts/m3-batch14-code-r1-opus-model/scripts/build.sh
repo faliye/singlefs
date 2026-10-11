@@ -11,4 +11,4 @@ export RUN_WITH_MEMORY_CAP_WAIT_SECONDS=${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-180}
 export CARGO_TARGET_DIR=$ATTACK_DIR/target-$arm
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="原型 crate 与依赖在冻结副本的拷贝上整编"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="三方攻方腿与别的会话各跑各的编译"
-cd "$ATTACK_DIR/$arm" && nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 8G bash "$REPO/scripts/capped.sh" "${ATTACK_THREADS:-7}" cargo build --release --offline -p attack-b14-probe
+cd "$ATTACK_DIR/$arm" && nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 8G bash "$REPO/scripts/hosts/capped.sh" "${ATTACK_THREADS:-7}" cargo build --release --offline -p attack-b14-probe

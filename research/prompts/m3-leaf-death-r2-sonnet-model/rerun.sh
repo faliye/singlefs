@@ -3,7 +3,7 @@
 #   - 候选二的零条目版本也配合并（M2 / M3 均分 / M3 刚好够），容器留在叶序里、合并只在有记录的片之间做；
 #   - 新读法 C2Hold、C2HoldZ（候选二最强形态）、T、TS、TSZ（候选三 / 四最强形态：今天意图那次已写的整对象墓碑 + 供出规则 + 数据单元门）、FSZ（墓碑的写挪到最后一批）；
 #   - r2-sweep（均分借换前提：有序删的历史）、r2-rollback（回退示例的另两个候选）、r2-indistinguishable（判别子两段历史，写路径带墓碑）。
-# 不依赖 crates/ 与 scripts/experiments/Cargo.toml；仓路径只用来找 scripts/run-with-memory-cap.sh（环境变量 SINGLEFS_REPO，给仓根）。
+# 不依赖 crates/ 与 scripts/experiments/Cargo.toml；仓路径只用来找 scripts/hosts/run-with-memory-cap.sh（环境变量 SINGLEFS_REPO，给仓根）。
 # 每一阶段整条经内存包装起（build 6G、其余 4G），例：
 #   M=research/prompts/m3-leaf-death-r2-sonnet-model; S=scripts; export SINGLEFS_REPO=$PWD
 #   bash $S/run-with-memory-cap.sh 6G bash $M/rerun.sh <空的输出目录> build

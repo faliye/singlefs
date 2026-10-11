@@ -21,11 +21,11 @@ open(p + '.new', 'w').write(s.replace(old, '    "crates/singlefs-checker-tier",\
 PY
 mv "$scratch/tree/Cargo.toml.new" "$scratch/tree/Cargo.toml"
 cd "$scratch/tree"
-CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash "$repo/scripts/run-with-memory-cap.sh" auto \
-  bash "$repo/scripts/capped.sh" 10 cargo build --offline --release -p r4probe
+CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash "$repo/scripts/hosts/run-with-memory-cap.sh" auto \
+  bash "$repo/scripts/hosts/capped.sh" 10 cargo build --offline --release -p r4probe
 cd "$scratch"
 for h in s1 s5 s3 s2 s6 s10; do
   rc=0
-  nice -n 19 bash "$repo/scripts/run-with-memory-cap.sh" 6G ./target/release/r4probe t5 "$h" 10 > "t5b-$h.log" 2>&1 || rc=$?
+  nice -n 19 bash "$repo/scripts/hosts/run-with-memory-cap.sh" 6G ./target/release/r4probe t5 "$h" 10 > "t5b-$h.log" 2>&1 || rc=$?
   echo "$h exit=$rc"
 done

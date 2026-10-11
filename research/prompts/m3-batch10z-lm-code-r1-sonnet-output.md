@@ -41,7 +41,7 @@
 | R_old 候选 | 同文件第 49 行 「.find_map(|rollback_target| {」取根环里 txg 等于 T_old、按实例表有效的**第一条读得出账的**；第 52 行 「if r_old_account.is_none() {」没有就宽护 | `crates/singlefs-core/src/mount.rs:2165` 「Some(accounts) if !accounts.is_empty() => {」：同 txg 的**每一条**都读得出才窄取，任何一条读不出或一条都没有都宽护 | 同 txg 只有一条根时同；有多条时**实现更护** |
 
 实测（造反例而不是读码）：
-- 命令形：`SINGLEFS_PROBE_ARM=diff` 经 `bash scripts/run-with-memory-cap.sh 3G bash scripts/capped.sh 1 <探针二进制> --nocapture s2_sweep`（`scripts/piece.sh`，模型目录），12 件并行（≤ 线程上限 15）。
+- 命令形：`SINGLEFS_PROBE_ARM=diff` 经 `bash scripts/hosts/run-with-memory-cap.sh 3G bash scripts/hosts/capped.sh 1 <探针二进制> --nocapture s2_sweep`（`scripts/piece.sh`，模型目录），12 件并行（≤ 线程上限 15）。
 - 扫的形（`scripts/jobs-1.txt`、`jobs-2.txt`、`jobs-6.txt`、`jobs-10.txt`、`jobs-11.txt`）：R 取 b1–b4、b6、b12、b20（回退）、d（删除，含意图崩在半途）、n、o、s；前缀 oooo、oooon、ooonn、oooons、40 次覆盖写；中间一步 Q 取无、o、n、b1；盘 384 与 1536 槽；故障组 racct、racct+rlin、racct+rall、racct+rtomb、racct+oldroot、racct+oldacct、racct+rlin+oldroot、rall、rtomb、racct+rlin1、racct+rlin2（后两个只坏谱系片两份副本里的一份）。
 - 入库实现与参照臂并进 R 那一槽的落点集合逐次比：`research/prompts/m3-batch10z-lm-code-r1-sonnet-model/logs/tridiff-summary.txt` 末几行 「合计 TRIDIFF=1272」「合计 equal=false 0」，即 1272 次挂载里 0 次不同；diff 臂的 1309 行历史里 `hit=true` 为 0。
 - 这 1272 次里结局分布：肯定不是（落点 0）、认出回退窄取（20、24 槽一级）、不知道宽护（82–130、608–726 槽一级，384 槽盘上 40 次覆盖写后到 720）；单份副本坏（`rlin1`、`rlin2`）读另一份认得出，走窄取，与参照臂同（`research/prompts/m3-batch10z-lm-code-r1-sonnet-model/runs/b10/p1.log`）。
@@ -226,6 +226,6 @@ checker 档那几行在合后副本上真跑过（第二节所述 9 行 prove-re
 
 ## 8　cite-check
 
-`python3 scripts/cite-check.py research/prompts/m3-batch10z-lm-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree --root <仓根>` 末行：
+`python3 scripts/agents/cite-check.py research/prompts/m3-batch10z-lm-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree --root <仓根>` 末行：
 
   ✓ 核了 37 处引文，对上 37 处，没判 0 处（逐处列在上面）

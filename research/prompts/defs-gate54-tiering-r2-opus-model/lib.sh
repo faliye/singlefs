@@ -45,12 +45,12 @@ make_repo() {
   variant_54 "$arm" "$version" > "$repo/$STAGE"
   if [[ "$arm" == post ]]; then
     cp "$MODEL/inputs/stage-inputs.tsv" "$repo/.claude/gate.d/stage-inputs.tsv"
-    cp "$MODEL/inputs/stage-must-run.sh" "$repo/scripts/stage-must-run.sh"
+    cp "$MODEL/inputs/stage-must-run.sh" "$repo/scripts/gate/stage-must-run.sh"
   else
     cp "$MODEL/inputs/stage-inputs-pre.tsv" "$repo/.claude/gate.d/stage-inputs.tsv"
-    cp "$MODEL/inputs/stage-must-run-pre.sh" "$repo/scripts/stage-must-run.sh"
+    cp "$MODEL/inputs/stage-must-run-pre.sh" "$repo/scripts/gate/stage-must-run.sh"
   fi
-  cp "$MODEL/inputs/change-touches-crates.sh" "$repo/scripts/change-touches-crates.sh"
+  cp "$MODEL/inputs/change-touches-crates.sh" "$repo/scripts/gate/change-touches-crates.sh"
   printf '[workspace]\nmembers = ["crates/singlefs-harness"]\n' > "$repo/Cargo.toml"
   printf '# lock v1\n' > "$repo/Cargo.lock"
   printf 'pub mod crash;\n' > "$repo/crates/singlefs-harness/src/lib.rs"

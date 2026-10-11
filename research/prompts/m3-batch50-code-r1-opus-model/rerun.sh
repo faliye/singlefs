@@ -4,15 +4,15 @@
 #   阶段按次序：prepare build edge closed churn-b2f-even churn-b2f-odd churn-b3-even churn-b3-odd m2-build m2-run m3 m4-build m4-run m5-build m5-run compare
 #   每个阶段在前台跑得完（churn 四个阶段各 8 个进程并行、每个进程一个种子，本机空闲时约 80 秒、负载 40 时约 160 秒）；all 依次跑全部。
 # 每个变异各用自己的编译目录（target-M2 … target-M5）：几份副本共用一个编译目录时 cargo 按相对路径与时间戳判新旧，会拿上一份副本编出的东西当这一份的。
-# 内存：每条 cargo 与每个测试二进制都经 $SINGLEFS_REPO/scripts/run-with-memory-cap.sh（cargo 10G，探针 1–8G），线程经 capped.sh 8。
+# 内存：每条 cargo 与每个测试二进制都经 $SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh（cargo 10G，探针 1–8G），线程经 capped.sh 8。
 # 盘：全是内存稀疏盘；只有 m5-run 跑的仓里现成用例按它们自己的写法在 TMPDIR 下建稀疏镜像文件，TMPDIR 指到工作目录里。
 # compare：expected/ 里每份与 out/ 里同名那份去掉「finished in …」之后排序再比，逐份报一致 / 不一致，有一份不一致退 1。
 set -euo pipefail
 : "${SINGLEFS_REPO:?要设 SINGLEFS_REPO=<仓根>}"
 W=$(realpath "$1"); STAGE=$2
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-CAP="$SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
-CAPPED="$SINGLEFS_REPO/scripts/capped.sh"
+CAP="$SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh"
+CAPPED="$SINGLEFS_REPO/scripts/hosts/capped.sh"
 OUT=$W/out; mkdir -p "$OUT"
 cargo_in() { local dir=$1 target=$2; shift 2; (cd "$dir" && CARGO_TARGET_DIR=$target nice -n 19 bash "$CAPPED" 8 bash "$CAP" 10G cargo "$@"); }
 binary() { ls -t "$1"/release/deps/"$2"-* | grep -v '\.d$' | head -n 1; }

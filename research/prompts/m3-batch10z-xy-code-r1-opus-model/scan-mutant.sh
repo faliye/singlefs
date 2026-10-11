@@ -7,8 +7,8 @@ ROOT=/home/fy5090/code/singlefs
 MODEL=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 FROZEN=$HOME/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree/crates/singlefs-checker-tier/src
 name=${1:?}; WORK=${2:?}
-CAP=$ROOT/scripts/run-with-memory-cap.sh
-THREADS=$ROOT/scripts/capped.sh
+CAP=$ROOT/scripts/hosts/run-with-memory-cap.sh
+THREADS=$ROOT/scripts/hosts/capped.sh
 tag=${name//:/-}; log=$WORK/runs/scanmut-$tag.log
 S=$WORK/scanmut; mkdir -p "$S/src-in" "$S/proto/src/bin"
 cp "$FROZEN"/crash_amplification.rs "$FROZEN"/gpu_unit_checks.rs "$S/src-in/"

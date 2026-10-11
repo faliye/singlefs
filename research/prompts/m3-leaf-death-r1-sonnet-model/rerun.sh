@@ -47,7 +47,7 @@ do_build() {
   python3 "$here/apply_patch4.py" "$work/patched3.rs" "$work/patched4.rs"
   python3 "$here/apply_patch5.py" "$work/patched4.rs" "$work/patched5.rs"
   cp "$work/patched5.rs" "$work/build/$bin_file"
-  (cd "$work/build" && bash "$SINGLEFS_REPO/scripts/run-with-memory-cap.sh" 6G nice -n 19 cargo build --release --offline --bin "$bin_name")
+  (cd "$work/build" && bash "$SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh" 6G nice -n 19 cargo build --release --offline --bin "$bin_name")
   echo "build 完成：$work/build/target/release/$bin_name"
 }
 
@@ -67,7 +67,7 @@ do_run() {
     tight=""; run_candidate="$candidate"
     if [[ "$candidate" == "tight_literal" ]]; then tight="literal"; run_candidate="baseline"; fi
     E177_CANDIDATE="$run_candidate" E177_TIGHT="$tight" E177_MERGE="$merge" E177_THREADS="${E177_THREADS:-8}" \
-      bash "$SINGLEFS_REPO/scripts/run-with-memory-cap.sh" 4G nice -n 19 "$binary" segment-one \
+      bash "$SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh" 4G nice -n 19 "$binary" segment-one \
       > "$out.partial" 2> "$work/runs/${candidate}_${merge}.err"
     mv "$out.partial" "$out"
     echo "跑完 ${candidate}_${merge}：$(wc -l < "$out") 行"

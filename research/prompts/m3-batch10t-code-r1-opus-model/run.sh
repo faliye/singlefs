@@ -15,11 +15,11 @@ cp "$model/opus_ledger_attack_model.rs" "$tests/"
 bash "$model/build_scan_bypass_test.sh" "$frozen" "$tests/opus_scan_bypass_model.rs"
 cd "$work/tree"
 for target in opus_ledger_attack_model opus_scan_bypass_model; do
-  CARGO_TARGET_DIR="$work/target" nice -n 19 bash "$repo/scripts/run-with-memory-cap.sh" 8G \
-    bash "$repo/scripts/capped.sh" 12 cargo test --offline -p singlefs-harness --test "$target" -- --nocapture --test-threads 1 \
+  CARGO_TARGET_DIR="$work/target" nice -n 19 bash "$repo/scripts/hosts/run-with-memory-cap.sh" 8G \
+    bash "$repo/scripts/hosts/capped.sh" 12 cargo test --offline -p singlefs-harness --test "$target" -- --nocapture --test-threads 1 \
     > "$work/$target.log" 2>&1
   grep -o 'MODEL .*' "$work/$target.log" | sort
 done
 nice -n 19 python3 "$model/s5_product_path_budget_from_the_opening_free_memory.py"
 rustc --edition 2021 -o "$work/raw_c_strings_check" "$model/compile_check_raw_c_strings.rs"
-bash "$repo/scripts/run-with-memory-cap.sh" 1G "$work/raw_c_strings_check"
+bash "$repo/scripts/hosts/run-with-memory-cap.sh" 1G "$work/raw_c_strings_check"

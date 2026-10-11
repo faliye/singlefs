@@ -307,4 +307,4 @@ LeafSplit without step row: [5, 5, 5]
 - 模型目录：`research/prompts/m3-batch52-54-code-r1-sonnet-model/`（README、tools、patches、logs、SHA256SUMS）。
 - 草稿 / 编译产物的处置：已删（交回前 `rm -rf` 这三个路径，`ls` 复核没有了）自己建的仓副本 `~/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/repo/`、编译目录 `…/target`、`…/target-naga`（会话共用暂存目录没用）；保留的只有该目录下的小文件（`tools/`、`pristine/` 变异前原件、`naga-check/` 源码、各 `.log`），复跑时按模型目录 README 从冻结副本重拷。
 
-交回前 `python3 scripts/cite-check.py research/prompts/m3-batch52-54-code-r1-sonnet-output.md` 末行：`✓ 核了 51 处引文，对上 51 处，没判 0 处（逐处列在上面）`。
+交回前 `python3 scripts/agents/cite-check.py research/prompts/m3-batch52-54-code-r1-sonnet-output.md` 末行：`✓ 核了 51 处引文，对上 51 处，没判 0 处（逐处列在上面）`。

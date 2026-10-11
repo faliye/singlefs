@@ -50,4 +50,4 @@
 - 腿提的新判法、新用例算零轮；条款没写、要用户定的，交用户。
 - 重型测试不跑：这一轮被判的全是 checker 档装置二进制的内联测试，腿一样都不跑，读码判，要跑的写成命令交主 agent；harness 档测试可以跑。
 
-交付：腿的报告写 `research/prompts/m3-formal-code-b37-r1-<腿名>-output.md`，分段落盘（每次写进文件不超过 150 行，第一段排他新建，回复只写短句）；模型与脚本放 `research/prompts/m3-formal-code-b37-r1-<腿名>-model/`（有就放，带一份 `tools/rerun.sh`，每条 cargo 经 `scripts/run-with-memory-cap.sh`）；草稿放 `~/.local/share/singlefs/work/<腿名>/`。引 kb 条款写 kb 文件自己的行号（去 kb 文件里现查，不从背景材料里数）。方案按 `crates/` 今天的实现来谈。
+交付：腿的报告写 `research/prompts/m3-formal-code-b37-r1-<腿名>-output.md`，分段落盘（每次写进文件不超过 150 行，第一段排他新建，回复只写短句）；模型与脚本放 `research/prompts/m3-formal-code-b37-r1-<腿名>-model/`（有就放，带一份 `tools/rerun.sh`，每条 cargo 经 `scripts/hosts/run-with-memory-cap.sh`）；草稿放 `~/.local/share/singlefs/work/<腿名>/`。引 kb 条款写 kb 文件自己的行号（去 kb 文件里现查，不从背景材料里数）。方案按 `crates/` 今天的实现来谈。

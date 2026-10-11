@@ -195,7 +195,7 @@ R 走丙（记录齐、账读不出，「txgs_of_the_roots_taking_the_current_ac
   - 「    /// （两处调用的最后一个参数整行比）。下游各层把收到的叫停原样往下交，换掉就是那一层的参数没用上、编译器报没用的变量。扫这份源码，不要卡。」（`crates/singlefs-checker-tier/src/crash_amplification.rs:4788`）
   - 实测：把 「        stop_is_requested,」（`crates/singlefs-checker-tier/src/crash_amplification.rs:6345`）（`judge_my_blocks_on_gpu` 的 gpu 特性那一份，`crash_amplification.rs`:6327 起）改成 `&|| false,`，`cargo check --offline -p singlefs-checker-tier --features verdict-store,gpu --lib`（`BINDGEN_EXTRA_CLANG_ARGS` 指到 gcc 的 include 目录绕过本机 clang 找不到 `stdbool.h`）原样：
     `Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 2m 13s`、`warning: unused variable: \`stop_is_requested\``、`warning: \`singlefs-checker-tier\` (lib) generated 1 warning`——是警告，编译过。
-    变异跑道不加 `-D warnings`：`grep -n 'RUSTFLAGS\|-D warnings\|unused' scripts/mutate.sh .claude/gate.d/checker-tier-crates-mutation-replay.sh scripts/replay.sh` 无输出。X1、X2 钉的是外层调用 `crash_amplification.rs`:5775、5810 两处；
+    变异跑道不加 `-D warnings`：`grep -n 'RUSTFLAGS\|-D warnings\|unused' scripts/mutation/mutate.sh .claude/gate.d/checker-tier-crates-mutation-replay.sh scripts/experiments/replay.sh` 无输出。X1、X2 钉的是外层调用 `crash_amplification.rs`:5775、5810 两处；
     下游各层（`crash_amplification.rs`:1420、2672、5365、6345 的 `stop_is_requested,`）我没找到另有用例钉。
 - 推翻它们的现象：入库的 checker 档里有一条用例在 Y1 至 Y4 或下游各层 `&|| false` 上红（我跑不了那一档）。
 
@@ -247,7 +247,7 @@ R 走丙（记录齐、账读不出，「txgs_of_the_roots_taking_the_current_ac
 
 ## 10 要主 agent 跑的命令（我不跑的）
 
-- 真卡：账层探针 `probe_kept_leases_on_a_lost_device` 对应的池层序列——借一笔建满、让它等设备超时（设备上留一段长活）、杀掉设备、再借 4000 MiB：看是否 `GPU_CARD_LEASE` 前就打「本次未跑」。工作目录仓根，`SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 16G …`，跑完看那一行。
+- 真卡：账层探针 `probe_kept_leases_on_a_lost_device` 对应的池层序列——借一笔建满、让它等设备超时（设备上留一段长活）、杀掉设备、再借 4000 MiB：看是否 `GPU_CARD_LEASE` 前就打「本次未跑」。工作目录仓根，`SINGLEFS_HEAVY_TESTS=user-request bash scripts/hosts/run-with-memory-cap.sh 16G …`，跑完看那一行。
 - checker 档：`cargo test --offline -p singlefs-checker-tier --features verdict-store,gpu --lib -- crash_amplification::tests::the_stop_request_remembered_in_this_run_is_the_one_handed_to_the_gpu_judge_and_the_cpu_checker gpu_unit_checks::tests::the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first`，对 X1、X2、X4、X4b 的 4 行变异各跑一遍，看是否与我的模型一致。
 - 复跑我的数：把 `research/prompts/m3-batch10z-jk-code-r1-sonnet-model/` 拷到草稿目录，按 README 把 `src/probe_jk.rs` 放进冻结副本拷贝的 `crates/singlefs-harness/tests/`、`src/probe-arms-on-mount.diff` 打在 `mount.rs` 上，`scripts/jobs-sw.txt`、`jobs-swt.txt`、`jobs-rb.txt` 用 `scripts/runjobs.sh` 起，`scripts/agg.py` 汇总；比 `logs/summary-*.txt`。
 

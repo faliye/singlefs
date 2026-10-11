@@ -26,7 +26,7 @@
 
 ## 复跑与文件
 
-模型目录 `research/prompts/m3-leaf-death-r2-sonnet-model/`：源码 = `research/prompts/m3-leaf-death-r1-opus-model/` 的拷贝（E177 装置 + 第一轮攻方的 `leaf_death.rs`）加本轮改动（`src/leaf_death.rs`；`src/main.rs` 只多 `borrowed_records` 字段与 4 个模式名）。不依赖 `crates/` 与 `scripts/experiments/Cargo.toml`；`SINGLEFS_REPO` 只用来找 `scripts/run-with-memory-cap.sh`。新增：
+模型目录 `research/prompts/m3-leaf-death-r2-sonnet-model/`：源码 = `research/prompts/m3-leaf-death-r1-opus-model/` 的拷贝（E177 装置 + 第一轮攻方的 `leaf_death.rs`）加本轮改动（`src/leaf_death.rs`；`src/main.rs` 只多 `borrowed_records` 字段与 4 个模式名）。不依赖 `crates/` 与 `scripts/experiments/Cargo.toml`；`SINGLEFS_REPO` 只用来找 `scripts/hosts/run-with-memory-cap.sh`。新增：
 
 - 零条目版本（候选二）配合并：容器留在叶序里、合并只在有记录的片之间做（`src/leaf_death.rs` 的 `dismiss_container_at`、`right_neighbour_of`）；
 - 读法 `C2Hold` / `C2HoldZ`（候选二最强形态）、`T` / `TS` / `TSZ`（候选三 / 四最强形态）、`FSZ`（墓碑的写挪到最后一批）；
@@ -289,7 +289,7 @@ ecb808becf7ea4159ad8ee7927ebf1c5613d0182d3f2ab64da6fb0ec9c589859  ./tools/counts
 
 ## cite-check 末行
 
-`python3 scripts/cite-check.py research/prompts/m3-leaf-death-r2-sonnet-output.md`：
+`python3 scripts/agents/cite-check.py research/prompts/m3-leaf-death-r2-sonnet-output.md`：
 
 ```
   ✓ 核了 53 处引文，对上 53 处，没判 0 处（逐处列在上面）

@@ -221,7 +221,7 @@ OPUS_K3 image=j1b-watermark-row-and-allocation writable=refused Recovery(Invaria
 ## 要主 agent 跑的命令
 
 不要求我这条腿的结论成立才跑；是核 K1-3 与 K2-2 唯一能落到 GPU 上的两步（checker 档、带 gpu，重型，归主 agent）：
-1. 冻结副本或主工作区上单跑 J4 那一条 GPU 对拍，看是不是 25 个状态全「判不了」：`SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 12G cargo test --offline --release -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- the_gpu_judge_agrees_with_the_cpu_when_product_tombstone_containers_after_a_full_one_skip_a_number`（工作目录仓根；线程照 `capped.sh`）。判结果看失败信息里的不一致数与「判不了」那一列；用例绿而 0 个不一致就推翻 K2-2。
+1. 冻结副本或主工作区上单跑 J4 那一条 GPU 对拍，看是不是 25 个状态全「判不了」：`SINGLEFS_HEAVY_TESTS=user-request bash scripts/hosts/run-with-memory-cap.sh 12G cargo test --offline --release -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- the_gpu_judge_agrees_with_the_cpu_when_product_tombstone_containers_after_a_full_one_skip_a_number`（工作目录仓根；线程照 `capped.sh`）。判结果看失败信息里的不一致数与「判不了」那一列；用例绿而 0 个不一致就推翻 K2-2。
 2. K1-3：在副本上把 `crash_judge_checker_scan.wgsl` 第 3357 行改成 `if (container_index + 2u == d_container_count && d_container_record_count(container_index) != knob_records) {`，跑同一个测试目标的 `the_gpu_judge_given_the_tombstone_knob_two_agrees_with_the_cpu_on_tombstone_containers_of_two_one_and_one_records_written_under_changing_knobs` 等三条：三条都绿就坐实 K1-3。
 
 ## 没做什么

@@ -12,7 +12,7 @@ SINGLEFS_REPO=~/.local/share/singlefs/work/m3-batch33t-code-r1/tree SINGLEFS_TOO
 bash research/prompts/m3-batch33t-code-r1-opus-model/compare.sh <空目录>/summary.txt
 ```
 
-`SINGLEFS_REPO` 是被判的树根（只读，拷进 `<目录>/repo` 再加臂开关），`SINGLEFS_TOOLS` 只取 `scripts/run-with-memory-cap.sh` 与 `scripts/capped.sh`。编 6G、跑 4G，同一时刻只起一条 cargo 或一个测试进程。臂开关（`patch_arms.py`，环境变量不设时与冻结副本行为相同）：`OPUS_F2_OFF`（F2 不退，即 F2 落地前）、`OPUS_F2_EXACT`（攻方收严）、`OPUS_F1_OFF`（F1 不拒）、`OPUS_F1_ANY`（攻方收严）、`OPUS_C_ACCOUNT`（攻方收严）。
+`SINGLEFS_REPO` 是被判的树根（只读，拷进 `<目录>/repo` 再加臂开关），`SINGLEFS_TOOLS` 只取 `scripts/hosts/run-with-memory-cap.sh` 与 `scripts/hosts/capped.sh`。编 6G、跑 4G，同一时刻只起一条 cargo 或一个测试进程。臂开关（`patch_arms.py`，环境变量不设时与冻结副本行为相同）：`OPUS_F2_OFF`（F2 不退，即 F2 落地前）、`OPUS_F2_EXACT`（攻方收严）、`OPUS_F1_OFF`（F1 不拒）、`OPUS_F1_ANY`（攻方收严）、`OPUS_C_ACCOUNT`（攻方收严）。
 
 | 文件 | sha256 |
 |---|---|

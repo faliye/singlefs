@@ -296,7 +296,7 @@ Z 在这三形上不出错的机理（推的，与量相符）：截短与长回
 
 ## cite-check 末行
 
-`python3 scripts/cite-check.py research/prompts/m3-leaf-death-r3-opus-output.md`：
+`python3 scripts/agents/cite-check.py research/prompts/m3-leaf-death-r3-opus-output.md`：
 
 ```
   ✓ 核了 17 处引文，对上 17 处，没判 0 处（逐处列在上面）

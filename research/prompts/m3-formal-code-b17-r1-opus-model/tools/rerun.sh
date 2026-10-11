@@ -10,8 +10,8 @@ THREADS="${2:-8}"
 REPO_ROOT=/home/fy5090/code/singlefs
 FROZEN=/tmp/claude-1000/m3-formal-code-b17-r1/tree
 MODEL="$(cd "$(dirname "$0")/.." && pwd)"
-CAP="$REPO_ROOT/scripts/run-with-memory-cap.sh"
-CAPPED="$REPO_ROOT/scripts/capped.sh"
+CAP="$REPO_ROOT/scripts/hosts/run-with-memory-cap.sh"
+CAPPED="$REPO_ROOT/scripts/hosts/capped.sh"
 if [ -e "$WORK" ]; then echo "工作目录已存在：$WORK" >&2; exit 2; fi
 mkdir -p "$WORK/repo" "$WORK/out"
 cp "$REPO_ROOT/Cargo.toml" "$REPO_ROOT/Cargo.lock" "$WORK/repo/"

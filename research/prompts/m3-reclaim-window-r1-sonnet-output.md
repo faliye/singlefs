@@ -301,10 +301,10 @@ C 的锚用「每个区域」而不用「每块盘」有一个好处：不需要
 ## 五、要主 agent 看或跑的
 
 1. 三方规则要求「副本上的数要在入库装置上重做才能引」：端口数不进 kb。若要引 W2 的 ⑥（46 行变 6 行）：在 `scripts/experiments/e139_tightened_floor.rs` 的 `candidacy_floor`（第 930 行起）里加系统配置那份 F，再跑
-   `bash scripts/replay.sh E139`（门禁里的实验复跑，属重型，我没跑，由主 agent 定要不要跑）；判结果看 `w_activation` 行 `fakes=` 与 `unrecoverable=`。
+   `bash scripts/experiments/replay.sh E139`（门禁里的实验复跑，属重型，我没跑，由主 agent 定要不要跑）；判结果看 `w_activation` 行 `fakes=` 与 `unrecoverable=`。
 2. 两份现有 harness 测试（非重型档，我没编没跑，要核 1.2 第 5 条的盘面）：
-   `cd /home/fy5090/code/singlefs && bash scripts/run-with-memory-cap.sh <上限> cargo test -p singlefs-harness --test one_revolution_window_after_a_hole_in_the_root_ring --test rollback_target_outside_the_one_revolution_window_is_not_a_candidate`；
-   内存上限取 `scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值；判结果看每个二进制的 `test result: ok`。
+   `cd /home/fy5090/code/singlefs && bash scripts/hosts/run-with-memory-cap.sh <上限> cargo test -p singlefs-harness --test one_revolution_window_after_a_hole_in_the_root_ring --test rollback_target_outside_the_one_revolution_window_is_not_a_candidate`；
+   内存上限取 `scripts/experiments/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值；判结果看每个二进制的 `test result: ok`。
 3. 复跑我的数：`cd research/prompts/m3-reclaim-window-r1-sonnet-model && nice -n 19 bash run_all.sh`（实测约 2 分 15 秒），再单跑 `probe_stale_root_exists.py`、`probe_lag_max.py`、`probe_b2_ring_all_six.py`。输出与 `out/` 里的逐行比。
 4. 我的 C 候选是我自己提的，被攻过零轮；判决里要标「零轮」。
 
@@ -320,4 +320,4 @@ C 的锚用「每个区域」而不用「每块盘」有一个好处：不需要
 
 ## 七、交回前的核对
 
-`python3 scripts/cite-check.py research/prompts/m3-reclaim-window-r1-sonnet-output.md` 末行（交回前最后一次跑）：见交回正文。
+`python3 scripts/agents/cite-check.py research/prompts/m3-reclaim-window-r1-sonnet-output.md` 末行（交回前最后一次跑）：见交回正文。

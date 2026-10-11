@@ -14,7 +14,7 @@ export CARGO_TARGET_DIR="$WORK/target" RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="派
 mkdir -p "$WORK/logs"
 [ -d "$WORK/tree" ] || cp -r "$FROZEN_TREE" "$WORK/tree"
 M="$WORK/tree/Cargo.toml"
-cap() { bash "$SINGLEFS_REPO/scripts/run-with-memory-cap.sh" "$1" bash "$SINGLEFS_REPO/scripts/capped.sh" 10 "${@:2}"; }
+cap() { bash "$SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh" "$1" bash "$SINGLEFS_REPO/scripts/hosts/capped.sh" 10 "${@:2}"; }
 for stage in $STAGES; do
   case "$stage" in
     build) cap 6G cargo test --offline --manifest-path "$M" -p singlefs-harness --test checker_known_bad_images --no-run > "$WORK/logs/build.log" 2>&1 ;;

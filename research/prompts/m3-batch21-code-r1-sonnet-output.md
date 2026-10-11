@@ -211,7 +211,7 @@
 
 ## 15　要主 agent 跑的命令（提交时，checker 档，GPU 卡上）
 
-- 对拍文件里新流与 6 条改名用例：`SINGLEFS_HEAVY_TESTS=commit bash scripts/run-with-memory-cap.sh <上限> bash scripts/capped.sh <N> cargo test --offline -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_deletion_through_the_last_batch`（工作目录仓根）；看 `test result` 行，新流应当 0 个状态不一致。
+- 对拍文件里新流与 6 条改名用例：`SINGLEFS_HEAVY_TESTS=commit bash scripts/hosts/run-with-memory-cap.sh <上限> bash scripts/hosts/capped.sh <N> cargo test --offline -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_deletion_through_the_last_batch`（工作目录仓根）；看 `test result` 行，新流应当 0 个状态不一致。
 - G 的 14 行变异（2754–2756 与表里 11 行改名行）按门禁 checker-tier-crates-mutation-replay 的整表跑，看每行点名用例红。
 
 ## 16　草稿、模型与清理

@@ -21,8 +21,8 @@ run() {
   (cd "$work/tree" && env RUN_WITH_MEMORY_CAP_WAIT_SECONDS=600 \
      RUN_WITH_MEMORY_CAP_PARALLEL_REASON="复跑攻方腿原型，与别的会话各跑各的" \
      RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="探针取样量随参数变大，峰值会涨" "$@" \
-     nice -n 19 bash "$repo/scripts/capped.sh" 10 \
-     bash "$repo/scripts/run-with-memory-cap.sh" 4G cargo "${cargo_args[@]}") > "$work/out/$name.log" 2>&1
+     nice -n 19 bash "$repo/scripts/hosts/capped.sh" 10 \
+     bash "$repo/scripts/hosts/run-with-memory-cap.sh" 4G cargo "${cargo_args[@]}") > "$work/out/$name.log" 2>&1
   echo "$name rc=$?"
 }
 for step in "$@"; do

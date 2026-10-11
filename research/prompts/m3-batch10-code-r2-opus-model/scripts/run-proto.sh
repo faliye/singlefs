@@ -5,5 +5,5 @@ cd /tmp/claude-1000/m3-batch10-code-r2-opus/tree || exit 99
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-150}"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="派出去的攻方腿 m3-batch10-code-r2-opus 在自己的副本上并行跑层 0 原型"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="原型各段参数不同，峰值表里那一次是另一段"
-nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh "$cap" bash /home/fy5090/code/singlefs/scripts/capped.sh "$threads" target/release/opus-r2-crash-states "$@" > "$log" 2>&1
+nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh "$cap" bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh "$threads" target/release/opus-r2-crash-states "$@" > "$log" 2>&1
 echo "$?"

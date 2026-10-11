@@ -10,7 +10,7 @@
 | 开工快照 | `research/prompts/m3-c651-r1-snapshot/`：`crates-sha256.txt`（230 份，冻结副本 `/tmp/claude-1000/m3-c651-r1/tree/`）、`kb-sha256.txt` | 腿交齐之后冻结副本 `sha256sum -c` 全 OK；`kb-sha256.txt` 只 `.claude/kb/checks-owed.md` 对不上（别的会话追加了行）；腿引它的只有正推的 `checks-owed.md:520`（C651 那一行），现查仍在第 520 行、内容同开工时 |
 | 云端正推（Sonnet） | `research/prompts/m3-c651-r1-sonnet-output.md`（248 行，sha256 b8d12c28…）；模型 `…-sonnet-model/`（`c651_probe*.rs`、`count_slot0_b.py`） | 探针数只当线索，判决靠攻方复跑坐实的那一份 |
 | 云端攻方（Opus） | `research/prompts/m3-c651-r1-opus-output.md`（sha256 8cb81c7a…）；模型 `…-opus-model/`（`patch_copy.py`、原型 `c651proto/`、`run_batch.sh`、汇表脚本、`runs/`） | 主 agent 在 `/tmp/claude-1000/m3-c651-r1-main-check/` 照报告「复跑」一节在冻结副本的拷贝上编（3G 上限，27 秒）、跑九个候选：九件 rc 全 0，九份日志去掉 `elapsed` 行与 `runs/b2-*.log` 逐行相同，`summary.py` 汇表与 `runs/summary2.txt` 逐行相同 |
-| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-c651-r1/tree --root . --background research/prompts/_m3-c651-r1-background.md`：「✓ 核了 74 处引文，对上 74 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/agents/cite-check.py <两份报告> --root /tmp/claude-1000/m3-c651-r1/tree --root . --background research/prompts/_m3-c651-r1-background.md`：「✓ 核了 74 处引文，对上 74 处，没判 0 处」 |
 
 攻方的数是副本装置（内存稀疏盘、层 0 枚举域、192 段历史 × 9 个读法、每读法 3 240 态）上量的；照 `.claude/rules/three-way-inference.md`，进 kb 之前在入库装置上重做（第五节第 3 条）。
 

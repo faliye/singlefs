@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # m3-c694-r1 云端正推腿的模型复跑：在冻结树的拷贝上打候选开关补丁（candidates.diff）、装探针用例（tests/）、只跑 harness 档，
 # 把结局行抽进 out/，再与 expected/ 比（compare.sh）。
-#   SINGLEFS_REPO   主仓路径（取 scripts/run-with-memory-cap.sh 与 capped.sh），必填
+#   SINGLEFS_REPO   主仓路径（取 scripts/hosts/run-with-memory-cap.sh 与 capped.sh），必填
 #   FROZEN_TREE     冻结树（含 Cargo.toml、crates/、litmus/），缺省 ~/.local/share/singlefs/work/m3-c694-r1/tree
 #   WORK            工作目录，缺省 ./work（自己的拷贝、自己的编译目录 $WORK/target）
 #   C694_KS         探针的「第一个文件之后覆盖写次数」，缺省 5（11 个拒全在 5 上）；FULL=1 取 1,2,3,5,8（60 格）
@@ -15,8 +15,8 @@ WORK="${WORK:-$PWD/work}"
 THREADS="${THREADS:-4}"
 KS="${C694_KS:-5}"
 [ "${FULL:-0}" = "1" ] && KS="1,2,3,5,8"
-MEMCAP="$SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
-CAPPED="$SINGLEFS_REPO/scripts/capped.sh"
+MEMCAP="$SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh"
+CAPPED="$SINGLEFS_REPO/scripts/hosts/capped.sh"
 mkdir -p "$WORK/out"
 if [ ! -d "$WORK/repo" ]; then
     mkdir -p "$WORK/repo"

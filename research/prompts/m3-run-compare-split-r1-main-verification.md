@@ -4,7 +4,7 @@
 
 ## 一、证据核对（主 agent）
 
-- cite-check：`python3 scripts/cite-check.py <两份报告> --root . --background research/prompts/_m3-run-compare-split-r1-background.md` 末行「✓ 核了 30 处引文，对上 26 处，没判 4 处」。没判的 4 处都是正推腿 `copy/` 路径（`judging_closure.rs:681`、`crash_judge_dispatch.rs:246`、`Cargo.toml:18`、`crash_given_states.rs:119`），在 `~/.local/share/singlefs/work/m3-merge-impl/e5/repo`（主工作区 + V…E5，与两条腿副本同一串补丁）上逐行打开核过，四处原文都对得上。
+- cite-check：`python3 scripts/agents/cite-check.py <两份报告> --root . --background research/prompts/_m3-run-compare-split-r1-background.md` 末行「✓ 核了 30 处引文，对上 26 处，没判 4 处」。没判的 4 处都是正推腿 `copy/` 路径（`judging_closure.rs:681`、`crash_judge_dispatch.rs:246`、`Cargo.toml:18`、`crash_given_states.rs:119`），在 `~/.local/share/singlefs/work/m3-merge-impl/e5/repo`（主工作区 + V…E5，与两条腿副本同一串补丁）上逐行打开核过，四处原文都对得上。
 - 开工快照：`sha256sum -c research/prompts/m3-run-compare-split-r1-snapshot/kb-sha256.txt` 三份对不上（`13-验证路线.md`、`18-块里携带什么信息.md`、`invariants.md`）。原因是腿跑着时别的会话提交了 31128273（归档旧研究记录），这三份只在归档路径那几行被替换（`git diff -U0 5d0b7e7c 31128273` 的块：13 号 74、126、143–144、210、320、329、342、344 行，invariants 68、143、153、196、304、311 行，增删行数相等）。两条腿引到的 kb 行只有 `13-验证路线.md:395`，不在被改的几处。
 - 我现查过的代码事实（E5 副本或主工作区，未被补丁动过的写主工作区）：
   - `crates/singlefs-reference-filesystem/src/lib.rs:440` `pub fn restart_after_a_recovery_that_abandoned_the_newest_root` 只核 hi、不判读出，然后无条件重起头（私有 `restart_from_the_recovered_state` 在 `:451`）。
@@ -12,8 +12,8 @@
   - E5 副本 `crash_injection.rs:1098` `read_faults_in_a_crash_state` 的入参是步种序列与 `after_each_step`（每步之后的流长）。
   - E5 副本 `crash_identity.rs:619`：GPU 与 CPU 判器的 `extra_inputs` 写死 `"-"`。
   - E5 副本 `judging_closure.rs:637` 起 `JUDGE_ENTRY_FILES` 只有 `crash.rs`、`crash_judge_gpu.rs`。
-  - `scripts/crash-amplification.sh:222` `FULL_EXPAND_UP_TO=30`。
-  - `scripts/crash-amplification-two-hosts.sh:1040` 每项 `cp -a` 整份本机库给第二台。
+  - `scripts/crash/crash-amplification.sh:222` `FULL_EXPAND_UP_TO=30`。
+  - `scripts/crash/crash-amplification-two-hosts.sh:1040` 每项 `cp -a` 整份本机库给第二台。
   - `crates/singlefs-checker-tier/Cargo.toml` 的 `verdict-store = ["dep:rocksdb"]` 是可选特性，默认不编。
   - E5 副本 `crash_injection.rs:3128` 拒后盘与崩溃镜像整盘相等比较。
   - E5 副本 `crash_amplification.rs:626` 的 B0 断言（基镜像上跑一遍 `recover`，比最新根）。

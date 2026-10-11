@@ -9,19 +9,19 @@
 
 ```
 # ① 闭包探针（#[path] 引副本的 judging_closure.rs，只用 std）：两份随机历史设点文件与几份候选入口出发的闭包
-bash scripts/run-with-memory-cap.sh 2G nice -n 19 bash scripts/capped.sh 5 \
+bash scripts/hosts/run-with-memory-cap.sh 2G nice -n 19 bash scripts/hosts/capped.sh 5 \
   bash research/prompts/m3-run-compare-split-r3-opus-model/run_closure.sh <副本> <草稿>
 # ② 簇 0 真搬家一次（把 crash.rs 的枚举挪进叶子 crash_enumeration.rs，cargo check 编得过），量叶子闭包与按项多重集（先跑 ①）
-bash scripts/run-with-memory-cap.sh 6G nice -n 19 bash scripts/capped.sh 5 \
+bash scripts/hosts/run-with-memory-cap.sh 6G nice -n 19 bash scripts/hosts/capped.sh 5 \
   bash research/prompts/m3-run-compare-split-r3-opus-model/run_move_probe.sh <副本> <草稿>
 # ③ 随机历史写表过 2048：录制口径与枚举写表口径各在第几步（36 段 × 144 步，我分三批、每批 3 件并行，每件 4 个种子）
-bash scripts/run-with-memory-cap.sh 2G nice -n 19 bash scripts/capped.sh 5 \
+bash scripts/hosts/run-with-memory-cap.sh 2G nice -n 19 bash scripts/hosts/capped.sh 5 \
   bash research/prompts/m3-run-compare-split-r3-opus-model/run_history_enumerated.sh <副本> <草稿> 0 36 144
 # ④ 双机块换主：从副本原样抽 WeightedShares 的 Rust 源码，拿原函数 owner_of_block 核整周期表，再数换主比例
-bash scripts/run-with-memory-cap.sh 1G nice -n 19 bash scripts/capped.sh 5 \
+bash scripts/hosts/run-with-memory-cap.sh 1G nice -n 19 bash scripts/hosts/capped.sh 5 \
   bash research/prompts/m3-run-compare-split-r3-opus-model/run_owner_drift.sh <副本> <草稿>
 # ⑤ 第一轮攻方的内核量法原样拷出来，在 E5、E7、E9 三份底子上各跑一遍
-bash scripts/run-with-memory-cap.sh 6G nice -n 19 bash scripts/capped.sh 5 \
+bash scripts/hosts/run-with-memory-cap.sh 6G nice -n 19 bash scripts/hosts/capped.sh 5 \
   bash research/prompts/m3-run-compare-split-r3-opus-model/run_kernel_measure_e7_e9.sh /home/fy5090/code/singlefs <草稿>
 ```
 

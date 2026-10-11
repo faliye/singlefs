@@ -24,8 +24,8 @@ for name, path, old, new, cmd, test in sel:
         print('SKIP', name[:60], 'old occurs', n, flush=True); continue
     open(f, 'w', encoding='utf-8').write(src.replace(old, new))
     try:
-        args = ['bash', '/home/fy5090/code/singlefs/scripts/capped.sh', '15', 'bash',
-                '/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh', '8G', 'nice', '-n', '19',
+        args = ['bash', '/home/fy5090/code/singlefs/scripts/hosts/capped.sh', '15', 'bash',
+                '/home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh', '8G', 'nice', '-n', '19',
                 'cargo', 'test', '--offline'] + cmd.split()
         env = dict(os.environ, CARGO_TARGET_DIR=TARGET)
         p = subprocess.run(args, cwd=COPY, env=env, capture_output=True, text=True, timeout=1500)

@@ -7,7 +7,7 @@
 | 物 | 路径 | 核法 |
 |---|---|---|
 | 正文 / 背景材料 / 改动全文 | `research/prompts/_m3-unlink-code-r2-body.md`、`_m3-unlink-code-r2-background.md`、`_m3-unlink-code-r2-diff.md` | — |
-| 开工快照 | `research/prompts/m3-unlink-code-r2-snapshot/`（crates 21 份、kb 3 份；冻结副本 `/tmp/claude-1000/m3-unlink-code-r2/tree/`） | `bash scripts/snapshot-check.sh m3-unlink-code-r2`：「✓ 快照 m3-unlink-code-r2：24 个文件都与开工时一致」 |
+| 开工快照 | `research/prompts/m3-unlink-code-r2-snapshot/`（crates 21 份、kb 3 份；冻结副本 `/tmp/claude-1000/m3-unlink-code-r2/tree/`） | `bash scripts/devices/snapshot-check.sh m3-unlink-code-r2`：「✓ 快照 m3-unlink-code-r2：24 个文件都与开工时一致」 |
 | 云端正推（Sonnet） | `research/prompts/m3-unlink-code-r2-sonnet-output.md`（226 行，sha256 7308ab2f…），模型 `…-sonnet-model/` | — |
 | 云端攻方（Opus） | `research/prompts/m3-unlink-code-r2-opus-output.md`（253 行，sha256 c2a1410b…），模型 `…-opus-model/`（`logs/` 18 份） | 主 agent 逐字核 `logs/sweep2.log` 第 937 行、`sweep3.log` 第 557 行、`mu1-tests.log` 第 22 行、`mu2-tests.log` 第 39 行、`mu1-probe.log` 第 897 行、`mu2-probe.log` 第 398 行，都与报告抄的相同；另把 `sweep2.log` 里续做阶段 `Publish` 注错点的「落下的写 − 取号 − 写账」重算：差 0 的 590 个点、差 2 的 242 个点 |
 | 引文 | 两份腿报告 | `cite-check.py <两份报告> --root /tmp/claude-1000/m3-unlink-code-r2/tree --root . --background <背景材料>`：「✓ 核了 96 处引文，对上 96 处，没判 0 处」 |

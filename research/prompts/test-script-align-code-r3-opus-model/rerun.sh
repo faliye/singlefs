@@ -5,13 +5,13 @@
 # 再打 patch_fix.py（本腿提的改法 B0R，环境变量 R3_FIX_B0_RECOVER_THE_BASE 开，默认关）。
 # 另按变异表第 1741、1729、1730 行造只改原文的仓副本（make_text_variants.py），给依赖判法与 C604 源码扫描两个重算用（判的是原文，不编译）。
 # 用法：bash rerun.sh <空的工作目录> [冻结副本，默认 /tmp/claude-1000/test-script-align-code-r3/tree]
-# 不跑 checker 档包的任何测试；跑的都是原型二进制，一次一条，经 scripts/run-with-memory-cap.sh；线程上限 12（capped.sh 12）。
+# 不跑 checker 档包的任何测试；跑的都是原型二进制，一次一条，经 scripts/hosts/run-with-memory-cap.sh；线程上限 12（capped.sh 12）。
 # 展开 16 那一趟（j1_diff-16）几分钟；只复跑别的设 R3_RERUN_QUICK=1。
 set -u
 model="$(cd "$(dirname "$0")" && pwd)"
 repository="$(cd "$model/../../.." && pwd)"
 work="${1:?要给工作目录}"; frozen="${2:-/tmp/claude-1000/test-script-align-code-r3/tree}"
-cap="$repository/scripts/run-with-memory-cap.sh"; capped="$repository/scripts/capped.sh"
+cap="$repository/scripts/hosts/run-with-memory-cap.sh"; capped="$repository/scripts/hosts/capped.sh"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑原型：编译与原型二进制峰值表里没有"
 mkdir -p "$work/runs" "$work/proto/.cargo" "$work/variants"
 export R3_SCRATCH="$work/runs" CARGO="$(command -v cargo)" R2_THREADS=12
@@ -40,5 +40,5 @@ if [[ "${R3_RERUN_QUICK:-0}" != 1 ]]; then
 fi
 K3_TREE="$frozen" python3 "$repository/research/prompts/test-script-align-code-r2-opus-model/k3check.py" "$model/outputs/inscope.tsv" > "$work/runs/k3check.out"
 # harness 档那五行变异的证红（outputs/prove-red.out）另起，在一份冻结副本的拷贝上：
-#   bash scripts/capped.sh 12 bash scripts/prove-red.sh --copy <冻结副本的拷贝> --memory 16G singlefs-harness <outputs/prove-red.out 里的五个变异名>
+#   bash scripts/hosts/capped.sh 12 bash scripts/mutation/prove-red.sh --copy <冻结副本的拷贝> --memory 16G singlefs-harness <outputs/prove-red.out 里的五个变异名>
 grep -h -E '^(B0CB |B0CB_TOTAL|NTEND|DEP_TOTAL|SCAN_VERDICT|L2ZERO|J1DIFF |J1SPLIT|J1DIFF_TOTAL)' "$work"/runs/*.out

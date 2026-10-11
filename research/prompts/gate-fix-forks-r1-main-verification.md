@@ -4,7 +4,7 @@
 
 材料：正文 `research/prompts/_gate-fix-forks-r1-body.md`，清单 `_gate-fix-forks-r1-checklist.md`、附录 `_gate-fix-forks-r1-appendix.md`，拼成 `_gate-fix-forks-r1-background.md`。这是第一轮：打中的先挂起，下面「暂定」的形态进第二轮再攻。
 
-**开工快照漂移**（`gate-fix-forks-r1-snapshot/sha256sums.txt`，2026-09-23 记，20 份）：变了 1 份。`.claude/gate.d/47-research-script-selftests.sh` 在腿跑着的时候被别的会话定点插进 1 行（第 29 行 `"bash scripts/watch.sh --selftest" \`）。倒推出快照时的原样存为 `gate-fix-forks-r1-snapshot/47-research-script-selftests.sh.at-snapshot`，sha256 与快照一致；经过写在同目录 `changed-during-legs.md`。攻方引的 `47:42` 落在副本第 42 行、主树第 43 行。
+**开工快照漂移**（`gate-fix-forks-r1-snapshot/sha256sums.txt`，2026-09-23 记，20 份）：变了 1 份。`.claude/gate.d/47-research-script-selftests.sh` 在腿跑着的时候被别的会话定点插进 1 行（第 29 行 `"bash scripts/agents/watch.sh --selftest" \`）。倒推出快照时的原样存为 `gate-fix-forks-r1-snapshot/47-research-script-selftests.sh.at-snapshot`，sha256 与快照一致；经过写在同目录 `changed-during-legs.md`。攻方引的 `47:42` 落在副本第 42 行、主树第 43 行。
 
 **本地攻方提示的一条事实写错了**：fact 8-3 说截断点落在六字符算法名中间、剪成头两个字符。主 agent 拿生成器现跑（`.claude/scripts/gen-decision-items.py` 的 `clip`）：截在中间（`校验和算法取 SHA`，n=10）原样留着；剪成 `SH` 的是截断点**正好停在整词之后**（`校验和算法取 SHA256`，n=13 → `校验和算法取 SH`；`条带冗余按 RAID5`，n=11 → `条带冗余按 RAI`），剥尾正则 `[A-Z]-?\d+` 从词中间咬走 `A256` / `D5`。两份样本 T8 第 8、9 题建在这条错的事实上，作废；第 10 题不依赖它，照判。
 
@@ -59,7 +59,7 @@
 
 攻方打中甲：正文「只剩 72 号自带一份」不成立——40:88、88:30 自带基准（先认 `gate-ok`，再认上游的 **tip** 不是 merge-base），61:34–42 自带基准（默认分支上 merge-base 就是 HEAD），92:155–157 基准取自共用脚本、路径集合却自己算。61 那份能复现放行：定案分两次提交、第一次没推，61 号退 77（`t5-61-bypass`）。主 agent 读 61:33–41 核过：注释写「与共享门禁的 Show me test 同一套口径」，代码在 master 上取 `merge-base HEAD master`，就是 HEAD。攻方打中乙：一条要求「那一行有 git 字样」的判据漏掉 92（`git` 在另一行的列表里）；去掉这一条误伤 8 行合法用法；红落在 47 号上而出路指向被测脚本。丙只打中判据那一半。正推：甲被「踩过的坑要做成会失败的检查」排除，丙是唯一能配红绿样本的。
 
-**判**：40、61、88、92 四处改用 `scripts/changed-paths.sh`（两腿一致、有可复现的放行，选定）。**暂定丙**：新立一道阶段，判据零轮，进第二轮攻。
+**判**：40、61、88、92 四处改用 `scripts/gate/changed-paths.sh`（两腿一致、有可复现的放行，选定）。**暂定丙**：新立一道阶段，判据零轮，进第二轮攻。
 
 主 agent 改这四处时又现查出三个洞，都在「改动范围的取法」这一格里：
 
@@ -148,7 +148,7 @@
 
 - T2：D8（核心索引结构） 已定项 3 第 68 行与已定项 5 第 107 行的条文冲突。
 - C46（门禁阶段自己不会红） 那一行（`checks-owed.md:48`）写 52 号「装不进沙箱、靠被调脚本自己的 `--selftest`」，52 号现在有合成样本，这句要改。
-- T11 那一格的两句错话：`scripts/archive-past-rounds.py:47` 说「68 号的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`……）」，门禁设的是 `GATE_DIFF_BASE`；上游 `diff_base` 在「全推出去了」时退到 HEAD~1，要报给上游。
+- T11 那一格的两句错话：`scripts/kb/archive-past-rounds.py:47` 说「68 号的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`……）」，门禁设的是 `GATE_DIFF_BASE`；上游 `diff_base` 在「全推出去了」时退到 HEAD~1，要报给上游。
 
 ## 回看决策
 

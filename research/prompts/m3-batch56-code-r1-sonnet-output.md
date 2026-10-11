@@ -11,7 +11,7 @@
 |---|---|---|
 | 冻结副本没动 | 在冻结副本里 `sha256sum -c research/prompts/m3-batch56-code-r1-snapshot/crates-sha256.txt` 计数 | `OK 14`（14 份全对，没有 FAILED） |
 | kb 没动 | 仓根 `sha256sum -c research/prompts/m3-batch56-code-r1-snapshot/kb-sha256.txt` 计数 | `OK 5`（5 份全对） |
-| 跑法 | 每条编译与测试：`nice -n 19 bash scripts/capped.sh 10 bash scripts/run-with-memory-cap.sh 10G cargo …`；用自己的编译目录 `target/`；同一时刻一条 cargo；变异都在 `copy/` 里改、改完 `cp` 回冻结副本原文并 `cmp` 相同 | 冻结副本没写过；`copy/` 里的 probe 文件（`zz_probe_*`）与变异不入仓 |
+| 跑法 | 每条编译与测试：`nice -n 19 bash scripts/hosts/capped.sh 10 bash scripts/hosts/run-with-memory-cap.sh 10G cargo …`；用自己的编译目录 `target/`；同一时刻一条 cargo；变异都在 `copy/` 里改、改完 `cp` 回冻结副本原文并 `cmp` 相同 | 冻结副本没写过；`copy/` 里的 probe 文件（`zz_probe_*`）与变异不入仓 |
 | 负载 | 开跑前 `ps` 看：没有 `qemu-system`、`vm-bench`、`e152`、`fio`；有别的会话的 `cargo test … -p singlefs-checker-tier --features verdict-store,gpu`（主 agent 的）在跑，机器 load 25–41；我的命令加 `nice -n 19` 照常跑，等锁没遇到，只是慢（一条 `checker_known_bad_images` 全文件变异 5 分钟左右） | 见各节 |
 | 没跑 | 门禁阶段、checker 档测试（`cargo test -p singlefs-checker-tier`、GPU 对拍用例）一律没跑 | 凡是只有它们能核的写「复核不了」 |
 
@@ -295,7 +295,7 @@ kd、kf 绿的理由（推，没有造出区分的可达形）：走得到的形
 
 ## 要主 agent 跑的命令
 
-1. 第 56 批登记行 13（慢档，960 次退役，release）：工作目录仓根的冻结副本或主工作区；`SINGLEFS_HEAVY_TESTS` 不需要（harness 档）；`bash scripts/capped.sh 10 bash scripts/run-with-memory-cap.sh 10G cargo test --offline --release -p singlefs-harness --test checker_known_bad_images -- --include-ignored nine_hundred_sixty_retirements_at_product_capacity_fill_every_retirement_container_but_the_rightmost_and_redden_nothing`，先在没变异的树上跑一遍判基线绿，再按 `crates/mutations.tsv` 该行做变异跑红；我在前台 200 秒限时里没跑完。
+1. 第 56 批登记行 13（慢档，960 次退役，release）：工作目录仓根的冻结副本或主工作区；`SINGLEFS_HEAVY_TESTS` 不需要（harness 档）；`bash scripts/hosts/capped.sh 10 bash scripts/hosts/run-with-memory-cap.sh 10G cargo test --offline --release -p singlefs-harness --test checker_known_bad_images -- --include-ignored nine_hundred_sixty_retirements_at_product_capacity_fill_every_retirement_container_but_the_rightmost_and_redden_nothing`，先在没变异的树上跑一遍判基线绿，再按 `crates/mutations.tsv` 该行做变异跑红；我在前台 200 秒限时里没跑完。
 2. 第 56 批登记行 22–30（GPU 对拍）：checker 档，要主 agent 提交时那一趟（`cargo test --release -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state`，上限与线程照主 agent 平时的）。
 3. 上面 K6.2 的 c3 / c789 / t789 / ca 四种改坏要在更大范围复跑：`checker_known_bad_images` 全文件不过滤的一遍我前台没跑完；原文在 `research/prompts/m3-batch56-code-r1-sonnet-model/mutdefs/`（c3.old/c3.new 等）。
 

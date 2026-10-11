@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # m3-c694-r2 云端辩方腿（Sonnet）模型的复跑：在冻结树的拷贝上打探针补丁（probe.diff，只在 mount.rs 里加计数与候选开关，默认全关 = 今天的实现）、
 # 装三条 harness 档探针（tests/）、各跑一遍，把结局行抽进 out/extracted/，再与 expected-<档>/ 比（compare.sh）。只跑 harness 档（singlefs-harness 的测试目标）。
-#   SINGLEFS_REPO   主仓路径（取 scripts/run-with-memory-cap.sh 与 capped.sh），必填
+#   SINGLEFS_REPO   主仓路径（取 scripts/hosts/run-with-memory-cap.sh 与 capped.sh），必填
 #   FROZEN_TREE     冻结树（含 Cargo.toml、Cargo.lock、crates/、litmus/），缺省 ~/.local/share/singlefs/work/m3-c694-r2/tree
 #   WORK            工作目录（第一个参数也行），缺省 ./work；自己的拷贝在 $WORK/repo、自己的编译目录在 $WORK/target
 #   PROFILE         quick（缺省，前台三四分钟：384 与 256 槽各 3 段历史 × 12 步、小盘推抬 F 那一串、被抛弃根三种造法）
@@ -15,8 +15,8 @@ FROZEN_TREE="${FROZEN_TREE:-$HOME/.local/share/singlefs/work/m3-c694-r2/tree}"
 WORK="${1:-${WORK:-$PWD/work}}"
 PROFILE="${PROFILE:-quick}"
 THREADS="${THREADS:-6}"
-MEMCAP="$SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
-CAPPED="$SINGLEFS_REPO/scripts/capped.sh"
+MEMCAP="$SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh"
+CAPPED="$SINGLEFS_REPO/scripts/hosts/capped.sh"
 mkdir -p "$WORK/out"
 if [ ! -d "$WORK/repo" ]; then
     mkdir -p "$WORK/repo"

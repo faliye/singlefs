@@ -24,8 +24,8 @@ make_copy() { # <名字> <探针文件> [补丁…]：拷冻结副本、放探�
 }
 run() { # <副本名> <日志名> <用例> [环境变量=值…]
   local name="$1" log="$2" test_name="$3"; shift 3
-  if ( cd "$scratch/$name" && env "$@" nice -n 19 bash "$repo_root/scripts/run-with-memory-cap.sh" 12G \
-      bash "$repo_root/scripts/capped.sh" "$threads" \
+  if ( cd "$scratch/$name" && env "$@" nice -n 19 bash "$repo_root/scripts/hosts/run-with-memory-cap.sh" 12G \
+      bash "$repo_root/scripts/hosts/capped.sh" "$threads" \
       cargo test --release -p singlefs-harness --test opus_scale_probe -- --exact "$test_name" --nocapture ) > "$scratch/$log" 2>&1; then
     echo "$log exit=0"
   else

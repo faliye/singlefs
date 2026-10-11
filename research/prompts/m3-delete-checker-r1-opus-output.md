@@ -9,7 +9,7 @@
 ```
 mkdir 空目录 && cd 空目录
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON=… RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON=…
-bash <仓>/scripts/run-with-memory-cap.sh 5G bash <仓>/scripts/capped.sh 10 \
+bash <仓>/scripts/hosts/run-with-memory-cap.sh 5G bash <仓>/scripts/hosts/capped.sh 10 \
   bash <仓>/research/prompts/m3-delete-checker-r1-opus-model/rerun.sh all     # 约 6 分钟；也可按 prepare / legal <批> / random / mut <批> / extra / summary 分段起
 ```
 

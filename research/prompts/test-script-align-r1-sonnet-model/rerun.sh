@@ -8,9 +8,9 @@ echo "== 段 1：并行线号与来历写进文件头（T1-1、T1-1a、T1-1b）"
 echo -n "HEAD verification.md 并行线号: "; git show HEAD:.claude/rules/verification.md | grep -c '并行线号'
 echo -n "工作区 verification.md 并行线号: "; grep -c '并行线号' .claude/rules/verification.md
 echo -n "规则与 CLAUDE.md 里的 parallel_line 或并行线号命中: "; grep -rn '并行线号\|parallel_line' .claude/rules CLAUDE.md | wc -l
-grep -nF '(^|_)parallel_line_(one|two|three)(_|$)' scripts/crash-case-check.py | cut -c1-60
-echo -n "crash-case-check.py 里「来历写进文件头」命中: "; grep -cF '来历写进文件头' scripts/crash-case-check.py
-grep -nF '来历进 commit message 或 .claude/kb/' scripts/crash-case-check.py | cut -c1-60
+grep -nF '(^|_)parallel_line_(one|two|three)(_|$)' scripts/crash/crash-case-check.py | cut -c1-60
+echo -n "crash-case-check.py 里「来历写进文件头」命中: "; grep -cF '来历写进文件头' scripts/crash/crash-case-check.py
+grep -nF '来历进 commit message 或 .claude/kb/' scripts/crash/crash-case-check.py | cut -c1-60
 grep -nF 'file-names 格出路还叫人把来历写进文件头' .claude/kb/checks-owed.md | cut -c1-40
 echo -n "HEAD 多线程旧句、修完代码旧句命中: "; git show HEAD:.claude/rules/implementation-workflow.md | grep -c '在同一份代码上核过一次'; git show HEAD:.claude/rules/verification.md | grep -c '修完代码也只重跑红的那几条'
 
@@ -49,8 +49,8 @@ echo -n "states_reused 在 crates 里的命中: "; grep -rn 'states_reused' crat
 echo -n "mutations.tsv 里 wgsl 的命中: "; grep -c wgsl crates/mutations.tsv
 echo -n "mutations.tsv 里开 gpu 的行: "; awk -F'\t' '!/^#/ && NF>=5 && $5 ~ /gpu/' crates/mutations.tsv | wc -l
 echo -n "mutations.tsv 里点名 each_attribute_changes_the_reuse_key 的行: "; grep -c each_attribute_changes_the_reuse_key crates/mutations.tsv
-echo -n "mutate.sh 里 252 或 254 的命中: "; grep -c '252\|254' scripts/mutate.sh
-echo -n "crash-amplification.sh 里 item_output= 的命中: "; grep -c 'item_output=' scripts/crash-amplification.sh
+echo -n "mutate.sh 里 252 或 254 的命中: "; grep -c '252\|254' scripts/mutation/mutate.sh
+echo -n "crash-amplification.sh 里 item_output= 的命中: "; grep -c 'item_output=' scripts/crash/crash-amplification.sh
 echo "本机 vendor 0x10de 的 PCI 设备："
 for d in /sys/bus/pci/devices/*; do [ "$(cat "$d/vendor")" = 0x10de ] && echo "$(basename "$d") class=$(cat "$d/class")"; done
 

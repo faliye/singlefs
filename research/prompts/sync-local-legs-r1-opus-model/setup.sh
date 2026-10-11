@@ -16,4 +16,4 @@ assert src.count(old) == 1
 open("ask-local.sh.tmp", "x", encoding="utf-8").write(src.replace(old, old + '  sleep "${ASK_LOCAL_FAKE_DELAY:-0}"   # draft-copy only: simulate request latency\n'))
 PY
 chmod --reference=ask-local.sh ask-local.sh.tmp && mv ask-local.sh.tmp ask-local.sh
-diff "$REPO/scripts/ask-local.sh" ask-local.sh || true
+diff "$REPO/scripts/agents/ask-local.sh" ask-local.sh || true

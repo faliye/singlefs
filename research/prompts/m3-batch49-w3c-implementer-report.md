@@ -105,7 +105,7 @@
 
 另重证了上一位的三行模型行（它们点名的用例这次重写了，判法变了）：「数记账行不算 inode 号水位台阶行」「数记账行把这次自己那一行也当照抄的台阶」「建 inode 落在最左那片之外时不认水位变了」（最后一行上一位留给门禁，这次证过）。
 
-证红都用 `scripts/prove-red.sh --copy <副本 b/> --memory 8G singlefs-harness <名…>`（`CARGO_BUILD_JOBS=16`、`capped.sh 16`），两趟各自先跑基线、基线不红。末行原样：
+证红都用 `scripts/mutation/prove-red.sh --copy <副本 b/> --memory 8G singlefs-harness <名…>`（`CARGO_BUILD_JOBS=16`、`capped.sh 16`），两趟各自先跑基线、基线不红。末行原样：
 
 ```
 prove-red-a.txt：✓ 点名 3 条：跑了 3 条，跳过 0 条，跑的都抓到了
@@ -172,7 +172,7 @@ accounting_tree_grows_a_level_when_inode_number_watermark_steps_cross_one_leaf: 
 singlefs_harness: test result: ok. 211 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 29.49s
 ```
 
-测试源码静态判据（`scripts/crash-case-check.py --only placement,file-names,one-scenario <副本 b/>`，退 0）：
+测试源码静态判据（`scripts/crash/crash-case-check.py --only placement,file-names,one-scenario <副本 b/>`，退 0）：
 
 ```
   ✓ 崩溃枚举用例都住在 singlefs-checker-tier 包里、标了 #[ignore] 的都登记了（扫了 313 份测试源码，认出 101 条；按测试函数直接调 enumerate_layer0 一族、自己逐个造崩溃状态、或经同一文件里的函数传递地这样做认；经 tests/<子目录>/ 里的共用函数间接调的、宏展开出来的认不出）
@@ -202,8 +202,8 @@ cargo 调用按单条命令数 10 次：编测试 1、跑动到的二进制 3（
 
 工作目录：主工作区（`/home/fy5090/code/singlefs`）。线程照当时的上限（下面写 16）；内存上限照 `replay.sh` 的默认 8G 或当时给的。
 
-1. 打补丁：`python3 scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-batch49/w3c/patch`，看最后两行（退 0、code-source-discipline 那一格绿）。我在一份主工作区此刻的整份副本上原样跑过一次，结局见第十一节。
-2. harness 档四个包全跑：`bash scripts/run-with-memory-cap.sh 24G bash scripts/capped.sh 16 cargo test --offline -p singlefs-harness -p singlefs-core -p singlefs-checker -p singlefs-format --no-fail-fast`（我那边是 8 个一组并行跑二进制，最慢的 `checker_known_bad_images` 在 2 线程下 210 秒；整份串着跑放后台），看每个 `test result:` 行，预期全绿。红了用 `python3 scripts/rerun-failed-tests.py <日志> -p <包>` 只重跑红的。
+1. 打补丁：`python3 scripts/gate/apply-writer-patch.py ~/.local/share/singlefs/work/m3-batch49/w3c/patch`，看最后两行（退 0、code-source-discipline 那一格绿）。我在一份主工作区此刻的整份副本上原样跑过一次，结局见第十一节。
+2. harness 档四个包全跑：`bash scripts/hosts/run-with-memory-cap.sh 24G bash scripts/hosts/capped.sh 16 cargo test --offline -p singlefs-harness -p singlefs-core -p singlefs-checker -p singlefs-format --no-fail-fast`（我那边是 8 个一组并行跑二进制，最慢的 `checker_known_bad_images` 在 2 线程下 210 秒；整份串着跑放后台），看每个 `test result:` 行，预期全绿。红了用 `python3 scripts/gate/rerun-failed-tests.py <日志> -p <包>` 只重跑红的。
 3. 慢档：`… cargo test --offline -p singlefs-harness --test rollback_by_a_forward_publish -- --include-ignored`（22 条慢档用例，三位实现员都没跑，其中一条钉回退水位 5）。
 4. checker 档（提交时的六道重阶段）：上一位报告第七节第 5 条与再前一位第七节第 3 条原样（GPU 对拍、`--lib` 里 GPU 判器的钉值、快档；快档里另看 `crash_enumeration_tree_split_streams` 与 `crash_injection_publish_after_a_mount_whose_deletion_continuation_stays_short` 的钉值）。
 5. 变异整表（checker-tier-crates-mutation-replay）：没证的是再前一位第四节标「留给门禁」的那几行（减去上一位证了的「谱系记录 24 字节」）与替换的 9 行里没证的 8 行；我追加的 6 行与上一位的三行模型行都证过。

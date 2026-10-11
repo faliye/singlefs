@@ -14,8 +14,8 @@
 - `cite-check.py` 两份报告一起跑（`--root` 冻结副本与主仓，带背景材料）：「核了 120 处引文，对上 120 处，没判 0 处」。
 - 主 agent 现查：
   - A1 在主仓复跑：`bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh $PWD/.claude/gate.d --item checker-tier-broad-mutation.sh` 退 1，10 份判对，`library-version-is-staged-tree-green` 与 `library-version-is-staged-tree-unstaged-change-green` 两份「期望退出 0，实测 1」（日志 `/tmp/claude-1000/m3-r1/gov-stage-selftest.log`），与攻方 `outputs/stage-selftest-live.txt` 同；
-  - A4 / G1-a 的机理：冻结副本 `scripts/admission.py:470` 起 `listed_input_files` 用 `git ls-files --cached --others`，`:688` 起 `manifest_of_files` 读磁盘上的文件内容算 sha256——标记的指纹是工作区，不是暂存区；`.claude/skills/crash-test/commit-stages.md` 第 19 行给这一道免了 `git diff --quiet`；
-  - A7：驱动 `scripts/broad-mutation.py:307` 环境型结局（timeout、memory-cap）不在 `DECISIVE_OUTCOMES` 里；用户定案「卡住算抓到」原文在 `research/prompts/_tooling-broad-mutation-prune-r2-body.md:9`：「测试卡住算抓到：按单条测试限时，超时就是那条测试没过。」
+  - A4 / G1-a 的机理：冻结副本 `scripts/gate/admission.py:470` 起 `listed_input_files` 用 `git ls-files --cached --others`，`:688` 起 `manifest_of_files` 读磁盘上的文件内容算 sha256——标记的指纹是工作区，不是暂存区；`.claude/skills/crash-test/commit-stages.md` 第 19 行给这一道免了 `git diff --quiet`；
+  - A7：驱动 `scripts/mutation/broad-mutation.py:307` 环境型结局（timeout、memory-cap）不在 `DECISIVE_OUTCOMES` 里；用户定案「卡住算抓到」原文在 `research/prompts/_tooling-broad-mutation-prune-r2-body.md:9`：「测试卡住算抓到：按单条测试限时，超时就是那条测试没过。」
 - 攻方的数在冻结副本的拷贝或抽出来的纯函数上量，A3、A5、A8 用的是从阶段里抽出来的两段内嵌 python（只核过它在 12 份样本上的退出码与真阶段逐份相同）。两条腿各格的「没打中」都是一次抽样。
 
 ## 二、逐条判决

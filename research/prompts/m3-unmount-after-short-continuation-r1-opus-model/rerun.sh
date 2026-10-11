@@ -12,7 +12,7 @@ rsync -a --exclude target --exclude .git "$frozen/" "$work/tree/"
 (cd "$work/tree" && patch -p1 < "$model/jia-transaction.patch" && patch -p1 < "$model/jia-bc-mount.patch")
 cp "$model/unmount_attack_probe.rs" "$work/tree/crates/singlefs-harness/tests/unmount_attack_probe.rs"
 export CARGO_TARGET_DIR="$work/target"
-(cd "$work/tree" && nice -n 19 bash "$repo/scripts/run-with-memory-cap.sh" 6G bash "$repo/scripts/capped.sh" 10 \
+(cd "$work/tree" && nice -n 19 bash "$repo/scripts/hosts/run-with-memory-cap.sh" 6G bash "$repo/scripts/hosts/capped.sh" 10 \
   cargo test --offline -p singlefs-harness --test unmount_attack_probe --no-run)
 bin="$(ls -t "$work"/target/debug/deps/unmount_attack_probe-* | grep -v '\.d$' | head -1)"
 (cd "$work" && bash "$model/run-batch.sh" "$batch" "$items" "$work/out" "$bin")

@@ -7,7 +7,7 @@
 | 物 | 路径 | 核法 |
 |---|---|---|
 | 正文 / 背景材料 / 改动全文 | `research/prompts/_m3-leftover-code-r1-body.md`、`_m3-leftover-code-r1-background.md`、`_m3-leftover-code-r1-diff.md` | — |
-| 开工快照 | `research/prompts/m3-leftover-code-r1-snapshot/`（crates 32 份、kb 4 份；冻结副本 `/tmp/claude-1000/m3-leftover-code-r1/tree/`） | `bash scripts/snapshot-check.sh m3-leftover-code-r1`：「✓ 快照 m3-leftover-code-r1：36 个文件都与开工时一致」 |
+| 开工快照 | `research/prompts/m3-leftover-code-r1-snapshot/`（crates 32 份、kb 4 份；冻结副本 `/tmp/claude-1000/m3-leftover-code-r1/tree/`） | `bash scripts/devices/snapshot-check.sh m3-leftover-code-r1`：「✓ 快照 m3-leftover-code-r1：36 个文件都与开工时一致」 |
 | 云端正推（Sonnet） | `research/prompts/m3-leftover-code-r1-sonnet-output.md`（247 行，sha256 69e44687…），模型 `…-sonnet-model/`（k1、k3、k4、k5） | — |
 | 云端攻方（Opus） | `research/prompts/m3-leftover-code-r1-opus-output.md`（sha256 d3fa52e2…），模型 `…-opus-model/` | 主 agent 现查 `logs/` 下被判「放过」的四份：`mut-slot1-only-both.log.lines` 首行「name=slot1-only-both cases=98 failed=0」，`mut-raise-no-restore`、`mut-map-first-instance-page-only`、`mut-defer-includes-abandoned` 三份都是 `failed=0` |
 | 引文 | 两份腿报告 | `cite-check.py <两份报告> --root . --background <背景材料>`：「✓ 核了 157 处引文，对上 157 处，没判 0 处」（快照 36 份与仓里一致，仓根与冻结副本同值） |

@@ -24,7 +24,7 @@ open(p,'w',encoding='utf-8').write(s)
 print('old-order applied')
 PY
 fi
-PROBE_IDX=${PROBE_IDX:-0} PROBE_OUT=$W/logs/$label.out nice -n 19 bash /home/fy5090/code/singlefs/scripts/capped.sh 10 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 10G cargo test --offline -p singlefs-harness --test zz_probe_k1_diff -- zz_probe_k1_member_listing --nocapture > $W/logs/$label.log 2>&1
+PROBE_IDX=${PROBE_IDX:-0} PROBE_OUT=$W/logs/$label.out nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 10 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 10G cargo test --offline -p singlefs-harness --test zz_probe_k1_diff -- zz_probe_k1_member_listing --nocapture > $W/logs/$label.log 2>&1
 echo "exit=$?" >> $W/logs/$label.log
 cp "$F/crates/singlefs-core/src/recovery.rs" crates/singlefs-core/src/recovery.rs
 cmp "$F/crates/singlefs-core/src/recovery.rs" crates/singlefs-core/src/recovery.rs && echo restored

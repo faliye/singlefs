@@ -22,7 +22,7 @@ for number in map(int, sys.argv[1:]):
     os.replace(target + ".mut", target)
     try:
         result = subprocess.run(
-            ["nice", "-n", "19", "bash", os.path.join(repo, "scripts/capped.sh"), threads,
+            ["nice", "-n", "19", "bash", os.path.join(repo, "scripts/hosts/capped.sh"), threads,
              "cargo", "check", "--offline", "-p", "singlefs-checker-tier", "--lib", "--message-format", "short"],
             cwd=copy, capture_output=True, text=True)
         errors = [line for line in result.stderr.splitlines() if ": error" in line or line.startswith("error")]

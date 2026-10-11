@@ -12,11 +12,11 @@ mkdir -p "$scratch/repo/crates/singlefs-checker-tier/e161_attack"
 cp "$model/attack.rs" "$scratch/repo/crates/singlefs-checker-tier/e161_attack/attack.rs"
 patch "$scratch/repo/crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs" < "$model/e161-hook.patch"
 cd "$scratch/repo"
-CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 4 \
+CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 4 \
   cargo build --release --offline -p singlefs-checker-tier --bin e161_crash_state_dedup_and_time_split
 mkdir "$scratch/out"
 for world in t4 torn collide kinds p5 order interior small p6 reuse; do
-  nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 4 \
+  nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 4 \
     "$scratch/target/release/e161_crash_state_dedup_and_time_split" attack "$world" 2>/dev/null \
     | grep -v '^LAYER0' > "$scratch/out/$world.out"
 done

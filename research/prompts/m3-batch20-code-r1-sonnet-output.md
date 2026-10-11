@@ -266,7 +266,7 @@ e142_new_pool_file_creation_write_dump 只收零个参数或 --device-bytes <每
 
 ## 要主 agent 跑的命令（checker 档，子 agent 不许跑）
 
-工作目录 `/home/fy5090/code/singlefs`，命令前缀 `SINGLEFS_HEAVY_TESTS=commit`，经 `bash scripts/run-with-memory-cap.sh <上限> bash scripts/capped.sh <线程数>` 起，上限与线程数由主 agent 按提交时的峰值表定：
+工作目录 `/home/fy5090/code/singlefs`，命令前缀 `SINGLEFS_HEAVY_TESTS=commit`，经 `bash scripts/hosts/run-with-memory-cap.sh <上限> bash scripts/hosts/capped.sh <线程数>` 起，上限与线程数由主 agent 按提交时的峰值表定：
 1. GPU 对拍新用例：`cargo test -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- the_gpu_judge_agrees_with_the_cpu_on_every_state_missing_one_write_of_an_unexpanded_segment_of_a_deletion_in_progress --nocapture`；看 `CRASH_JUDGE_GPU_MISSING_ONE_WRITE` 那行 `states_missing_one_write=104 failed=0`。
 2. 6 条换整份比的旧用例：同一个 `--test`，后面分别点名 `the_gpu_checker_agrees_with_the_cpu_on_every_state_of_a_deletion_in_progress`、`…when_the_deletion_queue_names_an_inode_without_a_record`、`…when_the_pending_deletion_occupancy_row_is_not_zero`、`…when_the_pending_deletion_occupancy_row_is_missing`、`…when_the_size_of_an_inode_being_deleted_asks_for_more_data_units`、`…when_a_published_tombstone_reaches_the_inode_number_watermark`；每条看 `CRASH_JUDGE_GPU` 行 `mismatches=0`。
 3. 两个 bin 的单测：`cargo test -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump`、`cargo test -p singlefs-checker-tier --bin deletion_write_dump`。

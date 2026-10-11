@@ -4,7 +4,7 @@
 
 ## 一、本地腿（三次抽样都过闸，但三份都含闸漏掉的拼接）
 
-`-s1` 有 `unaffectedable`，`-s2` 有 `Sortinging`，`-s3` 有 `Incorrecting` `unaffecteding` `totalinging`。当天给 `scripts/oov-check.py` 加了规则 E（屈折后缀之后又叠后缀），回扫 258 份既有本地腿输出，新增判红的恰是这三份、4 个词，零误报。⇒ 三份都按带损坏记，本地腿这一轮只算一票带瑕疵的线索。
+`-s1` 有 `unaffectedable`，`-s2` 有 `Sortinging`，`-s3` 有 `Incorrecting` `unaffecteding` `totalinging`。当天给 `scripts/kb/oov-check.py` 加了规则 E（屈折后缀之后又叠后缀），回扫 258 份既有本地腿输出，新增判红的恰是这三份、4 个词，零误报。⇒ 三份都按带损坏记，本地腿这一轮只算一票带瑕疵的线索。
 
 | 问 | 三份的要点 | 主 agent 核 |
 |---|---|---|

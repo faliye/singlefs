@@ -13,8 +13,8 @@ for item in "$@"; do
   scratch="$out/tmp-$batch-$count"
   {
     mkdir -p "$scratch"
-    TMPDIR="$scratch" OPUS_B32_KEY_ARM="$arm" nice -n 19 bash "$tools_repo/scripts/run-with-memory-cap.sh" 4G \
-      bash "$tools_repo/scripts/capped.sh" 1 "$binary" "$test_name" --exact --nocapture --test-threads=1 \
+    TMPDIR="$scratch" OPUS_B32_KEY_ARM="$arm" nice -n 19 bash "$tools_repo/scripts/hosts/run-with-memory-cap.sh" 4G \
+      bash "$tools_repo/scripts/hosts/capped.sh" 1 "$binary" "$test_name" --exact --nocapture --test-threads=1 \
       > "$out/$arm.$test_name.log" 2>&1
     rc=$?
     rm -rf "${scratch:?}"

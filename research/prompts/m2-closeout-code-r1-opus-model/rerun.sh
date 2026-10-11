@@ -9,7 +9,7 @@ git -C "$R" archive refs/sop/m2-closeout-code-r1-snapshot crates Cargo.toml Carg
 cp "$M"/opus_r1_*.rs "$S/tree/crates/singlefs-harness/tests/"
 export CARGO_TARGET_DIR="$S/target"
 cd "$S/tree"
-CAP="bash $R/scripts/capped.sh 5 bash $R/scripts/run-with-memory-cap.sh 12G"
+CAP="bash $R/scripts/hosts/capped.sh 5 bash $R/scripts/hosts/run-with-memory-cap.sh 12G"
 for t in opus_r1_z3_entries_with_a_substituted_device opus_r1_z1_rollback_and_quarantined_copies opus_r1_z5_torn_split_points_and_fua_release; do
   nice -n 19 $CAP cargo test -p singlefs-harness --test "$t" -- --nocapture
 done

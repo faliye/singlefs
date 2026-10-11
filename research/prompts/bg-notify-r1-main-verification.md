@@ -27,7 +27,7 @@
 | 2 | A1③、A3 缺的一处 | `.claude/main-agent.md`「交回怎么读」：第三种 completed（没有交回、没有那两句）读成「不会自己醒」，看它最后在等什么再发消息或停掉；TaskStop 停掉的不再交回、看门狗按被停退出 | 零轮 |
 | 3 | A1④ | `.claude/main-agent.md` 第 21、23 行：派不读共用约束的 agent 时把「长活可以等」那一条的后台写法写进提示；主 agent 自己的长命令同样照那一条写 | 零轮 |
 | 4 | A2 表外 | `.claude/hooks/bash-command-detector.sh` 换成 Opus 的变体，另把 `setsid` 收成只认 `-f` / `--fork`（核查员核出的误检）；文件头写明认的形态与判不到的（前台 `… &`、引号里当数据的 `&`、`… & (wait)`、`bash -c '… &'; wait`）；自检加 X01–X13、F01–F07 与三条 setsid，共 40 种，`BASH_COMMAND_DETECTOR_DISABLE_SELF_BACKGROUND=1` 判红 17 种 | 零轮（Opus 的变体只在它自己的模型上量过） |
-| 5 | A1③ 在机器那一侧 | `scripts/agent-watch.py` 新告警「结束本轮却不会醒」：结束本轮、没交回、起过的后台任务都已收到完成通知（`origin` 为 task-notification 的消息或 `queued_command` 附件）、之后没有新通知，60 秒后报；自检加「当场完了又去等」「通知刚到正要醒」两个样本，`AGENT_WATCH_BREAK=nowake` 判红 | 零轮（主 agent 自己加的） |
+| 5 | A1③ 在机器那一侧 | `scripts/agents/agent-watch.py` 新告警「结束本轮却不会醒」：结束本轮、没交回、起过的后台任务都已收到完成通知（`origin` 为 task-notification 的消息或 `queued_command` 附件）、之后没有新通知，60 秒后报；自检加「当场完了又去等」「通知刚到正要醒」两个样本，`AGENT_WATCH_BREAK=nowake` 判红 | 零轮（主 agent 自己加的） |
 | 6 | A4 | `agent-watch.py`：主会话记录不在时报告里写明「被停只按打断判」；自检加「停了、续做、又停」样本与「主会话记录不在」一格。`scripts/check-staged.sh` 自检加「红与 77 混着」一格 | 零轮 |
 
 对 `a339b505557ce905e` 那一段历史（结束本轮时起过六个后台任务，四个当场完了、两个还活着）新告警不报，是对的：那一刻它确实还有东西会叫醒它；脱钩的 `gate.sh` 由 hook 的第三种检出管。
@@ -44,4 +44,4 @@
 
 用户 2026-09-18 定：三方的云端腿 effort 改为 high，原话「将三轮中的opus 和 sonnet 改为high 模式 现在太高了。 无需验证这一点，改了就行了」。
 改的是 `.claude/agents/three-way-attack.md`、`.claude/agents/three-way-forward.md`、`.claude/agents/three-way-defense.md` 三份 frontmatter，各加一行 `effort: high`；这三份没有被这一轮或别的轮攻过，这里点名只为登记它们的来由。
-同一天用户又定：去掉子 agent 等长活时约 4 分钟一次的缓存续期（原话「每 4 分钟复检一次子 agent 内部的ping 也可以去掉了」）。`.claude/agent-common.md` 第 41 行改成「等长活时不起缓存计时器，结束本轮直接等完成通知」，写回 1 里「缓存计时器单独起一次」那句随之删掉；`.claude/main-agent.md` 第 21 行改成子 agent 不续提示缓存、主 agent 也不 ping；同样没走三方。`scripts/cache-keepalive.sh` 留在仓里，没有定义再叫它。
+同一天用户又定：去掉子 agent 等长活时约 4 分钟一次的缓存续期（原话「每 4 分钟复检一次子 agent 内部的ping 也可以去掉了」）。`.claude/agent-common.md` 第 41 行改成「等长活时不起缓存计时器，结束本轮直接等完成通知」，写回 1 里「缓存计时器单独起一次」那句随之删掉；`.claude/main-agent.md` 第 21 行改成子 agent 不续提示缓存、主 agent 也不 ping；同样没走三方。`scripts/hosts/cache-keepalive.sh` 留在仓里，没有定义再叫它。

@@ -84,7 +84,7 @@ for stage in "$@"; do
     NAGA_TARGET="${NAGA_TARGET:-$S/target-naga}"
     mkdir -p "$S/naga-check/src"
     cp "$HERE/../naga-check/Cargo.toml" "$S/naga-check/Cargo.toml"; cp "$HERE/../naga-check/src/main.rs" "$S/naga-check/src/main.rs"; cp "$FROZEN/Cargo.lock" "$S/naga-check/Cargo.lock"
-    (cd "$S/naga-check" && CARGO_TARGET_DIR="$NAGA_TARGET" nice -n 19 bash "$REPO/scripts/capped.sh" 16 cargo build --offline 2>&1 | tail -2)
+    (cd "$S/naga-check" && CARGO_TARGET_DIR="$NAGA_TARGET" nice -n 19 bash "$REPO/scripts/hosts/capped.sh" 16 cargo build --offline 2>&1 | tail -2)
     python3 - <<PY
 import json
 rows = json.load(open("$S/rows.json"))
@@ -92,7 +92,7 @@ for k, r in enumerate(rows): r["k"] = k
 json.dump(rows, open("$S/rows-k.json", "w"), ensure_ascii=False)
 PY
     # naga-check 是 cargo 编出来的二进制：整条校验脚本经内存包装跑（4G 上限）
-    nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 4G python3 "$HERE/wgsl_validate.py" "$FROZEN" "$S/wgsl" "$NAGA_TARGET/debug/naga-check" "$S/rows-k.json"
+    nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 4G python3 "$HERE/wgsl_validate.py" "$FROZEN" "$S/wgsl" "$NAGA_TARGET/debug/naga-check" "$S/rows-k.json"
     # 校验路径自己会红：两处故意写坏的源码（构造器少一个参数、引用不存在的常量）必须判红
     python3 - <<PY
 import pathlib
@@ -104,7 +104,7 @@ assert a.count(x) == 1 and b.count(y) == 1
 (w / "scan-broken.wgsl").write_text(b.replace(y, y.replace("APPLIED);", "APPLIED_X);")), encoding="utf-8")
 PY
     for f in walk-broken scan-broken; do
-      nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 4G "$NAGA_TARGET/debug/naga-check" "$S/wgsl/$f.wgsl" | head -1 | cut -c1-120; echo "$f rc=${PIPESTATUS[0]}"
+      nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 4G "$NAGA_TARGET/debug/naga-check" "$S/wgsl/$f.wgsl" | head -1 | cut -c1-120; echo "$f rc=${PIPESTATUS[0]}"
     done ;;
   *) echo "不认识的阶段 $stage" >&2; exit 2 ;;
   esac

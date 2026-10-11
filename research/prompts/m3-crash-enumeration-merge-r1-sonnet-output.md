@@ -189,7 +189,7 @@ label=L0 pat ExtentLowerSegmentBackToInline writes=29 segments=4 states6=13 stat
 
 ### 4.1 今天「判不了」怎么处置、F4 改成什么
 
-- 今天：配置登记了 `crash_judge_gpu` 的类，建不出表、有状态判不了，都**整趟报错、不退回 CPU 判器**（`crash_amplification.rs:7135` 一带的 `match (routes.crash_judge, &cards)`；文档在 `judge_my_blocks_on_gpu_cards` 的 `# Errors`；用户 2026-09-29 的原话在 `scripts/crash-amplification.sh:28`「不接受默认降级」）。没登记才由 CPU 判（`crash_amplification.rs:7120`）。
+- 今天：配置登记了 `crash_judge_gpu` 的类，建不出表、有状态判不了，都**整趟报错、不退回 CPU 判器**（`crash_amplification.rs:7135` 一带的 `match (routes.crash_judge, &cards)`；文档在 `judge_my_blocks_on_gpu_cards` 的 `# Errors`；用户 2026-09-29 的原话在 `scripts/crash/crash-amplification.sh:28`「不接受默认降级」）。没登记才由 CPU 判（`crash_amplification.rs:7120`）。
 - `crash_amplification.rs:1836` 那个函数文档写「判不了的状态交回 `None`（回落到 CPU）」只是函数返回值，调用处在上游已拒过，事实表第 6 节第 5 点已指出，我读码同意。
 - F4：每个状态 CPU 判（对拍参照），建得出表的 GPU 也判并逐状态比，建不出表的项在登记表里写「GPU 不判」+ 理由。这等于把「判不了」从**运行时判定**（建表时碰到才报错）搬成**登记表里的静态声明**。
 
@@ -298,7 +298,7 @@ unlink per-state-mount CPU lower bound: two hosts 8.4 h, one host 16.4 h
 | 入口脚本 | `crash-amplification.sh`/`-item.sh`/`-lib.sh`/`-two-hosts.sh`、`layer0-shard-run.sh`/`-selftest.sh`/`layer0-shard-configuration-check.sh`、`gpu-quiesce-run.sh`（13 处命中放量名）；`hook-swap.py`、`host-dispatch.py`、`host-resources.py`、`agent-watch.py` 里的名字 | 脚本执行位、`selftest-registry.tsv:43-45,80`、`lib_heavy_tests.py:585` `CRASH_AMPLIFICATION_SCRIPTS`（按文件名认重型，改名要同批改并保 `LIB_HEAVY_TESTS_BREAK=crash-amplification-unnamed` 那条弄坏开关仍红）|
 | 库目录 | `${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library`（`verification.md:36`）。改默认路径 = 新目录 = **空库 = 下一次整域冷跑**；要改就 `mv` 旧库，不要重建 | — |
 | 测试与模块 | `crates/` 49 份含 `layer0`：模块 `layer0_progress`（`verification.md` 模块表与 `//! checker 档模块：` 首行声明，15 份测试声明它、11 份声明 `crash_amplification`，`crash-case-check.py` 的 modules 一样判）、类型 `Layer0*`、计数行前缀 `LAYER0 …`（`stage-inputs.tsv` 的 `count-line=` 登记）、`crates/mutations.tsv`（249 处命中，其中 41 行点名层 0 全量用例函数、2 行点名放量用例；锚点腐化就红）、`e165-pinned-red-examples.tsv`（50 行含「层 0」）| 门禁 59 号（变异表锚点）、`mutation-tables` 格、E165 钉表复放 |
-| 条款与规则 | `verification.md`（第 34-36 行三档表、第 100-104 行「门禁管哪一半」）、`implementation-workflow.md`、`CLAUDE.md`、`main-agent.md`、`agent-common.md`、`implementation-writer.md`/`three-way-attack.md`/`experiment-*`/`investigator.md`/`tooling-writer.md`、`skills/crash-test/commit-stages.md`（26+7 处）、`skills/gate/staged-gate.md`、D13 已定项 9/15、`kb/milestone/*`、`invariants.md`（62 处「层 0」）、`tooling.md`、`verification-build.md`、`checks-owed.md`（76+50+27+30，欠账行）、`README.md`、`briefs/`、`scripts/perf-by-milestone.md` | 门禁 doc-text term-renames、doc-lint 的编号与简称（简称 ≤ 48 宽，`path-moves.md:31`）、doc-decisions（`--write` 重生成分项清单，`:33`）、doc-experiments decision-links（`:34`）|
+| 条款与规则 | `verification.md`（第 34-36 行三档表、第 100-104 行「门禁管哪一半」）、`implementation-workflow.md`、`CLAUDE.md`、`main-agent.md`、`agent-common.md`、`implementation-writer.md`/`three-way-attack.md`/`experiment-*`/`investigator.md`/`tooling-writer.md`、`skills/crash-test/commit-stages.md`（26+7 处）、`skills/gate/staged-gate.md`、D13 已定项 9/15、`kb/milestone/*`、`invariants.md`（62 处「层 0」）、`tooling.md`、`verification-build.md`、`checks-owed.md`（76+50+27+30，欠账行）、`README.md`、`briefs/`、`scripts/experiments/perf-by-milestone.md` | 门禁 doc-text term-renames、doc-lint 的编号与简称（简称 ≤ 48 宽，`path-moves.md:31`）、doc-decisions（`--write` 重生成分项清单，`:33`）、doc-experiments decision-links（`:34`）|
 | 登记 | `.claude/kb/term-renames.md` 加一节与表格行（表在 `:22` 起，一行「旧 \| 新 \| 匹配 \| 是什么」）；变更史里写一条索引性的改名条目（`path-moves.md:38`）| doc-text term-renames |
 
 **B. 冻结、原样留旧名（不改）**
@@ -324,7 +324,7 @@ unlink per-state-mount CPU lower bound: two hosts 8.4 h, one host 16.4 h
 ### 7.1 约束（都是现查的）
 
 1. **别的会话的快照**：`research/prompts/m3-batch52-54-code-r1-snapshot/crates-sha256.txt` 共 24 份，与合并要碰的文件相交的有 `crates/singlefs-checker-tier/src/crash_judge_gpu.rs`（`:7`）、`crash_judge_dispatch.rs`、两个 `crash_judge_checker*.wgsl`、测试 `crash_enumeration_new_pool_file_creation_stream.rs`、`crash_enumeration_sharded_across_processes.rs`、`crash_enumeration_tree_split_streams.rs`、`crash_enumeration_unlink_after_the_multi_record_publish_stream.rs`（`:12`）、`crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs`，还有 core 的 `recovery.rs`、`mount.rs`、`transaction.rs`、`inode_tree.rs`。派发闸拒绝派 `kb-scribe`/`implementation-writer` 改「还没写判决的三方轮的开工快照里」的文件（`agent-common.md` 派发闸一条）。**这一轮自己的快照（96 份 crates）也算**：这一轮判决写出之前，这些文件同样动不了。
-2. **另一批在飞**：`.claude/batch-scope`（现有 7 行：`CLAUDE.md`、`crash_amplification.rs`（`:15`）、`crash_facts.rs`、`crash_judge_common.wgsl`、`crash_judge_dispatch.rs`、`crash_judge_tables.rs`、`scripts/e152-tables.py`）是「判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行」那一批，提交前要清空。其中 `crash_judge_tables.rs`、`crash_judge_common.wgsl` 在判法闭包里（`crash_judge_gpu.rs:23` 引 `crash_judge_tables`），所以那一批提交就换一次判法版本。引擎口子要动的 `crash_amplification.rs` 与它撞。
+2. **另一批在飞**：`.claude/batch-scope`（现有 7 行：`CLAUDE.md`、`crash_amplification.rs`（`:15`）、`crash_facts.rs`、`crash_judge_common.wgsl`、`crash_judge_dispatch.rs`、`crash_judge_tables.rs`、`scripts/experiments/e152-tables.py`）是「判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行」那一批，提交前要清空。其中 `crash_judge_tables.rs`、`crash_judge_common.wgsl` 在判法闭包里（`crash_judge_gpu.rs:23` 引 `crash_judge_tables`），所以那一批提交就换一次判法版本。引擎口子要动的 `crash_amplification.rs` 与它撞。
 3. **判法版本**：闭包 = `crash.rs` + `crash_judge_gpu.rs` 出发（含 `crash_judge_tables.rs`、各 wgsl、core 的 `recovery` 等）；不在闭包：`crash_amplification.rs`、`crash_facts.rs`、`crash_identity.rs`、`verdict_store.rs`、`crash_judge_dispatch.rs`（`crash_identity.rs:861` 起的「不许引」表）、所有测试文件。改闭包里的文件（含标识符改名）就换一次判法版本 = 一次全量重判（K5）。
 4. **E171 冻结**排在这一题之后（派发材料原话）；E171 装置二进制引用 `Layer0*`（6.2 C 节）。冻结的那棵树必须是一个自洽的状态：不能门禁已改名、`stage-inputs.tsv` 还登着旧用例，也不能新登记表登着旧代码里没有的项。
 
@@ -351,8 +351,8 @@ unlink per-state-mount CPU lower bound: two hosts 8.4 h, one host 16.4 h
 
 - 工作目录：一个新建的仓副本（只拷 `Cargo.toml`、`Cargo.lock`、`.cargo`、`crates`），再 `python3 -I research/prompts/m3-crash-enumeration-merge-r1-sonnet-model/apply_probes.py <仓副本根>`。
 - 环境前缀：`SINGLEFS_HEAVY_TESTS=user-request CARGO_TARGET_DIR=<编译目录> ROCKSDB_LIB_DIR=/home/fy5090/code/singlefs/target/release/build/librocksdb-sys-f7ce5abb7da4f505/out ROCKSDB_STATIC=1`（后两个省掉现编 RocksDB；该目录只读引用，没有写进去）。
-- 编（我已编过一遍，1 分 19 秒 + 20 秒）：`bash scripts/capped.sh 7 cargo test --offline --release -p singlefs-checker-tier --features verdict-store --test crash_enumeration_unlink_after_the_multi_record_publish_stream --test crash_enumeration_multi_record_publish_stream --test crash_amplification_fixed_script_through_unmount --test crash_amplification_fixed_script_through_rollback --test crash_enumeration_tree_split_streams --test crash_enumeration_position_addressed_trees --test record_checker_judges_absence_by_the_persisted_set --test crash_enumeration_floor_raise_pushed_by_admission --no-run`。
-- 跑（每条经 `bash scripts/run-with-memory-cap.sh 6G bash scripts/capped.sh 7 <测试二进制> <用例函数> --exact --nocapture`，二进制路径是编译输出里 `Executable` 那一行）：放量函数默认展开 6，是快档用例，会真判几十到几百个态：`crash_amplification_of_the_unlink_after_the_multi_record_publish_stream_is_clean`、`crash_amplification_of_the_multi_record_publish_stream_is_clean`、`the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_and_reused`、`the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reused`（用例名以 `--list` 为准）。
+- 编（我已编过一遍，1 分 19 秒 + 20 秒）：`bash scripts/hosts/capped.sh 7 cargo test --offline --release -p singlefs-checker-tier --features verdict-store --test crash_enumeration_unlink_after_the_multi_record_publish_stream --test crash_enumeration_multi_record_publish_stream --test crash_amplification_fixed_script_through_unmount --test crash_amplification_fixed_script_through_rollback --test crash_enumeration_tree_split_streams --test crash_enumeration_position_addressed_trees --test record_checker_judges_absence_by_the_persisted_set --test crash_enumeration_floor_raise_pushed_by_admission --no-run`。
+- 跑（每条经 `bash scripts/hosts/run-with-memory-cap.sh 6G bash scripts/hosts/capped.sh 7 <测试二进制> <用例函数> --exact --nocapture`，二进制路径是编译输出里 `Executable` 那一行）：放量函数默认展开 6，是快档用例，会真判几十到几百个态：`crash_amplification_of_the_unlink_after_the_multi_record_publish_stream_is_clean`、`crash_amplification_of_the_multi_record_publish_stream_is_clean`、`the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_and_reused`、`the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reused`（用例名以 `--list` 为准）。
 - 看哪几行：`grep ZZPROBE <输出>`，取 `label=AMP …`。放量的 through_unmount / through_rollback 两个文件里我写的标签是 `AMP through-unmount`、`AMP through-rollback`，对 L0 的 `second-stream`、`through-rollback`；其余放量项标签 `AMP <flow 名>`（`multi-record-publish`、`unlink-after-multi-record-publish`、`sigma-of-the-misaligned-reuse` 等）。
 - 另两样我量不了：① 有卡的机器上对 io_min 8192、清扫流跑 `build_judge_tables`（看会不会撞 `WriteNotAlignedToALocation`），② 一次「全部命中」的整域空跑的挂钟与一个状态再挂载的成本（5.4）。
 
@@ -432,9 +432,9 @@ unlink per-state-mount CPU lower bound: two hosts 8.4 h, one host 16.4 h
 - `.claude/gate.d/checker-tier-layer0-replay.sh:8`：「# gate-cell: layer0-replay」
 - `.claude/gate.d/checker-tier-layer0-replay.sh:9`：「# gate-cell: feature-gated-tests」
 - `.claude/gate.d/checker-tier-layer0-replay.sh:13`：「全量，只有 layer0-replay 一格」
-- `scripts/admission.py:271`：「CRASH_CASE_MARKER_PREFIX = "singlefs-crash-case-green."」
-- `scripts/crash-amplification.sh:219`：「FULL_EXPAND_UP_TO=」
-- `scripts/crash-amplification.sh:24`：「崩溃注入（crash_injection_campaign）不在表里」
+- `scripts/gate/admission.py:271`：「CRASH_CASE_MARKER_PREFIX = "singlefs-crash-case-green."」
+- `scripts/crash/crash-amplification.sh:219`：「FULL_EXPAND_UP_TO=」
+- `scripts/crash/crash-amplification.sh:24`：「崩溃注入（crash_injection_campaign）不在表里」
 - `.claude/hooks/lib_heavy_tests.py:389`：「STAGE_KIND = {"checker-tier-layer0-replay.sh": "layer0-stage"」
 - `.claude/hooks/lib_heavy_tests.py:585`：「CRASH_AMPLIFICATION_SCRIPTS = frozenset(」
 - `.claude/hooks/selftest-registry.tsv:129`：「.claude/gate.d/checker-tier-layer0-replay.sh samples-light-marker:.layer0-sample-tools」
@@ -453,7 +453,7 @@ unlink per-state-mount CPU lower bound: two hosts 8.4 h, one host 16.4 h
 - `.claude/batch-scope:15`：「crates/singlefs-checker-tier/src/crash_amplification.rs」
 - `research/prompts/m3-batch52-54-code-r1-snapshot/crates-sha256.txt:7`：「crates/singlefs-checker-tier/src/crash_judge_gpu.rs」
 - `research/prompts/m3-batch52-54-code-r1-snapshot/crates-sha256.txt:12`：「crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs」
-- `scripts/crash-amplification.sh:28`：「不接受默认降级」
+- `scripts/crash/crash-amplification.sh:28`：「不接受默认降级」
 - `.claude/singlefs-ai-sop/rules/test-script-discipline.md:79`：「登记了的那几类只走加速路径，配置了几台机器就分到几台。」
 - `records/2026-09-24-里程碑二收尾调度.md:318`：「本机 23,700 个/秒、第二台 24,800 个/秒」
 - `.claude/gate.d/stage-inputs.tsv:49`：「crash-case:layer0-second-stream」

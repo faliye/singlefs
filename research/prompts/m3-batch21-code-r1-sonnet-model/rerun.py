@@ -11,8 +11,8 @@ LOG = f"{WORK}/log"
 DONE = f"{WORK}/done"
 SUMMARY = f"{WORK}/summary.txt"
 SNAPSHOT = f"{REPO}/research/prompts/m3-batch21-code-r1-snapshot/crates-sha256.txt"
-CAP_SCRIPT = f"{REPO}/scripts/run-with-memory-cap.sh"
-THREADS_SCRIPT = f"{REPO}/scripts/capped.sh"
+CAP_SCRIPT = f"{REPO}/scripts/hosts/run-with-memory-cap.sh"
+THREADS_SCRIPT = f"{REPO}/scripts/hosts/capped.sh"
 CALL_BUDGET = 215.0  # 秒：一次调用至多干这么久（前台命令不超过 240 秒）
 START = time.time()
 for d in (LOG, DONE):

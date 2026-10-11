@@ -16,7 +16,7 @@ done
 # 改法 F1（54 号：登记表、54 号自己、admission.py 进范围一问；admission.py 进每条用例的指纹）与 F6（admission.py：登记的用例函数要标 #[ignore]），
 # 套在临时拷贝上再跑 J1、J4（只在这几个探针上量过，被攻过零轮）
 cp "$repo/.claude/gate.d/checker-tier-layer0-replay.sh" "$work/checker-tier-layer0-replay.sh"
-cp "$repo/scripts/admission.py" "$work/admission.py"
+cp "$repo/scripts/gate/admission.py" "$work/admission.py"
 if patch -s "$work/checker-tier-layer0-replay.sh" "$here/fix-f1-checker-tier-layer0-replay.patch" && patch -s "$work/admission.py" "$here/fix-f6-admission.patch"; then
   python3 "$here/probe_j1_stage.py" --stage "$work/checker-tier-layer0-replay.sh" --admission "$work/admission.py" > "$work/j1-fixed.log" 2>&1
   echo "probe_j1_stage 套 F1、F6 exit=$?"

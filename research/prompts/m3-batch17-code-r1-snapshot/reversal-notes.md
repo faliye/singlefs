@@ -1,6 +1,6 @@
 # m3-batch17-code-r1 快照对不上的两份（2026-10-05）
 
-`bash scripts/snapshot-check.sh m3-batch17-code-r1`：7 个文件里 2 个对不上——`crates/singlefs-core/src/mount.rs`（快照 e9b32b9051c5）与 `crates/mutations.tsv`。快照之后改它们的是别的会话合进主工作区的补丁：根环线第 10b 批（`mount.rs` 把「挂载时读不出的槽」换成「挂载时读坏的槽」、RGall 去掉一圈窗口那一滤、C664 拒因拆开）与形式化线 26-3；变异表是两条线的锚点改写与追加。
+`bash scripts/devices/snapshot-check.sh m3-batch17-code-r1`：7 个文件里 2 个对不上——`crates/singlefs-core/src/mount.rs`（快照 e9b32b9051c5）与 `crates/mutations.tsv`。快照之后改它们的是别的会话合进主工作区的补丁：根环线第 10b 批（`mount.rs` 把「挂载时读不出的槽」换成「挂载时读坏的槽」、RGall 去掉一圈窗口那一滤、C664 拒因拆开）与形式化线 26-3；变异表是两条线的锚点改写与追加。
 
 倒推不用逐处反做：冻结副本 `/tmp/claude-1000/m3-batch17-code-r1/tree/` 里这两份的 sha256 与快照逐行相同（`sha256sum`：`mount.rs` e9b32b9051c55e50…、`mutations.tsv` 4140c7847b56fa71…），它就是快照时的原样。两条腿引的代码行都写冻结副本路径，`cite-check.py --root <冻结副本> --root .` 42 处全对上。
 

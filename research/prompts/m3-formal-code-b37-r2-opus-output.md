@@ -14,7 +14,7 @@ f8d05d588a5abf2d5d3abffb4c9cc39233a05fef4c830909d72b8fff057619f4  c13_family_axi
 fbf57a07ea3bb5434b61e277c4484762364d5c65b030448c4fdbffdfd252e3a4  expected-output.txt
 ```
 
-模型从冻结副本的源码里抽判据枚举、`Criterion::family` 的分族、`is_judged_under` 六条臂、改后单测写死的五份集合与五个调用；从 `scripts/replay.sh` 抽直接起装置、走这张判据表的 15 条驱动；再拿那 15 条驱动登记的产物里 `name=control criterion=` 的判据集合逐条核模型算的「今天每条正式跑有哪几条对照」（核一：15 条全相同，不同就退 4）。这一道核会红：把第 6193 行换成 `=> Family::LegalHistory,` 的一份假根上，核一 11 条不同、退 4（草稿 `~/.local/share/singlefs/work/m3b37r2-opus/selfred.txt`）。限度：读数一律当「跑了就红」，只管覆盖、不管数值；读数层的几格是读码判的，没进模型。
+模型从冻结副本的源码里抽判据枚举、`Criterion::family` 的分族、`is_judged_under` 六条臂、改后单测写死的五份集合与五个调用；从 `scripts/experiments/replay.sh` 抽直接起装置、走这张判据表的 15 条驱动；再拿那 15 条驱动登记的产物里 `name=control criterion=` 的判据集合逐条核模型算的「今天每条正式跑有哪几条对照」（核一：15 条全相同，不同就退 4）。这一道核会红：把第 6193 行换成 `=> Family::LegalHistory,` 的一份假根上，核一 11 条不同、退 4（草稿 `~/.local/share/singlefs/work/m3b37r2-opus/selfred.txt`）。限度：读数一律当「跑了就红」，只管覆盖、不管数值；读数层的几格是读码判的，没进模型。
 
 ## 各格判定一览
 
@@ -52,7 +52,7 @@ fbf57a07ea3bb5434b61e277c4484762364d5c65b030448c4fdbffdfd252e3a4  expected-outpu
 
 单测五个调用的族：r1 取「let legal_and_adversarial = [Family::LegalHistory, Family::Adversarial];」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:18279`），另四个取「let all_families = [Family::LegalHistory, Family::Adversarial, Family::MultiDisk];」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:18280`）。`main` 的族只来自命令行：不给 `--family` 是「let mut families = vec![Family::LegalHistory, Family::Adversarial];」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:17388`），`--family all` 是「"all" => {}」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:17419`）照旧取 L+A，多盘只有单独一族「families = vec![Family::MultiDisk];」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:17416`）。所以 L+A+M 这个调用在任何一次正式跑里都不会出现，四个调用测的是一个起不出来的组合。
 
-正式跑的单位是 (档, 族)：对照只跑选中的那一族（「/// 阳性对照那段循环：遍历判据表的每一行（只跑选中的那一族、这一档判的判据）。」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:7750`），族过滤在「if !families.contains(&criterion.family()) && !criterion.is_judged_in_every_family() {」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:7758`）；replay.sh 里 15 条直接起装置的驱动每条只带一族（例：「--bounds segment1 --family adversarial --profile r3 | grep」，`scripts/replay.sh:763`）。kb 也是按族记的：「② 阳性对照（合法历史一族 35 个读数、对抗一族 10 个）」（`.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md:26`）。模型输出（原样）：
+正式跑的单位是 (档, 族)：对照只跑选中的那一族（「/// 阳性对照那段循环：遍历判据表的每一行（只跑选中的那一族、这一档判的判据）。」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:7750`），族过滤在「if !families.contains(&criterion.family()) && !criterion.is_judged_in_every_family() {」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:7758`）；replay.sh 里 15 条直接起装置的驱动每条只带一族（例：「--bounds segment1 --family adversarial --profile r3 | grep」，`scripts/experiments/replay.sh:763`）。kb 也是按族记的：「② 阳性对照（合法历史一族 35 个读数、对抗一族 10 个）」（`.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md:26`）。模型输出（原样）：
 
 ```text
 == C1：单测五个调用（族组合 main 起不起得出 / 正式跑里有没有同档同族的一条）
@@ -63,7 +63,7 @@ fbf57a07ea3bb5434b61e277c4484762364d5c65b030448c4fdbffdfd252e3a4  expected-outpu
   r5               r5       L+A+M  main 起得出：否；同档同族的正式跑：无；写死 28 条
 ```
 
-r1 那一个 L+A 是 `main` 起得出的（不带 `--family`），但正式跑里 r1 三条是 `--family legal` 两条、`--family adversarial` 一条，也没有 L+A 的。单测注释说的是「正式跑用的五档（r1、r2、两份表都取的 r2、r3、r5，`scripts/replay.sh` 起这个装置的那几条驱动）」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:18271`）：档对上了，族没对上。这一格的后果在 C3-甲（族这一维的改坏单测全看不见）。
+r1 那一个 L+A 是 `main` 起得出的（不带 `--family`），但正式跑里 r1 三条是 `--family legal` 两条、`--family adversarial` 一条，也没有 L+A 的。单测注释说的是「正式跑用的五档（r1、r2、两份表都取的 r2、r3、r5，`scripts/experiments/replay.sh` 起这个装置的那几条驱动）」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:18271`）：档对上了，族没对上。这一格的后果在 C3-甲（族这一维的改坏单测全看不见）。
 
 ### C1-乙（打中，现状，原有）：r3 档写了 29 条，正式跑 r3 只有 8 条
 
@@ -83,7 +83,7 @@ r1 那一个 L+A 是 `main` 起得出的（不带 `--family`），但正式跑�
 
 这几个数由产物独立核过（核一：模型算的每条驱动的对照集与产物里 `name=control` 的判据集合 15 条全相同）。
 
-- r2 直接建表那一档：正式跑只有多盘一条（「--bounds segment1 --family multi_disk --profile r2 | grep」，`scripts/replay.sh:738`），第二段 `driver_e165_segment2` 经杀伤界驱动起、产物里没有 `name=control` 行。但只按 `--profile` 并上 `--table both` 那几条，r2 档 30 条齐。所以 r2 这一行是单测把 `--table both` 拆成另一档造出来的，按登记的「档」（`--profile`）不缺。
+- r2 直接建表那一档：正式跑只有多盘一条（「--bounds segment1 --family multi_disk --profile r2 | grep」，`scripts/experiments/replay.sh:738`），第二段 `driver_e165_segment2` 经杀伤界驱动起、产物里没有 `name=control` 行。但只按 `--profile` 并上 `--table both` 那几条，r2 档 30 条齐。所以 r2 这一行是单测把 `--table both` 拆成另一档造出来的，按登记的「档」（`--profile`）不缺。
 - r3 档按哪一种并法都缺：r3 的正式跑只有对抗一族那一条，产物收尾行「E7RESULT name=verdict scope=run bounds=segment1 family=adversarial states=64513748 self_checks_passed=15 control_readings=80 controls_not_red=0 void_conditions=0 halt_conditions=0 profile=r3 marker_parity=even」（`research/results/e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out:379`），80 个读数只出自 A 族 7 条与拆行一条。同一份产物在 A 域照判 J6Qn 与 J7：「E7RESULT name=verdict domain=A ring_slots=64 smallest_n=1 largest_n=4 criteria=r2 j6qn_premise_holds_violations=85400 j6qn_premise_holds_judged=45149528 j6qn_premise_fails_violations=0 j6qn_premise_fails_judged=0 j7_judged=45149528 j7a_instance_table_violations=0 j7a_allocation_record_tree_root_violations=1473356 j7a_filesystem_identifier_violations=0 j7b_violations=0 j7b_judged=1473356 j7c_violations=0 j7c_judged=43676172 first_returned_root_txg_is_the_largest=0」（`research/results/e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out:209`）。判出这一行的是「    if run_profile.judges_j7() {」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:8218`），不看族；登记 r2 5.4 也写 J6Qn 判「每个域（两族、多盘）」。所以 r3 档在正式跑里判了 J6Qn、J7 五格（A 域的判决行另带 J6 的前提两栏），r3 的哪一份产物里都没有它们的对照；单测的 r3 调用取 L+A+M，把这 21 条全跑出来，照过。
 
 不是这一批引入的：改前单测的 r3 调用同样取全族。r3 登记 5.1「对抗一族（`--family adversarial`）每个 (域, n) 多出 Q3 的几行（5.6）；去掉这几行之后与 `r2` 档同一条命令的输出逐字节相同（TV2 核）。」（`research/prompts/e165-r3-prereg.md:424`）——r3 档只登记了对抗一族那一跑；J6Qn、J7 的对照数值在 r2 与 r3 上相同（拆行只动对抗一族的 I-8.12 计数），说「r2 那几跑的对照罩得住 r3」要另立一条跨档的读法，那正是 B1-甲 否掉的「几档并起来判」。
@@ -147,7 +147,7 @@ r1 那一个 L+A 是 `main` 起得出的（不带 `--family`），但正式跑�
 
 ### C3-乙（打中，造的写法）：反盘次序与标记奇偶另一种
 
-单测五个调用都取偶数奇偶（「let parity = MarkerParity::EvenVersionsWrittenByTheUnmountSequence;」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:18278`）、默认盘次序；正式跑里有反盘次序两条（例：「--bounds segment1 --family multi_disk --only M,MC --profile r2 --table both --disk-order reversed | grep」，`scripts/replay.sh:753`）与 r5 odd 两条（例：「--bounds segment1 --family legal --profile r5 --marker-parity odd | grep」，`scripts/replay.sh:864`）。`is_judged_under` 拿的是带旋钮的原档（第 7761 行），对照自己才把盘次序与建表法退回默认（「.with_reported_disk_order(ReportedDiskOrder::FirstDeviceBeforeSecond);」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:6303`）。所以一条臂多一个看盘次序或奇偶的条件，单测看不见：
+单测五个调用都取偶数奇偶（「let parity = MarkerParity::EvenVersionsWrittenByTheUnmountSequence;」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:18278`）、默认盘次序；正式跑里有反盘次序两条（例：「--bounds segment1 --family multi_disk --only M,MC --profile r2 --table both --disk-order reversed | grep」，`scripts/experiments/replay.sh:753`）与 r5 odd 两条（例：「--bounds segment1 --family legal --profile r5 --marker-parity odd | grep」，`scripts/experiments/replay.sh:864`）。`is_judged_under` 拿的是带旋钮的原档（第 7761 行），对照自己才把盘次序与建表法退回默认（「.with_reported_disk_order(ReportedDiskOrder::FirstDeviceBeforeSecond);」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:6303`）。所以一条臂多一个看盘次序或奇偶的条件，单测看不见：
 
 ```text
 == 丙 `is_judged_under` 一条臂多一个看盘次序或奇偶的条件：共 12 个；单测红 0；单测过而某条正式跑少了对照 8；单测过、正式跑只多不少 0；单测过、正式跑不变 4
@@ -264,11 +264,11 @@ r1 那一个 L+A 是 `main` 起得出的（不带 `--family`），但正式跑�
 
 ## 要主 agent 跑的命令
 
-都是 checker 档，这条腿不跑。工作目录取一份仓副本（不是冻结副本、不是主工作区）；内存上限取 `scripts/replay.sh` 第 29 行 `REPLAY_MEMORY_CAP` 的默认值 8G，线程 15。
+都是 checker 档，这条腿不跑。工作目录取一份仓副本（不是冻结副本、不是主工作区）；内存上限取 `scripts/experiments/replay.sh` 第 29 行 `REPLAY_MEMORY_CAP` 的默认值 8G，线程 15。
 
 1. 坐实 C3-甲：副本里把 e165 装置第 6193 行「            | Self::J6QnSplitByI812 => Family::Adversarial,」换成 `            | Self::J6QnSplitByI812 => Family::LegalHistory,`，跑
-   `SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 15 cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- every_criterion_has_a_positive_control_and_every_control_is_red`
-   看 `test result:`：`1 passed` 即坐实单测放过。同一副本 `SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 15 cargo run --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds light --family adversarial --profile r3`，看 `name=verdict scope=run` 那一行：`control_readings=0`、`controls_not_red=0`、`void_conditions=0` 即坐实「r3 判了 A 族与拆行而没有对照、V2 不报」。
+   `SINGLEFS_HEAVY_TESTS=user-request bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 15 cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- every_criterion_has_a_positive_control_and_every_control_is_red`
+   看 `test result:`：`1 passed` 即坐实单测放过。同一副本 `SINGLEFS_HEAVY_TESTS=user-request bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 15 cargo run --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds light --family adversarial --profile r3`，看 `name=verdict scope=run` 那一行：`control_readings=0`、`controls_not_red=0`、`void_conditions=0` 即坐实「r3 判了 A 族与拆行而没有对照、V2 不报」。
 2. 坐实 C3-甲 第三行：另一份副本把第 6203–6206 行 `matches!(…)` 换成 `false`，同一条单测 `1 passed`；`cargo run … -- --bounds light --family adversarial --profile r2 --table both` 输出里 `grep -c 'name=control criterion=T_'` 为 0。
 3. 坐实 C3-丙 第 1 条：另一份副本把第 7591–7592 行 C8a 那两格换成空（`&[]`），跑整个 bin 的单测 `cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration`（同样经包装与 `SINGLEFS_HEAVY_TESTS=user-request`），看全过；`cargo run … -- --bounds light --family legal --profile r5 --marker-parity odd` 里 `grep -c 'name=control criterion=J8a '` 由 10 变 8（今天 odd 合法一族产物是 10）。
 4. 复核模型：把模型目录拷到草稿目录，`bash tools/rerun.sh`，应报「✓ 模型输出与 expected-output.txt 逐字相同（93 行）」。

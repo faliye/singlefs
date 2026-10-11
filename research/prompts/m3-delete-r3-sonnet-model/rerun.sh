@@ -3,7 +3,7 @@
 # 与辩方的 core-intent-carry.diff（意图那次只改 inode 记录），把攻方的原型用例文件与本目录的追加段拼成一个测试目标，跑 harness 档的
 # g1_ 四个用例与 g2_ 一个用例，再跑 ring_window_cells.py 对拍。
 # 用法（经内存包装与线程上限起；上限给 6G，峰值表里没有这条命令时要 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON）：
-#   bash scripts/run-with-memory-cap.sh 6G bash scripts/capped.sh 5 bash research/prompts/m3-delete-r3-sonnet-model/rerun.sh <仓根> <冻结副本根> <草稿目录>
+#   bash scripts/hosts/run-with-memory-cap.sh 6G bash scripts/hosts/capped.sh 5 bash research/prompts/m3-delete-r3-sonnet-model/rerun.sh <仓根> <冻结副本根> <草稿目录>
 # 冻结副本根 = /tmp/claude-1000/m3-delete-r2/tree（清单 research/prompts/m3-delete-r3-snapshot/crates-sha256.txt）。草稿目录必须还不存在，用完自己删。
 # 输出末尾：「R name= 行相同」「cells.out 相同」两行；R 行次序固定（g1_ 四个用例按字母序在前，g2_ 在后）。
 set -euo pipefail

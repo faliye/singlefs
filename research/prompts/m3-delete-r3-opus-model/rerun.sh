@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # m3-delete-r3 攻方腿复跑（副本专用，被攻过零轮）。用法（从仓根，整条脚本经内存包装与线程上限）：
-#   nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 5 \
+#   nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 5 \
 #     bash research/prompts/m3-delete-r3-opus-model/rerun.sh /tmp/claude-1000/m3-delete-r2/tree <还不存在的草稿目录>
 # 冻结副本清单 research/prompts/m3-delete-r3-snapshot/crates-sha256.txt。做的事：拷冻结副本的 crates/，打上 m3-delete-r2 攻方的
 # core-prototype-r2.diff（这一轮没改 core，只加用例），放进 m3_delete_r3_attack_prototype.rs，跑 harness 档这一个测试目标的全部用例；

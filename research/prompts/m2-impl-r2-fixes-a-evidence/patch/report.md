@@ -69,7 +69,7 @@ exit=0
  118 files changed, 2204 insertions(+), 2269 deletions(-)
 ```
 
-## 每条新测试的证红（`scripts/prove-red.sh --copy … --memory 8G singlefs-harness`，基线先跑、绿）
+## 每条新测试的证红（`scripts/mutation/prove-red.sh --copy … --memory 8G singlefs-harness`，基线先跑、绿）
 
 | 新测试 | 改坏哪一行（变异名序号） | 哪条断言红 |
 |---|---|---|

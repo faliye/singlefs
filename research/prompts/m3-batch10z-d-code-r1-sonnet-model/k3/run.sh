@@ -13,7 +13,7 @@ trap "python3 $W/k3/mut.py $name restore >> $out 2>&1" EXIT
 cd $W/repo
 run() { # label, args...
   label=$1; shift
-  timeout ${STAGE_TIMEOUT:-105} nice -n 19 bash $R/scripts/run-with-memory-cap.sh 12G bash $R/scripts/capped.sh 6 cargo test --offline "$@" > $W/k3/out/$name.$label.log 2>&1
+  timeout ${STAGE_TIMEOUT:-105} nice -n 19 bash $R/scripts/hosts/run-with-memory-cap.sh 12G bash $R/scripts/hosts/capped.sh 6 cargo test --offline "$@" > $W/k3/out/$name.$label.log 2>&1
   rc=$?
   echo "## $label rc=$rc" >> $out
   grep -E "^error(\[|:)|test result|^test .* FAILED|panicked at|could not compile" $W/k3/out/$name.$label.log | cut -c1-260 >> $out

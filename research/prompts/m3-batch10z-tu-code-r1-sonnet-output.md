@@ -144,7 +144,7 @@ $ cat research/prompts/m3-batch10z-tu-code-r1-sonnet-model/logs/final/wp1.log re
 - **读回自己写过的块的拼接、对齐与越界**：往拷贝加了差分测试 `rehearsal_device_agrees_with_the_file_backend_on_every_request`（`src/core-mounted-session-debug.diff`），拿真的 `FileBackedBlockDevice` 逐请求对拍（物理块 512 与 4096，设备 512 B 到 128 KiB，读 / 写 / 写零各占三分之一，偏移与长度含 0、越界、`u64::MAX` 附近、没对齐），错误成员与字段、读出的字节、底下那块盘有没有被写、整盘读回，都要相同：
 
 ```
-$ cd <拷贝> && TMPDIR=<草稿目录>/tmp bash scripts/run-with-memory-cap.sh 6G bash scripts/capped.sh 15 cargo test --release --offline -p singlefs-core --lib sonnet_k5 -- --nocapture
+$ cd <拷贝> && TMPDIR=<草稿目录>/tmp bash scripts/hosts/run-with-memory-cap.sh 6G bash scripts/hosts/capped.sh 15 cargo test --release --offline -p singlefs-core --lib sonnet_k5 -- --nocapture
 SONNET_K5 requests=100000 refused=63106
 test mounted_session::sonnet_k5_differential::rehearsal_device_agrees_with_the_file_backend_on_every_request ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 216 filtered out; finished in 0.96s
@@ -559,14 +559,14 @@ C16_pinned_lines_compare_removed: 红 1 条 ['every_layer_handed_the_stop_reques
 
 ## 9. 与规则的出入、清理
 
-- 出入：K5 / K1-2 的差分测试用 `TMPDIR` 指到草稿目录的 `tmp`；其余编出来的二进制（探针、harness 测试二进制、扫源码模型、rustc 小程序）都经 `bash scripts/run-with-memory-cap.sh`（1G 到 12G）起，一次一件、同时不超过 4 件；线程不超过 15。`cargo` 编译在内存包装里；`rustc` 编扫源码模型与小程序没经包装（不跑编出来的代码之外的事，规则不要求）。
+- 出入：K5 / K1-2 的差分测试用 `TMPDIR` 指到草稿目录的 `tmp`；其余编出来的二进制（探针、harness 测试二进制、扫源码模型、rustc 小程序）都经 `bash scripts/hosts/run-with-memory-cap.sh`（1G 到 12G）起，一次一件、同时不超过 4 件；线程不超过 15。`cargo` 编译在内存包装里；`rustc` 编扫源码模型与小程序没经包装（不跑编出来的代码之外的事，规则不要求）。
 - 草稿目录里的拷贝与编译目录已删（删前 `du -sh`）：`tree-a`、`tree-b`、`tree-m`、`tree-m2`、`tree-pm` 各 22M，`target-a` 572M、`target-b` 559M、`target-m` 553M、`target-m2` 553M、`target-pm` 541M、`target-scan` 1.2M、`replay`（rustc 编的小程序）208M、`shadow` 13M、`tmp` 260K；路径都在 `~/.local/share/singlefs/work/m3-batch10z-tu-code-r1-sonnet/` 下。留着的是日志、脚本与模型源码草稿（该目录合 9.9M，没有编译目录与仓副本）；会话暂存目录里我放的两份临时文件也已删。
 - 冻结副本没改。入库的只有本报告与 `research/prompts/m3-batch10z-tu-code-r1-sonnet-model/`。
 
 ## 10. 引文核对
 
 ```
-$ python3 scripts/cite-check.py research/prompts/m3-batch10z-tu-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-tu-code-r1/tree --root /home/fy5090/code/singlefs | tail -1
+$ python3 scripts/agents/cite-check.py research/prompts/m3-batch10z-tu-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-tu-code-r1/tree --root /home/fy5090/code/singlefs | tail -1
   ✓ 核了 6 处引文，对上 6 处，没判 0 处（逐处列在上面）
 ```
 

@@ -13,10 +13,10 @@ rsync -a --exclude target --exclude .git "$frozen"/ "$scratch/tree/"
 cap() {
     RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-攻方原型复跑，峰值表里没有这几条}" \
     RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-3600}" \
-        nice -n 19 bash "$repo/scripts/run-with-memory-cap.sh" 8G bash "$repo/scripts/capped.sh" 4 "$@"
+        nice -n 19 bash "$repo/scripts/hosts/run-with-memory-cap.sh" 8G bash "$repo/scripts/hosts/capped.sh" 4 "$@"
 }
 cd "$scratch/tree"
-nice -n 19 bash "$repo/scripts/capped.sh" 4 cargo build --offline --release -p bf-proto --tests
+nice -n 19 bash "$repo/scripts/hosts/capped.sh" 4 cargo build --offline --release -p bf-proto --tests
 BI2_SLOTS=50186,50277,50278,50280 cap cargo test --offline --release -p bf-proto --test bf_bad_images -- --nocapture > "$scratch/bad.log" 2>&1
 grep -E '^BI' "$scratch/bad.log"
 if [ "$mode" = crash ]; then

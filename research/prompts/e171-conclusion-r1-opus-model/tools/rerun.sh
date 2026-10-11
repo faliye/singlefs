@@ -10,8 +10,8 @@ THREADS=${2:-15}
 REPO=/home/fy5090/code/singlefs
 FROZEN=/tmp/claude-1000/e171-conclusion-r1/tree
 DUMPS=$REPO/scripts/experiments/target/e171-dumps
-CAP="bash $REPO/scripts/run-with-memory-cap.sh"
-CAPPED="bash $REPO/scripts/capped.sh $THREADS"
+CAP="bash $REPO/scripts/hosts/run-with-memory-cap.sh"
+CAPPED="bash $REPO/scripts/hosts/capped.sh $THREADS"
 mkdir "$WORK"
 cd "$WORK"
 export PYTHONDONTWRITEBYTECODE=1

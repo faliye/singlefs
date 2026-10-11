@@ -124,7 +124,7 @@ DECODE writes=64 tearable=0 states=18446744073709551615 fits_u32=false local_ord
 MUTANT gpu_remainder_64_bit writes=33 gpu_equals_cpu=true
 ```
 
-读法：一段 33 写（或三态写多到 3^m·2^(n−m) > 2^32），段内第 2^32 + 5 个状态 GPU 判的是第 5 个状态，后面 2^32 个状态 GPU 一个都没判、判的都是前面判过的。今天最长的段 30 写（`scripts/crash-amplification.sh:219`：「FULL_EXPAND_UP_TO=30」），没有一条流落在 33–64 写之间：潜在的，第一条长出这种段的流上出现。G9 下提交只等 GPU，CPU 对拍跟上之前这一截是假绿；第 ② 段若照今天留着，它在这里 panic（假红而不是假绿）。
+读法：一段 33 写（或三态写多到 3^m·2^(n−m) > 2^32），段内第 2^32 + 5 个状态 GPU 判的是第 5 个状态，后面 2^32 个状态 GPU 一个都没判、判的都是前面判过的。今天最长的段 30 写（`scripts/crash/crash-amplification.sh:219`：「FULL_EXPAND_UP_TO=30」），没有一条流落在 33–64 写之间：潜在的，第一条长出这种段的流上出现。G9 下提交只等 GPU，CPU 对拍跟上之前这一截是假绿；第 ② 段若照今天留着，它在这里 panic（假红而不是假绿）。
 
 **四句**：① 不分臂。② GPU 内核判的那一刻看不到高 32 位，属「判别子观测不到」；CPU 看得到。③ G10「同一条流里装得进的段照判」与 G5「能走 GPU 的必须走 GPU」合起来那一分句。④ 改法：甲，G10 的界改成「GPU 判器装得下的段」（今天每段 < 2^32 态），判表打包照第 ② 段那样核、不满足就登记成那一段 GPU 判不了（G6 那一条判红）；乙，内核按 lo / hi 两个字算满 64 位余数（模型里 `MUTANT` 那一格就是这个样子）。段级登记另要引擎加「按段不展开、计入跳过」的口子，跳过的数按「段号 + 写数」报、不报十进制态数。只在我的模型上量过、被攻过零轮。
 
@@ -155,7 +155,7 @@ MODEL_SELFCHECK compared=11 mismatched=0 []
 - 录制：同一行「每条流录制约 480–520 秒」（树分裂、按位置寻址两项「判只占几秒到几分钟」）。
 - 存判定占挂钟：`records/2026-10-01-删除与并发事务.md:1292`：「存判定占本机多记录那一趟 1045.6 / 2774.7 秒」——第一轮「含存判定」那条速率含它；两台不均：`records/2026-10-01-删除与并发事务.md:1288`：「第二台 409 862 144 态 1121.2 秒 3 卡 380 989 态/秒」，本机同一项 2774.7 秒，第一轮 `gpu-balanced` 把两台各自的速率相加，等于假设两台同时收工。
 
-按量过的整项挂钟逐项串跑（今天入口逐项串行，`scripts/crash-amplification.sh:226`：「次序就是全量的跑序」）：9.8 小时（照 records 的共享）到 10.8 小时（照今天代码的共享，L2-6）。只算判、零固定开销、两台完全均衡的下界：4.9–6.0 / 6.2–7.2 小时。第一轮报给用户弹窗的「GPU 单判 1.5–15 小时」区间下半截（1.5–3.1）没有量过的数撑；量过的整项挂钟落在 10 小时上下。都是 2026-09-30 与 10-08 那两天的树与内核（之后删除线往内核里加了判法，今天快慢没量）。
+按量过的整项挂钟逐项串跑（今天入口逐项串行，`scripts/crash/crash-amplification.sh:226`：「次序就是全量的跑序」）：9.8 小时（照 records 的共享）到 10.8 小时（照今天代码的共享，L2-6）。只算判、零固定开销、两台完全均衡的下界：4.9–6.0 / 6.2–7.2 小时。第一轮报给用户弹窗的「GPU 单判 1.5–15 小时」区间下半截（1.5–3.1）没有量过的数撑；量过的整项挂钟落在 10 小时上下。都是 2026-09-30 与 10-08 那两天的树与内核（之后删除线往内核里加了判法，今天快慢没量）。
 
 四句：① 不分臂（这一格只给数）；② 不适用；③ L2「哪几条速率的口径与 G5、G9 的跑法不一样」；④ 推翻它的现象：今天的树上照「要主 agent 跑的命令」第 1 条量出到 E 那一项高于 34 万态/秒。
 
@@ -196,7 +196,7 @@ G9「里程碑收尾与 E171 冻结之前必须跟上」⇒ 判法版本（G8 �
 
 **层 0 那一套**：`.claude/gate.d/checker-tier-layer0-replay.sh:34`：「--full：在 HEAD + 暂存区的 worktree 里跑（主工作区读得到别的会话没暂存的改动）」；指纹由门禁在测试之外算，`.claude/gate.d/checker-tier-layer0-replay.sh:37`：「开跑与跑完各算一次指纹、相同才写」，跑的过程中输入变了判红不写标记。
 
-**放量那一套**：`scripts/crash-amplification.sh:2`：「每次调都在这一刻的树上跑全量或点名的分项」——主工作区。分项驱动先只编（`scripts/crash-amplification-lib.sh:161`：「cargo_build_arguments=(test --release -p singlefs-checker-tier」，带 `--no-run`），再起 `cargo test`；判法版本由测试二进制起来之后从盘上读源码现算：`crates/singlefs-checker-tier/tests/common_crash_points/mod.rs:292`：「let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))」，第 299 行 `PipelineJudgingCode::of_the_judges(&root, …)`。版本算的是此刻盘上的源码，跑的是编译那一刻的源码；入口不比各项的版本是否相同（入口文件头 `grep -n 判法版本` 只命中复用的说明）。
+**放量那一套**：`scripts/crash/crash-amplification.sh:2`：「每次调都在这一刻的树上跑全量或点名的分项」——主工作区。分项驱动先只编（`scripts/crash/crash-amplification-lib.sh:161`：「cargo_build_arguments=(test --release -p singlefs-checker-tier」，带 `--no-run`），再起 `cargo test`；判法版本由测试二进制起来之后从盘上读源码现算：`crates/singlefs-checker-tier/tests/common_crash_points/mod.rs:292`：「let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))」，第 299 行 `PipelineJudgingCode::of_the_judges(&root, …)`。版本算的是此刻盘上的源码，跑的是编译那一刻的源码；入口不比各项的版本是否相同（入口文件头 `grep -n 判法版本` 只命中复用的说明）。
 
 **已经发生过的**：`records/2026-10-01-删除与并发事务.md:1292`：「删除流这一趟复用 0，因为两项之间主树合入了根环线第九块」，同一趟全量两项判在两个判法版本下、入口照报两项全绿。
 
@@ -206,13 +206,13 @@ G9「里程碑收尾与 E171 冻结之前必须跟上」⇒ 判法版本（G8 �
 
 ### L3-2　合表之后谁核「每条崩溃枚举用例都登记了」
 
-今天这一样由 `crash-case-check.py` placement 判，认用例的办法是按名字：`scripts/crash-case-check.py:95`：「ENUMERATION_CALL = re.compile(r"\b(enumerate_layer0」，另认 `every_crash` 与循环里造 `CrashImage`；`scripts/crash-case-check.py:33`：「判不了的：经 tests/<子目录>/ 里的共用函数间接调枚举函数的、宏展开出来的调用——认不出」；要求登记的只有标了 ignore 的（同文件第 23 行「③ checker 档包里标了 #[ignore] 的（全量那条）」）。
+今天这一样由 `crash-case-check.py` placement 判，认用例的办法是按名字：`scripts/crash/crash-case-check.py:95`：「ENUMERATION_CALL = re.compile(r"\b(enumerate_layer0」，另认 `every_crash` 与循环里造 `CrashImage`；`scripts/crash/crash-case-check.py:33`：「判不了的：经 tests/<子目录>/ 里的共用函数间接调枚举函数的、宏展开出来的调用——认不出」；要求登记的只有标了 ignore 的（同文件第 23 行「③ checker 档包里标了 #[ignore] 的（全量那条）」）。
 
 放量项走 `run_from_environment` / 公共模块的 `amplify_prepared_flow`，不标 ignore、挂特性（例 `crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs:425`：「#[cfg(feature = "verdict-store")]」）。G3 第二批把层 0 全量用例并掉（删掉直接调 `enumerate_layer0_*` 的那几份），G1 第四批把 `enumerate_layer0_*` 改名：之后 placement 一条合并后的项都认不出。**造出来的历史（推的）**：第五批有人照放量的写法加一条新流的用例、忘了进登记表：placement 认不出它是崩溃枚举用例，登记表里没有它，整域那一趟不跑它，门禁全绿。四句：① 不分臂；② 系统看得到测试源码，只是判据按旧名字认；③ L3「crash-case-check.py 的 placement / modules 两样在合并后判什么」；④ 改法：placement 改成按调用合并后引擎的入口认（`CrashPointRecorder` 建流再交引擎的那一类），登记表反向核：表里每一项的测试函数在、源码里每一条交引擎的测试都在表里；与 G1 改名同一批改。被攻过零轮。
 
 ### L3-3　modules 格的模块表、feature-gated-tests 格的「本次未跑」（小）
 
-- `scripts/crash-case-check.py:218`：「TIER_MODULES = ["crash", "layer0_progress",」（同一行后面有 `crash_amplification`），checker 档测试文件首行声明导入的模块，19 份声明了这两个之一（`grep -c 'checker 档模块：.*crash_amplification\|checker 档模块：.*layer0_progress' crates/singlefs-checker-tier/tests/*.rs | awk -F: '$2>0' | wc -l` 输出 `19`）。G1 改模块名，模块表与 19 份首行要同一批改，见 L6-4。
+- `scripts/crash/crash-case-check.py:218`：「TIER_MODULES = ["crash", "layer0_progress",」（同一行后面有 `crash_amplification`），checker 档测试文件首行声明导入的模块，19 份声明了这两个之一（`grep -c 'checker 档模块：.*crash_amplification\|checker 档模块：.*layer0_progress' crates/singlefs-checker-tier/tests/*.rs | awk -F: '$2>0' | wc -l` 输出 `19`）。G1 改模块名，模块表与 19 份首行要同一批改，见 L6-4。
 - feature-gated-tests 格：`.claude/gate.d/checker-tier-layer0-replay.sh:9`：「GPU 对拍没卡打的 NOT_RUN_NO_GPU_ADAPTER 逐条记本次未跑」；G11「配置开了 GPU 而卡用不上 … 退 78」。合并后同一道门禁里，崩溃点重放的项没卡退 78、别的挂 `gpu` 特性的单测（GPU 对拍那几份）没卡记本次未跑——两种语义怎么分、哪一格管哪一种，G2、G11 没写。四句：① 不分臂；② 看得到；③ L3 那一句；④ 改法：G11 写明 78 只管登记表里的项，feature-gated-tests 格照旧管表外的挂特性单测。被攻过零轮。
 
 ### L3-4　判法版本里的「工具链」不含 GPU 驱动与卡型（小）
@@ -247,8 +247,8 @@ G5：「随机历史两项的镜像那一判同样上 GPU（从它们录下的�
 ### L6-4　第四批改英文标识符，跨到第一批的文件
 
 G1 退役 `layer0_progress`、计数行前缀 `LAYER0…` 这一族。仓里 `crates/` 之外认这些名字的（`grep -c`、`grep -l` 原样数）：
-- `scripts/capped.sh:25`：「SINGLEFS_LAYER0_THREADS」——线程上限由它设进环境，crates 里读的是 `crates/singlefs-checker-tier/src/crash.rs:1733`：「pub const LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_LAYER0_THREADS";」。第四批只改 crates 里的变量名，`capped.sh` 设的旧名没人读，枚举照默认取全部核数：派发提示里的「线程上限」静默失效（`run-with-memory-cap.sh` 第 1699 行的自证也拿这个名字）。
-- `scripts/admission.py`：`grep -c 'LAYER0'` 输出 `115`（计数行前缀、判日志）；`.claude/gate.d/stage-inputs.tsv` 9 行带 `count-line=LAYER0`；门禁样本 `.claude/gate.d/fixtures/checker-tier-layer0-replay.sh/` 下 7 份文件带 `LAYER0`；`.claude/hooks/lib_heavy_tests.py` `grep -c 'layer0\|LAYER0'` 输出 `84`。
+- `scripts/hosts/capped.sh:25`：「SINGLEFS_LAYER0_THREADS」——线程上限由它设进环境，crates 里读的是 `crates/singlefs-checker-tier/src/crash.rs:1733`：「pub const LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_LAYER0_THREADS";」。第四批只改 crates 里的变量名，`capped.sh` 设的旧名没人读，枚举照默认取全部核数：派发提示里的「线程上限」静默失效（`run-with-memory-cap.sh` 第 1699 行的自证也拿这个名字）。
+- `scripts/gate/admission.py`：`grep -c 'LAYER0'` 输出 `115`（计数行前缀、判日志）；`.claude/gate.d/stage-inputs.tsv` 9 行带 `count-line=LAYER0`；门禁样本 `.claude/gate.d/fixtures/checker-tier-layer0-replay.sh/` 下 7 份文件带 `LAYER0`；`.claude/hooks/lib_heavy_tests.py` `grep -c 'layer0\|LAYER0'` 输出 `84`。
 - `crash-case-check.py` 的认法正则（第 95 行）与模块表（第 218 行），见 L3-2、L3-3。
 
 G14 第一批「脚本、门禁、钩子、登记表」、第四批「英文标识符改名」，按文件不相交切；这几份在第一批改过一次之后，第四批要再改一次，而且必须与 crates 同一个提交，否则中间那几个提交上门禁认不出计数行、线程上限失效。四句：① 不分臂；② 不适用；③ L6「每一批的出口」；④ 改法：第四批的文件清单写成「crates 里的标识符 + 上面这几份脚本里认它们的地方」，或环境变量名（`SINGLEFS_LAYER0_*`）明写不改、只改 Rust 标识符与计数行前缀。
@@ -293,8 +293,8 @@ G12（第一批）把 D13 已定项 9 改成「每次提交跑整域」；今天
 
 都是 checker 档（重型），子 agent 不跑；要不要跑由主 agent 定。工作目录一律仓根，库目录用新的空目录（不碰常用库）。
 
-1. 今天的树上各项整项挂钟（核 L2-1、L2-6）：`SINGLEFS_HEAVY_TESTS=user-request bash scripts/crash-amplification.sh --library ~/.local/share/singlefs/work/m3-merge-r2-rates/library-full`（多机配置照今天默认开 GPU、两台；内存上限照入口默认 `--memory-cap`、`--peer-memory-cap`）。看逐项 `CRASH_AMPLIFICATION_ITEM item=… states=… reused=… seconds=…` 与末行 `CRASH_AMPLIFICATION_TOTAL`。判法：到 E 那一项 `states / seconds` 高于 34 万 ⇒ L2-1 的「0.29 倍」不成立；删除流那一项 `reused` 大于 16777259 ⇒ L2-6 不成立。按模型推约 10–11 小时。
-2. 今天的树上 CPU 判一个状态多快（核 L2-2、L2-3）：`SINGLEFS_MULTI_HOST_CONFIG=<两台、ENABLE_GPU=0 的配置> SINGLEFS_HEAVY_TESTS=user-request bash scripts/crash-amplification.sh --item fixed-script-through-rollback --expand-up-to 24 --library ~/.local/share/singlefs/work/m3-merge-r2-rates/library-cpu`。看各行 `states_per_second=` 与 `checking_seconds=`；按 8 428 态/秒推约 2 小时。要比层 0 路，另起门禁 `--full --item layer0-second-stream` 跑一小时后停，读进度文件片行的态数与挂钟。
+1. 今天的树上各项整项挂钟（核 L2-1、L2-6）：`SINGLEFS_HEAVY_TESTS=user-request bash scripts/crash/crash-amplification.sh --library ~/.local/share/singlefs/work/m3-merge-r2-rates/library-full`（多机配置照今天默认开 GPU、两台；内存上限照入口默认 `--memory-cap`、`--peer-memory-cap`）。看逐项 `CRASH_AMPLIFICATION_ITEM item=… states=… reused=… seconds=…` 与末行 `CRASH_AMPLIFICATION_TOTAL`。判法：到 E 那一项 `states / seconds` 高于 34 万 ⇒ L2-1 的「0.29 倍」不成立；删除流那一项 `reused` 大于 16777259 ⇒ L2-6 不成立。按模型推约 10–11 小时。
+2. 今天的树上 CPU 判一个状态多快（核 L2-2、L2-3）：`SINGLEFS_MULTI_HOST_CONFIG=<两台、ENABLE_GPU=0 的配置> SINGLEFS_HEAVY_TESTS=user-request bash scripts/crash/crash-amplification.sh --item fixed-script-through-rollback --expand-up-to 24 --library ~/.local/share/singlefs/work/m3-merge-r2-rates/library-cpu`。看各行 `states_per_second=` 与 `checking_seconds=`；按 8 428 态/秒推约 2 小时。要比层 0 路，另起门禁 `--full --item layer0-second-stream` 跑一小时后停，读进度文件片行的态数与挂钟。
 3. 只核 L2-6 的便宜做法：同一份新库先后 `… --item multi-record-publish --expand-up-to 24`、`… --item unlink-after-the-multi-record-publish --expand-up-to 24`（GPU 配置），看删除流那几行 `states_reused`：等于 A 之前那一截（展开 24 下约 1 677 万）⇒ B、C 不共享；多出 B、C 小段的态数 ⇒ 共享、L2-6 错。
 
 ## 没做什么

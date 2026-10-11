@@ -15,8 +15,8 @@ W=$(cd "$W" && pwd)
 export CARGO_TARGET_DIR=$W/target
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="三方攻方腿与别的会话各跑各的"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="同一个原型二进制按 MODE 跑不同的活，峰值表只记了最小的那一种；整编峰值比增量编大"
-CAP="nice -n 19 bash $REPO/scripts/run-with-memory-cap.sh"
-CAPPED="bash $REPO/scripts/capped.sh"
+CAP="nice -n 19 bash $REPO/scripts/hosts/run-with-memory-cap.sh"
+CAPPED="bash $REPO/scripts/hosts/capped.sh"
 TESTFILE=the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads
 probe() { local out=$1; shift; (cd "$W" && env "$@" $CAP 3G $CAPPED "$T" "$W/target/release/attack-b19-probe" > "$W/out/$out" 2>&1); }
 n34() { local s=$1 arms=$2; probe "n34-${s//:/-}-a${arms//,/}.txt" MODE=n34 ARMS="$arms" SHAPES="$s" PRINT_PREFIX=1 DUMP_LEGAL_NOSPACE=1; }

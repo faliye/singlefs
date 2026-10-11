@@ -268,7 +268,7 @@ rebuild=Some(Walk(InodeNumberWatermarkRowMissingFromTheAccountingTree)) writable
 
 ## 要主 agent 跑的命令
 
-不要求我这条腿的结论成立才跑；是把 M1-4 落到 GPU 上的唯一一步（checker 档、带 gpu，重型，归主 agent）：在冻结副本的拷贝上把 `crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl` 第 3357 行换成 `if (container_index + 3u >= d_container_count && d_container_record_count(container_index) != knob_records) {`，跑 `SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 12G cargo test --offline --release -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- knob_two_agrees_with_the_cpu_on`（工作目录是那份拷贝的根，线程照 `capped.sh`）。这个过滤串选上 9 条（J3、L1、第 57 批 H1 各三条）；退役 L1 那一条基线就红（正文第二节已知），不看它；墓碑、谱系的 J3 与 L1 四条都绿就坐实 M1-4，其中有一条红就推翻它。
+不要求我这条腿的结论成立才跑；是把 M1-4 落到 GPU 上的唯一一步（checker 档、带 gpu，重型，归主 agent）：在冻结副本的拷贝上把 `crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl` 第 3357 行换成 `if (container_index + 3u >= d_container_count && d_container_record_count(container_index) != knob_records) {`，跑 `SINGLEFS_HEAVY_TESTS=user-request bash scripts/hosts/run-with-memory-cap.sh 12G cargo test --offline --release -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- knob_two_agrees_with_the_cpu_on`（工作目录是那份拷贝的根，线程照 `capped.sh`）。这个过滤串选上 9 条（J3、L1、第 57 批 H1 各三条）；退役 L1 那一条基线就红（正文第二节已知），不看它；墓碑、谱系的 J3 与 L1 四条都绿就坐实 M1-4，其中有一条红就推翻它。
 
 ## 没做什么
 

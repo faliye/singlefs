@@ -68,5 +68,5 @@
 
 - 第二轮，仍是单轮判；上表所有改法被攻过零轮，没有再试跑。
 - a 的改法把书记员的写回挪回 Bash，写范围闸对它只剩自愿的预检。
-- B1 残留：55 号读 `scripts/replay.sh` 与 E142 产物、59 号拷仓根 `Cargo.toml`、`Cargo.lock` 与 `research/results`，都不在指纹的 `-- crates litmus` 里。
+- B1 残留：55 号读 `scripts/experiments/replay.sh` 与 E142 产物、59 号拷仓根 `Cargo.toml`、`Cargo.lock` 与 `research/results`，都不在指纹的 `-- crates litmus` 里。
 - G1 仍挂起。

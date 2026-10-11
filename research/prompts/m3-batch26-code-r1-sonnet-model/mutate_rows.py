@@ -17,7 +17,7 @@ for n in rows:
         print(f"{n}\t{hits}\tANCHOR\t-"); continue
     open(path, 'w', encoding='utf-8').write(src.replace(orig, mut))
     try:
-        cmd = ['bash', f'{repo}/scripts/run-with-memory-cap.sh', '4G', 'bash', f'{repo}/scripts/capped.sh', '10',
+        cmd = ['bash', f'{repo}/scripts/hosts/run-with-memory-cap.sh', '4G', 'bash', f'{repo}/scripts/hosts/capped.sh', '10',
                'cargo', 'test', '--offline', '--manifest-path', f'{root}/Cargo.toml'] + args.split(' ')
         p = subprocess.run(cmd, capture_output=True, text=True)
         out = p.stdout + p.stderr

@@ -1,6 +1,6 @@
 #!/bin/bash
 # m3-tomb-r1 攻方腿复跑。用法（从仓根，整条脚本经内存包装）：
-#   nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 8 \
+#   nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 8 \
 #     bash research/prompts/m3-tomb-r1-opus-model/rerun.sh <带 crates/ 的树根> <还不存在的草稿目录>
 # 树根取冻结副本 /tmp/claude-1000/m3-delete-r2/tree（清单 research/prompts/m3-tomb-r1-snapshot/crates-sha256.txt）。
 # 输出：草稿目录里的 run-e-lines.txt（Rust 原型）与 model-output.txt（计数模型），与本目录同名文件逐行比。

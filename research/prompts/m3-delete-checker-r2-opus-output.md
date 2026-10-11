@@ -265,4 +265,4 @@ follow 30 code-only-vs-newest 0 newest-only-vs-code 0 code-not-each 0 each-not-c
 
 ## 引文核对
 
-`python3 scripts/cite-check.py research/prompts/m3-delete-checker-r2-opus-output.md` 末行原样：`✓ 核了 73 处引文，对上 73 处，没判 0 处（逐处列在上面）`
+`python3 scripts/agents/cite-check.py research/prompts/m3-delete-checker-r2-opus-output.md` 末行原样：`✓ 核了 73 处引文，对上 73 处，没判 0 处（逐处列在上面）`

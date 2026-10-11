@@ -5,7 +5,7 @@
 #   bash rerun.sh compare <工作目录>   # 各段 summary 里的 RESULT 行排序之后与 expected-summary.txt（同样排序）逐行比；不读 SINGLEFS_REPO、SINGLEFS_TOOLS
 # 变量：
 #   SINGLEFS_REPO   被判的源码（冻结副本 ~/.local/share/singlefs/work/m3-batch29-code-r1/tree）。
-#   SINGLEFS_TOOLS  包装脚本 scripts/run-with-memory-cap.sh、capped.sh 所在的仓根：先找 $SINGLEFS_REPO/scripts/，没有就取它。
+#   SINGLEFS_TOOLS  包装脚本 scripts/hosts/run-with-memory-cap.sh、capped.sh 所在的仓根：先找 $SINGLEFS_REPO/scripts/，没有就取它。
 #   OPUS_THREADS    线程上限（默认 31，经 capped.sh 设；派发时主 agent 给的上限）。
 #   OPUS_STAGE_BUDGET  harness-build、harness-probe 两段一次调用最多起新件的挂钟秒数（默认 190；过了就不再起下一件、不停正在跑的，退 0 并打印 STOP budget；
 #                   再调同一段从没做完的那一件接着做，打印 DONE 才算这一段做完）。all 会把这两段反复调到 DONE。
@@ -42,9 +42,9 @@ mkdir -p "$work/logs"
 work="$(cd "$work" && pwd)"
 repo="${SINGLEFS_REPO:?要设 SINGLEFS_REPO}"
 tools="$repo"
-[[ -f "$tools/scripts/run-with-memory-cap.sh" ]] || tools="${SINGLEFS_TOOLS:?SINGLEFS_REPO 下没有 scripts，要设 SINGLEFS_TOOLS}"
-cap="$tools/scripts/run-with-memory-cap.sh"
-capped="$tools/scripts/capped.sh"
+[[ -f "$tools/scripts/hosts/run-with-memory-cap.sh" ]] || tools="${SINGLEFS_TOOLS:?SINGLEFS_REPO 下没有 scripts，要设 SINGLEFS_TOOLS}"
+cap="$tools/scripts/hosts/run-with-memory-cap.sh"
+capped="$tools/scripts/hosts/capped.sh"
 threads="${OPUS_THREADS:-31}"
 budget="${OPUS_STAGE_BUDGET:-190}"
 tree="$work/tree"

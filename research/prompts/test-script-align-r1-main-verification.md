@@ -4,16 +4,16 @@
 
 ## 一、核查
 
-- `python3 scripts/cite-check.py <两份报告> --root . --background research/prompts/_test-script-align-r1-background.md`：「✓ 核了 69 处引文，对上 69 处，没判 0 处」。
-- 开工快照 `research/prompts/test-script-align-r1-snapshot/judged-sha256.txt` 判决前 `sha256sum -c`：三份对不上——`.claude/agents/crash-verifier.md`、`.claude/hooks/lib_heavy_tests.py`、`scripts/verus-proof-check.py`，都是别的会话在腿跑着时改的（这一批没碰）。攻方报告写明它核过 `lib_heavy_tests.py` 的那次改动只动 Verus 判法几段、样本档与自证判法没变，三组关键探针用改后的钩子重喂退出码相同；主 agent 下面现查的行都按今天的文件。kb 快照全对。
+- `python3 scripts/agents/cite-check.py <两份报告> --root . --background research/prompts/_test-script-align-r1-background.md`：「✓ 核了 69 处引文，对上 69 处，没判 0 处」。
+- 开工快照 `research/prompts/test-script-align-r1-snapshot/judged-sha256.txt` 判决前 `sha256sum -c`：三份对不上——`.claude/agents/crash-verifier.md`、`.claude/hooks/lib_heavy_tests.py`、`scripts/gate/verus-proof-check.py`，都是别的会话在腿跑着时改的（这一批没碰）。攻方报告写明它核过 `lib_heavy_tests.py` 的那次改动只动 Verus 判法几段、样本档与自证判法没变，三组关键探针用改后的钩子重喂退出码相同；主 agent 下面现查的行都按今天的文件。kb 快照全对。
 - 主 agent 现查坐实的：
   - T2-2：`find .claude/gate.d/fixtures/checker-tier-layer0-replay.sh/quick-features-*/ -path '*layer0-sample-tools*' -type f -printf '%m %p\n'` 出 `664 …/cargo`、`664 …/rustc`、`664 …/quick-tier`：没有执行位。
   - T2-1：`.claude/hooks/lib_heavy_tests.py` 第 141、1595、2142 行一带，样本档放行看的是样本根里有没有 `.layer0-sample-tools`；里面放什么不核。
-  - T3-1、T3-2：`scripts/crash-amplification.sh` 第 658 行驱动退 78 直接记 not-run（不看 `item_red`），第 715–719 行 `stopped_by_condition` 先于第 721 行 `run_verdict` 退 78。
-  - T3-3：`grep -n 'ignored_points\|states_skipped_by_ignore' scripts/crash-amplification.sh` 零命中。
-  - T3-6：`scripts/mutate.sh` 第 84–86 行只登记 250、251、253 三种包装结局，252、254 落进通用分支。
-  - T3-7：`scripts/mutate.sh` 第 90 行 `BROKEN_JUDGEMENT="${MUTATE_BREAK:-}"` 平常跑也读。
-  - T1-1：`scripts/crash-case-check.py` 第 190–192 行判 `parallel_line_*`；`.claude/rules/verification.md` 第 18 行本仓判的形态里没有它（这一批去重时删掉了「并行线号」）。
+  - T3-1、T3-2：`scripts/crash/crash-amplification.sh` 第 658 行驱动退 78 直接记 not-run（不看 `item_red`），第 715–719 行 `stopped_by_condition` 先于第 721 行 `run_verdict` 退 78。
+  - T3-3：`grep -n 'ignored_points\|states_skipped_by_ignore' scripts/crash/crash-amplification.sh` 零命中。
+  - T3-6：`scripts/mutation/mutate.sh` 第 84–86 行只登记 250、251、253 三种包装结局，252、254 落进通用分支。
+  - T3-7：`scripts/mutation/mutate.sh` 第 90 行 `BROKEN_JUDGEMENT="${MUTATE_BREAK:-}"` 平常跑也读。
+  - T1-1：`scripts/crash/crash-case-check.py` 第 190–192 行判 `parallel_line_*`；`.claude/rules/verification.md` 第 18 行本仓判的形态里没有它（这一批去重时删掉了「并行线号」）。
   - T1-2：`.claude/kb/checks-owed.md` C607 一行写「用例原子化」，副本标题是「用例原子化：每一条都能单独跑」。
 - 没现查、照腿的报告采的：T2-3、T2-4、T2-6、T3-4、T3-5、T3-9（攻方探针在模型目录，`rerun.sh` 可复跑）；正推 T4 各笔欠账的现状对不上（腿逐行给了 grep 命令与零命中，判决里照它改）。
 

@@ -11,7 +11,7 @@ REPO=/home/fy5090/code/singlefs FROZEN=/tmp/claude-1000/m3-formal-code-b20-r1/tr
   bash research/prompts/m3-formal-code-b20-r1-opus-model/tools/rerun.sh
 ```
 
-工作目录：仓根。脚本拷冻结副本与仓根的 `Cargo.toml`、`Cargo.lock` 到 `WORK`（缺省新建 `/tmp/claude-1000/b20-opus-rerun.XXXXXX`），把 `probes/` 下三份探针放进副本的 `crates/singlefs-harness/tests/`，release 编译，经 `scripts/run-with-memory-cap.sh` 与 `scripts/capped.sh` 顺序跑三个测试目标（我这边分片并行跑过，合起来约 6 分钟；顺序跑估 8 到 10 分钟，推的）。跑完看脚本末尾打出的 F1 / F2 / K2 fixed / F5 行、SUMMARY 与 ARM 计数、三档盘宽的 TALLY。
+工作目录：仓根。脚本拷冻结副本与仓根的 `Cargo.toml`、`Cargo.lock` 到 `WORK`（缺省新建 `/tmp/claude-1000/b20-opus-rerun.XXXXXX`），把 `probes/` 下三份探针放进副本的 `crates/singlefs-harness/tests/`，release 编译，经 `scripts/hosts/run-with-memory-cap.sh` 与 `scripts/hosts/capped.sh` 顺序跑三个测试目标（我这边分片并行跑过，合起来约 6 分钟；顺序跑估 8 到 10 分钟，推的）。跑完看脚本末尾打出的 F1 / F2 / K2 fixed / F5 行、SUMMARY 与 ARM 计数、三档盘宽的 TALLY。
 
 模型目录每个文件的 sha256（`find . -type f | sort | xargs sha256sum`，在模型目录里跑）：
 
@@ -230,7 +230,7 @@ K2 fixed arm 建 0 个 inode: 发成 | checker []
 
 ## 引文核对
 
-`python3 scripts/cite-check.py research/prompts/m3-formal-code-b20-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b20-r1/tree --root . --background research/prompts/_m3-formal-code-b20-r1-background.md` 末行：
+`python3 scripts/agents/cite-check.py research/prompts/m3-formal-code-b20-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b20-r1/tree --root . --background research/prompts/_m3-formal-code-b20-r1-background.md` 末行：
 
 ```
   ✓ 核了 33 处引文，对上 33 处，没判 0 处（逐处列在上面）

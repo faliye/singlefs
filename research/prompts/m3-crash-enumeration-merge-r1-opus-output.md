@@ -108,7 +108,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 ### K2-3　删除流态数差 15728640：今天的树上对得上，旧数在三处
 
-今天的树钉的是 24：`prepare` 断言段形，快用例也调它——`crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs:345`：「22, 2, 1, 2, 24, 2, 1, 2」（最后一批 24 个单元写，说明里写多了退役容器与退役树根）。2026-10-08 放量跑的那一趟按的是第 32 批探针的段形，最后一批 20：`scripts/crash-amplification.sh:42`：「PROBE_SEGMENT_SIZES [2,2,1,2,2,1,2,24,2,1,2,28,4,1,2,30,6,1,2,26,2,1,2,24,2,1,2,22,2,1,2,20,2,1,2]」。(2²⁴ − 1) − (2²⁰ − 1) = 15 728 640，恰是两数之差。两边造流同一组函数，今天放量那一项的态数也该是 1 463 812 278（推的，没跑）。旧数三处：`stage-inputs.tsv` 第 53 行注释 1448083638（F10 列了）、`crash-amplification.sh` 第 42 行探针段形（F10 没列：`research/prompts/_m3-crash-enumeration-merge-r1-body.md:41`：「`stage-inputs.tsv` 第 51–53 行注释、D13 第 259 行 12230590578」那一串里没有它）、records 2026-10-08 那几行（记录不改）。
+今天的树钉的是 24：`prepare` 断言段形，快用例也调它——`crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs:345`：「22, 2, 1, 2, 24, 2, 1, 2」（最后一批 24 个单元写，说明里写多了退役容器与退役树根）。2026-10-08 放量跑的那一趟按的是第 32 批探针的段形，最后一批 20：`scripts/crash/crash-amplification.sh:42`：「PROBE_SEGMENT_SIZES [2,2,1,2,2,1,2,24,2,1,2,28,4,1,2,30,6,1,2,26,2,1,2,24,2,1,2,22,2,1,2,20,2,1,2]」。(2²⁴ − 1) − (2²⁰ − 1) = 15 728 640，恰是两数之差。两边造流同一组函数，今天放量那一项的态数也该是 1 463 812 278（推的，没跑）。旧数三处：`stage-inputs.tsv` 第 53 行注释 1448083638（F10 列了）、`crash-amplification.sh` 第 42 行探针段形（F10 没列：`research/prompts/_m3-crash-enumeration-merge-r1-body.md:41`：「`stage-inputs.tsv` 第 51–53 行注释、D13 第 259 行 12230590578」那一串里没有它）、records 2026-10-08 那几行（记录不改）。
 
 ## K3　复用、剪枝与逐项
 
@@ -148,7 +148,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 ### K4-2　GPU 判的项里个别状态判不了，F4 没写
 
-今天：`crates/singlefs-checker-tier/src/crash_amplification.rs:2033`：「这张卡判不了领到的块里的某个状态（表越过了内核的容量）：整趟停下、报错，不退回 CPU 判器。」驱动把它判红：`scripts/crash-amplification.sh:1047`：「驱动退 248：算法上判不了」。F4 的「不静默退回、不整趟报错」只说登记了 GPU 不判的项；登记成 GPU 判的项里第 31 位或池级 checker 判不了字置位的那几个状态怎么记，没写。F4 下 CPU 本来就判每个状态，最省事的实现会只拿 CPU 结论、不比，就是一次「静默退回」。改法：写明「GPU 判不了的状态记一条 GPU/CPU 不一致（判红，理由写哪张表满了）」或「照今天整项停、退 248」，二选一写死。被攻过零轮。
+今天：`crates/singlefs-checker-tier/src/crash_amplification.rs:2033`：「这张卡判不了领到的块里的某个状态（表越过了内核的容量）：整趟停下、报错，不退回 CPU 判器。」驱动把它判红：`scripts/crash/crash-amplification.sh:1047`：「驱动退 248：算法上判不了」。F4 的「不静默退回、不整趟报错」只说登记了 GPU 不判的项；登记成 GPU 判的项里第 31 位或池级 checker 判不了字置位的那几个状态怎么记，没写。F4 下 CPU 本来就判每个状态，最省事的实现会只拿 CPU 结论、不比，就是一次「静默退回」。改法：写明「GPU 判不了的状态记一条 GPU/CPU 不一致（判红，理由写哪张表满了）」或「照今天整项停、退 248」，二选一写死。被攻过零轮。
 
 ### K4-3　io_min 8192、清扫小环池建不建得出 GPU 判表（核不动）
 
@@ -186,7 +186,7 @@ MODEL_SELFCHECK compared=4 mismatched=0 []
 
 ### K6-1　重型测试闸按名字认入口与门禁阶段
 
-`.claude/hooks/lib_heavy_tests.py:585`：「CRASH_AMPLIFICATION_SCRIPTS = frozenset({"crash-amplification.sh", "crash-amplification-item.sh", "crash-amplification-two-hosts.sh"})」，门禁阶段按文件名认：`.claude/hooks/lib_heavy_tests.py:389`：「STAGE_KIND = {"checker-tier-layer0-replay.sh": "layer0-stage",」。F2 合成一个入口、F1 给门禁改名，新名字不在这两张表里，闸就不再按名字判它（落回读正文判，判不判得出看新脚本怎么写，推的）——子 agent 能起整域的口子就在改名与改闸不同批的那几个提交之间。同一批要动的还有：自证登记表 `selftest-registry.tsv` 里三份放量入口（第 43–45 行）与门禁样本（第 128 行）、分片驱动（第 80 行）那几行；标记前缀 `scripts/admission.py:271`：「CRASH_CASE_MARKER_PREFIX = "singlefs-crash-case-green."」（改了它，今天那一份旧标记自然失效，它本来就不作数）；门禁与 `admission.py` 按行首认的计数行前缀（`LAYER0B `、`LAYER0_PARALLEL_FINISHED ` 这一族）——计数行的前缀改不改要与 F3 的计数断言一起定，改了就是 E171 那几份装置也要跟（K7-2）。改法：改名、闸、自证登记表、门禁样本同一批，闸的自证加一格「新入口名起整域，子 agent 被拒」。被攻过零轮。
+`.claude/hooks/lib_heavy_tests.py:585`：「CRASH_AMPLIFICATION_SCRIPTS = frozenset({"crash-amplification.sh", "crash-amplification-item.sh", "crash-amplification-two-hosts.sh"})」，门禁阶段按文件名认：`.claude/hooks/lib_heavy_tests.py:389`：「STAGE_KIND = {"checker-tier-layer0-replay.sh": "layer0-stage",」。F2 合成一个入口、F1 给门禁改名，新名字不在这两张表里，闸就不再按名字判它（落回读正文判，判不判得出看新脚本怎么写，推的）——子 agent 能起整域的口子就在改名与改闸不同批的那几个提交之间。同一批要动的还有：自证登记表 `selftest-registry.tsv` 里三份放量入口（第 43–45 行）与门禁样本（第 128 行）、分片驱动（第 80 行）那几行；标记前缀 `scripts/gate/admission.py:271`：「CRASH_CASE_MARKER_PREFIX = "singlefs-crash-case-green."」（改了它，今天那一份旧标记自然失效，它本来就不作数）；门禁与 `admission.py` 按行首认的计数行前缀（`LAYER0B `、`LAYER0_PARALLEL_FINISHED ` 这一族）——计数行的前缀改不改要与 F3 的计数断言一起定，改了就是 E171 那几份装置也要跟（K7-2）。改法：改名、闸、自证登记表、门禁样本同一批，闸的自证加一格「新入口名起整域，子 agent 被拒」。被攻过零轮。
 
 ### K6-2　F2 漏了 `--quick`
 
@@ -231,7 +231,7 @@ MODEL_SELFCHECK compared=4 mismatched=0 []
 
 ## 要主 agent 跑的命令
 
-1. 判法闭包的逐文件清单（核 K3-1、K3-3）。工作目录：一份仓副本的根；把 `research/prompts/m3-crash-enumeration-merge-r1-opus-model/closure_probe.rs` 放到 `crates/merge-probe/tests/`，`crates/merge-probe/Cargo.toml` 依赖 `singlefs-checker-tier`（`features = ["verdict-store"]`）与 `singlefs-checker`、`singlefs-core`、`singlefs-format`、`singlefs-harness`，并把 `crates/merge-probe` 加进工作区成员。命令：`ROCKSDB_LIB_DIR=<主编译目录>/release/build/librocksdb-sys-f7ce5abb7da4f505/out ROCKSDB_STATIC=1 CARGO_TARGET_DIR=<副本外的编译目录> bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 7 cargo test --offline --release -p merge-probe --test closure_probe -- --nocapture`。看 `OUTSIDE <用例> <文件>` 那几行：每条用例在判法闭包外的文件，是不是含测试文件本身、`crash_injection.rs`、`crates/singlefs-harness/src/history.rs` / `model.rs`。它链 checker 档库、不判状态；算不算重型由主 agent 定。
+1. 判法闭包的逐文件清单（核 K3-1、K3-3）。工作目录：一份仓副本的根；把 `research/prompts/m3-crash-enumeration-merge-r1-opus-model/closure_probe.rs` 放到 `crates/merge-probe/tests/`，`crates/merge-probe/Cargo.toml` 依赖 `singlefs-checker-tier`（`features = ["verdict-store"]`）与 `singlefs-checker`、`singlefs-core`、`singlefs-format`、`singlefs-harness`，并把 `crates/merge-probe` 加进工作区成员。命令：`ROCKSDB_LIB_DIR=<主编译目录>/release/build/librocksdb-sys-f7ce5abb7da4f505/out ROCKSDB_STATIC=1 CARGO_TARGET_DIR=<副本外的编译目录> bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 7 cargo test --offline --release -p merge-probe --test closure_probe -- --nocapture`。看 `OUTSIDE <用例> <文件>` 那几行：每条用例在判法闭包外的文件，是不是含测试文件本身、`crash_injection.rs`、`crates/singlefs-harness/src/history.rs` / `model.rs`。它链 checker 档库、不判状态；算不算重型由主 agent 定。
 2. io_min 8192 与清扫挂载建不建得出 GPU 判表（核 K4-3）：同一个原型包里，拷那两份测试文件当测试目标，各加一条用例：拿各自的 `prepare()` / `record_the_sweeping_mount()` 造 `crash_judge_tables::JudgeFlow { base, writes, segments, judged_root_index, versions, expansion: &full_expansion }`（io_min 的 `versions` 是 `&[]`），调 `build_judge_tables`，打 `Ok` 时的落点数或 `Err` 的 `JudgeTablesRefusal`；清扫那条另打段长与 `layer0_state_count_with_torn_in_place_overwrites(…, &full_expansion)`。只建表、不判状态。命令同上，`--test <目标名>`。
 3. 今天的树上 CPU 判一个状态的速率（核 K5 两条速率差 5.8 倍取哪一个）：checker 档，归主 agent 在用户要求时跑，取一项放量 `ENABLE_GPU=0` 的单机一趟，读驱动行的 `states_per_second`。
 

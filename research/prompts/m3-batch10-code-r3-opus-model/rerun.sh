@@ -7,7 +7,7 @@
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=/home/fy5090/code/singlefs
-cap() { nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" "$@"; }
+cap() { nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" "$@"; }
 STAGES="fixed-prod fixed-reread_only r7-prod-a r7-reread_only-a r7-prod-b r7-reread_only-b r7-prod-c r7-reread_only-c r7-prod-d r7-prod-e r7-prod-f r7-prod-g r7-reread_only-g r7-reread_only-h r7-zero_over_bad-n cells-prod cells-first_wins l0-mat384-d0E-d0Z l0-ab3845-K22-Z l0-ab3845-K22-Z-ro l0-mat384-q3new k2young k3"
 stage_cmd() {
   local s=$1
@@ -49,8 +49,8 @@ case ${1:-} in
     cp "$HERE/Cargo.toml" "$W/tree/crates/opus-r3-attack/Cargo.toml"; cp "$HERE/main.rs" "$W/tree/crates/opus-r3-attack/src/main.rs"
     cd "$W/tree"
     export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑攻方原型，第一次在新目录里整编"
-    cap 8G bash "$REPO/scripts/capped.sh" 31 cargo build --offline --release -p opus-r3-attack > "$W/out/build.log" 2>&1
-    cap 8G bash "$REPO/scripts/capped.sh" 31 cargo test --offline --release -p singlefs-harness --test rollback_by_a_forward_publish --no-run >> "$W/out/build.log" 2>&1
+    cap 8G bash "$REPO/scripts/hosts/capped.sh" 31 cargo build --offline --release -p opus-r3-attack > "$W/out/build.log" 2>&1
+    cap 8G bash "$REPO/scripts/hosts/capped.sh" 31 cargo test --offline --release -p singlefs-harness --test rollback_by_a_forward_publish --no-run >> "$W/out/build.log" 2>&1
     echo "setup 完：$W";;
   list) for s in $STAGES; do echo "$s  $(stage_cmd $s)"; done;;
   run)
@@ -60,7 +60,7 @@ case ${1:-} in
     if [ "$c" = K3 ]; then
       T=$(ls -t "$W"/tree/target/release/deps/rollback_by_a_forward_publish-* | grep -v '\.d$' | head -1)
       cd "$W/tree/crates/singlefs-harness"
-      cap 4G bash "$REPO/scripts/capped.sh" 31 "$T" --include-ignored --nocapture --test-threads=4 the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root plain_overwrite_whose_root_slot_write_zeroes > "$W/out/$s.log" 2>&1
+      cap 4G bash "$REPO/scripts/hosts/capped.sh" 31 "$T" --include-ignored --nocapture --test-threads=4 the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root plain_overwrite_whose_root_slot_write_zeroes > "$W/out/$s.log" 2>&1
     else
       envs=(); args=()
       for w in $c; do
@@ -72,7 +72,7 @@ case ${1:-} in
           *) args+=("$w");;
         esac
       done
-      env "${envs[@]}" nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 4G bash "$REPO/scripts/capped.sh" 31 "$BIN" "${args[@]}" > "$W/out/$s.log" 2>&1
+      env "${envs[@]}" nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 4G bash "$REPO/scripts/hosts/capped.sh" 31 "$BIN" "${args[@]}" > "$W/out/$s.log" 2>&1
     fi
     echo "rc=$? $s";;
   compare)

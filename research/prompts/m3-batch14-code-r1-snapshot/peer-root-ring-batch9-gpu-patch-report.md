@@ -166,7 +166,7 @@ error: could not compile `singlefs-checker-tier` (bin "e171_three_oracle_collusi
   按文件数（`-->` 行）：`e165_replay_bounded_enumeration.rs` 14、`e171_three_oracle_collusion.rs` 18、`an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 4。三个文件在主工作区里都是别的会话的改动（`git status` 里 `A` / `M`）。
 - `cargo build --offline --all-targets`：`Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 44.47s`。另一趟 `cargo build --offline --all-targets --all-features`（带 `verdict-store,gpu`，编进对拍测试文件）也退 0、0 条 warning。
 - 动到的 harness 档测试二进制：无（只动了 checker 档包）。
-- `scripts/crash-case-check.py` 对副本：只红 modules 一格、点名的是 `crates/singlefs-checker-tier/tests/gpu_unit_checks_every_gpu_test_takes_its_cards_through_gpu_test_start.rs`（补丁之外，主工作区原样就是这样），我的测试文件不在里面。
+- `scripts/crash/crash-case-check.py` 对副本：只红 modules 一格、点名的是 `crates/singlefs-checker-tier/tests/gpu_unit_checks_every_gpu_test_takes_its_cards_through_gpu_test_start.rs`（补丁之外，主工作区原样就是这样），我的测试文件不在里面。
 
 编译类 cargo 调用合计 6 次：只链 naga 的小程序 build 2 次、副本 build 2 次、clippy 2 次（第一次没带 `--keep-going`，停在别人那个 harness 测试上）；另有 fmt 2 次。ps 看到的负载：开工时有别的会话的 `cargo test -p singlefs-harness` 与 `cargo build --release -p singlefs-checker-tier --bins`（`/tmp/claude-1000/m3-formal-19-2/copy`）在跑，没有 qemu / fio / e152；各用自己的 target，没有等锁。内存包装两次拒（同会话里已有 8 条在跑、上限超过峰值表 2 倍），照它的出路加 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`、改 `auto` 重跑，那两次输出不算结果。
 
@@ -177,10 +177,10 @@ error: could not compile `singlefs-checker-tier` (bin "e171_three_oracle_collusi
 1. 对拍与判器单测（重型，带 `SINGLEFS_HEAVY_TESTS=commit` 或 `=user-request`）：
    ```
    SINGLEFS_HEAVY_TESTS=commit BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/lib/gcc/x86_64-linux-gnu/14/include" \
-     bash scripts/run-with-memory-cap.sh auto bash scripts/capped.sh 15 \
+     bash scripts/hosts/run-with-memory-cap.sh auto bash scripts/hosts/capped.sh 15 \
      cargo test --release -p singlefs-checker-tier --features verdict-store,gpu --lib --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state
    ```
-   看：`test result:` 两行都 ok、跑到的条数不为 0；`CRASH_JUDGE_GPU flow=… mismatches=0` 每条流一行；打 `NOT_RUN_NO_GPU_ADAPTER` 的是本次未跑、不算过。`--lib` 那一趟里要过的是 `crash_judge_gpu::tests` 三条 `*_parses_and_validates`、`scratch_words_given_to_each_state_reach_the_scratch_end_of_the_kernels`，`crash_judge_dispatch::tests` 的 `states_in_one_dispatch_follow_the_scratch_memory_up_to_the_lane_limit`、`every_kernel_stays_within_the_inlined_size_budget`、`the_walk_kernel_with_the_root_walk_called_from_six_sites_is_refused`。红了只重跑红的：`python3 scripts/rerun-failed-tests.py <日志> -p singlefs-checker-tier`。
+   看：`test result:` 两行都 ok、跑到的条数不为 0；`CRASH_JUDGE_GPU flow=… mismatches=0` 每条流一行；打 `NOT_RUN_NO_GPU_ADAPTER` 的是本次未跑、不算过。`--lib` 那一趟里要过的是 `crash_judge_gpu::tests` 三条 `*_parses_and_validates`、`scratch_words_given_to_each_state_reach_the_scratch_end_of_the_kernels`，`crash_judge_dispatch::tests` 的 `states_in_one_dispatch_follow_the_scratch_memory_up_to_the_lane_limit`、`every_kernel_stays_within_the_inlined_size_budget`、`the_walk_kernel_with_the_root_walk_called_from_six_sites_is_refused`。红了只重跑红的：`python3 scripts/gate/rerun-failed-tests.py <日志> -p singlefs-checker-tier`。
 2. 新变异行与换掉的那一行（重型）：
    ```
    SINGLEFS_HEAVY_TESTS=commit bash .claude/gate.d/checker-tier-crates-mutation-replay.sh \

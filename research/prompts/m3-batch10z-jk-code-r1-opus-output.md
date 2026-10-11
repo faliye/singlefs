@@ -6,7 +6,7 @@
 ## 复跑与 sha256
 
 - 模型目录只有一份 `research/prompts/m3-batch10z-jk-code-r1-opus-model/rerun.sh`（sha256 fb3518bd3ad6cd9787d8e9c29b861790a90435924a24a475252fa837c1ff73f5）：没有新写的模型源码，这条腿把入库 `mount.rs` 逐条套上第十块 10 行变异、跑点名的测试看各自红（K5 判别力的独立复跑）。
-- 复跑：`bash research/prompts/m3-batch10z-jk-code-r1-opus-model/rerun.sh <冻结副本tree> <空的CARGO_TARGET_DIR>`。每一件在 rerun.sh 里经 `bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 15 cargo …` 起。
+- 复跑：`bash research/prompts/m3-batch10z-jk-code-r1-opus-model/rerun.sh <冻结副本tree> <空的CARGO_TARGET_DIR>`。每一件在 rerun.sh 里经 `bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 15 cargo …` 起。
 - 被判文件在冻结副本 `~/.local/share/singlefs/work/m3-batch10z-jk-code-r1/tree/` 的 sha256：
   - `crates/singlefs-core/src/mount.rs` 73d353c452a564e4b74faefcc4b13d467699cea09022ea2c77a4a1cd55dea145
   - `crates/singlefs-harness/src/gpu_memory_ledger.rs` c9fdf242204f586da983cd7f663c604baad5ce865f55e4ecad7f472ed9f4a105

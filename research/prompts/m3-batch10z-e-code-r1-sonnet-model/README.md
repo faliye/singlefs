@@ -12,4 +12,4 @@
 - `logs/`：各条的原样输出。
 
 命令（工作目录是副本树根）：
-`CARGO_TARGET_DIR=<编译目录> nice -n 19 bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 cargo test --offline -p singlefs-harness --test <名> -- --nocapture --test-threads 1`
+`CARGO_TARGET_DIR=<编译目录> nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 6 cargo test --offline -p singlefs-harness --test <名> -- --nocapture --test-threads 1`

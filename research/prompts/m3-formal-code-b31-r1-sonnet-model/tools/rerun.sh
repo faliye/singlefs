@@ -23,7 +23,7 @@ mkdir -p "$OUT" "$draft"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-150}"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-同会话有别的子agent在跑各自的测试，本腿只跑harness档与core单测}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-派发提示要求cargo一律显式给8G上限，不用auto}"
-wrapped() { nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 8G bash "$REPO/scripts/capped.sh" "$CAP_THREADS" "$@"; }
+wrapped() { nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 8G bash "$REPO/scripts/hosts/capped.sh" "$CAP_THREADS" "$@"; }
 
 case "$stage" in
 static)

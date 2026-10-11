@@ -6,7 +6,7 @@
 
 - 22 份被判文件：在冻结副本根下 `sha256sum -c research/prompts/m3-batch33t-code-r1-snapshot/crates-sha256.txt 2>&1 | grep -vc OK`，原样输出 `0`（22 份全 OK）。
 - 没读禁读清单里的任何一份。读了：正文、背景材料附录、diff 全文、两份设计判决 `research/prompts/m3-c694-r1-main-verification.md`、`research/prompts/m3-c694-r2-main-verification.md`、实现员报告 `~/.local/share/singlefs/work/m3-batch33/t/report.md`（只当线索）。
-- 开跑前 `ps -o pid,args -u "$(id -u)"` 看到别的会话的 `cargo test`（`-p singlefs-harness -- --ignored`、`-p singlefs-checker-tier …`），没有 qemu-system、vm-bench、e152、fio；我的命令都加 `nice -n 19`，经 `scripts/run-with-memory-cap.sh`（编译 6G、跑 4G）与 `capped.sh 10`，一次只起一条 cargo，用自己的编译目录与一份仓副本。
+- 开跑前 `ps -o pid,args -u "$(id -u)"` 看到别的会话的 `cargo test`（`-p singlefs-harness -- --ignored`、`-p singlefs-checker-tier …`），没有 qemu-system、vm-bench、e152、fio；我的命令都加 `nice -n 19`，经 `scripts/hosts/run-with-memory-cap.sh`（编译 6G、跑 4G）与 `capped.sh 10`，一次只起一条 cargo，用自己的编译目录与一份仓副本。
 - 编译 + 探针 + 18 行变异整套 80 至 100 秒（`rerun.sh`，两遍）；checker 档一条没跑。
 - 复跑产物：`research/prompts/m3-batch33t-code-r1-sonnet-model/out/{probes,mutations,static}.txt`（四份输出两遍复跑后排序、去掉耗时字段，`compare.sh` 比出全同）。
 
@@ -84,7 +84,7 @@
 ### T8 注释、新测试、变异行
 
 - 变异行：diff 里追加的 18 行与替换的 20 行，与冻结副本 `crates/mutations.tsv` 逐行相同、原文在文件里恰好命中一次、必须红的测试名在点名的测试文件里是 `fn`：`research/prompts/m3-batch33t-code-r1-sonnet-model/out/static.txt:1`：「appended 18 replaced 20」、`:2`：「problems 0」。追加的 18 行逐行打进仓副本再还原、跑点名的用例：18 行全红且红的是点名的那条（`research/prompts/m3-batch33t-code-r1-sonnet-model/out/mutations.txt:1`：「ROWS 18」；`grep -c 'RED(expected test failed)'` 得 18）。替换的 20 行里 16 行（harness 档与 core `--lib`）我另用同一个驱动（`mutrun.py` 读 `replaced20.tsv`，见模型目录）打过一遍，全红且红的是点名的用例（这一遍没进 `rerun.sh`：其中一行单条 183 秒，整套会超 4 分钟；输出只在当时终端里，没落盘；要复核：`python3 -I mutrun.py <仓副本> <主仓> @replaced20.tsv`，`ROWS_FROM`、`ROWS_TO` 取行区间，checker 档那 4 行驱动自己跳过）；4 行在 checker 档（`bad_disk_input_campaign` 与 `crash_injection_campaign`），没跑（那四行的名字、参数、测试名「照旧」只能核到静态一致；替换前的表不在仓里，`git show HEAD:crates/mutations.tsv` 是更早的版本，比不出）。
-- 新测试 15 条（5 份新文件，另 1 份是共用搭建）在冻结副本的拷贝上复跑全绿，每份 1 秒以内，不需要慢档标记。文件名按领域在前、场景在后，不带里程碑、步号、增补号、并行线号、欠账号（判法 `scripts/crash-case-check.py` 的 `MILESTONE_FILE_NAME`，我只读了它的正则、没跑它）。一条函数名带来历：`crates/singlefs-harness/tests/recovery_and_both_mounts_fall_back_to_the_version_the_system_configuration_witnessed.rs:180`：「fn user_accepted_cost_of_2026_10_07_a_confirmed_root_whose_newer_system_configuration_slots_and_units_read_back_zero_reads_back_the_previous_version(」；规则 `.claude/singlefs-ai-sop/rules/test-script-discipline.md:14`：「不带里程碑、步号、批次这类来历；来历进 commit message 或项目 kb。」没列日期，按「这类」读算擦边：判「规则没说死」。
+- 新测试 15 条（5 份新文件，另 1 份是共用搭建）在冻结副本的拷贝上复跑全绿，每份 1 秒以内，不需要慢档标记。文件名按领域在前、场景在后，不带里程碑、步号、增补号、并行线号、欠账号（判法 `scripts/crash/crash-case-check.py` 的 `MILESTONE_FILE_NAME`，我只读了它的正则、没跑它）。一条函数名带来历：`crates/singlefs-harness/tests/recovery_and_both_mounts_fall_back_to_the_version_the_system_configuration_witnessed.rs:180`：「fn user_accepted_cost_of_2026_10_07_a_confirmed_root_whose_newer_system_configuration_slots_and_units_read_back_zero_reads_back_the_previous_version(」；规则 `.claude/singlefs-ai-sop/rules/test-script-discipline.md:14`：「不带里程碑、步号、批次这类来历；来历进 commit message 或项目 kb。」没列日期，按「这类」读算擦边：判「规则没说死」。
 - 注释：`mount.rs` 第 1475 行一带改成今天的行为（`crates/singlefs-core/src/mount.rs:1476` 起那段文档注释，写了映射现算、重读、凭据、拒），一致。残留两处没改成今天的：`crates/singlefs-core/src/mount.rs:1790`：「读不出、解不开交回 `None`（调用方只计数，不拒绝挂载）」（调用方现在可能拒，改之前就是旧话，不在 T8 点名的那一段）；`crates/singlefs-core/src/allocator.rs:266`：「只被被抛弃根引用的槽，当前账里既不是已分配也不是 defer，分配器却不许发出去，直到被抛弃的根离开根环。」`isolated` 字段的文档只说被抛弃根，没说水位之上记录点名的那部分。都是注释，不影响行为。
 - 推翻：追加的某行变异改回后点名的用例仍绿（复跑 18 / 18 红）；或替换的行里有一行原文命中不是恰好一次（静态核 0 个问题）。
 

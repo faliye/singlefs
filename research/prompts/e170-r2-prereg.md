@@ -8,7 +8,7 @@
 
 英文名：o3_spec_executor_with_witness_predicates
 
-英文名的来历：这次的执行器从第 1 次重跑冻结的那一份拷出来另放一个目录再改（5.2），照第 1 次重跑另起 `second_run_o3_spec_executor` 的先例另起新英文名；目录 `scripts/experiments/e170_o3_spec_executor_with_witness_predicates/`，变异表 `scripts/mutations/e170_o3_spec_executor_with_witness_predicates.tsv`。第 1 次重跑那一版的目录 `scripts/experiments/e170_second_run_o3_spec_executor/`、它的变异表 `scripts/mutations/e170_second_run_o3_spec_executor.tsv` 与 `scripts/replay.sh` 里 E170 的九行复跑（第 244–252 行）留着不动。导出装置 `crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs` 这次不改、不跑：输入全取已经导出、按 `manifest.tsv` 核过的目录（读法 5、7、8）。
+英文名的来历：这次的执行器从第 1 次重跑冻结的那一份拷出来另放一个目录再改（5.2），照第 1 次重跑另起 `second_run_o3_spec_executor` 的先例另起新英文名；目录 `scripts/experiments/e170_o3_spec_executor_with_witness_predicates/`，变异表 `scripts/mutation/tables/e170_o3_spec_executor_with_witness_predicates.tsv`。第 1 次重跑那一版的目录 `scripts/experiments/e170_second_run_o3_spec_executor/`、它的变异表 `scripts/mutation/tables/e170_second_run_o3_spec_executor.tsv` 与 `scripts/experiments/replay.sh` 里 E170 的九行复跑（第 244–252 行）留着不动。导出装置 `crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs` 这次不改、不跑：输入全取已经导出、按 `manifest.tsv` 核过的目录（读法 5、7、8）。
 
 主 agent 给的问题（派发提示原文逐字；第一行只是登记路径与草稿目录，不抄）：
 
@@ -21,7 +21,7 @@
 >
 > 登记写完、过自检就交回；不写装置、不跑。
 
-问题单 `research/prompts/e170-r2-questions.md`（sha256 `f730cc6f4f9b84de3ff9996285ea982d294c0a33633305a3436bcc83633b33ca`）第 5–10 行（`scripts/quote-kb.py` 整段抄）。它不是岔路单，是问题单：第六节每个量写明它对应 Q1–Q4 哪一行、取什么值让那一行翻面。
+问题单 `research/prompts/e170-r2-questions.md`（sha256 `f730cc6f4f9b84de3ff9996285ea982d294c0a33633305a3436bcc83633b33ca`）第 5–10 行（`scripts/kb/quote-kb.py` 整段抄）。它不是岔路单，是问题单：第六节每个量写明它对应 Q1–Q4 哪一行、取什么值让那一行翻面。
 
 **出处 `research/prompts/e170-r2-questions.md:5-10`（整段抄，未转述）**
 
@@ -73,7 +73,7 @@
 
 ## 二、被测条款与它引的定义
 
-被测条款三处：D13（验证路线） 已定项 6（O3 那一行与射程）、D23（journal 的角色与格式） 已定项 14（可写挂载读到的更新状态读不出那一段：见证判据、c_见证、取号那一写的见证值）、D16（发布语义） 已定项 7（根槽 FUA → 系统配置轮换 → 屏障，fsync 等轮换持久之后才返回）。W、T 要用的另几样定义一并抄：D22（单元原子性怎么合成） 已定项 8（判不出取 R2 的权威写法在它的射程）、D23 已定项 18（tail 存 jsn 的 48 位计数器）、`layout/01-first-txn.md` 第 152 行（tail 的取值：mkfs 0、暖机后 1、2、新池新建文件发布后 3）、第 158 行（journal tail 在偏移 469）、第 160 行（「自证过」「可用」的定义）。W 的定义以第二轮判决与 C670 行为准（派发提示），所以抄：`checks-owed.md` 表头与 C670、C673 两行；第二轮判决逐条判决表的表头与 R1 行（量 W 的那一格）、补 oracle 改法表的表头与前三行；第三轮判决第五节表头到第 4 行与第 6 行；第一轮攻方报告里 T 的原文那一行。允许集合的读法 3（原登记第 29 行，ack(c) 的定义）与 E171 第 1 次重跑登记读法 9（接口）也抄。下面由 `scripts/quote-kb.py` 整段抽出，回读逐字节一致（第十三节命令）。判决与攻方报告那几行带着量过的数，这些数怎么处置写在第四节第 2 条。
+被测条款三处：D13（验证路线） 已定项 6（O3 那一行与射程）、D23（journal 的角色与格式） 已定项 14（可写挂载读到的更新状态读不出那一段：见证判据、c_见证、取号那一写的见证值）、D16（发布语义） 已定项 7（根槽 FUA → 系统配置轮换 → 屏障，fsync 等轮换持久之后才返回）。W、T 要用的另几样定义一并抄：D22（单元原子性怎么合成） 已定项 8（判不出取 R2 的权威写法在它的射程）、D23 已定项 18（tail 存 jsn 的 48 位计数器）、`layout/01-first-txn.md` 第 152 行（tail 的取值：mkfs 0、暖机后 1、2、新池新建文件发布后 3）、第 158 行（journal tail 在偏移 469）、第 160 行（「自证过」「可用」的定义）。W 的定义以第二轮判决与 C670 行为准（派发提示），所以抄：`checks-owed.md` 表头与 C670、C673 两行；第二轮判决逐条判决表的表头与 R1 行（量 W 的那一格）、补 oracle 改法表的表头与前三行；第三轮判决第五节表头到第 4 行与第 6 行；第一轮攻方报告里 T 的原文那一行。允许集合的读法 3（原登记第 29 行，ack(c) 的定义）与 E171 第 1 次重跑登记读法 9（接口）也抄。下面由 `scripts/kb/quote-kb.py` 整段抽出，回读逐字节一致（第十三节命令）。判决与攻方报告那几行带着量过的数，这些数怎么处置写在第四节第 2 条。
 
 **出处 `.claude/kb/decisions/13-验证路线.md:153-181`（整段抄，未转述）**
 
@@ -458,9 +458,9 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ### 5.5 怎么跑
 
-- 判态：`python3 executor_main.py --dumps <导出目录> --batches <批> --workers <≤ 线程上限> --output <新文件>`（v1 在它自己的目录里跑，v2 在新目录里跑，都不改 v1 的入口参数）；坏状态与坏镜像走 5.3 那一份。一律 `bash scripts/capped.sh <N> bash scripts/run-with-memory-cap.sh <上限> …`，N 与上限取派发提示（没给上限就取 `scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认 8G）。
+- 判态：`python3 executor_main.py --dumps <导出目录> --batches <批> --workers <≤ 线程上限> --output <新文件>`（v1 在它自己的目录里跑，v2 在新目录里跑，都不改 v1 的入口参数）；坏状态与坏镜像走 5.3 那一份。一律 `bash scripts/hosts/capped.sh <N> bash scripts/hosts/run-with-memory-cap.sh <上限> …`，N 与上限取派发提示（没给上限就取 `scripts/experiments/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认 8G）。
 - 产物：`research/results/e170-r2-o3-spec-executor-<日期>-s<段>-<名>.out`，按日期另起新文件名，不覆盖。
-- 复跑行：v2 的单测与单测层变异（纯 Python，不依赖导出）由第一段的执行员加进 `scripts/replay.sh`，E170 原有九行不动。依赖导出的那几份产物不加复跑行：它们的输入是 311 字节记录头的冻结导出（不进 git），而今天的导出装置照 `crates/` 写 487 字节头（第三节），在今天的树上重导出来的态两版都读不了；这几份怎么进复跑交主 agent 定（第十一节 S2 同一件事）。
+- 复跑行：v2 的单测与单测层变异（纯 Python，不依赖导出）由第一段的执行员加进 `scripts/experiments/replay.sh`，E170 原有九行不动。依赖导出的那几份产物不加复跑行：它们的输入是 311 字节记录头的冻结导出（不进 git），而今天的导出装置照 `crates/` 写 487 字节头（第三节），在今天的树上重导出来的态两版都读不了；这几份怎么进复跑交主 agent 定（第十一节 S2 同一件事）。
 
 ### 5.6 冻结
 
@@ -471,7 +471,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 ### 5.7 装置写在哪；禁读清单；资源上限
 
 - **装置走 `research/` 那一支**：`scripts/experiments/e170_o3_spec_executor_with_witness_predicates/`（Python，目录里不放 `main.rs`）；执行员先跑 `cargo metadata --format-version 1 --no-deps --manifest-path scripts/experiments/Cargo.toml`，确认 bin 目标里没有多出 e170 那一项。没有入库装置：这几条问题问的是 kb 文字写出的 O3 判得怎样，不是 `crates/` 今天的代码，导出装置不改、不跑，本实验不读任何 `crates/` 常量。
-- **写 v2 的执行员（第一段）的禁读清单**：`crates/` 全部（含 `git log -p` / `git show` / `git diff` 里落在 `crates/` 的部分）；`scripts/experiments/` 下除新目录与 v1 目录里那 15 个冻结文件以外的全部（v1 目录的 `comparator*`、`mutation_driver*` 也不读；E171 的研究目录不读）；`scripts/` 下的源文件（照用法跑 `run-with-memory-cap.sh`、`capped.sh`、`quote-kb.py` 不算读）；`research/results/` 全部，只有 `grep '^name=freeze' research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out` 那几行例外；`research/prompts/` 下除问题单与三份登记的第一、二、五至十一节以外的全部（E171 的登记、判决、攻方报告都在内）；`records/` 全部；`.claude/kb/` 下除 `decisions/`、`invariants.md`、`layout/` 以外的全部（`checks-owed.md`、`experiments/` 在内）；三份登记的第三、四、十二、十三节；`scripts/experiments/target/` 下除 `e170-dumps/` 两条流里 manifest 列出的九个文件中 `impl-verdicts.tsv` 以外那八个以外的全部。交回时附自己读过的文件清单（从自己的工具调用里列）；主 agent 可用 `scripts/agent-handover.py` 抽它的会话记录核对。写 v2 的执行员不是这一批读过 `crates/` 的任何一位，也不是 E171 那几段的执行员。
+- **写 v2 的执行员（第一段）的禁读清单**：`crates/` 全部（含 `git log -p` / `git show` / `git diff` 里落在 `crates/` 的部分）；`scripts/experiments/` 下除新目录与 v1 目录里那 15 个冻结文件以外的全部（v1 目录的 `comparator*`、`mutation_driver*` 也不读；E171 的研究目录不读）；`scripts/` 下的源文件（照用法跑 `run-with-memory-cap.sh`、`capped.sh`、`quote-kb.py` 不算读）；`research/results/` 全部，只有 `grep '^name=freeze' research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out` 那几行例外；`research/prompts/` 下除问题单与三份登记的第一、二、五至十一节以外的全部（E171 的登记、判决、攻方报告都在内）；`records/` 全部；`.claude/kb/` 下除 `decisions/`、`invariants.md`、`layout/` 以外的全部（`checks-owed.md`、`experiments/` 在内）；三份登记的第三、四、十二、十三节；`scripts/experiments/target/` 下除 `e170-dumps/` 两条流里 manifest 列出的九个文件中 `impl-verdicts.tsv` 以外那八个以外的全部。交回时附自己读过的文件清单（从自己的工具调用里列）；主 agent 可用 `scripts/agents/agent-handover.py` 抽它的会话记录核对。写 v2 的执行员不是这一批读过 `crates/` 的任何一位，也不是 E171 那几段的执行员。
 - **第二、三段的执行员**：可以读 `crates/`、`research/results/`、`scripts/experiments/target/` 全部；不改 v2 的冻结文件；写 W_ref、T_ref 时守 5.4 那一句。
 - **资源**：工作进程数不超过派发提示的线程上限；内存上限取派发提示，没给取 8G；编译不需要（全是 Python）。
 
@@ -487,7 +487,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 | 段 | 谁做 | 做什么 | 要改的装置与产物 | 补问题单哪一行 | 补完够不够判 |
 |---|---|---|---|---|---|
-| 第一段 | 只读 kb 的执行员（禁读清单 5.7） | 拷 v1（V8）；照 5.2 改五处；单测 U-W1–U-W6、U-T1–U-T5、U-V1 与 v1 原有单测全过；单测层变异 X21–X31（在副本上逐条替换、跑单测、还原）；v2 在 I1 批 1、批 2 上严格与暂代两种跑法判；第七节 B1–B3 与上一次登记 A1–A13；冻结 | 新目录；`research/results/e170-r2-o3-spec-executor-<日期>-s1-executor.out`、`-s1-unit-tests.out`、`-s1-unit-level-mutations.out`；变异表 `scripts/mutations/e170_o3_spec_executor_with_witness_predicates.tsv` | 不补任何一行到够判（Q1 要两版在全部输入上比；Q2、Q3 要 s4 三行） | 不够；它交出冻结的 v2 与 W、T 的单测层判别力 |
+| 第一段 | 只读 kb 的执行员（禁读清单 5.7） | 拷 v1（V8）；照 5.2 改五处；单测 U-W1–U-W6、U-T1–U-T5、U-V1 与 v1 原有单测全过；单测层变异 X21–X31（在副本上逐条替换、跑单测、还原）；v2 在 I1 批 1、批 2 上严格与暂代两种跑法判；第七节 B1–B3 与上一次登记 A1–A13；冻结 | 新目录；`research/results/e170-r2-o3-spec-executor-<日期>-s1-executor.out`、`-s1-unit-tests.out`、`-s1-unit-level-mutations.out`；变异表 `scripts/mutation/tables/e170_o3_spec_executor_with_witness_predicates.tsv` | 不补任何一行到够判（Q1 要两版在全部输入上比；Q2、Q3 要 s4 三行） | 不够；它交出冻结的 v2 与 W、T 的单测层判别力 |
 | 第二段 | 读过 `crates/` 也行的执行员 | 5.3 的输入核对；v1 在 I1–I4 与 s4 三行上现跑并与入库产物比（V9）；v2 在 I2–I4、s4 三行与几何点上判；I5；写参照谓词与两份比对器；Q1、Q2、Q3 各量与 Q1-pc、Q2-pc、Q3-pc、Q3-pc2；X21 在第 242、269 行、X27 在第 270 行各跑一趟（Q2、Q3 的判别力自证） | 新目录里不进冻结的几份；`research/results/e170-r2-o3-spec-executor-<日期>-s2-*.out` | Q1、Q2、Q3；Q4 随之 | Q1–Q4 够判（撞欠一句或 K、K270 为空的那几格照 F4、F6 写明不够判） |
 | 第三段 | 同第二段 | 批层变异 X22–X26、X28–X31 在第九节写的取样点上各跑一趟；v1 的变异表 X1–X20 在 v2 的副本上跑单测层一遍 | `-s3-mutations.out` | 不补任何一行（附带，够判后不跑）：只给实验页写「N 条变异全抓」用 | — |
 
@@ -567,7 +567,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ## 九、变异
 
-v2 的变异（X 行）与比对器、参照谓词的变异（XC 行）登记在 `scripts/mutations/e170_o3_spec_executor_with_witness_predicates.tsv`，由变异驱动在草稿目录的副本上逐条替换、跑单测或那一格的判定、还原，结局照 `.claude/rules/mutation-sampling.md` 三栏记（抓到 / 无效 / 没红）；先逐条核原文在新目录的源文件里恰好命中一次。名字接着 v1 的 X1–X20、XC1–XC2 往下编。
+v2 的变异（X 行）与比对器、参照谓词的变异（XC 行）登记在 `scripts/mutation/tables/e170_o3_spec_executor_with_witness_predicates.tsv`，由变异驱动在草稿目录的副本上逐条替换、跑单测或那一格的判定、还原，结局照 `.claude/rules/mutation-sampling.md` 三栏记（抓到 / 无效 / 没红）；先逐条核原文在新目录的源文件里恰好命中一次。名字接着 v1 的 X1–X20、XC1–XC2 往下编。
 
 | 变异 | 改什么 | 在哪个取样点上改变输出 |
 |---|---|---|
@@ -644,7 +644,7 @@ X21–X31 在第一段先跑单测层；X21、X27 第二段在 s4 那几行上�
 
 #### 12.1 问题单换版
 
-`scripts/quote-kb.py` 整段抄（第十三节末命令），换版之后第 5–11 行：
+`scripts/kb/quote-kb.py` 整段抄（第十三节末命令），换版之后第 5–11 行：
 
 **出处 `research/prompts/e170-r2-questions.md:5-11`（整段抄，未转述）**
 
@@ -660,7 +660,7 @@ X21–X31 在第一段先跑单测层；X21、X27 第二段在 s4 那几行上�
 
 #### 12.2 被测条款增补
 
-主 agent 把 D23（journal 的角色与格式） 已定项 4（记录头字段表）列进被测条款。「跟上格式」要用的另几句一并抄：已定项 10（反向链覆盖整个记录头）、已定项 15（新根段七个字段与它们在施加时的用法）、已定项 17（点名项，「4096 记录 64 项」）；`layout/01-first-txn.md` 里还写 311 格式的那几行（第 64、79、325、329、357、359 行）与 `invariants.md` I-8.6 那一行一起抄，读法 11 写它们怎么处置；锚点 B12 用到的 D22（单元原子性怎么合成） 已定项 7 字段表 flags 那一行也抄。下面由 `scripts/quote-kb.py` 整段抽出，回读逐字节一致。
+主 agent 把 D23（journal 的角色与格式） 已定项 4（记录头字段表）列进被测条款。「跟上格式」要用的另几句一并抄：已定项 10（反向链覆盖整个记录头）、已定项 15（新根段七个字段与它们在施加时的用法）、已定项 17（点名项，「4096 记录 64 项」）；`layout/01-first-txn.md` 里还写 311 格式的那几行（第 64、79、325、329、357、359 行）与 `invariants.md` I-8.6 那一行一起抄，读法 11 写它们怎么处置；锚点 B12 用到的 D22（单元原子性怎么合成） 已定项 7 字段表 flags 那一行也抄。下面由 `scripts/kb/quote-kb.py` 整段抽出，回读逐字节一致。
 
 **出处 `.claude/kb/decisions/23-journal的角色与格式.md:148-177`（整段抄，未转述）**
 
@@ -925,7 +925,7 @@ X21–X31 在第一段先跑单测层；X21、X27 第二段在 s4 那几行上�
 
 **轨迹与几何**：Q5-a 沿流序按段报峰值、为正的段数、最后一段的值。几何点：G6 流一对流二；G7 批 1 对批 2（批 3 附带）；G8 E170 对照（Z1）对 E171 对照（Z5）；G9 P8 的底态 F 对 Mk（B15）。一点乙一点甲记「不稳定」（F5 同形），不判甲。
 
-**变异**（`scripts/mutations/e170_o3_spec_executor_with_witness_predicates_journal_header_487.tsv`，接着 X31 往下编；v1-487 不另立表）：
+**变异**（`scripts/mutation/tables/e170_o3_spec_executor_with_witness_predicates_journal_header_487.tsv`，接着 X31 往下编；v1-487 不另立表）：
 
 | 变异 | 改什么 | 在哪个取样点上改变输出 |
 |---|---|---|
@@ -997,7 +997,7 @@ X32–X36 第一段甲在单测层跑；X32、X35、X36 在 Z1 流一批 1 上�
 
 #### 12.11 `replay.sh` 里 E170 的九行怎么办（设计员提方案，主 agent 定；定之前谁都不动那九行）
 
-**现状**（读码推的，没跑）：`scripts/replay.sh` 第 244–252 行九行，驱动在第 700–796 行；第 759–766 行 `e170_r1_dumps` 与第 721–729 行 `e170_s3_dumps` 每次复跑都用今天的导出装置现导（`cargo run … e170_o3_spec_executor_export -- dump`，再 `bad-states` / `bad-states-second-run`）。今天的树上：
+**现状**（读码推的，没跑）：`scripts/experiments/replay.sh` 第 244–252 行九行，驱动在第 700–796 行；第 759–766 行 `e170_r1_dumps` 与第 721–729 行 `e170_s3_dumps` 每次复跑都用今天的导出装置现导（`cargo run … e170_o3_spec_executor_export -- dump`，再 `bad-states` / `bad-states-second-run`）。今天的树上：
 - `bad-states` 两个模式在 12.9 那一处回比不过、退 3（导出装置准备之前）⇒ 第 245–252 行这八行连输入都造不出来；
 - 准备之后造得出，但导出是 487 格式：第 244、245、249 行（导出装置自己的结果行：`dump` 两趟逐文件比、两套坏状态表的造法，带导出文件的摘要）输出会变；第 246–248 行（第一版执行器）、第 250–252 行（v1）是 311 读者读 487 字节，判定会变，变出来的也不是那几份产物当初说的事。
 - 同一件事也落在 E171 的复跑驱动上（第 812–1065 行用 `bad-states` 与 v1），归 E171 第 1 次重跑，这里只记。
@@ -1022,7 +1022,7 @@ X32–X36 第一段甲在单测层跑；X32、X35、X36 在 Z1 流一批 1 上�
 - `crates/singlefs-core/src/mount.rs` 395–452、4965–5030，grep 命中 3525 行；`crates/singlefs-core/src/recovery.rs` grep 命中 3232、3303 行；`crates/singlefs-core/src/transaction.rs` grep 命中 737、907、1286 行；`crates/singlefs-format/src/lib.rs` grep 命中 34–62 的常量行、223、228、427 行，`git show HEAD:` 与 `git show :` 同一常量各一行；`crates/singlefs-checker-tier/src/crash_injection.rs` grep 命中 77、2080、2110 行；`crates/singlefs-harness/src/mount_transparency.rs` grep 命中 1511、1538 行；`crates/singlefs-harness/tests/writable_mount_refusal_on_a_crash_state_without_read_faults.rs` grep 命中 257 行；`crates/mutations.tsv` grep 命中 2222 行；`crates/singlefs-checker-tier/tests/` 文件名清单。
 - `scripts/experiments/e170_second_run_o3_spec_executor/`：文件清单与行数；`executor_core.py` 80–92、119–176 与 def 行；`on_disk_layout.py` grep 命中 57、75、76、87、97、166 行；`journal_ring.py` grep 命中 3、79 行；`version_table.py` def 行与 grep 命中 85–102；`system_configuration.py`、`executor_main.py` 的 def 行；`spec-gaps.tsv` 前两列与表头。
 - `scripts/experiments/e171_three_oracle_collusion/`：文件清单；`o3_bad_image_judge.py` 1–40 与 def / argparse 行。
-- `scripts/replay.sh` grep 命中 25–26、244–252、700–1065 内带 e170 的行；`scripts/quote-kb.py` 1–60；`scripts/mutations/` 文件清单里 e170 的两项。
+- `scripts/experiments/replay.sh` grep 命中 25–26、244–252、700–1065 内带 e170 的行；`scripts/kb/quote-kb.py` 1–60；`scripts/mutation/tables/` 文件清单里 e170 的两项。
 - `scripts/experiments/target/`：`e170-dumps`、`e170-second-run-dumps`、`e171-dumps` 的目录清单；14 个导出目录的 `manifest.tsv` sha256 核对与 `states.tsv` 按批计数；s4 第 242 行流一七个文件的第一行（`impl-verdicts.tsv`、`oracle-verdicts.tsv`、`states.tsv`、`call-outcomes.tsv`、`stream-status.tsv`、`calls.tsv`、`manifest.tsv`，读到的数列在第四节第 4 条）；`bad-states.tsv` 与 `known-bad-states.tsv` 的行数。
 - `research/results/`：文件名清单（只看 e170、e171 开头的名字）；`e171-three-oracle-collusion-2026-10-03-s2-images-o3.out` 的前 300 字节（`name=config` 一行，只看行格式）。
 - 没读：`.claude/kb/experiments/170-O3规约执行器第一版.md` 与 `171-三oracle合谋测试.md`（结果与结论都在那里，判据从三份登记取）；别的实验页；`research/results/` 下的结果行。
@@ -1043,9 +1043,9 @@ cd scripts/experiments/target && for d in e170-dumps e170-second-run-dumps e171-
 git show HEAD:crates/singlefs-format/src/lib.rs | grep -n 'pub const JOURNAL_HEADER_BYTES'    # 200:… = 311;
 git show :crates/singlefs-format/src/lib.rs | grep -n 'pub const JOURNAL_HEADER_BYTES'        # 223:… = 487;
 grep -rn highest_system_configuration_journal_tail crates/singlefs-core/src/                   # 零命中
-nice -n 19 python3 scripts/quote-kb.py $D/questions-quote.md 'research/prompts/e170-r2-questions.md:5-10'
+nice -n 19 python3 scripts/kb/quote-kb.py $D/questions-quote.md 'research/prompts/e170-r2-questions.md:5-10'
 #   ✓ 1 段整抄进 /tmp/claude-1000/e170-r2-designer/questions-quote.md，回读逐字节一致
-L=.claude/kb/layout/01-first-txn.md; nice -n 19 python3 scripts/quote-kb.py $D/quotes.md \
+L=.claude/kb/layout/01-first-txn.md; nice -n 19 python3 scripts/kb/quote-kb.py $D/quotes.md \
  '.claude/kb/decisions/13-验证路线.md@#### 已定项 6：三个互相独立的 oracle' \
  '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换' \
  '.claude/kb/decisions/16-发布语义.md@#### 已定项 7：发布的持久顺序' \
@@ -1060,10 +1060,10 @@ L=.claude/kb/layout/01-first-txn.md; nice -n 19 python3 scripts/quote-kb.py $D/q
 #   ✓ 18 段整抄进 /tmp/claude-1000/e170-r2-designer/quotes.md，回读逐字节一致   exit=0
 set -o noclobber; cat $D/part1.md $D/part2.md $D/part3.md > research/prompts/e170-r2-prereg.md      # 排他新建
 # 之后逐段 >> 追加；第二节三段抄录追加之后：tail -n +<追加前行数+1> 登记 的第二节部分 | cmp - quotes.md  → appended-quotes-identical
-nice -n 19 python3 scripts/quote-kb.py $D/quote-r3-67-72.md 'research/prompts/e171-conclusion-r3-main-verification.md:67-72'
+nice -n 19 python3 scripts/kb/quote-kb.py $D/quote-r3-67-72.md 'research/prompts/e171-conclusion-r3-main-verification.md:67-72'
 #   ✓ 1 段整抄进 /tmp/claude-1000/e170-r2-designer/quote-r3-67-72.md，回读逐字节一致
 #   换掉第二节里 65-72 那一段（它以判决的二级标题行开头，避免登记里出现第十四个「## 」行）：
-nice -n 19 python3 scripts/replace-once.py research/prompts/e170-r2-prereg.md <65-72 那一段> <67-72 那一段>   # 命中 1 次
+nice -n 19 python3 scripts/kb/replace-once.py research/prompts/e170-r2-prereg.md <65-72 那一段> <67-72 那一段>   # 命中 1 次
 ```
 
 **修订 1（设计员，2026-10-04）读过的文件**（行号区间；grep 命中行也列）：
@@ -1073,7 +1073,7 @@ nice -n 19 python3 scripts/replace-once.py research/prompts/e170-r2-prereg.md <6
 - `.claude/kb/decisions/23-journal的角色与格式.md` 节标题行、148–177、266–272、448–498；`.claude/kb/decisions/22-单元原子性怎么合成.md` grep 命中 137、166、359 行；`.claude/kb/invariants.md` 95 行与 grep 命中 63 行；`.claude/kb/layout/01-first-txn.md` 节标题行、313–361，grep 命中 64、79、320、323、325、329、334、351、353、357、359 行；全 kb grep「311」命中行（12.10 列的那些）。
 - `crates/singlefs-format/src/lib.rs` grep 命中 206–257 的常量行，`git diff HEAD` 全文（109–129、183–229、400–440、478–540、569–690 一带），`git show HEAD:` 同名常量 184、185、197、200、206 行；`crates/singlefs-core/src/journal.rs` grep 命中 21–68、108–143、159–169、215–261、283–383、403–411、465–540、630–672 行与 240–262、340–350 行；`crates/singlefs-core/src/root_record.rs` 43–55 行；`crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs` grep 命中 19、34–71、1933、1963–1966、2012、2305、2715–2750、2852–2947、3085、3095–3125、3211、3226–3250、3856–3956 行；`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs` grep 命中 3926、4111 行。
 - `scripts/experiments/e170_second_run_o3_spec_executor/`：文件清单与行数；`on_disk_layout.py` 1–224；其余各 `.py` grep 命中 `JOURNAL_HEADER_BYTES`、新根段字段、反向链、点名项的行（`executor_main.py` 198，`journal_ring.py` 17、35、45、73–80、98–126，`replay_prefix.py` 89–92、188–191，`synthetic_pool_for_tests.py` 112–261）。
-- `scripts/replay.sh` grep 命中 e170 的行（244–252、700–796、805–1065 里带 e170 的行）与 700–712、719–730、794–800、805–830；`scripts/replace-once.py` 1–40；`.claude/hooks/heavy-test-guard.sh` 1–80；`.claude/hooks/lib_heavy_tests.py` grep 命中 52、545、588、734–737、850–870、1415–1430、3125–3140 行；`.claude/singlefs-ai-sop/scripts/doc-lint.sh` grep 命中 942–964 行。
+- `scripts/experiments/replay.sh` grep 命中 e170 的行（244–252、700–796、805–1065 里带 e170 的行）与 700–712、719–730、794–800、805–830；`scripts/kb/replace-once.py` 1–40；`.claude/hooks/heavy-test-guard.sh` 1–80；`.claude/hooks/lib_heavy_tests.py` grep 命中 52、545、588、734–737、850–870、1415–1430、3125–3140 行；`.claude/singlefs-ai-sop/scripts/doc-lint.sh` grep 命中 942–964 行。
 - `scripts/experiments/target/` 目录清单（12.10 第三条）；`research/results/` 只数了 `e171-r1`、`e170-r2` 开头的文件名（0 个）。
 - 没读：`.claude/kb/experiments/` 下的实验页；`research/results/` 下的结果行；`scripts/experiments/target/` 下任何导出文件的内容。
 
@@ -1097,20 +1097,20 @@ print('end',o,'segment',sum(w for n,w in rows[:7]),'items',(4096-o)//56, 'rest51
 #   tree_table 99 86 / mapping 185 86 / watermark 271 8 / F 279 8 / instance_table 287 86 / alloc_root 373 86 / unmount 459 4 / fsid 463 8 / MAC 471 16
 #   end 487 segment 364 items 64 rest512 25
 D=/tmp/claude-1000/e170-r2-designer-rev1; L=.claude/kb/layout/01-first-txn.md
-nice -n 19 python3 scripts/quote-kb.py $D/questions-quote.md 'research/prompts/e170-r2-questions.md:5-11'
+nice -n 19 python3 scripts/kb/quote-kb.py $D/questions-quote.md 'research/prompts/e170-r2-questions.md:5-11'
 #   ✓ 1 段整抄进 /tmp/claude-1000/e170-r2-designer-rev1/questions-quote.md，回读逐字节一致
-nice -n 19 python3 scripts/quote-kb.py $D/quotes.md \
+nice -n 19 python3 scripts/kb/quote-kb.py $D/quotes.md \
  '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 4：记录头约束在单个原子单元内，头 311 字节' \
  '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 10：`previous_hash` 覆盖前一条记录的整个记录头' \
  '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 15：崩在记录持久之后、根槽持久之前，恢复由记录重建那次发布的根' \
  '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 17：点名项 56 字节的字段表' \
  "$L~^\| w4 \| 暖机 \|" "$L~^\| t13 \| 事务 \|" "$L~^\| 新根段：树表单元指针" "$L~^\| 点名项 \| 56 \|" "$L~^合计 \*\*311 字节\*\*" "$L~^\*\*记录头字段表的偏移\*\*"
 #   ✓ 10 段整抄进 /tmp/claude-1000/e170-r2-designer-rev1/quotes.md，回读逐字节一致
-nice -n 19 python3 scripts/quote-kb.py $D/quote-i86.md '.claude/kb/invariants.md~^\| I-8\.6 \|'
+nice -n 19 python3 scripts/kb/quote-kb.py $D/quote-i86.md '.claude/kb/invariants.md~^\| I-8\.6 \|'
 #   ✓ 1 段整抄进 /tmp/claude-1000/e170-r2-designer-rev1/quote-i86.md，回读逐字节一致
-nice -n 19 python3 scripts/quote-kb.py $D/quote-d22-flags.md '.claude/kb/decisions/22-单元原子性怎么合成.md~^\| flags \| 4 \| 位 0 = 卸载记号'
+nice -n 19 python3 scripts/kb/quote-kb.py $D/quote-d22-flags.md '.claude/kb/decisions/22-单元原子性怎么合成.md~^\| flags \| 4 \| 位 0 = 卸载记号'
 #   ✓ 1 段整抄进 /tmp/claude-1000/e170-r2-designer-rev1/quote-d22-flags.md，回读逐字节一致
-# 修订 1 换进第十二节：照草稿分几段用 scripts/replace-once.py 换掉第十二节的占位句（每段命中 1 次）；
+# 修订 1 换进第十二节：照草稿分几段用 scripts/kb/replace-once.py 换掉第十二节的占位句（每段命中 1 次）；
 # 第十三节这一段用 >> 追加；回读核抄录区在登记里与草稿逐字节相同（见交回报告）
 ```
 
@@ -1194,7 +1194,7 @@ nice -n 19 python3 scripts/quote-kb.py $D/quote-d22-flags.md '.claude/kb/decisio
 
 **比修订 1 多要求了什么**（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列」三步的「写明收严在哪」；Z4 一张没造、Q5 一格没判，「记一次输」不适用）：已知坏镜像的行名取法写死；可比的 41 行要证明两边是同一条改法（Q5-i、S6），原文只按行名；B17 钉条数与目标名列；Q5-h 列出不可比那两行的判定；Q5-pc3 证明核对会红。放宽：没有。读法 17 把读法 13 括注里 Z4 的「41 行」换成照今天的条数，是输入跟今天（主 agent 定）；原判据下能进 Q5-a 的行一行没少，核对不过也不挪行。
 
-**变异**（接 12.8 的表；XC8、XC9 进 `scripts/mutations/e170_o3_spec_executor_with_witness_predicates_journal_header_487.tsv`，两条 crates 行进 `crates/mutations.tsv` 末尾）：
+**变异**（接 12.8 的表；XC8、XC9 进 `scripts/mutation/tables/e170_o3_spec_executor_with_witness_predicates_journal_header_487.tsv`，两条 crates 行进 `crates/mutations.tsv` 末尾）：
 
 | 变异 | 改什么 | 在哪个取样点上改变输出 |
 |---|---|---|
@@ -1270,7 +1270,7 @@ awk "NR>=$S&&NR<=$E" $T | grep -cE '^            "I-[0-9]+\.[0-9]+",?$'         
 awk "NR>=$S&&NR<=$E" $T | grep -E '^            [A-Z_]+,?$'                              # 5 行常量名
 awk "NR>=$S&&NR<=$E" $T | grep -cE '^        \($'                                        # 43
 grep -rn 'pub const REFERENCE_INTERVALS_ARE_EXACT\|pub const FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK' crates/singlefs-checker/src/   # image.rs:197 "I-3.5"、:206 "I-5.5"
-nice -n 19 python3 scripts/quote-kb.py $D/quote-e171-55.md 'research/prompts/e171-preregistration.md:270-270' 'research/prompts/e171-preregistration.md:273-273' 'research/prompts/e171-preregistration.md:275-275'
+nice -n 19 python3 scripts/kb/quote-kb.py $D/quote-e171-55.md 'research/prompts/e171-preregistration.md:270-270' 'research/prompts/e171-preregistration.md:273-273' 'research/prompts/e171-preregistration.md:275-275'
 #   ✓ 3 段整抄进 /tmp/claude-1000/e170-r2-designer-rev2/quote-e171-55.md，回读逐字节一致
 sha256sum research/prompts/e170-r2-prereg.md   # 修订之前 73fce1f069d7c4e7c3cf40b55003dae3ff5509c79cb9fc6d170ea30eea5ba1b4
 # 修订 2 照草稿 partA–partD 依次 >> 追加到登记末尾；回读：tail -c <草稿总字节> 登记 | cmp - <四段拼起来>

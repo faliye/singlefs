@@ -166,7 +166,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
 ──── h2-a 红：快档（不设 SINGLEFS_GATE_FULL，照整轮门禁的样子）
 $ bash .claude/gate.d/checker-tier-layer0-replay.sh
   ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 2 个改动路径，没有一个落在 crate/ Cargo.tom Cargo.lok 底下
-     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crate/ Cargo.tom Cargo.lok，判据见 scripts/change-touches-crates.sh。
+     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crate/ Cargo.tom Cargo.lok，判据见 scripts/gate/change-touches-crates.sh。
 [退出码 77]
     [格] 2175faa5f77d03252e
 ──── h2-a 红：快档（SINGLEFS_GATE_FULL=1）
@@ -181,7 +181,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
 ──── h2-b 红：快档（不设 SINGLEFS_GATE_FULL）
 $ bash .claude/gate.d/checker-tier-layer0-replay.sh
   ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 2 个改动路径，没有一个落在 crates/ Cargo.toml Cargo.lok 底下
-     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lok，判据见 scripts/change-touches-crates.sh。
+     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lok，判据见 scripts/gate/change-touches-crates.sh。
 [退出码 77]
     [格] 2175faa5f77d03252e
     改回之后工作区相对 HEAD：0 行 status
@@ -194,7 +194,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
 ──── h2 改回：不设 SINGLEFS_GATE_FULL ⇒ 干净工作树，改动范围那一问答「没碰」退 77
 $ bash .claude/gate.d/checker-tier-layer0-replay.sh
   ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间一个改动都没有（干净工作树；要重新验 HEAD 用 SINGLEFS_GATE_FULL=1）
-     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lock，判据见 scripts/change-touches-crates.sh。
+     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lock，判据见 scripts/gate/change-touches-crates.sh。
 [退出码 77]
     [格] 2175faa5f77d03252e
 ════ g1：只改判它的 54 号（文件末尾加一行注释），crates/ 不动
@@ -323,7 +323,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
 ──── h2 改回：不设 SINGLEFS_GATE_FULL ⇒ 干净工作树，改动范围那一问答「没碰」退 77
 $ bash .claude/gate.d/checker-tier-layer0-replay.sh
   ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间一个改动都没有（干净工作树；要重新验 HEAD 用 SINGLEFS_GATE_FULL=1）
-     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lock，判据见 scripts/change-touches-crates.sh。
+     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lock，判据见 scripts/gate/change-touches-crates.sh。
 [退出码 77]
     [格] ff7c9ca4e8c6ca9dbf
 ════ g1：只改判它的 54 号（文件末尾加一行注释），crates/ 不动

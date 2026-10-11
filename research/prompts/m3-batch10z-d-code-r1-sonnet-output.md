@@ -88,7 +88,7 @@
 
 C 那块盘（`pool_whose_newest_root_was_abandoned_by_a_crash_recovery`，C = 实例 2 的 txg 8，挂载那一刻记着 22 个落点）。探针 `h1_run`：可写挂载（故障关着，根环表记着 C 的 22 个落点），挂上之后故障开着，会话覆盖写 60 次、每 3 步跑一次 checker，C 离开根环（被这个进程的发布覆写）之后撤掉故障，再顺序写大文件写到 `NoSpaceAfterRaisingTheFloor`（写满），卸载，再跑 checker。命令：
 
-`CARGO_TARGET_DIR=… bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 cargo test --offline -p singlefs-harness --test k2d_probe -- --nocapture --test-threads 6 h1_ k23_baseline`（输出 `logs/probe-h1-c.log`，`test result: ok. 5 passed; … finished in 29.02s`）
+`CARGO_TARGET_DIR=… bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 6 cargo test --offline -p singlefs-harness --test k2d_probe -- --nocapture --test-threads 6 h1_ k23_baseline`（输出 `logs/probe-h1-c.log`，`test result: ok. 5 passed; … finished in 29.02s`）
 
 | 形 | 表里还记着 C 时空闲>0 的步 | 逐步 checker 首个违例 | 写后违例 | 卸载 | 卸载后违例 |
 |---|---|---|---|---|---|

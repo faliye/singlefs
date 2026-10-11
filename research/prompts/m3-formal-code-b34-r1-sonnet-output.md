@@ -380,7 +380,7 @@ $ cd /tmp/claude-1000/m3-formal-code-b34-r1-sonnet-rr/work && sha256sum -c …/c
 
 留着的是两个草稿目录里的日志与 `rows.json`（不是编译目录，也不是仓副本）。
 
-cite-check 末行（`python3 scripts/cite-check.py research/prompts/m3-formal-code-b34-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b34-r1/tree --root . --background research/prompts/_m3-formal-code-b34-r1-background.md`）：
+cite-check 末行（`python3 scripts/agents/cite-check.py research/prompts/m3-formal-code-b34-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b34-r1/tree --root . --background research/prompts/_m3-formal-code-b34-r1-background.md`）：
 ```
   ✓ 核了 33 处引文，对上 33 处，没判 0 处（逐处列在上面）
 ```

@@ -15,8 +15,8 @@ done
 TESTS="entries_after_mount_refuse_swapped_or_behind_devices fsync_drop_and_devices_without_the_selected_version acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration c245_r3_opus_probe"
 for arm in jia yij; do
   for t in $TESTS; do
-    (cd "$L/repo-$arm" && CARGO_TARGET_DIR="$L/target-$arm" nice -n 19 bash scripts/run-with-memory-cap.sh 8G \
-      bash scripts/capped.sh 4 cargo test --offline -p singlefs-harness --test "$t" -- --nocapture) > "$L/$arm-$t.log" 2>&1
+    (cd "$L/repo-$arm" && CARGO_TARGET_DIR="$L/target-$arm" nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G \
+      bash scripts/hosts/capped.sh 4 cargo test --offline -p singlefs-harness --test "$t" -- --nocapture) > "$L/$arm-$t.log" 2>&1
     echo "$arm $t exit $?"
   done
 done

@@ -133,7 +133,7 @@ clippy：在打了两个补丁的那棵树上跑 `cargo clippy --offline --keep-
 
 ## 五、证红
 
-`bash scripts/prove-red.sh --copy <副本> --memory 8G singlefs-harness <名…>` 跑了 4 行，原样末尾：
+`bash scripts/mutation/prove-red.sh --copy <副本> --memory 8G singlefs-harness <名…>` 跑了 4 行，原样末尾：
 
 ```text
 第9批 I-7.8 认领（F4）：认领之后一律只跳一槽（关掉按整单元跳，数据单元第二槽上的伪头又被数进出现过的树 ID）	抓到	a_node_header_forged_on_the_second_slot_of_a_file_unit_is_claimed_by_that_unit_and_the_watermark_invariant_holds 红了（日志 /tmp/claude-1000/m3-r1/batch9-checker/logs/prove-red/001.log）
@@ -194,9 +194,9 @@ clippy：在打了两个补丁的那棵树上跑 `cargo clippy --offline --keep-
 ## 七、要主 agent 跑的命令
 
 1. 打上之后（与别的会话那几处合在一起）先跑动到的 harness 档二进制，工作目录主仓，经 `run-with-memory-cap.sh 8G` 与 `capped.sh 10`：
-   `nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 10 cargo test --offline --no-fail-fast -p singlefs-harness --test checker_known_bad_images --test writable_mount_of_a_formatted_pool --test checker_narrow_invariants_and_abandoned_roots --test pool_checker_scan_of_tree_identifiers_claims_whole_units --test pool_checker_tree_identifier_birth_txg_agrees_across_every_readable_root --test pool_checker_gap_row_conditions_and_incomplete_reference_pairs`，再加 `cargo test -p singlefs-checker --lib`；看每个 `test result:` 行都是 `0 failed`。打了 `patch-item1` 的再加 `--test pool_checker_floor_raise_ceiling_takes_only_roots_inside_the_one_revolution_window`（4 条）。
+   `nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 10 cargo test --offline --no-fail-fast -p singlefs-harness --test checker_known_bad_images --test writable_mount_of_a_formatted_pool --test checker_narrow_invariants_and_abandoned_roots --test pool_checker_scan_of_tree_identifiers_claims_whole_units --test pool_checker_tree_identifier_birth_txg_agrees_across_every_readable_root --test pool_checker_gap_row_conditions_and_incomplete_reference_pairs`，再加 `cargo test -p singlefs-checker --lib`；看每个 `test result:` 行都是 `0 failed`。打了 `patch-item1` 的再加 `--test pool_checker_floor_raise_ceiling_takes_only_roots_inside_the_one_revolution_window`（4 条）。
 2. 没证的变异行（在主仓的一份副本上，打完补丁之后；每行约一分钟，前台 240 秒放得下四五行，要分几次或放后台）：
-   `nice -n 19 bash scripts/capped.sh 10 bash scripts/prove-red.sh --copy <副本> --memory 8G singlefs-harness <名…>`，名字是本目录 `mutations-append.tsv` 第 2–8、10–14、16–18、20 行的第一段（16 个），与 `patch-item1/mutations-append.tsv` 的 4 行（打了它的话）；看末行 `✓ 点名 N 条：跑了 N 条，跳过 0 条，跑的都抓到了`。
+   `nice -n 19 bash scripts/hosts/capped.sh 10 bash scripts/mutation/prove-red.sh --copy <副本> --memory 8G singlefs-harness <名…>`，名字是本目录 `mutations-append.tsv` 第 2–8、10–14、16–18、20 行的第一段（16 个），与 `patch-item1/mutations-append.tsv` 的 4 行（打了它的话）；看末行 `✓ 点名 N 条：跑了 N 条，跳过 0 条，跑的都抓到了`。
 3. GPU 一侧（9-3 交回之后）：`crates/singlefs-checker-tier/src/crash_judge_gpu.rs` 里把 I-9.28 的下标 68 补进内核覆盖表或「内核还没判」那张表（`POOL_CHECKER_INVARIANT_INDEXES_THE_KERNEL_DOES_NOT_JUDGE_YET`），否则 `--features gpu` 编不过；之后 `cargo clippy --all-targets --all-features -- -D warnings`（加 `CODE_DISCIPLINE_LINTS`）整仓那一遍。
 4. checker 档（提交时，`SINGLEFS_HEAVY_TESTS=commit`）：门禁 `checker-tier-layer0-replay` 快档与第八节点名的用例，`checker-tier-crates-mutation-replay` 整表。
 
@@ -212,7 +212,7 @@ clippy：在打了两个补丁的那棵树上跑 `cargo clippy --offline --keep-
 ## 九、额度、负载、草稿目录
 
 - 编译 / 测试的 cargo 调用按 Bash 调用数：run1（checker 库单测 + harness 首编，编不过一处）、run2、run3（乙的现场证据）、两次编攻方原型（乙、甲各一次；另有一次被内存包装以「超峰值理由不到 8 个字」退 251、命令没跑）、两次 clippy、一次合成的末尾验证（fmt + 两段测试 + build）、一次 prove-red，合计 10，到额度停下，所以第五节只证了 4 行。
-- 开跑前 `ps` 看到别的会话在跑看门狗 `scripts/watch.sh`、几条 cargo / rustc（我数到 7 个进程），没有 `qemu-system`、`fio`、`vm-bench.sh`、`e152-file-system-benchmark`；没等锁。
+- 开跑前 `ps` 看到别的会话在跑看门狗 `scripts/agents/watch.sh`、几条 cargo / rustc（我数到 7 个进程），没有 `qemu-system`、`fio`、`vm-bench.sh`、`e152-file-system-benchmark`；没等锁。
 - 草稿目录 `/tmp/claude-1000/m3-r1/batch9-checker/` 留着：`patch/`、`patch-item1/`、`logs/`（全部原样日志：`run1-*`、`run2-*`、`run3-*`、`final-*`、`clippy1.log`、`clippy2.log`、`protoA-build.log`、`protoB-build.log`、`prove-red-1.log`、`prove-red/`）、`fz/`（随机历史 22 份输出与跑法 `fz/batch.sh`、件说明 `specs.txt`、`specs-r3.txt`）、`walk.rs.literal-clause`（甲那一版 walk.rs，量随机历史用）、`walk.rs.variant-b`（乙那一版、没加注释之前）、`anchorcheck.py`（逐行核变异表原文在文件里恰好命中一次的小脚本）、`mut-merged*.tsv`（两棵树各自用的合并变异表）、`run1.sh`–`run3.sh`、`final.sh`。
 - 随机历史的产物没进 `research/results/`：我的写范围只到 `crates/`、`litmus/` 与草稿目录；要留就由主 agent 拷，路径在上一行。
 - 已删：三份仓副本（`tree`、`tree1`、`treeP`）连同各自的 `target`、两份做 diff 用的拷贝（`diffroot`、`diff2`）、一份原型二进制拷贝（`binB`）。

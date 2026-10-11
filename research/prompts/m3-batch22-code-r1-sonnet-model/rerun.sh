@@ -2,7 +2,7 @@
 # 正推腿 m3-batch22-code-r1 的探针重跑。
 # 用法：rerun.sh <空目录> [baseline|0..8|summary …]   不给后面的参数 = baseline、0..8 逐个跑完再 summary
 #   环境：SINGLEFS_REPO（仓路径，取脚本、cargo 配置与快照 sha256 清单）；FROZEN_TREE（冻结副本，默认 /tmp/claude-1000/m3-batch22-code-r1/tree）
-#   编译 6G、跑 4G、线程取环境变量 THREADS（默认 10），都经 scripts/run-with-memory-cap.sh；第一次调用把冻结副本拷进 <目录>/work 并核 12 份 sha256。
+#   编译 6G、跑 4G、线程取环境变量 THREADS（默认 10），都经 scripts/hosts/run-with-memory-cap.sh；第一次调用把冻结副本拷进 <目录>/work 并核 12 份 sha256。
 #   一项探针一次调用在整机负载高时要两分多钟，前台一次跑不完几项时分几次给序号，最后单独给 summary。
 # 比对：summary.txt 与本目录的 expected-summary.txt 逐字相同（run-one.sh 已把并行测试的行去了耗时、失败测试名排了序）。
 set -uo pipefail

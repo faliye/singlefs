@@ -2,9 +2,9 @@
 
 写于 2026-10-04，装置改之前、这一次的任何产物之前。**差分重跑**：臂、判据、门槛、作废与停机条款照上一次登记 `research/prompts/e157-r1-prereg.md`（sha256 `0d02d18083a9c5f5d295f29ce146605508c8d09abe977f1f8e5c7e84d1696c33`，第 1 次重跑，307 → 311）与它引的原登记 `research/prompts/e157-preregistration.md`。这里只写变了哪些输入、哪几格要重判、贴着旧值的锚点与变异怎么换；没写到的内容「同上一次登记」。只重跑第一段：第二段（C491）从未跑过、条款已由 D23 已定项 17 定案（同上一次登记文件头）。跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走。
 
-**装置写在哪（写死）：`scripts/experiments/e157_parallel_line_one_clauses.rs`（独立手写计数模型，不与 `crates/` 共用代码），不是入库装置。** 变异表 `scripts/mutations/e157_parallel_line_one_clauses.tsv`，复跑行 `scripts/replay.sh:193`（`E157|e157-parallel-line-one-clauses||e157-parallel-line-one-clauses-2026-09-25-h311-replay.out|exact`）。
+**装置写在哪（写死）：`scripts/experiments/e157_parallel_line_one_clauses.rs`（独立手写计数模型，不与 `crates/` 共用代码），不是入库装置。** 变异表 `scripts/mutation/tables/e157_parallel_line_one_clauses.tsv`，复跑行 `scripts/experiments/replay.sh:193`（`E157|e157-parallel-line-one-clauses||e157-parallel-line-one-clauses-2026-09-25-h311-replay.out|exact`）。
 
-**准入**：`python3 scripts/admission.py experiment /home/fy5090/code/singlefs E157` 退 2（准入登记里没有实验键 E157），不是 77。
+**准入**：`python3 scripts/gate/admission.py experiment /home/fy5090/code/singlefs E157` 退 2（准入登记里没有实验键 E157），不是 77。
 
 ## 一、问题
 
@@ -22,7 +22,7 @@
 **出处 `research/prompts/m3-r1-batch9-reruns-questions.md:17-17`（整段抄，未转述）**
 
 ```markdown
-| 4 | E116、E43、E49、E16、E157 | `scripts/experiments/` 下 e116、e157、e16、e43、e49 的源码里还有 311 / 188 / 67 旧值（删除与并发那条线跑 format-constants 的输出 `/tmp/claude-1000/m3-writeback2/format-constants.out`）：换成今天的值之后，各自的产物与正文引的数是否变 | 产物与 `scripts/replay.sh` 登记的 exact 产物不再逐字相同 | 每个都改完、复跑、与登记产物比过，变了的出新产物并回对正文 | 开着 |
+| 4 | E116、E43、E49、E16、E157 | `scripts/experiments/` 下 e116、e157、e16、e43、e49 的源码里还有 311 / 188 / 67 旧值（删除与并发那条线跑 format-constants 的输出 `/tmp/claude-1000/m3-writeback2/format-constants.out`）：换成今天的值之后，各自的产物与正文引的数是否变 | 产物与 `scripts/experiments/replay.sh` 登记的 exact 产物不再逐字相同 | 每个都改完、复跑、与登记产物比过，变了的出新产物并回对正文 | 开着 |
 ```
 
 这份登记只回答第 4 行里的 E157。每个量对应第 4 行的翻面观测（产物与登记的 exact 产物不再逐字相同）或够判条件（改完、复跑、比过、变了的出新产物并回对正文）。
@@ -39,7 +39,7 @@
 
 ## 二、被测条款与它引的定义
 
-上一次登记 2.1 抄的是 311 那一版的 D23 已定项 4 / 17。这一次用 `scripts/quote-kb.py` 重抄：D23 已定项 4（被测条款），与实验页 `### 影响的决策` 表点名分项的每一条：D23 已定项 12、17，D8 已定项 3、11。表里的 D9（加密）没有分项，不抄。产物 `/tmp/claude-1000/m3-r1/batch9-row4-design/e157-q.md`（5 段，回读逐字节一致），整份追加如下。原登记第二节抄过的其余条款（D16、数据这一侧、extent 树）不读点名项数，不重抄。
+上一次登记 2.1 抄的是 311 那一版的 D23 已定项 4 / 17。这一次用 `scripts/kb/quote-kb.py` 重抄：D23 已定项 4（被测条款），与实验页 `### 影响的决策` 表点名分项的每一条：D23 已定项 12、17，D8 已定项 3、11。表里的 D9（加密）没有分项，不抄。产物 `/tmp/claude-1000/m3-r1/batch9-row4-design/e157-q.md`（5 段，回读逐字节一致），整份追加如下。原登记第二节抄过的其余条款（D16、数据这一侧、extent 树）不读点名项数，不重抄。
 
 **出处 `.claude/kb/decisions/23-journal的角色与格式.md:148-177`（整段抄，未转述）**
 
@@ -237,7 +237,7 @@
 
 同上一次登记第五节，只换：
 
-- **两个被判的取值**：`H = 311`（装置一个字节不改，`bash scripts/replay.sh E157` 现跑；做完会怎样：与登记产物逐字节一致，S1 核）与 `H = 487`（只按第三节 3.2 改，重出产物；做完会怎样：锚点行 `a1_named_entries_per_record=` 与 `b2_named_entries_per_record_check=` 由 67 变 64，其余行逐字节不变——前半句由命令一的算术推出，后半句由「第一段判定格不读点名项数」推出，都由 Q157.1、Q157.4 在产物上核）。
+- **两个被判的取值**：`H = 311`（装置一个字节不改，`bash scripts/experiments/replay.sh E157` 现跑；做完会怎样：与登记产物逐字节一致，S1 核）与 `H = 487`（只按第三节 3.2 改，重出产物；做完会怎样：锚点行 `a1_named_entries_per_record=` 与 `b2_named_entries_per_record_check=` 由 67 变 64，其余行逐字节不变——前半句由命令一的算术推出，后半句由「第一段判定格不读点名项数」推出，都由 Q157.1、Q157.4 在产物上核）。
 - **P3（单测看得见点名项数这条通道）**改成：第七节 B8 那条纯函数单测在 456 / 457 / 512 / 513 四点上钉 65 / 64 / 64 / 63，由第九节 M17、M18 证明会红。上一次的 P3 靠 M15、M16，它们今天撞第 75 行编不过（第四节末行），不再能当阳性对照。
 - **P4（单测分得开新旧两代）**改成：余数单测（B7，25）由 M19（`H` 487 → 488，同档内挪一字节）证明会红；`H` 退回 311 那一代会让每条项数变 67，由第 75 行的编译期断言与 `== 64` 那条单测挡住，不经 `mutate.sh`。
 - P0（原登记第一段的对照 P1 / P2a / P2b）照旧，两个取值各跑一次。
@@ -285,7 +285,7 @@
 
 ## 九、变异
 
-**先后**：改装置之前在今天的源码上跑 `bash scripts/mutate.sh e157-parallel-line-one-clauses scripts/experiments/e157_parallel_line_one_clauses.rs scripts/mutations/e157_parallel_line_one_clauses.tsv`，留日志；改完再跑一遍。两次各按七个符号分栏数。M1–M6、M13（锚点都不含头宽）两次的状态必须相同，任一条变差 ⇒ V7。
+**先后**：改装置之前在今天的源码上跑 `bash scripts/mutation/mutate.sh e157-parallel-line-one-clauses scripts/experiments/e157_parallel_line_one_clauses.rs scripts/mutation/tables/e157_parallel_line_one_clauses.tsv`，留日志；改完再跑一遍。两次各按七个符号分栏数。M1–M6、M13（锚点都不含头宽）两次的状态必须相同，任一条变差 ⇒ V7。
 
 | 条 | 怎么改表 | 在哪个取样点上改变输出 | 谁该红 |
 |---|---|---|---|
@@ -304,7 +304,7 @@
 
 ### 作废
 
-原登记十一·甲 V1–V5、上一次登记的 V1、V7 照旧。V2 改成：M17 或 M18「没红」，或 M19「没红」（单测看不见点名项数这条通道，或分不开同一档里的两个头宽）。另加 V8：改完之后 `bash scripts/replay.sh E157` 对新产物不逐字节一致（确定性模型有隐藏状态）。
+原登记十一·甲 V1–V5、上一次登记的 V1、V7 照旧。V2 改成：M17 或 M18「没红」，或 M19「没红」（单测看不见点名项数这条通道，或分不开同一档里的两个头宽）。另加 V8：改完之后 `bash scripts/experiments/replay.sh E157` 对新产物不逐字节一致（确定性模型有隐藏状态）。
 
 ### 停机（两边都查，写进报告交回）
 
@@ -317,7 +317,7 @@
 ### 出新产物、改登记行
 
 - 产物名：`research/results/e157-parallel-line-one-clauses-<跑的那天，TZ=Asia/Tokyo date +%F>-h487.out`（旧名里的 `h311-replay` 换成 `h487`）；旧产物留着，不覆盖。
-- `scripts/replay.sh:193` 只改第 4 栏，成 `E157|e157-parallel-line-one-clauses||e157-parallel-line-one-clauses-<日期>-h487.out|exact`。
+- `scripts/experiments/replay.sh:193` 只改第 4 栏，成 `E157|e157-parallel-line-one-clauses||e157-parallel-line-one-clauses-<日期>-h487.out|exact`。
 - Q157.4 判「产物不变」时（按推导不该发生）不出新产物、登记行不动，先查 Q157.1。
 
 ### 够判停机
@@ -343,9 +343,9 @@
 | `.claude/rules/mutation-sampling.md` | 1–96（全文） |
 | `.claude/rules/implementation-first.md` | 1–20（全文） |
 | `.claude/rules/format-evolution.md` | 1–81（全文） |
-| `scripts/replay.sh` | 1–60 里的注释行；`grep -nE '^(E116\|E157\|E16\|E43\|E49)[A-Z0-9]*\|'` 命中 77、91、140、156–160、193 |
+| `scripts/experiments/replay.sh` | 1–60 里的注释行；`grep -nE '^(E116\|E157\|E16\|E43\|E49)[A-Z0-9]*\|'` 命中 77、91、140、156–160、193 |
 | `.claude/gate.d/stage-inputs.tsv` | 1–30 的注释行；`grep -nE '^(E116\|E157\|E16\|E16R5\|E43\|E49)\b'` 零命中 |
-| `scripts/quote-kb.py`、`scripts/replace-once.py` | 文件头注释（1–30） |
+| `scripts/kb/quote-kb.py`、`scripts/kb/replace-once.py` | 文件头注释（1–30） |
 
 ### 13.2 派发给的输入与上一次登记
 
@@ -380,9 +380,9 @@
 | `scripts/experiments/e16_journal.rs` | `grep -nwE` 旧值，命中 915 |
 | `scripts/experiments/e43_extension_point_budget.rs` | 140–182；196–252；440–475；590–641；`grep` 命中各行（含 `mount_verdict(` 的 193、439、649、651、656、671–682） |
 | `scripts/experiments/e49_chain_width.rs` | 32、35、70–76、104–146；276–292；600–643 的 `grep` 命中；`grep` 命中各行 |
-| `scripts/mutations/e116_pack_settle.tsv`、`e157_parallel_line_one_clauses.tsv`、`e49_chain_width.tsv` | 全文（截前 160–220 字） |
-| `scripts/mutations/e43_extension_point_budget.tsv` | 第一栏全文；`grep` 命中 16、19、20、21 |
-| `scripts/mutations/e16_fifth_run_peak_under_today_widths.tsv` | 第一栏全文 |
+| `scripts/mutation/tables/e116_pack_settle.tsv`、`e157_parallel_line_one_clauses.tsv`、`e49_chain_width.tsv` | 全文（截前 160–220 字） |
+| `scripts/mutation/tables/e43_extension_point_budget.tsv` | 第一栏全文；`grep` 命中 16、19、20、21 |
+| `scripts/mutation/tables/e16_fifth_run_peak_under_today_widths.tsv` | 第一栏全文 |
 
 ### 13.5 `crates/`
 
@@ -396,16 +396,16 @@
 ### 13.6 五份共用的命令（原样；读文件的 `sed` / `awk` / `grep -n` 已按行列在上面）
 
 ```
-for e in E116 E157 E16 E43 E49; do nice -n 19 timeout 60 python3 scripts/admission.py experiment /home/fy5090/code/singlefs $e; echo "exit=$?"; done
+for e in E116 E157 E16 E43 E49; do nice -n 19 timeout 60 python3 scripts/gate/admission.py experiment /home/fy5090/code/singlefs $e; echo "exit=$?"; done
   # 五个都是「✗ 准入登记里没有实验键 E…（.claude/gate.d/stage-inputs.tsv）」、exit=2
-nice -n 19 python3 scripts/quote-kb.py /tmp/claude-1000/m3-r1/batch9-row4-design/qrow4.md 'research/prompts/m3-r1-batch9-reruns-questions.md:12-13' 'research/prompts/m3-r1-batch9-reruns-questions.md:17-17'
+nice -n 19 python3 scripts/kb/quote-kb.py /tmp/claude-1000/m3-r1/batch9-row4-design/qrow4.md 'research/prompts/m3-r1-batch9-reruns-questions.md:12-13' 'research/prompts/m3-r1-batch9-reruns-questions.md:17-17'
   # ✓ 2 段整抄进 …/qrow4.md，回读逐字节一致（同名文件先前一次取错行区间，删掉重抄）
-nice -n 19 python3 scripts/quote-kb.py <草稿目录>/e116-q.md / e157-q.md / e16-q.md / e43-q.md / e49-q.md '<文件>@#### 已定项 N：…' …
+nice -n 19 python3 scripts/kb/quote-kb.py <草稿目录>/e116-q.md / e157-q.md / e16-q.md / e43-q.md / e49-q.md '<文件>@#### 已定项 N：…' …
   # 五次都是「✓ N 段整抄进 …，回读逐字节一致」、exit=0（8 / 5 / 8 / 14 / 4 段）
 git log -L75,75:scripts/experiments/e157_parallel_line_one_clauses.rs --format='%h %ad %s' --date=short
 git blame -L75,75 scripts/experiments/e157_parallel_line_one_clauses.rs      # 7a3c8e1e9 2026-09-27
 git blame -L887,887 scripts/experiments/e16_fifth_run_peak_under_today_widths.rs   # dbcc0d2f5 2026-09-28
-sha256sum scripts/experiments/{e116_pack_settle,e157_parallel_line_one_clauses,e16_fifth_run_peak_under_today_widths,e16_journal,e43_extension_point_budget,e49_chain_width}.rs scripts/mutations/{e116_pack_settle,e157_parallel_line_one_clauses,e16_fifth_run_peak_under_today_widths,e43_extension_point_budget,e49_chain_width}.tsv
+sha256sum scripts/experiments/{e116_pack_settle,e157_parallel_line_one_clauses,e16_fifth_run_peak_under_today_widths,e16_journal,e43_extension_point_budget,e49_chain_width}.rs scripts/mutation/tables/{e116_pack_settle,e157_parallel_line_one_clauses,e16_fifth_run_peak_under_today_widths,e43_extension_point_budget,e49_chain_width}.tsv
   # 装置依次 9417153e… 、b96446b8… 、44bbffd5… 、95dbf822… 、db61f951… 、8eb13c71…；变异表依次 211b8b33… 、01f7f81d… 、8d9abf0c… 、6df56d56… 、ad74fb9c…
 sha256sum crates/singlefs-format/src/lib.rs      # bf4f9982490a7d30a4577547779c5061d76b211096cc42a8db71d45936b4835f
 TZ=Asia/Tokyo date +%F                           # 2026-10-04

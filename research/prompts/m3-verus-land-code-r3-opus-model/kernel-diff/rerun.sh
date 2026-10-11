@@ -16,9 +16,9 @@ marker = '    "crates/singlefs-checker-tier",\n]'
 assert text.count(marker) == 1
 open(path, "w", encoding="utf-8").write(text.replace(marker, '    "crates/singlefs-checker-tier",\n    "crates/r3-attack-kernel-diff",\n]', 1))
 PY
-( cd "$tree" && nice -n 19 bash "$repo/scripts/capped.sh" 10 cargo build --offline --release -p r3-attack-kernel-diff )
+( cd "$tree" && nice -n 19 bash "$repo/scripts/hosts/capped.sh" 10 cargo build --offline --release -p r3-attack-kernel-diff )
 for family_arguments in "exhaustive 0 0" "random 5000000 1" "chain 5000000 2" "drops 5000000 3"; do
     set -- $family_arguments
-    nice -n 19 bash "$repo/scripts/run-with-memory-cap.sh" 512M bash "$repo/scripts/capped.sh" 10 \
+    nice -n 19 bash "$repo/scripts/hosts/run-with-memory-cap.sh" 512M bash "$repo/scripts/hosts/capped.sh" 10 \
         "$tree/target/release/r3-attack-kernel-diff" "$1" "$2" "$3" 10 > "$out/$1.txt" 2> "$out/$1.err"
 done

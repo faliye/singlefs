@@ -8,6 +8,6 @@ root="$(cd "$here/../../.." && pwd)"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="派发提示指定上限 8G，模型目录小模型"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-1500}"
 for m in b1_kind_vs_id b2_container_numbers b4_queue_and_capacity b5_tombstone_growth b6_ring_window b7_tombstone_prepay b8_publish_counts; do
-    nice -n 19 bash "$root/scripts/capped.sh" 15 bash "$root/scripts/run-with-memory-cap.sh" 8G \
+    nice -n 19 bash "$root/scripts/hosts/capped.sh" 15 bash "$root/scripts/hosts/run-with-memory-cap.sh" 8G \
         python3 "$here/$m.py" 2>&1 | grep -v '^run-with-memory-cap:' > "$out/$m.out"
 done

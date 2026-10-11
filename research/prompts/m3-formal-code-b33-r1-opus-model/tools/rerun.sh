@@ -14,7 +14,7 @@ cap="${CAP:-10}"; memory="${MEMORY:-8G}"
 out="$work/out"; mkdir -p "$out"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-攻方副本独立编译目录从零编，派发提示给的显式上限 8G}"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-三方攻方腿复跑各跑各的副本}"
-wrap() { nice -n 19 bash "$repo/scripts/run-with-memory-cap.sh" "$memory" bash "$repo/scripts/capped.sh" "$cap" "$@"; }
+wrap() { nice -n 19 bash "$repo/scripts/hosts/run-with-memory-cap.sh" "$memory" bash "$repo/scripts/hosts/capped.sh" "$cap" "$@"; }
 fresh() { rm -rf "$work/$1"; mkdir -p "$work/$1"; rsync -a "$frozen/" "$work/$1/tree/"; ( cd "$frozen" && sha256sum -c ../crates-sha256.txt >/dev/null ) || echo "RERUN 冻结副本 sha256 对不上：$frozen" >&2; }
 compiled() { grep -c "Compiling $2" "$1"; }
 for step in "${steps[@]}"; do

@@ -21,14 +21,14 @@ for m in $(cut -f1 "$out/h2-mutants.list"); do printf '%s\t' "$m" >> "$out/h2-sw
 bash "$here/exp1-marker-check.sh" "$frozen" "$work" > "$out/exp1-marker-check.txt" 2>&1
 # H1 第 7 条：结局组合
 mkdir -p "$work/h1-7"; awk 'NR>=344 && NR<=443' "$base/.claude/gate.d/checker-tier-broad-mutation.sh" > "$work/h1-7/gate_verdict.py"
-python3 "$here/h1-7-combos.py" "$base/scripts/broad-mutation.py" "$work/h1-7/gate_verdict.py" "$work/h1-7" 400 20261003 > "$out/h1-7-combos-400.txt" 2>&1
-python3 "$here/h1-7-combos.py" "$base/scripts/broad-mutation.py" "$work/h1-7/gate_verdict.py" "$work/h1-7" 5000 7 > "$out/h1-7-combos-5000.txt" 2>&1
+python3 "$here/h1-7-combos.py" "$base/scripts/mutation/broad-mutation.py" "$work/h1-7/gate_verdict.py" "$work/h1-7" 400 20261003 > "$out/h1-7-combos-400.txt" 2>&1
+python3 "$here/h1-7-combos.py" "$base/scripts/mutation/broad-mutation.py" "$work/h1-7/gate_verdict.py" "$work/h1-7" 5000 7 > "$out/h1-7-combos-5000.txt" 2>&1
 # H1 第 5 条旁支：全局键对哪些编译配置不变
 mkdir -p "$work/h1-5"; python3 "$here/h1-5-env-gap.py" "$base" "$work/h1-5" > "$out/h1-5-env-gap.txt" 2>&1
 # 只读：真库此刻那一版的全局键照门禁算法现算
-python3 "$here/h1-5-real-key.py" "$frozen/scripts/broad-mutation.py" "$frozen" "${SINGLEFS_BROAD_MUTATION_HOME:-$HOME/.local/share/singlefs/broad-mutation}" > "$out/h1-5-real-key.txt" 2>&1
+python3 "$here/h1-5-real-key.py" "$frozen/scripts/mutation/broad-mutation.py" "$frozen" "${SINGLEFS_BROAD_MUTATION_HOME:-$HOME/.local/share/singlefs/broad-mutation}" > "$out/h1-5-real-key.txt" 2>&1
 # 排除表读工作区那一份
 probe="$work/exp2"; rm -rf "${probe:?}"; mkdir -p "$probe"; cp -al "$base/." "$probe/"; git -C "$probe" init -q .; git -C "$probe" add -A
-f="$probe/scripts/broad-mutation-ignored-exclusions.tsv"; cp "$f" "$f.new"; printf 'singlefs-harness::x some_case\t工作区里加的一行（没暂存）\n' >> "$f.new"; mv "$f.new" "$f"
+f="$probe/scripts/mutation/broad-mutation-ignored-exclusions.tsv"; cp "$f" "$f.new"; printf 'singlefs-harness::x some_case\t工作区里加的一行（没暂存）\n' >> "$f.new"; mv "$f.new" "$f"
 python3 "$here/exp2-probe.py" "$probe" > "$out/exp2-probe.txt" 2>&1
 echo "done"

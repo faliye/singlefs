@@ -10,13 +10,13 @@
 
 ```
 # ① 闭包探针：七棵树（原样、内核由 GPU 判器引、再改内核一个字、内核只由流水线引、读故障态测试改每步 checker、crash.rs 纯搬家、crash.rs 对调两边）
-bash scripts/run-with-memory-cap.sh 2G nice -n 19 bash scripts/capped.sh 6 \
+bash scripts/hosts/run-with-memory-cap.sh 2G nice -n 19 bash scripts/hosts/capped.sh 6 \
   bash research/prompts/m3-run-compare-split-r2-opus-model/run_probe.sh <副本根> <草稿目录>
 # ② 双机按块亲和：两趟权重之间块换归属的比例（纯 Python，自带两组钉值自证）
 python3 -I research/prompts/m3-run-compare-split-r2-opus-model/weighted_shares_drift.py 136700,45275 140427,62390 642805,291558
 python3 -I research/prompts/m3-run-compare-split-r2-opus-model/weighted_shares_drift.py 136700,45275 136701,45275 273400,90550
 # ③ 随机历史写表长度：BROAD 比重、两块 4 GiB 盘、144 步，种子偏移 0–35（我分 8 件并行跑，每件 3 或 6 个种子）
-bash scripts/run-with-memory-cap.sh 4G nice -n 19 bash scripts/capped.sh 6 \
+bash scripts/hosts/run-with-memory-cap.sh 4G nice -n 19 bash scripts/hosts/capped.sh 6 \
   bash research/prompts/m3-run-compare-split-r2-opus-model/run_history_writes.sh <副本根> <草稿目录> 0 36 144
 # ④ 层 0 切片与判定库块对不对得齐（纯 Python）
 python3 -I research/prompts/m3-run-compare-split-r2-opus-model/layer0_slices.py multi-record-layer0-domain=1358954634 delete-30=1448083638 fixed-unmount-28=1610875015
@@ -252,7 +252,7 @@ OWNER_DRIFT kind=pipeline before=136700,45275 after=273400,90550 blocks=39917 mo
 
 真权重三组两两之间 40–43% 的块换主；一台的权重只差 1，给定状态表就有 38% 换主（指纹取模，总和一变整片重排），流水线 5.5%；比例相同、总和翻倍的一组 0%。
 改动序列：跑一趟全量（两台各录各比、只拷结论）→ 改一个判器内核（结论版本换、录入版本不换，这是拆两段要买的那一样）→ 再跑：权重重量过，四成的块落到另一台，那一台没有它们的录入（只拷了结论），只能重跑 Rust 恢复两遍。按第一轮攻方 D2 的参考数（每态 160–723 µs、26.16 亿态 116–525 线程时），四成就是 46–210 线程时的重录（算的，参考数是旧树）。
-「或列族」那一读法另撞一处：双机驱动每趟把本机整份库目录拷给第二台（`scripts/crash-amplification-two-hosts.sh:1040`「cp -a -- "$local_library" "$library_for_peer" || two_hosts_break_is ignore-snapshot-failure || { echo "  ✗ 拷不了库的快照给第二台" >&2; echo "  → 怎么办：看 $run_directory 可不可写" >&2; exit 2; }」；副本同一行在 `:1031`）。录入放同一个 RocksDB 的另一个列族，目录一拷就整份带走——第一轮 D1 那一格（每项拷整份库）原样回来。只有「另起一份库、放在这个目录之外」那一读法过得去。
+「或列族」那一读法另撞一处：双机驱动每趟把本机整份库目录拷给第二台（`scripts/crash/crash-amplification-two-hosts.sh:1040`「cp -a -- "$local_library" "$library_for_peer" || two_hosts_break_is ignore-snapshot-failure || { echo "  ✗ 拷不了库的快照给第二台" >&2; echo "  → 怎么办：看 $run_directory 可不可写" >&2; exit 2; }」；副本同一行在 `:1031`）。录入放同一个 RocksDB 的另一个列族，目录一拷就整份带走——第一轮 D1 那一格（每项拷整份库）原样回来。只有「另起一份库、放在这个目录之外」那一读法过得去。
 用户动作放开扫：单机——不中；双机、权重写死（`SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS` 由调用方给定）——不中；双机、照驱动每趟重量——中；只改结论种类不碰内核的提交——同样中（结论版本换了就要重比）。
 四句：分辨臂——分（「按块亲和 + 权重每趟重量」对「归属钉在录入那一刻、记进库」或「录入随块走」）；系统看得到——分块那一刻看得到这一块的录入在不在本机库里，今天不看；分句——第 5 问「双机分片在新形态下怎么走」，连同第 3 问「做不成」；跑前改法——第 4 条只有这一种亲和法。
 改法（推的，零轮）：录入那一刻把「这一块归哪台」写进库（块属性），之后的对比照这张表分，不再按当趟权重重分；权重只管还没录的块。或者权重量一次写进多机配置、改了才重排（代价：两台速度变了分得不匀）。
@@ -313,7 +313,7 @@ OWNER_DRIFT kind=pipeline before=136700,45275 after=273400,90550 blocks=39917 mo
 
 ### 三.1 N1 `layer0_progress` 的双机分片按片、判定库按块，对不齐（做不成，算的）
 
-层 0 那一路的双机是按切片交错分：`crates/singlefs-checker-tier/src/layer0_progress.rs:15`「//! `slice_index % n == i` 的那些片，跑完把这些片的片行写成这一片的账本（与进度文件同一种片行，另加文件头、片的线程行与收尾行）；」（主工作区与副本相同），片长只看态数（`/home/fy5090/.local/share/singlefs/work/m3-merge-impl/e5/repo/crates/singlefs-checker-tier/src/crash.rs:2537`「const LAYER0_RESUMABLE_SLICE_COUNT: u64 = 65_536;」，片长 = ⌈态数 ÷ 65536⌉，至少 16）；入口也照这条走（`scripts/crash-point-replay.sh:6` 的长活声明「登记了 shard=across-machines 的用例按多机配置两台各跑一片」）。判定库一块是 `/home/fy5090/.local/share/singlefs/work/m3-merge-impl/e5/repo/crates/singlefs-checker-tier/src/crash_amplification.rs:153`「pub const STATES_PER_BLOCK: u64 = 1 << 16;」。
+层 0 那一路的双机是按切片交错分：`crates/singlefs-checker-tier/src/layer0_progress.rs:15`「//! `slice_index % n == i` 的那些片，跑完把这些片的片行写成这一片的账本（与进度文件同一种片行，另加文件头、片的线程行与收尾行）；」（主工作区与副本相同），片长只看态数（`/home/fy5090/.local/share/singlefs/work/m3-merge-impl/e5/repo/crates/singlefs-checker-tier/src/crash.rs:2537`「const LAYER0_RESUMABLE_SLICE_COUNT: u64 = 65_536;」，片长 = ⌈态数 ÷ 65536⌉，至少 16）；入口也照这条走（`scripts/crash/crash-point-replay.sh:6` 的长活声明「登记了 shard=across-machines 的用例按多机配置两台各跑一片」）。判定库一块是 `/home/fy5090/.local/share/singlefs/work/m3-merge-impl/e5/repo/crates/singlefs-checker-tier/src/crash_amplification.rs:153`「pub const STATES_PER_BLOCK: u64 = 1 << 16;」。
 算的（`layer0_slices.py`，`outputs/layer0-slices.out` 原样）：
 
 ```
@@ -329,7 +329,7 @@ LAYER0_SLICE item=fixed-unmount-28 states=1610875015 states_per_slice=24581 bloc
 
 ### 三.2 N2 判红钉回快档：按历史键钉会漂，只在 GPU 上红的复判不出（推的）
 
-今天还一条都没钉（`scripts/crash-point-replay.sh:169`「PINNED_RED_EXAMPLES_NOT_RUN_REASON="崩溃点重放还没有钉表：全量出的红要钉回快档（test-script-discipline.md「全量的红，钉回快档」），今天一条都没钉"」），两段形态是第一次定钉法的地方。规则要「钉完核一次：在出红的那份代码上，钉住的用例同样红，红在同一条断言上」（`.claude/singlefs-ai-sop/rules/test-script-discipline.md:87`）。两处会断：
+今天还一条都没钉（`scripts/crash/crash-point-replay.sh:169`「PINNED_RED_EXAMPLES_NOT_RUN_REASON="崩溃点重放还没有钉表：全量出的红要钉回快档（test-script-discipline.md「全量的红，钉回快档」），今天一条都没钉"」），两段形态是第一次定钉法的地方。规则要「钉完核一次：在出红的那份代码上，钉住的用例同样红，红在同一条断言上」（`.claude/singlefs-ai-sop/rules/test-script-discipline.md:87`）。两处会断：
 1. 随机历史两项的红，顺手的钉法是钉历史键（项、种子与规模、序号）。R1 已说明这把键不按内容：生成器、比重、执行参数、取历史的判据一变，同一把键指到另一段历史，钉住的「回归」悄悄换了输入。要钉内容（基线摘要、写表、持久集合，即 `0F`/`13` 的那几行），而 `13` 只在全量那份库里，快档用的是一趟一建、跑完就删的空库（`crash-point-replay.sh` 文件头「两个域的写法」）——钉表要自带写内容，体量没算。
 2. P1–P3 那一类红（GPU 恢复与 Rust 录入比不上）是内核与 Rust 之间的分歧，不开 GPU 的轻型只有 CPU 判那一路，复判时根本不走那一条比较：在出红的那份代码上照样绿，「红在同一条断言上」核不了。要写明这一类钉进「开 GPU 才判、没开报本次未跑」的那一组（今天 `BOTH_TIERS_GROUPS` 有 GPU 对拍一类）。
 四句：分辨臂——分（「钉历史键」对「钉内容」）；系统看得到——钉的那一刻看得到写表；分句——第 5 问「判红钉回快档」；跑前改法——无。
@@ -342,8 +342,8 @@ LAYER0_SLICE item=fixed-unmount-28 states=1610875015 states_per_slice=24581 bloc
 
 - 续跑：同一条命令停了再起，结论按（块键，种类，版本）复用、录入按（键，种类，录入版本）复用，两层各自续；没 GPU 时「等数据跑完再对比」，录了没比的块下一趟照录入复用、只补比。没造出续跑独有的错；R1 那一格在续跑上照样中（续跑就是「录过的不再跑」）。
 - `import_from`：今天照抄录入表、路径、事实、核对、判法版本与结论块（副本 `verdict_store.rs:1566` 那个函数）；第 4 条「只拷结论」只要它不导新录入表，能做到。打中的是「或列族」撞整份 `cp -a`（R8），不是这个函数。
-- 变异表：`crates/mutations.tsv` 改 `*.wgsl` 的有 236 行、改流水线三份停止文件（`crash_amplification.rs`、`crash_judge_dispatch.rs`、`verdict_store.rs`）的有 159 行（`awk -F'\t'` 按第二栏数）。按覆盖复用那一层把 `include_str!` 读的文件算函数外：`scripts/crates-mutation-rows.py:98`「编进去的其余文件（include_str! 读的、proc-macro 与构建脚本单元的、删掉了的）一律算函数外；」——改 WGSL 照现跑，新内核同样。变异复跑那三份脚本（`mutate.sh`、门禁阶段、`crates-mutation-rows.py`）都不设也不清 `SINGLEFS_CRASH_AMPLIFICATION_*`（`grep -c` 三份都是 0），没设时引擎用一趟一删的临时库，不跨趟复用录入；调用方环境里带着这个变量时会被继承，那时同 R1、R3 的复用照样发生，这一条我没核。
-- 广谱变异：`scripts/broad-mutation.py` 里没有点名判定库或崩溃放量入口的跑法（`grep` 只命中一行 `gate-similar` 注释），不经两段形态的复用。没打中。
+- 变异表：`crates/mutations.tsv` 改 `*.wgsl` 的有 236 行、改流水线三份停止文件（`crash_amplification.rs`、`crash_judge_dispatch.rs`、`verdict_store.rs`）的有 159 行（`awk -F'\t'` 按第二栏数）。按覆盖复用那一层把 `include_str!` 读的文件算函数外：`scripts/mutation/crates-mutation-rows.py:98`「编进去的其余文件（include_str! 读的、proc-macro 与构建脚本单元的、删掉了的）一律算函数外；」——改 WGSL 照现跑，新内核同样。变异复跑那三份脚本（`mutate.sh`、门禁阶段、`crates-mutation-rows.py`）都不设也不清 `SINGLEFS_CRASH_AMPLIFICATION_*`（`grep -c` 三份都是 0），没设时引擎用一趟一删的临时库，不跨趟复用录入；调用方环境里带着这个变量时会被继承，那时同 R1、R3 的复用照样发生，这一条我没核。
+- 广谱变异：`scripts/mutation/broad-mutation.py` 里没有点名判定库或崩溃放量入口的跑法（`grep` 只命中一行 `gate-similar` 注释），不经两段形态的复用。没打中。
 - e161 装置：调旧引擎（第一轮 A4）；第 6 条留旧引擎到 e161 有去处，它照旧编得过、量的仍是旧引擎。它的产物是第一轮 D2 的 CPU 参考数来源，拆两段之后不再代表录入段的速率（M1 要另量，第一轮已写）。
 
 ## 没打中的形状

@@ -311,7 +311,7 @@ K2-1「崩溃恢复抛弃段里写的容器」的层 0 全量（一次回退那�
 - 命令（仓根 `/home/fy5090/code/singlefs`）：
 ```
 OPUS_WINDOW=rollback OPUS_THREADS=<N> OPUS_STATE_CAP=1100000 CARGO_TARGET_DIR=<工作目录>/target-base \
-  bash scripts/capped.sh <N> bash scripts/run-with-memory-cap.sh 10G \
+  bash scripts/hosts/capped.sh <N> bash scripts/hosts/run-with-memory-cap.sh 10G \
   cargo test --offline --release -p opus-probe-b56 --test k2_crash_abandoned -- --nocapture
 ```
 （`OPUS_STATE_CAP` 默认 10⁶，这个窗口 1 048 588 态，要放到 110 万才跑；枚举器自己的工作线程数读 `SINGLEFS_LAYER0_THREADS`（`crates/singlefs-checker-tier/src/crash.rs` 里 `LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE`），`OPUS_THREADS` 只管挂载与续写那一段。）

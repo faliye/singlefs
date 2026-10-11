@@ -33,7 +33,7 @@ SINGLEFS_REPO=~/.local/share/singlefs/work/m3-batch31-code-r1/tree SINGLEFS_TOOL
 bash research/prompts/m3-batch31-code-r1-opus-model/compare.sh <工作目录>   # 末行 SAME 1349 行
 ```
 
-- `SINGLEFS_TOOLS` 是包装脚本另给的变量（冻结副本里没有 `research/`），写在 `rerun.sh` 文件头。编译 6G、跑 4G 经 `scripts/run-with-memory-cap.sh`，线程经 `scripts/capped.sh`（`THREADS`，默认 10）；每条臂自己的编译目录 `<工作目录>/target-<臂>`；一条一条起 cargo。
+- `SINGLEFS_TOOLS` 是包装脚本另给的变量（冻结副本里没有 `research/`），写在 `rerun.sh` 文件头。编译 6G、跑 4G 经 `scripts/hosts/run-with-memory-cap.sh`，线程经 `scripts/hosts/capped.sh`（`THREADS`，默认 10）；每条臂自己的编译目录 `<工作目录>/target-<臂>`；一条一条起 cargo。
 - 三条臂：`base`（冻结副本原样，加探针）、`mut-fl0`（删掉 F-L0 那一处调用，即 `crates/mutations.tsv` 第 31 批 F-L0 那行的替换：期望模型的比对会不会红的自证）、`fix-key`（攻方改法 F-KEY）。`base` 与 `fix-key` 另跑整个 `checker_known_bad_images` 目标。
 - 本机一次从头跑通：工作目录 `~/.local/share/singlefs/work/m3-batch31-code-r1-opus/rr4/`（空目录起，三次前台调用各一条臂），`compare.sh` 末行原样「SAME 1349 行」。挂钟：base 约 2.5 分钟、mut-fl0 约 1 分钟、fix-key 约 2.7 分钟（本机负载 32 核占满时量的）。
 - 模型文件 sha256：

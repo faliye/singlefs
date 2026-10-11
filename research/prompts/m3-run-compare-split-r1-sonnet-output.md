@@ -21,7 +21,7 @@
    - 3.4 的簇漏三份用 `crash_injection` 公开接口的集成测试、一份调旧引擎的测试文件；「丁二 迁完就删旧引擎」不成立，`enumerate_layer0_*` 还被基础设施用例、实验装置 `e161` 与门禁脚本引用（Q7）。
    - 丙（新内核）的对拍需要丁一、戊的 CPU 判那一半当参照，3.4 把它们写成「不交」是漏的依赖（Q7）。
 2. **RefFS 拆得开**（事实表 P11 写「没核」）：第一次崩溃的允许集合是只读函数 `allowed_set_for_a_crash_in` 的返回值，不依赖读回；判绿之后重起头的 RefFS，其第二次崩溃的允许集合恰是单元素 {R1}（Q2）。
-3. **每态定长 160 字节的账**：按 26.16 亿态是 418.6 GB，但**今天登记的全量深度是 30 不是 28**（`scripts/crash-amplification.sh:222`），去重后的下界是 3 743 376 012 态，160 字节是 598.9 GB；磁盘余量开工时 514G，交回时 1.8T，会变（Q4）。
+3. **每态定长 160 字节的账**：按 26.16 亿态是 418.6 GB，但**今天登记的全量深度是 30 不是 28**（`scripts/crash/crash-amplification.sh:222`），去重后的下界是 3 743 376 012 态，160 字节是 598.9 GB；磁盘余量开工时 514G，交回时 1.8T，会变（Q4）。
 4. **CPU 代价是大头**：GPU 一侧约 7.2×10⁵ 态/秒，旧记录里 CPU 判器两台合计约 8 千态/秒（上界，含 checker）；观察者（P5）要在约 1.36×10⁹ 态上真挂载，一次轻型跑里每态墙钟约 66 ms，量级以天计，且这一块与拆不拆无关（Q5）。
 5. 九个问题的答案在第 4–12 节；P1–P18 逐处核对表在第 3 节；末尾是判定一览与「没做什么」。
 
@@ -101,7 +101,7 @@ grep -nE 'check_pool_image|check_records\(|check_records_against\(|record_check_
 
 ### 4.3 射程判据：harness 档 tests 与 src/bin 装置在不在
 
-我给的判据：**一处比较在射程里，当且仅当它被下面任一入口跑到**——放量分项（`scripts/crash-amplification.sh:230` 起 `ITEMS` 的 8 项）；合表 12 项第 ② ③ ④ 列点名的测试目标（`.claude/gate.d/crash-point-replay-items.tsv`）；它们直接调的 checker 档库函数与 harness 函数。据此：
+我给的判据：**一处比较在射程里，当且仅当它被下面任一入口跑到**——放量分项（`scripts/crash/crash-amplification.sh:230` 起 `ITEMS` 的 8 项）；合表 12 项第 ② ③ ④ 列点名的测试目标（`.claude/gate.d/crash-point-replay-items.tsv`）；它们直接调的 checker 档库函数与 harness 函数。据此：
 
 - `singlefs-harness/tests/` 不在：harness 档随时跑、不分 GPU，且 harness 档不许依赖 checker 档（`.claude/kb/decisions/13-验证路线.md:395`）。
 - `src/bin/` 的 E 系列装置不在：它们是独立验证装置（`.claude/rules/implementation-first.md:14`「`research/` 下的装置与模型只用来独立验证」、`:15` 的例外），由 experiment-replay 复跑。但 `e161` 调着旧引擎 `enumerate_layer0_in_state_slices`（`copy/crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:3023`），这一条决定旧引擎能不能删（Q7）。
@@ -200,11 +200,11 @@ GPU 对比版本的闭包里没有 `model.rs`（WGSL 不引 Rust），所以**�
 
 ```
 正文 body:23：- 规模：CLAUDE.md 记展开 28 全枚举七个分项 26.16 亿态，GPU 判一趟 7 小时 37 分；每态在 CPU 上跑 Rust 恢复两遍的速率在今天的树上没量过。
-scripts/crash-amplification.sh:222：FULL_EXPAND_UP_TO=30
-.claude/kb/checks-owed.md:610（C761 行，整行）：| C761 | 9/30 崩溃放量全量「26.16 亿态零违例」里多记录流没穷举 | 2026-09-30 那一趟崩溃放量全量（展开 28、七个分项含 σ）报的「26.16 亿态零违例」，多记录流那一项是 `exhaustive=false`（最长一段 30 写，第 32 批 Q 探针 `PROBE_SEGMENT_SIZES`；那时入口还没有「不穷举判红」这一判）；2026-10-08 展开 30 重跑多记录流与删除流两项都 `exhaustive=true`、0 红（日志 `~/.local/share/singlefs/work/m3-3-4-amplification/run-gpu-expand30.log`）。别的五项在展开 30 下穷不穷举没核。全仓还在引那句的地方（CLAUDE.md 当前里程碑一段、里程碑二记录、kb）要回扫 | 回扫按旧说法搜「26.16 亿」「2 616」「全枚举七个分项」，逐处判现状句还是那一次的事；入口 `scripts/crash-amplification.sh` 全量里一项不穷举就判红已经立了（2026-10-08） | 下一次阶段同步；另外五项要一趟展开 30 的全量 | records/2026-10-01-删除与并发事务.md 2026-10-08 那两条 |
+scripts/crash/crash-amplification.sh:222：FULL_EXPAND_UP_TO=30
+.claude/kb/checks-owed.md:610（C761 行，整行）：| C761 | 9/30 崩溃放量全量「26.16 亿态零违例」里多记录流没穷举 | 2026-09-30 那一趟崩溃放量全量（展开 28、七个分项含 σ）报的「26.16 亿态零违例」，多记录流那一项是 `exhaustive=false`（最长一段 30 写，第 32 批 Q 探针 `PROBE_SEGMENT_SIZES`；那时入口还没有「不穷举判红」这一判）；2026-10-08 展开 30 重跑多记录流与删除流两项都 `exhaustive=true`、0 红（日志 `~/.local/share/singlefs/work/m3-3-4-amplification/run-gpu-expand30.log`）。别的五项在展开 30 下穷不穷举没核。全仓还在引那句的地方（CLAUDE.md 当前里程碑一段、里程碑二记录、kb）要回扫 | 回扫按旧说法搜「26.16 亿」「2 616」「全枚举七个分项」，逐处判现状句还是那一次的事；入口 `scripts/crash/crash-amplification.sh` 全量里一项不穷举就判红已经立了（2026-10-08） | 下一次阶段同步；另外五项要一趟展开 30 的全量 | records/2026-10-01-删除与并发事务.md 2026-10-08 那两条 |
 ```
 
-- 今天的全量深度是 30（`scripts/crash-amplification.sh:222`），登记 8 项（`:230` 起的 `ITEMS`，比 9/30 那趟的 7 项多了删除流）。
+- 今天的全量深度是 30（`scripts/crash/crash-amplification.sh:222`），登记 8 项（`:230` 起的 `ITEMS`，比 9/30 那趟的 7 项多了删除流）。
 - 9/30 那趟 28 深的账：合计 2 615 501 475 态是各项状态数直接相加（`briefs/2026-09-28.md:86`），到 D 那段在到 E 里数了两遍；实判 2 563 727 926 态（`README.md:60` 的括注「这一趟实判 2 563 727 926 态」）[读]。
 - 10/08 那趟 30 深：多记录流 1 342 177 375 态、删除流 1 448 083 638 态（`records/2026-10-01-删除与并发事务.md:1292`），删除流把多记录流的 A、B、C 三段当前缀，块键相同，库里只记一份 [读，前缀关系读测试头注释 `copy/crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs:3`]。
 - **30 深去重后的下界** = 2 563 727 926 − 268 435 552（多记录流 28 深那份）+ 1 448 083 638（删除流 30 深，已含多记录流）= **3 743 376 012 态** [算]。下界，因为别的五项在 30 深下的态数没量过（C761 说「没核」）。
@@ -223,7 +223,7 @@ scripts/crash-amplification.sh:222：FULL_EXPAND_UP_TO=30
 
 磁盘余量会变，不能当前提：开工时 `df -h ~` 是 `/dev/nvme0n1p2  3.6T  2.9T  514G  86% /`，交回前 `df -h ~/.local/share/singlefs` 是 `/dev/nvme0n1p2  3.6T  1.7T  1.8T  50% /`（同一个盘，两次相隔我这一趟的工作时间）[读，命令原样输出]。背景材料写的「余 569G」是更早一刻的数。按 569G 算 30 深下界的 160 字节形态（598.9 GB）**落不下**，按 1.8T 落得下；这个判断要在开跑前现查。
 
-背景材料另一句「判定库今天 4.4G」：`du -sb ~/.local/share/singlefs/crash-amplification` 是 4 657 296 813 字节，其中 `runs/`（日志与取回的对端库）4 372 436 324，库目录 `library/` 只有 283 992 607 字节 [读，命令原样]。而且那份 `library/` 是**按结论种类存之前的旧布局**：入口默认的新库目录是 `library-by-conclusion-kind`（`scripts/crash-amplification-lib.sh:93`），盘上不存在 [读：`ls -d ~/.local/share/singlefs/crash-amplification/library*` 只出 `library`]。所以现有库的字节数**不能当作 `0A`–`0E` 或新表的压缩比样本**。
+背景材料另一句「判定库今天 4.4G」：`du -sb ~/.local/share/singlefs/crash-amplification` 是 4 657 296 813 字节，其中 `runs/`（日志与取回的对端库）4 372 436 324，库目录 `library/` 只有 283 992 607 字节 [读，命令原样]。而且那份 `library/` 是**按结论种类存之前的旧布局**：入口默认的新库目录是 `library-by-conclusion-kind`（`scripts/crash/crash-amplification-lib.sh:93`），盘上不存在 [读：`ls -d ~/.local/share/singlefs/crash-amplification/library*` 只出 `library`]。所以现有库的字节数**不能当作 `0A`–`0E` 或新表的压缩比样本**。
 
 ### 7.4 写内容 `13` 去重之后多大
 
@@ -244,9 +244,9 @@ scripts/crash-amplification.sh:222：FULL_EXPAND_UP_TO=30
 
 | 档 | 域 | 160 字节原始 | 说明 |
 |---|---|---|---|
-| 轻型 | 「甲二」∪ 展开 6（`scripts/crash-point-replay.sh:162` `LIGHT_EXPAND_UP_TO=6`） | 我读到的展开 6 日志行（`runs/` 下几趟的 `CRASH_AMPLIFICATION flow=…` 行）每项十几到几百态，十三行共约 480 态，固定脚本两项那趟没出数；< 10⁴ 态 → < 2 MB [推] | 新建空库，跑完删（`scripts/crash-point-replay.sh:532`、`:29`） |
+| 轻型 | 「甲二」∪ 展开 6（`scripts/crash/crash-point-replay.sh:162` `LIGHT_EXPAND_UP_TO=6`） | 我读到的展开 6 日志行（`runs/` 下几趟的 `CRASH_AMPLIFICATION flow=…` 行）每项十几到几百态，十三行共约 480 态，固定脚本两项那趟没出数；< 10⁴ 态 → < 2 MB [推] | 新建空库，跑完删（`scripts/crash/crash-point-replay.sh:532`、`:29`） |
 | 重型·剪枝 / 逐条 | 只补键不同的块 | 首次等于全量；之后只有变了的项 | 判器改了只重比；核心读路径改了重录 |
-| 重型·全量（清空复用） | 今天登记深度 30，3.74×10⁹ 态下界 | 598.9 GB | 新库放 `crash-point-replay-full/<时戳>-<进程号>/library`（`scripts/crash-point-replay.sh:542`），跑完不删 |
+| 重型·全量（清空复用） | 今天登记深度 30，3.74×10⁹ 态下界 | 598.9 GB | 新库放 `crash-point-replay-full/<时戳>-<进程号>/library`（`scripts/crash/crash-point-replay.sh:542`），跑完不删 |
 
 | 形态 | 30 深下界的大小 | 丢什么判别力 |
 |---|---|---|
@@ -275,7 +275,7 @@ scripts/crash-amplification.sh:222：FULL_EXPAND_UP_TO=30
 在**副本**上（六份补丁之后的树，不动主工作区）加计时，主 agent 或实现员跑：
 
 1. 在 `copy/crates/singlefs-checker-tier/src/crash.rs:1374`、`:1375` 两个 `recover` 前后各取一次 `Instant`，按线程累加纳秒与调用数；块末打一行 `RUN_COST pass=consulted|ignored ns=… calls=…`。观察者在 `observe_one_piece`（`crash_amplification.rs:10025`）里对挂载与 `check_pool_image` 分开计时。
-2. 命令（重型，主 agent 带 `SINGLEFS_HEAVY_TESTS=user-request`）：`bash scripts/run-with-memory-cap.sh <上限> bash scripts/capped.sh <线程> bash scripts/crash-amplification.sh --item multi-record-publish --expand-up-to 16`，`ENABLE_GPU=0`（要量的是 CPU），环境变量 `SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=<新建的空目录，不放 /tmp>`（入口读它，`copy/crates/singlefs-checker-tier/src/crash_amplification.rs:7609`）；再换 `--item fixed-script-through-unmount` 与 `--item position-addressed-trees` 各一次。线程数取 1、8、32 三档。
+2. 命令（重型，主 agent 带 `SINGLEFS_HEAVY_TESTS=user-request`）：`bash scripts/hosts/run-with-memory-cap.sh <上限> bash scripts/hosts/capped.sh <线程> bash scripts/crash/crash-amplification.sh --item multi-record-publish --expand-up-to 16`，`ENABLE_GPU=0`（要量的是 CPU），环境变量 `SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=<新建的空目录，不放 /tmp>`（入口读它，`copy/crates/singlefs-checker-tier/src/crash_amplification.rs:7609`）；再换 `--item fixed-script-through-unmount` 与 `--item position-addressed-trees` 各一次。线程数取 1、8、32 三档。
 3. 「量到哪算够」[推]：同一项连跑 3 次，每态纳秒的相对极差 < 10%；落到 `FileRead`、`NoFile`、`Failed` 三种结局的态各 ≥ 10⁴ 个（读回内容的代价依结局不同）；三项各 ≥ 2×10⁵ 态；线程数 1→8→32 近似线性（`recover` 无共享锁）；报 `recover` 两遍占旧 CPU 判器总用时的比例，乘 7.75 ms 得每线程每态的预测，再与新写的跑数据段整段墙钟对一次。
 
 ### 8.4 分片与流水
@@ -333,8 +333,8 @@ scripts/crash-amplification.sh:222：FULL_EXPAND_UP_TO=30
 3. **文件拆分是甲之前的「簇 0」**（6.4）：`crash.rs`、`crash_injection.rs` 按「枚举（叶子）/ 录入入口 / CPU 对比入口」拆开，`GivenStatesEngine` 那一节（`copy/crates/singlefs-checker-tier/src/crash_amplification.rs:8252` 到 `:9293`，约 1 040 行）挪走。纯搬家、判定不变，用「判法摘要里的词法单元串多重集不变」当验收。这一步也解掉丁一与戊撞 `GivenStatesEngine` 的问题（E5 只挪了类型、trait 与 CPU 就地判，`GivenStatesEngine` 还在 `crash_amplification.rs:8361`，**3.4 的这一句今天仍然成立**）。
 4. **戊的文件表漏了**：`crates/singlefs-harness/src/model.rs`（P8 要的「只推进不比较」口子在 `:2874` 到 `:3393`）；三份用 `crash_injection` 公开接口的集成测试——`crash_injection_writable_mount_after_the_crash.rs`、`crash_injection_publish_after_a_mount_whose_deletion_continuation_stays_short.rs`、`crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs`（`inject_crashes_into_history(` 在测试里共 13 处调用，`HistoryThenWritableMountRecords`、`mount_and_publish_once_on_the_crash_image` 的签名一变它们就编不过）。
 5. **`lib.rs` 是每个加模块的簇的撞点**（36 行，丙加内核模块、簇 0 加新文件都要改它）：`apply-writer-patch.py` 只对 `mutations.tsv` 按名字合并（事实表第 6 节末），`lib.rs` 的撞要在派发提示的「要动的文件」里错开。
-6. **门禁与脚本侧没有簇**：`scripts/admission.py`、`crash-case-check.py`、`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 登记、`crash-point-replay.sh`、`lib_crash_point_replay_items.py`，以及 `.claude/rules/verification.md:34` 的快档命令（要加 `--features verdict-store`，Q8）都得改；它们不在 `crates/`，实现员写不了，归工具员，3.4 没排 [推]。
-7. **己的替代检查没写**：删掉豁免表后，原来的 gpu-exemptions 格只核「标记与表行对得上」（`scripts/gpu-exemptions-check.py` 文件头），没有它就没有任何东西拦「开了 GPU 仍在 CPU 上对比」。记录 `records/2026-09-30-里程碑三开工第一轮.md:996` 同一条里已说要「另立会红的检查」，3.4 的己只写了删。形态建议 [推]：CPU 对比入口在 `routes.crash_judge == Gpu`（`copy/crates/singlefs-checker-tier/src/crash_amplification.rs:7596`）且不在 J6 参照上下文里被调用时直接 panic，配一条「开 GPU、毒化 CPU 对比入口」的用例进快档（有卡时跑，没卡报本次未跑）。
+6. **门禁与脚本侧没有簇**：`scripts/gate/admission.py`、`crash-case-check.py`、`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 登记、`crash-point-replay.sh`、`lib_crash_point_replay_items.py`，以及 `.claude/rules/verification.md:34` 的快档命令（要加 `--features verdict-store`，Q8）都得改；它们不在 `crates/`，实现员写不了，归工具员，3.4 没排 [推]。
+7. **己的替代检查没写**：删掉豁免表后，原来的 gpu-exemptions 格只核「标记与表行对得上」（`scripts/crash/gpu-exemptions-check.py` 文件头），没有它就没有任何东西拦「开了 GPU 仍在 CPU 上对比」。记录 `records/2026-09-30-里程碑三开工第一轮.md:996` 同一条里已说要「另立会红的检查」，3.4 的己只写了删。形态建议 [推]：CPU 对比入口在 `routes.crash_judge == Gpu`（`copy/crates/singlefs-checker-tier/src/crash_amplification.rs:7596`）且不在 J6 参照上下文里被调用时直接 panic，配一条「开 GPU、毒化 CPU 对比入口」的用例进快档（有卡时跑，没卡报本次未跑）。
 
 ### 10.3 丁二迁完 14 份测试文件，旧引擎 `enumerate_layer0_*` 留不留：留
 
@@ -365,17 +365,17 @@ record_checker_judges_absence_by_the_persisted_set.rs:1
 
 - 17 份不是 14 份：多的 `crash_segments_per_device_and_torn_in_place_overwrites.rs` 不在丁二名单里。
 - 这 17 份里有三份测的是**旧引擎自己的功能**——断点续跑（`crash_enumeration_resumes_from_its_progress_file.rs`）、跨进程分片（`crash_enumeration_sharded_across_processes.rs`）、发现日志按签名去重并续跑（`crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs`）。流水线的对应物是判定库续跑、`host_shares` 分片、判红清单；这三份是「迁」还是「删」没人定，迁不了的话旧引擎不能删。
-- 旧引擎还被这些地方引：`copy/crates/singlefs-checker-tier/src/layer0_progress.rs`（进度文件、分片账本、发现日志，文件头 `:12` 指到 `enumerate_layer0_in_state_slices`）、`copy/crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:3023`（实验装置，`scripts/replay.sh:309` 登记了 E161 的复跑）、`scripts/admission.py`、`scripts/crash-case-check.py`、`.claude/gate.d/checker-tier-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv` [读]。
+- 旧引擎还被这些地方引：`copy/crates/singlefs-checker-tier/src/layer0_progress.rs`（进度文件、分片账本、发现日志，文件头 `:12` 指到 `enumerate_layer0_in_state_slices`）、`copy/crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:3023`（实验装置，`scripts/experiments/replay.sh:309` 登记了 E161 的复跑）、`scripts/gate/admission.py`、`scripts/crash/crash-case-check.py`、`.claude/gate.d/checker-tier-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv` [读]。
 - 结论：丁二之后至少 `enumerate_layer0_in_state_slices`、`Layer0*` 计数类型与 `layer0_progress` 要留到 E161 的装置收掉（或把装置里那一处改成走流水线并重登记它的产物）、三份基础设施用例有了去处为止 [推]。
 
 ## 11. Q8 两档：轻型 ⊂ 重型还成不成立，轻型的库放哪
 
-- **成立，且不用改合表**。`.claude/rules/verification.md:50` 写的是「轻型是重型的子集：轻型里有的每一项，重型里都有」，入口自证 `light-within-heavy` 是拿真合表与小仓两份计划逐件核（`scripts/crash-point-replay.sh` 文件头「轻型是重型的子集」一段）。比的是（项，测试目标，展开域）这一层，拆成两段后每一项仍是同一个入口、同一组测试目标，只是每个入口内部先跑数据后比；轻型在小域（「甲二」∪ 展开 6）、重型在整域，包含关系不变 [读、推]。观察者也一样：展开 6 域里 140 态（07:43 那趟日志），30 深全展开 1.359×10⁹ 态，前者在后者里。
+- **成立，且不用改合表**。`.claude/rules/verification.md:50` 写的是「轻型是重型的子集：轻型里有的每一项，重型里都有」，入口自证 `light-within-heavy` 是拿真合表与小仓两份计划逐件核（`scripts/crash/crash-point-replay.sh` 文件头「轻型是重型的子集」一段）。比的是（项，测试目标，展开域）这一层，拆成两段后每一项仍是同一个入口、同一组测试目标，只是每个入口内部先跑数据后比；轻型在小域（「甲二」∪ 展开 6）、重型在整域，包含关系不变 [读、推]。观察者也一样：展开 6 域里 140 态（07:43 那趟日志），30 深全展开 1.359×10⁹ 态，前者在后者里。
 - **会破的是构建，不是包含关系**。快档命令是 `cargo test --release -p singlefs-checker-tier --lib --tests`（`.claude/rules/verification.md:34`），不带 `verdict-store`；RocksDB 是可选依赖、平常不编，因为「librocksdb-sys 在每个编译目录里现编一遍 C++」（`copy/crates/singlefs-checker-tier/Cargo.toml:18`、`:20`、`:26`–`:27`）。拆成先跑完全部数据、再从库读以后，每一个要判的测试（17 份调旧引擎的、13 处调 `inject_crashes_into_history`）都得读库，**快档整条要带这个特性**；`copy/crates/singlefs-checker-tier/src/crash_given_states.rs:119`：「`verdict-store` 特性的二进制只有它」，指不经库的就地判那一支（前半句在 `:118`）。连带：crates 变异整表每个拷贝目录都要现编 C++。两条路，交主 agent 或用户定 [推]：
   - 路 A：快档整条带特性，成本是每个编译目录多编一遍 C++（我没量，只知道 Cargo.toml 注释的说法，以及 `records/2026-09-30-里程碑三开工第一轮.md:986` 记的「编译两次撞 235 秒限时」）。
   - 路 B：对比段读一个 trait（库），实现两个——RocksDB 和内存 `BTreeMap`；内存那个只给不链 RocksDB 的小用例，**同样严格先写全部、后读**，对比段闭包里不引 RocksDB。代价：用户原话说的是「放入rockdb中」（`records/2026-09-30-里程碑三开工第一轮.md:997`），内存实现要用户点头。
-- **轻型的库放哪、删不删**：沿用。轻型每趟新建空库，放 `<放量的家目录>/crash-point-replay-quick/<时戳>/library`，跑完删（`scripts/crash-point-replay.sh:532`、`:29`），入口代码里 `delete_after` 一律删（`copy/crates/singlefs-checker-tier/src/crash_amplification.rs:8213`）。轻型域 < 10⁴ 态，两段的库 < 数 MB（第 7.7 节），两段在同一趟同一进程里，不需要跨进程续跑。**建议改的一处**：判红时不删，留着那一块的 `10`–`14` 行，方便看红态现场 [推]。
-- **轻型要加的守门**（`BOTH_TIERS_GROUPS` 那几类，`scripts/crash-point-replay.sh` 文件头）：
+- **轻型的库放哪、删不删**：沿用。轻型每趟新建空库，放 `<放量的家目录>/crash-point-replay-quick/<时戳>/library`，跑完删（`scripts/crash/crash-point-replay.sh:532`、`:29`），入口代码里 `delete_after` 一律删（`copy/crates/singlefs-checker-tier/src/crash_amplification.rs:8213`）。轻型域 < 10⁴ 态，两段的库 < 数 MB（第 7.7 节），两段在同一趟同一进程里，不需要跨进程续跑。**建议改的一处**：判红时不删，留着那一块的 `10`–`14` 行，方便看红态现场 [推]。
+- **轻型要加的守门**（`BOTH_TIERS_GROUPS` 那几类，`scripts/crash/crash-point-replay.sh` 文件头）：
   1. 每个新内核（P5 断言、P7、P10、P11、P14、P15、P16）一条 CPU 对 GPU 的逐态对拍，进快档，并各有「往加速那一侧塞一个已知故障，对拍要红」的自证（`.claude/singlefs-ai-sop/rules/test-script-discipline.md:82`；既有先例是 `FaultPutOnTheGpuSide`，`copy/crates/singlefs-checker-tier/src/crash_amplification.rs:8266`）。
   2. 剪枝自证分两层：录入行复用、结论行复用，各自「在小规模输入上关掉剪枝与复用跑一遍，判定与开着时逐项相同」（`.claude/singlefs-ai-sop/rules/test-script-discipline.md:63`）。
   3. 红态正文现场重跑补细节的那条路，要有一条钉回来的红例（`.claude/singlefs-ai-sop/rules/test-script-discipline.md@全量的红，钉回快档`）。
@@ -414,12 +414,12 @@ record_checker_judges_absence_by_the_persisted_set.rs:1
 
 | 编号 | 量什么 | 命令与环境 | 看哪几行 |
 |---|---|---|---|
-| M1 | 每态 `recover` 两遍的 CPU 代价（Q5） | 先让实现员在副本 `crash.rs:1374`、`:1375` 的两个 `recover` 前后加计时累加，块末打 `RUN_COST` 行。然后在副本根：`SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 16G bash scripts/capped.sh <1\|8\|32> bash scripts/crash-amplification.sh --item multi-record-publish --expand-up-to 16`；再各换 `--item fixed-script-through-unmount`、`--item position-addressed-trees`。`ENABLE_GPU` 以 `multi-host.env` 为准，现在是 0（`/home/fy5090/code/singlefs/multi-host.env`）。重型，只由主 agent 带前缀起 | `RUN_COST` 行；`CRASH_AMPLIFICATION_PHASES` 的 `seconds_judging` 与 `states_checked_here`；三次的相对极差 |
-| M2 | 观察者每态挂载成本、挂载写表分组数（Q5、Q6） | 同 M1 命令（`--item multi-record-publish`），多记录分项的测试名见 `scripts/crash-amplification.sh:233`；另在观察者里对每态挂载写表取 SHA-256 数不同值（实现员活） | `CRASH_POINT_REPLAY_OBSERVERS` 的 `states_observed_here`、`CRASH_AMPLIFICATION_PHASES` 的 `seconds_observing`、不同挂载写表个数 |
+| M1 | 每态 `recover` 两遍的 CPU 代价（Q5） | 先让实现员在副本 `crash.rs:1374`、`:1375` 的两个 `recover` 前后加计时累加，块末打 `RUN_COST` 行。然后在副本根：`SINGLEFS_HEAVY_TESTS=user-request bash scripts/hosts/run-with-memory-cap.sh 16G bash scripts/hosts/capped.sh <1\|8\|32> bash scripts/crash/crash-amplification.sh --item multi-record-publish --expand-up-to 16`；再各换 `--item fixed-script-through-unmount`、`--item position-addressed-trees`。`ENABLE_GPU` 以 `multi-host.env` 为准，现在是 0（`/home/fy5090/code/singlefs/multi-host.env`）。重型，只由主 agent 带前缀起 | `RUN_COST` 行；`CRASH_AMPLIFICATION_PHASES` 的 `seconds_judging` 与 `states_checked_here`；三次的相对极差 |
+| M2 | 观察者每态挂载成本、挂载写表分组数（Q5、Q6） | 同 M1 命令（`--item multi-record-publish`），多记录分项的测试名见 `scripts/crash/crash-amplification.sh:233`；另在观察者里对每态挂载写表取 SHA-256 数不同值（实现员活） | `CRASH_POINT_REPLAY_OBSERVERS` 的 `states_observed_here`、`CRASH_AMPLIFICATION_PHASES` 的 `seconds_observing`、不同挂载写表个数 |
 | M3 | 新表压缩比与 RocksDB 写放大（Q4） | 新布局落地后同 M1 命令，新建空库；跑完 `du -sb <库目录>`；跑的同时读 `/proc/<pid>/io` 的 `write_bytes`（或开 RocksDB 统计读 `rocksdb.stats`） | 库字节 ÷ 态数；`write_bytes` ÷ 库字节 |
-| M4 | P14 与「录入比对」内核的展开量（Q6） | 内核写出后在副本里写一条单测调 `kernel_inlined_size(&source)`（`copy/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs:263`），`bash scripts/capped.sh 8 cargo test --release -p singlefs-checker-tier --features gpu --lib <测试名>`（经 `run-with-memory-cap.sh`；带 `gpu` 的经 `gpu-quiesce-run.sh`） | `expressions` 与 `largest_contributors` |
+| M4 | P14 与「录入比对」内核的展开量（Q6） | 内核写出后在副本里写一条单测调 `kernel_inlined_size(&source)`（`copy/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs:263`），`bash scripts/hosts/capped.sh 8 cargo test --release -p singlefs-checker-tier --features gpu --lib <测试名>`（经 `run-with-memory-cap.sh`；带 `gpu` 的经 `gpu-quiesce-run.sh`） | `expressions` 与 `largest_contributors` |
 | M5 | 盘余量（Q4） | `df -h ~/.local/share/singlefs`，开跑前现查 | `Avail` |
-| M6 | 重建我的副本 | `rsync -a --exclude target --exclude 'target-*' /home/fy5090/code/singlefs/ <新目录>/`，再依次 `python3 scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-merge-impl/<v e e2 e3 e4 e5>/patch --root <新目录>`；我这一趟拷贝加六份补丁共约 7 分半（`rsync` 慢在盘上，不在补丁） | 退出码 1、0、0、0、0、0 |
+| M6 | 重建我的副本 | `rsync -a --exclude target --exclude 'target-*' /home/fy5090/code/singlefs/ <新目录>/`，再依次 `python3 scripts/gate/apply-writer-patch.py ~/.local/share/singlefs/work/m3-merge-impl/<v e e2 e3 e4 e5>/patch --root <新目录>`；我这一趟拷贝加六份补丁共约 7 分半（`rsync` 慢在盘上，不在补丁） | 退出码 1、0、0、0、0、0 |
 
 ## 14. 各结论的推翻条件
 
@@ -497,4 +497,4 @@ record_checker_judges_absence_by_the_persisted_set.rs:1
 - 没替主 agent 采纳或出判决；不判别的腿的格没判；没读禁读清单里的任何文件。
 - 没碰 kb、records、`.claude/`。要写进 kb 的东西（如 `verification.md` 快档命令要加特性）只在 Q8、Q7 里点了名。
 - 草稿与临时文件在 `~/.local/share/singlefs/work/m3-run-compare-split-r1-forward/`（`g/` 是 grep 落盘，`tools/ln.sh` 是我查行号的小脚本，`notes.md`，六份 `apply-*.log`）；副本 `copy/`（2.4G）已删，原因是只读副本用完即删（`.claude/agent-common.md` 与交回闸的要求）。
-- cite-check：副本还在时 `python3 scripts/cite-check.py <本报告> --root ~/.local/share/singlefs/work/m3-run-compare-split-r1-forward --root /home/fy5090/code/singlefs` 末行「✓ 核了 15 处引文，对上 15 处，没判 0 处」；副本删后按交回闸的默认根再跑，末行「✓ 核了 15 处引文，对上 11 处，没判 4 处」（4 处是 `copy/…` 路径，副本已删所以认不出，不是对不上）。报告里大多数引用不是「引号加位置」的写法，cite-check 看不到；这些行号我都用 `grep -nF` 现取过（小脚本 `tools/ln.sh`），并另用一段脚本核过 164 处 `路径:行号` 都没越过文件末尾。
+- cite-check：副本还在时 `python3 scripts/agents/cite-check.py <本报告> --root ~/.local/share/singlefs/work/m3-run-compare-split-r1-forward --root /home/fy5090/code/singlefs` 末行「✓ 核了 15 处引文，对上 15 处，没判 0 处」；副本删后按交回闸的默认根再跑，末行「✓ 核了 15 处引文，对上 11 处，没判 4 处」（4 处是 `copy/…` 路径，副本已删所以认不出，不是对不上）。报告里大多数引用不是「引号加位置」的写法，cite-check 看不到；这些行号我都用 `grep -nF` 现取过（小脚本 `tools/ln.sh`），并另用一段脚本核过 164 处 `路径:行号` 都没越过文件末尾。

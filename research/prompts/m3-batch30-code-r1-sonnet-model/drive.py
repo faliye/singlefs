@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """基线与变异逐行复跑（只 CPU 与 harness 档，GPU 两行不跑）。
-用法：drive.py <工作目录 W>；环境变量：SINGLEFS_REPO（被判的树）、SINGLEFS_WRAPPER（含 scripts/run-with-memory-cap.sh 与 capped.sh 的仓）。
+用法：drive.py <工作目录 W>；环境变量：SINGLEFS_REPO（被判的树）、SINGLEFS_WRAPPER（含 scripts/hosts/run-with-memory-cap.sh 与 capped.sh 的仓）。
 产出：W/out/baseline.txt（探针行与每条用例的 ok / FAILED，排序后）、W/out/mutations.txt（每条变异：名、点名的测试、RED / NOT_RED、红的用例）。"""
 import os, re, shutil, subprocess, sys, time
 
@@ -18,8 +18,8 @@ env = dict(os.environ, CARGO_TARGET_DIR=W + "/target")
 
 
 def sh(cap, args, log):
-    command = ["nice", "-n", "19", "bash", WRAP + "/scripts/run-with-memory-cap.sh", cap,
-               "bash", WRAP + "/scripts/capped.sh", "7", "cargo", "test", "--offline", *args]
+    command = ["nice", "-n", "19", "bash", WRAP + "/scripts/hosts/run-with-memory-cap.sh", cap,
+               "bash", WRAP + "/scripts/hosts/capped.sh", "7", "cargo", "test", "--offline", *args]
     with open(log, "w") as handle:
         return subprocess.run(command, cwd=REPO, env=env, stdout=handle, stderr=subprocess.STDOUT).returncode
 

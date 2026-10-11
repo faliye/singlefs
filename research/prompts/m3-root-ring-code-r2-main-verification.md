@@ -9,10 +9,10 @@
 | 物 | 路径 | 核法 |
 |---|---|---|
 | 正文 / 背景材料 / 小节清单 / 附录 / 改动全文 | `research/prompts/_m3-root-ring-code-r2-body.md`、`_m3-root-ring-code-r2-background.md`、`_m3-root-ring-code-r2-checklist.md`、`_m3-root-ring-code-r2-appendix.md`、`_m3-root-ring-code-r2-diff.md` | — |
-| 开工快照 | `research/prompts/m3-root-ring-code-r2-snapshot/`（crates 46 份、kb 4 份；冻结副本 `/tmp/claude-1000/m3-root-ring-code-r2/tree/`） | `bash scripts/snapshot-check.sh m3-root-ring-code-r2`：「✗ 快照 m3-root-ring-code-r2：50 个文件里 18 个对不上」，处置见下 |
+| 开工快照 | `research/prompts/m3-root-ring-code-r2-snapshot/`（crates 46 份、kb 4 份；冻结副本 `/tmp/claude-1000/m3-root-ring-code-r2/tree/`） | `bash scripts/devices/snapshot-check.sh m3-root-ring-code-r2`：「✗ 快照 m3-root-ring-code-r2：50 个文件里 18 个对不上」，处置见下 |
 | 云端正推（Sonnet） | `research/prompts/m3-root-ring-code-r2-sonnet-output.md`（466 行，sha256 29865c8a57c4ba8ccf5365499f4424ad3d4521f44266180e4fa8d79bb169aa6b），模型 `research/prompts/m3-root-ring-code-r2-sonnet-model/` | — |
 | 云端攻方（Opus） | `research/prompts/m3-root-ring-code-r2-opus-output.md`（200 行，sha256 34818b036a46233e5b215b9091f6595f39eb3c078c9142148f92e95d7ea9a433），模型 `research/prompts/m3-root-ring-code-r2-opus-model/` | 主 agent 复跑，见「复跑」一节 |
-| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root <crates 取冻结副本、其余取主仓的拼合根> --background research/prompts/_m3-root-ring-code-r2-background.md`：「✓ 核了 52 处引文，对上 52 处，没判 0 处（逐处列在上面）」 |
+| 引文 | 两份腿报告 | `python3 scripts/agents/cite-check.py <两份报告> --root <crates 取冻结副本、其余取主仓的拼合根> --background research/prompts/_m3-root-ring-code-r2-background.md`：「✓ 核了 52 处引文，对上 52 处，没判 0 处（逐处列在上面）」 |
 
 快照对不上的 18 份：腿跑着与交回之后，别的两条线往主工作区合了补丁、做了写回，冻结副本没动。两条腿都只读冻结副本（两份报告开头各自写明），`crates/` 的引文按冻结副本核、52 处全对上；kb 的引文按主仓核也全对上，被改的几处没有落在腿引的行上。倒推用的改动清单都存在快照目录里：
 

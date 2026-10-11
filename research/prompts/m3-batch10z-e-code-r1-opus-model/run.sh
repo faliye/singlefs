@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 第 10z 批第五块代码轮第一轮攻方模型的复跑：把两份模型拷进冻结副本的一份拷贝（harness 档测试目录），跑这两个测试目标。
-# 用法（仓根）：bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 \
+# 用法（仓根）：bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 6 \
 #   bash research/prompts/m3-batch10z-e-code-r1-opus-model/run.sh <冻结副本的拷贝> <编译目录>
 # 冻结副本本身只读：<冻结副本的拷贝> 先用 rsync -a --exclude target --exclude .git 从 ~/.local/share/singlefs/work/m3-batch10z-e-code-r1/tree/ 拷。
 # 改回去的探针（同样经内存包装）：python3 -I mutate_10ze.py <拷贝> <编译目录> <变异名…>；实现员没证红的行：python3 -I rows_10ze.py <拷贝> <编译目录> <行号…>。

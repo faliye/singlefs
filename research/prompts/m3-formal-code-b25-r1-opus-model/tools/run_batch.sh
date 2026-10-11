@@ -10,7 +10,7 @@ for part in "$@"; do
     { K1_HISTORIES="$dir/$part.tsv" nice -n 19 "$bin" --nocapture > "$dir/b$batch-$part.log" 2>&1; echo "$?" > "$dir/b$batch-$part.rc"; } &
   else
     { K1_HISTORIES="$dir/$part.tsv" RUN_WITH_MEMORY_CAP_PARALLEL_REASON="攻方腿原型并行分件跑历史" \
-        nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 120M \
+        nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 120M \
         "$bin" --nocapture > "$dir/b$batch-$part.log" 2>&1; echo "$?" > "$dir/b$batch-$part.rc"; } &
   fi
   n=$((n+1))

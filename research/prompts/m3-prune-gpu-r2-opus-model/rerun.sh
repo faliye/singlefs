@@ -20,14 +20,14 @@ patch "$scratch/repo/crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup
 rsync -a "$scratch/repo/" "$scratch/repo-root-before-records/"
 patch "$scratch/repo-root-before-records/crates/singlefs-core/src/transaction.rs" < "$model/transaction-root-before-records.diff"
 for variant in repo repo-root-before-records; do
-  (cd "$scratch/$variant" && CARGO_TARGET_DIR="$scratch/target-$variant" nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 4 \
+  (cd "$scratch/$variant" && CARGO_TARGET_DIR="$scratch/target-$variant" nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 4 \
     cargo build --release --offline -p singlefs-checker-tier --features verdict-store --bin e161_crash_state_dedup_and_time_split)
 done
 mkdir "$scratch/out"
 run_world() {
   local variant="$1" world="$2" name="$3"
   # shellcheck disable=SC2086
-  (cd "$scratch/$variant" && nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 4 \
+  (cd "$scratch/$variant" && nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 4 \
     "$scratch/target-$variant/release/e161_crash_state_dedup_and_time_split" attack $world 2>/dev/null \
     | grep -v '^LAYER0' > "$scratch/out/$name.out")
 }

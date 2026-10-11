@@ -193,7 +193,7 @@ ForcedToZero 下的新池流（mkfs 同一个进程，txg 3）：这一版先释
 
 ## 引文核对
 
-`python3 scripts/cite-check.py research/prompts/m3-formal-code-b19-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b19-r1/tree --root . --background research/prompts/_m3-formal-code-b19-r1-background.md` 末行原样：
+`python3 scripts/agents/cite-check.py research/prompts/m3-formal-code-b19-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b19-r1/tree --root . --background research/prompts/_m3-formal-code-b19-r1-background.md` 末行原样：
 
 ```
   ✓ 核了 30 处引文，对上 30 处，没判 0 处（逐处列在上面）

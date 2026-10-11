@@ -9,11 +9,11 @@ exit=0	agent=implementation-writer	command=bash scripts/vm-bench.s[[:alpha:]] --
 exit=2	agent=implementation-writer	command=bash .claude/gate.d/checker-tier-layer0-replay.sh /home/fy5090/code/singlefs	stderr1=✗ 重型测试被拒：门禁 checker-tier-layer0-replay.sh；要跑它的样本档：cd 进放了 .layer0-sample-tools 的样本根、根参数写同一个目录（登记表第 100 行；标记里的假工具要可执行、与仓里那一道某份样本的逐字节相同），或在仓根 bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh $PWD/.claude/gat
 exit=2	agent=implementation-writer	command=bash .claude/gate.d/checker-tier-layer0-replay.s? /home/fy5090/code/singlefs	stderr1=✗ 重型测试被拒：门禁 checker-tier-layer0-replay.sh；要跑它的样本档：cd 进放了 .layer0-sample-tools 的样本根、根参数写同一个目录（登记表第 100 行；标记里的假工具要可执行、与仓里那一道某份样本的逐字节相同），或在仓根 bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh $PWD/.claude/gat
 ## A2 崩溃放量全量入口（D13 已定项 9 的全量两样之一）不在按名字判的重型表里
-exit=0	agent=implementation-writer	command=bash scripts/crash-amplification.sh	stderr1=
-exit=0	agent=implementation-writer	command=bash scripts/crash-amplification-two-hosts.sh	stderr1=
+exit=0	agent=implementation-writer	command=bash scripts/crash/crash-amplification.sh	stderr1=
+exit=0	agent=implementation-writer	command=bash scripts/crash/crash-amplification-two-hosts.sh	stderr1=
 ## A2 对照：同一道的 --selftest（登记 heavy）与直接 cargo 照拒
-exit=2	agent=implementation-writer	command=bash scripts/crash-amplification-two-hosts.sh --selftest	stderr1=✗ 提交时才跑的检查被拒：scripts/crash-amplification-two-hosts.sh --selftest（登记表第 40 行记它起重活：自证在本机起两份真的 checker 档用例（cargo test，经 crash_amplification_run_on_this_host）再导入对账）（提交时才跑的检查）：implementation-writer
+exit=2	agent=implementation-writer	command=bash scripts/crash/crash-amplification-two-hosts.sh --selftest	stderr1=✗ 提交时才跑的检查被拒：scripts/crash/crash-amplification-two-hosts.sh --selftest（登记表第 40 行记它起重活：自证在本机起两份真的 checker 档用例（cargo test，经 crash_amplification_run_on_this_host）再导入对账）（提交时才跑的检查）：implementation-writer
 exit=2	agent=implementation-writer	command=cargo test --release -p singlefs-checker-tier --test crash_amplification_fixed_script_through_rollback	stderr1=✗ 重型测试被拒：cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；--test crash_amplification_fixed_script_through_rollback）（checker 档）：implementation-writer 不跑「checker 档」
 ## A2 对照：crash-amplification.sh --selftest（登记 light）放行
-exit=0	agent=implementation-writer	command=bash scripts/crash-amplification.sh --selftest	stderr1=
+exit=0	agent=implementation-writer	command=bash scripts/crash/crash-amplification.sh --selftest	stderr1=
 ## hook-swap 落地状态（假钩子）

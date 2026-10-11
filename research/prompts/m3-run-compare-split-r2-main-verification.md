@@ -4,7 +4,7 @@
 
 ## 一、证据核对（主 agent）
 
-- cite-check：`python3 scripts/cite-check.py <两份报告> --root . --root ~/.local/share/singlefs/work/m3-merge-impl/e5/repo --background research/prompts/_m3-run-compare-split-r2-background.md` 末行「✓ 核了 46 处引文，对上 46 处，没判 0 处（逐处列在上面）」。
+- cite-check：`python3 scripts/agents/cite-check.py <两份报告> --root . --root ~/.local/share/singlefs/work/m3-merge-impl/e5/repo --background research/prompts/_m3-run-compare-split-r2-background.md` 末行「✓ 核了 46 处引文，对上 46 处，没判 0 处（逐处列在上面）」。
 - 开工快照：`sha256sum -c research/prompts/m3-run-compare-split-r2-snapshot/kb-sha256.txt` 全部 OK。
 - 我在 E5 副本（主工作区 + V…E5，与两腿同一份底子）上现查过的代码行：
   - `crash_amplification.rs:9271`（J6 对照调 CPU 判器）、`:9148`（GPU 判不了退回 CPU）、`:9142`（CPU 那份按 `CpuJudge` 入库）。

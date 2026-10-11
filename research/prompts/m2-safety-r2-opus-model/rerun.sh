@@ -3,7 +3,7 @@
 # 把冻结副本拷一份，打上 core-arms.patch（A1–A4 与攻方腿自己的零轮臂，只在副本里），放进 opus_s4_attack.rs，逐段跑，输出写进 <输出目录>。
 #   bash rerun.sh [冻结副本的 crates 目录] [工作目录] [输出目录]
 # 默认：/tmp/claude-1000/m2-safety-r2/tree/crates、/tmp/claude-1000/m2-safety-r2-opus/rerun、<工作目录>/out。
-# 编译与跑一律经 scripts/run-with-memory-cap.sh（10G）与 scripts/capped.sh（8 线程）。约 6 分钟（8 线程）。
+# 编译与跑一律经 scripts/hosts/run-with-memory-cap.sh（10G）与 scripts/hosts/capped.sh（8 线程）。约 6 分钟（8 线程）。
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
@@ -26,8 +26,8 @@ cp "$HERE/opus_s4_attack.rs" "$WORK/tree/crates/singlefs-harness/tests/opus_s4_a
 export CARGO_TARGET_DIR="$WORK/target"
 run() {  # run <日志名> <用例名前缀> [环境变量…]
   local log="$1" filter="$2"; shift 2
-  ( cd "$WORK/tree" && env "$@" nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" "$CAP" \
-      bash "$REPO/scripts/capped.sh" "$THREADS" \
+  ( cd "$WORK/tree" && env "$@" nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" "$CAP" \
+      bash "$REPO/scripts/hosts/capped.sh" "$THREADS" \
       cargo test --release -p singlefs-harness --test opus_s4_attack "$filter" -- --nocapture ) > "$OUT/$log" 2>&1
   grep -E '^test result' "$OUT/$log"
 }

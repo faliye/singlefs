@@ -13,4 +13,4 @@
   `let tree_identifier_watermark = ring_roots\n        .iter()` 换成 `let tree_identifier_watermark = ring_roots_not_abandoned_by_crash_recovery(&ring_roots, &current_table)\n        .iter()`，
   结果见 `logs/inode-tree-mutation-results.txt` 末段。
 
-所有 cargo 命令形态：`CARGO_TARGET_DIR=<自己的> nice -n 19 bash scripts/run-with-memory-cap.sh 10G bash scripts/capped.sh 12 cargo test --offline --no-fail-fast -p <包> ...`。没跑 checker 档包 `singlefs-checker-tier` 的测试。
+所有 cargo 命令形态：`CARGO_TARGET_DIR=<自己的> nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 10G bash scripts/hosts/capped.sh 12 cargo test --offline --no-fail-fast -p <包> ...`。没跑 checker 档包 `singlefs-checker-tier` 的测试。

@@ -234,7 +234,7 @@ for s in setup crash-build crash-s0m crash-sdm; do bash $M/rerun.sh $W $s; done
 
 2. 可选：每个崩溃状态恢复之后再可写挂载、判、建一个号、判，命令同上，前面加 `OPUS_AFTER_RECOVERY=1`。每个状态要多做一次挂载、两次 checker，这一档没估过时间。
 
-3. 可选：F-W 副本上整份 `checker_known_bad_images`（1.5 那一行数）：先跑 `setup`、`kbi-fix` 两段，再跑 `OPUS_CODE=fix bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh <线程上限> $W/bin/kbi-fix`，看 `test result: ok. 151 passed`。本腿在副本上跑过一次，614 秒。
+3. 可选：F-W 副本上整份 `checker_known_bad_images`（1.5 那一行数）：先跑 `setup`、`kbi-fix` 两段，再跑 `OPUS_CODE=fix bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh <线程上限> $W/bin/kbi-fix`，看 `test result: ok. 151 passed`。本腿在副本上跑过一次，614 秒。
 
 ## 八、这条腿自己的限度
 

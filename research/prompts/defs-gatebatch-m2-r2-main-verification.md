@@ -41,7 +41,7 @@
 
 ## 三、实现次序
 
-1. 门禁审核会话交来的 54 号那一处替换（`/tmp/claude-1000/gate-fix-54-handoff/`：复用判定只认退 1 为可跳过，其余判红；换用 `scripts/stage-run-or-skip.sh`）先套上；
+1. 门禁审核会话交来的 54 号那一处替换（`/tmp/claude-1000/gate-fix-54-handoff/`：复用判定只认退 1 为可跳过，其余判红；换用 `scripts/gate/stage-run-or-skip.sh`）先套上；
 2. 这一节的改法由一个通用 agent 做（规格另写），每条先在旧代码上造会红的输入；
 3. 实分一（层 0 双机分片）交来的 `admission.py`、54 号、`stage-inputs.tsv`、`lib_heavy_tests.py` 四份 diff（`/tmp/claude-1000/impl-shard-1/deliver/`）在 2 之后按新代码重打；
 4. 第三轮攻 2、3 的改后字面（第一、二轮攻过的面不重复），腿跑着时这几份文件不动。
@@ -52,7 +52,7 @@
 
 ## 五、按路径点名被判的定义与文件（门禁 72 号）
 
-被判的：`.claude/gate.d/checker-tier-layer0-replay.sh`、`scripts/admission.py`、`.claude/gate.d/stage-inputs.tsv`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/rules/implementation-workflow.md`；一并核过（开工快照里、没改）的 `.claude/gate.d/stage-owners.tsv`、`.claude/agents/crash-verifier.md`、`scripts/check-segment-registry.py`、`.claude/main-agent.md`、`.claude/agents/gate-triage.md`。
+被判的：`.claude/gate.d/checker-tier-layer0-replay.sh`、`scripts/gate/admission.py`、`.claude/gate.d/stage-inputs.tsv`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/rules/implementation-workflow.md`；一并核过（开工快照里、没改）的 `.claude/gate.d/stage-owners.tsv`、`.claude/agents/crash-verifier.md`、`scripts/crash/check-segment-registry.py`、`.claude/main-agent.md`、`.claude/agents/gate-triage.md`。
 
 ## 回看决策
 

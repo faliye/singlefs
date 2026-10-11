@@ -17,9 +17,9 @@ mkdir -p "$OUT"
 export CARGO=$(command -v cargo)
 # 内存包装：探针峰值只有几十 MB，峰值表里有记录之后 8G 会被拒，写明理由再起
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="探针内存峰值只有几十兆，取保守的八吉上限"
-capped() { nice -n 19 bash "$ROOT/scripts/run-with-memory-cap.sh" 8G bash "$ROOT/scripts/capped.sh" 8 "$@"; }
+capped() { nice -n 19 bash "$ROOT/scripts/hosts/run-with-memory-cap.sh" 8G bash "$ROOT/scripts/hosts/capped.sh" 8 "$@"; }
 export CARGO_TARGET_DIR="$OUT/target"
-nice -n 19 bash "$ROOT/scripts/capped.sh" 8 cargo build --offline --manifest-path "$HERE/probe/Cargo.toml" 2>&1 | tail -2
+nice -n 19 bash "$ROOT/scripts/hosts/capped.sh" 8 cargo build --offline --manifest-path "$HERE/probe/Cargo.toml" 2>&1 | tail -2
 PROBE=$OUT/target/debug/r3-l2-probe
 CLOSURE=$OUT/target/debug/closure
 capped "$PROBE" > "$OUT/probe-l2.out" 2>&1

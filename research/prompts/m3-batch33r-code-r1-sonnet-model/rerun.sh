@@ -19,8 +19,8 @@ has() { [[ "$stages" == *" $1 "* ]]; }
 if has 1 && [[ -e "$out" && -n "$(ls -A "$out" 2>/dev/null)" ]]; then echo "输出目录不空：$out" >&2; exit 2; fi
 export PYTHONDONTWRITEBYTECODE=1
 mkdir -p "$out"; out="$(cd "$out" && pwd)"
-cap="$SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
-capped="$SINGLEFS_REPO/scripts/capped.sh"
+cap="$SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh"
+capped="$SINGLEFS_REPO/scripts/hosts/capped.sh"
 export CARGO_TARGET_DIR="$out/target"
 copy="$out/copy"
 

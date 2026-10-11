@@ -64,7 +64,7 @@ crash.rs `ddf64360…`、crash_injection.rs `bbfe7d37…`、transaction.rs `af33
 
 命令形态（run2 的原样；另外几次只改 `PROBE_*` 与变异开关）：
 ```
-PROBE_POLICY=consult PROBE_SEGMENT_WRITES=12 PROBE_RANDOM=200 nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 12G bash /home/fy5090/code/singlefs/scripts/capped.sh 16 cargo test --release --offline -p singlefs-harness --test zz_k3_9_probe -- --nocapture
+PROBE_POLICY=consult PROBE_SEGMENT_WRITES=12 PROBE_RANDOM=200 nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 12G bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 16 cargo test --release --offline -p singlefs-harness --test zz_k3_9_probe -- --nocapture
 ```
 
 | 次 | 代码 | 恢复策略 | 第二截 | TOTAL 行（原样） | 耗时 |
@@ -108,7 +108,7 @@ PROBE_POLICY=without PROBE_STAGE2=0 … cargo test --release --offline -p single
 
 用 checker 档原封不动地回答「今天那条测试红不红」要跑的命令（**没跑**，属于重型测试，交主 agent 去问用户）：
 在打了变异 C 的仓副本里跑
-`SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 10 cargo test --release -p singlefs-checker-tier --test crash_injection_campaign -- --include-ignored every_crash_state_of_a_written_out_history_recovers_into_a_committed_version crash_injection_fast_tier_recovers_only_into_versions_the_model_committed`。
+`SINGLEFS_HEAVY_TESTS=user-request bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 10 cargo test --release -p singlefs-checker-tier --test crash_injection_campaign -- --include-ignored every_crash_state_of_a_written_out_history_recovers_into_a_committed_version crash_injection_fast_tier_recovers_only_into_versions_the_model_committed`。
 内存与时长都是估计、没量过：内存估计在几个 GiB 以内（每个状态要克隆一次 4 GiB 稀疏盘，只存写过的扇区）。
 时长按文件头那句「快档 debug 下单跑一百来秒」、release 更快，估计几分钟。
 它能多答的是第三截（二次崩溃）和 `crash_points >= 95`（`crash_injection_campaign.rs:415`）这条规模断言在变异 C 下的值，这两样探针都没复刻。

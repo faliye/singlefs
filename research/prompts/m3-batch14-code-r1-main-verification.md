@@ -7,7 +7,7 @@
 | 物 | 路径 | 核法 |
 |---|---|---|
 | 正文 / diff / 背景材料 | `research/prompts/_m3-batch14-code-r1-body.md`、`_m3-batch14-code-r1-diff.md`、`_m3-batch14-code-r1-background.md` | — |
-| 开工快照 | `research/prompts/m3-batch14-code-r1-snapshot/`（crates 21 份、kb 2 份）；冻结副本 `/tmp/claude-1000/m3-batch14-code-r1/tree/` | `bash scripts/snapshot-check.sh m3-batch14-code-r1`：23 份里 6 份对不上，倒推见 `m3-batch14-code-r1-snapshot/reversal-notes.md`。D16 反做本线第三次写回 2 处、根环第 9 批写回乙 4 处，D8 反做本线第三次写回 1 处，两份 sha256 都回到快照；四份 crates 文件的改动出自根环第 9 批补丁与 2026-10-03 那一次提交，腿引的代码行都指冻结副本，不受影响 |
+| 开工快照 | `research/prompts/m3-batch14-code-r1-snapshot/`（crates 21 份、kb 2 份）；冻结副本 `/tmp/claude-1000/m3-batch14-code-r1/tree/` | `bash scripts/devices/snapshot-check.sh m3-batch14-code-r1`：23 份里 6 份对不上，倒推见 `m3-batch14-code-r1-snapshot/reversal-notes.md`。D16 反做本线第三次写回 2 处、根环第 9 批写回乙 4 处，D8 反做本线第三次写回 1 处，两份 sha256 都回到快照；四份 crates 文件的改动出自根环第 9 批补丁与 2026-10-03 那一次提交，腿引的代码行都指冻结副本，不受影响 |
 | 云端正推（Sonnet） | `research/prompts/m3-batch14-code-r1-sonnet-output.md`（244 行，sha256 0924656f…），模型 `…-sonnet-model/` | — |
 | 云端攻方（Opus） | `research/prompts/m3-batch14-code-r1-opus-output.md`（240 行，sha256 ed2c5ce5…），模型 `…-opus-model/` | 报告开头列的 31 份文件 sha256 全部对上 |
 | 引文 | 两份腿报告 | `cite-check.py --root <冻结副本> --root . --background <背景材料>`：「✓ 核了 81 处引文，对上 81 处，没判 0 处」。腿引的 D16 第 37、38 行被根环写回乙改过，引到的那一段（第 37 行准入式子、第 38 行前半句）在快照原样里逐字相同 |

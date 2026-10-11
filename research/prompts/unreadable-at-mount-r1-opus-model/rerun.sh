@@ -6,7 +6,7 @@ set -euo pipefail
 FROZEN=${1:?冻结副本根}; WORK=${2:?工作目录}
 MODEL=$(cd "$(dirname "$0")" && pwd)
 REPO=/home/fy5090/code/singlefs
-CAP=$REPO/scripts/capped.sh; MEM=$REPO/scripts/run-with-memory-cap.sh
+CAP=$REPO/scripts/hosts/capped.sh; MEM=$REPO/scripts/hosts/run-with-memory-cap.sh
 INVESTIGATOR=$REPO/research/prompts/closeout-recheck-2026-09-28
 mkdir -p "$WORK/runs" "$WORK/tmp"
 for copy in base jia yi bing a d; do

@@ -43,12 +43,12 @@ case ${1:-} in
     (cd "$W/tree" && patch -p1 -s < "$HERE/mount-arms-i1.patch" && patch -p1 -s < "$HERE/workspace-member.patch")
     mkdir -p "$W/tree/crates/opus-i1-attack/src"
     cp "$HERE/Cargo.toml" "$W/tree/crates/opus-i1-attack/Cargo.toml"; cp "$HERE/main.rs" "$W/tree/crates/opus-i1-attack/src/main.rs"
-    cd "$W/tree" && nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 5G bash "$REPO/scripts/capped.sh" 15 cargo build --offline --release -p opus-i1-attack > "$W/out/build.log" 2>&1
+    cd "$W/tree" && nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 5G bash "$REPO/scripts/hosts/capped.sh" 15 cargo build --offline --release -p opus-i1-attack > "$W/out/build.log" 2>&1
     echo "setup 完：$W";;
   list) for s in $STAGES; do echo "$s  $(stage_env $s)"; done;;
   run)
     W=${2:?草稿目录}; s=${3:?阶段}; spec=$(stage_env "$s"); envs=${spec%%|*}; args=${spec#*|}
-    env $envs OPUS_WORKERS=14 nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 3G bash "$REPO/scripts/capped.sh" 15 "$W/tree/target/release/opus-i1-attack" $args > "$W/out/$s.log" 2>&1
+    env $envs OPUS_WORKERS=14 nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 3G bash "$REPO/scripts/hosts/capped.sh" 15 "$W/tree/target/release/opus-i1-attack" $args > "$W/out/$s.log" 2>&1
     echo "rc=$? $s";;
   compare)
     W=${2:?草稿目录}; differ=0; total=0

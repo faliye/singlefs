@@ -14,7 +14,7 @@ rsync -a --exclude target --exclude .git "$frozen/" "$work/repo/"
 (cd "$work/repo" && patch -p0 < "$here/src/opus-arms-and-mutations.patch")
 cp "$here/src/opus10zb_probe_abandoned_slot.rs" "$here/src/opus10zb_probe_form1.rs" "$work/repo/crates/singlefs-harness/tests/"
 targets="--test opus10zb_probe_abandoned_slot --test opus10zb_probe_form1 $(cat "$here/scripts/k3-targets.txt")"
-(cd "$work/repo" && nice -n 19 bash "$tools/scripts/capped.sh" 8 cargo test --no-run --offline -p singlefs-harness $targets --target-dir "$work/target")
+(cd "$work/repo" && nice -n 19 bash "$tools/scripts/hosts/capped.sh" 8 cargo test --no-run --offline -p singlefs-harness $targets --target-dir "$work/target")
 # 规格里的二进制名带编译散列：换成这一次编出来的。
 for spec in "$here"/scripts/spec-*.tsv; do
   out="$work/$(basename "$spec")"
@@ -27,7 +27,7 @@ for spec in "$here"/scripts/spec-*.tsv; do
 done
 sed "s#^D=.*#D=$work#" "$here/scripts/batch.sh" > "$work/batch.sh"
 sed "s#^D=.*#D=$work#" "$here/scripts/batch2.sh" > "$work/batch2.sh"
-run() { nice -n 19 bash "$tools/scripts/run-with-memory-cap.sh" 8G bash "$tools/scripts/capped.sh" 8 bash "$@"; }
+run() { nice -n 19 bash "$tools/scripts/hosts/run-with-memory-cap.sh" 8G bash "$tools/scripts/hosts/capped.sh" 8 bash "$@"; }
 cd "$work"
 split -l 6 -d spec-b6.tsv spec-b6-part
 for p in spec-b6-part*; do run "$work/batch.sh" "${p#spec-}" "$work/$p"; done

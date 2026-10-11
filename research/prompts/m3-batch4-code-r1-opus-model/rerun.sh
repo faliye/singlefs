@@ -12,7 +12,7 @@ patch -p1 < "$MODEL/walk-differential-hook.patch"
 cp "$MODEL/attack_b4_opus.rs" crates/singlefs-harness/tests/attack_b4_opus.rs
 run() {
   RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="原型每次跑的状态数不同，峰值随之变" \
-    nice -n 19 bash "$REPO/scripts/capped.sh" 7 bash "$REPO/scripts/run-with-memory-cap.sh" 8G "$@"
+    nice -n 19 bash "$REPO/scripts/hosts/capped.sh" 7 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 8G "$@"
 }
 # C2-1、C2-2、C1 几何扫描（run-c21-c22.log、run-geom.log）
 run cargo test --release --offline -p singlefs-harness --test attack_b4_opus -- --nocapture c2_1 c2_2 > "$WORK/run-c21-c22.log" 2>&1

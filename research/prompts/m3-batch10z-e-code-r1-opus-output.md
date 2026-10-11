@@ -9,14 +9,14 @@
 ```
 # 仓根。先拷一份冻结副本（冻结副本本身只读），编译目录单独一个，不与别的拷贝共用
 rsync -a --exclude target --exclude .git ~/.local/share/singlefs/work/m3-batch10z-e-code-r1/tree/ <拷贝>/
-bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 \
+bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 6 \
   bash research/prompts/m3-batch10z-e-code-r1-opus-model/run.sh <拷贝> <编译目录>
 # 改回去的探针（每条改完、跑完即还原）
-bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 python3 -I \
+bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 6 python3 -I \
   research/prompts/m3-batch10z-e-code-r1-opus-model/mutate_10ze.py <拷贝> <编译目录> H1-largest-is-the-last-judged H19-stop-with-one-waiting-block-stops …
-bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 env PYTHONDONTWRITEBYTECODE=1 python3 -I \
+bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 6 env PYTHONDONTWRITEBYTECODE=1 python3 -I \
   research/prompts/m3-batch10z-e-code-r1-opus-model/show_mutant_10ze.py <拷贝> <编译目录> H1-largest-is-the-last-judged
-bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 python3 -I \
+bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 6 python3 -I \
   research/prompts/m3-batch10z-e-code-r1-opus-model/rows_10ze.py <拷贝> <编译目录> 3329 3333 3335 3340 3341 3347 3348
 # 窗口宽度另按 RUST_BACKTRACE 不设、=1、=full 各跑一次 attack_10ze_window（output-window.txt）
 ```

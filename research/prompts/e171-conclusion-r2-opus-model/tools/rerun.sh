@@ -14,8 +14,8 @@ S4=/tmp/claude-1000/e171-s4/frozen-tree
 TODAY=/tmp/claude-1000/e171-conclusion-r1/tree
 R1MODEL=$REPO/research/prompts/e171-conclusion-r1-opus-model
 D=$REPO/scripts/experiments/target/e171-dumps
-CAP="bash $REPO/scripts/run-with-memory-cap.sh"
-CAPPED="bash $REPO/scripts/capped.sh $THREADS"
+CAP="bash $REPO/scripts/hosts/run-with-memory-cap.sh"
+CAPPED="bash $REPO/scripts/hosts/capped.sh $THREADS"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='e171-conclusion-r2 攻方复跑：自写探针换输入或换二进制'
 export PYTHONDONTWRITEBYTECODE=1
 mkdir "$WORK"

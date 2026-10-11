@@ -33,7 +33,7 @@ PY
 cd "$WS"
 echo "=== S=$S mutant=$MUTANT ==="
 set +e
-CARGO_TARGET_DIR="$TARGET" bash /home/fy5090/code/singlefs/scripts/capped.sh 7 cargo test --offline -p singlefs-harness \
+CARGO_TARGET_DIR="$TARGET" bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 7 cargo test --offline -p singlefs-harness \
   --test pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement \
   -- the_first_file_after_ten_warm_up_only_mounts the_first_file_after_nine_warm_up_only_mounts 2>&1 \
   | grep -E '^test |test result|panicked|left:|right:|前提|error(\[|:)' | cut -c1-520

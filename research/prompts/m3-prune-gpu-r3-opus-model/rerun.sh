@@ -18,10 +18,10 @@ cp "$model/attack.rs" "$model/r2.rs" "$model/r3.rs" "$scratch/repo/crates/single
 patch -s "$scratch/repo/crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs" < "$model/e161-hook.patch"
 (cd "$scratch/repo" && patch -s -p1 < "$model/crates-probes.patch" && patch -s -p1 < "$model/r3-hook.patch")
 rsync -a "$scratch/repo/" "$scratch/variant/"
-(cd "$scratch/repo" && CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 4 \
+(cd "$scratch/repo" && CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 4 \
   cargo build --release --offline -p singlefs-checker-tier --features verdict-store --bin e161_crash_state_dedup_and_time_split) > "$scratch/build.log" 2>&1
 for world in r3-dump r3-panic-location r3-f1-torn r3-multi-record r3-messages-by-batch; do
-  (cd "$scratch/repo" && nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 4 \
+  (cd "$scratch/repo" && nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 4 \
     "$scratch/target/release/e161_crash_state_dedup_and_time_split" attack "$world" 2>/dev/null | grep -v '^LAYER0' > "$scratch/out/$world.out")
 done
 bash "$model/variants.sh" "$scratch/variant" "$scratch/target-variant" "$scratch/variants" > "$scratch/variants.log" 2>&1

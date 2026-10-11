@@ -14,7 +14,7 @@ import re, sys, itertools, os
 TREE = sys.argv[1]
 REPO = sys.argv[2]
 SRC = os.path.join(TREE, "crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs")
-REPLAY = os.path.join(REPO, "scripts/replay.sh")
+REPLAY = os.path.join(REPO, "scripts/experiments/replay.sh")
 RESULTS = os.path.join(REPO, "research/results")
 text = open(SRC, encoding="utf-8").read()
 lines = text.split("\n")

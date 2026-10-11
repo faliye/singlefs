@@ -8,8 +8,8 @@
 
 - crates 快照：冻结副本 `/tmp/claude-1000/m3-conc-r1/tree/` 对 `research/prompts/m3-conc-r1-snapshot/crates-sha256.txt` 226 份全 OK。
 - kb 快照：`.claude/kb/milestone/03-third-txn.md`、`.claude/kb/checks-owed.md`、`.claude/kb/decisions/13-验证路线.md`、`.claude/kb/decisions/23-journal的角色与格式.md`、`.claude/kb/decisions/08-核心索引结构.md` 五份对不上，是开工之后别的会话的改动（攻方腿报 D13、D23 被引的句子一字没变、只挪了行）。两条腿引文按现文全对（下一条），判决只引现文。
-- cite-check：`python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-conc-r1/tree --root . --background research/prompts/_m3-conc-r1-background.md` 末行「✓ 核了 181 处引文，对上 181 处，没判 0 处」。
-- 复跑：两个模型目录拷进草稿目录经 `scripts/run-with-memory-cap.sh` 跑。正推 17 个模型：11 个去掉入库输出首行的包装头之后逐字相同；另 6 个按自己所在位置往上三层找仓根读产物，在草稿目录里搭同样的层次、`research/results` 用符号链接接回仓里之后逐字相同。攻方 `rerun.sh` 五份输出全部「same」（`fsync_probe.py` 是本机计时取样，照它文件头不复跑相等）。
+- cite-check：`python3 scripts/agents/cite-check.py <两份报告> --root /tmp/claude-1000/m3-conc-r1/tree --root . --background research/prompts/_m3-conc-r1-background.md` 末行「✓ 核了 181 处引文，对上 181 处，没判 0 处」。
+- 复跑：两个模型目录拷进草稿目录经 `scripts/hosts/run-with-memory-cap.sh` 跑。正推 17 个模型：11 个去掉入库输出首行的包装头之后逐字相同；另 6 个按自己所在位置往上三层找仓根读产物，在草稿目录里搭同样的层次、`research/results` 用符号链接接回仓里之后逐字相同。攻方 `rerun.sh` 五份输出全部「same」（`fsync_probe.py` 是本机计时取样，照它文件头不复跑相等）。
 
 ## 二、各格
 

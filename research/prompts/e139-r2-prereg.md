@@ -6,9 +6,9 @@
 
 - 上一次登记 `research/prompts/e139-r1-prereg.md`（sha256 `1310c46198ba04ea6bc214e4e74ab35aa80f5dca5fa778c4610ba623d762a235`，第十二节有执行员修订 R1–R4）；原登记已归档，取法见上一次登记文件头。本登记写「同第 1 次」的地方都指 `e139-r1-prereg.md`。
 - 设计时没读第 1 次重跑的产物 `research/results/e139-tightened-floor-2026-10-04.out`（只取了 sha256 与字节数），没读实验页 `.claude/kb/experiments/139-按盘回退下界的收严形态.md` 的「### 第 1 次重跑」一节与判决、代价各节；实验页只读了标题行与 `grep -n '不大于条款'` 命中的第 206、274 行（被问的那一句就在这两行）。读到的已有的数照实列在第四节。
-- **装置写在哪（写死）**：`scripts/experiments/e139_tightened_floor.rs` 原地改（独立手写模型，不与 `crates/` 共用代码，`.claude/rules/implementation-first.md` 第 4 条），不走入库装置。第 1 次的全部臂、全部行的代码与输出一行不改，新东西另加；产物按日期另存新文件名 `research/results/e139-tightened-floor-<日期>.out`，`e139-tightened-floor-2026-10-04.out` 不覆盖；`scripts/replay.sh` 第 172 行改指新产物；变异表 `scripts/mutations/e139_tightened_floor.tsv` 照第九节追加。
+- **装置写在哪（写死）**：`scripts/experiments/e139_tightened_floor.rs` 原地改（独立手写模型，不与 `crates/` 共用代码，`.claude/rules/implementation-first.md` 第 4 条），不走入库装置。第 1 次的全部臂、全部行的代码与输出一行不改，新东西另加；产物按日期另存新文件名 `research/results/e139-tightened-floor-<日期>.out`，`e139-tightened-floor-2026-10-04.out` 不覆盖；`scripts/experiments/replay.sh` 第 172 行改指新产物；变异表 `scripts/mutation/tables/e139_tightened_floor.tsv` 照第九节追加。
 - 输入 sha256（写登记时现取）：装置 `f1c65104ca0d855ee790c5a366c5aa4e4cc144e49e639a7a729c2e9bde132446`，变异表 `3958c7fa168123e1d06922e397ed7bc8f286371db669fefc8742186cb99ff22f`，第 1 次产物 `2563dde0002f65c266a5223ecc3973a78e715ab1ba0a5e02f2ecbabd8448bdd2`（767430 字节），问题单 `research/prompts/m3-r1-e139-r2-questions.md` `d0f8cf5990699138e40549f5c20a21b2fe3e61a54aa1613d1bf2b0438bd2acc3`，判决 `research/prompts/m3-reclaim-window-r1-main-verification.md` `0d660fd2946346322a9755c2a07fb1fd6fd5425eb697a60c7516b71e3a982de4`，岔路单 `research/prompts/m3-reclaim-window-r1-forks.md` `27da6a67e95afb1f69b1eb16f0c93d34028b2ec0ae530edcd06fefb30d6fbb42`，D16 `7d0ae12ed1a2d732f988bff3a81966df27506cac1e6b121bfb4e3cdb866854ea`，`.claude/kb/checks-owed.md` `12d909782d74fac4fb97efa2efddce4e1086a5c71b6ed54b742770265e95daf5`。
-- 准入：`python3 scripts/admission.py experiment /home/fy5090/code/singlefs E139` 这一次退 2，原样输出「✗ 准入登记里没有实验键 E139（.claude/gate.d/stage-inputs.tsv）」——准入登记表里没有 E139 这一行，判不了「输入变没变」；这一趟的输入确实变了（装置要改、加臂），不是差分重跑，十三节照写全。
+- 准入：`python3 scripts/gate/admission.py experiment /home/fy5090/code/singlefs E139` 这一次退 2，原样输出「✗ 准入登记里没有实验键 E139（.claude/gate.d/stage-inputs.tsv）」——准入登记表里没有 E139 这一行，判不了「输入变没变」；这一趟的输入确实变了（装置要改、加臂），不是差分重跑，十三节照写全。
 - 格式常量与这台装置无关（装置不建字节），同第 1 次文件头那一条。
 
 ## 一、问题
@@ -46,7 +46,7 @@
 
 ## 二、被测条款与它引的定义
 
-`scripts/quote-kb.py` 整抄五段（同第 1 次的五个取法，D16 已定项 1 用 `@` 标题取），回读逐字节一致（命令在第十三节）。D16 自第 1 次登记以来改过：已定项 1 由第 27–81 行变成第 27–82 行，「根槽这一次读坏」「正常卸载」两行改了措辞或式子、「依据」多一条（再挂时某块盘一条有效根都读不出只放到一圈窗口里最旧有效根）；装置没有读错、不建卸载，这两行都是第十一节已登记的「不建」。用户 2026-10-04 定的 RGall 还没写回条款，今天这一节里「可再分配」「一圈窗口里最旧有效根」两行仍是窗口（判决第六节：「决策正文随下一轮实现同一批写回」）；RGall 的定义取「环里最旧有效根」那一行（下面整抄）与判决第六节的定案原话，不取这两行的窗口。定义不是答案：已定项 1 正文里嵌着第一次跑出的数，列在第四节。
+`scripts/kb/quote-kb.py` 整抄五段（同第 1 次的五个取法，D16 已定项 1 用 `@` 标题取），回读逐字节一致（命令在第十三节）。D16 自第 1 次登记以来改过：已定项 1 由第 27–81 行变成第 27–82 行，「根槽这一次读坏」「正常卸载」两行改了措辞或式子、「依据」多一条（再挂时某块盘一条有效根都读不出只放到一圈窗口里最旧有效根）；装置没有读错、不建卸载，这两行都是第十一节已登记的「不建」。用户 2026-10-04 定的 RGall 还没写回条款，今天这一节里「可再分配」「一圈窗口里最旧有效根」两行仍是窗口（判决第六节：「决策正文随下一轮实现同一批写回」）；RGall 的定义取「环里最旧有效根」那一行（下面整抄）与判决第六节的定案原话，不取这两行的窗口。定义不是答案：已定项 1 正文里嵌着第一次跑出的数，列在第四节。
 
 **出处 `.claude/kb/decisions/16-发布语义.md:27-82`（整段抄，未转述）**
 
@@ -330,7 +330,7 @@ RGall 的六处（判决第六节与 D16 已定项 1「一圈窗口里最旧有�
 
 ## 九、变异
 
-追加进 `scripts/mutations/e139_tightened_floor.tsv`，原 26 条照旧跑。加变体、改 `match` 之后先对原 26 条的原文逐条数命中，命中不是 1 次的照第 1 次第十二节 R1 的办法只修锚点（破坏点不变），写进本登记第十二节。每条写明在哪个取样点上改变输出；跑完某条没红，按 `.claude/rules/mutation-sampling.md` 三分，先问「换一个取样点它还同值吗」，不许直接记成等价或盲区。
+追加进 `scripts/mutation/tables/e139_tightened_floor.tsv`，原 26 条照旧跑。加变体、改 `match` 之后先对原 26 条的原文逐条数命中，命中不是 1 次的照第 1 次第十二节 R1 的办法只修锚点（破坏点不变），写进本登记第十二节。每条写明在哪个取样点上改变输出；跑完某条没红，按 `.claude/rules/mutation-sampling.md` 三分，先问「换一个取样点它还同值吗」，不许直接记成等价或盲区。
 
 | # | 变异 | 在哪个取样点上改变输出 | 预期由谁抓 |
 |---|---|---|---|
@@ -419,7 +419,7 @@ RGall 的六处（判决第六节与 D16 已定项 1「一圈窗口里最旧有�
 
 | # | 改了什么 | 依据 | 性质 |
 |---|---|---|---|
-| R1 | 变异表 `scripts/mutations/e139_tightened_floor.tsv`：M1 的原文与替换文里 `Arm::TightenedStatesWindowed(_)` 之后各加 `\| Arm::ClauseFloorWindowed(_) \| Arm::WholeRing(_)`；MW7 的原文与替换文里 `Arm::TightenedStatesWindowed(window_arm)` 之后各加 `\| Arm::ClauseFloorWindowed(window_arm)`；其余 24 条一字不动 | 装置加了 `Arm::ClauseFloorWindowed`、`Arm::WholeRing` 两个变体并把它们并进这两处的或模式之后，对 26 条原文逐条数命中：M1、MW7 各 0 次，其余 24 条各 1 次（`count_anchors.py` 的输出在报告里）；破坏点不变（M1 让活化判定恒真，MW7 让回收门槛不取 F_生效） | 只修锚点（第九节第一段要求的办法，照第 1 次 R1） |
+| R1 | 变异表 `scripts/mutation/tables/e139_tightened_floor.tsv`：M1 的原文与替换文里 `Arm::TightenedStatesWindowed(_)` 之后各加 `\| Arm::ClauseFloorWindowed(_) \| Arm::WholeRing(_)`；MW7 的原文与替换文里 `Arm::TightenedStatesWindowed(window_arm)` 之后各加 `\| Arm::ClauseFloorWindowed(window_arm)`；其余 24 条一字不动 | 装置加了 `Arm::ClauseFloorWindowed`、`Arm::WholeRing` 两个变体并把它们并进这两处的或模式之后，对 26 条原文逐条数命中：M1、MW7 各 0 次，其余 24 条各 1 次（`count_anchors.py` 的输出在报告里）；破坏点不变（M1 让活化判定恒真，MW7 让回收门槛不取 F_生效） | 只修锚点（第九节第一段要求的办法，照第 1 次 R1） |
 | R2 | 第九节新 16 条变异里 MR1 的原文多带一行（`None => true,` 后接 `Some(_) => txg_is_inside_window(…)` 那一行）、MR2 的原文多带一行（`else` 前接 `self.oldest_valid_txg_in_the_reclaim_window(self.ring_depth - REGION_COUNT).unwrap_or(0)`） | 只写 `None => true,` 在源码里命中 3 次、只写 `} else { self.oldest_persisted_valid_txg() }` 命中 2 次，不唯一；加一行上下文之后 42 条各命中 1 次；破坏点不变 | 只修锚点（新行） |
 | R3 | 采样点与字段落成文字：① 下界差 g、`rollback_target_changed`、`fakes_with_the_old_floor`、`checks_old_set_strictly_larger`、`checks_new_set_strictly_larger`、`system_configuration_below_root_floor_events` 在每次 `record_check`（含恢复里那一次）与每次 `admin_rollback` 选目标时各读一次，只在 `Arm::collects_second_rerun_observations` 的臂上采，`w_` 行不读；② ⓐ 在 `crash_and_recover` 里 `adopt_floors` 之后采，ⓑ、ⓒ 与 `stale_beyond_two_revolutions` 在 `publish` 里 `record_check` 之后采；③ `disk_without_valid_root_events` 在每次决定抬不抬 F 的位置（`push_after_commit` 的循环与 `forced_pressure` 里调 `observe_ceiling_difference` 处）读一次，不含 `activation_prefix` 里直接 `raise_floor_to(floor_upper_limit())` 的那一次；④ 刻度起点 T₀：`disk_stuck` 取卡住那一刻、`broken_slot` 与 H1 取坏槽开始那一刻的 `next_txg`；「这条臂放掉的块数」= `free_blocks` 里 Live 变 Freed 的块数累计；⑤ ⓑ 的 x 在 `_short` 阳性对照上门槛比窗口高、为负，照报；⑥ 「有上界」判 s(2→4) < 1/2 写成 2 × 增量 < 放掉的块数，不取整；⑦ `f_changed_row` 的类名：甲 `jia_count_basis_only`、乙 `yi_walk_changed`、丙 `bing_floor_gap_never_positive`；⑧ 逐行比的旧一边用同一次运行里 `w_` 行（旧下界），不读第 1 次产物文件；`w_` 行与第 1 次产物逐字相同由第六节第 2 行另判；⑨ 判决行另出 `verdict_f_clauses` 一行，把第十节 F1、F3、F4、F5、F7、F8、F9、F10、F11 与第十一节 V5–V8 各自打中的计数列成字段，只是把已登记的条件数出来，不改门槛 | 登记第六节第 4–8、11–17 行与第八节的字面；单测 K10、K12、K13 钉了 g、`disk_without_valid_root_events`、刻度与斜率的取值，采样点不同取值就不同 | 口径落成文字（照第 1 次 R4） |
 | R4 | `disk_stuck` 的模拟把快照留存上限从 64 放大到 1024（`STUCK_SNAPSHOTS_KEPT`，字段 `snapshots_kept_limit`），别的世界仍 64 | 卡住那块盘上的旧根可以比 64 次发布还老，恢复挑到它时它的快照早被挤掉，`restore_snapshot` 失败会记成不可恢复——那是模型的快照留存不够，不是臂的行为；原常量的注释「要大于最大的根环深度 48」是按每个根都不老于一圈写的。第 1 次的世界不受影响（上一条诊断运行前 2230 行逐字相同） | 补装置细节，不改判据 |
@@ -448,16 +448,16 @@ RGall 的六处（判决第六节与 D16 已定项 1「一圈窗口里最旧有�
 | `.claude/kb/checks-owed.md` | grep 命中 113、236、301、519、665、666（每行前 200 字）；519 整行（经 `quote-kb.py`） |
 | `.claude/kb/decisions/23-journal的角色与格式.md` | 399、402 |
 | `scripts/experiments/e139_tightened_floor.rs` | 1–1551、1551–1800、1796–1895、1900–2579、2580–2600、2940–2960；`grep -n` 函数与类型清单 |
-| `scripts/mutations/e139_tightened_floor.tsv` | 第 1 列（26 条变异名） |
-| `scripts/replay.sh` | 172（grep 命中） |
+| `scripts/mutation/tables/e139_tightened_floor.tsv` | 第 1 列（26 条变异名） |
+| `scripts/experiments/replay.sh` | 172（grep 命中） |
 | `.claude/gate.d/stage-inputs.tsv` | `grep -n 'e139\|E139'` 零命中 |
-| `scripts/admission.py` | 1–40 |
+| `scripts/gate/admission.py` | 1–40 |
 | `crates/singlefs-core/src/recovery.rs` | 1835–1900；grep 命中 1561、1590、1618、1662、1709、1768、1835、1892 |
 | `crates/singlefs-core/src/mount.rs` | 5874–5935、3115–3150；grep 命中 49–51、68、108、129、134、137、139–140、181、191、198–199、225、237、252、258–259、261、265、267–268、271–272、331–332、519、1205、1347、1787、1835、1847、1870、1879、2241、2530、2758、2866、2954、3032、3035–3036、3069、3124、3127、3138、5062、5874、5898、5906、5916、6584 |
 | `crates/singlefs-core/src/transaction.rs` | 597–606 |
 | `crates/singlefs-core/src/system_configuration.rs` | grep 命中 321、533、607、611、638 |
 | `crates/singlefs-core/src/root_ring.rs`、`allocator.rs`、`crates/singlefs-checker/src/walk.rs` | 窗口谓词 grep 的 26 处命中行号（第三节） |
-| `scripts/quote-kb.py`、`scripts/replace-once.py` | `--help` 输出 |
+| `scripts/kb/quote-kb.py`、`scripts/kb/replace-once.py` | `--help` 输出 |
 
 没读：第 1 次重跑的产物与 `research/results/` 下任何文件的内容；实验页的「### 第 1 次重跑」一节（206、274 两行 grep 命中除外）与判决、代价、补记、历史版本各节；两条三方腿的报告其余部分与模型的输出目录。
 
@@ -465,19 +465,19 @@ RGall 的六处（判决第六节与 D16 已定项 1「一圈窗口里最旧有�
 
 ```bash
 cat research/prompts/m3-r1-e139-r2-questions.md; wc -l research/prompts/e139-r1-prereg.md research/prompts/m3-reclaim-window-r1-main-verification.md research/prompts/m3-reclaim-window-r1-forks.md .claude/singlefs-ai-sop/rules/test-discipline.md .claude/rules/three-way-inference.md .claude/singlefs-ai-sop/rules/evidence-discipline.md .claude/rules/mutation-sampling.md .claude/rules/implementation-first.md
-f=scripts/experiments/e139_tightened_floor.rs; wc -l $f; sha256sum $f scripts/mutations/e139_tightened_floor.tsv research/prompts/m3-r1-e139-r2-questions.md research/prompts/e139-r1-prereg.md research/prompts/m3-reclaim-window-r1-main-verification.md research/prompts/m3-reclaim-window-r1-forks.md '.claude/kb/decisions/16-发布语义.md' .claude/kb/checks-owed.md; grep -n '^fn \|^    fn \|^enum \|^struct \|^impl \|^const \|^static \|^mod \|^#\[cfg(test)\]' $f | head -250
+f=scripts/experiments/e139_tightened_floor.rs; wc -l $f; sha256sum $f scripts/mutation/tables/e139_tightened_floor.tsv research/prompts/m3-r1-e139-r2-questions.md research/prompts/e139-r1-prereg.md research/prompts/m3-reclaim-window-r1-main-verification.md research/prompts/m3-reclaim-window-r1-forks.md '.claude/kb/decisions/16-发布语义.md' .claude/kb/checks-owed.md; grep -n '^fn \|^    fn \|^enum \|^struct \|^impl \|^const \|^static \|^mod \|^#\[cfg(test)\]' $f | head -250
 grep -n '每个洞\|893\|583' research/prompts/m3-reclaim-window-r1-sonnet-output.md | head -20; grep -n 'def \|pinned\|held' research/prompts/m3-reclaim-window-r1-sonnet-model/probe_gate_cost_after_hole.py | head -40
 cat -n research/prompts/m3-reclaim-window-r1-sonnet-model/probe_gate_cost_after_hole.py | head -40; sed -n 240,250p research/prompts/m3-reclaim-window-r1-sonnet-output.md | cut -c1-400
 f='.claude/kb/experiments/139-按盘回退下界的收严形态.md'; wc -l "$f"; grep -n '^#' "$f"; grep -n '不大于条款' "$f" | cut -c1-600
-sha256sum crates/singlefs-core/src/root_ring.rs crates/singlefs-core/src/allocator.rs crates/singlefs-core/src/mount.rs crates/singlefs-core/src/recovery.rs crates/singlefs-checker/src/walk.rs; git status --short crates/ | head; ls -la research/results/ | grep e139; git ls-files research/results | grep e139; grep -n 'e139\|E139' scripts/replay.sh .claude/gate.d/stage-inputs.tsv
+sha256sum crates/singlefs-core/src/root_ring.rs crates/singlefs-core/src/allocator.rs crates/singlefs-core/src/mount.rs crates/singlefs-core/src/recovery.rs crates/singlefs-checker/src/walk.rs; git status --short crates/ | head; ls -la research/results/ | grep e139; git ls-files research/results | grep e139; grep -n 'e139\|E139' scripts/experiments/replay.sh .claude/gate.d/stage-inputs.tsv
 sha256sum research/results/e139-tightened-floor-2026-10-04.out; grep -n 'fn effective_rollback_floor\|system_configuration_floor\|floor_in_the_system_configuration\|SystemConfiguration.*floor\|configuration.*rollback_floor' crates/singlefs-core/src/recovery.rs | head -20; grep -n 'fn rollback_candidate\|effective_rollback_floor\|txg_is_inside_the_one_revolution_window\|fn reclaim_floor\|oldest_valid_root_in_the_window' crates/singlefs-core/src/mount.rs | head -40
 sed -n 1835,1900p crates/singlefs-core/src/recovery.rs; sed -n 5874,5935p crates/singlefs-core/src/mount.rs; grep -n 'write_the_new_floor\|system configuration\|系统配置' crates/singlefs-core/src/mount.rs | head -20
 grep -n 'RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot' crates/singlefs-core/src/mount.rs | head; grep -n 'fn write_the_raised_floor\|fn .*floor.*system_configuration\|fn .*system_configuration.*floor' crates/singlefs-core/src/*.rs | head; grep -n 'rollback_floor' crates/singlefs-core/src/system_configuration.rs | head -5
 sed -n 3115,3150p crates/singlefs-core/src/mount.rs; sed -n 597,606p crates/singlefs-core/src/transaction.rs; sha256sum crates/singlefs-core/src/transaction.rs crates/singlefs-core/src/system_configuration.rs; git status --short crates/singlefs-core/ crates/singlefs-checker/
 grep -n '^#' '.claude/kb/decisions/16-发布语义.md' | head -20; grep -n 'C660\|E139' .claude/kb/checks-owed.md | cut -c1-200 | head; grep -n '根槽写失败重发时\|这一版的失败处置' '.claude/kb/decisions/23-journal的角色与格式.md' | cut -c1-80
-nice -n 19 python3 scripts/quote-kb.py /tmp/claude-1000/m3-r1/batch10-e139-design/quote-section2.md '.claude/kb/decisions/16-发布语义.md@#### 已定项 1：defer 窗口取按盘回退下界的收严形态，按状态数读' '.claude/kb/decisions/16-发布语义.md~^\| 1 \| \*\*defer 窗口取多大\*\*' '.claude/kb/checks-owed.md~^\| C660 \|' '.claude/kb/decisions/23-journal的角色与格式.md:399-399' '.claude/kb/decisions/23-journal的角色与格式.md:402-402'
+nice -n 19 python3 scripts/kb/quote-kb.py /tmp/claude-1000/m3-r1/batch10-e139-design/quote-section2.md '.claude/kb/decisions/16-发布语义.md@#### 已定项 1：defer 窗口取按盘回退下界的收严形态，按状态数读' '.claude/kb/decisions/16-发布语义.md~^\| 1 \| \*\*defer 窗口取多大\*\*' '.claude/kb/checks-owed.md~^\| C660 \|' '.claude/kb/decisions/23-journal的角色与格式.md:399-399' '.claude/kb/decisions/23-journal的角色与格式.md:402-402'
 sed -n 48,130p research/prompts/e139-r1-prereg.md > /tmp/claude-1000/m3-r1/batch10-e139-design/r1-quote.md; diff /tmp/claude-1000/m3-r1/batch10-e139-design/r1-quote.md /tmp/claude-1000/m3-r1/batch10-e139-design/quote-section2.md | cut -c1-1500
-nice -n 19 python3 scripts/admission.py experiment /home/fy5090/code/singlefs E139
+nice -n 19 python3 scripts/gate/admission.py experiment /home/fy5090/code/singlefs E139
 grep -rn 'txg_is_inside_the_one_revolution_window\|OneRevolutionWindow' crates/singlefs-core/src crates/singlefs-checker/src | grep -v '^\s*//' | awk -F: '{print $1":"$2}' | tr '\n' ' '
 grep -n 'let system_configuration_writes_before_the_first_publish\|预演过了、第一次发布之前：先把新 F' crates/singlefs-core/src/mount.rs; grep -n 'if target.checkpoint_txg < effective_floor' crates/singlefs-core/src/mount.rs; grep -n 'let highest_in_the_system_configurations\|let highest_on_the_abandoned_roots\|highest_on_the_roots$' crates/singlefs-core/src/recovery.rs
 python3 /tmp/claude-1000/m3-r1/batch10-e139-design/anchors_r2.py

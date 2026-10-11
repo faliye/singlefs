@@ -4,7 +4,7 @@
 sonnet_g2_model.rs    放进拷贝的 crates/singlefs-harness/tests/，只用公开接口：真 GpuMemoryLedger + 一张假的物理卡。
                       4 条：k1_3（等失败的借据卡在设备丢了那一刻活着的集合里）、k1_2（等失败的借据一笔笔累加）、
                       k3_1（随机操作，账不许给多于物理上真能再借的；SEEDS=<种子数>）、k3_2（Remain 状态少给多少、什么时候回来）。
-                      跑法（拷贝根目录）：SEEDS=200000 CARGO_TARGET_DIR=<目录> bash scripts/run-with-memory-cap.sh 1G bash scripts/capped.sh 4 \
+                      跑法（拷贝根目录）：SEEDS=200000 CARGO_TARGET_DIR=<目录> bash scripts/hosts/run-with-memory-cap.sh 1G bash scripts/hosts/capped.sh 4 \
                         cargo test --offline -p singlefs-harness --test sonnet_g2_model -- --nocapture
 parse_rows.py         把 _m3-batch10z-f-code-r1-diff.md 里追加 27 行与整行替换 9 行的变异表抽成 rows.json
 run_mut.py            对拷贝逐行注入变异、跑那一行点名的测试、还原（环境变量 ROWS=行文件，LOGP=日志前缀，SEEDS 透传）；参数：工作号 工作数 起 止

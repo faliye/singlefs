@@ -6,5 +6,5 @@ batch=$1; name=$2; shift 2
 mkdir -p "$S/runs/$batch"
 B=$(ls -t $S/target/release/deps/opus_s2_probe-* | grep -v '\.d$' | head -1)
 cd "$S"
-env "$@" nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 4G bash /home/fy5090/code/singlefs/scripts/capped.sh 1 "$B" --nocapture s2_sweep > "$S/runs/$batch/$name.log" 2>&1
+env "$@" nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 4G bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 1 "$B" --nocapture s2_sweep > "$S/runs/$batch/$name.log" 2>&1
 echo "$?" > "$S/runs/$batch/$name.rc"

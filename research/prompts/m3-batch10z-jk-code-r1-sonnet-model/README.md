@@ -11,4 +11,4 @@
 - `scripts/run.sh`、`runjobs.sh`（并行起一批）、`agg.py`（汇总）；`jobs-*.txt` 是三批的件表；`mutdrv.py` 加 `muts-*.tsv` 与 `extra-*.json` 是变异驱动与变异行；
   `scan-model/` 是第十一块 checker 档两条扫源码用例的逐字搬运，`scanmut.py` 在冻结副本的源文件上套变异后喂它。
 - `logs/`：各批汇总；`runs/`：每一件的原始输出（`.log`）与退出码（`.rc`）。
-- 重跑要的命令都经 `scripts/run-with-memory-cap.sh` 与 `capped.sh`；release 构建探针：`cargo test --release --offline -p singlefs-harness --test probe_jk --no-run`。
+- 重跑要的命令都经 `scripts/hosts/run-with-memory-cap.sh` 与 `capped.sh`；release 构建探针：`cargo test --release --offline -p singlefs-harness --test probe_jk --no-run`。

@@ -13,8 +13,8 @@ $ cd ~/.local/share/singlefs/work/m3-batch10y-code-r1/tree; sha256sum -c /home/f
 ```
 
 跑法：草稿副本 `~/.local/share/singlefs/work/m3-batch10y-code-r1-sonnet/repo`（从冻结副本 rsync，排除 /target、/.git、/scripts/experiments/target），编译目录 `~/.local/share/singlefs/work/m3-batch10y-code-r1-sonnet/target`（交回前删）。
-所有 cargo test 经 `nice -n 19 bash scripts/capped.sh 4 bash scripts/run-with-memory-cap.sh <4G 或 6G> bash <脚本>`；只跑 harness 档（`singlefs-harness` 的 `--lib` 与我自己加在草稿副本 `tests/` 下的探针），没碰 checker 档包的测试。
-开跑前 `python3 scripts/host-resources.py` 看到（原样）：
+所有 cargo test 经 `nice -n 19 bash scripts/hosts/capped.sh 4 bash scripts/hosts/run-with-memory-cap.sh <4G 或 6G> bash <脚本>`；只跑 harness 档（`singlefs-harness` 的 `--lib` 与我自己加在草稿副本 `tests/` 下的探针），没碰 checker 档包的测试。
+开跑前 `python3 scripts/hosts/host-resources.py` 看到（原样）：
 
 ```
   线程：32 核，此刻在用约 28.7 核（loadavg 19.03 9.66 14.04），可用 3 线程

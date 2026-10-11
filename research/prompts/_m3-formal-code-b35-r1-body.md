@@ -58,4 +58,4 @@ B4 新取样点之后还有没有存活的窗口变体（`.claude/rules/mutation
 - 腿提的新判法、新用例算零轮；条款没写、要用户定的，交用户，不由腿或主 agent 定。
 - 重型测试不跑：checker 档的测试、GPU 对拍与 `crates/mutations.tsv` 整表都不跑，涉及它们的结论写「推的」；harness 档测试可以跑。
 
-交付：腿的报告写 `research/prompts/m3-formal-code-b35-r1-<腿名>-output.md`，分段落盘（每次写进文件不超过 150 行，第一段排他新建，回复只写短句）；模型与脚本放 `research/prompts/m3-formal-code-b35-r1-<腿名>-model/`，带一份 `tools/rerun.sh`（每条 cargo 经 `scripts/run-with-memory-cap.sh`，上限按峰值表给或写 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON`）；草稿放 `/tmp/claude-1000/<腿名>/`。引 kb 条款写 kb 文件自己的行号（去 kb 文件里现查，不从背景材料里数）。方案按 `crates/` 今天的实现来谈。
+交付：腿的报告写 `research/prompts/m3-formal-code-b35-r1-<腿名>-output.md`，分段落盘（每次写进文件不超过 150 行，第一段排他新建，回复只写短句）；模型与脚本放 `research/prompts/m3-formal-code-b35-r1-<腿名>-model/`，带一份 `tools/rerun.sh`（每条 cargo 经 `scripts/hosts/run-with-memory-cap.sh`，上限按峰值表给或写 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON`）；草稿放 `/tmp/claude-1000/<腿名>/`。引 kb 条款写 kb 文件自己的行号（去 kb 文件里现查，不从背景材料里数）。方案按 `crates/` 今天的实现来谈。

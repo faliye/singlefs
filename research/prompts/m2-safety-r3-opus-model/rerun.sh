@@ -6,7 +6,7 @@
 # 默认：/tmp/claude-1000/safety-r3-frozen、/tmp/claude-1000/m2-safety-r3-opus-rerun、<工作目录>/out。
 # ⚠️ 冻结副本 /tmp/claude-1000/safety-r3-frozen 在 2026-09-26 被改过四个文件，下面的 sha256 核对会拒它；
 #    给一份与快照相同的仓根（这条腿交回时留着的 /tmp/claude-1000/m2-safety-r3-opus/tree 倒回补丁之后就是，见报告「没做什么」）。
-# 编译与跑一律经 scripts/run-with-memory-cap.sh（10G）与 scripts/capped.sh（6 线程）。
+# 编译与跑一律经 scripts/hosts/run-with-memory-cap.sh（10G）与 scripts/hosts/capped.sh（6 线程）。
 # 挂钟（6 线程，这条腿量的）：E1 2.6 分、E3 0.7 分、E4 0.8 分、E6 4.8 分、E7 13.1 分、E8 10.7 分、E10 7.3 分、E2 13.0 分、E5 43.9 分、E7/E1 的 P3r 3 分。
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,8 +24,8 @@ cp "$HERE/opus_r3_p3_attack.rs" "$WORK/tree/crates/singlefs-harness/tests/opus_r
 export CARGO_TARGET_DIR="$WORK/target"
 run() {  # run <日志名> <用例名前缀> [环境变量…]
   local log="$1" filter="$2"; shift 2
-  ( cd "$WORK/tree" && env "$@" nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" "$CAP" \
-      bash "$REPO/scripts/capped.sh" "$THREADS" \
+  ( cd "$WORK/tree" && env "$@" nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" "$CAP" \
+      bash "$REPO/scripts/hosts/capped.sh" "$THREADS" \
       cargo test --release -p singlefs-harness --test opus_r3_p3_attack "$filter" -- --nocapture ) > "$OUT/$log" 2>&1
   grep -E '^test result' "$OUT/$log"
 }

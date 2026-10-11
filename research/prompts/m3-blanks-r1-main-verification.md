@@ -8,8 +8,8 @@
 
 - crates 快照：冻结副本 `/tmp/claude-1000/m3-blanks-r1/tree/` 对 `research/prompts/m3-blanks-r1-snapshot/crates-sha256.txt` 215 份全 OK。
 - kb 快照：`.claude/kb/checks-owed.md`、`.claude/kb/decisions/18-块里携带什么信息.md` 两份对不上，是别的会话在开工之后写回 m3-code 线（D18 已定项 11 落后支改法 C、C585 / C586 挪进已还清），改动 diff 在 `research/prompts/m3-blanks-r1-snapshot/external-changes-d18-c585-2026-10-01.patch`（49 行）。两条腿引这两份的行按现文全对（下一条）。
-- cite-check：`python3 scripts/cite-check.py <两份报告> --background research/prompts/_m3-blanks-r1-background.md` 末行「✓ 核了 80 处引文，对上 80 处，没判 0 处」。
-- 复跑：两个模型目录拷进草稿目录，经 `scripts/run-with-memory-cap.sh` 2G、`capped.sh` 15 跑。正推七个模型（b1、b2、b4、b5、b6、b7、b8）的输出与入库 `.out` 逐字相同；攻方 `rerun.sh` 末行「model-output 相同」，`model-output.txt` sha256 f0d829da…5031 与入库那份相同。
+- cite-check：`python3 scripts/agents/cite-check.py <两份报告> --background research/prompts/_m3-blanks-r1-background.md` 末行「✓ 核了 80 处引文，对上 80 处，没判 0 处」。
+- 复跑：两个模型目录拷进草稿目录，经 `scripts/hosts/run-with-memory-cap.sh` 2G、`capped.sh` 15 跑。正推七个模型（b1、b2、b4、b5、b6、b7、b8）的输出与入库 `.out` 逐字相同；攻方 `rerun.sh` 末行「model-output 相同」，`model-output.txt` sha256 f0d829da…5031 与入库那份相同。
 - 主 agent 另查三处原文：D18 第 300 行「克隆头的类型 1 容器号从 1 起按树内单调分配，身份由出生树分开」；D3 已定项 9 第 2 条（`.claude/kb/decisions/03-空间分配.md` 第 187 行）「删掉一个 s 字节的对象之后，同样大小的写必须在有界步数内成功」；D23 已定项 14（`.claude/kb/decisions/23-journal的角色与格式.md` 第 376 行）「新根的用户可见树（inode 树、extent 树）与 `deleted_inodes` 的根指针取 R_old 那一版的；墓碑树、谱系树随现行那一版」。
 
 ## 二、各格

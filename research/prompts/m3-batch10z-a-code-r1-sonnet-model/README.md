@@ -11,4 +11,4 @@
 - `logs/`：`final-new.log`（改后树，两份探针）、`final-old.log`（改前树）、`run-new-1.log` / `run-old-1.log`（头一次跑）、`p2-run.log`、`nvidia-smi-q-memory-pids.txt`（只读）。
 
 命令（工作目录是各自的树根，`CARGO_TARGET_DIR` 各用各的）：
-`scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 15 cargo test --offline -p singlefs-harness --test sonnet_probe_common --test sonnet_probe_new_only -- --nocapture --test-threads 1`
+`scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 15 cargo test --offline -p singlefs-harness --test sonnet_probe_common --test sonnet_probe_new_only -- --nocapture --test-threads 1`

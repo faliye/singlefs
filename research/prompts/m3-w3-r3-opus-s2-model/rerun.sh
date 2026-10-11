@@ -7,13 +7,13 @@
 #   traces       报告里引的十条逐步打印
 #   recheck-r2   拷第二轮攻方与辩方的模型进 $W、编、各跑一组（攻方 main 0、辩方 defense 4），与它们自己的 expected 比
 #   compare      拿 $W/out 与模型目录 expected/ 比（只比 W3R3S2 开头的行、去掉 elapsed_s、排序后比）
-# 编译与跑都经 scripts/run-with-memory-cap.sh（编译 6G、跑 4G），线程 5（scripts/capped.sh）；同一时刻只起一条 cargo。
+# 编译与跑都经 scripts/hosts/run-with-memory-cap.sh（编译 6G、跑 4G），线程 5（scripts/hosts/capped.sh）；同一时刻只起一条 cargo。
 set -euo pipefail
 W=${1:?工作目录}; PART=${2:?段}
 R=${SINGLEFS_REPO:?设 SINGLEFS_REPO 为仓根}
 M=${W3R3S2_MODEL_DIR:-$R/research/prompts/m3-w3-r3-opus-s2-model}
-CAP="bash $R/scripts/run-with-memory-cap.sh"
-THREADS="bash $R/scripts/capped.sh 5"
+CAP="bash $R/scripts/hosts/run-with-memory-cap.sh"
+THREADS="bash $R/scripts/hosts/capped.sh 5"
 BIN=$W/target/release/w3-r3-s2-model
 mkdir -p "$W/out"
 model() { nice -n 19 $CAP 4G "$BIN" "$@"; }

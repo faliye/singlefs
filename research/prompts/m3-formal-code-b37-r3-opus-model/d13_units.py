@@ -5,7 +5,7 @@
   1. 冻结副本（第三轮）里的 e165 装置：判据枚举与标签、`Criterion::family`、`is_judged_in_every_family`、`is_judged_under` 各臂、
      改后单测的 14 个单元（名字、族、档的写法、写死的集合、注释里点的 replay.sh 行与产物名）、`main` 起对照那一行；
   2. 第二轮冻结副本里的单测（五个调用、按标签并起来比），只用来判 D4「两行变异在第二轮单测下放过」；
-  3. 仓里 scripts/replay.sh 第 699–880 行直接起装置的驱动（参数）、登记表里它们对的产物，与那些产物的
+  3. 仓里 scripts/experiments/replay.sh 第 699–880 行直接起装置的驱动（参数）、登记表里它们对的产物，与那些产物的
      `name=control` 判据集合、`name=verdict` 判定行（拿判定行独立核「这条判据在这一跑里判了」）。
 对照读数一律当「跑了就红」，只管判据一级（读数一级不在这一轮的攻击面里）。
 用法：d13_units.py <第三轮冻结副本根> <第二轮冻结副本根> <仓根>
@@ -274,7 +274,7 @@ def main():
             die(3, f"✗ 源码里这一行不是恰好一次：{needle.strip()}")
     table = Table(src)
     units = parse_units(src, table)
-    drivers = parse_drivers((repo / "scripts/replay.sh").read_text(encoding="utf-8"))
+    drivers = parse_drivers((repo / "scripts/experiments/replay.sh").read_text(encoding="utf-8"))
     rows = {d["artifact"]: artifact_rows(repo, d["artifact"]) for d in drivers}
 
     print("== 核一：模型算的每条正式跑的对照集 = 那条驱动在 replay.sh 登记行里对的产物的 name=control 集合")

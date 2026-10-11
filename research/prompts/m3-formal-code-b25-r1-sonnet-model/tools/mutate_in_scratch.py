@@ -27,8 +27,8 @@ def run_one(root, name, rel, old, new, cargo_args, test):
         env['RUN_WITH_MEMORY_CAP_PARALLEL_REASON'] = '派出去的正推腿与攻方腿各跑各的，同会话号'
         env['RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON'] = '草稿副本里施加变异再跑，上限取派发默认的 8G，峰值表是别处测的'
         repo = os.environ.get('SINGLEFS_REPO', '/home/fy5090/code/singlefs')
-        cmd = ['nice', '-n', '19', 'bash', f'{repo}/scripts/capped.sh', '6', 'bash',
-               f'{repo}/scripts/run-with-memory-cap.sh', os.environ.get('MEMORY_CAP', '8G'),
+        cmd = ['nice', '-n', '19', 'bash', f'{repo}/scripts/hosts/capped.sh', '6', 'bash',
+               f'{repo}/scripts/hosts/run-with-memory-cap.sh', os.environ.get('MEMORY_CAP', '8G'),
                'cargo', 'test', '--offline'] + cargo_args.split() + ['--', test]
         p = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True, timeout=230)
         out = p.stdout + p.stderr

@@ -35,7 +35,7 @@
 
 ## 三、记录第四十节改了哪几格
 
-用 `scripts/replace-once.py` 定点改，四格都「命中 1 次，已替换…并回读确认」；日期后来统一改成 `2026-09-26`（同样四次定点替换）。
+用 `scripts/kb/replace-once.py` 定点改，四格都「命中 1 次，已替换…并回读确认」；日期后来统一改成 `2026-09-26`（同样四次定点替换）。
 
 | 行 | 原来 | 改成（要点） |
 |---|---|---|
@@ -46,7 +46,7 @@
 
 **执行员内存包装落在第 30 行、没落第 35 行**：「定义里还没写经包装跑」这笔欠账写在第 30 行现状格；第 35 行说的是 `replay.sh` 驱动函数，现状格是「已改（2026-09-26）…」，没有定义那一半可改。另外，派发提示说「E142 第十七次跑与第十八次跑的执行员都被拒过（第 35 行一带有记录）」：第 35 行只记了第十七次跑（「2026-09-26 E142 第十七次跑的执行员跑 `replay.sh E142` 被 …拒」）；`grep -c '第十八次' records/2026-09-16-subagent拆分提案.md` 是 0，第十八次跑被拒这件事这份记录里没有。
 
-第 30 行还欠的三份（`crash-verifier.md`、`gate-triage.md`、`implementation-writer.md`）不在这一次的派发里，没动。实现员第 4 步要跑「动到的测试二进制」，照今天的定义去跑会被 `heavy-test-guard.sh` 拒；要不要并进这一轮定义三方，主 agent 定。攻方腿同样：`_m2-rollback-forward-r3-body.md` 第 59 行「**内存与进程**：编译与跑一律经 `bash scripts/run-with-memory-cap.sh <上限> <命令…>`…」这一条，派发正文逐轮写着，没进 `three-way-attack.md`（任务单只点了「取样」那一条）。
+第 30 行还欠的三份（`crash-verifier.md`、`gate-triage.md`、`implementation-writer.md`）不在这一次的派发里，没动。实现员第 4 步要跑「动到的测试二进制」，照今天的定义去跑会被 `heavy-test-guard.sh` 拒；要不要并进这一轮定义三方，主 agent 定。攻方腿同样：`_m2-rollback-forward-r3-body.md` 第 59 行「**内存与进程**：编译与跑一律经 `bash scripts/hosts/run-with-memory-cap.sh <上限> <命令…>`…」这一条，派发正文逐轮写着，没进 `three-way-attack.md`（任务单只点了「取样」那一条）。
 
 ## 四、定义 diff（`git diff -- .claude/agents/`，原样）
 
@@ -59,14 +59,14 @@ index cf04f24..866a37e 100644
  ## 做什么
  
  1. 开跑前照共用约束「不做」一节看负载。登记第六节里有耗时类的量时，跑产物之前连别的 `cargo`、`gate.sh` 也要等。
-+1b. 跑单测（`cargo test`）、`cargo run` 与装置二进制（cargo 编出来的可执行文件，例 `scripts/experiments/target/release/e<号>-<简称>`）一律经 `bash scripts/run-with-memory-cap.sh <上限> <命令…>`；写进脚本的，整条脚本经它跑（`bash scripts/run-with-memory-cap.sh <上限> bash <脚本>`）。上限取跑前登记或派发提示给的，都没给就取 `scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值。`mutate.sh` 与 `replay.sh` 在里面逐条套了，直接跑，外面不再包一层。退出码 250–254 是包装自己的结局（含义见 `scripts/run-with-memory-cap.sh` 文件头「退出码」一段）：那一次的输出不算产物，命令与退出码写进报告，不绕开包装重跑。
++1b. 跑单测（`cargo test`）、`cargo run` 与装置二进制（cargo 编出来的可执行文件，例 `scripts/experiments/target/release/e<号>-<简称>`）一律经 `bash scripts/hosts/run-with-memory-cap.sh <上限> <命令…>`；写进脚本的，整条脚本经它跑（`bash scripts/hosts/run-with-memory-cap.sh <上限> bash <脚本>`）。上限取跑前登记或派发提示给的，都没给就取 `scripts/experiments/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值。`mutate.sh` 与 `replay.sh` 在里面逐条套了，直接跑，外面不再包一层。退出码 250–254 是包装自己的结局（含义见 `scripts/hosts/run-with-memory-cap.sh` 文件头「退出码」一段）：那一次的输出不算产物，命令与退出码写进报告，不绕开包装重跑。
  2. 写 `scripts/experiments/e<号>_<简称>.rs`，在 `scripts/experiments/Cargo.toml` 末尾追加它的 `[[bin]]`（⚠️ **跑前登记把装置写死成「入库装置」时改写 `crates/singlefs-harness/src/bin/e<号>_<简称>.rs`**：岔路问的是「`crates/` 今天这份代码的性质」时，另写一份独立模型答不了，写范围闸按 `crates/singlefs-harness/src/bin/e*.rs` 放行。那种 bin 只读、只驱动与观测，不许改 `crates/singlefs-core` 与 `crates/singlefs-checker`；变异表改追加进 `crates/mutations.tsv` 末尾、归门禁 59 号跑。**另有三条只对入库装置生效**：① **不许从 `crates/` 里引决定工作量、几何或判据门槛的常量**——这类参数在装置里写本地常量，值抄自 kb 的登记位并注明文件与行号，另加一条断言拿它与实现侧同名常量回比；引了就等于装置与实现共用一个数，两边一起错而逐格相等。这一条挡不住「kb 与实现一起取错」。② **写了入库装置就要让它进代码轮判决的点名清单**：门禁 56 号的正则罩得到 `crates/*/src/bin/*.rs`，不点名那一道会红，而那条义务落在跑整轮门禁的一方身上、不落在你身上——交回时写明你新建了哪个 bin。③ **什么算「入库装置」以跑前登记里写死的那一句为准**；登记里没写死就走 `research/` 那一支，别自己判）（`name` 用连字符，与 `replay.sh` 登记行里的 bin 名一致；只追加，不改别人的）：纯算术的计数模型、单测、钉绝对值的断言；取样点覆盖登记里每一个会跑到的取值。写完跑 `bash .claude/scripts/naming-lint.sh`，新文件里的缩写与单字母名在这一步改完再往下走，不留给后面的门禁阶段。
- 3. 写变异表 `scripts/mutations/e<号>_<简称>.tsv`，在 `research/` 下跑完整张表：`cd scripts/experiments && nice -n 19 bash ../mutate.sh <bin 名> <源文件> ../mutations/<变异表>`（两个路径都相对 `research/`；bin 名以 `scripts/experiments/Cargo.toml` 里 `[[bin]]` 的 `name` 为准，没有显式声明的取文件名去掉 `.rs`；报「基线就是红的」时先查是不是在仓根下跑、bin 名是不是写错）（收尾要有「已还原，基线仍全绿」）；没红的逐条按 `mutation-sampling.md` 分类。
+ 3. 写变异表 `scripts/mutation/tables/e<号>_<简称>.tsv`，在 `research/` 下跑完整张表：`cd scripts/experiments && nice -n 19 bash ../mutate.sh <bin 名> <源文件> ../mutations/<变异表>`（两个路径都相对 `research/`；bin 名以 `scripts/experiments/Cargo.toml` 里 `[[bin]]` 的 `name` 为准，没有显式声明的取文件名去掉 `.rs`；报「基线就是红的」时先查是不是在仓根下跑、bin 名是不是写错）（收尾要有「已还原，基线仍全绿」）；没红的逐条按 `mutation-sampling.md` 分类。
  3b. 登记里的停机条款（第十一节里标「停机」的，通常是装置与 `crates/` 实现逐项对拍）在跑产物之前做，照原文真跑，不许只推；做不了就停下交回，不跑产物、不写实验页。登记的量一次做不完的，做完的那一段照常交，没做的逐条列进报告，实验页与索引行的状态写「部分已跑」，不写「已跑」。岔路单每一行都够判了（登记第十一节的够判停机），剩下的量不跑：实验页逐条标「够判后未跑」、写明各自对应哪一行，状态写「已跑（够判）」；够不够判由你按登记写的够判条件报，续不续由主 agent 定。
  4. 跑产物进 `research/results/`；跑前删旧输出，跑完认本轮才有的完成标记。重跑已有实验时，`research/results/` 里已有的产物不覆盖：与它逐字节一致就不新存；对不上就按今天的日期另存一份，实验页两份都点名、写明对不上，交主 agent 定哪份承重。生成产物用的二进制编在 `scripts/experiments/target/` 下，用最后一次源码改动编出来；生成产物与第 5 步跑 `replay.sh` 时都不设 `CARGO_TARGET_DIR`；草稿目录里的 target 只拿来迭代。
  4b. 产物出来之后先自查齐不齐：按登记的「臂 × 历史 × 几何」数一遍产物里每一类结果行的条数与字段，缺行、缺字段（例如某一族没有臂字段）、某一族一次都没造出被测形状，都列进报告，不许只看末行完成标记。报告里每个判据按每条臂全列判定，不挑「突出发现」报——对某条候选不利的那一半同样要写。分族、分臂的计数用一条命令从产物里数，报告与实验页贴那条命令和它的原样输出，不用文字重写族名单；给「这几族为什么是 0」写解释之前，先把那几族的产物行贴出来，确认它们真是 0。
 +4c. 交回之前逐行读判决行：`grep -n 'name=verdict' <产物>` 列出这一次每份产物里的全部判决行（逐字节一致没新存的，读 `research/results/` 里那一份；输出不截断），任何字段取值是 `false` 或 `not_run`，在报告里逐个点名：产物文件与行号、字段名、取值、为什么是这个值、是不是登记预期内的；一个都没有，也写一句「判决行 N 条，没有 false / not_run 字段」。
- 5. 在 `scripts/replay.sh` 里登记复跑，跑一次 `bash scripts/replay.sh E<号>` 确认逐字节一致。送进虚机跑的实验（`vm-bench.sh`，含 `--selftest`）与 E152 装置是重型测试，你不跑：装置、登记与复跑命令写好就停，在交回里写明要跑什么、为什么，由主 agent 问用户（`.claude/kb/vm-harness.md`；共用约束「不做」一节里重型测试那一条）。装置要起子进程、读它的输出时，先把输出读完再转打，计时按登记写的进程与时钟取（`.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」）；门禁 65 号查读子进程输出的循环里一边取时间一边输出。
+ 5. 在 `scripts/experiments/replay.sh` 里登记复跑，跑一次 `bash scripts/experiments/replay.sh E<号>` 确认逐字节一致。送进虚机跑的实验（`vm-bench.sh`，含 `--selftest`）与 E152 装置是重型测试，你不跑：装置、登记与复跑命令写好就停，在交回里写明要跑什么、为什么，由主 agent 问用户（`.claude/kb/vm-harness.md`；共用约束「不做」一节里重型测试那一条）。装置要起子进程、读它的输出时，先把输出读完再转打，计时按登记写的进程与时钟取（`.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」）；门禁 65 号查读子进程输出的循环里一边取时间一边输出。
  6. 跑阶段归属表登记给你的阶段（共用约束 `.claude/agent-common.md`「门禁」一节）；其中要编译或复跑整张表的，开跑前照共用约束看负载。15 号（编整个 research 工作区）与 87 号（复跑全部已入库实验）不归你，收尾由 `gate-triage` 统一跑；你只跑第 5 步自己那一个实验的 `replay.sh`。
  7. 主 agent 要写实验页时：`.claude/kb/experiments/<号>-<简称>.md`，结果整行抄自产物并带文件名，写复跑命令、口径、它答不了的；索引行进 `.claude/kb/experiments.md`。
 @@ -40,7 +42,7 @@ omitClaudeMd: true
@@ -206,9 +206,9 @@ index ea58224..d5e2eab 100644
 |---|---|---|---|
 | 17 | `.claude/agents/implementation-writer.md:28` | 第 4 步「其余行照样追加进 `mutations-append.tsv`」 | `grep -rn 'mutations-append' .claude/ scripts/` 只在这一行命中 1 次；同一份第 3 步写的是「`crates/mutations.tsv` 在的话…每条再加一行变异」。两步说的是不是同一份表、`mutations-append.tsv` 是什么，定义里没写（推的，没核实现员实际怎么交） |
 | 3 | `.claude/agent-common.md:47` | 写进脚本、python subprocess、make 同样算跑 | `.claude/hooks/heavy-test-guard.sh` 文件头第 69–73 行「看不见的（照常放行、不记检出）」里有 python subprocess、make、xargs 起的命令：定义说「同样算跑」，闸对这几样看不见，全靠 agent 自己守 |
-| 27 | `.claude/main-agent.md:30` | 叫醒条件「没带 `SINGLEFS_HEAVY_TESTS` 前缀的重型测试进程」 | `scripts/agent-watch.py` 的判法 |
+| 27 | `.claude/main-agent.md:30` | 叫醒条件「没带 `SINGLEFS_HEAVY_TESTS` 前缀的重型测试进程」 | `scripts/agents/agent-watch.py` 的判法 |
 | 26、30 | `.claude/main-agent.md:30`、`:36` | 整点询问与 `progress.md` | `agent-watch.py` 的 `ask-every-minutes` |
-| 6、32 | `.claude/agent-common.md:51`、`.claude/main-agent.md:46` | 线程上限 N 与 `capped.sh` | `scripts/capped.sh` 设的变量 |
+| 6、32 | `.claude/agent-common.md:51`、`.claude/main-agent.md:46` | 线程上限 N 与 `capped.sh` | `scripts/hosts/capped.sh` 设的变量 |
 | 4 | `.claude/agent-common.md:48` | 停一条链的做法 | `proc.py stop` 的行为、`bash-command-detector.sh` 的 ⑥（终止进程只许按点名的进程号，97f5904 提交说明写着 `agent-common.md` 里还没加 ⑥ ⑦） |
 | 1 | `.claude/agent-common.md:21` | 变体不用角标 | `write-guard.sh` 第三道、门禁 12 号 |
 | 5、22、29 | `.claude/agent-common.md:50`、`.claude/main-agent.md:21`、`:34` | 读大文件、派实现员先列文件、等长活不 ping | 纯做法，没有对应的闸 |

@@ -41,8 +41,8 @@ for index, f in enumerate(rows):
     bak = target + ".rowbak"; shutil.copy(target, bak)
     open(target, "w").write(text.replace(o, r)); os.utime(target)
     t0 = time.time()
-    cmd = ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh", "10G", "bash",
-           "/home/fy5090/code/singlefs/scripts/capped.sh", "8", "cargo", "test", "--offline",
+    cmd = ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh", "10G", "bash",
+           "/home/fy5090/code/singlefs/scripts/hosts/capped.sh", "8", "cargo", "test", "--offline",
            "--target-dir", f"{root}/target-h"] + args.split()
     try:
         p = subprocess.run(cmd, cwd=tree, capture_output=True, text=True, timeout=200)

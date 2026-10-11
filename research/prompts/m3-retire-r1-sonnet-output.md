@@ -4,7 +4,7 @@
 
 ## 0　读法、结论速览、复核
 
-**路径约定**：`crates/…` 指冻结树 `~/.local/share/singlefs/work/m3-retire-r1/tree/` 下的相对路径（全路径 = 该根 + 相对路径），行号是冻结树里的；kb 引文写 kb 文件自己的行号。核引文：`python3 scripts/cite-check.py <本报告> --root ~/.local/share/singlefs/work/m3-retire-r1/tree --root <仓根>`（`crates/…` 在前一个根下找，`.claude/kb/…` 与 `research/…` 在仓根下找；只给一个根会把另一类引文列成「没判」）。「方案按 `crates/` 今天的实现来谈」：下面每一处落点都是先读了冻结树的代码再写的。
+**路径约定**：`crates/…` 指冻结树 `~/.local/share/singlefs/work/m3-retire-r1/tree/` 下的相对路径（全路径 = 该根 + 相对路径），行号是冻结树里的；kb 引文写 kb 文件自己的行号。核引文：`python3 scripts/agents/cite-check.py <本报告> --root ~/.local/share/singlefs/work/m3-retire-r1/tree --root <仓根>`（`crates/…` 在前一个根下找，`.claude/kb/…` 与 `research/…` 在仓根下找；只给一个根会把另一类引文列成「没判」）。「方案按 `crates/` 今天的实现来谈」：下面每一处落点都是先读了冻结树的代码再写的。
 
 **结论速览**（细节在各节，推翻条件在各节末）：
 
@@ -358,7 +358,7 @@ D28 已定项 1 给 W 的前提写明「这个上界在删除批只改尾叶时�
 
 ```
 cp -r research/prompts/m3-retire-r1-sonnet-model <草稿目录>/copy
-SINGLEFS_REPO=<仓根> bash scripts/capped.sh 10 bash <草稿目录>/copy/rerun.sh <空目录> all
+SINGLEFS_REPO=<仓根> bash scripts/hosts/capped.sh 10 bash <草稿目录>/copy/rerun.sh <空目录> all
 ```
 
 跑完看 `compare：与 expected/summary.txt 逐行相同（排序后）`；报告引用的数都在 `<空目录>/out.txt` 的 `group=legal`（`policy=borrow` 四格）、`group=fault`、`group=alpha_rollback_retires` 三类行里，字段名与报告一一对应（`misdeath_A..E`、`resurrect_A..E`、`wrong_content_A..E`、`inv_red_*`、`rollback_cur_only_ids_*`、`max_retire_*`）。
@@ -366,9 +366,9 @@ SINGLEFS_REPO=<仓根> bash scripts/capped.sh 10 bash <草稿目录>/copy/rerun.
 ## 交回前自检（这一次真跑的末行）
 
 ```
-$ python3 scripts/cite-check.py research/prompts/m3-retire-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-retire-r1/tree --root /home/fy5090/code/singlefs
+$ python3 scripts/agents/cite-check.py research/prompts/m3-retire-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-retire-r1/tree --root /home/fy5090/code/singlefs
   ✓ 核了 49 处引文，对上 49 处，没判 0 处（逐处列在上面）
-$ SINGLEFS_REPO=/home/fy5090/code/singlefs bash scripts/capped.sh 10 bash research/prompts/m3-retire-r1-sonnet-model/rerun.sh <空目录> all
+$ SINGLEFS_REPO=/home/fy5090/code/singlefs bash scripts/hosts/capped.sh 10 bash research/prompts/m3-retire-r1-sonnet-model/rerun.sh <空目录> all
 compare：与 expected/summary.txt 逐行相同（排序后）
 ```
 

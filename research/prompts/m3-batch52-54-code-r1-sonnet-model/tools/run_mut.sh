@@ -4,7 +4,7 @@ W=$HOME/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet
 export CARGO_TARGET_DIR=$W/target
 cd $W && python3 tools/mut.py "$1" || exit 9
 cd $W/repo
-R="nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 10G bash /home/fy5090/code/singlefs/scripts/capped.sh 12"
+R="nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 10G bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 12"
 echo "== $1 core inode_tree::"
 $R cargo test --offline -p singlefs-core --lib inode_tree:: 2>&1 | grep -E '^test result|FAILED$|error(\[|:)' | head -5
 echo "== $1 harness ref test"

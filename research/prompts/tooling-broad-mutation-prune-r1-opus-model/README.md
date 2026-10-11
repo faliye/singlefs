@@ -13,7 +13,7 @@
 S=/tmp/claude-1000/<草稿目录>; mkdir -p $S/tools && cd $S/tools
 curl -sSfO https://static.rust-lang.org/dist/2026-08-20/llvm-tools-1.98.0-x86_64-unknown-linux-gnu.tar.xz && tar -xJf llvm-tools-1.98.0-x86_64-unknown-linux-gnu.tar.xz
 L=$S/tools/llvm-tools-1.98.0-x86_64-unknown-linux-gnu/llvm-tools-preview/lib/rustlib/x86_64-unknown-linux-gnu/bin
-bash scripts/run-with-memory-cap.sh 1G bash scripts/capped.sh 12 nice -n 19 python3 research/prompts/tooling-broad-mutation-prune-r1-opus-model/run.py $S/model-work $L
+bash scripts/hosts/run-with-memory-cap.sh 1G bash scripts/hosts/capped.sh 12 nice -n 19 python3 research/prompts/tooling-broad-mutation-prune-r1-opus-model/run.py $S/model-work $L
 ```
 
 产出 `run-output.txt`（这一次的原样输出）。

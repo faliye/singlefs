@@ -37,8 +37,8 @@ probes_part() {
     cat "$HERE/probe/known_bad_probe.rs.append" >> "$WORK/probe-tree/crates/singlefs-harness/tests/checker_known_bad_images.rs"
     run() { # run <日志名> <cargo test 参数…>
         local log="$1"; shift
-        nice -n 19 bash "$REPO/scripts/capped.sh" 7 timeout 230 \
-            bash "$REPO/scripts/run-with-memory-cap.sh" 12G \
+        nice -n 19 bash "$REPO/scripts/hosts/capped.sh" 7 timeout 230 \
+            bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 12G \
             cargo test --offline --manifest-path "$WORK/probe-tree/Cargo.toml" -p singlefs-harness "$@" > "$WORK/logs/$log" 2>&1 || true
         grep -E 'PROBE|test result' "$WORK/logs/$log"
     }

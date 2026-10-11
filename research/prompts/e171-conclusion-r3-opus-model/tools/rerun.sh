@@ -17,8 +17,8 @@ S4=/tmp/claude-1000/e171-s4/frozen-tree
 TODAY=/tmp/claude-1000/e171-conclusion-r3/tree
 E=$REPO/scripts/experiments/target/e171-dumps
 P=$REPO/research/results/e171-three-oracle-collusion-2026-10-03
-CAP="bash $REPO/scripts/run-with-memory-cap.sh"
-CAPPED="bash $REPO/scripts/capped.sh $THREADS"
+CAP="bash $REPO/scripts/hosts/run-with-memory-cap.sh"
+CAPPED="bash $REPO/scripts/hosts/capped.sh $THREADS"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON='e171-conclusion-r3 攻方复跑：自写探针换输入或换变异 core'
 export PYTHONDONTWRITEBYTECODE=1
 mkdir "$WORK"

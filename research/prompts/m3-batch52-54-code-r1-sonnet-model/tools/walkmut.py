@@ -24,7 +24,7 @@ open(p,'w',encoding='utf-8').write(base.replace(o,r))
 try:
     env=dict(os.environ); env['CARGO_TARGET_DIR']=W+'/target'
     tests=sys.argv[2].split(',')
-    c=['nice','-n','19','bash','/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh','10G','bash','/home/fy5090/code/singlefs/scripts/capped.sh','12','cargo','test','--offline','--no-fail-fast','-p','singlefs-harness']
+    c=['nice','-n','19','bash','/home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh','10G','bash','/home/fy5090/code/singlefs/scripts/hosts/capped.sh','12','cargo','test','--offline','--no-fail-fast','-p','singlefs-harness']
     for t in tests: c+=['--test',t]
     c+=['--','--include-ignored']
     pr=subprocess.run(c,cwd=W+'/repo',env=env,capture_output=True,text=True,timeout=235)

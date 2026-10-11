@@ -4,11 +4,11 @@ run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行�
 退   0 | wrapper=None         timed_out=False | 类 没出判定   | 出路 格自己的出路 | Verus 没出判定（退 0，编不过或起不来）：
 退   1 | wrapper=None         timed_out=False | 类 没出判定   | 出路 格自己的出路 | Verus 没出判定（退 1，编不过或起不来）：
 退 137 | wrapper=None         timed_out=False | 类 没出判定   | 出路 格自己的出路 | Verus 没出判定（退 137，编不过或起不来）：
-退 250 | wrapper=撞了这一条自己的内存上限 timed_out=False | 类 没跑成    | 出路 WRAPPER_HOWTO | 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 250（撞了这一条自己的内存上限，上限 4G），这一次
-退 251 | wrapper=包装用法错或起不了 scope timed_out=False | 类 没跑成    | 出路 WRAPPER_HOWTO | 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 251（包装用法错或起不了 scope，上限 4G），
-退 252 | wrapper=内存不够排不上      timed_out=False | 类 没跑成    | 出路 WRAPPER_HOWTO | 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 252（内存不够排不上，上限 4G），这一次的输出不算
+退 250 | wrapper=撞了这一条自己的内存上限 timed_out=False | 类 没跑成    | 出路 WRAPPER_HOWTO | 没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 250（撞了这一条自己的内存上限，上限 4G），这一次
+退 251 | wrapper=包装用法错或起不了 scope timed_out=False | 类 没跑成    | 出路 WRAPPER_HOWTO | 没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 251（包装用法错或起不了 scope，上限 4G），
+退 252 | wrapper=内存不够排不上      timed_out=False | 类 没跑成    | 出路 WRAPPER_HOWTO | 没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252（内存不够排不上，上限 4G），这一次的输出不算
 退 253 | wrapper=None         timed_out=True  | 类 超时红    | 出路 格自己的出路 | 超过 600 秒没出结局，按红记（C5：超时不当通过）
-退 254 | wrapper=被总上限挤掉       timed_out=False | 类 没跑成    | 出路 WRAPPER_HOWTO | 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 254（被总上限挤掉，上限 4G），这一次的输出不算判
+退 254 | wrapper=被总上限挤掉       timed_out=False | 类 没跑成    | 出路 WRAPPER_HOWTO | 没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 254（被总上限挤掉，上限 4G），这一次的输出不算判
 ### e3-e165-exit-codes 假包装退 0
      第 2 行（probe:2）：要 E7RESULT name=state domain=L ring_slots=64 n=2 ordinal=3 counters=states state=shape=1c0;first=returned:a，装置打的是 （没打）
   ✗ 钉住的 1 行在今天的实现上：装置退 0、打了 0 行结果、1 行与 ⑦ 不同
@@ -20,24 +20,24 @@ run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行�
      → 怎么办：今天的实现在钉住的输入上与原实现不同：是改动引入的回归就修实现；装置报指纹漂了就先查装置的枚举次序与状态编码变没变
 => 退出码 1
 ### e3-e165-exit-codes 假包装退 250
-  ✗ 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 250（撞了这一条自己的内存上限，上限 1G），钉住的 1 行这一次的输出不算判定
-     → 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现
+  ✗ 没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 250（撞了这一条自己的内存上限，上限 1G），钉住的 1 行这一次的输出不算判定
+     → 怎么办：照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；251、252、254 先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现
 => 退出码 1
 ### e3-e165-exit-codes 假包装退 251
-  ✗ 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 251（包装用法错或起不了 scope，上限 1G），钉住的 1 行这一次的输出不算判定
-     → 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现
+  ✗ 没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 251（包装用法错或起不了 scope，上限 1G），钉住的 1 行这一次的输出不算判定
+     → 怎么办：照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；251、252、254 先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现
 => 退出码 1
 ### e3-e165-exit-codes 假包装退 252
-  ✗ 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 252（内存不够排不上，上限 1G），钉住的 1 行这一次的输出不算判定
-     → 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现
+  ✗ 没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 252（内存不够排不上，上限 1G），钉住的 1 行这一次的输出不算判定
+     → 怎么办：照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；251、252、254 先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现
 => 退出码 1
 ### e3-e165-exit-codes 假包装退 253
-  ✗ 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 253（超过限时，上限 1G），钉住的 1 行这一次的输出不算判定
-     → 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现
+  ✗ 没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 253（超过限时，上限 1G），钉住的 1 行这一次的输出不算判定
+     → 怎么办：照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；251、252、254 先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现
 => 退出码 1
 ### e3-e165-exit-codes 假包装退 254
-  ✗ 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 254（被总上限挤掉，上限 1G），钉住的 1 行这一次的输出不算判定
-     → 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现
+  ✗ 没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 254（被总上限挤掉，上限 1G），钉住的 1 行这一次的输出不算判定
+     → 怎么办：照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；251、252、254 先跑 bash scripts/hosts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现
 => 退出码 1
 ### e3-mixed-cell
 check_vacuity 退 1；✗ 行 15 条：没跑成 8 条，照样验得过（空真，真红）7 条

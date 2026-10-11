@@ -4,7 +4,7 @@
 
 写于 2026-10-05，装置改之前、这一次的任何产物之前。判据、门槛、作废与停机条款在这里写死；跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走，不在这里回改。
 
-**文件名取 `r22`，不占号。** 上一次是第 21 次：登记 `research/prompts/e142-r21-prereg.md`（1569 行，sha256 `1a0a1d5578f19b0a19ada31ed636ec7cb0113bc19931fbc3d65d7496aa790bb0`），执行员报告 `/tmp/claude-1000/m3-r1/batch9-e142-run2/report.md`（sha256 `e3f266b85919eb6e512b326dc77cbcde4f0671c455866b5f870f2d6150b97cb9`），冻结装置 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs`（10149 行，sha256 `3bfa09fbcbe393516747a9ef3e7815a10d64dde3d01be5557d92dbddfbf0e147`），变异表 `scripts/mutations/e142_new_pool_file_creation_dry_run.tsv`（199 行，sha256 `c9f87de40ca16da12f298845583c6a9dd07579dbe99f5496a4539fbe40f7d2f6`）。
+**文件名取 `r22`，不占号。** 上一次是第 21 次：登记 `research/prompts/e142-r21-prereg.md`（1569 行，sha256 `1a0a1d5578f19b0a19ada31ed636ec7cb0113bc19931fbc3d65d7496aa790bb0`），执行员报告 `/tmp/claude-1000/m3-r1/batch9-e142-run2/report.md`（sha256 `e3f266b85919eb6e512b326dc77cbcde4f0671c455866b5f870f2d6150b97cb9`），冻结装置 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs`（10149 行，sha256 `3bfa09fbcbe393516747a9ef3e7815a10d64dde3d01be5557d92dbddfbf0e147`），变异表 `scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv`（199 行，sha256 `c9f87de40ca16da12f298845583c6a9dd07579dbe99f5496a4539fbe40f7d2f6`）。
 
 **不是差分登记**：臂多了一处改动（标签 6）、几何换了一个点、判据多了几格，所以十三节照全写。编号接第 21 次：读法 R64 起，格 Q142.86 起，变异 M221 起，失败 / 作废 / 停机条款用 F22*、V22*、S22-*；第 21 次的号不复用。
 
@@ -20,7 +20,7 @@
 
 **装置写在哪（写死）**：
 
-1. **模型：`scripts/experiments/e142_new_pool_file_creation_dry_run.rs`（独立手写模型，不与 `crates/` 共用代码），不是入库装置。** 问的是照 kb 独立写出的字节对 `crates/` 同不同，由独立模型回答；装置里不引 `crates/` 的任何常量。变异表 `scripts/mutations/e142_new_pool_file_creation_dry_run.tsv`，复跑行 `scripts/replay.sh:174`。
+1. **模型：`scripts/experiments/e142_new_pool_file_creation_dry_run.rs`（独立手写模型，不与 `crates/` 共用代码），不是入库装置。** 问的是照 kb 独立写出的字节对 `crates/` 同不同，由独立模型回答；装置里不引 `crates/` 的任何常量。变异表 `scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv`，复跑行 `scripts/experiments/replay.sh:174`。
 2. **比对侧：`crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs` 只跑、不读、不改**，照 `replay.sh` 的 `driver_e142`（第 510–516 行）第一条命令跑。它**不收参数**（文件第 15 行「不收参数」、第 86–90 行有参数就退 1），盘大小写死成 `TEST_IMAGE_DEFAULT_BYTES`（第 120 行，`crates/singlefs-format/src/lib.rs:308` 为 4 GiB）：**第二个几何 P8G 的 `crates/` 一侧今天给不出**，第五节 5.4 与第十一节 S22-dump2 写怎么办，交主 agent 定。
 3. **独立比对：`scripts/experiments/e142_region_diff_independent.rs` 不改**，只用 `old-new` 调用（Q142.89、PC-g）。
 4. 草稿脚本三份，全文在第十三节、sha256 跑前写死：`label6_anchor.py`（第七节 7.2 A1–A5 与 Q142.87 的解码）、`p8g_region_compare.py`（第二段 Q142.97）、第 21 次登记第十三节的 `back_chain_487.py` 与 `residual_old_values.sh`（全文在 `research/prompts/e142-r21-prereg.md`，执行员照全文重建、核 sha256 `b267c41bc41b3f41e6d216c3608ad1cdd57f0496af4b69024b8b5e69516a89de` 与 `63ea086247aaee402ff74cf9dd3c9d51c1220f7f379f3f5dc2f2bf595de2a1c0`）。
@@ -40,8 +40,8 @@
 | ⓪ | (1) 准入一段第一条的三条 `grep -c`。(2) 核第三节 3.2 的四个 sha256 与行数（冻结装置、装置变异表、独立 bin、独立 bin 变异表），不等 ⇒ 停机 S22-sha。(3) `ps -o pid,args -u "$(id -u)"` 看负载，照共用约束办。(4) 取 `crates/` 快照 A：`find crates -type f -not -path '*/target/*' -print0 \| sort -z \| xargs -0 sha256sum`，存 `research/results/e142-r22-crates-sha256-a-<日期>.txt`；`git status --short crates/` 原样存 `research/results/e142-r22-crates-status-a-<日期>.txt` | `research/results/` 下 E142 第 21 次的产物 |
 | ① | (1) 臂 N21R：冻结装置一字不改，在仓里编（release），照 `driver_e142` 两条命令原样跑，按它的次序拼成一整份（装置 stdout 在前、导出在后），存 `research/results/e142-new-pool-file-creation-dry-run-r22-arm-n21r-<日期>.out`（准入必须放行）。(2) Q142.91 的归一化 diff（第 21 次主产物 `research/results/e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out` → N21R），命令只写文件、只打行数。(3) 第十三节命令四的 `label6_anchor.py`：不带输入跑一次、`LABEL6_ANCHOR_BREAK=1` 跑一次、`--decode <N21R 产物>` 跑一次（PC-j），输出存 `research/results/e142-r22-anchor-label6-<日期>.out`。(4) 照 `research/prompts/e142-r21-prereg.md` 第十三节全文重建 `back_chain_487.py`（核 sha256），不带输入跑一次、`BACK_CHAIN_487_BREAK=1` 跑一次、带输入跑一次（输入取 N21R 产物：`--fsid-hex` = 设备 0、偏移 16785408、长度 4096 那一行 `name=device_region_bytes`（装置一侧，带 `region=`）十六进制的 [463, 471)；`--instance-table-pointer-hex` = 设备 0、偏移 1052672、长度 512 那一行的 [170, 256)），输出存 `research/results/e142-r22-anchor-b1-<日期>.out` | 第 21 次主产物里步 ①(2) 之外的读法 |
 | ② | 照第五节 5.1 臂 N22 的 ①–⑥ 与第三节 3.3 的逐处清单改装置、改单测；单测里的绝对值一律取第七节锚点（7.2 A1–A5 是第十三节命令四的输出，那是锚点不是产物），**不取任何一次产物的输出**；照第九节加 M221–M227，新加的七行与改了锚点的行（若有）作为小表对改后的源码跑一次，抓到 / 无效 / 没红三数进第十二节；跑第十三节命令七（第 21 次的 `residual_old_values.sh`）与命令六（标签 6 的四种残留写法），两者都要 0；单测全绿、第七节每个锚点都被单测钉住之后，记装置与变异表的 sha256、行数进第十二节（**冻结**） | 同上；`crates/singlefs-core/**`、`crates/singlefs-format/src/**`、`crates/singlefs-harness/**`（第三节 3.1 点名的行除外） |
-| ③ | (1) 重抄第二节条款（第十三节命令二），出口与第二节的 sha256 比（S22-clause）。(2) 快照 B，与 A `cmp`（V22c）。(3) 照 `driver_e142` 跑冻结的 N22，整份存 `research/results/e142-new-pool-file-creation-dry-run-r22-main-<日期>.out`（准入必须放行）。(4) 快照 C，与 B `cmp`；A、B、C 三份都进 `research/results/`。(5) 立即跑 `python3 scripts/admission.py experiment <仓根> E142`（Q142.92）。(6) **从这一格起才读** `crates/singlefs-harness/tests/new_pool_file_creation_publish.rs` 第 80 行（只读那一行）。(7) 独立 bin `old-new (主产物, N21R 产物)`，存 `research/results/e142-r22-region-old-new-independent-<日期>.out`（Q142.89）。(8) `label6_anchor.py --decode <主产物>`（Q142.87），追加进步 ①(3) 那份锚点文件。(9) Q142.86、Q142.88、Q142.90、Q142.93–Q142.95 的比对，输出存 `research/results/e142-r22-comparisons-<日期>.out`。(10) 第五节 5.2 的阳性对照与第七节 7.2 复算，输出存 `research/results/e142-r22-controls-<日期>.out` | — |
-| ④ | `scripts/replay.sh` 第 174 行改指主产物；写实验页；整张变异表照第九节末「要主 agent 跑的命令」交回（Q142.96 由主 agent 跑完补判）；交回照第十一节「交回之前」 | 实验页「判决」「影响的决策」两节在这一步才读 |
+| ③ | (1) 重抄第二节条款（第十三节命令二），出口与第二节的 sha256 比（S22-clause）。(2) 快照 B，与 A `cmp`（V22c）。(3) 照 `driver_e142` 跑冻结的 N22，整份存 `research/results/e142-new-pool-file-creation-dry-run-r22-main-<日期>.out`（准入必须放行）。(4) 快照 C，与 B `cmp`；A、B、C 三份都进 `research/results/`。(5) 立即跑 `python3 scripts/gate/admission.py experiment <仓根> E142`（Q142.92）。(6) **从这一格起才读** `crates/singlefs-harness/tests/new_pool_file_creation_publish.rs` 第 80 行（只读那一行）。(7) 独立 bin `old-new (主产物, N21R 产物)`，存 `research/results/e142-r22-region-old-new-independent-<日期>.out`（Q142.89）。(8) `label6_anchor.py --decode <主产物>`（Q142.87），追加进步 ①(3) 那份锚点文件。(9) Q142.86、Q142.88、Q142.90、Q142.93–Q142.95 的比对，输出存 `research/results/e142-r22-comparisons-<日期>.out`。(10) 第五节 5.2 的阳性对照与第七节 7.2 复算，输出存 `research/results/e142-r22-controls-<日期>.out` | — |
+| ④ | `scripts/experiments/replay.sh` 第 174 行改指主产物；写实验页；整张变异表照第九节末「要主 agent 跑的命令」交回（Q142.96 由主 agent 跑完补判）；交回照第十一节「交回之前」 | 实验页「判决」「影响的决策」两节在这一步才读 |
 
 文件名里的日期取跑的那一天（`TZ=Asia/Tokyo date +%F`）；已存在的同名文件不覆盖，按日期另存。步 ② 冻结之后到主产物落盘之前，装置源码的改动一律进第十二节修订。**看过 N21R 产物里导出那一半、或步 ③-6 那一行钉值之后，不许为了与 `crates/` 相等去改装置的写法与第七节锚点**；条款定了的地方发现装置写错，照改，修订里写明「依据是条款原文第几行，不是 `crates/`」，两边都查（停机 S22-crates）。步 ①(3)(4) 读 N21R 产物里那几段十六进制只为解码与取锚点输入，不许拿它去改装置。
 
@@ -87,7 +87,7 @@
 
 ## 二、被测条款与它引的定义
 
-派发提示点名的四处：D3（空间分配） 已定项 2（标签 6 的式子）；D5（快照 / 空间记账机制） 已定项 8（day-1 记账 15 行），连同它与 D3 已定项 2 共同引的定义 D5 已定项 4（统计量第 6 项）；D2（RAID 条带策略） 已定项 9（第一版跑 2 块盘，第二个几何只取两盘几何）；`.claude/kb/layout/01-first-txn.md`（整份，174 行字段表的另一侧；一级标题下的开头正文按行区间 1–27 取，其余十个二级节逐个按 `@标题` 取，三·二、四·二随父节）。174 行字段表的期望值取自第 21 次的那批条款，同样照抄：D23（journal 的角色与格式） 已定项 4、15、17；D16（发布语义） 第 42、51 行（同第 21 次，按行区间取）；D8（核心索引结构） 已定项 11、9、8；D18（块里携带什么信息） 已定项 24。`scripts/quote-kb.py` 机械抄，命令在第十三节命令二；出口 `/tmp/claude-1000/e142-r22-design/e142-r22-section2.md`（882 行，sha256 `540d8df91b9bc5f6e908b774379a79ce7b42cc87afa174019dd9cc22a60cecd9`），回读一致之后分七段原样追加在下面（切在抄录块之间）。
+派发提示点名的四处：D3（空间分配） 已定项 2（标签 6 的式子）；D5（快照 / 空间记账机制） 已定项 8（day-1 记账 15 行），连同它与 D3 已定项 2 共同引的定义 D5 已定项 4（统计量第 6 项）；D2（RAID 条带策略） 已定项 9（第一版跑 2 块盘，第二个几何只取两盘几何）；`.claude/kb/layout/01-first-txn.md`（整份，174 行字段表的另一侧；一级标题下的开头正文按行区间 1–27 取，其余十个二级节逐个按 `@标题` 取，三·二、四·二随父节）。174 行字段表的期望值取自第 21 次的那批条款，同样照抄：D23（journal 的角色与格式） 已定项 4、15、17；D16（发布语义） 第 42、51 行（同第 21 次，按行区间取）；D8（核心索引结构） 已定项 11、9、8；D18（块里携带什么信息） 已定项 24。`scripts/kb/quote-kb.py` 机械抄，命令在第十三节命令二；出口 `/tmp/claude-1000/e142-r22-design/e142-r22-section2.md`（882 行，sha256 `540d8df91b9bc5f6e908b774379a79ce7b42cc87afa174019dd9cc22a60cecd9`），回读一致之后分七段原样追加在下面（切在抄录块之间）。
 
 **出处 `.claude/kb/decisions/03-空间分配.md:50-67`（整段抄，未转述）**
 
@@ -523,7 +523,7 @@ C66（格式级空白没有分项号）立账正是因为这种空白当时有�
 512 是本机 `nvme0n1` 现查的值，D22（单元原子性怎么合成） 已定项 2 那一节逐字「同构 512 池上槽就是 512」；io_min 由 D2（RAID 条带策略） 已定项 19 记进系统配置）。
 全部固定结构两盘各一份、设备内偏移相同。落点坐标全池一个：(设备身份 4 字节, 16 KiB 槽号 6 字节)，
 槽号 = 设备内偏移 ÷ 16384（D3（空间分配） 已定项 7、D19（块指针的结构与宽度预算） 已定项 4）。
-这一节的槽号与写清单以 E142（新池新建文件的干跑） 第二十一次跑的主产物为准：`research/results/e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out`（`scripts/replay.sh` 第 174 行登记的那份）里 `name=width` 30 行 expected == actual，`name=write_list` 29 条写、12 个单元，窗口里 29 个写与 `crates/` 的导出按 (设备, 偏移, 长度) 配对（`name=impl_bytes_equal_summary … matched=29 equal=20 unequal=9`）：不同的 9 个里真差异只有记账树根第 10 条已承诺预留（装置照旧值写 0，`crates/` 照 D3（空间分配） 已定项 2 写 98 386），其余 8 个是校验和级联，装置照条款改之后由第二十二次跑再比；分配记录树与 extent 树按 D8（核心索引结构） 已定项 14 按位置寻址。
+这一节的槽号与写清单以 E142（新池新建文件的干跑） 第二十一次跑的主产物为准：`research/results/e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out`（`scripts/experiments/replay.sh` 第 174 行登记的那份）里 `name=width` 30 行 expected == actual，`name=write_list` 29 条写、12 个单元，窗口里 29 个写与 `crates/` 的导出按 (设备, 偏移, 长度) 配对（`name=impl_bytes_equal_summary … matched=29 equal=20 unequal=9`）：不同的 9 个里真差异只有记账树根第 10 条已承诺预留（装置照旧值写 0，`crates/` 照 D3（空间分配） 已定项 2 写 98 386），其余 8 个是校验和级联，装置照条款改之后由第二十二次跑再比；分配记录树与 extent 树按 D8（核心索引结构） 已定项 14 按位置寻址。
 
 | 设备内偏移 | 长度 | 是什么 | 16 KiB 槽号 | 指向 | 状态 |
 |---|---|---|---|---|---|
@@ -931,7 +931,7 @@ D8（核心索引结构） 已定项 6（2026-09-05）定了整段：inode 树�
 
 一条线的提交协议由它全部根槽写路径的录制流段序列定（D13（验证路线） 已定项 4 切段：屏障与 FUA 写切段，段内任意整写子集），等价类按这张表的同构分：段边界的位置相同、每段里出现的步骤种类**集合**相同（D17（实现分层与第三方管道） 已定项 2）；一步重复几次（设备数、单元数）是参数不进判据。别处引提交步骤一律链到这一节，不另抄。步骤种类**六种**：写单元（含码 3 容器、实例表单元）、写 journal 记录、根槽 FUA 写、系统配置槽原地覆写、屏障、**整段清零**（`zero_fill`，2026-09-22 随 mkfs 清根环与 journal 环加，用户 2026-09-19 定「录制流登记成一种新步骤、层 0 认它」）。⚠️ **mkfs 那一行的段序列不来自 E142（新池新建文件的干跑） 产物**：那份装置是 `research/` 下一份独立手写模型、不读 `crates/` 的 mkfs 实现（实验页「它答不了的」第 5 条），清零那几步它没有；那一行逐字来自活代码，由 `crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs` 的 `recorded_stream_matches_the_registered_mkfs_segment_sequence` 钉住，门禁 doc-registries 的 segment-registry 格按它比。其余各行的段序列逐字来自 E142（新池新建文件的干跑） 产物的 `name=segments` 行（`path=instance_acquisition / warm_up / transaction / post_mkfs_stream`；取号那一行不是根槽写路径，登记在这里是因为整条流按录制流切、它的两个写落在流的开头一段），单测 `registered_segment_sequences_match_every_recorded_path` 钉住它们；表与产物之间的逐字比对由门禁 doc-registries 的 segment-registry 格做（C316（提交步骤的登记位有四处且互不相同）已还清）。
 
-⚠️ **表里取 E142（新池新建文件的干跑） 产物的各行，对的是第二十一次跑的主产物** `e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out`（`scripts/replay.sh` 第 174 行登记的那份；第 35–39 行与第十九次跑的主产物逐字相同）：取号、暖机、普通发布三行与整条流那一句同产物第 36–39 行逐字相同，mkfs 那一行不按产物比、产物第 35 行与钉它的用例逐字相同；普通发布与整条流里的 12 个单元是分配记录树、extent 树按位置寻址（D8（核心索引结构） 已定项 14）之后的；每次发布末尾有系统配置轮换之后那道屏障（D16（发布语义） 已定项 7），同一块盘上连着的屏障并成一道（D13（验证路线） 已定项 4）；`name=width` 30 行 expected == actual。那一份产物没有跑层 0 整轮枚举（`name=layer0 … states=not_run closed_form=16777240 skipped=true`，够判之后不跑），整条流那一句的状态数是闭式算出来的，不是枚举出来的。
+⚠️ **表里取 E142（新池新建文件的干跑） 产物的各行，对的是第二十一次跑的主产物** `e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out`（`scripts/experiments/replay.sh` 第 174 行登记的那份；第 35–39 行与第十九次跑的主产物逐字相同）：取号、暖机、普通发布三行与整条流那一句同产物第 36–39 行逐字相同，mkfs 那一行不按产物比、产物第 35 行与钉它的用例逐字相同；普通发布与整条流里的 12 个单元是分配记录树、extent 树按位置寻址（D8（核心索引结构） 已定项 14）之后的；每次发布末尾有系统配置轮换之后那道屏障（D16（发布语义） 已定项 7），同一块盘上连着的屏障并成一道（D13（验证路线） 已定项 4）；`name=width` 30 行 expected == actual。那一份产物没有跑层 0 整轮枚举（`name=layer0 … states=not_run closed_form=16777240 skipped=true`，够判之后不跑），整条流那一句的状态数是闭式算出来的，不是枚举出来的。
 
 | 根槽写路径 | 录制流的段序列（每段的写数与种类；「种类」那串是产物 `kinds=` 字段的原样，每段一个步骤种类多重集，段之间用 `\|` 隔开，门禁 doc-registries 的 segment-registry 格逐字比对） | 出处 | 层 0 枚举 |
 |---|---|---|---|
@@ -1151,7 +1151,7 @@ R70 (b)(d) 不在 P8G 上判：它们查的是源码文本与单测，不是哪�
 
 ## 九、变异
 
-加进 `scripts/mutations/e142_new_pool_file_creation_dry_run.tsv`，编号接 M220 之后（今天表里 199 条，末条 `M220_field_attribution_labels_fsid_as_instance_table_pointer`）。锚点原文由执行员按改后的源码定，恰好命中一次；每条都要有一条单测把它抓红，单测里的绝对值取第七节锚点，不取任何一次产物的输出。「在哪个取样点上改变输出」写的是产物里哪一格会动；变异是否被抓以单测为准（`mutate.sh` 跑的是单测）。替换文里不许出现命令七的旧值写法（第 21 次修订一第 3 条的先例）。
+加进 `scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv`，编号接 M220 之后（今天表里 199 条，末条 `M220_field_attribution_labels_fsid_as_instance_table_pointer`）。锚点原文由执行员按改后的源码定，恰好命中一次；每条都要有一条单测把它抓红，单测里的绝对值取第七节锚点，不取任何一次产物的输出。「在哪个取样点上改变输出」写的是产物里哪一格会动；变异是否被抓以单测为准（`mutate.sh` 跑的是单测）。替换文里不许出现命令七的旧值写法（第 21 次修订一第 3 条的先例）。
 
 **第一段（M221–M227）**：
 
@@ -1180,7 +1180,7 @@ R70 (b)(d) 不在 P8G 上判：它们查的是源码文本与单测，不是哪�
 **要主 agent 跑的命令（整张变异表，超过前台时限）**：冻结之后、交回之前由执行员把下面这条原样写进报告，主 agent 起（共用约束「长活交回主 agent」）。工作目录 `/home/fy5090/code/singlefs/research`；内存上限 3G（理由同第 21 次报告第五节）；线程数取派发提示给的上限（没给取 6）；4 个工作进程。
 
 ```
-cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="E142 第 22 次整表：单测比第 21 次多，旧峰值不作数" MUTATE_MEMORY_MAX=3G MUTATE_JOBS=4 MUTATE_TARGET_DIR=<执行员草稿目录>/mtarget nice -n 19 bash scripts/capped.sh <线程数> bash scripts/mutate.sh e142-new-pool-file-creation-dry-run scripts/experiments/e142_new_pool_file_creation_dry_run.rs mutations/e142_new_pool_file_creation_dry_run.tsv > results/e142-mutate-r22-<段>-<日期>.log 2>&1
+cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="E142 第 22 次整表：单测比第 21 次多，旧峰值不作数" MUTATE_MEMORY_MAX=3G MUTATE_JOBS=4 MUTATE_TARGET_DIR=<执行员草稿目录>/mtarget nice -n 19 bash scripts/hosts/capped.sh <线程数> bash scripts/mutation/mutate.sh e142-new-pool-file-creation-dry-run scripts/experiments/e142_new_pool_file_creation_dry_run.rs mutations/e142_new_pool_file_creation_dry_run.tsv > results/e142-mutate-r22-<段>-<日期>.log 2>&1
 ```
 
 跑完看：`grep -E '^(✅|⏭|❌|💥|⚠️|⏱|🧱)' <日志> | awk '{print $1}' | sort | uniq -c`（几栏之和等于 206 或 209）、收尾的「计数：」行、末行「已还原，基线仍全绿」；没有那一行或退出码是 5 ⇒ 这一轮不算数（`mutation-sampling.md` 第七类）。`⏭` 与第 21 次的 `research/results/e142-mutate-2026-10-04-r21.log` 比。有没红的而要改装置源码（只加单测也算），冻结版 sha256 就变了：实验页写明「源码与主产物对应的冻结版不同、动了哪里」，产物不重跑，由主 agent 判（同第 21 次修订一第 1 条）。
@@ -1215,7 +1215,7 @@ cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="
 | V22c | 两次跑之间 `crates/` 变了 | 快照 A 与 B、或 B 与 C `cmp` 不同（第二段 A2、B2、C2 同） |
 | V22d | 阳性对照或判别力自证不过：测量分不出差别 | PC-e、PC-f22（比对器那一支）、P2、PC-g、PC-h1、PC-h2、PC-j、PC-k、第八节判别力自证任一条没看到「该看到什么」（PC-i 不过照第五节 5.2 那一行办，不作废） |
 | V22e | 产物缺行 | 主产物里 `name=layout_field` 不是恰好 174 行、`name=layout_field_summary` / `name=layout_field_positive_control` / `name=impl_bytes_equal_summary` / `name=root_record` / `name=back_chain` / `name=verdict` / `name=gaps` / `name=accounting` 不是恰好一行、`name=device_region_bytes` 不是 58 行；第二段产物 `name=p8g_device_region_bytes` 不是 29 行、`name=p8g_layout_field` 不是 174 行、`name=p8g_layout_field_summary` / `name=p8g_accounting` / `name=p8g_verdict` 不是恰好一行 |
-| V22f | 读数读不到，或内存包装自己的结局 | 任一格的量读出来是空的（读不到 ≠ 读到 0，`label6_anchor.py --decode` 少打一行也算）；或经 `scripts/run-with-memory-cap.sh` 跑出退出码 250–254（那一次的输出不算结果，命令与退出码写进报告） |
+| V22f | 读数读不到，或内存包装自己的结局 | 任一格的量读出来是空的（读不到 ≠ 读到 0，`label6_anchor.py --decode` 少打一行也算）；或经 `scripts/hosts/run-with-memory-cap.sh` 跑出退出码 250–254（那一次的输出不算结果，命令与退出码写进报告） |
 
 ### 停机（既不作废，也不当结果；两边都查，写进报告交回主 agent）
 
@@ -1236,7 +1236,7 @@ cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="
 1. 主产物里 `name=impl_bytes_equal_summary`、`name=root_record`、`name=back_chain`、`name=accounting`、`name=layout_field_summary`、`name=layout_field_positive_control`、第一行 `name=verdict`、`name=gaps`，`label6_anchor.py --decode` 的四行（主产物与 N21R 各四行），步 ①(4) 锚点文件的 B1、B1b 两行，独立 bin 的汇总行，原样整行抄进报告（`evidence-discipline.md`「引产物就整行抄」）；Q142.90 的分组表、Q142.95 的翻面表、Q142.94 的 `287` / `295` 归类表与命令六的四个计数放进报告文件。第二段另抄 `P8G_SUMMARY`、`name=p8g_layout_field_summary`、`name=p8g_accounting`、`name=p8g_verdict` 与 `name=verdict` 两行。
 2. 问题单三行逐行写「已够判 / 还差什么 / 剩下的量能不能让它翻面」。问题单文件执行员不改，状态由主 agent 改。
 3. 交主 agent 的清单（不改 kb）：`layout/01` 第 36 行改指这一次主产物与它的 `impl_bytes_equal_summary`；若 Q142.86 判「相同」，D5 已定项 8 依据段「除第 10 行……外全等」那一句与 `layout/01` 第 36 行「由第二十二次跑再比」那半句可以改；第四节第 10 条的提醒原样转给主 agent；第二段没有 P8G 导出时，S22-dump2 那一格原样转给主 agent。
-4. `scripts/replay.sh` 第 174 行改指主产物（第二段之后改指第二段产物）；实验页 `.claude/kb/experiments/142-新池新建文件的干跑.md` 加第二十二次跑一节；实验索引与变更史照执行员定义写。
+4. `scripts/experiments/replay.sh` 第 174 行改指主产物（第二段之后改指第二段产物）；实验页 `.claude/kb/experiments/142-新池新建文件的干跑.md` 加第二十二次跑一节；实验索引与变更史照执行员定义写。
 
 ### 够判停机
 
@@ -1248,7 +1248,7 @@ cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="
 
 **执行员修订一**（2026-10-05；时点：步 ② 单测全绿、小表跑完之后，N22 主产物一次没跑之前；步 ① 的臂 N21R、Q142.91、PC-j、PC-h1–h3 已先跑完，读的是冻结装置，不受这一节影响）。判据、门槛、臂的定义、第六、七、九节每一条的去留与报告方式一条没动。
 
-1. **冻结值**：装置 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` 10282 行，sha256 `4720213e259ab058fabb4474ac2d6ccf539301e9c31b56e06494cc3d99b25230`；变异表 `scripts/mutations/e142_new_pool_file_creation_dry_run.tsv` 206 行，sha256 `17132e8036555f286370e20dc05f69a95f28d0b2ca3324b6ca8e4c52949c40aa`（只在末尾追加 M221–M227，199 行原样）。单测 `--list` 108 条，`cargo test --release -p e7-index-bench --bin e142-new-pool-file-creation-dry-run` 107 过 0 败 1 忽略（改之前 104 过 1 忽略：新加 3 条、改 1 条）。
+1. **冻结值**：装置 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` 10282 行，sha256 `4720213e259ab058fabb4474ac2d6ccf539301e9c31b56e06494cc3d99b25230`；变异表 `scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv` 206 行，sha256 `17132e8036555f286370e20dc05f69a95f28d0b2ca3324b6ca8e4c52949c40aa`（只在末尾追加 M221–M227，199 行原样）。单测 `--list` 108 条，`cargo test --release -p e7-index-bench --bin e142-new-pool-file-creation-dry-run` 107 过 0 败 1 忽略（改之前 104 过 1 忽略：新加 3 条、改 1 条）。
 2. **臂 N22 ①–⑥ 的落地（依据：单测读数全绿）**：① 标签 6 由 `committed_reservation_bytes`（第 2870 行）现算，四个量在 `publish_first_file`（第 3029–3049 行）取：副本数 = `parameters.device_count`、H = `tombstone_tree_internal_levels`（第 2880 行；零根读 `TOMBSTONE_TREE_INTERNAL_LEVELS_OF_A_ZERO_ROOT` = 0，非零根 `panic!`）、n_live = `live_object_count_of_inode_records`（第 2893 行，按记录字节 [36, 40) 小端 u32 ≥ 1 数）、有没有 `deleted_inodes` 条目 = 树表第 1 版条目表里有没有树 ID 65544；字面 98 386 只在单测里。② 3.3 写的「把树表条目表的构造挪到记账之前」只能挪一半：树表里带指针的四条（extent、inode、分配记录、记账）引用记账树的根指针，没法排到记账之前；所以只把树表第 1 版里 day-1 注册、根指针为零的七条（树 ID 65541..65547，含 `deleted_inodes` 与墓碑树）先建（第 3029 行），带指针的四条仍在后面建，树表单元建出来之前接上那七条（第 3160 行），次序与先前相同；多加两条断言（组装出的树表有没有 `deleted_inodes` 条目要与算已承诺预留时看的那一份一致、条目按树 ID 严格升序）。这只落实 3.3「只挪次序」，不改写出的字节（单测里 11 条树表条目、树表单元长度、全部原有字节断言一条没改仍绿）。③ 两处注释已改（第 3022–3028 行与测试里那一处）。④ 单测：`allocation_and_accounting_trees_carry_the_byte_table_numbers` 的三项 0 改成两项 0 加 98 386；新加 `committed_reservation_formula_reproduces_the_d3_clause_anchors`（A1、A1 的盘上小端字节、A2、A3 六个判别值：副本 1 / H = 1 / n_live = 2 三个直接调用取值，常驻少一槽 / 41 改 40 / 槽宽 4096 三个断言今天的值不是它们，另钉 H 零根为 0 与 32768 除 815 余 168）、`live_object_count_skips_inode_records_whose_link_count_is_zero`（合成 nlink = 0、1、2 的记录字节）、`accounting_unit_carries_the_committed_reservation_at_the_registered_byte_offsets`（A4 第 3 / 4 / 10 / 13 / 14 行的标签与 value 偏移、A6 的 t10–t12 落点与 t13、t14 的偏移）。A5 主点半边由原有测试钉着（单元区 211 968 槽、3312 段、全空 3310、空闲 3 472 605 184）；**A5 的 P8G 半边与问题单第 2 行一起属第二段，这一次不跑**（依据：派发提示「只跑登记里的第一段……第二段（P8G，问题单第 2 行）这一次不跑」）。B1、B1b 沿用第 21 次的单测（第 9178、10099–10100 行）。⑤ M221–M227 已加（第九节原文，替换文照原样）。⑥ 别处没改。
 3. **小表（7 行 M221–M227）对改后的源码**：命令与原样输出 `research/results/e142-r22-mutation-subtable-2026-10-05.out`；抓到 7、无效 0、没红 0，`计数：内存撞顶 0 条（上限 3G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条`，`已还原，基线仍全绿`。M225 的会红检查只有 `live_object_count_skips_inode_records_whose_link_count_is_zero` 一条（输出不变，第九节预先写明）。旧 199 条的锚点逐条核（`check_anchors.py`）206 行 `bad 0`：没有一条需要重锚。
 4. **残留**：命令六四个计数都是 0（`research/results/e142-r22-controls-2026-10-05.out` 步 ③(10) 会再贴）；命令七 `residual_old_values count=0`；`287` 在冻结源码里 12 处、变异表第 2、3 列 0 处，与第 21 次相同；`grep -n '已承诺\|COMMITTED'` 在间隙文本里零命中。
@@ -1268,7 +1268,7 @@ cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="
 - `crates/`：`singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs:1-292`（整份）；`singlefs-harness/src/scenario.rs:1-130`；`singlefs-core/src/make_filesystem.rs:340-485` 与 `assert|Error::` 的命中行；`singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs:1-40` 与参数相关的命中行；`new_pool_file_creation_region_bytes.rs:1-30` 与命中行；`e142_new_pool_file_creation_write_dump_one_device.rs:1-30` 与命中行；`new_pool_file_creation_on_device.rs:1-55`、`:1395-1420`；`singlefs-core/src/admission.rs:236-300` 与 `committed_reservation|live_objects|ReplicaCount` 的命中行；`singlefs-core/src/transaction.rs:4150-4185`、`:4710-4722`、`:6390-6400`、`:7928-7940` 与命中行；`singlefs-harness/tests/new_pool_file_creation_publish.rs` 里 `E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION` 的命中行（80、566）；`singlefs-format/src/lib.rs` 里 `TEST_IMAGE_DEFAULT_BYTES` 的命中行（306、308、558）；`e142_parameters|run_new_pool_file_creation` 在 `crates/` 的命中行。
 - 装置 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs`：`:150-175`、`:375-387`（`put_u16/u32/u64` 的命中与后两行）、`:590-620`、`:1886-1910`、`:2000-2030`、`:2128-2200`、`:2670-2705`、`:2960-3040`、`:3872-3895`、`:6706-6720`、`:7190-7262`、`:7455-7475`、`:7628-7706`、`:8760-8768`、`:8893-8935`、`:9380-9415`；`DEVICE_BYTES|DEVICE_SLOTS|UNIT_AREA_SLOTS`、`COMMITTED|已承诺|committed`、`TREE_IDENTIFIER_DELETED_INODES|TOMBSTONE`、`name=device_region_bytes|impl_bytes_equal|accounting|root_record|back_chain`、`name=self_check_text_number`、`G22`、`p8g|P8G`、`fn main`、`check_text_numbers` 里两处 `push(format!` 的命中行；第 7698 行字段计数。
 - 变异表：末三行、`COMMITTED|已承诺|label6|committed` 的命中（零）、末条编号。独立 bin 与它的变异表只取了 sha256 与行数。
-- 脚本与门禁：`scripts/replay.sh` 里 `e142|E142` 的命中行与 `:510-516`；`.claude/gate.d/stage-inputs.tsv` 第 36 行（按空白切开的输入清单与注释前 600 字）、第 37 行前 400 字；`scripts/admission.py` 的 `def` 命中行、`:120-130`、`:702-800`；`scripts/quote-kb.py --help`、`scripts/replace-once.py --help` 的输出。
+- 脚本与门禁：`scripts/experiments/replay.sh` 里 `e142|E142` 的命中行与 `:510-516`；`.claude/gate.d/stage-inputs.tsv` 第 36 行（按空白切开的输入清单与注释前 600 字）、第 37 行前 400 字；`scripts/gate/admission.py` 的 `def` 命中行、`:120-130`、`:702-800`；`scripts/kb/quote-kb.py --help`、`scripts/kb/replace-once.py --help` 的输出。
 - `research/results/`：**没读内容**，只用 `ls | grep` 看了 E142 几份文件的文件名（第 21 次整表日志 `e142-mutate-2026-10-04-r21.log` 在不在）。`.claude/kb/experiments/`、实验索引、实验变更史：没读。
 - 草稿目录里自己写的文件与它们的输出；这份登记自己（回读核子串）。
 
@@ -1277,23 +1277,23 @@ cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="
 **命令一**（第三节 3.2 的 sha256 与行数；步 ⓪(2) 照它核）
 
 ```
-cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r22-design; { echo '命令一'; sha256sum scripts/experiments/e142_new_pool_file_creation_dry_run.rs scripts/mutations/e142_new_pool_file_creation_dry_run.tsv scripts/experiments/e142_region_diff_independent.rs scripts/mutations/e142_region_diff_independent.tsv; wc -l scripts/experiments/e142_new_pool_file_creation_dry_run.rs scripts/mutations/e142_new_pool_file_creation_dry_run.tsv scripts/experiments/e142_region_diff_independent.rs scripts/mutations/e142_region_diff_independent.tsv; } > $D/cmd1.txt 2>&1; cat $D/cmd1.txt
+cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r22-design; { echo '命令一'; sha256sum scripts/experiments/e142_new_pool_file_creation_dry_run.rs scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv scripts/experiments/e142_region_diff_independent.rs scripts/mutation/tables/e142_region_diff_independent.tsv; wc -l scripts/experiments/e142_new_pool_file_creation_dry_run.rs scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv scripts/experiments/e142_region_diff_independent.rs scripts/mutation/tables/e142_region_diff_independent.tsv; } > $D/cmd1.txt 2>&1; cat $D/cmd1.txt
 命令一
 3bfa09fbcbe393516747a9ef3e7815a10d64dde3d01be5557d92dbddfbf0e147  scripts/experiments/e142_new_pool_file_creation_dry_run.rs
-c9f87de40ca16da12f298845583c6a9dd07579dbe99f5496a4539fbe40f7d2f6  scripts/mutations/e142_new_pool_file_creation_dry_run.tsv
+c9f87de40ca16da12f298845583c6a9dd07579dbe99f5496a4539fbe40f7d2f6  scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv
 311ce77c9c73148059f4d8a3425ab8902413c34e7ca45ddc04cc582de92fae51  scripts/experiments/e142_region_diff_independent.rs
-8978e80a8a70a454f244a77f650eff04620016b7794042ed8388547933708a8e  scripts/mutations/e142_region_diff_independent.tsv
+8978e80a8a70a454f244a77f650eff04620016b7794042ed8388547933708a8e  scripts/mutation/tables/e142_region_diff_independent.tsv
  10149 scripts/experiments/e142_new_pool_file_creation_dry_run.rs
-   199 scripts/mutations/e142_new_pool_file_creation_dry_run.tsv
+   199 scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv
    766 scripts/experiments/e142_region_diff_independent.rs
-    10 scripts/mutations/e142_region_diff_independent.tsv
+    10 scripts/mutation/tables/e142_region_diff_independent.tsv
  11124 total
 ```
 
 **命令二**（第二节的二十四个取法；先跑出出口 `e142-r22-section2.md`，再用同样的二十四个取法重抄进 `recheck-e142-r22-section2.md` 比；步 ② 开工前与步 ③(1) 照它重抄，比的是 sha256 `540d8df91b9bc5f6e908b774379a79ce7b42cc87afa174019dd9cc22a60cecd9`）
 
 ```
-cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r22-design; L=.claude/kb/layout/01-first-txn.md; J='.claude/kb/decisions/23-journal的角色与格式.md'; P='.claude/kb/decisions/16-发布语义.md'; S='.claude/kb/decisions/03-空间分配.md'; K='.claude/kb/decisions/05-快照-空间记账机制.md'; R='.claude/kb/decisions/02-RAID条带策略.md'; rm -f $D/recheck-e142-r22-section2.md; nice -n 19 python3 scripts/quote-kb.py $D/recheck-e142-r22-section2.md "$S@#### 已定项 2：墓碑与 livelist 的 FREE 条目由准入控制算进最坏情况" "$K@#### 已定项 4：统计量有哪几个" "$K@#### 已定项 8：新池新建文件记账树里写哪几行" "$R@#### 已定项 9：第一个可运行目标跑 2 块盘" "$J@#### 已定项 4：记录头约束在单个原子单元内，头 487 字节" "$J@#### 已定项 15：崩在记录持久之后、根槽持久之前，恢复由记录重建那次发布的根" "$J@#### 已定项 17：点名项 56 字节的字段表" "$P:42-42" "$P:51-51" '.claude/kb/decisions/08-核心索引结构.md@#### 已定项 11：码 2 的载荷布局与 key 比较序' '.claude/kb/decisions/08-核心索引结构.md@#### 已定项 9：树的种类码的登记表' '.claude/kb/decisions/08-核心索引结构.md@#### 已定项 8：树表条目的字段表' '.claude/kb/decisions/18-块里携带什么信息.md@#### 已定项 24：第一版墓碑：墓碑树、40 字节记录、谱系记录' "$L:1-27" "$L@## 零、盘面地图与新池新建文件的写清单" "$L@## 一、mkfs 已经种下的（新池新建文件之前就在盘上）" "$L@## 二、数据这一侧" "$L@## 三、指向数据单元的指针（住在父节点里）" "$L@## 四、文件元数据（inode）" "$L@## 五、空间记账与分配" "$L@## 六、journal" "$L@## 七、发布（根记录与根槽）" "$L@## 八、根槽写路径的段序列登记表（C316（提交步骤的登记位有四处且互不相同） 的登记位，2026-09-13 立）" "$L@## 还剩几处空白" > $D/cmd2-out.txt 2>&1; echo "exit=$?"; tail -1 $D/cmd2-out.txt; wc -l $D/recheck-e142-r22-section2.md; sha256sum $D/recheck-e142-r22-section2.md $D/e142-r22-section2.md; cmp $D/recheck-e142-r22-section2.md $D/e142-r22-section2.md && echo same
+cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r22-design; L=.claude/kb/layout/01-first-txn.md; J='.claude/kb/decisions/23-journal的角色与格式.md'; P='.claude/kb/decisions/16-发布语义.md'; S='.claude/kb/decisions/03-空间分配.md'; K='.claude/kb/decisions/05-快照-空间记账机制.md'; R='.claude/kb/decisions/02-RAID条带策略.md'; rm -f $D/recheck-e142-r22-section2.md; nice -n 19 python3 scripts/kb/quote-kb.py $D/recheck-e142-r22-section2.md "$S@#### 已定项 2：墓碑与 livelist 的 FREE 条目由准入控制算进最坏情况" "$K@#### 已定项 4：统计量有哪几个" "$K@#### 已定项 8：新池新建文件记账树里写哪几行" "$R@#### 已定项 9：第一个可运行目标跑 2 块盘" "$J@#### 已定项 4：记录头约束在单个原子单元内，头 487 字节" "$J@#### 已定项 15：崩在记录持久之后、根槽持久之前，恢复由记录重建那次发布的根" "$J@#### 已定项 17：点名项 56 字节的字段表" "$P:42-42" "$P:51-51" '.claude/kb/decisions/08-核心索引结构.md@#### 已定项 11：码 2 的载荷布局与 key 比较序' '.claude/kb/decisions/08-核心索引结构.md@#### 已定项 9：树的种类码的登记表' '.claude/kb/decisions/08-核心索引结构.md@#### 已定项 8：树表条目的字段表' '.claude/kb/decisions/18-块里携带什么信息.md@#### 已定项 24：第一版墓碑：墓碑树、40 字节记录、谱系记录' "$L:1-27" "$L@## 零、盘面地图与新池新建文件的写清单" "$L@## 一、mkfs 已经种下的（新池新建文件之前就在盘上）" "$L@## 二、数据这一侧" "$L@## 三、指向数据单元的指针（住在父节点里）" "$L@## 四、文件元数据（inode）" "$L@## 五、空间记账与分配" "$L@## 六、journal" "$L@## 七、发布（根记录与根槽）" "$L@## 八、根槽写路径的段序列登记表（C316（提交步骤的登记位有四处且互不相同） 的登记位，2026-09-13 立）" "$L@## 还剩几处空白" > $D/cmd2-out.txt 2>&1; echo "exit=$?"; tail -1 $D/cmd2-out.txt; wc -l $D/recheck-e142-r22-section2.md; sha256sum $D/recheck-e142-r22-section2.md $D/e142-r22-section2.md; cmp $D/recheck-e142-r22-section2.md $D/e142-r22-section2.md && echo same
 exit=0
   ✓ 24 段整抄进 /tmp/claude-1000/e142-r22-design/recheck-e142-r22-section2.md，回读逐字节一致
 882 /tmp/claude-1000/e142-r22-design/recheck-e142-r22-section2.md
@@ -1302,7 +1302,7 @@ exit=0
 same
 ```
 
-第一节问题单的抄录：`nice -n 19 python3 scripts/quote-kb.py $D/e142-r22-questions-quote.md "research/prompts/e142-r22-questions.md:5-5" "research/prompts/e142-r22-questions.md:7-11"`（「✓ 2 段整抄……回读逐字节一致」，出口 15 行、sha256 `6b12e366c01e0b46b6ca25933c14568a91268553df22db0a8094e8ff17b00ccf`）。两份出口都整份是这份登记的子串（`python3 -c "… open(D+f,'rb').read() in reg …"` 两个 `True`）。
+第一节问题单的抄录：`nice -n 19 python3 scripts/kb/quote-kb.py $D/e142-r22-questions-quote.md "research/prompts/e142-r22-questions.md:5-5" "research/prompts/e142-r22-questions.md:7-11"`（「✓ 2 段整抄……回读逐字节一致」，出口 15 行、sha256 `6b12e366c01e0b46b6ca25933c14568a91268553df22db0a8094e8ff17b00ccf`）。两份出口都整份是这份登记的子串（`python3 -c "… open(D+f,'rb').read() in reg …"` 两个 `True`）。
 
 **命令三**（准入一段的 `grep -c`；步 ⓪(1) 照它核，前三条都要是 1；今天第四条（r21 登记）是 1）
 
@@ -1553,7 +1553,7 @@ cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r22-design; A=scripts/e
 **命令七**（第 21 次的 `residual_old_values.sh`，照 `research/prompts/e142-r21-prereg.md` 第 1530–1546 行重建，sha256 与第 21 次记的相同；Q142.94、PC-i 的另一半。草稿仓树 `headtree/` 里只放了 `git show HEAD:` 取出的装置与变异表）
 
 ```
-cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r22-design; set -o noclobber; sed -n '1530,1546p' research/prompts/e142-r21-prereg.md > $D/residual_old_values.sh; mkdir -p $D/headtree/scripts/experiments $D/headtree/scripts/mutations; git show HEAD:scripts/experiments/e142_new_pool_file_creation_dry_run.rs > $D/headtree/scripts/experiments/e142_new_pool_file_creation_dry_run.rs; git show HEAD:scripts/mutations/e142_new_pool_file_creation_dry_run.tsv > $D/headtree/scripts/mutations/e142_new_pool_file_creation_dry_run.tsv; { echo '命令七'; sha256sum $D/residual_old_values.sh; echo '冻结装置（仓根）：'; bash $D/residual_old_values.sh /home/fy5090/code/singlefs | grep '^residual_old_values'; echo 'HEAD 版装置（草稿仓树）：'; bash $D/residual_old_values.sh $D/headtree | grep '^residual_old_values'; } > $D/cmd7.txt 2>&1; cat $D/cmd7.txt
+cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r22-design; set -o noclobber; sed -n '1530,1546p' research/prompts/e142-r21-prereg.md > $D/residual_old_values.sh; mkdir -p $D/headtree/scripts/experiments $D/headtree/scripts/mutation/tables; git show HEAD:scripts/experiments/e142_new_pool_file_creation_dry_run.rs > $D/headtree/scripts/experiments/e142_new_pool_file_creation_dry_run.rs; git show HEAD:scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv > $D/headtree/scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv; { echo '命令七'; sha256sum $D/residual_old_values.sh; echo '冻结装置（仓根）：'; bash $D/residual_old_values.sh /home/fy5090/code/singlefs | grep '^residual_old_values'; echo 'HEAD 版装置（草稿仓树）：'; bash $D/residual_old_values.sh $D/headtree | grep '^residual_old_values'; } > $D/cmd7.txt 2>&1; cat $D/cmd7.txt
 命令七
 63ea086247aaee402ff74cf9dd3c9d51c1220f7f379f3f5dc2f2bf595de2a1c0  /tmp/claude-1000/e142-r22-design/residual_old_values.sh
 冻结装置（仓根）：
@@ -1567,7 +1567,7 @@ HEAD 版装置 sha256 `2f4ea2cfd3f142bbe76e054bfb6747ebe4cfd17509a19e6737f1dcf9e
 **命令八**（准入，第四节第 8 条）
 
 ```
-cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r22-design; { echo '命令八'; nice -n 19 timeout 200 python3 scripts/admission.py experiment /home/fy5090/code/singlefs E142; echo "exit=$?"; } > $D/cmd8.txt 2>&1; tail -5 $D/cmd8.txt
+cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r22-design; { echo '命令八'; nice -n 19 timeout 200 python3 scripts/gate/admission.py experiment /home/fy5090/code/singlefs E142; echo "exit=$?"; } > $D/cmd8.txt 2>&1; tail -5 $D/cmd8.txt
 命令八
   ✓ 放行 E142：输入自 research/results/e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out 以来变了（那一份 584fc9aef046，今天 525254e0683c）
 E7INPUT name=input_fingerprint key=E142 sha256=525254e0683ceae339e944ed6f05130e169dd0c8896b36c90a1fdd2e21b11e21 files=309
@@ -1605,4 +1605,4 @@ t13 16785408 4096 t14 1052672 512
 
 ### 13.3 写登记用的命令
 
-这份登记用 `set -o noclobber` 排他新建、之后每次不超过 150 行 `>>` 追加；几处事实更正用 `scripts/replace-once.py` 定点替换（各「命中 1 次……回读确认」；另有一处因命令六的输出被 `cut -c` 从汉字中间切断、整份登记读不成 UTF-8，`replace-once.py` 读不进，改法是在草稿目录生成改好的一份、`diff` 核过只动了命令六那一行命令与它的输出块、再 `mv` 换上）：`driver_e142` 的行号 510–516、D3 暂存改动的位置、两处格号（Q142.89、Q142.97）、第二段修订写在哪、R71 的归一化写法、第四节第 6 条读过的行区间。第二节七段与第一节的抄录都是出口文件原样追加，追加完回读：两份出口整份是这份登记的子串（`True True`），文件头一行在。
+这份登记用 `set -o noclobber` 排他新建、之后每次不超过 150 行 `>>` 追加；几处事实更正用 `scripts/kb/replace-once.py` 定点替换（各「命中 1 次……回读确认」；另有一处因命令六的输出被 `cut -c` 从汉字中间切断、整份登记读不成 UTF-8，`replace-once.py` 读不进，改法是在草稿目录生成改好的一份、`diff` 核过只动了命令六那一行命令与它的输出块、再 `mv` 换上）：`driver_e142` 的行号 510–516、D3 暂存改动的位置、两处格号（Q142.89、Q142.97）、第二段修订写在哪、R71 的归一化写法、第四节第 6 条读过的行区间。第二节七段与第一节的抄录都是出口文件原样追加，追加完回读：两份出口整份是这份登记的子串（`True True`），文件头一行在。

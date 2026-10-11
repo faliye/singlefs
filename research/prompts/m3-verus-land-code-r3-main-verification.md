@@ -10,7 +10,7 @@
 | 开工快照 | `research/prompts/m3-verus-land-code-r3-snapshot/`：`crates-sha256.txt`（217 份，冻结副本 `/tmp/claude-1000/m3-verus-land-code-r3/tree/`）、`kb-sha256.txt` | 腿交齐之后冻结副本 `sha256sum -c` 全 OK。`kb-sha256.txt` 只有 `.claude/kb/checks-owed.md` 对不上：别的会话插行，两条腿一处都没引它。主工作区 `crates/` 里快照内三份文件被别的会话改过，改前改后在 `research/prompts/m3-verus-land-code-r3-snapshot/external-changes-m3-code-r3-L.patch`；三份都不是被判文件，腿读冻结副本 |
 | 云端辩方（Sonnet） | `research/prompts/m3-verus-land-code-r3-sonnet-output.md`（275 行，sha256 386190b1…8a8f）；模型 `…-sonnet-model/` | 主 agent 在 `/tmp/claude-1000/m3-verus-land-code-r3-main-check/` 照模型 README，从冻结副本拷两份（今天的核 `r3core`、套上 `h52-restore.diff` 的 `restored`），`gen_old.sh` 生成 fcc4d340 那一版与 m1–m4，跑同一组八条差分（内存包装 6G、10 线程），日志 `logs/r3core-a.txt`、`logs/restored-a.txt` |
 | 云端攻方（Opus） | `research/prompts/m3-verus-land-code-r3-opus-output.md`（273 行，sha256 b49261e7…85f9）；模型 `…-opus-model/` | 主 agent 现跑三件：H5-2 退回的核在 rlimit 10 与 20 上各跑一次 Verus；J3 那四行照攻方 `verus-rows.sh` 在 rlimit 20 上重跑；S07 照辩方 `j2/run-j2.sh` 套到新用例上 |
-| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-verus-land-code-r3/tree --root . --background research/prompts/_m3-verus-land-code-r3-background.md`：「✓ 核了 58 处引文，对上 58 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/agents/cite-check.py <两份报告> --root /tmp/claude-1000/m3-verus-land-code-r3/tree --root . --background research/prompts/_m3-verus-land-code-r3-background.md`：「✓ 核了 58 处引文，对上 58 处，没判 0 处」 |
 
 主 agent 现跑的原样输出：
 
@@ -41,7 +41,7 @@
 | U1 | J1（H5-2） | **甲**：退回 H5-2，补证明提示让 Verus 在 rlimit 10 上过；补不出来再把登记的 rlimit 调到 20，照 `.claude/gate.d/verus-pins.tsv` 的流程整张重验。**乙**：保留删除，把核第 5、1310 行注释改成写明这一处次序与原文不同 | 甲：差分归零、对照回到第二轮的数（主 agent 现跑）；rlimit 10 上只差一处循环 rlimit 用尽（现跑）。乙：结局不变，多出的回调只在被改过的镜像上读盘（攻方推的，没造镜像量） |
 | U2 | J2 | **甲**：核头第 11 行收窄到用例罩住的那一种形状，补三格用例（锚点读不出、多条记录的发布、候选在提交标记或在飞上限上被断），S07、H07–H09 追加进 `crates/mutations.tsv` 并证红；可写挂载走缓存那一半另记欠账。**乙**：spec 加幽灵读盘日志 | 甲：攻方推的，没实现；乙：两条腿都说罩得更宽、看不到块层读，没有原型 |
 | U3 | J4（H5-3） | **甲**：一处定义，core 直接用核的四个类型，固有方法挪进核 crate 的 `verus!` 之外，胶水的手抄映射随之去掉。**乙**：维持 `PrefixKernel…` 改名，`lib.rs:23` 那句注释改成实话，另记一笔欠账 | 甲：辩方原型 `research/prompts/m3-verus-land-code-r3-sonnet-model/h53/h53-prototype.diff`（4 份文件），它在副本上量 Verus「32 verified, 0 errors」、core `--lib` 139 passed、五个 harness 目标过；主 agent 没复跑 |
-| U4 | J3 | **甲**：期望片段只数证明错，门禁 verus-must-red-worlds 格比之前剔掉 rlimit 那一个错误（改 `scripts/verus-proof-check.py` 与表头约定）。**乙**：只改这四行的变异写法，让它们在 rlimit 10 上不撞 rlimit | 甲：一次修掉这一类，四行在 rlimit 20 上 proof_errors 都 ≥ 1（现跑）；乙：只修已知的四行 |
+| U4 | J3 | **甲**：期望片段只数证明错，门禁 verus-must-red-worlds 格比之前剔掉 rlimit 那一个错误（改 `scripts/gate/verus-proof-check.py` 与表头约定）。**乙**：只改这四行的变异写法，让它们在 rlimit 10 上不撞 rlimit | 甲：一次修掉这一类，四行在 rlimit 20 上 proof_errors 都 ≥ 1（现跑）；乙：只修已知的四行 |
 
 不用交用户、并进下一批实现员照做的（零轮，编码纪律与测试，不改行为）：J4 其余五处（新用例期望值由式子算出、三常量两函数挪进 `common`、`+ 60` 与 `content_of(3300, 17)` 起名、核第 5、1310 行注释随 U1 改）；K20 那一行照攻方 H11 改写成原来那一判（`&& later.counter.0 != record.counter.0 + 1`）；`verus-mutations.tsv` 补攻方 A02 一行（「跳过紧挨着的下一条」）。
 

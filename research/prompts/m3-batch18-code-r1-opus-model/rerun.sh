@@ -4,7 +4,7 @@
 # 步骤：prepare | build | probe | sweep <from> <to> | sweepx <from> <to> | crash <from> <to> <part> | badimages | gpugap | n9 | diskloss
 #       | fixA-badimages | fixA-sweep <from> <to> | fixA-tests | mutC-sweep | mutC-crash | summary | all
 # 每一步一条前台命令跑得完（单步不超过约 3 分钟）；all 依次跑全部（约 50 分钟，给主 agent 放后台用）。
-# 跑编出来的代码一律经 scripts/run-with-memory-cap.sh；线程数取 M3B18_THREADS（缺省 10）。只跑 harness 档：不起 checker 档的测试目标。
+# 跑编出来的代码一律经 scripts/hosts/run-with-memory-cap.sh；线程数取 M3B18_THREADS（缺省 10）。只跑 harness 档：不起 checker 档的测试目标。
 set -euo pipefail
 model_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$model_dir/../../.." && pwd)"
@@ -13,7 +13,7 @@ work="${1:?工作目录}"
 step="${2:?步骤}"
 shift 2
 threads="${M3B18_THREADS:-10}"
-cap="$repo/scripts/run-with-memory-cap.sh"
+cap="$repo/scripts/hosts/run-with-memory-cap.sh"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-第18批代码轮攻方腿原型复跑，与同会话别的活互不依赖}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-新编译目录从头编、分批跑的历史段不同，峰值表只记了别的一次}"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-120}"
@@ -42,7 +42,7 @@ case "$step" in
     ;;
   build)
     for variant in tree fixA mutC; do
-      (cd "$work/$variant" && CARGO_TARGET_DIR="$work/target-$variant" nice -n 19 bash "$repo/scripts/capped.sh" "$threads" bash "$cap" 3G cargo build -q --release -p m3b18-opus-proto)
+      (cd "$work/$variant" && CARGO_TARGET_DIR="$work/target-$variant" nice -n 19 bash "$repo/scripts/hosts/capped.sh" "$threads" bash "$cap" 3G cargo build -q --release -p m3b18-opus-proto)
     done
     echo "built"
     ;;
@@ -57,7 +57,7 @@ case "$step" in
   fixA-badimages) run_mode fixA fixA-badimages badimages ;;
   fixA-sweep) M3B18_FROM="$1" run_mode fixA "fixA-sweep-$1" sweep "$2" ;;
   fixA-tests)
-    (cd "$work/fixA" && CARGO_TARGET_DIR="$work/target-fixA" nice -n 19 bash "$repo/scripts/capped.sh" "$threads" bash "$cap" 4G cargo test -q --release -p singlefs-harness --test pool_checker_judges_the_deletion_state_of_every_walked_version --test checker_known_bad_images) > "$work/out/fixA-tests.out" 2>&1
+    (cd "$work/fixA" && CARGO_TARGET_DIR="$work/target-fixA" nice -n 19 bash "$repo/scripts/hosts/capped.sh" "$threads" bash "$cap" 4G cargo test -q --release -p singlefs-harness --test pool_checker_judges_the_deletion_state_of_every_walked_version --test checker_known_bad_images) > "$work/out/fixA-tests.out" 2>&1
     ;;
   mutC-sweep) M3B18_FROM=1260 run_mode mutC mutC-sweep sweep 1680 ;;
   mutC-crash) M3B18_PART=0/2 M3B18_THREADS=2 run_mode mutC mutC-crash crashpoints 36 38 ;;

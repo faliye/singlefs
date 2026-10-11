@@ -9,9 +9,9 @@ SFS=/home/fy5090/code/singlefs
 cd "$TREE"; export CARGO_TARGET_DIR="$TGT"
 M=crates/singlefs-core/src/mount.rs
 PRISTINE="$TGT/mount.pristine"; cp "$M" "$PRISTINE"
-runlib () { bash "$SFS/scripts/run-with-memory-cap.sh" 8G bash "$SFS/scripts/capped.sh" 15 \
+runlib () { bash "$SFS/scripts/hosts/run-with-memory-cap.sh" 8G bash "$SFS/scripts/hosts/capped.sh" 15 \
   cargo test -p singlefs-core --lib -- placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests 2>&1 | grep 'test result:'; cp "$PRISTINE" "$M"; }
-runh () { bash "$SFS/scripts/run-with-memory-cap.sh" 8G bash "$SFS/scripts/capped.sh" 15 \
+runh () { bash "$SFS/scripts/hosts/run-with-memory-cap.sh" 8G bash "$SFS/scripts/hosts/capped.sh" 15 \
   cargo test -p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table -- "$1" 2>&1 | grep -E 'test result:|panicked at.*\.rs:[0-9]' | head -2; cp "$PRISTINE" "$M"; }
 echo "== baseline lib =="; runlib
 echo "== L4 take(1) =="; sed -i 's/\.take(ring_length_in_txgs)/.take(1)/' "$M"; runlib

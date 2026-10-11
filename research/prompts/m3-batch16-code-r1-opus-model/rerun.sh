@@ -48,8 +48,8 @@ second() { local arm=$1 b=$2
   env $N1C ATTACK_THREADS=1 bash "$S/sweep-batch.sh" "$((b+2))" "$arm" "s2c-$arm" WIDTHS 4 384 256 240; }
 n7_tests() {
   (cd n7clamp && CARGO_TARGET_DIR=$ATTACK_DIR/target-n7 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=180 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="副本上编跑五个 harness 测试目标，峰值未登记" \
-    RUN_WITH_MEMORY_CAP_PARALLEL_REASON="攻方腿副本与别的会话各跑各的" nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 6G \
-    bash "$REPO/scripts/capped.sh" 15 cargo test --offline --no-fail-fast "$@" -p singlefs-harness \
+    RUN_WITH_MEMORY_CAP_PARALLEL_REASON="攻方腿副本与别的会话各跑各的" nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 6G \
+    bash "$REPO/scripts/hosts/capped.sh" 15 cargo test --offline --no-fail-fast "$@" -p singlefs-harness \
     --test unlink_mount_continuation_and_the_emptied_version --test unlink_single_file_publishes \
     --test unlink_idempotence_criteria_and_rollback_to_the_emptied_version --test unlink_in_histories_judged_by_the_model \
     --test mount_transparency_judged_field_by_field_after_a_writable_mount); }

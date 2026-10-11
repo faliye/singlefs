@@ -230,4 +230,4 @@ J > 0 那 314 段闭式不超过约 10⁶ 的历史没枚举（合计约 4100 �
 
 ## 引文核对
 
-`python3 scripts/cite-check.py research/prompts/m3-batch10-code-r1-opus-s2-output.md --root /tmp/claude-1000/m3-batch10-code-r1/tree --root /home/fy5090/code/singlefs` 末行：「✓ 核了 18 处引文，对上 18 处，没判 0 处（逐处列在上面）」。只给仓根时 `crates/singlefs-checker/src/walk.rs` 那一处对不上：主工作区的 `walk.rs` 在这条腿跑着时被改过（sha256 870848fa…4a11，冻结副本 bb42ede4…c707），同一句在主工作区第 8736 行；本报告的代码行号一律按冻结副本。
+`python3 scripts/agents/cite-check.py research/prompts/m3-batch10-code-r1-opus-s2-output.md --root /tmp/claude-1000/m3-batch10-code-r1/tree --root /home/fy5090/code/singlefs` 末行：「✓ 核了 18 处引文，对上 18 处，没判 0 处（逐处列在上面）」。只给仓根时 `crates/singlefs-checker/src/walk.rs` 那一处对不上：主工作区的 `walk.rs` 在这条腿跑着时被改过（sha256 870848fa…4a11，冻结副本 bb42ede4…c707），同一句在主工作区第 8736 行；本报告的代码行号一律按冻结副本。

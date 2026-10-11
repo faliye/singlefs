@@ -42,7 +42,7 @@ RefFS 改正式依赖之后依赖方向对不对（`.claude/rules/verification.m
 - 两腿同判、主 agent 现查坐实 ⇒ 照那一判；一次抽样的「没打中」只算这一次。
 - 两腿分歧 ⇒ 主 agent 核分辨两者的那个事实；核不出就开第二轮，换攻击面。
 - 腿提的新判法、新用例算零轮。
-- 重型测试不跑：checker 档的测试（`cargo test -p singlefs-checker-tier`，含装置内联单测）、`crates/mutations.tsv` 整表都不跑，涉及它们的结论写「推的」。harness 档测试可以跑；装置二进制在自己的副本里编出来、经 `scripts/run-with-memory-cap.sh` 跑小规模（流一、流二或自造的小历史）可以，跑不起来写明。
+- 重型测试不跑：checker 档的测试（`cargo test -p singlefs-checker-tier`，含装置内联单测）、`crates/mutations.tsv` 整表都不跑，涉及它们的结论写「推的」。harness 档测试可以跑；装置二进制在自己的副本里编出来、经 `scripts/hosts/run-with-memory-cap.sh` 跑小规模（流一、流二或自造的小历史）可以，跑不起来写明。
 - 不读 E171 第 1 次重跑这一段正在写的产物（`research/results/e171-r1-*2026-10-05*`）。
 
 交付：腿的报告写 `research/prompts/m3-formal-code-b25-r1-<腿名>-output.md`，分段落盘（每次写进文件不超过 150 行，第一段排他新建，回复只写短句）；模型与脚本放 `research/prompts/m3-formal-code-b25-r1-<腿名>-model/`，带一份 `tools/rerun.sh`；草稿放 `/tmp/claude-1000/<腿名>/`。引 kb 条款写 kb 文件自己的行号（去 kb 文件里现查，不从背景材料里数）。方案按 `crates/` 今天的实现来谈。

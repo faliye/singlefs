@@ -222,7 +222,7 @@
 静态：`crates-mutation-rows.py static-check <冻结副本>`（原样输出，退出码 0）：
 
 ```
-COPIED	crates Cargo.toml Cargo.lock litmus scripts/run-with-memory-cap.sh scripts/crates-mutation-rows.py
+COPIED	crates Cargo.toml Cargo.lock litmus scripts/hosts/run-with-memory-cap.sh scripts/mutation/crates-mutation-rows.py
 CHECKED	3060	302	9
 static-check rc=0
 ```
@@ -310,7 +310,7 @@ crates/mutations.tsv: OK
 工作目录 `/home/fy5090/code/singlefs`；每条形如（内存上限与线程数照主 agent 的，下面的 `<上限>` `<N>` 待填；`SINGLEFS_HEAVY_TESTS=commit` 前缀由主 agent 加）：
 
 ```
-bash scripts/run-with-memory-cap.sh <上限> bash scripts/capped.sh <N> cargo test -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- --exact <名>
+bash scripts/hosts/run-with-memory-cap.sh <上限> bash scripts/hosts/capped.sh <N> cargo test -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- --exact <名>
 ```
 
 `<名>` 取下面九条之一，跑完看 `test … ok` 与 `CRASH_JUDGE_GPU_LEFT_TO_THE_CPU` 行（后两类流）：

@@ -6,7 +6,7 @@
 
 第三轮，也是这一批最后一轮（第三轮之后停）。第二轮判决 `research/prompts/m3-formal-code-b37-r2-main-verification.md` 采了两腿一致打中的「族这一维」，主 agent 当场改（判决第三节第 1、2 条），改动全文 `research/prompts/_m3-formal-code-b37-r3-diff.md`（相对第二轮冻结副本）：
 
-- `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 的内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red`：改成逐个核正式跑的 14 个单元（每个单元一族一档、一种建表法、一种盘次序、一种标记奇偶，取自 `scripts/replay.sh` 起 E165（恢复重放有界穷举与变异杀伤界）装置的驱动），每个单元的期望集写死成那条驱动 2026-10-04 产物里 `name=control` 的判据集合，读数全红，并起来罩全表，集合按 `Criterion` 比，另断言标签互不相同。
+- `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 的内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red`：改成逐个核正式跑的 14 个单元（每个单元一族一档、一种建表法、一种盘次序、一种标记奇偶，取自 `scripts/experiments/replay.sh` 起 E165（恢复重放有界穷举与变异杀伤界）装置的驱动），每个单元的期望集写死成那条驱动 2026-10-04 产物里 `name=control` 的判据集合，读数全红，并起来罩全表，集合按 `Criterion` 比，另断言标签互不相同。
 - `crates/mutations.tsv` 追加两行（族这一维）。
 
 这一轮只攻第二轮站住的形态与这一处改法；读数一级（第二轮判决第三节第 3 条记账）与 r3 档同档无对照（交用户）不再攻。

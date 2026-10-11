@@ -24,5 +24,5 @@ cat walk-shim.rs.txt >> $S/repo/crates/singlefs-checker/src/walk.rs
 - `k_forward_ledger_probe.run-output.txt`：A–F 那一次真跑的输出（6 条，199.91 秒，主要是 E）。G 在 `run-g.sh` / `run-g.output.txt`。
 - `k3_chain_record_differential_probe.rs`、`walk-shim.rs.txt`：K3-1 CPU 两侧差分（实现的 `InstanceTableChainRecord::parse` 对 checker 的 `chain_record_view`）。
 - `k4_scan_evasions_probe.rs`：K4-2 扫源码绕法 1–5。
-- `rerun-quick.sh`、`rerun-quick.output.txt`：基线 / 变异（容量那一项）/ K3 差分及其变异 / K4-2 探针的一次复跑；经 `bash scripts/run-with-memory-cap.sh 4G bash rerun-quick.sh` 跑。
+- `rerun-quick.sh`、`rerun-quick.output.txt`：基线 / 变异（容量那一项）/ K3 差分及其变异 / K4-2 探针的一次复跑；经 `bash scripts/hosts/run-with-memory-cap.sh 4G bash rerun-quick.sh` 跑。
 - `crstr.rs`：K4-2 绕法 1 的真实 Rust 证明（`cr#"x" "#` 这一行合法，`rustc --edition 2021` 编得过，输出见报告 K4-2 末）。

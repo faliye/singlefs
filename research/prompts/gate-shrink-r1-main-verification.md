@@ -4,7 +4,7 @@
 
 ## 开工快照核对
 
-`sha256sum -c research/prompts/gate-shrink-r1-snapshot/*-sha256.txt`：对不上两份。`.claude/gate.d/20-doc-decision-documents.sh` 在腿工作期间被别的会话改过（云端攻方报告末节「工作期间别的会话改了 20 号与 doc-lint.sh，行号已按现查改过」）；`records/2026-09-28-门禁59号提速与双机分片.md` 是主 agent 自己追加的计划行，三条腿都禁读它。两份云端腿报告的引文用 `python3 scripts/cite-check.py research/prompts/gate-shrink-r1-sonnet-output.md research/prompts/gate-shrink-r1-opus-output.md --background research/prompts/_gate-shrink-r1-background.md --background research/prompts/_gate-shrink-r1-diff.md` 按现在的文件核：「✓ 核了 38 处引文，对上 38 处，没判 0 处」。
+`sha256sum -c research/prompts/gate-shrink-r1-snapshot/*-sha256.txt`：对不上两份。`.claude/gate.d/20-doc-decision-documents.sh` 在腿工作期间被别的会话改过（云端攻方报告末节「工作期间别的会话改了 20 号与 doc-lint.sh，行号已按现查改过」）；`records/2026-09-28-门禁59号提速与双机分片.md` 是主 agent 自己追加的计划行，三条腿都禁读它。两份云端腿报告的引文用 `python3 scripts/agents/cite-check.py research/prompts/gate-shrink-r1-sonnet-output.md research/prompts/gate-shrink-r1-opus-output.md --background research/prompts/_gate-shrink-r1-background.md --background research/prompts/_gate-shrink-r1-diff.md` 按现在的文件核：「✓ 核了 38 处引文，对上 38 处，没判 0 处」。
 
 ## 腿与样本
 

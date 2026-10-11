@@ -197,7 +197,7 @@ general-purpose 7 次做只读盘点：「盘点收口表 35 行」「判收口�
 
 ### 2.5 补丁集成：做成脚本，不立 agent
 
-主 agent 打实现员补丁约 30 次，每次都现写 python 按名字替换、删除、追加 `crates/mutations.tsv` 的行，再跑 33 号、核 sha256（例：09-24 实十五「删主表 8 行、追加 16 行」，09-25 实十六接续「按名替代 12、删 4、追加 21」）。这是确定性的活，写成 `scripts/apply-writer-patch.py <补丁目录>`：`git apply --check`、打补丁、按实现员交的 `mutations-append.tsv` / `mutations-replacements.tsv` / `mutations-delete.txt` 合表（按名字，不按行号）、跑 33 号、回写一行进调度表。实现员定义的「产出」一节规定这三个文件的格式。
+主 agent 打实现员补丁约 30 次，每次都现写 python 按名字替换、删除、追加 `crates/mutations.tsv` 的行，再跑 33 号、核 sha256（例：09-24 实十五「删主表 8 行、追加 16 行」，09-25 实十六接续「按名替代 12、删 4、追加 21」）。这是确定性的活，写成 `scripts/gate/apply-writer-patch.py <补丁目录>`：`git apply --check`、打补丁、按实现员交的 `mutations-append.tsv` / `mutations-replacements.tsv` / `mutations-delete.txt` 合表（按名字，不按行号）、跑 33 号、回写一行进调度表。实现员定义的「产出」一节规定这三个文件的格式。
 
 ## 三、已有 agent 的增强
 
@@ -209,7 +209,7 @@ general-purpose 7 次做只读盘点：「盘点收口表 35 行」「判收口�
 |---|---|---|---|
 | 上下文 ≥ 900k 的 8 个里 7 个是它；实二一 1530 次调用、965k、中途被自动压缩；实二五「准入接线、见证修补等八件」945k、实二二三「失败重发、读者规则、隔离、见证」955k。用户 09-24「前前后后做了 6个小时 他要做什么 多大的任务 还要 三个小时？」 | `implementation-writer.md:19` 输入只要「步号与验收标准」，不限一次几件；`main-agent.md:50`「派发提示怎么写」没有件数上限 | `main-agent.md`「派发提示怎么写」加一句：实现员一次派的件数不超过 3、要动的 `crates/` 文件不超过 8（推的，没量过）；`implementation-writer.md`「做什么」加一步：上下文过 600k 时停在最近一个编得过的点，报告写做完的件与没做的件后交回，不硬撑到压缩 | 看门狗对 implementation-writer / experiment-runner 把「上下文过大」改成 700k 时报「该交接」（其余类型不报，见四.4）；派发闸数实现员提示里「要动的 crates 文件：」那一行的文件数，超上限拒 |
 | 实五把新写路径的崩溃枚举用例做成普通 `cargo test`，单跑约 12 分钟；用户 09-26「这里怎么加了一个这么重的任务」（第十步素材 ⑭） | `implementation-writer.md:30`（第 4 步）与 `:36`（第 7 步）只管层 0 流，没写「新崩溃枚举用例标 `#[ignore]`、交主 agent 登记进 `.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行」；`.claude/gate.d/` 又不在它的写范围（`:40`） | 第 7 步加：新崩溃枚举用例一律 `#[ignore]`，报告里给出要登记的 `crash-case:` 行原文，由主 agent 或 tooling-writer 登记 | 新门禁：`crates/*/tests/` 里调用崩溃枚举函数（`enumerate_layer0`、`enumerate_layer0_versions` 一族）的测试函数，没有 `#[ignore]` 或没有 `crash-case:` 行的判红；`heavy-test-guard.sh` 把不带 `--ignored` 却点名这种测试目标的 `cargo test` 也记一条 |
-| 实六的逐条证红脚本把变异表那一截 ` -- 用例名` 删掉，成了不挑目标的 `cargo test -p singlefs-harness`，会跑到名字带 layer0 的测试二进制；执行前的闸判不了（参数运行时才从表里读），是看门狗在进程层报出来、主 agent 逐个 pid 停的（09-26 续做消息「主 agent 停了你的三个变异 worker」）；实四乙、实五、实六各写了一份证红脚本（⑮） | `implementation-writer.md:29`（第 3 步）只写手工证红的做法，没有共用脚本 | 仓里立一份 `scripts/prove-red.sh <crate> <变异名…>`：从 `crates/mutations.tsv` 读行、每行必须带 `--lib` / `--test` / `--bin` 之一、目标名含 layer0 的跳过并列出、每条经内存包装；第 3 步改成「用它，不自己写证红脚本」 | 它的 `--selftest` 喂一行不挑目标的变异，必须拒绝；门禁 47 号收它的自证 |
+| 实六的逐条证红脚本把变异表那一截 ` -- 用例名` 删掉，成了不挑目标的 `cargo test -p singlefs-harness`，会跑到名字带 layer0 的测试二进制；执行前的闸判不了（参数运行时才从表里读），是看门狗在进程层报出来、主 agent 逐个 pid 停的（09-26 续做消息「主 agent 停了你的三个变异 worker」）；实四乙、实五、实六各写了一份证红脚本（⑮） | `implementation-writer.md:29`（第 3 步）只写手工证红的做法，没有共用脚本 | 仓里立一份 `scripts/mutation/prove-red.sh <crate> <变异名…>`：从 `crates/mutations.tsv` 读行、每行必须带 `--lib` / `--test` / `--bin` 之一、目标名含 layer0 的跳过并列出、每条经内存包装；第 3 步改成「用它，不自己写证红脚本」 | 它的 `--selftest` 喂一行不挑目标的变异，必须拒绝；门禁 47 号收它的自证 |
 | 实十四、十六、十八、十九、二十同时改 `transaction.rs`、`mount.rs`、`walk.rs`、`recovery.rs`，后交的要重新合并、重跑（拆分提案第四十节第 9 行） | `main-agent.md:21` 只是一句文字 | 派发提示必须有一行「要动的 crates 文件：…」 | 派发闸记下每个在跑实现员的那一行（按 agent 号存一个登记文件），新派的与在跑的求交集，非空就拒；实现员交回或被停时删它那一条 |
 | 在 run_in_background 里写 `until [ -s …/tasks/<id>.output ]; do sleep 20; done` 等自己的另一个后台任务：hook 检出里它一类占 72 条（全部 181 条里最多） | `agent-common.md:58` 写「run_in_background 里的等待循环只记检出」，等于默许 | 共用约束「长活可以等」加一句：等自己起的后台任务，结束本轮等完成通知，不写等输出文件的循环 | `bash-command-detector.sh` 对「条件在读本会话 `tasks/*.output` 或自己的日志」的循环，run_in_background 里也拒 |
 | 「Implement three checker invariants」想写 `.claude/kb/invariants.md` 被写闸拒 | 主 agent 的派发把 kb 改动混进实现员的活 | 见四.1「写范围一致」 | 同左 |
@@ -229,7 +229,7 @@ general-purpose 7 次做只读盘点：「盘点收口表 35 行」「判收口�
 
 | 现象 | 根因 | 改法 | 会红的检查 |
 |---|---|---|---|
-| E142 第 13–18 次跑各写一份 700–1015 行的重跑登记（设计员 6 次、约 3.6 agent·小时），多数是格式常量或记录头变了之后的同臂重跑；用户 09-26「理论上 代码不改 E142 就补充跑」 | `experiment-designer.md:21` 重跑登记要按十三节全写 | 加「差分重跑登记」：问题单只说「输入变了、同臂重跑」时，只写变了哪些输入、哪几行要重判、其余各节引上一次登记的路径与 sha256；准入由 `scripts/admission.py` 的 `inputs-changed` 判 | admission 判输入没变的实验，派发闸拒派它的重跑登记 |
+| E142 第 13–18 次跑各写一份 700–1015 行的重跑登记（设计员 6 次、约 3.6 agent·小时），多数是格式常量或记录头变了之后的同臂重跑；用户 09-26「理论上 代码不改 E142 就补充跑」 | `experiment-designer.md:21` 重跑登记要按十三节全写 | 加「差分重跑登记」：问题单只说「输入变了、同臂重跑」时，只写变了哪些输入、哪几行要重判、其余各节引上一次登记的路径与 sha256；准入由 `scripts/gate/admission.py` 的 `inputs-changed` 判 | admission 判输入没变的实验，派发闸拒派它的重跑登记 |
 
 ### 3.4 kb-scribe（40 次）
 
@@ -243,7 +243,7 @@ general-purpose 7 次做只读盘点：「盘点收口表 35 行」「判收口�
 
 | agent | 现象 | 根因 | 改法 | 会红的检查 |
 |---|---|---|---|---|
-| three-way-forward / attack / defense | 37 份核查员报告里带 ✗ 的行 514 行、带 ✓ 的 2394 行（`grep -c` 逐份数，行数不等于条数）；✗ 行里写「行号」的 197 处、「背景材料」52 处、「标题行」13 处；第十步素材 ⑤：层 0 规模第一轮正推 7 处行号指到标题行、定义收尾第一轮把现行定义的字接进「记录原文」的引号 | `three-way-forward.md:27`、`three-way-attack.md:43`、`three-way-defense.md:26` 都写了「引文写进报告之前 `grep -nF` 一次」，只是文字 | 立 `scripts/cite-check.py <报告>`：抽出每处「文件:行号 + 引号里的原文」，核那一行（或区间）逐字含这句、不是标题行、不是背景材料的行号；三类腿交回前跑一次，贴末行 | 交回闸（SubagentHandback 的 PreToolUse）对这三类腿与核查员：报告路径上跑 `cite-check.py`，有对不上的拒绝交回并列出；核查员第 2 步改成先跑它、只人工核它判不了的 |
+| three-way-forward / attack / defense | 37 份核查员报告里带 ✗ 的行 514 行、带 ✓ 的 2394 行（`grep -c` 逐份数，行数不等于条数）；✗ 行里写「行号」的 197 处、「背景材料」52 处、「标题行」13 处；第十步素材 ⑤：层 0 规模第一轮正推 7 处行号指到标题行、定义收尾第一轮把现行定义的字接进「记录原文」的引号 | `three-way-forward.md:27`、`three-way-attack.md:43`、`three-way-defense.md:26` 都写了「引文写进报告之前 `grep -nF` 一次」，只是文字 | 立 `scripts/agents/cite-check.py <报告>`：抽出每处「文件:行号 + 引号里的原文」，核那一行（或区间）逐字含这句、不是标题行、不是背景材料的行号；三类腿交回前跑一次，贴末行 | 交回闸（SubagentHandback 的 PreToolUse）对这三类腿与核查员：报告路径上跑 `cite-check.py`，有对不上的拒绝交回并列出；核查员第 2 步改成先跑它、只人工核它判不了的 |
 | three-way-attack / defense | 安全设计轮第三轮辩方直接在共享的 `/tmp/claude-1000/safety-r3-frozen/` 上打补丁、编译，攻方同时在读这份副本（⑪，主 agent 事后拿快照核过 130 个文件一致） | `main-agent.md` 没写冻结副本怎么建；`three-way-defense.md:32` 写范围只说「报告文件、模型目录、草稿目录」，没说冻结副本只读 | `main-agent.md`「代码轮派腿之前记一份开工快照」旁加：冻结副本建好就 `chmod -R a-w`；两份腿定义的写范围加「冻结副本只读，要改先拷进自己的草稿目录」 | 核查员开工与收尾各对冻结副本跑一次 `sha256sum -c` 快照清单，对不上就把那段窗口里的引用全记「分不清」 |
 | three-way-attack | 派发闸 3 次误拦（09-26「**禁跑**：名字带 `layer0` 的测试目标」、路径里的 layer0、自证用假 cargo）；API 限额打断 3 次；4 条腿跑过 2 小时 | 见四.1；取样规模已由 `three-way-attack.md:29-34` 第 3b 步补上（待定义三方） | 见四.1、四.5 | 同左 |
 | three-way-local-attack | 本地样本里单字母系统性替换（`UNTESFED` 27 处）两道损坏闸都判绿；提示里带 Rust 路径 `::` 让损坏闸误红、作废一次；样本里的算术错（应 147 报 145）没有任何东西查（③）；派发提示两次漏了禁读清单（09-23「输入缺项（先报）：派发消息没有给这一轮的『禁读清单』」、09-24「未开工。派发提示缺一项」） | `three-way-local-attack.md:29-30` 只有字词损坏闸与 oov 通读；`:22` 要禁读清单，派发时没查 | 损坏闸加一类：同一个不在词表里的词出现 ≥ 5 次、且与提示里某个词只差一个字母，判损坏；损坏闸跳过提示原文里出现过的代码片段；事实表题附一份由主 agent 算好的答案表（放在本地模型读不到、腿也不读的位置），腿收回样本后用脚本比数，不一致的格在运行记录里标「算术对不上」 | `corruption-check.py --selftest` 加 `UNTESFED` 形态的样本必须判红；派发闸查禁读清单（四.1） |
@@ -257,7 +257,7 @@ general-purpose 7 次做只读盘点：「盘点收口表 35 行」「判收口�
 | agent | 现象 | 根因 | 改法 | 会红的检查 |
 |---|---|---|---|---|
 | sweep | 阶段同步写事实表时检索词定成「冻结」，F4 组 326 行（两个 sweep 各 163 行）逐行判下来全是「不相干」（09-25 派的两份，自报）；另外 7 次盘点活派给了 GP（二.4） | `sweep.md:36` 第 7 步写事实表时不核检索词的精度；`:19-23` 只有四种活 | 第 7 步加：每个检索词先报命中行数，超过 100 行的抽 10 行自判，精度低的改窄再出候选表；加第五种活「逐行盘点一张表」 | `stale-candidates.py --check-facts` 对命中超过阈值、又没写「宽词已抽查」一行的检索词判红（阈值推的） |
-| mutation-triage | 被派去跑 2697 条的 cargo-mutants 广谱活动（09-23），写配置草案越出写范围，报告自称没跑完；09-23 主 agent「又停在『结束本轮却没交回』……现在就交回」 | `mutation-triage.md:18` 只接给定的变异表，派发表（`main-agent.md:59`）没说广谱活动归谁 | `main-agent.md:59` 那一行加：广谱变异是实验，走 experiment-designer 登记；mutation-triage 定义「输入」加一句「不接没有表的广谱活动」 | 派发闸：派 mutation-triage 的提示里要有 `scripts/mutations/…tsv` 或 `crates/mutations.tsv` 的条目名，没有就拒 |
+| mutation-triage | 被派去跑 2697 条的 cargo-mutants 广谱活动（09-23），写配置草案越出写范围，报告自称没跑完；09-23 主 agent「又停在『结束本轮却没交回』……现在就交回」 | `mutation-triage.md:18` 只接给定的变异表，派发表（`main-agent.md:59`）没说广谱活动归谁 | `main-agent.md:59` 那一行加：广谱变异是实验，走 experiment-designer 登记；mutation-triage 定义「输入」加一句「不接没有表的广谱活动」 | 派发闸：派 mutation-triage 的提示里要有 `scripts/mutation/tables/…tsv` 或 `crates/mutations.tsv` 的条目名，没有就拒 |
 | gate-triage | 只派了 2 次；用户 09-21「有红就改 不需要分诊」；一次被派去「独立复核 59 与 87 号并发化」（审脚本改动，不是分诊） | 分诊结果只到「归属」，主 agent 还要再判派谁修 | `gate-triage.md:38` 产出表加一列「谁来修」：tooling-writer / kb-scribe / implementation-writer / experiment-runner（锚点）/ 主 agent，按红阶段的文件路径归 | 无（产出形态由主 agent 审） |
 | crash-verifier | **六天一次都没派**：`crates/` 打了约 30 个实现员补丁，09-24、09-25 两批提交都带 `--no-verify`；层 0 全量、QEMU、herd7、crates 变异整表全部压在收尾第 5 步 | `main-agent.md:61` 只把它挂在「暂存之后、提交之前」，而用户 09-24 定「最后再说」 | `main-agent.md` 加：每集成 5 个实现员补丁（推的数）或每天一次，弹窗问用户要不要用 `user-request` 跑一次，只跑输入变了的崩溃枚举用例（54 号已能按用例复用）；用户 09-26「改了只跑改了的部分」就是这个方向 | 补丁集成脚本（二.5）记下自上次崩溃验证全绿以来打了几个补丁，超过就在输出里打一行提示（只提示，不拦，跑不跑由用户定） |
 | prior-art | 只派了 1 次（E160 参考负载），样本太少，看不出毛病 | — | 不改 | — |
@@ -281,7 +281,7 @@ general-purpose 7 次做只读盘点：「盘点收口表 35 行」「判收口�
 
 ### 4.3 写回规格检查（新立，给 kb-scribe 与 kb-spec-drafter 用）
 
-`scripts/kb-spec-check.py <规格>`，派发闸对 kb-scribe 的规格文件跑它，红就不让派：
+`scripts/kb/kb-spec-check.py <规格>`，派发闸对 kb-scribe 的规格文件跑它，红就不让派：
 
 1. 每条旧串在目标文件里 `grep -cF` 恰好 1；
 2. 新串里的编号都写成「编号（简称）」、简称与登记位逐字一致；新串里不出现与已登记编号同形、却指别的东西的记号（⑬ 里判决内部段名 `E10`、`N2` 撞了实验登记）；
@@ -291,7 +291,7 @@ general-purpose 7 次做只读盘点：「盘点收口表 35 行」「判收口�
 
 证据：书记员 9 次「红在这一轮写的句子上」+ 1 次缺配对行未开工；⑬ 记同日犯 4 次。自证：拿这几次的规格原件当拒绝样本。
 
-### 4.4 看门狗（`scripts/watch.sh`、`agent-watch.py`）
+### 4.4 看门狗（`scripts/agents/watch.sh`、`agent-watch.py`）
 
 | 改什么 | 证据（量过） | 做法 |
 |---|---|---|

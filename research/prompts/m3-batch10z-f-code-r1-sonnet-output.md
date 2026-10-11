@@ -296,8 +296,8 @@ REVERT-E 打头一句 OOM 的那一支把 println 换成 eprintln: scan1_pass=Tr
 
 ## 要主 agent 跑的命令（我复核不了的）
 
-1. 变异表 3370 行（改回 Poll）在真卡上有没有红：把 `crates/singlefs-checker-tier/src/gpu_unit_checks.rs` 的「device.poll(wgpu::PollType::Wait {」（第 1264 行）那一段换成 `device.poll(wgpu::PollType::Poll)`，在仓根跑 `SINGLEFS_HEAVY_TESTS=commit bash scripts/gpu-quiesce-run.sh -- bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 8 cargo test --offline -p singlefs-checker-tier --features gpu --test gpu_unit_checks_a_returned_card_lease_leaves_no_buffer_on_the_card -- --nocapture`，看 `GPU_CARD_LEASE_RETURNED … occupied_after_the_lease_was_returned=…` 一行与 `test result`；照绿就是 K4 第 5 点坐实（绿了说明这条用例分不出 Wait 与 Poll，要把清零换成在飞的活再提交才分得出）。
-2. 模型复跑（在冻结副本的拷贝上，harness 档，不起卡）：把 `research/prompts/m3-batch10z-f-code-r1-sonnet-model/sonnet_g2_model.rs` 拷到拷贝的 `crates/singlefs-harness/tests/`，`SEEDS=200000 CARGO_TARGET_DIR=<目录> bash scripts/run-with-memory-cap.sh 1G bash scripts/capped.sh 4 cargo test --offline -p singlefs-harness --test sonnet_g2_model -- --nocapture`，看 `K3-1 random: seeds=200000 violations=0` 与 K1-2、K1-3、K3-2、K2-2 那几行。
+1. 变异表 3370 行（改回 Poll）在真卡上有没有红：把 `crates/singlefs-checker-tier/src/gpu_unit_checks.rs` 的「device.poll(wgpu::PollType::Wait {」（第 1264 行）那一段换成 `device.poll(wgpu::PollType::Poll)`，在仓根跑 `SINGLEFS_HEAVY_TESTS=commit bash scripts/crash/gpu-quiesce-run.sh -- bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 8 cargo test --offline -p singlefs-checker-tier --features gpu --test gpu_unit_checks_a_returned_card_lease_leaves_no_buffer_on_the_card -- --nocapture`，看 `GPU_CARD_LEASE_RETURNED … occupied_after_the_lease_was_returned=…` 一行与 `test result`；照绿就是 K4 第 5 点坐实（绿了说明这条用例分不出 Wait 与 Poll，要把清零换成在飞的活再提交才分得出）。
+2. 模型复跑（在冻结副本的拷贝上，harness 档，不起卡）：把 `research/prompts/m3-batch10z-f-code-r1-sonnet-model/sonnet_g2_model.rs` 拷到拷贝的 `crates/singlefs-harness/tests/`，`SEEDS=200000 CARGO_TARGET_DIR=<目录> bash scripts/hosts/run-with-memory-cap.sh 1G bash scripts/hosts/capped.sh 4 cargo test --offline -p singlefs-harness --test sonnet_g2_model -- --nocapture`，看 `K3-1 random: seeds=200000 violations=0` 与 K1-2、K1-3、K3-2、K2-2 那几行。
 
 ## 草稿产物与删除
 
@@ -307,12 +307,12 @@ REVERT-E 打头一句 OOM 的那一支把 println 换成 eprintln: scan1_pass=Tr
 
 ## 引文核对
 
-（交回前跑 `python3 scripts/cite-check.py … --root <冻结副本> --root .`，末行贴在下面）
+（交回前跑 `python3 scripts/agents/cite-check.py … --root <冻结副本> --root .`，末行贴在下面）
 
 ```
-$ python3 scripts/cite-check.py research/prompts/m3-batch10z-f-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-f-code-r1/tree
+$ python3 scripts/agents/cite-check.py research/prompts/m3-batch10z-f-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-f-code-r1/tree
   ✓ 核了 34 处引文，对上 28 处，没判 6 处（逐处列在上面）
-$ python3 scripts/cite-check.py research/prompts/m3-batch10z-f-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-f-code-r1/tree --root .
+$ python3 scripts/agents/cite-check.py research/prompts/m3-batch10z-f-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-f-code-r1/tree --root .
   ✓ 核了 34 处引文，对上 34 处，没判 0 处（逐处列在上面）
 ```
 

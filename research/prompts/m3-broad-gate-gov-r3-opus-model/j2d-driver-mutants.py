@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""攻方 J2-d：驱动 escalation_evidence_problems（升档证据那一判）的判红分支逐个删掉（每种一份树拷贝，只改 scripts/broad-mutation.py 一处），
+"""攻方 J2-d：驱动 escalation_evidence_problems（升档证据那一判）的判红分支逐个删掉（每种一份树拷贝，只改 scripts/mutation/broad-mutation.py 一处），
 交主 agent 在每份拷贝上跑驱动 --selftest（子 agent 起拷贝的自证被重型闸拒），看 74 格里有没有一格红。
 用法：j2d-driver-mutants.py <原样树根> <放拷贝的目录>；每行打「名字<TAB>删的是哪一支」。旧串在文件里必须恰好命中一次。"""
 import os, shutil, subprocess, sys
 base, into = sys.argv[1:3]
-TARGET = "scripts/broad-mutation.py"
+TARGET = "scripts/mutation/broad-mutation.py"
 MUTANTS = [
     ("d1-control-same-exit", "（对照）两趟结局不同不算证据不齐：自证第 4 条（253|250）应当红",
      '    if escalated_exit != first_exit:\n        problems.append', '    if False:\n        problems.append'),

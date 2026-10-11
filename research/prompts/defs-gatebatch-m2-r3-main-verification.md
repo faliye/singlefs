@@ -47,7 +47,7 @@
 
 ## 三、实现次序
 
-1. 派工具实现员（G3）一次做完第二节全部改法，规格另写；它动的是 `.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`（自证）、`scripts/admission.py`、`.claude/gate.d/checker-tier-layer0-replay.sh`（FD3；读发现日志那几段不动）、`.claude/gate.d/stage-inputs.tsv`（FM 的登记格）、`scripts/layer0-shard-run.sh` 与 `layer0-shard-configuration-check.sh`（R1 的内存键）、`.claude/rules/implementation-workflow.md`、`.claude/agents/crash-verifier.md`。
+1. 派工具实现员（G3）一次做完第二节全部改法，规格另写；它动的是 `.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`（自证）、`scripts/gate/admission.py`、`.claude/gate.d/checker-tier-layer0-replay.sh`（FD3；读发现日志那几段不动）、`.claude/gate.d/stage-inputs.tsv`（FM 的登记格）、`scripts/crash/layer0-shard-run.sh` 与 `layer0-shard-configuration-check.sh`（R1 的内存键）、`.claude/rules/implementation-workflow.md`、`.claude/agents/crash-verifier.md`。
 2. 改法全被攻过零轮，不再开第四轮；G3 交回后主 agent 逐条核自证格（每格改前红、改后绿），`crash-verifier.md` 改动过门禁 72 号要去向：交用户选「逐份豁免」或另开一轮定义三方，弹窗时带上这一条。
 3. 改了准入模块的判法（FD2、FD3、FM）会让崩溃枚举用例的指纹变，已有全绿标记全部不再作数：下一趟 `--full`（提交时）要全跑。
 
@@ -61,7 +61,7 @@
 
 ## 五、按路径点名被判的定义与文件（门禁 72 号）
 
-被判的：`.claude/gate.d/checker-tier-layer0-replay.sh`、`scripts/admission.py`、`.claude/gate.d/stage-inputs.tsv`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/rules/implementation-workflow.md`、`.claude/agents/crash-verifier.md`、`scripts/layer0-shard-run.sh`、`scripts/layer0-shard-run-selftest.sh`、`scripts/layer0-shard-configuration-check.sh`；一并核过（开工快照里、没改）的 `.claude/gate.d/stage-owners.tsv`、`.claude/main-agent.md`、`.claude/agents/gate-triage.md`、`scripts/check-segment-registry.py`。
+被判的：`.claude/gate.d/checker-tier-layer0-replay.sh`、`scripts/gate/admission.py`、`.claude/gate.d/stage-inputs.tsv`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/rules/implementation-workflow.md`、`.claude/agents/crash-verifier.md`、`scripts/crash/layer0-shard-run.sh`、`scripts/crash/layer0-shard-run-selftest.sh`、`scripts/crash/layer0-shard-configuration-check.sh`；一并核过（开工快照里、没改）的 `.claude/gate.d/stage-owners.tsv`、`.claude/main-agent.md`、`.claude/agents/gate-triage.md`、`scripts/crash/check-segment-registry.py`。
 
 ## 回看决策
 

@@ -19,7 +19,7 @@ PY
 args=()
 for t in "$@"; do args+=(--test "$t"); done
 cd "$work"
-RUN_WITH_MEMORY_CAP_PARALLEL_REASON="主 agent 同时派了正推与攻方两条腿，各跑各的探针" nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 3G bash /home/fy5090/code/singlefs/scripts/capped.sh 15 cargo test --offline --release -p singlefs-harness "${args[@]}" > "/tmp/claude-1000/m3-root-ring-code-r1-sonnet/mut-$name.log" 2>&1
+RUN_WITH_MEMORY_CAP_PARALLEL_REASON="主 agent 同时派了正推与攻方两条腿，各跑各的探针" nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 3G bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 15 cargo test --offline --release -p singlefs-harness "${args[@]}" > "/tmp/claude-1000/m3-root-ring-code-r1-sonnet/mut-$name.log" 2>&1
 code=$?
 cp "$frozen/crates/$file" "$target"
 echo "MUTANT $name: exit=$code"; grep -E '^test .* FAILED|test result' "/tmp/claude-1000/m3-root-ring-code-r1-sonnet/mut-$name.log" | head -20

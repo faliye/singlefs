@@ -10,7 +10,7 @@
 | 开工快照 | `research/prompts/m3-verus-land-code-r2-snapshot/`：`crates-sha256.txt`（215 份，冻结副本 `/tmp/claude-1000/m3-verus-land-code-r2/tree/`）、`kb-sha256.txt` | 冻结副本交齐之后 `sha256sum -c` 全 OK。`kb-sha256.txt` 对不上三份，都是别的会话改的：`.claude/kb/checks-owed.md` 与 `.claude/kb/milestone/03-third-txn.md` 是删除定案写回（改前改后清单 `/tmp/claude-1000/m3-writeback-c/report.md`「三份快照文件的改动清单」），两条腿一处都没引这两份；`.claude/kb/decisions/23-journal的角色与格式.md` 相对 HEAD 改在第 376、385、405、418、440 行，腿只引了第 355 行，在改动之前 |
 | 云端正推（Sonnet） | `research/prompts/m3-verus-land-code-r2-sonnet-output.md`（161 行，sha256 37924c17…e404）；模型 `…-sonnet-model/` | 主 agent 在 `/tmp/claude-1000/m3-verus-land-code-r2-main-check/` 照 README 从冻结副本拷一份、`gen_old.sh` 生成改前四函数与 m1–m4、放 `zz_diff.rs`，经 `run.sh`（内存包装 8G、6 线程）跑：`random_family` 30 万个输入「Tally { total: 300000, diverged: 0, new_panics_only: 0, old_panics_only: 0, both_ok_differ: 0, panics_old: 0, panics_new: 0 …」；`positive_controls_are_red`「CONTROL[m1 去掉 take(limit)] diverged=1581 / 40000」「m2 … 3821」「m3 … 545」「m4 … 520」，四个数与报告逐个相同 |
 | 云端攻方（Opus） | `research/prompts/m3-verus-land-code-r2-opus-output.md`（sha256 24a413ba…3834）；模型 `…-opus-model/` | Verus 变异与 H5-1「删掉之后仍 32 verified, 0 errors」没复跑：H5 那几处并进第 5 批实现员，落地时实现员与合入验证照样要跑 Verus |
-| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-verus-land-code-r2/tree --root . --background research/prompts/_m3-verus-land-code-r2-background.md`：「✓ 核了 64 处引文，对上 64 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/agents/cite-check.py <两份报告> --root /tmp/claude-1000/m3-verus-land-code-r2/tree --root . --background research/prompts/_m3-verus-land-code-r2-background.md`：「✓ 核了 64 处引文，对上 64 处，没判 0 处」 |
 
 ## 二、逐格判决
 
@@ -28,7 +28,7 @@
 ## 三、两条腿之外主 agent 记的
 
 - 正推自报用 python3 `open('w')` 就地改过一次自己模型目录里的 `zz_diff.rs`，执行前拒绝的写法那道闸没拦：并进共用库盲区那一批（与第一轮攻方 `sed -i` 那一笔同族）。
-- 正推读过之后 `scripts/e165-pin-red-examples.py` 被改过（3-12、3-13 在改它），它引的行号指入库拷贝 `model/e165-pin-red-examples.py.read`。
+- 正推读过之后 `scripts/experiments/e165-pin-red-examples.py` 被改过（3-12、3-13 在改它），它引的行号指入库拷贝 `model/e165-pin-red-examples.py.read`。
 
 ## 四、下一步
 

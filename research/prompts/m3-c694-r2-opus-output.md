@@ -306,7 +306,7 @@ SILENT W=384 k=5 arm=today/all/mount/strict shape=S3 v=(1,9) landed=Some((1, 8))
 
 - 层 0 全量（每一段都展开）跑过的状态：第一轮原型 `crashmount 384 5` 两臂 41,022；本轮 `cm` 开发时五次（今天 `urM` 一次、2.1 两次、5.2 两次），复跑全量档又五次（`cm-today-ow-ur` 与 2.1、5.2 那四次），每次 20,511–20,516 个状态。单次都不超过 10⁶，合计约 25 万，不超过 10⁷。
 - 每次 `cm` 6 线程 117–274 秒（看负载；`LAYER0_PARALLEL_FINISHED` 行的 `elapsed_seconds`）。没有设批时限。没缩历史条数或长度以外的东西；崩溃状态没缩。
-- 编译与跑都经 `scripts/run-with-memory-cap.sh`（编译 6G、跑 4G）与 `capped.sh 6`；同一时刻只起一条 cargo。开工时 `ps` 看到别的会话的 `cargo test --release -p singlefs-checker-tier … --no-run` 在编，没有性能测量在跑；没有等锁。
+- 编译与跑都经 `scripts/hosts/run-with-memory-cap.sh`（编译 6G、跑 4G）与 `capped.sh 6`；同一时刻只起一条 cargo。开工时 `ps` 看到别的会话的 `cargo test --release -p singlefs-checker-tier … --no-run` 在编，没有性能测量在跑；没有等锁。
 
 ## 没做什么
 

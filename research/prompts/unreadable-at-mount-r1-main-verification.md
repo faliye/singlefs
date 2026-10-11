@@ -7,7 +7,7 @@
 ## 〇、快照与核查
 
 - 快照 `sha256sum -c`：kb 19 份里 `.claude/kb/checks-owed.md`、`.claude/kb/experiments-history.md` 两份对不上，是别的会话在腿跑着时改的，这一轮没碰。腿引到的 kb 行，这一份判决都按今天的文件逐处现查过（下面各节），没有一处落在被改的内容上。crates：主工作区与冻结副本都与 `crates-sha256.txt` 逐个相同。
-- `python3 scripts/cite-check.py` 对四份腿报告（攻方、正推、本地两份样本），`--root .`：「核了 9 处引文，对上 9 处，没判 0 处」。
+- `python3 scripts/agents/cite-check.py` 对四份腿报告（攻方、正推、本地两份样本），`--root .`：「核了 9 处引文，对上 9 处，没判 0 处」。
 - 正推腿引的 D21（权威态与派生态的分界） 三行现查逐字对上：`21-权威态与派生态的分界.md` 第 188 行「| **权威态** | **单元 + 记账 + 根** | 丢了就丢数据……」，第 191 行「「根」这一格含它的间接层：根记录 + 树表单元 + 实例表单元……」，第 269 行「| 索引损坏后的救援 | 扫描 → 按本线规则重建索引 |」。D23（journal 的角色与格式） 第 387 行「0 ⇒ 不判」「重做那一遍为假就用它往下走」现查逐字对上。
 - 攻方的数，从它模型目录的产物里逐字找（`research/prompts/unreadable-at-mount-r1-opus-model/c331-summary.txt`、`c393-summary.txt`、`runs/`），摘整行：
   - `today=base scenarios=1959 verdicts={'refused': 814, 'writable_no_loss': 905, 'writable_LOST_both': 18, 'writable_LOST_older_acknowledged': 222}`

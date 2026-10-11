@@ -25,14 +25,14 @@
 | `scripts/agg-b.py` | 7c8ffa080055c9530eac9140ef822aab48714d1bdf6e54426e7b1bd07bfca9ef |
 | `logs.tar.gz`（报告引的全部原样日志：`a/ b/ t/ l/`、`c-*.log`、`d.log`、两份 summary） | e9ab098b12490fd2ec48d4247a977eec372e0645fe60b90c6fe54b4991163cfa |
 
-复跑（`<W>` 取 `/tmp/claude-1000/m3-batch10-code-r2-opus`：四份 `scripts/*.sh` 第 4 行写死了 `cd <W>/tree`，放到别处要改那一行；每条 cargo 与每个二进制都经 `scripts/run-with-memory-cap.sh`，线程经 `scripts/capped.sh`）：
+复跑（`<W>` 取 `/tmp/claude-1000/m3-batch10-code-r2-opus`：四份 `scripts/*.sh` 第 4 行写死了 `cd <W>/tree`，放到别处要改那一行；每条 cargo 与每个二进制都经 `scripts/hosts/run-with-memory-cap.sh`，线程经 `scripts/hosts/capped.sh`）：
 
 ```
 rsync -a --exclude target --exclude .git /tmp/claude-1000/m3-batch10-code-r2/tree/ <W>/tree/
 cd <W>/tree && patch crates/singlefs-core/src/mount.rs < <模型目录>/mount-switches-full.patch && patch Cargo.toml < <模型目录>/workspace-member.patch
 cp <模型目录>/opus_r2_rr2_attack.rs crates/singlefs-harness/tests/ && mkdir -p crates/opus-r2-crash-states/src && cp <模型目录>/opus-r2-crash-states/Cargo.toml crates/opus-r2-crash-states/ && cp <模型目录>/opus-r2-crash-states/main.rs crates/opus-r2-crash-states/src/
-bash scripts/run-with-memory-cap.sh 3G bash scripts/capped.sh 12 cargo test --release --offline -p singlefs-harness --test opus_r2_rr2_attack --test a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable --test rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read --test rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root --test writable_mount_of_a_formatted_pool --test writable_mount_refusal_for_no_valid_root_in_the_rebuilt_allocators_root_ring --no-run
-bash scripts/run-with-memory-cap.sh 1800M bash scripts/capped.sh 12 cargo build --offline --release -p opus-r2-crash-states
+bash scripts/hosts/run-with-memory-cap.sh 3G bash scripts/hosts/capped.sh 12 cargo test --release --offline -p singlefs-harness --test opus_r2_rr2_attack --test a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable --test rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read --test rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root --test writable_mount_of_a_formatted_pool --test writable_mount_refusal_for_no_valid_root_in_the_rebuilt_allocators_root_ring --no-run
+bash scripts/hosts/run-with-memory-cap.sh 1800M bash scripts/hosts/capped.sh 12 cargo build --offline --release -p opus-r2-crash-states
 ```
 
 各段（臂由环境变量选：不设是 rr2_on，`SINGLEFS_OPUS_RR2_OFF=1`，`SINGLEFS_OPUS_ATTRIBUTE_BY_SLOT=1`）：

@@ -242,7 +242,7 @@ ROW 570 抓到(红) rc=101 compile_error=False :: 增补 3 第 2 件（…攻方
 
 ## cite-check 末行
 
-命令：`python3 scripts/cite-check.py research/prompts/m3-formal-code-b31-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b31-r1/tree --root . --background research/prompts/_m3-formal-code-b31-r1-background.md`
+命令：`python3 scripts/agents/cite-check.py research/prompts/m3-formal-code-b31-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b31-r1/tree --root . --background research/prompts/_m3-formal-code-b31-r1-background.md`
 
 ```
   ✓ 核了 74 处引文，对上 74 处，没判 0 处（逐处列在上面）

@@ -34,7 +34,7 @@
 
 ## 二、被测条款与它引的定义
 
-下面由 `scripts/quote-kb.py` 整段抽出（出口 `/home/fy5090/.local/share/singlefs/work/m3-3-5-M-design/section2-quotes.md`，sha256 `657fab12410267b566994dfd62529938f0b2cd7f5323b1dd98f5c50f30a593b3`，回读逐字节一致）。取法：D8 已定项 6 按 `@` 标题整节；`checks-owed.md` 表头两行（第 15–16 行）与 C116、C536 两行；`invariants.md` 的 I-9 表头两行（第 286–287 行）与 I-9.4 一行。
+下面由 `scripts/kb/quote-kb.py` 整段抽出（出口 `/home/fy5090/.local/share/singlefs/work/m3-3-5-M-design/section2-quotes.md`，sha256 `657fab12410267b566994dfd62529938f0b2cd7f5323b1dd98f5c50f30a593b3`，回读逐字节一致）。取法：D8 已定项 6 按 `@` 标题整节；`checks-owed.md` 表头两行（第 15–16 行）与 C116、C536 两行；`invariants.md` 的 I-9 表头两行（第 286–287 行）与 I-9.4 一行。
 
 **出处 `.claude/kb/decisions/08-核心索引结构.md:152-224`（整段抄，未转述）**
 
@@ -168,7 +168,7 @@
 
 | 做法 | 得到什么 | 代价 |
 |---|---|---|
-| 采用：三条臂都写在独立模型里，M1 那一臂逐步与 `crates/` 的纯函数对拍 | M2 − M1、M3 − M1 的差在同一份代码、同一套记法上算，不混两份代码；模型的 M1 有 `crates/` 当参照，对不上就停机两边查；重写记法自己写一遍，等于独立核 `crates/` 的位置左移清单 | 对拍 bin 挂在可选特性上，`scripts/replay.sh` 默认构建不编它，以后复跑只复判第七节的本地常量锚点，不复判对拍；对拍要靠执行员每段手动跑一次、产物进 `research/results/` |
+| 采用：三条臂都写在独立模型里，M1 那一臂逐步与 `crates/` 的纯函数对拍 | M2 − M1、M3 − M1 的差在同一份代码、同一套记法上算，不混两份代码；模型的 M1 有 `crates/` 当参照，对不上就停机两边查；重写记法自己写一遍，等于独立核 `crates/` 的位置左移清单 | 对拍 bin 挂在可选特性上，`scripts/experiments/replay.sh` 默认构建不编它，以后复跑只复判第七节的本地常量锚点，不复判对拍；对拍要靠执行员每段手动跑一次、产物进 `research/results/` |
 | 不采用：M1 直接调 `crates/` 的函数，M2、M3 写成包在 `crates/` 类型外面的函数 | 少写一份 M1 | M2、M3 的重写记法只能沿用 `crates/` 的位置左移约定，没人独立核；研究工作区默认构建依赖 `crates/`，`crates/` 一改复跑就跟着变；违背 `implementation-first.md` 第 4 条「不与实现共用代码」 |
 
 模型里要用到的 `crates/` 常量，执行员一律写成本地常量，在对拍 bin 里逐个加回比断言（`assert_eq!(本地常量, crates 的值)`），模型 bin 不直接引：`INODE_LEAF_RECORDS`（233，`singlefs-format/src/lib.rs:110`）、`leaf_containers_one_root_node_holds()`（135，`inode_tree.rs:109`）。
@@ -349,7 +349,7 @@ A3 的 M3（主旋钮）末态另钉内容：第 0 片最大号 291、第 1 片�
 
 ## 九、变异
 
-变异表 `scripts/mutations/e176_inode_leaf_merge_capacity_and_rewrites.tsv`，由执行员照下面写成（锚点原文按装置源码取，每条锚点在源码里恰好命中一次）。每条都写明在哪个取样点上改变输出；带「Python 核过」的由设计员在 `anchors.py` 上做同样的改动跑过（第十三节 `mutants_check.py` 与 A6 那条命令），其余是按定义直接算出的。
+变异表 `scripts/mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv`，由执行员照下面写成（锚点原文按装置源码取，每条锚点在源码里恰好命中一次）。每条都写明在哪个取样点上改变输出；带「Python 核过」的由设计员在 `anchors.py` 上做同样的改动跑过（第十三节 `mutants_check.py` 与 A6 那条命令），其余是按定义直接算出的。
 
 | 名 | 改什么 | 在哪一格改变输出 |
 |---|---|---|
@@ -393,7 +393,7 @@ A3 的 M3（主旋钮）末态另钉内容：第 0 片最大号 291、第 1 片�
 - 任一条序列在公共窗口内三条臂的操作流前缀 sha256 不同。
 - 同一段两遍产物 sha256 不同（确定性模型出了隐藏状态）。
 - 多线程与单线程的合并结果不逐字相同。
-- 经 `scripts/run-with-memory-cap.sh` 跑出退出码 250–254 的那一次：输出不算，命令与退出码写进报告。
+- 经 `scripts/hosts/run-with-memory-cap.sh` 跑出退出码 250–254 的那一次：输出不算，命令与退出码写进报告。
 - 读不到的数（某格空着）不当 0，那一格那一次作废重跑（`test-discipline.md`「读不到 ≠ 读到 0」）。
 
 停机（`implementation-first.md` 第 4 条：装置与 `crates/` 对不上，两边都查，既不作废也不当结果，交主 agent）：
@@ -423,7 +423,7 @@ A3 的 M3（主旋钮）末态另钉内容：第 0 片最大号 291、第 1 片�
 
 | # | 改了什么 | 依据 |
 |---|---|---|
-| 3 | 对拍 bin 不挂在 `scripts/experiments/Cargo.toml` 的可选特性上，改成同一目录树下一份独立 manifest：`scripts/experiments/e176_crates_oracle/Cargo.toml`（自成一个 workspace，路径依赖照旧只引 `crates/singlefs-core`、`crates/singlefs-format`，只读），源码 `scripts/experiments/e176_crates_oracle/oracle.rs`，以 `#[path]` 引同一份模型源码。第三节「挂在不默认打开的特性 `e176-crates-oracle` 上」那一句的写法因此没照做；「只有它以路径依赖引 `crates/`」「只拿两个纯函数当 M1 的参照」「不改 `crates/`」「replay.sh 默认构建不编它」照旧 | `bash scripts/mutate.sh e176-inode-leaf-merge-capacity-and-rewrites …` 退 2，基线输出原样：「failed to load manifest for dependency `singlefs-core`」「failed to read `/tmp/singlefs-mutate-waMhyf/crates/singlefs-core/Cargo.toml`」——可选的路径依赖照样要 cargo 读到 manifest，`mutate.sh` 只把 `research/` 拷进临时目录，副本旁边没有 `crates/`，e7-index-bench 里每一张变异表的基线都会编不过。这一条要主 agent 回看：用户 2026-10-08 认可的是「对拍 bin 走可选路径依赖引 `crates/`」 |
+| 3 | 对拍 bin 不挂在 `scripts/experiments/Cargo.toml` 的可选特性上，改成同一目录树下一份独立 manifest：`scripts/experiments/e176_crates_oracle/Cargo.toml`（自成一个 workspace，路径依赖照旧只引 `crates/singlefs-core`、`crates/singlefs-format`，只读），源码 `scripts/experiments/e176_crates_oracle/oracle.rs`，以 `#[path]` 引同一份模型源码。第三节「挂在不默认打开的特性 `e176-crates-oracle` 上」那一句的写法因此没照做；「只有它以路径依赖引 `crates/`」「只拿两个纯函数当 M1 的参照」「不改 `crates/`」「replay.sh 默认构建不编它」照旧 | `bash scripts/mutation/mutate.sh e176-inode-leaf-merge-capacity-and-rewrites …` 退 2，基线输出原样：「failed to load manifest for dependency `singlefs-core`」「failed to read `/tmp/singlefs-mutate-waMhyf/crates/singlefs-core/Cargo.toml`」——可选的路径依赖照样要 cargo 读到 manifest，`mutate.sh` 只把 `research/` 拷进临时目录，副本旁边没有 `crates/`，e7-index-bench 里每一张变异表的基线都会编不过。这一条要主 agent 回看：用户 2026-10-08 认可的是「对拍 bin 走可选路径依赖引 `crates/`」 |
 
 修订 3（第二段执行员，2026-10-08）。时点：第二段的装置代码写完、模型 bin 单测跑完（`cargo test --release --bin e176-inode-leaf-merge-capacity-and-rewrites` 的末行「test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s」），第二段产物一次都没跑之前。跑第二段的依据是派发提示「跑登记的第二段，因为登记写的触发条件已经成立：Q2p 两行在 p = 0.75 上落在 0.0724–0.1100，离门槛不到 0.05」那一句。第六、七、九节已有的每一条，去留与报告方式都没动；第一段的产物不受影响（同一份源码重跑第一段，与入库那份逐字节比）。
 
@@ -474,20 +474,20 @@ A3 的 M3（主旋钮）末态另钉内容：第 0 片最大号 291、第 1 片�
 | `scripts/experiments/e104_current_version.rs` | grep 命中 19、571、1529（只读合并时机的口径） |
 | `scripts/experiments/Cargo.toml`、`scripts/experiments/Cargo.toml` | 整份 |
 | `Cargo.toml` | 1–20 |
-| `scripts/claim-experiment.sh` | 1–140（整份） |
+| `scripts/kb/claim-experiment.sh` | 1–140（整份） |
 | `.claude/gate.d/checker-independence-and-sync.sh` | grep 命中 21、24、29、31、72、74、75、127、265、269、431 |
-| `scripts/replay.sh` | grep 命中 39、42、52、74 |
-| `scripts/mutate.sh` | grep 命中 719 |
-| `scripts/quote-kb.py`、`scripts/replace-once.py` | `--help` 的输出 |
+| `scripts/experiments/replay.sh` | grep 命中 39、42、52、74 |
+| `scripts/mutation/mutate.sh` | grep 命中 719 |
+| `scripts/kb/quote-kb.py`、`scripts/kb/replace-once.py` | `--help` 的输出 |
 
-另有一批只看了文件名的 grep（`填充率`、`31455`、`叶片数` 在排除实验目录之后命中的文件清单，含 `scripts/experiments/` 下 e19、e60、e74、e106、e111、e155 三份、e157、e159 与 `scripts/mutations/` 下两张表），这些文件的内容没读。
+另有一批只看了文件名的 grep（`填充率`、`31455`、`叶片数` 在排除实验目录之后命中的文件清单，含 `scripts/experiments/` 下 e19、e60、e74、e106、e111、e155 三份、e157、e159 与 `scripts/mutation/tables/` 下两张表），这些文件的内容没读。
 
 ### 跑过的命令（原样）
 
 ```
-bash scripts/claim-experiment.sh --next
-bash scripts/claim-experiment.sh E176 inode 树叶合并三候选的容量与写代价
-python3 scripts/quote-kb.py "$D/section2-quotes.md" '.claude/kb/decisions/08-核心索引结构.md@#### 已定项 6：inode 树的叶是码 3 打包记录单元，记录定长 140，已发布的 (inode 号, 对象出生代) 不复用' '.claude/kb/checks-owed.md:15-16' '.claude/kb/checks-owed.md~^\| C116 \|' '.claude/kb/checks-owed.md~^\| C536 \|' '.claude/kb/invariants.md:286-287' '.claude/kb/invariants.md~^\| I-9\.4 \|'
+bash scripts/kb/claim-experiment.sh --next
+bash scripts/kb/claim-experiment.sh E176 inode 树叶合并三候选的容量与写代价
+python3 scripts/kb/quote-kb.py "$D/section2-quotes.md" '.claude/kb/decisions/08-核心索引结构.md@#### 已定项 6：inode 树的叶是码 3 打包记录单元，记录定长 140，已发布的 (inode 号, 对象出生代) 不复用' '.claude/kb/checks-owed.md:15-16' '.claude/kb/checks-owed.md~^\| C116 \|' '.claude/kb/checks-owed.md~^\| C536 \|' '.claude/kb/invariants.md:286-287' '.claude/kb/invariants.md~^\| I-9\.4 \|'
 #   D=~/.local/share/singlefs/work/m3-3-5-M-design；输出：✓ 6 段整抄进 …/section2-quotes.md，回读逐字节一致
 python3 -I -c 'import math; print(233*135, (16384-131)//120, (32768-136)//140, math.ceil(233/2), 134+233, math.ceil(10**6/233), math.ceil(100000/233), round(4292/430,3), 233*4+1, 233*2+1)'
 #   输出：31455 135 233 117 367 4292 430 9.981 933 467

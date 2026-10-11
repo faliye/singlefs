@@ -11,15 +11,15 @@ M=$R/research/prompts/m2-closeout-code-r2-opus-model
 mkdir -p "$S/tree" "$S/fix" "$S/logs"
 git -C "$R" archive refs/sop/m2-closeout-code-r2-snapshot crates Cargo.toml Cargo.lock | tar -x -C "$S/tree"
 cp "$M"/opus_r2_*.rs "$S/tree/crates/singlefs-harness/tests/"
-CAP1="bash $R/scripts/capped.sh 1 bash $R/scripts/run-with-memory-cap.sh 8G"
-CAP2="bash $R/scripts/capped.sh 2 bash $R/scripts/run-with-memory-cap.sh 8G"
+CAP1="bash $R/scripts/hosts/capped.sh 1 bash $R/scripts/hosts/run-with-memory-cap.sh 8G"
+CAP2="bash $R/scripts/hosts/capped.sh 2 bash $R/scripts/hosts/run-with-memory-cap.sh 8G"
 cd "$S/tree"
 export CARGO_TARGET_DIR="$S/target"
 nice -n 19 $CAP1 cargo test -p singlefs-harness --release --test opus_r2_y2_session_and_entries_with_stale_or_swapped_devices -- --nocapture --test-threads 1 > "$S/logs/y2.log" 2>&1
 nice -n 19 $CAP1 cargo test -p singlefs-harness --test opus_r2_y4_system_configuration_fields_core_and_checker_read_differently -- --nocapture --test-threads 1 > "$S/logs/y4.log" 2>&1
 nice -n 19 $CAP1 cargo test -p singlefs-harness --release --test opus_r2_y7_same_segment_system_configuration_writes -- --nocapture > "$S/logs/a2a.log" 2>&1
 nice -n 19 $CAP1 cargo test -p singlefs-harness --release --test entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration > "$S/logs/z3a-existing.log" 2>&1
-nice -n 19 bash "$R/scripts/capped.sh" 2 cargo test -p singlefs-harness --release --test opus_r2_y1_y7_single_fault_ordinal_sweep --no-run
+nice -n 19 bash "$R/scripts/hosts/capped.sh" 2 cargo test -p singlefs-harness --release --test opus_r2_y1_y7_single_fault_ordinal_sweep --no-run
 bash "$M/batch_sweep.sh" 1 "$S/logs" "$S/tree" "$S/target"
 python3 "$M/analyze_sweep.py" "$S/logs/b1-1.log" | grep '^OUT'
 python3 "$M/analyze_sweep.py" "$S/logs/b1-2.log" | grep -v '^    '

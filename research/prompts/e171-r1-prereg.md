@@ -10,7 +10,7 @@
 
 英文名：three_oracle_collusion_after_the_oracle_fixes
 
-原装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs`、研究一侧 `scripts/experiments/e171_three_oracle_collusion/` 与 `scripts/replay.sh` 里它的十一行复跑留着不动：那几份是 s4 冻结树上的读数的装置，改它就改了复跑的输出。这一次另起新装置与新目录（E155R2–R4 的先例），名字用上面这个英文名（第五节 5.4）。
+原装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs`、研究一侧 `scripts/experiments/e171_three_oracle_collusion/` 与 `scripts/experiments/replay.sh` 里它的十一行复跑留着不动：那几份是 s4 冻结树上的读数的装置，改它就改了复跑的输出。这一次另起新装置与新目录（E155R2–R4 的先例），名字用上面这个英文名（第五节 5.4）。
 
 主 agent 给的问题（派发提示原文逐字；第一段只是登记路径与草稿目录，不抄）：
 
@@ -81,7 +81,7 @@
 
 ## 二、被测条款与它引的定义
 
-用 `scripts/quote-kb.py` 整段抄（出口在草稿目录，回读逐字节一致；追加进来之后 `tail | cmp` 再比一次，命令在第十三节），六段：D13（验证路线） 已定项 6 全节（被测条款）、D13 已定项 1 全节（Q4 压的挂载透明那一段在它里面，`@标题` 取整节，不按行区间截）、D23（journal 的角色与格式） 已定项 14 全节（Q4 的见证判据）、`checks-owed.md` 的 C670、C672、C673 三行（这一次要核的改法与前置）。三方判决 `research/prompts/e171-conclusion-r2-main-verification.md`（sha256 `6f545e505bf61124ed4009a2d2fc934b60a6d8b6a4546e756e715b12c7ecc8e1`）第三节与 `research/prompts/e171-conclusion-r3-main-verification.md`（sha256 `f757adbb45ea34c30b351cd68f31cafa9902e204117af0230fa0a448f4d66bae`）第五节不是 kb，只引路径与 sha256。
+用 `scripts/kb/quote-kb.py` 整段抄（出口在草稿目录，回读逐字节一致；追加进来之后 `tail | cmp` 再比一次，命令在第十三节），六段：D13（验证路线） 已定项 6 全节（被测条款）、D13 已定项 1 全节（Q4 压的挂载透明那一段在它里面，`@标题` 取整节，不按行区间截）、D23（journal 的角色与格式） 已定项 14 全节（Q4 的见证判据）、`checks-owed.md` 的 C670、C672、C673 三行（这一次要核的改法与前置）。三方判决 `research/prompts/e171-conclusion-r2-main-verification.md`（sha256 `6f545e505bf61124ed4009a2d2fc934b60a6d8b6a4546e756e715b12c7ecc8e1`）第三节与 `research/prompts/e171-conclusion-r3-main-verification.md`（sha256 `f757adbb45ea34c30b351cd68f31cafa9902e204117af0230fa0a448f4d66bae`）第五节不是 kb，只引路径与 sha256。
 
 **出处 `.claude/kb/decisions/13-验证路线.md:153-181`（整段抄，未转述）**
 
@@ -378,7 +378,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 **模式与开关**：`baseline`、`row`、`confirmed-loss-form`；`--streams <1,2,3 的子集>`（默认三条）、`--writable-mount-probe`、`--positive-control <O1-对拍|O1-对拍-卸载|O1-崩溃判官|RefFS|O2|交回值|内存对象|panic|见证>`。已知坏镜像模式不带过来（这一次的问题单没有坏镜像那一族，那一族归 Q6）。
 
-**研究一侧**：`scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/`（Python，目录里不放 `main.rs`），由原目录照抄起头：逐行驱动（换新 bin 名、`--snapshot-from` 指冻结树、加 `--streams`、`--writable-mount-probe` 透传、`--keep-dumps` 留导出目录）、比对器（Q1–Q5 各自的结果行、轨迹、几何）、比对器单测、变异驱动、`frozen_o3.py`（照读法 9 换冻结行来源）。两张坏实现表照抄、sha256 与原目录相同（第七节 A5）。变异表 `scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv`；装置一侧的变异行追加在 `crates/mutations.tsv` 末尾，名字以「E171R1 装置」起头。产物 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s<段>-<名>.out`；导出目录 `scripts/experiments/target/e171-r1-dumps/`，第二段的行导出判完即删（只留 `manifest.tsv` 与判定表），基线与第一段各行的留着。
+**研究一侧**：`scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/`（Python，目录里不放 `main.rs`），由原目录照抄起头：逐行驱动（换新 bin 名、`--snapshot-from` 指冻结树、加 `--streams`、`--writable-mount-probe` 透传、`--keep-dumps` 留导出目录）、比对器（Q1–Q5 各自的结果行、轨迹、几何）、比对器单测、变异驱动、`frozen_o3.py`（照读法 9 换冻结行来源）。两张坏实现表照抄、sha256 与原目录相同（第七节 A5）。变异表 `scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv`；装置一侧的变异行追加在 `crates/mutations.tsv` 末尾，名字以「E171R1 装置」起头。产物 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s<段>-<名>.out`；导出目录 `scripts/experiments/target/e171-r1-dumps/`，第二段的行导出判完即删（只留 `manifest.tsv` 与判定表），基线与第一段各行的留着。
 
 ### 5.4 谁跑什么
 
@@ -389,9 +389,9 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 | 基线两次（三条流、带探针）、阳性对照全表、`confirmed-loss-form` 两个取样点 | 执行员，一律经 `run-with-memory-cap.sh` 与 `capped.sh`；推得超过 240 秒的（流三带探针的基线多半超过）交主 agent 后台起 | 跑实验装置二进制，不是 checker 档测试 |
 | 第一段的逐行（空变异 + 15 行，见 5.5） | **主 agent 后台起**（`run_in_background`），执行员接着比对 | 每行拷树、改坏、编 checker 档、跑三条流，单行推几分钟到二十几分钟 |
 | 第二段整表（281 行加补位，两条流、不跑执行器、不带探针） | **主 agent 后台起**，执行员接着比对 | 同上，推四小时上下 |
-| 新装置的内联单测（`cargo test -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes`）、`crates/mutations.tsv` 末尾「E171R1 装置」各行的复跑、`scripts/replay.sh` 里这一次加的复跑行 | **重型，归提交时**（主 agent 照 `.claude/skills/crash-test/commit-stages.md`） | checker 档包的测试二进制、crates 变异整表、全部实验复跑都在重型清单里 |
+| 新装置的内联单测（`cargo test -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes`）、`crates/mutations.tsv` 末尾「E171R1 装置」各行的复跑、`scripts/experiments/replay.sh` 里这一次加的复跑行 | **重型，归提交时**（主 agent 照 `.claude/skills/crash-test/commit-stages.md`） | checker 档包的测试二进制、crates 变异整表、全部实验复跑都在重型清单里 |
 
-线程上限从派发提示取：并行线道数 × 每条线道里 cargo、装置、执行器的线程数不超过它（这一轮给的是 8：两条线道各 4，或四条线道各 2，执行员按单行实测定）。内存上限照 `scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值，派发提示另给的照给的。
+线程上限从派发提示取：并行线道数 × 每条线道里 cargo、装置、执行器的线程数不超过它（这一轮给的是 8：两条线道各 4，或四条线道各 2，执行员按单行实测定）。内存上限照 `scripts/experiments/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值，派发提示另给的照给的。
 
 ### 5.5 实现量、挂钟与分段
 
@@ -498,7 +498,7 @@ Q1–Q5 问的本身是计数（「有没有一行 / 一态」），翻面的门
 
 ## 九、变异
 
-装置一侧（新装置）的行追加在 `crates/mutations.tsv` 末尾，名字以「E171R1 装置」起头，必须红的测试是新装置的内联单测（重型，提交时复跑）；比对器与驱动一侧的行进 `scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv`，经新目录里的变异驱动跑（原登记修订 1 第 1 行的做法）。原装置照抄过来的那一部分，原有的变异行照名字改前缀复制一份指新文件（原文件的那几行不动）。每条写明在哪个取样点上改变输出：
+装置一侧（新装置）的行追加在 `crates/mutations.tsv` 末尾，名字以「E171R1 装置」起头，必须红的测试是新装置的内联单测（重型，提交时复跑）；比对器与驱动一侧的行进 `scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv`，经新目录里的变异驱动跑（原登记修订 1 第 1 行的做法）。原装置照抄过来的那一部分，原有的变异行照名字改前缀复制一份指新文件（原文件的那几行不动）。每条写明在哪个取样点上改变输出：
 
 | # | 改哪 | 改成什么 | 在哪个取样点上改变输出（会红的那一格） |
 |---|---|---|---|
@@ -622,7 +622,7 @@ name=freeze_seed sha256_prefix16=ce39b484ec109c7a
 - `crates/singlefs-core/src/transaction.rs` `pub fn` 的 `grep -n`、5781–5811、`inode_leaf_containers` 等的 `grep -n`；`crates/singlefs-core/src/mount.rs`、`mounted_session.rs` `pub fn` 的 `grep -n`；`crates/singlefs-core/src/inode_tree.rs` 50–130 与 `const`、`pub fn` 的 `grep -n`；`crates/singlefs-core/src/recovery.rs` 第 3232 行；几个交回类型 `derive` 的 `grep -B3` 命中行（`allocator.rs` 1063–1064，`transaction.rs` 578–579、960–961、2031、2680–2681，`mount.rs` 885–886、2196、2212、5363–5364）。
 - `crates/singlefs-format/src/lib.rs` 第 109–110 行。
 - `scripts/experiments/e171_three_oracle_collusion/`：`ls` 与 `wc -l`；两张表各头 3 行与按行号取出的十五行；`expansion_table.py` 1–40；`row_driver.py` 的 `grep -n` 命中行（第 6、10、13、72、74、139–146、187–203、221、342、356、376、388、396、406 行）。
-- `scripts/quote-kb.py` 1–40；`scripts/claim-experiment.sh` 1–60；`scripts/replace-once.py` 1–25；`.claude/gate.d/doc-experiments.sh` 第 16、57–58、409–436、605–640 行附近（`grep -n tmp` 与它前后，查 /tmp 怎么算引依据）。
+- `scripts/kb/quote-kb.py` 1–40；`scripts/kb/claim-experiment.sh` 1–60；`scripts/kb/replace-once.py` 1–25；`.claude/gate.d/doc-experiments.sh` 第 16、57–58、409–436、605–640 行附近（`grep -n tmp` 与它前后，查 /tmp 怎么算引依据）。
 
 **跑过的命令**（原样，只有草稿目录的路径写成 `<草稿目录>`；输出是 2026-10-03 这一次真跑出来的，长的只贴汇总，两条 grep 的命中行列在上面「读过的文件」里）：
 
@@ -631,7 +631,7 @@ $ ls research/prompts/e171-r1-prereg.md
 ls: cannot access 'research/prompts/e171-r1-prereg.md': No such file or directory
 $ set -o noclobber; cat > research/prompts/e171-r1-prereg.md <<'EOF' …（文件头与第一节前半）
 $ sed -n '5,12p' research/prompts/e171-r1-questions.md > <草稿目录>/questions-rows.md   # 追加进第一节，tail -n 8 | cmp → rows-identical
-$ python3 scripts/quote-kb.py <草稿目录>/quotes.md '.claude/kb/decisions/13-验证路线.md@#### 已定项 6：三个互相独立的 oracle' '.claude/kb/decisions/13-验证路线.md@#### 已定项 1：crash refinement 先验「一次发布 + 一次崩溃 + 一次恢复」' '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换' '.claude/kb/checks-owed.md~^\| C670 \|' '.claude/kb/checks-owed.md~^\| C672 \|' '.claude/kb/checks-owed.md~^\| C673 \|'
+$ python3 scripts/kb/quote-kb.py <草稿目录>/quotes.md '.claude/kb/decisions/13-验证路线.md@#### 已定项 6：三个互相独立的 oracle' '.claude/kb/decisions/13-验证路线.md@#### 已定项 1：crash refinement 先验「一次发布 + 一次崩溃 + 一次恢复」' '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换' '.claude/kb/checks-owed.md~^\| C670 \|' '.claude/kb/checks-owed.md~^\| C672 \|' '.claude/kb/checks-owed.md~^\| C673 \|'
   ✓ 6 段整抄进 <草稿目录>/quotes.md，回读逐字节一致
 # 第二节追加之后：tail -n +<追加前行数+1> 登记 | cmp - quotes.md → appended-quotes-identical
 $ grep -n '已确认丢了\|已确认的丢了\|已确认.*丢' research/prompts/e171-conclusion-r2-*.md research/prompts/e171-conclusion-r3-*.md research/prompts/e171-r1-questions.md .claude/kb/checks-owed.md | cut -c1-400
@@ -675,7 +675,7 @@ $ wc -l crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs
 6202 crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs
 $ python3 -c "a,b,c=5569.6,7607.9,1277.9; print(a+b+c, (a+b+c)/3600, a*2/117, b*2/164, c*2/6)"
 14455.4 4.0153888888888885 95.20683760683761 92.77926829268293 425.9666666666667
-$ python3 scripts/replace-once.py research/prompts/e171-r1-prereg.md <旧串> <新串>   # 五次：第五节末句、第九节 V7、第十一节够判停机一句、本节「跑过的命令」那一句、这一行自己，都是「命中 1 次，已替换」
+$ python3 scripts/kb/replace-once.py research/prompts/e171-r1-prereg.md <旧串> <新串>   # 五次：第五节末句、第九节 V7、第十一节够判停机一句、本节「跑过的命令」那一句、这一行自己，都是「命中 1 次，已替换」
 ```
 
 ### 修订 2（设计员，2026-10-04；接第十二节，只许追加，所以写在文件末尾）
@@ -828,7 +828,7 @@ $ python3 scripts/replace-once.py research/prompts/e171-r1-prereg.md <旧串> <�
 - 新装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：26–41、1880–1920、3085–3200、3414–3463、3530–3612、3713–3800、4379–4440、6478–6500、6944–7100、7955–8000、8290–8340、8615–8680 与 `grep -n` 命中行（计时、`#[path]`、`reference_filesystem::`、`StoppedByAPanic`、见证两支）。
 - `crates/singlefs-checker-tier/src/crash.rs` 1255–1300；`crates/singlefs-checker-tier/Cargo.toml` 全文；`crates/singlefs-checker-tier/src/crash_injection.rs` 的 `grep -n reference` 命中行；`crates/singlefs-harness/Cargo.toml` 与 `src/lib.rs` 的 `grep -n reference` 命中行；`crates/singlefs-harness/src/model_comparison.rs` 79–84；`crates/singlefs-harness/src/memory_pool.rs`、`read_tally.rs` 的 `pub` 项 `grep -n` 与 `read_tally.rs` 1–40；`crates/singlefs-core/src/recovery.rs` 102–114；全仓 `impl … PoolReader for` 的 `grep -n` 命中行；`crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs` 1–40、1476–1500（只读读者的做法，没读它的结果）。
 - `crates/mutations.tsv` 第 1 行与第 2443–2465 行（名字、文件、测试名三列）。
-- `scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` 255–300 与 `grep -n` 命中行（第 64、266、270、534、547–548、696 行）；`scripts/capped.sh` 1–30；`.claude/singlefs-ai-sop/scripts/doc-lint.sh` 900–975（not-numbers 怎么读）。
+- `scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` 255–300 与 `grep -n` 命中行（第 64、266、270、534、547–548、696 行）；`scripts/hosts/capped.sh` 1–30；`.claude/singlefs-ai-sop/scripts/doc-lint.sh` 900–975（not-numbers 怎么读）。
 
 跑过的命令（原样，输出在设计员报告里）：
 
@@ -1057,7 +1057,7 @@ V20–V27 见第 5.4 节表。V20–V31 都要在提交时那一趟抓到（第 
 - `crates/singlefs-checker-tier/src/crash.rs` 第 1130–1300 行与 `grep -n` 命中行（`judge_crash_image`、`check_records`、`JournalPolicy`）。
 - `crates/singlefs-harness/src/memory_pool.rs` 第 470–500、995–1015 行；`crates/singlefs-core/src/recovery.rs` 第 3405–3430 行；全仓 `fn journal_record_offsets_hint` 的 `grep -rn` 命中行；`crates/singlefs-harness/src/segments.rs` 第 34–38 行（`grep` 命中）。
 - `scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/`：`ls`；`row_driver.py` `grep -n 'def \|snapshot'` 命中行与第 235–247 行；目录里 `*.py` 的 `grep -n 's13\|q5_not_run\|q5_partition\|q5_equivalence'`（0 命中）。
-- `crates/mutations.tsv`：第 1 行；名字以「E171R1 装置」起头各行的第 1、3 列（第 2420–2442、2464–2468 行）。`scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv` 第 1 列。
+- `crates/mutations.tsv`：第 1 行；名字以「E171R1 装置」起头各行的第 1、3 列（第 2420–2442、2464–2468 行）。`scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv` 第 1 列。
 
 跑过的命令（原样，草稿目录写成 `<草稿目录>`；输出在设计员报告里）：
 
@@ -1332,7 +1332,7 @@ S15 ⑤ ⑥ 的预言出自调查报告第 4、5、8 节的机理（转环之前
 - 冻结树 `scripts/experiments/target/e171-r1-frozen-tree/`：装置第 1060–1083 行与 `fn start(name`、`PoolAllocator::new(vec`、`mark_format_time_units`、`new_pool_file_creation_operations_equal_build_pool` 的命中行；`crates/singlefs-core/src/allocator.rs` 的 `root_ring` 等命中行（第 24、975–980、1207–1241、1780–1798、1817–1818、1864–1871、1929、2687–2816 行附近）；`crates/singlefs-core/src/make_filesystem.rs` 第 670–740 行；`crates/singlefs-core/src/mount.rs` 第 1942 行；`crates/singlefs-harness/tests/common/mod.rs` 第 56–62、221–227 行；`crates/singlefs-harness/src/mount_transparency.rs` 那个枚举的 `grep -n -A40` 命中行。
 - 仓里 `crates/singlefs-core/src/allocator.rs` 第 1905–1925 行与 `root_ring_occupancy`、`record_root_written_by_this_process` 等命中行；`crates/singlefs-core/src/make_filesystem.rs`、`mount.rs`、`admission.rs` 的 `install_root_ring_occupancy` 命中行；`crates/singlefs-harness/tests/common/mod.rs` 第 670–720 行；`crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs` 的 `PoolAllocator::new\|build_pool` 命中行（第 9、258 行）。
 - `scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` 第 235–260 行。
-- `scripts/quote-kb.py` 1–40；`.claude/gate.d/doc-experiments.sh` 第 409–428、614–640 行与 `grep -n tmp` 命中行（查 /tmp 怎么算引依据）。
+- `scripts/kb/quote-kb.py` 1–40；`.claude/gate.d/doc-experiments.sh` 第 409–428、614–640 行与 `grep -n tmp` 命中行（查 /tmp 怎么算引依据）。
 - `research/results/` 与 `scripts/experiments/target/e171-r1-dumps/` 只 `ls`（文件名、修改时刻），没打开任何一份。
 
 跑过的命令（原样，草稿目录写成 `<草稿目录>`，别的会话草稿目录写成 `<调查目录>`、`<第一段新树草稿目录>`；输出在设计员报告里）：
@@ -1349,7 +1349,7 @@ $ for f in crates/singlefs-checker-tier/src/bin/e170*.rs; do grep -c 'install_ro
 $ sha256sum <旧树>/crates/singlefs-harness/tests/common/mod.rs crates/singlefs-harness/tests/common/mod.rs   # 都是 d2f84876…
 $ ls research/results/ | grep '^e171-r1-.*2026-10-05'; ls -l --time-style=+%H:%M:%S research/results/ | grep 'e171-r1-.*2026-10-05-s1-'
 $ ls scripts/experiments/target/e171-r1-dumps/ scripts/experiments/target/e171-r1-dumps/newtree-2026-10-05/ …/baseline-run1/ …/s2-device-baseline-streams-1-2/ …/baseline-run1/first_file_unlinked_then_inodes_across_one_leaf/
-$ python3 scripts/quote-kb.py <草稿目录>/c551.md '.claude/kb/checks-owed.md~^\| C551 \|'   # ✓ 1 段整抄，回读逐字节一致
+$ python3 scripts/kb/quote-kb.py <草稿目录>/c551.md '.claude/kb/checks-owed.md~^\| C551 \|'   # ✓ 1 段整抄，回读逐字节一致
 $ python3 -c "…"                                          # 修改时刻的减法、⌈3T⌉、第 12 步与合计的推算
 $ sha256sum <调查目录>/report.md research/prompts/m3-formal-code-b29-r1-main-verification.md research/prompts/m3-formal-code-b29-r1-opus-output.md records/2026-10-01-里程碑三形式化接入.md <第一段新树草稿目录>/report.md <第一段新树草稿目录>/run_segment_one_on_the_new_tree.sh <第一段新树草稿目录>/s2_compare.py
 $ TZ=Asia/Tokyo date +%F                                  # 2026-10-05
@@ -1555,7 +1555,7 @@ $ head -n 1097 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1098 res
 - 「分到别的台」的条件（第 3 步各项、第 9 步）：那一台从发过去的冻结树快照编（快照摘要等于 H3，与编排器合并规则 ② 同一核），二进制 sha256 照实记、不要求等于 H7；产物与导出取回本机再判。S17 罩它们：第 9 步在别的台时 Z1 不过，先在本机再跑一次第 9 步，本机那次 Z1 过就是跨机不一致（S17），本机那次也不过就是 Z1 作废；第 3 步在别的台跑的各项，要等第 12 步 row-0 两台对照（S17）判过才作数，S17 触发时它们全部不作数、在本机重跑。
 - 缺的一段：`rows_orchestrator.py` 在别的台只会起逐行驱动（`STEPS` 五种都跑 `row_driver.py`），没有「在别的台从快照编、跑一趟装置、取回产物与导出」这一类活。执行员写跑法时补得上就补（照编排器已有的预检、取回、续跑写，配自证与弄坏开关）；补不上，第 3、9 步留在本机与第 7 步同时跑，交回里写明缺这一段（H20）。
 - 按流切不做：A8 的「恰 3 态」、T、Z1 都是按一趟三条流写的，拆开要改判法的形态；流三一条就占这几趟挂钟的绝大部分（修订 6 第 6.4 节），拆出流一、流二省不下时间。
-- 本机同时跑几个单元：槽数照编排器的分配法从 `scripts/host-resources.py --json` 现算（带流三的单元每槽 6G，只有流一流二的 4G，照修订 6 跑法的 `CAP_LARGE`、`CAP_SMALL`），不写死；放不下的排队，第 7 步最先，其余按推的用时最长先。
+- 本机同时跑几个单元：槽数照编排器的分配法从 `scripts/hosts/host-resources.py --json` 现算（带流三的单元每槽 6G，只有流一流二的 4G，照修订 6 跑法的 `CAP_LARGE`、`CAP_SMALL`），不写死；放不下的排队，第 7 步最先，其余按推的用时最长先。
 - T 照旧取第 7 步的进程挂钟。同时跑的别的单元会让它变长，逐行限时 max(1800, ⌈3T⌉) 只会更宽（修订 2 第 2.5 节「限时只升不降」）；第 7 步的计时产物另打一行，列出它跑的期间同时在跑的单元名（只描述，不进判定）。
 
 **次序**（只改跑法，判法不动；修订 2 第 2.7 节与修订 6 第 6.4 节原是一步接一步）：
@@ -1637,9 +1637,9 @@ $ head -n 1097 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1098 res
 | H14 | 第 6、10 步 `q5 states=` 的期望与丙类精确数 | 执行员（由修订 9 代进第 8.2 节的式子） | 拍树之前 | 主取样点全枚举态数 = K 取法数 × 2^(C 的写数)（A10 同式） |
 | H15 | 修订 6 那一趟拿来对照的产物与导出目录清单 | 主 agent | 出对照产物之前 | 那一趟第 11–13 步跑完，或写明停在哪一行 |
 | H16 | `RUN_DATE`、`RUN_SUFFIX`（`-r8`）、导出根、日志目录 | 主 agent | 起跑时 | 名字不与已有产物撞 |
-| H17 | 跑法脚本、第 0 步判法、编排器副本、续跑核对、对照脚本的 sha256 | 执行员写完，主 agent 认 | 起跑之前 | `bash scripts/detached-run.sh long-run-check -- <起法>` 退 0；各自的自证绿 |
+| H17 | 跑法脚本、第 0 步判法、编排器副本、续跑核对、对照脚本的 sha256 | 执行员写完，主 agent 认 | 起跑之前 | `bash scripts/hosts/detached-run.sh long-run-check -- <起法>` 退 0；各自的自证绿 |
 | H18 | 别的台的三个落点 | 执行员 | 写跑法时 | 与修订 6 那一趟的不同名 |
-| H19 | 各台槽数与每槽线程 | 编排器 | 每次起跑与续跑 | 现查 `scripts/layer0-shard-configuration-check.sh --emit-hosts` 与 `scripts/host-resources.py --json` |
+| H19 | 各台槽数与每槽线程 | 编排器 | 每次起跑与续跑 | 现查 `scripts/crash/layer0-shard-configuration-check.sh --emit-hosts` 与 `scripts/hosts/host-resources.py --json` |
 | H20 | 第 3、9 步分不分到别的台（编排器那一段补没补上） | 执行员写，主 agent 认 | 起跑之前 | 补上的那一段有自证与弄坏开关 |
 
 #### 8.9 挂钟、分片、续跑、多机
@@ -1648,7 +1648,7 @@ $ head -n 1097 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1098 res
 推的（修订 8 树上没量过，基数是修订 6 树上的读数）：拍树与树里 release 编译约 20–40 分钟；第 0、1、2、2b 步约二十分钟；之后第 7 步约 4.1 小时（修订 6 第 6.4 节）是逐行开始之前最长的一段，第 3 步带流三的两项（各约 2.3–2.7 小时）与第 9 步（约 4.1 小时）同它一起跑；第 11–13 步照修订 6 那一趟起跑时的分配推，本机约 9.5 小时、第二台约 7.0 小时（调度记录第 1287 行，本机 5 槽、第二台 3 槽）；第 13 步只在有超时的行时跑。合计约 14–16 小时（推的）；一步接一步、两条线道的跑法推约 34–38 小时（修订 6 第 6.4 节）。实现变了，流三的写数、态数与每态耗时都可能变，这个数只用来排机器，不进任何判据。
 - 分片：第 3、4 步每项、第 10 步每次各一个单元，与第 5、6、7、9 步同时跑（第 8.4 节）；第 11–13 步按行，每行一个单线道驱动，最长先派到空出来的槽（编排器）。第 7 步不分（T 的定义）；流内按态区间切要改装置，不在修订 8。
 - 续跑：同一条命令重起只补没做完的：第 0–10 步按单元（日志记绿、产物在且行数同、单元绿时当场写下的清单 sha256 不变），第 11–13 步按行目录里有没有 `row-result.tsv`。
-- 多机：台数从 `scripts/layer0-shard-configuration-check.sh --emit-hosts` 读，每台槽数与每槽线程从 `scripts/host-resources.py --json` 现算，不写常量；第 3、9 步分到别的台要补编排器缺的那一段（第 8.4 节），补不上留本机。
+- 多机：台数从 `scripts/crash/layer0-shard-configuration-check.sh --emit-hosts` 读，每台槽数与每槽线程从 `scripts/hosts/host-resources.py --json` 现算，不写常量；第 3、9 步分到别的台要补编排器缺的那一段（第 8.4 节），补不上留本机。
 
 #### 8.10 待主 agent 认的几处
 
@@ -1788,7 +1788,7 @@ T = 75.274 秒，出自 `research/results/e171-r1-three-oracle-collusion-after-t
 10. `s2_compare.py`（8ca65475…）、`s15_compare.py`（346fcc2e…）仍按路径用修订 6 草稿 `~/.local/share/singlefs/work/e171-r1-segment1-rev6/` 那两份，开跑核 sha256：认；该目录与 `~/.local/share/singlefs/work/e171-r1-revision-8-prep/fixtures-revision-8/` 在修订 8 那一趟跑完、结论三方判完之前不删。
 11、12：git 索引与 .pyc 的说明，记下，不另处置。
 
-主 agent 另做：五份自证照报告第八节登记进 `.claude/hooks/selftest-registry.tsv`（light，第 49–53 行）；`scripts/replay.sh` 追加 `E171|@driver_e171_r1_s1_revision_8_tools_research_mutations||…-2026-10-07-s1-revision-8-tools-research-mutations-2026-10-07.out|exact` 与驱动函数，主 agent 照它的口径单跑一次，输出与入库产物逐字节相同。新产物由修订 8 那一趟写实验页的执行员一并点名。
+主 agent 另做：五份自证照报告第八节登记进 `.claude/hooks/selftest-registry.tsv`（light，第 49–53 行）；`scripts/experiments/replay.sh` 追加 `E171|@driver_e171_r1_s1_revision_8_tools_research_mutations||…-2026-10-07-s1-revision-8-tools-research-mutations-2026-10-07.out|exact` 与驱动函数，主 agent 照它的口径单跑一次，输出与入库产物逐字节相同。新产物由修订 8 那一趟写实验页的执行员一并点名。
 
 ### 修订 10（设计员，2026-10-08；批次 `records/2026-10-01-里程碑三形式化接入.md#36`；接第十二节，只许追加，所以写在文件末尾）
 
@@ -1911,11 +1911,11 @@ T = 75.274 秒，出自 `research/results/e171-r1-three-oracle-collusion-after-t
 | H22 | 比对器的三份基线导出目录（第 1、7、9 步绿的那一次） | 接第二段比对的执行员 | 比对之前 | 三个目录都在 H16 导出根下，TAG 与序列日志里各自的绿行对得上；`step-9-z1` 绿 |
 | H23 | 第二段的 `RUN_DATE`、产物前缀（`…-<RUN_DATE>-s2`）与后缀（`-r8`）、导出根、行输出根、日志目录、工作根 | 主 agent | 起跑时 | 不与修订 6 第二段（导出根 `scripts/experiments/target/e171-r1-dumps/revision-6-segment-2`、后缀 `-r6`）、修订 8 第一段（H16）的任何一个撞名 |
 | H24 | 别的台的四个落点（工具包、冻结树快照、取回目录、起法目录）与标签前缀 | 执行员 | 写跑法时 | 与修订 6 第二段、修订 8 第一段（H18、`e171s1r8`）的都不同名 |
-| H25 | 第二段·修订 8 编排层、入口、对照脚本（比对器改了的话连它）的 sha256 | 执行员写完，主 agent 认 | 起跑之前 | `bash scripts/detached-run.sh long-run-check -- <起法>` 退 0；各自的自证绿，每个弄坏开关红在点名格 |
+| H25 | 第二段·修订 8 编排层、入口、对照脚本（比对器改了的话连它）的 sha256 | 执行员写完，主 agent 认 | 起跑之前 | `bash scripts/hosts/detached-run.sh long-run-check -- <起法>` 退 0；各自的自证绿，每个弄坏开关红在点名格 |
 | H26 | 第二段的输入清单（文件与 sha256） | 编排层入口在第一趟开跑那一刻写下 | 第一行之前 | 续跑先核，对不上就停 |
 | H27 | 让路（第 10.3 节第 3 条）补没补上 | 执行员写，主 agent 认 | 起跑之前 | 补上的那一段有自证与弄坏开关 |
 | H28 | 修订 6 那一趟第二段拿来对照的产物与导出（比对器产物、合成产物、行输出根、前缀与后缀） | 主 agent | 出对照产物之前 | 文件都在，sha256 记下 |
-| H29 | 各台槽数与每槽线程（第二段编排层） | 编排层 | 每次起跑、续跑、加槽 | 现查 `scripts/layer0-shard-configuration-check.sh --emit-hosts` 与 `scripts/host-resources.py --json`，不写常量 |
+| H29 | 各台槽数与每槽线程（第二段编排层） | 编排层 | 每次起跑、续跑、加槽 | 现查 `scripts/crash/layer0-shard-configuration-check.sh --emit-hosts` 与 `scripts/hosts/host-resources.py --json`，不写常量 |
 
 #### 10.7 作废、停机、运行条件（沿用第 8.6 节与修订 6 第二段，逐条）
 
@@ -1967,7 +1967,7 @@ T = 75.274 秒，出自 `research/results/e171-r1-three-oracle-collusion-after-t
 推的（修订 8 树上没量过；基数是修订 6 那一趟）：修订 6 第二段整表两台各 3 槽跑完不到 2.6 小时（主 agent 派发转达），折每行约 2.6 × 6 ÷ 281 ≈ 0.056 槽时（约 200 秒，含拷树与编译）。这一趟第二段起跑之后先只用别的台：到第 7 步绿约 4 小时（第 8.9 节），按 3 槽推约做完 216 行；余下约 65 行、约 3.6 槽时在第 7 步绿之后与第一段逐行分槽，让路时排在第一段后面。第二段从起到完推约 5–6 小时。整趟（两段）：第一段推约 14–16 小时（第 8.9 节）；第二段大半落在第一段只用本机的那几小时里，推整趟约 14–17 小时。实现变了，T₂ 与每行用时都可能变，这些数只用来排机器，不进任何判据。
 - 分片：按行切，每行一个单线道逐行驱动，最长先派到各台空出来的槽（`rows_orchestrator_segment_two.py` 文件头「派发」，第二段·修订 8 编排层照用）；本机等第 7 步绿再加槽（第 10.3 节第 2 条）。
 - 续跑：同一条命令重起只补行目录里还没有 `row-result.tsv` 的行；别的台被停时取回的行先收进来，写到一半的重做；开跑先核输入清单（H26）与 H3、H8。
-- 多机：台数从 `scripts/layer0-shard-configuration-check.sh --emit-hosts` 读，每台槽数与每槽线程从 `scripts/host-resources.py --json` 现查现算（起跑、续跑、加槽时），不写常量（H29）。
+- 多机：台数从 `scripts/crash/layer0-shard-configuration-check.sh --emit-hosts` 读，每台槽数与每槽线程从 `scripts/hosts/host-resources.py --json` 现查现算（起跑、续跑、加槽时），不写常量（H29）。
 
 #### 10.10 待主 agent 认的几处
 
@@ -1996,7 +1996,7 @@ T = 75.274 秒，出自 `research/results/e171-r1-three-oracle-collusion-after-t
 - `.claude/agent-common.md` 全文；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122、`.claude/singlefs-ai-sop/rules/test-script-discipline.md` 1–96、`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–176、`.claude/rules/three-way-inference.md` 1–174、`.claude/rules/mutation-sampling.md` 1–96、`.claude/rules/implementation-first.md` 1–20（全文）。
 - 本登记 1–82、330–604、681–850、1099–1791（第 83–329 行是第二节整抄的条款与第三、四节，第 605–680 行是第十三节，第 851–1098 行是修订 3–5，这一次没重读）；`research/prompts/e171-r1-questions.md` 1–12。
 - `scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/`（下写 `<研究一侧>`）：`ls`；`run_segment_two_on_the_revision_6_tree_multi_host.sh` 1–88；`run_segment_one_on_the_revision_8_tree_multi_host.sh` 1–19；`rows_orchestrator_segment_two.py` 1–200 与 `grep -n` 命中行（第 101、309–364、474–537、591、1207–1210 行一带）；`segment_two_comparator.py` 1–60 与 `grep -n` 命中行（第 99–100、270–271、447–475 行）；`contrast_revision_6_against_revision_8.py` 1–45 与第 180 行；`segment_one_units_revision_8.py` 1–100 与第 111–112、189–191、770、920、941 行；`rows_orchestrator_revision_8.py` 1–60 与第 152、217–219 行；`rows_orchestrator.py` 的 `grep -n '^[A-Z_]* = '` 命中行与第 25–26、235–283 行一带的 `grep` 命中行；`segment_one_unit_revision_8.sh` 的 `grep -n` 命中行（第 11–14、32–35、89–316 行一带）；`check_product.py` 第 13–16、140–143、180–183 行；`row_driver.py` 第 709 行；`revision_8_placeholders.json` 全文。
-- `scripts/host-resources.py` 1–40 与 `grep -n 'slice_room\|available_threads'` 命中行。
+- `scripts/hosts/host-resources.py` 1–40 与 `grep -n 'slice_room\|available_threads'` 命中行。
 - `research/results/` 与 `scripts/experiments/target/e171-r1-dumps/` 一份都没打开，也没 `ls`。
 
 跑过的命令（原样，草稿目录写成 `<草稿目录>`；输出在设计员报告里）：
@@ -2010,8 +2010,8 @@ $ awk 'NR<=200' $D/rows_orchestrator_segment_two.py | cut -c1-400
 $ awk 'NR<=60' $D/segment_two_comparator.py; grep -n 'add_argument\|prefix\b\|r6\|revision.6\|revision-6' $D/segment_two_comparator.py
 $ awk 'NR<=45' $D/contrast_revision_6_against_revision_8.py; grep -n 'segment.two\|第二段\|s2-\|segment2' $D/contrast_revision_6_against_revision_8.py $D/segment_one_units_revision_8.py $D/rows_orchestrator_revision_8.py $D/revision_8_placeholders.py $D/revision_8_placeholders.json
 $ awk 'NR<=100' $D/segment_one_units_revision_8.py; awk 'NR<=60' $D/rows_orchestrator_revision_8.py; grep -n '^[A-Z_]* = ' $D/rows_orchestrator.py
-$ grep -n 'PEER_\|e171s\|label' $D/rows_orchestrator_segment_two.py; grep -n 'host-resources\|slice_room\|available_threads' $D/rows_orchestrator.py; python3 scripts/host-resources.py --help   # 退 2（用法错，只为看用法）
-$ grep -n 'slice_room\|available_threads' scripts/host-resources.py; awk 'NR<=40' scripts/host-resources.py
+$ grep -n 'PEER_\|e171s\|label' $D/rows_orchestrator_segment_two.py; grep -n 'host-resources\|slice_room\|available_threads' $D/rows_orchestrator.py; python3 scripts/hosts/host-resources.py --help   # 退 2（用法错，只为看用法）
+$ grep -n 'slice_room\|available_threads' scripts/hosts/host-resources.py; awk 'NR<=40' scripts/hosts/host-resources.py
 $ grep -n '250\|wrapper\|Z3' $D/rows_orchestrator_segment_two.py; grep -n 'rows_without_executor' -A3 $D/check_product.py; grep -n 'wrapper_ended\|WRAPPER' $D/segment_two_comparator.py
 $ grep -n 's2-device-baseline\|PREFIX=\|SUFFIX\|TAG\b\|attempt\|timing.out\|DUMPS_ROOT\|EXPORT' $D/segment_one_unit_revision_8.sh; cat $D/revision_8_placeholders.json
 $ P=research/prompts/e171-r1-prereg.md; grep -n '^### 修订' $P; for t in H21 … H30 S18 S19 Z8 F10; do grep -c "$t" $P; done; grep -c '修订 10' $P   # H21–H30、S18、S19、修订 10 都没用过
@@ -2044,7 +2044,7 @@ $ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 res
 7. 两份配置文件不进输入清单，配置值由 `run-values.tsv` 逐项核：认。
 8. git 索引说明：记下，不另处置。
 
-主 agent 另做：三份自证照报告第八节原文登记进 `.claude/hooks/selftest-registry.tsv`（light，第 54–56 行）；`scripts/replay.sh` 追加 `E171|@driver_e171_r1_s2_revision_10_tools_research_mutations||…-2026-10-08-s2-revision-10-tools-research-mutations.out|exact` 与驱动，主 agent 照口径单跑一次，与入库产物逐字节相同。新产物由修订 8 那一趟写实验页的执行员一并点名。拍树之后在修订 8 操作清单之外多做的 ⑨–⑭ 在报告第七节。
+主 agent 另做：三份自证照报告第八节原文登记进 `.claude/hooks/selftest-registry.tsv`（light，第 54–56 行）；`scripts/experiments/replay.sh` 追加 `E171|@driver_e171_r1_s2_revision_10_tools_research_mutations||…-2026-10-08-s2-revision-10-tools-research-mutations.out|exact` 与驱动，主 agent 照口径单跑一次，与入库产物逐字节相同。新产物由修订 8 那一趟写实验页的执行员一并点名。拍树之后在修订 8 操作清单之外多做的 ⑨–⑭ 在报告第七节。
 
 ### 修订 11（设计员，2026-10-08；批次 `records/2026-10-01-里程碑三形式化接入.md#38` 38-1；接第十二节，只许追加，所以写在文件末尾）
 
@@ -2145,7 +2145,7 @@ $ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 res
 | 内联、泛型、`derive(Debug)` 生成的文本（交回值摘要就是 `{:?}` 文本） | 不漏 | 不漏 | 漏：类型定义所在的文件不在覆盖里；补不上 |
 | `#[path]`、`include_str!` 这类静态数据 | 不漏：rustc 的 dep-info 列它们（修订 6 树装置的 dep-info 67 个文件里有 `../../../singlefs-harness/tests/common/mod.rs`） | 不漏 | 漏 |
 | 没执行的分支 | 不漏（多罩，只少复用） | 不漏 | 不漏（就是它省下的那一块） |
-| 构建环境（工具链、Cargo 清单与锁、`.cargo`、`RUSTFLAGS` 一类） | 补进 `[build]` 节，照 `scripts/admission.py` 第 517 行 `toolchain_line`、第 543 行 `build_environment_lines` 的取法 | 不漏 | 补进同一节 |
+| 构建环境（工具链、Cargo 清单与锁、`.cargo`、`RUSTFLAGS` 一类） | 补进 `[build]` 节，照 `scripts/gate/admission.py` 第 517 行 `toolchain_line`、第 543 行 `build_environment_lines` 的取法 | 不漏 | 补进同一节 |
 | 系统链接器、libc 版本 | 漏；不补（二进制字节会变，语义不变），由第二台的工具链比对（`multi-host-run.sh` 第 17 行）与 RC1–RC5 现跑核 | 不漏 | 漏 |
 | 编译目录的绝对路径 | 不进键（不改语义） | 进了：同一份源码在两个槽、两台编出两个 sha256，假的「不同」；不改编法补不上 | 同乙 |
 | 导出目录（上游读数） | 补进 `[upstream]`：上游那几个文件的 sha256 | 同甲 | 同甲 |
@@ -2158,7 +2158,7 @@ $ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 res
 - `[kind]` 单元种类：`device`、`e170`、`driver-row`、`o3-executor`、`mutation-driver`。
 - `[build]` `cargo -V` 与 `rustc -vV` 原样的 sha256；根与 `crates/*/Cargo.toml`、`Cargo.lock`、树里 `.cargo/` 下每个文件的 sha256；`admission.build_environment_lines` 给的构建环境各行。
 - `[closure]` 那棵树在树里编的 release 二进制的 dep-info（`target/release/<bin>.d`）列的每个源文件，相对树根的路径与 sha256；驱动行用改坏之后的内容（照 `bad_implementation_table.apply_mutation` 施加）。树外的路径出现在 dep-info 里就停（S18 ②）。
-- `[env]` 闭包源码里按名字读的环境变量（`SINGLEFS_`、`KS_`、`RAYON_` 起头的字面量），去掉 `scripts/capped.sh` 第 22–31 行设的八个线程数变量，逐个记「设了 / 没设」；有一个设了的单元不查库、不进库。
+- `[env]` 闭包源码里按名字读的环境变量（`SINGLEFS_`、`KS_`、`RAYON_` 起头的字面量），去掉 `scripts/hosts/capped.sh` 第 22–31 行设的八个线程数变量，逐个记「设了 / 没设」；有一个设了的单元不查库、不进库。
 - `[mutation]` 行号、行表那一行原文、变异表那一行原文；空变异记 `empty-of <原名>` 与那一行原文。
 - `[args]` 装置或驱动的参数，去掉输出目录、`--threads`、`--memory-cap`、`--lanes`、工作根与输出根。
 - `[limit]` L 的秒数（`max(1800, ⌈3T⌉)`，第 13 步再乘 3）；不限时的单元记 `none`。
@@ -2233,7 +2233,7 @@ $ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 res
 - 查库在派发之前：命中的行不进派发队列，各台的槽只排没命中的与 RC2、RC3 要现跑的；分配仍照编排器现查现算。
 - 续跑照原样：同一条命令再起，已落的（现跑的、取来的）都算做完。取用是先写账本旁的标记 `<导出根>/reuse-markers/<单元>.tsv`、再链接、最后链 `row-result.tsv`（驱动行）或写序列日志的绿行（第 0–10 步单元）；断在中间的，续跑时见到标记而没有绿行或 `row-result.tsv`，删掉这一单元已链的几份重取。账本在每层收尾时由标记现合，不靠中途追加。
 - 第 0–10 步续跑清单（第 8.4 节「续跑」第二条）把取来的单元照现跑的一样记进清单，sha256 是链过来那几份的。
-- 准入一层照旧：整个实验的输入没变，`scripts/admission.py experiment` 退 77，不起跑；判定一级的复用在这一层之下。
+- 准入一层照旧：整个实验的输入没变，`scripts/gate/admission.py experiment` 退 77，不起跑；判定一级的复用在这一层之下。
 
 #### 11.6 R5：修订 6 那一趟的读数能不能事后算键导进来
 
@@ -2298,7 +2298,7 @@ $ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 res
 
 | # | 证什么 | 怎么做 | 必须看到 |
 |---|---|---|---|
-| RP1 | 复用开、关两遍读数逐项相同 | 假世界（假装置、假驱动、假执行器、假编排，沿用 `selftest_fakes/`）：第 0–10 步全部单元与两段各 6 行，复用关跑一遍（入库）、复用开再跑一遍 | 第二遍除永远现跑的几类外全部取来；两遍落下的每份读数文件逐字节相同；两遍每条判法的输出行逐字相同；账本 N + M 等于单元数 |
+| RP1 | 复用开、关两遍读数逐项相同 | 假世界（假装置、假驱动、假执行器、假编排，沿用 ``）：第 0–10 步全部单元与两段各 6 行，复用关跑一遍（入库）、复用开再跑一遍 | 第二遍除永远现跑的几类外全部取来；两遍落下的每份读数文件逐字节相同；两遍每条判法的输出行逐字相同；账本 N + M 等于单元数 |
 | RP2 | 真二进制上同键读数相等、取来的与现跑的相同 | 修订 8 那一趟 step-0 绿之后的小单元 `reuse-selfproof`：H7 那个装置二进制跑三次 `stream-constants --streams 1,2,3`（只打 S1 常量，没有 Q1–Q5 读数）：①复用关、入一个只给这一单元用的库（H30 下 `selfproof/`）；②复用开、取来；③另一个目录现跑、照 RC1 比 | ②落下的文件与①逐字节相同；③ `identical=true`；产物 `<H16 前缀>-reuse-selfproof-r8.out` |
 | RP3 | 键里少一项就会错用 | 假世界里十节各有一格：只改那一节对应的一样输入（改闭包里一个文件、改工具链文本、设一个环境变量、改变异行、改参数、改 L、改上游一个文件、改驱动 import 的一个模块、改 Python 文本），其余不动 | 每格都不命中、现跑；弄坏开关 `drop-<节名>` 打开后那一格命中、格红 |
 | RP4 | 续跑只补没判的 | 假世界里在第 k 个取用与第 j 个现跑之后发 TERM，同一条命令再起 | 已取来的、已现跑完的都不再做；断在取用中间的那一个重取；库里条目数等于不同键的个数；账本 N + M 不变 |
@@ -2309,7 +2309,7 @@ $ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 res
 
 **弄坏开关**（`REUSE_BREAK=<项>`，只在自证起的子进程里认，别处设了退 2；写进新文件头）：`drop-kind`、`drop-build`、`drop-closure`、`drop-env`、`drop-mutation`、`drop-args`、`drop-limit`、`drop-upstream`、`drop-research`、`drop-python`（各红在 RP3 那一节的格）；`check-skipped`（RC1–RC3 不比，红在 RP7）；`closure-check-skipped`（红在 RP6）；`manifest-unchecked`（红在 RP8）；`insert-in-place`（红在 RP5）；`fresh-always-ignored`（step-9 取来，红在 RP1 的「永远现跑」格）。
 
-**变异**（追加进 `scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv`，经 `mutation_driver.py` 跑；每条写明在哪一格改变输出）：
+**变异**（追加进 `scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv`，经 `mutation_driver.py` 跑；每条写明在哪一格改变输出）：
 
 | # | 改哪 | 改成什么 | 在哪一格改变输出 |
 |---|---|---|---|
@@ -2354,7 +2354,7 @@ $ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 res
 | `segment_one_unit_revision_11.sh` | 修订 8 单元脚本照抄，只在 `device_step`、`driver_step`、`run_executor` 三处加「给了 `REUSE_ENTRY` 就取用、不起进程」；判法那几行一个字不改 |
 | `rows_orchestrator_revision_11.py` | 第一段逐行：派发之前查库；row-0 与跨机那一份照 RC2 现跑；取回之后入库前核三样（第 11.5 节「两台」）；RC4 |
 | `rows_orchestrator_segment_two_revision_11.py` | 第二段：查库、RC2、RC3 抽样、入库、RC4；补位协调照旧（要补位的行不查库） |
-| 两个入口 `run_segment_one_revision_11_multi_host.sh`、`run_segment_two_revision_11_multi_host.sh` 与 `revision_11_placeholders.json` | 照修订 8、10 入口的写法；文件头三行长活声明；`bash scripts/detached-run.sh long-run-check -- <起法>` 退 0 |
+| 两个入口 `run_segment_one_revision_11_multi_host.sh`、`run_segment_two_revision_11_multi_host.sh` 与 `revision_11_placeholders.json` | 照修订 8、10 入口的写法；文件头三行长活声明；`bash scripts/hosts/detached-run.sh long-run-check -- <起法>` 退 0 |
 
 研究一侧变异表追加 RV1–RV15；研究一侧有文件变了，research-mutations 那一单元这一趟照 H11 原规矩重跑（它自己的键也变了）。自证登记进 `.claude/hooks/selftest-registry.tsv` 归主 agent。
 
@@ -2376,7 +2376,7 @@ $ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 res
 - 以后各趟：省多少看改了哪（第 11.7 节）。只改闭包外的文件时，现跑的只剩 step-9（约 4.1 小时，修订 6 第 6.4 节）、step-10-run-2、第一段 row-0 两台各一份（每份约一个 T）、第二段跨机那一行两份与 RC3 的 k 行，推约 4–5 小时；改了任一 core 文件时一个装置单元都省不下。
 - 分片：不变（第 0–10 步按单元、两段按行）；命中的单元与行不进队列。
 - 续跑：同一条命令重起；取用靠标记与绿行补齐（第 11.5 节）；入库靠 `staging/` 加 `rename`。
-- 多机：台数照旧从 `scripts/layer0-shard-configuration-check.sh --emit-hosts` 读，槽与线程照旧从 `scripts/host-resources.py --json` 现算；库只在本机，第二台不查库、不留库。
+- 多机：台数照旧从 `scripts/crash/layer0-shard-configuration-check.sh --emit-hosts` 读，槽与线程照旧从 `scripts/hosts/host-resources.py --json` 现算；库只在本机，第二台不查库、不留库。
 
 #### 11.12 待主 agent 认的几处
 
@@ -2404,7 +2404,7 @@ $ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 res
 - `.claude/agent-common.md` 全文；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122、`.claude/singlefs-ai-sop/rules/test-script-discipline.md` 1–96、`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–176、`.claude/rules/three-way-inference.md` 1–174、`.claude/rules/mutation-sampling.md` 1–96、`.claude/rules/implementation-first.md` 1–20（全文）；`.claude/singlefs-ai-sop/rules/command-safety.md` 第 153 行（grep 命中）。
 - 本登记 1–82、289–573、793–812、1220–1300、1403–2047；`research/prompts/e171-r1-reuse-questions.md` 全文（17 行）；`records/2026-10-01-里程碑三形式化接入.md` 第 1353–1380 行与 `grep -n '^#'` 末 8 行、`grep -n '38-[0-9]'` 命中行。
 - 研究一侧目录（下写 `<研究一侧>`）：`row_driver.py` 1–130、221–748；`bad_implementation_table.py` 1–64、125–175 与 `grep -n` 命中行；`rows_orchestrator.py` 1–160、680–700 与 `grep -n` 命中行（第 110、112、137、146、581、597、681、696、915、1211 行）；`rows_orchestrator_segment_two.py` 1–130 与 `grep -n` 命中行；`segment_one_units_revision_8.py` 1–150；`segment_one_unit_revision_8.sh` 1–376；`run_segment_two_on_the_revision_6_tree_multi_host.sh`、`run_segment_one_on_the_revision_8_tree_multi_host.sh`、`run_segment_two_revision_10_multi_host.sh` 全文；`frozen_o3.py` 1–60；`check_product.py`、`cross_host_o3_check.py`、`device_timing.py`、`o3_bad_image_judge.py` 的 `grep -n` 命中行。
-- `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 1–60、2485–2514、5225–5236、9780–9830 与 `grep -n` 命中行；`crates/singlefs-checker-tier/src/crash.rs` 与 `crash_identity.rs`、`verdict_store.rs` 的 `grep -n` 命中行（文件头）；`scripts/admission.py` 1188–1240、260–300、517–560 与 `grep -n` 命中行；`scripts/capped.sh` 22–36；`scripts/multi-host-run.sh` 的 `grep -n` 命中行；根 `Cargo.toml` 第 17–19 行；修订 6 树里各 `Cargo.toml` 的 `[dependencies]` 一段、`singlefs-checker-tier/Cargo.toml` 去注释的全文、两份 dep-info 全文、`target/.rustc_info.json` 的 rustc 一行；修订 6 树 dep-info 列的 67 个文件里读环境变量的 `grep` 命中行。
+- `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 1–60、2485–2514、5225–5236、9780–9830 与 `grep -n` 命中行；`crates/singlefs-checker-tier/src/crash.rs` 与 `crash_identity.rs`、`verdict_store.rs` 的 `grep -n` 命中行（文件头）；`scripts/gate/admission.py` 1188–1240、260–300、517–560 与 `grep -n` 命中行；`scripts/hosts/capped.sh` 22–36；`scripts/hosts/multi-host-run.sh` 的 `grep -n` 命中行；根 `Cargo.toml` 第 17–19 行；修订 6 树里各 `Cargo.toml` 的 `[dependencies]` 一段、`singlefs-checker-tier/Cargo.toml` 去注释的全文、两份 dep-info 全文、`target/.rustc_info.json` 的 rustc 一行；修订 6 树 dep-info 列的 67 个文件里读环境变量的 `grep` 命中行。
 
 跑过的命令（原样，草稿目录写成 `<草稿目录>`，修订 6 树写成 `$T`；输出在设计员报告与草稿目录里）：
 
@@ -2454,7 +2454,7 @@ $ TZ=Asia/Tokyo date +%F   # 2026-10-08
 执行员报告 `~/.local/share/singlefs/work/e171-r1-revision-11-implement/report.md`（52e20a79…）。主 agent 现核：
 - 修订 8、10 与之前的 47 个文件对执行员开工前那份清单 `sha256sum -c` 47 个 OK（在研究一侧目录里核）；第 11.10 节 9 个新文件对 `h31.sha256` 9 个 OK。
 - 四份自证主 agent 各跑一轮：`reuse_library.py` 自证 38 项红 0、`segment_one_units_revision_11.py` 10 项红 0、`rows_orchestrator_revision_11.py` 9 项红 0、`rows_orchestrator_segment_two_revision_11.py` 11 项红 0；登记进 `.claude/hooks/selftest-registry.tsv` 第 57–60 行（light）。
-- 变异表 `scripts/mutations/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv` 的产物入库为 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-08-revision-11-tools-research-mutations.out`，`scripts/replay.sh` 第 358 行登记、驱动 `driver_e171_r1_revision_11_tools_research_mutations`；主 agent 照驱动口径单跑一次，与入库产物逐字节相同，`E7RESULT name=verdict mutations=15 caught=15 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`。
+- 变异表 `scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv` 的产物入库为 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-08-revision-11-tools-research-mutations.out`，`scripts/experiments/replay.sh` 第 358 行登记、驱动 `driver_e171_r1_revision_11_tools_research_mutations`；主 agent 照驱动口径单跑一次，与入库产物逐字节相同，`E7RESULT name=verdict mutations=15 caught=15 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`。
 
 报告第二节十条都认：
 1. 变异表另起 `_revision_11.tsv`，不追加进主表（主表由 `replay.sh` 逐字节复跑，照修订 8、10 先例）。

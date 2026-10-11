@@ -8,7 +8,7 @@
 bash research/prompts/m3-batch10z-vw-code-r1-opus-model/rerun.sh [<工作目录>]
 ```
 
-它从冻结副本拷仓：`assemble.sh` 把那份 harness 测试文件与 `atk_vw_part*.rs` 拼成测试目标 `atk_vw_opus`（只借原文件的搭建函数，攻方用例都以 `atk_` 开头、`#[ignore]`）；跑 K1 九形在新接口上逐格重扫（连同被拒之后、要出路之前放开的用户动作）、实现员三形、两槽 C、被抛弃根 A 与 C、窄四档单元区、报里记的「还剩什么」四种改动、只比实例代号与 txg 的别的池、有树无文件那一版、要出路那一次读盘出错、造 F/H/walkSkipped 的搜；再跑十五个攻方变异（`mutants.py`，原文恰好命中一次才改，否则退 3；`run-mutant.sh` 每个从冻结副本另拷一份）、变异表第 3575/3577/3583/3584 行与 M10 对 core 库单测；K4 用 `build-scan-proto.py` 把两份 checker 档源文件测试模块里的扫源码函数与几条扫源码用例原样抄进一个独立小 crate、`gen-scan-inputs.py` 造攻法输入。每件经 `scripts/run-with-memory-cap.sh`（每件 3G、编译 12G、扫源码 crate 4G、扫一次 2G），线程经 `scripts/capped.sh 15`。不起 checker 档测试、不枚举崩溃状态。整份约 30 分钟（推的：各件这一轮实测相加）。这一轮的原始输出在模型目录 `runs/`。
+它从冻结副本拷仓：`assemble.sh` 把那份 harness 测试文件与 `atk_vw_part*.rs` 拼成测试目标 `atk_vw_opus`（只借原文件的搭建函数，攻方用例都以 `atk_` 开头、`#[ignore]`）；跑 K1 九形在新接口上逐格重扫（连同被拒之后、要出路之前放开的用户动作）、实现员三形、两槽 C、被抛弃根 A 与 C、窄四档单元区、报里记的「还剩什么」四种改动、只比实例代号与 txg 的别的池、有树无文件那一版、要出路那一次读盘出错、造 F/H/walkSkipped 的搜；再跑十五个攻方变异（`mutants.py`，原文恰好命中一次才改，否则退 3；`run-mutant.sh` 每个从冻结副本另拷一份）、变异表第 3575/3577/3583/3584 行与 M10 对 core 库单测；K4 用 `build-scan-proto.py` 把两份 checker 档源文件测试模块里的扫源码函数与几条扫源码用例原样抄进一个独立小 crate、`gen-scan-inputs.py` 造攻法输入。每件经 `scripts/hosts/run-with-memory-cap.sh`（每件 3G、编译 12G、扫源码 crate 4G、扫一次 2G），线程经 `scripts/hosts/capped.sh 15`。不起 checker 档测试、不枚举崩溃状态。整份约 30 分钟（推的：各件这一轮实测相加）。这一轮的原始输出在模型目录 `runs/`。
 
 模型目录文件的 sha256（`sha256sum` 原样）：
 

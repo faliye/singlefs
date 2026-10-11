@@ -2,7 +2,7 @@
 
 轮：m3-batch57-code-r1；立场：正推（核代码做的是不是条款说的）；格：K1–K4。
 冻结副本：`~/.local/share/singlefs/work/m3-batch57-code-r1/repo/`（sha256 与 `research/prompts/m3-batch57-code-r1-snapshot/crates-sha256.txt` 逐份核过，8 份全 OK）。我的拷贝与编译目录：`~/.local/share/singlefs/work/m3-batch57-code-r1-sonnet/{repo,target}`。
-命令一律 `nice -n 19`、经 `scripts/run-with-memory-cap.sh 10G`、`capped.sh 10`、一次一条 cargo。开跑前 `ps` 看到主会话有一条 `cargo test --offline --release -p singlefs-checker-tier --features verdict-store,gpu`（pid 2390492）在跑，用的是主工作区 `target/`，不是性能测量，我用自己的编译目录照跑。
+命令一律 `nice -n 19`、经 `scripts/hosts/run-with-memory-cap.sh 10G`、`capped.sh 10`、一次一条 cargo。开跑前 `ps` 看到主会话有一条 `cargo test --offline --release -p singlefs-checker-tier --features verdict-store,gpu`（pid 2390492）在跑，用的是主工作区 `target/`，不是性能测量，我用自己的编译目录照跑。
 
 ## 〇、条款（kb 文件自己的行号，均 `grep -nF` 现查）
 

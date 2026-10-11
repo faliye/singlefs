@@ -8,7 +8,7 @@
 bash research/prompts/m3-batch10z-tu-code-r1-opus-model/rerun.sh [<工作目录>]
 ```
 
-它从冻结副本拷仓：一份不改，用 `assemble.sh` 把那份 harness 测试文件与 `atk_tu_part*.rs` 拼成测试目标 `atk_tu_opus`（只借原文件的搭建函数，攻方用例都以 `atk_` 开头、`#[ignore]`）；一份是量法副本，`cost-patch.py` 在副本 core 里加量预演挂钟与内存的开关和读数、加一个只供量法的预演入口、把 `block_device.rs` 的对齐判放成 `pub(crate)`、接上 `atk_overlay_tests.rs`（只进内存的盘与抄的对齐判的对拍单测），`assemble-cost.sh` 拼测试目标 `atk_tu_cost_opus`；再跑十一个攻方变异（`mutants.py`，原文恰好命中一次才改，否则退 3；`run-mutant.sh` 每个从冻结副本另拷一份）；K4 用 `build-scan-proto.sh` 把两份 checker 档源文件测试模块里的扫源码函数原样抄进一个独立小 crate，`gen-scan-inputs.py` 造输入。每件经 `scripts/run-with-memory-cap.sh`（每件 3G、并行时一批合计不超过 12G；编译 12G；大盘代价那两件 10G、12G 单独跑），线程经 `scripts/capped.sh`。不起 checker 档测试、不枚举崩溃状态。整份约 35 分钟（推的：各件这一轮实测相加）。这一轮的原始输出在模型目录 `runs/`。
+它从冻结副本拷仓：一份不改，用 `assemble.sh` 把那份 harness 测试文件与 `atk_tu_part*.rs` 拼成测试目标 `atk_tu_opus`（只借原文件的搭建函数，攻方用例都以 `atk_` 开头、`#[ignore]`）；一份是量法副本，`cost-patch.py` 在副本 core 里加量预演挂钟与内存的开关和读数、加一个只供量法的预演入口、把 `block_device.rs` 的对齐判放成 `pub(crate)`、接上 `atk_overlay_tests.rs`（只进内存的盘与抄的对齐判的对拍单测），`assemble-cost.sh` 拼测试目标 `atk_tu_cost_opus`；再跑十一个攻方变异（`mutants.py`，原文恰好命中一次才改，否则退 3；`run-mutant.sh` 每个从冻结副本另拷一份）；K4 用 `build-scan-proto.sh` 把两份 checker 档源文件测试模块里的扫源码函数原样抄进一个独立小 crate，`gen-scan-inputs.py` 造输入。每件经 `scripts/hosts/run-with-memory-cap.sh`（每件 3G、并行时一批合计不超过 12G；编译 12G；大盘代价那两件 10G、12G 单独跑），线程经 `scripts/hosts/capped.sh`。不起 checker 档测试、不枚举崩溃状态。整份约 35 分钟（推的：各件这一轮实测相加）。这一轮的原始输出在模型目录 `runs/`。
 
 模型目录文件的 sha256（`sha256sum` 原样）：
 
@@ -408,7 +408,7 @@ v4 那一条读到的名单头一项（`grep -o`）：`读到的是 [("外面定
 
 ## 引文核对
 
-`python3 scripts/cite-check.py research/prompts/m3-batch10z-tu-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-tu-code-r1/tree --root /home/fy5090/code/singlefs` 末行原样：
+`python3 scripts/agents/cite-check.py research/prompts/m3-batch10z-tu-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-tu-code-r1/tree --root /home/fy5090/code/singlefs` 末行原样：
 
 ```
   ✓ 核了 14 处引文，对上 14 处，没判 0 处（逐处列在上面）

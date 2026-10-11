@@ -21,7 +21,7 @@ case ${1:-} in
     (cd "$W/tree" && patch -p1 -s < "$HERE/t2-arm-core.patch")
     sed -i 's#    "crates/singlefs-reference-filesystem",#    "crates/singlefs-reference-filesystem",\n    "crates/t2-arm-probe",#' "$W/tree/Cargo.toml"
     cp "$HERE/Cargo.toml" "$W/tree/crates/t2-arm-probe/Cargo.toml"; cp "$HERE/main.rs" "$W/tree/crates/t2-arm-probe/src/main.rs"
-    cd "$W/tree" && nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 6G bash "$REPO/scripts/capped.sh" 15 cargo build --offline --release -p t2-arm-probe > "$W/out/build.log" 2>&1
+    cd "$W/tree" && nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 6G bash "$REPO/scripts/hosts/capped.sh" 15 cargo build --offline --release -p t2-arm-probe > "$W/out/build.log" 2>&1
     echo "setup 完：$W";;
   run)
     W=${2:?草稿目录}; arm=${3:?臂}; steps=${4:?步数}; mode=${5:?模式}
@@ -31,7 +31,7 @@ case ${1:-} in
       p0) envs="$envs OPUS_ROLLBACK_PICK=0";; p1) envs="$envs OPUS_ROLLBACK_PICK=1";; p2) envs="$envs OPUS_ROLLBACK_PICK=2";;
       b0) envs="$envs OPUS_ROLLBACK_BELOW=1 OPUS_ROLLBACK_PICK=0";; b1) envs="$envs OPUS_ROLLBACK_BELOW=1 OPUS_ROLLBACK_PICK=1";;
     esac
-    env $envs OPUS_WORKERS=14 nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 3G bash "$REPO/scripts/capped.sh" 15 \
+    env $envs OPUS_WORKERS=14 nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 3G bash "$REPO/scripts/hosts/capped.sh" 15 \
       "$W/tree/target/release/t2-arm-probe" s1grid mat-384-30-8,ab-384-3-5 > "$W/out/$arm-s$steps-$mode.log" 2>&1
     echo "rc=$? $arm-s$steps-$mode";;
   *) echo "用法见文件头" >&2; exit 2;;

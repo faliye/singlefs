@@ -15,7 +15,7 @@ assert orig.count(o)==1,'anchor count %d'%orig.count(o)
 open(p,'w',encoding='utf-8').write(orig.replace(o,rep))
 try:
     env=dict(os.environ); env['CARGO_TARGET_DIR']=W+'/target'
-    c=['nice','-n','19','bash','/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh','10G','bash','/home/fy5090/code/singlefs/scripts/capped.sh','12','cargo','test','--offline','--no-fail-fast']+shlex.split(cmd)
+    c=['nice','-n','19','bash','/home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh','10G','bash','/home/fy5090/code/singlefs/scripts/hosts/capped.sh','12','cargo','test','--offline','--no-fail-fast']+shlex.split(cmd)
     pr=subprocess.run(c,cwd=W+'/repo',env=env,capture_output=True,text=True,timeout=int(sys.argv[2]) if len(sys.argv)>2 else 230)
     out=pr.stdout+pr.stderr
     res=[l for l in out.splitlines() if l.startswith('test result') or l.endswith('FAILED') or l.startswith('error')]

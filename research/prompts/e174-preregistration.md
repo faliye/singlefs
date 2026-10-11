@@ -44,7 +44,7 @@
 
 ## 二、被测条款与它引的定义
 
-被测条款两处，`scripts/quote-kb.py` 抽进草稿目录的出口文件、回读一致后追加：D24（后台重活能不能卸给 GPU） 已定项 2 整节（`@标题` 取）；用户 2026-10-07 定 G1 二那一行连同表头（第 10t 批代码轮岔路单，行区间取，最后一行是 G1 行、不是 `|---|`）。
+被测条款两处，`scripts/kb/quote-kb.py` 抽进草稿目录的出口文件、回读一致后追加：D24（后台重活能不能卸给 GPU） 已定项 2 整节（`@标题` 取）；用户 2026-10-07 定 G1 二那一行连同表头（第 10t 批代码轮岔路单，行区间取，最后一行是 G1 行、不是 `|---|`）。
 
 与这一次的关系：已定项 2 第 1 条（GPU 是可选加速器）与第 3 条（GPU 路径要能被 CPU 独立复核）管的是 GPU 在格式与验证里的地位，这一次量的是 GPU 测试进程借显存的账，不判这三条成不成立；它们给出的约束是本实验的装置只在测试与验证一侧，不进格式。G1 二是账今天的形态（只记本进程借的、每次借现读）：乙在它之上改「借据丢掉时」那一步。
 
@@ -121,7 +121,7 @@
 - 装置照实现取的设置写成本地常量（不引 `crates/`）：后端只用 Vulkan；`request_device` 的 `required_limits` 取 `adapter.limits()`、`memory_hints` 取 `MemoryHints::Performance`；读数用 `nvidia-smi -q -d MEMORY,PIDS`，按进程号把 `Used GPU Memory` 加起来；「不等待」臂的 poll 是 `PollType::Poll`。执行员开跑之前逐条对 `crates/` 回比（第十一节停机条款的命令），不符就停。
 - 一个装置进程只用一张卡、只起一个设备；父进程按清单一个接一个起子进程（同一时刻卡上只有一个装置进程，不并行），每个子进程自己计时、自己把结果行写进自己的输出文件；父进程等子进程结束后整份读完再并（不在转发输出的循环里打时间戳，`.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」）。
 - 次序：清单按种子 174 打乱；同一格的 5 轮里两条臂交替（等待、不等待、等待…），两张卡交替。
-- 由主 agent 经 `bash scripts/gpu-quiesce-run.sh -- bash scripts/run-with-memory-cap.sh <上限> <父进程命令…>` 起（`.claude/rules/verification.md`「凡用 GPU 先清场，跑完不复原」）；上限取 `scripts/replay.sh` 的 `REPLAY_MEMORY_CAP` 默认 8G（缓冲都在卡上，主机侧不按 S 涨）。
+- 由主 agent 经 `bash scripts/crash/gpu-quiesce-run.sh -- bash scripts/hosts/run-with-memory-cap.sh <上限> <父进程命令…>` 起（`.claude/rules/verification.md`「凡用 GPU 先清场，跑完不复原」）；上限取 `scripts/experiments/replay.sh` 的 `REPLAY_MEMORY_CAP` 默认 8G（缓冲都在卡上，主机侧不按 S 涨）。
 
 ### 一笔借据在装置里怎么做
 
@@ -381,7 +381,7 @@ grep -c '"Used GPU Memory"' crates/singlefs-harness/src/gpu_memory_ledger.rs
 - `crates/singlefs-checker-tier/Cargo.toml` 第 22、29 行；`Cargo.lock` 第 275–277、1085–1087、1113–1115、1154–1156 行。
 - `crates/mutations.tsv`：只在 `grep -l` 里命中文件名，内容没读。
 - `scripts/experiments/Cargo.toml` 460–490；`scripts/experiments/e163_gpu_multicard_crc32c.rs` 第 408 行（grep 命中）。
-- `scripts/claim-experiment.sh` 1–40；`scripts/gpu-quiesce-run.sh` 1–40；`scripts/quote-kb.py` 1–60；`scripts/replace-once.py` 1–30；`scripts/replay.sh` 第 25、26、218、480、785、1479 行（grep 命中）。
+- `scripts/kb/claim-experiment.sh` 1–40；`scripts/crash/gpu-quiesce-run.sh` 1–40；`scripts/kb/quote-kb.py` 1–60；`scripts/kb/replace-once.py` 1–30；`scripts/experiments/replay.sh` 第 25、26、218、480、785、1479 行（grep 命中）。
 - 依赖源码（`~/.cargo/registry/src/*/`）：`wgpu-hal-30.0.1/src/lib.rs` 439–477；`wgpu-hal-30.0.1/src/vulkan/adapter.rs` 第 7、2951 行与 `vulkan/command.rs` 第 24、27 行（grep 命中）；`gpu-allocator-0.28.0/src/vulkan/mod.rs` 470–500、655–690 与 grep 命中第 26、29、165、232–234、276、287、350、377–386、436、484、487、488、542、577、653、667、670、673 行；`gpu-allocator-0.28.0/src/lib.rs` 第 281、304、440 行（grep 命中）；`wgpu-30.0.1/src/api/device.rs` 630–638；`wgpu-types-30.0.1/src/counters.rs` 177–185；`wgpu-types-30.0.1/src/lib.rs` 176–201。
 - 没读：`.claude/kb/experiments/`、`research/results/`、`.claude/kb/experiments.md`、`experiments-history.md`、`records/2026-09-30-里程碑三开工第一轮.md`（派发提示点名的批次记录，没读，免得读到结果行）。
 
@@ -389,8 +389,8 @@ grep -c '"Used GPU Memory"' crates/singlefs-harness/src/gpu_memory_ledger.rs
 
 ```
 TZ=Asia/Tokyo date +%F
-bash scripts/claim-experiment.sh --next
-bash scripts/claim-experiment.sh E174 借据丢掉时等待与显存回还
+bash scripts/kb/claim-experiment.sh --next
+bash scripts/kb/claim-experiment.sh E174 借据丢掉时等待与显存回还
 nvidia-smi --query-gpu=index,name,pci.bus_id,memory.total,driver_version --format=csv
 for i in 1 2 3 4 5; do /usr/bin/time -f '%e s' nvidia-smi -q -d MEMORY,PIDS > /dev/null; done 2>&1; nvidia-smi -q -d MEMORY,PIDS | sed -n '1,60p' | grep -n -E 'GPU 0000|Total|Reserved|Used|Free|Process ID|Processes|Used GPU' | head -30
 python3 -c "
@@ -398,8 +398,8 @@ G=1<<30;M=1<<20
 for s in (1*M,64*M,512*M,2*G,8*G):
   n=-(-s//G); b=min(s,G); print(s, n, b, n*b==s, s//M)"
 grep -rln --exclude-dir=experiments --exclude-dir=results --exclude-dir=prompts --exclude=experiments.md --exclude=experiments-history.md --exclude-dir=target --exclude-dir=.git -e '销了账、卡上可能还没还' -e 'returned_possibly_still_on_the_card' . | head -20
-python3 scripts/quote-kb.py $D/fork-row.md 'research/prompts/m3-batch10z-a-code-r1-forks.md:5-7'
-python3 scripts/quote-kb.py $D/section2.md '.claude/kb/decisions/24-后台重活能不能卸给GPU.md@#### 已定项 2：三条硬约束' 'research/prompts/m3-batch10t-code-r1-forks.md:7-9'
+python3 scripts/kb/quote-kb.py $D/fork-row.md 'research/prompts/m3-batch10z-a-code-r1-forks.md:5-7'
+python3 scripts/kb/quote-kb.py $D/section2.md '.claude/kb/decisions/24-后台重活能不能卸给GPU.md@#### 已定项 2：三条硬约束' 'research/prompts/m3-batch10t-code-r1-forks.md:7-9'
 （第十一节停机条款那 7 条 grep，现跑结果依次为 2、1、1、1、1、1、1）
 ```
 

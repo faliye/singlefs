@@ -4,7 +4,7 @@
 #   不给后面的参数 = 全部按这个次序跑完再 summary。前台一次放不下时分几次给步名，最后单独给 summary。
 #   环境：SINGLEFS_REPO（仓路径：取 run-with-memory-cap.sh、capped.sh 与快照 sha256 清单）；
 #         FROZEN_TREE（冻结副本，默认 /tmp/claude-1000/m3-batch23-code-r1/tree）；THREADS（默认 7）。
-#   编译 6G、跑 4G，都经 scripts/run-with-memory-cap.sh（显式上限，不写 auto）；用 <目录>/target 当编译目录。
+#   编译 6G、跑 4G，都经 scripts/hosts/run-with-memory-cap.sh（显式上限，不写 auto）；用 <目录>/target 当编译目录。
 #   第一次调用把冻结副本拷进 <目录>/work、核 13 份 sha256、把 probes/zs_probe.rs 放进 work 的 harness 测试目录。
 # 比对：<目录>/summary.txt 与本目录的 expected-summary.txt 逐字相同（每步输出已去掉耗时）。
 set -uo pipefail
@@ -22,8 +22,8 @@ fi
 export CARGO_TARGET_DIR="$dir/target"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="m3-batch23-code-r1 正推腿在自己的仓副本与编译目录里复跑，不与别的会话共用副本"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="派发提示要求编译 6G 跑 4G 显式写上限，不用 auto"
-cap="nice -n 19 bash $SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
-capped="bash $SINGLEFS_REPO/scripts/capped.sh $threads"
+cap="nice -n 19 bash $SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh"
+capped="bash $SINGLEFS_REPO/scripts/hosts/capped.sh $threads"
 build_prefix="$cap 6G $capped"
 run_prefix="$cap 4G $capped"
 strip_times() { sed -E 's/; finished in [0-9.]+s//'; }

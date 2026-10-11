@@ -15,7 +15,7 @@ open(T+rel,'w',encoding='utf-8').write(src.replace(orig,repl))
 env=dict(os.environ)
 env['RUN_WITH_MEMORY_CAP_PARALLEL_REASON']='同一会话派出的几个 agent 各跑各的，不是同一条链重复起'
 env['RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON']='变异之后要重编 core/checker 与测试二进制，峰值表里的实测值是不重编的'
-cmd=['timeout','225','bash','/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh','8G','bash','/home/fy5090/code/singlefs/scripts/capped.sh','7','nice','-n','19','cargo','test','--offline','-p','singlefs-harness']+targs
+cmd=['timeout','225','bash','/home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh','8G','bash','/home/fy5090/code/singlefs/scripts/hosts/capped.sh','7','nice','-n','19','cargo','test','--offline','-p','singlefs-harness']+targs
 try:
     r=subprocess.run(cmd,cwd=T,env=env,capture_output=True,text=True)
     out=r.stdout+r.stderr

@@ -31,7 +31,7 @@ PY
 export CARGO_TARGET_DIR="$WORK/target"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-复跑攻方腿副本上的探针与原型}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-复跑攻方腿各格，各格规模不同}"
-CAPPED=(nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" "$CAP" bash "$REPO/scripts/capped.sh" "$THREADS")
+CAPPED=(nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" "$CAP" bash "$REPO/scripts/hosts/capped.sh" "$THREADS")
 probe() { (cd "$WORK/ws" && "${CAPPED[@]}" cargo test --offline -p singlefs-harness --test b19_opus_probe "$1" -- --nocapture --test-threads 1); }
 gpu_check() { (cd "$WORK/ws" && "${CAPPED[@]}" cargo test --offline -p singlefs-checker --lib b19_opus -- --nocapture); }
 # cell 名字 [变量=值 …] 命令…：变量只在这一格的子 shell 里设；ONLY 设了时只跑名字里含它的格。

@@ -17,10 +17,10 @@ cap() {
     RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-攻方原型复跑，峰值表里没有这几条}" \
     RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-攻方原型复跑与别的会话各跑各的}" \
     RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-3600}" \
-        nice -n 19 bash "$repo/scripts/run-with-memory-cap.sh" 2G bash "$repo/scripts/capped.sh" 7 "$@"
+        nice -n 19 bash "$repo/scripts/hosts/run-with-memory-cap.sh" 2G bash "$repo/scripts/hosts/capped.sh" 7 "$@"
 }
 cd "$scratch/tree"
-nice -n 19 bash "$repo/scripts/capped.sh" 7 cargo build --offline --release -p bf-proto --tests
+nice -n 19 bash "$repo/scripts/hosts/capped.sh" 7 cargo build --offline --release -p bf-proto --tests
 t() { local target="$1"; shift; cap cargo test --offline --release -p bf-proto --test "$target" "$@" -- --nocapture --test-threads 1; }
 enum() { BF_WIDTH=384 BF_NO_CS1=1 R3_PREFIX=A R3_OPS="$1" R3_AFTER="$2" R3_STATE_START="$3" R3_STATE_LIMIT="$4" t bf_r3_gap gap_frequency_over_crash_states_and_remount; }
 run() {

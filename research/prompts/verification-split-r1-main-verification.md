@@ -16,7 +16,7 @@
 | Q3 54 号报「本次未跑」算不算覆盖 | 正推：兑现了条款 | 采纳 | 无改动 |
 | Q4 94 号不读 dev-dependencies 之后的缺口 | 攻方：红，dev-dependency 改名引实现、用在库单测里，94 号判绿（量过） | 采纳；改法换了 | 那一版的做法（池级 checker 加 dev-dependencies、94 号不读它）整个撤掉：三个包之后池级 checker 只依赖 `singlefs-format`，94 号照旧读全部依赖表；另加第 ④ 条，harness 档的依赖闭包（dev-dependencies 也算）与源码里不许有 checker 档包，样本 red 里 harness 经中间包在 dev-dependencies 里依赖它、源码引一处，两条各自判红 |
 | Q5 六份定义有没有自相矛盾 | 正推：兑现了条款 | 采纳 | 无改动 |
-| Q6 crash-case-check 认不全 | 攻方：红，同文件 helper、自写枚举函数等认不出，8 条登记只认出 3 条；一条豁免理由与实际不符 | 采纳 | 改了：`enumerating_helpers` 跟同一文件里传递地调枚举的函数；现查 `python3 scripts/crash-case-check.py .` 查了 35 条、判绿；`tests/<子目录>/` 里的共用函数、宏展开仍认不出，写在文件头与成功句；`crash_enumeration_resumes_from_its_progress_file.rs` 第 387 行那条豁免理由改成实际枚举的东西（第一条流的快档展开，第 12 个状态判红就停） |
+| Q6 crash-case-check 认不全 | 攻方：红，同文件 helper、自写枚举函数等认不出，8 条登记只认出 3 条；一条豁免理由与实际不符 | 采纳 | 改了：`enumerating_helpers` 跟同一文件里传递地调枚举的函数；现查 `python3 scripts/crash/crash-case-check.py .` 查了 35 条、判绿；`tests/<子目录>/` 里的共用函数、宏展开仍认不出，写在文件头与成功句；`crash_enumeration_resumes_from_its_progress_file.rs` 第 387 行那条豁免理由改成实际枚举的东西（第一条流的快档展开，第 12 个状态判红就停） |
 | Q7.1 已定项 4、5、7 与 15 | 正推：兑现了条款 | 采纳 | 无改动 |
 | Q7.2 已定项 9「范围」列与射程句说反话 | 正推：这一轮改动和条款说反话 | 采纳 | 改了：`.claude/kb/decisions/13-验证路线.md` 已定项 9 层 0 那一行范围改成「固定种子、固定脚本的负载与登记的崩溃枚举用例，不按写请求数限规模（规模见射程）」 |
 | Q7.3 已定项 15 的「两档」覆盖面 | 正推：兑现了条款，附一处措辞覆盖面歧义 | 采纳歧义那一半 | 改了：已定项 15 那句改成「checker 档里的崩溃点重放（门禁 54 号）分两档，55、57、59、87 号不分」 |
@@ -41,7 +41,7 @@
 ## 四、拆包之后的测试（只核测试逻辑，不核被测内容）
 
 - `#[test]` 计数：HEAD 1089、工作区 1093；`#[ignore]` 都是 25。差的 4 条新增与 1 条改名都在别的会话在飞的测试文件里。
-- harness 档 `cargo test -p singlefs-harness --no-fail-fast`（日志 `research/prompts/verification-split-tmp-evidence/harness-daily-after-split.log`）：47 个测试目标都编过、跑完，通过 622、失败 14、忽略 3，红在 8 个目标里。红的是抬 F、空间准入与见证那几条行为断言，这 14 条只重跑、不整份重跑（`scripts/rerun-failed-tests.py` 从日志取命令）：在只含这一轮改动的暂存树上同样 14 条红（`research/prompts/verification-split-tmp-evidence/rerun-failed-on-staged-tree.log`），在纯 HEAD 上也是这 14 条红（`research/prompts/verification-split-tmp-evidence/rerun-failed-on-head.log`）：拆包之前就红，不是拆包带进来的（量过）。
+- harness 档 `cargo test -p singlefs-harness --no-fail-fast`（日志 `research/prompts/verification-split-tmp-evidence/harness-daily-after-split.log`）：47 个测试目标都编过、跑完，通过 622、失败 14、忽略 3，红在 8 个目标里。红的是抬 F、空间准入与见证那几条行为断言，这 14 条只重跑、不整份重跑（`scripts/gate/rerun-failed-tests.py` 从日志取命令）：在只含这一轮改动的暂存树上同样 14 条红（`research/prompts/verification-split-tmp-evidence/rerun-failed-on-staged-tree.log`），在纯 HEAD 上也是这 14 条红（`research/prompts/verification-split-tmp-evidence/rerun-failed-on-head.log`）：拆包之前就红，不是拆包带进来的（量过）。
 
 ## 五、按路径点名被判的文件（门禁 56、72 号）
 

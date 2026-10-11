@@ -30,8 +30,8 @@ env.setdefault('RUN_WITH_MEMORY_CAP_WAIT_SECONDS', '1500')
 
 def cargo(cap, cargo_args):
     env['RUN_WITH_MEMORY_CAP_KEY'] = 'm3b28-sonnet-' + ('compile' if '--no-run' in cargo_args else 'run')
-    cmd = ['nice', '-n', '19', 'bash', os.path.join(args.tools, 'scripts/capped.sh'), args.threads,
-           'bash', os.path.join(args.tools, 'scripts/run-with-memory-cap.sh'), cap,
+    cmd = ['nice', '-n', '19', 'bash', os.path.join(args.tools, 'scripts/hosts/capped.sh'), args.threads,
+           'bash', os.path.join(args.tools, 'scripts/hosts/run-with-memory-cap.sh'), cap,
            'cargo', 'test', '--offline', '--manifest-path', os.path.join(args.tree, 'Cargo.toml')] + cargo_args
     p = subprocess.run(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=args.tools)
     if 250 <= p.returncode <= 254:

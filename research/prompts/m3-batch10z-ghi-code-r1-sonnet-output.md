@@ -22,7 +22,7 @@
 - 基线：`cargo test --offline -p singlefs-harness --lib -- gpu_memory_ledger` → `test result: ok. 104 passed; 0 failed`；
   `--test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table` → `ok. 11 passed`；
   `--test gpu_card_rounds_remember_a_stop_request_removed_mid_run` → `ok. 1 passed`。
-  命令都经 `bash scripts/capped.sh 15 bash scripts/run-with-memory-cap.sh 8G nice -n 19 cargo test --offline …` 起。
+  命令都经 `bash scripts/hosts/capped.sh 15 bash scripts/hosts/run-with-memory-cap.sh 8G nice -n 19 cargo test --offline …` 起。
 - 变异复跑做法：背景材料改动全文里的变异表行（`logs/rows-harness-*.log` 用 `tools/mutate_rows2.py`）套到拷贝上，跑那一行点名的测试，还原。
   checker 档的扫源码用例（四条）不能在 checker 档包里跑，我把它们的逻辑原样搬进 `scan-model/`（读运行时给的源文件路径），
   基线上四条都过（`test result: ok. 4 passed; 0 failed`），再对变异后的源码复跑。这是对用例逻辑的复现，不是用例本身；标「模型」。
@@ -301,7 +301,7 @@ checker 档的扫源码用例（四条）的模型：基线四条过；表里指
 
 ## 十、cite-check
 
-`python3 scripts/cite-check.py research/prompts/m3-batch10z-ghi-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-ghi-code-r1/tree --root /home/fy5090/code/singlefs` 末行：
+`python3 scripts/agents/cite-check.py research/prompts/m3-batch10z-ghi-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-ghi-code-r1/tree --root /home/fy5090/code/singlefs` 末行：
 
 ```
   ✓ 核了 51 处引文，对上 51 处，没判 0 处（逐处列在上面）

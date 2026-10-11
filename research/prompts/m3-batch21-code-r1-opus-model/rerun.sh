@@ -4,7 +4,7 @@
 # 步骤：prepare | build <tree|c2cap32|w1|w2> | n7-tests | n7-probe | n7-fix | n5-tests | n5-fix | n5-probe <tree|w1|w2> <K 列表，如 0,1,2,3>
 #       | n5-w2-targets | sweep | shapes | badimages | count | summary | compare | all
 # 每一步一条前台命令跑得完（单步约 4 分钟以内）；all 依次跑全部（约 25 分钟，给主 agent 放后台用）。compare = summary 之后与 expected-summary.txt 逐字比。
-# 编译经 scripts/run-with-memory-cap.sh 6G、跑 4G，线程经 scripts/capped.sh（M3B21_CAP_THREADS，缺省 10）。只跑 harness 档：
+# 编译经 scripts/hosts/run-with-memory-cap.sh 6G、跑 4G，线程经 scripts/hosts/capped.sh（M3B21_CAP_THREADS，缺省 10）。只跑 harness 档：
 # 不起 checker 档的测试目标与 bin（原型只把 singlefs-checker-tier 当库调，crash 模式在全量状态数超过 10^6 时不跑，这里只跑 count）。
 set -euo pipefail
 model_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,8 +14,8 @@ work="${1:?工作目录}"
 step="${2:?步骤}"
 shift 2
 threads="${M3B21_CAP_THREADS:-10}"
-cap="$repo/scripts/run-with-memory-cap.sh"
-capped="$repo/scripts/capped.sh"
+cap="$repo/scripts/hosts/run-with-memory-cap.sh"
+capped="$repo/scripts/hosts/capped.sh"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-第21批代码轮攻方腿原型复跑，与同机别的活互不依赖}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-新编译目录从头编、探针用例与峰值表记的不是同一次}"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-180}"

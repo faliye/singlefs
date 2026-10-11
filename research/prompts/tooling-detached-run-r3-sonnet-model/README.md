@@ -2,7 +2,7 @@
 
 草稿目录 `/tmp/claude-1000/tooling-detached-run-r3-sonnet/` 里按下面的配方搭仓副本（交回前已删，要复跑就重搭）：
 
-- `work/`：`.claude/hooks`、`.claude/scripts`、`.claude/singlefs-ai-sop` 取自主仓，`scripts/detached-run.sh` 取自主仓；5 份被判文件与 `/tmp/claude-1000/tooling-detached-run-r3/tree/` 里的逐字节相同（`cmp`）。
+- `work/`：`.claude/hooks`、`.claude/scripts`、`.claude/singlefs-ai-sop` 取自主仓，`scripts/hosts/detached-run.sh` 取自主仓；5 份被判文件与 `/tmp/claude-1000/tooling-detached-run-r3/tree/` 里的逐字节相同（`cmp`）。
 - `work-r1/`：`work/` 的 `.claude` 为底，再用 `/tmp/claude-1000/tooling-detached-run-r1/tree/` 里的 3 份钩子与 `detached-run.sh` 盖上。
 - `work-r2/`：同上，用 `/tmp/claude-1000/tooling-detached-run-r2/tree/` 里的 4 份钩子与 `detached-run.sh` 盖上。
 
@@ -14,4 +14,4 @@
 | `alarm_model.sh` | 替身 systemctl 下的 `watch`（只读，不起单元），ActiveState 查询按计划逐次给 F（失败）或 A | `alarm_model.out`（计划 `F F A F F A F F F F A A`） |
 | `cite-r1.out`、`cite-r2.out` | `cite-check.py` 在第一、二轮冻结副本上重跑两份报告 | 同名 |
 
-feed 脚本里的路径写死在草稿目录；`alarm_model.sh` 的第一个参数要用 `work/scripts/detached-run.sh`（冻结副本 `tree/` 里没有 `.claude/scripts/preflight.sh`，脚本开头的 `source` 落空会把参数清掉，退 2）。
+feed 脚本里的路径写死在草稿目录；`alarm_model.sh` 的第一个参数要用 `work/scripts/hosts/detached-run.sh`（冻结副本 `tree/` 里没有 `.claude/scripts/preflight.sh`，脚本开头的 `source` 落空会把参数清掉，退 2）。

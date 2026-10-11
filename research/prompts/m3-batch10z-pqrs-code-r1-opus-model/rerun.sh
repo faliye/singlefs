@@ -7,8 +7,8 @@ ROOT=/home/fy5090/code/singlefs
 MODEL=$ROOT/research/prompts/m3-batch10z-pqrs-code-r1-opus-model
 FROZEN=$HOME/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1/tree
 WORK=${1:-$HOME/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-opus-rerun}
-CAP=$ROOT/scripts/run-with-memory-cap.sh
-THREADS=$ROOT/scripts/capped.sh
+CAP=$ROOT/scripts/hosts/run-with-memory-cap.sh
+THREADS=$ROOT/scripts/hosts/capped.sh
 OUT=${WORK:?}/runs
 mkdir -p "$WORK" "$OUT"
 rsync -a --delete --exclude target --exclude .git "$FROZEN"/ "${WORK:?}"/repo/

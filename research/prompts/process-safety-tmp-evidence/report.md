@@ -1,7 +1,7 @@
 # 进程安全闸 + 接手内存准入：交回报告（2026-09-25 /）
 
 ## 先看这一条：这一轮自己踩出来的一处，结局判不了
-- `scripts/run-with-memory-cap.sh` 我用 `replace-once.py` 原地改（同一个 inode）。改的那一刻别的 agent 正经它跑 `cargo test -p singlefs-harness --test s4_r2_candidates`（进程 2965927，上限 10G 起）。`/proc/2965927/fdinfo/255` 读到 `pos: 67774`：bash 按文件偏移往下读，它的命令跑完会从改后文件的第 67774 字节接着读——落在自检成功那句 echo 的中间，不是原来的 `exit $?`。
+- `scripts/hosts/run-with-memory-cap.sh` 我用 `replace-once.py` 原地改（同一个 inode）。改的那一刻别的 agent 正经它跑 `cargo test -p singlefs-harness --test s4_r2_candidates`（进程 2965927，上限 10G 起）。`/proc/2965927/fdinfo/255` 读到 `pos: 67774`：bash 按文件偏移往下读，它的命令跑完会从改后文件的第 67774 字节接着读——落在自检成功那句 echo 的中间，不是原来的 `exit $?`。
 - 我想把原字节原地写回那个 inode，被权限分类器拒了（Irreversible Local Destruction），之后没再碰。查 `ps -p 2965927` 已经没有这个进程：**那一条 cargo test 的退出码与输出不可信，交主 agent 让它的属主重跑**。按我自己写的那几行推（没量过）：之后读到的是自检说明文字与 case 分派，没有 kill；最坏是报错退出、或把 run_capped 再跑一遍。
 - 根因是流程：正在跑的 bash 脚本不能原地改，要写临时文件再改名换 inode（前任装 v2–v4 都是 cp + mv）。`replace-once.py` 与会话里的原地改法没有闸，记在提案第四十节第 32 行「欠」里，交主 agent 定要不要立规矩或改 replace-once.py（我没改，超出这一轮）。
 
@@ -21,10 +21,10 @@
 - 提案 `records/2026-09-16-subagent拆分提案.md` 第四十节插了第 30 行（内存准入，更新了前任草稿的数）与第 32 行（进程安全闸），用 insert-row.py，写前复核 sha256 未变。
 
 ## 门禁原样判定行
-- 47（150 秒，rc=1）：`  ✗ python3 scripts/check-segment-registry.py --selftest 没过（退出码 1）：`——kb 段序列 `16+2+1+2` 对产物 `24+2+1+2`，别的会话的；包装与 mutate.sh 的自证都过。
+- 47（150 秒，rc=1）：`  ✗ python3 scripts/crash/check-segment-registry.py --selftest 没过（退出码 1）：`——kb 段序列 `16+2+1+2` 对产物 `24+2+1+2`，别的会话的；包装与 mutate.sh 的自证都过。
 - 62：`  ✓ 阶段归属表与门禁目录一致（75 个阶段，归 9 个 agent）`
 - 63：`  ✓ 写范围闸、Bash 检出 hook、重型测试闸、续派闸、续做闸与弹窗断言闸注册着、自证通过，…共用切词模块的 14 个函数只在 lib_shell_words.py 里定义（查了 .claude/hooks/ 下另外 11 个文件），…`
-- 73（rc=1）：`  ✓ 门禁自检通过：81 个脚本（.sh 与 .py）、239 条拒绝都带了出路`；`  ✓ 进程安全：查了 164 个脚本（.sh 126 个、.py 38 个），…own-scope 标注放行 1 处（scripts/run-with-memory-cap.sh:881）；没判的：.claude/process-safety-pending 里的 2 个文件 scripts/agent-watch.py（…:2160）；scripts/mutate.sh（…:351）`；shell-lint 三个目录 `✓`；红的只有 `  ✗ scripts/changed-paths.sh 在暂存区里是 100644，.sh 要可执行`——改前的 73 号在同一份仓上同样报这一行，是 67f2c78 提交时的执行位，不是这一轮。
+- 73（rc=1）：`  ✓ 门禁自检通过：81 个脚本（.sh 与 .py）、239 条拒绝都带了出路`；`  ✓ 进程安全：查了 164 个脚本（.sh 126 个、.py 38 个），…own-scope 标注放行 1 处（scripts/hosts/run-with-memory-cap.sh:881）；没判的：.claude/process-safety-pending 里的 2 个文件 scripts/agents/agent-watch.py（…:2160）；scripts/mutation/mutate.sh（…:351）`；shell-lint 三个目录 `✓`；红的只有 `  ✗ scripts/gate/changed-paths.sh 在暂存区里是 100644，.sh 要可执行`——改前的 73 号在同一份仓上同样报这一行，是 67f2c78 提交时的执行位，不是这一轮。
 - doc-lint：`  ✓ 文档铁律检查通过（检查 485，跳过 0；DOC_LINT_VERBOSE=1 看全部）`
 - hooks-registered：`  ✓ 10 个钩子都注册着，其中 9 个的自检通过`
 - gate-overlap：`  ✓ 相对 8d7bd9d23ae5：新加的门禁与钩子 3 个（…ask-user-claim-guard.sh、…heavy-test-guard.sh、…session-start.sh）都写明了比过谁，改过的 22 份脚本对照已有的 123 份没有整段相同`
@@ -32,7 +32,7 @@
 ## 改了哪些文件（都没暂存）
 - `.claude/hooks/bash-command-detector.sh`（sha256 b07ddbfefd9d5718…）、`.claude/gate.d/73-research-gate-lint.sh`（067e28d34965a292…）
 - 73 号样本：red 加 `scripts/stop-processes.sh`、`scripts/stop.py`、`.claude/gate.d/50-stop-group.sh`，green 加 `scripts/stop-own.sh`，两份 expect 加 want
-- `scripts/run-with-memory-cap.sh`（c8db93d7b6e914aa…，未跟踪）、`scripts/check-staged.sh`（0b4320a77f22f8d6…）
+- `scripts/hosts/run-with-memory-cap.sh`（c8db93d7b6e914aa…，未跟踪）、`scripts/check-staged.sh`（0b4320a77f22f8d6…）
 - 新建 `.claude/process-safety-pending`（0e3f0cd73c122390…）；`records/2026-09-16-subagent拆分提案.md` 第四十节第 30、32 行
 - 草稿：`/tmp/claude-1000/process-safety/`（改前副本 `before/`、补丁 `patches/`、各日志；只是在说当时草稿放哪，不是这一轮要核的依据）
 

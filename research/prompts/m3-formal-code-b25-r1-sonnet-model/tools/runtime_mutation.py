@@ -32,7 +32,7 @@ for line in open(table, encoding='utf-8'):
     try:
         with open(path, 'w', encoding='utf-8') as f:
             f.write(text.replace(old, new))
-        b = subprocess.run(['nice', '-n', '19', 'bash', f'{repo}/scripts/capped.sh', '6', 'cargo', 'build', '--release', '--offline',
+        b = subprocess.run(['nice', '-n', '19', 'bash', f'{repo}/scripts/hosts/capped.sh', '6', 'cargo', 'build', '--release', '--offline',
                             '-p', 'singlefs-checker-tier', '--bin', 'e171_three_oracle_collusion_after_the_oracle_fixes'],
                            cwd=root, env=env, capture_output=True, text=True, timeout=230)
     finally:
@@ -43,7 +43,7 @@ for line in open(table, encoding='utf-8'):
     binary = os.path.join(scratch, 'mutated-bin-' + str(abs(hash(name)) % 100000))
     shutil.copy2(os.path.join(root, 'target/release/e171_three_oracle_collusion_after_the_oracle_fixes'), binary)
     outdir = os.path.join(scratch, 'out', 'mut-' + str(abs(hash(name)) % 100000))
-    cmd = ['nice', '-n', '19', 'bash', f'{repo}/scripts/capped.sh', '6', 'bash', f'{repo}/scripts/run-with-memory-cap.sh', os.environ.get('MEMORY_CAP', '8G'), binary] + \
+    cmd = ['nice', '-n', '19', 'bash', f'{repo}/scripts/hosts/capped.sh', '6', 'bash', f'{repo}/scripts/hosts/run-with-memory-cap.sh', os.environ.get('MEMORY_CAP', '8G'), binary] + \
           [a.replace('@OUT@', outdir) for a in args]
     r = subprocess.run(cmd, cwd=scratch, env=env, capture_output=True, text=True, timeout=230)
     got = norm(r.stdout)

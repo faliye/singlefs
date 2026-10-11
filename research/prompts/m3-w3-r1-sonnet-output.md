@@ -289,4 +289,4 @@ D8 的处置是：同一条时间线上要红，被崩溃恢复抛弃的那一�
 
 ## 九、交回前的核对
 
-`python3 scripts/cite-check.py research/prompts/m3-w3-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-w3-r1/tree --root /home/fy5090/code/singlefs` 末行：见交回消息（每次改报告都重跑；这一节不再写数，免得写进来的数过期）。
+`python3 scripts/agents/cite-check.py research/prompts/m3-w3-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-w3-r1/tree --root /home/fy5090/code/singlefs` 末行：见交回消息（每次改报告都重跑；这一节不再写数，免得写进来的数过期）。

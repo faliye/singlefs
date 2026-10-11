@@ -7,7 +7,7 @@
 ## 〇、快照与核查
 
 - 快照 `sha256sum -c`：kb 12 份里 `.claude/kb/invariants.md`、`.claude/kb/checks-owed.md` 两份对不上，是别的会话在腿跑着时改的；腿引到这两份的行，逐处现查仍在（C331、C393、C32、C33、C75 各行）。crates：主工作区与 `crates-sha256.txt` 逐个相同。
-- `python3 scripts/cite-check.py` 对四份腿报告，`--root .`：「核了 14 处引文，对上 14 处，没判 0 处」。
+- `python3 scripts/agents/cite-check.py` 对四份腿报告，`--root .`：「核了 14 处引文，对上 14 处，没判 0 处」。
 - 辩方引的四处现查：`16-发布语义.md` 第 179 行（已定项 7 持久顺序，「fsync 等系统配置轮换持久之后」在行内）；`22-单元原子性怎么合成.md` 第 416 行（「撕裂形态的推理**在本机无法证伪**，那一整块记为推理，不是结论」）；`21-权威态与派生态的分界.md` 第 202 行（行内有「挂载只读、重建停在级 1 并显式报告」那一句）；`18-块里携带什么信息.md` 第 313 行（「只读挂载不取号」在行内）。都对上。
 - 攻方的数，从它模型目录 `research/prompts/unreadable-at-mount-r2-opus-model/` 的产物逐字找，摘整行：
   - `c331-summary-with-dev.txt` 第 11–12 行：`== candidate=jiaeio scenarios=1959 key_mismatch=0 verdicts={'refused': 1190, 'writable_no_loss': 649, 'writable_LOST_both': 9, 'writable_LOST_older_acknowledged': 111}` / `lost_cells=120 over_refused_cells=284 today_lost_now_not_lost=120`

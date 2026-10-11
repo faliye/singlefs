@@ -11,7 +11,7 @@ repo_root="$(cd "$here/../../.." && pwd)"
 frozen="${1:-/tmp/claude-1000/l0scale-r1-frozen}"
 scratch="${2:-/tmp/claude-1000/m2-layer0-scale-r3-opus-rerun}"
 threads="${THREADS:-6}"
-cap() { nice -n 19 bash "$repo_root/scripts/run-with-memory-cap.sh" 8G bash "$repo_root/scripts/capped.sh" "$threads" "$@"; }
+cap() { nice -n 19 bash "$repo_root/scripts/hosts/run-with-memory-cap.sh" 8G bash "$repo_root/scripts/hosts/capped.sh" "$threads" "$@"; }
 mkdir -p "$scratch"
 # ① 副本：两处 helper 改成 pub（逻辑不动），放探针
 rsync -a --exclude target --exclude .git "$frozen/" "$scratch/repo/"

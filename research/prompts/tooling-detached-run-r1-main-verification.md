@@ -12,13 +12,13 @@
 | 被判文件快照 | `research/prompts/tooling-detached-run-r1-snapshot/files-sha256.txt` | — |
 
 - 写判决前，被判的 7 份文件 `sha256sum -c` 全部 OK，腿跑着的时候没有被改过。
-- `cite-check.py` 跑两份报告：「核了 23 处引文，对上 21 处，没判 2 处」。没判的 2 处（`rules-discipline.md:13`、`scripts/watch.sh:11`，都是主仓路径、不在冻结副本里）主 agent 在主仓逐字核过，都对得上。
+- `cite-check.py` 跑两份报告：「核了 23 处引文，对上 21 处，没判 2 处」。没判的 2 处（`rules-discipline.md:13`、`scripts/agents/watch.sh:11`，都是主仓路径、不在冻结副本里）主 agent 在主仓逐字核过，都对得上。
 
 ## 二、逐条判决
 
 | # | 格 | 腿报的 | 主 agent 现查 | 判 |
 |---|---|---|---|---|
-| 1 | T3 子 agent 闸 | `source` / `.` 起脚本、改名拷贝，钩子只按文件名认 | 把命令写成钩子输入喂给主仓的 `bash-command-detector.sh`，不执行：clerk 身份下 `bash scripts/detached-run.sh start …` 退 2；`source …`、`. …`、`cp … /tmp/dr2.sh && bash /tmp/dr2.sh start …` 三种都退 0 | **打中**，必须改（F1） |
+| 1 | T3 子 agent 闸 | `source` / `.` 起脚本、改名拷贝，钩子只按文件名认 | 把命令写成钩子输入喂给主仓的 `bash-command-detector.sh`，不执行：clerk 身份下 `bash scripts/hosts/detached-run.sh start …` 退 2；`source …`、`. …`、`cp … /tmp/dr2.sh && bash /tmp/dr2.sh start …` 三种都退 0 | **打中**，必须改（F1） |
 | 2 | T3 重型闸 | 改名拷贝里藏 `cargo test --all`，重型闸看不穿 | 主 agent 不带前缀发 `bash /tmp/dr2.sh start --label p -- cargo test --all`，`heavy-test-guard.sh` 退 0（照规矩应拒）；clerk 身份同样退 0 | **打中**，必须改（F1） |
 | 3 | T4 自证只验 TERM | 注入「watch 收 HUP 时停单元」的错实现，自证仍然全绿 | 代码里 TERM / INT / HUP 三种信号走同一个收尾函数（`detached-run.sh` 第 352–354 行），代码本身对。主 agent 在草稿副本里带前缀跑 `repro-t4-watch-hup-gap.sh`：注入成功，坏脚本 `--selftest` 末行「✓ detached-run.sh 自证 11 格都对」、退 0，残留单元 0 | **打中**（测试缺口），补自证格（F2） |
 | 4 | T4 Ⓓ 只核三个变量 | 带进单元的 5 个变量，Ⓓ 只核了 3 个（漏 `PATH`、`HOME`） | 与报告所列的自证格写法相符，没有另跑 | 采，补格（F2） |
@@ -34,7 +34,7 @@
 ## 三、改法（交工具实现员，一批做完）
 
 - **F1**：子 agent 闸和重型闸都改成按脚本内容认 `detached-run.sh`，不再按文件名认：
-  - 认的依据是签名行（同 `scripts/broad-mutation.py` 的 G3 做法）；
+  - 认的依据是签名行（同 `scripts/mutation/broad-mutation.py` 的 G3 做法）；
   - `source` / `.` 起的、改名或符号链接的拷贝都要认得出；
   - 认不出的写法照 G3 那样逐个记进欠账。
   - 做成判红样本：clerk 身份下 `source …`、`. …`、改名拷贝起 start 都要退 2；主 agent 不带前缀经改名拷贝起 `cargo test --all` 要被重型闸拒。

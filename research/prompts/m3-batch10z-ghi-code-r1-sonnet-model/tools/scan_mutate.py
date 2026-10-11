@@ -24,7 +24,7 @@ for r in allrows:
         env = dict(os.environ, CARGO_TARGET_DIR=S + '/target-scan',
                    CA_SRC=mp if r['file'] == 'crash_amplification.rs' else T + 'crash_amplification.rs',
                    GU_SRC=mp if r['file'] == 'gpu_unit_checks.rs' else T + 'gpu_unit_checks.rs')
-        p = subprocess.run(['bash','/home/fy5090/code/singlefs/scripts/capped.sh','15','bash','/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh','4G','nice','-n','19','cargo','test','--offline'], cwd=S + '/scan-model', env=env, capture_output=True, text=True)
+        p = subprocess.run(['bash','/home/fy5090/code/singlefs/scripts/hosts/capped.sh','15','bash','/home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh','4G','nice','-n','19','cargo','test','--offline'], cwd=S + '/scan-model', env=env, capture_output=True, text=True)
         out = p.stdout + p.stderr
         failed = re.findall(r'^test (\S+) \.\.\. FAILED', out, re.M)
         covers = r['test'] in ' '.join(failed) if r.get('test') else None

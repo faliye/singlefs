@@ -32,7 +32,7 @@ E1 补的那一判有没有让合法历史误红（墓碑树、谱系树在删�
 core 写出与读取、G1 期望与字段表第 149 行三处是不是同一个单位、同一个值；全仓还有没有按秒解这 4 字节的地方（`crates/`、`research/` 的装置）；三个新钉值的出处站不站得住；checker 档读码判不变的那些钉值，判得对不对（池级 checker 真不读偏移 433？崩溃枚举的计数、镜像摘要还有哪些吃整份系统配置槽）。
 
 ### M4　主 agent 两处
-变异表那一行只改名、锚点与替换文没动，会不会让按名字复用的判定记录（`scripts/crates-mutation-rows.py`）对不上；字段表第 149 行的写法与 D16 已定项 5 的定案句对不对得上。
+变异表那一行只改名、锚点与替换文没动，会不会让按名字复用的判定记录（`scripts/mutation/crates-mutation-rows.py`）对不上；字段表第 149 行的写法与 D16 已定项 5 的定案句对不对得上。
 
 ## 四、分工
 
@@ -966,7 +966,7 @@ C66（格式级空白没有分项号）立账正是因为这种空白当时有�
 512 是本机 `nvme0n1` 现查的值，D22（单元原子性怎么合成） 已定项 2 那一节逐字「同构 512 池上槽就是 512」；io_min 由 D2（RAID 条带策略） 已定项 19 记进系统配置）。
 全部固定结构两盘各一份、设备内偏移相同。落点坐标全池一个：(设备身份 4 字节, 16 KiB 槽号 6 字节)，
 槽号 = 设备内偏移 ÷ 16384（D3（空间分配） 已定项 7、D19（块指针的结构与宽度预算） 已定项 4）。
-这一节的槽号与写清单以 E142（新池新建文件的干跑） 第二十二次跑第一段的主产物为准：`research/results/e142-new-pool-file-creation-dry-run-r22-main-2026-10-05.out`（`scripts/replay.sh` 第 174 行登记的那份）里 `name=width` 30 行 expected == actual，`name=write_list` 29 条写、12 个单元，窗口里 29 个写与 `crates/` 的导出按 (设备, 偏移, 长度) 配对、逐字节全等（`name=impl_bytes_equal_summary … matched=29 equal=29 unequal=0`，记账树根第 10 条已承诺预留两边都是 98 386）；分配记录树与 extent 树按 D8（核心索引结构） 已定项 14 按位置寻址。
+这一节的槽号与写清单以 E142（新池新建文件的干跑） 第二十二次跑第一段的主产物为准：`research/results/e142-new-pool-file-creation-dry-run-r22-main-2026-10-05.out`（`scripts/experiments/replay.sh` 第 174 行登记的那份）里 `name=width` 30 行 expected == actual，`name=write_list` 29 条写、12 个单元，窗口里 29 个写与 `crates/` 的导出按 (设备, 偏移, 长度) 配对、逐字节全等（`name=impl_bytes_equal_summary … matched=29 equal=29 unequal=0`，记账树根第 10 条已承诺预留两边都是 98 386）；分配记录树与 extent 树按 D8（核心索引结构） 已定项 14 按位置寻址。
 
 | 设备内偏移 | 长度 | 是什么 | 16 KiB 槽号 | 指向 | 状态 |
 |---|---|---|---|---|---|
@@ -1374,7 +1374,7 @@ D8（核心索引结构） 已定项 6（2026-09-05）定了整段：inode 树�
 
 一条线的提交协议由它全部根槽写路径的录制流段序列定（D13（验证路线） 已定项 4 切段：屏障与 FUA 写切段，段内任意整写子集），等价类按这张表的同构分：段边界的位置相同、每段里出现的步骤种类**集合**相同（D17（实现分层与第三方管道） 已定项 2）；一步重复几次（设备数、单元数）是参数不进判据。别处引提交步骤一律链到这一节，不另抄。步骤种类**六种**：写单元（含码 3 容器、实例表单元）、写 journal 记录、根槽 FUA 写、系统配置槽原地覆写、屏障、**整段清零**（`zero_fill`，2026-09-22 随 mkfs 清根环与 journal 环加，用户 2026-09-19 定「录制流登记成一种新步骤、层 0 认它」）。⚠️ **mkfs 那一行的段序列不来自 E142（新池新建文件的干跑） 产物**：那份装置是 `research/` 下一份独立手写模型、不读 `crates/` 的 mkfs 实现（实验页「它答不了的」第 5 条），清零那几步它没有；那一行逐字来自活代码，由 `crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs` 的 `recorded_stream_matches_the_registered_mkfs_segment_sequence` 钉住，门禁 doc-registries 的 segment-registry 格按它比。其余各行的段序列逐字来自 E142（新池新建文件的干跑） 产物的 `name=segments` 行（`path=instance_acquisition / warm_up / transaction / post_mkfs_stream`；取号那一行不是根槽写路径，登记在这里是因为整条流按录制流切、它的两个写落在流的开头一段），单测 `registered_segment_sequences_match_every_recorded_path` 钉住它们；表与产物之间的逐字比对由门禁 doc-registries 的 segment-registry 格做（C316（提交步骤的登记位有四处且互不相同）已还清）。
 
-⚠️ **表里取 E142（新池新建文件的干跑） 产物的各行，对的是第二十一次跑的主产物** `e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out`（`scripts/replay.sh` 第 174 行登记的那份；第 35–39 行与第十九次跑的主产物逐字相同）：取号、暖机、普通发布三行与整条流那一句同产物第 36–39 行逐字相同，mkfs 那一行不按产物比、产物第 35 行与钉它的用例逐字相同；普通发布与整条流里的 12 个单元是分配记录树、extent 树按位置寻址（D8（核心索引结构） 已定项 14）之后的；每次发布末尾有系统配置轮换之后那道屏障（D16（发布语义） 已定项 7），同一块盘上连着的屏障并成一道（D13（验证路线） 已定项 4）；`name=width` 30 行 expected == actual。那一份产物没有跑层 0 整轮枚举（`name=layer0 … states=not_run closed_form=16777240 skipped=true`，够判之后不跑），整条流那一句的状态数是闭式算出来的，不是枚举出来的。
+⚠️ **表里取 E142（新池新建文件的干跑） 产物的各行，对的是第二十一次跑的主产物** `e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out`（`scripts/experiments/replay.sh` 第 174 行登记的那份；第 35–39 行与第十九次跑的主产物逐字相同）：取号、暖机、普通发布三行与整条流那一句同产物第 36–39 行逐字相同，mkfs 那一行不按产物比、产物第 35 行与钉它的用例逐字相同；普通发布与整条流里的 12 个单元是分配记录树、extent 树按位置寻址（D8（核心索引结构） 已定项 14）之后的；每次发布末尾有系统配置轮换之后那道屏障（D16（发布语义） 已定项 7），同一块盘上连着的屏障并成一道（D13（验证路线） 已定项 4）；`name=width` 30 行 expected == actual。那一份产物没有跑层 0 整轮枚举（`name=layer0 … states=not_run closed_form=16777240 skipped=true`，够判之后不跑），整条流那一句的状态数是闭式算出来的，不是枚举出来的。
 
 | 根槽写路径 | 录制流的段序列（每段的写数与种类；「种类」那串是产物 `kinds=` 字段的原样，每段一个步骤种类多重集，段之间用 `\|` 隔开，门禁 doc-registries 的 segment-registry 格逐字比对） | 出处 | 层 0 枚举 |
 |---|---|---|---|

@@ -63,7 +63,7 @@ def run(tsv, root, idxs):
         try:
             args = r['cmd'].split(' ')
             # cmd 形如 "-p pkg --test x -- filter"；用例名过滤放在 -- 之后
-            base = ['nice', '-n', '19', 'bash', f'{repo}/scripts/run-with-memory-cap.sh', '8G', 'bash', f'{repo}/scripts/capped.sh', '7', 'cargo', 'test', '--offline'] + args
+            base = ['nice', '-n', '19', 'bash', f'{repo}/scripts/hosts/run-with-memory-cap.sh', '8G', 'bash', f'{repo}/scripts/hosts/capped.sh', '7', 'cargo', 'test', '--offline'] + args
             env = dict(os.environ)
             env['RUN_WITH_MEMORY_CAP_WAIT_SECONDS'] = '150'
             env['RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON'] = '变异跑道，上限取派发给的 8G'

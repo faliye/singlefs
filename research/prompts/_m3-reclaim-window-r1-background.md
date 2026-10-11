@@ -598,7 +598,7 @@ D16（发布语义） 管发布这一格：一个新根什么时候发、一次�
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
 
 ```bash
-bash scripts/replay.sh E139
+bash scripts/experiments/replay.sh E139
 # 直接跑装置：
 cd scripts/experiments && cargo run --release --bin e139_tightened_floor
 # 跑后补的诊断测试（保留池扫描 18 格的首末失败窗口）：
@@ -741,7 +741,7 @@ grep -o '^E7RESULT name=w_[a-z0-9_]* arm=[A-Za-z0-9_]*' research/results/e139-ti
 十三类世界（原登记「世界」表）一类不缺：`w_cell` 六类、`w_activation` 的 `activation_faults` / `activation_crash_no_loss` / `skip_then_raise` r ∈ {1, 2, 3}、`near_full`、`drain_failure`、`broken_slot`、`cost_growth`。保留池扫描不是故障世界，按登记够判后不跑。
 
 **单测与变异**：单测 36 个（`grep -c '#\[test\]' scripts/experiments/e139_tightened_floor.rs` 输出 36 = 原 21 + 新 15），连跑 5 次每次 `test result: ok. 36 passed`；新 15 个含登记第七节的 K1–K9（每个锚一条，期望值抄自登记第十三节末尾的独立核算脚本 `anchors.py` 的输出）与补的 6 条（回退之后锚在回退目标、回退目标取窗口里最旧的候选根、丢盘之后幸存盘上最新的有效根在窗口里、上限差计数器、跳号前缀拷贝与原前缀一致、steady 里四条新臂与原 G2S 逐字相同）。
-变异表 `scripts/mutations/e139_tightened_floor.tsv` 26 条（原 16 + 新 10）：
+变异表 `scripts/mutation/tables/e139_tightened_floor.tsv` 26 条（原 16 + 新 10）：
 
 ```bash
 cd scripts/experiments && MUTATE_JOBS=3 MUTATE_CARGO_JOBS=2 bash ../mutate.sh e139_tightened_floor e139_tightened_floor.rs ../mutations/e139_tightened_floor.tsv
@@ -874,7 +874,7 @@ G2SW_Q 的 151 行轨迹与 G2SW 逐行相同，G2SW_L 只有 1 行不同（`slo
 ```markdown
 ### 这是计数模型，不是实现
 
-没有 I/O、随机源是写死的种子 ⇒ 跑 N 遍必然逐字节一致。证据强度来自 **36 个单测 + 26 条变异全部被抓**（`scripts/mutations/e139_tightened_floor.tsv`；第一次运行时是 21 个与 16 条，第 1 次重跑加 15 个与 10 条，见「第 1 次重跑」）；
+没有 I/O、随机源是写死的种子 ⇒ 跑 N 遍必然逐字节一致。证据强度来自 **36 个单测 + 26 条变异全部被抓**（`scripts/mutation/tables/e139_tightened_floor.tsv`；第一次运行时是 21 个与 16 条，第 1 次重跑加 15 个与 10 条，见「第 1 次重跑」）；
 变异 M13（按状态数读的上限把空根也数进去）第一轮一个单测都没红，按 `.claude/rules/mutation-sampling.md` 判为取样点不敏感——原有单测只在没推过空的环上取样，两种上限那里同值；
 补了「推空的空根进环之后再抬一次」的单测 `forced_pressure_keeps_four_states_for_states_arm` 之后抓到。M14 第一版让被测代码不终止（区域号永远对不上），换成「失败打在区域 2」的形态后抓到。
 跨装置闸两道（E123（K 与回退深度的二选一各要付什么） 的扣住块数、E92（最坏块重用延迟需求） 的 N − K），与 E138（按盘回退下界与推空的空间要求） 同值。

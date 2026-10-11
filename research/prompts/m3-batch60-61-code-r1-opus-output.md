@@ -146,7 +146,7 @@ OPUS_P4R fraction=0.8 child_finished_before_the_kill=false status=signal: 9 (SIG
 
 - 该导的表被现判：导入只对不归本机的表做（`crates/singlefs-checker-tier/src/crash_amplification.rs:9398`「if !self.libraries_to_import_from.is_empty() && !self.owns_the_table(&key) {」），
   导完库里还没有就报对账不为空、不现判（`:9417`「这张表归别的机器判，导入了那一台取回的库之后库里还是没有它的结论」）。归本机的表从不导、照本库复用或现判，
-  与流水线那一侧不点本机那一份同一个分法。双机驱动给第二台的库是本机库的快照（`scripts/crash-amplification-two-hosts.sh:1040`「cp -a -- "$local_library" "$library_for_peer"」），
+  与流水线那一侧不点本机那一份同一个分法。双机驱动给第二台的库是本机库的快照（`scripts/crash/crash-amplification-two-hosts.sh:1040`「cp -a -- "$local_library" "$library_for_peer"」），
   本机先判着、归第二台的表第二台照快照复用，不会两边各判一份、判在不同的卡上再撞「块属性不同」。
 - 导入失败被吞：导入报错经 `?` 交回 `judge_the_given_states`，崩溃注入两处调用方都 panic（`crates/singlefs-checker-tier/src/crash_injection.rs:2086`「"第一截给定状态表 {} 判不了（不退回别处判）：{reason}",」、
   `:2194`「"第三截给定状态表 {} 判不了（不退回别处判）：{reason}",」），没有吞。
@@ -203,7 +203,7 @@ OPUS_P4 history=h07 step=planned-import-1 share=0/2 checked=0 imported=0 unjudge
 
 原样代码那一行是 `imported=2`（`expected/base-h4.txt`）。四句：不分辨臂（只管汇总行的数，读回不受影响）；看得到；满足正文 P5「改坏会不会红」；
 改法（被攻过零轮、没实现）：第 61 批那两条用例各在导入之后再导一次，钉第二次的 `imported_blocks` 等于第一次（全是已有且相同），这一步推的、没量。
-影响面小：入口脚本拿 `imported_blocks>0` 认导入行，双机驱动另在行尾加 `import_run=true`，重导一遍报 0 不会把那一行认成分份行（`scripts/crash-amplification.sh:79`「导入行（行尾 import_run=true，或带 imported_blocks>0）不是分份行，它留的块照算。」；推的，没跑那个入口）。
+影响面小：入口脚本拿 `imported_blocks>0` 认导入行，双机驱动另在行尾加 `import_run=true`，重导一遍报 0 不会把那一行认成分份行（`scripts/crash/crash-amplification.sh:79`「导入行（行尾 import_run=true，或带 imported_blocks>0）不是分份行，它留的块照算。」；推的，没跑那个入口）。
 
 另：几份要导入的库里同一块都在时，`imported_blocks` 每份各数一次（h05 三台、两份库都带本机快照，报 `imported=5`，这条流不归本机的结论块是 3 块）。旧 `import_from` 同样每份各数，不算这一批的回退，记一句。
 

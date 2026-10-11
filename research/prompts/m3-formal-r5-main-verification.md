@@ -10,7 +10,7 @@
 | 开工快照 | `research/prompts/m3-formal-r5-snapshot/`：`crates-sha256.txt`（230 份，冻结副本 `/tmp/claude-1000/m3-formal-r5/tree/`）、`kb-sha256.txt` | 腿交齐之后冻结副本 `sha256sum -c` 全 OK；`kb-sha256.txt` 只 `.claude/kb/checks-owed.md` 对不上（别的会话追加了行）；两腿引它的是第 168、366 行（C191、C447），现查内容同开工时 |
 | 云端辩方（Sonnet） | `research/prompts/m3-formal-r5-sonnet-output.md`（249 行，sha256 a3bc1983…） | 没量数；它引的数取自第一轮攻方副本或岔路单 |
 | 云端攻方（Opus） | `research/prompts/m3-formal-r5-opus-output.md`（317 行，sha256 e2f1ff4d…）；模型 `…-opus-model/`（r5probe、`rerun.sh`、19 份日志） | 主 agent 照 `rerun.sh` 在 `/tmp/claude-1000/m3-formal-r5-main-check/` 全件复跑：编 25.5 秒，19 件退出码全 0；19 份日志去掉 `elapsed` / `secs` / 「e.g.」示例行与包装行之后与入库的逐份 `diff` 0 行；按名字抽查 U3-1 两行（`rebuilt=true o1=red c3=green reffs=green conj(reffs&c3)=green …`）、U5 五行（um `mount` 与 `mount+write` 各：`unmount_marker[r1_marker=unmount] verdict=diff count=16390`、`unmount_marker_r2_is_not_unmount verdict=same count=24598`、`instance.r2_is_max_sysconf_ring_plus_one`、`rows.r2_equals_d18_item11_rule`、`sysconf.immutable_without_this_device` 各 `same count=24598`）、U6-2 一行（`mount_refused[disk_unchanged=true]:RowPublishAdmissionRefus…`），都在 |
-| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-formal-r5/tree --root . --background research/prompts/_m3-formal-r5-background.md`：「✓ 核了 122 处引文，对上 122 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/agents/cite-check.py <两份报告> --root /tmp/claude-1000/m3-formal-r5/tree --root . --background research/prompts/_m3-formal-r5-background.md`：「✓ 核了 122 处引文，对上 122 处，没判 0 处」 |
 
 攻方的数都是副本装置上量的（盘宽 384 / 256 槽、手写历史、RefFS-Q 是替身：窗前窗后内容取自实现的只读恢复）；照 `.claude/rules/three-way-inference.md` 在入库装置上重做之后才进 kb（第五节第 3 条）。
 

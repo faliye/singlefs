@@ -6,7 +6,7 @@
 ## 〇、证据与环境
 
 - 冻结副本 `~/.local/share/singlefs/work/m3-batch59-code-r1/repo/`，被判四份文件加变异表的 sha256 逐份核过，对得上快照（`sha256sum -c research/prompts/m3-batch59-code-r1-snapshot/crates-sha256.txt` 在冻结副本里五行都是 OK）。
-- 本腿的量全在拷贝 `~/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/` 上做，编译目录 `…/m3-batch59-code-r1-sonnet/target`；每条 cargo 经 `nice -n 19 bash scripts/capped.sh 15 bash scripts/run-with-memory-cap.sh 10G cargo …`，同一时刻一条；没跑门禁、没跑 checker 档测试（GPU 那三条读码判）。
+- 本腿的量全在拷贝 `~/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/repo/` 上做，编译目录 `…/m3-batch59-code-r1-sonnet/target`；每条 cargo 经 `nice -n 19 bash scripts/hosts/capped.sh 15 bash scripts/hosts/run-with-memory-cap.sh 10G cargo …`，同一时刻一条；没跑门禁、没跑 checker 档测试（GPU 那三条读码判）。
 - 开跑前 `ps` 看到别的会话在跑 `cargo test --release -p singlefs-checker-tier …`、崩溃点重放 `--quick`、一条 `-p opus-probe-b59`，没有 qemu、fio、vm-bench；整机 load average 26–39（32 核），本腿测试全在 nice 19 下被抢 CPU，时间数偏大。
 - 脚本与日志：`research/prompts/m3-batch59-code-r1-sonnet-model/`（里面的 `run.sh`、`apply_row.py`、`l4.sh`、`l2.sh`、探针与 `logs/`），原件在 `~/.local/share/singlefs/work/m3-batch59-code-r1-sonnet/`。
 - 几处 kb 事实先摆：

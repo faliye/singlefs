@@ -44,7 +44,7 @@
 
 交付：
 - 腿的报告写进 `research/prompts/m3-leaf-death-r2-<腿名>-output.md`，分段落盘：每次写进文件不超过 150 行，第一段排他新建，回复只写短句；早点开写。
-- 模型放 `research/prompts/m3-leaf-death-r2-<腿名>-model/`，`rerun.sh` 交回前在空目录里从头跑通一次；仓路径从环境变量 `SINGLEFS_REPO` 取，它要 `scripts/experiments/Cargo.toml` 的话写明；编译与跑都经 `scripts/run-with-memory-cap.sh`（编译 6G、跑 4G）；同一时刻只起一条 cargo；用自己的编译目录，不沿用别的树编过的编译目录。只跑 harness 档。可以从第一轮两腿的模型目录拷起。
+- 模型放 `research/prompts/m3-leaf-death-r2-<腿名>-model/`，`rerun.sh` 交回前在空目录里从头跑通一次；仓路径从环境变量 `SINGLEFS_REPO` 取，它要 `scripts/experiments/Cargo.toml` 的话写明；编译与跑都经 `scripts/hosts/run-with-memory-cap.sh`（编译 6G、跑 4G）；同一时刻只起一条 cargo；用自己的编译目录，不沿用别的树编过的编译目录。只跑 harness 档。可以从第一轮两腿的模型目录拷起。
 - 引 kb 条款写 kb 文件自己的行号；引代码写冻结树里的全路径:行号。
 - 方案按 `crates/` 今天的实现来谈。
 
@@ -188,16 +188,16 @@
 ```
 # 仓根；模型在 research/（不依赖 crates/），线程数读 E177_THREADS（默认 8），只影响挂钟、不影响输出
 cd /home/fy5090/code/singlefs/research
-bash scripts/capped.sh 8 cargo build --release --bin e177-per-tree-resurrection-without-tombstones
-E177_THREADS=8 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 8 cargo run -q --release --bin e177-per-tree-resurrection-without-tombstones -- segment-one
+bash scripts/hosts/capped.sh 8 cargo build --release --bin e177-per-tree-resurrection-without-tombstones
+E177_THREADS=8 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 8 cargo run -q --release --bin e177-per-tree-resurrection-without-tombstones -- segment-one
 # 只跑 H-环锚
-bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 8 cargo run -q --release --bin e177-per-tree-resurrection-without-tombstones -- anchor
-# 登记的复跑（scripts/replay.sh 一行：segment-one）
-cd .. && bash scripts/replay.sh E177
+bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 8 cargo run -q --release --bin e177-per-tree-resurrection-without-tombstones -- anchor
+# 登记的复跑（scripts/experiments/replay.sh 一行：segment-one）
+cd .. && bash scripts/experiments/replay.sh E177
 # 单测 23 个与变异表 17 条
 cd research
-bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 8 cargo test --release --bin e177-per-tree-resurrection-without-tombstones
-MUTATE_JOBS=4 MUTATE_MEMORY_MAX=4G bash scripts/mutate.sh e177-per-tree-resurrection-without-tombstones scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs mutations/e177_per_tree_resurrection_without_tombstones.tsv
+bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 8 cargo test --release --bin e177-per-tree-resurrection-without-tombstones
+MUTATE_JOBS=4 MUTATE_MEMORY_MAX=4G bash scripts/mutation/mutate.sh e177-per-tree-resurrection-without-tombstones scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs mutations/e177_per_tree_resurrection_without_tombstones.tsv
 ```
 
 | 文件 | 是什么 |
@@ -472,7 +472,7 @@ grep 'name=positive_control' research/results/e177-per-tree-resurrection-without
 
 单测 23 个（`grep -c '^test .* \.\.\. ok$' research/results/e177-per-tree-resurrection-without-tombstones-unit-tests.out` 输出 23；同一份文件第 46 行 `test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.18s`）。钉绝对值的有：十一个种类码、容量（233、815、135、477/150、294/143、根层级 2、211 968）、记账 15 行、码 2 树分裂与收缩的两个手造形状、H-环锚 八条锚点、F8 n_u = 3 的发布数 8 与记账死亡 105、建删空 inode n = 300 的 K1、K4 与 299 条死亡、e = OU 那一次的 extent 死亡 3、手造盘上 R-S 取最新版本、R-G 门控、`deleted_inodes` 取 nlink = 0、环窗 23 与 24 的边界、判定门槛挪动、轨迹峰值。对拍类：R-U 增量计数与整扫逐次扫描相同（两段历史）、G-环 与 G-宽 第一次再分配之前逐项相同、两段阳性对照全对上。
 
-变异表 `scripts/mutations/e177_per_tree_resurrection_without_tombstones.tsv` 17 条（登记 V1–V11 与修订 1 的 V12–V17；锚点各恰好命中一次）：抓到 17、无效 0、没红 0；`💥`、`⚠️`、`⏱`、`🧱` 各 0；收尾第 20、21 行「计数：内存撞顶 0 条（上限 4G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条、显存不够 0 条」「已还原，基线仍全绿」（`research/results/e177-per-tree-resurrection-without-tombstones-mutations.out`）。V7（墓碑匹配丢掉对象出生代）登记预期第一段取样点不敏感，由墓碑谓词那条直接单测抓到；V5（R-G 门控关掉）由手造盘那条单测抓到，不是登记写的 PC1（R-G 下 PC1 只植对象在 inode 树里有记录的 key，门控关不关都 +1）。
+变异表 `scripts/mutation/tables/e177_per_tree_resurrection_without_tombstones.tsv` 17 条（登记 V1–V11 与修订 1 的 V12–V17；锚点各恰好命中一次）：抓到 17、无效 0、没红 0；`💥`、`⚠️`、`⏱`、`🧱` 各 0；收尾第 20、21 行「计数：内存撞顶 0 条（上限 4G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条、显存不够 0 条」「已还原，基线仍全绿」（`research/results/e177-per-tree-resurrection-without-tombstones-mutations.out`）。V7（墓碑匹配丢掉对象出生代）登记预期第一段取样点不敏感，由墓碑谓词那条直接单测抓到；V5（R-G 门控关掉）由手造盘那条单测抓到，不是登记写的 PC1（R-G 下 PC1 只植对象在 inode 树里有记录的 key，门控关不关都 +1）。
 
 17 条全抓只说明写了断言的那几处被变异测过：判定行的组装（`verdict_lines`）、Q13 的三点配对、Q5 的统计只有轨迹与门槛两条单测管，没有变异动它们。
 
@@ -1140,16 +1140,16 @@ F=~/.local/share/singlefs/work/e175-frozen-crates/repo; R=$PWD/research/results/
 (cd $F && sha256sum -c --quiet $R/baseline-frozen-crates.sha)
 cp $R/device-source.rs $F/crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs
 # 每一臂：施加补丁（P 不施加；V1、V2 照 $R/patch-V1.diff、$R/patch-V2.diff）、编、拷出二进制、还原，再核一次清单
-ROOT=$PWD; (cd $F && CARGO_TARGET_DIR=<编译目录> bash $ROOT/scripts/capped.sh 7 cargo test --release --offline -p singlefs-harness --test e175_product_path_inode_watermark_regression --no-run)
-E175_ARM=P bash scripts/capped.sh 7 bash scripts/run-with-memory-cap.sh 8G <测试二进制> --test-threads 7
+ROOT=$PWD; (cd $F && CARGO_TARGET_DIR=<编译目录> bash $ROOT/scripts/hosts/capped.sh 7 cargo test --release --offline -p singlefs-harness --test e175_product_path_inode_watermark_regression --no-run)
+E175_ARM=P bash scripts/hosts/capped.sh 7 bash scripts/hosts/run-with-memory-cap.sh 8G <测试二进制> --test-threads 7
 E175_ARM=P E175_FAMILY=F2 E175_RESULT_FILE=$R/f2-P.out E175_CODE_BASELINE=b000407ab5f4afdffe9083ddaac343fe8470438ea17891c4637b1684d5052b44 E175_WORKER_THREADS=7 E175_TIME_BUDGET_SECONDS=170 \
-  bash scripts/capped.sh 7 bash scripts/run-with-memory-cap.sh 8G <测试二进制> --ignored --exact run_one_family_on_one_arm_into_the_result_file
+  bash scripts/hosts/capped.sh 7 bash scripts/hosts/run-with-memory-cap.sh 8G <测试二进制> --ignored --exact run_one_family_on_one_arm_into_the_result_file
 # 族名：D、F3a、F2、F1-broad、F1-reuse-after-raising-the-floor、F1-deleting-files-of-several-lower-leaves、
 #       F1-newest-system-configuration-slot-reading-zeros、G-long、G-small、G-draw、G-long-F1
 # 汇总（两段各一份）
 E175_SUMMARY_INPUTS=<逗号分隔的结果文件> E175_SUMMARY_FILE=<新文件> E175_CODE_BASELINE=b000407ab5f4afdffe9083ddaac343fe8470438ea17891c4637b1684d5052b44 <测试二进制> --ignored --exact summarize_the_result_files
-# 登记的复跑（scripts/replay.sh 一行 E175|@driver_e175：拷今天的 crates/ 进副本、放进 device-source.rs、跑 D 族 P 臂）
-bash scripts/replay.sh E175
+# 登记的复跑（scripts/experiments/replay.sh 一行 E175|@driver_e175：拷今天的 crates/ 进副本、放进 device-source.rs、跑 D 族 P 臂）
+bash scripts/experiments/replay.sh E175
 ```
 
 ````
@@ -1331,7 +1331,7 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 - 崩溃恢复抛弃根（双故障形，F3b）与写 / 刷盘故障注入后建 inode（F4）是登记第三段附带，够判后未跑；历史里抽到的 `CrashRecoveryAbandoningTheNewestRoot` 在 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙之后挂载被拒、不造被抛弃根，Q3b 的 0 不说明跨被抛弃时间线的重发不存在。装置没有数「判成被抛弃的根」的次数，两段里 S3 有没有判出过一条被抛弃根，页上不下结论。
 - Q6 的读法有一处局限：现行那一版取自这一步可读根里最新的那条，回退之前它自己就在环里读得出，Q6 > 0 只可能在现行那一版自己重建不出时出现；无读故障的历史里 Q6 = 0 由这个读法推得出，不是独立的观测。V717 因此在每一族都没跑，「回退取 max」那条护栏在这些历史里有没有被走到，这一页答不了。
 - 「活记录被原地换」那一形 I-9.29（同号只许一个出生代） 看不见：阳性对照 V1 臂 G-long 序号 24 的两次重发（`g-long-V1.out` 第 389、390 行）那两步 I-9.29 判成立。产品臂上没造出这一形，所以这一页答不了「产品路径上出现了 I-9.29 能不能抓」，只说 P 臂上它 0 次。
-- 「仓副本装置、冻结副本」：数出自 2026-10-08 拷的冻结副本（`baseline-frozen-crates.out`），没在入库装置上重做过。拷完之后主工作区 `crates/` 变了 4 个文件（`baseline-frozen-crates.out` 的 `name=main_drift_after_copy`：`crates/mutations.tsv` 与三个 `crates/singlefs-checker-tier/src/bin/` 下的装置），都不在这个装置编进来的 `singlefs-core`、`singlefs-checker`、`singlefs-harness` 里（推的：按路径判，没在漂移后的代码上重跑）；`scripts/replay.sh` 的 `driver_e175` 在漂移后的主工作区上编、跑 D 族 P 臂一次，输出去掉 `elapsed_ns` 与 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 相同。
+- 「仓副本装置、冻结副本」：数出自 2026-10-08 拷的冻结副本（`baseline-frozen-crates.out`），没在入库装置上重做过。拷完之后主工作区 `crates/` 变了 4 个文件（`baseline-frozen-crates.out` 的 `name=main_drift_after_copy`：`crates/mutations.tsv` 与三个 `crates/singlefs-checker-tier/src/bin/` 下的装置），都不在这个装置编进来的 `singlefs-core`、`singlefs-checker`、`singlefs-harness` 里（推的：按路径判，没在漂移后的代码上重跑）；`scripts/experiments/replay.sh` 的 `driver_e175` 在漂移后的主工作区上编、跑 D 族 P 臂一次，输出去掉 `elapsed_ns` 与 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 相同。
 - 什么现象会推翻页上的读数：同一份冻结副本、同一装置重跑出任何一段 P 臂结果行与产物不同（续跑与多线程合并在快档对拍过）；或第三段 F3b / F4、或登记之外的历史里出现同一条时间线上 Q1 ≥ 1、I-9.29（同号只许一个出生代） 红。
 
 ```

@@ -34,7 +34,7 @@
 | `14` 的键：两条都坐实合成一条 | 站得住 | 正推「`14` 缺模型派生常量」：`capacity_wall_is_permitted` 在 `model.rs:2835` 起，读 `unit_area_slots_per_device()`（`:2854`），`judge_effect` 读 `effective_rollback_floor()`（`:3036`）[读]。攻方「摆不出崩溃状态的历史无键」：E5 副本 `crash_injection.rs:1480` `tally.histories_without_any_crash_point = 1;`，该历史没有给定状态表，但每步模型比照样做 [读]；表名里的 `seed=` 在 E5 副本 `crash_injection.rs:2075`，所以「给定状态表块键记它属于哪一把历史键」只差项名与规模两项 |
 | RefFS 允许集合：一致，第二次崩溃 = {R1} | 站得住 | 第二次崩溃：「let crash = restarted.crash_after_every_operation_returned();」（`reference_filesystem_translation.rs:925`），重起头的 RefFS 操作序列已清空（`lib.rs` `restart_from_the_recovered_state` 里 `operations_since_the_last_recovery.clear()`），`lower_bound` 取 `StateIndex(0)`，循环不转，集合只剩起点 = R1 [读，我读了 `lib.rs:208-250`、`:286-300`] |
 | 录入版本四处互补 | 站得住，但「新内核不在闭包」不是拆法才有的洞 | 第 4 节 S3：`crash_verify_gpu.rs` 今天就是一个不在任何闭包里的 GPU 内核，靠自带摘要进自己表的键 |
-| 体量：双机拷库是闸 | 站得住 | 「cp -a -- "$local_library" "$library_for_peer"」（`scripts/crash-amplification-two-hosts.sh:1040`）每项一份整库；「FULL_EXPAND_UP_TO=30」（`scripts/crash-amplification.sh:222`）[读]。攻方「压缩比 5 时 3.3 项满」依赖假设的压缩比与 160 字节，两者都没量：判决写的是条件句，没越界 |
+| 体量：双机拷库是闸 | 站得住 | 「cp -a -- "$local_library" "$library_for_peer"」（`scripts/crash/crash-amplification-two-hosts.sh:1040`）每项一份整库；「FULL_EXPAND_UP_TO=30」（`scripts/crash/crash-amplification.sh:222`）[读]。攻方「压缩比 5 时 3.3 项满」依赖假设的压缩比与 160 字节，两者都没量：判决写的是条件句，没越界 |
 | CPU 代价：量级一致、要量 | 站得住 | 两腿都是旧数外推，判决没引数 |
 | GPU 展开：P14 单独成内核、采攻方的量 | 站得住，量的是下界 | 攻方的 62660 / 387189 是探针（只摆调用点、判据本体一行没写，攻方报告自己写了），所以「并进恢复内核到顶」是下界得出的结论，「单独成内核」无论本体多大都不违预算；正推估 7–25 万，现有内核 33–40 万已编得过，单独成内核落在已知编得过的区间里。M4 才定是一个还是两个内核 |
 | 分界：模型比与走焊在一起 | 站得住 | 「/// 拿实现的结局与模型的答案比；对得上就按模型自己算的结果往前走（不按实现交回的），对不上交回哪一格。」（`crates/singlefs-harness/src/model.rs:2870`）[读] |
@@ -204,10 +204,10 @@ n=24 mean_writes=481.083 max=746 min=86 max_per_step=31.08 mean_per_step=20.05 c
 
 ## 7. cite-check
 
-`python3 scripts/cite-check.py research/prompts/m3-run-compare-split-r2-sonnet-output.md --background research/prompts/_m3-run-compare-split-r2-background.md` 末行：
+`python3 scripts/agents/cite-check.py research/prompts/m3-run-compare-split-r2-sonnet-output.md --background research/prompts/_m3-run-compare-split-r2-background.md` 末行：
 
 ```
   ✓ 核了 17 处引文，对上 17 处，没判 0 处（逐处列在上面）
 ```
 
-补一条：我另用 `--root` 指到 E5 副本再跑过一遍，唯一对不上的是 `scripts/crash-amplification-two-hosts.sh:1040`——E5 副本里这份脚本是旧版（那句在第 1031 行），主工作区才是 1040；报告引的是主工作区，交回闸用默认根，不受影响。
+补一条：我另用 `--root` 指到 E5 副本再跑过一遍，唯一对不上的是 `scripts/crash/crash-amplification-two-hosts.sh:1040`——E5 副本里这份脚本是旧版（那句在第 1031 行），主工作区才是 1040；报告引的是主工作区，交回闸用默认根，不受影响。

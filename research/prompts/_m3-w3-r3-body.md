@@ -39,6 +39,6 @@
 
 交付：
 - 腿的报告写进 `research/prompts/m3-w3-r3-<腿名>-output.md`，分段落盘：每次写进文件不超过 150 行，第一段排他新建，回复只写短句；早点开写。
-- 模型放 `research/prompts/m3-w3-r3-<腿名>-model/`，`rerun.sh` 交回前在空目录里从头跑通一次，复跑脚本的路径一律从环境变量或参数取；仓路径从 `SINGLEFS_REPO` 取；编译与跑都经 `scripts/run-with-memory-cap.sh`（编译 6G、跑 4G）；同一时刻只起一条 cargo；用自己的编译目录。只跑 harness 档。可以从前两轮的模型目录拷起。
+- 模型放 `research/prompts/m3-w3-r3-<腿名>-model/`，`rerun.sh` 交回前在空目录里从头跑通一次，复跑脚本的路径一律从环境变量或参数取；仓路径从 `SINGLEFS_REPO` 取；编译与跑都经 `scripts/hosts/run-with-memory-cap.sh`（编译 6G、跑 4G）；同一时刻只起一条 cargo；用自己的编译目录。只跑 harness 档。可以从前两轮的模型目录拷起。
 - 引 kb 条款写 kb 文件自己的行号；引代码写冻结树里的全路径:行号。
 - 方案按 `crates/` 今天的实现来谈。

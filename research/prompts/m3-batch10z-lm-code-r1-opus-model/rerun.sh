@@ -8,8 +8,8 @@ ROOT=$(pwd)
 MD=$ROOT/research/prompts/m3-batch10z-lm-code-r1-opus-model
 FROZEN=${FROZEN:-$HOME/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree}
 WORK=${WORK:?给一个草稿目录}
-CAP="$ROOT/scripts/run-with-memory-cap.sh"
-CAPPED="$ROOT/scripts/capped.sh"
+CAP="$ROOT/scripts/hosts/run-with-memory-cap.sh"
+CAPPED="$ROOT/scripts/hosts/capped.sh"
 mkdir -p "$WORK/runs" "$WORK/summary" "$WORK/scan"
 rsync -a --exclude target --exclude .git "$FROZEN/" "$WORK/copy/"
 mkdir -p "$WORK/copy/.cargo" && cp "$ROOT/.cargo/config.toml" "$WORK/copy/.cargo/config.toml"

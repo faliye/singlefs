@@ -16,7 +16,7 @@ with open(diff_path) as f:
 out, keep = [], False
 for line in lines:
     if line.startswith("--- a/") or line.startswith("+++ b/"):
-        keep = "scripts/admission.py" in line
+        keep = "scripts/gate/admission.py" in line
     if keep:
         out.append(line)
 with open(out_path, "w") as f:
@@ -30,12 +30,12 @@ echo "G1 admission.py hunk 数：$(grep -c '^@@ ' "$WORK/g1-admission-only.diff"
 echo "G2 admission.py hunk 数：$(grep -c '^@@ ' "$WORK/g2-admission-only.diff")"
 
 mkdir -p "$WORK/step1/scripts" "$WORK/step2/scripts"
-cp "$ROOT/scripts/admission.py" "$WORK/today-admission.py"
-cp "$WORK/today-admission.py" "$WORK/step1/scripts/admission.py"
+cp "$ROOT/scripts/gate/admission.py" "$WORK/today-admission.py"
+cp "$WORK/today-admission.py" "$WORK/step1/scripts/gate/admission.py"
 ( cd "$WORK/step1" && patch -R -p1 --fuzz=0 < "$WORK/g2-admission-only.diff" )
-cp "$WORK/step1/scripts/admission.py" "$WORK/step2/scripts/admission.py"
+cp "$WORK/step1/scripts/gate/admission.py" "$WORK/step2/scripts/gate/admission.py"
 ( cd "$WORK/step2" && patch -R -p1 --fuzz=0 < "$WORK/g1-admission-only.diff" )
-cp "$WORK/step2/scripts/admission.py" "$WORK/baseline-r2-admission.py"
+cp "$WORK/step2/scripts/gate/admission.py" "$WORK/baseline-r2-admission.py"
 
 echo "今天 admission.py 行数：$(wc -l < "$WORK/today-admission.py")"
 echo "重建出的 r2 基线行数：$(wc -l < "$WORK/baseline-r2-admission.py")（r2 判决原句说 3194 行）"
@@ -54,7 +54,7 @@ python3 - "$ROOT" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[1] + "/scripts")
 import admission
-with open(sys.argv[1] + "/scripts/admission.py", encoding="utf-8") as f:
+with open(sys.argv[1] + "/scripts/gate/admission.py", encoding="utf-8") as f:
     source = f.read()
 digest_bytes, wanted_count = admission.crash_case_judging_digest_text(source)
 digest_lines = digest_bytes.decode("utf-8", "surrogateescape").count("\n")

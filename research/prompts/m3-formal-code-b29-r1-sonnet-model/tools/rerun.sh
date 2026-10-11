@@ -2,7 +2,7 @@
 # b29 第一轮正推腿的复跑脚本：只跑 harness 档与池级 checker 的测试二进制，不跑 checker 档包、GPU、变异整表。
 # 用法（主 agent 在后台起；整条脚本经内存包装跑，线程上限 10）：
 #   REPO=$PWD FROZEN=/tmp/claude-1000/m3-formal-code-b29-r1/tree WORK=<会话草稿>/b29-sonnet-rerun \
-#     bash run-with-memory-cap.sh 8G bash scripts/capped.sh 10 \
+#     bash run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 10 \
 #     bash research/prompts/m3-formal-code-b29-r1-sonnet-model/tools/rerun.sh <段名…>
 # 段名：setup anchors baseline l3 l2 l1-mutants l1-grid l1-extra l2-bigtree l4 l3-positive all
 # 每一段把原样输出落 $WORK/out/<段名>.log，末尾打 RESULT 行；各段的预期读数写在报告 research/prompts/m3-formal-code-b29-r1-sonnet-output.md。
@@ -14,7 +14,7 @@ export CARGO_TARGET_DIR=$WORK/target
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS=${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-600}
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="b29 正推腿复跑，上限取派发给的 8G"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="派出去的几个 agent 各跑各的，这条是 b29 正推腿的复跑"
-CAPPED="nice -n 19 bash $REPO/scripts/run-with-memory-cap.sh 8G bash $REPO/scripts/capped.sh 10"
+CAPPED="nice -n 19 bash $REPO/scripts/hosts/run-with-memory-cap.sh 8G bash $REPO/scripts/hosts/capped.sh 10"
 # 脚本整条已经在包装里时，这里的命令直接 nice + cargo（外面那层包装已给内存上限；脚本里不再嵌套起第二层）
 if [[ -n "${RERUN_ALREADY_WRAPPED:-}" ]]; then CAPPED="nice -n 19"; fi
 cargo_test() { (cd "$TREE" && $CAPPED cargo test --offline "$@"); }
@@ -31,7 +31,7 @@ seg_setup() {
 seg_anchors() {
   python3 "$MODEL/tools/mutants.py" anchors "$MODEL/data/mutants.tsv" "$FROZEN" | tail -1
   python3 "$MODEL/tools/mutants.py" anchors "$MODEL/data/extra.tsv" "$FROZEN" | tail -1
-  (cd "$REPO" && python3 scripts/crates-mutation-rows.py static-check "$FROZEN" | tail -3)
+  (cd "$REPO" && python3 scripts/mutation/crates-mutation-rows.py static-check "$FROZEN" | tail -3)
 }
 seg_baseline() {
   cargo_test -p singlefs-harness --lib --test checker_known_bad_images --test mount_transparency_judged_field_by_field_after_a_writable_mount \

@@ -2,7 +2,7 @@
 # 攻方 m3-batch33s-code-r1（Opus）模型复跑：在当前目录（空目录）里从头建仓副本、编译、跑，产出 summary.txt，再与 expected-summary.txt 比。
 # 用法：cd <空目录> && SINGLEFS_REPO=<singlefs 仓根> bash <本目录>/rerun.sh
 # 环境变量：
-#   SINGLEFS_REPO（必给）       singlefs 仓根：取 scripts/run-with-memory-cap.sh 与 capped.sh。
+#   SINGLEFS_REPO（必给）       singlefs 仓根：取 scripts/hosts/run-with-memory-cap.sh 与 capped.sh。
 #   FROZEN_TREE（可选）         被判的冻结副本，默认 ~/.local/share/singlefs/work/m3-batch33s-code-r1/tree（只读，拷一份到 ./repo 再改）。
 #   THREADS（可选）             线程上限，默认 7（经 capped.sh 设 CARGO_BUILD_JOBS 等）。
 #   RUN_KNOWN_BAD（可选）       默认 1：在打了 ATTACK_LAZY_FOLD 补丁的副本上跑 harness 的 checker_known_bad_images（8G），量改法 F1 不翻已有坏镜像。
@@ -15,8 +15,8 @@ FROZEN_TREE="${FROZEN_TREE:-$HOME/.local/share/singlefs/work/m3-batch33s-code-r1
 THREADS="${THREADS:-7}"
 RUN_KNOWN_BAD="${RUN_KNOWN_BAD:-1}"
 WORK="$(pwd)"
-CAP="$SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
-CAPPED="$SINGLEFS_REPO/scripts/capped.sh"
+CAP="$SINGLEFS_REPO/scripts/hosts/run-with-memory-cap.sh"
+CAPPED="$SINGLEFS_REPO/scripts/hosts/capped.sh"
 export CARGO_TARGET_DIR="$WORK/target"
 
 if [ ! -f "$WORK/repo/.attack-ready" ]; then

@@ -16,6 +16,6 @@ fi
 rm -rf "${scratch:?}/tree/crates/hole-attack-proto"
 cp -r "$model/proto" "$scratch/tree/crates/hole-attack-proto"
 cd "$scratch/tree"
-RUN_WITH_MEMORY_CAP_WAIT_SECONDS=3600 RUN_WITH_MEMORY_CAP_PARALLEL_REASON="m3-candidate-hole-r1 攻方腿原型编译，与别的会话各跑各的" RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="改了原型源码要增量重编，峰值随改动不同" CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 5G bash /home/fy5090/code/singlefs/scripts/capped.sh 8 cargo build --offline --release -p hole-attack-proto > "$scratch/build.log" 2>&1 || echo "build_failed" >> "$scratch/build.log"
+RUN_WITH_MEMORY_CAP_WAIT_SECONDS=3600 RUN_WITH_MEMORY_CAP_PARALLEL_REASON="m3-candidate-hole-r1 攻方腿原型编译，与别的会话各跑各的" RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="改了原型源码要增量重编，峰值随改动不同" CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 5G bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 8 cargo build --offline --release -p hole-attack-proto > "$scratch/build.log" 2>&1 || echo "build_failed" >> "$scratch/build.log"
 grep -E '^(error|warning: unused)' -A12 "$scratch/build.log" | head -80 || true
 tail -3 "$scratch/build.log"

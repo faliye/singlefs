@@ -25,8 +25,8 @@ for idx, (name, path, old, new, args, tests) in enumerate(rows):
     cap = '8G' if 'random_histories' in args else '6G'
     try:
         open(p, 'w', encoding='utf-8').write(orig.replace(o, n))
-        cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/scripts/run-with-memory-cap.sh', cap,
-               'bash', scripts_repo + '/scripts/capped.sh', '15', 'cargo', 'test', '--offline'] + args.split()
+        cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/scripts/hosts/run-with-memory-cap.sh', cap,
+               'bash', scripts_repo + '/scripts/hosts/capped.sh', '15', 'cargo', 'test', '--offline'] + args.split()
         r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=235)
         out = r.stdout + r.stderr
         rc = r.returncode

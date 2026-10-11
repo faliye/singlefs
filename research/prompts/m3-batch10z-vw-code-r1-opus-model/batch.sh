@@ -12,7 +12,7 @@ n=0
 while read -r log name envs; do
   [ -z "$log" ] && continue
   n=$((n+1))
-  { bash "$ROOT"/scripts/run-with-memory-cap.sh 3G env $envs nice -n 19 bash "$ROOT"/scripts/capped.sh 3 "$BIN" --ignored --nocapture --exact "$name" > "$OUT/$log" 2>&1; echo "$?" > "$OUT"/b"$BATCH"-$n.rc; } &
+  { bash "$ROOT"/scripts/hosts/run-with-memory-cap.sh 3G env $envs nice -n 19 bash "$ROOT"/scripts/hosts/capped.sh 3 "$BIN" --ignored --nocapture --exact "$name" > "$OUT/$log" 2>&1; echo "$?" > "$OUT"/b"$BATCH"-$n.rc; } &
 done < "$JOBS"
 wait
 got=$(ls "$OUT"/b"$BATCH"-*.rc 2>/dev/null | wc -l)

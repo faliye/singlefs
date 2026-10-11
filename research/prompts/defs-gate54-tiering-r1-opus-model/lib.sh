@@ -19,7 +19,7 @@ build_repo() {
     git -C "$MAIN_REPO" show "HEAD:$STAGE" > "$repo/$STAGE"; git -C "$MAIN_REPO" show HEAD:.claude/gate.d/stage-inputs.tsv > "$repo/.claude/gate.d/stage-inputs.tsv"
   fi
   chmod +x "$repo/$STAGE"
-  cp "$MAIN_REPO/scripts/stage-must-run.sh" "$MAIN_REPO/scripts/change-touches-crates.sh" "$repo/scripts/"
+  cp "$MAIN_REPO/scripts/gate/stage-must-run.sh" "$MAIN_REPO/scripts/gate/change-touches-crates.sh" "$repo/scripts/"
   printf '[workspace]\nmembers = ["crates/*"]\n' > "$repo/Cargo.toml"
   printf '# lock v1\n[[package]]\nname = "dep"\nversion = "1.0.0"\n' > "$repo/Cargo.lock"
   printf 'pub mod crash;\n' > "$repo/crates/singlefs-harness/src/lib.rs"

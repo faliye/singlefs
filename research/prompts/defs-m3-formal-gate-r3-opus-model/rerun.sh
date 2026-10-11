@@ -19,7 +19,7 @@ bash "$HERE/l2-install.sh" "$W/repo-l2k" "$W/l2" > "$W/l2-K3-output.txt" 2>&1
 for k in all-not-run mixed all-red; do bash "$HERE/l3-stage.sh" "$W/repo" "$k" "$W/l3" > "$W/l3-stage-$k.txt" 2>&1; done
 python3 "$HERE/l3-judge.py" "$W"/l3-stage-{all-not-run,mixed,all-red}.txt > "$W/l3-judge-output.txt" 2>&1
 python3 "$HERE/l3-judge-k4.py" "$W"/l3-stage-{all-not-run,mixed,all-red}.txt > "$W/l3-K4-output.txt" 2>&1
-( cd "$W" && bash "$W/repo/scripts/run-with-memory-cap.sh" 1Q true > "$W/l3-wrapper-251.txt" 2>&1; echo "rc=$?" >> "$W/l3-wrapper-251.txt" )
+( cd "$W" && bash "$W/repo/scripts/hosts/run-with-memory-cap.sh" 1Q true > "$W/l3-wrapper-251.txt" 2>&1; echo "rc=$?" >> "$W/l3-wrapper-251.txt" )
 for name in l1-output l1-K-output l1-e165-parse-output l1-argv-demo-output l2-output l2-K3-output l3-judge-output l3-K4-output l3-stage-all-not-run l3-stage-mixed l3-stage-all-red l3-wrapper-251; do
   if diff -q <(grep -v '秒）$' "$HERE/$name.txt") <(sed "s#$W#<草稿>#g" "$W/$name.txt" | grep -v '秒）$') >/dev/null; then echo "相同 $name"; else echo "不同 $name"; fi
 done

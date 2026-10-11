@@ -11,7 +11,7 @@
 | 开工快照 | `research/prompts/m3-delete-r2-snapshot/`：`crates-sha256.txt`（210 份，冻结副本 `/tmp/claude-1000/m3-delete-r2/tree/`）、`kb-sha256.txt` | 腿交齐之后冻结副本 `sha256sum -c` 全 OK；kb 清单在主仓全 OK |
 | 云端辩方（Sonnet） | `research/prompts/m3-delete-r2-sonnet-output.md`（sha256 293e8e1c…7b7e）；模型 `research/prompts/m3-delete-r2-sonnet-model/` | 第四节复跑 |
 | 云端攻方（Opus） | `research/prompts/m3-delete-r2-opus-output.md`（sha256 3efaa983…c15c）；模型 `research/prompts/m3-delete-r2-opus-model/` | 第四节复跑 |
-| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-delete-r2/tree --root . --background research/prompts/_m3-delete-r2-background.md`：「✓ 核了 108 处引文，对上 108 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/agents/cite-check.py <两份报告> --root /tmp/claude-1000/m3-delete-r2/tree --root . --background research/prompts/_m3-delete-r2-background.md`：「✓ 核了 108 处引文，对上 108 处，没判 0 处」 |
 
 两条腿的数都是副本原型上量的（原型没有意图记录、`deleted_inodes`、墓碑、nlink 字段、续做挂点）；进 kb 之前在入库装置上重做。攻方的 Z1–Z6 与辩方的收严都被攻过零轮。
 

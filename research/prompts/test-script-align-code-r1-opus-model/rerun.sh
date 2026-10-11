@@ -2,12 +2,12 @@
 # test-script-align-code-r1 攻方腿（Opus）的复跑：在一个空的工作目录里从冻结副本拷两份仓（tree 原样、tree2 改坏一处），
 # 照本目录的原型源码建 proto（依赖 tree，特性 verdict-store,gpu）与 proto2（依赖 tree2），编、跑，原样输出落进 <工作目录>/runs/。
 # 用法：bash rerun.sh <工作目录> [冻结副本，默认 /tmp/claude-1000/test-script-align-code-r1/tree]
-# 不跑 checker 档包的任何测试；跑的都是原型二进制，经 scripts/run-with-memory-cap.sh。线程上限 8（capped.sh 8）。
+# 不跑 checker 档包的任何测试；跑的都是原型二进制，经 scripts/hosts/run-with-memory-cap.sh。线程上限 8（capped.sh 8）。
 set -u
 model="$(cd "$(dirname "$0")" && pwd)"
 repository="$(cd "$model/../../.." && pwd)"
 work="${1:?要给工作目录}"; frozen="${2:-/tmp/claude-1000/test-script-align-code-r1/tree}"
-cap="$repository/scripts/run-with-memory-cap.sh"; capped="$repository/scripts/capped.sh"
+cap="$repository/scripts/hosts/run-with-memory-cap.sh"; capped="$repository/scripts/hosts/capped.sh"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-600}"
 mkdir -p "$work/runs"; export K2_SCRATCH="$work/runs" TMPDIR="$work/runs"
 rsync -a --exclude target --exclude .git "$frozen/" "$work/tree/"

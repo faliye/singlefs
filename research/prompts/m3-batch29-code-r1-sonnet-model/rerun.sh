@@ -28,7 +28,7 @@ out="${1:?用法：rerun.sh <目录> all}"; mode="${2:-all}"
 [[ "$mode" == all ]] || { echo "只认 all" >&2; exit 2; }
 : "${SINGLEFS_REPO:?要设 SINGLEFS_REPO=<冻结副本树根>}"
 tools="${SINGLEFS_TOOLS:-$(cd "$here/../../.." && pwd)}"
-[[ -f "$tools/scripts/run-with-memory-cap.sh" ]] || { echo "找不到 $tools/scripts/run-with-memory-cap.sh，设 SINGLEFS_TOOLS" >&2; exit 2; }
+[[ -f "$tools/scripts/hosts/run-with-memory-cap.sh" ]] || { echo "找不到 $tools/scripts/hosts/run-with-memory-cap.sh，设 SINGLEFS_TOOLS" >&2; exit 2; }
 mkdir -p "$out"
 out="$(cd "$out" && pwd)"
 threads="${RERUN_THREADS:-15}"
@@ -51,13 +51,13 @@ restore_walk() { cp "$out/pristine/walk.rs" "$tree/$walk"; touch "$tree/$walk"; 
 cargo_step() {   # cargo_step <上限> <键> <cargo 参数…>
     local cap="$1" key="$2"; shift 2
     CARGO_TARGET_DIR="$target" RUN_WITH_MEMORY_CAP_KEY="m3b29-sonnet-$key" \
-        nice -n 19 bash "$tools/scripts/capped.sh" "$threads" bash "$tools/scripts/run-with-memory-cap.sh" "$cap" \
+        nice -n 19 bash "$tools/scripts/hosts/capped.sh" "$threads" bash "$tools/scripts/hosts/run-with-memory-cap.sh" "$cap" \
         cargo test --offline --manifest-path "$tree/Cargo.toml" "$@"
 }
 
 unit_static() {
     set +e
-    python3 "$tools/scripts/crates-mutation-rows.py" static-check "$tree" > "$out/static.raw" 2>&1
+    python3 "$tools/scripts/mutation/crates-mutation-rows.py" static-check "$tree" > "$out/static.raw" 2>&1
     set -e
     local row
     for row in $(seq 2977 2989); do

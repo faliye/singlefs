@@ -16,5 +16,5 @@ case $s in
 esac
 sps=${SPS:-$sps}
 tag=$s${PICK:+-p$PICK}${S1CLASS:+-c$S1CLASS}${OPS:+-o$OPS}${SPS:+-$SPS}
-env $envs OPUS_WORKERS=14 nice -n 19 bash $REPO/scripts/run-with-memory-cap.sh 3G bash $REPO/scripts/capped.sh 15 $W/tree/target/release/opus-o1-attack s1grid $sps > $W/out/$tag.log 2> $W/out/$tag.err
+env $envs OPUS_WORKERS=14 nice -n 19 bash $REPO/scripts/hosts/run-with-memory-cap.sh 3G bash $REPO/scripts/hosts/capped.sh 15 $W/tree/target/release/opus-o1-attack s1grid $sps > $W/out/$tag.log 2> $W/out/$tag.err
 echo "rc=$? $tag"

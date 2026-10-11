@@ -88,7 +88,7 @@ def run(idx):
         t0 = time.time()
         env = dict(os.environ, CARGO_TARGET_DIR=TARGET)
         import signal
-        cmd = ["nice","-n","19","bash",f"{REPO}/scripts/run-with-memory-cap.sh","4G","bash",f"{REPO}/scripts/capped.sh","8",
+        cmd = ["nice","-n","19","bash",f"{REPO}/scripts/hosts/run-with-memory-cap.sh","4G","bash",f"{REPO}/scripts/hosts/capped.sh","8",
                "cargo","test","--offline","-p","singlefs-harness","--lib","gpu_memory_ledger"]
         proc = subprocess.Popen(cmd, cwd=TREE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
         try:

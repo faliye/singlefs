@@ -9,7 +9,7 @@
 模型目录 `research/prompts/m3-batch10-code-r2-opus-s2-model/`。复跑（工作目录随意，草稿目录要不存在或为空，跑 5 分钟上下）：
 
 ```
-bash scripts/run-with-memory-cap.sh 4000M bash research/prompts/m3-batch10-code-r2-opus-s2-model/rerun.sh <草稿目录> /tmp/claude-1000/m3-batch10-code-r2/tree
+bash scripts/hosts/run-with-memory-cap.sh 4000M bash research/prompts/m3-batch10-code-r2-opus-s2-model/rerun.sh <草稿目录> /tmp/claude-1000/m3-batch10-code-r2/tree
 ```
 
 末行报「比了 13 份，N 份不同」，逐份比每行 `name=`。它把冻结副本的 `Cargo.toml`、`Cargo.lock`、`crates/` 拷进草稿目录，打 `mount-rs-attack-arms.patch`（只在 `rebuilt_allocator` 里加一个读环境变量 `ATTACK_RR2_ARM` 的臂开关：空或 `rr2` 照冻结副本，`before` 回到 rr2 之前「整个环一条都没有才重读」，`merge` 是 rr2 加「重读那一遍按槽并两遍读数」），放进原型测试，release 编译，跑 12 次 grid 与一次新池那一格。这份复跑脚本本身这一轮没有整份跑过（前台时限装不下，见「要主 agent 跑的命令」）；`out/` 里的产物由同一份原型、同一份补丁在草稿副本上跑出，补丁打到冻结副本上与草稿副本的 `mount.rs` 逐字节相同（`cmp` 过）。
@@ -221,7 +221,7 @@ rr2 的重读只在第一遍缺盘时发生，没读故障时只在 K2-5 量到�
 ## 要主 agent 跑的命令
 
 1. 复跑模型（工作目录随意；内存上限 4000M；线程不需要设，原型单线程）：
-   `bash scripts/run-with-memory-cap.sh 4000M bash research/prompts/m3-batch10-code-r2-opus-s2-model/rerun.sh /tmp/claude-1000/<主 agent 草稿>/opus-s2-rerun /tmp/claude-1000/m3-batch10-code-r2/tree`
+   `bash scripts/hosts/run-with-memory-cap.sh 4000M bash research/prompts/m3-batch10-code-r2-opus-s2-model/rerun.sh /tmp/claude-1000/<主 agent 草稿>/opus-s2-rerun /tmp/claude-1000/m3-batch10-code-r2/tree`
    看末行「比了 13 份，0 份不同」。
 
 ## 过程里的几件事

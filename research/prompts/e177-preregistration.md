@@ -33,7 +33,7 @@
 
 ## 二、被测条款与它引的定义
 
-被测条款：D18 已定项 8、10、24，`checks-owed.md` 的 C109 那一行。一并整段抄进来的定义（读法 R-S、R-G 与臂 B 的定义要用）：C113 那一行（择现行的输入）、D8 已定项 6（inode 树的叶、「重建」那一段、「类型 2 的记录死亡不写墓碑」）、D8 已定项 9（种类码登记表）、D21 已定项 9（权威态 = 单元 + 记账 + 根，索引是派生态）。下面由 `scripts/quote-kb.py` 整段抽出，回读逐字节一致（命令见第十三节）。
+被测条款：D18 已定项 8、10、24，`checks-owed.md` 的 C109 那一行。一并整段抄进来的定义（读法 R-S、R-G 与臂 B 的定义要用）：C113 那一行（择现行的输入）、D8 已定项 6（inode 树的叶、「重建」那一段、「类型 2 的记录死亡不写墓碑」）、D8 已定项 9（种类码登记表）、D21 已定项 9（权威态 = 单元 + 记账 + 根，索引是派生态）。下面由 `scripts/kb/quote-kb.py` 整段抽出，回读逐字节一致（命令见第十三节）。
 
 **出处 `.claude/kb/decisions/18-块里携带什么信息.md:202-216`（整段抄，未转述）**
 
@@ -302,10 +302,10 @@
 | S16 | 码 3 类身份段 = 出生树、打包记录类型、容器号、容器出生代 | `unit.rs:64-69`（`PackedIdentity`） |
 | S17 | 扫描重建的读侧没有代码：`crates/singlefs-core` 里零命中；命中的只有 checker 与 checker 档装置的注释（C113 定案 P2 的已发布谓词） | 第十三节命令 C3 的输出 |
 | S18 | 容器退役记录没有写者：`grep -rn '退役记录' crates --include=*.rs` 零命中 | 第十三节命令 C4 |
-| S19 | 已有的 `crates/` 侧只读导出 `deletion_write_dump`：H1、H2、H3 三段删除历史 unlink 之后每一次写的原样与角色名；跑它属重型（checker 档包的 `src/bin/`），2026-10-05 的两份输出已在 `research/results/e172-r2-deletion-write-dump-{h1h2,h3}-2026-10-05.out` | `crates/singlefs-checker-tier/src/bin/deletion_write_dump.rs:1-21`、`scripts/replay.sh:1601-1610` |
+| S19 | 已有的 `crates/` 侧只读导出 `deletion_write_dump`：H1、H2、H3 三段删除历史 unlink 之后每一次写的原样与角色名；跑它属重型（checker 档包的 `src/bin/`），2026-10-05 的两份输出已在 `research/results/e172-r2-deletion-write-dump-{h1h2,h3}-2026-10-05.out` | `crates/singlefs-checker-tier/src/bin/deletion_write_dump.rs:1-21`、`scripts/experiments/replay.sh:1601-1610` |
 | S20 | 分配记录 20 字节：key (设备 4, 槽号 6) + value (跨度 2 含已释放标志, 分配代或释放代 8)；释放写成跨度最高位置 1 的记录（`ALLOCATION_RECORD_RELEASED_FLAG = 0x8000`），key 留在树里 | `crates/singlefs-core/src/allocator.rs:29-32`、`allocator.rs:51-56`、`allocator.rs:93-95` |
 
-**装置写在哪（写死）**：走 `scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs`，独立手写模型，不与 `crates/` 共用代码、不依赖 `crates/`（`implementation-first.md` 第 4 条）；bin 名 `e177-per-tree-resurrection-without-tombstones`，变异表 `scripts/mutations/e177_per_tree_resurrection_without_tombstones.tsv`。不写入库装置：这条岔路问的是「每种树的 key 死亡不写墓碑会复活几条」，答它要的是一个读侧，而读侧 `crates/` 里没有（S17），`crates/` 今天在形式化线冻结期也不许改。模型照上表 S2–S16 的写路径规则手写，与 `crates/` 的对拍走第十一节的停机条款。
+**装置写在哪（写死）**：走 `scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs`，独立手写模型，不与 `crates/` 共用代码、不依赖 `crates/`（`implementation-first.md` 第 4 条）；bin 名 `e177-per-tree-resurrection-without-tombstones`，变异表 `scripts/mutation/tables/e177_per_tree_resurrection_without_tombstones.tsv`。不写入库装置：这条岔路问的是「每种树的 key 死亡不写墓碑会复活几条」，答它要的是一个读侧，而读侧 `crates/` 里没有（S17），`crates/` 今天在形式化线冻结期也不许改。模型照上表 S2–S16 的写路径规则手写，与 `crates/` 的对拍走第十一节的停机条款。
 
 **`crates/` 侧的输入状态**：`git status --short crates/` 在 2026-10-08 有 192 行未提交改动（第十三节命令 C6）。执行员开工时重取上表行号，与这里不一致的逐条列进第十二节修订之前的「行号漂移」一栏，规则本身变了的按第十一节停机。
 
@@ -460,7 +460,7 @@ F1 共 2 × 7 = 14 段、F2 16 段、F3 5 段，合计 35 段；每段 × 2 几�
 
 ## 九、变异
 
-变异表 `scripts/mutations/e177_per_tree_resurrection_without_tombstones.tsv`，经 `scripts/mutate.sh` 跑（锚点各唯一命中，第七类）。每条写明在哪个取样点上改变输出；只在第二段取样点上改变输出的，第一段记「取样点不敏感（第三类），第二段补」，不记等价。
+变异表 `scripts/mutation/tables/e177_per_tree_resurrection_without_tombstones.tsv`，经 `scripts/mutation/mutate.sh` 跑（锚点各唯一命中，第七类）。每条写明在哪个取样点上改变输出；只在第二段取样点上改变输出的，第一段记「取样点不敏感（第三类），第二段补」，不记等价。
 
 | # | 改什么 | 在哪个取样点上改变输出 | 期望哪条断言红 |
 |---|---|---|---|
@@ -854,7 +854,7 @@ C2、C3、C13、C14 四行是「不这么读就由定义作废」的格，C17 �
 - `crates/singlefs-core/src/`：`unlink.rs`、`deleted_inodes.rs`、`tombstone_tree.rs`、`lineage_tree.rs`、`container_tree.rs`、`code_two_tree.rs`、`write_accounting.rs` 各自前 40 行里的 `//!` 行；`transaction.rs:4840-4887`、`4907-4990`、`5385-5470`、`8290-8400`，grep 命中 100-102、4816、4856、4888-4906、5413、5686、5781、5837、5890-5896、5965、6020、6085、6263、6286、6322、6709、8306、8334、8340、8346、8386；`code_two_tree.rs:630-700`（含 635、665、668）；`inode_tree.rs:1-40`、grep 命中 286；`mounted_session.rs` 前 30 行 `//!` 行、`54-110`；`allocator.rs` `//!` 1-9、grep 命中 7、265、274-279、416、432、519、579-580、605-606、617、631、643、750、780-781、815-822、842、844、949、982、991；`extent_tree.rs` `//!` 1-18；`allocation_record_tree.rs` `//!` 1-15；`unit.rs:64-76`、grep 命中 21-25、163-190；`mount.rs` grep 命中 3112、3149、3444-3456、3647-3658、3789-3795；`recovery.rs` grep 命中 72-74、1582-1730、2057。
 - `crates/singlefs-format/src/lib.rs` grep 命中 110、113、116、122、171、178、188、201、452-467、643、673。
 - `crates/singlefs-checker-tier/src/bin/deletion_write_dump.rs:1-60`；`crates/` 里 `TREE_KIND_*` 的 grep 命中（`bad_disk_input.rs`、`e171_*`、`crash_judge_gpu_agrees_*`、`recovery.rs`、`transaction.rs` 各行，只看了常量名）；C3 命中 `crates/singlefs-checker/src/walk.rs:745,1053,7242`、`crates/singlefs-harness/tests/checker_known_bad_images.rs:1212`。
-- `scripts/experiments/Cargo.toml`（整份）；`.claude/hooks/heavy-test-guard.sh:1-80` 的 grep 命中 27-49；`scripts/replay.sh` grep 命中 1601-1610；`scripts/claim-experiment.sh` 文件头；`scripts/quote-kb.py --help`、`replace-once.py --help` 的输出；`research/prompts/e173-preregistration.md` 只看了标题行（照节名排版）。
+- `scripts/experiments/Cargo.toml`（整份）；`.claude/hooks/heavy-test-guard.sh:1-80` 的 grep 命中 27-49；`scripts/experiments/replay.sh` grep 命中 1601-1610；`scripts/kb/claim-experiment.sh` 文件头；`scripts/kb/quote-kb.py --help`、`replace-once.py --help` 的输出；`research/prompts/e173-preregistration.md` 只看了标题行（照节名排版）。
 - `research/results/` 只 `ls` 了文件名（`grep -i e172`），没读内容。
 
 **没读**：E59、E104 的跑前登记、实验页、产物与装置源码（`scripts/experiments/e59_message_recompute.rs` 一行没读）；`.claude/kb/experiments/`、`research/results/` 内容。kb 决策文件里的「依据」段读到了别的实验的结论句，已列进第四节。
@@ -871,8 +871,8 @@ C2、C3、C13、C14 四行是「不这么读就由定义作废」的格，C17 �
 - C8（执行员照跑，每个候选一条）`grep -rln -i '<名>' crates/*/src --include=*.rs`，名字照这张对照：dirent → `dirent\|目录项`；反向索引 → `反向索引\|backref\|back_reference\|reverse_index`；空闲空间 → `空闲空间\|free_space`；LRU → `lru`。零命中记「crates 里没有写者」；有命中逐处看是不是写树节点的代码
 - C9（执行员照跑）`grep -rn '<名>' .claude/kb/decisions/ .claude/kb/layout/`，只看命中行里有没有 key 编法、单元类、容器形态、记录字段表四样，各记有无与出处
 - C10（执行员照跑，F2 用）`grep -rn '退役记录\|清扫门\|祖先表' .claude/kb/decisions/ .claude/kb/invariants.md | grep '第一版'`
-- `quote-kb.py` 那一次：`python3 scripts/quote-kb.py ~/.local/share/singlefs/work/m3-3-5-C109-design/quote.md '<D18>@#### 已定项 8：删除要写墓碑单元' '<D18>@#### 已定项 10：墓碑取区间记录 + 打包共享单元' '<D18>@#### 已定项 24：第一版墓碑：墓碑树、40 字节记录、谱系记录' '.claude/kb/checks-owed.md~^\| C109 \|' '.claude/kb/checks-owed.md~^\| C113 \|' '<D8>@#### 已定项 6：…' '<D8>@#### 已定项 9：树的种类码的登记表' '<D21>@#### 已定项 9：权威态 = 单元 + 记账 + 根，索引是派生态'`（`<D18>` 等是第二节出处行里的完整路径）→ `✓ 8 段整抄进 …/quote.md，回读逐字节一致`
-- `bash scripts/claim-experiment.sh --next` → `E177`；`bash scripts/claim-experiment.sh E177 逐树不写墓碑的复活数` → `✓ 占住 E177`
+- `quote-kb.py` 那一次：`python3 scripts/kb/quote-kb.py ~/.local/share/singlefs/work/m3-3-5-C109-design/quote.md '<D18>@#### 已定项 8：删除要写墓碑单元' '<D18>@#### 已定项 10：墓碑取区间记录 + 打包共享单元' '<D18>@#### 已定项 24：第一版墓碑：墓碑树、40 字节记录、谱系记录' '.claude/kb/checks-owed.md~^\| C109 \|' '.claude/kb/checks-owed.md~^\| C113 \|' '<D8>@#### 已定项 6：…' '<D8>@#### 已定项 9：树的种类码的登记表' '<D21>@#### 已定项 9：权威态 = 单元 + 记账 + 根，索引是派生态'`（`<D18>` 等是第二节出处行里的完整路径）→ `✓ 8 段整抄进 …/quote.md，回读逐字节一致`
+- `bash scripts/kb/claim-experiment.sh --next` → `E177`；`bash scripts/kb/claim-experiment.sh E177 逐树不写墓碑的复活数` → `✓ 占住 E177`
 - 补记：`crates/singlefs-core/src/allocator.rs:20-32` 与 `grep -n 'ALLOCATION_RECORD_RELEASED_FLAG' crates/singlefs-core/src/*.rs` 命中 `allocator.rs:30,51,56,93,95,2673`（第三节 S20 的出处）。
 
 ### 13.3 修订 1 读过的文件与跑过的命令（实验设计员，2026-10-08）
@@ -888,7 +888,7 @@ C2、C3、C13、C14 四行是「不这么读就由定义作废」的格，C17 �
 - `crates/singlefs-core/src/transaction.rs`：`3160-3200`、`3960-3985`、`5760-5900`、`6175-6230`；grep 命中 3171、3895、3940、3969、4032-4033、5060、5686、5781、5819、5827、5837、5887、5896、5965、6020、6085、6179、6200、6263、6712、6850、7822、8143。
 - `crates/singlefs-format/src/lib.rs` grep 命中 14、261、279、294、306、308、558。
 - `crates/singlefs-harness/tests/root_ring_turn_in_one_mount.rs:1-281`（整份）。
-- `scripts/replace-once.py --help` 的输出。
+- `scripts/kb/replace-once.py --help` 的输出。
 
 **没读**：`research/results/` 与 `.claude/kb/experiments/` 下任何内容；E172 的两份导出；这一轮没读 kb 决策文件（G-环 的规则全部出自 `crates/`，D16 已定项 1 只指路、不引文）。读到的推测与数列在 12.12。
 
@@ -900,4 +900,4 @@ C2、C3、C13、C14 四行是「不这么读就由定义作废」的格，C17 �
 - R4 `grep -n 'fn turning_the_root_ring\|CheckpointTxg(5),\|CheckpointTxg(25)\|CheckpointTxg(26))\|deferred_slots() + 1\|TREE_TABLE_GENESIS_SLOT,$' crates/singlefs-harness/tests/root_ring_turn_in_one_mount.rs` → 70、83、86、104、114、131；A14 (i) 是 89-95 行那条 `!device_map.is_free(TREE_TABLE_GENESIS_SLOT)`，(ii) 是 106-119 行，(iii) 是 126-133 行。
 - R5 `python3 -c '…'` → `slots 262144 unit_area 211968 10pct 21196`、`F1 14 F8 32 F3 5 total 51 runs 459 F1runs 126`、`ring 24 50176%64 0 784`；挂钟那一行 `python3 -c 'print(126*20/3600+45*7/3600, (126*4+45*1.3)/60, (126*20+45*7)/60/8, (126*4+45*1.3)/8)'` → `0.7875 9.375 5.90625 70.3125`。
 - `sha256sum research/prompts/e177-preregistration.md`（修订前）→ `7fa249836e2dc252577aa7916ecb576cdcaf0a04e093c510d7a7388c22f4dab5`；`sha256sum ~/.local/share/singlefs/work/e177-runner/report.md` → `2e39063002a88732332503fed0bc104845fae7292f738c594f3a033022d720e7`；`git status --short crates/ | wc -l` → `192`；`git log -1 --format='%h %ad' --date=short -- crates/singlefs-core/src crates/singlefs-harness/src` → `6c1509ed 2026-10-03`。
-- 写进登记：`scripts/replace-once.py`（把修订插在 `## 十三、读过的文件与跑过的命令` 之前，分段几次），本节用 `>>` 追加在文件末尾。
+- 写进登记：`scripts/kb/replace-once.py`（把修订插在 `## 十三、读过的文件与跑过的命令` 之前，分段几次），本节用 `>>` 追加在文件末尾。

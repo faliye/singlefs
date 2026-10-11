@@ -12,14 +12,14 @@
 |---|---|---|
 | `research/prompts/e172-preregistration.md` | `9ba83c55ecd8686636c728075cd0cb749e2198973fd130690a329c24d7d99079` | 第 1 次跑前登记（含第十二节修订 1） |
 | `scripts/experiments/e172_deletion_write_dry_run.rs` | `a626e18a349ad2dcd84bcdbb0771a57095bb34dd47aac7bcf3b74e6f003b0c4b` | 第 1 次冻结的装置，3573 行；`git status` 是 `??`（没进 git） |
-| `scripts/mutations/e172_deletion_write_dry_run.tsv` | `6e21494a259a52c9bf0c0fad5d272ab51a5d15e59a745340bcc4084ed14993b3` | 第 1 次冻结的变异表，20 条；`git status` 是 `??` |
+| `scripts/mutation/tables/e172_deletion_write_dry_run.tsv` | `6e21494a259a52c9bf0c0fad5d272ab51a5d15e59a745340bcc4084ed14993b3` | 第 1 次冻结的变异表，20 条；`git status` 是 `??` |
 | `research/prompts/e172-r2-questions.md` | `98353dd7d647bd1b19bd6f2b7193155f9e33b9b92bd811a477d2bf928ef976af` | 这一次的问题单，五行 |
 
 ## 一、问题
 
 英文名：deletion_write_dry_run
 
-（照抄第 1 次登记。装置仍是 `scripts/experiments/e172_deletion_write_dry_run.rs`、bin 名 `e172-deletion-write-dry-run`、变异表 `scripts/mutations/e172_deletion_write_dry_run.tsv`，原地改，不另起新装置；中文简称「删除写出的字节的干跑」只用在 kb 页。）
+（照抄第 1 次登记。装置仍是 `scripts/experiments/e172_deletion_write_dry_run.rs`、bin 名 `e172-deletion-write-dry-run`、变异表 `scripts/mutation/tables/e172_deletion_write_dry_run.tsv`，原地改，不另起新装置；中文简称「删除写出的字节的干跑」只用在 kb 页。）
 
 主 agent 给的问题（派发提示逐字，与问法有关的几行）：
 
@@ -28,7 +28,7 @@
 > 第 1 次的东西（读法与判据照它，只在问题单点名的地方改）
 > 1. 第 8 行的判据取 R8.c（先判取号；轮换一支另要实例代号相同），R8.b 不再作判据；R8.c 的阳性对照必须改坏之前为绿（写清它怎么造、改坏之后预期红在哪），作废条款照第 1 次 V4 的形状写。
 > 2. 历史三段：H1、H2 照第 1 次；H3 用 `cargo run -q -p singlefs-checker-tier --bin deletion_write_dump -- --history h3` 导（删除线第 20 批 X2 加的参数；不带参数照旧只导 H1、H2），H3 的定义照第 1 次登记第三段与 `crates/singlefs-harness/src/scenario.rs` 今天的 `run_deletion_history` 现查。
-> 3. 导出是新一次：今天主工作区（含形式化线第 30 批 T_time 改毫秒）重导，产物新文件名（不覆盖第 1 次那几份），`scripts/replay.sh` 第 275 行一带 `driver_e172` 改指新产物、H3 那一份怎么进复跑写清。
+> 3. 导出是新一次：今天主工作区（含形式化线第 30 批 T_time 改毫秒）重导，产物新文件名（不覆盖第 1 次那几份），`scripts/experiments/replay.sh` 第 275 行一带 `driver_e172` 改指新产物、H3 那一份怎么进复跑写清。
 > 4. 装置要改的地方（例：第 2853 行一带写死 `history_names == ["h1", "h2"]`、系统配置槽 T_time 的期望值、R8.c 成为判据）逐条列在登记里，写清改完哪些单测与变异要跟着改；第 1 次冻结的装置与变异表 sha256 写进登记作对照。
 > 5. 每段交回附岔路表（照问题单五行）。
 
@@ -90,7 +90,7 @@
 | D18 | 已定项 18、已定项 24、第 276–293 行 | 抄 | 同第 1 次登记第 52–54 行 |
 | D18 | 已定项 11 其余正文 | 不抄 | 同第 1 次登记第 54 行 |
 
-下面由 `scripts/quote-kb.py` 抽出（出口 `/tmp/claude-1000/e172-r2-design/quote-section2.md`，脚本回读逐字节一致，十二段 471 行），分四次追加进来。
+下面由 `scripts/kb/quote-kb.py` 抽出（出口 `/tmp/claude-1000/e172-r2-design/quote-section2.md`，脚本回读逐字节一致，十二段 471 行），分四次追加进来。
 
 **出处 `.claude/kb/layout/03-third-txn.md:1-60`（整段抄，未转述）**
 
@@ -237,7 +237,7 @@
 
 一条线的提交协议由它全部根槽写路径的录制流段序列定（D13（验证路线） 已定项 4 切段：屏障与 FUA 写切段，段内任意整写子集），等价类按这张表的同构分：段边界的位置相同、每段里出现的步骤种类**集合**相同（D17（实现分层与第三方管道） 已定项 2）；一步重复几次（设备数、单元数）是参数不进判据。别处引提交步骤一律链到这一节，不另抄。步骤种类**六种**：写单元（含码 3 容器、实例表单元）、写 journal 记录、根槽 FUA 写、系统配置槽原地覆写、屏障、**整段清零**（`zero_fill`，2026-09-22 随 mkfs 清根环与 journal 环加，用户 2026-09-19 定「录制流登记成一种新步骤、层 0 认它」）。⚠️ **mkfs 那一行的段序列不来自 E142（新池新建文件的干跑） 产物**：那份装置是 `research/` 下一份独立手写模型、不读 `crates/` 的 mkfs 实现（实验页「它答不了的」第 5 条），清零那几步它没有；那一行逐字来自活代码，由 `crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs` 的 `recorded_stream_matches_the_registered_mkfs_segment_sequence` 钉住，门禁 doc-registries 的 segment-registry 格按它比。其余各行的段序列逐字来自 E142（新池新建文件的干跑） 产物的 `name=segments` 行（`path=instance_acquisition / warm_up / transaction / post_mkfs_stream`；取号那一行不是根槽写路径，登记在这里是因为整条流按录制流切、它的两个写落在流的开头一段），单测 `registered_segment_sequences_match_every_recorded_path` 钉住它们；表与产物之间的逐字比对由门禁 doc-registries 的 segment-registry 格做（C316（提交步骤的登记位有四处且互不相同）已还清）。
 
-⚠️ **表里取 E142（新池新建文件的干跑） 产物的各行，对的是第二十一次跑的主产物** `e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out`（`scripts/replay.sh` 第 174 行登记的那份；第 35–39 行与第十九次跑的主产物逐字相同）：取号、暖机、普通发布三行与整条流那一句同产物第 36–39 行逐字相同，mkfs 那一行不按产物比、产物第 35 行与钉它的用例逐字相同；普通发布与整条流里的 12 个单元是分配记录树、extent 树按位置寻址（D8（核心索引结构） 已定项 14）之后的；每次发布末尾有系统配置轮换之后那道屏障（D16（发布语义） 已定项 7），同一块盘上连着的屏障并成一道（D13（验证路线） 已定项 4）；`name=width` 30 行 expected == actual。那一份产物没有跑层 0 整轮枚举（`name=layer0 … states=not_run closed_form=16777240 skipped=true`，够判之后不跑），整条流那一句的状态数是闭式算出来的，不是枚举出来的。
+⚠️ **表里取 E142（新池新建文件的干跑） 产物的各行，对的是第二十一次跑的主产物** `e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out`（`scripts/experiments/replay.sh` 第 174 行登记的那份；第 35–39 行与第十九次跑的主产物逐字相同）：取号、暖机、普通发布三行与整条流那一句同产物第 36–39 行逐字相同，mkfs 那一行不按产物比、产物第 35 行与钉它的用例逐字相同；普通发布与整条流里的 12 个单元是分配记录树、extent 树按位置寻址（D8（核心索引结构） 已定项 14）之后的；每次发布末尾有系统配置轮换之后那道屏障（D16（发布语义） 已定项 7），同一块盘上连着的屏障并成一道（D13（验证路线） 已定项 4）；`name=width` 30 行 expected == actual。那一份产物没有跑层 0 整轮枚举（`name=layer0 … states=not_run closed_form=16777240 skipped=true`，够判之后不跑），整条流那一句的状态数是闭式算出来的，不是枚举出来的。
 
 | 根槽写路径 | 录制流的段序列（每段的写数与种类；「种类」那串是产物 `kinds=` 字段的原样，每段一个步骤种类多重集，段之间用 `\|` 隔开，门禁 doc-registries 的 segment-registry 格逐字比对） | 出处 | 层 0 枚举 |
 |---|---|---|---|
@@ -654,13 +654,13 @@ H1、H2、H3 定义在第一节 1.2；H4 附带、够判后不跑。
 
 0. 核 S0（第十一节）：装置与变异表的 `sha256sum` 等于文件头那两个值；`deletion_write_dump.rs` 里有 `--history`、`scenario.rs` 里 `DeletionHistory::name()` 有 `h3`（S1）。第 1 次的装置与变异表没进 git（`??`），原地改会把第 1 次那一份丢掉：执行员改之前先确认主 agent 已把它们提交或另存（第五节末「待主 agent 定」那一条）。
 1. 导出（主 agent 跑；`<日期>` 取跑的那天 `TZ=Asia/Tokyo date +%F`，与第 1 次同一天也照样用带 `r2` 的新名字，不覆盖第 1 次的 `e172-deletion-write-dump-2026-10-05.out`）：
-   - `cd /home/fy5090/code/singlefs && nice -n 19 bash scripts/run-with-memory-cap.sh 4G cargo run -q -p singlefs-checker-tier --bin deletion_write_dump > research/results/e172-r2-deletion-write-dump-h1h2-<日期>.out`
-   - `cd /home/fy5090/code/singlefs && nice -n 19 bash scripts/run-with-memory-cap.sh 4G cargo run -q -p singlefs-checker-tier --bin deletion_write_dump -- --history h3 > research/results/e172-r2-deletion-write-dump-h3-<日期>.out`
+   - `cd /home/fy5090/code/singlefs && nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 4G cargo run -q -p singlefs-checker-tier --bin deletion_write_dump > research/results/e172-r2-deletion-write-dump-h1h2-<日期>.out`
+   - `cd /home/fy5090/code/singlefs && nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 4G cargo run -q -p singlefs-checker-tier --bin deletion_write_dump -- --history h3 > research/results/e172-r2-deletion-write-dump-h3-<日期>.out`
    - 两条各再跑一遍写到草稿目录，两两比 `sha256sum`（V3）。两份都整份入库。
-2. 装置按第 5.8 节改，单测：`cd /home/fy5090/code/singlefs/scripts/experiments && nice -n 19 bash ../scripts/run-with-memory-cap.sh 4G cargo test --release --bin e172-deletion-write-dry-run`。
-3. 产物：`cargo build --release --bin e172-deletion-write-dry-run`，再 `nice -n 19 bash ../scripts/run-with-memory-cap.sh 4G ./target/release/e172-deletion-write-dry-run ../results/e172-r2-deletion-write-dump-h1h2-<日期>.out ../results/e172-r2-deletion-write-dump-h3-<日期>.out > ../results/e172-r2-deletion-write-dry-run-<日期>.out`。产物不拼十六进制，每份导出各一行 `name=export_file`（文件名、sha256、行数、非十六进制行数）。
-4. `scripts/replay.sh`：第 275 行 `E172|@driver_e172||e172-deletion-write-dry-run-2026-10-05.out|exact` 改成 `E172|@driver_e172||e172-r2-deletion-write-dry-run-<日期>.out|exact`（第 1 次那份产物留在 `research/results/`，不再登记复跑：导出的系统配置槽字节变了，它复现不出来）；`driver_e172()`（第 1393–1397 行）改成先跑两次导出进两个临时文件（`$OUT_DIR/e172-r2-deletion-write-dump-h1h2.tmp` 与 `$OUT_DIR/e172-r2-deletion-write-dump-h3.tmp`，第二条带 `-- --history h3`），再把两个文件按「H1H2 在前、H3 在后」交给装置；第 1389–1392 行注释改指本登记第五节 5.7 第 4 步与两份入库导出的新文件名。H3 那一份就这样进复跑：每次复跑现导、产物第二行 `name=export_file` 带它的 sha256，导出一变那一行就对不上。
-5. 变异表整表由主 agent 跑：`cd /home/fy5090/code/singlefs/research && bash scripts/mutate.sh e172-deletion-write-dry-run scripts/experiments/e172_deletion_write_dry_run.rs mutations/e172_deletion_write_dry_run.tsv`；收尾要有「已还原，基线仍全绿」，按 `mutation-sampling.md` 那几栏数抓到 / 无效 / 没红，整表 32 条。
+2. 装置按第 5.8 节改，单测：`cd /home/fy5090/code/singlefs/scripts/experiments && nice -n 19 bash ../scripts/hosts/run-with-memory-cap.sh 4G cargo test --release --bin e172-deletion-write-dry-run`。
+3. 产物：`cargo build --release --bin e172-deletion-write-dry-run`，再 `nice -n 19 bash ../scripts/hosts/run-with-memory-cap.sh 4G ./target/release/e172-deletion-write-dry-run ../results/e172-r2-deletion-write-dump-h1h2-<日期>.out ../results/e172-r2-deletion-write-dump-h3-<日期>.out > ../results/e172-r2-deletion-write-dry-run-<日期>.out`。产物不拼十六进制，每份导出各一行 `name=export_file`（文件名、sha256、行数、非十六进制行数）。
+4. `scripts/experiments/replay.sh`：第 275 行 `E172|@driver_e172||e172-deletion-write-dry-run-2026-10-05.out|exact` 改成 `E172|@driver_e172||e172-r2-deletion-write-dry-run-<日期>.out|exact`（第 1 次那份产物留在 `research/results/`，不再登记复跑：导出的系统配置槽字节变了，它复现不出来）；`driver_e172()`（第 1393–1397 行）改成先跑两次导出进两个临时文件（`$OUT_DIR/e172-r2-deletion-write-dump-h1h2.tmp` 与 `$OUT_DIR/e172-r2-deletion-write-dump-h3.tmp`，第二条带 `-- --history h3`），再把两个文件按「H1H2 在前、H3 在后」交给装置；第 1389–1392 行注释改指本登记第五节 5.7 第 4 步与两份入库导出的新文件名。H3 那一份就这样进复跑：每次复跑现导、产物第二行 `name=export_file` 带它的 sha256，导出一变那一行就对不上。
+5. 变异表整表由主 agent 跑：`cd /home/fy5090/code/singlefs/research && bash scripts/mutation/mutate.sh e172-deletion-write-dry-run scripts/experiments/e172_deletion_write_dry_run.rs mutations/e172_deletion_write_dry_run.tsv`；收尾要有「已还原，基线仍全绿」，按 `mutation-sampling.md` 那几栏数抓到 / 无效 / 没红，整表 32 条。
 
 ### 5.8 装置要改的地方（行号是第 1 次冻结那一份 `a626e18a…` 的）
 
@@ -816,7 +816,7 @@ H1、H2、H3 定义在第一节 1.2；H4 附带、够判后不跑。
 
 ## 九、变异
 
-变异表仍是 `scripts/mutations/e172_deletion_write_dry_run.tsv`，改的是装置自己的期望与判定代码（不改 `crates/`）。单测读两份新入库的导出（找不到就判红，不跳过），另有不依赖导出的合成字节单测。
+变异表仍是 `scripts/mutation/tables/e172_deletion_write_dry_run.tsv`，改的是装置自己的期望与判定代码（不改 `crates/`）。单测读两份新入库的导出（找不到就判红，不跳过），另有不依赖导出的合成字节单测。
 
 **第 1 次的 20 条**（M1–M4、M6–M21）原样留着，含义不变。第 5.8 节的重构会挪动或改写其中几条的原文：执行员把原文改成重构后源码里唯一命中的那一段、替换文按同一个意思改，逐条在报告里写「旧原文 → 新原文」，不改它要打的那件事。目标行改了的只有一条：
 
@@ -911,9 +911,9 @@ H1、H2、H3 定义在第一节 1.2；H4 附带、够判后不跑。
 | `crates/singlefs-core/src/transaction.rs` | grep 命中行 900、2446、5876、5945、6000、6065、6087、6119 |
 | `crates/singlefs-core/src/inode_tree.rs`、`unlink.rs` | grep 命中行 286；118 |
 | `scripts/experiments/e172_deletion_write_dry_run.rs` | 结构 grep（360 行命中，草稿 `/tmp/claude-1000/e172-r2-design/device-outline.txt`）；600–632、754–767、1440–1501、1664–1730、2004–2038、2228–2354、2368–2382、2452–2935、2936–3292、3415–3437、3456–3464、3486–3573；逐行 awk 核过第十三节命令 7 那几行 |
-| `scripts/mutations/e172_deletion_write_dry_run.tsv` | 1–20（每行前 400 字） |
-| `scripts/replay.sh` | 1–40（grep `MEMORY_CAP` 与注释）、268–280、512–526、1380–1402；grep `e172` 命中行 275、1389、1393、1394、1396 |
-| `scripts/quote-kb.py` | 1–40 |
+| `scripts/mutation/tables/e172_deletion_write_dry_run.tsv` | 1–20（每行前 400 字） |
+| `scripts/experiments/replay.sh` | 1–40（grep `MEMORY_CAP` 与注释）、268–280、512–526、1380–1402；grep `e172` 命中行 275、1389、1393、1394、1396 |
+| `scripts/kb/quote-kb.py` | 1–40 |
 | `.claude/gate.d/stage-inputs.tsv` | grep `E172\|e172` 零命中 |
 | `research/results/` 目录 | `ls \| grep -i e172` 三个文件名，内容没读 |
 
@@ -921,11 +921,11 @@ H1、H2、H3 定义在第一节 1.2；H4 附带、够判后不跑。
 
 ### 13.2 跑过的命令（原样）
 
-1. `cd /home/fy5090/code/singlefs && mkdir -p /tmp/claude-1000/e172-r2-design && sha256sum research/prompts/e172-r2-questions.md research/prompts/e172-preregistration.md scripts/experiments/e172_deletion_write_dry_run.rs scripts/mutations/e172_deletion_write_dry_run.tsv; wc -l …; TZ=Asia/Tokyo date +%F; ls research/prompts/e172-r2-prereg.md` → 文件头那四个 sha256；问题单 19 行、第 1 次登记 663 行（`wc -l`；Read 读到第 664 行是末行无换行）、装置 3573 行、变异表 20 行；`2026-10-05`；重跑登记不存在。
+1. `cd /home/fy5090/code/singlefs && mkdir -p /tmp/claude-1000/e172-r2-design && sha256sum research/prompts/e172-r2-questions.md research/prompts/e172-preregistration.md scripts/experiments/e172_deletion_write_dry_run.rs scripts/mutation/tables/e172_deletion_write_dry_run.tsv; wc -l …; TZ=Asia/Tokyo date +%F; ls research/prompts/e172-r2-prereg.md` → 文件头那四个 sha256；问题单 19 行、第 1 次登记 663 行（`wc -l`；Read 读到第 664 行是末行无换行）、装置 3573 行、变异表 20 行；`2026-10-05`；重跑登记不存在。
 2. `sed -n '64,122p' research/prompts/e172-preregistration.md > …/l03-r1.txt && diff …/l03-r1.txt .claude/kb/layout/03-third-txn.md && echo SAME_L03` → `SAME_L03`。
-3. 第 1 次第二节十段按同一组取法重抄：`python3 scripts/quote-kb.py /tmp/claude-1000/e172-r2-design/r1-specs-today.md <第 1 次的十个取法>` → `✓ 10 段整抄进 …，回读逐字节一致`；`diff <(grep -v '^\*\*出处' r1-section2-body.md) <(grep -v '^\*\*出处' r1-specs-today.md)` 退出码 0。
+3. 第 1 次第二节十段按同一组取法重抄：`python3 scripts/kb/quote-kb.py /tmp/claude-1000/e172-r2-design/r1-specs-today.md <第 1 次的十个取法>` → `✓ 10 段整抄进 …，回读逐字节一致`；`diff <(grep -v '^\*\*出处' r1-section2-body.md) <(grep -v '^\*\*出处' r1-specs-today.md)` 退出码 0。
 4. `nice -n 19 python3 /tmp/claude-1000/e172-r2-design/anchors_r2.py`，输出原样：`payload_capacity 32634 content_bytes 81585`；`units 3 size 81585 blocks 160`；`units 2 size 65268 blocks 128`；`units 1 size 32634 blocks 64`；`tag6 n_live 0 98304 tag6 n_live 1 98386`；`h3 txg 6 root device 0 offset 1056768 journal_offset 16797696 sysconfig_generation 8 slot_offset 0`；`h3 txg 7 root device 1 offset 4202496 journal_offset 16801792 sysconfig_generation 9 slot_offset 4096`；`h3 txg 8 root device 0 offset 7348224 journal_offset 16805888 sysconfig_generation 10 slot_offset 0`；`h3 txg 9 root device 0 offset 1060864 journal_offset 16809984 sysconfig_generation 11 slot_offset 4096`；`T_time offset 433 width 4 value 5000 le_hex 88130000 T_dirty_low32 2147483648`。
 5. `sed -n '931,982p' crates/singlefs-core/src/mount.rs | grep -n 'writes\|acquir'; echo "exit=$?"` → `exit=1`；`grep -n 'acquisition_writes\|writes_of_the_acquisition\|instance_acquisition' crates/singlefs-core/src/mount.rs; echo "exit=$?"` → `exit=1`；同一次里 `sha256sum` 导出、场景、`system_configuration.rs` → `9b3f565e…`、`9d007793…`、`314660f247de8929d3d44bc9bcf18252c165dbb5fcf8d4a7573719cdb286729f`。
-6. 第二节：`python3 scripts/quote-kb.py /tmp/claude-1000/e172-r2-design/quote-section2.md` 加十二个取法（layout/03 一级标题、layout/01 第 93–158 行、layout/01「## 八、根槽写路径的段序列登记表…」、D8 已定项 16、D8 已定项 6、D16 已定项 5、D18 已定项 18、D18 已定项 24、D18 第 276–293 行、layout/01「## 四、文件元数据（inode）」、layout/01 第 295–311、386–387 行）→ `✓ 12 段整抄进 …，回读逐字节一致`，471 行；分四次 `sed -n` 追加进登记，追加完 `sed -n "${start},\$p" 登记 | cmp - quote-section2.md && echo QUOTE_MATCH` → `QUOTE_MATCH`。
+6. 第二节：`python3 scripts/kb/quote-kb.py /tmp/claude-1000/e172-r2-design/quote-section2.md` 加十二个取法（layout/03 一级标题、layout/01 第 93–158 行、layout/01「## 八、根槽写路径的段序列登记表…」、D8 已定项 16、D8 已定项 6、D16 已定项 5、D18 已定项 18、D18 已定项 24、D18 第 276–293 行、layout/01「## 四、文件元数据（inode）」、layout/01 第 295–311、386–387 行）→ `✓ 12 段整抄进 …，回读逐字节一致`，471 行；分四次 `sed -n` 追加进登记，追加完 `sed -n "${start},\$p" 登记 | cmp - quote-section2.md && echo QUOTE_MATCH` → `QUOTE_MATCH`。
 7. 定位与核行号：`grep -n` 装置结构（输出落草稿）；`awk 'NR==n'` 逐个核第 5.8 节引的装置行；`git status --short <E172 相关文件>`；`grep -n 'E172\|e172' .claude/gate.d/stage-inputs.tsv`（零命中）；`ls research/results/ | grep -i e172`。
-8. 登记里九处行号与措辞用 `replace-once.py` 定点改；第 5.8 节十五个改动编号与两处引用由 `D` 改成「改」（避开决策编号），用 `python3 scripts/replace-batch.py /tmp/claude-1000/e172-r2-design/relabel.json`（先 `--dry-run`，17 处各命中 1 次）；九处的命令是 `python3 scripts/replace-once.py research/prompts/e172-r2-prereg.md <旧串> <新串>` 定点改（各命中 1 次）。
+8. 登记里九处行号与措辞用 `replace-once.py` 定点改；第 5.8 节十五个改动编号与两处引用由 `D` 改成「改」（避开决策编号），用 `python3 scripts/kb/replace-batch.py /tmp/claude-1000/e172-r2-design/relabel.json`（先 `--dry-run`，17 处各命中 1 次）；九处的命令是 `python3 scripts/kb/replace-once.py research/prompts/e172-r2-prereg.md <旧串> <新串>` 定点改（各命中 1 次）。

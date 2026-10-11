@@ -78,7 +78,7 @@ PROBE_K2 new_flow_touched_16KiB_slots=2230 subset_of_old=true
 命令（日志与脚本在 `research/prompts/m3-batch58-code-r1-sonnet-model/`）：
 
 ```
-CARGO_TARGET_DIR=$W/target nice -n 19 bash scripts/run-with-memory-cap.sh 10G bash scripts/capped.sh 10 cargo test --offline --no-run -p singlefs-harness --test checker_known_bad_images --manifest-path $W/repo/Cargo.toml
+CARGO_TARGET_DIR=$W/target nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 10G bash scripts/hosts/capped.sh 10 cargo test --offline --no-run -p singlefs-harness --test checker_known_bad_images --manifest-path $W/repo/Cargo.toml
 $W/target/debug/deps/checker_known_bad_images-fa5092303c98133d under_changing_knobs_redden --test-threads 10
 ```
 

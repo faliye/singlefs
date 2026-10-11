@@ -10,7 +10,7 @@
 
 ## 一、问题
 
-英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置，不动驱动 `scripts/e165-replay-mutation-kill-bounds.sh` 与自造表）
+英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置，不动驱动 `scripts/experiments/e165-replay-mutation-kill-bounds.sh` 与自造表）
 
 主 agent 给的问题（派发提示原句，逐字；只抄与问题相关的几条，「被测条款」「实验简称」「预计挂钟」「草稿目录」的落点在本登记开头、第二节与第五节）：
 
@@ -18,7 +18,7 @@
 > 要回答的问题：`--profile r3` 档下合法一族（`--family legal`）在今天的实现上判出什么，J6Qn、J7 的阳性对照在这一档跑没跑、是不是全红。一种读法。
 > 重跑已有实验：E165（恢复重放有界穷举与变异杀伤界），第 6 次重跑。写重跑登记 `research/prompts/e165-r6-prereg.md`，节名照你定义「登记的固定节名」。
 > 登记要写死的（在问题单之外的约束）：
-> 1. 只补一条正式跑：`--profile r3 --bounds segment1 --family legal`，偶数卸载记号、直接建表、默认盘次序（与第 5 次重跑 r2 合法一族同形，`scripts/replay.sh` 第 738 行一带 r2 的驱动与第 763 行 r3 对抗驱动作样板）。要不要另跑奇数版本、两份表都取，由你按问题单第 1 行判，判了写理由；不为够判之外的格加跑。
+> 1. 只补一条正式跑：`--profile r3 --bounds segment1 --family legal`，偶数卸载记号、直接建表、默认盘次序（与第 5 次重跑 r2 合法一族同形，`scripts/experiments/replay.sh` 第 738 行一带 r2 的驱动与第 763 行 r3 对抗驱动作样板）。要不要另跑奇数版本、两份表都取，由你按问题单第 1 行判，判了写理由；不为够判之外的格加跑。
 > 2. 根：开工那一刻主工作区 `Cargo.toml`、`Cargo.lock`、`.cargo/`、`crates/` 的拷贝，记清单 sha256（照第 5 次「所有段都在同一份根上编、跑」的做法）；同一份根上再跑一次 `--profile r2 --family legal`（偶数、直接建表）当对照，用来判 r3 与 r2 合法一族的关系（照 r3 登记 5.1：r3 档对合法一族是否与 r2 逐字节同、或只差档名与 J6Qn 拆行，你按装置代码现查写成跑前预期）。别的会话在改 `crates/singlefs-core/src/mounted_session.rs` 与 checker 档两份测试模块，根取下来之后就不随主工作区变。
 > 3. 线程数：照前几次两种线程数整份逐字节相同的复核。
 > 4. 登记里写明执行员要交的：产物入 `research/results/`（名字照 `e165-replay-bounded-enumeration-2026-10-09-r6-…` 形态）、`replay.sh` 加复跑行（`exact`）、E165 装置内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red`（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 第 18287 行一带的 `formal_run_units`，今天 18 个单元）加这一跑的单元，期望集写死成这一跑产物 `name=control` 的判据集合；`crates/mutations.tsv` 追加一行只被这一单元抓到的变异（例如让 r3 档不跑 J6Qn 或 J7 对照的一行改坏；第 3383、3407、3496–3500 行是现有的 E165 行，作样板，不改它们）。单测与变异是 checker 档装置二进制的内联测试，执行员不跑它们（重型），交主 agent 跑；登记里把要主 agent 跑的命令写成原样。
@@ -28,7 +28,7 @@
 
 | # | 实验 | 问题 | 翻面观测 | 够判条件 | 状态 |
 |---|---|---|---|---|---|
-| 1 | E165（恢复重放有界穷举与变异杀伤界） | `--profile r3` 档下，合法一族在今天的实现上判出什么（各判据、各域的违例数），J6Qn、J7 的阳性对照在这一档跑没跑、是不是全红 | 某条在 r3 档判了的判据在这一跑里没有对照读数，或对照有不红的；合法一族的判定与登记的预期（含与同一份根上 `--profile r2` 合法一族的关系）对不上 | 照登记在一份记了清单的根上跑完这一跑（含登记要的线程数复核），产物入库、`scripts/replay.sh` 有复跑行、E165 装置内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red` 的单元表加上这一跑的单元（期望集取这一跑产物的 `name=control` 判据集合）并带一条只被这一单元抓到的变异 | 开着 |
+| 1 | E165（恢复重放有界穷举与变异杀伤界） | `--profile r3` 档下，合法一族在今天的实现上判出什么（各判据、各域的违例数），J6Qn、J7 的阳性对照在这一档跑没跑、是不是全红 | 某条在 r3 档判了的判据在这一跑里没有对照读数，或对照有不红的；合法一族的判定与登记的预期（含与同一份根上 `--profile r2` 合法一族的关系）对不上 | 照登记在一份记了清单的根上跑完这一跑（含登记要的线程数复核），产物入库、`scripts/experiments/replay.sh` 有复跑行、E165 装置内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red` 的单元表加上这一跑的单元（期望集取这一跑产物的 `name=control` 判据集合）并带一条只被这一单元抓到的变异 | 开着 |
 
 **读法写死（一种读法）**。这一行问了三样（判出什么、对照跑没跑、对照红不红），外加翻面观测里点名的一样（与同一份根上 r2 合法一族的关系）。第六节每个量写明它对应哪一样；四样合起来就是这一行：
 
@@ -40,11 +40,11 @@
 - **「全红」**：这一跑每一行 `name=control` 都是 `red_as_required=true`，收尾 `name=verdict scope=run` 行 `controls_not_red=0`。
 - **「与同一份根上 `--profile r2` 合法一族的关系」**：同一份根、同一个二进制跑 `--profile r2 --bounds segment1 --family legal`（偶数、直接建表、`normal`、8 线程），两份 `E7RESULT` 行逐行比。跑前预期写在第五节 5.3，判据在第六节 Y4。
 - **奇数版本与两份表都取：不跑**。理由：(1) 问题单这一行问的是 r3 档在正式跑里判了的那几条判据有没有对照；r3 档的正式跑只有 `replay.sh:763`（对抗）与 `766`（择根）两条，都不给 `--marker-parity`、`--table`，即偶数、直接建表，所以翻面观测里「某条在 r3 档判了的判据」全在偶数、直接建表这一格上；(2) 奇数版本换的是生成器（装置 `276–303`：`r2` 与 `r3` 两档的生成器是同一个 `VaryWithTheVersion(marker_parity)`），T_table、T_row 只在 `--table both` 时判（装置 `6214–6216`），两样都不是 r3 档在正式跑里判了的东西；(3) 跑了也不会让这一行翻面：它们出的对照读数属于另一个 (档, 族, 旋钮) 单元，按上面「跑了」那一条的读法不拿来补这一跑。第八节把奇数版本记成「够判后未跑」，写明它会看到什么。
-- **线程上限与内存上限**：正式跑 8 线程，复核换 4 线程（第六节 Y5）；内存上限取 `scripts/replay.sh:29` 的 `REPLAY_MEMORY_CAP` 默认值 `8G`，经 `scripts/run-with-memory-cap.sh` 跑。派发提示另给了线程上限的，取两者里小的，复核那一遍取它的一半（向下取整，至少 1），产物与第十二节写明实际取值。
+- **线程上限与内存上限**：正式跑 8 线程，复核换 4 线程（第六节 Y5）；内存上限取 `scripts/experiments/replay.sh:29` 的 `REPLAY_MEMORY_CAP` 默认值 `8G`，经 `scripts/hosts/run-with-memory-cap.sh` 跑。派发提示另给了线程上限的，取两者里小的，复核那一遍取它的一半（向下取整，至少 1），产物与第十二节写明实际取值。
 
 ## 二、被测条款与它引的定义
 
-用 `scripts/quote-kb.py` 按 `@标题`（C650（择根与重放没有合判） 与 I-8.12（同实例记录的 txg 不减） 两行按 `~正则`）整段抄进草稿目录 `~/.local/share/singlefs/work/e165-r6-designer/` 的两份出口，两次都报「回读逐字节一致」，再原样追加到这里（不转述；命令原样在第十三节）：
+用 `scripts/kb/quote-kb.py` 按 `@标题`（C650（择根与重放没有合判） 与 I-8.12（同实例记录的 txg 不减） 两行按 `~正则`）整段抄进草稿目录 `~/.local/share/singlefs/work/e165-r6-designer/` 的两份出口，两次都报「回读逐字节一致」，再原样追加到这里（不转述；命令原样在第十三节）：
 
 - `clauses.md`（7 段，258 行，sha256 `224f08a298700faf190f92dc81c596a15c403584e49f466ce363e406d2808b09`）是 r3 登记与 r5 登记第二节点名的被测条款的并集：D13（验证路线） 已定项 1（M2 语义层是 J7 五行的字面出处，M3 不动点是 J6Qn 的字面出处）、D23（journal 的角色与格式） 已定项 4、14、22，D22（单元原子性怎么合成） 已定项 24，`.claude/kb/checks-owed.md` C650 那一行，`.claude/kb/invariants.md` I-8.12 那一行（r3 登记时还没登进 invariants.md、取自 `research/prompts/m3-inv-b-r1-main-verification.md`，今天已登进，取 invariants.md 那一行）。
 - `clauses-defs.md`（2 段，65 行，sha256 `51ba9a9c9a64947774b20a047bb26fc2eba451da23cc2c00644f4544683f8c1d`）是 J7 五行用到字面的定义：D23 已定项 15（施加一条记录换哪几个字段）、D22 已定项 7（根记录字段表：卸载记号、fsid、实例表单元指针、分配记录树根指针）。
@@ -382,7 +382,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ## 三、实现今天的样子
 
-2026-10-09 在主工作区现读（行号是今天的）。主工作区这几份文件的 sha256：装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` `45ab5bcdafd27604345d16e581ab5bc95bae29f52f10b5f89fcce49203b94746`（20 250 行，`git status` 是 `M `；原样拷了一份到草稿目录 `device-at-design.rs`，同一个 sha256，给执行员开工时比对，第十一节 YH1），`crates/singlefs-core/src/recovery.rs` `be7418345d1eeb2a8e6aaf04676844bb8a05131c31f51d36d1184d3e2496871e`，`crates/singlefs-replay-prefix/src/lib.rs` `9966f42f396d22c2a90bdd35864557edd7ce45285be3d6b796ba9f8d18aa2fa4`，`crates/mutations.tsv` `01cabe488477e2666a2a700a0f6caf92d5a19b9f7f78789d90182e4b8547ae16`（3 640 行），`Cargo.toml` `4fc67af798ffb9786d37c0ef04b5f3651ad2100f252cff1fa5280a6a7a34c3c7`，`Cargo.lock` `4b1f906df826768be256512cac924bb99d7fe502058d5a4244885abc127f8e02`，`scripts/replay.sh` `31cf7c75b1ef7e6d6b0f45cbf2ab240718e7bbf7e05dfbec2e4962b3d6e2052a`。
+2026-10-09 在主工作区现读（行号是今天的）。主工作区这几份文件的 sha256：装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` `45ab5bcdafd27604345d16e581ab5bc95bae29f52f10b5f89fcce49203b94746`（20 250 行，`git status` 是 `M `；原样拷了一份到草稿目录 `device-at-design.rs`，同一个 sha256，给执行员开工时比对，第十一节 YH1），`crates/singlefs-core/src/recovery.rs` `be7418345d1eeb2a8e6aaf04676844bb8a05131c31f51d36d1184d3e2496871e`，`crates/singlefs-replay-prefix/src/lib.rs` `9966f42f396d22c2a90bdd35864557edd7ce45285be3d6b796ba9f8d18aa2fa4`，`crates/mutations.tsv` `01cabe488477e2666a2a700a0f6caf92d5a19b9f7f78789d90182e4b8547ae16`（3 640 行），`Cargo.toml` `4fc67af798ffb9786d37c0ef04b5f3651ad2100f252cff1fa5280a6a7a34c3c7`，`Cargo.lock` `4b1f906df826768be256512cac924bb99d7fe502058d5a4244885abc127f8e02`，`scripts/experiments/replay.sh` `31cf7c75b1ef7e6d6b0f45cbf2ab240718e7bbf7e05dfbec2e4962b3d6e2052a`。
 
 | 事实 | 文件:行 |
 |---|---|
@@ -421,7 +421,7 @@ cd <执行员草稿目录>/root && find Cargo.toml Cargo.lock .cargo crates -typ
 - 派发提示：同形的 r2 合法一族一跑 57.8 秒（主 agent 引 `research/results/e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-legal-family-timing.out` 末行；那份文件我没读）。对登记的影响：只用来估第五节的挂钟。
 - 装置单测 `formal_run_units` 每个单元上方的注释（装置 `18288–18624` 里那几行 `// …产物 …，N 条`）：r2 合法单元的产物 `name=control` 判据「17 条」，r3 对抗「8 条」，r1 合法「11 条」，r5 合法「16 条」等。对登记的影响：第五节 5.3 照装置代码推的这一跑对照判据集合（17 条，与 r2 合法单元的写死集合逐条相同）与这几行注释一致；它们是别人读产物数出的条数，不是这一跑的答案，Y1a 的门槛按代码与 r2 合法单元的写死集合定，不照注释。
 - D13 已定项 1 M3 那一格（第二节抄的原文）里的一句「E165（恢复重放有界穷举与变异杀伤界） 的对抗一族在界内判不动点，违例全在 I-8.12（同实例记录的 txg 不减） 不成立的记录表上（第 3 次重跑第一段）」：这是对抗一族的结论，抄条款时读到。对登记的影响：无，这一跑不跑对抗一族、不判 I-8.12 拆行。
-- `scripts/replay.sh` 第 731–736、755–761 行的注释（读驱动样板时读到）：「今天的装置在 J7a 两格上复不出」第 2 次重跑的旧产物（根环那条线 7-2 改了施加规则，登记 r5 PF2）、第 3 次第一段对抗一族的旧产物「在 J7a 分配记录树根那一格上复不出」；「计数与线程数无关（第 2 次重跑多盘一族 8 与 4 线程两遍逐字节相同）」「两段都是 8 与 4 线程两遍整份逐字节相同」。对登记的影响：J7a 在今天的实现上可能有非 0 的格（这一跑照报，不翻这一行：问题单问的是对照，判定只与同一份根上的 r2 比）；线程复核取 8 与 4 照前几次。
+- `scripts/experiments/replay.sh` 第 731–736、755–761 行的注释（读驱动样板时读到）：「今天的装置在 J7a 两格上复不出」第 2 次重跑的旧产物（根环那条线 7-2 改了施加规则，登记 r5 PF2）、第 3 次第一段对抗一族的旧产物「在 J7a 分配记录树根那一格上复不出」；「计数与线程数无关（第 2 次重跑多盘一族 8 与 4 线程两遍逐字节相同）」「两段都是 8 与 4 线程两遍整份逐字节相同」。对登记的影响：J7a 在今天的实现上可能有非 0 的格（这一跑照报，不翻这一行：问题单问的是对照，判定只与同一份根上的 r2 比）；线程复核取 8 与 4 照前几次。
 - r3 登记第三节（`318–385`）与第四节（`386–416`，读了整节）：r2 对抗一族 J6Qn「前提为真」A 85 400 / 45 149 528、AC 2 904，A6「前提为真」0、「前提为假」496，合法历史一族 11 个域 0，J7 五格全 0，r2 第四段两种建表法 0 / 0 等（那是 r3 登记引的实验页「第 2 次重跑」一节的数，2026-10-02 之前的根上量的）；r3 登记推的 t1–t6。对登记的影响：无。那几样是 r2 档 2026-10-02 的数；这一跑的比较对象是同一份根上新跑的 r2，不是它们。
 - r2 登记里 `grep -n` 命中的几行（`29`、`308`、`309`、`312`、`322`–`331`、`386`、`395`、`400`、`439`–`442`、`454`–`459`、`475`、`488`、`505`、`521`、`556`–`558`）与附录乙 `anchors_r2c.py`（`1255`–`1330`，整段读）：J6Qn、J7 五行的定义与对照、钉值 3 110 / 762 / 2 348 / 70。对登记的影响：第七节乙类照用这几个钉值，并用我自己写的脚本另算一遍（下一段）。
 - r5 登记第一节（`1–51`，读到 3-甲、3-丙 的读法）：判定字段的口径与「J7 照旧规则、J8 照新句」的分法。对登记的影响：第一节「判出什么」照 3-甲 的口径写。r5 登记第五节之后与「主 agent 认定」几节没读。
@@ -497,7 +497,7 @@ r3 登记 5.1 写「`r3` 档 = `r2` 档全部原样，另加两样」（对抗�
 5. 比对（Y1–Y8），写比对产物。
 6. 收尾核根：根里 `sha256sum -c ../root-manifest-at-start.sha256` 退 0；二进制 sha256 没变。
 7. 产物入 `research/results/`（前缀 `e165-replay-bounded-enumeration-<日期>-r6-`）：`r3-legal-family.out`、`r3-legal-family-timing.out`、`r3-legal-family-threads-second.out`、`r3-legal-family-threads-second-timing.out`、`r2-legal-family.out`、`r2-legal-family-timing.out`、`comparison.out`（Y1–Y8 每个量一行、根清单的 sha256、二进制 sha256、三遍的命令原样与退出码）。
-8. `scripts/replay.sh`：照 `driver_e165_r3_segment1_adversarial`（`763` 行）的样子加一个驱动 `driver_e165_r6_r3_legal`，命令 `--bounds segment1 --family legal --profile r3`、`E165_THREADS=8`，注释写明产物是哪份根上跑的（清单 sha256）与「主工作区 `crates/` 与根可能不同」那一句；登记行 `E165|@driver_e165_r6_r3_legal||e165-replay-bounded-enumeration-<日期>-r6-r3-legal-family.out|exact` 插在第 341 行（r3 对抗那一行）之后。r2 同根那一遍不加复跑行（它是比较对象，r2 合法一族今天在 `replay.sh` 里也没有复跑行，同 r5 登记的处置）。
+8. `scripts/experiments/replay.sh`：照 `driver_e165_r3_segment1_adversarial`（`763` 行）的样子加一个驱动 `driver_e165_r6_r3_legal`，命令 `--bounds segment1 --family legal --profile r3`、`E165_THREADS=8`，注释写明产物是哪份根上跑的（清单 sha256）与「主工作区 `crates/` 与根可能不同」那一句；登记行 `E165|@driver_e165_r6_r3_legal||e165-replay-bounded-enumeration-<日期>-r6-r3-legal-family.out|exact` 插在第 341 行（r3 对抗那一行）之后。r2 同根那一遍不加复跑行（它是比较对象，r2 合法一族今天在 `replay.sh` 里也没有复跑行，同 r5 登记的处置）。
 9. 装置单测加单元、`crates/mutations.tsv` 追加一行（第九节写死的原文）；两处都用 Edit 工具定点改，改之前核那两份文件此刻的 sha256 与第三节写的相同，不同就看别的会话改了哪里、改动碰到 `formal_run_units` 或第 3640 行之后的，停下交回（YH5）。
 10. 交回：报告里单列「要主 agent 跑的命令」（第九节原样），连同做完的、没做的。
 
@@ -592,7 +592,7 @@ r1 档生成器上那几行的 0 出自生成器的定义（r2 登记第一节�
 在 `formal_run_units` 数组里「r3 对抗」那个单元（今天 `18517–18532`）之后插入下面这个单元，数组长度 `18` 改成 `19`；注释里的 `replay.sh` 行号写加完复跑行之后 `driver_e165_r6_r3_legal` 那条命令所在的行号（现查），产物名写真的那一份：
 
 ```rust
-            // `scripts/replay.sh` 第 <行号> 行；产物 `e165-replay-bounded-enumeration-<日期>-r6-r3-legal-family.out`，17 条
+            // `scripts/experiments/replay.sh` 第 <行号> 行；产物 `e165-replay-bounded-enumeration-<日期>-r6-r3-legal-family.out`，17 条
             (
                 "r3 合法",
                 Family::LegalHistory,
@@ -641,13 +641,13 @@ E165 J7 五条在 r3 档判了不跑对照（几档并起来判时被 r2 的读�
 在仓根 `/home/fy5090/code/singlefs` 跑，线程数不另设（单测自己取 `available_parallelism`），内存上限取 `REPLAY_MEMORY_CAP` 默认 `8G`：
 
 1. 新单元在今天的装置上绿：
-   `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- tests::every_criterion_has_a_positive_control_and_every_control_is_red --exact`
+   `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- tests::every_criterion_has_a_positive_control_and_every_control_is_red --exact`
    看 `test result: ok. 1 passed`。
 2. 变异行被抓：
    `SINGLEFS_HEAVY_TESTS=commit bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --item 'E165 J7 五条在 r3 档判了不跑对照（几档并起来判时被 r2 的读数补上）'`
    看成功行写明只判了这一行、抓到 1 条；「无效」「没红」都不算。
 3. 只被这一单元抓到（加单元之前同一改动不红）：在执行员留下的根（`<执行员草稿目录>/root/`，里面的装置没有新单元）上另拷一份，在拷出的那份上把 9.2 的原文换成替换文再跑同一条单测：
-   `cp -a <执行员草稿目录>/root <执行员草稿目录>/root-mutated-without-unit && python3 scripts/replace-once.py <执行员草稿目录>/root-mutated-without-unit/crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs '            | Self::J7cUnmountMarkerWhenNothingIsApplied => run_profile.judges_j7(),' '            | Self::J7cUnmountMarkerWhenNothingIsApplied => run_profile.judges_j7() && !run_profile.splits_j6qn_by_i812(),' && cd <执行员草稿目录>/root-mutated-without-unit && SINGLEFS_HEAVY_TESTS=commit CARGO_TARGET_DIR=<执行员草稿目录>/target nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- tests::every_criterion_has_a_positive_control_and_every_control_is_red --exact`
+   `cp -a <执行员草稿目录>/root <执行员草稿目录>/root-mutated-without-unit && python3 scripts/kb/replace-once.py <执行员草稿目录>/root-mutated-without-unit/crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs '            | Self::J7cUnmountMarkerWhenNothingIsApplied => run_profile.judges_j7(),' '            | Self::J7cUnmountMarkerWhenNothingIsApplied => run_profile.judges_j7() && !run_profile.splits_j6qn_by_i812(),' && cd <执行员草稿目录>/root-mutated-without-unit && SINGLEFS_HEAVY_TESTS=commit CARGO_TARGET_DIR=<执行员草稿目录>/target nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- tests::every_criterion_has_a_positive_control_and_every_control_is_red --exact`
    看 `test result: ok. 1 passed`（绿 = 没有新单元时这条变异抓不到）。跑完删掉 `root-mutated-without-unit`。
 
 执行员能做的轻的一半：`cargo fmt -p singlefs-checker-tier -- --check` 与 `CARGO_TARGET_DIR=<执行员草稿目录>/target-main cargo test --no-run --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration`（只编不跑，确认新单元编得过）；`crates/mutations.tsv` 新行的锚点用 `grep -c` 核恰 1 次。
@@ -672,7 +672,7 @@ E165 J7 五条在 r3 档判了不跑对照（几档并起来判时被 r2 的读�
 | # | 条件 | 触发的观测 | 作废范围 |
 |---|---|---|---|
 | YV1 | 线程复核不同 | Y5 `cmp` 非 0 | r3 两遍都作废；查是计数合并还是见证取法依赖线程，交主 agent |
-| YV2 | 产物不完整或进程没正常收尾 | Y6：`name=done emitted=N` 与行数对不上；退出码非 0 且产物里没有 `name=void`、`name=halt` 行（panic，含 `assert_the_pinned_absolute_values` 断言不过）；内存包装退 250–254（`scripts/run-with-memory-cap.sh` 文件头「退出码」） | 那一遍作废；包装的退出码与命令原样交回，不绕开包装重跑 |
+| YV2 | 产物不完整或进程没正常收尾 | Y6：`name=done emitted=N` 与行数对不上；退出码非 0 且产物里没有 `name=void`、`name=halt` 行（panic，含 `assert_the_pinned_absolute_values` 断言不过）；内存包装退 250–254（`scripts/hosts/run-with-memory-cap.sh` 文件头「退出码」） | 那一遍作废；包装的退出码与命令原样交回，不绕开包装重跑 |
 | YV3 | 装置自己打了作废行 | `name=void` 行数 > 0，且条件不是 V2（V2 是对照不红，归 YF2）；例如 SV4（E1 上第一次返回根 txg 顶格的态数为 0） | 那一遍作废，原样交回 |
 | YV4 | 根在跑的过程中被动过 | 收尾 `sha256sum -c ../root-manifest-at-start.sha256` 非 0，或二进制 sha256 前后不同 | 三遍都作废 |
 | YV5 | 独立锚点与装置判红不一致 | 第七节乙类某行装置判 `red_as_required=true`（等于它的本地常量）而值不等于 `anchors_r6.py` 算的那个数；或 `anchors_r6.py` 重跑输出与第四节不同 | 对照部分作废：装置常量、锚点脚本、原登记的输入域三边对，交主 agent |
@@ -710,12 +710,12 @@ E165 J7 五条在 r3 档判了不跑对照（几档并起来判时被 r2 的读�
 | `research/prompts/e165-r5-prereg.md` | 1–51；`grep -n '^#'`（1809 起的「主 agent 认定」几节没读） |
 | `research/prompts/e165-r2-prereg.md` | `grep -n '^#'`；`grep` 命中 29、308、309、312、322–331、386、395、400、439–442、454–459、475、488、505、521、556–558；1145–1160、1255–1345 |
 | `research/prompts/e165-preregistration.md` | `grep -n '^#'`；412–441、638–670、688–695、740–755 |
-| `scripts/replay.sh` | 29；331–355（登记行）；699–793（`grep -n e165` 命中行与 720–780 整段） |
+| `scripts/experiments/replay.sh` | 29；331–355（登记行）；699–793（`grep -n e165` 命中行与 720–780 整段） |
 | `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | 150–420、1805–1813、2226–2227、2330、2505–2535、2625–2645、3110–3135（`grep`）、3470、4082、4175、4289、4322、5251、5267、5494、5586–5600、5670–5700、5783、5965、5982、6001、6120–6330、6432–6520、6520–6700（`grep`）、6751–6800、6860–6895、6940–6960、7319–7490、7672–7830、7920–7990、8195–8270、8465、8950–9005、12833、12947、17179、17346、17382、17480–17620、17640–17740、17740–17850、17878–17915、17920、18255–18420、18420–18700（`grep`）、18517–18535、18615–18660 |
 | `crates/singlefs-core/src/recovery.rs`、`crates/singlefs-replay-prefix/src/lib.rs` | `grep` 命中 1277、3423、3607、5585；3543、3980 |
 | `crates/mutations.tsv` | 1–5、3383、3407、3496–3500 |
 | `Cargo.toml`、`.cargo/config.toml`、`crates/*/Cargo.toml` | 1–40；整份；`grep -n 'path *= *"\.\./'` |
-| `scripts/quote-kb.py`、`scripts/replace-once.py`、`scripts/mutate.sh`、`.claude/gate.d/checker-tier-crates-mutation-replay.sh`、`.claude/hooks/heavy-test-guard.sh`、`scripts/crates-mutation-rows.py` | `--help` 输出；1–60（`grep`）；1–30；`grep -n 'no-run\|clippy'`；`grep -n '重复\|duplicate'`（0 命中） |
+| `scripts/kb/quote-kb.py`、`scripts/kb/replace-once.py`、`scripts/mutation/mutate.sh`、`.claude/gate.d/checker-tier-crates-mutation-replay.sh`、`.claude/hooks/heavy-test-guard.sh`、`scripts/mutation/crates-mutation-rows.py` | `--help` 输出；1–60（`grep`）；1–30；`grep -n 'no-run\|clippy'`；`grep -n '重复\|duplicate'`（0 命中） |
 | `.claude/kb/vm-harness.md` | `grep` 命中 151 |
 | `.claude/kb/invariants.md` | `grep -n 'I-8.12'` 命中 12、101 |
 | `.claude/kb/checks-owed.md` | `grep` 命中 509 |
@@ -726,9 +726,9 @@ E165 J7 五条在 r3 档判了不跑对照（几档并起来判时被 r2 的读�
 
 ```
 mkdir -p ~/.local/share/singlefs/work/e165-r6-designer
-nice -n 19 python3 scripts/quote-kb.py ~/.local/share/singlefs/work/e165-r6-designer/clauses.md '.claude/kb/decisions/13-验证路线.md@#### 已定项 1：crash refinement 先验「一次发布 + 一次崩溃 + 一次恢复」' '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 4：记录头约束在单个原子单元内，头 487 字节' '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换' '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 22：前缀判定：严格连续、断号即止' '.claude/kb/decisions/22-单元原子性怎么合成.md@#### 已定项 24：根落在同一类，且两类布局需要的是同一种机制' '.claude/kb/checks-owed.md~^\| C650 ' '.claude/kb/invariants.md~^\| I-8.12 '
+nice -n 19 python3 scripts/kb/quote-kb.py ~/.local/share/singlefs/work/e165-r6-designer/clauses.md '.claude/kb/decisions/13-验证路线.md@#### 已定项 1：crash refinement 先验「一次发布 + 一次崩溃 + 一次恢复」' '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 4：记录头约束在单个原子单元内，头 487 字节' '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换' '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 22：前缀判定：严格连续、断号即止' '.claude/kb/decisions/22-单元原子性怎么合成.md@#### 已定项 24：根落在同一类，且两类布局需要的是同一种机制' '.claude/kb/checks-owed.md~^\| C650 ' '.claude/kb/invariants.md~^\| I-8.12 '
   → ✓ 7 段整抄进 …/clauses.md，回读逐字节一致
-nice -n 19 python3 scripts/quote-kb.py ~/.local/share/singlefs/work/e165-r6-designer/clauses-defs.md '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 15：崩在记录持久之后、根槽持久之前，恢复由记录重建那次发布的根' '.claude/kb/decisions/22-单元原子性怎么合成.md@#### 已定项 7：根记录的字段表'
+nice -n 19 python3 scripts/kb/quote-kb.py ~/.local/share/singlefs/work/e165-r6-designer/clauses-defs.md '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 15：崩在记录持久之后、根槽持久之前，恢复由记录重建那次发布的根' '.claude/kb/decisions/22-单元原子性怎么合成.md@#### 已定项 7：根记录的字段表'
   → ✓ 2 段整抄进 …/clauses-defs.md，回读逐字节一致
 cp crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs ~/.local/share/singlefs/work/e165-r6-designer/device-at-design.rs
   → sha256 45ab5bcdafd27604345d16e581ab5bc95bae29f52f10b5f89fcce49203b94746
@@ -748,7 +748,7 @@ TZ=Asia/Tokyo date +%F
   → 2026-10-09
 ```
 
-登记本身用 `set -o noclobber` 排他新建、之后 `>>` 分段追加，几处行号用 `scripts/replace-once.py` 定点改过（都在落盘这一天、产物之前）。
+登记本身用 `set -o noclobber` 排他新建、之后 `>>` 分段追加，几处行号用 `scripts/kb/replace-once.py` 定点改过（都在落盘这一天、产物之前）。
 
 ## 待主 agent 认的
 
@@ -776,7 +776,7 @@ TZ=Asia/Tokyo date +%F
 5. 认。Y1a 翻面时新单元照产物写，按 YF1 记一次翻面。
 
 另外两条：
-- 执行员直接改主工作区里的 `scripts/replay.sh`、E165 装置的内联单测、`crates/mutations.tsv`（只在末尾追加），以及实验页、变更史、索引行。主工作区里 `crates/` 正被别的会话合入（删除线第 50 批会删 `crates/mutations.tsv` 第 952、953 行），所以改 `crates/mutations.tsv` 一律用 `scripts/insert-row.py` 或 `replace-once.py`，改装置单测一律用 `replace-once.py`，不整份重写。
+- 执行员直接改主工作区里的 `scripts/experiments/replay.sh`、E165 装置的内联单测、`crates/mutations.tsv`（只在末尾追加），以及实验页、变更史、索引行。主工作区里 `crates/` 正被别的会话合入（删除线第 50 批会删 `crates/mutations.tsv` 第 952、953 行），所以改 `crates/mutations.tsv` 一律用 `scripts/kb/insert-row.py` 或 `replace-once.py`，改装置单测一律用 `replace-once.py`，不整份重写。
 - 三遍跑的根照 5.6 拷，不随主工作区变。根里的 E165 装置要与 `device-at-design.rs` 逐字节相同（YH1）。
 
 ## 主 agent 认定：执行员交回（2026-10-09）

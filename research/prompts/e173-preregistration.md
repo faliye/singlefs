@@ -36,7 +36,7 @@
 
 ## 二、被测条款与它引的定义
 
-被测的是 D16（发布语义） 已定项 1 的「抬 F 的上限」「根槽这一次读坏」两行与同一节「准入」那一行（「一次准入最多 B = 4 + 2 k_tol 次发布……做满仍不够才报 ENOSPC」）；按 `@标题` 整节抄（`scripts/quote-kb.py`，回读逐字节一致），同一节里「环里最旧有效根」「抬 F 那一串」「`df`」「环深下限」与「「非空」从盘上怎么认」都是这几行引的定义，随整节进来。另抄三处引到的定义：D16 已定项 8（暖机：写行之后推到两块盘都有本实例的根）、已定项 9（空发布也写单元，c_max 的来历）、D22（单元原子性怎么合成） 字段表里「每区槽数 S」那一行（S 的取值范围）。
+被测的是 D16（发布语义） 已定项 1 的「抬 F 的上限」「根槽这一次读坏」两行与同一节「准入」那一行（「一次准入最多 B = 4 + 2 k_tol 次发布……做满仍不够才报 ENOSPC」）；按 `@标题` 整节抄（`scripts/kb/quote-kb.py`，回读逐字节一致），同一节里「环里最旧有效根」「抬 F 那一串」「`df`」「环深下限」与「「非空」从盘上怎么认」都是这几行引的定义，随整节进来。另抄三处引到的定义：D16 已定项 8（暖机：写行之后推到两块盘都有本实例的根）、已定项 9（空发布也写单元，c_max 的来历）、D22（单元原子性怎么合成） 字段表里「每区槽数 S」那一行（S 的取值范围）。
 
 **出处 `.claude/kb/decisions/16-发布语义.md:27-83`（整段抄，未转述）**
 
@@ -453,7 +453,7 @@ print(f"ceiling={C} seq={seq} F={C} gate={gate} reclaimed={rec} free_after={free
 
 ## 九、变异
 
-执行员写变异表 `scripts/mutations/e173_admission_ceiling_bad_ring_slot_dispositions.tsv`，至少下面这几条；每条写明在哪个取样点上改变输出，执行员先在单测里核「这一格在原式与变异上确实不同」再进表。
+执行员写变异表 `scripts/mutation/tables/e173_admission_ceiling_bad_ring_slot_dispositions.tsv`，至少下面这几条；每条写明在哪个取样点上改变输出，执行员先在单测里核「这一格在原式与变异上确实不同」再进表。
 
 | 变异 | 在哪一格改变输出 |
 |---|---|
@@ -498,7 +498,7 @@ print(f"ceiling={C} seq={seq} F={C} gate={gate} reclaimed={rec} free_after={free
 - V5 F4、F5 触发。
 - V6 变异表没跑完（收尾没有「已还原，基线仍全绿」）或有没红的条目没按 `mutation-sampling.md` 三分。
 
-**停机：装置与 `crates/` 对不上**（`implementation-first.md` 第 4 条：两边都查，不作废、也不当结果，停在这一格交回主 agent）。执行员在冻结树拷贝里先跑一次那份用例 `bash scripts/capped.sh <线程上限> bash scripts/run-with-memory-cap.sh <上限> cargo test -p singlefs-harness --test raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount`（harness 档；被重型测试闸拒了就不绕，写进报告，锚点照用例源码里的断言取），再让装置在同一份盘面上给出：
+**停机：装置与 `crates/` 对不上**（`implementation-first.md` 第 4 条：两边都查，不作废、也不当结果，停在这一格交回主 agent）。执行员在冻结树拷贝里先跑一次那份用例 `bash scripts/hosts/capped.sh <线程上限> bash scripts/hosts/run-with-memory-cap.sh <上限> cargo test -p singlefs-harness --test raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount`（harness 档；被重型测试闸拒了就不绕，写进报告，锚点照用例源码里的断言取），再让装置在同一份盘面上给出：
 
 | 编号 | 盘面（S = 4，照用例文件头的两份造法） | 冻结树上的值 | 装置要给的 |
 |---|---|---|---|
@@ -560,7 +560,7 @@ K1–K7 任一不符就停。K 格里装置与用例都对、而与条款（第�
 | `scripts/experiments/Cargo.toml` | 整份 |
 | `.claude/hooks/agent-write-scope.tsv` | experiment-runner、experiment-designer 那几行（11–23） |
 | `.claude/agents/experiment-runner.md` | grep `入库装置\|e7-index-bench` 的命中行 31、33、35、38、46 |
-| `scripts/claim-experiment.sh` | 1–40；`scripts/quote-kb.py --help` 前 30 行；`scripts/replace-once.py --help` 前 8 行 |
+| `scripts/kb/claim-experiment.sh` | 1–40；`scripts/kb/quote-kb.py --help` 前 30 行；`scripts/kb/replace-once.py --help` 前 8 行 |
 
 没读：`.claude/kb/experiments/` 下任何实验页、`research/results/`、`research/prompts/m3-batch10-code-r1-main-verification.md` 与那一轮的腿报告、攻方原型的 `out/`、用例文件头点名的 `records/2026-09-30-里程碑三开工第一轮.md` 与 `research/prompts/m3-root-ring-code-r3-opus-model/results/rs3z.log`。
 
@@ -575,13 +575,13 @@ diff /tmp/claude-1000/m3-batch10-code-r1/tree/crates/singlefs-core/src/allocator
 sha256sum research/prompts/m3-batch10-code-r1-snapshot/crates-sha256.txt crates/singlefs-core/src/mount.rs crates/singlefs-core/src/root_ring.rs crates/singlefs-core/src/mounted_session.rs crates/singlefs-harness/tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs
 cd /tmp/claude-1000/m3-batch10-code-r1/tree && sha256sum crates/singlefs-core/src/allocator.rs
 grep -rn '不抬 F 的空发布\|写掉那一槽\|PushEmptyUntil\|empty_publishes_until_the_slot' crates/singlefs-core/src/ | wc -l
-bash scripts/claim-experiment.sh --next
-bash scripts/claim-experiment.sh E173 上限卡在读坏槽的三种处置
-python3 scripts/quote-kb.py /tmp/claude-1000/m3-r1/batch10-ceiling-exp-design/quote-d16-item1.md '.claude/kb/decisions/16-发布语义.md@#### 已定项 1：defer 窗口取按盘回退下界的收严形态，按状态数读'
-python3 scripts/quote-kb.py /tmp/claude-1000/m3-r1/batch10-ceiling-exp-design/quote-d16-items-8-9.md '.claude/kb/decisions/16-发布语义.md@#### 已定项 8：暖机取戊，新实例的根先覆盖两块盘' '.claude/kb/decisions/16-发布语义.md@#### 已定项 9：一次空发布也写单元' '.claude/kb/decisions/22-单元原子性怎么合成.md~^\| \*\*每区槽数 S\*\* '
+bash scripts/kb/claim-experiment.sh --next
+bash scripts/kb/claim-experiment.sh E173 上限卡在读坏槽的三种处置
+python3 scripts/kb/quote-kb.py /tmp/claude-1000/m3-r1/batch10-ceiling-exp-design/quote-d16-item1.md '.claude/kb/decisions/16-发布语义.md@#### 已定项 1：defer 窗口取按盘回退下界的收严形态，按状态数读'
+python3 scripts/kb/quote-kb.py /tmp/claude-1000/m3-r1/batch10-ceiling-exp-design/quote-d16-items-8-9.md '.claude/kb/decisions/16-发布语义.md@#### 已定项 8：暖机取戊，新实例的根先覆盖两块盘' '.claude/kb/decisions/16-发布语义.md@#### 已定项 9：一次空发布也写单元' '.claude/kb/decisions/22-单元原子性怎么合成.md~^\| \*\*每区槽数 S\*\* '
 python3 /tmp/claude-1000/m3-r1/batch10-ceiling-exp-design/anchors.py
 python3 /tmp/claude-1000/m3-r1/batch10-ceiling-exp-design/anchors2.py
-python3 scripts/replace-once.py research/prompts/e173-preregistration.md <旧串> <新串>   （十三次，修本登记的措辞、文件头的 not-numbers 声明与第七节嵌入两份脚本原文，改这一句的这一次也算在内）
+python3 scripts/kb/replace-once.py research/prompts/e173-preregistration.md <旧串> <新串>   （十三次，修本登记的措辞、文件头的 not-numbers 声明与第七节嵌入两份脚本原文，改这一句的这一次也算在内）
 ```
 
 另有若干 `grep -n` / `sed -n` / `ls` / `git status --short` / `git log` 的只读命令，读到的行都列在上面的文件表里。

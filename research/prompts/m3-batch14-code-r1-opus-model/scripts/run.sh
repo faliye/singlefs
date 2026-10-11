@@ -7,4 +7,4 @@ export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="原型换参数、开层 0 枚举�
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="同一批几件原型并行跑，件数不超过线程上限"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS=${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-180}
 export SINGLEFS_LAYER0_THREADS=${SINGLEFS_LAYER0_THREADS:-$THREADS}
-nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 2G bash "$REPO/scripts/capped.sh" "$THREADS" "$ATTACK_DIR/target-$1/release/attack-b14-probe" > "$2" 2>&1
+nice -n 19 bash "$REPO/scripts/hosts/run-with-memory-cap.sh" 2G bash "$REPO/scripts/hosts/capped.sh" "$THREADS" "$ATTACK_DIR/target-$1/release/attack-b14-probe" > "$2" 2>&1

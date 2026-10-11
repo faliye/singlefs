@@ -12,9 +12,9 @@
 模型目录 `research/prompts/m3-batch10z-a-code-r1-opus-model/`。仓根执行（副本先 `rsync -a --exclude target --exclude .git` 从冻结副本拷）：
 
 ```
-bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 15 bash research/prompts/m3-batch10z-a-code-r1-opus-model/run.sh <副本> <编译目录>
-bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 15 bash research/prompts/m3-batch10z-a-code-r1-opus-model/pre10z.sh <空目录> <编译目录>
-bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 15 python3 -B research/prompts/m3-batch10z-a-code-r1-opus-model/mutate_k3.py <副本> <编译目录> <变异名…>
+bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 15 bash research/prompts/m3-batch10z-a-code-r1-opus-model/run.sh <副本> <编译目录>
+bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 15 bash research/prompts/m3-batch10z-a-code-r1-opus-model/pre10z.sh <空目录> <编译目录>
+bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 15 python3 -B research/prompts/m3-batch10z-a-code-r1-opus-model/mutate_k3.py <副本> <编译目录> <变异名…>
 ATTACK_MODEL=1 （同上一条，副本的 crates/singlefs-harness/tests/ 先放进两份模型）
 ```
 

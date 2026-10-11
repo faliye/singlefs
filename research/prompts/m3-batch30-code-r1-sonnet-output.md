@@ -30,10 +30,10 @@ crates/mutations.tsv: OK
 
 ### 0.3 变异表静态判（在冻结副本上）
 
-命令：`python3 scripts/crates-mutation-rows.py static-check /home/fy5090/.local/share/singlefs/work/m3-batch30-code-r1/tree`，原样输出：
+命令：`python3 scripts/mutation/crates-mutation-rows.py static-check /home/fy5090/.local/share/singlefs/work/m3-batch30-code-r1/tree`，原样输出：
 
 ```
-COPIED	crates Cargo.toml Cargo.lock litmus scripts/run-with-memory-cap.sh scripts/crates-mutation-rows.py
+COPIED	crates Cargo.toml Cargo.lock litmus scripts/hosts/run-with-memory-cap.sh scripts/mutation/crates-mutation-rows.py
 ANCHOR	1352	C577 结清 ②：litmus「轮换之后屏障」的 P0 去掉轮换之后那道屏障，与录制流里发布最后三步对不上	文件 litmus/publish-returns-after-the-rotation-barrier.litmus 不存在
 CHECKED	3039	301	9
 exit=1

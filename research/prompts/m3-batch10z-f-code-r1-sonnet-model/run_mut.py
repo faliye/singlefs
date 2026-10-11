@@ -9,8 +9,8 @@ if not os.path.isdir(tree):
     shutil.copytree(W + '/copy-a', tree, symlinks=True)
 env = dict(os.environ, CARGO_TARGET_DIR=tgt)
 def run(args, timeout=600):
-    cmd = ['nice', '-n', '19', 'bash', REPO + '/scripts/run-with-memory-cap.sh', '1G',
-           'bash', REPO + '/scripts/capped.sh', '2', 'cargo', 'test', '--offline'] + args
+    cmd = ['nice', '-n', '19', 'bash', REPO + '/scripts/hosts/run-with-memory-cap.sh', '1G',
+           'bash', REPO + '/scripts/hosts/capped.sh', '2', 'cargo', 'test', '--offline'] + args
     t = time.time()
     p = subprocess.run(cmd, cwd=tree, env=env, capture_output=True, text=True, timeout=timeout)
     return p.returncode, p.stdout + p.stderr, time.time() - t

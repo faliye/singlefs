@@ -6,7 +6,7 @@ for v in wgpu std; do
   cp "$W/gpu_unit_checks.orig.rs" "$W/k4copy/crates/singlefs-checker-tier/src/gpu_unit_checks.rs"
   python3 "$MD/k4_shadow.py" "$W/k4copy" "$v" > /dev/null || exit 3
   echo "variant=$v mod_lines=$(grep -c "mod $v {" "$W/k4copy/crates/singlefs-checker-tier/src/gpu_unit_checks.rs")"
-  ( cd "$W/k4copy" && CARGO_TARGET_DIR="$W/target-k4" nice -n 19 bash /home/fy5090/code/singlefs/scripts/capped.sh 8 cargo check --offline -p singlefs-checker-tier --features gpu --lib > "$W/k4-check-$v.log" 2>&1; echo "check $v rc=$?" )
+  ( cd "$W/k4copy" && CARGO_TARGET_DIR="$W/target-k4" nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 8 cargo check --offline -p singlefs-checker-tier --features gpu --lib > "$W/k4-check-$v.log" 2>&1; echo "check $v rc=$?" )
   grep -E 'Checking singlefs-checker-tier|^warning|^error|Finished' "$W/k4-check-$v.log" | head -5
   python3 "$MD/scan_port.py" "$W/k4copy/crates/singlefs-checker-tier/src/gpu_unit_checks.rs"
 done
@@ -18,7 +18,7 @@ old = "                    Ok(Ok(::wgpu::PollStatus::QueueEmpty))\n"
 assert s.count(old) == 1
 open(p, 'w').write(s.replace(old, "                    Ok(Ok(::wgpu::PollStatus::NoSuchVariant))\n"))
 PY
-( cd "$W/k4copy" && CARGO_TARGET_DIR="$W/target-k4" nice -n 19 bash /home/fy5090/code/singlefs/scripts/capped.sh 8 cargo check --offline -p singlefs-checker-tier --features gpu --lib > "$W/k4-check-negative.log" 2>&1; echo "check negative rc=$?" )
+( cd "$W/k4copy" && CARGO_TARGET_DIR="$W/target-k4" nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 8 cargo check --offline -p singlefs-checker-tier --features gpu --lib > "$W/k4-check-negative.log" 2>&1; echo "check negative rc=$?" )
 grep -E '^error\[' "$W/k4-check-negative.log" | head -1
 python3 - "$W/gpu_unit_checks.orig.rs" "$W/scan-negative.rs" <<'PY'
 import sys

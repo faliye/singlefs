@@ -35,7 +35,7 @@
 
 做法：在副本里写探针 `b19_sonnet_probe.rs`（放进副本 `crates/singlefs-harness/tests/`）。历史由实现自己写：mkfs → 可写挂载 k 次 → 在最后一次挂载里推 z 次零单元发布 → 写第一个文件（默认 768 MiB 环、两块 4 GiB 内存稀疏盘）；每格打印数据单元相对 U 的偏移、I-5.5 判定、池级 checker 判红清单。cargo 经 `run-with-memory-cap.sh` 与 `capped.sh` 起，线程 4–8。
 
-命令（工作目录副本根，`CARGO_TARGET_DIR` 指副本的 target）：`bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 4 cargo test -p singlefs-harness --test b19_sonnet_probe -- --nocapture`，`B19_KS`、`B19_ZS` 环境变量定格子。原始日志 `research/prompts/m3-formal-code-b19-r1-sonnet-model/out/scan1.log`（k=1、2 全 z=0..30，k=3 的 z=0..2，共 65 格；第一次起的串行扫，撞 240 秒前台上限被截断）与 `…/out/scan3.log`（k=3..14、z=0，12 格）。
+命令（工作目录副本根，`CARGO_TARGET_DIR` 指副本的 target）：`bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 4 cargo test -p singlefs-harness --test b19_sonnet_probe -- --nocapture`，`B19_KS`、`B19_ZS` 环境变量定格子。原始日志 `research/prompts/m3-formal-code-b19-r1-sonnet-model/out/scan1.log`（k=1、2 全 z=0..30，k=3 的 z=0..2，共 65 格；第一次起的串行扫，撞 240 秒前台上限被截断）与 `…/out/scan3.log`（k=3..14、z=0，12 格）。
 
 汇总（命令数出来的）：
 

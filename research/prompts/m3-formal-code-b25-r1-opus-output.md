@@ -7,9 +7,9 @@
 在主仓根下（整条脚本经内存包装，脚本里不再套包装；段之间互不依赖）：
 
 ```
-bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 6 \
+bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 6 \
   bash research/prompts/m3-formal-code-b25-r1-opus-model/tools/rerun.sh <草稿目录> k1-targeted k1-long k1-bound k1-rollback-mutations k1-container-number k2-device
-bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 6 \
+bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 6 \
   bash research/prompts/m3-formal-code-b25-r1-opus-model/tools/rerun.sh <草稿目录> k1-sweep
 ```
 
@@ -269,7 +269,7 @@ E7RESULT name=verdict s1_failed_checks=0 s13=equivalence_pairing q5_not_run=equi
 ## 要主 agent 跑的命令
 
 - 复跑：本报告开头两条（`k1-sweep` 那一条超过前台时限，用 run_in_background 起）。
-- 想把 K1-b 的结论引进 kb：在入库装置上照 T13 加用例与两行变异之后，跑 `bash scripts/mutate.sh` 那两行（harness 档）。
+- 想把 K1-b 的结论引进 kb：在入库装置上照 T13 加用例与两行变异之后，跑 `bash scripts/mutation/mutate.sh` 那两行（harness 档）。
 - 想坐实 K2-b 是不是只是方法上的洞：在入库装置上把对拍 k 临时加到 6（或照改法丁按单元成对取），跑一遍主取样点的 `confirmed-loss-form`，看 `mismatching_states`。这一步是判决要不要引的事，不归攻方腿。
 
 ## 没做什么
@@ -282,7 +282,7 @@ E7RESULT name=verdict s1_failed_checks=0 s13=equivalence_pairing q5_not_run=equi
 
 ## 引文核对
 
-`python3 scripts/cite-check.py research/prompts/m3-formal-code-b25-r1-opus-output.md --root scripts/experiments/target/e171-r1-frozen-tree --root . --background research/prompts/_m3-formal-code-b25-r1-background.md` 末行：
+`python3 scripts/agents/cite-check.py research/prompts/m3-formal-code-b25-r1-opus-output.md --root scripts/experiments/target/e171-r1-frozen-tree --root . --background research/prompts/_m3-formal-code-b25-r1-background.md` 末行：
 
 ```
   ✓ 核了 39 处引文，对上 39 处，没判 0 处（逐处列在上面）

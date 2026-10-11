@@ -378,7 +378,7 @@ ow=4 units=15 batches=1 band=154..158 silent=148..153 at136=TEST-RED-ON-CORRECT
 
 ## 引文核对
 
-`python3 scripts/cite-check.py research/prompts/m3-formal-code-b23-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b23-r1/tree --root . --background research/prompts/_m3-formal-code-b23-r1-background.md` 末行：
+`python3 scripts/agents/cite-check.py research/prompts/m3-formal-code-b23-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b23-r1/tree --root . --background research/prompts/_m3-formal-code-b23-r1-background.md` 末行：
 
 ```
   ✓ 核了 28 处引文，对上 28 处，没判 0 处（逐处列在上面）

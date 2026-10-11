@@ -20,8 +20,8 @@ run dispatch-guard nice -n 19 bash "$here/probe-dispatch-guard.sh" "$scratch/w-d
 run guard-spot-checks nice -n 19 bash "$here/probe-guard-spot-checks.sh" "$scratch/w-guard-spot-checks"
 run flat-draft nice -n 19 bash "$here/probe-flat-draft.sh" "$scratch/w-flat-draft"
 start="$(date +%s.%N)"
-run lib-heavy-tests-selftest nice -n 19 bash scripts/capped.sh 8 python3 .claude/hooks/lib_heavy_tests.py --selftest
-run heavy-test-guard-selftest nice -n 19 bash scripts/capped.sh 8 bash .claude/hooks/heavy-test-guard.sh --selftest
+run lib-heavy-tests-selftest nice -n 19 bash scripts/hosts/capped.sh 8 python3 .claude/hooks/lib_heavy_tests.py --selftest
+run heavy-test-guard-selftest nice -n 19 bash scripts/hosts/capped.sh 8 bash .claude/hooks/heavy-test-guard.sh --selftest
 echo "两份钩子自证合计秒数 $(echo "$(date +%s.%N) - $start" | bc)"
-run crash-amp-selftest nice -n 19 bash scripts/capped.sh 8 bash scripts/crash-amplification.sh --selftest
+run crash-amp-selftest nice -n 19 bash scripts/hosts/capped.sh 8 bash scripts/crash/crash-amplification.sh --selftest
 exit "$failed"

@@ -28,7 +28,7 @@
 | 编号 | 格 | 打中了什么 | 现查 | 判决与改法 |
 |---|---|---|---|---|
 | B1 / 正推 G3 | G3 | 59 号「计数：」行没有 💥、⚠️ 两栏；进程没跑完的落「无效」或「没红」，都判红；改后文字说「那一行各栏都有」「💥 不判失败」对 59 号不成立 | `59-crates-mutation-replay.sh` 的 `judge_one` 属实：编译错误记 invalid，否则记 failure（「没跑到」） | 站不住。mutation-sampling.md 与 mutation-triage.md 写明 59 号没有这两栏、两种落法都判红；「💥 不判失败」限定为 `mutate.sh` |
-| B2 | G2 | 崩溃验证员的六条路径对 57、59 太宽，别的会话动了 59 号不读的 `scripts/` 文件也会停；停下之后 main-agent 没有出路 | 属实（`stage-inputs.tsv` 59 号只登记 `scripts/run-with-memory-cap.sh`） | 站不住。改成每道取自己的输入（55、59 取登记行，57 取 `litmus crates .claude/scripts/lkmm.sh`，都加阶段脚本本身）；停下之后主 agent 照第 9 条协商 |
+| B2 | G2 | 崩溃验证员的六条路径对 57、59 太宽，别的会话动了 59 号不读的 `scripts/` 文件也会停；停下之后 main-agent 没有出路 | 属实（`stage-inputs.tsv` 59 号只登记 `scripts/hosts/run-with-memory-cap.sh`） | 站不住。改成每道取自己的输入（55、59 取登记行，57 取 `litmus crates .claude/scripts/lkmm.sh`，都加阶段脚本本身）；停下之后主 agent 照第 9 条协商 |
 | B3 | G2 | 漏了 `lkmm.sh`、阶段脚本、未跟踪的 `src/bin`、`tests` | 属实 | 同 B2 一并改：路径补上，未跟踪文件要没有输出 |
 | B4 | G1 | 三行放进同一次调用后退出码永远是 `git worktree remove` 的，「判绿之后才往下」无退出码可依；每次留一个临时目录 | 主 agent 用桩复现：改后第三行在 0 / 1 / 250 / 251 四种结局下整次调用退同一个数，临时目录与 worktree 都不留 | 站不住。54 号打印的第三行改成保留 `--full` 的退出码、清理临时目录；main-agent 写明看这次调用退 0 |
 | B5 | G1 | 复用名单漏了 87 号 | `87-replay.sh` 调 `stage-must-run.sh` 属实 | 改：三处补 87 |

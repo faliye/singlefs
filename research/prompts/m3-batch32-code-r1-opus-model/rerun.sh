@@ -3,7 +3,7 @@
 # 用法：SINGLEFS_REPO=<冻结副本根> SINGLEFS_TOOLS=<有 scripts 的仓根> [THREADS=4] bash rerun.sh <工作目录> [all|build|run]
 #   all（默认）= build 再 run；build 要求工作目录是空的；run 接在同一个目录的 build 之后。前台一条命令有时限时分两步起。
 # 变量：SINGLEFS_REPO 是被判的那棵树（冻结副本 ~/.local/share/singlefs/work/m3-batch32-code-r1/tree）；
-#       SINGLEFS_TOOLS 是取内存包装 scripts/run-with-memory-cap.sh 与线程包装 scripts/capped.sh 的仓根（包装脚本另给的变量）；
+#       SINGLEFS_TOOLS 是取内存包装 scripts/hosts/run-with-memory-cap.sh 与线程包装 scripts/hosts/capped.sh 的仓根（包装脚本另给的变量）；
 #       THREADS 是编译线程数（默认 4）。跑的每一件单线程、经内存包装 4G，同批 4 件并行。
 # 做什么：把冻结副本拷进工作目录，给 walk.rs 副本加臂开关（patch_walk_arms.py、patch_walk_arms_2.py），
 #         把 checker_known_bad_images.rs 原样拷成 opus_b32_probe.rs 再接上 probe_tail.rs、probe_tail_p4p2.rs，
@@ -24,8 +24,8 @@ build() {
   python3 "$here/patch_walk_arms_2.py" "$work/tree/crates/singlefs-checker/src/walk.rs"
   local tests_dir="$work/tree/crates/singlefs-harness/tests"
   cat "$tests_dir/checker_known_bad_images.rs" "$here/probe_tail.rs" "$here/probe_tail_p4p2.rs" > "$tests_dir/opus_b32_probe.rs"
-  ( cd "$work/tree" && CARGO_TARGET_DIR="$work/target" nice -n 19 bash "$tools/scripts/run-with-memory-cap.sh" 6G \
-      bash "$tools/scripts/capped.sh" "$threads" \
+  ( cd "$work/tree" && CARGO_TARGET_DIR="$work/target" nice -n 19 bash "$tools/scripts/hosts/run-with-memory-cap.sh" 6G \
+      bash "$tools/scripts/hosts/capped.sh" "$threads" \
       cargo test --release --offline --no-run -p singlefs-harness --test opus_b32_probe ) > "$work/build.log" 2>&1
   grep -o '/[^ ]*/release/deps/opus_b32_probe-[0-9a-f]*' "$work/build.log" | tail -n 1 > "$work/binary.txt"
   [ -x "$(cat "$work/binary.txt")" ] || { echo "没编出探针二进制，见 $work/build.log" >&2; exit 3; }

@@ -4,7 +4,7 @@
 #   quick  t1（靶向第二截那条用例的输入）× 5 个开关、t3 种子 0（第三截判别力那条用例的输入）× 7 个开关 × {基线, 加 V242u}，再加 F3 原型两趟（约 3 分钟）
 #   sweep  t3 种子 k×4096（k=1–42）三批：加 V242u、基线、加 V242u 与 F3 原型（约 9 分钟）
 #   rand   BROAD 比重的随机历史 60 段（种子 k×4096，k=1–60，8 步、每段 16 个崩溃态）基线（约 3 分钟）
-# 线程上限 B18_THREADS（默认 6）；每趟经 scripts/run-with-memory-cap.sh，上限 64M（原型单趟峰值约 24M）。
+# 线程上限 B18_THREADS（默认 6）；每趟经 scripts/hosts/run-with-memory-cap.sh，上限 64M（原型单趟峰值约 24M）。
 # 判结果：读工作目录 out/ 下各文件的 t1 / t3 / rand 行与 per-trial.txt；报告里引的行就是这些。
 set -euo pipefail
 MODEL=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -13,7 +13,7 @@ mode=${1:-quick}
 TREE=${2:-/tmp/claude-1000/m3-formal-code-b18-r1/tree}
 WORK=${3:-${TMPDIR:-/tmp}/b18-opus-rerun}
 THREADS=${B18_THREADS:-6}
-CAP="bash $REPO/scripts/run-with-memory-cap.sh 64M"
+CAP="bash $REPO/scripts/hosts/run-with-memory-cap.sh 64M"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑攻方原型上限固定为六十四兆不随峰值表变"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="复跑攻方原型小批并行各件互不共享状态"
 
@@ -37,7 +37,7 @@ old = '    "crates/singlefs-reference-filesystem",\n]'
 assert t.count(old) == 1, "工作区成员表的末行对不上"
 p.write_text(t.replace(old, '    "crates/singlefs-reference-filesystem",\n    "crates/b18-attack-proto",\n]'))
 PY
-(cd "$WORK/copy" && CARGO_TARGET_DIR="$WORK/target" nice -n 19 bash "$REPO/scripts/capped.sh" "$THREADS" cargo build --offline -p b18-attack-proto)
+(cd "$WORK/copy" && CARGO_TARGET_DIR="$WORK/target" nice -n 19 bash "$REPO/scripts/hosts/capped.sh" "$THREADS" cargo build --offline -p b18-attack-proto)
 B="$WORK/target/debug/b18-attack-proto"
 
 # 一波最多 THREADS 件并行，每件的退出码写进 out/<名>.rc；收齐之后数一遍，件数对不上整波作废。

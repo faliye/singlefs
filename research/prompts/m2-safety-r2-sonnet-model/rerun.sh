@@ -27,15 +27,15 @@ echo "==> 编译 + 跑（按项目纪律套内存与线程上限；这两个数�
 cd "$WORK_DIR"
 MEMORY_CAP="${SINGLEFS_RERUN_MEMORY_CAP:-10G}"
 THREAD_CAP="${SINGLEFS_RERUN_THREAD_CAP:-8}"
-bash "$REPO_ROOT/scripts/run-with-memory-cap.sh" "$MEMORY_CAP" \
-    bash "$REPO_ROOT/scripts/capped.sh" "$THREAD_CAP" \
+bash "$REPO_ROOT/scripts/hosts/run-with-memory-cap.sh" "$MEMORY_CAP" \
+    bash "$REPO_ROOT/scripts/hosts/capped.sh" "$THREAD_CAP" \
     cargo test -p singlefs-core --lib admission::
-bash "$REPO_ROOT/scripts/run-with-memory-cap.sh" "$MEMORY_CAP" \
-    bash "$REPO_ROOT/scripts/capped.sh" "$THREAD_CAP" \
+bash "$REPO_ROOT/scripts/hosts/run-with-memory-cap.sh" "$MEMORY_CAP" \
+    bash "$REPO_ROOT/scripts/hosts/capped.sh" "$THREAD_CAP" \
     cargo test -p singlefs-harness --test s4_r2_candidates -- --nocapture --test-threads 1
 # 上面这条里 width=384、candidate=a3 的 k 循环（0..=80）跑满要超过 40 分钟（checker 成本随历史变长）；
 # 本腿的报告只测到 k=66 就因时长预算主动停止。width=384、candidate=A4 的数据靠下面这份独立小测试补上（26 秒内跑完）：
 cp "$HERE/tests/s4_r2_width384_a4_supplement.rs" "$WORK_DIR/crates/singlefs-harness/tests/s4_r2_width384_a4_supplement.rs"
-bash "$REPO_ROOT/scripts/run-with-memory-cap.sh" "$MEMORY_CAP" \
-    bash "$REPO_ROOT/scripts/capped.sh" "$THREAD_CAP" \
+bash "$REPO_ROOT/scripts/hosts/run-with-memory-cap.sh" "$MEMORY_CAP" \
+    bash "$REPO_ROOT/scripts/hosts/capped.sh" "$THREAD_CAP" \
     cargo test -p singlefs-harness --test s4_r2_width384_a4_supplement -- --nocapture

@@ -3,5 +3,5 @@
 W=$HOME/.local/share/singlefs/work/m3-batch10z-tu-code-r1-sonnet
 name=$1; test=$2; shift 2
 cd "$W/tree-b"
-env "$@" nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 3G bash /home/fy5090/code/singlefs/scripts/capped.sh 3 "$(cat $W/runs/atkbin)" --ignored --nocapture --exact "$test" > "$W/runs/$name.log" 2>&1
+env "$@" nice -n 19 bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 3G bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 3 "$(cat $W/runs/atkbin)" --ignored --nocapture --exact "$test" > "$W/runs/$name.log" 2>&1
 echo $? > "$W/runs/$name.rc"

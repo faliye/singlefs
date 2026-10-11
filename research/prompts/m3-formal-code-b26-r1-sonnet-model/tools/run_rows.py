@@ -30,8 +30,8 @@ for lineno in wanted:
             filters.append(test)
         os.environ.setdefault("RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON", "草稿副本里单跑变异行取宽上限")
         os.environ.setdefault("RUN_WITH_MEMORY_CAP_PARALLEL_REASON", "同一会话下正推腿与攻方腿各跑各的")
-        argv = ["nice", "-n", "19", "bash", f"{repo}/scripts/capped.sh", "7", "timeout", "220",
-                "bash", f"{repo}/scripts/run-with-memory-cap.sh", "12G",
+        argv = ["nice", "-n", "19", "bash", f"{repo}/scripts/hosts/capped.sh", "7", "timeout", "220",
+                "bash", f"{repo}/scripts/hosts/run-with-memory-cap.sh", "12G",
                 "cargo", "test", "--offline", "--manifest-path", f"{work}/Cargo.toml", *head, "--", *filters]
         log = os.path.join(logdir, f"row-{lineno}.log")
         with open(log, "w") as out:

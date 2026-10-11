@@ -11,11 +11,11 @@
 
 ```
 rsync -a --exclude target --exclude .git ~/.local/share/singlefs/work/m3-batch10z-c-code-r1/tree/ <拷贝>/
-bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 6 \
+bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 6 \
   bash research/prompts/m3-batch10z-c-code-r1-opus-model/run.sh <拷贝> <编译目录>
-bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 6 \
+bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 6 \
   python3 research/prompts/m3-batch10z-c-code-r1-opus-model/mutate_10zc.py <拷贝> <编译目录> <变异名…>      # 不给名字列出 15 个
-bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 6 \
+bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 6 \
   python3 research/prompts/m3-batch10z-c-code-r1-opus-model/mutate_10zc.py <拷贝> <编译目录> --with-models endings-notify-one record-the-caught-after-waiting
 ```
 

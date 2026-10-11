@@ -8,7 +8,7 @@ frozen="$1"; D="$2"; shift 2
 items=("$@"); [ ${#items[@]} -eq 0 ] && items=(k3 k2first k2second k4)
 here="$(cd "$(dirname "$0")/.." && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
-W="$repo/scripts/run-with-memory-cap.sh"; C="$repo/scripts/capped.sh"
+W="$repo/scripts/hosts/run-with-memory-cap.sh"; C="$repo/scripts/hosts/capped.sh"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑 m3-formal-code-r2 攻方原型，逐段历史的峰值不同"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="复跑 m3-formal-code-r2 攻方原型 r2probe"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS=600

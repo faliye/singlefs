@@ -5,5 +5,5 @@
 2026-09-24 killed own scan pid 1389463 (model bug: truncate by >=2 levels leaks the position-0 spine; checker caught it as I-3.1)
 2026-09-24 started parallel S2 scan (bin-scan3, same source as scan.out) into out/scan-s2.out; main scan.out will be stopped after its 8 S1 lines
 2026-09-24 resumed session: scan.out had 2/8 S1 lines (no end date), scan-s2.out empty; starting one scan for remaining 10 configs into out/scan-rest.out with bin-scan3, 30 threads
-2026-09-24 coordinator: thread cap 4; scan-rest (30 threads) left running per instruction; later runs via scripts/capped.sh 4
+2026-09-24 coordinator: thread cap 4; scan-rest (30 threads) left running per instruction; later runs via scripts/hosts/capped.sh 4
 2026-09-24 scan-rest.out: S2-GlobalRadix panicked (closed_form u64 overflow, segment >=64 writes; Tally.closed_form sum overflow). Fixed to u128 (bin-final2); rerunning GlobalRadix + GlobalRadixInline with capped 4 into out/scan-radix.out

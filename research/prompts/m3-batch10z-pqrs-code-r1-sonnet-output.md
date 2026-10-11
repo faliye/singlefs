@@ -14,7 +14,7 @@ $ cd <冻结副本> && sha256sum -c research/prompts/m3-batch10z-pqrs-code-r1-sn
 
 做法（都在冻结副本的拷贝上，冻结副本没改）：
 
-- 第 K1–K3 格：拷贝 `tree-a`，把上一轮正推腿的随机历史探针（`research/prompts/m3-batch10z-no-code-r1-sonnet-model/src/s2_probe.rs.txt`）改到新接口，建成 harness 档用例 `p10z_probe`（release，`bash scripts/run-with-memory-cap.sh 3G bash scripts/capped.sh 1 <二进制>` 起，一件一个进程）。新增：动作 `W`/`N`/`S`/`G`/`H`（写；被「推满仍不够」拒时当场记报告、独立重算再显式推环、再写一次）、`P`（显式推环）、`X`（卸载再挂）、`K`（不卸载直接崩了再挂）、`J`（往根环表注入多槽 C）；环境变量 `P_FAIL_AT`（推环里第 n 次写报块设备错）、`P_CRASH`（推环里每条根写之前与之后的镜像各挂一次、再写 4 次、判 I-7.4 与 I-4.8）。
+- 第 K1–K3 格：拷贝 `tree-a`，把上一轮正推腿的随机历史探针（`research/prompts/m3-batch10z-no-code-r1-sonnet-model/src/s2_probe.rs.txt`）改到新接口，建成 harness 档用例 `p10z_probe`（release，`bash scripts/hosts/run-with-memory-cap.sh 3G bash scripts/hosts/capped.sh 1 <二进制>` 起，一件一个进程）。新增：动作 `W`/`N`/`S`/`G`/`H`（写；被「推满仍不够」拒时当场记报告、独立重算再显式推环、再写一次）、`P`（显式推环）、`X`（卸载再挂）、`K`（不卸载直接崩了再挂）、`J`（往根环表注入多槽 C）；环境变量 `P_FAIL_AT`（推环里第 n 次写报块设备错）、`P_CRASH`（推环里每条根写之前与之后的镜像各挂一次、再写 4 次、判 I-7.4 与 I-4.8）。
 - 报告的独立口径：报里的次数 n 用「从现行 txg 起逐次发布数到 C 记着落点的每一槽都被写到」暴力数（不用 `root_ring_push_target` 的算法）；挡着的槽数用「C 全部落点盖住的槽里隔离位置着的个数」另数；R 的 txg 与录下来的 R 比。三个量任一对不上，探针打 `!needs`、`!iso`、`rNe`。
 - 第 K4 格：拷贝 `tree-m`，在 `mounted_session.rs`、`allocator.rs`、`mount.rs` 上套 25 个变异，各编、各跑入库用例文件（`--test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table`，release，35 过 1 个 ignored）。
 - 第 K4、K5 格的 GPU 与崩溃放量扫源码用例：checker 档测试不跑；把三条（`the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking`、`the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call`、`a_card_hands_out_its_own_device_and_its_own_device_condition`）与 `every_layer_handed_the_stop_request_hands_it_on_or_asks_it` 的测试体与帮助函数从冻结副本源码按行区间机械抽出，只把 `include_str!` 换成读文件，做成两个独立小程序（不进 checker 包），喂改过的源码文本报 GREEN 或 RED。
@@ -467,9 +467,9 @@ crash_amplification.rs:3574:#[cfg(test)]
 - 现行产品代码上扫源码模型判绿（不会因为这一批把已有的合法写法判红）：
 
 ```
-$ GPU_SRC=~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1/tree/crates/singlefs-checker-tier/src/gpu_unit_checks.rs bash scripts/run-with-memory-cap.sh 1G ~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet/target-scan/release/scan-gpu
+$ GPU_SRC=~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1/tree/crates/singlefs-checker-tier/src/gpu_unit_checks.rs bash scripts/hosts/run-with-memory-cap.sh 1G ~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet/target-scan/release/scan-gpu
 GREEN
-$ CRASH_SRC=~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1/tree/crates/singlefs-checker-tier/src/crash_amplification.rs bash scripts/run-with-memory-cap.sh 1G ~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet/target-scan/release/scan-crash
+$ CRASH_SRC=~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1/tree/crates/singlefs-checker-tier/src/crash_amplification.rs bash scripts/hosts/run-with-memory-cap.sh 1G ~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet/target-scan/release/scan-crash
 GREEN
 ```
 
@@ -525,13 +525,13 @@ K5_use_wildcard_enum: RED the_card_pool_module_shadows_n
 
 ## 9. 与规则的出入、清理
 
-- 出入：`shadowprobe/k5.bin` 第一次是直接执行的（只打一行 `ok`），随后经 `run-with-memory-cap.sh` 重跑一遍；`shadow-a.rs` 到 `shadow-e.rs` 编了没跑；其余编出来的二进制（`p10z_probe`、`scan-gpu`、`scan-crash`、用例文件的测试二进制）都经 `bash scripts/run-with-memory-cap.sh` 起，一次一件，内存上限 1G 到 12G，线程不超过 15。
+- 出入：`shadowprobe/k5.bin` 第一次是直接执行的（只打一行 `ok`），随后经 `run-with-memory-cap.sh` 重跑一遍；`shadow-a.rs` 到 `shadow-e.rs` 编了没跑；其余编出来的二进制（`p10z_probe`、`scan-gpu`、`scan-crash`、用例文件的测试二进制）都经 `bash scripts/hosts/run-with-memory-cap.sh` 起，一次一件，内存上限 1G 到 12G，线程不超过 15。
 - 草稿目录里的拷贝与编译目录已删（删前 `du -sh`）：`target-a` 528M、`target-ctl` 528M、`target-m` 842M、`target-scan` 1.1M、`tree-a` 22M、`tree-m` 22M；`tree-a` 与 `target-a` 为补 `nr-crash-before-root` 日志重建过一次（又 22M、528M），也已删。路径都在 `~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet/` 下。留着的是日志与脚本草稿（该目录合 28M，没有编译目录与仓副本）。
 - 要主 agent 现查的最短命令（不用我的二进制）：行 1524 的变异——把 `crates/singlefs-core/src/mount.rs` 根槽读坏那一圈调用 `isolate_the_slots_not_allocated_of_a_placement_referenced_by_an_abandoned_root` 的第三个实参 `placement.span` 改成 `1`，跑 `cargo test --release -p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table`，应仍 35 过 1 个 ignored。
 
 ## 10. 引文核对
 
 ```
-$ python3 scripts/cite-check.py research/prompts/m3-batch10z-pqrs-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1/tree --root /home/fy5090/code/singlefs | tail -1
+$ python3 scripts/agents/cite-check.py research/prompts/m3-batch10z-pqrs-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1/tree --root /home/fy5090/code/singlefs | tail -1
   ✓ 核了 17 处引文，对上 17 处，没判 0 处（逐处列在上面）
 ```

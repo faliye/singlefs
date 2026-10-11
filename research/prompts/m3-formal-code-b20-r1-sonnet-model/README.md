@@ -1,7 +1,7 @@
 # m3-formal-code-b20-r1 正推腿的模型与脚本（Sonnet）
 
 全部在腿自己的副本 `/tmp/claude-1000/m3-formal-code-b20-r1-sonnet/work/`（冻结副本 `/tmp/claude-1000/m3-formal-code-b20-r1/tree/crates` 加仓根的 `Cargo.toml`、`Cargo.lock`、`.cargo/config.toml`）上做，仓内文件一个不改。
-重做：先 `bash setup_work.sh`，再按下表跑；每条都经 `scripts/run-with-memory-cap.sh` 与 `capped.sh`，同一会话里另有一条在跑时要设 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`（脚本里已设）。
+重做：先 `bash setup_work.sh`，再按下表跑；每条都经 `scripts/hosts/run-with-memory-cap.sh` 与 `capped.sh`，同一会话里另有一条在跑时要设 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`（脚本里已设）。
 
 | 文件 | 干什么 | 档 |
 |---|---|---|

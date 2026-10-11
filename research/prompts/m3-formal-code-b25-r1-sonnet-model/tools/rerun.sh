@@ -18,8 +18,8 @@ tree="$scratch/tree"
 device="crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="正推腿复跑，与别的会话同时在跑各跑各的"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="草稿副本里的小规模复跑，上限取 8G，峰值表是别处测的"
-capped() { nice -n 19 bash "$repo/scripts/capped.sh" 6 "$@"; }
-capped_run() { capped bash "$repo/scripts/run-with-memory-cap.sh" 8G "$@"; }
+capped() { nice -n 19 bash "$repo/scripts/hosts/capped.sh" 6 "$@"; }
+capped_run() { capped bash "$repo/scripts/hosts/run-with-memory-cap.sh" 8G "$@"; }
 
 setup() {
     mkdir -p "$scratch/out"

@@ -17,8 +17,8 @@ old = open(oldf).read().rstrip("\n"); new = open(newf).read().rstrip("\n")
 assert orig.count(old) == 1, f"旧串命中 {orig.count(old)} 次"
 shutil.copy(path, bak)
 open(path, "w").write(orig.replace(old, new)); os.utime(path)
-cmd = ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh", "10G", "bash",
-       "/home/fy5090/code/singlefs/scripts/capped.sh", "8", "cargo", "test", "--offline",
+cmd = ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh", "10G", "bash",
+       "/home/fy5090/code/singlefs/scripts/hosts/capped.sh", "8", "cargo", "test", "--offline",
        "--target-dir", f"{root}/target-h"] + cargo_args + ["--", "--test-threads=4"]
 try:
     r = subprocess.run(cmd, cwd=tree, capture_output=True, text=True, env=dict(os.environ, PROBE_SEEDS="12", PROBE_STEPS="9000"))

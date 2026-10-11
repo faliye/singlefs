@@ -20,8 +20,8 @@ for old, new in pairs:
     text = text.replace(old, new)
 shutil.copy(path, bak)
 open(path, "w").write(text); os.utime(path)
-cmd = ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh", "10G", "bash",
-       "/home/fy5090/code/singlefs/scripts/capped.sh", "8", "cargo", "test", "--offline",
+cmd = ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh", "10G", "bash",
+       "/home/fy5090/code/singlefs/scripts/hosts/capped.sh", "8", "cargo", "test", "--offline",
        "--target-dir", f"{root}/target-h"] + cargo_args + ["--", "--nocapture", "--test-threads=4"]
 try:
     r = subprocess.run(cmd, cwd=tree, capture_output=True, text=True, env=dict(os.environ, PROBE_SEEDS="12", PROBE_STEPS="9000"))

@@ -15,7 +15,7 @@
 ## 重建
 
 1. `rsync -a <冻结副本>/ tree-a/`；拷 `src/p10z_probe.rs.txt` 成 `tree-a/crates/singlefs-harness/tests/p10z_probe.rs`；`patch -p0` 或手工按 `src/core-debug-edits.diff` 改 `tree-a/crates/singlefs-core/src/allocator.rs`。
-2. `cd tree-a && CARGO_TARGET_DIR=<目录> bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 15 cargo test --release --offline -p singlefs-harness --test p10z_probe --no-run`。
+2. `cd tree-a && CARGO_TARGET_DIR=<目录> bash scripts/hosts/run-with-memory-cap.sh 12G bash scripts/hosts/capped.sh 15 cargo test --release --offline -p singlefs-harness --test p10z_probe --no-run`。
 3. `scripts/*.sh|py` 里的 `W=`、`$HOME/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet` 要改成自己的草稿目录；`bash scripts/repro.sh` 重跑 `logs/final/`。
 4. 变异：`rsync -a <冻结副本>/ tree-m/`，`python3 scripts/mut.py <变异名…>`（名字见脚本里的 `mut('名字', …)`）。
 5. 扫源码模型：`src/scan-*-Cargo.toml.txt` 改名 `Cargo.toml`、`src/scan-*-main.rs.txt` 改名 `src/main.rs`，`cargo build --release --offline`。

@@ -197,7 +197,7 @@ OWNER_DRIFT kind=pipeline before=4544035,5880702 after=611669,813458 blocks=3991
 
 ## 9. cite-check
 
-`python3 scripts/cite-check.py research/prompts/m3-run-compare-split-r3-sonnet-output.md --root . --root /home/fy5090/.local/share/singlefs/work/m3-merge-impl/e5/repo --background research/prompts/_m3-run-compare-split-r3-background.md` 末行（交回闸用默认根再跑一遍；E5 副本的文件我都写了绝对路径）：
+`python3 scripts/agents/cite-check.py research/prompts/m3-run-compare-split-r3-sonnet-output.md --root . --root /home/fy5090/.local/share/singlefs/work/m3-merge-impl/e5/repo --background research/prompts/_m3-run-compare-split-r3-background.md` 末行（交回闸用默认根再跑一遍；E5 副本的文件我都写了绝对路径）：
 
 ```
   ✓ 核了 44 处引文，对上 44 处，没判 0 处（逐处列在上面）

@@ -299,7 +299,7 @@ core 库 `unlink` 那 7 条、`unlink_of_a_file_spanning_two_extent_lower_leaves
 - 「test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash ... FAILED」（`research/prompts/m3-batch21-code-r1-opus-model/out/n5-tree-ignored-rollback.out:24`）
 - 「test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash ... FAILED」（`research/prompts/m3-batch21-code-r1-opus-model/out/n5-tree-ignored-rollback.out:26`）
 
-第一条的 panic 是恢复之后重开、池级 checker 报 I-3.1（记账的已分配与遍历全部有效根得到的对不上，`out/n5-tree-ignored-rollback.out` 里那一段）。release 档、线程上限 10 下跑的；另两条的 panic 同样是重开之后池级 checker 报 I-3.1（`out/n5-tree-ignored-rollback.out` 第 39、44 行）。这份测试文件不在第 21 批被判名单里；合入验证脚本里没有 `--ignored`（`grep -n ignored scripts/merge-and-verify.sh` 0 行），这三条合入时不跑，提交时的整轮门禁跑不跑、上一次绿在哪一天，我没查。交主 agent 去处，我没追。
+第一条的 panic 是恢复之后重开、池级 checker 报 I-3.1（记账的已分配与遍历全部有效根得到的对不上，`out/n5-tree-ignored-rollback.out` 里那一段）。release 档、线程上限 10 下跑的；另两条的 panic 同样是重开之后池级 checker 报 I-3.1（`out/n5-tree-ignored-rollback.out` 第 39、44 行）。这份测试文件不在第 21 批被判名单里；合入验证脚本里没有 `--ignored`（`grep -n ignored scripts/gate/merge-and-verify.sh` 0 行），这三条合入时不跑，提交时的整轮门禁跑不跑、上一次绿在哪一天，我没查。交主 agent 去处，我没追。
 
 ## 七、没打中的形状
 

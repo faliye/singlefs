@@ -200,6 +200,6 @@
 
 ## cite-check 末行
 
-`python3 scripts/cite-check.py research/prompts/m3-formal-code-b25-r1-sonnet-output.md --root scripts/experiments/target/e171-r1-frozen-tree --root . --background research/prompts/_m3-formal-code-b25-r1-background.md`：
+`python3 scripts/agents/cite-check.py research/prompts/m3-formal-code-b25-r1-sonnet-output.md --root scripts/experiments/target/e171-r1-frozen-tree --root . --background research/prompts/_m3-formal-code-b25-r1-background.md`：
 
     ✓ 核了 83 处引文，对上 83 处，没判 0 处（逐处列在上面）

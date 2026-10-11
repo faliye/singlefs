@@ -20,7 +20,7 @@ printf '0.1 sha256 OK 份数\t%s\n' "$ok" >> "$out"
 work=$out_dir/work; mkdir -p "$work"
 cp -a "$SINGLEFS_REPO"/crates "$SINGLEFS_REPO"/Cargo.toml "$SINGLEFS_REPO"/Cargo.lock "$SINGLEFS_REPO"/litmus "$work"/
 mkdir -p "$work/.claude" "$work/scripts"
-static=$(cd "$SINGLEFS_MAIN_REPO" && python3 scripts/crates-mutation-rows.py static-check "$work" 2>&1 | grep '^CHECKED' || true)
+static=$(cd "$SINGLEFS_MAIN_REPO" && python3 scripts/mutation/crates-mutation-rows.py static-check "$work" 2>&1 | grep '^CHECKED' || true)
 printf '0.2 static-check\t%s\n' "$static" >> "$out"
 # 0.7：守卫仿真
 printf '0.7 guard_model\t%s\n' "$(python3 -I "$here/guard_model.py" | tr '\n' ';')" >> "$out"

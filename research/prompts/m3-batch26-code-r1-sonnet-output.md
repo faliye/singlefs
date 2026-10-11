@@ -58,7 +58,7 @@
 
 - 行 2883（`crates/mutations.tsv:2883`，「第24批 K I-9.2 同形：孩子头里的类与类型段说的不符也当相符」）：原文 `        if Some(class_in_the_header) == class_the_entry_type_names {` 在新 walk.rs 里恰好 1 次（`crates/singlefs-checker/src/walk.rs:4129`），替换成 `!=`。读码：改成 `!=` 之后类相等的反而走「交回那一类」、类不等的交回 None（照类型段那一支读），名叫「inode 类型段 0、身份清零、孩子是叶容器」那条坏镜像就不再判出 I-9.2「类标签不符」。实跑：在我的拷贝里施加、只跑该行点名的测试：退出码 101、点名的 `an_inode_tree_entry_of_type_zero_with_a_zero_identity_over_a_leaf_container_reddens_only_the_inode_entry_invariant` FAILED（`expected-summary.txt` 第 1 行 `2883	1	101	1`）。**仍红**。
 - 行 2884（`crates/mutations.tsv:2884`，「第24批 K 孩子的类不验整单元校验和」）：原文 `.is_some_and(|content| crc32_castagnoli_table(&content) == location.checksum);` 在新 walk.rs 里恰好 1 次（`crates/singlefs-checker/src/walk.rs:4125`：「.is_some_and(|content| crc32_castagnoli_table(&content) == location.checksum);」），替换成 `.is_some();`。实跑退出码 101，点名的 `an_inode_leaf_whose_class_tag_alone_says_index_node_is_read_at_the_length_of_its_entry_type` FAILED（`2884	1	101	1`）。**仍红**。
-- 这两行的原文锚点在新写法下都还恰好命中一次（`scripts/mutate.sh` 的「命中数必须为 1」那一关过得去；我用自己的 `mutate_rows.py` 同样要求恰好 1，输出第 2 列都是 1）。
+- 这两行的原文锚点在新写法下都还恰好命中一次（`scripts/mutation/mutate.sh` 的「命中数必须为 1」那一关过得去；我用自己的 `mutate_rows.py` 同样要求恰好 1，输出第 2 列都是 1）。
 - 推翻：把这两行换到整张表一起跑，门禁 59 号报「没红」或「锚点命中数不是 1」。
 
 ## 3. K1 · H2：GPU 同改与对拍补的一形
@@ -137,7 +137,7 @@ H1 四形共用的判法：`crates/singlefs-harness/tests/checker_known_bad_imag
 - 2930–2933 四行是同一个替换（`if !verifies_… { continue; }` 改成「类等于类型段那一类就不 continue」，等价于改之前的早退），点名的测试各不相同；施加一次，四条 H1 坏镜像都红，所以每条坏镜像单独就分得出这一变异。2934 与 2935 同理是同一个替换（拿掉调用），两条读不出孩子的坏镜像都红。
 - 第 6 列点名的测试与参数筛不筛得到：每行的筛选串 `stale_copy_of_the_child child_that_does_not_read_back` 选中的就是上面 6 条（`--list` 6 条，且第 6 列六个名字都在里面）；GPU 行的筛选串是那条对拍测试的完整函数名，`crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs` 里这个名字只有那一个函数加它自己里面的 `test_name` 字符串（`grep -c` 为 2：函数名一次、字符串一次），选得到一条。
 - 复跑数：`research/prompts/m3-batch26-code-r1-sonnet-model/expected-summary.txt` 前 8 行（含第 24 批 K 的 2883、2884）。
-- 推翻：把我的 `mutate_rows.py` 换成 `scripts/mutate.sh` 在这几行上有一行「没红」。
+- 推翻：把我的 `mutate_rows.py` 换成 `scripts/mutation/mutate.sh` 在这几行上有一行「没红」。
 
 ### 6.1 我自己加的额外变异（探测测试够不够尖，不是第 26 批的行）
 

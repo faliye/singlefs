@@ -23,8 +23,8 @@ for number in map(int, sys.argv[1:]):
     started = time.time()
     open(full, "w", encoding="utf-8").write(original.replace(old, new))
     try:
-        command = ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh", "8G",
-                   "bash", "/home/fy5090/code/singlefs/scripts/capped.sh", "10",
+        command = ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh", "8G",
+                   "bash", "/home/fy5090/code/singlefs/scripts/hosts/capped.sh", "10",
                    "cargo", "test", "--release", "--offline"] + shlex.split(args)
         result = subprocess.run(command, cwd=WORK, env=env, capture_output=True, text=True)
         log = result.stdout + result.stderr

@@ -210,9 +210,9 @@
 
 负载：开工时 `ps` 没有 cargo、qemu、fio、gate 在跑，没等锁。收到「线程上限 16 → 6」之前起的两趟扫描用 `capped.sh 16`、探针内部 14 线程；之后一律 `capped.sh 6`。
 
-- 编译（不经内存包装）：每份 `cd <副本> && CARGO_TARGET_DIR=<副本自己的 target> nice -n 19 bash scripts/capped.sh <16|6> cargo test --offline --release -p singlefs-harness --test <探针> --no-run`。末行都是 `exit 0`（`logs/build-*.log`）。
+- 编译（不经内存包装）：每份 `cd <副本> && CARGO_TARGET_DIR=<副本自己的 target> nice -n 19 bash scripts/hosts/capped.sh <16|6> cargo test --offline --release -p singlefs-harness --test <探针> --no-run`。末行都是 `exit 0`（`logs/build-*.log`）。
 - 大档扫描：
-  - 命令：`cd <副本> && SCAN_START=0 SCAN_COUNT=512 SCAN_THREADS=14 CARGO_TARGET_DIR=<target> nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 16 cargo test --offline --release -p singlefs-harness --test zz_probe_scan -- --ignored --nocapture`
+  - 命令：`cd <副本> && SCAN_START=0 SCAN_COUNT=512 SCAN_THREADS=14 CARGO_TARGET_DIR=<target> nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 16 cargo test --offline --release -p singlefs-harness --test zz_probe_scan -- --ignored --nocapture`
   - 工作区：`test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 203.81s` / `exit 0`
   - HEAD：`test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 170.47s` / `exit 0`
 - 第 2 件那条用例，直接执行编出来的测试二进制（`… run-with-memory-cap.sh 8G bash … capped.sh 16 <二进制> every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking --exact --nocapture`）：

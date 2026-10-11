@@ -27,7 +27,7 @@
 
 ## 三、改法（被攻过零轮，第二轮攻）
 
-- **Y1**（J1-a、J1-b，攻方 F1，副本上量过）：54 号范围那一问再加 `.claude/gate.d/stage-inputs.tsv`、54 号自己、`scripts/admission.py`；`admission.py` 按 `--extra-file` 进每条用例的指纹；54 号自证的 `expected_fingerprint` 跟着改，另补一格「只改登记表的提交不带 `SINGLEFS_GATE_FULL=1` 也判红」。
+- **Y1**（J1-a、J1-b，攻方 F1，副本上量过）：54 号范围那一问再加 `.claude/gate.d/stage-inputs.tsv`、54 号自己、`scripts/gate/admission.py`；`admission.py` 按 `--extra-file` 进每条用例的指纹；54 号自证的 `expected_fingerprint` 跟着改，另补一格「只改登记表的提交不带 `SINGLEFS_GATE_FULL=1` 也判红」。
 - **Y2**（J4-b，F6 量过、F9 推的）：`crash-cases` 自查要求登记的用例函数标了 `#[ignore]`，没标就退 2；闸在登记的测试目标被点名、却不带 `--ignored` 时读源码核那条函数标没标 ignore，没标按重型算。
 - **Y3**（J4-a，F7、F8 推的）：闸把 nextest（`--run-ignored`）、mutants、miri、llvm-cov、hack 也当跑测试的子命令；`--config` 里有 `alias.` 或 `.runner`、环境里有 `CARGO_TARGET_*_RUNNER` 的当可能带 `--ignored`；前缀表补 `/usr/bin/time`、`flock`、`rustup run`、`chrt`、`prlimit`、`systemd-run`、`strace`、`perf`；任意可执行文件带 `--ignored` / `--include-ignored` 且参数里有登记的用例函数名的按崩溃枚举用例算。闸是执行前的一道，看门狗在进程那一层兜底，两道都留。
 - **Y4**（J4-c，F10）：带 `--list` 的不算重型；`--include-ignored --exact <快用例>` 那一种接受误拒，写进闸的文件头。
@@ -43,7 +43,7 @@
 
 ## 五、按路径点名被判的定义与文件（门禁 72 号）
 
-被判的：`.claude/gate.d/checker-tier-layer0-replay.sh`、`scripts/admission.py`、`.claude/gate.d/stage-inputs.tsv`、`.claude/gate.d/stage-owners.tsv`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/agents/crash-verifier.md`、`.claude/rules/implementation-workflow.md`、`scripts/check-segment-registry.py`；一并核过的 `.claude/main-agent.md`、`.claude/agents/gate-triage.md`。
+被判的：`.claude/gate.d/checker-tier-layer0-replay.sh`、`scripts/gate/admission.py`、`.claude/gate.d/stage-inputs.tsv`、`.claude/gate.d/stage-owners.tsv`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/agents/crash-verifier.md`、`.claude/rules/implementation-workflow.md`、`scripts/crash/check-segment-registry.py`；一并核过的 `.claude/main-agent.md`、`.claude/agents/gate-triage.md`。
 
 ## 回看决策
 

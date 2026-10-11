@@ -21,8 +21,8 @@ for line in open(cases_file, encoding='utf-8'):
         open(p, 'w', encoding='utf-8').write(orig.replace(o, n))
         for group_index, args in enumerate(arg_groups.split(';;')):
             cap = '8G' if 'random_histories' in args else '6G'
-            cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/scripts/run-with-memory-cap.sh', cap,
-                   'bash', scripts_repo + '/scripts/capped.sh', '15', 'cargo', 'test', '--offline'] + args.split()
+            cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/scripts/hosts/run-with-memory-cap.sh', cap,
+                   'bash', scripts_repo + '/scripts/hosts/capped.sh', '15', 'cargo', 'test', '--offline'] + args.split()
             try:
                 r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=235)
                 out, rc = r.stdout + r.stderr, r.returncode

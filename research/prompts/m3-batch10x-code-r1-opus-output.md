@@ -22,8 +22,8 @@
 ```bash
 S=<草稿目录>; rsync -a --exclude /target --exclude /.git --exclude /scripts/experiments/target ~/.local/share/singlefs/work/m3-batch10x-code-r1/tree/ $S/repo/
 cp research/prompts/m3-batch10x-code-r1-opus-model/attack_m3_10x_gpu_ledger.rs $S/repo/crates/singlefs-harness/tests/
-cd $S/repo && CARGO_TARGET_DIR=$S/target nice -n 19 bash <仓根>/scripts/run-with-memory-cap.sh 8G \
-  bash <仓根>/scripts/capped.sh 10 cargo test --offline -p singlefs-harness --test attack_m3_10x_gpu_ledger -- --nocapture --test-threads 1
+cd $S/repo && CARGO_TARGET_DIR=$S/target nice -n 19 bash <仓根>/scripts/hosts/run-with-memory-cap.sh 8G \
+  bash <仓根>/scripts/hosts/capped.sh 10 cargo test --offline -p singlefs-harness --test attack_m3_10x_gpu_ledger -- --nocapture --test-threads 1
 ```
 
 判结果看 `SUMMARY` 五行与 `test result: ok. 5 passed`。模型是纯算术、几毫秒跑完，没缩取样；不涉及崩溃状态（没有一段历史要恢复、要跑 checker），层 0 枚举那一条不适用，原型状态数 0。
@@ -120,7 +120,7 @@ ROW k1c config=unconfigured+env30000 room_on_the_empty_card=21521 need=21522 out
 没打中。冻结副本里 `grep -rn 'gpu-memory-ledgers\|LONGEST_WAIT_FOR_GPU_MEMORY\|POLL_INTERVAL_FOR_MEMORY'`（`.rs`、`.sh`、`.py`、`.tsv`）零命中；三份被判文件里 `flock|账本|等满|1800|判活|/proc/` 只剩两处注释：
 - 「这条用例报「本次未跑」时打的那一行」那一句在 `crates/singlefs-checker-tier/src/gpu_unit_checks.rs` 第 811 行，后半句还写「崩溃放量产品路径借草稿区等满了也打它」；
 - `crates/singlefs-harness/src/gpu_memory_ledger.rs` 第 9 行是新口径的说明，不算。
-分项驱动 `scripts/crash-amplification-item.sh` 文件头第 24 行还写「池里的卡等满了也登记不上」、自证桩里还造「等了 1800 秒」的行（第 299、307、333 行），是说法旧了，不是代码路径。
+分项驱动 `scripts/crash/crash-amplification-item.sh` 文件头第 24 行还写「池里的卡等满了也登记不上」、自证桩里还造「等了 1800 秒」的行（第 299、307、333 行），是说法旧了，不是代码路径。
 
 试过的形：账本目录变量、`SINGLEFS_WORK_ROOT`、等满常数、判活函数在 crates、scripts、`.claude/gate.d` 里的引用；都没有。
 
@@ -150,7 +150,7 @@ R2 的历史：乙在第 ① 段 `GpuCrashJudge::on_card_with_packed_tables` 里
 
 ### 245 接得住多少
 
-① 的判法在 `scripts/run-with-memory-cap.sh` 文件头：命令退非 0 才读内核日志，「驱动的这一行不带进程号，同一段时间里别的进程撞了显存也算进来」（`scripts/run-with-memory-cap.sh:100`）。R1–R4 都让命令退 101，驱动那一行在窗口里，就退 245；本机此刻 `journalctl -k` 读得到（「量的数」④）。所以经包装跑的那一条，R1–R4 最后都落进 245，不会留成红。
+① 的判法在 `scripts/hosts/run-with-memory-cap.sh` 文件头：命令退非 0 才读内核日志，「驱动的这一行不带进程号，同一段时间里别的进程撞了显存也算进来」（`scripts/hosts/run-with-memory-cap.sh:100`）。R1–R4 都让命令退 101，驱动那一行在窗口里，就退 245；本机此刻 `journalctl -k` 读得到（「量的数」④）。所以经包装跑的那一条，R1–R4 最后都落进 245，不会留成红。
 接住之后的代价不同：② 是「这一趟本次未跑、判过的块在库里」，245 是「这一条命令的输出全不算数」。门禁里一条 `cargo test` 罩一整个测试二进制甚至整个包，一处 R2 让这一整条的结果全作废（包括同一条里别的用例真红的结论）。
 没经包装跑的（人手直接 `cargo test`、读不到内核日志的机器）R1–R4 就是红，原因写的是「起不来上下文」「编译线程 panic」，认不出是显存。
 
@@ -193,7 +193,7 @@ ROW k2w1 room_now=440 room_when_empty=29550 one_state=602 holds_now=0 booking=re
 1. 起过卡池的测试进程里，产品路径用例要判一条流。
 2. 此刻池里每张卡都被占着：同一进程里 GPU 对拍用例借着大的一笔（这个二进制里两边并行，产品路径的环境锁只排产品路径之间），或卡上另一个测试进程占着（「量的数」②：主 agent 这一轮就是两个测试进程同时在 5090 上，一个到 11759 MiB）。
 3. 产品路径算出每张卡带 0 个状态 → `Err` → 调用方「run_from_environment(&flow, &judging, &root, limit).expect("按环境跑得完");」（`crates/singlefs-checker-tier/tests/common_crash_points/mod.rs:328`）panic，用例红。
-4. 经分项驱动跑的，这一句被认成设备用不上（`scripts/crash-amplification-lib.sh` 第 340 行的 `device_pattern` 里有「没有一张卡装得下这条流的表」），退 78，出路写「修好设备，或改配置」；该是 77 本次未跑。
+4. 经分项驱动跑的，这一句被认成设备用不上（`scripts/crash/crash-amplification-lib.sh` 第 340 行的 `device_pattern` 里有「没有一张卡装得下这条流的表」），退 78，出路写「修好设备，或改配置」；该是 77 本次未跑。
 
 **四句**：分得出（把全是 0 那一支改成去借、`NothingToPlace` 在「此刻带不了」时改记 `NoRoomNow`，就落进本次未跑，推的）；系统看得到（此刻能借的与空着时能借的它都算了）；满足的分句是定义里「比此刻能借的大而空着时放得下，是借不到…一张都借不到报本次未跑」；没有跑前条款。
 

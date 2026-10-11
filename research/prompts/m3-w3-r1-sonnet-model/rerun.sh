@@ -11,7 +11,7 @@
 #   bash rerun.sh compare         （不读 SINGLEFS_REPO）
 # 环境变量：W3_WORK（工作目录，默认 ~/.local/share/singlefs/work/m3-w3-r1-sonnet-rerun；prepare 要它不存在或为空）、
 #           W3_BUDGET（一趟领新历史的时限，秒，默认 200）、W3_THREADS（默认 6）。
-# 内存：编译 6G、跑 4G，都经 scripts/run-with-memory-cap.sh；同一时刻只起一条 cargo；用自己的编译目录。
+# 内存：编译 6G、跑 4G，都经 scripts/hosts/run-with-memory-cap.sh；同一时刻只起一条 cargo；用自己的编译目录。
 set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_OF_THIS_SCRIPT=$(cd "$HERE/../../.." && pwd)
@@ -20,8 +20,8 @@ WORK=${W3_WORK:-$HOME/.local/share/singlefs/work/m3-w3-r1-sonnet-rerun}
 THREADS=${W3_THREADS:-6}
 BUDGET=${W3_BUDGET:-200}
 CODE_BASELINE=w3-sonnet-model
-CAPPED=$REPO_OF_THIS_SCRIPT/scripts/capped.sh
-CAP=$REPO_OF_THIS_SCRIPT/scripts/run-with-memory-cap.sh
+CAPPED=$REPO_OF_THIS_SCRIPT/scripts/hosts/capped.sh
+CAP=$REPO_OF_THIS_SCRIPT/scripts/hosts/run-with-memory-cap.sh
 TEST=e175_product_path_inode_watermark_regression
 
 step=${1:-}

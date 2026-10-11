@@ -219,7 +219,7 @@ stderr 里是 `panic in a destructor during cleanup` / `thread caused non-unwind
 核 H4（重型、要卡，只在提交时或用户要求时）：在冻结副本的一份拷贝里照 `crates/mutations.tsv` 第 3370 行把 `Wait { … }` 那三行换成 `device.poll(wgpu::PollType::Poll)`，再跑
 
 ```
-SINGLEFS_HEAVY_TESTS=user-request bash /home/fy5090/code/singlefs/scripts/gpu-quiesce-run.sh -- bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 8G bash /home/fy5090/code/singlefs/scripts/capped.sh 8 cargo test -p singlefs-checker-tier --features gpu --test gpu_unit_checks_a_returned_card_lease_leaves_no_buffer_on_the_card -- --nocapture
+SINGLEFS_HEAVY_TESTS=user-request bash /home/fy5090/code/singlefs/scripts/crash/gpu-quiesce-run.sh -- bash /home/fy5090/code/singlefs/scripts/hosts/run-with-memory-cap.sh 8G bash /home/fy5090/code/singlefs/scripts/hosts/capped.sh 8 cargo test -p singlefs-checker-tier --features gpu --test gpu_unit_checks_a_returned_card_lease_leaves_no_buffer_on_the_card -- --nocapture
 ```
 
 工作目录是那份拷贝；看 `test result:` 那一行。照绿就是 H4 坐实（那一行变异抓不住），红就是我推错了。
@@ -239,7 +239,7 @@ SINGLEFS_HEAVY_TESTS=user-request bash /home/fy5090/code/singlefs/scripts/gpu-qu
 
 ## 引文核对
 
-`python3 scripts/cite-check.py research/prompts/m3-batch10z-f-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-f-code-r1/tree` 末行：
+`python3 scripts/agents/cite-check.py research/prompts/m3-batch10z-f-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-f-code-r1/tree` 末行：
 
 ```
   ✓ 核了 41 处引文，对上 20 处，没判 21 处（逐处列在上面）
