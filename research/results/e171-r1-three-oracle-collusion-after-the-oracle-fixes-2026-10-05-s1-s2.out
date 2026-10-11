@@ -1,4 +1,4 @@
-E7RESULT name=config segment=s1 product=s2 e170_dump=research/target/e171-r1-dumps/newtree-2026-10-05/s2-e170-export device_baseline=research/target/e171-r1-dumps/newtree-2026-10-05/s2-device-baseline-streams-1-2
+E7RESULT name=config segment=s1 product=s2 e170_dump=scripts/experiments/target/e171-r1-dumps/newtree-2026-10-05/s2-e170-export device_baseline=scripts/experiments/target/e171-r1-dumps/newtree-2026-10-05/s2-device-baseline-streams-1-2
 E7RESULT name=s2 stream=new_pool_file_creation file=base-sectors.bin e170_sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35 device_sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35 equal=true
 E7RESULT name=s2 stream=new_pool_file_creation file=ops.tsv e170_sha256=ac4c69ba9f40325555760bb645c724e63e7c82decea73a6f643a59e7ef9b1936 device_sha256=ac4c69ba9f40325555760bb645c724e63e7c82decea73a6f643a59e7ef9b1936 equal=true
 E7RESULT name=s2 stream=new_pool_file_creation file=ops-payload.bin e170_sha256=b6ea71ba7ec15dca8cfd0bd2cca33aff74502aaeaceee9c5b24e7b3a71a9e565 device_sha256=b6ea71ba7ec15dca8cfd0bd2cca33aff74502aaeaceee9c5b24e7b3a71a9e565 equal=true

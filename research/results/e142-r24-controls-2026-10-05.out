@@ -79,7 +79,7 @@ A1 label6 main (copies 2, H 0, n_live 1) 98384 expected 98386 False
 residual_old_values count=0
 (全部输出行数 1)
 PC-i 命令七（HEAD 版草稿树）
-2f4ea2cfd3f142bbe76e054bfb6747ebe4cfd17509a19e6737f1dcf9ebd62999  /tmp/claude-1000/e142-r24-run/headtree/research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs
+2f4ea2cfd3f142bbe76e054bfb6747ebe4cfd17509a19e6737f1dcf9ebd62999  /tmp/claude-1000/e142-r24-run/headtree/scripts/experiments/e142_new_pool_file_creation_dry_run.rs
 residual_old_values count=69
 命令六（仓里装置，四个计数）
 0

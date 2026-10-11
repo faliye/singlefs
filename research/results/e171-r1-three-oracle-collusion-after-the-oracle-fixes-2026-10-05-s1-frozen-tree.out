@@ -1,4 +1,4 @@
-E7RESULT name=config segment=s1 product=frozen_tree tree=research/target/e171-r1-frozen-tree void_tree=research/target/e171-r1-frozen-tree-revision-1-void-2026-10-04
+E7RESULT name=config segment=s1 product=frozen_tree tree=scripts/experiments/target/e171-r1-frozen-tree void_tree=scripts/experiments/target/e171-r1-frozen-tree-revision-1-void-2026-10-04
 E7RESULT name=frozen_tree key=snapshot_digest value=4d071c126a48577b39d3d8a77a898d59eb32366bfd1c5dc8460e930aafade6dd files=284
 E7RESULT name=frozen_tree key=git_head value=31e47115471ba5502a4531d25dffcc921be36899
 E7RESULT name=frozen_tree key=git_status_lines value=94

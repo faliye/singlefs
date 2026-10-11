@@ -117,7 +117,7 @@ diff 退出码 0，输出 0 行
 ## 导出一侧：第二段产物最后 39 行（不带参数的导出）与第一段主产物最后 39 行逐字节相同
 相同
 
-## Q142.102 第二段指纹：命令 python3 research/scripts/admission.py experiment <仓根> E142 的输出（步 ⑦ 落盘后立即跑，原样存 /tmp/claude-1000/e142-r22-run2/q102.out）
+## Q142.102 第二段指纹：命令 python3 scripts/admission.py experiment <仓根> E142 的输出（步 ⑦ 落盘后立即跑，原样存 /tmp/claude-1000/e142-r22-run2/q102.out）
   ✗ 拒绝开跑 E142：输入自上次产物以来没变，不必重跑——research/results/e142-new-pool-file-creation-dry-run-r22-s2-main-2026-10-05.out 头上的输入指纹与今天的相同（9a8d224772bf）
      → 怎么办：沿用那一份的结论；确要重跑，设 SINGLEFS_EXPERIMENT_RERUN_REASON=<理由> 再跑，理由会写进产物。输入清单登记在 .claude/gate.d/stage-inputs.tsv 的 E142 那一行，少登了一条就补上
 exit=77
@@ -271,7 +271,7 @@ echo
 echo "## 导出一侧：第二段产物最后 39 行（不带参数的导出）与第一段主产物最后 39 行逐字节相同"
 tail -n 39 $S | cmp - <(tail -n 39 $M1) && echo "相同"
 echo
-echo "## Q142.102 第二段指纹：命令 python3 research/scripts/admission.py experiment <仓根> E142 的输出（步 ⑦ 落盘后立即跑，原样存 $S2/q102.out）"
+echo "## Q142.102 第二段指纹：命令 python3 scripts/admission.py experiment <仓根> E142 的输出（步 ⑦ 落盘后立即跑，原样存 $S2/q102.out）"
 cat $S2/q102.out | cut -c1-400
 echo
 echo "## V22c crates 快照 A2、B2、C2 两两 cmp"

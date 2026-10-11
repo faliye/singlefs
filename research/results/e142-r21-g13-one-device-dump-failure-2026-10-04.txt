@@ -1,5 +1,5 @@
 # E142 第 21 次重跑步 ③(8)：G13（一盘）的 crates 导出没跑成，停机 S21-dump（登记第十一节）。
-# 命令（仓根，经内存包装、线程上限 6）：bash research/scripts/run-with-memory-cap.sh 4G bash research/scripts/capped.sh 6 cargo run -q -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump_one_device
+# 命令（仓根，经内存包装、线程上限 6）：bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 6 cargo run -q -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump_one_device
 # stdout：0 行、0 字节；退出码与 stderr 原样如下（不改 crates，不换写法绕过）
 run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
 

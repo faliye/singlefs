@@ -1,7 +1,7 @@
 run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
-   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/research/e7-index-bench)
+   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/scripts/experiments)
 warning: constant `CHAINS` is never used
-   --> e7-index-bench/src/bin/e49_chain_width.rs:109:7
+   --> scripts/experiments/e49_chain_width.rs:109:7
     |
 109 | const CHAINS: [u64; 3] = [2, 4, 8];
     |       ^^^^^^

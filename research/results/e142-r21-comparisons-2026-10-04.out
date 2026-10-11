@@ -243,7 +243,7 @@ chains=1:0,2:699178990,3:3937788698
 --- 装置源码：HEAD 提交版 sha256 2f4ea2cfd3f142bbe76e054bfb6747ebe4cfd17509a19e6737f1dcf9ebd62999（N19R 那时工作区那一份是 2f4ea2cf…2999，第三节 3.2）
 --- 上一次主产物（提交 dbcc0d2f，2026-09-28）之后对装置源码的提交：
 d9ce7eba 2026-10-03 新增 E7 索引基准装置源码
- research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs | 2 +-
+ scripts/experiments/e142_new_pool_file_creation_dry_run.rs | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 ## Q142.82 判决不翻面（R61）：N19R 与 N21 逐行逐字段（flips.py）

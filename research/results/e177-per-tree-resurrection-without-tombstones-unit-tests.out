@@ -14,7 +14,7 @@ run-with-memory-cap: 排队（已等 720 秒，至多 3600 秒）：slice 已占
 run-with-memory-cap: 排队（已等 780 秒，至多 3600 秒）：slice 已占 39.9 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 2 条
 run-with-memory-cap: 排队（已等 840 秒，至多 3600 秒）：slice 已占 39.9 GiB，这一条要 8.0 GiB（峰值表里没有这条，按它的上限 8G 算），总上限 40.1 GiB；账上在跑 2 条
 run-with-memory-cap: 排了 852 秒，起跑（singlefs-memory-cap-2740252-271592038）
-   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/research/e7-index-bench)
+   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/scripts/experiments)
     Finished `release` profile [optimized + debuginfo] target(s) in 4.43s
      Running unittests src/bin/e177_per_tree_resurrection_without_tombstones.rs (target/release/deps/e177_per_tree_resurrection_without_tombstones-936907051523d06e)
 

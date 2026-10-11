@@ -1,4 +1,4 @@
-E7RESULT name=config segment=s1 comparator=segment_one baseline=/home/fy5090/code/singlefs/research/target/e171-r1-dumps/s2-baseline-streams-1-2 second_baseline=- rows_root=-
+E7RESULT name=config segment=s1 comparator=segment_one baseline=/home/fy5090/code/singlefs/scripts/experiments/target/e171-r1-dumps/s2-baseline-streams-1-2 second_baseline=- rows_root=-
 E7RESULT name=a1 batch=1 o1_comparison_red_calls=0 O1-模型崩溃判官=0 O1-RefFS=0 O2=0 O3甲=0 O3乙=0 o3_ran=true
 E7RESULT name=a1 batch=2 o1_comparison_red_calls=0 O1-模型崩溃判官=0 O1-RefFS=0 O2=0 O3甲=0 O3乙=0 o3_ran=true
 E7RESULT name=a11 stream=new_pool_file_creation states=82 crash_judge_applicable_device=82 crash_judge_applicable_recomputed=82 reference_filesystem_voting_device=82 reference_filesystem_voting_recomputed=82 holds=true

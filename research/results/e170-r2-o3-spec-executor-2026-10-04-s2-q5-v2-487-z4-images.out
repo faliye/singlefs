@@ -1,4 +1,4 @@
-name=config input=Z4 executor=e170_o3_spec_executor_with_witness_predicates_journal_header_487 dumps=/home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-copy-s2 known_bad_dir=/home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/known-bad-s2 freeze_reference=v2-487-freeze-reference.out
+name=config input=Z4 executor=e170_o3_spec_executor_with_witness_predicates_journal_header_487 dumps=/home/fy5090/code/singlefs/scripts/experiments/target/e170-r2-today-dumps/e170-bad-states-copy-s2 known_bad_dir=/home/fy5090/code/singlefs/scripts/experiments/target/e170-r2-today-dumps/known-bad-s2 freeze_reference=v2-487-freeze-reference.out
 name=freeze_check when=start identical=true files_now=16 reference_lines=17
 name=dump_check stream=new_pool_file_creation count_mismatches=0 checksum_mismatches=0 versions=4
 name=version stream=new_pool_file_creation index=0 projection=(0,0,wm=65536,floor=0) root_write=None return_point=0 call=base_image

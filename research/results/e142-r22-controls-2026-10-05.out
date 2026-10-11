@@ -172,11 +172,11 @@ echo; echo "## 7.2 B1 / B1b 复算：输入取自这一次主产物（controls_f
 python3 $D/controls_from_product.py $M
 echo; echo "## 7.2 B2–B11 独立复算（offsets_487.py，sha256 $(sha256sum $D/offsets_487.py | cut -d' ' -f1)，登记里记的 936bbf57…）"; python3 $D/offsets_487.py
 echo; echo "## PC-i 旧值残留检查分得出旧值（命令七 residual_old_values.sh sha256 $(sha256sum $D/residual_old_values.sh | cut -d' ' -f1)；命令六）"
-echo "命令七 HEAD 版装置与变异表（git show HEAD: 抽到草稿仓树，装置 sha256 $(sha256sum $D/headtree/research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs | cut -d' ' -f1)）：$(bash $D/residual_old_values.sh $D/headtree | tail -1)"
-echo "命令七 N21R 那一份装置与变异表（git show :<路径> 取暂存区版本，装置 sha256 $(sha256sum $D/frozen_n21r/research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs | cut -d' ' -f1)）：$(bash $D/residual_old_values.sh $D/frozen_n21r | tail -1)"
+echo "命令七 HEAD 版装置与变异表（git show HEAD: 抽到草稿仓树，装置 sha256 $(sha256sum $D/headtree/scripts/experiments/e142_new_pool_file_creation_dry_run.rs | cut -d' ' -f1)）：$(bash $D/residual_old_values.sh $D/headtree | tail -1)"
+echo "命令七 N21R 那一份装置与变异表（git show :<路径> 取暂存区版本，装置 sha256 $(sha256sum $D/frozen_n21r/scripts/experiments/e142_new_pool_file_creation_dry_run.rs | cut -d' ' -f1)）：$(bash $D/residual_old_values.sh $D/frozen_n21r | tail -1)"
 echo "命令七 冻结的 N22 装置与变异表（仓根）：$(bash $D/residual_old_values.sh /home/fy5090/code/singlefs | tail -1)"
 echo "命令六 N21R 那一份装置（四个计数，各应为 1）："
-A=$D/frozen_n21r/research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs
+A=$D/frozen_n21r/scripts/experiments/e142_new_pool_file_creation_dry_run.rs
 for pattern in 'STATISTIC_COMMITTED_RESERVATION_BYTES, TREE_IDENTIFIER_NONE, 0)' 'for statistic in \[STATISTIC_UNRECLAIMABLE_BYTES, STATISTIC_PENDING_DELETE_BYTES, STATISTIC_COMMITTED_RESERVATION_BYTES\]' '准入不等式要的四项 day-1 各写一行 0' '三项 0（读不到行是坏账'; do printf '%s => ' "$pattern"; grep -c "$pattern" $A; done
 echo; echo "## 附录：本文件用到的脚本 sha256"
 sha256sum $D/make_pcg.py $D/back_chain_487.py $D/offsets_487.py $D/controls_from_product.py $D/fsid_vs_data_unit.py $D/residual_old_values.sh $D/controls22.sh

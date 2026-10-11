@@ -22,7 +22,7 @@
 //!
 //! 代码标记（登记第十二节修订 2 第 2 条）：`E175_CODE_BASELINE` = 冻结副本清单 `baseline-frozen-crates.sha` 的 sha256。
 //! 大规模那一条在新结果文件的第一行写 `# code_baseline=<值>`（不是 `E7RESULT` 行，复跑比对不看它），续写已有文件时第一行
-//! 必须是同一个值，不同就拒（两份代码混用）；没设时写 `not-given`（只给 `research/scripts/replay.sh` 的 `driver_e175` 复跑用，
+//! 必须是同一个值，不同就拒（两份代码混用）；没设时写 `not-given`（只给 `scripts/replay.sh` 的 `driver_e175` 复跑用，
 //! 产物一律设）。汇总那一条要求每份输入的第一行都是同一个 `code_baseline`、且等于 `E175_CODE_BASELINE`，
 //! 汇总文件第一行写同一个文件头，每一行汇总行末尾带 `code_baseline=<值>`。
 

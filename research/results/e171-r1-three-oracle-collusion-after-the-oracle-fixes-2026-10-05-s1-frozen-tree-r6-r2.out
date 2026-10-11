@@ -1,4 +1,4 @@
-E7RESULT name=config segment=s1 product=frozen_tree revision=6 tree=research/target/e171-r1-frozen-tree-revision-6 first_segment_tree=research/target/e171-r1-frozen-tree q5_tree=research/target/e171-r1-frozen-tree-revision-5-q5
+E7RESULT name=config segment=s1 product=frozen_tree revision=6 tree=scripts/experiments/target/e171-r1-frozen-tree-revision-6 first_segment_tree=scripts/experiments/target/e171-r1-frozen-tree q5_tree=scripts/experiments/target/e171-r1-frozen-tree-revision-5-q5
 E7RESULT name=frozen_tree key=fixture file=p6-revision-6.patch sha256=cb9780b7dd5f37eff58a01f8e6a32dd7678bf74f0dfe6d78e76132a4e2177773 expected=cb9780b7dd5f37eff58a01f8e6a32dd7678bf74f0dfe6d78e76132a4e2177773 holds=true
 E7RESULT name=frozen_tree key=fixture file=hunk-b29.diff sha256=bd0e04b43ef439b3117e29a7ccd68b3226b9790fc867b5cc4c2d96a4f0c10dba expected=bd0e04b43ef439b3117e29a7ccd68b3226b9790fc867b5cc4c2d96a4f0c10dba holds=true
 E7RESULT name=frozen_tree key=fixture file=p6-on-dbef78ed-from-31-2.patch sha256=f672cce38a555a32478b104b240f176609c8b0d6b7eb72a86ac4f0898627afee expected=f672cce38a555a32478b104b240f176609c8b0d6b7eb72a86ac4f0898627afee holds=true

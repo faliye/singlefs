@@ -1,5 +1,5 @@
 run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
-   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/research/e7-index-bench)
+   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/scripts/experiments)
     Finished `release` profile [optimized + debuginfo] target(s) in 0.22s
      Running unittests src/bin/e43_extension_point_budget.rs (target/release/deps/e43_extension_point_budget-ba419008fe4d277d)
 

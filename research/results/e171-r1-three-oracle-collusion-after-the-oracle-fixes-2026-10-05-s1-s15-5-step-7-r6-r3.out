@@ -1,4 +1,4 @@
-E7RESULT name=config segment=s1 product=s15_five inputs=research/target/e171-r1-dumps/revision-6-2026-10-05-r3/baseline-run1_research/target/e171-r1-dumps/newtree-2026-10-05/baseline-run1
+E7RESULT name=config segment=s1 product=s15_five inputs=scripts/experiments/target/e171-r1-dumps/revision-6-2026-10-05-r3/baseline-run1_scripts/experiments/target/e171-r1-dumps/newtree-2026-10-05/baseline-run1
 E7RESULT name=s15_5 stream=new_pool_file_creation file=base-sectors.bin equal=true
 E7RESULT name=s15_5 stream=new_pool_file_creation file=ops.tsv equal=true
 E7RESULT name=s15_5 stream=new_pool_file_creation file=ops-payload.bin equal=true

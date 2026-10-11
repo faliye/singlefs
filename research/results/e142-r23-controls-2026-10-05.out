@@ -71,8 +71,8 @@ DECODE side=crates device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=la
 DECODE side=crates device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
 --- PC-j 的 head -3 之后（上面已写）
 --- PC-i（命令七 on 冻结装置的 HEAD 版草稿仓树；命令六 on HEAD 版装置、on frozen-s2.rs）
-2f4ea2cfd3f142bbe76e054bfb6747ebe4cfd17509a19e6737f1dcf9ebd62999  /tmp/claude-1000/e142-r23-run/headtree/research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs
-ec2af965de10fb42fb4d79e141dda75c355273ef822e998ca2ef0274512aa107  /tmp/claude-1000/e142-r23-run/headtree/research/mutations/e142_new_pool_file_creation_dry_run.tsv
+2f4ea2cfd3f142bbe76e054bfb6747ebe4cfd17509a19e6737f1dcf9ebd62999  /tmp/claude-1000/e142-r23-run/headtree/scripts/experiments/e142_new_pool_file_creation_dry_run.rs
+ec2af965de10fb42fb4d79e141dda75c355273ef822e998ca2ef0274512aa107  /tmp/claude-1000/e142-r23-run/headtree/scripts/mutations/e142_new_pool_file_creation_dry_run.tsv
 63ea086247aaee402ff74cf9dd3c9d51c1220f7f379f3f5dc2f2bf595de2a1c0  /tmp/claude-1000/e142-r23-run/residual_old_values.sh
 命令七 HEAD 版：
 residual_old_values count=69

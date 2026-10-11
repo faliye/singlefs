@@ -1,4 +1,4 @@
-name=config dumps=/home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-dump streams=new_pool_file_creation,fixed_script_through_e_then_unmount batches=1,2 workers=7 python=3.12.3 crc32c=google_crc32c:c crc32c_self_check=pass
+name=config dumps=/home/fy5090/code/singlefs/scripts/experiments/target/e170-r2-today-dumps/e170-dump streams=new_pool_file_creation,fixed_script_through_e_then_unmount batches=1,2 workers=7 python=3.12.3 crc32c=google_crc32c:c crc32c_self_check=pass
 name=load stream=new_pool_file_creation load_ns=1276219 prepare_ns=353540 ops=57 writes=41 calls=3 sampled_states=82 torn_writes=8
 name=dump_check stream=new_pool_file_creation count_mismatches=0 checksum_mismatches=0 version_table_anomalies=0
 name=version stream=new_pool_file_creation index=0 projection=(0,0,wm=65536,floor=0) root_write=None return_point=0 call=base_image

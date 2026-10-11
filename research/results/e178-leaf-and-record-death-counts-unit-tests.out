@@ -1,4 +1,4 @@
-   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/research/e7-index-bench)
+   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/scripts/experiments)
     Finished `release` profile [optimized + debuginfo] target(s) in 4.67s
      Running unittests src/bin/e178_leaf_and_record_death_counts.rs (target/release/deps/e178_leaf_and_record_death_counts-61daeff83d369a8f)
 

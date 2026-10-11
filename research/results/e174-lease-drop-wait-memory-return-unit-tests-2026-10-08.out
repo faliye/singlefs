@@ -1,4 +1,4 @@
-   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/research/e7-index-bench)
+   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/scripts/experiments)
     Finished `release` profile [optimized + debuginfo] target(s) in 2.32s
      Running unittests src/bin/e174_lease_drop_wait_memory_return.rs (/home/fy5090/.local/share/singlefs/work/m3-r1/e174/mutate-target/release/deps/e174_lease_drop_wait_memory_return-9356e310bc5e4989)
 

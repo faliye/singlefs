@@ -1,4 +1,4 @@
-name=mutation_run level=unit_tests_only table=research/mutations/e170_second_run_o3_spec_executor.tsv executor_directory=research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor
+name=mutation_run level=unit_tests_only table=scripts/mutations/e170_second_run_o3_spec_executor.tsv executor_directory=scripts/experiments/e170_second_run_o3_spec_executor
 run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
 caught [X1_择根取txg与实例代号最小] file=root_ring.py ['Ran 53 tests in 0.074s', 'FAILED (failures=25)'] first_red=['test_a_landing_below_the_acknowledged_version_is_not_in_because_a_c_has_a_lower_bound', 'test_a_landing_that_shares_instance_and_txg_with_an_allowed_version_but_not_its_projection_is_judged_not_in', 'test_a_named_unit_missing_one_copy_stops_the_prefix_and_lands_the_previous_version'] red_count=25
 caught [X2_择根平局实例代号低者赢] file=root_ring.py ['Ran 53 tests in 0.084s', 'FAILED (failures=3)'] first_red=['test_g05_root_in_a_slot_its_txg_does_not_give_changes_the_choice', 'test_g06_root_with_a_foreign_identity_changes_the_choice', 'test_n1_root_txg_lowered_in_place_replays_record_three'] red_count=3
