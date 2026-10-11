@@ -2,7 +2,7 @@
 //!
 //!   new_pool_file_creation_on_device /dev/vda /dev/vdb <direct | page-cache | skip-new-pool-file-creation-barrier | file-overwrite | second-instance | raise-rollback-floor>
 //!
-//! 由 `research/scripts/vm-bench.sh` 送进虚机（`VM_DISKS=2`，设备路径排在参数前面）。结果行以 `E7RESULT` 打头、
+//! 由 `scripts/devices/vm-bench.sh` 送进虚机（`VM_DISKS=2`，设备路径排在参数前面）。结果行以 `E7RESULT` 打头、
 //! 末行报条数（vm-bench.sh 的完整性闸）。这个二进制只判它自己判得了的（恢复读回文件、段序列）；
 //! 「盘上实际收到的是不是程序以为的」由宿主上的 `new_pool_file_creation_device_log_check` 拿 QEMU 的设备侧日志判。
 //! `skip-new-pool-file-creation-barrier`：新池新建文件在盘 0 上漏掉「单元 → journal 记录」那道屏障，而录制器照样记下它——

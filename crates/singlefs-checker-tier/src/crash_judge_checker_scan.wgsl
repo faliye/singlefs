@@ -45,17 +45,41 @@ var<private> c_exempted: array<u32, 8>;
 
 var<private> c_deferred_per_device: array<u32, 8>;
 
-// 引用集合这一遍「记一条指针」：只回答「这条指针指着哪条已释放记录的落点」，位记在 (记录, 候选根) 上
+// 已释放记录那张表（C_RELEASED）按 (盘, 槽) 的桶表，写法同 crash_judge_checker_common.wgsl 的 slot_key_first_bucket 那一段：最新根那一遍收完
+// 已释放记录之后建，候选根那几遍里 r_note 按它找。借 C_JOURNAL_GROUP_KEYS 的前 C_RELEASED_BUCKET_COUNT 个字：I-1.8 在这之前用完，
+// I-3.10 在这之后自己清桶
+const C_RELEASED_BUCKET_COUNT: u32 = 2u * C_MAX_RELEASED;
+
+const C_RELEASED_BUCKETS: u32 = C_JOURNAL_GROUP_KEYS;
+
+// 借的那几段装得下（解析内核时判，不进展开量）：已释放记录的桶表与 I-1.8 的检查字在 C_JOURNAL_GROUP_KEYS 里，I-1.8 的次序在 C_ROW_ORDER 里
+const_assert C_RELEASED_BUCKET_COUNT <= SCRATCH_END - C_JOURNAL_GROUP_KEYS;
+
+const_assert C_MAX_SCANNED <= SCRATCH_END - C_JOURNAL_GROUP_KEYS;
+
+const_assert C_MAX_SCANNED <= C_JOURNAL_GROUP_KEYS - C_ROW_ORDER;
+
+// 引用集合这一遍「记一条指针」：只回答「这条指针指着哪条已释放记录的落点」，位记在 (记录, 候选根) 上。原来每记一条指针都把已释放记录从头比到尾，
+// 改成两条位置条目各按桶表找一遍：同 (盘, 槽) 的几条记录都在从首桶起到第一个空桶那一段里，一条记录两条位置条目都对上时同一位置两次，与原来一样
 fn r_note(p: Ptr) {
     if (!r_noting) {
         return;
     }
-    for (var k = 0u; k < c_released_count; k = k + 1u) {
-        let device = sw(C_RELEASED + k * 5u);
-        let slot = vec2<u32>(sw(C_RELEASED + k * 5u + 1u), sw(C_RELEASED + k * 5u + 2u));
-        if ((p.device0 == device && eq64(p.slot0, slot)) || (p.device1 == device && eq64(p.slot1, slot))) {
-            let word = C_REFERENCED_BY + k * 2u + (r_candidate >> 5u);
-            sws(word, sw(word) | (1u << (r_candidate & 31u)));
+    for (var copy = 0u; copy < 2u; copy = copy + 1u) {
+        let device = select(p.device0, p.device1, copy == 1u);
+        let slot = select(p.slot0, p.slot1, copy == 1u);
+        var bucket = slot_key_first_bucket(device, slot, C_RELEASED_BUCKET_COUNT);
+        for (var probe = 0u; probe < C_RELEASED_BUCKET_COUNT; probe = probe + 1u) {
+            let released_index_plus_one = sw(C_RELEASED_BUCKETS + bucket);
+            if (released_index_plus_one == 0u) {
+                break;
+            }
+            let released = C_RELEASED + (released_index_plus_one - 1u) * 5u;
+            if (sw(released) == device && sw(released + 1u) == slot.x && sw(released + 2u) == slot.y) {
+                let word = C_REFERENCED_BY + (released_index_plus_one - 1u) * 2u + (r_candidate >> 5u);
+                sws(word, sw(word) | (1u << (r_candidate & 31u)));
+            }
+            bucket = (bucket + 1u) & (C_RELEASED_BUCKET_COUNT - 1u);
         }
     }
 }
@@ -720,6 +744,21 @@ fn judge_release_generation_and_tree_table_birth() {
             sws(C_REFERENCED_BY + c_released_count * 2u + 1u, 0u);
             c_released_count = c_released_count + 1u;
         }
+        // r_note 读的桶表：表至多 C_MAX_RELEASED 条、桶数是它的两倍，往后挪总找得到空桶
+        for (var bucket = 0u; bucket < C_RELEASED_BUCKET_COUNT; bucket = bucket + 1u) {
+            sws(C_RELEASED_BUCKETS + bucket, 0u);
+        }
+        for (var released_index = 0u; released_index < c_released_count; released_index = released_index + 1u) {
+            let released = C_RELEASED + released_index * 5u;
+            var bucket = slot_key_first_bucket(sw(released), vec2<u32>(sw(released + 1u), sw(released + 2u)), C_RELEASED_BUCKET_COUNT);
+            for (var probe = 0u; probe < C_RELEASED_BUCKET_COUNT; probe = probe + 1u) {
+                if (sw(C_RELEASED_BUCKETS + bucket) == 0u) {
+                    sws(C_RELEASED_BUCKETS + bucket, released_index + 1u);
+                    break;
+                }
+                bucket = (bucket + 1u) & (C_RELEASED_BUCKET_COUNT - 1u);
+            }
+        }
         every = c_released_count > 0u;
     }
     r_noting = false;
@@ -945,32 +984,21 @@ fn c_seen_node_insert(p: Ptr) -> bool {
     return true;
 }
 
-// I-5.4 的一棵树：同一块盘上任意两条记录罩住的槽区间互不相交（按 (槽, 跨度) 排序后相邻比 ⟺ 任两条比）
+// I-5.4 的一棵树：同一块盘上任意两条记录罩住的槽区间互不相交。两两比的写法是「同盘的 a、b，(槽, 跨度, 行号) 字典序 a 在前、b 的槽 < a 的末端 ⇒ 违例」；
+// 按 (盘, 槽, 跨度, 行号) 排好之后只比相邻两条（同盘、后一条的槽 < 前一条的末端）与它等价：有违例的一对 (a, b) 时，a 后面那一条 k 排在 b 之前或就是 b、
+// 同盘，k 的槽 ≤ b 的槽 < a 的末端；反过来相邻两条违例就是一对（同 (槽, 跨度) 的两条照两两比的写法按行号分先后，跨度不为 0 就算相交）
 fn judge_allocation_record_ranges() {
     // walk.rs 每块盘有记录就判一次（相邻两条都不相交那一次成立）：读到的树里有记录就算判过
     if (c_alloc_record_count > 0u) {
         judge(INVARIANT_I_5_4, true);
     }
-    for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
-        let a = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
-        let device = sw(a);
-        let slot = vec2<u32>(sw(a + 1u), sw(a + 2u));
-        let span = sw(a + 3u);
-        let end = add64(slot, u64_of(span));
-        for (var j = 0u; j < c_alloc_record_count; j = j + 1u) {
-            if (i == j) {
-                continue;
-            }
-            let b = C_ALLOC_RECORDS + j * C_ALLOC_RECORD_WORDS;
-            if (sw(b) != device) {
-                continue;
-            }
-            let other_slot = vec2<u32>(sw(b + 1u), sw(b + 2u));
-            let other_span = sw(b + 3u);
-            let a_first = lt64(slot, other_slot) || (eq64(slot, other_slot) && (span < other_span || (span == other_span && i < j)));
-            if (a_first && lt64(other_slot, end)) {
-                violate(INVARIANT_I_5_4);
-            }
+    order_rows_by_their_first_four_words(C_ALLOC_RECORDS, C_ALLOC_RECORD_WORDS, c_alloc_record_count, C_ROW_ORDER);
+    for (var position = 1u; position < c_alloc_record_count; position = position + 1u) {
+        let earlier = C_ALLOC_RECORDS + sw(C_ROW_ORDER + position - 1u) * C_ALLOC_RECORD_WORDS;
+        let later = C_ALLOC_RECORDS + sw(C_ROW_ORDER + position) * C_ALLOC_RECORD_WORDS;
+        if (sw(earlier) == sw(later)
+            && lt64(vec2<u32>(sw(later + 1u), sw(later + 2u)), add64(vec2<u32>(sw(earlier + 1u), sw(earlier + 2u)), u64_of(sw(earlier + 3u))))) {
+            violate(INVARIANT_I_5_4);
         }
     }
 }
@@ -1063,6 +1091,23 @@ fn judge_allocation_records_disjoint() {
     }
 }
 
+// I-3.10 去重表 C_EXAMINED（每行 5 字：盘、槽 lo/hi、代 lo/hi）的桶：每个桶记一行的下标 + 1，0 是空桶，按 (盘, 槽, 代) 散列、撞了往后挪一个桶。
+// 原来每条记录从头比到表尾，各版的记录多半已判过，条数平方长。桶数取表的两倍，表满（C_MAX_EXAMINED 行）时也至少一半是空桶，往后挪总停得下。
+// 借 C_JOURNAL_GROUP_KEYS 那一段：那是走读内核逐盘 journal 用的；扫描内核里 I-1.8（检查字）与 I-3.9（已释放记录的桶表）在这之前借过、
+// 各自用完，这里开判时从头清
+const C_EXAMINED_BUCKET_COUNT: u32 = 4096u;
+
+const C_EXAMINED_BUCKETS: u32 = C_JOURNAL_GROUP_KEYS;
+
+fn c_examined_first_bucket(device: u32, slot: vec2<u32>, generation: vec2<u32>) -> u32 {
+    var hash = device * 0x9E3779B1u;
+    hash = (hash ^ slot.x) * 0x85EBCA77u;
+    hash = (hash ^ slot.y) * 0xC2B2AE3Du;
+    hash = (hash ^ generation.x) * 0x27D4EB2Fu;
+    hash = (hash ^ generation.y) * 0x165667B1u;
+    return (hash ^ (hash >> 15u)) & (C_EXAMINED_BUCKET_COUNT - 1u);
+}
+
 // I-3.10 的一棵树：未释放的记录（按盘、槽、代去重）的分配代等于它罩住的单元头里的诞生代号
 fn judge_allocation_generations_of_the_records() {
     for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
@@ -1073,12 +1118,20 @@ fn judge_allocation_generations_of_the_records() {
         let device = sw(a);
         let slot = vec2<u32>(sw(a + 1u), sw(a + 2u));
         let generation = vec2<u32>(sw(a + 4u), sw(a + 5u));
+        var bucket = c_examined_first_bucket(device, slot, generation);
         var examined = false;
-        for (var k = 0u; k < c_examined_count; k = k + 1u) {
-            if (sw(C_EXAMINED + k * 5u) == device && sw(C_EXAMINED + k * 5u + 1u) == slot.x && sw(C_EXAMINED + k * 5u + 2u) == slot.y
-                && sw(C_EXAMINED + k * 5u + 3u) == generation.x && sw(C_EXAMINED + k * 5u + 4u) == generation.y) {
-                examined = true;
+        loop {
+            let examined_row_plus_one = sw(C_EXAMINED_BUCKETS + bucket);
+            if (examined_row_plus_one == 0u) {
+                break;
             }
+            let row = C_EXAMINED + (examined_row_plus_one - 1u) * 5u;
+            if (sw(row) == device && sw(row + 1u) == slot.x && sw(row + 2u) == slot.y
+                && sw(row + 3u) == generation.x && sw(row + 4u) == generation.y) {
+                examined = true;
+                break;
+            }
+            bucket = (bucket + 1u) & (C_EXAMINED_BUCKET_COUNT - 1u);
         }
         if (examined) {
             continue;
@@ -1092,6 +1145,7 @@ fn judge_allocation_generations_of_the_records() {
         sws(C_EXAMINED + c_examined_count * 5u + 2u, slot.y);
         sws(C_EXAMINED + c_examined_count * 5u + 3u, generation.x);
         sws(C_EXAMINED + c_examined_count * 5u + 4u, generation.y);
+        sws(C_EXAMINED_BUCKETS + bucket, c_examined_count + 1u);
         c_examined_count = c_examined_count + 1u;
         // 起点槽上可用的单元头：magic、类 1 / 2 / 3、头校验和过
         let s = read_at(device, slot_to_bytes(slot), 4096u);
@@ -1142,6 +1196,9 @@ fn judge_allocation_generations_under_tree_table(tree_table_pointer: Ptr) {
 fn judge_allocation_generations_against_unit_births() {
     c_seen_node_count = 0u;
     c_examined_count = 0u;
+    for (var bucket = 0u; bucket < C_EXAMINED_BUCKET_COUNT; bucket = bucket + 1u) {
+        sws(C_EXAMINED_BUCKETS + bucket, 0u);
+    }
     r_noting = false;
     // 候选集里每条根（先判它持有的那棵分配记录树）、由记录施加出来的那几版、下一次挂载先施加的那一版（在前两段判完之后才找），
     // 次序照旧，树表那一判同一个调用点
@@ -1831,16 +1888,124 @@ fn judge_accounting(fsid_low: vec2<u32>) {
 }
 
 // ── I-1.8：扫描方向按已发布谓词过滤的码 1 / 码 3 单元归并成组
-// 一个扫描项的归并键：码 1 是 [42, 101)；码 3 是 [42, 89) 与 [93, 107)
-fn c_merge_key_equal(base_a: u32, base_b: u32) -> bool {
+// 一个扫描项的归并键：码 1 是 [42, 101)；码 3 是 [42, 89) 与 [93, 107)。原来每一项跟它前面、后面的每一项各比一遍归并键（码 3 的对象 key 那一半
+// 还要套两三层），扫描项数的平方乃至更高次长；改成按归并键排一次序、按序走一遍。比的时候码 3 的归并键换一个字节次序：先对象 key [42, 69)，
+// 再全序键（诞生代号 [73, 81)、实例与事务号 [93, 103)），再归并键其余的 [69, 73)、[81, 89)、[103, 107)。换的只是同一组字节的次序，
+// 两条归并键相等 ⟺ 这样排的字节逐个相等；同一组的成员在次序里连成一段，同对象 key 的组连成一串，串里全序键相同的组又挨在一起
+const C_MERGE_KEY_BYTES_OF_A_DATA_UNIT: u32 = 59u;
+
+const C_MERGE_KEY_BYTES_OF_A_PACKED_UNIT: u32 = 61u;
+
+// 码 3 换过次序的归并键里对象 key 占前几个字节、对象 key 连着全序键占前几个字节
+const C_OBJECT_KEY_BYTES: u32 = 27u;
+
+const C_OBJECT_KEY_AND_TOTAL_ORDER_KEY_BYTES: u32 = 45u;
+
+// 扫描项按归并键排好的次序借 C_ROW_ORDER（至多 C_MAX_SCANNED 个，那张表 C_MAX_REFERENCES 个字）；每一项读出来那一份切片的检查字（c2）
+// 借 C_JOURNAL_GROUP_KEYS 的前 C_MAX_SCANNED 个字（那一段 C_JOURNAL_GROUP_KEY_WORDS × MAX_RECORDS 个字）。I-1.8 是扫描内核第一判，
+// 之后 I-5.4 借 C_ROW_ORDER、I-3.9 与 I-3.10 借 C_JOURNAL_GROUP_KEYS 都各自从头写
+const C_SCANNED_CHECK_WORDS: u32 = C_JOURNAL_GROUP_KEYS;
+
+fn c_merge_key_bytes(unit_class: u32) -> u32 {
+    return select(C_MERGE_KEY_BYTES_OF_A_PACKED_UNIT, C_MERGE_KEY_BYTES_OF_A_DATA_UNIT, unit_class == 1u);
+}
+
+// 换过次序的归并键第 position 个字节在单元里的偏移
+fn c_merge_key_byte_offset(unit_class: u32, position: u32) -> u32 {
+    if (unit_class == 1u || position < C_OBJECT_KEY_BYTES) {
+        return 42u + position;
+    }
+    if (position < 35u) {
+        return 73u + position - C_OBJECT_KEY_BYTES;
+    }
+    if (position < C_OBJECT_KEY_AND_TOTAL_ORDER_KEY_BYTES) {
+        return 93u + position - 35u;
+    }
+    if (position < 49u) {
+        return 69u + position - C_OBJECT_KEY_AND_TOTAL_ORDER_KEY_BYTES;
+    }
+    if (position < 57u) {
+        return 81u + position - 49u;
+    }
+    return 103u + position - 57u;
+}
+
+// 扫描项 a 与 b（收的次序里的下标）换过次序的归并键从头起有几个字节相同；两项的类不同交 0
+fn c_scanned_units_common_merge_key_prefix(a: u32, b: u32) -> u32 {
+    let base_a = sw(C_SCANNED + a);
+    let base_b = sw(C_SCANNED + b);
     let unit_class = rd8(base_a, 6u);
     if (rd8(base_b, 6u) != unit_class) {
-        return false;
+        return 0u;
     }
-    if (unit_class == 1u) {
-        return bytes_equal(base_a, 42u, base_b, 42u, 59u);
+    let key_bytes = c_merge_key_bytes(unit_class);
+    var position = 0u;
+    while (position < key_bytes) {
+        let offset = c_merge_key_byte_offset(unit_class, position);
+        if (rd8(base_a, offset) != rd8(base_b, offset)) {
+            break;
+        }
+        position = position + 1u;
     }
-    return bytes_equal(base_a, 42u, base_b, 42u, 47u) && bytes_equal(base_a, 93u, base_b, 93u, 14u);
+    return position;
+}
+
+// 扫描项 a 排在 b 前面：先按类（码 1 在前），再按换过次序的归并键逐字节比，键相同的按收的次序——全序。同一组的段里按收的次序走，
+// 段首就是原写法里「这一组的代表」（收的次序里第一个）
+fn c_scanned_unit_precedes(a: u32, b: u32) -> bool {
+    let base_a = sw(C_SCANNED + a);
+    let base_b = sw(C_SCANNED + b);
+    let class_a = rd8(base_a, 6u);
+    let class_b = rd8(base_b, 6u);
+    if (class_a != class_b) {
+        return class_a < class_b;
+    }
+    let prefix = c_scanned_units_common_merge_key_prefix(a, b);
+    if (prefix == c_merge_key_bytes(class_a)) {
+        return a < b;
+    }
+    let offset = c_merge_key_byte_offset(class_a, prefix);
+    return rd8(base_a, offset) < rd8(base_b, offset);
+}
+
+// 前 count 个扫描项按 c_scanned_unit_precedes 排，下标写进 C_ROW_ORDER 起的 count 个字。堆排序，写法同 order_rows_by_their_first_four_words
+fn c_order_the_scanned_units_by_merge_key(count: u32) {
+    for (var i = 0u; i < count; i = i + 1u) {
+        sws(C_ROW_ORDER + i, i);
+    }
+    if (count < 2u) {
+        return;
+    }
+    let heap_building_steps = count / 2u;
+    var heap_size = count;
+    for (var step = 0u; step < heap_building_steps + count - 1u; step = step + 1u) {
+        var node = 0u;
+        if (step < heap_building_steps) {
+            node = heap_building_steps - 1u - step;
+        } else {
+            heap_size = heap_size - 1u;
+            let largest = sw(C_ROW_ORDER);
+            sws(C_ROW_ORDER, sw(C_ROW_ORDER + heap_size));
+            sws(C_ROW_ORDER + heap_size, largest);
+        }
+        loop {
+            let left = 2u * node + 1u;
+            if (left >= heap_size) {
+                break;
+            }
+            var larger = left;
+            if (left + 1u < heap_size && c_scanned_unit_precedes(sw(C_ROW_ORDER + left), sw(C_ROW_ORDER + left + 1u))) {
+                larger = left + 1u;
+            }
+            if (!c_scanned_unit_precedes(sw(C_ROW_ORDER + node), sw(C_ROW_ORDER + larger))) {
+                break;
+            }
+            let parent = sw(C_ROW_ORDER + node);
+            sws(C_ROW_ORDER + node, sw(C_ROW_ORDER + larger));
+            sws(C_ROW_ORDER + larger, parent);
+            node = larger;
+        }
+    }
 }
 
 fn c_payload_checksum(base: u32) -> u32 {
@@ -1885,123 +2050,71 @@ fn judge_merged_version_total_order(fsid_low: vec2<u32>) {
             undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (36u << 8u);
             return;
         }
-        sws(C_SCANNED + scanned, l);
+        // 原写法存落点下标、每比一次重读一遍（同一个状态里同一个落点读出同一份切片）：这里读一次，存字节基与检查字
+        sws(C_SCANNED + scanned, s.base);
+        sws(C_SCANNED_CHECK_WORDS + scanned, s.c2);
         scanned = scanned + 1u;
     }
-    for (var i = 0u; i < scanned; i = i + 1u) {
-        let si = read_location(sw(C_SCANNED + i));
-        // 更早的成员已经代表这一组
-        var represented = false;
-        for (var j = 0u; j < i; j = j + 1u) {
-            if (c_merge_key_equal(si.base, read_location(sw(C_SCANNED + j)).base)) {
-                represented = true;
-            }
+    c_order_the_scanned_units_by_merge_key(scanned);
+    // ② 那一串（同对象 key 的码 3 各组）：上一组的代表、这一串几组、串里有没有两组全序键相同
+    var previous_packed_representative = NONE;
+    var representatives_of_the_object_key = 0u;
+    var two_representatives_share_the_total_order_key = false;
+    var group_start = 0u;
+    while (group_start < scanned) {
+        let representative = sw(C_ROW_ORDER + group_start);
+        let unit_class = rd8(sw(C_SCANNED + representative), 6u);
+        let key_bytes = c_merge_key_bytes(unit_class);
+        var group_end = group_start + 1u;
+        while (group_end < scanned && c_scanned_units_common_merge_key_prefix(representative, sw(C_ROW_ORDER + group_end)) == key_bytes) {
+            group_end = group_end + 1u;
         }
-        if (represented) {
-            continue;
-        }
-        // ① 同一组的成员载荷相同
-        var members = 0u;
-        var every_same_checksum = true;
-        let first_checksum = c_payload_checksum(si.base);
-        for (var k = i; k < scanned; k = k + 1u) {
-            let sk = read_location(sw(C_SCANNED + k));
-            if (!c_merge_key_equal(si.base, sk.base)) {
+        // ① 同一组的成员载荷相同：可读的（载荷 CRC 在盘上对得上）成员的载荷校验和不超过一种。原写法先看校验和字段全相同就判成立，
+        // 不全相同才看可读的那几个——全相同时可读的那几个也只有一种，两种写法同判；两个以上成员的组各判一次（walk.rs judge_merged_version_total_order 的 judged）
+        var readable_checksum = 0u;
+        var have_readable = false;
+        var more_than_one = false;
+        for (var position = group_start; position < group_end; position = position + 1u) {
+            let member = sw(C_ROW_ORDER + position);
+            if ((sw(C_SCANNED_CHECK_WORDS + member) & 2u) == 0u) {
                 continue;
             }
-            members = members + 1u;
-            if (c_payload_checksum(sk.base) != first_checksum) {
-                every_same_checksum = false;
+            let checksum = c_payload_checksum(sw(C_SCANNED + member));
+            if (!have_readable) {
+                readable_checksum = checksum;
+                have_readable = true;
+            } else if (checksum != readable_checksum) {
+                more_than_one = true;
             }
         }
-        // 两个以上成员的组各判一次（walk.rs judge_merged_version_total_order 的 judged）
-        if (members >= 2u && every_same_checksum) {
-            judge(INVARIANT_I_1_8, true);
-        }
-        if (members >= 2u && !every_same_checksum) {
-            // 可读的（载荷 CRC 在盘上对得上）成员的载荷校验和是不是不超过一种
-            var readable_checksum = 0u;
-            var have_readable = false;
-            var more_than_one = false;
-            for (var k = i; k < scanned; k = k + 1u) {
-                let sk = read_location(sw(C_SCANNED + k));
-                if (!c_merge_key_equal(si.base, sk.base) || (sk.c2 & 2u) == 0u) {
-                    continue;
-                }
-                let checksum = c_payload_checksum(sk.base);
-                if (!have_readable) {
-                    readable_checksum = checksum;
-                    have_readable = true;
-                } else if (checksum != readable_checksum) {
-                    more_than_one = true;
-                }
-            }
+        if (group_end - group_start >= 2u) {
             judge(INVARIANT_I_1_8, !more_than_one);
         }
-        // ② 同 key 的各组两两全序键不等（只判码 3）
-        if (rd8(si.base, 6u) != 3u) {
-            continue;
+        // ② 同对象 key 的各组两两全序键不等（只判码 3，码 3 排在码 1 后面）：同对象 key 的组连成一串、串里全序键相同的组挨在一起，
+        // 比相邻两组的代表就够；一串两组以上判一次
+        if (unit_class == 3u) {
+            var same_object_key = false;
+            if (previous_packed_representative != NONE) {
+                let prefix = c_scanned_units_common_merge_key_prefix(previous_packed_representative, representative);
+                same_object_key = prefix >= C_OBJECT_KEY_BYTES;
+                if (prefix >= C_OBJECT_KEY_AND_TOTAL_ORDER_KEY_BYTES) {
+                    two_representatives_share_the_total_order_key = true;
+                }
+            }
+            if (!same_object_key) {
+                if (representatives_of_the_object_key >= 2u) {
+                    judge(INVARIANT_I_1_8, !two_representatives_share_the_total_order_key);
+                }
+                representatives_of_the_object_key = 0u;
+                two_representatives_share_the_total_order_key = false;
+            }
+            representatives_of_the_object_key = representatives_of_the_object_key + 1u;
+            previous_packed_representative = representative;
         }
-        var key_represented = false;
-        for (var j = 0u; j < i; j = j + 1u) {
-            let sj = read_location(sw(C_SCANNED + j));
-            if (rd8(sj.base, 6u) != 3u || !bytes_equal(si.base, 42u, sj.base, 42u, 27u)) {
-                continue;
-            }
-            // j 是不是自己那一组的代表
-            var j_represented = false;
-            for (var q = 0u; q < j; q = q + 1u) {
-                if (c_merge_key_equal(sj.base, read_location(sw(C_SCANNED + q)).base)) {
-                    j_represented = true;
-                }
-            }
-            if (!j_represented) {
-                key_represented = true;
-            }
-        }
-        if (key_represented) {
-            continue;
-        }
-        var representatives = 0u;
-        var duplicate_total_order = false;
-        for (var k = i; k < scanned; k = k + 1u) {
-            let sk = read_location(sw(C_SCANNED + k));
-            if (rd8(sk.base, 6u) != 3u || !bytes_equal(si.base, 42u, sk.base, 42u, 27u)) {
-                continue;
-            }
-            var k_represented = false;
-            for (var q = 0u; q < k; q = q + 1u) {
-                if (c_merge_key_equal(sk.base, read_location(sw(C_SCANNED + q)).base)) {
-                    k_represented = true;
-                }
-            }
-            if (k_represented) {
-                continue;
-            }
-            representatives = representatives + 1u;
-            // 与更早的代表比全序键 (诞生代号, 实例, 事务号)
-            for (var m = i; m < k; m = m + 1u) {
-                let sm = read_location(sw(C_SCANNED + m));
-                if (rd8(sm.base, 6u) != 3u || !bytes_equal(si.base, 42u, sm.base, 42u, 27u)) {
-                    continue;
-                }
-                var m_represented = false;
-                for (var q = 0u; q < m; q = q + 1u) {
-                    if (c_merge_key_equal(sm.base, read_location(sw(C_SCANNED + q)).base)) {
-                        m_represented = true;
-                    }
-                }
-                if (m_represented) {
-                    continue;
-                }
-                if (eq64(rd64(sm.base, 73u), rd64(sk.base, 73u)) && rd32(sm.base, 93u) == rd32(sk.base, 93u) && eq64(rd48(sm.base, 97u), rd48(sk.base, 97u))) {
-                    duplicate_total_order = true;
-                }
-            }
-        }
-        if (representatives >= 2u) {
-            judge(INVARIANT_I_1_8, !duplicate_total_order);
-        }
+        group_start = group_end;
+    }
+    if (representatives_of_the_object_key >= 2u) {
+        judge(INVARIANT_I_1_8, !two_representatives_share_the_total_order_key);
     }
 }
 
@@ -2892,7 +3005,8 @@ var<private> d_object_birth_count: u32;
 // （判决 `research/prompts/m3-batch23-code-r1-main-verification.md` 第二节 K2 N5）
 var<private> d_object_births_are_compared: bool;
 
-// I-9.20 不重号那一句两两比：一棵墓碑树的墓碑多于这么多条就判不了（比较次数随条数平方涨）
+// I-9.20 不重号那一句：一棵墓碑树的墓碑多于这么多条就判不了（原来两两比、比较次数随条数平方涨时定的门槛；改成排一次序之后门槛照旧，
+// 判不判得了不变，排序借的两段按它的大小判装不装得下）
 const DELETION_MAX_TOMBSTONES_COMPARED_PAIRWISE: u32 = 4096u;
 
 fn d_container_row(container_index: u32) -> u32 {
@@ -3420,8 +3534,22 @@ fn d_judge_every_tombstone_is_well_formed(version_txg: vec2<u32>) {
     }
 }
 
+// I-9.20 不重号那一句：在谱系上的墓碑的 (号 lo、号 hi、对象出生代 lo、对象出生代 hi) 每条一行、4 个字，按 order_rows_by_their_first_four_words 排、
+// 行号次序借 C_ROW_ORDER。借 C_ALLOC_RECORDS 那一段（C_MAX_ALLOC_RECORDS × C_ALLOC_RECORD_WORDS 个字）：读它的几处（I-5.4、I-3.10、I-5.5、记账那几条的
+// r_allocation_tree）都把记录数复位、从头写过才读，墓碑与谱系那一遍里没有谁读它；C_ROW_ORDER 在扫描内核里 I-1.8、I-5.4 之后就没有谁读
+const D_TOMBSTONE_KEY_WORDS: u32 = 4u;
+
+const D_TOMBSTONE_KEYS: u32 = C_ALLOC_RECORDS;
+
+// 借的两段装得下墓碑总数的上限（解析内核时判，不进展开量）
+const_assert DELETION_MAX_TOMBSTONES_COMPARED_PAIRWISE * D_TOMBSTONE_KEY_WORDS <= C_MAX_ALLOC_RECORDS * C_ALLOC_RECORD_WORDS;
+
+const_assert DELETION_MAX_TOMBSTONES_COMPARED_PAIRWISE <= C_JOURNAL_GROUP_KEYS - C_ROW_ORDER;
+
 // I-9.20 不重号那一句（walk.rs judge_tombstones_on_the_lineage_of_a_version_are_distinct，只判在谱系上的）：这一版在谱系上的墓碑按 (号, 对象出生代)
-// 不重复。两两比，墓碑总数多于 DELETION_MAX_TOMBSTONES_COMPARED_PAIRWISE 判不了
+// 不重复。原来每条在谱系上的墓碑跟叶序在它之前的每一条比（每版 T² / 2）；改成每条在谱系上的墓碑记一行键、按键排一次序，同键的在次序里挨着，
+// 比相邻两行就够——有两条同键 ⟺ 次序里有相邻两行同键；原写法每见一条重的置一次违例位，这里每对相邻同键置一次，置的是同一位。
+// 墓碑总数多于 DELETION_MAX_TOMBSTONES_COMPARED_PAIRWISE 照旧判不了（站点 60，与原写法同一个门槛，判不判得了不变）
 fn d_judge_tombstones_on_the_lineage_are_distinct(version_txg: vec2<u32>) {
     var tombstone_count = 0u;
     for (var container_index = 0u; container_index < d_container_count; container_index = container_index + 1u) {
@@ -3431,6 +3559,7 @@ fn d_judge_tombstones_on_the_lineage_are_distinct(version_txg: vec2<u32>) {
         undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (60u << 8u);
         return;
     }
+    var keys_on_the_lineage = 0u;
     for (var container_index = 0u; container_index < d_container_count; container_index = container_index + 1u) {
         let base = d_container_base(container_index);
         for (var record_index = 0u; record_index < d_container_record_count(container_index); record_index = record_index + 1u) {
@@ -3441,22 +3570,20 @@ fn d_judge_tombstones_on_the_lineage_are_distinct(version_txg: vec2<u32>) {
             judge(INVARIANT_I_9_20, true);
             let object = rd64(base, o + DELETION_TOMBSTONE_RECORD_OBJECT_IDENTIFIER_OFFSET);
             let object_birth = rd64(base, o + DELETION_TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET);
-            // 叶序在它之前的墓碑：前几片容器的全部、同一片里它之前的
-            for (var earlier_container = 0u; earlier_container <= container_index; earlier_container = earlier_container + 1u) {
-                let earlier_base = d_container_base(earlier_container);
-                var earlier_limit = d_container_record_count(earlier_container);
-                if (earlier_container == container_index) {
-                    earlier_limit = record_index;
-                }
-                for (var earlier_record = 0u; earlier_record < earlier_limit; earlier_record = earlier_record + 1u) {
-                    let earlier = d_container_record_offset(earlier_container, earlier_record, DELETION_TOMBSTONE_RECORD_BYTES);
-                    if (eq64(rd64(earlier_base, earlier + DELETION_TOMBSTONE_RECORD_OBJECT_IDENTIFIER_OFFSET), object)
-                        && eq64(rd64(earlier_base, earlier + DELETION_TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET), object_birth)
-                        && d_txg_is_on_the_lineage(rd64(earlier_base, earlier + DELETION_TOMBSTONE_RECORD_DEATH_TXG_OFFSET), version_txg)) {
-                        violate(INVARIANT_I_9_20);
-                    }
-                }
-            }
+            let key_row = D_TOMBSTONE_KEYS + keys_on_the_lineage * D_TOMBSTONE_KEY_WORDS;
+            sws(key_row, object.x);
+            sws(key_row + 1u, object.y);
+            sws(key_row + 2u, object_birth.x);
+            sws(key_row + 3u, object_birth.y);
+            keys_on_the_lineage = keys_on_the_lineage + 1u;
+        }
+    }
+    order_rows_by_their_first_four_words(D_TOMBSTONE_KEYS, D_TOMBSTONE_KEY_WORDS, keys_on_the_lineage, C_ROW_ORDER);
+    for (var position = 1u; position < keys_on_the_lineage; position = position + 1u) {
+        let earlier = D_TOMBSTONE_KEYS + sw(C_ROW_ORDER + position - 1u) * D_TOMBSTONE_KEY_WORDS;
+        let later = D_TOMBSTONE_KEYS + sw(C_ROW_ORDER + position) * D_TOMBSTONE_KEY_WORDS;
+        if (sw(earlier) == sw(later) && sw(earlier + 1u) == sw(later + 1u) && sw(earlier + 2u) == sw(later + 2u) && sw(earlier + 3u) == sw(later + 3u)) {
+            violate(INVARIANT_I_9_20);
         }
     }
 }

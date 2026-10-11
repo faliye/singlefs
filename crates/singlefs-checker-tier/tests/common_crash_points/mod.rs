@@ -1,29 +1,225 @@
 //! 崩溃放量共用的流程步骤。几个测试文件调这里的同一个函数，就得到同一个身份、同一串路径段：前缀节点在库里只核一次，
 //! 别的流直接复用（前缀共享是剪枝的基础，没有它每次放量都从头核）。
-//! 崩溃点的文件是这一份（`file!()`），不是调它的测试文件：改调用方的测试文件不动这里的节点。判法摘要与设点的文件无关，
-//! 只随两个判器的闭包变（`crash_identity::JUDGE_ENTRY_FILES`）。
+//! 崩溃点的文件是这一份（`file!()`），不是调它的测试文件：改调用方的测试文件不动这里的节点。GPU 结论的版本与设点的文件无关；
+//! CPU 结论的版本是 CPU 判器闭包并上设点文件出发的闭包（崩溃点重放合并第三轮判决 J8），设在这里的点几条流同一把。
+//! 多记录流的 B、C 两次顺序写也在这里设点（J3：删除流与多记录流共享到 C）；不录崩溃点的层 0 那一路调同一个 [`sequential_write`]，
+//! 两份造法只有这一份写法。不录崩溃点的那几样不要 `verdict-store` 特性，录崩溃点的那几样（录制器、按环境跑）要。
+//! 挂在标准前缀节点上的观察者登记在这里（J4，[`OBSERVERS_ON_THE_STANDARD_PREFIX`]，只有名字）；观察者的代码与照表跑的放量入口在
+//! `tests/common_crash_point_observers/mod.rs`：这一份不引它，公共模块设的点的 CPU 判器版本因此不收观察者代码（第三轮正文 H4「观察者代码不进
+//! 计划哈希、不进判器版本」）。删除流的录法（意图、各批）也在这里：删除流设点与观察者另读的输入照录都用它。
 #![allow(
     dead_code,
     reason = "共用的步骤模块：每个测试文件只调其中几步，没调的在那个测试二进制里就是没用到"
 )]
 
 use super::common::{parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
+#[cfg(feature = "verdict-store")]
 use singlefs_checker_tier::crash_amplification::CrashPointRecorder;
+#[cfg(feature = "verdict-store")]
 use singlefs_core::address::CheckpointTxg;
-use singlefs_core::address::InstanceGeneration;
+use singlefs_core::address::{InodeNumber, InstanceGeneration};
+#[cfg(feature = "verdict-store")]
 use singlefs_core::mount::{
     mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, unmount, Mounted,
     RaisedFloor, RollbackTarget, ShadowLedger, UnmountRaisedTheFloor, Unmounted,
 };
+#[cfg(feature = "verdict-store")]
+use singlefs_core::transaction::{publish_overwrite, PoolVersion};
 use singlefs_core::transaction::{
-    publish_overwrite, FirstFile, PoolVersion, PoolWriter, TransactionOutput,
+    publish_sequential_write, publish_unlink_intent, publish_unlink_step, FirstFile, PoolWriter,
+    TransactionOutput, FIRST_INODE_NUMBER,
 };
+use singlefs_core::unit::data_unit_payload_capacity;
+use singlefs_harness::scenario::deletion_history_batch_size;
+#[cfg(feature = "verdict-store")]
 use singlefs_harness::RecordedPublishEntry;
 
 /// 这一份的仓内路径，与 `file!()` 归一之后相同；测试拿它核身份里的文件。
 pub const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/common_crash_points/mod.rs";
 
+/// 恰好要 `data_units` 个数据单元的内容：最后一个单元装一半（多记录流与删除流的 B、C 两次顺序写都取这一份字节）。
+pub fn content_needing(data_units: usize, seed: usize) -> Vec<u8> {
+    let payload_capacity = data_unit_payload_capacity();
+    (0..(data_units - 1) * payload_capacity + payload_capacity / 2)
+        .map(|index| u8::try_from((index * 11 + seed * 3 + 7) % 251).expect("小于 256"))
+        .collect()
+}
+
+/// 顺序写（多记录流与删除流的 B、C）：把现行那一版的内容换成 `content`，实例 1、调用方时间比第一个文件晚 60 秒。
+/// 层 0 那一路直接调它，录崩溃点的那一路经 [`sequential_write_step`] 调它：两份造法同一份写法（J3，「两份造法写表摘要相等」的用例核它）。
+pub fn sequential_write(pool: &mut BuiltPool, content: &[u8]) -> TransactionOutput {
+    let publish_parameters = parameters();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    let previous = pool.output.clone();
+    let output = publish_sequential_write(
+        &mut writer,
+        &mut pool.allocator,
+        &previous,
+        FirstFile {
+            content,
+            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
+        },
+        InstanceGeneration(1),
+    )
+    .expect("顺序写");
+    pool.output = output.clone();
+    output
+}
+
+/// [`sequential_write`] 设一个崩溃点（设点文件是这一份）：多记录流的 B、C 与删除流的 B、C 是同一个身份、同一个节点，共享到 C。
+#[cfg(feature = "verdict-store")]
+pub fn sequential_write_step(
+    recorder: &mut CrashPointRecorder,
+    pool: &mut BuiltPool,
+    content: &[u8],
+) -> TransactionOutput {
+    recorder.step(file!(), "sequential_write", || {
+        sequential_write(pool, content)
+    })
+}
+
+/// 多记录流到 C 为止的三次带文件的发布（A 在 `build_pool` 里）：每一版的输出与 B、C 的内容。
+pub struct MultiRecordPublishesRecorded {
+    pub first: TransactionOutput,
+    pub second: TransactionOutput,
+    pub second_content: Vec<u8>,
+    pub third: TransactionOutput,
+    pub third_content: Vec<u8>,
+}
+
+impl MultiRecordPublishesRecorded {
+    /// A、B、C 三版带文件的版本（oracle 认的那张表，按发布的次序）。
+    pub fn versions(&self) -> Vec<singlefs_harness::memory_pool::PublishedVersion> {
+        let version = |output: &TransactionOutput, content: Vec<u8>| {
+            singlefs_harness::memory_pool::PublishedVersion {
+                instance: output.root.instance,
+                checkpoint_txg: output.root.checkpoint_txg,
+                content,
+            }
+        };
+        vec![
+            version(&self.first, super::common::file_content()),
+            version(&self.second, self.second_content.clone()),
+            version(&self.third, self.third_content.clone()),
+        ]
+    }
+}
+
+/// 多记录流到 C 为止（录崩溃点）：取号加暖机、新池新建文件两个点，B（两个数据单元、两条记录）、C（三个数据单元、三条记录）
+/// 两次顺序写各一个点，全设在这一份里：多记录流与接在它后面的删除流共享到 C（崩溃点重放合并第三轮判决 J3）。
+#[cfg(feature = "verdict-store")]
+pub fn record_the_multi_record_publishes(
+    recorder: &mut CrashPointRecorder,
+    pool: &mut BuiltPool,
+) -> MultiRecordPublishesRecorded {
+    record_pool_build(recorder, pool);
+    let first = pool.output.clone();
+    let second_content = content_needing(2, 1);
+    let second = sequential_write_step(recorder, pool, &second_content);
+    let third_content = content_needing(3, 2);
+    let third = sequential_write_step(recorder, pool, &third_content);
+    MultiRecordPublishesRecorded {
+        first,
+        second,
+        second_content,
+        third,
+        third_content,
+    }
+}
+
+// ============================== 删除流的录法（多记录流到 C 之后 unlink 第一个文件） ==============================
+// 删除流自己的层 0 用例与挂在标准前缀上的可写挂载续做观察者都要它：观察者另读的输入从录一遍删除流得来，单跑多记录流那一项也照录
+// （崩溃点重放合并第三轮判决 J4、M4 第 10 条「单跑照录别项流程」）。
+
+/// unlink 的是第一个文件。
+pub const UNLINKED_FILE: InodeNumber = InodeNumber(FIRST_INODE_NUMBER);
+
+/// 意图那次的调用方时间比顺序写晚：与那条记录现有的时间不同，意图写的是不是调用方给的那一个分辨得出。
+pub const SECONDS_FROM_THE_SEQUENTIAL_WRITES_TO_THE_INTENT: u64 = 120;
+
+/// 删除段的批数（不含最后一批）：三个数据单元按批大小 1 走「留 2、留 1、最后一批」（K-U6 翻面观测：删除段少于两批不算数）。
+pub const DELETION_BATCHES_BEFORE_THE_FINAL_BATCH: usize = 2;
+
+/// unlink 第一个文件的意图那次发布（实例 1）。
+pub fn publish_the_unlink_intent(pool: &mut BuiltPool) -> TransactionOutput {
+    let publish_parameters = parameters();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    let previous = pool.output.clone();
+    let output = publish_unlink_intent(
+        &mut writer,
+        &mut pool.allocator,
+        &previous,
+        UNLINKED_FILE,
+        FIXED_WRITE_TIME_SECONDS + SECONDS_FROM_THE_SEQUENTIAL_WRITES_TO_THE_INTENT,
+        InstanceGeneration(1),
+    )
+    .expect("unlink 意图");
+    pool.output = output.clone();
+    output
+}
+
+/// 删除的下一批（批大小照只供测试的 `deletion_history_batch_size`，实例 1）。
+pub fn publish_the_next_unlink_step(pool: &mut BuiltPool) -> TransactionOutput {
+    let publish_parameters = parameters();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    let previous = pool.output.clone();
+    let output = publish_unlink_step(
+        &mut writer,
+        &mut pool.allocator,
+        &previous,
+        UNLINKED_FILE,
+        deletion_history_batch_size(),
+        InstanceGeneration(1),
+    )
+    .expect("unlink 的一批");
+    pool.output = output.clone();
+    output
+}
+
+// ============================== 挂在标准前缀上的观察者：登记表（崩溃点重放合并第三轮判决 J4） ==============================
+
+/// 挂在标准前缀节点上的观察者（封闭的一张：加一种就加一个成员，`common_crash_point_observers::amplify_a_flow_through_the_standard_prefix`
+/// 里的 `match` 跟着补）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ObserverOfTheStandardPrefix {
+    /// 每个状态上可写挂载一次、续做走到空、挂完的盘过池级 checker（`common_crash_point_observers::observe_the_mount_continuation`；
+    /// 用户 2026-10-10 定「可写挂载挂在标准前缀上，
+    /// 共享前缀的每个状态都做，不得例外」）。
+    WritableMountAndContinuation,
+}
+
+impl ObserverOfTheStandardPrefix {
+    /// 观察者的名字：进它的结论种类（`ConclusionKind::Observer`）、计数与判红那一项。
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::WritableMountAndContinuation => "writable_mount_and_continuation",
+        }
+    }
+}
+
+/// 登记表（第三轮正文 H4）：标准前缀的节点（这份文件里设点的入口名：[`record_the_multi_record_publishes`] 设的取号加暖机、新池新建文件、
+/// B、C 两次顺序写）→ 挂的观察者。单跑一项照表跑它经过的每个节点上登记的全部观察者；共享节点上的观察者对经过它的每一项、每一个状态都跑
+/// （块键相同的块在库里复用）。观察者代码不进计划哈希、不进判器版本，它的版本从这份文件出发算（`crash_identity::ConclusionVersionRequest::Observer`）。
+pub static OBSERVERS_ON_THE_STANDARD_PREFIX: &[(&str, &[ObserverOfTheStandardPrefix])] = &[
+    (
+        "acquire_instance_and_warm_up",
+        &[ObserverOfTheStandardPrefix::WritableMountAndContinuation],
+    ),
+    (
+        "publish_first_file",
+        &[ObserverOfTheStandardPrefix::WritableMountAndContinuation],
+    ),
+    (
+        "sequential_write",
+        &[ObserverOfTheStandardPrefix::WritableMountAndContinuation],
+    ),
+];
+
 /// `build_pool` 已经发出去的两段：取号加暖机、新池新建文件。
+#[cfg(feature = "verdict-store")]
 pub fn record_pool_build(recorder: &mut CrashPointRecorder, pool: &BuiltPool) {
     recorder.record_span(
         file!(),
@@ -38,6 +234,7 @@ pub fn record_pool_build(recorder: &mut CrashPointRecorder, pool: &BuiltPool) {
 }
 
 /// 覆盖写：把现行那一版的内容换成 `content`。
+#[cfg(feature = "verdict-store")]
 pub fn overwrite_step(
     recorder: &mut CrashPointRecorder,
     pool: &mut BuiltPool,
@@ -63,6 +260,7 @@ pub fn overwrite_step(
 }
 
 /// 关掉镜像再可写挂载（重开：取号、写行、暖机）。
+#[cfg(feature = "verdict-store")]
 pub fn mount_writable_step(recorder: &mut CrashPointRecorder, pool: &mut BuiltPool) -> Mounted {
     recorder.step(file!(), "mount_writable", || {
         let mut devices = pool.reopen_recorded();
@@ -73,6 +271,7 @@ pub fn mount_writable_step(recorder: &mut CrashPointRecorder, pool: &mut BuiltPo
 }
 
 /// 挂着的时候用一次向前发布回退到 `target`。
+#[cfg(feature = "verdict-store")]
 pub fn roll_back_step(
     recorder: &mut CrashPointRecorder,
     pool: &mut BuiltPool,
@@ -93,6 +292,7 @@ pub fn roll_back_step(
 }
 
 /// 抬回退下界 F 到 `new_floor`：先把新 F 写进每块盘的系统配置，再推带新 F 的空发布直到每块盘上都有一条（D16 已定项 1「抬 F 那一串」）。
+#[cfg(feature = "verdict-store")]
 pub fn raise_rollback_floor_step(
     recorder: &mut CrashPointRecorder,
     pool: &mut BuiltPool,
@@ -117,6 +317,7 @@ pub fn raise_rollback_floor_step(
 
 /// 正常卸载（影子账开着），录制流上把这一段记成卸载入口发的（C557：带卸载记号的根槽写只许落在卸载入口里）：
 /// 带文件的一版上卸载必抬 F，交回那一串；现行版本换成那一串最后落盘的那一次。
+#[cfg(feature = "verdict-store")]
 pub fn unmount_step(
     recorder: &mut CrashPointRecorder,
     pool: &mut BuiltPool,
@@ -156,6 +357,7 @@ pub fn unmount_step(
     unused_imports,
     reason = "共用的步骤模块：只有改环境、经 run_from_environment 跑的测试文件用这两个守卫，别的测试二进制里转出去没人用"
 )]
+#[cfg(feature = "verdict-store")]
 pub use singlefs_checker_tier::crash_amplification::{
     CrashAmplificationEnvironment, EnvironmentRestoredOnDrop,
 };
@@ -168,6 +370,7 @@ pub use singlefs_checker_tier::crash_amplification::{
     clippy::too_many_arguments,
     reason = "一条流的七样各自独立，收成一个结构体只是把七个字段挪个地方"
 )]
+#[cfg(feature = "verdict-store")]
 pub fn amplify_prepared_flow(
     flow_name: &str,
     base: &singlefs_harness::memory_pool::MemoryPool,
@@ -196,6 +399,7 @@ pub fn amplify_prepared_flow(
     clippy::too_many_arguments,
     reason = "一条流的八样各自独立，收成一个结构体只是把八个字段挪个地方"
 )]
+#[cfg(feature = "verdict-store")]
 pub fn amplify_prepared_flow_against_the_version_table(
     flow_name: &str,
     base: &singlefs_harness::memory_pool::MemoryPool,
@@ -217,6 +421,7 @@ pub fn amplify_prepared_flow_against_the_version_table(
         versions_without_a_file,
         crash_points,
         default_expand_up_to,
+        &[],
     )
     .0
 }
@@ -227,6 +432,7 @@ pub fn amplify_prepared_flow_against_the_version_table(
     clippy::too_many_arguments,
     reason = "一条流的七样各自独立，收成一个结构体只是把七个字段挪个地方"
 )]
+#[cfg(feature = "verdict-store")]
 pub fn amplify_prepared_flow_and_hand_back_its_line(
     flow_name: &str,
     base: &singlefs_harness::memory_pool::MemoryPool,
@@ -250,15 +456,18 @@ pub fn amplify_prepared_flow_and_hand_back_its_line(
         &[],
         crash_points,
         default_expand_up_to,
+        &[],
     )
 }
 
-/// 同 [`amplify_prepared_flow_and_hand_back_its_line`]，版本表另带「没有文件的那几版」。
+/// 同 [`amplify_prepared_flow_and_hand_back_its_line`]，版本表另带「没有文件的那几版」，连同挂在节点上的观察者（没挂是空的；
+/// 照登记表挂的那一份由 `common_crash_point_observers::amplify_a_flow_through_the_standard_prefix` 交进来）。
 #[allow(
     clippy::too_many_arguments,
-    reason = "一条流的八样各自独立，收成一个结构体只是把八个字段挪个地方"
+    reason = "一条流的八样各自独立，另加挂在节点上的观察者；收成一个结构体只是把字段挪个地方"
 )]
-fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
+#[cfg(feature = "verdict-store")]
+pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
     flow_name: &str,
     base: &singlefs_harness::memory_pool::MemoryPool,
     writes: &[singlefs_harness::memory_pool::RetainedWrite],
@@ -268,13 +477,14 @@ fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
     versions_without_a_file: &[singlefs_harness::memory_pool::PublishedVersionWithoutAFile],
     crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
     default_expand_up_to: usize,
+    observers: &[singlefs_checker_tier::crash_amplification::ObserverOnTheNodes<'_>],
 ) -> (
     singlefs_checker_tier::crash_amplification::EnvironmentRun,
     Option<String>,
 ) {
     use singlefs_checker_tier::crash_amplification::{
-        reuse_and_scale_fields_of_the_line, run_from_environment, CrashFlow,
-        ExpandUpToWritesPerSegment, PipelineJudgingCode,
+        reuse_and_scale_fields_of_the_line, run_from_environment_with_observers, CrashFlow,
+        ExpandUpToWritesPerSegment,
     };
     use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
     let limit = ExpandUpToWritesPerSegment::from_environment_or(default_expand_up_to);
@@ -296,11 +506,6 @@ fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         .parent()
         .expect("Cargo.lock 所在的目录就是仓根")
         .to_path_buf();
-    let judging = PipelineJudgingCode::of_the_judges(
-        &root,
-        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
-    )
-    .expect("判法摘要");
     // 调用方没给库就建一份临时的：两个变量设上，跑完（或 panic）还原成调用方原来的样子
     let temporary_library = match std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY") {
         Some(_) => None,
@@ -325,7 +530,15 @@ fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         }
     };
     let started = std::time::Instant::now();
-    let run = run_from_environment(&flow, &judging, &root, limit).expect("按环境跑得完");
+    let run = run_from_environment_with_observers(
+        &flow,
+        flow_name,
+        observers,
+        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
+        &root,
+        limit,
+    )
+    .expect("按环境跑得完");
     let seconds = started.elapsed().as_secs_f64();
     if let Some((directory, restored)) = temporary_library {
         drop(restored);
@@ -354,15 +567,10 @@ fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         return (run, Some(line));
     }
     let judge_line = judge_fields_of_the_summary_line(&run);
-    let judge_version: String = run
-        .judge_version
-        .0
-        .iter()
-        .take(8)
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+    let judge_version = run.judged_conclusions().version_text();
+    let cross_check_line = run.cross_check.fields_of_the_line();
     let line = format!(
-        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judge_version={judge_version} seconds={seconds:.1}{reuse_and_scale}{judge_line}",
+        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judge_version={judge_version} seconds={seconds:.1}{reuse_and_scale}{judge_line}{cross_check_line}",
         run.mode.name(),
         run.checking.states_checked,
         run.checking.blocks_checked,
@@ -392,11 +600,38 @@ fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
             comparison.disagreement_samples
         );
     }
+    // 计数向量每一趟都判（J7）：这一趟判的与库里复用的块，读回来的计数向量与计划对得上
+    assert!(
+        run.count_vector_disagreements.is_empty(),
+        "流 {flow_name}：计数向量与计划对不上：{:?}",
+        run.count_vector_disagreements
+    );
+    assert_the_cross_check_agrees(flow_name, &run);
     (run, Some(line))
+}
+
+/// 对照（崩溃点重放合并第三轮判决 J6）比了就要对上：GPU 与 CPU 两份结论逐状态红项、两遍各自落到的根、结局、失败点都相同，
+/// 每一块两份都存了恢复字。没配 GPU、用户授权跳过、被叫停的那一趟没比，不判。
+#[cfg(feature = "verdict-store")]
+pub fn assert_the_cross_check_agrees(
+    flow_name: &str,
+    run: &singlefs_checker_tier::crash_amplification::EnvironmentRun,
+) {
+    use singlefs_checker_tier::crash_amplification::CrossCheckOfTheRun;
+    match &run.cross_check {
+        CrossCheckOfTheRun::Compared { comparison, .. } => assert!(
+            comparison.agrees(),
+            "流 {flow_name}：对照对不上（GPU 与 CPU 两份结论）：{comparison:?}"
+        ),
+        CrossCheckOfTheRun::SkippedByTheUser
+        | CrossCheckOfTheRun::NotConfiguredTheJudgeRunsOnTheCpu
+        | CrossCheckOfTheRun::NotComparedTheRunStoppedEarly => {}
+    }
 }
 
 /// 汇总行里说第 ① 段在哪判的那几个字段：GPU 判的带用了几张卡、判了多少、多快、写库花了多久；CPU 判的只有 `judge=cpu`。
 #[must_use]
+#[cfg(feature = "verdict-store")]
 pub fn judge_fields_of_the_summary_line(
     run: &singlefs_checker_tier::crash_amplification::EnvironmentRun,
 ) -> String {
@@ -415,6 +650,7 @@ pub fn judge_fields_of_the_summary_line(
 }
 
 /// 一次录下的整条写表当一个崩溃点（起点镜像不枚举、只录一次发布那几条流）：名字是这条流的名字，设点的文件给 `file!()`。
+#[cfg(feature = "verdict-store")]
 pub fn one_crash_point_over_every_write(
     code_file: &str,
     name: &str,

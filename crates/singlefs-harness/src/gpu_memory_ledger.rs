@@ -51,7 +51,7 @@
 //! 账不防的：两个进程同一刻读到同一份空闲、一起借超了（各自只记自己借的）；一份 `nvidia-smi -q` 报告里空闲与这个进程占着的是驱动的两次查询，
 //! 本机两张卡的两次读显存相隔约 1.3 毫秒（第 10y 批代码轮攻方量过 1347.9 µs），这个进程别的线程恰在两次之间建上的那一笔既在空闲里又在占着的里
 //! （第 10y 批代码轮判决 K1-1：与两进程同读一份空闲同形，归运行时兜底，不另改）。这两形由运行时兜底：内存包装
-//! `research/scripts/run-with-memory-cap.sh` 认出内核日志里的 `NVRM … NV_ERR_NO_MEMORY` 退 245，wgpu 报 Out of Memory 时
+//! `scripts/hosts/run-with-memory-cap.sh` 认出内核日志里的 `NVRM … NV_ERR_NO_MEMORY` 退 245，wgpu 报 Out of Memory 时
 //! 崩溃放量产品路径与卡池起设备把这一趟报本次未跑（原因写显存不够，[`GPU_MEMORY_SHORT_REASON_PREFIX`]、
 //! [`reason_for_running_out_of_gpu_memory`]）。
 //!

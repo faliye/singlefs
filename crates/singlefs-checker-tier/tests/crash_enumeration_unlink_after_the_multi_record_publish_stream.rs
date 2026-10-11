@@ -1,4 +1,4 @@
-//! checker 档模块：crash、layer0_progress、writable_mount_phases、crash_amplification
+//! checker 档模块：crash、layer0_progress、crash_identity、crash_amplification
 //! 删除类发布崩在中间（K-U6 F1：接在多记录流后面 unlink 那个文件）：多记录流「取号 → 暖机 × 2 → A → B → C」之后
 //! unlink 第一个文件（C 之后三个数据单元）：意图那次发布 → 按只供测试的批大小 1 删两批 → 最后一批（D8（核心索引结构） 已定项 16），
 //! 整条录制流按 D13（验证路线） 已定项 4 枚举崩溃状态。每个状态跑恢复 + 多版本 oracle、池级 checker、记录核对器；
@@ -10,7 +10,9 @@
 //! - 可写挂载一次：续做把队列走到空（D8（核心索引结构） 已定项 5「续做是每次恢复都跑的常规动作」、已定项 16 第 6 条），
 //!   续做的步数等于恢复落到的那一版还差几步；续做的每一批落在这次挂载的实例上，txg 与事务号都是这个实例的下一个、连号
 //!   （已定项 16 第 2 条末句）；挂完的盘再跑一遍池级 checker，一条不变量都不许判违例（照 `assert_clean` 的口径，已定项 16 第 7 条 ③；
-//!   判决 `research/prompts/m3-batch33r-code-r1-main-verification.md` 第三节第 2 条）。挂载是每个状态上的重活，观察者放在工作线程上跑
+//!   判决 `research/prompts/m3-batch33r-code-r1-main-verification.md` 第三节第 2 条；这一个观察者与删除流的录法住在公共模块
+//!   `tests/common_crash_point_observers/mod.rs`、删除流的录法住在公共模块 `tests/common_crash_points/mod.rs`，崩溃放量那一路照登记表把它挂在标准前缀的节点上，
+//!   崩溃点重放合并第三轮判决 J4）。挂载是每个状态上的重活，观察者放在工作线程上跑
 //!   （`crash::Layer0StateObserving::OnTheWorkerThreads`），一个工作线程、四个工作线程与观察者在调用线程上三种跑法的计数逐项相同（快档对拍）。
 //!
 //! **比已有的流多罩了什么**：已有的层 0 流上没有删除类发布；这里意图那次（13 个单元：墓碑容器、`deleted_inodes` 根、inode 叶容器与根……）、
@@ -23,14 +25,20 @@
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
-#[cfg(feature = "verdict-store")]
+mod common_crash_point_observers;
 mod common_crash_points;
 
 use std::num::NonZeroUsize;
 
-use common::{build_pool, file_content, geometry, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
+use common::{build_pool, file_content, geometry, BuiltPool};
+use common_crash_point_observers::{
+    assert_the_mounted_disks_and_the_continuation_numbers_were_checked_on_every_state,
+    observe_the_mount_continuation, MountContinuationInputs,
+};
+use common_crash_points::{
+    content_needing, publish_the_next_unlink_step, publish_the_unlink_intent, sequential_write,
+    DELETION_BATCHES_BEFORE_THE_FINAL_BATCH, UNLINKED_FILE,
+};
 use singlefs_checker_tier::crash::{
     enumerate_layer0_against_the_version_table_or_one_shard, full_expansion,
     layer0_state_count_with_torn_in_place_overwrites, Layer0EnumerationOutcome,
@@ -38,109 +46,23 @@ use singlefs_checker_tier::crash::{
     Layer0StateObserving, Layer0Tally, Layer0VersionTable, Layer0WorkerThreadsSource,
 };
 use singlefs_checker_tier::layer0_progress::Layer0Resume;
-use singlefs_checker_tier::writable_mount_phases::materialized_crash_image;
-use singlefs_core::address::{CheckpointTxg, InodeNumber, InstanceGeneration};
-use singlefs_core::admission::SpaceAdmission;
-use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::journal::record_offset;
-use singlefs_core::mount::{
-    mount_writable_with_test_only_switches_and_deletion_switches, DeletionQueueContinuationOutcome,
-    MountOutput, ShadowLedger,
-};
 use singlefs_core::records::NLINK_OF_AN_INODE_BEING_DELETED;
 use singlefs_core::recovery::{RecoveryOutcome, RecoveryReport};
-use singlefs_core::transaction::{
-    publish_sequential_write, publish_unlink_intent, publish_unlink_step, FirstFile, PoolVersion,
-    PoolWriter, TransactionOutput, FIRST_INODE_NUMBER,
-};
-use singlefs_core::unit::data_unit_payload_capacity;
+use singlefs_core::transaction::TransactionOutput;
 use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
 use singlefs_harness::memory_pool::{
     closed_form_state_count, publishes_in, writes_and_segments, CrashImage, MemoryPool,
     PublishedVersion, PublishedVersionWithoutAFile, RecordStreamContinuity, RetainedWrite,
-    SparseBlockDevice,
 };
-use singlefs_harness::scenario::{deletion_history_batch_size, deletion_history_switches};
 use singlefs_harness::segments::StepKind;
 
 /// 全量那一趟的流名：进断点续跑的进度文件名与双机分片的账本名（`singlefs_checker_tier::layer0_progress`）。
 const FULL_ENUMERATION_STREAM_NAME: &str = "unlink_after_the_multi_record_publish";
 
-/// unlink 的是第一个文件。
-const UNLINKED_FILE: InodeNumber = InodeNumber(FIRST_INODE_NUMBER);
-
-/// 意图那次的调用方时间比顺序写晚：与那条记录现有的时间不同，意图写的是不是调用方给的那一个分辨得出。
-const SECONDS_FROM_THE_SEQUENTIAL_WRITES_TO_THE_INTENT: u64 = 120;
-
-/// 删除段的批数（不含最后一批）：三个数据单元按批大小 1 走「留 2、留 1、最后一批」（K-U6 翻面观测：删除段少于两批不算数）。
-const DELETION_BATCHES_BEFORE_THE_FINAL_BATCH: usize = 2;
-
 /// 快档对拍里多线程那一趟的工作线程数。
 const WORKER_THREADS_OF_THE_MULTI_THREADED_COMPARISON: usize = 4;
-
-/// 恰好要 `data_units` 个数据单元的内容：最后一个单元装一半（与多记录流同一份字节）。
-fn content_needing(data_units: usize, seed: usize) -> Vec<u8> {
-    let payload_capacity = data_unit_payload_capacity();
-    (0..(data_units - 1) * payload_capacity + payload_capacity / 2)
-        .map(|index| u8::try_from((index * 11 + seed * 3 + 7) % 251).expect("小于 256"))
-        .collect()
-}
-
-fn sequential_write(pool: &mut BuiltPool, content: &[u8]) -> TransactionOutput {
-    let publish_parameters = parameters();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
-    let previous = pool.output.clone();
-    let output = publish_sequential_write(
-        &mut writer,
-        &mut pool.allocator,
-        &previous,
-        FirstFile {
-            content,
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
-        },
-        InstanceGeneration(1),
-    )
-    .expect("顺序写");
-    pool.output = output.clone();
-    output
-}
-
-fn publish_the_unlink_intent(pool: &mut BuiltPool) -> TransactionOutput {
-    let publish_parameters = parameters();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
-    let previous = pool.output.clone();
-    let output = publish_unlink_intent(
-        &mut writer,
-        &mut pool.allocator,
-        &previous,
-        UNLINKED_FILE,
-        FIXED_WRITE_TIME_SECONDS + SECONDS_FROM_THE_SEQUENTIAL_WRITES_TO_THE_INTENT,
-        InstanceGeneration(1),
-    )
-    .expect("unlink 意图");
-    pool.output = output.clone();
-    output
-}
-
-fn publish_the_next_unlink_step(pool: &mut BuiltPool) -> TransactionOutput {
-    let publish_parameters = parameters();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
-    let previous = pool.output.clone();
-    let output = publish_unlink_step(
-        &mut writer,
-        &mut pool.allocator,
-        &previous,
-        UNLINKED_FILE,
-        deletion_history_batch_size(),
-        InstanceGeneration(1),
-    )
-    .expect("unlink 的一批");
-    pool.output = output.clone();
-    output
-}
 
 /// 写表里写到某个 journal 记录槽（两盘同偏移）的那几格。
 fn writes_to_record(writes: &[RetainedWrite], counter: u64) -> Vec<usize> {
@@ -212,17 +134,15 @@ enum DeletionPublishKind {
     FinalBatch,
 }
 
-/// 删除的一次发布在写表里的样子：它的单元写、它那一条记录的两份写、它的根槽写，它与上一版的根。
+/// 删除的一次发布在写表里的样子：它的单元写、它那一条记录的两份写、它的根槽写，它上一版的根（它自己那一版落到之后续做还差几步，
+/// 在可写挂载续做观察者另读的输入里：`common_crash_point_observers::MountContinuationInputs`）。
 #[derive(Debug)]
 struct DeletionPublish {
     kind: DeletionPublishKind,
     unit_writes: Vec<usize>,
     record_copies: Vec<usize>,
     root_write: usize,
-    version: (InstanceGeneration, CheckpointTxg),
     version_before: (InstanceGeneration, CheckpointTxg),
-    /// 恢复落到这一版之后，可写挂载的续做还要发几步才走到空。
-    continuation_steps_from_this_version: usize,
 }
 
 impl DeletionPublish {
@@ -247,6 +167,8 @@ struct Prepared {
     deletion_publishes: Vec<DeletionPublish>,
     /// C 那一版：意图那次的上一版，读回它的内容。
     content_before_the_deletion: Vec<u8>,
+    /// 可写挂载续做观察者另读的输入（公共模块 `MountContinuationInputs`）：带文件的 A、B、C，删除那几步各自落到之后续做还差几步。
+    mount_continuation_inputs: MountContinuationInputs,
 }
 
 impl Prepared {
@@ -377,9 +299,7 @@ fn prepare(tag: &str) -> Prepared {
             unit_writes: publish.units.clone(),
             record_copies,
             root_write: publish.root,
-            version,
             version_before,
-            continuation_steps_from_this_version: recorded.deletion_steps.len() - 1 - step_index,
         });
         version_before = version;
     }
@@ -434,6 +354,10 @@ fn prepare(tag: &str) -> Prepared {
         versions_without_a_file,
         multi_record_publishes,
         deletion_publishes,
+        mount_continuation_inputs: MountContinuationInputs::of_the_publishes(
+            &[&recorded.first, &recorded.second, &recorded.third],
+            &recorded.deletion_steps,
+        ),
         content_before_the_deletion: recorded.third_content,
     }
 }
@@ -507,230 +431,6 @@ fn observe_the_deletion_cut_in_the_middle(
     }
 }
 
-/// 恢复落到的是哪一类版本：挂载之后该是哪一种池版本、续做还差几步按它定。
-#[derive(Clone, Copy, Debug)]
-enum LandedVersion<'prepared> {
-    /// mkfs 或两次暖机：A 之前，根下面没有树。
-    BeforeTheFirstFile,
-    /// A、B、C 之一：有文件、队列空。
-    WithAFile,
-    /// 意图、两批、最后一批之一。
-    OneOfTheDeletionPublishes(&'prepared DeletionPublish),
-}
-
-fn landed_version<'prepared>(
-    prepared: &'prepared Prepared,
-    effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
-) -> LandedVersion<'prepared> {
-    let effective_root = effective_root.expect("快档与全量的每个状态都择到根（oracle 另判）");
-    if let Some(deletion_publish) = prepared
-        .deletion_publishes
-        .iter()
-        .find(|publish| publish.version == effective_root)
-    {
-        return LandedVersion::OneOfTheDeletionPublishes(deletion_publish);
-    }
-    if prepared
-        .versions
-        .iter()
-        .any(|version| (version.instance, version.checkpoint_txg) == effective_root)
-    {
-        return LandedVersion::WithAFile;
-    }
-    LandedVersion::BeforeTheFirstFile
-}
-
-/// 这一状态上可写挂载一次（批大小同录流，三个容量照产品路径）：续做把队列走到空，步数等于恢复落到的那一版还差几步；
-/// 落到删除那几版上的，挂完是「有树、文件集合为空」那一版；落到 A、B、C 上的挂完照旧有文件；落到 A 之前的挂完照旧没有树。
-fn observe_the_mount_continuation(
-    prepared: &Prepared,
-    image: &CrashImage<'_>,
-    report: &RecoveryReport,
-    counts: &mut Layer0ObserverCounts,
-) {
-    let materialized = materialized_crash_image(image);
-    let mount_parameters = parameters();
-    let mut devices: Vec<_> = materialized
-        .devices
-        .iter()
-        .map(|(identity, sectors)| {
-            let mut device = SparseBlockDevice::new(
-                materialized.device_size_in_bytes,
-                PhysicalBlockSizeInBytes(mount_parameters.geometry.physical_block_size),
-            );
-            device.image = sectors.clone();
-            (*identity, device)
-        })
-        .collect();
-    let mounted = mount_writable_with_test_only_switches_and_deletion_switches(
-        &mount_parameters,
-        &mut devices,
-        SpaceAdmission::JudgedByTheFormula,
-        ShadowLedger::On,
-        deletion_history_switches(),
-    )
-    .unwrap_or_else(|error| panic!("每个崩溃状态上可写挂载都做得成：{error:?}"));
-    assert!(
-        matches!(
-            mounted.output.deletion_queue_continuation_outcome,
-            DeletionQueueContinuationOutcome::WalkedToEmpty
-        ),
-        "续做把队列走到空：{:?}",
-        mounted.output.deletion_queue_continuation_outcome
-    );
-    let landed = landed_version(prepared, report.effective_root);
-    let expected_continuation_steps = match landed {
-        LandedVersion::OneOfTheDeletionPublishes(publish) => {
-            publish.continuation_steps_from_this_version
-        }
-        LandedVersion::BeforeTheFirstFile | LandedVersion::WithAFile => 0,
-    };
-    assert_eq!(
-        mounted.output.deletion_queue_continuation.len(),
-        expected_continuation_steps,
-        "恢复落到 {:?}：续做还差几步就发几步",
-        report.effective_root
-    );
-    counts.add(
-        &format!("mount_continuation_steps_{expected_continuation_steps}"),
-        1,
-    );
-    match (&mounted.current, landed) {
-        (PoolVersion::WithTreesAndNoFile(current), LandedVersion::OneOfTheDeletionPublishes(_)) => {
-            assert!(current.deleted_inodes.is_empty(), "挂完队列是空的");
-        }
-        (PoolVersion::WithFile(current), LandedVersion::WithAFile) => {
-            assert!(
-                current.deleted_inodes.is_empty(),
-                "删除之前的版本队列本来就空"
-            );
-        }
-        (PoolVersion::WithoutFile(_), LandedVersion::BeforeTheFirstFile) => {
-            counts.add("mount_before_the_first_file", 1);
-        }
-        (current, landed) => panic!(
-            "落到删除那几版上的挂完是有树、文件集合为空那一版，落到 A、B、C 上的带文件，落到 A 之前的没有树：落到 {landed:?}，挂完 {current:?}"
-        ),
-    }
-    assert_the_continuation_publishes_take_the_next_numbers_of_the_instance(&mounted.output);
-    counts.add(
-        "continuation_steps_numbered_next_in_the_instance",
-        u64::try_from(mounted.output.deletion_queue_continuation.len()).expect("步数装得进 u64"),
-    );
-    let mounted_disks = MemoryPool {
-        devices: devices
-            .into_iter()
-            .map(|(identity, device)| (identity, device.image))
-            .collect(),
-        device_size_in_bytes: materialized.device_size_in_bytes,
-    };
-    let violated_after_the_mount: Vec<(&str, String)> = check_pool_image(&mounted_disks)
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(reason) => Some((invariant, reason)),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .collect();
-    assert!(
-        violated_after_the_mount.is_empty(),
-        "恢复落到 {:?}、可写挂载续做之后的盘，池级 checker 一条都不许判违例（同 assert_clean 的口径）：{violated_after_the_mount:?}",
-        report.effective_root
-    );
-    counts.add("pool_checker_clean_after_the_mount", 1);
-}
-
-/// 这次挂载里一次发布：续做的一步，或续做里为空间推的抬 F 那一串里的一次空发布。
-#[derive(Clone, Copy)]
-enum PublishOfTheContinuation<'output> {
-    DeletionStep(&'output TransactionOutput),
-    FloorRaise(&'output TransactionOutput),
-}
-
-impl<'output> PublishOfTheContinuation<'output> {
-    fn output(self) -> &'output TransactionOutput {
-        match self {
-            PublishOfTheContinuation::DeletionStep(output)
-            | PublishOfTheContinuation::FloorRaise(output) => output,
-        }
-    }
-}
-
-/// 有树的一版（写行、暖机那几次交回的）：续做有步数时它们都有树。
-fn version_of_trees_before_the_continuation(version: &PoolVersion) -> &TransactionOutput {
-    match version {
-        PoolVersion::WithFile(output) | PoolVersion::WithTreesAndNoFile(output) => output,
-        PoolVersion::WithoutFile(_) => panic!(
-            "续做有步数的挂载，续做之前那几次发布都在有树的一版上（写行、暖机交回有树的一版）"
-        ),
-    }
-}
-
-/// D8（核心索引结构） 已定项 16 第 2 条末句：续做的每一批各占一个事务号，等于本实例的下一个（与普通发布同一套编号）。
-/// 续做的每一步与续做里为空间推的抬 F 按 txg 交错排好，从这次挂载在续做之前发的最后一次（写行、暖机、取号之后推的抬 F，按先后）接起：
-/// 每一次都落在这次挂载的实例上、txg 是前一次加一（连号）；续做的每一步的事务号是前一次发布之后这个实例用过的最大事务号加一。
-/// 续做没有步数时什么都不判。
-fn assert_the_continuation_publishes_take_the_next_numbers_of_the_instance(output: &MountOutput) {
-    if output.deletion_queue_continuation.is_empty() {
-        return;
-    }
-    let last_publish_before_the_continuation = output
-        .space_admission
-        .floor_raises()
-        .iter()
-        .flat_map(|raised| raised.publishes.iter())
-        .last()
-        .or_else(|| {
-            output
-                .warm_up_publishes
-                .last()
-                .map(version_of_trees_before_the_continuation)
-        })
-        .unwrap_or_else(|| version_of_trees_before_the_continuation(&output.row_publish));
-    assert_eq!(
-        last_publish_before_the_continuation.root.instance, output.instance,
-        "续做之前那一次发布是这次挂载发的"
-    );
-    let mut publishes_of_the_continuation: Vec<PublishOfTheContinuation<'_>> = output
-        .deletion_queue_continuation
-        .iter()
-        .map(PublishOfTheContinuation::DeletionStep)
-        .chain(
-            output
-                .floor_raises_pushed_by_the_continuation
-                .iter()
-                .flat_map(|raised| raised.publishes.iter())
-                .map(PublishOfTheContinuation::FloorRaise),
-        )
-        .collect();
-    publishes_of_the_continuation.sort_by_key(|publish| publish.output().root.checkpoint_txg);
-    let mut previous = last_publish_before_the_continuation;
-    for publish in publishes_of_the_continuation {
-        let this_publish = publish.output();
-        assert_eq!(
-            this_publish.root.instance, output.instance,
-            "续做里的每一次发布落在这次挂载的实例上（txg {:?}）",
-            this_publish.root.checkpoint_txg
-        );
-        assert_eq!(
-            this_publish.root.checkpoint_txg.0,
-            previous.root.checkpoint_txg.0 + 1,
-            "续做里的每一次发布的 txg 是前一次加一（连号）"
-        );
-        match publish {
-            PublishOfTheContinuation::DeletionStep(step) => assert_eq!(
-                step.record.transaction,
-                previous.highest_transaction_number_in_this_instance + 1,
-                "续做的一步（txg {:?}）的事务号是这个实例的下一个",
-                step.root.checkpoint_txg
-            ),
-            PublishOfTheContinuation::FloorRaise(_) => {}
-        }
-        previous = this_publish;
-    }
-}
-
 /// 每个状态上核的三样：发布边界、删除的中间态、可写挂载续做（连同续做各步的代与事务号、挂完的盘过池级 checker）。
 /// 只读 `prepared`，各工作线程共用一份。
 fn observe_every_state(
@@ -741,7 +441,7 @@ fn observe_every_state(
 ) {
     observe_the_publish_boundary(prepared, image, report, counts);
     observe_the_deletion_cut_in_the_middle(prepared, image, report, counts);
-    observe_the_mount_continuation(prepared, image, report, counts);
+    observe_the_mount_continuation(&prepared.mount_continuation_inputs, image, report, counts);
 }
 
 fn assert_clean(tally: &Layer0Tally) {
@@ -772,25 +472,6 @@ fn assert_clean(tally: &Layer0Tally) {
             tally.checker_first_violation.get(invariant)
         );
     }
-}
-
-/// 每个状态挂完的盘都过了池级 checker；续做发成的每一步都核了代与事务号（续做 k 步的状态各核 k 步）。
-fn assert_the_mounted_disks_and_the_continuation_numbers_were_checked_on_every_state(
-    counts: &Layer0ObserverCounts,
-    states: u64,
-) {
-    assert_eq!(
-        counts.count_named("pool_checker_clean_after_the_mount"),
-        states,
-        "每个状态挂完的盘都过了池级 checker"
-    );
-    assert_eq!(
-        counts.count_named("continuation_steps_numbered_next_in_the_instance"),
-        (1..=3)
-            .map(|steps| steps * counts.count_named(&format!("mount_continuation_steps_{steps}")))
-            .sum::<u64>(),
-        "续做发成的每一步都核了代与事务号"
-    );
 }
 
 fn expansion_of_the_segments_shorter_than_ten(
@@ -1084,35 +765,47 @@ fn full_enumeration_of_the_unlink_after_the_multi_record_publish_stream_is_exhau
     assert_clean(&tally);
 }
 
-/// 崩溃放量的形态（照多记录流：取号加暖机、新池新建文件两个点由公共模块设，B、C 两次顺序写，意图与每一批各一个点；起点是第 32 批 Q 的草稿）：
-/// 按环境跑一趟，健康的流零红；配置开了 GPU 就是 GPU 判器判。版本表带「没有文件的那几版」（意图那一版，`CrashFlow::versions_without_a_file`，
-/// 第 33 批 R 报告「停下交主 agent」第一项），两批与最后一批不进表、照比它旧的最新那一项判：不带它时各批报没有文件判成违例、放量红。
-/// 展开上限默认 6。
+/// 录制器那一份造法录下的删除流：起点镜像、写表、段、崩溃点、被判的根槽写（最后一批的那一条）、版本表与「没有文件的那几版」。
 #[cfg(feature = "verdict-store")]
-#[test]
-fn crash_amplification_of_the_unlink_after_the_multi_record_publish_stream_is_clean() {
+struct RecordedThroughTheCrashPointRecorder {
+    base: MemoryPool,
+    writes: Vec<RetainedWrite>,
+    segments: Vec<Vec<usize>>,
+    crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
+    judged_root_index: usize,
+    versions: Vec<PublishedVersion>,
+    versions_without_a_file: Vec<PublishedVersionWithoutAFile>,
+}
+
+/// 录制器那一份造法：取号加暖机、新池新建文件、B、C 四个点由公共模块设（与多记录流同一个函数，共享到 C，崩溃点重放合并第三轮判决 J3），
+/// 意图与每一批各一个点；`stop_after_the_multi_record_publishes` 为真时录到 C 就停（多记录流那一份，比共享用）。
+#[cfg(feature = "verdict-store")]
+fn record_through_the_crash_point_recorder(
+    tag: &str,
+    stop_after_the_multi_record_publishes: bool,
+) -> RecordedThroughTheCrashPointRecorder {
     use singlefs_checker_tier::crash_amplification::CrashPointRecorder;
-    let mut pool = build_pool("crash-amplification-unlink-after-multi-record");
+    let mut pool = build_pool(tag);
     let mut recorder = CrashPointRecorder::new(pool.stream.clone(), pool.mkfs_operation_count);
-    common_crash_points::record_pool_build(&mut recorder, &pool);
-    let first = pool.output.clone();
-    let second_content = content_needing(2, 1);
-    let second = recorder.step(file!(), "sequential_write", || {
-        sequential_write(&mut pool, &second_content)
-    });
-    let third_content = content_needing(3, 2);
-    let third = recorder.step(file!(), "sequential_write", || {
-        sequential_write(&mut pool, &third_content)
-    });
-    let mut deletion_steps = vec![recorder.step(file!(), "publish_unlink_intent", || {
-        publish_the_unlink_intent(&mut pool)
-    })];
-    for _batch_index in 0..=DELETION_BATCHES_BEFORE_THE_FINAL_BATCH {
-        deletion_steps.push(recorder.step(file!(), "publish_unlink_step", || {
-            publish_the_next_unlink_step(&mut pool)
-        }));
+    let publishes =
+        common_crash_points::record_the_multi_record_publishes(&mut recorder, &mut pool);
+    let mut versions_without_a_file = Vec::new();
+    if !stop_after_the_multi_record_publishes {
+        let mut deletion_steps = vec![recorder.step(file!(), "publish_unlink_intent", || {
+            publish_the_unlink_intent(&mut pool)
+        })];
+        for _batch_index in 0..=DELETION_BATCHES_BEFORE_THE_FINAL_BATCH {
+            deletion_steps.push(recorder.step(file!(), "publish_unlink_step", || {
+                publish_the_next_unlink_step(&mut pool)
+            }));
+        }
+        assert_the_shape_of_the_deletion_steps(&deletion_steps);
+        let intent = deletion_steps.first().expect("意图那一步");
+        versions_without_a_file.push(PublishedVersionWithoutAFile {
+            instance: intent.root.instance,
+            checkpoint_txg: intent.root.checkpoint_txg,
+        });
     }
-    assert_the_shape_of_the_deletion_steps(&deletion_steps);
     let base = pool.memory_pool_after_mkfs();
     let operations = pool.retained_operations();
     let (writes, segments, stream_indexes) =
@@ -1125,37 +818,240 @@ fn crash_amplification_of_the_unlink_after_the_multi_record_publish_stream_is_cl
         .iter()
         .rposition(|write| write.kind == StepKind::RootRecordFua)
         .expect("根槽写");
-    let versions = vec![
-        PublishedVersion {
-            instance: first.root.instance,
-            checkpoint_txg: first.root.checkpoint_txg,
-            content: file_content(),
-        },
-        PublishedVersion {
-            instance: second.root.instance,
-            checkpoint_txg: second.root.checkpoint_txg,
-            content: second_content,
-        },
-        PublishedVersion {
-            instance: third.root.instance,
-            checkpoint_txg: third.root.checkpoint_txg,
-            content: third_content,
-        },
-    ];
-    let intent = deletion_steps.first().expect("意图那一步");
-    let versions_without_a_file = vec![PublishedVersionWithoutAFile {
-        instance: intent.root.instance,
-        checkpoint_txg: intent.root.checkpoint_txg,
-    }];
-    common_crash_points::amplify_prepared_flow_against_the_version_table(
-        "unlink-after-multi-record-publish",
-        &base,
-        &writes,
-        &segments,
-        judged_root_index,
-        &versions,
-        &versions_without_a_file,
+    RecordedThroughTheCrashPointRecorder {
+        base,
+        writes,
+        segments,
         crash_points,
+        judged_root_index,
+        versions: publishes.versions(),
+        versions_without_a_file,
+    }
+}
+
+/// 崩溃放量的形态（起点是第 32 批 Q 的草稿）：按环境跑一趟，健康的流零红；配置开了 GPU 就是 GPU 判器判、CPU 判器同时对照。
+/// 版本表带「没有文件的那几版」（意图那一版，`CrashFlow::versions_without_a_file`，第 33 批 R 报告「停下交主 agent」第一项），
+/// 两批与最后一批不进表、照比它旧的最新那一项判：不带它时各批报没有文件判成违例、放量红。展开上限默认 6。
+/// 登记表挂在标准前缀节点上的观察者（可写挂载续做）照表跑（崩溃点重放合并第三轮判决 J4），与多记录流那一项在同一批块上共享。
+#[cfg(feature = "verdict-store")]
+#[test]
+fn crash_amplification_of_the_unlink_after_the_multi_record_publish_stream_is_clean() {
+    let recorded = record_through_the_crash_point_recorder(
+        "crash-amplification-unlink-after-multi-record",
+        false,
+    );
+    common_crash_point_observers::amplify_a_flow_through_the_standard_prefix(
+        "unlink-after-the-multi-record-publish",
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        recorded.judged_root_index,
+        &recorded.versions,
+        &recorded.versions_without_a_file,
+        recorded.crash_points,
         6,
+    );
+}
+
+/// 两份造法写表摘要相等（崩溃点重放合并第三轮判决 J3，第一轮判决 K2-2）：层 0 那一份（[`prepare`]，不录崩溃点）与录制器那一份
+/// （B、C 两次顺序写挪进公共模块之后）录下的起点镜像与整张带屏障的写表逐字节相同、段一样切、被判的根槽写与版本表相同。
+/// 两份都调公共模块里同一个 `sequential_write`；层 0 那一份的写法与挪之前逐字相同。摘要打一行 `CRASH_POINT_REPLAY_WRITE_TABLE`。
+#[cfg(feature = "verdict-store")]
+#[test]
+fn the_unlink_stream_writes_the_same_table_through_the_crash_point_recorder_as_without_it() {
+    use singlefs_checker_tier::crash_identity::{step_write_table_with_barriers, SectorImage};
+    let without_the_recorder = prepare("unlink-write-table-without-the-recorder");
+    let through_the_recorder =
+        record_through_the_crash_point_recorder("unlink-write-table-through-the-recorder", false);
+    let digests_of = |base: &MemoryPool, writes: &[RetainedWrite], segments: &[Vec<usize>]| {
+        (
+            SectorImage::of_base(base).digest(),
+            step_write_table_with_barriers(writes, segments, 0..writes.len()),
+        )
+    };
+    let (base_digest, write_table_digest) = digests_of(
+        &without_the_recorder.base,
+        &without_the_recorder.writes,
+        &without_the_recorder.segments,
+    );
+    assert_eq!(
+        digests_of(
+            &through_the_recorder.base,
+            &through_the_recorder.writes,
+            &through_the_recorder.segments
+        ),
+        (base_digest, write_table_digest),
+        "两份造法的起点镜像与整张带屏障的写表逐字节相同"
+    );
+    assert_eq!(
+        through_the_recorder.segments, without_the_recorder.segments,
+        "段一样切"
+    );
+    assert_eq!(
+        through_the_recorder.judged_root_index, without_the_recorder.judged_root_index,
+        "被判的根槽写都是最后一批的那一条"
+    );
+    assert_eq!(
+        (
+            &through_the_recorder.versions,
+            &through_the_recorder.versions_without_a_file
+        ),
+        (
+            &without_the_recorder.versions,
+            &without_the_recorder.versions_without_a_file
+        ),
+        "版本表与「没有文件的那几版」相同"
+    );
+    let hexadecimal =
+        |digest: &[u8]| -> String { digest.iter().map(|byte| format!("{byte:02x}")).collect() };
+    println!(
+        "CRASH_POINT_REPLAY_WRITE_TABLE flow=unlink-after-multi-record-publish base_digest={} write_table_digest={}",
+        hexadecimal(&base_digest),
+        hexadecimal(&write_table_digest)
+    );
+}
+
+/// 删除流与多记录流共享到 C（崩溃点重放合并第三轮正文 H3，主 agent 定）：计划里的点细到每个屏障段（`<入口>.<周期>.<步>`），按点名的前缀认
+/// 公共模块设的四个节点——取号加暖机、新池新建文件、B、C（B、C 都是 `sequential_write`：同一个入口里点名重复出现，就是下一个节点起头）。
+/// 两条流这四个节点的每一个点身份、判器另读的输入、计划哈希、状态序号区间与块逐个相同（块键全同、判定共享）；整条流最后全部持久那一个状态
+/// 不归 C，各自另立成流自己的末节点 `end_of_flow`（`crash_amplification::plan_crash_points`）：多记录流在 C 之后只剩它，删除流在 C 之后
+/// 还有意图、各批与它自己的末节点；两条流的末节点身份与计划哈希各不相同。
+#[cfg(feature = "verdict-store")]
+#[test]
+fn the_unlink_stream_shares_the_nodes_through_c_with_the_multi_record_publish_stream_and_each_stream_ends_in_its_own_node(
+) {
+    use singlefs_checker_tier::crash_amplification::{
+        plan_crash_points, CrashFlow, PlannedCrashPoint, END_OF_FLOW_NODE_NAME,
+    };
+    let unlink = record_through_the_crash_point_recorder("unlink-shares-the-prefix", false);
+    let multi_record =
+        record_through_the_crash_point_recorder("multi-record-shares-the-prefix", true);
+    let expansion = |_segment_index: usize, segment: &[usize]| {
+        if segment.len() <= 6 {
+            Layer0SegmentExpansion::EveryProperSubset
+        } else {
+            Layer0SegmentExpansion::NotExpanded
+        }
+    };
+    let plan_of = |recorded: &RecordedThroughTheCrashPointRecorder| {
+        plan_crash_points(&CrashFlow {
+            base: &recorded.base,
+            writes: &recorded.writes,
+            segments: &recorded.segments,
+            judged_root_index: recorded.judged_root_index,
+            versions: &recorded.versions,
+            versions_without_a_file: &recorded.versions_without_a_file,
+            expansion: &expansion,
+            crash_points: recorded.crash_points.clone(),
+        })
+    };
+    let unlink_plan = plan_of(&unlink);
+    let multi_record_plan = plan_of(&multi_record);
+    // 公共模块设的节点：身份以公共模块的路径起头、不是末节点；入口名是点名第一段，同一个入口里点名重复出现就是下一个节点起头
+    let common_identity_prefix = format!("{}::", common_crash_points::THIS_FILE);
+    let nodes_set_in_the_common_module =
+        |points: &[PlannedCrashPoint]| -> Vec<(String, Vec<usize>)> {
+            let mut nodes: Vec<(String, Vec<usize>, Vec<String>)> = Vec::new();
+            for (index, point) in points.iter().enumerate() {
+                if !point.identity.starts_with(&common_identity_prefix)
+                    || point.name == END_OF_FLOW_NODE_NAME
+                {
+                    break;
+                }
+                let entry = point
+                    .name
+                    .split('.')
+                    .next()
+                    .expect("点名以入口名起头")
+                    .to_string();
+                let starts_a_node = nodes.last().is_none_or(|(last_entry, _, names)| {
+                    *last_entry != entry || names.contains(&point.name)
+                });
+                if starts_a_node {
+                    nodes.push((entry, Vec::new(), Vec::new()));
+                }
+                let (_entry, indexes, names) = nodes.last_mut().expect("刚放进去一个节点");
+                indexes.push(index);
+                names.push(point.name.clone());
+            }
+            nodes
+                .into_iter()
+                .map(|(entry, indexes, _names)| (entry, indexes))
+                .collect()
+        };
+    let multi_record_nodes = nodes_set_in_the_common_module(&multi_record_plan.points);
+    assert_eq!(
+        multi_record_nodes
+            .iter()
+            .map(|(entry, _indexes)| entry.as_str())
+            .collect::<Vec<&str>>(),
+        vec![
+            "acquire_instance_and_warm_up",
+            "publish_first_file",
+            "sequential_write",
+            "sequential_write"
+        ],
+        "多记录流公共模块设的四个节点：取号加暖机、新池新建文件、B、C"
+    );
+    assert_eq!(
+        nodes_set_in_the_common_module(&unlink_plan.points),
+        multi_record_nodes,
+        "删除流经过同样四个节点、每个节点同样几个点"
+    );
+    let points_through_c = 1 + *multi_record_nodes
+        .last()
+        .and_then(|(_entry, indexes)| indexes.last())
+        .expect("C 至少一个点");
+    assert_eq!(
+        multi_record_plan.points.len(),
+        points_through_c + 1,
+        "多记录流在 C 之后只剩它自己的末节点"
+    );
+    assert!(
+        unlink_plan.points.len() > points_through_c + 1,
+        "删除流在 C 之后还有意图、各批与它自己的末节点"
+    );
+    for index in 0..points_through_c {
+        let (unlink_point, multi_record_point) =
+            (&unlink_plan.points[index], &multi_record_plan.points[index]);
+        let name = &multi_record_point.name;
+        assert_eq!(
+            unlink_point.identity, multi_record_point.identity,
+            "第 {index} 个点（{name}）两条流是树上同一个节点：设点文件、名字、复用键都相同"
+        );
+        assert_eq!(
+            unlink_point.judge_inputs, multi_record_point.judge_inputs,
+            "第 {index} 个点（{name}）判器另读的输入相同"
+        );
+        assert_eq!(
+            unlink_point.plan_hash, multi_record_point.plan_hash,
+            "第 {index} 个点（{name}）计划哈希相同：C 也是，整条流最后那一个状态不归它了"
+        );
+        assert_eq!(
+            (unlink_point.ordinals.clone(), unlink_point.blocks()),
+            (
+                multi_record_point.ordinals.clone(),
+                multi_record_point.blocks()
+            ),
+            "第 {index} 个点（{name}）状态序号区间与块相同：块键全同、判定共享"
+        );
+    }
+    let unlink_end = unlink_plan.points.last().expect("计划至少一个点");
+    let multi_record_end = multi_record_plan.points.last().expect("计划至少一个点");
+    for end in [unlink_end, multi_record_end] {
+        assert_eq!(end.name, END_OF_FLOW_NODE_NAME, "计划最后一项是末节点");
+        assert_eq!(
+            end.ordinals.end - end.ordinals.start,
+            1,
+            "末节点只管整条流最后全部持久那一个状态"
+        );
+    }
+    assert_ne!(
+        unlink_end.identity, multi_record_end.identity,
+        "两条流的末节点各是各的：整张写表叠完的镜像不同"
+    );
+    assert_ne!(
+        unlink_end.plan_hash, multi_record_end.plan_hash,
+        "两条流的末节点计划哈希不同"
     );
 }

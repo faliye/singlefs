@@ -3,7 +3,7 @@
 //! 不改 `crates/singlefs-core`、`crates/singlefs-checker`。
 //!
 //! 删除路径今天不在 `crates/` 里：主工作区这一份里 [`delete_path_hooks`] 是桩（登记第十二节修订第 2 条），一调就打
-//! `E name=stop reason=delete_path_patch_absent` 并退非零；补丁表 `research/mutations/e168_delete_ring_window_borrow_delete_path.tsv`
+//! `E name=stop reason=delete_path_patch_absent` 并退非零；补丁表 `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv`
 //! 在 `cp -a` 出的副本里给 core 加只供测试的删除入口与开关，再把这个桩整个换成接上它们的那一份。`s1-history` 模式不调删除入口，
 //! 两份二进制都能跑（停机条款 S1：副本开关全关时与主工作区逐字节、逐数相同）。
 //!
@@ -301,7 +301,7 @@ fn stop_with_the_line(stop_line: String) -> ! {
 const PROGRESS_INTERVAL: Duration = Duration::from_secs(300);
 /// 线程数：先读这个，没设读 [`SHARED_THREAD_CAP_ENVIRONMENT_VARIABLE`]，都没设取 `available_parallelism`。
 const THREADS_ENVIRONMENT_VARIABLE: &str = "E168_THREADS";
-/// `research/scripts/capped.sh` 设的通用线程上限。
+/// `scripts/hosts/capped.sh` 设的通用线程上限。
 const SHARED_THREAD_CAP_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_THREAD_CAP";
 /// 大片（P4）同时跑的上限。
 const LARGE_SLICE_THREADS_ENVIRONMENT_VARIABLE: &str = "E168_LARGE_SLICE_THREADS";

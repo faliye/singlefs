@@ -633,7 +633,7 @@ fn prepare(tag: &str) -> Prepared {
 /// 全量：[`FULL_STATES`] 个状态。跑得慢（每个状态两遍恢复 + checker + 记录核对器），门禁 checker-tier-layer0-replay 在 release 下跑它；平时 `cargo test` 跳过。
 /// 带断点续跑（`singlefs_checker_tier::layer0_progress`）：进度目录、输入指纹与强制从头跑的开关都从环境变量取，没设进度目录就不留进度文件；
 /// I-3.10 那一类的逐状态计数记在观察者计数里，续跑时随进度文件接上。双机分片（`SINGLEFS_LAYER0_SHARD`，
-/// `research/scripts/layer0-shard-run.sh`）：跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
+/// `scripts/crash/layer0-shard-run.sh`）：跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
 #[test]
 #[ignore = "全量六千七百多万个状态，门禁 checker-tier-layer0-replay （.claude/gate.d/checker-tier-layer0-replay.sh）在 release 下跑，带断点续跑"]
 fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations() {

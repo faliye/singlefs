@@ -87,7 +87,8 @@ fn record_new_pool_file_creation(tag: &str) -> RecordedFlow {
     }
 }
 
-/// 临时目录：一份开了 GPU 的多机配置（单机）与一份库，用例结束（成功、失败、panic）都删掉。
+/// 临时目录：一份开了 GPU 的多机配置（单机）与一份库，用例结束（成功、失败、panic）都删掉。配置里的显卡先后照抄本机这一趟的
+/// （清场之下要清场之后那一份显卡先后：用例自己写上，`crash_amplification::card_priority_lines_of_the_caller`，抄的是调用方给这个进程的那一份）。
 struct GpuRunDirectory {
     directory: PathBuf,
     configuration: PathBuf,
@@ -103,7 +104,19 @@ impl GpuRunDirectory {
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).expect("建得了临时目录");
         let configuration = directory.join("multi-host-with-gpu.env");
-        std::fs::write(&configuration, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
+        let repository_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../Cargo.lock")
+            .canonicalize()
+            .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
+            .parent()
+            .expect("Cargo.lock 所在的目录就是仓根")
+            .to_path_buf();
+        let cards = singlefs_checker_tier::crash_amplification::card_priority_lines_of_the_caller(
+            &repository_root,
+        )
+        .expect("本机的多机配置读得了");
+        std::fs::write(&configuration, format!("ENABLE_GPU=1\n{cards}"))
+            .expect("写得了开 GPU 的配置");
         let library = directory.join("library");
         Self {
             directory,
@@ -119,9 +132,10 @@ impl Drop for GpuRunDirectory {
     }
 }
 
-/// 在这个进程的卡池上按环境真跑一趟：配置开 GPU、单机，`GPU_COMPUTATION_CLASSES` 照 `gpu_classes`，库是新建的空库（每个块都要判）。
+/// 在这个进程的卡池上按环境真跑一趟：配置开 GPU、单机（判器、核对、单元校验和三类都走 GPU，对照那一遍 CPU 判器同时判、单元校验和交卡对拍；
+/// 崩溃点重放合并第三轮判决 J5、J6），库是新建的空库（每个块都要判）。
 /// 本机没卡（卡池报了「本次未跑」）、或产品路径显存不够（这一趟照叫停的样子交回），交 `None`，调用的用例报「本次未跑」当场返回。
-fn amplify_on_the_card_pool(test_name: &str, gpu_classes: &str) -> Option<EnvironmentRun> {
+fn amplify_on_the_card_pool(test_name: &str) -> Option<EnvironmentRun> {
     gpu_card_pool_or_report_not_run(test_name)?;
     let recorded = record_new_pool_file_creation(test_name);
     let directory = GpuRunDirectory::new(test_name);
@@ -130,7 +144,6 @@ fn amplify_on_the_card_pool(test_name: &str, gpu_classes: &str) -> Option<Enviro
             "SINGLEFS_MULTI_HOST_CONFIG",
             directory.configuration.as_os_str(),
         ),
-        ("GPU_COMPUTATION_CLASSES", OsStr::new(gpu_classes)),
         (
             "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
             directory.library.as_os_str(),
@@ -170,21 +183,20 @@ fn amplify_on_the_card_pool(test_name: &str, gpu_classes: &str) -> Option<Enviro
     Some(run)
 }
 
-/// 第 ① 段在卡上判（登记 `crash_judge_gpu`）：每张用到的卡上，判器的草稿区都在显存账上借了，判器用的就是借来的那张
+/// 第 ① 段在卡上判（配置开了 GPU）：每张用到的卡上，判器的草稿区都在显存账上借了，判器用的就是借来的那张
 /// （额度是借的量加驱动那一份，开出来的草稿区不超过借的），判器建好那一刻与这张卡判完那一刻那一笔借据都还在账上。哪天这一支改回不借，
 /// 借的量是 `None`，借了又在判之前或判完之前还掉，核账是 `Some(false)`，判完那一刻不核是 `None`，这条都红。
 #[test]
 fn the_product_path_judges_on_scratch_it_booked_on_the_card_pool() {
-    let Some(run) = amplify_on_the_card_pool(
-        "the_product_path_judges_on_scratch_it_booked_on_the_card_pool",
-        "crash_judge_gpu",
-    ) else {
+    let Some(run) =
+        amplify_on_the_card_pool("the_product_path_judges_on_scratch_it_booked_on_the_card_pool")
+    else {
         return;
     };
     let gpu_judge = run
         .gpu_judge
         .as_ref()
-        .expect("登记了 crash_judge_gpu、有卡：第 ① 段在卡上判");
+        .expect("配置开了 GPU、有卡：第 ① 段在卡上判");
     assert!(
         !gpu_judge.cards.is_empty(),
         "新建的空库里每个块都要判：至少一张卡判了"
@@ -223,14 +235,13 @@ fn the_product_path_judges_on_scratch_it_booked_on_the_card_pool() {
     }
 }
 
-/// 第 ① 段由 CPU 判、单元校验和交卡对拍（登记 `gpu_unit_checks`），第 ② 段在卡上核（登记 `crash_verify_gpu`）：
+/// 对照那一遍 CPU 判器的单元校验和交卡对拍，第 ② 段在卡上核（配置开了 GPU 三类都走 GPU）：
 /// 两样在卡上建的缓冲都在显存账上借了（借的量不为 0）、做完那一刻那一笔借据还在账上、第 ② 段在卡上核了。哪一样改回不借，
 /// 对应的借的量是 `None`；借了又在用完之前还掉，核账不是 `Some(true)`：这条都红。
 #[test]
 fn the_product_path_books_the_unit_checksum_and_facts_verifier_buffers_on_the_card_pool() {
     let Some(run) = amplify_on_the_card_pool(
         "the_product_path_books_the_unit_checksum_and_facts_verifier_buffers_on_the_card_pool",
-        "gpu_unit_checks crash_verify_gpu",
     ) else {
         return;
     };
@@ -259,6 +270,6 @@ fn the_product_path_books_the_unit_checksum_and_facts_verifier_buffers_on_the_ca
     assert_eq!(
         run.verification.map(|outcome| outcome.verifier),
         Some("gpu"),
-        "登记了 crash_verify_gpu：第 ② 段在卡上核"
+        "配置开了 GPU：第 ② 段在卡上核"
     );
 }

@@ -30,7 +30,7 @@
 //! 按数据行的次序每行判一个状态、打一行 `name=state`（与 `--replay-state` 打的那一行是同一段代码）；按 ②③④ 找到状态之后
 //! 拿它重算 ①（`sha256(<域>|<N>|<state= 的值，截到 ;first= 之前>)`），与表里不同、或有行找不到状态、或行本身不对
 //! （不是二十一段、⑨ 起抄来的红例账那一行与 ②③④⑦⑧ 对不上），退 1。
-//! 逐态行与 ⑦ 比不比得上由读这张表的一方（`research/scripts/e165-pin-red-examples.py --replay`）判，装置不判。
+//! 逐态行与 ⑦ 比不比得上由读这张表的一方（`scripts/experiments/e165-pin-red-examples.py --replay`）判，装置不判。
 
 use std::cell::Cell;
 use std::collections::{btree_map, BTreeMap};
@@ -2793,7 +2793,7 @@ fn parse_a_pinned_red_example(
     let columns: Vec<&str> = line.split('\t').collect();
     if columns.len() == PINNED_TABLE_OWN_COLUMN_COUNT {
         return Err(format!(
-            "这一行没整行抄红例账，用 research/scripts/e165-pin-red-examples.py 补（这一行是 {PINNED_TABLE_OWN_COLUMN_COUNT} 段的旧格式，要 {PINNED_TABLE_COLUMN_COUNT} 段）"
+            "这一行没整行抄红例账，用 scripts/experiments/e165-pin-red-examples.py 补（这一行是 {PINNED_TABLE_OWN_COLUMN_COUNT} 段的旧格式，要 {PINNED_TABLE_COLUMN_COUNT} 段）"
         ));
     }
     if columns.len() != PINNED_TABLE_COLUMN_COUNT {
@@ -2819,7 +2819,7 @@ fn parse_a_pinned_red_example(
 }
 
 /// 输入指纹：`sha256(<域>|<N>|<逐态行里 state= 的值，截到 ;first= 之前>)` 的十六进制，与
-/// `research/scripts/e165-pin-red-examples.py` 的 `input_fingerprint` 同一个算法。逐态行里认不出 ` state=<不带空白的值>` 收尾交 `None`。
+/// `scripts/experiments/e165-pin-red-examples.py` 的 `input_fingerprint` 同一个算法。逐态行里认不出 ` state=<不带空白的值>` 收尾交 `None`。
 fn input_fingerprint_of(domain_text: &str, size_text: &str, state_row: &str) -> Option<String> {
     let (_row_before_the_state, state_text) = state_row.rsplit_once(" state=")?;
     if state_text.is_empty() || state_text.chars().any(char::is_whitespace) {
@@ -3001,7 +3001,7 @@ fn replay_every_pinned_red_example(table_path: &str, run_profile: RunProfile) {
             eprintln!("  ✗ {problem}");
         }
         eprintln!(
-            "  → 怎么办：指纹漂了先查装置的枚举次序与状态编码变没变；行不对的照表头的二十一段格式（自己的八段后面接红例账出红的那一行原样）找回原行，八段的旧行用 research/scripts/e165-pin-red-examples.py 补整行（表只由它写）"
+            "  → 怎么办：指纹漂了先查装置的枚举次序与状态编码变没变；行不对的照表头的二十一段格式（自己的八段后面接红例账出红的那一行原样）找回原行，八段的旧行用 scripts/experiments/e165-pin-red-examples.py 补整行（表只由它写）"
         );
         std::process::exit(1);
     }
@@ -18268,7 +18268,7 @@ mod tests {
     }
 
     /// 判据表每一行都有一条对照且都红（登记 5.4、作废条款 V2；r2 档加的 J6Qn、J7 五行同样，登记 r2 5.5；r5 档加的 J8 五行，登记 r5 5.4；
-    /// T_table、T_row，登记 r2 5.5）。逐个核正式跑的单元：`research/scripts/replay.sh` 起这个装置的那几条驱动，加上第 5 次重跑登记
+    /// T_table、T_row，登记 r2 5.5）。逐个核正式跑的单元：`scripts/experiments/replay.sh` 起这个装置的那几条驱动，加上第 5 次重跑登记
     /// 比对对象表里没有复跑行的四条（r2 直接建表，两族、两种标记奇偶），每条一族、一档、
     /// 一种建表法、一种盘次序、一种标记奇偶；每个单元跑出对照的判据恰好是那条驱动产物里 `name=control` 的那一份（写死成字面，
     /// 不从 `is_judged_under`、`Criterion::family` 现算，那是被核的东西），且读数全红；全部单元并起来罩全表。不把几档、几族并起来判：
@@ -18285,7 +18285,7 @@ mod tests {
             .collect();
         assert_eq!(labels.len(), Criterion::ALL.len(), "判据的标签互不相同");
         let formal_run_units: [(&str, Family, RunProfile, &[Criterion]); 19] = [
-            // `research/scripts/replay.sh` 的 `driver_e165`、`driver_e165_light`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-legal-family.out`，11 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165`、`driver_e165_light`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-legal-family.out`，11 条
             (
                 "r1 合法",
                 Family::LegalHistory,
@@ -18304,7 +18304,7 @@ mod tests {
                     Criterion::Ia2NoVerificationCounted,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-adversarial-family.out`，7 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-adversarial-family.out`，7 条
             (
                 "r1 对抗",
                 Family::Adversarial,
@@ -18319,7 +18319,7 @@ mod tests {
                     Criterion::ALimit,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment3_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-multi-disk.out`，4 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment3_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-multi-disk.out`，4 条
             (
                 "r2 多盘",
                 Family::MultiDisk,
@@ -18411,7 +18411,7 @@ mod tests {
                     Criterion::ALimit,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment4_table_both_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-legal-family.out`，19 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment4_table_both_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-legal-family.out`，19 条
             (
                 "两份表都取的 r2 合法",
                 Family::LegalHistory,
@@ -18438,7 +18438,7 @@ mod tests {
                     Criterion::TableComparisonSeesADifferentRow,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment4_table_both_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-adversarial-family.out`，9 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment4_table_both_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-adversarial-family.out`，9 条
             (
                 "两份表都取的 r2 对抗",
                 Family::Adversarial,
@@ -18455,7 +18455,7 @@ mod tests {
                     Criterion::TableComparisonSeesADifferentRow,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment4_table_both_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-multi-disk.out`，6 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment4_table_both_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-multi-disk.out`，6 条
             (
                 "两份表都取的 r2 多盘",
                 Family::MultiDisk,
@@ -18469,7 +18469,7 @@ mod tests {
                     Criterion::TableComparisonSeesADifferentRow,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment4_reversed_disk_order_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-legal-family.out`，19 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment4_reversed_disk_order_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-legal-family.out`，19 条
             (
                 "两份表都取、盘次序反报的 r2 合法",
                 Family::LegalHistory,
@@ -18498,7 +18498,7 @@ mod tests {
                     Criterion::TableComparisonSeesADifferentRow,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment4_reversed_disk_order_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out`，6 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r2_segment4_reversed_disk_order_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out`，6 条
             (
                 "两份表都取、盘次序反报的 r2 多盘",
                 Family::MultiDisk,
@@ -18514,7 +18514,7 @@ mod tests {
                     Criterion::TableComparisonSeesADifferentRow,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r3_segment1_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out`，8 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r3_segment1_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out`，8 条
             (
                 "r3 对抗",
                 Family::Adversarial,
@@ -18530,7 +18530,7 @@ mod tests {
                     Criterion::J6QnSplitByI812,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r6_r3_legal`；产物 `e165-replay-bounded-enumeration-2026-10-09-r6-r3-legal-family.out`，17 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r6_r3_legal`；产物 `e165-replay-bounded-enumeration-2026-10-09-r6-r3-legal-family.out`，17 条
             (
                 "r3 合法",
                 Family::LegalHistory,
@@ -18555,7 +18555,7 @@ mod tests {
                     Criterion::J7cUnmountMarkerWhenNothingIsApplied,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r5_segment3_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-legal-family.out`，16 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r5_segment3_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-legal-family.out`，16 条
             (
                 "r5 合法",
                 Family::LegalHistory,
@@ -18579,7 +18579,7 @@ mod tests {
                     Criterion::J8cNothingAppliedReturnsTheChosenRoot,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r5_segment3_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-adversarial-family.out`，8 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r5_segment3_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-adversarial-family.out`，8 条
             (
                 "r5 对抗",
                 Family::Adversarial,
@@ -18595,7 +18595,7 @@ mod tests {
                     Criterion::J6QnSplitByI812,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r5_segment3_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-multi-disk.out`，4 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r5_segment3_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-multi-disk.out`，4 条
             (
                 "r5 多盘",
                 Family::MultiDisk,
@@ -18607,7 +18607,7 @@ mod tests {
                     Criterion::MultiDiskAppliedSetAndLandedVersion,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r5_segment3_odd_marker_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-legal-family.out`，16 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r5_segment3_odd_marker_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-legal-family.out`，16 条
             (
                 "奇数版本的 r5 合法",
                 Family::LegalHistory,
@@ -18631,7 +18631,7 @@ mod tests {
                     Criterion::J8cNothingAppliedReturnsTheChosenRoot,
                 ],
             ),
-            // `research/scripts/replay.sh` 的 `driver_e165_r5_segment3_odd_marker_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-adversarial-family.out`，8 条
+            // `scripts/experiments/replay.sh` 的 `driver_e165_r5_segment3_odd_marker_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-adversarial-family.out`，8 条
             (
                 "奇数版本的 r5 对抗",
                 Family::Adversarial,
@@ -18827,7 +18827,7 @@ mod tests {
         assert_eq!(parse.problems_of_the_rows_that_do_not_parse.len(), 1);
         assert!(
             parse.problems_of_the_rows_that_do_not_parse[0].starts_with(
-                "第 3 行：这一行没整行抄红例账，用 research/scripts/e165-pin-red-examples.py 补"
+                "第 3 行：这一行没整行抄红例账，用 scripts/experiments/e165-pin-red-examples.py 补"
             ),
             "要点名行号、说没整行抄、给补的脚本：{:?}",
             parse.problems_of_the_rows_that_do_not_parse

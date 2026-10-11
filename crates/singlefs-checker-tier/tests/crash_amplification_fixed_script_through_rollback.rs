@@ -18,7 +18,7 @@ use common_crash_points::{mount_writable_step, overwrite_step, record_pool_build
 use singlefs_checker_tier::crash::layer0_plan_state_count;
 use singlefs_checker_tier::crash_amplification::{
     checking_threads, plan_crash_points, reuse_and_scale_fields_of_the_line, run_from_environment,
-    CrashFlow, CrashPointRecorder, ExpandUpToWritesPerSegment, PipelineJudgingCode,
+    CrashFlow, CrashPointRecorder, ExpandUpToWritesPerSegment,
 };
 use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
@@ -51,6 +51,9 @@ impl Drop for TemporaryStore {
         let _ = std::fs::remove_dir_all(&self.directory);
     }
 }
+
+/// 这条流在崩溃点重放合表（`.claude/gate.d/crash-point-replay-items.tsv`）里的项名：按段登记表照它找这条流登记了的段。
+const ITEM_NAME: &str = "fixed-script-through-the-rollback";
 
 #[test]
 fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reused() {
@@ -231,11 +234,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         .parent()
         .expect("Cargo.lock 所在的目录就是仓根")
         .to_path_buf();
-    let judging = PipelineJudgingCode::of_the_judges(
-        &root,
-        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
-    )
-    .expect("判法摘要");
+    let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
     let plan = plan_crash_points(&flow);
     let state_count = layer0_plan_state_count(&base, &writes, &segments, &expansion);
     assert_eq!(plan.points.last().expect("有点").ordinals.end, state_count);
@@ -275,7 +274,8 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         }
     };
     let checking_started = Instant::now();
-    let run = run_from_environment(&flow, &judging, &root, limit).expect("按环境跑得完");
+    let run =
+        run_from_environment(&flow, ITEM_NAME, &toolchain, &root, limit).expect("按环境跑得完");
     let checking_seconds = checking_started.elapsed().as_secs_f64();
     if run.placement_only {
         // 只排派活计划的那一趟一块都没判：不断言、不打汇总行
@@ -328,7 +328,8 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
             run.checking.states_checked, run.recording.states_recorded,
             "这一趟录下来要判的状态都核了"
         );
-        let second_run = run_from_environment(&flow, &judging, &root, limit).expect("第二趟跑得完");
+        let second_run =
+            run_from_environment(&flow, ITEM_NAME, &toolchain, &root, limit).expect("第二趟跑得完");
         assert_eq!(
             second_run.recording.blocks_already_judged,
             run.recording.blocks_recorded + run.recording.blocks_already_judged,
@@ -365,12 +366,14 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         _ => " verifier=none".to_string(),
     };
     let gpu_judge_line = common_crash_points::judge_fields_of_the_summary_line(&run);
+    common_crash_points::assert_the_cross_check_agrees("fixed-script-through-the-rollback", &run);
+    let cross_check_line = run.cross_check.fields_of_the_line();
     drop(library_guard);
     for line in &run.coverage_lines {
         println!("CRASH_AMPLIFICATION_POINT {line}");
     }
     println!(
-        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1}{}{verifier_line}{gpu_judge_line}",
+        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1}{}{verifier_line}{gpu_judge_line}{cross_check_line}",
         run.mode.name(),
         run.share.index,
         run.share.count,
@@ -381,12 +384,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         run.unjudged_blocks,
         run.checking.red_states,
         checking_threads(),
-        run.judge_version
-            .0
-            .iter()
-            .take(8)
-            .map(|byte| format!("{byte:02x}"))
-            .collect::<String>(),
+        run.judged_conclusions().version_text(),
         f64::from(u32::try_from(run.checking.states_checked).expect("装得进 u32")) / checking_seconds.max(0.001),
         started.elapsed().as_secs_f64(),
         reuse_and_scale_fields_of_the_line(&run)

@@ -117,7 +117,7 @@ const FIRST_FILE_BYTES: usize = 96;
 const OVERWRITE_FILE_BYTES: usize = 96;
 const FIXED_WRITE_TIME_SECONDS: u64 = 1_800_000_000;
 
-/// 项目全仓统一的产物完整性闸口径（`research/scripts/replay.sh` 第 11 行「收尾行必须是
+/// 项目全仓统一的产物完整性闸口径（`scripts/experiments/replay.sh` 第 11 行「收尾行必须是
 /// `name=done emitted=N`」）：每一条结果行都以 `E7RESULT` 起头，`main` 收尾打一条
 /// `E7RESULT name=done emitted=N`，N = 本进程打过的 `E7RESULT` 行数（含收尾这一条）。
 static EMITTED_RESULT_LINES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -5023,7 +5023,7 @@ fn run_fixed_publication_byte_script(geometry: &Geometry) {
 // 十、第 2 次跑（`research/prompts/e158-r2-prereg.md`）：5.6 常量回比与第七节锚点（第 2 次跑那一份）、
 //    H1d（5.5 末尾主 agent 跑前修订加的历史族）、Q1-0（H1c 的抛弃步，前提 1 在装置上的读数）、
 //    实七两段复现历史。这一节只加：第一次跑的各模式（上面一至九）原样留着，它们的旧产物由
-//    `research/scripts/replay.sh` 里 E158 那几行复跑；第一节处理表里的删与改归后面的段。
+//    `scripts/experiments/replay.sh` 里 E158 那几行复跑；第一节处理表里的删与改归后面的段。
 // ============================================================================
 
 use std::cell::RefCell;
@@ -7497,7 +7497,7 @@ struct ArmObservation {
 /// 主工作区与今天那一臂的副本不声明，这几个函数退成空。
 #[allow(
     unexpected_cfgs,
-    reason = "特性 e158-r3-arm 只在草稿副本的 singlefs-harness/Cargo.toml 里声明（research/mutations/e158_arms.tsv 收尾那一行）"
+    reason = "特性 e158-r3-arm 只在草稿副本的 singlefs-harness/Cargo.toml 里声明（scripts/mutation/tables/e158_arms.tsv 收尾那一行）"
 )]
 mod third_run_arm_hooks {
     use std::cell::Cell;
@@ -11018,7 +11018,7 @@ fn run_third_run_mode(mode: &str, command_line_arguments: &[String]) -> bool {
 }
 
 /// 产物文件头（登记开头「产物文件头第一行写这个汇总 sha256」）：快照的汇总 sha256 由跑的人经环境变量交进来；
-/// `E7INPUT` 开头，`research/scripts/replay.sh` 比对前删掉，`name=done` 不数它。
+/// `E7INPUT` 开头，`scripts/experiments/replay.sh` 比对前删掉，`name=done` 不数它。
 fn emit_input_header() {
     println!(
         "E7INPUT name=crates_snapshot key=E158 sha256={}",
@@ -11607,7 +11607,7 @@ struct FourthRunArmExtras {
 /// 等待钩子（第 4 次跑）：推进虚拟时钟之前先调 `on_wait`（记第一个等待标记）。臂的代码只在副本里有，见 `third_run_arm_hooks`。
 #[allow(
     unexpected_cfgs,
-    reason = "特性 e158-r3-arm 只在草稿副本的 singlefs-harness/Cargo.toml 里声明（research/mutations/e158_arms.tsv 的 r4 收尾那一行）"
+    reason = "特性 e158-r3-arm 只在草稿副本的 singlefs-harness/Cargo.toml 里声明（scripts/mutation/tables/e158_arms.tsv 的 r4 收尾那一行）"
 )]
 mod fourth_run_arm_hooks {
     #[cfg(feature = "e158-r3-arm")]

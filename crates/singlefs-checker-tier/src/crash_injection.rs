@@ -62,6 +62,7 @@ use singlefs_core::transaction::{
 use singlefs_core::write_accounting::{WritesByStructureKind, WrittenStructureKind};
 
 use crate::crash::check_records_against;
+use crate::crash_judge_conclusions::BlockCountVector;
 use crate::writable_mount_phases::writable_mount_phase_of_each_write;
 /// 可写挂载的分段与崩溃镜像落池住在 `crate::writable_mount_phases`（不拿随机历史当输入的用例经那一份引）；崩溃注入的用例照旧从这里引。
 pub use crate::writable_mount_phases::{
@@ -88,6 +89,18 @@ use singlefs_harness::model::{
     crash_recovery_disagreement, ModelDisagreement, ModelDisagreementAspect, ModelRefusalReason,
     ModelRootKey, ObservedReadBack, ObservedRefusalReason,
 };
+
+/// 恢复读回的那一版问理想模型允不允许（`singlefs_harness::model::crash_recovery_disagreement`）：比的是实现跑出来的结局与只住内存的
+/// 理想模型，两边都是 Rust 代码在跑，不是判一张镜像，上不了 GPU（豁免表 `.claude/gate.d/gpu-exemptions.tsv` 那一行，崩溃点重放合并
+/// 第三轮判决 J5）。随机历史的池级 checker 与两遍恢复那一截上 GPU（给定状态表），这一截不上。
+// gpu-exempt: comparison-with-the-ideal-model
+fn disagreement_with_the_ideal_model(
+    committed_versions: &BTreeMap<ModelRootKey, Option<Rc<[u8]>>>,
+    newest_persisted_root: Option<ModelRootKey>,
+    read_back: &ObservedReadBack,
+) -> Option<ModelDisagreement> {
+    crash_recovery_disagreement(committed_versions, newest_persisted_root, read_back)
+}
 use singlefs_harness::model_comparison::{
     model_root_key, observed_read_back_after_a_crash, refusal_reason_of_mount_error,
     refusal_reason_of_publish_error,
@@ -107,6 +120,7 @@ use singlefs_harness::numeric_environment_variable::{
 use singlefs_harness::reference_filesystem_translation::{
     judge_a_second_crash_after_the_restart, JointVerdictOfTheReferenceFileSystemAndTheModel,
     ReferenceFileSystemJudgementOfACrash, ReferenceFileSystemTranslation, ReferenceFileSystemVote,
+    TranslatedHistory,
 };
 use singlefs_harness::scenario::FIXED_WRITE_TIME_SECONDS;
 use singlefs_harness::segments::{FixedGeometry, StepKind};
@@ -477,10 +491,10 @@ pub struct CrashInjectionTally {
     /// 恢复真的施加过 journal 记录前缀的崩溃状态数。
     pub recoveries_that_applied_journal_records: u64,
     pub checker_runs: u64,
+    /// 第一截各状态上逐条不变量判绿（判到而没违例）的次数，从给定状态表的计数向量并进来。
     pub invariant_holds: BTreeMap<&'static str, u64>,
-    pub invariant_not_applicable: BTreeMap<&'static str, u64>,
-    /// 判成「部分没判」（`InvariantVerdict::PartiallyJudged`）的次数：不红，也不算判绿。
-    pub invariant_partially_judged: BTreeMap<&'static str, u64>,
+    /// 第一截各状态上逐条不变量没判到的次数：不适用或部分没判（GPU 判器的判到位不分这两样，两个判器同一个数法），不红，也不算判绿。
+    pub invariant_not_judged: BTreeMap<&'static str, u64>,
     /// 记录核对器跑过几次、两类各判红几次（与层 0 那一路同一份判据，`crash::check_records_against`）。
     pub record_checks: u64,
     pub record_root_without_record: u64,
@@ -573,6 +587,9 @@ pub struct CrashInjectionTally {
     pub reference_filesystem_and_model_verdicts_on_second_crashes:
         BTreeMap<JointVerdictOfTheReferenceFileSystemAndTheModel, u64>,
     pub reference_filesystem_abstentions: BTreeMap<&'static str, u64>,
+    /// 给定状态表里判器交了占位结论的张数（[`GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost`]：两台分片、这张表归别的机器判、
+    /// 库里又没有）：不为 0 时这一批的计数偏少、新发现可能漏，报告里另打一行（[`CrashInjectionReport::render`]），入口照「本次未跑」交回。
+    pub given_states_tables_left_to_other_hosts: u64,
 }
 
 impl CrashInjectionTally {
@@ -597,8 +614,7 @@ impl CrashInjectionTally {
             recoveries_that_applied_journal_records,
             checker_runs,
             invariant_holds,
-            invariant_not_applicable,
-            invariant_partially_judged,
+            invariant_not_judged,
             record_checks,
             record_root_without_record,
             record_claimed_state_missing_unit,
@@ -652,6 +668,7 @@ impl CrashInjectionTally {
             reference_filesystem_and_model_verdicts_on_crash_images,
             reference_filesystem_and_model_verdicts_on_second_crashes,
             reference_filesystem_abstentions,
+            given_states_tables_left_to_other_hosts,
         } = following;
         self.histories += histories;
         self.histories_completed += histories_completed;
@@ -687,14 +704,8 @@ impl CrashInjectionTally {
         for (invariant, count) in invariant_holds {
             *self.invariant_holds.entry(invariant).or_insert(0) += count;
         }
-        for (invariant, count) in invariant_not_applicable {
-            *self.invariant_not_applicable.entry(invariant).or_insert(0) += count;
-        }
-        for (invariant, count) in invariant_partially_judged {
-            *self
-                .invariant_partially_judged
-                .entry(invariant)
-                .or_insert(0) += count;
+        for (invariant, count) in invariant_not_judged {
+            *self.invariant_not_judged.entry(invariant).or_insert(0) += count;
         }
         self.record_checks += record_checks;
         self.record_root_without_record += record_root_without_record;
@@ -824,6 +835,7 @@ impl CrashInjectionTally {
                 .entry(reason)
                 .or_insert(0) += count;
         }
+        self.given_states_tables_left_to_other_hosts += given_states_tables_left_to_other_hosts;
     }
 
     /// 记一票：RefFS 与 O1 判官两票合起来的那一格，RefFS 弃权时连理由。
@@ -1035,13 +1047,9 @@ impl CrashInjectionTally {
         for invariant in singlefs_checker::image::IMPLEMENTED_INVARIANTS {
             let _ = writeln!(
                 text,
-                "  {invariant}：判绿 {} 次、不适用 {} 次、部分没判 {} 次",
+                "  {invariant}：判绿 {} 次、没判到（不适用或部分没判）{} 次",
                 self.invariant_holds.get(invariant).copied().unwrap_or(0),
-                self.invariant_not_applicable
-                    .get(invariant)
-                    .copied()
-                    .unwrap_or(0),
-                self.invariant_partially_judged
+                self.invariant_not_judged
                     .get(invariant)
                     .copied()
                     .unwrap_or(0)
@@ -1226,6 +1234,31 @@ pub fn inject_crashes_into_history_drawing_second_crashes(
         second_crash_draw,
         InstanceTableSweepConfiguration::PRODUCT,
         image_directory,
+        &GivenStatesJudgedOnTheCpuInPlace,
+    )
+}
+
+/// [`inject_crashes_into_history`]，第一截与第三截上只读一张镜像的那几样（池级 checker、两遍恢复、记录核对器）交 `given_states_judge` 判
+/// （给定状态表，崩溃点重放合并第三轮判决 J3；崩溃注入战役经它把判器换成引擎，[`run_crash_injection_campaign_judging_the_given_states_with`]）。
+///
+/// # Panics
+/// 同 [`inject_crashes_into_history`]；`given_states_judge` 判不了某一张表。
+#[must_use]
+pub fn inject_crashes_into_history_judging_the_given_states_with(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    draw: CrashPointDraw,
+    image_directory: Option<&Path>,
+    given_states_judge: &dyn GivenStatesJudge,
+) -> HistoryCrashInjection {
+    inject_crashes_into_history_with_every_switch(
+        history,
+        execution,
+        draw,
+        SecondCrashPointDraw::OneInEachMountPhaseBySeed,
+        InstanceTableSweepConfiguration::PRODUCT,
+        image_directory,
+        given_states_judge,
     )
 }
 
@@ -1249,6 +1282,7 @@ pub fn inject_crashes_into_history_with_the_instance_table_sweep_configuration(
         SecondCrashPointDraw::OneInEachMountPhaseBySeed,
         instance_table_sweep,
         image_directory,
+        &GivenStatesJudgedOnTheCpuInPlace,
     )
 }
 
@@ -1362,7 +1396,7 @@ fn inject_a_crash_at_the_start_of_the_last_step_sweeping_on_any_row(
     )
 }
 
-/// 崩溃注入的全部开关一处收：第一次崩溃怎么摆、二次崩溃怎么摆、挂载末尾的实例表清扫用哪一份配置。
+/// 崩溃注入的全部开关一处收：第一次崩溃怎么摆、二次崩溃怎么摆、挂载末尾的实例表清扫用哪一份配置、给定状态表交谁判。
 fn inject_crashes_into_history_with_every_switch(
     history: &GeneratedHistory,
     execution: HistoryExecution,
@@ -1370,6 +1404,7 @@ fn inject_crashes_into_history_with_every_switch(
     second_crash_draw: SecondCrashPointDraw,
     instance_table_sweep: InstanceTableSweepConfiguration,
     image_directory: Option<&Path>,
+    given_states_judge: &dyn GivenStatesJudge,
 ) -> HistoryCrashInjection {
     let stream = SharedStream::retaining_contents();
     let mut committed_versions: BTreeMap<ModelRootKey, Option<Rc<[u8]>>> = BTreeMap::new();
@@ -1445,6 +1480,24 @@ fn inject_crashes_into_history_with_every_switch(
         tally.histories_without_any_crash_point = 1;
     }
     let last_committed_version = committed_versions.keys().next_back().copied();
+    // 第一截只读一张镜像的那几样交给定状态表（基线是 mkfs 之后的池，用户 2026-10-10 定）：一段历史上的崩溃状态先一起判完，下面逐个取
+    let history_after_the_make_filesystem = HistoryAfterTheMakeFilesystem::of(
+        &writes,
+        &segments,
+        &stream_indexes,
+        marks.after_make_filesystem,
+        execution,
+    );
+    let first_crash_conclusions = judge_the_first_crashes_on_given_states_tables(
+        given_states_judge,
+        history.seed,
+        &history_after_the_make_filesystem,
+        &crash_points,
+        &segments,
+        writes.len(),
+        &first_write_after_each_power_loss,
+        &mut tally,
+    );
 
     let mut base = MemoryPool::with_devices(
         &[DeviceIdentity(0), DeviceIdentity(1)],
@@ -1455,19 +1508,17 @@ fn inject_crashes_into_history_with_every_switch(
         known_red_hits: Vec::new(),
         new_findings: Vec::new(),
     };
-    for crash_point in &crash_points {
+    for (crash_point, first_crash_conclusion) in crash_points.iter().zip(&first_crash_conclusions) {
         let first_write_of_the_segment = segments[crash_point.segment_index][0];
         let writes_in_the_segment = crash_point.persisted_within_the_segment.len();
         // 段号从小到大，基线只往前叠：更早的段整段持久，按写表整段施加，不为每个崩溃状态从头重建。
         base.apply_writes(&writes[writes_applied_to_the_base..first_write_of_the_segment]);
         writes_applied_to_the_base = first_write_of_the_segment;
-        let mut persisted = vec![false; writes.len()];
-        persisted[..first_write_of_the_segment].fill(true);
-        for (within_the_segment, is_persisted) in
-            crash_point.persisted_within_the_segment.iter().enumerate()
-        {
-            persisted[first_write_of_the_segment + within_the_segment] = *is_persisted;
-        }
+        let persisted = persisted_over_the_whole_write_table(
+            writes.len(),
+            first_write_of_the_segment,
+            &crash_point.persisted_within_the_segment,
+        );
         let image = CrashImage {
             base: &base,
             writes: &writes
@@ -1519,7 +1570,7 @@ fn inject_crashes_into_history_with_every_switch(
         let read_back = observed_read_back_after_a_crash(report);
         tally.model_judgements += 1;
         let disagreement =
-            crash_recovery_disagreement(&committed_versions, newest_persisted, &read_back);
+            disagreement_with_the_ideal_model(&committed_versions, newest_persisted, &read_back);
         // RefFS 那一票：崩溃时刻按切开当前段的那道屏障由哪一步发出归属（r6 用户定案 H1-收严，只给 RefFS 用；
         // O1 判官与 `crash_point.step` 照旧按段里第一个被扣下的写）。当前段取持久窗口最后一个写所在那一段：段内的崩溃状态就是
         // `segment_index` 那一段；靶向用例越过段尾的那一个，崩在窗口末尾那一段里（窗口里更晚的写都可能已落）。
@@ -1527,8 +1578,9 @@ fn inject_crashes_into_history_with_every_switch(
             &segments,
             first_write_of_the_segment + writes_in_the_segment - 1,
         );
-        let reference_filesystem_judgement = reference_filesystem_history.judge_a_crash(
-            reference_filesystem_history.crash_moment_in_segment(segment_the_crash_closes),
+        let reference_filesystem_judgement = reference_filesystem_judgement_of_a_crash_image(
+            &reference_filesystem_history,
+            segment_the_crash_closes,
             &read_back,
         );
         tally.note_the_reference_filesystem_vote(
@@ -1545,11 +1597,10 @@ fn inject_crashes_into_history_with_every_switch(
                 ObservedReadBack::Failed { .. } => {}
             }
         }
-        // 记录核对器（层 0 那一路同一份判据、同一种交法）：两份崩溃后镜像都是这份崩溃镜像（只读恢复不改盘），核的是这段历史的整条记录流——
-        // 更早的段里发出的单元写与 journal 记录写要算进一次发布里；恢复落到由 journal 记录重建的一版时，那一版的根槽写在更晚的段里，
+        // 记录核对器与池级 checker 在上面那张给定状态表上判过（judge_the_first_crashes_on_given_states_tables）：核的是 mkfs 之后这段历史的
+        // 整条记录流——更早的段里发出的单元写与 journal 记录写要算进一次发布里；恢复落到由 journal 记录重建的一版时，那一版的根槽写在更晚的段里，
         // 只给到这一段为止的前缀就找不到它、读不出它的实例表，被它抛弃的发布的豁免整条落空（D23（journal 的角色与格式） 已定项 15）。
-        // 持久集合与整条流逐条对应：更早的段整段持久、当前段按这个崩溃点的子集、更晚的段一个都没持久（D13（验证路线） 已定项 7 的第四样入参）。
-        // 这个崩溃状态之前掉过电的，在每道掉电接缝处断开（[`RecordStreamSeam::AfterAPowerLoss`]）。
+        // 这个崩溃状态之前掉过电的，在每道掉电接缝处断开（[`RecordStreamSeam::AfterAPowerLoss`]）；第二、三截照这几道接缝接上挂载。
         let first_write_after_each_power_loss_before_the_crash: Vec<usize> =
             first_write_after_each_power_loss
                 .iter()
@@ -1558,20 +1609,7 @@ fn inject_crashes_into_history_with_every_switch(
                     *first_write_after_the_power_loss <= first_write_of_the_segment
                 })
                 .collect();
-        let power_loss_seams_before_the_crash =
-            power_loss_seams(&first_write_after_each_power_loss_before_the_crash);
-        let record_check = check_records_against(
-            &image,
-            &image,
-            &writes,
-            &persisted,
-            if power_loss_seams_before_the_crash.is_empty() {
-                RecordStreamContinuity::OneRecording
-            } else {
-                RecordStreamContinuity::BrokenAtSeams(&power_loss_seams_before_the_crash)
-            },
-            report.effective_root,
-        );
+        let record_check = first_crash_conclusion.record_check();
         tally.record_checks += 1;
         if record_check.root_without_record {
             tally.record_root_without_record += 1;
@@ -1579,7 +1617,8 @@ fn inject_crashes_into_history_with_every_switch(
         if record_check.claimed_state_missing_unit {
             tally.record_claimed_state_missing_unit += 1;
         }
-        let mut violations = checker_violations_on(&image, &mut tally);
+        tally.checker_runs += 1;
+        let mut violations = first_crash_conclusion.pool_checker_violations();
         violations.extend(reference_filesystem_judgement.vote.violation());
         if !(violations.is_empty()
             && disagreement.is_none()
@@ -1644,8 +1683,11 @@ fn inject_crashes_into_history_with_every_switch(
         }
         let (mount_writes, mount_segments, _mount_stream_indexes) =
             writes_and_segments_with_stream_indexes(&mount_run.mount_operations, &geometry);
-        let (writes_of_the_publish_after_the_mount, _publish_segments, _publish_stream_indexes) =
-            writes_and_segments_with_stream_indexes(&mount_run.publish_operations, &geometry);
+        let (
+            writes_of_the_publish_after_the_mount,
+            segments_of_the_publish_after_the_mount,
+            _publish_stream_indexes,
+        ) = writes_and_segments_with_stream_indexes(&mount_run.publish_operations, &geometry);
         let records_across_the_crash = HistoryThenWritableMountRecords::new(
             &writes,
             &persisted,
@@ -1741,6 +1783,20 @@ fn inject_crashes_into_history_with_every_switch(
                 reference_filesystem_at_the_first_crash: &reference_filesystem_judgement,
                 read_faults_in_the_first_crash_state: read_faults_in_the_crash_state,
                 second_crash_draw,
+                given_states: SecondCrashGivenStates {
+                    judge: given_states_judge,
+                    history_after_the_make_filesystem: &history_after_the_make_filesystem,
+                    persisted_history_of_the_table: history_after_the_make_filesystem
+                        .persisted_set_of_the_table(&persisted),
+                    power_loss_seams_of_the_table: history_after_the_make_filesystem
+                        .power_loss_seams_of_the_table(
+                            &first_write_after_each_power_loss_before_the_crash,
+                        ),
+                    version_landed_on_after_the_first_crash: report.effective_root,
+                    writes_of_the_publish_after_the_mount: &writes_of_the_publish_after_the_mount,
+                    segments_of_the_publish_after_the_mount:
+                        &segments_of_the_publish_after_the_mount,
+                },
             },
             history.seed,
             crash_point,
@@ -1754,6 +1810,423 @@ fn inject_crashes_into_history_with_every_switch(
         known_red_hits: findings.known_red_hits,
         new_findings: findings.new_findings,
     }
+}
+
+// ============================== 给定状态表（崩溃点重放合并第三轮判决 J3、J5、J6；用户 2026-10-10 定的四件） ==============================
+/// 给定状态表的形态、结论、判器 trait 与 CPU 就地判住在 `crate::crash_given_states`（流水线经那一份引，不经崩溃注入）；用例照旧从这里引。
+pub use crate::crash_given_states::{
+    count_vector_of_the_given_states, judge_a_given_state_on_the_cpu,
+    judge_the_given_states_on_the_cpu, GivenStateConclusion, GivenStatesConclusionsOfATable,
+    GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesJudgedOnTheCpuInPlace,
+    GivenStatesOfATable, POOL_CHECKER_VIOLATION_WITHOUT_ITS_DETAIL,
+};
+
+/// 判器交的是占位结论（两台分片、这张表归别的机器判）就记一张（[`CrashInjectionTally::given_states_tables_left_to_other_hosts`]）。
+fn count_a_table_left_to_another_host(
+    tally: &mut CrashInjectionTally,
+    source: GivenStatesConclusionsSource,
+) {
+    match source {
+        GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+        GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost => {
+            tally.given_states_tables_left_to_other_hosts += 1;
+        }
+    }
+}
+
+/// 一张表的结论并进崩溃注入的计数：逐条不变量判绿（判到减违例）、没判到（不适用或部分没判）各几次。
+fn absorb_the_pool_checker_counts_of_the_table(
+    tally: &mut CrashInjectionTally,
+    count_vector: &BlockCountVector,
+) {
+    for (invariant, counts) in &count_vector.per_invariant {
+        let invariant = singlefs_checker::image::IMPLEMENTED_INVARIANTS
+            .iter()
+            .find(|candidate| **candidate == invariant.as_str())
+            .expect(
+                "计数向量按 IMPLEMENTED_INVARIANTS 逐条一行（StateCountsOfABlock::into_count_vector）；判定库读回的在同一把版本下存，清单相同",
+            );
+        *tally.invariant_holds.entry(invariant).or_insert(0) += counts.judged - counts.violated;
+        *tally.invariant_not_judged.entry(invariant).or_insert(0) += counts.not_applicable;
+    }
+}
+
+/// mkfs 写了写表的前几个写：录制流下标在 `after_make_filesystem` 之前的那几个（写表与 `stream_indexes` 逐条对应、按录制流次序）。
+fn writes_of_the_make_filesystem(stream_indexes: &[usize], after_make_filesystem: usize) -> usize {
+    stream_indexes
+        .iter()
+        .position(|stream_index| *stream_index >= after_make_filesystem)
+        .unwrap_or(stream_indexes.len())
+}
+
+/// 写表从第 `first_write` 个起的那一截的切段（下标减去 `first_write`）：整段在它之前的不要，跨过它的只留它之后那一部分
+/// （跨过它的段不是候选段，上面不摆状态；留下的那一部分只为让每个写都在一段里）。
+fn segments_from_the_write(segments: &[Vec<usize>], first_write: usize) -> Vec<Vec<usize>> {
+    segments
+        .iter()
+        .map(|segment| {
+            segment
+                .iter()
+                .filter(|write| **write >= first_write)
+                .map(|write| write - first_write)
+                .collect::<Vec<usize>>()
+        })
+        .filter(|segment| !segment.is_empty())
+        .collect()
+}
+
+/// 整条写表上一个崩溃状态的持久集合：段首之前全持久，从段首起照 `persisted_within_the_segment`（靶向用例可以越过段尾），之后都没持久。
+fn persisted_over_the_whole_write_table(
+    write_count: usize,
+    first_write_of_the_segment: usize,
+    persisted_within_the_segment: &[bool],
+) -> Vec<bool> {
+    let mut persisted = vec![false; write_count];
+    persisted[..first_write_of_the_segment].fill(true);
+    persisted[first_write_of_the_segment
+        ..first_write_of_the_segment + persisted_within_the_segment.len()]
+        .copy_from_slice(persisted_within_the_segment);
+    persisted
+}
+
+/// 给定状态表的基线与写表（用户 2026-10-10 定「基线改成 mkfs 之后」；同日弹窗定创世那几次发布照样进记录核对器，「先查 GPU 能不能核，
+/// 不能就 CPU 核一遍」，查下来 GPU 核得到）：基线是空盘叠上 mkfs 的全部写；写表从 mkfs 第一个不是清零的写起——mkfs 先清零、再写单元、
+/// 根槽与系统配置，清零只在基线里（GPU 的落点模型不收清零写），mkfs 那几个数据写留在写表的头上，每个给定状态里都落了。
+/// 它们叠在基线上一个字节都不改（清零都在它们之前，每个字节上最后一次写还是基线里那一次）；留在写表里是为了让创世那几次发布进两侧
+/// 记录核对器的发布表：发布表按写表下标记单元副本与根槽写，基线里的写没有下标，GPU 那一侧就核不到创世发布的单元。
+pub struct HistoryAfterTheMakeFilesystem<'history> {
+    base: MemoryPool,
+    writes: &'history [RetainedWrite],
+    segments: Vec<Vec<usize>>,
+    /// 整条写表的第几个写是这张写表的第 0 个：mkfs 的清零写有几个（只叠进基线）。
+    first_write_of_the_table: usize,
+    /// 这张写表的头几个写是 mkfs 写的（每个给定状态里都落了）。
+    writes_of_the_make_filesystem_in_the_table: usize,
+}
+
+impl<'history> HistoryAfterTheMakeFilesystem<'history> {
+    /// 空盘叠上 mkfs 的写就是基线；写表从 mkfs 第一个不是清零的写起（`writes` 是整条写表，与 `stream_indexes` 逐条对应，
+    /// `after_make_filesystem` 是 mkfs 写完时录制流的下标）。
+    ///
+    /// # Panics
+    /// mkfs 的清零写不都在它的数据写之前（叠回去的数据写会盖掉清零，基线就不再是这张写表在全落时的样子）。
+    #[must_use]
+    pub fn of(
+        writes: &'history [RetainedWrite],
+        segments: &[Vec<usize>],
+        stream_indexes: &[usize],
+        after_make_filesystem: usize,
+        execution: HistoryExecution,
+    ) -> Self {
+        let writes_of_the_make_filesystem =
+            writes_of_the_make_filesystem(stream_indexes, after_make_filesystem);
+        let first_write_of_the_table = writes[..writes_of_the_make_filesystem]
+            .iter()
+            .position(|write| write.kind != StepKind::ZeroFill)
+            .unwrap_or(writes_of_the_make_filesystem);
+        assert!(
+            writes[first_write_of_the_table..writes_of_the_make_filesystem]
+                .iter()
+                .all(|write| write.kind != StepKind::ZeroFill),
+            "mkfs 先发清零、再发数据写（make_filesystem 的次序）：清零之后再没有清零"
+        );
+        let mut base = MemoryPool::with_devices(
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+            execution.device_width.device_bytes(),
+        );
+        base.apply_writes(&writes[..writes_of_the_make_filesystem]);
+        Self {
+            base,
+            writes: &writes[first_write_of_the_table..],
+            segments: segments_from_the_write(segments, first_write_of_the_table),
+            first_write_of_the_table,
+            writes_of_the_make_filesystem_in_the_table: writes_of_the_make_filesystem
+                - first_write_of_the_table,
+        }
+    }
+
+    #[must_use]
+    pub fn base(&self) -> &MemoryPool {
+        &self.base
+    }
+
+    /// 这张写表：mkfs 的数据写在头上，接着是 mkfs 之后的历史。
+    #[must_use]
+    pub fn writes(&self) -> &'history [RetainedWrite] {
+        self.writes
+    }
+
+    /// 这张写表的切段（下标按这张写表）。
+    #[must_use]
+    pub fn segments(&self) -> &[Vec<usize>] {
+        &self.segments
+    }
+
+    /// 这张写表头上 mkfs 写的那几个（创世那几次发布的单元写、根槽写与系统配置槽写）。
+    #[must_use]
+    pub fn writes_of_the_make_filesystem(&self) -> &'history [RetainedWrite] {
+        &self.writes[..self.writes_of_the_make_filesystem_in_the_table]
+    }
+
+    /// 整条写表的下标换成这张写表的下标。
+    ///
+    /// # Panics
+    /// 那个写是 mkfs 的清零写（不在这张写表里）。
+    #[must_use]
+    pub fn index_in_the_table(&self, index_over_the_whole_write_table: usize) -> usize {
+        index_over_the_whole_write_table
+            .checked_sub(self.first_write_of_the_table)
+            .expect("清零写只在基线里：问到的写在 mkfs 的清零写之后")
+    }
+
+    /// 整条写表上的一个持久集合换成这张写表的。
+    ///
+    /// # Panics
+    /// mkfs 的写在这个持久集合里有一个没落（崩溃状态只摆在整段落在 mkfs 之后的段上，`draw_crash_points` 的候选段）。
+    #[must_use]
+    pub fn persisted_set_of_the_table(
+        &self,
+        persisted_over_the_whole_write_table: &[bool],
+    ) -> Vec<bool> {
+        assert!(
+            persisted_over_the_whole_write_table
+                [..self.first_write_of_the_table + self.writes_of_the_make_filesystem_in_the_table]
+                .iter()
+                .all(|is_persisted| *is_persisted),
+            "崩溃状态摆在整段落在 mkfs 之后的段上：mkfs 的写都已落"
+        );
+        persisted_over_the_whole_write_table[self.first_write_of_the_table..].to_vec()
+    }
+
+    /// 整条写表下标上的掉电之后第一个写换成这张写表上的接缝。
+    ///
+    /// # Panics
+    /// 那次掉电在 mkfs 写完之前（mkfs 不掉电：随机历史的掉电是历史里一步，在起点之后）。
+    fn power_loss_seams_of_the_table(
+        &self,
+        first_write_after_each_power_loss: &[usize],
+    ) -> Vec<RecordStreamSeam> {
+        power_loss_seams(
+            &first_write_after_each_power_loss
+                .iter()
+                .map(|first_write_after_the_power_loss| {
+                    assert!(
+                        *first_write_after_the_power_loss
+                            >= self.first_write_of_the_table
+                                + self.writes_of_the_make_filesystem_in_the_table,
+                        "掉电是历史里的一步，在 mkfs 写完之后"
+                    );
+                    self.index_in_the_table(*first_write_after_the_power_loss)
+                })
+                .collect::<Vec<usize>>(),
+        )
+    }
+}
+
+/// 第一截：这段历史上每个第一次崩溃状态的池级 checker、两遍恢复、记录核对器交 `judge` 判，掉电接缝相同的几个状态一张表
+/// （记录核对器照每个状态之前掉过的电断开，第一次崩溃之前没掉过电的是一条录制流）。交回与 `crash_points` 同序的结论；
+/// 计数（判绿、没判到）并进 `tally`。判不了就 panic：配了 GPU 卡用不上、判定库读写失败都判红，不退回 CPU。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "判器、历史、崩溃状态、整条写表的切段与掉电接缝、计数，各是各的东西"
+)]
+fn judge_the_first_crashes_on_given_states_tables(
+    judge: &dyn GivenStatesJudge,
+    seed: HistorySeed,
+    history_after_the_make_filesystem: &HistoryAfterTheMakeFilesystem<'_>,
+    crash_points: &[CrashPoint],
+    segments: &[Vec<usize>],
+    write_count: usize,
+    first_write_after_each_power_loss: &[usize],
+    tally: &mut CrashInjectionTally,
+) -> Vec<GivenStateConclusion> {
+    let mut crash_points_by_power_losses: BTreeMap<Vec<usize>, Vec<usize>> = BTreeMap::new();
+    for (crash_point_index, crash_point) in crash_points.iter().enumerate() {
+        let first_write_of_the_segment = segments[crash_point.segment_index][0];
+        let power_losses_before_the_crash: Vec<usize> = first_write_after_each_power_loss
+            .iter()
+            .copied()
+            .filter(|first_write_after_the_power_loss| {
+                *first_write_after_the_power_loss <= first_write_of_the_segment
+            })
+            .collect();
+        crash_points_by_power_losses
+            .entry(power_losses_before_the_crash)
+            .or_default()
+            .push(crash_point_index);
+    }
+    let mut conclusions: Vec<Option<GivenStateConclusion>> = vec![None; crash_points.len()];
+    for (power_losses, crash_point_indexes) in crash_points_by_power_losses {
+        let seams = history_after_the_make_filesystem.power_loss_seams_of_the_table(&power_losses);
+        let persisted_sets: Vec<Vec<bool>> = crash_point_indexes
+            .iter()
+            .map(|crash_point_index| {
+                let crash_point = &crash_points[*crash_point_index];
+                history_after_the_make_filesystem.persisted_set_of_the_table(
+                    &persisted_over_the_whole_write_table(
+                        write_count,
+                        segments[crash_point.segment_index][0],
+                        &crash_point.persisted_within_the_segment,
+                    ),
+                )
+            })
+            .collect();
+        let table = GivenStatesOfATable {
+            table_name: format!("seed={}/first-crash/power-losses={power_losses:?}", seed.0),
+            base: &history_after_the_make_filesystem.base,
+            writes: history_after_the_make_filesystem.writes,
+            segments: &history_after_the_make_filesystem.segments,
+            seams: &seams,
+            persisted_sets,
+        };
+        let judged = judge
+            .judge_the_given_states(&table)
+            .unwrap_or_else(|reason| {
+                panic!(
+                    "第一截给定状态表 {} 判不了（不退回别处判）：{reason}",
+                    table.table_name
+                )
+            });
+        assert_eq!(
+            judged.states.len(),
+            crash_point_indexes.len(),
+            "判器逐状态交回结论，与表里的状态同序"
+        );
+        absorb_the_pool_checker_counts_of_the_table(tally, &judged.count_vector);
+        count_a_table_left_to_another_host(tally, judged.source);
+        for (crash_point_index, conclusion) in crash_point_indexes.into_iter().zip(judged.states) {
+            conclusions[crash_point_index] = Some(conclusion);
+        }
+    }
+    conclusions
+        .into_iter()
+        .map(|conclusion| conclusion.expect("每个崩溃状态恰好落在一组掉电接缝里"))
+        .collect()
+}
+
+/// 第三截那张给定状态表要的东西（一个第一次崩溃状态上的二次崩溃共一张）：mkfs 之后的历史、它在这个第一次崩溃状态上的持久集合与掉电接缝、
+/// 第一次崩溃之后只读恢复落到的那一版、挂载之后那一次发布的写与切段，以及交谁判。
+struct SecondCrashGivenStates<'history> {
+    judge: &'history dyn GivenStatesJudge,
+    history_after_the_make_filesystem: &'history HistoryAfterTheMakeFilesystem<'history>,
+    persisted_history_of_the_table: Vec<bool>,
+    power_loss_seams_of_the_table: Vec<RecordStreamSeam>,
+    version_landed_on_after_the_first_crash: Option<(InstanceGeneration, CheckpointTxg)>,
+    writes_of_the_publish_after_the_mount: &'history [RetainedWrite],
+    segments_of_the_publish_after_the_mount: &'history [Vec<usize>],
+}
+
+/// 第三截：这个第一次崩溃状态上每个二次崩溃的池级 checker、两遍恢复、记录核对器交判器判（一张表，用户 2026-10-10 定第三截照候选丁：
+/// 写表是 mkfs 之后的历史接挂载那一段、再接之后那一次发布，接缝 = 第一次崩溃之前的掉电接缝 + 历史与挂载之间那一道崩溃接缝，
+/// 与 [`HistoryThenWritableMountRecords`] 交 CPU 记录核对器的同一种断法；GPU 的发布表照它分）。`ordered` 里每个二次崩溃的
+/// `persisted_in_the_mount` 与整条挂载流逐条对应；之后那一次发布一个写都还没发。交回与 `ordered` 同序的结论。
+/// 判不了就 panic（同 [`judge_the_first_crashes_on_given_states_tables`]）。
+fn judge_the_second_crashes_on_a_given_states_table(
+    given: &SecondCrashGivenStates<'_>,
+    mount_writes: &[RetainedWrite],
+    mount_segments: &[Vec<usize>],
+    persisted_in_the_mount_of_each_second_crash: &[Vec<bool>],
+    table_name: String,
+) -> GivenStatesConclusionsOfATable {
+    let history = given.history_after_the_make_filesystem;
+    let history_write_count = history.writes.len();
+    let writes: Vec<RetainedWrite> = history
+        .writes
+        .iter()
+        .chain(mount_writes)
+        .chain(given.writes_of_the_publish_after_the_mount)
+        .cloned()
+        .collect();
+    let shifted = |segments: &[Vec<usize>], by: usize| -> Vec<Vec<usize>> {
+        segments
+            .iter()
+            .map(|segment| segment.iter().map(|write| write + by).collect())
+            .collect()
+    };
+    let segments: Vec<Vec<usize>> = history
+        .segments
+        .iter()
+        .cloned()
+        .chain(shifted(mount_segments, history_write_count))
+        .chain(shifted(
+            given.segments_of_the_publish_after_the_mount,
+            history_write_count + mount_writes.len(),
+        ))
+        .collect();
+    let mut seams = given.power_loss_seams_of_the_table.clone();
+    seams.push(RecordStreamSeam::AfterACrash {
+        first_write_after_the_crash: history_write_count,
+        version_landed_on_after_the_crash: given.version_landed_on_after_the_first_crash,
+    });
+    let persisted_sets: Vec<Vec<bool>> = persisted_in_the_mount_of_each_second_crash
+        .iter()
+        .map(|persisted_in_the_mount| {
+            assert_eq!(
+                persisted_in_the_mount.len(),
+                mount_writes.len(),
+                "二次崩溃的持久集合与整条挂载流逐条对应"
+            );
+            given
+                .persisted_history_of_the_table
+                .iter()
+                .chain(persisted_in_the_mount)
+                .copied()
+                .chain(std::iter::repeat_n(
+                    false,
+                    given.writes_of_the_publish_after_the_mount.len(),
+                ))
+                .collect()
+        })
+        .collect();
+    let table = GivenStatesOfATable {
+        table_name,
+        base: &history.base,
+        writes: &writes,
+        segments: &segments,
+        seams: &seams,
+        persisted_sets,
+    };
+    let judged = given
+        .judge
+        .judge_the_given_states(&table)
+        .unwrap_or_else(|reason| {
+            panic!(
+                "第三截给定状态表 {} 判不了（不退回别处判）：{reason}",
+                table.table_name
+            )
+        });
+    assert_eq!(
+        judged.states.len(),
+        persisted_in_the_mount_of_each_second_crash.len(),
+        "判器逐状态交回结论，与表里的状态同序"
+    );
+    judged
+}
+
+/// RefFS 那一票（第一截）：照崩溃时刻交事件、判恢复读回的东西。比的是 RefFS 翻译的历史与实现读回的内容，不是一张镜像，上不了 GPU
+/// （豁免表 `.claude/gate.d/gpu-exemptions.tsv` 的 `reference-filesystem` 那一行；用户 2026-10-10 点头）。
+// gpu-exempt: reference-filesystem
+fn reference_filesystem_judgement_of_a_crash_image(
+    reference_filesystem_history: &TranslatedHistory,
+    segment_the_crash_closes: usize,
+    read_back: &ObservedReadBack,
+) -> ReferenceFileSystemJudgementOfACrash {
+    reference_filesystem_history.judge_a_crash(
+        reference_filesystem_history.crash_moment_in_segment(segment_the_crash_closes),
+        read_back,
+    )
+}
+
+/// RefFS 那一票（二次崩溃那一截）：接着第一次崩溃判绿时重新起头的 RefFS 判（理由同 [`reference_filesystem_judgement_of_a_crash_image`]）。
+// gpu-exempt: reference-filesystem
+fn reference_filesystem_vote_on_a_second_crash(
+    reference_filesystem_at_the_first_crash: &ReferenceFileSystemJudgementOfACrash,
+    read_back_after_the_second_crash: &ObservedReadBack,
+) -> ReferenceFileSystemVote {
+    judge_a_second_crash_after_the_restart(
+        reference_filesystem_at_the_first_crash,
+        read_back_after_the_second_crash,
+    )
 }
 
 /// 一段历史上攒下的已知红与新发现。同一段历史里同一截同一个签名的新发现只留第一个（按段号从小到大）。
@@ -2633,6 +3106,7 @@ struct RefusalOnTheCrashImage<'crash> {
     clippy::too_many_arguments,
     reason = "每个参数各是一样东西：计数与发现、挂载那一趟与它之后的记录核对、判拒绝要的崩溃镜像那一份、这一个崩溃状态落在哪"
 )]
+// gpu-exempt: writable-mount
 fn judge_the_writable_mount_on_the_crash_image(
     tally: &mut CrashInjectionTally,
     findings: &mut FindingsOfOneHistory,
@@ -3315,13 +3789,17 @@ struct SecondCrashInputs<'history> {
     read_faults_in_the_first_crash_state: ReadFaultsInTheCrashState,
     /// 二次崩溃怎么摆：挂载每一段按种子各摆一个，或靶向用例写死的那一个。
     second_crash_draw: SecondCrashPointDraw,
+    /// 二次崩溃镜像上只读一张镜像的那几样交给定状态表判（[`judge_the_second_crashes_on_a_given_states_table`]）。
+    given_states: SecondCrashGivenStates<'history>,
 }
 
 /// 第三截：挂载途中的二次崩溃。每个二次崩溃状态上：只读恢复（看 journal）、问模型——允许的版本是模型提交过的每一版，加上这次挂载写出的根
 /// （写行那次与暖机照抄第一次崩溃之后恢复到的那一版的文件，所以内容取那一次读回的；那一次恢复失败时一条都不加）；
 /// 盘上已持久的最新根槽取第一次崩溃与挂载写表两边里更新的那条——、池级 checker、记录核对器。
-/// 记录核对器核的是整条历史录制流接上整条挂载流（[`HistoryThenWritableMountRecords::record_check_after_a_second_crash`]）：
-/// 历史那几次发布在二次崩溃镜像上还在不在也核；恢复落到由记录重建的写行那一版时，它的根槽写在更晚的段里，也在表里。
+/// 池级 checker、两遍恢复与记录核对器在一张给定状态表上判（[`judge_the_second_crashes_on_a_given_states_table`]，配了 GPU 走 GPU）：
+/// 记录核对器核的是 mkfs 之后的整条历史录制流接上整条挂载流，历史那几次发布在二次崩溃镜像上还在不在也核；恢复落到由记录重建的
+/// 写行那一版时，它的根槽写在更晚的段里，也在表里。要录下可写挂载那一趟 Rust 实现发出的写、二次崩溃之后再挂，上不了 GPU。
+// gpu-exempt: second-crash-during-mount
 fn judge_second_crashes_inside_the_writable_mount(
     tally: &mut CrashInjectionTally,
     findings: &mut FindingsOfOneHistory,
@@ -3350,6 +3828,7 @@ fn judge_second_crashes_inside_the_writable_mount(
         reference_filesystem_at_the_first_crash,
         read_faults_in_the_first_crash_state,
         second_crash_draw,
+        given_states,
     } = inputs;
     let mount_writes = records_across_the_crash.mount_writes();
     let phase_of_each_write = writable_mount_phase_of_each_write(
@@ -3388,7 +3867,35 @@ fn judge_second_crashes_inside_the_writable_mount(
     let mut writes_applied_to_the_second_base = 0usize;
     let mut ordered = second_crash_points;
     ordered.sort_by_key(|second| second.segment_index);
-    for second in &ordered {
+    // 与整条挂载流逐条对应：更早的段整段持久、当前段按二次崩溃的子集、更晚的段一个都没持久。
+    let persisted_in_the_mount_of_each_second_crash: Vec<Vec<bool>> = ordered
+        .iter()
+        .map(|second| {
+            persisted_over_the_whole_write_table(
+                mount_writes.len(),
+                mount_segments[second.segment_index][0],
+                &second.persisted_within_the_segment,
+            )
+        })
+        .collect();
+    let second_crash_conclusions = judge_the_second_crashes_on_a_given_states_table(
+        &given_states,
+        mount_writes,
+        mount_segments,
+        &persisted_in_the_mount_of_each_second_crash,
+        format!(
+            "seed={}/second-crash/segment={}/first-crash-fingerprint={:016x}",
+            seed.0,
+            crash_point.segment_index,
+            fingerprint_of_the_persisted_subset(&crash_point.persisted_within_the_segment)
+        ),
+    );
+    count_a_table_left_to_another_host(tally, second_crash_conclusions.source);
+    for ((second, persisted_in_the_mount), second_crash_conclusion) in ordered
+        .iter()
+        .zip(&persisted_in_the_mount_of_each_second_crash)
+        .zip(&second_crash_conclusions.states)
+    {
         let segment = &mount_segments[second.segment_index];
         let first_write_of_the_segment = segment[0];
         let writes_in_the_segment = second.persisted_within_the_segment.len();
@@ -3396,12 +3903,6 @@ fn judge_second_crashes_inside_the_writable_mount(
             &mount_writes[writes_applied_to_the_second_base..first_write_of_the_segment],
         );
         writes_applied_to_the_second_base = first_write_of_the_segment;
-        // 与整条挂载流逐条对应：更早的段整段持久、当前段按二次崩溃的子集、更晚的段一个都没持久。
-        let mut persisted_in_the_mount = vec![false; mount_writes.len()];
-        persisted_in_the_mount[..first_write_of_the_segment].fill(true);
-        persisted_in_the_mount
-            [first_write_of_the_segment..first_write_of_the_segment + writes_in_the_segment]
-            .copy_from_slice(&second.persisted_within_the_segment);
         let image = CrashImage {
             base: &second_base,
             writes: &mount_writes
@@ -3423,16 +3924,16 @@ fn judge_second_crashes_inside_the_writable_mount(
         }
         let read_back_after_the_second_crash = observed_read_back_after_a_crash(report);
         let newest_persisted_by_the_mount =
-            newest_persisted_root(mount_writes, &persisted_in_the_mount)
+            newest_persisted_root(mount_writes, persisted_in_the_mount)
                 .map(|(checkpoint_txg, instance)| model_root_key(instance, checkpoint_txg));
         let newest_persisted = newest_persisted_before_the_mount.max(newest_persisted_by_the_mount);
         tally.second_crash_model_judgements += 1;
-        let disagreement = crash_recovery_disagreement(
+        let disagreement = disagreement_with_the_ideal_model(
             &versions_allowed,
             newest_persisted,
             &read_back_after_the_second_crash,
         );
-        let reference_filesystem_vote = judge_a_second_crash_after_the_restart(
+        let reference_filesystem_vote = reference_filesystem_vote_on_a_second_crash(
             reference_filesystem_at_the_first_crash,
             &read_back_after_the_second_crash,
         );
@@ -3442,11 +3943,7 @@ fn judge_second_crashes_inside_the_writable_mount(
             disagreement.as_ref(),
         );
         tally.second_crash_record_checks += 1;
-        let record_check = records_across_the_crash.record_check_after_a_second_crash(
-            &persisted_in_the_mount,
-            &image,
-            report.effective_root,
-        );
+        let record_check = second_crash_conclusion.record_check();
         let second_crash_image_materialized = materialized_crash_image(&image);
         judge_the_remount_after_a_second_crash(
             tally,
@@ -3471,7 +3968,7 @@ fn judge_second_crashes_inside_the_writable_mount(
             image_directory,
         );
         tally.second_crash_checker_runs += 1;
-        let mut violations = checker_violations_of(&image);
+        let mut violations = second_crash_conclusion.pool_checker_violations();
         violations.extend(reference_filesystem_vote.violation());
         // 挂载透明的射程只管不带故障的状态（D13（验证路线） 已定项 1）：第一次崩溃那个态注入过读故障的，它上面那次挂载途中的二次崩溃
         // 也不判，与第二截同一个理由记一次没判（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J2
@@ -3485,7 +3982,7 @@ fn judge_second_crashes_inside_the_writable_mount(
                     floor_raises_in_the_uninterrupted_mount_writes,
                     continuation_of_the_uninterrupted_mount,
                     rows_deleted_by_the_sweep_of_the_uninterrupted_mount,
-                    &persisted_in_the_mount,
+                    persisted_in_the_mount,
                     second.phase,
                 )
             }
@@ -3667,6 +4164,7 @@ struct RemountRefusedAfterASecondCrash<'remount> {
 /// 整环重读一次仍一条不被抛弃的自证有效根都没有」、崩溃态没注入读故障、那一拒的判据在二次崩溃镜像上复算为真 ⇒ 拒得不合法，报红
 /// （判官的 [`RefusalConditionNotMet::NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults`]）。
 /// 拒因是实例表读不出的不判。
+// gpu-exempt: witness-criterion-w
 fn judge_the_remount_refusal_after_a_second_crash_against_the_criteria_true_without_read_faults(
     tally: &mut CrashInjectionTally,
     findings: &mut FindingsOfOneHistory,
@@ -4043,34 +4541,8 @@ fn draw_a_proper_subset(source: &mut SeededRandomSource, segment_length: usize) 
     persisted
 }
 
-/// 对一份崩溃镜像跑池级 checker，记每条不变量判绿、不适用各几次，交回判红的那几条（与 `history.rs` 的 `violations_on` 同一条口径，
-/// 计数进的是崩溃注入自己的那一份）。
-fn checker_violations_on(
-    image: &CrashImage<'_>,
-    tally: &mut CrashInjectionTally,
-) -> Vec<(&'static str, String)> {
-    tally.checker_runs += 1;
-    let mut violations = Vec::new();
-    for (invariant, verdict) in check_pool_image(image) {
-        match verdict {
-            InvariantVerdict::Holds => *tally.invariant_holds.entry(invariant).or_insert(0) += 1,
-            InvariantVerdict::NotApplicable(_) => {
-                *tally.invariant_not_applicable.entry(invariant).or_insert(0) += 1;
-            }
-            InvariantVerdict::PartiallyJudged(_) => {
-                *tally
-                    .invariant_partially_judged
-                    .entry(invariant)
-                    .or_insert(0) += 1;
-            }
-            InvariantVerdict::Violated(detail) => violations.push((invariant, detail)),
-        }
-    }
-    violations
-}
-
-/// 对挂载之后的池、二次崩溃的镜像跑池级 checker，交回判红的那几条（判绿、不适用的计数只记第一截那一份：
-/// 那两截的 checker 次数另记在 `checker_runs_after_the_writable_mount` 与 `second_crash_checker_runs`）。
+/// 对挂载之后的池跑池级 checker，交回判红的那几条（判绿、没判到的计数只记第一截那一份，从第一截的给定状态表来：
+/// 这一截的 checker 次数另记在 `checker_runs_after_the_writable_mount`）。
 fn checker_violations_of(image: &dyn ImageReader) -> Vec<(&'static str, String)> {
     check_pool_image(image)
         .into_iter()
@@ -4165,6 +4637,9 @@ fn write_crash_image_files(
     Some(here)
 }
 
+/// 报告里注明「有给定状态表交的是占位结论」那一行的开头（[`CrashInjectionReport::render`]）。
+pub const GIVEN_STATES_TABLES_LEFT_TO_OTHER_HOSTS_NOTE: &str = "两台分片留给别的机器";
+
 /// 一批种子跑下来的崩溃注入报告。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CrashInjectionReport {
@@ -4183,6 +4658,9 @@ pub struct CrashInjectionReport {
     pub image_retention: FailureImageRetention,
     /// 这一批照哪一组断言判（交「重放这一整批」那一行写出来；跑的时候不读它）。
     pub assertions: CrashInjectionAssertions,
+    /// 给定状态表的判器叫停了（[`GivenStatesJudge::stop_is_requested`]），没领的那几片里有几段历史：0 是整批都跑了；
+    /// 不为 0 时计数与新发现只是领了的那几片的，调用方照「本次未跑」交回、不照它判。
+    pub histories_left_by_the_stop_request: u64,
 }
 
 impl CrashInjectionReport {
@@ -4215,6 +4693,20 @@ impl CrashInjectionReport {
             }
             (None, FailureImageRetention::KeepTheImageFiles)
             | (None, FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes) => {}
+        }
+        if self.histories_left_by_the_stop_request > 0 {
+            let _ = writeln!(
+                text,
+                "叫停了：{} 段历史没领（下面的计数与新发现只是领了的那几片的，这一批不作数）",
+                self.histories_left_by_the_stop_request
+            );
+        }
+        if self.tally.given_states_tables_left_to_other_hosts > 0 {
+            let _ = writeln!(
+                text,
+                "{GIVEN_STATES_TABLES_LEFT_TO_OTHER_HOSTS_NOTE}：{} 张给定状态表归别的机器判、交的是占位结论（下面的计数偏少、新发现可能漏，这一批不作数；导入那一台的库再跑一趟才作数）",
+                self.tally.given_states_tables_left_to_other_hosts
+            );
         }
         text.push_str(&self.tally.render());
         for (form_index, form) in KNOWN_RED_FORMS.iter().enumerate() {
@@ -4570,6 +5062,22 @@ pub struct CrashInjectionCampaign {
 /// `draw` 是靶向用例那一支 [`CrashPointDraw::ExactlyOneCrashState`]（只经 [`inject_crashes_into_history`] 摆，不进战役）。
 #[must_use]
 pub fn run_crash_injection_campaign(campaign: &CrashInjectionCampaign) -> CrashInjectionReport {
+    run_crash_injection_campaign_judging_the_given_states_with(
+        campaign,
+        &GivenStatesJudgedOnTheCpuInPlace,
+    )
+}
+
+/// [`run_crash_injection_campaign`]，第一截与第三截的给定状态表交 `given_states_judge` 判（崩溃点重放的引擎经它接进来，
+/// `crate::crash_amplification::GivenStatesEngine`；各工作线程共用这一个判器）。
+///
+/// # Panics
+/// 同 [`run_crash_injection_campaign`]；`given_states_judge` 判不了某一张表。
+#[must_use]
+pub fn run_crash_injection_campaign_judging_the_given_states_with(
+    campaign: &CrashInjectionCampaign,
+    given_states_judge: &dyn GivenStatesJudge,
+) -> CrashInjectionReport {
     let CrashInjectionCampaign {
         first_seed,
         seed_count,
@@ -4609,6 +5117,10 @@ pub fn run_crash_injection_campaign(campaign: &CrashInjectionCampaign) -> CrashI
             let next_slice_index = &next_slice_index;
             let image_directory = image_directory.as_path();
             scope.spawn(move || loop {
+                // 领一片之前问叫停（同流水线那一侧「每领一块之前先问」）：叫停了就不再领，领了的片照样判完交回
+                if given_states_judge.stop_is_requested() {
+                    break;
+                }
                 let slice_index = next_slice_index.fetch_add(1, Ordering::Relaxed);
                 let Some(slice) = slices.get(slice_index) else {
                     break;
@@ -4621,11 +5133,12 @@ pub fn run_crash_injection_campaign(campaign: &CrashInjectionCampaign) -> CrashI
                             operations_per_history,
                             &weights,
                         );
-                        inject_crashes_into_history(
+                        inject_crashes_into_history_judging_the_given_states_with(
                             &history,
                             execution,
                             draw,
                             Some(image_directory),
+                            given_states_judge,
                         )
                     })
                     .collect();
@@ -4661,11 +5174,16 @@ pub fn run_crash_injection_campaign(campaign: &CrashInjectionCampaign) -> CrashI
         }
         (in_order, next_slice_to_merge)
     });
+    // 领片的下标从 0 起一个接一个发，叫停只让后面的片没人领：领了的片都交回了，就是并进来的那几片
+    let slices_taken = next_slice_index.load(Ordering::Relaxed).min(slices.len());
     assert_eq!(
-        merged_slice_count,
-        slices.len(),
-        "每一片都按次序并进来了：少了说明有工作线程领了片却没交回"
+        merged_slice_count, slices_taken,
+        "领了的每一片都按次序并进来了：少了说明有工作线程领了片却没交回"
     );
+    let histories_left_by_the_stop_request: u64 = slices[slices_taken..]
+        .iter()
+        .map(|slice| slice.end - slice.start)
+        .sum();
     println!(
         "CRASH_INJECTION_FINISHED seeds=[{first_seed},{}) slices={} worker_threads={spawned_worker_threads} elapsed_seconds={:.1}",
         first_seed + seed_count,
@@ -4706,6 +5224,7 @@ pub fn run_crash_injection_campaign(campaign: &CrashInjectionCampaign) -> CrashI
         image_directory: image_directory_left_behind.then_some(image_directory),
         image_retention,
         assertions,
+        histories_left_by_the_stop_request,
     }
 }
 
@@ -7283,6 +7802,233 @@ mod tests {
                     .iter()
                     .any(|write| write.kind == StepKind::JournalRecord),
             "前提：覆盖写那次发布写了记录与根（这个崩溃态里都不落）"
+        );
+    }
+
+    /// 那段历史跑完之后的整条写表、切段、录制流下标与 mkfs 写完时的录制流下标（给定状态表照它们建，[`HistoryAfterTheMakeFilesystem::of`]）。
+    fn whole_write_table_of_the_history(
+        history: &GeneratedHistory,
+        execution: HistoryExecution,
+    ) -> (Vec<RetainedWrite>, Vec<Vec<usize>>, Vec<usize>, usize) {
+        let stream = SharedStream::retaining_contents();
+        let run = execute_history_with(history, execution, &stream, &mut |_observation| {});
+        assert_eq!(run.ending, HistoryEnding::Completed, "前提：这段历史跑完");
+        let (writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
+            &stream.retained_operations(),
+            &execution.device_width.fixed_geometry(),
+        );
+        (
+            writes,
+            segments,
+            stream_indexes,
+            run.operations_written_by_make_filesystem,
+        )
+    }
+
+    /// 盖掉创世树表单元两份副本的两个单元写（与 mkfs 写的那两份同盘、同偏移、同长，内容换成别的字节），交回时连同 mkfs 那份副本在写表里的下标。
+    /// 树表那一份是 mkfs 单元写里偏移最大的那一组（实例表在单元区起点、树表紧跟它，`make_filesystem` 的 `tree_table_genesis_placement_at`）。
+    fn writes_overwriting_the_genesis_tree_table(
+        history_after_the_make_filesystem: &HistoryAfterTheMakeFilesystem<'_>,
+    ) -> (Vec<RetainedWrite>, usize) {
+        let genesis_units: Vec<(usize, &RetainedWrite)> = history_after_the_make_filesystem
+            .writes_of_the_make_filesystem()
+            .iter()
+            .enumerate()
+            .filter(|(_, write)| write.kind == StepKind::UnitWrite)
+            .collect();
+        let tree_table_offset = genesis_units
+            .iter()
+            .map(|(_, write)| write.offset)
+            .max()
+            .expect("mkfs 写了实例表与树表两个单元");
+        let tree_table_copies: Vec<(usize, &RetainedWrite)> = genesis_units
+            .into_iter()
+            .filter(|(_, write)| write.offset == tree_table_offset)
+            .collect();
+        assert_eq!(
+            tree_table_copies.len(),
+            2,
+            "前提：创世树表单元两块盘各一份副本"
+        );
+        let overwrites = tree_table_copies
+            .iter()
+            .map(|(_, copy)| RetainedWrite {
+                device: copy.device,
+                kind: StepKind::UnitWrite,
+                is_force_unit_access: false,
+                offset: copy.offset,
+                contents: singlefs_harness::memory_pool::WrittenContents::Bytes(vec![
+                    0xA5;
+                    usize::try_from(copy.length_in_bytes())
+                        .expect("单元长装得进 usize")
+                ]),
+            })
+            .collect();
+        (overwrites, tree_table_copies[0].0)
+    }
+
+    /// 创世发布进记录核对器（用户 2026-10-10 弹窗定「先查 GPU 能不能核，不能就 CPU 核一遍」，查下来 GPU 核得到、走 GPU 的发布表）：
+    /// 那段历史跑完、每个写都落了，末尾再种两个盖掉创世树表单元两份副本的单元写（根环里还有创世那三条根，回收谓词证得出这次复用不合法），
+    /// CPU 判器的记录核对器判「恢复自称的状态缺了一次发布的单元」；不种那两个写时同一张表不红。
+    /// 判别力：给定状态表的写表把 mkfs 的写整截留在表外（基线照旧是 mkfs 之后），创世发布不进发布表，种了也不红（`crates/mutations.tsv` 那一行）。
+    // crash-case-check:not-a-crash-case 只判写死的两个给定状态（种与不种），不枚举崩溃状态
+    #[test]
+    fn a_genesis_unit_overwritten_by_a_reuse_the_reclaim_predicate_refuses_is_red_on_the_cpu_record_checker(
+    ) {
+        let (history, execution) = history_of_the_first_file_and_one_overwrite();
+        let (writes, segments, stream_indexes, after_make_filesystem) =
+            whole_write_table_of_the_history(&history, execution);
+        let history_after_the_make_filesystem = HistoryAfterTheMakeFilesystem::of(
+            &writes,
+            &segments,
+            &stream_indexes,
+            after_make_filesystem,
+            execution,
+        );
+        let (overwrites, genesis_copy) =
+            writes_overwriting_the_genesis_tree_table(&history_after_the_make_filesystem);
+        let healthy_writes = history_after_the_make_filesystem.writes();
+        let planted_writes: Vec<RetainedWrite> =
+            healthy_writes.iter().chain(&overwrites).cloned().collect();
+        assert!(
+            !crate::crash::reuse_is_not_proven_illegal_by_the_reclaim_predicate(
+                &planted_writes,
+                crate::crash::checkpoint_txg_of_the_publish_that_made_the_write(
+                    &planted_writes,
+                    genesis_copy
+                ),
+                planted_writes.len() - 1,
+            ),
+            "前提：创世那几条根还在根环里，回收谓词证得出盖掉创世树表单元不合法"
+        );
+        let record_check_with_every_write_persisted = |table_writes: &[RetainedWrite]| {
+            let mut segments_of_the_table = history_after_the_make_filesystem.segments().to_vec();
+            if table_writes.len() > healthy_writes.len() {
+                segments_of_the_table.push((healthy_writes.len()..table_writes.len()).collect());
+            }
+            let persisted = vec![true; table_writes.len()];
+            judge_a_given_state_on_the_cpu(
+                &GivenStatesOfATable {
+                    table_name: "first-file-and-one-overwrite/every-write-persisted".to_string(),
+                    base: history_after_the_make_filesystem.base(),
+                    writes: table_writes,
+                    segments: &segments_of_the_table,
+                    seams: &[],
+                    persisted_sets: vec![persisted.clone()],
+                },
+                &persisted,
+            )
+            .record_check()
+        };
+        assert_eq!(
+            record_check_with_every_write_persisted(healthy_writes),
+            RecordCheck::default(),
+            "不种：跑完的历史每个写都落了，记录核对器不红"
+        );
+        assert!(
+            record_check_with_every_write_persisted(&planted_writes).claimed_state_missing_unit,
+            "种了：创世树表单元两份副本都被不合法地盖掉，记录核对器判恢复自称的状态缺了创世发布的单元"
+        );
+    }
+
+    /// GPU 判器的发布表照 CPU 记录核对器同一个分法分（给定状态表）：创世那几次发布在表里、带 mkfs 的单元写；枚举写表接在录制流后面的撕裂根槽写
+    /// （mkfs 的根槽写叠在 mkfs 之后的基线上可撕，撕出来与原字节相同）不分出另一次发布。不要卡：只建表、不判。
+    /// 判别力：发布表照整张枚举写表分（`PublishesSplitFrom::TheEnumeratedWrites`），多出几次根在录制流之后的发布；写表把 mkfs 的写留在表外，
+    /// 创世发布不在表里（`crates/mutations.tsv` 两行）。
+    #[test]
+    fn the_gpu_publishes_of_a_given_states_table_are_split_as_the_cpu_record_checker_splits_them_genesis_included(
+    ) {
+        use crate::crash_judge_tables::{
+            build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams, JudgeFlow,
+        };
+        let (history, execution) = history_of_the_first_file_and_one_overwrite();
+        let (writes, segments, stream_indexes, after_make_filesystem) =
+            whole_write_table_of_the_history(&history, execution);
+        let history_after_the_make_filesystem = HistoryAfterTheMakeFilesystem::of(
+            &writes,
+            &segments,
+            &stream_indexes,
+            after_make_filesystem,
+            execution,
+        );
+        let table_writes = history_after_the_make_filesystem.writes();
+        let persisted = vec![true; table_writes.len()];
+        let not_expanded = |_segment_index: usize, _segment: &[usize]| {
+            crate::crash::Layer0SegmentExpansion::NotExpanded
+        };
+        let enumerated_write_count = crate::crash::layer0_enumeration_tables(
+            history_after_the_make_filesystem.base(),
+            table_writes,
+            history_after_the_make_filesystem.segments(),
+            &not_expanded,
+        )
+        .enumerated_writes
+        .len();
+        assert!(
+            enumerated_write_count > table_writes.len(),
+            "前提：枚举写表接了撕裂镜像（mkfs 的根槽写与系统配置槽写叠在基线上可撕）"
+        );
+        let mut mask = persisted.clone();
+        mask.resize(enumerated_write_count, false);
+        let tables = build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams(
+            &JudgeFlow {
+                base: history_after_the_make_filesystem.base(),
+                writes: table_writes,
+                segments: history_after_the_make_filesystem.segments(),
+                judged_root_index: 0,
+                versions: &[],
+                expansion: &not_expanded,
+            },
+            &[],
+            vec![mask],
+            &[],
+        )
+        .expect("建得出这张表");
+        let sorted = |mut units: Vec<usize>| {
+            units.sort_unstable();
+            units
+        };
+        let gpu_publishes: Vec<(usize, Vec<usize>)> = tables
+            .publishes
+            .iter()
+            .map(|publish| {
+                (
+                    usize::try_from(publish.root_write).expect("下标装得进 usize"),
+                    sorted(
+                        publish
+                            .unit_copy_groups
+                            .iter()
+                            .flatten()
+                            .map(|copy| usize::try_from(*copy).expect("下标装得进 usize"))
+                            .collect(),
+                    ),
+                )
+            })
+            .collect();
+        let cpu_publishes: Vec<(usize, Vec<usize>)> = singlefs_harness::memory_pool::publishes_in(
+            table_writes,
+            &persisted,
+            RecordStreamContinuity::OneRecording,
+        )
+        .into_iter()
+        .map(|publish| (publish.root, sorted(publish.units)))
+        .collect();
+        assert_eq!(
+            gpu_publishes, cpu_publishes,
+            "GPU 的发布表与 CPU 记录核对器分出的发布逐次相同（根槽写、单元写）"
+        );
+        let genesis_writes = history_after_the_make_filesystem
+            .writes_of_the_make_filesystem()
+            .len();
+        let genesis_unit_writes: Vec<usize> = (0..genesis_writes)
+            .filter(|write| table_writes[*write].kind == StepKind::UnitWrite)
+            .collect();
+        assert!(
+            !genesis_unit_writes.is_empty()
+                && gpu_publishes
+                    .iter()
+                    .any(|(root, units)| *root < genesis_writes && *units == genesis_unit_writes),
+            "创世那次发布在 GPU 的发布表里、带 mkfs 的单元写 {genesis_unit_writes:?}：{gpu_publishes:?}"
         );
     }
 

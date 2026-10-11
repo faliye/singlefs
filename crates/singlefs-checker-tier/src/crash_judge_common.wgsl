@@ -139,27 +139,30 @@ const MAGIC_SFSU: u32 = 0x55534653u;
 const MAGIC_SFSJ: u32 = 0x4A534653u;
 
 // 草稿区（每个状态一片，单位 u32）
-const MAX_RECORDS: u32 = 512u;
+// journal 记录表：环里自证过的记录按 (实例, 计数器) 去重收进来，恢复内核（scan_journal）与走读内核（逐盘、I-4.1 重放读的那一份 C_REPLAY_RECORDS）
+// 都按它收、满了记判不了（原因 2）。环不绕回、不回收时条数随发布累计：墓碑容器那条流被判那两次发布落了之后 1636 条，
+// 分配记录 2048 / 2050 条那两条流 864 / 865 条，所以从 512 抬到 2048
+const MAX_RECORDS: u32 = 2048u;
 const RECORD_WORDS: u32 = 6u;
-const R_RECORDS: u32 = 0u;                                   // 3072
+const R_RECORDS: u32 = 0u;                                   // 12288
 const MAX_ROOTS: u32 = 48u;
-const R_ROOTS: u32 = 3072u;                                  // 96：版本、区域
+const R_ROOTS: u32 = 12288u;                                 // 96：版本、区域
 const MAX_MAPPING_ENTRIES: u32 = 1024u;
-const R_MAPPING: u32 = 3168u;                                // 3072：字节基、条目偏移、条目宽
+const R_MAPPING: u32 = 12384u;                               // 3072：字节基、条目偏移、条目宽
 const MAX_ACCOUNTING_ENTRIES: u32 = 512u;
-const R_ACCOUNTING: u32 = 6240u;                             // 1536
-const MAX_ALLOCATION_RECORDS: u32 = 1024u;
+const R_ACCOUNTING: u32 = 15456u;                            // 1536
+const MAX_ALLOCATION_RECORDS: u32 = 2048u;
 const ALLOCATION_RECORD_WORDS: u32 = 6u;
-const R_ALLOCATION: u32 = 7776u;                             // 6144
+const R_ALLOCATION: u32 = 16992u;                            // 12288
 const MAX_SEEN: u32 = 512u;
-const R_SEEN: u32 = 13920u;                                  // 1024
+const R_SEEN: u32 = 29280u;                                  // 1024
 const MAX_DATA_POINTERS: u32 = 256u;
-const R_DATA: u32 = 14944u;                                  // 512：字节基、偏移
+const R_DATA: u32 = 30304u;                                  // 512：字节基、偏移
 const MAX_UPPER_ENTRIES: u32 = 256u;
-const R_UPPER: u32 = 15456u;                                 // 512：字节基、偏移
+const R_UPPER: u32 = 30816u;                                 // 512：字节基、偏移
 const MAX_ROWS: u32 = 512u;
-const R_ROWS: u32 = 15968u;                                  // 1536：实例、txg lo、txg hi
-const SCRATCH_WORDS_REQUIRED: u32 = 17504u;
+const R_ROWS: u32 = 31328u;                                  // 1536：实例、txg lo、txg hi
+const SCRATCH_WORDS_REQUIRED: u32 = 32864u;
 
 const MAX_DEVICES: u32 = 8u;
 const MAX_FRAMES: u32 = 12u;
@@ -1206,19 +1209,33 @@ fn record_version_at(index: u32) -> u32 {
 fn record_key_less(instance_a: u32, counter_a: vec2<u32>, instance_b: u32, counter_b: vec2<u32>) -> bool {
     return instance_a < instance_b || (instance_a == instance_b && lt64(counter_a, counter_b));
 }
-// 按 (实例代号, 计数器) 排序插入；已有同键的不换（BTreeMap::or_insert：先读到的留下）
+// 记录表按 (实例代号, 计数器) 严格升序（只经 insert_record 写）：第一个键不小于 (instance, counter) 的位置，都小交回 record_count。
+// 二分：每一轮 [low, high) 之前的键都小于它、从 high 起的都不小于它，至多 ⌈log2(MAX_RECORDS + 1)⌉ = 12 轮
+fn record_position_not_below(instance: u32, counter: vec2<u32>) -> u32 {
+    var low = 0u;
+    var high = record_count;
+    while (low < high) {
+        let middle = (low + high) / 2u;
+        let middle_instance = sw(R_RECORDS + middle * RECORD_WORDS + 1u);
+        let middle_counter = vec2<u32>(sw(R_RECORDS + middle * RECORD_WORDS + 2u), sw(R_RECORDS + middle * RECORD_WORDS + 3u));
+        if (record_key_less(middle_instance, middle_counter, instance, counter)) {
+            low = middle + 1u;
+        } else {
+            high = middle;
+        }
+    }
+    return low;
+}
+// 第 position 条的键是不是 (instance, counter)：position 可以是 record_count（表尾之后，不是）
+fn record_key_at_is(position: u32, instance: u32, counter: vec2<u32>) -> bool {
+    return position < record_count && sw(R_RECORDS + position * RECORD_WORDS + 1u) == instance
+        && sw(R_RECORDS + position * RECORD_WORDS + 2u) == counter.x && sw(R_RECORDS + position * RECORD_WORDS + 3u) == counter.y;
+}
+// 按 (实例代号, 计数器) 排序插入；已有同键的不换（BTreeMap::or_insert：先读到的留下）。插入点用二分找（环按偏移收、计数器升序到达时就是表尾，不挪）
 fn insert_record(version: u32, r: Rec) {
-    var position = 0u;
-    while (position < record_count) {
-        let instance = sw(R_RECORDS + position * RECORD_WORDS + 1u);
-        let counter = vec2<u32>(sw(R_RECORDS + position * RECORD_WORDS + 2u), sw(R_RECORDS + position * RECORD_WORDS + 3u));
-        if (instance == r.instance && eq64(counter, r.counter)) {
-            return;
-        }
-        if (record_key_less(r.instance, r.counter, instance, counter)) {
-            break;
-        }
-        position = position + 1u;
+    let position = record_position_not_below(r.instance, r.counter);
+    if (record_key_at_is(position, r.instance, r.counter)) {
+        return;
     }
     if (record_count >= MAX_RECORDS) {
         undecidable = UNDECIDABLE_TOO_MANY_RECORDS;
@@ -1260,12 +1277,9 @@ fn scan_journal(cfg: SysConfig) {
     }
 }
 fn find_record(instance: u32, counter: vec2<u32>) -> u32 {
-    for (var i = 0u; i < record_count; i = i + 1u) {
-        if (sw(R_RECORDS + i * RECORD_WORDS + 1u) == instance
-            && sw(R_RECORDS + i * RECORD_WORDS + 2u) == counter.x
-            && sw(R_RECORDS + i * RECORD_WORDS + 3u) == counter.y) {
-            return i;
-        }
+    let position = record_position_not_below(instance, counter);
+    if (record_key_at_is(position, instance, counter)) {
+        return position;
     }
     return NONE;
 }

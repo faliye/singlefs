@@ -1,4 +1,4 @@
-//! checker 档模块：无（自己逐个造崩溃状态，只用 harness 档的随机历史、内存池、可写挂载与挂载透明判官）
+//! checker 档模块：layer0_progress、crash_injection、crash_amplification、gpu_unit_checks
 //! C696（崩溃注入的读故障一支在随机历史里从没触发）判别力自证里「第三截调用点写死成 NoneInjected」那一种接错，在随机历史上是等价变异
 //! （第 26 批 C696 设计调查报告第三节）：写死之后只在三样都成立的态上改判定——第一次崩溃那一态注入过读故障、
 //! 它上面那次可写挂载途中的二次崩溃镜像上再挂以判据 N-配置 拒、那个二次崩溃镜像上判据 W（`judge_writable_mount_refusal_of_a_crash_state`
@@ -9,7 +9,16 @@
 //! 那条靶向用例钉（W 为真的阳性对照）。
 //! 推翻「等价」的观测：这里任一个态上 W 为真。量的范围：一组比重、一档盘宽（单元区 384 槽）、种子基起前 4 段那一步发过写的历史、
 //! 段内只摆前缀、第三截只摆挂载写的前缀；更宽的范围没量。
+//! 同一批崩溃态与二次崩溃镜像另判池级 checker、两遍恢复、记录核对器（用户 2026-10-10 定「读故障那一项也接给定状态表，加判镜像那几样」）：
+//! 交给定状态表（`crash_injection::GivenStatesOfATable`，基线是 mkfs 之后的池；第三截一张表在历史与挂载之间断开），编进 `verdict-store`
+//! 特性时经崩溃点重放的引擎（照本机多机配置走 GPU 或 CPU、配了 GPU 时 CPU 同一批也判逐状态比），没编进来时在 CPU 上就地判；一个都不许红。
+//! W 照旧在 CPU 上判（豁免表 `witness-criterion-w` 那一行）。
 
+#[cfg(not(feature = "verdict-store"))]
+use singlefs_checker_tier::crash_injection::GivenStatesJudgedOnTheCpuInPlace;
+use singlefs_checker_tier::crash_injection::{
+    GivenStatesJudge, GivenStatesOfATable, HistoryAfterTheMakeFilesystem,
+};
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
@@ -17,13 +26,15 @@ use singlefs_core::mount::{
     mount_writable_with_space_admission, MountError, NewerPublishWitness, RollbackTarget,
     SelectedVersionAgainstTheWitness, StillUnreadableAfterOneReread, WitnessedCounterComparison,
 };
+use singlefs_core::recovery::{recover, JournalPolicy};
 use singlefs_harness::history::{
     execute_history_with, generate_history_with_weights, GenerationWeights, HistoryDeviceWidth,
     HistoryExecution, HistoryOperationKind, HistorySeed, PerStepChecker, StepPosition,
     SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
 };
 use singlefs_harness::memory_pool::{
-    writes_and_segments_with_stream_indexes, MemoryPool, RetainedWrite, SparseBlockDevice,
+    writes_and_segments_with_stream_indexes, MemoryPool, RecordStreamSeam, RetainedWrite,
+    SparseBlockDevice,
 };
 use singlefs_harness::mount_transparency::{
     judge_writable_mount_refusal_of_a_crash_state, read_recovery_fields, ComparedVersion,
@@ -32,11 +43,28 @@ use singlefs_harness::mount_transparency::{
 };
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
+#[cfg(feature = "verdict-store")]
+use singlefs_checker_tier::crash_amplification::{
+    FaultPutOnTheGpuSide, GivenStatesEngine, GivenStatesItem, GivenStatesRun,
+};
+#[cfg(feature = "verdict-store")]
+use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+
 const WIDTH: HistoryDeviceWidth = HistoryDeviceWidth::UnitAreaOf384Slots;
 const DEVICES: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
 const HISTORIES: usize = 4;
 const SEEDS_SEARCHED: u64 = 64;
 const OPERATIONS_PER_HISTORY: usize = 24;
+/// 小规模那几条（轻型里跑的，取自上面那一批的头一段历史）：只取一段。
+#[cfg(feature = "verdict-store")]
+const HISTORIES_OF_THE_SMALL_BATCH: usize = 1;
+
+/// 这份测试文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
+#[cfg(feature = "verdict-store")]
+const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/crash_injection_read_faulted_states_never_hold_the_witness_criterion.rs";
+/// 崩溃点重放合表里这一项的名字（`.claude/gate.d/crash-point-replay-items.tsv`）。
+#[cfg(feature = "verdict-store")]
+const CRASH_POINT_REPLAY_ITEM: &str = "read-faulted-states-never-hold-the-witness-criterion";
 
 /// 判据 N-配置 为真、重读仍为真的一拒（判官自己在镜像上复算判据，不看这里填的读数）。
 fn witness_refusal_claimed_on(selected_version: (InstanceGeneration, CheckpointTxg)) -> MountError {
@@ -86,8 +114,8 @@ fn witness_criterion_holds_without_read_faults(image: &MemoryPool) -> bool {
     }
 }
 
-/// 崩溃镜像上起一次可写挂载（与崩溃注入第二截同一种做法），交回挂载写表（做成与否都交，被拒时是空的）。
-fn writes_of_a_writable_mount_on(image: &MemoryPool) -> Vec<RetainedWrite> {
+/// 崩溃镜像上起一次可写挂载（与崩溃注入第二截同一种做法），交回挂载写表与它的切段（做成与否都交，被拒时是空的）。
+fn writes_of_a_writable_mount_on(image: &MemoryPool) -> (Vec<RetainedWrite>, Vec<Vec<usize>>) {
     let parameters = WIDTH.parameters();
     let stream = SharedStream::retaining_contents();
     let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> = image
@@ -110,32 +138,67 @@ fn writes_of_a_writable_mount_on(image: &MemoryPool) -> Vec<RetainedWrite> {
         &mut devices,
         SpaceAdmission::JudgedByTheFormula,
     );
-    let (writes, _segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
+    let (writes, segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
         &stream.retained_operations(),
         &WIDTH.fixed_geometry(),
     );
-    writes
+    (writes, segments)
 }
 
-/// 场景：那一组比重、种子基起前 4 段「每块盘最新那一槽系统配置读回全 0 的可写挂载」发过写的历史，每段 24 步。崩溃态取那一步发的第一个写
+/// 一批读故障态判完的几个数：取了几段历史、摆了几个崩溃态与几个二次崩溃镜像、W 为真的态、给定状态表那几样判红的态。
+struct ReadFaultedStatesOfTheBatch {
+    histories_taken: usize,
+    read_faulted_crash_states: u64,
+    second_crash_images: u64,
+    images_holding_the_witness_criterion: Vec<String>,
+    images_red_on_the_given_states: Vec<String>,
+}
+
+/// 一张给定状态表交 `judge` 判，判红的态（池级 checker、记录核对器两条里有一样红）按 `describe` 逐个记下。
+fn judge_and_note_the_red_states(
+    judge: &dyn GivenStatesJudge,
+    table: &GivenStatesOfATable<'_>,
+    describe: &dyn Fn(usize) -> String,
+    red_states: &mut Vec<String>,
+) {
+    let judged = judge
+        .judge_the_given_states(table)
+        .unwrap_or_else(|reason| panic!("给定状态表 {} 判不了：{reason}", table.table_name));
+    assert_eq!(
+        judged.states.len(),
+        table.persisted_sets.len(),
+        "判器逐状态交回结论"
+    );
+    for (ordinal, state) in judged.states.iter().enumerate() {
+        let items = state.red_items();
+        if !items.is_empty() {
+            red_states.push(format!("{}：{items:?}", describe(ordinal)));
+        }
+    }
+}
+
+/// 场景：那一组比重、种子基起「每块盘最新那一槽系统配置读回全 0 的可写挂载」发过写的前 `histories` 段历史，每段 24 步。崩溃态取那一步发的第一个写
 /// 之后结束的每一段的每个前缀（崩溃窗口末尾在那一步之后，崩溃注入认成注入过读故障的那一类）；每段最长那个前缀上再起一次可写挂载，
-/// 挂载写的每个前缀是一个第三截的二次崩溃镜像。
-/// 预期：这些镜像上 W 一个都不为真（写死 NoneInjected 与正确接线在这批态上判出一样的东西）；崩溃态与二次崩溃镜像各至少一个（不是空判）。
-#[test]
-#[ignore = "checker 档：自己逐个摆崩溃态复算判据，release 下跑"]
-fn read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_criterion() {
+/// 挂载写的每个前缀是一个第三截的二次崩溃镜像。每个镜像判 W；崩溃态一段历史一张给定状态表、二次崩溃一个最长前缀一张表，交 `judge` 判。
+fn judge_the_read_faulted_states(
+    judge: &dyn GivenStatesJudge,
+    histories: usize,
+) -> ReadFaultedStatesOfTheBatch {
     let execution = HistoryExecution {
         per_step_checker: PerStepChecker::Skipped,
         device_width: WIDTH,
         space_admission: SpaceAdmission::JudgedByTheFormula,
     };
-    let mut histories_taken = 0usize;
-    let mut read_faulted_crash_states = 0u64;
-    let mut second_crash_images = 0u64;
-    let mut images_holding_the_witness_criterion: Vec<String> = Vec::new();
-    // 迭代上界是 SEEDS_SEARCHED 个种子；跨轮携带三样计数与 W 为真的态的描述；取够 HISTORIES 段就停。
+    let mut batch = ReadFaultedStatesOfTheBatch {
+        histories_taken: 0,
+        read_faulted_crash_states: 0,
+        second_crash_images: 0,
+        images_holding_the_witness_criterion: Vec::new(),
+        images_red_on_the_given_states: Vec::new(),
+    };
+    // 迭代上界是 SEEDS_SEARCHED 个种子；跨轮携带几样计数与判红的态的描述；取够 `histories` 段就停，判器叫停了也停（手里那一段判完）。
     for seed_offset in 0..SEEDS_SEARCHED {
-        if histories_taken == HISTORIES {
+        if batch.histories_taken == histories || judge.stop_is_requested() {
             break;
         }
         let seed = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + seed_offset;
@@ -146,9 +209,13 @@ fn read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_cri
         );
         let stream = SharedStream::retaining_contents();
         let mut operations_after_each_step: Vec<(StepPosition, usize)> = Vec::new();
-        execute_history_with(&history, execution, &stream, &mut |observation| {
+        let run = execute_history_with(&history, execution, &stream, &mut |observation| {
             operations_after_each_step.push((observation.position, stream.operation_count()));
         });
+        assert!(
+            run.first_stream_index_after_each_power_loss.is_empty(),
+            "这一组比重里没有掉电那一步：给定状态表不带掉电接缝"
+        );
         let mut operations_before_the_step = 0usize;
         let mut first_stream_index_of_the_step = None;
         for (position, operations_after_the_step) in &operations_after_each_step {
@@ -171,6 +238,20 @@ fn read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_cri
             &stream.retained_operations(),
             &WIDTH.fixed_geometry(),
         );
+        // 给定状态表的基线是 mkfs 之后的池，写表从 mkfs 第一个不是清零的写起、mkfs 的数据写每个状态里都落了（用户 2026-10-10 定，
+        // 创世那几次发布照样进记录核对器；与崩溃注入第一截、第三截同一个构造）
+        let history_after_the_make_filesystem = HistoryAfterTheMakeFilesystem::of(
+            &writes,
+            &segments,
+            &stream_indexes,
+            run.operations_written_by_make_filesystem,
+            execution,
+        );
+        let base_after_the_make_filesystem = history_after_the_make_filesystem.base();
+        let writes_after_the_make_filesystem = history_after_the_make_filesystem.writes();
+        let segments_after_the_make_filesystem = history_after_the_make_filesystem.segments();
+        let mut first_crash_persisted_sets: Vec<Vec<bool>> = Vec::new();
+        let mut first_crash_descriptions: Vec<String> = Vec::new();
         let mut base = MemoryPool::with_devices(&DEVICES, WIDTH.device_bytes());
         let mut writes_applied_to_the_base = 0usize;
         for segment in &segments {
@@ -184,43 +265,345 @@ fn read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_cri
             if last_stream_index < first_stream_index_of_the_step {
                 continue;
             }
+            let first_write_after_the_make_filesystem =
+                history_after_the_make_filesystem.index_in_the_table(first_write);
             let mut longest_prefix = base.clone();
             for persisted_writes in 0..segment.len() {
                 let mut image = base.clone();
                 image.apply_writes(&writes[first_write..first_write + persisted_writes]);
-                read_faulted_crash_states += 1;
+                batch.read_faulted_crash_states += 1;
                 if witness_criterion_holds_without_read_faults(&image) {
-                    images_holding_the_witness_criterion.push(format!(
+                    batch.images_holding_the_witness_criterion.push(format!(
                         "种子 {seed} 第一次崩溃：段首写 {first_write}、落了 {persisted_writes} 个"
                     ));
                 }
+                let mut persisted = vec![false; writes_after_the_make_filesystem.len()];
+                persisted[..first_write_after_the_make_filesystem + persisted_writes].fill(true);
+                first_crash_persisted_sets.push(persisted);
+                first_crash_descriptions.push(format!(
+                    "种子 {seed} 第一次崩溃：段首写 {first_write}、落了 {persisted_writes} 个"
+                ));
                 longest_prefix = image;
             }
-            let mount_writes = writes_of_a_writable_mount_on(&longest_prefix);
+            let (mount_writes, mount_segments) = writes_of_a_writable_mount_on(&longest_prefix);
             for persisted_mount_writes in 0..mount_writes.len() {
                 let mut second_crash_image = longest_prefix.clone();
                 second_crash_image.apply_writes(&mount_writes[..persisted_mount_writes]);
-                second_crash_images += 1;
+                batch.second_crash_images += 1;
                 if witness_criterion_holds_without_read_faults(&second_crash_image) {
-                    images_holding_the_witness_criterion.push(format!(
+                    batch.images_holding_the_witness_criterion.push(format!(
                         "种子 {seed} 第三截：段首写 {first_write}、挂载写落了 {persisted_mount_writes} 个"
                     ));
                 }
             }
+            // 第三截：mkfs 之后的历史接挂载写，在历史与挂载之间断开；历史那一截照最长那个前缀落、挂载写取每个前缀
+            let longest_prefix_writes = first_write_after_the_make_filesystem + segment.len() - 1;
+            let history_write_count = writes_after_the_make_filesystem.len();
+            let second_crash_writes: Vec<RetainedWrite> = writes_after_the_make_filesystem
+                .iter()
+                .chain(&mount_writes)
+                .cloned()
+                .collect();
+            let second_crash_segments: Vec<Vec<usize>> = segments_after_the_make_filesystem
+                .iter()
+                .cloned()
+                .chain(mount_segments.iter().map(|mount_segment| {
+                    mount_segment
+                        .iter()
+                        .map(|write| write + history_write_count)
+                        .collect()
+                }))
+                .collect();
+            let seams = [RecordStreamSeam::AfterACrash {
+                first_write_after_the_crash: history_write_count,
+                version_landed_on_after_the_crash: recover(&longest_prefix, JournalPolicy::Consult)
+                    .effective_root,
+            }];
+            let second_crash_persisted_sets: Vec<Vec<bool>> = (0..mount_writes.len())
+                .map(|persisted_mount_writes| {
+                    let mut persisted = vec![false; second_crash_writes.len()];
+                    persisted[..longest_prefix_writes].fill(true);
+                    persisted[history_write_count..history_write_count + persisted_mount_writes]
+                        .fill(true);
+                    persisted
+                })
+                .collect();
+            judge_and_note_the_red_states(
+                judge,
+                &GivenStatesOfATable {
+                    table_name: format!(
+                        "seed={seed}/second-crash/segment-first-write={first_write}"
+                    ),
+                    base: base_after_the_make_filesystem,
+                    writes: &second_crash_writes,
+                    segments: &second_crash_segments,
+                    seams: &seams,
+                    persisted_sets: second_crash_persisted_sets,
+                },
+                &|ordinal| {
+                    format!("种子 {seed} 第三截：段首写 {first_write}、挂载写落了 {ordinal} 个")
+                },
+                &mut batch.images_red_on_the_given_states,
+            );
         }
-        histories_taken += 1;
+        judge_and_note_the_red_states(
+            judge,
+            &GivenStatesOfATable {
+                table_name: format!("seed={seed}/first-crash"),
+                base: base_after_the_make_filesystem,
+                writes: writes_after_the_make_filesystem,
+                segments: segments_after_the_make_filesystem,
+                seams: &[],
+                persisted_sets: first_crash_persisted_sets,
+            },
+            &|ordinal| first_crash_descriptions[ordinal].clone(),
+            &mut batch.images_red_on_the_given_states,
+        );
+        batch.histories_taken += 1;
     }
+    batch
+}
+
+/// 种子与规模（进给定状态表的块键，第三轮正文 H8）。
+#[cfg(feature = "verdict-store")]
+fn seeds_and_scale_of(histories: usize) -> String {
+    format!(
+        "seed_base={SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE} seeds_searched={SEEDS_SEARCHED} histories={histories} operations_per_history={OPERATIONS_PER_HISTORY} weights=NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS width={WIDTH:?}"
+    )
+}
+
+#[cfg(feature = "verdict-store")]
+fn repository_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../Cargo.lock")
+        .canonicalize()
+        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
+        .parent()
+        .expect("Cargo.lock 所在的目录就是仓根")
+        .to_path_buf()
+}
+
+/// 前 `histories` 段经崩溃点重放的引擎判给定状态表（`fault` 只给证明对照会红的那条用例）。
+#[cfg(feature = "verdict-store")]
+fn read_faulted_states_through_the_given_states_engine(
+    histories: usize,
+    fault: FaultPutOnTheGpuSide,
+) -> (ReadFaultedStatesOfTheBatch, GivenStatesRun) {
+    let engine = GivenStatesEngine::start_from_environment_putting_a_fault_on_the_gpu_side(
+        GivenStatesItem {
+            item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
+            setting_file: THIS_FILE.to_string(),
+            seeds_and_scale: seeds_and_scale_of(histories),
+        },
+        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
+        &repository_root(),
+        fault,
+    )
+    .expect("崩溃点重放的引擎照本机配置起得来（配了 GPU 卡用不上、结论版本与编译时对不上都在这里红，不退回 CPU）");
+    let batch = judge_the_read_faulted_states(&engine, histories);
+    (batch, engine.finish())
+}
+
+/// 前 `histories` 段：编进 `verdict-store` 特性时经崩溃点重放的引擎（对照比不上、GPU 判不了都在这里红），没编进来时在 CPU 上就地判。
+/// 引擎那一趟被叫停、或两台分片而别的机器的表还没导回来时这一批不作数：打「本次未跑」那一行（`test_name` 是用例名）、交 `None`。
+fn read_faulted_states_through_the_crash_point_replay_entry(
+    histories: usize,
+    test_name: &str,
+) -> Option<ReadFaultedStatesOfTheBatch> {
+    #[cfg(feature = "verdict-store")]
+    {
+        use singlefs_harness::gpu_memory_ledger::gpu_not_run_line;
+        let (batch, run) = read_faulted_states_through_the_given_states_engine(
+            histories,
+            FaultPutOnTheGpuSide::NoFault,
+        );
+        assert_eq!(
+            run.red_items(),
+            Vec::<String>::new(),
+            "给定状态表那一路判红（对照比不上、GPU 判不了）"
+        );
+        if run.stopped_early {
+            println!(
+                "{}",
+                gpu_not_run_line(
+                    test_name,
+                    &format!(
+                        "叫停了（SINGLEFS_CRASH_AMPLIFICATION_STOP_FILE 指的文件在）：取了 {} 段就停，判过的表在库里",
+                        batch.histories_taken
+                    )
+                )
+            );
+            return None;
+        }
+        if run.left_tables_to_the_other_hosts() {
+            println!(
+                "{}",
+                gpu_not_run_line(
+                    test_name,
+                    &format!(
+                        "两台分片：这一份是 {}/{}，{} 张表归别的机器判、还没导回来（导入那一台的库之后再跑一趟才作数）",
+                        run.share.index, run.share.count, run.tally.tables_left_to_the_other_hosts
+                    )
+                )
+            );
+            return None;
+        }
+        Some(batch)
+    }
+    #[cfg(not(feature = "verdict-store"))]
+    {
+        let _ = test_name;
+        Some(judge_the_read_faulted_states(
+            &GivenStatesJudgedOnTheCpuInPlace,
+            histories,
+        ))
+    }
+}
+
+/// 一批的预期：取够了段、两类态各至少一个（不是空判）、W 一个都不为真、给定状态表那几样一个都不红。
+fn assert_the_read_faulted_states_hold_neither_the_witness_criterion_nor_a_red_image(
+    batch: &ReadFaultedStatesOfTheBatch,
+    histories: usize,
+) {
     assert_eq!(
-        histories_taken, HISTORIES,
-        "前提：种子基起 {SEEDS_SEARCHED} 段里有 {HISTORIES} 段那一步发过写"
+        batch.histories_taken, histories,
+        "前提：种子基起 {SEEDS_SEARCHED} 段里有 {histories} 段那一步发过写"
     );
     assert!(
-        read_faulted_crash_states >= 1 && second_crash_images >= 1,
-        "前提：摆到了注入过读故障的崩溃态 {read_faulted_crash_states} 个、第三截二次崩溃镜像 {second_crash_images} 个"
+        batch.read_faulted_crash_states >= 1 && batch.second_crash_images >= 1,
+        "前提：摆到了注入过读故障的崩溃态 {} 个、第三截二次崩溃镜像 {} 个",
+        batch.read_faulted_crash_states,
+        batch.second_crash_images
     );
     assert_eq!(
-        images_holding_the_witness_criterion,
+        batch.images_holding_the_witness_criterion,
         Vec::<String>::new(),
-        "注入过读故障的崩溃态 {read_faulted_crash_states} 个、二次崩溃镜像 {second_crash_images} 个上 W 都不为真（写死 NoneInjected 是等价变异）"
+        "注入过读故障的崩溃态 {} 个、二次崩溃镜像 {} 个上 W 都不为真（写死 NoneInjected 是等价变异）",
+        batch.read_faulted_crash_states,
+        batch.second_crash_images
+    );
+    assert_eq!(
+        batch.images_red_on_the_given_states,
+        Vec::<String>::new(),
+        "这批崩溃态与二次崩溃镜像上池级 checker、记录核对器一个都不红"
+    );
+}
+
+/// 场景：那一组比重、种子基起前 4 段那一步发过写的历史（摆法见 [`judge_the_read_faulted_states`]）。
+/// 预期：这些镜像上 W 一个都不为真（写死 NoneInjected 与正确接线在这批态上判出一样的东西）；崩溃态与二次崩溃镜像各至少一个（不是空判）；
+/// 池级 checker、两遍恢复、记录核对器交给定状态表判，一个都不红。
+#[test]
+#[ignore = "checker 档：自己逐个摆崩溃态复算判据，release 下跑"]
+fn read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_criterion() {
+    let Some(batch) = read_faulted_states_through_the_crash_point_replay_entry(
+        HISTORIES,
+        "read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_criterion",
+    ) else {
+        return;
+    };
+    assert_the_read_faulted_states_hold_neither_the_witness_criterion_nor_a_red_image(
+        &batch, HISTORIES,
+    );
+}
+
+/// 轻型那一步（取自上面那条重型用例：同一批种子的头一段历史）：经崩溃点重放的引擎判，照本机配置走 GPU 或 CPU，W 不为真、给定状态表那几样不红。
+// crash-case-check:not-a-crash-case 一段历史的小规模那一步，全量是同文件 read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_criterion
+#[cfg(feature = "verdict-store")]
+#[test]
+fn the_first_read_faulted_history_judged_through_the_crash_point_replay_entry_holds_no_red_image() {
+    let Some(batch) = read_faulted_states_through_the_crash_point_replay_entry(
+        HISTORIES_OF_THE_SMALL_BATCH,
+        "the_first_read_faulted_history_judged_through_the_crash_point_replay_entry_holds_no_red_image",
+    ) else {
+        return;
+    };
+    assert_the_read_faulted_states_hold_neither_the_witness_criterion_nor_a_red_image(
+        &batch,
+        HISTORIES_OF_THE_SMALL_BATCH,
+    );
+}
+
+/// 开 GPU 的头一段历史：这一趟自己写一份开 GPU 的多机配置、在环境守卫里跑，库是临时的；`fault` 塞在 GPU 那一侧。
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+fn the_first_read_faulted_history_judged_on_the_gpu(
+    tag: &str,
+    fault: FaultPutOnTheGpuSide,
+) -> (ReadFaultedStatesOfTheBatch, GivenStatesRun) {
+    use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
+    let directory = std::env::temp_dir().join(format!(
+        "singlefs-read-faulted-given-states-on-the-gpu-{tag}-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&directory);
+    std::fs::create_dir_all(&directory).expect("建得了临时目录");
+    let configuration = directory.join("multi-host-with-gpu.env");
+    // 清场之下要清场之后那一份显卡先后：照抄调用方给这个进程的那一份（用例自己写上；不读此刻的环境）
+    let cards = singlefs_checker_tier::crash_amplification::card_priority_lines_of_the_caller(
+        &repository_root(),
+    )
+    .expect("本机的多机配置读得了");
+    std::fs::write(&configuration, format!("ENABLE_GPU=1\n{cards}")).expect("写得了开 GPU 的配置");
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&[(
+        "SINGLEFS_MULTI_HOST_CONFIG",
+        configuration.as_os_str(),
+    )]);
+    let judged =
+        read_faulted_states_through_the_given_states_engine(HISTORIES_OF_THE_SMALL_BATCH, fault);
+    drop(environment);
+    let _ = std::fs::remove_dir_all(&directory);
+    judged
+}
+
+/// 验收第 1 条（崩溃点重放合并第三轮判决 J6）：配了 GPU 时这一项的崩溃态与二次崩溃镜像由 GPU 判器判、CPU 判器同一批也判，逐状态比对拍字，
+/// 一个都不差；比过的状态是两类态之和。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
+// crash-case-check:not-a-crash-case 一段历史的小规模对拍，只核 GPU 与 CPU 逐状态对得上；全量是同文件 read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_criterion
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+#[test]
+fn the_first_read_faulted_history_judged_on_the_gpu_agrees_with_the_cpu_judge_state_by_state() {
+    use singlefs_checker_tier::crash_amplification::{CrossCheckOfTheGivenStates, JudgedBy};
+    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+    if gpu_card_pool_or_report_not_run(
+        "the_first_read_faulted_history_judged_on_the_gpu_agrees_with_the_cpu_judge_state_by_state",
+    )
+    .is_none()
+    {
+        return;
+    }
+    let (batch, run) =
+        the_first_read_faulted_history_judged_on_the_gpu("agrees", FaultPutOnTheGpuSide::NoFault);
+    assert_eq!(run.judged_by, JudgedBy::GpuJudge, "配了 GPU：GPU 判器判");
+    assert_eq!(run.cross_check, CrossCheckOfTheGivenStates::Compared);
+    assert_eq!(
+        run.tally.cross_check_states_compared,
+        batch.read_faulted_crash_states + batch.second_crash_images,
+        "两类态都比过"
+    );
+    assert_eq!(
+        run.red_items(),
+        Vec::<String>::new(),
+        "cross_check_disagreements=0、GPU 都判得了"
+    );
+}
+
+/// 验收第 1 条的另一半：往 GPU 那一侧塞一个已知故障，对照要比得出来、判红。
+// crash-case-check:not-a-crash-case 一段历史的小规模对拍，只核塞在 GPU 那一侧的故障被对照抓到；全量是同文件 read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_criterion
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+#[test]
+fn a_fault_put_on_the_gpu_side_of_the_first_read_faulted_history_turns_the_cross_check_red() {
+    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+    if gpu_card_pool_or_report_not_run(
+        "a_fault_put_on_the_gpu_side_of_the_first_read_faulted_history_turns_the_cross_check_red",
+    )
+    .is_none()
+    {
+        return;
+    }
+    let (_batch, run) = the_first_read_faulted_history_judged_on_the_gpu(
+        "fault",
+        FaultPutOnTheGpuSide::FirstInvariantViolatedBitFlippedOnTheFirstStateOfEachTable,
+    );
+    assert!(
+        !run.tally.cross_check_disagreements.is_empty(),
+        "GPU 那一侧塞了故障，对照一条都没比出来"
     );
 }

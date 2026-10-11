@@ -25,8 +25,8 @@ use singlefs_format::{
 };
 use singlefs_harness::memory_pool::{
     publishes_in, root_identity_of_write, MemoryPool, PublishedVersion,
-    PublishedVersionWithoutAFile, RecordStreamContinuity, RetainedWrite, WrittenContents,
-    SECTOR_BYTES,
+    PublishedVersionWithoutAFile, RecordStreamContinuity, RecordStreamSeam, RetainedWrite,
+    WrittenContents, SECTOR_BYTES,
 };
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
@@ -253,6 +253,13 @@ pub enum JudgeTablesRefusal {
         length: usize,
         enumerated_writes: usize,
     },
+    /// 给定状态表的第 `seam_index` 道接缝比前一道早、或越过录制流（[`build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams`]）。
+    SeamsNotInOrderWithinTheRecordedWrites { seam_index: usize },
+    /// 第 `seam_index` 道是掉电接缝，清单里第 `position` 个掩码在它之前那一截没全落（被判的状态要落在掉电之后）。
+    GivenPersistedSetNotWhollyPersistedBeforeAPowerLossSeam { position: usize, seam_index: usize },
+    /// 崩溃接缝之前那一截里写表下标 `root_write` 的根槽写，清单里第 `position` 个掩码与第 0 个落没落不一样：
+    /// 一张表的发布表只能按一种剔法分，这几个状态要分到不同的表里。
+    GivenPersistedSetsDisagreeOnARootWriteBeforeACrashSeam { root_write: usize, position: usize },
 }
 
 fn slot_bytes() -> u64 {
@@ -294,12 +301,25 @@ pub fn build_judge_tables_against_the_version_table(
         flow,
         versions_without_a_file,
         JudgeStateSource::SegmentExpansions,
+        &[],
+        PublishesSplitFrom::TheEnumeratedWrites,
     )
+}
+
+/// GPU 的发布表从哪一张写表分（[`judge_publishes`]）：与同一批状态上 CPU 记录核对器拿到的那一张相同。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PublishesSplitFrom {
+    /// 枚举写表（录制流接撕裂镜像与重放）：层 0 的 CPU 记录核对器（`crash::check_records`）拿的就是它。
+    TheEnumeratedWrites,
+    /// 只取录制流：随机历史的 CPU 记录核对器（`crash_injection::judge_a_given_state_on_the_cpu`）拿的写表不带撕裂镜像与重放。
+    /// 枚举写表接在后面的撕裂根槽写分不出另一次发布：mkfs 的根槽写叠在 mkfs 之后的基线上（创世发布进记录核对器，用户 2026-10-10 定），
+    /// 撕出来与原字节相同，接成一次发布就把录制流末尾没等到根槽写的单元写与记录写归给它。
+    TheRecordedWritesOnly,
 }
 
 /// 给定状态表（[`JudgeStateSource::GivenPersistedSets`]）：GPU 判 `given_persisted_sets` 里的每一个持久掩码（按枚举写表给，第 k 个是序号 k 的状态），
 /// 不按段展开拆序号。落点的版本只取这几个掩码叠得出来的那几种；枚举写表照 `flow` 的段建（撕裂镜像与重放接在哪由段定）。
-/// 期望版本表同 [`build_judge_tables_against_the_version_table`]。
+/// 期望版本表同 [`build_judge_tables_against_the_version_table`]。发布表与层 0 一样从枚举写表分（掩码可以点名撕裂态，对的是层 0 的 CPU 判器）。
 ///
 /// # Errors
 /// [`JudgeTablesRefusal`] 的各成员；掩码与枚举写表不一样长是 [`JudgeTablesRefusal::GivenPersistedSetOfAnotherLength`]。
@@ -315,13 +335,50 @@ pub fn build_judge_tables_for_the_given_persisted_sets(
         flow,
         versions_without_a_file,
         JudgeStateSource::GivenPersistedSets(given_persisted_sets),
+        &[],
+        PublishesSplitFrom::TheEnumeratedWrites,
     )
 }
 
+/// 同 [`build_judge_tables_for_the_given_persisted_sets`]，录制流在 `seams` 那几道接缝处断开（随机历史的第一截在掉电之后、第三截在
+/// 历史与挂载之间；用户 2026-10-10 定「第三截也上 GPU，GPU 的发布表认接缝」）：发布表照记录核对器同一个分法
+/// （`singlefs_harness::memory_pool::publishes_in` 的 `RecordStreamContinuity::BrokenAtSeams`）分，内核照旧只读发布表，所以接缝怎么断
+/// 在建表这一刻定死。崩溃那道接缝之前那一截剔哪几次发布要看那几次的根槽写落没落，这一张表里的每个持久掩码在那几个根槽写上都要一样
+/// （随机历史一张表就是一个第一次崩溃状态上的二次崩溃，历史那一截都是同一个掩码）；掉电那道接缝之前那一截要在每个掩码里全落了。
+/// `seams` 是空的就是一条录制流。发布表只从录制流分（随机历史的 CPU 记录核对器拿的写表不带撕裂镜像与重放，[`PublishesSplitFrom`]），
+/// 这一点与 [`build_judge_tables_for_the_given_persisted_sets`] 不同。
+///
+/// # Errors
+/// 同 [`build_judge_tables_for_the_given_persisted_sets`]；接缝不按录制流下标从小到大或越过录制流
+/// （[`JudgeTablesRefusal::SeamsNotInOrderWithinTheRecordedWrites`]）；掉电接缝之前有一个掩码没全落
+/// （[`JudgeTablesRefusal::GivenPersistedSetNotWhollyPersistedBeforeAPowerLossSeam`]）；崩溃接缝之前某个根槽写在两个掩码里一个落一个没落
+/// （[`JudgeTablesRefusal::GivenPersistedSetsDisagreeOnARootWriteBeforeACrashSeam`]）。
+///
+/// # Panics
+/// 同 [`build_judge_tables_against_the_version_table`]。
+pub fn build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams(
+    flow: &JudgeFlow<'_>,
+    versions_without_a_file: &[PublishedVersionWithoutAFile],
+    given_persisted_sets: Vec<Vec<bool>>,
+    seams: &[RecordStreamSeam],
+) -> Result<JudgeTables, JudgeTablesRefusal> {
+    build_judge_tables_from_the_state_source(
+        flow,
+        versions_without_a_file,
+        JudgeStateSource::GivenPersistedSets(given_persisted_sets),
+        seams,
+        PublishesSplitFrom::TheRecordedWritesOnly,
+    )
+}
+
+/// `seams_of_the_given_sets` 只在给定状态表上可以不空（[`build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams`]）；
+/// 按段展开那一路恒给空表（层 0 的流是一条录制流）。`publishes_split_from` 说发布表从哪一张写表分（[`PublishesSplitFrom`]）。
 fn build_judge_tables_from_the_state_source(
     flow: &JudgeFlow<'_>,
     versions_without_a_file: &[PublishedVersionWithoutAFile],
     state_source: JudgeStateSource,
+    seams_of_the_given_sets: &[RecordStreamSeam],
+    publishes_split_from: PublishesSplitFrom,
 ) -> Result<JudgeTables, JudgeTablesRefusal> {
     let _version_table_without_contradictions =
         Layer0VersionTable::new(flow.versions, versions_without_a_file);
@@ -440,7 +497,16 @@ fn build_judge_tables_from_the_state_source(
         &locations,
         &location_index_by_start,
     )?;
-    let publishes = judge_publishes(enumerated);
+    let writes_the_publishes_are_split_from: &[RetainedWrite] = match publishes_split_from {
+        PublishesSplitFrom::TheEnumeratedWrites => enumerated,
+        PublishesSplitFrom::TheRecordedWritesOnly => &enumerated[..flow.writes.len()],
+    };
+    let publishes = judge_publishes(
+        writes_the_publishes_are_split_from,
+        flow.writes.len(),
+        &state_source,
+        seams_of_the_given_sets,
+    )?;
     let expected_versions = flow
         .versions
         .iter()
@@ -1196,10 +1262,116 @@ fn later_overlapping_writes_of(
     laters
 }
 
-/// 发布表：与记录核对器同一个分法（`publishes_in`，一条录制流；持久集合不进分法）。
-fn judge_publishes(enumerated: &[RetainedWrite]) -> Vec<JudgePublish> {
-    let persisted = vec![false; enumerated.len()];
-    publishes_in(enumerated, &persisted, RecordStreamContinuity::OneRecording)
+/// 发布表：与记录核对器同一个分法（`publishes_in`）。按段展开、或给定状态表不带接缝时是一条录制流（持久集合不进分法）；
+/// 给定状态表带接缝时在接缝处断开，崩溃接缝之前那一截剔哪几次发布按这张表的持久掩码定（每个掩码在那几个根槽写上都一样，这里核），
+/// 掉电接缝之前那一截要在每个掩码里全落了（这里核，不交 `publishes_in` 去 panic）。接缝的下标是录制流的下标（`recorded_write_count`
+/// 之前）。`enumerated` 是发布表从哪一张写表分（调用方照 [`PublishesSplitFrom`] 给）：给整张枚举写表时，接在录制流之后的撕裂镜像与重放归最后一截。
+fn judge_publishes(
+    enumerated: &[RetainedWrite],
+    recorded_write_count: usize,
+    state_source: &JudgeStateSource,
+    seams_of_the_given_sets: &[RecordStreamSeam],
+) -> Result<Vec<JudgePublish>, JudgeTablesRefusal> {
+    let representative_persisted: Option<&Vec<bool>> = match state_source {
+        JudgeStateSource::SegmentExpansions => {
+            assert!(
+                seams_of_the_given_sets.is_empty(),
+                "按段展开那一路恒给空的接缝表（build_judge_tables_from_the_state_source 的两个调用点）"
+            );
+            None
+        }
+        JudgeStateSource::GivenPersistedSets(given_persisted_sets) => {
+            if seams_of_the_given_sets.is_empty() {
+                None
+            } else {
+                given_persisted_sets_agree_across_the_seams(
+                    enumerated,
+                    recorded_write_count,
+                    given_persisted_sets,
+                    seams_of_the_given_sets,
+                )?;
+                given_persisted_sets.first()
+            }
+        }
+    };
+    let publishes = match representative_persisted {
+        Some(persisted) => publishes_in(
+            enumerated,
+            persisted,
+            RecordStreamContinuity::BrokenAtSeams(seams_of_the_given_sets),
+        ),
+        None => publishes_in(
+            enumerated,
+            &vec![false; enumerated.len()],
+            RecordStreamContinuity::OneRecording,
+        ),
+    };
+    Ok(judge_publishes_of(enumerated, publishes))
+}
+
+/// 给定状态表的接缝核三样（[`judge_publishes`]）：接缝按录制流下标从小到大、不越过录制流；每道掉电接缝之前那一截在每个掩码里全落了；
+/// 每道崩溃接缝之前那一截（从上一道接缝起）里的每个根槽写在每个掩码里落没落都一样。
+fn given_persisted_sets_agree_across_the_seams(
+    enumerated: &[RetainedWrite],
+    recorded_write_count: usize,
+    given_persisted_sets: &[Vec<bool>],
+    seams: &[RecordStreamSeam],
+) -> Result<(), JudgeTablesRefusal> {
+    let mut first_write_of_the_recording = 0usize;
+    for (seam_index, seam) in seams.iter().enumerate() {
+        let first_write_after_the_seam = seam.first_write_after_the_seam();
+        if first_write_after_the_seam < first_write_of_the_recording
+            || first_write_after_the_seam > recorded_write_count
+        {
+            return Err(JudgeTablesRefusal::SeamsNotInOrderWithinTheRecordedWrites { seam_index });
+        }
+        match seam {
+            RecordStreamSeam::AfterAPowerLoss { .. } => {
+                if let Some(position) = given_persisted_sets.iter().position(|persisted| {
+                    !persisted[..first_write_after_the_seam]
+                        .iter()
+                        .all(|is_persisted| *is_persisted)
+                }) {
+                    return Err(
+                        JudgeTablesRefusal::GivenPersistedSetNotWhollyPersistedBeforeAPowerLossSeam {
+                            position,
+                            seam_index,
+                        },
+                    );
+                }
+            }
+            RecordStreamSeam::AfterACrash { .. } => {
+                for root_write in (first_write_of_the_recording..first_write_after_the_seam)
+                    .filter(|write_index| enumerated[*write_index].kind == StepKind::RootRecordFua)
+                {
+                    let Some(first) = given_persisted_sets.first() else {
+                        break;
+                    };
+                    if let Some(position) = given_persisted_sets
+                        .iter()
+                        .position(|persisted| persisted[root_write] != first[root_write])
+                    {
+                        return Err(
+                            JudgeTablesRefusal::GivenPersistedSetsDisagreeOnARootWriteBeforeACrashSeam {
+                                root_write,
+                                position,
+                            },
+                        );
+                    }
+                }
+            }
+        }
+        first_write_of_the_recording = first_write_after_the_seam;
+    }
+    Ok(())
+}
+
+/// `publishes_in` 分出的每次发布换成判器的发布表（单元写按偏移分组）。
+fn judge_publishes_of(
+    enumerated: &[RetainedWrite],
+    publishes: Vec<singlefs_harness::memory_pool::PublishWrites>,
+) -> Vec<JudgePublish> {
+    publishes
         .into_iter()
         .map(|publish| {
             let mut copies_by_offset: BTreeMap<u64, Vec<u32>> = BTreeMap::new();
@@ -1848,17 +2020,22 @@ pub fn bytes_to_words(bytes: &[u8]) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_judge_tables, crc_shifted_past_sixteen_zero_kibibytes, JudgeFlow, JudgeLocationKind,
-        JudgeStateSource, JudgeTables, JudgeTablesRefusal, JudgeTablesWords, SEGMENT_WORDS,
+        build_judge_tables, crc_shifted_past_sixteen_zero_kibibytes, judge_publishes, JudgeFlow,
+        JudgeLocationKind, JudgePublish, JudgeStateSource, JudgeTables, JudgeTablesRefusal,
+        JudgeTablesWords, SEGMENT_WORDS,
     };
     use crate::crash::Layer0SegmentExpansion;
     use crate::crash_facts::{
         SegmentExpansionFact, SegmentFact,
         SEGMENT_EXPANSION_CODE_IN_PLACE_SUBSETS_WITH_COPY_ON_WRITE_NONE_OR_ALL,
     };
-    use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
+    use singlefs_core::address::{
+        CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+    };
     use singlefs_core::checksum::crc32_castagnoli;
-    use singlefs_harness::memory_pool::{MemoryPool, RetainedWrite, WrittenContents};
+    use singlefs_harness::memory_pool::{
+        MemoryPool, RecordStreamSeam, RetainedWrite, WrittenContents,
+    };
     use singlefs_harness::segments::StepKind;
 
     /// 只有掩码计划那几样的判表（没有落点、写、发布）：words() 摊段表与给定状态表那两张看得出布局。
@@ -1998,6 +2175,118 @@ mod tests {
             refusal,
             JudgeTablesRefusal::EnumeratedWritesPastTheMaskWidth {
                 enumerated_writes: 2049
+            }
+        );
+    }
+
+    /// 一次合成的写：盘 0、`offset` 起 4096 字节；根槽写的字节里实例代号在偏移 24、checkpoint_txg 在偏移 28（`root_identity_of_write` 的读法）。
+    fn synthetic_write(
+        kind: StepKind,
+        offset: u64,
+        root_identity: Option<(u32, u64)>,
+    ) -> RetainedWrite {
+        let mut bytes = vec![0u8; 4096];
+        if let Some((instance, checkpoint_txg)) = root_identity {
+            bytes[24..28].copy_from_slice(&instance.to_le_bytes());
+            bytes[28..36].copy_from_slice(&checkpoint_txg.to_le_bytes());
+        }
+        RetainedWrite {
+            device: DeviceIdentity(0),
+            kind,
+            is_force_unit_access: kind == StepKind::RootRecordFua,
+            offset: DeviceOffsetInBytes(offset),
+            contents: WrittenContents::Bytes(bytes),
+        }
+    }
+
+    /// 历史两次发布（实例 1 的 txg 1、2）、挂载一次发布（实例 2 的 txg 2）：写表下标 0..6 是历史、6..8 是挂载。
+    fn history_of_two_publishes_then_a_mount_of_one() -> Vec<RetainedWrite> {
+        vec![
+            synthetic_write(StepKind::UnitWrite, 1 << 24, None),
+            synthetic_write(StepKind::JournalRecord, 1 << 22, None),
+            synthetic_write(StepKind::RootRecordFua, 1 << 20, Some((1, 1))),
+            synthetic_write(StepKind::UnitWrite, (1 << 24) + (1 << 15), None),
+            synthetic_write(StepKind::JournalRecord, (1 << 22) + 4096, None),
+            synthetic_write(StepKind::RootRecordFua, (1 << 20) + 4096, Some((1, 2))),
+            synthetic_write(StepKind::UnitWrite, (1 << 24) + (2 << 15), None),
+            synthetic_write(StepKind::RootRecordFua, (1 << 20) + 8192, Some((2, 2))),
+        ]
+    }
+
+    /// 给定状态表的发布表认崩溃接缝（用户 2026-10-10 定第三截照候选丁）：第一次崩溃截在历史第二次发布的根之前、恢复落到 txg 1，
+    /// 接缝放在历史与挂载之间时，历史那一截只留落了根的那一次，挂载那次发布只带挂载写的单元；接缝放错一个位置（放在历史两次发布之间），
+    /// 历史第二次发布照样进表、挂载的单元也分错——两份发布表不同，GPU 的记录核对器读的就是这一张，判得出接缝放错了。
+    #[test]
+    fn the_publishes_of_given_persisted_sets_follow_where_the_crash_seam_is_put() {
+        let writes = history_of_two_publishes_then_a_mount_of_one();
+        let persisted = vec![true, true, true, true, true, false, false, false];
+        let state_source = JudgeStateSource::GivenPersistedSets(vec![persisted]);
+        let seam_at = |first_write_after_the_crash: usize| RecordStreamSeam::AfterACrash {
+            first_write_after_the_crash,
+            version_landed_on_after_the_crash: Some((InstanceGeneration(1), CheckpointTxg(1))),
+        };
+        let at_the_seam = judge_publishes(&writes, writes.len(), &state_source, &[seam_at(6)])
+            .expect("历史那一截的根槽写只有一个掩码，核得过");
+        let roots_and_units = |publishes: &[JudgePublish]| -> Vec<(u32, u32, u64, Vec<Vec<u32>>)> {
+            publishes
+                .iter()
+                .map(|publish| {
+                    (
+                        publish.root_write,
+                        publish.instance,
+                        publish.checkpoint_txg,
+                        publish.unit_copy_groups.clone(),
+                    )
+                })
+                .collect()
+        };
+        assert_eq!(
+            roots_and_units(&at_the_seam),
+            vec![(2, 1, 1, vec![vec![0]]), (7, 2, 2, vec![vec![6]])],
+            "接缝在历史与挂载之间：历史第二次发布没落根、恢复也没落到它，剔掉；挂载那次只带挂载写的单元"
+        );
+        let one_place_early = judge_publishes(&writes, writes.len(), &state_source, &[seam_at(3)])
+            .expect("接缝之前那一截只有一个根槽写，核得过");
+        assert_ne!(
+            roots_and_units(&one_place_early),
+            roots_and_units(&at_the_seam),
+            "接缝放错位置，发布表不同"
+        );
+        assert_eq!(
+            roots_and_units(
+                &judge_publishes(&writes, writes.len(), &state_source, &[])
+                    .expect("不带接缝是一条录制流")
+            ),
+            vec![
+                (2, 1, 1, vec![vec![0]]),
+                (5, 1, 2, vec![vec![3]]),
+                (7, 2, 2, vec![vec![6]])
+            ],
+            "不带接缝时三次发布全在表里（今天的一条录制流）"
+        );
+    }
+
+    /// 崩溃接缝之前某个根槽写在两个掩码里一落一不落：一张表只能按一种剔法分发布，建表拒、点名那个根槽写与掩码，不 panic。
+    #[test]
+    fn given_persisted_sets_that_disagree_on_a_root_write_before_the_crash_seam_are_refused() {
+        let writes = history_of_two_publishes_then_a_mount_of_one();
+        let landed_on_the_first = vec![true, true, true, true, true, false, false, false];
+        let landed_on_the_second = vec![true, true, true, true, true, true, true, false];
+        let refusal = judge_publishes(
+            &writes,
+            writes.len(),
+            &JudgeStateSource::GivenPersistedSets(vec![landed_on_the_first, landed_on_the_second]),
+            &[RecordStreamSeam::AfterACrash {
+                first_write_after_the_crash: 6,
+                version_landed_on_after_the_crash: Some((InstanceGeneration(1), CheckpointTxg(1))),
+            }],
+        )
+        .expect_err("第 5 个写（历史第二次发布的根）在两个掩码里一落一不落");
+        assert_eq!(
+            refusal,
+            JudgeTablesRefusal::GivenPersistedSetsDisagreeOnARootWriteBeforeACrashSeam {
+                root_write: 5,
+                position: 1
             }
         );
     }

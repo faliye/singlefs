@@ -189,3 +189,60 @@ fn rolling_back_a_failed_acquisition_overwrites_the_older_slot_only_behind_a_bar
         "mkfs 之后没有一段里同一块盘写两次系统配置槽"
     );
 }
+
+/// 回卷之后再取号：盘 1 的取号写报错、盘 0 的取号写回卷成旧代号（同上一条），撤掉故障后同一个写入口再取一次号。
+/// 回卷写后面没有屏障，再取号的第一个取号写覆写的是盘 0 上回卷写之外的那一槽；两者之间要有取号自己那道屏障。
+/// 上一次发布末尾轮换之后有 C577 那道屏障，「重开取号」那一格里取号自己那道屏障是多余的；这一格里它是唯一隔开两写的那一道。
+#[test]
+fn acquisition_after_a_rolled_back_acquisition_overwrites_the_older_slot_only_behind_a_barrier() {
+    let mut pool = build_pool("a1-barrier-acquisition-after-rollback");
+    let plan = SharedFaultPlan::unarmed(geometry());
+    let mut devices: Vec<(DeviceIdentity, FaultInjectingBlockDevice<Recorded>)> = pool
+        .devices
+        .take()
+        .expect("新池新建文件写完，盘还开着")
+        .into_iter()
+        .map(|(identity, inner)| {
+            (
+                identity,
+                FaultInjectingBlockDevice::new(identity, inner, plan.clone()),
+            )
+        })
+        .collect();
+    plan.arm(FaultSchedule {
+        fault: InjectedFault::WriteFails,
+        device: FaultDeviceSelector::OnlyDevice(DeviceIdentity(1)),
+        placement: FaultPlacement::OffsetBelow(
+            singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
+                * u64::from(parameters().geometry.fixed_structure_slot_spacing),
+        ),
+        counting: FaultCounting::AcrossThePool,
+        occurrence: FaultOccurrence::EVERY_MATCHING_CALL,
+    });
+    let publish_parameters = parameters();
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    let failure = match acquire_instance(&mut writer).expect_err("盘 1 的取号写报错，取号必须失败") {
+        InstanceAcquisitionFailed::Acquisition(acquisition) => acquisition,
+        InstanceAcquisitionFailed::SystemConfigurationWitnessUndecidableWhenReadingTheWitness {
+            first_device_reporting_a_read_error,
+        } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该判不出：{first_device_reporting_a_read_error:?}"),
+        InstanceAcquisitionFailed::DeviceWithoutAnySelfVerifiedSystemConfigurationSlotWhenReadingTheWitness {
+            device,
+        } => panic!("这条用例里每块盘两槽都读得出自证过的系统配置，取号不该拒在见证值那一核：{device:?}"),
+    };
+    assert!(
+        matches!(failure.rollback, AcquisitionRollback::RolledBack),
+        "盘 0 那份已写出，回卷做成：{failure:?}"
+    );
+    plan.disarm();
+    acquire_instance(&mut writer).expect("故障撤掉之后，同一个写入口再取号做成");
+    drop(writer);
+    assert_eq!(
+        second_system_configuration_writes_in_one_segment(
+            &pool.stream.operations(),
+            pool.mkfs_operation_count
+        ),
+        Vec::new(),
+        "mkfs 之后没有一段里同一块盘写两次系统配置槽"
+    );
+}

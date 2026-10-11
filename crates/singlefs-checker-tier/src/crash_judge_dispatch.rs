@@ -4,7 +4,7 @@
 //! 不换判法版本、不用把判过的状态重判一遍（用户 2026-09-29 定「派活和判法拆出来最好」）。
 //! 这一份修了会改结论的毛病时，抬 `crate::crash_judge_gpu::GPU_JUDGE_REVISION`。
 //!
-//! 一张卡上同时在算的就是一次派活里的状态。草稿区一条缓冲受这张卡的存储绑定上限管（wgpu 压到 2 GiB − 4，装 2170 个状态）；
+//! 一张卡上同时在算的就是一次派活里的状态。草稿区一条缓冲受这张卡的存储绑定上限管（wgpu 压到 2 GiB − 4，装几个状态照 `SCRATCH_WORDS` 算，`states_per_scratch_lane`）；
 //! 一次派活要带更多状态，就每条缓冲各派一次活、同一个内核的几次派活排在同一趟里（它们碰的草稿与结论缓冲互不相同），卡一起算。
 //! 5090 上量到的（固定脚本到回退、展开 16，131 195 态）：一次 256 / 2170 / 4340 / 8680 / 13020 个状态，
 //! 每秒 9 405 / 75 360 / 139 970 / 241 726 / 310 100 态，每次派活 27 / 28 / 30 / 34 / 38 毫秒。
@@ -30,7 +30,9 @@ pub const MEBIBYTES_LEFT_FOR_THE_DRIVER: u64 = 2560;
 /// （内核日志 Xid 109；固定脚本到 E 那条流一次派约三万个状态时撞过，程序从此等不到结果）。一次派活带几个状态按它调。
 pub const LONGEST_DISPATCH_SECONDS: f64 = 0.5;
 /// 等卡算完最多等多久（秒）：到点还没算完就报错，不干等（通道被驱动掐掉之后结果永远不回来）。
-pub const LONGEST_WAIT_FOR_THE_CARD_SECONDS: u64 = 120;
+/// 几条 GPU 对拍同卡并行时一次派活要排在别的用例后面：删除线第 59 批三条同卡并行时一条等过了 120 秒（单跑那条整条 254 秒跑完），
+/// 用户 2026-10-10 定从 120 抬到 300。
+pub const LONGEST_WAIT_FOR_THE_CARD_SECONDS: u64 = 300;
 /// 一次派活带的状态数最少几个（算得太久减半时的下限）。
 const NARROWEST_DISPATCH: usize = 256;
 /// 量宽度时，这一档每个状态的用时比前面最好那一档多出这么多倍就不再加宽。
@@ -1101,15 +1103,15 @@ mod tests {
     #[test]
     fn states_in_one_dispatch_follow_the_scratch_memory_up_to_the_lane_limit() {
         let bytes_per_state = u64::try_from(SCRATCH_WORDS * 4).expect("装得进 u64");
-        // 每个状态 320 688 × 4 = 1 282 752 字节：2 147 483 644 ÷ 1 282 752 = 1674 个（向下取整）
-        assert_eq!(states_per_scratch_lane(BINDING_LIMIT), 1674);
+        // 每个状态 419 768 × 4 = 1 679 072 字节：2 147 483 644 ÷ 1 679 072 = 1278 个（向下取整）
+        assert_eq!(states_per_scratch_lane(BINDING_LIMIT), 1278);
         assert_eq!(states_per_scratch_lane(1), 1, "再小的上限也带一个");
-        // 12 GiB 的草稿区：12 × 1024 × 1024 × 1024 ÷ 1 282 752 = 10 044 个（向下取整）
+        // 12 GiB 的草稿区：12 × 1024 × 1024 × 1024 ÷ 1 679 072 = 7673 个（向下取整）
         assert_eq!(
             states_per_dispatch(BINDING_LIMIT, 12 * 1024),
             usize::try_from(12 * 1024 * 1024 * 1024 / bytes_per_state).expect("装得进 usize")
         );
-        assert_eq!(states_per_dispatch(BINDING_LIMIT, 12 * 1024), 10_044);
+        assert_eq!(states_per_dispatch(BINDING_LIMIT, 12 * 1024), 7673);
         assert_eq!(
             states_per_dispatch(BINDING_LIMIT, 0),
             1,
@@ -1117,15 +1119,15 @@ mod tests {
         );
         assert_eq!(
             states_per_dispatch(BINDING_LIMIT, 1024 * 1024),
-            1674 * MAXIMUM_SCRATCH_LANES,
+            1278 * MAXIMUM_SCRATCH_LANES,
             "显存再多也只到条数上限"
         );
     }
 
     /// 卡池按 [`super::mebibytes_a_judge_needs`] 借给用例的卡（额度是借的量加驱动那一份）上，判器开的草稿区不少于借的时候算进去的状态数：
     /// 小流（45、489 个状态）照状态数、大流（131 195 个）照要的宽度（一条缓冲那么窄、三条缓冲加窄的那一档那么宽）。
-    /// 表取 1 MiB：每个状态草稿区 320 688 × 4 加两份结论字 2 × 14 × 4，共 1 282 864 字节，
-    /// 45 个状态要 1 + ⌈45 × 1 282 864 ÷ 1 048 576⌉ = 1 + ⌈57 728 880 ÷ 1 048 576⌉ = 1 + 56 = 57 MiB。
+    /// 表取 1 MiB：每个状态草稿区 419 768 × 4 加两份结论字 2 × 20 × 4，共 1 679 232 字节，
+    /// 45 个状态要 1 + ⌈45 × 1 679 232 ÷ 1 048 576⌉ = 1 + ⌈75 565 440 ÷ 1 048 576⌉ = 1 + 73 = 74 MiB。
     #[test]
     fn a_card_lent_what_a_judge_needs_opens_scratch_for_every_state_it_was_lent_for() {
         use super::{mebibytes_a_judge_needs, states_in_flight_within, PackedJudgeTables};
@@ -1133,12 +1135,12 @@ mod tests {
             words: vec![0; 1024 * 1024 / 4],
             state_count,
         };
-        assert_eq!(mebibytes_a_judge_needs(&tables_of(45), usize::MAX), 57);
+        assert_eq!(mebibytes_a_judge_needs(&tables_of(45), usize::MAX), 74);
         for (state_count, requested) in [
             (45, usize::MAX),
             (489, usize::MAX),
-            (131_195, 1674),
-            (131_195, 3 * 1674),
+            (131_195, 1278),
+            (131_195, 3 * 1278),
             (131_195, 256),
         ] {
             let tables = tables_of(state_count);
@@ -1494,23 +1496,33 @@ mod tests {
     /// 恢复 332 666 → 334 042、扫描 388 815 → 395 434、走读 346 278 → 352 481（实现 G 副本上用同一个数法 `kernel_inlined_size` 量的草稿工具：
     /// 它照库里的拼法从盘上现读五份 WGSL，拼出的与库编进去的那一份逐字相同时量出的数与它相同，三份都经 naga 解析、校验得过；箭头左边是改之前的钉值）；
     /// 删除线第 57 批 H1 扫描内核旋钮那一支加判「最右那片之外每片记录数 == 旋钮值」扫描 395 434 → 395 566（第 57 批实现员副本上用草稿工具直接调库里的
-    /// `kernel_inlined_size` 与三个 `*_kernel_source` 量的：在改之前那一份上量回 334 042 / 395 434 / 352 481，与旧钉值逐个相等）：
+    /// `kernel_inlined_size` 与三个 `*_kernel_source` 量的：在改之前那一份上量回 334 042 / 395 434 / 352 481，与旧钉值逐个相等）；
+    /// 崩溃点重放合并实现 E11 把随条数平方长的几处换成二分与「排一次序、按序走一遍」（恢复与走读内核的 journal 记录表插入、按键找改二分，
+    /// 走读内核逐盘 journal 的组判按组键堆排序、I-5.1 堆排序后比相邻，扫描内核 I-5.4 堆排序后比相邻、I-3.10 去重改散列桶）
+    /// 恢复 334 042 → 334 332、扫描 395 566 → 396 569、走读 352 481 → 345 075（E11 副本上用草稿工具直接调库里的 `kernel_inlined_size`、
+    /// 从盘上现读五份 WGSL 照库里的拼法拼出来量的：在改之前那一份上拼出的与库编进去的逐字相同、量回 334 042 / 395 566 / 352 481；三份都经 naga 解析、校验得过）；
+    /// 崩溃点重放合并实现 E13 把容量那几条流上还随条数平方长的几处换成散列与「排一次序、按序走一遍」（走读内核主走读的引用集合、位置项校验和、
+    /// I-3.5 落点表、走过的单元加桶表，记一条指针的八步与引用集合、校验和两张表各收成一个调用点，I-3.5 摊单元排序后留段尾；扫描内核 I-1.8 按归并键排序后按段走，
+    /// I-3.9 已释放记录加桶表）扫描 396 569 → 392 371、走读 345 075 → 340 071，恢复不变（E13 副本上用同一个草稿工具量的：在改之前那一份上量回
+    /// 334 332 / 396 569 / 345 075，改之后三份都经 naga 解析、校验得过）；崩溃点重放合并实现 E14 把扫描内核 I-9.20 不重号那一句的墓碑两两比换成
+    /// 「在谱系上的墓碑记键、排一次序、比相邻两行」（排序借库里那一份 order_rows_by_their_first_four_words，多一个调用点）扫描 392 371 → 392 197，
+    /// 恢复与走读不变（E14 副本上用 E13 那一份草稿工具量的：在改之前那一份上量回 334 332 / 392 371 / 340 071，改之后三份都经 naga 解析、校验得过）：
     /// 改了哪个内核的源码，这里先红，量过新数、确认余量还够之后再改钉值，免得余量悄悄耗光、等上卡时才撞预算。
     #[test]
     fn each_kernel_keeps_its_pinned_inlined_size_and_margin_under_the_budget() {
         for (name, source, pinned_expressions, pinned_margin) in [
-            ("recovery", recovery_kernel_source(), 334_042, 65_958),
+            ("recovery", recovery_kernel_source(), 334_332, 65_668),
             (
                 "checker-scan",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
-                395_566,
-                4_434,
+                392_197,
+                7_803,
             ),
             (
                 "checker-walk",
                 crate::crash_judge_gpu::checker_walk_kernel_source(),
-                352_481,
-                47_519,
+                340_071,
+                59_929,
             ),
         ] {
             let size = super::kernel_inlined_size(&source);

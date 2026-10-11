@@ -189,7 +189,7 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         states > 0 && states <= STATES_AT_MOST,
         "推的那一串的崩溃状态数 {states} 在 10⁶ 以内"
     );
-    // 线程数与层 0 同一个来源（环境变量 `SINGLEFS_LAYER0_THREADS`，`research/scripts/capped.sh` 设它），挂载那一遍也按它分片。
+    // 线程数与层 0 同一个来源（环境变量 `SINGLEFS_LAYER0_THREADS`，`scripts/hosts/capped.sh` 设它），挂载那一遍也按它分片。
     let parallelism = Layer0Parallelism::from_environment();
     // 观察者交来的 `image.writes` 是枚举用的写表（`CrashImage` 的文档：录制流里的写在前，原地覆写的撕裂镜像与重放接在后面），
     // `image.persisted` 与它逐条对应、比录制流长。整趟枚举只有这一张表：头一次收下，之后每个状态核它一样长。

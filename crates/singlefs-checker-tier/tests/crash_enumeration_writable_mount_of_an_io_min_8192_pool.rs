@@ -1,4 +1,4 @@
-//! checker 档模块：crash
+//! checker 档模块：crash、crash_judge_tables
 //! io_min 8192（固定结构槽距 8192）的池上第一次可写挂载在层 0 的证据：mkfs(io_min 8192) → 可写挂载（取号 1、写行发布 txg 1、暖机 txg 2），
 //! 把 mkfs 之后的整条录制流按 D13（验证路线） 已定项 4 取崩溃状态，跑恢复 + 多版本 oracle、池级 checker、记录核对器。
 //!
@@ -166,6 +166,31 @@ fn assert_recovery_checker_and_record_checker_clean(tally: &Layer0Tally) {
             tally.checker_first_violation.get(invariant)
         );
     }
+}
+
+/// 判表建得出（崩溃点重放合并第三轮判决 J14 第二批开工前的事实核：io_min 8192 的池判表建不建得出；J5「能走 GPU 的必须走」）：
+/// 这条流整域展开交 GPU 判器建表，不拒（槽距 8192 的系统配置槽 1、根环槽都是落点），表里的状态数就是全量的 33 个。只建表、不上卡，
+/// 不要 `gpu` 特性。
+#[test]
+fn the_gpu_judge_tables_of_the_first_writable_mount_of_an_io_min_8192_pool_build_with_its_33_crash_states(
+) {
+    use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
+    let prepared = prepare();
+    let tables = build_judge_tables(&JudgeFlow {
+        base: &prepared.base,
+        writes: &prepared.writes,
+        segments: &prepared.segments,
+        judged_root_index: prepared.judged_root_index,
+        versions: &[],
+        expansion: &full_expansion,
+    })
+    .unwrap_or_else(|refusal| {
+        panic!("io_min 8192 的池第一次可写挂载这条流 GPU 判器建不出表：{refusal:?}")
+    });
+    assert_eq!(
+        tables.state_count, FULL_STATES,
+        "判表的状态数与全量相同（原地覆写三态）"
+    );
 }
 
 /// 快档：段序列与全量的状态数钉住（七段、33 态），每段按甲二展开跑一遍恢复与 checker。

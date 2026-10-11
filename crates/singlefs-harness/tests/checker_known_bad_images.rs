@@ -17084,6 +17084,18 @@ const A_SHORT_CONTAINER_BEFORE_A_FULL_ONE: ContainersUnderChangingKnobs =
         root_ring: RootRingBeforeTheJudgement::TurnedOverByCreatingInodes,
     };
 
+/// 少一条的那片离最右三片：旋钮 2、2、1、1、2、2、2、1 写出 [2, 1, 2, 2, 1]，再把根环转过一圈（第 59 批 L2）。上面三张盘少的那片离最右
+/// 都不超过两片，只判最右之前两片（攻方 `research/prompts/m3-batch58-code-r1-opus-model/mutants.py` 的 `w-last-two`）在它们上面与正确判法同判；
+/// 这一张的容器 2 在倒数第三片之前，那一形不判它、照绿，正确判法红在容器 2。写的中途 [2, 1, 1]、[2, 1, 2]、[2, 1, 2, 1] 那几版里容器 2
+/// 离最右不超过两片，那几版留在候选集里时那一形也红，所以要转出去。
+const A_SHORT_CONTAINER_THREE_CONTAINERS_LEFT_OF_THE_RIGHTMOST: ContainersUnderChangingKnobs =
+    ContainersUnderChangingKnobs {
+        records_per_container_of_each_record: &[2, 2, 1, 1, 2, 2, 2, 1],
+        record_counts_in_leaf_order: &[2, 1, 2, 2, 1],
+        short_container: 2,
+        root_ring: RootRingBeforeTheJudgement::TurnedOverByCreatingInodes,
+    };
+
 /// 第 58 批 J3：只这一棵按 `layout` 逐条换旋钮写出三片以上的容器（另两棵照产品），带旋钮值的入口报这一棵旋钮 2：每片都不超旋钮值、
 /// 容器号从 1 逐片加一、每片至少一条，只「不是最右的容器 `short_container` 装了 1 条，不是旋钮值 2」不成立，只红这一棵的那一条（I-9.22 / I-9.37）。
 /// 第 57 批 H1 的会红用例都只有两片容器，两片时只判最左片、只判倒数第二片、只判叶序第一片与正确写法等价，这几张盘把它们分开。
@@ -17180,7 +17192,6 @@ fn retirement_containers_of_two_two_one_and_one_records_under_changing_knobs_red
 }
 
 #[test]
-#[ignore = "harness 慢档用例：根环转过一圈（30 次发布）再逐版判，debug 下单条跑过 60 秒"]
 fn tombstone_containers_of_two_one_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
 ) {
     assert_containers_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
@@ -17191,7 +17202,6 @@ fn tombstone_containers_of_two_one_two_and_one_records_under_changing_knobs_redd
 }
 
 #[test]
-#[ignore = "harness 慢档用例：根环转过一圈（30 次发布）再逐版判，debug 下单条跑过 60 秒"]
 fn lineage_containers_of_two_one_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
 ) {
     assert_containers_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
@@ -17202,13 +17212,42 @@ fn lineage_containers_of_two_one_two_and_one_records_under_changing_knobs_redden
 }
 
 #[test]
-#[ignore = "harness 慢档用例：根环转过一圈（30 次发布）再逐版判，debug 下单条跑过 60 秒"]
 fn retirement_containers_of_two_one_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
 ) {
     assert_containers_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
         ContainerTreeOfTheCapacityInvariants::Retirement,
         "known-bad-retirement-containers-of-two-one-two-and-one-records",
         &A_SHORT_CONTAINER_BEFORE_A_FULL_ONE,
+    );
+}
+
+#[test]
+fn tombstone_containers_of_two_one_two_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
+) {
+    assert_containers_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
+        ContainerTreeOfTheCapacityInvariants::Tombstone,
+        "known-bad-tombstone-containers-of-two-one-two-two-and-one-records",
+        &A_SHORT_CONTAINER_THREE_CONTAINERS_LEFT_OF_THE_RIGHTMOST,
+    );
+}
+
+#[test]
+fn lineage_containers_of_two_one_two_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
+) {
+    assert_containers_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
+        ContainerTreeOfTheCapacityInvariants::Lineage,
+        "known-bad-lineage-containers-of-two-one-two-two-and-one-records",
+        &A_SHORT_CONTAINER_THREE_CONTAINERS_LEFT_OF_THE_RIGHTMOST,
+    );
+}
+
+#[test]
+fn retirement_containers_of_two_one_two_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
+) {
+    assert_containers_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two(
+        ContainerTreeOfTheCapacityInvariants::Retirement,
+        "known-bad-retirement-containers-of-two-one-two-two-and-one-records",
+        &A_SHORT_CONTAINER_THREE_CONTAINERS_LEFT_OF_THE_RIGHTMOST,
     );
 }
 

@@ -9,6 +9,7 @@
 use singlefs_checker::image::chosen_system_configurations;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
+    TreeIdentifier,
 };
 use singlefs_core::allocator::{
     PoolAllocator, UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
@@ -26,8 +27,8 @@ use singlefs_core::mounted_read::{
 };
 use singlefs_core::pointer::NodePointer;
 use singlefs_core::records::{
-    AccountingEntry, TreeTableEntry, STATISTIC_INODE_WATERMARK, TREE_KIND_ACCOUNTING,
-    TREE_KIND_ALLOCATION, TREE_KIND_INODE,
+    AccountingEntry, TreeTableEntry, STATISTIC_INODE_WATERMARK, STATISTIC_NO_DEVICE_DIMENSION,
+    TREE_KIND_ACCOUNTING, TREE_KIND_ALLOCATION, TREE_KIND_INODE,
 };
 use singlefs_core::recovery::{
     allocation_records_under_root, choose_system_configuration, rebuild_version, recover,
@@ -535,10 +536,22 @@ fn a_chosen_root_whose_checkpoint_txg_is_the_largest_value_is_refused_as_damaged
     );
 }
 
+/// 统计量 7：扩展点配额已用量（D5（快照 / 空间记账机制） 已定项 4 那张表第 7 行，不带设备维、不带树维）。登记过，核心层今天不写它，
+/// `singlefs_core::records` 里没有它的常量。
+const STATISTIC_EXTENSION_POINT_QUOTA_USED: u16 = 7;
+
 /// 从盘上重建一版要它自己那一行 inode 号水位（统计量 12、代段 = 根的 txg），不认台阶顶替（D5（快照 / 空间记账机制） 已定项 2 射程「inode 号水位的台阶行」；
 /// I-3.13 记账行代段等于这一版的 txg）：第一个文件（txg 3，它那一行是第 1 级台阶）之后覆盖写一版（txg 4：池级与每盘的行换成代段 4，
-/// 照抄台阶 (12, 3)，加自己那一行 (12, 4)，16 行）。把 txg 4 那一版自己那一行的统计量标签改成 13（仍排在末尾；不算台阶的行仍是 3 + 6 × 2），
-/// 那一版的根槽原地换成指着改过的树表的那一条：这一版只剩台阶 (12, 3) 那一行水位。
+/// 照抄台阶 (12, 3)，加自己那一行 (12, 4)，16 行）。txg 4 那一版自己那一行删掉，换进一行这一版的统计量 7（扩展点配额已用量）
+/// (7, 0, 0xFFFF_FFFF, 4)、seq 照删掉的那一行，那一版的根槽原地换成指着改过的树表的那一条：这一版只剩台阶 (12, 3) 那一行水位。
+/// 换进一行是为了让数记账条目照过：那一判不算台阶行（统计量 12、代段早于根的 txg），只删自己那一行时不算台阶的行剩 14 ≠ 3 + 6 × 2，
+/// 重建在数条目那一判先拒、到不了水位行那一判。数得进去、又不是这一版水位行的只能是统计量不为 12 的一行。这一版写了统计量 1–6、10、11、12
+/// （D5 已定项 8 那张表的写法），D5 已定项 4 那张表里登记过、这一版没写的还有 7、13、14，三项都不带设备维、不带树维；
+/// 换进来的统计量 7 那一行标签登记过、维度对（树段 0、设备段 0xFFFF_FFFF，D5 已定项 8 的写法）、代段等于这一版的 txg、seq 不为 0，
+/// 记账条目宽、逐条判代与 seq、数条目三判照过，I-3.13（非台阶行的代段等于这一版的 txg）也照过。它借的是 D5 已定项 8「没有对象的统计量不写行」
+/// 今天不判：这一版没有扩展点配额，这一行本不该有，重建今天不判这一条；读者将来判它，这条用例就红在那一判上，要换造法。
+/// 不换进上一版那一行已分配字节 (1, 0, 0, 3)：它违反 I-3.13，读者逐条判 I-3.13 时先报 I-3.13、到不了水位行那一判。
+/// 不靠没登记的统计量标签：读者逐条判拒标签 > 12、数条目时不算标签 > 12 的行，这条照报水位行缺；读者逐条判 I-3.13 时也照报。
 /// 从盘上重建 txg 4 那一版（`rebuild_version`，可写挂载与回退建上一版走的那一份）判它坏：记账树里没有这一版的水位行；
 /// 可写挂载建不出所选那一版，这个池系统配置里见证的 journal 计数器是 mkfs 写的 0，F2 乙不退
 /// （D23（journal 的角色与格式） 已定项 14「c_见证 = 0 … 都不退」），在任何写之前拒、报同一个失败。冷读文件内容的走读不读水位，不在这条用例里。
@@ -573,15 +586,48 @@ fn a_version_whose_own_inode_number_watermark_row_is_damaged_leaving_only_a_step
         ),
         "覆盖写那一版：16 行，水位那一统计量是台阶 (12, 3) 与它自己那一行 (12, 4)"
     );
+    assert!(
+        overwrite
+            .accounting_entries
+            .iter()
+            .all(|row| row.statistic != STATISTIC_EXTENSION_POINT_QUOTA_USED),
+        "覆盖写那一版没写统计量 7：这一版没有扩展点配额（D5 已定项 8「没有对象的统计量不写行」）"
+    );
     let damaged_root =
         root_whose_accounting_rows_are_rewritten(&mut pool.image, &overwrite.root, |rows| {
-            let own_row = rows.last_mut().expect("记账树恒有池级 3 行");
+            let own_row = rows.pop().expect("记账树恒有池级 3 行");
             assert_eq!(
                 (own_row.statistic, own_row.generation),
                 (STATISTIC_INODE_WATERMARK, overwrite_txg),
                 "末行是这一版自己那一行水位"
             );
-            own_row.statistic = STATISTIC_INODE_WATERMARK + 1;
+            rows.push(AccountingEntry {
+                statistic: STATISTIC_EXTENSION_POINT_QUOTA_USED,
+                tree: TreeIdentifier(0),
+                device: DeviceIdentity(STATISTIC_NO_DEVICE_DIMENSION),
+                generation: overwrite_txg,
+                value: 0,
+                sequence: own_row.sequence,
+            });
+            rows.sort_by_key(AccountingEntry::sort_key);
+            assert_eq!(
+                (
+                    rows.len(),
+                    rows.iter()
+                        .filter(|row| row.statistic == STATISTIC_INODE_WATERMARK)
+                        .map(|row| row.generation)
+                        .collect::<Vec<_>>()
+                ),
+                (16, vec![CheckpointTxg(3)]),
+                "改过的这一版仍是 16 行，水位那一统计量只剩台阶 (12, 3)"
+            );
+            assert!(
+                rows.iter()
+                    .filter(|row| !(row.statistic == STATISTIC_INODE_WATERMARK
+                        && row.generation < overwrite_txg))
+                    .all(|row| row.generation == overwrite_txg),
+                "台阶行之外每一行的代段都是这一版的 txg（I-3.13 照过）"
+            );
         });
     let ring_slot = target_for_publish(overwrite_txg, pool.geometry.root_ring_slots_per_region);
     let device_holding_the_root = DeviceIdentity(

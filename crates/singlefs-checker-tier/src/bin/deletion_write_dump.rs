@@ -12,7 +12,7 @@
 //!
 //! 只驱动、只观测：不改 `singlefs-core`、`singlefs-checker`、`singlefs-format`。
 //!
-//!   deletion_write_dump                    导 H1、H2（E172 第一段那一份，`research/scripts/replay.sh` 里 E172 那一行逐字节比它）
+//!   deletion_write_dump                    导 H1、H2（E172 第一段那一份，`scripts/experiments/replay.sh` 里 E172 那一行逐字节比它）
 //!   deletion_write_dump --history <名>     只导点名的那一段，名字是 h1、h2、h3 之一（E172 第三段用 `--history h3`）
 //!
 //! H3 不进不带参数的导出：进了，E172 第一段那一份与它的复跑就对不上了。

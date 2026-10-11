@@ -2036,11 +2036,30 @@ fn pool_whose_allocation_records_and_one_accounting_entry_carry_a_generation_aft
     devices
 }
 
+/// 台阶行那个池（txg 4）上两处一起坏，每一处都把指着它的校验和重算：
+/// ① 记账树根的条目宽 34 缩到 key 宽 22、16 条每条只留 key（[`pool_whose_accounting_root_carrying_a_step_row_is_narrowed_to_its_keys`]）：
+///    条目宽那一判报它，条目解不开、逐条判与数条目都轮不到。只坏这一处时只读恢复报记账条目窄于字段表，这里先核一遍；
+/// ② [`move_the_allocation_records_of_the_tree_table_slot_after_the_root`]。
+fn pool_whose_allocation_records_carry_a_generation_after_the_root_and_whose_accounting_root_is_narrowed_to_its_keys(
+) -> Devices {
+    let mut devices = pool_whose_accounting_root_carrying_a_step_row_is_narrowed_to_its_keys();
+    assert_eq!(
+        recover(&devices, JournalPolicy::Consult).outcome,
+        RecoveryOutcome::Failed {
+            root: Some((InstanceGeneration(1), TXG_OF_THE_ROOT_CARRYING_THE_STEP_ROW)),
+            failure: accounting_entry_narrower_than_its_field_table(),
+        },
+        "前提：只坏记账那一处时，只读恢复在 txg 4 那条根上报记账条目窄于字段表"
+    );
+    move_the_allocation_records_of_the_tree_table_slot_after_the_root(&mut devices);
+    devices
+}
+
 /// 场景：第一个文件之后再建一个空 inode（txg 4）；记账树根里 key 最小的那一行删掉（标签与代都不碰，记账条目数因此对不上），
 /// 罩这一版树表单元那个槽的两条分配记录代改成 5，晚于根；指着改过的节点的每一道校验和重算。
 /// 预期：只读恢复（冷走读）在 txg 4 那条根上报「分配记录跨度为 0，或分配代 / 释放代晚于根」：逐条判分配记录的代与跨度排在数记账条目之前
 /// （先判得了自己那一条的，再数；判决 `research/prompts/m3-batch56-code-r1-main-verification.md` 第三节 H4）。
-/// 那一判挪到数记账条目之后，这份镜像报成记账条目数。排在数映射条目、记账条目逐条判之前那两个次序由下面两张镜像各钉一个。
+/// 那一判挪到数记账条目之后，这份镜像报成记账条目数。排在数映射条目、记账条目逐条判、记账条目宽之前那三个次序由下面三张镜像各钉一个。
 #[test]
 fn allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_count_by_the_recovery(
 ) {
@@ -2111,9 +2130,10 @@ fn allocation_records_whose_generation_is_after_the_root_are_refused_before_the_
 
 /// 场景：第一个文件之后再建一个空 inode（txg 4）；记账树根里这一版自己那一行 inode 号水位的代改成 5（晚于根；台阶行不碰，记账条目数照旧对得上），
 /// 罩这一版树表单元那个槽的两条分配记录代改成 5，晚于根；指着改过的节点的每一道校验和重算。
-/// 预期：只读恢复（冷走读）在 txg 4 那条根上报「分配记录跨度为 0，或分配代 / 释放代晚于根」：逐条判分配记录的代与跨度排在记账条目宽、
+/// 预期：只读恢复（冷走读）在 txg 4 那条根上报「分配记录跨度为 0，或分配代 / 释放代晚于根」：逐条判分配记录的代与跨度排在
 /// 记账条目逐条判代与 seq 之前（冷走读那一段的次序注释与重建相同：分配记录、条目宽、逐条判、数）。
-/// 那一判挪到记账条目逐条判之后（仍在两个数之前），这份镜像报成「记账条目的代晚于根或 seq 为 0」。
+/// 那一判挪到记账条目逐条判之后（仍在两个数之前），这份镜像报成「记账条目的代晚于根或 seq 为 0」。这张盘每条记账条目宽都是 34，
+/// 条目宽那一判不坏，「分配记录排在条目宽之前」这半句它钉不到，由最后两条（记账树根缩到 key 宽的那张盘）钉。可写挂载那一条在下面。
 #[test]
 fn allocation_records_whose_generation_is_after_the_root_are_refused_before_each_accounting_entry_is_judged_by_the_recovery(
 ) {
@@ -2127,6 +2147,59 @@ fn allocation_records_whose_generation_is_after_the_root_are_refused_before_each
             failure: allocation_record_span_zero_or_generation_after_the_root(),
         },
         "只读恢复在 txg 4 那条根上报分配记录的代晚于根，不报记账条目的代"
+    );
+}
+
+/// 场景：同上一条的坏镜像，交给可写挂载。
+/// 预期：可写挂载在任何写之前交回「分配记录跨度为 0，或分配代 / 释放代晚于根」：重建那一版逐条判分配记录在读记账树之前，
+/// 排在记账条目逐条判代与 seq 之前，与冷走读报同一个成员。重建把那一判挪到记账条目逐条判之后（仍在数记账条目之前），
+/// 这份镜像报成「记账条目的代晚于根或 seq 为 0」，而上面两张盘的可写挂载照报分配记录：那两张盘坏的是两个数，挪到两个数之前它们分不出
+/// （攻方原型 `research/prompts/m3-batch58-code-r1-opus-output.md`「K3-3」一节的 `r-rebuild-alloc-after-each-entry`）。
+#[test]
+fn allocation_records_whose_generation_is_after_the_root_are_refused_before_each_accounting_entry_is_judged_by_the_writable_mount(
+) {
+    let mut devices =
+        pool_whose_allocation_records_and_one_accounting_entry_carry_a_generation_after_the_root();
+    let refusal = writable_mount_refused_before_any_write(&mut devices);
+    assert!(
+        matches!(&refusal, MountError::Recovery(failure) if *failure == allocation_record_span_zero_or_generation_after_the_root()),
+        "可写挂载报分配记录的代晚于根，不报记账条目的代：{refusal:?}"
+    );
+}
+
+/// 场景：第一个文件之后再建一个空 inode（txg 4）；记账树根的条目宽缩到 key 宽、每条只留 key（条目数 16 不变），
+/// 罩这一版树表单元那个槽的两条分配记录代改成 5，晚于根；指着改过的节点的每一道校验和重算。
+/// 预期：只读恢复（冷走读）在 txg 4 那条根上报「分配记录跨度为 0，或分配代 / 释放代晚于根」：逐条判分配记录的代与跨度排在
+/// 记账条目宽那一判之前（冷走读那一段的次序：分配记录、条目宽、逐条判、数）。那一判挪到条目宽之后（逐条判与两个数之前），
+/// 这份镜像报成记账条目窄于字段表（22 对 34）；上面那张逐条判坏的盘条目宽都对，分不出这一形。可写挂载那一条在下面。
+#[test]
+fn allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_width_by_the_recovery(
+) {
+    let devices =
+        pool_whose_allocation_records_carry_a_generation_after_the_root_and_whose_accounting_root_is_narrowed_to_its_keys();
+    let report = recover(&devices, JournalPolicy::Consult);
+    assert_eq!(
+        report.outcome,
+        RecoveryOutcome::Failed {
+            root: Some((InstanceGeneration(1), TXG_OF_THE_ROOT_CARRYING_THE_STEP_ROW)),
+            failure: allocation_record_span_zero_or_generation_after_the_root(),
+        },
+        "只读恢复在 txg 4 那条根上报分配记录的代晚于根，不报记账条目窄于字段表"
+    );
+}
+
+/// 场景：同上一条的坏镜像，交给可写挂载。
+/// 预期：可写挂载在任何写之前交回「分配记录跨度为 0，或分配代 / 释放代晚于根」：重建那一版逐条判分配记录在读记账树之前，
+/// 排在记账条目宽那一判之前，与冷走读报同一个成员。重建把那一判挪到条目宽之后（逐条判与数记账条目之前），这份镜像报成记账条目窄于字段表。
+#[test]
+fn allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_width_by_the_writable_mount(
+) {
+    let mut devices =
+        pool_whose_allocation_records_carry_a_generation_after_the_root_and_whose_accounting_root_is_narrowed_to_its_keys();
+    let refusal = writable_mount_refused_before_any_write(&mut devices);
+    assert!(
+        matches!(&refusal, MountError::Recovery(failure) if *failure == allocation_record_span_zero_or_generation_after_the_root()),
+        "可写挂载报分配记录的代晚于根，不报记账条目窄于字段表：{refusal:?}"
     );
 }
 

@@ -860,7 +860,7 @@ fn one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_o
 /// 全量：固定脚本到 E 再正常卸载，闭式 [`FULL_STATES_THROUGH_THE_UNMOUNT`] 个状态（段序列由 `prepare` 钉住）。
 /// 门禁 checker-tier-layer0-replay 在 release 下跑它，认下面打印的 `LAYER0B` 行里 `exhaustive=true`。带断点续跑（`singlefs_checker_tier::layer0_progress`）：
 /// 进度目录、输入指纹与强制从头跑的开关都从环境变量取，没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，
-/// `research/scripts/layer0-shard-run.sh`）：跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
+/// `scripts/crash/layer0-shard-run.sh`）：跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
 #[test]
 #[ignore = "全量五十多亿个状态、每个两遍恢复 + checker；门禁 checker-tier-layer0-replay 在 release 下跑，带断点续跑"]
 fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {

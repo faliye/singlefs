@@ -129,6 +129,9 @@ type CompiledPipelinesBySourceDigest = std::sync::Mutex<
 #[derive(Clone)]
 pub struct GpuCard {
     pub name: String,
+    /// 驱动的名字与版本（wgpu adapter info 的 `driver` 与 `driver_info`，空格接起来）：崩溃放量 GPU 结论的块属性照它写，不进版本
+    /// （第三轮判决 J8、M4 第 11 条：两台驱动不同不分版本，靠对照与轻型的小输入对拍抓差）。
+    pub driver_version: String,
     pub pci_bus_identifier: String,
     /// `nvidia-smi` 给这张卡的序号（配置按它点名）。
     pub index: u32,
@@ -324,6 +327,7 @@ fn nvidia_smi_memory_and_processes_report() -> Result<String, String> {
 struct DiscoveredCard {
     adapter: wgpu::Adapter,
     name: String,
+    driver_version: String,
     pci_bus_identifier: String,
     reported: ReportedCard,
 }
@@ -351,11 +355,26 @@ fn nvidia_discrete_cards_reported_by_nvidia_smi() -> Vec<DiscoveredCard> {
             Some(DiscoveredCard {
                 adapter,
                 name: information.name,
+                driver_version: driver_version_of_the_adapter(
+                    &information.driver,
+                    &information.driver_info,
+                ),
                 pci_bus_identifier,
                 reported,
             })
         })
         .collect()
+}
+
+/// 驱动的名字与版本那一句（wgpu adapter info 的 `driver`、`driver_info` 两项，空格接起来；两项都空写一句没报）。
+#[must_use]
+pub fn driver_version_of_the_adapter(driver: &str, driver_info: &str) -> String {
+    match (driver.trim(), driver_info.trim()) {
+        ("", "") => "driver-not-reported-by-wgpu".to_string(),
+        (name, "") => name.to_string(),
+        ("", version) => version.to_string(),
+        (name, version) => format!("{name} {version}"),
+    }
 }
 
 /// 在找到的这张卡上起设备、编单元校验和的管线；起不来交为什么（显存不够与别的分开，[`CardStartFailure`]）。不看空闲显存（看不看由调用方定）。
@@ -420,6 +439,7 @@ fn start_the_device_and_the_pipeline(
     }
     Ok(GpuCard {
         name: discovered.name.clone(),
+        driver_version: discovered.driver_version.clone(),
         pci_bus_identifier: discovered.pci_bus_identifier.clone(),
         index: discovered.reported.index,
         free_memory_mebibytes: discovered.reported.free_memory_mebibytes,
@@ -1167,6 +1187,10 @@ pub mod gpu_test_start {
         ScratchLeaseOnACard, CARD_QUOTA_ENVIRONMENT_VARIABLE,
     };
 
+    /// 起池那一步（单测在别的用例拿着改环境的锁换了配置时现起一次，核它照的是哪一份显卡配置）。
+    #[cfg(test)]
+    pub(in crate::gpu_unit_checks) use card_pool::start_the_gpu_card_pool;
+
     mod card_pool {
         use super::super::{
             card_memory_reader_of_the_card_pool, device_found_idle_by_a_poll,
@@ -1181,8 +1205,7 @@ pub mod gpu_test_start {
         };
         use crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER;
         use crate::gpu_card_configuration::{
-            cards_by_priority_from_configuration_or_environment, configured_cards_not_usable,
-            CardHost,
+            configured_cards_not_usable, GpuConfigurationOfTheCaller,
         };
         use singlefs_harness::gpu_memory_ledger::{
             card_ledger_capacity_mebibytes, reason_for_a_booking_without_room_now,
@@ -1677,8 +1700,14 @@ pub mod gpu_test_start {
             }
         }
 
-        /// 起池那一次的结局：进程里只判一次，之后每条用例照它。
-        enum GpuCardPoolStart {
+        /// 起池那一次：照哪一份显卡配置挑的卡（调用方给这个进程的那一份）与结局。进程里只判一次，之后每条用例照它。
+        pub(in crate::gpu_unit_checks) struct GpuCardPoolStart {
+            pub(in crate::gpu_unit_checks) configuration: &'static GpuConfigurationOfTheCaller,
+            outcome: GpuCardPoolStartOutcome,
+        }
+
+        /// 起池那一次的结局。
+        enum GpuCardPoolStartOutcome {
             Started(GpuCardPool),
             NotRunNoGpuAdapter { reason: String },
             CardsPresentButNotUsable { reason: String },
@@ -1694,35 +1723,33 @@ pub mod gpu_test_start {
             configuration_refusal: Option<String>,
         }
 
-        /// 照显卡配置挑这台机器的卡：`GPU_CARDS_BY_PRIORITY`（环境变量，没设读 `SINGLEFS_GPU_CARDS_CONFIG` 指的显卡配置里的同名键）
+        /// 照 `configuration`（调用方给这个进程的显卡配置）挑这台机器的卡：`GPU_CARDS_BY_PRIORITY`（那一份里的环境变量，没设读多机配置里的那两个键，
+        /// [`GpuConfigurationOfTheCaller::cards_by_priority`]）
         /// 里这台机器（`SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE`，没设是本机）的那几项，照配置的次序与额度（与崩溃放量取卡同一个约定）；
         /// 都没配就是本机每张 NVIDIA 独显，按空闲显存从大到小、不设额度。只找卡、不起设备，也不看此刻空闲多少（能不能借在借的那一刻判）。
-        fn cards_named_for_this_machine() -> CardsNamedForThisMachine {
+        fn cards_named_for_this_machine(
+            configuration: &GpuConfigurationOfTheCaller,
+        ) -> CardsNamedForThisMachine {
             let refused = |reason: String| CardsNamedForThisMachine {
                 cards: Vec::new(),
                 named_but_not_found: Vec::new(),
                 configuration_refusal: Some(reason),
             };
-            let host = match CardHost::of_this_process() {
+            let host = match configuration.host() {
                 Ok(host) => host,
                 Err(reason) => return refused(reason),
             };
-            let configuration_file = match std::env::var_os("SINGLEFS_GPU_CARDS_CONFIG") {
-                Some(text) => {
-                    let path = std::path::PathBuf::from(text);
-                    if !path.is_file() {
-                        return refused(format!(
-                            "SINGLEFS_GPU_CARDS_CONFIG 指的配置不在：{}",
-                            path.display()
-                        ));
-                    }
-                    Some(path)
-                }
-                None => None,
-            };
-            let configured = match cards_by_priority_from_configuration_or_environment(
-                configuration_file.as_deref(),
-            ) {
+            // 显卡先后写在多机配置里（判决 J5、J11）：仓根取这一份源码编进来的那个包往上两层，多机配置按它的 git common-dir 找主工作树那一份
+            let repository_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .and_then(std::path::Path::parent)
+                .expect("包目录在 crates/ 下，往上两层是仓根");
+            let configuration_file =
+                match configuration.multi_host_configuration_file(repository_root) {
+                    Ok(configuration_file) => configuration_file,
+                    Err(reason) => return refused(reason),
+                };
+            let configured = match configuration.cards_by_priority(configuration_file.as_deref()) {
                 Ok(configured) => configured,
                 Err(reason) => return refused(reason),
             };
@@ -1816,8 +1843,21 @@ pub mod gpu_test_start {
             GpuCardPool { cards, ledger }
         }
 
-        fn start_the_gpu_card_pool() -> GpuCardPoolStart {
-            let named = cards_named_for_this_machine();
+        /// 起池：照调用方给这个进程的显卡配置挑卡（[`GpuConfigurationOfTheCaller::of_this_process`]），不读此刻的进程环境——
+        /// 第一次起池时别的用例可能正拿着改环境的锁、把多机配置换成它的临时那一份，整个进程的卡池不跟它走。
+        pub(in crate::gpu_unit_checks) fn start_the_gpu_card_pool() -> GpuCardPoolStart {
+            let configuration = GpuConfigurationOfTheCaller::of_this_process();
+            GpuCardPoolStart {
+                configuration,
+                outcome: card_pool_start_outcome_on(configuration),
+            }
+        }
+
+        /// 照 `configuration` 挑卡、判有没有卡、开账：起池那一次的结局。
+        fn card_pool_start_outcome_on(
+            configuration: &GpuConfigurationOfTheCaller,
+        ) -> GpuCardPoolStartOutcome {
+            let named = cards_named_for_this_machine(configuration);
             let decision = decide_gpu_test_start(
                 &enumerate_vulkan_adapters(),
                 &read_pci_nvidia_display_controllers_on_the_bus(std::path::Path::new(
@@ -1832,10 +1872,10 @@ pub mod gpu_test_start {
             match decision {
                 GpuTestStart::RunOnTheUsableCards => {
                     if named.named_but_not_found.is_empty() {
-                        GpuCardPoolStart::Started(open_the_card_pool(named.cards))
+                        GpuCardPoolStartOutcome::Started(open_the_card_pool(named.cards))
                     } else {
                         // 点名的卡少一张都不跑（用户 2026-09-29 定：配了 GPU 就要它干活，不行就明确报错，不接受少用几张的默认降级）
-                        GpuCardPoolStart::CardsPresentButNotUsable {
+                        GpuCardPoolStartOutcome::CardsPresentButNotUsable {
                             reason: format!(
                                 "配置点名给这台机器的卡里，序号 {:?} 用不了（上面 GPU_CARD_NOT_USABLE 那几行）：点名的卡每一张都要用得上",
                                 named.named_but_not_found
@@ -1844,12 +1884,12 @@ pub mod gpu_test_start {
                     }
                 }
                 GpuTestStart::NotRunNoGpuAdapter { reason } => {
-                    GpuCardPoolStart::NotRunNoGpuAdapter { reason }
+                    GpuCardPoolStartOutcome::NotRunNoGpuAdapter { reason }
                 }
                 GpuTestStart::AdapterPresentButNoCardStarted { reason }
                 | GpuTestStart::NvidiaCardOnPciButVulkanEnumeratesNone { reason }
                 | GpuTestStart::PciBusVisibleButListingUnreadable { reason } => {
-                    GpuCardPoolStart::CardsPresentButNotUsable {
+                    GpuCardPoolStartOutcome::CardsPresentButNotUsable {
                         reason: format!("{reason}{configuration_note}"),
                     }
                 }
@@ -1858,7 +1898,7 @@ pub mod gpu_test_start {
 
         static GPU_CARD_POOL: std::sync::OnceLock<GpuCardPoolStart> = std::sync::OnceLock::new();
 
-        /// 这个进程的卡池：第一条来要的用例起池（只在这时判一次有没有卡、找一次点名的卡，挑卡照 [`cards_named_for_this_machine`]；
+        /// 这个进程的卡池：第一条来要的用例起池（[`start_the_gpu_card_pool`]：只在这时判一次有没有卡、找一次点名的卡，挑卡照 [`cards_named_for_this_machine`]；
         /// 设备等借到那张卡时才起），之后每条用例拿同一个。本机没有 NVIDIA 卡时每条来要的用例各打一行
         /// [`not_run_line`]、交回 `None`（调用的用例当场返回）。先判有没有卡、建好表知道要多少显存之后再借（[`GpuCardPool::lease_card_or_report_not_run`]）。
         ///
@@ -1867,14 +1907,18 @@ pub mod gpu_test_start {
         /// [`CARD_QUOTA_ENVIRONMENT_VARIABLE`] 设了而认不出。
         #[must_use]
         pub fn gpu_card_pool_or_report_not_run(test_name: &str) -> Option<&'static GpuCardPool> {
-            match GPU_CARD_POOL.get_or_init(start_the_gpu_card_pool) {
-                GpuCardPoolStart::Started(pool) => Some(pool),
-                GpuCardPoolStart::NotRunNoGpuAdapter { reason } => {
+            let start = GPU_CARD_POOL.get_or_init(start_the_gpu_card_pool);
+            match &start.outcome {
+                GpuCardPoolStartOutcome::Started(pool) => Some(pool),
+                GpuCardPoolStartOutcome::NotRunNoGpuAdapter { reason } => {
                     println!("{}", not_run_line(test_name, reason));
                     None
                 }
-                GpuCardPoolStart::CardsPresentButNotUsable { reason } => {
-                    panic!("{test_name}：{reason}")
+                GpuCardPoolStartOutcome::CardsPresentButNotUsable { reason } => {
+                    panic!(
+                        "{test_name}：{reason}（卡池照调用方给这个进程的显卡配置挑的卡：{:?}）",
+                        start.configuration
+                    )
                 }
             }
         }
@@ -1882,11 +1926,11 @@ pub mod gpu_test_start {
         /// 这个进程已经起好的卡池；还没起过池、或起池判成没卡、有卡而用不上，交 `None`（不起池，什么都不打）。
         #[must_use]
         pub fn card_pool_started_in_this_process() -> Option<&'static GpuCardPool> {
-            match GPU_CARD_POOL.get() {
-                Some(GpuCardPoolStart::Started(pool)) => Some(pool),
+            match GPU_CARD_POOL.get().map(|start| &start.outcome) {
+                Some(GpuCardPoolStartOutcome::Started(pool)) => Some(pool),
                 Some(
-                    GpuCardPoolStart::NotRunNoGpuAdapter { .. }
-                    | GpuCardPoolStart::CardsPresentButNotUsable { .. },
+                    GpuCardPoolStartOutcome::NotRunNoGpuAdapter { .. }
+                    | GpuCardPoolStartOutcome::CardsPresentButNotUsable { .. },
                 )
                 | None => None,
             }
@@ -1920,6 +1964,28 @@ mod tests {
     const TESTS_MODULE_OPENING: &str = "#[cfg(test)]\nmod tests \u{7b}";
     /// 顶格的右括号自成一行（函数体在这里收尾）。
     const TOP_LEVEL_CLOSING_BRACE_LINE: &str = "\n\u{7d}\n";
+
+    /// J8、M4 第 11 条：块属性里的驱动版本取 wgpu adapter info 的 `driver` 与 `driver_info` 两项，空格接起来；一项空只取另一项，
+    /// 两项都空写一句没报（不写空串）。
+    #[test]
+    fn the_driver_version_of_a_card_joins_the_driver_name_and_its_information() {
+        assert_eq!(
+            super::driver_version_of_the_adapter("NVIDIA", "580.95.05"),
+            "NVIDIA 580.95.05"
+        );
+        assert_eq!(
+            super::driver_version_of_the_adapter("NVIDIA", " "),
+            "NVIDIA"
+        );
+        assert_eq!(
+            super::driver_version_of_the_adapter("", "580.95.05"),
+            "580.95.05"
+        );
+        assert_eq!(
+            super::driver_version_of_the_adapter("", ""),
+            "driver-not-reported-by-wgpu"
+        );
+    }
 
     /// 假的 sysfs 里 PCI 总线那一截的样子。
     enum FakePciBus<'devices> {
@@ -3881,6 +3947,39 @@ mod tests {
                 .count(),
             1,
             "wgpu-core {version} 丢设备时交给回调的不再是 hal 错的那一句：{handle_body}"
+        );
+    }
+
+    /// 主 agent 2026-10-10 定的条款：卡池只认进程起来时（第一次换环境之前）调用方的那份配置，不跟用例临时改的环境走。确定地造出
+    /// 「别的用例拿着改环境的锁换着临时配置时第一次起池」那种交错（`crate::gpu_card_configuration::while_another_thread_holds_a_temporary_gpu_configuration`：
+    /// 那条线程把多机配置、显卡先后、这台机器的角色换成它的临时那一份，这边起完池它才放）：起池照的是调用方给这个进程的那一份
+    /// （`GpuConfigurationOfTheCaller::of_this_process`），不是那条线程的。起池那一步只找卡、开账，不起设备、不借显存，没有卡的机器上照样判
+    /// （判的是起池照哪一份配置挑卡，不看找没找到卡）。
+    #[cfg(feature = "verdict-store")]
+    #[test]
+    fn the_card_pool_started_while_another_thread_holds_a_temporary_configuration_picks_from_the_configuration_of_the_caller(
+    ) {
+        use super::gpu_test_start::start_the_gpu_card_pool;
+        use crate::gpu_card_configuration::{
+            while_another_thread_holds_a_temporary_gpu_configuration, GpuConfigurationOfTheCaller,
+            CARDS_OF_THE_TEMPORARY_GPU_CONFIGURATION,
+        };
+        let (start, temporary_configuration) =
+            while_another_thread_holds_a_temporary_gpu_configuration(
+                "card-pool-start",
+                start_the_gpu_card_pool,
+            );
+        let picked_from = format!("{:?}", start.configuration);
+        assert!(
+            !picked_from.contains(CARDS_OF_THE_TEMPORARY_GPU_CONFIGURATION)
+                && !picked_from.contains(&*temporary_configuration.to_string_lossy()),
+            "起池照的是拿着锁那条线程换上的临时配置 {}：{picked_from}",
+            temporary_configuration.display()
+        );
+        assert_eq!(
+            start.configuration,
+            GpuConfigurationOfTheCaller::of_this_process(),
+            "起池照的是调用方给这个进程的那一份"
         );
     }
 }

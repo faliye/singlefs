@@ -23,9 +23,32 @@
 //! 块键只由流程定（点的位置、它写下的字节、它起步的镜像）；判器改了不动块键，判定块与违例另按判法版本分行，旧版本的行留作历史，
 //! 复用只认同一判法版本（用户 2026-09-29 定：结果只绑流程，判法版本是行的属性）。
 //! 名字前面带字节数，一个块键不会是另一个块键的前缀，按块键前缀扫违例表只扫到这一块的。
+//!
+//! 三种结论（崩溃点重放合并第三轮判决 J7、J8，第二轮判决 L1-8）另用下面几张表，与上面那几张同库并存：
+//!
+//! | 表 | 键 | 值 |
+//! |---|---|---|
+//! | 库布局 | `00` | 布局号，4 字节大端（2：有下面这几张表）；没有这一行的是这一套之前的库 |
+//! | 结论块 | `0A` ‖ 块键 ‖ 结论种类 ‖ 版本（32 字节） | 块里每个状态一个字节：判定向量编号 |
+//! | 结论违例 | `0B` ‖ 块键 ‖ 结论种类 ‖ 版本 ‖ 块内序号（8 字节） | 那个状态的判定向量编号，一个字节 |
+//! | 恢复字 | `0C` ‖ 块键 ‖ 结论种类 ‖ 版本 | 每个状态八个字（两遍各自落到的根两个字、结局、失败点），每字 4 字节小端；不进判定向量编号 |
+//! | 计数向量 | `0D` ‖ 块键 ‖ 结论种类 ‖ 版本 | 逐条不变量判到 / 违例 / 不适用、各观察者计数、按发布分的态数（[`BlockCountVector`]） |
+//! | 块属性 | `0E` ‖ 块键 ‖ 结论种类 ‖ 版本 | 在哪判的：CPU，或 GPU 连同卡型与驱动版本（[`JudgingDevice`]）；不进版本 |
+//!
+//! 结论种类 = `01`（GPU 判器）、`02`（CPU 判器）、`03` ‖ 观察者名的字节数（2 字节）‖ 观察者名；版本是 `crash_identity::ConclusionVersion`。
+//! 一块一种结论的结论块、违例、恢复字、计数向量与块属性同一批原子地写、一起读回。这一套之前的库（没有布局行）用
+//! [`VerdictStore::open_existing_with_conclusion_kinds`] 打开时拒绝、不迁移：那时的判定块按（块键，两个判器合起来的判法版本）存，
+//! 三种结论的版本都与它不同，迁过来一块也复用不上；换一个新目录建库，就是一趟清空复用的全量。
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
+
+use crate::crash_identity::{ConclusionKind, ConclusionVersion, ObserverName};
+/// 判定向量、恢复字与计数向量的类型在判器一侧（崩溃点重放合并第三轮判决 J8：改结论的几处搬进判器一侧），这里只管它们的字节布局，路径照旧从这里引。
+pub use crate::crash_judge_conclusions::{
+    BlockCountVector, EncodedVerdictVector, InvariantStateCounts, RecoveryWordsOfState,
+    RECOVERY_WORDS_PER_STATE,
+};
 
 /// 输入指纹与枚举计划哈希都是 SHA-256 摘要的字节数。
 pub const SHA256_DIGEST_BYTES: usize = 32;
@@ -33,7 +56,7 @@ pub const SHA256_DIGEST_BYTES: usize = 32;
 /// 违例表的键里块内序号占几个字节。
 const STATE_OFFSET_IN_BLOCK_BYTES: usize = std::mem::size_of::<u64>();
 
-/// 这一份判定是拿哪一份输入算出来的：门禁 checker-tier-layer0-replay 给每条崩溃枚举用例算的输入指纹（`research/scripts/admission.py`，SHA-256）。
+/// 这一份判定是拿哪一份输入算出来的：门禁 checker-tier-layer0-replay 给每条崩溃枚举用例算的输入指纹（`scripts/gate/admission.py`，SHA-256）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct InputFingerprint(pub [u8; SHA256_DIGEST_BYTES]);
 
@@ -125,6 +148,18 @@ impl VerdictBlockKey {
         key_bytes
     }
 
+    /// 块键字节接上结论种类与版本（结论块表、结论违例表、恢复字旁表、计数向量表、块属性表的键）。
+    fn to_block_key_bytes_with_conclusion(
+        &self,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+    ) -> Vec<u8> {
+        let mut key_bytes = self.to_block_key_bytes();
+        key_bytes.extend_from_slice(&conclusion_kind_key_bytes(kind));
+        key_bytes.extend_from_slice(&conclusion_version.0);
+        key_bytes
+    }
+
     /// [`Self::to_block_key_bytes`] 的逆：列表、导入时从键字节认回块键，交回块键与它后面剩下的字节（判法版本、块内序号这类后缀）；
     /// 长度或名字对不上交回 None。
     fn from_block_key_bytes_with_suffix(bytes: &[u8]) -> Option<(Self, &[u8])> {
@@ -152,10 +187,6 @@ impl VerdictBlockKey {
         ))
     }
 }
-
-/// 一个状态的判定向量，按调用方定的编码存成字节（这个模块不解释它）；两份字节相同就是同一个判定向量。
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct EncodedVerdictVector(pub Vec<u8>);
 
 /// 判定向量的编号：同一个库里一种判定向量一个编号，从 0 起按登记次序给，登记过就不变（关库重开也不变）。
 /// 只能从 [`VerdictStore::register_verdict_vector`] 或读回的块拿到。
@@ -218,7 +249,289 @@ pub struct StoredViolation {
     pub verdict_vector_number: VerdictVectorNumber,
 }
 
-/// 库里的四张表；键的第一个字节是表标签。
+/// 恢复字旁表里一个状态占几个字节：八个字，每字 4 字节小端。
+const RECOVERY_WORD_BYTES_PER_STATE: usize = RECOVERY_WORDS_PER_STATE * std::mem::size_of::<u32>();
+
+fn recovery_words_value_bytes(words_of_each_state: &[RecoveryWordsOfState]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(words_of_each_state.len() * RECOVERY_WORD_BYTES_PER_STATE);
+    for words in words_of_each_state {
+        for word in words.0 {
+            bytes.extend_from_slice(&word.to_le_bytes());
+        }
+    }
+    bytes
+}
+
+/// [`recovery_words_value_bytes`] 的逆；长度不是 `state_count` 个状态的整份交回 None。
+fn recovery_words_from_value_bytes(
+    bytes: &[u8],
+    state_count: usize,
+) -> Option<Vec<RecoveryWordsOfState>> {
+    if bytes.len() != state_count * RECOVERY_WORD_BYTES_PER_STATE {
+        return None;
+    }
+    let (states, _no_remainder) = bytes.as_chunks::<RECOVERY_WORD_BYTES_PER_STATE>();
+    Some(
+        states
+            .iter()
+            .map(|state_bytes| {
+                let (word_bytes, _no_word_remainder) = state_bytes.as_chunks::<4>();
+                let mut words = [0u32; RECOVERY_WORDS_PER_STATE];
+                for (word, bytes_of_word) in words.iter_mut().zip(word_bytes) {
+                    *word = u32::from_le_bytes(*bytes_of_word);
+                }
+                RecoveryWordsOfState(words)
+            })
+            .collect(),
+    )
+}
+
+/// 计数向量值的头一个字节：写法换了就换它，旧写法读成不合布局。
+const COUNT_VECTOR_FORMAT_NUMBER: u8 = 1;
+
+/// 在一段字节上往前读：读不够交回 None。
+struct ByteCursor<'bytes> {
+    bytes: &'bytes [u8],
+    position: usize,
+}
+
+impl<'bytes> ByteCursor<'bytes> {
+    fn take(&mut self, length: usize) -> Option<&'bytes [u8]> {
+        let taken = self
+            .bytes
+            .get(self.position..self.position.checked_add(length)?)?;
+        self.position += length;
+        Some(taken)
+    }
+
+    fn big_endian_u32(&mut self) -> Option<u32> {
+        Some(u32::from_be_bytes(<[u8; 4]>::try_from(self.take(4)?).ok()?))
+    }
+
+    fn big_endian_u64(&mut self) -> Option<u64> {
+        Some(u64::from_be_bytes(<[u8; 8]>::try_from(self.take(8)?).ok()?))
+    }
+
+    /// 4 字节大端的长度加那么多字节的 UTF-8。
+    fn length_prefixed_text(&mut self) -> Option<String> {
+        let length = usize::try_from(self.big_endian_u32()?).ok()?;
+        String::from_utf8(self.take(length)?.to_vec()).ok()
+    }
+
+    fn is_at_the_end(&self) -> bool {
+        self.position == self.bytes.len()
+    }
+}
+
+fn push_length_prefixed_text(bytes: &mut Vec<u8>, text: &str) {
+    let length = u32::try_from(text.len()).expect("计数名、卡型与驱动版本的文字不会超过 4 GiB");
+    bytes.extend_from_slice(&length.to_be_bytes());
+    bytes.extend_from_slice(text.as_bytes());
+}
+
+fn push_section_entry_count(bytes: &mut Vec<u8>, entry_count: usize) {
+    let entry_count = u32::try_from(entry_count).expect("一块的计数向量一节不会超过 u32::MAX 条");
+    bytes.extend_from_slice(&entry_count.to_be_bytes());
+}
+
+/// 读一节：条数，再逐条「名字、值」；名字要严格升序（写的时候按 `BTreeMap` 的次序写，重名或乱序就是坏字节）。
+fn read_count_section<Count>(
+    cursor: &mut ByteCursor<'_>,
+    read_count: impl Fn(&mut ByteCursor<'_>) -> Option<Count>,
+) -> Option<BTreeMap<String, Count>> {
+    let entry_count = cursor.big_endian_u32()?;
+    let mut section = BTreeMap::new();
+    for _entry in 0..entry_count {
+        let name = cursor.length_prefixed_text()?;
+        if section
+            .last_key_value()
+            .is_some_and(|(previous_name, _count): (&String, &Count)| *previous_name >= name)
+        {
+            return None;
+        }
+        let count = read_count(cursor)?;
+        section.insert(name, count);
+    }
+    Some(section)
+}
+
+/// 计数向量（[`BlockCountVector`]，类型在判器一侧 `crate::crash_judge_conclusions`）存进计数向量表的字节：格式号一个字节，之后三节
+/// （逐条不变量、观察者、按发布分），每节 4 字节大端条数、逐条名字（4 字节大端长度 + UTF-8）与计数（每个 8 字节大端；不变量一条三个：
+/// 判到、违例、不适用）。字节布局只在这里，计数向量里每一格是什么由判器一侧定。
+#[must_use]
+pub fn count_vector_bytes(count_vector: &BlockCountVector) -> Vec<u8> {
+    let mut bytes = vec![COUNT_VECTOR_FORMAT_NUMBER];
+    push_section_entry_count(&mut bytes, count_vector.per_invariant.len());
+    for (invariant_name, counts) in &count_vector.per_invariant {
+        push_length_prefixed_text(&mut bytes, invariant_name);
+        for count in [counts.judged, counts.violated, counts.not_applicable] {
+            bytes.extend_from_slice(&count.to_be_bytes());
+        }
+    }
+    for section in [&count_vector.per_observer, &count_vector.states_by_publish] {
+        push_section_entry_count(&mut bytes, section.len());
+        for (name, count) in section {
+            push_length_prefixed_text(&mut bytes, name);
+            bytes.extend_from_slice(&count.to_be_bytes());
+        }
+    }
+    bytes
+}
+
+/// [`count_vector_bytes`] 的逆；格式号不对、读不够、名字不是严格升序、后面多出字节，交回 None。
+#[must_use]
+pub fn count_vector_from_bytes(bytes: &[u8]) -> Option<BlockCountVector> {
+    let mut cursor = ByteCursor { bytes, position: 0 };
+    if cursor.take(1)? != [COUNT_VECTOR_FORMAT_NUMBER] {
+        return None;
+    }
+    let per_invariant = read_count_section(&mut cursor, |cursor| {
+        Some(InvariantStateCounts {
+            judged: cursor.big_endian_u64()?,
+            violated: cursor.big_endian_u64()?,
+            not_applicable: cursor.big_endian_u64()?,
+        })
+    })?;
+    let per_observer = read_count_section(&mut cursor, |cursor| cursor.big_endian_u64())?;
+    let states_by_publish = read_count_section(&mut cursor, |cursor| cursor.big_endian_u64())?;
+    cursor.is_at_the_end().then_some(BlockCountVector {
+        per_invariant,
+        per_observer,
+        states_by_publish,
+    })
+}
+
+/// 这一块在哪判的（块属性，第三轮判决 J8、M2-5）：CPU，或 GPU 连同卡型与驱动版本。不进版本：两台驱动不同不分版本，靠对照与轻型的小输入对拍抓差。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum JudgingDevice {
+    Cpu,
+    Gpu {
+        card_type: String,
+        driver_version: String,
+    },
+}
+
+impl JudgingDevice {
+    /// 块属性表的值：`01` 是 CPU；`02` 之后是卡型与驱动版本（各 4 字节大端长度 + UTF-8）。
+    fn to_attribute_bytes(&self) -> Vec<u8> {
+        match self {
+            Self::Cpu => vec![0x01],
+            Self::Gpu {
+                card_type,
+                driver_version,
+            } => {
+                let mut bytes = vec![0x02];
+                push_length_prefixed_text(&mut bytes, card_type);
+                push_length_prefixed_text(&mut bytes, driver_version);
+                bytes
+            }
+        }
+    }
+
+    fn from_attribute_bytes(bytes: &[u8]) -> Option<Self> {
+        let mut cursor = ByteCursor { bytes, position: 0 };
+        let device = match cursor.take(1)? {
+            [0x01] => Self::Cpu,
+            [0x02] => Self::Gpu {
+                card_type: cursor.length_prefixed_text()?,
+                driver_version: cursor.length_prefixed_text()?,
+            },
+            _ => return None,
+        };
+        cursor.is_at_the_end().then_some(device)
+    }
+}
+
+/// 存一块一种结论要给的整份：结论块、违例状态、计数向量、块属性，连同恢复字（判器给；观察者没有）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConclusionBlockRecord {
+    pub block: VerdictBlock,
+    pub violating_states: Vec<StateOffsetInBlock>,
+    pub count_vector: BlockCountVector,
+    pub judged_on: JudgingDevice,
+    pub recovery_words: Option<Vec<RecoveryWordsOfState>>,
+}
+
+/// 读回的一块一种结论：结论块、按块内序号排的违例、计数向量、块属性、恢复字（存的时候没给就是 None）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StoredConclusionBlock {
+    pub block: VerdictBlock,
+    pub violations: Vec<StoredViolation>,
+    pub count_vector: BlockCountVector,
+    pub judged_on: JudgingDevice,
+    pub recovery_words: Option<Vec<RecoveryWordsOfState>>,
+}
+
+/// 结论种类在键里的字节：`01` GPU 判器、`02` CPU 判器、`03` ‖ 观察者名的字节数（2 字节大端）‖ 观察者名。种类自己定长或带长度，
+/// 一个种类的字节不会是另一个的前缀。
+fn conclusion_kind_key_bytes(kind: &ConclusionKind) -> Vec<u8> {
+    match kind {
+        ConclusionKind::GpuJudge => vec![0x01],
+        ConclusionKind::CpuJudge => vec![0x02],
+        ConclusionKind::Observer { observer_name } => {
+            let name_bytes = observer_name.as_str().as_bytes();
+            let name_length = u16::try_from(name_bytes.len())
+                .expect("ObserverName::new 只收不超过 u16::MAX 字节的名字");
+            let mut kind_bytes = vec![0x03];
+            kind_bytes.extend_from_slice(&name_length.to_be_bytes());
+            kind_bytes.extend_from_slice(name_bytes);
+            kind_bytes
+        }
+    }
+}
+
+/// [`conclusion_kind_key_bytes`] 的逆：交回种类与它后面剩下的字节；认不回来交回 None。
+fn conclusion_kind_from_key_bytes(bytes: &[u8]) -> Option<(ConclusionKind, &[u8])> {
+    let (tag, after_tag) = bytes.split_first()?;
+    match tag {
+        0x01 => Some((ConclusionKind::GpuJudge, after_tag)),
+        0x02 => Some((ConclusionKind::CpuJudge, after_tag)),
+        0x03 => {
+            let name_length = <[u8; 2]>::try_from(after_tag.get(..2)?).ok()?;
+            let name_end = 2 + usize::from(u16::from_be_bytes(name_length));
+            let name = std::str::from_utf8(after_tag.get(2..name_end)?).ok()?;
+            Some((
+                ConclusionKind::Observer {
+                    observer_name: ObserverName::new(name).ok()?,
+                },
+                &after_tag[name_end..],
+            ))
+        }
+        _ => None,
+    }
+}
+
+/// 库的布局。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VerdictStoreLayout {
+    /// 这一套之前的库：没有布局行，只有按（块键，判法版本）存的判定块表与违例表。
+    BeforeConclusionKinds,
+    /// 有布局行：另按（块键，结论种类，版本）存结论，恢复字、计数向量、块属性随块存。
+    ConclusionKinds,
+}
+
+/// 布局行的值：有结论种类那几张表的布局号。
+const CONCLUSION_KINDS_LAYOUT_NUMBER: u32 = 2;
+
+fn read_library_layout(database: &rocksdb::DB) -> Result<VerdictStoreLayout, VerdictStoreError> {
+    let key_bytes = VerdictStoreKey::LibraryLayout.to_key_bytes();
+    match database
+        .get(&key_bytes.0)
+        .map_err(VerdictStoreError::RocksDatabase)?
+    {
+        None => Ok(VerdictStoreLayout::BeforeConclusionKinds),
+        Some(layout_bytes) if layout_bytes == CONCLUSION_KINDS_LAYOUT_NUMBER.to_be_bytes() => {
+            Ok(VerdictStoreLayout::ConclusionKinds)
+        }
+        Some(_unknown_layout_bytes) => Err(stored_bytes_mismatch(
+            VerdictStoreTable::LibraryLayout,
+            &key_bytes.0,
+            "布局号认不得",
+        )),
+    }
+}
+
+/// 库里的各张表；键的第一个字节是表标签。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VerdictStoreTable {
     VerdictBlocks,
@@ -237,6 +550,18 @@ pub enum VerdictStoreTable {
     VerifierVerdicts,
     /// 判法版本表：键是判法版本（判器闭包摘要），值是这一版收的文件清单（UTF-8 文本），给人查「这一版判器是哪几份代码」。
     JudgeVersions,
+    /// 库布局：一行，值是布局号（[`VerdictStoreLayout`]）。
+    LibraryLayout,
+    /// 结论块：键是块键 + 结论种类 + 版本，值是每个状态一个判定向量编号。
+    ConclusionBlocks,
+    /// 结论违例：键是块键 + 结论种类 + 版本 + 块内序号，值是那个状态的判定向量编号。
+    ConclusionViolations,
+    /// 恢复字旁表：键是块键 + 结论种类 + 版本（与结论块同形：几种结论共用一把版本时各存各的），值是每个状态八个字。
+    RecoveryWords,
+    /// 计数向量：键是块键 + 结论种类 + 版本，值是 [`count_vector_bytes`]。
+    ConclusionCountVectors,
+    /// 块属性：键是块键 + 结论种类 + 版本，值是在哪判的（[`JudgingDevice`]）。
+    ConclusionBlockAttributes,
 }
 
 impl VerdictStoreTable {
@@ -251,6 +576,12 @@ impl VerdictStoreTable {
             Self::FlowFacts => 0x07,
             Self::VerifierVerdicts => 0x08,
             Self::JudgeVersions => 0x09,
+            Self::LibraryLayout => 0x00,
+            Self::ConclusionBlocks => 0x0A,
+            Self::ConclusionViolations => 0x0B,
+            Self::RecoveryWords => 0x0C,
+            Self::ConclusionCountVectors => 0x0D,
+            Self::ConclusionBlockAttributes => 0x0E,
         }
     }
 }
@@ -279,6 +610,42 @@ enum VerdictStoreKey<'key> {
     VerifierBlock(&'key VerdictBlockKey, &'key [u8; 32]),
     /// 判法版本表里一版的键。
     JudgeVersionDescription(&'key JudgeVersion),
+    /// 布局行的键（只有表标签）。
+    LibraryLayout,
+    /// 结论块表里一块一种结论的键：块键 + 结论种类 + 版本。
+    ConclusionBlock(
+        &'key VerdictBlockKey,
+        &'key ConclusionKind,
+        &'key ConclusionVersion,
+    ),
+    ConclusionViolation(
+        &'key VerdictBlockKey,
+        &'key ConclusionKind,
+        &'key ConclusionVersion,
+        StateOffsetInBlock,
+    ),
+    /// 结论违例表里这一块这一种结论这一版本下的全部键共有的前缀。
+    ConclusionViolationsOfBlockPrefix(
+        &'key VerdictBlockKey,
+        &'key ConclusionKind,
+        &'key ConclusionVersion,
+    ),
+    /// 恢复字旁表里一块一种结论一版本的键。
+    RecoveryWords(
+        &'key VerdictBlockKey,
+        &'key ConclusionKind,
+        &'key ConclusionVersion,
+    ),
+    ConclusionCountVector(
+        &'key VerdictBlockKey,
+        &'key ConclusionKind,
+        &'key ConclusionVersion,
+    ),
+    ConclusionBlockAttributes(
+        &'key VerdictBlockKey,
+        &'key ConclusionKind,
+        &'key ConclusionVersion,
+    ),
 }
 
 /// 按 [`VerdictStoreKey`] 拼出来的键字节。
@@ -324,6 +691,33 @@ impl VerdictStoreKey<'_> {
             Self::JudgeVersionDescription(version) => {
                 (VerdictStoreTable::JudgeVersions, version.0.to_vec())
             }
+            Self::LibraryLayout => (VerdictStoreTable::LibraryLayout, Vec::new()),
+            Self::ConclusionBlock(block_key, kind, conclusion_version) => (
+                VerdictStoreTable::ConclusionBlocks,
+                block_key.to_block_key_bytes_with_conclusion(kind, conclusion_version),
+            ),
+            Self::ConclusionViolation(block_key, kind, conclusion_version, offset) => {
+                let mut key_bytes_after_tag =
+                    block_key.to_block_key_bytes_with_conclusion(kind, conclusion_version);
+                key_bytes_after_tag.extend_from_slice(&offset.0.to_be_bytes());
+                (VerdictStoreTable::ConclusionViolations, key_bytes_after_tag)
+            }
+            Self::ConclusionViolationsOfBlockPrefix(block_key, kind, conclusion_version) => (
+                VerdictStoreTable::ConclusionViolations,
+                block_key.to_block_key_bytes_with_conclusion(kind, conclusion_version),
+            ),
+            Self::RecoveryWords(block_key, kind, conclusion_version) => (
+                VerdictStoreTable::RecoveryWords,
+                block_key.to_block_key_bytes_with_conclusion(kind, conclusion_version),
+            ),
+            Self::ConclusionCountVector(block_key, kind, conclusion_version) => (
+                VerdictStoreTable::ConclusionCountVectors,
+                block_key.to_block_key_bytes_with_conclusion(kind, conclusion_version),
+            ),
+            Self::ConclusionBlockAttributes(block_key, kind, conclusion_version) => (
+                VerdictStoreTable::ConclusionBlockAttributes,
+                block_key.to_block_key_bytes_with_conclusion(kind, conclusion_version),
+            ),
         };
         let mut key_bytes = Vec::with_capacity(1 + key_bytes_after_tag.len());
         key_bytes.push(table.key_tag());
@@ -382,6 +776,20 @@ pub enum VerdictStoreError {
     /// 这个块键下已经存着不同的块或不同的违例：同一份输入、同一份计划下同一块判出两样，是覆盖、拒绝还是另记，没定，
     /// 第一版不支持；返回之前什么都没写。
     DifferentVerdictsUnderAStoredBlockKeyNotDecidedInTheFirstVersion { block_key: VerdictBlockKey },
+    /// 这一套之前的库（没有布局行）：按结论种类存取与 [`VerdictStore::open_existing_with_conclusion_kinds`] 一律拒绝、不迁移；
+    /// 换一个新目录建库（一趟清空复用的全量）。
+    LibraryLayoutPredatesConclusionKinds { directory: PathBuf },
+    /// 这个（块键，结论种类，版本）下已经存着不同的结论（块、违例、计数向量或恢复字不同）：覆盖、拒绝还是另记没定，第一版不支持；
+    /// 返回之前什么都没写。
+    DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion {
+        block_key: VerdictBlockKey,
+        kind: ConclusionKind,
+    },
+    /// 结论逐项相同、块属性（在哪判的、卡型、驱动版本）不同：留哪一份、两份都记还是拒绝没定，第一版不支持；返回之前什么都没写。
+    DifferentBlockAttributesUnderAStoredConclusionNotDecidedInTheFirstVersion {
+        block_key: VerdictBlockKey,
+        kind: ConclusionKind,
+    },
 }
 
 /// 建库还是开已有的库。
@@ -522,19 +930,129 @@ fn load_verdict_vectors(database: &rocksdb::DB) -> Result<LoadedVerdictVectors, 
     })
 }
 
+/// 一块一种结论在库里的全部行（结论块、违例、计数向量、块属性，给了恢复字的连同恢复字）放进一批。存块与按计划导入都经它，行的写法只在这一处。
+fn put_conclusion_rows_into_the_batch(
+    batch: &mut rocksdb::WriteBatch,
+    block_key: &VerdictBlockKey,
+    kind: &ConclusionKind,
+    conclusion_version: &ConclusionVersion,
+    conclusion: &StoredConclusionBlock,
+) {
+    batch.put(
+        VerdictStoreKey::ConclusionBlock(block_key, kind, conclusion_version)
+            .to_key_bytes()
+            .0,
+        conclusion.block.to_block_value_bytes(),
+    );
+    for violation in &conclusion.violations {
+        batch.put(
+            VerdictStoreKey::ConclusionViolation(
+                block_key,
+                kind,
+                conclusion_version,
+                violation.offset_in_block,
+            )
+            .to_key_bytes()
+            .0,
+            vec![violation.verdict_vector_number.as_u8()],
+        );
+    }
+    batch.put(
+        VerdictStoreKey::ConclusionCountVector(block_key, kind, conclusion_version)
+            .to_key_bytes()
+            .0,
+        count_vector_bytes(&conclusion.count_vector),
+    );
+    batch.put(
+        VerdictStoreKey::ConclusionBlockAttributes(block_key, kind, conclusion_version)
+            .to_key_bytes()
+            .0,
+        conclusion.judged_on.to_attribute_bytes(),
+    );
+    if let Some(recovery_words) = &conclusion.recovery_words {
+        batch.put(
+            VerdictStoreKey::RecoveryWords(block_key, kind, conclusion_version)
+                .to_key_bytes()
+                .0,
+            recovery_words_value_bytes(recovery_words),
+        );
+    }
+}
+
+/// 要存的结论与库里同键那一份比出来的结局（不同的两种是错误，见 [`VerdictStore::stored_conclusion_compared_with`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StoredConclusionComparison {
+    NotStored,
+    StoredIdentically,
+}
+
+/// 按计划导入点名的键（[`VerdictStore::import_the_planned_rows_from`]）：这一趟这条流要从别的机器取回的几样，别的一行都不看。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlannedImportKeys {
+    /// 结论：一项是一块一种结论一把版本。
+    pub conclusions: Vec<(VerdictBlockKey, ConclusionKind, ConclusionVersion)>,
+    /// 路径索引里的路径。
+    pub paths: Vec<String>,
+    /// 核对表的行：块键连同核对代码摘要。导过来的核对行点名的事实表（值的头 32 字节）随它们一起导。
+    pub verifier_blocks: Vec<(VerdictBlockKey, [u8; SHA256_DIGEST_BYTES])>,
+}
+
+/// 按计划导入的账：点名的结论各落在哪一格（写了、本库已有且相同而跳过、对方库里没有），路径、核对行与事实行各写了几行，
+/// 一共写了几个键值行（连同新登记的判定向量那两张表）、同步写了几批。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PlannedImportTally {
+    pub conclusion_blocks_written: u64,
+    pub conclusion_blocks_already_identical: u64,
+    pub conclusion_blocks_missing_in_the_other_library: u64,
+    pub paths_written: u64,
+    pub verifier_blocks_written: u64,
+    pub flow_facts_written: u64,
+    pub rows_written: u64,
+    pub synced_writes: u64,
+}
+
+impl PlannedImportTally {
+    /// 记一批同步写：写下了几行。
+    fn count_a_written_batch(&mut self, rows_written_in_the_batch: u64) {
+        self.rows_written += rows_written_in_the_batch;
+        self.synced_writes += 1;
+    }
+}
+
+/// 按计划导入时一批攒到这么多字节就同步写一次（一块一种结论的行不拆开，块内原子）：一块 GPU 结论连恢复字约 2 MiB
+/// （65536 个状态每个 1 字节编号加 32 字节恢复字），一批装几十块；同步写的次数随写下的字节数线性，攒批的内存有界。数是推的，没量过。
+const PLANNED_IMPORT_BATCH_BYTES: usize = 64 << 20;
+
+/// 按计划导入时正在攒的一批：要写的行，与这一批里新登记的判定向量（按登记次序；这一批写下去之后才进库的内存表）。
+struct PlannedImportBatch {
+    batch: rocksdb::WriteBatch,
+    verdict_vectors_registered_in_the_batch: Vec<EncodedVerdictVector>,
+}
+
+impl PlannedImportBatch {
+    fn empty() -> Self {
+        Self {
+            batch: rocksdb::WriteBatch::default(),
+            verdict_vectors_registered_in_the_batch: Vec::new(),
+        }
+    }
+}
+
 /// 一个打开着的判定库。同一时刻一个库只许一个进程开（RocksDB 的 LOCK 文件），进程里改库的方法都要 `&mut self`，
 /// 所以「先读后写」的两步之间没有别的写者。
 pub struct VerdictStore {
     database: rocksdb::DB,
+    directory: PathBuf,
+    layout: VerdictStoreLayout,
     verdict_vector_by_number: Vec<EncodedVerdictVector>,
     verdict_vector_number_by_content: HashMap<Vec<u8>, VerdictVectorNumber>,
 }
 
 impl VerdictStore {
-    /// 在一个还不存在的目录上建一个空库。
+    /// 在一个还不存在的目录上建一个空库，写下布局行（[`VerdictStoreLayout::ConclusionKinds`]）同步落盘之后才返回。
     ///
     /// # Errors
-    /// 目录已经在了（`LibraryDirectoryAlreadyExists`）、看不了目录在不在、RocksDB 建库失败。
+    /// 目录已经在了（`LibraryDirectoryAlreadyExists`）、看不了目录在不在、RocksDB 建库或写布局行失败。
     pub fn create_empty(directory: &Path) -> Result<Self, VerdictStoreError> {
         if library_directory_exists(directory)? {
             return Err(VerdictStoreError::LibraryDirectoryAlreadyExists {
@@ -543,7 +1061,15 @@ impl VerdictStore {
         }
         let database = rocksdb::DB::open(&library_options(LibraryCreation::CreateEmpty), directory)
             .map_err(VerdictStoreError::RocksDatabase)?;
-        Self::from_opened_database(database)
+        let mut batch = rocksdb::WriteBatch::default();
+        batch.put(
+            VerdictStoreKey::LibraryLayout.to_key_bytes().0,
+            CONCLUSION_KINDS_LAYOUT_NUMBER.to_be_bytes(),
+        );
+        database
+            .write_opt(batch, &synced_write_options())
+            .map_err(VerdictStoreError::RocksDatabase)?;
+        Self::from_opened_database(database, directory)
     }
 
     /// 开一个已有的库；第一次打不开时调一次 `DB::repair` 再开。
@@ -578,16 +1104,40 @@ impl VerdictStore {
                 }
             }
         };
-        Ok((Self::from_opened_database(database)?, opening))
+        Ok((Self::from_opened_database(database, directory)?, opening))
     }
 
-    fn from_opened_database(database: rocksdb::DB) -> Result<Self, VerdictStoreError> {
+    /// 开一个已有的、有结论种类那几张表的库（[`Self::open_existing`] 再看布局）：这一套之前的库拒绝、不迁移。
+    ///
+    /// # Errors
+    /// 同 [`Self::open_existing`]；库没有布局行（`LibraryLayoutPredatesConclusionKinds`）。
+    pub fn open_existing_with_conclusion_kinds(
+        directory: &Path,
+    ) -> Result<(Self, VerdictStoreOpening), VerdictStoreError> {
+        let (store, opening) = Self::open_existing(directory)?;
+        match store.layout {
+            VerdictStoreLayout::ConclusionKinds => Ok((store, opening)),
+            VerdictStoreLayout::BeforeConclusionKinds => {
+                Err(VerdictStoreError::LibraryLayoutPredatesConclusionKinds {
+                    directory: directory.to_path_buf(),
+                })
+            }
+        }
+    }
+
+    fn from_opened_database(
+        database: rocksdb::DB,
+        directory: &Path,
+    ) -> Result<Self, VerdictStoreError> {
+        let layout = read_library_layout(&database)?;
         let LoadedVerdictVectors {
             verdict_vector_by_number,
             verdict_vector_number_by_content,
         } = load_verdict_vectors(&database)?;
         Ok(Self {
             database,
+            directory: directory.to_path_buf(),
+            layout,
             verdict_vector_by_number,
             verdict_vector_number_by_content,
         })
@@ -826,13 +1376,20 @@ impl VerdictStore {
             .map_err(VerdictStoreError::RocksDatabase)
     }
 
-    /// 路径索引登一条：这条路径上的节点是这个身份。同一路径再登、身份相同不算错；身份不同也照写（同名不同数据的分叉在路径这一级并成一段，
-    /// 最后写的那个留在索引里；两边都在块表里，一个不丢）。
+    /// 路径索引登一条：这条路径上的节点是这个身份。同一路径再登、身份相同不算错，什么都不写（与 [`Self::record_block`] 一样先比再写）；
+    /// 身份不同也照写（同名不同数据的分叉在路径这一级并成一段，最后写的那个留在索引里；两边都在块表里，一个不丢）。
     ///
     /// # Errors
-    /// RocksDB 写失败。
+    /// RocksDB 读写失败。
     pub fn record_path(&mut self, path: &str, identity: &str) -> Result<(), VerdictStoreError> {
         let key_bytes = VerdictStoreKey::Path(path).to_key_bytes();
+        let stored_identity = self
+            .database
+            .get(&key_bytes.0)
+            .map_err(VerdictStoreError::RocksDatabase)?;
+        if stored_identity.as_deref() == Some(identity.as_bytes()) {
+            return Ok(());
+        }
         let mut batch = rocksdb::WriteBatch::default();
         batch.put(&key_bytes.0, identity.as_bytes());
         self.database
@@ -1116,10 +1673,11 @@ impl VerdictStore {
     }
 
     /// 把另一台的库导进来（两台各写各的库、最后并成一个）：录入表、路径索引、事实表、核对表与判法版本表逐行照抄；判定块按判定向量的内容在这个库里
-    /// 重新登记编号，连同违例一起写、判法版本照抄；这个库里已有同一块键同一版本、判定相同的算已导入，不同就报错。交回导入的判定块数。
+    /// 重新登记编号，连同违例一起写、判法版本照抄；这个库里已有同一块键同一版本、判定相同的算已导入，不同就报错。另一台有结论种类那几张表的，
+    /// 每块每种结论连同违例、计数向量、块属性与恢复字按同一个办法导（[`Self::store_conclusion_block`]）。交回导入的判定块数与结论块数之和。
     ///
     /// # Errors
-    /// RocksDB 读写失败；同一块键两边判定不同；判定向量超过 256 种。
+    /// RocksDB 读写失败；同一块键两边判定不同；判定向量超过 256 种；另一台有结论而这个库是这一套之前的布局。
     pub fn import_from(&mut self, other: &VerdictStore) -> Result<u64, VerdictStoreError> {
         for (block_key, state_count) in other.recorded_blocks()? {
             self.record_block(&block_key, state_count)?;
@@ -1163,7 +1721,673 @@ impl VerdictStore {
             self.store_verdict_block(&block_key, &version, &renumbered_block, &violating)?;
             imported += 1;
         }
+        let conclusion_keys = match other.layout {
+            VerdictStoreLayout::ConclusionKinds => other.stored_conclusion_keys()?,
+            VerdictStoreLayout::BeforeConclusionKinds => Vec::new(),
+        };
+        for (block_key, kind, conclusion_version) in conclusion_keys {
+            let stored = other
+                .read_conclusion_block(&block_key, &kind, &conclusion_version)?
+                .expect("刚列出来的结论块读得到");
+            let mut renumbered_states =
+                Vec::with_capacity(stored.block.verdict_vector_number_of_each_state().len());
+            for number in stored.block.verdict_vector_number_of_each_state() {
+                let vector = other
+                    .verdict_vector_of_number(*number)
+                    .expect("结论块里的编号在它自己的库里登记过")
+                    .clone();
+                renumbered_states.push(self.register_verdict_vector(&vector)?);
+            }
+            let record = ConclusionBlockRecord {
+                block: VerdictBlock::new(renumbered_states).expect("读回的结论块至少一个状态"),
+                violating_states: stored
+                    .violations
+                    .iter()
+                    .map(|violation| violation.offset_in_block)
+                    .collect(),
+                count_vector: stored.count_vector,
+                judged_on: stored.judged_on,
+                recovery_words: stored.recovery_words,
+            };
+            self.store_conclusion_block(&block_key, &kind, &conclusion_version, &record)?;
+            imported += 1;
+        }
         Ok(imported)
+    }
+
+    /// 按计划导入（[`PlannedImportKeys`]）：只读点名的键，不扫两边的整张表。每一项先在对方库里读，没有就跳过（第二台没判到的块）；
+    /// 结论按判定向量的内容换成这个库的编号（这个库没登记过的判定向量随行一起登记），再照 [`Self::store_conclusion_block`] 的规矩与本库同键的比：
+    /// 逐项相同跳过、不写，结论不同或块属性不同报错；本库没有的连同新登记的判定向量放进一批。路径、核对行与事实行本库已有且逐字节相同的跳过，
+    /// 不同的照写（与 [`Self::record_path`]、[`Self::store_verifier_block`]、[`Self::store_flow_facts`] 同规矩）。一块一种结论的行在同一批里
+    /// （块内原子），一批攒到 [`PLANNED_IMPORT_BATCH_BYTES`] 字节同步写一次，最后一批收尾时写。中途出错时已写下的批留着、正在攒的那一批不写，
+    /// 重跑同一条命令补齐（写下的都是对方库里有的行，重跑逐项相同就跳过）。
+    ///
+    /// 读写次数（N 是点名的项数，与两边库里别的流、别的版本的行数无关）：每项结论对方库四次点读加一次只扫这一块的违例前缀扫、本库一次点读
+    /// （本库有这一块时再三次点读加一次前缀扫，没有时再一次点读看恢复字旁表）；每条路径、每个核对行两边各一次点读；核对行点名的每份事实
+    /// 两边各一次点读；同步写的批数是写下的字节数除以批长向上取整。每个状态换编号查一张 256 格的表，每种判定向量只按内容查一次。
+    ///
+    /// # Errors
+    /// 点名了结论而这个库是这一套之前的布局；RocksDB 读写失败；存着的行不合布局（违例的块内序号不在块里、核对行不到 32 字节这类）；
+    /// 同一（块键，种类，版本）两边结论不同或块属性不同；判定向量超过 256 种。
+    pub fn import_the_planned_rows_from(
+        &mut self,
+        other: &VerdictStore,
+        planned: &PlannedImportKeys,
+    ) -> Result<PlannedImportTally, VerdictStoreError> {
+        if !planned.conclusions.is_empty() {
+            self.refuse_unless_the_conclusion_kinds_layout()?;
+        }
+        let mut tally = PlannedImportTally::default();
+        let mut pending = PlannedImportBatch::empty();
+        // 对方库的编号换成这个库的编号：一次导入里两边的编号都不变（新登记的照次序接在后面），按对方的编号记一次就够
+        let mut this_number_of_each_other_number: Vec<Option<VerdictVectorNumber>> =
+            vec![None; usize::from(u8::MAX) + 1];
+        let mut conclusion_keys_seen: HashSet<Vec<u8>> = HashSet::new();
+        for (block_key, kind, conclusion_version) in &planned.conclusions {
+            let conclusion_key_bytes =
+                VerdictStoreKey::ConclusionBlock(block_key, kind, conclusion_version)
+                    .to_key_bytes();
+            if !conclusion_keys_seen.insert(conclusion_key_bytes.0.clone()) {
+                continue;
+            }
+            let other_conclusion = match other.layout {
+                VerdictStoreLayout::ConclusionKinds => {
+                    other.read_conclusion_block(block_key, kind, conclusion_version)?
+                }
+                VerdictStoreLayout::BeforeConclusionKinds => None,
+            };
+            let Some(other_conclusion) = other_conclusion else {
+                tally.conclusion_blocks_missing_in_the_other_library += 1;
+                continue;
+            };
+            let requested = self.conclusion_renumbered_for_the_planned_import(
+                other,
+                other_conclusion,
+                &conclusion_key_bytes,
+                &mut this_number_of_each_other_number,
+                &mut pending,
+            )?;
+            match self.stored_conclusion_compared_with(
+                block_key,
+                kind,
+                conclusion_version,
+                &requested,
+            )? {
+                StoredConclusionComparison::StoredIdentically => {
+                    tally.conclusion_blocks_already_identical += 1;
+                }
+                StoredConclusionComparison::NotStored => {
+                    put_conclusion_rows_into_the_batch(
+                        &mut pending.batch,
+                        block_key,
+                        kind,
+                        conclusion_version,
+                        &requested,
+                    );
+                    tally.conclusion_blocks_written += 1;
+                    if let Some(rows) =
+                        self.write_the_planned_import_batch_when_full(&mut pending)?
+                    {
+                        tally.count_a_written_batch(rows);
+                    }
+                }
+            }
+        }
+        let mut paths_seen: HashSet<&str> = HashSet::new();
+        for path in &planned.paths {
+            if !paths_seen.insert(path.as_str()) {
+                continue;
+            }
+            let Some(identity) = other.identity_of_path(path)? else {
+                continue;
+            };
+            if self.identity_of_path(path)?.as_deref() == Some(identity.as_str()) {
+                continue;
+            }
+            pending.batch.put(
+                VerdictStoreKey::Path(path).to_key_bytes().0,
+                identity.as_bytes(),
+            );
+            tally.paths_written += 1;
+        }
+        let mut verifier_keys_seen: HashSet<Vec<u8>> = HashSet::new();
+        let mut facts_digests_named: BTreeSet<[u8; SHA256_DIGEST_BYTES]> = BTreeSet::new();
+        for (block_key, verifier_digest) in &planned.verifier_blocks {
+            let key_bytes =
+                VerdictStoreKey::VerifierBlock(block_key, verifier_digest).to_key_bytes();
+            if !verifier_keys_seen.insert(key_bytes.0.clone()) {
+                continue;
+            }
+            let Some(value_bytes) = other
+                .database
+                .get(&key_bytes.0)
+                .map_err(VerdictStoreError::RocksDatabase)?
+            else {
+                continue;
+            };
+            let facts_digest = value_bytes
+                .get(..SHA256_DIGEST_BYTES)
+                .and_then(|digest_bytes| <[u8; SHA256_DIGEST_BYTES]>::try_from(digest_bytes).ok())
+                .ok_or_else(|| {
+                    stored_bytes_mismatch(
+                        VerdictStoreTable::VerifierVerdicts,
+                        &key_bytes.0,
+                        "核对行的值要以 32 字节事实摘要起头",
+                    )
+                })?;
+            facts_digests_named.insert(facts_digest);
+            let stored_value = self
+                .database
+                .get(&key_bytes.0)
+                .map_err(VerdictStoreError::RocksDatabase)?;
+            if stored_value.as_deref() == Some(value_bytes.as_slice()) {
+                continue;
+            }
+            pending.batch.put(&key_bytes.0, &value_bytes);
+            tally.verifier_blocks_written += 1;
+            if let Some(rows) = self.write_the_planned_import_batch_when_full(&mut pending)? {
+                tally.count_a_written_batch(rows);
+            }
+        }
+        for facts_digest in &facts_digests_named {
+            let Some(facts_bytes) = other.read_flow_facts(facts_digest)? else {
+                continue;
+            };
+            if self.read_flow_facts(facts_digest)?.as_deref() == Some(facts_bytes.as_slice()) {
+                continue;
+            }
+            pending.batch.put(
+                VerdictStoreKey::FlowFacts(facts_digest).to_key_bytes().0,
+                &facts_bytes,
+            );
+            tally.flow_facts_written += 1;
+            if let Some(rows) = self.write_the_planned_import_batch_when_full(&mut pending)? {
+                tally.count_a_written_batch(rows);
+            }
+        }
+        if !pending.batch.is_empty() {
+            tally.count_a_written_batch(self.write_the_planned_import_batch(pending)?);
+        }
+        Ok(tally)
+    }
+
+    /// 攒着的那一批到了 [`PLANNED_IMPORT_BATCH_BYTES`] 字节就同步写下去、换一批空的接着攒；交回写下的行数，没到交回 None。
+    ///
+    /// # Errors
+    /// RocksDB 写失败。
+    fn write_the_planned_import_batch_when_full(
+        &mut self,
+        pending: &mut PlannedImportBatch,
+    ) -> Result<Option<u64>, VerdictStoreError> {
+        if pending.batch.size_in_bytes() < PLANNED_IMPORT_BATCH_BYTES {
+            return Ok(None);
+        }
+        let full_batch = std::mem::replace(pending, PlannedImportBatch::empty());
+        self.write_the_planned_import_batch(full_batch).map(Some)
+    }
+
+    /// 对方库读回的一块一种结论换成这个库的编号：每种判定向量按内容找这个库的编号，这个库没有的在攒着的那一批里登记（编号接在已登记的
+    /// 与这一批已登记的后面）；违例的编号取换过编号的块里那个状态的（同 [`Self::store_conclusion_block`]）。
+    ///
+    /// # Errors
+    /// 判定向量超过 256 种（`MoreThan256VerdictVectorsNotDecidedInTheFirstVersion`，这一批没写）；对方库的违例的块内序号不在块里。
+    fn conclusion_renumbered_for_the_planned_import(
+        &self,
+        other: &VerdictStore,
+        other_conclusion: StoredConclusionBlock,
+        conclusion_key_bytes: &VerdictStoreKeyBytes,
+        this_number_of_each_other_number: &mut [Option<VerdictVectorNumber>],
+        pending: &mut PlannedImportBatch,
+    ) -> Result<StoredConclusionBlock, VerdictStoreError> {
+        let other_numbers = other_conclusion.block.verdict_vector_number_of_each_state();
+        let mut this_numbers = Vec::with_capacity(other_numbers.len());
+        for other_number in other_numbers {
+            let slot = this_number_of_each_other_number
+                .get_mut(usize::from(other_number.as_u8()))
+                .expect("换编号的表有 256 格，编号是一个字节");
+            let this_number = match *slot {
+                Some(this_number) => this_number,
+                None => {
+                    let vector = other.verdict_vector_of_number(*other_number).expect(
+                        "对方库读回的结论块里的编号在它自己的库里登记过（read_conclusion_block 逐个核过）",
+                    );
+                    let this_number =
+                        self.verdict_vector_number_for_the_planned_import(vector, pending)?;
+                    *slot = Some(this_number);
+                    this_number
+                }
+            };
+            this_numbers.push(this_number);
+        }
+        let block = VerdictBlock::new(this_numbers).expect("读回的结论块至少一个状态");
+        let mut violations = Vec::with_capacity(other_conclusion.violations.len());
+        for violation in &other_conclusion.violations {
+            let Some(verdict_vector_number) =
+                block.verdict_vector_number_at(violation.offset_in_block)
+            else {
+                return Err(stored_bytes_mismatch(
+                    VerdictStoreTable::ConclusionViolations,
+                    &conclusion_key_bytes.0,
+                    "对方库这一块这一种结论有一处违例的块内序号不在块里",
+                ));
+            };
+            violations.push(StoredViolation {
+                offset_in_block: violation.offset_in_block,
+                verdict_vector_number,
+            });
+        }
+        Ok(StoredConclusionBlock {
+            block,
+            violations,
+            count_vector: other_conclusion.count_vector,
+            judged_on: other_conclusion.judged_on,
+            recovery_words: other_conclusion.recovery_words,
+        })
+    }
+
+    /// 一种判定向量在这个库里的编号：登记过的照旧；这一批里已登记的照它在批里的次序；都没有的放进这一批登记（两张表各一行），编号接在后面。
+    ///
+    /// # Errors
+    /// 加上这一种就超过 256 种（`MoreThan256VerdictVectorsNotDecidedInTheFirstVersion`，这一批没写）。
+    fn verdict_vector_number_for_the_planned_import(
+        &self,
+        verdict_vector: &EncodedVerdictVector,
+        pending: &mut PlannedImportBatch,
+    ) -> Result<VerdictVectorNumber, VerdictStoreError> {
+        if let Some(registered_number) =
+            self.verdict_vector_number_by_content.get(&verdict_vector.0)
+        {
+            return Ok(*registered_number);
+        }
+        let registered_count = self.verdict_vector_by_number.len();
+        if let Some(position_in_the_batch) = pending
+            .verdict_vectors_registered_in_the_batch
+            .iter()
+            .position(|registered_in_the_batch| registered_in_the_batch == verdict_vector)
+        {
+            let number = u8::try_from(registered_count + position_in_the_batch)
+                .expect("放进这一批时核过编号装得进一个字节");
+            return Ok(VerdictVectorNumber(number));
+        }
+        let Ok(next_number) =
+            u8::try_from(registered_count + pending.verdict_vectors_registered_in_the_batch.len())
+        else {
+            return Err(VerdictStoreError::MoreThan256VerdictVectorsNotDecidedInTheFirstVersion);
+        };
+        let number = VerdictVectorNumber(next_number);
+        pending.batch.put(
+            VerdictStoreKey::VerdictVectorNumberByContent(verdict_vector)
+                .to_key_bytes()
+                .0,
+            [number.0],
+        );
+        pending.batch.put(
+            VerdictStoreKey::VerdictVectorContentByNumber(number)
+                .to_key_bytes()
+                .0,
+            &verdict_vector.0,
+        );
+        pending
+            .verdict_vectors_registered_in_the_batch
+            .push(verdict_vector.clone());
+        Ok(number)
+    }
+
+    /// 把攒好的一批同步写下去，写下去之后这一批登记的判定向量才进内存表；交回写下的键值行数。
+    ///
+    /// # Errors
+    /// RocksDB 写失败（这一批一行都没进库，内存表也不动）。
+    fn write_the_planned_import_batch(
+        &mut self,
+        pending: PlannedImportBatch,
+    ) -> Result<u64, VerdictStoreError> {
+        let rows = u64::try_from(pending.batch.len()).expect("一批的行数装得进 u64");
+        self.database
+            .write_opt(pending.batch, &synced_write_options())
+            .map_err(VerdictStoreError::RocksDatabase)?;
+        for verdict_vector in pending.verdict_vectors_registered_in_the_batch {
+            let number = VerdictVectorNumber(
+                u8::try_from(self.verdict_vector_by_number.len())
+                    .expect("放进这一批时核过编号装得进一个字节"),
+            );
+            self.verdict_vector_number_by_content
+                .insert(verdict_vector.0.clone(), number);
+            self.verdict_vector_by_number.push(verdict_vector);
+        }
+        Ok(rows)
+    }
+
+    /// 库的布局：建库时写的布局行（[`VerdictStore::create_empty`] 写），这一套之前的库没有这一行。
+    #[must_use]
+    pub fn layout(&self) -> VerdictStoreLayout {
+        self.layout
+    }
+
+    /// 按结论种类存取之前先看布局：这一套之前的库一律拒绝、什么都不写。
+    fn refuse_unless_the_conclusion_kinds_layout(&self) -> Result<(), VerdictStoreError> {
+        match self.layout {
+            VerdictStoreLayout::ConclusionKinds => Ok(()),
+            VerdictStoreLayout::BeforeConclusionKinds => {
+                Err(VerdictStoreError::LibraryLayoutPredatesConclusionKinds {
+                    directory: self.directory.clone(),
+                })
+            }
+        }
+    }
+
+    /// 存一块一种结论（第三轮判决 J7、J8，第二轮判决 L1-8）：结论块、它的违例、计数向量、块属性与恢复字同一批同步写下去之后才返回；
+    /// 违例状态的判定向量编号取块里那个状态的。同一块在别的种类、别的版本下的行不受影响。
+    ///
+    /// # Errors
+    /// 这一套之前的库（`LibraryLayoutPredatesConclusionKinds`，什么都没写）；这个（块键，种类，版本）下已经存着不同的结论
+    /// （`DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion`）或结论相同而块属性不同
+    /// （`DifferentBlockAttributesUnderAStoredConclusionNotDecidedInTheFirstVersion`），两种都什么都没写；已存的行读回来不合布局；RocksDB 读写失败。
+    ///
+    /// # Panics
+    /// 块里有这个库没登记过的编号、违例状态的块内序号不在块里、恢复字条数与块长不等：都是调用方的 bug。
+    pub fn store_conclusion_block(
+        &mut self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+        record: &ConclusionBlockRecord,
+    ) -> Result<VerdictBlockStoring, VerdictStoreError> {
+        self.refuse_unless_the_conclusion_kinds_layout()?;
+        let registered_count = self.verdict_vector_by_number.len();
+        let numbers_of_each_state = record.block.verdict_vector_number_of_each_state();
+        assert!(
+            numbers_of_each_state
+                .iter()
+                .all(|state_number| usize::from(state_number.as_u8()) < registered_count),
+            "结论块里的判定向量编号必须是这个库登记过的（这个库登记了 {registered_count} 种）"
+        );
+        if let Some(recovery_words) = &record.recovery_words {
+            assert_eq!(
+                recovery_words.len(),
+                numbers_of_each_state.len(),
+                "恢复字每个状态一份：调用方给的条数与块长不等"
+            );
+        }
+        let requested = StoredConclusionBlock {
+            block: record.block.clone(),
+            violations: record
+                .violating_states
+                .iter()
+                .copied()
+                .collect::<BTreeSet<StateOffsetInBlock>>()
+                .into_iter()
+                .map(|offset_in_block| StoredViolation {
+                    offset_in_block,
+                    verdict_vector_number: record
+                        .block
+                        .verdict_vector_number_at(offset_in_block)
+                        .expect("结论违例的块内序号必须在块里（调用方给的序号超出了块长）"),
+                })
+                .collect(),
+            count_vector: record.count_vector.clone(),
+            judged_on: record.judged_on.clone(),
+            recovery_words: record.recovery_words.clone(),
+        };
+        match self.stored_conclusion_compared_with(
+            block_key,
+            kind,
+            conclusion_version,
+            &requested,
+        )? {
+            StoredConclusionComparison::StoredIdentically => {
+                return Ok(VerdictBlockStoring::AlreadyStoredIdentically)
+            }
+            StoredConclusionComparison::NotStored => {}
+        }
+        let mut batch = rocksdb::WriteBatch::default();
+        put_conclusion_rows_into_the_batch(
+            &mut batch,
+            block_key,
+            kind,
+            conclusion_version,
+            &requested,
+        );
+        self.database
+            .write_opt(batch, &synced_write_options())
+            .map_err(VerdictStoreError::RocksDatabase)?;
+        Ok(VerdictBlockStoring::WrittenAndSynced)
+    }
+
+    /// 要存的一块一种结论（编号已是这个库的）与库里这个（块键，种类，版本）下存着的比：没存过（恢复字旁表也没有这一行）交回
+    /// `NotStored`；块、违例、计数向量、恢复字与块属性都相同交回 `StoredIdentically`。存块与按计划导入都经它，规矩只在这一处。
+    ///
+    /// # Errors
+    /// 结论不同（`DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion`）；结论相同、块属性不同
+    /// （`DifferentBlockAttributesUnderAStoredConclusionNotDecidedInTheFirstVersion`）；恢复字旁表有这一行而结论块表没有；
+    /// 已存的行读回来不合布局；RocksDB 读失败。
+    fn stored_conclusion_compared_with(
+        &self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+        requested: &StoredConclusionBlock,
+    ) -> Result<StoredConclusionComparison, VerdictStoreError> {
+        if let Some(stored) = self.read_conclusion_block(block_key, kind, conclusion_version)? {
+            let is_the_same_conclusion = stored.block == requested.block
+                && stored.violations == requested.violations
+                && stored.count_vector == requested.count_vector
+                && stored.recovery_words == requested.recovery_words;
+            if !is_the_same_conclusion {
+                return Err(
+                    VerdictStoreError::DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion {
+                        block_key: block_key.clone(),
+                        kind: kind.clone(),
+                    },
+                );
+            }
+            if stored.judged_on != requested.judged_on {
+                return Err(VerdictStoreError::DifferentBlockAttributesUnderAStoredConclusionNotDecidedInTheFirstVersion {
+                    block_key: block_key.clone(),
+                    kind: kind.clone(),
+                });
+            }
+            return Ok(StoredConclusionComparison::StoredIdentically);
+        }
+        let recovery_words_key =
+            VerdictStoreKey::RecoveryWords(block_key, kind, conclusion_version).to_key_bytes();
+        let stray_recovery_words = self
+            .database
+            .get(&recovery_words_key.0)
+            .map_err(VerdictStoreError::RocksDatabase)?;
+        if stray_recovery_words.is_some() {
+            return Err(stored_bytes_mismatch(
+                VerdictStoreTable::RecoveryWords,
+                &recovery_words_key.0,
+                "恢复字旁表有这一块这一种结论这一版本，结论块表没有",
+            ));
+        }
+        Ok(StoredConclusionComparison::NotStored)
+    }
+
+    /// 读回一块一种结论，连同违例、计数向量、块属性与恢复字；这个（块键，种类，版本）没存过时是 `None`（别的种类、别的版本存过也是 `None`）。
+    ///
+    /// # Errors
+    /// 这一套之前的库；存着的结论块是空的或点名了没登记的编号、缺计数向量或块属性、计数向量或块属性或恢复字不合布局；RocksDB 读失败。
+    pub fn read_conclusion_block(
+        &self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+    ) -> Result<Option<StoredConclusionBlock>, VerdictStoreError> {
+        self.refuse_unless_the_conclusion_kinds_layout()?;
+        let conclusion_key =
+            VerdictStoreKey::ConclusionBlock(block_key, kind, conclusion_version).to_key_bytes();
+        let Some(conclusion_value_bytes) = self
+            .database
+            .get(&conclusion_key.0)
+            .map_err(VerdictStoreError::RocksDatabase)?
+        else {
+            return Ok(None);
+        };
+        let numbers_of_each_state = conclusion_value_bytes
+            .iter()
+            .map(|stored_number| {
+                self.registered_verdict_vector_number(
+                    VerdictStoreTable::ConclusionBlocks,
+                    &conclusion_key.0,
+                    *stored_number,
+                )
+            })
+            .collect::<Result<Vec<VerdictVectorNumber>, VerdictStoreError>>()?;
+        let state_count = numbers_of_each_state.len();
+        let block =
+            VerdictBlock::new(numbers_of_each_state).map_err(|EmptyVerdictBlockRejected| {
+                stored_bytes_mismatch(
+                    VerdictStoreTable::ConclusionBlocks,
+                    &conclusion_key.0,
+                    "存着的结论块值是空的",
+                )
+            })?;
+        let read_required_value = |table: VerdictStoreTable, key_bytes: VerdictStoreKeyBytes| {
+            self.database
+                .get(&key_bytes.0)
+                .map_err(VerdictStoreError::RocksDatabase)?
+                .ok_or_else(|| stored_bytes_mismatch(table, &key_bytes.0, "结论块在而这一行缺着"))
+                .map(|value_bytes| (key_bytes, value_bytes))
+        };
+        let (count_key, count_bytes) = read_required_value(
+            VerdictStoreTable::ConclusionCountVectors,
+            VerdictStoreKey::ConclusionCountVector(block_key, kind, conclusion_version)
+                .to_key_bytes(),
+        )?;
+        let count_vector = count_vector_from_bytes(&count_bytes).ok_or_else(|| {
+            stored_bytes_mismatch(
+                VerdictStoreTable::ConclusionCountVectors,
+                &count_key.0,
+                "计数向量的字节不合布局",
+            )
+        })?;
+        let (attribute_key, attribute_bytes) = read_required_value(
+            VerdictStoreTable::ConclusionBlockAttributes,
+            VerdictStoreKey::ConclusionBlockAttributes(block_key, kind, conclusion_version)
+                .to_key_bytes(),
+        )?;
+        let judged_on = JudgingDevice::from_attribute_bytes(&attribute_bytes).ok_or_else(|| {
+            stored_bytes_mismatch(
+                VerdictStoreTable::ConclusionBlockAttributes,
+                &attribute_key.0,
+                "块属性的字节不合布局",
+            )
+        })?;
+        let recovery_words_key =
+            VerdictStoreKey::RecoveryWords(block_key, kind, conclusion_version).to_key_bytes();
+        let recovery_words = match self
+            .database
+            .get(&recovery_words_key.0)
+            .map_err(VerdictStoreError::RocksDatabase)?
+        {
+            None => None,
+            Some(words_bytes) => Some(
+                recovery_words_from_value_bytes(&words_bytes, state_count).ok_or_else(|| {
+                    stored_bytes_mismatch(
+                        VerdictStoreTable::RecoveryWords,
+                        &recovery_words_key.0,
+                        "恢复字不是块里每个状态八个字",
+                    )
+                })?,
+            ),
+        };
+        Ok(Some(StoredConclusionBlock {
+            block,
+            violations: self.conclusion_violations_in_block(block_key, kind, conclusion_version)?,
+            count_vector,
+            judged_on,
+            recovery_words,
+        }))
+    }
+
+    /// 这一块一种结论的违例，按块内序号排。
+    fn conclusion_violations_in_block(
+        &self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+    ) -> Result<Vec<StoredViolation>, VerdictStoreError> {
+        let prefix =
+            VerdictStoreKey::ConclusionViolationsOfBlockPrefix(block_key, kind, conclusion_version)
+                .to_key_bytes();
+        let prefix_length = prefix.0.len();
+        let mut violations = Vec::new();
+        for entry in entries_with_key_prefix(&self.database, prefix) {
+            let (key_bytes, number_bytes) = entry.map_err(VerdictStoreError::RocksDatabase)?;
+            let offset_bytes =
+                <[u8; STATE_OFFSET_IN_BLOCK_BYTES]>::try_from(&key_bytes[prefix_length..]);
+            let (Ok(offset_bytes), &[stored_number]) = (offset_bytes, &*number_bytes) else {
+                return Err(stored_bytes_mismatch(
+                    VerdictStoreTable::ConclusionViolations,
+                    &key_bytes,
+                    "结论违例表里版本之后不是 8 字节的块内序号，或值不是一个字节",
+                ));
+            };
+            violations.push(StoredViolation {
+                offset_in_block: StateOffsetInBlock(u64::from_be_bytes(offset_bytes)),
+                verdict_vector_number: self.registered_verdict_vector_number(
+                    VerdictStoreTable::ConclusionViolations,
+                    &key_bytes,
+                    stored_number,
+                )?,
+            });
+        }
+        Ok(violations)
+    }
+
+    /// 一块要的几种结论里哪几种还没有（按给的次序）：「哪一种没有就只排那一种」（第三轮判决 J8）。每一项的版本由调用方给：
+    /// GPU 判器一把、这一块的设点文件那一把 CPU、挂在这个节点上的每个观察者各一把。
+    ///
+    /// # Errors
+    /// 这一套之前的库；RocksDB 读失败。
+    pub fn conclusions_missing_for_block(
+        &self,
+        block_key: &VerdictBlockKey,
+        required: &[(ConclusionKind, ConclusionVersion)],
+    ) -> Result<Vec<(ConclusionKind, ConclusionVersion)>, VerdictStoreError> {
+        self.refuse_unless_the_conclusion_kinds_layout()?;
+        let mut missing = Vec::new();
+        for (kind, conclusion_version) in required {
+            let key_bytes = VerdictStoreKey::ConclusionBlock(block_key, kind, conclusion_version)
+                .to_key_bytes();
+            let stored = self
+                .database
+                .get(&key_bytes.0)
+                .map_err(VerdictStoreError::RocksDatabase)?;
+            if stored.is_none() {
+                missing.push((kind.clone(), *conclusion_version));
+            }
+        }
+        Ok(missing)
+    }
+
+    /// 结论块表里的全部（块键，种类，版本），按键序：同一块几种结论、几把版本就有几行。
+    ///
+    /// # Errors
+    /// 这一套之前的库；RocksDB 读失败；键字节认不回来。
+    pub fn stored_conclusion_keys(
+        &self,
+    ) -> Result<Vec<(VerdictBlockKey, ConclusionKind, ConclusionVersion)>, VerdictStoreError> {
+        self.refuse_unless_the_conclusion_kinds_layout()?;
+        self.block_keys_of_table(VerdictStoreTable::ConclusionBlocks)?
+            .into_iter()
+            .map(|(block_key, suffix, _value)| {
+                let unreadable = || {
+                    stored_bytes_mismatch(
+                        VerdictStoreTable::ConclusionBlocks,
+                        &suffix,
+                        "结论块的键在块键之后要是结论种类加 32 字节的版本",
+                    )
+                };
+                let (kind, version_bytes) =
+                    conclusion_kind_from_key_bytes(&suffix).ok_or_else(unreadable)?;
+                let conclusion_version = <[u8; SHA256_DIGEST_BYTES]>::try_from(version_bytes)
+                    .map(ConclusionVersion)
+                    .map_err(|_| unreadable())?;
+                Ok((block_key, kind, conclusion_version))
+            })
+            .collect()
     }
 
     #[cfg(test)]
@@ -1926,6 +3150,979 @@ mod tests {
             merged.judge_versions().expect("列版本").len(),
             2,
             "判法版本表随导入合并"
+        );
+    }
+
+    const GPU_CONCLUSION_VERSION: ConclusionVersion =
+        ConclusionVersion([0x51; SHA256_DIGEST_BYTES]);
+    const CPU_CONCLUSION_VERSION: ConclusionVersion =
+        ConclusionVersion([0x52; SHA256_DIGEST_BYTES]);
+    const OBSERVER_CONCLUSION_VERSION: ConclusionVersion =
+        ConclusionVersion([0x53; SHA256_DIGEST_BYTES]);
+
+    fn observer_kind(name: &str) -> ConclusionKind {
+        ConclusionKind::Observer {
+            observer_name: ObserverName::new(name).expect("测试里的观察者名非空、不长"),
+        }
+    }
+
+    fn count_vector_of(states: u64) -> BlockCountVector {
+        BlockCountVector {
+            per_invariant: BTreeMap::from([
+                (
+                    "allocation_record_matches_the_tree".to_string(),
+                    InvariantStateCounts {
+                        judged: states - 1,
+                        violated: 1,
+                        not_applicable: 1,
+                    },
+                ),
+                (
+                    "root_record_names_a_reachable_tree".to_string(),
+                    InvariantStateCounts {
+                        judged: states,
+                        violated: 0,
+                        not_applicable: 0,
+                    },
+                ),
+            ]),
+            per_observer: BTreeMap::from([("mounted_states".to_string(), states)]),
+            states_by_publish: BTreeMap::from([
+                ("instance2_txg5".to_string(), states - 1),
+                ("every_write_persisted".to_string(), 1),
+            ]),
+        }
+    }
+
+    fn recovery_words_of(states: u32) -> Vec<RecoveryWordsOfState> {
+        (0..states)
+            .map(|state| RecoveryWordsOfState([2, 5 + state, 1, 0, 2, 4, 1, 100 + state]))
+            .collect()
+    }
+
+    fn conclusion_record(block: VerdictBlock, violating_states: &[u64]) -> ConclusionBlockRecord {
+        let states = u32::try_from(block.verdict_vector_number_of_each_state().len())
+            .expect("测试里的块不长");
+        ConclusionBlockRecord {
+            block,
+            violating_states: violating_states
+                .iter()
+                .copied()
+                .map(StateOffsetInBlock)
+                .collect(),
+            count_vector: count_vector_of(u64::from(states)),
+            judged_on: JudgingDevice::Gpu {
+                card_type: "probe card".to_string(),
+                driver_version: "probe driver 1".to_string(),
+            },
+            recovery_words: Some(recovery_words_of(states)),
+        }
+    }
+
+    /// 同一块三种结论各存各的：存了 GPU 的，CPU 与观察者照样缺着（只排那两种）；种类不同、版本字节相同也互不顶替；
+    /// 两个名字前缀相同的观察者是两种；三种都存了就一种都不缺，结论块表三行。
+    #[test]
+    fn three_conclusion_kinds_of_one_block_are_reused_and_missing_separately() {
+        let directory = TemporaryLibraryDirectory::new("three-kinds");
+        let mut store = VerdictStore::create_empty(&directory.path).expect("建库");
+        let clean = store
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let red = store
+            .register_verdict_vector(&verdict_vector(b"red"))
+            .expect("登记");
+        let block_key = block_key_named("node", 0);
+        let observer = observer_kind("mount");
+        let required = [
+            (ConclusionKind::GpuJudge, GPU_CONCLUSION_VERSION),
+            (ConclusionKind::CpuJudge, CPU_CONCLUSION_VERSION),
+            (observer.clone(), OBSERVER_CONCLUSION_VERSION),
+        ];
+        assert_eq!(
+            store
+                .conclusions_missing_for_block(&block_key, &required)
+                .expect("对账"),
+            required.to_vec(),
+            "空库三种都缺"
+        );
+        store
+            .store_conclusion_block(
+                &block_key,
+                &ConclusionKind::GpuJudge,
+                &GPU_CONCLUSION_VERSION,
+                &conclusion_record(block_of(&[clean, red]), &[1]),
+            )
+            .expect("存 GPU 结论");
+        assert_eq!(
+            store
+                .conclusions_missing_for_block(&block_key, &required)
+                .expect("对账"),
+            required[1..].to_vec(),
+            "存了 GPU 的，只缺 CPU 与观察者"
+        );
+        assert_eq!(
+            store
+                .read_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::CpuJudge,
+                    &GPU_CONCLUSION_VERSION
+                )
+                .expect("读"),
+            None,
+            "CPU 种类拿 GPU 那把版本的字节读不到 GPU 的结论"
+        );
+        store
+            .store_conclusion_block(
+                &block_key,
+                &ConclusionKind::CpuJudge,
+                &CPU_CONCLUSION_VERSION,
+                &conclusion_record(block_of(&[clean, clean]), &[]),
+            )
+            .expect("存 CPU 结论：与 GPU 那份不同也不算冲突");
+        assert_eq!(
+            store
+                .conclusions_missing_for_block(&block_key, &required)
+                .expect("对账"),
+            required[2..].to_vec(),
+            "只缺观察者"
+        );
+        let longer_name_observer = observer_kind("mounts");
+        store
+            .store_conclusion_block(
+                &block_key,
+                &longer_name_observer,
+                &OBSERVER_CONCLUSION_VERSION,
+                &conclusion_record(block_of(&[clean, clean]), &[]),
+            )
+            .expect("存另一个观察者的结果");
+        assert_eq!(
+            store
+                .conclusions_missing_for_block(&block_key, &required)
+                .expect("对账"),
+            required[2..].to_vec(),
+            "名字前缀相同的另一个观察者顶替不了这一个"
+        );
+        store
+            .store_conclusion_block(
+                &block_key,
+                &observer,
+                &OBSERVER_CONCLUSION_VERSION,
+                &conclusion_record(block_of(&[red, clean]), &[0]),
+            )
+            .expect("存观察者结果");
+        assert_eq!(
+            store
+                .conclusions_missing_for_block(&block_key, &required)
+                .expect("对账"),
+            Vec::new(),
+            "三种都有了"
+        );
+        assert_eq!(
+            store
+                .read_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::GpuJudge,
+                    &GPU_CONCLUSION_VERSION
+                )
+                .expect("读")
+                .map(|stored| stored.block),
+            Some(block_of(&[clean, red])),
+            "GPU 的结论没被后存的两种顶掉"
+        );
+        assert_eq!(
+            store.stored_conclusion_keys().expect("列").len(),
+            4,
+            "结论块表四行：GPU、CPU、两个观察者"
+        );
+    }
+
+    /// 一块一种结论连同计数向量、块属性与恢复字写下去再读回逐项相同；关库重开照样相同。恢复字另一张表存，不进判定向量编号：
+    /// 存完判定向量还是登记的那两种。
+    #[test]
+    fn a_conclusion_block_reads_back_with_its_count_vector_attributes_and_recovery_words() {
+        let directory = TemporaryLibraryDirectory::new("conclusion-read-back");
+        let block_key = block_key_named("node", 65536);
+        let (record, red) = {
+            let mut store = VerdictStore::create_empty(&directory.path).expect("建库");
+            let clean = store
+                .register_verdict_vector(&verdict_vector(b""))
+                .expect("登记");
+            let red = store
+                .register_verdict_vector(&verdict_vector(b"red"))
+                .expect("登记");
+            let record = conclusion_record(block_of(&[clean, red, clean]), &[1]);
+            assert_eq!(
+                store
+                    .store_conclusion_block(
+                        &block_key,
+                        &ConclusionKind::CpuJudge,
+                        &CPU_CONCLUSION_VERSION,
+                        &record
+                    )
+                    .expect("存"),
+                VerdictBlockStoring::WrittenAndSynced
+            );
+            assert_eq!(
+                store.verdict_vector_by_number.len(),
+                2,
+                "恢复字不进判定向量编号"
+            );
+            let recovery_words_row = store
+                .database
+                .get(
+                    VerdictStoreKey::RecoveryWords(
+                        &block_key,
+                        &ConclusionKind::CpuJudge,
+                        &CPU_CONCLUSION_VERSION,
+                    )
+                    .to_key_bytes()
+                    .0,
+                )
+                .expect("读原始值")
+                .expect("恢复字在旁表里");
+            assert_eq!(
+                recovery_words_row.len(),
+                3 * RECOVERY_WORDS_PER_STATE * 4,
+                "旁表里每个状态八个字、每字四个字节"
+            );
+            (record, red)
+        };
+        let (store, opening) =
+            VerdictStore::open_existing_with_conclusion_kinds(&directory.path).expect("重开");
+        assert_eq!(opening, VerdictStoreOpening::OpenedAtTheFirstAttempt);
+        assert_eq!(store.layout(), VerdictStoreLayout::ConclusionKinds);
+        let stored = store
+            .read_conclusion_block(
+                &block_key,
+                &ConclusionKind::CpuJudge,
+                &CPU_CONCLUSION_VERSION,
+            )
+            .expect("读")
+            .expect("存过");
+        assert_eq!(stored.block, record.block);
+        assert_eq!(
+            stored.violations,
+            vec![StoredViolation {
+                offset_in_block: StateOffsetInBlock(1),
+                verdict_vector_number: red,
+            }]
+        );
+        assert_eq!(stored.count_vector, record.count_vector, "计数向量随块读回");
+        assert_eq!(stored.judged_on, record.judged_on, "块属性随块读回");
+        assert_eq!(
+            stored.recovery_words, record.recovery_words,
+            "恢复字随块读回"
+        );
+    }
+
+    /// 计数向量写成字节再读回逐项相同（空的也一样）；格式号不对、读不够、后面多出字节、名字不是严格升序的，都读不回。
+    #[test]
+    fn count_vector_bytes_round_trip_and_refuse_malformed_bytes() {
+        let count_vector = count_vector_of(7);
+        let bytes = count_vector_bytes(&count_vector);
+        assert_eq!(count_vector_from_bytes(&bytes), Some(count_vector.clone()));
+        assert_eq!(
+            count_vector_from_bytes(&count_vector_bytes(&BlockCountVector::default())),
+            Some(BlockCountVector::default())
+        );
+        let mut wrong_format = bytes.clone();
+        wrong_format[0] = COUNT_VECTOR_FORMAT_NUMBER + 1;
+        let mut trailing = bytes.clone();
+        trailing.push(0);
+        let truncated = &bytes[..bytes.len() - 1];
+        for (malformed, what) in [
+            (&wrong_format[..], "格式号不对"),
+            (&trailing[..], "后面多出字节"),
+            (truncated, "读不够"),
+        ] {
+            assert_eq!(count_vector_from_bytes(malformed), None, "{what}");
+        }
+        let mut unsorted = vec![COUNT_VECTOR_FORMAT_NUMBER];
+        push_section_entry_count(&mut unsorted, 0);
+        push_section_entry_count(&mut unsorted, 2);
+        for name in ["b", "a"] {
+            push_length_prefixed_text(&mut unsorted, name);
+            unsorted.extend_from_slice(&1u64.to_be_bytes());
+        }
+        push_section_entry_count(&mut unsorted, 0);
+        assert_eq!(count_vector_from_bytes(&unsorted), None, "名字不是严格升序");
+    }
+
+    /// 这一套之前的布局（没有布局行，今天建的库就是这样）：按结论种类打开拒绝；照旧打开的能用旧的那几张表，按结论种类存取一律拒绝、什么都不写。
+    #[test]
+    fn a_library_in_the_layout_before_conclusion_kinds_is_refused_by_every_conclusion_access() {
+        let directory = TemporaryLibraryDirectory::new("layout-before-conclusion-kinds");
+        {
+            let store = VerdictStore::create_empty(&directory.path).expect("建库");
+            store
+                .database
+                .delete(VerdictStoreKey::LibraryLayout.to_key_bytes().0)
+                .expect("删掉布局行，造一个这一套之前的库");
+        }
+        let refused = VerdictStore::open_existing_with_conclusion_kinds(&directory.path);
+        assert!(
+            matches!(
+                refused,
+                Err(VerdictStoreError::LibraryLayoutPredatesConclusionKinds { .. })
+            ),
+            "按结论种类打开要拒：{:?}",
+            refused.err()
+        );
+        let (mut store, _opening) = VerdictStore::open_existing(&directory.path).expect("照旧打开");
+        assert_eq!(store.layout(), VerdictStoreLayout::BeforeConclusionKinds);
+        let clean = store
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("旧表照用");
+        let entries_before = store.every_stored_entry();
+        let block_key = block_key_named("node", 0);
+        let stored = store.store_conclusion_block(
+            &block_key,
+            &ConclusionKind::GpuJudge,
+            &GPU_CONCLUSION_VERSION,
+            &conclusion_record(block_of(&[clean]), &[]),
+        );
+        assert!(
+            matches!(
+                stored,
+                Err(VerdictStoreError::LibraryLayoutPredatesConclusionKinds { .. })
+            ),
+            "按结论种类存要拒：{stored:?}"
+        );
+        assert!(
+            matches!(
+                store.conclusions_missing_for_block(&block_key, &[]),
+                Err(VerdictStoreError::LibraryLayoutPredatesConclusionKinds { .. })
+            ),
+            "按结论种类对账要拒"
+        );
+        assert_eq!(
+            store.every_stored_entry(),
+            entries_before,
+            "拒了就一个字都不写"
+        );
+    }
+
+    /// 同一（块键，种类，版本）下换一份结论（块、违例、计数向量、恢复字任一不同）拒绝；结论相同只换块属性也拒绝；拒了一个字都不写；
+    /// 逐项相同的再存放行、不写。
+    #[test]
+    fn a_different_conclusion_or_attribute_under_a_stored_key_is_refused_and_the_library_is_unchanged(
+    ) {
+        let directory = TemporaryLibraryDirectory::new("different-conclusion");
+        let mut store = VerdictStore::create_empty(&directory.path).expect("建库");
+        let clean = store
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let red = store
+            .register_verdict_vector(&verdict_vector(b"red"))
+            .expect("登记");
+        let block_key = block_key_named("node", 0);
+        let record = conclusion_record(block_of(&[clean, red]), &[1]);
+        store
+            .store_conclusion_block(
+                &block_key,
+                &ConclusionKind::GpuJudge,
+                &GPU_CONCLUSION_VERSION,
+                &record,
+            )
+            .expect("存");
+        let entries_before = store.every_stored_entry();
+        let mut other_counts = record.clone();
+        other_counts
+            .count_vector
+            .per_observer
+            .insert("mounted_states".to_string(), 99);
+        let mut other_recovery_words = record.clone();
+        other_recovery_words.recovery_words = Some(recovery_words_of(3)[1..].to_vec());
+        let mut other_violations = record.clone();
+        other_violations.violating_states = vec![];
+        for (different, what) in [
+            (other_counts, "计数向量不同"),
+            (other_recovery_words, "恢复字不同"),
+            (other_violations, "违例不同"),
+        ] {
+            let refused = store.store_conclusion_block(
+                &block_key,
+                &ConclusionKind::GpuJudge,
+                &GPU_CONCLUSION_VERSION,
+                &different,
+            );
+            assert!(
+                matches!(
+                    refused,
+                    Err(VerdictStoreError::DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion { .. })
+                ),
+                "{what}要拒：{refused:?}"
+            );
+        }
+        let mut other_device = record.clone();
+        other_device.judged_on = JudgingDevice::Gpu {
+            card_type: "probe card".to_string(),
+            driver_version: "probe driver 2".to_string(),
+        };
+        let refused_attributes = store.store_conclusion_block(
+            &block_key,
+            &ConclusionKind::GpuJudge,
+            &GPU_CONCLUSION_VERSION,
+            &other_device,
+        );
+        assert!(
+            matches!(
+                refused_attributes,
+                Err(VerdictStoreError::DifferentBlockAttributesUnderAStoredConclusionNotDecidedInTheFirstVersion { .. })
+            ),
+            "结论相同、驱动版本不同要拒：{refused_attributes:?}"
+        );
+        assert_eq!(
+            store.every_stored_entry(),
+            entries_before,
+            "拒了就一个字都不写"
+        );
+        assert_eq!(
+            store
+                .store_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::GpuJudge,
+                    &GPU_CONCLUSION_VERSION,
+                    &record
+                )
+                .expect("再存同一份"),
+            VerdictBlockStoring::AlreadyStoredIdentically
+        );
+        assert_eq!(store.every_stored_entry(), entries_before);
+    }
+
+    /// 导入把结论连同计数向量、块属性与恢复字带过去，判定向量按内容在这个库里重新编号。
+    #[test]
+    fn import_copies_conclusions_with_their_count_vectors_attributes_and_recovery_words() {
+        let source_directory = TemporaryLibraryDirectory::new("conclusion-import-source");
+        let mut source = VerdictStore::create_empty(&source_directory.path).expect("建库");
+        let source_red = source
+            .register_verdict_vector(&verdict_vector(b"red"))
+            .expect("登记");
+        let source_clean = source
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let block_key = block_key_named("node", 0);
+        let observer = observer_kind("mount");
+        source
+            .store_conclusion_block(
+                &block_key,
+                &observer,
+                &OBSERVER_CONCLUSION_VERSION,
+                &conclusion_record(block_of(&[source_clean, source_red]), &[1]),
+            )
+            .expect("存");
+        let merged_directory = TemporaryLibraryDirectory::new("conclusion-import-merged");
+        let mut merged = VerdictStore::create_empty(&merged_directory.path).expect("建库");
+        let merged_clean = merged
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        assert_eq!(merged.import_from(&source).expect("导入"), 1, "导过去一块");
+        let merged_red = merged
+            .register_verdict_vector(&verdict_vector(b"red"))
+            .expect("导入时已登记过");
+        let stored = merged
+            .read_conclusion_block(&block_key, &observer, &OBSERVER_CONCLUSION_VERSION)
+            .expect("读")
+            .expect("导过来了");
+        let expected = conclusion_record(block_of(&[merged_clean, merged_red]), &[1]);
+        assert_eq!(stored.block, expected.block, "按内容重新编号");
+        assert_eq!(stored.count_vector, expected.count_vector);
+        assert_eq!(stored.judged_on, expected.judged_on);
+        assert_eq!(stored.recovery_words, expected.recovery_words);
+    }
+
+    /// 按计划导入的对拍用的流 F 与另一条流 G 的节点名、F 的块。
+    const FLOW_F_NODE: &str = "flow-f::node-f::0011";
+    const FLOW_G_NODE: &str = "flow-g::node-g::0022";
+    /// 本库 A 里流 F 在一把旧版本下的历史行（判法改过、旧行留着）。
+    const OLD_GPU_CONCLUSION_VERSION: ConclusionVersion =
+        ConclusionVersion([0x54; SHA256_DIGEST_BYTES]);
+    const CPU_VERIFIER_DIGEST: [u8; SHA256_DIGEST_BYTES] = [0x81; SHA256_DIGEST_BYTES];
+    const GPU_VERIFIER_DIGEST: [u8; SHA256_DIGEST_BYTES] = [0x82; SHA256_DIGEST_BYTES];
+    const OLD_FACTS_DIGEST: [u8; SHA256_DIGEST_BYTES] = [0x71; SHA256_DIGEST_BYTES];
+    const FLOW_F_FACTS_DIGEST: [u8; SHA256_DIGEST_BYTES] = [0x72; SHA256_DIGEST_BYTES];
+    const FLOW_G_FACTS_DIGEST: [u8; SHA256_DIGEST_BYTES] = [0x73; SHA256_DIGEST_BYTES];
+    const MOUNT_OBSERVER_NAME: &str = "mount";
+
+    fn flow_f_block(block_index: u64) -> VerdictBlockKey {
+        block_key_named(FLOW_F_NODE, block_index * STATES_PER_FLOW_F_TEST_BLOCK)
+    }
+
+    fn flow_g_block(block_index: u64) -> VerdictBlockKey {
+        block_key_named(FLOW_G_NODE, block_index * STATES_PER_FLOW_F_TEST_BLOCK)
+    }
+
+    /// 对拍里块起点的步长（块里的状态数各块自己定，不超过它）。
+    const STATES_PER_FLOW_F_TEST_BLOCK: u64 = 4;
+
+    fn observer_record(block: VerdictBlock, violating_states: &[u64]) -> ConclusionBlockRecord {
+        let states = u64::try_from(block.verdict_vector_number_of_each_state().len())
+            .expect("测试里的块不长");
+        ConclusionBlockRecord {
+            block,
+            violating_states: violating_states
+                .iter()
+                .copied()
+                .map(StateOffsetInBlock)
+                .collect(),
+            count_vector: count_vector_of(states),
+            judged_on: JudgingDevice::Cpu,
+            recovery_words: None,
+        }
+    }
+
+    fn store_conclusion_in_the_test_library(
+        store: &mut VerdictStore,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+        record: &ConclusionBlockRecord,
+    ) {
+        store
+            .store_conclusion_block(block_key, kind, conclusion_version, record)
+            .expect("测试库里存得进结论");
+    }
+
+    /// 本库 A（导入那一趟开跑时本机的库）：流 F 四块都录了，第 0 块是本机这一份、两种判器都判过；第 1 块的 CPU 结论早先导入过一次；
+    /// 第 0、1 块在旧 GPU 版本下有历史行；流 G 第 0 块判过；三条路径；一份旧事实行。同一个目录名之外逐字节相同，两份 A 各调一次。
+    fn build_the_local_library_a(directory: &Path) -> VerdictStore {
+        let mut store = VerdictStore::create_empty(directory).expect("建库");
+        let clean = store
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let red = store
+            .register_verdict_vector(&verdict_vector(b"red-f"))
+            .expect("登记");
+        for (block_index, state_count) in [(0, 2), (1, 2), (2, 3), (3, 2)] {
+            store
+                .record_block(&flow_f_block(block_index), state_count)
+                .expect("录入");
+        }
+        store.record_block(&flow_g_block(0), 2).expect("录入");
+        let judged_by_this_host = conclusion_record(block_of(&[clean, red]), &[1]);
+        for (kind, conclusion_version) in [
+            (ConclusionKind::GpuJudge, GPU_CONCLUSION_VERSION),
+            (ConclusionKind::CpuJudge, CPU_CONCLUSION_VERSION),
+        ] {
+            store_conclusion_in_the_test_library(
+                &mut store,
+                &flow_f_block(0),
+                &kind,
+                &conclusion_version,
+                &judged_by_this_host,
+            );
+        }
+        store_conclusion_in_the_test_library(
+            &mut store,
+            &flow_f_block(1),
+            &ConclusionKind::CpuJudge,
+            &CPU_CONCLUSION_VERSION,
+            &conclusion_record(block_of(&[clean, red]), &[1]),
+        );
+        store_conclusion_in_the_test_library(
+            &mut store,
+            &flow_f_block(0),
+            &ConclusionKind::GpuJudge,
+            &OLD_GPU_CONCLUSION_VERSION,
+            &conclusion_record(block_of(&[clean, clean]), &[]),
+        );
+        store_conclusion_in_the_test_library(
+            &mut store,
+            &flow_f_block(1),
+            &ConclusionKind::GpuJudge,
+            &OLD_GPU_CONCLUSION_VERSION,
+            &conclusion_record(block_of(&[red, clean]), &[0]),
+        );
+        store_conclusion_in_the_test_library(
+            &mut store,
+            &flow_g_block(0),
+            &ConclusionKind::GpuJudge,
+            &GPU_CONCLUSION_VERSION,
+            &conclusion_record(block_of(&[clean, clean]), &[]),
+        );
+        for (path, identity) in [
+            ("f.0", "flow-f-identity-0"),
+            ("f.0/f.1", "flow-f-identity-1-before-the-fork"),
+            ("g.0", "flow-g-identity-0"),
+        ] {
+            store.record_path(path, identity).expect("登路径");
+        }
+        store
+            .store_flow_facts(&OLD_FACTS_DIGEST, b"facts of an older extractor")
+            .expect("登事实");
+        store
+    }
+
+    /// 对方库 B（第二台取回的库）：A 的快照加上第二台这一趟判的——流 F 第 1 块的 GPU 结论、第 2 块的 GPU 与观察者结论（用到一种 A 没登记过的
+    /// 判定向量）、这两块在 CPU 核对代码下的核对行与 F 的事实行、F 的两条路径（一条与 A 同路径不同身份，是同名不同数据并成一段的那种）；
+    /// 第 3 块没判到。另一条流 G 第 1 块也判了、核了、登了路径与事实（不属于 F）。
+    fn build_the_other_library_b(directory: &Path) -> VerdictStore {
+        let mut store = build_the_local_library_a(directory);
+        let clean = store
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let red = store
+            .register_verdict_vector(&verdict_vector(b"red-f"))
+            .expect("登记");
+        let red_only_in_the_other_library = store
+            .register_verdict_vector(&verdict_vector(b"red-f-judged-on-the-other-host"))
+            .expect("登记");
+        store_conclusion_in_the_test_library(
+            &mut store,
+            &flow_f_block(1),
+            &ConclusionKind::GpuJudge,
+            &GPU_CONCLUSION_VERSION,
+            &conclusion_record(block_of(&[clean, red]), &[1]),
+        );
+        let block_two = block_of(&[red_only_in_the_other_library, clean, clean]);
+        store_conclusion_in_the_test_library(
+            &mut store,
+            &flow_f_block(2),
+            &ConclusionKind::GpuJudge,
+            &GPU_CONCLUSION_VERSION,
+            &conclusion_record(block_two.clone(), &[0]),
+        );
+        store_conclusion_in_the_test_library(
+            &mut store,
+            &flow_f_block(2),
+            &observer_kind(MOUNT_OBSERVER_NAME),
+            &OBSERVER_CONCLUSION_VERSION,
+            &observer_record(block_two, &[0]),
+        );
+        store_conclusion_in_the_test_library(
+            &mut store,
+            &flow_g_block(1),
+            &ConclusionKind::GpuJudge,
+            &GPU_CONCLUSION_VERSION,
+            &conclusion_record(block_of(&[red, clean]), &[0]),
+        );
+        for (block_key, facts_digest, bits) in [
+            (flow_f_block(1), FLOW_F_FACTS_DIGEST, vec![0, 1]),
+            (flow_f_block(2), FLOW_F_FACTS_DIGEST, vec![1, 0, 0]),
+            (flow_g_block(1), FLOW_G_FACTS_DIGEST, vec![1, 0]),
+        ] {
+            store
+                .store_verifier_block(&block_key, &CPU_VERIFIER_DIGEST, &facts_digest, &bits)
+                .expect("写核对行");
+        }
+        store
+            .store_flow_facts(&FLOW_F_FACTS_DIGEST, b"facts of flow f")
+            .expect("登事实");
+        store
+            .store_flow_facts(&FLOW_G_FACTS_DIGEST, b"facts of flow g")
+            .expect("登事实");
+        for (path, identity) in [
+            ("f.0/f.1", "flow-f-identity-1-after-the-fork"),
+            ("f.0/f.1/f.2", "flow-f-identity-2"),
+            ("g.0/g.1", "flow-g-identity-1"),
+        ] {
+            store.record_path(path, identity).expect("登路径");
+        }
+        store
+    }
+
+    /// 流水线导入那一趟照计划点名的键（`crash_amplification` 导入那一段的形态）：流 F 里不归本机的第 1–3 块，每块两种判器各一把当前版本、
+    /// 观察者一把，两种核对代码各一行；路径是计划里 F 的每个点。
+    fn planned_keys_of_flow_f_beyond_this_host_s_share() -> PlannedImportKeys {
+        let mut planned = PlannedImportKeys {
+            conclusions: Vec::new(),
+            paths: vec![
+                "f.0".to_string(),
+                "f.0/f.1".to_string(),
+                "f.0/f.1/f.2".to_string(),
+            ],
+            verifier_blocks: Vec::new(),
+        };
+        for block_index in 1..4 {
+            for (kind, conclusion_version) in [
+                (ConclusionKind::GpuJudge, GPU_CONCLUSION_VERSION),
+                (ConclusionKind::CpuJudge, CPU_CONCLUSION_VERSION),
+                (
+                    observer_kind(MOUNT_OBSERVER_NAME),
+                    OBSERVER_CONCLUSION_VERSION,
+                ),
+            ] {
+                planned
+                    .conclusions
+                    .push((flow_f_block(block_index), kind, conclusion_version));
+            }
+            for verifier_digest in [CPU_VERIFIER_DIGEST, GPU_VERIFIER_DIGEST] {
+                planned
+                    .verifier_blocks
+                    .push((flow_f_block(block_index), verifier_digest));
+            }
+        }
+        planned
+    }
+
+    /// 一块一种结论读回来、换成判定向量的内容（两份库的编号各是各的，按内容比才是「读回相同」）。
+    #[derive(Debug, PartialEq, Eq)]
+    struct ConclusionReadBackByContent {
+        verdict_vector_of_each_state: Vec<Vec<u8>>,
+        violations: Vec<(u64, Vec<u8>)>,
+        count_vector_bytes: Vec<u8>,
+        judged_on: JudgingDevice,
+        recovery_words: Option<Vec<RecoveryWordsOfState>>,
+    }
+
+    fn conclusion_read_back_by_content(
+        store: &VerdictStore,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+    ) -> Option<ConclusionReadBackByContent> {
+        let vector_bytes = |number: VerdictVectorNumber| {
+            store
+                .verdict_vector_of_number(number)
+                .expect("读回的编号在这个库里登记过")
+                .0
+                .clone()
+        };
+        store
+            .read_conclusion_block(block_key, kind, conclusion_version)
+            .expect("读结论")
+            .map(|stored| ConclusionReadBackByContent {
+                verdict_vector_of_each_state: stored
+                    .block
+                    .verdict_vector_number_of_each_state()
+                    .iter()
+                    .map(|number| vector_bytes(*number))
+                    .collect(),
+                violations: stored
+                    .violations
+                    .iter()
+                    .map(|violation| {
+                        (
+                            violation.offset_in_block.0,
+                            vector_bytes(violation.verdict_vector_number),
+                        )
+                    })
+                    .collect(),
+                count_vector_bytes: count_vector_bytes(&stored.count_vector),
+                judged_on: stored.judged_on,
+                recovery_words: stored.recovery_words,
+            })
+    }
+
+    /// B 里属于流 G 的行：键里带 G 的节点名的（G 的块的结论、核对行），G 的路径与事实行。
+    fn is_a_row_of_flow_g(key_bytes: &[u8]) -> bool {
+        let flow_g_node_bytes = FLOW_G_NODE.as_bytes();
+        key_bytes
+            .windows(flow_g_node_bytes.len())
+            .any(|window| window == flow_g_node_bytes)
+            || key_bytes == VerdictStoreKey::Path("g.0/g.1").to_key_bytes().0.as_slice()
+            || key_bytes
+                == VerdictStoreKey::FlowFacts(&FLOW_G_FACTS_DIGEST)
+                    .to_key_bytes()
+                    .0
+                    .as_slice()
+    }
+
+    /// 优化前后对拍（`.claude/singlefs-ai-sop/rules/test-script-discipline.md`「编译与算法都要快」：优化前后在同一组输入上判定逐项相同）：
+    /// 两份逐字节相同的本库 A，一份整库导入对方库 B（[`VerdictStore::import_from`]，改之前流水线的导法），一份按计划只导流 F 不归本机的那几块；
+    /// 流 F 的每个块键在每种结论、每把版本下读回相同，F 的路径、核对行、事实行读回相同。按计划导入写下的行数钉成绝对值，
+    /// 写下的正是 B 比 A 多出、属于 F 的那几行；B 里流 G 的新行不写。
+    #[test]
+    fn importing_the_planned_rows_of_a_flow_reads_back_like_importing_the_whole_library_and_writes_only_that_flow_s_new_rows(
+    ) {
+        let other_directory = TemporaryLibraryDirectory::new("planned-import-other");
+        let other = build_the_other_library_b(&other_directory.path);
+        let whole_directory = TemporaryLibraryDirectory::new("planned-import-whole");
+        let mut imported_whole = build_the_local_library_a(&whole_directory.path);
+        let planned_directory = TemporaryLibraryDirectory::new("planned-import-planned");
+        let mut imported_by_plan = build_the_local_library_a(&planned_directory.path);
+        let entries_before = imported_by_plan.every_stored_entry();
+        assert_eq!(
+            entries_before,
+            imported_whole.every_stored_entry(),
+            "两份本库 A 开头逐字节相同"
+        );
+        imported_whole.import_from(&other).expect("整库导入");
+        let tally = imported_by_plan
+            .import_the_planned_rows_from(
+                &other,
+                &planned_keys_of_flow_f_beyond_this_host_s_share(),
+            )
+            .expect("按计划导入");
+        for block_index in 0..4 {
+            for (kind, conclusion_version) in [
+                (ConclusionKind::GpuJudge, GPU_CONCLUSION_VERSION),
+                (ConclusionKind::GpuJudge, OLD_GPU_CONCLUSION_VERSION),
+                (ConclusionKind::CpuJudge, CPU_CONCLUSION_VERSION),
+                (
+                    observer_kind(MOUNT_OBSERVER_NAME),
+                    OBSERVER_CONCLUSION_VERSION,
+                ),
+            ] {
+                let block_key = flow_f_block(block_index);
+                assert_eq!(
+                    conclusion_read_back_by_content(
+                        &imported_by_plan,
+                        &block_key,
+                        &kind,
+                        &conclusion_version
+                    ),
+                    conclusion_read_back_by_content(
+                        &imported_whole,
+                        &block_key,
+                        &kind,
+                        &conclusion_version
+                    ),
+                    "流 F 第 {block_index} 块的 {kind:?} 在版本 {:02x}… 下两种导法读回不同",
+                    conclusion_version.0[0]
+                );
+            }
+            for verifier_digest in [CPU_VERIFIER_DIGEST, GPU_VERIFIER_DIGEST] {
+                assert_eq!(
+                    imported_by_plan
+                        .read_verifier_block(&flow_f_block(block_index), &verifier_digest)
+                        .expect("读核对行"),
+                    imported_whole
+                        .read_verifier_block(&flow_f_block(block_index), &verifier_digest)
+                        .expect("读核对行"),
+                    "流 F 第 {block_index} 块在核对代码 {:02x}… 下的核对行两种导法读回不同",
+                    verifier_digest[0]
+                );
+            }
+        }
+        for path in ["f.0", "f.0/f.1", "f.0/f.1/f.2"] {
+            assert_eq!(
+                imported_by_plan.identity_of_path(path).expect("读路径"),
+                imported_whole.identity_of_path(path).expect("读路径"),
+                "流 F 的路径 {path} 两种导法读回不同"
+            );
+        }
+        assert_eq!(
+            imported_by_plan
+                .read_flow_facts(&FLOW_F_FACTS_DIGEST)
+                .expect("读事实"),
+            imported_whole
+                .read_flow_facts(&FLOW_F_FACTS_DIGEST)
+                .expect("读事实"),
+            "流 F 的事实行两种导法读回不同"
+        );
+        // 绝对值：结论 3 块写下（F1 的 GPU 5 行、F2 的 GPU 5 行、F2 的观察者 4 行），F1 的 CPU 本库已有、相同；
+        // F1 的观察者、F2 的 CPU、F3 的三种对方库里没有。另：新判定向量 2 行、路径 2 行（f.0 相同跳过）、核对 2 行、事实 1 行
+        assert_eq!(
+            tally,
+            PlannedImportTally {
+                conclusion_blocks_written: 3,
+                conclusion_blocks_already_identical: 1,
+                conclusion_blocks_missing_in_the_other_library: 5,
+                paths_written: 2,
+                verifier_blocks_written: 2,
+                flow_facts_written: 1,
+                rows_written: 21,
+                synced_writes: 1,
+            },
+            "按计划导入的账"
+        );
+        let entries_before: BTreeSet<StoredEntry> = entries_before.into_iter().collect();
+        let written_by_plan: BTreeSet<StoredEntry> = imported_by_plan
+            .every_stored_entry()
+            .into_iter()
+            .filter(|entry| !entries_before.contains(entry))
+            .collect();
+        let other_beyond_a_of_flow_f: BTreeSet<StoredEntry> = other
+            .every_stored_entry()
+            .into_iter()
+            .filter(|entry| !entries_before.contains(entry) && !is_a_row_of_flow_g(&entry.0))
+            .collect();
+        assert_eq!(written_by_plan.len(), 21, "按计划导入写下 21 行");
+        assert_eq!(
+            written_by_plan, other_beyond_a_of_flow_f,
+            "按计划导入写下的正是 B 比 A 多出、属于流 F 的那几行"
+        );
+        assert!(
+            conclusion_read_back_by_content(
+                &imported_whole,
+                &flow_g_block(1),
+                &ConclusionKind::GpuJudge,
+                &GPU_CONCLUSION_VERSION
+            )
+            .is_some()
+                && conclusion_read_back_by_content(
+                    &imported_by_plan,
+                    &flow_g_block(1),
+                    &ConclusionKind::GpuJudge,
+                    &GPU_CONCLUSION_VERSION
+                )
+                .is_none(),
+            "流 G 的新结论整库导入带过来了，按计划导入不碰它"
+        );
+    }
+
+    /// 按计划导入时本库同键已有不同的结论（流 F 第 2 块的 GPU 结论两边判得不同）：照存块的规矩报错，点名那一块那一种；
+    /// 排在它前面已攒进这一批的行（F1 的 GPU 结论）一行都不写，本库逐字节不变。
+    #[test]
+    fn planned_import_refuses_a_different_conclusion_under_a_stored_key_and_leaves_the_library_unchanged(
+    ) {
+        let other_directory = TemporaryLibraryDirectory::new("planned-import-conflict-other");
+        let other = build_the_other_library_b(&other_directory.path);
+        let local_directory = TemporaryLibraryDirectory::new("planned-import-conflict-local");
+        let mut local = build_the_local_library_a(&local_directory.path);
+        let red = local
+            .register_verdict_vector(&verdict_vector(b"red-f"))
+            .expect("登记");
+        store_conclusion_in_the_test_library(
+            &mut local,
+            &flow_f_block(2),
+            &ConclusionKind::GpuJudge,
+            &GPU_CONCLUSION_VERSION,
+            &conclusion_record(block_of(&[red, red, red]), &[0, 1, 2]),
+        );
+        let entries_before = local.every_stored_entry();
+        match local.import_the_planned_rows_from(
+            &other,
+            &planned_keys_of_flow_f_beyond_this_host_s_share(),
+        ) {
+            Err(
+                VerdictStoreError::DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion {
+                    block_key,
+                    kind,
+                },
+            ) => {
+                assert_eq!(block_key, flow_f_block(2), "点名判得不同的那一块");
+                assert_eq!(kind, ConclusionKind::GpuJudge, "点名判得不同的那一种");
+            }
+            other_outcome => panic!("本库同键已有不同的结论应当报错，得到 {other_outcome:?}"),
+        }
+        assert_eq!(
+            local.every_stored_entry(),
+            entries_before,
+            "报错之前攒着的那一批一行都没写"
+        );
+    }
+
+    /// 同一条路径再登同一个身份：什么都不写（库的序号不动）；换一个身份照写。
+    #[test]
+    fn recording_a_path_again_with_the_same_identity_writes_nothing() {
+        let directory = TemporaryLibraryDirectory::new("path-recorded-twice");
+        let mut store = VerdictStore::create_empty(&directory.path).expect("建库");
+        store
+            .record_path("a.unit_write.1", "f::a.unit_write.1::00")
+            .expect("登路径");
+        let sequence_after_the_first = store.database.latest_sequence_number();
+        store
+            .record_path("a.unit_write.1", "f::a.unit_write.1::00")
+            .expect("再登同一个身份");
+        assert_eq!(
+            store.database.latest_sequence_number(),
+            sequence_after_the_first,
+            "同一个身份再登不写库"
+        );
+        store
+            .record_path("a.unit_write.1", "f::a.unit_write.1::11")
+            .expect("换一个身份");
+        assert!(
+            store.database.latest_sequence_number() > sequence_after_the_first,
+            "换了身份照写"
+        );
+        assert_eq!(
+            store.identity_of_path("a.unit_write.1").expect("读路径"),
+            Some("f::a.unit_write.1::11".to_string()),
+            "最后登的身份留在索引里"
         );
     }
 }

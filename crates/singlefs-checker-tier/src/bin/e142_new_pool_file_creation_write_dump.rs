@@ -1,6 +1,6 @@
 //! E142（新池新建文件的干跑） 第 15 次跑步③：只读导出，比对侧。
 //!
-//! 在两块内存盘上跑与 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs`
+//! 在两块内存盘上跑与 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs`
 //! 同一套参数的 mkfs → 取号 → 暖机 → 新池新建文件，把「新池新建文件窗口」（`ScenarioPoint::BeforeNewPoolFileCreation`
 //! 那一刻录制流的长度起，到发布真正结束为止）里**每一次写请求**按 (设备, 字节偏移, 字节长度, sha256, 整段十六进制)
 //! 原样打出来。**不带任何位置寻址的布局知识**：不按名字归类、不假设哪个偏移属于哪棵树，
@@ -39,7 +39,7 @@ use singlefs_harness::{
 
 /// E142 那套几何：两块同构盘，`physical_block_size` = io_min = 512。
 /// 值抄自跑前登记第一节「装置写在哪」第 2 条 ①：模型
-/// `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs` 第 132 行 `DEVICE_BYTES`、
+/// `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` 第 132 行 `DEVICE_BYTES`、
 /// 第 15 行 `PHYSICAL_BLOCK_BYTES`（两者在这个装置里都是 512 那一档的推论，逐项断言见 `main` 开头）。
 const DEVICE_COUNT: u32 = 2;
 const PHYSICAL_BLOCK_SIZE_IN_BYTES: u32 = 512;

@@ -6,14 +6,14 @@
 //! 这次发布的根槽（t14，区域 0 槽 1，只落在根环区域 0 那块盘）、这次发布写的系统配置槽（t15，两盘各一份）
 //! ⇒ 24 + 2 + 1 + 2 = **29**，与那一节「⇒ 写请求数 … 29 条」逐项对得上。
 //! 分配记录树按位置寻址（D8（核心索引结构） 已定项 14）之前这张表是 8 个单元、21 行；E142 第十五次跑起装置那一侧改比
-//! `e142_new_pool_file_creation_write_dump` 的逐次写导出（`research/scripts/replay.sh` 那一段的注释），这张表不再进 E142 的比对，
+//! `e142_new_pool_file_creation_write_dump` 的逐次写导出（`scripts/experiments/replay.sh` 那一段的注释），这张表不再进 E142 的比对，
 //! 由 `tests/new_pool_file_creation_write_regions.rs` 钉住它与新池新建文件真发出的写逐条配得上。区域名照 E142 装置 `descriptive_tag()` 的取名。
 //!
 //! 这张表只对 E142 那套几何成立（两盘、`physical_block_size` = 512、io_min = 512 ⇒ 固定结构槽距 4096、根槽宽 512），
 //! 换几何要连表一起改：`region_table_against_writes` 就是把它钉在实装身上的那道检查。
 //!
 //! **只读**：本模块与 [`crate::scenario`] 之外的写路径一个字节都不碰（量 5 要的是「实装写出来的字节」，不是「另写一遍」）。
-//! 装置（`research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs`）与这里是两份代码，不共用，
+//! 装置（`scripts/experiments/e142_new_pool_file_creation_dry_run.rs`）与这里是两份代码，不共用，
 //! 对不上时两边都查（`.claude/rules/implementation-first.md` 第 4 条）。
 
 use std::collections::BTreeMap;

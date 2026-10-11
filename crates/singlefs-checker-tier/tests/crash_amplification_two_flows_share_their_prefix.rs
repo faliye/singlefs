@@ -836,9 +836,11 @@ fn a_version_the_prefix_cannot_reach_leaves_the_judge_inputs_of_the_prefix_alone
     }
 }
 
-/// R1：被判的根槽写换了位置（换成写表里第一条根槽写），树（身份）不动，管它前后的点判器另读的输入跟着变。
+/// 被判的根槽写换了位置（换成写表里第一条根槽写），树（身份）不动，判器另读的输入与计划哈希也不动：被判根不进块键
+/// （崩溃点重放合并第三轮判决 J3 的 M2-2 甲；判器拿它只记「根槽已持久」、不进逐项判定，那个计数各项按自己的被判根事后数）。
+/// 此前（R1）这一条钉的是「判器另读的输入跟着变」，被判根不同的两条流因此在 C 上不共享（第三轮攻方 M2-2）。
 #[test]
-fn moving_the_judged_root_slot_write_changes_the_judge_inputs_but_not_the_tree() {
+fn moving_the_judged_root_slot_write_changes_neither_the_tree_nor_the_judge_inputs() {
     let recorded = record_flow("judged-root-moved", &content_of(11, 4100), true);
     let plan = plan_crash_points(&recorded.flow());
     let first_root = recorded
@@ -858,14 +860,14 @@ fn moving_the_judged_root_slot_write_changes_the_judge_inputs_but_not_the_tree()
         identities(&plan),
         "被判的根槽写不动树"
     );
-    assert!(
-        moved_plan
-            .points
-            .iter()
-            .zip(&plan.points)
-            .any(|(moved, original)| moved.judge_inputs != original.judge_inputs),
-        "被判的根槽写换了位置，判器另读的输入要跟着变"
-    );
+    for (moved, original) in moved_plan.points.iter().zip(&plan.points) {
+        assert_eq!(
+            (moved.judge_inputs, moved.plan_hash),
+            (original.judge_inputs, original.plan_hash),
+            "点 {}：被判的根槽写换了位置，判器另读的输入与计划哈希不动（块键不动，判定照样共享）",
+            original.name
+        );
+    }
 }
 
 /// M3：只差一条根槽写的一对（覆盖写那一次的根槽写改坏第一个字节，根身份那几个字节不动）：管这条写的那个点父镜像相同、判器另读的输入相同、
@@ -1001,7 +1003,8 @@ fn root_slot_writes_whose_txgs_do_not_strictly_increase_put_every_later_write_in
     let not_increasing_plan = flow_over(&not_increasing);
     let not_increasing_with_the_last_write_flipped =
         flow_over(&writes_with_the_last_write_flipped(&not_increasing));
-    let points_before_the_last = increasing.points.len() - 1;
+    // 管最后一次写的那个点与它后面的末节点（整张写表叠完的那一个状态）不比：前者的写表里就有这一次写，后者的父镜像与判器另读的输入都罩着它
+    let points_before_the_last = increasing.points.len() - 2;
     assert!(points_before_the_last >= 2, "最后一次写之前至少两个点");
     for index in 0..points_before_the_last {
         assert_eq!(

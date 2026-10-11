@@ -1,7 +1,7 @@
 # Verus 必红世界表（singlefs-replay-prefix 的核）：每行五段，制表符分隔——变异名 <TAB> 文件 <TAB> 原文 <TAB> 替换文 <TAB> 期望。
 # 文件是从仓根起的相对路径；原文在文件里必须恰好命中一次；原文与替换文里的 \n 表示换行，别的反斜杠转义不用。
 # 期望一律写 proof_errors=M：M 是改坏之后在登记的 rlimit（.claude/gate.d/verus-pins.tsv 的 rlimit 行）上 Verus 报的证明错条数——error 起头的报错，
-# 除去含「Resource limit (rlimit) exceeded」的与以「aborting due to」起头的之后剩下的（research/scripts/verus-proof-check.py 的 proof_error_messages），至少 1；不写「verified, M errors」：Verus 把 rlimit 用尽也计进 errors，换个 rlimit 那个数就变。
+# 除去含「Resource limit (rlimit) exceeded」的与以「aborting due to」起头的之后剩下的（scripts/gate/verus-proof-check.py 的 proof_error_messages），至少 1；不写「verified, M errors」：Verus 把 rlimit 用尽也计进 errors，换个 rlimit 那个数就变。
 # 跑法：把原文换成替换文，在 crates/singlefs-replay-prefix 下跑
 #   verus --crate-type=lib --edition=2021 --crate-name singlefs_replay_prefix --no-cheating --rlimit <登记的 rlimit> src/lib.rs
 # （Verus 0.2026.09.20.aef82ed），证明错的条数等于期望的 M、退出码不为 0 算红，然后还原。平时的 cargo test 不跑这张表。

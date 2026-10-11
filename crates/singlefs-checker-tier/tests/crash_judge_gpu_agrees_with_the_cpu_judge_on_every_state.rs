@@ -91,6 +91,8 @@
 //! （`crash_judge_gpu::CrossCheckWords`：红项、两遍各自落到的根、结局、失败点、池级 checker 判到位、判不了）；甲二展开的一条流上
 //! GPU 拆出的持久掩码（探针内核 `crash_judge_dispatch::persisted_masks_on_the_card`）与 CPU 判表、crash.rs 枚举逐序号相同、对拍字逐状态相同；
 //! 33 次写的一段第 2³² + 5 个状态起 GPU 与 CPU 拆出同一个掩码；给定状态表上 GPU 照清单判、与 CPU 逐状态相同；判表核段长对不上的拒建。
+//! 第59批 E14：I-1.8 第一句在一块盘上有几个数据单元的流上（三个数据单元的文件只改最后一个单元一份副本的载荷）、第二句一条 inode 叶两份副本
+//! 只差出生序号（同对象 key、同全序键的两组）的流，隔离豁免（I-3.11 的隔离的记录）豁免与不豁免各一条流，都整份比。
 #![cfg(all(feature = "verdict-store", feature = "gpu"))]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -2599,6 +2601,12 @@ fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_
             || gpu_recovery != *cpu_recovery
             || gpu_cross_check_words != *cpu_cross_check_words
         {
+            // 每个不一致的状态打一行、不截（下面的说明只留前 12 个，CPU 那一半带读出的文件内容、GPU 的字排在后面）：GPU 结论字整份
+            // （第 1 字是恢复内核判不了的原因、第 13 字是池级 checker 判不了的原因）、两侧恢复的四个字与对拍字，不带文件内容；只打、不进判定
+            eprintln!(
+                "CRASH_JUDGE_GPU_STATE flow={} state={ordinal} gpu_words={gpu_words:?} gpu_recovery={gpu_recovery:?} cpu_recovery={cpu_recovery:?} cpu_bits={cpu_bits:#x} gpu={gpu_cross_check_words:?} cpu={cpu_cross_check_words:?}",
+                flow.name
+            );
             if comparison.mismatches.len() < 12 {
                 comparison.mismatches.push(format!(
                     "状态 {ordinal}：CPU {cpu_bits:#x} {cpu_items} {cpu_report} checker={:?} 判到={:?} 对拍字={cpu_cross_check_words:?}；GPU {gpu_words:?} checker={:?} 判到={:?} 对拍字={gpu_cross_check_words:?}",
@@ -3700,6 +3708,213 @@ fn the_gpu_judge_agrees_with_the_cpu_when_a_journal_record_txg_goes_back_within_
         "the_gpu_judge_agrees_with_the_cpu_when_a_journal_record_txg_goes_back_within_an_instance",
         &record_rollback_with_a_journal_record_txg_going_back("crash-judge-gpu-i812"),
         "I-8.12",
+    );
+}
+
+// ─── 走读内核逐盘 journal 组判按段走（E11）之后的两支：I-8.8「没提交的组之后本实例还有记录」、I-8.10「恰一条带末条标志才比根」 ───
+
+/// journal 记录头里事务号（8 字节）、提交标记（1 字节）、记录标志（1 字节）的偏移（D23（journal 的角色与格式） 已定项 17 的字段表；
+/// 走读内核 `order_the_records_of_device_by_group` 取事务号 78，`judge_commit_markers_of_device` 读提交标记 86，I-8.9 与 I-8.10 读记录标志 7）。
+const JOURNAL_RECORD_TRANSACTION_OFFSET: usize = 78;
+const JOURNAL_RECORD_COMMIT_MARKER_OFFSET: usize = 86;
+const JOURNAL_RECORD_FLAGS_OFFSET: usize = 7;
+/// 提交标记字节取 1 是带提交标记、取 0 是不带（D23（journal 的角色与格式） 已定项 17；只许这两个值）。
+const JOURNAL_RECORD_COMMIT_MARKER_PRESENT: u8 = 1;
+const JOURNAL_RECORD_COMMIT_MARKER_ABSENT: u8 = 0;
+/// 记录标志位 0：本次发布末条（D23（journal 的角色与格式） 已定项 17）。
+const JOURNAL_RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH: u8 = 0b0000_0001;
+/// 新根段里树 ID 水位 8 字节的段内偏移（树表指针 86、映射根指针 86 之后）。
+const NEW_ROOT_SEGMENT_TREE_IDENTIFIER_WATERMARK: usize = 172;
+
+/// 三个数据单元那条流（[`record_new_pool_through_a_three_unit_file`]）里新建文件那次发布（实例 1、txg 3）与顺序写那次发布（实例 1、txg 4）。
+const CHECKPOINT_TXG_OF_THE_FILE_CREATION: u64 = 3;
+const CHECKPOINT_TXG_OF_THE_THREE_RECORD_PUBLISH: u64 = 4;
+
+/// I-8.8 判据④（一组一条提交标记都不带时，本实例之后不许再有记录）：三个数据单元那条流上，新建文件那次发布（实例 1、txg 3，一条记录）
+/// 两块盘各一份的提交标记写成 0、重封、同实例后面的记录重链。这一组一条提交标记都不带，同一块盘上同一实例之后还有顺序写那次发布（txg 4）的三条记录，
+/// CPU 池级 checker 红 I-8.8 判据④（walk.rs `judge_commit_markers_per_transaction`）。
+/// 走读内核按 (实例, 事务号) 排好次序之后，这一判比的是「本实例在表里最靠后那一条的下标 > 组末的下标」（`crash_judge_checker.wgsl`
+/// `judge_commit_markers_of_device`）：比较写反或永不成立时，txg 3 那条记录与 txg 4 的记录都落了的状态上 GPU 不红而 CPU 红，对拍字不同。
+fn record_three_unit_file_whose_file_creation_record_carries_no_commit_marker(
+    tag: &str,
+) -> RecordedFlow {
+    let mut flow = record_new_pool_through_a_three_unit_file(
+        tag,
+        "three-unit-file-creation-record-without-commit-marker",
+    );
+    let records_of_the_file_creation =
+        journal_record_writes_of_the_publish(&flow, CHECKPOINT_TXG_OF_THE_FILE_CREATION);
+    assert_eq!(
+        records_of_the_file_creation.len(),
+        2,
+        "流 {}：新建文件那次发布一条记录、两块盘各一份",
+        flow.name
+    );
+    let records_of_the_three_record_publish =
+        journal_record_writes_of_the_publish(&flow, CHECKPOINT_TXG_OF_THE_THREE_RECORD_PUBLISH);
+    for (index, counter) in &records_of_the_file_creation {
+        let write = &flow.writes[*index];
+        let bytes = write.bytes().expect("记录写带字节");
+        assert_ne!(
+            read_u64_at(bytes, JOURNAL_RECORD_TRANSACTION_OFFSET),
+            0,
+            "流 {}：新建文件那次发布的事务号不是 0（事务号 0 的空发布不进 I-8.8 的组）",
+            flow.name
+        );
+        assert_eq!(
+            bytes[JOURNAL_RECORD_COMMIT_MARKER_OFFSET], JOURNAL_RECORD_COMMIT_MARKER_PRESENT,
+            "流 {}：改之前新建文件那条记录带提交标记",
+            flow.name
+        );
+        assert!(
+            records_of_the_three_record_publish
+                .iter()
+                .any(|(later_index, later_counter)| {
+                    flow.writes[*later_index].device == write.device && later_counter > counter
+                }),
+            "流 {}：同一块盘上同一实例在新建文件那条记录之后还有顺序写那次发布的记录",
+            flow.name
+        );
+    }
+    for (index, _) in records_of_the_file_creation {
+        rewrite_journal_record_and_reseal(&mut flow, index, &|bytes| {
+            bytes[JOURNAL_RECORD_COMMIT_MARKER_OFFSET] = JOURNAL_RECORD_COMMIT_MARKER_ABSENT;
+        });
+    }
+    flow
+}
+
+/// I-8.8 判据④：[`record_three_unit_file_whose_file_creation_record_carries_no_commit_marker`]。CPU 一侧先钉流造对了：整条落盘的镜像上
+/// I-8.8 只红在判据④（判据③与提交标记字节不红）；再整份比，GPU 逐状态与 CPU 相同。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_an_uncommitted_transaction_is_followed_by_more_records_of_its_instance(
+) {
+    let flow = record_three_unit_file_whose_file_creation_record_carries_no_commit_marker(
+        "crash-judge-gpu-i88-uncommitted-transaction-then-more-records",
+    );
+    let mut image_with_every_write_landed = flow.base.clone();
+    image_with_every_write_landed.apply_writes(&flow.writes);
+    match pool_checker_verdict_on_the_image(&image_with_every_write_landed, "I-8.8") {
+        InvariantVerdict::Violated(detail) => assert!(
+            detail.starts_with("判据④：") && !detail.contains("；"),
+            "流 {}：整条落盘的镜像上 I-8.8 只红在判据④，实际：{detail}",
+            flow.name
+        ),
+        other_verdict @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => panic!(
+            "流 {}：整条落盘的镜像上 I-8.8 要红在判据④，实际 {other_verdict:?}",
+            flow.name
+        ),
+    }
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_an_uncommitted_transaction_is_followed_by_more_records_of_its_instance",
+        &flow,
+        "I-8.8",
+    );
+}
+
+/// I-8.10 只比带末条标志恰一条的组：三个数据单元那条流上，顺序写那次发布（实例 1、txg 4，三条记录）两块盘各一份的第一条记录也带上末条标志、
+/// 最后一条记录新根段里的树 ID 水位加 1，都重封、同实例后面的记录重链。那次发布带末条标志的有两条：CPU 池级 checker 红 I-8.9（多于一条末条），
+/// I-8.10 不比这一组（walk.rs `judge_new_root_segment_of_the_last_record_against_the_roots`：末条标志不唯一的组归 I-8.9）。
+/// 走读内核按 (实例, checkpoint_txg) 排好次序之后数一遍这一组带末条标志的，恰一条才比（`crash_judge_checker.wgsl`
+/// `judge_new_root_segment_of_the_last_record_against_the_roots_of_device`）：放成「至少一条就比」时，它拿段里最后那条带标志的
+/// （水位加了 1 的末条）去比 (1, 4) 的根，三条记录与那条根都落了的状态上 GPU 红 I-8.10 而 CPU 不红，对拍字不同。
+fn record_three_unit_file_whose_three_record_publish_carries_two_last_record_flags(
+    tag: &str,
+) -> RecordedFlow {
+    let mut flow = record_new_pool_through_a_three_unit_file(
+        tag,
+        "three-unit-file-three-record-publish-with-two-last-record-flags",
+    );
+    let records =
+        journal_record_writes_of_the_publish(&flow, CHECKPOINT_TXG_OF_THE_THREE_RECORD_PUBLISH);
+    assert_eq!(
+        records.len(),
+        6,
+        "流 {}：顺序写那次发布切成三条记录、两块盘各一份",
+        flow.name
+    );
+    let first_counter = records
+        .iter()
+        .map(|(_, counter)| *counter)
+        .min()
+        .expect("顺序写那次发布有记录");
+    let last_counter = records
+        .iter()
+        .map(|(_, counter)| *counter)
+        .max()
+        .expect("顺序写那次发布有记录");
+    assert_eq!(
+        last_counter - first_counter,
+        2,
+        "流 {}：三条记录的计数器连着",
+        flow.name
+    );
+    for (index, counter) in &records {
+        let flags = flow.writes[*index].bytes().expect("记录写带字节")[JOURNAL_RECORD_FLAGS_OFFSET];
+        assert_eq!(
+            flags,
+            if *counter == last_counter {
+                JOURNAL_RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH
+            } else {
+                0
+            },
+            "流 {}：改之前只有末条（计数器 {last_counter}）带末条标志，计数器 {counter} 那条的记录标志是 {flags:#010b}",
+            flow.name
+        );
+    }
+    for (index, counter) in records {
+        if counter == first_counter {
+            rewrite_journal_record_and_reseal(&mut flow, index, &|bytes| {
+                bytes[JOURNAL_RECORD_FLAGS_OFFSET] |=
+                    JOURNAL_RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH;
+            });
+        } else if counter == last_counter {
+            rewrite_journal_record_and_reseal(&mut flow, index, &|bytes| {
+                let watermark =
+                    JOURNAL_NEW_ROOT_SEGMENT_OFFSET + NEW_ROOT_SEGMENT_TREE_IDENTIFIER_WATERMARK;
+                bytes[watermark] = bytes[watermark].wrapping_add(1);
+            });
+        }
+    }
+    flow
+}
+
+/// I-8.10 末条标志不唯一的组不比：[`record_three_unit_file_whose_three_record_publish_carries_two_last_record_flags`]。CPU 一侧先钉流造对了：
+/// 整条落盘的镜像上 I-8.9 红在「多于一条末条」、I-8.10 不红（水位加了 1 的末条所在那一组不比）；再整份比，GPU 逐状态与 CPU 相同。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_with_two_last_record_flags_is_not_compared_with_its_root(
+) {
+    let flow = record_three_unit_file_whose_three_record_publish_carries_two_last_record_flags(
+        "crash-judge-gpu-i810-two-last-record-flags",
+    );
+    let mut image_with_every_write_landed = flow.base.clone();
+    image_with_every_write_landed.apply_writes(&flow.writes);
+    match pool_checker_verdict_on_the_image(&image_with_every_write_landed, "I-8.9") {
+        InvariantVerdict::Violated(detail) => assert!(
+            detail.contains("多于一条末条："),
+            "流 {}：整条落盘的镜像上 I-8.9 红在多于一条末条，实际：{detail}",
+            flow.name
+        ),
+        other_verdict @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => panic!(
+            "流 {}：整条落盘的镜像上 I-8.9 要红在多于一条末条，实际 {other_verdict:?}",
+            flow.name
+        ),
+    }
+    let verdict_of_the_new_root_segment =
+        pool_checker_verdict_on_the_image(&image_with_every_write_landed, "I-8.10");
+    assert!(
+        !matches!(verdict_of_the_new_root_segment, InvariantVerdict::Violated(_)),
+        "流 {}：整条落盘的镜像上 I-8.10 不比带两条末条标志的那一组、不红，实际 {verdict_of_the_new_root_segment:?}",
+        flow.name
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_with_two_last_record_flags_is_not_compared_with_its_root",
+        &flow,
+        "I-8.9",
     );
 }
 
@@ -8116,7 +8331,8 @@ fn record_an_abandoned_root_whose_own_instance_table_is_a_chain_longer_than_the_
 /// O-1：回退候选集外的根（被崩溃恢复抛弃的 C）自己那张实例表链 257 片
 /// （[`record_an_abandoned_root_whose_own_instance_table_is_a_chain_longer_than_the_gpu_walks`]）。CPU 读链不设片数上限，读到末片、判 I-3.12 红；
 /// GPU 走满上限链还没完，池级 checker 记判不了（实例表链过长那三种原因字之一），不当读不出、跳过 I-3.12。逐状态：池级 checker 判了的，
-/// 违例位与 CPU 逐位相同；判不了的，原因字只能是实例表链过长，且至少一个这样的状态上 CPU 红 I-3.12；判不了就回落 CPU
+/// 违例位与 CPU 逐位相同；判不了的，原因字只能是实例表链过长，且至少一个这样的状态上 CPU 红 I-3.12；恢复内核判不了的，原因只能是
+/// 沿链读满 256 片还有下一片（[`GPU_RECOVERY_REASONS_LEFT_TO_THE_CPU_ON_AN_INSTANCE_TABLE_CHAIN_OF_257_PAGES`]，恢复读到 C 的状态）；判不了就回落 CPU
 /// （`gpu_verdict_items` 交回 None），回落之后每个状态的红项都与 CPU 相同。
 /// 记哪一个原因字是推的（读码，没跑过）：走读内核把根环里每条自证过的根都另起一份走读走一遍（最新根、候选根、被抛弃的根、F 之下的根各一个阶段，
 /// `crash_judge_checker.wgsl` 的 `walk_and_hand_off`），每次先走它的实例表链，链 257 片先在那里记 61，扫描内核不跑；扫描内核那两处（37、38）
@@ -8164,6 +8380,14 @@ fn the_gpu_judge_leaves_to_the_cpu_an_instance_table_chain_longer_than_the_pages
                 "状态 {ordinal}：GPU 池级 checker 判不了的原因字 {other_reason:#x} 不是实例表链过长"
             )),
         }
+        // 恢复读到 C（链 257 片）的状态上恢复内核沿链读满 256 片还有下一片，按设计交 CPU（E9 那一趟这条流 56 个状态记 4）
+        disagreements.extend(
+            recovery_kernel_left_the_state_to_the_cpu_for_an_unlisted_reason(
+                ordinal,
+                gpu_words,
+                GPU_RECOVERY_REASONS_LEFT_TO_THE_CPU_ON_AN_INSTANCE_TABLE_CHAIN_OF_257_PAGES,
+            ),
+        );
         let concluded = gpu_verdict_items(gpu_words)
             .map_or_else(|| cpu_red_items.clone(), |items| format!("{items:?}"));
         if concluded != *cpu_red_items {
@@ -9837,7 +10061,8 @@ fn the_gpu_judge_agrees_with_the_cpu_on_a_newest_instance_table_chain_of_as_many
 /// CPU 走到末片、比、红 I-9.29；GPU 走读内核走满上限链还没完，池级 checker 记判不了、原因字是实例表链过长
 /// （[`GPU_UNDECIDABLE_INSTANCE_TABLE_CHAIN_LONGER_THAN_THE_PAGES_WALKED`]），不当没走到末片（当成没走到末片的话门关、不比，GPU 不红 I-9.29 而 CPU 红）。
 /// 逐状态：池级 checker 判了的，违例位与 CPU 逐位相同；判不了的，原因字只能是实例表链过长，且至少一个这样的状态上 CPU 红 I-9.29；
-/// 照流水线那样判不了就回落 CPU（`gpu_verdict_items` 交回 None），回落之后每个状态的红项都与 CPU 相同。
+/// 恢复内核判不了的，原因只能是沿链读满 256 片还有下一片（[`GPU_RECOVERY_REASONS_LEFT_TO_THE_CPU_ON_AN_INSTANCE_TABLE_CHAIN_OF_257_PAGES`]，
+/// 恢复落到那条最新根的状态）；照流水线那样判不了就回落 CPU（`gpu_verdict_items` 交回 None），回落之后每个状态的红项都与 CPU 相同。
 #[test]
 fn the_gpu_judge_leaves_to_the_cpu_a_newest_instance_table_chain_longer_than_the_pages_it_walks() {
     let test_name =
@@ -9880,6 +10105,14 @@ fn the_gpu_judge_leaves_to_the_cpu_a_newest_instance_table_chain_longer_than_the
                 "状态 {ordinal}：GPU 池级 checker 判不了的原因字 {other_reason:#x} 不是实例表链过长"
             )),
         }
+        // 恢复落到链 257 片那条最新根的状态上恢复内核沿链读满 256 片还有下一片，按设计交 CPU（E9 那一趟这条流 28 个状态记 4）
+        disagreements.extend(
+            recovery_kernel_left_the_state_to_the_cpu_for_an_unlisted_reason(
+                ordinal,
+                gpu_words,
+                GPU_RECOVERY_REASONS_LEFT_TO_THE_CPU_ON_AN_INSTANCE_TABLE_CHAIN_OF_257_PAGES,
+            ),
+        );
         let concluded = gpu_verdict_items(gpu_words)
             .map_or_else(|| cpu_red_items.clone(), |items| format!("{items:?}"));
         if concluded != *cpu_red_items {
@@ -10933,16 +11166,53 @@ fn the_gpu_judge_agrees_with_the_cpu_when_a_tombstone_root_entry_of_type_zero_na
     );
 }
 
+/// GPU 结论第 1 字：恢复内核判不了（第 0 字带 [`verdict_bits::UNDECIDABLE`]）时是它的原因（`crash_judge_recovery.wgsl` 写结论那一段）。
+/// 恢复内核的原因只有不带站点的 1–8（`crash_judge_common.wgsl` 的 `UNDECIDABLE_*`），池级 checker 原因字（[`POOL_CHECKER_UNDECIDABLE_WORD`]）
+/// 多半带站点（低 8 位是原因、其上是站点号），是两套码：同值的几个只是两边共用同一个常量，不能拿一张码表同时比两个字。
+const GPU_RECOVERY_UNDECIDABLE_REASON_WORD: usize = 1;
+
+/// GPU 恢复内核沿实例表链读满 256 片、最后一片还说有下一片时记的原因（`crash_judge_common.wgsl` 的 `UNDECIDABLE_TOO_DEEP`）。
+/// 恢复内核沿链读的三处（`crash_judge_common.wgsl` 的 `instance_table_chain_readable`、`crash_judge_recovery.wgsl` 的
+/// `load_rows_of_the_instance_table_chain` 与 `load_instance_table_of_the_effective_root`）都设 256 片的上限；CPU 读链不设上限，
+/// 链更长的状态按设计交 CPU（`load_rows_of_the_instance_table_chain` 上面那段注释：「链长过 256 片的记判不了」）。
+const GPU_RECOVERY_UNDECIDABLE_TOO_DEEP: u32 = 4;
+
+/// 实例表链 257 片那三条流上恢复内核许交 CPU 的原因：恢复读到链 257 片的那条根的状态上，恢复内核沿链读满 256 片还有下一片，
+/// 记 [`GPU_RECOVERY_UNDECIDABLE_TOO_DEEP`]、交 CPU；别的原因照旧算不一致。同造法、链 256 片的流不用它（每个状态两个内核都要判得了）。
+const GPU_RECOVERY_REASONS_LEFT_TO_THE_CPU_ON_AN_INSTANCE_TABLE_CHAIN_OF_257_PAGES: &[u32] =
+    &[GPU_RECOVERY_UNDECIDABLE_TOO_DEEP];
+
+/// 「判不了就回落 CPU」那几条用例里恢复内核那一半：恢复内核判不了的状态 `gpu_verdict_items` 也交回 None、回落 CPU，
+/// 只看池级 checker 原因字的话这种状态既不计数、也不断言。原因不在 `recovery_reasons_left_to_the_cpu`（恢复内核自己那套码）里
+/// 就交回一句不一致（给空的就是这条流上恢复内核每个状态都该判得了）。
+fn recovery_kernel_left_the_state_to_the_cpu_for_an_unlisted_reason(
+    ordinal: usize,
+    gpu_words: &[u32; VERDICT_WORDS],
+    recovery_reasons_left_to_the_cpu: &[u32],
+) -> Option<String> {
+    let recovery_reason = gpu_words[GPU_RECOVERY_UNDECIDABLE_REASON_WORD];
+    (gpu_words[0] & (1 << verdict_bits::UNDECIDABLE) != 0
+        && !recovery_reasons_left_to_the_cpu.contains(&recovery_reason))
+    .then(|| {
+        format!(
+            "状态 {ordinal}：GPU 恢复内核判不了、原因 {recovery_reason:#x} 不在 {recovery_reasons_left_to_the_cpu:#x?} 里（这条流只许因点名的原因交 CPU）"
+        )
+    })
+}
+
 /// GPU 走读内核记判不了「类型段 0 的内部节点」时交回的原因字（`crash_judge_common.wgsl` 的 `UNDECIDABLE_TOO_DEEP`）。
 const GPU_UNDECIDABLE_TOO_DEEP: u32 = 4;
 
 /// 逐状态比 GPU 与 CPU，GPU 池级 checker 只许在 `reasons_left_to_the_cpu` 这几种原因字上判不了：判了的，违例位与 CPU 逐位相同；
-/// 判不了的，原因字在 `reasons_left_to_the_cpu` 里；至少一个状态的原因字在 `reasons_one_state_must_carry` 里；照流水线那样判不了就回落 CPU
-/// （`gpu_verdict_items` 交回 None），回落之后每个状态的红项都与 CPU 相同。本机没有 NVIDIA 独显适配器时报「本次未跑」返回。
+/// 判不了的，原因字在 `reasons_left_to_the_cpu` 里；恢复内核判不了的，第 1 字的原因要在 `recovery_reasons_left_to_the_cpu` 里
+/// （恢复内核自己那套码，见 [`GPU_RECOVERY_UNDECIDABLE_REASON_WORD`]）；至少一个状态的原因字在 `reasons_one_state_must_carry` 里；
+/// 照流水线那样判不了就回落 CPU（`gpu_verdict_items` 交回 None），回落之后每个状态的红项都与 CPU 相同。
+/// 本机没有 NVIDIA 独显适配器时报「本次未跑」返回。
 fn assert_the_gpu_judge_leaves_to_the_cpu_only_states_undecidable_for(
     test_name: &str,
     flow: &RecordedFlow,
     reasons_left_to_the_cpu: &[u32],
+    recovery_reasons_left_to_the_cpu: &[u32],
     reasons_one_state_must_carry: &[u32],
 ) {
     let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
@@ -10977,6 +11247,13 @@ fn assert_the_gpu_judge_leaves_to_the_cpu_only_states_undecidable_for(
                 "状态 {ordinal}：GPU 池级 checker 判不了的原因字 {reason:#x} 不在 {reasons_left_to_the_cpu:#x?} 里"
             ));
         }
+        disagreements.extend(
+            recovery_kernel_left_the_state_to_the_cpu_for_an_unlisted_reason(
+                ordinal,
+                gpu_words,
+                recovery_reasons_left_to_the_cpu,
+            ),
+        );
         let concluded = gpu_verdict_items(gpu_words)
             .map_or_else(|| cpu_red_items.clone(), |items| format!("{items:?}"));
         if concluded != *cpu_red_items {
@@ -11045,6 +11322,9 @@ fn the_gpu_judge_leaves_to_the_cpu_an_inode_root_entry_of_type_zero_over_a_leaf_
             "crash-judge-gpu-i92-inode-root-entry-type-zero-leaf-second-copy-verifying-as-a-node",
         ),
         &[GPU_UNDECIDABLE_TOO_DEEP],
+        // 恢复内核这条流上每个状态都判得了（第 59 批 E9 那一趟逐状态核过：判不了的 9 个状态都只是池级 checker 记的）；
+        // 池级 checker 那一张里的 4 是走读内核的原因字，不是恢复内核的码
+        &[],
         &[GPU_UNDECIDABLE_TOO_DEEP],
     );
 }
@@ -11306,6 +11586,8 @@ fn the_gpu_judge_leaves_to_the_cpu_a_candidate_instance_table_chain_longer_than_
             GPU_UNDECIDABLE_INSTANCE_TABLE_PAGES_AFTER_THE_FIRST_LONGER_THAN_THE_PAGES_SCANNED,
             GPU_UNDECIDABLE_INSTANCE_TABLE_ROWS_LONGER_THAN_THE_PAGES_SCANNED,
         ],
+        // 恢复读到 R（链 257 片）的状态上恢复内核沿链读满 256 片还有下一片，按设计交 CPU（E9 那一趟这条流 16 个状态记 4）
+        GPU_RECOVERY_REASONS_LEFT_TO_THE_CPU_ON_AN_INSTANCE_TABLE_CHAIN_OF_257_PAGES,
         &[
             GPU_UNDECIDABLE_INSTANCE_TABLE_PAGES_AFTER_THE_FIRST_LONGER_THAN_THE_PAGES_SCANNED,
             GPU_UNDECIDABLE_INSTANCE_TABLE_ROWS_LONGER_THAN_THE_PAGES_SCANNED,
@@ -12826,6 +13108,8 @@ fn the_gpu_judge_leaves_to_the_cpu_a_data_pointer_whose_first_location_names_the
             "crash-judge-gpu-s2-tail-data-pointer-last-slot-of-a-gap",
         ),
         &[GPU_UNDECIDABLE_SPLICED_READ_MATCHES],
+        // 恢复内核读第一个文件时同一处拼读记同一个原因（两个内核共用 `crash_judge_common.wgsl` 的 read_at 与这个常量）
+        &[GPU_UNDECIDABLE_SPLICED_READ_MATCHES],
         &[GPU_UNDECIDABLE_SPLICED_READ_MATCHES],
     );
 }
@@ -14021,5 +14305,679 @@ fn the_gpu_judge_given_the_retirement_knob_two_agrees_with_the_cpu_on_retirement
         ),
         knobs_of_the_retirement_tree(KNOB_RECORDS_JUDGING_A_SHORT_MIDDLE_CONTAINER),
         KNOB_CAPACITY_INVARIANT_OF_THE_LINEAGE_AND_RETIREMENT_TREES,
+    );
+}
+
+// ───────────── 第 59 批 L1（判决 `research/prompts/m3-batch58-code-r1-main-verification.md` 第三节 L1；两条腿 K1-3）：少一条的那片之后还有满的一片、根环转过一圈 ─────────────
+// ───────────── 第 60 批 N1（判决 `research/prompts/m3-batch59-code-r1-main-verification.md` 第三节 N1；攻方 M1-4、正推 M1-1）：少一条的那片离最右三片 ─────────────
+
+/// 只一棵容器树逐条换旋钮写、再把根环转过一圈的那几张盘怎么造：写第 k 条记录时这一棵一片几条，根环转过一圈之后这一棵按叶序每片的记录数。
+struct ContainersWrittenUnderChangingKnobsBeforeTheRootRingTurnsOver {
+    records_per_container_of_each_record: &'static [u64],
+    record_counts_in_leaf_order: &'static [usize],
+}
+
+/// 少一条的那片之后还有一片满的（第 59 批 L1）：旋钮 2、2、1、1、2、1 写出 [2, 1, 2, 1]（`crates/singlefs-harness/tests/checker_known_bad_images.rs` 的
+/// `A_SHORT_CONTAINER_BEFORE_A_FULL_ONE` 那一形）。第 58 批 J3 那三条 [2, 1, 1] 上少一条的那片只会落在倒数第二位，GPU 扫描内核
+/// 「只判倒数第二片」在它们上面与正确判法逐位相同；这里少一条的容器 2 之后还有一片满的。
+const A_SHORT_CONTAINER_BEFORE_A_FULL_ONE:
+    ContainersWrittenUnderChangingKnobsBeforeTheRootRingTurnsOver =
+    ContainersWrittenUnderChangingKnobsBeforeTheRootRingTurnsOver {
+        records_per_container_of_each_record: &[2, 2, 1, 1, 2, 1],
+        record_counts_in_leaf_order: &[2, 1, 2, 1],
+    };
+
+/// 少一条的那片离最右三片（第 60 批 N1）：旋钮 2、2、1、1、2、2、2、1 写出 [2, 1, 2, 2, 1]（`crates/singlefs-harness/tests/checker_known_bad_images.rs` 的
+/// `A_SHORT_CONTAINER_THREE_CONTAINERS_LEFT_OF_THE_RIGHTMOST` 那一形，第 59 批 L2）。上面 [2, 1, 2, 1] 与第 58 批 J3 那几条上少一条的那片离最右
+/// 都不超过两片，GPU 扫描内核「只判最右之前两片」（攻方 `research/prompts/m3-batch59-code-r1-opus-model/` 的 `w-last-two`）在它们上面与正确判法逐位相同；
+/// 这里容器 2 在倒数第三片之前。写的中途 [2, 1, 1]、[2, 1, 2]、[2, 1, 2, 1] 那几版里容器 2 离最右不超过两片，留在候选集里时那一形也红，所以要转出去。
+const A_SHORT_CONTAINER_THREE_CONTAINERS_LEFT_OF_THE_RIGHTMOST:
+    ContainersWrittenUnderChangingKnobsBeforeTheRootRingTurnsOver =
+    ContainersWrittenUnderChangingKnobsBeforeTheRootRingTurnsOver {
+        records_per_container_of_each_record: &[2, 2, 1, 1, 2, 2, 2, 1],
+        record_counts_in_leaf_order: &[2, 1, 2, 2, 1],
+    };
+
+/// 第 59 批 L1、第 60 批 N1 那几条流写的是哪一棵容器树（另两棵照产品）。
+#[derive(Clone, Copy, Debug)]
+enum ContainerTreeWrittenBeforeTheRootRingTurnsOver {
+    Tombstone,
+    Lineage,
+    Retirement,
+}
+
+impl ContainerTreeWrittenBeforeTheRootRingTurnsOver {
+    /// 新池新建文件之后，第 k 条记录写的时候只这一棵压到 `records_per_container_of_each_record[k]` 条一片：墓碑树逐个 unlink 空 inode 到底
+    /// （同 [`record_tombstone_containers_of_two_one_and_one_records_under_changing_knobs`]），谱系树挂着回退到第一个文件那一版
+    /// （[`pool_rolled_back_under_these_lineage_knobs`]），退役树每次退役独占最右那片叶的号（同
+    /// [`record_retirement_containers_of_two_one_and_one_records_under_changing_knobs`]）。
+    fn pool_written_under_these_knobs(
+        self,
+        tag: &str,
+        records_per_container_of_each_record: &[u64],
+    ) -> BuiltPool {
+        match self {
+            Self::Tombstone => {
+                let mut pool = pool_with_new_inodes(
+                    tag,
+                    u64::try_from(records_per_container_of_each_record.len()).expect("装得进 u64"),
+                );
+                // 迭代上界：切片的长度。
+                for (inode, records_per_container) in
+                    (FIRST_FILE.0 + 1..).zip(records_per_container_of_each_record)
+                {
+                    unlink_an_empty_inode_to_the_end_under_the_capacities(
+                        &mut pool,
+                        inode,
+                        capacities_of_the_tombstone_container_knob(*records_per_container),
+                    );
+                }
+                pool
+            }
+            Self::Lineage => pool_rolled_back_under_these_lineage_knobs(
+                tag,
+                records_per_container_of_each_record,
+            ),
+            Self::Retirement => {
+                let mut pool = pool_with_new_inodes(tag, INODE_RECORDS_PER_LEAF);
+                // 迭代上界：切片的长度。第 0 次删的是建出来的最后一个号（独占最右那片叶），之后每次先建一个再删它。
+                for (retirement_index, records_per_container) in
+                    records_per_container_of_each_record.iter().enumerate()
+                {
+                    if retirement_index > 0 {
+                        common_deletion_in_progress::publish_new_inodes_and_advance_the_pool(
+                            &mut pool, 1,
+                        );
+                    }
+                    let inode = pool.output.inode_number_watermark() - 1;
+                    unlink_an_empty_inode_to_the_end_under_the_capacities(
+                        &mut pool,
+                        inode,
+                        capacities_of_the_retirement_container_knob(*records_per_container),
+                    );
+                }
+                pool
+            }
+        }
+    }
+
+    /// 这一版这一棵按叶序每片的记录数。
+    fn record_counts_of_each_container(self, pool: &BuiltPool) -> Vec<usize> {
+        match self {
+            Self::Tombstone => pool
+                .output
+                .tombstone_containers
+                .iter()
+                .map(|container| container.contents.records.len())
+                .collect(),
+            Self::Lineage => pool
+                .output
+                .lineage_containers
+                .iter()
+                .map(|container| container.contents.records.len())
+                .collect(),
+            Self::Retirement => pool
+                .output
+                .retirement_containers
+                .iter()
+                .map(|container| container.contents.records.len())
+                .collect(),
+        }
+    }
+
+    /// 判的时候编进 GPU 扫描内核、交给 CPU 新入口的旋钮值：只这一棵装 `records_per_container` 条一片。
+    fn knobs_judging(self, records_per_container: u64) -> ContainerCapacityKnobs {
+        match self {
+            Self::Tombstone => knobs_of_the_tombstone_tree(records_per_container),
+            Self::Lineage => knobs_of_the_lineage_tree(records_per_container),
+            Self::Retirement => knobs_of_the_retirement_tree(records_per_container),
+        }
+    }
+
+    /// 这一棵带旋钮值的那一条（墓碑树 I-9.22，谱系树与退役树 I-9.37）。
+    fn knob_capacity_invariant(self) -> &'static str {
+        match self {
+            Self::Tombstone => KNOB_CAPACITY_INVARIANT_OF_THE_TOMBSTONE_TREE,
+            Self::Lineage | Self::Retirement => {
+                KNOB_CAPACITY_INVARIANT_OF_THE_LINEAGE_AND_RETIREMENT_TREES
+            }
+        }
+    }
+}
+
+/// 只 `tree` 这一棵按 `layout` 逐条换旋钮写出三片以上的容器，再建 30 次空 inode（[`turn_the_root_ring_over_by_creating_inodes`]）把根环转过一圈：
+/// 写这棵树的那几版、连同写到一半时少一条的那片离最右更近的那几版，都转出写完之后各版的回退候选集，那几版的状态上照判写到一半的那一形，
+/// 写完之后的状态上候选集里只剩 `layout.record_counts_in_leaf_order` 那一形（与 harness `checker_known_bad_images.rs` 里同名那一形的三条同形）。
+/// 流从 mkfs 之后录起，被判的是最后一次根槽写。
+fn record_containers_written_under_changing_knobs_with_the_root_ring_turned_over(
+    tree: ContainerTreeWrittenBeforeTheRootRingTurnsOver,
+    layout: &ContainersWrittenUnderChangingKnobsBeforeTheRootRingTurnsOver,
+    tag: &str,
+    name: &'static str,
+) -> RecordedFlow {
+    let mut pool =
+        tree.pool_written_under_these_knobs(tag, layout.records_per_container_of_each_record);
+    turn_the_root_ring_over_by_creating_inodes(&mut pool);
+    assert_eq!(
+        tree.record_counts_of_each_container(&pool),
+        layout.record_counts_in_leaf_order,
+        "{tree:?} 按叶序每片的记录数（根环转过一圈之后）"
+    );
+    let versions = versions_with_the_first_file_through_the_last_publish(&pool);
+    recorded_flow_of_the_pool(&pool, name, versions)
+}
+
+/// L1、N1：`tree` 这一棵按 `layout` 写、根环转过一圈，GPU 扫描内核与 CPU 新入口都给这一棵旋钮 2：每片都不超旋钮值、容器号从 1 逐片加一、
+/// 每片至少一条，只「不是最右的容器 2 装了 1 条，不是旋钮值 2」不成立。CPU 在这条流的全部状态上红过的不变量恰好是这一棵的那一条
+/// （I-9.22 / I-9.37；另两棵照产品、不红，别的不变量在合法写出来的盘上也不红），GPU 红在同样的状态、同样的位上。
+/// [2, 1, 2, 1] 上 GPU 扫描内核只判倒数第二片（第 3 片，装满 2 条）、[2, 1, 2, 2, 1] 上只判最右之前两片（第 3、4 片，都装满 2 条），
+/// 在根环转过之后的状态上照绿，就在那里与 CPU 不一致。
+fn assert_the_gpu_judge_given_the_knob_two_agrees_with_the_cpu_that_containers_written_under_changing_knobs_with_the_root_ring_turned_over_redden_only_the_knob_capacity_invariant(
+    test_name: &str,
+    tree: ContainerTreeWrittenBeforeTheRootRingTurnsOver,
+    layout: &ContainersWrittenUnderChangingKnobsBeforeTheRootRingTurnsOver,
+    tag: &str,
+    name: &'static str,
+) {
+    let flow = record_containers_written_under_changing_knobs_with_the_root_ring_turned_over(
+        tree, layout, tag, name,
+    );
+    let knob_capacity_invariant = tree.knob_capacity_invariant();
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state_given_the_container_capacity_knobs(
+        cards,
+        &flow,
+        tree.knobs_judging(KNOB_RECORDS_JUDGING_A_SHORT_MIDDLE_CONTAINER),
+    ) else {
+        return;
+    };
+    assert_eq!(
+        comparison.cpu_checker_red_invariants,
+        std::collections::BTreeSet::from([knob_capacity_invariant]),
+        "流 {} 上 CPU 新入口带旋钮值红过的不变量恰好是 {knob_capacity_invariant}",
+        flow.name
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}（GPU 扫描内核编进旋钮值）：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
+    );
+}
+
+#[test]
+fn the_gpu_judge_given_the_tombstone_knob_two_agrees_with_the_cpu_on_tombstone_containers_of_two_one_two_and_one_records_with_the_root_ring_turned_over(
+) {
+    assert_the_gpu_judge_given_the_knob_two_agrees_with_the_cpu_that_containers_written_under_changing_knobs_with_the_root_ring_turned_over_redden_only_the_knob_capacity_invariant(
+        "the_gpu_judge_given_the_tombstone_knob_two_agrees_with_the_cpu_on_tombstone_containers_of_two_one_two_and_one_records_with_the_root_ring_turned_over",
+        ContainerTreeWrittenBeforeTheRootRingTurnsOver::Tombstone,
+        &A_SHORT_CONTAINER_BEFORE_A_FULL_ONE,
+        "crash-judge-gpu-tombstone-containers-of-two-one-two-and-one-records-ring-turned",
+        "tombstone-containers-of-two-one-two-and-one-records-with-the-root-ring-turned-over",
+    );
+}
+
+#[test]
+fn the_gpu_judge_given_the_lineage_knob_two_agrees_with_the_cpu_on_lineage_containers_of_two_one_two_and_one_records_with_the_root_ring_turned_over(
+) {
+    assert_the_gpu_judge_given_the_knob_two_agrees_with_the_cpu_that_containers_written_under_changing_knobs_with_the_root_ring_turned_over_redden_only_the_knob_capacity_invariant(
+        "the_gpu_judge_given_the_lineage_knob_two_agrees_with_the_cpu_on_lineage_containers_of_two_one_two_and_one_records_with_the_root_ring_turned_over",
+        ContainerTreeWrittenBeforeTheRootRingTurnsOver::Lineage,
+        &A_SHORT_CONTAINER_BEFORE_A_FULL_ONE,
+        "crash-judge-gpu-lineage-containers-of-two-one-two-and-one-records-ring-turned",
+        "lineage-containers-of-two-one-two-and-one-records-with-the-root-ring-turned-over",
+    );
+}
+
+#[test]
+fn the_gpu_judge_given_the_retirement_knob_two_agrees_with_the_cpu_on_retirement_containers_of_two_one_two_and_one_records_with_the_root_ring_turned_over(
+) {
+    assert_the_gpu_judge_given_the_knob_two_agrees_with_the_cpu_that_containers_written_under_changing_knobs_with_the_root_ring_turned_over_redden_only_the_knob_capacity_invariant(
+        "the_gpu_judge_given_the_retirement_knob_two_agrees_with_the_cpu_on_retirement_containers_of_two_one_two_and_one_records_with_the_root_ring_turned_over",
+        ContainerTreeWrittenBeforeTheRootRingTurnsOver::Retirement,
+        &A_SHORT_CONTAINER_BEFORE_A_FULL_ONE,
+        "crash-judge-gpu-retirement-containers-of-two-one-two-and-one-records-ring-turned",
+        "retirement-containers-of-two-one-two-and-one-records-with-the-root-ring-turned-over",
+    );
+}
+
+#[test]
+fn the_gpu_judge_given_the_tombstone_knob_two_agrees_with_the_cpu_on_tombstone_containers_of_two_one_two_two_and_one_records_with_the_root_ring_turned_over(
+) {
+    assert_the_gpu_judge_given_the_knob_two_agrees_with_the_cpu_that_containers_written_under_changing_knobs_with_the_root_ring_turned_over_redden_only_the_knob_capacity_invariant(
+        "the_gpu_judge_given_the_tombstone_knob_two_agrees_with_the_cpu_on_tombstone_containers_of_two_one_two_two_and_one_records_with_the_root_ring_turned_over",
+        ContainerTreeWrittenBeforeTheRootRingTurnsOver::Tombstone,
+        &A_SHORT_CONTAINER_THREE_CONTAINERS_LEFT_OF_THE_RIGHTMOST,
+        "crash-judge-gpu-tombstone-containers-of-two-one-two-two-and-one-records-ring-turned",
+        "tombstone-containers-of-two-one-two-two-and-one-records-with-the-root-ring-turned-over",
+    );
+}
+
+#[test]
+fn the_gpu_judge_given_the_lineage_knob_two_agrees_with_the_cpu_on_lineage_containers_of_two_one_two_two_and_one_records_with_the_root_ring_turned_over(
+) {
+    assert_the_gpu_judge_given_the_knob_two_agrees_with_the_cpu_that_containers_written_under_changing_knobs_with_the_root_ring_turned_over_redden_only_the_knob_capacity_invariant(
+        "the_gpu_judge_given_the_lineage_knob_two_agrees_with_the_cpu_on_lineage_containers_of_two_one_two_two_and_one_records_with_the_root_ring_turned_over",
+        ContainerTreeWrittenBeforeTheRootRingTurnsOver::Lineage,
+        &A_SHORT_CONTAINER_THREE_CONTAINERS_LEFT_OF_THE_RIGHTMOST,
+        "crash-judge-gpu-lineage-containers-of-two-one-two-two-and-one-records-ring-turned",
+        "lineage-containers-of-two-one-two-two-and-one-records-with-the-root-ring-turned-over",
+    );
+}
+
+#[test]
+fn the_gpu_judge_given_the_retirement_knob_two_agrees_with_the_cpu_on_retirement_containers_of_two_one_two_two_and_one_records_with_the_root_ring_turned_over(
+) {
+    assert_the_gpu_judge_given_the_knob_two_agrees_with_the_cpu_that_containers_written_under_changing_knobs_with_the_root_ring_turned_over_redden_only_the_knob_capacity_invariant(
+        "the_gpu_judge_given_the_retirement_knob_two_agrees_with_the_cpu_on_retirement_containers_of_two_one_two_two_and_one_records_with_the_root_ring_turned_over",
+        ContainerTreeWrittenBeforeTheRootRingTurnsOver::Retirement,
+        &A_SHORT_CONTAINER_THREE_CONTAINERS_LEFT_OF_THE_RIGHTMOST,
+        "crash-judge-gpu-retirement-containers-of-two-one-two-two-and-one-records-ring-turned",
+        "retirement-containers-of-two-one-two-two-and-one-records-with-the-root-ring-turned-over",
+    );
+}
+
+// ───────────── 第59批 E14：GPU 扫描内核 I-1.8 两句与走读内核位置项校验和那张表各一个敏感的取样点 ─────────────
+
+/// I-1.8 ①「同一组的成员载荷相同」的一个敏感取样点：三个数据单元那条流（[`record_new_pool_through_a_three_unit_file`]）上，
+/// 最后一个数据单元只改盘号小的那一份副本的载荷首字节、重封到根（与 `new-pool-data-unit-copies-differ` 同一形）。CPU 判 I-1.8 红。
+/// GPU 扫描内核收扫描项的次序是落点表的 (盘, 偏移) 升序：码 1 的扫描项在一块盘上不止一个时，被改的那个单元的两份副本在收的次序里
+/// 隔着别的数据单元，只有按归并键排过序才挨在一起、归成一组；新池新建文件那条流上码 1 只有一个数据单元，两份副本按收的次序本来就挨着，
+/// 排没排序看不出来（第59批 E13 那一行变异在那条流上没红）。
+fn record_three_unit_file_with_one_copy_of_its_last_data_unit_carrying_another_payload(
+    tag: &str,
+) -> RecordedFlow {
+    let name = "three-unit-file-one-copy-of-the-last-data-unit-carries-another-payload";
+    let mut flow = record_new_pool_through_a_three_unit_file(tag, name);
+    let is_a_data_unit = |bytes: &[u8]| unit_class(bytes) == 1;
+    let targets = last_unit_copies(&flow, name, &is_a_data_unit, true);
+    let changed_device = flow.writes[targets[0]].device;
+    let changed_offset = flow.writes[targets[0]].offset;
+    // 收的次序里两份副本之间夹着别的数据单元：被改的那一盘上偏移更大的，或另一块盘上偏移更小的
+    let data_units_between_the_two_copies = flow
+        .writes
+        .iter()
+        .filter(|write| {
+            write.kind == StepKind::UnitWrite
+                && write.bytes().is_some_and(is_a_data_unit)
+                && ((write.device == changed_device && write.offset.0 > changed_offset.0)
+                    || (write.device != changed_device && write.offset.0 < changed_offset.0))
+        })
+        .count();
+    assert!(
+        data_units_between_the_two_copies >= 1,
+        "流 {name}：按 (盘, 偏移) 收的次序里，被改的数据单元的两份副本之间要夹着别的数据单元（这条流要的就是这一点）"
+    );
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &targets, &|bytes| {
+        bytes[134] ^= 0xFF;
+    });
+    flow
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_one_copy_of_a_data_unit_among_several_carries_another_payload(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_one_copy_of_a_data_unit_among_several_carries_another_payload",
+        &record_three_unit_file_with_one_copy_of_its_last_data_unit_carrying_another_payload(
+            "crash-judge-gpu-i18-among-three-data-units",
+        ),
+        "I-1.8",
+    );
+}
+
+/// 码 3 单元头里的出生序号（4 字节，偏移 103）：在码 3 的归并键 [93, 107) 那一段里，不在全序键（诞生代号 [73, 81)、实例与事务号 [93, 103)）里。
+const PACKED_UNIT_BIRTH_SEQUENCE_OFFSET: usize = 103;
+
+/// I-1.8 ②「同 key 的各组两两全序键不等」那一支：新池新建文件的流上 inode 叶容器只改盘号大的那一份副本的出生序号（加 1）、重封到根。
+/// 两份副本的归并键不同、各成一组，对象 key 与全序键都相同：CPU 判 I-1.8 第二句红（两份载荷相同，第一句成立）。
+/// GPU 扫描内核按换过次序的归并键（对象 key、全序键、其余）排，这两组挨着，相邻两组的公共前缀到出生序号那一段才断（第 57 个字节），
+/// 比相邻两组的那一句要认出「对象 key 连着全序键都相同」。
+fn record_new_pool_with_the_second_copy_of_the_inode_leaf_carrying_another_birth_sequence(
+    tag: &str,
+) -> RecordedFlow {
+    let name = "new-pool-second-copy-of-the-inode-leaf-carries-another-birth-sequence";
+    let mut flow = record_new_pool_file_creation(tag, name);
+    let copies = last_unit_copies(&flow, name, &is_an_inode_leaf_container, false);
+    let second_copy = *copies
+        .iter()
+        .max_by_key(|index| flow.writes[**index].device.0)
+        .expect("一个单元两份副本");
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &[second_copy], &|bytes| {
+        let birth_sequence = read_u32_at(bytes, PACKED_UNIT_BIRTH_SEQUENCE_OFFSET);
+        bytes[PACKED_UNIT_BIRTH_SEQUENCE_OFFSET..PACKED_UNIT_BIRTH_SEQUENCE_OFFSET + 4]
+            .copy_from_slice(&birth_sequence.wrapping_add(1).to_le_bytes());
+    });
+    flow
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_two_copies_of_an_inode_leaf_split_into_two_groups_of_one_total_order_key(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_two_copies_of_an_inode_leaf_split_into_two_groups_of_one_total_order_key",
+        &record_new_pool_with_the_second_copy_of_the_inode_leaf_carrying_another_birth_sequence(
+            "crash-judge-gpu-i18-two-groups-of-one-total-order-key",
+        ),
+        "I-1.8",
+    );
+}
+
+/// 分配记录叶：key 宽 10（设备 4、槽号 6）、条目 20（key、跨度 2 含已释放标志、分配代或释放代 8）。
+const ALLOCATION_LEAF_RECORD_BYTES: usize = 20;
+/// 记账树里「defer 待释放」那一项（D5（快照 / 空间记账机制） 已定项 4 第 5 项，`singlefs_core::records::STATISTIC_DEFER_QUEUE_BYTES`）。
+const STATISTIC_DEFER_QUEUE_BYTES: u16 = 5;
+
+/// 隔离的那个数据单元的两份副本读回来什么样（[`record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined`]）。
+#[derive(Clone, Copy, Debug)]
+enum CopiesOfTheQuarantinedDataUnit {
+    /// 盘号大的那一份载荷首字节翻转、不重封：与每一条指着它的位置条目都对不上，这个单元整组豁免。
+    TheSecondReadsBackOtherBytes,
+    /// 两份都是原样；带着指它的位置条目的几片单元（下段叶、映射叶）按写的次序轮流把盘 0、盘 1 那一条的校验和写错：每一份都对得上
+    /// 另一片里指着它的那一条，不豁免。
+    EachMatchesOneOfTheLocationEntriesNamingIt,
+}
+
+/// 隔离豁免那一支（I-3.1 / I-3.11 的隔离的记录，D19（块指针的结构与宽度预算） 已定项 5；池级 checker `quarantined_slots_exempted_per_device`，
+/// GPU 扫描内核 `c_quarantine_exempted`、读走读内核主走读记的位置项校验和那张表）：
+/// 三个数据单元的文件发完意图（txg 5）与按批大小 1 的前两批（txg 6 放掉第三个单元、txg 7 放掉第二个单元）。txg 7 那一版改成「写者把放掉的
+/// 第二个单元隔离了」：分配记录叶里那个单元两块盘上的记录改回第一批那一版的样子（仍分配、分配代），记账叶里两块盘的 defer 待释放各减一个单元，
+/// 重封到根。最新根不引用它、更早的候选根（txg 4、5、6）引用它，判 I-3.11 那一遍它是一条已分配而没有根引用的记录，豁免不豁免看 `copies`：
+/// 豁免时 I-3.11 成立，不豁免时 I-3.11 红（已分配多一个单元）。I-3.1 那一遍走的是全部候选根，这个单元有根引用，不进隔离。
+fn record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined(
+    tag: &str,
+    copies: CopiesOfTheQuarantinedDataUnit,
+) -> RecordedFlow {
+    let name = match copies {
+        CopiesOfTheQuarantinedDataUnit::TheSecondReadsBackOtherBytes => {
+            "second-deletion-batch-quarantined-data-unit-second-copy-reads-back-other-bytes"
+        }
+        CopiesOfTheQuarantinedDataUnit::EachMatchesOneOfTheLocationEntriesNamingIt => {
+            "second-deletion-batch-quarantined-data-unit-copies-each-match-one-location-entry"
+        }
+    };
+    let mut pool = pool_with_a_three_unit_file(tag);
+    publish_the_intent(&mut pool);
+    let after_the_first_batch = publish_the_next_step_in_batches_of_one(&mut pool);
+    let after_the_second_batch = publish_the_next_step_in_batches_of_one(&mut pool);
+    let released_by_the_second_batch: Vec<_> = after_the_first_batch
+        .data_pointers
+        .iter()
+        .filter(|pointer| !after_the_second_batch.data_pointers.contains(pointer))
+        .copied()
+        .collect();
+    assert_eq!(
+        released_by_the_second_batch.len(),
+        1,
+        "按批大小 1 的第二批放掉一个数据单元（第一批之后 {} 个、第二批之后 {} 个）",
+        after_the_first_batch.data_pointers.len(),
+        after_the_second_batch.data_pointers.len()
+    );
+    let quarantined = released_by_the_second_batch[0];
+    let mut flow = recorded_flow_of_the_pool(
+        &pool,
+        name,
+        versions_with_the_first_file_before_its_deletion(),
+    );
+
+    // 分配记录：第二批那一版两块盘上那一条（已释放、释放代）改回第一批那一版的（仍分配、分配代）
+    let record_of = |records: &[singlefs_core::allocator::AllocationRecord],
+                     location: &singlefs_core::pointer::LocationEntry| {
+        *records
+            .iter()
+            .find(|record| record.device == location.device && record.slot == location.slot)
+            .unwrap_or_else(|| panic!("那一版的分配记录里有 {location:?} 那一条"))
+    };
+    let record_replacements: Vec<(Vec<u8>, Vec<u8>)> = quarantined
+        .locations
+        .iter()
+        .map(|location| {
+            let released = record_of(&after_the_second_batch.allocation_records, location);
+            let allocated = record_of(&after_the_first_batch.allocation_records, location);
+            assert!(
+                released.is_released && !allocated.is_released,
+                "第二批那一版这一条已释放、第一批那一版仍分配：{released:?} / {allocated:?}"
+            );
+            (released.to_bytes(), allocated.to_bytes())
+        })
+        .collect();
+    let records_of_an_allocation_leaf = |bytes: &[u8]| -> Vec<usize> {
+        if unit_class(bytes) != 2
+            || usize::from(index_node_key_width(bytes)) != ALLOCATION_RECORD_TREE_KEY_BYTES
+            || usize::from(index_node_entry_width(bytes)) != ALLOCATION_LEAF_RECORD_BYTES
+            || bytes[50] != 0
+        {
+            return Vec::new();
+        }
+        let entry_count = usize::from(read_u16_at(
+            bytes,
+            index_node_entry_count_offset(ALLOCATION_RECORD_TREE_KEY_BYTES),
+        ));
+        (0..entry_count)
+            .map(|index| {
+                index_node_entries_start(ALLOCATION_RECORD_TREE_KEY_BYTES)
+                    + index * ALLOCATION_LEAF_RECORD_BYTES
+            })
+            .collect()
+    };
+    let leaves_with_the_released_records: Vec<usize> = flow
+        .writes
+        .iter()
+        .enumerate()
+        .filter(|(_, write)| {
+            write.kind == StepKind::UnitWrite
+                && write.bytes().is_some_and(|bytes| {
+                    records_of_an_allocation_leaf(bytes).iter().any(|record| {
+                        record_replacements.iter().any(|(released, _)| {
+                            bytes[*record..*record + ALLOCATION_LEAF_RECORD_BYTES] == released[..]
+                        })
+                    })
+                })
+        })
+        .map(|(index, _)| index)
+        .collect();
+    assert!(
+        !leaves_with_the_released_records.is_empty(),
+        "流 {name} 里第二批那一版的分配记录叶写着那两条已释放的记录"
+    );
+    corrupt_units_and_reseal_up_to_the_root(
+        &mut flow,
+        &leaves_with_the_released_records,
+        &|bytes| {
+            for record in records_of_an_allocation_leaf(bytes) {
+                for (released, allocated) in &record_replacements {
+                    if bytes[record..record + ALLOCATION_LEAF_RECORD_BYTES] == released[..] {
+                        bytes[record..record + ALLOCATION_LEAF_RECORD_BYTES]
+                            .copy_from_slice(allocated);
+                    }
+                }
+            }
+        },
+    );
+
+    // 记账：第二批那一版两块盘的 defer 待释放各减一个单元
+    let unit_bytes = flow
+        .writes
+        .iter()
+        .find(|write| {
+            write.kind == StepKind::UnitWrite
+                && write.device == quarantined.locations[0].device
+                && write.offset == quarantined.locations[0].slot.to_device_offset()
+        })
+        .expect("流里写过被隔离的那个数据单元")
+        .length_in_bytes();
+    let devices_of_the_unit: Vec<u32> = quarantined
+        .locations
+        .iter()
+        .map(|location| location.device.0)
+        .collect();
+    let accounting_leaf = last_unit_copies(&flow, name, &is_an_accounting_leaf, false);
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, &accounting_leaf, &|bytes| {
+        let entry_count = usize::from(read_u16_at(
+            bytes,
+            index_node_entry_count_offset(ACCOUNTING_KEY_BYTES),
+        ));
+        for device in &devices_of_the_unit {
+            let rows: Vec<usize> = (0..entry_count)
+                .map(|index| {
+                    index_node_entries_start(ACCOUNTING_KEY_BYTES) + index * ACCOUNTING_ROW_BYTES
+                })
+                .filter(|row| {
+                    read_u16_at(bytes, *row) == STATISTIC_DEFER_QUEUE_BYTES
+                        && read_u32_at(bytes, row + ACCOUNTING_ROW_DEVICE_OFFSET) == *device
+                })
+                .collect();
+            assert_eq!(rows.len(), 1, "记账叶里盘 {device} 的 defer 待释放恰好一行");
+            let value = read_u64_at(bytes, rows[0] + ACCOUNTING_ROW_VALUE_OFFSET);
+            assert!(
+                value >= unit_bytes,
+                "盘 {device} 的 defer 待释放 {value} 字节里算着被放掉的那个单元（{unit_bytes} 字节）"
+            );
+            bytes[rows[0] + ACCOUNTING_ROW_VALUE_OFFSET..rows[0] + ACCOUNTING_ROW_VALUE_OFFSET + 8]
+                .copy_from_slice(&(value - unit_bytes).to_le_bytes());
+        }
+    });
+
+    match copies {
+        CopiesOfTheQuarantinedDataUnit::TheSecondReadsBackOtherBytes => {
+            let second = quarantined.locations[1];
+            let second_copy_writes: Vec<usize> = flow
+                .writes
+                .iter()
+                .enumerate()
+                .filter(|(_, write)| {
+                    write.kind == StepKind::UnitWrite
+                        && write.device == second.device
+                        && write.offset == second.slot.to_device_offset()
+                })
+                .map(|(index, _)| index)
+                .collect();
+            assert_eq!(
+                second_copy_writes.len(),
+                1,
+                "被隔离的那个数据单元盘 {} 那一份流里只写过一次",
+                second.device.0
+            );
+            let WrittenContents::Bytes(bytes) = &mut flow.writes[second_copy_writes[0]].contents
+            else {
+                panic!("单元写是普通写");
+            };
+            bytes[134] ^= 0xFF;
+        }
+        CopiesOfTheQuarantinedDataUnit::EachMatchesOneOfTheLocationEntriesNamingIt => {
+            let entry_bytes = |location: &singlefs_core::pointer::LocationEntry| -> Vec<u8> {
+                let mut entry = Vec::with_capacity(14);
+                entry.extend_from_slice(&location.device.0.to_le_bytes());
+                entry.extend_from_slice(&location.slot.0.to_le_bytes()[..6]);
+                entry.extend_from_slice(&location.unit_checksum.to_le_bytes());
+                entry
+            };
+            let entries_naming_it = [
+                entry_bytes(&quarantined.locations[0]),
+                entry_bytes(&quarantined.locations[1]),
+            ];
+            // 带着指它的位置条目的单元（下段叶里的数据指针、映射叶里的映射条目，走读都把那条位置条目的校验和记下），按第一次写的次序，
+            // 每个单元的几份副本。每一片都写错一条：哪一片先被走到，它写错的那一盘只记一个校验和的话就只剩错的那一个
+            let mut referrers: Vec<(u64, Vec<usize>)> = Vec::new();
+            for (index, write) in flow.writes.iter().enumerate() {
+                let Some(bytes) = write.bytes() else {
+                    continue;
+                };
+                if write.kind != StepKind::UnitWrite
+                    || !entries_naming_it.iter().any(|entry| {
+                        bytes
+                            .windows(entry.len())
+                            .any(|window| window == &entry[..])
+                    })
+                {
+                    continue;
+                }
+                match referrers
+                    .iter_mut()
+                    .find(|(offset, _)| *offset == write.offset.0)
+                {
+                    Some((_, copies_of_the_referrer)) => copies_of_the_referrer.push(index),
+                    None => referrers.push((write.offset.0, vec![index])),
+                }
+            }
+            assert!(
+                referrers.len() >= 2,
+                "流 {name} 里至少两片单元带着指被隔离的那个数据单元的位置条目（第一批之前那一版与第一批那一版各有下段叶），只找到 {}",
+                referrers.len()
+            );
+            for (position, (_, copies_of_the_referrer)) in referrers.iter().enumerate() {
+                let stale = &entries_naming_it[position % 2];
+                corrupt_units_and_reseal_up_to_the_root(
+                    &mut flow,
+                    copies_of_the_referrer,
+                    &|bytes| {
+                        let occurrences: Vec<usize> = (0..=bytes.len() - stale.len())
+                            .filter(|start| bytes[*start..*start + stale.len()] == stale[..])
+                            .collect();
+                        assert_eq!(
+                            occurrences.len(),
+                            1,
+                            "这片单元里指着那一份的位置条目恰好一条"
+                        );
+                        let checksum = occurrences[0] + 10;
+                        let written_wrong = read_u32_at(bytes, checksum) ^ 0xFFFF_FFFF;
+                        bytes[checksum..checksum + 4].copy_from_slice(&written_wrong.to_le_bytes());
+                    },
+                );
+            }
+        }
+    }
+    flow
+}
+
+/// 豁免那一形：被隔离的单元盘 1 那一份对不上任何一条指着它的位置条目，整组豁免，第二批那一版上 I-3.11 照样成立
+/// （不豁免的话已分配多一个单元、红）。CPU 一个状态都不红 I-3.11，GPU 每个状态逐位相同。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_second_copy_reads_back_other_bytes_is_exempted(
+) {
+    let test_name = "the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_second_copy_reads_back_other_bytes_is_exempted";
+    let flow =
+        record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined(
+            "crash-judge-gpu-quarantine-second-copy-reads-back-other-bytes",
+            CopiesOfTheQuarantinedDataUnit::TheSecondReadsBackOtherBytes,
+        );
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.len(),
+        mismatch_listing(&comparison)
+    );
+    assert!(
+        comparison.cpu_checker_held_invariants.contains("I-3.11")
+            && !comparison.cpu_checker_red_invariants.contains("I-3.11"),
+        "流 {} 上 CPU 池级 checker 判过 I-3.11、一个状态都不红（被隔离的单元豁免了；成立过的 {:?}，红过的 {:?}）",
+        flow.name,
+        comparison.cpu_checker_held_invariants,
+        comparison.cpu_checker_red_invariants
+    );
+}
+
+/// 不豁免那一形：被隔离的单元两份都对得上某一条指着它的位置条目（带着这两条的每一片单元各写错一条），不豁免，CPU 判 I-3.11 红。
+/// 位置项校验和那张表要把同 (盘, 槽) 的每一个不同的校验和都记下：只记一个的话，先走到的那一片写错的那一盘只剩错的那一个，那一份就对不上、整组豁免。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_copies_each_match_one_location_entry_is_not_exempted(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_copies_each_match_one_location_entry_is_not_exempted",
+        &record_three_unit_file_through_its_second_deletion_batch_with_the_released_data_unit_quarantined(
+            "crash-judge-gpu-quarantine-copies-each-match-one-location-entry",
+            CopiesOfTheQuarantinedDataUnit::EachMatchesOneOfTheLocationEntriesNamingIt,
+        ),
+        "I-3.11",
     );
 }

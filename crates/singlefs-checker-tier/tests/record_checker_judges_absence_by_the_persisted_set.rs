@@ -753,7 +753,7 @@ fn enumerate_every_subset_of_one_segment(
 }
 
 /// 计数行：`<前缀> states=… closed_form_states=… exhaustive=… record_claimed_state_missing_unit=…`。
-/// `exhaustive=true` 只在评过的状态数等于闭式算的数时打（门禁 checker-tier-layer0-replay 的 `exhaustive=` 判它，`research/scripts/admission.py`）。
+/// `exhaustive=true` 只在评过的状态数等于闭式算的数时打（门禁 checker-tier-layer0-replay 的 `exhaustive=` 判它，`scripts/gate/admission.py`）。
 fn count_line(prefix: &str, enumerated: &SubsetsOfOneSegmentEnumerated) -> String {
     format!(
         "{prefix} states={} closed_form_states={} exhaustive={} record_claimed_state_missing_unit={}",
@@ -785,7 +785,7 @@ fn parallel_finished_line(enumerated: &SubsetsOfOneSegmentEnumerated) -> String 
     )
 }
 
-/// 一行里 `键=值` 那几段（与 `research/scripts/admission.py` 的 `fields_of_line` 同一个切法：按空白切、第一个 `=` 分开）。
+/// 一行里 `键=值` 那几段（与 `scripts/gate/admission.py` 的 `fields_of_line` 同一个切法：按空白切、第一个 `=` 分开）。
 fn fields_of_line(line: &str) -> std::collections::BTreeMap<&str, &str> {
     line.split_whitespace()
         .filter_map(|token| token.split_once('='))

@@ -21,14 +21,44 @@
 //! 这一份只放判法：内核原文、表怎么打包、派活参数与结论各是哪几个字、草稿区每个状态多大。怎么上卡、一次派活带几个状态、
 //! 几张卡怎么用，在 `crate::crash_judge_dispatch`——那一份不在判法闭包里（用户 2026-09-29 定「派活和判法拆出来最好」），
 //! 改它不换判法版本；这一份不许引它。
-use singlefs_checker::image::{InvariantVerdict, IMPLEMENTED_INVARIANTS};
+use singlefs_checker::image::IMPLEMENTED_INVARIANTS;
 use singlefs_checker::walk::ContainerCapacityKnobs;
-use singlefs_core::recovery::{RecoveryFailure, RecoveryOutcome};
 use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
-use crate::crash::{Layer0OracleViolationKind, Layer0StateJudgement};
+use crate::crash::{
+    Layer0OracleViolationKind, LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE,
+    LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE, LAYER0_RED_PASS_POOL_CHECKER,
+    LAYER0_RED_PASS_RECORD_CHECKER, RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT,
+    RECORD_CHECKER_ROOT_WITHOUT_RECORD,
+};
 use crate::crash_facts::segment_expansion_code_wgsl_constants;
+use crate::crash_judge_conclusions::{
+    recovery_words_of_the_cross_check_words, RecoveryWordsOfState,
+};
 use crate::crash_judge_tables::{JudgeTablesWords, JUDGE_TABLE_COUNT, SEGMENT_WORDS};
+
+/// 不挂 `gpu` 特性的那一半（失败点码表、红位、走读结局的码、对拍比的那几个字与它的 CPU 一侧）在 `crate::crash_judge_conclusions`
+/// （崩溃点重放合并第三轮判决 J8：改结论的几处搬进判器一侧；失败点码表挪出 `gpu` 特性，没编进卡的 CPU 结论也带恢复字），
+/// 这里照旧转出去：派活、对拍用例与内核常量的生成照这条路径引。
+pub use crate::crash_judge_conclusions::{
+    cross_check_words_of_cpu_judgement, gpu_failure_point_code,
+    pool_checker_violated_and_judged_bits, verdict_bits, CrossCheckWords, LandedRootWords,
+    GPU_FAILURE_POINTS, GPU_FAILURE_POINT_ALLOCATION_RECORD_OUTSIDE_THE_POOL_GEOMETRY,
+    GPU_FAILURE_POINT_DEVICE_ENDS_BEFORE_THE_UNIT_AREA_START,
+    GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE,
+    GPU_FAILURE_POINT_INODE_NUMBER_WATERMARK_ROW_MISSING_FROM_THE_ACCOUNTING_TREE,
+    GPU_FAILURE_POINT_INVARIANT_VIOLATED, GPU_FAILURE_POINT_MAPPING_MISS,
+    GPU_FAILURE_POINT_MAPPING_STILL_UNREADABLE, GPU_FAILURE_POINT_NONE,
+    GPU_FAILURE_POINT_NO_DEVICE_IN_THE_POOL, GPU_FAILURE_POINT_NO_VALID_ROOT,
+    GPU_FAILURE_POINT_NO_VALID_SYSTEM_CONFIGURATION,
+    GPU_FAILURE_POINT_ROOT_PUBLISH_CARRIES_MORE_THAN_ONE_LAST_RECORD_FLAG_WHOSE_ANCHOR_IS_UNDECIDED,
+    GPU_FAILURE_POINT_ROOT_RING_SLOTS_PER_REGION_OUT_OF_RANGE,
+    GPU_FAILURE_POINT_SYSTEM_CONFIGURATIONS_DISAGREE,
+    GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_INCOMPAT_BITS_NOT_RECOGNIZED,
+    GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_VALUE_REFUSED, GPU_FAILURE_POINT_UNIT_MALFORMED,
+    GPU_FAILURE_POINT_UNIT_UNREADABLE, RECOVERY_OUTCOME_CODE_FAILED,
+    RECOVERY_OUTCOME_CODE_FILE_READ, RECOVERY_OUTCOME_CODE_NO_FILE,
+};
 
 /// 两个内核共用的那一半源码：表的读法、u64、落点与版本、指针与单元的解析、系统配置与根与 journal 的解析、掩码。
 pub const GPU_JUDGE_COMMON_SOURCE: &str = include_str!("crash_judge_common.wgsl");
@@ -74,10 +104,6 @@ pub const POOL_CHECKER_JUDGED_FIRST_WORD: usize = IGNORED_PASS_LANDED_CHECKPOINT
 pub const POOL_CHECKER_JUDGED_WORDS: usize = POOL_CHECKER_VIOLATED_WORDS;
 /// 每个状态的结论几个 u32：恢复内核 8 个，池级 checker 内核违例位、走到第几步、判不了的原因，不看 journal 那一遍落到的根，判到位。
 pub const VERDICT_WORDS: usize = POOL_CHECKER_JUDGED_FIRST_WORD + POOL_CHECKER_JUDGED_WORDS;
-/// 走读结局的码（第 4、6 字；内核里的 `OUTCOME_*`）。
-pub const RECOVERY_OUTCOME_CODE_NO_FILE: u32 = 0;
-pub const RECOVERY_OUTCOME_CODE_FILE_READ: u32 = 1;
-pub const RECOVERY_OUTCOME_CODE_FAILED: u32 = 2;
 
 // 违例位装得下池级 checker 的每一条不变量；读出来的是一个 u128，字数再多就装不进。
 const _: () = assert!(
@@ -223,81 +249,6 @@ pub fn kernel_prelude_wgsl_constants() -> String {
     )
 }
 
-/// 失败点码一张表的单一来源：每一行一个常量名与它的码，生成 Rust 常量、[`GPU_FAILURE_POINTS`] 与 WGSL 常量（名字去掉 `GPU_` 前缀）。
-macro_rules! gpu_failure_points {
-    ($($constant:ident = $code:literal,)*) => {
-        $(pub const $constant: u32 = $code;)*
-        /// 全部失败点码（常量名、码），按码升序：[`failure_point_wgsl_constants`] 照它生成内核里的常量。
-        pub const GPU_FAILURE_POINTS: &[(&str, u32)] = &[$((stringify!($constant), $constant),)*];
-    };
-}
-
-gpu_failure_points! {
-    GPU_FAILURE_POINT_NONE = 0,
-    GPU_FAILURE_POINT_NO_VALID_SYSTEM_CONFIGURATION = 1,
-    GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_INCOMPAT_BITS_NOT_RECOGNIZED = 2,
-    GPU_FAILURE_POINT_SYSTEM_CONFIGURATIONS_DISAGREE = 3,
-    GPU_FAILURE_POINT_NO_DEVICE_IN_THE_POOL = 4,
-    GPU_FAILURE_POINT_ROOT_RING_SLOTS_PER_REGION_OUT_OF_RANGE = 5,
-    GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_VALUE_REFUSED = 6,
-    GPU_FAILURE_POINT_DEVICE_ENDS_BEFORE_THE_UNIT_AREA_START = 7,
-    GPU_FAILURE_POINT_NO_VALID_ROOT = 8,
-    GPU_FAILURE_POINT_UNIT_UNREADABLE = 9,
-    GPU_FAILURE_POINT_UNIT_MALFORMED = 10,
-    GPU_FAILURE_POINT_INVARIANT_VIOLATED = 11,
-    GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE = 12,
-    GPU_FAILURE_POINT_INODE_NUMBER_WATERMARK_ROW_MISSING_FROM_THE_ACCOUNTING_TREE = 13,
-    GPU_FAILURE_POINT_ALLOCATION_RECORD_OUTSIDE_THE_POOL_GEOMETRY = 14,
-    GPU_FAILURE_POINT_MAPPING_MISS = 15,
-    GPU_FAILURE_POINT_MAPPING_STILL_UNREADABLE = 16,
-    GPU_FAILURE_POINT_ROOT_PUBLISH_CARRIES_MORE_THAN_ONE_LAST_RECORD_FLAG_WHOSE_ANCHOR_IS_UNDECIDED = 17,
-}
-
-/// CPU 恢复的一个失败在 GPU 结论里的失败点码（第 5、7 字）：`RecoveryFailure` 每个成员一个码，成员带的细节（盘、槽、哪一处）不进码。
-/// 恢复没失败（没有文件、读到文件）的那一遍失败点是 [`GPU_FAILURE_POINT_NONE`]。
-#[must_use]
-pub fn gpu_failure_point_code(failure: &RecoveryFailure) -> u32 {
-    match failure {
-        RecoveryFailure::NoValidSystemConfiguration { .. } => {
-            GPU_FAILURE_POINT_NO_VALID_SYSTEM_CONFIGURATION
-        }
-        RecoveryFailure::SystemConfigurationIncompatBitsNotRecognized { .. } => {
-            GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_INCOMPAT_BITS_NOT_RECOGNIZED
-        }
-        RecoveryFailure::SystemConfigurationsDisagree => {
-            GPU_FAILURE_POINT_SYSTEM_CONFIGURATIONS_DISAGREE
-        }
-        RecoveryFailure::NoDeviceInThePool => GPU_FAILURE_POINT_NO_DEVICE_IN_THE_POOL,
-        RecoveryFailure::RootRingSlotsPerRegionOutOfRange { .. } => {
-            GPU_FAILURE_POINT_ROOT_RING_SLOTS_PER_REGION_OUT_OF_RANGE
-        }
-        RecoveryFailure::SystemConfigurationValueRefused { .. } => {
-            GPU_FAILURE_POINT_SYSTEM_CONFIGURATION_VALUE_REFUSED
-        }
-        RecoveryFailure::DeviceEndsBeforeTheUnitAreaStart { .. } => {
-            GPU_FAILURE_POINT_DEVICE_ENDS_BEFORE_THE_UNIT_AREA_START
-        }
-        RecoveryFailure::NoValidRoot => GPU_FAILURE_POINT_NO_VALID_ROOT,
-        RecoveryFailure::UnitUnreadable { .. } => GPU_FAILURE_POINT_UNIT_UNREADABLE,
-        RecoveryFailure::UnitMalformed { .. } => GPU_FAILURE_POINT_UNIT_MALFORMED,
-        RecoveryFailure::InvariantViolated { .. } => GPU_FAILURE_POINT_INVARIANT_VIOLATED,
-        RecoveryFailure::EntryNarrowerThanItsFieldTable { .. } => {
-            GPU_FAILURE_POINT_ENTRY_NARROWER_THAN_ITS_FIELD_TABLE
-        }
-        RecoveryFailure::InodeNumberWatermarkRowMissingFromTheAccountingTree => {
-            GPU_FAILURE_POINT_INODE_NUMBER_WATERMARK_ROW_MISSING_FROM_THE_ACCOUNTING_TREE
-        }
-        RecoveryFailure::AllocationRecordOutsideThePoolGeometry { .. } => {
-            GPU_FAILURE_POINT_ALLOCATION_RECORD_OUTSIDE_THE_POOL_GEOMETRY
-        }
-        RecoveryFailure::MappingMiss { .. } => GPU_FAILURE_POINT_MAPPING_MISS,
-        RecoveryFailure::MappingStillUnreadable { .. } => GPU_FAILURE_POINT_MAPPING_STILL_UNREADABLE,
-        RecoveryFailure::RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided {
-            ..
-        } => GPU_FAILURE_POINT_ROOT_PUBLISH_CARRIES_MORE_THAN_ONE_LAST_RECORD_FLAG_WHOSE_ANCHOR_IS_UNDECIDED,
-    }
-}
-
 /// 失败点码在内核里的常量（WGSL 源码）：[`GPU_FAILURE_POINTS`] 每一行一个，名字去掉 `GPU_` 前缀（`FAILURE_POINT_*`）。
 #[must_use]
 pub fn failure_point_wgsl_constants() -> String {
@@ -311,42 +262,6 @@ pub fn failure_point_wgsl_constants() -> String {
             )
         })
         .collect()
-}
-
-/// 一个状态在对拍里比的那几个字（判决 `research/prompts/m3-crash-enumeration-merge-r3-main-verification.md` 第三节 J6，用户 2026-10-10 定失败点这一版就比）：
-/// 红项（两遍 oracle 与记录核对器的红位、池级 checker 的违例位）、两遍各自落到的根（实例代号、checkpoint_txg 低 32 位；没落到根时两个都是 `u32::MAX`）、
-/// 两遍的走读结局与失败点（[`gpu_failure_point_code`]）、池级 checker 逐条判到位、GPU 判不了。GPU 那一侧由 [`cross_check_words_of_gpu_verdict`]、
-/// CPU 那一侧由 [`cross_check_words_of_cpu_judgement`] 换出来，两份逐字段相等才算对上（CPU 那一侧判不了恒为假：GPU 判不了的状态对不上）。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CrossCheckWords {
-    /// 结论第 0 字去掉判不了那一位：两遍 oracle 各七类（[`verdict_bits`]）、记录核对器两条。
-    pub red_bits: u32,
-    /// 池级 checker 的违例位（位 i ↔ `IMPLEMENTED_INVARIANTS[i]`）。
-    pub pool_checker_violated_bits: u128,
-    pub consulted_pass_landed_root: LandedRootWords,
-    pub ignored_pass_landed_root: LandedRootWords,
-    pub consulted_pass_outcome: u32,
-    pub ignored_pass_outcome: u32,
-    pub consulted_pass_failure_point: u32,
-    pub ignored_pass_failure_point: u32,
-    /// 池级 checker 逐条判到位（成立或违例）。
-    pub pool_checker_judged_bits: u128,
-    pub gpu_could_not_judge: bool,
-}
-
-/// 一遍恢复落到的根在结论里的两个字：实例代号、checkpoint_txg 低 32 位；没落到根时两个都是 `u32::MAX`。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct LandedRootWords {
-    pub instance: u32,
-    pub checkpoint_txg_low: u32,
-}
-
-impl LandedRootWords {
-    /// 没落到根（择不到系统配置或根、重放在施加任何记录之前停下）。
-    pub const NOT_LANDED: Self = Self {
-        instance: u32::MAX,
-        checkpoint_txg_low: u32::MAX,
-    };
 }
 
 /// GPU 一个状态的结论字换成对拍比的那几个字。
@@ -380,116 +295,86 @@ pub fn cross_check_words_of_gpu_verdict(words: &[u32]) -> CrossCheckWords {
     }
 }
 
-/// 一遍恢复的报告换成落到的根那两个字：`effective_root`（施加 journal 之后实际走的那条根；退回见证到的那一版时是退到的那一版）。
-fn landed_root_words_of(
-    effective_root: Option<(
-        singlefs_core::address::InstanceGeneration,
-        singlefs_core::address::CheckpointTxg,
-    )>,
-) -> LandedRootWords {
-    effective_root.map_or(LandedRootWords::NOT_LANDED, |(instance, checkpoint_txg)| {
-        LandedRootWords {
-            instance: instance.0,
-            checkpoint_txg_low: u32::try_from(checkpoint_txg.0 & 0xFFFF_FFFF).expect("低 32 位"),
-        }
-    })
-}
-
-/// 走读结局的码与失败点码（第 4 / 5 字或第 6 / 7 字）。
-fn outcome_and_failure_point_of(outcome: &RecoveryOutcome) -> (u32, u32) {
-    match outcome {
-        RecoveryOutcome::NoFile { .. } => (RECOVERY_OUTCOME_CODE_NO_FILE, GPU_FAILURE_POINT_NONE),
-        RecoveryOutcome::FileRead { .. } => {
-            (RECOVERY_OUTCOME_CODE_FILE_READ, GPU_FAILURE_POINT_NONE)
-        }
-        RecoveryOutcome::Failed { failure, .. } => (
-            RECOVERY_OUTCOME_CODE_FAILED,
-            gpu_failure_point_code(failure),
-        ),
+/// 一个状态的 GPU 结论字换成与 CPU `Layer0StateJudgement::red_items` 逐项同名、同序的红项；判不了的状态交回 `None`
+/// （崩溃放量第 ① 段收卡上结论那一段遇到它整趟停下）。红项换成判定向量的编码在 `crate::crash_judge_conclusions`。
+#[must_use]
+pub fn gpu_verdict_items(words: &[u32; VERDICT_WORDS]) -> Option<Vec<String>> {
+    let bits = words[0];
+    if bits & (1 << verdict_bits::UNDECIDABLE) != 0 || words[POOL_CHECKER_UNDECIDABLE_WORD] != 0 {
+        return None;
     }
+    let mut items = Vec::new();
+    for (index, kind) in Layer0OracleViolationKind::EVERY_KIND.iter().enumerate() {
+        let shift = verdict_bits::CONSULTED_ORACLE_FIRST + u32::try_from(index).expect("七类");
+        if bits & (1 << shift) != 0 {
+            items.push(format!(
+                "{LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE}:{}",
+                kind.name()
+            ));
+        }
+    }
+    for (index, kind) in Layer0OracleViolationKind::EVERY_KIND.iter().enumerate() {
+        let shift = verdict_bits::IGNORED_ORACLE_FIRST + u32::try_from(index).expect("七类");
+        if bits & (1 << shift) != 0 {
+            items.push(format!(
+                "{LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE}:{}",
+                kind.name()
+            ));
+        }
+    }
+    let violated = pool_checker_violated_bits(words);
+    for (index, invariant) in IMPLEMENTED_INVARIANTS.iter().enumerate() {
+        if violated & (1u128 << index) != 0 {
+            items.push(format!("{LAYER0_RED_PASS_POOL_CHECKER}:{invariant}"));
+        }
+    }
+    if bits & (1 << verdict_bits::ROOT_WITHOUT_RECORD) != 0 {
+        items.push(format!(
+            "{LAYER0_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_ROOT_WITHOUT_RECORD}"
+        ));
+    }
+    if bits & (1 << verdict_bits::CLAIMED_STATE_MISSING_UNIT) != 0 {
+        items.push(format!(
+            "{LAYER0_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT}"
+        ));
+    }
+    Some(items)
 }
 
-/// oracle 一类违例在红位里的位置（与 `Layer0OracleViolationKind::EVERY_KIND` 同序）。
-fn oracle_kind_position(kind: Layer0OracleViolationKind) -> u32 {
-    u32::try_from(
-        Layer0OracleViolationKind::EVERY_KIND
-            .iter()
-            .position(|candidate| *candidate == kind)
-            .expect("七类之一"),
-    )
-    .expect("七类，装得进 u32")
-}
-
-/// 池级 checker 一份判定的违例位与判到位（位 i ↔ `IMPLEMENTED_INVARIANTS[i]`；判到 = 成立或违例，不适用与部分没判都不算）。
+/// GPU 一个状态的恢复字（与 CPU 那一份 `Layer0StateJudgement::recovery_words` 同一种八个字，对照逐字比）：结论字先换成对拍比的那几个字
+/// （[`cross_check_words_of_gpu_verdict`]），再取那八个。
 ///
 /// # Panics
-/// 判定里有一条不在 `IMPLEMENTED_INVARIANTS` 里。
+/// `words` 不是 [`VERDICT_WORDS`] 个字。
 #[must_use]
-pub fn pool_checker_violated_and_judged_bits(
-    verdicts: &[(&'static str, InvariantVerdict)],
-) -> (u128, u128) {
-    verdicts.iter().fold(
-        (0u128, 0u128),
-        |(violated, judged), (invariant, verdict)| {
-            let bit = 1u128
-                << IMPLEMENTED_INVARIANTS
-                    .iter()
-                    .position(|candidate| candidate == invariant)
-                    .expect("池级 checker 报的不变量在清单里");
-            match verdict {
-                InvariantVerdict::Violated(_) => (violated | bit, judged | bit),
-                InvariantVerdict::Holds => (violated, judged | bit),
-                InvariantVerdict::NotApplicable(_) | InvariantVerdict::PartiallyJudged(_) => {
-                    (violated, judged)
-                }
-            }
-        },
-    )
+pub fn recovery_words_of_the_gpu_verdict(words: &[u32]) -> RecoveryWordsOfState {
+    recovery_words_of_the_cross_check_words(&cross_check_words_of_gpu_verdict(words))
 }
 
-/// CPU 判器一个状态的判定换成对拍比的那几个字（池级 checker 取判定里那一份；旋钮值编进内核的对拍用例拿带同一组旋钮值的入口重判之后
-/// 自己换掉违例位与判到位）。
+/// GPU 一个状态的结论字里与 `crate::crash_amplification::recovery_words_of`（CPU 两遍恢复的四个数）同口径的四个字（第 2、3、4、6 字）。
 #[must_use]
-pub fn cross_check_words_of_cpu_judgement(judgement: &Layer0StateJudgement) -> CrossCheckWords {
-    let mut red_bits = 0u32;
-    if let Some(violation) = &judgement.consulted_oracle {
-        red_bits |=
-            1 << (verdict_bits::CONSULTED_ORACLE_FIRST + oracle_kind_position(violation.kind));
-    }
-    if let Some(violation) = &judgement.ignored_oracle {
-        red_bits |=
-            1 << (verdict_bits::IGNORED_ORACLE_FIRST + oracle_kind_position(violation.kind));
-    }
-    if judgement.records.root_without_record {
-        red_bits |= 1 << verdict_bits::ROOT_WITHOUT_RECORD;
-    }
-    if judgement.records.claimed_state_missing_unit {
-        red_bits |= 1 << verdict_bits::CLAIMED_STATE_MISSING_UNIT;
-    }
-    let (pool_checker_violated_bits, pool_checker_judged_bits) =
-        pool_checker_violated_and_judged_bits(&judgement.pool_checker);
-    let (consulted_pass_outcome, consulted_pass_failure_point) =
-        outcome_and_failure_point_of(&judgement.consulted.outcome);
-    let (ignored_pass_outcome, ignored_pass_failure_point) =
-        outcome_and_failure_point_of(&judgement.ignored.outcome);
-    CrossCheckWords {
-        red_bits,
-        pool_checker_violated_bits,
-        consulted_pass_landed_root: landed_root_words_of(judgement.consulted.effective_root),
-        ignored_pass_landed_root: landed_root_words_of(judgement.ignored.effective_root),
-        consulted_pass_outcome,
-        ignored_pass_outcome,
-        consulted_pass_failure_point,
-        ignored_pass_failure_point,
-        pool_checker_judged_bits,
-        gpu_could_not_judge: false,
-    }
+pub fn gpu_recovery_words(words: &[u32; VERDICT_WORDS]) -> [u32; 4] {
+    [words[2], words[3], words[4], words[6]]
 }
+
 /// 每个状态的草稿区几个 u32（checker 共用那一半里 `SCRATCH_END`：共用的 `SCRATCH_WORDS_REQUIRED`、走读与扫描的集合、两个内核的交接段、
 /// 交接段之后走读内核自己用的表：两张，加 I-3.5 的出现规则读的四张；再之后是扫描内核删除态扫描与墓碑、谱系那一遍用的五张：inode 记录、每个号的数据单元数、
 /// 一棵墓碑树或谱系树的容器、一版的谱系记录、I-9.29 跨版本的号 → 对象出生代，与 I-9.30 读的最新根记账里 inode 号水位那一统计量的行，
 /// 再加退役那几条读的两张叶身份表：被判的那一版与 I-9.35 的父版；最后是判到位的两张表：评估过、射程里有一部分判不了，各 4 个字）。
-pub const SCRATCH_WORDS: usize = 320_696;
+/// 第 59 批 L6（判决 `research/prompts/m3-batch58-code-r1-main-verification.md` 第三节）把恢复内核的分配记录表 `MAX_ALLOCATION_RECORDS`
+/// 与扫描内核的已释放记录表 `C_MAX_RELEASED` 从 1024 抬到 2048：共用那一半多 1024 × 6 = 6144 字、已释放记录表多 1024 × 5 = 5120 字、
+/// 它的「哪条候选根引用它」两字一条多 1024 × 2 = 2048 字，320 696 + 6144 + 5120 + 2048 = 334 008。
+/// 之后 journal 记录表 `MAX_RECORDS` 从 512 抬到 2048（共用那一半的记录表 6 字一条多 1536 × 6 = 9216 字、走读内核 I-4.1 重放读的那一份环
+/// `C_REPLAY_RECORDS` 4 字一条多 1536 × 4 = 6144 字），走读内核引用集合 `C_MAX_REFERENCES`、位置项校验和 `C_MAX_CHECKSUMS`、
+/// I-3.5 落点表 `C_APPEARANCE_MAX_PLACEMENTS` 从 2048 抬到 4096（两份引用集合 5 字一条多 2 × 2048 × 5 = 20 480 字、主走读与收割两张校验和表
+/// 4 字一条多 2 × 2048 × 4 = 16 384 字、落点表 10 字一条多 2048 × 10 = 20 480 字）：
+/// 334 008 + 9216 + 6144 + 20 480 + 16 384 + 20 480 = 406 712。
+/// 再之后扫描内核读一条根自己实例表全部行的那张表 `C_R_MAX_ROWS` 从 256 抬到 512（取号之后崩溃 369 次再挂载写 370 行那条流在站点 32 判不了）：
+/// 3 字一行多 256 × 3 = 768 字，406 712 + 768 = 407 480。
+/// 再之后两两比与组首判那几处换成「排一次序、按序走一遍」（一个状态一条线程，那几处随条数平方长，墓碑容器那条流与分配记录满表那两条流
+/// 一次派活撞驱动的上下文切换时限），末尾接两张表：journal 组、I-5.1、I-5.4 轮着借的行号次序 `C_ROW_ORDER`（取三者最大的 `C_MAX_REFERENCES` = 4096 字）、
+/// journal 组键 `C_JOURNAL_GROUP_KEYS`（4 字一条 × `MAX_RECORDS` 2048 = 8192 字，扫描内核 I-3.10 的去重桶借它）：407 480 + 4096 + 8192 = 419 768。
+pub const SCRATCH_WORDS: usize = 419_768;
 /// 内核的工作组大小（三个内核都是 `@workgroup_size(64)`）：派 n 个状态要 ⌈n ÷ 64⌉ 个工作组。
 pub const WORKGROUP_SIZE: usize = 64;
 /// 内核的四个绑定（`crash_judge_common.wgsl` 开头）：派活参数、打包的表、结论、草稿区。
@@ -524,17 +409,6 @@ pub const VERDICT_WORD_NOT_WRITTEN: u32 = u32::MAX;
 pub fn verdict_was_written_by_both_kernels(words: &[u32; VERDICT_WORDS]) -> bool {
     (words[0] != VERDICT_WORD_NOT_WRITTEN || words[1] != VERDICT_WORD_NOT_WRITTEN)
         && words[POOL_CHECKER_REACHED_WORD] != VERDICT_WORD_NOT_WRITTEN
-}
-
-/// 红位。
-pub mod verdict_bits {
-    /// 看 journal 那一遍 oracle 的七类从这一位起（与 `Layer0OracleViolationKind::EVERY_KIND` 同序）。
-    pub const CONSULTED_ORACLE_FIRST: u32 = 0;
-    /// 不看 journal 那一遍从这一位起。
-    pub const IGNORED_ORACLE_FIRST: u32 = 8;
-    pub const ROOT_WITHOUT_RECORD: u32 = 16;
-    pub const CLAIMED_STATE_MISSING_UNIT: u32 = 17;
-    pub const UNDECIDABLE: u32 = 31;
 }
 
 /// 判法代码的摘要：内核前面那一份生成的常量（[`kernel_prelude_wgsl_constants`]）、三棵容器树都没装旋钮的那一份旋钮常量与五份内核源码，

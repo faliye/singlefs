@@ -1,5 +1,5 @@
 # singlefs workspace（里程碑「新池新建文件」步 0 的脚手架，2026-09-14）。
-# research/ 是实验 workspace，自己有 Cargo.toml，这里显式排除。
+# scripts/experiments/ 是实验 workspace，自己有 Cargo.toml，这里显式排除。
 [workspace]
 resolver = "2"
 members = [
@@ -11,9 +11,9 @@ members = [
     "crates/singlefs-checker-tier",
     "crates/singlefs-reference-filesystem",
 ]
-exclude = ["research"]
+exclude = ["scripts/experiments"]
 
-# 与 research/Cargo.toml 同一条理由：release 默认关掉整数溢出检查，溢出会变成静默回绕。
+# 与 scripts/experiments/Cargo.toml 同一条理由：release 默认关掉整数溢出检查，溢出会变成静默回绕。
 [profile.release]
 opt-level = 3
 debug = true

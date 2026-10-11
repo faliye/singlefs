@@ -603,7 +603,7 @@ fn a_device_left_with_one_self_verified_system_configuration_slot_is_not_refused
     }
 }
 
-/// 放开扫那条用例的线程数变量（`research/scripts/capped.sh` 设它）。
+/// 放开扫那条用例的线程数变量（`scripts/hosts/capped.sh` 设它）。
 const THREAD_CAP_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_THREAD_CAP";
 
 /// 放开扫的线程数：`thread_cap_value` 是 [`THREAD_CAP_ENVIRONMENT_VARIABLE`] 的值（`None` 是没设），经共用解析

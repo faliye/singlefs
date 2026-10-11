@@ -1,4 +1,4 @@
-//! checker 档模块：crash、layer0_progress、crash_amplification
+//! checker 档模块：crash、layer0_progress、crash_identity、crash_amplification
 //! 里程碑「覆盖写、释放、回退与复用」并行线一的层 0 小负载（验收第 3 条）：多条记录的发布边界在小单元数上造出来——
 //! 「取号 → 暖机 × 2 → A（第一个文件，一个数据单元：12 个单元）→ B（顺序写两个数据单元：14 个单元、两条记录）
 //! → C（顺序写三个数据单元：15 个单元、三条记录）」整条录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，
@@ -24,10 +24,11 @@
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
-#[cfg(feature = "verdict-store")]
+mod common_crash_point_observers;
 mod common_crash_points;
 
-use common::{build_pool, file_content, geometry, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
+use common::{build_pool, file_content, geometry};
+use common_crash_points::{content_needing, sequential_write};
 use singlefs_checker_tier::crash::{
     enumerate_layer0_in_state_slices_or_one_shard,
     enumerate_layer0_selecting_versions_observing_each_state, full_expansion,
@@ -38,10 +39,7 @@ use singlefs_checker_tier::layer0_progress::Layer0Resume;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::journal::record_offset;
 use singlefs_core::recovery::{RecoveryOutcome, RecoveryReport};
-use singlefs_core::transaction::{
-    publish_sequential_write, FirstFile, PoolWriter, TransactionOutput,
-};
-use singlefs_core::unit::data_unit_payload_capacity;
+use singlefs_core::transaction::TransactionOutput;
 use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
 use singlefs_harness::memory_pool::{
     closed_form_state_count, writes_and_segments, CrashImage, MemoryPool, PublishedVersion,
@@ -51,34 +49,6 @@ use singlefs_harness::segments::StepKind;
 
 /// 全量那一趟的流名：进断点续跑的进度文件名与双机分片的账本名（`singlefs_checker_tier::layer0_progress`）。
 const FULL_ENUMERATION_STREAM_NAME: &str = "file_overwrite_parallel_line_one";
-
-/// 恰好要 `data_units` 个数据单元的内容：最后一个单元装一半。
-fn content_needing(data_units: usize, seed: usize) -> Vec<u8> {
-    let payload_capacity = data_unit_payload_capacity();
-    (0..(data_units - 1) * payload_capacity + payload_capacity / 2)
-        .map(|index| u8::try_from((index * 11 + seed * 3 + 7) % 251).expect("小于 256"))
-        .collect()
-}
-
-fn sequential_write(pool: &mut BuiltPool, content: &[u8]) -> TransactionOutput {
-    let publish_parameters = parameters();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
-    let previous = pool.output.clone();
-    let output = publish_sequential_write(
-        &mut writer,
-        &mut pool.allocator,
-        &previous,
-        FirstFile {
-            content,
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
-        },
-        InstanceGeneration(1),
-    )
-    .expect("顺序写");
-    pool.output = output.clone();
-    output
-}
 
 /// 一次多条记录的发布在写表里的样子：它每一条记录的两份写各在写表的哪一格，它的根在哪一版、上一版是哪一版。
 struct MultiRecordPublish {
@@ -360,7 +330,7 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
 /// 取三态，各 3² · 2^n − 1，共 16 段、12230590578），
 /// 每个状态两遍恢复 + checker。登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），checker-tier-layer0-replay 认下面打印的
 /// `LAYER0_PARALLEL_LINE_ONE` 行里 `exhaustive=true`。带断点续跑：进度目录、输入指纹与强制从头跑的开关从环境变量取，
-/// 没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，`research/scripts/layer0-shard-run.sh`）：
+/// 没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，`scripts/crash/layer0-shard-run.sh`）：
 /// 跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
 #[test]
 #[ignore = "全量 1358954634 个状态（十三亿多）、每个两遍恢复 + checker；门禁 checker-tier-layer0-replay --full 在 release 下跑，带断点续跑、可双机分片"]
@@ -420,24 +390,26 @@ fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean()
     assert_clean(&tally);
 }
 
-/// 崩溃放量的形态（前缀节点与别的流共享：取号加暖机、新池新建文件两个点由公共模块设，B、C 两次顺序写各一个点）：按环境跑一趟，
-/// 健康的流零红；配置开了 GPU 就是 GPU 判器判。展开上限默认 6（每段真子集全枚举时状态数 2^n − 1）。
+/// 录制器那一份造法录下的多记录流：起点镜像、写表、段、崩溃点、被判的根槽写（最后一条）、版本表。
 #[cfg(feature = "verdict-store")]
-#[test]
-fn crash_amplification_of_the_multi_record_publish_stream_is_clean() {
+struct RecordedThroughTheCrashPointRecorder {
+    base: MemoryPool,
+    writes: Vec<RetainedWrite>,
+    segments: Vec<Vec<usize>>,
+    crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
+    judged_root_index: usize,
+    versions: Vec<PublishedVersion>,
+}
+
+/// 录制器那一份造法（前缀节点与别的流共享：取号加暖机、新池新建文件两个点由公共模块设，B、C 两次顺序写也由公共模块设，
+/// 删除流共享到 C，崩溃点重放合并第三轮判决 J3）。
+#[cfg(feature = "verdict-store")]
+fn record_through_the_crash_point_recorder(tag: &str) -> RecordedThroughTheCrashPointRecorder {
     use singlefs_checker_tier::crash_amplification::CrashPointRecorder;
-    let mut pool = build_pool("crash-amplification-multi-record");
+    let mut pool = build_pool(tag);
     let mut recorder = CrashPointRecorder::new(pool.stream.clone(), pool.mkfs_operation_count);
-    common_crash_points::record_pool_build(&mut recorder, &pool);
-    let first = pool.output.clone();
-    let second_content = content_needing(2, 1);
-    let second = recorder.step(file!(), "sequential_write", || {
-        sequential_write(&mut pool, &second_content)
-    });
-    let third_content = content_needing(3, 2);
-    let third = recorder.step(file!(), "sequential_write", || {
-        sequential_write(&mut pool, &third_content)
-    });
+    let publishes =
+        common_crash_points::record_the_multi_record_publishes(&mut recorder, &mut pool);
     let base = pool.memory_pool_after_mkfs();
     let operations = pool.retained_operations();
     let (writes, segments, stream_indexes) =
@@ -450,31 +422,139 @@ fn crash_amplification_of_the_multi_record_publish_stream_is_clean() {
         .iter()
         .rposition(|write| write.kind == StepKind::RootRecordFua)
         .expect("根槽写");
-    let versions = vec![
-        PublishedVersion {
-            instance: first.root.instance,
-            checkpoint_txg: first.root.checkpoint_txg,
-            content: file_content(),
-        },
-        PublishedVersion {
-            instance: second.root.instance,
-            checkpoint_txg: second.root.checkpoint_txg,
-            content: second_content,
-        },
-        PublishedVersion {
-            instance: third.root.instance,
-            checkpoint_txg: third.root.checkpoint_txg,
-            content: third_content,
-        },
-    ];
-    common_crash_points::amplify_prepared_flow(
-        "multi-record-publish",
-        &base,
-        &writes,
-        &segments,
-        judged_root_index,
-        &versions,
+    RecordedThroughTheCrashPointRecorder {
+        base,
+        writes,
+        segments,
         crash_points,
+        judged_root_index,
+        versions: publishes.versions(),
+    }
+}
+
+/// 崩溃放量的形态：按环境跑一趟，健康的流零红；配置开了 GPU 就是 GPU 判器判、CPU 判器同时对照。展开上限默认 6
+/// （每段真子集全枚举时状态数 2^n − 1）。这条流整条走在标准前缀上：登记表挂在标准前缀节点上的观察者（可写挂载续做）照表跑，
+/// 它另读的删除流照录（崩溃点重放合并第三轮判决 J4、M4 第 10 条），观察者计数的断言每一趟都判。
+#[cfg(feature = "verdict-store")]
+#[test]
+fn crash_amplification_of_the_multi_record_publish_stream_is_clean() {
+    let recorded = record_through_the_crash_point_recorder("crash-amplification-multi-record");
+    common_crash_point_observers::amplify_a_flow_through_the_standard_prefix(
+        "multi-record-publish",
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        recorded.judged_root_index,
+        &recorded.versions,
+        &[],
+        recorded.crash_points,
         6,
     );
+}
+
+/// 两份造法写表摘要相等（崩溃点重放合并第三轮判决 J3，第一轮判决 K2-2）：层 0 那一份（[`prepare`]，不录崩溃点）与录制器那一份
+/// （B、C 两次顺序写挪进公共模块之后）录下的起点镜像与整张带屏障的写表逐字节相同、段一样切，被判的根槽写是同一条、版本表相同。
+/// 两份都调公共模块里同一个 `sequential_write`；层 0 那一份的写法与挪之前逐字相同，所以这条也核「挪进公共模块之后写表与今天相同」。
+/// 摘要打一行 `CRASH_POINT_REPLAY_WRITE_TABLE`，跑过一次之后可以钉成常量。
+#[cfg(feature = "verdict-store")]
+#[test]
+fn the_multi_record_publish_stream_writes_the_same_table_through_the_crash_point_recorder_as_without_it(
+) {
+    use singlefs_checker_tier::crash_identity::{step_write_table_with_barriers, SectorImage};
+    let without_the_recorder = prepare("multi-record-write-table-without-the-recorder");
+    let through_the_recorder =
+        record_through_the_crash_point_recorder("multi-record-write-table-through-the-recorder");
+    let digests_of = |base: &MemoryPool, writes: &[RetainedWrite], segments: &[Vec<usize>]| {
+        (
+            SectorImage::of_base(base).digest(),
+            step_write_table_with_barriers(writes, segments, 0..writes.len()),
+        )
+    };
+    let (base_digest, write_table_digest) = digests_of(
+        &without_the_recorder.base,
+        &without_the_recorder.writes,
+        &without_the_recorder.segments,
+    );
+    assert_eq!(
+        digests_of(
+            &through_the_recorder.base,
+            &through_the_recorder.writes,
+            &through_the_recorder.segments
+        ),
+        (base_digest, write_table_digest),
+        "两份造法的起点镜像与整张带屏障的写表逐字节相同"
+    );
+    assert_eq!(
+        through_the_recorder.segments, without_the_recorder.segments,
+        "段一样切"
+    );
+    assert_eq!(
+        through_the_recorder.judged_root_index, without_the_recorder.judged_root_index,
+        "被判的根槽写都是最后一条"
+    );
+    assert_eq!(
+        through_the_recorder.versions, without_the_recorder.versions,
+        "版本表相同"
+    );
+    let hexadecimal =
+        |digest: &[u8]| -> String { digest.iter().map(|byte| format!("{byte:02x}")).collect() };
+    println!(
+        "CRASH_POINT_REPLAY_WRITE_TABLE flow=multi-record-publish base_digest={} write_table_digest={}",
+        hexadecimal(&base_digest),
+        hexadecimal(&write_table_digest)
+    );
+}
+
+/// 「根槽已持久」的计数事后数（崩溃点重放合并第三轮判决 J3 的 M2-2 甲、J7）：被判的根槽写不进块键之后，计数按计划的段现算
+/// （`crash_amplification::states_with_the_root_slot_write_persisted`），与层 0 逐状态数的（`Layer0Tally::root_persisted_states`）
+/// 在快档那个域（写数小于 10 的段全展开）上相同；被判根换成第一条根槽写也相同。
+#[cfg(feature = "verdict-store")]
+#[test]
+fn the_root_slot_persisted_count_computed_from_the_plan_equals_the_one_counted_state_by_state() {
+    use singlefs_checker_tier::crash_amplification::{
+        plan_crash_points, states_with_the_root_slot_write_persisted, CrashFlow,
+    };
+    let recorded = record_through_the_crash_point_recorder("multi-record-root-persisted-count");
+    let expand = |_segment_index: usize, segment: &[usize]| segment.len() < 10;
+    let expansion = |segment_index: usize, segment: &[usize]| {
+        if expand(segment_index, segment) {
+            Layer0SegmentExpansion::EveryProperSubset
+        } else {
+            Layer0SegmentExpansion::NotExpanded
+        }
+    };
+    let first_root_slot_write = recorded
+        .writes
+        .iter()
+        .position(|write| write.kind == StepKind::RootRecordFua)
+        .expect("至少一条根槽写");
+    assert_ne!(first_root_slot_write, recorded.judged_root_index);
+    for judged_root_index in [recorded.judged_root_index, first_root_slot_write] {
+        let tally = enumerate_layer0_selecting_versions_observing_each_state(
+            &recorded.base,
+            &recorded.writes,
+            &recorded.segments,
+            judged_root_index,
+            &recorded.versions,
+            &expand,
+            &mut |_image, _report| {},
+        );
+        let flow = CrashFlow {
+            base: &recorded.base,
+            writes: &recorded.writes,
+            segments: &recorded.segments,
+            judged_root_index,
+            versions: &recorded.versions,
+            versions_without_a_file: &[],
+            expansion: &expansion,
+            crash_points: recorded.crash_points.clone(),
+        };
+        let plan = plan_crash_points(&flow);
+        assert_eq!(
+            states_with_the_root_slot_write_persisted(&flow, &plan, judged_root_index),
+            tally.root_persisted_states,
+            "被判根是写表第 {judged_root_index} 次写：按计划的段现算与逐状态数的相同（共 {} 个状态）",
+            tally.states
+        );
+    }
 }

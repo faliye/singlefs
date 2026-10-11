@@ -9,7 +9,7 @@
 //!   量甲-T1 与 G12 两条臂的多扣（Q1a、Q1b）与它们的差 Δ，按洞的计数分组判（Q1c、Q1c-洞、Q1c-前、Q1c-后、Q1d）。
 //!
 //! 只读驱动 `singlefs-core` / `singlefs-checker` 的公开入口，不改这两个 crate 的生产代码；产物按 `E7RESULT` 行打印，复跑登记在
-//! `research/scripts/replay.sh`。洞的 txg、挂载做完的 txg、终点 txg 从本地 S 与装置里的锚点模型（[`anchor_model`]，登记第七节 7.2
+//! `scripts/experiments/replay.sh`。洞的 txg、挂载做完的 txg、终点 txg 从本地 S 与装置里的锚点模型（[`anchor_model`]，登记第七节 7.2
 //! 命令四 `anchors_e156_r4.py` 的逐行移植，门槛那一处照第 6 次重跑登记 `research/prompts/e156-r6-prereg.md` 第十三节命令四
 //! `anchors_e156_r6.py` 改）算，不从 `crates/` 算；装置跑的时候从盘上现量，两边比。
 //!
@@ -18,7 +18,7 @@
 //! `all_zero_slots_still_pinned`）；K10 守门、「每」列的旁路门槛与锚点模型三处吃同一个读数。
 //!
 //! 判定写在装置里（[`judge_peak_against_threshold`] 那一组函数，单测 U18），不另写 Python 判定脚本：执行员的写范围不含
-//! `research/scripts/` 与门禁 47 号，理由与改动记在登记第十二节。
+//! `scripts/` 与门禁 47 号，理由与改动记在登记第十二节。
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 

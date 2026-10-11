@@ -319,18 +319,11 @@ fn checker_record_valid(s: Slice, fsid_low: vec2<u32>) -> bool {
     return true;
 }
 
-// 一块盘上的记录按计数器排进草稿区：版本、计数器 lo/hi、实例、环槽 lo/hi
+// 一块盘上的记录按计数器排进草稿区：版本、计数器 lo/hi、实例、环槽 lo/hi。插入点用二分找（环按偏移收、计数器升序到达时就是表尾，不挪）
 fn checker_insert_record(version: u32, counter: vec2<u32>, instance: u32, ring_slot: vec2<u32>) {
-    var position = 0u;
-    while (position < record_count) {
-        let existing = vec2<u32>(sw(R_RECORDS + position * RECORD_WORDS + 1u), sw(R_RECORDS + position * RECORD_WORDS + 2u));
-        if (eq64(existing, counter)) {
-            return;
-        }
-        if (lt64(counter, existing)) {
-            break;
-        }
-        position = position + 1u;
+    let position = checker_record_position_not_below(counter);
+    if (checker_record_counter_at_is(position, counter)) {
+        return;
     }
     if (record_count >= MAX_RECORDS) {
         undecidable = UNDECIDABLE_TOO_MANY_RECORDS;
@@ -434,125 +427,143 @@ fn judge_transaction_numbers_of_device() {
     }
 }
 
-// I-8.8：提交标记字节只许 0 / 1；一组（同实例同非 0 事务号）带标记的至多一条且在组末；一条都不带时本实例之后不许再有记录
+// 逐盘 journal 那几条按组判（I-8.8 的组是同实例同事务号，I-8.9、I-8.1、I-8.10 的组是同实例同 checkpoint_txg，即同一次发布）：组首、组末、
+// 组里各条原来各自从表头扫到 i、从 i 扫到表尾去找，条数平方长。改成每条记录一行组键（实例、键 lo/hi、0）、按 (组键, 表里的下标) 排一次序
+// （order_rows_by_their_first_four_words），同组的在次序里连成一段、段里按表里的下标升序：段首就是组里第一条，段尾就是组末那一条
+const JOURNAL_GROUP_BY_TRANSACTION: u32 = 0u;
+
+const JOURNAL_GROUP_BY_PUBLISH: u32 = 1u;
+
+fn checker_record_base_at(index: u32) -> u32 {
+    return B[T_VERSION_BYTES] + tab(T_VERSIONS, sw(R_RECORDS + index * RECORD_WORDS) * VERSION_WORDS + 1u);
+}
+
+// 这块盘的记录表（checker_scan_journal_of_device 收的）按组排进 C_ROW_ORDER：组键写进 C_JOURNAL_GROUP_KEYS（事务号取记录偏移 78，checkpoint_txg 取 26）
+fn order_the_records_of_device_by_group(group_kind: u32) {
+    let key_offset = select(26u, 78u, group_kind == JOURNAL_GROUP_BY_TRANSACTION);
+    for (var i = 0u; i < record_count; i = i + 1u) {
+        let key = rd64(checker_record_base_at(i), key_offset);
+        let row = C_JOURNAL_GROUP_KEYS + i * C_JOURNAL_GROUP_KEY_WORDS;
+        sws(row, sw(R_RECORDS + i * RECORD_WORDS + 3u));
+        sws(row + 1u, key.x);
+        sws(row + 2u, key.y);
+        sws(row + 3u, 0u);
+    }
+    order_rows_by_their_first_four_words(C_JOURNAL_GROUP_KEYS, C_JOURNAL_GROUP_KEY_WORDS, record_count, C_ROW_ORDER);
+}
+
+// C_ROW_ORDER 里从 position 起那一组段的末端（段之后第一个位置）：组键前三个字与段首那条相同的连着走完
+fn journal_group_end(position: u32) -> u32 {
+    let first = C_JOURNAL_GROUP_KEYS + sw(C_ROW_ORDER + position) * C_JOURNAL_GROUP_KEY_WORDS;
+    var end = position + 1u;
+    while (end < record_count) {
+        let member = C_JOURNAL_GROUP_KEYS + sw(C_ROW_ORDER + end) * C_JOURNAL_GROUP_KEY_WORDS;
+        if (sw(member) != sw(first) || sw(member + 1u) != sw(first + 1u) || sw(member + 2u) != sw(first + 2u)) {
+            break;
+        }
+        end = end + 1u;
+    }
+    return end;
+}
+
+// I-8.8：提交标记字节只许 0 / 1；一组（同实例同非 0 事务号）带标记的至多一条且在组末；一条都不带时本实例之后不许再有记录。
+// 要 C_ROW_ORDER 里是按 (实例, 事务号) 排好的次序（order_the_records_of_device_by_group(JOURNAL_GROUP_BY_TRANSACTION)）。
+// 「本实例之后还有记录」⟺ 本实例在表里最靠后的那一条的下标 > 组末的下标：同实例的各组在次序里连成一段，进这一段时走一遍取最大下标
 fn judge_commit_markers_of_device() {
     for (var i = 0u; i < record_count; i = i + 1u) {
-        let r = checker_record_at(i);
-        if (r.commit_byte > 1u) {
+        if (rd8(checker_record_base_at(i), 86u) > 1u) {
             violate(INVARIANT_I_8_8);
         }
-        if (is_zero64(r.transaction)) {
-            continue;
-        }
-        // 只在组的第一条上判一次
-        var is_first = true;
-        for (var j = 0u; j < i; j = j + 1u) {
-            let earlier = checker_record_at(j);
-            if (earlier.instance == r.instance && eq64(earlier.transaction, r.transaction)) {
-                is_first = false;
-                break;
+    }
+    var position = 0u;
+    var instance_span_end = 0u;
+    var latest_index_of_the_instance = 0u;
+    while (position < record_count) {
+        let first = sw(C_ROW_ORDER + position);
+        let instance = sw(C_JOURNAL_GROUP_KEYS + first * C_JOURNAL_GROUP_KEY_WORDS);
+        if (position >= instance_span_end) {
+            instance_span_end = position;
+            latest_index_of_the_instance = first;
+            while (instance_span_end < record_count
+                && sw(C_JOURNAL_GROUP_KEYS + sw(C_ROW_ORDER + instance_span_end) * C_JOURNAL_GROUP_KEY_WORDS) == instance) {
+                latest_index_of_the_instance = max(latest_index_of_the_instance, sw(C_ROW_ORDER + instance_span_end));
+                instance_span_end = instance_span_end + 1u;
             }
         }
-        if (!is_first) {
+        let group_end = journal_group_end(position);
+        let group_start = position;
+        position = group_end;
+        let transaction = vec2<u32>(sw(C_JOURNAL_GROUP_KEYS + first * C_JOURNAL_GROUP_KEY_WORDS + 1u),
+            sw(C_JOURNAL_GROUP_KEYS + first * C_JOURNAL_GROUP_KEY_WORDS + 2u));
+        if (is_zero64(transaction)) {
             continue;
         }
-        var last_index = i;
+        let last_index = sw(C_ROW_ORDER + group_end - 1u);
         var marked = 0u;
         var marked_at_last = false;
-        for (var j = i; j < record_count; j = j + 1u) {
-            let member = checker_record_at(j);
-            if (member.instance == r.instance && eq64(member.transaction, r.transaction)) {
-                last_index = j;
-            }
-        }
-        for (var j = i; j <= last_index; j = j + 1u) {
-            let member = checker_record_at(j);
-            if (member.instance == r.instance && eq64(member.transaction, r.transaction) && member.commit_byte == 1u) {
+        for (var member_position = group_start; member_position < group_end; member_position = member_position + 1u) {
+            let member = sw(C_ROW_ORDER + member_position);
+            if (rd8(checker_record_base_at(member), 86u) == 1u) {
                 marked = marked + 1u;
-                marked_at_last = j == last_index;
+                marked_at_last = member == last_index;
             }
         }
         if (marked >= 2u || (marked == 1u && !marked_at_last)) {
             violate(INVARIANT_I_8_8);
         }
         // image::judge_commit_markers_per_transaction 的 judged_transactions：两条以上的组、一条提交标记都不带的组各算判过一组
-        var group_members = 0u;
-        for (var j = i; j <= last_index; j = j + 1u) {
-            let member = checker_record_at(j);
-            if (member.instance == r.instance && eq64(member.transaction, r.transaction)) {
-                group_members = group_members + 1u;
-            }
-        }
-        if (group_members >= 2u || marked == 0u) {
+        if (group_end - group_start >= 2u || marked == 0u) {
             judge(INVARIANT_I_8_8, true);
         }
-        if (marked == 0u) {
-            for (var j = last_index + 1u; j < record_count; j = j + 1u) {
-                if (checker_record_at(j).instance == r.instance) {
-                    violate(INVARIANT_I_8_8);
-                    break;
-                }
-            }
+        if (marked == 0u && latest_index_of_the_instance > last_index) {
+            violate(INVARIANT_I_8_8);
         }
     }
 }
 
-// I-8.9：记录标志其余位、序号 0、组内跳号、不从 1 起、多于一条末条、末条之后还有记录、没有末条
+// I-8.9：记录标志其余位、序号 0、组内跳号、不从 1 起、多于一条末条、末条之后还有记录、没有末条。
+// 要 C_ROW_ORDER 里是按 (实例, checkpoint_txg) 排好的次序（order_the_records_of_device_by_group(JOURNAL_GROUP_BY_PUBLISH)）
 fn judge_publish_ordinals_of_device() {
     for (var i = 0u; i < record_count; i = i + 1u) {
-        let r = checker_record_at(i);
+        let base = checker_record_base_at(i);
         // image::judge_publish_ordinals_and_last_record_flags：盘上有一条记录就算判过（judged_records）
-        judge(INVARIANT_I_8_9, (r.flags & 0xFEu) == 0u);
-        if (r.ordinal == 0u) {
+        judge(INVARIANT_I_8_9, (rd8(base, 7u) & 0xFEu) == 0u);
+        if (rd32(base, 87u) == 0u) {
             violate(INVARIANT_I_8_9);
         }
-        // 组 = 同实例同 txg：只在组的第一条上判
-        var is_first = true;
-        for (var j = 0u; j < i; j = j + 1u) {
-            let earlier = checker_record_at(j);
-            if (earlier.instance == r.instance && eq64(earlier.txg, r.txg)) {
-                is_first = false;
-                break;
-            }
-        }
-        if (!is_first) {
-            continue;
-        }
-        var last_index = i;
+    }
+    var position = 0u;
+    while (position < record_count) {
+        let group_start = position;
+        let group_end = journal_group_end(position);
+        position = group_end;
+        let r = checker_record_at(sw(C_ROW_ORDER + group_start));
+        let last_index = sw(C_ROW_ORDER + group_end - 1u);
         var flagged = 0u;
         var flagged_at_last = false;
-        for (var j = i; j < record_count; j = j + 1u) {
-            let member = checker_record_at(j);
-            if (member.instance == r.instance && eq64(member.txg, r.txg)) {
-                last_index = j;
-            }
-        }
-        for (var j = i + 1u; j <= last_index; j = j + 1u) {
-            let member = checker_record_at(j);
-            if (!(member.instance == r.instance && eq64(member.txg, r.txg))) {
-                continue;
-            }
-            // 序号之差要等于计数器之差（序号是 u32，差可以为负：按 64 位有符号比）
-            let counter_distance = sub64(member.counter, r.counter);
-            if (member.ordinal >= r.ordinal) {
-                if (!eq64(u64_of(member.ordinal - r.ordinal), counter_distance)) {
+        for (var member_position = group_start; member_position < group_end; member_position = member_position + 1u) {
+            let member_index = sw(C_ROW_ORDER + member_position);
+            let member = checker_record_at(member_index);
+            if (member_position > group_start) {
+                // 序号之差要等于计数器之差（序号是 u32，差可以为负：按 64 位有符号比）
+                let counter_distance = sub64(member.counter, r.counter);
+                if (member.ordinal >= r.ordinal) {
+                    if (!eq64(u64_of(member.ordinal - r.ordinal), counter_distance)) {
+                        violate(INVARIANT_I_8_9);
+                    }
+                } else {
                     violate(INVARIANT_I_8_9);
                 }
-            } else {
-                violate(INVARIANT_I_8_9);
+            }
+            if ((member.flags & 1u) != 0u) {
+                flagged = flagged + 1u;
+                flagged_at_last = member_index == last_index;
             }
         }
         if (!is_zero64(r.counter)) {
             let before = checker_find_record_by_counter(sub64(r.counter, u64_of(1u)));
             if (before != NONE && r.ordinal != 1u) {
                 violate(INVARIANT_I_8_9);
-            }
-        }
-        for (var j = i; j <= last_index; j = j + 1u) {
-            let member = checker_record_at(j);
-            if (member.instance == r.instance && eq64(member.txg, r.txg) && (member.flags & 1u) != 0u) {
-                flagged = flagged + 1u;
-                flagged_at_last = j == last_index;
             }
         }
         if (flagged == 0u) {
@@ -598,29 +609,14 @@ fn judge_journal_record_txg_per_instance_of_device() {
     }
 }
 
-// I-8.1 读环的那一格：同一实例、同一 checkpoint_txg 的记录（同一次发布）不多于系统配置记的在飞上限条，每组在组里第一条上数一次
+// I-8.1 读环的那一格：同一实例、同一 checkpoint_txg 的记录（同一次发布）不多于系统配置记的在飞上限条，每组数一次。
+// 要 C_ROW_ORDER 里是按 (实例, checkpoint_txg) 排好的次序：组里几条就是那一段多长
 fn judge_records_of_one_publish_within_the_in_flight_record_limit_of_device(declared_in_flight_record_limit: u32) {
-    for (var i = 0u; i < record_count; i = i + 1u) {
-        let r = checker_record_at(i);
-        var is_first = true;
-        for (var j = 0u; j < i; j = j + 1u) {
-            let earlier = checker_record_at(j);
-            if (earlier.instance == r.instance && eq64(earlier.txg, r.txg)) {
-                is_first = false;
-                break;
-            }
-        }
-        if (!is_first) {
-            continue;
-        }
-        var records_of_this_publish = 0u;
-        for (var j = i; j < record_count; j = j + 1u) {
-            let member = checker_record_at(j);
-            if (member.instance == r.instance && eq64(member.txg, r.txg)) {
-                records_of_this_publish = records_of_this_publish + 1u;
-            }
-        }
-        judge(INVARIANT_I_8_1, records_of_this_publish <= declared_in_flight_record_limit);
+    var position = 0u;
+    while (position < record_count) {
+        let group_end = journal_group_end(position);
+        judge(INVARIANT_I_8_1, group_end - position <= declared_in_flight_record_limit);
+        position = group_end;
     }
 }
 
@@ -674,27 +670,26 @@ fn judge_named_entries_against_the_unit_headers_of_device() {
 
 // I-8.10：同 (实例代号, checkpoint_txg) 带末条标志的记录恰一条时，它的新根段七段（记录偏移 99 起：树表指针 86、映射根指针 86、
 // 树 ID 水位 8、回退下界 F 8、实例表指针 86、分配记录树根指针 86、卸载记号 4）与根环里同 (实例代号, checkpoint_txg) 的每条自证过的根的
-// 同名七段（根记录 36、256、122、130、170、342，卸载记号对根记录 flags 20 那 4 字节）逐字节相同（用户 2026-10-03 定从四段扩到七段）
+// 同名七段（根记录 36、256、122、130、170、342，卸载记号对根记录 flags 20 那 4 字节）逐字节相同（用户 2026-10-03 定从四段扩到七段）。
+// 要 C_ROW_ORDER 里是按 (实例, checkpoint_txg) 排好的次序：一组里带末条标志的数一遍，恰一条才比
 fn judge_new_root_segment_of_the_last_record_against_the_roots_of_device() {
-    for (var i = 0u; i < record_count; i = i + 1u) {
-        let r = checker_record_at(i);
-        if ((r.flags & 1u) == 0u) {
-            continue;
-        }
-        var another_last_record_of_this_publish = false;
-        for (var j = 0u; j < record_count; j = j + 1u) {
-            if (j == i) {
-                continue;
-            }
-            let other = checker_record_at(j);
-            if ((other.flags & 1u) != 0u && other.instance == r.instance && eq64(other.txg, r.txg)) {
-                another_last_record_of_this_publish = true;
-                break;
+    var position = 0u;
+    while (position < record_count) {
+        let group_end = journal_group_end(position);
+        var last_records_of_this_publish = 0u;
+        var the_last_record = NONE;
+        for (var member_position = position; member_position < group_end; member_position = member_position + 1u) {
+            let member = sw(C_ROW_ORDER + member_position);
+            if ((rd8(checker_record_base_at(member), 7u) & 1u) != 0u) {
+                last_records_of_this_publish = last_records_of_this_publish + 1u;
+                the_last_record = member;
             }
         }
-        if (another_last_record_of_this_publish) {
+        position = group_end;
+        if (last_records_of_this_publish != 1u) {
             continue;
         }
+        let r = checker_record_at(the_last_record);
         for (var k = 0u; k < root_count; k = k + 1u) {
             let root = checker_root_of(k);
             if (root.instance != r.instance || !eq64(root.txg, r.txg)) {
@@ -839,21 +834,16 @@ fn appearance_tree_kind_is_user_visible(kind: u32) -> bool {
     return kind == TREE_KIND_EXTENT || kind == TREE_KIND_INODE || kind == TREE_KIND_DELETED_INODES;
 }
 
-// 落点表里 (盘, 槽) 那一行的下标，不在就是 NONE
+// 落点表里 (盘, 槽) 那一行的下标，不在就是 NONE（按桶表 W_PLACEMENT_BUCKETS 找）
 fn appearance_placement_index(device: u32, slot: vec2<u32>) -> u32 {
-    for (var i = 0u; i < appearance_placement_count; i = i + 1u) {
-        let row = C_APPEARANCE_PLACEMENTS + i * C_APPEARANCE_PLACEMENT_WORDS;
-        if (sw(row) == device && sw(row + 1u) == slot.x && sw(row + 2u) == slot.y) {
-            return i;
-        }
-    }
-    return NONE;
+    return hashed_row_of(W_PLACEMENT_BUCKETS, W_PLACEMENT_BUCKET_COUNT, C_APPEARANCE_PLACEMENTS, C_APPEARANCE_PLACEMENT_WORDS, device, slot, 0u, false).row;
 }
 
 // walk.rs note_references_of_a_pointer_followed_by_the_walk 里记 I-3.5 那两张表的两句：落点第一次记下时记它是哪个单元
 // （unit_of_each_placement.entry(..).or_insert），走读此刻在一棵用户可见树里、这个落点还没打标签时打上那棵树（or_insert）
 fn appearance_note_placement(device: u32, slot: vec2<u32>, unit_device: u32, unit_slot: vec2<u32>) {
-    var index = appearance_placement_index(device, slot);
+    let found = hashed_row_of(W_PLACEMENT_BUCKETS, W_PLACEMENT_BUCKET_COUNT, C_APPEARANCE_PLACEMENTS, C_APPEARANCE_PLACEMENT_WORDS, device, slot, 0u, false);
+    var index = found.row;
     if (index == NONE) {
         if (appearance_placement_count >= C_APPEARANCE_MAX_PLACEMENTS) {
             undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (40u << 8u);
@@ -871,6 +861,9 @@ fn appearance_note_placement(device: u32, slot: vec2<u32>, unit_device: u32, uni
         sws(new_row + 7u, 0u);
         sws(new_row + 8u, 0u);
         sws(new_row + 9u, 0u);
+        if (found.empty_bucket != NONE) {
+            sws(W_PLACEMENT_BUCKETS + found.empty_bucket, index + 1u);
+        }
         appearance_placement_count = appearance_placement_count + 1u;
     }
     let row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
@@ -1015,14 +1008,9 @@ fn appearance_note_the_version_just_walked(instance: u32, txg: vec2<u32>, refere
     appearance_version_count = appearance_version_count + 1u;
 }
 
-// 主走读里 (盘, 槽) 在走过的单元表里的下标，不在就是 NONE
+// 主走读里 (盘, 槽) 在走过的单元表里的下标，不在就是 NONE（按桶表 W_VISITED_BUCKETS 找）
 fn w_visited_index_in_the_main_walk(device: u32, slot: vec2<u32>) -> u32 {
-    for (var i = 0u; i < w_visited_count[0]; i = i + 1u) {
-        if (sw(C_VISITED0 + i * 3u) == device && sw(C_VISITED0 + i * 3u + 1u) == slot.x && sw(C_VISITED0 + i * 3u + 2u) == slot.y) {
-            return i;
-        }
-    }
-    return NONE;
+    return hashed_row_of(W_VISITED_BUCKETS, W_VISITED_BUCKET_COUNT, C_VISITED0, 3u, device, slot, 0u, false).row;
 }
 
 fn c_references_base() -> u32 {
@@ -1073,6 +1061,9 @@ fn w_start(context: u32, judging: bool) {
         w_inode_tree_walked = false;
         w_have_largest_inode = false;
         w_largest_inode = vec2<u32>(0u, 0u);
+        for (var bucket = W_REFERENCE_BUCKETS; bucket < W_BUCKETS_END; bucket = bucket + 1u) {
+            sws(bucket, 0u);
+        }
     }
 }
 
@@ -1085,60 +1076,70 @@ fn w_begin_version() {
     }
 }
 
-// 引用集合：(盘, 起点槽, 跨度) 去重记进；位置项校验和记进主走读的表或收割表
+// 引用集合：(盘, 起点槽, 跨度) 去重记进；位置项校验和记进主走读的表或收割表。两张表各一轮、同一个找的调用点（这个函数在走读内核里展开二十来份）：
+// 第 0 轮引用集合（第四个字比跨度），第 1 轮位置项校验和（第四个字比校验和）。主走读那两张按桶表找（W_REFERENCE_BUCKETS、W_CHECKSUM_BUCKETS），
+// 另起的那几遍（上下文 1）的引用集合与收割表照旧从头比：那几遍各走一条根、表小。引用集合满了记站点 1、照旧接着记校验和；校验和那张满了记站点 2
 fn w_note_reference(device: u32, slot: vec2<u32>, checksum: u32, span: u32) {
-    let base = c_references_base();
-    let count = w_reference_count[w_context];
-    var present = false;
-    for (var i = 0u; i < count; i = i + 1u) {
-        if (sw(base + i * C_REFERENCE_WORDS) == device && sw(base + i * C_REFERENCE_WORDS + 1u) == slot.x
-            && sw(base + i * C_REFERENCE_WORDS + 2u) == slot.y && sw(base + i * C_REFERENCE_WORDS + 3u) == span) {
-            present = true;
-            break;
+    for (var table = 0u; table < 2u; table = table + 1u) {
+        var rows = c_references_base();
+        var stride = C_REFERENCE_WORDS;
+        var count = w_reference_count[w_context];
+        var capacity = C_MAX_REFERENCES;
+        var fourth_word = span;
+        var buckets = W_REFERENCE_BUCKETS;
+        var bucket_count = W_REFERENCE_BUCKET_COUNT;
+        if (table == 1u) {
+            if (w_context != 0u && !w_harvesting) {
+                return;
+            }
+            rows = select(C_HARVEST, C_CHECKSUMS, w_context == 0u);
+            stride = C_CHECKSUM_WORDS;
+            count = select(w_harvest_count, w_checksum_count, w_context == 0u);
+            capacity = C_MAX_CHECKSUMS;
+            fourth_word = checksum;
+            buckets = W_CHECKSUM_BUCKETS;
+            bucket_count = W_CHECKSUM_BUCKET_COUNT;
         }
-    }
-    if (!present) {
-        if (count >= C_MAX_REFERENCES) {
-            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (1u << 8u);
+        var present = false;
+        var empty_bucket = NONE;
+        if (w_context == 0u) {
+            let found = hashed_row_of(buckets, bucket_count, rows, stride, device, slot, fourth_word, true);
+            present = found.row != NONE;
+            empty_bucket = found.empty_bucket;
         } else {
-            sws(base + count * C_REFERENCE_WORDS, device);
-            sws(base + count * C_REFERENCE_WORDS + 1u, slot.x);
-            sws(base + count * C_REFERENCE_WORDS + 2u, slot.y);
-            sws(base + count * C_REFERENCE_WORDS + 3u, span);
-            sws(base + count * C_REFERENCE_WORDS + 4u, 0u);
-            w_reference_count[w_context] = count + 1u;
+            for (var i = 0u; i < count; i = i + 1u) {
+                if (sw(rows + i * stride) == device && sw(rows + i * stride + 1u) == slot.x
+                    && sw(rows + i * stride + 2u) == slot.y && sw(rows + i * stride + 3u) == fourth_word) {
+                    present = true;
+                    break;
+                }
+            }
         }
-    }
-    var checksum_base = C_CHECKSUMS;
-    var checksum_count = w_checksum_count;
-    if (w_context != 0u) {
-        if (!w_harvesting) {
-            return;
+        if (present) {
+            continue;
         }
-        checksum_base = C_HARVEST;
-        checksum_count = w_harvest_count;
-    }
-    var known = false;
-    for (var i = 0u; i < checksum_count; i = i + 1u) {
-        if (sw(checksum_base + i * C_CHECKSUM_WORDS) == device && sw(checksum_base + i * C_CHECKSUM_WORDS + 1u) == slot.x
-            && sw(checksum_base + i * C_CHECKSUM_WORDS + 2u) == slot.y && sw(checksum_base + i * C_CHECKSUM_WORDS + 3u) == checksum) {
-            known = true;
-            break;
-        }
-    }
-    if (!known) {
-        if (checksum_count >= C_MAX_CHECKSUMS) {
+        if (count >= capacity) {
+            if (table == 0u) {
+                undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (1u << 8u);
+                continue;
+            }
             undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (2u << 8u);
             return;
         }
-        sws(checksum_base + checksum_count * C_CHECKSUM_WORDS, device);
-        sws(checksum_base + checksum_count * C_CHECKSUM_WORDS + 1u, slot.x);
-        sws(checksum_base + checksum_count * C_CHECKSUM_WORDS + 2u, slot.y);
-        sws(checksum_base + checksum_count * C_CHECKSUM_WORDS + 3u, checksum);
-        if (w_context == 0u) {
-            w_checksum_count = checksum_count + 1u;
+        sws(rows + count * stride, device);
+        sws(rows + count * stride + 1u, slot.x);
+        sws(rows + count * stride + 2u, slot.y);
+        sws(rows + count * stride + 3u, fourth_word);
+        if (empty_bucket != NONE) {
+            sws(buckets + empty_bucket, count + 1u);
+        }
+        if (table == 0u) {
+            sws(rows + count * stride + 4u, 0u);
+            w_reference_count[w_context] = count + 1u;
+        } else if (w_context == 0u) {
+            w_checksum_count = count + 1u;
         } else {
-            w_harvest_count = checksum_count + 1u;
+            w_harvest_count = count + 1u;
         }
     }
 }
@@ -1153,9 +1154,16 @@ fn w_visited_contains(device: u32, slot: vec2<u32>) -> bool {
     return false;
 }
 
-// visited_units.insert：已有交回 false
+// visited_units.insert：已有交回 false。主走读那一张按桶表 W_VISITED_BUCKETS 找，另起的那几遍照旧从头比
 fn w_visit(device: u32, slot: vec2<u32>) -> bool {
-    if (w_visited_contains(device, slot)) {
+    var visited_bucket = NONE;
+    if (w_context == 0u) {
+        let found = hashed_row_of(W_VISITED_BUCKETS, W_VISITED_BUCKET_COUNT, C_VISITED0, 3u, device, slot, 0u, false);
+        if (found.row != NONE) {
+            return false;
+        }
+        visited_bucket = found.empty_bucket;
+    } else if (w_visited_contains(device, slot)) {
         return false;
     }
     let count = w_visited_count[w_context];
@@ -1169,6 +1177,9 @@ fn w_visit(device: u32, slot: vec2<u32>) -> bool {
     sws(base + count * 3u + 2u, slot.y);
     if (w_context == 0u) {
         sws(C_VISITED_BIRTHS0 + count * C_VISITED_BIRTH_WORDS, 0u);
+    }
+    if (visited_bucket != NONE) {
+        sws(W_VISITED_BUCKETS + visited_bucket, count + 1u);
     }
     w_visited_count[w_context] = count + 1u;
     return true;
@@ -1253,19 +1264,28 @@ fn w_merge_below(device: u32, slot: vec2<u32>) {
     }
 }
 
-// 走读跟着一条指针往下：两条位置条目记进引用集合，判同一版第二次引用，记到父单元下面
+// 走读跟着一条指针往下：两条位置条目记进引用集合，判同一版第二次引用，记到父单元下面。
+// 八步照原来的次序走：两条位置条目的落点（I-3.5，主走读）、第 0 条的引用、同一版第二次引用、父单元，第 1 条的同样三样（与第 0 条同落点时后两样不做）。
+// 次序不改（几张表同时满时 undecidable 留最后写的那个站点）；每样只有一个调用点：这个函数在走读内核里展开二十来份，原来每份里每样两份拷贝
 fn w_note_pointer_references(p: Ptr, span: u32) {
-    if (w_context == 0u) {
-        appearance_note_placement(p.device0, p.slot0, p.device0, p.slot0);
-        appearance_note_placement(p.device1, p.slot1, p.device0, p.slot0);
-    }
-    w_note_reference(p.device0, p.slot0, p.sum0, span);
-    w_judge_placement_in_version(p.device0, p.slot0);
-    w_record_below(p.device0, p.slot0);
-    w_note_reference(p.device1, p.slot1, p.sum1, span);
-    if (!(p.device1 == p.device0 && eq64(p.slot1, p.slot0))) {
-        w_judge_placement_in_version(p.device1, p.slot1);
-        w_record_below(p.device1, p.slot1);
+    let second_location_is_the_first = p.device1 == p.device0 && eq64(p.slot1, p.slot0);
+    for (var step = 0u; step < 8u; step = step + 1u) {
+        let on_the_second_location = step == 1u || step >= 5u;
+        let device = select(p.device0, p.device1, on_the_second_location);
+        let slot = select(p.slot0, p.slot1, on_the_second_location);
+        if (step < 2u) {
+            if (w_context == 0u) {
+                appearance_note_placement(device, slot, p.device0, p.slot0);
+            }
+        } else if (step == 2u || step == 5u) {
+            w_note_reference(device, slot, select(p.sum0, p.sum1, on_the_second_location), span);
+        } else if (on_the_second_location && second_location_is_the_first) {
+            continue;
+        } else if (step == 3u || step == 6u) {
+            w_judge_placement_in_version(device, slot);
+        } else {
+            w_record_below(device, slot);
+        }
     }
 }
 
@@ -3478,24 +3498,90 @@ fn appearance_placement_is_in_tree(index: u32, kind: u32, tree: vec2<u32>) -> bo
     return sw(row + 6u) == 1u && sw(row + 7u) == kind && sw(row + 8u) == tree.x && sw(row + 9u) == tree.y;
 }
 
+// 一版引用的落点里第 k 个排在第 j 个前面（k、j 是版本表那一段里的序号，first 是那一段的起点）：先按折成的单元 (盘, 槽)，同一个单元的
+// 按落点自己的 (盘, 槽)（appearance_placement_is_greater 的序），都相同的按序号——全序；同一个单元的落点连成一段、段尾是它 (盘, 槽) 最大的那个
+fn appearance_version_placement_precedes(first: u32, k: u32, j: u32) -> bool {
+    let placement_k = sw(C_APPEARANCE_VERSION_PLACEMENTS + first + k);
+    let placement_j = sw(C_APPEARANCE_VERSION_PLACEMENTS + first + j);
+    let row_k = C_APPEARANCE_PLACEMENTS + placement_k * C_APPEARANCE_PLACEMENT_WORDS;
+    let row_j = C_APPEARANCE_PLACEMENTS + placement_j * C_APPEARANCE_PLACEMENT_WORDS;
+    if (sw(row_k + 3u) != sw(row_j + 3u)) {
+        return sw(row_k + 3u) < sw(row_j + 3u);
+    }
+    let unit_slot_k = vec2<u32>(sw(row_k + 4u), sw(row_k + 5u));
+    let unit_slot_j = vec2<u32>(sw(row_j + 4u), sw(row_j + 5u));
+    if (!eq64(unit_slot_k, unit_slot_j)) {
+        return lt64(unit_slot_k, unit_slot_j);
+    }
+    if (appearance_placement_is_greater(placement_j, placement_k)) {
+        return true;
+    }
+    if (appearance_placement_is_greater(placement_k, placement_j)) {
+        return false;
+    }
+    return k < j;
+}
+
+// C_ROW_ORDER 装得下一版引用的落点（解析内核时判，不进展开量）
+const_assert C_MAX_IN_VERSION <= C_JOURNAL_GROUP_KEYS - C_ROW_ORDER;
+
+// 一版引用的 count 个落点（版本表那一段从 first 起）按 appearance_version_placement_precedes 排，序号写进 C_ROW_ORDER 起的 count 个字
+// （至多 C_MAX_IN_VERSION 个，那张表 C_MAX_REFERENCES 个字；I-3.5 在逐盘 journal 之后、I-5.1 之前判，那两处借它的时段不相交）。
+// 堆排序，写法同 order_rows_by_their_first_four_words
+fn appearance_order_the_placements_of_a_version_by_unit(first: u32, count: u32) {
+    for (var i = 0u; i < count; i = i + 1u) {
+        sws(C_ROW_ORDER + i, i);
+    }
+    if (count < 2u) {
+        return;
+    }
+    let heap_building_steps = count / 2u;
+    var heap_size = count;
+    for (var step = 0u; step < heap_building_steps + count - 1u; step = step + 1u) {
+        var node = 0u;
+        if (step < heap_building_steps) {
+            node = heap_building_steps - 1u - step;
+        } else {
+            heap_size = heap_size - 1u;
+            let largest = sw(C_ROW_ORDER);
+            sws(C_ROW_ORDER, sw(C_ROW_ORDER + heap_size));
+            sws(C_ROW_ORDER + heap_size, largest);
+        }
+        loop {
+            let left = 2u * node + 1u;
+            if (left >= heap_size) {
+                break;
+            }
+            var larger = left;
+            if (left + 1u < heap_size && appearance_version_placement_precedes(first, sw(C_ROW_ORDER + left), sw(C_ROW_ORDER + left + 1u))) {
+                larger = left + 1u;
+            }
+            if (!appearance_version_placement_precedes(first, sw(C_ROW_ORDER + node), sw(C_ROW_ORDER + larger))) {
+                break;
+            }
+            let parent = sw(C_ROW_ORDER + node);
+            sws(C_ROW_ORDER + node, sw(C_ROW_ORDER + larger));
+            sws(C_ROW_ORDER + larger, parent);
+            node = larger;
+        }
+    }
+}
+
 // 一版去重之后的单元摊进 APPEARANCE_UNITS，交回几个（判不了交回 NONE）。note_the_version_just_walked_for_the_appearance_rule 把这一版的落点
-// 按 (盘, 槽) 升序折成单元收进 BTreeMap，同一个单元后收的标签盖掉先收的：这里每个单元留它 (盘, 槽) 最大的那个落点（标签取那一个的）
+// 按 (盘, 槽) 升序折成单元收进 BTreeMap，同一个单元后收的标签盖掉先收的：这里每个单元留它 (盘, 槽) 最大的那个落点（标签取那一个的）。
+// 原来每个落点跟这一版全部落点两两比「有没有同单元、更大的」，条数平方长；改成按 (单元, 落点) 排一次序、每段留段尾——
+// 同单元的落点连成一段，段尾就是那个没有同单元更大落点的（一版的落点两两不同：w_judge_placement_in_version 去过重）。
+// 摊开的次序换成按单元排，读它的两处（appearance_tree_is_inherited_whole、逐个单元判 I-3.5）每个单元各判各的、与次序无关
 fn appearance_spread_the_units_of_a_version(version_index: u32) -> u32 {
     let row = appearance_version_row(version_index);
     let first = sw(row + 4u);
     let count = sw(row + 5u);
+    appearance_order_the_placements_of_a_version_by_unit(first, count);
     var units = 0u;
-    for (var k = 0u; k < count; k = k + 1u) {
-        let placement = sw(C_APPEARANCE_VERSION_PLACEMENTS + first + k);
-        var a_greater_placement_of_the_same_unit = false;
-        for (var j = 0u; j < count; j = j + 1u) {
-            let other = sw(C_APPEARANCE_VERSION_PLACEMENTS + first + j);
-            if (j != k && appearance_same_unit(placement, other) && appearance_placement_is_greater(other, placement)) {
-                a_greater_placement_of_the_same_unit = true;
-                break;
-            }
-        }
-        if (a_greater_placement_of_the_same_unit) {
+    for (var position = 0u; position < count; position = position + 1u) {
+        let placement = sw(C_APPEARANCE_VERSION_PLACEMENTS + first + sw(C_ROW_ORDER + position));
+        if (position + 1u < count
+            && appearance_same_unit(placement, sw(C_APPEARANCE_VERSION_PLACEMENTS + first + sw(C_ROW_ORDER + position + 1u)))) {
             continue;
         }
         if (units >= APPEARANCE_MAX_UNITS) {
@@ -3731,22 +3817,8 @@ fn collect_the_records_the_replay_reads(fsid_low: vec2<u32>) -> u32 {
             }
             let instance = rd32(s.base, 16u);
             let counter = rd48(s.base, 20u);
-            var position = 0u;
-            var already_read = false;
-            while (position < count) {
-                let row = C_REPLAY_RECORDS + position * C_REPLAY_RECORD_WORDS;
-                let existing_instance = sw(row + 3u);
-                let existing_counter = vec2<u32>(sw(row + 1u), sw(row + 2u));
-                if (existing_instance == instance && eq64(existing_counter, counter)) {
-                    already_read = true;
-                    break;
-                }
-                if (instance < existing_instance || (instance == existing_instance && lt64(counter, existing_counter))) {
-                    break;
-                }
-                position = position + 1u;
-            }
-            if (already_read) {
+            let position = replay_record_position_not_below(count, instance, counter);
+            if (replay_record_key_at_is(count, position, instance, counter)) {
                 continue;
             }
             if (count >= MAX_RECORDS) {
@@ -3771,13 +3843,34 @@ fn collect_the_records_the_replay_reads(fsid_low: vec2<u32>) -> u32 {
     return count;
 }
 
+// 重放读的那一份环（前 count 条，按 (实例, 计数器) 严格升序）里第一个键不小于 (instance, counter) 的位置，都小交回 count。
+// 二分：每一轮 [low, high) 之前的键都小于它、从 high 起的都不小于它，至多 ⌈log2(MAX_RECORDS + 1)⌉ = 12 轮
+fn replay_record_position_not_below(count: u32, instance: u32, counter: vec2<u32>) -> u32 {
+    var low = 0u;
+    var high = count;
+    while (low < high) {
+        let middle = (low + high) / 2u;
+        let row = C_REPLAY_RECORDS + middle * C_REPLAY_RECORD_WORDS;
+        let middle_instance = sw(row + 3u);
+        if (middle_instance < instance || (middle_instance == instance && lt64(vec2<u32>(sw(row + 1u), sw(row + 2u)), counter))) {
+            low = middle + 1u;
+        } else {
+            high = middle;
+        }
+    }
+    return low;
+}
+
+fn replay_record_key_at_is(count: u32, position: u32, instance: u32, counter: vec2<u32>) -> bool {
+    let row = C_REPLAY_RECORDS + position * C_REPLAY_RECORD_WORDS;
+    return position < count && sw(row + 3u) == instance && sw(row + 1u) == counter.x && sw(row + 2u) == counter.y;
+}
+
 // 重放读的那一份环里 (实例, 计数器) 那一条的下标，没有就是 NONE
 fn replay_record_index(count: u32, instance: u32, counter: vec2<u32>) -> u32 {
-    for (var i = 0u; i < count; i = i + 1u) {
-        let row = C_REPLAY_RECORDS + i * C_REPLAY_RECORD_WORDS;
-        if (sw(row + 3u) == instance && sw(row + 1u) == counter.x && sw(row + 2u) == counter.y) {
-            return i;
-        }
+    let position = replay_record_position_not_below(count, instance, counter);
+    if (replay_record_key_at_is(count, position, instance, counter)) {
+        return position;
     }
     return NONE;
 }
@@ -4151,24 +4244,21 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                 // I-5.1：同一块盘上不同的引用不许占重叠的槽（按 (槽, 跨度) 排序后相邻两条比 ⟺ 任两条比）
                 let reference_count = w_reference_count[0];
                 // walk.rs 每块盘按 (槽, 跨度) 排好之后相邻两条各判一次：有一块盘上有两条以上的引用就算判过
+                // 两两比的写法是「同盘的 i、j，(槽, 跨度) 字典序 i 严格在前、j 的槽 < i 的末端 ⇒ 违例」；有两条同盘的就算判过。引用集合按 (盘, 槽, 跨度)
+                // 去重（w_note_reference），没有两条 (盘, 槽, 跨度) 都相同。按 (盘, 槽, 跨度, 行号) 排好之后只比相邻两条（同盘、后一条的槽 < 前一条的末端）
+                // 与它等价：有违例的一对 (i, j) 时，i 后面那一条 k 排在 j 之前或就是 j、同盘，k 的槽 ≤ j 的槽 < i 的末端；反过来相邻两条违例就是一对；
+                // 同盘的在次序里连成一段，有两条同盘就有相邻两条同盘
+                order_rows_by_their_first_four_words(C_REFERENCES0, C_REFERENCE_WORDS, reference_count, C_ROW_ORDER);
                 var some_device_has_two_references = false;
-                for (var i = 0u; i < reference_count; i = i + 1u) {
-                    let device = sw(C_REFERENCES0 + i * C_REFERENCE_WORDS);
-                    let slot = vec2<u32>(sw(C_REFERENCES0 + i * C_REFERENCE_WORDS + 1u), sw(C_REFERENCES0 + i * C_REFERENCE_WORDS + 2u));
-                    let span = sw(C_REFERENCES0 + i * C_REFERENCE_WORDS + 3u);
-                    let end = add64(slot, u64_of(span));
-                    for (var j = 0u; j < reference_count; j = j + 1u) {
-                        if (j == i || sw(C_REFERENCES0 + j * C_REFERENCE_WORDS) != device) {
-                            continue;
-                        }
-                        some_device_has_two_references = true;
-                        let other_slot = vec2<u32>(sw(C_REFERENCES0 + j * C_REFERENCE_WORDS + 1u), sw(C_REFERENCES0 + j * C_REFERENCE_WORDS + 2u));
-                        let other_span = sw(C_REFERENCES0 + j * C_REFERENCE_WORDS + 3u);
-                        // i 排在 j 前面：(slot, span) 字典序小
-                        let i_first = lt64(slot, other_slot) || (eq64(slot, other_slot) && span < other_span);
-                        if (i_first && lt64(other_slot, end)) {
-                            violate(INVARIANT_I_5_1);
-                        }
+                for (var position = 1u; position < reference_count; position = position + 1u) {
+                    let earlier = C_REFERENCES0 + sw(C_ROW_ORDER + position - 1u) * C_REFERENCE_WORDS;
+                    let later = C_REFERENCES0 + sw(C_ROW_ORDER + position) * C_REFERENCE_WORDS;
+                    if (sw(earlier) != sw(later)) {
+                        continue;
+                    }
+                    some_device_has_two_references = true;
+                    if (lt64(vec2<u32>(sw(later + 1u), sw(later + 2u)), add64(vec2<u32>(sw(earlier + 1u), sw(earlier + 2u)), u64_of(sw(earlier + 3u))))) {
+                        violate(INVARIANT_I_5_1);
                     }
                 }
                 if (some_device_has_two_references) {
@@ -4705,7 +4795,10 @@ fn judge_the_pool_from_its_system_configuration_slots(device_count: u32) -> u32 
         judge_journal_back_chain_of_device();
         judge_named_entry_location_order_of_device();
         judge_transaction_numbers_of_device();
+        // 按组判的那几条读 C_ROW_ORDER：I-8.8 按 (实例, 事务号) 排；之后 I-8.9、I-8.1、I-8.10 按 (实例, checkpoint_txg) 排一次、三条共用（中间不改记录表）
+        order_the_records_of_device_by_group(JOURNAL_GROUP_BY_TRANSACTION);
         judge_commit_markers_of_device();
+        order_the_records_of_device_by_group(JOURNAL_GROUP_BY_PUBLISH);
         judge_publish_ordinals_of_device();
         judge_journal_record_txg_per_instance_of_device();
         judge_records_of_one_publish_within_the_in_flight_record_limit_of_device(g.declared_in_flight_record_limit);

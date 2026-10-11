@@ -686,7 +686,7 @@ fn a_shard_cut_short_resumes_from_its_own_progress_file_to_the_same_ledger() {
     std::fs::remove_dir_all(&shard_directory).ok();
 }
 
-/// 驱动脚本 `research/scripts/layer0-shard-run.sh --selftest` 跑的那条小流：分片开关、进度目录、输入指纹、线程数都从环境变量取
+/// 驱动脚本 `scripts/crash/layer0-shard-run.sh --selftest` 跑的那条小流：分片开关、进度目录、输入指纹、线程数都从环境变量取
 /// （与两条流的全量用例同一个入口）。没设分片开关时照常跑完整条流；分片跑一片时只写账本、不打计数行；merge 那一趟打的计数行
 /// 与不分片的逐字相同（驱动脚本比这两行），并照钉死的数判。
 #[test]

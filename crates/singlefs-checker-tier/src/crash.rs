@@ -1451,6 +1451,66 @@ pub fn judge_layer0_state_range_against_the_version_table(
     ordinals: Range<u64>,
     judge_state: &mut dyn FnMut(u64, &CrashImage<'_>, &Layer0StateJudgement),
 ) -> u64 {
+    judge_layer0_state_range_against_the_version_table_naming_the_publish(
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        expansion,
+        ordinals,
+        &mut |ordinal, _publish, image, judgement| judge_state(ordinal, image, judgement),
+    )
+}
+
+/// 同 [`judge_layer0_state_range_against_the_version_table`]，回调另带这个状态归哪次发布（[`Layer0PublishOfState`]，与层 0 计数
+/// `Layer0Tally::states_by_publish` 同一个归法）：崩溃放量按块存的计数向量里按发布分的态数由它逐状态数（崩溃点重放合并第三轮判决 J7）。
+///
+/// # Panics
+/// `ordinals` 越过整条流的状态数。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "与 judge_layer0_state_range_against_the_version_table 同一组参数，回调多带一项"
+)]
+#[must_use]
+pub fn judge_layer0_state_range_against_the_version_table_naming_the_publish(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: Layer0VersionTable<'_>,
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    ordinals: Range<u64>,
+    judge_state: &mut dyn FnMut(u64, Layer0PublishOfState, &CrashImage<'_>, &Layer0StateJudgement),
+) -> u64 {
+    visit_layer0_state_range(
+        base,
+        writes,
+        segments,
+        expansion,
+        ordinals,
+        &mut |ordinal, publish, image| {
+            let judgement =
+                judge_crash_image_against_the_version_table(image, judged_root_index, versions);
+            judge_state(ordinal, publish, image, &judgement);
+        },
+    )
+}
+
+/// 同一条流、同一种展开，按层 0 的状态序号走 `ordinals` 这一段、不判：每个状态现算持久集合、造镜像，连同它归哪次发布交给 `visit_state`。
+/// 交回整条流的状态数。崩溃放量挂在节点上的观察者（崩溃点重放合并第三轮判决 J4）经它拿每个状态的镜像，自己恢复、自己看。
+///
+/// # Panics
+/// `ordinals` 越过整条流的状态数。
+#[must_use]
+pub fn visit_layer0_state_range(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    ordinals: Range<u64>,
+    visit_state: &mut dyn FnMut(u64, Layer0PublishOfState, &CrashImage<'_>),
+) -> u64 {
     let tearable = TearableInPlaceOverwrites::of(base, writes);
     let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
     let plan = Layer0StatePlan::new(
@@ -1472,9 +1532,7 @@ pub fn judge_layer0_state_range_against_the_version_table(
             writes: enumerated_writes,
             persisted: plan.persisted_writes_of_state(ordinal),
         };
-        let judgement =
-            judge_crash_image_against_the_version_table(&image, judged_root_index, versions);
-        judge_state(ordinal, &image, &judgement);
+        visit_state(ordinal, plan.publish_of_state(ordinal), &image);
     }
     plan.state_count
 }
@@ -2180,22 +2238,22 @@ impl WritesWithTornImages {
     }
 }
 
-/// 一段里的原地写与单元写（COW），各按段内次序：单元写落在新分出来的槽上，其余（系统配置槽、journal 记录、根槽、清零）都是原地覆盖。
+/// 一段里的原地写与单元写（COW），各按段内次序：分法只有一份，在 [`crate::crash_facts::in_place_and_copy_on_write_writes_of_the_segment`]
+/// （GPU 判表与第 ② 段核对的拆法也照它），这里只把写表下标换回 `usize`。
 fn in_place_and_copy_on_write_writes_of(
     writes: &[RetainedWrite],
     segment: &[usize],
 ) -> (Vec<usize>, Vec<usize>) {
-    segment
-        .iter()
-        .copied()
-        .partition(|write_index| match writes[*write_index].kind {
-            StepKind::UnitWrite => false,
-            StepKind::ZeroFill
-            | StepKind::SystemConfigurationSlot
-            | StepKind::JournalRecord
-            | StepKind::RootRecordFua
-            | StepKind::Barrier => true,
-        })
+    let write_index_of = |index: u32| usize::try_from(index).expect("写表下标装得进 usize");
+    let (in_place_writes, copy_on_write_writes) =
+        crate::crash_facts::in_place_and_copy_on_write_writes_of_the_segment(writes, segment);
+    (
+        in_place_writes.into_iter().map(write_index_of).collect(),
+        copy_on_write_writes
+            .into_iter()
+            .map(write_index_of)
+            .collect(),
+    )
 }
 
 /// 按 `expansion` 展开、每次写只取两态（没持久 / 持久，补第三态之前的口径）时的状态数：各段展开出来的，再加全部持久那一个
@@ -4618,7 +4676,7 @@ mod tests {
 
     /// 环境变量设成 0：停下，不悄悄退回单线程；消息是数值环境变量共用解析的那一句（带变量名与原值），不是这里另写的一句。
     /// 写成 `catch_unwind` 再核 panic 消息，与写成 `#[should_panic(expected = …)]` 等价：
-    /// 判 `crates/mutations.tsv` 的门禁 checker-tier-crates-mutation-replay 认得两种结果行（`research/scripts/crates-mutation-rows.py` 的
+    /// 判 `crates/mutations.tsv` 的门禁 checker-tier-crates-mutation-replay 认得两种结果行（`scripts/mutation/crates-mutation-rows.py` 的
     /// `results_by_test` 在点名之后容得下 ` - should panic` 那一段）。
     #[test]
     fn zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back() {
