@@ -16,6 +16,6 @@ s = s.replace('        GenerationWeights::LEAVING_ORPHANS_FOR_THE_INSTANCE_TABLE
 s = s.replace('            ("orphans", 10_448_260_464_455_344_558),\n', '')
 open(sys.argv[2], 'w').write(s)
 PY
-nice -n 19 bash "$REPO/research/scripts/capped.sh" 7 timeout 235 bash "$REPO/research/scripts/run-with-memory-cap.sh" 12G \
+nice -n 19 bash "$REPO/scripts/capped.sh" 7 timeout 235 bash "$REPO/scripts/run-with-memory-cap.sh" 12G \
     cargo test --offline --manifest-path "$WORK/work-head/Cargo.toml" -p singlefs-harness \
     --test random_history_generation_keeps_the_existing_weights_step_for_step 2>&1 | grep -E 'test result|Running'

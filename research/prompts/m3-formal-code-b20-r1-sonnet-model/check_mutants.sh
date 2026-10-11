@@ -13,7 +13,7 @@ python3 $M/anchor_check.py /tmp/claude-1000/m3-formal-code-b20-r1/tree 2362 2367
 cd $W
 for row in 2362 2363 2364 2365 2366 2367; do
   cp $OUT/emit/row$row.rs $W/$F
-  timeout 200 bash $R/research/scripts/capped.sh 10 nice -n 19 cargo check --offline -p singlefs-checker-tier --tests > $OUT/row$row.log 2>&1
+  timeout 200 bash $R/scripts/capped.sh 10 nice -n 19 cargo check --offline -p singlefs-checker-tier --tests > $OUT/row$row.log 2>&1
   echo "row$row cargo check rc=$? warnings=$(grep -c '^warning' $OUT/row$row.log) errors=$(grep -c '^error' $OUT/row$row.log)" >> $OUT/summary.txt
 done
 cp $OUT/orig.rs $W/$F; cmp $OUT/orig.rs $W/$F && echo "副本已还原" >> $OUT/summary.txt

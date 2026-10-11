@@ -86,7 +86,7 @@ d6059302f5c51a73f3704e9e437fb6b3287ee5cb628c27d9273128e7e1be0f04  patch/mutation
 - `cargo build --offline --all-targets`：退 0，`    Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 9.94s`
 - `cargo check --offline -p singlefs-checker-tier --tests --bins`：退 0
 - `cargo test -p singlefs-harness --test named_unit_verification_stands_in_for_the_barrier_before_the_record`（经内存包装）：`test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s`
-- `research/scripts/crash-case-check.py`（四样）：`✓ crash-case-check 判了 4 样（placement、modules、file-names、one-scenario），0 样无对象可判`
+- `scripts/crash-case-check.py`（四样）：`✓ crash-case-check 判了 4 样（placement、modules、file-names、one-scenario），0 样无对象可判`
 
 ## 门禁（登记给我的：33、74、92、94；53、93、89 号表里的名字今天在 gate.d 里找不到文件）
 

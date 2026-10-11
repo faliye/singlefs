@@ -5,7 +5,7 @@
 ## 0 前提与复跑环境
 
 - 冻结副本五份被判文件的 sha256 在快照 `research/prompts/m3-batch10i-code-r1-snapshot/crates-sha256.txt` 里各命中 1 次（命令：对 `mount.rs`、`allocator.rs`、`mutations.tsv`、`rollback_by_a_forward_publish.rs`、`rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 各 `sha256sum` 后 `grep -c` 快照，五行输出都是 1）。D16 与 checks-owed 的 sha256 同快照 `kb-sha256.txt`（`16-发布语义.md` 为 b2cd52de…，同值）。
-- 复跑只在草稿副本 `/tmp/claude-1000/m3-batch10i-code-r1-sonnet/work/`（冻结副本的 `crates/`、`Cargo.*`、`.cargo/`），自己的 target `/tmp/claude-1000/m3-batch10i-code-r1-sonnet/target/`；每条命令 `nice -n 19 bash research/scripts/run-with-memory-cap.sh <上限> bash research/scripts/capped.sh 15 cargo test --offline …`。变异一律用模型目录里的 `mutrun.py`（在副本上套一行、跑整个测试二进制、还原；全部跑完后 `diff -rq` 副本 `crates/` 与冻结副本 `crates/` 无输出）。
+- 复跑只在草稿副本 `/tmp/claude-1000/m3-batch10i-code-r1-sonnet/work/`（冻结副本的 `crates/`、`Cargo.*`、`.cargo/`），自己的 target `/tmp/claude-1000/m3-batch10i-code-r1-sonnet/target/`；每条命令 `nice -n 19 bash scripts/run-with-memory-cap.sh <上限> bash scripts/capped.sh 15 cargo test --offline …`。变异一律用模型目录里的 `mutrun.py`（在副本上套一行、跑整个测试二进制、还原；全部跑完后 `diff -rq` 副本 `crates/` 与冻结副本 `crates/` 无输出）。
 - 包装结局：第一次起 rollback 那一条退 252（同会话已有一条在跑：攻方腿的 `cargo build --offline --release -p opus-i1-attack`，`ps` 看到的），那一次的输出不算结果；之后设 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`（派出去的两条腿各跑各的）照跑。另有五次退 251（四次是上限超过峰值表实测的 2 倍、一次是 `auto` 而表里没有这条命令的键），一次退 250（变异 2871 按 `auto` 的 918M 撞顶，改 3G 加理由重跑，结果用重跑那一次），退 250/251/252 的输出都没当结果用。
 - 可复现物：`research/prompts/m3-batch10i-code-r1-sonnet-model/`（`mutrun.py`、`p/` 下每个自造变异的原文与替换文、`logs/` 下 37 份原始输出、`results.txt` 每份的 `test result` 行）。
 
@@ -180,5 +180,5 @@ E1 是定案，E2、E3 管数，E4 管影子账，E5 管解开。E1 之外 kb �
 - 没跑全量 `cargo test -p singlefs-harness`、checker 档、门禁、变异整表（不归子 agent）；变异只套了点名的二进制与 core 库，别的二进制里是否有测试在 P1 到 P4、A2、A3 下红，核不了。
 - 变异表另外 7 行替换（第 2299 行等）没逐行复跑。
 - 没在入库装置上重做数：本报告的变异与读序数是草稿副本上的复跑，按 `.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」那一节，进判决前由主 agent 在入库装置上重做；模型目录里的 `mutrun.py` 与 `p/` 可拷去重跑。
-- 包装在每次跑的时候会往 `research/scripts/memory-peaks.tsv` 记峰值（它自己的行为），我没动那份文件。
+- 包装在每次跑的时候会往 `scripts/memory-peaks.tsv` 记峰值（它自己的行为），我没动那份文件。
 - 草稿目录 `/tmp/claude-1000/m3-batch10i-code-r1-sonnet/` 里的 `work/`（冻结副本拷贝，19M）与 `target/`（编译目录，26G）：交回前已删（`rm -rf`，之后 `ls` 只剩日志与 `model/`、`progress.md`），不再有；`mut-*.log` 已拷进模型目录 `logs/`，草稿目录里留着原件。

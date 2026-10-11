@@ -27,7 +27,7 @@
 模型目录 `research/prompts/m3-leaf-death-r3-opus-model/`（主模型从第二轮攻方模型改出；`src/clone.rs` 是新写的克隆头小模型；`copy/` 是放进仓副本的一个 harness 测试目标与给副本 checker 加开关的脚本）。复跑（仓根；每段经内存包装，编译 6G、其余 4G，6 线程；同一时刻只起一条 cargo；`rerun.sh` 不靠自己在仓里的位置找输入，仓路径从 `SINGLEFS_REPO` 取）：
 
 ```
-M=research/prompts/m3-leaf-death-r3-opus-model; S=research/scripts; O=<空目录>
+M=research/prompts/m3-leaf-death-r3-opus-model; S=scripts; O=<空目录>
 export SINGLEFS_REPO=/home/fy5090/.local/share/singlefs/work/m3-leaf-death-r1/tree
 bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 6 bash $M/rerun.sh $O build
 bash $S/run-with-memory-cap.sh 4G bash $S/capped.sh 6 bash $M/rerun.sh $O sweep-4 clone determinism
@@ -296,7 +296,7 @@ Z 在这三形上不出错的机理（推的，与量相符）：截短与长回
 
 ## cite-check 末行
 
-`python3 research/scripts/cite-check.py research/prompts/m3-leaf-death-r3-opus-output.md`：
+`python3 scripts/cite-check.py research/prompts/m3-leaf-death-r3-opus-output.md`：
 
 ```
   ✓ 核了 17 处引文，对上 17 处，没判 0 处（逐处列在上面）

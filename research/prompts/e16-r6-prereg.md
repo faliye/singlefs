@@ -2,9 +2,9 @@
 
 写于 2026-10-04，装置改之前、这一次的任何产物之前。**差分重跑**：臂、几何点、判据、容差、作废与停机条款照上一次登记 `research/prompts/e16-r5-prereg.md`（sha256 `3e858988461c9778562e011b0a8de45b1c7099b541a23de8bf12b6b7f09d9932`，第 5 次跑），连同它第十二节的修订（Q3 / Q4 以预测比值为分母那一路为准，两路都报）。这里只写变了哪些输入、哪几格要重判、贴着旧值的取样点与锚点怎么换；没写到的内容「同上一次登记」。跑出数之后要改，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列——失败条款打中的时候怎么办」三步走。
 
-**装置写在哪（写死）：沿用第 5 次的装置 `research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs`（独立手写计数模型，不与 `crates/` 共用代码），不是入库装置，不另起新装置。** 变异表 `research/mutations/e16_fifth_run_peak_under_today_widths.tsv`；复跑行 `research/scripts/replay.sh:158–160` 三行，键照旧是 `E16R5`（键是这个装置的登记名，不是跑的次数；另起 `E16R6` 会让三行旧登记指着一份改过的装置复现不出）。原装置 `research/e7-index-bench/src/bin/e16_journal.rs` 与 `replay.sh:156–157` 两行一字不动：原装置里没有 311 / 188 / 67 这几个量（`grep -nwE '311\|188\|67'` 只命中第 915 行的随机种子 `67`，不是点名项）。
+**装置写在哪（写死）：沿用第 5 次的装置 `scripts/experiments/e16_fifth_run_peak_under_today_widths.rs`（独立手写计数模型，不与 `crates/` 共用代码），不是入库装置，不另起新装置。** 变异表 `scripts/mutations/e16_fifth_run_peak_under_today_widths.tsv`；复跑行 `scripts/replay.sh:158–160` 三行，键照旧是 `E16R5`（键是这个装置的登记名，不是跑的次数；另起 `E16R6` 会让三行旧登记指着一份改过的装置复现不出）。原装置 `scripts/experiments/e16_journal.rs` 与 `replay.sh:156–157` 两行一字不动：原装置里没有 311 / 188 / 67 这几个量（`grep -nwE '311\|188\|67'` 只命中第 915 行的随机种子 `67`，不是点名项）。
 
-**准入**：`python3 research/scripts/admission.py experiment /home/fy5090/code/singlefs E16` 退 2（准入登记里没有实验键 E16），不是 77；`E16R5` 同样没有登记行（`grep -nE '^E16R5' .claude/gate.d/stage-inputs.tsv` 零命中）。
+**准入**：`python3 scripts/admission.py experiment /home/fy5090/code/singlefs E16` 退 2（准入登记里没有实验键 E16），不是 77；`E16R5` 同样没有登记行（`grep -nE '^E16R5' .claude/gate.d/stage-inputs.tsv` 零命中）。
 
 ## 一、问题
 
@@ -22,7 +22,7 @@
 **出处 `research/prompts/m3-r1-batch9-reruns-questions.md:17-17`（整段抄，未转述）**
 
 ```markdown
-| 4 | E116、E43、E49、E16、E157 | `research/e7-index-bench/src/bin/` 下 e116、e157、e16、e43、e49 的源码里还有 311 / 188 / 67 旧值（删除与并发那条线跑 format-constants 的输出 `/tmp/claude-1000/m3-writeback2/format-constants.out`）：换成今天的值之后，各自的产物与正文引的数是否变 | 产物与 `research/scripts/replay.sh` 登记的 exact 产物不再逐字相同 | 每个都改完、复跑、与登记产物比过，变了的出新产物并回对正文 | 开着 |
+| 4 | E116、E43、E49、E16、E157 | `scripts/experiments/` 下 e116、e157、e16、e43、e49 的源码里还有 311 / 188 / 67 旧值（删除与并发那条线跑 format-constants 的输出 `/tmp/claude-1000/m3-writeback2/format-constants.out`）：换成今天的值之后，各自的产物与正文引的数是否变 | 产物与 `scripts/replay.sh` 登记的 exact 产物不再逐字相同 | 每个都改完、复跑、与登记产物比过，变了的出新产物并回对正文 | 开着 |
 ```
 
 这份登记只回答第 4 行里的 E16。第 4 行问的是「换成今天的值之后，产物与正文引的数变不变」；上一次登记的问题单 `research/prompts/e16-r5-questions.md` 三行（峰值落点、预测式误差、适用范围句）的判定由第六节 Q1–Q6 在新产物上重判一遍，判定变了照报，那三行的状态改不改由主 agent 定。
@@ -41,7 +41,7 @@
 
 ## 二、被测条款与它引的定义
 
-上一次登记第二节抄的被测条款是实验页第 58–90 行那一节（适用范围句）、原装置第 16–29 / 446–481 行与 D8 已定项 14 的两行，这几段这一次一字不改，照上一次登记第二节读；上一次抄的「今天的记录宽」两段（上一次的 `layout/01-first-txn.md:323`、`:351`，今天在第 329、357 行：「4096 − 311 = 3785 ⇒ 一条记录最多装 67 项」「合计 **311 字节** … 装 67 个点名项」）今天还没改（回扫报告 3.1 节把它们列在「要改」里），这一次不抄它们，改从 D23 正文取。用 `research/scripts/quote-kb.py` 抄：D23 已定项 4（「4096 上余 3609（64 个点名项）」），与实验页 `### 影响的决策` 表点名分项的每一条：D23 已定项 1、17，D25 已定项 1–5。表里的 D10、D11、D13、D16、D22、D4 没有分项，不抄。产物 `/tmp/claude-1000/m3-r1/batch9-row4-design/e16-q.md`（8 段，回读逐字节一致），整份追加如下。
+上一次登记第二节抄的被测条款是实验页第 58–90 行那一节（适用范围句）、原装置第 16–29 / 446–481 行与 D8 已定项 14 的两行，这几段这一次一字不改，照上一次登记第二节读；上一次抄的「今天的记录宽」两段（上一次的 `layout/01-first-txn.md:323`、`:351`，今天在第 329、357 行：「4096 − 311 = 3785 ⇒ 一条记录最多装 67 项」「合计 **311 字节** … 装 67 个点名项」）今天还没改（回扫报告 3.1 节把它们列在「要改」里），这一次不抄它们，改从 D23 正文取。用 `scripts/quote-kb.py` 抄：D23 已定项 4（「4096 上余 3609（64 个点名项）」），与实验页 `### 影响的决策` 表点名分项的每一条：D23 已定项 1、17，D25 已定项 1–5。表里的 D10、D11、D13、D16、D22、D4 没有分项，不抄。产物 `/tmp/claude-1000/m3-r1/batch9-row4-design/e16-q.md`（8 段，回读逐字节一致），整份追加如下。
 
 **出处 `.claude/kb/decisions/23-journal的角色与格式.md:148-177`（整段抄，未转述）**
 
@@ -324,7 +324,7 @@ smallfile 那一行三列留空是照实写：负载表这三列的口径来自 
 - **PC1 / PC2**（原装置现跑与误差分母核定）这一次**不重跑**：原装置一字没改，它不读点名项数，上一次的产物与修订照旧有效；标「够判后未跑」。
 - **PC3**（新装置在 G0 上逐格复现原装置）照跑：`pc3` 模式只用 `RecordFormat::LegacyOriginal`，不读第 56 行，预计产物逐字节不变（Q7）。
 - **PC4** 照第一节最后一行：每个几何点 B = 1 甲 − 乙 = L + 1；B ∈ {1, 2, 5, 10, 20, 50, 64, 65, 67} 的格比值 > 1。
-- **S4 基线**：改装置之前 `bash research/scripts/replay.sh E16R5` 三行逐字节一致（第十一节）。
+- **S4 基线**：改装置之前 `bash scripts/replay.sh E16R5` 三行逐字节一致（第十一节）。
 
 真实基线照旧是 G2（1 TiB、今天的扇出），记录宽换成 64。**实现量与分段**：改 3 个常量与 3 段注释、批轴加 2 点、4 条单测；变异表删 1 条、加 2 条；`replay.sh:158–160` 改产物名（变了的才改）；实验页按 Q8 回对。上一次登记分两段，第二段（G3、G5、F128、F296、R1、R∞）已经跑过，这一次**两段一起跑**（`second_segment` 模式），一个执行员做完，不分段。
 
@@ -370,7 +370,7 @@ smallfile 那一行三列留空是照实写：负载表这三列的口径来自 
 
 ## 九、变异
 
-**先后**：改装置之前在今天的源码上跑 `bash research/scripts/mutate.sh e16-fifth-run-peak-under-today-widths research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs research/mutations/e16_fifth_run_peak_under_today_widths.tsv`，留日志；改完再跑一遍。两次各按七个符号分栏数，逐条比；除下表两行外，其余 16 条两次状态必须相同，任一条变差 ⇒ V6（只作废「N 条全抓」那句话）。
+**先后**：改装置之前在今天的源码上跑 `bash scripts/mutate.sh e16-fifth-run-peak-under-today-widths scripts/experiments/e16_fifth_run_peak_under_today_widths.rs scripts/mutations/e16_fifth_run_peak_under_today_widths.tsv`，留日志；改完再跑一遍。两次各按七个符号分栏数，逐条比；除下表两行外，其余 16 条两次状态必须相同，任一条变差 ⇒ V6（只作废「N 条全抓」那句话）。
 
 | 条 | 怎么改表 | 在哪个取样点上改变输出 |
 |---|---|---|
@@ -393,7 +393,7 @@ smallfile 那一行三列留空是照实写：负载表这三列的口径来自 
 
 ### 作废
 
-上一次登记 V1–V6 照旧，V4 的「B ≤ 67」换成第一节最后一行的批集合 {1, 2, 5, 10, 20, 50, 64, 65, 67}。另加 V7：改完之后 `bash research/scripts/replay.sh E16R5` 对三份新产物（pc3 不变时对登记的那份）不逐字节一致。
+上一次登记 V1–V6 照旧，V4 的「B ≤ 67」换成第一节最后一行的批集合 {1, 2, 5, 10, 20, 50, 64, 65, 67}。另加 V7：改完之后 `bash scripts/replay.sh E16R5` 对三份新产物（pc3 不变时对登记的那份）不逐字节一致。
 
 ### 停机
 
@@ -402,12 +402,12 @@ smallfile 那一行三列留空是照实写：负载表这三列的口径来自 
 | S1 | 装置的本地常量与 `crates/singlefs-format/src/lib.rs` 的字面量有一个对不上；核对命令见第十三节命令二，执行员开工跑一次（那时装置还是 311 / 67，预计与 `lib.rs` 两处不同，只记下来、不停）、改完之后出产物之前再跑一次，输出须与那九行逐字相同 | 同上一次登记 |
 | S2 | Q7 越出允许集合；或 pc3 产物与登记的不逐字节相同 | 新装置的生成器、去重、记录块数；`RecordFormat::LegacyOriginal` 那一支有没有读到第 56 行 |
 | S3 | 同上一次登记（几何配置行与 7.2 不同） | 同上一次登记 |
-| S4 | 基线没立住：改装置之前 `bash research/scripts/replay.sh E16R5` 三行不全逐字节一致 | 先查是什么让今天的构建与留存产物不同；这一次跑时装置 67、`crates/` 64，正处在 S1 的触发状态，只当比较基线，写死的例外 |
+| S4 | 基线没立住：改装置之前 `bash scripts/replay.sh E16R5` 三行不全逐字节一致 | 先查是什么让今天的构建与留存产物不同；这一次跑时装置 67、`crates/` 64，正处在 S1 的触发状态，只当比较基线，写死的例外 |
 
 ### 出新产物、改登记行
 
 - 变了的产物另存新名，旧名的日期后加 `-h487`：`research/results/e16-fifth-run-peak-under-today-widths-<跑的那天，TZ=Asia/Tokyo date +%F>-h487.out`、`…-second-segment-<日期>-h487.out`；pc3 若逐字节不变，不出新产物，`replay.sh:159` 那一行不动。旧产物都留着，不覆盖。
-- `research/scripts/replay.sh:158`、`:160` 只改第 4 栏的文件名，键 `E16R5` 与参数栏（空、`second_segment`）不动。
+- `scripts/replay.sh:158`、`:160` 只改第 4 栏的文件名，键 `E16R5` 与参数栏（空、`second_segment`）不动。
 
 ### 够判停机
 
@@ -432,9 +432,9 @@ smallfile 那一行三列留空是照实写：负载表这三列的口径来自 
 | `.claude/rules/mutation-sampling.md` | 1–96（全文） |
 | `.claude/rules/implementation-first.md` | 1–20（全文） |
 | `.claude/rules/format-evolution.md` | 1–81（全文） |
-| `research/scripts/replay.sh` | 1–60 里的注释行；`grep -nE '^(E116\|E157\|E16\|E43\|E49)[A-Z0-9]*\|'` 命中 77、91、140、156–160、193 |
+| `scripts/replay.sh` | 1–60 里的注释行；`grep -nE '^(E116\|E157\|E16\|E43\|E49)[A-Z0-9]*\|'` 命中 77、91、140、156–160、193 |
 | `.claude/gate.d/stage-inputs.tsv` | 1–30 的注释行；`grep -nE '^(E116\|E157\|E16\|E16R5\|E43\|E49)\b'` 零命中 |
-| `research/scripts/quote-kb.py`、`research/scripts/replace-once.py` | 文件头注释（1–30） |
+| `scripts/quote-kb.py`、`scripts/replace-once.py` | 文件头注释（1–30） |
 
 ### 13.2 派发给的输入与上一次登记
 
@@ -463,15 +463,15 @@ smallfile 那一行三列留空是照实写：负载表这三列的口径来自 
 
 | 文件 | 行 |
 |---|---|
-| `research/e7-index-bench/src/bin/e116_pack_settle.rs` | `grep` 命中各行；260–280；535–545 |
-| `research/e7-index-bench/src/bin/e157_parallel_line_one_clauses.rs` | 1–80；255–320；495–525；`grep` 命中各行；`git blame -L75,75` |
-| `research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs` | `grep` 命中各行；220–236；419–445；780–800；817–880 的 `grep` 命中；880–890；1060–1090；1220–1242；`git blame -L887,887` |
-| `research/e7-index-bench/src/bin/e16_journal.rs` | `grep -nwE` 旧值，命中 915 |
-| `research/e7-index-bench/src/bin/e43_extension_point_budget.rs` | 140–182；196–252；440–475；590–641；`grep` 命中各行（含 `mount_verdict(` 的 193、439、649、651、656、671–682） |
-| `research/e7-index-bench/src/bin/e49_chain_width.rs` | 32、35、70–76、104–146；276–292；600–643 的 `grep` 命中；`grep` 命中各行 |
-| `research/mutations/e116_pack_settle.tsv`、`e157_parallel_line_one_clauses.tsv`、`e49_chain_width.tsv` | 全文（截前 160–220 字） |
-| `research/mutations/e43_extension_point_budget.tsv` | 第一栏全文；`grep` 命中 16、19、20、21 |
-| `research/mutations/e16_fifth_run_peak_under_today_widths.tsv` | 第一栏全文 |
+| `scripts/experiments/e116_pack_settle.rs` | `grep` 命中各行；260–280；535–545 |
+| `scripts/experiments/e157_parallel_line_one_clauses.rs` | 1–80；255–320；495–525；`grep` 命中各行；`git blame -L75,75` |
+| `scripts/experiments/e16_fifth_run_peak_under_today_widths.rs` | `grep` 命中各行；220–236；419–445；780–800；817–880 的 `grep` 命中；880–890；1060–1090；1220–1242；`git blame -L887,887` |
+| `scripts/experiments/e16_journal.rs` | `grep -nwE` 旧值，命中 915 |
+| `scripts/experiments/e43_extension_point_budget.rs` | 140–182；196–252；440–475；590–641；`grep` 命中各行（含 `mount_verdict(` 的 193、439、649、651、656、671–682） |
+| `scripts/experiments/e49_chain_width.rs` | 32、35、70–76、104–146；276–292；600–643 的 `grep` 命中；`grep` 命中各行 |
+| `scripts/mutations/e116_pack_settle.tsv`、`e157_parallel_line_one_clauses.tsv`、`e49_chain_width.tsv` | 全文（截前 160–220 字） |
+| `scripts/mutations/e43_extension_point_budget.tsv` | 第一栏全文；`grep` 命中 16、19、20、21 |
+| `scripts/mutations/e16_fifth_run_peak_under_today_widths.tsv` | 第一栏全文 |
 
 ### 13.5 `crates/`
 
@@ -485,16 +485,16 @@ smallfile 那一行三列留空是照实写：负载表这三列的口径来自 
 ### 13.6 五份共用的命令（原样；读文件的 `sed` / `awk` / `grep -n` 已按行列在上面）
 
 ```
-for e in E116 E157 E16 E43 E49; do nice -n 19 timeout 60 python3 research/scripts/admission.py experiment /home/fy5090/code/singlefs $e; echo "exit=$?"; done
+for e in E116 E157 E16 E43 E49; do nice -n 19 timeout 60 python3 scripts/admission.py experiment /home/fy5090/code/singlefs $e; echo "exit=$?"; done
   # 五个都是「✗ 准入登记里没有实验键 E…（.claude/gate.d/stage-inputs.tsv）」、exit=2
-nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/m3-r1/batch9-row4-design/qrow4.md 'research/prompts/m3-r1-batch9-reruns-questions.md:12-13' 'research/prompts/m3-r1-batch9-reruns-questions.md:17-17'
+nice -n 19 python3 scripts/quote-kb.py /tmp/claude-1000/m3-r1/batch9-row4-design/qrow4.md 'research/prompts/m3-r1-batch9-reruns-questions.md:12-13' 'research/prompts/m3-r1-batch9-reruns-questions.md:17-17'
   # ✓ 2 段整抄进 …/qrow4.md，回读逐字节一致（同名文件先前一次取错行区间，删掉重抄）
-nice -n 19 python3 research/scripts/quote-kb.py <草稿目录>/e116-q.md / e157-q.md / e16-q.md / e43-q.md / e49-q.md '<文件>@#### 已定项 N：…' …
+nice -n 19 python3 scripts/quote-kb.py <草稿目录>/e116-q.md / e157-q.md / e16-q.md / e43-q.md / e49-q.md '<文件>@#### 已定项 N：…' …
   # 五次都是「✓ N 段整抄进 …，回读逐字节一致」、exit=0（8 / 5 / 8 / 14 / 4 段）
-git log -L75,75:research/e7-index-bench/src/bin/e157_parallel_line_one_clauses.rs --format='%h %ad %s' --date=short
-git blame -L75,75 research/e7-index-bench/src/bin/e157_parallel_line_one_clauses.rs      # 7a3c8e1e9 2026-09-27
-git blame -L887,887 research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs   # dbcc0d2f5 2026-09-28
-sha256sum research/e7-index-bench/src/bin/{e116_pack_settle,e157_parallel_line_one_clauses,e16_fifth_run_peak_under_today_widths,e16_journal,e43_extension_point_budget,e49_chain_width}.rs research/mutations/{e116_pack_settle,e157_parallel_line_one_clauses,e16_fifth_run_peak_under_today_widths,e43_extension_point_budget,e49_chain_width}.tsv
+git log -L75,75:scripts/experiments/e157_parallel_line_one_clauses.rs --format='%h %ad %s' --date=short
+git blame -L75,75 scripts/experiments/e157_parallel_line_one_clauses.rs      # 7a3c8e1e9 2026-09-27
+git blame -L887,887 scripts/experiments/e16_fifth_run_peak_under_today_widths.rs   # dbcc0d2f5 2026-09-28
+sha256sum scripts/experiments/{e116_pack_settle,e157_parallel_line_one_clauses,e16_fifth_run_peak_under_today_widths,e16_journal,e43_extension_point_budget,e49_chain_width}.rs scripts/mutations/{e116_pack_settle,e157_parallel_line_one_clauses,e16_fifth_run_peak_under_today_widths,e43_extension_point_budget,e49_chain_width}.tsv
   # 装置依次 9417153e… 、b96446b8… 、44bbffd5… 、95dbf822… 、db61f951… 、8eb13c71…；变异表依次 211b8b33… 、01f7f81d… 、8d9abf0c… 、6df56d56… 、ad74fb9c…
 sha256sum crates/singlefs-format/src/lib.rs      # bf4f9982490a7d30a4577547779c5061d76b211096cc42a8db71d45936b4835f
 TZ=Asia/Tokyo date +%F                           # 2026-10-04

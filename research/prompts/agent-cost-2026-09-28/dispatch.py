@@ -125,7 +125,7 @@ def subagents():
     rewrites = collections.Counter(); rewrite_tokens = collections.Counter(); hook_err = collections.Counter(); hook_reason = collections.defaultdict(collections.Counter)
     kinds = collections.defaultdict(collections.Counter); cls = collections.defaultdict(collections.Counter)
     med_stats = collections.defaultdict(list)
-    gov_kw = re.compile(r'\.claude/agents|\.claude/hooks|agent-common|main-agent|门禁|gate\.d|钩子|hook|定义|规则|rules/|watch|看门狗|research/scripts|治理|严查|governance|同步记录|knowledge-sync|回扫')
+    gov_kw = re.compile(r'\.claude/agents|\.claude/hooks|agent-common|main-agent|门禁|gate\.d|钩子|hook|定义|规则|rules/|watch|看门狗|scripts|治理|严查|governance|同步记录|knowledge-sync|回扫')
     fs_kw = re.compile(r'crates/|不变量|invariants|checker|崩溃|层 0|layer0|实验|E1\d\d|决策|D\d\d?（|kb/decisions|里程碑')
     for meta in glob.glob(f'{ROOT}/*/subagents/agent-*.meta.json'):
         jl = meta.replace('.meta.json', '.jsonl')

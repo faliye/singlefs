@@ -57,7 +57,7 @@ ok crates/singlefs-core/src/transaction.rs
 - `research/results/e177-per-tree-resurrection-without-tombstones-segment-one.out:5455`：「family=F1 n=900 order=ascending geometry=ring arm=B reader=R-S tree=central_mapping kind_code=5 publishes=1819 r_peak=3」（中央映射同）。
 - `research/results/e177-per-tree-resurrection-without-tombstones-segment-one.out:435`：「family=F1 n=300 order=ascending geometry=wide arm=B reader=R-S tree=allocation_records_a kind_code=3 publishes=607 r_peak=1」（n = 300 删空 1 片：复活数 = 删空的片数）。
 
-读法：臂 B 的 inode 为 0 是因为整对象墓碑 (inode, 对象出生代) 把留在旧版本里的已死记录压掉了（登记 5.3 的墓碑效力，`research/prompts/e177-preregistration.md` 里是装置自定的，K-W5b 没定，见 D18 `.claude/kb/decisions/18-块里携带什么信息.md:579`：「第一版单头、无快照、无清扫。扫盘重建怎么读墓碑与谱系记录不在这里定，记欠账（K-W5b」）。臂 B 的分配记录与映射仍复活，是因为读法 R-S 把「删空容器最新的那一版单元」当作活单元收下，它占的槽照样进分配记录与映射（`research/e7-index-bench/src/bin/e177_per_tree_resurrection_without_tombstones.rs:2928` 起，对每个被收下的容器单元记 `slot` 与 `mapping_key`）；墓碑压的是记录，压不到容器单元自己。
+读法：臂 B 的 inode 为 0 是因为整对象墓碑 (inode, 对象出生代) 把留在旧版本里的已死记录压掉了（登记 5.3 的墓碑效力，`research/prompts/e177-preregistration.md` 里是装置自定的，K-W5b 没定，见 D18 `.claude/kb/decisions/18-块里携带什么信息.md:579`：「第一版单头、无快照、无清扫。扫盘重建怎么读墓碑与谱系记录不在这里定，记欠账（K-W5b」）。臂 B 的分配记录与映射仍复活，是因为读法 R-S 把「删空容器最新的那一版单元」当作活单元收下，它占的槽照样进分配记录与映射（`scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs:2928` 起，对每个被收下的容器单元记 `slot` 与 `mapping_key`）；墓碑压的是记录，压不到容器单元自己。
 
 ### K1.3 把「死亡」拆成三种，各自需要什么载体（推的，每种在 E177 上有对应的量）
 
@@ -153,7 +153,7 @@ allocation_records_a    3       3       3          0       3      3
 
 判法：先问这棵树的态别（kb），再看 E177 臂 B（`crates/` 今天）在 R-S 下的状态，最后问复活是不是随它的源单元来的。
 
-- `.claude/kb/decisions/21-权威态与派生态的分界.md:189`：「| **派生态** | **索引（树）** |」；`:202`：「分配记录落派生态（已定项 5）」。E177 对 extent、分配记录、中央映射、`deleted_inodes` 都按派生态从被判活的单元算（`research/e7-index-bench/src/bin/e177_per_tree_resurrection_without_tombstones.rs:2839` 起的 `select_current_reading`，`:2928` 起对每个被收下的数据单元与容器记槽号与映射 key）。
+- `.claude/kb/decisions/21-权威态与派生态的分界.md:189`：「| **派生态** | **索引（树）** |」；`:202`：「分配记录落派生态（已定项 5）」。E177 对 extent、分配记录、中央映射、`deleted_inodes` 都按派生态从被判活的单元算（`scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs:2839` 起的 `select_current_reading`，`:2928` 起对每个被收下的数据单元与容器记槽号与映射 key）。
 - 所以这几棵树的 key 死亡不需要自己的死亡记录：源单元（数据单元、inode 叶容器）判死了，它们跟着没有。副本里证这一点：把源单元的死亡补齐（候选 `retire_shrink`）后，臂 B 的 extent / 分配记录 / 映射在 F1、F3、F8 的 ring 与 wide 上 r 全 0（摘要 `ret+shr` 列）。
 
 | 树 | 态别 | 今天的死亡载体 | E177 臂 B ring（原行） | 对的世界 | 缺口 |

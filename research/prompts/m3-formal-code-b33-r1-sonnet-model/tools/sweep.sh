@@ -13,7 +13,7 @@ job() {
     (( remaining < 25 )) && exit 0
     cd "$TREE/crates/singlefs-harness" || exit 2
     CARGO_MANIFEST_DIR="$TREE/crates/singlefs-harness" nice -n 19 timeout "$remaining" \
-        bash "$REPO/research/scripts/run-with-memory-cap.sh" "$MEM" bash "$REPO/research/scripts/capped.sh" "$CAP" "$exe" --nocapture > "$SWEEP_DIR/$name.log" 2>&1
+        bash "$REPO/scripts/run-with-memory-cap.sh" "$MEM" bash "$REPO/scripts/capped.sh" "$CAP" "$exe" --nocapture > "$SWEEP_DIR/$name.log" 2>&1
     echo $? > "$SWEEP_DIR/$name.rc"
 }
 export -f job

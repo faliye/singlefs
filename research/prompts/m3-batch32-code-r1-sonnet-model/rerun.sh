@@ -5,13 +5,13 @@
 # 用法：rerun.sh <空工作目录> [阶段…]    阶段：prep anchors model build baseline probe i49 mutations broad extra all（默认 all）；整理见 compare.sh
 # 环境变量：
 #   SINGLEFS_REPO   必填。冻结副本根（~/.local/share/singlefs/work/m3-batch32-code-r1/tree：Cargo.toml、Cargo.lock、crates/、litmus/）
-#   SINGLEFS_TOOLS  包装脚本所在仓根（要有 research/scripts/run-with-memory-cap.sh 与 capped.sh）；没给取本脚本往上三层
+#   SINGLEFS_TOOLS  包装脚本所在仓根（要有 scripts/run-with-memory-cap.sh 与 capped.sh）；没给取本脚本往上三层
 #   SONNET_THREADS  线程上限，默认 4（派发提示的「线程上限」）
 #   SONNET_EXTRA_LINES      可选：extra 阶段跑 extra_mutations.tsv 的哪几行，默认 "1 2 3 4 5 6 7 8"（第 9、10 行是候选改法 F1，只在 i49 阶段用）
 #   SONNET_MUTATION_LINES   可选：mutations 阶段跑变异表哪几行，默认 "3078 3079 3080 3081 3082 3083"；结果追加到 out/mutations.txt（阶段开头不清）
 #   SONNET_STEP_SECONDS     可选：每条经内存包装的命令的挂钟上限（秒，设成 RUN_WITH_MEMORY_CAP_TIME_LIMIT）；没设不限。
 #                  退出码 253 是它到点了：重跑同一阶段接着编（cargo 留着已编好的）。
-# 内存：编译 6G、跑 4G，都显式给，经 research/scripts/run-with-memory-cap.sh；同一时刻只起一条 cargo；编译目录在 <工作目录>/target，不与别处共用。
+# 内存：编译 6G、跑 4G，都显式给，经 scripts/run-with-memory-cap.sh；同一时刻只起一条 cargo；编译目录在 <工作目录>/target，不与别处共用。
 # 一次调用里跑不完时（前台一次不超过 240 秒）把阶段分几次调用，顺序同 all：prep anchors model build baseline probe mutations extra；每个阶段都能单独重跑。
 # 产出（<工作目录>/out/）：anchors.txt（变异表 12 行锚点命中次数与点名测试筛不筛得到）、model.txt（Python 模型三份的输出）、baseline.txt、probe.txt（PROBE 行）、
 # mutations.txt 与 extra.txt（每行变异一行 RESULT）。
@@ -30,8 +30,8 @@ export CARGO_TARGET_DIR="$WORK/target"
 
 capped_cargo() {  # 用法：capped_cargo <上限> cargo 参数…
   local cap="$1"; shift
-  ( cd "$TREE" && bash "$TOOLS/research/scripts/run-with-memory-cap.sh" "$cap" \
-      bash "$TOOLS/research/scripts/capped.sh" "$THREADS" nice -n 19 "$@" )
+  ( cd "$TREE" && bash "$TOOLS/scripts/run-with-memory-cap.sh" "$cap" \
+      bash "$TOOLS/scripts/capped.sh" "$THREADS" nice -n 19 "$@" )
 }
 HARNESS_TEST=(-p singlefs-harness --test checker_known_bad_images)
 NEW_TEST_FILTERS=(whichever_location_names_a_node_walked_before sixteen_kibibytes_beside_a_node over_a_child_whose_two_location_checksums_are_wrong

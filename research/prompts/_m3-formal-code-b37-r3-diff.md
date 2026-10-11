@@ -11,11 +11,11 @@
      }
  
      /// 判据表每一行都有一条对照且都红（登记 5.4、作废条款 V2；r2 档加的 J6Qn、J7 五行同样，登记 r2 5.5；r5 档加的 J8 五行，登记 r5 5.4；
--    /// T_table、T_row，登记 r2 5.5）。正式跑用的五档（r1、r2、两份表都取的 r2、r3、r5，`research/scripts/replay.sh` 起这个装置的那几条驱动）
+-    /// T_table、T_row，登记 r2 5.5）。正式跑用的五档（r1、r2、两份表都取的 r2、r3、r5，`scripts/replay.sh` 起这个装置的那几条驱动）
 -    /// 各自核：这一档跑出对照的判据恰好是登记给这一档的那一份（写死成字面，不从 `is_judged_under` 现算，那是被核的东西），
 -    /// 且这一档的读数全红；五档并起来罩全表。不把几档读数并起来判：并起来时一档少跑的对照会被别的档的读数补上
 -    /// （判决 `research/prompts/m3-formal-code-b37-r1-main-verification.md` B1-甲）。对抗一族那几行要扫到 n = 3，用上全部核。
-+    /// T_table、T_row，登记 r2 5.5）。逐个核正式跑的单元：`research/scripts/replay.sh` 起这个装置的那几条驱动，每条一族、一档、
++    /// T_table、T_row，登记 r2 5.5）。逐个核正式跑的单元：`scripts/replay.sh` 起这个装置的那几条驱动，每条一族、一档、
 +    /// 一种建表法、一种盘次序、一种标记奇偶；每个单元跑出对照的判据恰好是那条驱动产物里 `name=control` 的那一份（写死成字面，
 +    /// 不从 `is_judged_under`、`Criterion::family` 现算，那是被核的东西），且读数全红；全部单元并起来罩全表。不把几档、几族并起来判：
 +    /// 并起来时一个单元少跑的对照会被别的单元的读数补上（判决 `research/prompts/m3-formal-code-b37-r1-main-verification.md` B1-甲、
@@ -82,7 +82,7 @@
 +            .collect();
 +        assert_eq!(labels.len(), Criterion::ALL.len(), "判据的标签互不相同");
 +        let formal_run_units: [(&str, Family, RunProfile, &[Criterion]); 14] = [
-+            // `research/scripts/replay.sh` 第 703、706 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-legal-family.out`，11 条
++            // `scripts/replay.sh` 第 703、706 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-legal-family.out`，11 条
 +            (
 +                "r1 合法",
 +                Family::LegalHistory,
@@ -101,7 +101,7 @@
 +                    Criterion::Ia2NoVerificationCounted,
 +                ],
 +            ),
-+            // `research/scripts/replay.sh` 第 710 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-adversarial-family.out`，7 条
++            // `scripts/replay.sh` 第 710 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-adversarial-family.out`，7 条
              (
 -                "r1",
 -                &legal_and_adversarial,
@@ -119,7 +119,7 @@
 +                    Criterion::ALimit,
 +                ],
 +            ),
-+            // `research/scripts/replay.sh` 第 738 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-multi-disk.out`，4 条
++            // `scripts/replay.sh` 第 738 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-multi-disk.out`，4 条
 +            (
 +                "r2 多盘",
 +                Family::MultiDisk,
@@ -131,7 +131,7 @@
 +                    Criterion::MultiDiskAppliedSetAndLandedVersion,
 +                ],
 +            ),
-+            // `research/scripts/replay.sh` 第 741 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-legal-family.out`，19 条
++            // `scripts/replay.sh` 第 741 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-legal-family.out`，19 条
 +            (
 +                "两份表都取的 r2 合法",
 +                Family::LegalHistory,
@@ -158,7 +158,7 @@
 +                    Criterion::TableComparisonSeesADifferentRow,
 +                ],
 +            ),
-+            // `research/scripts/replay.sh` 第 744 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-adversarial-family.out`，9 条
++            // `scripts/replay.sh` 第 744 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-adversarial-family.out`，9 条
 +            (
 +                "两份表都取的 r2 对抗",
 +                Family::Adversarial,
@@ -175,7 +175,7 @@
 +                    Criterion::TableComparisonSeesADifferentRow,
 +                ],
 +            ),
-+            // `research/scripts/replay.sh` 第 747 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-multi-disk.out`，6 条
++            // `scripts/replay.sh` 第 747 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-multi-disk.out`，6 条
 +            (
 +                "两份表都取的 r2 多盘",
 +                Family::MultiDisk,
@@ -189,7 +189,7 @@
 +                    Criterion::TableComparisonSeesADifferentRow,
 +                ],
 +            ),
-+            // `research/scripts/replay.sh` 第 750 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-legal-family.out`，19 条
++            // `scripts/replay.sh` 第 750 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-legal-family.out`，19 条
 +            (
 +                "两份表都取、盘次序反报的 r2 合法",
 +                Family::LegalHistory,
@@ -218,7 +218,7 @@
 +                    Criterion::TableComparisonSeesADifferentRow,
 +                ],
 +            ),
-+            // `research/scripts/replay.sh` 第 753 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out`，6 条
++            // `scripts/replay.sh` 第 753 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out`，6 条
 +            (
 +                "两份表都取、盘次序反报的 r2 多盘",
 +                Family::MultiDisk,
@@ -234,7 +234,7 @@
 +                    Criterion::TableComparisonSeesADifferentRow,
 +                ],
 +            ),
-+            // `research/scripts/replay.sh` 第 763 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out`，8 条
++            // `scripts/replay.sh` 第 763 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out`，8 条
 +            (
 +                "r3 对抗",
 +                Family::Adversarial,
@@ -250,7 +250,7 @@
 +                    Criterion::J6QnSplitByI812,
 +                ],
 +            ),
-+            // `research/scripts/replay.sh` 第 855 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-legal-family.out`，16 条
++            // `scripts/replay.sh` 第 855 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-legal-family.out`，16 条
 +            (
 +                "r5 合法",
 +                Family::LegalHistory,
@@ -274,7 +274,7 @@
 +                    Criterion::J8cNothingAppliedReturnsTheChosenRoot,
 +                ],
              ),
-+            // `research/scripts/replay.sh` 第 858 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-adversarial-family.out`，8 条
++            // `scripts/replay.sh` 第 858 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-adversarial-family.out`，8 条
              (
 -                "r2",
 -                &all_families,
@@ -294,7 +294,7 @@
 +                    Criterion::J6QnSplitByI812,
 +                ],
              ),
-+            // `research/scripts/replay.sh` 第 861 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-multi-disk.out`，4 条
++            // `scripts/replay.sh` 第 861 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-multi-disk.out`，4 条
              (
 -                "两份表都取的 r2",
 -                &all_families,
@@ -310,7 +310,7 @@
 +                    Criterion::MultiDiskAppliedSetAndLandedVersion,
 +                ],
              ),
-+            // `research/scripts/replay.sh` 第 864 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-legal-family.out`，16 条
++            // `scripts/replay.sh` 第 864 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-legal-family.out`，16 条
              (
 -                "r3",
 -                &all_families,
@@ -338,7 +338,7 @@
 +                    Criterion::J8cNothingAppliedReturnsTheChosenRoot,
 +                ],
              ),
-+            // `research/scripts/replay.sh` 第 867 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-adversarial-family.out`，8 条
++            // `scripts/replay.sh` 第 867 行；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-adversarial-family.out`，8 条
              (
 -                "r5",
 -                &all_families,

@@ -502,7 +502,7 @@ $ awk 'NR==4911' crates/singlefs-checker-tier/src/crash_amplification.rs   （�
 三条行为用例我只读了断言，没跑；N1 我只在扫源码模型上放行、在 `cargo check` 上编过。要核的话，在仓的一份拷贝上（或提交时）：
 
 1. 工作目录：仓根拷贝；环境前缀 `SINGLEFS_HEAVY_TESTS=user-request`（或 `=commit`）；内存上限 12G、线程 8。
-   `bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 8 cargo test --release -p singlefs-checker-tier --lib --features verdict-store,gpu -- the_stop_request_is_asked_once_before_each_block_and_a_stop_leaves_the_later_blocks_untaken every_layer_handed_the_stop_request_hands_it_on_or_asks_it the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking`
+   `bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 8 cargo test --release -p singlefs-checker-tier --lib --features verdict-store,gpu -- the_stop_request_is_asked_once_before_each_block_and_a_stop_leaves_the_later_blocks_untaken every_layer_handed_the_stop_request_hands_it_on_or_asks_it the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking`
    看 `test result: ok. 3 passed`。
 2. 同前缀：`… cargo test --release -p singlefs-checker-tier --features verdict-store --test crash_amplification_pipeline_records_checks_and_reuses -- a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_the_rest`，看 `1 passed`。
 3. 核 N1：把 `research/prompts/m3-batch10z-no-code-r1-sonnet-model/gpu/scan-extra.json` 里的 `old` 换成 `new`（`crates/singlefs-checker-tier/src/crash_amplification.rs`，`check_selected_blocks` 的函数体）后再跑第 1 条里的 `every_layer_handed_the_stop_request_hands_it_on_or_asks_it`；我的推断是它仍 `ok`（扫源码放行）。再让 `crash_amplification_pipeline_records_checks_and_reuses` 整个目标跑一遍，看有没有一条在这个变异上红（我推断没有，因为没有用例调 `check_selected_blocks`）。
@@ -533,6 +533,6 @@ $ awk 'NR==4911' crates/singlefs-checker-tier/src/crash_amplification.rs   （�
 ## 10 引文核对
 
 ```
-$ python3 research/scripts/cite-check.py research/prompts/m3-batch10z-no-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-no-code-r1/tree --root /home/fy5090/code/singlefs   （末行）
+$ python3 scripts/cite-check.py research/prompts/m3-batch10z-no-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-no-code-r1/tree --root /home/fy5090/code/singlefs   （末行）
   ✓ 核了 19 处引文，对上 19 处，没判 0 处（逐处列在上面）
 ```

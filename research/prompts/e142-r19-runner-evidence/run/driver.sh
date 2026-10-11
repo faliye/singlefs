@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 照 research/scripts/replay.sh 的 driver_e142 两条命令原样跑，按它的次序拼：模型 stdout 在前、导出在后。
+# 照 scripts/replay.sh 的 driver_e142 两条命令原样跑，按它的次序拼：模型 stdout 在前、导出在后。
 # 用法：driver.sh <标签> <产物路径>；模型 stderr（准入）存 <草稿>/run/<标签>.model-stderr.txt
 set -u
 label="$1"; product="$2"
@@ -8,7 +8,7 @@ repo=<仓根>
 cap=8G
 snapshot="$scratch/$label.dump.txt"
 [ -e "$product" ] && { echo "产物已存在：$product" >&2; exit 9; }
-(cd "$repo" && nice -n 19 bash research/scripts/run-with-memory-cap.sh "$cap" bash research/scripts/capped.sh 4 cargo run -q -p singlefs-harness --bin e142_first_transaction_write_dump) > "$snapshot" 2> "$scratch/$label.dump-stderr.txt"
+(cd "$repo" && nice -n 19 bash scripts/run-with-memory-cap.sh "$cap" bash scripts/capped.sh 4 cargo run -q -p singlefs-harness --bin e142_first_transaction_write_dump) > "$snapshot" 2> "$scratch/$label.dump-stderr.txt"
 dump_exit=$?
 echo "dump_exit=$dump_exit" > "$scratch/$label.exits.txt"
 [ "$dump_exit" = 0 ] || exit 3

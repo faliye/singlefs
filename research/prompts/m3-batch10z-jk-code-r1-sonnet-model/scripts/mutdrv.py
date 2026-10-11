@@ -1,6 +1,6 @@
 import json, os, subprocess, sys, shutil, threading, queue, re, shlex
 W=os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-jk-code-r1-sonnet')
-R='/home/fy5090/code/singlefs/research/scripts'
+R='/home/fy5090/code/singlefs/scripts'
 def load(path):
     rows=[]
     for line in open(path,encoding='utf-8'):

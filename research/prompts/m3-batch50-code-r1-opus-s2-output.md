@@ -298,8 +298,8 @@ name=crash scenario=rollback-after-absorb states=65548 violations=0 first_violat
 
 ## 要主 agent 跑的命令
 
-1. 超预算的四段崩溃枚举（每段 5.2×10⁶～7.1×10⁷ 个状态，本机 8 线程约 400 状态 / 秒，最小那段约 3.6 小时，推的）：在模型目录副本里先 `SINGLEFS_REPO=/home/fy5090/code/singlefs bash rerun.sh <工作目录> prepare`，再以 `<工作目录>/crash-proto` 为工作目录跑 `CARGO_TARGET_DIR=<工作目录>/target-proto bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G bash /home/fy5090/code/singlefs/research/scripts/capped.sh <线程> cargo run --release --offline -q -- absorb`（另三个场景名 `borrow`、`lender-absorb`、`reunlink-after-rollback`）。原型里 10⁶ 的闸要先改掉（`src/main.rs` 的 `STATES_AT_MOST`），它超过本腿的预算，要不要跑由主 agent 定。看 `name=crash` 行的 `violations=0`、`checker_red=0`。
-2. checker 档那份旧断言（K3-1）：`SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 8 cargo test --release -p singlefs-checker-tier --test crash_points_tree_identifier_watermark_orphans`，推的会在搭流那一步 panic、失败说明是「流 ①：第一个文件版本 (1, 3) 从 mkfs 的水位 65536 发 65536..65547、新水位 65548」。
+1. 超预算的四段崩溃枚举（每段 5.2×10⁶～7.1×10⁷ 个状态，本机 8 线程约 400 状态 / 秒，最小那段约 3.6 小时，推的）：在模型目录副本里先 `SINGLEFS_REPO=/home/fy5090/code/singlefs bash rerun.sh <工作目录> prepare`，再以 `<工作目录>/crash-proto` 为工作目录跑 `CARGO_TARGET_DIR=<工作目录>/target-proto bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 8G bash /home/fy5090/code/singlefs/scripts/capped.sh <线程> cargo run --release --offline -q -- absorb`（另三个场景名 `borrow`、`lender-absorb`、`reunlink-after-rollback`）。原型里 10⁶ 的闸要先改掉（`src/main.rs` 的 `STATES_AT_MOST`），它超过本腿的预算，要不要跑由主 agent 定。看 `name=crash` 行的 `violations=0`、`checker_red=0`。
+2. checker 档那份旧断言（K3-1）：`SINGLEFS_HEAVY_TESTS=commit bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 8 cargo test --release -p singlefs-checker-tier --test crash_points_tree_identifier_watermark_orphans`，推的会在搭流那一步 panic、失败说明是「流 ①：第一个文件版本 (1, 3) 从 mkfs 的水位 65536 发 65536..65547、新水位 65548」。
 
 ## 没做什么
 

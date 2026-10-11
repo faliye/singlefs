@@ -184,7 +184,7 @@ JUDGE landed_roots(instance,txg)->states (0, 0):5 (1, 1):3 (1, 2):7 (1, 3):8 (1,
 
 这些不是「错」，是对着 D8 已定项 5、16 逐条读出来、这条流没有断言的格；属不属于这条流的范围由主 agent 定：
 
-1. **全量那条 `#[ignore]` 用例没登记成 `crash-case:`。** 「#[test]」（`/home/fy5090/.local/share/singlefs/work/m3-batch33r-code-r1/tree/crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs:836-838`） 起的全量用例标了 「#[ignore = "全量 1448083638 个状态」（`/home/fy5090/.local/share/singlefs/work/m3-batch33r-code-r1/tree/crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs:837`）；`research/scripts/crash-case-check.py` 的 placement 判法按 「ENUMERATION_CALL = re.compile(r"\b(enumerate_layer0\w*)」（`research/scripts/crash-case-check.py:95`） 认出调了 `enumerate_layer0` 一族而标了 `#[ignore]` 的用例，要在 `.claude/gate.d/stage-inputs.tsv` 里有 `test=singlefs-checker-tier:crash_enumeration_unlink_after_the_multi_record_publish_stream:<函数名>` 的登记行。今天主工作区的登记表里没有：
+1. **全量那条 `#[ignore]` 用例没登记成 `crash-case:`。** 「#[test]」（`/home/fy5090/.local/share/singlefs/work/m3-batch33r-code-r1/tree/crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs:836-838`） 起的全量用例标了 「#[ignore = "全量 1448083638 个状态」（`/home/fy5090/.local/share/singlefs/work/m3-batch33r-code-r1/tree/crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs:837`）；`scripts/crash-case-check.py` 的 placement 判法按 「ENUMERATION_CALL = re.compile(r"\b(enumerate_layer0\w*)」（`scripts/crash-case-check.py:95`） 认出调了 `enumerate_layer0` 一族而标了 `#[ignore]` 的用例，要在 `.claude/gate.d/stage-inputs.tsv` 里有 `test=singlefs-checker-tier:crash_enumeration_unlink_after_the_multi_record_publish_stream:<函数名>` 的登记行。今天主工作区的登记表里没有：
 
 ```
 $ grep -c 'unlink_after' .claude/gate.d/stage-inputs.tsv
@@ -273,7 +273,7 @@ MUTCHECK row=3109 anchor_hits=1 cargo_check_exit=0 error_lines=0 named_test=the_
 
 ## 复跑一览（模型目录 `research/prompts/m3-batch33r-code-r1-sonnet-model/`）
 
-文件：`rerun.sh`（入口，变量 `SINGLEFS_REPO`，另 `SINGLEFS_FROZEN_TREE`、`SINGLEFS_THREADS`、`SINGLEFS_STAGES`，文件头写明）、`compare.sh`（用法在文件头第一行，排序、去耗时字段后比两份汇总，自己不依赖 `SINGLEFS_REPO`）、`oracle_model.py`、`judge_states.py`、`anchors.py`、`mutation_compile_check.py`、两份 harness 档探针 `m33_stream_probe.rs`、`m33_state_probe.rs`、`summary-expected.txt`（第一次从头跑的汇总，131 行）。编译 6G、跑 4G，线程上限 6，都经 `research/scripts/run-with-memory-cap.sh` 与 `capped.sh`，同一时刻只起一条 cargo，编译目录在输出目录里；只跑 harness 档与 `cargo check`，没有跑 `singlefs-checker-tier` 的测试。
+文件：`rerun.sh`（入口，变量 `SINGLEFS_REPO`，另 `SINGLEFS_FROZEN_TREE`、`SINGLEFS_THREADS`、`SINGLEFS_STAGES`，文件头写明）、`compare.sh`（用法在文件头第一行，排序、去耗时字段后比两份汇总，自己不依赖 `SINGLEFS_REPO`）、`oracle_model.py`、`judge_states.py`、`anchors.py`、`mutation_compile_check.py`、两份 harness 档探针 `m33_stream_probe.rs`、`m33_state_probe.rs`、`summary-expected.txt`（第一次从头跑的汇总，131 行）。编译 6G、跑 4G，线程上限 6，都经 `scripts/run-with-memory-cap.sh` 与 `capped.sh`，同一时刻只起一条 cargo，编译目录在输出目录里；只跑 harness 档与 `cargo check`，没有跑 `singlefs-checker-tier` 的测试。
 
 「在空目录里从头跑通」：因为前台命令有 240 秒时限，每次分两次调用同一个输出目录（`SINGLEFS_STAGES="1 2 3 4"` 与 `"5 6 7 8"`），做了两次，输出目录各自从空开始：
 

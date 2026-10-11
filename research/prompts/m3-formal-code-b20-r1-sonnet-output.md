@@ -8,7 +8,7 @@
 
 先说三件事：
 1. K3 点名 20-1 原补丁 `/tmp/claude-1000/m3-formal-20-1/patch/crates.patch`，而禁读清单列了 `/tmp/claude-1000/m3-formal-20-1/` 这个目录。两句话在这一个文件上冲突，我只读了这一份补丁文件（它是代码，不是实现员的报告），目录里别的文件没读、没列。要按禁读清单严格算，K3-4 一格作废，主 agent 另核。
-2. 跑 harness 档时包装拒了第二条日常命令（同一会话里 Opus 腿在跑一条），我设了 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`（同一轮两腿各用各的副本与编译目录）放行，没绕开包装；包装自己记峰值表（`research/scripts/memory-peaks.tsv`，已在 `.gitignore` 里）。
+2. 跑 harness 档时包装拒了第二条日常命令（同一会话里 Opus 腿在跑一条），我设了 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`（同一轮两腿各用各的副本与编译目录）放行，没绕开包装；包装自己记峰值表（`scripts/memory-peaks.tsv`，已在 `.gitignore` 里）。
 3. 背景材料里的 5999 行是合入后主仓的行号；冻结副本里同一处在 `crates/singlefs-checker-tier/src/crash_injection.rs` 第 5999 至 6003 行（调 `writable_mount_phase_of_each_write` 那一句），下面都用冻结副本的行号。
 
 ## K1　F1、F2、F5 的用例证不证得到点名的接错
@@ -110,7 +110,7 @@
   - 行 2369（关会话时把现行根的 F 记成它的 txg）：真用例 panic 在 F 不动那条：「assertion `left == right` failed: 树表 0 条的一版上卸载不抬 F」（`research/prompts/m3-formal-code-b20-r1-sonnet-model/outputs/k3-row2369-real-test.log:11`）、左 2 右 0（`research/prompts/m3-formal-code-b20-r1-sonnet-model/outputs/k3-row2369-real-test.log:12`、`research/prompts/m3-formal-code-b20-r1-sonnet-model/outputs/k3-row2369-real-test.log:13`）。探针：「PROBE A2 会话关（!has_writable_session） = true」（`research/prompts/m3-formal-code-b20-r1-sonnet-model/outputs/k3-row2369-probe.log:12`）、「PROBE A3 F 不动（卸载后 F == 卸载前 F） = false（前 ModelCheckpointTxg(0)，后 ModelCheckpointTxg(2)）」（`research/prompts/m3-formal-code-b20-r1-sonnet-model/outputs/k3-row2369-probe.log:13`），别的三条仍真。只红「F 不动」。
 - 范围说明：「只让点名的那条断言红」量的是这一条用例里的断言；这两行变异让别的测试文件红不红我没量（变异表的判法是「抓到」，不要求只红一条）。
 
-推翻条件：在入库的装置上经 `research/scripts/mutate.sh` 重跑这两行，红的断言不是上面那一条；或这条用例里的某一条别的断言在变异下也红。
+推翻条件：在入库的装置上经 `scripts/mutate.sh` 重跑这两行，红的断言不是上面那一条；或这条用例里的某一条别的断言在变异下也红。
 
 ### K3-2　`crates/singlefs-checker/src/image.rs` 的 I-5.5 注释与 `.claude/kb/invariants.md` 的 I-5.5 一致
 
@@ -172,7 +172,7 @@ D3 已定项 8 第 1 条原文是「起点槽号最小、起点 32768 对齐、�
 ## 没做什么
 
 - checker 档一个没跑：三条新用例（F1 加的断言、F2、F5、发布臂固定历史用例）与 6 行 checker 档变异（`crates/mutations.tsv` 第 2362 至 2367 行）的基线绿、变异红都是推的；我只在 harness 档复做了接线处的引擎层事实，并核了六行变异的原文各命中一次、变异后源码 `cargo check --tests` 过。
-- 没经 `research/scripts/mutate.sh` 在入库的装置上跑变异表；K3-1 的两行是在副本上把变异后的 `model.rs` 换进去跑真用例与探针，数不进 kb（`.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」那一条：副本上的数要在入库装置上重做才能引）。
+- 没经 `scripts/mutate.sh` 在入库的装置上跑变异表；K3-1 的两行是在副本上把变异后的 `model.rs` 换进去跑真用例与探针，数不进 kb（`.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」那一条：副本上的数要在入库装置上重做才能引）。
 - K2（发布臂改法）不归我，没判；`first_file_is_a_live_record` 只在 K1 里作为「编得过」出现。
 - F3（二次崩溃种子混进第一次崩溃那个子集）、V242u 那一行的抽样口径没碰。
 - 没读 Opus 腿的报告与模型目录、`/tmp/claude-1000/m3-formal-code-b20-r1-opus/`；没读 `/tmp/claude-1000/m3-formal-20-1/` 里除 `patch/crates.patch` 以外的任何文件。
@@ -180,9 +180,9 @@ D3 已定项 8 第 1 条原文是「起点槽号最小、起点 32768 对齐、�
 
 ## 要主 agent 跑的命令（checker 档，我不跑）
 
-工作目录仓根，环境变量前缀 `SINGLEFS_HEAVY_TESTS=commit`，内存上限 8G、线程 10，命令都带 `bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 10`：
+工作目录仓根，环境变量前缀 `SINGLEFS_HEAVY_TESTS=commit`，内存上限 8G、线程 10，命令都带 `bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 10`：
 1. 基线（四条各应 `1 passed`）：`cargo test -p singlefs-checker-tier --lib -- crash_injection::tests::<名>`，名依次是：`a_crash_state_where_only_the_rotation_of_an_overwrite_landed_is_an_illegal_witness_refusal_of_the_writable_mount_after_the_crash`（F1 加了断言）、`a_second_crash_where_only_the_rotation_of_the_row_publish_landed_is_an_illegal_witness_refusal_through_the_call_site`（F2）、`the_end_of_a_crash_window_is_named_by_its_stream_index_and_not_by_its_write_index`（F5）、`the_publish_after_a_writable_mount_on_a_version_created_after_the_first_file_was_unlinked_creates_an_inode_and_is_published`（K2 的，顺带）。
-2. 变异：`crates/mutations.tsv` 第 2362 至 2367 行，用 `research/scripts/mutate.sh` 带那几行，判每一行红的是第 5 列那条用例。
+2. 变异：`crates/mutations.tsv` 第 2362 至 2367 行，用 `scripts/mutate.sh` 带那几行，判每一行红的是第 5 列那条用例。
 
 跑完看：基线四行 `test result: ok. 1 passed`；变异每行判「抓到」。F1 那行还要看红的是不是条件那两条断言（报错消息里有「拒得不合法要由 C670 那一条」或「不许列出 CriterionFalseWhenRecomputedOnTheCrashImage」）。
 

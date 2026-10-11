@@ -15,7 +15,7 @@ MEM="${MEM:-8G}"          # 内存上限
 cg() {
     local name="$1"; shift
     local log="$WORK/log/$name.log"
-    ( cd "$TREE" && nice -n 19 bash "$REPO/research/scripts/run-with-memory-cap.sh" "$MEM" bash "$REPO/research/scripts/capped.sh" "$CAP" cargo "$@" ) > "$log" 2>&1
+    ( cd "$TREE" && nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" "$MEM" bash "$REPO/scripts/capped.sh" "$CAP" cargo "$@" ) > "$log" 2>&1
     local rc=$?
     echo "== $name exit=$rc"
     grep -E '^test result|^error(\[|:)|panicked at' "$log" | head -"${HEAD:-8}"

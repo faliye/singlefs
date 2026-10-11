@@ -9,7 +9,7 @@
 | 物 | 路径 | 核法 |
 |---|---|---|
 | 正文 / 改动全文 / 背景材料 | `research/prompts/_m3-formal-code-b25-r1-body.md`、`_m3-formal-code-b25-r1-diff.md`、`_m3-formal-code-b25-r1-background.md` | — |
-| 冻结副本与快照 | E171 第一段冻结树 `research/target/e171-r1-frozen-tree/`（摘要 4d071c12…）；crates 清单 `/tmp/claude-1000/m3-formal-code-b25-r1/crates-sha256.txt`（291 行）；kb 快照 `research/prompts/m3-formal-code-b25-r1-snapshot/kb-sha256.txt`（2 份） | 写判决前 `sha256sum -c`：冻结树对清单 0 处不符，kb 两份 OK |
+| 冻结副本与快照 | E171 第一段冻结树 `scripts/experiments/target/e171-r1-frozen-tree/`（摘要 4d071c12…）；crates 清单 `/tmp/claude-1000/m3-formal-code-b25-r1/crates-sha256.txt`（291 行）；kb 快照 `research/prompts/m3-formal-code-b25-r1-snapshot/kb-sha256.txt`（2 份） | 写判决前 `sha256sum -c`：冻结树对清单 0 处不符，kb 两份 OK |
 | 云端正推（Sonnet） | `research/prompts/m3-formal-code-b25-r1-sonnet-output.md`（sha256 e74815ed…），模型 `…-sonnet-model/` | 主 agent 照它的 `tools/rerun.sh setup k1 k2` 在会话草稿复跑，见第四节 |
 | 云端攻方（Opus） | `research/prompts/m3-formal-code-b25-r1-opus-output.md`（sha256 3b71b123…），模型 `…-opus-model/` | 主 agent 照它的 `tools/rerun.sh` 七段全跑，见第四节 |
 | 引文 | 两份腿报告 | `cite-check.py <两份报告> --root <冻结树> --root . --background <背景材料>`：122 处引文对上 122 处，没判 0 处 |
@@ -57,7 +57,7 @@
 
 ## 四、复跑核对
 
-攻方：`bash research/scripts/run-with-memory-cap.sh 4G bash research/scripts/capped.sh 6 bash research/prompts/m3-formal-code-b25-r1-opus-model/tools/rerun.sh <会话草稿>/b25-opus-rerun k1-targeted k1-long k1-bound k1-rollback-mutations k1-container-number k2-device k1-sweep`，退 0。逐段与报告比：`k1-long` 四行、`k1-bound` 打点行（报告摘的五行逐行同）、`k1-rollback-mutations` 三组、`k1-container-number` 的 checker 开关两行与 `many_inodes_write_and_read` 2 红、`k2-device` 六种跑法（base、dump-k2、dump-k6、fault-k2、fault-k6、noroot）的 E7RESULT 行与报告第 150–153、175–181、223–224 行对上（复跑脚本把 `q5_equivalence_pairing`、`q5` 两种长行截在固定宽度，截断之前逐字同；`q5_equivalence`、`verdict` 两种行整行逐字同）、`k1-sweep` `rows=1296 not_completed=0`。
+攻方：`bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 6 bash research/prompts/m3-formal-code-b25-r1-opus-model/tools/rerun.sh <会话草稿>/b25-opus-rerun k1-targeted k1-long k1-bound k1-rollback-mutations k1-container-number k2-device k1-sweep`，退 0。逐段与报告比：`k1-long` 四行、`k1-bound` 打点行（报告摘的五行逐行同）、`k1-rollback-mutations` 三组、`k1-container-number` 的 checker 开关两行与 `many_inodes_write_and_read` 2 红、`k2-device` 六种跑法（base、dump-k2、dump-k6、fault-k2、fault-k6、noroot）的 E7RESULT 行与报告第 150–153、175–181、223–224 行对上（复跑脚本把 `q5_equivalence_pairing`、`q5` 两种长行截在固定宽度，截断之前逐字同；`q5_equivalence`、`verdict` 两种行整行逐字同）、`k1-sweep` `rows=1296 not_completed=0`。
 
 正推：`SCRATCH=<会话草稿>/b25-sonnet-rerun bash research/prompts/m3-formal-code-b25-r1-sonnet-model/tools/rerun.sh setup|k1|k2`。`setup`、`k2` 退 0；`k1` 退 1，红在「3 行变异另 110 条零红」那一趟（脚本自己的 `timeout=230` 在负载下超时），别的读数都出了：3 行变异各 `outcome=caught failed=1`，KX1、KX2 在新用例上 `not_caught`、在 470 步上 `caught`，KX4、KX6、KX7、KX8 `not_caught`，KX3、KX5 `caught`；K2 附加态 `mismatching_vs_class_columns=0`、抹键 `=936`；V17、V18 `stdout_same_as_unmutated=True`、V19 `exit=3`；KM2–KM7 `stdout_same_as_unmutated=True`、KM1 `differing_lines=2`。
 

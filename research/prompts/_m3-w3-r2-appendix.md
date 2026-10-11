@@ -44,16 +44,16 @@ F=~/.local/share/singlefs/work/e175-frozen-crates/repo; R=$PWD/research/results/
 (cd $F && sha256sum -c --quiet $R/baseline-frozen-crates.sha)
 cp $R/device-source.rs $F/crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs
 # 每一臂：施加补丁（P 不施加；V1、V2 照 $R/patch-V1.diff、$R/patch-V2.diff）、编、拷出二进制、还原，再核一次清单
-ROOT=$PWD; (cd $F && CARGO_TARGET_DIR=<编译目录> bash $ROOT/research/scripts/capped.sh 7 cargo test --release --offline -p singlefs-harness --test e175_product_path_inode_watermark_regression --no-run)
-E175_ARM=P bash research/scripts/capped.sh 7 bash research/scripts/run-with-memory-cap.sh 8G <测试二进制> --test-threads 7
+ROOT=$PWD; (cd $F && CARGO_TARGET_DIR=<编译目录> bash $ROOT/scripts/capped.sh 7 cargo test --release --offline -p singlefs-harness --test e175_product_path_inode_watermark_regression --no-run)
+E175_ARM=P bash scripts/capped.sh 7 bash scripts/run-with-memory-cap.sh 8G <测试二进制> --test-threads 7
 E175_ARM=P E175_FAMILY=F2 E175_RESULT_FILE=$R/f2-P.out E175_CODE_BASELINE=b000407ab5f4afdffe9083ddaac343fe8470438ea17891c4637b1684d5052b44 E175_WORKER_THREADS=7 E175_TIME_BUDGET_SECONDS=170 \
-  bash research/scripts/capped.sh 7 bash research/scripts/run-with-memory-cap.sh 8G <测试二进制> --ignored --exact run_one_family_on_one_arm_into_the_result_file
+  bash scripts/capped.sh 7 bash scripts/run-with-memory-cap.sh 8G <测试二进制> --ignored --exact run_one_family_on_one_arm_into_the_result_file
 # 族名：D、F3a、F2、F1-broad、F1-reuse-after-raising-the-floor、F1-deleting-files-of-several-lower-leaves、
 #       F1-newest-system-configuration-slot-reading-zeros、G-long、G-small、G-draw、G-long-F1
 # 汇总（两段各一份）
 E175_SUMMARY_INPUTS=<逗号分隔的结果文件> E175_SUMMARY_FILE=<新文件> E175_CODE_BASELINE=b000407ab5f4afdffe9083ddaac343fe8470438ea17891c4637b1684d5052b44 <测试二进制> --ignored --exact summarize_the_result_files
-# 登记的复跑（research/scripts/replay.sh 一行 E175|@driver_e175：拷今天的 crates/ 进副本、放进 device-source.rs、跑 D 族 P 臂）
-bash research/scripts/replay.sh E175
+# 登记的复跑（scripts/replay.sh 一行 E175|@driver_e175：拷今天的 crates/ 进副本、放进 device-source.rs、跑 D 族 P 臂）
+bash scripts/replay.sh E175
 ```
 
 ````
@@ -235,7 +235,7 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 - 崩溃恢复抛弃根（双故障形，F3b）与写 / 刷盘故障注入后建 inode（F4）是登记第三段附带，够判后未跑；历史里抽到的 `CrashRecoveryAbandoningTheNewestRoot` 在 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙之后挂载被拒、不造被抛弃根，Q3b 的 0 不说明跨被抛弃时间线的重发不存在。装置没有数「判成被抛弃的根」的次数，两段里 S3 有没有判出过一条被抛弃根，页上不下结论。
 - Q6 的读法有一处局限：现行那一版取自这一步可读根里最新的那条，回退之前它自己就在环里读得出，Q6 > 0 只可能在现行那一版自己重建不出时出现；无读故障的历史里 Q6 = 0 由这个读法推得出，不是独立的观测。V717 因此在每一族都没跑，「回退取 max」那条护栏在这些历史里有没有被走到，这一页答不了。
 - 「活记录被原地换」那一形 I-9.29（同号只许一个出生代） 看不见：阳性对照 V1 臂 G-long 序号 24 的两次重发（`g-long-V1.out` 第 389、390 行）那两步 I-9.29 判成立。产品臂上没造出这一形，所以这一页答不了「产品路径上出现了 I-9.29 能不能抓」，只说 P 臂上它 0 次。
-- 「仓副本装置、冻结副本」：数出自 2026-10-08 拷的冻结副本（`baseline-frozen-crates.out`），没在入库装置上重做过。拷完之后主工作区 `crates/` 变了 4 个文件（`baseline-frozen-crates.out` 的 `name=main_drift_after_copy`：`crates/mutations.tsv` 与三个 `crates/singlefs-checker-tier/src/bin/` 下的装置），都不在这个装置编进来的 `singlefs-core`、`singlefs-checker`、`singlefs-harness` 里（推的：按路径判，没在漂移后的代码上重跑）；`research/scripts/replay.sh` 的 `driver_e175` 在漂移后的主工作区上编、跑 D 族 P 臂一次，输出去掉 `elapsed_ns` 与 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 相同。
+- 「仓副本装置、冻结副本」：数出自 2026-10-08 拷的冻结副本（`baseline-frozen-crates.out`），没在入库装置上重做过。拷完之后主工作区 `crates/` 变了 4 个文件（`baseline-frozen-crates.out` 的 `name=main_drift_after_copy`：`crates/mutations.tsv` 与三个 `crates/singlefs-checker-tier/src/bin/` 下的装置），都不在这个装置编进来的 `singlefs-core`、`singlefs-checker`、`singlefs-harness` 里（推的：按路径判，没在漂移后的代码上重跑）；`scripts/replay.sh` 的 `driver_e175` 在漂移后的主工作区上编、跑 D 族 P 臂一次，输出去掉 `elapsed_ns` 与 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 相同。
 - 什么现象会推翻页上的读数：同一份冻结副本、同一装置重跑出任何一段 P 臂结果行与产物不同（续跑与多线程合并在快档对拍过）；或第三段 F3b / F4、或登记之外的历史里出现同一条时间线上 Q1 ≥ 1、I-9.29（同号只许一个出生代） 红。
 
 ```

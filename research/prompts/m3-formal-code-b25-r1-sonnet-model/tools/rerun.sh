@@ -13,13 +13,13 @@ set -euo pipefail
 repo="${SINGLEFS_REPO:-/home/fy5090/code/singlefs}"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 scratch="${SCRATCH:-/tmp/claude-1000/m3-formal-code-b25-r1-sonnet-rerun}"
-frozen="$repo/research/target/e171-r1-frozen-tree"
+frozen="$repo/scripts/experiments/target/e171-r1-frozen-tree"
 tree="$scratch/tree"
 device="crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="正推腿复跑，与别的会话同时在跑各跑各的"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="草稿副本里的小规模复跑，上限取 8G，峰值表是别处测的"
-capped() { nice -n 19 bash "$repo/research/scripts/capped.sh" 6 "$@"; }
-capped_run() { capped bash "$repo/research/scripts/run-with-memory-cap.sh" 8G "$@"; }
+capped() { nice -n 19 bash "$repo/scripts/capped.sh" 6 "$@"; }
+capped_run() { capped bash "$repo/scripts/run-with-memory-cap.sh" 8G "$@"; }
 
 setup() {
     mkdir -p "$scratch/out"
@@ -91,7 +91,7 @@ k3() {
     capped_run ./e171-probe-bin stream-constants --streams 1,2,3 2>&1 >/dev/null | grep PROBE
     (cd "$repo" && python3 - <<'PY'
 import json, subprocess
-m = json.loads(subprocess.check_output(['cargo', 'metadata', '--offline', '--format-version', '1'], cwd='research/target/e171-r1-frozen-tree'))
+m = json.loads(subprocess.check_output(['cargo', 'metadata', '--offline', '--format-version', '1'], cwd='scripts/experiments/target/e171-r1-frozen-tree'))
 ws = {p['name']: p for p in m['packages'] if p['source'] is None}
 for n in sorted(ws):
     print(n, sorted({d['name'] for d in ws[n]['dependencies']} & set(ws)))

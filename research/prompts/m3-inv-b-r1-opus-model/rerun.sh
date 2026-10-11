@@ -11,7 +11,7 @@ rsync -a --exclude target --exclude .git "$frozen"/ "$scratch/tree/"
 ( cd "$scratch/tree" && patch -p1 < "$here/proto.diff" )
 cap() { RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-攻方原型复跑，峰值表里没有这几条}" \
         RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-1800}" \
-        nice -n 19 bash "$repo/research/scripts/run-with-memory-cap.sh" 8G bash "$repo/research/scripts/capped.sh" "$threads" "$@"; }
+        nice -n 19 bash "$repo/scripts/run-with-memory-cap.sh" 8G bash "$repo/scripts/capped.sh" "$threads" "$@"; }
 cd "$scratch/tree"
 cap cargo build -p singlefs-harness --tests
 # B7：组合坏镜像与对照格（三种守卫各判一次）。

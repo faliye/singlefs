@@ -84,7 +84,7 @@
 | 共享 `gate.sh` 第 423 行 `update-ref refs/singlefs/gate-ok`、第 58 行 `--staged` 时 `worktree add --detach` | 坐实：门禁本身有 git 写 |
 | `lib-item-ref-status.py` 的扫描范围含 `records/**/*.md`、`research/**/*.rs`、`.claude/rules/*.md`，只排除 `/prompts/`；`relabel-item.py` 第 78 行 `write_text`，第 82–83 行排除 `records/` 的只是「要人看」清单 | 坐实（第 44–50 行、第 78、82–83 行）。各类带分项引用的文件数（2 / 47 / 115 / 1）没复数，不承重 |
 | E146 装置的 `TREE_TABLE_ENTRIES_PER_UNIT = 112` 在 d2aeb7d 改成 81；首次出现在 d098c77（2026-09-13）；⌊16253/145⌋ = 112、⌊16253/148⌋ = 109 | 坐实（`git show d2aeb7d -U0`、`git log -S`、`python3`）；`crates/singlefs-core/src/records.rs` 第 1、112 行「extent 叶记录 112」是同一个数不同的量，坐实 |
-| `.gitignore` 挡住 `/.claude/singlefs-ai-sop/`、`.claude/settings.local.json`、`__pycache__/`、`target/`、`.env` | 坐实（另有 `*.img`、`*.qcow2`、`/research/target/`） |
+| `.gitignore` 挡住 `/.claude/singlefs-ai-sop/`、`.claude/settings.local.json`、`__pycache__/`、`target/`、`.env` | 坐实（另有 `*.img`、`*.qcow2`、`/scripts/experiments/target/`） |
 | `git log origin/master..HEAD` 0 条 | 坐实 |
 | `research/prompts/*-sonnet-output.md` 136 份、入库 129 | 现查 137 / 129；多出的一份是这一轮自己的 `agent-split-r1-sonnet-output.md` |
 | 代价算术：第一批逐个 8 ×（3 × 5 + 1）= 128 次、× 137,814 = 17,640,192；全部十五个 261 次、35,969,454；按批合并 66 次、9,095,724 | 逐项复算相符 |

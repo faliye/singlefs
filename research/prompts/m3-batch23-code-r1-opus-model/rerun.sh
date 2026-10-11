@@ -10,7 +10,7 @@
 #     b1-1a b1-1b b1-2a b1-2b b1-3a b1-3b b1-4a b1-4b b2-1a b2-1b b2-2a b2-2b b2-3a b2-3b b2-4a b2-4b
 # all = 依次跑全部；批段与自证段四段一组并行（每段退出码写进 logs/<段>.rc，单个不带参数的 wait 等齐）。
 # 包装：编译经 run-with-memory-cap.sh 6G、跑经 4G；线程经 capped.sh "${OPUS_THREADS:-7}"；全部 nice -n 19。
-# 包装脚本目录取 SINGLEFS_TOOL，没给就取 $SINGLEFS_REPO/research/scripts（冻结副本里没有 research/，要给 SINGLEFS_TOOL）。
+# 包装脚本目录取 SINGLEFS_TOOL，没给就取 $SINGLEFS_REPO/scripts（冻结副本里没有 research/，要给 SINGLEFS_TOOL）。
 set -uo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 die() { echo "rerun.sh: $*" >&2; exit 2; }
@@ -55,7 +55,7 @@ export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASO
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-派发提示写死编译 6G、跑 4G}"
 
 tool_dir() {
-    local dir=${SINGLEFS_TOOL:-${SINGLEFS_REPO:-}/research/scripts}
+    local dir=${SINGLEFS_TOOL:-${SINGLEFS_REPO:-}/scripts}
     [ -f "$dir/run-with-memory-cap.sh" ] && [ -f "$dir/capped.sh" ] || die "包装脚本不在 $dir（给 SINGLEFS_TOOL）"
     echo "$dir"
 }

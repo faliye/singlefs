@@ -11,7 +11,7 @@
 | 开工快照 | `research/prompts/m3-tomb-r1-snapshot/`：`crates-sha256.txt`（210 份，冻结副本 `/tmp/claude-1000/m3-delete-r2/tree/`）、`kb-sha256.txt` | 腿交齐之后冻结副本 `sha256sum -c` 全 OK；kb 清单在主仓全 OK |
 | 云端正推（Sonnet） | `research/prompts/m3-tomb-r1-sonnet-output.md`（sha256 295758fa…9a06）；模型 `research/prompts/m3-tomb-r1-sonnet-model/` | 第四节复跑 |
 | 云端攻方（Opus） | `research/prompts/m3-tomb-r1-opus-output.md`（sha256 79ae9151…49ef）；模型 `research/prompts/m3-tomb-r1-opus-model/` | 第四节复跑 |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-delete-r2/tree --root . --background research/prompts/_m3-tomb-r1-background.md`：「✓ 核了 120 处引文，对上 120 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-delete-r2/tree --root . --background research/prompts/_m3-tomb-r1-background.md`：「✓ 核了 120 处引文，对上 120 处，没判 0 处」 |
 
 两条腿的数都是副本或模型上量的：扫盘重建在 `crates/` 里没有实现，两边的扫描规则都是按 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P2 / P3 与 D18（块里携带什么信息） 已定项 11 的字面写的，不是 E104（扫描重建的现行版本判定） 的复跑。
 

@@ -7,7 +7,7 @@
 | 物 | 路径 | 核法 |
 |---|---|---|
 | 正文 / 背景材料 / 改动全文 | `research/prompts/_m3-root-ring-code-r1-body.md`、`_m3-root-ring-code-r1-background.md`、`_m3-root-ring-code-r1-diff.md` | — |
-| 开工快照 | `research/prompts/m3-root-ring-code-r1-snapshot/`（crates 31 份、kb 7 份；冻结副本 `/tmp/claude-1000/m3-root-ring-code-r1/tree/`） | `bash research/scripts/snapshot-check.sh m3-root-ring-code-r1`：「✗ 快照 m3-root-ring-code-r1：38 个文件里 3 个对不上」，三份见下 |
+| 开工快照 | `research/prompts/m3-root-ring-code-r1-snapshot/`（crates 31 份、kb 7 份；冻结副本 `/tmp/claude-1000/m3-root-ring-code-r1/tree/`） | `bash scripts/snapshot-check.sh m3-root-ring-code-r1`：「✗ 快照 m3-root-ring-code-r1：38 个文件里 3 个对不上」，三份见下 |
 | 云端正推（Sonnet） | `research/prompts/m3-root-ring-code-r1-sonnet-output.md`（241 行，sha256 3b2dd816…2d76），模型 `…-sonnet-model/` | — |
 | 云端攻方（Opus） | `research/prompts/m3-root-ring-code-r1-opus-output.md`（sha256 ad94d741…4f9d），模型 `…-opus-model/` | 主 agent 复跑，见第四节 |
 | 引文 | 两份腿报告 | `cite-check.py <两份报告> --root <crates 取冻结副本、其余取主仓的拼合根> --background <背景材料>`：「✗ 核了 89 处引文，3 处对不上，0 处没判」，三处见下 |

@@ -5,4 +5,4 @@
 - `cite-lines.py`：报告引文行号现查用的小脚本（读 `标签|文件|原文` 清单，打命中数与行号）。
 - 起法（主 agent 在仓副本里跑）：
   cd <仓副本>；`CARGO_TARGET_DIR=<编译目录> ROCKSDB_LIB_DIR=<某个已编好的 librocksdb-sys 的 out 目录> ROCKSDB_STATIC=1`（省掉现编 RocksDB 的 C++；本机 `target/release/build/librocksdb-sys-f7ce5abb7da4f505/out` 里有 librocksdb.a）。
-  编：`bash research/scripts/capped.sh 7 cargo test --offline --release -p singlefs-checker-tier --features verdict-store --test <目标>… --no-run`（仓副本里 1 分 19 秒编完，用 7 线程）。
+  编：`bash scripts/capped.sh 7 cargo test --offline --release -p singlefs-checker-tier --features verdict-store --test <目标>… --no-run`（仓副本里 1 分 19 秒编完，用 7 线程）。

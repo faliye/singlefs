@@ -1,6 +1,6 @@
 # m3-batch37-43-code-r1 正推腿（Sonnet）的模型目录
 
-仓路径从环境变量取：`SINGLEFS_REPO` = 冻结副本根（`~/.local/share/singlefs/work/m3-batch37-43-code-r1/tree`），`SINGLEFS_MAIN_REPO` = 主仓根（只取 `research/scripts/` 里的内存包装与线程上限脚本）。可选 `SONNET_TARGET` = 编译目录（默认 `<输出目录>/work/target`）。
+仓路径从环境变量取：`SINGLEFS_REPO` = 冻结副本根（`~/.local/share/singlefs/work/m3-batch37-43-code-r1/tree`），`SINGLEFS_MAIN_REPO` = 主仓根（只取 `scripts/` 里的内存包装与线程上限脚本）。可选 `SONNET_TARGET` = 编译目录（默认 `<输出目录>/work/target`）。
 
 | 文件 | 做什么 |
 |---|---|
@@ -33,7 +33,7 @@ bash compare.sh OUT expected
 export CARGO_TARGET_DIR=<编译目录> PROVE_RED_LOG_DIRECTORY=<日志目录>
 cd <仓副本>   # 副本里改过的文件要 touch 一下再跑：cp -p 回原样的源文件 mtime 比编译产物旧，cargo 不重编（我踩过一次）
 mapfile -t N < <(sed -n '2,12p' names.txt)
-bash <主仓>/research/scripts/prove-red.sh --copy "$PWD" --memory 6G singlefs-harness "${N[@]}"
+bash <主仓>/scripts/prove-red.sh --copy "$PWD" --memory 6G singlefs-harness "${N[@]}"
 ```
 
 三段的输出在 `prove-red-run/chunk-*.txt`：第 2–12 行 11 条、第 1 行与 13–26 行 15 条、第 27–39 行 13 条，合计 39 条，「跑的都抓到了」。

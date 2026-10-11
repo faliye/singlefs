@@ -25,7 +25,7 @@ stage_setup() {
     ( cd "$TREE" && sha256sum -c "$(dirname "$FROZEN")/crates-sha256.txt" 2>&1 | grep -vc ': OK$' | sed 's/^/sha_not_ok=/' )
 }
 stage_static() {
-    ( cd "$REPO" && python3 research/scripts/crates-mutation-rows.py static-check "$TREE" | tail -3 )
+    ( cd "$REPO" && python3 scripts/crates-mutation-rows.py static-check "$TREE" | tail -3 )
     python3 "$MODEL_DIR/tools/p6_rows.py" "$TREE" "$REPO/research/prompts/_m3-formal-code-b33-r1-diff.md"
 }
 stage_base() {

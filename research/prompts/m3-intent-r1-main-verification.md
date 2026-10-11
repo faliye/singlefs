@@ -10,7 +10,7 @@
 | 开工快照 | `research/prompts/m3-intent-r1-snapshot/`：`crates-sha256.txt`（210 份，冻结副本 `/tmp/claude-1000/m3-delete-r2/tree/`）、`kb-sha256.txt`（13 份） | 冻结副本 `sha256sum -c` 全 OK；kb 13 份里 4 份在开工之后被别的会话改过（`.claude/kb/checks-owed.md`、`.claude/kb/invariants.md`、`.claude/kb/decisions/26-后台整理与放置回收.md`、`.claude/kb/decisions/13-验证路线.md`），两腿的引文对这四份的现状核，cite-check 全对上（下一行） |
 | 云端正推（Sonnet） | `research/prompts/m3-intent-r1-sonnet-output.md`（547 行，sha256 5dc05f63…c5）；原型 `research/prompts/m3-intent-r1-sonnet-model/` | 第四节 |
 | 云端攻方（Opus） | `research/prompts/m3-intent-r1-opus-output.md`（273 行，sha256 6db048bd…bc2）；模型 `research/prompts/m3-intent-r1-opus-model/` | 第四节 |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-delete-r2/tree --root . --background research/prompts/_m3-intent-r1-background.md`：「✓ 核了 173 处引文，对上 173 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-delete-r2/tree --root . --background research/prompts/_m3-intent-r1-background.md`：「✓ 核了 173 处引文，对上 173 处，没判 0 处」 |
 
 主 agent 现查：D26（后台整理与放置回收） 已定项 2 写整理「无界总量走 D8（核心索引结构） 已定项 5 的意图机制——那一条逐字管『……先把意图写进 logged_ops 树，再分批推进』」；logged_ops 树的字段表没有条款（C364（整理意图记录没有字段表））；`grep -rn 'logged_ops\|LoggedOp\|intent' crates/singlefs-core/src/` 零命中。
 

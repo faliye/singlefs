@@ -1,6 +1,6 @@
 # m3-batch35-36-code-r1 正推腿（Sonnet）的模型目录
 
-仓路径从环境变量取：`SINGLEFS_REPO` = 冻结副本根（`~/.local/share/singlefs/work/m3-batch35-36-code-r1/tree`），`SINGLEFS_MAIN_REPO` = 主仓根（只取 `research/scripts/` 里的内存包装与线程上限脚本）。
+仓路径从环境变量取：`SINGLEFS_REPO` = 冻结副本根（`~/.local/share/singlefs/work/m3-batch35-36-code-r1/tree`），`SINGLEFS_MAIN_REPO` = 主仓根（只取 `scripts/` 里的内存包装与线程上限脚本）。
 
 | 脚本 | 做什么 | 前台耗时 |
 |---|---|---|

@@ -5,7 +5,7 @@ target=W+'/tree-mut/crates/singlefs-harness/src/gpu_memory_ledger.rs'
 src=open(W+'/mut/gpu_memory_ledger.orig.rs').read()
 cut=src.index("#[cfg(test)]\nmod tests {")
 env=dict(os.environ, CARGO_TARGET_DIR=W+'/target-mut')
-cmd=['nice','-n','19','bash','/home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh','12G','bash','/home/fy5090/code/singlefs/research/scripts/capped.sh','6','cargo','test','--offline','-p','singlefs-harness','--test','killers_new','--','--test-threads','4']
+cmd=['nice','-n','19','bash','/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh','12G','bash','/home/fy5090/code/singlefs/scripts/capped.sh','6','cargo','test','--offline','-p','singlefs-harness','--test','killers_new','--','--test-threads','4']
 ids=sys.argv[1:]
 for i in ['BASE']+ids:
     if i=='BASE':

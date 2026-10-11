@@ -231,7 +231,7 @@ D24（后台重活能不能卸给 GPU） 管一件事：三个后台重活（批
 
 跑前登记 `research/prompts/e174-preregistration.md`（装置与单测写完、真卡产物一次没跑之前的 sha256 `b2d5cd0c56552ec1ad322d5d8cca22f1fcb705617cb876d3726635058edc0d92`；执行员在第十二节「修订」写了 1 条：补一条臂「在飞·中」、钉死几处登记没写死的读法，原判据一字没动）；岔路单 `research/prompts/m3-batch10z-a-code-r1-forks.md` 的 G2 一行里"乙"的两个数：借据丢掉时先等设备把这笔借据提交的活做完再销账（`device.poll` 用等待那一种），等一次要多久（G2-乙-等待）；等完、缓冲丢掉之后，下一次 `nvidia-smi -q -d MEMORY,PIDS` 读到这个进程占着的是否已经不含那笔缓冲，含多少、隔多久才不含（G2-乙-读数）。问法里"再丢掉缓冲"按登记的读法：缓冲对象在借据活着时先丢，借据丢掉时再 poll，poll 返回那一刻算销账。
 
-装置是独立手写的，不是入库装置：`research/e7-index-bench/src/bin/e174_lease_drop_wait_memory_return.rs`（bin 名 `e174-lease-drop-wait-memory-return`，特性 `e174-gpu`，依赖沿用 E163（GPU多卡算单元校验和） 那份钉死的 `wgpu =30.0.1`、`pollster =1.0.1`），不依赖 `crates/`、不与实现共用代码。设备怎么起（Vulkan、`required_limits: adapter.limits()`、`MemoryHints::Performance`）、读数口径（`nvidia-smi -q -d MEMORY,PIDS` 按进程号把 `Used GPU Memory` 加起来）、`PollType::Poll` 的写法都抄自 `crates/` 今天的取法，开跑前用登记第十一节那 7 条 `grep -c` 回比过：输出依次 2、1、1、1、1、1、1，与登记写的值逐条相同；驱动版本现读是 595.84（`nvidia-smi --query-gpu=index,name,pci.bus_id,memory.total,driver_version --format=csv` 两张卡都报 595.84，Total 32607 MiB 与 16311 MiB）。
+装置是独立手写的，不是入库装置：`scripts/experiments/e174_lease_drop_wait_memory_return.rs`（bin 名 `e174-lease-drop-wait-memory-return`，特性 `e174-gpu`，依赖沿用 E163（GPU多卡算单元校验和） 那份钉死的 `wgpu =30.0.1`、`pollster =1.0.1`），不依赖 `crates/`、不与实现共用代码。设备怎么起（Vulkan、`required_limits: adapter.limits()`、`MemoryHints::Performance`）、读数口径（`nvidia-smi -q -d MEMORY,PIDS` 按进程号把 `Used GPU Memory` 加起来）、`PollType::Poll` 的写法都抄自 `crates/` 今天的取法，开跑前用登记第十一节那 7 条 `grep -c` 回比过：输出依次 2、1、1、1、1、1、1，与登记写的值逐条相同；驱动版本现读是 595.84（`nvidia-smi --query-gpu=index,name,pci.bus_id,memory.total,driver_version --format=csv` 两张卡都报 595.84，Total 32607 MiB 与 16311 MiB）。
 
 **现状**：两段真卡产物都跑完、`judge` 判过，G2-乙 的两个数在两段上都量到了，登记第十一节的够判条件满足（状态「两段跑完、够判」）。
 
@@ -267,26 +267,26 @@ D24（后台重活能不能卸给 GPU） 管一件事：三个后台重活（批
 ```
 # 仓根；装置在 research/（不依赖 crates/）。真卡上的命令经 gpu-quiesce-run.sh 清场、经内存包装、线程上限 8
 cd /home/fy5090/code/singlefs/research
-bash scripts/capped.sh 8 cargo build --release -p e7-index-bench --features e174-gpu --bin e174-lease-drop-wait-memory-return
+bash scripts/hosts/capped.sh 8 cargo build --release -p e7-index-bench --features e174-gpu --bin e174-lease-drop-wait-memory-return
 # 不起卡：单测 19 条、变异表 28 条、自检、清单
-bash scripts/capped.sh 8 bash scripts/run-with-memory-cap.sh 12G cargo test --release -p e7-index-bench --features e174-gpu --bin e174-lease-drop-wait-memory-return
-MUTATE_JOBS=9 MUTATE_MEMORY_MAX=6G MUTATE_TIMEOUT=200 bash scripts/capped.sh 8 bash scripts/mutate.sh e174-lease-drop-wait-memory-return e7-index-bench/src/bin/e174_lease_drop_wait_memory_return.rs mutations/e174_lease_drop_wait_memory_return.tsv
-bash scripts/capped.sh 8 bash scripts/run-with-memory-cap.sh 8G ./target/release/e174-lease-drop-wait-memory-return checks
-bash scripts/capped.sh 8 bash scripts/run-with-memory-cap.sh 8G ./target/release/e174-lease-drop-wait-memory-return plan --segment first
+bash scripts/hosts/capped.sh 8 bash scripts/hosts/run-with-memory-cap.sh 12G cargo test --release -p e7-index-bench --features e174-gpu --bin e174-lease-drop-wait-memory-return
+MUTATE_JOBS=9 MUTATE_MEMORY_MAX=6G MUTATE_TIMEOUT=200 bash scripts/hosts/capped.sh 8 bash scripts/mutation/mutate.sh e174-lease-drop-wait-memory-return scripts/experiments/e174_lease_drop_wait_memory_return.rs mutations/e174_lease_drop_wait_memory_return.tsv
+bash scripts/hosts/capped.sh 8 bash scripts/hosts/run-with-memory-cap.sh 8G ./target/release/e174-lease-drop-wait-memory-return checks
+bash scripts/hosts/capped.sh 8 bash scripts/hosts/run-with-memory-cap.sh 8G ./target/release/e174-lease-drop-wait-memory-return plan --segment first
 # 上卡：先冒烟两个子进程，再第一段（不含在飞·轻），再在飞·轻，再第二段；同一条命令重起就是续跑
-bash scripts/gpu-quiesce-run.sh -- bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 8 ./target/release/e174-lease-drop-wait-memory-return run --segment first --skip-light --limit-jobs 2 --output results/e174-lease-drop-wait-memory-return-segment-one-<日期>.out
+bash scripts/crash/gpu-quiesce-run.sh -- bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 8 ./target/release/e174-lease-drop-wait-memory-return run --segment first --skip-light --limit-jobs 2 --output results/e174-lease-drop-wait-memory-return-segment-one-<日期>.out
 # 判（确定性，读产物）
-bash scripts/capped.sh 8 bash scripts/run-with-memory-cap.sh 8G ./target/release/e174-lease-drop-wait-memory-return judge --input results/e174-lease-drop-wait-memory-return-segment-one-<日期>.out --scope first
+bash scripts/hosts/capped.sh 8 bash scripts/hosts/run-with-memory-cap.sh 8G ./target/release/e174-lease-drop-wait-memory-return judge --input results/e174-lease-drop-wait-memory-return-segment-one-<日期>.out --scope first
 ```
 
 两段真卡产物是 `run --segment first --skip-light` 与 `run --segment second --skip-light` 写的（产物第 1 行 `config` 的 `skip_light=true` 为证），命令形态是冒烟那条命令去掉 `--limit-jobs`（`gpu-quiesce-run.sh -- … run --segment first --skip-light --output …`，第二段换 `--segment second`）。真卡产物含计时与显存读数，两次跑不同，不复跑；入库的是它们的 `judge` 输出（确定性，读产物）。判的命令，仓里 `research/` 下跑：
 
 ```
-bash scripts/capped.sh 10 bash scripts/run-with-memory-cap.sh 8G ./target/release/e174-lease-drop-wait-memory-return judge --input results/e174-lease-drop-wait-memory-return-segment-one-2026-10-08.out --scope first
-bash scripts/capped.sh 10 bash scripts/run-with-memory-cap.sh 8G ./target/release/e174-lease-drop-wait-memory-return judge --input results/e174-lease-drop-wait-memory-return-segment-two-2026-10-08.out --scope second
+bash scripts/hosts/capped.sh 10 bash scripts/hosts/run-with-memory-cap.sh 8G ./target/release/e174-lease-drop-wait-memory-return judge --input results/e174-lease-drop-wait-memory-return-segment-one-2026-10-08.out --scope first
+bash scripts/hosts/capped.sh 10 bash scripts/hosts/run-with-memory-cap.sh 8G ./target/release/e174-lease-drop-wait-memory-return judge --input results/e174-lease-drop-wait-memory-return-segment-two-2026-10-08.out --scope second
 ```
 
-`research/scripts/replay.sh` 登记四行：`E174|@driver_e174_checks`、`E174|@driver_e174_simulated_judge`（不起卡、不含计时字段的两份）与 `E174|@driver_e174_segment_one_judge`、`E174|@driver_e174_segment_two_judge`（真卡两段产物的 `judge` 输出，产物 `…-segment-one-judge-2026-10-08.out`、`…-segment-two-judge-2026-10-08.out`）。replay.sh 整份目前一开跑就在准入表检查上退 2（`bash scripts/replay.sh --admission-only` 报「E142 登记了准入，而这张复跑表里它有 2 行」），与这四行无关，所以这四行没经 replay.sh 复跑，是手工跑同一条命令，输出与登记的产物 `cmp` 逐字节相同：两段的 judge 命令都退 0、stderr 为空，`cmp` 无输出。
+`scripts/experiments/replay.sh` 登记四行：`E174|@driver_e174_checks`、`E174|@driver_e174_simulated_judge`（不起卡、不含计时字段的两份）与 `E174|@driver_e174_segment_one_judge`、`E174|@driver_e174_segment_two_judge`（真卡两段产物的 `judge` 输出，产物 `…-segment-one-judge-2026-10-08.out`、`…-segment-two-judge-2026-10-08.out`）。replay.sh 整份目前一开跑就在准入表检查上退 2（`bash scripts/experiments/replay.sh --admission-only` 报「E142 登记了准入，而这张复跑表里它有 2 行」），与这四行无关，所以这四行没经 replay.sh 复跑，是手工跑同一条命令，输出与登记的产物 `cmp` 逐字节相同：两段的 judge 命令都退 0、stderr 为空，`cmp` 无输出。
 
 ````
 
@@ -331,7 +331,7 @@ S2=e174-lease-drop-wait-memory-return-segment-two-2026-10-08.out
 J2=e174-lease-drop-wait-memory-return-segment-two-judge-2026-10-08.out
 ```
 
-产物第 1 行与第 1698 行（`grep -n 'name=config' $S1`、`grep -n 'name=verdict' $S1`，原样带行号；真卡产物含计时与显存读数，再跑要上卡，不登记进 `research/scripts/replay.sh`，登记的是它的判的输出）：
+产物第 1 行与第 1698 行（`grep -n 'name=config' $S1`、`grep -n 'name=verdict' $S1`，原样带行号；真卡产物含计时与显存读数，再跑要上卡，不登记进 `scripts/experiments/replay.sh`，登记的是它的判的输出）：
 
 ```
 1:E7RESULT name=config segment=first seed=174 driver_version=595.84 skip_light=true cells=88 rounds_required=5 refills_at_most=3 simulated=false
@@ -527,7 +527,7 @@ zcat $S1.raw.gz | grep -c '^######## .*card=rtx5060ti size_mib=8192 liveness=\(m
 
 产物 `research/results/e174-lease-drop-wait-memory-return-segment-two-2026-10-08.out`（243 行，原文压缩包是同名加 `.raw.gz`），判的输出 `research/results/e174-lease-drop-wait-memory-return-segment-two-judge-2026-10-08.out`（26 行）。一个子进程两条线程：线程 B 在同一个设备上一次接一次提交 400 毫秒的活，线程 A 做一笔借据（S = 64 MiB、2 GiB，在飞·中，空转目标 250 毫秒，一次建）；臂三条：`Wait { submission_index: None }`（下记 wait）、`Wait { submission_index: Some(线程 A 这笔借据最后一次提交) }`（wait_own）、`Poll`（poll）。两张卡，每格 5 轮。变量同第一段那一节。
 
-产物第 1 行与第 242 行（`grep -n 'name=config' $S2`、`grep -n 'name=verdict' $S2`，原样带行号；不登记进 `research/scripts/replay.sh`，理由同第一段）：
+产物第 1 行与第 242 行（`grep -n 'name=config' $S2`、`grep -n 'name=verdict' $S2`，原样带行号；不登记进 `scripts/experiments/replay.sh`，理由同第一段）：
 
 ```
 1:E7RESULT name=config segment=second seed=174 driver_version=595.84 skip_light=true cells=12 rounds_required=5 refills_at_most=3 simulated=false
@@ -617,7 +617,7 @@ grep -c 'name=lease ' $S2
 ```markdown
 ### 单测与变异
 
-单测 19 个：`grep -c '^test .* \.\.\. ok$' research/results/e174-lease-drop-wait-memory-return-unit-tests-2026-10-08-r2.out` 输出 19，同一份文件里 `test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`。变异表 `research/mutations/e174_lease_drop_wait_memory_return.tsv` 28 行（`grep -c '' research/mutations/e174_lease_drop_wait_memory_return.tsv` 输出 28），`mutate.sh` 输出 `research/results/e174-lease-drop-wait-memory-return-mutate-2026-10-08-r2.log`：`grep -c '^✅' …` 输出 28，`grep -c '^⏭' …` 与 `grep -c '^❌' …` 都输出 0；第 30、31 行 `计数：内存撞顶 0 条（上限 6G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条、显存不够 0 条` 与 `已还原，基线仍全绿`。单测与变异各有一份更早的输出（`…-unit-tests-2026-10-08.out`、`…-mutate-2026-10-08.log`，同样 19 个、28 条全抓），对的是之后又改了 `run` 续跑语义（已有 `name=done` 行但要补轮或换一组格时接着跑并追加新的 verdict 与 done）之前的源码，留着，正文引的数以 r2 为准。
+单测 19 个：`grep -c '^test .* \.\.\. ok$' research/results/e174-lease-drop-wait-memory-return-unit-tests-2026-10-08-r2.out` 输出 19，同一份文件里 `test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`。变异表 `scripts/mutation/tables/e174_lease_drop_wait_memory_return.tsv` 28 行（`grep -c '' scripts/mutation/tables/e174_lease_drop_wait_memory_return.tsv` 输出 28），`mutate.sh` 输出 `research/results/e174-lease-drop-wait-memory-return-mutate-2026-10-08-r2.log`：`grep -c '^✅' …` 输出 28，`grep -c '^⏭' …` 与 `grep -c '^❌' …` 都输出 0；第 30、31 行 `计数：内存撞顶 0 条（上限 6G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条、显存不够 0 条` 与 `已还原，基线仍全绿`。单测与变异各有一份更早的输出（`…-unit-tests-2026-10-08.out`、`…-mutate-2026-10-08.log`，同样 19 个、28 条全抓），对的是之后又改了 `run` 续跑语义（已有 `name=done` 行但要补轮或换一组格时接着跑并追加新的 verdict 与 done）之前的源码，留着，正文引的数以 r2 为准。
 
 变异表的行（页内编号）：M1–M7 是登记第九节的七条（M1 等待臂的 `Wait` 换成 `Poll`、M2 拆缓冲张数向上取整换成向下取整、M3 把 BAR1 下的 `Used` 当成进程占着的、M4 建缓冲时每张取一半、M5 扣住不丢组在第 6 步照样丢缓冲、M6 t0 记在 poll 开始之前、M7 在飞档第 4 步也等完）；M8–M28 是执行员补的二十一条，改判定一侧的门槛与比较（M8–M13、M25）、读数解析与分配器比较（M15–M17）、外层计时与 K7、K9、扣住不丢组的窗口比较（M18、M22–M24）、续跑与清单（M14、M19–M21、M26–M28）。登记第九节说"判定脚本那几处门槛的变异由第八节的判别力自证代替"，这里另补了变异，不算替代。M5 登记写的取样点（"等待臂某一格 R_next 已经 ≤ τ 的 S"）在模型卡上就有（等待臂 2048 MiB 的 R_next 为 0），变异被抓，真卡上有没有这样的格要看产物。
 

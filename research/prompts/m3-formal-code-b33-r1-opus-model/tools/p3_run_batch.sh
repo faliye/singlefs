@@ -20,7 +20,7 @@ for name in "$@"; do
     (
       cd "$work" || exit 90
       if [ "$name" != baseline ]; then python3 "$tools/p3_mutants.py" . "$name" || exit 91; fi
-      CARGO_TARGET_DIR="$work/target" nice -n 19 bash "$repo/research/scripts/capped.sh" "$threads" \
+      CARGO_TARGET_DIR="$work/target" nice -n 19 bash "$repo/scripts/capped.sh" "$threads" \
         cargo test --offline --no-fail-fast -p singlefs-harness \
         --test overwrite_in_one_instance --test root_ring_turn_in_one_mount \
         -- allocated_statistic_equals repeated_overwrites_go_past turning_the_root_ring \

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # m3-leaf-death-r1 攻方腿（Opus）模型的复跑。仓路径从 SINGLEFS_REPO 取（K3 那两阶段拷它的 crates/ 改副本；给冻结树或仓根都行）。
 # 每一阶段整条经内存包装与线程上限起（编译那两阶段 6G、其余 4G），例：
-#   M=research/prompts/m3-leaf-death-r1-opus-model; S=research/scripts
+#   M=research/prompts/m3-leaf-death-r1-opus-model; S=scripts
 #   bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 7 bash $M/rerun.sh <空的输出目录> build
 #   bash $S/run-with-memory-cap.sh 4G bash $S/capped.sh 7 bash $M/rerun.sh <输出目录> e177
 # 阶段（按这个次序各跑一次就是全量）：build e177 merges-0 … merges-7 rename-0 rename-1 rc indistinguishable rollback

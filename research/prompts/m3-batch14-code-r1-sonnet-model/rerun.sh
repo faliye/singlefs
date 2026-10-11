@@ -27,6 +27,6 @@ for mutant in "${mutants[@]}"; do
 done
 if [[ "$mode" == full ]]; then
   for probe in probe-lone-survivor-live-files probe-mount-continuation-time; do
-    echo "##### $probe"; nice -n 19 bash "${REPO:-/home/fy5090/code/singlefs}/research/scripts/run-with-memory-cap.sh" 6G bash "${REPO:-/home/fy5090/code/singlefs}/research/scripts/capped.sh" "${THREADS:-7}" bash "$here/$probe.sh" 2>&1 | cut -c1-300
+    echo "##### $probe"; nice -n 19 bash "${REPO:-/home/fy5090/code/singlefs}/scripts/run-with-memory-cap.sh" 6G bash "${REPO:-/home/fy5090/code/singlefs}/scripts/capped.sh" "${THREADS:-7}" bash "$here/$probe.sh" 2>&1 | cut -c1-300
   done
 fi

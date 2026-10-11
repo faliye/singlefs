@@ -176,7 +176,7 @@ old rows 2898 new rows 2903 only-new names 5 only-old names 0
 
 - 不判 K2；没有去攻（造反例）；257 片的链只读代码推，没造镜像。
 - GPU 一律没跑（正文规定）；GPU 对拍、GPU 那两行与 2903、1926 行变异归提交时主 agent 跑。复核不了：GPU 侧的数全是读 wgsl 加 CPU 算期望，没有卡上的数。
-- 重型测试没跑；我只跑了 `singlefs-harness` 的 `checker_known_bad_images` 一个测试目标（harness 档），经 `research/scripts/run-with-memory-cap.sh`（编译 6G、跑 4G）与 `research/scripts/capped.sh 10`。起跑前 `ps` 看到别的 agent 在跑 `cargo test`（`m3-r1/two-leads` 的副本），没有性能测量（qemu、vm-bench、fio）在跑，照常加 `nice -n 19` 跑。排队时遇过一次「同会话只许一条」被拒，改用 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON` 声明理由放行；峰值表对上限的 2 倍规则用 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON` 声明，上限仍是 6G 与 4G，见 `rerun.sh` 文件头。
+- 重型测试没跑；我只跑了 `singlefs-harness` 的 `checker_known_bad_images` 一个测试目标（harness 档），经 `scripts/run-with-memory-cap.sh`（编译 6G、跑 4G）与 `scripts/capped.sh 10`。起跑前 `ps` 看到别的 agent 在跑 `cargo test`（`m3-r1/two-leads` 的副本），没有性能测量（qemu、vm-bench、fio）在跑，照常加 `nice -n 19` 跑。排队时遇过一次「同会话只许一条」被拒，改用 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON` 声明理由放行；峰值表对上限的 2 倍规则用 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON` 声明，上限仍是 6G 与 4G，见 `rerun.sh` 文件头。
 - 旧用例没有逐个翻：1.4 末段列的「没有逐形钉住的关向」只看了本批新加的三条与 N5-d。
 - 不采纳、不出判决。
 - 实现员报告 `/tmp/claude-1000/m3-batch25/n/report.md` 没读（只当线索）；批前拷贝 `/tmp/claude-1000/m3-batch25/before/` 只用来比 mutations.tsv 的三行替换。

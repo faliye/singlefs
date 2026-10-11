@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """对一份树副本（就地改、跑完还原）里的变异表行逐条施加、跑 harness 档测试、还原；一次只起一条 cargo。结果一行一个文件，断了续跑。
 
-  mutrun.py --tree <树根> --target <编译目录> --tools <放 research/scripts 的仓根> --table <tsv> --rows 2883,2930,...
+  mutrun.py --tree <树根> --target <编译目录> --tools <放 scripts 的仓根> --table <tsv> --rows 2883,2930,...
             --outdir <结果目录> [--deadline <epoch 秒，0 = 不限>] [--threads 10]
 每行一个结果文件 <outdir>/<表文件名>-<行号>.txt，内容一行：
   ROW<TAB>表文件名<TAB>行号<TAB>名字前 40 字<TAB>结局<TAB>点名的测试红没红<TAB>红了几个
@@ -30,8 +30,8 @@ env.setdefault('RUN_WITH_MEMORY_CAP_WAIT_SECONDS', '1500')
 
 def cargo(cap, cargo_args):
     env['RUN_WITH_MEMORY_CAP_KEY'] = 'm3b29-sonnet-' + ('compile' if '--no-run' in cargo_args else 'run')
-    cmd = ['nice', '-n', '19', 'bash', os.path.join(args.tools, 'research/scripts/capped.sh'), args.threads,
-           'bash', os.path.join(args.tools, 'research/scripts/run-with-memory-cap.sh'), cap,
+    cmd = ['nice', '-n', '19', 'bash', os.path.join(args.tools, 'scripts/capped.sh'), args.threads,
+           'bash', os.path.join(args.tools, 'scripts/run-with-memory-cap.sh'), cap,
            'cargo', 'test', '--offline', '--manifest-path', os.path.join(args.tree, 'Cargo.toml')] + cargo_args
     p = subprocess.run(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=args.tools)
     if 250 <= p.returncode <= 254:

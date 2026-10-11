@@ -11,7 +11,7 @@ bash research/prompts/m3-formal-code-b35-r1-opus-model/tools/rerun.sh <草稿目
 bash research/prompts/m3-formal-code-b35-r1-opus-model/tools/rerun.sh <草稿目录> build crafted s256   # 只跑一部分
 ```
 
-`build` 段：把冻结副本拷进 `<草稿目录>/tree`（先 `sha256sum -c` 清单），拷出五份 checker（`b35-checker-pre35` = walk.rs 反打改动全文里 35-1 的 walk.rs 那一段、加只记不判的探针；`b35-checker-probe` = 今天的 walk.rs 加探针；`mutr` / `mutn` / `mutz` = 三处 CPU 变异），经内存包装 `cargo build --release`，核日志里有 `Compiling b35-opus-proto`。每段经 `research/scripts/run-with-memory-cap.sh 8G` 与 `capped.sh 10`；8G 超过峰值表两倍，脚本里带 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON`（峰值表记的是 208M）。结果与 `out/*.txt` 逐行比（`seconds=` 是挂钟不比）。
+`build` 段：把冻结副本拷进 `<草稿目录>/tree`（先 `sha256sum -c` 清单），拷出五份 checker（`b35-checker-pre35` = walk.rs 反打改动全文里 35-1 的 walk.rs 那一段、加只记不判的探针；`b35-checker-probe` = 今天的 walk.rs 加探针；`mutr` / `mutn` / `mutz` = 三处 CPU 变异），经内存包装 `cargo build --release`，核日志里有 `Compiling b35-opus-proto`。每段经 `scripts/run-with-memory-cap.sh 8G` 与 `capped.sh 10`；8G 超过峰值表两倍，脚本里带 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON`（峰值表记的是 208M）。结果与 `out/*.txt` 逐行比（`seconds=` 是挂钟不比）。
 
 模型目录 `research/prompts/m3-formal-code-b35-r1-opus-model/` 每个文件的 sha256：
 

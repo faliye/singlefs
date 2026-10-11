@@ -18,7 +18,7 @@ try:
         o, n = old.replace('\\n', '\n'), new.replace('\\n', '\n')
         assert cur.count(o) == 1, ('anchor', name[:40])
         open(p, 'w', encoding='utf-8').write(cur.replace(o, n))
-    cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/research/scripts/run-with-memory-cap.sh', '8G', 'bash', scripts_repo + '/research/scripts/capped.sh', '7', 'cargo', 'test', '--offline'] + a[4].split()
+    cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/scripts/run-with-memory-cap.sh', '8G', 'bash', scripts_repo + '/scripts/capped.sh', '7', 'cargo', 'test', '--offline'] + a[4].split()
     r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=220)
     out = r.stdout + r.stderr
 finally:

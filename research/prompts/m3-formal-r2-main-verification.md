@@ -10,7 +10,7 @@
 | 开工快照 | `research/prompts/m3-formal-r2-snapshot/`：`crates-sha256.txt`（207 份，冻结副本 `/tmp/claude-1000/m3-formal-r2/tree/`）、`verus-core-sha256.txt`（5 份）、`kb-sha256.txt` | 腿交齐之后在冻结副本上 `sha256sum -c` 全 OK；`kb-sha256.txt` 在主仓全 OK |
 | 云端辩方（Sonnet） | `research/prompts/m3-formal-r2-sonnet-output.md`（sha256 0b55123c…8d09）；模型 `research/prompts/m3-formal-r2-sonnet-model/` | 主 agent 在 `/tmp/claude-1000/m3-formal-r2-main-check/sonnet/` 经内存包装复跑 README 列的 n = 4 四条命令与 `ledger_by_criterion.py`：`ledger_by_criterion.txt` sha256 相同（01f47d5d…aa95），`model_outputs.txt` 里 n = 4 的六行逐字相同；n = 1…4 态数相加 57 585 320 等于 `research/results/e165-replay-bounded-enumeration-2026-10-01-segment1-adversarial-family.out` 第 84 行 |
 | 云端攻方（Opus） | `research/prompts/m3-formal-r2-opus-output.md`（sha256 15ee394b…597f）；模型 `research/prompts/m3-formal-r2-opus-model/` | 见第四节「复跑」 |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-formal-r2/tree --root . --background research/prompts/_m3-formal-r2-background.md`：「✓ 核了 53 处引文，对上 53 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-formal-r2/tree --root . --background research/prompts/_m3-formal-r2-background.md`：「✓ 核了 53 处引文，对上 53 处，没判 0 处」 |
 | 主 agent 自己跑的 | `/tmp/claude-1000/m3-formal-r2-main-check/verus/`：Verus 核（`replay_prefix_core_clippy_clean.rs`）原样，与删掉「`record.instance != expected_key.0 \|\| record.counter != expected_key.1` 时断」那一判的副本，Verus 0.2026.09.20.aef82ed `--no-cheating` 各验一次 | 两份都是「verification results:: 13 verified, 0 errors」（`base.log`、`skip_i83.log`） |
 
 两条腿的数都是副本或译本上量的；进 kb 之前在入库装置上重做（第五节）。辩方的译本与 E165 共用条款和域定义，它与 E165 逐数相等只说明译对了。
@@ -38,7 +38,7 @@
 
 ## 四、复跑
 
-攻方模型：照它的 `README.md` 在 `/tmp/claude-1000/m3-formal-r2-main-check/opus/` 从冻结副本拷一份、打三份补丁、编一次、跑 `run-all.sh` 与 `summarize.py`，经 `research/scripts/run-with-memory-cap.sh 6G`（第一次写 `auto` 被拒：峰值表里没有这条命令）。入库的 `runs/` 下 15 份文件（`exits.txt`、`m0-adv.out`、`m0.out`、`m0row.out`、`m1.out`–`m6row.out`、`m9.out`、`m10.out`、`summary.txt`）与复跑出来的逐份 sha256 相同。判决引的数（1 007 514、264 499、352 608、15 343、K10 下 0 / 0）都在这份 `summary.txt` 与 `m0-adv.out` 里，是副本上的数，进 kb 之前在入库装置上重做。
+攻方模型：照它的 `README.md` 在 `/tmp/claude-1000/m3-formal-r2-main-check/opus/` 从冻结副本拷一份、打三份补丁、编一次、跑 `run-all.sh` 与 `summarize.py`，经 `scripts/run-with-memory-cap.sh 6G`（第一次写 `auto` 被拒：峰值表里没有这条命令）。入库的 `runs/` 下 15 份文件（`exits.txt`、`m0-adv.out`、`m0.out`、`m0row.out`、`m1.out`–`m6row.out`、`m9.out`、`m10.out`、`summary.txt`）与复跑出来的逐份 sha256 相同。判决引的数（1 007 514、264 499、352 608、15 343、K10 下 0 / 0）都在这份 `summary.txt` 与 `m0-adv.out` 里，是副本上的数，进 kb 之前在入库装置上重做。
 
 辩方模型：见第一节那一行。
 

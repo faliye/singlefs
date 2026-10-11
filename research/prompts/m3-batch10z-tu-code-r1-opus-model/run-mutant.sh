@@ -6,8 +6,8 @@ ROOT=/home/fy5090/code/singlefs
 MODEL=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 FROZEN=$HOME/.local/share/singlefs/work/m3-batch10z-tu-code-r1/tree
 name=${1:?}; WORK=${2:?}
-CAP=$ROOT/research/scripts/run-with-memory-cap.sh
-THREADS=$ROOT/research/scripts/capped.sh
+CAP=$ROOT/scripts/run-with-memory-cap.sh
+THREADS=$ROOT/scripts/capped.sh
 OUT=$WORK/runs
 mkdir -p "$OUT"
 rsync -a --delete --exclude target --exclude .git "$FROZEN"/ "$WORK"/repo-mut/

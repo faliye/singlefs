@@ -10,7 +10,7 @@
 | 正推腿（Sonnet，Q1、Q3） | `research/prompts/tooling-broad-mutation-prune-r1-sonnet-output.md`（214 行），模型目录 `…-sonnet-model/` | d1b36e54 |
 | 攻方腿（Opus，Q2、Q3） | `research/prompts/tooling-broad-mutation-prune-r1-opus-output.md`（260 行），模型目录 `…-opus-model/` | f9d6a80a |
 
-- `cite-check.py`（主仓为根）：「核了 77 处引文，10 处对不上，0 处没判」。10 处都是正推腿引 `research/scripts/broad-mutation.py` 的行号，原文现在往后挪了 3–51 行。这份驱动在腿交回之后被别的会话改过，引的句子逐字都在，不算引错。
+- `cite-check.py`（主仓为根）：「核了 77 处引文，10 处对不上，0 处没判」。10 处都是正推腿引 `scripts/broad-mutation.py` 的行号，原文现在往后挪了 3–51 行。这份驱动在腿交回之后被别的会话改过，引的句子逐字都在，不算引错。
 - 主 agent 现查第 556 条：
   - 库目录 `versions/19c45e02…/results.tsv` 那一行是「556	singlefs-core	crates/singlefs-core/src/allocator.rs:837:9: replace ReuseWindow::name -> &'static str with ""	timeout	one		11.1	1392.2」。
   - 攻方副本证据 `crates-copy-evidence/mutation-556-single-catching-test.txt` 里有「FAIL [ 147.570s] (1/1) singlefs-harness::test_only_switches_force_every_branch …」「test result: FAILED. 0 passed; 1 failed; … finished in 147.57s」「left: ""」。

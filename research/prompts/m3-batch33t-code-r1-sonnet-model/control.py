@@ -12,7 +12,7 @@ new = old.replace('referenced_by_candidates.contains(&key) || ', '')
 assert orig.count(old) == 1 and old != new
 try:
     open(p, 'w', encoding='utf-8').write(orig.replace(old, new))
-    cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/research/scripts/run-with-memory-cap.sh', '4G', 'bash', scripts_repo + '/research/scripts/capped.sh', '10',
+    cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/scripts/run-with-memory-cap.sh', '4G', 'bash', scripts_repo + '/scripts/capped.sh', '10',
            'cargo', 'test', '-p', 'singlefs-harness', '--test', 'sonnet_probe_b33t', '--', '--nocapture', '--test-threads=1', 'p23']
     r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=220)
 finally:

@@ -8,13 +8,13 @@
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=/home/fy5090/code/singlefs
-R=$REPO/research/scripts
+R=$REPO/scripts
 case ${1:-} in
   setup)
     W=${2:?草稿目录}; FROZEN=${3:-$HOME/.local/share/singlefs/work/m3-batch10y-code-r1/tree}
     mkdir -p "$W"; [ -z "$(ls -A "$W")" ] || { echo "草稿目录不空：$W" >&2; exit 2; }
     mkdir -p "$W/repo" "$W/out"
-    rsync -a --exclude /target --exclude /.git --exclude /research/target "$FROZEN/" "$W/repo/"
+    rsync -a --exclude /target --exclude /.git --exclude /scripts/experiments/target "$FROZEN/" "$W/repo/"
     (cd "$W/repo" && patch -p1 -s < "$HERE/opus-k4-arms.patch")
     cp "$HERE/opus_10y_ledger_probe.rs" "$HERE/opus_10y_k4_probe.rs" "$W/repo/crates/singlefs-harness/tests/"
     cd "$W/repo" && CARGO_TARGET_DIR="$W/target" nice -n 19 bash "$R/run-with-memory-cap.sh" 8G bash "$R/capped.sh" 10 \

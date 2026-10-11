@@ -4,9 +4,9 @@
 
 ## 一、核查
 
-- `python3 research/scripts/cite-check.py <两份报告> --root . --background research/prompts/_test-script-align-r3-background.md`：「✓ 核了 54 处引文，对上 54 处，没判 0 处」。
+- `python3 scripts/cite-check.py <两份报告> --root . --background research/prompts/_test-script-align-r3-background.md`：「✓ 核了 54 处引文，对上 54 处，没判 0 处」。
 - 开工快照 `research/prompts/test-script-align-r3-snapshot/judged-sha256.txt` 判决前 `sha256sum -c` 全对。
-- 攻方 A1、A2 主 agent 现查（`research/prompts/test-script-align-r2-opus-model/hook-probe.py` 喂本仓 `heavy-test-guard.sh`，以 implementation-writer 身份）：`bash research/scripts/mutat[[:alpha:]].sh crates/mutations.tsv` 退 0（A1：POSIX 字符类，钩子的 python glob 不认、零命中落回字面放行）；`bash research/scripts/crash-amplification.sh` 退 0（A2：崩溃放量全量入口不在按名字判的重型表里）；对照 `bash research/scripts/crash-amplification-two-hosts.sh --selftest` 退 2。`bash .claude/gate.d/54-layer0-repla[[:alpha:]].sh <根>` 退 2（这一条另有判法拦住，A1 的形态不是每条都中）。
+- 攻方 A1、A2 主 agent 现查（`research/prompts/test-script-align-r2-opus-model/hook-probe.py` 喂本仓 `heavy-test-guard.sh`，以 implementation-writer 身份）：`bash scripts/mutat[[:alpha:]].sh crates/mutations.tsv` 退 0（A1：POSIX 字符类，钩子的 python glob 不认、零命中落回字面放行）；`bash scripts/crash-amplification.sh` 退 0（A2：崩溃放量全量入口不在按名字判的重型表里）；对照 `bash scripts/crash-amplification-two-hosts.sh --selftest` 退 2。`bash .claude/gate.d/54-layer0-repla[[:alpha:]].sh <根>` 退 2（这一条另有判法拦住，A1 的形态不是每条都中）。
 - 正推 V3 复现了前两轮报的自证格数、种数、开关数、样本判对数、探针退出码，都对得上；对不上的几处它写明了原数、复现数与命令（54 号 12 个开关里 6 个文件头点名的样本与实测判错的不相等；术语计数的原取法没留下）。主 agent 没逐条复跑，照它的模型目录采。
 
 ## 二、判定与去向
@@ -32,7 +32,7 @@
 | 4 | C622 标记谁设 | M1 / M2 / M3 | 交用户 |
 | 5 | 崩溃放量全量由谁跑 | 记欠账，下一批在崩溃验证员定义或门禁里加一道 | 记账 |
 
-用户 2026-10-01 弹窗定：第 1 行「现在就修」（交 `tooling-writer`，经 `research/scripts/hook-swap.py` 换上，零轮）；第 2 行 C623 取「按项登记」；第 3 行 C625 取「B mutate.sh 写法」；第 4 行 C622 取「M2 样本根里放」。三处定案交 `kb-scribe` 写回欠账表。
+用户 2026-10-01 弹窗定：第 1 行「现在就修」（交 `tooling-writer`，经 `scripts/hook-swap.py` 换上，零轮）；第 2 行 C623 取「按项登记」；第 3 行 C625 取「B mutate.sh 写法」；第 4 行 C622 取「M2 样本根里放」。三处定案交 `kb-scribe` 写回欠账表。
 
 ## 四、被判文件里点名的定义与共用约束
 

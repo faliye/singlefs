@@ -16,6 +16,6 @@
 ## 重建
 
 1. `rsync -a <冻结副本>/ tree-a/`；拷 `src/p10z_probe.rs.txt` 成 `tree-a/crates/singlefs-harness/tests/p10z_probe.rs`；按两份 `*-debug.diff` 手工改 `tree-a` 的 `allocator.rs`、`mounted_session.rs`。
-2. `cd tree-a && CARGO_TARGET_DIR=<目录> bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 15 cargo test --release --offline -p singlefs-harness --test p10z_probe --no-run`。
+2. `cd tree-a && CARGO_TARGET_DIR=<目录> bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 15 cargo test --release --offline -p singlefs-harness --test p10z_probe --no-run`。
 3. `bash scripts/par4.sh < 清单` 跑探针（清单每行 `日志名 环境变量…`）。
 4. 扫源码模型：`src/scan-*-Cargo.toml.txt` 改名 `Cargo.toml`、`src/scan-*-main.rs.txt` 改名 `src/main.rs`，`cargo build --release --offline`；`replay-*.rs.txt` 直接 `rustc --edition 2021 -O`。

@@ -2,7 +2,7 @@
 """replay23.py <行文件.tsv> [行号…] ：把第二十三块变异行的 旧串→新串 套到扫源码小程序（build/{gpu,crash}-main.rs），rustc 编、跑，报哪些用例红、点名的那条红没红。"""
 import os, re, subprocess, sys
 W = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-xy-code-r1-sonnet/scan')
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 S = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree/crates/singlefs-checker-tier/src/')
 rows = [l.rstrip('\n').split('\t') for l in open(sys.argv[1]) if l.strip()]
 only = set(map(int, sys.argv[2:])) or set(range(1, len(rows) + 1))

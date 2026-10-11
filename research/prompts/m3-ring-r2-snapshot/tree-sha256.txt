@@ -219,7 +219,7 @@ cb6679b5b83bedae5af87752dead4eec3bc46a526a5efb90dd4e02764d2a28ff  .claude/kb/dec
 c189929a99ac051b05ff1ae1c8b1b34f87daf4ede7268fcfcd9cdbaeb9aa120a  .claude/kb/decisions/05-快照-空间记账机制.md
 2c07c54b234dd9d70bacbcff08f334a9a3e0839addccbbfe20a55f2cb9f986ae  .claude/kb/decisions/21-权威态与派生态的分界.md
 3eb1b773bc5fb71458f168670af2da521cebbda4f09f5ca52c7441f3d501ac5d  .claude/kb/decisions/03-空间分配.md
-b6d425e33c6fbfad1809af48003230eec8134050bfb2f75ab68fde2919477233  .claude/kb/milestone/04-fourth-txn.md
+b6d425e33c6fbfad1809af48003230eec8134050bfb2f75ab68fde2919477233  .claude/kb/milestone/05-fifth-txn.md
 5453d29326213d9885d946358f74472c43abe0f7d6a704db054bc32d5965288d  .claude/kb/milestone/01-first-txn.md
 beee8234cea1dd9f86a211490d86930b25fd0e5824ef4142fde5c0a03f3129fc  .claude/kb/milestone/03-third-txn.md
 e4697297d6c317174094d1c69fe09d41600b9ed8a3e4f38ebb921cc5594db611  .claude/kb/milestone/02-second-txn.md

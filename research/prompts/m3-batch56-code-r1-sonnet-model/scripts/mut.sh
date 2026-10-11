@@ -20,7 +20,7 @@ print("mutated", rel)
 PY
 rc=$?
 if [ $rc -ne 0 ]; then cp "$F/$rel" "$rel"; exit $rc; fi
-nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 10 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 10G cargo test --offline "$@" > "$W/logs/$label.log" 2>&1
+nice -n 19 bash /home/fy5090/code/singlefs/scripts/capped.sh 10 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 10G cargo test --offline "$@" > "$W/logs/$label.log" 2>&1
 echo "exit=$?" >> "$W/logs/$label.log"
 cp "$F/$rel" "$rel"
 cmp "$F/$rel" "$rel" && echo restored

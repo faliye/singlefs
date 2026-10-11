@@ -48,10 +48,10 @@
 
 ### E3　正式跑（`replay.sh` 里起 E165 装置的）与族
 
-- r1：合法一族「--family legal」（`research/scripts/replay.sh:703`，轻档同一族在 `:706`），对抗一族「--bounds segment1 --family adversarial」（`research/scripts/replay.sh:710`）。r1 档没有多盘：「if selection.families.contains(&Family::MultiDisk) && !run_profile.judges_j6qn() {」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:17696`）。
-- r2 直接建表只有多盘一族：「--bounds segment1 --family multi_disk --profile r2」（`research/scripts/replay.sh:738`）。三族都在 r2 两份表都取下起：「--family legal --profile r2 --table both」（`research/scripts/replay.sh:741`）、「--family adversarial --profile r2 --table both」（`research/scripts/replay.sh:744`）、「--family multi_disk --profile r2 --table both」（`research/scripts/replay.sh:747`）；反盘次序两条（第 750、753 行）是同一档同一集合（`run_profile_of_a_control` 把表与盘次序旋钮摘掉再补 T，「fn run_profile_of_a_control(control: ControlKind, run_profile: RunProfile) -> RunProfile {」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:6300`）。
-- r3 只有对抗一族：「--family adversarial --profile r3」（`research/scripts/replay.sh:763`）；择根一族 `--family root_choice` 与 r4 的 `root_choice_faults` 走各自的对照，不进 `Criterion`，模型不含。
-- r5 三族：「--family legal --profile r5」（`research/scripts/replay.sh:855`）、「--family adversarial --profile r5」（`research/scripts/replay.sh:858`）、「--family multi_disk --profile r5」（`research/scripts/replay.sh:861`），奇偶另一种两条（第 864、867 行）。
+- r1：合法一族「--family legal」（`scripts/replay.sh:703`，轻档同一族在 `:706`），对抗一族「--bounds segment1 --family adversarial」（`scripts/replay.sh:710`）。r1 档没有多盘：「if selection.families.contains(&Family::MultiDisk) && !run_profile.judges_j6qn() {」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:17696`）。
+- r2 直接建表只有多盘一族：「--bounds segment1 --family multi_disk --profile r2」（`scripts/replay.sh:738`）。三族都在 r2 两份表都取下起：「--family legal --profile r2 --table both」（`scripts/replay.sh:741`）、「--family adversarial --profile r2 --table both」（`scripts/replay.sh:744`）、「--family multi_disk --profile r2 --table both」（`scripts/replay.sh:747`）；反盘次序两条（第 750、753 行）是同一档同一集合（`run_profile_of_a_control` 把表与盘次序旋钮摘掉再补 T，「fn run_profile_of_a_control(control: ControlKind, run_profile: RunProfile) -> RunProfile {」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:6300`）。
+- r3 只有对抗一族：「--family adversarial --profile r3」（`scripts/replay.sh:763`）；择根一族 `--family root_choice` 与 r4 的 `root_choice_faults` 走各自的对照，不进 `Criterion`，模型不含。
+- r5 三族：「--family legal --profile r5」（`scripts/replay.sh:855`）、「--family adversarial --profile r5」（`scripts/replay.sh:858`）、「--family multi_disk --profile r5」（`scripts/replay.sh:861`），奇偶另一种两条（第 864、867 行）。
 - 对照取的族是命令行的族：「positive_control_readings(&selection.families, run_profile, thread_count);」（`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:17769`）。
 - 模型逐个正式跑算出对照条数（`rerun-output.txt:20` 至 `:34`），再按档并起来比写死集合：r1 18 = 18、r2 两份表都取 30 = 30、r5 28 = 28；r2 直接建表 4 对 28、r3 8 对 29，都是子集（`rerun-output.txt:37` 至 `:41`）。
 - 判定：没有一档「正式跑判了而集合里没写」（并都 ⊆ 写死）。「写了而正式跑不起」有两档：r2 直接建表（24 条）与 r3（21 条）——写死集合是整档（全族）的集合，而正式跑只起一两族。这两档是虚档，不碍：对任何族子集，正式跑的对照集合 = 整档集合 ∩ 族过滤，整档集合对了、过滤也对，就对（过滤没人钉，见 E5）。
@@ -145,7 +145,7 @@
 ## 四、模型与复跑
 
 - 目录 `research/prompts/m3-formal-code-b37-r2-sonnet-model/`：`tools/model.py`（sha256 `514b9c29895c36e6a6828722fe0561123da602d75fac11d4a479071e065d166f`）、`tools/rerun.sh`（`fbb4bace23650d14d9d09bb4b14a525ba07d55ab0d8db08a6d25c1276b1a9d65`）、`rerun-output.txt`（`1e5ef3291a3712a503bbb1b6ddd52315c8b72265ff58e589798133596a4c95b0`，131 行）。
-- 复跑：`bash research/prompts/m3-formal-code-b37-r2-sonnet-model/tools/rerun.sh`，工作目录仓根，默认读冻结副本和仓根；有 `rerun-output.txt` 就逐字比，末行「与 rerun-output.txt 逐字相同」。我跑了四遍，都相同。纯 Python，没有 cargo，所以没有要经内存包装的命令。它读仓里的 `research/scripts/replay.sh` 与 `research/results/` 下 2026-10-04 的产物；这两处别的会话改了输出会变（`replay.sh` 现在是 `MM` 状态）。
+- 复跑：`bash research/prompts/m3-formal-code-b37-r2-sonnet-model/tools/rerun.sh`，工作目录仓根，默认读冻结副本和仓根；有 `rerun-output.txt` 就逐字比，末行「与 rerun-output.txt 逐字相同」。我跑了四遍，都相同。纯 Python，没有 cargo，所以没有要经内存包装的命令。它读仓里的 `scripts/replay.sh` 与 `research/results/` 下 2026-10-04 的产物；这两处别的会话改了输出会变（`replay.sh` 现在是 `MM` 状态）。
 - 模型的前提（推翻它们就推翻对应数字）：判据到谓词的映射与 `family()` 是从源码解析出来的，不是我抄的；登记规则 `registered()` 是我读 r1、r2、r3、r5 登记写的，出处在 E2；「正式跑」取自 `replay.sh` 里起 E165 装置的行（不含 `root_choice`、`root_choice_faults`、r4）；改坏假设「多一条对照一定红」对旧并集单测是宽的（旧单测少抓不会多抓）。
 
 ## 五、没做什么
@@ -160,6 +160,6 @@
 
 没有必须跑的。想把 E5 的换族坏法在入库装置上坐实（我只在模型里量过），可选：在草稿副本里把 `Criterion::family` 的 `Self::ALimit` 从对抗一族臂移到合法历史一族臂，然后
 
-`cd <副本根> && SINGLEFS_HEAVY_TESTS=user-request bash research/scripts/run-with-memory-cap.sh 24G bash research/scripts/capped.sh 15 cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- every_criterion_has_a_positive_control_and_every_control_is_red`
+`cd <副本根> && SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 24G bash scripts/capped.sh 15 cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- every_criterion_has_a_positive_control_and_every_control_is_red`
 
 预期（模型推的，没跑过）仍是 `1 passed`；同一份副本上 `--family adversarial --profile r5` 的 `name=control` 行里不再有 `criterion=A_limit`，合法一族多一条。看到单测红，就说明 E5 说的放过不成立。

@@ -6,5 +6,5 @@ bin=$(ls -t target/release/deps/opus_r2_rr2_attack-* | grep -v '\.d$' | head -n 
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-150}"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="派出去的攻方腿 m3-batch10-code-r2-opus 在自己的副本上并行跑原型"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="原型各段参数不同，峰值表里那一次是另一段"
-nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh "$cap" bash /home/fy5090/code/singlefs/research/scripts/capped.sh 1 "$bin" "$@" > "$log" 2>&1
+nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh "$cap" bash /home/fy5090/code/singlefs/scripts/capped.sh 1 "$bin" "$@" > "$log" 2>&1
 echo "$?"

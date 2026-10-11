@@ -12,7 +12,7 @@
 | 开工快照 | `research/prompts/m3-delete-r3-snapshot/`：`crates-sha256.txt`（210 份，冻结副本 `/tmp/claude-1000/m3-delete-r2/tree/`）、`kb-sha256.txt`（13 份） | 腿交齐之后冻结副本 `sha256sum -c` 全 OK；kb 13 份里 12 份 OK，`.claude/kb/checks-owed.md` 被别的会话改过（`git diff HEAD` 的改动在第 45、108 行起，第 45 行原位替换不挪行号）；腿只引了它第 100 行（辩方第二节 W4 行），落在改动之外 |
 | 云端辩方（Sonnet） | `research/prompts/m3-delete-r3-sonnet-output.md`（318 行，sha256 53770c87…3900）；模型 `research/prompts/m3-delete-r3-sonnet-model/` | 第四节复跑 |
 | 云端攻方（Opus） | `research/prompts/m3-delete-r3-opus-output.md`（321 行，sha256 9b51ef43…6d0）；模型 `research/prompts/m3-delete-r3-opus-model/` | 第四节复跑 |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-delete-r2/tree --root . --background research/prompts/_m3-delete-r3-background.md`：「✓ 核了 95 处引文，对上 95 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-delete-r2/tree --root . --background research/prompts/_m3-delete-r3-background.md`：「✓ 核了 95 处引文，对上 95 处，没判 0 处」 |
 
 两条腿的数都是副本原型（冻结副本 + 删除第二轮攻方 `core-prototype-r2.diff`）或计数模型上量的；原型里没有墓碑树、`deleted_inodes`、谱系记录，那几样的单元数是按角色表加的。进 kb 之前在入库装置上重做。
 

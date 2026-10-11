@@ -11,7 +11,7 @@ start=next(i for i,l in enumerate(src) if 'let formal_run_units' in l)
 end=next(i for i,l in enumerate(src) if i>start and 'let mut controlled_in_some_unit' in l)
 units=[];cur=None
 for l in src[start:end]:
-    m=re.search(r'research/scripts/replay.sh` 第 ([\d、]+) 行；产物 `([^`]+)`，(\d+) 条',l)
+    m=re.search(r'scripts/replay.sh` 第 ([\d、]+) 行；产物 `([^`]+)`，(\d+) 条',l)
     if m: cur={'line':m.group(1),'prod':m.group(2),'n':int(m.group(3)),'crit':[]};units.append(cur);continue
     m=re.match(r'\s+Criterion::(\w+),?\s*$',l)
     if m and cur is not None: cur['crit'].append(m.group(1))

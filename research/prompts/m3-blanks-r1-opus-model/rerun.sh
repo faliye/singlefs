@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 复跑：bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 15 bash <本目录>/rerun.sh <输出目录>
+# 复跑：bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 15 bash <本目录>/rerun.sh <输出目录>
 # 四个纯 Python 模型，不读盘、不编译；输出拼成 <输出目录>/model-output.txt，与本目录那份逐字比。
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"

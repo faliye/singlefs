@@ -26,7 +26,7 @@
 模型目录 `research/prompts/m3-leaf-death-r3-opus-s2-model/`（Rust 模型从第二轮攻方模型拷起改的；`clone/` 是克隆头模型；`copy/` 是放进仓副本的一个 harness 测试目标与给副本加开关的补丁脚本）。复跑（仓根；每条经内存包装，编译 6G、其余 4G，6 线程；同一时刻只起一条 cargo；路径从环境变量与参数取）：
 
 ```
-S=research/scripts; M=research/prompts/m3-leaf-death-r3-opus-s2-model; O=<空目录>
+S=scripts; M=research/prompts/m3-leaf-death-r3-opus-s2-model; O=<空目录>
 export R3S2_MODEL_DIR=$PWD/$M SINGLEFS_REPO=/home/fy5090/.local/share/singlefs/work/m3-leaf-death-r1/tree
 bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 6 bash $M/rerun.sh $O build
 for st in sweep-0 sweep-1 sweep-2 sweep-3 sweep-4; do bash $S/run-with-memory-cap.sh 4G bash $S/capped.sh 6 bash $M/rerun.sh $O $st; done

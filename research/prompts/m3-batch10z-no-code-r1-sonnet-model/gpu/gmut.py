@@ -4,7 +4,7 @@ import os, sys, json, subprocess, shutil, re
 W = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet')
 FROZEN = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-no-code-r1/tree/crates/singlefs-harness/src/gpu_memory_ledger.rs')
 DST = W + '/tree-mut/crates/singlefs-harness/src/gpu_memory_ledger.rs'
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 rows = json.load(open(sys.argv[1]))
 want = sys.argv[2:]
 env = dict(os.environ, CARGO_TARGET_DIR=W + '/target-mut')

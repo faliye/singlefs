@@ -18,7 +18,7 @@ cat "$HERE/probe.rs" >> "$WORK/repo/crates/singlefs-harness/tests/checker_known_
 export CARGO_TARGET_DIR="$WORK/target"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-上限按派发提示写死 4G 与 6G，峰值表按实测收紧}"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-派出去的几个 agent 各跑各的}"
-SCRIPTS="$SINGLEFS_REPO/research/scripts"
+SCRIPTS="$SINGLEFS_REPO/scripts"
 cd "$WORK/repo"
 nice -n 19 bash "$SCRIPTS/run-with-memory-cap.sh" 6G bash "$SCRIPTS/capped.sh" 10 cargo test --offline -p singlefs-harness --test checker_known_bad_images --no-run >"$WORK/build.log" 2>&1
 {

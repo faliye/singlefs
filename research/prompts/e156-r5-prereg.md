@@ -27,7 +27,7 @@
 > 要点：
 > - 变的输入：core 断言（31-1）；装置 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 内联单测用的 `new_pool_file_creation_state` 装根环表（第 31 批 31-3 做，补丁 /tmp/claude-1000/m3-formal-31-3/patch/ 交回后才有）；W7 那一格阳性对照 PC-分配器（第 4732 行起，经第 1420 行 `allocator_without_the_root_ring`：「换回不装根环表的分配器，环转过一圈之后 A10 应判红」）今天在第一次记根时 panic。
 > - 问题单第 1 行：给 W7 那一格换对照，候选三个（换一种不经分配器 API 造「不回收」的对照臂 / 改成断言 panic 的对照 / 撤掉这一臂并写明它证的东西由 core 断言接管），每个候选写清「证的是不是原对照那件事」、什么观测会让它翻面；照 test-discipline「阳性对照必须对每一条被测的臂都跑」「检查本身也可能是错的」判，选一个写死（选的理由写进登记），并写清那一臂的改法交执行员（装置改动由执行员在第 31 批合入之后做，你不写代码）。
-> - 问题单第 2 行：第 4 次已够判的读数在新 crates/ 上逐字段重比；产物新文件名，第 4 次产物不动；`research/scripts/replay.sh` 第 193 行改指新产物。
+> - 问题单第 2 行：第 4 次已够判的读数在新 crates/ 上逐字段重比；产物新文件名，第 4 次产物不动；`scripts/replay.sh` 第 193 行改指新产物。
 > - 起跑前提写明：第 31 批（31-1、31-2、31-3）合入主工作区、合入验证绿之后才起跑。
 > 交付：登记文件；报告 `/tmp/claude-1000/e156-r5-designer/report.md`。
 
@@ -40,7 +40,7 @@
 
 <!-- doc-lint:not-numbers PC A10 W7 -->
 
-用户 2026-10-05 定「core 在分配器没装根环表而记了一条根时断言」（弹窗选项原文「再加 core 断言」；起因是 E171 流三的 I-3.1 红，调查报告 `/tmp/claude-1000/e171-s1-i31-investigation/report.md`），第 31 批 31-1 实现它（报告 `/tmp/claude-1000/m3-formal-31-1/report.md` 第 9 节）。E156 装置 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 有两处因此在第一次记根时 panic：W7 的阳性对照 PC-分配器（第 4732 行起，`HhAllocatorSource::WithoutRootRingPositiveControl`，经第 1420 行 `allocator_without_the_root_ring`：「换回不装根环表的分配器，环转过一圈之后 A10 应判红」），与内联单测 `new_pool_file_creation_state`（第 5052 行，7 处调用）。`research/scripts/replay.sh` 第 193 行 `E156|@driver_e156||e156-alloc-basis-counts-2026-09-26-r2.out|exact` 会因此对不上。
+用户 2026-10-05 定「core 在分配器没装根环表而记了一条根时断言」（弹窗选项原文「再加 core 断言」；起因是 E171 流三的 I-3.1 红，调查报告 `/tmp/claude-1000/e171-s1-i31-investigation/report.md`），第 31 批 31-1 实现它（报告 `/tmp/claude-1000/m3-formal-31-1/report.md` 第 9 节）。E156 装置 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 有两处因此在第一次记根时 panic：W7 的阳性对照 PC-分配器（第 4732 行起，`HhAllocatorSource::WithoutRootRingPositiveControl`，经第 1420 行 `allocator_without_the_root_ring`：「换回不装根环表的分配器，环转过一圈之后 A10 应判红」），与内联单测 `new_pool_file_creation_state`（第 5052 行，7 处调用）。`scripts/replay.sh` 第 193 行 `E156|@driver_e156||e156-alloc-basis-counts-2026-09-26-r2.out|exact` 会因此对不上。
 
 | # | 问题 | 候选 | 翻面观测 | 够判条件 | 状态 |
 |---|---|---|---|---|---|
@@ -270,7 +270,7 @@
 | J28 | **变异表里的 E156 M35**：`crates/mutations.tsv` 第 803 行，把 `allocator_after_make_filesystem(parameters, devices, genesis)` 换成 `allocator_without_the_root_ring(devices, genesis)`，点名 U14 | `awk -F'\t' 'NR==803'` |
 | J29 | **31-1 追加的三行变异**（合入后在 `crates/mutations.tsv` 末尾）：第 1 行「C551：分配器没装根环表记根时静默返回（不断言）」点名 core 单测 `recording_a_root_on_an_allocator_without_a_root_ring_occupancy_panics_instead_of_never_reclaiming`；第 2 行「C551：记根时环转了也不回收…」把 `self.reclaim_released_records_up_to(reclaim_floor, ReclaimedReuse::Immediately);` 换成返回空 `Vec` 的块，点名 harness 用例；第 3 行 `build_pool` 不装根环表 | 31-1 `mutations-append.tsv`（sha256 `2e0520ff…`）；`grep -c` 那一句原文在今天的 `allocator.rs` 里命中 1 次 |
 | J30 | **公有的根环表构造**：`RootRingOccupancy::read_from_the_ring`（`allocator.rs:1040`）按调用方给的槽与住客建表，住客可以是 `BadAtMount`（挂载时读坏，回收门槛钉在它可能住过的最旧 txg，直到这个进程把那一槽写掉）；`install_root_ring_occupancy`（第 1877 行）装上 | `allocator.rs:989-1060`、`:1877` |
-| J31 | **复跑行**：`research/scripts/replay.sh:193` `E156\|@driver_e156\|\|e156-alloc-basis-counts-2026-09-26-r2.out\|exact`；`driver_e156` 在第 1181–1183 行，经内存包装 `cargo run -q -p singlefs-checker-tier --bin e156_allocation_basis_counts` | `grep -n` |
+| J31 | **复跑行**：`scripts/replay.sh:193` `E156\|@driver_e156\|\|e156-alloc-basis-counts-2026-09-26-r2.out\|exact`；`driver_e156` 在第 1181–1183 行，经内存包装 `cargo run -q -p singlefs-checker-tier --bin e156_allocation_basis_counts` | `grep -n` |
 | J32 | 今天的装置：5776 行，sha256 `f1930d4e…`，相对 HEAD 只多 1 行（`git diff --cached --stat`：1 insertion） | `wc -l`、`sha256sum`、`git diff --stat` |
 
 **对装置的直接后果**：① I1 合入之后 J22 那一臂在 `main` 里 panic，`main` 交不出第二段的 verdict 与其后的各行，`replay.sh:193` 对不上（问题单出处行同判）；② J24、J25 让第 2 行的规范化可以只按「族名 = PC-allocator」与「行名 = pc_allocator」两条摘行，不用猜；③ J23 那段判定本身不依赖分配器有没有根环表，换对照时可以原样复用；④ q1_cell 行打 `allocator=ProductPathWithRootRing`，删成员时这个 Debug 名不能变，否则第 2 行每一格都多一处不同。
@@ -288,7 +288,7 @@
 | P5 | D16 已定项 1 依据新加的一条：「每个洞回收门槛多压一圈（正推腿端口上 S = 16 平均 893 块对窗口门槛 583 块）」「持续写失败 15 / 30 / 60 / 120 次时最多扣住 50 / 80 / 140 / 260」「连崩 13 次之后挂载（S = 4），已分配 166 块、窗口门槛同一段 26 块」 | 第二节重取的条款 | 这是岔路 1 题目本身的代价数（洞上多扣），出自两条腿各自的模型，不是入库装置的数。这一份不新定岔路 1 的门槛（第 4 次的 2 槽 / 1 槽不动，第 2 行只比读数），不受它影响；不引 |
 | P6 | **我算出来的（写第一行的判据之前）**：在第 4 次锚点 `--dump` 上数「释放代 r 的树表第一次在观测点上可发」，Hh(1, 后, S) 里 r = 6 的滞后 = 23 / 47 / 95（S = 4 / 8 / 16，= 6S − 1），r = 5 的 = 24 / 48 / 96；同一法在 Hh(0, —, S) 上给 12 / 24 / 48（= 3S，与 A10 同，算法自检）。又推了一条（读码，没跑）：M44 那种「不读空闲位图、按 3S 的时间表记」的滞后，在 Hh(1, 后, S = 4) 上给 {12, 13, 14} 一类值（挂载里的写行与暖机不观测），不含 23 | 第十三节命令三、命令四的原样输出 | 就是第七节 K15、L1 与第五节 PC-钉门槛「必须看到」那一格的值；也是第一节 W11「只看『不符』不够」的依据 |
 | P7 | **我预估的（读码，没跑）**：第 2 行在规范化之后「相同」——31-1 只换了没装根环表那一支（J21），31-3 只改内联单测的起点（I2），装置主路径用的都是装着根环表的分配器（第 4 次 W7）。但第 4 次产物之后别的批改过 `crates/`（I5，例：D16 已定项 1 退回环里最旧有效根、准入式子加环窗口），我没核那些改动碰不碰族的读数。看到的一处：装置第 697 行（已暂存、没提交）给 checker 新加的判定结果 `PartiallyJudged` 补了一支 `"partially_judged"`，它只经第 4579 行进 U13a 那一行（`name=u13a_rollback_to_oldest_candidate`），I-3.11 若在新 `crates/` 上判成「部分判了」，那一行会变 | 第三节 J21–J26、第二节 | 不改判据；量出「不同」就照第十节 F26 / F27 记、Q2c 判归属，不回头解释成「预估错了所以不算」 |
-| P8 | 问题单出处行：「`research/scripts/replay.sh` 第 193 行 … 会因此对不上」 | 问题单 | 与 J22 后果 ① 同；没核今天（31 批之前）那一行复跑绿不绿 |
+| P8 | 问题单出处行：「`scripts/replay.sh` 第 193 行 … 会因此对不上」 | 问题单 | 与 J22 后果 ① 同；没核今天（31 批之前）那一行复跑绿不绿 |
 
 ## 五、臂、阳性对照、真实基线
 
@@ -492,7 +492,7 @@
 - `.claude/agent-common.md`：整份（100 行）
 - `.claude/singlefs-ai-sop/rules/test-discipline.md`（122 行）、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`（176 行）、`.claude/rules/three-way-inference.md`（174 行）、`.claude/rules/mutation-sampling.md`（96 行）、`.claude/rules/implementation-first.md`（20 行）：整份
 - `.claude/agents/experiment-runner.md`：`grep -n '第 4 步\|^4\.\|文件名'` 命中的第 31、33、35、38、39、40 行
-- `research/scripts/replace-once.py`：`--help` 的输出
+- `scripts/replace-once.py`：`--help` 的输出
 
 ### 13.2 派发给的输入、前几次登记、记录
 
@@ -517,7 +517,7 @@
 - `crates/singlefs-core/src/allocator.rs`（sha256 `c80d321d…`，`git status` 为 `MM`）：第 960–1060、1870–1925、1909–1913 行；`grep -n 'pub fn\|pub struct RootRingOccupancy\|pub enum\|impl RootRingOccupancy'` 里与根环、回收有关的命中行；`grep -n 'let Some(occupancy) = self.root_ring.as_mut() else'` → 第 1915 行
 - `crates/singlefs-format/src/lib.rs:279`（`ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM = 8`，`grep` 命中）
 - `crates/mutations.tsv`：前 3 行（表头）；`grep -n 'E156'` 命中行（前 220 字符）；第 803 行六段
-- `research/scripts/replay.sh`：第 185–200、526–580 行；`grep -n 'driver_e156\|E156\|e156'` 命中行（第 193、528、534、539、551、561、1181、1182 行）
+- `scripts/replay.sh`：第 185–200、526–580 行；`grep -n 'driver_e156\|E156\|e156'` 命中行（第 193、528、534、539、551、561、1181、1182 行）
 
 ### 13.5 跑过的命令（原样；读文件的 `sed` / `awk` / `grep -n` / Read 在上面按行列过，不重列）
 
@@ -554,7 +554,7 @@ ls: cannot access 'research/prompts/e156-r5-prereg.md': No such file or director
 **命令一**（第 4 次第十三节命令一原样，只换出口；第二节与第十一节 S2 用它）：
 
 ```
-$ nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e156-r5-designer/quotes/e156-r5-clauses-now.md \
+$ nice -n 19 python3 scripts/quote-kb.py /tmp/claude-1000/e156-r5-designer/quotes/e156-r5-clauses-now.md \
    '.claude/kb/decisions/28-挂载期承诺量.md@#### 已定项 1：准入不等式的权威形式' \
    '.claude/kb/decisions/28-挂载期承诺量.md@#### 已定项 3：实例切换的预留' \
    '.claude/kb/decisions/16-发布语义.md@#### 已定项 1：defer 窗口取按盘回退下界的收严形态，按状态数读' \
@@ -576,7 +576,7 @@ same
 **命令二**（第一节的问题单）：
 
 ```
-$ nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e156-r5-designer/quotes/e156-r5-question.md 'research/prompts/e156-r5-questions.md:1-10'
+$ nice -n 19 python3 scripts/quote-kb.py /tmp/claude-1000/e156-r5-designer/quotes/e156-r5-question.md 'research/prompts/e156-r5-questions.md:1-10'
   ✓ 1 段整抄进 /tmp/claude-1000/e156-r5-designer/quotes/e156-r5-question.md，回读逐字节一致     # rc=0
 $ sha256sum …/quotes/e156-r5-question.md
 20e4eec9af3211f396db131d9b9169c05dc4604b8daa8b95f973243b4a029fb3  …/quotes/e156-r5-question.md

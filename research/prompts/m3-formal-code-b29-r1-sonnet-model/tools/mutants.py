@@ -6,7 +6,7 @@
   mutants.py anchors <tsv> <树根>               逐行数原文在文件里命中几次（恰 1 才算锚点好）
   mutants.py list <tsv> [--harness]
   mutants.py run <tsv> <树根> <序号> [<序号>…]  施加→cargo test→还原；打 RESULT 行
-环境：CARGO_TARGET_DIR、REPO（主仓根，找 research/scripts）必须设。
+环境：CARGO_TARGET_DIR、REPO（主仓根，找 scripts）必须设。
 """
 import os, re, subprocess, sys, time
 
@@ -63,7 +63,7 @@ def run(tsv, root, idxs):
         try:
             args = r['cmd'].split(' ')
             # cmd 形如 "-p pkg --test x -- filter"；用例名过滤放在 -- 之后
-            base = ['nice', '-n', '19', 'bash', f'{repo}/research/scripts/run-with-memory-cap.sh', '8G', 'bash', f'{repo}/research/scripts/capped.sh', '10', 'cargo', 'test', '--offline'] + args
+            base = ['nice', '-n', '19', 'bash', f'{repo}/scripts/run-with-memory-cap.sh', '8G', 'bash', f'{repo}/scripts/capped.sh', '10', 'cargo', 'test', '--offline'] + args
             env = dict(os.environ)
             env['RUN_WITH_MEMORY_CAP_WAIT_SECONDS'] = '150'
             env['RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON'] = '变异跑道，上限取派发给的 8G'

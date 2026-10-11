@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 用法：SINGLEFS_REPO=<冻结副本根（含 crates/）> SINGLEFS_MAIN_REPO=<主仓根，只取 research/scripts/> bash rerun.sh <输出目录> [阶段…]
+# 用法：SINGLEFS_REPO=<冻结副本根（含 crates/）> SINGLEFS_MAIN_REPO=<主仓根，只取 scripts/> bash rerun.sh <输出目录> [阶段…]
 #   第一次调用输出目录必须为空（或不存在）；同一输出目录里可以接着调下一个阶段（分段跑：每段前台 ≤ 4 分钟，同一时刻只起一条 cargo，每条 cargo 经内存包装 6G / 8G、线程 15）。
 #   阶段：static（sha256 + 变异表全表锚点）  f2diff（差分模型，不编译）  baseline（编译 + 基线 harness 用例 + core lib）
 #         mut <从> <到>（变异行序号区间，追加写 mutations.txt；全表 48 行，checker 档行打 SKIPPED）  adhoc（窄版 A1–A3，追加写 adhoc.txt）
@@ -9,7 +9,7 @@ set -euo pipefail
 : "${SINGLEFS_REPO:?要设 SINGLEFS_REPO}"; : "${SINGLEFS_MAIN_REPO:?要设 SINGLEFS_MAIN_REPO}"
 out=${1:?要给一个输出目录}; shift || true
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-S=$SINGLEFS_MAIN_REPO/research/scripts
+S=$SINGLEFS_MAIN_REPO/scripts
 mkdir -p "$out"
 if [ ! -d "$out/work/repo" ]; then
   [ -z "$(ls -A "$out" 2>/dev/null)" ] || { echo "输出目录第一次用必须是空的：$out" >&2; exit 2; }

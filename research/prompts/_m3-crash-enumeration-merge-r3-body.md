@@ -21,14 +21,14 @@
 前两轮正文第二节、事实表 `~/.local/share/singlefs/work/crash-enumeration-merge-facts/report.md`、两轮四份腿报告照旧有效；第二轮之后主工作区变了的：
 - 删除线第 56 批合入主工作区（core `recovery.rs`、`mount.rs`、`inode_tree.rs`；池级 checker `walk.rs`、`image.rs`；checker 档 `crash_judge_checker_scan.wgsl`、`crash_judge_checker_common.wgsl`、`crash_judge_gpu.rs`、`crash_judge_dispatch.rs`、`crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs`），删除线自己的合入后验证在跑。
 - 第二十六块合入后验证 checker 档快档全绿（「checker-quick rc=0 results=61 failed_results=0」），带 gpu 特性那几步在第二十六块加第 56 批的树上跑。
-- T3a 合入（`.claude/hooks/lib_heavy_tests.py`、`heavy-test-guard.sh`、`runner-dispatch-guard.sh`、`.claude/agents/investigator.md`）；T3b 在改 `research/scripts/` 与 `.claude/gate.d/` 里的判定复用库与名字，这几份不在这一轮快照里，腿引它们只引事实、不钉行号。
+- T3a 合入（`.claude/hooks/lib_heavy_tests.py`、`heavy-test-guard.sh`、`runner-dispatch-guard.sh`、`.claude/agents/investigator.md`）；T3b 在改 `scripts/` 与 `.claude/gate.d/` 里的判定复用库与名字，这几份不在这一轮快照里，腿引它们只引事实、不钉行号。
 - 主 agent 现查过的（第二轮判决第一节第 ⑤–⑦ 格）：`crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs:1100` 与多记录流第 434 行各自 `recorder.step(file!(), "sequential_write", …)`，设点文件进身份；开 GPU 时每个状态只经 GPU 判器（`crates/singlefs-checker-tier/src/crash_amplification.rs` `ComputedOn::Gpu` 那一支），配置关 GPU 才走 CPU 判器 `judge_crash_image`（同一段 `ComputedOn::Cpu` 那一支，`crash.rs` 第 1374–1375 行调 `recover`、第 1388 行调 `check_pool_image`）。
 - 代价数：前两轮的速率都取自 2026-09-30、10-08 的树，今天的树没量过；用户 2026-10-10 说「你的时间预测是错的」。主 agent 会在今天的树上量，这一轮不引旧速率当依据。
 - 方案按 `crates/` 今天的实现来谈。
 
 ## 三、被判的形态（收严后，一种）
 
-- H1 名字：统一叫「崩溃点重放」，下分快档与整域；「层 0」「崩溃放量」作为装置名、门禁名、脚本名、英文标识符（`Layer0StateJudgement`、`enumerate_layer0_*`、`layer0_progress`、计数行前缀 `LAYER0…`）、环境变量名（`SINGLEFS_LAYER0_*`）、库目录默认路径、D13 层表三层的名字全部退役，照 `.claude/rules/path-moves.md`「改一个全仓术语」登记 `.claude/kb/term-renames.md`。英文标识符、环境变量名与认它们的脚本（`research/scripts/capped.sh`、`admission.py`、`stage-inputs.tsv`、门禁样本、`lib_heavy_tests.py`、`crash-case-check.py` 的正则与模块表、`run-with-memory-cap.sh` 的自证）在第四批同一个提交里改；checker 档测试文件首行的模块声明与 modules 格的模块表同批；仓外私有配置主 agent 同时改。
+- H1 名字：统一叫「崩溃点重放」，下分快档与整域；「层 0」「崩溃放量」作为装置名、门禁名、脚本名、英文标识符（`Layer0StateJudgement`、`enumerate_layer0_*`、`layer0_progress`、计数行前缀 `LAYER0…`）、环境变量名（`SINGLEFS_LAYER0_*`）、库目录默认路径、D13 层表三层的名字全部退役，照 `.claude/rules/path-moves.md`「改一个全仓术语」登记 `.claude/kb/term-renames.md`。英文标识符、环境变量名与认它们的脚本（`scripts/capped.sh`、`admission.py`、`stage-inputs.tsv`、门禁样本、`lib_heavy_tests.py`、`crash-case-check.py` 的正则与模块表、`run-with-memory-cap.sh` 的自证）在第四批同一个提交里改；checker 档测试文件首行的模块声明与 modules 格的模块表同批；仓外私有配置主 agent 同时改。
 - H2 一张登记表、一个入口、一道门禁：同 G2（13 条 `crash-case:` 与 8 项放量合成一张表，一项一条流；入口认 `--quick`、`--list-items`、`--item <项>`，不带参数 = 快档全部项加整域全部项；门禁改名并吸收放量入口；重型测试闸、自证登记表、门禁样本同一批改，闸的自证加一格「新入口起整域，子 agent 被拒」）；另 `crash-case-check.py` 的 placement 改认合并后的项，与入口同批。
 - H3 一套引擎：同 G3（录写流、按 D13 已定项 4 展开、身份与前缀共享、判定库按块存；第二条流取录制器那一份造法，层 0 独有的三条断言搬过去，加「两份造法写表摘要相等」的快用例）；多记录流的 B、C 两步挪进 `crates/singlefs-checker-tier/tests/common_crash_points/mod.rs` 设点，多记录流与删除流共享到 C；随机历史两项（崩溃注入快档、读故障态不持有见证）加「给定状态表」一种展开，也是这个入口与这个判定库里的项。
 - H4 观察者挂在节点上：哪个节点挂哪几个观察者由登记表静态列出（节点用登记了名字的标准前缀），单跑一项照表跑它经过的每个节点上登记的全部观察者；共享节点上的观察者对经过它的每一项、每一个状态都跑；观察者结果按（块键，观察者版本）存，观察者版本 = 观察者代码出发的闭包；观察者代码不进计划哈希、不进判器版本。
@@ -40,7 +40,7 @@
 - H10 段：整域按全量展开深度展不开的段按段登记（段号 + 写数），引擎加段级「不展开、计入跳过」的口子，跳过量报段号与写数、不报十进制态数；GPU 内核按 lo / hi 两个字算满 64 位的段内余数，判表打包核段长，装不下的段记 GPU 判不了（照 H6 判红）。
 - H11 跑在哪：多机配置合成一份，没写 `ENABLE_GPU` 算开；层 0 分片与放量双机两套驱动合成一套；配置显式写 `ENABLE_GPU=0` 时挂 gpu 特性的那几格报「本次未跑」、镜像照 H5 由 CPU 判；提交那一趟整域照门禁 `--full` 在 HEAD + 暂存区的 worktree 里跑。
 - H12 条款：D13 已定项 9「全量指两样」改成一样；层表只留「范围」一列，「什么时候跑」整块归 H9；已定项 15、`.claude/rules/verification.md`、`.claude/rules/implementation-workflow.md`、`.claude/main-agent.md`、`.claude/skills/crash-test/commit-stages.md` 跟着改。新条款在第四批合入之后的第一次提交起生效，第一至第四批的提交照今天的条款（快档全绿，全量用户要求时跑）。
-- H13 旧数：事实表第 6 节 8 处加 `research/scripts/crash-amplification.sh` 第 42 行探针段形，落地那一批改成现值；第一轮判决 K1-2 的 92.8%、两轮的挂钟数作废，代价改用主 agent 在今天的树上量的数。
+- H13 旧数：事实表第 6 节 8 处加 `scripts/crash-amplification.sh` 第 42 行探针段形，落地那一批改成现值；第一轮判决 K1-2 的 92.8%、两轮的挂钟数作废，代价改用主 agent 在今天的树上量的数。
 - H14 切批：一（等 T3a、T3b 合入再派）：脚本、门禁、钩子、登记表、条款文本（照 H12 不生效）、登记表一段一行的形态；二：引擎（H3 公共模块与给定状态表、H4、H7、H8 引擎侧、H10 引擎侧）、`crates/singlefs-checker-tier/src/crash_injection.rs` 的录写与建判表、合并范围里的测试文件；三：GPU 判器（H6 八个字、H7 判到位、H10 满 64 位、判表加段的展开方式一列、随机历史的判表），等删除线第 56 批验完从主工作区拷底；四：H1 标识符改名连脚本同一提交；之后整域一趟、E171 冻结。
 
 ## 四、格
@@ -77,5 +77,5 @@ H1–H14 逐条对第一节「用户已定」的每一句原话：有没有一�
 - 引代码写仓里的路径与行号，开工时 `sha256sum` 记下你引的文件；第二节点名的 T3b 那几份可能在你跑着时变，引它们只引事实。
 - 腿自己量的数在自己的草稿目录（`~/.local/share/singlefs/work/<腿名>/`）里量，报告写命令与原样输出；量法拷仓副本，不在主工作区改。读码推出的「没打中」尽量换成造出来的反例尝试。
 - **不跑 checker 档**：`singlefs-checker-tier` 包的任何测试（含快用例、直接执行它的测试二进制）、链它的库的小程序、门禁阶段（`--list`、`--list-items` 除外）、崩溃放量、GPU，一律不跑；要它们的数写进报告「要主 agent 跑的命令」交回。harness 档、纯算术模型、抽出来的独立小程序可以跑。
-- 本机内存 60G、几条线同时在跑：每条编译与测试命令经 `research/scripts/run-with-memory-cap.sh` 带不超过 12G 的上限，同时起的件数乘上限不超过 12G。
+- 本机内存 60G、几条线同时在跑：每条编译与测试命令经 `scripts/run-with-memory-cap.sh` 带不超过 12G 的上限，同时起的件数乘上限不超过 12G。
 - 报告分段落盘：每一次工具调用写进文件的内容不超过 150 行，第一段排他新建，回复只写短句。

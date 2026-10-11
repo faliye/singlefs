@@ -29,8 +29,8 @@
 在冻结副本的拷贝上把 `crates/singlefs-harness/tests/mount_transparency_judged_field_by_field_after_a_writable_mount.rs` 整份拷成 `y1_probe.rs`，末尾追加探针（只读：造崩溃镜像、挂载、再用 harness 自己的 `read_recovery_fields` 读两次、逐项打印）。命令（工作目录 `/tmp/claude-1000/m3-formal-c655-c687-r1-sonnet/work`，`CARGO_TARGET_DIR` 指到草稿目录，`ps` 看到别的 cargo 与 e170 复跑在跑、无性能测量，加 `nice -n 19` 照常跑）：
 
 ```
-nice -n 19 bash research/scripts/capped.sh 10 cargo test --offline -p singlefs-harness --test y1_probe --no-run
-RUN_WITH_MEMORY_CAP_PARALLEL_REASON="三方正推腿与同会话别的腿并行各跑各的小池探针" nice -n 19 bash research/scripts/run-with-memory-cap.sh 6G bash research/scripts/capped.sh 10 <测试二进制> y1_probe_ --nocapture --test-threads=1
+nice -n 19 bash scripts/capped.sh 10 cargo test --offline -p singlefs-harness --test y1_probe --no-run
+RUN_WITH_MEMORY_CAP_PARALLEL_REASON="三方正推腿与同会话别的腿并行各跑各的小池探针" nice -n 19 bash scripts/run-with-memory-cap.sh 6G bash scripts/capped.sh 10 <测试二进制> y1_probe_ --nocapture --test-threads=1
 ```
 
 第一次不带理由那一次退出码 252：内存包装报「这个会话已经有一条日常的在跑，同一个会话同时只许一条；命令没跑」（包装自己的结局，不是结果）；第二次起带包装自己写明的并行理由（本会话里 Opus 腿与别的任务在同时跑）跑过，退出码 0，输出在 `…-sonnet-model/y1-probe-run2.log`（六个场景）、`y1-probe-run3.log`（世代号与 tail 的关系）、`y1-probe-run4.log`（有树而文件集合为空的一版）。

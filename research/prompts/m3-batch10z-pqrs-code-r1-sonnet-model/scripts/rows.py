@@ -3,7 +3,7 @@
 import os, re, shutil, subprocess, sys, time
 W = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet')
 T = W + '/tree-m'
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 lines = open('/home/fy5090/code/singlefs/research/prompts/_m3-batch10z-pqrs-code-r1-diff.md').read().split('\n')
 a, b = int(sys.argv[1]), int(sys.argv[2])
 for ln in range(a, b + 1):

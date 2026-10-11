@@ -16,7 +16,7 @@
 
 ## 重建
 
-1. `rsync -a --exclude target <冻结副本>/ tree-a/`；按 `src/patches/tree-a-*.diff` 改；拷 `src/p10z_probe.rs.txt` 成 `crates/singlefs-harness/tests/p10z_probe.rs`；`cargo test --release --offline -p singlefs-harness --test p10z_probe --no-run`（`BINDGEN_EXTRA_CLANG_ARGS` 取 `research/scripts/crash-amplification-lib.sh`），`scripts/runq.sh scripts/spec-main.txt` 起批（`spec-rest.txt`、`spec-tb.txt` 同）。
+1. `rsync -a --exclude target <冻结副本>/ tree-a/`；按 `src/patches/tree-a-*.diff` 改；拷 `src/p10z_probe.rs.txt` 成 `crates/singlefs-harness/tests/p10z_probe.rs`；`cargo test --release --offline -p singlefs-harness --test p10z_probe --no-run`（`BINDGEN_EXTRA_CLANG_ARGS` 取 `scripts/crash-amplification-lib.sh`），`scripts/runq.sh scripts/spec-main.txt` 起批（`spec-rest.txt`、`spec-tb.txt` 同）。
 2. 攻方原型：`cat <冻结副本的 raise_floor_….rs> src/atk-vw/atk_vw_part*.rs > crates/singlefs-harness/tests/atk_vw_opus.rs`；pqrs / tu 同法（tu 要接 `part9_k14.rs`，在 `tree-k14` 上编）；`scripts/runq2.sh scripts/spec-opus.txt` 等。
 3. 变异：三份干净副本 `tree-m1..3`，`scripts/mw.sh rows-AC 60 2`（`rows-AC-<i>.tsv` 由 `rows-AC.tsv` 按行号对三取余拆成）。
 4. 扫源码：`python3 scan/vw_extract3.py <源文件> <文件名> build/<gpu|crash>-main.rs skip=…`（卡池 `skip=a_poll_before_booking_takes_a_device_as_idle_only_when_its_queue_is_empty`；崩溃放量 `skip=every_environment_variable_this_file_reads_by_name_is_in_the_list_a_run_reads skip=the_stop_request_is_asked_once_before_each_block_and_a_stop_leaves_the_later_blocks_untaken skip=the_stop_request_scan_reads_layer_names_rebindings_and_pinned_lines_past_comments_and_strings skip=new skip=drop`），`rustc --edition 2021 -O`；`SRC=<变体文件> <二进制>`。

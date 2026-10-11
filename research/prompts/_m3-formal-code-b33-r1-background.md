@@ -504,7 +504,7 @@ E7RESULT name=verdict stage=second cells_run=38 cells_not_fitting=4 truncated_ce
 **要主 agent 在提交时跑的命令**（执行员不跑，重型）：
 
 ```
-SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 10 cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts
+SINGLEFS_HEAVY_TESTS=commit bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 10 cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts
 ```
 
 看 `test result:` 行是不是 `18 passed`（Q2d），U19 的名字是 `hh_back_hole_at_four_slots_per_region_delays_the_tree_table_reclaim_to_six_ring_slots_minus_one_and_the_a10_judgement_sees_it`；变异：`crates/mutations.tsv` 第 803 行（旧 M35，替换文 `allocator_without_the_root_ring` 在装置里已不存在，编不过）要换成改写后的 M35、末尾追加 M44（两行的原样内容在 `research/results/e156-alloc-basis-counts-2026-10-05-mutations-replacements.tsv` 与 `research/results/e156-alloc-basis-counts-2026-10-05-mutations-append.tsv`），由门禁 checker-tier-crates-mutation-replay 跑，三个数分开报。

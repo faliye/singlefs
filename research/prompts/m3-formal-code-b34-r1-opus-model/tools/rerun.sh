@@ -11,7 +11,7 @@ DIFF="$REPO/research/prompts/_m3-formal-code-b34-r1-diff.md"
 SEGMENTS=("$@")
 [[ ${#SEGMENTS[@]} -gt 0 ]] || SEGMENTS=(build crafted r1 r2 r3 r4 rfl l41 l45 l6 l57a l57b l65a l65b l3)
 mkdir -p "$W/out"
-CAP=(env RUN_WITH_MEMORY_CAP_PARALLEL_REASON="m3-formal-code-b34-r1 攻方原型复跑" RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="同一个二进制按参数跑大小不同的几段历史" nice -n 19 bash "$REPO/research/scripts/run-with-memory-cap.sh" 8G bash "$REPO/research/scripts/capped.sh" 10)
+CAP=(env RUN_WITH_MEMORY_CAP_PARALLEL_REASON="m3-formal-code-b34-r1 攻方原型复跑" RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="同一个二进制按参数跑大小不同的几段历史" nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 8G bash "$REPO/scripts/capped.sh" 10)
 BIN="$W/target/release/b34probe"
 
 build() {

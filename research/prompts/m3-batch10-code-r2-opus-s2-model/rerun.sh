@@ -1,6 +1,6 @@
 #!/bin/bash
 # m3-batch10-code-r2 攻方第二次抽样（opus-s2）K2 模型复跑。
-# 用法：bash research/scripts/run-with-memory-cap.sh 4000M bash rerun.sh <草稿目录> [冻结副本根]
+# 用法：bash scripts/run-with-memory-cap.sh 4000M bash rerun.sh <草稿目录> [冻结副本根]
 #   草稿目录要不存在或为空；冻结副本根默认 /tmp/claude-1000/m3-batch10-code-r2/tree。
 # 做的事：把冻结副本的 Cargo.toml、Cargo.lock、crates/ 拷进草稿目录，打上 mount-rs-attack-arms.patch（ATTACK_RR2_ARM 臂开关），
 # 放进原型测试，release 编译，按 臂（rr2 / before / merge）× 盘宽（4g / 384）× 前置覆盖写（1 / 3）跑 12 次 k2_attack_grid，

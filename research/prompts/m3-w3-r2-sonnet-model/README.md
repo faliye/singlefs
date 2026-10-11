@@ -11,5 +11,5 @@
 - `rerun.sh`：分段复跑，每段一条前台命令；`compare.sh`：把输出与 `expected/` 比；`expected/`：模型输出（去掉 W3TRACE 行）与装置输出的摘要。
 - 复跑顺序（在空目录 W 里；`SINGLEFS_REPO` 取仓根）：
   `derive build-model build-P build-V1 quick model-main model-defense model-mutation model-ringwin model-replay model-deep dev-g-long-v1-idx24 dev-g-long-v1 dev-f2-v1 dev-g-long-p dev-f2-p-1 dev-f2-p-2 compare`，
-  最后一段末行 `compared=37 status=0`。编译 6G、跑 4G，线程 6，经 `research/scripts/run-with-memory-cap.sh`；只跑 harness 档。
+  最后一段末行 `compared=37 status=0`。编译 6G、跑 4G，线程 6，经 `scripts/run-with-memory-cap.sh`；只跑 harness 档。
 - 看表：`python3 tools/table2.py <候选,候选…> expected/model-defense-0.out`（模型），`python3 tools/mut_table.py <含 mutation-0..5 的目录>`（变异），`python3 tools/agg.py <装置结果文件…>`（装置合计）。

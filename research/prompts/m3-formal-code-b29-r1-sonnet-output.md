@@ -20,7 +20,7 @@
 - 新用例常量 `2 * INODE_LEAF_RECORDS + 4`（470 步），改名 `model_compares_inode_creations_into_the_third_inode_leaf_container.rs`（27-2b 的 rename）；KX1、KX2 在 27-2b 替换块第 23、24 行（旧名那两行 2、3 被替换）。
 - 135 边界：纯函数用例 `appending_inode_records_one_at_a_time_rewrites_container_floor_k_over_233_and_refuses_the_136th_container`（0.78 秒）与 model.rs 的 `the_inode_leaf_container_position_reaches_the_last_of_135_leaf_containers_and_panics_one_record_beyond`；保留模型 `assert!`、不答拒，与判决（「保留 assert!、不答拒」（`research/prompts/m3-formal-code-b25-r1-main-verification.md:26`））同向。
 - 装置照修订 5：十件逐件重做（`JudgingPiece::ALL` 十项）、k = 6（「const EQUIVALENCE_PAIRING_IN_FLIGHT_WRITES_KEPT: usize = 6;」（`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:8493`））、S1 新加三条、F9、no_root_write 在对拍之前判（「if let Some(shape_name) = shape_without_a_root_write(&shapes) {」（`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:8028`），次序：造主取样点那一形、造对拍那一形、先看两形的根写、再对拍），U1–U9 与 V20–V31 十二行变异都在（27-2 追加块第 6–17 行）。`unattributed_panic_states=` 照「主 agent 认定：27-2 装置交回」第 2 条，见 L1-e。
-- 命令与输出：`python3 research/prompts/m3-formal-code-b29-r1-sonnet-model/tools/mutants.py anchors <data/mutants.tsv> <冻结树根> | tail -1` 输出 `NOT_ONE 0`（61 行原文在各自文件里都恰命中 1 次）；`python3 research/scripts/crates-mutation-rows.py static-check <冻结树根>` 末行 `CHECKED	2677	292	9`，只报 1 行 ANCHOR（变异表第 1354 行，`litmus/…litmus` 文件不在冻结副本里，与本轮无关）。
+- 命令与输出：`python3 research/prompts/m3-formal-code-b29-r1-sonnet-model/tools/mutants.py anchors <data/mutants.tsv> <冻结树根> | tail -1` 输出 `NOT_ONE 0`（61 行原文在各自文件里都恰命中 1 次）；`python3 scripts/crates-mutation-rows.py static-check <冻结树根>` 末行 `CHECKED	2677	292	9`，只报 1 行 ANCHOR（变异表第 1354 行，`litmus/…litmus` 文件不在冻结副本里，与本轮无关）。
 - 推翻条件：diff 里某件与上面对不上，或某行锚点命中数不是 1。
 
 ### L1-b　T13 回退用例与 drop-retain / drop-extend：罩得住点名的行为；换取样点各只罩一半
@@ -293,6 +293,6 @@ REPO=$PWD FROZEN=/tmp/claude-1000/m3-formal-code-b29-r1/tree WORK=<会话草稿>
 引文核对（本报告）：
 
 ```
-$ python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b29-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b29-r1/tree --root . --background research/prompts/_m3-formal-code-b29-r1-background.md
+$ python3 scripts/cite-check.py research/prompts/m3-formal-code-b29-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b29-r1/tree --root . --background research/prompts/_m3-formal-code-b29-r1-background.md
   ✓ 核了 70 处引文，对上 70 处，没判 0 处（逐处列在上面）
 ```

@@ -18,7 +18,7 @@ b682478b01099f855b37cf7571981ca5af1d2445b03744e53f0d36777575ded1  c510-date-gate
 提示：英文，自足，无 markdown 强调；18 格判据，覆盖六类（CATEGORY_A 外部文献日期入文件名、CATEGORY_B 归档迁入的历史文件带旧日期、CATEGORY_C 生成物带上游日期、CATEGORY_D 浅克隆或非顶层调用、CATEGORY_E 跨时区书写、CATEGORY_F fixtures 故意造的越界日期样本），每格要求「具体形态 / 为什么合法 / 今天在不在仓里」三项，逐项都要一句「This would be refuted by:」。写死的事实 8 条（FACT 1–8）全部由本 agent 现查得出（读 `.claude/gate.d/95-fixture-claims.sh`、`.claude/singlefs-ai-sop/scripts/lib.sh`、`.claude/kb/prior-art.md`、`.claude/kb/decisions-history/2026-09.md`、`.gitignore`，以及 `git ls-files` / `git log` 系列命令），不是转述派发提示的转述——逐句核对表见草稿目录 `c510-date-gate-r1-local-attack-translation-audit.md`（17 行核对，含本 agent 自己现查补出的限定词，例如 FACT 4 里 95-fixture-claims.sh 对 `project_start_date` 返空时的回退替换机制，以及 FACT 5 里 decisions-history 文件名只有年-月两段、正则命不中）。
 
 四次前台调用（未用 setsid / 后台 / disown），命令一致（除路径外）：
-`nice -n 19 bash research/scripts/ask-local.sh /tmp/claude-1000/c510-local-attack/c510-date-gate-r1-local-attack.md > /tmp/claude-1000/c510-local-attack/c510-date-gate-r1-local-attack-output-s<n>.md`
+`nice -n 19 bash scripts/agents/ask-local.sh /tmp/claude-1000/c510-local-attack/c510-date-gate-r1-local-attack.md > /tmp/claude-1000/c510-local-attack/c510-date-gate-r1-local-attack-output-s<n>.md`
 
 ## 第 1 次调用（判红作废，留存为 output-void1.md）
 

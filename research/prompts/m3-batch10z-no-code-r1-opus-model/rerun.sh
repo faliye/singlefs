@@ -8,8 +8,8 @@ ROOT=$(pwd)
 MD=$ROOT/research/prompts/m3-batch10z-no-code-r1-opus-model
 FROZEN=${FROZEN:-$HOME/.local/share/singlefs/work/m3-batch10z-no-code-r1/tree}
 WORK=${WORK:?给一个草稿目录}
-CAP="$ROOT/research/scripts/run-with-memory-cap.sh"
-CAPPED="$ROOT/research/scripts/capped.sh"
+CAP="$ROOT/scripts/run-with-memory-cap.sh"
+CAPPED="$ROOT/scripts/capped.sh"
 mkdir -p "$WORK/runs" "$WORK/summary"
 for t in copy pre14 k4copy; do
   rsync -a --exclude target --exclude .git "$FROZEN/" "$WORK/$t/"

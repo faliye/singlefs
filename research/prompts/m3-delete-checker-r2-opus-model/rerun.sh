@@ -5,7 +5,7 @@
 #     bash rerun.sh <空的工作目录> <步骤>
 # 步骤：prepare build sweep-f1 sweep-f2 sweep-f3 sweep-fc-a sweep-fc-b sweep-r-a sweep-r-b press s4a knob t7-a t7-y xleaf tomb
 #       crash-count show analyze summary；all 依次跑全部（实测见报告，单步不超过约 3 分钟）。
-# 编译与跑编出来的代码一律经 research/scripts/run-with-memory-cap.sh（编译 6G、跑 4G），线程经 research/scripts/capped.sh 6；
+# 编译与跑编出来的代码一律经 scripts/run-with-memory-cap.sh（编译 6G、跑 4G），线程经 scripts/capped.sh 6；
 # 原型线程数 M3DCR2_THREADS（缺省 6）。只跑 harness 档：不起 checker 档的测试目标与 bin，只把 singlefs-checker-tier 当库链进来。
 set -euo pipefail
 model="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,8 +14,8 @@ frozen="${FROZEN_TREE:-/tmp/claude-1000/m3-delete-checker-r2/tree}"
 work="${1:?工作目录}"
 step="${2:?步骤}"
 threads="${M3DCR2_THREADS:-6}"
-cap="$repo/research/scripts/run-with-memory-cap.sh"
-capped="$repo/research/scripts/capped.sh"
+cap="$repo/scripts/run-with-memory-cap.sh"
+capped="$repo/scripts/capped.sh"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-三方攻方腿原型复跑，与同机别的活互不依赖}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-派发提示定编原型 6G、跑扫描 4G，峰值表只记了别的一次}"
 binary="$work/target/release/m3dcr2-opus-proto"

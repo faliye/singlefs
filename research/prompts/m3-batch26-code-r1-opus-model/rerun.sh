@@ -2,8 +2,8 @@
 # m3-batch26-code-r1 攻方模型复跑。
 #   SINGLEFS_REPO=<仓或冻结副本，含 crates/ 与 Cargo.*> SINGLEFS_TOOLS=<仓根> bash rerun.sh <空工作目录> <段|all>
 #   bash rerun.sh compare <工作目录>        # 各段日志里的 RESULT 行排序，与 expected-summary.txt 比；不依赖 SINGLEFS_REPO
-# 变量：SINGLEFS_REPO 是被判的源码（冻结副本只有 crates/ 与 Cargo.*）；包装脚本 run-with-memory-cap.sh、capped.sh 先找 $SINGLEFS_REPO/research/scripts/，
-#   没有就取 $SINGLEFS_TOOLS/research/scripts/（SINGLEFS_REPO 是冻结副本时必须给 SINGLEFS_TOOLS）。OPUS_THREADS 线程上限（默认 10）。
+# 变量：SINGLEFS_REPO 是被判的源码（冻结副本只有 crates/ 与 Cargo.*）；包装脚本 run-with-memory-cap.sh、capped.sh 先找 $SINGLEFS_REPO/scripts/，
+#   没有就取 $SINGLEFS_TOOLS/scripts/（SINGLEFS_REPO 是冻结副本时必须给 SINGLEFS_TOOLS）。OPUS_THREADS 线程上限（默认 10）。
 # 段：setup build-new build-old build-fix h-new h-old h-fix u-new u-old u-fix v p a2 k b1 b2 kbi summary
 #   tree-new = SINGLEFS_REPO 原样；tree-old = 反打 batch26-walk.patch（第 26 批 walk.rs 那两处改动之前）；tree-fix = tree-new 打 fix-FB-FV.diff（攻方改法，零轮）。
 # 编译与跑都经 run-with-memory-cap.sh（编译 6G、跑 4G），线程经 capped.sh；b1、b2 四件并行、每件 capped 2。每段前台四分钟以内。
@@ -45,9 +45,9 @@ if [[ "$stage" == summary ]]; then
 fi
 repo="${SINGLEFS_REPO:?要设 SINGLEFS_REPO}"
 tools="$repo"
-[[ -f "$tools/research/scripts/run-with-memory-cap.sh" ]] || tools="${SINGLEFS_TOOLS:?SINGLEFS_REPO 下没有 research/scripts，要设 SINGLEFS_TOOLS}"
-cap="$tools/research/scripts/run-with-memory-cap.sh"
-capped="$tools/research/scripts/capped.sh"
+[[ -f "$tools/scripts/run-with-memory-cap.sh" ]] || tools="${SINGLEFS_TOOLS:?SINGLEFS_REPO 下没有 scripts，要设 SINGLEFS_TOOLS}"
+cap="$tools/scripts/run-with-memory-cap.sh"
+capped="$tools/scripts/capped.sh"
 threads="${OPUS_THREADS:-10}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-派发提示写死编译 6G、跑 4G}"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-三方攻方腿模型复跑，在自己的工作目录里各跑各的}"

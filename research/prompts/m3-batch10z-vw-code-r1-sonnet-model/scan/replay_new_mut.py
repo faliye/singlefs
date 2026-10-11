@@ -1,6 +1,6 @@
 import os, re, subprocess, sys
 W = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-vw-code-r1-sonnet/scan')
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 S = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-vw-code-r1/tree/crates/singlefs-checker-tier/src/')
 M = {
  'gpu': {

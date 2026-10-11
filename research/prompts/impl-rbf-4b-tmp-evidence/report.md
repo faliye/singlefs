@@ -112,7 +112,7 @@
 
 ## 五、第 12 件命名：108 → 9
 
-naming-lint 全仓：开工时「✗ 230 处」（crates 里 108 处），现在「✗ 131 处名字不合命名纪律（查了 261 个 .rs 文件、62720 个声明的名字）」（crates 里 9 处，其余 122 处在 `research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs`，不归我）。
+naming-lint 全仓：开工时「✗ 230 处」（crates 里 108 处），现在「✗ 131 处名字不合命名纪律（查了 261 个 .rs 文件、62720 个声明的名字）」（crates 里 9 处，其余 122 处在 `scripts/experiments/e142_first_transaction_dry_run.rs`，不归我）。
 
 改法：
 - 99 个名字：开头的冠词 `a_` 去掉，名字中间的 `_a_` 换成 `_the_`。所有调用点、文档里点名的反引号、`crates/mutations.tsv` 里的过滤串与必须红的测试名一起换。
@@ -139,7 +139,7 @@ naming-lint 全仓：开工时「✗ 230 处」（crates 里 108 处），现在
 | `tests/second_transaction_supplement_two_tree_nodes_and_the_central_mapping.rs:1079` | `a_leaf_of_a_two_level_lower_extent_segment_…` | kb 点名（`decisions/08-核心索引结构.md:409`） |
 
 kb 点名的 8 条要改，得 kb 与代码同一轮一起换：书记员改 kb 那几处引文，实现员改名。
-另外，`research/scripts/memory-peaks.tsv` 按命令记峰值，里面有 17 个我改过的旧测试名。改名之后那几行查不到，第一次按上限排队；我没改那张表（不在写范围）。
+另外，`scripts/memory-peaks.tsv` 按命令记峰值，里面有 17 个我改过的旧测试名。改名之后那几行查不到，第一次按上限排队；我没改那张表（不在写范围）。
 
 ## 六、钉死值：改前 / 改后 / 原因
 
@@ -259,8 +259,8 @@ kb 点名的 8 条要改，得 kb 与代码同一轮一起换：书记员改 kb 
    - 种子与注入点在 `logs/scan-findings.log`；
    - 大档 `#[ignore]` 那条今天跑会红。
 9. **命名剩的 8 个 kb 点名的名字**：要书记员改 kb 引文、实现员同一轮改名（第五节表）。
-   - `research/scripts/memory-peaks.tsv` 里有 17 个我改掉的旧测试名，不在写范围，没动。
-10. **区域表那个 bin**：E142 第十五次跑起不再用它（`research/scripts/replay.sh:409` 起的注释）。今天只剩 `first_transaction_region_bytes` 测试钉着表与写清单一致。
+   - `scripts/memory-peaks.tsv` 里有 17 个我改掉的旧测试名，不在写范围，没动。
+10. **区域表那个 bin**：E142 第十五次跑起不再用它（`scripts/replay.sh:409` 起的注释）。今天只剩 `first_transaction_region_bytes` 测试钉着表与写清单一致。
     - kb `experiments/142-…` 第 191 行说的「21 行区域清单」是那时的事，要不要注一句，交书记员。
 
 ## 十、交回前的验证（主工作区，自己的 target `target-main`；末尾原样）
@@ -325,7 +325,7 @@ cargo build --offline --all-targets：exit 0
 33 exit=0   ✓ 148 个实验二进制都有成形的变异表，1690 条变异的原文各命中源码一次；crates/mutations.tsv 754 条的原文各命中源码一次（本阶段不跑变异，只验装置在、锚点对得上、两段里没有 \n 以外的反斜杠转义、crates 那张表里没有两行重复——重复按「文件 + 原文 + 替换文 + 点名的测试」四项认，变异名另判）
 53 exit=0   ✓ 格式常量文件里的占位都指得到分项或欠账（4 个占位：D23（journal 的角色与格式） 已定项 19；C506（每区槽数 S 写成编译期常量，条文说它住系统配置）；D22（单元原子性怎么合成） 已定项 1；C323（镜像大小全仓没有条款））
 74 exit=0   ✓ 模型对拍每一段都判过、实现与模型没有对不上的（查了 6 段）：
-80 exit=0   ✓ 152 个实验二进制各自至少有一条绝对值断言（research/e7-index-bench/src/bin 下 148 份，别处 src/bin 下以 e<数字>_ 开头的 4 份）
+80 exit=0   ✓ 152 个实验二进制各自至少有一条绝对值断言（scripts/experiments 下 148 份，别处 src/bin 下以 e<数字>_ 开头的 4 份）
 89 exit=77   ⊘ 本次未跑：收口表第 27 行那几笔的前置一个都没进来，今天无对象可判（5 条逐字探针、覆盖 4 笔，逐条对上今天的值）
 92 exit=0   ✓ 布局清单 1 套布局、6 条路径都在，位号都对得上 D15（格式冻结政策） 已定项 4 的登记表；这次改动比 73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321，105 个格式常量里变了 7 个（checker 在同一次改动里跟了 7 个，按滞后表放行 0 个），都不欠 checker 跟进
 93 exit=0   ✓ feature bit 位号在记账表、D15（格式冻结政策） 已定项 4 与代码三处一致（记账表 2 位、登记表分出去 2 位；扫了 54 个 .rs，认出 4 处 feature bit 常量、解出位号 3 处；没判位号的 1 处：SUPPORTED_INCOMPAT_BITS（crates/singlefs-core/src/system_configuration.rs:31，常量声明没写在一行里，解不出值））

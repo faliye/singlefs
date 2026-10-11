@@ -20,8 +20,8 @@ for idx, (name, path, old, new, args, tests) in enumerate(rows):
     assert orig.count(o) == 1, ('anchor', idx)
     try:
         open(p, 'w', encoding='utf-8').write(orig.replace(o, n))
-        cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/research/scripts/run-with-memory-cap.sh', '4G',
-               'bash', scripts_repo + '/research/scripts/capped.sh', '10', 'cargo', 'test'] + args.split()
+        cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/scripts/run-with-memory-cap.sh', '4G',
+               'bash', scripts_repo + '/scripts/capped.sh', '10', 'cargo', 'test'] + args.split()
         r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=220)
         out = r.stdout + r.stderr
     finally:

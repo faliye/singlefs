@@ -1,6 +1,6 @@
 # 第 25 批代码轮第一轮（m3-formal-code-b25-r1）· 云端正推腿报告
 
-腿：云端正推（Sonnet）。格：K1、K2、K3。方案按 `crates/` 今天的实现来谈：代码引文读冻结副本 `research/target/e171-r1-frozen-tree/`（只读，没在里面编、没往里写），行号是那棵树里的；kb 与登记引文写它们自己的行号。
+腿：云端正推（Sonnet）。格：K1、K2、K3。方案按 `crates/` 今天的实现来谈：代码引文读冻结副本 `scripts/experiments/target/e171-r1-frozen-tree/`（只读，没在里面编、没往里写），行号是那棵树里的；kb 与登记引文写它们自己的行号。
 模型与脚本：`research/prompts/m3-formal-code-b25-r1-sonnet-model/`（`tools/rerun.sh`；`outputs/` 是这一轮真跑出来的原样输出；`probes/` 是我自造的探针源码与对装置的补丁）。草稿副本在 `/tmp/claude-1000/m3-formal-code-b25-r1-sonnet/`（见末尾「草稿副本」一节）。
 
 ## 0. 怎么做的（短）
@@ -200,6 +200,6 @@
 
 ## cite-check 末行
 
-`python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b25-r1-sonnet-output.md --root research/target/e171-r1-frozen-tree --root . --background research/prompts/_m3-formal-code-b25-r1-background.md`：
+`python3 scripts/cite-check.py research/prompts/m3-formal-code-b25-r1-sonnet-output.md --root scripts/experiments/target/e171-r1-frozen-tree --root . --background research/prompts/_m3-formal-code-b25-r1-background.md`：
 
     ✓ 核了 83 处引文，对上 83 处，没判 0 处（逐处列在上面）

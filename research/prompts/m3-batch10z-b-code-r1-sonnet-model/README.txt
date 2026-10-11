@@ -8,7 +8,7 @@ k2/  K2-2 两臂量法（副本里的探测，不入库装置）
                           C 臂开关（环境变量 SINGLEFS_ARM_C）相对冻结副本的 diff；加在副本里，不是实现。
   an.py / an-output.txt   统计脚本与原样输出（读 sweep-*.txt）。summ.py 是早一版的统计脚本。
   sweep-today-arm.txt / sweep-c-arm.txt   两臂各 50 例的原始行（RESULT / ISOSET）。
-  复跑：SWEEP_MOD=3 SWEEP_REM=<0|1|2> [SINGLEFS_ARM_C=1] CARGO_TARGET_DIR=<编译目录> bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 8 cargo test --offline -p singlefs-harness --test k2_arms_probe -- --nocapture --test-threads 8 s_ [m_]
+  复跑：SWEEP_MOD=3 SWEEP_REM=<0|1|2> [SINGLEFS_ARM_C=1] CARGO_TARGET_DIR=<编译目录> bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 8 cargo test --offline -p singlefs-harness --test k2_arms_probe -- --nocapture --test-threads 8 s_ [m_]
 k3/  K3 变异
   mut.py                  变异表（名 -> 文件、原文、替换文；原文须恰好命中一次）与施加/还原。用法 python3 mut.py <名> [restore]；路径写死在副本 repo-k3 下，用时改 R。
   run.sh                  施加、按 STAGES 跑 harness 档目标、还原。all.sh / all2.sh / all3.sh 是我用过的驱动。

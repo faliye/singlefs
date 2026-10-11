@@ -2,7 +2,7 @@
 # m3-formal-code-b24-r1 攻方腿的副本探针复跑（只在副本里改、只在副本里编和跑；不跑 checker 档包的任何测试目标与装置）。
 # 用法：bash tools/rerun.sh <段>，段按次序：setup build real-small real-large-batch 1..3 real-dense-batch real-collect
 #        f3-begin f3-rows f3-end b1-slots b1-batch 1..3 b1-collect harness h2s-setup h2s 5|15 h2s-compile 4|16；all 依次全跑。
-# 环境变量：REPO_ROOT（仓根，取 Cargo.toml / Cargo.lock 与 research/scripts）、FROZEN_TREE（冻结副本根，下面是 crates/）、
+# 环境变量：REPO_ROOT（仓根，取 Cargo.toml / Cargo.lock 与 scripts）、FROZEN_TREE（冻结副本根，下面是 crates/）、
 #           WORK（副本与产物目录）、THREADS（线程上限，默认 10）、BUILD_CAP（编译的内存上限，默认 3G；量过冷编峰值 1.4 GiB）、RUN_CAP（跑探针的上限，默认 256M；量过峰值 55 MiB）。
 # 产物写进 $WORK/out/，与模型目录 out/ 下同名文件逐字节比（cmp）。每段前台跑得完（各段挂钟见报告「复跑」一节）。
 set -euo pipefail
@@ -14,8 +14,8 @@ THREADS="${THREADS:-10}"
 BUILD_CAP="${BUILD_CAP:-3G}"
 RUN_CAP="${RUN_CAP:-256M}"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-200}"
-CAP="$REPO_ROOT/research/scripts/run-with-memory-cap.sh"
-CAPPED="$REPO_ROOT/research/scripts/capped.sh"
+CAP="$REPO_ROOT/scripts/run-with-memory-cap.sh"
+CAPPED="$REPO_ROOT/scripts/capped.sh"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-攻方腿副本探针复跑，与别的活并行}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-探针各子命令峰值差得远，统一给一个上限}"
 COPY="$WORK/copy"

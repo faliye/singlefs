@@ -20,7 +20,7 @@ mkdir -p crates/inv-a-proto
 cp -r "$here/inv-a-proto/." crates/inv-a-proto/
 export CARGO_TARGET_DIR="$scratch/target"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-复跑 m3-inv-a-r1 攻方腿的模型}"
-wrap=(nice -n 19 bash "$repository/research/scripts/run-with-memory-cap.sh" 8G bash "$repository/research/scripts/capped.sh" "$threads")
+wrap=(nice -n 19 bash "$repository/scripts/run-with-memory-cap.sh" 8G bash "$repository/scripts/capped.sh" "$threads")
 "${wrap[@]}" cargo test -p singlefs-harness --test inv_a_watermark_replay_and_system_configuration -- --nocapture --test-threads=1 > "$scratch/logs/harness.log" 2>&1
 INV_A_CORE_WATERMARK_ROOTS_ONLY=1 "${wrap[@]}" cargo test -p singlefs-harness --test inv_a_watermark_replay_and_system_configuration -- --nocapture --test-threads=1 a5_unapplied > "$scratch/logs/harness-core-roots-only.log" 2>&1
 proto=(cargo test --release -p inv-a-proto --test inv_a_crash_states -- --nocapture --test-threads=1)

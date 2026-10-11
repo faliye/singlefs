@@ -27,7 +27,7 @@
 ## 二、实现今天的样子（主 agent 的观测，2026-10-06）
 
 - 合入验证 `merge-and-verify.sh`「✓ 测试全绿（170 个测试二进制）」（`/tmp/claude-1000/merge-and-verify/2026-10-06-1324740/`）；fmt 与 `cargo clippy --offline --all-targets --all-features -- -D warnings` 经内存包装单跑都退 0；`reuse_after_raising_the_floor --ignored` 13 条全过。checker 档没跑。
-- K 自报：E142 `--device-bytes 8589934592` 输出与 `research/results/e142-r24-p8g-crates-dump-2026-10-05.out` 逐字节相同；不带参数那份只差第 1 行 `E7INPUT`（`research/scripts/replay.sh` 比对前删掉这一行）。
+- K 自报：E142 `--device-bytes 8589934592` 输出与 `research/results/e142-r24-p8g-crates-dump-2026-10-05.out` 逐字节相同；不带参数那份只差第 1 行 `E7INPUT`（`scripts/experiments/replay.sh` 比对前删掉这一行）。
 - 方案按 `crates/` 今天的实现来谈。
 
 ## 三、格
@@ -63,6 +63,6 @@
 
 交付：
 - 腿的报告写进 `research/prompts/m3-batch24-code-r1-<腿名>-output.md`，分段落盘：每次写进文件不超过 150 行，第一段排他新建，回复只写短句。
-- 模型与脚本放 `research/prompts/m3-batch24-code-r1-<腿名>-model/`，`rerun.sh` 交回前在空目录里从头跑通一次；仓路径从环境变量 `SINGLEFS_REPO` 取；编译与跑都经 `research/scripts/run-with-memory-cap.sh`，上限显式给（编译 6G、跑 4G），不用 `auto`；`compare` 比之前把并行测试的 `test … ok` 行排序、自己不依赖 `SINGLEFS_REPO`；用自己的编译目录。草稿放 `/tmp/claude-1000/<腿名>/`。
+- 模型与脚本放 `research/prompts/m3-batch24-code-r1-<腿名>-model/`，`rerun.sh` 交回前在空目录里从头跑通一次；仓路径从环境变量 `SINGLEFS_REPO` 取；编译与跑都经 `scripts/hosts/run-with-memory-cap.sh`，上限显式给（编译 6G、跑 4G），不用 `auto`；`compare` 比之前把并行测试的 `test … ok` 行排序、自己不依赖 `SINGLEFS_REPO`；用自己的编译目录。草稿放 `/tmp/claude-1000/<腿名>/`。
 - 引 kb 条款写 kb 文件自己的行号；引代码写冻结副本里的全路径:行号。
 - 方案按 `crates/` 今天的实现来谈。

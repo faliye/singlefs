@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 复跑 m3-c694-r2 攻方（Opus）模型。
 # 环境变量：SINGLEFS_REPO 冻结副本根（有 Cargo.toml、Cargo.lock、crates/；本轮是 ~/.local/share/singlefs/work/m3-c694-r2/tree）；
-#   SINGLEFS_TOOLS 仓根（只取 research/scripts/run-with-memory-cap.sh 与 capped.sh 两个包装脚本）；
+#   SINGLEFS_TOOLS 仓根（只取 scripts/run-with-memory-cap.sh 与 capped.sh 两个包装脚本）；
 #   THREADS 线程数（默认 6）；PROFILE quick（默认，前台约 4 分钟）或 full（报告里的全部数，期望文件 expected/ 就是它的输出，约 25–40 分钟，看负载）。
 # 用法：rerun.sh <空工作目录>。拷一份冻结副本到 <工作目录>/repo，make_patched.py 改（臂由环境变量选，一份编译服务全部臂），
 #   编译目录 <工作目录>/target（编译 6G、跑 4G，经内存包装；同一时刻只起一条 cargo、一个原型进程）。
@@ -19,8 +19,8 @@ work="$(cd "$work" && pwd)"
 cp "$SINGLEFS_REPO/Cargo.toml" "$SINGLEFS_REPO/Cargo.lock" "$work/repo/"
 cp -r "$SINGLEFS_REPO/crates" "$work/repo/crates"
 python3 -B "$here/make_patched.py" "$work/repo"
-cap="$SINGLEFS_TOOLS/research/scripts/run-with-memory-cap.sh"
-capped="$SINGLEFS_TOOLS/research/scripts/capped.sh"
+cap="$SINGLEFS_TOOLS/scripts/run-with-memory-cap.sh"
+capped="$SINGLEFS_TOOLS/scripts/capped.sh"
 export CARGO_TARGET_DIR="$work/target"
 ( cd "$work/repo" && nice -n 19 bash "$cap" 6G bash "$capped" "$threads" cargo build --release -p opus-c694r2-probe ) > "$work/build.log" 2>&1
 probe="$CARGO_TARGET_DIR/release/opus-c694r2-probe"

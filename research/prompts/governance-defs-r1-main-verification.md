@@ -29,7 +29,7 @@
 |---|---|---|---|---|
 | A1 | G1 | 崩溃验证员在主工作区跑 54 号快档，工作区与暂存区在 `crates/ Cargo.toml Cargo.lock` 上不同时算出的键找不到 worktree 里写的全绿标记，判红，而同一批 `gate.sh --staged` 判绿 | 核查员复跑模型 8 种状态属实 | 站不住。崩溃验证员不再跑 54 号；54 号快档只在 `gate.sh --staged`（HEAD + 暂存区的树）里跑；`.claude/gate.d/stage-owners.tsv` 里 54 号改归门禁分诊员；crash-verifier.md、main-agent.md、agent-common.md、`.claude/rules/implementation-workflow.md` 同步，`heavy-test-guard.sh` 拒绝时的出路同步 |
 | A2 | G1 | 全绿标记的键还含 54 号脚本自己的 sha256 与 `cargo -V`、`rustc -V`，主 agent 起全量的条件只看登记路径 | `checker-tier-layer0-replay.sh:25、176、191` 属实 | 改：main-agent.md 的触发条件补「54 号脚本本身或工具链」 |
-| A3 | G2 | 实验执行员第 5 步 `bash research/scripts/replay.sh E<号>` 被 heavy-test-guard 拒 | 主 agent 用合成 JSON 喂钩子：旧写法退 2，经 `run-with-memory-cap.sh 4G` 的写法退 0 | 改：第 5 步写成经内存包装的命令 |
+| A3 | G2 | 实验执行员第 5 步 `bash scripts/replay.sh E<号>` 被 heavy-test-guard 拒 | 主 agent 用合成 JSON 喂钩子：旧写法退 2，经 `run-with-memory-cap.sh 4G` 的写法退 0 | 改：第 5 步写成经内存包装的命令 |
 | A4 | G2 | 共用约束只写了内存包装退 250 怎么办 | `run-with-memory-cap.sh` 文件头退出码表属实 | 改：补 251、252、254 各怎么办 |
 | A5 | G3 | 样本号已被占时 `>` 会整份盖掉干净样本 | 属实（改前也中） | 改：第 3 步先 `ls` 取下一个没用过的号 |
 | A6 | G3 | 「共用约束开着 noclobber」与实测不符 | 属实 | 改：删掉这句理由，写「`>|` 在开没开 noclobber 时都写得进」 |

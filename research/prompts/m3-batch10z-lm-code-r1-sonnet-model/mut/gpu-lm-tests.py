@@ -1,6 +1,6 @@
 import json, os, subprocess, shlex
 W=os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet')
-R='/home/fy5090/code/singlefs/research/scripts'
+R='/home/fy5090/code/singlefs/scripts'
 rows=json.load(open(W+'/mut/gpu-h.json'))
 want={'Z1','Z6','Z7','Z8'}
 p=W+'/tree-gpu/crates/singlefs-harness/src/gpu_memory_ledger.rs'

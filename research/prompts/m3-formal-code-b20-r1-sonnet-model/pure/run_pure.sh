@@ -19,5 +19,5 @@ open(D+"/pure_base.rs","w",encoding="utf-8").write(src)
 PY
 for v in base row2366; do
   rustc --edition 2021 -o $D/pure_$v $D/pure_$v.rs 2> $D/compile_$v.log || { echo "编译 $v 失败"; cat $D/compile_$v.log | head -20; continue; }
-  bash $R/research/scripts/run-with-memory-cap.sh 512M $D/pure_$v > $D/run_$v.out 2>&1; echo "$v rc=$?" >> $D/rc.txt
+  bash $R/scripts/run-with-memory-cap.sh 512M $D/pure_$v > $D/run_$v.out 2>&1; echo "$v rc=$?" >> $D/rc.txt
 done

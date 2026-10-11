@@ -45,7 +45,7 @@
 命令（在副本根目录，`CARGO_TARGET_DIR=/tmp/claude-1000/investigate-gate74-reds/target`）：
 
 ```
-nice -n 19 bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 6 cargo test --release --offline -p singlefs-harness --test second_transaction_supplement_three_random_history
+nice -n 19 bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 cargo test --release --offline -p singlefs-harness --test second_transaction_supplement_three_random_history
 ```
 
 退出码 101，日志 `run1.log`（638 行）。原样行：
@@ -78,7 +78,7 @@ thread 'crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_it
 - 命令：
 
 ```
-SINGLEFS_DIAG=1 SINGLEFS_DIAG_WATCH_SLOT=50184 RUST_BACKTRACE=1 nice -n 19 bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 6 cargo test --release --offline -p singlefs-harness --test second_transaction_supplement_three_random_history -- --exact crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43 --nocapture
+SINGLEFS_DIAG=1 SINGLEFS_DIAG_WATCH_SLOT=50184 RUST_BACKTRACE=1 nice -n 19 bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 cargo test --release --offline -p singlefs-harness --test second_transaction_supplement_three_random_history -- --exact crash_recovery_abandoning_the_newest_root_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43 --nocapture
 ```
 
 原样（去掉栈帧，DIAG-STEP 行截到 200 字符）：

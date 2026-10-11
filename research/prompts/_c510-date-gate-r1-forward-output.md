@@ -265,7 +265,7 @@ git 追踪的文件总数，不是 fixtures 样本数）。
     `printf 'E1 name=done emitted=1\n' > research/results/e1-old-round-2026-01-01.out`：
     这个带日期的文件名是**运行时才生成**、生成后从不提交进 git（在沙箱里跑），
     `git ls-files` 看不到它；`setup.sh` 本身是 `.sh` 不是 `.md`，body 扫描也碰不到。
-  - `research/scripts/stale-candidates.py` 第 514 行 `write('records/2026-01-01-log.md', ...)`：
+  - `scripts/kb/stale-candidates.py` 第 514 行 `write('records/2026-01-01-log.md', ...)`：
     现查上下文第 499 行 `git('init', '-q')`——这段自检在**自己另起的一个临时 git 仓**里跑，
     不是本仓，`git ls-files` 从来不会扫到它。
   三个例子现查全部属实，**这一样今天仍然欠着**。

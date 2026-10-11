@@ -9,8 +9,8 @@ ROOT=/home/fy5090/code/singlefs
 MODEL=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 FROZEN=$HOME/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree
 WORK=${1:-$HOME/.local/share/singlefs/work/m3-batch10z-xy-code-r1-opus-rerun}
-CAP=$ROOT/research/scripts/run-with-memory-cap.sh
-THREADS=$ROOT/research/scripts/capped.sh
+CAP=$ROOT/scripts/run-with-memory-cap.sh
+THREADS=$ROOT/scripts/capped.sh
 OUT=$WORK/runs; mkdir -p "$OUT"
 step() { echo "== $(TZ=Asia/Tokyo date +%F) $*" | tee -a "$OUT/rerun-steps.log"; }
 batches() { # batches <批前缀> <件表>：每 4 件一批

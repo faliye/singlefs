@@ -18,10 +18,10 @@ fi
 cap() {
     RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-攻方原型复跑，峰值表里没有这几条}" \
     RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-3600}" \
-        nice -n 19 bash "$repo/research/scripts/run-with-memory-cap.sh" 4G bash "$repo/research/scripts/capped.sh" 7 "$@"
+        nice -n 19 bash "$repo/scripts/run-with-memory-cap.sh" 4G bash "$repo/scripts/capped.sh" 7 "$@"
 }
 cd "$scratch/tree"
-nice -n 19 bash "$repo/research/scripts/capped.sh" 7 cargo build --offline --release -p bf-proto --tests
+nice -n 19 bash "$repo/scripts/capped.sh" 7 cargo build --offline --release -p bf-proto --tests
 t() { cap cargo test --offline --release -p bf-proto --test "$@" -- --nocapture; }
 run() {
     local name="$1"; local log="$scratch/logs/$name.log"

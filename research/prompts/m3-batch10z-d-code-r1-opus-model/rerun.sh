@@ -16,7 +16,7 @@ mkdir -p "$work/repo/crates/opus10zd-probe"
 cp -r "$here/src/opus10zd-probe/." "$work/repo/crates/opus10zd-probe/"
 export CARGO_TARGET_DIR=$work/target
 for t in opus10zd_h2_borrowed opus10zd_abandoned_slot; do
-  (cd "$work/repo" && nice -n 19 bash "$tools/research/scripts/run-with-memory-cap.sh" 12G bash "$tools/research/scripts/capped.sh" "$threads" \
+  (cd "$work/repo" && nice -n 19 bash "$tools/scripts/run-with-memory-cap.sh" 12G bash "$tools/scripts/capped.sh" "$threads" \
     cargo test --release --offline -p opus10zd-probe --test "$t" --no-run) > "$work/build-$t.log" 2>&1 || { echo "编译 $t 失败，见 $work/build-$t.log"; exit 1; }
 done
 bin_of() { ls -t "$work/target/release/deps/" | grep "^$1-[0-9a-f]*\$" | head -1; }
@@ -26,7 +26,7 @@ for spec in "${specs[@]}"; do
   while IFS=$'\t' read -r name envs; do
     envs=${envs//OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed/}
     bin=$h2bin; [[ $name == x* || $name == z* ]] && bin=$xbin
-    { env $envs nice -n 19 bash "$tools/research/scripts/run-with-memory-cap.sh" 4G bash "$tools/research/scripts/capped.sh" 1 \
+    { env $envs nice -n 19 bash "$tools/scripts/run-with-memory-cap.sh" 4G bash "$tools/scripts/capped.sh" 1 \
         "$work/target/release/deps/$bin" --nocapture opus_sweep > "$work/runs/$name.log" 2>&1; echo "$?" > "$work/runs/$name.rc"; } &
     n=$((n+1))
     if (( n % threads == 0 )); then wait; fi

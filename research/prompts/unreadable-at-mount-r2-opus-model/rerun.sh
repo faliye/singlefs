@@ -3,13 +3,13 @@
 # 另有我提的两份收窄 / 放宽：甲-读错-每盘 jiaeiodev、(b)-从映射现算 bmap（被攻过零轮）。
 # 打第一轮的 common-mod.rs.diff 与本目录的 common-mod-memory.rs.diff（镜像改在内存稀疏盘上），再打各自候选的 diff；
 # 拷进两张网格用例与轨迹原型，编译、跑、汇总。用法：
-#   bash research/scripts/run-with-memory-cap.sh 16G bash rerun.sh <冻结副本根（含 crates/）> <工作目录（新建）>
+#   bash scripts/run-with-memory-cap.sh 16G bash rerun.sh <冻结副本根（含 crates/）> <工作目录（新建）>
 set -euo pipefail
 FROZEN=${1:?冻结副本根}; WORK=${2:?工作目录}
 MODEL=$(cd "$(dirname "$0")" && pwd)
 REPO=/home/fy5090/code/singlefs
 R1=$REPO/research/prompts/unreadable-at-mount-r1-opus-model
-CAP=$REPO/research/scripts/capped.sh
+CAP=$REPO/scripts/capped.sh
 mkdir -p "$WORK/runs" "$WORK/tmp"
 for copy in base jia jiaeio jiaeiodev a b bmap; do
   mkdir -p "$WORK/$copy/.cargo"

@@ -4,7 +4,7 @@ import os, subprocess, sys, shutil, re, time
 W = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet')
 T = W + '/tree-m'
 S = T + '/crates/singlefs-core/src/'
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 MS, AL, MT = 'mounted_session.rs', 'allocator.rs', 'mount.rs'
 M = {}
 def mut(name, f, old, new): M[name] = (f, old, new)

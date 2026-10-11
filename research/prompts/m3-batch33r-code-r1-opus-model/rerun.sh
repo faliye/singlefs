@@ -1,5 +1,5 @@
 # 用法：SINGLEFS_REPO=<仓根> [FROZEN_TREE=<冻结副本>] bash rerun.sh <空的输出目录> <阶段>…   阶段：build roots threads verdicts warm-ups:<i> instance-row:<i> merge all
-# m3-batch33r-code-r1 攻方腿（Opus）原型的复跑。仓路径取环境变量 SINGLEFS_REPO（只用它的 research/scripts/run-with-memory-cap.sh、capped.sh
+# m3-batch33r-code-r1 攻方腿（Opus）原型的复跑。仓路径取环境变量 SINGLEFS_REPO（只用它的 scripts/run-with-memory-cap.sh、capped.sh
 # 与 research/prompts/m3-batch33r-code-r1-snapshot/crates-sha256.txt）；被编的代码取 FROZEN_TREE（默认冻结副本），先核被判 4 份的 sha256。
 # 编译经内存包装、上限 6G，跑经内存包装、上限 4G，线程 6（capped.sh 6）；编译目录是 <输出目录>/target，不碰仓里的 target。
 # 阶段分开起是因为 oracle 两截合计约 39 万个状态、轻载时约半小时：子 agent 前台一条命令四分钟以内，一片一条；主 agent 可以 `all` 一次跑完。
@@ -10,8 +10,8 @@ FROZEN_TREE="${FROZEN_TREE:-$HOME/.local/share/singlefs/work/m3-batch33r-code-r1
 OUT="${1:?给输出目录}"
 shift
 MODEL="$(cd "$(dirname "$0")" && pwd)"
-CAP="$SINGLEFS_REPO/research/scripts/run-with-memory-cap.sh"
-CAPPED="$SINGLEFS_REPO/research/scripts/capped.sh"
+CAP="$SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
+CAPPED="$SINGLEFS_REPO/scripts/capped.sh"
 BIN="$OUT/target/release/opus-probe-b33r"
 run() { # run <输出名> <环境…> -- <参数…>
     local name="$1"; shift

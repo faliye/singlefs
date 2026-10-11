@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # m3-batch27-code-r1 攻方（Opus）模型的复跑。
 # 用法：
-#   SINGLEFS_REPO=<被判的仓树（冻结副本）> SINGLEFS_TOOLS=<带 research/scripts/run-with-memory-cap.sh 与 capped.sh 的仓根> \
+#   SINGLEFS_REPO=<被判的仓树（冻结副本）> SINGLEFS_TOOLS=<带 scripts/run-with-memory-cap.sh 与 capped.sh 的仓根> \
 #     bash rerun.sh <空的工作目录> all        # 拷两份仓副本（new = 被判的样子；old = walk.rs 退回第 27 批之前），追加原型，编、跑，写 <工作目录>/summary.txt
 #   bash rerun.sh compare <summary.txt>      # 与本目录的 expected-summary.txt 比（两边都先排序），不读 SINGLEFS_REPO
 # 环境变量：SINGLEFS_REPO（仓树）、SINGLEFS_TOOLS（包装脚本所在的仓根；包装脚本另读的变量在它自己文件头）、
@@ -27,8 +27,8 @@ what="${2:-all}"
 : "${SINGLEFS_REPO:?设 SINGLEFS_REPO}"
 : "${SINGLEFS_TOOLS:?设 SINGLEFS_TOOLS}"
 threads="${OPUS_B27_THREADS:-12}"
-cap="$SINGLEFS_TOOLS/research/scripts/run-with-memory-cap.sh"
-capped="$SINGLEFS_TOOLS/research/scripts/capped.sh"
+cap="$SINGLEFS_TOOLS/scripts/run-with-memory-cap.sh"
+capped="$SINGLEFS_TOOLS/scripts/capped.sh"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="派发提示规定上限显式写（编译 6G、跑 4G），不写 auto"
 mkdir -p "$work"
 prepare() {

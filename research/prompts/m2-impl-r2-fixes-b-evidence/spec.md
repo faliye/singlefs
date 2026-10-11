@@ -24,5 +24,5 @@
 - 不碰：改法 A 的那几份（`crates/singlefs-checker/src/`、`checker_known_bad_images.rs`、`a_zero_unit_publish_…`、`litmus/`）；两个包的 `Cargo.toml`、`Cargo.lock`、`crates/singlefs-checker-tier/src/` 下除两个 bin 之外的文件。
 - 交补丁：在副本里改，交 `patch/`（`crates.patch`、`mutations-append.tsv`、`mutations-replacements.tsv`），交回前对主工作区 `git apply --check`；别的会话还在挪文件，打不上的逐份列出改法。
 - 重型测试：不跑。每条 `cargo test` 带 `--lib`、`--test <目标>` 或 `--bin` 之一。
-- 线程上限：4。每条 cargo 经 `research/scripts/capped.sh 4`。
+- 线程上限：4。每条 cargo 经 `scripts/capped.sh 4`。
 - 报告 `/tmp/claude-1000/impl-r2-fixes-b/report.md`；草稿目录 `/tmp/claude-1000/impl-r2-fixes-b/`；进度逐条追加进同目录的 `progress.md`。上下文过 600k 停在编得过的点交回。

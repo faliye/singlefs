@@ -209,7 +209,7 @@ GPU 一侧：池级 checker 的 GPU 判器只带违例位（`crash_judge_checker
 **全仓按秒解这 4 字节：没打中（量过 + 读码）。**
 - 读码：`crates/` 里读偏移 433 的只有 G1 那一处（按毫秒）；core 自己不读（运行配置一档没有字段，挂载选项通道不存在）；池级 checker 与两个 GPU 内核没有一处读它。`research/` 的装置：E91、E159 内部常量本来就按毫秒，E108 按秒但只是模型参数不读盘，E142 已写 5000，E170 五个规约执行器按偏移 433 解出 `checkpoint_time_threshold` 却不拿它判任何东西。
 - 量过：覆盖写之后的镜像上把两块盘四个系统配置槽的 [433, 437) 一起换成 5、0、200、4999、u32::MAX，重封；`check_pool_image` 的整份判定与 `recover` 两遍（看 / 不看 journal）的结局与没换时逐字相同（`out/i54-units-and-time.log` 的 `B30TIME` 五行 `checker_same=true consulted_same=true ignored_same=true`）。这同时坐实了 30-3 报告「池级 checker 不读这 4 字节」那一句。
-- 顺手记一处（不算打中）：E170 五个目录的合成池仍写 5，例 `research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor/synthetic_pool_for_tests.py:59`「"checkpoint_time_threshold": 5,」，按今天的单位是 5 毫秒；执行器只解不判，判定不受影响，换不换由实验那边定（30-3 报告第七节已列）。
+- 顺手记一处（不算打中）：E170 五个目录的合成池仍写 5，例 `scripts/experiments/e170_second_run_o3_spec_executor/synthetic_pool_for_tests.py:59`「"checkpoint_time_threshold": 5,」，按今天的单位是 5 毫秒；执行器只解不判，判定不受影响，换不换由实验那边定（30-3 报告第七节已列）。
 
 **三个新钉值的出处：没打中（量过，另一条路）。** 换一条不靠「取断言的 left」的路复核：今天的字节里把 T_time 换回 5、整槽校验和重封，得到的摘要应等于第 30 批之前一直入库判绿的旧钉值。
 
@@ -227,7 +227,7 @@ B30CRC today=1329175690 reverted=4048568891 old_pin=4048568891 new_pin=132917569
 
 ## M4　主 agent 两处
 
-**变异行只改名：没打中（推的，读脚本）。** 按条记录的键是 `research/scripts/crates-mutation-rows.py:46`「行键 = sha256（这一行六段原样用制表符接起来 + 这一趟的每条内存上限 + 每条限时）。」，名字在六段里，改名只让 `crates/mutations.tsv` 第 2636 行那一行下一趟重跑，不会复用到别的记录、也不会对不上；而 core 这一批改了源码，底座指纹本来就变，整表都要重跑。仓里按旧名找这一行的只剩两份改动全文（`_m3-formal-code-b29-r1-diff.md`、`_m3-formal-code-b30-r1-diff.md`）与 b29 正推腿的产物，都是当时的记录，不是在用的键。
+**变异行只改名：没打中（推的，读脚本）。** 按条记录的键是 `scripts/crates-mutation-rows.py:46`「行键 = sha256（这一行六段原样用制表符接起来 + 这一趟的每条内存上限 + 每条限时）。」，名字在六段里，改名只让 `crates/mutations.tsv` 第 2636 行那一行下一趟重跑，不会复用到别的记录、也不会对不上；而 core 这一批改了源码，底座指纹本来就变，整表都要重跑。仓里按旧名找这一行的只剩两份改动全文（`_m3-formal-code-b29-r1-diff.md`、`_m3-formal-code-b30-r1-diff.md`）与 b29 正推腿的产物，都是当时的记录，不是在用的键。
 
 **字段表第 149 行与 D16 已定项 5：打中一格格式空白（低，推的）。** D16 已定项 5 的定案句 `.claude/kb/decisions/16-发布语义.md:140`「**`T_time` 用户可设，不限制**：挂载时传的值覆盖盘上的字段并回写；超出 [200 ms, 5 s] 不拒绝，只给警告（用户 2026-09-20）」。4 字节毫秒写得出 1 ms 到 4 294 967 295 ms（约 49.7 天），写不出 1 ms 以下（例 0.5 ms）与约 49.7 天以上的值；「不限制、不拒绝」与「写不出」之间怎么处置（取整、饱和、还是拒），字段表与 D16 都没写。默认值与 [200 ms, 5 s] 区间都写得出，b29 判决 L2 那一格的空白已经补上；剩下的是这两端。今天没有挂载选项通道（C422），走不到，推的。改法（零轮，交用户定）：字段表那一行或 D16 已定项 5 补一句写不出的值怎么办，例「挂载时传的值按毫秒向上取整、超过 u32 上限按上限写并警告」。
 
@@ -260,7 +260,7 @@ B30CRC today=1329175690 reverted=4048568891 old_pin=4048568891 new_pin=132917569
 
 ## 引文核对
 
-`python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b30-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b30-r1/tree --root . --background research/prompts/_m3-formal-code-b30-r1-background.md` 末行：
+`python3 scripts/cite-check.py research/prompts/m3-formal-code-b30-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b30-r1/tree --root . --background research/prompts/_m3-formal-code-b30-r1-background.md` 末行：
 
 ```text
   ✓ 核了 29 处引文，对上 29 处，没判 0 处（逐处列在上面）

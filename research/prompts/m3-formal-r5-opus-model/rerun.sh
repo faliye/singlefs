@@ -8,7 +8,7 @@ frozen="$1"; scratch="$2"; shift 2
 items=("$@"); [ ${#items[@]} -eq 0 ] && items=(scan u3-rb u5-s1 u5-s5 u5-rbmut u5-um u5-fms u3-ow)
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
-W="$repo/research/scripts/run-with-memory-cap.sh"
+W="$repo/scripts/run-with-memory-cap.sh"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="复跑 m3-formal-r5 攻方腿原型 r5probe"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑 m3-formal-r5 攻方腿原型，峰值表按整条命令记"
 mkdir -p "$scratch"
@@ -18,7 +18,7 @@ cp "$here/Cargo.toml" "$scratch/tree/crates/r5probe/Cargo.toml"
 cp "$here/main.rs" "$scratch/tree/crates/r5probe/src/main.rs"
 python3 "$here/apply-mutation-switch.py" "$scratch/tree"
 cd "$scratch/tree"
-CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash "$W" 3700M bash "$repo/research/scripts/capped.sh" 8 cargo build --offline --release -p r5probe
+CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash "$W" 3700M bash "$repo/scripts/capped.sh" 8 cargo build --offline --release -p r5probe
 cd "$scratch"
 P=./target/release/r5probe
 run() { local log="$1"; shift; local rc=0; nice -n 19 bash "$W" 1G "$@" > "$log" 2>&1 || rc=$?; echo "$log exit=$rc"; }

@@ -4,7 +4,7 @@
 
 1. **续做第二段**：第一段交回（报告 `/tmp/claude-1000/e142-r22-run/report.md` 第五节）之后，问题单第 1 行已够判、第 3 行 (d) 由主 agent 整张表跑完已够判，只剩第 2 行（P8G）开着，续做第二段。
 2. **`crates/` 的 P8G 导出给，命令是**：在主工作区（仓根）跑
-   `bash research/scripts/run-with-memory-cap.sh <上限> cargo run -q -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump -- --device-bytes 8589934592`
+   `bash scripts/run-with-memory-cap.sh <上限> cargo run -q -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump -- --device-bytes 8589934592`
    ——与 `replay.sh` 的 `driver_e142` 第一条命令相同，只多 `-- --device-bytes 8589934592`。
 3. **那条命令用到的 `crates/` 改动是谁做的**：删除线第 18 批 X（implementation-writer，报告 `/tmp/claude-1000/m3-batch18/x/report.md`，补丁 7645e4ae…），给导出 bin `crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs` 加了可选参数 `--device-bytes <每盘字节数>`，不带参数时两块盘各 `TEST_IMAGE_DEFAULT_BYTES`（4 GiB）、输出与只收零个参数时逐字节相同（文件第 14–16 行文档）。2026-10-05 合入主工作区，合入验证 `/tmp/claude-1000/merge-and-verify/2026-10-05-413718/`：159 个 harness 测试二进制全绿，fmt 与 clippy 退 0。执行员开工先自己核一次「不带参数的导出与第 22 次主产物导出那一半逐字节相同」，不相同就停在 S22-dump2，Q142.97 记「还差」。
 
@@ -18,8 +18,8 @@
 
 | 项 | 值 |
 |---|---|
-| 装置 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs` | 10866 行，sha256 `c400139b8cfc7c0e4b96d483200055e9891252c9171bbbeb06771046bf63d899` |
-| 变异表 `research/mutations/e142_new_pool_file_creation_dry_run.tsv` | 210 行，sha256 `ef63ea858443d708868f3ca55659f62727e4c867d96b5c234bf4dbf3e1fcf1c3`（第一段冻结的 206 行里只改了 M55 一行的锚点与替换文，末尾追加 M228–M231 四行） |
+| 装置 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` | 10866 行，sha256 `c400139b8cfc7c0e4b96d483200055e9891252c9171bbbeb06771046bf63d899` |
+| 变异表 `scripts/mutations/e142_new_pool_file_creation_dry_run.tsv` | 210 行，sha256 `ef63ea858443d708868f3ca55659f62727e4c867d96b5c234bf4dbf3e1fcf1c3`（第一段冻结的 206 行里只改了 M55 一行的锚点与替换文，末尾追加 M228–M231 四行） |
 | 第一段冻结值（核过，S22-sha 不触发） | 装置 10282 行 `4720213e…5230`、变异表 206 行 `17132e80…0aa`，开工时现取与登记第十二节相同 |
 | 单测 | `--list` 118 条，其中 1 条 `#[ignore]`；`cargo test --release -p e7-index-bench --bin e142-new-pool-file-creation-dry-run`：117 过 0 败 1 忽略（第一段 107 过；新加 10 条） |
 

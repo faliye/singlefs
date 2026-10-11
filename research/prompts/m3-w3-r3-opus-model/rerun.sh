@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # m3-w3-r3 攻方腿（Opus）的复跑。用法：SINGLEFS_REPO=<仓根> [W3R3_MODEL_DIR=<本目录>] [R2_MODEL_DIR=<第二轮攻方模型目录>] [FROZEN_TREE=<冻结树>] bash rerun.sh <工作目录> <段>
 # 路径只从环境变量与参数取：W3R3_MODEL_DIR 默认 $SINGLEFS_REPO/research/prompts/m3-w3-r3-opus-model，R2_MODEL_DIR 默认 $SINGLEFS_REPO/research/prompts/m3-w3-r2-opus-model，
-# FROZEN_TREE 默认 ~/.local/share/singlefs/work/m3-w3-r1/tree。编译与跑都经 research/scripts/run-with-memory-cap.sh（编译 6G、跑 4G），线程 5（research/scripts/capped.sh）。
+# FROZEN_TREE 默认 ~/.local/share/singlefs/work/m3-w3-r1/tree。编译与跑都经 scripts/run-with-memory-cap.sh（编译 6G、跑 4G），线程 5（scripts/capped.sh）。
 # 段（每段一条前台命令，各在 4 分钟以内）：
 #   build-model        编抽象模型（model/，不依赖 crates/）
 #   model-verify       verify 组 0..4（独立重算前两轮的数）
@@ -21,8 +21,8 @@ R=${SINGLEFS_REPO:?设 SINGLEFS_REPO 为仓根}
 M=${W3R3_MODEL_DIR:-$R/research/prompts/m3-w3-r3-opus-model}
 R2=${R2_MODEL_DIR:-$R/research/prompts/m3-w3-r2-opus-model}
 FROZEN=${FROZEN_TREE:-$HOME/.local/share/singlefs/work/m3-w3-r1/tree}
-CAP="bash $R/research/scripts/run-with-memory-cap.sh"
-THREADS="bash $R/research/scripts/capped.sh 5"
+CAP="bash $R/scripts/run-with-memory-cap.sh"
+THREADS="bash $R/scripts/capped.sh 5"
 REAL_CARGO=${REAL_CARGO:-$HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo}
 mkdir -p "$W/out"
 MODEL=$W/target-model/release/w3r3-model

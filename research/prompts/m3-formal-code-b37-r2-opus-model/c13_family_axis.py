@@ -4,7 +4,7 @@
 读三样东西（都只读）：
   1. 冻结副本里的 e165 装置源码：判据枚举（变体 → 标签）、`Criterion::family` 的分族、`is_judged_under` 的六条臂、
      `positive_control_readings` 的族过滤那一行、改后单测里写死的五份集合与五个 (档, 族) 调用；
-  2. 仓里 `research/scripts/replay.sh` 起 e165 装置的驱动（参数）与它登记的产物名；
+  2. 仓里 `scripts/replay.sh` 起 e165 装置的驱动（参数）与它登记的产物名；
   3. 那几份产物里 `name=control criterion=` 的判据集合——拿它独立核模型算出的「今天每条正式跑有哪几条对照」。
 然后：
   A. C1：单测的五个调用里，哪几个是 `main` 根本起不出来的族组合；正式跑按档并起来的对照集与单测写死的集合逐档比；
@@ -185,7 +185,7 @@ def old_test_passes(model):
 
 
 def parse_drivers(repo):
-    text = (repo / "research/scripts/replay.sh").read_text()
+    text = (repo / "scripts/replay.sh").read_text()
     artifact_of = dict(re.findall(r"^E165\|@(driver_e165\w*)\|\|([^|]+)\|exact$", text, re.M))
     drivers = []
     for name, body in re.findall(r"^(driver_e165\w*)\(\) \{\n(.*?)\n\}", text, re.M | re.S):

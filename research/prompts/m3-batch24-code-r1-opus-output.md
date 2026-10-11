@@ -4,7 +4,7 @@
 
 ## 复跑
 
-模型在 `research/prompts/m3-batch24-code-r1-opus-model/`。仓路径取 `SINGLEFS_REPO`（冻结副本只有 `crates/` 与 `Cargo.*` 时另给 `SINGLEFS_TOOLS=<仓根>` 取包装脚本）；编译 6G、跑 4G 经 `research/scripts/run-with-memory-cap.sh`，线程经 `capped.sh`（`OPUS_THREADS`，默认 10）；每段前台四分钟以内。
+模型在 `research/prompts/m3-batch24-code-r1-opus-model/`。仓路径取 `SINGLEFS_REPO`（冻结副本只有 `crates/` 与 `Cargo.*` 时另给 `SINGLEFS_TOOLS=<仓根>` 取包装脚本）；编译 6G、跑 4G 经 `scripts/run-with-memory-cap.sh`，线程经 `capped.sh`（`OPUS_THREADS`，默认 10）；每段前台四分钟以内。
 
 ```
 SINGLEFS_REPO=/tmp/claude-1000/m3-batch24-code-r1/tree SINGLEFS_TOOLS=<仓根> bash research/prompts/m3-batch24-code-r1-opus-model/rerun.sh <空工作目录> <段|all>
@@ -203,7 +203,7 @@ RESULT n3turn turns=30 queue=[] tombstones=1 I-9.17=不适用[R-no-lineage-entry
 崩溃状态那一格（3.3）若要补，最小的两段（C2、C3）各 1 048 583 个状态，略过约 10⁶，推的挂钟十几个小时，照派发规则我没跑。要跑的话（工作目录是复跑用的那个、先跑过 `setup`、`crash-build`；包装要的两条理由变量同 `rerun.sh` 里 `export RUN_WITH_MEMORY_CAP_` 那两行；挂钟远过前台四分钟，要放后台）：
 
 ```
-cd <工作目录>/crash && OPUS_CRASH_HISTORIES=1 OPUS_STATE_CAP=1100000 nice -n 19 bash <仓>/research/scripts/run-with-memory-cap.sh 4G bash <仓>/research/scripts/capped.sh 10 <工作目录>/target/release/opus-b24-crash
+cd <工作目录>/crash && OPUS_CRASH_HISTORIES=1 OPUS_STATE_CAP=1100000 nice -n 19 bash <仓>/scripts/run-with-memory-cap.sh 4G bash <仓>/scripts/capped.sh 10 <工作目录>/target/release/opus-b24-crash
 ```
 
 看 `RESULT crash C2 … flag …` 那几行：有 `DEFAULT`、`RED`、`NA I-9.24`、`MISMATCH` 任一行就是打中，没有就是这一段零旗。

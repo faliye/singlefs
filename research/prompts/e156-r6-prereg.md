@@ -6,7 +6,7 @@
 
 **这一份回答问题单 `research/prompts/e156-r6-questions.md` 的三行**（11 行，sha256 `bb7325526cdad14ca4d072949412ac18af0caa3fafa1efeb3ef54eb215ca7d24`）：第 1 行（照定乙读门槛之后 38 格 K10、F24 还有没有不符的点，连同副本里去掉 core 全零钉住的判别力自证）在第六节 R1a–R1d 量；第 2 行（岔路单第 1 行的读数与第 5 次产物比）在第六节 R2a–R2c 量，**只报、不重下判决**——岔路单 `research/prompts/alloc-basis-forks.md` 第 1 行用户 2026-09-27 已定（留到里程碑三、考虑重排算法，C566），第 5 次「主 agent 认定」第 4 条写明这一次的读数交 C566 那一项开工时用；第 3 行（PC-钉门槛 六格两列）在第六节 R3 量，定义同第 5 次 Q1r5a、Q1r5b。
 
-**装置写在哪（写死）：入库装置。** 执行员改写 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 与它的内联单测；不在 `research/e7-index-bench/src/bin/` 另起装置。依据：三行问的都是 `crates/` 今天这份代码（core 照定乙实现的全零钉住）在这一族历史上的性质，第 1 行要的是「同一个装置、门槛照定乙读之后，在今天的 `crates/` 上还有没有不符的点」，第 2、3 行要与第 5 次同一个装置的产物逐格比，另写一份独立模型答不了。只读、只驱动与观测，不改 `crates/singlefs-core`、`crates/singlefs-checker`、`crates/singlefs-format`（第六节 R1c 的判别力自证只在草稿副本里改 core，不回主工作区）；变异照第九节追加进 `crates/mutations.tsv`。
+**装置写在哪（写死）：入库装置。** 执行员改写 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 与它的内联单测；不在 `scripts/experiments/` 另起装置。依据：三行问的都是 `crates/` 今天这份代码（core 照定乙实现的全零钉住）在这一族历史上的性质，第 1 行要的是「同一个装置、门槛照定乙读之后，在今天的 `crates/` 上还有没有不符的点」，第 2、3 行要与第 5 次同一个装置的产物逐格比，另写一份独立模型答不了。只读、只驱动与观测，不改 `crates/singlefs-core`、`crates/singlefs-checker`、`crates/singlefs-format`（第六节 R1c 的判别力自证只在草稿副本里改 core，不回主工作区）；变异照第九节追加进 `crates/mutations.tsv`。
 
 **这条实验要读 `crates/` 的常量**：同第 5 次（即第 4 次表头那张表，连同 r2、r3 表头），这一次一个都不新加。钉住的 txg 用装置本地的 `E156_ROOT_RING_REGIONS × S`（环长 3S）与装置已经在用的 `singlefs_core::root_ring::target_for_publish` 算（第五节 E8），A2 已经核过 txg 与 u mod 3S 一一对应。
 
@@ -154,7 +154,7 @@ pub enum RootRingOccupant {
 | J42 | 第 4996–5008 行 `use super::{…}`：`rustfmt --check --edition 2021` 对整份文件只报这一处（第 5002 行超宽，改成七行） | 第十三节命令原样 |
 | J43 | 今天的装置：5819 行，sha256 `e69e423a…`；`git diff --stat`（工作区对暂存区）102 增 59 删、`git diff --cached --stat` 1 增（第 5 次执行员的改动在工作区，没暂存） | 第十三节 |
 | J44 | `crates/mutations.tsv` 里 E156 24 行（`grep -c 'E156'`）；M36（第 803 行）的原文就是 `reclaim_threshold_read_from_the_ring_image` 的函数体（`valid_root_txgs\n        .iter()\n        .min()…`），改函数体会让它的锚点不再唯一命中（第七类）；M42（第 809 行）原文 `let every_publish_floor = ring_threshold;`；M44 第 2747 行、M35 第 2748 行 | `awk -F'\t'` 读那几行 |
-| J45 | 复跑行：`research/scripts/replay.sh:193` `E156\|@driver_e156\|\|e156-alloc-basis-counts-2026-10-05.out\|exact`（已指第 5 次产物） | `grep -n` |
+| J45 | 复跑行：`scripts/replay.sh:193` `E156\|@driver_e156\|\|e156-alloc-basis-counts-2026-10-05.out\|exact`（已指第 5 次产物） | `grep -n` |
 
 **对装置的直接后果**：① 门槛只在 J38 那一处算、「每」列与 K10 都吃它，所以 W15 改一个调用点（不动函数体，M36 的锚点保住）就同时改了 K10 守门与「每」列；② 挂载时根环读数要新加到 `HhRunState` 里，在 J39 的挂载点记、每次挂载整张换；③ 锚点模型（J40）与 Python 脚本要同改一处，否则第一段在 `v2_threshold_differs_from_the_anchor` 停（调查报告第三节 x2 那一次就是这样停的）；④ U17 不核门槛，门槛的改动没有单测盯着，第九节加 U20。
 
@@ -201,7 +201,7 @@ pub enum RootRingOccupant {
 | E9 | `HhStateInputs` 加 E7 那两项；`read_hh_state` 里把第 1817–1818 行 `let ring_threshold =\n        reclaim_threshold_read_from_the_ring_image(effective_floor, &valid_root_txgs);` 换成：先按 W18 算「到这个观测点还钉着的槽的最旧 txg 集合」（变量名写死 `all_zero_slots_still_pinned`，类型 `BTreeSet<u64>`；读那一槽用 `ring` 里已经读到的根——`ring` 在第 1779 行就有，按槽建一张表在算门槛之前），再 `reclaim_threshold_read_from_the_ring_image(effective_floor, &valid_root_txgs.union(&all_zero_slots_still_pinned).copied().collect())` | **`reclaim_threshold_read_from_the_ring_image` 的函数体（第 1552–1562 行）一个字不动**（M36 的锚点）；第 1836 行 `let every_publish_floor = ring_threshold;` 一个字不动（M42 的锚点）；`oldest_valid_root_txg`（第 1819 行）照旧只按 `valid_root_txgs` 取（W19）。W18 的 (a)(b)(c)(d) 各计一个数进观测读数，(b) 累加成格的 `pin_released_by_reread_only`，(d) 累加成 `bad_slots_still_pinned`，两个数都进 E10 那两行。W18 的判断照第九节 M47 写死的那一句写：`occupant` 是那一槽这一刻读出的自证合法根的 txg（`Option<u64>`，读不出根为 `None`），`first_txg` 是这次挂载的第一个 txg；「写掉」（`occupant_txg >= first_txg`）与「重读读出」（`occupant_txg < first_txg`）两句都不成立的槽算仍钉着 |
 | E10 | 新行：每格在 `name=q1_cell_checks` 之后打 `name=all_zero_pin_cell family={} {shape.fields()} mounts={} pins_installed={} pinned_points={} pinned_slots_peak={} pinned_slots_end={} threshold_lowered_points={} released_by_write={} released_by_reread_only={} bad_slots_at_mount={} bad_slots_still_pinned={}`（`pinned_points` = 至少钉着一槽的观测点数，`threshold_lowered_points` = B 让门槛比只按 A 取更低的观测点数）；第二段 `name=failure_clauses` 之后打一行 `name=all_zero_pin_summary cells={} cells_with_pins={} pins_installed={} threshold_lowered_points={} released_by_reread_only={} bad_slots_at_mount={} bad_slots_still_pinned={}` | **已有的行一行都不改格式、不挪次序**；已有行里的值随门槛变（`q1_observation` 的 `floor=`、`anchor_dump`、`q1_cell_checks` 等）是这一次的结果，不是格式改动 |
 | E11 | 锚点模型 `anchor_model::run_the_anchor_hole_script`（第 1182–1301 行）照第十三节命令四的补丁改同一处：循环前 `let mount_first_txgs: BTreeSet<u64> = holes.iter().map(\|hole\| hole + 1).collect();` 与 `let mut pins: BTreeSet<u64> = BTreeSet::new();`；循环里在 `ring.insert` 之前 `if mount_first_txgs.contains(&txg) { pins = (0..ring_length.min(txg)).filter(\|slot\| !ring.contains_key(slot)).collect(); }`；第 1214 行 `let floor = oldest;` 换成 `let floor = pins.iter().copied().filter(\|slot\| !ring.contains_key(slot)).fold(oldest, u64::min);`。`missing_txgs`、`live_holes` 与两条闭式照旧读 `oldest`；`tree_table_reclaim_lags` 不动（k = 0 没有挂载）。模块头注释（第 1067–1073 行）与文件头第 12–13 行改指第 6 次的脚本 | 改完 `name=anchor_dump` 那 1092 行去掉前缀之后必须与命令四 `--dump` 的 `DUMP` 行逐行同（L8） |
-| E12 | 复跑登记：`research/scripts/replay.sh:193` 改指新主产物；E156 那段注释补一句第 6 次（登记是这一份、产物文件名、门槛照定乙读） | 第 5 次产物与更早的 E156 产物一个不删、不挪、不覆盖 |
+| E12 | 复跑登记：`scripts/replay.sh:193` 改指新主产物；E156 那段注释补一句第 6 次（登记是这一份、产物文件名、门槛照定乙读） | 第 5 次产物与更早的 E156 产物一个不删、不挪、不覆盖 |
 | E13 | **fmt**：全部改完之后只对这一份文件跑 `rustfmt --edition 2021 crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs`，再 `rustfmt --check --edition 2021` 同一文件无输出；第 4996–5008 行那一块（J42）随之改好 | 不对整个包跑 `cargo fmt`（包里别的文件可能在别的快照里） |
 | E14 | 新单测 U20、三行变异 M45–M47（第九节） | 写法照第九节；改完照第 4 次第九节的规矩逐条核 E156 全部各行原文在源码里恰好命中一次（M36、M42 尤其） |
 
@@ -389,7 +389,7 @@ pub enum RootRingOccupant {
 - `.claude/agent-common.md`：整份（100 行）
 - `.claude/singlefs-ai-sop/rules/test-discipline.md`（122 行）、`.claude/rules/three-way-inference.md`（174 行）、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`（176 行）、`.claude/rules/mutation-sampling.md`（96 行）、`.claude/rules/implementation-first.md`（20 行）：整份
 - `.claude/agents/experiment-runner.md`：`grep -n 'replay\|第 4 步\|文件名'` 命中的第 31、33、35、38、39、40、46 行（前 200 字符）
-- `research/scripts/quote-kb.py`：`--help` 前 30 行；`research/scripts/replace-once.py`：`--help`
+- `scripts/quote-kb.py`：`--help` 前 30 行；`scripts/replace-once.py`：`--help`
 
 ### 13.2 派发给的输入、前几次登记、记录、调查
 
@@ -417,7 +417,7 @@ pub enum RootRingOccupant {
 - 装置 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs`（5819 行，sha256 `e69e423a…`）：第 1–60、1060–1420、1540–1900、2054–2094、2128–2240、2347–2600、4349–4365、4570–4625、4940–5030、5521–5640、5684–5721 行；`grep -n` 命中行（门槛、`valid_root_txgs`、`fn main`、`use`、`HhStateInputs {`、`mount_writable(`、`injected_holes`、`dump_lines`、`v2_threshold_differs_from_the_anchor`、各 `"name=…` 行的格式第 2819、3852、3881、3898、3908、4290、4731、4741、4867、4886、4946、4958、4980 行、`#[test]` 之后一行、`HolePosition::Front`）
 - `crates/singlefs-checker-tier/Cargo.toml`：`grep -n edition`（第 5 行 `edition = "2021"`）
 - `crates/mutations.tsv`（sha256 `58b9b75d…`）：前 3 行（前 300 字符）；`grep -n 'E156 M3[5-9]\|E156 M4'` 命中行；第 803、809、2747、2748 行六段
-- `research/scripts/replay.sh`（sha256 `21bca46f…`）：`grep -n 'E156'` 命中第 193、531、554、1192 行（前 200 字符）
+- `scripts/replay.sh`（sha256 `21bca46f…`）：`grep -n 'E156'` 命中第 193、531、554、1192 行（前 200 字符）
 
 ### 13.5 跑过的命令（原样；读文件的 `awk` / `grep -n` / Read 在上面按行列过，不重列；输出是写这一节时重跑的）
 
@@ -494,7 +494,7 @@ ls: cannot access 'research/prompts/m3-formal-code-b31-r1-main-verification.md':
 ```
 $ awk 'NR>=96 && NR<=255' research/prompts/e156-r5-prereg.md > …/r5-section2-quote.md; sha256sum …/r5-section2-quote.md
 a54efaa24231508eb8a0d99ab6b9a4ed761ae337b1af256388f163f79c2a5bbb  …/r5-section2-quote.md
-$ nice -n 19 python3 research/scripts/quote-kb.py …/e156-r6-clauses-now.md \
+$ nice -n 19 python3 scripts/quote-kb.py …/e156-r6-clauses-now.md \
    '.claude/kb/decisions/28-挂载期承诺量.md@#### 已定项 1：准入不等式的权威形式' \
    '.claude/kb/decisions/28-挂载期承诺量.md@#### 已定项 3：实例切换的预留' \
    '.claude/kb/decisions/16-发布语义.md@#### 已定项 1：defer 窗口取按盘回退下界的收严形态，按状态数读' \
@@ -514,10 +514,10 @@ $ grep -n '全零' .claude/kb/decisions/16-发布语义.md | cut -c1-80
 **命令二**（第一节的问题单、第二节的定乙四段）：
 
 ```
-$ nice -n 19 python3 research/scripts/quote-kb.py …/e156-r6-question.md 'research/prompts/e156-r6-questions.md:1-11'; echo rc=$?
+$ nice -n 19 python3 scripts/quote-kb.py …/e156-r6-question.md 'research/prompts/e156-r6-questions.md:1-11'; echo rc=$?
   ✓ 1 段整抄进 /tmp/claude-1000/e156-r6-designer/quotes/e156-r6-question.md，回读逐字节一致
 rc=0
-$ nice -n 19 python3 research/scripts/quote-kb.py …/e156-r6-yi.md 'crates/singlefs-core/src/allocator.rs:943-946' 'crates/singlefs-core/src/allocator.rs:989-996' 'records/2026-09-30-里程碑三开工第一轮.md:624-624' 'records/2026-09-30-里程碑三开工第一轮.md:628-628'; echo rc=$?
+$ nice -n 19 python3 scripts/quote-kb.py …/e156-r6-yi.md 'crates/singlefs-core/src/allocator.rs:943-946' 'crates/singlefs-core/src/allocator.rs:989-996' 'records/2026-09-30-里程碑三开工第一轮.md:624-624' 'records/2026-09-30-里程碑三开工第一轮.md:628-628'; echo rc=$?
   ✓ 4 段整抄进 /tmp/claude-1000/e156-r6-designer/quotes/e156-r6-yi.md，回读逐字节一致
 rc=0
 $ sha256sum …/e156-r6-question.md …/e156-r6-yi.md; wc -l 同两份
@@ -736,7 +736,7 @@ b980971a72ce14468743f6b2e4392c65fb97970a7c4da451d377a94649229653  lag_r6_c.out
 
 ## 主 agent 认定：第 6 次交回（2026-10-05，产物之后）
 
-1. 问题单三行都够判（报告 `/tmp/claude-1000/e156-r6-run/report.md` sha256 780327bc…）。主 agent 现查：主产物 `research/results/e156-alloc-basis-counts-2026-10-05-r2.out`（4063 行，sha256 1c8812b19456165b…）里 `s11_k10_violation_points=0`、`f24_real_every_differ_points=0` 各一处；判别力对照 `research/results/e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out`（sha256 eaf6b8b63d3b1d89…）里两者各 34；`research/scripts/replay.sh` 第 193 行指新产物。S3 要写进第十二节的 sha256 照这一条记，第十二节本身不改。
+1. 问题单三行都够判（报告 `/tmp/claude-1000/e156-r6-run/report.md` sha256 780327bc…）。主 agent 现查：主产物 `research/results/e156-alloc-basis-counts-2026-10-05-r2.out`（4063 行，sha256 1c8812b19456165b…）里 `s11_k10_violation_points=0`、`f24_real_every_differ_points=0` 各一处；判别力对照 `research/results/e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out`（sha256 eaf6b8b63d3b1d89…）里两者各 34；`scripts/replay.sh` 第 193 行指新产物。S3 要写进第十二节的 sha256 照这一条记，第十二节本身不改。
 2. 第 2 行：F1 仍触发；Q1d「每」列 4 组由增长翻成不单调（F34），只照报。岔路单第 1 行用户 2026-09-27 已定（C566），不重开；这组读数交 C566 开工时用。
 3. 主产物用 release 二进制跑（与 `replay.sh` 的 debug 驱动同源码；debug 只跑到前 1803 行、与 release 前 1803 行相同），整份 debug 输出由提交前 `replay.sh E156` 第一次核到，认。
 4. 装置（sha256 3129ec95…，单测 19 条，新加 U20）与 M45–M47 三行变异并进下一轮代码轮被判清单；装置内联单测与三行变异的证红归提交时。

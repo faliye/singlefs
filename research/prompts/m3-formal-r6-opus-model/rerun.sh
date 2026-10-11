@@ -9,7 +9,7 @@ frozen="$1"; scratch="$2"; shift 2
 items=("$@"); [ ${#items[@]} -eq 0 ] && items=(sizes lo-rbm lo-rbm-mut tgt-fft tgt-rbm w1-off-A w1-on-A)
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
-W="$repo/research/scripts/run-with-memory-cap.sh"
+W="$repo/scripts/run-with-memory-cap.sh"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="复跑 m3-formal-r6 攻方腿原型 r6probe"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑 m3-formal-r6 攻方腿原型，峰值表按整条命令记"
 mkdir -p "$scratch/runs"
@@ -21,7 +21,7 @@ mkdir -p "$scratch/tree/crates/r6probe/src"
 cp "$here/Cargo.toml" "$scratch/tree/crates/r6probe/Cargo.toml"
 cp "$here/main.rs" "$scratch/tree/crates/r6probe/src/main.rs"
 cd "$scratch/tree"
-CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash "$W" 3G bash "$repo/research/scripts/capped.sh" 5 cargo build --offline --release -p r6probe
+CARGO_TARGET_DIR="$scratch/target" nice -n 19 bash "$W" 3G bash "$repo/scripts/capped.sh" 5 cargo build --offline --release -p r6probe
 cd "$scratch"
 P=./target/release/r6probe
 run() { local log="$1"; shift; local rc=0; nice -n 19 bash "$W" 2G "$@" > "runs/$log" 2>&1 || rc=$?; echo "$log exit=$rc"; }

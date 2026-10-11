@@ -3,13 +3,13 @@
 # （patch_tree.py：看判器输入原文的口子；patch_tree_fix.py：攻方腿提的改法，环境变量 R2_FIX_BOUND_BY_THE_BASE_ROOT 开，默认关、与冻结副本同），
 # 照本目录的原型源码建 proto（依赖 tree，特性 verdict-store,gpu），编、跑，原样输出落进 <工作目录>/runs/。
 # 用法：bash rerun.sh <空的工作目录> [冻结副本，默认 /tmp/claude-1000/test-script-align-code-r2/tree]
-# 不跑 checker 档包的任何测试；跑的都是原型二进制，一次一条，经 research/scripts/run-with-memory-cap.sh；线程上限 12（capped.sh 12）。
+# 不跑 checker 档包的任何测试；跑的都是原型二进制，一次一条，经 scripts/run-with-memory-cap.sh；线程上限 12（capped.sh 12）。
 # 展开 16 的四批合起来约 300 万个状态判两遍以内，本腿实跑挂钟见报告；只复跑展开 6 那几样设 R2_RERUN_QUICK=1。
 set -u
 model="$(cd "$(dirname "$0")" && pwd)"
 repository="$(cd "$model/../../.." && pwd)"
 work="${1:?要给工作目录}"; frozen="${2:-/tmp/claude-1000/test-script-align-code-r2/tree}"
-cap="$repository/research/scripts/run-with-memory-cap.sh"; capped="$repository/research/scripts/capped.sh"
+cap="$repository/scripts/run-with-memory-cap.sh"; capped="$repository/scripts/capped.sh"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑原型：编译与展开 16 的那几趟峰值表里没有"
 mkdir -p "$work/runs" "$work/proto/.cargo"
 export R2_SCRATCH="$work/runs" CARGO="$(command -v cargo)" R2_THREADS=12

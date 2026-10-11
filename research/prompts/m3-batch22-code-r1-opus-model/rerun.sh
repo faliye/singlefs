@@ -5,7 +5,7 @@
 # 段：setup build n4n7 lineage-n6 scenarios sweep-k0[-b] sweep-k0-reissue[-b] sweep-k1[-b] sweep-k0-long[-b] sweep-k1-long[-b] sweep-k2-reissue[-b]
 #     crash-build crash-count crash-boundaries summary
 # 编译与跑都经 run-with-memory-cap.sh（编译 6G、跑 4G），线程经 capped.sh（OPUS_THREADS，默认 10）。
-# 包装脚本取 $SINGLEFS_REPO/research/scripts/，没有就取 $SINGLEFS_TOOLS/research/scripts/（SINGLEFS_REPO 是只含 crates 的冻结副本时给它）。
+# 包装脚本取 $SINGLEFS_REPO/scripts/，没有就取 $SINGLEFS_TOOLS/scripts/（SINGLEFS_REPO 是只含 crates 的冻结副本时给它）。
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "${1:-}" == compare ]]; then
@@ -25,9 +25,9 @@ mkdir -p "$work/logs"
 work="$(cd "$work" && pwd)"
 repo="${SINGLEFS_REPO:?要设 SINGLEFS_REPO}"
 tools="$repo"
-[[ -x "$tools/research/scripts/run-with-memory-cap.sh" || -f "$tools/research/scripts/run-with-memory-cap.sh" ]] || tools="${SINGLEFS_TOOLS:?SINGLEFS_REPO 下没有 research/scripts，要设 SINGLEFS_TOOLS}"
-cap="$tools/research/scripts/run-with-memory-cap.sh"
-capped="$tools/research/scripts/capped.sh"
+[[ -x "$tools/scripts/run-with-memory-cap.sh" || -f "$tools/scripts/run-with-memory-cap.sh" ]] || tools="${SINGLEFS_TOOLS:?SINGLEFS_REPO 下没有 scripts，要设 SINGLEFS_TOOLS}"
+cap="$tools/scripts/run-with-memory-cap.sh"
+capped="$tools/scripts/capped.sh"
 threads="${OPUS_THREADS:-10}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-派发提示写死编译 6G、跑 4G}"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-三方攻方腿模型复跑，在自己的工作目录里各跑各的}"

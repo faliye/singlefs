@@ -11,7 +11,7 @@
 | 开工快照 | `research/prompts/m3-delete-r1-snapshot/`：`crates-sha256.txt`（205 份，冻结副本 `/tmp/claude-1000/m3-ring-r1/tree/`）、`kb-sha256.txt`（9 份） | 冻结副本上 `sha256sum -c` 全 OK。kb 9 份里 8 份与 HEAD fcc4d340 逐字相同；`.claude/kb/milestone/03-third-txn.md` 与 HEAD、现状都不同（快照之后别的会话改过），腿引它的第 23、83、84 行在改动范围之外（改动是第 2、43、47、53、61 行的同数替换与第 109 行起的追加），按现状核对上 |
 | 云端正推（Sonnet） | `research/prompts/m3-delete-r1-sonnet-output.md`（sha256 f9d2ef3e…9e87；第 0–3 节前一条腿写、第 4 节起接续腿写） | 引文见下一行；没有模型目录 |
 | 云端攻方（Opus） | `research/prompts/m3-delete-r1-opus-output.md`（sha256 ac03cb65…6c3d）；模型 `research/prompts/m3-delete-r1-opus-model/` | 第四节复跑 |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-ring-r1/tree --root . --background research/prompts/_m3-delete-r1-background.md`：「✓ 核了 110 处引文，对上 110 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-ring-r1/tree --root . --background research/prompts/_m3-delete-r1-background.md`：「✓ 核了 110 处引文，对上 110 处，没判 0 处」 |
 
 攻方的数都是副本原型上量的（原型没有意图记录、`deleted_inodes`、墓碑，nlink 是线程局部开关）；进 kb 之前在入库装置上重做。正推腿没跑任何东西，它的状态数与逐格空间值都是推的。
 

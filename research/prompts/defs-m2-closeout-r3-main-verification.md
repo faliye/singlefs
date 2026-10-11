@@ -6,13 +6,13 @@
 
 - 正文 `research/prompts/_defs-m2-closeout-r3-body.md`，背景材料 `_defs-m2-closeout-r3-background.md`，附录二 `_defs-m2-closeout-r3-diff.md`，开工快照 `research/prompts/defs-m2-closeout-r3-snapshot/sha256sums.txt`（派核查员之前主 agent `sha256sum -c` 27 个全 OK）。
 - 腿：云端正推 `defs-m2-closeout-r3-sonnet-output.md`（探针 `defs-m2-closeout-r3-sonnet-model/`）；云端攻方 `defs-m2-closeout-r3-opus-output.md`（探针 `defs-m2-closeout-r3-opus-model/`）；本地攻方 `defs-m2-closeout-r3-local-attack-output-s1.md`、`-s2.md` 两份干净（`-void1.md` 被损坏闸判红作废：模型引了带 `**` 的通配路径，闸认成星号落单）。
-- 核查员 `defs-m2-closeout-r3-verifier-output.md`：79 处 ✓75 ✗2 分不清 2 核不动 1。两处 ✗ 都在正推腿：`.claude/gate.d/40-results-cited.sh:19` 应为第 33 行（它自己的 `rerun.sh` 输出就是 33），引第二轮判决第 22 行漏抄一个「号」字；都不改它的判定。分不清两处：正推引修定义的 agent 报告第 639 行（全文 495 行，原句在第 222 行，推的是抄错）；攻方引 `research/scripts/memory-peaks.tsv:910`，那一行今天在第 919 行，文件在攻方交回之后被别的会话追加过。两条云端腿的 `rerun.sh` 复跑都逐字节一致。
+- 核查员 `defs-m2-closeout-r3-verifier-output.md`：79 处 ✓75 ✗2 分不清 2 核不动 1。两处 ✗ 都在正推腿：`.claude/gate.d/40-results-cited.sh:19` 应为第 33 行（它自己的 `rerun.sh` 输出就是 33），引第二轮判决第 22 行漏抄一个「号」字；都不改它的判定。分不清两处：正推引修定义的 agent 报告第 639 行（全文 495 行，原句在第 222 行，推的是抄错）；攻方引 `scripts/memory-peaks.tsv:910`，那一行今天在第 919 行，文件在攻方交回之后被别的会话追加过。两条云端腿的 `rerun.sh` 复跑都逐字节一致。
 
 ## 二、逐格判
 
 | 攻方编号 | 被攻的改法 | 判 | 改法 |
 |---|---|---|---|
-| R1 | G1（15、74 号在阶段里经内存包装） | **打中（量过）**：上限写成 `12GiB`、`16GB`、`8g` 时包装退 2（用法错），而包装文件头把 0–249 算作命令自己的退出码（`research/scripts/run-with-memory-cap.sh` 第 18 行与第 27 行重叠），15 号报「cargo test 退出码 2」还吞掉包装的报错，74 号报「测试二进制判红」 | V1 |
+| R1 | G1（15、74 号在阶段里经内存包装） | **打中（量过）**：上限写成 `12GiB`、`16GB`、`8g` 时包装退 2（用法错），而包装文件头把 0–249 算作命令自己的退出码（`scripts/run-with-memory-cap.sh` 第 18 行与第 27 行重叠），15 号报「cargo test 退出码 2」还吞掉包装的报错，74 号报「测试二进制判红」 | V1 |
 | R2 | G1 × G9（「给一个数」） | **打中（量过）**：照 `.claude/main-agent.md` 的字面写不带单位的 `16`，包装的写法正则单位可选，按 16 字节起 scope 退 251，两处出路都不指向真原因 | V1 |
 | R3 | G1 × 分诊员第 3 步 | 打中（推的）：15、74 号撞上限退 250 或排不上队退 252 时 ✗ 行点名包装文件，分诊员按「点名的文件在不在暂存区 diff 里」判归属，没有一格对应包装自己的结局 | V2 |
 | R4 | G2 × 40 号 | **打中（量过）**：新文件名写成日期、`-r2`、`.r12` 的 40 号判红要实验页点名；写成 `.r2` 的 40 号当中间件静默跳过，而 `replay.sh` 正指着它；逐字节一致又不写页时没有一步能让 40 号变绿。正推腿独立报了同一格 | V3 |
@@ -35,7 +35,7 @@
 - **V6**（R7）：15、74 号出路补 253（限时：把 `RUN_WITH_MEMORY_CAP_TIME_LIMIT` 拿掉或放宽再跑）。
 - **V7**（R8）：攻方第 3b 步写成「这一条腿与接手它的腿全部原型跑的全量」，接手的腿从交接摘要里取已跑的量。
 
-**改的时候**：`research/scripts/run-with-memory-cap.sh` 与 `.claude/hooks/bash-command-detector.sh` 此刻正被在跑的腿与每一次工具调用读着，一律用 `research/scripts/replace-once.py` 换新 inode 改，不就地写（第二轮核查员坐实过一次包装脚本在跑着的时候被原地改、跑着的那一趟报语法错）。改完跑 47、62、63 号与 doc-lint、两份脚本的自证与 hook 自证。
+**改的时候**：`scripts/run-with-memory-cap.sh` 与 `.claude/hooks/bash-command-detector.sh` 此刻正被在跑的腿与每一次工具调用读着，一律用 `scripts/replace-once.py` 换新 inode 改，不就地写（第二轮核查员坐实过一次包装脚本在跑着的时候被原地改、跑着的那一趟报语法错）。改完跑 47、62、63 号与 doc-lint、两份脚本的自证与 hook 自证。
 
 ## 四、延后与报给别处的
 
@@ -51,7 +51,7 @@
 
 ## 六、按路径点名被判的定义与文件（门禁 72 号）
 
-这一轮被判的：`.claude/agents/three-way-attack.md`、`.claude/agents/three-way-local-defense.md`、`.claude/agents/experiment-runner.md`、`.claude/agents/crash-verifier.md`、`.claude/agents/gate-triage.md`、`.claude/agents/implementation-writer.md`、`.claude/agent-common.md`、`.claude/main-agent.md`、`.claude/hooks/ask-user-claim-guard.sh`、`.claude/gate.d/74-model-differential.sh`、`.claude/gate.d/15-research-build.sh`、`.claude/gate.d/stage-inputs.tsv`。V1–V7 要改的：`research/scripts/run-with-memory-cap.sh`、`.claude/gate.d/15-research-build.sh`、`.claude/gate.d/74-model-differential.sh`、`.claude/main-agent.md`、`.claude/agents/crash-verifier.md`、`.claude/agents/gate-triage.md`、`.claude/agents/experiment-runner.md`、`.claude/gate.d/40-results-cited.sh`、`.claude/hooks/bash-command-detector.sh`、`.claude/agents/three-way-attack.md`。
+这一轮被判的：`.claude/agents/three-way-attack.md`、`.claude/agents/three-way-local-defense.md`、`.claude/agents/experiment-runner.md`、`.claude/agents/crash-verifier.md`、`.claude/agents/gate-triage.md`、`.claude/agents/implementation-writer.md`、`.claude/agent-common.md`、`.claude/main-agent.md`、`.claude/hooks/ask-user-claim-guard.sh`、`.claude/gate.d/74-model-differential.sh`、`.claude/gate.d/15-research-build.sh`、`.claude/gate.d/stage-inputs.tsv`。V1–V7 要改的：`scripts/run-with-memory-cap.sh`、`.claude/gate.d/15-research-build.sh`、`.claude/gate.d/74-model-differential.sh`、`.claude/main-agent.md`、`.claude/agents/crash-verifier.md`、`.claude/agents/gate-triage.md`、`.claude/agents/experiment-runner.md`、`.claude/gate.d/40-results-cited.sh`、`.claude/hooks/bash-command-detector.sh`、`.claude/agents/three-way-attack.md`。
 
 ## 回看决策
 

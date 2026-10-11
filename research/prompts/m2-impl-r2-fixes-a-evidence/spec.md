@@ -13,7 +13,7 @@
 | 3 | C577 结清 ②：`litmus/` 的 P0 只写到根槽，不写系统配置槽与它之后的屏障（C577 报告「我不改、交主 agent 另派的」一节） | 补一条 litmus「轮换之后屏障」：P0 写根槽（FUA）→ 写系统配置槽 → 屏障 → 返回；观察者在返回之后读系统配置槽必须看到轮换后的值；配对照组（去掉屏障的 `-nofence` 版本，herd7 判 Sometimes / Never 要分得开），绑到 `transaction.rs` 的 `persist_the_root_then_rotate_the_system_configuration`（锚点写法照 `litmus/` 已有六份与 `.claude/scripts/lkmm.sh` 的约定现查；`publish_order_matches_litmus.rs` 归第二轮改法 B 改）。herd7 是重型（57 号），你不跑；照已有 litmus 的形态写、静态核锚点 | 报告写明没跑 herd7、归提交时 57 号 |
 | 4 | C577 结清 ③：屏障报错时零单元发布不冻结、整个挂载返回错误（D23（journal 的角色与格式） 已定项 14 射程今天已写成选择） | 一条用例钉住这一支今天的结局（零单元发布、轮换后屏障报错 → 挂载返回哪个错误成员、盘上哪几步已落、之后可写挂载怎么判），不改行为 | 用例绿；改坏（让它冻结）它就红，`prove-red.sh` 证一次 |
 
-每处改法先红后改、一条「改回去它就红」的变异，`research/scripts/prove-red.sh` 证红；门禁 94 号跑到绿。
+每处改法先红后改、一条「改回去它就红」的变异，`scripts/prove-red.sh` 证红；门禁 94 号跑到绿。
 
 ## 约束
 
@@ -21,5 +21,5 @@
 - 同时在改 `crates/` 的，你都不碰：合入后验证一（core `mount.rs`、`recovery.rs`、`transaction.rs`，harness `model_comparison.rs`、`history.rs`、`bin/first_transaction_on_device.rs`、`bin/e158_root_choice_repair.rs`，几十份测试）；别的会话在挪 11 份测试进 `crates/singlefs-checker/tests/`（层 0 文件与三份崩溃枚举用例）与两个包的 `Cargo.toml`。
 - 交补丁：在副本里改，交 `patch/`（`crates.patch` 含 `litmus/`、`mutations-append.tsv`），交回前对主工作区 `git apply --check`。
 - 重型测试：不跑。每条 `cargo test` 带 `--lib`、`--test <目标>` 或 `--bin` 之一。
-- 线程上限：4。每条 cargo 经 `research/scripts/capped.sh 4`。
+- 线程上限：4。每条 cargo 经 `scripts/capped.sh 4`。
 - 报告 `/tmp/claude-1000/impl-r2-fixes-a/report.md`；草稿目录 `/tmp/claude-1000/impl-r2-fixes-a/`；进度逐条追加进同目录的 `progress.md`。

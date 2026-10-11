@@ -10,7 +10,7 @@
 | 开工快照 | `research/prompts/m3-verus-land-code-r1-snapshot/`：`crates-sha256.txt`（212 份，冻结副本 `/tmp/claude-1000/m3-verus-land-code-r1/tree/`）、`kb-sha256.txt` | 腿交齐之后冻结副本 `sha256sum -c` 全 OK；`kb-sha256.txt` 在主仓全 OK |
 | 云端正推（Sonnet） | `research/prompts/m3-verus-land-code-r1-sonnet-output.md`（sha256 8e9e4929…bdcd）；模型 `research/prompts/m3-verus-land-code-r1-sonnet-model/` | 它的对拍（56 924 864 个输入）没复跑：与攻方腿互不共享代码的另一份对拍（60 000 个输入）结论相同，两条路径各自带阳性对照 |
 | 云端攻方（Opus） | `research/prompts/m3-verus-land-code-r1-opus-output.md`（sha256 0e897b08…bd59）；模型 `research/prompts/m3-verus-land-code-r1-opus-model/` | 定点项复跑见第四节；C6 表格单元格里的引文 `cite-check.py` 认不出，主 agent 在冻结副本上逐行 `sed -n` 核过：14 处原文都在（例：`lib.rs:467`「if record.ordinal_within_publish as u64」；`[原文` 共 46 处；`recovery.rs:3122` 的 `unreachable!`；改前 fcc4d340 第 3143 行是 `u64::from(record.ordinal_within_publish.0)`） |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-verus-land-code-r1/tree --root . --background research/prompts/_m3-verus-land-code-r1-background.md`：「✓ 核了 34 处引文，对上 34 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-verus-land-code-r1/tree --root . --background research/prompts/_m3-verus-land-code-r1-background.md`：「✓ 核了 34 处引文，对上 34 处，没判 0 处」 |
 | 主 agent 现跑的 Verus | `/tmp/claude-1000/m3-verus-land-code-r1-main-check/verus/`、`…/verus-green/`；Verus 0.2026.09.20.aef82ed `--no-cheating` | 新 crate 核原样「14 verified, 0 errors」；主循环条件加 `&& false`（一条都不施加）「14 verified, 0 errors」；攻方 `verus-green-mutations.tsv` 12 行（每行只改一处可执行判定：反向链不判、提交标记不看、末条不带提交标记照施加、C540 不判、点名单元不验、在飞上限不看、一条都不施加、锚点读不出时不看 txg、`Err` 一臂恒报、最大事务号取最小、水位之上条数不数、锚点不看 txg）**12 行全是「14 verified, 0 errors」**（`summary.txt`） |
 
 ## 二、逐格判决

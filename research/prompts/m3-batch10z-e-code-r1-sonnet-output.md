@@ -17,7 +17,7 @@
 | 冻结副本 | `~/.local/share/singlefs/work/m3-batch10z-e-code-r1/tree/`；在它里面 `sha256sum -c research/prompts/m3-batch10z-e-code-r1-snapshot/crates-sha256.txt`：`OK` 334 行、不是 `OK` 的 0 行（`grep -c ': OK'` 与 `grep -vc ': OK'` 的输出）。下面引的行号都是它的；仓根的三份源文件此刻同一行号（引文对仓根也核过） |
 | 我的副本 | 草稿目录 `tree/`（跑 sim）、`tree-mut/`（跑变异）是它的拷贝，`diff -rq` 只多我加的三个测试文件；编译目录 `target/`、`target-mut/`、`target-strings/` |
 | 开跑前负载 | `ps` 看到别的会话的 `cargo test --release -p opus-probe`（pid 3038659 一族），没有 qemu、vm-bench、e152、fio；`nvidia-smi --query-gpu` 只读：5090 用着 239 MiB、5060 Ti 2 MiB；我没起任何 GPU 设备，所有跑的都是 harness 档纯函数与 `wgpu` 的 `to_string()` |
-| 命令 | `CARGO_TARGET_DIR=<草稿目录>/target nice -n 19 bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 6 cargo test --offline -p singlefs-harness --test <名> -- --nocapture --test-threads 1`；变异那批 `--lib -- gpu_memory_ledger` |
+| 命令 | `CARGO_TARGET_DIR=<草稿目录>/target nice -n 19 bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 cargo test --offline -p singlefs-harness --test <名> -- --nocapture --test-threads 1`；变异那批 `--lib -- gpu_memory_ledger` |
 | 禁读 | 没读攻方这一轮的输出、模型和提示 |
 | 基线 | 未变异的 `cargo test --offline -p singlefs-harness --lib` 原样末行：`test result: ok. 169 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 27.88s` |
 
@@ -234,7 +234,7 @@ GREEN：M01 M05 M10 M13 M14 M17 M22 M23 M33
 
 ## 七、要主 agent 跑的命令 / 复核不了的
 
-- 把 `probes/killers_new.rs` 的 7 条并进 `gpu_memory_ledger.rs` 的测试段，并为 M05、M10、M13、M14、M17、M22、M23 各加一行变异（锚点与替换文在 `mut/mutants.py`）。验证：`CARGO_TARGET_DIR=<编译目录> bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 6 cargo test --offline -p singlefs-harness --test killers_new`，看 `test result: ok. 7 passed`；变异上各红一条（`python3 mut/run_killers.py M05 M10 M13 M14 M17 M22 M23`，路径要改成自己的）。
+- 把 `probes/killers_new.rs` 的 7 条并进 `gpu_memory_ledger.rs` 的测试段，并为 M05、M10、M13、M14、M17、M22、M23 各加一行变异（锚点与替换文在 `mut/mutants.py`）。验证：`CARGO_TARGET_DIR=<编译目录> bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 cargo test --offline -p singlefs-harness --test killers_new`，看 `test result: ok. 7 passed`；变异上各红一条（`python3 mut/run_killers.py M05 M10 M13 M14 M17 M22 M23`，路径要改成自己的）。
 - 复核不了（要真卡 / checker 档）：真卡上因显存不够丢设备时回调给的句子；两个窗口的实际宽度；checker 档新增两条用例（`the_pieces_of_one_block_report_their_endings_in_one_group`、`a_device_lost_for_lack_of_memory_explains_a_failure_on_it_as_gpu_memory_short`）我只读了没跑；替换的 5 行与追加的第 23、24 行变异。
 - 5.3 的四处胶水要加用例，需要把外层循环里「交 `after_the_round` 的参数」与「读设备丢没丢」抽成不要卡的函数再测；实现员报告把它们记作抽不出，我只确认了变异表里没有配行，没判抽不抽得出。
 

@@ -7,8 +7,8 @@
 ## 副本相对仓里源码改了什么（`diff -u`）
 
 ```diff
---- research/e7-index-bench/src/bin/e138_per_disk_floor.rs	2026-09-12
-+++ /tmp/claude-1000/-home-fy5090-code-singlefs/86b2ac0e-7e65-418c-97a7-f3d755730fe6/scratchpad/verify-copy/research/e7-index-bench/src/bin/e138_per_disk_floor.rs	2026-09-12
+--- scripts/experiments/e138_per_disk_floor.rs	2026-09-12
++++ /tmp/claude-1000/-home-fy5090-code-singlefs/86b2ac0e-7e65-418c-97a7-f3d755730fe6/scratchpad/verify-copy/scripts/experiments/e138_per_disk_floor.rs	2026-09-12
 @@ -300,6 +300,8 @@
      nonempty_txgs: HashSet<u64>,
      admin_rollback_happened: bool,

@@ -5,8 +5,8 @@
 set -u
 W=$1; b=$2; jobs=$3
 ROOT=${ROOT:-/home/fy5090/code/singlefs}
-CAP=$ROOT/research/scripts/run-with-memory-cap.sh
-CAPPED=$ROOT/research/scripts/capped.sh
+CAP=$ROOT/scripts/run-with-memory-cap.sh
+CAPPED=$ROOT/scripts/capped.sh
 BT=$(ls -t "$W"/target/release/deps/opus_no_probe-* | grep -v '\.d$' | head -1)
 BP=$(ls -t "$W"/target-pre14/release/deps/opus_no_probe-* | grep -v '\.d$' | head -1)
 mkdir -p "$W/runs"

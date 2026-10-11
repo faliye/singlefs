@@ -7,7 +7,7 @@ work=${1:?新工作目录}
 here=$(cd "$(dirname "$0")" && pwd)
 frozen=${SINGLEFS_FROZEN:-$HOME/.local/share/singlefs/work/m3-batch10z-ghi-code-r1/tree}
 tools=${SINGLEFS_TOOLS:?要仓根}
-cap() { nice -n 19 bash "$tools/research/scripts/run-with-memory-cap.sh" "$1" bash "$tools/research/scripts/capped.sh" "$2" "${@:3}"; }
+cap() { nice -n 19 bash "$tools/scripts/run-with-memory-cap.sh" "$1" bash "$tools/scripts/capped.sh" "$2" "${@:3}"; }
 mkdir -p "$work/runs" "$work/out"
 rsync -a --exclude target --exclude .git "$frozen/" "$work/repo/"
 rsync -a --exclude target --exclude .git "$frozen/" "$work/repo-m/"

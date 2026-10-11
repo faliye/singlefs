@@ -175,7 +175,7 @@
 
 ## 4 要主 agent 跑的命令（checker 档与 GPU；子 agent 不跑）
 
-- 钉值与 Rust 单测：`SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 7 cargo test --offline -p singlefs-checker-tier --lib -- each_kernel_keeps_its_pinned_inlined_size_and_margin_under_the_budget crash_judge_tables::tests`（工作目录取冻结副本或合入后的主工作区）；看 `test result` 两行，钉值红就是 V4 的 318224 / 352195 / 346138 有错。
+- 钉值与 Rust 单测：`SINGLEFS_HEAVY_TESTS=commit bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 7 cargo test --offline -p singlefs-checker-tier --lib -- each_kernel_keeps_its_pinned_inlined_size_and_margin_under_the_budget crash_judge_tables::tests`（工作目录取冻结副本或合入后的主工作区）；看 `test result` 两行，钉值红就是 V4 的 318224 / 352195 / 346138 有错。
 - V 的 9 行 checker 档变异（变异表第 3246 行与 3250–3257 行）：每行第 5 列是 `cargo test` 参数、第 6 列是必须红的测试名，原样在 `/home/fy5090/.local/share/singlefs/work/m3-batch35-36-code-r1/tree/crates/mutations.tsv`；跑完看是否都红。
 - 对拍文件整份（release、`verdict-store,gpu`）：主 agent 已跑过 159 条（背景材料第二节），要核的是 V1–V3 新增六条流与 V5 两处断言——用例名在本报告 V5；`CRASH_JUDGE_GPU_MISMATCH` 应 0 行。
 - 门禁 checker-tier-crates-mutation-replay：会在第 3163 行判「没抓到」、在第 3075、3116、3117 行判失锚（W7）。

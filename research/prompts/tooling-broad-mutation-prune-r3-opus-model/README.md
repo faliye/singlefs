@@ -11,5 +11,5 @@
 复跑（仓根下；llvm-tools 1.98.0 解到任意目录，取它的 `lib/rustlib/x86_64-unknown-linux-gnu/bin`）：
 
 ```
-bash research/scripts/capped.sh 12 bash research/scripts/run-with-memory-cap.sh 8G python3 -B research/prompts/tooling-broad-mutation-prune-r3-opus-model/run.py <工作目录> <llvm bin 目录>
+bash scripts/capped.sh 12 bash scripts/run-with-memory-cap.sh 8G python3 -B research/prompts/tooling-broad-mutation-prune-r3-opus-model/run.py <工作目录> <llvm bin 目录>
 ```

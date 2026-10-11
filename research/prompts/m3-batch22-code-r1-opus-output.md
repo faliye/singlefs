@@ -263,6 +263,6 @@ CPU 冷走读答「没有文件」的三支：树表 0 条、inode 树里没有 
 
 ## 要主 agent 跑的命令
 
-1. 复跑模型（工作目录任取一个空目录，`SINGLEFS_REPO` 指冻结副本、`SINGLEFS_TOOLS` 指有 `research/scripts/` 的仓）：
+1. 复跑模型（工作目录任取一个空目录，`SINGLEFS_REPO` 指冻结副本、`SINGLEFS_TOOLS` 指有 `scripts/` 的仓）：
    `SINGLEFS_REPO=/tmp/claude-1000/m3-batch22-code-r1/tree SINGLEFS_TOOLS=/home/fy5090/code/singlefs bash research/prompts/m3-batch22-code-r1-opus-model/rerun.sh <空目录> all`，再 `bash research/prompts/m3-batch22-code-r1-opus-model/rerun.sh compare <空目录>`，看末行 `SUMMARY_MATCHES 907 行`。编译 6G、跑 4G、线程 `OPUS_THREADS`（默认 10）；我分段跑完一遍，各段 8–100 秒（机器负载 90 左右时）。
 2. 若要层 0 全域：`crash/src/main.rs` 已接好 `enumerate_layer0_selecting_versions_observing_each_state`（`expand` 恒真），状态数超过 10⁶ 时跳过；放开要改那一个阈值，最小的 H4 一段 3 145 747 个状态，推的约 90 小时（10 线程）。我不建议为这一格放量（推的）：单元写那一段里的子集，根与记录都没持久，镜像上只多了没被引用的单元。

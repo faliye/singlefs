@@ -7,7 +7,7 @@
 ## 〇、快照与核查
 
 - 快照 `sha256sum -c`：kb 10 份里 D23（journal 的角色与格式）、`invariants.md`、`checks-owed.md`、`milestone/02-second-txn.md` 四份对不上，都是别的会话与本会话收口表对齐那一批在腿跑着时的改动；腿引到的行由 cite-check 按今天的文件核过。crates：主工作区与 `crates-sha256.txt` 逐个相同。
-- `python3 research/scripts/cite-check.py` 对四份腿报告，`--root .`：「核了 34 处引文，对上 34 处，没判 0 处」。
+- `python3 scripts/cite-check.py` 对四份腿报告，`--root .`：「核了 34 处引文，对上 34 处，没判 0 处」。
 - 攻方产物（`research/prompts/abandoned-floor-r1-opus-model/runs/`，23 份原样日志）：主 agent 只核了日志在、各批用例全过（探针用例，结局记在输出里，不靠断言）、`b2-2-jia-not-counted.log` 有 14 行 I-3.1、`b2-9-ding_defer_below_floor-not-counted.log` 0 行（E9、E10 那一批上甲红、丁-defer 不红，与报告同向）。报告里逐格的计数（978 格、1254 格、60 格里 44 格等）出自它的汇表脚本，主 agent 没重算。复跑没做。
 - 攻方自陈：崩溃状态没按层 0 枚举，每段历史一个手挑的崩溃点；E4、E7 两种造法算不算合法状态它没判。
 

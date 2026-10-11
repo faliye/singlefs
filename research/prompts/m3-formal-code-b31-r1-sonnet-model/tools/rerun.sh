@@ -23,14 +23,14 @@ mkdir -p "$OUT" "$draft"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-150}"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-同会话有别的子agent在跑各自的测试，本腿只跑harness档与core单测}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-派发提示要求cargo一律显式给8G上限，不用auto}"
-wrapped() { nice -n 19 bash "$REPO/research/scripts/run-with-memory-cap.sh" 8G bash "$REPO/research/scripts/capped.sh" "$CAP_THREADS" "$@"; }
+wrapped() { nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 8G bash "$REPO/scripts/capped.sh" "$CAP_THREADS" "$@"; }
 
 case "$stage" in
 static)
   rsync -a --exclude target/ "$FROZEN/" "$draft/tree/"
   { echo "== N5 静态核"; python3 "$here/check_rows.py" "$FROZEN"; } 2>&1 | tee -a "$OUT/n5-static.txt"
   mkdir -p "$draft/n4"
-  q5="$REPO/research/target/e171-r1-frozen-tree-revision-5-q5/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
+  q5="$REPO/scripts/experiments/target/e171-r1-frozen-tree-revision-5-q5/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
   repo_file="$FROZEN/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
   old="${OLD945:-/tmp/claude-1000/m3-formal-31-2/device-945e41c8.rs}"
   patches="${P6_DIR:-/tmp/claude-1000/m3-formal-31-2/patch}"

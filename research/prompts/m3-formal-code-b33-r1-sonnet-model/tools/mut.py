@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""施加 / 撤回一行变异（只在草稿副本里用）。读法照 research/scripts/crates-mutation-rows.py：六段制表符分隔，只把 \\n 还原成换行。
+"""施加 / 撤回一行变异（只在草稿副本里用）。读法照 scripts/crates-mutation-rows.py：六段制表符分隔，只把 \\n 还原成换行。
   mut.py apply TREE (行号|变异名全名) [--table 表路径]   原文必须恰好命中一次，否则退 3；先把原文件备份到 TREE/.mutbak/
   mut.py apply-spec TREE 规格文件                          规格文件三行：文件相对路径 / 原文 / 替换文（\\n 还原成换行）
   mut.py restore TREE                                      把备份放回去并 touch（修改时间换新，cargo 才会重编），清掉备份

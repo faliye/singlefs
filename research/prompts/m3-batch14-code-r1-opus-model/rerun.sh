@@ -30,7 +30,7 @@ test_tree() { # <名> <补丁>：冻结副本拷一份、打一个变异或改�
   local args=(); for t in "$@"; do args+=(--test "$t"); done
   (cd "t-$name" && CARGO_TARGET_DIR=$ATTACK_DIR/target-tests RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="副本上编跑 harness 测试目标" \
     RUN_WITH_MEMORY_CAP_PARALLEL_REASON="攻方腿副本上的变异测试与原型扫描并行各跑各的" RUN_WITH_MEMORY_CAP_WAIT_SECONDS=180 \
-    nice -n 19 bash "$REPO/research/scripts/run-with-memory-cap.sh" 8G bash "$REPO/research/scripts/capped.sh" "${ATTACK_THREADS:-7}" \
+    nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 8G bash "$REPO/scripts/capped.sh" "${ATTACK_THREADS:-7}" \
     cargo test --offline --no-fail-fast -p singlefs-harness "${args[@]}") > "out/tests-$name.log" 2>&1 || true
 }
 run_stage() {

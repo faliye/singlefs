@@ -8,7 +8,7 @@ cut=src.index("#[cfg(test)]\nmod tests {")
 filt=os.environ.get('FILT','gpu_memory_ledger')
 a=int(sys.argv[1]); b=int(sys.argv[2])
 env=dict(os.environ, CARGO_TARGET_DIR=W+'/target-mut')
-cmd=['nice','-n','19','bash','/home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh','12G','bash','/home/fy5090/code/singlefs/research/scripts/capped.sh','6','cargo','test','--offline','-p','singlefs-harness','--lib','--']+([filt] if filt else [])
+cmd=['nice','-n','19','bash','/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh','12G','bash','/home/fy5090/code/singlefs/scripts/capped.sh','6','cargo','test','--offline','-p','singlefs-harness','--lib','--']+([filt] if filt else [])
 def run(label, tmp):
     t=time.time()
     try:

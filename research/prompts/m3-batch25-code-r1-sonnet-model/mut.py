@@ -5,7 +5,7 @@ import sys, subprocess, shutil, os
 work, target = sys.argv[1], sys.argv[2]
 orig_dir = work + '/orig'
 repo = work + '/repo'
-scripts = os.environ['SINGLEFS_REPO'] + '/research/scripts'
+scripts = os.environ['SINGLEFS_REPO'] + '/scripts'
 env = dict(os.environ, CARGO_TARGET_DIR=target)
 rows = open(orig_dir + '/crates/mutations.tsv', encoding='utf-8').read().split('\n')
 W = 'crates/singlefs-checker/src/walk.rs'

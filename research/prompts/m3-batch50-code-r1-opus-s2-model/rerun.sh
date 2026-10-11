@@ -13,8 +13,8 @@ set -u
 WORK=${1:?工作目录}; STAGE=${2:?阶段}
 MODEL=$(cd "$(dirname "$0")" && pwd)
 TREE=${SINGLEFS_S2_TREE:-$HOME/.local/share/singlefs/work/m3-batch50-code-r1/tree}
-CAP="$SINGLEFS_REPO/research/scripts/run-with-memory-cap.sh"
-CAPPED="$SINGLEFS_REPO/research/scripts/capped.sh"
+CAP="$SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
+CAPPED="$SINGLEFS_REPO/scripts/capped.sh"
 mkdir -p "$WORK/outputs"
 OUT=$WORK/outputs
 PROBES="opus_s2_probe_edge_unlink.rs opus_s2_probe_first_file_tree_identifier_watermark.rs opus_s2_probe_random_leaves.rs opus_s2_probe_random_leaves_abandoned.rs opus_s2_probe_direction.rs"

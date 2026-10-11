@@ -16,7 +16,7 @@ S=/tmp/claude-1000/<草稿目录>
 rsync -a --exclude target --exclude .git /tmp/claude-1000/m3-ring-r1/tree/ $S/tree/
 mkdir -p $S/tree/crates/singlefs-core/examples
 cp research/prompts/m3-formal-r1-opus-model/formal_probe_replay_bounded.rs $S/tree/crates/singlefs-core/examples/
-nice -n 19 bash research/scripts/run-with-memory-cap.sh 6G bash research/scripts/capped.sh 6 \
+nice -n 19 bash scripts/run-with-memory-cap.sh 6G bash scripts/capped.sh 6 \
   python3 research/prompts/m3-formal-r1-opus-model/campaign.py $S/tree $S/target $S/out 6
 python3 research/prompts/m3-formal-r1-opus-model/summarize.py $S/out/results.tsv $S/out/campaign.log
 ```

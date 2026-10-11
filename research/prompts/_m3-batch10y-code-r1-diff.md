@@ -39,7 +39,7 @@ diff --git a/crates/singlefs-harness/src/gpu_memory_ledger.rs b/crates/singlefs-
  //! 比此刻能借的大而空着时放得下，是借不到：不等，调用方按借不到走下一条（几张卡一起借的换后面的卡，一张都借不到报本次未跑，
  //! [`scratch_booking_refusal_outcome`]、[`GPU_NOT_RUN_MARKER`]）。
  //! 账不防的：两个进程同一刻读到同一份空闲、一起借超了（各自只记自己借的）。这一形由运行时兜底：内存包装
- //! `research/scripts/run-with-memory-cap.sh` 认出内核日志里的 `NVRM … NV_ERR_NO_MEMORY` 退 245，wgpu 报 Out of Memory 时
+ //! `scripts/hosts/run-with-memory-cap.sh` 认出内核日志里的 `NVRM … NV_ERR_NO_MEMORY` 退 245，wgpu 报 Out of Memory 时
 -//! 崩溃放量产品路径把这一块报本次未跑（原因写显存不够，[`reason_for_running_out_of_gpu_memory`]）。
 +//! 崩溃放量产品路径与卡池起设备把这一趟报本次未跑（原因写显存不够，[`GPU_MEMORY_SHORT_REASON_PREFIX`]、
 +//! [`reason_for_running_out_of_gpu_memory`]）。
@@ -2287,7 +2287,7 @@ diff --git a/crates/singlefs-checker-tier/src/crash_amplification.rs b/crates/si
 +//!    （`decide_the_work_on_the_card`）；设备因为 Out of Memory 丢了，卡池下一次借这张卡时重起设备。
 +//!    单元校验和对拍几条线程一起派活，那一段没包进接 Out of Memory 的那一层：那里的 Out of Memory 记在设备上、照旧让这一趟红。
  //!    没起过卡池的进程照旧不进账（[`GpuCardsSource::DevicesStartedForThisRun`]：这一趟自己在点名的卡上起设备），调用方是这几种：
- //!    崩溃放量分项驱动（`research/scripts/crash-amplification-item.sh`）起的、只有经 [`run_from_environment`] 跑的用例而没有一条取卡池的测试二进制
+ //!    崩溃放量分项驱动（`scripts/crash/crash-amplification-item.sh`）起的、只有经 [`run_from_environment`] 跑的用例而没有一条取卡池的测试二进制
  //!    （`tests/crash_amplification_fixed_script_through_rollback.rs`、`…_through_unmount.rs`、`crash_amplification_two_flows_share_their_prefix.rs`、
 @@ -56,10 +61,12 @@
  use singlefs_core::root_record::ROOT_MAGIC;

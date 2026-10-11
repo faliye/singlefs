@@ -2,7 +2,7 @@
 # m3-retire-r1 攻方腿第二次抽样（opus-s2）模型的复跑。路径一律从环境变量与参数取，不靠这份脚本自己在仓里的位置：
 #   S2_MODEL_DIR   模型目录（本目录）；SINGLEFS_REPO  拷 crates/ 改副本用的树（冻结树：要 Cargo.toml、Cargo.lock、.cargo、crates）。
 # 每一阶段由调用方整条经内存包装与线程上限起（编译类 6G、其余 4G），例（仓根）：
-#   S=research/scripts; export S2_MODEL_DIR=$PWD/research/prompts/m3-retire-r1-opus-s2-model SINGLEFS_REPO=<冻结树>
+#   S=scripts; export S2_MODEL_DIR=$PWD/research/prompts/m3-retire-r1-opus-s2-model SINGLEFS_REPO=<冻结树>
 #   bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 16 bash $S2_MODEL_DIR/rerun.sh <空的输出目录> build
 # 阶段（按这个次序各跑一次就是全量）：build sweep demos determinism copybuild copyrun summarize
 # 编译类：build、copybuild。线程数读 S2_THREADS（默认 6），只影响挂钟。

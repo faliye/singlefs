@@ -6,7 +6,7 @@
 
 ## 复跑与现场
 
-- 模型目录 `research/prompts/m3-crash-enumeration-merge-r3-opus-model/`。复跑：`bash research/scripts/run-with-memory-cap.sh 2G bash research/prompts/m3-crash-enumeration-merge-r3-opus-model/rerun.sh`，末行要是 `MODEL_SELFCHECK compared=20 mismatched=0 []`。
+- 模型目录 `research/prompts/m3-crash-enumeration-merge-r3-opus-model/`。复跑：`bash scripts/run-with-memory-cap.sh 2G bash research/prompts/m3-crash-enumeration-merge-r3-opus-model/rerun.sh`，末行要是 `MODEL_SELFCHECK compared=20 mismatched=0 []`。
 - 它做什么：`extract.sh` 从 `crates/singlefs-checker-tier/src/crash_identity.rs`（钉 sha256 488f75ff…d2f0，变了退 3）按行原样抽出词法切分与「按模块引用收闭包」那几段（第 278–875、1009–1235 行），接上我写的驱动 `closure_main.rs`，编成不带依赖的单文件程序；不链 checker 档的库、不跑 checker 档的任何测试。摘要换成 FNV（只比文件集合）。
 - 自证：抽出来的算法在今天的树上复现 `crash_identity.rs` 自己那条测试钉的判器闭包成员（10 份）与非成员（9 份）；会红的一格：不设停止表时 `layer0_progress.rs` 进闭包（`unstopped_has_layer0_progress=true`），停止表那一刀模型分得出。
 - `SHA256SUMS` 原样：
@@ -51,7 +51,7 @@
 
 H2 只给闸加「新入口起整域，子 agent 被拒」一格，没说 `--quick` 放行子 agent；H12 要改的是 D13 已定项 9、15、`verification.md`、`implementation-workflow.md`、`main-agent.md`、`commit-stages.md`，没有 `agent-common.md`、`implementation-writer.md` 与闸的 `classify`；H1 碰 `lib_heavy_tests.py` 只为改名。
 
-**造出来的历史**：第四批合入、新条款生效之后，主 agent 派实现员改 `recovery.rs`。实现员照 H9 起 `<新入口> --quick`：闸按包与入口名认成 checker 档，子 agent 一律拒；照实现员定义它本来也不该跑。轻型「每次都跑它的全部」在这一步做不到，第一次跑到轻型的是提交时的主 agent。轻型里还有 GPU 对拍：照 H5 要走 GPU，照 `verification.md`「凡用 GPU 先清场」要经 `research/scripts/gpu-quiesce-run.sh`，它「跑完、跑红或被打断都不复原」（同文件第 4 行），卡上有别的计算进程时「照拒（退 78），出路是等那个进程跑完再起。」（`research/scripts/gpu-quiesce-run.sh:22`）——主 agent 在跑重型那几个小时里，实现员的轻型要么退 78、要么与重型同卡（读回命令是私有的，同卡的另一趟算不算「白名单外」我没法核，推的）。
+**造出来的历史**：第四批合入、新条款生效之后，主 agent 派实现员改 `recovery.rs`。实现员照 H9 起 `<新入口> --quick`：闸按包与入口名认成 checker 档，子 agent 一律拒；照实现员定义它本来也不该跑。轻型「每次都跑它的全部」在这一步做不到，第一次跑到轻型的是提交时的主 agent。轻型里还有 GPU 对拍：照 H5 要走 GPU，照 `verification.md`「凡用 GPU 先清场」要经 `scripts/gpu-quiesce-run.sh`，它「跑完、跑红或被打断都不复原」（同文件第 4 行），卡上有别的计算进程时「照拒（退 78），出路是等那个进程跑完再起。」（`scripts/gpu-quiesce-run.sh:22`）——主 agent 在跑重型那几个小时里，实现员的轻型要么退 78、要么与重型同卡（读回命令是私有的，同卡的另一趟算不算「白名单外」我没法核，推的）。
 
 **四句**：① 不分臂（只有一种形态）。② 不是观测问题，是形态里没有改闸的那一步。③ 满足 M1「与新定案字面打架」：H9 一句与 G2 / H2 的闸、与三份现行定义同时成立不了。④ 形态没给改法。我提的：甲，H14 第一批写明改 `lib_heavy_tests.py` 的 `classify`（子 agent 起新入口 `--quick` 放行、不带参数与 `--item` 照拒）、`agent-common.md` 那一句与实现员定义那一行，并写明子 agent 起轻型的 GPU 那一截怎么与在跑的重型分卡；乙，轻型里要 GPU 的那几样（小输入对拍）不交实现员、由合入后验证跑，实现员只跑轻型的 CPU 部分——乙与 H5「能走 GPU 的必须走」有张力，要用户点头。只在读码上成立，被攻过零轮。
 
@@ -70,8 +70,8 @@ H2 只给闸加「新入口起整域，子 agent 被拒」一格，没说 `--qui
 **许可它的那几句**：H11「多机配置合成一份……层 0 分片与放量双机两套驱动合成一套……提交那一趟整域照门禁 `--full` 在 HEAD + 暂存区的 worktree 里跑」；H5「配了双机就两台分片」。
 
 **今天两套读法不同**：
-- 放量：`repository_root` 是脚本所在那棵树的根（「repository_root="$(cd "$item_script_directory/../.." && pwd)"」，`research/scripts/crash-amplification-item.sh:100`），配置取「configuration_file="${SINGLEFS_MULTI_HOST_CONFIG:-$repository_root/multi-host.env}"」（`research/scripts/crash-amplification-lib.sh:127`；分项驱动第 549 行同形）。
-- 层 0：按 git common-dir 取主工作树那一份，「configuration_file="$(dirname "$common_directory")/multi-host.env"」（`research/scripts/layer0-shard-configuration-check.sh:88`），门禁文件头写明「<主工作树的根>/multi-host.env」（`.claude/gate.d/checker-tier-layer0-replay.sh:41`）。
+- 放量：`repository_root` 是脚本所在那棵树的根（「repository_root="$(cd "$item_script_directory/../.." && pwd)"」，`scripts/crash-amplification-item.sh:100`），配置取「configuration_file="${SINGLEFS_MULTI_HOST_CONFIG:-$repository_root/multi-host.env}"」（`scripts/crash-amplification-lib.sh:127`；分项驱动第 549 行同形）。
+- 层 0：按 git common-dir 取主工作树那一份，「configuration_file="$(dirname "$common_directory")/multi-host.env"」（`scripts/layer0-shard-configuration-check.sh:88`），门禁文件头写明「<主工作树的根>/multi-host.env」（`.claude/gate.d/checker-tier-layer0-replay.sh:41`）。
 - `multi-host.env` 不进 git，HEAD + 暂存区的 worktree 里没有它。
 
 **造出来的历史**：用户配了双机（主工作树 `multi-host.env` 写 `ENABLE_ACROSS_MACHINES=1`），提交时照 H11 在 worktree 里起合成后的整域。合成的驱动若沿用放量那一套读法：worktree 根上没有配置文件，双机开关读成没写（今天的判法：没写算关），这一趟单机跑；`ENABLE_GPU` 照 H11 没写算开，还要卡。用户第二句「配置了分片就分片跑」在提交那一趟不成立，而且没有一行报错。沿用层 0 那一套则照常双机。H11 只说「合成一套」，没说取哪种找法。
@@ -90,7 +90,7 @@ H2 只给闸加「新入口起整域，子 agent 被拒」一格，没说 `--qui
 
 ### M1-5　E171 编排脚本照旧按「没写算 0」转写配置（小）
 
-H11「没写 `ENABLE_GPU` 算开」改的是同一份多机配置；今天的模板与判法都写「没写或写 0 一律算关」（`multi-host.env.example:26`）。E171 编排脚本给第二台造配置时：「keys.update({"ENABLE_ACROSS_MACHINES": "1", "ENABLE_GPU": values.get("ENABLE_GPU", "0")})」（`research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py:839`）。主工作树配置没写 `ENABLE_GPU` 时，本机照 H11 开 GPU，E171 那一趟显式写 0 关掉。H1 的改名清单与 H11 都没点到它。四句：① 不分臂；② 看得到；③ G11 / H11「多机配置合成一份」——同一份配置两种默认；④ 改法：H11 的改动清单加上所有读 `ENABLE_GPU` 的地方（`grep -rln ENABLE_GPU` 今天 12 份，含两份 E171 编排脚本与三份 checker 档测试）。被攻过零轮。
+H11「没写 `ENABLE_GPU` 算开」改的是同一份多机配置；今天的模板与判法都写「没写或写 0 一律算关」（`multi-host.env.example:26`）。E171 编排脚本给第二台造配置时：「keys.update({"ENABLE_ACROSS_MACHINES": "1", "ENABLE_GPU": values.get("ENABLE_GPU", "0")})」（`scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py:839`）。主工作树配置没写 `ENABLE_GPU` 时，本机照 H11 开 GPU，E171 那一趟显式写 0 关掉。H1 的改名清单与 H11 都没点到它。四句：① 不分臂；② 看得到；③ G11 / H11「多机配置合成一份」——同一份配置两种默认；④ 改法：H11 的改动清单加上所有读 `ENABLE_GPU` 的地方（`grep -rln ENABLE_GPU` 今天 12 份，含两份 E171 编排脚本与三份 checker 档测试）。被攻过零轮。
 
 ### M1-6　没打中：G12、G13
 
@@ -132,7 +132,7 @@ MODEL_SELFCHECK compared=20 mismatched=0 []
 - 于是 C 这个点两项的计划哈希不同、块键不同，库里各判一遍；A、B 两点两边都是 `never_persisted`，版本表按上界截到 B（意图那一版 txg 更大、截掉），照常共享。
 - 核对今天的数：records 里 2026-10-08 那一趟删除流先跑（「CRASH_AMPLIFICATION_ITEM item=unlink-after-the-multi-record-publish exit=0 states=1448083638 reused=0」），多记录流后跑（「CRASH_AMPLIFICATION_ITEM item=multi-record-publish exit=0 states=1342177375 reused=16777259」，两句都在 `records/2026-10-01-删除与并发事务.md:1292`）：今天只共享取号暖机与 A，与这一读法一致（B、C 今天各在自己的文件里设点，挪不挪都分不出这一格；分得出的是挪完之后的那一趟）。
 
-**数（推的，算术）**：探针段形 `PROBE_SEGMENT_SIZES`（`research/scripts/crash-amplification.sh:42`）前 19 段两项相同，两态闭式 1 358 954 604（`python3` 一行算出，与第二轮 `records_assumption` 的共享量同数）。C 那个点管的单元段是 30 写那一段，2^30 − 1 = 1 073 741 823 态。挪完的共享量 ∈ [16 777 259 + (2^28 − 1), 1 358 954 604 − (2^30 − 1)] = [285 212 714, 285 212 781]（下界只加 B 的 28 写段，上界只扣 C 的 30 写段，C 那个点另管的几段小段两端各差几十态）。照第二轮模型的今天去重 5 133 787 951 换算，挪完去重 4 865 352 429 – 4 865 352 496，不是第二轮判决交用户表里的 3 791 610 606。
+**数（推的，算术）**：探针段形 `PROBE_SEGMENT_SIZES`（`scripts/crash-amplification.sh:42`）前 19 段两项相同，两态闭式 1 358 954 604（`python3` 一行算出，与第二轮 `records_assumption` 的共享量同数）。C 那个点管的单元段是 30 写那一段，2^30 − 1 = 1 073 741 823 态。挪完的共享量 ∈ [16 777 259 + (2^28 − 1), 1 358 954 604 − (2^30 − 1)] = [285 212 714, 285 212 781]（下界只加 B 的 28 写段，上界只扣 C 的 30 写段，C 那个点另管的几段小段两端各差几十态）。照第二轮模型的今天去重 5 133 787 951 换算，挪完去重 4 865 352 429 – 4 865 352 496，不是第二轮判决交用户表里的 3 791 610 606。
 
 **四句**：① 不分臂（H3 一种形态）。② 系统排计划那一刻看得到两条流各自的被判根槽写——判别子观测得到；打中的是块键把「这一项最后一条根」写进了共享节点。③ M2「H3……删除流与多记录流在 C 之前的节点是不是同一把版本」：C 之前（A、B）是；C 本身不是，H3「共享到 C」那一分句不成立。④ 改法：甲，被判根槽写不进判器另读的输入：版本表形态下它只喂计数 `root_persisted_states`（`crash.rs` 判一张镜像那一段，红项不读它；引擎那一段注释自己写着「不进逐项判定；照样进键」（`crates/singlefs-checker-tier/src/crash_amplification.rs:497`）），计数改成各项按自己的被判根从块的持久集合事后数，块里不存；乙，接受 C 不共享，交用户表把共享量与去重数改成上面那组；丙，删除流的被判根取「与多记录流共用的最后一条」——改了删除流判的是什么，不推荐。甲动引擎与 H7 计数向量（第二批），乙只改数。只在读码与算术上成立、没跑，被攻过零轮；判法见末节第 2 条。
 
@@ -269,7 +269,7 @@ H5「甲二在第三批之前登记一行临时豁免、第三批删」与 H7「
 
 ## 要主 agent 跑的命令
 
-工作目录都是仓根 `/home/fy5090/code/singlefs`；第 1–3 条是 checker 档或要卡，子 agent 不跑。`<库根>` 取一个新的空目录（例 `~/.local/share/singlefs/work/m3-r3-measure/`，不放开机会清的目录）；`<卡>` 取私有显卡配置里 `GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED` 那一串；`<bindgen>` 取 `research/scripts/crash-amplification-lib.sh` 的 `CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS`。不经入口 `crash-amplification.sh`，因为分项驱动起本机那一趟时传的是 `0/1`（`research/scripts/crash-amplification-item.sh` 第 609 行），共用库第 174 行把它写进环境、盖掉调用方给的值，抽样要直接起用例。各项的测试目标与用例函数取 `bash research/scripts/crash-amplification.sh --list-items` 的第 2、3 列（今天 8 项，次序就是登记次序）。
+工作目录都是仓根 `/home/fy5090/code/singlefs`；第 1–3 条是 checker 档或要卡，子 agent 不跑。`<库根>` 取一个新的空目录（例 `~/.local/share/singlefs/work/m3-r3-measure/`，不放开机会清的目录）；`<卡>` 取私有显卡配置里 `GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED` 那一串；`<bindgen>` 取 `scripts/crash-amplification-lib.sh` 的 `CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS`。不经入口 `crash-amplification.sh`，因为分项驱动起本机那一趟时传的是 `0/1`（`scripts/crash-amplification-item.sh` 第 609 行），共用库第 174 行把它写进环境、盖掉调用方给的值，抽样要直接起用例。各项的测试目标与用例函数取 `bash scripts/crash-amplification.sh --list-items` 的第 2、3 列（今天 8 项，次序就是登记次序）。
 
 **第 0 步（先核两件事，几分钟）**：在第 2 条的循环里只跑第一项、`N=2000`，看用例退 0、`CRASH_AMPLIFICATION flow=` 那一行带 `unjudged_blocks>0`、`red=0`；若用例在对账那一步因别的份没判而 panic，这套抽样不能用，改成整项跑第 1 项（删除流）一次当速率样本。再跑第二项，看它的 `states_reused` 是否大于 0（共享块号在两项之间对得上）。用这两项的挂钟按项数与 N 估第 2 条全量的挂钟，再定 N。
 
@@ -277,19 +277,19 @@ H5「甲二在第三批之前登记一行临时豁免、第三批删」与 H7「
 
 ```
 printf 'ENABLE_GPU=1\nENABLE_ACROSS_MACHINES=0\n' > <库根>/gpu-on.env
-SINGLEFS_HEAVY_TESTS=user-request bash research/scripts/gpu-quiesce-run.sh -- bash research/scripts/run-with-memory-cap.sh 24G env SINGLEFS_MULTI_HOST_CONFIG=<库根>/gpu-on.env GPU_COMPUTATION_CLASSES='gpu_unit_checks crash_verify_gpu crash_judge_gpu' GPU_CARDS_BY_PRIORITY='<卡>' SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=<库根>/placement SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=30 SINGLEFS_CRASH_AMPLIFICATION_THREADS=31 BINDGEN_EXTRA_CLANG_ARGS='<bindgen>' cargo test --offline --release -p singlefs-checker-tier --features verdict-store,gpu --test <测试目标> -- --exact <用例函数> --nocapture
+SINGLEFS_HEAVY_TESTS=user-request bash scripts/gpu-quiesce-run.sh -- bash scripts/run-with-memory-cap.sh 24G env SINGLEFS_MULTI_HOST_CONFIG=<库根>/gpu-on.env GPU_COMPUTATION_CLASSES='gpu_unit_checks crash_verify_gpu crash_judge_gpu' GPU_CARDS_BY_PRIORITY='<卡>' SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=<库根>/placement SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=30 SINGLEFS_CRASH_AMPLIFICATION_THREADS=31 BINDGEN_EXTRA_CLANG_ARGS='<bindgen>' cargo test --offline --release -p singlefs-checker-tier --features verdict-store,gpu --test <测试目标> -- --exact <用例函数> --nocapture
 ```
 
 **第 2 条　整域等距抽样，GPU 一趟、CPU 一趟**（8 项按登记次序进同一份新库；判法见 M3 节「每条命令读哪一行」表第 2 行；读每项 `CRASH_AMPLIFICATION flow=… states_checked_here=… states_reused=…`、`CRASH_AMPLIFICATION_PHASES … seconds_planning_and_recording=… seconds_judging=…`，GPU 那一趟另读 `CRASH_AMPLIFICATION_GPU_TOTAL … states_per_second=`）：
 
 ```
 N=<第 0 步定的数>
-bash research/scripts/crash-amplification.sh --list-items | cut -f2,3 > <库根>/items.tsv
+bash scripts/crash-amplification.sh --list-items | cut -f2,3 > <库根>/items.tsv
 # GPU 一趟（库 <库根>/gpu-$N）
-while IFS=$'\t' read -r target case_name; do SINGLEFS_HEAVY_TESTS=user-request bash research/scripts/gpu-quiesce-run.sh -- bash research/scripts/run-with-memory-cap.sh 24G env SINGLEFS_MULTI_HOST_CONFIG=<库根>/gpu-on.env GPU_COMPUTATION_CLASSES='gpu_unit_checks crash_verify_gpu crash_judge_gpu' GPU_CARDS_BY_PRIORITY='<卡>' SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/$N SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=<库根>/gpu-$N SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=30 SINGLEFS_CRASH_AMPLIFICATION_THREADS=31 BINDGEN_EXTRA_CLANG_ARGS='<bindgen>' cargo test --offline --release -p singlefs-checker-tier --features verdict-store,gpu --test "$target" -- --exact "$case_name" --nocapture >> <库根>/gpu-$N.log 2>&1; echo "ITEM_RC $target $?" >> <库根>/gpu-$N.log; done < <库根>/items.tsv
+while IFS=$'\t' read -r target case_name; do SINGLEFS_HEAVY_TESTS=user-request bash scripts/gpu-quiesce-run.sh -- bash scripts/run-with-memory-cap.sh 24G env SINGLEFS_MULTI_HOST_CONFIG=<库根>/gpu-on.env GPU_COMPUTATION_CLASSES='gpu_unit_checks crash_verify_gpu crash_judge_gpu' GPU_CARDS_BY_PRIORITY='<卡>' SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/$N SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=<库根>/gpu-$N SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=30 SINGLEFS_CRASH_AMPLIFICATION_THREADS=31 BINDGEN_EXTRA_CLANG_ARGS='<bindgen>' cargo test --offline --release -p singlefs-checker-tier --features verdict-store,gpu --test "$target" -- --exact "$case_name" --nocapture >> <库根>/gpu-$N.log 2>&1; echo "ITEM_RC $target $?" >> <库根>/gpu-$N.log; done < <库根>/items.tsv
 # CPU 一趟（库 <库根>/cpu-$N；配置写 ENABLE_GPU=0，不经清场）
 printf 'ENABLE_GPU=0\nENABLE_ACROSS_MACHINES=0\n' > <库根>/gpu-off.env
-while IFS=$'\t' read -r target case_name; do SINGLEFS_HEAVY_TESTS=user-request bash research/scripts/run-with-memory-cap.sh 24G env SINGLEFS_MULTI_HOST_CONFIG=<库根>/gpu-off.env SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/$N SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=<库根>/cpu-$N SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=30 SINGLEFS_CRASH_AMPLIFICATION_THREADS=31 BINDGEN_EXTRA_CLANG_ARGS='<bindgen>' cargo test --offline --release -p singlefs-checker-tier --features verdict-store --test "$target" -- --exact "$case_name" --nocapture >> <库根>/cpu-$N.log 2>&1; echo "ITEM_RC $target $?" >> <库根>/cpu-$N.log; done < <库根>/items.tsv
+while IFS=$'\t' read -r target case_name; do SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 24G env SINGLEFS_MULTI_HOST_CONFIG=<库根>/gpu-off.env SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/$N SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=<库根>/cpu-$N SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=30 SINGLEFS_CRASH_AMPLIFICATION_THREADS=31 BINDGEN_EXTRA_CLANG_ARGS='<bindgen>' cargo test --offline --release -p singlefs-checker-tier --features verdict-store --test "$target" -- --exact "$case_name" --nocapture >> <库根>/cpu-$N.log 2>&1; echo "ITEM_RC $target $?" >> <库根>/cpu-$N.log; done < <库根>/items.tsv
 grep -c '^ITEM_RC' <库根>/gpu-$N.log <库根>/cpu-$N.log   # 各要是 8；有一行 rc 不是 0 的那一项作废
 grep -h 'CRASH_AMPLIFICATION flow=\|CRASH_AMPLIFICATION_PHASES\|CRASH_AMPLIFICATION_GPU_TOTAL' <库根>/gpu-$N.log <库根>/cpu-$N.log
 ```
@@ -300,7 +300,7 @@ grep -h 'CRASH_AMPLIFICATION flow=\|CRASH_AMPLIFICATION_PHASES\|CRASH_AMPLIFICAT
 
 **第 3 条　删除流逐态可写挂载的速率**：在 HEAD + 暂存区的 worktree 里照门禁的出路句起 `checker-tier-layer0-replay.sh --full`，只点删除流那一条（`--item crash-case:<删除流的登记名>`，名字取 `--list-items`）；跑 T 分钟后从最底层的进程停起（`proc.py stop`，逐个）。读续跑进度目录 `<git common-dir>/singlefs-layer0-progress/<输入指纹>/` 里判完的切片数与切片长（读法照 `crates/singlefs-checker-tier/src/layer0_progress.rs` 文件头），R_挂载 = 判完的态数 / 秒数。这条判的是每态「两遍恢复 + checker + 记录核对 + 一次可写挂载」的合计速率，挂载单独那一截要再减第 2 条 CPU 那一趟删除流的 R_C。
 
-**第 4 条　复跑闭包模型（不是 checker 档，谁都能跑）**：`bash research/scripts/run-with-memory-cap.sh 2G bash research/prompts/m3-crash-enumeration-merge-r3-opus-model/rerun.sh`。判法：末行 `MODEL_SELFCHECK compared=20 mismatched=0 []`；十四行 `MODEL setting=` 里任何一行 `crash_judge_dispatch.rs=0` ⇒ M2-1 错。`crash_identity.rs` 变了它退 3，要先按新行号改 `extract.sh` 的两个区间与钉的 sha256。
+**第 4 条　复跑闭包模型（不是 checker 档，谁都能跑）**：`bash scripts/run-with-memory-cap.sh 2G bash research/prompts/m3-crash-enumeration-merge-r3-opus-model/rerun.sh`。判法：末行 `MODEL_SELFCHECK compared=20 mismatched=0 []`；十四行 `MODEL setting=` 里任何一行 `crash_judge_dispatch.rs=0` ⇒ M2-1 错。`crash_identity.rs` 变了它退 3，要先按新行号改 `extract.sh` 的两个区间与钉的 sha256。
 
 ## 收工
 

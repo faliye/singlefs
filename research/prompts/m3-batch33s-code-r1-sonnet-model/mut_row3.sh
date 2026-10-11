@@ -10,7 +10,7 @@ for row in "$@"; do
   cargo_args=$(grep '^CARGO ' "$OUT.head" | sed 's/^CARGO //')
   cd "$REPO"
   # shellcheck disable=SC2086
-  bash ${SINGLEFS_MAIN_REPO}/research/scripts/capped.sh 7 nice -n 19 cargo test --release --offline $cargo_args > "$OUT" 2>&1
+  bash ${SINGLEFS_MAIN_REPO}/scripts/capped.sh 7 nice -n 19 cargo test --release --offline $cargo_args > "$OUT" 2>&1
   code=$?
   python3 -I ${SCRATCH}/bin/apply_row.py "$TABLE" "$row" "$REPO" "$PRISTINE" restore >/dev/null
   must=$(grep '^MUST ' "$OUT.head" | sed 's/^MUST //')

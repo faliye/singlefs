@@ -5,12 +5,12 @@
 #   bash rerun.sh enum  <工作目录> <产物目录> <x|a|b|c> [臂]   N1 层 0 全量枚举一段历史（不给臂两臂都跑；c 那一段两臂合起来近 4 分钟，分两次跑）
 #   bash rerun.sh n2    <工作目录> <产物目录>       N2 注错点放开扫（五个起点，c1 臂）
 #   bash rerun.sh compare <产物目录>               与本目录 out/ 里的产物比判定行（去掉耗时与进度行）
-# 冻结副本：/tmp/claude-1000/m3-unlink-code-r3/tree/（只读，拷出来改）。编译与跑都经 research/scripts/run-with-memory-cap.sh。
+# 冻结副本：/tmp/claude-1000/m3-unlink-code-r3/tree/（只读，拷出来改）。编译与跑都经 scripts/run-with-memory-cap.sh。
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
-cap="$repo/research/scripts/run-with-memory-cap.sh"
-capped="$repo/research/scripts/capped.sh"
+cap="$repo/scripts/run-with-memory-cap.sh"
+capped="$repo/scripts/capped.sh"
 frozen=/tmp/claude-1000/m3-unlink-code-r3/tree
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="原型每次改过重编，峰值表里的旧读数不代表这一版"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-200}"

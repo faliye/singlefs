@@ -11,7 +11,7 @@ gitq() { git -c user.email=attack@example.com -c user.name=attack "$@"; }
 # build_repo <目录> <post|pre>：post＝工作区今天的 54 号与 stage-inputs.tsv（开工快照里的那一版），pre＝HEAD 的（分档之前）。
 build_repo() {
   local repo="$1" arm="$2"
-  rm -rf -- "${repo:?}"; mkdir -p "$repo/.claude/gate.d" "$repo/research/scripts" "$repo/research/results" "$repo/.claude/kb/layout" \
+  rm -rf -- "${repo:?}"; mkdir -p "$repo/.claude/gate.d" "$repo/scripts" "$repo/research/results" "$repo/.claude/kb/layout" \
     "$repo/crates/singlefs-harness/src" "$repo/crates/singlefs-harness/tests" "$repo/crates/singlefs-core/src"
   if [[ "$arm" == post ]]; then
     cp "$MAIN_REPO/$STAGE" "$repo/$STAGE"; cp "$MAIN_REPO/.claude/gate.d/stage-inputs.tsv" "$repo/.claude/gate.d/stage-inputs.tsv"
@@ -19,7 +19,7 @@ build_repo() {
     git -C "$MAIN_REPO" show "HEAD:$STAGE" > "$repo/$STAGE"; git -C "$MAIN_REPO" show HEAD:.claude/gate.d/stage-inputs.tsv > "$repo/.claude/gate.d/stage-inputs.tsv"
   fi
   chmod +x "$repo/$STAGE"
-  cp "$MAIN_REPO/research/scripts/stage-must-run.sh" "$MAIN_REPO/research/scripts/change-touches-crates.sh" "$repo/research/scripts/"
+  cp "$MAIN_REPO/scripts/stage-must-run.sh" "$MAIN_REPO/scripts/change-touches-crates.sh" "$repo/scripts/"
   printf '[workspace]\nmembers = ["crates/*"]\n' > "$repo/Cargo.toml"
   printf '# lock v1\n[[package]]\nname = "dep"\nversion = "1.0.0"\n' > "$repo/Cargo.lock"
   printf 'pub mod crash;\n' > "$repo/crates/singlefs-harness/src/lib.rs"

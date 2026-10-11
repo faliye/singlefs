@@ -59,4 +59,4 @@ H1、H2 动 GPU 扫描内核 `crash_judge_checker_scan.wgsl`，派之前先与�
 
 ## 六、复跑核对（攻方模型）
 
-攻方模型拷到 `~/.local/share/singlefs/work/m3-batch56-code-r1-verify/model/`，在空工作目录 `run/` 从头跑 `SINGLEFS_SCRIPTS=research/scripts OPUS_THREADS=15 OPUS_MEMORY_CAP=8G bash model/rerun.sh run all`（冻结副本取缺省路径），rc=0，compare 原样末行「compare：21 份，不一致 0 份」，21 份逐份「一致」。第二节引的攻方数（K1 重挂与回退 0 拒、K2 旋钮下 4000 次判 0 违例、旋钮 1 写旋钮 2 / 3 判 Holds、`w-close-one-early` 与 `fix-knob-full` 两臂、K4 等价族、产品支三判去掉照绿）都在这 21 份里，主 agent 复跑与腿交的一致。
+攻方模型拷到 `~/.local/share/singlefs/work/m3-batch56-code-r1-verify/model/`，在空工作目录 `run/` 从头跑 `SINGLEFS_SCRIPTS=scripts OPUS_THREADS=15 OPUS_MEMORY_CAP=8G bash model/rerun.sh run all`（冻结副本取缺省路径），rc=0，compare 原样末行「compare：21 份，不一致 0 份」，21 份逐份「一致」。第二节引的攻方数（K1 重挂与回退 0 拒、K2 旋钮下 4000 次判 0 违例、旋钮 1 写旋钮 2 / 3 判 Holds、`w-close-one-early` 与 `fix-knob-full` 两臂、K4 等价族、产品支三判去掉照绿）都在这 21 份里，主 agent 复跑与腿交的一致。

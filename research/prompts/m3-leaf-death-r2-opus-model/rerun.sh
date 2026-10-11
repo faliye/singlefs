@@ -2,7 +2,7 @@
 # m3-leaf-death-r2 攻方腿（Opus）模型的复跑。模型本身不依赖 crates/；copybuild / copyrun 两阶段拷 SINGLEFS_REPO 的 crates/ 进
 # <输出目录>/repo 改副本（加一个 harness 测试目标），给冻结树或仓根都行（要 Cargo.toml、Cargo.lock、.cargo、crates，不要 research/）。
 # 每一阶段整条经内存包装与线程上限起（编译两阶段 6G、其余 4G），例：
-#   M=research/prompts/m3-leaf-death-r2-opus-model; S=research/scripts
+#   M=research/prompts/m3-leaf-death-r2-opus-model; S=scripts
 #   bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 6 bash $M/rerun.sh <空的输出目录> build
 #   bash $S/run-with-memory-cap.sh 4G bash $S/capped.sh 6 bash $M/rerun.sh <输出目录> demos
 # 阶段（按这个次序各跑一次就是全量）：build demos sweep-0 sweep-1 sweep-2 sweep-3 trace determinism copybuild copyrun summarize

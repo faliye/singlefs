@@ -2,7 +2,7 @@
 # repo-mut.sh <变异名…> : 套变异、编入库用例文件、跑（含 ignored），写 runs/RM/<名>.log，打印失败的用例名
 set -u
 W=$HOME/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet
-R=/home/fy5090/code/singlefs/research/scripts
+R=/home/fy5090/code/singlefs/scripts
 mkdir -p $W/runs/RM
 for name in "$@"; do
   python3 $W/scripts/mutate.py $name > /dev/null || { echo "$name APPLYFAIL"; continue; }

@@ -258,7 +258,7 @@ V9 只红 I-9.6，但红的是前一半（第 18 行：「I-9.6：记账里的 i
 
 开工时 `ps` 看到主 agent 的 E161 可行性档与 E142 变异表、别的会话的 `cargo test`，没有性能测量在跑；内存 slice 常被别的活订满，几次排队。包装自己的结局（这几次的输出都不算结果，改上限或等位之后重跑）：
 
-| 命令（经 `research/scripts/run-with-memory-cap.sh`） | 退出码 | 怎么了 |
+| 命令（经 `scripts/run-with-memory-cap.sh`） | 退出码 | 怎么了 |
 |---|---|---|
 | `3G cargo build --release -p m3b18-opus-proto`（等 220 秒） | 252 | 排不上 |
 | `12G target/release/m3b18-opus-proto sweep` | 252 | 排不上；改 4G 重跑 |

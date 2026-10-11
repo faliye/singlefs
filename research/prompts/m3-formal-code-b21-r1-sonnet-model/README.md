@@ -15,8 +15,8 @@
 | `out/` | 上面各条的原样输出 | |
 
 起法（工作目录是副本，全经包装；线程上限按派发提示）：
-`CARGO_TARGET_DIR=<草稿目录>/target bash research/scripts/capped.sh 7 cargo test --offline -p singlefs-harness --test <名> --no-run`，
-再 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON=… RUN_WITH_MEMORY_CAP_PARALLEL_REASON=… bash research/scripts/capped.sh 7 bash research/scripts/run-with-memory-cap.sh 4G <测试二进制> …`。
+`CARGO_TARGET_DIR=<草稿目录>/target bash scripts/capped.sh 7 cargo test --offline -p singlefs-harness --test <名> --no-run`，
+再 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON=… RUN_WITH_MEMORY_CAP_PARALLEL_REASON=… bash scripts/capped.sh 7 bash scripts/run-with-memory-cap.sh 4G <测试二进制> …`。
 `b21_scan.rs` 吃环境变量 `B21_SLACK`、`B21_S`（逗号分隔）、`B21_J`（`default` 或 `j128`）。
 
 ## 复现（副本与编译目录交回前已删）

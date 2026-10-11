@@ -317,7 +317,7 @@ index 90fa88c..73fb2c2 100644
 +/// 取三态，各 3² · 2^n − 1，共 16 段、12230590578），
  /// 每个状态两遍恢复 + checker。登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），54 号认下面打印的
  /// `LAYER0_PARALLEL_LINE_ONE` 行里 `exhaustive=true`。带断点续跑：进度目录、输入指纹与强制从头跑的开关从环境变量取，
- /// 没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，`research/scripts/layer0-shard-run.sh`）：
+ /// 没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，`scripts/layer0-shard-run.sh`）：
  /// 跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
  #[test]
 -#[ignore = "全量 12230590578 个状态（一百二十多亿）、每个两遍恢复 + checker；门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片"]

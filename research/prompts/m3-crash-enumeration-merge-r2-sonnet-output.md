@@ -26,14 +26,14 @@
 | K1-4 σ（没打中） | 无异议（我也没造出反例；读码，没跑） | 同判决 | 在 σ 历史上逐个比两边持久集合，层 0 有放量没有的 |
 | K2-1 整条流记本次未跑（打中，小） | **站得住，机制现成** | 盖不住的段今天就按「不展开」处理（`crates/singlefs-checker-tier/src/crash_amplification.rs:172`：「if segment.len() <= self.0 {」，否则 `crates/singlefs-checker-tier/src/crash.rs:1869`：「Self::NotExpanded => 0,」），测试里预设的 ignore 是按点的（`crates/singlefs-checker-tier/src/crash_amplification.rs:194`：「pub ignored: bool,」）；G10 的「按段登记」用现有的点级 ignore 就能做 | 位置寻址第三条流的小段在展开 30 下今天并不被判（那就是判决说的「丢」不存在） |
 | K2-2 第二条流两套造法（没打中，采做法） | 无异议 | 同判决（两腿都读码） | 两份造法在同一树上写表摘要不同 |
-| K2-3 删除流差 15728640 | **站得住**；G13 要补的探针段形那一行只是注释 | `research/scripts/crash-amplification.sh:42` 是注释行，不是运行时输入 | 放量那一项在今天的树上 `states` 不是 1463812278 |
+| K2-3 删除流差 15728640 | **站得住**；G13 要补的探针段形那一行只是注释 | `scripts/crash-amplification.sh:42` 是注释行，不是运行时输入 | 放量那一项在今天的树上 `states` 不是 1463812278 |
 | K3-1 判法版本罩不住引擎与观察者（打中） | **「打中」站得住；「改法」不是唯一不被打中的，字面照做还自相矛盾**（2.1、2.2） | 入口只有两份（`crates/singlefs-checker-tier/src/crash_identity.rs:839`：「pub const JUDGE_ENTRY_FILES」），流水线自己写明不罩（`crates/singlefs-checker-tier/src/crash_amplification.rs:739`：「设点的测试文件、流水线自己变了，摘要不变」）。乙（手抬版本号）同样被「忘了抬」打中；甲照字面（每项一个版本、∪ 整个引擎文件）被 K1-2 与用户 2026-09-29 的拆分打中 | 2.1、2.2 里的两条反例：造两项共前缀的流看它们的块键与版本；改 `crash_amplification.rs` 一条单测看摘要动不动 |
 | K3-2 两份文件头口径（采） | 无异议 | 同判决 | — |
 | K3-3 随机历史键没定义（打中） | **站得住，机制有现成一半** | 今天登记的崩溃注入用例的闭包里就收了随机历史脚手架与 `crash_injection.rs`（`crates/singlefs-checker-tier/src/crash_identity.rs:890`：「pub const RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED」那张白名单，用例 `crash_injection_campaign`），键里缺的是种子与抽法参数（`crates/singlefs-checker-tier/src/crash_injection.rs:226`：「/// 按种子抽这么多个（每个是「一段 + 那一段的一个真子集」」）。G8 写的「种子 + 规模参数 + 整份闭包」够；抽法（`CrashPointDraw` 三种）要算规模参数 | 白名单里的闭包算出来不含 `crash_injection.rs` |
 | K4-1 按项登记太粗（打中） | **站得住**（用户已定按判法分界） | 同判决 | — |
 | K4-2 个别状态判不了（定义缺口） | **站得住** | `crates/singlefs-checker-tier/src/crash_amplification.rs:2033` 是整趟停；G6 改成记不一致判红 | — |
 | K4-3 io_min、清扫建不建得出表（核不动） | **仍核不动；G5 已把它当成立** | 本腿不跑 GPU | 在卡上对两流跑 `build_judge_tables` 看 `JudgeTablesRefusal`（命令在末尾） |
-| K4-4 卡用不上（定义缺口） | **站得住**；用户 2026-09-29 原话支持退 78 | `research/scripts/crash-amplification.sh:28`：「不接受默认降级」 | — |
+| K4-4 卡用不上（定义缺口） | **站得住**；用户 2026-09-29 原话支持退 78 | `scripts/crash-amplification.sh:28`：「不接受默认降级」 | — |
 | K5 提交代价（给数） | **站得住但口径要补一句**：弹窗上的 21.6–124.4 小时是「每个状态 CPU 判一遍」，不含逐状态可写挂载 | 攻方模型把删除流挂载另列约 50.8 小时（推的），正推下界两台 8.4 小时；弹窗交代（判决第三节）没提挂载 | 量出今天树上一次可写挂载的单态成本 |
 | K6-1 重型闸按名字认（打中） | **站得住** | `.claude/hooks/lib_heavy_tests.py:585`：「CRASH_AMPLIFICATION_SCRIPTS = frozenset」（行号现查，T3 在改这份，别钉） | — |
 | K6-2 漏 `--quick`（打中，小） | **站得住**；G2 已补 | `.claude/singlefs-ai-sop/rules/test-script-discipline.md:21`：「全量：快档与慢档的全部项」 | — |
@@ -84,10 +84,10 @@
 | G7 计数随块存 | U3、U5 | **绕开**（与 G9 撞） | 见 0.4：GPU 腿只有违例位。提交时能每趟判的只有闭式与按发布分的态数（结构量）；逐条不变量的判到 / 不适用计数、观察者计数要 CPU 腿。成功那句若写成「计数断言每一趟都判」就是假话 | GPU 内核补上「判到 / 不适用」的输出字（G14 第三批没写） |
 | G8 判法版本 | U3、U6 | 见 2.1、2.2 | — | — |
 | G9 两档 | U3、U5、U6 | **绕开**两处，**照漏**一处 | 见下三条 | 见下三条 |
-| G10 装不进 u64 的段 | U3、U6 | 不构成「例外」；**判据偏松** | 登记的是做不到的段，不是选择；按段登记，用现成点级 ignore（K2-1 行）。判据写「装不进 u64」，而 u64 装得进的段（三十五写到六十三写）早就判不动：今天用「展开上限」登记（`research/scripts/crash-amplification.sh:219` 的 `FULL_EXPAND_UP_TO=30`），`crates/singlefs-checker-tier/src/crash.rs:1860`：「2 态的写六十几个就到了」是 panic 的边，不是可行的边 | 加一条写数 31–63 的段，整域在 G10 字面下还是排它去判 |
-| G11 跑在哪 | U8 | 照办；**前提已大半成立** | 两个入口今天就读同一份多机配置（`research/scripts/layer0-shard-configuration-check.sh:33`：「配置文件：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}」，`research/scripts/crash-amplification-lib.sh:127`：「configuration_file="${SINGLEFS_MULTI_HOST_CONFIG:-$repository_root/multi-host.env}"」），两个开关键只在一处定义（`research/scripts/layer0-shard-configuration-check.sh:20`：「两个开关键只在这一份里定义（别处照这里读，不另写一份）」）。真要合的是两套双机驱动与 GPU 卡配置；「默认 `ENABLE_GPU=1`」与今天「没写或写 0 算关」（`research/scripts/layer0-shard-configuration-check.sh:22`：「GPU：写 1 算开，没写或写 0 算关」）相反，且配置是 git 忽略的私有文件，仓内改不到。无卡的机器每趟快档都退 78，与规则的整脚本口径相合（`.claude/singlefs-ai-sop/rules/test-script-discipline.md:80`：「不悄悄退回 CPU 或单机」），但与规则对个别项的口径（`.claude/singlefs-ai-sop/rules/test-script-discipline.md:53`：「要特定硬件的那几条，在没有那种硬件的机器上报」「本次未跑」）不同，G11 要写明取哪个 | 默认值改在 `.example` 模板与检查脚本里，用户确认无卡机器退 78 |
+| G10 装不进 u64 的段 | U3、U6 | 不构成「例外」；**判据偏松** | 登记的是做不到的段，不是选择；按段登记，用现成点级 ignore（K2-1 行）。判据写「装不进 u64」，而 u64 装得进的段（三十五写到六十三写）早就判不动：今天用「展开上限」登记（`scripts/crash-amplification.sh:219` 的 `FULL_EXPAND_UP_TO=30`），`crates/singlefs-checker-tier/src/crash.rs:1860`：「2 态的写六十几个就到了」是 panic 的边，不是可行的边 | 加一条写数 31–63 的段，整域在 G10 字面下还是排它去判 |
+| G11 跑在哪 | U8 | 照办；**前提已大半成立** | 两个入口今天就读同一份多机配置（`scripts/layer0-shard-configuration-check.sh:33`：「配置文件：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}」，`scripts/crash-amplification-lib.sh:127`：「configuration_file="${SINGLEFS_MULTI_HOST_CONFIG:-$repository_root/multi-host.env}"」），两个开关键只在一处定义（`scripts/layer0-shard-configuration-check.sh:20`：「两个开关键只在这一份里定义（别处照这里读，不另写一份）」）。真要合的是两套双机驱动与 GPU 卡配置；「默认 `ENABLE_GPU=1`」与今天「没写或写 0 算关」（`scripts/layer0-shard-configuration-check.sh:22`：「GPU：写 1 算开，没写或写 0 算关」）相反，且配置是 git 忽略的私有文件，仓内改不到。无卡的机器每趟快档都退 78，与规则的整脚本口径相合（`.claude/singlefs-ai-sop/rules/test-script-discipline.md:80`：「不悄悄退回 CPU 或单机」），但与规则对个别项的口径（`.claude/singlefs-ai-sop/rules/test-script-discipline.md:53`：「要特定硬件的那几条，在没有那种硬件的机器上报」「本次未跑」）不同，G11 要写明取哪个 | 默认值改在 `.example` 模板与检查脚本里，用户确认无卡机器退 78 |
 | G12 条款 | U2、U3 | 照办；时序见 L6 | D13 层表「层 0」撞名（K6-3 行） | — |
-| G13 旧数 | U9 | 照办 | `research/scripts/crash-amplification.sh:42` 是注释行 | — |
+| G13 旧数 | U9 | 照办 | `scripts/crash-amplification.sh:42` 是注释行 | — |
 | G14 切批 | U9 | 照办；L6 另述 | — | — |
 
 ### G9 展开（三条）
@@ -98,7 +98,7 @@
 
 ## 5 L6（顺带）：G14 切批
 
-- **撞在飞的工具批**：第一批要改入口、重型闸、登记表、门禁（G2），正文第二节说 T3 正在改同一批文件（`research/prompts/_m3-crash-enumeration-merge-r2-body.md:18`：「T3 在改 `research/scripts/admission.py`」），G14 没写等 T3 合入。
+- **撞在飞的工具批**：第一批要改入口、重型闸、登记表、门禁（G2），正文第二节说 T3 正在改同一批文件（`research/prompts/_m3-crash-enumeration-merge-r2-body.md:18`：「T3 在改 `scripts/admission.py`」），G14 没写等 T3 合入。
 - **条款先于做法**：G14 第一批含 G12 的条款（`research/prompts/_m3-crash-enumeration-merge-r2-body.md:36`：「不碰 `crates/`」），那一批合入后，D13、`verification.md` 写的是「每次提交跑整域」，引擎要到第二、三批才有两档。第一轮正推腿的排法是条款最后（S4，依赖入口已切换）。中间那几次提交按条款要跑整域，而入口背后仍是两套旧测试：「不带参数 = 快档加整域」会把同一条流判两遍，正是用户 U1 要避免的「下一次又要重跑」。出路：条款挪到第三批之后，或者第一批的条款写成「本批至第四批之间的提交不跑整域，记一笔」，与 U9 一致。
 - **第一次整套能跑**：快档要 G6（CPU 对拍）与 G5（GPU 判镜像）两头都有，第三批合入之后；整域要等第四批（改名换版本）之后才跑一趟，G14 末句已写。第二批与第三批各换一次判法版本（G8 把引擎并进版本，第三批动判器），不是「只重判一次」，只有这两批之间不跑整域才成立。
 - **中间态**：第一批不碰 `crates/` 时，计数行前缀 `LAYER0…` 仍由旧测试打，门禁与 `admission.py` 照旧读，今天两套装置跑得起来；风险只在 G2 要同批改重型闸（`.claude/hooks/lib_heavy_tests.py:585`：「CRASH_AMPLIFICATION_SCRIPTS = frozenset」）：新入口名与旧入口名要同时登记到第四批才能删旧名。
@@ -106,15 +106,15 @@
 ## 6 要主 agent 跑的命令（本腿一条没跑）
 
 1. 核 3 节（`mount.rs` 在不在判法闭包）。工作目录：仓根；checker 档单测，要带 `SINGLEFS_HEAVY_TESTS=user-request`：
-   `SINGLEFS_HEAVY_TESTS=user-request bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 6 cargo test --release -p singlefs-checker-tier --lib the_judging_closure_of_the_judges_holds -- --nocapture 2>&1 | tee <日志>`
+   `SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 cargo test --release -p singlefs-checker-tier --lib the_judging_closure_of_the_judges_holds -- --nocapture 2>&1 | tee <日志>`
    看：`grep -c '^JUDGING_CODE_FILE' <日志>`、`grep 'singlefs-core/src/mount.rs\|singlefs-core/src/unlink.rs\|singlefs-core/src/instance_table_sweep.rs' <日志>`。
-2. 核 K1-2 的共享是否在同版本下成立：同一个判法版本下先跑 `multi-record-publish` 再跑 `unlink-after-the-multi-record-publish`（展开 30），读两行 `CRASH_AMPLIFICATION_ITEM ... reused=`；删除流的 `reused` 不是约 13.6 亿则 92.8% 不成立。命令形态：`bash research/scripts/crash-amplification.sh --item multi-record-publish` 然后 `--item unlink-after-the-multi-record-publish`（带 `SINGLEFS_HEAVY_TESTS=user-request`，GPU 清场与内存包装由脚本自己套）。
+2. 核 K1-2 的共享是否在同版本下成立：同一个判法版本下先跑 `multi-record-publish` 再跑 `unlink-after-the-multi-record-publish`（展开 30），读两行 `CRASH_AMPLIFICATION_ITEM ... reused=`；删除流的 `reused` 不是约 13.6 亿则 92.8% 不成立。命令形态：`bash scripts/crash-amplification.sh --item multi-record-publish` 然后 `--item unlink-after-the-multi-record-publish`（带 `SINGLEFS_HEAVY_TESTS=user-request`，GPU 清场与内存包装由脚本自己套）。
 3. 核 G5 末句：在一张卡的机器上，对一份随机历史的写表（`run_crash_injection_campaign` 录下的）按 `crates/singlefs-checker-tier/src/crash_judge_tables.rs:194` 的 `JudgeFlow` 建判表，看能否表达「抽出来的一个子集」；与第一轮攻方报告「要主 agent 跑的命令」第 2 条（io_min、清扫）合并跑。
 
 ## 7 没做什么
 
 - 没跑 checker 档、GPU、门禁阶段、崩溃放量；没编译任何 Rust；没跑模型（草稿目录只有我写的 `clos.py`，纯文本近似，结论只当旁证）。
-- 没复核第一轮两腿的 K5 模型数（L2 归攻方）；没核 `research/e7-index-bench` 与 `research/results` 里的旧名归类。
+- 没复核第一轮两腿的 K5 模型数（L2 归攻方）；没核 `scripts/experiments` 与 `research/results` 里的旧名归类。
 - 没替主 agent撤销或维持判决：上面「站得住 / 判轻 / 已过期」只是复核结果。
 - 「辩方替代」两条（2.1 节点级版本、2.2 把结论编码搬进判器一侧）没被攻过，零轮；它们是我提的收严，只在读码上推过。
 - 收工 `sha256sum -c`：crates 91 份通过；kb 清单 `.claude/kb/checks-owed.md` 在我跑的过程中变了（开工时全过，收工时该份不符）——不是我改的，我也没引它。

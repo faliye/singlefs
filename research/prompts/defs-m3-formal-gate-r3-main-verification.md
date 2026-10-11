@@ -12,7 +12,7 @@
 | 开工快照 | `research/prompts/defs-m3-formal-gate-r3-snapshot/sha256sums.txt`（9 份） | 交齐之后 `sha256sum -c` 全 OK |
 | 云端辩方（Sonnet） | `research/prompts/defs-m3-formal-gate-r3-sonnet-output.md`（216 行，sha256 886047c7…1962）；模型 `…-sonnet-model/` | 没复跑：它的 L3 那一处与攻方 L3-a 是两份互不共享代码的探针，结论同向 |
 | 云端攻方（Opus） | `research/prompts/defs-m3-formal-gate-r3-opus-output.md`（422 行，sha256 7a1ae9b1…84a0f4）；模型 `…-opus-model/` | 主 agent 在 `/tmp/claude-1000/defs-m3-formal-gate-r3-main-check/` 照 `rerun.sh` 复跑：`l1-output.txt`、`l1-K-output.txt`、`l1-argv-demo-output.txt`、`l3-judge-output.txt`、`l3-K4-output.txt` 与入库的逐字节相同；`l1-e165-parse-output.txt` 只差草稿路径，`l2-output.txt`、`l2-K3-output.txt` 只差草稿路径与计时；结论行原样：「T2-VERUS_ROOT=B 退 1 "verified": 0」「Z1 VERUS_ROOT 未设 → 拷贝 B（宏库截断，T2 编不过） q1 退 0 q3 退 10」 |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root . --background research/prompts/_defs-m3-formal-gate-r3-background.md`：「✓ 核了 55 处引文，对上 55 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root . --background research/prompts/_defs-m3-formal-gate-r3-background.md`：「✓ 核了 55 处引文，对上 55 处，没判 0 处」 |
 | 看门狗检出 | 攻方脚本 `l2-install.sh` 第 44 行 `verus-proof-check.py tool-versions $COPY` 被重型闸拒 | 攻方报告 L1-e 判误拒没打中；那一处是子命令后面跟变量、闸按「认不出就算干活」拒，方向安全，记账 |
 
 ## 二、逐格判决

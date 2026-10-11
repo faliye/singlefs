@@ -213,7 +213,7 @@ ZeroesWritten：崩溃之后重开 steps 20 txg 32 .. 51 names {'["I-3.1"]'} dif
 
 ## 要主 agent 跑的命令
 
-1. 带一次覆盖写的层 0（分得出臂的那一段，`closed_form_state_count` 16797718，超过子 agent 每段 10⁶ 的上限）：工作目录 `rerun.sh setup` 建的草稿目录，命令 `OPUS_SEED=7 OPUS_PLANS=400 OPUS_STEPS=1 OPUS_L0_MAX_STATES=20000000 OPUS_R3_ARM=<空或 reread_only> bash research/scripts/run-with-memory-cap.sh 4G bash research/scripts/capped.sh 31 <草稿目录>/tree/target/release/opus-r3-attack l0 ab-384-3-5 f-d1-allE-reread-A0/3-Z`；按 1.5 的速度约 0.004–0.007 秒一态，估 20–35 小时一臂（推的）。看 `OPUS3-L0-TALLY` 那一行的 `checker_violated`：重读臂该有 I-7.4、按槽并臂该是空。
+1. 带一次覆盖写的层 0（分得出臂的那一段，`closed_form_state_count` 16797718，超过子 agent 每段 10⁶ 的上限）：工作目录 `rerun.sh setup` 建的草稿目录，命令 `OPUS_SEED=7 OPUS_PLANS=400 OPUS_STEPS=1 OPUS_L0_MAX_STATES=20000000 OPUS_R3_ARM=<空或 reread_only> bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 31 <草稿目录>/tree/target/release/opus-r3-attack l0 ab-384-3-5 f-d1-allE-reread-A0/3-Z`；按 1.5 的速度约 0.004–0.007 秒一态，估 20–35 小时一臂（推的）。看 `OPUS3-L0-TALLY` 那一行的 `checker_violated`：重读臂该有 I-7.4、按槽并臂该是空。
 2. 整套复跑：`rerun.sh setup`、`list` 列的 23 个阶段逐个 `run`、`compare`，末行「比了 23 份，0 份不同」。
 
 ## 没做什么

@@ -72,7 +72,7 @@
 
 ## 二、被测条款与它引的定义
 
-被测条款是 D13（验证路线） 已定项 4（崩溃状态集合的定义：段模型）与已定项 7（记录核对器的入参含持久集合）。以下由 `research/scripts/quote-kb.py` 整段抄进 `/tmp/claude-1000/e161-r2-design/section2-quote.md`、回读逐字节一致之后原样追加（四段：D13 索引表第 4、7 行，已定项 4、已定项 7 两小节；`@标题` 取，索引表两行用 `~正则` 取整行）。第 1 次另抄的里程碑三第一、五两项是第 1 次问题单（G1–G5）的背景，这一次的问题单四行不问它们，不抄。
+被测条款是 D13（验证路线） 已定项 4（崩溃状态集合的定义：段模型）与已定项 7（记录核对器的入参含持久集合）。以下由 `scripts/quote-kb.py` 整段抄进 `/tmp/claude-1000/e161-r2-design/section2-quote.md`、回读逐字节一致之后原样追加（四段：D13 索引表第 4、7 行，已定项 4、已定项 7 两小节；`@标题` 取，索引表两行用 `~正则` 取整行）。第 1 次另抄的里程碑三第一、五两项是第 1 次问题单（G1–G5）的背景，这一次的问题单四行不问它们，不抄。
 
 **出处 `.claude/kb/decisions/13-验证路线.md:12-12`（整段抄，未转述）**
 
@@ -149,7 +149,7 @@
 | 装置：可行性档 | `:5321` `run_feasibility`；`:5324` config 行写 `domain=first_small_37+quick_54_84+strided_segment_heads_4096`；`:5359` 字段 `first_nine_segments_identical`；`:5543` 判决行 | 锚点对不上时它照样往下评每个域（`anchors_hold` 只进判决行与退出码），域变大时没有先停的一步 |
 | 装置：内联测试（13 条，`grep -c '#\[test\]'` 现数） | `:5573-5609` 共用的 `evaluate_the_first_stream_small_domain`（先评、不先核域大小）；`:5626` A2（`:5634` 比 `:3918`）；`:5663` A4（`:5679-5683` 钉 37、`:5684` 钉 65 338、`:5689` 钉 54）；`:5697` `:5699` 钉 37、`:5707` 钉 file_read 12；`:5744` 注释 37；`:5773` PC3 缩小版（`:5786` `37 * 2 ms`）；`:5825` S3/S4 对拍 | 调查报告第一节：今天主工作区两条 `FAILED`（A2、A4），其余用 D1-small 的 6 条在 32G 撞顶（`.../checker-tier-quick-early-tests.log` 第 1017、1018、1025 行，这一次没现查日志） |
 | 变异表 | `crates/mutations.tsv` 第 1202–1213 行，12 条 `E161 crash_state_dedup …（M1–M12）`（行号随别的会话的改动会移，跑时按名字现查） | 这份文件工作区有别的会话暂存与未暂存的改动（`git diff --cached --stat` 210 行增删、`git diff --stat` +14），改它要与那些会话协商 |
-| 复跑驱动 | `research/scripts/replay.sh:216` 登记 `E161|@driver_e161_feasibility||e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out|timing`；`:561-562` 驱动（`E161_THREADS=10`、`$REPLAY_MEMORY_CAP`，默认 `:26` 8G） | 新产物落盘之后，第 216 行的产物名要换成新产物 |
+| 复跑驱动 | `scripts/replay.sh:216` 登记 `E161|@driver_e161_feasibility||e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out|timing`；`:561-562` 驱动（`E161_THREADS=10`、`$REPLAY_MEMORY_CAP`，默认 `:26` 8G） | 新产物落盘之后，第 216 行的产物名要换成新产物 |
 | 工作区里未提交、与这次有关的 crates 改动 | e161 装置 `:2091-2092`（暂存）：`NotApplicable(_) \| PartiallyJudged(_)` 计进不适用；`crates/singlefs-checker/src/image.rs:39` 新增 `InvariantVerdict::PartiallyJudged(String)`（`git diff HEAD --stat` 该文件 +29/−3）、`crates/singlefs-checker-tier/src/crash.rs`（+9/−3） | 第 1 次产物之后 checker 多了一种判定。行 3 若有格翻面，分不开是域变了、这处改动，还是别的改动（第十节 F3 写明怎么记） |
 
 ## 四、跑之前已经存在的数
@@ -163,7 +163,7 @@
 | 4.3 | 我算的这一次的域与锚点：第一条流 D1-small 45、D1-stride 每大段 7 260、D1-quick 46、段头 4 096；第二条流取样段 11–26 逐段 `[16777215,3,1,8,8,262143,3,1,8,65535,3,1,8,65535,3,1]`、和 17 170 476、按发布 `[16777219, 262163, 65547, 65547]`、D1-small 393 261、D1-quick 52；W 49 与 527；整条第二条流最大一段 268 435 455 | 第十三节 `anchors_r2.py` | 进第七节 A2–A9。行 2 的「域的状态数算出来、写死」在设计时已经做完，跑的时候只核装置算出来的与它相同（Q2a） |
 | 4.4 | 两种读法在今天两条流上给同一个域；在第 1 次旧段形上都给回 37 与 1 441 821；把第二条流整条 78 段当取样段时两种分开（甲取 10 个大段，乙最大值并列、认不出）；甲的门槛取 19 与 24 都得 45，取 25、26 都得 16 777 260 | 第十三节 `anchors_r2_geometry.py` | 行 2 选哪种读法在今天的域上不改任何一格判据，所以两种都登记、文件头挂那一句。几何敏感性（第八节）用的就是这几格 |
 | 4.5 | 第 1 次可行性档：域是第一条流 D1-small 37、两条流 D1-quick 54 + 84、两个 26 写段各段头 4 096；装置 13 条单测全绿；产物 171 行、收尾 `name=done emitted=171`、退出码 0；10 线程约 3 分钟、复跑上限 16G | 第 1 次登记 12.2 F1（第 472 行）；实验页开头一段、「这一段做了什么」「复跑」两节（读了这三处） | 13 条单测与 171 行只当行 4、行 3 的对照形状，不进门槛；3 分钟用来定限时（5.8） |
-| 4.6 | 内存峰值（`research/scripts/memory-peaks.tsv`，只在本机成立）：第 1 次 `feasibility` 1 690 304 512 与 1 814 036 480 字节（上限 16G、8G）；第 1 次 13 条单测整跑（`singlefs-harness` 包、10 线程）8 688 500 736 字节；10-04 `cargo test --release --no-fail-fast -p singlefs-checker-tier --bin e156_… --bin e161_…` 记成上限 34 359 738 368（32G 撞顶）；09-29 只跑两条 3 351 248 896 | `grep -n 'e161' research/scripts/memory-peaks.tsv` 第 6211、6246、6252–6256、6894、7623、7673 行 | 定 5.8 每条命令的内存上限 |
+| 4.6 | 内存峰值（`scripts/memory-peaks.tsv`，只在本机成立）：第 1 次 `feasibility` 1 690 304 512 与 1 814 036 480 字节（上限 16G、8G）；第 1 次 13 条单测整跑（`singlefs-harness` 包、10 线程）8 688 500 736 字节；10-04 `cargo test --release --no-fail-fast -p singlefs-checker-tier --bin e156_… --bin e161_…` 记成上限 34 359 738 368（32G 撞顶）；09-29 只跑两条 3 351 248 896 | `grep -n 'e161' scripts/memory-peaks.tsv` 第 6211、6246、6252–6256、6894、7623、7673 行 | 定 5.8 每条命令的内存上限 |
 | 4.7 | `layer0` 段内单元子集：第一条流段 7 的 24 次单元写全是两态（m = 0），第二条流段 11 同 | `anchors_r2.py` 认 m；crates `in_place_overwrite_torn_state_count.rs` 钉 `("unit_write", 24, 0)`（第三节） | 段头 4 096 = 2¹² 正好是段里前 12 次单元写的全部子集、后 12 次都没落。第 1 次的段头（26 写段，最低两位是三态的系统配置槽写）每 9 个序号走一遍两次轮换的组合，这一次段头里没有系统配置槽撕裂态（它们今天在 D1-small 的段 6）。这是行 3 的段头那几格内容变了的已知原因，第十节 F3 写明怎么记 |
 | 4.8 | 128 位键撞车概率上界：这一次全部域合起来不同键至多 33 947 736 个，n² / 2¹²⁹ ≈ 1.7 × 10⁻²⁴ | 第十三节命令 | 同第 1 次 7.3 最后一条：内容 hash 不靠这个界，逐字节核（V2） |
 
@@ -242,7 +242,7 @@ G1–G5 的臂同第 1 次 5.2（第 193–207 行），这一次不判 G 行（
 |---|---|---|---|---|
 | 第一段 | 实现员 | 5.6 的 I-1 到 I-12；文件头那一句删掉之前不开工 | 都不直接补；是第二、三段的前提 | — |
 | 第二段 | 主 agent | 5.8 的 C1、C2（内联测试） | 行 4 的内联测试那一半；行 2 的「内联测试跑得完」与 A4 域大小；行 1 的「crates = 公式 = 锚点」11 段（A2 那条测试里段 7 不逐个数，`segment_count_checks_up_to` 的上限 2²⁰） | 行 4 内联那一半够判；行 1、行 2 不够（段 7 没逐个数、可行性档没跑） |
-| 第三段 | 主 agent 跑 C3，执行员落产物与比对 | 5.8 的 C3；执行员把产物落进 `research/results/`、照第六节 Q1–Q3 判、照 PCr3 先证比对脚本会红、写实验页、把 `research/scripts/replay.sh:216` 的产物名换成新产物（执行员写范围之外的由主 agent 定谁改） | 行 1 全部（段 7 在可行性档里逐个数）、行 2 全部、行 3 全部 | 三行都够判 |
+| 第三段 | 主 agent 跑 C3，执行员落产物与比对 | 5.8 的 C3；执行员把产物落进 `research/results/`、照第六节 Q1–Q3 判、照 PCr3 先证比对脚本会红、写实验页、把 `scripts/replay.sh:216` 的产物名换成新产物（执行员写范围之外的由主 agent 定谁改） | 行 1 全部（段 7 在可行性档里逐个数）、行 2 全部、行 3 全部 | 三行都够判 |
 | 第四段 | 主 agent 提交时 | 5.8 的 C4 | 行 4 的变异那一半 | 够判 |
 | 附带 | 主 agent | 5.8 的 C3b（线程数 1） | 行 3：只在 Q3 有翻面格时跑，用来排除线程数造成的翻面 | 够判后不跑 |
 
@@ -253,8 +253,8 @@ G1–G5 的臂同第 1 次 5.2（第 193–207 行），这一次不判 G 行（
 | # | 命令 | 内存上限与理由 | 限时 | 线程 | 跑完看哪几行 |
 |---|---|---|---|---|---|
 | C1 | `nice -n 19 cargo build --release -p singlefs-checker-tier --bin e161_crash_state_dedup_and_time_split` | 不跑编出来的代码，不经包装 | — | cargo 默认 | 退出码 0 |
-| C2 | `{ SINGLEFS_HEAVY_TESTS=commit RUN_WITH_MEMORY_CAP_TIME_LIMIT=1800 nice -n 19 bash research/scripts/run-with-memory-cap.sh 12G cargo test --release -p singlefs-checker-tier --bin e161_crash_state_dedup_and_time_split -- --test-threads=4; echo "exit=$?"; } > <草稿目录>/e161-r2-c2-inline-tests.log 2>&1` | 12G：第四节 4.6 第 1 次同一批 13 条整跑的实测峰值 8 688 500 736 字节（含编译的页缓存）的约 1.4 倍；这一次每条评 45 个状态（第 1 次 37），新加的 I-10 不评状态。包装若以「超过实测峰值 2 倍」退 251，照它报的 auto 值改，不设放宽的理由 | 1800 秒（含编译） | `--test-threads=4`，装置测试里自带的线程数 1、2 | `exit=` 那一行；`test result:` 那一行（passed 数等于 `grep -c '#\[test\]'` 现数、failed 0、ignored 0）；有 `panicked at` 的连同后面三行 |
-| C3 | `{ set -o pipefail; E161_THREADS=10 SINGLEFS_HEAVY_TESTS=commit RUN_WITH_MEMORY_CAP_TIME_LIMIT=1800 nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G cargo run -q --release -p singlefs-checker-tier --bin e161_crash_state_dedup_and_time_split -- feasibility \| grep '^E7RESULT ' > research/results/e161-crash-state-dedup-and-time-split-feasibility-r2-<日期>.out; echo "exit=${PIPESTATUS[0]}"; } 2> <草稿目录>/e161-r2-c3-feasibility.err` | 8G：4.6 第 1 次 `feasibility` 实测峰值 1 814 036 480 字节；这一次域与第 1 次同量级（45 + 46 + 52 + 2 × 4 096 + PC3 的 7 × 1 000），A1 逐个数的位图从 2²⁸ 位降到 2²⁴ 位；8G 是 `replay.sh` 复跑同一驱动的默认上限（`:26`），取同一个数让复跑与这一次同条件。退 251 同 C2 办 | 1800 秒（第 1 次 10 线程约 3 分钟） | `E161_THREADS=10`（同 `replay.sh:562`） | `exit=` 那一行（stderr 文件里）；产物行数等于 `name=done emitted=` 的数；`name=verdict` 一行；`name=anchor_segment stream=first` 11 行；`name=anchor_stream` 两行 |
+| C2 | `{ SINGLEFS_HEAVY_TESTS=commit RUN_WITH_MEMORY_CAP_TIME_LIMIT=1800 nice -n 19 bash scripts/run-with-memory-cap.sh 12G cargo test --release -p singlefs-checker-tier --bin e161_crash_state_dedup_and_time_split -- --test-threads=4; echo "exit=$?"; } > <草稿目录>/e161-r2-c2-inline-tests.log 2>&1` | 12G：第四节 4.6 第 1 次同一批 13 条整跑的实测峰值 8 688 500 736 字节（含编译的页缓存）的约 1.4 倍；这一次每条评 45 个状态（第 1 次 37），新加的 I-10 不评状态。包装若以「超过实测峰值 2 倍」退 251，照它报的 auto 值改，不设放宽的理由 | 1800 秒（含编译） | `--test-threads=4`，装置测试里自带的线程数 1、2 | `exit=` 那一行；`test result:` 那一行（passed 数等于 `grep -c '#\[test\]'` 现数、failed 0、ignored 0）；有 `panicked at` 的连同后面三行 |
+| C3 | `{ set -o pipefail; E161_THREADS=10 SINGLEFS_HEAVY_TESTS=commit RUN_WITH_MEMORY_CAP_TIME_LIMIT=1800 nice -n 19 bash scripts/run-with-memory-cap.sh 8G cargo run -q --release -p singlefs-checker-tier --bin e161_crash_state_dedup_and_time_split -- feasibility \| grep '^E7RESULT ' > research/results/e161-crash-state-dedup-and-time-split-feasibility-r2-<日期>.out; echo "exit=${PIPESTATUS[0]}"; } 2> <草稿目录>/e161-r2-c3-feasibility.err` | 8G：4.6 第 1 次 `feasibility` 实测峰值 1 814 036 480 字节；这一次域与第 1 次同量级（45 + 46 + 52 + 2 × 4 096 + PC3 的 7 × 1 000），A1 逐个数的位图从 2²⁸ 位降到 2²⁴ 位；8G 是 `replay.sh` 复跑同一驱动的默认上限（`:26`），取同一个数让复跑与这一次同条件。退 251 同 C2 办 | 1800 秒（第 1 次 10 线程约 3 分钟） | `E161_THREADS=10`（同 `replay.sh:562`） | `exit=` 那一行（stderr 文件里）；产物行数等于 `name=done emitted=` 的数；`name=verdict` 一行；`name=anchor_segment stream=first` 11 行；`name=anchor_stream` 两行 |
 | C3b（附带，够判后不跑） | 同 C3，`E161_THREADS=1`、`RUN_WITH_MEMORY_CAP_TIME_LIMIT=7200`，产物写 `…-feasibility-r2-threads1-<日期>.out` | 8G，同 C3 | 7200 秒（按 C3 的 10 倍） | 1 | 与 C3 产物去掉计时字段（名字以 `_elapsed_ns`、`_ratio` 结尾的，与 `replay.sh` 的 `timing` 比法同）之后逐行相同 |
 | C4 | 提交时照 `.claude/skills/crash-test/commit-stages.md` 跑 `checker-tier-crates-mutation-replay`（它逐条经包装，外面不再包） | 阶段自己的上限 | 阶段自己的 | 阶段自己的 | 阶段日志里变异名以 `E161 crash_state_dedup` 起头的每一行：抓到、无效、没红三栏按 `.claude/rules/mutation-sampling.md`「改了一个格式常量之后，要看「无效」那一栏有没有变多」那一节分开数 |
 
@@ -280,7 +280,7 @@ G1–G5 的臂同第 1 次 5.2（第 193–207 行），这一次不判 G 行（
 | 量 | 怎么算 | 门槛 | 判定 | 对应的行与翻面取值 |
 |---|---|---|---|---|
 | Q2a 域大小 | C3 产物 `name=anchor_stream` 两行的 `d1_small`、`d1_stride`、`d1_quick`、`d1_heads` 与对应的 `*_match`；C2 里 A4 那条与 I-10 那条测试 | 第七节 A4：第一条流 45、7 260、46、4 096；第二条流 393 261、7 260、52、4 096 | 全等记「域写死且装置算得对」；不等走第十一节 V8 或 S3（谁和 crates 一致见那两条） | 行 2 够判条件「域的状态数算出来、写死」 |
-| Q2b 跑得完 | C2、C3 各自的包装退出码；跑完后 `research/scripts/memory-peaks.tsv` 里这条命令的峰值行；C3 的挂钟由主 agent 记（只当参考，不进判定） | 退出码不是 250、253 | 是 250 或 253：记「跑不完」，那一条命令点名的是哪一段（C2 看最后一条在跑的测试名，C3 看产物最后一行），走停机条款 S8 | 行 2 翻面观测一「重定后的域在本机内存上限里跑不完」：两种读法域相同，一起翻 |
+| Q2b 跑得完 | C2、C3 各自的包装退出码；跑完后 `scripts/memory-peaks.tsv` 里这条命令的峰值行；C3 的挂钟由主 agent 记（只当参考，不进判定） | 退出码不是 250、253 | 是 250 或 253：记「跑不完」，那一条命令点名的是哪一段（C2 看最后一条在跑的测试名，C3 看产物最后一行），走停机条款 S8 | 行 2 翻面观测一「重定后的域在本机内存上限里跑不完」：两种读法域相同，一起翻 |
 | Q2c 没有对象的判据格数 | 逐格核下面九样，数「没有对象」的格：① 五个格（`first_small`、`first_quick`、`first_segment_head`、`second_quick`、`second_segment_head`）的 `name=g1` 行 `states` 各等于 45、46、4 096、52、4 096；② `positive_control_refeed` 的 `refed_state_unit_positions` > 0；③ `first_small` 的 `name=reuse_arm` 里 `arm=k2_consult` 的 `distinct_outcomes` ≥ 2（PC2b 的对象：读出文件与没有文件两种结局都在）；④ 五个格里至少一格 `arm=k4_full` 的 `distinct_outcomes` ≥ 2（PC4b 的对象）；⑤ `positive_control_timing` 六行 `states=1000` 且 `pc3_segment_holds=true`；⑥ `stop_clause_crates` 三格的 `compared_states` > 0（逐个是否相同归 S3 判，这里只问有没有对象）、`stop_clause_crates_per_state` 两格 `states=4096`；⑦ `stop_clause_determinism` 两行 `control_states` > 0；⑧ `positive_control_remove_one_position` 每行 `positions` > 0；⑨ `positive_control_device_memory` 两行都在 | 钉绝对值：= 0 | = 0 记「每格有对象」；≥ 1 逐格列，记「这几格失去对象」 | 行 2 翻面观测二「某个候选让第 1 次登记里某一格判据失去对象」：两种读法域相同，一起翻 |
 | Q2d 读法甲乙给的域是否相同 | 第十三节 `anchors_r2.py` 已算（`A==B first True second True`）；装置只实现选定的一种，不另跑 | — | 报数 | 行 2：说明两种读法在判据上不可分，交主 agent 按 1.4 的区别删一种 |
 
@@ -468,18 +468,18 @@ F3 用的已知差别表（设计时按第五节 5.5 与第四节 4.7 写，跑�
 | `crates/singlefs-checker/src/image.rs` | grep 39、261、283 |
 | `crates/mutations.tsv` | 1–5；`e161` grep 1202–1213（每行截前 400 字） |
 | `.claude/kb/decisions/13-验证路线.md` | 标题 grep（1、5、25、74、88、121、137、154、183、202、226、260、290、325、341、362、381、394）；12、15 两行的 grep；123、133、134；quote-kb 抄的 12、15、121–136、183–201 |
-| `research/scripts/mutate.sh` | 1–60（去空行） |
+| `scripts/mutate.sh` | 1–60（去空行） |
 | `.claude/gate.d/checker-tier-crates-mutation-replay.sh` | grep 命中 18、32、53、55、63、66、70、72、81、82、152、171、175、177、190、194、219、233、241 |
 | `.claude/skills/crash-test/commit-stages.md` | `crates-mutation-replay` grep 命中 3、19、20、22、23、36、40 |
 | `.claude/hooks/heavy-test-guard.sh` | 1–80 里 `run`、`bin`、`checker-tier` 的命中行 |
-| `research/scripts/run-with-memory-cap.sh` | 1–40 里退出码、上限的命中行；71–80；grep 25、84、85、93、119、145、187、188、191、249、645、653 |
-| `research/scripts/memory-peaks.tsv` | 1–8；`e161` grep 6211、6246、6252–6256、6894、7623、7673 |
-| `research/scripts/replay.sh` | grep 25、26、216、468、513、514、558、561、562 |
-| `research/scripts/quote-kb.py` | `--help` 前 20 行 |
-| `research/scripts/replace-once.py` | 1–30 |
+| `scripts/run-with-memory-cap.sh` | 1–40 里退出码、上限的命中行；71–80；grep 25、84、85、93、119、145、187、188、191、249、645、653 |
+| `scripts/memory-peaks.tsv` | 1–8；`e161` grep 6211、6246、6252–6256、6894、7623、7673 |
+| `scripts/replay.sh` | grep 25、26、216、468、513、514、558、561、562 |
+| `scripts/quote-kb.py` | `--help` 前 20 行 |
+| `scripts/replace-once.py` | 1–30 |
 | `research/results/` | 只 `ls \| grep -i e161`（文件名），没读内容 |
 
-没读：第 1 次产物与 `research/results/` 下任何内容、实验页的结果与结论各节、`.claude/kb/experiments.md`、`.claude/kb/experiments-history.md`、`records/`、`.claude/kb/decisions-history.md`、`research/perf-by-milestone.md`、调查报告点名的那几份 `/tmp` 日志原件。
+没读：第 1 次产物与 `research/results/` 下任何内容、实验页的结果与结论各节、`.claude/kb/experiments.md`、`.claude/kb/experiments-history.md`、`records/`、`.claude/kb/decisions-history.md`、`scripts/perf-by-milestone.md`、调查报告点名的那几份 `/tmp` 日志原件。
 
 ### 13.2 跑过的命令（原样）与算术的原样输出
 
@@ -491,8 +491,8 @@ grep -n '^#' ".claude/kb/experiments/161-崩溃放量的去重与分段耗时.md
 grep -n '^const\|^static\|^pub const\|^    const\|^fn \|^pub fn\|^mod \|^struct\|^enum\|^impl\|#\[test\]\|^    fn \|#\[path\|^use ' $F
 ls crates/singlefs-checker-tier/tests/; grep -n '2, 2, 1, 2, 2, 1' crates/singlefs-checker-tier/tests/*.rs crates/singlefs-harness/tests/*.rs
 grep -rn '14_960_689_284\|14960689284\|16_777_260\|16_777_215\|268_435_455\|file_read_states\|no_file_states' crates/ --include=*.rs | grep -v 'e161_'
-grep -n 'e161' crates/mutations.tsv; grep -n 'e161\|E161' research/scripts/replay.sh; grep -n 'e161' research/scripts/memory-peaks.tsv
-git diff --cached --stat -- $F crates/mutations.tsv research/scripts/replay.sh; git diff --stat -- $F crates/mutations.tsv; git diff --cached -- $F | head -20
+grep -n 'e161' crates/mutations.tsv; grep -n 'e161\|E161' scripts/replay.sh; grep -n 'e161' scripts/memory-peaks.tsv
+git diff --cached --stat -- $F crates/mutations.tsv scripts/replay.sh; git diff --stat -- $F crates/mutations.tsv; git diff --cached -- $F | head -20
 git diff HEAD --numstat -- crates/singlefs-checker/src/image.rs crates/singlefs-checker-tier/src/crash.rs; git log --oneline -1 c3540c02; git log -1 --format='%h %ad' --date=short b970d824
 git rev-parse --short HEAD          # 31e47115
 sha256sum research/prompts/e161-preregistration.md research/prompts/e161-r2-questions.md /tmp/claude-1000/m3-5-7-e161/report.md
@@ -506,10 +506,10 @@ TZ=Asia/Tokyo date +%F              # 2026-10-05
 mkdir -p /tmp/claude-1000/e161-r2-design
 set -o noclobber; cat > research/prompts/e161-r2-prereg.md <<'EOF2'   # 排他新建，之后 >> 分段追加
 sed -n '7,12p' research/prompts/e161-r2-questions.md >> research/prompts/e161-r2-prereg.md
-nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e161-r2-design/section2-quote.md '.claude/kb/decisions/13-验证路线.md~^\| 4 \| \*\*崩溃点重放' '.claude/kb/decisions/13-验证路线.md~^\| 7 \| \*\*O2' '.claude/kb/decisions/13-验证路线.md@#### 已定项 4：崩溃点重放只枚举整写子集' '.claude/kb/decisions/13-验证路线.md@#### 已定项 7：O2（独立解析器 + checker） 判的是**一个**镜像'
+nice -n 19 python3 scripts/quote-kb.py /tmp/claude-1000/e161-r2-design/section2-quote.md '.claude/kb/decisions/13-验证路线.md~^\| 4 \| \*\*崩溃点重放' '.claude/kb/decisions/13-验证路线.md~^\| 7 \| \*\*O2' '.claude/kb/decisions/13-验证路线.md@#### 已定项 4：崩溃点重放只枚举整写子集' '.claude/kb/decisions/13-验证路线.md@#### 已定项 7：O2（独立解析器 + checker） 判的是**一个**镜像'
 #   ✓ 4 段整抄进 /tmp/claude-1000/e161-r2-design/section2-quote.md，回读逐字节一致
 cat /tmp/claude-1000/e161-r2-design/section2-quote.md >> research/prompts/e161-r2-prereg.md
-nice -n 19 python3 research/scripts/replace-once.py research/prompts/e161-r2-prereg.md <旧串> <新串>   # 写登记时的定点修正（行号出处、节号互指、臂名的字面），都在装置改动与产物之前
+nice -n 19 python3 scripts/replace-once.py research/prompts/e161-r2-prereg.md <旧串> <新串>   # 写登记时的定点修正（行号出处、节号互指、臂名的字面），都在装置改动与产物之前
 nice -n 19 python3 anchors_r2.py ; nice -n 19 python3 anchors_r2_geometry.py   # 在草稿目录里跑
 python3 -c "n=17170476+16777260; print('max distinct keys', n, 'bound', n*n/2**129)"   # max distinct keys 33947736 bound 1.6933712874306195e-24
 ```

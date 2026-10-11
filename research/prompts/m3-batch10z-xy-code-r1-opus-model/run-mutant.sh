@@ -8,8 +8,8 @@ ROOT=/home/fy5090/code/singlefs
 MODEL=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 FROZEN=$HOME/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree
 phase=${1:?}; mutant=${2:?}; WORK=${3:?}
-CAP=$ROOT/research/scripts/run-with-memory-cap.sh
-THREADS=$ROOT/research/scripts/capped.sh
+CAP=$ROOT/scripts/run-with-memory-cap.sh
+THREADS=$ROOT/scripts/capped.sh
 OUT=$WORK/runs; mkdir -p "$OUT"
 tag=${mutant//:/-}
 export CARGO_TARGET_DIR=$WORK/target-mut

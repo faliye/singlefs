@@ -178,9 +178,9 @@ $ grep -nE 'ConfirmedLossShapes \{|export_prepared_stream\(|piece_panic_control_
 - U15 的态数 = 末段各写取法数之积加全持久态：因为 `first_ordinal + product == state_count`，全持久态就是区间最后一个，集合大小就是积（用例用 `BTreeSet` 去了重）；U16 的 `classification.judged_ordinals(&digits).len()` 与装置调 `export_prepared_stream(…ListedStatesKeepingTheConsultedReports(judged)…)` 用的是同一个表达式。
 - **复跑不了**：U10–U16 与 V32–V36 都是 checker 档装置内联用例，派发不跑；上面都是读码 + 已有用例钉的数，写「推的」。**推翻 U13 / U14 的现象：** 提交时这两条用例的 `unattributed_panic_states=` 不是 144（例如对拍流上有别的真 panic，31-2 报告第 6 节末也写了）。
 
-**4.4 `p6-on-dbef78ed.patch` 打出来的那份与仓里那份之差。** 登记要求之差恰好第 29 批那 4 行：「即两份装置恰好只差第 29 批那 4 行」（`research/prompts/e171-r1-prereg.md:1204`）。我没用 31-2 的草稿件，独立取料复核（`out/n4-p6.txt`，`rerun.sh <草稿> static`）：Q5 树那份取自 `research/target/e171-r1-frozen-tree-revision-5-q5/…`，旧基底取自 31-2 的 `device-945e41c8.rs`（`git hash-object` = `6bfee63…`，与 `crates.patch` 的 `index 6bfee63..3dd188c` 的左端相同，冻结副本里那份 = `3dd188c…`）。原样：
+**4.4 `p6-on-dbef78ed.patch` 打出来的那份与仓里那份之差。** 登记要求之差恰好第 29 批那 4 行：「即两份装置恰好只差第 29 批那 4 行」（`research/prompts/e171-r1-prereg.md:1204`）。我没用 31-2 的草稿件，独立取料复核（`out/n4-p6.txt`，`rerun.sh <草稿> static`）：Q5 树那份取自 `scripts/experiments/target/e171-r1-frozen-tree-revision-5-q5/…`，旧基底取自 31-2 的 `device-945e41c8.rs`（`git hash-object` = `6bfee63…`，与 `crates.patch` 的 `index 6bfee63..3dd188c` 的左端相同，冻结副本里那份 = `3dd188c…`）。原样：
 ```
-945e41c8…  device-945e41c8.rs        dbef78ed…  research/target/e171-r1-frozen-tree-revision-5-q5/…        cc736772…  冻结副本里的那份
+945e41c8…  device-945e41c8.rs        dbef78ed…  scripts/experiments/target/e171-r1-frozen-tree-revision-5-q5/…        cc736772…  冻结副本里的那份
 patching file …/q5-plus-p6.rs (read from …/q5.rs)           （patch --fuzz=0，无偏移、无模糊）
 2c933e21…  q5-plus-p6.rs
 --- diff q5+p6 对仓里那份
@@ -194,7 +194,7 @@ patching file …/q5-plus-p6.rs (read from …/q5.rs)           （patch --fuzz=
 ```
 即 P6 在 Q5 树上无模糊打上、与仓里那份只差那 4 行；两份补丁的内容相同、只是行号头不同；hunk 数 20 与 31-2 报告第 4 节那张表的行数相同。
 
-**4.5 旁注（不属于本格）：** 磁盘上已有 `research/target/e171-r1-frozen-tree-revision-6/`，它的装置与 P6 结果相比只有 14 行 `diff`，全在流三本地常量与注释（`LOCAL_THIRD_STREAM_WRITES` 6000 → 5980、`…FULL_STATES` 441 453 147 → 362 809 947、`…TWO_STATE_CLOSED_FORM` 441 451 942 → 362 808 742，及段长表几个 24 → 20）：这正是登记 6.2 第 2 条「流三本地常量重取」的形状；我没核它与修订 6 的关系，也没核那几个数。
+**4.5 旁注（不属于本格）：** 磁盘上已有 `scripts/experiments/target/e171-r1-frozen-tree-revision-6/`，它的装置与 P6 结果相比只有 14 行 `diff`，全在流三本地常量与注释（`LOCAL_THIRD_STREAM_WRITES` 6000 → 5980、`…FULL_STATES` 441 453 147 → 362 809 947、`…TWO_STATE_CLOSED_FORM` 441 451 942 → 362 808 742，及段长表几个 24 → 20）：这正是登记 6.2 第 2 条「流三本地常量重取」的形状；我没核它与修订 6 的关系，也没核那几个数。
 
 ## N5　变异行
 
@@ -237,12 +237,12 @@ ROW 570 抓到(红) rc=101 compile_error=False :: 增补 3 第 2 件（…攻方
 - harness 档只跑了 13 个二进制 + 草稿副本上的 5 种变异 + 4 个探针；其余 146 个二进制没量（负载高、前台 240 秒），主 agent 合入验证里的 165 个全绿只说明没红。
 - D3 已定项 7 我只引了第 131 行那一条，没把整节从头读完；D16 已定项 1 整节读过；背景材料里的 kb 附录没整份读，kb 条款都去 kb 文件里现查行号。
 - 31-3 报告第 4 节「旧 E171 s4 表第 95 行结局会变」我只核了读码上的机理（`allocator.rs:2037` 的早退），没复跑。
-- 磁盘上的 `research/target/e171-r1-frozen-tree-revision-6/` 装置与 P6 结果的 14 行差异（N4 4.5）只看了差异，没核它与登记第 6.2 节第 2 条的关系。
+- 磁盘上的 `scripts/experiments/target/e171-r1-frozen-tree-revision-6/` 装置与 P6 结果的 14 行差异（N4 4.5）只看了差异，没核它与登记第 6.2 节第 2 条的关系。
 - 草稿目录处置：交回前删掉 `/tmp/claude-1000/m3-formal-code-b31-r1-sonnet/tree/`（含它的 `target/`）与 `/tmp/claude-1000/m3-formal-code-b31-r1-sonnet/rerun-draft/`（含 `tree/`）；留着只有文本的日志：`/tmp/claude-1000/m3-formal-code-b31-r1-sonnet/runs3/` 与 `build*.log`，原样输出已进 `research/prompts/m3-formal-code-b31-r1-sonnet-model/out/`。
 
 ## cite-check 末行
 
-命令：`python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b31-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b31-r1/tree --root . --background research/prompts/_m3-formal-code-b31-r1-background.md`
+命令：`python3 scripts/cite-check.py research/prompts/m3-formal-code-b31-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b31-r1/tree --root . --background research/prompts/_m3-formal-code-b31-r1-background.md`
 
 ```
   ✓ 核了 74 处引文，对上 74 处，没判 0 处（逐处列在上面）

@@ -9,7 +9,7 @@
 ## 零、方法与不作数的东西
 
 - 全部是 harness 档：`cargo test -p singlefs-harness`（`--lib`、`--test …`）。每份副本自己的 `CARGO_TARGET_DIR=…/work/target`；每一趟编完核日志里被测包确有 `Compiling`（`tools/lib.sh` 的 `cg` 每段末尾打 `compiled:` 行；变异跑的日志里 `Compiling singlefs-checker`、`singlefs-core` 或 `singlefs-harness` 都在）。没有 `Compiling` 的趟不算：变异趟都有；仅有的无 `Compiling` 的两趟（`probe-p4-base-all`、`base-reuse-one`）是同一份源码上紧接着重跑已编好的二进制，不是变异趟。
-- cargo 与编出来的二进制都经 `research/scripts/run-with-memory-cap.sh` 加 `research/scripts/capped.sh`（10 线程，扫整个套件时 3 个并行 × 3 线程），设了 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`。包装退 252（排不上）的那一遍扫描（124 个二进制）输出不算结果，没绕开包装，改成 3G 上限重跑到全部有结果。
+- cargo 与编出来的二进制都经 `scripts/run-with-memory-cap.sh` 加 `scripts/capped.sh`（10 线程，扫整个套件时 3 个并行 × 3 线程），设了 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`。包装退 252（排不上）的那一遍扫描（124 个二进制）输出不算结果，没绕开包装，改成 3G 上限重跑到全部有结果。
 - checker 档一律没跑：`singlefs-checker-tier` 的测试与装置内联单测、GPU 对拍、E156 装置、层 0、`crates/mutations.tsv` 整表。涉及它们的结论写「推的」。
 - 33-b 那条 checker 档用例的造法，我把用例文件拷成 harness 档的探针（`probes/make_probe_rollback_floor.py`：删掉唯一的 `singlefs_checker_tier` 的 use 与最后一条用到它的用例，其余原样），在 `singlefs-harness` 包里编、跑。这不是 checker 档包自己的测试二进制；它回答「新造法在今天的 core 上量到什么」，不回答「checker 档那条用例本身绿不绿」。
 - 冻结副本只有 `crates/` 与两份 Cargo 文件，几条用例读 `../../litmus`，我从主工作区拷了一份 `litmus/`（这一轮的改动不碰它）。
@@ -244,14 +244,14 @@ G5 的实现在 `crates/singlefs-checker-tier/src/crash_injection.rs:3451`：「
 
 旧行（HEAD 的 `crates/mutations.tsv` 第 38 行）改名为「步 4：回退候选集的 F 用目标根自己带的 F 而不是 F_生效」（今天在行 2796）；冻结副本里旧名一次也不在表里（`grep -nF '用最新根自己带的 F' crates/mutations.tsv` 零命中；`grep -nF '步 4：回退候选集' crates/mutations.tsv` 命中第 28 行「候选集不按实例表判」与第 2796 行新名）。旧行的替换文 `newest_root.rollback_floor` 在今天的 core 上编不过：我施加它后 `cargo build -p singlefs-core` 报
 `error[E0425]: cannot find value `newest_root` in this scope` / `--> crates/singlefs-core/src/mount.rs:6086:32`（`variants/old-row38-newest-root.spec`，日志 `work/log/var-old-row38-compile.log`），所以旧行本来就是编不过、等于没跑的（C427 那一形）；改名换替换文是对的。
-按旧名找它的地方（`grep -rnF '回退候选集的 F 用最新根自己带的 F' research/e7-index-bench research/scripts .claude crates` 原样输出两行）：
+按旧名找它的地方（`grep -rnF '回退候选集的 F 用最新根自己带的 F' scripts/experiments scripts .claude crates` 原样输出两行）：
 
 ```
-research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/bad-implementations-117.tsv:33:33	2	crates/singlefs-core/src/mount.rs	7	步 4：回退候选集的 F 用最新根自己带的 F 而不是 F_生效	b093430c0295
-research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad-implementations-117.tsv:33:33	2	crates/singlefs-core/src/mount.rs	7	步 4：回退候选集的 F 用最新根自己带的 F 而不是 F_生效	b093430c0295
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/bad-implementations-117.tsv:33:33	2	crates/singlefs-core/src/mount.rs	7	步 4：回退候选集的 F 用最新根自己带的 F 而不是 F_生效	b093430c0295
+scripts/experiments/e171_three_oracle_collusion/bad-implementations-117.tsv:33:33	2	crates/singlefs-core/src/mount.rs	7	步 4：回退候选集的 F 用最新根自己带的 F 而不是 F_生效	b093430c0295
 ```
 
-消费它的是 E171 的 `locate_by_name`：`research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad_implementation_table.py:116`：「hits = [row for row in table if row.name == selected.name]」，找不到返回 `STATUS_NOT_FOUND`（`research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad_implementation_table.py:118`：「return Located(STATUS_NOT_FOUND, None, False)」），文档写明「找不到、名字不唯一都不跑（补位）」（`:115`），`substitute_for`（`:158`）换同一文件组里下一个不在表里的行。结局：E171 重放会把这一行补位成别的行（第 33 行落到 `mount.rs` 组里的另一条），不是静默失效；但 E171 的「按名字在今天表里逐行核」（`comparator.py` 的 A4）会多报一行找不到，登记 `research/prompts/e171-preregistration.md:349` 的表与 kb 里「117 行」的口径要跟着解释。另外这次删一行让后面所有行号减一：判决与背景材料里的「第 721 行」「第 1377 行」今天是 720、1376（我在上面（c）按今天的号取的）。
+消费它的是 E171 的 `locate_by_name`：`scripts/experiments/e171_three_oracle_collusion/bad_implementation_table.py:116`：「hits = [row for row in table if row.name == selected.name]」，找不到返回 `STATUS_NOT_FOUND`（`scripts/experiments/e171_three_oracle_collusion/bad_implementation_table.py:118`：「return Located(STATUS_NOT_FOUND, None, False)」），文档写明「找不到、名字不唯一都不跑（补位）」（`:115`），`substitute_for`（`:158`）换同一文件组里下一个不在表里的行。结局：E171 重放会把这一行补位成别的行（第 33 行落到 `mount.rs` 组里的另一条），不是静默失效；但 E171 的「按名字在今天表里逐行核」（`comparator.py` 的 A4）会多报一行找不到，登记 `research/prompts/e171-preregistration.md:349` 的表与 kb 里「117 行」的口径要跟着解释。另外这次删一行让后面所有行号减一：判决与背景材料里的「第 721 行」「第 1377 行」今天是 720、1376（我在上面（c）按今天的号取的）。
 推翻条件：E171 的任一消费者找不到旧名时报的不是补位（例如抛错或静默用别的行当它）。我读了 `bad_implementation_table.py` 两份（`…_after_the_oracle_fixes` 里 `:116` 同写法），没跑 E171（它是研究脚本，且 replay 属重型）。
 
 ## P5　E156 装置
@@ -315,8 +315,8 @@ control 是在副本里把 core 的 `mount.rs` 一行换成「挂载时一个全
 **（a）（b）静态核**（`tools/rerun.sh static`，原样）：
 
 ```
-$ python3 research/scripts/crates-mutation-rows.py static-check <冻结副本拷贝>
-COPIED	crates Cargo.toml Cargo.lock litmus research/scripts/run-with-memory-cap.sh research/scripts/crates-mutation-rows.py
+$ python3 scripts/crates-mutation-rows.py static-check <冻结副本拷贝>
+COPIED	crates Cargo.toml Cargo.lock litmus scripts/run-with-memory-cap.sh scripts/crates-mutation-rows.py
 CHECKED	2817	299	9
 ```
 
@@ -372,7 +372,7 @@ baseline（harness 档，`out/baseline-runs.txt`）：`--lib` 86 过 1 忽略、
 ## 要主 agent 跑的命令
 
 1. 慢档里一次调用 225 秒内没跑完的 6 条合法历史（探针版）：`REPO=$PWD FROZEN=/tmp/claude-1000/m3-formal-code-b33-r1/tree WORK=<草稿目录> CAP=10 MEM=8G bash research/prompts/m3-formal-code-b33-r1-sonnet-model/tools/rerun.sh setup sweep sweep-slow`（后台跑，不设超时；`sweep-slow` 的单任务时限 `BUDGET` 默认 3000 秒）。看 `$WORK/sweep-ignored/*.rc` 与 `grep -h '^B33' $WORK/sweep-ignored/*.log`：任何一行 B33F1 / B33C 出现在不是故意弄坏树表的测试上，就是 P2（a）被推翻。没跑完的是 `fault_injection_large_tier_from_the_environment`、`one_fixed_history_injects_twelve_faults_and_none_of_them_panics`、`allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_former_one_node_wall`、`random_histories_large_tier_seeds_and_length_from_the_environment`、两条 `unit_area_wall_sampling_on_small_devices_…`。
-2. checker 档（我不跑）：U11 与 E156 内联单测：`SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 10 cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts` 看 `19 passed`，另 `--bin e171_three_oracle_collusion_after_the_oracle_fixes -- the_third_stream_past_one_turn_of_the_root_ring_holds_i_3_1`；33-a 的 ① 与 33-b 的 ② 两条用例主 agent 已跑过，我没复核。
+2. checker 档（我不跑）：U11 与 E156 内联单测：`SINGLEFS_HEAVY_TESTS=commit bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 10 cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts` 看 `19 passed`，另 `--bin e171_three_oracle_collusion_after_the_oracle_fixes -- the_third_stream_past_one_turn_of_the_root_ring_holds_i_3_1`；33-a 的 ① 与 33-b 的 ② 两条用例主 agent 已跑过，我没复核。
 3. 抬 F 慢档用例今天是否红：`cargo test -p singlefs-harness --test reuse_after_raising_the_floor -- --ignored --exact raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it`（在主工作区单跑），看是不是 `I-9.18 在 E 之后的镜像上要成立`。
 
 ## 没做什么
@@ -387,6 +387,6 @@ baseline（harness 档，`out/baseline-runs.txt`）：`--lib` 86 过 1 忽略、
 
 ## cite-check 末行
 
-命令：`python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b33-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b33-r1/tree --root . --background research/prompts/_m3-formal-code-b33-r1-background.md`
+命令：`python3 scripts/cite-check.py research/prompts/m3-formal-code-b33-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b33-r1/tree --root . --background research/prompts/_m3-formal-code-b33-r1-background.md`
 
 末行：`✓ 核了 79 处引文，对上 79 处，没判 0 处（逐处列在上面）`

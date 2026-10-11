@@ -52,4 +52,4 @@ fn main() {
 RS
 } > "$P"/src/bin/atk-gpu-scan.rs
 cd "$P"
-bash "$ROOT"/research/scripts/run-with-memory-cap.sh 4G nice -n 19 bash "$ROOT"/research/scripts/capped.sh 4 cargo build --offline --release
+bash "$ROOT"/scripts/run-with-memory-cap.sh 4G nice -n 19 bash "$ROOT"/scripts/capped.sh 4 cargo build --offline --release

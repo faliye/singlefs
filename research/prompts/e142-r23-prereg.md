@@ -10,11 +10,11 @@
 
 | 输入 | 改了什么 | 谁改 |
 |---|---|---|
-| 装置 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs` | 第 1524 行 `        writer.put_u32(5); // T_time 秒` 改成 `        writer.put_u32(5000); // T_time 毫秒`（缩进 8 个空格照原样）；别处一字不动：改后与第 22 次第二段冻结版（sha256 `c400139b…d899`）的 diff 只有这一行 | 这一次的执行员（步 ②） |
+| 装置 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` | 第 1524 行 `        writer.put_u32(5); // T_time 秒` 改成 `        writer.put_u32(5000); // T_time 毫秒`（缩进 8 个空格照原样）；别处一字不动：改后与第 22 次第二段冻结版（sha256 `c400139b…d899`）的 diff 只有这一行 | 这一次的执行员（步 ②） |
 | `crates/singlefs-core/src/system_configuration.rs` | 第 30 批 30-3：`TIME_THRESHOLD_SECONDS: u32 = 5` 改成 `TIME_THRESHOLD_MILLISECONDS: u32 = 5000`，`time_threshold_seconds()` 改成 `time_threshold_milliseconds()`，写槽那一行跟着换（补丁 `/tmp/claude-1000/m3-formal-30-3/patch/crates.patch`，137 行，sha256 `11e06eab39c0ccc22b03a499636e6743a0463e416e869565f04daecea2524518`；报告 `/tmp/claude-1000/m3-formal-30-3/report.md`，200 行，sha256 `8db785b62d70aa8e9756b0d3f02ae09e1cbddfd49101fdee89304a92ed5a7006`）。同一补丁另改 harness 三份文件（`mount_transparency.rs` 与两份测试），不在 E142 的写路上 | 主 agent 合入（起跑前提 P1） |
 | `.claude/kb/layout/01-first-txn.md` 第 149 行 | 主 agent 照用户 2026-10-05 定案写明单位毫秒、默认 5000（这一行不进任何判据，见第一节 R78；只影响准入指纹，见第四节第 6 条） | 主 agent |
 | `.claude/gate.d/stage-inputs.tsv` 第 36 行（准入键 `E142`） | 加进这份登记（起跑前提 P2） | 主 agent |
-| 不变 | 变异表 `research/mutations/e142_new_pool_file_creation_dry_run.tsv`（210 行，sha256 `ef63ea85…f1c3`）；独立 bin `e142_region_diff_independent.rs` 与它的变异表；第 21、22 次的草稿脚本（`label6_anchor.py`、`make_synthetic.py`、`p8g_region_compare.py`、`back_chain_487.py`、`residual_old_values.sh`）；导出 bin；`research/scripts/replay.sh` 的 `driver_e142`（第 512–518 行）与 `driver_e142_p8g_crates_dump`（第 524–526 行） | — |
+| 不变 | 变异表 `scripts/mutations/e142_new_pool_file_creation_dry_run.tsv`（210 行，sha256 `ef63ea85…f1c3`）；独立 bin `e142_region_diff_independent.rs` 与它的变异表；第 21、22 次的草稿脚本（`label6_anchor.py`、`make_synthetic.py`、`p8g_region_compare.py`、`back_chain_487.py`、`residual_old_values.sh`）；导出 bin；`scripts/replay.sh` 的 `driver_e142`（第 512–518 行）与 `driver_e142_p8g_crates_dump`（第 524–526 行） | — |
 
 **哪几格要重判**（逐格在第六节）：
 
@@ -24,7 +24,7 @@
 - 新加：T_time 的绝对值（第七节 7.1 K6–K8、7.2 A7–A9；Q142.107）、改动只碰 T_time 与整槽校验和两段字节（Q142.113）、T_time 旧写法残留（命令十二，进 Q142.118）、两份主点导出相同（Q142.121）、P8G 判决对第 22 次第二段（Q142.111 (ii)）。
 - 照用、不重判：第 22 次第二段修订第一节的判决字段甲乙分类（25 个字段，甲 12、乙 13）；第 22 次 R71 的判决字段集、归一化写法与剔除清单 E1–E3；第七节 7.2 A1–A6、B1、B1b、B2–B11 的值。
 
-**装置写在哪（写死）**：同第 22 次文件头第 1–3 条。模型是 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs`（独立手写模型，不与 `crates/` 共用代码），**不是入库装置**，装置里不引 `crates/` 的任何常量；比对侧导出 bin `crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs` 只跑、不读、不改，主点照 `driver_e142`，P8G 照 `driver_e142_p8g_crates_dump`；独立 bin 只用 `old-new`。草稿脚本：第 21、22 次的五份照原登记全文重建、核 sha256（`label6_anchor.py` `15c945328a473e21c0e50a604445e54b9b40b98c4996a434a1596883a70725f7`、`make_synthetic.py` `f9936271b8c23c7c4fd7868d9b18bb4978ac18c7d9c443e5b25099f83b0fede8`、`p8g_region_compare.py` `1090d0a763085ae6eb7a9ae2739b0d1b7bec9bea23f03a6180298792cd7937a8`，全文在第 22 次登记第十三节；`back_chain_487.py` `b267c41bc41b3f41e6d216c3608ad1cdd57f0496af4b69024b8b5e69516a89de`、`residual_old_values.sh` `63ea086247aaee402ff74cf9dd3c9d51c1220f7f379f3f5dc2f2bf595de2a1c0`，全文在 `research/prompts/e142-r21-prereg.md`）；这一次新加 `ttime_anchor.py`（112 行，sha256 `f598eee8f08090dbcadc6338bf05ea811e4ba8fd9c8f0a9c6c366a03d2a55089`）与 `make_synthetic_ttime.py`（23 行，sha256 `3e33a12a08bfbfc079c454ef570733a6b775f24d3f5b232618e6f7198e6f029f`），全文在第十三节。不新建 bin，不改 `crates/` 的任何文件，不改两个 driver。这一次没有计时类的量。
+**装置写在哪（写死）**：同第 22 次文件头第 1–3 条。模型是 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs`（独立手写模型，不与 `crates/` 共用代码），**不是入库装置**，装置里不引 `crates/` 的任何常量；比对侧导出 bin `crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs` 只跑、不读、不改，主点照 `driver_e142`，P8G 照 `driver_e142_p8g_crates_dump`；独立 bin 只用 `old-new`。草稿脚本：第 21、22 次的五份照原登记全文重建、核 sha256（`label6_anchor.py` `15c945328a473e21c0e50a604445e54b9b40b98c4996a434a1596883a70725f7`、`make_synthetic.py` `f9936271b8c23c7c4fd7868d9b18bb4978ac18c7d9c443e5b25099f83b0fede8`、`p8g_region_compare.py` `1090d0a763085ae6eb7a9ae2739b0d1b7bec9bea23f03a6180298792cd7937a8`，全文在第 22 次登记第十三节；`back_chain_487.py` `b267c41bc41b3f41e6d216c3608ad1cdd57f0496af4b69024b8b5e69516a89de`、`residual_old_values.sh` `63ea086247aaee402ff74cf9dd3c9d51c1220f7f379f3f5dc2f2bf595de2a1c0`，全文在 `research/prompts/e142-r21-prereg.md`）；这一次新加 `ttime_anchor.py`（112 行，sha256 `f598eee8f08090dbcadc6338bf05ea811e4ba8fd9c8f0a9c6c366a03d2a55089`）与 `make_synthetic_ttime.py`（23 行，sha256 `3e33a12a08bfbfc079c454ef570733a6b775f24d3f5b232618e6f7198e6f029f`），全文在第十三节。不新建 bin，不改 `crates/` 的任何文件，不改两个 driver。这一次没有计时类的量。
 
 **起跑前提（写死；步 ⓪ 逐条核，有一条不齐 ⇒ 停机 S23-open，一步都不跑）**：
 
@@ -44,8 +44,8 @@
 | ⓪ | (1) 起跑前提 P1–P4。(2) `ps -o pid,args -u "$(id -u)"` 看负载，照共用约束办。(3) 快照 A：同第 22 次步 ⓪(4)，存 `research/results/e142-r23-crates-sha256-a-<日期>.txt` 与 `research/results/e142-r23-crates-status-a-<日期>.txt`。(4) 重建草稿脚本（文件头「装置写在哪」那一段的七份），核 sha256；跑命令十一（PC-t），输出存 `research/results/e142-r23-controls-<日期>.out` | `research/results/` 下 E142 第 22 次的产物（步 ①(4)(6) 与步 ③(10) 点名的那几格除外，且只按那一格的读法读） |
 | ① | (1) 把冻结装置原样拷进执行员草稿目录（`frozen-s2.rs`），核 sha256 为 `c400139b8cfc7c0e4b96d483200055e9891252c9171bbbeb06771046bf63d899`。(2) 臂 N22R：冻结装置一字不改，在仓里编（release），照 `driver_e142` 两条命令原样跑，按它的次序拼成一整份（装置 stdout 在前、导出在后），存 `research/results/e142-new-pool-file-creation-dry-run-r23-arm-n22r-<日期>.out`（准入必须放行）。(3) 照 `driver_e142_p8g_crates_dump` 跑 `crates/` 的 P8G 导出，存 `research/results/e142-r23-p8g-crates-dump-<日期>.out`。(4) Q142.115：第 22 次第二段主产物 `research/results/e142-new-pool-file-creation-dry-run-r22-s2-main-2026-10-05.out` → N22R 的归一化 diff（第 22 次 R71 的归一化与剔除），命令只写文件、只打行数；另取 N22R 的 `back_chain=` 与 `chains=` 里 w4 那一条。(5) 对照：PC-f23（N22R 的 `name=impl_bytes_equal_summary` 与各行 `equal=false`）、PC-f23p（`p8g_region_compare.py <N22R> <P8G 导出>`）、PC-t2（`ttime_anchor.py --decode <N22R>`、`--decode <N22R> p8g_device_region_bytes`、`--decode <P8G 导出>`）、PC-g23、PC-j、PC-i、命令十二在 `frozen-s2.rs` 上（PC-twelve），追加进步 ⓪(4) 那份 controls 文件。(6) B1 复算：同第 22 次步 ①(4)，输入照同一行同一段取自 N22R 产物，输出存 `research/results/e142-r23-anchor-b1-<日期>.out`（PC-h1–PC-h3） | 第 22 次第二段主产物里步 ①(4) 之外的读法 |
 | ② | (1) 用 Edit 把第 1524 行改成文件头表里那一行，别处不碰。(2) `diff <草稿目录>/frozen-s2.rs <装置>` 的输出恰是 `1524c1524`、一行删一行加（命令与输出原样进第十二节）；多出一处 ⇒ 撤回多出来的那处再核，仍不是恰一行 ⇒ 停机 S23-scope。(3) 单测：`cargo test --release -p e7-index-bench --bin e142-new-pool-file-creation-dry-run`（经内存包装）必须 117 过、0 败、1 忽略（第 22 次第二段修订第一节的数）；有一条红 ⇒ 停机 S23-scope，不改单测、不加单测。(4) 命令七（同第 22 次）、命令六（同第 22 次）、命令十二（这一份）。(5) 冻结：装置 sha256 与行数（行数应仍为 10866）、变异表 sha256（应仍为 `ef63ea85…f1c3`）写进第十二节。不加变异、不改变异表（第九节） | 同上；`crates/singlefs-core/**`、`crates/singlefs-format/src/**`、`crates/singlefs-harness/**`（起跑前提 P1 那三条 `grep` 与第三节 3.1 点名的行除外） |
-| ③ | (1) S23-clause 再抄一次（命令二）。(2) 快照 B，与 A `cmp`（V23c）。(3) 照 `driver_e142` 跑冻结的 N23，整份存 `research/results/e142-new-pool-file-creation-dry-run-r23-main-<日期>.out`（准入必须放行）。(4) 快照 C，与 B `cmp`；A、B、C 三份都进 `research/results/`。(5) 立即跑 `python3 research/scripts/admission.py experiment <仓根> E142`（Q142.116）。(6) **从这一格起才读** `crates/singlefs-harness/tests/new_pool_file_creation_publish.rs` 第 80 行（只读那一行）。(7) 独立 bin `old-new (主产物, N22R 产物)`，存 `research/results/e142-r23-region-old-new-independent-<日期>.out`（Q142.113）。(8) `ttime_anchor.py --decode` 主产物（行名缺省一次、`p8g_device_region_bytes` 一次）与 `--diff <主产物> <N22R>`（两种行名各一次）；`label6_anchor.py --decode` 主产物（两种行名各一次）与 `--decode <P8G 导出>`；存 `research/results/e142-r23-anchors-<日期>.out`。(9) `p8g_region_compare.py <主产物> <P8G 导出>`。(10) 其余各格（Q142.105、Q142.106、Q142.110、Q142.111、Q142.112、Q142.114、Q142.117–Q142.119、Q142.121）的比对存 `research/results/e142-r23-comparisons-<日期>.out`；Q142.111 (ii) 与 Q142.119 在这一格才读第 22 次第二段主产物里的判决字段 | — |
-| ④ | `research/scripts/replay.sh` 第 174 行的产物名改成步 ③(3) 那份、第 175 行的产物名改成步 ①(3) 那份（两行别的字段不动）；写实验页（加第二十三次跑一节）；整张变异表照第九节末写成「要主 agent 跑的命令」交回（Q142.120 由主 agent 跑完补判）；交回照第十一节「交回之前」 | 实验页「判决」「影响的决策」两节在这一步才读 |
+| ③ | (1) S23-clause 再抄一次（命令二）。(2) 快照 B，与 A `cmp`（V23c）。(3) 照 `driver_e142` 跑冻结的 N23，整份存 `research/results/e142-new-pool-file-creation-dry-run-r23-main-<日期>.out`（准入必须放行）。(4) 快照 C，与 B `cmp`；A、B、C 三份都进 `research/results/`。(5) 立即跑 `python3 scripts/admission.py experiment <仓根> E142`（Q142.116）。(6) **从这一格起才读** `crates/singlefs-harness/tests/new_pool_file_creation_publish.rs` 第 80 行（只读那一行）。(7) 独立 bin `old-new (主产物, N22R 产物)`，存 `research/results/e142-r23-region-old-new-independent-<日期>.out`（Q142.113）。(8) `ttime_anchor.py --decode` 主产物（行名缺省一次、`p8g_device_region_bytes` 一次）与 `--diff <主产物> <N22R>`（两种行名各一次）；`label6_anchor.py --decode` 主产物（两种行名各一次）与 `--decode <P8G 导出>`；存 `research/results/e142-r23-anchors-<日期>.out`。(9) `p8g_region_compare.py <主产物> <P8G 导出>`。(10) 其余各格（Q142.105、Q142.106、Q142.110、Q142.111、Q142.112、Q142.114、Q142.117–Q142.119、Q142.121）的比对存 `research/results/e142-r23-comparisons-<日期>.out`；Q142.111 (ii) 与 Q142.119 在这一格才读第 22 次第二段主产物里的判决字段 | — |
+| ④ | `scripts/replay.sh` 第 174 行的产物名改成步 ③(3) 那份、第 175 行的产物名改成步 ①(3) 那份（两行别的字段不动）；写实验页（加第二十三次跑一节）；整张变异表照第九节末写成「要主 agent 跑的命令」交回（Q142.120 由主 agent 跑完补判）；交回照第十一节「交回之前」 | 实验页「判决」「影响的决策」两节在这一步才读 |
 
 文件名里的日期取跑的那一天（`TZ=Asia/Tokyo date +%F`）；已存在的同名文件不覆盖，按日期另存。**看过 N22R 产物里导出那一半、或步 ③(6) 那一行钉值之后，不许为了与 `crates/` 相等去改装置与第七节锚点**；这一次装置只许改第 1524 行那一处（S23-scope）。
 
@@ -58,7 +58,7 @@
 **出处 `research/prompts/e142-r23-questions.md:5-5`（整段抄，未转述）**
 
 ```markdown
-第 22 次（登记 `research/prompts/e142-r22-prereg.md` 与 `research/prompts/e142-r22-s2-revision.md`，主产物 `research/results/e142-new-pool-file-creation-dry-run-r22-s2-main-2026-10-05.out`、P8G 导出 `research/results/e142-r22-p8g-crates-dump-2026-10-05.out`）在主点与 P8G 两个几何上都答「装置与 `crates/` 29 个区域逐字节相同」。之后用户 2026-10-05 定系统配置槽偏移 433 那 4 字节 T_time 的编码单位改成毫秒、默认 5000（判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L2 第三行），第 30 批 30-3 照改 `crates/singlefs-core/src/system_configuration.rs`（补丁 `/tmp/claude-1000/m3-formal-30-3/patch/crates.patch`）；装置 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs` 第 1524 行仍写 `writer.put_u32(5); // T_time 秒`。第 22 次的登记与产物冻结不动。
+第 22 次（登记 `research/prompts/e142-r22-prereg.md` 与 `research/prompts/e142-r22-s2-revision.md`，主产物 `research/results/e142-new-pool-file-creation-dry-run-r22-s2-main-2026-10-05.out`、P8G 导出 `research/results/e142-r22-p8g-crates-dump-2026-10-05.out`）在主点与 P8G 两个几何上都答「装置与 `crates/` 29 个区域逐字节相同」。之后用户 2026-10-05 定系统配置槽偏移 433 那 4 字节 T_time 的编码单位改成毫秒、默认 5000（判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L2 第三行），第 30 批 30-3 照改 `crates/singlefs-core/src/system_configuration.rs`（补丁 `/tmp/claude-1000/m3-formal-30-3/patch/crates.patch`）；装置 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` 第 1524 行仍写 `writer.put_u32(5); // T_time 秒`。第 22 次的登记与产物冻结不动。
 ```
 
 **出处 `research/prompts/e142-r23-questions.md:7-11`（整段抄，未转述）**
@@ -90,7 +90,7 @@
 
 派发提示点名的三处：D16（发布语义） 已定项 5（`T_time` 的默认值与可设区间）；用户 2026-10-05 定案「T_time 盘上单位改毫秒、默认 5000」（出处是判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第三节第 4 条与第五节第 1 行，第 80、95 行）；`.claude/kb/layout/01-first-txn.md` 第 149 行（T_time 字段）。另抄这一次的判据要用的 `layout/01` 四处：第 40–41 行（系统配置槽 0、槽 1 的设备内偏移与槽宽）、第 81 行（t15 写系统配置槽 1、世代号 5）、第 83 行（窗口 29 条写里系统配置 2 条）、第 158 行（系统配置字段表各字段的偏移，T_time 433、整槽校验和 155）。第 22 次的那几条（D3 已定项 2、D5 已定项 4 / 8、D2 已定项 9、D23 已定项 4 / 15 / 17、D16 第 42、51 行、D8 已定项 8 / 9 / 11、D18 已定项 24、`layout/01` 整份）同第 22 次第二节，不重抄；它们在第 22 次登记之后有没有变，由第 22 次的命令二原样重抄、与它的出口比来回答——**这一次不核**（理由：这一次的改动不碰它们定的任何一个字节；174 行字段表的期望字面写死在装置里，冻结版不变，`layout/01` 的文本变了也不改判据），交回时写明「没核」。
 
-`layout/01` 按行区间取，不按 `@标题` 取：它的「一」节整节 70 行，这一次只用到其中五行；按行区间取的每一段，抄完看了最后一行（第 41、81、83、149、158 行各是一整行表格行或一整段正文，不以 `|---|` 收尾，没有内层围栏）。`research/scripts/quote-kb.py` 机械抄，命令在第十三节命令二；出口 `/tmp/claude-1000/e142-r23-designer/e142-r23-section2.md`（72 行，sha256 `57c56d04bdbed74b6ce5f036e561abd1e52da0e4a94a2d274090ff79336d1373`），回读一致之后原样追加在下面。
+`layout/01` 按行区间取，不按 `@标题` 取：它的「一」节整节 70 行，这一次只用到其中五行；按行区间取的每一段，抄完看了最后一行（第 41、81、83、149、158 行各是一整行表格行或一整段正文，不以 `|---|` 收尾，没有内层围栏）。`scripts/quote-kb.py` 机械抄，命令在第十三节命令二；出口 `/tmp/claude-1000/e142-r23-designer/e142-r23-section2.md`（72 行，sha256 `57c56d04bdbed74b6ce5f036e561abd1e52da0e4a94a2d274090ff79336d1373`），回读一致之后原样追加在下面。
 
 **出处 `.claude/kb/decisions/16-发布语义.md:138-162`（整段抄，未转述）**
 
@@ -321,7 +321,7 @@
 **要主 agent 跑的命令（整张变异表，超过前台时限）**：冻结之后、交回之前由执行员把下面这条原样写进报告，主 agent 起。工作目录 `/home/fy5090/code/singlefs/research`；内存上限 3G（同第 22 次）；线程数取派发提示给的上限（没给取 6）；4 个工作进程。
 
 ```
-cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="E142 第 23 次整表：装置改了 T_time 一行，旧峰值照用" MUTATE_MEMORY_MAX=3G MUTATE_JOBS=4 MUTATE_TARGET_DIR=<执行员草稿目录>/mtarget nice -n 19 bash scripts/capped.sh <线程数> bash scripts/mutate.sh e142-new-pool-file-creation-dry-run e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs mutations/e142_new_pool_file_creation_dry_run.tsv > results/e142-mutate-r23-<日期>.log 2>&1
+cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="E142 第 23 次整表：装置改了 T_time 一行，旧峰值照用" MUTATE_MEMORY_MAX=3G MUTATE_JOBS=4 MUTATE_TARGET_DIR=<执行员草稿目录>/mtarget nice -n 19 bash scripts/capped.sh <线程数> bash scripts/mutate.sh e142-new-pool-file-creation-dry-run scripts/experiments/e142_new_pool_file_creation_dry_run.rs mutations/e142_new_pool_file_creation_dry_run.tsv > results/e142-mutate-r23-<日期>.log 2>&1
 ```
 
 跑完看：`grep -E '^(✅|⏭|❌|💥|⚠️|⏱|🧱)' <日志> | awk '{print $1}' | sort | uniq -c`（几栏之和等于 210）、收尾的「计数：」行、末行「已还原，基线仍全绿」；没有那一行或退出码是 5 ⇒ 这一轮不算数（`mutation-sampling.md` 第七类）。`⏭` 与 `research/results/e142-mutate-r22-s2-2026-10-05.log` 比。
@@ -355,7 +355,7 @@ cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="
 | V23c | 两次跑之间 `crates/` 变了 | 快照 A 与 B、或 B 与 C `cmp` 不同；或 Q142.121 两份主点导出不同 |
 | V23d | 阳性对照或判别力自证不过：测量分不出差别 | PC-f23（比对器那一支）、PC-f23p（同）、PC-t、PC-t2（`magic` 那一支）、PC-g23、PC-e、P2、PC-h1、PC-h2、PC-j、PC-k、第八节判别力自证任一条没看到「该看到什么」（PC-i、PC-twelve 不过照第五节 5.2 那一行办，不作废） |
 | V23e | 产物缺行 | 同第 22 次 V22e 的两份清单（主产物同时含主点与 P8G 两段，两份清单都核）；另 `ttime_anchor.py --decode` 主产物两种行名各不是恰两行装置一侧、主点不是恰两行 `crates/` 一侧，P8G 导出不是恰两行 |
-| V23f | 读数读不到，或内存包装自己的结局 | 任一格的量读出来是空的（读不到 ≠ 读到 0，`ttime_anchor.py` 或 `label6_anchor.py` 少打一行也算）；或经 `research/scripts/run-with-memory-cap.sh` 跑出退出码 250–254 |
+| V23f | 读数读不到，或内存包装自己的结局 | 任一格的量读出来是空的（读不到 ≠ 读到 0，`ttime_anchor.py` 或 `label6_anchor.py` 少打一行也算）；或经 `scripts/run-with-memory-cap.sh` 跑出退出码 250–254 |
 
 ### 停机（既不作废，也不当结果；两边都查，写进报告交回主 agent）
 
@@ -375,7 +375,7 @@ cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="
 1. 主产物里 `name=impl_bytes_equal_summary`、`name=root_record`、`name=back_chain`、`name=accounting`、`name=layout_field_summary`、`name=layout_field_positive_control`、第一行 `name=verdict`、`name=p8g_layout_field_summary`、`name=p8g_accounting`、`name=p8g_verdict`、`name=p8g_control_main_point`；N22R 的 `name=impl_bytes_equal_summary` 与 `equal=false` 各行；`P8G_SUMMARY` 两行（主产物、N22R）；`ttime_anchor.py` 的全部 `TTIME` 与 `TTIME_DIFF` 行；`label6_anchor.py` 的全部 `DECODE` 行；步 ①(6) 锚点文件的 B1、B1b 两行；独立 bin 的汇总行；第二段主产物（第 22 次）的 `name=p8g_verdict` 一行——原样整行抄进报告（`evidence-discipline.md`「引产物就整行抄」）；Q142.114 的分组表、Q142.119 的翻面表、Q142.118 的归类表与命令十二、命令六的计数放进报告文件。
 2. 问题单三行逐行写「已够判 / 还差什么 / 剩下的量能不能让它翻面」。问题单文件执行员不改，状态由主 agent 改。
 3. 交主 agent 的清单（不改 kb）：`layout/01` 第 36 行改指这一次主产物与它的 `impl_bytes_equal_summary`；第 149 行写回（若还没写）与第四节第 6 条的指纹提醒；第九节那处 T_time 没有单测与变异的缺口；起跑前提 P1 记下的合入后 sha256。
-4. `research/scripts/replay.sh` 第 174、175 行改指新产物（步 ④）；实验页 `.claude/kb/experiments/142-新池新建文件的干跑.md` 加第二十三次跑一节；实验索引与变更史照执行员定义写。
+4. `scripts/replay.sh` 第 174、175 行改指新产物（步 ④）；实验页 `.claude/kb/experiments/142-新池新建文件的干跑.md` 加第二十三次跑一节；实验索引与变更史照执行员定义写。
 
 ### 够判停机
 
@@ -416,9 +416,9 @@ cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="
 - 被测条款：`.claude/kb/decisions/16-发布语义.md` 标题行 grep、`:136-142`，已定项 5 经 `quote-kb.py` 抽出后读（第二节）；`git diff -U0` 的改动块头（第 9–79 行）。`.claude/kb/layout/01-first-txn.md`：标题行 grep、`:100-160`（命令输出截到每行 400 字）、`:149`、`:158`、`:40`、`:41`、`:81`–`:83`、`:118`、`:128`，第 28–88 行里 `系统配置|29 条|t15|槽世代` 的命中行，第 313–424 行里 `系统配置` 的命中行，`git diff -U0` 第 36 行一处。判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md`：标题行 grep 与 `T_time` 的命中行（41、77、80、95）。
 - 30-3：`/tmp/claude-1000/m3-formal-30-3/report.md:1-12`、`:119-200` 与标题行；`/tmp/claude-1000/m3-formal-30-3/patch/crates.patch:1-60` 与 `diff --git` / `+++` 行；目录列表。
 - `crates/`：`singlefs-core/src/system_configuration.rs` 里 `TIME_THRESHOLD|time_threshold` 的命中行（85、290、291、522）；`crates/` 里除这份之外 `time_threshold|TIME_THRESHOLD` 的命中行（`singlefs-harness/src/mount_transparency.rs:1357`、`:1366`、`:1370`）；`singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs` 里 `device-bytes|device_bytes` 的命中行（14、16、90、92、94）；`singlefs-harness/tests/new_pool_file_creation_publish.rs` 里 `E142|e142|T_time|5000|time_threshold` 的命中行（2、59、61、62、65、67、73、75、79、80、92、293、333、421、438、440、459、477、566、567）；`git status --short` 三份文件与 `crates/` 的条数。
-- 装置 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs`：`:1470-1560`、`:2800-2815`、`:2870-2882`、`:6750-6800`、`:6807-6816`、`:6861-6960`、`:6950-6955`、`:7007-7097`、`:7278-7292`；`T_time|433|毫秒` 等、`SYSTEM_CONFIGURATION|system_configuration_slot`、`fn layout_field|name=layout_field`、`r18_system_configuration|r18_clause_fields`、`include_str|read_to_string|01-first-txn.md`、`fn width_rows`、`"system_configuration`、`name=write_list|device_region_bytes|journal_header_write_digest|sha256=`、`sha256=|hexadecimal=|_hex=`（第 8171 行之前）、测试模块里 `to_slot|parse_slot|system_configuration|0x1388|5000|05000000|[433` 的命中行、`"[0-9a-f]{40,}"` 的命中行、`^fn` 在第 2300–3400 行的命中、`"149` 的计数。
-- 独立 bin `research/e7-index-bench/src/bin/e142_region_diff_independent.rs:1-40` 与 `unmapped|clause_d22_9|derived|changed=|println!` 的命中行。
-- `research/scripts/replay.sh:170-177`、`:505-526`、`driver_e142` 与 `REPLAY_MEMORY_CAP=` 的命中行；`.claude/gate.d/stage-inputs.tsv` 第 36 行（按空白切开的输入清单与注释前 300 字）、`^E142` 的命中行；`research/scripts/quote-kb.py --help`、`research/scripts/replace-once.py --help` 的输出。
+- 装置 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs`：`:1470-1560`、`:2800-2815`、`:2870-2882`、`:6750-6800`、`:6807-6816`、`:6861-6960`、`:6950-6955`、`:7007-7097`、`:7278-7292`；`T_time|433|毫秒` 等、`SYSTEM_CONFIGURATION|system_configuration_slot`、`fn layout_field|name=layout_field`、`r18_system_configuration|r18_clause_fields`、`include_str|read_to_string|01-first-txn.md`、`fn width_rows`、`"system_configuration`、`name=write_list|device_region_bytes|journal_header_write_digest|sha256=`、`sha256=|hexadecimal=|_hex=`（第 8171 行之前）、测试模块里 `to_slot|parse_slot|system_configuration|0x1388|5000|05000000|[433` 的命中行、`"[0-9a-f]{40,}"` 的命中行、`^fn` 在第 2300–3400 行的命中、`"149` 的计数。
+- 独立 bin `scripts/experiments/e142_region_diff_independent.rs:1-40` 与 `unmapped|clause_d22_9|derived|changed=|println!` 的命中行。
+- `scripts/replay.sh:170-177`、`:505-526`、`driver_e142` 与 `REPLAY_MEMORY_CAP=` 的命中行；`.claude/gate.d/stage-inputs.tsv` 第 36 行（按空白切开的输入清单与注释前 300 字）、`^E142` 的命中行；`scripts/quote-kb.py --help`、`scripts/replace-once.py --help` 的输出。
 - `research/results/`：**没读内容**，只用 `ls | grep` 看了 E142 第 22 次各文件的文件名。`.claude/kb/experiments/`、实验索引、实验变更史：没读。
 - 草稿目录里自己写的文件与它们的输出；这份登记自己（回读核子串）。
 
@@ -427,24 +427,24 @@ cd /home/fy5090/code/singlefs/research && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="
 **命令一**（第三节 3.2 的 sha256 与行数，连同 `crates/singlefs-core/src/system_configuration.rs` 合入之前的值；步 ⓪ 的 P3 照它核前四个）
 
 ```
-cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r23-designer; A=research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs; { echo '命令一'; sha256sum $A research/mutations/e142_new_pool_file_creation_dry_run.tsv research/e7-index-bench/src/bin/e142_region_diff_independent.rs research/mutations/e142_region_diff_independent.tsv crates/singlefs-core/src/system_configuration.rs; wc -l $A research/mutations/e142_new_pool_file_creation_dry_run.tsv research/e7-index-bench/src/bin/e142_region_diff_independent.rs research/mutations/e142_region_diff_independent.tsv; } > $D/cmd1.txt 2>&1; cat $D/cmd1.txt
+cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r23-designer; A=scripts/experiments/e142_new_pool_file_creation_dry_run.rs; { echo '命令一'; sha256sum $A scripts/mutations/e142_new_pool_file_creation_dry_run.tsv scripts/experiments/e142_region_diff_independent.rs scripts/mutations/e142_region_diff_independent.tsv crates/singlefs-core/src/system_configuration.rs; wc -l $A scripts/mutations/e142_new_pool_file_creation_dry_run.tsv scripts/experiments/e142_region_diff_independent.rs scripts/mutations/e142_region_diff_independent.tsv; } > $D/cmd1.txt 2>&1; cat $D/cmd1.txt
 命令一
-c400139b8cfc7c0e4b96d483200055e9891252c9171bbbeb06771046bf63d899  research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs
-ef63ea858443d708868f3ca55659f62727e4c867d96b5c234bf4dbf3e1fcf1c3  research/mutations/e142_new_pool_file_creation_dry_run.tsv
-311ce77c9c73148059f4d8a3425ab8902413c34e7ca45ddc04cc582de92fae51  research/e7-index-bench/src/bin/e142_region_diff_independent.rs
-8978e80a8a70a454f244a77f650eff04620016b7794042ed8388547933708a8e  research/mutations/e142_region_diff_independent.tsv
+c400139b8cfc7c0e4b96d483200055e9891252c9171bbbeb06771046bf63d899  scripts/experiments/e142_new_pool_file_creation_dry_run.rs
+ef63ea858443d708868f3ca55659f62727e4c867d96b5c234bf4dbf3e1fcf1c3  scripts/mutations/e142_new_pool_file_creation_dry_run.tsv
+311ce77c9c73148059f4d8a3425ab8902413c34e7ca45ddc04cc582de92fae51  scripts/experiments/e142_region_diff_independent.rs
+8978e80a8a70a454f244a77f650eff04620016b7794042ed8388547933708a8e  scripts/mutations/e142_region_diff_independent.tsv
 a0b44f0954b8a83192b9c2843bdf4496195b0bdf411600b8aae846b88c4f8142  crates/singlefs-core/src/system_configuration.rs
- 10866 research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs
-   210 research/mutations/e142_new_pool_file_creation_dry_run.tsv
-   766 research/e7-index-bench/src/bin/e142_region_diff_independent.rs
-    10 research/mutations/e142_region_diff_independent.tsv
+ 10866 scripts/experiments/e142_new_pool_file_creation_dry_run.rs
+   210 scripts/mutations/e142_new_pool_file_creation_dry_run.tsv
+   766 scripts/experiments/e142_region_diff_independent.rs
+    10 scripts/mutations/e142_region_diff_independent.tsv
  11852 total
 ```
 
 **命令二**（第二节的八个取法与第一节问题单的两个取法；步 ⓪ 与步 ③(1) 的 S23-clause 照它重抄进另一个出口文件，与 sha256 `57c56d04bdbed74b6ce5f036e561abd1e52da0e4a94a2d274090ff79336d1373` 比，不同就 `diff` 两份出口）
 
 ```
-cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r23-designer; L=.claude/kb/layout/01-first-txn.md; P='.claude/kb/decisions/16-发布语义.md'; V=research/prompts/m3-formal-code-b29-r1-main-verification.md; Q=research/prompts/e142-r23-questions.md; { echo '命令二'; nice -n 19 python3 research/scripts/quote-kb.py $D/e142-r23-section2.md "$P@#### 已定项 5：\`T_time\` 与 \`T_dirty\` 取多少，丢失窗口的口径" "$L:40-41" "$L:81-81" "$L:83-83" "$L:149-149" "$L:158-158" "$V:80-80" "$V:95-95"; echo "exit=$?"; wc -l $D/e142-r23-section2.md; sha256sum $D/e142-r23-section2.md; echo '命令二·问题单'; nice -n 19 python3 research/scripts/quote-kb.py $D/e142-r23-questions-quote.md "$Q:5-5" "$Q:7-11"; echo "exit=$?"; wc -l $D/e142-r23-questions-quote.md; sha256sum $D/e142-r23-questions-quote.md; } > $D/cmd2.txt 2>&1; cat $D/cmd2.txt
+cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r23-designer; L=.claude/kb/layout/01-first-txn.md; P='.claude/kb/decisions/16-发布语义.md'; V=research/prompts/m3-formal-code-b29-r1-main-verification.md; Q=research/prompts/e142-r23-questions.md; { echo '命令二'; nice -n 19 python3 scripts/quote-kb.py $D/e142-r23-section2.md "$P@#### 已定项 5：\`T_time\` 与 \`T_dirty\` 取多少，丢失窗口的口径" "$L:40-41" "$L:81-81" "$L:83-83" "$L:149-149" "$L:158-158" "$V:80-80" "$V:95-95"; echo "exit=$?"; wc -l $D/e142-r23-section2.md; sha256sum $D/e142-r23-section2.md; echo '命令二·问题单'; nice -n 19 python3 scripts/quote-kb.py $D/e142-r23-questions-quote.md "$Q:5-5" "$Q:7-11"; echo "exit=$?"; wc -l $D/e142-r23-questions-quote.md; sha256sum $D/e142-r23-questions-quote.md; } > $D/cmd2.txt 2>&1; cat $D/cmd2.txt
 命令二
   ✓ 8 段整抄进 /tmp/claude-1000/e142-r23-designer/e142-r23-section2.md，回读逐字节一致
 exit=0
@@ -490,7 +490,7 @@ TTIME_DIFF device=1 changed_bytes=7 offsets=6,155,156,157,158,433,434 outside_t_
 **命令十二**（T_time 的旧写法与新写法；Q142.118、PC-twelve。四个计数依次是：旧写法整行、`T_time 秒`、新写法整行、变异表里的 `T_time`。冻结之后要是 0、0、1、0；今天的装置（即 `frozen-s2.rs`）上是 1、1、0、0）
 
 ```
-cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r23-designer; A=research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs; { echo '命令十二'; grep -c 'writer.put_u32(5); // T_time 秒' $A; grep -c 'T_time 秒' $A; grep -c 'writer.put_u32(5000); // T_time 毫秒' $A; grep -c 'T_time' research/mutations/e142_new_pool_file_creation_dry_run.tsv; } > $D/cmd12.txt 2>&1; cat $D/cmd12.txt
+cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r23-designer; A=scripts/experiments/e142_new_pool_file_creation_dry_run.rs; { echo '命令十二'; grep -c 'writer.put_u32(5); // T_time 秒' $A; grep -c 'T_time 秒' $A; grep -c 'writer.put_u32(5000); // T_time 毫秒' $A; grep -c 'T_time' scripts/mutations/e142_new_pool_file_creation_dry_run.tsv; } > $D/cmd12.txt 2>&1; cat $D/cmd12.txt
 命令十二
 1
 1
@@ -503,7 +503,7 @@ cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r23-designer; A=researc
 **命令十三**（第一节 R78：174 行字段表的 `layout_line` 里有没有第 149 行，与 `layout_field_rows` 由哪三个函数拼成）
 
 ```
-cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r23-designer; A=research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs; { echo '命令十三'; grep -c '"149' $A; awk 'NR>=7089 && NR<=7095' $A; } > $D/cmd13.txt 2>&1; cat $D/cmd13.txt
+cd /home/fy5090/code/singlefs && D=/tmp/claude-1000/e142-r23-designer; A=scripts/experiments/e142_new_pool_file_creation_dry_run.rs; { echo '命令十三'; grep -c '"149' $A; awk 'NR>=7089 && NR<=7095' $A; } > $D/cmd13.txt 2>&1; cat $D/cmd13.txt
 命令十三
 0
 fn layout_field_rows(final_image: &dyn BlockReader, after_mkfs_image: &dyn BlockReader) -> Vec<LayoutFieldRow> {
@@ -694,4 +694,4 @@ for name, data in (("synthetic_ttime_old.out", old), ("synthetic_ttime_old_outsi
 
 ### 13.3 写登记用的命令
 
-这份登记用 `set -o noclobber` 排他新建、之后每次不超过 150 行 `>>` 追加；第一节与第二节的抄录、第十三节的命令输出与两份脚本全文都是草稿目录里的文件原样追加。几处事实更正用 `research/scripts/replace-once.py` 定点替换（各「命中 1 次……回读确认」）：第一节 R78 两处函数行区间（`layout_field_rows` 第 7089–7095 行、`push_layout_rows_for_units` 第 6882–6952 行）、第五节 5.1 整槽校验和那一格的行号（第 118 行）与「没有字段带系统配置槽的字节」那一句的出处（改成第六、七节的命中，命令十四）、第十节开头 F23k 空号的说明。追加完回读：两份抄录出口、两份脚本、命令一、二、十一至十四的输出文件整份是这份登记的子串（`python3` 逐个 `in` 判，十个 `True`）；从登记里按「全文」那两段截出的脚本 sha256 与命令十一记的相同（`f598eee8…5089`、`3e33a12a…f793`）；文件头一行在。
+这份登记用 `set -o noclobber` 排他新建、之后每次不超过 150 行 `>>` 追加；第一节与第二节的抄录、第十三节的命令输出与两份脚本全文都是草稿目录里的文件原样追加。几处事实更正用 `scripts/replace-once.py` 定点替换（各「命中 1 次……回读确认」）：第一节 R78 两处函数行区间（`layout_field_rows` 第 7089–7095 行、`push_layout_rows_for_units` 第 6882–6952 行）、第五节 5.1 整槽校验和那一格的行号（第 118 行）与「没有字段带系统配置槽的字节」那一句的出处（改成第六、七节的命中，命令十四）、第十节开头 F23k 空号的说明。追加完回读：两份抄录出口、两份脚本、命令一、二、十一至十四的输出文件整份是这份登记的子串（`python3` 逐个 `in` 判，十个 `True`）；从登记里按「全文」那两段截出的脚本 sha256 与命令十一记的相同（`f598eee8…5089`、`3e33a12a…f793`）；文件头一行在。

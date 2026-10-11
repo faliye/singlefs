@@ -12,7 +12,7 @@ env["RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON"] = "副本上的变异跑法，峰值
 env["RUN_WITH_MEMORY_CAP_PARALLEL_REASON"] = "云端正推腿与云端攻方腿各跑各的探针，并行派出"
 REPO = "/home/fy5090/code/singlefs"
 def run(args, log):
-    cmd = ["nice", "-n", "19", "bash", f"{REPO}/research/scripts/run-with-memory-cap.sh", "4G", "bash", f"{REPO}/research/scripts/capped.sh", "4", "cargo", "test"] + args
+    cmd = ["nice", "-n", "19", "bash", f"{REPO}/scripts/run-with-memory-cap.sh", "4G", "bash", f"{REPO}/scripts/capped.sh", "4", "cargo", "test"] + args
     with open(log, "w") as f:
         p = subprocess.run(cmd, cwd=ws, env=env, stdout=f, stderr=subprocess.STDOUT, timeout=230)
     return p.returncode

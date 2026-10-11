@@ -26,7 +26,7 @@ GPU 口径的总纲在 D24：三条硬约束的第 3 条是「3. **它是一个�
 
 - 真账：`GpuMemoryLedger::new` 加公开函数 `book_on_the_card`、`record_the_device_started_on_the_card`、`card_rooms_mebibytes_now`、`prepare_the_driver_share_before_starting_the_device`；读数函数由我的「物理卡」给：这个进程占的 x = 驱动实占 + 活着借据已建上的 + 销了账卡上还没还的；空闲 F = 空卡能用 32 110 − 外人 − x。**真能再借（保证值）** = F − 活着借据还没建的 − 驱动还要长的；账多给 = 账给的 − 真能再借。
 - 对照：改前 = 冻结副本 `patch -R` 掉实现员的 `crates.patch`（`tree-old`），同一份探针在两份树上各跑一遍，编译目录各用各的（头一次两树共用一个目录，cargo 把改前的当新鲜、跑出两份一样的数，我发现后弃掉，重编重跑）。
-- 命令（工作目录各树根）：`CARGO_TARGET_DIR=<草稿目录>/target[-old] nice -n 19 bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 15 cargo test --offline -p singlefs-harness --test sonnet_probe_common --test sonnet_probe_new_only -- --nocapture --test-threads 1`；退出码都是 0，包装没有 250–254 的结局。开跑前 `ps` 看到别的会话的 `cargo test -p singlefs-harness -- --ignored …`（pid 800410 一族），没有 qemu、vm-bench、e152、fio，我加 `nice -n 19` 照跑。
+- 命令（工作目录各树根）：`CARGO_TARGET_DIR=<草稿目录>/target[-old] nice -n 19 bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 15 cargo test --offline -p singlefs-harness --test sonnet_probe_common --test sonnet_probe_new_only -- --nocapture --test-threads 1`；退出码都是 0，包装没有 250–254 的结局。开跑前 `ps` 看到别的会话的 `cargo test -p singlefs-harness -- --ignored …`（pid 800410 一族），没有 qemu、vm-bench、e152、fio，我加 `nice -n 19` 照跑。
 - 输出原样在 `research/prompts/m3-batch10z-a-code-r1-sonnet-model/logs/final-new.log`（sha256 030eac62…fa4f）、`final-old.log`（sha256 efe43ac2…cb26），探针源码在 `…/probes/`。
 - 没有占卡、没有起 GPU 设备；`nvidia-smi -q -d MEMORY,PIDS` 只读跑过一次（`…/logs/nvidia-smi-q-memory-pids.txt`：驱动 595.84，5090 总 32607、保留 497、空闲 32110，进程表 0 行）。
 - 不碰重型：没有跑 checker 档的任何测试；checker 档里的几处只读码，标「读码」。

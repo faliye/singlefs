@@ -1,7 +1,7 @@
 import json, os, subprocess, sys, shlex, threading, queue
 W=os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet')
 F0=os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree')
-R='/home/fy5090/code/singlefs/research/scripts'
+R='/home/fy5090/code/singlefs/scripts'
 # usage: drv.py <workers> <threads-each> <tag> <a:b> <json...>
 nworkers=int(sys.argv[1]); thr=sys.argv[2]; tag=sys.argv[3]; a,b=map(int,sys.argv[4].split(':'))
 jobs=[]

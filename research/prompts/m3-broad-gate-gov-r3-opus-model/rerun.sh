@@ -15,7 +15,7 @@ seg_j2a() {
     { echo "== $h"; HOOK="$here/hook-$h.sh" run_samples "$base" "$work/out/j2a-$h" gate-verdict-escalated-green
       grep -E '登记表第|说第' "$work/out/j2a-$h/gate-verdict-escalated-green.txt" | sed "s|$work/[^ ]*||" ; } >> "$out/j2a-hooks.txt"
   done
-  mkdir -p "$work/probe"; python3 "$here/j2a-baseline-probe.py" "$base/research/scripts/broad-mutation.py" "$work/probe" 2>&1 | grep -v '^  ·' > "$out/j2a-baseline-probe.txt"
+  mkdir -p "$work/probe"; python3 "$here/j2a-baseline-probe.py" "$base/scripts/broad-mutation.py" "$work/probe" 2>&1 | grep -v '^  ·' > "$out/j2a-baseline-probe.txt"
 }
 seg_j2b() {
   rm -rf "${work:?}/trees/j2b"; mkdir -p "$work/trees/j2b"
@@ -42,7 +42,7 @@ seg_j1c() {
   rsync -a "$base/" "$work/trees/j1c/a0-original/"
   python3 "$here/j1c-env-gap.py" "$work/trees/j1c" "$work" a0-original $(cut -f1 "$out/j1c-mutants.list") > "$out/j1c-env-gap.txt" 2>&1
 }
-seg_j1d() { python3 "$here/j1d-rustup-toolchain.py" "$base/research/scripts/broad-mutation.py" "$base" nightly-x86_64-unknown-linux-gnu > "$out/j1d-rustup-toolchain.txt" 2>&1; }
+seg_j1d() { python3 "$here/j1d-rustup-toolchain.py" "$base/scripts/broad-mutation.py" "$base" nightly-x86_64-unknown-linux-gnu > "$out/j1d-rustup-toolchain.txt" 2>&1; }
 seg_j1a() { { command -v cargo; PATH=/usr/bin:/bin run_samples "$base" "$work/out/j1a-nocargo" library-version-is-staged-tree-marker-check-clean-unmarked
              grep -E '✗|→|^exit=' "$work/out/j1a-nocargo/library-version-is-staged-tree-marker-check-clean-unmarked.txt"; } > "$out/j1a-marker-check-no-cargo.txt" 2>&1; }
 seg_j2c() {
@@ -53,8 +53,8 @@ seg_j2c() {
 }
 seg_j3() {
   mkdir -p "$work/j3"; awk 'NR>=399 && NR<=624' "$base/.claude/gate.d/checker-tier-broad-mutation.sh" > "$work/j3/gate_verdict.py"
-  python3 "$here/j3-combos.py" "$base/research/scripts/broad-mutation.py" "$work/j3/gate_verdict.py" "$work/j3" 400 20261003 > "$out/j3-combos-400.txt" 2>&1
-  python3 "$here/j3-combos.py" "$base/research/scripts/broad-mutation.py" "$work/j3/gate_verdict.py" "$work/j3" 5000 7 > "$out/j3-combos-5000.txt" 2>&1
+  python3 "$here/j3-combos.py" "$base/scripts/broad-mutation.py" "$work/j3/gate_verdict.py" "$work/j3" 400 20261003 > "$out/j3-combos-400.txt" 2>&1
+  python3 "$here/j3-combos.py" "$base/scripts/broad-mutation.py" "$work/j3/gate_verdict.py" "$work/j3" 5000 7 > "$out/j3-combos-5000.txt" 2>&1
   : > "$out/j3-switches.txt"
   for b in $(awk 'NR>=83 && NR<=111 && $1=="#" && $2 ~ /^[a-z][a-z-]+$/ {print $2}' "$base/.claude/gate.d/checker-tier-broad-mutation.sh"); do
     printf '%s\t' "$b" >> "$out/j3-switches.txt"; CHECKER_TIER_BROAD_MUTATION_BREAK=$b run_samples "$base" "$work/out/sw-$b" >> "$out/j3-switches.txt"

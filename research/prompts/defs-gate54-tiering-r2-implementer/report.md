@@ -9,7 +9,7 @@
 | `.claude/gate.d/checker-tier-layer0-replay.sh` | 232c8c0de11bf6561f9ca1736652745f387d05832ad0a5c99a08bc80c0386bf7（与攻方 `inputs/54-post.sh` 相同） | f845fcd011526c9790450078245b769141867a8cfc8990f613e7fe5ad0520a5b | 438（原 397） |
 | `.claude/agents/gate-triage.md` | e631bc7adf9345e3f9e74559c137cb97b07c9ce5f313811ab10b83358e3c6bb7 | 3663395ae0e6170c13f70eb0f81741dea3c958f01c3881e3afa6677b5353f564 | 39（原 39，改的是第 26 行那一整行） |
 
-副本：`rsync -a --exclude /target` 主工作区（含 `.git`）到 `/tmp/claude-1000/defs54-r2-impl/repo`，删掉副本里被 `.gitignore` 挡着的 `research/target/`（7.7G，只删副本）。原样两份另存 `orig/`，补丁用 `diff -u --label a/… --label b/…` 从 `orig/` 对 `repo/` 生成；把补丁套回 `orig/` 的拷贝，两份 sha256 与上表改后一栏相同。收尾时主工作区两份 sha256 仍是起点那两个。
+副本：`rsync -a --exclude /target` 主工作区（含 `.git`）到 `/tmp/claude-1000/defs54-r2-impl/repo`，删掉副本里被 `.gitignore` 挡着的 `scripts/experiments/target/`（7.7G，只删副本）。原样两份另存 `orig/`，补丁用 `diff -u --label a/… --label b/…` 从 `orig/` 对 `repo/` 生成；把补丁套回 `orig/` 的拷贝，两份 sha256 与上表改后一栏相同。收尾时主工作区两份 sha256 仍是起点那两个。
 
 真仓 git common-dir（`.git`）里 `singlefs-layer0*`：开工 0 个，收尾 0 个（`find … -maxdepth 1 -name 'singlefs-layer0*' | wc -l`）。
 
@@ -166,7 +166,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
 ──── h2-a 红：快档（不设 SINGLEFS_GATE_FULL，照整轮门禁的样子）
 $ bash .claude/gate.d/checker-tier-layer0-replay.sh
   ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 2 个改动路径，没有一个落在 crate/ Cargo.tom Cargo.lok 底下
-     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crate/ Cargo.tom Cargo.lok，判据见 research/scripts/change-touches-crates.sh。
+     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crate/ Cargo.tom Cargo.lok，判据见 scripts/change-touches-crates.sh。
 [退出码 77]
     [格] 2175faa5f77d03252e
 ──── h2-a 红：快档（SINGLEFS_GATE_FULL=1）
@@ -181,7 +181,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
 ──── h2-b 红：快档（不设 SINGLEFS_GATE_FULL）
 $ bash .claude/gate.d/checker-tier-layer0-replay.sh
   ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 2 个改动路径，没有一个落在 crates/ Cargo.toml Cargo.lok 底下
-     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lok，判据见 research/scripts/change-touches-crates.sh。
+     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lok，判据见 scripts/change-touches-crates.sh。
 [退出码 77]
     [格] 2175faa5f77d03252e
     改回之后工作区相对 HEAD：0 行 status
@@ -194,7 +194,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
 ──── h2 改回：不设 SINGLEFS_GATE_FULL ⇒ 干净工作树，改动范围那一问答「没碰」退 77
 $ bash .claude/gate.d/checker-tier-layer0-replay.sh
   ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间一个改动都没有（干净工作树；要重新验 HEAD 用 SINGLEFS_GATE_FULL=1）
-     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lock，判据见 research/scripts/change-touches-crates.sh。
+     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lock，判据见 scripts/change-touches-crates.sh。
 [退出码 77]
     [格] 2175faa5f77d03252e
 ════ g1：只改判它的 54 号（文件末尾加一行注释），crates/ 不动
@@ -323,7 +323,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
 ──── h2 改回：不设 SINGLEFS_GATE_FULL ⇒ 干净工作树，改动范围那一问答「没碰」退 77
 $ bash .claude/gate.d/checker-tier-layer0-replay.sh
   ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间一个改动都没有（干净工作树；要重新验 HEAD 用 SINGLEFS_GATE_FULL=1）
-     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lock，判据见 research/scripts/change-touches-crates.sh。
+     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 crates/ Cargo.toml Cargo.lock，判据见 scripts/change-touches-crates.sh。
 [退出码 77]
     [格] ff7c9ca4e8c6ca9dbf
 ════ g1：只改判它的 54 号（文件末尾加一行注释），crates/ 不动

@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers P8G -->
 
-第 22 次（登记 `research/prompts/e142-r22-prereg.md` 与 `research/prompts/e142-r22-s2-revision.md`，主产物 `research/results/e142-new-pool-file-creation-dry-run-r22-s2-main-2026-10-05.out`、P8G 导出 `research/results/e142-r22-p8g-crates-dump-2026-10-05.out`）在主点与 P8G 两个几何上都答「装置与 `crates/` 29 个区域逐字节相同」。之后用户 2026-10-05 定系统配置槽偏移 433 那 4 字节 T_time 的编码单位改成毫秒、默认 5000（判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L2 第三行），第 30 批 30-3 照改 `crates/singlefs-core/src/system_configuration.rs`（补丁 `/tmp/claude-1000/m3-formal-30-3/patch/crates.patch`）；装置 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs` 第 1524 行仍写 `writer.put_u32(5); // T_time 秒`。第 22 次的登记与产物冻结不动。
+第 22 次（登记 `research/prompts/e142-r22-prereg.md` 与 `research/prompts/e142-r22-s2-revision.md`，主产物 `research/results/e142-new-pool-file-creation-dry-run-r22-s2-main-2026-10-05.out`、P8G 导出 `research/results/e142-r22-p8g-crates-dump-2026-10-05.out`）在主点与 P8G 两个几何上都答「装置与 `crates/` 29 个区域逐字节相同」。之后用户 2026-10-05 定系统配置槽偏移 433 那 4 字节 T_time 的编码单位改成毫秒、默认 5000（判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L2 第三行），第 30 批 30-3 照改 `crates/singlefs-core/src/system_configuration.rs`（补丁 `/tmp/claude-1000/m3-formal-30-3/patch/crates.patch`）；装置 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` 第 1524 行仍写 `writer.put_u32(5); // T_time 秒`。第 22 次的登记与产物冻结不动。
 
 | # | 问题 | 候选 | 翻面观测 | 够判条件 | 状态 |
 |---|---|---|---|---|---|

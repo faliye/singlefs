@@ -28,7 +28,7 @@ bash .claude/gate.d/95-fixture-claims.sh            # 现在是绿
 造的实验都在仓的一份副本上跑，副本连 `.git` 一起拷，所以 `project_start_date` 与真仓同为 2026-08-26：
 
 ```
-rsync -a --exclude target --exclude research/target \
+rsync -a --exclude target --exclude scripts/experiments/target \
   <仓根>/ /tmp/claude-1000/c510-attack/repo/
 cd /tmp/claude-1000/c510-attack/repo && bash .claude/gate.d/95-fixture-claims.sh
 ```
@@ -231,7 +231,7 @@ GIT_COMMITTER_DATE="2026-01-01T00:00:00" GIT_AUTHOR_DATE="2026-01-01T00:00:00" s
 `.claude/kb/checks-owed.md:454`（`grep -nF '运行时才生成的编造日期 95 号扫不到'` 现查命中这一行）
 已定项里写着「② 运行时才生成的编造日期 95 号扫不到（`fixtures/60-stale-open-items.sh/*/setup.sh` 的
 `GIT_COMMITTER_DATE="2026-01-01"`、`fixtures/91-archive-past-rounds.sh/red/setup.sh` 造的
-`e1-old-round-2026-01-01.out`、`research/scripts/stale-candidates.py` 自检里的 `records/2026-01-01-log.md`）」。
+`e1-old-round-2026-01-01.out`、`scripts/kb/stale-candidates.py` 自检里的 `records/2026-01-01-log.md`）」。
 
 两点分歧：
 
@@ -444,7 +444,7 @@ RC=1
 `````
 | C441 | 全仓清扫工具会吃掉自己的判别力样本 | 术语清扫按登记表全仓替换时，把门禁 90 号自己的红绿两份样本也扫了：`fixtures/90-term-renames.sh/{red,green}/.claude/kb/term-renames.md` 的**旧名那一列**被换成新名，红绿两份内容变得一模一样，判别力当场归零——而 90 号本身照样报绿，只有阶段自检报「green 期望退出 0，实测 1」时才露出来（2026-09-21 实测）。同一形态对任何「按表替换全仓」的工具都成立：它的样本里必须留着被替换的那一侧 | 判据：一道检查的判别力样本被它自己扫过之后，红样本还红不红。做法是让清扫工具默认把 `fixtures/<自己的阶段名>/` 排除掉，排不掉就在自检里造一次「样本被自己扫过」的场景、要求红样本仍然红 | 无 | 2026-09-21 archive-rename 轮：`.claude/term-rename-exempt` 里那条 `fixtures/90-term-renames.sh/` 的登记 |
 
-| C510 | 编造的日期没人拦 | **「日期不许是编的」这条禁令住在上游**（`.claude/singlefs-ai-sop/scripts/doc-lint.sh` 的 M 段，判据是 `lib.sh` 的 `date_out_of_range`：早于本仓第一个提交宽限 7 天、或晚于最晚时区的今天，都不可能是真发生过的事），**而它只认正文里的两种形态**：历史条目的 `### 日期`、正文里的「实测（日期）」。2026-09-23 实测：门禁样本里 8 个文件名与 32 处正文写着 2026-01-01 / 2026-01-02，比本仓第一个提交（2026-08-26）早大半年；带一个 `records/2026-01-01-临时实测.md` 跑 64 道阶段加 doc-lint，**0 道点名它**。一个编造日期读起来和真日期一模一样，而门禁样本正是后来人照抄形态的样板 | **已还大半（2026-09-23，门禁 95 号第 ④ 条）**：判据 source 上游 `lib.sh` 的 `date_out_of_range`，不另写一份；两维各判各的、各报各的数——文件名扫全仓路径（现查 1651 个文件、90 条带日期），正文只扫 `.claude/gate.d/fixtures/` 下的 `.md`（现查 173 份、80 个日期）。当天把那 8 个文件名与 32 处正文改成各自 fixture 的创建日（样本里要表先后两次事件的用创建日与次日）。判别力在 `fixtures/95-fixture-claims.sh/` 双向证过：red 的 `setup.sh` 在临时仓里现造一个坏文件名与一处坏正文（**不摆进仓里**，摆进来会被这一条自己扫到，C441（全仓清扫工具会吃掉自己的判别力样本）），并先做一个真实日期的提交让 `project_start_date` 有值、下界那一支真的走到；green 两维各放一个合法日期，成功句报「1 条带日期」「1 份 .md 里 1 个日期」，防「扫到 0 项也报绿」。**仍欠三样**：① `.claude/doc-lint-exclude` 里每行要写清它关掉了哪几类检查——只为绕开登记冲突而整份排除，等于把日期、指代、编号简称几条一起关掉，排除项该按检查分格、不按文件分格；② 运行时才生成的编造日期 95 号扫不到（`fixtures/60-stale-open-items.sh/*/setup.sh` 的 `GIT_COMMITTER_DATE="2026-01-01"`、`fixtures/91-archive-past-rounds.sh/red/setup.sh` 造的 `e1-old-round-2026-01-01.out`、`research/scripts/stale-candidates.py` 自检里的 `records/2026-01-01-log.md`）；③ 真 kb 正文里的 `已定（日期）`、`—— 已跑（日期）` 形态**明确不做**，依据见下一格 | **射程不许再放大，这条是实测定的**：2026-09-23 扫全仓正文得 52 处越界，其中 20 处全部合法——`prior-art.md` 9 处（别家项目的真实日期：bcachefs 手册 2026-04-16、`k1024.org/posts/2019/2019-02-08`、Greg KH 2026-07-15 表态）、`decisions-history/2026-09.md` 3 处（RFC 演进史 2015-08-07 → 2016-11-14 → 2017-01-30）、`checks-owed.md` 8 处（这一行自己引 2026-01-01 当例子）。`date_out_of_range` 的下界假设是「本仓的事不可能早于本仓第一个提交」，**这只对说本仓自己事的日期成立**；上游 M 段只认那两种形态不是射程不够，是有意收窄。⚠️ 本条 2026-09-23 早先的版本提议「上游把 M 段射程扩到表格单元格与标题括注」，**当天被这次实测推翻、已撤回** | 2026-09-23 用户看到 `fixtures/81-audit-contradictions.sh/red/records/2026-01-01-总审核.md` 问「我们禁止了这样的命名，为什么还出现」，逐处现查后立 |
+| C510 | 编造的日期没人拦 | **「日期不许是编的」这条禁令住在上游**（`.claude/singlefs-ai-sop/scripts/doc-lint.sh` 的 M 段，判据是 `lib.sh` 的 `date_out_of_range`：早于本仓第一个提交宽限 7 天、或晚于最晚时区的今天，都不可能是真发生过的事），**而它只认正文里的两种形态**：历史条目的 `### 日期`、正文里的「实测（日期）」。2026-09-23 实测：门禁样本里 8 个文件名与 32 处正文写着 2026-01-01 / 2026-01-02，比本仓第一个提交（2026-08-26）早大半年；带一个 `records/2026-01-01-临时实测.md` 跑 64 道阶段加 doc-lint，**0 道点名它**。一个编造日期读起来和真日期一模一样，而门禁样本正是后来人照抄形态的样板 | **已还大半（2026-09-23，门禁 95 号第 ④ 条）**：判据 source 上游 `lib.sh` 的 `date_out_of_range`，不另写一份；两维各判各的、各报各的数——文件名扫全仓路径（现查 1651 个文件、90 条带日期），正文只扫 `.claude/gate.d/fixtures/` 下的 `.md`（现查 173 份、80 个日期）。当天把那 8 个文件名与 32 处正文改成各自 fixture 的创建日（样本里要表先后两次事件的用创建日与次日）。判别力在 `fixtures/95-fixture-claims.sh/` 双向证过：red 的 `setup.sh` 在临时仓里现造一个坏文件名与一处坏正文（**不摆进仓里**，摆进来会被这一条自己扫到，C441（全仓清扫工具会吃掉自己的判别力样本）），并先做一个真实日期的提交让 `project_start_date` 有值、下界那一支真的走到；green 两维各放一个合法日期，成功句报「1 条带日期」「1 份 .md 里 1 个日期」，防「扫到 0 项也报绿」。**仍欠三样**：① `.claude/doc-lint-exclude` 里每行要写清它关掉了哪几类检查——只为绕开登记冲突而整份排除，等于把日期、指代、编号简称几条一起关掉，排除项该按检查分格、不按文件分格；② 运行时才生成的编造日期 95 号扫不到（`fixtures/60-stale-open-items.sh/*/setup.sh` 的 `GIT_COMMITTER_DATE="2026-01-01"`、`fixtures/91-archive-past-rounds.sh/red/setup.sh` 造的 `e1-old-round-2026-01-01.out`、`scripts/kb/stale-candidates.py` 自检里的 `records/2026-01-01-log.md`）；③ 真 kb 正文里的 `已定（日期）`、`—— 已跑（日期）` 形态**明确不做**，依据见下一格 | **射程不许再放大，这条是实测定的**：2026-09-23 扫全仓正文得 52 处越界，其中 20 处全部合法——`prior-art.md` 9 处（别家项目的真实日期：bcachefs 手册 2026-04-16、`k1024.org/posts/2019/2019-02-08`、Greg KH 2026-07-15 表态）、`decisions-history/2026-09.md` 3 处（RFC 演进史 2015-08-07 → 2016-11-14 → 2017-01-30）、`checks-owed.md` 8 处（这一行自己引 2026-01-01 当例子）。`date_out_of_range` 的下界假设是「本仓的事不可能早于本仓第一个提交」，**这只对说本仓自己事的日期成立**；上游 M 段只认那两种形态不是射程不够，是有意收窄。⚠️ 本条 2026-09-23 早先的版本提议「上游把 M 段射程扩到表格单元格与标题括注」，**当天被这次实测推翻、已撤回** | 2026-09-23 用户看到 `fixtures/81-audit-contradictions.sh/red/records/2026-01-01-总审核.md` 问「我们禁止了这样的命名，为什么还出现」，逐处现查后立 |
 
 `````
 

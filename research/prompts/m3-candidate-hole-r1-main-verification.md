@@ -12,7 +12,7 @@
 | 开工快照 | `research/prompts/m3-candidate-hole-r1-snapshot/`（kb 4 份、crates 8 份；冻结副本 `/tmp/claude-1000/m3-candidate-hole-r1/tree/`） | crates 8 份在冻结副本上 `sha256sum -c` 全过；kb 4 份里 D16（发布语义）、checks-owed.md、invariants.md 三份快照之后被改过，D13（验证路线） 没变，见下一段 |
 | 云端正推（Sonnet） | `research/prompts/m3-candidate-hole-r1-sonnet-output.md`（212 行，sha256 4f8171bb…b690），没写模型 | — |
 | 云端攻方（Opus） | `research/prompts/m3-candidate-hole-r1-opus-output.md`（276 行，sha256 b9698809…fc8c），模型 `research/prompts/m3-candidate-hole-r1-opus-model/`（`results/SHA256SUMS` sha256 802b8885…5e52） | 主 agent 复跑，见「复跑」一节 |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root <倒推根> --background research/prompts/_m3-candidate-hole-r1-background.md`：「✓ 核了 80 处引文，对上 80 处，没判 0 处（逐处列在上面）」；倒推根里 crates 指冻结副本、kb 四份是倒推出的快照原样 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root <倒推根> --background research/prompts/_m3-candidate-hole-r1-background.md`：「✓ 核了 80 处引文，对上 80 处，没判 0 处（逐处列在上面）」；倒推根里 crates 指冻结副本、kb 四份是倒推出的快照原样 |
 
 快照之后改过的 kb 三份，倒推法与改动清单在 `research/prompts/m3-candidate-hole-r1-snapshot/kb-reverse.md` 与 `kb-reverse.py`：按落盘的逆序反做删除与并发那条线的第三份写回（C693 手补 C159 一处、插 C691–C693 三行、scribe-b 定点替换、scribe-a 落在 D16 的 2 处）、本线 C342 回填一处、本线写回乙 11 处、本线写回甲落在 checks-owed 的 7 处（C398 一行挪表，倒推时插回 C399 之前），倒推出的四份与 `kb-sha256.txt` 逐份相同。腿引的 kb 行都在倒推出的原样上核过（cite-check 80 处对上）。另：主仓 2026-10-03 起有一串提交（`git log 0c065788^..HEAD`，别的会话做的），只改了文件在不在提交里，不改内容，不影响这一轮的核对。
 

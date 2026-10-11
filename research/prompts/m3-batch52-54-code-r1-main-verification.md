@@ -61,4 +61,4 @@
 
 ## 六、复跑核对（攻方模型）
 
-攻方模型拷到 `~/.local/share/singlefs/work/m3-batch52-54-code-r1-verify/model/`（七份脚本与探针 sha256 与报告开头那张表逐个相同），在空工作目录 `run/` 从头跑 `SINGLEFS_SCRIPTS=research/scripts SINGLEFS_REPO=<冻结副本> OPUS_THREADS=15 OPUS_MEMORY_CAP=12G bash model/rerun.sh run all`（第一次没设 `SINGLEFS_SCRIPTS`，模型目录拷出仓之后找不到脚本目录，rc=1、什么都没跑；设上重跑），rc=0，compare 原样末行「compare：22 份，不一致 0 份」，22 份逐份「一致」。第二节引的攻方数（K1 六坏法的成员、K2 旋钮下 1800 次判 0 违例、产品容量两条边、三种容器号坏法不红、K3 四段摘要、K4 13 个种子形状计数、K5 八个钉值、K6 恒真照绿）都在这 22 份里，主 agent 复跑与腿交的一致。
+攻方模型拷到 `~/.local/share/singlefs/work/m3-batch52-54-code-r1-verify/model/`（七份脚本与探针 sha256 与报告开头那张表逐个相同），在空工作目录 `run/` 从头跑 `SINGLEFS_SCRIPTS=scripts SINGLEFS_REPO=<冻结副本> OPUS_THREADS=15 OPUS_MEMORY_CAP=12G bash model/rerun.sh run all`（第一次没设 `SINGLEFS_SCRIPTS`，模型目录拷出仓之后找不到脚本目录，rc=1、什么都没跑；设上重跑），rc=0，compare 原样末行「compare：22 份，不一致 0 份」，22 份逐份「一致」。第二节引的攻方数（K1 六坏法的成员、K2 旋钮下 1800 次判 0 违例、产品容量两条边、三种容器号坏法不红、K3 四段摘要、K4 13 个种子形状计数、K5 八个钉值、K6 恒真照绿）都在这 22 份里，主 agent 复跑与腿交的一致。

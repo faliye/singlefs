@@ -19,7 +19,7 @@ K1 各项（详见第二节表，数在第三、四节，推翻条件在第六�
 
 ## 复跑
 
-模型目录 `research/prompts/m3-w3-r2-sonnet-model/`（`README.md` 写了每个文件是什么）。在仓根，`W` 取一个空目录，每段一条前台命令（各在 4 分钟以内），编译与跑都经 `research/scripts/run-with-memory-cap.sh`（编译 6G、跑 4G），线程 6，只跑 harness 档：
+模型目录 `research/prompts/m3-w3-r2-sonnet-model/`（`README.md` 写了每个文件是什么）。在仓根，`W` 取一个空目录，每段一条前台命令（各在 4 分钟以内），编译与跑都经 `scripts/run-with-memory-cap.sh`（编译 6G、跑 4G），线程 6，只跑 harness 档：
 
 ```
 M=research/prompts/m3-w3-r2-sonnet-model; W=<空目录>
@@ -430,4 +430,4 @@ d88506b6c2a59aa1c6a0c541c8f9233f707b08e1e5daf9ba3741d1c4188d7a16  ./tools/summar
 bd8033092394f059c5994c5fa5c59d67dd1f3dd50c4f149e3061d10d12eaacef  ./w3r2_module.rs
 ```
 
-交回前跑 `python3 research/scripts/cite-check.py research/prompts/m3-w3-r2-sonnet-output.md` 的末行：✓ 核了 16 处引文，对上 16 处，没判 0 处（逐处列在上面）
+交回前跑 `python3 scripts/cite-check.py research/prompts/m3-w3-r2-sonnet-output.md` 的末行：✓ 核了 16 处引文，对上 16 处，没判 0 处（逐处列在上面）

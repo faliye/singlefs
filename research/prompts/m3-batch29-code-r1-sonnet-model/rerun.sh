@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 正推腿（m3-batch29-code-r1-sonnet）的复跑脚本：一次只起一条 cargo，只跑 harness 档，checker 档（含 GPU）一概不跑。
-#   SINGLEFS_REPO=<冻结副本树根（有 Cargo.toml 与 crates/）> [SINGLEFS_TOOLS=<有 research/scripts 的仓根，默认从本脚本位置推>] \
+#   SINGLEFS_REPO=<冻结副本树根（有 Cargo.toml 与 crates/）> [SINGLEFS_TOOLS=<有 scripts 的仓根，默认从本脚本位置推>] \
 #     [RERUN_THREADS=<线程上限，默认 15>] [RERUN_BUDGET_SECONDS=<墙钟预算，默认 0 = 不限；用完在单元 / 变异行边界退 75，再跑同一条命令续>] bash rerun.sh <目录> all
 #       目录第一次要空；全做完退 0 并打印汇总（summary.txt）。
 #   bash rerun.sh compare <summary-a> <summary-b>     # 两份 summary 各自排序后逐行比，自己不依赖 SINGLEFS_REPO
@@ -28,7 +28,7 @@ out="${1:?用法：rerun.sh <目录> all}"; mode="${2:-all}"
 [[ "$mode" == all ]] || { echo "只认 all" >&2; exit 2; }
 : "${SINGLEFS_REPO:?要设 SINGLEFS_REPO=<冻结副本树根>}"
 tools="${SINGLEFS_TOOLS:-$(cd "$here/../../.." && pwd)}"
-[[ -f "$tools/research/scripts/run-with-memory-cap.sh" ]] || { echo "找不到 $tools/research/scripts/run-with-memory-cap.sh，设 SINGLEFS_TOOLS" >&2; exit 2; }
+[[ -f "$tools/scripts/run-with-memory-cap.sh" ]] || { echo "找不到 $tools/scripts/run-with-memory-cap.sh，设 SINGLEFS_TOOLS" >&2; exit 2; }
 mkdir -p "$out"
 out="$(cd "$out" && pwd)"
 threads="${RERUN_THREADS:-15}"
@@ -51,13 +51,13 @@ restore_walk() { cp "$out/pristine/walk.rs" "$tree/$walk"; touch "$tree/$walk"; 
 cargo_step() {   # cargo_step <上限> <键> <cargo 参数…>
     local cap="$1" key="$2"; shift 2
     CARGO_TARGET_DIR="$target" RUN_WITH_MEMORY_CAP_KEY="m3b29-sonnet-$key" \
-        nice -n 19 bash "$tools/research/scripts/capped.sh" "$threads" bash "$tools/research/scripts/run-with-memory-cap.sh" "$cap" \
+        nice -n 19 bash "$tools/scripts/capped.sh" "$threads" bash "$tools/scripts/run-with-memory-cap.sh" "$cap" \
         cargo test --offline --manifest-path "$tree/Cargo.toml" "$@"
 }
 
 unit_static() {
     set +e
-    python3 "$tools/research/scripts/crates-mutation-rows.py" static-check "$tree" > "$out/static.raw" 2>&1
+    python3 "$tools/scripts/crates-mutation-rows.py" static-check "$tree" > "$out/static.raw" 2>&1
     set -e
     local row
     for row in $(seq 2977 2989); do

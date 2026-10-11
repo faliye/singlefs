@@ -10,7 +10,7 @@
 | 开工快照 | `research/prompts/m3-formal-r4-snapshot/`：`crates-sha256.txt`（220 份，冻结副本 `/tmp/claude-1000/m3-formal-r4/tree/`）、`kb-sha256.txt` | 腿交齐之后冻结副本 `sha256sum -c` 全 OK；`kb-sha256.txt` 全 OK |
 | 云端正推（Sonnet） | `research/prompts/m3-formal-r4-sonnet-output.md`（339 行，sha256 45931dac…b5a3）；模型 `…-sonnet-model/`（`t1_fsync_reading.py`、`t2_allowed_sets.py`） | 两个脚本是纯 Python 算允许集合的小模型，正推自报复跑与产物逐字节同；主 agent 没复跑（数只用来说明 T1、T2 两读分得开，判决不靠它的绝对值） |
 | 云端攻方（Opus） | `research/prompts/m3-formal-r4-opus-output.md`（304 行，sha256 a55a4216…bea4）；模型 `…-opus-model/`（原型 crate `r4probe`、`rerun.sh`、15 份日志） | 主 agent 在 `/tmp/claude-1000/m3-formal-r4-main-check/` 照 `rerun.sh` 复跑：脚本里的编译用 `auto` 上限撞了 866M（oom-kill），改成 8G 手动编过，六段历史各跑一遍；与入库的 `t5b-*.log` 比，去掉内存包装两行、`prepare_secs` / `elapsed_secs` 与缩进的「e.g.」示例块之后逐行相同（123–132 行各一份），示例块不同是多线程下先报到的状态不同；`states_judged` 合计 65 719 |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-formal-r4/tree --root . --background research/prompts/_m3-formal-r4-background.md`：「✓ 核了 98 处引文，对上 98 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-formal-r4/tree --root . --background research/prompts/_m3-formal-r4-background.md`：「✓ 核了 98 处引文，对上 98 处，没判 0 处」 |
 
 攻方的数是它在冻结副本拷贝上、小盘（环 6 MiB）上量的，判决引的都是主 agent 复跑坐实的计数行；照 `.claude/rules/three-way-inference.md`「一条腿在副本装置上量出来的数，要在入库的装置上重做一次才能引」，这些数进 kb 之前要在入库装置上重做（第五节）。
 

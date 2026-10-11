@@ -37,13 +37,13 @@ awk -F'\t' '$2 ~ /^heavy/{print $1" | "$2}' .claude/hooks/selftest-registry.tsv
 echo -n "checks-owed 里「假驱动」: "; grep -c '假驱动' .claude/kb/checks-owed.md
 
 echo "== L5 replay.sh 与 broad-mutation.py"
-for p in '--list-items' '--item' '--selftest'; do echo -n "replay.sh 里 $p: "; grep -c -- "$p" research/scripts/replay.sh; done
-awk 'NR==82' research/scripts/broad-mutation.py | cut -c1-160
+for p in '--list-items' '--item' '--selftest'; do echo -n "replay.sh 里 $p: "; grep -c -- "$p" scripts/replay.sh; done
+awk 'NR==82' scripts/broad-mutation.py | cut -c1-160
 
 echo "== L6 记录里的尾巴在 checks-owed 里的命中数"
 for k in '基线就是红' 'BUILTIN_FEEDS' '版本表' '变异表证过红\|按变异表' 'selftest-pattern-words-judged' '函数名'; do echo -n "$k: "; grep -c "$k" .claude/kb/checks-owed.md; done
-echo -n "暂存的 memory-peaks 临时文件: "; git status --short research/scripts | grep memory-peaks || echo 无
-ls -la research/scripts/memory-peaks.tsv.*.partial 2>/dev/null
+echo -n "暂存的 memory-peaks 临时文件: "; git status --short scripts | grep memory-peaks || echo 无
+ls -la scripts/memory-peaks.tsv.*.partial 2>/dev/null
 
 echo "== L7 / 1.4 C409 引句在 D13 与 checks-owed 里的命中"
 echo -n "D13: "; grep -cF '里程碑收尾、动了崩溃点重放或判器的那一批提交之前 = 全量档全绿' .claude/kb/decisions/13-验证路线.md
@@ -61,15 +61,15 @@ if [[ -f "$patch/crates.patch" ]]; then
   echo -n "mutations-append.tsv 命中行: "; grep -c states_reused "$patch/mutations-append.tsv"
   echo -n "+++ 行指向 crates/ 之外的文件数: "; grep '^+++ b/' "$patch/crates.patch" | grep -vc '^+++ b/crates/'
 else echo "补丁不在 $patch"; fi
-echo -n "crash-amplification.sh 里非注释行读 crates/ 的行数: "; grep -v '^\s*#' research/scripts/crash-amplification.sh | grep -c 'crates/'
+echo -n "crash-amplification.sh 里非注释行读 crates/ 的行数: "; grep -v '^\s*#' scripts/crash-amplification.sh | grep -c 'crates/'
 
 echo "== 探针：本仓钩子对第三轮正文第二节点名的几条命令（只喂 JSON，implementation-writer 身份）"
 probe=research/prompts/test-script-align-r2-opus-model/hook-probe.py
 while IFS= read -r c; do python3 "$probe" "$S/det.jsonl" implementation-writer "$PWD" "$c" | cut -c1-170; done <<'CMDS'
-bash research/scripts/mutate.{sh,x} crates/mutations.tsv
+bash scripts/mutate.{sh,x} crates/mutations.tsv
 bash .claude/gate.d/checker-tier-layer0-replay.{sh,} /home/fy5090/code/singlefs
-bash research/scripts/mutate.sh crates/mutation?.tsv
-ls research/scripts/{a,b}.sh
+bash scripts/mutate.sh crates/mutation?.tsv
+ls scripts/{a,b}.sh
 cat crates/*.toml
 CMDS
 echo "== 第二轮攻方 rerun.sh（只喂 JSON）"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 用法：SINGLEFS_REPO=<冻结副本根，含 crates/> SINGLEFS_MAIN_REPO=<主仓根，取 research/scripts/> bash rerun.sh <空的输出目录>
+# 用法：SINGLEFS_REPO=<冻结副本根，含 crates/> SINGLEFS_MAIN_REPO=<主仓根，取 scripts/> bash rerun.sh <空的输出目录>
 # 复跑正推腿报告 0.1、0.2、0.7、0.8（不编译、不跑 cargo）：sha256 对 18 份、变异表静态检查、守卫 u32 仿真、变异表与合前对比。
 # 报告 0.3–0.6、0.9 要编译（harness 基线、kernel-sizes 小程序、变异行逐条现跑），按 README.md 分条跑，不在这里。
 # 输出写 <输出目录>/rerun.out，逐行是「标签 TAB 结果」；compare.sh 比两次输出。
@@ -19,8 +19,8 @@ printf '0.1 sha256 OK 份数\t%s\n' "$ok" >> "$out"
 # 0.2：变异表静态检查（把冻结副本拷成临时副本再判，不动冻结副本）
 work=$out_dir/work; mkdir -p "$work"
 cp -a "$SINGLEFS_REPO"/crates "$SINGLEFS_REPO"/Cargo.toml "$SINGLEFS_REPO"/Cargo.lock "$SINGLEFS_REPO"/litmus "$work"/
-mkdir -p "$work/.claude" "$work/research/scripts"
-static=$(cd "$SINGLEFS_MAIN_REPO" && python3 research/scripts/crates-mutation-rows.py static-check "$work" 2>&1 | grep '^CHECKED' || true)
+mkdir -p "$work/.claude" "$work/scripts"
+static=$(cd "$SINGLEFS_MAIN_REPO" && python3 scripts/crates-mutation-rows.py static-check "$work" 2>&1 | grep '^CHECKED' || true)
 printf '0.2 static-check\t%s\n' "$static" >> "$out"
 # 0.7：守卫仿真
 printf '0.7 guard_model\t%s\n' "$(python3 -I "$here/guard_model.py" | tr '\n' ';')" >> "$out"

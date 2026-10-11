@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # 正推腿 m3-batch10t-code-r1 的快速复跑（harness 档，不要显卡）。草稿副本在 $S/repo（冻结副本去掉 target 的拷贝，
 # 加了 crates/singlefs-harness/tests/ 下的几份探针与 scan_copy.rs，walk.rs 末尾加了 chain_record_view 的垫片）。
-# 经 `bash research/scripts/run-with-memory-cap.sh 4G bash <这份脚本>` 跑；输出落到调用方给的文件。
+# 经 `bash scripts/run-with-memory-cap.sh 4G bash <这份脚本>` 跑；输出落到调用方给的文件。
 set -uo pipefail
 S="$HOME/.local/share/singlefs/work/m3-batch10t-code-r1-sonnet"
 export TMPDIR="$S/tmp" CARGO_TARGET_DIR="$S/target"
-R=/home/fy5090/code/singlefs/research/scripts/replace-once.py
+R=/home/fy5090/code/singlefs/scripts/replace-once.py
 cd "$S/repo" || exit 2
-run() { nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 cargo test --offline -p singlefs-harness "$@" 2>&1 | grep -E 'PROBE|test result|FAILED|panicked at' | cut -c1-230; }
+run() { nice -n 19 bash /home/fy5090/code/singlefs/scripts/capped.sh 8 cargo test --offline -p singlefs-harness "$@" 2>&1 | grep -E 'PROBE|test result|FAILED|panicked at' | cut -c1-230; }
 echo "== A 基线：harness 档 gpu_memory_ledger 单测"; run --lib -- gpu_memory_ledger
 LEDGER=crates/singlefs-harness/src/gpu_memory_ledger.rs
 cp "$LEDGER" "$S/ledger.orig.rs"

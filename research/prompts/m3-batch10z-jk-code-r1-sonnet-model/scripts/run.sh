@@ -2,7 +2,7 @@
 # run.sh <label> <arm> [ENV=val ...]  -> runs/<label>.log
 set -u
 W=$HOME/.local/share/singlefs/work/m3-batch10z-jk-code-r1-sonnet
-R=/home/fy5090/code/singlefs/research/scripts
+R=/home/fy5090/code/singlefs/scripts
 label=$1; arm=$2; shift 2
 mkdir -p $W/runs
 cd $W/tree-p

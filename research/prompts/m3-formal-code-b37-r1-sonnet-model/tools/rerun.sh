@@ -11,7 +11,7 @@ echo "== B4 两行变异的锚点命中数与落点"; python3 -I "$here/anchors.
 if [[ "${2:-}" == harness ]]; then
   echo "== B2 harness 档：25 的另一半（不是 checker 档，可跑）"
   target="$(mktemp -d)"; trap 'rm -rf "$target"' EXIT
-  (cd "$tree" && CARGO_TARGET_DIR="$target" nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G \
-    bash /home/fy5090/code/singlefs/research/scripts/capped.sh 15 \
+  (cd "$tree" && CARGO_TARGET_DIR="$target" nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 8G \
+    bash /home/fy5090/code/singlefs/scripts/capped.sh 15 \
     cargo test --offline --locked -p singlefs-harness --test new_pool_file_creation_publish)
 fi

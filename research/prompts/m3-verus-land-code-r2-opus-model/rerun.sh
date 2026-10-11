@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 攻方 m3-verus-land-code-r2 的复跑：在 <工作目录> 里从冻结副本拷核与仓，跑 Verus 三张表、harness 两张表。
-# 用法：bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 6 bash rerun.sh <冻结副本根> <工作目录>
+# 用法：bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 6 bash rerun.sh <冻结副本根> <工作目录>
 # 冻结副本根：/tmp/claude-1000/m3-verus-land-code-r2/tree（sha256 清单 research/prompts/m3-verus-land-code-r2-snapshot/crates-sha256.txt）。
 # Verus 三张表各几十秒；harness 那 14 行在本机负载下 release 共约 20 分钟（含 14 次增量编译）。
 set -u

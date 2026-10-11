@@ -56,4 +56,4 @@
 
 ## 六、复跑核对（攻方模型）
 
-攻方模型拷到 `~/.local/share/singlefs/work/m3-batch57-code-r1-verify/model/`，在空工作目录 `run/` 从头跑 `SINGLEFS_SCRIPTS=research/scripts OPUS_THREADS=15 OPUS_MEMORY_CAP=8G bash model/rerun.sh run all`（冻结副本取缺省路径），rc=0，compare 原样末行「compare：41 份，不一致 0 份」，41 份逐份「一致」（含 `row-3848.txt`，即第三节末那一行慢档写侧变异的复跑）。第二节引的攻方数（旋钮 ≥ 2 随机历史 5700 次判 0 违例、[2, 1, 1] 三棵树正确判法 Violated 与改坏下 Holds、K3-2 那张盘两种次序报的成员、K3-3 两种读者改法下前提断言红）都在这 41 份里，主 agent 复跑与腿交的一致。
+攻方模型拷到 `~/.local/share/singlefs/work/m3-batch57-code-r1-verify/model/`，在空工作目录 `run/` 从头跑 `SINGLEFS_SCRIPTS=scripts OPUS_THREADS=15 OPUS_MEMORY_CAP=8G bash model/rerun.sh run all`（冻结副本取缺省路径），rc=0，compare 原样末行「compare：41 份，不一致 0 份」，41 份逐份「一致」（含 `row-3848.txt`，即第三节末那一行慢档写侧变异的复跑）。第二节引的攻方数（旋钮 ≥ 2 随机历史 5700 次判 0 违例、[2, 1, 1] 三棵树正确判法 Violated 与改坏下 Holds、K3-2 那张盘两种次序报的成员、K3-3 两种读者改法下前提断言红）都在这 41 份里，主 agent 复跑与腿交的一致。

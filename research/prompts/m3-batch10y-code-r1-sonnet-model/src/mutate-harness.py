@@ -27,8 +27,8 @@ for index, row in enumerate(rows, 1):
             "#!/usr/bin/env bash\nset -uo pipefail\ncd \"%s\"\nexport CARGO_TARGET_DIR=\"%s\"\ncargo test %s\n" % (REPO, W + "/target", command)
         )
         result = subprocess.run(
-            ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/research/scripts/capped.sh", "4",
-             "bash", "/home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh", "4G", "bash", script],
+            ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/scripts/capped.sh", "4",
+             "bash", "/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh", "4G", "bash", script],
             capture_output=True, text=True, env=env)
         out = result.stdout + result.stderr
         verdict = "红（被抓）" if result.returncode == 101 else ("绿（没抓）" if result.returncode == 0 else f"退出码 {result.returncode}")

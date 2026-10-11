@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 正推腿 m3-batch26-code-r1-sonnet 的复跑：在冻结副本的拷贝里编 harness、跑第 26 批 6 条坏镜像、逐行施加 mutations.tsv 里第 24 批 K 那两行与第 26 批 CPU 那六行、再施加自己加的额外变异。
-# 环境变量：SINGLEFS_REPO（仓根，要用它的 research/scripts）、FROZEN_TREE（冻结副本，缺省 /tmp/claude-1000/m3-batch26-code-r1/tree）、
+# 环境变量：SINGLEFS_REPO（仓根，要用它的 scripts）、FROZEN_TREE（冻结副本，缺省 /tmp/claude-1000/m3-batch26-code-r1/tree）、
 #   WORK（工作目录，缺省 /tmp/claude-1000/m3-batch26-code-r1-sonnet-rerun；编译目录在里面）、STAGES（缺省「build base paper extra」，可拆开分次跑，共用同一个 WORK）。
 # 编译与跑都经 run-with-memory-cap.sh（编译 6G、跑 4G）与 capped.sh 10。GPU 不跑。
 # 输出：$WORK/summary.txt（行号 TAB 命中次数 TAB 退出码 TAB 红的测试数，按行号排序）、$WORK/base.txt（基线 6 条测试的结果行，排序）。
@@ -14,7 +14,7 @@ export CARGO_TARGET_DIR="$WORK/target" RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="派
 mkdir -p "$WORK/logs"
 [ -d "$WORK/tree" ] || cp -r "$FROZEN_TREE" "$WORK/tree"
 M="$WORK/tree/Cargo.toml"
-cap() { bash "$SINGLEFS_REPO/research/scripts/run-with-memory-cap.sh" "$1" bash "$SINGLEFS_REPO/research/scripts/capped.sh" 10 "${@:2}"; }
+cap() { bash "$SINGLEFS_REPO/scripts/run-with-memory-cap.sh" "$1" bash "$SINGLEFS_REPO/scripts/capped.sh" 10 "${@:2}"; }
 for stage in $STAGES; do
   case "$stage" in
     build) cap 6G cargo test --offline --manifest-path "$M" -p singlefs-harness --test checker_known_bad_images --no-run > "$WORK/logs/build.log" 2>&1 ;;

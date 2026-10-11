@@ -11,8 +11,8 @@ python3 "$HERE/probe.py" apply "$S/tree" "$rel" "$HERE/probes/$probe.orig" "$HER
 cd "$S/tree"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，只跑 harness 档单个测试二进制"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS=150
-CARGO_TARGET_DIR=$S/target nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh "${CAP:-4G}" \
-  bash /home/fy5090/code/singlefs/research/scripts/capped.sh 6 \
+CARGO_TARGET_DIR=$S/target nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh "${CAP:-4G}" \
+  bash /home/fy5090/code/singlefs/scripts/capped.sh 6 \
   cargo test --offline -p singlefs-harness --test "$bin" -- "$@" > "$S/probe-$probe-$bin.log" 2>&1
 rc=$?
 python3 "$HERE/probe.py" restore "$S/tree" "$FROZEN" "$rel"

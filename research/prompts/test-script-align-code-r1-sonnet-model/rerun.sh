@@ -13,8 +13,8 @@ fi
 echo "== 探针 1：decide_gpu_test_start 的结局"
 nice -n 19 rustc --edition 2021 -O -o "$work/probe" "$work/gpu_adapter_decision_probe.rs" 2>"$work/rustc.err" || { cat "$work/rustc.err"; exit 4; }
 # 峰值表里有这条命令的实测峰值就用 auto（1.5 倍），没有（第一次跑）才写明 2G
-bash research/scripts/run-with-memory-cap.sh auto "$work/probe" 2>"$work/cap.err"; probe_exit=$?
-if [[ $probe_exit -eq 251 ]]; then bash research/scripts/run-with-memory-cap.sh 2G "$work/probe"; probe_exit=$?; else cat "$work/cap.err" >&2; fi
+bash scripts/run-with-memory-cap.sh auto "$work/probe" 2>"$work/cap.err"; probe_exit=$?
+if [[ $probe_exit -eq 251 ]]; then bash scripts/run-with-memory-cap.sh 2G "$work/probe"; probe_exit=$?; else cat "$work/cap.err" >&2; fi
 echo "exit=$probe_exit"
 crates="$tree/crates"
 echo "== 探针 2：PCI 判据在冻结副本里有没有"

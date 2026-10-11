@@ -12,10 +12,10 @@ cp Cargo.toml Cargo.lock $S/tree/
 python3 $M/patch_recovery.py $S/tree/crates/singlefs-core/src/recovery.rs
 python3 $M/patch_e165.py $S/tree/crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs
 python3 $M/patch_e165_k10.py $S/tree/crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs
-(cd $S/tree && nice -n 19 bash <仓>/research/scripts/run-with-memory-cap.sh auto bash <仓>/research/scripts/capped.sh 10 \
+(cd $S/tree && nice -n 19 bash <仓>/scripts/run-with-memory-cap.sh auto bash <仓>/scripts/capped.sh 10 \
    cargo build --release --offline -p singlefs-checker-tier --bin e165_replay_bounded_enumeration --target-dir $S/target)
-E165_ATTACK_BIN=$S/target/release/e165_replay_bounded_enumeration nice -n 19 bash <仓>/research/scripts/run-with-memory-cap.sh 2G \
-   bash <仓>/research/scripts/capped.sh 10 bash $M/run-all.sh $S/runs
+E165_ATTACK_BIN=$S/target/release/e165_replay_bounded_enumeration nice -n 19 bash <仓>/scripts/run-with-memory-cap.sh 2G \
+   bash <仓>/scripts/capped.sh 10 bash $M/run-all.sh $S/runs
 python3 $M/summarize.py $S/runs > $S/runs/summary.txt
 ```
 

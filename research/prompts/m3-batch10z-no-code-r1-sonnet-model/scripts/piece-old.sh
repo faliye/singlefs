@@ -2,7 +2,7 @@
 # piece.sh <批号> <件名> <环境变量…>  经内存包装起一件 s2 探针
 set -u
 W=$HOME/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet
-R=/home/fy5090/code/singlefs/research/scripts
+R=/home/fy5090/code/singlefs/scripts
 batch=$1; name=$2; shift 2
 mkdir -p "$W/runs/$batch"
 B=$(ls -t $W/target-old/release/deps/s2_probe-* | grep -v '\.d$' | head -1)

@@ -16,7 +16,7 @@
 
 - 冻结副本 `/tmp/claude-1000/m3-formal-code-b31-r1/tree/`（主仓第 31 批合入后的 `crates/`、`Cargo.toml`、`Cargo.lock`，sha256 清单同目录 `crates-sha256.txt`，310 行）。代码引文读冻结副本，写 `crates/…` 相对路径与那棵树里的行号。要编就拷到自己的草稿目录。
 - 合入验证 `/tmp/claude-1000/merge-and-verify/2026-10-05-2822486/`：harness 档 165 个测试二进制全绿；fmt、`--all-targets --all-features` clippy、单开 gpu / verdict-store 两种 clippy、musl release `new_pool_file_creation_on_device` 都过。checker 档一条没跑：checker 档经 `build_pool` 一族搭的流（31-1 报告第 9 节：29 份测试文件与 E161 装置）在 mkfs 同进程里发布超过 23 次的，落点 / 写流 / 崩溃态数可能变（读码，没逐份数）；E171 新装置的 U10–U16、各装置的变异行、QEMU 那道门禁都只编过。
-- 已知、已记的：旧 E171 装置比对器那几份复跑（`research/scripts/replay.sh` 第 270、272–274 行）与 s4 坏实现表第 95 行结局会变（31-3 报告第 2 条）；E156 W7 那一格阳性对照今天在第一次记根时 panic，归 E156 第 5 次重跑；`overwrite_in_one_instance.rs` 第 605–612 行那条 812 用例的说明过时，归下一批。
+- 已知、已记的：旧 E171 装置比对器那几份复跑（`scripts/replay.sh` 第 270、272–274 行）与 s4 坏实现表第 95 行结局会变（31-3 报告第 2 条）；E156 W7 那一格阳性对照今天在第一次记根时 panic，归 E156 第 5 次重跑；`overwrite_in_one_instance.rs` 第 605–612 行那条 812 用例的说明过时，归下一批。
 
 方案按 `crates/` 今天的实现来谈。
 
@@ -1491,7 +1491,7 @@ nlink == dirent 条数的门（dirent 树存在）今天没有输入，写不成
 
 跑前登记 `research/prompts/e170-preregistration.md`（第十二节修订 1）；问题单 `research/prompts/o3-spec-executor-questions.md` 的 Q1（只照 kb 文字写的 Python 执行器判不判得出一个崩溃状态在不在规约允许的集合里）、Q2（执行器与实现在同一批状态上判得一不一致）、Q3（执行器有没有判别力）、Q4（一态多久、能不能进快档）。
 
-**现状**：第 2 次重跑（2026-10-04，「第 2 次重跑」一节）换了一张问题单 `research/prompts/e170-r2-questions.md`（执行器另起两个目录，加谓词 W、T，再跟上 487 字节 journal 记录头）：五行都够判，Q4 判甲，E171（三oracle合谋测试） 第 1 次重跑用 v2-487。第 1 次重跑（2026-10-03，严格跑法，「第 1 次重跑」一节）也跑了三段：Q1 判得出、Q2 一致、Q3 有判别力，三行问题单的判定写在现状表的 Q1、Q2、Q3 三行。第一次跑（「第一段做了什么」「第二段」「第三段」各节）：三段都跑了。第一段（读 `crates/` 的导出装置）导出两条层 0 流、取三批 972 态、记实现判定；第二段（只读 kb 的 Python 执行器，`research/e7-index-bench/src/bin/e170_o3_spec_executor/`）写成、冻结、跑三批；第三段（读 `crates/` 的执行员，执行器不改）写比对器、造坏状态表与盲测族、跑执行器变异。四行的判定照登记第六节字面：
+**现状**：第 2 次重跑（2026-10-04，「第 2 次重跑」一节）换了一张问题单 `research/prompts/e170-r2-questions.md`（执行器另起两个目录，加谓词 W、T，再跟上 487 字节 journal 记录头）：五行都够判，Q4 判甲，E171（三oracle合谋测试） 第 1 次重跑用 v2-487。第 1 次重跑（2026-10-03，严格跑法，「第 1 次重跑」一节）也跑了三段：Q1 判得出、Q2 一致、Q3 有判别力，三行问题单的判定写在现状表的 Q1、Q2、Q3 三行。第一次跑（「第一段做了什么」「第二段」「第三段」各节）：三段都跑了。第一段（读 `crates/` 的导出装置）导出两条层 0 流、取三批 972 态、记实现判定；第二段（只读 kb 的 Python 执行器，`scripts/experiments/e170_o3_spec_executor/`）写成、冻结、跑三批；第三段（读 `crates/` 的执行员，执行器不改）写比对器、造坏状态表与盲测族、跑执行器变异。四行的判定照登记第六节字面：
 
 | 行 | 判定 | 依据（产物） | 照字面之外要一起读的 |
 |---|---|---|---|

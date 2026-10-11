@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # m3-w3-r2 辩方腿（Sonnet）的复跑。用法：SINGLEFS_REPO=<仓根> bash rerun.sh <工作目录> <段>
-# 段（每段一条前台命令，4 分钟以内；编译与跑都经 research/scripts/run-with-memory-cap.sh，编译 6G、跑 4G）：
+# 段（每段一条前台命令，4 分钟以内；编译与跑都经 scripts/run-with-memory-cap.sh，编译 6G、跑 4G）：
 #   derive        从攻方腿的模型目录（$SINGLEFS_REPO/research/prompts/m3-w3-r1-opus-model）按 tools/derivation 里的五个补丁脚本重新生成
 #                 timeline-model/src/main.rs、w3r2_module.rs、make_device.py，与本目录里存的逐字节比（cmp）
 #   build-model   编抽象时间线模型（不依赖 crates/）
@@ -20,8 +20,8 @@ M=$(cd "$(dirname "$0")" && pwd)
 FROZEN=${FROZEN_TREE:-$HOME/.local/share/singlefs/work/m3-w3-r1/tree}
 E=$R/research/results/e175-product-path-inode-watermark-regression-2026-10-08
 O=$R/research/prompts/m3-w3-r1-opus-model
-CAP="bash $R/research/scripts/run-with-memory-cap.sh"
-THREADS="bash $R/research/scripts/capped.sh 6"
+CAP="bash $R/scripts/run-with-memory-cap.sh"
+THREADS="bash $R/scripts/capped.sh 6"
 mkdir -p "$W/out" "$W/bin"
 export SINGLEFS_REPO
 model() { nice -n 19 $CAP 4G "$W/target-model/release/w3r2-timeline-model" "$@"; }

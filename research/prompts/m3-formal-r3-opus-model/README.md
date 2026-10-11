@@ -11,30 +11,30 @@ rsync -a --exclude target --exclude .git /tmp/claude-1000/m3-formal-r3/tree/ $S/
 M=research/prompts/m3-formal-r3-opus-model
 python3 $M/patch_attack.py $S/tree            # 读同目录的 e165_attack_functions.rs；每处原文恰好命中一次
 # 编（两份各一个 target 目录）：
-(cd $S/tree-base && bash research/scripts/run-with-memory-cap.sh 3G bash research/scripts/capped.sh 8 cargo build --release --offline -p singlefs-checker-tier --bin e165_replay_bounded_enumeration --target-dir $S/target-base)
-(cd $S/tree && bash research/scripts/run-with-memory-cap.sh 3G bash research/scripts/capped.sh 8 cargo build --release --offline -p singlefs-checker-tier --bin e165_replay_bounded_enumeration --target-dir $S/target)
+(cd $S/tree-base && bash scripts/run-with-memory-cap.sh 3G bash scripts/capped.sh 8 cargo build --release --offline -p singlefs-checker-tier --bin e165_replay_bounded_enumeration --target-dir $S/target-base)
+(cd $S/tree && bash scripts/run-with-memory-cap.sh 3G bash scripts/capped.sh 8 cargo build --release --offline -p singlefs-checker-tier --bin e165_replay_bounded_enumeration --target-dir $S/target)
 # 原样装置：light 两族、segment1 对抗一族 A 域（与 research/results/ 的产物逐字节比，见 runs/base-equivalence.txt）
 $S/target-base/release/e165_replay_bounded_enumeration --bounds light --family legal
 $S/target-base/release/e165_replay_bounded_enumeration --bounds segment1 --family adversarial --only A
 # 打补丁的装置：各开关组合
-bash research/scripts/run-with-memory-cap.sh 3G bash $M/run-all.sh $S/target/release/e165_replay_bounded_enumeration $S/runs-attack
+bash scripts/run-with-memory-cap.sh 3G bash $M/run-all.sh $S/target/release/e165_replay_bounded_enumeration $S/runs-attack
 python3 $M/summarize.py $S/runs-attack > summary-all.txt        # 与 runs/summary-all.txt 比
 # Verus（0.2026.09.20.aef82ed，--no-cheating）
 V=~/.local/share/singlefs/formal-tools/verus-0.2026.09.20/verus-x86-linux/verus
 python3 $M/verus_variants.py $S/tree-base/crates/singlefs-replay-prefix/src/lib.rs $S/verus
-bash research/scripts/run-with-memory-cap.sh 600M bash $M/run-verus.sh $V $S/verus                       # → runs/verus-today-spec-verdicts.txt
+bash scripts/run-with-memory-cap.sh 600M bash $M/run-verus.sh $V $S/verus                       # → runs/verus-today-spec-verdicts.txt
 python3 $M/s2_strengthen.py $S/tree-base/crates/singlefs-replay-prefix/src/lib.rs $S/s00/src/lib.rs
 python3 $M/verus_variants.py $S/s00/src/lib.rs $S/verus-s2v
-bash research/scripts/run-with-memory-cap.sh 600M bash $M/run-verus.sh $V $S/verus-s2v                   # → runs/verus-s2-spec-verdicts.txt
+bash scripts/run-with-memory-cap.sh 600M bash $M/run-verus.sh $V $S/verus-s2v                   # → runs/verus-s2-spec-verdicts.txt
 python3 $M/s2_plus.py $S/s00/src/lib.rs $S/s01/src/lib.rs
 python3 $M/verus_variants.py $S/s01/src/lib.rs $S/verus-s2p
-bash research/scripts/run-with-memory-cap.sh 1G bash $M/run-verus.sh $V $S/verus-s2p --rlimit 200       # → runs/verus-s2-plus-spec-verdicts.txt
+bash scripts/run-with-memory-cap.sh 1G bash $M/run-verus.sh $V $S/verus-s2p --rlimit 200       # → runs/verus-s2-plus-spec-verdicts.txt
 (cd $S/verus-s2p/v08-back-chain-off && $V --crate-type=lib --edition=2021 --crate-name singlefs_replay_prefix --no-cheating --rlimit 1000 src/lib.rs)
 # 卸载记号的池上原型（内存稀疏盘、原样的核）
 cp $M/m3_formal_r3_attack_unmount_marker.rs $S/tree-base/crates/singlefs-harness/tests/
-(cd $S/tree-base && bash research/scripts/run-with-memory-cap.sh 2000M bash research/scripts/capped.sh 8 cargo test --offline -p singlefs-harness --test m3_formal_r3_attack_unmount_marker --target-dir $S/target-base -- --nocapture)
+(cd $S/tree-base && bash scripts/run-with-memory-cap.sh 2000M bash scripts/capped.sh 8 cargo test --offline -p singlefs-harness --test m3_formal_r3_attack_unmount_marker --target-dir $S/target-base -- --nocapture)
 ```
-（`research/scripts/…` 指主仓的那几份，在副本里跑时写主仓的绝对路径。）
+（`scripts/…` 指主仓的那几份，在副本里跑时写主仓的绝对路径。）
 
 ## 开关
 

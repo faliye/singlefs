@@ -8,7 +8,7 @@
 
 ## 复跑命令与模型文件
 
-在仓根，`W` 取一个空目录；每段一条前台命令（各在 4 分钟以内），编译与跑都经 `research/scripts/run-with-memory-cap.sh`（编译 6G、跑 4G），线程 5：
+在仓根，`W` 取一个空目录；每段一条前台命令（各在 4 分钟以内），编译与跑都经 `scripts/run-with-memory-cap.sh`（编译 6G、跑 4G），线程 5：
 
 ```
 M=research/prompts/m3-w3-r3-opus-s2-model; W=<空目录>
@@ -245,7 +245,7 @@ W3R3S2COUNT group=k2 rule=Opt1 arm=Product first_txg=Product ring=4 depth=8 form
 
 ## 没做什么
 
-- 没跑任何重型测试：没编、没跑 `singlefs-checker-tier` 的测试与层 0 枚举，没跑门禁；编译与运行只有我的模型和拷来的两份第二轮模型，全部经 `research/scripts/run-with-memory-cap.sh`（编译 6G、跑 2G–4G）、`nice -n 19`、线程 5。
+- 没跑任何重型测试：没编、没跑 `singlefs-checker-tier` 的测试与层 0 枚举，没跑门禁；编译与运行只有我的模型和拷来的两份第二轮模型，全部经 `scripts/run-with-memory-cap.sh`（编译 6G、跑 2G–4G）、`nice -n 19`、线程 5。
 - 没判 K1（代价并排、Q1–Q7 归正推腿）；没替主 agent 采纳；没读第一次抽样与正推腿的报告、模型、草稿。
 - 开工时 `ps` 看到别的会话在跑 `cargo test --offline --no-fail-fast -p singlefs-format -p singlefs-core -p singlefs-harness -p singlefs-checker`（pid 800319），没有性能测量在跑；没等锁。
 - 草稿目录 `~/.local/share/singlefs/work/m3-w3-r3-opus-s2/` 里的编译目录（`model/target/`、`recheck/target-r2-opus/`、`recheck/target-r2-sonnet/`、`rerun-empty/target/`、`rerun-empty/recheck/target-*`）与拷来的两份第二轮模型源码交回前删掉；留下原始输出 `out/`（深 7 那一次试跑）、`out2/`（`expected/` 的来源）、`rerun-empty/out/`（交回前那一次从头复跑）与模型源码，约几 MB，主 agent 不要了整个目录可删。这些输出没进 `research/results/`：本轮产物按交付写进模型目录 `expected/`。

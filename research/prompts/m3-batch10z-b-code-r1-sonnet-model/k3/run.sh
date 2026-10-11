@@ -11,7 +11,7 @@ cd $W/repo-k3
 export CARGO_TARGET_DIR=$W/target-k3
 run() {
   label=$1; shift
-  nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 12G bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 cargo test --offline "$@" > $W/k3/out/$name.$label.log 2>&1
+  nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 12G bash /home/fy5090/code/singlefs/scripts/capped.sh 8 cargo test --offline "$@" > $W/k3/out/$name.$label.log 2>&1
   rc=$?
   echo "## $label rc=$rc :: $(grep -E '^test result' $W/k3/out/$name.$label.log | tr '\n' ' ')" >> $out
   grep -E '^test .* FAILED$' $W/k3/out/$name.$label.log | sed 's/^/   FAILED: /' >> $out

@@ -4,7 +4,7 @@
 
 ## 一、题面
 
-崩溃状态的枚举与判定今天有两个入口、两个名字：门禁 checker-tier-layer0-replay（「层 0」，13 条 `crash-case:`）与 `research/scripts/crash-amplification.sh`（「崩溃放量」，8 项）。两边各有快档与全量；同一条流的两套全量常写在同一个测试文件里，各录一遍、各举一遍、各判一遍。用户 2026-10-10 定合成一套，原话：
+崩溃状态的枚举与判定今天有两个入口、两个名字：门禁 checker-tier-layer0-replay（「层 0」，13 条 `crash-case:`）与 `scripts/crash/crash-amplification.sh`（「崩溃放量」，8 项）。两边各有快档与全量；同一条流的两套全量常写在同一个测试文件里，各录一遍、各举一遍、各判一遍。用户 2026-10-10 定合成一套，原话：
 - 「层 0 如果是 崩溃放量 为什么不用 gpu加速呢？ 很显然这样分开是不对的，要改。现在就改吧」
 - 「那么 现在跑之前就要合并。 两个的快档和慢档都要合并到一起。」「如果不合并跑了，等于下一次又要重跑」
 - 「CPU 对拍 肯定也是日常剪枝跑  每次提交选全量和剪枝 跑的时候可以逐项。 这是写所有测试的标准。」
@@ -36,7 +36,7 @@
 - F5 随机历史两项（崩溃注入快档、读故障态不持有见证）：同一个入口、同一个判定库与复用键约定、同一种快档 / 整域分法；驱动照今天 `crash_injection.rs` 的随机历史与故障注入，不经录写流引擎；GPU 不判（照 F4 登记理由）。
 - F6 两档：快档 = 每项小规模（固定流展开 6，随机历史小种子数），GPU 与 CPU 都判，每次提交跑；整域 = 每项展开盖住每一段（`exhaustive=true`），每次提交跑，默认剪枝（按条复用：键同的、与已判等价的才剪），点名全量就清空复用重跑。点名单跑一项与它在整域里跑判定相同。
 - F7 整域盖不住的流（今天按位置寻址的 `ExtentLowerSegmentGrowsToTwoLevels`）：照 `test-script-discipline.md`「按登记整批不判的一类不算剪枝」登记、成功那句逐个列「本次未跑」，不判红也不算全绿。
-- F8 跑在哪：GPU 照 `research/scripts/gpu-quiesce-run.sh` 清场与私有显卡配置；双机照今天放量与层 0 分片各自那一套合成一套；内存上限照 `.claude/main-agent.md`「一轮怎么开、怎么收」第 12 条。
+- F8 跑在哪：GPU 照 `scripts/crash/gpu-quiesce-run.sh` 清场与私有显卡配置；双机照今天放量与层 0 分片各自那一套合成一套；内存上限照 `.claude/main-agent.md`「一轮怎么开、怎么收」第 12 条。
 - F9 条款：D13 已定项 9「全量指两样」改成一样，「全量档提交时不默认跑」改成提交跑整域（剪枝或全量），层 0 快档 / 全量的射程句跟着改；`.claude/rules/verification.md`、`.claude/rules/implementation-workflow.md`、`.claude/main-agent.md`、`.claude/skills/crash-test/commit-stages.md` 里两样分开写的地方跟着改。
 - F10 旧数：事实表第 6 节 8 处（`stage-inputs.tsv` 第 51–53 行注释、D13 第 259 行 12230590578、记录里 `exhaustive=true` 的说法、`crash_amplification.rs` 第 1833 行文档、两份文件头复用键口径）在落地那一批里改成现值。
 
@@ -64,7 +64,7 @@ F4 的「登记 GPU 不判」与今天「判不了整趟报错」：哪几项会
 
 ### K6　改名与条款
 
-F1、F9 的射程：门禁名、`# gate-covers: 崩溃点重放` 键、`.claude/gate-not-implemented.tsv`、全绿标记前缀（`research/scripts/admission.py` 第 271 行 `singlefs-crash-case-green.`）、钩子 `.claude/hooks/lib_heavy_tests.py` 认重型的写法、`selftest-registry.tsv`、门禁样本、170 份文件里的名字；冻结证据与已归档产物里的旧名照 `path-moves.md` 怎么留。D13 已定项 9 层表（层 0 / 层 1 / 层 2）合成之后还讲不讲负载规模分层，怎么写才不与 F6 的两档打架。
+F1、F9 的射程：门禁名、`# gate-covers: 崩溃点重放` 键、`.claude/gate-not-implemented.tsv`、全绿标记前缀（`scripts/gate/admission.py` 第 271 行 `singlefs-crash-case-green.`）、钩子 `.claude/hooks/lib_heavy_tests.py` 认重型的写法、`selftest-registry.tsv`、门禁样本、170 份文件里的名字；冻结证据与已归档产物里的旧名照 `path-moves.md` 怎么留。D13 已定项 9 层表（层 0 / 层 1 / 层 2）合成之后还讲不讲负载规模分层，怎么写才不与 F6 的两档打架。
 
 ### K7　次序
 
@@ -75,6 +75,6 @@ F1、F9 的射程：门禁名、`# gate-covers: 崩溃点重放` 键、`.claude/
 - 引 kb 条款写 kb 文件名加那份文件自己的行号，行号去 kb 文件里现查，不从背景材料里数。
 - 引代码写仓里的路径与行号（`git rev-parse HEAD` 加工作区，开工时 `sha256sum` 记下你引的文件）。
 - 腿自己量的数在自己的草稿目录（`~/.local/share/singlefs/work/<腿名>/`）里量，报告写命令与原样输出；量法拷仓副本，不在主工作区改。读码推出的「没打中」尽量换成造出来的反例尝试。
-- 本机内存 60G、几条线同时在跑：每条编译与测试命令经 `research/scripts/run-with-memory-cap.sh` 带不超过 12G 的上限，同时起的件数乘上限不超过 12G；编出来的测试二进制也经它跑，不直接执行。
+- 本机内存 60G、几条线同时在跑：每条编译与测试命令经 `scripts/hosts/run-with-memory-cap.sh` 带不超过 12G 的上限，同时起的件数乘上限不超过 12G；编出来的测试二进制也经它跑，不直接执行。
 - 报告分段落盘：每一次工具调用写进文件的内容不超过 150 行，第一段排他新建，回复只写短句。
 - 不跑任何门禁阶段（`.claude/gate.d/` 下的脚本一律不起，`--list`、`--list-items` 除外），不跑 checker 档测试、崩溃放量、GPU。

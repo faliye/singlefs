@@ -5,7 +5,7 @@
 # 段：setup build n1-inode n1-T1 n1-T2 n1-T3 n1-T3ring-a n1-T3ring-b n1-T3ring-c n1-L1 n1-L2 n1-L3 n1-stale n3-turn n3-b1 n3-b2
 #     fix-setup fix-build fix-stale fix-matrix fix-kbi crash-build crash-count summary
 # 编译与跑都经 run-with-memory-cap.sh（编译 6G、跑 4G），线程经 capped.sh（OPUS_THREADS，默认 10）。每段前台四分钟以内跑完。
-# 包装脚本取 $SINGLEFS_REPO/research/scripts/，没有就取 $SINGLEFS_TOOLS/research/scripts/（SINGLEFS_REPO 是只含 crates 的冻结副本时给它）。
+# 包装脚本取 $SINGLEFS_REPO/scripts/，没有就取 $SINGLEFS_TOOLS/scripts/（SINGLEFS_REPO 是只含 crates 的冻结副本时给它）。
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "${1:-}" == compare ]]; then
@@ -36,9 +36,9 @@ if [[ "$stage" == summary ]]; then
 fi
 repo="${SINGLEFS_REPO:?要设 SINGLEFS_REPO}"
 tools="$repo"
-[[ -f "$tools/research/scripts/run-with-memory-cap.sh" ]] || tools="${SINGLEFS_TOOLS:?SINGLEFS_REPO 下没有 research/scripts，要设 SINGLEFS_TOOLS}"
-cap="$tools/research/scripts/run-with-memory-cap.sh"
-capped="$tools/research/scripts/capped.sh"
+[[ -f "$tools/scripts/run-with-memory-cap.sh" ]] || tools="${SINGLEFS_TOOLS:?SINGLEFS_REPO 下没有 scripts，要设 SINGLEFS_TOOLS}"
+cap="$tools/scripts/run-with-memory-cap.sh"
+capped="$tools/scripts/capped.sh"
 threads="${OPUS_THREADS:-10}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-派发提示写死编译 6G、跑 4G}"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-三方攻方腿模型复跑，在自己的工作目录里各跑各的}"

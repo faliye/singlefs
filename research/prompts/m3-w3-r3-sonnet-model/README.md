@@ -9,5 +9,5 @@ K1（三个形态并排的代价表）与 K2（Y1 两种取法）用的模型与
 - `tools/`：`table2.py`（单个输出文件排表）、`mut_table3.py`（八种变异排表）、`compare_r2.py`、`compare_r2opus.py`、`report_tables.py`（报告里的汇总表从 `expected/` 现算）。
 - `expected/`：模型输出（去掉 W3TRACE 行、排序）与算术、探针、对账的输出。
 - 复跑：`SINGLEFS_REPO=<仓根> bash rerun.sh <空目录> <段>`，段的次序与每段做什么见 `rerun.sh` 文件头。冻结树取 `FROZEN_TREE`（默认 `~/.local/share/singlefs/work/m3-w3-r1/tree`）。
-  编译 6G、跑 4G，都经 `research/scripts/run-with-memory-cap.sh`，只跑 harness 档（探针编的是 `singlefs-core` 的 lib 测试，不碰 checker 档）。
+  编译 6G、跑 4G，都经 `scripts/run-with-memory-cap.sh`，只跑 harness 档（探针编的是 `singlefs-core` 的 lib 测试，不碰 checker 档）。
 - 依赖的外部东西：`compare-r2`、`compare-r2opus` 读第二轮两条腿的 `expected/`（`research/prompts/m3-w3-r2-{sonnet,opus}-model/expected/`），那批被归档之后这两段要先从 git 历史里取回；`probe-build`、`cost-check` 读冻结树（`FROZEN_TREE`）与 `research/prompts/m3-w3-r1-snapshot/tree-sha256.txt`；别的段不依赖仓里别的东西。

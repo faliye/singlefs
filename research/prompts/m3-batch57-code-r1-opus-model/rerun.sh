@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 攻方腿（m3-batch57-code-r1 opus）的复跑：rerun.sh <工作目录> <阶段>…（或 all；阶段表见 all 那一行，列表也可以 `rerun.sh <工作目录> list`）。
-# 环境：SINGLEFS_REPO（被判的冻结副本，缺省 ~/.local/share/singlefs/work/m3-batch57-code-r1/repo）、SINGLEFS_SCRIPTS（仓的 research/scripts，
+# 环境：SINGLEFS_REPO（被判的冻结副本，缺省 ~/.local/share/singlefs/work/m3-batch57-code-r1/repo）、SINGLEFS_SCRIPTS（仓的 scripts，
 # 缺省按模型目录在仓里的位置推）、OPUS_THREADS（线程上限，缺省 10）、OPUS_MEMORY_CAP（内存包装上限，缺省 4G）。
 # 副本只拷 Cargo.toml、Cargo.lock、crates/，原型 crate 拷成副本工作区成员 crates/opus-probe-b57（测试目标名不带 layer0），
 # K3 原型片段接到副本里 corrupt_on_disk_content_is_refused_instead_of_panicking.rs 的末尾。base、mutw（改 walk.rs 与变异表那一行写侧的变异）、

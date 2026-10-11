@@ -1,7 +1,7 @@
 import os, re, shutil, subprocess
 W = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet')
 T = W + '/tree-m'
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 lines = open('/home/fy5090/code/singlefs/research/prompts/_m3-batch10z-pqrs-code-r1-diff.md').read().split('\n')
 f = lines[1523].split('\t')
 old, new = f[2].replace('\\n', '\n'), f[3].replace('\\n', '\n')

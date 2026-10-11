@@ -1,7 +1,7 @@
-0	research/scripts/admission.py	rc=1	cargo 版本 ×80；rustc 版本 ×80
-19	research/scripts/crates-mutation-rows.py	rc=0	rustc 版本 ×44
-35	research/scripts/multi-host-run.sh	rc=0	cargo 版本 ×20；rustc 版本 ×32
-37	research/scripts/mutation-shard-run.sh	rc=1	rustc 版本 ×96
-51	research/scripts/stage-must-run.sh	rc=0	cargo 版本 ×22；rustc 版本 ×22
+0	scripts/admission.py	rc=1	cargo 版本 ×80；rustc 版本 ×80
+19	scripts/crates-mutation-rows.py	rc=0	rustc 版本 ×44
+35	scripts/multi-host-run.sh	rc=0	cargo 版本 ×20；rustc 版本 ×32
+37	scripts/mutation-shard-run.sh	rc=1	rustc 版本 ×96
+51	scripts/stage-must-run.sh	rc=0	cargo 版本 ×22；rustc 版本 ×22
 71	stage-samples	rc=1	cargo 版本 ×6；rustc 版本 ×6
 总计：72 件，起了真 cargo / rustc / qemu / herd7 / verus / z3 的 6 件

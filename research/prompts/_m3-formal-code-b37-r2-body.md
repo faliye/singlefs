@@ -11,7 +11,7 @@
 - `crates/singlefs-checker/src/image.rs` 第 212 行补两种不适用。
 - `crates/mutations.tsv` 本批四行（第 3383、3407 行整行换，第 3496、3497 行追加）。
 
-条款同第一轮（E165（恢复重放有界穷举与变异杀伤界）的阳性对照条款，I-4.1（重放后树可遍历））：`research/prompts/e165-preregistration.md` 第 5.4 节与 V2、`research/prompts/e165-r2-prereg.md` 第 5.5 节（另看第 5.4 节 J7 判在哪几档）、`research/prompts/e165-r3-prereg.md` 第 5.6 节（拆行）、`research/prompts/e165-r5-prereg.md` 第 5.3、5.4 节；正式跑的档取 `research/scripts/replay.sh` 起这个装置的驱动。
+条款同第一轮（E165（恢复重放有界穷举与变异杀伤界）的阳性对照条款，I-4.1（重放后树可遍历））：`research/prompts/e165-preregistration.md` 第 5.4 节与 V2、`research/prompts/e165-r2-prereg.md` 第 5.5 节（另看第 5.4 节 J7 判在哪几档）、`research/prompts/e165-r3-prereg.md` 第 5.6 节（拆行）、`research/prompts/e165-r5-prereg.md` 第 5.3、5.4 节；正式跑的档取 `scripts/replay.sh` 起这个装置的驱动。
 
 ## 二、实现今天的样子（主 agent 的观测，2026-10-08）
 

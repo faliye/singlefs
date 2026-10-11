@@ -4,7 +4,7 @@
 
 材料：正文 `research/prompts/_gate-fix-forks-r3-body.md`，清单 `_gate-fix-forks-r3-checklist.md`、附录 `_gate-fix-forks-r3-appendix.md`（含第一、二轮判决全文），拼成 `_gate-fix-forks-r3-background.md`；代码 diff `_gate-fix-forks-r3-diff.md`。**这是第三轮，判完就停，不开第四轮。**
 
-**开工快照漂移**（`gate-fix-forks-r3-snapshot/sha256sums.txt`，105 份；快照时的原样树 `/tmp/claude-1000/gate-fix-forks-r3-snapshot-tree/`）：腿跑着的时候变了 3 份。`.claude/rules/implementation-workflow.md`（主 agent，正推交回之后改了第 18 行那句「门禁 71 号」）与 `.claude/scripts/gen-decision-items.py`（主 agent，not-numbers 标记的读法改成跳过代码围栏）的经过在 `gate-fix-forks-r3-snapshot/changed-during-legs.md`；`research/scripts/replay.sh` 是别的会话改的。三条腿读的都是快照树，攻方收工时自己核过这三份它没读主树。
+**开工快照漂移**（`gate-fix-forks-r3-snapshot/sha256sums.txt`，105 份；快照时的原样树 `/tmp/claude-1000/gate-fix-forks-r3-snapshot-tree/`）：腿跑着的时候变了 3 份。`.claude/rules/implementation-workflow.md`（主 agent，正推交回之后改了第 18 行那句「门禁 71 号」）与 `.claude/scripts/gen-decision-items.py`（主 agent，not-numbers 标记的读法改成跳过代码围栏）的经过在 `gate-fix-forks-r3-snapshot/changed-during-legs.md`；`scripts/replay.sh` 是别的会话改的。三条腿读的都是快照树，攻方收工时自己核过这三份它没读主树。
 
 ## 一、三条腿与核查员
 
@@ -14,7 +14,7 @@
 | 云端正推（Sonnet，T1、T3、T8 与第二轮判决的数） | `gate-fix-forks-r3-sonnet-output.md`（495 行） | 15 处 13 处对、1 处核不动；**一处摘句**：引 `format-evolution.md:41` 丢了句首「关系是…之一。」与句尾「、关系是支撑或推翻。」，不碰它那一格的结论 |
 | 本地攻方（T4、T8） | 提示 `gate-fix-forks-r3-local-attack.md`；干净样本 s1、s2 | 24 处 22 处对、1 处核不动；**一处**：提示与核对表说剥尾的连接字「六个」，源码 `gen-decision-items.py:51` 的字符集里是七个（与、和是两个字），24 格事实都是现跑的原样输出，不受它影响 |
 
-第一个核查员撞了会话限额停在半路，报告没落盘；主 agent 用 `research/scripts/agent-handover.py` 抽了交接摘要，新派一个从已落盘的复跑现场接着做完。
+第一个核查员撞了会话限额停在半路，报告没落盘；主 agent 用 `scripts/agent-handover.py` 抽了交接摘要，新派一个从已落盘的复跑现场接着做完。
 
 ## 二、逐格判定
 

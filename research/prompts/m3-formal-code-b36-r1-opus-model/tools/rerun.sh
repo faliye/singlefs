@@ -4,7 +4,7 @@
 # 冻结副本默认 ~/.local/share/singlefs/work/m3-formal-code-b36-r1（B36_FROZEN 可换），setup 先按它的清单核 sha256。
 # 每段的输出落 <草稿目录>/out/<段>.log（与模型 out/ 里留的同名文件比）；判结果看 B36X / B36XT / B36XT2 / B36L0-DONE / B36L0T / B36R / B36G / B36M 行。
 # B36R-DONE、B36L0-DONE 的 seconds= 与 B36H 行的 seconds= 是挂钟，不比；B36R / B36L0T 的计数行逐字比；FIRST 行里的原文是各线程最先遇到的那一张，线程次序会换，只比键。
-# 每条 cargo 与每次跑编出来的二进制都经 research/scripts/run-with-memory-cap.sh；同一时刻只起一条。线程 16（B36_THREADS 可压小）。
+# 每条 cargo 与每次跑编出来的二进制都经 scripts/run-with-memory-cap.sh；同一时刻只起一条。线程 16（B36_THREADS 可压小）。
 set -euo pipefail
 W="${1:?草稿目录}"; shift
 REPO="$(cd "$(dirname "$0")/../../../.." && pwd)"
@@ -14,7 +14,7 @@ T="${B36_THREADS:-16}"
 SEGMENTS=("$@")
 [[ ${#SEGMENTS[@]} -gt 0 ]] || SEGMENTS=(setup build crafted crafted2 l57 l66 l14 l12 l36a l36b l36c r1 r2 r3 naga mut-a mut-b)
 mkdir -p "$W/out"
-CAP() { local cap="$1"; shift; env RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="m3-formal-code-b36-r1 攻方原型复跑：同一个二进制按参数跑大小不同的几段" nice -n 19 bash "$REPO/research/scripts/run-with-memory-cap.sh" "$cap" bash "$REPO/research/scripts/capped.sh" "$T" "$@"; }
+CAP() { local cap="$1"; shift; env RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="m3-formal-code-b36-r1 攻方原型复跑：同一个二进制按参数跑大小不同的几段" nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" "$cap" bash "$REPO/scripts/capped.sh" "$T" "$@"; }
 BIN="$W/target/release/b36probe"
 run() { local name="$1"; shift; { CAP 3G "$@"; echo "rc=$?"; } > "$W/out/$name.log" 2>&1 || true; }
 

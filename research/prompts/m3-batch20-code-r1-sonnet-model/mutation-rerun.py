@@ -18,8 +18,8 @@ for n in map(int, sys.argv[1:]):
     if cnt != 1:
         print(f"row {n}: anchor hits {cnt}"); continue
     open(full, "w", encoding="utf-8").write(src.replace(old, new))
-    cmd = ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh", "6G",
-           "bash", "/home/fy5090/code/singlefs/research/scripts/capped.sh", "6", "cargo", "test", "--offline"] + args.split() + ["--", test]
+    cmd = ["nice", "-n", "19", "bash", "/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh", "6G",
+           "bash", "/home/fy5090/code/singlefs/scripts/capped.sh", "6", "cargo", "test", "--offline"] + args.split() + ["--", test]
     r = subprocess.run(cmd, cwd=TREE, env=env, capture_output=True, text=True)
     m = re.search(r"不超过 (\d+)M 的上限", r.stderr)
     if r.returncode == 251 and m:

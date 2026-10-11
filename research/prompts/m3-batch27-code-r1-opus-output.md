@@ -24,7 +24,7 @@
 
 ```bash
 export SINGLEFS_REPO=/tmp/claude-1000/m3-batch27-code-r1/tree   # 被判的仓树
-export SINGLEFS_TOOLS=/home/fy5090/code/singlefs                 # 带 research/scripts/run-with-memory-cap.sh、capped.sh 的仓根
+export SINGLEFS_TOOLS=/home/fy5090/code/singlefs                 # 带 scripts/run-with-memory-cap.sh、capped.sh 的仓根
 # 同一会话另有一条经内存包装在跑时：export RUN_WITH_MEMORY_CAP_PARALLEL_REASON=<理由>
 bash research/prompts/m3-batch27-code-r1-opus-model/rerun.sh <空目录> all      # 或分步：build → j3（OPUS_B27_VERSIONS=new / old / fix）→ j3types → fixcheck → j1
 python3 research/prompts/m3-batch27-code-r1-opus-model/analyze.py <空目录>/summary.txt

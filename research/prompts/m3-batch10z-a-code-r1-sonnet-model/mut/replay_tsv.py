@@ -1,7 +1,7 @@
 # 把 mutations.tsv 里指定行（行号）的 harness 档变异在 tree-mut 副本里逐条改、跑点名的测试、还原；红了写「抓到」。
 import subprocess, sys, os
 BASE = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-a-code-r1-sonnet')
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 rows = open(f'{BASE}/tree/crates/mutations.tsv').read().split('\n')
 for n in map(int, sys.argv[1:]):
     f = rows[n - 1].split('\t')

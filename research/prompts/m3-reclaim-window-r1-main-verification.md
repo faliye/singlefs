@@ -9,7 +9,7 @@
 | 核了什么 | 结果 |
 |---|---|
 | 开工快照 | `research/prompts/m3-reclaim-window-r1-snapshot/` 两份清单 `sha256sum -c` 全对，腿跑着的时候被判的 kb 与证据没被改 |
-| 引文 | `python3 research/scripts/cite-check.py` 两腿：「✓ 核了 50 处引文，对上 50 处，没判 0 处」 |
+| 引文 | `python3 scripts/cite-check.py` 两腿：「✓ 核了 50 处引文，对上 50 处，没判 0 处」 |
 | 正推腿模型复跑 | 拷到主 agent 草稿 `rw-rerun/fwd/`，`run_all.sh` 加三个单跑探针，54 份输出逐份 `cmp`：54 份逐字节相同 |
 | 攻方腿计数模型复跑 | `ring_model.py 4 7 PXYC 2 all`，9 行逐行在 `results/model-a.log` 里逐字找到，含 `arm=G … states=337408 fake=0 lone0=35 lone1=1009` |
 | 攻方腿原型复跑 | 照它的 `scripts/build.sh`、`run.sh` 在今天的主工作区拷贝上编臂 G（主 agent 草稿 `rw-rerun/atkdir/G/`；与腿跑时的冻结树只差点名项门槛、9-8、9-8b 三份测试与钉值补丁，core 逻辑同），跑 `VERBOSE=1 S=4 C=24 K=1,6,12 J=20` 得 76 行，去掉内存包装那一行与 `build=`、`elapsed=` 计时字段之后与 `results/v-G.log` 逐行相同，`DataUnitChecksumMismatchEverywhere` 8 处 |

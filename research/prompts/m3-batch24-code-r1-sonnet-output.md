@@ -227,9 +227,9 @@ sha256 前缀取自 `research/prompts/m3-batch24-code-r1-snapshot/crates-sha256.
 
 ## 13 要主 agent 跑的命令（我这里不能跑的：GPU 与 checker 档）
 
-工作目录仓根；都带 `SINGLEFS_HEAVY_TESTS=commit`（或 `=user-request`），经 `bash research/scripts/run-with-memory-cap.sh <上限> bash research/scripts/capped.sh <N> …`，上限与线程数我没有依据，沿用主 agent 提交时的取法。
+工作目录仓根；都带 `SINGLEFS_HEAVY_TESTS=commit`（或 `=user-request`），经 `bash scripts/run-with-memory-cap.sh <上限> bash scripts/capped.sh <N> …`，上限与线程数我没有依据，沿用主 agent 提交时的取法。
 
 1. GPU 对拍（要显卡）：`cargo test --offline -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- <第 24 批新加的 5 条与改了断言的 N4-a>`，用例名就是 `crates/mutations.tsv:2898`–`:2903` 六行最后一列的六个名字（五条新加，加改了断言的 N4-a `the_gpu_judge_agrees_with_the_cpu_when_a_tombstone_root_entry_of_type_zero_carries_an_identity`）。看哪几行：每条 `ok`，没有 `CRASH_JUDGE_GPU_MISMATCH`；没有显卡时用例自己报「没跑」，那不算通过。
-2. G 的 6 行变异：`research/scripts/mutate.sh` 对 `crates/mutations.tsv` 的 2898–2903 行；看哪几行：6 行都红在各自最后一列的用例上。
+2. G 的 6 行变异：`scripts/mutate.sh` 对 `crates/mutations.tsv` 的 2898–2903 行；看哪几行：6 行都红在各自最后一列的用例上。
 3. E142 导出 bin 两条内联单测与 K 的两行变异：`cargo test --offline -p singlefs-checker-tier --bin e142_new_pool_file_creation_write_dump -- the_largest_device_bytes_parse_but_their_free_maps_exceed_the_bound_and_the_bin_ends_as_a_refused_command_line device_bytes_at_the_free_map_bound_pass_and_one_slot_more_is_refused`（看 2 条 ok）；变异 `crates/mutations.tsv:2894`、`:2895` 各红。
 4. E142 bin 的退出码与产物：`--device-bytes 18446744073709551615` 应退 1 且 stderr 含「超过上界」，`--device-bytes 0` 应退 1（mkfs 的错），`--device-bytes 8589934592` 的输出与 `research/results/e142-r24-p8g-crates-dump-2026-10-05.out` 逐字节相同；再选一两个 1 TiB 上下的 `--device-bytes` 看会不会 abort（N4 第 4.3 节的推翻条件）。

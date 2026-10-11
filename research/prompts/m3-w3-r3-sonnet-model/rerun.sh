@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # m3-w3-r3 正推腿（Sonnet）的复跑。用法：SINGLEFS_REPO=<仓根> bash rerun.sh <工作目录> <段>
 # 路径只从环境变量与参数取：仓根 SINGLEFS_REPO；冻结树 FROZEN_TREE（默认 ~/.local/share/singlefs/work/m3-w3-r1/tree，只有 cost-check 段读它）。
-# 每段一条前台命令（负载低时各在 4 分钟以内）；编译 6G、跑 4G，都经 research/scripts/run-with-memory-cap.sh；只跑 harness 档，不碰 crates/ 的编译。
+# 每段一条前台命令（负载低时各在 4 分钟以内）；编译 6G、跑 4G，都经 scripts/run-with-memory-cap.sh；只跑 harness 档，不碰 crates/ 的编译。
 # 段：
 #   build-model       编抽象时间线模型（不依赖 crates/）
 #   model-main        main 组 0..5（P、V1、V2 三臂 × 清扫阈值从不 / 0；环 4、长 7）
@@ -27,8 +27,8 @@ W=${1:?工作目录}; PART=${2:?段}
 R=${SINGLEFS_REPO:?设 SINGLEFS_REPO 为仓根}
 M=$(cd "$(dirname "$0")" && pwd)
 FROZEN=${FROZEN_TREE:-$HOME/.local/share/singlefs/work/m3-w3-r1/tree}
-CAP="bash $R/research/scripts/run-with-memory-cap.sh"
-THREADS="bash $R/research/scripts/capped.sh 6"
+CAP="bash $R/scripts/run-with-memory-cap.sh"
+THREADS="bash $R/scripts/capped.sh 6"
 mkdir -p "$W/out"
 export SINGLEFS_REPO
 BIN=$W/target-model/release/w3r2-timeline-model

@@ -27,8 +27,8 @@ printf 'exit=1\nwant=x\n' > "$E2/gate.d/fixtures/doc-text.sh/red/expect"
 p implementation-writer "$R" "bash $E2/.claude/singlefs-ai-sop/scripts/stage-selftest.sh $E2/gate.d"
 
 echo "## U1-b 通配命令词的 --selftest 不当自证：登记成轻的也被当没登记而拒（方向安全，但看有没有误拒）"
-p implementation-writer "$R" "bash research/scripts/admission*.py --selftest"
-p implementation-writer "$R" "python3 research/scripts/crates-mutation-rows.p? --selftest"
+p implementation-writer "$R" "bash scripts/admission*.py --selftest"
+p implementation-writer "$R" "python3 scripts/crates-mutation-rows.p? --selftest"
 
 echo "## U2-a 54 号样本档：假 rustc 不核内容（字节相同的假 cargo + 任意可执行 rustc），看放行与否"
 G="$S/evil-54"; rm -rf "$G"; mkdir -p "$G/.layer0-sample-tools/cases"

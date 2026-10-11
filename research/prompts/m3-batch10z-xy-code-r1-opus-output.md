@@ -10,7 +10,7 @@ bash research/prompts/m3-batch10z-xy-code-r1-opus-model/rerun.sh [<工作目录>
 
 - 从冻结副本拷仓，`assemble.sh` 把那份 harness 测试文件与 `atk_xy_*.rs` 拼成测试目标 `atk_xy_opus`（只借原文件的搭建函数，攻方用例都以 `atk_` 开头、`#[ignore]`；`a*`、`b*` 是上一轮 `m3-batch10z-vw-code-r1-opus-model/atk_vw_part*.rs` 拷来改的，`c1`–`c4` 是这一轮新写的）。
 - 依次跑：K1-1 上一轮那几族形（K1 九形 12 格 × 21 种动作、实现员三形、两槽 C、被抛弃根 A 与 C、窄四档 × 11 种动作）；H 形推完放得下（`c1`）；推环入口照收次序对调的盘表（`c2`，连同另一条臂 `ARM-push-checks-the-table-order`）；别的会话同一对数（`c3`）；两道判的先后（`c4`）；攻方变异与变异表第 3603–3623 行；扫源码小程序（`build-scan-proto.py` 从两份 checker 档源文件的 `mod tests` 机械抽出读自己源文件的用例）喂 `gen-scan-inputs.py` 造的写法；第 3624–3640 行与 B1–B4 施加在抄出来的源文件上；K4 两棵冻结副本比对。
-- 每件经 `research/scripts/run-with-memory-cap.sh`（并行件 3G，一批至多 4 件；编译 12G；扫源码 4G / 2G），线程经 `research/scripts/capped.sh`（合计不超过 7）。不起 checker 档测试、门禁阶段、崩溃枚举。不用 `set -e`，一步失败照记、接着跑；读参数用 `mapfile`。
+- 每件经 `scripts/run-with-memory-cap.sh`（并行件 3G，一批至多 4 件；编译 12G；扫源码 4G / 2G），线程经 `scripts/capped.sh`（合计不超过 7）。不起 checker 档测试、门禁阶段、崩溃枚举。不用 `set -e`，一步失败照记、接着跑；读参数用 `mapfile`。
 - 限度：`rerun.sh` 没有一口气整份跑过（前台一次至多 4 分钟、子 agent 不起后台），是把它里面的每一段命令分批照原样跑过、日志落进 `runs/`；`bash -n` 过。整份估约 40 分钟（推的：这一轮各段实测相加，机器上另有 cargo 在跑时更长）。
 - 原型里的盘面是从录下的写流里截一个前缀（崩在 R 第一条记录之后）得来的一个崩溃状态，不是层 0 的整写子集枚举；派发不许起崩溃枚举，没调 `enumerate_layer0`，也没有别的崩溃状态。
 
@@ -322,7 +322,7 @@ g20-legal-drop-under-a-cfg-attr gRgggg
 
 ## 引文核对
 
-`python3 research/scripts/cite-check.py research/prompts/m3-batch10z-xy-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree --root /home/fy5090/code/singlefs` 末行：
+`python3 scripts/cite-check.py research/prompts/m3-batch10z-xy-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree --root /home/fy5090/code/singlefs` 末行：
 
 ```
   ✓ 核了 17 处引文，对上 17 处，没判 0 处（逐处列在上面）

@@ -6,7 +6,7 @@
 
 ## 复跑命令与模型文件
 
-在仓根，`W` 取一个空目录；每段一条前台命令（各在 4 分钟以内），编译与跑都经 `research/scripts/run-with-memory-cap.sh`（编译 6G、跑 4G），线程 6：
+在仓根，`W` 取一个空目录；每段一条前台命令（各在 4 分钟以内），编译与跑都经 `scripts/run-with-memory-cap.sh`（编译 6G、跑 4G），线程 6：
 
 ```
 M=research/prompts/m3-w3-r1-opus-model; W=<空目录>

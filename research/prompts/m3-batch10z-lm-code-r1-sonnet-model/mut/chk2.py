@@ -1,7 +1,7 @@
 import os, subprocess, importlib.util, sys
 W=os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet')
 T=os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree')
-R='/home/fy5090/code/singlefs/research/scripts'
+R='/home/fy5090/code/singlefs/scripts'
 GPU='crates/singlefs-checker-tier/src/gpu_unit_checks.rs'; CR='crates/singlefs-checker-tier/src/crash_amplification.rs'
 src=open(W+'/mut/scanmut.py',encoding='utf-8').read()
 ns={}

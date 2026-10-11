@@ -2,8 +2,8 @@
 # m3-leaf-death-r3 正推腿（Sonnet）模型的复跑。模型本身不依赖 crates/（src/model.rs、src/clone.rs）；copybuild / copyrun 两阶段拷 SINGLEFS_REPO 的 crates/ 进
 # <输出目录>/repo 改副本（加一个 harness 测试目标、给 I-9.4 第三句加一个开关），给冻结树 ~/.local/share/singlefs/work/m3-leaf-death-r1/tree 或仓根都行
 # （要 Cargo.toml、Cargo.lock、.cargo、crates，不要 research/）。仓路径、输出目录一律从环境变量 / 参数取，不靠本脚本在仓里的位置。
-# 每一阶段整条经内存包装起（build 与 copybuild 6G、其余 4G），例（工作目录随意，S 指仓里的 research/scripts）：
-#   M=<本目录>; S=<仓>/research/scripts; export SINGLEFS_REPO=<冻结树或仓根>
+# 每一阶段整条经内存包装起（build 与 copybuild 6G、其余 4G），例（工作目录随意，S 指仓里的 scripts）：
+#   M=<本目录>; S=<仓>/scripts; export SINGLEFS_REPO=<冻结树或仓根>
 #   bash $S/run-with-memory-cap.sh 6G bash $M/rerun.sh <空的输出目录> build
 #   bash $S/run-with-memory-cap.sh 4G bash $M/rerun.sh <输出目录> sweep-0
 #   …（sweep-0 … sweep-15 各一条，clone、determinism 各一条）

@@ -19,8 +19,8 @@ patch -s -d "$scratch/repo-l7" -p1 < "$r1/l7-resume-prototype-crash-rs.patch"
 cp "$here/opus_r2_resume_probe.rs" "$scratch/repo-l7/crates/singlefs-harness/tests/"
 run() { # <副本> <测试目标> <日志名> <用例> [环境变量=值…]
   local copy="$1" target="$2" log="$3" test_name="$4"; shift 4
-  if ( cd "$scratch/$copy" && env PROBE_SCRATCH="$scratch/l7-scratch" "$@" nice -n 19 bash "$repo_root/research/scripts/run-with-memory-cap.sh" 8G \
-      bash "$repo_root/research/scripts/capped.sh" "$threads" \
+  if ( cd "$scratch/$copy" && env PROBE_SCRATCH="$scratch/l7-scratch" "$@" nice -n 19 bash "$repo_root/scripts/run-with-memory-cap.sh" 8G \
+      bash "$repo_root/scripts/capped.sh" "$threads" \
       cargo test --release -p singlefs-harness --test "$target" -- --exact "$test_name" --nocapture ) > "$scratch/$log" 2>&1; then
     echo "$log exit=0"
   else
@@ -45,7 +45,7 @@ run repo-l7 opus_r2_resume_probe r2a.log r2a_one_file_per_input_fingerprint_lets
 run repo-l7 opus_r2_resume_probe r2b.log r2b_observer_assertion_is_lost_on_resume
 # M3：tests/common.rs 与 tests/common/mod.rs 并存
 : > "$scratch/repo/crates/singlefs-harness/tests/common.rs"; touch "$scratch/repo/crates/singlefs-harness/tests/$P.rs"
-( cd "$scratch/repo" && nice -n 19 bash "$repo_root/research/scripts/run-with-memory-cap.sh" 8G bash "$repo_root/research/scripts/capped.sh" "$threads" \
+( cd "$scratch/repo" && nice -n 19 bash "$repo_root/scripts/run-with-memory-cap.sh" 8G bash "$repo_root/scripts/capped.sh" "$threads" \
     cargo test --release -p singlefs-harness --test $P --no-run ) > "$scratch/m3-common-rs-2.log" 2>&1 || echo "m3-common-rs-2.log exit=$?"
 rm "$scratch/repo/crates/singlefs-harness/tests/common.rs"
 grep -hE '^(Q1_TOTAL|Q3_TOTAL|Q5 |  CONFIRMED|  SHRUNK|Q6 |  ARM_A2 |  SIGMA_FULL|Q7 |Q9 |Q10 |ARMS |R2A|R2B|error\[E0761\])' "$scratch"/*.log

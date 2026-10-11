@@ -8,7 +8,7 @@
 模型目录 `research/prompts/m3-retire-r1-opus-model/`，每阶段整条经内存包装（copybuild 6G，其余 4G）：
 
 ```
-S=<仓根>/research/scripts
+S=<仓根>/scripts
 export RETIRE_R1_MODEL_DIR=<仓根>/research/prompts/m3-retire-r1-opus-model SINGLEFS_REPO=<冻结树>
 bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 16 bash $RETIRE_R1_MODEL_DIR/rerun.sh <空目录> copybuild
 bash $S/run-with-memory-cap.sh 4G bash $S/capped.sh 16 bash $RETIRE_R1_MODEL_DIR/rerun.sh <同一目录> copyrun demo sweep-4 random-0 random-1 random-2 random-3 random-norb

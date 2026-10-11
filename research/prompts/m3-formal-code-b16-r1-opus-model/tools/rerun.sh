@@ -19,11 +19,11 @@ sed -i 's#    "crates/singlefs-reference-filesystem",#    "crates/singlefs-refer
 rm -rf "$WORK/ws/crates/c670-probe"
 cp -r "$MODEL/c670-probe" "$WORK/ws/crates/"
 build() {
-  (cd "$WORK/ws" && CARGO_TARGET_DIR="$WORK/target" nice -n 19 bash "$REPO/research/scripts/run-with-memory-cap.sh" 4G \
-    bash "$REPO/research/scripts/capped.sh" "$THREADS" cargo build --offline --release -p c670-probe)
+  (cd "$WORK/ws" && CARGO_TARGET_DIR="$WORK/target" nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 4G \
+    bash "$REPO/scripts/capped.sh" "$THREADS" cargo build --offline --release -p c670-probe)
 }
 probe() {
-  nice -n 19 bash "$REPO/research/scripts/run-with-memory-cap.sh" "$CAP" "$WORK/target/release/c670-probe" "$@"
+  nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" "$CAP" "$WORK/target/release/c670-probe" "$@"
 }
 restore_core() {
   cp "$FROZEN/crates/singlefs-core/src/transaction.rs" "$WORK/ws/crates/singlefs-core/src/transaction.rs"
@@ -56,8 +56,8 @@ probe named --segments-up-to 4 > "$WORK/v242u-named.txt"
 probe ops AfterFirstFile PublishOverwrite --segments-up-to 4 > "$WORK/v242u-ops-overwrite.txt"
 restore_core
 # 三、harness 档：两份新用例的基线，再逐行跑变异行（第 2215–2224 行；2225–2229 点名 checker 档，跳过）
-(cd "$WORK/ws" && CARGO_TARGET_DIR="$WORK/target-test" nice -n 19 bash "$REPO/research/scripts/run-with-memory-cap.sh" 8G \
-  bash "$REPO/research/scripts/capped.sh" "$THREADS" cargo test --offline -p singlefs-harness \
+(cd "$WORK/ws" && CARGO_TARGET_DIR="$WORK/target-test" nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 8G \
+  bash "$REPO/scripts/capped.sh" "$THREADS" cargo test --offline -p singlefs-harness \
   --test model_answers_unmount_with_the_floor_at_the_current_version --test writable_mount_refusal_on_a_crash_state_without_read_faults) > "$WORK/harness-base.log" 2>&1
 grep -E '^test |test result' "$WORK/harness-base.log"
 : > "$WORK/rows.txt"
@@ -66,8 +66,8 @@ bash "$MODEL/tools/run-mutation-rows.sh" "$WORK/ws" "$FROZEN" "$WORK/rows.txt" $
 cat "$FROZEN/crates/singlefs-harness/tests/model_answers_unmount_with_the_floor_at_the_current_version.rs" \
   "$MODEL/harness-tests/attack_unmount_without_trees.rs" > "$WORK/ws/crates/singlefs-harness/tests/attack_unmount_without_trees.rs"
 python3 "$MODEL/tools/apply-mutation.py" "$WORK/ws" 2217
-(cd "$WORK/ws" && CARGO_TARGET_DIR="$WORK/target-test" nice -n 19 bash "$REPO/research/scripts/run-with-memory-cap.sh" 8G \
-  bash "$REPO/research/scripts/capped.sh" "$THREADS" cargo test --offline -p singlefs-harness --test attack_unmount_without_trees -- attack_ --nocapture) > "$WORK/k1.log" 2>&1
+(cd "$WORK/ws" && CARGO_TARGET_DIR="$WORK/target-test" nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh" 8G \
+  bash "$REPO/scripts/capped.sh" "$THREADS" cargo test --offline -p singlefs-harness --test attack_unmount_without_trees -- attack_ --nocapture) > "$WORK/k1.log" 2>&1
 cp "$FROZEN/crates/singlefs-harness/src/model.rs" "$WORK/ws/crates/singlefs-harness/src/model.rs"
 rm "$WORK/ws/crates/singlefs-harness/tests/attack_unmount_without_trees.rs"
 grep -h -E '^== |^first_states|^first_c670=|^second_states|^abandoning|^elapsed' "$WORK"/base-*.txt "$WORK"/abandon-*.txt "$WORK"/m22*.txt "$WORK"/v242u-*.txt

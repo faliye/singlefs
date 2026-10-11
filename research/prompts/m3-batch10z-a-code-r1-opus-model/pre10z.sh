@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 对照臂：同一份模型跑在第 10z 批之前的显存账上（把改动全文里 gpu_memory_ledger.rs 那一段反着打回去）。
 # 起设备那一步换成 10z 之前的 check_registered_before_starting_the_device（没有重新登记）；别的一字不改。断言照 10z 的数写，在这一臂上红是预期的，只看 ATTACK 行。
-# 用法（仓根）：bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 15 \
+# 用法（仓根）：bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 15 \
 #   bash research/prompts/m3-batch10z-a-code-r1-opus-model/pre10z.sh <空目录> <编译目录>
 set -euo pipefail
 copy="${1:?空目录}"

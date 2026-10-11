@@ -8,7 +8,7 @@
 
 英文名：deletion_write_dry_run
 
-（装置源文件 `research/e7-index-bench/src/bin/e172_deletion_write_dry_run.rs`，bin 名 `e172-deletion-write-dry-run`，变异表 `research/mutations/e172_deletion_write_dry_run.tsv`；中文简称「删除写出的字节的干跑」只用在 kb 页，待主 agent 认。）
+（装置源文件 `scripts/experiments/e172_deletion_write_dry_run.rs`，bin 名 `e172-deletion-write-dry-run`，变异表 `scripts/mutations/e172_deletion_write_dry_run.tsv`；中文简称「删除写出的字节的干跑」只用在 kb 页，待主 agent 认。）
 
 主 agent 给的问题（派发提示逐字）：里程碑三·6「删除写出的字节的干跑」——照 E142（新池新建文件的干跑） 的形，研究侧装置只写独立解码器（不 `use` crates，按 layout/01、layout/03 的偏移表把导出里每个写区域逐字段解出来与登记取值比，外加覆盖率），不手写独立模型；`crates/` 侧导出是 `crates/singlefs-checker-tier/src/bin/deletion_write_dump.rs` 与 `crates/singlefs-harness/src/scenario.rs` 的 `run_deletion_history`。问题单 `research/prompts/m3-delete-dryrun-questions.md`（sha256 135f771bfdd8be8dd57184c7df847a3e904d3e2e5f2f051cd433183579720613，八行），登记里每个量对应其中一行。
 
@@ -41,7 +41,7 @@
 
 ## 二、被测条款与它引的定义
 
-被测条款：`.claude/kb/layout/03-third-txn.md`（全文）与 `.claude/kb/decisions/08-核心索引结构.md`「#### 已定项 16：第一版 unlink：只立 deleted_inodes、从尾部分批、挂载里续做到空」。宽度与落点以 `.claude/kb/layout/01-first-txn.md` 为准。下面用 `research/scripts/quote-kb.py` 整段抽出（出口 `/tmp/claude-1000/m3-delete-dryrun-design/quote-section2.md`，脚本回读逐字节一致），再追加进来。
+被测条款：`.claude/kb/layout/03-third-txn.md`（全文）与 `.claude/kb/decisions/08-核心索引结构.md`「#### 已定项 16：第一版 unlink：只立 deleted_inodes、从尾部分批、挂载里续做到空」。宽度与落点以 `.claude/kb/layout/01-first-txn.md` 为准。下面用 `scripts/quote-kb.py` 整段抽出（出口 `/tmp/claude-1000/m3-delete-dryrun-design/quote-section2.md`，脚本回读逐字节一致），再追加进来。
 
 小节清单（抄 / 不抄）：
 
@@ -366,7 +366,7 @@ D8（核心索引结构） 已定项 6（2026-09-05）定了整段：inode 树�
 | 1 | 问题单第 4 行（派发给的输入） | 实现员副本上：续做三批每盘 12 / 13 / 12、会话三批 12 / 11 / 10，后两批多写分配记录树一对叶 | 第 4 行的判据（R4.b：多出的每个单元里要有这次发布自己分配或释放的槽的分配记录变了才归「有条款依据」）是在知道「多出来的是分配记录树叶」之后写的；它不取任何门槛数，只按记录差归类，三种候选都能判出 |
 | 2 | 实现员报告 `/tmp/claude-1000/m3-batch18/x/report.md` 第一、三节（派发给的输入，为读导出格式整份读过） | 参考导出的全部非十六进制行：H1 txg 5 / 6 / 7 / 8、角色集合 13 / 12 / 11 / 10 与逐个角色名；H2 的发布次序（意图 txg 5、卸载抬 F 6、7、写行 8、暖机 9、10、续做 11、12、13）、续做批的角色名（含 `t5@0.0.62`、`t5@0.1.62`）；`before_window_summary operations=127 writes=101`；窗口写数 112 / 231、屏障 24 / 58、段数 4 / 11；`mount_writes_before_its_first_publish` 在 step 95–99；462 行、sha256 `5a9b3fa2…bd397`；`file_bytes=81585` | 第七节的 txg 锚点（H1 5–8）是从 layout/01 第 166 行「新池新建文件 txg 恒 3」加 D8 已定项 16 第 2 条「各占一个事务号」独立推的，但写的人推之前已经看到这几个数；H2 挂载那一截的 txg 不当绝对锚点（暖机次数没有条款，layout/01 第 414 行），只钉「续做批的 txg 连着、接在最后一次暖机之后」。第 3 行的期望值取 layout/03，不取这份参考；参考导出不当产物（第十一节 S1） |
 | 3 | 同一份报告第一节 | E142 导出不带参数的 39 行与 r22 产物逐字节相同、P8G 那一份差 9 个写区域 | E142 的事，与这里的判据无关 |
-| 4 | `.claude/kb/experiments/142-新池新建文件的干跑.md` 第 1 行（标题行，读方法节时顺带读到）与 `research/scripts/replay.sh` 第 495–508 行注释 | E142 第二十二次跑 `equal=29 unequal=0`、已承诺预留 98386、变异 206 条全抓等 E142 的结论 | 读的是 E142 的方法（第 2–84 行）与 `driver_e142` 的跑法；E142 的结论不进这里的任何门槛。98386 是 n_live = 1 那一版的标签 6，这里 H1、H2 删除类发布都是 n_live = 0，锚点 98304 另算（第七节） |
+| 4 | `.claude/kb/experiments/142-新池新建文件的干跑.md` 第 1 行（标题行，读方法节时顺带读到）与 `scripts/replay.sh` 第 495–508 行注释 | E142 第二十二次跑 `equal=29 unequal=0`、已承诺预留 98386、变异 206 条全抓等 E142 的结论 | 读的是 E142 的方法（第 2–84 行）与 `driver_e142` 的跑法；E142 的结论不进这里的任何门槛。98386 是 n_live = 1 那一版的标签 6，这里 H1、H2 删除类发布都是 n_live = 0，锚点 98304 另算（第七节） |
 | 5 | `.claude/kb/layout/01-first-txn.md` 第 36、404 行 | E142 产物 `matched=29 equal=29 unequal=0`、段序列来自 E142 第二十一次跑 | 同上，E142 的事 |
 | 6 | `.claude/kb/checks-owed.md` C478 那一行 | 并行线三建 233 个 inode 之后根写出的区间 [2, 2]，子树覆盖 [2, 234] | 第 7 行只记值、标读法；那个例子给出两种读法分叉的形态（孩子是码 3 容器的内部节点），第六节 R7 的读法标签照它分三种 |
 | 7 | 判问法时自己算的（第十三节的命令） | 81585、160 / 128 / 64、98304 / 98386、815、2031、120、根槽与 journal 记录、系统配置槽的偏移 | 写进第七节当锚点；它们出自条款加算术，跑之前就在 |
@@ -375,7 +375,7 @@ D8（核心索引结构） 已定项 6（2026-09-05）定了整段：inode 树�
 
 ## 五、臂、阳性对照、真实基线
 
-**装置写在哪（写死）**：装置写在 `research/e7-index-bench/src/bin/e172_deletion_write_dry_run.rs`（研究侧，`implementation-first.md` 第 4 条：不 `use` 任何 `singlefs-*` crate、不 include E142 的源码，偏移表从 layout/01、layout/03、D18 抄成本地常量、每个常量旁写「`<kb 文件>` 第几行」）。它不是入库装置。它只做解码与比对，不手写独立模型（主 agent 定，依据在问题单文件头）。`crates/` 侧只读导出由 `cargo run -p singlefs-checker-tier --bin deletion_write_dump` 在合入后的主工作区里跑，装置读它的输出文件。
+**装置写在哪（写死）**：装置写在 `scripts/experiments/e172_deletion_write_dry_run.rs`（研究侧，`implementation-first.md` 第 4 条：不 `use` 任何 `singlefs-*` crate、不 include E142 的源码，偏移表从 layout/01、layout/03、D18 抄成本地常量、每个常量旁写「`<kb 文件>` 第几行」）。它不是入库装置。它只做解码与比对，不手写独立模型（主 agent 定，依据在问题单文件头）。`crates/` 侧只读导出由 `cargo run -p singlefs-checker-tier --bin deletion_write_dump` 在合入后的主工作区里跑，装置读它的输出文件。
 
 ### 5.1 被比的两边（这次没有设计上的对立臂，比的是「实装」与「登记」）
 
@@ -427,10 +427,10 @@ D8（核心索引结构） 已定项 6（2026-09-05）定了整段：inode 树�
 ### 5.6 跑法（执行员照这个次序；超过前台时限的由主 agent 跑）
 
 1. 核 S1：主工作区里有 `crates/singlefs-checker-tier/src/bin/deletion_write_dump.rs`、`scenario.rs` 里有 `run_deletion_history`；记下两个文件的 `sha256sum`。
-2. 导出两遍（主 agent 跑，编 `singlefs-checker-tier` 慢）：`cd /home/fy5090/code/singlefs && nice -n 19 bash research/scripts/run-with-memory-cap.sh 4G cargo run -q -p singlefs-checker-tier --bin deletion_write_dump > research/results/e172-deletion-write-dump-<日期>.out`，第二遍写到草稿目录，两份比 sha256（V3）。导出约 10 MB（参考那一份 10118080 字节），整份入库；装置产物 `research/results/e172-deletion-write-dry-run-<日期>-s1.out` 不拼十六进制，只记导出的文件名、sha256 与非十六进制行数。
-3. 装置读导出文件跑：`cd research/e7-index-bench && cargo build --release --bin e172-deletion-write-dry-run`，再 `bash ../scripts/run-with-memory-cap.sh 4G ./target/release/e172-deletion-write-dry-run <导出文件>`（相对路径照 `driver_e142` 的写法）。
-4. `research/scripts/replay.sh` 加一个 `driver_e172`，形照 `driver_e142`（先跑导出进临时文件，再跑装置），登记那一行 `exact`。
-5. 变异表整张由主 agent 跑：`cd /home/fy5090/code/singlefs/research && bash scripts/mutate.sh e172-deletion-write-dry-run e7-index-bench/src/bin/e172_deletion_write_dry_run.rs mutations/e172_deletion_write_dry_run.tsv`；收尾要有「已还原，基线仍全绿」，按 `mutation-sampling.md` 那几栏数抓到 / 无效 / 没红。
+2. 导出两遍（主 agent 跑，编 `singlefs-checker-tier` 慢）：`cd /home/fy5090/code/singlefs && nice -n 19 bash scripts/run-with-memory-cap.sh 4G cargo run -q -p singlefs-checker-tier --bin deletion_write_dump > research/results/e172-deletion-write-dump-<日期>.out`，第二遍写到草稿目录，两份比 sha256（V3）。导出约 10 MB（参考那一份 10118080 字节），整份入库；装置产物 `research/results/e172-deletion-write-dry-run-<日期>-s1.out` 不拼十六进制，只记导出的文件名、sha256 与非十六进制行数。
+3. 装置读导出文件跑：`cd scripts/experiments && cargo build --release --bin e172-deletion-write-dry-run`，再 `bash ../scripts/run-with-memory-cap.sh 4G ./target/release/e172-deletion-write-dry-run <导出文件>`（相对路径照 `driver_e142` 的写法）。
+4. `scripts/replay.sh` 加一个 `driver_e172`，形照 `driver_e142`（先跑导出进临时文件，再跑装置），登记那一行 `exact`。
+5. 变异表整张由主 agent 跑：`cd /home/fy5090/code/singlefs/research && bash scripts/mutate.sh e172-deletion-write-dry-run scripts/experiments/e172_deletion_write_dry_run.rs mutations/e172_deletion_write_dry_run.tsv`；收尾要有「已还原，基线仍全绿」，按 `mutation-sampling.md` 那几栏数抓到 / 无效 / 没红。
 
 ## 六、报哪些量与各自的判据
 
@@ -534,7 +534,7 @@ D8（核心索引结构） 已定项 6（2026-09-05）定了整段：inode 树�
 
 ## 九、变异
 
-变异表 `research/mutations/e172_deletion_write_dry_run.tsv`，改的是装置自己的期望与判定代码（不改 `crates/`）。单测读入库的导出 `research/results/e172-deletion-write-dump-<日期>.out`（找不到就判红，不跳过），另有不依赖导出的合成字节单测。每条写明在哪个取样点上改变输出；只在第三段的 H3 上敏感的，第一段不进表、第三段再加（`mutation-sampling.md` 第三类：不当等价变异留档）。
+变异表 `scripts/mutations/e172_deletion_write_dry_run.tsv`，改的是装置自己的期望与判定代码（不改 `crates/`）。单测读入库的导出 `research/results/e172-deletion-write-dump-<日期>.out`（找不到就判红，不跳过），另有不依赖导出的合成字节单测。每条写明在哪个取样点上改变输出；只在第三段的 H3 上敏感的，第一段不进表、第三段再加（`mutation-sampling.md` 第三类：不当等价变异留档）。
 
 | 变异 | 改什么 | 在哪个取样点上改变输出 |
 |---|---|---|
@@ -632,12 +632,12 @@ D8（核心索引结构） 已定项 6（2026-09-05）定了整段：inode 树�
 | `.claude/kb/milestone/03-third-txn.md` | 88、114（grep「三·6」命中行） |
 | `.claude/kb/experiments/142-新池新建文件的干跑.md` | 标题 grep；1–84（第 1 行是标题行，带 E142 的结论，列在第四节第 4 条；「判决」及以后各节没读） |
 | `.claude/kb/experiments/` 目录 | `ls` 末五个文件名 |
-| `research/scripts/replay.sh` | 25–26、174、269–273（grep 命中行）、495–600 |
-| `research/scripts/claim-experiment.sh` | 1–99 |
-| `research/scripts/quote-kb.py` | 1–40 |
-| `research/scripts/mutate.sh` | 1–30 |
-| `research/scripts/replace-once.py` | `--help` 输出 |
-| `research/e7-index-bench/Cargo.toml` | 377–381、449–452（grep `e142` 命中行） |
+| `scripts/replay.sh` | 25–26、174、269–273（grep 命中行）、495–600 |
+| `scripts/claim-experiment.sh` | 1–99 |
+| `scripts/quote-kb.py` | 1–40 |
+| `scripts/mutate.sh` | 1–30 |
+| `scripts/replace-once.py` | `--help` 输出 |
+| `scripts/experiments/Cargo.toml` | 377–381、449–452（grep `e142` 命中行） |
 | `/tmp/claude-1000/m3-batch18/x/report.md` | 1–254（整份） |
 | `/tmp/claude-1000/m3-batch18/x/patch/crates.patch` | 1–280（`deletion_write_dump.rs`）、403–1094（`scenario.rs`）；`diff --git` 行 grep |
 | `/tmp/claude-1000/m3-batch18/x/` 目录 | `ls -la`、`wc -l`（`verify/deletion-dump.out` 只看行数与字节数，内容没读） |
@@ -655,9 +655,9 @@ D8（核心索引结构） 已定项 6（2026-09-05）定了整段：inode 树�
 
 ### 13.2 跑过的命令（原样）
 
-1. `cd /home/fy5090/code/singlefs && n=$(bash research/scripts/claim-experiment.sh --next) && echo "next=$n" && bash research/scripts/claim-experiment.sh "$n" 删除写出的字节的干跑; echo "exit=$?"` → `next=E172`、`✓ 占住 E172`、`exit=0`。
+1. `cd /home/fy5090/code/singlefs && n=$(bash scripts/claim-experiment.sh --next) && echo "next=$n" && bash scripts/claim-experiment.sh "$n" 删除写出的字节的干跑; echo "exit=$?"` → `next=E172`、`✓ 占住 E172`、`exit=0`。
 2. 锚点：草稿目录 `/tmp/claude-1000/m3-delete-dryrun-design/anchors.py`（`python3 anchors.py`）与一行按位 CRC32C 参考实现；输出原样：`payload_capacity 32634 content_bytes 81585`；`units 3 size 81585 blocks 160`、`units 2 size 65268 blocks 128`、`units 1 size 32634 blocks 64`；`tag6 n_live 0 98304`、`tag6 n_live 1 98386`；`ceil(2*16384/815) 41`；`tomb_capacity 815 deleted_inodes_root_capacity 2031`；`tomb_root_entry_width 120`；`txg 5 root region 2 device 0 offset 7344128` 到 `txg 13 root region 1 device 1 offset 4210688` 九行；`journal counter 5 offset 16793600` 到 `journal counter 8 offset 16805888`；`sysconfig generation 7 slot 1 offset 4096` 到 `sysconfig generation 10 slot 0 offset 0`；`range_end 0xffffffffffffffff`；`crc32c(123456789) 0xe3069283`。
-3. 第二节：`python3 research/scripts/quote-kb.py /tmp/claude-1000/m3-delete-dryrun-design/quote-section2.md` 加十个取法（layout/03 一级标题、D8 已定项 16、D18 已定项 18、D18 已定项 24、D18 第 276–293 行、layout/01「## 四、文件元数据（inode）」、layout/01 第 295–311、386–387、411、418 行）→ `✓ 10 段整抄进 …，回读逐字节一致`，`exit=0`，273 行。
+3. 第二节：`python3 scripts/quote-kb.py /tmp/claude-1000/m3-delete-dryrun-design/quote-section2.md` 加十个取法（layout/03 一级标题、D8 已定项 16、D18 已定项 18、D18 已定项 24、D18 第 276–293 行、layout/01「## 四、文件元数据（inode）」、layout/01 第 295–311、386–387、411、418 行）→ `✓ 10 段整抄进 …，回读逐字节一致`，`exit=0`，273 行。
 4. 第三节的现查：`ls crates/singlefs-checker-tier/src/bin/deletion_write_dump.rs`（No such file or directory）；`grep -c 'run_deletion_history' crates/singlefs-harness/src/scenario.rs`（0）；`sed -n '894,940p' crates/singlefs-core/src/mount.rs | grep -n 'writes\|acquir'`（零命中）；`grep -n 'acquisition_writes\|writes_of_the_acquisition\|instance_acquisition' crates/singlefs-core/src/mount.rs`（零命中）。
 5. `sha256sum research/prompts/m3-delete-dryrun-questions.md` → `135f771bfdd8be8dd57184c7df847a3e904d3e2e5f2f051cd433183579720613`，与派发提示给的相同。
-6. 登记里三处措辞用 `python3 research/scripts/replace-once.py research/prompts/e172-preregistration.md <旧串> <新串>` 定点改（各命中 1 次）。
+6. 登记里三处措辞用 `python3 scripts/replace-once.py research/prompts/e172-preregistration.md <旧串> <新串>` 定点改（各命中 1 次）。

@@ -4,7 +4,7 @@
 
 ## 开工快照核对
 
-`sha256sum -c research/prompts/gate-shrink-r1-snapshot/*-sha256.txt`：对不上两份。`.claude/gate.d/20-doc-decision-documents.sh` 在腿工作期间被别的会话改过（云端攻方报告末节「工作期间别的会话改了 20 号与 doc-lint.sh，行号已按现查改过」）；`records/2026-09-28-门禁59号提速与双机分片.md` 是主 agent 自己追加的计划行，三条腿都禁读它。两份云端腿报告的引文用 `python3 research/scripts/cite-check.py research/prompts/gate-shrink-r1-sonnet-output.md research/prompts/gate-shrink-r1-opus-output.md --background research/prompts/_gate-shrink-r1-background.md --background research/prompts/_gate-shrink-r1-diff.md` 按现在的文件核：「✓ 核了 38 处引文，对上 38 处，没判 0 处」。
+`sha256sum -c research/prompts/gate-shrink-r1-snapshot/*-sha256.txt`：对不上两份。`.claude/gate.d/20-doc-decision-documents.sh` 在腿工作期间被别的会话改过（云端攻方报告末节「工作期间别的会话改了 20 号与 doc-lint.sh，行号已按现查改过」）；`records/2026-09-28-门禁59号提速与双机分片.md` 是主 agent 自己追加的计划行，三条腿都禁读它。两份云端腿报告的引文用 `python3 scripts/cite-check.py research/prompts/gate-shrink-r1-sonnet-output.md research/prompts/gate-shrink-r1-opus-output.md --background research/prompts/_gate-shrink-r1-background.md --background research/prompts/_gate-shrink-r1-diff.md` 按现在的文件核：「✓ 核了 38 处引文，对上 38 处，没判 0 处」。
 
 ## 腿与样本
 
@@ -30,7 +30,7 @@
 | 3-B8 | **打中，不删** experiment-refs、decision-refs | 云端攻方 B8，M7 V8 |
 | 3-B9 | batch-scope 判据对、缺成批登记的写法；knowledge-sync 判据对、红是流程欠账（这一轮自己也要写阶段同步记录）；archive-past-rounds 在多会话下判据不合用（攻方推的） | 云端攻方 B9；M8 算过 batch-scope 在暂存树上照样红（188 个触发文件 151 个没登记） |
 | 4 次序与改名 | 77 号见 B6；47 号两处认「两位数开头」的 glob（`[0-9][0-9]-*.sh`）去编号时要改，否则部分改名时 fixture-claims 静默跳过；**按全名指门禁从此没人判**（governance-refs 只认「两位数加号」与反引号路径，M5 量过）——打中，采 | 云端攻方第三节 4、5 |
-| 5 定义改动 | 这一轮改的那几块（Q8、Q9、Q15 与改门禁号）没有互相矛盾的句子；**两处不是这一轮的**：`.claude/rules/three-way-inference.md` 与 `.claude/main-agent.md` 里撤掉「核查员按轮派」的文字、`.claude/rules/verification.md` 的耗时用例量法改写（连带 `research/scripts/harness-test-timing.py` 删除），不在这一轮判；**一处是这一轮的、要改**：`.claude/rules/implementation-workflow.md`「双机分片」那一条接的 59 号双机写法，与用户同日两条定案不符（59 号整套重设计归别的会话；双机与 GPU 都要从本地配置读 `ENABLE_ACROSS_MACHINES` / `ENABLE_GPU` 才开） | 正推第 5 问；`crash-verifier.md` 把 `stage-owners.tsv` 当「提交时跑哪几道」读，与第二列新意思「判红时派给谁修」要连着读才说得通——采正推的意见：`crash-verifier.md` 自己写明跑哪几道，不再靠这张表 |
+| 5 定义改动 | 这一轮改的那几块（Q8、Q9、Q15 与改门禁号）没有互相矛盾的句子；**两处不是这一轮的**：`.claude/rules/three-way-inference.md` 与 `.claude/main-agent.md` 里撤掉「核查员按轮派」的文字、`.claude/rules/verification.md` 的耗时用例量法改写（连带 `scripts/harness-test-timing.py` 删除），不在这一轮判；**一处是这一轮的、要改**：`.claude/rules/implementation-workflow.md`「双机分片」那一条接的 59 号双机写法，与用户同日两条定案不符（59 号整套重设计归别的会话；双机与 GPU 都要从本地配置读 `ENABLE_ACROSS_MACHINES` / `ENABLE_GPU` 才开） | 正推第 5 问；`crash-verifier.md` 把 `stage-owners.tsv` 当「提交时跑哪几道」读，与第二列新意思「判红时派给谁修」要连着读才说得通——采正推的意见：`crash-verifier.md` 自己写明跑哪几道，不再靠这张表 |
 | 6 只在提交时跑的代价 | **打中一处硬伤**：34 号 evidence-in-repo 在 `gate-staged.sh` 的链接 worktree 里整格退 77，提交路径上它从来不判 | 主 agent 现查 `.claude/gate.d/34-doc-experiment-pages-and-products.sh:509`、`:526`–`:527`：链接 worktree 退 77，理由是时间戳是检出时写的；它的判据二（kb 与新写的提示拿 `/tmp` 当依据）不看时间戳，照样该判。写入时拦的 W1–W4 与用户「扫仓的门禁只在提交时跑」有交集，交用户 |
 
 ## 采纳的改法（第 4 步实施）

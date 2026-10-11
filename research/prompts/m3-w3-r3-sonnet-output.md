@@ -16,7 +16,7 @@
 
 ## 一、复跑与模型文件
 
-模型目录 `research/prompts/m3-w3-r3-sonnet-model/`。在仓根，`W` 取一个空目录；每段一条前台命令（编译 6G、跑 4G，线程 6，都经 `research/scripts/run-with-memory-cap.sh`；只跑 harness 档）：
+模型目录 `research/prompts/m3-w3-r3-sonnet-model/`。在仓根，`W` 取一个空目录；每段一条前台命令（编译 6G、跑 4G，线程 6，都经 `scripts/run-with-memory-cap.sh`；只跑 harness 档）：
 
 ```
 M=research/prompts/m3-w3-r3-sonnet-model; W=<空目录>
@@ -436,4 +436,4 @@ compared=47 status=0
 ```
 之后只改了三处：`rerun.sh` 开头加 `export PYTHONDONTWRITEBYTECODE=1`、README 里两句（`mut_table3.py` 的说明与依赖的外部东西）；在另一个空目录 `rerun3` 里重跑 build-model、model-blind、model-mutation、model-mutation2-p、model-mutation2-v1、cost-check 六段再 `compare`：22 个文件 `same`、0 个 `DIFFERENT`（其余文件在那个目录里没跑，`compare` 报缺，不算比过）。`expected/` 里的模型输出是开发时第二遍（alphabet 标签与 D 变异口径改过之后）整理的，不是复跑那一遍，所以复跑是对着它比；`probe-compare.out`、`probe-small-real.out`、`probe-shape.out`、`probe-bulk.out` 与 `report-tables.out` 是确定性输出。
 
-交回前跑 `python3 research/scripts/cite-check.py research/prompts/m3-w3-r3-sonnet-output.md` 的末行：  ✓ 核了 167 处引文，对上 167 处，没判 0 处（逐处列在上面）
+交回前跑 `python3 scripts/cite-check.py research/prompts/m3-w3-r3-sonnet-output.md` 的末行：  ✓ 核了 167 处引文，对上 167 处，没判 0 处（逐处列在上面）

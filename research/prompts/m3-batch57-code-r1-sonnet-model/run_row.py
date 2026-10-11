@@ -15,8 +15,8 @@ for ln in map(int, sys.argv[1:]):
     if n != 1:
         print(f'ROW {ln} 锚点命中 {n} 次，跳过'); continue
     open(f'{W}/repo/{file}', 'w', encoding='utf-8').write(src.replace(old, new))
-    cmd = ['nice', '-n', '19', 'bash', '/home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh', '10G',
-           'bash', '/home/fy5090/code/singlefs/research/scripts/capped.sh', '10', 'cargo', 'test', '--offline'] + shlex.split(args)
+    cmd = ['nice', '-n', '19', 'bash', '/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh', '10G',
+           'bash', '/home/fy5090/code/singlefs/scripts/capped.sh', '10', 'cargo', 'test', '--offline'] + shlex.split(args)
     p = subprocess.run(cmd, cwd=f'{W}/repo', env=env, capture_output=True, text=True)
     open(f'{W}/row-{ln}.log', 'w').write(p.stdout + p.stderr)
     open(f'{W}/repo/{file}', 'w', encoding='utf-8').write(src)

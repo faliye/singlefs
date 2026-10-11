@@ -16,7 +16,7 @@ f20719ecf7d3cdef
 f20719ecf7d3cdef
 ```
 
-- 只跑 harness 档：`cargo test -p singlefs-harness`，经 `bash research/scripts/capped.sh 10 bash research/scripts/run-with-memory-cap.sh 4G …`，仓副本与编译目录在 `~/.local/share/singlefs/work/m3-batch10x-code-r1-sonnet/`（交回前删）。起跑前 `host-resources.py` 看过：本机可用线程 0–27 间摆动（主 agent 的合后验证在跑）；没有性能测量在跑。钩子有几次对默认预测 8G 报「本机放不下」，我给的上限是 4G，包装没排队、没退 250–254，测试二进制实际峰值 26 MiB（host 历史表记的）。
+- 只跑 harness 档：`cargo test -p singlefs-harness`，经 `bash scripts/capped.sh 10 bash scripts/run-with-memory-cap.sh 4G …`，仓副本与编译目录在 `~/.local/share/singlefs/work/m3-batch10x-code-r1-sonnet/`（交回前删）。起跑前 `host-resources.py` 看过：本机可用线程 0–27 间摆动（主 agent 的合后验证在跑）；没有性能测量在跑。钩子有几次对默认预测 8G 报「本机放不下」，我给的上限是 4G，包装没排队、没退 250–254，测试二进制实际峰值 26 MiB（host 历史表记的）。
 - 基线（冻结副本、不改一行）：`cargo test -p singlefs-harness --lib --offline gpu_memory_ledger` → `test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out`。
 - 模型与日志在 `research/prompts/m3-batch10x-code-r1-sonnet-model/`：`forward_probe.rs`（七条探针，假读数，不要显卡）、`mutate-probe.py` + `mutants1.json`（harness 档变异探针）、两份原样输出日志。
 - checker 档（含 GPU 用例、`crash_amplification` 的单测）按规定一律不跑。凡写「复核不了」的，都是要真卡、或要 checker 档才能坐实的。
@@ -110,7 +110,7 @@ research/prompts/m3-batch10x-code-r1-sonnet-model/forward_probe-run.log:48: P3 3
 
 ### K1-2　跨进程那一套删干净了吗
 
-- 对账、取卡、判器派活、核对五份源码（`gpu_memory_ledger.rs`、`gpu_unit_checks.rs`、`crash_judge_dispatch.rs`、`crash_verify_gpu.rs`、`crash_amplification.rs`）grep `flock|thread::sleep|Condvar|wait_timeout|thread::park|/proc/|is_process_alive|process_alive|LONGEST_WAIT|ledger_directory|gpu-memory-ledgers`：5 行命中，全在 `crash_judge_dispatch.rs`（`:32`、`:878`、`:882` 是一次派活等卡算完的 120 秒上限，`:1090`、`:1092` 读 `/proc/self/status` 的常驻峰值），与借卡无关；`research/scripts/`、`.claude/gate.d/`、两份 env 样板里没有 `gpu-memory-ledgers`、`GPU_MEMORY_LEDGER`。账里只剩进程内的 `Mutex`（`crates/singlefs-harness/src/gpu_memory_ledger.rs:694`、`:758`）。
+- 对账、取卡、判器派活、核对五份源码（`gpu_memory_ledger.rs`、`gpu_unit_checks.rs`、`crash_judge_dispatch.rs`、`crash_verify_gpu.rs`、`crash_amplification.rs`）grep `flock|thread::sleep|Condvar|wait_timeout|thread::park|/proc/|is_process_alive|process_alive|LONGEST_WAIT|ledger_directory|gpu-memory-ledgers`：5 行命中，全在 `crash_judge_dispatch.rs`（`:32`、`:878`、`:882` 是一次派活等卡算完的 120 秒上限，`:1090`、`:1092` 读 `/proc/self/status` 的常驻峰值），与借卡无关；`scripts/`、`.claude/gate.d/`、两份 env 样板里没有 `gpu-memory-ledgers`、`GPU_MEMORY_LEDGER`。账里只剩进程内的 `Mutex`（`crates/singlefs-harness/src/gpu_memory_ledger.rs:694`、`:758`）。
 - 借的路径：`book_on_one_of_these_cards` 与 `book_states_on_the_cards_with_room` 都是「读、判、记」在一次锁里，借不到当场交 `Err`，不等（`crates/singlefs-harness/src/gpu_memory_ledger.rs:695-720`）。
 - 剩下的：**注释里还写着旧的「等满了」**，共 10 行（命令原样输出）：
 
@@ -138,7 +138,7 @@ crates/singlefs-checker-tier/src/crash_judge_dispatch.rs:928
 
 | 路 | 代码 | 结局 |
 |---|---|---|
-| ① 内存包装退 245 | 包装文件头：「245    显存不够：命令退了非 0，而它起止之间的内核日志里有显卡驱动报的显存不够」（`research/scripts/run-with-memory-cap.sh:26`）；「RUN_WITH_MEMORY_CAP_BREAK=gpuoomonsuccess  命令退 0 也查内核日志、查到显存不够就退 245」（`research/scripts/run-with-memory-cap.sh:237`）是弄坏开关 | 只在**命令退非 0**时才看内核日志。被 wgpu 接住、退 0 的那一路（下面 ②③）不会变 245，而且本来就报了本次未跑，不矛盾 |
+| ① 内存包装退 245 | 包装文件头：「245    显存不够：命令退了非 0，而它起止之间的内核日志里有显卡驱动报的显存不够」（`scripts/run-with-memory-cap.sh:26`）；「RUN_WITH_MEMORY_CAP_BREAK=gpuoomonsuccess  命令退 0 也查内核日志、查到显存不够就退 245」（`scripts/run-with-memory-cap.sh:237`）是弄坏开关 | 只在**命令退非 0**时才看内核日志。被 wgpu 接住、退 0 的那一路（下面 ②③）不会变 245，而且本来就报了本次未跑，不矛盾 |
 | ② 第 ① 段建判器、判一块 | 范围推在这条线程上：「.push_error_scope(wgpu::ErrorFilter::OutOfMemory);」（`crates/singlefs-checker-tier/src/crash_amplification.rs:1989`）；工作 panic 也接住：「let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(work));」（`crates/singlefs-checker-tier/src/crash_amplification.rs:1990`）；两处调用 `:2018`、`:2078` | 出错发 `CardMessage::OutOfMemory`：「received.out_of_memory.get_or_insert(reason);」（`crates/singlefs-checker-tier/src/crash_amplification.rs:1932`）；写库线程把前面按序到的块照写进库；最后「if let Some(reason) = received.out_of_memory {」（`crates/singlefs-checker-tier/src/crash_amplification.rs:2718`）打本次未跑、交 `NotRunTheGpuMemoryWasShort`。一致 |
 | ③ 第 ② 段核对 | 同一个函数包住 `verify_blocks_from_these_facts`：「let tally = match on_the_card_catching_out_of_memory(&card, "第 ② 段核对时", || {」（`crates/singlefs-checker-tier/src/crash_amplification.rs:5414`）。`crash_verify_gpu.rs` 里没有线程（grep `thread::|spawn|rayon` 0 命中），错误范围按线程分在 wgpu 30.0.1 里确是线程本地（`wgpu-30.0.1/src/backend/wgpu_core.rs:634` 的 `scopes: HashMap<thread_id::ThreadId, …>`） | 本次未跑。一致 |
 | ④ 单元校验和对拍 | 文件头自己认没接：「单元校验和对拍几条线程一起派活，wgpu 的错误范围按线程分，一个范围接不住几条线程，这一段没接：」（`crates/singlefs-checker-tier/src/crash_amplification.rs:39`） | 默认错误处理函数 panic，整趟红。已知、不算打中 |
@@ -278,7 +278,7 @@ research/prompts/m3-batch10x-code-r1-sonnet-model/mutate-probe-run.log:14: C20 c
 ## 要主 agent 跑的命令（checker 档 + 真卡；子 agent 不跑）
 
 - 坐实冲突 D：先让另一个进程占住被测那几张卡的几乎全部空闲显存（让每张卡此刻借不出一个状态），再跑（工作目录仓根，`SINGLEFS_HEAVY_TESTS=user-request` 前缀，内存上限 16G，线程 10）：
-  `bash research/scripts/capped.sh 10 bash research/scripts/run-with-memory-cap.sh 16G cargo test -p singlefs-checker-tier --features verdict-store,gpu --test crash_amplification_product_path_books_its_scratch_on_the_card_pool -- the_product_path_judges_on_scratch_it_booked_on_the_card_pool`
+  `bash scripts/capped.sh 10 bash scripts/run-with-memory-cap.sh 16G cargo test -p singlefs-checker-tier --features verdict-store,gpu --test crash_amplification_product_path_books_its_scratch_on_the_card_pool -- the_product_path_judges_on_scratch_it_booked_on_the_card_pool`
   看输出里是 `NOT_RUN_NO_GPU_ADAPTER … reason=显存不够…`（定义要的）还是 panic 带「没有一张卡装得下这条流的表」（我读出的）。
 - 坐实冲突 C：同上，让占卡的进程在登记之后、起设备之前才把卡占满，看是不是 panic 带「上起不了设备」。要时序控制，不好做；可以只读代码判。
 - 坐实 K3-2 的 `cfg_attr`：在 `crates/singlefs-checker-tier/src/` 临时放一个 `#[cfg_attr(test, test)] fn x() { let _ = usable_gpu_cards(); }`，跑 `--test gpu_unit_checks_every_gpu_test_takes_its_cards_through_gpu_test_start`，看是否仍绿；跑完删掉。

@@ -26,8 +26,8 @@ fi
 export CARGO_TARGET_DIR="$dir/target"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="m3-batch24-code-r1 正推腿在自己的仓副本与编译目录里复跑，不与别的会话共用副本"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="派发提示要求编译 6G 跑 4G 显式写上限，不用 auto"
-cap="nice -n 19 bash $SINGLEFS_REPO/research/scripts/run-with-memory-cap.sh"
-capped="bash $SINGLEFS_REPO/research/scripts/capped.sh $threads"
+cap="nice -n 19 bash $SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
+capped="bash $SINGLEFS_REPO/scripts/capped.sh $threads"
 build_prefix="$cap 6G $capped"
 run_prefix="$cap 4G $capped"
 strip_times() { sed -E 's/; finished in [0-9.]+s//'; }

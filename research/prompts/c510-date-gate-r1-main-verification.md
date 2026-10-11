@@ -19,7 +19,7 @@ CATEGORY_E / F 两次都答「找不到具体误判对象」，CATEGORY_D 两次
 跑前判据写死的是「说得出具体对象与它为什么合法」才算打中，据此记「没打中」。
 两份样本已满足「一条腿只抽一次样不算一次观测」那条的两次门槛。
 
-**主 agent 现查的一条反证**：A 类要成真，得有带外部日期的文件名进仓。现查 `research/scripts/fetch-refs.sh` 第 21–27 行，
+**主 agent 现查的一条反证**：A 类要成真，得有带外部日期的文件名进仓。现查 `scripts/fetch-refs.sh` 第 21–27 行，
 七份固定下来的文献命名是 `ostep-45-file-integrity.pdf`、`naclcrypto.pdf`、`nist-sp800-38b.pdf` 这种，**一个日期都不带**；
 上游原名里带日期的那份（`naclcrypto-20090310.pdf`）在本仓被改成了不带日期的名字。今天的命名惯例不产生这类对象。
 

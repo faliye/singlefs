@@ -4,9 +4,9 @@
 
 ## 复跑
 
-模型目录 `research/prompts/m3-batch56-code-r1-opus-model/`。从空目录起（模型目录拷出仓用时设 `SINGLEFS_SCRIPTS=<仓根>/research/scripts`）：
+模型目录 `research/prompts/m3-batch56-code-r1-opus-model/`。从空目录起（模型目录拷出仓用时设 `SINGLEFS_SCRIPTS=<仓根>/scripts`）：
 ```
-SINGLEFS_SCRIPTS=$PWD/research/scripts OPUS_THREADS=10 OPUS_MEMORY_CAP=4G \
+SINGLEFS_SCRIPTS=$PWD/scripts OPUS_THREADS=10 OPUS_MEMORY_CAP=4G \
   bash research/prompts/m3-batch56-code-r1-opus-model/rerun.sh <空工作目录> all
 ```
 `all` 依次跑 base-build、k2-knob、k2-crash-counts、k2-crash-timing、k1-base、k2-random-b1/b2/b3、k4-shape、k4-family、`mutants.py --list` 列的 12 份（11 种改坏与 1 条改法臂 `fix-knob-full`，阶段名都是 `mut-<名>`）、compare；只拷冻结副本的 `Cargo.toml`、`Cargo.lock`、`crates/`，原型 crate `probe-crate/` 拷成副本工作区里的成员 `crates/opus-probe-b56`（测试目标名不带 layer0），base 与变异各用自己的 `CARGO_TARGET_DIR`，变异挨个共用一个副本目录与编译目录；同一时刻一条 cargo，每条经 `capped.sh` 与 `run-with-memory-cap.sh`。前台有超时的环境按阶段名分几次起、同一个工作目录接着跑（变异阶段被打断后重起不重拷、接着编）。挂钟（本机负载 15–30 下）：编译约 4 分钟，原型与 harness 阶段约 10 分钟，12 份变异与改法臂约 30 分钟。
@@ -311,7 +311,7 @@ K2-1「崩溃恢复抛弃段里写的容器」的层 0 全量（一次回退那�
 - 命令（仓根 `/home/fy5090/code/singlefs`）：
 ```
 OPUS_WINDOW=rollback OPUS_THREADS=<N> OPUS_STATE_CAP=1100000 CARGO_TARGET_DIR=<工作目录>/target-base \
-  bash research/scripts/capped.sh <N> bash research/scripts/run-with-memory-cap.sh 10G \
+  bash scripts/capped.sh <N> bash scripts/run-with-memory-cap.sh 10G \
   cargo test --offline --release -p opus-probe-b56 --test k2_crash_abandoned -- --nocapture
 ```
 （`OPUS_STATE_CAP` 默认 10⁶，这个窗口 1 048 588 态，要放到 110 万才跑；枚举器自己的工作线程数读 `SINGLEFS_LAYER0_THREADS`（`crates/singlefs-checker-tier/src/crash.rs` 里 `LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE`），`OPUS_THREADS` 只管挂载与续写那一段。）
@@ -349,7 +349,7 @@ OPUS_WINDOW=rollback OPUS_THREADS=<N> OPUS_STATE_CAP=1100000 CARGO_TARGET_DIR=<�
 - 没改冻结副本与主工作区的任何文件。草稿目录 `~/.local/share/singlefs/work/m3-batch56-code-r1-opus/` 里的仓副本与编译目录（base、run1–run3 与它们的 target）交回前都删了；留下的只有 `out/`（探索时的终端日志）与 `kept/run3-out/`（交回前那次复跑的 21 份输出与 compare）。
 
 ## 交回前的复跑
-模型目录定稿之后（上面那张 sha256 表），在空目录 `~/.local/share/singlefs/work/m3-batch56-code-r1-opus/run3/` 里从头跑全部阶段（`SINGLEFS_SCRIPTS=/home/fy5090/code/singlefs/research/scripts OPUS_THREADS=10 OPUS_MEMORY_CAP=4G`，前台每次至多 228 秒、按阶段名分 19 次起；`mut-k4-borrow-even-after-absorbing`、`mut-k4-floor-inclusive` 各被前台时限打断一次、同名重起接着编），compare 的原样输出（副本与编译目录随后删了，这一次的输出拷在 `~/.local/share/singlefs/work/m3-batch56-code-r1-opus/kept/run3-out/`）：
+模型目录定稿之后（上面那张 sha256 表），在空目录 `~/.local/share/singlefs/work/m3-batch56-code-r1-opus/run3/` 里从头跑全部阶段（`SINGLEFS_SCRIPTS=/home/fy5090/code/singlefs/scripts OPUS_THREADS=10 OPUS_MEMORY_CAP=4G`，前台每次至多 228 秒、按阶段名分 19 次起；`mut-k4-borrow-even-after-absorbing`、`mut-k4-floor-inclusive` 各被前台时限打断一次、同名重起接着编），compare 的原样输出（副本与编译目录随后删了，这一次的输出拷在 `~/.local/share/singlefs/work/m3-batch56-code-r1-opus/kept/run3-out/`）：
 ```
 一致 k1-base.txt
 一致 k2-crash-counts.txt

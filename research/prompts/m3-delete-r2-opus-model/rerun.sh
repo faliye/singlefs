@@ -2,7 +2,7 @@
 # m3-delete-r2 攻方腿原型的复跑（副本专用，被攻过零轮）：把冻结副本的 crates/ 拷进草稿目录，打上 core-prototype-r2.diff
 # （m3-delete-r1 攻方原型那份 diff 加这一轮的账房钩子与两个准入开关），放进用例，跑 harness 档的这一个测试目标。
 # 用法（经内存包装与线程上限起）：
-#   bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 8 bash research/prompts/m3-delete-r2-opus-model/rerun.sh <冻结副本根> <草稿目录>
+#   bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 8 bash research/prompts/m3-delete-r2-opus-model/rerun.sh <冻结副本根> <草稿目录>
 # 冻结副本根是 /tmp/claude-1000/m3-delete-r2/tree（清单 research/prompts/m3-delete-r2-snapshot/crates-sha256.txt）。
 # 草稿目录必须还不存在；跑完它里面留着仓副本与编译目录，用完自己删。输出里的 `E name=` 行与 run-final-e-lines.txt 逐行比。
 set -euo pipefail

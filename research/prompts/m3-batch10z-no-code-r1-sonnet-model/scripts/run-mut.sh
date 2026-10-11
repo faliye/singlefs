@@ -2,7 +2,7 @@
 # run-mut.sh <变异名> : 套变异、编 tree-mut 的 s2_probe、跑两批、写 runs/M/<名>.sum
 set -u
 W=$HOME/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet
-R=/home/fy5090/code/singlefs/research/scripts
+R=/home/fy5090/code/singlefs/scripts
 name=$1
 mkdir -p $W/runs/M
 python3 $W/scripts/mutate.py $name || exit 9

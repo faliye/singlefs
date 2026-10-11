@@ -14,7 +14,7 @@ adfd5f5d1e2cdca47968f27e7a38673a5f40fa881083ee1323dea2a7cab65bf8  d13_units.py
 e3f2073f808aa1abeefd60fbff8d3bea1cc8ae35e19560e611347c0c8087993a  expected-output.txt
 ```
 
-模型从冻结副本读判据表（标签、`Criterion::family`、`is_judged_in_every_family`、`is_judged_under` 各臂）与 `positive_control_readings` 的两道 `continue`（读成表达式求值，所以变异行的替换文能整份重读）、改后单测的 14 个单元、`main` 起对照的那一行；从第二轮冻结副本读第二轮单测（只判 D4 的「第二轮单测下放过」）；从 `research/scripts/replay.sh` 第 699–880 行读直接起装置的驱动参数，按 `split_off_the_profile_options` 与 `parse_the_command_line` 的默认值解成 (族, 档)，再拿 `replay.sh` 登记行对的产物里 `name=control` 的判据集合核模型算的每条正式跑的对照集（核一：15 条全相同，不同退 4）。核一会红：e165 装置第 6193 行换成 `=> Family::LegalHistory,` 的假根上，核一 11 条不同、退 4（草稿 `~/.local/share/singlefs/work/m3b37r3-opus/selfred.txt`）。D4 那几行的红在哪个单元与主 agent 的 `prove-red` 日志（`~/.local/share/singlefs/work/m3-formal-37c-run/prove-red-logs/001–005.log`）逐个相同。限度：读数一律当「跑了就红」，只管判据一级。
+模型从冻结副本读判据表（标签、`Criterion::family`、`is_judged_in_every_family`、`is_judged_under` 各臂）与 `positive_control_readings` 的两道 `continue`（读成表达式求值，所以变异行的替换文能整份重读）、改后单测的 14 个单元、`main` 起对照的那一行；从第二轮冻结副本读第二轮单测（只判 D4 的「第二轮单测下放过」）；从 `scripts/replay.sh` 第 699–880 行读直接起装置的驱动参数，按 `split_off_the_profile_options` 与 `parse_the_command_line` 的默认值解成 (族, 档)，再拿 `replay.sh` 登记行对的产物里 `name=control` 的判据集合核模型算的每条正式跑的对照集（核一：15 条全相同，不同退 4）。核一会红：e165 装置第 6193 行换成 `=> Family::LegalHistory,` 的假根上，核一 11 条不同、退 4（草稿 `~/.local/share/singlefs/work/m3b37r3-opus/selfred.txt`）。D4 那几行的红在哪个单元与主 agent 的 `prove-red` 日志（`~/.local/share/singlefs/work/m3-formal-37c-run/prove-red-logs/001–005.log`）逐个相同。限度：读数一律当「跑了就红」，只管判据一级。
 
 ## 各格判定一览
 
@@ -36,7 +36,7 @@ e3f2073f808aa1abeefd60fbff8d3bea1cc8ae35e19560e611347c0c8087993a  expected-outpu
 
 ### 单元是不是恰好是正式跑的全部（没打中）
 
-`research/scripts/replay.sh` 第 699–880 行里 `cargo run … --bin e165_replay_bounded_enumeration` 直接起装置的 18 行，去掉 `--family root_choice`（第 766 行）、`root_choice_faults`（第 791、870 行）三条（它们走 `run_the_root_choice_family` / `run_the_root_choice_faults_family`，不调 `positive_control_readings`），剩 15 条。模型按命令行解出 (族, 档) 再与单测的单元比（原样）：
+`scripts/replay.sh` 第 699–880 行里 `cargo run … --bin e165_replay_bounded_enumeration` 直接起装置的 18 行，去掉 `--family root_choice`（第 766 行）、`root_choice_faults`（第 791、870 行）三条（它们走 `run_the_root_choice_family` / `run_the_root_choice_faults_family`，不调 `positive_control_readings`），剩 15 条。模型按命令行解出 (族, 档) 再与单测的单元比（原样）：
 
 ```text
 == D1：14 个单元对 replay.sh 直接起装置的驱动（root_choice 两族除外）
@@ -47,7 +47,7 @@ e3f2073f808aa1abeefd60fbff8d3bea1cc8ae35e19560e611347c0c8087993a  expected-outpu
 
 每个单元注释写的驱动行与模型找到的驱动行逐个「对」（第 703 与 706 两行解出同一个 (合法, r1)，界不进对照那次调用，见 D3）。
 
-经杀伤界驱动起的那几条不是今天装置的正式跑：r2 模式调装置是「DEVICE_PROFILE_ARGUMENTS = ["--profile", "r2"]」（`research/scripts/e165-replay-mutation-kill-bounds.sh:278`）加「            return ["--bounds", "segment2"]」（`research/scripts/e165-replay-mutation-kill-bounds.sh:557`），不带 `--family`，所以是合法、对抗两族一起（「    let mut families = vec![Family::LegalHistory, Family::Adversarial];」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:17388`）。这个 (r2 直接建表, 两族) 组合单测里没有。但它编的是 `--root` 那棵树：「    copy_the_tree(setup, tree)」（`research/scripts/e165-replay-mutation-kill-bounds.sh:1020`）从「        source = os.path.join(setup.root, entry)」（`research/scripts/e165-replay-mutation-kill-bounds.sh:997`）拷，两个 r2 模式驱动的根是「  local frozen_root="${E165_R2_FROZEN_ROOT:-/tmp/claude-1000/e165-r2-segment4/root}"」（`research/scripts/replay.sh:722`）与「  local root="${E165_R5_SEGMENT1_ROOT:-/tmp/claude-1000/e165-r5-segment1/root}"」（`research/scripts/replay.sh:820`）。今天的装置改坏到不了那几跑，单测管不着它们也不缺。r3、r4 两个模式跑的是 root_choice 两族。
+经杀伤界驱动起的那几条不是今天装置的正式跑：r2 模式调装置是「DEVICE_PROFILE_ARGUMENTS = ["--profile", "r2"]」（`scripts/e165-replay-mutation-kill-bounds.sh:278`）加「            return ["--bounds", "segment2"]」（`scripts/e165-replay-mutation-kill-bounds.sh:557`），不带 `--family`，所以是合法、对抗两族一起（「    let mut families = vec![Family::LegalHistory, Family::Adversarial];」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:17388`）。这个 (r2 直接建表, 两族) 组合单测里没有。但它编的是 `--root` 那棵树：「    copy_the_tree(setup, tree)」（`scripts/e165-replay-mutation-kill-bounds.sh:1020`）从「        source = os.path.join(setup.root, entry)」（`scripts/e165-replay-mutation-kill-bounds.sh:997`）拷，两个 r2 模式驱动的根是「  local frozen_root="${E165_R2_FROZEN_ROOT:-/tmp/claude-1000/e165-r2-segment4/root}"」（`scripts/replay.sh:722`）与「  local root="${E165_R5_SEGMENT1_ROOT:-/tmp/claude-1000/e165-r5-segment1/root}"」（`scripts/replay.sh:820`）。今天的装置改坏到不了那几跑，单测管不着它们也不缺。r3、r4 两个模式跑的是 root_choice 两族。
 
 我先按这一单元打过一行坏法（J7 那条臂 `run_profile.judges_j7()` 换成 `run_profile.compares_the_two_record_tables()`：14 个单元里带 J7 的只有两份表都取的两个合法单元，都取两份表，单测照过；(r2 直接建表, 两族) 那一跑少五条 J7 对照），查到它编冻结根之后撤回：今天的正式跑上这一行是等价的。
 
@@ -61,7 +61,7 @@ e3f2073f808aa1abeefd60fbff8d3bea1cc8ae35e19560e611347c0c8087993a  expected-outpu
   r3 对抗：驱动行 [763]（注释写 [763]，对）；写死 8 条 = 注释点的产物 是 = 登记行对的产物 是；注释点的产物就是登记行对的那一份
 ```
 
-另 11 个单元同第三行。r1 那三条：登记行是「E165|@driver_e165||e165-replay-bounded-enumeration-2026-10-01-segment1-legal-family.out|exact」（`research/scripts/replay.sh:331`）与「E165|@driver_e165_adversarial||e165-replay-bounded-enumeration-2026-10-01-segment1-adversarial-family.out|exact」（`research/scripts/replay.sh:333`），单测注释点的是 `…-2026-10-04-r5-segment1-r1-*.out`。两份逐字节相同（第 5 次第一段 PV3 就是拿它们比的），所以钉值不受影响；只是单测文档注释那句「每个单元跑出对照的判据恰好是那条驱动产物里 `name=control` 的那一份」对 r1 三条指的不是 replay.sh 拿来比的那一份。只报，不算打中。
+另 11 个单元同第三行。r1 那三条：登记行是「E165|@driver_e165||e165-replay-bounded-enumeration-2026-10-01-segment1-legal-family.out|exact」（`scripts/replay.sh:331`）与「E165|@driver_e165_adversarial||e165-replay-bounded-enumeration-2026-10-01-segment1-adversarial-family.out|exact」（`scripts/replay.sh:333`），单测注释点的是 `…-2026-10-04-r5-segment1-r1-*.out`。两份逐字节相同（第 5 次第一段 PV3 就是拿它们比的），所以钉值不受影响；只是单测文档注释那句「每个单元跑出对照的判据恰好是那条驱动产物里 `name=control` 的那一份」对 r1 三条指的不是 replay.sh 拿来比的那一份。只报，不算打中。
 
 **推翻条件。** replay.sh 第 699–880 行之外另有一处用今天的源码起 `e165_replay_bounded_enumeration` 的普通跑法（不是 `--pinned-cases`、`--replay-state`、`--list-states`）；或杀伤界驱动不经 `--root` 编装置。
 
@@ -181,11 +181,11 @@ e3f2073f808aa1abeefd60fbff8d3bea1cc8ae35e19560e611347c0c8087993a  expected-outpu
 
 ## 要主 agent 跑的命令
 
-都是 checker 档或重型复跑，这条腿不跑。工作目录取一份仓副本（不是冻结副本、不是主工作区）；内存上限取 `research/scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值 8G，线程 15。
+都是 checker 档或重型复跑，这条腿不跑。工作目录取一份仓副本（不是冻结副本、不是主工作区）；内存上限取 `scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值 8G，线程 15。
 
 1. 坐实 D3-甲（族）：副本里把 e165 装置第 17769 行「        positive_control_readings(&selection.families, run_profile, thread_count);」换成 `        positive_control_readings(&[Family::LegalHistory], run_profile, thread_count);`，跑
-   `SINGLEFS_HEAVY_TESTS=user-request bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 15 cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- every_criterion_has_a_positive_control_and_every_control_is_red`
-   看 `test result:`：`1 passed` 即坐实单测放过。同一副本 `SINGLEFS_HEAVY_TESTS=user-request E165_THREADS=15 bash research/scripts/run-with-memory-cap.sh 8G cargo run --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --max-n 1 --family adversarial --profile r3`，看：`grep -c 'name=control criterion=A'` 为 0；有 `name=verdict domain=A ` 开头、带 `a0_violations=` 的行；`name=verdict scope=run` 那一行 `controls_not_red=0 void_conditions=0`；退出码 0。
+   `SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 15 cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- every_criterion_has_a_positive_control_and_every_control_is_red`
+   看 `test result:`：`1 passed` 即坐实单测放过。同一副本 `SINGLEFS_HEAVY_TESTS=user-request E165_THREADS=15 bash scripts/run-with-memory-cap.sh 8G cargo run --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --max-n 1 --family adversarial --profile r3`，看：`grep -c 'name=control criterion=A'` 为 0；有 `name=verdict domain=A ` 开头、带 `a0_violations=` 的行；`name=verdict scope=run` 那一行 `controls_not_red=0 void_conditions=0`；退出码 0。
 2. 坐实 D3-甲（档）：另一份副本把同一行的 `run_profile, thread_count` 换成 `RunProfile::R1, thread_count`，同一条单测 `1 passed`；`cargo run … -- --bounds segment1 --max-n 1 --family legal --profile r2 --table both` 输出里 `grep -c 'name=control criterion=J6Qn '` 为 0、`grep -c 'criteria=r2 j6qn_premise_holds_violations='` 大于 0。
 3. D1 余项（不挡这一批）：在主工作区按 replay.sh 第 738、741、744、747、750、753、858、861、864、867 行原样起那 10 条，各自 `| grep '^E7RESULT '` 后与第 335–340、350–353 行登记的产物 `cmp`（产物里没有 `E7RESULT ` 之外的行）。不同就是「2026-10-04 产物之后装置变了」在判定行一级的观测，集合一级照单测 `1 passed` 不变。
 4. 复核模型：把模型目录拷到草稿目录，`bash tools/rerun.sh`，应报「✓ 模型输出与 expected-output.txt 逐字相同（113 行）」。
@@ -194,7 +194,7 @@ e3f2073f808aa1abeefd60fbff8d3bea1cc8ae35e19560e611347c0c8087993a  expected-outpu
 
 | 格 | 试过的形状 | 取样范围 |
 |---|---|---|
-| D1 | 正式跑里有没有单元之外的 (族, 档) | replay.sh 第 699–880 行直接起装置的 18 行逐条解参数；杀伤界三个模式的调法（第 278、557 行与 r3、r4 两套）与编法（第 997、1020 行）；门禁与 research/scripts 里别处起这个装置的（只有 `--pinned-cases` 一条路，在对照之前就返回） |
+| D1 | 正式跑里有没有单元之外的 (族, 档) | replay.sh 第 699–880 行直接起装置的 18 行逐条解参数；杀伤界三个模式的调法（第 278、557 行与 r3、r4 两套）与编法（第 997、1020 行）；门禁与 scripts 里别处起这个装置的（只有 `--pinned-cases` 一条路，在对照之前就返回） |
 | D1 | 14 份集合对点名产物、对登记行的产物 | 14 个单元 × 两份产物；r1 三条两份产物逐字节比 |
 | D1 | 产物之后装置变没变 | 本机 5 个版本的冻结副本逐份 diff；两份 profile-check 产物列的复跑对象 |
 | D1 | (r2 直接建表, 两族) 那一跑少 J7 对照（J7 臂换成 `compares_the_two_record_tables()`） | 先当打中，查到杀伤界编冻结根后撤回 |

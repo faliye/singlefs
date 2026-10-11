@@ -7,7 +7,7 @@
 ## 〇、怎么量的
 
 - 副本：冻结副本拷到 `/tmp/claude-1000/m3-formal-code-b35-r1-sonnet/work`，清单核对 0 行不对（`sha256sum -c … | grep -vc ': OK$'` 输出 0）；每次施加补丁或变异之后核还原，一律 0 行不对。仓里 `crates/` 与冻结副本一个字没动。
-- 编译：每条 cargo 经 `bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 10 cargo test --offline …`；峰值表里没有这几组目标组合的键，8G 不触发「超过峰值两倍」那一条（`tools/env.sh` 仍带了 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON` 的理由，预防别的机器上表里有键）。开跑前 `ps` 看过：没有 qemu-system、vm-bench、e152、fio 在跑（别的会话有 cargo 与长跑的 e171 在，`nice -n 19` 照跑）。
+- 编译：每条 cargo 经 `bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 10 cargo test --offline …`；峰值表里没有这几组目标组合的键，8G 不触发「超过峰值两倍」那一条（`tools/env.sh` 仍带了 `RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON` 的理由，预防别的机器上表里有键）。开跑前 `ps` 看过：没有 qemu-system、vm-bench、e152、fio 在跑（别的会话有 cargo 与长跑的 e171 在，`nice -n 19` 照跑）。
 - 编译日志（`results/build.log`）三个被测包都有 `Compiling`，原样：
   ```
      Compiling singlefs-checker v0.1.0 ($S/work/crates/singlefs-checker)

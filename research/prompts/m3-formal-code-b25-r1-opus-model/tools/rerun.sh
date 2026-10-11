@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 攻方腿 m3-formal-code-b25-r1-opus 的复跑。整条脚本经内存包装跑（脚本里不再套包装），在主仓根下：
-#   bash research/scripts/run-with-memory-cap.sh 4G bash research/scripts/capped.sh 6 \
+#   bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 6 \
 #     bash research/prompts/m3-formal-code-b25-r1-opus-model/tools/rerun.sh <草稿目录> <段…>
 # 段：k1-targeted k1-long k1-bound k1-rollback-mutations k1-container-number k2-device k1-sweep
 #   k1-sweep 1296 段历史，本机负载 15–30 时约 15–20 分钟，超过前台时限，单独起；别的段各 1–3 分钟。
@@ -9,7 +9,7 @@ set -euo pipefail
 work=$1; shift
 repo=$(cd "$(dirname "$0")/../../../.." && pwd)
 model="$repo/research/prompts/m3-formal-code-b25-r1-opus-model"
-frozen="$repo/research/target/e171-r1-frozen-tree"
+frozen="$repo/scripts/experiments/target/e171-r1-frozen-tree"
 tree="$work/tree"; target="$work/target"; out="$work/out"
 mkdir -p "$work" "$out"
 fresh_tree() {

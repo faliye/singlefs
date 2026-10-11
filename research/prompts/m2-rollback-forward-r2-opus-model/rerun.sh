@@ -9,7 +9,7 @@ set -euo pipefail
 TREE=$1; WORK=$2; MODE=${3:-fast}
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../../.." && pwd)"
-S="$REPO_ROOT/research/scripts"
+S="$REPO_ROOT/scripts"
 mkdir -p "$WORK/tmp"
 rsync -a --delete --exclude target --exclude .git "$TREE/" "$WORK/repo/"
 cp "$REPO_ROOT/Cargo.toml" "$REPO_ROOT/Cargo.lock" "$WORK/repo/"

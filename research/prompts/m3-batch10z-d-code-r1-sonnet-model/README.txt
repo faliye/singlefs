@@ -7,7 +7,7 @@ probe/  K2 / K1-1 探测（不入库装置）
                           + tail2.rs（h2_run：K2-2，R 来自 common_unwitnessed_publish 的盘，逐组读回全零 × 账故障 / 根槽故障 / 账与记录读回全零）+ tail3.rs（K1-1：管理员回退、公开上限函数）。
   build_probe.py          从新用例文件生成 head.rs。
   sumh2.py                把 H2 扫描日志里的 RESULT 行压成一行一例。
-  复跑：CARGO_TARGET_DIR=<编译目录> bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 6 cargo test --offline -p singlefs-harness --test k2d_probe -- --nocapture --test-threads 6 <过滤串>
+  复跑：CARGO_TARGET_DIR=<编译目录> bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 cargo test --offline -p singlefs-harness --test k2d_probe -- --nocapture --test-threads 6 <过滤串>
         过滤串：k23_ / h1_ring / h1_account / k11_ / h2_<ow|sq>_<none|acct|root|az|rz|bz>_g<00..13>
 k3/  K3 自造变异
   mut.py                  变异表（名 -> 文件、原文、替换文；原文须恰好命中一次）与施加 / 还原：python3 mut.py <名> [restore]；路径写死在副本 repo 下。

@@ -6,7 +6,7 @@
 
 ```
 # 冻结副本里没有 research/，包装脚本目录用 SINGLEFS_TOOL 给
-export SINGLEFS_REPO=/tmp/claude-1000/m3-batch23-code-r1/tree SINGLEFS_TOOL=<仓>/research/scripts
+export SINGLEFS_REPO=/tmp/claude-1000/m3-batch23-code-r1/tree SINGLEFS_TOOL=<仓>/scripts
 bash research/prompts/m3-batch23-code-r1-opus-model/rerun.sh <空目录> all        # 估约 10 分钟（按两遍分段的挂钟加的）；或按段：setup build n5 …
 bash research/prompts/m3-batch23-code-r1-opus-model/rerun.sh compare <同一目录>  # 不读 SINGLEFS_REPO
 ```
@@ -243,7 +243,7 @@ bash research/prompts/m3-batch23-code-r1-opus-model/rerun.sh compare <同一目�
 
 ## 引文核对
 
-`python3 research/scripts/cite-check.py research/prompts/m3-batch23-code-r1-opus-output.md --root /tmp/claude-1000/m3-batch23-code-r1/tree --root . --background research/prompts/_m3-batch23-code-r1-background.md` 末行（退 0）：
+`python3 scripts/cite-check.py research/prompts/m3-batch23-code-r1-opus-output.md --root /tmp/claude-1000/m3-batch23-code-r1/tree --root . --background research/prompts/_m3-batch23-code-r1-background.md` 末行（退 0）：
 
 ```
   ✓ 核了 54 处引文，对上 54 处，没判 0 处（逐处列在上面）

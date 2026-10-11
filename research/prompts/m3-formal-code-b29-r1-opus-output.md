@@ -230,7 +230,7 @@ B1、B2 的代价：副本 debug 下第 4 片那条约 20 秒、两条回退约 
 
 ## 要主 agent 跑的命令（都是 checker 档，提交时或用户要求时）
 
-- E171 装置内联用例，对 L1-a 表里四种形状各打一行变异看红不红：`SINGLEFS_HEAVY_TESTS=commit cargo test --release -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes`，工作目录主仓根，经 `research/scripts/run-with-memory-cap.sh` 照提交时那一档的上限，看有没有一条在变异后由绿转红。
+- E171 装置内联用例，对 L1-a 表里四种形状各打一行变异看红不红：`SINGLEFS_HEAVY_TESTS=commit cargo test --release -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes`，工作目录主仓根，经 `scripts/run-with-memory-cap.sh` 照提交时那一档的上限，看有没有一条在变异后由绿转红。
 - GPU 对拍补一条墓碑树容器指针 extent 偏移坏流之后整份比（L4-a、L4-c），看 CPU 池级 checker 与 GPU 走读内核是否同时由绿转红。
 - `crash_enumeration_sharded_across_processes` 在冻结树上跑一趟，核 #9 两个钉值。
 
@@ -254,7 +254,7 @@ B1、B2 的代价：副本 debug 下第 4 片那条约 20 秒、两条回退约 
 
 ## cite-check
 
-命令：`python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b29-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b29-r1/tree --root . --background research/prompts/_m3-formal-code-b29-r1-background.md`，末行：
+命令：`python3 scripts/cite-check.py research/prompts/m3-formal-code-b29-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b29-r1/tree --root . --background research/prompts/_m3-formal-code-b29-r1-background.md`，末行：
 
 ```
   ✓ 核了 36 处引文，对上 36 处，没判 0 处（逐处列在上面）

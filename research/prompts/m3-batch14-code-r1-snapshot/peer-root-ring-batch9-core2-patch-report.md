@@ -1,6 +1,6 @@
 # 第 9 批 9-5 core 簇实现员报告（2026-10-04）
 
-批次：`records/2026-09-30-里程碑三开工第一轮.md#9`（9-5 core 簇）。交补丁：补丁目录 `/tmp/claude-1000/m3-r1/batch9-core2/patch/`（`crates.patch`、`mutations-append.tsv` 22 行、`mutations-replacements.tsv` 5 行）。副本取派发那一刻的主工作区；`research/scripts/apply-writer-patch.py <补丁目录> --dry-run` 对今天的主工作区判过：「✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 2325 行」。补丁没动 `crates/singlefs-checker/src/`。
+批次：`records/2026-09-30-里程碑三开工第一轮.md#9`（9-5 core 簇）。交补丁：补丁目录 `/tmp/claude-1000/m3-r1/batch9-core2/patch/`（`crates.patch`、`mutations-append.tsv` 22 行、`mutations-replacements.tsv` 5 行）。副本取派发那一刻的主工作区；`scripts/apply-writer-patch.py <补丁目录> --dry-run` 对今天的主工作区判过：「✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 2325 行」。补丁没动 `crates/singlefs-checker/src/`。
 
 ## 结论
 
@@ -141,7 +141,7 @@ core 库单测 3 条（`instance_table_sweep.rs` 里）：已发布谓词两支�
 
 ## 五、证红：改坏哪一处 → 哪条断言红
 
-全部用 `bash research/scripts/prove-red.sh --copy /tmp/claude-1000/m3-r1/batch9-core2/work --memory 8G singlefs-harness <名…>` 跑（行在副本的 `crates/mutations.tsv` 里，与 `mutations-append.tsv` 同一份）。每行的 cargo 参数都带 `-- <那条用例名>`，一行只跑那一条用例，同时红了别的用例这一趟看不到。两趟的汇总行原样：第一趟（5 行）「✓ 点名 5 条：跑了 5 条，跳过 0 条，跑的都抓到了」；第二趟（15 行）「✗ 点名 15 条：跑了 15 条，跳过 0 条，有没红或无效的（逐条列在上面）」——没红的那一行是 q3，用例与变异行之后都删了（第七节第 2 条），其余 14 行都抓到了。日志在 `/tmp/claude-1000/m3-r1/batch9-core2/prove-logs-2/`、`prove-logs-3/`（`baseline.log` 加逐行编号）。
+全部用 `bash scripts/prove-red.sh --copy /tmp/claude-1000/m3-r1/batch9-core2/work --memory 8G singlefs-harness <名…>` 跑（行在副本的 `crates/mutations.tsv` 里，与 `mutations-append.tsv` 同一份）。每行的 cargo 参数都带 `-- <那条用例名>`，一行只跑那一条用例，同时红了别的用例这一趟看不到。两趟的汇总行原样：第一趟（5 行）「✓ 点名 5 条：跑了 5 条，跳过 0 条，跑的都抓到了」；第二趟（15 行）「✗ 点名 15 条：跑了 15 条，跳过 0 条，有没红或无效的（逐条列在上面）」——没红的那一行是 q3，用例与变异行之后都删了（第七节第 2 条），其余 14 行都抓到了。日志在 `/tmp/claude-1000/m3-r1/batch9-core2/prove-logs-2/`、`prove-logs-3/`（`baseline.log` 加逐行编号）。
 
 | 变异（改坏哪一处） | 红的用例 → 断言消息原样 |
 |---|---|
@@ -223,7 +223,7 @@ test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 test result: ok. 183 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
 ```
 
-`research/scripts/crash-case-check.py` 在副本上：file-names「✓ 查了 176 份测试文件的名字…」、one-scenario「✓ harness 档 984 条用例都是一条一个场景」；placement 报我那两条 `#[ignore]` 没登记（第八节给登记行）；modules 报的那一处是别人的 `gpu_unit_checks_every_gpu_test_takes_its_cards_through_gpu_test_start.rs`，不是这一轮的。
+`scripts/crash-case-check.py` 在副本上：file-names「✓ 查了 176 份测试文件的名字…」、one-scenario「✓ harness 档 984 条用例都是一条一个场景」；placement 报我那两条 `#[ignore]` 没登记（第八节给登记行）；modules 报的那一处是别人的 `gpu_unit_checks_every_gpu_test_takes_its_cards_through_gpu_test_start.rs`，不是这一轮的。
 
 ## 七、停下交主 agent 的、我取了读法的、做不出会红用例的
 

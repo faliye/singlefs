@@ -230,7 +230,7 @@ MUTANT M6-poll-exit-returns-every-card test result: ok. 104 passed; 0 failed; 0 
 
 ## 引文核对
 
-`python3 research/scripts/cite-check.py research/prompts/m3-batch10z-ghi-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-ghi-code-r1/tree --root .` 末行：
+`python3 scripts/cite-check.py research/prompts/m3-batch10z-ghi-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-ghi-code-r1/tree --root .` 末行：
 
 ```
   ✓ 核了 17 处引文，对上 17 处，没判 0 处（逐处列在上面）

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 复跑挂钟：89 秒（实测一次；空真格 15 处 requires 每处起一次桩包装，三种格各跑两遍，没有一步慢）。
 # 只读探针：不起 Verus、不起真包装、不跑真阶段。在仓根跑：
-#   RUN_WITH_MEMORY_CAP_PARALLEL_REASON="辩方腿各跑各的探针" bash research/scripts/run-with-memory-cap.sh 4G bash research/scripts/capped.sh 4 nice -n 19 bash research/prompts/defs-m3-formal-gate-r3-sonnet-model/rerun.sh
+#   RUN_WITH_MEMORY_CAP_PARALLEL_REASON="辩方腿各跑各的探针" bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 4 nice -n 19 bash research/prompts/defs-m3-formal-gate-r3-sonnet-model/rerun.sh
 set -uo pipefail
 root="$(cd "$(dirname "$0")/../../.." && pwd)"
 scratch="${SCRATCH:-/tmp/claude-1000/defs-m3-formal-gate-r3-sonnet}"

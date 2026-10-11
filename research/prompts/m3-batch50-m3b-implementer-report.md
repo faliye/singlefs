@@ -19,7 +19,7 @@
 - `crates.patch`：70 个文件（`grep -c '^+++ b/'` 数的）。
 - `mutations-append.tsv` 71 行（上一位 66 行，其中 1 行我改了目标；加我 5 行）、`mutations-replacements.tsv` 45 行（上一位 44 行，其中 2 行我又改过；加 1 行），见第五节第 5 条、`mutations-delete.txt` 2 行（`mutations-deletions.tsv` 同内容）、`report.md`（本报告）。
 - 交回前核过：把主工作区此刻的 `crates/`、`litmus/` 拷进 `m3b/verify/`、照 `apply-writer-patch.py` 的 `plan()` 打上，与我的副本逐文件比，只差 `crates/mutations.tsv` 第 3551 行——主工作区在我拷 `base/` 之后改了「第10z批第二十一块 GPU 取卡 K5 卡池扫源码 use 里改回至多一层花括号…」那一行，按名字合并时它保留主工作区的新写法，补丁不碰它。
-- `python3 research/scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-batch50/m3b/patch --root /home/fy5090/code/singlefs --dry-run`：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 3632 行`，退 0。
+- `python3 scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-batch50/m3b/patch --root /home/fy5090/code/singlefs --dry-run`：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 3632 行`，退 0。
 - 派发写的「合进主工作区排在形式化线拍树之后」：我没打，主 agent 照次序打。
 
 ## 三、这一轮写过的文件（我自己列）
@@ -202,7 +202,7 @@
 
 ### 5. 证红
 
-- 用 `research/scripts/prove-red.sh --copy <副本> --memory 6G <crate> <名>`，每次一条（驱动 `m3b/scripts/prove-chunk.sh`，结局在 `m3b/prove-results.tsv`，日志在 `m3b/prove-logs/<名字的 sha256 前 12 位>/`）。范围：上一位本批追加 37 行、替换 36 行，加我新加的 R3 那一行、我改过的 W3 那一行；checker 档 9 行不在内。
+- 用 `scripts/prove-red.sh --copy <副本> --memory 6G <crate> <名>`，每次一条（驱动 `m3b/scripts/prove-chunk.sh`，结局在 `m3b/prove-results.tsv`，日志在 `m3b/prove-logs/<名字的 sha256 前 12 位>/`）。范围：上一位本批追加 37 行、替换 36 行，加我新加的 R3 那一行、我改过的 W3 那一行；checker 档 9 行不在内。
 - 结局：70 行都「抓到」。第一趟有两行没抓到，按 `.claude/rules/mutation-sampling.md` 分了类、改了再证：
   - 「第 50 批 R1：退役记录的死亡 txg 取这次发布的前一个 txg（不是身份消失那一次）」没红：点名的单元测试 `retirement_tree::tests::the_first_retirement_record_opens_container_one…` 自己造记录、不走 `retirement_records_of_this_publish`——真盲区。改成点名发布路径上断言死亡 txg 的那条 `inode_leaf_absorb_and_borrow_on_the_unlink_path -- the_left_leaf_absorbs_its_right_neighbour_and_the_final_batch_retires_the_right_one`，红在第 79 行（左 death_txg 5、右 6）。
   - 「三·2 第 7 条：池级 checker 判 I-9.16 ② 的发号次序不认四棵新树（退回七棵）」无效：把 `[u16; 12]` 的数组换成 `[u16; 7]`，`TREE_KINDS_EACH_EXACTLY_ONCE_IN_A_TREE_TABLE_WITH_ENTRIES: [u16; 12]` 引它编不过（主工作区那一版同样编不过：`[u16; 11]` 换 7）。改成只在发号次序那一判里取前 7 种（`TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER[..7]`），红在 `the_checker_reddens_only_the_tree_table_ordering_when_the_tombstone_and_lineage_entries_swapped_their_kinds`（左 []、右 ["I-9.16"]）。
@@ -221,7 +221,7 @@
   ```
 - `cargo build --offline --all-targets`：退 0，末尾 `    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.13s`。
 - `cargo build --offline -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes`：退 0，末尾 `    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.02s`（`--all-targets` 那一次已编过）。
-- 四个包（harness、core、checker、format）`cargo test --no-run` 出的 184 个测试二进制，逐个经 `research/scripts/run-with-memory-cap.sh 3G bash research/scripts/capped.sh 4 <二进制>` 跑：184 个退 0；`test result` 行合计 1877 过、0 红、67 忽略。日志 `m3b/runs/all-6/`。
+- 四个包（harness、core、checker、format）`cargo test --no-run` 出的 184 个测试二进制，逐个经 `scripts/run-with-memory-cap.sh 3G bash scripts/capped.sh 4 <二进制>` 跑：184 个退 0；`test result` 行合计 1877 过、0 红、67 忽略。日志 `m3b/runs/all-6/`。
 - harness 慢档动过的 25 条（`--ignored`，经内存包装）：`rollback_by_a_forward_publish` 22 条各起一个进程、各 1 线程，22 条都 `test result: ok. 1 passed`（最长 45.51s）；`admission_checkpoint_cost_per_device_paths` 1 条 ok（89.10s）；`admission_raises_the_floor_before_refusing` 的 `at_366_instance_rows_…` ok（87.27s）；`unlink_writes_per_transaction_do_not_grow_with_the_file` 的 `unlink_of_files_of_sixteen_and_thirty_two_batches_…` ok（31.48s），它的钉值上一位已照算法改过，这次没再改。日志 `m3b/runs/rollback-slow/`、`m3b/runs/t4-slow-*.log`。慢档跑在窄盘钉值改完之前那一份编译上；之后改的只有测试文件里的造形钉值、checker 档源码与变异表，四个慢档用例的二进制不受影响（推的，没重跑）。
 
 ## 六、证红逐条结局
@@ -320,20 +320,20 @@
 
 ## 九、主 agent 要跑的命令
 
-工作目录都是主工作区 `/home/fy5090/code/singlefs`，先把补丁打进去（派发写的次序：形式化线拍树之后）。下面 2–5 是 checker 档、重型，提交时或用户要求时跑；`BINDGEN_EXTRA_CLANG_ARGS` 取 `research/scripts/crash-amplification-lib.sh` 第 81 行的 `CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS`。线程上限照当时的派发（这里写 31）。
+工作目录都是主工作区 `/home/fy5090/code/singlefs`，先把补丁打进去（派发写的次序：形式化线拍树之后）。下面 2–5 是 checker 档、重型，提交时或用户要求时跑；`BINDGEN_EXTRA_CLANG_ARGS` 取 `scripts/crash-amplification-lib.sh` 第 81 行的 `CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS`。线程上限照当时的派发（这里写 31）。
 
-1. 打补丁：`python3 research/scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-batch50/m3b/patch`。看「✓ 打上了」与 code-source-discipline 那一行退 0。
+1. 打补丁：`python3 scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-batch50/m3b/patch`。看「✓ 打上了」与 code-source-discipline 那一行退 0。
 2. GPU 判器的单测（内核解析与校验、草稿区字数、展开预算与钉值、第 10q 批单调用点）：
    ```
    SINGLEFS_HEAVY_TESTS=commit BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/lib/gcc/x86_64-linux-gnu/14/include" \
-     bash research/scripts/gpu-quiesce-run.sh -- bash research/scripts/run-with-memory-cap.sh 16G bash research/scripts/capped.sh 31 \
+     bash scripts/gpu-quiesce-run.sh -- bash scripts/run-with-memory-cap.sh 16G bash scripts/capped.sh 31 \
      cargo test --release -p singlefs-checker-tier --features verdict-store,gpu --lib -- crash_judge_gpu::tests crash_judge_dispatch::tests
    ```
    看 `checker_scan_kernel_source_parses_and_validates`、`scratch_words_given_to_each_state_reach_the_scratch_end_of_the_kernels`、`each_kernel_keeps_its_pinned_inlined_size_and_margin_under_the_budget`（钉 332 666 / 387 154 / 346 278）、`each_judge_merged_into_one_call_site_keeps_that_single_call_site_in_the_scan_kernel`、`every_kernel_stays_within_the_inlined_size_budget` 各 `ok`。
 3. GPU 对拍整份（第 1 条的验收；四条新的名字见第五节第 1 条）：
    ```
    SINGLEFS_HEAVY_TESTS=commit BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/lib/gcc/x86_64-linux-gnu/14/include" \
-     bash research/scripts/gpu-quiesce-run.sh -- bash research/scripts/run-with-memory-cap.sh 24G bash research/scripts/capped.sh 31 \
+     bash scripts/gpu-quiesce-run.sh -- bash scripts/run-with-memory-cap.sh 24G bash scripts/capped.sh 31 \
      cargo test --release -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state
    ```
    看 `test result` 0 红，`NOT_RUN_NO_GPU_ADAPTER` 行数 0（有卡时）；四条新的、含删到最后一批与「删 → 回退 → 再删」的那几条都 `ok`。
@@ -354,7 +354,7 @@
    看每行「抓到」，「无效」「没红」都是 0。上一位那 5 行（`第 5 批 GPU 判器：派活…`、`第 10 批 10b GPU 判器：…` 四行）也一直没证过。
 5. checker 档 136 槽那条（退役树进准入之后前提可能变）：
    ```
-   SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 31 \
+   SINGLEFS_HEAVY_TESTS=commit bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 31 \
      cargo test --release -p singlefs-checker-tier --test crash_injection_publish_after_a_mount_whose_deletion_continuation_stays_short
    ```
    看 `the_publish_after_a_mount_whose_deletion_continuation_stays_short_creates_an_inode_and_is_refused_at_the_unit_area_wall ... ok`。红了的话照 `admission_raises_the_floor_before_refusing.rs` 那样重扫它的单元区槽数（它的文件头写了攻方怎么扫的）。

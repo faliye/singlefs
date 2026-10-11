@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 用法：python3 -I mutrun.py <仓副本根> <主仓根（取 research/scripts/）> <rows.txt>   —— 逐行把变异表里名字以前缀（rows.txt 每行一个）起头的行打进副本、跑它的 cargo test、再还原，每行出一行 ROW。
+# 用法：python3 -I mutrun.py <仓副本根> <主仓根（取 scripts/）> <rows.txt>   —— 逐行把变异表里名字以前缀（rows.txt 每行一个）起头的行打进副本、跑它的 cargo test、再还原，每行出一行 ROW。
 # 环境：CARGO_TARGET_DIR 由调用方设；ROWS_FROM / ROWS_TO 取序号区间（序号 = 命中行在变异表里的先后）；checker 档行（-p singlefs-checker-tier）不跑，打 SKIPPED；
 #       内存包装 6G（编译加跑），random_histories 的行 8G；线程 15（capped.sh）；一次只起一条 cargo。
 import os, re, subprocess, sys
@@ -25,8 +25,8 @@ for idx, (name, path, old, new, args, tests) in enumerate(rows):
     cap = '8G' if 'random_histories' in args else '6G'
     try:
         open(p, 'w', encoding='utf-8').write(orig.replace(o, n))
-        cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/research/scripts/run-with-memory-cap.sh', cap,
-               'bash', scripts_repo + '/research/scripts/capped.sh', '15', 'cargo', 'test', '--offline'] + args.split()
+        cmd = ['nice', '-n', '19', 'bash', scripts_repo + '/scripts/run-with-memory-cap.sh', cap,
+               'bash', scripts_repo + '/scripts/capped.sh', '15', 'cargo', 'test', '--offline'] + args.split()
         r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=235)
         out = r.stdout + r.stderr
         rc = r.returncode

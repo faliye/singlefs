@@ -14,45 +14,45 @@
 ── 汇总：synthetic-verus.sh 跑了 1 格（--check 点名）
   vac-notrun：红（退出 1）
   ✗ synthetic-verus.sh：1 格里 1 格红（vac-notrun）
-     → vac-notrun：✗ 行写「没跑成：内存包装」的照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办，不改前置条件
+     → vac-notrun：✗ 行写「没跑成：内存包装」的照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办，不改前置条件
      → 改完只重跑红的格：bash .claude/gate.d/synthetic-verus.sh --check vac-notrun
 stage exit=1
 === vac-mixed
 ── 汇总：synthetic-verus.sh 跑了 1 格（--check 点名）
   vac-mixed：红（退出 1）
   ✗ synthetic-verus.sh：1 格里 1 格红（vac-mixed）
-     → vac-mixed：✗ 行写「没跑成：内存包装」的照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办，不改前置条件
+     → vac-mixed：✗ 行写「没跑成：内存包装」的照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办，不改前置条件
      → 改完只重跑红的格：bash .claude/gate.d/synthetic-verus.sh --check vac-mixed
 stage exit=1
 === vac-red
 ── 汇总：synthetic-verus.sh 跑了 1 格（--check 点名）
   vac-red：红（退出 1）
   ✗ synthetic-verus.sh：1 格里 1 格红（vac-red）
-     → vac-red：✗ 行写「没跑成：内存包装」的照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办，不改前置条件
+     → vac-red：✗ 行写「没跑成：内存包装」的照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办，不改前置条件
      → 改完只重跑红的格：bash .claude/gate.d/synthetic-verus.sh --check vac-red
 stage exit=1
 ### l3-verus-exit-codes
 退   0 | 类 没出判定   | 出路 格自己的出路 | 没带 | Verus 没出判定（退 0，编不过或起不来）：✗ 桩包装：退 0 | → 桩包装的出路
 退   1 | 类 没出判定   | 出路 格自己的出路 | 没带 | Verus 没出判定（退 1，编不过或起不来）：✗ 桩包装：退 1 | → 桩包装的出路
 退 137 | 类 没出判定   | 出路 格自己的出路 | 没带 | Verus 没出判定（退 137，编不过或起不来）：✗ 桩包装：退 137 | → 桩包装的出路
-退 250 | 类 没跑成    | 出路 按码给的包装出路 | 带包装的 ✗ 与 → | 没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 250（撞了这一条
-退 251 | 类 没跑成    | 出路 按码给的包装出路 | 带包装的 ✗ 与 → | 没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 251（包装用法错
-退 252 | 类 没跑成    | 出路 按码给的包装出路 | 带包装的 ✗ 与 → | 没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 252（内存不够排
+退 250 | 类 没跑成    | 出路 按码给的包装出路 | 带包装的 ✗ 与 → | 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 250（撞了这一条
+退 251 | 类 没跑成    | 出路 按码给的包装出路 | 带包装的 ✗ 与 → | 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 251（包装用法错
+退 252 | 类 没跑成    | 出路 按码给的包装出路 | 带包装的 ✗ 与 → | 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 252（内存不够排
 退 253 | 类 超时红    | 出路 格自己的出路 | 没带 | 超过 600 秒没出结局，按红记（C5：超时不当通过）
-退 254 | 类 没跑成    | 出路 按码给的包装出路 | 带包装的 ✗ 与 → | 没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 254（被总上限挤
+退 254 | 类 没跑成    | 出路 按码给的包装出路 | 带包装的 ✗ 与 → | 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 254（被总上限挤
 ### l3-e165-exit-codes 假包装退 137
   ✗ 装置被信号停了（退 137，信号 9）：钉住的 1 行这一次没判完，输出不算判定
-     → 怎么办：照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办：撞了这一条自己的上限由包装认成 250，外面 kill -9 同样退 137——这一次是�
+     → 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：撞了这一条自己的上限由包装认成 250，外面 kill -9 同样退 137——这一次是�
 => 退出码 1
 ### l3-e165-exit-codes 假包装退 250
-  ✗ 没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 250（撞了这一条自己的内存上限，上限 1G），钉住的 1 行这一次的输出不算判定
-     → 怎么办：照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑
+  ✗ 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 250（撞了这一条自己的内存上限，上限 1G），钉住的 1 行这一次的输出不算判定
+     → 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑
 => 退出码 1
 ### l3-e165-exit-codes 假包装退 252
-  ✗ 没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 252（内存不够排不上，上限 1G），钉住的 1 行这一次的输出不算判定
-     → 怎么办：照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑
+  ✗ 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 252（内存不够排不上，上限 1G），钉住的 1 行这一次的输出不算判定
+     → 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑
 => 退出码 1
 ### l3-e165-exit-codes 假包装退 253
-  ✗ 没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 253（超过限时，上限 1G），钉住的 1 行这一次的输出不算判定
-     → 怎么办：照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑
+  ✗ 没跑成：内存包装 scripts/run-with-memory-cap.sh 退 253（超过限时，上限 1G），钉住的 1 行这一次的输出不算判定
+     → 怎么办：照 scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑
 => 退出码 1

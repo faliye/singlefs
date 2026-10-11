@@ -2,7 +2,7 @@ import subprocess, sys, shutil, os, json
 BASE = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-a-code-r1-sonnet')
 SRC = f'{BASE}/tree/crates/singlefs-harness/src/gpu_memory_ledger.rs'
 DST = f'{BASE}/tree-mut/crates/singlefs-harness/src/gpu_memory_ledger.rs'
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 MUTS = {
  'N12 见到的那一份不扣销了账的（照没压的算）': ('''            reading,
             self.booked(),

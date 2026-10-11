@@ -10,7 +10,7 @@ while read -r name envs seed s count; do
   n=$((n+1))
   if [ "$envs" = "-" ]; then envs=""; fi
   if [ "$disks" = small ]; then envs="PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=268435456${envs:+,$envs}"; fi
-  { env $(echo "$envs" | tr ',' ' ') RUN_WITH_MEMORY_CAP_PARALLEL_REASON="改钉实现员复跑随机历史，各件各跑" RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑攻方原型，峰值随种子不同" RUN_WITH_MEMORY_CAP_WAIT_SECONDS=120 RUN_WITH_MEMORY_CAP_TIME_LIMIT=220 nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 1500M bash /home/fy5090/code/singlefs/research/scripts/capped.sh 1 $bin "$seed" "$s" "$count" window > out-$b-$name.out 2> out-$b-$name.err; echo "$?" > rc-$b-$n.txt; } &
+  { env $(echo "$envs" | tr ',' ' ') RUN_WITH_MEMORY_CAP_PARALLEL_REASON="改钉实现员复跑随机历史，各件各跑" RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑攻方原型，峰值随种子不同" RUN_WITH_MEMORY_CAP_WAIT_SECONDS=120 RUN_WITH_MEMORY_CAP_TIME_LIMIT=220 nice -n 19 bash /home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh 1500M bash /home/fy5090/code/singlefs/scripts/capped.sh 1 $bin "$seed" "$s" "$count" window > out-$b-$name.out 2> out-$b-$name.err; echo "$?" > rc-$b-$n.txt; } &
 done < "$spec"
 wait
 got=$(ls rc-$b-*.txt 2>/dev/null | wc -l)

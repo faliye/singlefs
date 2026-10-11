@@ -12,7 +12,7 @@
 | 开工快照 | `research/prompts/m3-formal-r3-snapshot/`：`crates-sha256.txt`（212 份，冻结副本 `/tmp/claude-1000/m3-formal-r3/tree/`）、`kb-sha256.txt` | 腿交齐之后冻结副本 `sha256sum -c` 全 OK；`kb-sha256.txt` 只有 `.claude/kb/checks-owed.md` 对不上：相对 HEAD 的改动在第 45、108、130、182、214、269、282–284、353 等行，腿引的第 88、277 行不在改动处 |
 | 云端攻方（Opus） | `research/prompts/m3-formal-r3-opus-output.md`（305 行，sha256 60544b2b…85a1）；模型 `research/prompts/m3-formal-r3-opus-model/` | 第五节 |
 | 云端辩方（Sonnet） | `research/prompts/m3-formal-r3-sonnet-output.md`（271 行，sha256 ca7b1c6d…2057）；模型 `research/prompts/m3-formal-r3-sonnet-model/` | 第五节 |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-formal-r3/tree --root . --background research/prompts/_m3-formal-r3-background.md`：「✓ 核了 103 处引文，对上 103 处，没判 0 处」 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root /tmp/claude-1000/m3-formal-r3/tree --root . --background research/prompts/_m3-formal-r3-background.md`：「✓ 核了 103 处引文，对上 103 处，没判 0 处」 |
 | 主 agent 现查的代码 | 冻结副本 `crates/singlefs-core/src/recovery.rs` 第 3137–3156 行 | 施加记录重建出的根 `unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence`（第 3147 行），注释引 D22（单元原子性怎么合成） 已定项 7「其余根写 0」 |
 
 两条腿的数都是冻结副本的拷贝或译本上量的；进 kb 之前在入库装置上重做。
@@ -59,7 +59,7 @@
 
 ## 五、复跑（T4 与主 agent 自己跑的）
 
-- 攻方模型：照 `research/prompts/m3-formal-r3-opus-model/README.md` 在 `/tmp/claude-1000/m3-formal-r3-main-check/opus/` 从冻结副本拷一份、`patch_attack.py`（recovery.rs 4 处、E165 装置 13 处）、编一次、`run-all.sh` 与 `summarize.py`，经 `research/scripts/run-with-memory-cap.sh 3G`：`summary-all.txt` 的 sha256 与入库那份相同（98c764c4…011e）。攻方报的第二轮数全部复现：1 007 514、264 499、352 608、K10 下 0 / 0、57 585 320 都在冻结副本上逐数对上；口径改一处：第二轮引的 15 343 是乙切法的合法态（C 14 737、C6 606），D16（发布语义） 已定项 7 的屏障位置下是甲切法 C 8 006、C6 383、共 8 389，开关 1、2 在两种口径上 J1–J4 都是 0，结论不变。
+- 攻方模型：照 `research/prompts/m3-formal-r3-opus-model/README.md` 在 `/tmp/claude-1000/m3-formal-r3-main-check/opus/` 从冻结副本拷一份、`patch_attack.py`（recovery.rs 4 处、E165 装置 13 处）、编一次、`run-all.sh` 与 `summarize.py`，经 `scripts/run-with-memory-cap.sh 3G`：`summary-all.txt` 的 sha256 与入库那份相同（98c764c4…011e）。攻方报的第二轮数全部复现：1 007 514、264 499、352 608、K10 下 0 / 0、57 585 320 都在冻结副本上逐数对上；口径改一处：第二轮引的 15 343 是乙切法的合法态（C 14 737、C6 606），D16（发布语义） 已定项 7 的屏障位置下是甲切法 C 8 006、C6 383、共 8 389，开关 1、2 在两种口径上 J1–J4 都是 0，结论不变。
 - 卸载记号的池上原型：没复跑（要编 harness 档），机理主 agent 读代码坐实（第一节），辩方另一条副本独立量到同一处，两条路径不共用代码。
 - Verus（0.2026.09.20.aef82ed，`--no-cheating`，`/tmp/claude-1000/m3-formal-r3-main-check/`，`rlimit-check.txt`、`v08-1000.log`、`vac.log`）：攻方补强加两句之后的核（`s2_strengthen.py` 再 `s2_plus.py`）原样 rlimit 200 与 1000 都是「14 verified, 0 errors」；关掉反向链的变体 rlimit 200「error: while loop: Resource limit (rlimit) exceeded … 13 verified, 1 errors」、rlimit 1000「14 verified, 0 errors」；Z2（不看在飞上限）rlimit 200 与 1000 都是「13 verified, 1 errors」；删 I-8.3 那一判 rlimit 200「13 verified, 1 errors」。冻结核的 `replay_core` 的 `requires` 头一条加 `false,`：「14 verified, 0 errors」。
 - 辩方模型（Python 译本与 E165 副本加计数）没有复跑：它与攻方是两条互不共享代码的路径，判决引它的地方（S1 的 1 867 682、S5 域外、S6 的 464 / 2 904）都标了出处，S1、S6 的结论有攻方那一条独立路径同向。

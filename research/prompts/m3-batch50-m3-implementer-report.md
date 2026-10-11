@@ -11,7 +11,7 @@
 
 ## 二、补丁
 
-两套，格式照 `research/scripts/apply-writer-patch.py` 文件头（`mutations-delete.txt` 与派发写的 `mutations-deletions.tsv` 内容相同，两份都放）：
+两套，格式照 `scripts/apply-writer-patch.py` 文件头（`mutations-delete.txt` 与派发写的 `mutations-deletions.tsv` 内容相同，两份都放）：
 
 1. 打在「主工作区 + W3 补丁（`~/.local/share/singlefs/work/m3-batch49/w3c/patch/`）」上：`~/.local/share/singlefs/work/m3-batch50/m3/patch/`
    - `crates.patch`：62 个文件，4073 行加、645 行删。
@@ -68,7 +68,7 @@
 
 ## 六、验证（第 4 步那几样）
 
-- cargo 调用 10 次：`cargo clippy` 三次（改穷举 match）、`cargo test --offline --no-run -p singlefs-harness -p singlefs-core -p singlefs-checker -p singlefs-format` 四次、末尾 `cargo clippy` 三次（前两次各抓到一处：多余 import、`identity_op`）。测试二进制不经 cargo、逐个经 `research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 4 <二进制>` 跑（7 路并行），日志在 `runs-4/`。
+- cargo 调用 10 次：`cargo clippy` 三次（改穷举 match）、`cargo test --offline --no-run -p singlefs-harness -p singlefs-core -p singlefs-checker -p singlefs-format` 四次、末尾 `cargo clippy` 三次（前两次各抓到一处：多余 import、`identity_op`）。测试二进制不经 cargo、逐个经 `scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 4 <二进制>` 跑（7 路并行），日志在 `runs-4/`。
 - `cargo fmt --all -- --check`：退 0，输出空。
 - `cargo clippy --offline --all-targets --all-features -- -D warnings` 加 `CODE_DISCIPLINE_LINTS` 七条：退 0，末尾原样：
   ```
@@ -129,13 +129,13 @@
 
 工作目录都是副本 `~/.local/share/singlefs/work/m3-batch50/m3/b`（变异表已是本批之后的那张）：
 
-1. 构建（预算用满没跑）：`bash research/scripts/capped.sh 31 cargo build --offline --all-targets`，再 `bash research/scripts/capped.sh 31 cargo build --offline -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes`；看退出码 0。
+1. 构建（预算用满没跑）：`bash scripts/capped.sh 31 cargo build --offline --all-targets`，再 `bash scripts/capped.sh 31 cargo build --offline -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes`；看退出码 0。
 2. 证红（名字清单每行一个，在草稿目录）：
    ```
    cd ~/.local/share/singlefs/work/m3-batch50/m3/b
    for crate in singlefs-core singlefs-format singlefs-checker singlefs-harness; do
      mapfile -t names < ../prove-red-$crate.txt
-     bash research/scripts/prove-red.sh --copy "$PWD" --memory 8G $crate "${names[@]}"
+     bash scripts/prove-red.sh --copy "$PWD" --memory 8G $crate "${names[@]}"
    done
    ```
    每行判定看「抓到」，整次退 0。`26-3 挂载透明…` 那一行跑整个 `mount_transparency_judged_field_by_field_after_a_writable_mount` 二进制，基线现在红（第七节那 1 条），会被判基线红停下，等第七节修好再证。checker 档那 5 行（`--features verdict-store,gpu`）留给 `checker-tier-crates-mutation-replay`。
@@ -153,7 +153,7 @@
    - core / format 单测：34 字节布局 ← `R1：退役记录死亡 txg 段与容器出生代段写反`；开第一片 ← `R1：退役记录的死亡 txg 取这次发布的前一个 txg…`；整棵照抄 ← `退役树：没有新记录的发布照样重写开放容器`；满了关片跨两片 ← `退役树：开放容器满了不关…` 与 `容器树多条追加：…只记最后那一片`；根满长高 ← `退役树：根满不长高…`；同一身份两条 ← `退役树只追加：…盖掉已有的记录`；容量开关 ← `退役树：只供测试的容量收 0 条`；容器树多条 ← `…（容器树自己那条用例）`；吸收 ← `M3：左吸收右时身份留给右片…`；借 ← `M3：借不均分（多借一条）`；借到并 ← `M3：借不均分（多借一条），一路删到并`；R3 20 / 40 片 ← `R3：删空最左一片之后右边挪了位置的片按位置重写…`；标签 6 退役 ← `R2：标签 6 不加退役那 35 字节每条记录`、`R2：标签 6 常驻不加退役树内部层数`；ckpt 退役 ← `R2：ckpt_cost 退役那一项不加退役树内部层数`；W 374 ← `R2：环窗口 W 不加退役那 6 + H_退役`；959 ← `格式：一片退役容器装的条数按 33 字节一条算`（名字前缀都是「第 50 批 」）。
    - debug 下若先撞 `debug_assert`，照实记；要断言自己红就 `--release` 再跑。
 3. 第七节 11 条的重新造形：另派实现员，照 `admission_raises_the_floor_before_refusing.rs` 第 276–283 行注释那个网格重扫；`mount_transparency_…` 的 `pool_crashed_after_the_unlink_intent_of_fourteen_data_units_on_narrow_devices` 用同一形状。
-4. 慢档（动过的文件里那几条）：`bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 31 cargo test --offline -p singlefs-harness --test rollback_by_a_forward_publish --test unlink_writes_per_transaction_do_not_grow_with_the_file --test admission_checkpoint_cost_per_device_paths --test admission_raises_the_floor_before_refusing -- --ignored`。
+4. 慢档（动过的文件里那几条）：`bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 31 cargo test --offline -p singlefs-harness --test rollback_by_a_forward_publish --test unlink_writes_per_transaction_do_not_grow_with_the_file --test admission_checkpoint_cost_per_device_paths --test admission_raises_the_floor_before_refusing -- --ignored`。
 5. checker 档（提交时）：六道重阶段、`checker-tier-layer0-replay` 快档与全量、`checker-tier-crates-mutation-replay`，对照第八节；GPU 对拍照设计问题第 1 条的定案再看。
 
 ## 十三、没做什么
@@ -169,5 +169,5 @@
 
 ## 附：两套补丁的 `--dry-run`（交回前跑的，原样）
 
-- `python3 research/scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-batch50/m3/patch-combined --root /home/fy5090/code/singlefs --dry-run`：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 3627 行`，退 0（对着主工作区此刻的那一版核的）。
-- `python3 research/scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-batch50/m3/patch --root <主工作区 + W3 的副本> --dry-run`：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 3589 行`，退 0。
+- `python3 scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-batch50/m3/patch-combined --root /home/fy5090/code/singlefs --dry-run`：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 3627 行`，退 0（对着主工作区此刻的那一版核的）。
+- `python3 scripts/apply-writer-patch.py ~/.local/share/singlefs/work/m3-batch50/m3/patch --root <主工作区 + W3 的副本> --dry-run`：`✓ 核过了（--dry-run，没改）：补丁 有，变异表合并之后 3589 行`，退 0。

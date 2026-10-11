@@ -2,7 +2,7 @@
 # 同 batch.sh；规格行的环境变量串里 OPUS_BIN=<测试二进制名> 点名跑哪一份（不写就用 scripts/binary-name）。
 set -u
 W=$HOME/.local/share/singlefs/work/m3-batch10z-d-code-r1-opus
-S=/home/fy5090/code/singlefs/research/scripts
+S=/home/fy5090/code/singlefs/scripts
 spec=$1; batch=$2; from=$3; to=$4
 cd "$W/repo"
 rm -f "$W"/runs/b"$batch"-*.rc

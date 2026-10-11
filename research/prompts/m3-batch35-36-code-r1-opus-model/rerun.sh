@@ -2,7 +2,7 @@
 # 复跑 m3-batch35-36-code-r1 攻方（Opus）模型。用法：rerun.sh <空工作目录> [阶段…]（不给阶段就按次序串行跑全部；单个阶段前台都在 4 分钟内）。
 # 环境变量：
 #   SINGLEFS_REPO   被判的树根（有 Cargo.toml、Cargo.lock、crates/；本轮是冻结副本 ~/.local/share/singlefs/work/m3-batch35-36-code-r1/tree）。只读，拷进 <工作目录>/repo 再改。
-#   SINGLEFS_TOOLS  仓根：只取 research/scripts/run-with-memory-cap.sh 与 research/scripts/capped.sh 两个包装脚本。
+#   SINGLEFS_TOOLS  仓根：只取 scripts/run-with-memory-cap.sh 与 scripts/capped.sh 两个包装脚本。
 #   THREADS         线程上限（默认 7，经 capped.sh 设给 cargo 与测试）。
 # 阶段：prep（拷树、patch_arms.py 加臂开关、放进探针）→ build（编，6G）→ h1 → ow → sw3vis → sw3hid → sw3f1 → sw3both → sw3all3 → sw3single → w4 → exist → v2model → summary。
 #   跑都经 run-with-memory-cap.sh（跑 4G，编 6G），同一时刻只起一条 cargo；编译目录 <工作目录>/target。
@@ -17,8 +17,8 @@ work="${1:?要一个工作目录（第一次跑要空的）}"; shift || true
 threads="${THREADS:-7}"
 mkdir -p "$work"
 work="$(cd "$work" && pwd)"
-cap="$SINGLEFS_TOOLS/research/scripts/run-with-memory-cap.sh"
-capped="$SINGLEFS_TOOLS/research/scripts/capped.sh"
+cap="$SINGLEFS_TOOLS/scripts/run-with-memory-cap.sh"
+capped="$SINGLEFS_TOOLS/scripts/capped.sh"
 export CARGO_TARGET_DIR="$work/target"
 stages=("$@")
 [ "${#stages[@]}" -gt 0 ] || stages=(prep build h1 ow sw3vis sw3hid sw3f1 sw3both sw3all3 sw3single w4 exist v2model summary)

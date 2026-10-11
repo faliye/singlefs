@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 攻方腿（m3-batch56-code-r1 opus）的复跑：rerun.sh <工作目录> <阶段>…（或 all）。
-# 环境：SINGLEFS_REPO（被判的冻结副本，缺省 ~/.local/share/singlefs/work/m3-batch56-code-r1/repo）、SINGLEFS_SCRIPTS（仓的 research/scripts，
+# 环境：SINGLEFS_REPO（被判的冻结副本，缺省 ~/.local/share/singlefs/work/m3-batch56-code-r1/repo）、SINGLEFS_SCRIPTS（仓的 scripts，
 # 缺省按模型目录在仓里的位置推）、OPUS_THREADS（线程上限，缺省 10）、OPUS_MEMORY_CAP（内存包装上限，缺省 10G）。
 # 每个副本只拷 Cargo.toml、Cargo.lock、crates/，各用自己的 CARGO_TARGET_DIR；同一时刻只起一条 cargo。产物写 <工作目录>/out/<阶段>.txt。
 set -euo pipefail

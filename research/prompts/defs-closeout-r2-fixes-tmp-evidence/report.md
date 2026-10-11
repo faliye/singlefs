@@ -10,15 +10,15 @@
 
 | G | 文件与小节（改后行号） | 改了什么 |
 |---|---|---|
-| G1 | `.claude/agents/gate-triage.md`「输入」、第 1b 步（:26）、第 2 步（:27） | 撤回 F9：删「`gate.sh` 整条经内存包装的上限」这一项输入；1b、2 还原成 F9 之前的写法（草稿 `/tmp/claude-1000/defs-closeout-r1-fixes/before/.claude/agents/gate-triage.md`），命令回到 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged`。与那份草稿逐行 diff 只差一处：1b 的括注从「87 号经 `research/scripts/replay.sh` 逐条套了」变成「87 号经 `research/scripts/replay.sh` 逐条套了，15、74 号在阶段里面经包装」 |
-| G1 | `.claude/gate.d/74-model-differential.sh`（:39–43 注释与变量；cargo 那一支） | `cargo test --release -p singlefs-harness --test "$TEST_BINARY"` 改成经 `research/scripts/run-with-memory-cap.sh` 跑（包装路径按阶段文件自己所在的仓根取，与同一文件取 `stage-must-run.sh` 的写法相同）。上限取 `GATE_MODEL_DIFFERENTIAL_MEMORY_MAX`，没设取 8G（`research/scripts/replay.sh:24` 的 `REPLAY_MEMORY_CAP` 默认值）。包装退 250–254 单独判红、出路指到包装文件头「退出码」一段；普通判红那一支的单跑命令改用同一个上限变量的值 |
-| G1 | `.claude/gate.d/15-research-build.sh`（:25–38） | `cd research && cargo test --release` 改成经同一个包装跑；上限取 `GATE_RESEARCH_BUILD_MEMORY_MAX`，没设取 8G；峰值表的键写死成 `gate 15-research-build: cargo test --release (research)`（不写死的话键是「cargo test --release」，分不出工作区）；包装退 250–254 单独判红 |
+| G1 | `.claude/agents/gate-triage.md`「输入」、第 1b 步（:26）、第 2 步（:27） | 撤回 F9：删「`gate.sh` 整条经内存包装的上限」这一项输入；1b、2 还原成 F9 之前的写法（草稿 `/tmp/claude-1000/defs-closeout-r1-fixes/before/.claude/agents/gate-triage.md`），命令回到 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged`。与那份草稿逐行 diff 只差一处：1b 的括注从「87 号经 `scripts/replay.sh` 逐条套了」变成「87 号经 `scripts/replay.sh` 逐条套了，15、74 号在阶段里面经包装」 |
+| G1 | `.claude/gate.d/74-model-differential.sh`（:39–43 注释与变量；cargo 那一支） | `cargo test --release -p singlefs-harness --test "$TEST_BINARY"` 改成经 `scripts/run-with-memory-cap.sh` 跑（包装路径按阶段文件自己所在的仓根取，与同一文件取 `stage-must-run.sh` 的写法相同）。上限取 `GATE_MODEL_DIFFERENTIAL_MEMORY_MAX`，没设取 8G（`scripts/replay.sh:24` 的 `REPLAY_MEMORY_CAP` 默认值）。包装退 250–254 单独判红、出路指到包装文件头「退出码」一段；普通判红那一支的单跑命令改用同一个上限变量的值 |
+| G1 | `.claude/gate.d/15-research-build.sh`（:25–38） | `cd scripts/experiments && cargo test --release` 改成经同一个包装跑；上限取 `GATE_RESEARCH_BUILD_MEMORY_MAX`，没设取 8G；峰值表的键写死成 `gate 15-research-build: cargo test --release (research)`（不写死的话键是「cargo test --release」，分不出工作区）；包装退 250–254 单独判红 |
 | G1 | `.claude/agent-common.md`「不做」一节「跑编译出来的代码经内存包装」那一条（:48） | 「`mutate.sh`、`replay.sh` 与门禁 59 号在里面逐条套了」后面加「门禁 15、74 号在阶段里面经包装（派发提示给了上限的，设进阶段文件头写的变量：15 号 `GATE_RESEARCH_BUILD_MEMORY_MAX`，74 号 `GATE_MODEL_DIFFERENTIAL_MEMORY_MAX`）」 |
 | G1 | `.claude/agents/crash-verifier.md` 第 1b 步（:26） | 「59 号在里面逐条套了，74 号在阶段里面经包装，这两道照第 2 步直接跑，外面不再包一层」 |
 | G1 | `.claude/agents/implementation-writer.md` 第 1b 步（:26） | 末尾加「登记给你的 74 号在阶段里面经包装，照跑，外面不再包一层」 |
 | G1、G9 | `.claude/main-agent.md`「派发提示怎么写」（:48） | 删「派门禁分诊员时给 `gate.sh` 整条经内存包装的上限」；改成「派崩溃验证员时给 54、55、57 号各自的内存上限，每道一个数，照 crash-verifier「输入」一节给：54、57 号写明是量过的还是推的，55 号的不小于同时起的虚机数乘每台的内存。门禁 15、74 号在阶段里面经内存包装，要换它们的上限就在派发提示里给一个数，没给用 `replay.sh` 的 `REPLAY_MEMORY_CAP` 默认值」 |
-| G9 | `.claude/agents/crash-verifier.md`「输入」（:20） | 「每道一个数：54、57 号的写明是量过的（峰值表 `research/scripts/memory-peaks.tsv` 里那一道整条经包装跑出的峰值）还是推的；55 号的不小于……」（55 号照 F8 原样） |
-| G2 | `.claude/agents/experiment-runner.md` 第 4 步（:31）、第 4c 步（:33） | 删「逐字节一致就删掉这一次的新文件、不新存」。改成「这一次的新文件也不删：重跑已有实验时，第 5 步把 `research/scripts/replay.sh` 里这个实验的登记行改指新文件，旧的留着；拿新文件与已有的那份比，逐字节一致的在报告里写明，对不上的在实验页两份都点名、写明对不上，交主 agent 定哪份承重」。4c 里「逐字节一致没新存的，读 `research/results/` 里那一份」那半句随之删掉 |
+| G9 | `.claude/agents/crash-verifier.md`「输入」（:20） | 「每道一个数：54、57 号的写明是量过的（峰值表 `scripts/memory-peaks.tsv` 里那一道整条经包装跑出的峰值）还是推的；55 号的不小于……」（55 号照 F8 原样） |
+| G2 | `.claude/agents/experiment-runner.md` 第 4 步（:31）、第 4c 步（:33） | 删「逐字节一致就删掉这一次的新文件、不新存」。改成「这一次的新文件也不删：重跑已有实验时，第 5 步把 `scripts/replay.sh` 里这个实验的登记行改指新文件，旧的留着；拿新文件与已有的那份比，逐字节一致的在报告里写明，对不上的在实验页两份都点名、写明对不上，交主 agent 定哪份承重」。4c 里「逐字节一致没新存的，读 `research/results/` 里那一份」那半句随之删掉 |
 | G3 | `.claude/agents/three-way-attack.md` 第 3b 步第 4 条（:33） | 加「原型里的流只许在原型里自己造，不从名字带 `layer0` 的用例里拷（拷文件、拷代码段、`include!`、`mod` 引进来都算拷）」与「这一轮全部原型跑的全量合起来不超过约 10⁷ 个状态」；结尾改成「一段历史自己就超过约 10⁶ 的，那段不跑；再跑就要越过约 10⁷ 的，剩下的不跑；两样都写进报告交主 agent」 |
 | G4 | `.claude/hooks/ask-user-claim-guard.sh`：`FILE_AND_LINE`（:57–59）、`FILE_NAME_CHARACTER` 上的注释、文件头判法、自证 | 第一支 `/` 之后换成攻方 `f13-fix-g1.sh` 的写法 `(?:{ASCII_PATH_CHARACTER}+|{FILE_NAME_CHARACTER}*\.(?:{EXTENSION_ALTERNATION}))`（逐字相同）；自证加 6 格必拒；文件头判法与成功行跟着改（第二节） |
 | G5 | `.claude/agents/experiment-runner.md` 第 4c 步（:33） | 点名对象改成表示「没过」的字段：取值是布尔 `false` 的、取值是 `not_run` 的、取值是大于 0 的整数而名字表示违例 / 不匹配 / 歧义 / 失败的计数；取值是布尔 `true` 的、取值是 `zero` 的（例 `control_violations_ok=true`、`layer0_violations=zero`）与名字不表示「没过」的计数（例 `journal_differing_states`）不点名；拿不准的点名，写「拿不准」。「一个都没有」那句改成「……违例、不匹配、歧义、失败类的整数计数都是 0」 |
@@ -104,13 +104,13 @@ G6-02	detector	three-way-attack	fg	exit=0
 G6-03	heavy	three-way-attack	rib	exit=0	  ! heavy-test-guard.sh：bash / sh 起的脚本 /tmp/claude-1000/defs-closeout-r2-fixes/probe/w/a.sh 不存在，里面的命令没判；这条命令照常执行，记了一条检出
 ```
 
-命令（cwd 仓根）：G1-01 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged`（门禁分诊员还原后的第 2 步）；G1-02 同一条不带 `--staged`；G1-03 对照：不带前缀；G1-04 `nice -n 19 bash .claude/gate.d/15-research-build.sh`；G1-05 前面加 `GATE_RESEARCH_BUILD_MEMORY_MAX=12G`；G1-06、G1-08 `nice -n 19 bash .claude/gate.d/74-model-differential.sh`（实现员、崩溃验证员）；G1-07、G1-09 前面加 `GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=8G`；G1-10 主 agent 直接跑 74 号；G1-11 74 号普通判红时打印的单跑命令 `bash research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture`；G1-12 对照：同一条不经包装；G1-13 `bash research/scripts/capped.sh 8 bash .claude/gate.d/15-research-build.sh`；G1-14 崩溃验证员 1b 的 54 号写法（没变，核一次）；G1-15 分诊员单跑 87 号；G1-16 F9 那一版的整条包装写法（hook 照放，定义里已经不叫人这么跑）。G6-01/02/03：3c 新写法（`rm -f …/b2-*.rc; { …; echo "$?" > …/b2-1.rc; } & { …; echo "$?" > …/b2-2.rc; } & wait; n=$(ls …/b2-*.rc | wc -l); if [ "$n" -ne 2 ]; then echo void; else cat …; fi`）在 run_in_background 与前台喂检出 hook、在 run_in_background 喂重型闸，都放行；G6-03 那一行 `!` 是 `a.sh` 在探针里不存在，只记检出。检出记录 3 条（G1-03、G1-12、G6-03 各一条），在 `probe/probe-detections-63sz6yhu.jsonl`。
+命令（cwd 仓根）：G1-01 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged`（门禁分诊员还原后的第 2 步）；G1-02 同一条不带 `--staged`；G1-03 对照：不带前缀；G1-04 `nice -n 19 bash .claude/gate.d/15-research-build.sh`；G1-05 前面加 `GATE_RESEARCH_BUILD_MEMORY_MAX=12G`；G1-06、G1-08 `nice -n 19 bash .claude/gate.d/74-model-differential.sh`（实现员、崩溃验证员）；G1-07、G1-09 前面加 `GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=8G`；G1-10 主 agent 直接跑 74 号；G1-11 74 号普通判红时打印的单跑命令 `bash scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture`；G1-12 对照：同一条不经包装；G1-13 `bash scripts/capped.sh 8 bash .claude/gate.d/15-research-build.sh`；G1-14 崩溃验证员 1b 的 54 号写法（没变，核一次）；G1-15 分诊员单跑 87 号；G1-16 F9 那一版的整条包装写法（hook 照放，定义里已经不叫人这么跑）。G6-01/02/03：3c 新写法（`rm -f …/b2-*.rc; { …; echo "$?" > …/b2-1.rc; } & { …; echo "$?" > …/b2-2.rc; } & wait; n=$(ls …/b2-*.rc | wc -l); if [ "$n" -ne 2 ]; then echo void; else cat …; fi`）在 run_in_background 与前台喂检出 hook、在 run_in_background 喂重型闸，都放行；G6-03 那一行 `!` 是 `a.sh` 在探针里不存在，只记检出。检出记录 3 条（G1-03、G1-12、G6-03 各一条），在 `probe/probe-detections-63sz6yhu.jsonl`。
 
 重型闸按名字判门禁阶段、不读正文（`.claude/rules/implementation-workflow.md:59`），所以 74、15 号阶段里面加了包装不改变它对这两道的判定：两道对各身份照旧放行。
 
 ### 三 b、改后的两道阶段在假根上跑（经包装那一支的三种结局）
 
-两道都没在仓上真跑（原因见第五节）。改用两个只有几行 Rust 的假根：`fake74`（工作区成员 `crates/singlefs-harness`，测试目标就叫 `second_transaction_supplement_three_random_history`，打出六段标题与「模型对拍 N 步」）与 `fake15`（`research/` 下一个带两个单测的 crate）；两者的测试在设了 `FAKE_ALLOCATE_MIB` 时先摸满那么多内存。先 `cargo test --offline --release … --no-run` 只编不跑；阶段从一个镜像目录起（`mirror/.claude/gate.d/` 放改后的两份脚本，`mirror/research/scripts` 是指到仓里 `research/scripts` 的符号链接，这样 `$(dirname "$0")/../..` 取到的包装就是仓里那一份），峰值表指到草稿目录里的私有一份（`RUN_WITH_MEMORY_CAP_PEAKS`，不碰主仓的 `memory-peaks.tsv`），`RUN_WITH_MEMORY_CAP_WAIT_SECONDS=300`。假根的全部源码存在 `g1/fake-roots-sources.txt`。
+两道都没在仓上真跑（原因见第五节）。改用两个只有几行 Rust 的假根：`fake74`（工作区成员 `crates/singlefs-harness`，测试目标就叫 `second_transaction_supplement_three_random_history`，打出六段标题与「模型对拍 N 步」）与 `fake15`（`research/` 下一个带两个单测的 crate）；两者的测试在设了 `FAKE_ALLOCATE_MIB` 时先摸满那么多内存。先 `cargo test --offline --release … --no-run` 只编不跑；阶段从一个镜像目录起（`mirror/.claude/gate.d/` 放改后的两份脚本，`mirror/scripts` 是指到仓里 `scripts` 的符号链接，这样 `$(dirname "$0")/../..` 取到的包装就是仓里那一份），峰值表指到草稿目录里的私有一份（`RUN_WITH_MEMORY_CAP_PEAKS`，不碰主仓的 `memory-peaks.tsv`），`RUN_WITH_MEMORY_CAP_WAIT_SECONDS=300`。假根的全部源码存在 `g1/fake-roots-sources.txt`。
 
 绿（默认上限）：
 
@@ -147,9 +147,9 @@ error: test failed, to rerun pass `-p singlefs-harness --test second_transaction
 Caused by:
   process didn't exit successfully: `/tmp/claude-1000/defs-closeout-r2-fixes/g1/fake74/target/release/deps/second_transaction_supplement_three_random_history-c6b70fa26f432660 --nocapture` (signal: 9, SIGKILL: kill)
 run-with-memory-cap: 撞了内存上限 200M（scope singlefs-memory-cap-1468639-87326325 的 Result=oom-kill，命令退出码 101）
-  ✗ 随机历史的测试二进制没判出结果：内存包装 research/scripts/run-with-memory-cap.sh 退 250（上限 200M），这一次的输出不算判定
+  ✗ 随机历史的测试二进制没判出结果：内存包装 scripts/run-with-memory-cap.sh 退 250（上限 200M），这一次的输出不算判定
      → 怎么办：照包装文件头「退出码」一段办：250 是这一道要的比上限多，把 GATE_MODEL_DIFFERENTIAL_MEMORY_MAX 设大再跑；
-                251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。
+                251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。
 exit=1
 == 15 red (cap 200M, allocates 400 MiB)
          Finished `release` profile [optimized] target(s) in 0.00s
@@ -158,9 +158,9 @@ exit=1
      running 2 tests
      test tests::second_test_is_counted ... ok
      run-with-memory-cap: 撞了内存上限 200M（scope singlefs-memory-cap-1468695-1038813893 的 Result=oom-kill，命令退出码 143）
-  ✗ research 的构建与单测没判出结果：内存包装 research/scripts/run-with-memory-cap.sh 退 250（上限 200M），这一次的输出不算判定
+  ✗ research 的构建与单测没判出结果：内存包装 scripts/run-with-memory-cap.sh 退 250（上限 200M），这一次的输出不算判定
      → 怎么办：照包装文件头「退出码」一段办：250 是这一道要的比上限多，把 GATE_RESEARCH_BUILD_MEMORY_MAX 设大再跑；
-               251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。
+               251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。
 exit=1
 ```
 
@@ -172,7 +172,7 @@ exit=1
 error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_random_history`
   ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）
      → 怎么办：单跑看细节（经内存包装，上限同这一道）：
-                bash research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+                bash scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
                 签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样：先看模型那一格引的条款，再判改实现还是改模型。
 exit=1
 == 15 red (test panics)
@@ -202,10 +202,10 @@ exit=1
 
 | 门禁 | 原样判定行 | 退出码 |
 |---|---|---|
-| 47 | ✓ research 脚本的自证都通过（本阶段跑了 31 条；research/scripts/ 里声称有 --selftest 的 35 份中 34 份有门禁阶段在跑）<br>没跑的 1 份（登记在本阶段的 NOT_RUN_HERE）：research/scripts/vm-bench.sh：自证要连起三次虚机，挂钟太重，不进每轮门禁 | 0 |
+| 47 | ✓ research 脚本的自证都通过（本阶段跑了 31 条；scripts/ 里声称有 --selftest 的 35 份中 34 份有门禁阶段在跑）<br>没跑的 1 份（登记在本阶段的 NOT_RUN_HERE）：scripts/vm-bench.sh：自证要连起三次虚机，挂钟太重，不进每轮门禁 | 0 |
 | 62 | ✓ 阶段归属表与门禁目录一致（76 个阶段，归 9 个 agent） | 0 |
 | 63 | ✓ 写范围闸、Bash 检出 hook、重型测试闸、续派闸、续做闸与弹窗断言闸注册着、自证通过，按模式找进程的上游钩子注册着、文件在，会话开始 hook（压缩后提示与启动时的 OOM 报告）注册着、自证通过，书记官写入后的核对 hook 注册着、自证通过，表与定义一致（3 个有 Write 或 Edit 的定义、18 条路径模式），共用切词模块的 14 个函数只在 lib_shell_words.py 里定义（查了 .claude/hooks/ 下另外 12 个文件），共用重型测试判定模块的 15 个函数只在 lib_heavy_tests.py 里定义（查了 .claude/hooks/ 下另外 12 个文件；selftest、load_sibling_module 不算，见 NOT_SHARED_JUDGMENT） | 0 |
-| 73 | ✓ 门禁自检通过：84 个脚本（.sh 与 .py）、260 条拒绝都带了出路<br>✓ 查了 72 个脚本：.sh 都可执行，暂存区里的模式与工作区一致<br>✓ 进程安全：查了 168 个脚本（.sh 127 个、.py 41 个），发信号的写法都只打得到点名的一个进程；own-scope 标注放行 1 处（research/scripts/run-with-memory-cap.sh:952）；没判的：.claude/process-safety-pending 里的 2 个文件 research/scripts/agent-watch.py（research/scripts/agent-watch.py:2162）；research/scripts/mutate.sh（research/scripts/mutate.sh:351）<br>✓ shell 纪律检查通过（共 34 个脚本）<br>✓ shell 纪律检查通过（共 8 个脚本）<br>✓ shell 纪律检查通过（共 9 个脚本） | 0 |
+| 73 | ✓ 门禁自检通过：84 个脚本（.sh 与 .py）、260 条拒绝都带了出路<br>✓ 查了 72 个脚本：.sh 都可执行，暂存区里的模式与工作区一致<br>✓ 进程安全：查了 168 个脚本（.sh 127 个、.py 41 个），发信号的写法都只打得到点名的一个进程；own-scope 标注放行 1 处（scripts/run-with-memory-cap.sh:952）；没判的：.claude/process-safety-pending 里的 2 个文件 scripts/agent-watch.py（scripts/agent-watch.py:2162）；scripts/mutate.sh（scripts/mutate.sh:351）<br>✓ shell 纪律检查通过（共 34 个脚本）<br>✓ shell 纪律检查通过（共 8 个脚本）<br>✓ shell 纪律检查通过（共 9 个脚本） | 0 |
 | doc-lint（文档铁律，`bash .claude/singlefs-ai-sop/scripts/doc-lint.sh <仓根>`） | ✓ 文档铁律检查通过（检查 485，跳过 0；DOC_LINT_VERBOSE=1 看全部） | 0 |
 | 规则纪律（项目本地；照 `gate.sh` 的 `run_rules_lint` 起：`GATE_IN_STAGE=1 RULES_LINT_DIR=<仓根>/.claude/rules RULES_LINT_FILES="CLAUDE.md .claude/agents/*.md .claude/agent-common.md .claude/main-agent.md .claude/skills/*/SKILL.md"`） | ✓ 规则只写怎么做（扫了 29 份文件 1793 行；没扫 0 个；记录小节 0、论证小节 0、带日期的行 0（另有 9 行的日期只在「」或反引号里）、解释性段落 0、解释性半句 0、没带劝阻句的链接 0；词法说明判了 1670 行（围栏与表格行不判），命中 0；使用者名字这一条无对象可判：被扫的仓没有 I18N 或没登记 consumers=） | 0 |
 | gate-overlap（门禁查重） | ✓ 相对 97f5904b44cd：新加的门禁与钩子 1 个（.claude/gate.d/84-verdict-false-named.sh）都写明了比过谁，改过的 15 份脚本对照已有的 132 份没有整段相同<br>没判的：装进来的 SOP 副本 37 份只当对照（.claude/singlefs-ai-sop/scripts） | 0 |
@@ -217,8 +217,8 @@ exit=1
 - **74、15 号没在仓上真跑**。15 号是整个 research 工作区 `cargo test --release`（阶段归属表写它「全工作区十几分钟」，按量级是全量测试），不跑；74 号要 release 编整个 `crates/`，这一轮只验了改动那一支（第三 b 节假根上的绿、撞顶、测试失败三种结局）与样本（第三 c 节）。真跑一次归提交时的崩溃验证员 / 门禁分诊员。
 - **默认上限 8G 对 15 号没量过**：峰值表里没有 research 整个工作区 `cargo test --release` 的行（`grep` 键含 `research` 的行都是单个 bin 或 `-p singlefs-harness` 的），推的；判决 G1 定的默认就是 `REPLAY_MEMORY_CAP` 的默认值，照写。74 号整道经包装跑过的峰值 4.41–4.70 GiB（攻方报告 H1 节峰值表三行，含编译），在 8G 以下。
 - **G1 里「`check.sh` 的 `cargo test --all` 报给 SOP 会话、记进 `records/2026-09-16-subagent拆分提案.md` 第四十节」与 G3 里「派发闸误拒记进第四节」**：`records/` 与上游 SOP 不在放行文件里，归主 agent。
-- **包装文件头 `research/scripts/run-with-memory-cap.sh:72`** 讲嵌套时仍拿「整条 gate.sh 经它跑」当例子；机制描述本身还对，但 G1 之后没有定义再叫人这么跑。那份不在放行文件里，没改。
-- **`.claude/gate.d/stage-inputs.tsv` 的 74 号那一行**（`crates/ Cargo.toml Cargo.lock`）没把 `research/scripts/run-with-memory-cap.sh` 列进输入：阶段现在读它，包装改了不会让 74 号的复用判定失效。不在放行文件里，没改（推的影响：包装改坏时 74 号可能按「输入没变」复用旧绿）。
+- **包装文件头 `scripts/run-with-memory-cap.sh:72`** 讲嵌套时仍拿「整条 gate.sh 经它跑」当例子；机制描述本身还对，但 G1 之后没有定义再叫人这么跑。那份不在放行文件里，没改。
+- **`.claude/gate.d/stage-inputs.tsv` 的 74 号那一行**（`crates/ Cargo.toml Cargo.lock`）没把 `scripts/run-with-memory-cap.sh` 列进输入：阶段现在读它，包装改了不会让 74 号的复用判定失效。不在放行文件里，没改（推的影响：包装改坏时 74 号可能按「输入没变」复用旧绿）。
 - **攻方 H2 附带的一格**（40 号把 `*.r[0-9].out` 当逐轮中间件跳过，G2 之后新文件常写成 `rN`）不在 G1–G9 里，没动。
 - **重型闸对 F9 那种整条包装写法照放**（第三 a 节 G1-16 exit=0）：定义里已经不这么写，闸没拦它；闸不在放行文件里。
 - **`bash-command-detector.sh` 自己给 ④ 的拒绝出路**没跟着 G6 改（不在放行文件里）：`bash-command-detector.sh:2395–2397` 的出路只写「几条活要并行就在同一条命令里 `a & b & wait`，用不带参数的 `wait` 等齐」，不提退出码文件、批号件号与数件数。
@@ -228,7 +228,7 @@ exit=1
 ## 六、草稿与清理
 
 草稿目录 `/tmp/claude-1000/defs-closeout-r2-fixes/`：`before/`（改前备份）、`start-sha256.txt`、`end-sha256.txt`、`defs.diff`（只含八份定义）、`my-changes-final.diff`、`g4/`（改法脚本 `edit_hook.py`、只加格与改判法两份弹窗闸拷贝、三份自证输出）、`g1/`（改法脚本 `edit_stages.py`、两份改后阶段脚本、`run-fixture.sh`、私有峰值表 `peaks.tsv`、假根源码 `fake-roots-sources.txt`、`fake-roots-du.txt`）、`probe/`（探针用例与输出、两份检出记录、`probe.py` 建的 HEAD 版弹窗闸拷贝目录 `probe-ask-head-u0cy62ik/`）、`gates/`（七道门禁的日志、起止时刻与退出码）。
-删了的：假根 `/tmp/claude-1000/defs-closeout-r2-fixes/g1/fake74`（1.2M，含它的 `target/`）与 `/tmp/claude-1000/defs-closeout-r2-fixes/g1/fake15`（1.2M，含 `research/target/`），删前 `du -sh` 记在 `g1/fake-roots-du.txt`；镜像目录 `g1/mirror`（两份脚本拷贝加一个指到仓里 `research/scripts` 的符号链接，`rm -rf` 只删链接本身，仓里的目录还在）。
+删了的：假根 `/tmp/claude-1000/defs-closeout-r2-fixes/g1/fake74`（1.2M，含它的 `target/`）与 `/tmp/claude-1000/defs-closeout-r2-fixes/g1/fake15`（1.2M，含 `scripts/experiments/target/`），删前 `du -sh` 记在 `g1/fake-roots-du.txt`；镜像目录 `g1/mirror`（两份脚本拷贝加一个指到仓里 `scripts` 的符号链接，`rm -rf` 只删链接本身，仓里的目录还在）。
 中途有一次交回调用是误发的，被交回闸拒掉（点名的正是这两个假根），没有送达；这一份是唯一送达的交回。
 
 ## 附：改后全量 diff（相对开工时的备份，`my-changes-final.diff` 原样）
@@ -244,7 +244,7 @@ exit=1
 +   - 在自己的原型里这样调枚举函数跑小流不算重型：原型里的流只许在原型里自己造，不从名字带 `layer0` 的用例里拷（拷文件、拷代码段、`include!`、`mod` 引进来都算拷）；测试目标的名字不带 `layer0`（带了 `heavy-test-guard.sh` 按名字拒）；每次跑之前用同一份文件的 `closed_form_state_count` 算出这一次全量的状态数，不超过约 10⁶ 个（几段历史合起来超过的，分几次跑）；这一轮全部原型跑的全量合起来不超过约 10⁷ 个状态。一段历史自己就超过约 10⁶ 的，那段不跑；再跑就要越过约 10⁷ 的，剩下的不跑；两样都写进报告交主 agent。
     - 随机跑批分小批：每批的段数按先跑一小段估出的时长定，不给批设限时（包装的 `RUN_WITH_MEMORY_CAP_TIME_LIMIT`、外面套 `timeout` 都不用）；每批的段数与估时写进报告。
  3c. 内存与进程：
-    - 编译与跑都经内存包装：跑的照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条，`cargo build` 也经它（`bash research/scripts/run-with-memory-cap.sh <上限> cargo build …`）。
+    - 编译与跑都经内存包装：跑的照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条，`cargo build` 也经它（`bash scripts/run-with-memory-cap.sh <上限> cargo build …`）。
     - 只停自己起的进程，一次一个 `python3 .claude/singlefs-ai-sop/scripts/proc.py stop <pid>`（共用约束「执行前拒绝的写法」那一条的 ⑥）。
 -   - 并行起的几件，每件把退出码写进自己的文件（`{ <命令>; echo "$?" > <草稿目录>/<名字>.rc; } &`），最后单独一个不带参数的 `wait` 等齐，再按起的次序逐个读 `.rc` 文件（共用约束「执行前拒绝的写法」那一条的 ④）；不用 `wait "$pid"` 收退出码。
 +   - 并行起的几件，每件把退出码写进自己的文件，文件名带批号与件号（`{ <命令>; echo "$?" > <草稿目录>/b<批号>-<件号>.rc; } &`），每批开跑前先删掉这一批的 `.rc`（`rm -f <草稿目录>/b<批号>-*.rc`）；最后单独一个不带参数的 `wait` 等齐，数一遍这一批的 `.rc`，文件数与派出去的件数对不上，整批作废；对得上再按起的次序逐个读（共用约束「执行前拒绝的写法」那一条的 ④）；不用 `wait "$pid"` 收退出码。
@@ -265,15 +265,15 @@ exit=1
 --- a/.claude/agents/experiment-runner.md
 +++ b/.claude/agents/experiment-runner.md
 @@ -28,12 +28,12 @@
- 2. 写 `research/e7-index-bench/src/bin/e<号>_<简称>.rs`，在 `research/e7-index-bench/Cargo.toml` 末尾追加它的 `[[bin]]`（⚠️ **跑前登记把装置写死成「入库装置」时改写 `crates/singlefs-harness/src/bin/e<号>_<简称>.rs`**：岔路问的是「`crates/` 今天这份代码的性质」时，另写一份独立模型答不了，写范围闸按 `crates/singlefs-harness/src/bin/e*.rs` 放行。那种 bin 只读、只驱动与观测，不许改 `crates/singlefs-core` 与 `crates/singlefs-checker`；变异表改追加进 `crates/mutations.tsv` 末尾、归门禁 59 号跑。**另有三条只对入库装置生效**：① **不许从 `crates/` 里引决定工作量、几何或判据门槛的常量**——这类参数在装置里写本地常量，值抄自 kb 的登记位并注明文件与行号，另加一条断言拿它与实现侧同名常量回比；引了就等于装置与实现共用一个数，两边一起错而逐格相等。这一条挡不住「kb 与实现一起取错」。② **写了入库装置就要让它进代码轮判决的点名清单**：门禁 56 号的正则罩得到 `crates/*/src/bin/*.rs`，不点名那一道会红，而那条义务落在跑整轮门禁的一方身上、不落在你身上——交回时写明你新建了哪个 bin。③ **什么算「入库装置」以跑前登记里写死的那一句为准**；登记里没写死就走 `research/` 那一支，别自己判）（`name` 用连字符，与 `replay.sh` 登记行里的 bin 名一致；只追加，不改别人的）：纯算术的计数模型、单测、钉绝对值的断言；取样点覆盖登记里每一个会跑到的取值。写完跑 `bash .claude/scripts/naming-lint.sh`，新文件里的缩写与单字母名在这一步改完再往下走，不留给后面的门禁阶段。
- 3. 写变异表 `research/mutations/e<号>_<简称>.tsv`，在 `research/` 下跑完整张表：`cd research && nice -n 19 bash scripts/mutate.sh <bin 名> e7-index-bench/src/bin/<源文件> mutations/<变异表>`（两个路径都相对 `research/`；bin 名以 `research/e7-index-bench/Cargo.toml` 里 `[[bin]]` 的 `name` 为准，没有显式声明的取文件名去掉 `.rs`；报「基线就是红的」时先查是不是在仓根下跑、bin 名是不是写错）（收尾要有「已还原，基线仍全绿」）；没红的逐条按 `mutation-sampling.md` 分类。
+ 2. 写 `scripts/experiments/e<号>_<简称>.rs`，在 `scripts/experiments/Cargo.toml` 末尾追加它的 `[[bin]]`（⚠️ **跑前登记把装置写死成「入库装置」时改写 `crates/singlefs-harness/src/bin/e<号>_<简称>.rs`**：岔路问的是「`crates/` 今天这份代码的性质」时，另写一份独立模型答不了，写范围闸按 `crates/singlefs-harness/src/bin/e*.rs` 放行。那种 bin 只读、只驱动与观测，不许改 `crates/singlefs-core` 与 `crates/singlefs-checker`；变异表改追加进 `crates/mutations.tsv` 末尾、归门禁 59 号跑。**另有三条只对入库装置生效**：① **不许从 `crates/` 里引决定工作量、几何或判据门槛的常量**——这类参数在装置里写本地常量，值抄自 kb 的登记位并注明文件与行号，另加一条断言拿它与实现侧同名常量回比；引了就等于装置与实现共用一个数，两边一起错而逐格相等。这一条挡不住「kb 与实现一起取错」。② **写了入库装置就要让它进代码轮判决的点名清单**：门禁 56 号的正则罩得到 `crates/*/src/bin/*.rs`，不点名那一道会红，而那条义务落在跑整轮门禁的一方身上、不落在你身上——交回时写明你新建了哪个 bin。③ **什么算「入库装置」以跑前登记里写死的那一句为准**；登记里没写死就走 `research/` 那一支，别自己判）（`name` 用连字符，与 `replay.sh` 登记行里的 bin 名一致；只追加，不改别人的）：纯算术的计数模型、单测、钉绝对值的断言；取样点覆盖登记里每一个会跑到的取值。写完跑 `bash .claude/scripts/naming-lint.sh`，新文件里的缩写与单字母名在这一步改完再往下走，不留给后面的门禁阶段。
+ 3. 写变异表 `scripts/mutations/e<号>_<简称>.tsv`，在 `research/` 下跑完整张表：`cd scripts/experiments && nice -n 19 bash ../mutate.sh <bin 名> <源文件> ../mutations/<变异表>`（两个路径都相对 `research/`；bin 名以 `scripts/experiments/Cargo.toml` 里 `[[bin]]` 的 `name` 为准，没有显式声明的取文件名去掉 `.rs`；报「基线就是红的」时先查是不是在仓根下跑、bin 名是不是写错）（收尾要有「已还原，基线仍全绿」）；没红的逐条按 `mutation-sampling.md` 分类。
  3b. 登记里的停机条款（第十一节里标「停机」的，通常是装置与 `crates/` 实现逐项对拍）在跑产物之前做，照原文真跑，不许只推；做不了就停下交回，不跑产物、不写实验页。登记的量一次做不完的，做完的那一段照常交，没做的逐条列进报告，实验页与索引行的状态写「部分已跑」，不写「已跑」。岔路单每一行都够判了（登记第十一节的够判停机），剩下的量不跑：实验页逐条标「够判后未跑」、写明各自对应哪一行，状态写「已跑（够判）」；够不够判由你按登记写的够判条件报，续不续由主 agent 定。
--4. 跑产物进 `research/results/`。那里已有的产物一个都不删、不挪、不覆盖（共用约束「执行前拒绝的写法」那一条的 ⑤）：这一次的输出写一个新文件名（带今天的日期或 `rN`，写之前 `ls` 确认没有同名的），跑完按这个新文件名认本轮才有的完成标记。重跑已有实验时拿新文件与已有的那份比：逐字节一致就删掉这一次的新文件、不新存；对不上就两份都留，实验页两份都点名、写明对不上，交主 agent 定哪份承重。生成产物用的二进制编在 `research/target/` 下，用最后一次源码改动编出来；生成产物与第 5 步跑 `replay.sh` 时都不设 `CARGO_TARGET_DIR`；草稿目录里的 target 只拿来迭代。
-+4. 跑产物进 `research/results/`。那里已有的产物一个都不删、不挪、不覆盖（共用约束「执行前拒绝的写法」那一条的 ⑤）：这一次的输出写一个新文件名（带今天的日期或 `rN`，写之前 `ls` 确认没有同名的），跑完按这个新文件名认本轮才有的完成标记。这一次的新文件也不删：重跑已有实验时，第 5 步把 `research/scripts/replay.sh` 里这个实验的登记行改指新文件，旧的留着；拿新文件与已有的那份比，逐字节一致的在报告里写明，对不上的在实验页两份都点名、写明对不上，交主 agent 定哪份承重。生成产物用的二进制编在 `research/target/` 下，用最后一次源码改动编出来；生成产物与第 5 步跑 `replay.sh` 时都不设 `CARGO_TARGET_DIR`；草稿目录里的 target 只拿来迭代。
+-4. 跑产物进 `research/results/`。那里已有的产物一个都不删、不挪、不覆盖（共用约束「执行前拒绝的写法」那一条的 ⑤）：这一次的输出写一个新文件名（带今天的日期或 `rN`，写之前 `ls` 确认没有同名的），跑完按这个新文件名认本轮才有的完成标记。重跑已有实验时拿新文件与已有的那份比：逐字节一致就删掉这一次的新文件、不新存；对不上就两份都留，实验页两份都点名、写明对不上，交主 agent 定哪份承重。生成产物用的二进制编在 `scripts/experiments/target/` 下，用最后一次源码改动编出来；生成产物与第 5 步跑 `replay.sh` 时都不设 `CARGO_TARGET_DIR`；草稿目录里的 target 只拿来迭代。
++4. 跑产物进 `research/results/`。那里已有的产物一个都不删、不挪、不覆盖（共用约束「执行前拒绝的写法」那一条的 ⑤）：这一次的输出写一个新文件名（带今天的日期或 `rN`，写之前 `ls` 确认没有同名的），跑完按这个新文件名认本轮才有的完成标记。这一次的新文件也不删：重跑已有实验时，第 5 步把 `scripts/replay.sh` 里这个实验的登记行改指新文件，旧的留着；拿新文件与已有的那份比，逐字节一致的在报告里写明，对不上的在实验页两份都点名、写明对不上，交主 agent 定哪份承重。生成产物用的二进制编在 `scripts/experiments/target/` 下，用最后一次源码改动编出来；生成产物与第 5 步跑 `replay.sh` 时都不设 `CARGO_TARGET_DIR`；草稿目录里的 target 只拿来迭代。
  4b. 产物出来之后先自查齐不齐：按登记的「臂 × 历史 × 几何」数一遍产物里每一类结果行的条数与字段，缺行、缺字段（例如某一族没有臂字段）、某一族一次都没造出被测形状，都列进报告，不许只看末行完成标记。报告里每个判据按每条臂全列判定，不挑「突出发现」报——对某条候选不利的那一半同样要写。分族、分臂的计数用一条命令从产物里数，报告与实验页贴那条命令和它的原样输出，不用文字重写族名单；给「这几族为什么是 0」写解释之前，先把那几族的产物行贴出来，确认它们真是 0。
 -4c. 交回之前逐行读判决行：`grep -n 'name=verdict' <产物>` 列出这一次每份产物里的全部判决行（逐字节一致没新存的，读 `research/results/` 里那一份；输出不截断），任何字段取值是 `false` 或 `not_run`，或字段名表示违例、不匹配、歧义、失败的计数（名字里带 `violation`、`mismatch`、`ambiguous`、`fail` 的，例 `layer0_violations`、`width_mismatches`、`today_ambiguous`）取值不是 0，在报告里逐个点名：产物文件与行号、字段名、取值、为什么是这个值、是不是登记预期内的；一个都没有，也写一句「判决行 N 条，没有 false / not_run 字段，违例、不匹配、歧义、失败类计数都是 0」。
 +4c. 交回之前逐行读判决行：`grep -n 'name=verdict' <产物>` 列出这一次每份产物里的全部判决行（输出不截断），在报告里逐个点名其中表示「没过」的字段：取值是布尔 `false` 的；取值是 `not_run` 的；取值是大于 0 的整数、而名字表示违例、不匹配、歧义、失败的计数（例 `layer0_violations`、`width_mismatches`、`today_ambiguous`）。取值是布尔 `true` 的、取值是 `zero` 的（例 `control_violations_ok=true`、`layer0_violations=zero`）与名字不表示「没过」的计数（例 `journal_differing_states`）不点名；拿不准的点名，写「拿不准」。每个点名写：产物文件与行号、字段名、取值、为什么是这个值、是不是登记预期内的；一个都没有，也写一句「判决行 N 条，没有 false / not_run 字段，违例、不匹配、歧义、失败类的整数计数都是 0」。
- 5. 在 `research/scripts/replay.sh` 里登记复跑，跑一次 `bash research/scripts/replay.sh E<号>` 确认逐字节一致。送进虚机跑的实验（`vm-bench.sh`，含 `--selftest`）与 E152 装置是重型测试，你不跑：装置、登记与复跑命令写好就停，在交回里写明要跑什么、为什么，由主 agent 问用户（`.claude/kb/vm-harness.md`；共用约束「不做」一节里重型测试那一条）。装置要起子进程、读它的输出时，先把输出读完再转打，计时按登记写的进程与时钟取（`.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」）；门禁 65 号查读子进程输出的循环里一边取时间一边输出。
+ 5. 在 `scripts/replay.sh` 里登记复跑，跑一次 `bash scripts/replay.sh E<号>` 确认逐字节一致。送进虚机跑的实验（`vm-bench.sh`，含 `--selftest`）与 E152 装置是重型测试，你不跑：装置、登记与复跑命令写好就停，在交回里写明要跑什么、为什么，由主 agent 问用户（`.claude/kb/vm-harness.md`；共用约束「不做」一节里重型测试那一条）。装置要起子进程、读它的输出时，先把输出读完再转打，计时按登记写的进程与时钟取（`.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」）；门禁 65 号查读子进程输出的循环里一边取时间一边输出。
 -6. 跑阶段归属表登记给你的阶段（共用约束 `.claude/agent-common.md`「门禁」一节），84 号除外：它放到第 7 步写完实验页之后跑；这一次不写实验页的，在这一步最后跑，红了照写。其中要编译或复跑整张表的，开跑前照共用约束看负载。15 号（编整个 research 工作区）与 87 号（复跑全部已入库实验）不归你，收尾由 `gate-triage` 统一跑；你只跑第 5 步自己那一个实验的 `replay.sh`。
 -7. 主 agent 要写实验页时：`.claude/kb/experiments/<号>-<简称>.md`，结果整行抄自产物并带文件名，写复跑命令、口径、它答不了的；索引行进 `.claude/kb/experiments.md`。写完（连同第 7b 步）跑 84 号，贴原样末行与退出码。
 +6. 跑阶段归属表登记给你的阶段（共用约束 `.claude/agent-common.md`「门禁」一节），读实验页或实验索引的那几道除外（27、34、40、69、75、84、85、86、88、99 号）：它们放到第 7 步写完实验页之后跑；这一次不写实验页的，在这一步最后跑，红了照写，产物照第 4 步一个不删（86 号出路里「把 research 下那些文件删掉」那一句不照做，写进报告交主 agent）。其中要编译或复跑整张表的，开跑前照共用约束看负载。15 号（编整个 research 工作区）与 87 号（复跑全部已入库实验）不归你，收尾由 `gate-triage` 统一跑；你只跑第 5 步自己那一个实验的 `replay.sh`。
@@ -287,22 +287,22 @@ exit=1
  
  - 这次改动的范围：`git diff --stat -- crates litmus` 原样，或提交区间。
  - 这一次是提交时跑还是用户要求时跑：决定命令带 `SINGLEFS_HEAVY_TESTS=commit` 还是 `=user-request`。
--- 54、55、57 号各自的内存上限（第 1b 步用）；55 号的不小于同时起的虚机数乘每台的内存（`.claude/gate.d/55-qemu-first-transaction.sh` 的 `MODES` 档数 × `research/scripts/vm-bench.sh` 的 `VM_MEM`）。
-+- 54、55、57 号各自的内存上限（第 1b 步用），每道一个数：54、57 号的写明是量过的（峰值表 `research/scripts/memory-peaks.tsv` 里那一道整条经包装跑出的峰值）还是推的；55 号的不小于同时起的虚机数乘每台的内存（`.claude/gate.d/55-qemu-first-transaction.sh` 的 `MODES` 档数 × `research/scripts/vm-bench.sh` 的 `VM_MEM`）。
+-- 54、55、57 号各自的内存上限（第 1b 步用）；55 号的不小于同时起的虚机数乘每台的内存（`.claude/gate.d/55-qemu-first-transaction.sh` 的 `MODES` 档数 × `scripts/vm-bench.sh` 的 `VM_MEM`）。
++- 54、55、57 号各自的内存上限（第 1b 步用），每道一个数：54、57 号的写明是量过的（峰值表 `scripts/memory-peaks.tsv` 里那一道整条经包装跑出的峰值）还是推的；55 号的不小于同时起的虚机数乘每台的内存（`.claude/gate.d/55-qemu-first-transaction.sh` 的 `MODES` 档数 × `scripts/vm-bench.sh` 的 `VM_MEM`）。
  - 报告路径与草稿目录。
  
  ## 做什么
  
  1. 每个阶段开跑前各照共用约束「不做」一节看一次负载；另有别的 `gate.sh` 正在跑 54 号、或有 `checker-tier-layer0-replay.sh --full` 在跑时，不起 54 号，等它结束。
--1b. 54、55、57 号整条经内存包装跑（共用约束「不做」一节「跑编译出来的代码经内存包装」那一条；上限取输入给的那一道的，退出码 250–254 照那一条办）：第 2 步里起这三道的每条命令，在 `bash <阶段文件>` 前面加 `bash research/scripts/run-with-memory-cap.sh <上限>`，写成 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/<文件>`；59 号在里面逐条套了，照第 2 步直接跑，外面不再包一层。
-+1b. 54、55、57 号整条经内存包装跑（共用约束「不做」一节「跑编译出来的代码经内存包装」那一条；上限取输入给的那一道的，退出码 250–254 照那一条办）：第 2 步里起这三道的每条命令，在 `bash <阶段文件>` 前面加 `bash research/scripts/run-with-memory-cap.sh <上限>`，写成 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/<文件>`；59 号在里面逐条套了，74 号在阶段里面经包装，这两道照第 2 步直接跑，外面不再包一层。
+-1b. 54、55、57 号整条经内存包装跑（共用约束「不做」一节「跑编译出来的代码经内存包装」那一条；上限取输入给的那一道的，退出码 250–254 照那一条办）：第 2 步里起这三道的每条命令，在 `bash <阶段文件>` 前面加 `bash scripts/run-with-memory-cap.sh <上限>`，写成 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/<文件>`；59 号在里面逐条套了，照第 2 步直接跑，外面不再包一层。
++1b. 54、55、57 号整条经内存包装跑（共用约束「不做」一节「跑编译出来的代码经内存包装」那一条；上限取输入给的那一道的，退出码 250–254 照那一条办）：第 2 步里起这三道的每条命令，在 `bash <阶段文件>` 前面加 `bash scripts/run-with-memory-cap.sh <上限>`，写成 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/<文件>`；59 号在里面逐条套了，74 号在阶段里面经包装，这两道照第 2 步直接跑，外面不再包一层。
  2. 只在提交时（或主 agent 转达用户要求时）跑你那几道，不跑 `gate.sh` 整轮与全量 `cargo test`（`.claude/hooks/heavy-test-guard.sh` 拒）。按共用约束 `.claude/agent-common.md`「门禁」一节从阶段归属表取登记给你的阶段，一次只跑一个；54、55、57、59 号命令带输入给的那个前缀：`SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/<文件>`，其余登记给你的轻阶段不带；54 号默认不带 `--full`（快档加核全绿标记），派发提示点名要层 0 全量时才带；每个记开始与结束时刻（`date -u`）和退出码。单个阶段超过 Bash 单次上限就后台跑，退出码写进文件（`{ SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/<文件>; echo "exit=$?"; } > <草稿目录>/<阶段>.log 2>&1`；退出码只认日志里的 `exit=` 那一行，不认起后台的那条命令自己的 `$?`），结束后读输出。别的会话同时在跑 cargo 时，编译会卡在「Blocking waiting for file lock」，照实记等了多久，不算这个阶段的耗时。
  3. 每个阶段原样抄它的「✓」行，或「✗」行与紧跟的「→」；退出码 77 记「本次未跑」，不记通过。
  4. 计数行原样抄：崩溃状态数、恢复结果、与 E142 产物或闭式比对的那几行。输出里读不到判定行的阶段记「作废」，不记通过。
 --- a/.claude/agents/gate-triage.md
 +++ b/.claude/agents/gate-triage.md
 @@ -18,14 +18,13 @@
- - 这一轮的改动已经按 `research/scripts/stage-mine.py` 暂存了没有（没暂存就不派你，或者主 agent 明写「跑全量工作区」）。
+ - 这一轮的改动已经按 `scripts/stage-mine.py` 暂存了没有（没暂存就不派你，或者主 agent 明写「跑全量工作区」）。
  - 这一次是提交时跑还是用户要求时跑：决定命令带 `SINGLEFS_HEAVY_TESTS=commit` 还是 `=user-request`。
  - 这一轮暂存区 diff 的范围：`git diff --cached --stat` 原样。主 agent 明写跑全量工作区时，暂存区多半是空的，这时主 agent 另给「这一轮改过的文件清单」，归属按清单判。
 -- `gate.sh` 整条经内存包装的上限（第 1b 步用）。
@@ -311,9 +311,9 @@ exit=1
  ## 做什么
  
  1. 开跑前照共用约束「不做」一节看负载；另有别的 `gate.sh` 在跑就等它结束。
--1b. 自己单跑的编译出来的代码（`cargo test`、测试二进制）照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条经包装跑。`gate.sh` 整条经内存包装跑，上限取输入给的，退出码 250–254 照那一条办；里面 59 号、87 号逐条再经包装的照常跑（嵌套怎么排队见 `research/scripts/run-with-memory-cap.sh` 文件头「包装里再经包装跑的」那一句）。单跑的门禁阶段照第 2 步直接跑，外面不包一层（87 号经 `research/scripts/replay.sh` 逐条套了）。
--2. 只在提交时（或主 agent 转达用户要求时）跑：暂存过的跑 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh <上限> bash .claude/scripts/gate.sh --staged`（用户要求时 `=user-request`）；主 agent 明写全量的跑同一条、去掉 `--staged`（前缀照带）。54、55、57、59 这几道重阶段在 `gate.sh` 里照各自的复用判定走（54 号只核全绿标记），你不直接调它们，也不跑全量 `cargo test`（`.claude/hooks/heavy-test-guard.sh` 拒）；登记给你的其余阶段单跑时不带前缀，87 号单跑照带。超过 Bash 单次上限时后台跑、结束后读输出。
-+1b. 自己单跑的编译出来的代码（`cargo test`、测试二进制）照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条经包装跑；`gate.sh` 与单跑的门禁阶段照第 2 步直接跑，外面不包一层（87 号经 `research/scripts/replay.sh` 逐条套了，15、74 号在阶段里面经包装）。
+-1b. 自己单跑的编译出来的代码（`cargo test`、测试二进制）照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条经包装跑。`gate.sh` 整条经内存包装跑，上限取输入给的，退出码 250–254 照那一条办；里面 59 号、87 号逐条再经包装的照常跑（嵌套怎么排队见 `scripts/run-with-memory-cap.sh` 文件头「包装里再经包装跑的」那一句）。单跑的门禁阶段照第 2 步直接跑，外面不包一层（87 号经 `scripts/replay.sh` 逐条套了）。
+-2. 只在提交时（或主 agent 转达用户要求时）跑：暂存过的跑 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash scripts/run-with-memory-cap.sh <上限> bash .claude/scripts/gate.sh --staged`（用户要求时 `=user-request`）；主 agent 明写全量的跑同一条、去掉 `--staged`（前缀照带）。54、55、57、59 这几道重阶段在 `gate.sh` 里照各自的复用判定走（54 号只核全绿标记），你不直接调它们，也不跑全量 `cargo test`（`.claude/hooks/heavy-test-guard.sh` 拒）；登记给你的其余阶段单跑时不带前缀，87 号单跑照带。超过 Bash 单次上限时后台跑、结束后读输出。
++1b. 自己单跑的编译出来的代码（`cargo test`、测试二进制）照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条经包装跑；`gate.sh` 与单跑的门禁阶段照第 2 步直接跑，外面不包一层（87 号经 `scripts/replay.sh` 逐条套了，15、74 号在阶段里面经包装）。
 +2. 只在提交时（或主 agent 转达用户要求时）跑：暂存过的跑 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged`（用户要求时 `=user-request`）；主 agent 明写全量的跑不带参数（前缀照带）。54、55、57、59 这几道重阶段在 `gate.sh` 里照各自的复用判定走（54 号只核全绿标记），你不直接调它们，也不跑全量 `cargo test`（`.claude/hooks/heavy-test-guard.sh` 拒）；登记给你的其余阶段单跑时不带前缀，87 号单跑照带。超过 Bash 单次上限时后台跑、结束后读输出。
  3. 每个红阶段：抄门禁给的「✗」行与紧跟的「→」下一步原样；看它点名的文件与行在不在暂存区 diff 的块里（`git diff --cached -U0 -- <文件>`）。在块里 ⇒「这一轮」；文件在但行不在块里、或文件不在暂存区 ⇒「不是这一轮」；红句说的是「这一批输入」本身的（54 号的「没有这批输入的全绿标记」「那一格的哈希不同」这类）不按它点名的标记路径判：这一轮的改动（`git diff --cached --name-only`；跑全量工作区时是主 agent 给的文件清单）碰了 `.claude/gate.d/stage-inputs.tsv` 里那一道那一行登记的路径 ⇒「这一轮」，下一步原样抄 54 号出路里的三行命令，一条都没碰 ⇒「不是这一轮」；工具没装、网关不通、`cargo` 不在 ⇒「环境」，用 `bash .claude/scripts/env.sh` 的对应行佐证；别的会话同时在跑同一个重阶段、进程被外部信号杀掉（输出里一行裸的 `Terminated`）⇒「并发」，贴开跑时与出事前后 `ps` 看到的同名进程。红阶段没有「✗」与「→」可抄的（被杀、崩溃），抄它最后 20 行输出，判「分不清」或「并发」，写明没有下一步可抄。分不清的写「分不清」与原因。
  4. 原样抄未实现清单与「由项目本地阶段覆盖」清单。别的会话同时在改仓、跑全量工作区时「工作区跑的过程中没变」那一条红了：照抄开跑、收尾两个指纹，判「不是这一轮」。`gate.sh` 不打印单个阶段的耗时，取不到的不估。
@@ -335,20 +335,20 @@ exit=1
  - 不编译 Rust、不跑 `gate.sh` 全量，除非定义明写要做。跑脚本、跑模型一律加 `nice -n 19`。
  - 重型测试（名字含 `layer0` 的测试二进制与 54 号、QEMU、herd7、crates 变异整表、全量 `cargo test`（`--all` / `--workspace` / 工作区根裸跑）与 `check.sh`、`gate.sh` 整轮、87 号全部实验复跑、E152 装置）只在提交代码时跑一次、或用户要求时跑；子 agent 一律不跑，只跑自己动到的测试二进制（`cargo test -p <crate> --test <自己的目标>`、`--lib`）、fmt / clippy / build 与 `.claude/gate.d/` 下 54、55、57、59、87 之外的阶段。`crash-verifier` 只跑 54、55、57、59 号那几道，`gate-triage` 只跑 `gate.sh` 整轮与 87 号，都在提交时或用户要求时跑、命令带 `SINGLEFS_HEAVY_TESTS=commit`（用户要求时 `=user-request`）。项目 settings 里的 `.claude/hooks/heavy-test-guard.sh` 在执行前拒绝越出这些的命令；被拒了不换写法绕过去，在交回里写明要跑什么、为什么，交主 agent 去问用户。
  - 写进脚本文件、放进 `python3` 的 subprocess、`make` 这类间接起法同样算跑：自己写的验证链里不许出现重型测试的任何一步，名字含 `layer0` 的测试二进制也不许。
--- 跑编译出来的代码经内存包装：`cargo test` / `run` / `bench`（带 `--no-run` 只编不跑的不算）与直接执行 cargo 编出来的二进制（实验装置、测试二进制），一律经 `bash research/scripts/run-with-memory-cap.sh <上限> <命令…>` 跑；写进自己的脚本再跑的，整条脚本经它跑（`bash research/scripts/run-with-memory-cap.sh <上限> bash <脚本>`）。上限取派发提示给的（定义另写了来源的照定义），都没给就取 `research/scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值。`research/scripts/mutate.sh`、`research/scripts/replay.sh` 与门禁 59 号在里面逐条套了，直接跑，外面不再包一层。退出码 250–254 是包装自己的结局（含义见 `research/scripts/run-with-memory-cap.sh` 文件头「退出码」一段）：那一次的输出不算结果，命令与退出码写进报告，不绕开包装重跑。`cargo build`、`cargo clippy`、`cargo fmt` 不跑编出来的代码，不要求经它。
-+- 跑编译出来的代码经内存包装：`cargo test` / `run` / `bench`（带 `--no-run` 只编不跑的不算）与直接执行 cargo 编出来的二进制（实验装置、测试二进制），一律经 `bash research/scripts/run-with-memory-cap.sh <上限> <命令…>` 跑；写进自己的脚本再跑的，整条脚本经它跑（`bash research/scripts/run-with-memory-cap.sh <上限> bash <脚本>`）。上限取派发提示给的（定义另写了来源的照定义），都没给就取 `research/scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值。`research/scripts/mutate.sh`、`research/scripts/replay.sh` 与门禁 59 号在里面逐条套了，门禁 15、74 号在阶段里面经包装（派发提示给了上限的，设进阶段文件头写的变量：15 号 `GATE_RESEARCH_BUILD_MEMORY_MAX`，74 号 `GATE_MODEL_DIFFERENTIAL_MEMORY_MAX`），都直接跑，外面不再包一层。退出码 250–254 是包装自己的结局（含义见 `research/scripts/run-with-memory-cap.sh` 文件头「退出码」一段）：那一次的输出不算结果，命令与退出码写进报告，不绕开包装重跑。`cargo build`、`cargo clippy`、`cargo fmt` 不跑编出来的代码，不要求经它。
+-- 跑编译出来的代码经内存包装：`cargo test` / `run` / `bench`（带 `--no-run` 只编不跑的不算）与直接执行 cargo 编出来的二进制（实验装置、测试二进制），一律经 `bash scripts/run-with-memory-cap.sh <上限> <命令…>` 跑；写进自己的脚本再跑的，整条脚本经它跑（`bash scripts/run-with-memory-cap.sh <上限> bash <脚本>`）。上限取派发提示给的（定义另写了来源的照定义），都没给就取 `scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值。`scripts/mutate.sh`、`scripts/replay.sh` 与门禁 59 号在里面逐条套了，直接跑，外面不再包一层。退出码 250–254 是包装自己的结局（含义见 `scripts/run-with-memory-cap.sh` 文件头「退出码」一段）：那一次的输出不算结果，命令与退出码写进报告，不绕开包装重跑。`cargo build`、`cargo clippy`、`cargo fmt` 不跑编出来的代码，不要求经它。
++- 跑编译出来的代码经内存包装：`cargo test` / `run` / `bench`（带 `--no-run` 只编不跑的不算）与直接执行 cargo 编出来的二进制（实验装置、测试二进制），一律经 `bash scripts/run-with-memory-cap.sh <上限> <命令…>` 跑；写进自己的脚本再跑的，整条脚本经它跑（`bash scripts/run-with-memory-cap.sh <上限> bash <脚本>`）。上限取派发提示给的（定义另写了来源的照定义），都没给就取 `scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值。`scripts/mutate.sh`、`scripts/replay.sh` 与门禁 59 号在里面逐条套了，门禁 15、74 号在阶段里面经包装（派发提示给了上限的，设进阶段文件头写的变量：15 号 `GATE_RESEARCH_BUILD_MEMORY_MAX`，74 号 `GATE_MODEL_DIFFERENTIAL_MEMORY_MAX`），都直接跑，外面不再包一层。退出码 250–254 是包装自己的结局（含义见 `scripts/run-with-memory-cap.sh` 文件头「退出码」一段）：那一次的输出不算结果，命令与退出码写进报告，不绕开包装重跑。`cargo build`、`cargo clippy`、`cargo fmt` 不跑编出来的代码，不要求经它。
  - 要停自己起的一条链（脚本、后台任务）时，先列出它的整棵子进程（`ps -o pid,ppid,args --ppid <pid>` 逐层往下），从最底层起逐个 `python3 .claude/singlefs-ai-sop/scripts/proc.py stop <pid>`（`proc.py` 只停给定的那一个，不带子进程），停完再列一遍，确认一个不剩；不许留下正在跑的那一步「让它跑完」。
  - 要编译、跑门禁阶段、跑变异或产物的，开跑前 `ps -o pid,args -u "$(id -u)"` 看负载：有性能测量在跑（`qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`）就报「在等 pid …（命令）」停下；只有别的 `cargo`、`gate.sh` 在跑的，加 `nice -n 19` 照常跑（cargo 自己排队拿文件锁），报告里记下 `ps` 看到了什么、等锁等了多久。定义另有更严要求的照定义。
  - 读大文件（超过 500 行）先 grep 定位、再按行段读（Read 的 offset / limit），不整份读；同一份文件读过一次、之后没改过，就不再整份重读。长命令的输出落进草稿目录的文件，只读汇总行（`tail -n 20`、`grep -c`、`grep ✗`），不把整份日志、整份 diff 读进上下文。
 @@ -61,7 +61,7 @@
-     ① 起看门狗的错误写法：`research/scripts/watch.sh`、`research/scripts/agent-watch.py watch` 不用 run_in_background 起，或命令里带单独的 `&`、`nohup`、`disown`、`setsid`、把输出丢进 `/dev/null`。看门狗只有主 agent 起。
+     ① 起看门狗的错误写法：`scripts/watch.sh`、`scripts/agent-watch.py watch` 不用 run_in_background 起，或命令里带单独的 `&`、`nohup`、`disown`、`setsid`、把输出丢进 `/dev/null`。看门狗只有主 agent 起。
      ② 前台没有超时的等待循环：`until` / `while` 里有 `sleep`，外面没套 `timeout`。要等就用 run_in_background 起、结束本轮等完成通知，或 `python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`。
      ③ 把活放出追踪：`disown`、`coproc`、`setsid -f`、`nohup … &`、`tmux` / `screen` 的分离模式、不等到结束的 `systemd-run`。
 -    ④ run_in_background 里有作业以单独的 `&` 收尾，之后同一条命令里没有 `wait`。要并行就每件把退出码写进自己的文件（`{ <命令>; echo "$?" > <文件>; } &`），最后单独一个不带参数的 `wait` 等齐，再按派活的次序逐个读那几个文件；不用 `wait "$pid"` 收。
 +    ④ run_in_background 里有作业以单独的 `&` 收尾，之后同一条命令里没有 `wait`。要并行就每件把退出码写进自己的文件（`{ <命令>; echo "$?" > <文件>; } &`，文件名带批号与件号，每批开跑前先删掉这一批的文件），最后单独一个不带参数的 `wait` 等齐，再按派活的次序逐个读那几个文件；读之前数一遍，文件数与派出去的件数对不上，整批作废；不用 `wait "$pid"` 收。
      ⑤ 整份覆盖 `research/results/` 下已存在又没进 git 的产物：`>`、`>|`、`&>`、不带 `-a` 的 `tee`、`cp` / `mv` / `install` 的目标、`dd of=`、`truncate`。追加（`>>`、`tee -a`）与新文件名不拦；要换就按日期另存新文件名，旧的留着。
      ⑥ 终止进程不是点名一个自己起的进程号或任务号：`kill` 的目标带负号、是 0 或 `$PPID`、一次给几个、是命令替换或通配，在循环里逐个发（`proc.py stop` 同样），按名字、按 cgroup 或 `/proc` 挑进程，写死的进程号指到自己会话的祖先、别的会话起的进程或 SSH / VSCode / 本地模型服务，`systemctl` 停 SSH、登录会话、本地模型服务这类单元，关机重启。放行的是点名一个：`kill "$!"`、`kill %1`、单独一条 `python3 .claude/singlefs-ai-sop/scripts/proc.py stop <pid>`。
-     ⑦ 在同一个 inode 上改已经存在的脚本（`.sh`、`.py` 或带执行位的文件，在仓里或 `/tmp/claude-1000/` 下）：`>`、`>|`、`&>`、不带 `-a` 的 `tee`、`cp` 的目标、`dd of=`、`truncate`、python 的 `open(…, 'w')` 这一类。改脚本写到同目录临时文件再 `mv` 换上，或用 `research/scripts/replace-once.py` / `insert-row.py` 定点改；追加与新建不拦。
+     ⑦ 在同一个 inode 上改已经存在的脚本（`.sh`、`.py` 或带执行位的文件，在仓里或 `/tmp/claude-1000/` 下）：`>`、`>|`、`&>`、不带 `-a` 的 `tee`、`cp` 的目标、`dd of=`、`truncate`、python 的 `open(…, 'w')` 这一类。改脚本写到同目录临时文件再 `mv` 换上，或用 `scripts/replace-once.py` / `insert-row.py` 定点改；追加与新建不拦。
 --- a/.claude/main-agent.md
 +++ b/.claude/main-agent.md
 @@ -45,7 +45,7 @@
@@ -356,7 +356,7 @@ exit=1
  同时在跑的重活（编译、测试、变异、产物、原型扫描）不止一个时，每份派发提示写一行「线程上限：N」，N = 整机核数 ÷ 同时在跑的重活数（向下取整，至少 1）；重活数变了，给在跑的 agent 发消息改 N。
  
 -派崩溃验证员时给 54、55、57 号各自的内存上限，55 号的不小于同时起的虚机数乘每台的内存（算法在 `.claude/agents/crash-verifier.md`「输入」一节）；派门禁分诊员时给 `gate.sh` 整条经内存包装的上限。
-+派崩溃验证员时给 54、55、57 号各自的内存上限，每道一个数，照 `.claude/agents/crash-verifier.md`「输入」一节给：54、57 号写明是量过的还是推的，55 号的不小于同时起的虚机数乘每台的内存。门禁 15、74 号在阶段里面经内存包装，要换它们的上限就在派发提示里给一个数，没给用 `research/scripts/replay.sh` 的 `REPLAY_MEMORY_CAP` 默认值。
++派崩溃验证员时给 54、55、57 号各自的内存上限，每道一个数，照 `.claude/agents/crash-verifier.md`「输入」一节给：54、57 号写明是量过的还是推的，55 号的不小于同时起的虚机数乘每台的内存。门禁 15、74 号在阶段里面经内存包装，要换它们的上限就在派发提示里给一个数，没给用 `scripts/replay.sh` 的 `REPLAY_MEMORY_CAP` 默认值。
  
  在不影响正确性的前提下写简练：只写对方干这件活要的东西——定义「输入」一节要的项、为哪几行岔路或哪个问题、定义与共用约束里没有的约束、交付什么交到哪；不复述定义与规则里已经写着的做法，不讲来龙去脉。事实、路径、行号、数与判据一个不少，嫌长就指到文件，不删内容。
  
@@ -428,10 +428,10 @@ exit=1
  fi
  
  TEST_BINARY="second_transaction_supplement_three_random_history"
-+# 这里的 cargo test 跑编译出来的代码，经 research/scripts/run-with-memory-cap.sh 放进内存上限里跑（.claude/agent-common.md「跑编译出来的代码经内存包装」那一条），
++# 这里的 cargo test 跑编译出来的代码，经 scripts/run-with-memory-cap.sh 放进内存上限里跑（.claude/agent-common.md「跑编译出来的代码经内存包装」那一条），
 +# 谁跑这一道都一样，外面不再包一层。上限取 GATE_MODEL_DIFFERENTIAL_MEMORY_MAX（派发提示给了上限的，跑这一道的 agent 设进它），
-+# 没设取 research/scripts/replay.sh 的 REPLAY_MEMORY_CAP 默认值 8G。包装自己的结局（退出码 250–254）不是测试的判定，单独判红、单独给出路。
-+MEMORY_CAP_RUNNER="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/run-with-memory-cap.sh"
++# 没设取 scripts/replay.sh 的 REPLAY_MEMORY_CAP 默认值 8G。包装自己的结局（退出码 250–254）不是测试的判定，单独判红、单独给出路。
++MEMORY_CAP_RUNNER="$(cd "$(dirname "$0")/../.." && pwd)/scripts/run-with-memory-cap.sh"
 +MODEL_DIFFERENTIAL_MEMORY_MAX="${GATE_MODEL_DIFFERENTIAL_MEMORY_MAX:-8G}"
  SECTIONS=("随机历史快档" "随机历史：偏向抬 F 之后复用的取样点" "随机历史：偏向抬 F 之后回退的取样点" "随机历史：越过原分配记录墙的取样点" "随机历史：小盘上逼近单元区墙的取样点" "随机历史：小盘上逼近单元区墙的取样点（空间准入判着）")
  
@@ -446,20 +446,20 @@ exit=1
 +  if (( cargo_exit != 0 )); then
      tail -40 "$log"
 -    echo "  ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）"
--    echo "     → 怎么办：单跑看细节（经内存包装，上限取派发提示给的，没给就用 research/scripts/replay.sh 的 REPLAY_MEMORY_CAP 默认值 8G）："
--    echo "                bash research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test $TEST_BINARY -- --nocapture"
+-    echo "     → 怎么办：单跑看细节（经内存包装，上限取派发提示给的，没给就用 scripts/replay.sh 的 REPLAY_MEMORY_CAP 默认值 8G）："
+-    echo "                bash scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test $TEST_BINARY -- --nocapture"
 -    echo "                签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样：先看模型那一格引的条款，再判改实现还是改模型。"
      rm -f "$log"
 +    case "$cargo_exit" in
 +      250|251|252|253|254)
-+        echo "  ✗ 随机历史的测试二进制没判出结果：内存包装 research/scripts/run-with-memory-cap.sh 退 $cargo_exit（上限 $MODEL_DIFFERENTIAL_MEMORY_MAX），这一次的输出不算判定"
++        echo "  ✗ 随机历史的测试二进制没判出结果：内存包装 scripts/run-with-memory-cap.sh 退 $cargo_exit（上限 $MODEL_DIFFERENTIAL_MEMORY_MAX），这一次的输出不算判定"
 +        echo "     → 怎么办：照包装文件头「退出码」一段办：250 是这一道要的比上限多，把 GATE_MODEL_DIFFERENTIAL_MEMORY_MAX 设大再跑；"
-+        echo "                251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。"
++        echo "                251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。"
 +        ;;
 +      *)
 +        echo "  ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）"
 +        echo "     → 怎么办：单跑看细节（经内存包装，上限同这一道）："
-+        echo "                bash research/scripts/run-with-memory-cap.sh $MODEL_DIFFERENTIAL_MEMORY_MAX cargo test --release -p singlefs-harness --test $TEST_BINARY -- --nocapture"
++        echo "                bash scripts/run-with-memory-cap.sh $MODEL_DIFFERENTIAL_MEMORY_MAX cargo test --release -p singlefs-harness --test $TEST_BINARY -- --nocapture"
 +        echo "                签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样：先看模型那一格引的条款，再判改实现还是改模型。"
 +        ;;
 +    esac
@@ -473,20 +473,20 @@ exit=1
    exit 1; }
  
 -out="$(cd "$R" && cargo test --release 2>&1)"
-+# 这里的 cargo test 跑编译出来的代码，经 research/scripts/run-with-memory-cap.sh 放进内存上限里跑（.claude/agent-common.md「跑编译出来的代码经内存包装」那一条），
++# 这里的 cargo test 跑编译出来的代码，经 scripts/run-with-memory-cap.sh 放进内存上限里跑（.claude/agent-common.md「跑编译出来的代码经内存包装」那一条），
 +# 谁跑这一道都一样，外面不再包一层。上限取 GATE_RESEARCH_BUILD_MEMORY_MAX（派发提示给了上限的，跑这一道的 agent 设进它），
-+# 没设取 research/scripts/replay.sh 的 REPLAY_MEMORY_CAP 默认值 8G。峰值表的键写死：光看「cargo test --release」分不出是哪个工作区。
++# 没设取 scripts/replay.sh 的 REPLAY_MEMORY_CAP 默认值 8G。峰值表的键写死：光看「cargo test --release」分不出是哪个工作区。
 +# 包装自己的结局（退出码 250–254）不是构建与单测的判定，单独判红、单独给出路。
-+MEMORY_CAP_RUNNER="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/run-with-memory-cap.sh"
++MEMORY_CAP_RUNNER="$(cd "$(dirname "$0")/../.." && pwd)/scripts/run-with-memory-cap.sh"
 +RESEARCH_BUILD_MEMORY_MAX="${GATE_RESEARCH_BUILD_MEMORY_MAX:-8G}"
 +out="$(cd "$R" && RUN_WITH_MEMORY_CAP_KEY="gate 15-research-build: cargo test --release (research)" \
 +  bash "$MEMORY_CAP_RUNNER" "$RESEARCH_BUILD_MEMORY_MAX" cargo test --release 2>&1)"
  rc=$?
 +if (( rc >= 250 && rc <= 254 )); then
 +  tail -8 <<<"$out" | sed 's/^/     /'
-+  echo "  ✗ research 的构建与单测没判出结果：内存包装 research/scripts/run-with-memory-cap.sh 退 $rc（上限 $RESEARCH_BUILD_MEMORY_MAX），这一次的输出不算判定"
++  echo "  ✗ research 的构建与单测没判出结果：内存包装 scripts/run-with-memory-cap.sh 退 $rc（上限 $RESEARCH_BUILD_MEMORY_MAX），这一次的输出不算判定"
 +  echo "     → 怎么办：照包装文件头「退出码」一段办：250 是这一道要的比上限多，把 GATE_RESEARCH_BUILD_MEMORY_MAX 设大再跑；"
-+  echo "               251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。"
++  echo "               251、252、254 先跑 bash scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。"
 +  exit 1
 +fi
  if (( rc != 0 )); then

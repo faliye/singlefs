@@ -9,6 +9,6 @@ R=/home/fy5090/code/singlefs
 OUT=/tmp/claude-1000/m3-formal-code-b20-r1-sonnet/f1f2-out; mkdir -p "$OUT"
 cp "$R/research/prompts/m3-formal-code-b20-r1-sonnet-model/f1f2/probe_f1f2.rs" "$W/crates/singlefs-harness/tests/probe_f1f2.rs"
 cd "$W"
-bash $R/research/scripts/run-with-memory-cap.sh 8G bash $R/research/scripts/capped.sh 10 nice -n 19 \
+bash $R/scripts/run-with-memory-cap.sh 8G bash $R/scripts/capped.sh 10 nice -n 19 \
   cargo test --offline -p singlefs-harness --test probe_f1f2 -- --nocapture --test-threads=1 > "$OUT/probe.log" 2>&1
 echo "rc=$?" >> "$OUT/probe.log"

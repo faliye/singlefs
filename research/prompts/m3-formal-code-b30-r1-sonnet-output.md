@@ -30,7 +30,7 @@
 | 回退只取回第 2 片（2719） | 第 3 片被重写过的回退、没有第 4 片的回退 |
 | 回退只丢第 3 片（2720） | 没有第 4 片的回退（只这一条） |
 
-- 把这四行的 `cargo test` 结局喂给 `research/scripts/crates-mutation-rows.py` 的 `verdict_of_run`（本模型 `rerun.sh m4-keys`）：四行都判 `caught`（9 行里 2717–2723、2635、2733 都 `caught`，2636 行见 M4）。
+- 把这四行的 `cargo test` 结局喂给 `scripts/crates-mutation-rows.py` 的 `verdict_of_run`（本模型 `rerun.sh m4-keys`）：四行都判 `caught`（9 行里 2717–2723、2635、2733 都 `caught`，2636 行见 M4）。
 - 变异表行文：`crates/mutations.tsv:2717` 「O1 跨叶容器（胶水）：第 4 片及以后都当第 3 片（第 29 批攻方，判决 L1 第三行）」；`crates/mutations.tsv:2720` 「O1 跨叶容器回退（理想模型自身）：回退只丢现行那一版的第 3 片、更右的留着（第 29 批攻方，判决 L1 第三行）」。
 
 推翻它的现象：把这四行里任一行施加后新文件三条用例全绿；或 `anchors` 报某行原文命中数不是 1。
@@ -62,9 +62,9 @@
 ### M1-c　四行变异的锚点与 KX1 / KX2 那几行：一致（不互相掩护）
 
 - 同一原文、不同替换文的对子（`crates/mutations.tsv` 行号，锚点起行在冻结副本里现查）：胶水行 2717 与 2563（原文同一行 `crates/singlefs-harness/src/model_comparison.rs:80`，替换 `.min(2)` 对 `.min(1)`，还有 2461 的 `.min(0)`）；模型落点行 2718 与 2564、2460（原文同一行 `crates/singlefs-harness/src/model.rs:197`）；回退 retain 行 2720 与 2561（同一段三行，起 `model.rs:1719`）；2719 的 `.filter(...)` 三行起 `model.rs:1726`，与 2562 的 extend 三行（起 `model.rs:1722`）相邻、不重叠。
-- 一行改坏的是干净副本：变异驱动 `research/scripts/crates-mutation-rows.py` 的 `judge_row` 每条先读未改的文件，`crates/…` 原文必须命中恰好 1 次才改（`research/scripts/crates-mutation-rows.py:894` 「assert pristine.count(row.old) == 1, (row.path, row.name)」），改一处、跑点名的测试、写回原样。两行同原文不会一行把另一行的原文改没。
+- 一行改坏的是干净副本：变异驱动 `scripts/crates-mutation-rows.py` 的 `judge_row` 每条先读未改的文件，`crates/…` 原文必须命中恰好 1 次才改（`scripts/crates-mutation-rows.py:894` 「assert pristine.count(row.old) == 1, (row.path, row.name)」），改一处、跑点名的测试、写回原样。两行同原文不会一行把另一行的原文改没。
 - 静态判（`crates-mutation-rows.py static-check`）：冻结副本 2728 条成形行、只有一行报 `ANCHOR`，是 `litmus/…` 那条（冻结副本不带 `litmus/`，与 b29 判决第四节说的同一条，不在这一轮的改动里）；新加的 4 行、30-2 的 4 行 CPU 与 9 行 GPU、30-3 的 2 行锚点都命中 1 次。
-- 点名用例在输出里只许对上一个（`research/scripts/crates-mutation-rows.py:666` 「if len(results) > 1:」）：新文件三个用例名互不为子串（我逐个核过），两行同名同红也各自判。
+- 点名用例在输出里只许对上一个（`scripts/crates-mutation-rows.py:666` 「if len(results) > 1:」）：新文件三个用例名互不为子串（我逐个核过），两行同名同红也各自判。
 - 实际红的是点名的那一条：行 2717、2718 点名的用例（建到第 4 片）红；行 2719 点名的用例红；行 2720 点名的用例红（`out/m1-m2-m3-mutation-results.tsv`，`verdict_of_run` 判 `caught`）。
 
 推翻它的现象：某行的原文在施加另一行的改动之后才命中（驱动改成不还原时才会）；或 `verdict_of_run` 对其中一行判 `failure`。
@@ -167,7 +167,7 @@ core 的判（`crates/singlefs-core/src/pointer.rs:210` 起的 `PointerHeadAsRea
 
 - `crates/`：零（见 M3-a：没有读者）。
 - `research/`（`rerun.sh m3-greps` 原样输出）：没有按秒「判」它的读者。有两类要说：
-  - E142 装置写系统配置槽，自己写这个字段：主仓工作区的 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs:1524` 「writer.put_u32(5000); // T_time 毫秒」；HEAD 里同一处是 `put_u32(5); // T_time 秒`（`git show HEAD:…` 现查，第 1494 行）。也就是 30-3 报告第七节说「E142 会与 core 对不上」那一条在今天工作区已经改过了（这一份文件还带着别的未提交改动，`git status` 是 `MM`），冻结副本不含 `research/`，所以 E142 是否与新 core 逐字对上我没跑（它是 research 的跑法，门禁 `E142` 行输入含 `crates/`，要重跑）。
+  - E142 装置写系统配置槽，自己写这个字段：主仓工作区的 `scripts/experiments/e142_new_pool_file_creation_dry_run.rs:1524` 「writer.put_u32(5000); // T_time 毫秒」；HEAD 里同一处是 `put_u32(5); // T_time 秒`（`git show HEAD:…` 现查，第 1494 行）。也就是 30-3 报告第七节说「E142 会与 core 对不上」那一条在今天工作区已经改过了（这一份文件还带着别的未提交改动，`git status` 是 `MM`），冻结副本不含 `research/`，所以 E142 是否与新 core 逐字对上我没跑（它是 research 的跑法，门禁 `E142` 行输入含 `crates/`，要重跑）。
   - E170 五个 O3 规约执行器：`on_disk_layout.py` 按偏移 433、宽 4 解出 `checkpoint_time_threshold`，只解不判；五个目录的 `synthetic_pool_for_tests.py` 造合成池写 5。合成池的 5 与 core 今天的 5000 不同，但没有任何地方拿它与 core 比（grep 零命中），换不换由实验那边定。
   - 其余命中（e108、e91、e159、e97、e70、e87）是把 T_time 当模型参数用，不读盘。
 - 规则没说的：D16 已定项 5 的用户可设（`.claude/kb/decisions/16-发布语义.md:140` 「**`T_time` 用户可设，不限制**：挂载时传的值覆盖盘上的字段并回写」）与 4 字节毫秒字段：u32 毫秒最大约 49.7 天，「不限制」写成毫秒时有一个隐含的上限，条款没写它（推的，今天没有设值的路）。
@@ -203,7 +203,7 @@ core 的判（`crates/singlefs-core/src/pointer.rs:210` 起的 `PointerHeadAsRea
 
 ### M4-a　变异表那一行改名，会不会让按名字复用的判定记录对不上：结局一致；「锚点与替换文不动」这句与树里的行冲突（冲突）
 
-- 判定记录不按名字复用：`research/scripts/crates-mutation-rows.py:432` 「text = "\t".join(row.fields) + f"\nmemory_max={memory_max}\ntimeout_seconds={timeout_seconds}\n"」，行键是这一行六段原样（名字是第一段）加上限的 sha256；用时表按六段原样的 sha256 记。所以改名、改锚点、改替换文任一样都是新行键，旧记录不会被复用，也不会被错用，下一次重放这一行当新行跑。
+- 判定记录不按名字复用：`scripts/crates-mutation-rows.py:432` 「text = "\t".join(row.fields) + f"\nmemory_max={memory_max}\ntimeout_seconds={timeout_seconds}\n"」，行键是这一行六段原样（名字是第一段）加上限的 sha256；用时表按六段原样的 sha256 记。所以改名、改锚点、改替换文任一样都是新行键，旧记录不会被复用，也不会被错用，下一次重放这一行当新行跑。
 - 主 agent 在改动全文第 3 行写「锚点与替换文不动」（`research/prompts/_m3-formal-code-b30-r1-diff.md` 开头）。对照：b29 树里的那一行（`research/prompts/_m3-formal-code-b29-r1-diff.md` 里的 MUT-A 行）锚点是 `const TIME_THRESHOLD_SECONDS: u32 = 5;`、替换文 `… = 4;`；入树现行 `crates/mutations.tsv:2636` 是 `const TIME_THRESHOLD_MILLISECONDS: u32 = 5000;` 改 `… = 4000;`。名字、锚点、替换文三段都变了（常量改名不得不变）。「不动」只相对 30-3 实现员补丁里那一行成立（补丁行已经带新锚点）。
 - 三个行键（`rerun.sh m4-keys`，上限 8G、900 秒）：b29 行 `61266eba493f`、补丁原样（新锚点、旧名）`7400b43507af`、入树现行 `dc5d22c6d891`，互不相同。
 - 现行行 2636 在冻结副本上 `verdict_of_run` 判 `caught`（`rerun.sh m3-rows` 行 18）。
@@ -242,7 +242,7 @@ core 的判（`crates/singlefs-core/src/pointer.rs:210` 起的 `PointerHeadAsRea
 
 ```
 REPO=$PWD FROZEN=/tmp/claude-1000/m3-formal-code-b30-r1/tree WORK=<会话草稿>/b30-sonnet-rerun RERUN_ALREADY_WRAPPED=1 \
-  bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 7 \
+  bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 7 \
   bash research/prompts/m3-formal-code-b30-r1-sonnet-model/tools/rerun.sh all
 ```
 
@@ -258,6 +258,6 @@ REPO=$PWD FROZEN=/tmp/claude-1000/m3-formal-code-b30-r1/tree WORK=<会话草稿>
 
 ## cite-check 末行
 
-命令：`python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b30-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b30-r1/tree --root . --background research/prompts/_m3-formal-code-b30-r1-background.md`
+命令：`python3 scripts/cite-check.py research/prompts/m3-formal-code-b30-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b30-r1/tree --root . --background research/prompts/_m3-formal-code-b30-r1-background.md`
 
   ✓ 核了 24 处引文，对上 24 处，没判 0 处（逐处列在上面）

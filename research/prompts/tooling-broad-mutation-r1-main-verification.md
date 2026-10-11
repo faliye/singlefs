@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers T1 T2 T3 T4 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12 G13 G14 G15 -->
 
-用户 2026-09-30：「钩子的代码要三方 打一次」。被判的四份文件：`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/gate.d/code-tooling.sh`、`research/scripts/broad-mutation.py`（工具实现员 2026-09-30 交回，关 C489（singlefs-core 那 1786 条广谱变异没跑） 里「跑不起来」那一半）。
+用户 2026-09-30：「钩子的代码要三方 打一次」。被判的四份文件：`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/gate.d/code-tooling.sh`、`scripts/broad-mutation.py`（工具实现员 2026-09-30 交回，关 C489（singlefs-core 那 1786 条广谱变异没跑） 里「跑不起来」那一半）。
 
 ## 一、证据
 
@@ -13,7 +13,7 @@
 | 正推腿 | `research/prompts/tooling-broad-mutation-r1-sonnet-output.md` | 6184cb2a6c403bf72a548dc997e2d7ddd627f93ea8999a44370d7d1c91c3b83e |
 | 攻方腿 | `research/prompts/tooling-broad-mutation-r1-opus-output.md` | afa2693bdcfd1eb7c549e5133049582dca23c02130436a2890fbff0da8b7f346 |
 
-`python3 research/scripts/cite-check.py <两份报告> --background research/prompts/_tooling-broad-mutation-r1-background.md` 末行：「✓ 核了 98 处引文，对上 98 处，没判 0 处」。两条腿的实测都在副本上、用假清单与假一步做的，不算入库装置上的数；下面「主 agent 现查」一列是主 agent 对着仓里那四份文件自己核的。
+`python3 scripts/cite-check.py <两份报告> --background research/prompts/_tooling-broad-mutation-r1-background.md` 末行：「✓ 核了 98 处引文，对上 98 处，没判 0 处」。两条腿的实测都在副本上、用假清单与假一步做的，不算入库装置上的数；下面「主 agent 现查」一列是主 agent 对着仓里那四份文件自己核的。
 
 ## 二、各格判定
 
@@ -35,7 +35,7 @@
 | T3(b) H9 结果表半行 | 两条腿都报 | — | 打中（推的，SIGKILL 造不出，要掉电或磁盘满）；改：末行不完整时不算数并在下一次追加前截掉 |
 | T3(c) H10 基线绿过之后环境坏了 | 两条腿都报 | 驱动第 703–723 行：基线读到已有行就复用；第 129 行：cargo 退 101 一律当「编不过或有测试没过」 | **打中，要改**；已跑出的行怎么复核见第四节 |
 | T3(c) H11 一步退认不出的码 | 攻方腿 | — | 打中（一条腿）；改：落一行「驱动错」继续往下，不卡死在同一条 |
-| T3(c) H12 `#[ignore]` 的用例两段都不跑 | 两条腿都报（harness 档 71、checker 档 19） | `grep -n 'include-ignored\|run-ignored\|ignored' research/scripts/broad-mutation.py` 零命中 | **打中**；补不补是代价取舍，交用户（第五节） |
+| T3(c) H12 `#[ignore]` 的用例两段都不跑 | 两条腿都报（harness 档 71、checker 档 19） | `grep -n 'include-ignored\|run-ignored\|ignored' scripts/broad-mutation.py` 零命中 | **打中**；补不补是代价取舍，交用户（第五节） |
 | T3(c) H13 `--stage-two-only` 对没跑过第一段的条直接记 missed | 攻方腿 | — | 打中（一条腿）；改：拒 |
 | T3(c) H3 只供测试的环境变量 | 两条腿都报；攻方腿实测 `BROAD_MUTATION_STEP_DRIVER=/bin/true` 不带前缀往库里写基线与结果行 | 驱动第 1017 行：设了 `BROAD_MUTATION_STEP_DRIVER` 就不查前缀；第 655 行读环境 | **打中，要改** |
 | T3 自证覆盖 | 正推腿：18 格罩不住 12 项；攻方腿：对 H1–H13 都不罩 | 主 agent 跑过：自证退 0、7 个开关逐个退 1 | 自证只证了它写了的那些；上面每条改法各补一格加一个开关 |

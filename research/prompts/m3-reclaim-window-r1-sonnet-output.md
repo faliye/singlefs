@@ -24,7 +24,7 @@
 
 ### 1.1 前提（我读过、现查过的）
 
-- 输入文件的 sha256 与快照一致：`sha256sum crates/singlefs-core/src/allocator.rs crates/singlefs-core/src/mount.rs crates/singlefs-core/src/transaction.rs crates/singlefs-checker/src/walk.rs research/e7-index-bench/src/bin/e139_tightened_floor.rs | diff - research/prompts/m3-reclaim-window-r1-snapshot/crates-sha256.txt` 只多出快照里别的四个文件的行（`.out`、`e139-r1-prereg.md`、两份窗口判决），前五行逐字相同；`.out` 与 `e139-r1-prereg.md` 的 sha256 也与快照第 6、7 行相同。
+- 输入文件的 sha256 与快照一致：`sha256sum crates/singlefs-core/src/allocator.rs crates/singlefs-core/src/mount.rs crates/singlefs-core/src/transaction.rs crates/singlefs-checker/src/walk.rs scripts/experiments/e139_tightened_floor.rs | diff - research/prompts/m3-reclaim-window-r1-snapshot/crates-sha256.txt` 只多出快照里别的四个文件的行（`.out`、`e139-r1-prereg.md`、两份窗口判决），前五行逐字相同；`.out` 与 `e139-r1-prereg.md` 的 sha256 也与快照第 6、7 行相同。
 - `crates/` 里没有降级挂载：`grep -rn -i 'degraded\|降级' crates/singlefs-core/src/*.rs | wc -l` 输出 `0`。一块盘丢了，在实现里表现为 `PoolReader::read` 返回 `None`，那一盘的根环槽全读成 `Unreadable`（`crates/singlefs-core/src/recovery.rs:1244` 起的 `read_root_ring_slot`）。
 - 窗口谓词：「写成 txg + 3S > N，N < 3S 时整个环都在窗口里、不减出负数」(`crates/singlefs-core/src/root_ring.rs:120`)。区域 = txg mod 3、区内槽 = (txg / 3) mod S，所以 txg 与 txg + 3S 同槽。
 
@@ -134,10 +134,10 @@ compared rows 16 field diffs 0
 
 D16 表对装置有五处丙，实验页第 197–213 行那张表。⑦、②、③、④、⑥ 是实验页登记第十一节的编号（实验页第 215 行）。
 
-- **⑦ 一圈窗口里最旧有效根的锚**（回退之后装置不发向前的根，锚停在回退目标）：**造不出 46 / 3，也不会被它改掉**。装置里只有 `World::AdminRollback` 与 `RollbackFirstPublish` 两个世界调 `admin_rollback`（`research/e7-index-bench/src/bin/e139_tightened_floor.rs:1584`、`:1586`），活化一族的函数 `activation_prefix`、`run_activation_case`（`:1615`、`:1640`）里一次都不调。端口没有走到这一处，这一格我**没量**。
+- **⑦ 一圈窗口里最旧有效根的锚**（回退之后装置不发向前的根，锚停在回退目标）：**造不出 46 / 3，也不会被它改掉**。装置里只有 `World::AdminRollback` 与 `RollbackFirstPublish` 两个世界调 `admin_rollback`（`scripts/experiments/e139_tightened_floor.rs:1584`、`:1586`），活化一族的函数 `activation_prefix`、`run_activation_case`（`:1615`、`:1640`）里一次都不调。端口没有走到这一处，这一格我**没量**。
 - **② 抬 F 的上限另滤 txg ≥ F**（实现：「.filter(|root| root.checkpoint_txg >= current_floor)」(`crates/singlefs-core/src/mount.rs:2247`)）：**单独造不出**。60 行逐字节与原产物相同。同时要说明这个世界对②没有分辨力：活化一族里上限只在前缀末尾算一次，`probe_p2_ceiling_calls.py` 输出 `{'upper_limit_calls': 80}`，80 次里改成条款的滤法后一次都没变；推空循环里算处置目标的 `disposal_target` 一次都没调到。所以②只能写「走不到」，不能写「条款对它无所谓」。
 - **③ 生效**（装置取每块幸存盘各取最大再取最小，条款取三项取大）：**单独造不出，改成条款的样子反而更糟**：假候选总数 4816 变 5757，9 行不同。条款的 F_生效更高，回收更多；候选下界不同步变高，旧根就更容易落在「已被回收、还算候选」里。③ 只有和 ⑥ 一起改才有意义。
-- **⑥ 回退候选集的下界**：**这是造出假候选的那一处**。装置的候选下界取幸存盘上全部自证合法的根所带 F 的最大值：「self.visible_roots().iter().map(|root| root.floor).max().unwrap_or(0)」(`research/e7-index-bench/src/bin/e139_tightened_floor.rs:932`)，没有系统配置里那份 F。条款写的是 txg ≥ F_生效：「恢复后生效值 F_生效 = max(各幸存盘最新持久有效根所带 F 的最大值, 被抛弃时间线上的根所带 F 的最大值, 系统配置里读得出的 F 的最大值)」(`.claude/kb/decisions/16-发布语义.md:39`)；
+- **⑥ 回退候选集的下界**：**这是造出假候选的那一处**。装置的候选下界取幸存盘上全部自证合法的根所带 F 的最大值：「self.visible_roots().iter().map(|root| root.floor).max().unwrap_or(0)」(`scripts/experiments/e139_tightened_floor.rs:932`)，没有系统配置里那份 F。条款写的是 txg ≥ F_生效：「恢复后生效值 F_生效 = max(各幸存盘最新持久有效根所带 F 的最大值, 被抛弃时间线上的根所带 F 的最大值, 系统配置里读得出的 F 的最大值)」(`.claude/kb/decisions/16-发布语义.md:39`)；
   checker 也是这样判的：「max(各幸存盘最新持久有效根所带 F 的最大值,」(`crates/singlefs-checker/src/walk.rs:8037`)。抬 F 先写系统配置、后发带新 F 的根，带新 F 的根还没落到幸存盘上时，装置的候选下界低，旧根留在候选集里；条款的下界已经是新 F，旧根在它之下被排除。
   只把这一处改成条款，46 行变 6 行，总数 4816 变 200，不可恢复不变。**实验页写反了方向**：「装置的候选集不大于条款的，假候选偏少」(`.claude/kb/experiments/139-按盘回退下界的收严形态.md:206`)。在系统配置里的 F 高于所有根所带 F 的那一段时间里，装置的候选集比条款的大。
 - **④ 「非空」**：**单独造不出**。60 行逐字节相同。端口里两种判法在 47760 个根上判得不同（`probe_p2_p4_effect.py` 的 `p4_disagree_not_oldest`，都不是窗口里最旧的那条，也就是真值集合与「与前一条有效根比」在窗口中间不同），但没有一次传到假候选或不可恢复上。实验页第 212 行推的「两种数法给同一个数」在这个世界里不成立，只是没有后果。
@@ -300,11 +300,11 @@ C 的锚用「每个区域」而不用「每块盘」有一个好处：不需要
 
 ## 五、要主 agent 看或跑的
 
-1. 三方规则要求「副本上的数要在入库装置上重做才能引」：端口数不进 kb。若要引 W2 的 ⑥（46 行变 6 行）：在 `research/e7-index-bench/src/bin/e139_tightened_floor.rs` 的 `candidacy_floor`（第 930 行起）里加系统配置那份 F，再跑
-   `cd research && bash scripts/replay.sh E139`（门禁里的实验复跑，属重型，我没跑，由主 agent 定要不要跑）；判结果看 `w_activation` 行 `fakes=` 与 `unrecoverable=`。
+1. 三方规则要求「副本上的数要在入库装置上重做才能引」：端口数不进 kb。若要引 W2 的 ⑥（46 行变 6 行）：在 `scripts/experiments/e139_tightened_floor.rs` 的 `candidacy_floor`（第 930 行起）里加系统配置那份 F，再跑
+   `bash scripts/replay.sh E139`（门禁里的实验复跑，属重型，我没跑，由主 agent 定要不要跑）；判结果看 `w_activation` 行 `fakes=` 与 `unrecoverable=`。
 2. 两份现有 harness 测试（非重型档，我没编没跑，要核 1.2 第 5 条的盘面）：
-   `cd /home/fy5090/code/singlefs && bash research/scripts/run-with-memory-cap.sh <上限> cargo test -p singlefs-harness --test one_revolution_window_after_a_hole_in_the_root_ring --test rollback_target_outside_the_one_revolution_window_is_not_a_candidate`；
-   内存上限取 `research/scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值；判结果看每个二进制的 `test result: ok`。
+   `cd /home/fy5090/code/singlefs && bash scripts/run-with-memory-cap.sh <上限> cargo test -p singlefs-harness --test one_revolution_window_after_a_hole_in_the_root_ring --test rollback_target_outside_the_one_revolution_window_is_not_a_candidate`；
+   内存上限取 `scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值；判结果看每个二进制的 `test result: ok`。
 3. 复跑我的数：`cd research/prompts/m3-reclaim-window-r1-sonnet-model && nice -n 19 bash run_all.sh`（实测约 2 分 15 秒），再单跑 `probe_stale_root_exists.py`、`probe_lag_max.py`、`probe_b2_ring_all_six.py`。输出与 `out/` 里的逐行比。
 4. 我的 C 候选是我自己提的，被攻过零轮；判决里要标「零轮」。
 
@@ -320,4 +320,4 @@ C 的锚用「每个区域」而不用「每块盘」有一个好处：不需要
 
 ## 七、交回前的核对
 
-`python3 research/scripts/cite-check.py research/prompts/m3-reclaim-window-r1-sonnet-output.md` 末行（交回前最后一次跑）：见交回正文。
+`python3 scripts/cite-check.py research/prompts/m3-reclaim-window-r1-sonnet-output.md` 末行（交回前最后一次跑）：见交回正文。

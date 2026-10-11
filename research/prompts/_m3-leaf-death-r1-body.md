@@ -66,6 +66,6 @@ E177（逐树不写墓碑的复活数）第一段 2026-10-08 跑完（执行员�
 
 交付：
 - 腿的报告写进 `research/prompts/m3-leaf-death-r1-<腿名>-output.md`，分段落盘：每次写进文件不超过 150 行，第一段排他新建，回复只写短句；早点开写。
-- 模型与脚本放 `research/prompts/m3-leaf-death-r1-<腿名>-model/`，`rerun.sh` 交回前在空目录里从头跑通一次；仓路径从环境变量 `SINGLEFS_REPO` 取；编译与跑都经 `research/scripts/run-with-memory-cap.sh`，上限显式给（编译 6G、跑 4G），不用 `auto`；同一时刻只起一条 cargo；`compare` 比之前排序、去掉耗时字段、自己不依赖 `SINGLEFS_REPO`；用自己的编译目录。只跑 harness 档。草稿放 `~/.local/share/singlefs/work/<腿名>/`。E177 的装置 `research/e7-index-bench/src/bin/` 下 e177 那一份可以拷进自己的目录改臂。
+- 模型与脚本放 `research/prompts/m3-leaf-death-r1-<腿名>-model/`，`rerun.sh` 交回前在空目录里从头跑通一次；仓路径从环境变量 `SINGLEFS_REPO` 取；编译与跑都经 `scripts/run-with-memory-cap.sh`，上限显式给（编译 6G、跑 4G），不用 `auto`；同一时刻只起一条 cargo；`compare` 比之前排序、去掉耗时字段、自己不依赖 `SINGLEFS_REPO`；用自己的编译目录。只跑 harness 档。草稿放 `~/.local/share/singlefs/work/<腿名>/`。E177 的装置 `scripts/experiments/` 下 e177 那一份可以拷进自己的目录改臂。
 - 引 kb 条款写 kb 文件自己的行号；引代码写冻结副本里的全路径:行号。
 - 方案按 `crates/` 今天的实现来谈。

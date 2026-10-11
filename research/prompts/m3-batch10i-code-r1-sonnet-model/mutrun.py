@@ -6,7 +6,7 @@ import argparse, os, re, subprocess, sys, shlex, pathlib
 S = pathlib.Path('/tmp/claude-1000/m3-batch10i-code-r1-sonnet')
 WORK = S / 'work'
 FROZEN_TSV = pathlib.Path('/tmp/claude-1000/m3-batch10i-code-r1/tree/crates/mutations.tsv')
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 CAP = os.environ.get('MUT_CAP', 'auto')
 ap = argparse.ArgumentParser()
 ap.add_argument('name'); ap.add_argument('row')

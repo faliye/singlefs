@@ -7,7 +7,7 @@
 1. `y1_probe_appended_part.rs`：把 `crates/singlefs-harness/tests/mount_transparency_judged_field_by_field_after_a_writable_mount.rs` 整份拷成 `crates/singlefs-harness/tests/y1_probe.rs`，把文件里每个 `#[test]` 换成 `#[allow(dead_code)]`，末尾接上这个文件。
 2. `y3_probe_appended_part.rs`：同样拷 `crates/singlefs-harness/tests/checker_known_bad_images.rs` 成 `y3_probe.rs`，换 `#[test]`，末尾接这个文件；`TMPDIR` 指到可写目录（`build_pool` 在里面建稀疏镜像文件）。
 3. `allocator-fallback-counter.diff`：只给 `crates/singlefs-core/src/allocator.rs` 加两个静态计数器，数 `FallBackToLowestFreeSlot` 那一支走过几次（y1_probe 里 `y3_probe_fallback_*` 读它）。`patch -p0` 或手工加。
-4. 编译与运行：`nice -n 19 bash research/scripts/capped.sh 10 cargo test --offline -p singlefs-harness --test y1_probe --no-run`；跑测试二进制经 `bash research/scripts/run-with-memory-cap.sh <上限> bash research/scripts/capped.sh 10 <二进制> <测试名> --nocapture --test-threads=1`；本会话里别的任务也在用内存包装时要设 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON=<理由>`。
+4. 编译与运行：`nice -n 19 bash scripts/capped.sh 10 cargo test --offline -p singlefs-harness --test y1_probe --no-run`；跑测试二进制经 `bash scripts/run-with-memory-cap.sh <上限> bash scripts/capped.sh 10 <二进制> <测试名> --nocapture --test-threads=1`；本会话里别的任务也在用内存包装时要设 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON=<理由>`。
 
 日志（原样，未改）：
 

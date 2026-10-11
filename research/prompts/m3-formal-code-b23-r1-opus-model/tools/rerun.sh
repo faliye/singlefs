@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # m3-formal-code-b23-r1 攻方腿的副本探针复跑（只在副本里改、只在副本里编和跑；不跑 checker 档包的任何测试目标）。
 # 用法：bash tools/rerun.sh <setup|build|build-tests|k3a|f3|a1|b1|b1-sweep|collateral|collateral-one <none|nlink|birth|size>|all>
-# 环境变量：REPO_ROOT（仓根，取 Cargo.toml / Cargo.lock 与 research/scripts）、FROZEN_TREE（冻结副本根，下面是 crates/）、
+# 环境变量：REPO_ROOT（仓根，取 Cargo.toml / Cargo.lock 与 scripts）、FROZEN_TREE（冻结副本根，下面是 crates/）、
 #           WORK（副本与产物目录）、THREADS（线程上限，默认 7）、BUILD_CAP（编译的内存上限，默认 8G）、RUN_CAP（跑探针与 harness 测试的上限，默认 4G）。
 # 产物写进 $WORK/out/，与模型目录 out/ 下同名文件逐字节比（cmp）。
 set -euo pipefail
@@ -12,8 +12,8 @@ WORK="${WORK:-/tmp/claude-1000/m3-formal-code-b23-r1-opus-rerun}"
 THREADS="${THREADS:-7}"
 BUILD_CAP="${BUILD_CAP:-8G}"
 RUN_CAP="${RUN_CAP:-4G}"
-CAP="$REPO_ROOT/research/scripts/run-with-memory-cap.sh"
-CAPPED="$REPO_ROOT/research/scripts/capped.sh"
+CAP="$REPO_ROOT/scripts/run-with-memory-cap.sh"
+CAPPED="$REPO_ROOT/scripts/capped.sh"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-攻方腿副本探针复跑，与别的活并行}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-探针各子命令峰值差得远，统一给一个上限}"
 BIN="$WORK/copy/target/release/opus-b23-probe"

@@ -33,8 +33,8 @@ cp "$here/n1_sonnet_probe.rs" "$scratch/baseline/crates/singlefs-harness/tests/"
 
 run() { # <副本> <日志名> <用例> [环境变量=值…]
   local copy="$1" log="$2" test_name="$3"; shift 3
-  if ( cd "$scratch/$copy" && env "$@" nice -n 19 bash "$repo_root/research/scripts/run-with-memory-cap.sh" 8G \
-      bash "$repo_root/research/scripts/capped.sh" "$threads" \
+  if ( cd "$scratch/$copy" && env "$@" nice -n 19 bash "$repo_root/scripts/run-with-memory-cap.sh" 8G \
+      bash "$repo_root/scripts/capped.sh" "$threads" \
       cargo test --release -p singlefs-harness --test n1_sonnet_probe -- --exact "$test_name" --nocapture ) > "$scratch/$log" 2>&1; then
     echo "$log exit=0"
   else

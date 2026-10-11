@@ -181,7 +181,7 @@ y2 就是正文第二节已记那一形（checker 只在 `crates/singlefs-checke
 - **C551 推翻条件**（副本量过，`tools/patch_c551_probe.py` 只加打印）：越过 812 条的末尾那一版 83 条不变量里 68 条成立、15 条不适用、0 条部分没判（`research/prompts/m3-formal-code-b33-r1-opus-model/out/c551-probe.log:53`：「B33C551 end_of_812 holds=68 total=83」）；不适用的 15 条全是「没有对象」一类（I-7.9、I-8.8、I-3.12、I-4.1、I-5.5、I-4.4、I-4.6、I-4.7、I-9.17–I-9.23）。每一版跑 checker 的那条 30 版里 I-3.1 一次都没落进「不是成立」（`grep -c 'I-3.1:'` → 0）。所以「同一条用例判全部不变量」按字面做到了，I-3.1 在内（`.claude/kb/checks-owed.md:425`：「`build_pool` 装上根环表之后，同一条用例判全部不变量。」）。没打中。
 - **① `Some(1 + 3)`**（读码）：第一次崩溃那一态与它途中三个二次崩溃记的是同一个理由键（`crates/singlefs-checker-tier/src/crash_injection.rs:2733`：「"崩溃态注入过读故障（挂载透明只管不带故障的状态）";」），用例另钉 `second_crash_points == 3` 与「二次崩溃一个都没判」，三个变异各红在不同的数上。没打中；用例没跑（checker 档）。
 - **② 33-b 新造法**（读码）：下界只可能来自盘 0 的系统配置（根上的 F 都是 0），目标 (1, 2) 是树表 0 条的暖机根；F_生效 算错时报的是 `VersionWithoutFile`，与 `BelowEffectiveFloor` 分得开（`crates/singlefs-checker-tier/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs:471`：「"txg 2 低于 F 生效值 3：不是候选：{:?}",」）。「拒在任何写之前」从比盘面快照改成比录制流步数（`crates/singlefs-checker-tier/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs:477`：「"拒在任何写之前：录制流不多一步"」）：盘上的写都经录制器，两者在这个装置上等价（推的）。没打中；用例没跑。
-- **旧第 38 行改名**（读码，推的）：E171 两份坏实现表第 33 行按旧名「步 4：回退候选集的 F 用最新根自己带的 F 而不是 F_生效」找（`research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/bad-implementations-117.tsv:33`：「步 4：回退候选集的 F 用最新根自己带的 F 而不是 F_生效」）。驱动从所给快照根的 `crates/mutations.tsv` 按名字取行，找不到就走登记 5.2 的补位、换同文件组下一行。已冻结的几棵 E171 树里还是旧行，不受影响；之后从今天的树取快照重跑 E171，第 33 行跑的就是补位那一行，`replay.sh` 的 exact 比对会在那一行上不同。
+- **旧第 38 行改名**（读码，推的）：E171 两份坏实现表第 33 行按旧名「步 4：回退候选集的 F 用最新根自己带的 F 而不是 F_生效」找（`scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/bad-implementations-117.tsv:33`：「步 4：回退候选集的 F 用最新根自己带的 F 而不是 F_生效」）。驱动从所给快照根的 `crates/mutations.tsv` 按名字取行，找不到就走登记 5.2 的补位、换同文件组下一行。已冻结的几棵 E171 树里还是旧行，不受影响；之后从今天的树取快照重跑 E171，第 33 行跑的就是补位那一行，`replay.sh` 的 exact 比对会在那一行上不同。
 
 ## P5　E156 装置
 
@@ -194,7 +194,7 @@ y2 就是正文第二节已记那一形（checker 只在 `crates/singlefs-checke
 
 ## P6　变异行
 
-副本上 `python3 research/scripts/crates-mutation-rows.py static-check .` 末行原样：「CHECKED	2817	298	9」，只报一行问题：第 1352 行 litmus 文件不在冻结副本里（副本只有 `crates/` 与两份 Cargo 文件，不是这一轮的行）（`research/prompts/m3-formal-code-b33-r1-opus-model/out/mutation-rows-static-check.log:2`：「文件 litmus/publish-returns-after-the-rotation-barrier.litmus 不存在」）。按名字挑出的这一轮 25 行（第 2745、2746、2774–2791、2793–2795、2821、2822 行），点名的测试函数各在 1 个文件里。原文相同的几组：F1 三行（第 2777–2779 行）同一处改法分别点名 B、A、第 0 代三条用例；R3 两行（第 2788、2793 行）、B3 两行（第 2789、2794 行）同一处改法分别点名两条 812 用例——P3 表里这几种改法下各自点名的用例都红，没有一组是靠同一条用例一起错。没打中。
+副本上 `python3 scripts/crates-mutation-rows.py static-check .` 末行原样：「CHECKED	2817	298	9」，只报一行问题：第 1352 行 litmus 文件不在冻结副本里（副本只有 `crates/` 与两份 Cargo 文件，不是这一轮的行）（`research/prompts/m3-formal-code-b33-r1-opus-model/out/mutation-rows-static-check.log:2`：「文件 litmus/publish-returns-after-the-rotation-barrier.litmus 不存在」）。按名字挑出的这一轮 25 行（第 2745、2746、2774–2791、2793–2795、2821、2822 行），点名的测试函数各在 1 个文件里。原文相同的几组：F1 三行（第 2777–2779 行）同一处改法分别点名 B、A、第 0 代三条用例；R3 两行（第 2788、2793 行）、B3 两行（第 2789、2794 行）同一处改法分别点名两条 812 用例——P3 表里这几种改法下各自点名的用例都红，没有一组是靠同一条用例一起错。没打中。
 
 ## P1　32-1 的 B3、B4
 
@@ -234,6 +234,6 @@ y2 就是正文第二节已记那一形（checker 只在 `crates/singlefs-checke
 
 ## 引文核对
 
-`python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b33-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b33-r1/tree --root . --background research/prompts/_m3-formal-code-b33-r1-background.md` 末行见下一行（交回前现跑）。
+`python3 scripts/cite-check.py research/prompts/m3-formal-code-b33-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b33-r1/tree --root . --background research/prompts/_m3-formal-code-b33-r1-background.md` 末行见下一行（交回前现跑）。
 
 「✓ 核了 49 处引文，对上 49 处，没判 0 处（逐处列在上面）」

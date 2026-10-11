@@ -4,7 +4,7 @@
 # GPU 那几行（2938–2942）要 checker 档包与 GPU 卡，子 agent 不跑，这里只核锚点与参数筛。
 #
 # 环境变量：
-#   SINGLEFS_REPO  仓路径（取 research/scripts/run-with-memory-cap.sh 与 capped.sh）；必须给
+#   SINGLEFS_REPO  仓路径（取 scripts/run-with-memory-cap.sh 与 capped.sh）；必须给
 #   M3B27_TREE     冻结副本，默认 /tmp/claude-1000/m3-batch27-code-r1/tree
 #   M3B27_OUT      输出目录，默认 mktemp 新建；已存在且非空就停
 # 编译 6G、跑 4G，线程上限 15；编译目录在输出目录里（自己的 target）。
@@ -16,8 +16,8 @@ tree="${M3B27_TREE:-/tmp/claude-1000/m3-batch27-code-r1/tree}"
 out="${M3B27_OUT:-$(mktemp -d /tmp/claude-1000/m3-batch27-code-r1-sonnet-rerun.XXXXXX)}"
 mkdir -p "$out"
 if [ -n "$(ls -A "$out")" ]; then echo "输出目录 $out 非空" >&2; exit 2; fi
-cap="$SINGLEFS_REPO/research/scripts/run-with-memory-cap.sh"
-capped="$SINGLEFS_REPO/research/scripts/capped.sh"
+cap="$SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
+capped="$SINGLEFS_REPO/scripts/capped.sh"
 export CARGO_TARGET_DIR="$out/target"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="派发提示规定编译 6G、跑 4G，显式写上限不用 auto"
 results="$out/results.txt"

@@ -4,9 +4,9 @@
 
 ## 复跑
 
-模型目录 `research/prompts/m3-batch57-code-r1-opus-model/`。从空目录起（模型目录拷出仓用时设 `SINGLEFS_SCRIPTS=<仓根>/research/scripts`；`SINGLEFS_REPO` 缺省就是这一轮的冻结副本）：
+模型目录 `research/prompts/m3-batch57-code-r1-opus-model/`。从空目录起（模型目录拷出仓用时设 `SINGLEFS_SCRIPTS=<仓根>/scripts`；`SINGLEFS_REPO` 缺省就是这一轮的冻结副本）：
 ```
-SINGLEFS_SCRIPTS=$PWD/research/scripts OPUS_THREADS=10 OPUS_MEMORY_CAP=4G \
+SINGLEFS_SCRIPTS=$PWD/scripts OPUS_THREADS=10 OPUS_MEMORY_CAP=4G \
   bash research/prompts/m3-batch57-code-r1-opus-model/rerun.sh <空工作目录> all
 ```
 `all` 依次跑 `rerun.sh <工作目录> list` 列的 41 个阶段与 compare：base-build、base-fast（被判的四份用例在副本上照绿）、base-slow（两份用例的四条慢档）、k1-random-b1…b4（旋钮 ≥ 2 的随机历史）、k4-middle、k3-probe、7 个 `mut-*`（我的 6 种改坏与第 57 批 H4 两行）、25 个 `row-*`（第 57 批变异表里不碰 `.wgsl` 的 25 行，照各行自己的 cargo 参数跑，看点名的测试红没红）。只拷冻结副本的 `Cargo.toml`、`Cargo.lock`、`crates/`；原型 crate `probe-crate/` 拷成副本工作区成员 `crates/opus-probe-b57`（测试目标名不带 layer0）；`probes/corrupt_on_disk_k3_append.rs` 接到副本里 `corrupt_on_disk_content_is_refused_instead_of_panicking.rs` 末尾。base、mutw、mutr 三个副本各用自己的 `CARGO_TARGET_DIR`，同一时刻一条 cargo，每条经 `capped.sh` 与 `run-with-memory-cap.sh`。前台有超时的环境按阶段名分几次起、同一个工作目录接着跑。挂钟（本机负载 11–23 下）：编译约 1 分钟，base 与原型阶段约 12 分钟，变异与 25 行约 12 分钟。
@@ -365,7 +365,7 @@ GPU H1 那 3 行原文与替换文相同的核法（冻结副本的变异表）�
 - 没改冻结副本与主工作区的任何被判文件；写的只有这份报告与模型目录。
 
 ## 交回前的复跑
-模型目录定稿之后（开头那张 sha256 表），在空目录 `~/.local/share/singlefs/work/m3-batch57-code-r1-opus/run3/` 里从头跑全部阶段（`SINGLEFS_SCRIPTS=/home/fy5090/code/singlefs/research/scripts OPUS_THREADS=10 OPUS_MEMORY_CAP=4G`，`SINGLEFS_REPO` 取缺省的冻结副本；前台按阶段名分 12 次起，其中第 10 次越过 240 秒被改放到后台、等完成通知后接着起），compare 的原样输出：
+模型目录定稿之后（开头那张 sha256 表），在空目录 `~/.local/share/singlefs/work/m3-batch57-code-r1-opus/run3/` 里从头跑全部阶段（`SINGLEFS_SCRIPTS=/home/fy5090/code/singlefs/scripts OPUS_THREADS=10 OPUS_MEMORY_CAP=4G`，`SINGLEFS_REPO` 取缺省的冻结副本；前台按阶段名分 12 次起，其中第 10 次越过 240 秒被改放到后台、等完成通知后接着起），compare 的原样输出：
 ```
 一致 base-build.txt
 一致 base-fast.txt

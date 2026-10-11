@@ -8,7 +8,7 @@
 bash research/prompts/m3-batch10z-pqrs-code-r1-opus-model/rerun.sh [<工作目录>]
 ```
 
-它从冻结副本拷一份仓，用 `assemble.sh` 把冻结副本里的 `crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 与 `atk_part*.rs` 拼成新测试目标 `atk_pqrs_opus`（只借原文件的搭建函数，攻方用例都以 `atk_` 开头、`#[ignore]`），release 编，逐件经 `research/scripts/run-with-memory-cap.sh` 跑（每件 3G、一次一件；编译 12G），输出落 `<工作目录>/runs/`；最后跑四个攻方自己的变异（`mutants.py`，原文恰好命中一次才改，否则退 3）。整份约 15 分钟（推的：各件这一轮实测 3–150 秒相加）。这一轮的原始输出在模型目录 `runs/`。
+它从冻结副本拷一份仓，用 `assemble.sh` 把冻结副本里的 `crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 与 `atk_part*.rs` 拼成新测试目标 `atk_pqrs_opus`（只借原文件的搭建函数，攻方用例都以 `atk_` 开头、`#[ignore]`），release 编，逐件经 `scripts/run-with-memory-cap.sh` 跑（每件 3G、一次一件；编译 12G），输出落 `<工作目录>/runs/`；最后跑四个攻方自己的变异（`mutants.py`，原文恰好命中一次才改，否则退 3）。整份约 15 分钟（推的：各件这一轮实测 3–150 秒相加）。这一轮的原始输出在模型目录 `runs/`。
 
 模型目录文件的 sha256（`sha256sum` 原样）：
 
@@ -330,7 +330,7 @@ K1 的几件（203 + 24 格）与变异各单独前台跑，各 4–35 秒。编
 
 ## 引文核对
 
-`python3 research/scripts/cite-check.py research/prompts/m3-batch10z-pqrs-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1/tree --root /home/fy5090/code/singlefs` 末行原样：
+`python3 scripts/cite-check.py research/prompts/m3-batch10z-pqrs-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1/tree --root /home/fy5090/code/singlefs` 末行原样：
 
 ```
   ✓ 核了 11 处引文，对上 11 处，没判 0 处（逐处列在上面）

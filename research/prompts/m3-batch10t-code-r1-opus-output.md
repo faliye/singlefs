@@ -68,7 +68,7 @@ bash research/prompts/m3-batch10t-code-r1-opus-model/run.sh ~/.local/share/singl
 
 命令（草稿目录副本）与原样输出：
 ```
-CARGO_TARGET_DIR=$D/target nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 12 cargo test --offline -p singlefs-harness --test opus_ledger_attack_model -- --nocapture --test-threads 1
+CARGO_TARGET_DIR=$D/target nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 12 cargo test --offline -p singlefs-harness --test opus_ledger_attack_model -- --nocapture --test-threads 1
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.99s
 MODEL scenario=s1 configured=Some(32607) arm=today capacity_at_open=30047 outsider=20000 outcome=booked=30047 card_demand=52607 card_total=32607 over_mib=20000
 MODEL scenario=s1 configured=None arm=today capacity_at_open=21893 outsider=20000 outcome=booked=21893 card_demand=44453 card_total=32607 over_mib=11846
@@ -283,7 +283,7 @@ I-2.4 行实现列有一般句「走读不跟随的指针 I-2.4 不判」（`.cl
 
 扫法原样拷进 harness 档原型（`build_scan_bypass_test.sh` 照冻结副本第 21–30、62–68、89–424 行拼），命令与原样输出：
 ```
-CARGO_TARGET_DIR=$D/target nice -n 19 bash research/scripts/run-with-memory-cap.sh 4G bash research/scripts/capped.sh 12 cargo test --offline -p singlefs-harness --test opus_scan_bypass_model -- --nocapture
+CARGO_TARGET_DIR=$D/target nice -n 19 bash scripts/run-with-memory-cap.sh 4G bash scripts/capped.sh 12 cargo test --offline -p singlefs-harness --test opus_scan_bypass_model -- --nocapture
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 MODEL scenario=k4-2 sample=plain_call lines_found=[2]
 MODEL scenario=k4-2 sample=raw_c_string_with_a_backslash lines_found=[]

@@ -35,7 +35,7 @@
 
 ## 二、被测条款与它引的定义
 
-被测三处（D8（核心索引结构） 已定项 6、I-9.29、C479）与它们引到的两处定义（I-9.18 的「在谱系上」、D23（journal 的角色与格式） 已定项 14 的回退「水位」一格），由 `research/scripts/quote-kb.py` 整段抽出（出口 `/home/fy5090/.local/share/singlefs/work/m3-3-5-W-design/quote-sec2.md`，回读逐字节一致），原样追加：
+被测三处（D8（核心索引结构） 已定项 6、I-9.29、C479）与它们引到的两处定义（I-9.18 的「在谱系上」、D23（journal 的角色与格式） 已定项 14 的回退「水位」一格），由 `scripts/quote-kb.py` 整段抽出（出口 `/home/fy5090/.local/share/singlefs/work/m3-3-5-W-design/quote-sec2.md`，回读逐字节一致），原样追加：
 
 **出处 `.claude/kb/decisions/08-核心索引结构.md:152-224`（整段抄，未转述）**
 
@@ -283,7 +283,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 变异表：`crates/mutations.tsv` 第 717 行，名字「实三（D23 已定项 14「水位」）：回退那次的 inode 号水位只取环里读得出的根，不与内存里现行那一版的取 max」，原文 `ring.max(current.inode_number_watermark())` 那三行，替换成 `|ring| ring`。
 
-`research/e7-index-bench` 不依赖 `crates/`（`research/e7-index-bench/Cargo.toml` 的 `[dependencies]` 只有 `aes-gcm`、`chacha20poly1305`）。
+`scripts/experiments` 不依赖 `crates/`（`scripts/experiments/Cargo.toml` 的 `[dependencies]` 只有 `aes-gcm`、`chacha20poly1305`）。
 
 ## 四、跑之前已经存在的数
 
@@ -346,11 +346,11 @@ F2 的比重（份数，三张操作表各和为 100；`rollback_targets: Fourth
 
 ### 装置写在哪（写死）
 
-装置写在**仓副本**里的 `crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs`：不走 `research/e7-index-bench/src/bin/`（那份 crate 不依赖 `crates/`，独立模型答不了「今天这份代码的产品路径能不能退」——这条岔路问的就是 `crates/` 今天的性质），也不改主工作区的 `crates/`（形式化线冻结期）。执行员在自己的草稿目录里拷一份仓（不带 `target/`；不用 `git worktree`），只在副本里加这一个文件；V1、V2、V717 在副本里逐个施加、跑完还原，施加前后记被改文件的 `sha256sum`。
+装置写在**仓副本**里的 `crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs`：不走 `scripts/experiments/`（那份 crate 不依赖 `crates/`，独立模型答不了「今天这份代码的产品路径能不能退」——这条岔路问的就是 `crates/` 今天的性质），也不改主工作区的 `crates/`（形式化线冻结期）。执行员在自己的草稿目录里拷一份仓（不带 `target/`；不用 `git worktree`），只在副本里加这一个文件；V1、V2、V717 在副本里逐个施加、跑完还原，施加前后记被改文件的 `sha256sum`。
 
 - **副本基线**（修订 2 改，原文与依据见第十二节修订 2）：等派发提示写明根环线这一批已合入、主工作区停下，执行员拷一份冻结副本，第一段、第二段都在这一份上跑，基线就是拷的那一刻的这一份。拷的范围照修订 1 第 6 条：`Cargo.toml`、`Cargo.lock`、`.cargo/`、`crates/`（不带 `target/`）。拷之前在主工作区记 `git rev-parse HEAD`、`git diff HEAD -- crates | sha256sum`、`git status --short -- crates | sha256sum` 与这四样下全部文件的 `sha256sum` 清单；拷完在主工作区再取一次清单、在副本里（放装置文件之前）取一次清单，三份逐行相同才算拷成，不同就删副本重拷。副本那份清单落产物目录 `baseline-frozen-crates.sha`，三行与核对结果落 `baseline-frozen-crates.out`（写法见第十二节修订 2 第 2 条）。拷完之后主工作区再变，不作废、不停跑，只在两段都跑完时附带记一笔漂移的文件数，不进任何判据。
 - **装置要读 `crates/` 的常量**（照入库装置的写法：逐个写成装置里的本地常量，再加一条回比断言，不直接引）：`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`（本地 `7_463_871_032_432_355_113`）、`singlefs_core::transaction::FIRST_INODE_NUMBER`（本地 1）。条款给的锚点（第七节 A1–A3）不读 `crates/`，写成本地常量、只与跑出来的数比。
-- 跑法：`cargo test --release -p singlefs-harness --test e175_product_path_inode_watermark_regression`，经 `research/scripts/run-with-memory-cap.sh`、`nice -n 19`；装置自己按 `research/scripts/host-resources.py --json` 报的可用核数与内存起工作线程（每线程预留 1 GiB），合并按族、臂、序号次序，结果与单线程逐字相同（小规模对拍一次，进装置的快档用例）。
+- 跑法：`cargo test --release -p singlefs-harness --test e175_product_path_inode_watermark_regression`，经 `scripts/run-with-memory-cap.sh`、`nice -n 19`；装置自己按 `scripts/host-resources.py --json` 报的可用核数与内存起工作线程（每线程预留 1 GiB），合并按族、臂、序号次序，结果与单线程逐字相同（小规模对拍一次，进装置的快档用例）。
 - 产物：`research/results/e175-product-path-inode-watermark-regression-<日期>/`，内含装置源码原样一份、三份补丁、副本基线三行、每段历史一行的结果（族、臂、种子或序列号、各量、结局）、汇总表。三方规则「副本上的数要在入库的装置上重做一次才能引」照办：冻结期解除之前，kb 引这些数要写明「仓副本装置」；装置要不要进 `crates/` 由主 agent 定。
 
 ### 分段（按岔路排序；每段交回之后主 agent 对着 W 行判续不续）
@@ -490,7 +490,7 @@ V3–V5 在装置文件头逐个列开关名、弄坏哪一处、打开后哪条
 
 1. **S3 路 2 的「所选根」**：执行器的会话不对观察者开放（`StepObservation` 只给 `image` 与 `model`），按第六节 S3 写的退路取「IdealModel 记的所选根」：模型的 `answer_mount_writable` 取它根环里最新那条（`crates/singlefs-harness/src/model.rs:2235`），装置取上一步观察时 `model.committed_versions()` 里最大的 `ModelRootKey`。两条路都取得到，没有改成逐事件人工核。
 2. **S1 的根键**：用根记录全部字段的 `Debug` 串（根槽解出来的每一个字段）代替根槽字节的 sha256；同一身份出现两份不同内容另数（`s1_identity_conflicts`，第一段各族各臂都是 0）。
-3. **工作线程数**：取派发提示「线程上限：8（同时在跑：主 agent 的崩溃放量、E176、E177 执行员）」那一句的 8，没有按 `research/scripts/host-resources.py --json` 报的 32 个可用核起。
+3. **工作线程数**：取派发提示「线程上限：8（同时在跑：主 agent 的崩溃放量、E176、E177 执行员）」那一句的 8，没有按 `scripts/host-resources.py --json` 报的 32 个可用核起。
 4. **第九节 V4 的作用处**：「S3 每条根都判成被崩溃恢复抛弃」只作用在给发号事件分类（Q1 / Q3b、Q9）的那一处，择现行那一版与两路比对不受它影响。依据的单测读数：第一版写在 S3 的每一处，V1 臂打开它时 `rollback_one_step_then_create_matches_the_arm` 红在 A4（`left: [[], []]`，现行那一版没了），不在登记写的 A5；收窄之后红在「A5：Q1 恰好 1」（`left: 0`、`right: 1`），同一段打印 `q1=0 q3b=1`，与第九节 V4 那一行写的输出变化相同。
 5. **第七节 A3 / A5 的取样点**：D2(4) 回退到 (实例 1, txg 3)，也就是第一个文件还活着的那一版，之后那次 `CreateInode` 执行器不调（只在第一个文件已删完的一版上建），A3 那一格没有样本；D2(5)、D2(6) 的回退没做成。依据的单测读数：`D2(4) arm=P ending=completed issued=[[2], [3]] rollbacks_applied=1 rollback_targets=[((1, 3), Some(2))] q1=0 q3b=0`。A3 在 k = 1、2、3 上钉（P、V717 臂发 4），A5 的「发的号 = 目标那一版水位」在 V1 臂 k = 1、2、3 上钉，原文不动。
 6. **仓副本**：只拷构建要的 `Cargo.toml`、`Cargo.lock`、`.cargo/`、`crates/`（不带 `target/`，`research/` 不进副本）；副本 `crates/` 336 个文件与主工作区逐个 sha256 相同，三臂跑完之后再比一次仍相同（产物 `baseline.out`）。
@@ -505,9 +505,9 @@ V3–V5 在装置文件头逐个列开关名、弄坏哪一处、打开后哪条
    - `baseline-frozen-crates.sha`：副本里放装置文件之前，在副本根目录跑 `find Cargo.toml Cargo.lock .cargo crates -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum` 的原样输出（路径相对副本根）。主工作区拷前、拷后两份清单用同一条命令在仓根取。
    - `baseline-frozen-crates.out`，每行一条：`name=frozen_copy`，字段 `date`、`root_ring_batch`（派发提示给的批次名或提交号原样）、`git_head`、`diff_head_crates_sha256`、`status_short_crates_sha256`、`file_count`、`sha_list_sha256`（`baseline-frozen-crates.sha` 的 `sha256sum`）、`main_before_copy_equal`、`main_after_copy_equal`（两份主工作区清单各与副本清单逐行比，都是 `true` 才开跑）、`device_source_sha256`；每一臂开跑前、还原后各一行 `name=arm_check`，字段 `segment`、`arm`、`phase`、`listed_mismatch`、`extra_files`、`patched_file_sha256`；两段都跑完后一行 `name=main_drift_after_copy`，字段 `files_changed`、`files_added_or_removed`（附带，不进任何判据）。
    - 冻结副本上 V1、V2 两处原文（第九节）各 `grep -c` 一次，必须恰好 1 处；V717 按 `crates/mutations.tsv` 里名字「实三（D23 已定项 14「水位」）：回退那次的 inode 号水位只取环里读得出的根，不与内存里现行那一版的取 max」那一行找，不按第 717 行这个行号找，原文在 `mount.rs` 里恰好 1 处。三处各自的行号写进 `baseline-frozen-crates.out`（`name=mutation_anchor`）；与第三节、第九节写的行号不同不算不符，原文不是恰好 1 处才走第十一节停机。
-   - 产物里写明是哪份代码：每份结果文件（文件头）与每一行汇总行带 `code_baseline=<sha_list_sha256>`；`research/scripts/replay.sh` 的 E175 那一行只留 `E7RESULT` 行比对，文件头不得写成 `E7RESULT` 行。实验页「产物清单」「读数」两节写明「冻结副本 `code_baseline=…`，拷于 <日期>，根环线 <批次> 合入之后」。
+   - 产物里写明是哪份代码：每份结果文件（文件头）与每一行汇总行带 `code_baseline=<sha_list_sha256>`；`scripts/replay.sh` 的 E175 那一行只留 `E7RESULT` 行比对，文件头不得写成 `E7RESULT` 行。实验页「产物清单」「读数」两节写明「冻结副本 `code_baseline=…`，拷于 <日期>，根环线 <批次> 合入之后」。
 3. **几何四点**（补齐）：第五节「分段」第二段写「三个点」、「预计挂钟」写「几何三点约 1.8 万步」，配的命令是 `64*150+64*60+32*150` = 18 240，少了 G-draw；第八节那张表是四个点。照用户「四点」改第五节，第八节不动。核算：`python3 -c "print(64*150+64*60+64*60+32*150, 32*150)"` 应输出 `22080 4800`。
-4. **第一段旧产物的处置**（补齐，让新旧两份不混）：重跑第一段的第一份新产物落盘之前，执行员把产物目录 `research/results/e175-product-path-inode-watermark-regression-2026-10-08/` 里现有的 19 份（`ls -1 | wc -l` 数出 19：`baseline.out`、`baseline-segment-two.out`、`device-source.rs`、`d-P.out`、`d-P-replay.out`、`d-V1.out`、`d-V2.out`、`f2-P.out`、`f2-V1.out`、`f2-V2.out`、`f3a-P.out`、`f3a-V1.out`、`f3a-V2.out`、`patch-V1.diff`、`patch-V2.diff`、`quick-tests.out`、`summary-segment-one.out`、`trial-f2-P-first-8-seeds.out`、`trial-f3a-P-8-long-sequences.out`）原样挪进产物目录下的 `superseded-old-crates/`，不改内容、不删；挪之前、挪之后各取一次这 19 份的 `sha256sum`，逐行相同才往下。第一段那份代码的清单 `~/.local/share/singlefs/work/e175-runner/main-crates.sha`（336 行）拷进去成 `superseded-old-crates/old-crates.sha`，旧数是哪份代码上的就在仓里有出处。实验页写明：`superseded-old-crates/` 下是第一段那份 `crates/`（`old-crates.sha`）上的数，不进 W 行判决、不进任何量的合计，正文引它们时写「旧代码上的数」。新产物照原文件名落回产物目录顶层，目录名不改，`research/scripts/replay.sh` 第 362 行与 `driver_e175` 指的 `d-P-replay.out`、`device-source.rs` 路径不变；挪完到新的这两份落盘之间 replay 那一行指不到文件，挪与落新产物由同一位执行员在同一次派发里做完。
+4. **第一段旧产物的处置**（补齐，让新旧两份不混）：重跑第一段的第一份新产物落盘之前，执行员把产物目录 `research/results/e175-product-path-inode-watermark-regression-2026-10-08/` 里现有的 19 份（`ls -1 | wc -l` 数出 19：`baseline.out`、`baseline-segment-two.out`、`device-source.rs`、`d-P.out`、`d-P-replay.out`、`d-V1.out`、`d-V2.out`、`f2-P.out`、`f2-V1.out`、`f2-V2.out`、`f3a-P.out`、`f3a-V1.out`、`f3a-V2.out`、`patch-V1.diff`、`patch-V2.diff`、`quick-tests.out`、`summary-segment-one.out`、`trial-f2-P-first-8-seeds.out`、`trial-f3a-P-8-long-sequences.out`）原样挪进产物目录下的 `superseded-old-crates/`，不改内容、不删；挪之前、挪之后各取一次这 19 份的 `sha256sum`，逐行相同才往下。第一段那份代码的清单 `~/.local/share/singlefs/work/e175-runner/main-crates.sha`（336 行）拷进去成 `superseded-old-crates/old-crates.sha`，旧数是哪份代码上的就在仓里有出处。实验页写明：`superseded-old-crates/` 下是第一段那份 `crates/`（`old-crates.sha`）上的数，不进 W 行判决、不进任何量的合计，正文引它们时写「旧代码上的数」。新产物照原文件名落回产物目录顶层，目录名不改，`scripts/replay.sh` 第 362 行与 `driver_e175` 指的 `d-P-replay.out`、`device-source.rs` 路径不变；挪完到新的这两份落盘之间 replay 那一行指不到文件，挪与落新产物由同一位执行员在同一次派发里做完。
 5. **挂钟重算与试跑**（第五节「预计挂钟」）：重算见那一节「修订 2 重算」一条，数由 `python3 -c "f3a_p=143335; f2_p=256*60; f3a_v=11566; f2_v=64*60; s1=(f3a_p+2*f3a_v)*0.04037+(f2_p+2*f2_v)*0.19348; n=4*128*30+2*4*32*30+64*150+64*60+64*60+32*150+32*150; print(f3a_p+f2_p+2*(f3a_v+f2_v), round(s1), round(s1/8/60,1), n, round(n*0.19348/8/60,1), round(3*n*0.19348/8/60,1))"` 算出，输出 `189507 11178 23.3 49920 20.1 60.4`。收严：冻结副本上重跑第一段照第五节先试跑 F2 的 P 前 8 个种子（代码变了，第一段那次的每步读数不替新代码作保）；第二段另先试跑 G-long 的 P 前 4 个种子（600 步），量 150 步历史的每步挂钟。任一外推超过 2 小时就停下交回主 agent 分片，不缩登记的历史数。
 
 ## 十三、读过的文件与跑过的命令
@@ -536,11 +536,11 @@ V3–V5 在装置文件头逐个列开关名、弄坏哪一处、打开后哪条
 - `crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs:1526-1540`。
 - `crates/singlefs-checker/src/walk.rs`：10370-10420、10490-10630、10509-10513，grep 命中 57、10034、10387、10409、10509、10562、10571、10616、11668-11701 间各行、6420、7080、9973、10947、10955、10381、10496、10607、10623；awk 取 10380、10392、10490、10503、10508、10594、10606。
 - `crates/singlefs-checker/src/image.rs`：grep 命中 181、280，`^pub fn` 行（430-1517 间）。
-- `research/e7-index-bench/Cargo.toml`（`[dependencies]` 段与前 60 行）、`research/Cargo.toml`、`Cargo.toml:1-40`、`research/prompts/m3-c651-r1-opus-model/c651proto/Cargo.toml` 第 9-13 行（grep）、`crates/singlefs-checker-tier/Cargo.toml` 第 2、6、9-14 行（grep）。
+- `scripts/experiments/Cargo.toml`（`[dependencies]` 段与前 60 行）、`scripts/experiments/Cargo.toml`、`Cargo.toml:1-40`、`research/prompts/m3-c651-r1-opus-model/c651proto/Cargo.toml` 第 9-13 行（grep）、`crates/singlefs-checker-tier/Cargo.toml` 第 2、6、9-14 行（grep）。
 - `.claude/hooks/heavy-test-guard.sh:1-80`（去空行）。
 - `records/2026-09-27-验证两档拆分.md:95`；`records/2026-10-01-删除与并发事务.md` 第 350、365、389、404、935、956、959、1225、1231 行（grep 命中）。
 - `.claude/gate.d/fixtures/harness-model-differential-and-scenarios.sh/model-differential-green/model-differential-cargo-output.log` 第 2、5、86、152、220、418 行。
-- `research/scripts/claim-experiment.sh` 文件头注释；`research/scripts/quote-kb.py --help` 输出。
+- `scripts/claim-experiment.sh` 文件头注释；`scripts/quote-kb.py --help` 输出。
 
 没读：`.claude/kb/experiments/`、`research/results/`、实验索引与实验变更史；全仓搜 `random_histories` 时排了 `experiments`、`results`、`prompts`、`target` 目录与 `experiments.md`、`experiments-history.md`。
 
@@ -551,12 +551,12 @@ awk -F'\t' 'NR==717{for(i=1;i<=NF;i++) print i": "$i}' crates/mutations.tsv
 grep -c '} + new_inodes_of_this_publish;' crates/singlefs-core/src/transaction.rs
 grep -c 'version_to_publish_the_rollback_after(current, &target_version, inode_number_watermark);' crates/singlefs-core/src/mount.rs
 grep -rln 'random_histories' --exclude-dir=experiments --exclude-dir=results --exclude-dir=prompts --exclude-dir=target --exclude=experiments.md --exclude=experiments-history.md .
-bash research/scripts/claim-experiment.sh --next
-bash research/scripts/claim-experiment.sh E175 '产品路径上 inode 号水位退回与重发号'
-nice -n 19 python3 research/scripts/quote-kb.py $D/quote-sec2.md '.claude/kb/decisions/08-核心索引结构.md@#### 已定项 6：inode 树的叶是码 3 打包记录单元，记录定长 140，已发布的 (inode 号, 对象出生代) 不复用' '.claude/kb/invariants.md~^\| I-9\.29 \|' '.claude/kb/invariants.md~^\| I-9\.18 \|' '.claude/kb/checks-owed.md~^\| C479 \|' '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换'
+bash scripts/claim-experiment.sh --next
+bash scripts/claim-experiment.sh E175 '产品路径上 inode 号水位退回与重发号'
+nice -n 19 python3 scripts/quote-kb.py $D/quote-sec2.md '.claude/kb/decisions/08-核心索引结构.md@#### 已定项 6：inode 树的叶是码 3 打包记录单元，记录定长 140，已发布的 (inode 号, 对象出生代) 不复用' '.claude/kb/invariants.md~^\| I-9\.29 \|' '.claude/kb/invariants.md~^\| I-9\.18 \|' '.claude/kb/checks-owed.md~^\| C479 \|' '.claude/kb/decisions/23-journal的角色与格式.md@#### 已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换'
 python3 -c "print(sum(11**L for L in range(5)), 14641*9+1331*8+121*7+11*6+5, sum(11**L for L in range(4)), 1*5+11*6+121*7+1331*8, 256*60, 64*60, 4*128*30, 4*32*30, 64*150+64*60+32*150)"
 python3 -c "print([2+i for i in range(3)])"
 nproc; free -g | head -2
-python3 research/scripts/replace-batch.py --dry-run $D/fix1.json && python3 research/scripts/replace-batch.py $D/fix1.json   # 另 fix2、fix3 同形，只改本登记里的行号与措辞
+python3 scripts/replace-batch.py --dry-run $D/fix1.json && python3 scripts/replace-batch.py $D/fix1.json   # 另 fix2、fix3 同形，只改本登记里的行号与措辞
 ```
 最后两条 `python3 -c` 的输出：`16105 143335 1464 11566 15360 3840 15360 3840 18240` 与 `[2, 3, 4]`。

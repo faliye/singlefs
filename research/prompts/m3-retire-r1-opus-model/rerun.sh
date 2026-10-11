@@ -2,7 +2,7 @@
 # m3-retire-r1 攻方腿（opus）模型的复跑。路径一律从环境变量与参数取：
 #   RETIRE_R1_MODEL_DIR  模型目录（本目录）；SINGLEFS_REPO  拷 crates/ 改副本用的树（冻结树或仓根：要 Cargo.toml、Cargo.lock、.cargo、crates）。
 # 每一阶段由调用方整条经内存包装与线程上限起（copybuild 6G，其余 4G），例：
-#   S=<仓根>/research/scripts; export RETIRE_R1_MODEL_DIR=<本目录> SINGLEFS_REPO=<冻结树>
+#   S=<仓根>/scripts; export RETIRE_R1_MODEL_DIR=<本目录> SINGLEFS_REPO=<冻结树>
 #   bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 10 bash $RETIRE_R1_MODEL_DIR/rerun.sh <空的输出目录> copybuild
 #   bash $S/run-with-memory-cap.sh 4G bash $S/capped.sh 10 bash $RETIRE_R1_MODEL_DIR/rerun.sh <输出目录> copyrun
 # 阶段（按这个次序各跑一次就是全量）：copybuild copyrun demo sweep-0 sweep-1 sweep-2 sweep-3 sweep-4

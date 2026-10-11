@@ -1,6 +1,6 @@
 # 判决：回扫员阶段同步改成「事实表 + 逐行判」，三方第一轮（sweep-rel-r1，2026-09-19）
 
-被判的定义：`.claude/agents/sweep.md`（输入一节「阶段同步」、第 7–11 步、产出、没做什么）、`.claude/main-agent.md`（「什么时候派哪个 agent」表「一个阶段任务结束」那一行）；另判 `research/scripts/stale-candidates.py`、`.claude/gate.d/73-research-gate-lint.sh` 与它的样本、`research/scripts/fixtures/stale-candidates-benchmark-facts.tsv`。
+被判的定义：`.claude/agents/sweep.md`（输入一节「阶段同步」、第 7–11 步、产出、没做什么）、`.claude/main-agent.md`（「什么时候派哪个 agent」表「一个阶段任务结束」那一行）；另判 `scripts/stale-candidates.py`、`.claude/gate.d/73-research-gate-lint.sh` 与它的样本、`scripts/fixtures/stale-candidates-benchmark-facts.tsv`。
 腿：Opus 攻方 `research/prompts/sweep-rel-r1-opus-output.md`（模型 `sweep-rel-r1-opus-model/`）、Sonnet 正推 `sweep-rel-r1-sonnet-output.md`、本地攻方 `sweep-rel-r1-local-attack-output-s1.md` / `-s2.md`；核查员 `sweep-rel-r1-verifier-output.md`（52 处 ✓ 48、✗ 2、核不动 2；两处 ✗ 都是行号引错、引文对，不改任何一格）。
 
 ## 一、逐格判定
@@ -26,8 +26,8 @@
 
 ## 二、写回（这一轮做完的）
 
-- `research/scripts/stale-candidates.py`：`--check-facts` 加三道闸——只改措辞行引的变更标题要看得出改措辞（`REWORDING_HEADING_WORDS`）、`&&` 只在第一个词自己超上限时许用、实事行在结束那一版不许零命中；上限 150 → 500；`--groups` 倒写、跨字母、写了表里没有的组都拒绝（退出码 2）；核对器要求理由引这一行至少 4 个字的原话；阳性对照钉死候选行数（4190 行、2821 个不同的行）并把下限提到 25；文件头加「管不到的」。自证 14 格 → 27 格；拿 Opus 腿的变异脚本与主 agent 按新锚点补的变异重跑，10 个非空变异全被抓（M9 被阳性对照抓）。
-- `research/scripts/fixtures/stale-candidates-benchmark-facts.tsv`：9 行多余的 `&&` 机械地退回第一个词（B1、B6、B13、B14、E1、F4、F7、G3、F7b），照 Opus 腿 T7；罩住 20 → 25。
+- `scripts/stale-candidates.py`：`--check-facts` 加三道闸——只改措辞行引的变更标题要看得出改措辞（`REWORDING_HEADING_WORDS`）、`&&` 只在第一个词自己超上限时许用、实事行在结束那一版不许零命中；上限 150 → 500；`--groups` 倒写、跨字母、写了表里没有的组都拒绝（退出码 2）；核对器要求理由引这一行至少 4 个字的原话；阳性对照钉死候选行数（4190 行、2821 个不同的行）并把下限提到 25；文件头加「管不到的」。自证 14 格 → 27 格；拿 Opus 腿的变异脚本与主 agent 按新锚点补的变异重跑，10 个非空变异全被抓（M9 被阳性对照抓）。
+- `scripts/fixtures/stale-candidates-benchmark-facts.tsv`：9 行多余的 `&&` 机械地退回第一个词（B1、B6、B13、B14、E1、F4、F7、G3、F7b），照 Opus 腿 T7；罩住 20 → 25。
 - `.claude/gate.d/73-research-gate-lint.sh`：`GATE_LINT_DIR` 指到第一个目标目录；样本下只扫样本自己（红：1 个脚本、1 条拒绝），真仓只扫 51 个目标脚本。
 - `.claude/agents/sweep.md`：第 7 步检索词要在基准与结束两版都命中、上限 500、`&&` 只在第一个词超上限时用、只改措辞要看得出；第 9 步日期改成「把日期删掉再读」的检验、冒号句逐个分句判、表格前置与检查列是现状句、理由引原话。
 - `.claude/main-agent.md`：逐行判的输入也给做成的事；复判从全部判定里抽 20 行、五种各至少 2 行，重派后对那一段再抽，抽不出判错为止。

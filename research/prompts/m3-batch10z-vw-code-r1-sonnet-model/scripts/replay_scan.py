@@ -2,7 +2,7 @@
 """replay_scan.py <gpu|crash> <行号…> : 把改动全文里第二十一块变异行的 旧串→新串 套到扫源码模型（replay/<kind>_model.rs），rustc 编、跑，报哪些用例红。"""
 import os, re, subprocess, sys
 W = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-tu-code-r1-sonnet')
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 S = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-tu-code-r1/tree/crates/singlefs-checker-tier/src/')
 kind = sys.argv[1]
 L = open('/home/fy5090/code/singlefs/research/prompts/_m3-batch10z-tu-code-r1-diff.md').read().split('\n')

@@ -9,7 +9,7 @@ import os, re, shutil, subprocess, sys
 FROZEN = "/tmp/claude-1000/m3-batch19-code-r1/tree"
 SNAPSHOT = "/home/fy5090/code/singlefs/research/prompts/m3-batch19-code-r1-snapshot/crates-sha256.txt"
 HERE = os.path.dirname(os.path.realpath(__file__))
-SCRIPTS = "/home/fy5090/code/singlefs/research/scripts"
+SCRIPTS = "/home/fy5090/code/singlefs/scripts"
 W = os.path.realpath(sys.argv[1])
 STAGE = sys.argv[2]
 WORK = f"{W}/work"

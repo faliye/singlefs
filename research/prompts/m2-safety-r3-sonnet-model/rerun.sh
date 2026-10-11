@@ -31,6 +31,6 @@ echo "==> 编译 + 跑（按项目纪律套内存与线程上限；这两个数�
 cd "$WORK_DIR"
 MEMORY_CAP="${SINGLEFS_RERUN_MEMORY_CAP:-10G}"
 THREAD_CAP="${SINGLEFS_RERUN_THREAD_CAP:-6}"
-bash "$REPO_ROOT/research/scripts/run-with-memory-cap.sh" "$MEMORY_CAP" \
-    bash "$REPO_ROOT/research/scripts/capped.sh" "$THREAD_CAP" \
+bash "$REPO_ROOT/scripts/run-with-memory-cap.sh" "$MEMORY_CAP" \
+    bash "$REPO_ROOT/scripts/capped.sh" "$THREAD_CAP" \
     cargo test -p singlefs-harness --test m2_safety_r3_defense_a1_a3_a4_c283 -- --nocapture --test-threads 1

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 复跑（m2-closeout-code-r3 云端攻方腿）：在快照 refs/sop/m2-closeout-code-r3-snapshot 的副本上加原型包 opus-r3-proto 跑，不动主工作区。
 # 用法（在仓根下）：bash research/prompts/m2-closeout-code-r3-opus-model/rerun.sh <草稿目录>
-# 线程上限 8、内存上限 8G（research/scripts/replay.sh 的缺省）。建四份副本：snapshot（原样）、fixB / fixC（原型 B、C 两个改法）、mut736（变异表第 736 行那条变异）。
+# 线程上限 8、内存上限 8G（scripts/replay.sh 的缺省）。建四份副本：snapshot（原样）、fixB / fixC（原型 B、C 两个改法）、mut736（变异表第 736 行那条变异）。
 # 1. checks.sh：快照自带的几份 harness 档用例、X6 字段逐格与盘体对调、X1 写行之后掉电加一槽坏、第 736 行变异下的新旧两个靶
 # 2. X6 旧快照 / 一槽坏 / 内容核对：snapshot、fixB、fixC 各跑一遍
 # 3. X5 ① 批 2、批 3（batch_x5.sh；共约 45 分钟），analyze_x5.py 分格
@@ -9,7 +9,7 @@ set -euo pipefail
 S=${1:?草稿目录}
 R=$(git rev-parse --show-toplevel)
 M=$R/research/prompts/m2-closeout-code-r3-opus-model
-CAP="bash $R/research/scripts/run-with-memory-cap.sh 8G bash $R/research/scripts/capped.sh"
+CAP="bash $R/scripts/run-with-memory-cap.sh 8G bash $R/scripts/capped.sh"
 mkdir -p "$S/logs"
 for arm in snapshot fixB fixC mut736; do
   mkdir -p "$S/$arm"

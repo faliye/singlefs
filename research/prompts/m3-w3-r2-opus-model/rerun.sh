@@ -9,14 +9,14 @@
 #   shard-<i>     原型：层 0 自己的分片 i/20（i = 0..19），A、B 两种历史各跑一遍；二十片合计约 35 分钟（长段，可选）
 #   merge         读二十份账本并起来（要先跑完 shard-0..19）
 #   compare       拿 $W/out 与模型目录 expected/ 比（去掉 elapsed_s 字段、只比 W3R2 开头的行、排序后比）；compare-quick 不比 merge 那一份
-# 编译与跑都经 research/scripts/run-with-memory-cap.sh（编译 6G、跑 4G），线程 6（research/scripts/capped.sh）。
+# 编译与跑都经 scripts/run-with-memory-cap.sh（编译 6G、跑 4G），线程 6（scripts/capped.sh）。
 set -euo pipefail
 W=${1:?工作目录}; PART=${2:?段}
 R=${SINGLEFS_REPO:?设 SINGLEFS_REPO 为仓根}
 M=${W3R2_MODEL_DIR:-$R/research/prompts/m3-w3-r2-opus-model}
 FROZEN=${FROZEN_TREE:-$HOME/.local/share/singlefs/work/m3-w3-r1/tree}
-CAP="bash $R/research/scripts/run-with-memory-cap.sh"
-THREADS="bash $R/research/scripts/capped.sh 6"
+CAP="bash $R/scripts/run-with-memory-cap.sh"
+THREADS="bash $R/scripts/capped.sh 6"
 REAL_CARGO=${REAL_CARGO:-$HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo}
 mkdir -p "$W/out"
 BIN=$W/target/release/w3-r2-attack

@@ -44,6 +44,6 @@
 
 交付：
 - 腿的报告写进 `research/prompts/m3-leaf-death-r2-<腿名>-output.md`，分段落盘：每次写进文件不超过 150 行，第一段排他新建，回复只写短句；早点开写。
-- 模型放 `research/prompts/m3-leaf-death-r2-<腿名>-model/`，`rerun.sh` 交回前在空目录里从头跑通一次；仓路径从环境变量 `SINGLEFS_REPO` 取，它要 `research/Cargo.toml` 的话写明；编译与跑都经 `research/scripts/run-with-memory-cap.sh`（编译 6G、跑 4G）；同一时刻只起一条 cargo；用自己的编译目录，不沿用别的树编过的编译目录。只跑 harness 档。可以从第一轮两腿的模型目录拷起。
+- 模型放 `research/prompts/m3-leaf-death-r2-<腿名>-model/`，`rerun.sh` 交回前在空目录里从头跑通一次；仓路径从环境变量 `SINGLEFS_REPO` 取，它要 `scripts/experiments/Cargo.toml` 的话写明；编译与跑都经 `scripts/run-with-memory-cap.sh`（编译 6G、跑 4G）；同一时刻只起一条 cargo；用自己的编译目录，不沿用别的树编过的编译目录。只跑 harness 档。可以从第一轮两腿的模型目录拷起。
 - 引 kb 条款写 kb 文件自己的行号；引代码写冻结树里的全路径:行号。
 - 方案按 `crates/` 今天的实现来谈。

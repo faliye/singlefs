@@ -9,14 +9,14 @@
 ```
 # 仓根。先拷一份冻结副本（冻结副本本身只读），编译目录单独一个，不与别的拷贝共用
 rsync -a --exclude target --exclude .git ~/.local/share/singlefs/work/m3-batch10z-e-code-r1/tree/ <拷贝>/
-bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 6 \
+bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 \
   bash research/prompts/m3-batch10z-e-code-r1-opus-model/run.sh <拷贝> <编译目录>
 # 改回去的探针（每条改完、跑完即还原）
-bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 6 python3 -I \
+bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 python3 -I \
   research/prompts/m3-batch10z-e-code-r1-opus-model/mutate_10ze.py <拷贝> <编译目录> H1-largest-is-the-last-judged H19-stop-with-one-waiting-block-stops …
-bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 6 env PYTHONDONTWRITEBYTECODE=1 python3 -I \
+bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 env PYTHONDONTWRITEBYTECODE=1 python3 -I \
   research/prompts/m3-batch10z-e-code-r1-opus-model/show_mutant_10ze.py <拷贝> <编译目录> H1-largest-is-the-last-judged
-bash research/scripts/run-with-memory-cap.sh 12G bash research/scripts/capped.sh 6 python3 -I \
+bash scripts/run-with-memory-cap.sh 12G bash scripts/capped.sh 6 python3 -I \
   research/prompts/m3-batch10z-e-code-r1-opus-model/rows_10ze.py <拷贝> <编译目录> 3329 3333 3335 3340 3341 3347 3348
 # 窗口宽度另按 RUST_BACKTRACE 不设、=1、=full 各跑一次 attack_10ze_window（output-window.txt）
 ```
@@ -110,7 +110,7 @@ WINDOW rust_backtrace=Some("1") panics=50 first_micros=7782 rest_median_micros=2
 WINDOW rust_backtrace=Some("full") panics=50 first_micros=8809 rest_median_micros=1134 rest_max_micros=1214
 ```
 
-默认钩子首次几十微秒、之后个位数微秒；设了 `RUST_BACKTRACE` 的进程首次 panic 要取、解回溯，约 8–9 毫秒。仓里的脚本、门禁阶段都不设它（`grep -rln RUST_BACKTRACE research/scripts .claude/gate.d crates` 没有输出），此刻环境里也没设。checker 档二进制更大，解回溯更慢是推的。活在展开时丢的局部量（缓冲、映射）没有等卡的 Drop，读码，推的。
+默认钩子首次几十微秒、之后个位数微秒；设了 `RUST_BACKTRACE` 的进程首次 panic 要取、解回溯，约 8–9 毫秒。仓里的脚本、门禁阶段都不设它（`grep -rln RUST_BACKTRACE scripts .claude/gate.d crates` 没有输出），此刻环境里也没设。checker 档二进制更大，解回溯更慢是推的。活在展开时丢的局部量（缓冲、映射）没有等卡的 Drop，读码，推的。
 
 **第一段（真的显存不够判红）**：`/home/fy5090/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wgpu-core-30.0.1/src/device/resource.rs:5420`：「self.valid.store(false, Ordering::Release);」与 `/home/fy5090/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wgpu-core-30.0.1/src/device/resource.rs:5424`：「device_lost_closure(DeviceLostReason::Unknown, message.to_string());」之间，设备已经无效、丢失还没记。另一段在这当中因设备无效失败：它的调用拿到的是 `DeviceError::Lost`（`/home/fy5090/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wgpu-core-30.0.1/src/device/mod.rs:357`：「Self::Lost => ErrorType::DeviceLost,」），这一类 wgpu 不交错误范围也不交没接住的处理（`/home/fy5090/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wgpu-30.0.1/src/backend/wgpu_core.rs:304`：「ErrorType::DeviceLost => return, // will be surfaced via callback」），所以它自己的范围里什么都没有；要是它连展开带记一起在这段里做完，就记成没丢、判红，与实现员写的一样。两行之间只有取一把锁，正常是微秒以下；能拉宽它的是丢设备那条线程恰在这两行之间被调走。量过此刻本机（6 条线程各量 1 秒，`nice -n 19`）两次相邻读钟之间被停的最长时长，两次分别约 2 ms、1 ms（`output-window.txt` 与 `output-models.txt` 的 GAP 行）。真 panic 那一段自己从 panic 到记下也要几微秒以上（上一段的数），所以要中，得丢设备那条线程被调走、同时另一段恰在那几毫秒里撞上无效设备、panic、展开完。推的，造不出：要卡。
 

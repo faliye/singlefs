@@ -29,7 +29,7 @@
 模型目录 `research/prompts/m3-leaf-death-r2-opus-model/`（自己写的，不是 E177 装置的拷贝；`copy/` 是放进仓副本的一个 harness 测试目标）。复跑（仓根；每条经内存包装，编译 6G、跑 4G，6 线程；同一时刻只起一条 cargo）：
 
 ```
-M=research/prompts/m3-leaf-death-r2-opus-model; S=research/scripts; O=<空目录>
+M=research/prompts/m3-leaf-death-r2-opus-model; S=scripts; O=<空目录>
 export SINGLEFS_REPO=/home/fy5090/.local/share/singlefs/work/m3-leaf-death-r1/tree
 bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 6 bash $M/rerun.sh $O build
 bash $S/run-with-memory-cap.sh 4G bash $S/capped.sh 6 bash $M/rerun.sh $O demos sweep-0

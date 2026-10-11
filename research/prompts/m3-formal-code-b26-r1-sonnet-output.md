@@ -198,12 +198,12 @@
 
 ## 六、要主 agent 跑的命令（我没跑的）
 
-- 判 J3 #7、#8、#9 是否仍对（根环线点名重跑那 8 条的同一件事）：`SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh <上限> cargo test --release -p singlefs-checker-tier --test crash_enumeration_new_pool_file_creation_stream --test crash_enumeration_sharded_across_processes --test a_publish_returns_only_after_the_system_configuration_rotation_is_durable`，工作目录仓根；看 `CHECKER` 行是否仍是日志里那 69 条、`unsharded_enumeration_prints_and_writes_byte_for_byte_what_it_did_before_sharding` 左值是否仍是 `7e64a883…`。
+- 判 J3 #7、#8、#9 是否仍对（根环线点名重跑那 8 条的同一件事）：`SINGLEFS_HEAVY_TESTS=commit bash scripts/run-with-memory-cap.sh <上限> cargo test --release -p singlefs-checker-tier --test crash_enumeration_new_pool_file_creation_stream --test crash_enumeration_sharded_across_processes --test a_publish_returns_only_after_the_system_configuration_rotation_is_durable`，工作目录仓根；看 `CHECKER` 行是否仍是日志里那 69 条、`unsharded_enumeration_prints_and_writes_byte_for_byte_what_it_did_before_sharding` 左值是否仍是 `7e64a883…`。
 - 判 J2-5 的取样与 C3 的第三截：`… cargo test --release -p singlefs-checker-tier --lib -- crash_injection::tests::first_crash_states`，另加 `--test crash_injection_read_faulted_states_never_hold_the_witness_criterion -- --include-ignored`。
 - 复跑我的东西（harness 档，几分钟）：`FROZEN=/tmp/claude-1000/m3-formal-code-b26-r1/tree REPO=$PWD WORK=<草稿> bash research/prompts/m3-formal-code-b26-r1-sonnet-model/tools/rerun.sh all`；只看静态那几格：`… rerun.sh static`（几秒）。
 
 ## 七、cite-check 末行
 
-`python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b26-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b26-r1/tree --root . --background research/prompts/_m3-formal-code-b26-r1-background.md` 末行：
+`python3 scripts/cite-check.py research/prompts/m3-formal-code-b26-r1-sonnet-output.md --root /tmp/claude-1000/m3-formal-code-b26-r1/tree --root . --background research/prompts/_m3-formal-code-b26-r1-background.md` 末行：
 
   ✓ 核了 86 处引文，对上 86 处，没判 0 处（逐处列在上面）

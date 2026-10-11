@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 用法：SINGLEFS_REPO=<冻结副本根（含 crates/）> SINGLEFS_MAIN_REPO=<主仓根，取 research/scripts/> bash rerun.sh <空的输出目录>   （前台约 3 分钟；同一时刻只起一条 cargo；每条 cargo 经内存包装 8G、线程 7）
+# 用法：SINGLEFS_REPO=<冻结副本根（含 crates/）> SINGLEFS_MAIN_REPO=<主仓根，取 scripts/> bash rerun.sh <空的输出目录>   （前台约 3 分钟；同一时刻只起一条 cargo；每条 cargo 经内存包装 8G、线程 7）
 # 复跑正推腿报告的 R1（sha256）、R2（变异表静态判）、R3（基线 harness 用例）、R4（变异行逐条现跑，checker 档行不跑）、R5（组合变异）；R6 单独在 rerun-adhoc.sh。输出写 <输出目录>/{static,baseline,mutations,combo}.txt，compare.sh 比两次。
 set -euo pipefail
 : "${SINGLEFS_REPO:?要设 SINGLEFS_REPO}"; : "${SINGLEFS_MAIN_REPO:?要设 SINGLEFS_MAIN_REPO}"
@@ -8,7 +8,7 @@ out=${1:?要给一个输出目录}; here=$(cd "$(dirname "${BASH_SOURCE[0]}")" &
 mkdir -p "$out/work"; repo=$out/work/repo; mkdir -p "$repo"
 cp -a "$SINGLEFS_REPO"/crates "$SINGLEFS_REPO"/Cargo.toml "$SINGLEFS_REPO"/Cargo.lock "$SINGLEFS_REPO"/litmus "$repo"/
 export CARGO_TARGET_DIR=$out/work/target
-S=$SINGLEFS_MAIN_REPO/research/scripts
+S=$SINGLEFS_MAIN_REPO/scripts
 # R1 R2
 { printf 'R1 sha256 OK 份数\t%s\n' "$(cd "$SINGLEFS_REPO" && sha256sum -c "$here/crates-sha256.txt" 2>&1 | grep -c ': OK$' || true)"
   python3 -I "$here/static_anchor.py" "$repo"; } > "$out/static.txt"

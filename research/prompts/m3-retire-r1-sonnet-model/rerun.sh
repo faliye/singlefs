@@ -15,7 +15,7 @@ ops=60
 do_run() {
   : "${SINGLEFS_REPO:?要设 SINGLEFS_REPO=<仓根>}"
   mkdir -p "$work"
-  bash "$SINGLEFS_REPO/research/scripts/run-with-memory-cap.sh" 4G nice -n 19 python3 -I "$here/model.py" "$histories" "$ops" > "$work/out.txt"
+  bash "$SINGLEFS_REPO/scripts/run-with-memory-cap.sh" 4G nice -n 19 python3 -I "$here/model.py" "$histories" "$ops" > "$work/out.txt"
   echo "run 完成：$work/out.txt（$(wc -l < "$work/out.txt") 行）"
 }
 

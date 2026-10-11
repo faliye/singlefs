@@ -203,9 +203,9 @@ R4 的机理（读码 + ⑤ 量过）：
 
 - 注入入口（读码，没打中）：跑法里造 `ConfirmedLossShapes` 的只有 `run_confirmed_loss_form` 一处，三格一律交空：「            // 跑法里三格一律空、命令行不开放（登记修订 6 第 6.2 节第 3 条；修订 5 第 5.1 节…注入只经装置内部的开关进…）。」（`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:8037`）。其余造非空注入的都在 `mod tests` 里，`PiecePanicInjection` 在测试之外只有阳性对照内置的那一份，那是原有设计。没找到命令行或环境变量能把它们打开的路。
 - p6 补丁（量过，没打中）：
-  - 从 `research/target/e171-r1-frozen-tree-revision-5-q5/` 拷出装置（sha256 前缀 `dbef78ed3eede487`），`patch --fuzz=0 -o` 打 `/tmp/claude-1000/m3-formal-31-2/patch/p6-on-dbef78ed.patch`，得 `2c933e2136f991a6…`；
+  - 从 `scripts/experiments/target/e171-r1-frozen-tree-revision-5-q5/` 拷出装置（sha256 前缀 `dbef78ed3eede487`），`patch --fuzz=0 -o` 打 `/tmp/claude-1000/m3-formal-31-2/patch/p6-on-dbef78ed.patch`，得 `2c933e2136f991a6…`；
   - 它与冻结树里那份（`cc73677273fd4a4f…`）`diff` 只多 4 行（`RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults` 那一个分支），这个名字在 `research/prompts/_m3-formal-code-b29-r1-diff.md` 里出现 12 次，是第 29 批加的。
-  - 另：`research/target/e171-r1-frozen-tree-revision-6/` 里那份装置的 sha256 前缀是 `67e7a5498425ec3f`，与 `2c933e21…` 之差是流三的段长表、写数、全量状态数与闭式那几个常量加两行注释（修订 6 第 6.2 节第 2 条重取），不是 p6 本身。
+  - 另：`scripts/experiments/target/e171-r1-frozen-tree-revision-6/` 里那份装置的 sha256 前缀是 `67e7a5498425ec3f`，与 `2c933e21…` 之差是流三的段长表、写数、全量状态数与闭式那几个常量加两行注释（修订 6 第 6.2 节第 2 条重取），不是 p6 本身。
   - 那棵树的 core 不带第 31 批断言，U12 的注释写明「修订 6 树的 core 不带、那棵树不编用例」（`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:12281` 那一行起）。
 - U13、U14 的期望数：checker 档内联用例，没跑，没攻。
 
@@ -277,7 +277,7 @@ R4 的机理（读码 + ⑤ 量过）：
 
 ## cite-check
 
-命令：`python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b31-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b31-r1/tree --root . --background research/prompts/_m3-formal-code-b31-r1-background.md`，末行原样：
+命令：`python3 scripts/cite-check.py research/prompts/m3-formal-code-b31-r1-opus-output.md --root /tmp/claude-1000/m3-formal-code-b31-r1/tree --root . --background research/prompts/_m3-formal-code-b31-r1-background.md`，末行原样：
 
 ```
   ✓ 核了 18 处引文，对上 18 处，没判 0 处（逐处列在上面）

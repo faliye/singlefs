@@ -2230,7 +2230,7 @@ index 0000000..f3e9882
 +//! inode 树叶容器的合并与借在发布路径上逐次对一份独立参照（判决 `research/prompts/m3-batch50-code-r1-main-verification.md` 第三节 F1）：
 +//! 参照按条款另写一份，不引 `singlefs_core::inode_tree` 的合并、借、摘片代码，只从发布出来的那一版读记录与身份——
 +//! D8（核心索引结构） 已定项 6：插入落在最右的叶、满 233 条就在末尾分裂，右半容器号 = 那条新记录的 inode 号、出生代 = 这次发布的 txg；
-+//! 合并时机照 E176（inode 树叶合并三候选的容量与写代价） M3 那一臂（`research/e7-index-bench/src/bin/e176_inode_leaf_merge_capacity_and_rewrites.rs`
++//! 合并时机照 E176（inode 树叶合并三候选的容量与写代价） M3 那一臂（`scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs`
 +//! 的 `remove`）：删空的整片摘掉、身份消失，它的新左右邻从左邻起并；没删空就从它起并——先查它与右邻、再查左邻与它，两片之和 ≤ 233 就左吸收右、
 +//! 被吸收的那一片身份消失，并完从幸存那片接着查；从它起一次都没并、它少于 ⌈233 ÷ 2⌉ 条、它有右邻时从右邻借最小的 ⌊(右 − 左) ÷ 2⌋ 条，
 +//! 两片都保留身份，再从借出的那一片起并。

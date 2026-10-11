@@ -15,7 +15,7 @@ work="${1:?用法：rerun.sh <工作目录> build|run|compare|all}"
 stage="${2:?用法：rerun.sh <工作目录> build|run|compare|all}"
 original_sha="9061c07b72a3c74693ddcacb885b0b4a9ebc4e4dc2c7082cfee320b3112848f5"
 bin_name="e177-per-tree-resurrection-without-tombstones"
-bin_file="e7-index-bench/src/bin/e177_per_tree_resurrection_without_tombstones.rs"
+bin_file="scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs"
 runs=(
   "baseline none" "baseline absorb" "baseline absorb_borrow"
   "retire none" "retire absorb" "retire absorb_borrow"
@@ -32,8 +32,8 @@ do_build() {
   need_repo
   mkdir -p "$work/build" "$work/runs"
   if [[ ! -d "$work/build/e7-index-bench" ]]; then
-    cp -r "$SINGLEFS_REPO/research/e7-index-bench" "$work/build/e7-index-bench"
-    cp "$SINGLEFS_REPO/research/Cargo.toml" "$SINGLEFS_REPO/research/Cargo.lock" "$work/build/"
+    cp -r "$SINGLEFS_REPO/scripts/experiments" "$work/build/e7-index-bench"
+    cp "$SINGLEFS_REPO/scripts/experiments/Cargo.toml" "$SINGLEFS_REPO/scripts/experiments/Cargo.lock" "$work/build/"
   fi
   actual_sha="$(sha256sum "$SINGLEFS_REPO/research/$bin_file" | cut -d' ' -f1)"
   if [[ "$actual_sha" != "$original_sha" ]]; then
@@ -47,7 +47,7 @@ do_build() {
   python3 "$here/apply_patch4.py" "$work/patched3.rs" "$work/patched4.rs"
   python3 "$here/apply_patch5.py" "$work/patched4.rs" "$work/patched5.rs"
   cp "$work/patched5.rs" "$work/build/$bin_file"
-  (cd "$work/build" && bash "$SINGLEFS_REPO/research/scripts/run-with-memory-cap.sh" 6G nice -n 19 cargo build --release --offline --bin "$bin_name")
+  (cd "$work/build" && bash "$SINGLEFS_REPO/scripts/run-with-memory-cap.sh" 6G nice -n 19 cargo build --release --offline --bin "$bin_name")
   echo "build 完成：$work/build/target/release/$bin_name"
 }
 
@@ -67,7 +67,7 @@ do_run() {
     tight=""; run_candidate="$candidate"
     if [[ "$candidate" == "tight_literal" ]]; then tight="literal"; run_candidate="baseline"; fi
     E177_CANDIDATE="$run_candidate" E177_TIGHT="$tight" E177_MERGE="$merge" E177_THREADS="${E177_THREADS:-8}" \
-      bash "$SINGLEFS_REPO/research/scripts/run-with-memory-cap.sh" 4G nice -n 19 "$binary" segment-one \
+      bash "$SINGLEFS_REPO/scripts/run-with-memory-cap.sh" 4G nice -n 19 "$binary" segment-one \
       > "$out.partial" 2> "$work/runs/${candidate}_${merge}.err"
     mv "$out.partial" "$out"
     echo "跑完 ${candidate}_${merge}：$(wc -l < "$out") 行"

@@ -89,7 +89,7 @@ ab1abddeb5dd4bc5b2d219dd9cd0fdd09659c6ac57529954e5abe242ac678716  tools/rerun.sh
 
 ### B1-丙（打中，口径）：三档与正式跑的档对不上
 
-- 正式跑带 `--table both` 的全是 r2：replay.sh 第 740 行起的 `driver_e165_r2_segment4_table_both_legal` 等三条与反盘次序两条（例：「--bounds segment1 --family adversarial --profile r2 --table both」，`research/scripts/replay.sh:744`）。没有一条正式跑用 r3+both。改动的注释说 T 两条「正式跑带 `--table both`」，没说正式跑是 r2。
+- 正式跑带 `--table both` 的全是 r2：replay.sh 第 740 行起的 `driver_e165_r2_segment4_table_both_legal` 等三条与反盘次序两条（例：「--bounds segment1 --family adversarial --profile r2 --table both」，`scripts/replay.sh:744`）。没有一条正式跑用 r3+both。改动的注释说 T 两条「正式跑带 `--table both`」，没说正式跑是 r2。
 - 正式跑的 J7 档是 r2（第二段基线 L+A、`--table both` 合法一族），r3 档只有对抗一族一条正式跑（`driver_e165_r3_segment1_adversarial`，replay.sh 第 762 行），J7 是合法一族的判据——单测里 J7 的读数全来自没有正式跑的 r3/L、r3+both/L。
 - 第一档多余：非 T 的对照在跑之前一律退回直接建表（「.with_table_source(RecordTableSource::Direct)」，`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs:6302`），所以 r3+both 的读数 = r3 的读数再加 T 两条。模型：「r3 直接建表那一档有、而 r3+both 没有的 = []」，「r5 ∪ r3+both 罩全 35/35」。
 - 今天数值上没有害处：T 两条在 r2+both 上的读数另有一条单测钉着（第 18197 行那条，取 r2+both），r3+both 与 r2+both 在 L 域上的 T 读数按代码读是同一个数（推的，没跑）。
@@ -198,13 +198,13 @@ ab1abddeb5dd4bc5b2d219dd9cd0fdd09659c6ac57529954e5abe242ac678716  tools/rerun.sh
 
 ## 要主 agent 跑的命令
 
-都是 checker 档，这条腿不跑。工作目录取改法所在的副本（不是冻结副本、不是主工作区）；内存上限取 `research/scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值，线程 15。
+都是 checker 档，这条腿不跑。工作目录取改法所在的副本（不是冻结副本、不是主工作区）；内存上限取 `scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值，线程 15。
 
 1. 坐实 B1-甲 的一个例子（改坏之后单测仍过）：在副本里把 e165 装置第 6248 行「| Self::ALimit => true,」换成 `| Self::ALimit => !run_profile.judges_j8(),`，再跑
-   `SINGLEFS_HEAVY_TESTS=user-request bash research/scripts/run-with-memory-cap.sh <上限> bash research/scripts/capped.sh 15 cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- every_criterion_has_a_positive_control_and_every_control_is_red`
+   `SINGLEFS_HEAVY_TESTS=user-request bash scripts/run-with-memory-cap.sh <上限> bash scripts/capped.sh 15 cargo test --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- every_criterion_has_a_positive_control_and_every_control_is_red`
    看 `test result:` 一行：`1 passed` 即坐实「单测放过」。同一副本上 `cargo run --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds light --family legal --profile r5`（经同一包装）看 `name=verdict scope=run` 行：`controls_not_red=0`、`void_conditions=0`，而 `name=control criterion=J0` 一行都没有，即坐实「正式跑判了没对照、V2 不报」。
 2. 改法 甲 落地后，同一条单测在未改坏的副本上 `1 passed`、在第 1 条那份改坏的副本上 `1 failed`。
-3. B4 建议的换次序变异（若采纳）：`bash research/scripts/prove-red.sh` 照变异表那一行跑，看是不是「抓到」、红在 `publish_writes_line_gives_the_total_then_every_kind_in_report_order_with_zeros`；同时 `-p singlefs-core --lib report_order` 应当仍绿（证明只有 nff 那条杀得掉它）。
+3. B4 建议的换次序变异（若采纳）：`bash scripts/prove-red.sh` 照变异表那一行跑，看是不是「抓到」、红在 `publish_writes_line_gives_the_total_then_every_kind_in_report_order_with_zeros`；同时 `-p singlefs-core --lib report_order` 应当仍绿（证明只有 nff 那条杀得掉它）。
 
 ## 没打中的形状
 

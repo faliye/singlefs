@@ -18,7 +18,7 @@ for probe in l1-hook l1-p5 l1-attrs l1-manifest d2-trace marker-fields; do
   nice -n 19 python3 "$script" > "$out/$probe.log" 2>&1
   echo "$probe rc=$? $(tail -1 "$out/$probe.log")"
 done
-nice -n 19 bash research/scripts/run-with-memory-cap.sh 2G bash "$here/verify_semantics.sh" "$R3_SCRATCH" > "$out/semantics.log" 2>&1
+nice -n 19 bash scripts/run-with-memory-cap.sh 2G bash "$here/verify_semantics.sh" "$R3_SCRATCH" > "$out/semantics.log" 2>&1
 echo "semantics rc=$? $(grep -c '^SEM' "$out/semantics.log") 行 SEM"
 bash "$here/verify_systemd_run.sh" > "$out/systemd-run.log" 2>&1
 echo "systemd-run rc=$? $(grep -c '^SEM' "$out/systemd-run.log") 行 SEM"

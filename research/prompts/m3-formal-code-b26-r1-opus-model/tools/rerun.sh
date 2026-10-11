@@ -5,7 +5,7 @@
 # 段（不给就全跑，次序照下）：build f3 frac seglen quick r1 r3 r4a r4b r4c r5 r6 r7 r8 r9 mut mutb compare
 # 单段挂钟（攻方那一趟，7 线程）：r7 约 231 秒、r8 约 200 秒、r4a 约 188 秒、r4c 约 160 秒、r4b 约 139 秒、r1/r5/r6 约 125 秒，
 # 其余几秒到几十秒；r7、r8 贴着前台 240 秒的线，主 agent 复跑时放后台起。
-# 每段经 research/scripts/run-with-memory-cap.sh（探针 8G，变异副本上的编译与测试 4G）与 capped.sh 7；只在 WORK 下写。
+# 每段经 scripts/run-with-memory-cap.sh（探针 8G，变异副本上的编译与测试 4G）与 capped.sh 7；只在 WORK 下写。
 set -euo pipefail
 : "${REPO:?要主仓根}" "${FROZEN:?要冻结副本的 tree 目录}" "${WORK:?要草稿目录}"
 MODEL="$REPO/research/prompts/m3-formal-code-b26-r1-opus-model"
@@ -14,8 +14,8 @@ export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REA
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS="${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-600}"
 mkdir -p "$WORK/out"
 BIN="$WORK/target/release/opus-b26-probe"
-CAP=(nice -n 19 bash "$REPO/research/scripts/run-with-memory-cap.sh")
-THREADS=(bash "$REPO/research/scripts/capped.sh" 7)
+CAP=(nice -n 19 bash "$REPO/scripts/run-with-memory-cap.sh")
+THREADS=(bash "$REPO/scripts/capped.sh" 7)
 
 probe() { # probe <输出名> <探针参数…>：跑探针，去掉进度行与包装的提示行落进 WORK/out/<输出名>
   local name="$1"; shift

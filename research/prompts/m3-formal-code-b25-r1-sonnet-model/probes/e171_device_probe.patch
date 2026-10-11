@@ -1,4 +1,4 @@
---- /home/fy5090/code/singlefs/research/target/e171-r1-frozen-tree/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs	2026-10-04 22:44:24.298013369 +0000
+--- /home/fy5090/code/singlefs/scripts/experiments/target/e171-r1-frozen-tree/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs	2026-10-04 22:44:24.298013369 +0000
 +++ /tmp/claude-1000/m3-formal-code-b25-r1-sonnet/tree/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs	2026-10-04 23:36:40.466868771 +0000
 @@ -7499,6 +7499,66 @@
                  "name=q5_partition sampling_point={sampling_point} {}",

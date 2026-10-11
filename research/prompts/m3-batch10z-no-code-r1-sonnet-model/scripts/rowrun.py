@@ -2,7 +2,7 @@
 """rowrun.py <json> <编号…>: 对 tree-mut 套实现员的变异行（只动 allocator.rs / mount.rs），按行里的命令编并跑点名的用例。"""
 import os, sys, json, subprocess, shutil
 W = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet')
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 rows = json.load(open(sys.argv[1]))
 env = dict(os.environ, CARGO_TARGET_DIR=W + '/target-mut')
 for r in rows:

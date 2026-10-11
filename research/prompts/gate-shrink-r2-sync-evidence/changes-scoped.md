@@ -209,14 +209,14 @@
   新：名、三个数写「待提交时 checker-tier-crates-mutation-replay」。`research/
 - 旧：源码改动编出来；生成产物与第 5 步跑 `replay.sh` 时都不设 `CARGO_
   新：源码改动编出来；生成产物时不设 `CARGO_T
-- 旧：sh 会静默盖掉前一个），跑一次 `bash research/scripts/replay.sh E<号>` 确认逐字节一致。登记行改指第 4 步的
+- 旧：sh 会静默盖掉前一个），跑一次 `bash scripts/replay.sh E<号>` 确认逐字节一致。登记行改指第 4 步的
   新：sh 会静默盖掉前一个）。登记行改指第 4 步的
 - 旧：字节一致也点一行；门禁 40 号按文件名查）；这一次
   新：字节一致也点一行；门禁 doc-experiments 的 results-c
 - 旧：6. 跑阶段归属表登记给你的阶段（共用约束 `.c
   新：6. 门禁阶段交回前不跑，由提交前 `gate-triage` 跑的 `research/
 - 旧：跑阶段归属表登记给你的阶段（共用约束 `.clau
-  新：e-triage` 跑的 `research/scripts/gate-staged.sh`（它起的整轮 `gate.sh`）判（共用约束 `.clau
+  新：e-triage` 跑的 `scripts/gate-staged.sh`（它起的整轮 `gate.sh`）判（共用约束 `.clau
 - 旧：n.md`「门禁」一节），读实验页或实验索引的那几道除外（27、34、40、69、75、84、85、86、88、99 号）：它们放到第 7 步写完实验页之后跑；这一次不写实验页的，在这一步最后跑，红了照写，产物照第 4
   新：n.md`「门禁」一节）。整轮门禁判红派回给你修时，产物照第
 - 旧：页的，在这一步最后跑，红了照写，产物照第 4 步一个不
@@ -287,7 +287,7 @@
 
 ### .claude/agents/implementation-writer.md
 
-- 旧：档测试文件第一行声明模块、耗时用例由 `research/scripts/harness-test-timing.py` 按耗时表标，不手标）。
+- 旧：档测试文件第一行声明模块、耗时用例由 `scripts/harness-test-timing.py` 按耗时表标，不手标）。
   新：档测试文件第一行声明模块）。
 - 旧：es/` 下的源码之后 33 号红）：给 33 号原
   新：/` 下的源码之后门禁 code-source-discipline 的 mutation-
@@ -432,7 +432,7 @@
 - 旧：4. 跑阶段归属表登记给你的阶段各一次并贴结果（共
   新：4. 门禁阶段交回前不跑，由提交前 `gate-triage` 跑的 `research/
 - 旧：跑阶段归属表登记给你的阶段各一次并贴结果（共用约束 `.clau
-  新：e-triage` 跑的 `research/scripts/gate-staged.sh`（它起的整轮 `gate.sh`）判（共用约束 `.clau
+  新：e-triage` 跑的 `scripts/gate-staged.sh`（它起的整轮 `gate.sh`）判（共用约束 `.clau
 - 旧：.md`「门禁」一节）；阶段数用那条 `awk` 接 `|
   新：.md`「门禁」一节）；第 2、3 步里的 `--write` 是
 - 旧：段数用那条 `awk` 接 `| wc -l` 数出来贴原样，不手数。红的判它是不是这一轮写出来
@@ -587,7 +587,7 @@
   新：
 - 旧：1. 判别力自证，先做：从待核的引用里挑一条，在草稿目录的副本里把它的行号加 1，按第 2 步核它，必须判 ✗；判不出就停下报告「核查方法不分辨」。
   新：
-- 旧：2. 先跑 `python3 research/scripts/cite-check.py <全部腿报告> --root <快照根> --background <背景材料>`：它判了的（对不上、指到标题行、写的是背景材料的行号）照抄它的判定，贴末行；它列成「没判」的与它认不出写法的引文，再逐处人工核。每处「文件:行号 + 抄的原文」：到快照里取那一行（区间就取区间）比内容（输入给了快照就一律对快照
+- 旧：2. 先跑 `python3 scripts/cite-check.py <全部腿报告> --root <快照根> --background <背景材料>`：它判了的（对不上、指到标题行、写的是背景材料的行号）照抄它的判定，贴末行；它列成「没判」的与它认不出写法的引文，再逐处人工核。每处「文件:行号 + 抄的原文」：到快照里取那一行（区间就取区间）比内容（输入给了快照就一律对快照
   新：
 - 旧：3. 每行引的产物：在产物文件里逐字找。
   新：
@@ -595,7 +595,7 @@
   新：
 - 旧：5. 本地腿的转述核对表里每一处「原文文件:行」也逐条核：行号在不在、抄的是不是原文、英文有没有丢限定词，也有没有多加原文没有的限定词或括注。
   新：
-- 旧：6. 要编译的在草稿目录的副本里经 `bash research/scripts/run-with-memory-cap.sh 4G …` 跑（共用约束「不做」一节）；包装跑不起来（退 251 这类）、要虚机、要网络的写「核不动」与原因；「核不动」与「分不清」（第 2 步与输入一节那几种，连同原因）各单列一栏，不算进 ✓ 也不算进 ✗；报告文件现在的 sha256 与交回里给的对不上，整份记「分不
+- 旧：6. 要编译的在草稿目录的副本里经 `bash scripts/run-with-memory-cap.sh 4G …` 跑（共用约束「不做」一节）；包装跑不起来（退 251 这类）、要虚机、要网络的写「核不动」与原因；「核不动」与「分不清」（第 2 步与输入一节那几种，连同原因）各单列一栏，不算进 ✓ 也不算进 ✗；报告文件现在的 sha256 与交回里给的对不上，整份记「分不
   新：
 - 旧：## 写范围
   新：
@@ -922,11 +922,11 @@
   新：个 Claude 会话在本仓的同一个工作区里并行工作，
 - 旧：| 只暂存自己的块 | `research
   新：| checker-tier-layer0-replay（层 0 全量） | 用例标 `#[ig
-- 旧：| 只暂存自己的块 | `research/scripts/stage-mine.py --match 我的标记 --foreign
+- 旧：| 只暂存自己的块 | `scripts/stage-mine.py --match 我的标记 --foreign
   新：y（层 0 全量） | 用例标 `#[ignore]
 - 旧：--match 我的标记 --foreign 别人的标记 文件…`，先 `--dry-run`
   新：0 全量） | 用例标 `#[ignore]`
-- 旧：的标记 文件…`，先 `--dry-run` 看它挑了哪几块；`research/scripts/check-staged.sh` 在临时 worktree 上只拿 HEAD + 暂存区跑 kb 阶段。它会把 `.gitignore` 掉的 `
+- 旧：的标记 文件…`，先 `--dry-run` 看它挑了哪几块；`scripts/check-staged.sh` 在临时 worktree 上只拿 HEAD + 暂存区跑 kb 阶段。它会把 `.gitignore` 掉的 `
   新：全量） | 用例标 `#[ignore]`、住 `
 - 旧：`.gitignore` 掉的 `.claude/si
   新：`#[ignore]`、住 `crates/sin
@@ -1008,7 +1008,7 @@
   新：谁在拦：共享 `gate.sh` 内
 - 旧：谁在拦：门禁 65 号（`research
   新：谁在拦：共享 `gate.sh` 内置的「转发计时」阶段
-- 旧：65 号（`research/scripts/rel
+- 旧：65 号（`scripts/rel
   新：e/singlefs-ai-sop/scripts/rel
 
 ### .claude/main-agent.md
@@ -1266,7 +1266,7 @@
 - 旧：两次不一致就照 `.claude/si
   新：3. 判决要引的复跑数：把腿的模型目录拷到草稿目录，在副本里经 `research/s
 - 旧：两次不一致就照 `.claude/singlefs-ai
-  新：本里经 `research/scripts/run
+  新：本里经 `scripts/run
 - 旧：`.claude/singlefs-ai-sop/rul
   新：esearch/scripts/run-with-m
 - 旧：ude/singlefs-ai-sop/rules/test-
@@ -1340,9 +1340,9 @@
   新：-check.py` 的 one-scenario 那一样
 - 旧：ibtest 的「has been running f
   新：.py` 的 one-scenario 那一样判，
-- 旧：t 的「has been running for over 60 seconds」定：`python3 research/scripts
+- 旧：t 的「has been running for over 60 seconds」定：`python3 scripts
   新：` 的 one-scenario 那一样判，门禁
-- 旧：thon3 research/scripts/harness
+- 旧：thon3 scripts/harness
   新：的 one-scenario 那一样判，门禁 h
 - 旧：esearch/scripts/harness-test
   新：one-scenario 那一样判，门禁 harness-mode
@@ -1370,7 +1370,7 @@
   新：- 阶段归属表 `.cla
 - 旧：55、57、59、87 号照各自的复用判定跑（`research/sc
   新：- 阶段归属表 `.claude/gat
-- 旧：的复用判定跑（`research/scripts/stage-must-
+- 旧：的复用判定跑（`scripts/stage-must-
   新：.claude/gate.d/stage-owner
 - 旧：ripts/stage-must-run.sh` 文
   新：ate.d/stage-owners.tsv` 一行一个门
@@ -1418,7 +1418,7 @@
   新：档一条用例一个场景 | 门禁 harness-mod
 - 旧：check.py` 与 `research/scri
   新：k.py --only one-scenario`）
-- 旧：y` 与 `research/scripts/harness
+- 旧：y` 与 `scripts/harness
   新：y one-scenario`） |
 - 旧：esearch/scripts/harness-test-timing.py check`） |
   新：one-scenario`） |
@@ -1489,7 +1489,7 @@
 - 旧：记进那份计划，跑相关门禁：47、62、63、doc-l
   新：。改完记进那份计划；门禁、样本与脚本自证归提交时
 - 旧：计划，跑相关门禁：47、62、63、doc-lint，改了定
-  新：改完记进那份计划；门禁、样本与脚本自证归提交时，由提交前 `gate-triage` 跑的 `research/scripts/gate-staged.sh` 判，改完一样
+  新：改完记进那份计划；门禁、样本与脚本自证归提交时，由提交前 `gate-triage` 跑的 `scripts/gate-staged.sh` 判，改完一样
 - 旧：禁：47、62、63、doc-lint，改了定义与共用约束的走
   新：/gate-staged.sh` 判，改完一样都不跑。改了定
 - 旧：轮三方或由用户逐份豁免（72 号判），改了触发文件的
@@ -1524,7 +1524,7 @@
   新：新名 / 匹配），门禁 doc-text 的 term-rena
 - 旧：结、依据哪条分项；门禁 16 号按它判三条（每层、每
   新：结、依据哪条分项；门禁 doc-decisions 的 freeze-la
-- 旧：| `research/scripts/check-
+- 旧：| `scripts/check-
   新：.claude/kb/experiments-hist
 - 旧：h/scripts/check-staged.sh` | 在
   新：ude/rules/changelog-form
@@ -1582,5 +1582,5 @@
 - 旧：e`](layer0-shard.env.example
   新：`](multi-host.env.example
 - 旧：| 层 0 双机分片本地配置的模板，见「层 0 全量分到两
-  新：y 的双机分片、跨机脚本 `research/scripts/multi-host-run.sh` 共用；双机与 GPU 两个开关默认关），见「层 0 全量分到两
+  新：y 的双机分片、跨机脚本 `scripts/multi-host-run.sh` 共用；双机与 GPU 两个开关默认关），见「层 0 全量分到两
 

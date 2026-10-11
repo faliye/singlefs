@@ -25,7 +25,7 @@
 ## 三、格
 
 ### B1　E165 全表对照
-三档并起来是不是恰好罩住 `Criterion::ALL` 每一行、而且每一行的对照都在**判它的那一档**里红（一行在 A 档有读数、在 B 档才判，并起来会不会让一条没判的读数顶替）；三档与 E165 正式跑用的档与 `--table` 取法对不对得上（读三份登记与驱动 `research/scripts/` 里起这个装置的那份）；r1、r2 那两段原样，r2 那条「不判 J6Qn 拆行」的断言还成不成立；`Criterion::ALL` 里有没有一行三档都不判、这条单测因此仍会红或被放过。
+三档并起来是不是恰好罩住 `Criterion::ALL` 每一行、而且每一行的对照都在**判它的那一档**里红（一行在 A 档有读数、在 B 档才判，并起来会不会让一条没判的读数顶替）；三档与 E165 正式跑用的档与 `--table` 取法对不对得上（读三份登记与驱动 `scripts/` 里起这个装置的那份）；r1、r2 那两段原样，r2 那条「不判 J6Qn 拆行」的断言还成不成立；`Criterion::ALL` 里有没有一行三档都不判、这条单测因此仍会红或被放过。
 
 ### B2　nff 钉值
 25 与 harness 那份是不是同一个量（同一条路、同一段切法）；三种写的名字与次序与 `describe_publish_writes` 现在打的、与 `WrittenStructureKind` 的报告次序是不是逐个相同；这两处之外同一文件的别的内联单测还有没有对着旧值的。
@@ -50,4 +50,4 @@
 - 腿提的新判法、新用例算零轮；条款没写、要用户定的，交用户。
 - 重型测试不跑：这一轮被判的全是 checker 档装置二进制的内联测试，腿一样都不跑，读码判，要跑的写成命令交主 agent；harness 档测试可以跑。
 
-交付：腿的报告写 `research/prompts/m3-formal-code-b37-r1-<腿名>-output.md`，分段落盘（每次写进文件不超过 150 行，第一段排他新建，回复只写短句）；模型与脚本放 `research/prompts/m3-formal-code-b37-r1-<腿名>-model/`（有就放，带一份 `tools/rerun.sh`，每条 cargo 经 `research/scripts/run-with-memory-cap.sh`）；草稿放 `~/.local/share/singlefs/work/<腿名>/`。引 kb 条款写 kb 文件自己的行号（去 kb 文件里现查，不从背景材料里数）。方案按 `crates/` 今天的实现来谈。
+交付：腿的报告写 `research/prompts/m3-formal-code-b37-r1-<腿名>-output.md`，分段落盘（每次写进文件不超过 150 行，第一段排他新建，回复只写短句）；模型与脚本放 `research/prompts/m3-formal-code-b37-r1-<腿名>-model/`（有就放，带一份 `tools/rerun.sh`，每条 cargo 经 `scripts/run-with-memory-cap.sh`）；草稿放 `~/.local/share/singlefs/work/<腿名>/`。引 kb 条款写 kb 文件自己的行号（去 kb 文件里现查，不从背景材料里数）。方案按 `crates/` 今天的实现来谈。

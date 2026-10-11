@@ -1,6 +1,6 @@
 //! d23-e16r5-r1 云端攻方（W1）的副本模型。
 //!
-//! 来源：`research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs`（入库装置，一个字节没动）。
+//! 来源：`scripts/experiments/e16_fifth_run_peak_under_today_widths.rs`（入库装置，一个字节没动）。
 //! 这里拷了它的几何、操作流生成器、两条臂的记账与逐行分类（峰值集合容差 0.1%、单调容差 1%、
 //! 对角带因子 2，与入库装置同值），另加：
 //! - 覆写记账的两种取法：`AsInFifthRun`（入库装置原样：甲按批内次数计、乙不把重新弄脏的单元移出「已落盘」）

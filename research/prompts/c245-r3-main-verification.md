@@ -9,7 +9,7 @@
 | 核什么 | 怎么核 | 结果 |
 |---|---|---|
 | 开工快照 | `sha256sum -c research/prompts/c245-r3-snapshot/kb-sha256.txt` | 8 份全 OK，腿跑的时候被引的 kb 文件没被改过 |
-| 两条云端腿的引文 | `python3 research/scripts/cite-check.py research/prompts/c245-r3-sonnet-output.md research/prompts/c245-r3-opus-output.md --root . --background research/prompts/_c245-r3-background.md` | 「核了 36 处引文，对上 36 处，没判 0 处」 |
+| 两条云端腿的引文 | `python3 scripts/cite-check.py research/prompts/c245-r3-sonnet-output.md research/prompts/c245-r3-opus-output.md --root . --background research/prompts/_c245-r3-background.md` | 「核了 36 处引文，对上 36 处，没判 0 处」 |
 | 攻方腿的四个被测源文件 | `sha256sum crates/singlefs-core/src/{mount,transaction,journal,recovery}.rs` 前 16 位与报告第 8 行比 | 085e18385d9e1a00、af33d518a58401de、661a2d3c638bedf5、2051deb895547221，四个都相同 |
 | 攻方腿模型目录 | `sha256sum -c SHA256SUMS` | 五份全 OK |
 | 攻方腿探针复跑 | 整仓（不带 `target`、`.git`）拷进 `/tmp/claude-1000/c245-r3-verify/repo`，从副本里的模型目录起 `rerun.sh`（内部每条经 `run-with-memory-cap.sh 8G`） | 甲副本 19 行 `probe=` 与乙-J 副本 17 行 `probe=` 逐行原样出现在 `probe-output.txt`；甲副本五个测试目标退 0；乙-J 副本钉落后支与「可见」支的四个目标 10 + 16 + 5 + 8 = 39 条全绿（1 条原有耗时用例 ignored），探针 4 过 3 红（A1、A2、C，腿写明的预期红） |

@@ -3,7 +3,7 @@
 # <输出目录>/repo，用 copy/patch_checker.py 给副本的 CPU checker 加三个环境变量开关，再加一个 harness 测试目标（copy/opus_r3_leaf_death_images.rs）。
 # SINGLEFS_REPO 给冻结树（~/.local/share/singlefs/work/m3-leaf-death-r1/tree）或仓根都行（要 Cargo.toml、Cargo.lock、.cargo、crates）。
 # 每一段整条经内存包装与线程上限起（编译两段 6G、其余 4G），例：
-#   M=research/prompts/m3-leaf-death-r3-opus-model; S=research/scripts
+#   M=research/prompts/m3-leaf-death-r3-opus-model; S=scripts
 #   bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 6 bash $M/rerun.sh <空的输出目录> build
 #   bash $S/run-with-memory-cap.sh 4G bash $S/capped.sh 6 bash $M/rerun.sh <输出目录> sweep-0
 # 段（按这个次序各跑一次就是全量）：build sweep-0 sweep-1 sweep-2 sweep-3 sweep-4 clone determinism copybuild

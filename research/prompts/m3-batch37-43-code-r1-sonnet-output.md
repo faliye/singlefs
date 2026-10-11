@@ -294,7 +294,7 @@ sha256：23 份全 OK（第 0 节）。列：文件 / 这一轮对应的格 / �
 
 ## 7 prove-red.sh 复证与一次意外
 
-- 用 `research/scripts/prove-red.sh --copy <仓副本> --memory 6G singlefs-harness <变异名…>` 把 harness 档 39 行再证一遍（与 `mutrun.py` 是两个驱动）：三段，`✓ 点名 11 条：跑了 11 条，跳过 0 条，跑的都抓到了`、`✓ 点名 15 条：跑了 15 条，跳过 0 条，跑的都抓到了`、`✓ 点名 13 条：跑了 13 条，跳过 0 条，跑的都抓到了`，合计 39 条全抓到（原样在 `research/prompts/m3-batch37-43-code-r1-sonnet-model/prove-red-run/chunk-*.txt`）。
+- 用 `scripts/prove-red.sh --copy <仓副本> --memory 6G singlefs-harness <变异名…>` 把 harness 档 39 行再证一遍（与 `mutrun.py` 是两个驱动）：三段，`✓ 点名 11 条：跑了 11 条，跳过 0 条，跑的都抓到了`、`✓ 点名 15 条：跑了 15 条，跳过 0 条，跑的都抓到了`、`✓ 点名 13 条：跑了 13 条，跳过 0 条，跑的都抓到了`，合计 39 条全抓到（原样在 `research/prompts/m3-batch37-43-code-r1-sonnet-model/prove-red-run/chunk-*.txt`）。
 - 意外（照实写）：第一次我把 20 个名字放进一段，前台 `timeout 235` 把它杀了；其中第 3259 行改的是 `crates/singlefs-core/src/allocator.rs`（不在 23 份快照里），被杀时还没还原，我的工作副本里 `allocator.rs` 缺了 `protected.extend(...)` 一行。我是靠随后同一个用例的「基线就红」发现的（`diff -rq` 对 TREE 只列出这一个文件），把 TREE 里的原文件拷回、`touch` 之后 `diff -rq crates <TREE>/crates` 无输出。影响面：这之前跑的 `rerun-out`、`rerun-out2` 两个空目录各用各自的副本（事后 `diff -rq` 都与 TREE 相同），基线与变异结果都出在它们里面；工作副本里在意外之前跑的基线（各 harness 目标）是在干净副本上跑的，意外之后没有再用工作副本的结果当依据。TREE 本身没动（23 份 sha256 全 OK，事后复核一次 `sha256sum -c` 无不 OK）。
 
 ## 8 判定一览
@@ -341,7 +341,7 @@ sha256：23 份全 OK（第 0 节）。列：文件 / 这一轮对应的格 / �
 
 1. 恢复内核钉值：`cargo test -p singlefs-checker-tier --lib each_kernel_keeps_its_pinned_inlined_size_and_margin_under_the_budget`，看 `recovery` 一项是不是 `328_970`、余量 `71_030`。
 2. GPU 对拍文件（带 `--nocapture`，看 `CRASH_JUDGE_GPU_MISMATCH` 行数与「本次未跑」条数）：`cargo test -p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state -- --nocapture`；重点看第 11809、11980、11999、12110 行起的四条流和 B1 的 `the_gpu_judge_agrees_with_the_cpu_that_a_recovery_does_not_fall_back_to_a_version_the_instance_table_of_the_chosen_root_abandons`。
-3. checker 档变异 9 行：名字前缀在 `research/prompts/m3-batch37-43-code-r1-sonnet-model/rows.txt`，序号是 `expected/mutations.txt` 里 `SKIPPED` 的 `ROW 1、2、3、10、38、39、40、42、44`；经门禁 checker-tier-crates-mutation-replay 或 `research/scripts/mutate.sh` 跑。
+3. checker 档变异 9 行：名字前缀在 `research/prompts/m3-batch37-43-code-r1-sonnet-model/rows.txt`，序号是 `expected/mutations.txt` 里 `SKIPPED` 的 `ROW 1、2、3、10、38、39、40、42、44`；经门禁 checker-tier-crates-mutation-replay 或 `scripts/mutate.sh` 跑。
 4. 崩溃注入第三截（`crash_injection.rs` 的两臂与两格计数）：随你提交时的 checker 档整轮。
 
 复跑我的模型：`SINGLEFS_REPO=<冻结副本根> SINGLEFS_MAIN_REPO=<主仓根> bash research/prompts/m3-batch37-43-code-r1-sonnet-model/rerun.sh <空目录> static f2diff`，再按模型目录 `README.md` 的分段顺序接着跑，最后 `bash …/compare.sh <那个目录> …/expected` 应见五个「全同」。

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 正推腿（m3-batch16-code-r1）的复核脚本：在冻结树的拷贝上跑 harness 档的三个测试目标，并逐个施加变异看红不红。
 # 只跑 harness 与 core 库的测试，不碰 checker 档。整条脚本要经内存包装与线程上限起：
-#   WORKDIR=<空目录> RUN_WITH_MEMORY_CAP_PARALLEL_REASON=... bash research/scripts/run-with-memory-cap.sh 8G \
-#     bash research/scripts/capped.sh 15 bash research/prompts/m3-batch16-code-r1-sonnet-model/rerun.sh <阶段…>
+#   WORKDIR=<空目录> RUN_WITH_MEMORY_CAP_PARALLEL_REASON=... bash scripts/run-with-memory-cap.sh 8G \
+#     bash scripts/capped.sh 15 bash research/prompts/m3-batch16-code-r1-sonnet-model/rerun.sh <阶段…>
 # 阶段（每个阶段单独起一次，前台跑得完；WORKDIR 在阶段之间共用，第一次起是空目录）：
 #   baseline  三个目标 + core 库单测，不变异
 #   rows      mutations.tsv 第 2386-2393 行逐行施加、跑点名的目标

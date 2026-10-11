@@ -4,8 +4,8 @@
 #   bash rerun.sh compare <工作目录>     # 各段日志里的 RESULT 行去掉计时字段、排序之后与 expected-summary.txt（同样排序）比；不读 SINGLEFS_REPO、SINGLEFS_TOOLS
 # 变量：
 #   SINGLEFS_REPO   被判的源码（冻结副本 /tmp/claude-1000/m3-batch28-code-r1/tree 或仓根）。
-#   SINGLEFS_TOOLS  包装脚本 run-with-memory-cap.sh、capped.sh 所在的仓根：先找 $SINGLEFS_REPO/research/scripts/，没有就取
-#                   $SINGLEFS_TOOLS/research/scripts/（SINGLEFS_REPO 是冻结副本时必须给）。
+#   SINGLEFS_TOOLS  包装脚本 run-with-memory-cap.sh、capped.sh 所在的仓根：先找 $SINGLEFS_REPO/scripts/，没有就取
+#                   $SINGLEFS_TOOLS/scripts/（SINGLEFS_REPO 是冻结副本时必须给）。
 #   OPUS_THREADS    线程上限（默认 10，经 capped.sh 设）。
 #   包装另读的：RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON、RUN_WITH_MEMORY_CAP_PARALLEL_REASON、RUN_WITH_MEMORY_CAP_WAIT_SECONDS（没设时这里给默认值）。
 # 段（all 依次跑全部；每段单跑在四分钟以内）：
@@ -36,9 +36,9 @@ mkdir -p "$work/logs" "$work/bin"
 work="$(cd "$work" && pwd)"
 repo="${SINGLEFS_REPO:?要设 SINGLEFS_REPO}"
 tools="$repo"
-[[ -f "$tools/research/scripts/run-with-memory-cap.sh" ]] || tools="${SINGLEFS_TOOLS:?SINGLEFS_REPO 下没有 research/scripts，要设 SINGLEFS_TOOLS}"
-cap="$tools/research/scripts/run-with-memory-cap.sh"
-capped="$tools/research/scripts/capped.sh"
+[[ -f "$tools/scripts/run-with-memory-cap.sh" ]] || tools="${SINGLEFS_TOOLS:?SINGLEFS_REPO 下没有 scripts，要设 SINGLEFS_TOOLS}"
+cap="$tools/scripts/run-with-memory-cap.sh"
+capped="$tools/scripts/capped.sh"
 threads="${OPUS_THREADS:-10}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-派发提示写死编译 6G、跑 4G}"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-三方攻方腿模型复跑，在自己的工作目录里串行编、跑}"

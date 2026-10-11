@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 用法：SINGLEFS_REPO=<仓根> [SINGLEFS_FROZEN_TREE=<冻结副本>] [SINGLEFS_THREADS=6] [SINGLEFS_STAGES="1 2 3 4 5 6 7 8"] bash rerun.sh <输出目录>
-# 变量：SINGLEFS_REPO（仓根，取 research/scripts 里的包装与快照里的 sha256）；SINGLEFS_FROZEN_TREE（冻结副本，默认
+# 变量：SINGLEFS_REPO（仓根，取 scripts 里的包装与快照里的 sha256）；SINGLEFS_FROZEN_TREE（冻结副本，默认
 #   $HOME/.local/share/singlefs/work/m3-batch33r-code-r1/tree）；SINGLEFS_THREADS（线程上限，默认 6）；SINGLEFS_STAGES（要跑哪几步，默认全部；
 #   前台命令有时限时分几次跑同一个输出目录，第一次含 1 步，最后一次含 8 步）。含第 1 步时输出目录必须不存在或为空。
 # 做什么（顺序、同一时刻只一条 cargo；编译 6G、跑 4G，经 run-with-memory-cap.sh；编译目录在输出目录里）：
@@ -19,8 +19,8 @@ has() { [[ "$stages" == *" $1 "* ]]; }
 if has 1 && [[ -e "$out" && -n "$(ls -A "$out" 2>/dev/null)" ]]; then echo "输出目录不空：$out" >&2; exit 2; fi
 export PYTHONDONTWRITEBYTECODE=1
 mkdir -p "$out"; out="$(cd "$out" && pwd)"
-cap="$SINGLEFS_REPO/research/scripts/run-with-memory-cap.sh"
-capped="$SINGLEFS_REPO/research/scripts/capped.sh"
+cap="$SINGLEFS_REPO/scripts/run-with-memory-cap.sh"
+capped="$SINGLEFS_REPO/scripts/capped.sh"
 export CARGO_TARGET_DIR="$out/target"
 copy="$out/copy"
 

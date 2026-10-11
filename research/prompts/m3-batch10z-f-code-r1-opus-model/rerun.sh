@@ -15,7 +15,7 @@ patch "$D/copy-b/crates/singlefs-harness/src/gpu_memory_ledger.rs" < "$M/fix-fk1
 ROOT=$PWD
 run_tests() { # $1 拷贝  $2 输出  其余：cargo test 的目标
   local copy=$1 out=$2; shift 2
-  (cd "$D/copy-$copy" && CARGO_TARGET_DIR="$D/target-$copy" nice -n 19 bash $ROOT/research/scripts/run-with-memory-cap.sh 3G bash "$ROOT/research/scripts/capped.sh" 8 \
+  (cd "$D/copy-$copy" && CARGO_TARGET_DIR="$D/target-$copy" nice -n 19 bash $ROOT/scripts/run-with-memory-cap.sh 3G bash "$ROOT/scripts/capped.sh" 8 \
      cargo test --offline --no-fail-fast -p singlefs-harness "$@" -- --nocapture --test-threads 1) > "$D/$out.log" 2>&1
   sed 's/^test [a-z0-9_]* \.\.\. //' "$D/$out.log" | grep '^ATTACK' > "$D/$out.txt" || true
   wc -l < "$D/$out.txt"
@@ -23,10 +23,10 @@ run_tests() { # $1 拷贝  $2 输出  其余：cargo test 的目标
 run_tests a out-a --test attack_10zf_ledger --test attack_10zf_rounds
 run_tests b out-b --test attack_10zf_ledger
 COPY="$D/copy-a" CARGO_TARGET_DIR="$D/target-a" LOGS="$D/mut-logs" FROZEN="$FROZEN" \
-  nice -n 19 bash research/scripts/run-with-memory-cap.sh 3G bash research/scripts/capped.sh 8 bash "$M/mutate-harness.sh" "$M/all-mutants.tsv" 1 25 > "$D/mutants.txt" 2>&1
+  nice -n 19 bash scripts/run-with-memory-cap.sh 3G bash scripts/capped.sh 8 bash "$M/mutate-harness.sh" "$M/all-mutants.tsv" 1 25 > "$D/mutants.txt" 2>&1
 rustc -O -o "$D/unwind_in_drop" "$M/unwind_in_drop.rs"
 for arm in as-shipped not-while-panicking; do
-  set +e; nice -n 19 bash research/scripts/run-with-memory-cap.sh 1G "$D/unwind_in_drop" $arm > "$D/unwind-$arm.out" 2> "$D/unwind-$arm.err"; rc=$?; set -e
+  set +e; nice -n 19 bash scripts/run-with-memory-cap.sh 1G "$D/unwind_in_drop" $arm > "$D/unwind-$arm.out" 2> "$D/unwind-$arm.err"; rc=$?; set -e
   echo "UNWIND arm=$arm rc=$rc stdout_lines=$(grep -c UNWIND "$D/unwind-$arm.out") abort_line=$(grep -c 'panic in a destructor during cleanup' "$D/unwind-$arm.err")"
 done > "$D/unwind.txt"
 echo "rerun done: $D"

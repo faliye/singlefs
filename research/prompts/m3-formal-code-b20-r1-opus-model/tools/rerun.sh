@@ -20,10 +20,10 @@ sha256sum "$MODEL_DIRECTORY"/probes/*.rs | tee "$WORK/out/probes.sha256"
 cd "$WORK/repo"
 export CARGO_TARGET_DIR="$WORK/target"
 run() {
-  bash "$REPO/research/scripts/run-with-memory-cap.sh" "$CAP" bash "$REPO/research/scripts/capped.sh" "$THREADS" nice -n 19 "$@"
+  bash "$REPO/scripts/run-with-memory-cap.sh" "$CAP" bash "$REPO/scripts/capped.sh" "$THREADS" nice -n 19 "$@"
 }
 for target in b20_opus_k1_targeted_states b20_opus_k2_short_continuation b20_opus_k2_histories_on_narrow_widths; do
-  bash "$REPO/research/scripts/capped.sh" "$THREADS" nice -n 19 cargo test --offline --release --no-run -p singlefs-harness --test "$target"
+  bash "$REPO/scripts/capped.sh" "$THREADS" nice -n 19 cargo test --offline --release --no-run -p singlefs-harness --test "$target"
 done
 run cargo test --offline --release -p singlefs-harness --test b20_opus_k1_targeted_states -- --nocapture --test-threads=1 > "$WORK/out/k1.log" 2>&1
 B20_SLOTS_FROM=100 B20_SLOTS_TO=320 B20_SLOTS_STEP=2 \

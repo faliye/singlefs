@@ -7,7 +7,7 @@
 - `/tmp/claude-1000/d23-writeback-spec/spec.json`
 - `/tmp/claude-1000/d23-writeback-spec/spec.md`（同内容，markdown 写法）
 
-两份都跑过 `python3 research/scripts/kb-spec-check.py`，末行原样：
+两份都跑过 `python3 scripts/kb-spec-check.py`，末行原样：
 
 ```
   ✓ 规格 8 条：旧串各恰好 1 次，编号引用、指代、依据配对与变更史快查都过（查了 8 条）

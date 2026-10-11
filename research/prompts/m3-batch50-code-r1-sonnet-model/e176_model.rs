@@ -5,7 +5,7 @@
 //! M1 那一臂另由 `e176_inode_leaf_merge_crates_oracle.rs`（特性 `e176-crates-oracle`）逐步对拍 `crates/` 的两个纯函数；
 //! 那个 bin 以 `#[path]` 把这份文件当模块引进去，所以对拍 bin 用到的项都写成 `pub`。
 //!
-//! 用法：`e176-inode-leaf-merge-capacity-and-rewrites segment-one`（第一段）或 `segment-two`（第二段，登记第五节与修订 3）；线程数读 `SINGLEFS_THREAD_CAP`（`research/scripts/capped.sh` 设），没设取 1。
+//! 用法：`e176-inode-leaf-merge-capacity-and-rewrites segment-one`（第一段）或 `segment-two`（第二段，登记第五节与修订 3）；线程数读 `SINGLEFS_THREAD_CAP`（`scripts/capped.sh` 设），没设取 1。
 //! 产物是 `E7RESULT` 行，收尾 `E7RESULT name=done emitted=N`（N 把 config 行与 done 行都算进去）。
 //! 确定性模型：跑两遍逐字节相同只说明没有隐藏状态，不是统计上稳定。
 
@@ -1922,7 +1922,7 @@ pub fn segment_two_sensitivity_lines(results: &[SequenceResult]) -> Vec<String> 
     lines
 }
 
-/// 线程数：`SINGLEFS_THREAD_CAP`（`research/scripts/capped.sh` 设），没设取 1；写错就停。
+/// 线程数：`SINGLEFS_THREAD_CAP`（`scripts/capped.sh` 设），没设取 1；写错就停。
 fn thread_count_from_environment() -> usize {
     match std::env::var("SINGLEFS_THREAD_CAP") {
         Ok(text) => text.parse::<usize>().ok().filter(|threads| *threads >= 1).expect("SINGLEFS_THREAD_CAP 要是正整数"),

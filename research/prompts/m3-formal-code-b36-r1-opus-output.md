@@ -9,7 +9,7 @@ bash research/prompts/m3-formal-code-b36-r1-opus-model/tools/rerun.sh <草稿目
 bash research/prompts/m3-formal-code-b36-r1-opus-model/tools/rerun.sh <草稿目录> setup build crafted crafted2 naga   # 只跑造盘与 naga 那几段（几分钟）
 ```
 
-`setup` 把冻结副本拷进 `<草稿目录>/tree`、核清单 316 行，造两份 checker 拷贝（`b36-checker-probe` = 今天的 walk.rs 加只记不判的探针；`b36-checker-pre36` = 反打 36-1b 的 walk.rs，即第 35 批的 FL 认法，同样加探针），反打 36-2 的三份 wgsl 得到 36-2 之前的内核；`build` 编两个二进制（`b36probe`、`b36naga`），核日志里四个包各有 `Compiling`。每条 cargo 与每次跑编出来的二进制都经 `research/scripts/run-with-memory-cap.sh`，同一时刻只起一条，线程 16。各段输出落 `<草稿目录>/out/<段>.log`，与模型目录 `out/` 里留的同名文件比（挂钟 `seconds=`、`wall=` 不比；`-FIRST` 行的原文是各线程最先遇到的那一张，只比键）。
+`setup` 把冻结副本拷进 `<草稿目录>/tree`、核清单 316 行，造两份 checker 拷贝（`b36-checker-probe` = 今天的 walk.rs 加只记不判的探针；`b36-checker-pre36` = 反打 36-1b 的 walk.rs，即第 35 批的 FL 认法，同样加探针），反打 36-2 的三份 wgsl 得到 36-2 之前的内核；`build` 编两个二进制（`b36probe`、`b36naga`），核日志里四个包各有 `Compiling`。每条 cargo 与每次跑编出来的二进制都经 `scripts/run-with-memory-cap.sh`，同一时刻只起一条，线程 16。各段输出落 `<草稿目录>/out/<段>.log`，与模型目录 `out/` 里留的同名文件比（挂钟 `seconds=`、`wall=` 不比；`-FIRST` 行的原文是各线程最先遇到的那一张，只比键）。
 
 模型目录每个文件的 sha256（`find . -type f | sort | xargs sha256sum`）：
 

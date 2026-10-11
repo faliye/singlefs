@@ -11,7 +11,7 @@ R=/home/fy5090/code/singlefs; FROZEN=/tmp/claude-1000/m3-formal-code-b29-r1/tree
 TREE=$DRAFT/tree; TARGET=$DRAFT/target; LOGS=$DRAFT/variants
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-复跑攻方腿的原型与变体，与别的腿并行}"
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="${RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON:-派发提示定 cargo 一律给 8G 上限}"
-wrap() { nice -n 19 bash "$R/research/scripts/run-with-memory-cap.sh" 8G bash "$R/research/scripts/capped.sh" 10 "$@"; }
+wrap() { nice -n 19 bash "$R/scripts/run-with-memory-cap.sh" 8G bash "$R/scripts/capped.sh" 10 "$@"; }
 one() { wrap bash "$HERE/run_one_variant.sh" "$TREE" "$TARGET" "$LOGS" "$@"; }
 T3=model_compares_inode_creations_into_the_third_inode_leaf_container
 TR=model_compares_a_rollback_to_a_version_with_fewer_inode_leaf_containers

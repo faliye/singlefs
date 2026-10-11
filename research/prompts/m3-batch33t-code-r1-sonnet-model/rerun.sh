@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 用法：SINGLEFS_REPO=<主仓根，取 research/scripts 的内存包装与 diff 文件> [SINGLEFS_FROZEN_TREE=<冻结副本根，默认 ~/.local/share/singlefs/work/m3-batch33t-code-r1/tree>] bash rerun.sh <空工作目录>
+# 用法：SINGLEFS_REPO=<主仓根，取 scripts 的内存包装与 diff 文件> [SINGLEFS_FROZEN_TREE=<冻结副本根，默认 ~/.local/share/singlefs/work/m3-batch33t-code-r1/tree>] bash rerun.sh <空工作目录>
 # 在空工作目录里：拷冻结副本成仓副本、放进探针测试、经 run-with-memory-cap.sh（编译与跑各 4G 以内、线程 10）跑探针 p1 p1b p1c p23 p4 p5 p6、
 # 把追加的 18 行变异逐行打进副本再还原、静态核 38 行变异行；再做一次对照（拿掉 C 的候选豁免，control.py）；输出 <工作目录>/out/{probes,mutations,control,static}.txt。一次只起一条 cargo。
 set -euo pipefail
@@ -12,8 +12,8 @@ mkdir -p "$work/repo" "$work/out"
 cp -r "$tree/." "$work/repo/"
 cp "$here/probe/sonnet_probe_b33t.rs" "$work/repo/crates/singlefs-harness/tests/sonnet_probe_b33t.rs"
 export CARGO_TARGET_DIR="$work/target"
-wrap=(nice -n 19 bash "$SINGLEFS_REPO/research/scripts/run-with-memory-cap.sh")
-capped=(bash "$SINGLEFS_REPO/research/scripts/capped.sh" 10)
+wrap=(nice -n 19 bash "$SINGLEFS_REPO/scripts/run-with-memory-cap.sh")
+capped=(bash "$SINGLEFS_REPO/scripts/capped.sh" 10)
 cd "$work/repo"
 "${wrap[@]}" 6G "${capped[@]}" cargo test -p singlefs-harness --test sonnet_probe_b33t --no-run > "$work/build.log" 2>&1
 "${wrap[@]}" 4G "${capped[@]}" cargo test -p singlefs-harness --test sonnet_probe_b33t -- --nocapture --test-threads=1 > "$work/probes.log" 2>&1

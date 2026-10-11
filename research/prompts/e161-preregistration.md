@@ -54,7 +54,7 @@
 
 ## 二、被测条款与它引的定义
 
-被测条款是 D13（验证路线） 已定项 4（段模型：枚举域）与已定项 7（记录核对器的入参含持久集合）；背景是 `.claude/kb/milestone/03-third-txn.md` 第一项与第五项。以下由 `research/scripts/quote-kb.py` 整段抄进 `/tmp/claude-1000/e-gpu-dedup-designer/section2-quote.md`、回读逐字节一致之后原样追加（六段：D13 表的第 4、7 行，已定项 4、已定项 7 两小节，里程碑三第一、五两项）。
+被测条款是 D13（验证路线） 已定项 4（段模型：枚举域）与已定项 7（记录核对器的入参含持久集合）；背景是 `.claude/kb/milestone/03-third-txn.md` 第一项与第五项。以下由 `scripts/quote-kb.py` 整段抄进 `/tmp/claude-1000/e-gpu-dedup-designer/section2-quote.md`、回读逐字节一致之后原样追加（六段：D13 表的第 4、7 行，已定项 4、已定项 7 两小节，里程碑三第一、五两项）。
 
 **出处 `.claude/kb/decisions/13-验证路线.md:12-12`（整段抄，未转述）**
 
@@ -505,12 +505,12 @@ PC2c、PC4c 找不到判别位置、或命中数为 0 不作废：那条臂的�
 | `固定脚本` 在别处的 grep 命中 | `crates/singlefs-harness/src/crash_injection.rs:406`；`tests/second_transaction_supplement_two_admission_formula.rs:4`、`76`；`tests/second_transaction_supplement_two_unreadable_abandoned_root_slot.rs:95`；`tests/second_transaction_step_five_reuse.rs:1`、`62`；`src/model_comparison.rs:60`、`79` |
 | `crates/singlefs-harness/tests/common/mod.rs` | 公开项 grep；1–250、360–434 |
 | `crates/singlefs-harness/Cargo.toml` | grep 2、8–11 |
-| `research/scripts/claim-experiment.sh` | 1–60 |
-| `research/scripts/quote-kb.py` | 1–40 |
-| `research/scripts/replace-once.py` | 1–30 |
-| `research/scripts/replay.sh` | grep `REPLAY_MEMORY_CAP` 命中 25、26、404、449、450 |
+| `scripts/claim-experiment.sh` | 1–60 |
+| `scripts/quote-kb.py` | 1–40 |
+| `scripts/replace-once.py` | 1–30 |
+| `scripts/replay.sh` | grep `REPLAY_MEMORY_CAP` 命中 25、26、404、449、450 |
 
-没读：`.claude/kb/experiments/` 下任何实验页、`.claude/kb/experiments.md`、`.claude/kb/experiments-history.md`、`research/results/`、`records/`、`.claude/kb/decisions-history/`、`research/perf-by-milestone.md`。
+没读：`.claude/kb/experiments/` 下任何实验页、`.claude/kb/experiments.md`、`.claude/kb/experiments-history.md`、`research/results/`、`records/`、`.claude/kb/decisions-history/`、`scripts/perf-by-milestone.md`。
 
 ### 13.2 跑过的命令（原样）与算术的原样输出
 
@@ -547,11 +547,11 @@ index, name, memory.total [MiB], memory.used [MiB], memory.free [MiB]
 写登记用到的：
 
 ```bash
-nice -n 19 bash research/scripts/claim-experiment.sh --next                      # E161
-nice -n 19 bash research/scripts/claim-experiment.sh E161 崩溃放量的去重与分段耗时
-nice -n 19 python3 research/scripts/quote-kb.py /tmp/claude-1000/e-gpu-dedup-designer/section2-quote.md '.claude/kb/decisions/13-验证路线.md:12-12' '.claude/kb/decisions/13-验证路线.md:15-15' '.claude/kb/decisions/13-验证路线.md@#### 已定项 4：崩溃点重放只枚举整写子集' '.claude/kb/decisions/13-验证路线.md@#### 已定项 7：O2（独立解析器 + checker） 判的是**一个**镜像' '.claude/kb/milestone/03-third-txn.md@## 一　崩溃重放的验证重新设计：公共的、模块的、单独分支的' '.claude/kb/milestone/03-third-txn.md@## 五　崩溃放量的 checker 挪到 GPU：过程落文件，一次算出结果'
+nice -n 19 bash scripts/claim-experiment.sh --next                      # E161
+nice -n 19 bash scripts/claim-experiment.sh E161 崩溃放量的去重与分段耗时
+nice -n 19 python3 scripts/quote-kb.py /tmp/claude-1000/e-gpu-dedup-designer/section2-quote.md '.claude/kb/decisions/13-验证路线.md:12-12' '.claude/kb/decisions/13-验证路线.md:15-15' '.claude/kb/decisions/13-验证路线.md@#### 已定项 4：崩溃点重放只枚举整写子集' '.claude/kb/decisions/13-验证路线.md@#### 已定项 7：O2（独立解析器 + checker） 判的是**一个**镜像' '.claude/kb/milestone/03-third-txn.md@## 一　崩溃重放的验证重新设计：公共的、模块的、单独分支的' '.claude/kb/milestone/03-third-txn.md@## 五　崩溃放量的 checker 挪到 GPU：过程落文件，一次算出结果'
 #   ✓ 6 段整抄进 …/section2-quote.md，回读逐字节一致
-nice -n 19 python3 research/scripts/replace-once.py research/prompts/e161-preregistration.md <旧串> <新串>   # 五次定点修正（5.3 的 PC3、5.1 第 2 步、Q3j、4.7 的出处一格、13.1 里程碑三那一行，再加这一行本身的次数），都在装置写之前
+nice -n 19 python3 scripts/replace-once.py research/prompts/e161-preregistration.md <旧串> <新串>   # 五次定点修正（5.3 的 PC3、5.1 第 2 步、Q3j、4.7 的出处一格、13.1 里程碑三那一行，再加这一行本身的次数），都在装置写之前
 nice -n 19 python3 anchors.py ; nice -n 19 python3 anchors2.py
 python3 -c "n=3.1e8; print('p_collision_bound', n*n/2**129)"                     # 1.4120625889252729e-22
 python3 -c "print('largest stream2 seg states', 3**2*2**28-1, 'x66B GB', (3**2*2**28-1)*66/1e9)"   # 2415919103 159.450660798

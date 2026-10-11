@@ -214,7 +214,7 @@ OPUS_NO_STRESS threads=8 rounds=5000 bookings=40000 restarts=2039 restart_refuse
 
 ## 引文核对
 
-`python3 research/scripts/cite-check.py research/prompts/m3-batch10z-no-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-no-code-r1/tree --root <仓根>` 末行：
+`python3 scripts/cite-check.py research/prompts/m3-batch10z-no-code-r1-opus-output.md --root ~/.local/share/singlefs/work/m3-batch10z-no-code-r1/tree --root <仓根>` 末行：
 
 ```
   ✓ 核了 17 处引文，对上 17 处，没判 0 处（逐处列在上面）

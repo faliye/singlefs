@@ -239,7 +239,7 @@ $ diff <(git show HEAD:crates/singlefs-core/src/block_device.rs) ~/.local/share/
 **差分对拍重跑**（我上一轮的 `sonnet_k5_differential`，拿真的 `FileBackedBlockDevice` 逐请求对拍只进内存的盘；物理块 512 与 4096、设备 512 B 到 128 KiB 五种盘，读 / 写 / 写零各三分之一，偏移与长度含 0、越界、`u64::MAX` 附近、没对齐；错误成员与字段、读出的字节、底下那块盘有没有被写、整盘读回都要相同；原模块 `src/…/core-mounted-session-debug.diff` 附在拷贝的 `mounted_session.rs` 末尾）：
 
 ```
-$ cd tree-a && TMPDIR=../tmp bash research/scripts/run-with-memory-cap.sh 6G bash research/scripts/capped.sh 15 cargo test --release --offline -p singlefs-core --lib sonnet_k5 -- --nocapture
+$ cd tree-a && TMPDIR=../tmp bash scripts/run-with-memory-cap.sh 6G bash scripts/capped.sh 15 cargo test --release --offline -p singlefs-core --lib sonnet_k5 -- --nocapture
 SONNET_K5 requests=100000 refused=63106
 test mounted_session::sonnet_k5_differential::rehearsal_device_agrees_with_the_file_backend_on_every_request ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
@@ -528,7 +528,7 @@ cf0fe8a5af5522fd
 ## 10. 引文核对
 
 ```
-$ python3 research/scripts/cite-check.py research/prompts/m3-batch10z-vw-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-vw-code-r1/tree --root /home/fy5090/code/singlefs | tail -1
+$ python3 scripts/cite-check.py research/prompts/m3-batch10z-vw-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-vw-code-r1/tree --root /home/fy5090/code/singlefs | tail -1
   ✓ 核了 7 处引文，对上 7 处，没判 0 处（逐处列在上面）
 ```
 

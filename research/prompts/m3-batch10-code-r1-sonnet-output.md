@@ -276,7 +276,7 @@ BAD count 0 of 23
 
 ## 交回前核对
 
-`python3 research/scripts/cite-check.py <本报告> --root <冻结副本> --root . --background research/prompts/_m3-batch10-code-r1-background.md` 末行：
+`python3 scripts/cite-check.py <本报告> --root <冻结副本> --root . --background research/prompts/_m3-batch10-code-r1-background.md` 末行：
 
 ```
   ✓ 核了 68 处引文，对上 68 处，没判 0 处（逐处列在上面）

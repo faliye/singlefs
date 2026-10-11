@@ -104,7 +104,7 @@ STOPSIM stop_from_round=Some(2) result=StoppedOnRequest stored=0 rounds=2 judged
 ```
    叫停时 9 块判完不入库；产品代码里这一刻不是返回 `StoppedOnRequest` 而是断言 panic（模型把断言的条件改成记一条，没有真 panic）。什么现象会推翻：第 2 轮即使叫停也先领交回的那一块（卡线程的 `must_stop` 在第 2 轮之前被清）。产品里叫停靠文件，没有被清的路径（读码）。
    窗口：第 1 轮的 `after_a_round_of_the_cards` 在叫停已成立时交 `NotRunTheGpuMemoryWasShort` 返回（不再起），所以只有叫停文件在「第 1 轮收尾判过之后、第 2 轮第一块被领走之前」出现才撞到；这一段含借草稿区与（冷编）建判器，可以是分钟级。
-4. **汇报数算两遍**：每一轮收工的卡都 `extend` 进去「outcome.cards.extend(received.finished_cards);」（`crates/singlefs-checker-tier/src/crash_amplification.rs:3094`），最后「outcome.cards_used = outcome.cards.len();」（`crates/singlefs-checker-tier/src/crash_amplification.rs:3154`）。头一轮判完收工、第二轮又被用上的那张卡进两次，`cards_used` 比真用的卡数多、`CRASH_AMPLIFICATION_GPU_TOTAL cards_used=` 这一行报错的数。模型里 `dup_finished_cells=47`（3000 格里 47 格某张卡 `Finished` 出现两次）。只影响汇总行，不影响判定：crates 里 `cards_used` 的使用处是打印与取最大（`grep -rn cards_used crates` 命中的没有断言）；`research/scripts` 里我只看了三份崩溃放量脚本，命中的是显卡配置变量名，没看到解析输出行里 `cards=` 的，别的脚本没查。
+4. **汇报数算两遍**：每一轮收工的卡都 `extend` 进去「outcome.cards.extend(received.finished_cards);」（`crates/singlefs-checker-tier/src/crash_amplification.rs:3094`），最后「outcome.cards_used = outcome.cards.len();」（`crates/singlefs-checker-tier/src/crash_amplification.rs:3154`）。头一轮判完收工、第二轮又被用上的那张卡进两次，`cards_used` 比真用的卡数多、`CRASH_AMPLIFICATION_GPU_TOTAL cards_used=` 这一行报错的数。模型里 `dup_finished_cells=47`（3000 格里 47 格某张卡 `Finished` 出现两次）。只影响汇总行，不影响判定：crates 里 `cards_used` 的使用处是打印与取最大（`grep -rn cards_used crates` 命中的没有断言）；`scripts` 里我只看了三份崩溃放量脚本，命中的是显卡配置变量名，没看到解析输出行里 `cards=` 的，别的脚本没查。
 5. 什么现象会推翻第 1 点的「没有判两遍、漏判、无限再起」：产品循环与模型有一处不一样而我没读出来。已知的差异：真循环在借草稿区时按账的此刻能借压每张卡的状态数（模型用固定的 `holds_states`），这会改变哪些卡「装了状态」，但不改变上面几条依赖的队、写库序、轮数的约束。
 
 ## K2-1　有没有一形让账给的量大于此刻真能用的（新代码引进来的）

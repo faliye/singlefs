@@ -11,8 +11,8 @@
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=/home/fy5090/code/singlefs
-CAP="bash $REPO/research/scripts/run-with-memory-cap.sh"
-THR="bash $REPO/research/scripts/capped.sh 15"
+CAP="bash $REPO/scripts/run-with-memory-cap.sh"
+THR="bash $REPO/scripts/capped.sh 15"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="复跑攻方原型，与别的会话并行" RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="原型各子命令起点不同"
 case ${1:-} in
   setup)

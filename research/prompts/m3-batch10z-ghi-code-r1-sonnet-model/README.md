@@ -9,7 +9,7 @@
   `cp crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs crates/singlefs-harness/tests/probe_rollback_revived.rs`，
   把 `use singlefs_core::mount::{` 那一段里的 `rollback_floor_ceiling, unmount,` 改成 `rollback_floor_ceiling, roll_back_by_a_forward_publish, unmount,`，
   再把本文件整份追加到 `probe_rollback_revived.rs` 末尾；跑
-  `bash research/scripts/capped.sh 15 bash research/scripts/run-with-memory-cap.sh 8G nice -n 19 cargo test --offline -p singlefs-harness --test probe_rollback_revived -- probe_units_revived --nocapture`。
+  `bash scripts/capped.sh 15 bash scripts/run-with-memory-cap.sh 8G nice -n 19 cargo test --offline -p singlefs-harness --test probe_rollback_revived -- probe_units_revived --nocapture`。
 - `probe_started_now_blocks.rs`：K4-2 探针，放进 `crates/singlefs-harness/tests/` 跑同样的命令（`--test probe_started_now_blocks`）。
 - `probe_cost_of_the_protected_list_scan.rs`：K2-2 耗时探针，是 `crates/singlefs-core/src/allocator.rs` 测试模块里的一条用例（插在 `fn pool_after_mkfs` 之前），
   命令 `cargo test --offline -p singlefs-core --lib -- probe_cost_of_the_protected_list_scan --nocapture`。

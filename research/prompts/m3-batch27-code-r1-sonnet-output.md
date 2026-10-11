@@ -165,7 +165,7 @@ row=2942 anchor_hits=1 named_test_matched_by_a_filter=1 test_target=crash_judge_
 
 另：全表无重名行（`awk` 取第 1 段 `sort | uniq -d` 输出为空）、每行恰六段（`NF != 6` 的行数 0）。
 
-harness 档三行（2934、2935、2937）我在冻结副本的拷贝上逐行改坏并跑点名的测试（编译 6G、跑 4G、线程 15，经 `research/scripts/run-with-memory-cap.sh` 与 `capped.sh`），原样输出（`expected.txt` 里取）：
+harness 档三行（2934、2935、2937）我在冻结副本的拷贝上逐行改坏并跑点名的测试（编译 6G、跑 4G、线程 15，经 `scripts/run-with-memory-cap.sh` 与 `capped.sh`），原样输出（`expected.txt` 里取）：
 
 ```
 harness_run: baseline test an_inode_tree_entry_of_type_zero_with_an_identity_over_a_child_that_does_not_read_back_reddens_the_inode_entry_invariant ... ok
@@ -202,7 +202,7 @@ harness_run: mutated-row-2937 test an_inode_tree_entry_with_an_unregistered_type
 
 负载：开工前 `ps -o pid,args -u "$(id -u)"` 看到别的会话在跑 `cargo test`、`cargo-clippy`、`cargo check` 与 rocksdb 的 c++ 编译；没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`，所以照常跑，全部加 `nice -n 19`，没有等锁。
 
-- 编译：`nice -n 19 bash research/scripts/run-with-memory-cap.sh 6G bash research/scripts/capped.sh 15 cargo test --offline --locked -p singlefs-harness --test checker_known_bad_images --no-run`（`RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON` 设了理由：包装按已记的实测峰值 1446M 拒了 6G，派发提示规定显式 6G）。跑：同形 `4G`，参数 `-- stale_copy_of_the_child child_that_does_not_read_back`。编译目录是我自己的 `CARGO_TARGET_DIR`。
+- 编译：`nice -n 19 bash scripts/run-with-memory-cap.sh 6G bash scripts/capped.sh 15 cargo test --offline --locked -p singlefs-harness --test checker_known_bad_images --no-run`（`RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON` 设了理由：包装按已记的实测峰值 1446M 拒了 6G，派发提示规定显式 6G）。跑：同形 `4G`，参数 `-- stale_copy_of_the_child child_that_does_not_read_back`。编译目录是我自己的 `CARGO_TARGET_DIR`。
 - 链模型：`python3 chain_model.py` 末行 `cases=32 violations=0`。
 - `rerun.sh` 在空目录从头跑（把模型目录拷到新位置、新输出目录、新 target）：
 

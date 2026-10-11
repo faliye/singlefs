@@ -2,7 +2,7 @@
 # piece.sh <log名> <环境变量…>  经内存包装起一件 p10z 探针
 set -u
 W=$HOME/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet
-R=/home/fy5090/code/singlefs/research/scripts
+R=/home/fy5090/code/singlefs/scripts
 name=$1; shift
 mkdir -p "$W/runs-mut"
 B=$(ls -t $W/target-ctl/release/deps/p10z_probe-* | grep -v '\.d$' | head -1)

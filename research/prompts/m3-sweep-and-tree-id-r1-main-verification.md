@@ -9,10 +9,10 @@
 | 物 | 路径 | 核法 |
 |---|---|---|
 | 正文 / 背景材料 / 小节清单 / 附录 | `research/prompts/_m3-sweep-and-tree-id-r1-body.md`、`_m3-sweep-and-tree-id-r1-background.md`、`_m3-sweep-and-tree-id-r1-checklist.md`、`_m3-sweep-and-tree-id-r1-appendix.md` | — |
-| 开工快照 | `research/prompts/m3-sweep-and-tree-id-r1-snapshot/`（kb 6 份、crates 36 份；冻结副本 `/tmp/claude-1000/m3-sweep-and-tree-id-r1/tree/`） | `bash research/scripts/snapshot-check.sh m3-sweep-and-tree-id-r1`：「✓ 快照 m3-sweep-and-tree-id-r1：42 个文件都与开工时一致」 |
+| 开工快照 | `research/prompts/m3-sweep-and-tree-id-r1-snapshot/`（kb 6 份、crates 36 份；冻结副本 `/tmp/claude-1000/m3-sweep-and-tree-id-r1/tree/`） | `bash scripts/snapshot-check.sh m3-sweep-and-tree-id-r1`：「✓ 快照 m3-sweep-and-tree-id-r1：42 个文件都与开工时一致」 |
 | 云端正推（Sonnet） | `research/prompts/m3-sweep-and-tree-id-r1-sonnet-output.md`（264 行，sha256 56c6a930…f3f7），没写模型 | — |
 | 云端攻方（Opus） | `research/prompts/m3-sweep-and-tree-id-r1-opus-output.md`（293 行，sha256 17505448…0c8），模型 `research/prompts/m3-sweep-and-tree-id-r1-opus-model/` | 主 agent 复跑，见「复跑」一节 |
-| 引文 | 两份腿报告 | `python3 research/scripts/cite-check.py <两份报告> --root . --background research/prompts/_m3-sweep-and-tree-id-r1-background.md`：「✓ 核了 90 处引文，对上 90 处，没判 0 处（逐处列在上面）」 |
+| 引文 | 两份腿报告 | `python3 scripts/cite-check.py <两份报告> --root . --background research/prompts/_m3-sweep-and-tree-id-r1-background.md`：「✓ 核了 90 处引文，对上 90 处，没判 0 处（逐处列在上面）」 |
 
 ### 复跑
 

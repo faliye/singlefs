@@ -22,10 +22,10 @@
 
 ## 复跑与文件
 
-模型目录 `research/prompts/m3-leaf-death-r1-opus-model/`：E177 装置 `research/e7-index-bench/src/bin/e177_per_tree_resurrection_without_tombstones.rs`（冻结树里同路径，sha256 `9061c07b…12848f5`）的拷贝改成 `src/main.rs`，加的部分在 `src/leaf_death.rs`；K3 的仓副本用例与补丁在 `k3-copy/`。复跑（仓根，7 个线程；每一阶段都经内存包装，编译 6G、跑 4G）：
+模型目录 `research/prompts/m3-leaf-death-r1-opus-model/`：E177 装置 `scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs`（冻结树里同路径，sha256 `9061c07b…12848f5`）的拷贝改成 `src/main.rs`，加的部分在 `src/leaf_death.rs`；K3 的仓副本用例与补丁在 `k3-copy/`。复跑（仓根，7 个线程；每一阶段都经内存包装，编译 6G、跑 4G）：
 
 ```
-M=research/prompts/m3-leaf-death-r1-opus-model; S=research/scripts; O=<空目录>
+M=research/prompts/m3-leaf-death-r1-opus-model; S=scripts; O=<空目录>
 export SINGLEFS_REPO=/home/fy5090/.local/share/singlefs/work/m3-leaf-death-r1/tree
 bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 7 bash $M/rerun.sh $O build
 bash $S/run-with-memory-cap.sh 4G bash $S/capped.sh 7 bash $M/rerun.sh $O e177 rc indistinguishable rollback
@@ -70,7 +70,7 @@ ea9ca4c27ca7bb2445b23ff7188790b5b28b7e45c48df72f1f58d4bec159fd0f  ./tools/agg.aw
 
 ### 0　装置与取样
 
-- 写路径就是 E177 装置那一份（照 `crates/` 今天的规则手写，删空摘掉在 `plan_inode_record_removal`：「if plan.inode_containers[position].records.is_empty() {」（`/home/fy5090/.local/share/singlefs/work/m3-leaf-death-r1/tree/research/e7-index-bench/src/bin/e177_per_tree_resurrection_without_tombstones.rs:1957`），对应 `crates/` 的「containers.remove(index.position());」（`/home/fy5090/.local/share/singlefs/work/m3-leaf-death-r1/tree/crates/singlefs-core/src/inode_tree.rs:308`））。我只加：合并策略 M2、M3 均分、M3 刚好够（规则照 E176 装置 `merge_until_no_pair_fits` / `borrow_from_right_if_below_floor` 重写一份，重写清单按 `crates/` 的位置记法）；候选二的两种写法；候选一、三的记录放模型专用区、不占槽（与 E177 臂 P 同一种理想化：只量读侧有了它够不够，盘上载体另算代价）。
+- 写路径就是 E177 装置那一份（照 `crates/` 今天的规则手写，删空摘掉在 `plan_inode_record_removal`：「if plan.inode_containers[position].records.is_empty() {」（`/home/fy5090/.local/share/singlefs/work/m3-leaf-death-r1/tree/scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs:1957`），对应 `crates/` 的「containers.remove(index.position());」（`/home/fy5090/.local/share/singlefs/work/m3-leaf-death-r1/tree/crates/singlefs-core/src/inode_tree.rs:308`））。我只加：合并策略 M2、M3 均分、M3 刚好够（规则照 E176 装置 `merge_until_no_pair_fits` / `borrow_from_right_if_below_floor` 重写一份，重写清单按 `crates/` 的位置记法）；候选二的两种写法；候选一、三的记录放模型专用区、不占槽（与 E177 臂 P 同一种理想化：只量读侧有了它够不够，盘上载体另算代价）。
 - 读法 S 就是 E177 的 R-S。锚：S 在 F1 n = 900 升序、G-环 上的 inode 那一行与 E177 产物逐字段对得上：模型输出「reader=S tree=inode r_peak=460 r_final=460 r_positive_scans=869 r_out_peak=459」（`/home/fy5090/.local/share/singlefs/work/m3-leaf-death-r1-opus/rerun1/e177.out:816`），E177 产物「r_peak=460 r_peak_at=1821 r_positive_scans=869 r_final=460」（`research/results/e177-per-tree-resurrection-without-tombstones-segment-one.out:5289`）。另每次扫描都把 S 与拷来的 E177 `select_current_reading`（R-S、臂 N）逐个名字空间比：1048 次模拟每一次 `leaf_s_differs_from_e177_r_s=0`、`assertion_violations=0`（除了候选二「留在树里」那一写法按定义会违反的 K4_emptied_container_not_written 不计）、`stopped_at=none`（`grep -c` 四个数都是 1048）。
 - 取样：E177 第一段的 51 段历史 × G-环、G-宽（G-紧 没跑，见「限度」）。合并历史 64 段（建 700 / 1400 个空 inode，再走 1000 步：建 10% / 30%，覆盖写 5%，顺序写 3%，其余 unlink；unlink 的号 0% / 70% 落在每 50 步换一片的「盯着的」容器里，其余在全部活号里随机挑；种子 1–8）——用户决定的那几步（建多少、删哪些号、什么时候写文件、往哪一片集中删）都在随机里放开，只固定前缀（mkfs、新池新建文件、可写挂载）。每段 × 两个几何 × 五种写法（M1、M2、M3 均分、M3 刚好够、M1 + 候选二只落一次）。挂钟：先跑 20 件估出每件约 1 秒，全量 640 件分八批、每批 80 件（88–135 秒）；没缩历史、没缩几何。这个模型没有崩溃状态（与 E177 一样只有干净发布之后的扫描），见「限度」。
 

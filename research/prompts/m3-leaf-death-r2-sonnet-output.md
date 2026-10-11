@@ -26,7 +26,7 @@
 
 ## 复跑与文件
 
-模型目录 `research/prompts/m3-leaf-death-r2-sonnet-model/`：源码 = `research/prompts/m3-leaf-death-r1-opus-model/` 的拷贝（E177 装置 + 第一轮攻方的 `leaf_death.rs`）加本轮改动（`src/leaf_death.rs`；`src/main.rs` 只多 `borrowed_records` 字段与 4 个模式名）。不依赖 `crates/` 与 `research/Cargo.toml`；`SINGLEFS_REPO` 只用来找 `research/scripts/run-with-memory-cap.sh`。新增：
+模型目录 `research/prompts/m3-leaf-death-r2-sonnet-model/`：源码 = `research/prompts/m3-leaf-death-r1-opus-model/` 的拷贝（E177 装置 + 第一轮攻方的 `leaf_death.rs`）加本轮改动（`src/leaf_death.rs`；`src/main.rs` 只多 `borrowed_records` 字段与 4 个模式名）。不依赖 `crates/` 与 `scripts/experiments/Cargo.toml`；`SINGLEFS_REPO` 只用来找 `scripts/run-with-memory-cap.sh`。新增：
 
 - 零条目版本（候选二）配合并：容器留在叶序里、合并只在有记录的片之间做（`src/leaf_death.rs` 的 `dismiss_container_at`、`right_neighbour_of`）；
 - 读法 `C2Hold` / `C2HoldZ`（候选二最强形态）、`T` / `TS` / `TSZ`（候选三 / 四最强形态）、`FSZ`（墓碑的写挪到最后一批）；
@@ -36,7 +36,7 @@
 复跑（仓根，8 个线程；每阶段经内存包装，build 6G、其余 4G；交回前在空目录 `~/.local/share/singlefs/work/m3-leaf-death-r2-sonnet/rerun1/` 里从头跑通一次，另在 `rerun2/` 里重跑 e177、sweep、rollback、indist、merges-0 五段，排序后 sha256 与 `expected/sorted-output-sha256.txt` 逐个相同）：
 
 ```
-M=research/prompts/m3-leaf-death-r2-sonnet-model; S=research/scripts; O=<空目录>; export SINGLEFS_REPO=$PWD
+M=research/prompts/m3-leaf-death-r2-sonnet-model; S=scripts; O=<空目录>; export SINGLEFS_REPO=$PWD
 bash $S/run-with-memory-cap.sh 6G bash $M/rerun.sh $O build
 bash $S/run-with-memory-cap.sh 4G bash $M/rerun.sh $O e177 sweep rollback indist
 for k in 0 1 2 3 4 5 6 7; do bash $S/run-with-memory-cap.sh 4G bash $M/rerun.sh $O merges-$k; done
@@ -289,7 +289,7 @@ ecb808becf7ea4159ad8ee7927ebf1c5613d0182d3f2ab64da6fb0ec9c589859  ./tools/counts
 
 ## cite-check 末行
 
-`python3 research/scripts/cite-check.py research/prompts/m3-leaf-death-r2-sonnet-output.md`：
+`python3 scripts/cite-check.py research/prompts/m3-leaf-death-r2-sonnet-output.md`：
 
 ```
   ✓ 核了 53 处引文，对上 53 处，没判 0 处（逐处列在上面）

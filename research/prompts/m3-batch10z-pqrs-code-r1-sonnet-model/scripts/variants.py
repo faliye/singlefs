@@ -1,7 +1,7 @@
 import os, subprocess, sys
 W = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1-sonnet')
 FR = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-pqrs-code-r1/tree/crates/singlefs-checker-tier/src/')
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 gpu = open(FR + 'gpu_unit_checks.rs').read()
 crash = open(FR + 'crash_amplification.rs').read()
 def run(binary, envname, path):

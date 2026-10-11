@@ -7,7 +7,7 @@
 ## 一、核查
 
 - 开工快照：冻结副本 `/tmp/claude-1000/test-script-align-code-r1/tree/` 对 `research/prompts/test-script-align-code-r1-snapshot/crates-sha256.txt` `sha256sum -c` 全对。
-- `python3 research/scripts/cite-check.py <两份报告> --root . --background research/prompts/_test-script-align-code-r1-background.md`：「核了 79 处引文，4 处对不上，0 处没判」。四处都在正推报告，引文是对的、行号写偏：第 51 行（量显存那条 `#[ignore]` 不在 1592 行）、第 52 行（`crash_judge_dispatch.rs` 那句在第 997、1121 行，不在 977）、第 85 行（`SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO` 在第 56 行，不在 54）、第 169 行（`CRASH_INJECTION_VARIABLE_PREFIX` 在第 2317 行，不在 1983）；判决按改正后的行号采。
+- `python3 scripts/cite-check.py <两份报告> --root . --background research/prompts/_test-script-align-code-r1-background.md`：「核了 79 处引文，4 处对不上，0 处没判」。四处都在正推报告，引文是对的、行号写偏：第 51 行（量显存那条 `#[ignore]` 不在 1592 行）、第 52 行（`crash_judge_dispatch.rs` 那句在第 997、1121 行，不在 977）、第 85 行（`SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO` 在第 56 行，不在 54）、第 169 行（`CRASH_INJECTION_VARIABLE_PREFIX` 在第 2317 行，不在 1983）；判决按改正后的行号采。
 - 主 agent 在冻结副本上现查：
   - R1：`crash_identity.rs` 第 88–113 行 `StepAttributes` 只有 `write_table_with_barriers` 与 `parent_output` 两样进复用键；`crash_amplification.rs` 第 303–313 行计划哈希只写段序、状态数、展开方式；`versions`、`judged_root_index`（第 122–123 行）两处都不进；第 337–339 行判法摘要「设点的测试文件、流水线自己变了，摘要不变」。攻方的机制成立。
   - C604 一半：`tests/record_checker_judges_absence_by_the_persisted_set.rs` 第 1081–1084 行 σ 对拍 `.expect("本机要有一张空闲显存够的 NVIDIA 独显…")`，没卡时 panic，不报本次未跑。

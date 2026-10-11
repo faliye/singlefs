@@ -692,7 +692,7 @@ D8：「派生态，丢了从叶重建」（`.claude/kb/decisions/08-核心索�
 模型目录 `research/prompts/m3-leaf-death-r3-sonnet-model/`（入库内容见下 sha256）。复跑（仓根为工作目录；线程数读 `R3_THREADS`；仓路径给 `SINGLEFS_REPO`，只用来找 harness 副本要拷的 `crates/`，给冻结树或仓根都行；每阶段整条经内存包装，编译 6G、其余 4G，同一时刻只起一条 cargo）：
 
 ```
-M=research/prompts/m3-leaf-death-r3-sonnet-model; S=research/scripts; O=<空目录>
+M=research/prompts/m3-leaf-death-r3-sonnet-model; S=scripts; O=<空目录>
 export SINGLEFS_REPO=/home/fy5090/.local/share/singlefs/work/m3-leaf-death-r1/tree
 bash $S/run-with-memory-cap.sh 6G bash $M/rerun.sh $O build
 for k in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do bash $S/run-with-memory-cap.sh 4G bash $M/rerun.sh $O sweep-$k; done

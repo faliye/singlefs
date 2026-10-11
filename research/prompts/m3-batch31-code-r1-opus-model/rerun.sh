@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 复跑 m3-batch31-code-r1 攻方（Opus）模型。
 # 环境变量：SINGLEFS_REPO 冻结副本根（有 Cargo.toml、Cargo.lock、crates/）；SINGLEFS_TOOLS 仓根（包装脚本
-#   research/scripts/run-with-memory-cap.sh 与 research/scripts/capped.sh 从这里取，冻结副本里没有 research/）；THREADS 线程数（默认 10）。
+#   scripts/run-with-memory-cap.sh 与 scripts/capped.sh 从这里取，冻结副本里没有 research/）；THREADS 线程数（默认 10）。
 # 用法：rerun.sh <工作目录> [臂…]，臂默认 base mut-fl0 fix-key（见 make_arm.py）；点名的臂在工作目录里不许已经跑过，
 #   可以分几次各跑一条臂（一次前台跑不完时），summary.txt 每次按 base、mut-fl0、fix-key 的次序把已跑的臂重新拼一遍。同一时刻只起一条 cargo；编译 6G、跑 4G，经内存包装。
 # 每条臂：拷一份 crates 到 <工作目录>/<臂>/，make_arm.py 改，编译目录 <工作目录>/target-<臂>；产出
@@ -21,8 +21,8 @@ mkdir -p "$work"
 for arm in "${arms[@]}"; do
   [ ! -e "$work/$arm" ] || { echo "这条臂已经跑过：$work/$arm（换一个空工作目录，或只点没跑过的臂）" >&2; exit 2; }
 done
-cap="$SINGLEFS_TOOLS/research/scripts/run-with-memory-cap.sh"
-capped="$SINGLEFS_TOOLS/research/scripts/capped.sh"
+cap="$SINGLEFS_TOOLS/scripts/run-with-memory-cap.sh"
+capped="$SINGLEFS_TOOLS/scripts/capped.sh"
 for arm in "${arms[@]}"; do
   tree="$work/$arm"
   mkdir -p "$tree"

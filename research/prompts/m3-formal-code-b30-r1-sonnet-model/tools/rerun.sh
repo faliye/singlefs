@@ -2,7 +2,7 @@
 # b30 第一轮云端正推腿的复跑脚本：只跑 harness 档测试二进制与池级 checker 的探针，不跑 checker 档包、GPU、变异整表。
 # 用法（主 agent 在后台起；整条脚本经内存包装跑，线程上限 7）：
 #   REPO=$PWD FROZEN=/tmp/claude-1000/m3-formal-code-b30-r1/tree WORK=<会话草稿>/b30-sonnet-rerun RERUN_ALREADY_WRAPPED=1 \
-#     bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 7 \
+#     bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 7 \
 #     bash research/prompts/m3-formal-code-b30-r1-sonnet-model/tools/rerun.sh <段名…>
 # 段名：setup anchors m1-tests m1-rows m1-grid m1-extra m1-extra-wide m2-rows m2-sweep m2-scan m2-heads m2-kind m2-i54 m3-pins m3-433 m3-rows m3-greps m4-keys all
 # 每一段原样输出落 $WORK/out/<段名>.log，末尾打 RESULT 行；各段的预期读数写在报告 research/prompts/m3-formal-code-b30-r1-sonnet-output.md。
@@ -14,7 +14,7 @@ OUT=$WORK/out; mkdir -p "$OUT"
 export RUN_WITH_MEMORY_CAP_WAIT_SECONDS=${RUN_WITH_MEMORY_CAP_WAIT_SECONDS:-600}
 export RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="b30 正推腿复跑，上限取派发给的 8G"
 export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="派出去的几个 agent 各跑各的，这条是 b30 正推腿的复跑"
-CAPPED="nice -n 19 bash $REPO/research/scripts/run-with-memory-cap.sh 8G bash $REPO/research/scripts/capped.sh 7"
+CAPPED="nice -n 19 bash $REPO/scripts/run-with-memory-cap.sh 8G bash $REPO/scripts/capped.sh 7"
 if [[ -n "${RERUN_ALREADY_WRAPPED:-}" ]]; then CAPPED="nice -n 19"; fi
 PROBES=$MODEL/probes
 # 用哪棵树跑：cargo_in <树名> <目标目录名> cargo 参数…
@@ -53,7 +53,7 @@ PY
 }
 seg_anchors() {
   python3 "$MODEL/tools/mutants.py" anchors "$MODEL/data/mutants.tsv" "$FROZEN" | tail -1
-  (cd "$REPO" && python3 research/scripts/crates-mutation-rows.py static-check "$FROZEN" | tail -3)
+  (cd "$REPO" && python3 scripts/crates-mutation-rows.py static-check "$FROZEN" | tail -3)
 }
 seg_m1_tests() { cargo_in tree target -p singlefs-harness --test model_compares_the_third_and_fourth_inode_leaf_containers 2>&1 | grep -E 'test |result'; }
 seg_m1_rows() { mut "$MODEL/data/mutants.tsv" 0 1 2 3; }
@@ -108,14 +108,14 @@ seg_m3_greps() {
   cd "$REPO"
   echo "== crates 里 T_time 的全部引用（不含变异表）"; grep -rniE 'time_threshold|TIME_THRESHOLD' crates --include='*.rs' --include='*.wgsl' | grep -v 'crates/mutations.tsv' | cut -c1-170
   echo "== crates 里偏移 433 字面"; grep -rnE '\b433\b' crates --include='*.rs' --include='*.wgsl' | grep -v 'b30_m' | cut -c1-170
-  echo "== research 装置里写 / 解 T_time 盘上字段的地方"; grep -rnIE 'put_u32\(5\)|put_u32\(5000\)|T_time (秒|毫秒)|"checkpoint_time_threshold"' research/e7-index-bench/src --include='*.rs' --include='*.py' | cut -c1-200
+  echo "== research 装置里写 / 解 T_time 盘上字段的地方"; grep -rnIE 'put_u32\(5\)|put_u32\(5000\)|T_time (秒|毫秒)|"checkpoint_time_threshold"' scripts/experiments --include='*.rs' --include='*.py' | cut -c1-200
   echo "== 字段表与 D16"; grep -n '| T_time |' .claude/kb/layout/01-first-txn.md; sed -n 140p .claude/kb/decisions/16-发布语义.md | cut -c1-120
 }
 seg_m4_keys() {
   cd "$REPO"; python3 - "$FROZEN" "$MODEL" "$OUT" <<'PY'
 import hashlib, importlib.util, sys
 frozen, model, out = sys.argv[1:]
-spec = importlib.util.spec_from_file_location('cmr', 'research/scripts/crates-mutation-rows.py')
+spec = importlib.util.spec_from_file_location('cmr', 'scripts/crates-mutation-rows.py')
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 rows, bad, mem, to = m.read_table(f'{frozen}/crates/mutations.tsv')
 byname = {}

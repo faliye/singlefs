@@ -1,7 +1,7 @@
 import sys, os, shutil, re
-src = "/tmp/claude-1000/m3-gov-r3-freeze/tree/research/scripts"
+src = "/tmp/claude-1000/m3-gov-r3-freeze/tree/scripts"
 name = sys.argv[1]
-dst0 = f"/tmp/claude-1000/m3-gov-r3-defense/drvs/{name}"; dst = dst0 + "/research/scripts"
+dst0 = f"/tmp/claude-1000/m3-gov-r3-defense/drvs/{name}"; dst = dst0 + "/scripts"
 if os.path.exists(dst0): shutil.rmtree(dst0)
 shutil.copytree(src, dst)
 shutil.copytree('/tmp/claude-1000/m3-gov-r3-freeze/tree/.claude/scripts', dst0 + '/.claude/scripts')

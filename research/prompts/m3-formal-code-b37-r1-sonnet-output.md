@@ -62,13 +62,13 @@ pass1 判的行数: 29  pass3 判的行数: 31  pass1 是 pass3 的子集: True 
 
 ### 4. 三档与 E165 正式跑用的档、`--table` 取法对不对得上
 
-读驱动 `research/scripts/replay.sh`：
+读驱动 `scripts/replay.sh`：
 
 | 测试里的趟 | 正式跑里的对应 | 对得上吗 |
 |---|---|---|
-| r3 Direct | `--profile r3`：「--bounds segment1 --family adversarial --profile r3」（`research/scripts/replay.sh:763`），不带 `--table` | 对得上（正式跑只跑对抗一族，测试三族都跑，是并集更宽） |
-| r5 Direct | `--profile r5`：「--bounds segment1 --family legal --profile r5」（`research/scripts/replay.sh:855`）、对抗（第 858 行）、多盘（第 861 行），都不带 `--table` | 对得上 |
-| r3 加 Both | 正式跑里 `--table both` 全配 `--profile r2`：「--family legal --profile r2 --table both」（`research/scripts/replay.sh:741`）、对抗（第 744 行）、多盘（第 747 行） | 对不上档名：正式跑没有 `--profile r3 --table both` 这一条 |
+| r3 Direct | `--profile r3`：「--bounds segment1 --family adversarial --profile r3」（`scripts/replay.sh:763`），不带 `--table` | 对得上（正式跑只跑对抗一族，测试三族都跑，是并集更宽） |
+| r5 Direct | `--profile r5`：「--bounds segment1 --family legal --profile r5」（`scripts/replay.sh:855`）、对抗（第 858 行）、多盘（第 861 行），都不带 `--table` | 对得上 |
+| r3 加 Both | 正式跑里 `--table both` 全配 `--profile r2`：「--family legal --profile r2 --table both」（`scripts/replay.sh:741`）、对抗（第 744 行）、多盘（第 747 行） | 对不上档名：正式跑没有 `--profile r3 --table both` 这一条 |
 
 对不上的那一格不影响判据，三点依据：
 
@@ -118,7 +118,7 @@ test recorded_paths_match_the_registered_segment_sequences ... ok
 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
 ```
 
-  命令是 `CARGO_TARGET_DIR=<草稿目录>/target nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 15 cargo test --offline --locked -p singlefs-harness --test new_pool_file_creation_publish`，退出码 0。nff 那条是 checker 档，我没跑；主 agent 的日志 `~/.local/share/singlefs/work/e165-control-test-fix/nff-run.log` 末行「test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.81s」（我读过，没复跑）。
+  命令是 `CARGO_TARGET_DIR=<草稿目录>/target nice -n 19 bash scripts/run-with-memory-cap.sh 8G bash scripts/capped.sh 15 cargo test --offline --locked -p singlefs-harness --test new_pool_file_creation_publish`，退出码 0。nff 那条是 checker 档，我没跑；主 agent 的日志 `~/.local/share/singlefs/work/e165-control-test-fix/nff-run.log` 末行「test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.81s」（我读过，没复跑）。
 - 来源：harness 第 347–349 行的注释写明为什么 23 变 25：「mkfs 23 → 25 步，第一段 12 → 14 个写」（`crates/singlefs-harness/tests/new_pool_file_creation_publish.rs:348`）。nff 的改动只是把这个数跟上。
 
 ### 2. 三种写的名字与次序
@@ -276,7 +276,7 @@ row 3407 anchor count 1 lines 18308 test every_criterion_has_a_positive_control_
 
 ## 交回前的 cite-check
 
-命令：`python3 research/scripts/cite-check.py research/prompts/m3-formal-code-b37-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-formal-code-b37-r1/tree --root /home/fy5090/code/singlefs`，末行原样：
+命令：`python3 scripts/cite-check.py research/prompts/m3-formal-code-b37-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-formal-code-b37-r1/tree --root /home/fy5090/code/singlefs`，末行原样：
 
 ```
   ✓ 核了 65 处引文，对上 65 处，没判 0 处（逐处列在上面）

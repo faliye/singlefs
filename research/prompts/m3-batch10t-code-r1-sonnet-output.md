@@ -3,7 +3,7 @@
 日期 2026-10-07。立场：正推。先从判决（`research/prompts/m3-batch10o-code-r1-main-verification.md` 第三节、第五节）与用户原话推出「应该是什么」，再读冻结副本与代码逐格比：一样写一样，不一样把两边整行并排抄出来。
 引代码写冻结副本里的路径（根 `~/.local/share/singlefs/work/m3-batch10t-code-r1/tree/`，下文 `crates/...` 都指它）。
 冻结副本核过：`sha256sum -c research/prompts/m3-batch10t-code-r1-snapshot/crates-sha256.txt` 在副本根下 318 行全 OK。
-腿自己的探针与输出在 `research/prompts/m3-batch10t-code-r1-sonnet-model/`（README.md 写怎么重建草稿副本）。全部只跑 harness 档、经 `research/scripts/run-with-memory-cap.sh`，没有跑任何 checker 档包的测试二进制，没有上卡。
+腿自己的探针与输出在 `research/prompts/m3-batch10t-code-r1-sonnet-model/`（README.md 写怎么重建草稿副本）。全部只跑 harness 档、经 `scripts/run-with-memory-cap.sh`，没有跑任何 checker 档包的测试二进制，没有上卡。
 用户原话（背景材料正文第一节转抄，代码注释同引）：「仅仅管会不会对指定的电脑造成cpu或者gpu的oom」（`crates/singlefs-harness/src/gpu_memory_ledger.rs:7`）、「不压并发」（`crates/singlefs-harness/src/gpu_memory_ledger.rs:7`）。
 
 判定词：一致 / 冲突 / 规则没说。冲突与新形都标明「读码」或「量过」；量过的是账本这一层的纯 harness 单测，真卡上的行为（驱动、分配器）一律标「推的」。

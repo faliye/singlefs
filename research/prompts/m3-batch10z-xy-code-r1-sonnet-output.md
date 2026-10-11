@@ -440,7 +440,7 @@ admission_raises_the_floor_before_refusing                                  test
 ## 9. 引文核对
 
 ```
-$ python3 research/scripts/cite-check.py research/prompts/m3-batch10z-xy-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree --root /home/fy5090/code/singlefs | tail -1
+$ python3 scripts/cite-check.py research/prompts/m3-batch10z-xy-code-r1-sonnet-output.md --root ~/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree --root /home/fy5090/code/singlefs | tail -1
   ✓ 核了 11 处引文，对上 11 处，没判 0 处（逐处列在上面）
 ```
 

@@ -4,7 +4,7 @@
 
 材料：正文 `research/prompts/_gate-fix-forks-r1-body.md`，清单 `_gate-fix-forks-r1-checklist.md`、附录 `_gate-fix-forks-r1-appendix.md`，拼成 `_gate-fix-forks-r1-background.md`。这是第一轮：打中的先挂起，下面「暂定」的形态进第二轮再攻。
 
-**开工快照漂移**（`gate-fix-forks-r1-snapshot/sha256sums.txt`，2026-09-23 记，20 份）：变了 1 份。`.claude/gate.d/47-research-script-selftests.sh` 在腿跑着的时候被别的会话定点插进 1 行（第 29 行 `"bash research/scripts/watch.sh --selftest" \`）。倒推出快照时的原样存为 `gate-fix-forks-r1-snapshot/47-research-script-selftests.sh.at-snapshot`，sha256 与快照一致；经过写在同目录 `changed-during-legs.md`。攻方引的 `47:42` 落在副本第 42 行、主树第 43 行。
+**开工快照漂移**（`gate-fix-forks-r1-snapshot/sha256sums.txt`，2026-09-23 记，20 份）：变了 1 份。`.claude/gate.d/47-research-script-selftests.sh` 在腿跑着的时候被别的会话定点插进 1 行（第 29 行 `"bash scripts/watch.sh --selftest" \`）。倒推出快照时的原样存为 `gate-fix-forks-r1-snapshot/47-research-script-selftests.sh.at-snapshot`，sha256 与快照一致；经过写在同目录 `changed-during-legs.md`。攻方引的 `47:42` 落在副本第 42 行、主树第 43 行。
 
 **本地攻方提示的一条事实写错了**：fact 8-3 说截断点落在六字符算法名中间、剪成头两个字符。主 agent 拿生成器现跑（`.claude/scripts/gen-decision-items.py` 的 `clip`）：截在中间（`校验和算法取 SHA`，n=10）原样留着；剪成 `SH` 的是截断点**正好停在整词之后**（`校验和算法取 SHA256`，n=13 → `校验和算法取 SH`；`条带冗余按 RAID5`，n=11 → `条带冗余按 RAI`），剥尾正则 `[A-Z]-?\d+` 从词中间咬走 `A256` / `D5`。两份样本 T8 第 8、9 题建在这条错的事实上，作废；第 10 题不依赖它，照判。
 
@@ -51,7 +51,7 @@
 
 正推：`test-discipline.md:114` 管的是拿多条臂互比的实验；B2（设备日志比对）、B4（区域字节）是逐项对 ground truth，不在它的失效模式里；乙整目录一刀切比条款宽。缺口是 `crates/` 下 `e<数字>_` 开头的实验今天不在射程里，e156 合规只是碰巧。本地攻方两份样本：B1 实验、B2 工具、B3 实验，一致；B4 分歧（s1 按 fact 4-3「一次测量的干跑」判实验，s2 按 fact 4-4「输出交给 research 下另一份二进制去比」判工具），两份都算出乙今天红 B2、B4 两份。B4 的归属不稳定，不下结论。
 
-主 agent 现查：`research/e7-index-bench/src/bin` 下 145 份全部以 `e<数字>_` 开头（`ls … | grep -vcE '^e[0-9]+_'` → 0）。
+主 agent 现查：`scripts/experiments` 下 145 份全部以 `e<数字>_` 开头（`ls … | grep -vcE '^e[0-9]+_'` → 0）。
 
 **暂定（正推提的，零轮）**：庚——射程 = 今天那个目录 ∪ `crates/*/src/bin`、`research/*/src/bin` 下所有 `e<数字>_*.rs`；其余 `.rs` 照旧只列名。它是今天射程的严格超集，今天不新红（e156 有 1 条）；B4 不以 `e` 开头，不进射程，它的归属交第二轮。
 
@@ -59,7 +59,7 @@
 
 攻方打中甲：正文「只剩 72 号自带一份」不成立——40:88、88:30 自带基准（先认 `gate-ok`，再认上游的 **tip** 不是 merge-base），61:34–42 自带基准（默认分支上 merge-base 就是 HEAD），92:155–157 基准取自共用脚本、路径集合却自己算。61 那份能复现放行：定案分两次提交、第一次没推，61 号退 77（`t5-61-bypass`）。主 agent 读 61:33–41 核过：注释写「与共享门禁的 Show me test 同一套口径」，代码在 master 上取 `merge-base HEAD master`，就是 HEAD。攻方打中乙：一条要求「那一行有 git 字样」的判据漏掉 92（`git` 在另一行的列表里）；去掉这一条误伤 8 行合法用法；红落在 47 号上而出路指向被测脚本。丙只打中判据那一半。正推：甲被「踩过的坑要做成会失败的检查」排除，丙是唯一能配红绿样本的。
 
-**判**：40、61、88、92 四处改用 `research/scripts/changed-paths.sh`（两腿一致、有可复现的放行，选定）。**暂定丙**：新立一道阶段，判据零轮，进第二轮攻。
+**判**：40、61、88、92 四处改用 `scripts/changed-paths.sh`（两腿一致、有可复现的放行，选定）。**暂定丙**：新立一道阶段，判据零轮，进第二轮攻。
 
 主 agent 改这四处时又现查出三个洞，都在「改动范围的取法」这一格里：
 
@@ -75,7 +75,7 @@
 
 ### T11　共用脚本的基准要不要改认 `GATE_DIFF_BASE`（攻方在 T5 里挖出、不分辨臂，主 agent 立成一格）
 
-主 agent 现查坐实：`gate.sh:115–123` 算好 `GATE_DIFF_BASE` 导给每道阶段，注释的起因是「同一轮里两个阶段判的不是同一批改动……审计实测于使用者项目的一个本地阶段」；`.claude/gate.d/`、`research/scripts/`、`.claude/scripts/`、`.claude/hooks/` 里读它的 0 处。今天 `diff_base` → `896b73f`（HEAD~1），`gate_diff_base gate` → `3b60f09`（HEAD）。两者只在「全推出去了」这一种仓状态下不同：上游在 `merge-base` 等于 HEAD 时往回退到 `gate-ok` 或 HEAD~1。
+主 agent 现查坐实：`gate.sh:115–123` 算好 `GATE_DIFF_BASE` 导给每道阶段，注释的起因是「同一轮里两个阶段判的不是同一批改动……审计实测于使用者项目的一个本地阶段」；`.claude/gate.d/`、`scripts/`、`.claude/scripts/`、`.claude/hooks/` 里读它的 0 处。今天 `diff_base` → `896b73f`（HEAD~1），`gate_diff_base gate` → `3b60f09`（HEAD）。两者只在「全推出去了」这一种仓状态下不同：上游在 `merge-base` 等于 HEAD 时往回退到 `gate-ok` 或 HEAD~1。
 
 主 agent 在真仓上用两个基准各跑 11 道依赖改动范围的阶段（同一时刻，脚本 `scratchpad/window/compare.sh`）：10 道输出逐字相同；**68 号不同**——HEAD~1 窗口把上一次提交里的 `research/prompts/gate-reuse-sync.md` 算进这一批，它点名的 7 个文件（`stage-must-run.sh`、`gate-staged.sh`、54、55、59、87 号等）被当成「已在同步记录里点名」，红从 124 降到 117；而这一批对这 7 个文件的改动一个字都没写进同步记录。改认 `GATE_DIFF_BASE` 会让已经提交过的那一批的记录替这一批顶账。
 
@@ -148,7 +148,7 @@
 
 - T2：D8（核心索引结构） 已定项 3 第 68 行与已定项 5 第 107 行的条文冲突。
 - C46（门禁阶段自己不会红） 那一行（`checks-owed.md:48`）写 52 号「装不进沙箱、靠被调脚本自己的 `--selftest`」，52 号现在有合成样本，这句要改。
-- T11 那一格的两句错话：`research/scripts/archive-past-rounds.py:47` 说「68 号的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`……）」，门禁设的是 `GATE_DIFF_BASE`；上游 `diff_base` 在「全推出去了」时退到 HEAD~1，要报给上游。
+- T11 那一格的两句错话：`scripts/archive-past-rounds.py:47` 说「68 号的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`……）」，门禁设的是 `GATE_DIFF_BASE`；上游 `diff_base` 在「全推出去了」时退到 HEAD~1，要报给上游。
 
 ## 回看决策
 

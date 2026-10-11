@@ -10,7 +10,7 @@
 模型目录 `research/prompts/m3-retire-r1-opus-s2-model/`：`src/` 是纯模型（Rust，从 `research/prompts/m3-leaf-death-r3-opus-s2-model/src/model.rs` 拷起改，写路径换成 E176 的 M3，回退目标放开到被前一次回退抛弃的那一段，加六种退役读法、九条 K5 候选判据与 K4 计数）；`copy/opus_s2_retire_history.rs` 是放进冻结树副本 `crates/singlefs-harness/tests/` 的三条用例（内存稀疏盘 `SparseBlockDevice`）；`tools/summarize.py` 汇总；`expected/` 是第一次复跑 `rerun1/` 的 `summary/`。复跑（仓根；每条经内存包装，编译 6G、其余 4G，16 线程；同一时刻只起一条 cargo）：
 
 ```
-S=research/scripts; M=research/prompts/m3-retire-r1-opus-s2-model; O=<空目录>
+S=scripts; M=research/prompts/m3-retire-r1-opus-s2-model; O=<空目录>
 export S2_MODEL_DIR=$PWD/$M SINGLEFS_REPO=/home/fy5090/.local/share/singlefs/work/m3-retire-r1/tree S2_THREADS=16
 bash $S/run-with-memory-cap.sh 6G bash $S/capped.sh 16 bash $M/rerun.sh $O build
 for st in sweep demos determinism; do bash $S/run-with-memory-cap.sh 4G bash $S/capped.sh 16 bash $M/rerun.sh $O $st; done
@@ -211,7 +211,7 @@ S2SUM family=r reader=none histories=288 versions_judged=510262 r_versions=40668
 
 正文 `research/prompts/_m3-retire-r1-body.md:45`「一次发布至多写几条退役记录：删空摘掉、合并吸收各一条；」。
 
-推的（再量）：今天一次发布只删一条记录（K2.3 引的两处）。照 E176 的 M3（`research/e7-index-bench/src/bin/e176_inode_leaf_merge_capacity_and_rewrites.rs:211`「/// 从容器号为 `start_container_number` 的那片起，按 `order` 查它与左右邻两对，和 ≤ 233 就并；并完从幸存那片接着查，直到没有一对装得下。」）每次发布之后「相邻两片都装不进一片」对整棵树成立（删一条只动它所在那片的两对；并完的幸存那片比被并的两片都大；借不改借方与出借方之和），由此删一条至多一次「摘或并」：删空的那片原来只剩 1 条，它两边的邻居都满，摘掉之后新相邻那一对装不下；没删空时至多并一次。量到（族 r，从头照 M3 写）：每次有退役的发布都是 1 条，`retirement_records_in_one_publish_peak=1`（K3 那一行计数原样）。比「各一条」还紧。
+推的（再量）：今天一次发布只删一条记录（K2.3 引的两处）。照 E176 的 M3（`scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs:211`「/// 从容器号为 `start_container_number` 的那片起，按 `order` 查它与左右邻两对，和 ≤ 233 就并；并完从幸存那片接着查，直到没有一对装得下。」）每次发布之后「相邻两片都装不进一片」对整棵树成立（删一条只动它所在那片的两对；并完的幸存那片比被并的两片都大；借不改借方与出借方之和），由此删一条至多一次「摘或并」：删空的那片原来只剩 1 条，它两边的邻居都满，摘掉之后新相邻那一对装不下；没删空时至多并一次。量到（族 r，从头照 M3 写）：每次有退役的发布都是 1 条，`retirement_records_in_one_publish_peak=1`（K3 那一行计数原样）。比「各一条」还紧。
 
 **打中上界式**（量过）：这条整树不变量只在从头照 M3 写的树上有。今天的 crates 是 M1（只删空即摘，`/home/fy5090/.local/share/singlefs/work/m3-retire-r1/tree/crates/singlefs-core/src/inode_tree.rs:16`「//! **删除只有一种落法**」那一段），它写出来的树里相邻的小叶随处可见；换成 M3 之后第一次最后一批，E176 的「并到没有一对装得下」会连着吸收。`expected/cascade.txt` 原样（叶容量 6、退役容器 3 条）：
 

@@ -2,7 +2,7 @@
 """replay_mut.py <gpu|crash> : 对扫源码模型套我自己的变异（旧串→新串），编、跑，报哪些用例红（全绿 = 活下来）。"""
 import os, re, subprocess, sys
 W = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-tu-code-r1-sonnet')
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 S = os.path.expanduser('~/.local/share/singlefs/work/m3-batch10z-tu-code-r1/tree/crates/singlefs-checker-tier/src/')
 kind = sys.argv[1]
 only = set(sys.argv[2:])

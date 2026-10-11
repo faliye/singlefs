@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 复跑 m3-delete-checker-r1 攻方腿的原型（副本专用，不进 crates/）。
 # 用法（工作目录 = 当前目录，空目录里起；整条经内存包装与线程上限）：
-#   bash research/scripts/run-with-memory-cap.sh 5G bash research/scripts/capped.sh 10 bash <本目录>/rerun.sh <阶段>
+#   bash scripts/run-with-memory-cap.sh 5G bash scripts/capped.sh 10 bash <本目录>/rerun.sh <阶段>
 # 阶段：prepare（拷源树、打补丁、编）| legal <批大小> | random | mut <批大小> | extra | summary | all（依次全做，约 6 分钟）
 # 源树默认冻结副本 /tmp/claude-1000/m3-delete-checker-r1/tree，M3DC_SOURCE 可改；prepare 先按快照的 sha256 核源树。
 set -euo pipefail

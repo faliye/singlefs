@@ -2,7 +2,7 @@
 # probe_mut.sh <变异名> : 在 tree-pm 上套 mut3 的一个变异（debug 版 tree-a 的拷贝），编 p10z 探针，跑 a1 a2 a3 批，汇总
 set -u
 W=$HOME/.local/share/singlefs/work/m3-batch10z-vw-code-r1-sonnet
-R=/home/fy5090/code/singlefs/research/scripts
+R=/home/fy5090/code/singlefs/scripts
 name=$1
 rm -rf "$W/tree-pm"; mkdir -p "$W/tree-pm"; rsync -a --exclude target "$W/tree-a/" "$W/tree-pm/"
 python3 - "$name" <<'PY'

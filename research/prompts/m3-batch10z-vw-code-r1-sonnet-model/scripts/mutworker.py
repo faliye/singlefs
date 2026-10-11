@@ -6,7 +6,7 @@ import os, re, shlex, subprocess, sys, time
 tree, target, rows, done, budget = sys.argv[1:6]
 mem = sys.argv[6] if len(sys.argv) > 6 else '4G'
 threads = sys.argv[7] if len(sys.argv) > 7 else '5'
-R = '/home/fy5090/code/singlefs/research/scripts'
+R = '/home/fy5090/code/singlefs/scripts'
 start = time.time()
 seen = set()
 if os.path.exists(done):

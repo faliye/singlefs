@@ -51,7 +51,7 @@ checker-tier-layer0-replay.sh	1
 
 ## 二、怎么跑的
 
-- 逐格顺序跑，一次一格：`nice -n 19 bash research/scripts/capped.sh 8 timeout -k 10 300 bash .claude/gate.d/<门禁> --check <格>`，在仓根上跑、不给项目根参数（默认取脚本往上两级）。整道的三份（77、92、94）不带 `--check`。脚本在 `/tmp/claude-1000/gate-inventory/run-cells.sh`，清单 `cell-list.tsv` 77 行。
+- 逐格顺序跑，一次一格：`nice -n 19 bash scripts/capped.sh 8 timeout -k 10 300 bash .claude/gate.d/<门禁> --check <格>`，在仓根上跑、不给项目根参数（默认取脚本往上两级）。整道的三份（77、92、94）不带 `--check`。脚本在 `/tmp/claude-1000/gate-inventory/run-cells.sh`，清单 `cell-list.tsv` 77 行。
 - 开跑前看负载：没有 qemu、vm-bench、e152、fio；load average 2.46（32 核）；本机另有 vllm 本地模型与几个 claude 会话在跑。跑的是**工作区**（不是 `--staged` 的临时树），工作区里有几个会话的未提交改动，所以取改动范围的格（11 号几格、34 号几格、20 号 settled-same-file、30 号几格）判的是这些改动合在一起的样子。
 - 没跑：54、55、57、59、87（重型）与 15、74（要编译），第 6、10 列写「不跑」。
 - 两格撞了 300 秒停掉：12 号 term-renames（日志只有格名一行）、47 号 research-script-selftests。
@@ -83,21 +83,21 @@ $ awk -F'\t' 'NR>1 {v=$10; sub(/[（：(].*/,"",v); print v}' cells.tsv | sort |
 
 ```
 CLAIMED	53	RUN	48
-MISSING	research/scripts/layer0-shard-configuration-check.sh
-MISSING	research/scripts/layer0-shard-run-selftest.sh
-MISSING	research/scripts/memory-peaks.tsv
-MISSING	research/scripts/rerun-failed-tests.py
-EXEMPT	research/scripts/vm-bench.sh	自证要连起三次虚机，挂钟太重，不进每轮门禁
+MISSING	scripts/layer0-shard-configuration-check.sh
+MISSING	scripts/layer0-shard-run-selftest.sh
+MISSING	scripts/memory-peaks.tsv
+MISSING	scripts/rerun-failed-tests.py
+EXEMPT	scripts/vm-bench.sh	自证要连起三次虚机，挂钟太重，不进每轮门禁
 ```
 
 「声称有 --selftest」的认法是文件全文里出现 `--selftest` 这串字（:241–242 `"--selftest" in open(path…).read()`），不看它是不是自己的开关。逐份现查：
 
 | 文件 | 自己有没有 `--selftest` | 依据（`grep -n -- --selftest`） |
 |---|---|---|
-| research/scripts/layer0-shard-configuration-check.sh | 没有，只在注释里提别人的 | :24「research/scripts/layer0-shard-run.sh --selftest 里对应那一格判错」、:27「layer0-shard-run.sh --selftest 用」 |
-| research/scripts/layer0-shard-run-selftest.sh | 没有，它是别人的自证本体 | :2「research/scripts/layer0-shard-run.sh --selftest 的本体」；`layer0-shard-run.sh --selftest` 在 runner 表里（47 号:208） |
-| research/scripts/memory-peaks.tsv | 没有，是数据文件 | 内存包装写的峰值日志，第 248、249、598、743、1012、1081、2200、2207 行记的是别的命令行里的 `--selftest`；它被 .gitignore 挡着（`git check-ignore -v` → `.gitignore:14:/research/scripts/memory-peaks.tsv`），`--staged` 的临时树里没有它 |
-| research/scripts/rerun-failed-tests.py | 有 | :8 用法「rerun-failed-tests.py --selftest」、:154 `if arguments == ["--selftest"]`；runner 表与 15 号都没调它 |
+| scripts/layer0-shard-configuration-check.sh | 没有，只在注释里提别人的 | :24「scripts/layer0-shard-run.sh --selftest 里对应那一格判错」、:27「layer0-shard-run.sh --selftest 用」 |
+| scripts/layer0-shard-run-selftest.sh | 没有，它是别人的自证本体 | :2「scripts/layer0-shard-run.sh --selftest 的本体」；`layer0-shard-run.sh --selftest` 在 runner 表里（47 号:208） |
+| scripts/memory-peaks.tsv | 没有，是数据文件 | 内存包装写的峰值日志，第 248、249、598、743、1012、1081、2200、2207 行记的是别的命令行里的 `--selftest`；它被 .gitignore 挡着（`git check-ignore -v` → `.gitignore:14:/scripts/memory-peaks.tsv`），`--staged` 的临时树里没有它 |
+| scripts/rerun-failed-tests.py | 有 | :8 用法「rerun-failed-tests.py --selftest」、:154 `if arguments == ["--selftest"]`；runner 表与 15 号都没调它 |
 
 所以四份里三份是认法认错（文本里提到而已），一份（rerun-failed-tests.py）是真有自证、没人跑。
 
@@ -108,22 +108,22 @@ EXEMPT	research/scripts/vm-bench.sh	自证要连起三次虚机，挂钟太重�
 
 ```
   ✗ 这些 research 脚本声称有 --selftest，却没有任何门禁阶段在跑它：
-      research/scripts/layer0-shard-configuration-check.sh
-      research/scripts/layer0-shard-run-selftest.sh
-      research/scripts/memory-peaks.tsv
-      research/scripts/rerun-failed-tests.py
+      scripts/layer0-shard-configuration-check.sh
+      scripts/layer0-shard-run-selftest.sh
+      scripts/memory-peaks.tsv
+      scripts/rerun-failed-tests.py
   → 怎么办：把它加进上面的 runner 表；确实不该每轮跑的，登记进 NOT_RUN_HERE 并写明为什么——没人跑的自证只在写它的那天跑过一次。
 rc=1 用时 344 秒
 ```
 
   原 47 号的 runner 表 41 条（新的 45 条，多了 mutation-shard-run.sh、multi-host-run.sh、crates-mutation-rows.py、migrate-changelog-format.py 四条）在今天的工作区上全过（日志里没有一行 runner 的 ✗），然后覆盖段报同样四份，退 1。
-- 另在 HEAD 那棵树上现算（`git show HEAD:` 取出 research/scripts/ 78 份与 `.claude/gate.d/[0-9][0-9]-*.sh` 79 份放进 `head-coverage-tree/`，跑同一段覆盖代码）：`CLAIMED 49 RUN 44`，MISSING 是 harness-test-timing.py、layer0-shard-configuration-check.sh、layer0-shard-run-selftest.sh、rerun-failed-tests.py。也就是说三份在合并之前的 HEAD 上就判红；memory-peaks.tsv 只在工作区出现（没进 git）；harness-test-timing.py 今天在暂存区里是删除（`git status` 为 `D `）。
+- 另在 HEAD 那棵树上现算（`git show HEAD:` 取出 scripts/ 78 份与 `.claude/gate.d/[0-9][0-9]-*.sh` 79 份放进 `head-coverage-tree/`，跑同一段覆盖代码）：`CLAIMED 49 RUN 44`，MISSING 是 harness-test-timing.py、layer0-shard-configuration-check.sh、layer0-shard-run-selftest.sh、rerun-failed-tests.py。也就是说三份在合并之前的 HEAD 上就判红；memory-peaks.tsv 只在工作区出现（没进 git）；harness-test-timing.py 今天在暂存区里是删除（`git status` 为 `D `）。
 
 ## 五、跑的先后有依赖的
 
-1. **77 号要在所有跑测试的阶段之后，而按文件名排它不在最后。** 共享 gate.sh 按文件名排序逐个跑本地阶段（`.claude/singlefs-ai-sop/scripts/gate.sh:636` `find "$GATE_D" -maxdepth 1 -name '*.sh' … | sort`）；77 号自己的分界写的是「这一阶段排在最后」（`.claude/gate.d/77-test-environment.sh:40`），取祖先 gate.sh 的启动时刻当分界、晚于它的临时条目不判红（:38–41）。按文件名 87、92、94 排在 77 后面；87 号起 research/scripts/replay.sh，它的输出目录是 `${TMPDIR:-/tmp}/singlefs-replay-$$`（replay.sh:30），名字落在 77 号扫的 singlefs-* 里（77 号今天的日志「共查 206 项 singlefs-*」）。推的，没量过：87 留下的东西这一趟 77 看不见，下一趟门禁开跑之前留下的会被下一趟 77 判红（与 C474 同形，`.claude/kb/checks-owed.md:396`）。92、94 只读文本。
+1. **77 号要在所有跑测试的阶段之后，而按文件名排它不在最后。** 共享 gate.sh 按文件名排序逐个跑本地阶段（`.claude/singlefs-ai-sop/scripts/gate.sh:636` `find "$GATE_D" -maxdepth 1 -name '*.sh' … | sort`）；77 号自己的分界写的是「这一阶段排在最后」（`.claude/gate.d/77-test-environment.sh:40`），取祖先 gate.sh 的启动时刻当分界、晚于它的临时条目不判红（:38–41）。按文件名 87、92、94 排在 77 后面；87 号起 scripts/replay.sh，它的输出目录是 `${TMPDIR:-/tmp}/singlefs-replay-$$`（replay.sh:30），名字落在 77 号扫的 singlefs-* 里（77 号今天的日志「共查 206 项 singlefs-*」）。推的，没量过：87 留下的东西这一趟 77 看不见，下一趟门禁开跑之前留下的会被下一趟 77 判红（与 C474 同形，`.claude/kb/checks-owed.md:396`）。92、94 只读文本。
 2. **共享阶段先于本地阶段**：「本地阶段判别力」stage-selftest（gate.sh:404）与「构建与单测」check.sh（gate.sh:539）都在「项目本地阶段」（gate.sh:631）之前跑；check.sh 的 `cargo test --all` 已在 debug 下跑过 54 号快档与 74 号那批用例（见 cells.tsv 第 7 列）。
-3. **跨趟的依赖**：55、57、59、74、87 号先问 research/scripts/stage-must-run.sh，比 `refs/sop/staged-green` 那棵树与这次暂存树（stage-must-run.sh:16）；那条 ref 只在 research/scripts/gate-staged.sh 起的整轮全绿之后才前移（gate-staged.sh:4、:47）。所以这几道「这一次要不要跑」取决于上一次整轮门禁有没有全绿。54 号快档核的全绿标记由此前的 `--full` 写（54 号:21），同样跨趟。
+3. **跨趟的依赖**：55、57、59、74、87 号先问 scripts/stage-must-run.sh，比 `refs/sop/staged-green` 那棵树与这次暂存树（stage-must-run.sh:16）；那条 ref 只在 scripts/gate-staged.sh 起的整轮全绿之后才前移（gate-staged.sh:4、:47）。所以这几道「这一次要不要跑」取决于上一次整轮门禁有没有全绿。54 号快档核的全绿标记由此前的 `--full` 写（54 号:21），同样跨趟。
 4. **写回的次序**：30 号 status-sync 的 `--write` 按 decisions.md 索引表的「状态」「结论（简报）」两格重写史册节顶的现状行（30 号:57–60）；20 号 decision-items-sync 的 `--write` 重写的正是 decisions.md 索引表的「状态」列（20 号:26、:35–36）。修红时 20 号的 `--write` 要先于 30 号的 `--write`，反过来 30 号写进去的是旧状态。门禁里的判定次序（20 在 30 前）与这个一致。
 5. **归档与同步记录打架**：34 号 archive-past-rounds 要求删掉上一轮的记录，11 号 knowledge-sync 要求改动范围里的同步记录还在；C450 仍欠（`.claude/kb/checks-owed.md:376`），34 号的出路里写了「不给基准…删完门禁 11 号的 knowledge-sync 格当场红」（`logs/34-doc-experiment-pages-and-products__archive-past-rounds.log`）。这是 `--apply` 与判定之间的先后，不是门禁里的次序。
 6. 10 号 citations 在整道七格全跑时先在后台起、轮到它时再 wait（10 号:23–24），是道内的并行，与别的阶段无关。
@@ -157,7 +157,7 @@ rc=1 用时 344 秒
 - 54、55、57、59、87 号（重型）与 15、74 号（要编译）没跑，第 6、10 列写「不跑」；它们的「判什么、读什么」取自文件头与 stage-inputs.tsv。
 - 12 号 term-renames、47 号 research-script-selftests 撞 300 秒停掉，没有完整判定；47 号那一格的覆盖段另外现算了（第四节）。term-renames 没有另算。
 - 「抓到过没有」一列不是穷举：我按旧号（「门禁 N 号」「N 号」、旧文件名）在 records/、.claude/kb/、research/prompts/ 里搜到 3716 行命中（`hits.txt`，`grep -vc '^=== ' hits.txt` 数），只逐条读了 records/ 与 kb 里的那一部分（`hits-kb-records.txt`）和带强信号词的一部分（`strong-hits.txt`），research/prompts/ 里的大半没逐条读；写「没找到记录」的格可能有漏的。也没搜 git 历史里已归档的文件。
-- 「与谁重复」只比了共享 gate.sh 第 380–560 行那批阶段与这 23 道之间；没比钩子（除 write-guard 共用库那一处）、没比 research/scripts 里不属于门禁的检查。
+- 「与谁重复」只比了共享 gate.sh 第 380–560 行那批阶段与这 23 道之间；没比钩子（除 write-guard 共用库那一处）、没比 scripts 里不属于门禁的检查。
 - 各格的红没有修，也没判归属是这一轮的还是别的会话的（只按日志写了点名的文件）。
 - 没跑 `gate.sh` 整轮与 `gate-staged.sh`，没做任何 git 写操作，没改仓里任何文件。
-- 删了自己在草稿目录建的两份仓副本：`/tmp/claude-1000/gate-inventory/head-coverage-tree`（2.9M，HEAD 的 research/scripts 与门禁阶段）、`/tmp/claude-1000/gate-inventory/old47-tree`（24K，原 47 号的拷贝与两个指回真仓的符号链接）。没删：`logs/`（428K，各格原样日志）、`old47-run.log`、`old47-run-attempt1.log`、`old47.sh`、`coverage.py`、`timings.tsv`、`hits*.txt`、`gen_part*.py` 与 `assemble.py`（cells.tsv 的生成器）——都是这份报告的依据，主 agent 要核。
+- 删了自己在草稿目录建的两份仓副本：`/tmp/claude-1000/gate-inventory/head-coverage-tree`（2.9M，HEAD 的 scripts 与门禁阶段）、`/tmp/claude-1000/gate-inventory/old47-tree`（24K，原 47 号的拷贝与两个指回真仓的符号链接）。没删：`logs/`（428K，各格原样日志）、`old47-run.log`、`old47-run-attempt1.log`、`old47.sh`、`coverage.py`、`timings.tsv`、`hits*.txt`、`gen_part*.py` 与 `assemble.py`（cells.tsv 的生成器）——都是这份报告的依据，主 agent 要核。

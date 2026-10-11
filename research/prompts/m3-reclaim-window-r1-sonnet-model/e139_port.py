@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E139 装置（research/e7-index-bench/src/bin/e139_tightened_floor.rs）活化一族世界的 Python 端口。
+"""E139 装置（scripts/experiments/e139_tightened_floor.rs）活化一族世界的 Python 端口。
 只端口 G2SW / G2SW_ringgate 在 activation_faults / activation_crash_no_loss / skip_then_raise 三族里走到的那部分。
 目的：先逐行复现产物 research/results/e139-tightened-floor-2026-10-04.out 的 w_activation 行（fakes / unrecoverable / checks），
 再在副本上一次只改一处。端口与 Rust 装置不共用代码，行号引自 Rust 装置。

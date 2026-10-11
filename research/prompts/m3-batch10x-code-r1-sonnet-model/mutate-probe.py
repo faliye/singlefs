@@ -11,7 +11,7 @@ for name, old, new in mutants:
     assert orig.count(old) == 1, (name, orig.count(old))
     open(src, 'w').write(orig.replace(old, new))
     try:
-        r = subprocess.run(['nice','-n','19','bash','/home/fy5090/code/singlefs/research/scripts/capped.sh','10','bash','/home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh','4G','cargo','test','-p','singlefs-harness','--lib','--offline','gpu_memory_ledger'],
+        r = subprocess.run(['nice','-n','19','bash','/home/fy5090/code/singlefs/scripts/capped.sh','10','bash','/home/fy5090/code/singlefs/scripts/run-with-memory-cap.sh','4G','cargo','test','-p','singlefs-harness','--lib','--offline','gpu_memory_ledger'],
                            cwd=repo, env=env, capture_output=True, text=True, timeout=200)
         out = r.stdout + r.stderr
         res = [l for l in out.splitlines() if l.startswith('test result') or 'error[' in l or l.startswith('error')]

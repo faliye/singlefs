@@ -12,7 +12,7 @@
 |---|---|---|
 | 冻结副本对快照清单 | `cd tree; sha256sum -c research/prompts/m3-formal-code-b24-r1-snapshot/crates-sha256.txt \| awk '{print $NF}' \| sort \| uniq -c`，再 `wc -l` 清单 | 输出 `288 OK`，清单 288 行，没有一行不是 OK |
 | 前腿落盘的东西 | `ls -la` 模型目录与 `out/` | `k1_model.py`、`k1_run.sh`、`probe/` 三份探针、`out/` 7 份日志都在；报告没有 |
-| 前腿 K1 小模型 | 给 `k1_model.py` 加三条改坏（`take13`、`last12-window`、`last16-window`，用 `research/scripts/replace-once.py` 改），全部 20 个变异目录重跑 `k1_run.sh`（正常取样与加强取样各一遍） | 输出落 `out/r2-k1-rows-and-extras.log`、`out/r2-k1-stronger-sampling.log`；前腿已有的变异结局逐个同 |
+| 前腿 K1 小模型 | 给 `k1_model.py` 加三条改坏（`take13`、`last12-window`、`last16-window`，用 `scripts/replace-once.py` 改），全部 20 个变异目录重跑 `k1_run.sh`（正常取样与加强取样各一遍） | 输出落 `out/r2-k1-rows-and-extras.log`、`out/r2-k1-stronger-sampling.log`；前腿已有的变异结局逐个同 |
 | 前腿 B1 探针 | `B24_GRID=base` 与 `drift` 各重跑一遍 | 汇总行与前腿日志逐字同（见 K2-a），落 `out/r2-b1-*-grid.summary.txt` |
 | 前腿撕裂探针 | 重跑 | 4 passed，落 `out/r2-torn-device-zero.log` |
 | 前腿真历史探针 | 前腿跑 48 操作那一遍中途 `error: test failed`、没留下数 | 重跑 64 史 × 16 操作、16 史 × 48 操作，两遍都 `test result: ok`，落 `out/r2-real-history-segments-*.log` |
