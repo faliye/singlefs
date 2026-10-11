@@ -355,7 +355,7 @@ A=scripts/experiments/e142_new_pool_file_creation_dry_run.rs
 for pattern in 'STATISTIC_COMMITTED_RESERVATION_BYTES, TREE_IDENTIFIER_NONE, 0)' 'for statistic in \[STATISTIC_UNRECLAIMABLE_BYTES, STATISTIC_PENDING_DELETE_BYTES, STATISTIC_COMMITTED_RESERVATION_BYTES\]' '准入不等式要的四项 day-1 各写一行 0' '三项 0（读不到行是坏账'; do printf '%s => ' "$pattern"; grep -c "$pattern" $A; done
 echo "287、295 两个数在冻结源码里的每一处命中（命令 grep -nE '(^|[^0-9_x])(287|295)([^0-9_]|\$)' \$A）："
 grep -nE '(^|[^0-9_x])(287|295)([^0-9_]|$)' $A | cut -c1-200
-echo "变异表第 2、3 列里 287、295 的命中行数：$(awk -F'\t' '{s=$2 "\t" $3; if (s ~ /(^|[^0-9_x])(287|295)([^0-9_]|$)/) c++} END{print c+0}' scripts/mutations/e142_new_pool_file_creation_dry_run.tsv)"
+echo "变异表第 2、3 列里 287、295 的命中行数：$(awk -F'\t' '{s=$2 "\t" $3; if (s ~ /(^|[^0-9_x])(287|295)([^0-9_]|$)/) c++} END{print c+0}' scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv)"
 echo
 echo "## Q142.95 判决字段不翻面（R70 (c)、R71）：flips22.py 三对"
 echo "--- 第 21 次主产物 → N22"; python3 $D/flips22.py $P $M

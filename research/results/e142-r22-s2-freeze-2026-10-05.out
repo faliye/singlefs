@@ -1,10 +1,10 @@
 # E142 r22 第二段步 ⑥ 冻结：装置、变异表、单测、命令六与命令七、锚点核对、导出前后的 sha256
 ## 冻结值（命令 sha256sum 与 wc -l）
 c400139b8cfc7c0e4b96d483200055e9891252c9171bbbeb06771046bf63d899  scripts/experiments/e142_new_pool_file_creation_dry_run.rs
-ef63ea858443d708868f3ca55659f62727e4c867d96b5c234bf4dbf3e1fcf1c3  scripts/mutations/e142_new_pool_file_creation_dry_run.tsv
+ef63ea858443d708868f3ca55659f62727e4c867d96b5c234bf4dbf3e1fcf1c3  scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv
 662c9df72343dddcbb464d3910d309876730d7e3ba8f880115d49ba636a65624  scripts/experiments/target/release/e142-new-pool-file-creation-dry-run
  10866 scripts/experiments/e142_new_pool_file_creation_dry_run.rs
-   210 scripts/mutations/e142_new_pool_file_creation_dry_run.tsv
+   210 scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv
  11076 total
 ## 单测（命令：cargo test --release -p e7-index-bench --bin e142-new-pool-file-creation-dry-run --no-run 编出测试二进制，经 run-with-memory-cap.sh 跑；原样 test result 行见 /tmp/claude-1000/e142-r22-run2/test-3.out 的最后一行）
 test result: ok. 117 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.23s
