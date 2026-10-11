@@ -15,7 +15,7 @@
 第一轮正文第二节、事实表 `~/.local/share/singlefs/work/crash-enumeration-merge-facts/report.md` 与第一轮两腿报告照旧有效；第一轮之后主工作区变了的：
 - 根环第二十六块合入（`~/.local/share/singlefs/work/m3-r1/batch10z-26a/patch/`、`…/batch10z-26b/patch/`）：`crates/singlefs-checker-tier/src/crash_amplification.rs` 与 `gpu_unit_checks.rs` 只改了测试模块（切口用例各加方括号那一形、故意拒的写法），`crates/singlefs-core/src/mounted_session.rs` 推环入口先核盘表次序。合入后验证在跑。
 - 删除线第 52–55 批已合入；第 56 批在做，要改 `crash_judge_checker_scan.wgsl`、`crash_judge_checker_common.wgsl`、`crash_judge_gpu.rs`、`crash_judge_dispatch.rs`、`crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs`（往 GPU 判器里加判法），可能在这一轮腿跑着时合入，判决时照它的补丁核。
-- 工具批 T1、T2 已合入（研究脚本、门禁结构；`scripts/lib_libtest_result_lines.py` 新库）；T3 在改 `scripts/admission.py`、`.claude/hooks/lib_heavy_tests.py`、`.claude/gate.d/stage-inputs.tsv` 等，这几份不在这一轮快照里，腿引它们只引事实、不钉行号。
+- 工具批 T1、T2 已合入（研究脚本、门禁结构；`scripts/gate/lib_libtest_result_lines.py` 新库）；T3 在改 `scripts/gate/admission.py`、`.claude/hooks/lib_heavy_tests.py`、`.claude/gate.d/stage-inputs.tsv` 等，这几份不在这一轮快照里，腿引它们只引事实、不钉行号。
 - 方案按 `crates/` 今天的实现来谈。
 
 ## 三、被判的形态（收严后，一种）
@@ -30,9 +30,9 @@
 - G8 判法版本与复用键：块键 = 这一步带屏障的写表 + 起步镜像（照今天 `crash_amplification.rs` 文件头）；判定按（块键，判法版本）存；判法版本 = 判器闭包（`crash.rs`、GPU 判器）∪ 这一项测试文件出发的闭包 ∪ 引擎（`crash_amplification.rs` 与它的依赖）∪ 观察者代码。随机历史两项的键 = 种子 + 规模参数 + 测试文件出发的整份闭包，判定按段存。两份文件头口径统一成这一条。
 - G9 两档：快档 = 每项在「甲二」（`InPlaceSubsetsWithCopyOnWriteNoneOrAll`）与展开 6 两个域的并集上判（随机历史两项用小种子数），GPU 判镜像、CPU 对拍与观察者都跑，每次提交跑；整域 = 每段全展开（`EveryProperSubset`），每次提交跑，默认剪枝（键与判法版本都同才复用、与已判等价的才剪，等价关系有用例钉住），点名全量就清空复用。提交只等 GPU 那一截跑完；CPU 那一截（对拍与要真跑实现的观察者）日常剪枝跑，提交时它没跟上的那一版逐项报「CPU 对拍本次未跑完」，里程碑收尾与 E171 冻结之前必须跟上。点名单跑一项与它在整域里跑判定相同；剪枝自证（关掉剪枝与复用在小输入上逐项相同）进快档。
 - G10 整域里装不进 u64 的段：按段登记（不是整条流），照 `test-script-discipline.md`「按登记整批不判的一类不算剪枝」报 `states_skipped_by_ignore`、成功那句逐个列「本次未跑」，同一条流里装得进的段照判。
-- G11 跑在哪：多机配置合成一份、默认 `ENABLE_GPU=1`；GPU 照 `scripts/gpu-quiesce-run.sh` 清场与私有显卡配置；配置开了 GPU 而卡用不上（显存借不到、第二台连不上）退 78，不降级、不报绿；双机照今天放量与层 0 分片合成一套。
+- G11 跑在哪：多机配置合成一份、默认 `ENABLE_GPU=1`；GPU 照 `scripts/crash/gpu-quiesce-run.sh` 清场与私有显卡配置；配置开了 GPU 而卡用不上（显存借不到、第二台连不上）退 78，不降级、不报绿；双机照今天放量与层 0 分片合成一套。
 - G12 条款：D13 已定项 9「全量指两样」改成一样；层表只留「范围」一列（按负载规模分层），「什么时候跑」整块归 G9 两档；已定项 15、`.claude/rules/verification.md`、`.claude/rules/implementation-workflow.md`、`.claude/main-agent.md`、`.claude/skills/crash-test/commit-stages.md` 跟着改。
-- G13 旧数：事实表第 6 节 8 处加 `scripts/crash-amplification.sh` 第 42 行探针段形，落地那一批改成现值。
+- G13 旧数：事实表第 6 节 8 处加 `scripts/crash/crash-amplification.sh` 第 42 行探针段形，落地那一批改成现值。
 - G14 切批与次序：一、脚本、门禁、钩子、登记表、条款（G2、G9 的入口与档、G10、G11、G12），不碰 `crates/`；二、`crash_amplification.rs` 引擎口子（G4、G6、G7、G8）与只在合并范围里的测试文件；三、GPU 判器那几份（G5、G6），等删除线第 56 批合入后从主工作区拷底；四、英文标识符改名（G1）；之后整域一趟、E171 冻结。
 
 ## 四、格
@@ -69,5 +69,5 @@ G1–G14 逐条对第一节「用户已定」的每一句：有没有一条违�
 - 引代码写仓里的路径与行号，开工时 `sha256sum` 记下你引的文件；第二节点名的那几份可能在你跑着时变，引它们只引事实。
 - 腿自己量的数在自己的草稿目录（`~/.local/share/singlefs/work/<腿名>/`）里量，报告写命令与原样输出；量法拷仓副本，不在主工作区改。读码推出的「没打中」尽量换成造出来的反例尝试。
 - **不跑 checker 档**：`singlefs-checker-tier` 包的任何测试（含快用例、直接执行它的测试二进制）、链它的库的小程序、门禁阶段（`--list`、`--list-items` 除外）、崩溃放量、GPU，一律不跑；要它们的数写进报告「要主 agent 跑的命令」交回。harness 档、纯算术模型、抽出来的独立小程序可以跑。
-- 本机内存 60G、几条线同时在跑：每条编译与测试命令经 `scripts/run-with-memory-cap.sh` 带不超过 12G 的上限，同时起的件数乘上限不超过 12G。
+- 本机内存 60G、几条线同时在跑：每条编译与测试命令经 `scripts/hosts/run-with-memory-cap.sh` 带不超过 12G 的上限，同时起的件数乘上限不超过 12G。
 - 报告分段落盘：每一次工具调用写进文件的内容不超过 150 行，第一段排他新建，回复只写短句。
