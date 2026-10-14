@@ -13,7 +13,7 @@ E7RESULT name=anchor id="甲7 用户数据落点起点" observed="0,2,4" expecte
 E7RESULT name=anchor id="甲7 提交内生块落点" observed="{0,1},{2,3},{4,5}" expected="{0,1},{2,3},{4,5}" ok=true
 E7RESULT name=anchor id="甲6 发树 ID 的起点（0 = 没发）" observed="65536,0,0" expected="65536,0,0" ok=true
 E7RESULT name=anchor id="甲6 期末树 ID 水位" observed="65548" expected="65548" ok=true
-E7RESULT name=anchor id="甲6 第一个事务发的树 ID" observed="65536,65537,65538,65539,65540,65541,65542,65543,65544,65545,65546,65547" expected="65536,65537,65538,65539,65540,65541,65542,65543,65544,65545,65546,65547" ok=true
+E7RESULT name=anchor id="甲6 新池新建文件发的树 ID" observed="65536,65537,65538,65539,65540,65541,65542,65543,65544,65545,65546,65547" expected="65536,65537,65538,65539,65540,65541,65542,65543,65544,65545,65546,65547" ok=true
 E7RESULT name=anchor id="甲8 一个 txg 与一个根环槽" observed="batch_txg=6 batch_root_slot=(0,2) transactions_with_own_txg=0" expected="batch_txg=6 batch_root_slot=(0,2) transactions_with_own_txg=0" ok=true
 E7RESULT name=anchor id="乙1 A去锁 n=2" observed="schedules=6 U=4/4 G=8/4 I=4/4 X=4/4" expected="schedules=6 U=4/4 G=8/4 I=4/4 X=4/4" ok=true
 E7RESULT name=anchor id="乙1 A去锁 n=3" observed="schedules=90 U=120/84 G=240/84 I=120/84 X=120/84" expected="schedules=90 U=120/84 G=240/84 I=120/84 X=120/84" ok=true

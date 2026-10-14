@@ -1,0 +1,71 @@
+== E142 r25 第一段步 ④ comparisons；脚本 s1_comparisons.sh sha256 b73b83fc4433185b5ff4fa5ca9fc1cb162e9c5434124e07636e4639877a6e098
+== 登记行（步 ④(1) 现跑）
+registry_exit=0 lines=1
+E7RESULT name=segments path=mkfs operations=25 segments=14+1+1+1+4 closed_form=16402 kinds=[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+== PC-reg（N24R） 产物 mkfs 行对登记行
+mkfs_lines_before_done=1
+E7RESULT name=segments path=mkfs operations=23 segments=12+1+1+1+4 closed_form=4114 kinds=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+R25_MKFS arm=N24R cmp=different
+R25_MKFS_FIELD arm=N24R field=operations different fixture=23 registry=25
+R25_MKFS_FIELD arm=N24R field=segments different fixture=12+1+1+1+4 registry=14+1+1+1+4
+R25_MKFS_FIELD arm=N24R field=closed_form different fixture=4114 registry=16402
+R25_MKFS_FIELD arm=N24R field=kinds different fixture=[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2] registry=[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+== Q142.127（N25M） 产物 mkfs 行对登记行
+mkfs_lines_before_done=1
+E7RESULT name=segments path=mkfs operations=25 segments=14+1+1+1+4 closed_form=16402 kinds=[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+R25_MKFS arm=N25M cmp=same
+R25_MKFS_FIELD arm=N25M field=operations same value=25
+R25_MKFS_FIELD arm=N25M field=segments same value=14+1+1+1+4
+R25_MKFS_FIELD arm=N25M field=closed_form same value=16402
+R25_MKFS_FIELD arm=N25M field=kinds same value=[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+== Q142.128（N25M）mkfs 两侧计数
+R25_Q128 item=1 crates_mkfs_operations=25 fixture_operations=25 equal=true
+E7RESULT name=before_window_summary side=model operations=47 writes=33 last_five=device0@16781312+4096,device1@16781312+4096,device0@7340032+512,device0@0+4096,device1@0+4096
+E7RESULT name=before_window_summary operations=47 writes=33 last_five=device0@16781312+4096,device1@16781312+4096,device0@7340032+512,device0@0+4096,device1@0+4096
+R25_Q128 field=operations fixture=47 crates=47 equal=true
+R25_Q128 field=writes fixture=33 crates=33 equal=true
+R25_Q128 field=last_five fixture=device0@16781312+4096,device1@16781312+4096,device0@7340032+512,device0@0+4096,device1@0+4096 crates=device0@16781312+4096,device1@16781312+4096,device0@7340032+512,device0@0+4096,device1@0+4096 equal=true
+== Q142.130（守门 N24R -> N25M，profile mkfs）
+R25 profile=mkfs lines_old=1124 lines_new=1127 e2_e3_removed=true
+R25_GROUP name=before_window_summary rows_old=1 rows_new=1 changed=1 added=0 removed=0 problems=none
+R25_GROUP name=gap rows_old=33 rows_new=33 changed=1 added=0 removed=0 problems=none
+R25_GROUP name=journal_header_write_digest rows_old=60 rows_new=62 changed=0 added=2 removed=0 problems=none
+R25_GROUP name=journal_header_write_digest_summary rows_old=1 rows_new=1 changed=1 added=0 removed=0 problems=none
+R25_GROUP name=segments rows_old=5 rows_new=5 changed=1 added=0 removed=0 problems=none
+R25_GROUP name=segments_geometry rows_old=0 rows_new=1 changed=0 added=1 removed=0 problems=none
+R25_GROUP name=segments_sensitivity rows_old=13 rows_new=13 changed=1 added=0 removed=0 problems=none
+R25_GROUP name=segments_three_state rows_old=5 rows_new=5 changed=1 added=0 removed=0 problems=none
+R25 changed_lines_total=9
+R25_VERDICT profile=mkfs pass=true groups_bad=none groups_to_attribute=none
+guard_exit=0
+== Q142.131（N25M）
+line: E7RESULT name=segments_geometry point=G1B path=mkfs operations=14 segments=7+1+1+1+2 closed_form=134 kinds=[zero_fill×5,unit_write×2,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×2,barrier]
+segments_geometry_lines=1
+R25_Q131 item=1 field=operations fixture=14 a_m2=14 equal=true
+R25_Q131 item=1 field=segments fixture=7+1+1+1+2 a_m2=7+1+1+1+2 equal=true
+R25_Q131 item=1 field=closed_form fixture=134 a_m2=134 equal=true
+R25_Q131 item=1 field=kinds fixture=[zero_fill×5,unit_write×2,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×2,barrier] a_m2=[zero_fill×5,unit_write×2,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×2,barrier] equal=true
+g11_mkfs_lines=1
+E7RESULT name=segments_sensitivity point=G11 trailing_barrier=off path=mkfs operations=25 segments=14+1+1+1+4 closed_form=16402 closed_form_three_state=16402 in_place_per_segment=0+0+0+0+0 kinds=[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]
+R25_Q131 item=2 field=operations g11=25 main=25 equal=true
+R25_Q131 item=2 field=segments g11=14+1+1+1+4 main=14+1+1+1+4 equal=true
+R25_Q131 item=2 field=closed_form g11=16402 main=16402 equal=true
+R25_Q131 item=2 field=kinds g11=[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2] main=[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2] equal=true
+== P2 与 PC-e（N24R）
+320:E7RESULT name=positive_control_p2 arm=arm_n16 point=a_level1_pointer_first_byte region=allocation_internal_of_device_0 device=0 injected_offset=145 regions_flagged=1 matches_injection=true
+321:E7RESULT name=positive_control_p2 arm=arm_n16 point=b_root_largest_key_last_byte region=allocation_root device=0 injected_offset=71 regions_flagged=1 matches_injection=true
+322:E7RESULT name=positive_control_p2 arm=arm_n16 point=c_extent_leaf_entry_tag_byte region=extent_root device=0 injected_offset=187 regions_flagged=1 matches_injection=true
+323:E7RESULT name=positive_control_p2 arm=arm_n16 point=d_journal_named_item_5_first_byte region=journal_record device=0 injected_offset=711 regions_flagged=1 matches_injection=true
+899:E7RESULT name=layout_field_positive_control injected=4 detected=4 exact=true
+== P2 与 PC-e（N25M）
+323:E7RESULT name=positive_control_p2 arm=arm_n16 point=a_level1_pointer_first_byte region=allocation_internal_of_device_0 device=0 injected_offset=145 regions_flagged=1 matches_injection=true
+324:E7RESULT name=positive_control_p2 arm=arm_n16 point=b_root_largest_key_last_byte region=allocation_root device=0 injected_offset=71 regions_flagged=1 matches_injection=true
+325:E7RESULT name=positive_control_p2 arm=arm_n16 point=c_extent_leaf_entry_tag_byte region=extent_root device=0 injected_offset=187 regions_flagged=1 matches_injection=true
+326:E7RESULT name=positive_control_p2 arm=arm_n16 point=d_journal_named_item_5_first_byte region=journal_record device=0 injected_offset=711 regions_flagged=1 matches_injection=true
+902:E7RESULT name=layout_field_positive_control injected=4 detected=4 exact=true
+== Q142.132（第 24 次主产物 -> N24R，profile same）
+R25 profile=same lines_old=1124 lines_new=1124 e2_e3_removed=true
+R25_GROUP name=p8g_control_main_point rows_old=1 rows_new=1 changed=1 added=0 removed=0 problems=must_not_change
+R25 changed_lines_total=1
+R25_VERDICT profile=same pass=false groups_bad=p8g_control_main_point groups_to_attribute=none
+guard_exit=0

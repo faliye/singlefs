@@ -1,6 +1,6 @@
 # E142 第 21 次重跑步 ②：对改后的源码跑变异表的两张小表（不是整张 199 条；整张交主 agent 跑，见登记第十二节修订）
 # 跑的那一刻的源码比后来冻结的少 7.2 B2、B3、B10、B11 的几处钉值断言与 placements_match_the_independently_computed_byte_offsets 这一条单测（只加断言与单测，装置里被变异的代码一个字没动），那一刻的 sha256 没有留；冻结版的 sha256 见登记第十二节修订
-# 小表一：整张表末 22 行（M199–M203 旧行 + M204–M220 新行），命令：cd scripts/experiments && MUTATE_TARGET_DIR=<草稿目录> MUTATE_JOBS=4 MUTATE_MEMORY_MAX=3G nice -n 19 bash ../capped.sh 7 bash ../mutate.sh e142-new-pool-file-creation-dry-run e142_new_pool_file_creation_dry_run.rs <小表>
+# 小表一：整张表末 22 行（M199–M203 旧行 + M204–M220 新行），命令：cd scripts/experiments && MUTATE_TARGET_DIR=<草稿目录> MUTATE_JOBS=4 MUTATE_MEMORY_MAX=3G nice -n 19 bash ../hosts/capped.sh 7 bash ../mutation/mutate.sh e142-new-pool-file-creation-dry-run e142_new_pool_file_creation_dry_run.rs <小表>
 mutate: 这一轮开 4 个工作进程（各项取最小、至少 1）：核数 32 的一半、至多 16，给 16 个；MUTATE_JOBS 给 4 个；表里 22 条。卡在「MUTATE_JOBS」这一项；每个 cargo 编译并行度 7（调用方的 CARGO_BUILD_JOBS）
 基线：全绿
 ✅ [M199_g11_keeps_the_trailing_barrier] 红：tests::g11_rows_match_the_anchors_of_the_stream_without_the_trailing_barrier,tests::fua_not_a_boundary_gives_16777249_states_and_134217754_without_the_trailing_barrier,tests::swallowed_barrier_points_match_the_registered_anchors

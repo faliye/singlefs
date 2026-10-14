@@ -1,6 +1,6 @@
 # E142 r22 第二段步 ⑥：M55（重锚）与 M228–M231 小表（5 行）对改后的源码跑一次
 # 装置 sha256 c400139b8cfc7c0e4b96d483200055e9891252c9171bbbeb06771046bf63d899 之前一版（只差 4 处注释文字，见 freeze 文件），小表 sha256 745554ec3c8aa677c7733ef0337fe2b72a7ed7e2fbd3c5760be2bb69dfbca846（= 变异表里 M55、M228、M229、M230、M231 五行）
-# 命令：cd scripts/experiments && RUN_WITH_MEMORY_CAP_PARALLEL_REASON=<同一会话派出去的几个执行员各跑各的装置> RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON=<E142 第 22 次第二段小表：单测比第 21 次多，旧峰值不作数> MUTATE_MEMORY_MAX=3G MUTATE_JOBS=4 MUTATE_TARGET_DIR=<草稿目录>/mtarget nice -n 19 timeout 225 bash ../capped.sh 15 bash ../mutate.sh e142-new-pool-file-creation-dry-run e142_new_pool_file_creation_dry_run.rs <小表>
+# 命令：cd scripts/experiments && RUN_WITH_MEMORY_CAP_PARALLEL_REASON=<同一会话派出去的几个执行员各跑各的装置> RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON=<E142 第 22 次第二段小表：单测比第 21 次多，旧峰值不作数> MUTATE_MEMORY_MAX=3G MUTATE_JOBS=4 MUTATE_TARGET_DIR=<草稿目录>/mtarget nice -n 19 timeout 225 bash ../hosts/capped.sh 15 bash ../mutation/mutate.sh e142-new-pool-file-creation-dry-run e142_new_pool_file_creation_dry_run.rs <小表>
 # 退出码 0；耗时：real	0m51.887s
 ## stdout 原样
 基线：全绿

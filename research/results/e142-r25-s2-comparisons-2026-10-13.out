@@ -1,0 +1,175 @@
+== E142 r25 第二段步 ① PC-n25m / PC-indep；脚本 s2_step1.sh sha256 10e701cef9a8e10e7f3449ae72d1ade15f64df71a26d3a16c2d069c1c046bf1a
+47771544d786b3a4d1da7416d6d847c7dca32dde1be7db191313ad3f3e137798  /home/fy5090/code/singlefs/research/results/e142-new-pool-file-creation-dry-run-r25-arm-n25m-2026-10-13.out
+== PC-n25m：impl_bytes_equal_summary 与 equal=false 的区域
+414:E7RESULT name=impl_bytes_equal_summary model_regions=29 crates_regions=29 matched=29 equal=20 unequal=9 unmatched_model=0 unmatched_crates=0 snapshot_given=true
+      1 region=accounting_root device=0
+      1 region=accounting_root device=1
+      1 region=journal_record device=0
+      1 region=journal_record device=1
+      1 region=mapping_root device=0
+      1 region=mapping_root device=1
+      1 region=root_record device=0
+      1 region=tree_table device=0
+      1 region=tree_table device=1
+== PC-n25m：label6_anchor.py --decode
+DECODE side=model device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=model device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:196760 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:196760 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+== PC-indep：独立 bin 第一种调用 <N25M 产物> <它的 crates/ 那一半>
+39
+indep_exit=0
+E7RESULT name=independent_region_diff_summary model_regions=29 crates_regions=29 equal=20 unequal=9
+29
+== E142 r25 第二段步 ④ comparisons；脚本 s2_comparisons.sh sha256 4c50d9656b99e9de1fea05b16d8347d70ed5f3700d378009d53a49ef9190d4f9
+a64b55e9c6acb46a57c92e8ef486a065e2cb9cb4a07a40c8e3b233886d96f2bb  research/results/e142-new-pool-file-creation-dry-run-r25-main-2026-10-13.out
+47771544d786b3a4d1da7416d6d847c7dca32dde1be7db191313ad3f3e137798  research/results/e142-new-pool-file-creation-dry-run-r25-arm-n25m-2026-10-13.out
+9ef6ea93644c597dbb1a32abc9d7d86a0e2e923df1ae7ea0aba49ac363db3d61  research/results/e142-new-pool-file-creation-dry-run-r25-arm-n24r-2026-10-13.out
+f8aba4bf57669ac2b22c0b0720e147a930e3496ccfd4716d641d764ca6fc4fb5  research/results/e142-new-pool-file-creation-dry-run-r24-main-2026-10-05.out
+6cf0735e387114072ec4a4c86c847fca6ee185b4b2087e7d344dea70e61fe6ea  research/results/e142-r25-p8g-crates-dump-2026-10-13.out
+e7aa451ecf4ad7bf6c22ab66cc407eb980bbf22b75b9156f0369a145398cfb75  research/results/e142-r24-p8g-crates-dump-2026-10-05.out
+352ac89832c32bb17728a5f71eb5b11e5d47c3410760356b518a6fea05e46588  scripts/experiments/e142_new_pool_file_creation_dry_run.rs
+c330df2bb806f49c6b34a0c666fbe5ccad18adbb1ee513a923d36b9da969bf4c  scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv
+79f0cdbf3f51fc5fa8db6de77d750852f9f0cf6dcbd64b9c3910963f4697fb11  ./scripts/experiments/target/release/e142-region-diff-independent
+143bccdc9ecd1ec47c539bf8c870995efec14a9d98e8d991be98e6fcf96b674d  /home/fy5090/.local/share/singlefs/work/e142-r25-run-2/q142_verdict_fields.py
+54dc31433c2cdbad740642b5591c612ff256d9d64b67fd6db4594843df2dd0e4  /home/fy5090/.local/share/singlefs/work/e142-r25-run-2/residual_old_values.sh
+== V25e 恰一行（第一行 name=done 之前）
+rows_before_done name=impl_bytes_equal_summary count=1
+rows_before_done name=layout_field_summary count=1
+rows_before_done name=accounting count=1
+rows_before_done name=root_record count=1
+rows_before_done name=verdict count=1
+== Q142.134 主点逐区域
+414:E7RESULT name=impl_bytes_equal_summary model_regions=29 crates_regions=29 matched=29 equal=29 unequal=0 unmatched_model=0 unmatched_crates=0 snapshot_given=true
+impl_bytes_equal_false_rows=0
+== Q142.135 独立路径逐区域（第一种调用）
+crates_half_lines=39
+indep_exit=0
+E7RESULT name=independent_region_diff_summary model_regions=29 crates_regions=29 equal=29 unequal=0
+independent_region_unmatched_rows=0
+== Q142.136 字段表逐行
+907:E7RESULT name=layout_field_summary rows=180 equal=180 unequal=0
+layout_field_rows=180 layout_field_equal_false=0
+== Q142.137 标签 6 两侧
+DECODE side=model device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:196760 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=model device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:196760 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:196760 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:196760 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+688:E7RESULT name=accounting entries=15 allocated_bytes_per_device=278528 free_bytes_per_device=3472605184 empty_cluster_segments_per_device=3310 fragmentation_runs_per_device=4 inode_watermark=2 unreclaimable_per_device=0 defer_queue_per_device=16384 pending_delete=0 committed_reservation=196760 sequence_all_one=true generation=3
+== Q142.138 第二段守门（N25M -> N25，profile retire）
+R25 profile=retire lines_old=1127 lines_new=1139 e2_e3_removed=true
+R25_GROUP name=device_region_bytes rows_old=29 rows_new=29 changed=9 added=0 removed=0 problems=none
+R25_GROUP name=p8g_device_region_bytes rows_old=29 rows_new=29 changed=9 added=0 removed=0 problems=none
+R25_GROUP name=accounting rows_old=1 rows_new=1 changed=1 added=0 removed=0 problems=none
+R25_GROUP name=change_count_diff rows_old=67 rows_new=67 changed=33 added=0 removed=0 problems=attribute
+R25_GROUP name=journal_header_flag_diff rows_old=16 rows_new=16 changed=2 added=0 removed=0 problems=attribute
+R25_GROUP name=journal_header_write_digest rows_old=62 rows_new=62 changed=9 added=0 removed=0 problems=none
+R25_GROUP name=layout_field rows_old=174 rows_new=180 changed=4 added=6 removed=0 problems=none
+R25_GROUP name=layout_field_summary rows_old=1 rows_new=1 changed=1 added=0 removed=0 problems=none
+R25_GROUP name=p8g_accounting rows_old=1 rows_new=1 changed=1 added=0 removed=0 problems=none
+R25_GROUP name=p8g_control_main_point rows_old=1 rows_new=1 changed=1 added=0 removed=0 problems=must_not_change
+R25_GROUP name=p8g_layout_field rows_old=174 rows_new=180 changed=4 added=6 removed=0 problems=none
+R25_GROUP name=p8g_layout_field_summary rows_old=1 rows_new=1 changed=1 added=0 removed=0 problems=none
+R25_GROUP name=p8g_write_list_row rows_old=29 rows_new=29 changed=9 added=0 removed=0 problems=none
+R25_GROUP name=root_record rows_old=1 rows_new=1 changed=1 added=0 removed=0 problems=none
+R25_GROUP name=write_list_row rows_old=29 rows_new=29 changed=9 added=0 removed=0 problems=none
+R25 changed_lines_total=106
+R25_VERDICT profile=retire pass=false groups_bad=p8g_control_main_point groups_to_attribute=change_count_diff,journal_header_flag_diff
+guard_exit=0
+oldnew_exit=0
+E7RESULT name=old_new_independent_summary new_regions=29 old_regions=29 matched=29 changed=9 unchanged=20 unmatched_new=0 unmatched_old=0 mapped_regions=0 unmapped_regions=9
+E7RESULT name=old_new_independent_verdict all_changes_mapped=false
+== Q142.139 P8G
+P8G_SUMMARY model_regions=29 matched=29 equal=29 unequal=0 unmatched_model=0 unmatched_crates=0
+DECODE side=model device=0 free_bytes_dev0=label2:7767572480 free_bytes_dev1=label2:7767572480 committed_reservation=label6:196760 empty_cluster_segments_dev0=label11:7406 empty_cluster_segments_dev1=label11:7406
+DECODE side=model device=1 free_bytes_dev0=label2:7767572480 free_bytes_dev1=label2:7767572480 committed_reservation=label6:196760 empty_cluster_segments_dev0=label11:7406 empty_cluster_segments_dev1=label11:7406
+DECODE side=crates device=0 free_bytes_dev0=label2:7767572480 free_bytes_dev1=label2:7767572480 committed_reservation=label6:196760 empty_cluster_segments_dev0=label11:7406 empty_cluster_segments_dev1=label11:7406
+DECODE side=crates device=1 free_bytes_dev0=label2:7767572480 free_bytes_dev1=label2:7767572480 committed_reservation=label6:196760 empty_cluster_segments_dev0=label11:7406 empty_cluster_segments_dev1=label11:7406
+983:E7RESULT name=p8g_accounting entries=15 allocated_bytes_per_device=278528 free_bytes_per_device=7767572480 empty_cluster_segments_per_device=7406 fragmentation_runs_per_device=4 inode_watermark=2 unreclaimable_per_device=0 defer_queue_per_device=16384 pending_delete=0 committed_reservation=196760 sequence_all_one=true generation=3
+1165:E7RESULT name=p8g_layout_field_summary rows=180 equal=180 unequal=0
+== Q142.140 绝对值
+60:E7RESULT name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=65549 rollback_floor=0 unmount_marker=false record_bytes=4096 back_chain=2660362816
+743:E7RESULT name=layout_field id=L13 record_or_unit=t12_tree_table_first_version field=entry_count@98 expected=12 actual=12 equal=true layout_line=386+49+78
+744:E7RESULT name=layout_field id=L14 record_or_unit=t12_tree_table_first_version field=declared_length@8 expected=2400 actual=2400 equal=true layout_line=386
+811:E7RESULT name=layout_field id=L16 record_or_unit=t12_tree_table_first_version field=entry11_tree_identifier expected=65548 actual=65548 equal=true layout_line=387
+812:E7RESULT name=layout_field id=L16 record_or_unit=t12_tree_table_first_version field=entry11_kind expected=13 actual=13 equal=true layout_line=387
+813:E7RESULT name=layout_field id=L16 record_or_unit=t12_tree_table_first_version field=entry11_root_slot expected=zero actual=zero equal=true layout_line=387
+814:E7RESULT name=layout_field id=L16 record_or_unit=t12_tree_table_first_version field=entry11_head_identifier expected=65537 actual=65537 equal=true layout_line=387
+815:E7RESULT name=layout_field id=L16 record_or_unit=t12_tree_table_first_version field=entry11_birth_txg expected=3 actual=3 equal=true layout_line=387
+816:E7RESULT name=layout_field id=L16 record_or_unit=t12_tree_table_first_version field=entry11_previous_snapshot_txg expected=0 actual=0 equal=true layout_line=387
+817:E7RESULT name=layout_field id=L17 record_or_unit=t13_journal_record field=new_root_segment_tree_identifier_watermark@271 expected=65549 actual=65549 equal=true layout_line=325+353
+820:E7RESULT name=layout_field id=L19 record_or_unit=t14_root_record field=tree_identifier_watermark@122 expected=65549 actual=65549 equal=true layout_line=375
+== 8.2 判别力自证：门槛挪到 equal >= 30（两点之间）
+main_equal=29 p8g_equal=29 threshold29_main=green threshold29_p8g=green threshold30_main=red threshold30_p8g=red
+== Q142.141 PC-old（草稿仓树：n25.rs 末尾追加三行）
+命令七：
+residual_old_values count=3
+命令十二：
+1
+1
+1
+0
+命令六：
+0
+0
+1
+0
+== Q142.141 仓里 N25 装置与变异表
+命令七：
+fixture:8924:    /// （[0, 根环基址) 那一段）；mkfs 之后的流里不再有整段清零（变异 M232、M233）。
+table:212:         pool.record_zero_fill(device, DeviceOffset(0)); // [0, 根环基址)	        if device == DeviceIdentity(0) { pool.record_zero_fill(device, DeviceOffset(0)); } // [0, 根环基址) 
+residual_old_values count=2
+命令七附 287 / 295 逐处归类（装置命中行）：
+5487:    // 第二十一次跑改按 487 字节头的字段表（新根段七项：实例表指针 287、分配记录树根指针 373、卸载记号 459，fsid 463、MAC 471、头末 487）。
+5530:        287..=372 => {
+5531:            let local = offset - 287;
+7134:            "instance_table_pointer[287,373)_vs_published_root_record[170,256)",
+7137:            &|record: &[u8]| lowercase_hex(&record[287..373]),
+8325:        // 新根段内（D23 已定项 15 的七项次序，7.2 B6）：树表 99、映射 185、水位 271、F 279、实例表指针 287、分配记录树根指针 373、卸载记号 459、段末 463。
+8329:        assert_eq!(279 + 8, 287, "实例表单元指针起点");
+8330:        assert_eq!(287 + NODE_POINTER_BYTES, 373, "分配记录树根指针起点");
+8891:            (&with_trailing.recording.operations, with_trailing_counts, ("point=G10a swallowed_device=1", 1, "transaction", 34, "24+5", 16_777_247, 16_777_287, "0+2", "[unit_write×24,barrier×2]|[journal_record×2,
+8895:            (&without_trailing.operations, without_trailing_counts, ("point=G12a trailing_barrier=off swallowed_device=1", 1, "transaction", 32, "24+5", 16_777_247, 16_777_287, "0+2", "[unit_write×24,barrier×2]|[j
+9701:    /// 第二十一次跑再钉新根段后三项与挪位之后的 fsid、MAC（7.2 B6：287、373、459、463、471，M220 的会红检查落在这里）。
+9713:            (287, "new_instance_table"),
+9854:        // 新根段后三项（D23 已定项 15）：实例表指针 [287, 373) 与这次发布写的根记录 [170, 256) 逐字节相同（B10），
+9858:        assert_eq!(&output.record_bytes[287..373], &root_slot[170..256], "实例表指针与那次发布写的根记录里的逐字节相同");
+命令七附 287 / 295 逐处归类（变异表命中行，第 2、3 列）：
+命令十二：
+0
+0
+1
+0
+命令六：
+0
+0
+0
+0
+== Q142.142 判决字段（从这一格起读第 24 次主产物的判决字段）
+Q142_FIELDS e3_dropped=true r71_fields_old=77 r71_fields_new=77 extra_fields=4 width_rows_new=30 width_rows_not_equal_new=0
+Q142_VERDICT r71_flipped=0 extra_flipped=0 r71_keys_union=77
+-- 对照：同一个脚本在第 24 次主产物对 N24R 上
+Q142_FIELDS e3_dropped=true r71_fields_old=77 r71_fields_new=77 extra_fields=4 width_rows_new=30 width_rows_not_equal_new=0
+Q142_FLIP field=extra:p8g_control_main_point#0:equal old=12 new=11
+Q142_FLIP field=extra:p8g_control_main_point#0:unequal old=0 new=1
+Q142_FLIP field=extra:p8g_control_main_point#0:unequal_fields old=none new=text_numbers_all_classified
+Q142_VERDICT r71_flipped=0 extra_flipped=3 r71_keys_union=77
+-- 主 agent 的预言（S25-drift 归因）
+research/results/e142-new-pool-file-creation-dry-run-r25-main-2026-10-13.out:910:E7RESULT name=self_check_text_numbers text_fields=132 numbers=565 bound=20 bound_mismatched=0 literal_allowlisted=545 unclassified=0
+research/results/e142-new-pool-file-creation-dry-run-r25-main-2026-10-13.out:1173:E7RESULT name=p8g_control_main_point fields=12 equal=12 unequal=0 unequal_fields=none
+research/results/e142-new-pool-file-creation-dry-run-r24-main-2026-10-05.out:901:E7RESULT name=self_check_text_numbers text_fields=131 numbers=564 bound=21 bound_mismatched=0 literal_allowlisted=543 unclassified=0
+research/results/e142-new-pool-file-creation-dry-run-r24-main-2026-10-05.out:1158:E7RESULT name=p8g_control_main_point fields=12 equal=12 unequal=0 unequal_fields=none
+917:
+text_numbers_all_classified=true
+== Q142.145 P8G 导出与第 24 次
+research/results/e142-r24-p8g-crates-dump-2026-10-05.out research/results/e142-r25-p8g-crates-dump-2026-10-13.out differ: byte 724689, line 21
+cmp_exit=1
+== Q142.138 (2) 归因（groups_to_attribute 两组只变哪几列、落在哪些结构）
+ATTR group=change_count_diff rows_old=67 rows_new=67 changed_by_columns={('new', 'old'): 33} by_structure={'root_record': 5, 'journal_record': 20, 'mapping_root': 4, 'tree_table': 4}
+ATTR group=journal_header_flag_diff rows_old=16 rows_new=16 changed_by_columns={('new', 'old'): 2} by_structure={'t13:header_checksum': 2}
+== Q142.144 准入（主产物落盘之后立即跑）
+  ✗ 拒绝开跑 E142：输入自上次产物以来没变，不必重跑——research/results/e142-new-pool-file-creation-dry-run-r25-main-2026-10-13.out 头上的输入指纹与今天的相同（2d351a4c7d35）
+     → 怎么办：沿用那一份的结论；确要重跑，设 SINGLEFS_EXPERIMENT_RERUN_REASON=<理由> 再跑，理由会写进产物。输入清单登记在 .claude/gate.d/stage-inputs.tsv 的 E142 那一行，少登了一条就补上
+admission_exit=77
+== 快照 B2 / C2
+cmp_a2_b2_sha=0 cmp_a2_b2_status=0 cmp_b2_c2_sha=0 cmp_b2_c2_status=0
