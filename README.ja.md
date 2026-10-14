@@ -52,7 +52,7 @@ waaagh!
 
 | 検証 | 何を判定するか | ゲート |
 |---|---|---|
-| クラッシュポイント再生 | 書き込み要求のストリームを各ディスクのバリアで区切り、区間内のあらゆる永続化状態を列挙し、状態ごとにイメージを作ってリカバリとプールレベル checker を走らせる | checker-tier-layer0-replay。フル実行はユーザーの要求時のみ |
+| クラッシュポイント再生 | 書き込み要求のストリームを各ディスクのバリアで区切り、区間内のあらゆる永続化状態を列挙し、状態ごとにイメージを作ってリカバリとプールレベル checker を走らせる | checker-tier-crash-point-replay。フル実行はユーザーの要求時のみ |
 | クラッシュ増幅 | 同じ列挙を数十億状態まで広げる。ストリームをまず判定ライブラリに記録し、ライブラリから読み戻して判定する。判定器は GPU 上で動き、二台構成で分割する | `scripts/crash/crash-amplification.sh`。ユーザーの要求時に走らせる |
 | プールレベル checker | 不変条件の一覧（`crates/singlefs-checker/invariants/`）で「実装済み」の 92 条。コード中の一覧と同数 | 上の二行から呼ばれる |
 | モデル突き合わせ | ランダムな操作列を、メモリ上にだけ住む理想モデルと一歩ずつ比べる | harness-model-differential-and-scenarios |
@@ -103,7 +103,7 @@ checker 層（クラッシュ列挙ケース、QEMU、herd7、ミューテーシ
 
 ### 複数マシンと GPU（任意）
 
-リポジトリのルートにあるテンプレート [`multi-host.env.example`](multi-host.env.example) に従って、手元に `multi-host.env`（git では無視される）を書く。二台構成での分割、GPU 判定器、GPU カードの優先順と割り当て量、静止化のコマンドがすべてそこにあり、各キーの説明はテンプレートにある。書き終えたら `bash scripts/crash/layer0-shard-configuration-check.sh` で一度判定する。GPU を使うときは必ず先に静止化し、終わっても元に戻さない（`scripts/crash/gpu-quiesce-run.sh`）。結果がファイルになる作業を二台目に移すには `bash scripts/hosts/multi-host-run.sh --peer -- <コマンド>`。各スクリプトの置き場所は [`scripts/README.md`](scripts/README.md) にある。
+リポジトリのルートにあるテンプレート [`multi-host.env.example`](multi-host.env.example) に従って、手元に `multi-host.env`（git では無視される）を書く。二台構成での分割、GPU 判定器、GPU カードの優先順と割り当て量、静止化のコマンドがすべてそこにあり、各キーの説明はテンプレートにある。書き終えたら `bash scripts/crash/crash-point-replay-shard-configuration-check.sh` で一度判定する。GPU を使うときは必ず先に静止化し、終わっても元に戻さない（`scripts/crash/gpu-quiesce-run.sh`）。結果がファイルになる作業を二台目に移すには `bash scripts/hosts/multi-host-run.sh --peer -- <コマンド>`。各スクリプトの置き場所は [`scripts/README.md`](scripts/README.md) にある。
 
 ゲートスクリプトとルールは singlefs-ai-sop がまとめて配布しており、参加者は全員同じ一式を走らせる。
 

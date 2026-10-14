@@ -52,7 +52,7 @@ waaagh！
 
 | 验证 | 判什么 | 门禁 |
 |---|---|---|
-| 崩溃点重放 | 写请求流按每块盘的屏障切段，枚举段内每一种落盘状态，逐个生成镜像、跑恢复加池级 checker | checker-tier-layer0-replay；全量只在用户要求时跑 |
+| 崩溃点重放 | 写请求流按每块盘的屏障切段，枚举段内每一种落盘状态，逐个生成镜像、跑恢复加池级 checker | checker-tier-crash-point-replay；全量只在用户要求时跑 |
 | 崩溃放量 | 同一套枚举放到几十亿态：流先录进判定库，再从库读回判，判器在 GPU 上，两台机器分片 | `scripts/crash/crash-amplification.sh`，用户要求时跑 |
 | 池级 checker | 不变量清单（`crates/singlefs-checker/invariants/`）里「已实现」的 92 条，与代码里的清单同数 | 被上两样调用 |
 | 模型对拍 | 随机操作序列与只住内存的理想模型逐步比 | harness-model-differential-and-scenarios |
@@ -103,7 +103,7 @@ checker 档（崩溃枚举用例、QEMU、herd7、变异表、形式化验证、
 
 ### 多机与 GPU（可选）
 
-照仓根模板 [`multi-host.env.example`](multi-host.env.example) 在本机写一份 `multi-host.env`（git 忽略）：两台分片、GPU 判器、显卡的先后与额度、清场命令都在里面，每个键的说明在模板里；写完 `bash scripts/crash/layer0-shard-configuration-check.sh` 判一次。凡用 GPU 先清场，跑完不复原（`scripts/crash/gpu-quiesce-run.sh`）。把一件结果是文件的活挪到第二台：`bash scripts/hosts/multi-host-run.sh --peer -- <命令>`。各脚本放哪见 [`scripts/README.md`](scripts/README.md)。
+照仓根模板 [`multi-host.env.example`](multi-host.env.example) 在本机写一份 `multi-host.env`（git 忽略）：两台分片、GPU 判器、显卡的先后与额度、清场命令都在里面，每个键的说明在模板里；写完 `bash scripts/crash/crash-point-replay-shard-configuration-check.sh` 判一次。凡用 GPU 先清场，跑完不复原（`scripts/crash/gpu-quiesce-run.sh`）。把一件结果是文件的活挪到第二台：`bash scripts/hosts/multi-host-run.sh --peer -- <命令>`。各脚本放哪见 [`scripts/README.md`](scripts/README.md)。
 
 门禁脚本与规则由 singlefs-ai-sop 统一分发，所有参与者跑的是同一套。
 

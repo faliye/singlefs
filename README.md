@@ -52,7 +52,7 @@ How far verification reaches:
 
 | Verification | What it judges | Gate |
 |---|---|---|
-| Crash-point replay | Cut the write-request stream into segments at each disk's barriers, enumerate every persistence state inside each segment, build an image for each, and run recovery plus the pool-level checker | checker-tier-layer0-replay; the full run happens only on user request |
+| Crash-point replay | Cut the write-request stream into segments at each disk's barriers, enumerate every persistence state inside each segment, build an image for each, and run recovery plus the pool-level checker | checker-tier-crash-point-replay; the full run happens only on user request |
 | Crash amplification | The same enumeration scaled to billions of states: streams are first recorded into the verdict library, then read back and judged; the judge runs on GPUs, sharded across two hosts | `scripts/crash/crash-amplification.sh`, run on user request |
 | Pool-level checker | The 92 invariants marked implemented in the invariant list (`crates/singlefs-checker/invariants/`), the same count as the list in the code | Called by the two rows above |
 | Model differential testing | Random operation sequences compared step by step with an ideal model that lives only in memory | harness-model-differential-and-scenarios |
@@ -103,7 +103,7 @@ Prerequisites: herd7 needs `opam install herdtools7` and `SINGLEFS_KERNEL_TREE=`
 
 ### Multiple hosts and GPUs (optional)
 
-Write a local `multi-host.env` (git-ignored) from the template [`multi-host.env.example`](multi-host.env.example) at the repository root: two-host sharding, the GPU judge, the order and quota of GPU cards, and the quiesce commands are all there, with each key explained in the template; afterwards run `bash scripts/crash/layer0-shard-configuration-check.sh` once to check it. Every GPU run quiesces first and does not restore afterwards (`scripts/crash/gpu-quiesce-run.sh`). To move a job whose result is a file onto the second host: `bash scripts/hosts/multi-host-run.sh --peer -- <command>`. Where each script lives is in [`scripts/README.md`](scripts/README.md).
+Write a local `multi-host.env` (git-ignored) from the template [`multi-host.env.example`](multi-host.env.example) at the repository root: two-host sharding, the GPU judge, the order and quota of GPU cards, and the quiesce commands are all there, with each key explained in the template; afterwards run `bash scripts/crash/crash-point-replay-shard-configuration-check.sh` once to check it. Every GPU run quiesces first and does not restore afterwards (`scripts/crash/gpu-quiesce-run.sh`). To move a job whose result is a file onto the second host: `bash scripts/hosts/multi-host-run.sh --peer -- <command>`. Where each script lives is in [`scripts/README.md`](scripts/README.md).
 
 The gate scripts and rules are distributed by singlefs-ai-sop, so every participant runs the same set.
 

@@ -1,0 +1,6 @@
+# 三语文件登记表：门禁 doc-text 的 trilingual-files、trilingual-structure、trilingual-changed-together、trilingual-glossary 四格从这里取对象。
+# 一行一条「<模式>  # 理由」，理由不许省（至少 4 个字）；模式写英语那一份（默认语言），相对仓根，* 与 ? 不跨目录。
+# 一份英语文件 <名>.md 的三份是 <名>.md（en）、<名>.zh.md（zh）、<名>.ja.md（ja）：三份都在、结构对得上、改动同进同出、译文照术语表 .claude/kb/translation-glossary.md 用词。
+# 模式匹配到的文件名里不带语言后缀（briefs/*.md 只认 YYYY-MM-DD.md 这种名字）。登记表指不到任何文件的行判红。
+README.md  # 仓根 README：面向使用者的入口，英语为默认版本，中文原文在 README.zh.md，日语在 README.ja.md
+briefs/*.md  # 项目简报：每份 YYYY-MM-DD.md 是英语版本，中文原文 YYYY-MM-DD.zh.md，日语 YYYY-MM-DD.ja.md
