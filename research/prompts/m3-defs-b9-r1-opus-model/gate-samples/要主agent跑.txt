@@ -1,0 +1,19 @@
+# m3-defs-b9-r1 攻方腿：要主 agent 跑的门禁格（子 agent 起不了 --check）。前缀照主 agent 跑门禁格的做法（SINGLEFS_HEAVY_TESTS=commit 或 user-request）。
+# G = 这一轮冻结副本 ~/.local/share/singlefs/work/m3-defs-b9-r1/repo/ 的一份拷贝（门禁所在仓）；T = 新的空目录；M = research/prompts/m3-defs-b9-r1-opus-model
+bash $M/gate-samples/make_trees.sh ~/.local/share/singlefs/work/m3-defs-b9-r1/repo $M $T
+# 1 叫停表（Z4-甲）：不是 git 仓，abandoned-rounds 格只看树
+bash $G/.claude/gate.d/doc-process-records.sh --check abandoned-rounds $T/abandoned-after
+#   预计退 1，点名 m3-batch63-code-r1「〔去向：m3-batch63-code-r1 两条腿当场停掉（没交回、不写判决）〕这段原话命中 2 次」；对照：同一条命令换成 G 本身预计退 0
+# 2 heavy-thread-defaults（Z2）：三棵都不是 git 仓，只缩不涨不比
+bash $G/.claude/gate.d/code-tooling.sh --check heavy-thread-defaults $T/htd-insert   # 预计退 0：random_histories.rs 新加的 sampling_workers_by_default 不点名
+bash $G/.claude/gate.d/code-tooling.sh --check heavy-thread-defaults $T/htd-edit     # 预计退 0：crates-mutation-rows.py 改过的那一行（读进 GATE_MUTATION_TOTAL_WORKERS）不点名
+bash $G/.claude/gate.d/code-tooling.sh --check heavy-thread-defaults $T/htd-shell    # 预计退 1：点名 var_from_registry.sh:5（|| 赋值）等 5 处，不点名 capped_assign_default.sh（${RUST_TEST_THREADS:=8}）
+# 3 doc-text（Z5）：样本根不是门禁所在仓，私有值只认样本根下的假配置（值都是编的）
+bash $G/.claude/gate.d/doc-text.sh --check clock-times,date-once,term-renames,private-values $T/z5
+#   预计 clock-times 红行片段是「…ate/peer-checkout 上 2026-10-13T10:31:05 收尾。…」（假值的后 17 个字没打码），对照行「…〔私有值〕 上 …」；
+#   date-once 红行原样打「records/2026-10-13-demo-peer-host-42-对拍.md」；term-renames 原样打「research/results/from-peer/srv/demo-private/peer-checkout/notes.md」；
+#   private-values 自己的红行都打码（〔文件名含私有值〕）
+# 4 long-run-header-exempt（Z7）：两棵都是 git 仓，基准取 HEAD（没有上游）
+bash $G/.claude/gate.d/code-tooling.sh --check long-run-header-exempt $T/exempt-base-table   # 预计退 1：登记的 sha256 与基准那一版不同（重钉）
+bash $G/.claude/gate.d/code-tooling.sh --check long-run-header-exempt $T/exempt-no-base      # 预计退 0，成功句写「基准里还没有这张表」：同一处重钉不红
+# 以上预计都是抽出格里的判法在本腿树上跑出来的（模型目录 out/），没起过格本身；抽出跑与格本身的差别：改动范围与基准由格自己经 scripts/gate/changed-paths.sh 取。

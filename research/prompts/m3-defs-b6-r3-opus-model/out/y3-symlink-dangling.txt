@@ -1,0 +1,22 @@
+=== symlink-dangling r3
+  ✓ 查了这次改动里 1 份文本文件新加的 1 行：对着 multi-host.env 的 4 个长词（8 个字以上）与本机主机名判了，没有一处命中
+     没判的：不足 8 个字的词 1 个（键 SAMPLE_SHORT_WORD）、二进制 0 份
+rc=0
+=== symlink-dangling r2
+  ✓ 查了这次改动里 1 份文本文件新加的 1 行：对着 multi-host.env 的 4 个长词（8 个字以上）与本机主机名判了，没有一处命中
+     没判的：不足 8 个字的词 1 个（键 SAMPLE_SHORT_WORD）、二进制 0 份
+rc=0
+=== symlink-dangling r1
+  ✓ 查了这次改动里 1 份文本文件新加的 1 行：对着 multi-host.env 的 4 个长词（8 个字以上）与本机主机名判了，没有一处命中
+     没判的：不足 8 个字的词 1 个（键 SAMPLE_SHORT_WORD）、二进制 0 份
+rc=0
+=== symlink-dangling b3
+  ✓ 查了这次改动里 1 份文本文件新加的 2 行：对着 multi-host.env 的 4 个长词（8 个字以上）与本机主机名判了，没有一处命中
+     没判的：不足 8 个字的词 1 个（键 SAMPLE_SHORT_WORD）、二进制 0 份
+rc=0
+=== symlink-dangling fix
+  ✗ 这次改动新加的 1 行里出现了本机私有值（multi-host.env 里 8 个字以上的词，或本机主机名）；只列文件、行号与键名，不打印值：
+      research/results/peer-latest:链接目标  键名：PEER_REPOSITORY_DIRECTORY（值不打印）
+     → 怎么办：把命中的词换成「第二台」「本机」这类说法（要引整句的，整句里的值也换掉）；值只留在 multi-host.env，别写进记录、日志摘录、提示和代码。
+               红行没打印值，对着行号和键名去 multi-host.env 找；路径里哪一段含私有值，那一段打成〔文件名含私有值〕；commit message 这一格看不到，提交说明里同样别
+rc=1

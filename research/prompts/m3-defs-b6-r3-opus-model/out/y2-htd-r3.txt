@@ -1,0 +1,23 @@
+  ✗ 18 处自己定并行度默认值的写法没经登记位取（每台默认重活线程数登记在 .claude/heavy-thread-default）：
+     crates/demo/src/harness_wrapper.rs:4  读自己的线程变量 SAMPLE_HARNESS_WRAPPER_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「process_environment_variable("SAMPLE_HARNESS_WRAPPER_THREADS
+     crates/demo/src/lib.rs:8  读自己的线程变量 SAMPLE_AFTER_TEST_DECL_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「std::env::var("SAMPLE_AFTER_TEST_DECL_THREADS").expect("set it").parse()
+     crates/demo/src/project_wrapper.rs:7  读自己的线程变量 SAMPLE_COUNT_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「count_from_environment("SAMPLE_COUNT_WORKERS", 8)」
+     crates/demo/src/tests.rs:3  读自己的线程变量 SAMPLE_IN_TEST_FILE_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「let _ = std::env::var("SAMPLE_IN_TEST_FILE_THREADS");」
+     crates/demo/src/use_alias.rs:4  读自己的线程变量 SAMPLE_USE_ALIAS_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「read_variable("SAMPLE_USE_ALIAS_THREADS").expect("set it").parse().unwra
+     crates/demo/src/vars_iter.rs:2  读自己的线程变量 SAMPLE_VARS_ITER_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「std::env::vars().find(|(key, _)| key == "SAMPLE_VARS_ITER_THREADS").map(
+     scripts/experiments/alias_env.py:4  读自己的线程变量 SAMPLE_ALIAS_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「THREADS = int(ENV["SAMPLE_ALIAS_THREADS"])」
+     scripts/experiments/baseline_read.py:3  读自己的线程变量 SAMPLE_BASELINE_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「THREADS = int(os.environ["SAMPLE_BASELINE_THREADS"])」
+     scripts/experiments/copied_env.py:4  读自己的线程变量 SAMPLE_COPIED_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「THREADS = int(settings.get("SAMPLE_COPIED_THREADS", "0") or 0)」
+     scripts/experiments/wrap_helper.py:8  读自己的线程变量 SAMPLE_WRAP_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「THREADS = int(read_env("SAMPLE_WRAP_THREADS"))」
+     scripts/hosts/and_default.sh:2  写死的线程数默认（|| / && 赋值）  「test -z "$SAMPLE_AND_FALLBACK_WORKERS" && SAMPLE_AND_FALLBACK_WORKERS=8」
+     scripts/hosts/argparse_default.py:4  写死的线程数默认  「parser.add_argument("--jobs", type=int, default=8)」
+     scripts/hosts/capped.sh:68  nproc  「if [[ "${CAPPED_BREAK:-}" == default-from-nproc ]]; then nproc; return 0; fi」
+     scripts/hosts/heavy_threads.py:32  读自己的线程变量 HEAVY_THREADS_BREAK：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「BREAK_VARIABLE = "HEAVY_THREADS_BREAK"」
+     scripts/hosts/heavy_threads.py:62  cpu_count  「return os.cpu_count() or 1」
+     scripts/hosts/if_default.sh:2  读自己的线程变量 SAMPLE_IF_FALLBACK_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「if [[ -z "${SAMPLE_IF_FALLBACK_THREADS:-}" ]]; then SAMPLE_IF_FALLBACK_
+     scripts/hosts/or_default.sh:3  写死的线程数默认（|| / && 赋值）  「[[ -n "${SAMPLE_OR_FALLBACK_JOBS:-}" ]] || SAMPLE_OR_FALLBACK_JOBS=8」
+     scripts/hosts/printenv_read.sh:2  读自己的线程变量 SAMPLE_PRINTENV_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「workers="$(printenv SAMPLE_PRINTENV_WORKERS)"」
+     → 怎么办：shell 先 source scripts/hosts/heavy-threads.sh 再 heavy_thread_default 取，python 用 scripts/hosts/heavy_threads.py 的 default_heavy_threads() 取，
+               起命令写 bash scripts/hosts/capped.sh default；参数或环境变量给了照给的。装置读自己的线程变量的：把变量名加进 scripts/hosts/capped.sh 的 variable_names，
+               或让装置没设时回退到 SINGLEFS_THREAD_CAP / 登记值（rust 装置 include scripts/experiments/heavy_threads_default/threads.rs，python 用 default_heavy_threads）。确实不是重活（自证输入、线程数就是场景本身、�
+               登记进 .claude/heavy-thread-exempt：一行「<路径>:<锚串>  # 理由」，锚串取那一行里的一段原文；排除只缩不涨。

@@ -1,0 +1,49 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -7039,6 +7039,10 @@
+         .collect()
+ }
+ 
++/// 模型用：候选处置选择器（0 现行、1 一律豁免、2 标记、3 曾被引用）与「标记」清单。
++pub static C794_CANDIDATE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
++pub static C794_MARKED_SLOTS: std::sync::Mutex<Vec<u64>> = std::sync::Mutex::new(Vec::new());
++
+ /// 隔离的记录（D19（块指针的结构与宽度预算） 已定项 5：释放之前读盘核出对不上的那个单元，每块盘上的分配记录都留在已分配，
+ /// 映射条目去掉、没有任何根再引用它）在 I-3.1（已分配统计对得上） 与 I-3.11（已分配减 defer 等于最新根走读） 上怎么认
+ /// （用户 2026-09-25 定；**按单元判**是主 agent 同日定的读法，I-3.1 / I-3.11 两行的措辞随后由书记员改）：已分配而没有根引用的记录，
+@@ -7095,6 +7099,11 @@
+         }
+     }
+     for ((slot, span_slots), devices_of_the_unit) in unreferenced_units {
++        let referenced_once_by_some_root = C794_CANDIDATE.load(std::sync::atomic::Ordering::SeqCst)
++            == 3
++            && devices_of_the_unit
++                .iter()
++                .any(|device| location_entry_checksums.at(*device, slot).is_some());
+         let mut copy_matches_its_location_entry = |device: u32| {
+             let Some(unit) = usize::try_from(span_slots * SLOT_BYTES)
+                 .ok()
+@@ -7109,9 +7118,20 @@
+                 None => check_unit(&unit).is_ok(),
+             }
+         };
+-        let some_copy_fails = devices_of_the_unit
+-            .iter()
+-            .any(|device| !copy_matches_its_location_entry(*device));
++        let candidate = C794_CANDIDATE.load(std::sync::atomic::Ordering::SeqCst);
++        let some_copy_fails = match candidate {
++            // A：现行（核出坏的才豁免）
++            0 => devices_of_the_unit
++                .iter()
++                .any(|device| !copy_matches_its_location_entry(*device)),
++            // B：已分配而没有根引用的记录一律豁免
++            1 => true,
++            // C：标记在册（模型里由写者的隔离清单供给，代替盘上的隔离位）
++            2 => C794_MARKED_SLOTS.lock().unwrap().contains(&slot),
++            // D：有任何一条走过的或根环里的根的位置项指着它（曾被引用过）就豁免
++            3 => referenced_once_by_some_root,
++            _ => unreachable!(),
++        };
+         if some_copy_fails {
+             for device in devices_of_the_unit {
+                 *exempted.entry(device).or_insert(0) += span_slots;

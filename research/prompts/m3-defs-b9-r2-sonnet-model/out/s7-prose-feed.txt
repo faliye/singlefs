@@ -1,0 +1,19 @@
+例名	类型	b9	b10
+对照：只有规范句	experiment-runner	放	放
+对照：只有规范句	investigator	放	放
+下一行：每台线程按此刻空闲现算	experiment-runner	放	放
+下一行：每台线程按此刻空闲现算	investigator	放	放
+下一行：两台，第一台 64 线程、第二台 4 线程	experiment-runner	放	放
+下一行：两台，第一台 64 线程、第二台 4 线程	investigator	放	放
+下一行：线程取 nproc 的一半	experiment-runner	放	放
+下一行：线程取 nproc 的一半	investigator	放	放
+任务描述里：只用本机一台，开 8 个 worker	experiment-runner	放	放
+任务描述里：只用本机一台，开 8 个 worker	investigator	放	放
+引用块里：用户说每台线程看忙闲	experiment-runner	放	放
+引用块里：用户说每台线程看忙闲	investigator	放	放
+括号里：（台数取 3）	experiment-runner	放	放
+括号里：（台数取 3）	investigator	放	放
+KS_THREADS 环境变量	experiment-runner	放	放
+KS_THREADS 环境变量	investigator	放	放
+多机行本身写死台数（对照，应拒）	experiment-runner	拒	拒
+多机行本身写死台数（对照，应拒）	investigator	拒	拒

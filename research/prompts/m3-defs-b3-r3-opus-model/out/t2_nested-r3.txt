@@ -1,0 +1,6 @@
+name=dispatch tree=r3 step=child-first rc=0 lock_child=True
+name=dispatch tree=r3 step=same-child-again rc=2
+name=dispatch tree=r3 step=parent-while-child-running rc=0 lock_parent=True lock_child_kept=True
+name=write tree=r3 case=parent-holder-writes-own rc=0 lock_refusal=-
+name=write tree=r3 case=parent-holder-writes-child rc=2 lock_refusal=✗ <WORK>/work-root/e900/segment-1/repo-copy/notes.md 在
+name=write tree=r3 case=child-holder-writes-child rc=0 lock_refusal=-

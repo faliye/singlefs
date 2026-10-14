@@ -1,0 +1,15 @@
+  ✗ 线程上限要是正整数或 default，收到的是「abc」
+  → 怎么办：写成 capped.sh <正整数|default> <命令>；子 agent 照派发提示里「线程上限：N」写 N；default（取 .claude/heavy-thread-default 的登记值）只给主 agent 与脚本内部用
+退出=2
+default 退出=0
+CARGO_BUILD_JOBS=7 RUST_TEST_THREADS=7 SINGLEFS_CRASH_JUDGE_CPU_THREADS=unset
+CARGO_BUILD_JOBS=7 SINGLEFS_THREAD_CAP=7
+--- --test-threads 零命中（共用库、双机驱动、崩溃放量）
+scripts/crash/crash-amplification-lib.sh:0
+scripts/crash/crash-amplification-two-hosts.sh:0
+scripts/crash/crash-amplification.sh:0
+--- admission.py 里的 test-threads（只应有自证临时目录前缀一处）
+5273:    work = tempfile.mkdtemp(prefix="admission-selftest-threads-")
+--- 三份定义里的「编译」
+.claude/agents/clerk.md:29:2. 要编译、跑编译出来的代码的，照共用约束「不做」一节看负载、经内存包装、带线程上限；重型测试不跑。
+.claude/agents/three-way-defense.md:36:- 报告文件、模型目录、草稿目录。除此之外不写。冻结副本（主 agent 建的开工

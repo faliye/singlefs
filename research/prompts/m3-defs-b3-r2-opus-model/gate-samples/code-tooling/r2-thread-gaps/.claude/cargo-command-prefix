@@ -1,0 +1,2 @@
+# 样本
+bash scripts/hosts/run-with-memory-cap.sh 24G bash scripts/hosts/capped.sh default  # 样本：线程取每台默认重活线程数

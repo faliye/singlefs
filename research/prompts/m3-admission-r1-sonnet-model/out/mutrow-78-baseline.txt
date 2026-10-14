@@ -1,0 +1,4 @@
+row=78 file=crates/singlefs-core/src/allocator.rs anchor_hits=1 baseline=True
+exit=0
+test devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 2.59s

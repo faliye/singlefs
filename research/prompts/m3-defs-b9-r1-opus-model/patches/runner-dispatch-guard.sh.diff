@@ -1,0 +1,47 @@
+--- a/.claude/hooks/runner-dispatch-guard.sh
++++ b/.claude/hooks/runner-dispatch-guard.sh
+@@ -1088,25 +1088,26 @@
+     return None
+ 
+ def without_code_blocks(prompt):
+-    """去掉提示里三个反引号围起来的代码块：围栏行和围栏之间的行都换成空行（行数不变）。⑭ 与 ⑮ 都经这一个函数认围栏，认法照 CommonMark：
+-    开头那一行至多缩进 3 个空格、三个及以上反引号、后面的语言名里不许有反引号（行首的 ```…``` 是行内代码，不开块；缩进 4 格或用制表符缩进的不是围栏）；
+-    闭合的围栏是至多缩进 3 个空格、至少同样多个反引号、后面只有空白的一行。围栏要闭合才算：开了没关的那一行照原样留着，后面的行照判（不让一个没闭合的围栏遮住整份提示）。"""
+-    loose = break_switch_is("code-fence-loose")
+-    fence_open = CODE_FENCE_OPEN_LOOSE if loose else CODE_FENCE_OPEN
++    """（攻方试改 F-Z1）代码块照 CommonMark 参照实现（markdown-it-py 的 commonmark 预设）认：反引号与波浪线围栏、列表与引用块里的围栏都认；
++    只遮闭合了的围栏（最后一行去掉容器前缀之后是同一种围栏字符、不短于开头的一行）；缩进代码块、HTML 块不遮；没闭合的照判。
++    载不进 markdown-it-py 时一行都不遮（退回改前整份照判），不让认法分歧遮住真声明。"""
++    try:
++        import markdown_it
++    except ImportError:
++        return prompt
+     lines = prompt.split("\n")
+-    kept, index = [], 0
+-    while index < len(lines):
+-        opening = fence_open.match(lines[index].rstrip("\r"))
+-        if opening is not None:
+-            closing = re.compile((r"[ \t]*`{" if loose else r" {0,3}`{") + str(len(opening.group(1))) + r",}[ \t]*")
+-            end = next((later for later in range(index + 1, len(lines)) if closing.fullmatch(lines[later].rstrip("\r"))), None)
+-            if end is not None:
+-                kept.extend([""] * (end - index + 1))
+-                index = end + 1
+-                continue
+-        kept.append(lines[index])
+-        index += 1
+-    return "\n".join(kept)
++    hidden = set()
++    for token in markdown_it.MarkdownIt("commonmark").parse(prompt):
++        if token.type != "fence" or not token.map:
++            continue
++        first, end = token.map
++        if end - first < 2 or end > len(lines):
++            continue
++        closing = re.sub(r"^(?:[ \t]*>)*[ \t]*", "", lines[end - 1].rstrip("\r"))
++        character = token.markup[0]
++        if re.fullmatch(re.escape(character) + "{" + str(len(token.markup)) + r",}[ \t]*", closing):
++            hidden.update(range(first, end))
++    return "\n".join("" if index in hidden else line for index, line in enumerate(lines))
+ 
+ def thread_limit_verdict(subagent_type, prompt):
+     """⑮ 行首「线程上限：」后面只认一个十进制整数（后面什么都不接，括注也不行），整数要等于登记值；写成公式或比例（÷、/、一半）、两个以上数字、整数后面接括注或别的话、

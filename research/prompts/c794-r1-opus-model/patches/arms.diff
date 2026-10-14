@@ -1,0 +1,67 @@
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -3692,7 +3692,8 @@
+             };
+             let check_the_copy_against_its_location_entry = |copy: Option<Vec<u8>>| match copy {
+                 None => CopyCheck::Unreadable,
+-                Some(copy) if crc32_castagnoli(&copy) != location.unit_checksum => {
++                Some(copy) if crc32_castagnoli(&copy) != location.unit_checksum
++                    || std::env::var("OPUS_C794_BOGUS").is_ok() => {
+                     CopyCheck::ChecksumMismatch
+                 }
+                 Some(_) => CopyCheck::Intact,
+@@ -8140,7 +8141,12 @@
+     // 释放先于分配（D3（空间分配） 已定项 7）：被换下的落点进 defer 队列、槽仍占着，这次的落点不会落到它们上面。
+     // 释放之前读盘核校验和核出对不上（读不出也算）的那几份：逻辑上照样释放（映射条目这次不再写它），那一份在它那块盘上的分配记录
+     // 留在已分配、不改成已释放（D19（块指针的结构与宽度预算） 已定项 5，用户 2026-09-24 定案），核得上的那一份照常释放。
++    let opus_leak_slot: Option<u64> = std::env::var("OPUS_C794_LEAK_SLOT").ok().and_then(|v| v.parse().ok());
+     for placement in release {
++        // OPUS-C794 攻方臂：写者漏释放一个被换下的单元（两块盘都不改记录，映射条目照样去掉）。
++        if opus_leak_slot == Some(placement.slot.0) {
++            continue;
++        }
+         let devices_whose_copy_failed_the_checksum: Vec<DeviceIdentity> = quarantine
+             .iter()
+             .filter(|copy| copy.placement == *placement)
+@@ -8162,6 +8168,10 @@
+     let mut slots: BTreeMap<TransactionUnit, SlotNumber> = BTreeMap::new();
+     for identity in rewritten {
+         let placement = allocate_placement_for_role(allocator, *identity, txg)?;
++        // OPUS-C794 攻方臂（Z10 那一种）：写者把刚分配的活数据单元记成已释放、放进 defer。
++        if std::env::var("OPUS_C794_Z10").is_ok() && matches!(identity, TransactionUnit::Data(_)) {
++            allocator.release(placement, txg);
++        }
+         slots.insert(*identity, placement.slot);
+     }
+     // 这次的根要盖掉根环里的一个槽：落点都取完了、这次不再分配，在装记账行之前记下它——盖掉的是被抛弃的根就清它的隔离位，
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -7109,9 +7109,25 @@
+                 None => check_unit(&unit).is_ok(),
+             }
+         };
+-        let some_copy_fails = devices_of_the_unit
+-            .iter()
+-            .any(|device| !copy_matches_its_location_entry(*device));
++        // OPUS-C794 攻方臂：空 = 今天；relax_all = 没有根引用的已分配单元一律豁免；
++        // relax_ring = 根环里还有一条根的位置项指着它就豁免（不读单元）；marker = 写者记下的隔离标记（模拟盘上标记，OPUS_C794_MARKED 里给 盘:槽）。
++        let arm = std::env::var("OPUS_C794_CHECKER").unwrap_or_default();
++        let some_copy_fails = match arm.as_str() {
++            "" => devices_of_the_unit
++                .iter()
++                .any(|device| !copy_matches_its_location_entry(*device)),
++            "relax_all" => true,
++            "relax_ring" => devices_of_the_unit
++                .iter()
++                .any(|device| location_entry_checksums.at(*device, slot).is_some()),
++            "marker" => {
++                let marked = std::env::var("OPUS_C794_MARKED").unwrap_or_default();
++                devices_of_the_unit.iter().any(|device| {
++                    marked.split(',').any(|item| item == format!("{device}:{slot}"))
++                })
++            }
++            other => panic!("OPUS_C794_CHECKER={other} 认不得"),
++        };
+         if some_copy_fails {
+             for device in devices_of_the_unit {
+                 *exempted.entry(device).or_insert(0) += span_slots;

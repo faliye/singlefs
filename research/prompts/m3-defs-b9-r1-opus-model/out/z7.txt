@@ -1,0 +1,10 @@
+b9	未改	exempt-check 退出=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；没给基准（基准那一版里还没有这张表，或不在 git 仓里），只缩不涨这一条没比 
+b9	repin-基准有表	exempt-check 退出=1	  ✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 6 行）：      第 15 行 scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh 登记的 sha256 e76e13e9b664041b3f9a99523b4637206d4ea09ce17d154782cd722ef9b11063 与基准那一版里的 732f411351a3f6502d84cfb4a6939d8bd84
+b9	repin-基准没有表	exempt-check 退出=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；没给基准（基准那一版里还没有这张表，或不在 git 仓里），只缩不涨这一条没比 
+b9	reuse-entry-基准有表	exempt-check 退出=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨 
+b9	reuse-entry-被起脚本	script 退出=0	  ✓ 长活声明齐了（<WORK>/z7/b9-tree/scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh，判了 3 个键）：分片：同修订 8：第 0–10 步按单元切（第 3、4 步每项、第 10 步每次各一个单元，另加 reuse-selfproof），第 11–13 步按行，每行一个单线道驱动；命中复用库
+r2	未改	exempt-check 退出=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；没给基准（基准那一版里还没有这张表，或不在 git 仓里），只缩不涨这一条没比 
+r2	repin-基准有表	exempt-check 退出=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨 
+r2	repin-基准没有表	exempt-check 退出=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；没给基准（基准那一版里还没有这张表，或不在 git 仓里），只缩不涨这一条没比 
+r2	reuse-entry-基准有表	exempt-check 退出=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨 
+r2	reuse-entry-被起脚本	script 退出=0	  ✓ 长活声明齐了（<WORK>/z7/r2-tree/scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh，判了 3 个键）：分片：同修订 8：第 0–10 步按单元切（第 3、4 步每项、第 10 步每次各一个单元，另加 reuse-selfproof），第 11–13 步按行，每行一个单线道驱动；命中复用库

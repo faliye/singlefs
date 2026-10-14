@@ -1,0 +1,10 @@
+8d9fcdb567937e5582fce58a32a83708c48bfb1a5fcc59fa0e3aefd59c07d7db  ./.claude/gate.d/doc-experiments.sh
+be71e8e6e769e8813b876410429dda15a318adab089df71e58b40adbf93ea681  ./.claude/gate.d/doc-process-records.sh
+a705cea312834c064f456d23ddecba4f3700bccf990b0d4c31edc58441143691  ./.claude/singlefs-ai-sop/scripts/gate.sh
+bdd0674238e9971a4add4065704c066f12458e0ee23047aeaeef453385ea44b2  ./.claude/singlefs-ai-sop/scripts/lib.sh
+bc1d7f3cfce327c1a75a2105594fd76726eeb13cd9abae225c19a144273e21f0  ./.claude/skills/gate/staged-gate.md
+4326926d1cacda58603c11084c2ca7798d5a8c48428f59b3be4dda565b3d46ef  ./research/prompts/gate-fix-forks-r2-main-verification.md
+21fb1a30b8126f5da7c65e63c3c92cbd5d2fe18cfdaaa08c8cf905cddd668371  ./scripts/gate/changed-paths.sh
+c1278ae85d48d4eb42dafa23785f79ae62a5104052524bd651c38823ba8be4b3  ./scripts/gate/gate-staged.sh
+266f88ec2eb9c5227d36b93089e5657ab604acdc2def873b7ab8f62a1df64b69  ./scripts/gate/stage-must-run.sh
+20c71ca072e793952be1531e0483bc5dcb822b87d6eed16ea042f100e893242e  ./scripts/kb/archive-past-rounds.py

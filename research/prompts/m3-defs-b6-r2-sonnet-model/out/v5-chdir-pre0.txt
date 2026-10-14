@@ -1,0 +1,11 @@
+C0-baseline-cd	rc=2	✗ 重型测试被拒：cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；按包）（checker 档）：implementation-writer 不跑「checker 档」
+C1-env-C	rc=0	
+C2-env-iC-combined	rc=0	
+C3-env-u-then-C	rc=0	
+C4-pushd	rc=2	✗ 重型测试被拒：cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；按包）（checker 档）：implementation-writer 不跑「checker 档」
+C5-subshell-cd	rc=2	✗ 重型测试被拒：cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；按包）（checker 档）：implementation-writer 不跑「checker 档」
+C6-env-C-var	rc=0	
+C7-cargo-C-nightly	rc=2	✗ 重型测试被拒：cargo test 跑到 singlefs-checker-tier 包的测试（checker 档，默认只在提交时跑；按包）（checker 档）：implementation-writer 不跑「checker 档」
+C8-env-S-split	rc=0	
+C9-env-C-then-sh-c	rc=0	
+C10-env-C-long-eq	rc=0	

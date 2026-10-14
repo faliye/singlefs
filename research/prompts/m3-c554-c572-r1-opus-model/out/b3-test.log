@@ -1,0 +1,11 @@
+running 3 tests
+OPUS-B3 slot_s_free=false slot_s_plus_1_free=true isolated_slots=0
+OPUS-B3-FORM3 got=(false, true)
+OPUS-B3 slot_s_free=false slot_s_plus_1_free=true isolated_slots=0
+OPUS-B3 slot_s_free=false slot_s_plus_1_free=true isolated_slots=1
+OPUS-B3-FORM2 got=(false, true)
+test mount::attack_b3_isolation_keyed_by_start_slot::opus_b3_c_ring_placement_with_a_current_record_at_the_same_start_slot_is_skipped_whole ... OPUS-B3 slot_s_free=false slot_s_plus_1_free=false isolated_slots=2
+OPUS-B3-FORM1 narrow_first=(false, true) wide_first=(false, false)
+test mount::attack_b3_isolation_keyed_by_start_slot::opus_b3_current_account_record_at_the_same_start_slot_exempts_the_whole_wider_placement ... ok
+test mount::attack_b3_isolation_keyed_by_start_slot::opus_b3_two_abandoned_roots_narrow_first_leaves_the_second_slot_of_the_wide_one_free ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 248 filtered out; finished in 0.00s

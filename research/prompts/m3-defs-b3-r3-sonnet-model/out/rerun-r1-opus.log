@@ -1,0 +1,5 @@
+name=compare file=d1 same
+name=compare file=d3 same
+name=compare file=d4 same
+name=compare file=d6 same
+name=compare file=d6-cell same

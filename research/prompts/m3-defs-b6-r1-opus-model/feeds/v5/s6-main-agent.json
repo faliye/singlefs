@@ -1,0 +1,1 @@
+{"tool_name": "Bash", "cwd": "/home/fy5090/.local/share/singlefs/work/m3-defs-b6-r1-opus/v5-b6", "tool_input": {"command": "bash /home/fy5090/.local/share/singlefs/work/m3-defs-b6-r1-opus/v5-b6/wc-body/.claude/hooks/write-guard.sh --selftest"}}

@@ -1,0 +1,10 @@
+rform	b10	hx-form-r1	不收：第 1 行的出处 records/log.md 第 6 行里除这一轮外还有别的轮名 ghost-r2（出处那一行只许写这一轮的名字；同一行里别的轮的叫停原话不是为这一轮说的，另找只写这一轮的那一行） 
+rform	b9	hx-form-r1	不收：第 1 行的出处 records/log.md 第 6 行里除这一轮外还有别的轮名 ghost-r2（出处那一行只许写这一轮的名字；同一行里别的轮的叫停原话不是为这一轮说的，另找只写这一轮的那一行） 
+drift	插行前	b10	hx-drift-r1	收 
+drift	插行前	b9	hx-drift-r1	收 
+drift	插行后	b10	hx-drift-r1	收（出处 records/log.md 写的第 6 行，原话现在在第 7 行） 
+drift	插行后	b9	hx-drift-r1	收（出处 records/log.md 写的第 6 行，原话现在在第 7 行） 
+drift	插行又改字	b10	hx-drift-r1	不收：第 1 行的出处 records/log.md 第 6 行里没有「」括起来的用户原话（去掉空白后至少 6 个字） 
+drift	插行又改字	b9	hx-drift-r1	不收：第 1 行的出处 records/log.md 里找不到〔去向：hx-drift-r1 两条腿当场停掉〕这段原话（被删或改了字；〔〕里要与那份文件逐字相同） 
+legacy	b10	c196-r1	收 hx-new-r1	不收：第 2 行没有出处：要写 records/<文件>.md 第 N 行〔<那一行里含这一轮名字的一段原话>〕（research/、.claude/ 下的文件、这一轮自己的材料、仓外路径都不认） 
+legacy	b9	c196-r1	收 hx-new-r1	不收：第 2 行没有出处：要写 records/<文件>.md 第 N 行〔<那一行里含这一轮名字的一段原话>〕（research/、.claude/ 下的文件、这一轮自己的材料、仓外路径都不认） 

@@ -1,0 +1,16 @@
+C1-list-fence-closed-at-column-0	CommonMark 遮的标签行 [5]	逐行认法遮的标签行 [3, 8]	有歧义 [3, 5, 8]	拒（边界有歧义）
+C2-blockquote-fence-closed-without-marker	CommonMark 遮的标签行 [5]	逐行认法遮的标签行 [3, 8]	有歧义 [3, 5, 8]	拒（边界有歧义）
+C3-details-fold-with-blank-line	CommonMark 遮的标签行 [9]	逐行认法遮的标签行 [12]	有歧义 [9, 12]	拒（边界有歧义）
+C4-closing-fence-indented-4	CommonMark 遮的标签行 [3, 5]	逐行认法遮的标签行 [3, 8]	有歧义 [5, 8]	拒（边界有歧义）
+C5-closing-fence-tab	CommonMark 遮的标签行 [3, 5]	逐行认法遮的标签行 [3, 8]	有歧义 [5, 8]	拒（边界有歧义）
+C6-closing-fence-shorter	CommonMark 遮的标签行 [3, 5]	逐行认法遮的标签行 [3, 8]	有歧义 [5, 8]	拒（边界有歧义）
+H1-list-fence-closed-at-column-0-hosts	CommonMark 遮的标签行 [6]	逐行认法遮的标签行 [9]	有歧义 [6, 9]	拒（边界有歧义）
+T1-tilde-lone-fence-16	CommonMark 遮的标签行 [7]	逐行认法遮的标签行 [7]	有歧义 []	照常判
+T2-list-fence-container-end-16	CommonMark 遮的标签行 [9]	逐行认法遮的标签行 [6]	有歧义 [6, 9]	拒（边界有歧义）
+T3-html-comment-fence-16	CommonMark 遮的标签行 [7]	逐行认法遮的标签行 [4]	有歧义 [4, 7]	拒（边界有歧义）
+O0-backtick-block-example	CommonMark 遮的标签行 [4]	逐行认法遮的标签行 [4]	有歧义 []	照常判
+O1-tilde-block-example	CommonMark 遮的标签行 [4]	逐行认法遮的标签行 [4]	有歧义 []	照常判
+O2-nested-list-fence-example	CommonMark 遮的标签行 [5]	逐行认法遮的标签行 [5]	有歧义 []	照常判
+O3-blockquote-fence-example	CommonMark 遮的标签行 [4]	逐行认法遮的标签行 [4]	有歧义 []	照常判
+O5-proper-nesting-four-backticks	CommonMark 遮的标签行 [5]	逐行认法遮的标签行 []	有歧义 [5]	拒（边界有歧义）
+D1-indented-code-block-example	CommonMark 遮的标签行 []	逐行认法遮的标签行 []	有歧义 []	照常判

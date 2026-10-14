@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+test -z "$SAMPLE_AND_FALLBACK_WORKERS" && SAMPLE_AND_FALLBACK_WORKERS=8
+exec make -j "$SAMPLE_AND_FALLBACK_WORKERS"

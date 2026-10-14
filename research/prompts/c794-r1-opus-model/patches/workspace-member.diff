@@ -1,0 +1,10 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -10,6 +10,7 @@
+     "crates/singlefs-checker",
+     "crates/singlefs-checker-tier",
+     "crates/singlefs-reference-filesystem",
++    "crates/attack-c794-probe",
+ ]
+ exclude = ["scripts/experiments"]
+ 

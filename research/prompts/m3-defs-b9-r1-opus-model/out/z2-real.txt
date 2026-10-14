@@ -1,0 +1,10 @@
+b9	base	  ✓ 每台默认重活线程数只经登记位取：登记值 31；扫了 832 份（scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-pref 退出=0 
+b9	insert-fn-exempted-file	  ✓ 每台默认重活线程数只经登记位取：登记值 31；扫了 832 份（scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-pref 退出=0 
+b9	insert-fn-new-file	  ✗ 1 处自己定并行度默认值的写法没经登记位取（每台默认重活线程数登记在 .claude/heavy-thread-default）：      crates/singlefs-harness/tests/new_sampling.rs:2  available_parallelism  「std::thread::available_parallelism().map_or(1, usize::from)」 退出=1 
+b9	edit-exempted-line	  ✓ 每台默认重活线程数只经登记位取：登记值 31；扫了 832 份（scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-pref 退出=0 
+b9	edit-line-new-file	  ✗ 1 处自己定并行度默认值的写法没经登记位取（每台默认重活线程数登记在 .claude/heavy-thread-default）：      scripts/mutation/new_rows.py:4  cpu_count、写死的线程数默认（回退值）、读自己的线程变量 GATE_MUTATION_TOTAL_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「processor_count = int(os.environ.get("GATE_MUTA 退出=1 
+r2	base	  ✓ 每台默认重活线程数只经登记位取：登记值 31；扫了 832 份（scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-pref 退出=0 
+r2	insert-fn-exempted-file	  ✓ 每台默认重活线程数只经登记位取：登记值 31；扫了 832 份（scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-pref 退出=0 
+r2	insert-fn-new-file	  ✗ 1 处自己定并行度默认值的写法没经登记位取（每台默认重活线程数登记在 .claude/heavy-thread-default）：      crates/singlefs-harness/tests/new_sampling.rs:2  available_parallelism  「std::thread::available_parallelism().map_or(1, usize::from)」 退出=1 
+r2	edit-exempted-line	  ✓ 每台默认重活线程数只经登记位取：登记值 31；扫了 832 份（scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-pref 退出=0 
+r2	edit-line-new-file	  ✗ 1 处自己定并行度默认值的写法没经登记位取（每台默认重活线程数登记在 .claude/heavy-thread-default）：      scripts/mutation/new_rows.py:4  cpu_count、写死的线程数默认（回退值）、读自己的线程变量 GATE_MUTATION_TOTAL_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「processor_count = int(os.environ.get("GATE_MUTA 退出=1 

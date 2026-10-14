@@ -1,0 +1,4 @@
+name=y4_grep file=.claude/agents count_define_thread_limit=9
+name=y4_grep continuation-guard_thread_mentions=0
+name=y4_grep test_threads crash-amplification-lib=0 two-hosts=0 crash-amplification=0 admission=1
+name=y4_grep crates_mutation_rows=3953 gpu_in_command=661 gpu_in_feature_list=473 gpu_feature_rows_without_filter=2 rows_with_test_threads=0

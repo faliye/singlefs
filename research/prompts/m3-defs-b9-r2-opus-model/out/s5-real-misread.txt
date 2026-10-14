@@ -1,0 +1,2 @@
+r2	叫停表：m3-batch63-code-r1	收	⑥ 派实现员退出=0	  ✓ 派发闸照这份提示放行（implementation-writer，查了 8 行提示）；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主会话记录判）、⑤ 与本会话在跑的实现员撞文件（派的那一刻按登记判）、⑯ 草稿目录写者锁（派的那一刻按锁文件与主会话记录判） 
+r1	叫停表：m3-batch63-code-r1	不收：第 8 行的出处 records/2026-10-01-删除与并发事务.md 里找不到〔m3-batch63-code-r1 用户叫停，不再打〕这段原话（被删或改了字；〔〕里要与那份文件逐字相同）	⑥ 派实现员退出=2	✗ 派 implementation-writer 要改的文件落在还没判完的三方轮 m3-batch63-code-r1 的开工快照里：   三方轮 m3-batch63-code-r1（开工快照 research/prompts/m3-batch63-code-r1-snapshot/，research/prompts/m3-batch63-code-r1-main-verification.m

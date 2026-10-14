@@ -1,0 +1,8 @@
+## 现状（一行都不遮）
+fenced-example	PATH=shim	退出=2	会拒 1 处（线程上限）	载不进那句 stderr=1 行
+tilde-example	PATH=shim	退出=2	会拒 1 处（线程上限）	载不进那句 stderr=1 行
+plain	PATH=shim	退出=0	（没有拒绝项）	载不进那句 stderr=1 行
+## 试改（退回逐行认法）
+fenced-example	PATH=shim	退出=0	（没有拒绝项）	载不进那句 stderr=1 行
+tilde-example	PATH=shim	退出=2	会拒 1 处（线程上限）	载不进那句 stderr=1 行
+plain	PATH=shim	退出=0	（没有拒绝项）	载不进那句 stderr=1 行

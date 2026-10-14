@@ -1,0 +1,20 @@
+--- a/.claude/gate.d/doc-text.sh
++++ b/.claude/gate.d/doc-text.sh
+@@ -365,7 +365,16 @@
+         if found:
+             position, pattern_name, matched = found
+             anchor = position + len(matched) if form['snippet_to_match_end'] else position
+-            findings.append((relative_path, line_number, pattern_name, line[max(0, position - 20):anchor + 10].strip()))
++            start, end = max(0, position - 20), anchor + 10
++            for _key, word in masking_targets:      # （攻方试改 F-Z5）片段的两头不切在私有值中间：落在值里就挪到值的边上，整值进片段再打码
++                found_at = line.find(word)
++                while found_at >= 0:
++                    if found_at < start < found_at + len(word):
++                        start = found_at
++                    if found_at < end < found_at + len(word):
++                        end = found_at + len(word)
++                    found_at = line.find(word, found_at + 1)
++            findings.append((relative_path, line_number, pattern_name, line[start:end].strip()))
+ 
+ if findings:
+     finding_files = sorted({path for path, _, _, _ in findings})

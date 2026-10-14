@@ -1,0 +1,36 @@
+     Running tests/checker_narrow_invariants_and_abandoned_roots.rs 
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs 
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/entries_after_mount_refuse_swapped_or_behind_devices.rs 
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/fsync_drop_and_devices_without_the_selected_version.rs 
+test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; 
+     Running tests/mount_transparency_judges_the_system_configuration_witness_by_r2.rs 
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs 
+test result: ok. 72 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; 
+     Running tests/rollback_by_a_forward_publish.rs 
+test result: ok. 3 passed; 0 failed; 22 ignored; 0 measured; 0 filtered out; 
+     Running tests/system_configuration_witness_is_undecidable_only_when_a_slot_reports_a_read_error_and_no_device_verified_both.rs 
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs 
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/warm_up_journal_counter.rs 
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero.rs 
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/writable_mount_isolates_the_units_named_by_unapplied_journal_records_until_their_root_ring_slot_is_overwritten.rs 
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/writable_mount_refusal_for_an_unreadable_account_with_incomplete_records_judged_on_the_d23_list.rs 
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/writable_mount_refusal_judged_against_the_d23_list.rs 
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/writable_mount_refusal_on_a_crash_state_without_read_faults.rs 
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/writable_mount_refuses_a_publish_above_the_water_mark_missing_records_whose_named_units_read_back_zero.rs 
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/writable_mount_rejudges_missing_records_after_falling_back_to_the_witnessed_version.rs 
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+     Running tests/writable_mount_takes_a_second_instance.rs 
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 

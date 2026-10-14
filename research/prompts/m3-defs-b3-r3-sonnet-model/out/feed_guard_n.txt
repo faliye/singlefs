@@ -1,0 +1,7 @@
+name=feed_guard_n case=经内存包装、capped.sh 31（等于提示里的 31） rc=0
+name=feed_guard_n case=经内存包装、capped.sh 8（提示里是 31） rc=0
+name=feed_guard_n case=经内存包装、不经 capped.sh rc=0
+name=feed_guard_n case=既不经内存包装也不经 capped.sh rc=2
+name=feed_guard_n file=.claude/hooks/heavy-test-guard.sh 线程上限出现次数=0
+name=feed_guard_n file=.claude/hooks/lib_heavy_tests.py 线程上限出现次数=0
+name=feed_guard_n file=.claude/hooks/runner-dispatch-guard.sh 线程上限出现次数=103

@@ -1,0 +1,94 @@
+.claude/gate.d/code-tooling.sh	available_parallelism  「thread_default_form("available_parallelism", r"\bavailable_parallelism\b"),」
+.claude/gate.d/code-tooling.sh	available_threads（按此刻忙闲现算）  「thread_default_form("available_threads（按此刻忙闲现算）", r"\bavailable_threads\b"),」
+.claude/gate.d/code-tooling.sh	min(16  「thread_default_form("min(16", r"\bmin\s*\(\s*16\b|\.min\(\s*16\s*\)"),」
+.claude/gate.d/code-tooling.sh	nproc、sched_getaffinity、available_parallelism、available_threads（按此刻忙闲现算）  「THREAD_DEFAULT_PREFILTER = re.compile(r"nproc|cpu_count|sched_getaffinity|available_parallelism|available_threads|min\s*\(\s*16|\.min\(|capped\.sh|THREAD|JOBS|W」
+.claude/gate.d/code-tooling.sh	nproc  「thread_default_form("nproc", r"\bnproc\b"),」
+.claude/gate.d/code-tooling.sh	nproc  「THREAD_DEFAULT_HALF_CONTEXT = re.compile(r"(?i)nproc|cpu_count|core|processor|parallel|thread|jobs|worker|核")」
+.claude/gate.d/code-tooling.sh	nproc  「THREAD_DEFAULT_KEPT_LITERAL = re.compile(r"nproc|.*capped\.sh|[0-9]+|--(?:threads|jobs|workers|lanes)|threads|jobs|workers|" + THREAD_VARIABLE)」
+.claude/gate.d/code-tooling.sh	sched_getaffinity  「thread_default_form("sched_getaffinity", r"\bsched_getaffinity\b"),」
+.claude/hooks/lib_heavy_tests.py	capped.sh <数字>  「("探针包：经 capped.sh 起 cargo test", ["bash", "scripts/hosts/capped.sh", "7", "cargo", "test", "--manifest-path", "probes/linked/Cargo.toml"], work, "checker-tier-c」
+.claude/hooks/runner-dispatch-guard.sh	available_threads（按此刻忙闲现算）、读自己的线程变量 RUNNER_DISPATCH_GUARD_HEAVY_THREADS_LIBRARY：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「case("长活:多机一行写 available_threads 现算拒", "experiment-runner", runner_base + over + two_lines」
+.claude/hooks/runner-dispatch-guard.sh	available_threads（按此刻忙闲现算）、读自己的线程变量 RUNNER_DISPATCH_GUARD_HEAVY_THREADS_LIBRARY：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「+ "多机：台数取 --emit-hosts，每台线程取 .claude/heavy-thread-default 与 available_threads 里小的那个\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),」
+.claude/hooks/runner-dispatch-guard.sh	available_threads（按此刻忙闲现算）、读自己的线程变量 RUNNER_DISPATCH_GUARD_HEAVY_THREADS_LIBRARY：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「"派设计员与带重活的类型（线程上限那张类型表）没写预计挂钟或写得认不出的拒，超过 2 小时而分片、续跑、多机三行不齐（没写、半截、多机写死额度、多机写 host-resources 或 available_threads 现算、多机没点名 --emit-hosts 或登记值、分不了没点名或太短）的拒，齐了、点名了、2 」
+.claude/hooks/runner-dispatch-guard.sh	nproc、available_parallelism、available_threads（按此刻忙闲现算）、读自己的线程变量 RUNNER_DISPATCH_GUARD_HEAVY_THREADS_LIBRARY：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「"（这一行里不要出现 host-resources、available_threads 这两个词，也不要出现 available_parallelism、nproc、除以、在跑、核数、忙闲、空闲、负载这些现算说法的词，否定句里也不行）；"」
+crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs	available_parallelism  「std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)」
+crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	available_parallelism、读自己的线程变量 E165_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「let thread_count = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);」
+crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	available_parallelism、读自己的线程变量 E165_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「let thread_count = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);」
+crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	available_parallelism、读自己的线程变量 E165_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「let thread_count = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);」
+crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	available_parallelism、读自己的线程变量 E165_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「std::thread::available_parallelism().map_or(1, std::num::NonZero::get)」
+crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs	available_parallelism、读自己的线程变量 E168_LARGE_SLICE_THREADS、E168_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「available_parallelism」
+crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs	available_parallelism、读自己的线程变量 E168_LARGE_SLICE_THREADS、E168_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「available_parallelism: usize,」
+crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs	available_parallelism、读自己的线程变量 E168_LARGE_SLICE_THREADS、E168_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「std::thread::available_parallelism().map_or(1, std::num::NonZero::get),」
+crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs	写死的线程数默认、读自己的线程变量 E168_LARGE_SLICE_THREADS、E168_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「const LARGE_SLICE_THREADS_WHEN_UNSET: usize = 1;」
+crates/singlefs-checker-tier/src/crash_amplification.rs	available_parallelism、读自己的线程变量 SINGLEFS_CRASH_AMPLIFICATION_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)」
+crates/singlefs-checker-tier/src/crash_amplification.rs	available_parallelism、读自己的线程变量 SINGLEFS_CRASH_AMPLIFICATION_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「.unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::MIN))」
+crates/singlefs-checker-tier/src/crash_injection.rs	available_parallelism  「available_parallelism: impl Fn() -> std::io::Result<std::num::NonZeroUsize>,」
+crates/singlefs-checker-tier/src/crash_injection.rs	available_parallelism  「None => match available_parallelism() {」
+crates/singlefs-checker-tier/src/crash_injection.rs	available_parallelism  「std::thread::available_parallelism,」
+crates/singlefs-checker-tier/src/layer0_enumeration.rs	available_parallelism  「std::thread::available_parallelism().map_or(1, NonZeroUsize::get),」
+crates/singlefs-checker-tier/src/layer0_enumeration.rs	available_parallelism  「std::thread::available_parallelism().map_or(1, NonZeroUsize::get)」
+crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs	available_parallelism、读自己的线程变量 SINGLEFS_CRASH_JUDGE_CPU_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「.unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::MIN))」
+crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs	available_parallelism、读自己的线程变量 SINGLEFS_CRASH_JUDGE_CPU_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「.unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::MIN))」
+crates/singlefs-harness/src/fault_injection.rs	available_parallelism  「available_parallelism: impl Fn() -> std::io::Result<std::num::NonZeroUsize>,」
+crates/singlefs-harness/src/fault_injection.rs	available_parallelism  「None => match available_parallelism() {」
+crates/singlefs-harness/src/fault_injection.rs	available_parallelism  「std::thread::available_parallelism,」
+crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs	available_parallelism  「|| std::thread::available_parallelism().map_or(1, usize::from),」
+crates/singlefs-harness/tests/random_histories.rs	available_parallelism  「std::thread::available_parallelism()」
+crates/singlefs-harness/tests/random_histories.rs	available_parallelism  「.unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::MIN))」
+crates/singlefs-harness/tests/random_histories.rs	min(16  「.min(16)」
+scripts/crash/crash-amplification-lib.sh	nproc、读自己的线程变量 CRASH_AMPLIFICATION_BUILD_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「echo $(( $(nproc) > 1 ? $(nproc) - 1 : 1 ))」
+scripts/crash/crash-amplification-two-hosts.sh	available_threads（按此刻忙闲现算）、写死的线程数默认（回退值）、读自己的线程变量 CRASH_AMPLIFICATION_PEER_THREADS、STUB_LOCAL_THREADS、STUB_PEER_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「local = {"number": 1, "name": "本机", "is_local": True, "is_peer": False, "read": True, "cpu": {"available_threads": int(os.environ.get("STUB_LOCAL_THREADS") or 1」
+scripts/crash/crash-amplification-two-hosts.sh	available_threads（按此刻忙闲现算）、写死的线程数默认（回退值）、读自己的线程变量 CRASH_AMPLIFICATION_PEER_THREADS、STUB_LOCAL_THREADS、STUB_PEER_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「peer["cpu"] = {"available_threads": int(os.environ.get("STUB_PEER_THREADS") or 5)}」
+scripts/crash/crash-amplification-two-hosts.sh	available_threads（按此刻忙闲现算）、读自己的线程变量 CRASH_AMPLIFICATION_PEER_THREADS、STUB_LOCAL_THREADS、STUB_PEER_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「"看 crash_amplification_threads_now 里 max(1, available_threads)"」
+scripts/crash/crash-amplification-two-hosts.sh	available_threads（按此刻忙闲现算）、读自己的线程变量 CRASH_AMPLIFICATION_PEER_THREADS、STUB_LOCAL_THREADS、STUB_PEER_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「"看 crash_amplification_threads_now 里 max(1, available_threads)"」
+scripts/crash/crash-amplification-two-hosts.sh	available_threads（按此刻忙闲现算）、读自己的线程变量 CRASH_AMPLIFICATION_PEER_THREADS、STUB_LOCAL_THREADS、STUB_PEER_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「"看 crash_amplification_threads_now 里 max(1, available_threads)，与 peer_threads_now 把它写进 peer_run_environment"」
+scripts/devices/build-patched-qemu.sh	nproc  「BREAK_ITEMS=(skip-dsc-checksum skip-file-checksum allow-volatile-home skip-version-match skip-patch-readback stamp-ignores-patch threads-from-nproc)」
+scripts/devices/build-patched-qemu.sh	nproc  「if [[ "$build_break" == threads-from-nproc ]]; then nproc; else heavy_thread_default; fi」
+scripts/devices/build-patched-qemu.sh	nproc  「selftest_case "没设上限时 make 的并行数是登记的重活默认" 0 threads-from-nproc build_threads_default_problem」
+scripts/experiments/e162_crash_verdict_block_store.rs	available_parallelism  「let local = u64::try_from(std::thread::available_parallelism().map(usize::from).unwrap_or(0)).expect("装得进 u64");」
+scripts/experiments/e162_crash_verdict_block_store.rs	available_parallelism  「std::thread::available_parallelism().map(usize::from).unwrap_or(0),」
+scripts/experiments/e162_crash_verdict_block_store.rs	nproc  「.args(["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", &host, "nproc"])」
+scripts/experiments/e162_verdict_store_network.rs	available_parallelism  「std::thread::available_parallelism().map(|count| count.get()).unwrap_or(0),」
+scripts/experiments/e165-pin-red-examples.py	cpu_count、写死的线程数默认（回退值）  「return int(environment.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1)」
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/fake_row_driver.py	写死的线程数默认  「parser.add_argument("--lanes", type=int, default=1)」
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/fake_row_driver.py	写死的线程数默认  「parser.add_argument("--threads", type=int, default=6)」
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py	写死的线程数默认  「parser.add_argument("--lanes", type=int, default=1)」
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py	available_threads（按此刻忙闲现算）  「available_threads: int」
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py	available_threads（按此刻忙闲现算）  「lines.append(f"分配 {host_name(allocation.number)}：可用线程 {found.available_threads}（取 {allocation.threads}）、"」
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py	available_threads（按此刻忙闲现算）  「threads = max(0, min(found.available_threads, HOST_THREADS_CEILING))」
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/test_default_threads.py	核数的一半  「self.assertEqual(row_driver.threads_per_lane(None, 2, {}), max(1, registered // 2))」
+scripts/experiments/e171_three_oracle_collusion/row_driver.py	写死的线程数默认  「parser.add_argument("--lanes", type=int, default=1)」
+scripts/experiments/e171_three_oracle_collusion/test_collusion_pipeline.py	capped.sh <数字>  「self.assertEqual(command[4:7], ["/repo/scripts/hosts/capped.sh", "6", "/bin/dev"])」
+scripts/experiments/e171_three_oracle_collusion/test_o3_columns.py	capped.sh <数字>  「self.assertEqual(command[4:7], ["/repo/scripts/hosts/capped.sh", "3", "nice"])」
+scripts/experiments/e171_three_oracle_collusion/test_o3_columns.py	写死的线程数默认  「values = {"no_executor": False, "positive_control": None, "repo_root": "/repo", "threads": 2, "memory_cap": "1G"}」
+scripts/experiments/e17_merge.rs	available_parallelism  「std::thread::available_parallelism().map(|v| v.get()).unwrap_or(0)」
+scripts/experiments/e21_cpu.rs	available_parallelism  「let core_count = std::thread::available_parallelism().map(|parallelism| parallelism.get()).unwrap_or(1);」
+scripts/experiments/e6_multicore.rs	available_parallelism  「let core_count = std::thread::available_parallelism().map(|parallelism| parallelism.get()).unwrap_or(1);」
+scripts/experiments/replay.sh	nproc、核数的一半、读自己的线程变量 REPLAY_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「echo $(( $(nproc 2>/dev/null || echo 4) / 2 ))」
+scripts/experiments/replay.sh	nproc、读自己的线程变量 REPLAY_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「if [[ "$REPLAY_BROKEN" == jobs-from-nproc ]]; then」
+scripts/gate/admission.py	cpu_count、sched_getaffinity、读自己的线程变量 HEAVY_THREADS_BREAK、OMP_NUM_THREADS、REPLAY_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「counts = [count for count in (os.cpu_count(), len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None) if count]」
+scripts/gate/admission.py	nproc、读自己的线程变量 HEAVY_THREADS_BREAK、OMP_NUM_THREADS、REPLAY_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「completed = subprocess.run([nproc], capture_output=True, text=True, errors="replace", env=dict(environment))」
+scripts/gate/admission.py	nproc、读自己的线程变量 HEAVY_THREADS_BREAK、OMP_NUM_THREADS、REPLAY_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「nproc = shutil.which("nproc", path=environment.get("PATH")) or "nproc"」
+scripts/gate/admission.py	nproc、读自己的线程变量 HEAVY_THREADS_BREAK、OMP_NUM_THREADS、REPLAY_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「write_executable(os.path.join(tools, "nproc"), "#!/usr/bin/env bash\necho 1\n")」
+scripts/gate/admission.py	nproc、读自己的线程变量 HEAVY_THREADS_BREAK、OMP_NUM_THREADS、REPLAY_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「write_executable(os.path.join(tools, "nproc"), "#!/usr/bin/env bash\necho 1\n")」
+scripts/gate/verus-proof-check.py	cpu_count、写死的线程数默认（回退值）、读自己的线程变量 GATE_VERUS_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「return int(environment.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1)」
+scripts/gate/verus-proof-check.py	写死的线程数默认、读自己的线程变量 GATE_VERUS_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「options = {"verus_root": install, "cargo_home": cargo_home, "launcher": [], "timeout": 5, "threads": 2, "jobs": 2,」
+scripts/hosts/capped.sh	nproc  「if [[ "${CAPPED_BREAK:-}" == default-from-nproc ]]; then nproc; return 0; fi」
+scripts/hosts/detached-run.sh	capped.sh <数字>  「bash "$detached_run_script" long-run-check -- bash "$scripts_directory/run-with-memory-cap.sh" 1G bash "$scripts_directory/capped.sh" 1 \」
+scripts/hosts/heavy_threads.py	cpu_count、读自己的线程变量 HEAVY_THREADS_BREAK：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「return os.cpu_count() or 1」
+scripts/hosts/heavy-threads.sh	nproc、读自己的线程变量 HEAVY_THREADS_BREAK：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「if heavy_threads_break_is_set missing-registration-uses-core-count; then nproc; return 0; fi」
+scripts/hosts/host-dispatch.py	cpu_count、写死的线程数默认（回退值）  「jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), int(os.environ.get("SINGLEFS_THREAD_CAP") or 0) or os.cpu_count() or 1))」
+scripts/hosts/host-resources.py	available_threads（按此刻忙闲现算）  「cpu = dict(cpu, available_threads=max(0, cpu["cores"] - used))」
+scripts/hosts/host-resources.py	cpu_count、写死的线程数默认（回退值）  「jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), int(os.environ.get("SINGLEFS_THREAD_CAP") or 0) or os.cpu_count() or 1))」
+scripts/hosts/minimal-copy.py	cpu_count、写死的线程数默认（回退值）  「jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), int(os.environ.get("SINGLEFS_THREAD_CAP") or 0) or os.cpu_count() or 1))」
+scripts/hosts/run-with-memory-cap.sh	capped.sh <数字>、读自己的线程变量 RUN_WITH_MEMORY_CAP_THREADS_RESOLVED：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「in_context env "${thread_variable_unsets[@]}" RUN_WITH_MEMORY_CAP_KEY=selftest-threads-capped bash "$target" 64M bash "$SCRIPT_DIRECTORY/capped.sh" 3 true 2>>"$」
+scripts/hosts/run-with-memory-cap.sh	nproc、读自己的线程变量 RUN_WITH_MEMORY_CAP_THREADS_RESOLVED：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「"selftest-threads-unset|未设（整机 $(nproc) 核）" "selftest-threads-default|$registered_threads" "selftest-threads-default-cap|5"; do」
+scripts/hosts/source-stamp.py	cpu_count、写死的线程数默认（回退值）  「jobs = max(1, min(len(SWITCH_EXPECTED_CELLS), int(os.environ.get("SINGLEFS_THREAD_CAP") or 0) or os.cpu_count() or 1))」
+scripts/mutation/crates-mutation-rows.py	cpu_count、写死的线程数默认（回退值）、读自己的线程变量 GATE_MUTATION_CARGO_JOBS、GATE_MUTATION_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「cargo_jobs = environment.get("GATE_MUTATION_CARGO_JOBS", "").strip() or str(max(1, (os.cpu_count() or 4) // worker_count))」
+scripts/mutation/crates-mutation-rows.py	cpu_count、写死的线程数默认（回退值）、读自己的线程变量 GATE_MUTATION_CARGO_JOBS、GATE_MUTATION_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「processor_count = os.cpu_count() or 4」
+scripts/mutation/crates-mutation-rows.py	min(16、核数的一半、读自己的线程变量 GATE_MUTATION_CARGO_JOBS、GATE_MUTATION_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「by_processor = max(1, min(16, processor_count // 2))」
+scripts/mutation/mutate.sh	nproc、读自己的线程变量 MUTATE_CARGO_JOBS、MUTATE_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「processor_count="$(nproc 2>/dev/null || echo 2)"」
+scripts/mutation/mutate.sh	nproc、读自己的线程变量 MUTATE_CARGO_JOBS、MUTATE_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「processor_count="$(nproc 2>/dev/null || echo 2)"」
+scripts/mutation/mutate.sh	写死的线程数默认、读自己的线程变量 MUTATE_CARGO_JOBS、MUTATE_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「MAXIMUM_WORKERS_BY_PROCESSOR=16  # 核数那一项的上限，与 checker-tier-crates-mutation-replay 的 worker_count_for 相同」
+scripts/mutation/mutate.sh	核数的一半、读自己的线程变量 MUTATE_CARGO_JOBS、MUTATE_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「by_processor=$((processor_count / 2))」
+scripts/mutation/mutate.sh	核数的一半、读自己的线程变量 MUTATE_CARGO_JOBS、MUTATE_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「expected_workers=$((processor_count / 2))」

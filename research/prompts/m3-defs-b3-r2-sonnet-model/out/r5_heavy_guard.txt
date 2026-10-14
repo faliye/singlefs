@@ -1,0 +1,71 @@
+name=R5 tree=before case='test --manifest-path linked' rc=2
+name=R5 tree=before case='run --manifest-path linked' rc=2
+name=R5 tree=before case='test --manifest-path gitdep' rc=2
+name=R5 tree=before case='nextest --manifest-path linked' rc=2
+name=R5 tree=before case='cwd linked: cargo test' rc=2
+name=R5 tree=before case='main agent no prefix: cd linked && cargo run' rc=2
+name=R5 tree=before case='main agent with commit prefix: cargo run linked' rc=0
+name=R5 tree=before case='test --manifest-path plain' rc=0
+name=R5 tree=before case='D5-1 cwd linked: cargo test -p attack-probe' rc=0
+name=R5 tree=before case='D5-1 cwd W: -p attack-probe --manifest-path linked' rc=0
+name=R5 tree=before case='D5-1 cwd linked: cargo run -p attack-probe' rc=0
+name=R5 tree=before case='D5-1 cwd linked: cargo test --package attack-probe' rc=0
+name=R5 tree=before case='D5-1 cwd linked: cargo run --package=attack-probe' rc=0
+name=R5 tree=before case='D5-1 bench --manifest-path linked' rc=0
+name=R5 tree=before case='D5-1 build --manifest-path linked (compile only)' rc=0
+name=R5 tree=before case='D5-1 exec compiled probe binary' rc=0
+name=R5 tree=before case='D5-1 virtual workspace root: cargo run' rc=0
+name=R5 tree=before case='X plain probe cwd: cargo test -p plain-probe' rc=0
+name=R5 tree=before case='X -p singlefs-checker-tier from tree root' rc=2
+name=R5 tree=before case='X -p singlefs-harness from tree root (harness tier)' rc=0
+name=R5 tree=before case='X cwd checker-tier crate: cargo test -p singlefs-harness --lib' rc=0
+name=R5 tree=before case='X cwd harness crate: cargo test --lib' rc=0
+name=R5 tree=before case='X cwd checker-tier crate: cargo test --lib' rc=2
+name=R5 tree=before case='X tree root: cargo bench' rc=0
+name=R5 tree=before case='X tree root: cargo bench -p singlefs-harness' rc=0
+name=R5 tree=before case='X tree root: cargo bench --no-run' rc=0
+name=R5 tree=before case='X shadow probe named like a workspace member: cwd probe, -p singlefs-harness' rc=0
+name=R5 tree=after case='test --manifest-path linked' rc=2
+name=R5 tree=after case='run --manifest-path linked' rc=2
+name=R5 tree=after case='test --manifest-path gitdep' rc=2
+name=R5 tree=after case='nextest --manifest-path linked' rc=2
+name=R5 tree=after case='cwd linked: cargo test' rc=2
+name=R5 tree=after case='main agent no prefix: cd linked && cargo run' rc=2
+name=R5 tree=after case='main agent with commit prefix: cargo run linked' rc=0
+name=R5 tree=after case='test --manifest-path plain' rc=0
+name=R5 tree=after case='D5-1 cwd linked: cargo test -p attack-probe' rc=2
+name=R5 tree=after case='D5-1 cwd W: -p attack-probe --manifest-path linked' rc=2
+name=R5 tree=after case='D5-1 cwd linked: cargo run -p attack-probe' rc=2
+name=R5 tree=after case='D5-1 cwd linked: cargo test --package attack-probe' rc=2
+name=R5 tree=after case='D5-1 cwd linked: cargo run --package=attack-probe' rc=2
+name=R5 tree=after case='D5-1 bench --manifest-path linked' rc=2
+name=R5 tree=after case='D5-1 build --manifest-path linked (compile only)' rc=0
+name=R5 tree=after case='D5-1 exec compiled probe binary' rc=0
+name=R5 tree=after case='D5-1 virtual workspace root: cargo run' rc=0
+name=R5 tree=after case='X plain probe cwd: cargo test -p plain-probe' rc=0
+name=R5 tree=after case='X -p singlefs-checker-tier from tree root' rc=2
+name=R5 tree=after case='X -p singlefs-harness from tree root (harness tier)' rc=0
+name=R5 tree=after case='X cwd checker-tier crate: cargo test -p singlefs-harness --lib' rc=0
+name=R5 tree=after case='X cwd harness crate: cargo test --lib' rc=0
+name=R5 tree=after case='X cwd checker-tier crate: cargo test --lib' rc=2
+name=R5 tree=after case='X tree root: cargo bench' rc=2
+name=R5 tree=after case='X tree root: cargo bench -p singlefs-harness' rc=0
+name=R5 tree=after case='X tree root: cargo bench --no-run' rc=0
+name=R5 tree=after case='X shadow probe named like a workspace member: cwd probe, -p singlefs-harness' rc=2
+name=R5 case=lock-lib-same-file same_lib=True
+name=R5 tree=before case='lock: sub-agent cargo build in main workspace' rc=2
+name=R5 tree=before case='lock: main agent cargo build' rc=2
+name=R5 tree=before case='lock: sub-agent cargo --version' rc=0
+name=R5 tree=before case='lock: sub-agent bash build.sh' rc=0
+name=R5 tree=before case='lock: sub-agent cargo fmt' rc=2
+name=R5 tree=before case='lock: sub-agent cargo metadata' rc=2
+name=R5 tree=before case='lock: sub-agent cargo tree' rc=2
+name=R5 tree=before case='lock: sub-agent cp -r copy with .git: cargo build' rc=2
+name=R5 tree=after case='lock: sub-agent cargo build in main workspace' rc=2
+name=R5 tree=after case='lock: main agent cargo build' rc=2
+name=R5 tree=after case='lock: sub-agent cargo --version' rc=0
+name=R5 tree=after case='lock: sub-agent bash build.sh' rc=0
+name=R5 tree=after case='lock: sub-agent cargo fmt' rc=2
+name=R5 tree=after case='lock: sub-agent cargo metadata' rc=2
+name=R5 tree=after case='lock: sub-agent cargo tree' rc=2
+name=R5 tree=after case='lock: sub-agent cp -r copy with .git: cargo build' rc=2

@@ -1,0 +1,4 @@
+after SINGLEFS_THREAD_CAP=16 时 线程上限：16 退出=2
+after SINGLEFS_THREAD_CAP=16 时 线程上限：31 退出=0
+before SINGLEFS_THREAD_CAP=16 时 线程上限：16 退出=2
+before SINGLEFS_THREAD_CAP=16 时 线程上限：31 退出=0

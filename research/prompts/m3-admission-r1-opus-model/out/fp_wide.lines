@@ -1,0 +1,81 @@
+FP round=0 kind=user size=1 txg=4 built_on=3 ckpt_cost=52 data_slots=2 ordinary_other_slots=4 fixed_point_slots=6 excess=-46 mapping_tree_height=1
+FP round=1 kind=user size=8 txg=5 built_on=4 ckpt_cost=52 data_slots=16 ordinary_other_slots=5 fixed_point_slots=6 excess=-46 mapping_tree_height=1
+FP round=2 kind=user size=144 txg=6 built_on=5 ckpt_cost=52 data_slots=288 ordinary_other_slots=5 fixed_point_slots=6 excess=-46 mapping_tree_height=1
+FP round=3 kind=user size=145 txg=7 built_on=6 ckpt_cost=52 data_slots=290 ordinary_other_slots=7 fixed_point_slots=8 excess=-44 mapping_tree_height=1
+FP round=4 kind=user size=2 txg=8 built_on=7 ckpt_cost=52 data_slots=4 ordinary_other_slots=5 fixed_point_slots=8 excess=-44 mapping_tree_height=1
+FP round=5 kind=user size=300 txg=9 built_on=8 ckpt_cost=52 data_slots=600 ordinary_other_slots=8 fixed_point_slots=10 excess=-42 mapping_tree_height=2
+FP round=6 kind=user size=1 txg=10 built_on=9 ckpt_cost=56 data_slots=2 ordinary_other_slots=4 fixed_point_slots=6 excess=-50 mapping_tree_height=1
+FP round=7 kind=user size=289 txg=11 built_on=10 ckpt_cost=52 data_slots=578 ordinary_other_slots=8 fixed_point_slots=10 excess=-42 mapping_tree_height=2
+FP round=8 kind=user size=1500 txg=12 built_on=11 ckpt_cost=56 data_slots=3000 ordinary_other_slots=16 fixed_point_slots=26 excess=-30 mapping_tree_height=2
+FP round=9 kind=user size=3 txg=13 built_on=12 ckpt_cost=72 data_slots=6 ordinary_other_slots=5 fixed_point_slots=16 excess=-56 mapping_tree_height=1
+FP round=10 kind=user size=433 txg=14 built_on=13 ckpt_cost=52 data_slots=866 ordinary_other_slots=9 fixed_point_slots=11 excess=-41 mapping_tree_height=2
+FP round=11 kind=user size=1 txg=15 built_on=14 ckpt_cost=58 data_slots=2 ordinary_other_slots=4 fixed_point_slots=8 excess=-50 mapping_tree_height=1
+FP round=12 kind=user size=2000 txg=16 built_on=15 ckpt_cost=52 data_slots=4000 ordinary_other_slots=19 fixed_point_slots=29 excess=-23 mapping_tree_height=2
+FP round=13 kind=user size=5 txg=17 built_on=16 ckpt_cost=78 data_slots=10 ordinary_other_slots=5 fixed_point_slots=16 excess=-62 mapping_tree_height=1
+FP round=14 kind=raise txg=18 built_on=17 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=14 kind=raise txg=19 built_on=18 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=14 kind=user size=3000 txg=20 built_on=19 ckpt_cost=52 data_slots=6000 ordinary_other_slots=26 fixed_point_slots=46 excess=-6 mapping_tree_height=2
+FP round=15 kind=user size=1 txg=21 built_on=20 ckpt_cost=92 data_slots=2 ordinary_other_slots=4 fixed_point_slots=24 excess=-68 mapping_tree_height=1
+FP round=16 kind=user size=8 txg=22 built_on=21 ckpt_cost=52 data_slots=16 ordinary_other_slots=5 fixed_point_slots=8 excess=-44 mapping_tree_height=1
+FP round=17 kind=user size=144 txg=23 built_on=22 ckpt_cost=52 data_slots=288 ordinary_other_slots=5 fixed_point_slots=6 excess=-46 mapping_tree_height=1
+FP round=18 kind=user size=145 txg=24 built_on=23 ckpt_cost=52 data_slots=290 ordinary_other_slots=7 fixed_point_slots=6 excess=-46 mapping_tree_height=1
+FP round=19 kind=user size=2 txg=25 built_on=24 ckpt_cost=52 data_slots=4 ordinary_other_slots=5 fixed_point_slots=6 excess=-46 mapping_tree_height=1
+FP round=20 kind=user size=300 txg=26 built_on=25 ckpt_cost=52 data_slots=600 ordinary_other_slots=8 fixed_point_slots=10 excess=-42 mapping_tree_height=2
+FP round=21 kind=user size=1 txg=27 built_on=26 ckpt_cost=56 data_slots=2 ordinary_other_slots=4 fixed_point_slots=8 excess=-48 mapping_tree_height=1
+FP round=22 kind=user size=289 txg=28 built_on=27 ckpt_cost=52 data_slots=578 ordinary_other_slots=8 fixed_point_slots=12 excess=-40 mapping_tree_height=2
+FP round=23 kind=raise txg=29 built_on=28 ckpt_cost=56 fixed_point_slots=7 excess=-49
+FP round=23 kind=raise txg=30 built_on=29 ckpt_cost=56 fixed_point_slots=9 excess=-47
+FP round=23 kind=raise txg=31 built_on=30 ckpt_cost=56 fixed_point_slots=9 excess=-47
+FP round=23 kind=user size=1500 txg=32 built_on=31 ckpt_cost=56 data_slots=3000 ordinary_other_slots=16 fixed_point_slots=30 excess=-26 mapping_tree_height=2
+FP round=24 kind=user size=3 txg=33 built_on=32 ckpt_cost=72 data_slots=6 ordinary_other_slots=5 fixed_point_slots=16 excess=-56 mapping_tree_height=1
+FP round=25 kind=user size=433 txg=34 built_on=33 ckpt_cost=52 data_slots=866 ordinary_other_slots=9 fixed_point_slots=19 excess=-33 mapping_tree_height=2
+FP round=26 kind=user size=1 txg=35 built_on=34 ckpt_cost=58 data_slots=2 ordinary_other_slots=4 fixed_point_slots=10 excess=-48 mapping_tree_height=1
+FP round=27 kind=user size=2000 txg=36 built_on=35 ckpt_cost=52 data_slots=4000 ordinary_other_slots=19 fixed_point_slots=37 excess=-15 mapping_tree_height=2
+FP round=28 kind=user size=5 txg=37 built_on=36 ckpt_cost=78 data_slots=10 ordinary_other_slots=5 fixed_point_slots=16 excess=-62 mapping_tree_height=1
+FP round=29 kind=raise txg=38 built_on=37 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=29 kind=raise txg=39 built_on=38 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=29 kind=raise txg=40 built_on=39 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=29 kind=user size=3000 txg=41 built_on=40 ckpt_cost=52 data_slots=6000 ordinary_other_slots=26 fixed_point_slots=50 excess=-2 mapping_tree_height=2
+FP round=30 kind=user size=1 txg=42 built_on=41 ckpt_cost=92 data_slots=2 ordinary_other_slots=4 fixed_point_slots=28 excess=-64 mapping_tree_height=1
+FP round=31 kind=user size=8 txg=43 built_on=42 ckpt_cost=52 data_slots=16 ordinary_other_slots=5 fixed_point_slots=8 excess=-44 mapping_tree_height=1
+FP round=32 kind=user size=144 txg=44 built_on=43 ckpt_cost=52 data_slots=288 ordinary_other_slots=5 fixed_point_slots=6 excess=-46 mapping_tree_height=1
+FP round=33 kind=user size=145 txg=45 built_on=44 ckpt_cost=52 data_slots=290 ordinary_other_slots=7 fixed_point_slots=14 excess=-38 mapping_tree_height=1
+FP round=34 kind=user size=2 txg=46 built_on=45 ckpt_cost=52 data_slots=4 ordinary_other_slots=5 fixed_point_slots=8 excess=-44 mapping_tree_height=1
+FP round=35 kind=user size=300 txg=47 built_on=46 ckpt_cost=52 data_slots=600 ordinary_other_slots=8 fixed_point_slots=10 excess=-42 mapping_tree_height=2
+FP round=36 kind=user size=1 txg=48 built_on=47 ckpt_cost=56 data_slots=2 ordinary_other_slots=4 fixed_point_slots=8 excess=-48 mapping_tree_height=1
+FP round=37 kind=user size=289 txg=49 built_on=48 ckpt_cost=52 data_slots=578 ordinary_other_slots=8 fixed_point_slots=12 excess=-40 mapping_tree_height=2
+FP round=38 kind=raise txg=50 built_on=49 ckpt_cost=56 fixed_point_slots=9 excess=-47
+FP round=38 kind=raise txg=51 built_on=50 ckpt_cost=56 fixed_point_slots=9 excess=-47
+FP round=38 kind=raise txg=52 built_on=51 ckpt_cost=56 fixed_point_slots=7 excess=-49
+FP round=38 kind=user size=1500 txg=53 built_on=52 ckpt_cost=56 data_slots=3000 ordinary_other_slots=16 fixed_point_slots=32 excess=-24 mapping_tree_height=2
+FP round=39 kind=user size=3 txg=54 built_on=53 ckpt_cost=72 data_slots=6 ordinary_other_slots=5 fixed_point_slots=16 excess=-56 mapping_tree_height=1
+FP round=40 kind=user size=433 txg=55 built_on=54 ckpt_cost=52 data_slots=866 ordinary_other_slots=9 fixed_point_slots=17 excess=-35 mapping_tree_height=2
+FP round=41 kind=user size=1 txg=56 built_on=55 ckpt_cost=58 data_slots=2 ordinary_other_slots=4 fixed_point_slots=12 excess=-46 mapping_tree_height=1
+FP round=42 kind=user size=2000 txg=57 built_on=56 ckpt_cost=52 data_slots=4000 ordinary_other_slots=19 fixed_point_slots=37 excess=-15 mapping_tree_height=2
+FP round=43 kind=user size=5 txg=58 built_on=57 ckpt_cost=78 data_slots=10 ordinary_other_slots=5 fixed_point_slots=18 excess=-60 mapping_tree_height=1
+FP round=44 kind=raise txg=59 built_on=58 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=44 kind=raise txg=60 built_on=59 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=44 kind=raise txg=61 built_on=60 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=44 kind=user size=3000 txg=62 built_on=61 ckpt_cost=52 data_slots=6000 ordinary_other_slots=26 fixed_point_slots=48 excess=-4 mapping_tree_height=2
+FP round=45 kind=user size=1 txg=63 built_on=62 ckpt_cost=92 data_slots=2 ordinary_other_slots=4 fixed_point_slots=26 excess=-66 mapping_tree_height=1
+FP round=46 kind=user size=8 txg=64 built_on=63 ckpt_cost=52 data_slots=16 ordinary_other_slots=5 fixed_point_slots=8 excess=-44 mapping_tree_height=1
+FP round=47 kind=user size=144 txg=65 built_on=64 ckpt_cost=52 data_slots=288 ordinary_other_slots=5 fixed_point_slots=6 excess=-46 mapping_tree_height=1
+FP round=48 kind=user size=145 txg=66 built_on=65 ckpt_cost=52 data_slots=290 ordinary_other_slots=7 fixed_point_slots=14 excess=-38 mapping_tree_height=1
+FP round=49 kind=user size=2 txg=67 built_on=66 ckpt_cost=52 data_slots=4 ordinary_other_slots=5 fixed_point_slots=8 excess=-44 mapping_tree_height=1
+FP round=50 kind=user size=300 txg=68 built_on=67 ckpt_cost=52 data_slots=600 ordinary_other_slots=8 fixed_point_slots=10 excess=-42 mapping_tree_height=2
+FP round=51 kind=user size=1 txg=69 built_on=68 ckpt_cost=56 data_slots=2 ordinary_other_slots=4 fixed_point_slots=8 excess=-48 mapping_tree_height=1
+FP round=52 kind=user size=289 txg=70 built_on=69 ckpt_cost=52 data_slots=578 ordinary_other_slots=8 fixed_point_slots=12 excess=-40 mapping_tree_height=2
+FP round=53 kind=raise txg=71 built_on=70 ckpt_cost=56 fixed_point_slots=9 excess=-47
+FP round=53 kind=raise txg=72 built_on=71 ckpt_cost=56 fixed_point_slots=7 excess=-49
+FP round=53 kind=raise txg=73 built_on=72 ckpt_cost=56 fixed_point_slots=7 excess=-49
+FP round=53 kind=user size=1500 txg=74 built_on=73 ckpt_cost=56 data_slots=3000 ordinary_other_slots=16 fixed_point_slots=32 excess=-24 mapping_tree_height=2
+FP round=54 kind=user size=3 txg=75 built_on=74 ckpt_cost=72 data_slots=6 ordinary_other_slots=5 fixed_point_slots=16 excess=-56 mapping_tree_height=1
+FP round=55 kind=user size=433 txg=76 built_on=75 ckpt_cost=52 data_slots=866 ordinary_other_slots=9 fixed_point_slots=19 excess=-33 mapping_tree_height=2
+FP round=56 kind=user size=1 txg=77 built_on=76 ckpt_cost=58 data_slots=2 ordinary_other_slots=4 fixed_point_slots=12 excess=-46 mapping_tree_height=1
+FP round=57 kind=user size=2000 txg=78 built_on=77 ckpt_cost=52 data_slots=4000 ordinary_other_slots=19 fixed_point_slots=37 excess=-15 mapping_tree_height=2
+FP round=58 kind=user size=5 txg=79 built_on=78 ckpt_cost=78 data_slots=10 ordinary_other_slots=5 fixed_point_slots=18 excess=-60 mapping_tree_height=1
+FP round=59 kind=raise txg=80 built_on=79 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=59 kind=raise txg=81 built_on=80 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=59 kind=raise txg=82 built_on=81 ckpt_cost=52 fixed_point_slots=6 excess=-46
+FP round=59 kind=user size=3000 txg=83 built_on=82 ckpt_cost=52 data_slots=6000 ordinary_other_slots=26 fixed_point_slots=48 excess=-4 mapping_tree_height=2
+FP summary geometry=[16384, 16384] ring=67108864 user_publishes=60 user_exceed=0 max_user_excess=-2 raise_exceed=0 max_raise_excess=-46

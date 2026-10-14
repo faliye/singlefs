@@ -1,0 +1,41 @@
+name=R8 case=S18-d7-ok-live-compute before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=R8-registered-wording before_rc=2 before_detail=14 after_rc=0 after_detail=-
+name=R8 case=S18-quota-31threads-64G before_rc=2 before_detail=14 after_rc=2 after_detail=14
+name=R8 case=S18-quota-chinese-numerals before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-quota-chinese-numerals-registered before_rc=2 before_detail=14 after_rc=0 after_detail=-
+name=R8 case=S18-quota-cards-0-1-2 before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-quota-cards-registered before_rc=2 before_detail=14 after_rc=0 after_detail=-
+name=R8 case=X-registered-plus-live-word before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=X-registered-negated-live-word before_rc=2 before_detail=14 after_rc=2 after_detail=14
+name=R8 case=X-registered-no-emit-hosts before_rc=2 before_detail=14 after_rc=2 after_detail=14
+name=R8 case=X-registered-name-only before_rc=2 before_detail=14 after_rc=0 after_detail=-
+name=R8 case=X-registered-fullwidth-quota before_rc=2 before_detail=14 after_rc=2 after_detail=14
+name=R8 case=S18-shard-line-with-numbers before_rc=2 before_detail=14 after_rc=0 after_detail=-
+name=R8 case=S18-over2h-nothing-else-experiment-designer before_rc=2 before_detail=14 after_rc=2 after_detail=14
+name=R8 case=S18-no-wall-clock-experiment-designer before_rc=2 before_detail=14 after_rc=2 after_detail=14
+name=R8 case=S18-over2h-nothing-else-experiment-runner before_rc=2 before_detail=14 after_rc=2 after_detail=14
+name=R8 case=S18-no-wall-clock-experiment-runner before_rc=2 before_detail=14 after_rc=2 after_detail=14
+name=R8 case=S18-over2h-nothing-else-implementation-writer before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-no-wall-clock-implementation-writer before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-over2h-nothing-else-investigator before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-no-wall-clock-investigator before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-over2h-nothing-else-tooling-writer before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-no-wall-clock-tooling-writer before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-over2h-nothing-else-mutation-triage before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-no-wall-clock-mutation-triage before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-over2h-nothing-else-three-way-attack before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-no-wall-clock-three-way-attack before_rc=0 before_detail=- after_rc=2 after_detail=14
+name=R8 case=S18-over2h-nothing-else-clerk before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R8 case=S18-no-wall-clock-clerk before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R8 case=S18-over2h-nothing-else-sweep before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R8 case=S18-no-wall-clock-sweep before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R8 case=S18-over2h-nothing-else-kb-scribe before_rc=2 before_detail=other:✗ 派 kb-scribe 的提示缺它定义要的输入：判决（.claude/age,other:✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡 after_rc=2 after_detail=other:✗ 派 kb-scribe 的提示缺它定义要的输入：判决（.claude/age,other:✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡
+name=R8 case=S18-no-wall-clock-kb-scribe before_rc=2 before_detail=other:✗ 派 kb-scribe 的提示缺它定义要的输入：判决（.claude/age,other:✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡 after_rc=2 after_detail=other:✗ 派 kb-scribe 的提示缺它定义要的输入：判决（.claude/age,other:✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡
+name=R8 case=S18-over2h-nothing-else-three-way-forward before_rc=2 before_detail=other:✗ 派 three-way-forward 的提示缺它定义要的输入：禁读清单、背 after_rc=2 after_detail=other:✗ 派 three-way-forward 的提示缺它定义要的输入：禁读清单、背
+name=R8 case=S18-no-wall-clock-three-way-forward before_rc=2 before_detail=other:✗ 派 three-way-forward 的提示缺它定义要的输入：禁读清单、背 after_rc=2 after_detail=other:✗ 派 three-way-forward 的提示缺它定义要的输入：禁读清单、背
+name=R8 case=S18-over2h-nothing-else-three-way-defense before_rc=2 before_detail=other:✗ 派 three-way-defense 的提示缺它定义要的输入：禁读清单、背 after_rc=2 after_detail=other:✗ 派 three-way-defense 的提示缺它定义要的输入：禁读清单、背
+name=R8 case=S18-no-wall-clock-three-way-defense before_rc=2 before_detail=other:✗ 派 three-way-defense 的提示缺它定义要的输入：禁读清单、背 after_rc=2 after_detail=other:✗ 派 three-way-defense 的提示缺它定义要的输入：禁读清单、背
+name=R8 case=S18-over2h-nothing-else-prior-art before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R8 case=S18-no-wall-clock-prior-art before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R8 case=S18-over2h-nothing-else-three-way-materials before_rc=2 before_detail=other:✗ 派 three-way-materials 的提示缺它定义要的输入：-bod after_rc=2 after_detail=other:✗ 派 three-way-materials 的提示缺它定义要的输入：-bod
+name=R8 case=S18-no-wall-clock-three-way-materials before_rc=2 before_detail=other:✗ 派 three-way-materials 的提示缺它定义要的输入：-bod after_rc=2 after_detail=other:✗ 派 three-way-materials 的提示缺它定义要的输入：-bod

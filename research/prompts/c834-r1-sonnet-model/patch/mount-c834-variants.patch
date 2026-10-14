@@ -1,0 +1,170 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -2038,6 +2038,7 @@
+     slots_per_region: crate::root_ring::RootRingSlotsPerRegion,
+     current_records: &[AllocationRecord],
+     journal_instance_in_the_system_configuration: InstanceGeneration,
++    per_device_slot_instances: &[Vec<InstanceGeneration>],
+     before_the_one_reread: &mut BeforeTheOneReread<'_>,
+ ) -> Result<PlacementsInTheAccountsOfNewerReadableRoots, MountError> {
+     let mut in_the_accounts_of_newer_roots_by_ring_slot: BTreeMap<
+@@ -2075,8 +2076,14 @@
+                             root,
+                         ) {
+                             Some(computed) => computed,
+-                            None if journal_instance_in_the_system_configuration
+-                                <= root.instance =>
++                            None if !c834_variant_says_a_later_mount_took_the_number_and_wrote(
++                                devices,
++                                journal_instance_in_the_system_configuration,
++                                per_device_slot_instances,
++                                roots,
++                                records,
++                                root,
++                            ) =>
+                             {
+                                 placements_of_an_unapplied_publish_whose_account_is_unreadable(
+                                     devices,
+@@ -3122,6 +3129,7 @@
+                 slots_per_region,
+                 &current_records,
+                 system_configuration.quantities.journal_instance,
++                &c834_per_device_slot_instances(devices, system_configuration),
+                 before_the_one_reread,
+             )?;
+             for (ring_slot, placements_in_the_newer_roots_account) in
+@@ -10154,3 +10162,134 @@
+         );
+     }
+ }
++
++// ---- C834 正推腿的模型改动（只在草稿副本里，环境变量 C834_VARIANT 选候选；不进仓）----
++fn c834_per_device_slot_instances<Device: BlockDevice>(
++    devices: &Vec<(DeviceIdentity, Device)>,
++    system_configuration: &crate::system_configuration::SystemConfiguration,
++) -> Vec<Vec<InstanceGeneration>> {
++    let parameters_of_the_pool = parameters_of_the_system_configuration(system_configuration);
++    devices
++        .iter()
++        .map(|(identity, _)| {
++            self_verified_system_configuration_slots_of_the_pool(
++                devices,
++                *identity,
++                &parameters_of_the_pool,
++            )
++            .into_iter()
++            .map(|slot| slot.quantities.journal_instance)
++            .collect()
++        })
++        .collect()
++}
++
++/// true = 放过（`continue`），false = 照记录不齐那一支办（重读、仍不成拒）。
++fn c834_variant_says_a_later_mount_took_the_number_and_wrote<Device: BlockDevice>(
++    devices: &Vec<(DeviceIdentity, Device)>,
++    chosen_instance: InstanceGeneration,
++    per_device_slot_instances: &[Vec<InstanceGeneration>],
++    roots: &[RootRecord],
++    records: &BTreeMap<(InstanceGeneration, u64), crate::journal::JournalRecord>,
++    root: &RootRecord,
++) -> bool {
++    let variant = std::env::var("C834_VARIANT").unwrap_or_else(|_| "k1".to_string());
++    let per_device_max: Vec<InstanceGeneration> = per_device_slot_instances
++        .iter()
++        .filter_map(|slots| slots.iter().copied().max())
++        .collect();
++    let largest = per_device_max.iter().copied().max();
++    let smallest = per_device_max.iter().copied().min();
++    let appears_in_a_root_or_record = |number: InstanceGeneration| {
++        roots.iter().any(|candidate| candidate.instance == number)
++            || records.keys().any(|(instance, _)| *instance == number)
++    };
++    match variant.as_str() {
++        // 今天的实现：择到那一份的号比那条根新就放过
++        "k1" => chosen_instance > root.instance,
++        // 候选：逐盘取槽里最大、盘间取最小
++        "k2" => smallest.is_some_and(|number| number > root.instance),
++        // 候选：要求盘上有带比那条根更大的号的根或 journal 记录
++        "k3" => {
++            roots.iter().any(|candidate| candidate.instance > root.instance)
++                || records.keys().any(|(instance, _)| *instance > root.instance)
++        }
++        // 候选：照 I-7.7 第 2 句：盘间不等时较大者不出现在任何根、记录里就按较小者；相等照那个数
++        "k4" => {
++            let (Some(largest), Some(smallest)) = (largest, smallest) else {
++                return false;
++            };
++            if largest == smallest || appears_in_a_root_or_record(largest) {
++                largest > root.instance
++            } else {
++                smallest > root.instance
++            }
++        }
++        // 候选：k3 的凭据，再加「R 的根点名的中央映射树根那个槽里现在是别的、自证过的、实例代号比 R 新的索引节点」
++        "k6" => {
++            roots.iter().any(|candidate| candidate.instance > root.instance)
++                || records.keys().any(|(instance, _)| *instance > root.instance)
++                || root.mapping_root.locations.iter().any(|location| {
++                    PoolReader::read(
++                        devices,
++                        location.device,
++                        location.slot.to_device_offset(),
++                        usize::try_from(NODE_BYTES).expect("16384"),
++                    )
++                    .and_then(|bytes| crate::unit::parse_index_node(&bytes).ok())
++                    .is_some_and(|node| node.instance > root.instance)
++                })
++        }
++        // 候选：逐盘逐槽取最小（「逐盘取最小」的另一种读法：各盘各槽里最小的那个）
++        "k2_min_over_every_slot" => per_device_slot_instances
++            .iter()
++            .flatten()
++            .copied()
++            .min()
++            .is_some_and(|number| number > root.instance),
++        // k6 的变异：只留映射根那一句
++        "k6_only_mapping_root" => root.mapping_root.locations.iter().any(|location| {
++            PoolReader::read(
++                devices,
++                location.device,
++                location.slot.to_device_offset(),
++                usize::try_from(NODE_BYTES).expect("16384"),
++            )
++            .and_then(|bytes| crate::unit::parse_index_node(&bytes).ok())
++            .is_some_and(|node| node.instance > root.instance)
++        }),
++        // k6 的变异：records 那一句 > 改 >=
++        "k6_records_ge" => {
++            roots.iter().any(|candidate| candidate.instance > root.instance)
++                || records.keys().any(|(instance, _)| *instance >= root.instance)
++                || root.mapping_root.locations.iter().any(|location| {
++                    PoolReader::read(
++                        devices,
++                        location.device,
++                        location.slot.to_device_offset(),
++                        usize::try_from(NODE_BYTES).expect("16384"),
++                    )
++                    .and_then(|bytes| crate::unit::parse_index_node(&bytes).ok())
++                    .is_some_and(|node| node.instance > root.instance)
++                })
++        }
++        // k6 的变异：映射根那一句 > 改 >=
++        "k6_mapping_ge" => {
++            roots.iter().any(|candidate| candidate.instance > root.instance)
++                || records.keys().any(|(instance, _)| *instance > root.instance)
++                || root.mapping_root.locations.iter().any(|location| {
++                    PoolReader::read(
++                        devices,
++                        location.device,
++                        location.slot.to_device_offset(),
++                        usize::try_from(NODE_BYTES).expect("16384"),
++                    )
++                    .and_then(|bytes| crate::unit::parse_index_node(&bytes).ok())
++                    .is_some_and(|node| node.instance >= root.instance)
++                })
++        }
++        // 候选（外部审核）：跨盘跨槽取最大
++        "k5" => largest.is_some_and(|number| number > root.instance),
++        other => panic!("C834_VARIANT 不认识：{other}"),
++    }
++}

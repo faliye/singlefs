@@ -1,0 +1,11 @@
+== after rc=1 含假值的输出行=0 打码处=6
+   research/results/〔文件名含私有值〕/〔文件名含私有值〕/c.out
+   research/results/〔文件名含私有值〕
+   research/results/〔文件名含私有值〕/a.out
+   research/results/〔文件名含私有值〕/b.out
+== before rc=1 含假值的输出行=3 打码处=2
+   research/results/e1/srv/sample-private/peer-tree/inner/srv/sample-private/peer-tree/c.out
+   research/results/〔文件名含私有值〕
+   research/results/mirror/srv/sample-private/peer-tree/a.out
+   research/results/mirror2/srv/sample-private/peer-tree-2/b.out
+== pre0 rc=0 含假值的输出行=0 打码处=0

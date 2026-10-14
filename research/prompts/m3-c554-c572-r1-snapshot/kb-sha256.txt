@@ -1,0 +1,5 @@
+6cc30b0eef34d71d4ec02b5f5b983ac239bc3d76d39b65cbab72cd5be258a469  .claude/kb/checks-owed.md
+9d8eeae30992a58af3283a618decfb8d86bb07e94a35778e3afdeb7b2d624ae0  .claude/kb/decisions/23-journal的角色与格式.md
+b2965c90cf7704cd1120bd45f61e415b7a3bc8222be7ca61438434075900b314  .claude/kb/decisions/16-发布语义.md
+0e9029723d43752aa6d42fdbb271369c3ae3cccbfdbf556bbf4cd53cd15e9a6f  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+4324f866e515d5c545bc5bb49530733f9e7344b5de56d8c3dc382f9a5b213811  .claude/kb/experiments/158-择根与修复四岔路.md

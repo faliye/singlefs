@@ -1,0 +1,48 @@
+name=R6 tree=before case=1a-B-wrong-prompt-first rc=2 refused_by_lock=True claim_file=False names_holder=False
+name=R6 tree=before case=1b-A-after rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=before case=2a-old-process-receipt-before-lock rc=2 refused_by_lock=True claim_file=False names_holder=False
+name=R6 tree=before case=2b-new-dispatch rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=before case=3a-old-process-no-receipt-first rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=before case=3b-new-dispatch-after rc=2 refused_by_lock=True claim_file=True names_holder=True
+name=R6 tree=before case=4a-transcript-unreadable-old-first rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=before case=4b-transcript-unreadable-new-after rc=2 refused_by_lock=True claim_file=True names_holder=True
+name=R6 tree=before case=5a-B-no-receipt-sub rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=before case=sub-before-E-lock-A-writes-parent rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=before case=sub-before-E-lock-A-writes-sub rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=before case=9-no-receipt-matches-lock rc=2 refused_by_lock=True message_has_prompt_sha_prefix=False message_names_holder_agent=False
+name=R6 tree=before case=sub-A-writes-parent rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=before case=sub-E-writes-own-sub rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=before case=sub-A-writes-E-sub rc=2 refused_by_lock=True claim_file=True names_holder=-
+name=R6 tree=before case=sub-E-writes-parent rc=2 refused_by_lock=True claim_file=True names_holder=-
+name=R6 tree=before case=stale-number-in-lib-header line4_has_15=True line4_has_16=False
+name=R6 tree=after case=1a-B-wrong-prompt-first rc=2 refused_by_lock=True claim_file=False names_holder=True
+name=R6 tree=after case=1b-A-after rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=after case=2a-old-process-receipt-before-lock rc=2 refused_by_lock=True claim_file=False names_holder=True
+name=R6 tree=after case=2b-new-dispatch rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=after case=3a-old-process-no-receipt-first rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=after case=3b-new-dispatch-after rc=2 refused_by_lock=True claim_file=True names_holder=True
+name=R6 tree=after case=4a-transcript-unreadable-old-first rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=after case=4b-transcript-unreadable-new-after rc=2 refused_by_lock=True claim_file=True names_holder=True
+name=R6 tree=after case=5a-B-no-receipt-sub rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=after case=sub-before-E-lock-A-writes-parent rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=after case=sub-before-E-lock-A-writes-sub rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=after case=9-no-receipt-matches-lock rc=2 refused_by_lock=True message_has_prompt_sha_prefix=True message_names_holder_agent=False
+name=R6 tree=after case=sub-A-writes-parent rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=after case=sub-E-writes-own-sub rc=0 refused_by_lock=False claim_file=True names_holder=-
+name=R6 tree=after case=sub-A-writes-E-sub rc=2 refused_by_lock=True claim_file=True names_holder=-
+name=R6 tree=after case=sub-E-writes-parent rc=2 refused_by_lock=True claim_file=True names_holder=-
+name=R6 tree=after case=stale-number-in-lib-header line4_has_15=False line4_has_16=True
+name=R6 tree=before case=d16-a-first rc=0 lock_refusal=False lock_present=True
+name=R6 tree=before case=d16-b-same-dir-again rc=2 lock_refusal=True lock_present=True
+name=R6 tree=before case=d16-c-with-valve rc=0 lock_refusal=False lock_present=True
+name=R6 tree=before case=d16-d-inline-not-line-start rc=0 lock_refusal=False lock_present=True
+name=R6 tree=before case=d16-e-sub-dir rc=0 lock_refusal=False lock_present=True
+name=R6 tree=before case=d16-f-backtick rc=2 lock_refusal=True lock_present=True
+name=R6 tree=after case=d16-a-first rc=0 lock_refusal=False lock_present=True
+name=R6 tree=after case=d16-b-same-dir-again rc=2 lock_refusal=True lock_present=True
+name=R6 tree=after case=d16-c-with-valve rc=0 lock_refusal=False lock_present=True
+name=R6 tree=after case=d16-d-inline-not-line-start rc=0 lock_refusal=False lock_present=True
+name=R6 tree=after case=d16-e-sub-dir rc=0 lock_refusal=False lock_present=True
+name=R6 tree=after case=d16-f-backtick rc=2 lock_refusal=True lock_present=True
+name=R6 tree=before case=static-agents total=14 with_write_or_edit=6 bash_only=8 common_scopes_lock_to_write_edit=False common_says_child_dir_rule=False
+name=R6 tree=after case=static-agents total=14 with_write_or_edit=6 bash_only=8 common_scopes_lock_to_write_edit=True common_says_child_dir_rule=True

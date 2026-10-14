@@ -1,0 +1,52 @@
+X1 线程上限 31 + 另起一行 线程上限说明（正当说明） [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限 31 + 另起一行 线程上限说明（正当说明） [three-way-forward]	after=0	before=0	pre0=0	放行
+X1 线程上限 31 + 另起一行 线程上限说明（正当说明） [three-way-defense]	after=0	before=0	pre0=0	放行
+X1 线程上限 31 + 另起一行 线程上限说明（正当说明） [investigator]	after=0	before=0	pre0=0	放行
+X1 线程上限 31 + 线程上限说明里写数字 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限 31 + 线程上限说明里写 ÷ 与一半 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限说明在前、线程上限在后 [clerk]	after=0	before=0	pre0=0	放行
+X1 只有线程上限说明、没有线程上限行 [clerk]	after=2	before=2	pre0=0	✗ 派 clerk 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 只有线程上限说明、没有线程上限行 [three-way-forward]	after=2	before=2	pre0=0	✗ 派 three-way-forward 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 只有线程上限说明、没有线程上限行 [three-way-defense]	after=2	before=2	pre0=0	✗ 派 three-way-defense 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 只有线程上限说明、没有线程上限行 [investigator]	after=2	before=2	pre0=2	✗ 派 investigator 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 只有线程上限说明里写 16、没有线程上限行 [clerk]	after=2	before=2	pre0=0	✗ 派 clerk 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 线程上限 16 + 线程上限说明 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：16」（16 不等于登记值 31）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 线程上限 16 + 已判 + 线程上限说明 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限说明里套一行 线程上限：16（行首空格） [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：16」（16 不等于登记值 31）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 线程上限（说明）：31 全角括号在标签里 [clerk]	after=2	before=2	pre0=0	✗ 派 clerk 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 线程上限 31 半角冒号 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限： 31 冒号后空格 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限：31 行尾空格 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限：31 行尾制表符 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限：31 行尾句号 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：31。」（整数后面接了别的话：这一行只许一个十进制整数，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heavy-thr
+X1 线程上限：31 行尾 半角分号 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：31;」（整数后面接了别的话：这一行只许一个十进制整数，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heavy-thr
+X1 线程上限：31 后接 行内 线程上限说明 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：31 线程上限说明：本机」（整数后面接了别的话：这一行只许一个十进制整数，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/
+X1 线程上限：31（本机） 括注（R1 判过：放，R2 应拒） [clerk]	after=2	before=0	pre0=0	✗ 派 clerk 的提示写了「线程上限：31（本机）」（整数后面接了括注：括注一概不认，说明写得再好也不行，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/hea
+X1 线程上限：31（本机） 括注（R1 判过：放，R2 应拒） [three-way-forward]	after=2	before=0	pre0=0	✗ 派 three-way-forward 的提示写了「线程上限：31（本机）」（整数后面接了括注：括注一概不认，说明写得再好也不行，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31
+X1 线程上限：31（本机） 括注（R1 判过：放，R2 应拒） [three-way-defense]	after=2	before=0	pre0=0	✗ 派 three-way-defense 的提示写了「线程上限：31（本机）」（整数后面接了括注：括注一概不认，说明写得再好也不行，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31
+X1 线程上限：31（本机） 括注（R1 判过：放，R2 应拒） [investigator]	after=2	before=0	pre0=0	✗ 派 investigator 的提示写了「线程上限：31（本机）」（整数后面接了括注：括注一概不认，说明写得再好也不行，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.cla
+X1 线程上限：31(本机) 半角括注 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：31(本机)」（整数后面接了括注：括注一概不认，说明写得再好也不行，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/hea
+X1 线程上限：31 [本机] 方括号 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：31 [本机]」（整数后面接了别的话：这一行只许一个十进制整数，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heavy
+X1 线程上限：31 <本机> 尖括号 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：31 <本机>」（整数后面接了别的话：这一行只许一个十进制整数，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heavy
+X1 线程上限：31 # 本机 井号注释 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：31 # 本机」（整数后面接了别的话：这一行只许一个十进制整数，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heavy
+X1 线程上限：31 -- 本机 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：31 -- 本机」（整数后面接了别的话：这一行只许一个十进制整数，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heav
+X1 两行线程上限：31 与 31 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限：31 加粗标签 **线程上限**：31 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限：31 列表项 - 线程上限：31 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限：31 行首空格 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限：31 引用 > 线程上限：31 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限：031 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限：+31 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：+31」（整数后面接了别的话：这一行只许一个十进制整数，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heavy-thr
+X1 线程上限：31.0 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：31.0」（有 2 个数字 31、0，只许一个）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 线程上限：3１ 混全角 [clerk]	after=2	before=2	pre0=2	✗ 派 clerk 的提示写了「线程上限：3１」（整数后面接了别的话：这一行只许一个十进制整数，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.claude/heavy-thre
+X1 线程上限已判 顶缺行 理由=这件活只读 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限已判 顶缺行 理由=这件活只读 [three-way-forward]	after=0	before=0	pre0=0	放行
+X1 线程上限已判 顶缺行 理由=这件活只读 [three-way-defense]	after=0	before=0	pre0=0	放行
+X1 线程上限已判 顶缺行 理由=这件活只读 [investigator]	after=0	before=0	pre0=0	放行
+X1 线程上限已判 理由空 [clerk]	after=2	before=2	pre0=0	✗ 派 clerk 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 线程上限已判 理由=无 [clerk]	after=2	before=2	pre0=0	✗ 派 clerk 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 线程上限已判 理由=<理由> [clerk]	after=2	before=2	pre0=0	✗ 派 clerk 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 线程上限已判 理由=没有 [clerk]	after=2	before=2	pre0=0	✗ 派 clerk 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。
+X1 线程上限已判 写在括注里 线程上限：31（线程上限已判：忙） [clerk]	after=2	before=0	pre0=0	✗ 派 clerk 的提示写了「线程上限：31（线程上限已判：忙）」（整数后面接了括注：括注一概不认，说明写得再好也不行，说明另起一行写「线程上限说明：…」，那一行不判）；这一行只认一个十进制整数、后面什么都不接（括注也不行），整数要等于登记的每台默认重活线程数 31（.clau
+X1 线程上限已判 理由里写 机器忙 [clerk]	after=0	before=0	pre0=0	放行
+X1 线程上限说明 当成已判的替身（说明行写 已判） [clerk]	after=2	before=2	pre0=0	✗ 派 clerk 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 31（.claude/heavy-thread-default）。

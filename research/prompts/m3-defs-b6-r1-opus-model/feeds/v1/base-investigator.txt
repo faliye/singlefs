@@ -1,0 +1,7 @@
+开工先读 `.claude/agent-common.md`。
+重型测试：不跑
+预计挂钟：2 小时内
+草稿目录：~/.local/share/singlefs/work/m3-defs-b6-r1-opus/fake-scratch/
+报告：~/.local/share/singlefs/work/m3-defs-b6-r1-opus/fake-scratch/report.md
+活：把 records 里一张表的行数数一遍，交回数。
+现象：records 里一张表的行数对不上。

@@ -1,0 +1,20 @@
+--- a/.claude/hooks/runner-dispatch-guard.sh
++++ b/.claude/hooks/runner-dispatch-guard.sh
+@@ -1016,7 +1016,7 @@
+                + ("\n" + "\n".join(notes) if notes else ""))
+ 
+ THREAD_LIMIT_LINE = re.compile(LINE_START + r"线程上限[* \t]*[：:][* \t]*(.*?)[ \t]*$", re.M)
+-CODE_FENCE_OPEN = re.compile(r"^[ \t]*(`{3,})")   # 代码块的围栏行：行首（可缩进）三个及以上反引号，后面可接语言名
++CODE_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,})[^`]*$")   # 试改 F-Y1（攻方草稿）：照 CommonMark，围栏行至多缩进 3 格、反引号围栏的语言名里不许有反引号（```…``` 写在一行里的是行内代码，不开块）   # 代码块的围栏行：行首（可缩进）三个及以上反引号，后面可接语言名
+ THREAD_LIMIT_LEADING_NUMBER = re.compile(r"(\d+)(?!\d|\.\d)")
+ THREAD_LIMIT_VALUE = re.compile(r"[0-9]+")   # 一个十进制整数，后面什么都不接（括注也不行；说明另起一行照普通正文写，那一行不判）
+ THREAD_LIMIT_VALUE_WITH_NOTE = re.compile(r"[0-9]+(?:[ \t]*（([^（）\n]*)）)?")   # 只有弄坏开关 thread-note-accepted 下还在用：改前整数后面至多一段中文（全角）括注
+@@ -1070,7 +1070,7 @@
+     while index < len(lines):
+         opening = CODE_FENCE_OPEN.match(lines[index])
+         if opening is not None:
+-            closing = re.compile(r"[ \t]*`{" + str(len(opening.group(1))) + r",}[ \t]*")
++            closing = re.compile(r" {0,3}`{" + str(len(opening.group(1))) + r",}[ \t]*")
+             end = next((later for later in range(index + 1, len(lines)) if closing.fullmatch(lines[later].rstrip("\r"))), None)
+             if end is not None:
+                 kept.extend([""] * (end - index + 1))

@@ -1,0 +1,5 @@
+name=dispatch-14-form tree=r1 case=divide-by-running rc=2 refusals=1 first=✗ 派 experiment-runner 的提示写了预计挂钟超过 2 小时，长活声明不齐：
+name=dispatch-14-form tree=r1 case=one-host-nproc rc=0 refusals=0 first=-
+name=dispatch-14-form tree=r1 case=one-host-nproc-registered-words rc=2 refusals=1 first=✗ 派 experiment-runner 的提示写了预计挂钟超过 2 小时，长活声明不齐：
+name=dispatch-14-form tree=r1 case=wall-clock-first-segment rc=0 refusals=0 first=-
+name=dispatch-14-form tree=r1 case=control-registered rc=2 refusals=1 first=✗ 派 experiment-runner 的提示写了预计挂钟超过 2 小时，长活声明不齐：

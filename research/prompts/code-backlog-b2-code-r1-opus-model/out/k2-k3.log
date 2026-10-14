@@ -1,0 +1,39 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/code-backlog-b2-code-r1-opus/repo/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/code-backlog-b2-code-r1-opus/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.01s
+     Running tests/opus_k2_isolation_made_by_a_rollback_release.rs (/home/fy5090/.local/share/singlefs/work/code-backlog-b2-code-r1-opus/target-main/debug/deps/opus_k2_isolation_made_by_a_rollback_release-2e360f2c1185be74)
+
+running 1 test
+OPUS-K2 rollback target=(1, 3) resurrected_units=4 isolated_units=[] current_units=12
+OPUS-K2-ROLLBACK-RELEASE bad_device=0 quarantined_copies=2 released=4
+OPUS-K2-ROLLBACK-RELEASE record device=0 is_released=false generation=4
+OPUS-K2-ROLLBACK-RELEASE record device=1 is_released=false generation=4
+OPUS-K2 rollback target=(1, 4) resurrected_units=3 isolated_units=[("Data(DataUnitIndexInFile(0))", 50182, 50182)] current_units=14
+OPUS-K2-BACK-TO-B bad_device=0 slot_of_b=50182 outcome=Err("IsolatedUnitCopyUnreadableOrMismatched { unit: Data(DataUnitIndexInFile(0)), device: DeviceIdentity(0), slot: SlotNumber(50182) }") disk_unchanged=true records_unchanged=true
+OPUS-K2 rollback target=(1, 4) resurrected_units=3 isolated_units=[("Data(DataUnitIndexInFile(0))", 50182, 50182)] current_units=14
+OPUS-K2-BACK-TO-B-REPAIRED bad_device=0 outcome=Ok(RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }) cold_reads_b=true
+OPUS-K2 rollback target=(1, 3) resurrected_units=4 isolated_units=[] current_units=12
+OPUS-K2-ROLLBACK-RELEASE bad_device=1 quarantined_copies=2 released=4
+OPUS-K2-ROLLBACK-RELEASE record device=0 is_released=false generation=4
+OPUS-K2-ROLLBACK-RELEASE record device=1 is_released=false generation=4
+OPUS-K2 rollback target=(1, 4) resurrected_units=3 isolated_units=[("Data(DataUnitIndexInFile(0))", 50182, 50182)] current_units=14
+OPUS-K2-BACK-TO-B bad_device=1 slot_of_b=50182 outcome=Err("IsolatedUnitCopyUnreadableOrMismatched { unit: Data(DataUnitIndexInFile(0)), device: DeviceIdentity(1), slot: SlotNumber(50182) }") disk_unchanged=true records_unchanged=true
+OPUS-K2 rollback target=(1, 4) resurrected_units=3 isolated_units=[("Data(DataUnitIndexInFile(0))", 50182, 50182)] current_units=14
+OPUS-K2-BACK-TO-B-REPAIRED bad_device=1 outcome=Ok(RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }) cold_reads_b=true
+test opus_k2_rolling_back_to_b_after_a_rollback_isolated_its_data_unit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/opus_k3_refusal_order_and_allocator_state.rs (/home/fy5090/.local/share/singlefs/work/code-backlog-b2-code-r1-opus/target-main/debug/deps/opus_k3_refusal_order_and_allocator_state-2c18dc0d24f96742)
+
+running 1 test
+OPUS-K2 rollback target=(1, 3) resurrected_units=4 isolated_units=[] current_units=12
+OPUS-K2 rollback target=(1, 4) resurrected_units=3 isolated_units=[("Data(DataUnitIndexInFile(0))", 50182, 50182)] current_units=14
+OPUS-K3 also_corrupt_a_resurrected_unit=false data_slot_of_b=50182 inode_root_slot_of_b=50256 outcome=Err("IsolatedUnitCopyUnreadableOrMismatched { unit: Data(DataUnitIndexInFile(0)), device: DeviceIdentity(1), slot: SlotNumber(50182) }") disk_unchanged=true allocator_debug_unchanged=true output_unchanged=true
+OPUS-K2 rollback target=(1, 3) resurrected_units=4 isolated_units=[] current_units=12
+OPUS-K2 rollback target=(1, 4) resurrected_units=3 isolated_units=[("Data(DataUnitIndexInFile(0))", 50182, 50182)] current_units=14
+OPUS-K3 also_corrupt_a_resurrected_unit=true data_slot_of_b=50182 inode_root_slot_of_b=50256 outcome=Err("ResurrectedUnitCopyUnreadableOrMismatched { unit: InodeRoot, device: DeviceIdentity(0), slot: SlotNumber(50256) }") disk_unchanged=true allocator_debug_unchanged=true output_unchanged=true
+test opus_k3_refusal_leaves_the_whole_allocator_untouched_and_reports_the_resurrected_reason_before_the_isolated_one ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+

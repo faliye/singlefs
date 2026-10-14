@@ -1,0 +1,20 @@
+markdown-it-py 3.0.0（commonmark 预设）
+H0-control-canonical	不在代码块里的声明行：第 10 行「线程上限：31」；第 11 行「多机：台数从 layer0-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量」
+H1-control-live	不在代码块里的声明行：第 10 行「线程上限：31」；第 11 行「多机：每台线程按此刻空闲现算，机器忙时按负载降」
+H2-tilde-lone-fence-live	不在代码块里的声明行：第 10 行「线程上限：31」；第 15 行「多机：每台线程按此刻空闲现算，机器忙时按负载降」
+H3-next-line-live	不在代码块里的声明行：第 10 行「线程上限：31」；第 11 行「多机：台数从 layer0-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量」
+H4-next-line-live-runner	不在代码块里的声明行：第 11 行「线程上限：31」；第 12 行「多机：台数从 layer0-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量」
+H5-quoted-user-line-duplicate	不在代码块里的声明行：第 10 行「线程上限：31」；第 12 行「> 多机：每台按忙闲来」；第 13 行「多机：台数从 layer0-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量」
+O0-control-example-in-backtick-block	不在代码块里的声明行：第 8 行「线程上限：31」
+O1-tilde-block-example	不在代码块里的声明行：第 8 行「线程上限：31」
+O2-nested-list-fence-example	不在代码块里的声明行：第 8 行「线程上限：31」
+O3-blockquote-fence-example	不在代码块里的声明行：第 8 行「线程上限：31」
+O4-unclosed-fence-at-end-example	不在代码块里的声明行：第 8 行「线程上限：31」
+T0-control-16	不在代码块里的声明行：第 8 行「线程上限：16」
+T1-tilde-lone-fence-16	不在代码块里的声明行：第 12 行「线程上限：16」
+T1b-tilde-lone-fence-load	不在代码块里的声明行：第 12 行「线程上限：31（机器忙，按负载降到 16）」
+T2-list-fence-container-end-16	不在代码块里的声明行：第 13 行「线程上限：16」
+T3-html-comment-fence-16	不在代码块里的声明行：第 11 行「线程上限：16」
+V0-writer-missing-line	不在代码块里的声明行：无
+V1-writer-valve-only-16	不在代码块里的声明行：无
+V2-writer-valve-and-16	不在代码块里的声明行：第 8 行「线程上限：16」

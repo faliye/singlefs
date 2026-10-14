@@ -1,0 +1,10 @@
+canon	0	  ✓ 长活声明齐了（<WORK>/scratch/z6-header/canon.sh，判了 3 个键）：分片：按行号 mod 片数切；续跑：结果表里已有的行跳过，重起同一条命令只
+canon-period-zh	0	  ✓ 长活声明齐了（<WORK>/scratch/z6-header/canon-period-zh.sh，判了 3 个键）：分片：按行号 mod 片数切；续跑：结果表里已有的行跳
+canon-period-en	0	  ✓ 长活声明齐了（<WORK>/scratch/z6-header/canon-period-en.sh，判了 3 个键）：分片：按行号 mod 片数切；续跑：结果表里已有的行跳
+canon-semicolon-note	5	  ✗ 长活声明（<WORK>/scratch/z6-header/canon-semicolon-note.sh）：# long-run-hosts: 一行在规范句「台数从 lay
+canon-then-plain-comment-live	0	  ✓ 长活声明齐了（<WORK>/scratch/z6-header/canon-then-plain-comment-live.sh，判了 3 个键）：分片：按行号 mod 片数
+canon-then-second-hosts-key	5	  ✗ 长活声明（<WORK>/scratch/z6-header/canon-then-second-hosts-key.sh）：# long-run-hosts: 一行在规范句「
+canon-then-second-hosts-key-same	5	  ✗ 长活声明（<WORK>/scratch/z6-header/canon-then-second-hosts-key-same.sh）：# long-run-hosts: 一行
+split-canon-over-two-keys	5	  ✗ 长活声明（<WORK>/scratch/z6-header/split-canon-over-two-keys.sh）：# long-run-hosts: 一行不是规范写法「
+canon-then-blank-then-comment	0	  ✓ 长活声明齐了（<WORK>/scratch/z6-header/canon-then-blank-then-comment.sh，判了 3 个键）：分片：按行号 mod 片数
+canon-dup-shards-key	0	  ✓ 长活声明齐了（<WORK>/scratch/z6-header/canon-dup-shards-key.sh，判了 3 个键）：分片：按行号 mod 片数切 再按文件名切一

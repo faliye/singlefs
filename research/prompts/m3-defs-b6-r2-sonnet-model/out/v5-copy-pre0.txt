@@ -1,0 +1,7 @@
+S1-lib-imported-by-unchanged-guard	rc=0	
+S1b-same-as-implementation-writer	rc=0	
+S2-changed-lib-run-directly	rc=0	
+S4-unregistered-lib-imported	rc=0	
+S5-changed-body-subagent	rc=0	
+S6-changed-body-main-agent	rc=0	
+S7-changed-lib-run-directly-main-agent	rc=0	

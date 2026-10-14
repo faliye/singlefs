@@ -1,0 +1,17 @@
+# m3-defs-b9-r2 攻方腿：要主 agent 跑的门禁格（子 agent 起不了 --check）。前缀照主 agent 跑门禁格的做法（SINGLEFS_HEAVY_TESTS=commit 或 user-request）。
+# G2 = 这一轮冻结副本 ~/.local/share/singlefs/work/m3-defs-b9-r2/repo/ 的一份拷贝；G1 = 第一轮冻结副本 ~/.local/share/singlefs/work/m3-defs-b9-r1/repo/ 的一份拷贝；
+# T2、T1 = 新的空目录；M = research/prompts/m3-defs-b9-r2-opus-model
+bash $M/gate-samples/make_trees.sh ~/.local/share/singlefs/work/m3-defs-b9-r2/repo $M $T2
+bash $M/gate-samples/make_trees.sh ~/.local/share/singlefs/work/m3-defs-b9-r1/repo $M $T1
+# 1 heavy-thread-defaults（S3）：不是 git 仓，只缩不涨不比
+bash $G2/.claude/gate.d/code-tooling.sh --check heavy-thread-defaults $T2/htd-s3
+#   预计退 1、点名 3 处：conditional_literal.sh:4、stderr_silenced.sh:4、via_own_function.sh:5；不点名 colon_equals_fallback.sh、sourced_literal.sh、
+#   cap_fallback_via_variable.sh、registry_divided_by_variable.sh、assigned_twice_registry.sh
+bash $G1/.claude/gate.d/code-tooling.sh --check heavy-thread-defaults $T1/htd-s3
+#   预计退 1、点名 8 处：八份喂法（sample_defaults.sh 之外）的 || 赋值那一行全点名，含 assigned_twice_registry.sh（见 out/s3-samples.txt「门禁 r1」一段）
+# 2 abandoned-rounds（S5）：不是 git 仓，格只看树
+bash $G2/.claude/gate.d/doc-process-records.sh --check abandoned-rounds $T2/abandoned-misread
+#   预计退 0，成功句另列「照行号提示取那一行照收的 1 行」，点名 m3-batch63-code-r1、第 1594 行、「原话找不到，行号提示那一行还有这一轮的名字，取那一行」
+bash $G1/.claude/gate.d/doc-process-records.sh --check abandoned-rounds $T1/abandoned-misread
+#   预计退 1，点名 m3-batch63-code-r1「找不到〔m3-batch63-code-r1 用户叫停，不再打〕这段原话」
+# 以上预计都是抽出格里的判法（code-tooling 的格代码、lib_abandoned_rounds.py）在本腿树上跑出来的（模型目录 out/），没起过格本身。

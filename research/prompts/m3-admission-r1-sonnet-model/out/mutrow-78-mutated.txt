@@ -1,0 +1,8 @@
+row=78 file=crates/singlefs-core/src/allocator.rs anchor_hits=1 baseline=False
+exit=101
+test devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written ... FAILED
+thread 'devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written' (203030) panicked at crates/singlefs-harness/tests/unequal_devices.rs:392:5:
+  left: AllocatorFingerprint { records: [AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50176), span_slots: 2, generation: CheckpointTxg(4), is_released: true }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber
+ right: AllocatorFingerprint { records: [AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50176), span_slots: 2, generation: CheckpointTxg(4), is_released: true }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 2.29s
+error: test failed, to rerun pass `-p singlefs-harness --test unequal_devices`

@@ -1,0 +1,2 @@
+# 样本排除表
+scripts/experiments/absorbed.py:print_cores = os.cpu_count()  # 只把本机核数打进报告，不起线程

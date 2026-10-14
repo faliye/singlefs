@@ -1,0 +1,5 @@
+name=c576-probe-pair-fragmented result=Some("PlacementRefused { unit: InodeLeafContainer(InodeLeafContainerIndexInTree(0)), refusal: NoFreeSlotOnAnyDevice }")
+test probe_c576_pair_fragmented_publish_passes_the_landing_check_and_is_refused_by_the_placement_after_the_allocator_was_touched ... ok
+name=c576-probe-switch-off result=Some("PlacementRefused { unit: ExtentRoot, refusal: NoFreeSlotOnAnyDevice }")
+test probe_c576_with_the_switch_off_publish_running_out_of_space_midway_leaves_the_allocator_as_it_was ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.09s

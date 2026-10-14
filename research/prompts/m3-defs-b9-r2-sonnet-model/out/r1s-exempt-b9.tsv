@@ -1,0 +1,13 @@
+不给基准	0	✓ .claude/long-run-live-hosts-exempt 1 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；没给基准（基准那一版里还没有这张表，或不在 git 仓里），只缩不涨这一条没比
+基准与现在逐字相同	0	✓ .claude/long-run-live-hosts-exempt 1 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨
+改了脚本再重钉	1	✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 1 行）： | 第 1 行 scripts/p.sh 登记的 sha256 99881ad9c41b06b2534241bed7a279b7a4511d5cb86025c79ff8545824619ed3 与基准那一版里的 dcd3d1324d38b9b4da1770e5c6ac0b59e6049fd862dc0d2a5e313461c627e28d 不同（豁免表重钉了：改了脚本正文再换表里的 sha256 也算涨） | → 怎么办：豁免只缩不涨，表里的 sha256 不能换：把脚本的改动撤回去（sh
+基准是不带 sha256 的旧写法而现在重钉	0	✓ .claude/long-run-live-hosts-exempt 1 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨
+基准是不带 sha256 的旧写法而路径没变	0	✓ .claude/long-run-live-hosts-exempt 1 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨
+基准里没有这个路径	1	✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 1 行）： | 第 1 行 scripts/p.sh 是基准那一版里没有的（豁免表涨了） | → 怎么办：豁免只缩不涨：新脚本的文件头按登记值写；确实要加的，交主 agent 问用户再加
+基准是空文件	1	✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 1 行）： | 第 1 行 scripts/p.sh 是基准那一版里没有的（豁免表涨了） | → 怎么办：豁免只缩不涨：新脚本的文件头按登记值写；确实要加的，交主 agent 问用户再加
+基准只有注释	1	✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 1 行）： | 第 1 行 scripts/p.sh 是基准那一版里没有的（豁免表涨了） | → 怎么办：豁免只缩不涨：新脚本的文件头按登记值写；确实要加的，交主 agent 问用户再加
+基准里 sha256 写成大写	0	✓ .claude/long-run-live-hosts-exempt 1 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨
+基准里同一路径两行不同 sha256 而现在是其中一个	0	✓ .claude/long-run-live-hosts-exempt 1 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨
+基准里同一路径两行不同 sha256 而现在是第三个	1	✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 1 行）： | 第 1 行 scripts/p.sh 登记的 sha256 e2fcc2991bbdecda25996d471032b2c7d27c80f5837955e141029d3b16f86d8f 与基准那一版里的 99881ad9c41b06b2534241bed7a279b7a4511d5cb86025c79ff8545824619ed3、dcd3d1324d38b9b4da1770e5c6ac0b59e6049fd862dc0d2a5e313461c627e28d 不同（豁免表重钉了：改
+表里 sha256 与脚本不符而基准相同	1	✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 1 行）： | 第 1 行的 scripts/p.sh 现在的 sha256 是 99881ad9c41b06b2534241bed7a279b7a4511d5cb86025c79ff8545824619ed3，表里登记的是 dcd3d1324d38b9b4da1770e5c6ac0b59e6049fd862dc0d2a5e313461c627e28d（脚本改过了，豁免只给登记的那一版文件） | → 怎么办：这份脚本不该再改：把改动撤回去；确要改它，文件头按登记值读法写（多机一行用规范句）并删掉这一行
+表里删了这一行	0	✓ .claude/long-run-live-hosts-exempt 0 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登记值读不齐）；与基准那一版比没涨

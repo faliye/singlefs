@@ -1,0 +1,96 @@
+C794RESULT mirror=transient_two_read_errors stage=txg4_after_B candidate=keep_current red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg4_after_B candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg4_after_B candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg4_after_B candidate=once_referenced_evidence red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg20 candidate=keep_current red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg20 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg20 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg20 candidate=once_referenced_evidence red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg24 candidate=keep_current red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg24 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg24 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg24 candidate=once_referenced_evidence red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg26 candidate=keep_current red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg26 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg26 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg26 candidate=once_referenced_evidence red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg27 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg27 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg27 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg27 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg28 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg28 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg28 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg28 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg29 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg29 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg29 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg29 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg30 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg30 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg30 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg30 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg32 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg32 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg32 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg32 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg36 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg36 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg36 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg36 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg40 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg40 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg40 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg40 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg44 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg44 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg44 candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=transient_two_read_errors stage=txg44 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg4_after_B candidate=keep_current red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg4_after_B candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg4_after_B candidate=on_disk_quarantine_mark red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg4_after_B candidate=once_referenced_evidence red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg20 candidate=keep_current red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg20 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg20 candidate=on_disk_quarantine_mark red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg20 candidate=once_referenced_evidence red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg24 candidate=keep_current red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg24 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg24 candidate=on_disk_quarantine_mark red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg24 candidate=once_referenced_evidence red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg26 candidate=keep_current red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg26 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg26 candidate=on_disk_quarantine_mark red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg26 candidate=once_referenced_evidence red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg27 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg27 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg27 candidate=on_disk_quarantine_mark red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg27 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg28 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg28 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg28 candidate=on_disk_quarantine_mark red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg28 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg29 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg29 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg29 candidate=on_disk_quarantine_mark red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg29 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg30 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg30 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg30 candidate=on_disk_quarantine_mark red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg30 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg32 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg32 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg32 candidate=on_disk_quarantine_mark red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg32 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg36 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg36 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg36 candidate=on_disk_quarantine_mark red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg36 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg40 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg40 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg40 candidate=on_disk_quarantine_mark red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg40 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg44 candidate=keep_current red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg44 candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg44 candidate=on_disk_quarantine_mark red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds
+C794RESULT mirror=writer_forgets_the_release stage=txg44 candidate=once_referenced_evidence red=["I-3.1", "I-3.11"] I-3.1=violated I-3.11=violated I-5.2=holds

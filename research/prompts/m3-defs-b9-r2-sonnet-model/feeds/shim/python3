@@ -1,0 +1,3 @@
+#!/bin/sh
+# 模拟 PATH 上的 python3 没有 dist-packages（venv / conda / pyenv 那类环境）：-S 不加载 site，系统的 markdown_it 就导不进
+exec /usr/bin/python3 -S "$@"

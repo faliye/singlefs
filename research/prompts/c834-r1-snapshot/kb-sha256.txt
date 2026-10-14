@@ -1,0 +1,5 @@
+6e4466e1abf9b7ad336c36b5e324f2c8ffd0d2fba83afdc9523a1f5892729166  .claude/kb/checks-owed.md
+cee4cbb7da5bd2eb0f5a3c652448974ccf9e19b18bb497546dd2767ba83864ad  .claude/kb/term-renames.md
+04195d90a11cfca7f1c693e4d8c7d4613a2f4045acf3ff9526f3915aba225568  crates/singlefs-checker/invariants/02-根环.md
+01cf69c99b4993794b95a74024cc5723f71a00f030c31df3883a862ad9152f75  .claude/kb/decisions/22-单元原子性怎么合成.md
+565620bcead49240809b3788d09345f1e339007874b22207006c45f8b4cc77ef  .claude/kb/decisions/23-journal的角色与格式.md

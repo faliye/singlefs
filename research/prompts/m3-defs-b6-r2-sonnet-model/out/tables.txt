@@ -1,0 +1,50 @@
+=== after
+guard_type_tables 问题: None
+派发闸 线程上限表: ['clerk', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', 'tooling-writer']
+派发闸 预计挂钟表: ['clerk', 'experiment-designer', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward
+骨架 HEAVY_WORK_TYPES: ['clerk', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', 'tooling-writer']
+骨架 LONG_RUN_TYPES: ['clerk', 'experiment-designer', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', '
+线程表一致: True  挂钟表一致: True
+agent-common.md ⑭ 串: ['clerk', 'experiment-designer', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward',
+agent-common.md ⑮ 串: ['clerk', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', 'tooling-writer'] 与�
+main-agent.md ⑮ 串: ['clerk', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', 'tooling-writer'] 与派
+main-agent.md ⑭ 串: ['clerk', 'experiment-designer', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', '
+定义 clerk                    输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 experiment-designer      输入里有预计挂钟行=True 线程上限行=False   派发闸要预计挂钟=True 要线程上限=False
+定义 experiment-runner        输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 implementation-writer    输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 investigator             输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 kb-scribe                输入里有预计挂钟行=False 线程上限行=False   派发闸要预计挂钟=False 要线程上限=False
+定义 mutation-triage          输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 prior-art                输入里有预计挂钟行=False 线程上限行=False   派发闸要预计挂钟=False 要线程上限=False
+定义 sweep                    输入里有预计挂钟行=False 线程上限行=False   派发闸要预计挂钟=False 要线程上限=False
+定义 three-way-attack         输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 three-way-defense        输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 three-way-forward        输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 three-way-materials      输入里有预计挂钟行=False 线程上限行=False   派发闸要预计挂钟=False 要线程上限=False
+定义 tooling-writer           输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+=== before
+guard_type_tables 问题: None
+派发闸 线程上限表: ['clerk', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', 'tooling-writer']
+派发闸 预计挂钟表: ['clerk', 'experiment-designer', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward
+骨架 HEAVY_WORK_TYPES: ['clerk', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', 'tooling-writer']
+骨架 LONG_RUN_TYPES: ['clerk', 'experiment-designer', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', '
+线程表一致: True  挂钟表一致: True
+agent-common.md ⑭ 串: ['clerk', 'experiment-designer', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward',
+agent-common.md ⑮ 串: ['clerk', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', 'tooling-writer'] 与�
+main-agent.md ⑮ 串: ['clerk', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', 'tooling-writer'] 与派
+main-agent.md ⑭ 串: ['clerk', 'experiment-designer', 'experiment-runner', 'implementation-writer', 'investigator', 'mutation-triage', 'three-way-attack', 'three-way-defense', 'three-way-forward', '
+定义 clerk                    输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 experiment-designer      输入里有预计挂钟行=True 线程上限行=False   派发闸要预计挂钟=True 要线程上限=False
+定义 experiment-runner        输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 implementation-writer    输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 investigator             输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 kb-scribe                输入里有预计挂钟行=False 线程上限行=False   派发闸要预计挂钟=False 要线程上限=False
+定义 mutation-triage          输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 prior-art                输入里有预计挂钟行=False 线程上限行=False   派发闸要预计挂钟=False 要线程上限=False
+定义 sweep                    输入里有预计挂钟行=False 线程上限行=False   派发闸要预计挂钟=False 要线程上限=False
+定义 three-way-attack         输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 three-way-defense        输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 three-way-forward        输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True
+定义 three-way-materials      输入里有预计挂钟行=False 线程上限行=False   派发闸要预计挂钟=False 要线程上限=False
+定义 tooling-writer           输入里有预计挂钟行=True 线程上限行=True   派发闸要预计挂钟=True 要线程上限=True

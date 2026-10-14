@@ -1,0 +1,12 @@
+C794RESULT mirror=z10 with_quarantine=false publishes=3 live_slot=50188
+C794RESULT mirror=z10 stage=txg7_after_empty_publishes candidate=keep_current red=["I-3.9", "I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794DETAIL mirror=z10 stage=txg7_after_empty_publishes I-3.11 盘 0：记账的已分配 Some(1343488) 减 defer 待释放 Some(1114112)，不等于从最新根（txg 10）走读到的 262144（其中隔离豁免 0）
+C794RESULT mirror=z10 stage=txg7_after_empty_publishes candidate=exempt_every_unreferenced_record red=["I-3.9", "I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=z10 stage=txg7_after_empty_publishes candidate=on_disk_quarantine_mark red=["I-3.9", "I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=z10 stage=txg7_after_empty_publishes candidate=once_referenced_evidence red=["I-3.9", "I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=z10 with_quarantine=true publishes=3 live_slot=50188
+C794RESULT mirror=z10_plus_transient stage=txg7_after_empty_publishes candidate=keep_current red=["I-3.1", "I-3.9"] I-3.1=violated I-3.11=holds I-5.2=holds
+C794DETAIL mirror=z10_plus_transient stage=txg7_after_empty_publishes I-3.1 盘 0：记账的已分配 Some(1376256)，遍历全部有效根得到 1343488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 11 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 4、低于 F 的根槽 4 个
+C794RESULT mirror=z10_plus_transient stage=txg7_after_empty_publishes candidate=exempt_every_unreferenced_record red=["I-3.9", "I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=z10_plus_transient stage=txg7_after_empty_publishes candidate=on_disk_quarantine_mark red=["I-3.9", "I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
+C794RESULT mirror=z10_plus_transient stage=txg7_after_empty_publishes candidate=once_referenced_evidence red=["I-3.9", "I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds

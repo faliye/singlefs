@@ -1,0 +1,13 @@
+# 正推腿原型（m3-batch63-code-r1 sonnet）：mirror.py/rerun.sh 拷进仓副本的 crates/sonnet-probe-b63，并改副本根 Cargo.toml 把它加成工作区成员；不进主工作区。
+[package]
+name = "sonnet-probe-b63"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[features]
+default = ["verdict-store"]
+verdict-store = ["singlefs-checker-tier/verdict-store"]
+
+[dependencies]
+singlefs-checker-tier = { path = "../singlefs-checker-tier", features = ["verdict-store"] }

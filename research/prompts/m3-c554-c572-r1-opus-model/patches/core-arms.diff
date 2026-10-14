@@ -1,0 +1,132 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -1313,7 +1313,31 @@
+         &system_configuration.immutable.filesystem_identifier,
+     )
+     .unwrap_or(CheckpointTxg(0));
+-    checkpoint_txg_after_the_version(highest_ring_txg.max(highest_record_txg))
++    let first = checkpoint_txg_after_the_version(highest_ring_txg.max(highest_record_txg))?;
++    // ===== 攻方腿 m3-c554-c572-r1 B4 臂（只在草稿副本里）：OPUS_B4_ARM=skip_once =====
++    // 「新实例的第一次发布避开环里读不出的槽对应的 txg」最窄的一种读法：那一槽这一刻读不出、自证不过或读回全零，就往后挪一个 txg（只挪一次）。
++    if std::env::var("OPUS_B4_ARM").as_deref() == Ok("skip_once") {
++        let target = crate::root_ring::target_for_publish(first, system_configuration.immutable.sizes.root_ring_slots_per_region);
++        let device = system_configuration.immutable.region_devices[usize::try_from(target.region).expect("区域号")];
++        let readable = devices
++            .iter()
++            .find(|(id, _)| *id == device)
++            .and_then(|(_, d)| {
++                let mut bytes = vec![0u8; usize::try_from(system_configuration.immutable.sizes.physical_block_size).expect("块宽")];
++                d.read_at(
++                    crate::root_ring::slot_offset(target, system_configuration.immutable.sizes.fixed_structure_slot_spacing),
++                    &mut bytes,
++                )
++                .ok()
++                .map(|()| bytes)
++            })
++            .and_then(|bytes| crate::root_record::RootRecord::parse_slot(&bytes, &system_configuration.immutable.filesystem_identifier));
++        if readable.is_none() {
++            eprintln!("OPUS-B4 skip_once first={} -> {}", first.0, first.0 + 1);
++            return checkpoint_txg_after_the_version(first);
++        }
++    }
++    Ok(first)
+ }
+ 
+ /// 接在 txg 为 `version` 的那一版后面的下一个 txg（它加一），挂载一侧（可写挂载、抬 F、正常卸载）用。
+@@ -1941,8 +1965,34 @@
+                         before_the_one_reread,
+                     )?
+                 }
+-                None => continue,
++                // ===== 攻方腿 m3-c554-c572-r1 B2 臂（只在草稿副本里）：OPUS_B2_ARM =====
++                None => match std::env::var("OPUS_B2_ARM").unwrap_or_default().as_str() {
++                    "" => continue,
++                    "released" => current_records
++                        .iter()
++                        .filter(|record| record.is_released)
++                        .map(|record| (record.device, record.slot, u64::from(record.span_slots)))
++                        .collect(),
++                    "allocated" => placements_still_allocated_in_the_account(current_records),
++                    "allocated_released" => current_records
++                        .iter()
++                        .map(|record| (record.device, record.slot, u64::from(record.span_slots)))
++                        .collect(),
++                    "mapping" => placements_of_an_unapplied_publish_whose_account_is_unreadable(
++                        devices,
++                        unit_area_start,
++                        &root_of_the_publish,
++                        current_records,
++                        before_the_one_reread,
++                    )?,
++                    other => panic!("OPUS_B2_ARM={other:?} 认不得"),
++                },
+             };
++        eprintln!(
++            "OPUS-B2 c_account_publish txg={} placements={}",
++            checkpoint_txg.0,
++            placements.len()
++        );
+         in_the_accounts_by_ring_slot
+             .entry(target_for_publish(checkpoint_txg, slots_per_region))
+             .or_default()
+@@ -8104,6 +8154,55 @@
+         &target_units,
+         allocator,
+     )?;
++    // ===== 攻方腿 m3-c554-c572-r1 B5 臂（只在草稿副本里）：OPUS_C572_ARM =====
++    // 「隔离单元」= 目标引用、现行账里同槽同分配代仍分配（复活判定当共用）、而现行那一版的用户可见单元不引用它的那几个。
++    let opus_c572_arm = std::env::var("OPUS_C572_ARM").unwrap_or_default();
++    let opus_slots_referenced_by_current: BTreeSet<(DeviceIdentity, SlotNumber)> =
++        user_visible_units_through_the_mapping(current)
++            .map(|units| {
++                units
++                    .iter()
++                    .flat_map(|(_, locations)| locations.iter().map(|l| (l.device, l.slot)))
++                    .collect()
++            })
++            .unwrap_or_default();
++    let opus_quarantined_shared: Vec<(TransactionUnit, [LocationEntry; 2])> = target_units
++        .iter()
++        .filter(|(unit, locations)| {
++            !units_to_check_on_every_device.iter().any(|(u, l)| u == unit && l == locations)
++                && locations
++                    .iter()
++                    .all(|l| !opus_slots_referenced_by_current.contains(&(l.device, l.slot)))
++        })
++        .copied()
++        .collect();
++    eprintln!(
++        "OPUS-C572 arm={opus_c572_arm:?} target_units={} resurrected_units_checked={} shared_not_referenced_by_current={}",
++        target_units.len(),
++        units_to_check_on_every_device.len(),
++        opus_quarantined_shared.len()
++    );
++    let mut units_to_check_on_every_device = units_to_check_on_every_device;
++    match opus_c572_arm.as_str() {
++        "" => {}
++        "verify_quarantined" => units_to_check_on_every_device.extend(opus_quarantined_shared.iter().copied()),
++        "verify_all_shared" => {
++            let all: Vec<(TransactionUnit, [LocationEntry; 2])> = target_units.to_vec();
++            units_to_check_on_every_device = all;
++        }
++        "refuse_quarantined" => {
++            if let Some((unit, locations)) = opus_quarantined_shared.first() {
++                eprintln!("OPUS-C572 refused_because_the_target_references_a_quarantined_unit");
++                return Err(RollbackError::ResurrectedUnitCopyUnreadableOrMismatched {
++                    unit: *unit,
++                    device: locations[0].device,
++                    slot: locations[0].slot,
++                });
++            }
++        }
++        other => panic!("OPUS_C572_ARM={other:?} 认不得"),
++    }
++    eprintln!("OPUS-C572 units_checked_on_every_device={}", units_to_check_on_every_device.len());
+     every_copy_of_the_resurrected_units_reads_back(&*devices, &units_to_check_on_every_device)?;
+     // 释放集：cur 引用的用户可见单元里，落点不在 R_old 引用的那几个里的（在的那几个上面判过同槽同分配代，是两版共用的）。
+     let slots_referenced_by_the_target: BTreeSet<(DeviceIdentity, SlotNumber)> = target_units
+@@ -9547,3 +9646,4 @@
+         );
+     }
+ }
++

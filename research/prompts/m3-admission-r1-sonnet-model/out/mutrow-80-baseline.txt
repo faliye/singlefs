@@ -1,0 +1,4 @@
+row=80 file=crates/singlefs-core/src/allocator.rs anchor_hits=1 baseline=True
+exit=0
+test raising_the_floor_when_the_only_empty_segment_is_held_falls_back_to_slots_outside_the_hold ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 2.42s

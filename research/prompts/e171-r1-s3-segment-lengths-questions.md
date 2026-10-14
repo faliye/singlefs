@@ -1,0 +1,9 @@
+# E171（三oracle合谋测试） 流三段长钉值的问题单（2026-10-13）
+
+装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 的 `stream-constants --streams 3` 在 HEAD ce1457c3、HEAD + 2026-10-13 暂存区、钉死那次提交 f8a9ddaa 三棵树上都退 3：只有 `first_file_unlinked_then_inodes_across_one_leaf_segment_lengths` 一条 `holds=false`，钉值 `LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 与 crates 现算的 959 段里下标 15（钉 20、算 24）与 43（钉 24、算 20）互换，总写 5980、根写 240、全量态数 362809947、快档态数 3127 都 `holds=true`；四趟那一行 sha256 相同（主 agent 日志 `~/.local/share/singlefs/work/commit-2026-10-11/e171-constants-2026-10-13.log`、`e171-s3-rerun-{1,2}.log`、`e171-s3-head-only.log`）。调查员（报告 `~/.local/share/singlefs/work/investigate-e171-s3-segments/report.md`）在副本上读出的机理：下标 15 是调用 4（删第一个文件的最后一批）、下标 43 是调用 11（第 7 次建 inode）；crates 今天在调用 4 多写 `RetirementLeafContainer(0)` 与 `RetirementRoot` 两个单元（`crates/singlefs-core/src/transaction.rs:5434`，判决 m3-retire-r1 第三节第 3–6 条，2026-10-09），分配落点后推 4 槽，叶 62 起槽 50344 落进调用 10 一次发布；钉值取自 2026-10-05 的产物 `research/results/e171-r1-…-2026-10-05-s1-stream-constants-r6-r2.out`、`-r6-r3.out` 的 `crates=` 一栏，那时没有退役记录。副本上的反事实（退役记录换成空列表）得回旧钉值；副本的数不进 kb。只写问题与候选，不写倾向。
+
+| # | 问题 | 候选 | 翻面观测 | 够判条件 | 状态 |
+|---|---|---|---|---|---|
+| 1 | 把 `LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 换成今天 crates 现算的那一份（只有下标 15、43 两处不同）之后，`stream-constants --streams 1,2,3` 三条流的全部核对都 `holds=true`、退 0 吗 | 全过 / 哪一条不过 | 任一行 `holds=false` 或 `s1_failed_checks` 非 0 | 重钉后在入库装置上跑一次、产物登记进复跑 | 够判：全过（修订 13，乙 `holds=false` 0 行、`s1_failed_checks=0`、退 0） |
+| 2 | 「互换由退役记录引起」在入库的装置上复现得出来吗：不写退役记录时 crates 现算的段长表与旧钉值逐项相同、写时与新钉值逐项相同 | 复现 / 不复现（哪一侧不同） | 关掉退役记录后段长表与旧钉值有任一项不同 | 入库装置上两种取法各跑一次（怎么关、关在哪一层由登记定；不许为此改 `crates/singlefs-core/` 的产品代码） | 够判：入库装置上做不到（修订 12 第 12.5.3 节），副本上的反事实只作线索 |
+| 3 | 2026-10-05 的 `-s1-stream-constants-r6-r2.out`、`-r6-r3.out` 两份产物里 `crates=` 一栏是旧钉值，复跑登记怎么对待它们 | 留作修订 6 树的历史、页里写明不再是现值 / 作废 / 换成新产物 | 复跑登记按 exact 判这两份而装置已换钉值 ⇒ 必红 | 登记里写明两份的去向、复跑表与页一致 | 够判：留作修订 6 树的历史（修订 13，RS8 改前改后 0、页第 7 项写明、replay.sh 加乙的行） |

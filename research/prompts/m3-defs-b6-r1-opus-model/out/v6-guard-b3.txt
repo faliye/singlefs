@@ -1,0 +1,7 @@
+✗ 派 implementation-writer 要改的文件落在还没判完的三方轮 old-topic-r1 的开工快照里：
+  三方轮 old-topic-r1（开工快照 research/prompts/old-topic-r1-snapshot/，research/prompts/old-topic-r1-main-verification.md 还不在）：
+    crates/demo/src/lib.rs（出现在派发提示；快照清单 frozen-copy-sha256.txt）
+→ 规矩：.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」：腿跑着的时候主 agent 不改这些文件，要改的等判决时一起改。
+→ 怎么办：等 old-topic-r1 的判决写完再派，或把这几处改动并进判决；判过这次派发不碰那一轮的证据（例如只读不改），在派发提示里单起一行写「快照冲突已判：old-topic-r1 <理由>」（理由不许空）；用户已叫停、不会写判决的轮，在 research/prompts/abandoned-rounds.tsv 加一行收掉它（轮名、日期、为什么撂下、去向，制表符分隔；门禁 doc-process-records 的 abandoned-rounds 格读同一张表），行里写出处「records/<文件>.md 第 N 行」：records/ 下现存文件的那一行里要有这一轮的名字和「」括起来的用户原话（去掉空白后至少 6 个字），不认这一轮自己的材料、规则与定义文件、仓外路径（含 ..），之后这一轮的快照不再挡任何派发。
+! research/prompts/abandoned-rounds.tsv 登记了 old-topic-r1，但收不了这一轮：第 7 行没有出处：要写 records/<文件>.md 第 N 行（research/、.claude/ 下的文件、这一轮自己的材料、仓外路径都不认）
+→ 派发闸照这份提示会拒 1 处（快照冲突），照上面逐处改完再核；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主会话记录判）、⑤ 与本会话在跑的实现员撞文件（派的那一刻按登记判）、⑯ 草稿目录写者锁（派的那一刻按锁文件与主会话记录判）

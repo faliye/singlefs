@@ -1,0 +1,27 @@
+name=a2a3-identity stage=fresh reading_available_slots=211968 allocator_issuable_unblocked_slots=211968 reading_minus_issuable=0
+name=a4-closed-pairs stage=fresh cluster_segments=0 unblocked_slots=211968 pairs_for_data_outside_segments=105984 pairs_for_data_per_room=105984 slots_unblocked_inside_cluster_segments_upper_bound=0
+name=a3-probe stage=fresh d0_allocated_slots=0 d0_free_slots=211968 d0_available_bytes=3472883712 d0_unblocked_slots=211968 d0_pairs_for_data=105984
+name=a2a3-identity stage=two_data_units_allocated reading_available_slots=211964 allocator_issuable_unblocked_slots=211964 reading_minus_issuable=0
+name=a2a3-identity stage=isolate_two_free_slots reading_available_slots=211962 allocator_issuable_unblocked_slots=211962 reading_minus_issuable=0
+name=a2a3-identity stage=isolate_two_allocated_slots_double_deducted reading_available_slots=211960 allocator_issuable_unblocked_slots=211962 reading_minus_issuable=-2
+name=a3-probe stage=two_data_units_allocated d0_allocated_slots=4 d0_free_slots=211964 d0_available_bytes=3472818176 d0_unblocked_slots=211964 d0_pairs_for_data=105982
+name=a3-probe stage=both_released_in_defer_window d0_allocated_slots=4 d0_free_slots=211964 d0_available_bytes=3472818176 d0_unblocked_slots=211964 d0_pairs_for_data=105982
+name=a2a3-identity stage=two_slots_reclaimed_and_held reading_available_slots=211962 allocator_issuable_unblocked_slots=211962 reading_minus_issuable=0
+reclaimed_placements=2
+name=a3-probe stage=reclaimed_but_held_until_floor_takes_effect d0_allocated_slots=0 d0_free_slots=211968 d0_available_bytes=3472883712 d0_unblocked_slots=211964 d0_pairs_for_data=105982
+name=a2a3-identity stage=holds_released reading_available_slots=211962 allocator_issuable_unblocked_slots=211964 reading_minus_issuable=-2
+name=a3-probe stage=holds_released d0_allocated_slots=0 d0_free_slots=211968 d0_available_bytes=3472883712 d0_unblocked_slots=211968 d0_pairs_for_data=105984
+test identity_between_the_reading_and_what_the_allocator_can_issue ... ok
+test probe ... ok
+name=a4-closed-pairs stage=300_one_slot_commit_generated_blocks cluster_segments=5 unblocked_slots=211668 pairs_for_data_outside_segments=105824 pairs_for_data_per_room=105824 slots_unblocked_inside_cluster_segments_upper_bound=20
+reclaimed=300
+name=a4-closed-pairs stage=all_300_released_and_reclaimed_inside_closed_segments cluster_segments=5 unblocked_slots=211968 pairs_for_data_outside_segments=105824 pairs_for_data_per_room=105824 slots_unblocked_inside_cluster_segments_upper_bound=320
+name=a4-closed-pairs next_user_data_slot=50496 (单元区起点 50176)
+test slots_closed_to_user_data_inside_the_mounts_cluster_segments_grow_with_churn ... ok
+name=a5-c574-first-half d0_unblocked_slots=105984 d0_pairs_for_data=0
+name=a5-c574-first-half pre_check_for_one_two_slot_container=true
+name=a5-c574-first-half landing_one_slot_ok=true landing_two_slots_aligned=Err(NoFreeSlotOnAnyDevice)
+test the_landing_check_counts_single_slots_while_a_two_slot_container_needs_an_aligned_pair ... ok
+name=a4-witness d0_formula_available_slots=320 formula_admits_one_data_unit=true d0_pairs_for_data_outside_segments=0 landing_check_admits_one_data_unit=false user_data_alloc=None
+test the_byte_formula_admits_a_data_unit_while_no_slot_pair_outside_the_cluster_segments_is_left ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s

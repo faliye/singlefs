@@ -1,0 +1,10 @@
+== 基准=before 的表, 被判=after（只缩不涨那一条）
+  ✗ 排除表涨了：这几行基准 base-repo 那一版里没有：
+     第 82 行 scripts/agents/dispatch-prompt.py:"THREAD_LIMIT_REQUIRED_AGENTS" in long_run_table.group(2)
+     第 83 行 scripts/experiments/replay.sh:&& REPLAY_JOBS=1
+     → 怎么办：排除只缩不涨。新写的默认值经 heavy_thread_default / default_heavy_threads / capped.sh default 取；确实要加的，交主 agent 问用户再加。
+== 基准=pre0 的表, 被判=after（只缩不涨那一条）
+  ✗ 排除表涨了：这几行基准 base-repo 那一版里没有：
+     第 82 行 scripts/agents/dispatch-prompt.py:"THREAD_LIMIT_REQUIRED_AGENTS" in long_run_table.group(2)
+     第 83 行 scripts/experiments/replay.sh:&& REPLAY_JOBS=1
+     → 怎么办：排除只缩不涨。新写的默认值经 heavy_thread_default / default_heavy_threads / capped.sh default 取；确实要加的，交主 agent 问用户再加。

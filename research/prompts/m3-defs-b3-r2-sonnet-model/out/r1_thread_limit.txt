@@ -1,0 +1,91 @@
+name=R1 case=S7-31 before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S7-div before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=S7-slash before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=S7-half before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=S7-031 before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S7-32 before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=S7-30 before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=S7-310 before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=S7-31.5 before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=S7-N=31 before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=S7-default before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=S7-cores-div before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=A3-formula before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=A3-second-host before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=X-ok-paren before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=X-ok-paren-space before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=X-fullwidth-digit before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=X-superscript before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=X-zero-width-inside before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=X-zero-width-trail before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=X-paren-digits before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=X-paren-not-number before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=X-paren-chinese-numeral before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=X-paren-fraction-words before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=X-halfwidth-paren before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=X-comma before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=X-arabic-indic before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=X-plus before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=X-leading-space-tab before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S7-halfwidth-colon before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S7-list before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S7-bold before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=X-two-lines-31-and-31 before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=X-two-lines-31-and-16 before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=X-indented before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=X-quote-prefix before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=S3-valve-reason before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S3-valve-x before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S3-valve-placeholder before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=S3-valve-empty before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=X-valve-anything-formula before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=X-valve-whitespace-reason before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=S8-missing-line-implementation-writer before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=S8-missing-line-valve-implementation-writer before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-line-31-implementation-writer before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-investigator before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=S8-missing-line-valve-investigator before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-line-31-investigator before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-tooling-writer before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=S8-missing-line-valve-tooling-writer before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-line-31-tooling-writer before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-experiment-runner before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=S8-missing-line-valve-experiment-runner before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-line-31-experiment-runner before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-mutation-triage before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=S8-missing-line-valve-mutation-triage before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-line-31-mutation-triage before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-three-way-attack before_rc=0 before_detail=- after_rc=2 after_detail=15
+name=R1 case=S8-missing-line-valve-three-way-attack before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-line-31-three-way-attack before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-clerk before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-valve-clerk before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-line-31-clerk before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-sweep before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-valve-sweep before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-line-31-sweep before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-kb-scribe before_rc=2 before_detail=other:✗ 派 kb-scribe 的提示缺它定义要的输入：判决（.claude/age,other:✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡 after_rc=2 after_detail=other:✗ 派 kb-scribe 的提示缺它定义要的输入：判决（.claude/age,other:✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡
+name=R1 case=S8-missing-line-valve-kb-scribe before_rc=2 before_detail=other:✗ 派 kb-scribe 的提示缺它定义要的输入：判决（.claude/age,other:✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡 after_rc=2 after_detail=other:✗ 派 kb-scribe 的提示缺它定义要的输入：判决（.claude/age,other:✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡
+name=R1 case=S8-line-31-kb-scribe before_rc=2 before_detail=other:✗ 派 kb-scribe 的提示缺它定义要的输入：判决（.claude/age,other:✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡 after_rc=2 after_detail=other:✗ 派 kb-scribe 的提示缺它定义要的输入：判决（.claude/age,other:✗ 派 kb-scribe 的提示里认不出一份规格（提示正文与点名的工作根或过渡
+name=R1 case=S8-missing-line-three-way-forward before_rc=2 before_detail=other:✗ 派 three-way-forward 的提示缺它定义要的输入：禁读清单、背 after_rc=2 after_detail=other:✗ 派 three-way-forward 的提示缺它定义要的输入：禁读清单、背
+name=R1 case=S8-missing-line-valve-three-way-forward before_rc=2 before_detail=other:✗ 派 three-way-forward 的提示缺它定义要的输入：禁读清单、背 after_rc=2 after_detail=other:✗ 派 three-way-forward 的提示缺它定义要的输入：禁读清单、背
+name=R1 case=S8-line-31-three-way-forward before_rc=2 before_detail=other:✗ 派 three-way-forward 的提示缺它定义要的输入：禁读清单、背 after_rc=2 after_detail=other:✗ 派 three-way-forward 的提示缺它定义要的输入：禁读清单、背
+name=R1 case=S8-missing-line-three-way-defense before_rc=2 before_detail=other:✗ 派 three-way-defense 的提示缺它定义要的输入：禁读清单、背 after_rc=2 after_detail=other:✗ 派 three-way-defense 的提示缺它定义要的输入：禁读清单、背
+name=R1 case=S8-missing-line-valve-three-way-defense before_rc=2 before_detail=other:✗ 派 three-way-defense 的提示缺它定义要的输入：禁读清单、背 after_rc=2 after_detail=other:✗ 派 three-way-defense 的提示缺它定义要的输入：禁读清单、背
+name=R1 case=S8-line-31-three-way-defense before_rc=2 before_detail=other:✗ 派 three-way-defense 的提示缺它定义要的输入：禁读清单、背 after_rc=2 after_detail=other:✗ 派 three-way-defense 的提示缺它定义要的输入：禁读清单、背
+name=R1 case=S8-missing-line-three-way-materials before_rc=2 before_detail=other:✗ 派 three-way-materials 的提示缺它定义要的输入：-bod after_rc=2 after_detail=other:✗ 派 three-way-materials 的提示缺它定义要的输入：-bod
+name=R1 case=S8-missing-line-valve-three-way-materials before_rc=2 before_detail=other:✗ 派 three-way-materials 的提示缺它定义要的输入：-bod after_rc=2 after_detail=other:✗ 派 three-way-materials 的提示缺它定义要的输入：-bod
+name=R1 case=S8-line-31-three-way-materials before_rc=2 before_detail=other:✗ 派 three-way-materials 的提示缺它定义要的输入：-bod after_rc=2 after_detail=other:✗ 派 three-way-materials 的提示缺它定义要的输入：-bod
+name=R1 case=S8-missing-line-prior-art before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-valve-prior-art before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-line-31-prior-art before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-experiment-designer before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-missing-line-valve-experiment-designer before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=S8-line-31-experiment-designer before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=X-placeholder-fill-implementation-writer before_rc=2 before_detail=other:✗ 派 implementation-writer 的提示骨架还有 1 处占位没 after_rc=2 after_detail=other:✗ 派 implementation-writer 的提示骨架还有 1 处占位没
+name=R1 case=X-placeholder-angle-anything-implementation-writer before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=X-placeholder-angle-31-implementation-writer before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=A1-env8-prompt31 before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=A1-env8-prompt8 before_rc=2 before_detail=15 after_rc=2 after_detail=15
+name=R1 case=A1-env8-prompt8-valve before_rc=0 before_detail=- after_rc=0 after_detail=-
+name=R1 case=A1-skeleton-env8 before_rc=0 before_detail=线程上限：31 after_rc=0 after_detail=线程上限：31

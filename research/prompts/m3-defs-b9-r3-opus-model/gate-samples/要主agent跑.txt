@@ -1,0 +1,15 @@
+# m3-defs-b9-r3 攻方腿：要主 agent 跑的门禁格（子 agent 起不了 --check）。前缀照主 agent 跑门禁格的做法（SINGLEFS_HEAVY_TESTS=commit 或 user-request）。
+# G3、G2、G1 = 第三、二、一轮冻结副本（~/.local/share/singlefs/work/m3-defs-b9-r{3,2,1}/repo/）各一份拷贝；T3、T2、T1 = 新的空目录；M = research/prompts/m3-defs-b9-r3-opus-model
+bash $M/gate-samples/make_trees.sh ~/.local/share/singlefs/work/m3-defs-b9-r3/repo $T3
+bash $M/gate-samples/make_trees.sh ~/.local/share/singlefs/work/m3-defs-b9-r2/repo $T2
+bash $M/gate-samples/make_trees.sh ~/.local/share/singlefs/work/m3-defs-b9-r1/repo $T1
+# Q4-甲 abandoned-rounds：出处那一行照 date-once 的出路删掉「（2026-10-14）」之后
+bash $G3/.claude/gate.d/doc-process-records.sh --check abandoned-rounds $T3/abandoned-paren-after-migrate
+#   预计退 1，点名 hx-paren-r1「找不到〔hx-paren-r1 用户叫停（2026-10-14）〕这段原话」，并写「行号提示的第 6 行有这一轮的名字，但去掉改名表…之后，〔〕里的字不在那一行里」
+bash $G2/.claude/gate.d/doc-process-records.sh --check abandoned-rounds $T2/abandoned-paren-after-migrate
+#   预计退 0，成功句另列照行号提示取那一行照收的 1 行（hx-paren-r1，第 6 行）
+bash $G1/.claude/gate.d/doc-process-records.sh --check abandoned-rounds $T1/abandoned-paren-after-migrate
+#   预计退 1，点名 hx-paren-r1「找不到〔hx-paren-r1 用户叫停（2026-10-14）〕这段原话」
+# 对照：删之前那一棵三版都预计退 0
+bash $G3/.claude/gate.d/doc-process-records.sh --check abandoned-rounds $T3/abandoned-paren-before-migrate
+# 以上预计是 lib_abandoned_rounds.py 命令行（门禁格与派发闸 ⑥ 共用的那一份）在本腿树上跑出来的（out/q4-date-once.txt），没起过格本身。

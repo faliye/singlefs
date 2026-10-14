@@ -1,0 +1,9 @@
+被判行数（路径、行号、行文前 80 字去重）： {'after': 94, 'before': 92, 'pre0': 92}
+== after 有而 before 没有 2 行
+   scripts/agents/dispatch-prompt.py:269  读自己的线程变量 THREAD_LIMIT_REQUIRED_AGENTS：capped.sh 不设它，读它的那条语句里也没回退到 SING  | if "THREAD_LIMIT_REQUIRED_AGENTS" in long_run_table.group(2):
+   scripts/experiments/replay.sh:1892  写死的线程数默认（|| / && 赋值）、读自己的线程变量 REPLAY_JOBS：capped.sh 不设它，读它的那条语句里也没回退到   | [[ "$REPLAY_JOBS" -lt 1 ]] && REPLAY_JOBS=1
+== before 有而 after 没有 0 行
+== after 有而 pre0 没有 2 行
+   scripts/agents/dispatch-prompt.py:269  读自己的线程变量 THREAD_LIMIT_REQUIRED_AGENTS：capped.sh 不设它，读它的那条语句里也没回退到 SING  | if "THREAD_LIMIT_REQUIRED_AGENTS" in long_run_table.group(2):
+   scripts/experiments/replay.sh:1892  写死的线程数默认（|| / && 赋值）、读自己的线程变量 REPLAY_JOBS：capped.sh 不设它，读它的那条语句里也没回退到   | [[ "$REPLAY_JOBS" -lt 1 ]] && REPLAY_JOBS=1
+== pre0 有而 after 没有 0 行

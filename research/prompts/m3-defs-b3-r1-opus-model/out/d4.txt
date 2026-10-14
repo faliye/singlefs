@@ -1,0 +1,19 @@
+name=d4 key=PEER_SSH_HOST word=0 kind=其他词 length=13 files=1
+  records/2026-09-30-里程碑三开工第一轮.md
+name=d4 key=PEER_REPOSITORY_DIRECTORY word=0 kind=路径 length=41 files=0
+name=d4 key=PEER_CARGO_BIN_DIRECTORY word=0 kind=路径 length=23 files=0
+name=d4 key=QUIESCE_STOP_COMMAND word=1 kind=路径 length=45 files=0
+name=d4 key=QUIESCE_START_COMMAND word=1 kind=路径 length=46 files=0
+name=d4 key=QUIESCE_STOPPED_CHECK_COMMAND word=1 kind=路径 length=46 files=0
+name=d4 key=QUIESCE_STOPPED_CHECK_COMMAND word=2 kind=其他词 length=7 files=318
+name=d4 key=QUIESCE_STARTED_CHECK_COMMAND word=1 kind=路径 length=46 files=0
+name=d4 key=QUIESCE_STARTED_CHECK_COMMAND word=2 kind=其他词 length=7 files=383
+name=d4 key=GPU_CARDS_BY_PRIORITY word=0 kind=其他词 length=5 files=2001
+name=d4 key=GPU_CARDS_BY_PRIORITY word=1 kind=其他词 length=4 files=221
+name=d4 key=GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED word=0 kind=其他词 length=5 files=2001
+name=d4 key=GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED word=1 kind=其他词 length=4 files=221
+name=d4 key=GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED word=2 kind=其他词 length=5 files=2001
+name=d4 key=GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED word=3 kind=其他词 length=4 files=221
+name=d4 key=GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED word=4 kind=其他词 length=4 files=221
+name=d4 key=本机 hostname word=0 kind=主机名 length=12 files=1
+  research/prompts/m3-batch10x-code-r1-opus-output.md

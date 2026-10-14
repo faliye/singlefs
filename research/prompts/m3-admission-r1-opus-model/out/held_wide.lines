@@ -1,0 +1,88 @@
+==== A3-wide unit_area_slots=16384 journal_ring_bytes=67108864 units=5000 small_overwrites=4 failing_publish=2 reserves_slots=2491
+PROBE wide_start | d0 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878 | d1 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878
+PROBE wide big_write units=5000 outcome=Ok floor_raises=0 raise_publishes=[] current_txg=4 F=0
+PROBE wide control_second_big_write=Ok floor_raises=1 raise_publishes=[[9, 10]] current_txg=11 F=5
+PROBE wide_before_fault | d0 cap=16384 alloc=10191 iso=0 alloc&iso=0 unblocked=6193 held_only=0 pairs_out=3089 pairs_all=3095 segs=3 formula_avail_slots=3702 | d1 cap=16384 alloc=10191 iso=0 alloc&iso=0 unblocked=6193 held_only=0 pairs_out=3089 pairs_all=3095 segs=3 formula_avail_slots=3702
+PROBE wide faulted_write=FloorRaiseFailedWhilePushingForSpace cause=RaiseFloorSequencePublishFailed persisted=1 cause=Other(BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))) pushed_by=SpaceAdmissionRefused[d0 avail_slots=6178 demand_slots=10000,d1 avail_slots=6178 demand_slots=10000] current_txg=9 F=5
+PROBE wide resent=true current_txg=10 F=5 devices_of_last2=[(8, 0), (9, 0), (10, 1)]
+PROBE wide_stuck | d0 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=6181 held_only=10117 pairs_out=3089 pairs_all=3089 segs=3 formula_avail_slots=13807 | d1 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=6181 held_only=10117 pairs_out=3089 pairs_all=3089 segs=3 formula_avail_slots=13807
+PROBE wide retry_same_write=NoSpaceAfterRaisingTheFloor floor_raises=0 stop=FloorAlreadyAtTheCeiling floor=5 ceiling=5 last_refusal=SpaceAdmissionRefused[d0 avail_slots=6178 demand_slots=10000,d1 avail_slots=6178 demand_slots=10000]
+PROBE wide_released | d0 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=16298 held_only=0 pairs_out=8091 pairs_all=8148 segs=3 formula_avail_slots=13807 | d1 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=16298 held_only=0 pairs_out=8091 pairs_all=8148 segs=3 formula_avail_slots=13807
+PROBE wide release_holds_then_same_write=Ok floor_raises=0 raise_publishes=[]
+PROBE wide small_overwrites k=1 ok=1 then_same_write=Ok floor_raises=1 raise_publishes=[[12, 13]] current_txg=14 F=6
+PROBE wide small_overwrites k=2 ok=2 then_same_write=Ok floor_raises=1 raise_publishes=[[13, 14]] current_txg=15 F=7
+PROBE wide small_overwrites k=3 ok=3 then_same_write=Ok floor_raises=1 raise_publishes=[[14, 15, 16]] current_txg=17 F=8
+PROBE wide small_overwrites k=4 ok=4 then_same_write=Ok floor_raises=1 raise_publishes=[[15, 16]] current_txg=17 F=11
+PROBE wide small_overwrites k=5 ok=5 then_same_write=Ok floor_raises=1 raise_publishes=[[16, 17]] current_txg=18 F=12
+PROBE wide smaller_write units=1250 outcome=Ok floor_raises=0 raise_publishes=[]
+PROBE wide smaller_write units=2500 outcome=Ok floor_raises=0 raise_publishes=[]
+PROBE wide smaller_write units=3750 outcome=NoSpaceAfterRaisingTheFloor floor_raises=0 stop=FloorAlreadyAtTheCeiling floor=5 ceiling=5 last_refusal=SpaceAdmissionRefused[d0 avail_slots=6178 demand_slots=7500,d1 avail_slots=6178 demand_slots=7500]
+==== A3-wide unit_area_slots=16384 journal_ring_bytes=67108864 units=5000 small_overwrites=4 failing_publish=3 reserves_slots=2491
+PROBE wide_start | d0 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878 | d1 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878
+PROBE wide big_write units=5000 outcome=Ok floor_raises=0 raise_publishes=[] current_txg=4 F=0
+PROBE wide control_second_big_write=Ok floor_raises=1 raise_publishes=[[9, 10]] current_txg=11 F=5
+PROBE wide raise has only 2 publishes
+PROBE wide control did not push a raise that made room
+==== A3-wide unit_area_slots=16384 journal_ring_bytes=67108864 units=5000 small_overwrites=5 failing_publish=2 reserves_slots=2491
+PROBE wide_start | d0 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878 | d1 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878
+PROBE wide big_write units=5000 outcome=Ok floor_raises=0 raise_publishes=[] current_txg=4 F=0
+PROBE wide control_second_big_write=Ok floor_raises=1 raise_publishes=[[10, 11]] current_txg=12 F=6
+PROBE wide_before_fault | d0 cap=16384 alloc=10203 iso=0 alloc&iso=0 unblocked=6181 held_only=0 pairs_out=3088 pairs_all=3089 segs=3 formula_avail_slots=3690 | d1 cap=16384 alloc=10203 iso=0 alloc&iso=0 unblocked=6181 held_only=0 pairs_out=3088 pairs_all=3089 segs=3 formula_avail_slots=3690
+PROBE wide faulted_write=FloorRaiseFailedWhilePushingForSpace cause=RaiseFloorSequencePublishFailed persisted=1 cause=Other(BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))) pushed_by=SpaceAdmissionRefused[d0 avail_slots=6176 demand_slots=10000,d1 avail_slots=6176 demand_slots=10000] current_txg=10 F=6
+PROBE wide resent=true current_txg=11 F=6 devices_of_last2=[(9, 0), (10, 1), (11, 0)]
+PROBE wide_stuck | d0 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=6169 held_only=10129 pairs_out=3056 pairs_all=3083 segs=4 formula_avail_slots=13807 | d1 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=6169 held_only=10129 pairs_out=3056 pairs_all=3083 segs=4 formula_avail_slots=13807
+PROBE wide retry_same_write=NoSpaceAfterRaisingTheFloor floor_raises=0 stop=FloorAlreadyAtTheCeiling floor=6 ceiling=6 last_refusal=SpaceAdmissionRefused[d0 avail_slots=6112 demand_slots=10000,d1 avail_slots=6112 demand_slots=10000]
+PROBE wide_released | d0 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=16298 held_only=0 pairs_out=8059 pairs_all=8147 segs=4 formula_avail_slots=13807 | d1 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=16298 held_only=0 pairs_out=8059 pairs_all=8147 segs=4 formula_avail_slots=13807
+PROBE wide release_holds_then_same_write=Ok floor_raises=0 raise_publishes=[]
+PROBE wide small_overwrites k=1 ok=1 then_same_write=Ok floor_raises=1 raise_publishes=[[13, 14]] current_txg=15 F=7
+PROBE wide small_overwrites k=2 ok=2 then_same_write=Ok floor_raises=1 raise_publishes=[[14, 15, 16]] current_txg=17 F=8
+PROBE wide small_overwrites k=3 ok=3 then_same_write=Ok floor_raises=1 raise_publishes=[[15, 16]] current_txg=17 F=9
+PROBE wide small_overwrites k=4 ok=4 then_same_write=Ok floor_raises=1 raise_publishes=[[16, 17]] current_txg=18 F=12
+PROBE wide small_overwrites k=5 ok=5 then_same_write=Ok floor_raises=1 raise_publishes=[[17, 18, 19]] current_txg=20 F=13
+PROBE wide smaller_write units=1250 outcome=Ok floor_raises=0 raise_publishes=[]
+PROBE wide smaller_write units=2500 outcome=Ok floor_raises=0 raise_publishes=[]
+PROBE wide smaller_write units=3750 outcome=NoSpaceAfterRaisingTheFloor floor_raises=0 stop=FloorAlreadyAtTheCeiling floor=6 ceiling=6 last_refusal=SpaceAdmissionRefused[d0 avail_slots=6112 demand_slots=7500,d1 avail_slots=6112 demand_slots=7500]
+==== A3-wide unit_area_slots=16384 journal_ring_bytes=67108864 units=5000 small_overwrites=5 failing_publish=3 reserves_slots=2491
+PROBE wide_start | d0 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878 | d1 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878
+PROBE wide big_write units=5000 outcome=Ok floor_raises=0 raise_publishes=[] current_txg=4 F=0
+PROBE wide control_second_big_write=Ok floor_raises=1 raise_publishes=[[10, 11]] current_txg=12 F=6
+PROBE wide raise has only 2 publishes
+PROBE wide control did not push a raise that made room
+==== A3-wide unit_area_slots=16384 journal_ring_bytes=67108864 units=5000 small_overwrites=6 failing_publish=2 reserves_slots=2491
+PROBE wide_start | d0 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878 | d1 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878
+PROBE wide big_write units=5000 outcome=Ok floor_raises=0 raise_publishes=[] current_txg=4 F=0
+PROBE wide control_second_big_write=Ok floor_raises=1 raise_publishes=[[11, 12, 13]] current_txg=14 F=7
+PROBE wide_before_fault | d0 cap=16384 alloc=10215 iso=0 alloc&iso=0 unblocked=6169 held_only=0 pairs_out=3055 pairs_all=3083 segs=4 formula_avail_slots=3678 | d1 cap=16384 alloc=10215 iso=0 alloc&iso=0 unblocked=6169 held_only=0 pairs_out=3055 pairs_all=3083 segs=4 formula_avail_slots=3678
+PROBE wide faulted_write=FloorRaiseFailedWhilePushingForSpace cause=RaiseFloorSequencePublishFailed persisted=1 cause=Other(BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))) pushed_by=SpaceAdmissionRefused[d0 avail_slots=6110 demand_slots=10000,d1 avail_slots=6110 demand_slots=10000] current_txg=11 F=7
+PROBE wide resent=true current_txg=12 F=7 devices_of_last2=[(10, 1), (11, 0), (12, 0)]
+PROBE wide_stuck | d0 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=6157 held_only=10141 pairs_out=3055 pairs_all=3077 segs=4 formula_avail_slots=13807 | d1 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=6157 held_only=10141 pairs_out=3055 pairs_all=3077 segs=4 formula_avail_slots=13807
+PROBE wide retry_same_write=NoSpaceAfterRaisingTheFloor floor_raises=0 stop=FloorAlreadyAtTheCeiling floor=7 ceiling=7 last_refusal=SpaceAdmissionRefused[d0 avail_slots=6110 demand_slots=10000,d1 avail_slots=6110 demand_slots=10000]
+PROBE wide_released | d0 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=16298 held_only=0 pairs_out=8059 pairs_all=8147 segs=4 formula_avail_slots=13807 | d1 cap=16384 alloc=86 iso=0 alloc&iso=0 unblocked=16298 held_only=0 pairs_out=8059 pairs_all=8147 segs=4 formula_avail_slots=13807
+PROBE wide release_holds_then_same_write=Ok floor_raises=0 raise_publishes=[]
+PROBE wide small_overwrites k=1 ok=1 then_same_write=Ok floor_raises=1 raise_publishes=[[14, 15, 16]] current_txg=17 F=8
+PROBE wide small_overwrites k=2 ok=2 then_same_write=Ok floor_raises=1 raise_publishes=[[15, 16]] current_txg=17 F=9
+PROBE wide small_overwrites k=3 ok=3 then_same_write=Ok floor_raises=1 raise_publishes=[[16, 17]] current_txg=18 F=10
+PROBE wide small_overwrites k=4 ok=4 then_same_write=Ok floor_raises=1 raise_publishes=[[17, 18, 19]] current_txg=20 F=13
+PROBE wide small_overwrites k=5 ok=5 then_same_write=Ok floor_raises=1 raise_publishes=[[18, 19]] current_txg=20 F=14
+PROBE wide smaller_write units=1250 outcome=Ok floor_raises=0 raise_publishes=[]
+PROBE wide smaller_write units=2500 outcome=Ok floor_raises=0 raise_publishes=[]
+PROBE wide smaller_write units=3750 outcome=NoSpaceAfterRaisingTheFloor floor_raises=0 stop=FloorAlreadyAtTheCeiling floor=7 ceiling=7 last_refusal=SpaceAdmissionRefused[d0 avail_slots=6110 demand_slots=7500,d1 avail_slots=6110 demand_slots=7500]
+==== A3-wide unit_area_slots=16384 journal_ring_bytes=67108864 units=5000 small_overwrites=6 failing_publish=3 reserves_slots=2491
+PROBE wide_start | d0 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878 | d1 cap=16384 alloc=15 iso=0 alloc&iso=0 unblocked=16369 held_only=0 pairs_out=8157 pairs_all=8183 segs=1 formula_avail_slots=13878
+PROBE wide big_write units=5000 outcome=Ok floor_raises=0 raise_publishes=[] current_txg=4 F=0
+PROBE wide control_second_big_write=Ok floor_raises=1 raise_publishes=[[11, 12, 13]] current_txg=14 F=7
+PROBE wide_before_fault | d0 cap=16384 alloc=10215 iso=0 alloc&iso=0 unblocked=6169 held_only=0 pairs_out=3055 pairs_all=3083 segs=4 formula_avail_slots=3678 | d1 cap=16384 alloc=10215 iso=0 alloc&iso=0 unblocked=6169 held_only=0 pairs_out=3055 pairs_all=3083 segs=4 formula_avail_slots=3678
+PROBE wide faulted_write=FloorRaiseFailedWhilePushingForSpace cause=RaiseFloorSequencePublishFailed persisted=2 cause=Other(BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))) pushed_by=SpaceAdmissionRefused[d0 avail_slots=6110 demand_slots=10000,d1 avail_slots=6110 demand_slots=10000] current_txg=12 F=7
+PROBE wide resent=true current_txg=13 F=7 devices_of_last2=[(11, 0), (12, 0), (13, 1)]
+PROBE wide_stuck | d0 cap=16384 alloc=92 iso=0 alloc&iso=0 unblocked=6151 held_only=10141 pairs_out=3055 pairs_all=3074 segs=4 formula_avail_slots=13801 | d1 cap=16384 alloc=92 iso=0 alloc&iso=0 unblocked=6151 held_only=10141 pairs_out=3055 pairs_all=3074 segs=4 formula_avail_slots=13801
+PROBE wide retry_same_write=NoSpaceAfterRaisingTheFloor floor_raises=0 stop=FloorAlreadyAtTheCeiling floor=7 ceiling=7 last_refusal=SpaceAdmissionRefused[d0 avail_slots=6110 demand_slots=10000,d1 avail_slots=6110 demand_slots=10000]
+PROBE wide_released | d0 cap=16384 alloc=92 iso=0 alloc&iso=0 unblocked=16292 held_only=0 pairs_out=8059 pairs_all=8144 segs=4 formula_avail_slots=13801 | d1 cap=16384 alloc=92 iso=0 alloc&iso=0 unblocked=16292 held_only=0 pairs_out=8059 pairs_all=8144 segs=4 formula_avail_slots=13801
+PROBE wide release_holds_then_same_write=Ok floor_raises=0 raise_publishes=[]
+PROBE wide small_overwrites k=1 ok=1 then_same_write=Ok floor_raises=1 raise_publishes=[[15, 16]] current_txg=17 F=8
+PROBE wide small_overwrites k=2 ok=2 then_same_write=Ok floor_raises=1 raise_publishes=[[16, 17]] current_txg=18 F=9
+PROBE wide small_overwrites k=3 ok=3 then_same_write=Ok floor_raises=1 raise_publishes=[[17, 18, 19]] current_txg=20 F=10
+PROBE wide small_overwrites k=4 ok=4 then_same_write=Ok floor_raises=1 raise_publishes=[[18, 19]] current_txg=20 F=14
+PROBE wide small_overwrites k=5 ok=5 then_same_write=Ok floor_raises=1 raise_publishes=[[19, 20]] current_txg=21 F=15
+PROBE wide smaller_write units=1250 outcome=Ok floor_raises=0 raise_publishes=[]
+PROBE wide smaller_write units=2500 outcome=Ok floor_raises=0 raise_publishes=[]
+PROBE wide smaller_write units=3750 outcome=NoSpaceAfterRaisingTheFloor floor_raises=0 stop=FloorAlreadyAtTheCeiling floor=7 ceiling=7 last_refusal=SpaceAdmissionRefused[d0 avail_slots=6110 demand_slots=7500,d1 avail_slots=6110 demand_slots=7500]

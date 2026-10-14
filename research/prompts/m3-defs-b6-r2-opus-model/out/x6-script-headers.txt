@@ -1,0 +1,8 @@
+r2	h0_canonical	rc=0	
+r2	h1_note_live	rc=0	
+r2	h2_wrapped	rc=1	  ✗ 长活声明（<WORK>/feeds/x6/scripts/h2_wrapped.sh）：# long-run-hosts: 一行不是规范写�
+r2	h3_note_eid	rc=1	  ✗ 长活声明（<WORK>/feeds/x6/scripts/h3_note_eid.sh）：# long-run-hosts: 一行规范句后面
+r1	h0_canonical	rc=0	
+r1	h1_note_live	rc=1	  ✗ 长活声明（<WORK>/feeds/x6/scripts/h1_note_live.sh）：# long-run-hosts: 一行写了按核�
+r1	h2_wrapped	rc=0	
+r1	h3_note_eid	rc=0	

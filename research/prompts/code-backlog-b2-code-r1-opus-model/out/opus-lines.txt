@@ -1,0 +1,20 @@
+OPUS-K1-ORDER via=abandoned_ring slot_s isolated_and_free=(false, true)
+OPUS-K1-ORDER via=abandoned_ring slot_s isolated_and_free=(true, false)
+OPUS-K1-ORDER via=ring_slot_read_bad slot_s isolated_and_free=(false, true)
+OPUS-K1-ORDER via=ring_slot_read_bad slot_s isolated_and_free=(true, false)
+OPUS-K1-STRENGTH order=disk_read_root_earlier dev0_s_isolated=true dev0_s1_isolated=true dev1_s_isolated=true
+OPUS-K1-STRENGTH order=disk_read_root_earlier dev0_s_isolated=true dev0_s1_isolated=true dev1_s_isolated=true
+OPUS-K1-STRENGTH order=recorded_root_earlier dev0_s_isolated=false dev0_s1_isolated=false dev1_s_isolated=true
+OPUS-K1-STRENGTH order=recorded_root_earlier dev0_s_isolated=false dev0_s1_isolated=false dev1_s_isolated=true
+OPUS-K2-BACK-TO-B bad_device=0 slot_of_b=50182 outcome=Err("IsolatedUnitCopyUnreadableOrMismatched { unit: Data(DataUnitIndexInFile(0)), device: DeviceIdentity(0), slot: SlotNumber(50182) }") disk_unchanged=true records_unchanged=true
+OPUS-K2-BACK-TO-B bad_device=1 slot_of_b=50182 outcome=Err("IsolatedUnitCopyUnreadableOrMismatched { unit: Data(DataUnitIndexInFile(0)), device: DeviceIdentity(1), slot: SlotNumber(50182) }") disk_unchanged=true records_unchanged=true
+OPUS-K2-BACK-TO-B-REPAIRED bad_device=0 outcome=Ok(RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }) cold_reads_b=true
+OPUS-K2-BACK-TO-B-REPAIRED bad_device=1 outcome=Ok(RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(4) }) cold_reads_b=true
+OPUS-K2-ROLLBACK-RELEASE bad_device=0 quarantined_copies=2 released=4
+OPUS-K2-ROLLBACK-RELEASE bad_device=1 quarantined_copies=2 released=4
+OPUS-K2-ROLLBACK-RELEASE record device=0 is_released=false generation=4
+OPUS-K2-ROLLBACK-RELEASE record device=0 is_released=false generation=4
+OPUS-K2-ROLLBACK-RELEASE record device=1 is_released=false generation=4
+OPUS-K2-ROLLBACK-RELEASE record device=1 is_released=false generation=4
+OPUS-K3 also_corrupt_a_resurrected_unit=false data_slot_of_b=50182 inode_root_slot_of_b=50256 outcome=Err("IsolatedUnitCopyUnreadableOrMismatched { unit: Data(DataUnitIndexInFile(0)), device: DeviceIdentity(1), slot: SlotNumber(50182) }") disk_unchanged=true allocator_debug_unchanged=true output_unchanged=true
+OPUS-K3 also_corrupt_a_resurrected_unit=true data_slot_of_b=50182 inode_root_slot_of_b=50256 outcome=Err("ResurrectedUnitCopyUnreadableOrMismatched { unit: InodeRoot, device: DeviceIdentity(0), slot: SlotNumber(50256) }") disk_unchanged=true allocator_debug_unchanged=true output_unchanged=true

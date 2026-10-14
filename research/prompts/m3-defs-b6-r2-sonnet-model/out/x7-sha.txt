@@ -1,0 +1,14 @@
+0 原样	exempt-check=0	lib_long_run_script=0	long-run-check=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才齐（按登
+1 只改执行位 chmod +x	exempt-check=0	lib_long_run_script=0	long-run-check=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才�
+2 只改执行位 chmod -x	exempt-check=0	lib_long_run_script=0	long-run-check=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件头都得靠现算读法才�
+3 文件末尾多一个换行	exempt-check=1	lib_long_run_script=1	long-run-check=5	  ✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 6 行）：
+4 换行符改 CRLF	exempt-check=1	lib_long_run_script=1	long-run-check=5	  ✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 6 行）：
+5 去掉文件末尾换行	exempt-check=1	lib_long_run_script=1	long-run-check=5	  ✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 6 行）：
+6 改脚本并同步改表里的 sha256（与基准表比：路径没涨）	exempt-check=0	lib_long_run_script=0	long-run-check=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 
+7 改脚本正文里的 现算 说法并同步 sha256	exempt-check=0	lib_long_run_script=0	long-run-check=0	  ✓ .claude/long-run-live-hosts-exempt 6 行：每行的脚本都在、登记的 sha256 都对得上，文件�
+8 同内容拷到表外 long-run-check=5
+9 脚本改名（表里路径对不上）	exempt-check=1	lib_long_run_script=1	long-run-check=5	  ✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 6 行）：
+10 表里 sha256 写成全 0	exempt-check=1	lib_long_run_script=1	long-run-check=5	  ✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 6 行）：
+11 表里 sha256 写成大写十六进制	exempt-check=1	lib_long_run_script=1	long-run-check=5	  ✗ .claude/long-run-live-hosts-exempt 有 1 处不对（共 6 行）：
+12 符号链接指到表内脚本 long-run-check=0
+13 基准表就是现表（含 sha256 的新写法）exempt-check=0

@@ -1,0 +1,11 @@
+name=r2-regex gate-file-sha256-matches=1
+name=r2-regex case=thread-default-forms:env-prefix-assignment hit=0
+name=r2-regex case=thread-default-forms:cargo-dash-j hit=0
+name=r2-regex case=thread-default-forms:test-threads-literal hit=0
+name=r2-regex case=thread-default-forms:colon-equals-default hit=0
+name=r2-regex case=thread-default-forms:control-colon-dash-default hit=1
+name=r2-regex case=thread-default-forms:real-replay-e161-pin hit=0
+name=r2-regex case=env-prefix-counted-as-shell-local hit=1
+name=r2-regex case=cfg-test-on-single-use-breaks hit=1
+name=r2-regex case=capped-path-string-kept hit=1
+name=r2-regex case=capped-path-string-counts-as-fallback hit=1

@@ -1,0 +1,4 @@
+name=S14 tree=before case=scratch-hog-report reported=5 names=['old-copy-git', 'old-copy-nogit', 'target', '怎么办', '草稿根里超阈值的编译目录与仓副本']
+name=S14 tree=before case=agent-watch-py-sha256-prefix sha=8af9b62aa117 main_agent_says_stopped_counts=False
+name=S14 tree=after case=scratch-hog-report reported=5 names=['old-copy-git', 'old-copy-nogit', 'target', '怎么办', '草稿根里超阈值的编译目录与仓副本']
+name=S14 tree=after case=agent-watch-py-sha256-prefix sha=8af9b62aa117 main_agent_says_stopped_counts=True

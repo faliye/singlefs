@@ -1,0 +1,13 @@
+  ✗ 8 处自己定并行度默认值的写法没经登记位取（每台默认重活线程数登记在 .claude/heavy-thread-default）：
+     crates/demo/src/end_tests.rs:2  读自己的线程变量 SAMPLE_BEFORE_TESTS_WORKERS：capped.sh 不设它，文件里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「std::env::var("SAMPLE_BEFORE_TESTS_WORKERS").expect("set it").parse().expect("number")」
+     scripts/experiments/not_absorbed.py:2  读自己的线程变量 SAMPLE_NOT_ABSORBED_WORKERS：capped.sh 不设它，文件里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「workers = int(os.environ["SAMPLE_NOT_ABSORBED_WORKERS"])」
+     scripts/experiments/plain_read.py:2  读自己的线程变量 SAMPLE_PLAIN_THREADS：capped.sh 不设它，文件里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「threads = int(os.environ.get("SAMPLE_PLAIN_THREADS", "8"))」
+     scripts/hosts/capped.sh:68  nproc  「if [[ "${CAPPED_BREAK:-}" == default-from-nproc ]]; then nproc; return 0; fi」
+     scripts/hosts/heavy_threads.py:62  cpu_count  「return os.cpu_count() or 1」
+     scripts/hosts/or_arith_default.sh:2  读自己的线程变量 SAMPLE_OR_ARITH_JOBS：capped.sh 不设它，文件里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「[[ -n "${SAMPLE_OR_ARITH_JOBS:-}" ]] || SAMPLE_OR_ARITH_JOBS=$((4 * 2))」
+     scripts/hosts/or_literal_default.sh:2  读自己的线程变量 SAMPLE_OR_LITERAL_JOBS：capped.sh 不设它，文件里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「[[ -n "${SAMPLE_OR_LITERAL_JOBS:-}" ]] || SAMPLE_OR_LITERAL_JOBS=8」
+     scripts/hosts/or_var_default.sh:3  读自己的线程变量 SAMPLE_OR_VAR_JOBS：capped.sh 不设它，文件里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「[[ -n "${SAMPLE_OR_VAR_JOBS:-}" ]] || SAMPLE_OR_VAR_JOBS=$fallback」
+     → 怎么办：shell 先 source scripts/hosts/heavy-threads.sh 再 heavy_thread_default 取，python 用 scripts/hosts/heavy_threads.py 的 default_heavy_threads() 取，
+               起命令写 bash scripts/hosts/capped.sh default；参数或环境变量给了照给的。装置读自己的线程变量的：把变量名加进 scripts/hosts/capped.sh 的 variable_names，
+               或让装置没设时回退到 SINGLEFS_THREAD_CAP / 登记值（rust 装置 include scripts/experiments/heavy_threads_default/threads.rs，python 用 default_heavy_threads）。确实不是重活（自证输入、线程数就是场景本身、只报核数不起线程）的，
+               登记进 .claude/heavy-thread-exempt：一行「<路径>:<锚串>  # 理由」，锚串取那一行里的一段原文；排除只缩不涨。

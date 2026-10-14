@@ -1,0 +1,1 @@
+d29009361f1c5bc6748ddaf4dc2fe672e358a897a44051ee61a0c354811d3060  .claude/kb/term-renames.md

@@ -1,0 +1,3 @@
+name=peer-env tree=r1 side=local RUST_TEST_THREADS=31 CARGO_BUILD_JOBS=31 SINGLEFS_THREAD_CAP=31
+name=peer-env tree=r1 side=peer RUST_TEST_THREADS=unset CARGO_BUILD_JOBS=unset SINGLEFS_THREAD_CAP=unset
+name=peer-env-doc tree=r1 multi-host-run.sh line=26

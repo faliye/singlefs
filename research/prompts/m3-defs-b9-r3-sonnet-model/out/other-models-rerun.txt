@@ -1,0 +1,105 @@
+# 前两轮腿模型目录的复跑（不属于 rerun.sh；命令里的 --work 为本腿草稿目录下新的空目录，路径略）
+# 命令形：bash scripts/hosts/run-with-memory-cap.sh 2G bash <模型目录>/tools/rerun.sh --repo <仓根> --frozen <冻结副本> --work <新目录>，RERUN_PARTS 分几次跑
+## m3-defs-b9-r2-opus-model RERUN_PARTS=s3,s5,s6,s7
+same s3-fixtures-and-real-tree.txt
+same s3-samples.txt
+same s5-combos.txt
+same s5-real-misread.txt
+same s6-mask-shapes.txt
+same s7-user-per-host.txt
+合计 same=6 DIFF=0
+## m3-defs-b9-r2-opus-model RERUN_PARTS=s1
+same s1-ambiguity-prototype.txt
+same s1-fence.txt
+same s1-hosts-fallback.txt
+合计 same=3 DIFF=0
+## m3-defs-b9-r2-sonnet-model RERUN_PARTS=r1sonnet,r1opus
+same r1o-fence-feed.txt
+same r1o-stdin-feed.txt
+same r1o-z2-shell-b10.txt
+same r1o-z2-shell-b9.txt
+same r1o-z4-drift.txt
+same r1o-z4-misc.txt
+same r1o-z4-real.txt
+same r1o-z5-cells-b10.txt
+same r1o-z5-cells-b9.txt
+same r1o-z7.txt
+same r1s-abandoned-b10.tsv
+same r1s-abandoned-b9.tsv
+same r1s-exempt-b10.tsv
+same r1s-exempt-b9.tsv
+same r1s-heavy-guard-b10.txt
+same r1s-heavy-guard-b9.txt
+same r1s-long-run-prompt-b10.tsv
+same r1s-long-run-prompt-b9.tsv
+same r1s-real-abandoned-table-b10.txt
+same r1s-real-abandoned-table-b9.txt
+same r1s-real-exempt-table-b10.txt
+same r1s-real-exempt-table-b9.txt
+same r1s-script-header-b10.tsv
+same r1s-script-header-b9.tsv
+same r1s-thread-prompt-b10.tsv
+same r1s-thread-prompt-b9.tsv
+合计 same=26 DIFF=0
+## m3-defs-b9-r2-sonnet-model RERUN_PARTS=s1,s2,s3,s4,s5,s6,s7
+same s1-construct-matrix.txt
+same s1-differential-fuzz.txt
+same s1-fallback-trial.txt
+same s1-fuzz-b10.txt
+same s1-library-missing.txt
+same s2-exit-matrix.txt
+same s3-cell-b10.txt
+same s3-cell-b9.txt
+same s3-fixtures-both.txt
+same s4-heavy-guard-b10.txt
+same s4-heavy-guard-b9.txt
+same s5-drift-matrix.txt
+same s5-fixtures-lib.txt
+same s5-line-number-read.txt
+same s5-real-records.txt
+same s5-similarity-trial.txt
+same s6-anchor-b10.txt
+same s6-anchor-b9.txt
+same s6-cells-b10.txt
+same s6-cells-b9.txt
+same s7-prose-feed.txt
+合计 same=21 DIFF=0
+## m3-defs-b9-r1-opus-model RERUN_PARTS=z1,z4,z5,z7
+same z1-commonmark.txt
+same z1-fence.txt
+same z1-fix.txt
+same z1-stdin.txt
+same z4-drift.txt
+same z4-misc.txt
+same z4-real.txt
+same z5-cells-b9.txt
+same z5-cells-fix.txt
+same z5-cells-r2.txt
+same z5-cells-r3.txt
+DIFF z7.txt
+合计 same=11 DIFF=1
+## m3-defs-b9-r1-opus-model RERUN_PARTS=z2
+same z2-anchors-b9.txt
+same z2-real.txt
+same z2-shell-b9.txt
+same z2-shell-r2.txt
+same z2-shell-r3.txt
+合计 same=5 DIFF=0
+## 总计
+r2opus same=9 DIFF=0
+r2son same=47 DIFF=0
+r1opus same=16 DIFF=1
+## r1 攻方 z7.txt 的 DIFF 行（本腿复跑 vs 模型目录 out/）
+## m3-defs-b9-r1-sonnet-model（该模型的 rerun.sh 自己逐份打「逐行相同 / 不同或 out/ 里没有」）
+name=real-abandoned-table.txt 与模型目录 out/ 里同名文件逐行相同
+name=real-exempt-table.txt 与模型目录 out/ 里同名文件逐行相同
+name=real-round-names.txt 与模型目录 out/ 里同名文件逐行相同
+name=z1-thread-prompt.tsv 与模型目录 out/ 里同名文件逐行相同
+name=z3-heavy-guard.txt 与模型目录 out/ 里同名文件逐行相同
+name=z4-abandoned.tsv 与模型目录 out/ 里同名文件逐行相同
+name=z6-long-run-prompt.tsv 与模型目录 out/ 里同名文件逐行相同
+name=z6-script-header.tsv 与模型目录 out/ 里同名文件不同或 out/ 里没有
+name=z7-exempt.tsv 与模型目录 out/ 里同名文件逐行相同
+合计 逐行相同=8 不同=1
+## z6-script-header.tsv 不同的原因：两份逐行比，每行只差末尾字数（草稿路径长短不同、喂法脚本先按字截行）
+行数 10；短者长度内逐字相同的行 10；退出码列相同的行 10

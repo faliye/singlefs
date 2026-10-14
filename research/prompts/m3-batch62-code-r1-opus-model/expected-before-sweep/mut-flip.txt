@@ -1,0 +1,52 @@
+build_rc=0
+run_rc=101
+test attack_in_memory_table_after_a_product_batch_import ... OPUS_BATCH rows=5 new_vectors=0
+OPUS_BATCH rows=7 new_vectors=1
+OPUS_BATCH rows=4 new_vectors=0
+OPUS_BATCH rows=7 new_vectors=1
+OPUS_BATCH rows=3 new_vectors=0
+OPUS_BATCH rows=1 new_vectors=0
+OPUS_BATCH rows=1 new_vectors=0
+OPUS_MEM tally=PlannedImportTally { conclusion_blocks_written: 4, conclusion_blocks_already_identical: 1, conclusion_blocks_missing_in_the_other_library: 4, paths_written: 2, verifier_blocks_written: 2, flow_facts_written: 1, rows_written: 28, synced_writes: 7 }
+OPUS_MEM in_memory_numbers_0_to_4=[Some(""), Some("red-f"), Some("red-f-judged-on-the-other-host"), Some("red-f-block-three-on-the-other-host"), None]
+OPUS_MEM fresh_number=4
+OPUS_MEM differs_before_reopen=0 differs_after_reopen=0 fresh_read_back=Some("registered-after-the-import")
+test attack_two_new_vectors_in_one_batch_then_one_more_batch ... OPUS_IMPORT two batch=product
+OPUS_BATCH rows=5 new_vectors=0
+OPUS_BATCH rows=10 new_vectors=2
+OPUS_BATCH rows=7 new_vectors=1
+OPUS_IMPORT two batch=one-byte
+OPUS_BATCH rows=22 new_vectors=3
+OPUS_TWO product=PlannedImportTally { conclusion_blocks_written: 3, conclusion_blocks_already_identical: 1, conclusion_blocks_missing_in_the_other_library: 5, paths_written: 0, verifier_blocks_written: 0, flow_facts_written: 0, rows_written: 22, synced_writes: 3 }
+OPUS_TWO one_byte=PlannedImportTally { conclusion_blocks_written: 3, conclusion_blocks_already_identical: 1, conclusion_blocks_missing_in_the_other_library: 5, paths_written: 0, verifier_blocks_written: 0, flow_facts_written: 0, rows_written: 22, synced_writes: 1 }
+OPUS_TWO same_bytes_as_one_batch=true
+OPUS_TWO numbers_2_to_4=[Some("red-x-only-on-the-other-host"), Some("red-y-only-on-the-other-host"), Some("red-z-only-on-the-other-host")] differs_after_reopen=0
+test mirror_21_rows ... OPUS_BATCH rows=5 new_vectors=0
+OPUS_BATCH rows=7 new_vectors=1
+OPUS_BATCH rows=4 new_vectors=0
+OPUS_BATCH rows=3 new_vectors=0
+OPUS_BATCH rows=1 new_vectors=0
+OPUS_BATCH rows=1 new_vectors=0
+OPUS_R21 tally=PlannedImportTally { conclusion_blocks_written: 3, conclusion_blocks_already_identical: 1, conclusion_blocks_missing_in_the_other_library: 5, paths_written: 2, verifier_blocks_written: 2, flow_facts_written: 1, rows_written: 21, synced_writes: 6 }
+thread 'mirror_21_rows' panicked at crates/opus-probe-b62/tests/batch62_store_probe.rs:317:5:
+assertion `left == right` failed: 按计划导入的账
+  left: PlannedImportTally { conclusion_blocks_written: 3, conclusion_blocks_already_identical: 1, conclusion_blocks_missing_in_the_other_library: 5, paths_written: 2, verifier_blocks_written: 2, flow_facts_written: 1, rows_written: 21, synced_writes: 6 }
+test mirror_q3_facts_backfill ... OPUS_BATCH rows=1 new_vectors=0
+OPUS_FACTS tally=PlannedImportTally { conclusion_blocks_written: 0, conclusion_blocks_already_identical: 0, conclusion_blocks_missing_in_the_other_library: 0, paths_written: 0, verifier_blocks_written: 0, flow_facts_written: 1, rows_written: 1, synced_writes: 1 }
+test mirror_q3_one_byte_batches ... OPUS_IMPORT q3 batch=product
+OPUS_BATCH rows=5 new_vectors=0
+OPUS_BATCH rows=7 new_vectors=1
+OPUS_BATCH rows=4 new_vectors=0
+OPUS_BATCH rows=7 new_vectors=1
+OPUS_BATCH rows=3 new_vectors=0
+OPUS_BATCH rows=1 new_vectors=0
+OPUS_BATCH rows=1 new_vectors=0
+OPUS_IMPORT q3 batch=one-byte
+OPUS_BATCH rows=28 new_vectors=2
+OPUS_Q3 product=PlannedImportTally { conclusion_blocks_written: 4, conclusion_blocks_already_identical: 1, conclusion_blocks_missing_in_the_other_library: 4, paths_written: 2, verifier_blocks_written: 2, flow_facts_written: 1, rows_written: 28, synced_writes: 7 }
+OPUS_Q3 one_byte=PlannedImportTally { conclusion_blocks_written: 4, conclusion_blocks_already_identical: 1, conclusion_blocks_missing_in_the_other_library: 4, paths_written: 2, verifier_blocks_written: 2, flow_facts_written: 1, rows_written: 28, synced_writes: 1 }
+OPUS_Q3 disk new_keys=27 changed_values=1 same_as_one_batch=true
+thread 'mirror_q3_one_byte_batches' panicked at crates/opus-probe-b62/tests/batch62_store_probe.rs:248:5:
+assertion `left == right` failed: 照产品的批长：一批写完
+  left: PlannedImportTally { conclusion_blocks_written: 4, conclusion_blocks_already_identical: 1, conclusion_blocks_missing_in_the_other_library: 4, paths_written: 2, verifier_blocks_written: 2, flow_facts_written: 1, rows_written: 28, synced_writes: 7 }
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in Xs

@@ -1,0 +1,10 @@
+name=rerun_roots repo=/home/fy5090/code/singlefs frozen=/home/fy5090/.local/share/singlefs/work/m3-defs-b3-r2/repo before=/home/fy5090/.local/share/singlefs/work/m3-defs-b3-r1/repo model=<WORK>/models/m3-defs-b3-r2-sonnet-model work=<WORK>
+name=compare file=r1_thread_limit same
+name=compare file=r2_capped same
+name=compare file=r3_r4_static same
+name=compare file=r5_heavy_guard same
+name=compare file=r6_writer_lock same
+name=compare file=r7_abandoned differs
+name=compare file=r8_long_run same
+name=compare file=s14_watchdog same
+name=compare file=e1 same

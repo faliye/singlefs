@@ -1,0 +1,23 @@
+name=patch dir=m3-tooling-b6 files=23 plus=468 minus=57 sha256=d0a5b3f1..05fc
+name=patch dir=m3-tooling-b6-fixup files=4 plus=12 minus=5 sha256=4b345d0e..f6d2
+name=patch dir=m3-tooling-b7-dispatch files=32 plus=470 minus=240 sha256=16b68610..5ad6
+name=patch dir=m3-tooling-b7-gates files=34 plus=429 minus=53 sha256=b9dd8901..74b1
+name=patch dir=m3-tooling-b7-defs files=13 plus=17 minus=17 sha256=81760c8f..df6b
+name=patch dir=m3-tooling-b7-fixup files=2 plus=12 minus=11 sha256=bfc7bbeb..719d
+name=patch dir=m3-tooling-b8-dispatch files=24 plus=260 minus=115 sha256=d662c0bd..efd4
+name=patch dir=m3-tooling-b8-gates files=48 plus=467 minus=153 sha256=56c84fcf..3f37
+name=patch dir=m3-tooling-b8-defs files=13 plus=17 minus=17 sha256=340c4322..c3fe
+name=patch dir=m3-tooling-b8-fixup files=4 plus=58 minus=4 sha256=a08f25ca..325d
+name=b8_union_of_three_patches files=85
+name=commit 9407d9a b6 applied   23 files changed, 468 insertions(+), 57 deletions(-) 
+name=commit 2b18900 b6 fixup   4 files changed, 12 insertions(+), 5 deletions(-) 
+name=commit a013292 b7 applied   79 files changed, 916 insertions(+), 310 deletions(-) 
+name=commit d9c9859 b7 fixup   2 files changed, 12 insertions(+), 11 deletions(-) 
+name=commit 80e5f38 b8 applied   86 files changed, 749 insertions(+), 288 deletions(-) 
+name=commit 309071b b8 fixup   4 files changed, 58 insertions(+), 4 deletions(-) 
+name=exempt_rows tag=after-b6 heavy_thread_exempt=66 long_run_live_hosts_exempt=6
+name=exempt_rows tag=after-b6-fixup heavy_thread_exempt=66 long_run_live_hosts_exempt=6
+name=exempt_rows tag=after-b7 heavy_thread_exempt=68 long_run_live_hosts_exempt=6
+name=exempt_rows tag=after-b7-fixup heavy_thread_exempt=66 long_run_live_hosts_exempt=6
+name=exempt_rows tag=after-b8 heavy_thread_exempt=86 long_run_live_hosts_exempt=6
+name=exempt_rows tag=after-b8-fixup heavy_thread_exempt=89 long_run_live_hosts_exempt=6

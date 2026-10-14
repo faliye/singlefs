@@ -1,0 +1,13 @@
+--- a/.claude/hooks/lib_abandoned_rounds.py
++++ b/.claude/hooks/lib_abandoned_rounds.py
+@@ -212,6 +212,10 @@
+             return (f"{source_path} 第 {line_number} 行后面没带〔〕括的原话（写成 {source_path} 第 {line_number} 行〔<那一行里含这一轮名字 {round_name} 的一段原话，逐字照抄>〕；"
+                     "判的时候拿原话在那份文件里找，行号只当提示）"), None
+         hits = locate_excerpt(whole_text, excerpt)
++        if len(hits) > 1 and line_number in hits:      # （攻方试改 F-Z4）命中几处而行号提示正落在其中一处：取提示那一行
++            hits = [line_number]
++        if not hits and 1 <= line_number <= len(cited_lines) and re.search(r"(?<![" + ROUND_NAME_EDGE_CHARACTERS + r"])" + re.escape(round_name) + r"(?![" + ROUND_NAME_EDGE_CHARACTERS + r"])", cited_lines[line_number - 1]):
++            hits = [line_number]                        # （攻方试改 F-Z4）原话找不到（改名、删日期改了字）而行号提示那一行还有这一轮的名字：取提示那一行，往下照判名字、别的轮名与「」原话
+         if not hits:
+             return f"{source_path} 里找不到〔{excerpt}〕这段原话（被删或改了字；〔〕里要与那份文件逐字相同）", None
+         if len(hits) > 1:

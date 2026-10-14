@@ -1,0 +1,27 @@
+=== unreadable r3
+Traceback (most recent call last):
+  File "<stdin>", line 83, in <module>
+PermissionError: [Errno 13] Permission denied: 'research/results/from-peer/srv/sample-private/peer-tree/research/results/e999.out'
+rc=1
+=== unreadable r2
+Traceback (most recent call last):
+  File "<stdin>", line 153, in <module>
+PermissionError: [Errno 13] Permission denied: 'research/results/from-peer/srv/sample-private/peer-tree/research/results/e999.out'
+rc=1
+=== unreadable r1
+Traceback (most recent call last):
+  File "<stdin>", line 134, in <module>
+PermissionError: [Errno 13] Permission denied: 'research/results/from-peer/srv/sample-private/peer-tree/research/results/e999.out'
+rc=1
+=== unreadable b3
+Traceback (most recent call last):
+  File "<stdin>", line 93, in <module>
+PermissionError: [Errno 13] Permission denied: 'research/results/from-peer/srv/sample-private/peer-tree/research/results/e999.out'
+rc=1
+=== unreadable fix
+  ✗ 这次改动里 1 个文件的名字含本机私有值（路径里含值的那一段打成〔文件名含私有值〕，值不打印）：
+      research/results/〔文件名含私有值〕/research/results/e999.out  键名：PEER_REPOSITORY_DIRECTORY（值不打印）
+     → 怎么办：文件名里的值换成「第二台」「本机」这类说法再改名（用 git status 看这次新加、改动的文件名，对着目录和键名找）；产物的文件名由脚本拼出来的�
+  ✗ 这次改动里 1 个文件读不了（权限、坏链接这类），这一格没法比对：
+      research/results/〔文件名含私有值〕/research/results/e999.out  errno 13
+rc=1

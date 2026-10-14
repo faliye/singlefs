@@ -1,0 +1,5 @@
+row=12 file=crates/singlefs-core/src/transaction.rs anchor_hits=1 baseline=False
+exit=0
+test publish_running_out_of_space_midway_leaves_the_allocator_as_it_was ... ok
+test probe_c576_with_the_switch_off_publish_running_out_of_space_midway_leaves_the_allocator_as_it_was ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.09s

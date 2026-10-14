@@ -1,0 +1,20 @@
+--- legacy-sourceless 库默认读法（⑥）
+lg-r1	不收：第 1 行没有出处：要写 records/<文件>.md 第 N 行（research/、.claude/ 下的文件、这一轮自己的材料、仓外路径都不认）
+--- legacy-sourceless 库 --legacy-ok 读法（门禁格）
+lg-r1	收
+--- other-name-unrecognised 库默认读法（⑥）
+ot-r1	收
+--- other-name-unrecognised 库 --legacy-ok 读法（门禁格）
+ot-r1	收
+--- symlink-source 库默认读法（⑥）
+sy-r1	不收：第 1 行的出处 records/link.md 解到 <WORK>/gate-trees/symlink-source/outside/log.md，不在 <WORK>/gate-trees/symlink-source/records 之内（符号链接或 .. 指到了外面）
+sub-r1	收
+--- symlink-source 库 --legacy-ok 读法（门禁格）
+sy-r1	不收：第 1 行的出处 records/link.md 解到 <WORK>/gate-trees/symlink-source/outside/log.md，不在 <WORK>/gate-trees/symlink-source/records 之内（符号链接或 .. 指到了外面）
+sub-r1	收
+--- exempt-check exempt-table 树
+  ✗ .claude/long-run-live-hosts-exempt 有 2 处不对（共 3 行）：
+     第 1 行指向不存在的路径：scripts/missing.sh
+     第 2 行的 scripts/registered.sh 文件头已经按登记值读法写齐了，不需要豁免
+     → 怎么办：删掉这一行；脚本搬了就改路径，删了或改成按登记值写就删掉这一行；豁免只缩不涨
+退出=1

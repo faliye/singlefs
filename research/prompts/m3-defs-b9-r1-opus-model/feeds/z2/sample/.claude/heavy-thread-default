@@ -1,0 +1,6 @@
+# 每台机器默认的重活线程数（编译、测试、变异、产物、原型扫描）：全仓唯一的登记位。
+# 取法：shell 经 scripts/hosts/heavy-threads.sh 的 heavy_thread_default，python 经 scripts/hosts/heavy_threads.py 的 default_heavy_threads，
+#   起命令经 bash scripts/hosts/capped.sh default <命令>；SINGLEFS_THREAD_CAP 设了照它，脚本的参数给了照参数。双机时每台各取这一个数。
+# 写法：第一条非注释行 `<正整数>  # <理由>`；空行与 # 开头的行不算。写坏或删掉这份文件，上面几个取法一律拒绝，不退回按核数算。
+# 门禁 code-tooling 的 heavy-thread-defaults 格判 scripts/、.claude/gate.d/、.claude/hooks/、crates/ 里不经这里自己定并行度默认值的写法；排除表 .claude/heavy-thread-exempt。
+31  # 用户 2026-10-12 定：所有重活默认每台 31 线程，双机两台各 31、合计 62，给了参数照参数；机器忙时也固定 31、不看忙闲（records/2026-10-12-里程碑三工具与治理批.md）

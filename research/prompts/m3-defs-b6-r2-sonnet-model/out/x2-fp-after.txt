@@ -1,0 +1,15 @@
+  ✗ 10 处自己定并行度默认值的写法没经登记位取（每台默认重活线程数登记在 .claude/heavy-thread-default）：
+     crates/demo/src/fp_rust_cmp.rs:2  读自己的线程变量 SAMPLE_RUST_CMP_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「name == "SAMPLE_RUST_CMP_THREADS"」
+     crates/demo/src/fp_rust_match.rs:3  读自己的线程变量 SAMPLE_RUST_MATCH_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「"SAMPLE_RUST_MATCH_THREADS" => 1,」
+     scripts/experiments/fp_argparse.py:3  读自己的线程变量 SAMPLE_META_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「p.add_argument("--threads", metavar="SAMPLE_META_THREADS", default=None)」
+     scripts/experiments/fp_compare.py:3  读自己的线程变量 SAMPLE_COMPARED_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「if "SAMPLE_COMPARED_THREADS" in registry_table:」
+     scripts/experiments/fp_dict_arg.py:3  读自己的线程变量 SAMPLE_DICT_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「subprocess.run(["true"], env={"SAMPLE_DICT_THREADS": "4"})」
+     scripts/experiments/fp_names_tuple.py:2  读自己的线程变量 SAMPLE_TUPLE_JOBS、SAMPLE_TUPLE_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「KNOWN = ("SAMPLE_TUPLE_THREADS", "SAMPLE_TUPLE_JOBS")」
+     scripts/experiments/fp_unused_const.py:1  读自己的线程变量 SAMPLE_UNUSED_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「UNUSED_NAME = "SAMPLE_UNUSED_THREADS"」
+     scripts/hosts/capped.sh:68  nproc  「if [[ "${CAPPED_BREAK:-}" == default-from-nproc ]]; then nproc; return 0; fi」
+     scripts/hosts/fp_clamp.sh:4  写死的线程数默认（|| / && 赋值）  「[[ "$SAMPLE_CLAMP_JOBS" -lt 1 ]] && SAMPLE_CLAMP_JOBS=1」
+     scripts/hosts/heavy_threads.py:62  cpu_count、读自己的线程变量 HEAVY_THREADS_BREAK：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「return os.cpu_count() or 1」
+     → 怎么办：shell 先 source scripts/hosts/heavy-threads.sh 再 heavy_thread_default 取，python 用 scripts/hosts/heavy_threads.py 的 default_heavy_threads() 取，
+               起命令写 bash scripts/hosts/capped.sh default；参数或环境变量给了照给的。装置读自己的线程变量的：把变量名加进 scripts/hosts/capped.sh 的 variable_names，
+               或让装置没设时回退到 SINGLEFS_THREAD_CAP / 登记值（rust 装置 include scripts/experiments/heavy_threads_default/threads.rs，python 用 default_heavy_threads）。确实不是重活（自证输入、线程数就是场景本身、只报核数不起线程）的，
+               登记进 .claude/heavy-thread-exempt：一行「<路径>:<锚串>  # 理由」，锚串取那一行里的一段原文；排除只缩不涨。

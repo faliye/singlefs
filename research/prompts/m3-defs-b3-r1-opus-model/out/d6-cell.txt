@@ -1,0 +1,3 @@
+name=d6-cell case=halted-without-tsv-row rc=1
+     r-stop-r1（_r-stop-r1-body.md）
+name=d6-cell case=halted-and-tsv-row rc=0

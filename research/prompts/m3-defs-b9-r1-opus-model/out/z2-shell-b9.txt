@@ -1,0 +1,11 @@
+  ✗ 5 处自己定并行度默认值的写法没经登记位取（每台默认重活线程数登记在 .claude/heavy-thread-default）：
+     scripts/experiments/assign_default.sh:3  读自己的线程变量 SAMPLE_FILL_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「: "${SAMPLE_FILL_THREADS:=8}"」
+     scripts/experiments/capped_dash_default.sh:3  写死的线程数默认  「cargo test -- --test-threads "${RUST_TEST_THREADS:-8}"」
+     scripts/experiments/if_one_line.sh:3  读自己的线程变量 SAMPLE_IF_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「if [[ -z "${SAMPLE_IF_THREADS:-}" ]]; then SAMPLE_IF_THREADS=8; fi」
+     scripts/experiments/printenv_fallback.sh:3  读自己的线程变量 SAMPLE_PRINTENV_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值  「workers="$(printenv SAMPLE_PRINTENV_THREADS || echo 8)"」
+     scripts/experiments/var_from_registry.sh:5  写死的线程数默认（|| / && 赋值）  「[[ -n "${SAMPLE_SWEEP_THREADS:-}" ]] || SAMPLE_SWEEP_THREADS=$default_threads」
+     → 怎么办：shell 先 source scripts/hosts/heavy-threads.sh 再 heavy_thread_default 取，python 用 scripts/hosts/heavy_threads.py 的 default_heavy_threads() 取，
+               起命令写 bash scripts/hosts/capped.sh default；参数或环境变量给了照给的。装置读自己的线程变量的：把变量名加进 scripts/hosts/capped.sh 的 variable_names，
+               或让装置没设时回退到 SINGLEFS_THREAD_CAP / 登记值（rust 装置 include scripts/experiments/heavy_threads_default/threads.rs，python 用 default_heavy_threads）。确实不是重活（自证输入、线程数就是场景本身、只报核数不起线程）的，
+               登记进 .claude/heavy-thread-exempt：一行「<路径>:<锚串>  # 理由」，锚串取那一行里的一段原文；排除只缩不涨。
+退出=1

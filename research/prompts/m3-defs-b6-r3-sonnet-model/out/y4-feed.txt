@@ -1,0 +1,14 @@
+a1-registered	clerk	rc=0	线程相关行数=0	
+a2-eight-no-verdict	clerk	rc=2	线程相关行数=3	✗ 派 clerk 的提示写了「线程上限：8」（8 不等于登记值 31）；这一行只认一个十进制整数�
+a3-eight-busy-reason	clerk	rc=0	线程相关行数=0	
+a4-eight-user-reason	clerk	rc=0	线程相关行数=0	
+a5-verdict-only	clerk	rc=0	线程相关行数=0	
+a6-verdict-x	clerk	rc=0	线程相关行数=0	
+a7-verdict-placeholder	clerk	rc=2	线程相关行数=3	✗ 派 clerk 的提示写了「线程上限：8」（8 不等于登记值 31）；这一行只认一个十进制整数�
+a8-verdict-none	clerk	rc=2	线程相关行数=3	✗ 派 clerk 的提示写了「线程上限：8」（8 不等于登记值 31）；这一行只认一个十进制整数�
+a9-verdict-reason-with-number	clerk	rc=0	线程相关行数=0	
+b1-forward-no-line	three-way-forward	rc=2	线程相关行数=3	✗ 派 three-way-forward 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记�
+b2-forward-verdict-only	three-way-forward	rc=2	线程相关行数=0	
+b3-31-with-verdict	clerk	rc=0	线程相关行数=0	
+b4-8-in-codeblock	clerk	rc=2	线程相关行数=3	✗ 派 clerk 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默�
+b5-note-line	clerk	rc=0	线程相关行数=0	

@@ -1,0 +1,4 @@
+C794RESULT same_bytes stage=txg4_after_B left=transient_two_read_errors right=transient_two_corrupted_reads identical=true differing_sectors=0
+C794RESULT same_bytes stage=txg7_floor_raised_to_4 left=transient_two_read_errors right=transient_two_corrupted_reads identical=true differing_sectors=0
+C794RESULT same_bytes stage=txg4_after_B left=transient_two_read_errors right=writer_forgets_the_release identical=true differing_sectors=0
+C794RESULT same_bytes stage=txg7_floor_raised_to_4 left=transient_two_read_errors right=writer_forgets_the_release identical=true differing_sectors=0

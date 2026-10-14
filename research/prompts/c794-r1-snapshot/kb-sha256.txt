@@ -1,0 +1,6 @@
+6e4466e1abf9b7ad336c36b5e324f2c8ffd0d2fba83afdc9523a1f5892729166  .claude/kb/checks-owed.md
+0e9029723d43752aa6d42fdbb271369c3ae3cccbfdbf556bbf4cd53cd15e9a6f  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+cee4cbb7da5bd2eb0f5a3c652448974ccf9e19b18bb497546dd2767ba83864ad  .claude/kb/term-renames.md
+7385e0ea681d60fd8e845da5b552d07bcc4ea8e66a832f9ab077ce53581d41f5  crates/singlefs-checker/invariants/05-空间记账.md
+edec5cea18aa8c6b0d154b80b2b8640efb99b53c87cdc02eee888d20f5fd8cd4  crates/singlefs-checker/invariants/07-分配器.md
+1886fa7d77f62e52875d5807064eeb81e77c5ac71e6e84e1609a6adc6bf856eb  .claude/kb/decisions/05-快照-空间记账机制.md

@@ -1,0 +1,5 @@
+scripts/hosts/capped.sh:default-from-nproc  # 弄坏开关 default-from-nproc 照改前取本机核数，只给自证证红
+scripts/hosts/heavy-threads.sh:missing-registration-uses-core-count  # 弄坏开关照改前取本机核数，只给自证证红
+scripts/hosts/heavy_threads.py:return os.cpu_count() or 1  # 弄坏开关 missing-registration-uses-core-count 照改前取本机核数，只给自证证红
+scripts/hosts/heavy_threads.py:BREAK_VARIABLE = "HEAVY_THREADS_BREAK"  # 弄坏开关的变量名，只给自证证红，不定并行度
+scripts/hosts/heavy-threads.sh:${HEAVY_THREADS_BREAK:-}  # 弄坏开关的变量名，只给自证证红，不定并行度
