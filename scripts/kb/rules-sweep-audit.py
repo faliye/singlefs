@@ -61,13 +61,21 @@ def main(argv):
         return selftest()
     if not argv:
         print("  ✗ 没给要核对的规则文件")
-        print("     → 怎么办：python3 scripts/rules-rationale-audit.py .claude/rules/x.md")
+        print("     → 怎么办：python3 scripts/kb/rules-sweep-audit.py [--base <提交>] .claude/rules/x.md")
         return 2
     base = "HEAD"
     if "--base" in argv:
         index = argv.index("--base")
+        if index + 1 >= len(argv):
+            print("  ✗ --base 后面没给提交")
+            print("     → 怎么办：python3 scripts/kb/rules-sweep-audit.py --base <提交> .claude/rules/x.md（不给 --base 就比 HEAD）")
+            return 2
         base = argv[index + 1]
         argv = argv[:index] + argv[index + 2:]
+        if not argv:
+            print("  ✗ 给了 --base 却没给要核对的规则文件")
+            print("     → 怎么办：python3 scripts/kb/rules-sweep-audit.py --base <提交> .claude/rules/x.md")
+            return 2
     failed = False
     for name in argv:
         rule_path = Path(name)

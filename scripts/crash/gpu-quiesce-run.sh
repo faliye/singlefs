@@ -10,10 +10,10 @@
 #   gpu-quiesce-run.sh --selftest     拿假的清场命令（换掉多机配置）与假的命令走一遍各格，末尾一轮逐个打开弄坏开关、核它红在点名的格
 #
 # 清场：读多机配置（${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，模板仓根 multi-host.env.example；主工作树的根按 git common-dir 取，
-#   同 scripts/crash/layer0-shard-configuration-check.sh）的两个键 QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND，两个都要写；
+#   同 scripts/crash/crash-point-replay-shard-configuration-check.sh）的两个键 QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND，两个都要写；
 #   QUIESCE_START_COMMAND、QUIESCE_STARTED_CHECK_COMMAND 留给手动复原，这一份不读、写没写都照跑。
 #   两条命令各用 bash -c 在调用方的工作目录里跑，命令与输出都不打到标准错误上（里面有私有的服务名）。
-#   输出逐条追加进这一趟的本机日志 <日志目录>/<日期>-<登记名>.log（目录 700、文件 600，每条前后各一行「== <键> 起 <UTC 时刻>」「== <键> 退 <码>」）：
+#   输出逐条追加进这一趟的本机日志 <日志目录>/<日期>-<登记名>.log（目录 700、文件 600，每条前后各一行「== <键> 起 <时刻>」「== <键> 退 <码>」）：
 #   清场回读没过、或这一趟跑的清场命令退非 0 时留下，路径写进 GPU_QUIESCE 那一行的 log=；都过了就删掉。
 # 上一趟清了场没复原、服务已经停着：这一趟照样跑清场命令（私有清场脚本见已经停干净就只回读、退 0），回读过了就照跑。
 #   日志目录 ${GPU_QUIESCE_LOG_DIRECTORY:-<工作根>/gpu-quiesce-logs}：开机不清，工作根只在 .claude/hooks/lib_work_root.py 里定义（SINGLEFS_WORK_ROOT），
@@ -88,12 +88,12 @@
 #   GPU_QUIESCE_BREAK=keep-inherited-check-variables  调用方带进来的 GPU_QUIESCE_CHECK_LOCAL_CARDS、GPU_QUIESCE_CHECK_EXEMPT_PIDS 不清掉，这一份没设的那一样照它们传给回读
 #       used-card-outsider（「这一趟用卡 0，卡 0 上的外人却没挡住回读」）
 #   这几个开关别的脚本的自证也认（它们起的命令经这一份）：崩溃放量入口 scripts/crash/crash-amplification.sh、分项驱动 scripts/crash/crash-amplification-item.sh
-#   与门禁 checker-tier-layer0-replay 的样本，各红在哪一格写在那三份文件头。
-# 自证末尾那一轮走 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_switch_wheel（并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS，没给取 SINGLEFS_THREAD_CAP，再没给按 nproc）。
+#   与门禁 checker-tier-crash-point-replay 的样本，各红在哪一格写在那三份文件头。
+# 自证末尾那一轮走 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_switch_wheel（并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS，没给取 SINGLEFS_THREAD_CAP，再没给取登记的重活默认并行度）。
 #
-# gate-similar: peer-host-lib.sh 它的 peer_host_quiesce / peer_host_quiesce_left 只在双机配置开着时读得到清场命令，也不管几趟同时用卡；改它会废掉层 0 双机分片三条用例的全绿标记（admission.py 的 SHARD_DRIVER_FILES），所以这里另写清场与登记
+# gate-similar: peer-host-lib.sh 它的 peer_host_quiesce / peer_host_quiesce_left 只在双机配置开着时读得到清场命令，也不管几趟同时用卡；改它会废掉崩溃点重放双机分片三条用例的全绿标记（admission.py 的 SHARD_DRIVER_FILES），所以这里另写清场与登记
 # gate-similar: crash-amplification-two-hosts.sh 它的 --quiesce 经 peer-host-lib.sh 清场，只给单跑双机驱动时用；分项驱动与崩溃放量入口经这一份
-# gate-similar: layer0-shard-run.sh 它在层 0 双机分片（CPU）开跑前经 peer-host-lib.sh 清场；不上 GPU，不归这一份
+# gate-similar: crash-point-replay-shard-run.sh 它在崩溃点重放双机分片（CPU）开跑前经 peer-host-lib.sh 清场；不上 GPU，不归这一份
 # gate-similar: run-with-memory-cap.sh 同是「包装 -- 命令」的写法，它管内存上限，这里管清场；两样各自套，次序由调用方定
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"

@@ -66,17 +66,9 @@ def human(byte_count):
     return f"{byte_count / 1024 ** 2:.0f} MiB"
 
 
-def default_peak_table(script_directory):
-    """主仓的 scripts/hosts/memory-peaks.tsv（从 git worktree 里跑也读写主仓那一份）；不在 git 仓里用脚本所在目录的。"""
-    try:
-        common_directory = subprocess.run(["git", "-C", script_directory, "rev-parse", "--path-format=absolute", "--git-common-dir"],
-                                          capture_output=True, text=True, stdin=subprocess.DEVNULL).stdout.strip()
-    except OSError:
-        common_directory = ""
-    if common_directory and os.path.basename(common_directory) == ".git" \
-            and os.path.isdir(os.path.join(os.path.dirname(common_directory), "scripts")):
-        return os.path.join(os.path.dirname(common_directory), "scripts", "hosts", "memory-peaks.tsv")
-    return os.path.join(script_directory, "memory-peaks.tsv")
+def default_peak_table():
+    """本机的 ${XDG_DATA_HOME:-~/.local/share}/singlefs/memory-peaks.tsv：仓外的运行状态，worktree 与第二台的副本里跑的都读写本机那一份。"""
+    return os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "singlefs", "memory-peaks.tsv")
 
 
 def read_peak_table(path):
@@ -165,6 +157,22 @@ def unreclaimable_bytes(cgroup_directory):
     except (OSError, ValueError):
         return None
     return max(0, current - file_pages)
+
+
+def resident_bytes(slice_directory, slice_used):
+    """slice 里不属于任何 scope 的常驻用量：slice 回收不掉的用量 slice_used 减去它底下每个子 cgroup（scope）回收不掉的用量之和，不小于 0。
+    账上在跑的与别的 scope 都跑完、收尾之后，这一截也不会少（scope 退出后挂回 slice 的 shmem、内核对象之类）；包装用它判「等多久都放不下」
+    （run-with-memory-cap.sh 文件头「排队」一段）。slice 目录读不了就当没有子 cgroup、全算常驻（偏多不偏少）。"""
+    try:
+        names = os.listdir(slice_directory)
+    except OSError:
+        return slice_used
+    children = 0
+    for name in names:
+        child = os.path.join(slice_directory, name)
+        if os.path.isdir(child):
+            children += unreclaimable_bytes(child) or 0
+    return max(0, slice_used - children)
 
 
 def process_start_time(process_id):

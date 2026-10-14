@@ -25,7 +25,7 @@ import tempfile
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
 DEFAULT_TABLE = os.path.join(REPOSITORY_ROOT, "records", "2026-09-24-里程碑二收尾调度.md")

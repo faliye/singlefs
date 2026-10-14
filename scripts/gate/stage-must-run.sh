@@ -13,11 +13,15 @@
 # .claude/gate.d/stage-inputs.tsv）。这一份只做两件事：把模块的「可跳过」（退 10）翻成这里的 1，
 # 以及**模块自己出错一律按要跑处理**——python 起不来、抛异常退 1，都不许被读成「可跳过」，那等于把这道门禁关掉。
 #
-# 判据只有一句：**这一道读的那几条路径，在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间，git 说变没变。**
+# 判据只有一句：**这一道读的那几条路径，在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间，逐文件的源码摘要变没变。**
+# 源码摘要不随注释与空白变（scripts/gate/lib_source_digest.py 文件头：.rs 去注释取词法单元、doctest 与 SAFETY 注释照代码算，.sh 经 bash 解析、
+# .py 经 tokenize 去注释，crates/ 下没人读的 .md 不进，其余取原文）：两棵树 blob 不同而摘要相同的文件算没变，依据句里点出来；
+# 模式变了、符号链接与子模块变了照样算变。全绿标记那一条路的指纹同样按源码摘要算（admission.py 文件头「输入没变 ⇒ 不跑」那一条）。
+# 弄坏开关 ADMISSION_BREAK=gate-reuse-by-blob 让比对退回逐字（blob）比：自证「只改注释判可跳过」「crates 下加一份没人读的 .md 判可跳过」两格红。
 # 在这之前先看一眼全绿标记：checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification
 # 判绿时按登记输入（登记了 environment= 的连同此刻的环境）在被判那棵树上的指纹写 git common-dir 里的
 # `singlefs-stage-green.<阶段文件名>.<指纹>`（admission.py stage-marker-write），在就可跳过——
-# 主 agent 提交前在工作区单跑过的那一趟，整轮门禁不用再跑第二遍（用户 2026-09-27 定：照 checker-tier-layer0-replay 写标记、只跑变了的）。
+# 主 agent 提交前在工作区单跑过的那一趟，整轮门禁不用再跑第二遍（用户 2026-09-27 定：照 checker-tier-crash-point-replay 写标记、只跑变了的）。
 # 路径清单在 `.claude/gate.d/stage-inputs.tsv`，那是唯一登记位；清单自己也进比对（清单变了必定重跑）。
 # 阶段文件名参数也可以写 <阶段>.sh:<格名>（admission.py 的按格复用：checker-tier-formal-verification 每格各登记一行、各问一次），判法与整道的相同，
 # 进比对的阶段脚本是冒号之前那一份，登记行第三列写 closure=<包>:<bin> 的另把那个 bin 的 cargo 依赖闭包现算进输入；这一份不用为它多做什么。

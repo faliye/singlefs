@@ -131,6 +131,7 @@ fn container_count(arm: Arm, ordinary_unit_count: u64, stripe_widths: &[usize], 
 }
 
 /// 单元按宽度循环攒批，每条条带装 w−1 个单元 ⇒ 条带数。逐条带循环。
+#[cfg(test)]
 fn stripe_count_by_loop(unit_count: u64, stripe_widths: &[usize]) -> u64 {
     let mut units_left = unit_count;
     let mut stripe_total = 0u64;

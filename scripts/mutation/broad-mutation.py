@@ -5,7 +5,7 @@
 # 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/hosts/detached-run.sh start --wall-clock over-2h 与 long-run-check、scripts/hosts/host-dispatch.py 文件头 ⓪ 都读这几行）：
 # long-run-shards: 按清单序号切：--shard <k>/<n> 只跑「序号 mod n == k」的条（n 由调用方给，两台各起一趟 --shard k/2），跑完在一台上 --import-results <另一台那一版的目录> 并成一份
 # long-run-resume: 重起同一条命令就是续跑：结果表里已有定论的条跳过，超时、内存撞顶、驱动错与被打断的那一条照样再选中重跑（被打断的先照在途记录拷回原件）
-# long-run-unshardable: 多机：--shard 的片数、在哪几台起、每台的 --threads 与 --memory-cap 都由调用方手给（--threads 默认 SINGLEFS_THREAD_CAP 或核数减一，--memory-cap 默认 24G），驱动不读 layer0-shard-configuration-check.sh --emit-hosts 的清单、也不按 host-resources.py --json 现算
+# long-run-unshardable: 多机：--shard 的片数、在哪几台起、每台的 --threads 与 --memory-cap 都由调用方手给（--threads 默认 SINGLEFS_THREAD_CAP 或每台默认重活线程数（.claude/heavy-thread-default 的登记值），--memory-cap 默认 24G），驱动不读 crash-point-replay-shard-configuration-check.sh --emit-hosts 的清单、也不按 host-resources.py --json 现算
 """广谱变异的逐条驱动（.claude/kb/checks-owed.md 的 C489；用户 2026-09-30 定：一直跑、中断要续接不从头来、一条一条可点名）。
 
   broad-mutation.py --sync-tree [--commit <提交>]   把主仓某个提交（默认 HEAD）的源码导出成库目录里的专用树（git archive，不动主仓），
@@ -33,7 +33,7 @@
   --skip-stage-two        只跑第一段；第一段没红的记「只过了第一段」（stage-one-only），不算「没红」定论
   --stage-two-only        只给过了第一段的条补第二段；点名的条没过过第一段（这一版里没有它的 stage-one-only 行）拒，退 2
   --stage-two-eatmydata   第二段的文档测试与 checker 档快档也经 eatmydata 跑（默认不经；harness 慢档用例那一步与第一段同一种起法，一直经）
-  --threads <N>           线程数，默认取 SINGLEFS_THREAD_CAP，没设取核数减 1；编译与测试都照它（经 scripts/hosts/capped.sh）
+  --threads <N>           线程数，默认取 SINGLEFS_THREAD_CAP，没设取每台默认重活线程数（.claude/heavy-thread-default 的登记值）；编译与测试都照它（经 scripts/hosts/capped.sh）
   --memory-cap <上限>     每条命令的内存上限（scripts/hosts/run-with-memory-cap.sh 的写法），默认 BROAD_MUTATION_MEMORY_CAP，没设 24G
   --timeout-floor <秒>    单步超时的地板，默认 900；--timeout-multiplier <倍> 默认 5。单步超时 = max(地板, 倍数 × 这一版基线里这一步的秒数)：
                           基线是开跑时在这台机器当时的负载下量的（.claude/kb/tooling.md「超时地板按空闲机器标定，就会把「机器上还有别的活」记成「变异抓不到」」）
@@ -419,9 +419,11 @@ from typing import NamedTuple
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY, ".claude", "scripts"))
 from project_preflight import preflight  # noqa: E402
+sys.path.insert(0, os.path.join(SCRIPT_DIRECTORY, "..", "hosts"))
+from heavy_threads import HeavyThreadDefaultError, default_heavy_threads  # noqa: E402
 
 SELF_PATH = os.path.join(SCRIPT_DIRECTORY, os.path.basename(__file__))
 # libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）全仓只在 lib_libtest_result_lines.py 解析一份：should panic 那一段不进名字
@@ -433,7 +435,7 @@ REAL_SELF_PATH = os.path.realpath(__file__)
 MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "run-with-memory-cap.sh")
 THREAD_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "capped.sh")
 DEFAULT_HOME = "~/.local/share/singlefs/broad-mutation"
-DEFAULT_MEMORY_CAP = "24G"        # 2026-09-30 派发给的上限；各步的实测峰值由内存包装记在 scripts/hosts/memory-peaks.tsv（键 broad-mutation <步名>）
+DEFAULT_MEMORY_CAP = "24G"        # 2026-09-30 派发给的上限；各步的实测峰值由内存包装记在 ~/.local/share/singlefs/memory-peaks.tsv（键 broad-mutation <步名>）
 DEFAULT_TIMEOUT_FLOOR_SECONDS = 900
 DEFAULT_TIMEOUT_MULTIPLIER = 5
 DEFAULT_LOCK_WAIT_SECONDS = 120
@@ -3178,10 +3180,13 @@ class ArgumentParser(argparse.ArgumentParser):
 
 
 def default_threads():
-    configured = os.environ.get("SINGLEFS_THREAD_CAP", "")
-    if re.fullmatch(r"[1-9][0-9]*", configured):
-        return int(configured)
-    return max(1, (os.cpu_count() or 2) - 1)
+    """--threads 的缺省：SINGLEFS_THREAD_CAP 设了取它，否则每台默认重活线程数（.claude/heavy-thread-default 的登记值）；取不了照用法错退，不退回按核数算。"""
+    try:
+        return default_heavy_threads()
+    except HeavyThreadDefaultError as error:
+        print(f"  ✗ {error}", file=sys.stderr)
+        print(f"  → 怎么办：{error.howto}", file=sys.stderr)
+        sys.exit(EXIT_USAGE)
 
 
 def parse_arguments(argv):

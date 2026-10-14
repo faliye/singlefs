@@ -4,24 +4,25 @@
 """崩溃点重放合表的读法与核法（一份判法，入口 scripts/crash/crash-point-replay.sh 与 scripts/crash/crash-case-check.py 的 placement 共用）。
 
 合表 .claude/gate.d/crash-point-replay-items.tsv（写法在它的表头）：一项一条流，点名它在重型里的两部分——
-  层 0 那一套（.claude/gate.d/stage-inputs.tsv 的 crash-case: 行）与放量那一套（scripts/crash/crash-amplification.sh 的 ITEMS），
+  崩溃点重放那一套（.claude/gate.d/stage-inputs.tsv 的 crash-case: 行）与放量那一套（scripts/crash/crash-amplification.sh 的 ITEMS），
   再写轻型取自重型的哪几个测试目标。
 
 用法：
     lib_crash_point_replay_items.py list [仓根]      逐行打「项名<TAB>crash-case 键（空格隔开，没有是 -）<TAB>放量分项（同上）<TAB>轻型的测试目标」；
                                                      合表核不过时不打，打问题、退 1
     lib_crash_point_replay_items.py check [仓根]     只核，核过打一句成功句（核了几项、几条 crash-case、几个放量分项、几个轻型测试目标）
-    lib_crash_point_replay_items.py segments [仓根]  只核按段登记文件（见下「按段登记」），核过打一句成功句（几行、几项）；门禁 code-source-discipline 的
-                                                     crash-point-replay-segments 格与入口 scripts/crash/crash-point-replay.sh 开跑前都调它
+    lib_crash_point_replay_items.py segments [仓根]  只核按段登记文件（见下「按段登记」），核过打一句成功句（几行、几项、几条流）；门禁 code-source-discipline 的
+                                                     crash-point-replay-segments 格与两个入口 scripts/crash/crash-point-replay.sh、scripts/crash/crash-amplification.sh
+                                                     开跑前都调它
   被 import 时用 read_items(root)、crash_case_rows(root)、pipeline_items(root)、problems(root)、crash_cases_named(root)、
   registered_functions(root)（合表点名的重型部分落到哪几个「测试目标、用例函数」，crash-case-check.py 的 placement 用）、segment_problems(root)；
   核法的判别力由 selftest_cells() 拿造出来的小仓核，它由 scripts/crash/crash-case-check.py --selftest 起（placement 读的就是这一份核法）。
 
 按段登记（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J10、M4 第 15 条；与引擎那一路实现 E2 的接口约定）：
-  文件 .claude/gate.d/crash-point-replay-segments.tsv，一行 <项名>\t<段号>\t<段写数>\t<段写表摘要>（可再加一段 # 说明），# 开头的行是注释。
-  入口开跑时往引擎送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<这份文件的绝对路径>，登记了的段由引擎在重型里按「甲二」展开。
-  核法（segment_problems）：文件读得了；每行四段；项名是合表里的一项；段号与段写数是非负整数（十进制、不带前导 0）、段写数大于 0；
-  摘要是 64 位小写十六进制（sha256）；同一项同一段只一行。合表读不了照合表的问题报。
+  文件 .claude/gate.d/crash-point-replay-segments.tsv，一行 <项名>\t<流名>\t<段号>\t<段写数>\t<段写表摘要>（可再加一段 # 说明），# 开头的行是注释。
+  入口开跑时往引擎送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<这份文件的绝对路径>，引擎按第 2 列（流名）取这条流的行，登记了的段在重型里按「甲二」展开。
+  核法（segment_problems）：文件读得了；每行五段；项名是合表里的一项；流名匹配 ^[A-Za-z][A-Za-z0-9_]*$；段号与段写数是非负整数（十进制、不带前导 0）、
+  段写数大于 0；摘要是 64 位小写十六进制（sha256）；同一（流名，段号）只一行。合表读不了照合表的问题报。
 
 核法（problems）：
   ① 每行四段（再加 # 说明）；项名是小写字母、数字、-，不重复，不含 layer0、amplification（判决第三节 J1：新名字不用这两个词）；
@@ -30,7 +31,7 @@
   ④ 第四段（轻型取自重型的哪几个测试目标）不空，每一个都是这一项第二、三段点名的部分的测试目标之一，
      crates/singlefs-checker-tier/tests/<目标>.rs 在（门禁核「轻型登记的每一行都指得到重型里现存的那一项」，用户 2026-10-10 定）。
   合表或 stage-inputs.tsv 读不了算一处问题，不抛；放量入口 crash-amplification.sh 不在当成 ITEMS 是空的
-  （合表点名了放量分项的那几项照样报「不是 ITEMS 里的分项」；层 0 门禁的样本根里只有合表、没有放量入口）。
+  （合表点名了放量分项的那几项照样报「不是 ITEMS 里的分项」；崩溃点重放门禁的样本根里只有合表、没有放量入口）。
 退出码：0 核过（list 打全表）；1 有问题（逐处列）；2 用法错。
 
 弄坏开关（只给自证证红用）。逐项写开关名、弄坏哪一处、打开后 scripts/crash/crash-case-check.py --selftest 哪几格红
@@ -51,8 +52,12 @@
       segments-bad-segment-number、segments-zero-writes
   CRASH_POINT_REPLAY_ITEMS_BREAK=segment-digest-unchecked  按段登记不核摘要是 64 位小写十六进制
       segments-bad-digest
-  CRASH_POINT_REPLAY_ITEMS_BREAK=segment-duplicate-accepted  按段登记不核同一项同一段只一行
+  CRASH_POINT_REPLAY_ITEMS_BREAK=segment-duplicate-accepted  按段登记不核同一（流名，段号）只一行
       segments-duplicate
+  CRASH_POINT_REPLAY_ITEMS_BREAK=segment-flow-name-unchecked  按段登记不核流名的写法
+      segments-bad-flow-name
+  CRASH_POINT_REPLAY_ITEMS_BREAK=segment-column-count-unchecked  按段登记不核每行五段（段数不对的行不报、跳过）
+      segments-field-count
 """
 import os
 import re
@@ -62,7 +67,7 @@ import tempfile
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
 
@@ -78,6 +83,7 @@ PIPELINE_ITEM = re.compile(r"^\s*\$'([a-z0-9][a-z0-9-]*)\\t(\w+)\\t(\w+)\\t[^']*
 SEGMENTS_TABLE = os.path.join(".claude", "gate.d", "crash-point-replay-segments.tsv")
 NONNEGATIVE_INTEGER = re.compile(r"^(?:0|[1-9][0-9]*)$")
 SEGMENT_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+SEGMENT_FLOW_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
 class Item:
@@ -220,7 +226,7 @@ def registered_functions(root):
 
 
 def read_segments(root):
-    """按段登记文件的行：→ ([(行号, 项名, 段号, 段写数, 摘要)], 问题)。文件读不了、段数不对各是一处问题。"""
+    """按段登记文件的行：→ ([(行号, 项名, 流名, 段号, 段写数, 摘要)], 问题)。文件读不了、段数不对各是一处问题。"""
     rows, found = [], []
     try:
         lines = open(os.path.join(root, SEGMENTS_TABLE), encoding="utf-8").read().splitlines()
@@ -230,8 +236,9 @@ def read_segments(root):
         if not line.strip() or line.startswith("#"):
             continue
         fields = line.split("\t#", 1)[0].split("\t")
-        if len(fields) != 4:
-            found.append(f"{SEGMENTS_TABLE}:{number} 是 {len(fields)} 段，要四段（项名、段号、段写数、段写表摘要，制表符分隔）")
+        if len(fields) != 5:
+            if BROKEN != "segment-column-count-unchecked":
+                found.append(f"{SEGMENTS_TABLE}:{number} 是 {len(fields)} 段，要五段（项名、流名、段号、段写数、段写表摘要，制表符分隔）")
             continue
         rows.append((number, *(field.strip() for field in fields)))
     return rows, found
@@ -245,10 +252,12 @@ def segment_problems(root):
         found += [f"核按段登记要读合表：{problem}" for problem in item_problems]
     names = {item.name for item in items}
     seen = {}
-    for number, name, segment, writes, digest in rows:
+    for number, name, flow, segment, writes, digest in rows:
         where = f"{SEGMENTS_TABLE}:{number}"
         if name not in names and BROKEN != "segment-unknown-item-accepted":
             found.append(f"{where}：项名 {name} 不是合表 {ITEMS_TABLE} 里的一项")
+        if not SEGMENT_FLOW_NAME.match(flow) and BROKEN != "segment-flow-name-unchecked":
+            found.append(f"{where}：流名「{flow}」不合写法（字母起头，只许字母、数字与 _；照引擎驱动行的 flow= 写）")
         if BROKEN != "segment-numbers-unchecked":
             if not NONNEGATIVE_INTEGER.match(segment):
                 found.append(f"{where}：段号「{segment}」不是非负整数（十进制、不带前导 0）")
@@ -256,9 +265,9 @@ def segment_problems(root):
                 found.append(f"{where}：段写数「{writes}」要是大于 0 的整数（十进制、不带前导 0）")
         if not SEGMENT_DIGEST.match(digest) and BROKEN != "segment-digest-unchecked":
             found.append(f"{where}：段写表摘要「{digest}」不是 64 位小写十六进制（sha256）")
-        if (name, segment) in seen and BROKEN != "segment-duplicate-accepted":
-            found.append(f"{where}：{name} 第 {segment} 段已在第 {seen[(name, segment)]} 行登记过，同一项同一段只一行")
-        seen.setdefault((name, segment), number)
+        if (flow, segment) in seen and BROKEN != "segment-duplicate-accepted":
+            found.append(f"{where}：流 {flow} 第 {segment} 段已在第 {seen[(flow, segment)]} 行登记过，同一条流同一段只一行")
+        seen.setdefault((flow, segment), number)
     return found
 
 
@@ -268,12 +277,12 @@ def command_segments(root):
         for problem in found:
             print(f"  ✗ {problem}")  # gate-lint:detail
         print(f"  ✗ 按段登记文件 {SEGMENTS_TABLE} 有 {len(found)} 处不对（逐处列在上面）")  # gate-lint:summary
-        print(f"  → 怎么办：照那几处改 {SEGMENTS_TABLE}（写法在它的表头与 scripts/crash/lib_crash_point_replay_items.py 文件头「按段登记」）：项名照合表写，"
-              "段号与段写数写十进制整数、段写数大于 0，摘要写段写表的 sha256（64 位小写十六进制），同一项同一段只留一行")
+        print(f"  → 怎么办：照那几处改 {SEGMENTS_TABLE}（写法在它的表头与 scripts/crash/lib_crash_point_replay_items.py 文件头「按段登记」）：每行五段，项名照合表写，"
+              "流名照引擎驱动行的 flow= 写，段号与段写数写十进制整数、段写数大于 0，摘要写段写表的 sha256（64 位小写十六进制），同一条流同一段只留一行")
         return 1
     rows, _ = read_segments(root)
-    print(f"  ✓ 崩溃点重放按段登记核过：{len(rows)} 行（{len({row[1] for row in rows})} 项），项名都在合表里、段号与段写数是非负整数且段写数大于 0、"
-          "摘要是 64 位小写十六进制、同一项同一段只一行")
+    print(f"  ✓ 崩溃点重放按段登记核过：{len(rows)} 行（{len({row[1] for row in rows})} 项、{len({row[2] for row in rows})} 条流），每行五段、项名都在合表里、"
+          "流名合写法、段号与段写数是非负整数且段写数大于 0、摘要是 64 位小写十六进制、同一条流同一段只一行")
     return 0
 
 
@@ -320,7 +329,7 @@ def selftest_cells():
     def world(name, table_rows, crash_cases, pipeline_rows, targets):
         root = os.path.join(work, name)
         os.makedirs(os.path.join(root, ".claude", "gate.d"))
-        os.makedirs(os.path.join(root, "scripts"))
+        os.makedirs(os.path.dirname(os.path.join(root, PIPELINE_ENTRY)))
         os.makedirs(os.path.join(root, TIER_TESTS))
         with open(os.path.join(root, ITEMS_TABLE), "w", encoding="utf-8") as handle:
             handle.write(SELFTEST_TABLE_HEADER + "".join("\t".join(row) + "\t# 样本\n" for row in table_rows))
@@ -392,20 +401,24 @@ def selftest_cells():
         elif wanted is not None and not any(wanted in problem for problem in found):
             failures.append((cell, f"按段登记应当报一处含「{wanted}」的问题，实际 {found}"))
 
-    clean_segments = [["stream-one", "0", "7", digest], ["stream-one", "2", "12", digest + "\t# 说明"], ["stream-two", "0", "3", digest]]
+    # 一项几条流各登各的段：stream-two 那一项两条流都登第 0 段，不算重
+    clean_segments = [["stream-one", "stream_one_Flow", "0", "7", digest], ["stream-one", "stream_one_Flow", "2", "12", digest + "\t# 说明"],
+                      ["stream-two", "two_A", "0", "3", digest], ["stream-two", "two_B", "0", "5", digest]]
     expect_segments("segments-clean", segments_world("segments-clean", clean_segments), None)
     expect_segments("segments-header-only", segments_world("segments-header-only", []), None)
-    expect_segments("segments-unknown-item", segments_world("segments-unknown-item", clean_segments + [["ghost", "0", "3", digest]]),
+    expect_segments("segments-unknown-item", segments_world("segments-unknown-item", clean_segments + [["ghost", "ghost_flow", "0", "3", digest]]),
                     "项名 ghost 不是合表")
-    expect_segments("segments-bad-segment-number", segments_world("segments-bad-segment-number", [["stream-one", "-1", "3", digest]]),
+    expect_segments("segments-bad-flow-name", segments_world("segments-bad-flow-name", [["stream-one", "stream-one", "0", "3", digest]]),
+                    "流名「stream-one」不合写法")
+    expect_segments("segments-bad-segment-number", segments_world("segments-bad-segment-number", [["stream-one", "stream_one_Flow", "-1", "3", digest]]),
                     "段号「-1」不是非负整数")
-    expect_segments("segments-zero-writes", segments_world("segments-zero-writes", [["stream-one", "0", "0", digest]]),
+    expect_segments("segments-zero-writes", segments_world("segments-zero-writes", [["stream-one", "stream_one_Flow", "0", "0", digest]]),
                     "段写数「0」要是大于 0 的整数")
-    expect_segments("segments-bad-digest", segments_world("segments-bad-digest", [["stream-one", "0", "3", digest.upper()]]),
+    expect_segments("segments-bad-digest", segments_world("segments-bad-digest", [["stream-one", "stream_one_Flow", "0", "3", digest.upper()]]),
                     "不是 64 位小写十六进制")
-    expect_segments("segments-duplicate", segments_world("segments-duplicate", clean_segments + [["stream-one", "2", "9", digest]]),
-                    "stream-one 第 2 段已在第 3 行登记过")
-    expect_segments("segments-field-count", segments_world("segments-field-count", [["stream-one", "0", "3"]]), "是 3 段，要四段")
+    expect_segments("segments-duplicate", segments_world("segments-duplicate", clean_segments + [["stream-one", "stream_one_Flow", "2", "9", digest]]),
+                    "流 stream_one_Flow 第 2 段已在第 3 行登记过")
+    expect_segments("segments-field-count", segments_world("segments-field-count", [["stream-one", "0", "3", digest]]), "是 4 段，要五段")
     expect_segments("segments-table-missing", segments_world("segments-table-missing", None), "读不了按段登记文件")
     shutil.rmtree(work, ignore_errors=True)
     return cells, failures

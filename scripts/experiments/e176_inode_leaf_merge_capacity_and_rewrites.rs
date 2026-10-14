@@ -9,6 +9,8 @@
 //! 产物是 `E7RESULT` 行，收尾 `E7RESULT name=done emitted=N`（N 把 config 行与 done 行都算进去）。
 //! 确定性模型：跑两遍逐字节相同只说明没有隐藏状态，不是统计上稳定。
 
+// admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
+// run-condition: command python3
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
@@ -1922,11 +1924,13 @@ pub fn segment_two_sensitivity_lines(results: &[SequenceResult]) -> Vec<String> 
     lines
 }
 
-/// 线程数：`SINGLEFS_THREAD_CAP`（`scripts/hosts/capped.sh` 设），没设取 1；写错就停。
+include!("heavy_threads_default/threads.rs");
+
+/// 线程数：`SINGLEFS_THREAD_CAP`（`scripts/hosts/capped.sh` 设），没设取登记的重活默认并行度（`.claude/heavy-thread-default`）；写错就停。
 fn thread_count_from_environment() -> usize {
     match std::env::var("SINGLEFS_THREAD_CAP") {
         Ok(text) => text.parse::<usize>().ok().filter(|threads| *threads >= 1).expect("SINGLEFS_THREAD_CAP 要是正整数"),
-        Err(_) => 1,
+        Err(_) => default_heavy_threads(include_str!("../../.claude/heavy-thread-default")),
     }
 }
 
@@ -2100,6 +2104,7 @@ pub fn segment_two_output(threads: usize) -> (Vec<String>, bool) {
 }
 
 fn main() {
+    preflight();
     let mode = std::env::args().nth(1).unwrap_or_default();
     let threads = thread_count_from_environment();
     let (lines, positive_controls_ok) = match mode.as_str() {
@@ -2445,5 +2450,33 @@ mod tests {
         let left_first_delta2 = point_value(&result, JUDGED_ROWS[1], 2);
         assert!(lines[4].contains(&format!(" opposite_value={} ", value_text(left_first_delta2))), "先查左边那一点取的是 left_first 窗口：{}", lines[4]);
         assert!(lines[4].contains(" opposite=wa_keep1of2_a1000@left_first "), "{}", lines[4]);
+    }
+}
+
+fn repository_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+}
+
+fn preflight() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let root = repository_root();
+    let source = root.join("scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs");
+    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    let mut command = std::process::Command::new("python3");
+    command.arg(&script).arg("check").arg(&source);
+    if arguments.iter().any(|argument| argument == "--force") {
+        command.arg("--force");
+    }
+    command.arg("--");
+    command.args(arguments.iter().filter(|argument| *argument != "--force"));
+    let output = command.output().unwrap_or_else(|error| {
+        eprintln!("  ✗ 起不了 python3 判准入：{error}");
+        eprintln!("  → 怎么办：装上 python3，或在有 python3 的机器上跑");
+        std::process::exit(78)
+    });
+    if !output.status.success() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        std::process::exit(output.status.code().unwrap_or(1));
     }
 }

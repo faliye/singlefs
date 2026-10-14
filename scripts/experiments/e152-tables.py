@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 每次渲染的是此刻点名的那一份产物，上一次渲染出的表不替这一次作保
+# run-condition: none 只读点名的一份产物文本，除了 python3 之外没有环境要求，不起 cargo、不编不跑
 """E152（按里程碑对比六家文件系统的文件性能）：把产物里的 name=summary 行渲染成 scripts/experiments/perf-by-milestone.md 用的表。
 
   e152-tables.py <产物>        打印 markdown 表（每个维度一张，行是配置，格子是 5 轮中位）
@@ -13,6 +15,11 @@ E152_TABLES_SINGLEFS_WRITE_CALLS=1 强制把 singlefs 的二进制写调用数�
 import os
 import statistics
 import sys
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
 
 CONFIGURATION_ORDER = ["raw", "ext4", "xfs", "f2fs", "btrfs", "bcachefs", "zfs",
                        "raw-md", "ext4-md", "xfs-md", "f2fs-md", "btrfs-raid1", "bcachefs-replicas2", "zfs-mirror", "singlefs"]
@@ -352,4 +359,5 @@ def main():
 
 
 if __name__ == "__main__":
+    preflight(__file__)
     sys.exit(main())

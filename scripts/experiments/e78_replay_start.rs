@@ -97,6 +97,7 @@ struct World {
     /// **只给审计与闭式对照用，不给任何恢复算法用。**
     reallocated_at_publishes: Vec<Vec<u64>>,
     /// torn 场景：环里多一条 M+1 的记录，其单元没落盘。
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     torn_record: Option<Record>,
 }
 

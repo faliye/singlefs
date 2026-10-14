@@ -2043,9 +2043,11 @@ fn groups_of_the_second_segment() -> Vec<GroupSettings> {
     groups
 }
 
-/// 线程数只影响挂钟、不影响任何一行输出（每组各算各的，结果按组的次序收）。
+include!("heavy_threads_default/threads.rs");
+
+/// 线程数只影响挂钟、不影响任何一行输出（每组各算各的，结果按组的次序收）。`SINGLEFS_THREAD_CAP` 没设取登记的重活默认并行度（`.claude/heavy-thread-default`）。
 fn worker_thread_count() -> usize {
-    std::env::var("SINGLEFS_THREAD_CAP").ok().and_then(|text| text.parse::<usize>().ok()).filter(|count| *count >= 1).unwrap_or(4)
+    default_heavy_threads(include_str!("../../.claude/heavy-thread-default"))
 }
 
 fn run_groups_in_parallel(groups: &[GroupSettings]) -> Vec<GroupResult> {

@@ -68,7 +68,7 @@
 //! 换算法要重跑；`rand` 的随机是全域均匀，没有热点分布；不建模预读命中。
 
 use aes_gcm::{
-    aead::{AeadInPlace, KeyInit},
+    aead::{AeadInOut, KeyInit},
     Aes256Gcm, Nonce,
 };
 use e7_index_bench::Emitter;
@@ -183,10 +183,10 @@ fn open(path: &str, direct: bool) -> std::fs::File {
     })
 }
 
-/// 一次校验：对整个单元算一遍 MAC。沿用 E6 的被测对象（AES-256-GCM，
-/// `encrypt_in_place_detached`）——换 API 就换了被测对象。
+/// 一次校验：对整个单元算一遍 MAC。沿用 E6 的被测对象（AES-256-GCM 原地算 MAC：`encrypt_inout_detached`；
+/// aead 0.6 里旧名 `encrypt_in_place_detached` 就是转调它）——换算法或换算法实现就换了被测对象。
 fn verify(c: &Aes256Gcm, nonce: &Nonce<aes_gcm::aes::cipher::consts::U12>, buf: &mut [u8]) -> u8 {
-    let t = c.encrypt_in_place_detached(nonce, b"", buf).expect("MAC 失败");
+    let t = c.encrypt_inout_detached(nonce, b"", buf.into()).expect("MAC 失败");
     t[0]
 }
 
@@ -203,7 +203,7 @@ fn rand_arm(path: &str, direct: bool, g: usize, units: u64, ops: u64, seed: u64)
     let f = open(path, direct);
     let key = [0x42u8; 32];
     let c = Aes256Gcm::new_from_slice(&key).unwrap();
-    let nonce = Nonce::from_slice(&[0u8; 12]);
+    let nonce = &Nonce::from([0u8; 12]);
     let mut buf = Aligned::new(g);
     let mut st = seed | 1;
     let mut sink = 0u64;
@@ -256,7 +256,7 @@ fn seq_arm(path: &str, direct: bool, g: usize, total_bytes: u64) -> Arm {
     let f = open(path, direct);
     let key = [0x42u8; 32];
     let c = Aes256Gcm::new_from_slice(&key).unwrap();
-    let nonce = Nonce::from_slice(&[0u8; 12]);
+    let nonce = &Nonce::from([0u8; 12]);
     let mut buf = Aligned::new(SEQ_IO);
     let ios = total_bytes / SEQ_IO as u64;
     let mut sink = 0u64;

@@ -2,7 +2,7 @@
 """E171 第一段多机跑法的第二台（及以后各台）那一头：rows_orchestrator.py 经 scripts/hosts/multi-host-run.sh --peer 把它与 expected.json
 送进那边的树（research/e171-s1-peer-kit/），在那棵树的树根跑。只用标准库与树里的 row_driver、frozen_o3。
 
-  peer_side.py preflight  --expected <json> --slots N --threads T [--compile]
+  peer_side.py preflight  --expected <json> --slots N [--threads T] [--compile]   （--threads 不给取登记的重活默认并行度）
       逐项核：Python 主次版本、google_crc32c 装没装（都与本机相同）、rsync 在、基线计时与驱动各文件的 sha256、发来的冻结快照摘要、O3 冻结行（Z2）、
       树所在的盘空余 ≥ 槽数 × 3 GiB；--compile 时把冻结快照拷一份、照驱动的编法离线编一遍（cargo build --release --offline -p singlefs-checker-tier
       --bin e171_three_oracle_collusion_after_the_oracle_fixes，经 capped.sh T）。报告写 <out>/preflight.txt（multi-host-run.sh --fetch 取回），
@@ -93,7 +93,8 @@ def preflight(arguments: argparse.Namespace, expected: dict) -> int:
         log_path = os.path.join(out, "preflight-compile.log")
         environment = dict(os.environ, CARGO_TARGET_DIR=os.path.join(os.getcwd(), PREFLIGHT_TARGET_RELATIVE))
         with open(log_path, "w", encoding="utf-8") as log:
-            code = subprocess.run(["bash", os.path.join(os.getcwd(), "scripts/hosts/capped.sh"), str(arguments.threads), "nice", "-n", "19", "cargo",
+            threads_for_capped = "default" if arguments.threads is None else str(arguments.threads)   # 不给 --threads 取登记的重活默认并行度（capped.sh default）
+            code = subprocess.run(["bash", os.path.join(os.getcwd(), "scripts/hosts/capped.sh"), threads_for_capped, "nice", "-n", "19", "cargo",
                                    "build", "--release", "--offline", "-p", DEVICE_PACKAGE, "--bin", DEVICE_BINARY_NAME],
                                   cwd=PREFLIGHT_TREE_RELATIVE, env=environment, stdout=log, stderr=subprocess.STDOUT).returncode
         checks.append(("offline_compile", code == 0, f"cargo_exit={code}"))
@@ -132,7 +133,7 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("mode", choices=("preflight", "run-driver"))
     parser.add_argument("--expected", required=True)
     parser.add_argument("--slots", type=int, default=1)
-    parser.add_argument("--threads", type=int, default=5)
+    parser.add_argument("--threads", type=int, default=None, help="离线编的线程数；不给取登记的重活默认并行度（capped.sh default）")
     parser.add_argument("--compile", action="store_true")
     if "--" in argument_list:
         split = argument_list.index("--")

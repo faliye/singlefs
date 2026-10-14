@@ -11,7 +11,7 @@ set -u -o pipefail -o noclobber
 TAG="${1:?日期标签}"
 WORKERS="${2:?工作进程数}"
 SCRATCH="${3:?草稿目录}"
-ROOT="$(cd "$(dirname "$0")/../../.. && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 export PYTHONDONTWRITEBYTECODE=1
 V2="$ROOT/scripts/experiments/e170_o3_spec_executor_with_witness_predicates"
 V487="$ROOT/scripts/experiments/e170_o3_spec_executor_with_witness_predicates_journal_header_487"

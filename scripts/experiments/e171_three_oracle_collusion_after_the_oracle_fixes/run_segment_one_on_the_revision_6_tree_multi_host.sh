@@ -381,5 +381,6 @@ case "$ORCHESTRATOR_EXIT" in
   *) stop "多机编排退 $ORCHESTRATOR_EXIT（见上面 ✗ 那一行）" ;;
 esac
 STEP=done
+# gate-lint:nocount 这一句报一串步骤跑完，不扫一批对象；每一步判了多少写在各步自己的日志里
 say "✓ 全部步骤跑完。比对器（segment_one_comparator.py）归下一段执行员；产物前缀 $PREFIX，行输出根 $DUMPS/segment1-rows$RESUME_TAG，日志 $LOGS"
 exit 0

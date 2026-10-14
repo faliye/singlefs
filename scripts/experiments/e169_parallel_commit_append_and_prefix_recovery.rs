@@ -13,6 +13,8 @@
 //! 已返回 fsync 的事务集合按崩溃点现算（修订 ④ 补的 R1 读法让返回可以落在两个闭段点之间，所以按发出前缀切）。
 //! 同一格里全部执行的崩溃状态按内容去重。
 
+// admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
+// run-condition: command python3
 use e7_index_bench::Emitter;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -4400,6 +4402,7 @@ const REPLAY_CORE_INPUTS_ARGUMENT: &str = "replay-core-inputs";
 const SEGMENT_TWO_ARGUMENT: &str = "segment-two";
 
 fn main() {
+    preflight();
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     match arguments.as_slice() {
         [] => run_segment_one(),
@@ -5160,5 +5163,33 @@ mod tests {
         assert!(grid.values().all(|result| result.pending.final_value == 0 && result.pending.peak_after_drain == 0));
         assert!(grid.values().all(|result| result.reserved_lag.is_none_or(|lag| lag.final_value == 0)));
         assert!(grid.iter().all(|(key, result)| result.return_times.len() == usize::try_from(key.6).expect("k ≤ 64")));
+    }
+}
+
+fn repository_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+}
+
+fn preflight() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let root = repository_root();
+    let source = root.join("scripts/experiments/e169_parallel_commit_append_and_prefix_recovery.rs");
+    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    let mut command = std::process::Command::new("python3");
+    command.arg(&script).arg("check").arg(&source);
+    if arguments.iter().any(|argument| argument == "--force") {
+        command.arg("--force");
+    }
+    command.arg("--");
+    command.args(arguments.iter().filter(|argument| *argument != "--force"));
+    let output = command.output().unwrap_or_else(|error| {
+        eprintln!("  ✗ 起不了 python3 判准入：{error}");
+        eprintln!("  → 怎么办：装上 python3，或在有 python3 的机器上跑");
+        std::process::exit(78)
+    });
+    if !output.status.success() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        std::process::exit(output.status.code().unwrap_or(1));
     }
 }

@@ -14,11 +14,12 @@
 #   any-target  放过不挑目标的参数
 #       「不挑目标的变异行应当整次拒绝、退 2」
 #   main-allowed  放过主工作区
-#       「--copy 指主工作区应当以「主工作区」为由拒绝」
+#       「--copy 指主工作区应当以「主工作区」为由拒绝」（那一格的主工作区是临时目录里一棵假的、经 prove 的 main_root 顶替，
+#       自证从哪棵树起都判得出；打开开关时假 cargo 在那棵假树上照跑，不再以主工作区为由退 2）
 #   heavy-run  没设 SINGLEFS_HEAVY_TESTS（子 agent 起的）时照样跑重型的行
 #       「子 agent 起（没设 SINGLEFS_HEAVY_TESTS）：checker 档包的行跳过、逐行报本次未跑、cargo 一次都不起、整次退 77」
-#   layer0-by-name  回到按 --test 目标名里带不带 layer0 跳过（改前的口径，与重型测试闸的按包判不一致）
-#       「--test 目标名带 layer0 而包不是 checker 档：照跑、判抓到」「子 agent 起（没设 SINGLEFS_HEAVY_TESTS）：checker 档包的行跳过……」
+#   crash-point-replay-by-name  回到按 --test 目标名里带不带 crash_point_replay 跳过（改前的口径，与重型测试闸的按包判不一致）
+#       「--test 目标名带 crash_point_replay 而包不是 checker 档：照跑、判抓到」「子 agent 起（没设 SINGLEFS_HEAVY_TESTS）：checker 档包的行跳过……」
 #   own-table  回到自己切表（六段就收、不看哪一段空着），不经 read_table
 #       「点名的行不成形（必须红的测试名空着）：整次拒绝、写明哪一段空着」「切表与 read_table 逐行相同」
 #   own-judge  回到自己判结局（任一行点名的 FAILED 就算抓到，不看退出码、不看对上几个用例、不认 NOT_RUN），不经 verdict_of_run
@@ -33,6 +34,9 @@
 #       「内存包装退 245（显存不够）的那一条应当报显存不够、不算抓到、退 1」（实际判成抓到、退 0）、「判法与 verdict_of_run 对同一组样本逐行相同」
 #   no-copy-lock  不在副本根上拿副本锁（见「判法与次序」⓪），锁被占着也照跑
 #       「证红跑的时候副本根上拿着副本锁、跑完放掉；锁被占着时拒绝、退 2、cargo 一次都不起」
+#   no-rebuild-check  施加变异之后那一趟编译不核被改的包有没有 Compiling 行（见「判法与次序」⑤）
+#       「编译目录里的产物比施加变异后的源码新（共用编译目录）：那一条判没重编、退 1，不判没红」（实际判成没红）；
+#       scripts/gate/lib_rebuilt_packages.py 的 REBUILT_PACKAGES_BREAK=any-compiling-line 不让这一格红（那一趟一行 Compiling 都没有）
 #   should panic 那一段的解析在 lib_libtest_result_lines.py：LIBTEST_RESULT_LINES_BREAK=should-panic-in-name 时
 #       「#[should_panic] 的用例红了……应当判抓到、退 0」判错
 # 编译目录那三格的开关（开关一行，下一行起是打开后判错的自证项）：
@@ -42,7 +46,10 @@
 #   PROVE_RED_BREAK=second-argument-target  CARGO_TARGET_DIR 的默认值照改前 $2 的取法拿第二个参数拼
 #       「--copy 不在第一个（--memory 1G --copy <副本>）：编译目录是 <副本>/target」（取成 1G/target）
 #   PROVE_RED_BREAK=caller-target-overridden  调用方设了的 CARGO_TARGET_DIR 也换成 <副本>/target
-#       「调用方设了 CARGO_TARGET_DIR：照它的、不覆盖」
+#       「调用方设了 CARGO_TARGET_DIR：照它的、不覆盖」；连带「编译目录里的产物比施加变异后的源码新（共用编译目录）……」
+#       （那一格的共用编译目录就是调用方设的 CARGO_TARGET_DIR，被换成副本自己的 target 之后照常重编、判抓到、退 0）
+#   PROVE_RED_BREAK=build-jobs-six  没设 CARGO_BUILD_JOBS 时写死 6（改前的样子），不取登记的重活默认并行度；同样只在自证起的那层子进程里生效
+#       「不设 CARGO_BUILD_JOBS：开头那几行应当取登记的重活默认并行度、调用方设了的照它」（子进程打 CARGO_BUILD_JOBS=6）
 #
 # 判法与次序：
 #   ① --copy 必须是一份副本：目录在、里面有 crates/mutations.tsv、不是这份脚本所在的主工作区（在主工作区上改坏源码会波及别的会话）；
@@ -58,6 +65,11 @@
 #      跑完照 verdict_of_run 判：抓到（退出码非 0、点名的测试恰好对上一个用例且有 FAILED；#[should_panic] 的结果行多一段「 - should panic」同样认）、
 #      无效（点名的一行都没出现而有 error 行或 could not compile）、没红（其余；点名省掉模块路径而对上两个用例也算）、
 #      本次未跑（点名的测试 ok 又打了 NOT_RUN_NO_GPU_ADAPTER）；跑完把原文件写回并 touch。
+#      判之前先核这一趟真重编了被改的那个包（.claude/kb/milestone/03-third-txn.md「待优化：流程、门禁与装置上踩过的坑」第 1 行）：
+#      变异行改的文件往上找到的包（scripts/gate/lib_rebuilt_packages.py 的 package_of）在这一趟的输出里要有「Compiling <包名> v…」行；
+#      没有（编译目录里的产物比改过的源码新，cargo 认它已编、测试跑在旧产物上）记「✗ <名>\t没重编」、整次退 1，
+#      出路是刷源码修改时刻或换干净编译目录（不设 CARGO_TARGET_DIR，用副本自己的 target）重跑。内存包装退 245、250–254 的那一条不核（结果本来就不算数）；
+#      改的不是包里的 .rs、或编完它不在编译目录的任何 dep-info 里（这一趟编译不读它，例如没开的 feature 下才编的模块）的不核（判法 packages_to_check）。
 #      内存包装退 245（显存不够：命令退了非 0、起止之间内核报了 NV_ERR_NO_MEMORY，run-with-memory-cap.sh 文件头「退出码」）的那一条：
 #      输出里的 FAILED 是被显存不够弄红的，不算抓到，记「✗ <名>：显存不够」、整次退 1；退 250–254 的同样不算，记内存包装的结局。
 #      基线那一次退 245 或 250–254：停下，原样退那个码。
@@ -69,15 +81,24 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 副本路径与主仓不同、或 bindgen 的环境变了，librocksdb-sys 的 C++ 会在基线那一次重编；cc 按 cargo 的并行度开编译器，
-# 32 路一起编 RocksDB 撞过 12G 与 16G 的上限（退 250），6 路编过得去。调用方另给 CARGO_BUILD_JOBS 就照它的。
-export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-6}"
+# 调用方另给 CARGO_BUILD_JOBS 就照它的，没给取登记的重活默认并行度（.claude/heavy-thread-default，scripts/hosts/heavy-threads.sh）。
+# 32 路一起编 RocksDB 撞过 12G 与 16G 的上限（退 250，内存包装报出来，不是悄悄编坏）：撞了就压小 CARGO_BUILD_JOBS 或加大 --memory 再来。
+source "$SCRIPT_DIRECTORY/../hosts/heavy-threads.sh"
+if [[ -z "${CARGO_BUILD_JOBS:-}" ]]; then
+  if [[ "${PROVE_RED_BREAK:-}" == build-jobs-six && -n "${PROVE_RED_SELFTEST_PROLOGUE:-}" ]]; then
+    CARGO_BUILD_JOBS=6   # 弄坏开关（文件头）：改前的写法
+  else
+    CARGO_BUILD_JOBS="$(heavy_thread_default)"
+  fi
+fi
+export CARGO_BUILD_JOBS
 # CARGO_TARGET_DIR 的默认值（副本自己的 target）在下面的 python 里解析完 --copy 之后才定、只设给 cargo 那几次（cargo_environment）：
 # 这里不从位置参数取——只给 --selftest 时没有 $2（set -u 下当场退 1），--copy 不在第一个时 $2 也不是副本。
 if [[ "${PROVE_RED_BREAK:-}" == unbound-second-argument && -n "${PROVE_RED_SELFTEST_PROLOGUE:-}" ]]; then
   export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$2/target}"   # 弄坏开关（文件头）：改前的写法
 fi
 python3 /dev/fd/3 "$SCRIPT_DIRECTORY" "$@" 3<<'PY'
-import importlib.util, os, re, shlex, shutil, subprocess, sys, tempfile
+import importlib.util, os, re, shlex, shutil, subprocess, sys, tempfile, time
 
 sys.dont_write_bytecode = True   # 下面按路径载入的两份模块不往 __pycache__ 里写
 SCRIPT_DIRECTORY = sys.argv[1]
@@ -104,6 +125,8 @@ ROWS = load_module(os.path.join(SCRIPT_DIRECTORY, "crates-mutation-rows.py"), "c
 HEAVY_TESTS = load_module(os.path.join(MAIN_ROOT, ".claude", "hooks", "lib_heavy_tests.py"), "lib_heavy_tests_for_prove_red")
 # 副本锁（文件头「判法与次序」⓪）与 apply-writer-patch.py 同一把、同一份写法
 COPY_LOCK = load_module(os.path.join(SCRIPT_DIRECTORY, "..", "gate", "apply-writer-patch.py"), "apply_writer_patch_for_prove_red")
+# 被改的包这一趟重编了没有（文件头「判法与次序」⑤）：与 merge-and-verify.sh 同一份判法
+REBUILT = load_module(os.path.join(SCRIPT_DIRECTORY, "..", "gate", "lib_rebuilt_packages.py"), "lib_rebuilt_packages_for_prove_red")
 
 
 def default_memory_cap():
@@ -147,16 +170,16 @@ def refusal_for(row, crate):
 
 def heavy_reason(row, copy):
     """这一行的 cargo test 照 lib_heavy_tests.classify 判（当前目录是副本的根）：重型的交那一句，不是交 None。"""
-    if BROKEN == "layer0-by-name":
+    if BROKEN == "crash-point-replay-by-name":
         arguments = row.arguments.split()
-        named_layer0 = any(argument == "--test" and index + 1 < len(arguments) and "layer0" in arguments[index + 1] for index, argument in enumerate(arguments))
-        return "目标名字带 layer0" if named_layer0 else None
+        named_crash_point_replay = any(argument == "--test" and index + 1 < len(arguments) and "crash_point_replay" in arguments[index + 1] for index, argument in enumerate(arguments))
+        return "目标名字带 crash_point_replay" if named_crash_point_replay else None
     found = HEAVY_TESTS.classify(["cargo", "test", *row.arguments.split()], copy)
     return f"{found.category}（{found.detail}）" if found else None
 
 
 def heavy_tests_allowed():
-    return os.environ.get(HEAVY_TESTS_VARIABLE, "") in HEAVY_TESTS_OCCASIONS and BROKEN != "layer0-by-name"
+    return os.environ.get(HEAVY_TESTS_VARIABLE, "") in HEAVY_TESTS_OCCASIONS and BROKEN != "crash-point-replay-by-name"
 
 
 def own_verdict(row, code, text):
@@ -205,6 +228,22 @@ def judged_line(row, code, text, memory, log_path):
     return "failed", f"✗ {row.name}：内存包装的结局，退出码 {code}（日志 {log_path}）"
 
 
+def rebuild_problem(copy, row, code, text, log_path, target_directory=None):
+    """施加变异之后那一趟真重编了被改的包没有（文件头「判法与次序」⑤）：没有交要打的那一行，有（或这一趟不核）交 None。"""
+    if BROKEN == "no-rebuild-check" or code == GPU_MEMORY_HIT_EXIT or 250 <= code <= 254:
+        return None
+    if target_directory and not os.path.isabs(target_directory):   # 相对路径是 cargo 照它的当前目录（副本根）解的
+        target_directory = os.path.join(copy, target_directory)
+    packages, _note = REBUILT.packages_to_check(copy, [row.path], target_directory)
+    if not packages:   # 改的不是包里的 .rs、或这一趟编译不读它（不在编译目录的任何 dep-info 里）：cargo 本来就不因它重编，不核
+        return None
+    package = packages[0]
+    if REBUILT.missing_rebuilds([package], [text]):
+        return (f"✗ {row.name}\t没重编\t改了 {row.path}，这一趟的输出里却没有「Compiling {package} v…」行：编译目录里的产物比改过的源码新，"
+                f"测试跑的是旧产物，判定不算数；刷源码修改时刻或换干净编译目录（不设 CARGO_TARGET_DIR，用副本自己的 target）重跑（日志 {log_path}）")
+    return None
+
+
 def cargo_environment(copy, target_directory=None):
     """cargo 那几次的环境：调用方设了（非空）CARGO_TARGET_DIR 照它的，没设就是副本自己的 target（target_directory 只给弄坏开关用）。
     证红要自己专用的编译目录，不与别的编译共用：每条变异改坏源码再还原，还原后的文件 mtime 可能比变异那次编出的产物旧，
@@ -222,16 +261,18 @@ def run_cargo(copy, arguments, memory, log_path, cargo, environment):
     return result.returncode, open(log_path, encoding="utf-8", errors="replace").read()
 
 
-def prove(copy, memory, crate, names, cargo="cargo", target_directory=None):
-    """→ (退出码, [输出行])。"""
+def prove(copy, memory, crate, names, cargo="cargo", target_directory=None, main_root=None):
+    """→ (退出码, [输出行])。main_root 是判「--copy 指的是不是主工作区」时的主工作区，不给就是这份脚本所在的仓根 MAIN_ROOT；
+    自证给一棵临时的假主工作区，那一格判得出来不靠自证从哪棵树起（从符号链接拼的草稿树起时 MAIN_ROOT 里没有 crates/mutations.tsv）。"""
     copy = os.path.realpath(copy)
+    main_root = MAIN_ROOT if main_root is None else os.path.realpath(main_root)
     environment = cargo_environment(copy, target_directory)
     if not os.path.isfile(os.path.join(copy, "crates", "mutations.tsv")):
         return 2, [f"✗ {copy} 里没有 crates/mutations.tsv，不像仓副本", "→ 怎么办：rsync -a --exclude target --exclude .git <仓根>/ <草稿目录>/copy/ 拷一份再给 --copy"]
-    if copy == MAIN_ROOT and BROKEN != "main-allowed":
+    if copy == main_root and BROKEN != "main-allowed":
         return 2, [f"✗ --copy 指的是主工作区 {copy}", "→ 怎么办：在草稿目录里拷一份仓副本（rsync -a --exclude target --exclude .git），证红只在副本上改坏源码"]
     lock = None
-    if BROKEN != "no-copy-lock" and copy != MAIN_ROOT:   # 主工作区只在弄坏开关 main-allowed 下走到这里，不在它根上建锁文件
+    if BROKEN != "no-copy-lock" and copy != main_root:   # 主工作区只在弄坏开关 main-allowed 下走到这里，不在它根上建锁文件
         try:
             lock = COPY_LOCK.hold_copy_lock(copy)
         except OSError as error:
@@ -293,6 +334,11 @@ def prove_holding_the_lock(copy, memory, crate, names, cargo, environment):
         finally:
             open(path, "w", encoding="utf-8").write(original_text)
             os.utime(path)
+        rebuilt_problem = rebuild_problem(copy, row, code, text, log_path, environment.get("CARGO_TARGET_DIR"))
+        if rebuilt_problem:
+            output.append(rebuilt_problem)
+            failed = True
+            continue
         outcome, line = judged_line(row, code, text, memory, log_path)
         output.append(line)
         failed = failed or outcome == "failed"
@@ -300,7 +346,8 @@ def prove_holding_the_lock(copy, memory, crate, names, cargo, environment):
         not_run += outcome == "not-run"
     summary = f"点名 {len(names)} 条：跑了 {len(chosen)} 条，抓到 {caught} 条，本次未跑 {not_run} 条"
     if failed:
-        return 1, output + [f"✗ {summary}，有没红或无效的（逐条列在上面）", "→ 怎么办：没红的换一条真会改行为的变异或补断言；无效的改替换文；照 .claude/rules/mutation-sampling.md 分类"]
+        return 1, output + [f"✗ {summary}，有没红、无效或没重编的（逐条列在上面）",
+                            "→ 怎么办：没红的换一条真会改行为的变异或补断言；无效的改替换文；照 .claude/rules/mutation-sampling.md 分类；没重编的按那一行刷修改时刻或换编译目录重跑"]
     if caught == 0:
         return EXIT_NOT_RUN, output + [f"- {summary}：一条都没抓到，点名的都是本次未跑（逐条列在上面）",
                                        f"→ 怎么办：重型的那几行交回主 agent，由它在提交时带 {HEAVY_TESTS_VARIABLE}=commit 跑；打了 NOT_RUN 的换一台有卡的机器再证"]
@@ -319,7 +366,7 @@ def write_text(path, text, executable=False):
 SELFTEST_TABLE = ("# 样本\n"
                   "caught\tcrates/demo/src/lib.rs\t{ 42 }\t{ 41 }\t-p demo --lib -- answer\tanswer_is_42\n"
                   "untargeted\tcrates/demo/src/lib.rs\t{ 42 }\t{ 43 }\t-p demo -- answer\tanswer_is_42\n"
-                  "layer\tcrates/demo/src/lib.rs\t{ 42 }\t{ 41 }\t-p demo --test demo_layer0 -- answer\tanswer_is_42\n"
+                  "layer\tcrates/demo/src/lib.rs\t{ 42 }\t{ 41 }\t-p demo --test demo_crash_point_replay -- answer\tanswer_is_42\n"
                   "panics\tcrates/demo/src/lib.rs\t{ 42 }\t{ 45 }\t-p demo --lib -- answer\tanswer_panics\n"
                   "broken\tcrates/demo/src/lib.rs\t{ 42 }\t{ 46 }\t-p demo --lib -- answer\tanswer_is_42\n"
                   "elsewhere\tcrates/demo/src/lib.rs\t{ 42 }\t{ 47 }\t-p demo --lib -- answer\tanswer_is_42\n"
@@ -343,8 +390,8 @@ SELFTEST_VERDICT_SAMPLES = (
 )
 
 
-def selftest_copy(work):
-    copy = os.path.join(work, "copy")
+def selftest_copy(work, name="copy"):
+    copy = os.path.join(work, name)
     write_text(os.path.join(copy, "Cargo.toml"), '[workspace]\nmembers = ["crates/*"]\n')
     for package, answer in (("demo", 42), ("singlefs-checker-tier", 42), ("redbase", 50)):
         write_text(os.path.join(copy, "crates", package, "Cargo.toml"), f'[package]\nname = "{package}"\n')
@@ -376,7 +423,13 @@ def selftest():
                    "package=demo; previous=''\n"
                    "for argument in \"$@\"; do [[ \"$previous\" == -p ]] && package=\"$argument\"; previous=\"$argument\"; done\n"
                    "source_file=\"crates/$package/src/lib.rs\"\n"
-                   "case \"$(cat \"$source_file\")\" in\n"
+                   # 照 cargo 按 mtime 判新不新鲜：编译目录里这个包的产物不在、或源码比它新，才重编（拷一份当产物、照真 cargo 打 Compiling 行）；
+                   # 测试跑的是产物，不是此刻的源码（编译目录里留着比源码新的旧产物时，测试跑在旧产物上）
+                   "build_directory=\"${CARGO_TARGET_DIR:-target}/fake-build\"; mkdir -p \"$build_directory\"; artifact=\"$build_directory/$package.rs\"\n"
+                   "if [[ ! -e \"$artifact\" || \"$source_file\" -nt \"$artifact\" ]]; then cp \"$source_file\" \"$artifact\"; echo \"   Compiling $package v0.1.0 ($PWD/crates/$package)\"\n"
+                   # 照 rustc 写 dep-info（<编译目录>/debug/deps/<包>.d 列出读过的源文件）：没重编那一格靠它认出这个文件是这一趟编译读的
+                   "  mkdir -p \"${CARGO_TARGET_DIR:-target}/debug/deps\"; echo \"$artifact: $PWD/$source_file\" > \"${CARGO_TARGET_DIR:-target}/debug/deps/$package.d\"; fi\n"
+                   "case \"$(cat \"$artifact\")\" in\n"
                    "*'{ 42 }'*) printf 'running 2 tests\\ntest tests::answer_is_42 ... ok\\ntest tests::answer_panics - should panic ... ok\\n\\n"
                    "test result: ok. 2 passed; 0 failed; 0 ignored\\n'; exit 0 ;;\n"
                    "*'{ 45 }'*) printf 'running 2 tests\\ntest tests::answer_is_42 ... ok\\ntest tests::answer_panics - should panic ... FAILED\\n\\n"
@@ -421,7 +474,7 @@ def selftest():
         code, lines = prove(copy, "1G", "demo", ["layer"], cargo=fake_cargo)
         checked_cases += 1
         if code != 0 or not any(line.startswith("layer\t抓到\t") for line in lines):
-            failures.append(f"--test 目标名带 layer0 而包不是 checker 档：照跑、判抓到、退 0（重型只按包判），实际 {code} {lines}")
+            failures.append(f"--test 目标名带 crash_point_replay 而包不是 checker 档：照跑、判抓到、退 0（重型只按包判），实际 {code} {lines}")
         code, lines = prove(copy, "1G", "demo", ["panics"], cargo=fake_cargo)
         checked_cases += 1
         if code != 0 or not any(line.startswith("panics\t抓到\t") for line in lines):
@@ -442,7 +495,9 @@ def selftest():
         checked_cases += 1
         if code != 2 or not any("基线（没改源码）就红" in line for line in lines) or any(line.startswith("redbase\t抓到\t") for line in lines):
             failures.append(f"基线（没改源码）就红：停下、退 2、一条变异都不记抓到，实际 {code} {lines}")
-        code, lines = prove(MAIN_ROOT, "1G", "demo", ["caught"], cargo=fake_cargo)
+        # 主工作区拿临时目录里一棵同样形态的树（有 crates/mutations.tsv）顶替、经 main_root 交给 prove：自证从哪棵树起（仓里、仓副本、符号链接拼的草稿树）都判得出这一格
+        fake_main = selftest_copy(work, "main")
+        code, lines = prove(fake_main, "1G", "demo", ["caught"], cargo=fake_cargo, main_root=fake_main)
         checked_cases += 1
         if code != 2 or not any("主工作区" in line for line in lines):
             failures.append(f"--copy 指主工作区应当以「主工作区」为由拒绝，实际 {code} {lines}")
@@ -508,6 +563,26 @@ def selftest():
         checked_cases += 1
         if lock_wrong:
             failures.append("证红跑的时候副本根上拿着副本锁、跑完放掉；锁被占着时拒绝、退 2、cargo 一次都不起：" + "；".join(lock_wrong))
+        # 没重编那一格（文件头「判法与次序」⑤）：调用方设的 CARGO_TARGET_DIR 是一份共用编译目录，里面 demo 的产物（没改过的源码）比施加变异后的源码新
+        #   （另一份副本后编的那种，修改时刻取明天）：假 cargo 不重编、测试跑在旧产物上全绿；要判没重编、退 1，不判没红
+        shared_target = os.path.join(work, "shared-target")
+        stale_artifact = os.path.join(shared_target, "fake-build", "demo.rs")
+        write_text(stale_artifact, "fn answer() -> u32 { 42 }\n")
+        # 上一次在这份编译目录里编这个副本时留下的 dep-info：lib.rs 是编译读过的文件
+        write_text(os.path.join(shared_target, "debug", "deps", "demo.d"), f"{stale_artifact}: {os.path.realpath(copy)}/crates/demo/src/lib.rs\n")
+        tomorrow = time.time() + 86400
+        os.utime(stale_artifact, (tomorrow, tomorrow))
+        saved_target = os.environ.get("CARGO_TARGET_DIR")
+        os.environ["CARGO_TARGET_DIR"] = shared_target
+        try:
+            code, lines = prove(copy, "1G", "demo", ["caught"], cargo=fake_cargo)
+        finally:
+            os.environ.pop("CARGO_TARGET_DIR", None)
+            if saved_target is not None:
+                os.environ["CARGO_TARGET_DIR"] = saved_target
+        checked_cases += 1
+        if code != 1 or not any(line.startswith("✗ caught\t没重编\t") and "Compiling demo" in line for line in lines):
+            failures.append(f"编译目录里的产物比施加变异后的源码新（共用编译目录）：那一条判没重编、退 1，不判没红，实际退 {code} {lines}")
         # 编译目录三格：开头那几行不碰位置参数（只给 --selftest 也走得过去）；默认值在解析完 --copy 之后定，次序不限；调用方设了的不覆盖
         caller_target = os.environ.pop("CARGO_TARGET_DIR", None)
         try:
@@ -517,6 +592,19 @@ def selftest():
             if probe.returncode != 0 or "PROVE_RED_PROLOGUE CARGO_TARGET_DIR=<未设>" not in probe.stdout.splitlines():
                 failures.append(f"不设 CARGO_TARGET_DIR、只给 --selftest：开头那几行应当走得过去、不替调用方设编译目录（子进程打 CARGO_TARGET_DIR=<未设>、退 0），"
                                 f"实际退 {probe.returncode}，输出 {(probe.stdout + probe.stderr).strip()!r}")
+            # 编译并行度：没设 CARGO_BUILD_JOBS 取登记文件第一条非注释行的数（SINGLEFS_THREAD_CAP 也没设），设了的照它
+            with open(os.path.join(MAIN_ROOT, ".claude", "heavy-thread-default"), encoding="utf-8") as registry:
+                registered_jobs = next((line.split()[0] for line in registry if line.strip() and not line.lstrip().startswith("#")), "<登记里没有数>")
+            for preset, want in ((None, registered_jobs), ("3", "3")):
+                environment = {name: value for name, value in os.environ.items() if name not in ("CARGO_BUILD_JOBS", "SINGLEFS_THREAD_CAP")}
+                environment["PROVE_RED_SELFTEST_PROLOGUE"] = "1"
+                if preset is not None:
+                    environment["CARGO_BUILD_JOBS"] = preset
+                jobs_probe = subprocess.run(["bash", os.path.join(SCRIPT_DIRECTORY, "prove-red.sh"), "--selftest"], capture_output=True, text=True, env=environment)
+                checked_cases += 1
+                if jobs_probe.returncode != 0 or f"PROVE_RED_PROLOGUE CARGO_BUILD_JOBS={want}" not in jobs_probe.stdout.splitlines():
+                    failures.append(f"{'不设' if preset is None else '调用方设了'} CARGO_BUILD_JOBS：开头那几行应当{'取登记的重活默认并行度 ' if preset is None else '照它的 '}{want}（子进程打 CARGO_BUILD_JOBS={want}），"
+                                    f"实际退 {jobs_probe.returncode}，输出 {(jobs_probe.stdout + jobs_probe.stderr).strip()!r}")
             if os.path.exists(target_log):
                 os.unlink(target_log)
             code, lines = run(["--memory", "1G", "--copy", copy, "demo", "caught"], cargo=fake_cargo)
@@ -543,10 +631,11 @@ def selftest():
                   "结果行在 lib_libtest_result_lines.py），编译目录那三格看 run() / cargo_environment() 与开头 python3 之前那几行；"
                   "PROVE_RED_BREAK 或 LIBTEST_RESULT_LINES_BREAK 设着的话这里本来就该红")
             return 1
-        print(f"  ✓ prove-red 自检通过：会红的抓到并写回源码，should_panic 红了抓到，编不过判无效，别的测试红判没红，包装退 245 报显存不够不算抓到，基线红停下退 2，"
-              f"不挑目标的整次拒绝，目标名带 layer0 而包不是 checker 档的照跑，主工作区拒绝，"
+        print(f"  ✓ prove-red 自检通过（判法样本 {len(SELFTEST_VERDICT_SAMPLES)} 条）：会红的抓到并写回源码，should_panic 红了抓到，编不过判无效，别的测试红判没红，包装退 245 报显存不够不算抓到，基线红停下退 2，"
+              f"不挑目标的整次拒绝，目标名带 crash_point_replay 而包不是 checker 档的照跑，主工作区拒绝，"
               f"checker 档包的行子 agent 起时本次未跑退 77、带前缀起时照跑，不成形的行整次拒绝，切表与 read_table 相同，"
               f"判法与 verdict_of_run 对 {len(SELFTEST_VERDICT_SAMPLES)} 条样本逐行相同，跑的时候副本根上拿着副本锁、跑完放掉、锁被占着时拒绝，"
+              f"共用编译目录里的产物比施加变异后的源码新时判没重编，"
               f"不设 CARGO_TARGET_DIR 只给 --selftest 走得过开头，--copy 不在第一个时编译目录照样是副本的 target，调用方设了的不覆盖（查了 {checked_cases} 种）")
         return 0
     finally:
@@ -581,6 +670,7 @@ def main():
         if os.environ.get("PROVE_RED_SELFTEST_PROLOGUE"):
             # 自证起的那一层子进程：只证开头那几行走得过去，打它此刻看到的 CARGO_TARGET_DIR 就退（编译目录那一格核这一行）
             print(f"PROVE_RED_PROLOGUE CARGO_TARGET_DIR={os.environ.get('CARGO_TARGET_DIR', '<未设>')}")
+            print(f"PROVE_RED_PROLOGUE CARGO_BUILD_JOBS={os.environ.get('CARGO_BUILD_JOBS', '<未设>')}")
             return 0
         return selftest()
     code, lines = run(arguments)

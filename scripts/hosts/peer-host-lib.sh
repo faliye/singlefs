@@ -2,16 +2,16 @@
 # 双机分片共用的第二台那几段：读本地配置、在第二台上跑命令、拷文件、比工具链、找规范副本、清场（不复原）、
 # 脱离 ssh 会话起一份活并轮询、按进程号连同后代停一棵进程树、把输出里配置的主机与目录换成「第二台」。
 # 被 source 的函数库，只定义函数与几个全局变量、不改 shell 选项，不单独调；scripts/mutation/mutation-shard-run.sh（门禁 checker-tier-crates-mutation-replay 的双机分片驱动）source 它。
-# gate-overlap:copy-kept layer0-shard-run.sh 改它会让登记了 shard=across-machines 的三条崩溃枚举用例的全绿标记作废（admission.py 的 SHARD_DRIVER_FILES 按内容进输入指纹），KV 接入那一批再把它迁到这一份上
+# gate-overlap:copy-kept crash-point-replay-shard-run.sh 改它会让登记了 shard=across-machines 的三条崩溃枚举用例的全绿标记作废（admission.py 的 SHARD_DRIVER_FILES 按内容进输入指纹），KV 接入那一批再把它迁到这一份上
 #
-# 配置与层 0 分片同一份：scripts/crash/layer0-shard-configuration-check.sh --emit-assignments（只调）。配置里的主机、目录与清场命令是私有的：
+# 配置与崩溃点重放分片同一份：scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-assignments（只调）。配置里的主机、目录与清场命令是私有的：
 # 这里的函数打出来的话一律写「第二台」，第二台上的命令与拷文件的错误输出经 peer_host_redact 换掉再打。
 #
 # 全局变量（peer_host_load_configuration 设）：PEER_SSH_HOST PEER_REPOSITORY_DIRECTORY PEER_CARGO_BIN_DIRECTORY PEER_MEMORY_CAP
 #   QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND、peer_host_is_this_machine；
 #   peer_host_quiesced（peer_host_quiesce 清过场置 1，peer_host_quiesce_left 报过之后置 0）；peer_host_toolchain_text（peer_host_compare_toolchains 设）；
 #   peer_host_detached_outcome（peer_host_wait_detached 设：exit <码>、vanished、unreachable、never-started）。
-# 只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1（照层 0 分片）：「第二台」是本机上的另一个目录，命令在本机跑，
+# 只供测试的开关 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1（照崩溃点重放分片）：「第二台」是本机上的另一个目录，命令在本机跑，
 #   环境照 ssh 那样只给最少几样（HOME、USER、LOGNAME、LANG、XDG_RUNTIME_DIR、DBUS_SESSION_BUS_ADDRESS、CARGO_HOME、RUSTUP_HOME 与 PATH），本机别的环境变量不漏过去。
 # 弄坏开关 PEER_HOST_LIB_BREAK=<项>（只给证红用，逗号分隔可给几个；打开时调用方的自证退 1）。这一份没有自证，红在两份 source 它的脚本的 --selftest 里：
 #   scripts/mutation/mutation-shard-run.sh 与 scripts/hosts/multi-host-run.sh，两份的失败行都是「✗ <格名>：<细节>」。
@@ -38,11 +38,11 @@ peer_host_load_configuration() { # <配置判法脚本> <树根>：判得过就�
   if (( configuration_exit == 3 )); then return 3; fi
   if (( configuration_exit != 0 )); then
     echo "  ✗ 双机分片的本地配置判不过（原因不在这里打：配置里的主机与目录是私有的）"
-    echo "     → 怎么办：单跑 bash scripts/crash/layer0-shard-configuration-check.sh 看原因；配置照仓根 multi-host.env.example 写"
+    echo "     → 怎么办：单跑 bash scripts/crash/crash-point-replay-shard-configuration-check.sh 看原因；配置照仓根 multi-host.env.example 写"
     return 1
   fi
   eval "$assignments"
-  peer_host_is_this_machine="${SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE:-0}"
+  peer_host_is_this_machine="${SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE:-0}"
 }
 
 peer_host_redact() { # 标准输入原样转到标准输出，配置里第二台的目录、cargo 目录与主机名换成「第二台的目录」「第二台的 cargo 目录」「第二台」

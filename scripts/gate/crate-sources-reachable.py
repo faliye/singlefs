@@ -39,7 +39,7 @@ import tomllib
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
 
@@ -248,7 +248,7 @@ def switch_wheel():
             print(f"  · 开关轮：{switch} 红在「{'、'.join(red_cells)}」，含点名的 {cell}")
         else:
             failures += 1
-            print(f"  ✗ 开关轮：{switch} 打开后退 {completed.returncode}、红在「{'、'.join(red_cells) or '（没有）'}」，点名的是 {cell}")
+            print(f"  ✗ 开关轮：{switch} 打开后退 {completed.returncode}、红在「{'、'.join(red_cells) or '（没有）'}」，点名的是 {cell}")  # gate-lint:detail
     if failures:
         print(f"  ✗ 开关轮 {len(expected)} 个开关里 {failures} 个没红在点名的格")
         print("     → 怎么办：改那一处判法，或照实改文件头的开关表")

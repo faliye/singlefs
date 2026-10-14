@@ -2,8 +2,8 @@
 """E171 第 1 次重跑·修订 11：修订 8 那一趟第 11–13 步的多机逐行编排，带复用（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.2–11.5、11.9、11.10 节）。
 由 segment_one_units_revision_11.py 在修订 8 的逐行起跑闸都绿之后起（同修订 8 的命令行），修订 11 占位的路径从环境变量 E171_REVISION_11_CONFIG 取。
 
-为什么另写一层：rows_orchestrator_revision_8.py（e6f1071e…）一个字节不改。这一层按路径载入它（开跑先核 sha256，不是就退 3；它照旧按 sha256 载入
-第一段编排器 7bfbdb84… 与 cross_host_o3_check.py），修订 8 那一层改的几处（落点、H8 核对、跨机 o3 比法、停派文件、加槽）原样装上，再在第一段编排器上换三处：
+为什么另写一层：rows_orchestrator_revision_8.py（25d77b2b…）一个字节不改。这一层按路径载入它（开跑先核 sha256，不是就退 3；它照旧按 sha256 载入
+第一段编排器 1dcfb8d0… 与 cross_host_o3_check.py），修订 8 那一层改的几处（落点、H8 核对、跨机 o3 比法、停派文件、加槽）原样装上，再在第一段编排器上换三处：
   ① 第 11、12 步派发之前（phase_rows_and_checks）：每行照第 11.2、11.3 节算键（L 取 --baseline-timing 那份 step-7 计时的 process_wall），查库、写标记
     （<H16 导出根>/reuse-markers/segment-one-rows/），命中的行照第 11.5 节「取用」先写标记、再把条目里的行目录硬链接进行输出根（row-result.tsv 最后链），
     编排器原有的续跑因此当它做完了、不派；合成时由编排器原有的 --skip-finished 重报把它并进产物（合并规则 ①–⑦ 不改）。第 12 步 row-0 与跨机那一份 X
@@ -48,7 +48,7 @@ BREAK_VARIABLE = "ROWS_R11_BREAK"
 SELFTEST_VARIABLE = "ROWS_R11_SELFTEST"
 CONFIG_VARIABLE = "E171_REVISION_11_CONFIG"
 ROWS_R8_PATH = os.path.join(HERE, "rows_orchestrator_revision_8.py")
-ROWS_R8_SHA256 = "e6f1071e72d06695c6638a9e6ebf214b0f867744b4da2e30a490be87afb9f444"
+ROWS_R8_SHA256 = "25d77b2bf5f90b066bd33bc31bf37c36cad6c1b9e9f196e606ba0a6077f5a416"
 EXIT_WRONG_PINNED_FILE = 3
 LEDGER_STEM = "reuse-ledger-rows"
 MARKERS_NAME = "segment-one-rows"
@@ -67,7 +67,7 @@ def load_pinned(path: str, expected: str, module_name: str) -> types.ModuleType:
 
 
 try:
-    rows8 = load_pinned(ROWS_R8_PATH, ROWS_R8_SHA256, "rows_orchestrator_revision_8_e6f1071e")
+    rows8 = load_pinned(ROWS_R8_PATH, ROWS_R8_SHA256, "rows_orchestrator_revision_8_25d77b2b")
 except RuntimeError as wrong_file:
     print(f"✗ {wrong_file}（这一层调的是钉住的那一份的函数；改过就先核这一层，再改钉的 sha256）", file=sys.stderr)
     sys.exit(EXIT_WRONG_PINNED_FILE)
@@ -278,6 +278,7 @@ def main(argument_list: list[str]) -> int:
     repo = os.path.abspath(argument_list[argument_list.index("--repo") + 1] if "--repo" in argument_list else os.getcwd())
     if not config_path or not os.path.exists(config_path):
         print(f"✗ 修订 11 占位要经 {CONFIG_VARIABLE} 给（由 segment_one_units_revision_11.py 起时设好）：{config_path or '没给'}（退 78）", file=sys.stderr)
+        print('     → 怎么办：经 segment_one_units_revision_11.py 起，它会设好这个变量；手起时先把占位配置的路径写进这个变量', file=sys.stderr)
         return one.EXIT_RUN_CONDITION
     reuse_config = json.load(open(config_path, encoding="utf-8"))
     mode = argument_list[0] if argument_list else ""

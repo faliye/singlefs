@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
+# admission: always 每次汇总的是此刻点名的那一份跑批输出，上一次的汇总不替这一次作保
+# run-condition: none 只读点名的一份跑批输出文本，除了 python3 之外没有环境要求，不起 cargo、不编不跑
 """E56 汇总：每 (mode, cache, nleaf, arm, eps) 取种子中位数与极差。
 
 用法：python3 scripts/experiments/e56-report.py <跑批输出>
 """
 import sys, re, statistics as st
 from collections import defaultdict
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
+preflight(__file__)
 
 rows = []
 key = None
@@ -21,7 +29,7 @@ for line in open(sys.argv[1]):
 
 def num(x):
     try: return float(x)
-    except: return None
+    except (TypeError, ValueError): return None
 
 upd = defaultdict(list); qry = defaultdict(list)
 for r in rows:

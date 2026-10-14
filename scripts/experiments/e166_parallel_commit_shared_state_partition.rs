@@ -202,6 +202,7 @@ enum ShapeKind {
     /// 事务 0 只建 1 个 inode；其余事务只写 1 个用户数据单元。
     Disjoint,
     /// 每个事务 1 个用户数据单元、建 2 个 inode（只用于 P区 的预留不够那一格）。
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     MultiInode,
 }
 
@@ -242,12 +243,14 @@ enum InodeReservation {
     /// P区 / P设 在 CLAIM 里预留的 inode 号个数 = 本事务要建的数（默认 r_i 够用）。
     Exact,
     /// 每个要建 inode 的事务固定预留这么多个（第二段「多 inode、r_i = 1」用）。
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     Fixed(u8),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum RegionCountChoice {
     EqualToTransactionCount,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     Fixed(usize),
 }
 
@@ -1417,10 +1420,6 @@ impl<'model> Explorer<'model> {
         Explorer { model, memo: if use_memo { Some(HashMap::new()) } else { None } }
     }
 
-    fn memo_state_count(&self) -> usize {
-        self.memo.as_ref().map_or(0, HashMap::len)
-    }
-
     fn explore(&mut self, state: &ModelState) -> Aggregate {
         let model = self.model;
         // 记忆化的键 = 整个状态：各事务已重算次数也在里面（截断判据要它）。
@@ -1482,13 +1481,12 @@ impl<'model> Explorer<'model> {
 
 struct Enumeration {
     aggregate: Aggregate,
-    memo_states: usize,
 }
 
 fn enumerate_schedules(model: &Model, use_memo: bool) -> Enumeration {
     let mut explorer = Explorer::new(model, use_memo);
     let aggregate = explorer.explore(&initial_state(model));
-    Enumeration { aggregate, memo_states: explorer.memo_state_count() }
+    Enumeration { aggregate}
 }
 
 // ── Q-9：同步轮次 ────────────────────────────────────────────────────────────
@@ -1692,7 +1690,7 @@ fn anchors_from_the_clauses() -> Vec<AnchorLine> {
     let mut keys = Vec::new();
     push_held_keys(&no_file_model, Resource::TreeIdentifier, &no_file_state.transactions[0].items, &mut keys);
     lines.push(AnchorLine::new(
-        "甲6 第一个事务发的树 ID",
+        "甲6 新池新建文件发的树 ID",
         keys.iter().map(u64::to_string).collect::<Vec<String>>().join(","),
         "65536,65537,65538,65539,65540,65541,65542,65543,65544,65545,65546,65547",
     ));

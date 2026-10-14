@@ -2,9 +2,9 @@
 """E171 第 1 次重跑第一段·修订 6 树 `-resume2` 那一趟：跨机一致对照（停机条款 S17，登记「主 agent 认定：多机跑法交回」第 4 条）的单独入口。
 在已经跑完的两份行目录（第 12 步 row-0 本机那一次、跨机对照 X 第二台那一次）上重出对照产物；一行都不跑、不起驱动、不起 cargo、不碰别的台。
 
-与编排器 rows_orchestrator.py（sha256 7bfbdb84…，不改）的关系：row 行、device.out 的 E7RESULT 行、导出 z1 五个文件三样的比法与产物的行形
+与编排器 rows_orchestrator.py（sha256 1dcfb8d0…，不改）的关系：row 行、device.out 的 E7RESULT 行、导出 z1 五个文件三样的比法与产物的行形
 照抄自它——前三样直接调它的函数（row_line_without_timing、device_result_lines、dump_differences、row_line、read_ledger、host_of），开跑先核它的
-sha256，不是 7bfbdb84… 就退 3。只改 o3 那一样：在它的去法（normalized_o3_lines：去 name=config、name=state_time 两种行与键名以 _ns 结尾的字段，
+sha256，不是 1dcfb8d0… 就退 3。只改 o3 那一样：在它的去法（normalized_o3_lines：去 name=config、name=state_time 两种行与键名以 _ns 结尾的字段，
 原样调它）之后，再去三个只随进程号、工作进程数与调度变的键，并按整行排序再比：
   name=state 行的 worker=（冻结执行器 executor_main.py 判那一态的工作进程号 os.getpid()）；
   name=timing 行的 workers=（--workers 参数，即每槽线程）与 worker_processes=（这一批实际判过态的工作进程个数）；
@@ -19,7 +19,7 @@ sha256，不是 7bfbdb84… 就退 3。只改 o3 那一样：在它的去法（n
       把对照产物写到标准输出（落盘由调用的一方用排他的重定向写新文件名）；末行是 name=verdict。
   cross_host_o3_check.py --selftest
       假行目录走一遍各格，末尾逐个打开弄坏开关核它红在点名格；末行「自证 N 项，红 M」。
-退出码：0 四样都同；1 有一样不同（停机条款 S17 的「不同」）；2 用法错，或平常跑时设了弄坏开关；3 编排器不是 7bfbdb84… 那一份。
+退出码：0 四样都同；1 有一样不同（停机条款 S17 的「不同」）；2 用法错，或平常跑时设了弄坏开关；3 编排器不是 1dcfb8d0… 那一份。
 
 弄坏开关 CROSS_HOST_O3_BREAK=<项>（只在 --selftest 起的子进程里认，CROSS_HOST_O3_SELFTEST=1；别处设了退 2）。项名、弄坏哪一处、打开后红在哪一格：
   o3-keeps-worker                      name=state 行的 worker= 不去              o3-same-after-process-identifiers-changed
@@ -45,7 +45,7 @@ import types
 
 # 编排器取同一目录里入库的那一份（与原先草稿 e171-r1-segment1-rev6/ 里那份逐字节相同，开跑照旧核 sha256）
 ORCHESTRATOR_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rows_orchestrator.py")
-ORCHESTRATOR_SHA256 = "7bfbdb84559476033853794499836f752fdf8a3e803e17cd9539ae49ee3b7e0e"
+ORCHESTRATOR_SHA256 = "1dcfb8d0c08a706077f41fe69d3566d7a99e16f3dcbffc10808a2f0d88d17853"
 # 去法：键只在点名的那一种行里去（行种类 → 键）
 SCHEDULING_KEYS_BY_LINE_KIND = {"name=state": ("worker",), "name=timing": ("workers", "worker_processes")}
 EVERY_SCHEDULING_KEY = ("worker", "workers", "worker_processes")
@@ -66,7 +66,7 @@ EXIT_WRONG_ORCHESTRATOR = 3
 
 
 class WrongOrchestrator(Exception):
-    """编排器文件的 sha256 不是 7bfbdb84… 那一份：照抄的三样比法不再是跑那一趟用的那一份。"""
+    """编排器文件的 sha256 不是 1dcfb8d0… 那一份：照抄的三样比法不再是跑那一趟用的那一份。"""
 
 
 def broken(item: str) -> bool:
@@ -84,7 +84,7 @@ def load_orchestrator(path: str = ORCHESTRATOR_PATH) -> types.ModuleType:
     if actual != ORCHESTRATOR_SHA256:
         raise WrongOrchestrator(f"{path} 的 sha256 是 {actual}，不是 {ORCHESTRATOR_SHA256}")
     sys.dont_write_bytecode = True
-    specification = importlib.util.spec_from_file_location("rows_orchestrator_7bfbdb84", path)
+    specification = importlib.util.spec_from_file_location("rows_orchestrator_1dcfb8d0", path)
     module = importlib.util.module_from_spec(specification)
     sys.modules[specification.name] = module  # dataclasses 在类定义时按 __module__ 去 sys.modules 里找这个模块
     specification.loader.exec_module(module)
@@ -180,6 +180,7 @@ def compare(arguments: argparse.Namespace) -> int:
 def main(argument_list: list[str]) -> int:
     if os.environ.get("CROSS_HOST_O3_BREAK") and os.environ.get("CROSS_HOST_O3_SELFTEST") != "1":
         print("✗ CROSS_HOST_O3_BREAK 只在 --selftest 起的子进程里认；平常跑时设了它就拒（退 2）", file=sys.stderr)
+        print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
         return EXIT_USAGE
     try:
         if argument_list[:1] == ["--selftest"]:
@@ -192,6 +193,7 @@ def main(argument_list: list[str]) -> int:
         return compare(arguments)
     except WrongOrchestrator as error:
         print(f"✗ {error}", file=sys.stderr)
+        print('     → 怎么办：被钉的那一份内容变了；照 .claude/rules/path-moves.md 第 6 步核 diff，只差路径就重钉，否则从 git 历史取那一版', file=sys.stderr)
         return EXIT_WRONG_ORCHESTRATOR
 
 
@@ -284,7 +286,7 @@ def cells_o3(orchestrator: types.ModuleType, scratch: str) -> list[tuple[str, bo
     }
     for name, other in same_pairs.items():
         results.append((name, o3_same(orchestrator, scratch, name, base, other), "两边只差进程号、线程数、行序之一（或三样都差），要判同"))
-    # 这几格的输入真分得出：原样逐字不同，编排器 7bfbdb84… 的去法判不同，打乱的那一份 name=state 行次序真变了
+    # 这几格的输入真分得出：原样逐字不同，编排器 1dcfb8d0… 的去法判不同，打乱的那一份 name=state 行次序真变了
     other = same_pairs["o3-same-after-all-three-changed"]
     old_a = orchestrator.normalized_o3_lines(write_o3(os.path.join(scratch, "old", "a"), base))
     old_b = orchestrator.normalized_o3_lines(write_o3(os.path.join(scratch, "old", "b"), other))
@@ -332,7 +334,7 @@ def cells_parts_and_product(orchestrator: types.ModuleType, scratch: str) -> lis
         refused = False
     except WrongOrchestrator:
         refused = True
-    results.append(("orchestrator-hash-checked", refused and orchestrator.__name__ == "rows_orchestrator_7bfbdb84", "编排器多一个字节就拒"))
+    results.append(("orchestrator-hash-checked", refused and orchestrator.__name__ == "rows_orchestrator_1dcfb8d0", "编排器多一个字节就拒"))
     return results
 
 
@@ -384,7 +386,7 @@ def selftest(argument_list: list[str]) -> int:
     finally:
         shutil.rmtree(scratch)
     for name, passed, detail in results:
-        print(f"{'✓' if passed else '✗'} {name}：{detail}")
+        print(f"{'✓' if passed else '✗'} {name}：{detail}")  # gate-lint:detail
     if cells_only:
         return 0 if all(passed for _, passed, _ in results) else 1
     for switch, named_cell in BREAK_SWITCHES.items():
@@ -393,7 +395,7 @@ def selftest(argument_list: list[str]) -> int:
         red_cells = [line[2:].split("：", 1)[0] for line in completed.stdout.splitlines() if line.startswith("✗ ")]
         passed = completed.returncode == 1 and named_cell in red_cells
         results.append((f"break-{switch}", passed, f"红的格 {red_cells}"))
-        print(f"{'✓' if passed else '✗'} 弄坏开关 {switch} 红在点名格 {named_cell}：子进程退 {completed.returncode}，红的格 {red_cells}")
+        print(f"{'✓' if passed else '✗'} 弄坏开关 {switch} 红在点名格 {named_cell}：子进程退 {completed.returncode}，红的格 {red_cells}")  # gate-lint:detail
     red = sum(not passed for _, passed, _ in results)
     print(f"自证 {len(results)} 项，红 {red}")
     return 0 if red == 0 else 1

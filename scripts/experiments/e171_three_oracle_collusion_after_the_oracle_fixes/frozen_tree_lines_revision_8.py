@@ -692,6 +692,7 @@ def main(argument_list: list[str]) -> int:
         return commands[arguments.mode](repo, arguments.config, output)
     except RunConditionError as error:
         print(f"✗ {error}（退 78）", file=sys.stderr)
+        print('     → 怎么办：照上面那句补齐运行条件（配置、冻结树、设备文件）再用同一条命令起', file=sys.stderr)
         return EXIT_RUN_CONDITION
 
 

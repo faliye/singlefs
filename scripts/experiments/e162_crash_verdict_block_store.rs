@@ -3703,6 +3703,7 @@ mod tests {
 
     /// M3：每条臂的登记写法每块提交中位 ≥ 0.5 × 同一目录里裸「追加 64 KiB + fdatasync」的中位（H2）。
     #[test]
+    // wallclock-assert: 断言两组各自实测的中位数之比（每块提交中位乘 2 不小于裸写追加加 fdatasync 的中位），两组分在不同时刻测，各受负载影响
     fn every_registered_arm_commit_waits_for_the_device() {
         let _device = device_lock();
         let directory = TestDirectory::new("h2");

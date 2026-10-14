@@ -112,7 +112,7 @@ def search_term_matches(compiled_parts, line):
 # 答案在仓里另有明文（那份同步记录），对照只防工具被改窄，不当盲测用。
 BENCHMARK_BASE = 'b1c8cef~1'
 BENCHMARK_TARGET = '00c9d4f'
-BENCHMARK_FACTS = 'scripts/kb/fixtures/stale-candidates-benchmark-facts.tsv'
+BENCHMARK_FACTS = 'scripts/kb/stale-candidates-benchmark-facts.tsv'
 BENCHMARK_MINIMUM_COVERED = 25
 BENCHMARK_EXPECTED_CANDIDATE_ROWS = 4190
 BENCHMARK_EXPECTED_UNIQUE_LINES = 2821

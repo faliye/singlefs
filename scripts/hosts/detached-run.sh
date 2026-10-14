@@ -51,7 +51,10 @@
 #   是命令没跑起来（单元里写不进登记或日志，退出码是单元里那个 bash 的），判没起成、退 1。
 # start 的 --wall-clock（必填，也可写成 --wall-clock=<值>）：这一次的预计挂钟在 2 小时内写 within-2h，超过写 over-2h。没写、写了别的值，用法错退 2、什么都不起。
 #   over-2h 的：从 -- 之后的词里认出被起的那份脚本，读它文件头注释块里的长活声明——# long-run-shards:（分片单元）、# long-run-resume:（续跑入口：
-#   同一条命令重起只补没做完的）、# long-run-hosts:（台数从 layer0-shard-configuration-check.sh --emit-hosts 读、额度从 host-resources.py --json 现算，不写死），
+#   同一条命令重起只补没做完的）、# long-run-hosts:（这一行与派发提示里的「多机：」一行同一种读法，按登记值读：只认 .claude/hooks/lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE 那一句规范写法，
+#   逐字（可带句末句号），后面不许接任何说明，说明另起一行写普通注释，别的写法一律拒，不再用现算词表；规范句只写在那一处，这里不抄。文件头写的读法与脚本真做的事是否一致，钩子看不到，由写文件头的人保证。
+#   只有 .claude/long-run-live-hosts-exempt 登记、登记的 sha256 又对得上这份脚本现在文件的脚本（真按此刻空闲现算的 E171 六份入口）这一行按现算读：点名 --emit-hosts 与 host-resources.py，不写死；
+#   登记的 sha256 对不上（脚本改过）判红；那张表只缩不涨，读法的细节见 .claude/hooks/lib_long_run.py 文件头），
 #   分不了的写 # long-run-unshardable: 点名缺的那几段与为什么（至少 8 个字）。判据 .claude/singlefs-ai-sop/rules/test-script-discipline.md
 #   「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」；认被起的脚本、读声明与判法都在 .claude/hooks/lib_long_run.py（写法以它的文件头为准）。
 #   声明不齐、多机一行写死额度、判不出被起的是哪份脚本（bash -c '…' 一长串、直接起 cargo 或编出来的二进制）、判法起不来，都拒、退 5，
@@ -229,6 +232,18 @@
 #       长活⑥ long-run-check：分不了一行不到 8 个字、没点名缺的多机都拒（退 5），点名了的放（退 0）
 #   LIB_LONG_RUN_BREAK=hosts-unchecked  多机一行不看内容
 #       长活④ over-2h、多机一行写死线程与内存：拒、退 5、点名写死的额度、没建登记
+#       长活⑨ long-run-check 多机一行按登记值读：规范句放（退 0），带句末句号的规范句放、规范句后另起一行写普通注释放；现算写法、否定句里提 host-resources.py、没点名登记值、除以此刻在跑的重活数、规范句后接任何说明（含数字的、不含数字的、写按此刻空闲现算 / 按负载降 / 除以此刻同时在跑的重活数 / host-resources.py 的）都拒（退 5）
+#       长活⑩ 豁免表里登记的脚本文件头按现算读（退 0），没登记的同一份文件头照拒（没登记的也放了）
+#   LIB_LONG_RUN_BREAK=hosts-canonical-unchecked  登记值读法下多机一行不核是不是规范句（写了就放，只剩写死的额度那一条）
+#       长活⑨（现算写法、否定句里提 host-resources.py、没点名登记值、除以此刻在跑的重活数四份与规范句后接说明的六份都放了，退 0 而不是 5）；长活⑩（没登记的同一份文件头放了）
+#   LIB_LONG_RUN_BREAK=hosts-suffix-accepted  登记值读法下规范句后面接任何说明都放行（只核以规范句起头）
+#       长活⑨（规范句后接说明的六份放了，退 0 而不是 5）
+#   LIB_LONG_RUN_BREAK=exempt-sha256-unchecked  豁免表里登记的 sha256 不比（在表里的脚本一律按现算读）
+#       长活⑩（登记在表里、脚本改过一个字节的那份放了，退 0 而不是 1）
+#   LIB_LONG_RUN_BREAK=header-live-reading  脚本文件头退回按现算读（点名 host-resources.py 才齐，登记值那一句反而拒）
+#       长活⑦（包着的 full.sh 退 5）；长活⑧（over-2h 起 full.sh 被拒）；长活⑨（规范句退 5、现算写法退 0）；长活⑩（没登记的、登记了而 sha256 对不上的同一份文件头也放了）
+#   LIB_LONG_RUN_BREAK=live-exempt-ignored  不查 .claude/long-run-live-hosts-exempt，登记了的脚本也按登记值读
+#       长活⑩ 登记在豁免表里的脚本文件头按现算读（退 0），没登记的同一份文件头照拒（退 5）
 #   LIB_LONG_RUN_BREAK=script-unresolved-accepted  判不出被起的脚本时当成齐了
 #       长活⑤ over-2h、bash -c 一长串判不出被起的脚本：拒、退 5、出路写进一份脚本、没建登记
 #   LIB_LONG_RUN_BREAK=unshardable-unchecked  分不了一行不看字数、不看点没点名缺的那几样
@@ -1753,16 +1768,40 @@ SAMPLE
 #!/usr/bin/env bash
 # long-run-shards: 按行号 mod 片数切
 # long-run-resume: 结果表里已有的行跳过，重起同一条命令只补没做完的
-# long-run-hosts: 本机 31 线程 30G、第二台 31 线程 50G（--emit-hosts 与 host-resources.py 只当参考）
+# long-run-hosts: 本机 31 线程 30G、第二台 31 线程 50G（--emit-hosts 与 heavy-thread-default 只当参考）
 touch "$1"
 SAMPLE
   cat > "$long_run/full.sh" <<'SAMPLE'
 #!/usr/bin/env bash
 # long-run-shards: 按行号 mod 片数切
 # long-run-resume: 结果表里已有的行跳过，重起同一条命令只补没做完的
-# long-run-hosts: 台数取 layer0-shard-configuration-check.sh --emit-hosts，每台的线程与内存取 host-resources.py --json 现算
+# long-run-hosts: 台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量
 touch "$1"
 SAMPLE
+  # 多机一行的该拒的写法（长活⑨）：现算（点名 host-resources.py）、否定句里提 host-resources.py、没点名登记值、除以此刻在跑的重活数，
+  # 以及规范句后接任何说明（后接「；」与说明、说明里有数字、写按此刻空闲现算、写机器忙时按负载降、写除以此刻同时在跑的重活数、写 host-resources.py 的 available_threads）；
+  # 该放的两种：规范句带句末句号、规范句另起一行写普通注释（规范句取 lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE，不在这里另抄）
+  local lr_canonical lr_host_names lr_host_lines
+  lr_canonical="$(python3 -B -c 'import sys; sys.path.insert(0, sys.argv[1]); import lib_long_run; print(lib_long_run.CANONICAL_HOSTS_SENTENCE)' "$scripts_directory/../../.claude/hooks")" \
+    || { echo "  ✗ 读不到 .claude/hooks/lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE（长活⑨ 的样本要它）"; exit 1; }
+  lr_host_names=(hosts-live hosts-negated hosts-unnamed hosts-divide hosts-note hosts-digit hosts-note-idle hosts-note-load hosts-note-divide hosts-note-resources hosts-period hosts-note-line)
+  lr_host_lines=(
+    "台数取 crash-point-replay-shard-configuration-check.sh --emit-hosts，每台的线程与内存取 host-resources.py --json 现算"
+    "台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不调 host-resources.py 现算"
+    "台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程按多机配置里写的"
+    "台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值除以此刻同时在跑的重活数"
+    "$lr_canonical；双机时两台各取这一个数，机器忙也不降"
+    "$lr_canonical；见第 2 节"
+    "$lr_canonical；按此刻空闲现算每台槽数与线程"
+    "$lr_canonical；机器忙时按负载降"
+    "$lr_canonical；除以此刻同时在跑的重活数"
+    "$lr_canonical；每台线程按 host-resources.py 的 available_threads 取"
+    "$lr_canonical。"
+    "$lr_canonical"$'\n# 说明：双机时两台各取这一个数，机器忙也不降（另起一行的普通注释，不带 long-run-hosts:）')
+  for lr_index in "${!lr_host_names[@]}"; do
+    printf '#!/usr/bin/env bash\n# 样本：多机一行的写法\n# long-run-shards: 按行号 mod 片数切\n# long-run-resume: 结果表里已有的行跳过，重起同一条命令只补没做完的\n# long-run-hosts: %s\ntouch "$1"\n' \
+      "${lr_host_lines[$lr_index]}" > "$long_run/${lr_host_names[$lr_index]}.sh"
+  done
   cat > "$long_run/short.sh" <<'SAMPLE'
 #!/usr/bin/env bash
 # long-run-shards: 按行号 mod 片数切
@@ -1838,6 +1877,52 @@ SAMPLE
     "$( { ((rc == 0)) && [[ "$got" == 5 ]] && grep -qF "长活声明齐了（$long_run/full.sh" "$work/lr7.out" && grep -qF "长活声明（$long_run/bare.sh）" "$work/lr7.out"; } && echo 0 || echo 1)" \
     "$work/lr7.out"
 
+  # 长活⑨ long-run-check 多机一行按登记值读：规范句（full.sh）放（退 0），带句末句号的规范句（hosts-period.sh）与规范句另起一行写普通注释（hosts-note-line.sh）放；
+  # 现算写法、否定句里提 host-resources.py、没点名登记值、除以此刻在跑的重活数都拒（退 5，点名「不是规范写法」），规范句后接任何说明的六份
+  # （「；」加说明、说明里有数字、按此刻空闲现算、按负载降、除以此刻同时在跑的重活数、host-resources.py 的 available_threads）都拒（退 5，点名「接了说明」）
+  local lr9_names=(full hosts-period hosts-note-line hosts-live hosts-negated hosts-unnamed hosts-divide hosts-note hosts-digit hosts-note-idle hosts-note-load hosts-note-divide hosts-note-resources)
+  local lr9_rc=() lr9_got="" lr9_ok=1
+  for lr_index in "${!lr9_names[@]}"; do
+    bash "$detached_run_script" long-run-check -- bash "$long_run/${lr9_names[$lr_index]}.sh" x > "$work/lr9-${lr9_names[$lr_index]}.out" 2>&1; lr9_rc[lr_index]=$?
+    lr9_got+="${lr9_names[$lr_index]} ${lr9_rc[lr_index]}；"
+    if ((lr_index < 3)); then
+      ((lr9_rc[lr_index] == 0)) || lr9_ok=0
+    else
+      ((lr9_rc[lr_index] == 5)) || lr9_ok=0
+      if ((lr_index < 7)); then
+        grep -q "一行不是规范写法" "$work/lr9-${lr9_names[$lr_index]}.out" || lr9_ok=0
+      else
+        { grep -q "接了说明" "$work/lr9-${lr9_names[$lr_index]}.out" && ! grep -q "不是规范写法" "$work/lr9-${lr9_names[$lr_index]}.out"; } || lr9_ok=0
+      fi
+    fi
+  done
+  { echo "$lr9_got"; cat "$work"/lr9-*.out; } > "$work/lr9.out"
+  detached_run_expect "长活⑨ long-run-check 多机一行按登记值读：规范句放、带句末句号的规范句放、规范句另起一行写普通注释放（退 0）；现算写法、否定句里提 host-resources.py、没点名登记值、除以此刻在跑的重活数、规范句后接任何说明（含数字的与不含数字的）都拒（退 5）" \
+    "$( ((lr9_ok == 1)) && echo 0 || echo 1)" \
+    "$work/lr9.out"
+
+  # 长活⑩ 豁免表：登记在 .claude/long-run-live-hosts-exempt 里、sha256 对得上的脚本，文件头按现算读（hosts-live.sh 的同一份内容放在 listed.sh，退 0）；没登记的同一份内容（unlisted.sh）照拒（退 5）；
+  #   登记了而脚本改过一个字节（edited.sh：登记的是改之前那一版的 sha256）也拒，点名 sha256 对不上（退 1）。
+  #   样本树里放一份判法库的拷贝与一张登记 listed.sh、edited.sh 的表（带 sha256），库按自己所在的仓根找表
+  local exempt_tree="$work/exempt-tree" exempt_listed_rc exempt_unlisted_rc exempt_edited_rc exempt_listed_sha256
+  mkdir -p "$exempt_tree/.claude/hooks" "$exempt_tree/scripts"
+  cp "$scripts_directory/../../.claude/hooks/lib_long_run.py" "$scripts_directory/../../.claude/hooks/lib_shell_words.py" "$scripts_directory/../../.claude/hooks/lib_heavy_tests.py" "$exempt_tree/.claude/hooks/"
+  cp "$long_run/hosts-live.sh" "$exempt_tree/scripts/listed.sh"
+  cp "$long_run/hosts-live.sh" "$exempt_tree/scripts/unlisted.sh"
+  cp "$long_run/hosts-live.sh" "$exempt_tree/scripts/edited.sh"
+  exempt_listed_sha256="$(sha256sum "$exempt_tree/scripts/listed.sh" | cut -d' ' -f1)"
+  printf '\n# 自证：登记之后又改了一个字节\n' >> "$exempt_tree/scripts/edited.sh"   # 追加在 touch 那一行之后，文件头不变、sha256 变了
+  printf '# 自证用的豁免表\nscripts/listed.sh  %s  # 自证：文件头按现算写、不能改\nscripts/edited.sh  %s  # 自证：登记的是改之前那一版的 sha256\n' \
+    "$exempt_listed_sha256" "$exempt_listed_sha256" > "$exempt_tree/.claude/long-run-live-hosts-exempt"
+  python3 "$exempt_tree/.claude/hooks/lib_long_run.py" script "$exempt_tree" -- bash "$exempt_tree/scripts/listed.sh" x > "$work/lr10.out" 2>&1; exempt_listed_rc=$?
+  python3 "$exempt_tree/.claude/hooks/lib_long_run.py" script "$exempt_tree" -- bash "$exempt_tree/scripts/unlisted.sh" x >> "$work/lr10.out" 2>&1; exempt_unlisted_rc=$?
+  python3 "$exempt_tree/.claude/hooks/lib_long_run.py" script "$exempt_tree" -- bash "$exempt_tree/scripts/edited.sh" x >> "$work/lr10.out" 2>&1; exempt_edited_rc=$?
+  echo "listed.sh 退 $exempt_listed_rc；unlisted.sh 退 $exempt_unlisted_rc；edited.sh 退 $exempt_edited_rc" >> "$work/lr10.out"
+  detached_run_expect "长活⑩ 豁免表里登记的脚本（sha256 对得上）文件头按现算读（退 0），没登记的同一份文件头照拒、登记了而 sha256 对不上的照拒（都退 1，detached-run.sh 把它转成退 5）" \
+    "$( { ((exempt_listed_rc == 0)) && [[ "$exempt_unlisted_rc" == 1 && "$exempt_edited_rc" == 1 ]] && grep -qF "长活声明齐了（$exempt_tree/scripts/listed.sh" "$work/lr10.out" \
+          && grep -qF "长活声明（$exempt_tree/scripts/unlisted.sh）" "$work/lr10.out" && grep -qF "长活声明（$exempt_tree/scripts/edited.sh）：scripts/edited.sh 在 .claude/long-run-live-hosts-exempt 里登记的 sha256 是 $exempt_listed_sha256" "$work/lr10.out"; } && echo 0 || echo 1)" \
+    "$work/lr10.out"
+
   # 长活⑧ over-2h 三样齐了照起、命令跑了、stderr 有「长活声明齐了」；within-2h 不读声明（bare.sh）照起（对照）
   bash "$detached_run_script" start --wall-clock over-2h --label "${prefix}lr-ok" -- bash "$long_run/full.sh" "$long_run/lr-ok.marker" > "$work/lr8.out" 2>&1; rc=$?
   bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}lr-within" -- bash "$long_run/bare.sh" "$long_run/lr-within.marker" >> "$work/lr8.out" 2>&1; got=$?
@@ -1864,7 +1949,7 @@ SAMPLE
     echo "     → 怎么办：按不对的那一格修 detached-run.sh 再跑 --selftest；DETACHED_RUN_BREAK 设着的话本来就该红"
     exit 1
   fi
-  echo "  ✓ detached-run.sh 自证 $detached_run_selftest_checked 格都对（用法错与拒绝、弄坏开关设在自证之外就拒、-- 之后开头的赋值名不合写法就拒、建不了登记时挪回同名旧登记且挪不回出声、退出码在单元收掉之后读得到、环境（连 PATH、HOME）与工作目录带进单元、watch 全部结束自己退、同名在跑就拒、默认停机时限设进单元、stop 只停登记的那一个、stop 等命令收尾完、调用方被停命令照跑、watch 被 TERM / INT / HUP 都不停单元、查不到单元状态时 list 单列 watch 不退且连续 3 次报警 start 与 stop 拒 start 同名不挪旧登记、查不到之后又查得到照报退出码、没起成的单列、同名重起照报旧一次的退出码、登记被挪走的单元照列、观察到的登记被挪走而单元在跑 watch 不算结束、systemd-run 报错而单元照起记成在跑、日志写不进不起单元、命令没跑起来认得出、单元里写登记失败单列、--force 摘法与闸一致、停机时限设进单元且到点 KILL 记进登记、Linger=no 时警告、同一秒里同名重起等到下一秒、watch 开跑之后起了又跑完的短命令照报、命令留在别的 scope 里的进程随单元停、--wall-clock 必填且 over-2h 判长活声明（没声明、半截、写死额度、判不出脚本、分不了没点名都拒，包装跳过，齐了照起）、收尾不剩单元）"
+  echo "  ✓ detached-run.sh 自证 $detached_run_selftest_checked 格都对（用法错与拒绝、弄坏开关设在自证之外就拒、-- 之后开头的赋值名不合写法就拒、建不了登记时挪回同名旧登记且挪不回出声、退出码在单元收掉之后读得到、环境（连 PATH、HOME）与工作目录带进单元、watch 全部结束自己退、同名在跑就拒、默认停机时限设进单元、stop 只停登记的那一个、stop 等命令收尾完、调用方被停命令照跑、watch 被 TERM / INT / HUP 都不停单元、查不到单元状态时 list 单列 watch 不退且连续 3 次报警 start 与 stop 拒 start 同名不挪旧登记、查不到之后又查得到照报退出码、没起成的单列、同名重起照报旧一次的退出码、登记被挪走的单元照列、观察到的登记被挪走而单元在跑 watch 不算结束、systemd-run 报错而单元照起记成在跑、日志写不进不起单元、命令没跑起来认得出、单元里写登记失败单列、--force 摘法与闸一致、停机时限设进单元且到点 KILL 记进登记、Linger=no 时警告、同一秒里同名重起等到下一秒、watch 开跑之后起了又跑完的短命令照报、命令留在别的 scope 里的进程随单元停、--wall-clock 必填且 over-2h 判长活声明（没声明、半截、写死额度、判不出脚本、分不了没点名都拒，多机一行按登记值读：只认规范句（可带句末句号，后面不接任何说明），别的写法都拒，豁免表里登记且 sha256 对得上的脚本按现算读、sha256 对不上的拒，包装跳过，齐了照起）、收尾不剩单元）"
 }
 
 if [[ -n "${DETACHED_RUN_BREAK:-}" && "${1:-}" != --selftest ]] && ! detached_run_break_is break-honored-anywhere && ! detached_run_inside_selftest; then

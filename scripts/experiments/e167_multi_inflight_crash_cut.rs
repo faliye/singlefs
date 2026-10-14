@@ -2164,9 +2164,11 @@ use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
-/// 线程数只影响挂钟、不影响任何一行输出（并行单位之间的合并是求和、取最小、取并）。
+include!("heavy_threads_default/threads.rs");
+
+/// 线程数只影响挂钟、不影响任何一行输出（并行单位之间的合并是求和、取最小、取并）。`SINGLEFS_THREAD_CAP` 没设取登记的重活默认并行度（`.claude/heavy-thread-default`）。
 fn worker_thread_count() -> usize {
-    std::env::var("SINGLEFS_THREAD_CAP").ok().and_then(|text| text.parse::<usize>().ok()).filter(|count| *count >= 1).unwrap_or(4)
+    default_heavy_threads(include_str!("../../.claude/heavy-thread-default"))
 }
 
 #[derive(Default)]

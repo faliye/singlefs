@@ -117,7 +117,6 @@ struct DlEntry {
 
 #[derive(Clone)]
 struct Snapshot {
-    txg: u64,
     previous_snapshot_txg: u64,
     root: u32,
     deadlist: Vec<DlEntry>,
@@ -288,7 +287,6 @@ impl World {
 
     fn snapshot(&mut self) {
         self.snaps.push(Snapshot {
-            txg: self.txg,
             previous_snapshot_txg: self.previous_snapshot_txg,
             root: self.live_root,
             deadlist: std::mem::take(&mut self.head_deadlist),

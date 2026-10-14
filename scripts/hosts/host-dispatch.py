@@ -16,18 +16,21 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
      派法占几台（hosts_of_dispatch）：
        给了 --shard <k>/<n>、n ≥ 2，而此刻能派的机器至少两台（本机与多机配置开着、判得过的第二台）⇒ 多台；
        否则读被起脚本文件头的长活声明（四个键 # long-run-shards: / # long-run-resume: / # long-run-hosts: / # long-run-unshardable:）。
-         找脚本、读文件头、判齐不齐都用 .claude/hooks/lib_long_run.py 那一份（started_script、script_header_declaration、judge；
+         找脚本、读文件头、判齐不齐都用 .claude/hooks/lib_long_run.py 那一份（started_script、script_header_declaration、judge_script_header；
          scripts/hosts/detached-run.sh 的 start --wall-clock over-2h 与 long-run-check 判的也是它），被起的脚本按仓根找：
-         judge 判齐了、shards 与 hosts 两键都写了 ⇒ 多台（它自己分片、按多机配置派到几台）；
-         judge 判齐了、缺的那几样由 unshardable 一行点名 ⇒ 分不了，放行，打一行理由（例 layer0-shard-run.sh、crash-amplification.sh、broad-mutation.py：台数与额度不按 --emit-hosts 与 host-resources.py 现算）；
-         judge 判不齐（一行都没写、半截声明、hosts 一行没点名两份现查或写死额度）⇒ 只占一台，判出的问题写进理由。
+         judge_script_header 判齐了、shards 与 hosts 两键都写了 ⇒ 多台（它自己分片、按多机配置派到几台）；
+           （脚本文件头的 # long-run-hosts: 与派发提示里的「多机：」一行同一种读法，按登记值读：只认 .claude/hooks/lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE 那一句规范写法，
+           逐字（可带句末句号），后面不许接任何说明（说明另起一行写普通注释），别的写法一律拒（规范句只写在那份库里，这里不抄）；只有仓根 .claude/long-run-live-hosts-exempt 登记、登记的 sha256 又对得上这份脚本的文件头按现算读：
+           点名 --emit-hosts 与 host-resources.py，sha256 对不上判不齐。派发器不判提示，两种读法见 .claude/hooks/lib_long_run.py 文件头）
+         judge_script_header 判齐了、缺的那几样由 unshardable 一行点名 ⇒ 分不了，放行，打一行理由（例 crash-point-replay-shard-run.sh、crash-amplification.sh、broad-mutation.py：台数与额度不按 --emit-hosts 与 host-resources.py 现算）；
+         judge_script_header 判不齐（一行都没写、半截声明、hosts 一行不是规范写法或写死额度、在豁免表里而 sha256 对不上）⇒ 只占一台，判出的问题写进理由。
        LIB_LONG_RUN_BREAK（那份库的弄坏开关）派发器不认：判之前从环境里摘掉、判完放回（派出去的命令照旧拿得到）。
        别的 ⇒ 只占一台。
-     用时超过 LONG_RUN_SECONDS（2 小时）而只占一台 ⇒ 不派，退 244，出路：改成按 layer0-shard-configuration-check.sh --emit-hosts 与 host-resources.py --json
-       现算的两台分片（每片各派一次，带 --shard <k>/<n>），或在被起脚本的文件头补齐长活声明（分不了的写 # long-run-unshardable: <缺哪一段、为什么分不了>）。
+     用时超过 LONG_RUN_SECONDS（2 小时）而只占一台 ⇒ 不派，退 244，出路：改成台数按 crash-point-replay-shard-configuration-check.sh --emit-hosts 读、每台线程取登记值
+       .claude/heavy-thread-default 的两台分片（每片各派一次，带 --shard <k>/<n>），或在被起脚本的文件头补齐长活声明（分不了的写 # long-run-unshardable: <缺哪一段、为什么分不了>）。
 
 五步：
-  ① 机器：本机总在；第二台从多机配置读（仓根 multi-host.env，不进仓；判法 scripts/crash/layer0-shard-configuration-check.sh，读法 scripts/hosts/peer-host-lib.sh
+  ① 机器：本机总在；第二台从多机配置读（仓根 multi-host.env，不进仓；判法 scripts/crash/crash-point-replay-shard-configuration-check.sh，读法 scripts/hosts/peer-host-lib.sh
      的 peer_host_load_configuration）。配置里双机开关 ENABLE_ACROSS_MACHINES 没开（判法退 3）就只有本机；配置判不过同样只有本机，打一行原因。
   ② 现查每台此刻的余量（每一轮都重查，不按声明的上限记账）：
      内存：/proc/meminfo 的 MemAvailable 减去那台内存包装账上在跑的、还没涨到预测峰值的那一截（memory_peaks_lib.headroom，算法同包装的排队），
@@ -38,7 +41,7 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
        再减 GPU_MARGIN_MEBIBYTES 与派发器账上别的 --gpu 那几趟预测了而还没用到的那一截。
      第二台经 ssh 读：把 memory_peaks_lib.py 的源码与本文件里取显存的两个函数送过去（python3 -c，base64 编码），用 peer-host-lib.sh 的 peer_host_run 跑。
   ③ 按历史预测这一条要多少：
-     内存：峰值表 scripts/hosts/memory-peaks.tsv（RUN_WITH_MEMORY_CAP_PEAKS 可换），键与内存包装同一份取法（memory_peaks_lib.command_key，
+     内存：峰值表 ${XDG_DATA_HOME:-~/.local/share}/singlefs/memory-peaks.tsv（RUN_WITH_MEMORY_CAP_PEAKS 可换），键与内存包装同一份取法（memory_peaks_lib.command_key，
        RUN_WITH_MEMORY_CAP_KEY 给了就用它）。有真峰值用峰值；撞过顶的（记的峰值到了那一次的上限）按记的上限 × CAP_FACTOR；查不到用默认值
        （memory_peaks_lib.DEFAULT_MEMORY_PREDICTION_TEXT，8G）。
      显存：派发器自己记的显存峰值表（默认 ${XDG_STATE_HOME:-~/.local/state}/singlefs/gpu-memory-peaks.tsv，跨重启、不进仓；
@@ -95,11 +98,14 @@ records/2026-09-16-subagent拆分提案.md 第五十五节最后两条、第五�
   no-peer-cap-clamp     第二台的上限不按 PEER_MEMORY_CAP 收         peer-cap-clamp
   peer-despite-switch-off  双机开关没开也查、也派第二台             switch-off-local-only
   no-usage-check        没有 -- 也照派                              usage
-  long-history-ignored  ⓪ 不看用时表里的历史用时（只看 --estimated-hours）  long-history-single-host、partial-declaration-single-host
+  long-history-ignored  ⓪ 不看用时表里的历史用时（只看 --estimated-hours）  long-history-single-host、partial-declaration-single-host、hosts-live-single-host、hosts-compute-phrase-single-host、hosts-note-digit-single-host、hosts-note-single-host、hosts-note-live-single-host
   long-estimate-ignored ⓪ 不看 --estimated-hours                    long-estimate-single-host
   shards-as-single      ⓪ 给了 --shard 也当只占一台                 two-host-shards-pass
-  long-run-header-ignored  ⓪ 不读被起脚本文件头的长活声明          shards-hosts-declared-passes、unshardable-declared-passes、partial-declaration-single-host
-  long-run-header-unjudged ⓪ 读了声明不交 judge 判，写了几个键都算齐  partial-declaration-single-host
+  long-run-header-ignored  ⓪ 不读被起脚本文件头的长活声明          shards-hosts-declared-passes、hosts-period-passes、unshardable-declared-passes、partial-declaration-single-host、hosts-live-single-host、hosts-compute-phrase-single-host、hosts-note-digit-single-host、hosts-note-single-host、hosts-note-live-single-host
+  long-run-header-unjudged ⓪ 读了声明不交 judge 判，写了几个键都算齐  partial-declaration-single-host、hosts-live-single-host、hosts-compute-phrase-single-host、hosts-note-digit-single-host、hosts-note-single-host、hosts-note-live-single-host、hosts-exempt-live-passes、hosts-exempt-sha-mismatch-single-host
+  long-run-header-live-reading  ⓪ 文件头的 # long-run-hosts: 退回按现算读（点名 host-resources.py 才齐）  shards-hosts-declared-passes、hosts-period-passes、hosts-live-single-host、hosts-exempt-live-passes
+  long-run-exempt-ignored  ⓪ 不查仓根 .claude/long-run-live-hosts-exempt，登记了的脚本也按登记值读  hosts-exempt-live-passes
+  long-run-exempt-sha256-ignored  ⓪ 不比豁免表里登记的 sha256，登记了的脚本一律按现算读  hosts-exempt-sha-mismatch-single-host
   no-duration-record    跑完不记用时                                duration-recorded
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E402
@@ -129,7 +135,7 @@ from datetime import datetime, timezone  # noqa: E402
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, SCRIPT_DIRECTORY)
 import memory_peaks_lib as peaks  # noqa: E402
-sys.path.insert(0, os.path.join(os.path.dirname(SCRIPT_DIRECTORY), ".claude", "hooks"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY)), ".claude", "hooks"))
 import lib_long_run as long_run_lib  # noqa: E402   长活声明的判法（文件头 ⓪），与 detached-run.sh 共用
 
 MEBIBYTE = peaks.MEBIBYTE
@@ -255,7 +261,7 @@ class Settings:
 
 def settings_from_environment():
     environment = dict(os.environ)
-    repository_root = os.path.dirname(SCRIPT_DIRECTORY)
+    repository_root = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
     state_home = environment.get("XDG_STATE_HOME") or os.path.join(environment.get("HOME") or "/", ".local", "state")
     runtime = environment.get("XDG_RUNTIME_DIR") or "/tmp"
     wait_text = environment.get("HOST_DISPATCH_WAIT_SECONDS", "")
@@ -263,9 +269,9 @@ def settings_from_environment():
         repository_root=repository_root,
         multi_host_run=os.path.join(SCRIPT_DIRECTORY, "multi-host-run.sh"),
         gpu_quiesce_run=os.path.join(SCRIPT_DIRECTORY, "..", "crash", "gpu-quiesce-run.sh"),
-        configuration_check=os.path.join(SCRIPT_DIRECTORY, "..", "crash", "layer0-shard-configuration-check.sh"),
+        configuration_check=os.path.join(SCRIPT_DIRECTORY, "..", "crash", "crash-point-replay-shard-configuration-check.sh"),
         peer_host_lib=os.path.join(SCRIPT_DIRECTORY, "peer-host-lib.sh"),
-        peak_table=environment.get("RUN_WITH_MEMORY_CAP_PEAKS") or peaks.default_peak_table(SCRIPT_DIRECTORY),
+        peak_table=environment.get("RUN_WITH_MEMORY_CAP_PEAKS") or peaks.default_peak_table(),
         gpu_peak_table=environment.get("HOST_DISPATCH_GPU_PEAKS") or os.path.join(state_home, "singlefs", "gpu-memory-peaks.tsv"),
         state_directory=environment.get("HOST_DISPATCH_STATE_DIR") or os.path.join(runtime, "singlefs-host-dispatch"),
         quiesce_state_directory=environment.get("GPU_QUIESCE_STATE_DIRECTORY") or os.path.join(runtime, "singlefs-gpu-quiesce"),
@@ -555,7 +561,20 @@ def header_hosts(command, repository_root):
             return "single", f"读不了被起的脚本 {script}：{error}"
         if not declared:
             return "single", f"{script} 文件头没写长活声明（# long-run-shards: 与 # long-run-hosts:，或 # long-run-unshardable:）"
-        problems = [] if broken("long-run-header-unjudged") else long_run_lib.judge(declared, long_run_lib.HEADER_SPELLING)
+        if broken("long-run-header-unjudged"):
+            problems = []
+        elif broken("long-run-header-live-reading"):          # 弄坏：文件头退回按现算读
+            problems = long_run_lib.judge(declared, long_run_lib.HEADER_SPELLING, long_run_lib.HOSTS_READING_LIVE)
+        elif broken("long-run-exempt-ignored"):               # 弄坏：不查豁免表，登记了的也按登记值读
+            problems = long_run_lib.judge(declared, long_run_lib.HEADER_SPELLING, long_run_lib.HOSTS_READING_REGISTERED)
+        elif broken("long-run-exempt-sha256-ignored"):        # 弄坏：不比豁免表里登记的 sha256，登记了的一律按现算读
+            os.environ[long_run_lib.BREAK_VARIABLE] = "exempt-sha256-unchecked"
+            try:
+                problems = long_run_lib.judge_script_header(script, declared, repository_root)
+            finally:
+                os.environ.pop(long_run_lib.BREAK_VARIABLE, None)
+        else:
+            problems = long_run_lib.judge_script_header(script, declared, repository_root)
         if problems:
             return "single", f"{script} 文件头的长活声明不齐：{'；'.join(problems)}"
         if all(long_run_lib.is_written(declared.get(key)) for key in ("shards", "hosts")):
@@ -598,7 +617,7 @@ def long_run_text(long_run):
     return "没有历史用时、也没给预计挂钟"
 
 
-LONG_RUN_HOWTO = ("改成按 `layer0-shard-configuration-check.sh --emit-hosts` 与 `host-resources.py --json` 现算的两台分片"
+LONG_RUN_HOWTO = ("改成台数按 `crash-point-replay-shard-configuration-check.sh --emit-hosts` 读、每台线程取登记值 `.claude/heavy-thread-default` 的两台分片"
                   "（每片各派一次：host-dispatch.py --shard <k>/<n> -- <那一片的命令>），或在被起脚本的文件头补齐长活声明"
                   "（# long-run-shards: 与 # long-run-hosts:，分不了的写 # long-run-unshardable: <缺哪一段、为什么分不了>；写法与判法在 .claude/hooks/lib_long_run.py 文件头）")
 
@@ -674,7 +693,7 @@ def decide(settings, request, prediction, peer, plan=False):
                 return Decision(chosen.host, cap=chosen.cap, entry_path=entry_path, probes=probes)
             if verdicts and all(verdict.never for verdict in verdicts) and not broken("wait-on-hopeless"):
                 settings.tell("  ✗ 哪台都等多久也放不下：" + "；".join(f"{host_name(verdict.host)}：{verdict.why}" for verdict in verdicts))
-                settings.tell("  → 怎么办：这一条要的比每台都大——先查它为什么要这么多（峰值表 scripts/hosts/memory-peaks.tsv 里键「"
+                settings.tell("  → 怎么办：这一条要的比每台都大——先查它为什么要这么多（峰值表 ~/.local/share/singlefs/memory-peaks.tsv 里键「"
                               f"{prediction.key[:80]}」那一行、显存峰值表 {settings.gpu_peak_table}），或拆小再派；不绕开派发器硬起")
                 return Decision(None, exit_code=EXIT_NEVER_FITS, probes=probes)
         if plan:
@@ -1026,10 +1045,10 @@ class SelftestWorld:
             "HOST_DISPATCH_SELFTEST_PEER": self.peer,
         })
         return Settings(
-            repository_root=os.path.dirname(SCRIPT_DIRECTORY),
+            repository_root=os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY)),
             multi_host_run=os.path.join(self.directory, "multi-host-run.sh"),
             gpu_quiesce_run=os.path.join(self.directory, "gpu-quiesce-run.sh"),
-            configuration_check=os.path.join(SCRIPT_DIRECTORY, "..", "crash", "layer0-shard-configuration-check.sh"),
+            configuration_check=os.path.join(SCRIPT_DIRECTORY, "..", "crash", "crash-point-replay-shard-configuration-check.sh"),
             peer_host_lib=os.path.join(SCRIPT_DIRECTORY, "peer-host-lib.sh"),
             peak_table=self.peak_table, gpu_peak_table=self.gpu_peak_table,
             state_directory=os.path.join(self.directory, "dispatch-state"), quiesce_state_directory=self.quiesce_state,
@@ -1239,7 +1258,7 @@ def selftest_cells(root):
     code = dispatch(world, ["--", *command])
     text = "\n".join(world.lines)
     check("long-history-single-host", code == EXIT_LONG_SINGLE_HOST and not world.launches() and "历史用时 3.0 小时" in text
-          and "layer0-shard-configuration-check.sh --emit-hosts" in text and "host-resources.py --json" in text and "为什么分不了" in text,
+          and "crash-point-replay-shard-configuration-check.sh --emit-hosts" in text and ".claude/heavy-thread-default" in text and "为什么分不了" in text,
           f"历史用时 3 小时、只占一台应当退 {EXIT_LONG_SINGLE_HOST}、没派、报历史用时与出路，实际退 {code}、派了「{world.launches()}」；{world.lines[-2:]}")
 
     # long-estimate-single-host：用时表里没有这条，调用方给了 --estimated-hours 3 ⇒ 按预计挂钟判，退 244、没派
@@ -1273,11 +1292,30 @@ def selftest_cells(root):
         # (格名, 文件头, 该不该派, 派法占几台)
         ("shards-hosts-declared-passes",
          "# long-run-shards: 自证用的按用例切片\n# long-run-resume: 重起同一条命令只补没做完的片\n"
-         "# long-run-hosts: 机器清单从 layer0-shard-configuration-check.sh --emit-hosts 读、每台额度从 host-resources.py --json 现算\n", True, "multi"),
+         f"# long-run-hosts: {long_run_lib.CANONICAL_HOSTS_SENTENCE}\n", True, "multi"),
+        ("hosts-period-passes",
+         "# long-run-shards: 自证用的按用例切片\n# long-run-resume: 重起同一条命令只补没做完的片\n"
+         f"# long-run-hosts: {long_run_lib.CANONICAL_HOSTS_SENTENCE}。\n", True, "multi"),
         ("unshardable-declared-passes",
          "# long-run-shards: 自证用的按用例切片\n# long-run-resume: 重起同一条命令只补没做完的片\n"
          "# long-run-unshardable: 多机：自证用的一整段、台数固定、额度不现算\n", True, "cannot"),
         ("partial-declaration-single-host", "# long-run-shards: 自证用的按用例切片\n", False, "single"),
+        # 多机一行逐字等于规范句（可带句末句号），后面不许接任何说明：点名 host-resources.py 现算的写法、写了除以此刻在跑的重活数的写法、规范句后接说明（含数字的与不含数字的、写按此刻空闲现算的），文件头也拒
+        ("hosts-note-single-host",
+         "# long-run-shards: 自证用的按用例切片\n# long-run-resume: 重起同一条命令只补没做完的片\n"
+         f"# long-run-hosts: {long_run_lib.CANONICAL_HOSTS_SENTENCE}；双机时两台各取这一个数\n", False, "single"),
+        ("hosts-note-live-single-host",
+         "# long-run-shards: 自证用的按用例切片\n# long-run-resume: 重起同一条命令只补没做完的片\n"
+         f"# long-run-hosts: {long_run_lib.CANONICAL_HOSTS_SENTENCE}；按此刻空闲现算每台槽数与线程\n", False, "single"),
+        ("hosts-note-digit-single-host",
+         "# long-run-shards: 自证用的按用例切片\n# long-run-resume: 重起同一条命令只补没做完的片\n"
+         f"# long-run-hosts: {long_run_lib.CANONICAL_HOSTS_SENTENCE}；见第 2 节\n", False, "single"),
+        ("hosts-live-single-host",
+         "# long-run-shards: 自证用的按用例切片\n# long-run-resume: 重起同一条命令只补没做完的片\n"
+         "# long-run-hosts: 机器清单从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读、每台额度从 host-resources.py --json 现算\n", False, "single"),
+        ("hosts-compute-phrase-single-host",
+         "# long-run-shards: 自证用的按用例切片\n# long-run-resume: 重起同一条命令只补没做完的片\n"
+         "# long-run-hosts: 台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值除以此刻同时在跑的重活数\n", False, "single"),
     )
     for cell, header, passes, hosts in declarations:
         world = SelftestWorld(root, cell)
@@ -1294,6 +1332,28 @@ def selftest_cells(root):
             ok = code == EXIT_LONG_SINGLE_HOST and not launches and "hosts=single" in text and "长活声明不齐" in text and "# long-run-unshardable:" in text
         check(cell, ok, f"文件头「{header.strip()}」应当{'照派、hosts=' + hosts if passes else f'退 {EXIT_LONG_SINGLE_HOST}、没派、报声明不齐'}，"
                         f"实际退 {code}、派了「{launches}」；{world.lines[-2:]}")
+
+    # hosts-exempt-live-passes：仓根 .claude/long-run-live-hosts-exempt 登记的脚本（sha256 对得上），文件头按现算读 ⇒ multi；同一份内容没登记的 ⇒ single；
+    # hosts-exempt-sha-mismatch-single-host：登记了而脚本改过一个字节（登记的是改之前那一版的 sha256）⇒ single
+    world = SelftestWorld(root, "hosts-exempt-live-passes")
+    live_header = ("# long-run-shards: 自证用的按用例切片\n# long-run-resume: 重起同一条命令只补没做完的片\n"
+                   "# long-run-hosts: 机器清单从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读、每台额度从 host-resources.py --json 现算\n")
+    listed_script, unlisted_script, edited_script = (os.path.join(world.directory, name) for name in ("listed.sh", "unlisted.sh", "edited.sh"))
+    for path in (listed_script, unlisted_script, edited_script):
+        world.write_executable(path, f"#!/usr/bin/env bash\n{live_header}exit 0\n")
+    listed_sha256 = long_run_lib.file_sha256(listed_script)
+    with open(edited_script, "a", encoding="utf-8") as handle:   # 登记之后又改了一个字节：追加在 exit 0 之后，文件头不变、sha256 变了
+        handle.write("# 自证：登记之后又改了一个字节\n")
+    os.makedirs(os.path.join(world.directory, ".claude"), exist_ok=True)
+    with open(os.path.join(world.directory, ".claude", "long-run-live-hosts-exempt"), "w", encoding="utf-8") as handle:
+        handle.write(f"listed.sh  {listed_sha256}  # 自证：文件头按现算写、不能改\nedited.sh  {listed_sha256}  # 自证：登记的是改之前那一版的 sha256\n")
+    listed_hosts, _why = header_hosts(["bash", listed_script], world.directory)
+    unlisted_hosts, _why = header_hosts(["bash", unlisted_script], world.directory)
+    edited_hosts, edited_why = header_hosts(["bash", edited_script], world.directory)
+    check("hosts-exempt-live-passes", listed_hosts == "multi" and unlisted_hosts == "single",
+          f"豁免表里登记的脚本文件头按现算读应当是 multi、同一份内容没登记的应当是 single，实际登记的 {listed_hosts}、没登记的 {unlisted_hosts}")
+    check("hosts-exempt-sha-mismatch-single-host", edited_hosts == "single" and "sha256" in edited_why,
+          f"豁免表里登记了而脚本改过（sha256 对不上）应当是 single 并点名 sha256，实际 {edited_hosts}、理由「{edited_why[:200]}」")
 
     # duration-recorded：派出去那条链跑 1 秒、退 0 ⇒ 用时表里这条记 1–5 秒、退出码 0、本机
     world = SelftestWorld(root, "duration-recorded")
@@ -1331,11 +1391,16 @@ SWITCH_EXPECTED_CELLS = {
     "no-peer-cap-clamp": ["peer-cap-clamp"],
     "peer-despite-switch-off": ["switch-off-local-only"],
     "no-usage-check": ["usage"],
-    "long-history-ignored": ["long-history-single-host", "partial-declaration-single-host"],
+    "long-history-ignored": ["long-history-single-host", "partial-declaration-single-host", "hosts-live-single-host", "hosts-compute-phrase-single-host", "hosts-note-digit-single-host", "hosts-note-single-host", "hosts-note-live-single-host"],
     "long-estimate-ignored": ["long-estimate-single-host"],
     "shards-as-single": ["two-host-shards-pass"],
-    "long-run-header-ignored": ["shards-hosts-declared-passes", "unshardable-declared-passes", "partial-declaration-single-host"],
-    "long-run-header-unjudged": ["partial-declaration-single-host"],
+    "long-run-header-ignored": ["shards-hosts-declared-passes", "hosts-period-passes", "unshardable-declared-passes", "partial-declaration-single-host", "hosts-live-single-host",
+                               "hosts-compute-phrase-single-host", "hosts-note-digit-single-host", "hosts-note-single-host", "hosts-note-live-single-host"],
+    "long-run-header-unjudged": ["partial-declaration-single-host", "hosts-live-single-host", "hosts-compute-phrase-single-host", "hosts-note-digit-single-host", "hosts-note-single-host", "hosts-note-live-single-host", "hosts-exempt-live-passes",
+                                "hosts-exempt-sha-mismatch-single-host"],
+    "long-run-header-live-reading": ["shards-hosts-declared-passes", "hosts-period-passes", "hosts-live-single-host", "hosts-exempt-live-passes"],
+    "long-run-exempt-ignored": ["hosts-exempt-live-passes"],
+    "long-run-exempt-sha256-ignored": ["hosts-exempt-sha-mismatch-single-host"],
     "no-duration-record": ["duration-recorded"],
 }
 

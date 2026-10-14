@@ -10,6 +10,8 @@
                               [--produced-after 时刻] [--gate-run-temporary-directory 目录]...
                               [--cross-run-temporary-directory 目录]...
     test-environment-check.py clean [--temporary-directory 目录]... [--yes]
+                              [--run-times-file 文件 | --previous-run-started 时刻] [--produced-after 时刻] [--refuse-too-recent]
+    test-environment-check.py record-run-start --run-times-file 文件 --run-started 时刻
     test-environment-check.py --selftest
 
 check 逐类判，每类一行 ✓ / ✗ / !（没查成）/ -（没要求跑）：
@@ -28,14 +30,26 @@ check 逐类判，每类一行 ✓ / ✗ / !（没查成）/ -（没要求跑）
 clean 只清前两类判红的那些：卸载、dmsetup remove、losetup -d、删文件与目录；不给 --yes 只打印计划。
 qemu 进程不自动杀，列出 pid 交人判。白名单与在用的一律不碰，删之前断言路径就在临时目录下、以 singlefs- 开头。
 
+上一趟门禁留下的残留（C474）：名字里没有 pid、没有进程开着、但不到 --recent-minutes 没改的条目，clean 平时当「可能正在跑」不碰；
+给了上一趟门禁的开跑时刻（--previous-run-started 直接给 epoch 秒，或 --run-times-file 读 record-run-start 记下的那份文件），
+最近一次修改落在 [上一趟开跑, --produced-after) 之内、没有进程开着的，哪怕不到那么久也当上一趟留下的删掉，汇总行单列「上一趟留下的 N 项」；
+--produced-after（本趟开跑时刻）及之后才出现的是这一趟自己产生的，不碰也不算「太新、这一趟清不掉」。没给上一趟时刻时一切照旧。
+--refuse-too-recent（只配不带 --yes 的 clean）：剩下还有「太新、这一趟清不掉」的项就退 4，逐项报还要等多少秒；
+门禁 harness-test-environment 的 machine-clean 格开跑前用它预演。
+record-run-start：把一趟门禁的开跑时刻写进 --run-times-file（本趟 current、上一趟 previous 两行，同一个开跑时刻重复记不转动），
+写法是同目录临时文件改名换上，原子；门禁 harness-test-environment 的 machine-clean 格每趟调一次。
+
 为什么要它：用户 2026-09-19 定「每一轮的里程碑都应该要有一个干净的环境……每次里程碑完结后要检查挂载的盘有没有异常」。
 那天现查 /tmp 下 82 个 singlefs-*：37 个 replay 复跑目录共 41G（replay.sh 只在全绿时删），
 40 个 4 GiB 稀疏测试盘镜像（crates 测试靠 Drop 删，进程被杀就漏下）。
 
-退出码：0 干净；1 有残留或异常（clean --yes 时：有一步没做成）；2 用法错；3 有一类没查成（与 1 同时成立时取 1）。
+退出码：0 干净；1 有残留或异常（clean --yes 时：有一步没做成）；2 用法错；3 有一类没查成（与 1 同时成立时取 1）；
+4 只给 clean --refuse-too-recent：还有太新、这一趟清不掉的项。
 破坏开关（只给 --selftest 用，证明自检会红）：环境变量 TEST_ENVIRONMENT_CHECK_BREAK 取
 aliveowner / allowlist / openfile / pidreuse / recent / readonly / freespace / kernellog / loopbacking / deleteguard /
-gaterunscanned / crossrununscanned 之一（gaterunscanned：临时目录残留这一类照扫 --gate-run-temporary-directory 点名的目录，
+gaterunscanned / crossrununscanned / previousrunignored / runtimesnotrotated 之一
+（previousrunignored：clean 不认上一趟的开跑时刻，上一趟留下的太新条目仍当可能正在跑，自检「上一趟留下的删得掉」那几条不中；
+runtimesnotrotated：record-run-start 不把本趟转成上一趟，自检「记两个时刻」那几条不中；gaterunscanned：临时目录残留这一类照扫 --gate-run-temporary-directory 点名的目录，
 自检「这一轮门禁的临时目录不进临时目录残留」那一条不中；crossrununscanned：临时目录残留这一类不扫 --cross-run-temporary-directory 点名的目录，
 自检「gate.sh 开跑前的 TMPDIR 也扫」那一条不中）。
 """
@@ -62,7 +76,10 @@ REPOSITORY_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(
 SCRIPT_RELATIVE_PATH = 'scripts/hosts/test-environment-check.py'
 BREAK_SWITCH_VARIABLE = 'TEST_ENVIRONMENT_CHECK_BREAK'
 BREAK_SWITCH_NAMES = ('aliveowner', 'allowlist', 'openfile', 'pidreuse', 'recent',
-                      'readonly', 'freespace', 'kernellog', 'loopbacking', 'deleteguard', 'gaterunscanned', 'crossrununscanned')
+                      'readonly', 'freespace', 'kernellog', 'loopbacking', 'deleteguard', 'gaterunscanned', 'crossrununscanned',
+                      'previousrunignored', 'runtimesnotrotated')
+# 退出码 4：clean --refuse-too-recent 预演见到太新、这一趟清不掉的项
+EXIT_TOO_RECENT = 4
 TOKYO_TIMEZONE = datetime.timezone(datetime.timedelta(hours=9))
 GIBIBYTE = 1 << 30
 ENTRY_PREFIX = 'singlefs-'
@@ -81,20 +98,20 @@ ALLOWLIST = (
     (re.compile(r'^singlefs-mutate-target$'),
      'mutate.sh 的 cargo 编译产物目录，跨轮复用（scripts/mutation/mutate.sh 的 MUTATE_TARGET）'),
     (re.compile(r'^singlefs-e152-packages$'),
-     'E152 六家文件系统的下载包缓存（scripts/devices/e152-stage-root.sh 第 16 行）'),
+     'E152 六家文件系统的下载包缓存（scripts/devices/e152-stage-root.sh 的 PACKAGES）'),
     (re.compile(r'^singlefs-pdftext-[0-9]+$'),
      '引文核对的 PDF 抽文本缓存，名字里是 uid 不是 pid（scripts/kb/verify-citations.sh 的 PDFTXT_CACHE）'),
     (re.compile(r'^singlefs-vmlinuz(-.+)?$'),
-     '给 QEMU 用的可读内核副本（scripts/devices/vm-kernel.sh 第 19、36 行）'),
+     '给 QEMU 用的可读内核副本（scripts/devices/vm-kernel.sh 的 DEST）'),
 )
 
 # 名字里带创建者 pid 的形态：按 pid 判创建者在不在。第一个捕获组是 pid。
 PROCESS_IDENTIFIER_NAME_PATTERNS = (
-    (re.compile(r'^singlefs-replay-([0-9]+)$'), 'scripts/experiments/replay.sh 第 16 行'),
+    (re.compile(r'^singlefs-replay-([0-9]+)$'), 'scripts/experiments/replay.sh 的 OUT_DIR'),
     (re.compile(r'^singlefs-step[0-9]+-.+-([0-9]+)-[0-9]+-dev[0-9]+\.img$'),
      'crates/singlefs-harness/tests/ 的 image_path'),
-    (re.compile(r'^singlefs-core-fake-sysfs-([0-9]+)$'), 'crates/singlefs-core/src/block_device.rs 第 562 行'),
-    (re.compile(r'^singlefs-core-.+-([0-9]+)-[0-9]+\.img$'), 'crates/singlefs-core/src/block_device.rs 第 427 行'),
+    (re.compile(r'^singlefs-core-fake-sysfs-([0-9]+)$'), 'crates/singlefs-core/src/block_device.rs 的测试 queue_attributes_are_read_from_the_sysfs_tree_and_missing_ones_are_none'),
+    (re.compile(r'^singlefs-core-.+-([0-9]+)-[0-9]+\.img$'), 'crates/singlefs-core/src/block_device.rs 的测试辅助函数 temporary_image_path'),
 )
 
 
@@ -262,6 +279,7 @@ class TemporaryEntry:
     unreadable_count: int           # 遍历时读不了的子项个数
     verdict: str                    # residual / in_use / allowlisted
     reason: str
+    from_previous_run: bool = False  # 上一趟门禁留下的：最近修改落在 [上一趟开跑, 本趟开跑) 内，不到 recent_seconds 也判残留（C474）
 
 
 def measure_entry(path):
@@ -317,14 +335,25 @@ def describe_openers(openers):
     return '；'.join(shown) + more
 
 
-def classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds, produced_after=0.0):
+def left_by_previous_run(latest_modification_epoch, previous_run_started, produced_after):
+    """最近一次修改落在 [上一趟开跑, 本趟开跑) 之内：上一趟门禁留下的（C474）。没给上一趟的时刻就不成立。
+    produced_after 是本趟开跑时刻，0 表示没有上界（人在两趟之间跑 clean）。"""
+    if not previous_run_started or break_switch_is('previousrunignored'):
+        return False
+    if latest_modification_epoch < previous_run_started:
+        return False
+    return not produced_after or latest_modification_epoch < produced_after
+
+
+def classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds, produced_after=0.0, previous_run_started=0.0):
     name = os.path.basename(path)
     kind, actual_bytes, apparent_bytes, latest_modification_epoch, unreadable_count = measure_entry(path)
 
-    def build(verdict, reason):
+    def build(verdict, reason, from_previous_run=False):
         return TemporaryEntry(path=path, kind=kind, actual_bytes=actual_bytes, apparent_bytes=apparent_bytes,
                               latest_modification_epoch=latest_modification_epoch,
-                              unreadable_count=unreadable_count, verdict=verdict, reason=reason)
+                              unreadable_count=unreadable_count, verdict=verdict, reason=reason,
+                              from_previous_run=from_previous_run)
 
     allowlist_reason = match_allowlist(name)
     if allowlist_reason is not None:
@@ -347,12 +376,15 @@ def classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds, pr
         return build('in_use', describe_openers(openers))
     age_seconds = now_epoch - latest_modification_epoch
     if age_seconds < recent_seconds and not break_switch_is('recent'):
+        if left_by_previous_run(latest_modification_epoch, previous_run_started, produced_after):
+            return build('residual', f'名字里没有 pid、没有进程开着它，{int(age_seconds // 60)} 分钟前改过，不到 {recent_seconds // 60} 分钟，'
+                                     '但出现在上一趟门禁开跑之后、本趟开跑之前，是上一趟留下的', from_previous_run=True)
         return build('in_use', f'名字里没有 pid、没有进程开着它，但 {int(age_seconds // 60)} 分钟前还在改，可能正在跑')
     return build('residual', '名字里没有 pid，没有进程开着它下面的文件，'
                              f'最近一次修改在 {int(age_seconds // 60)} 分钟前')
 
 
-def scan_temporary_directories(temporary_directories, recent_seconds, produced_after=0.0):
+def scan_temporary_directories(temporary_directories, recent_seconds, produced_after=0.0, previous_run_started=0.0):
     """返回 (条目列表, 打开文件扫描结果, 读不了的临时目录列表)。"""
     open_path_scan = scan_open_paths(temporary_directories)
     now_epoch = time.time()
@@ -374,7 +406,8 @@ def scan_temporary_directories(temporary_directories, recent_seconds, produced_a
                 continue  # TMPDIR 与 /tmp 指向同一处时只算一次
             seen_real_paths.add(real_path)
             try:
-                entries.append(classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds, produced_after))
+                entries.append(classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds,
+                                                        produced_after, previous_run_started))
             except FileNotFoundError:
                 continue  # 扫描的过程中被别的进程删掉了
     return entries, open_path_scan, unreadable_directories
@@ -395,6 +428,8 @@ class Environment:
     smart_requested: bool = False
     # 这个时刻之后才出现的临时条目单列成「这一次跑自己产生的」、不判红（C448）；0 表示不分界、照旧全判
     produced_after: float = 0.0
+    # 上一趟门禁的开跑时刻（C474）：clean 把最近修改落在 [它, produced_after) 内、没有进程开着的条目当上一趟留下的删掉，哪怕不到 recent_seconds；0 表示不认
+    previous_run_started: float = 0.0
     # gate.sh 发给这一轮各阶段的 TMPDIR：临时目录残留这一类不扫它（见 entry_scan_directories），设备与宿主盘照旧算它
     gate_run_temporary_directories: list = dataclasses.field(default_factory=list)
     # gate.sh 开跑前的 TMPDIR（GATE_CROSS_RUN_TMPDIR）：临时目录残留这一类另扫它（见 entry_scan_directories），设备与宿主盘不算它
@@ -1110,6 +1145,62 @@ def run_check(environment, report_path=''):
     return exit_code
 
 
+# ── 门禁开跑时刻的跨趟文件（C474）──────────────────────────────────────
+# 两行：current=<本趟开跑 epoch 秒>、previous=<上一趟的>。上游 gate.sh 不能改，开跑时刻由门禁 harness-test-environment 的 machine-clean 格
+# 往上找祖先里的 gate.sh 读出来、调 record-run-start 记下；clean 读它判「上一趟留下的」。
+
+def read_run_times(path):
+    """(current, previous)；文件不在、读不懂的一项记 0.0。"""
+    values = {'current': 0.0, 'previous': 0.0}
+    for line in (read_text_or_none(path) or '').splitlines():
+        key, separator, value = line.partition('=')
+        if not separator or key.strip() not in values:
+            continue
+        try:
+            number = float(value.strip())
+        except ValueError:
+            continue
+        if 0 < number < 1e12:
+            values[key.strip()] = number
+    return values['current'], values['previous']
+
+
+def record_run_start(path, started):
+    """把 started 记成本趟、原来的本趟转成上一趟，写同目录临时文件再改名换上（原子）。
+    同一个 started 重复记不转动；比已记的本趟还早的（并发的另一趟晚收工）不动文件。返回 (current, previous)。"""
+    current, previous = read_run_times(path)
+    if started == current or started < current:
+        return current, previous
+    if not break_switch_is('runtimesnotrotated'):
+        previous = current
+    directory = os.path.dirname(os.path.abspath(path))
+    os.makedirs(directory, exist_ok=True)
+    handle, temporary_path = tempfile.mkstemp(dir=directory, prefix='.gate-run-times.')
+    try:
+        with os.fdopen(handle, 'w') as stream:
+            stream.write(f'current={started!r}\nprevious={previous!r}\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary_path, 0o644)
+        os.replace(temporary_path, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(temporary_path)
+        raise
+    return started, previous
+
+
+def previous_run_started_from_file(path, this_run_started):
+    """文件里「上一趟」的开跑时刻。this_run_started 是本趟的（0 表示人在两趟之间，没有本趟）：
+    本趟还没记（current 比它早）时 current 就是上一趟；已经记了（current 不早于它）时取 previous。"""
+    current, previous = read_run_times(path)
+    if not this_run_started:
+        return current
+    if 0 < current < this_run_started:
+        return current
+    return previous if 0 < previous < this_run_started else 0.0
+
+
 # ── clean：只清前两类里判红的 ───────────────────────────────────────────
 
 class RefusedDeletion(Exception):
@@ -1191,8 +1282,8 @@ def execute_clean(environment, actions):
             continue
         entry = action.temporary_entry
         try:
-            recheck = classify_temporary_entry(entry.path, fresh_open_path_scan, time.time(),
-                                               environment.recent_seconds)
+            recheck = classify_temporary_entry(entry.path, fresh_open_path_scan, time.time(), environment.recent_seconds,
+                                               environment.produced_after, environment.previous_run_started)
         except FileNotFoundError:
             print(f'  - 跳过：{entry.path} 已经不在了')
             continue
@@ -1215,12 +1306,19 @@ def execute_clean(environment, actions):
     return failures
 
 
-def run_clean(environment, confirmed):
+def run_clean(environment, confirmed, refuse_too_recent=False):
     print(f'test-environment-check：clean（临时目录 {"、".join(environment.temporary_directories)}，'
           f'{"动手" if confirmed else "只打印计划"}）')
+    if environment.previous_run_started:
+        upper = (f'本趟开跑 {format_time(environment.produced_after)}' if environment.produced_after
+                 else '没有本趟（两趟之间）')
+        print(f'  上一趟门禁开跑 {format_time(environment.previous_run_started)}，{upper}：'
+              '这段时间里出现、没有进程开着的条目当上一趟留下的删，不受「不到 '
+              f'{environment.recent_seconds // 60} 分钟」限制')
     device_scan = scan_devices(environment)
     entries, open_path_scan, unreadable_directories = scan_temporary_directories(
-        environment.temporary_directories, environment.recent_seconds)
+        environment.temporary_directories, environment.recent_seconds,
+        environment.produced_after, environment.previous_run_started)
     actions = plan_clean(environment, device_scan, entries)
     freed_bytes = sum(action.temporary_entry.actual_bytes for action in actions if action.temporary_entry)
     print(f'  打算做 {len(actions)} 步，删临时条目能腾出实际 {format_bytes(freed_bytes)}：')
@@ -1238,19 +1336,33 @@ def run_clean(environment, confirmed):
     # 不碰的那几项要在最后一行也报出来。逐条列在上面了，而读的人常常只看末尾那一行——
     # 「太新」这一档尤其要点名：它不是白名单，是这一次清不掉、下一次门禁开跑前又已经存在，
     # 于是 harness-test-environment 必然判它红（清完紧接着跑门禁时撞过一次，白跑一轮全量）。
-    too_recent = [entry for entry in kept if '可能正在跑' in entry.reason]
+    # 本趟开跑之后才出现的太新项是这一趟自己的，不算「清不掉」
+    too_recent = [entry for entry in kept if '可能正在跑' in entry.reason
+                  and not (environment.produced_after and entry.latest_modification_epoch >= environment.produced_after)]
+    previous_run_count = sum(1 for action in actions if action.temporary_entry and action.temporary_entry.from_previous_run)
+    previous_run_summary = (f'；上一趟留下的 {previous_run_count} 项（出现在上一趟开跑之后、本趟开跑之前，没有进程开着，'
+                            f'不到 {environment.recent_seconds // 60} 分钟也删）' if environment.previous_run_started else '')
     kept_summary = (f'；不碰 {len(kept)} 项'
                     + (f'，其中 {len(too_recent)} 项只是太新（不到 {environment.recent_seconds // 60} 分钟没改），'
                        f'这一次清不掉、下一次门禁会判它们红：{"、".join(os.path.basename(entry.path) for entry in too_recent)}'
-                       if too_recent else ''))
+                       if too_recent else '')
+                    + previous_run_summary)
     if not confirmed:
         print(f'  没动任何东西{kept_summary}；看过上面这份清单、确认没有正在跑的活在用它们之后，加 --yes 再跑一次')
+        if refuse_too_recent and too_recent:
+            now_epoch = time.time()
+            for entry in too_recent:
+                wait_seconds = max(1, int(environment.recent_seconds - (now_epoch - entry.latest_modification_epoch)) + 1)
+                print(f'    · 太新项：{entry.path}，还要等 {wait_seconds} 秒才满 {environment.recent_seconds // 60} 分钟没改')
+            print(f'  ✗ 有 {len(too_recent)} 项太新、这一趟清不掉（clean 不碰，下一趟门禁会判它们红）')
+            return EXIT_TOO_RECENT
         return 0
     failures = execute_clean(environment, actions)
     print('  清完复查：')
     recheck_scan = scan_devices(environment)
     recheck_entries, recheck_open_scan, recheck_unreadable = scan_temporary_directories(
-        environment.temporary_directories, environment.recent_seconds)
+        environment.temporary_directories, environment.recent_seconds,
+        environment.produced_after, environment.previous_run_started)
     recheck_results = judge_devices(recheck_scan) + [judge_temporary_entries(
         recheck_entries, recheck_open_scan, recheck_unreadable, environment.temporary_directories)]
     for result in recheck_results:
@@ -1657,6 +1769,129 @@ def check_cross_run_directory(recorder, workspace):
                     f'--cross-run-temporary-directory 应当收成一张表，实际 {parsed.cross_run_temporary_directory!r}')
 
 
+def check_previous_run_window(recorder, workspace, holders):
+    """C474：上一趟门禁留下的、不到 recent_seconds 的条目，clean 删得掉；把上一趟的开跑时刻抹掉，回到不删；
+    门禁开跑时刻的跨趟文件记本趟与上一趟两个时刻、原子写；预演见到太新、这一趟清不掉的项退 4 并报还要等多少秒。"""
+    case_directory = os.path.join(workspace, 'previous-run-case')
+    fake_temporary = os.path.join(case_directory, 'tmp')
+    empty_block_root = os.path.join(case_directory, 'sys-block')
+    for directory in (fake_temporary, empty_block_root, os.path.join(case_directory, 'ext4')):
+        os.makedirs(directory)
+    write_text(os.path.join(case_directory, 'mounts'), '')
+    now_epoch = time.time()
+    previous_started = now_epoch - 300      # 上一趟开跑
+    this_started = now_epoch - 60           # 本趟开跑
+    samples = {   # 名字: (最近修改距今秒数, 期望：窗口 [上一趟, 本趟) 给了时的判定)
+        'singlefs-prev-left.Aaa111': 200,     # 窗口内、不到 10 分钟、没有进程开着：上一趟留下的
+        'singlefs-before-prev.Bbb222': 400,   # 上一趟开跑之前、不到 10 分钟：太新，这一趟清不掉
+        'singlefs-this-run.Ccc333': 30,       # 本趟开跑之后：这一趟自己的
+        'singlefs-crates-mutation-target': 200,   # 白名单
+        'singlefs-held-open.Eee555': 200,     # 窗口内但有进程开着
+        'singlefs-old-left.Rrr666': 3600,     # 本来就够老
+    }
+    for name, age in samples.items():
+        write_text(os.path.join(fake_temporary, name, 'left'), 'x\n')
+        set_tree_modification_time(os.path.join(fake_temporary, name), now_epoch - age)
+    holders.append(start_holder_process(os.path.join(fake_temporary, 'singlefs-held-open.Eee555', 'left')))
+
+    def classify(**keywords):
+        entries, _, _ = scan_temporary_directories([fake_temporary], 600, **keywords)
+        return {os.path.basename(entry.path): entry for entry in entries}
+
+    with_window = classify(produced_after=this_started, previous_run_started=previous_started)
+    verdicts = {name: entry.verdict for name, entry in with_window.items()}
+    recorder.expect(verdicts == {'singlefs-prev-left.Aaa111': 'residual', 'singlefs-before-prev.Bbb222': 'in_use',
+                                 'singlefs-this-run.Ccc333': 'in_use', 'singlefs-crates-mutation-target': 'allowlisted',
+                                 'singlefs-held-open.Eee555': 'in_use', 'singlefs-old-left.Rrr666': 'residual'},
+                    f'上一趟门禁留下的（窗口内、不到 10 分钟、没人开着）该判残留，窗口外与本趟的不该：{verdicts}')
+    recorder.expect(with_window['singlefs-prev-left.Aaa111'].from_previous_run
+                    and not with_window['singlefs-old-left.Rrr666'].from_previous_run,
+                    '窗口内留下的该标成上一趟留下的，本来就够老的不标')
+    without_previous = {name: entry.verdict for name, entry in classify(produced_after=this_started).items()}
+    recorder.expect(without_previous['singlefs-prev-left.Aaa111'] == 'in_use'
+                    and without_previous['singlefs-before-prev.Bbb222'] == 'in_use',
+                    f'没给上一趟的开跑时刻时一切照旧，太新的不删：{without_previous}')
+    between_runs = {name: entry.verdict for name, entry in classify(previous_run_started=previous_started).items()}
+    recorder.expect(between_runs['singlefs-prev-left.Aaa111'] == 'residual' and between_runs['singlefs-this-run.Ccc333'] == 'residual'
+                    and between_runs['singlefs-before-prev.Bbb222'] == 'in_use',
+                    f'两趟之间（没有本趟）上一趟开跑之后的都算上一趟留下的：{between_runs}')
+
+    environment = Environment(temporary_directories=[fake_temporary], system_block_root=empty_block_root,
+                              mounts_path=os.path.join(case_directory, 'mounts'),
+                              ext4_system_root=os.path.join(case_directory, 'ext4'), process_identifier_filter=set(),
+                              produced_after=this_started, previous_run_started=previous_started)
+    plain_environment = dataclasses.replace(environment, produced_after=0.0, previous_run_started=0.0)
+    present_before = sorted(os.listdir(fake_temporary))
+
+    def run_clean_quietly(clean_environment, confirmed, refuse=False):
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            exit_code = run_clean(clean_environment, confirmed, refuse)
+        return exit_code, captured.getvalue()
+
+    refused_exit, refused_output = run_clean_quietly(environment, False, True)
+    wait_lines = [line for line in refused_output.split('\n') if '太新项：' in line]
+    wait_seconds = [int(match.group(1)) for line in wait_lines for match in [re.search(r'还要等 ([0-9]+) 秒', line)] if match]
+    recorder.expect(refused_exit == EXIT_TOO_RECENT and len(wait_lines) == 1 and 'singlefs-before-prev.Bbb222' in wait_lines[0]
+                    and len(wait_seconds) == 1 and 190 <= wait_seconds[0] <= 215,
+                    f'预演见到上一趟开跑之前的太新项该退 {EXIT_TOO_RECENT}、只点名它、报还要等约 200 秒（本趟自己的不算）：'
+                    f'退出码 {refused_exit}，{wait_lines}')
+    recorder.expect('上一趟留下的 1 项' in refused_output and sorted(os.listdir(fake_temporary)) == present_before,
+                    '预演的汇总行要单列「上一趟留下的 1 项」，且不许动任何东西')
+    plain_exit, plain_output = run_clean_quietly(plain_environment, False, True)
+    recorder.expect(plain_exit == EXIT_TOO_RECENT and '上一趟留下的' not in plain_output
+                    and 'singlefs-prev-left.Aaa111' in plain_output.split('太新项：', 1)[-1],
+                    f'抹掉上一趟的开跑时刻，上一趟留下的那一项就回到太新、不删，汇总行不报上一趟：退出码 {plain_exit}')
+    no_refuse_exit, _ = run_clean_quietly(environment, False)
+    recorder.expect(no_refuse_exit == 0, f'不带 --refuse-too-recent 的预演仍退 0，实际 {no_refuse_exit}')
+
+    clean_exit, clean_output = run_clean_quietly(environment, True)
+    left = sorted(os.listdir(fake_temporary))
+    recorder.expect(clean_exit == 0 and left == sorted(set(present_before) - {'singlefs-prev-left.Aaa111', 'singlefs-old-left.Rrr666'}),
+                    f'clean --yes 该删上一趟留下的与本来就老的两项，其余（太新的、本趟的、白名单、有人开着）一个不动：'
+                    f'退出码 {clean_exit}，剩 {left}')
+    recorder.expect('上一趟留下的 1 项' in clean_output, 'clean 汇总行要单列「上一趟留下的 1 项」')
+
+    # 门禁开跑时刻的跨趟文件
+    times_path = os.path.join(case_directory, 'cache', 'gate-run-times')
+    recorder.expect(read_run_times(times_path) == (0.0, 0.0), '文件不在时两个时刻都是 0')
+    first = record_run_start(times_path, 1000.0)
+    second = record_run_start(times_path, 2000.0)
+    repeated = record_run_start(times_path, 2000.0)
+    older = record_run_start(times_path, 1500.0)
+    recorder.expect((first, second, repeated, older) == ((1000.0, 0.0), (2000.0, 1000.0), (2000.0, 1000.0), (2000.0, 1000.0)),
+                    f'记两个时刻：本趟转成上一趟，同一时刻重复记不转，更早的不覆盖：{(first, second, repeated, older)}')
+    recorder.expect(read_run_times(times_path) == (2000.0, 1000.0) and os.listdir(os.path.dirname(times_path)) == ['gate-run-times'],
+                    '落盘后读回两个时刻，目录里没有留临时文件（临时文件改名换上）')
+    recorder.expect(previous_run_started_from_file(times_path, 2000.0) == 1000.0
+                    and previous_run_started_from_file(times_path, 0.0) == 2000.0
+                    and previous_run_started_from_file(times_path, 3000.0) == 2000.0,
+                    '上一趟的时刻：本趟已记取 previous，两趟之间取 current，本趟还没记取 current')
+    write_text(times_path, 'current=不是数\nprevious=-5\n')
+    recorder.expect(read_run_times(times_path) == (0.0, 0.0), '读不懂的文件当没记录，不崩')
+
+    # 命令行
+    parsed = build_argument_parser().parse_args(['clean', '--run-times-file', times_path, '--produced-after', '5', '--refuse-too-recent'])
+    recorder.expect((parsed.run_times_file, parsed.produced_after, parsed.refuse_too_recent) == (times_path, 5.0, True),
+                    '--run-times-file / --produced-after / --refuse-too-recent 该解析进 clean')
+    quiet = io.StringIO()
+    # main 在设了破坏开关时一律拒跑；这几条只证命令行，开关交给上面各条去证，所以这里先摘掉它再还回去
+    saved_switch = os.environ.pop(BREAK_SWITCH_VARIABLE, None)
+    try:
+        with contextlib.redirect_stdout(quiet):
+            usage_codes = (main(['clean', '--yes', '--refuse-too-recent']), main(['check', '--previous-run-started', '5']),
+                           main(['clean', '--run-times-file', times_path, '--previous-run-started', '5']),
+                           main(['record-run-start']))
+            end_to_end = main(['record-run-start', '--run-times-file', os.path.join(case_directory, 'cli', 'gate-run-times'),
+                               '--run-started', '7'])
+    finally:
+        if saved_switch is not None:
+            os.environ[BREAK_SWITCH_VARIABLE] = saved_switch
+    recorder.expect(usage_codes == (2, 2, 2, 2) and end_to_end == 0
+                    and read_run_times(os.path.join(case_directory, 'cli', 'gate-run-times')) == (7.0, 0.0),
+                    f'用法错退 2、record-run-start 从命令行记得进文件：{usage_codes}，{end_to_end}')
+
+
 def run_selftest():
     break_switch = os.environ.get(BREAK_SWITCH_VARIABLE, '')
     if break_switch and break_switch not in BREAK_SWITCH_NAMES:
@@ -1681,6 +1916,7 @@ def run_selftest():
         check_host_disk(recorder, workspace)
         check_gate_run_directory(recorder, workspace)
         check_cross_run_directory(recorder, workspace)
+        check_previous_run_window(recorder, workspace, holders)
     finally:
         for holder in holders:
             if holder.poll() is None:
@@ -1699,7 +1935,8 @@ def run_selftest():
     print(f'  ✓ --selftest 通过{switch_note}：{recorder.assertion_count} 条断言都中（临时条目分类、'
           '删除护栏、稀疏文件按实际占用、loop / dm / 挂载 / qemu、clean 预演与动手及次序、'
           '宿主盘只读 / 剩余空间 / ext4 计数 / 内核日志 / 退出码 / 报告不覆盖、'
-          '这一轮门禁的临时目录不进临时目录残留而 loop 照旧算它、gate.sh 开跑前的 TMPDIR 也扫）')
+          '这一轮门禁的临时目录不进临时目录残留而 loop 照旧算它、gate.sh 开跑前的 TMPDIR 也扫、'
+          '上一趟门禁留下的不到 10 分钟的条目 clean 删得掉而抹掉上一趟时刻就不删、开跑时刻的跨趟文件记两个时刻、预演见到太新的项退 4）')
     return 0
 
 
@@ -1707,8 +1944,9 @@ def build_argument_parser():
     parser = argparse.ArgumentParser(
         prog='test-environment-check.py',
         description='里程碑开工时清一次、完结时查一次：测试环境残留与宿主盘异常。')
-    parser.add_argument('action', nargs='?', default='check', choices=('check', 'clean'),
-                        help='check（默认）逐类判；clean 只清前两类判红的，不给 --yes 只打印计划')
+    parser.add_argument('action', nargs='?', default='check', choices=('check', 'clean', 'record-run-start'),
+                        help='check（默认）逐类判；clean 只清前两类判红的，不给 --yes 只打印计划；'
+                             'record-run-start 把一趟门禁的开跑时刻记进 --run-times-file')
     parser.add_argument('--selftest', action='store_true', help='在临时工作区里造样本自证会红')
     parser.add_argument('--temporary-directory', action='append', default=None,
                         help='要查的临时目录，可给多次；默认 /tmp，TMPDIR 设了且不同就再加上它')
@@ -1723,6 +1961,16 @@ def build_argument_parser():
     parser.add_argument('--cross-run-temporary-directory', action='append', default=[],
                         help='gate.sh 开跑前的 TMPDIR（GATE_CROSS_RUN_TMPDIR），可给多次；只给 check：临时目录残留这一类另扫它，'
                              '设备与宿主盘不算它；门禁 harness-test-environment 在 gate.sh 里时传进来')
+    parser.add_argument('--previous-run-started', type=float, default=0.0,
+                        help='只给 clean：上一趟门禁的开跑时刻（epoch 秒）；最近修改落在 [它, --produced-after) 之内、没有进程开着的条目'
+                             '当上一趟留下的删，不受 --recent-minutes 限制（C474）；不给就照旧')
+    parser.add_argument('--run-times-file', default='',
+                        help='门禁开跑时刻的跨趟文件（门禁 harness-test-environment 的 machine-clean 格写在 '
+                             '${GATE_CROSS_RUN_TMPDIR:-~/.local/share/singlefs/cross-run-cache}/gate-run-times）；'
+                             'clean 从它读上一趟的时刻（与 --previous-run-started 二选一），record-run-start 写它')
+    parser.add_argument('--run-started', type=float, default=0.0, help='只给 record-run-start：本趟门禁的开跑时刻（epoch 秒）')
+    parser.add_argument('--refuse-too-recent', action='store_true',
+                        help='只给不带 --yes 的 clean：预演后还有太新、这一趟清不掉的项就退 4，逐项报还要等多少秒')
     parser.add_argument('--minimum-free-gibibytes', type=float, default=50.0, help='剩余空间下限（GiB），默认 50；两条取严')
     parser.add_argument('--recent-minutes', type=float, default=10.0,
                         help='名字里没有 pid 的条目这么多分钟内还在改就当可能正在跑，默认 10')
@@ -1757,7 +2005,40 @@ def main(argument_list):
         print('  ✗ --cross-run-temporary-directory 只给 check')
         print(f'     → 怎么办：clean 那个目录用 --temporary-directory 点名：python3 {SCRIPT_RELATIVE_PATH} clean --temporary-directory <那个目录>')
         return 2
+    if arguments.action != 'clean' and (arguments.previous_run_started or arguments.refuse_too_recent):
+        print('  ✗ --previous-run-started / --refuse-too-recent 只给 clean')
+        print(f'     → 怎么办：去掉它们，或改跑 python3 {SCRIPT_RELATIVE_PATH} clean')
+        return 2
+    if arguments.action not in ('clean', 'record-run-start') and arguments.run_times_file:
+        print('  ✗ --run-times-file 只给 clean 与 record-run-start')
+        print(f'     → 怎么办：去掉它，或改跑 python3 {SCRIPT_RELATIVE_PATH} clean --run-times-file <文件>')
+        return 2
+    if arguments.refuse_too_recent and arguments.yes:
+        print('  ✗ --refuse-too-recent 是预演用的，不能和 --yes 一起')
+        print(f'     → 怎么办：先不带 --yes 跑一次看有没有太新的项，再单独跑 clean --yes')
+        return 2
+    if arguments.previous_run_started and arguments.run_times_file:
+        print('  ✗ --previous-run-started 与 --run-times-file 只能给一个')
+        print('     → 怎么办：直接给上一趟的 epoch 秒就去掉 --run-times-file，要读文件就去掉 --previous-run-started')
+        return 2
+    if arguments.action == 'record-run-start':
+        if not arguments.run_times_file or arguments.run_started <= 0:
+            print('  ✗ record-run-start 要 --run-times-file <文件> 与 --run-started <epoch 秒，大于 0>')
+            print(f'     → 怎么办：python3 {SCRIPT_RELATIVE_PATH} record-run-start --run-times-file <文件> --run-started <开跑时刻>')
+            return 2
+        try:
+            current, previous = record_run_start(arguments.run_times_file, arguments.run_started)
+        except OSError as error:
+            print(f'  ✗ 没记成：{arguments.run_times_file}（{error.strerror or error}）')
+            print('     → 怎么办：确认它所在目录存在、当前用户写得了，再跑一次')
+            return 1
+        print(f'  ✓ 门禁开跑时刻已记：本趟 {format_time(current)}，上一趟 '
+              f'{format_time(previous) if previous else "没有记录"}（{arguments.run_times_file}）')
+        return 0
     temporary_directories = arguments.temporary_directory or default_temporary_directories()
+    previous_run_started = arguments.previous_run_started
+    if arguments.run_times_file:
+        previous_run_started = previous_run_started_from_file(arguments.run_times_file, arguments.produced_after)
     environment = Environment(temporary_directories=temporary_directories,
                               gate_run_temporary_directories=arguments.gate_run_temporary_directory,
                               cross_run_temporary_directories=arguments.cross_run_temporary_directory,
@@ -1765,9 +2046,9 @@ def main(argument_list):
                               minimum_free_percent=arguments.minimum_free_percent,
                               minimum_free_gibibytes=arguments.minimum_free_gibibytes,
                               kernel_log_since=arguments.kernel_log_since, smart_requested=arguments.smart,
-                              produced_after=arguments.produced_after)
+                              produced_after=arguments.produced_after, previous_run_started=previous_run_started)
     if arguments.action == 'clean':
-        return run_clean(environment, arguments.yes)
+        return run_clean(environment, arguments.yes, arguments.refuse_too_recent)
     return run_check(environment, arguments.report)
 
 

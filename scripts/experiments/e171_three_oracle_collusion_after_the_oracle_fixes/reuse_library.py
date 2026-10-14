@@ -396,8 +396,8 @@ def segment_one_reading_names() -> list[str]:
 
 
 _pinned_modules: dict[str, types.ModuleType] = {}
-PINNED = {"rows_orchestrator_7bfbdb84": ("rows_orchestrator.py", "7bfbdb84559476033853794499836f752fdf8a3e803e17cd9539ae49ee3b7e0e"),
-          "rows_orchestrator_segment_two_132731f8": ("rows_orchestrator_segment_two.py", "132731f83e0582e80cfff6711299375569e6446958c027ca9c61b27df7a839a1")}
+PINNED = {"rows_orchestrator_1dcfb8d0": ("rows_orchestrator.py", "1dcfb8d0c08a706077f41fe69d3566d7a99e16f3dcbffc10808a2f0d88d17853"),
+          "rows_orchestrator_segment_two_7d7b458b": ("rows_orchestrator_segment_two.py", "7d7b458b95e0a2b8a650e5e9f45b5405902661ffc296b06643100f63cea98393")}
 
 
 def pinned_module(module_name: str) -> types.ModuleType:
@@ -418,7 +418,7 @@ def pinned_module(module_name: str) -> types.ModuleType:
 
 def segment_one_row_units(steps: tuple[str, ...], rows_of_step: dict[str, tuple[int, ...]] | None = None) -> list[RowUnit]:
     """第一段第 11–13 步的行：flags 取第一段编排器 STEPS 那一步（row-0 另带 --empty-mutation，同 step_arguments）；s12 的 row-0 与 sx 是 RC2 的两份。"""
-    orchestrator = pinned_module("rows_orchestrator_7bfbdb84")
+    orchestrator = pinned_module("rows_orchestrator_1dcfb8d0")
     units = []
     for step in steps:
         flags = orchestrator.STEPS[step].flags
@@ -430,7 +430,7 @@ def segment_one_row_units(steps: tuple[str, ...], rows_of_step: dict[str, tuple[
 
 def segment_two_row_units(rows: tuple[int, ...], cross_host_row: int | None, steps: tuple[str, ...] = ("rows",)) -> list[RowUnit]:
     """第二段的行：flags 取第二段编排器那一步；跨机对照那一行在整表与跨机那一次都是 RC2 的一份。"""
-    two = pinned_module("rows_orchestrator_segment_two_132731f8")
+    two = pinned_module("rows_orchestrator_segment_two_7d7b458b")
     units = []
     for step in steps:
         flags = {"rows": two.ROWS_STEP, "rerun": two.RERUN_STEP, "cross": two.ROWS_STEP}[step].flags
@@ -800,7 +800,7 @@ def normalized_o3_lines(path: str) -> list[str]:
     directory = tempfile.mkdtemp(prefix="reuse-o3-")
     try:
         shutil.copyfile(path, os.path.join(directory, "o3.out"))
-        return cross_host_o3_check.o3_lines_without_scheduling(pinned_module("rows_orchestrator_7bfbdb84"), directory)
+        return cross_host_o3_check.o3_lines_without_scheduling(pinned_module("rows_orchestrator_1dcfb8d0"), directory)
     finally:
         shutil.rmtree(directory, ignore_errors=True)
 
@@ -1175,6 +1175,7 @@ def command_fetch(arguments: argparse.Namespace) -> int:
         meta = fetch(Library(arguments.library), arguments.entry, targets)
     except (CorruptedEntry, FileExistsError) as error:
         print(f"✗ 取用不成：{error}", file=sys.stderr)
+        print('     → 怎么办：目标已在就先挪走再取；库里那一条坏了就删掉那一条，让下一趟重算', file=sys.stderr)
         return 1
     print(meta.get("exit", "0"))
     return 0

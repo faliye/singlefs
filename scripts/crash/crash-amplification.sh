@@ -5,16 +5,20 @@
 # 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/hosts/detached-run.sh start --wall-clock over-2h 与 long-run-check、scripts/hosts/host-dispatch.py 文件头 ⓪ 都读这几行）：
 # long-run-shards: 按登记表 ITEMS 的分项逐项跑；多机配置开着双机时，每一项由 crash-amplification-two-hosts.sh 把它的状态块按两台量到的速度分成两份（SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/2、1/2），第二台那一份取回、导入本机库并成一份
 # long-run-resume: 一份库装全部分项（${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library-by-conclusion-kind，在 /tmp 之外）；重起同一条命令就是续跑：同一判法版本下判过的块全部复用、只判没判过的，第二台判到一半被停也先导入再退
-# long-run-unshardable: 多机：台数只认多机配置的双机开关（至多本机与 PEER_SSH_HOST 两台，不读 layer0-shard-configuration-check.sh --emit-hosts 的清单）；跑的那一步线程取 --threads 或本机核数减一、内存上限取 --memory-cap 与 --peer-memory-cap（本机默认 38G），只有本机只编那一步与第二台那两趟的线程按 host-resources.py --json 现算
+# long-run-unshardable: 多机：台数只认多机配置的双机开关（至多本机与 PEER_SSH_HOST 两台，不读 crash-point-replay-shard-configuration-check.sh --emit-hosts 的清单）；跑的那一步线程取 --threads 或本机核数减一、内存上限取 --memory-cap 与 --peer-memory-cap（本机默认 38G），只有本机只编那一步与第二台那两趟的线程按 host-resources.py --json 现算
 # 崩溃放量全量（用户 2026-09-29 定：其他的崩溃放量放在一个脚本里做、作为分项；以后全量就是一起跑，分项用参数跑；不指定参数就作为全量跑）：
 #
 #   crash-amplification.sh                                  全量：登记表里每个分项按次序跑一遍，展开深度用 FULL_EXPAND_UP_TO（见「全量的展开深度」）
 #   crash-amplification.sh --item <分项> [--item <分项>]…    只跑点名的分项，给几次取并集（分项名照 --list-items 列的）；展开深度同全量，成功句不说全量
 #   crash-amplification.sh --expand-up-to <N> [--item …]    缩过规模的一趟：每项按展开 N 跑（N 与 FULL_EXPAND_UP_TO 相同就是没缩）；成功句写「缩过规模：展开 N」、不说全量，并点名哪几项不穷举
 #   crash-amplification.sh --list-items                     逐行列出可点名的分项：分项名、测试目标、用例函数、档位（TAB 隔开）；不清场、不跑
-#   crash-amplification.sh --selftest                       用假的分项驱动与假的清场命令走一遍第 1–33 格（列项、点名、拒绝、清场、各种判红、本次未跑、复用数、派出收回、
+#   crash-amplification.sh --selftest                       用假的分项驱动与假的清场命令走一遍第 1–46 格（列项、点名、拒绝、清场、各种判红、本次未跑、复用数、派出收回、
 #                                                           只供自证的变量、有红又有项退 78、按登记整批不判的数、驱动行的 red= 与全量的零态、复用数每项只取一次、两台分份的 flow= 行留的块、
-#                                                           分项驱动退 77 与它报的本次未跑、几条流里有的没借到、不带参数的全量里一项不穷举红在那一项），
+#                                                           分项驱动退 77 与它报的本次未跑、几条流里有的没借到、不带参数的全量里一项不穷举红在那一项、
+#                                                           只因登记的段不穷举不红而报段号与写数、没登段的流照旧红、往驱动送按段登记文件、登记文件写坏拒跑、
+#                                                           登了段的流里另有展开上限盖不住又没登记的段红在那条流与那几段、驱动行没报那个字段照不穷举红、
+#                                                           登记段分片枚举不红而报全展开与分片已判几态、分片段已判 0 态而那一行现判与复用都是 0 红在那条流与那一段、全部复用的一趟不红、分项驱动报判段没跑（step=judge）记本次未跑、
+#                                                           登了段的行没报全或写坏登记段的域与分片进度照重编引擎红），
 #                                                           末尾一轮从下面「弄坏开关」那张表现读开关、逐个打开，核它红在点名的那几格
 #   其余参数原样交给每一项的分项驱动：[--threads <N>] [--memory-cap <上限>] [--peer-memory-cap <上限>] [--library <库目录>] [--label <标签>]
 #
@@ -38,8 +42,10 @@
 # 重起的那一趟认包装交下来的 GPU_QUIESCE_HOLDER（文件在、文件名以父进程号加「-」起头），不再清。
 #
 # 全量的展开深度：只登记在一处，FULL_EXPAND_UP_TO（第一行代码之后那个赋值）。不带 --expand-up-to 就把它交给每一项的驱动；
-#   驱动行（CRASH_AMPLIFICATION）报的 expand_up_to 与交下去的不同判红；展开深度是它时每一行都要 exhaustive=true，有一行不是（exhaustive=false 或没报）
-#   这一项判红、整趟退 1（全量的完成标记不认缩过规模的那一趟），理由里点名不穷举的流，出路是「加大展开深度重跑，或查是哪一段超出」。
+#   驱动行（CRASH_AMPLIFICATION）报的 expand_up_to 与交下去的不同判红；展开深度是它时每一行都要 exhaustive=true，或 exhaustive=false 只因登记的段
+#   （这一行 registered_segments= 不是 -、unregistered_segments_beyond_expansion= 是 -，见「按段登记」）；有一行两样都不是
+#   （exhaustive=false 而 registered_segments= 是 -、没报或写得认不得，或 exhaustive= 没报）这一项判红、整趟退 1（全量的完成标记不认缩过规模的那一趟），
+#   理由里点名不穷举又没登段的流，出路是「按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开」；登了段的行另两种判红见「按段登记」。
 #   给了 --expand-up-to 而值不同的是缩过规模的一趟：exhaustive=false 不判红，ITEM 行照实写出，成功句点名哪几项不穷举（见「输出」的成功句）。
 #   取值：登记分项里最长一段的写数。今天是 30 写：多记录流与删除流（multi-record-publish、unlink-after-the-multi-record-publish）共有的第 16 段，
 #   出处是第 32 批 Q 探针真跑出来的段形状 PROBE_SEGMENT_SIZES [2,2,1,2,2,1,2,24,2,1,2,28,4,1,2,30,6,1,2,26,2,1,2,24,2,1,2,22,2,1,2,20,2,1,2]
@@ -48,28 +54,66 @@
 #   所以从 28 抬到 30 只改写数是 29、30 的段，不超过 28 写的段展开不变。
 #   这里不现算：驱动行只报 exhaustive= 与 expand_up_to=、不报段的写数（crates/singlefs-checker-tier/src/crash_amplification.rs 的
 #   reuse_and_scale_fields_of_the_line），段形状要编、跑 checker 档的用例才拿得到。新加的流或改了写表而出现更长的段，这里不会自己跟上：
-#   不带参数的全量会在那一项判红（上面那一条），照出路把这个值改到新的最长段。
+#   不带参数的全量会在那一项判红（上面那一条），照出路把这个值改到新的最长段，或把整域展不开的段按段登记。
+#
+# 按段登记（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J10、H10）：表是 .claude/gate.d/crash-point-replay-segments.tsv
+#   （写法在它的表头，核法 scripts/crash/lib_crash_point_replay_items.py 的 segment_problems）。选好分项之后、清场之前先核被判仓根下那一份，核不过退 2、
+#   一项都不跑；核过了 export SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<被判仓根>/.claude/gate.d/crash-point-replay-segments.tsv（绝对路径，与
+#   scripts/crash/crash-point-replay.sh 送的同一个文件），分项驱动与双机驱动从环境继承（第二台那几趟由 crash-amplification-two-hosts.sh 送快照）。
+#   引擎对登记了的段按甲二 ∪ 展开 6 展开，驱动行报 exhaustive=false registered_segments=<段号>:<写数>[,…]（没登段写 -），之后报
+#   unregistered_segments_beyond_expansion=<段号>:<写数>[,…]（这条流里没登记、展开上限又盖不住的段；一段都没有写 -；引擎的 exhaustive 在登了段时一律是 false）。
+#   一行 exhaustive=false 而 registered_segments= 是那种写法的（登了段的行），展开深度是全量的那一个时按 unregistered_segments_beyond_expansion= 判：
+#     是 -：不因不穷举判红；
+#     是 <段号>:<写数>[,…]：判红，理由点名那条流与那几段（「流 <流> 段 <段号>:<写数>、…」），出路「按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开」；
+#     没报或写得认不得（旧引擎打的行）：照不穷举判红，理由点名那条流，出路「引擎没报 unregistered_segments_beyond_expansion=，重编引擎」。
+#   按行判，同一项别的行照判。
+#   分片枚举（用户 2026-10-13 定：登记段的「甲二 ∪ 展开 6」装不进 u64 时按固定次序分片枚举，每趟判 2^32 个态、判定进库，下一趟从库里接着判）：
+#   引擎在 unregistered_segments_beyond_expansion= 之后报 registered_segment_domains=<段号>:<full|slice>[,…]（登记段的域是全展开还是分片；一段都没登写 -）
+#   与 registered_segment_progress=<段号>:<已判态数>/<域的总态数>[,…]（只列 slice 段，没有写 -；两个数都是精确的十进制数字串，引擎的态数是 768 位宽整数
+#   （用户 2026-10-13 定，6 个 u128 拼），可能到 140 位：这里只按 ^[0-9]+$ 认、不转成数、不做数值比较，成功句原样打这两个串）。登了段的行，不看展开深度：
+#     两个字段缺一个（旧引擎）、registered_segments= 列的段有一段不在 registered_segment_domains= 里、slice 段没在 registered_segment_progress= 里、
+#     进度里列了不是 slice 的段、或写法认不得：判红，理由点名那条流，出路「引擎没报 registered_segment_domains= / registered_segment_progress=，重编引擎」；
+#     slice 段已判态数字面全是 0、而这一行的现判（states_checked_here=）与复用（states_reused=，没报照 0 算）都不是正整数：判红，理由点名那条流与那一段（「流 <流> 段 <段号>:0/<总>」），
+#     出路「这一趟一个态都没判，看录入段与判段的日志」；现判或复用有一个是正整数的（全部复用的一趟就是现判 0、复用大于 0）不因它判红；
+#     其余不因分片判红（分片的段没判全域，照登记段只按甲二 ∪ 展开 6 判那样，不算不穷举）。
+#   ITEM 行写 registered_segments=：每段一条「<流>@<段号>:<写数>」（没带 flow= 的行只写「<段号>:<写数>」），逗号隔开、同一条流几行报的按段去重，一段都没有写 -；
+#   之后写 unregistered_segments_beyond_expansion=：同一种写法，取各行（登没登段都算）报的这个字段；一段都没有而有一行没报这个字段（或写得认不得）写 unknown，否则写 -。
+#   再写 registered_segment_domains= 与 registered_segment_progress=：取登了段的行报的这两个字段原样，每段前面加「<流>@」（没带 flow= 的行不加），同一条流几行报的按段去重；
+#   一段都没有而有登了段的行没报全或写坏（上面判红的那种）写 unknown，否则写 -。
+#   成功句末尾接「按段登记 N 段（K 项，只按甲二 ∪ 展开 6 判、没判全域）：<分项> 流 <流> 段 <段号>（<写数> 写）、…，…」，一段都没有接「按段登记：0 段」；
+#   再接「登记段的域（甲二 ∪ 展开 6）N 段（K 项；全展开 F 段、分片 S 段）：<分项> 流 <流> 段 <段号>：全展开、<分项> 流 <流> 段 <段号>：分片，已判 <已判>/<总>、…」
+#   （一段都没有接「登记段的域：0 段」）；
+#   再接「展开上限盖不住又没登记的段 N 段（K 项，没判全域）：<分项> 流 <流> 段 <段号>（<写数> 写）、…」，一段都没有接「展开上限盖不住又没登记的段：0 段」；
+#   有项 ITEM 行写 unknown 的再接「（另有 J 项取不出：<分项、…>，驱动行没报 unregistered_segments_beyond_expansion=）」。展开深度是全量的那一个时
+#   这种段都已判红（登了段的照上面，没登段的照不穷举），到不了成功句；成功句里报得出段来的只有缩过规模的一趟。
+#   全量展开那几段要的态数不报（H10）。
 #
 # 输出：每项的驱动输出边跑边转打，同时 tee 进这一项自己的文件
-#   ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/runs/entry-<UTC 时刻>-<进程号>/<分项>.log，跑完从那份文件取汇总，
+#   ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/runs/entry-<时刻>-<进程号>/<分项>.log，跑完从那份文件取汇总，
 #   打一行 CRASH_AMPLIFICATION_ITEM item=<分项> exit=<驱动退出码> states=<现判：Σ states_checked_here> reused=<复用：这一项只取一次，取法见「复用数怎么取」，取不出写 unknown>
 #     red=<Σ red> lines=<CRASH_AMPLIFICATION 行数> expand_up_to=<各行报的展开深度，各行不一或有行没报写 unknown>
 #     exhaustive=<每一行都是 exhaustive=true 才写 true> verdict=<green|red|not-run> seconds=<这一项的挂钟>
-#     ignored_points=<Σ ignored_points> states_skipped_by_ignore=<Σ states_skipped_by_ignore>（有一行没报这两个数或不是非负整数，两个都写 unknown；见「按登记整批不判」）。
+#     ignored_points=<按流分组、每组只取一次的 ignored_points 之和> states_skipped_by_ignore=<同样取法的 states_skipped_by_ignore 之和>（有一行没报这两个数或不是非负整数、或同一组各行报的数不同，两个都写 unknown；见「按登记整批不判」）
+#     registered_segments=<按段登记的段，写法见「按段登记」；没有写 ->
+#     unregistered_segments_beyond_expansion=<展开上限盖不住又没登记的段，写法见「按段登记」；没有写 -，取不出写 unknown>
+#     registered_segment_domains=<登记段的域> registered_segment_progress=<分片段的进度>（写法见「按段登记」；没有写 -，取不出写 unknown）。
 #   末尾一行 CRASH_AMPLIFICATION_TOTAL dispatched=<派出几项> items=<收回几项> failed=<几项红> not_run=<几项本次未跑> reuse_unknown=<几项取不出复用数>
 #     states=<Σ 现判> reused_known=<Σ 取得出的那几项的复用> red=<Σ red> expand_up_to=<交给驱动的展开深度> scope=<full|items|scaled> seconds=<挂钟>
-#     ignored_points=<Σ 取得出的那几项> states_skipped_by_ignore=<Σ 取得出的那几项> ignore_unknown=<几项取不出这两个数>。
+#     ignored_points=<Σ 取得出的那几项> states_skipped_by_ignore=<Σ 取得出的那几项> ignore_unknown=<几项取不出这两个数（没报、写坏或同一组各行不同）>。
 #   scope：full 没点名、展开深度是 FULL_EXPAND_UP_TO；items 点了名、展开深度是它；scaled 展开深度不是它（点没点名都算）。
 #   退 0 时再打一句成功句（✓）：开头「崩溃放量全量（展开 N）」（只有 scope=full 且没有一项本次未跑才这样写）、「崩溃放量（展开 N）」（scope=full、
 #     有项本次未跑）、「崩溃放量点名的 K 项（展开 N）」、「崩溃放量缩过规模：展开 N」；接「K 项都退 0、0 红」，有项本次未跑时接
 #     「跑完的 K 项 0 红；本次未跑 J 项：<分项（原因）、…>」；scope=scaled 时接着写穷举那一段：有驱动行的项里有不是 exhaustive=true 的，写
 #     「不穷举 J 项：<分项、…>（展开 N 盖不住它们最长的一段，这几项没判完全域）」，都是的写「有驱动行的 K 项都穷举」；
-#     再接「现判 N 态、<复用那一段>；派出 D 项、收回 D 项」；末尾接「按登记整批不判」那一段（见下）。
+#     再接「现判 N 态、<复用那一段>；派出 D 项、收回 D 项」；再接「按登记整批不判」那一段（见下），末尾接「按段登记」那三段（按段登记的段、登记段的域、展开上限盖不住又没登记的段，见上）。
 # 一项怎么判（verdict）：
 #   red（计进 failed，整趟退 1），有一条就是：驱动退非 0（退 78 另见下；退 248 是算法上判不了，照这一条判红、清单里写明）；red 之和大于 0（驱动退几都算，退 78 也算）；
 #     有一行缺 red= 或 red 的值不是非负整数（驱动行的约定是每行带 red=<非负整数>；驱动退几都算）；
-#     驱动退 0 却 0 行 CRASH_AMPLIFICATION（出路：看测试名还在不在、cargo 是不是筛出了 0 条）；展开深度是 FULL_EXPAND_UP_TO 而有一行不是 exhaustive=true
-#     （出路：加大展开深度重跑，或查是哪一段超出；见「全量的展开深度」）；
+#     驱动退 0 却 0 行 CRASH_AMPLIFICATION（出路：看测试名还在不在、cargo 是不是筛出了 0 条）；展开深度是 FULL_EXPAND_UP_TO 而有一行不是 exhaustive=true、
+#     又不是只因登记的段不穷举（出路：按段登记或加深展开；见「全量的展开深度」「按段登记」）；展开深度是它而登了段的行报
+#     unregistered_segments_beyond_expansion= 不是 -（出路：按段登记或加深展开）或没报这个字段（出路：重编引擎；见「按段登记」）；
+#     登了段的行（不看展开深度）registered_segment_domains= / registered_segment_progress= 没报全、漏段或写法认不得（出路：重编引擎），
+#     或分片段已判 0 态而那一行现判与复用都是 0（出路：看录入段与判段的日志；见「按段登记」）；
 #     有一行报的 expand_up_to 与交下去的不同（驱动没照给的展开深度跑）；scope=full（不带参数的全量）里一项现判 0 态、复用 0 态
 #     （叫停或留了没判的块的项除外，那种照 not-run）。
 #   not-run（本次未跑：不计进 failed，也不算通过，照 .claude/singlefs-ai-sop/rules/show-me-test.md「门禁不许假装通过」逐项报；环境里有 GATE_NOT_RUN_FILE
@@ -81,7 +125,8 @@
 #     分项驱动退 77（一项都没跑到：排派活计划那一趟借不到显存、一块都没判，或第二台排计划那一趟借不到显存；scripts/crash/crash-amplification-item.sh 文件头「退出码」）
 #     也是 not-run，不按「驱动退非 0」判红；原因写它打的 CRASH_AMPLIFICATION_NOT_RUN 行的 reason=（没打那一行的照写没打）。
 #     驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN 行（一条用例几条流，没借到显存的那几条各一行，借到的照判）同样是 not-run，原因写几条流没判与第一行的 reason=：
-#     这一项不算通过。这两种都不按「驱动退 0 却 0 行」判红，全量里也不按「现判 0 态、复用 0 态」判红；行里报了红照样记 red。
+#     这一项不算通过。驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行（配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性：判段这一趟不跑、录入段照录，
+#     分项驱动或双机驱动转打的那几行，一条流一行）也是这一种，原因写几条流判段没跑与第一行 step=judge 的 reason=。这几种都不按「驱动退 0 却 0 行」判红，全量里也不按「现判 0 态、复用 0 态」判红；行里报了红照样记 red。
 #     派出的项全是 not-run 时整趟退 77。
 #   驱动退 78（显卡或第二台用不上、清场或多机配置不满足）：行里没报红（red 之和为 0、每行的 red= 都对）就记 exit=78 verdict=not-run；
 #     行里报了红记 exit=78 verdict=red（判出来的红不让 78 盖掉）。两种都停在这一项、后面的项不再派。
@@ -110,24 +155,29 @@
 #   成功句：都取得出写「复用 M 态」；全都取不出写「复用数取不出（J 项：<分项…>，驱动行没报 states_reused=）」；一部分取不出写
 #   「复用 M 态（只算取得出的 K 项；另有 J 项取不出：<分项…>，驱动行没报 states_reused=）」。有取不出的项时不写「复用 0 态」，也不写「不复用」。
 # 按登记整批不判（.claude/singlefs-ai-sop/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」：这一类不算剪枝，成功句报跳过了多少、哪几类）：
-#   驱动行的约定是每行带 ignored_points=<测试代码里预设 ignore 的点数> states_skipped_by_ignore=<这些点的段因此没展开的态数>；一项的两个数是各行之和。
-#   成功句末尾接「按登记整批不判：N 个点、M 态」；N 或 M 大于 0 时接着写类名：驱动行只报点数与态数、不报类名，写「类名取不出」并点名有跳过的分项。
-#   有项取不出（有一行没报这两个数或不是非负整数）：这一项两个数写 unknown、计进 TOTAL 行的 ignore_unknown，不红；成功句写
-#   「按登记整批不判：取不出（J 项：…）」或「取得出的 K 项 N 个点、M 态；另有 J 项取不出：…」，不把取不出的记成 0。
+#   驱动行的约定是每行带 ignored_points=<测试代码里预设 ignore 的点数> states_skipped_by_ignore=<这些点的段因此没展开的态数>。这两个数是那条流的测试代码预设的，
+#   不随一趟变：同一条流的本机份、第二台份、导入、叫停再续的各行报的是同一份，所以和复用数一样按流分组、每组只取一次（不是各行之和）：
+#   - 按流分组：行里有 flow=<名> 的按名分，没有的归一组（同「复用数怎么取」）；
+#   - 组里各行报的两个数相同就取那一份；不同就这一项两个数写 unknown、点名那条流，不悄悄取最大或最小；
+#   - 不同的流各取一次相加，一项的两个数是各组取到的数之和。
+#   成功句在「按段登记」那一段之前接「按登记整批不判：N 个点、M 态」；N 或 M 大于 0 时接着写类名：驱动行只报点数与态数、不报类名，写「类名取不出」并点名有跳过的分项。
+#   有项取不出（有一行没报这两个数或不是非负整数，或同一组各行报的数不同）：这一项两个数写 unknown、计进 TOTAL 行的 ignore_unknown，不红；成功句写
+#   「按登记整批不判：取不出（J 项：…）」或「取得出的 K 项 N 个点、M 态；另有 J 项取不出：…」，不把取不出的记成 0；各行报的数不同的，J 项里该项后面括号点名那条流，
+#   标准错误在 ITEM 行之后另打一行点名分项与流。
 # 派出收回：派出的是这一趟起了驱动的项数，收回的是打出 CRASH_AMPLIFICATION_ITEM 行的项数，对不上整趟判红（command-safety.md「并行不许把失败吃掉」）。
 #   某一项退 78 而停下时，后面没派的项不算派出，在 ✗ 里报出几项没派。
 # 退出码：
 #   0   跑到的项都不红、派出收回相等（有项本次未跑也是 0，成功句与标准错误里逐项点名）
 #   1   有红（上面 red 的几条）、或收回的项数与派出的不等；有项退 78 时也是 1（有红先判，退 78 的那一项照样在 ✗ 里点名、后面的项照样不派）
 #   2   用法错：参数认不得、--item 后面缺项名或项名认不得（这两种列出可点名的项）、--expand-up-to 不是正整数、登记表坏、分项驱动不在、
-#       平常跑时带了只给自证用的变量（见「只供自证」）
+#       平常跑时带了只给自证用的变量（见「只供自证」）、按段登记文件核不过（见「按段登记」；逐处列出问题，不清场、一项都不跑）
 #   77  派出的项一项都没判完（全是 not-run），也没有红
 #   78  运行条件不满足（出路：修好设备，或改配置）：preflight 判的（文件头两条 run-condition；含开了 GPU 而多机配置里一份卡都没写）、
 #       开跑前清场回读没过或多机配置没写全清场那两个键（scripts/crash/gpu-quiesce-run.sh 判的，它打 GPU_QUIESCE step=command result=not-started）、
 #       建不了放每项输出的目录、某一项的驱动退 78（这一趟没有红时）
 #   preflight 自己判不了条件（声明写坏）时退 1，见 .claude/singlefs-ai-sop/rules/preflight-discipline.md「不满足时」。没有别的退出码。
 # 弄坏开关 CRASH_AMPLIFICATION_BREAK=<项>（几个用逗号连；只在自证起的子进程里认）。逐项写开关名、弄坏哪一处、打开后 --selftest 哪几格该红
-#   （格号是 run_selftest 里的第 1–33 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
+#   （格号是 run_selftest 里的第 1–46 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
 # 写法（B 写法，样板是 scripts/mutation/mutate.sh 文件头「弄坏开关」一段）：一行「#   CRASH_AMPLIFICATION_BREAK=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头
 #   写点名的格「第 N 格」（、隔开；括号里是那一格失败行的句首，开关轮不读，括号外的每一段都算一格）。--selftest 末尾那一轮（开关轮）从这张表现读
 #   （crash-amplification-lib.sh 的 crash_amplification_read_switch_table，与双机驱动同一份读法）：表里 CRASH_AMPLIFICATION_BREAK 的开关与代码里认的开关要相等
@@ -149,7 +199,8 @@
 #   GPU_QUIESCE_BREAK=restore-after-run  清场包装出去时又照多机配置复原
 #       第 6 格（「没有照「开跑前清一次、每项带 --quiesced、跑完不复原」走」）、第 30 格（「跑完调了复原命令、或有项红时没退 1」）
 #   CRASH_AMPLIFICATION_BREAK=reuse-as-zero  取得出的复用数也记 0
-#       第 10 格（「复用数取错」）、第 28 格（「复用数没有每项只取一次」）、第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）
+#       第 10 格（「复用数取错」）、第 28 格（「复用数没有每项只取一次」）、第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）、
+#       第 45 格（「全部复用的一趟判了红、或 ITEM 行没照实写现判 3 复用 7」：ITEM 行复用写成 0）
 #   CRASH_AMPLIFICATION_BREAK=accept-unknown-reuse  取不出复用数的项记成 reused=0、不计进 reuse_unknown、成功句不点名
 #       第 11 格（「取不出复用数的项没照实报出」）、第 12 格（「两台跑的行被拿来推复用数」）
 #   CRASH_AMPLIFICATION_BREAK=reuse-across-shares  两台分份行、导入行、叫停的行也拿 states 减 states_checked_here 当复用数
@@ -161,7 +212,10 @@
 #   CRASH_AMPLIFICATION_BREAK=accept-zero-lines  驱动退 0、0 行 CRASH_AMPLIFICATION 不判红
 #       第 14 格（「驱动退 0、0 行却没判红」）
 #   CRASH_AMPLIFICATION_BREAK=accept-not-exhaustive  展开深度是全量的那一个、有行不是穷举也不判红
-#       第 15 格（「全量的展开深度下有行不是穷举却没判红」）、第 33 格（「不带参数的全量里一项不穷举，没有红在那一项」）
+#       第 15 格（「全量的展开深度下有行不是穷举却没判红」）、第 33 格（「不带参数的全量里一项不穷举，没有红在那一项」）、
+#       第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
 #   CRASH_AMPLIFICATION_BREAK=skip-not-exhaustive-in-full-scope  不带参数的全量（scope=full）里不判不穷举，点名的照判
 #       第 33 格（「不带参数的全量里一项不穷举，没有红在那一项」）
 #   CRASH_AMPLIFICATION_BREAK=hide-scaled-not-exhaustive  缩过规模那一趟的成功句不点名哪几项不穷举
@@ -179,7 +233,8 @@
 #   CRASH_AMPLIFICATION_BREAK=ignore-red-on-78  驱动退 78 时不看行里的红，照本次未跑记
 #       第 23 格（「驱动退 78 而行里报了红，这一项没记红」）
 #   CRASH_AMPLIFICATION_BREAK=skip-ignore-report  成功句不报按登记整批不判的点数与态数
-#       第 24 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 25 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）
+#       第 24 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 25 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）、
+#       第 44 格（「按登记不判的点数与态数没按流分组、每组只取一次」：成功句没报）
 #   CRASH_AMPLIFICATION_BREAK=ignore-unknown-as-zero  驱动行没报 ignored_points= / states_skipped_by_ignore= 的记成 0、不点名
 #       第 25 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）
 #   CRASH_AMPLIFICATION_BREAK=accept-bad-red-field  有行缺 red= 或 red 不是非负整数也不判红
@@ -195,24 +250,83 @@
 #   CRASH_AMPLIFICATION_BREAK=import-line-as-share-line  导入行（import_run=true）也认作分份行，它留的块不算没判
 #       第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）
 #   CRASH_AMPLIFICATION_BREAK=driver-not-run-as-zero-lines  不认分项驱动的 CRASH_AMPLIFICATION_NOT_RUN 行（退 0 而 0 行的照「驱动退 0 却 0 行」判红）
-#       第 31 格（「分项驱动退 77 没记进本次未跑」：原因里没有那一行的 reason=）、第 32 格（「几条流里有的没借到显存，这一项却记了通过」）
+#       第 31 格（「分项驱动退 77 没记进本次未跑」：原因里没有那一行的 reason=）、第 32 格（「几条流里有的没借到显存，这一项却记了通过」）、
+#       第 46 格（「分项驱动报判段没跑的那一项没记本次未跑」）
 #   CRASH_AMPLIFICATION_BREAK=driver-77-as-failure  分项驱动退 77 照别的非 0 退出码判红（改前的判法）
 #       第 31 格（「分项驱动退 77 没记进本次未跑」）
+#   CRASH_AMPLIFICATION_BREAK=judge-not-run-ignored  不认分项驱动转打的 CRASH_AMPLIFICATION_NOT_RUN step=judge 行（退 0 而 0 行的照「驱动退 0 却 0 行」判红）
+#       第 46 格（「分项驱动报判段没跑的那一项没记本次未跑」）
+#   CRASH_AMPLIFICATION_BREAK=registered-segments-ignored  不认驱动行的 registered_segments=（改前的判法：exhaustive=false 一律算不穷举）
+#       第 34 格（「一行 exhaustive=false 只因登记的段，这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
+#       第 40 格（「登记段分片枚举判了红、或 ITEM 行没带那两个字段、或成功句没报全展开与分片已判几态」）、
+#       第 41 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」）、
+#       第 42 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）、
+#       第 43 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）、
+#       第 45 格（「全部复用的一趟判了红」：登记段不认、stub 那条照不穷举红）
+#   CRASH_AMPLIFICATION_BREAK=registered-excuses-the-whole-item  一项里有一行登了段，这一项 exhaustive=false 的行就都不算不穷举（不按行判）
+#       第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）
+#   CRASH_AMPLIFICATION_BREAK=dash-counts-as-registered  registered_segments=- 也算登了段
+#       第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）
+#   CRASH_AMPLIFICATION_BREAK=registered-segments-unreported  ITEM 行的 registered_segments= 写 -、成功句不报按段登记那一段
+#       第 34 格（「一行 exhaustive=false 只因登记的段，这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
+#       第 40 格（「登记段分片枚举判了红、或 ITEM 行没带那两个字段、或成功句没报全展开与分片已判几态」）
+#   CRASH_AMPLIFICATION_BREAK=segments-registry-not-sent  不往分项驱动送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY（改前的样子）
+#       第 36 格（「分项驱动没收到按段登记文件的绝对路径」）
+#   CRASH_AMPLIFICATION_BREAK=segments-registry-unchecked  开跑前不核按段登记文件
+#       第 37 格（「按段登记文件写坏了却没整趟拒跑」）
+#   CRASH_AMPLIFICATION_BREAK=beyond-expansion-ignored  不按 unregistered_segments_beyond_expansion= 判（改前的判法：登了段的行一律不算不穷举）
+#       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
+#   CRASH_AMPLIFICATION_BREAK=beyond-expansion-missing-as-dash  驱动行没报 unregistered_segments_beyond_expansion= 当成报了 -（ITEM 行写 - 不写 unknown，判法上当成没有展不开的段）
+#       第 24 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 25 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）、第 28 格（「复用数没有每项只取一次」）、
+#       第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）、第 34 格（「一行 exhaustive=false 只因登记的段，这一项却判了红」）、
+#       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
+#   CRASH_AMPLIFICATION_BREAK=beyond-expansion-unreported  ITEM 行的 unregistered_segments_beyond_expansion= 写 -、成功句不报展开上限盖不住又没登记的段
+#       第 24 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 25 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）、第 28 格（「复用数没有每项只取一次」）、
+#       第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）、第 34 格（「一行 exhaustive=false 只因登记的段，这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
+#       第 40 格（「登记段分片枚举判了红、或 ITEM 行没带那两个字段、或成功句没报全展开与分片已判几态」）
+#   CRASH_AMPLIFICATION_BREAK=slice-progress-zero-accepted  分片段已判 0 态也不判红
+#       第 41 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」）
+#   CRASH_AMPLIFICATION_BREAK=slice-zero-despite-reuse  分片段已判 0 态不看那一行的现判与复用（改前的判法：全部复用的一趟也红）
+#       第 45 格（「全部复用的一趟判了红」）
+#   CRASH_AMPLIFICATION_BREAK=domains-missing-accepted  登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，当成没有登记段的域（不判红，ITEM 行写 -）
+#       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
+#       第 42 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）
+#   CRASH_AMPLIFICATION_BREAK=domain-unlisted-segment-accepted  registered_segments= 列的段不在 registered_segment_domains= 里、分片段不在 registered_segment_progress= 里都不判红
+#       第 43 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）
+#   CRASH_AMPLIFICATION_BREAK=slice-domains-unreported  ITEM 行的 registered_segment_domains= / registered_segment_progress= 写 -、成功句不报登记段的域那一段
+#       第 34 格（「一行 exhaustive=false 只因登记的段，这一项却判了红」）、第 35 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 38 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 39 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
+#       第 40 格（「登记段分片枚举判了红、或 ITEM 行没带那两个字段、或成功句没报全展开与分片已判几态」）、
+#       第 41 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」：ITEM 行的进度没照实写）、
+#       第 42 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）、
+#       第 43 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）
+#   CRASH_AMPLIFICATION_BREAK=ignore-summed-per-row  按登记不判的 ignored_points= / states_skipped_by_ignore= 对每一行相加（同一条流的本机份、第二台份、导入、叫停再续各行重复计），不按流分组只取一次、同组各行不同也不记 unknown
+#       第 44 格（「按登记不判的点数与态数没按流分组、每组只取一次」）
 # 只供自证（自证起的子进程里才认；平常跑时有一个非空就退 2 拒跑、拒绝句逐个点名，--list-items 与 --selftest 本身不拒）：
 #   CRASH_AMPLIFICATION_BREAK=<项>（上面那张表）；CRASH_AMPLIFICATION_SELFTEST_RED_ITEM=1 每项的测试目标名后面加 -red（假驱动见了退 1）；
 #   CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT=<分项> 跑完那一项不打它的 CRASH_AMPLIFICATION_ITEM 行、不计进汇总（造一项收不回）；
-#   CRASH_AMPLIFICATION_ITEM_DRIVER=<脚本> 换掉分项驱动（自证用假的）。
+#   CRASH_AMPLIFICATION_ITEM_DRIVER=<脚本> 换掉分项驱动（自证用假的）；
+#   CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT=<目录> 按段登记的被判仓根换成它（核与送的都是 <目录>/.claude/gate.d/crash-point-replay-segments.tsv，见「按段登记」）。
 #   「自证起的子进程」的标记：CRASH_AMPLIFICATION_SELFTEST_MARK=<文件>，那份文件在、内容是 SELFTEST_MARK_CONTENT 那一行；只有 run_selftest 设它。
-#   这五个变量读完就从环境里清掉，不传给分项驱动；经清场包装重起的那一趟由这里原样交回去（只在自证起的子进程里）。
+#   这六个变量读完就从环境里清掉，不传给分项驱动；经清场包装重起的那一趟由这里原样交回去（只在自证起的子进程里）。
 #   清场走真的 scripts/crash/gpu-quiesce-run.sh：自证把多机配置指到临时目录里只写了假清场命令的一份、状态目录指到临时目录，不碰真的清场命令。
 #   CRASH_AMPLIFICATION_SWITCH_TABLE=<文件>：--selftest 末尾的开关轮从这份文件的文件头读开关表（不设读本脚本自己的），代码里认的开关照旧从本脚本取；
-#     拿一份改坏了表的拷贝（删一格、多一格、格名写错）证开关轮会红。只在 --selftest 的开关轮里读：平常跑不读它，不在上面拒跑的四个之列。
+#     拿一份改坏了表的拷贝（删一格、多一格、格名写错）证开关轮会红。只在 --selftest 的开关轮里读：平常跑不读它，不在上面拒跑的五个之列。
 # 自证末尾那一轮（开关轮）走 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_switch_wheel（与双机驱动共用，判法与并行度见那份文件头「弄坏开关轮」）：
-#   并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS（正整数），没给取 SINGLEFS_THREAD_CAP，再没给按 nproc；一个开关一个进程，各写各的输出文件，逐个 wait 收。
+#   并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS（正整数），没给取 SINGLEFS_THREAD_CAP，再没给取登记的重活默认并行度（.claude/heavy-thread-default）；一个开关一个进程，各写各的输出文件，逐个 wait 收。
 #
 # gate-similar: crash-amplification-item.sh 它跑一个分项的一趟（排派活计划、定在哪跑）；这里是分项登记表与全量的循环，每项调它
 # gate-similar: crash-amplification-two-hosts.sh 它跑一条用例的双机一趟，由分项驱动在要动用第二台时调；这里不直接调它
-# gate-similar: layer0-shard-run.sh 它跑层 0 登记的崩溃枚举用例（CPU 枚举、checker-tier-layer0-replay 全绿标记）；这里跑的是走判定库的流水线用例
+# gate-similar: crash-point-replay-shard-run.sh 它跑崩溃点重放登记的崩溃枚举用例（CPU 枚举、checker-tier-crash-point-replay 全绿标记）；这里跑的是走判定库的流水线用例
 # gate-similar: gpu-quiesce-run.sh 它只管清场、回读、跑（不复原）；这里选好分项之后经它重起自己
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -246,6 +360,7 @@ crash_amplification_break_switches="${CRASH_AMPLIFICATION_BREAK:-}"
 selftest_red_item="${CRASH_AMPLIFICATION_SELFTEST_RED_ITEM:-}"
 selftest_drop_result="${CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT:-}"
 test_item_driver="${CRASH_AMPLIFICATION_ITEM_DRIVER:-}"
+selftest_segments_root="${CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT:-}"
 
 running_under_selftest=0
 if [[ -n "${CRASH_AMPLIFICATION_SELFTEST_MARK:-}" && -f "${CRASH_AMPLIFICATION_SELFTEST_MARK:-}" ]] \
@@ -256,11 +371,22 @@ unset CRASH_AMPLIFICATION_SELFTEST_MARK
 
 crash_amplification_break_is() { [[ ",$crash_amplification_break_switches," == *",$1,"* ]]; }
 
-# 一项的汇总（判法见文件头「一项怎么判」「复用数怎么取」「按登记整批不判」）：读这一项的输出文件，打一行十一个数，空格隔开：
+# 一项的汇总（判法见文件头「一项怎么判」「复用数怎么取」「按登记整批不判」「按段登记」）：读这一项的输出文件，打一行十四个字段，空格隔开：
 # 行数 现判 红 复用（或 unknown） exhaustive（true|false） 展开深度（或 unknown） 叫停的行数（不算 warm_up 行） 没判的块（不算 warm_up 行；两台分份行的只在同一组没有导入行时算）
 # red= 坏了的行数（缺 red= 或值不是非负整数） 按登记不判的点数（或 unknown） 按登记不判的态数（或 unknown）
+# 不穷举又没按段登记的行数 那几行的流名（、隔开，没带 flow= 的写「没带flow=的行」；没有写 -） 按段登记的段（[<流>@]<段号>:<写数>，逗号隔开；没有写 -）
+# 登了段而另有展开上限盖不住又没登记的段的行数 那几段（[<流>@]<段号>:<写数>，逗号隔开；没有写 -）
+# 登了段、exhaustive=false 而没报 unregistered_segments_beyond_expansion=（或写得认不得）的行数 那几行的流名（写法同上；没有写 -）
+# ITEM 行的 unregistered_segments_beyond_expansion=（各行报的段，[<流>@]<段号>:<写数> 逗号隔开；没有写 -，取不出写 unknown）
+# ITEM 行的 registered_segment_domains=（[<流>@]<段号>:<full|slice> 逗号隔开）与 registered_segment_progress=（[<流>@]<段号>:<已判>/<总>）：没有写 -，取不出写 unknown
+# 登了段而 registered_segment_domains= / registered_segment_progress= 缺了、没列全登记的段或写法认不得的行数 那几行的流名（写法同上；没有写 -）
+# 分片段已判 0 态的行数 那几段（[<流>@]<段号>:<已判>/<总>，逗号隔开；没有写 -）
+# 按登记不判的两个数同一组（按流分，没带 flow= 的归一组）各行报的数不同的流名（、隔开，没带 flow= 的写「没带flow=的行」；没有写 -）
 summarize_the_item() { # <这一项的输出文件>
-  local across=0 as_zero=0 ignore_as_zero=0 every_line=0 flow_unexcused=0 excuse_without_import=0 import_as_share=0 output_file="$1"
+  local across=0 as_zero=0 ignore_as_zero=0 every_line=0 flow_unexcused=0 excuse_without_import=0 import_as_share=0 output_file="$1" ignore_per_row=0
+  crash_amplification_break_is ignore-summed-per-row && ignore_per_row=1
+  local registered_ignored=0 registered_whole_item=0 dash_registered=0 beyond_ignored=0 beyond_missing_as_dash=0
+  local slice_zero_accepted=0 slice_zero_despite_reuse=0 domains_missing_accepted=0 domain_unlisted_accepted=0
   crash_amplification_break_is reuse-across-shares && across=1
   crash_amplification_break_is reuse-as-zero && as_zero=1
   crash_amplification_break_is ignore-unknown-as-zero && ignore_as_zero=1
@@ -268,15 +394,89 @@ summarize_the_item() { # <这一项的输出文件>
   crash_amplification_break_is flow-share-lines-unexcused && flow_unexcused=1
   crash_amplification_break_is excuse-share-lines-without-import && excuse_without_import=1
   crash_amplification_break_is import-line-as-share-line && import_as_share=1
+  crash_amplification_break_is registered-segments-ignored && registered_ignored=1
+  crash_amplification_break_is registered-excuses-the-whole-item && registered_whole_item=1
+  crash_amplification_break_is dash-counts-as-registered && dash_registered=1
+  crash_amplification_break_is beyond-expansion-ignored && beyond_ignored=1
+  crash_amplification_break_is beyond-expansion-missing-as-dash && beyond_missing_as_dash=1
+  crash_amplification_break_is slice-progress-zero-accepted && slice_zero_accepted=1
+  crash_amplification_break_is slice-zero-despite-reuse && slice_zero_despite_reuse=1
+  crash_amplification_break_is domains-missing-accepted && domains_missing_accepted=1
+  crash_amplification_break_is domain-unlisted-segment-accepted && domain_unlisted_accepted=1
   [[ -f "$output_file" ]] || output_file=/dev/null
   # 复用数按流分组、每组只取一次（文件头「复用数怎么取」）：组里有先判着的行只取第一行先判着的；没有就取导入行之外各行之和。
-  # 没判的块同样按流分组（文件头「一项怎么判」not-run）：分份行留的块只在同一组没有导入行时算
+  # 没判的块同样按流分组（文件头「一项怎么判」not-run）：分份行留的块只在同一组没有导入行时算。
+  # 按段登记（文件头「按段登记」）：exhaustive=false 而 registered_segments= 是 <段号>:<写数>[,…] 的行，unregistered_segments_beyond_expansion= 是 - 才不算不穷举；
+  #   不是 - 的那几段、没报这个字段的那几行另记；那几段与各行报的这个字段都按流去重记下。
+  #   登了段的行还要报 registered_segment_domains= / registered_segment_progress=（文件头「按段登记」的分片枚举）：缺、漏段、认不得的那几行另记，分片段已判 0 态的那几段另记
   awk -v across="$across" -v as_zero="$as_zero" -v ignore_as_zero="$ignore_as_zero" -v every_line="$every_line" \
-      -v flow_unexcused="$flow_unexcused" -v excuse_without_import="$excuse_without_import" -v import_as_share="$import_as_share" '
+      -v flow_unexcused="$flow_unexcused" -v excuse_without_import="$excuse_without_import" -v import_as_share="$import_as_share" \
+      -v registered_ignored="$registered_ignored" -v registered_whole_item="$registered_whole_item" -v dash_registered="$dash_registered" \
+      -v beyond_ignored="$beyond_ignored" -v beyond_missing_as_dash="$beyond_missing_as_dash" \
+      -v slice_zero_accepted="$slice_zero_accepted" -v slice_zero_despite_reuse="$slice_zero_despite_reuse" -v domains_missing_accepted="$domains_missing_accepted" -v domain_unlisted_accepted="$domain_unlisted_accepted" \
+      -v ignore_per_row="$ignore_per_row" '
+    BEGIN {
+      # 分片段的进度：<段号>:<已判>/<总>，两个数都是十进制数字串（可能到 140 位）：只按写法认，不转成数、不做数值比较
+      progress_entry = "[0-9]+:[0-9]+/[0-9]+"
+      progress_list = "^" progress_entry "(," progress_entry ")*$"
+    }
+    function remember_one(kind, entry) {
+      # 按 kind（domain、progress、zero）去重追加进 listed[kind]
+      if ((kind, entry) in entry_seen) return
+      entry_seen[kind, entry] = 1
+      listed[kind] = listed[kind] (listed[kind] == "" ? "" : ",") entry
+    }
+    function domains_problem_of_the_line(    count, pieces, piece_index, at, number) {
+      # 这一行的 registered_segment_domains= / registered_segment_progress=：0 对；1 缺了一个、写法认不得、或进度里有不是分片的段；2 登记的段没在域里、或分片段没在进度里。
+      #   对时段号的域记进 line_kind、分片段的「已判/总」记进 line_progress（弄坏开关 domain-unlisted-segment-accepted 下不查 2 那两样）
+      split("", line_kind); split("", line_progress)
+      if (!domains_seen || !progress_seen) return 1
+      if (domains != "-" && domains !~ /^[0-9]+:(full|slice)(,[0-9]+:(full|slice))*$/) return 1
+      if (progress != "-" && progress !~ progress_list) return 1
+      if (domains != "-") {
+        count = split(domains, pieces, ",")
+        for (piece_index = 1; piece_index <= count; piece_index++) {
+          at = index(pieces[piece_index], ":"); line_kind[substr(pieces[piece_index], 1, at - 1)] = substr(pieces[piece_index], at + 1)
+        }
+      }
+      if (progress != "-") {
+        count = split(progress, pieces, ",")
+        for (piece_index = 1; piece_index <= count; piece_index++) {
+          at = index(pieces[piece_index], ":"); number = substr(pieces[piece_index], 1, at - 1)
+          if (!(number in line_kind) || line_kind[number] != "slice") return 1
+          line_progress[number] = substr(pieces[piece_index], at + 1)
+        }
+      }
+      if (domain_unlisted_accepted) return 0
+      count = split(registered, pieces, ",")
+      for (piece_index = 1; piece_index <= count; piece_index++) {
+        number = pieces[piece_index]; sub(/:.*/, "", number)
+        if (number != "-" && !(number in line_kind)) return 2
+      }
+      for (number in line_kind) if (line_kind[number] == "slice" && !(number in line_progress)) return 2
+      return 0
+    }
+    function segment_entries_of(list, flow_name,    count, pieces, piece_index, text) {
+      # <段号>:<写数>[,…] → [<流>@]<段号>:<写数>[,…]
+      count = split(list, pieces, ","); text = ""
+      for (piece_index = 1; piece_index <= count; piece_index++) text = text (text == "" ? "" : ",") (flow_name == "" ? "" : flow_name "@") pieces[piece_index]
+      return text
+    }
+    function remember_entries(entries, kind,    count, pieces, piece_index) {
+      # 按 kind 去重追加：kind 是 "red" 记进 beyond_red_text，"report" 记进 beyond_report_text
+      count = split(entries, pieces, ",")
+      for (piece_index = 1; piece_index <= count; piece_index++) {
+        if ((kind, pieces[piece_index]) in entry_seen) continue
+        entry_seen[kind, pieces[piece_index]] = 1
+        if (kind == "red") beyond_red_text = beyond_red_text (beyond_red_text == "" ? "" : ",") pieces[piece_index]
+        else beyond_report_text = beyond_report_text (beyond_report_text == "" ? "" : ",") pieces[piece_index]
+      }
+    }
     /^CRASH_AMPLIFICATION / {
       lines++
       explicit = ""; states = ""; checked = ""; share_count = ""; stopped = 0; imported = 0; unjudged = 0; warm = 0; exhaustive = ""; expand = ""
-      red_seen = 0; ignored_here = ""; skipped_here = ""; flow = ""; import_run = 0; mode = ""
+      red_seen = 0; ignored_here = ""; skipped_here = ""; flow = ""; import_run = 0; mode = ""; registered = ""; beyond = ""; beyond_seen = 0
+      domains = ""; domains_seen = 0; progress = ""; progress_seen = 0
       for (field = 2; field <= NF; field++) {
         key = $field; sub(/=.*/, "", key); value = substr($field, length(key) + 2)
         if (key == "states_reused") explicit = value
@@ -295,12 +495,82 @@ summarize_the_item() { # <这一项的输出文件>
         else if (key == "warm_up" && value == "true") warm = 1
         else if (key == "exhaustive") exhaustive = value
         else if (key == "expand_up_to") expand = value
+        else if (key == "registered_segments") registered = value
+        else if (key == "unregistered_segments_beyond_expansion") { beyond = value; beyond_seen = 1 }
+        else if (key == "registered_segment_domains") { domains = value; domains_seen = 1 }
+        else if (key == "registered_segment_progress") { progress = value; progress_seen = 1 }
       }
+      # unregistered_segments_beyond_expansion=：- 或 <段号>:<写数>[,…] 才认得；没报或写得认不得算取不出（弄坏开关 beyond-expansion-missing-as-dash 下当成 -）
+      beyond_known = (beyond_seen && (beyond == "-" || beyond ~ /^[0-9]+:[0-9]+(,[0-9]+:[0-9]+)*$/))
+      if (!beyond_known && beyond_missing_as_dash) { beyond = "-"; beyond_known = 1 }
+      if (!beyond_known) beyond_unknown = 1
+      else if (beyond != "-") remember_entries(segment_entries_of(beyond, flow), "report")
       if (!red_seen) bad_red++
-      if (ignored_here ~ /^[0-9]+$/ && skipped_here ~ /^[0-9]+$/) { ignored += ignored_here; skipped += skipped_here }
+      # 按登记不判的两个数（文件头「按登记整批不判」）：按流分组、每组只取一次；同一组各行报的不同记进 ignore_conflict（弄坏开关 ignore-summed-per-row 下逐行相加）
+      if (ignored_here ~ /^[0-9]+$/ && skipped_here ~ /^[0-9]+$/) {
+        if (ignore_per_row) { ignored += ignored_here; skipped += skipped_here }
+        else {
+          ignore_points_text = ignored_here; sub(/^0+/, "", ignore_points_text); if (ignore_points_text == "") ignore_points_text = "0"
+          ignore_states_text = skipped_here; sub(/^0+/, "", ignore_states_text); if (ignore_states_text == "") ignore_states_text = "0"
+          if (!(flow in ignore_seen)) {
+            ignore_seen[flow] = 1; ignore_flow_order[++ignore_flow_count] = flow
+            ignore_points_of[flow] = ignore_points_text; ignore_states_of[flow] = ignore_states_text
+          } else if (ignore_points_of[flow] != ignore_points_text || ignore_states_of[flow] != ignore_states_text) ignore_conflict[flow] = 1
+        }
+      }
       else if (!ignore_as_zero) ignore_unknown = 1
       if (checked ~ /^[0-9]+$/) states_checked += checked
       if (exhaustive != "true") not_exhaustive = 1
+      # 按段登记：这一行登了段（registered_segments= 不是 - 而写得认得）就把段按流记下；exhaustive=false 只因登记段的行不算不穷举
+      line_registered = (!registered_ignored && (registered ~ /^[0-9]+:[0-9]+(,[0-9]+:[0-9]+)*$/ || (dash_registered && registered == "-")))
+      flow_label = (flow == "" ? "没带flow=的行" : flow)
+      if (line_registered) {
+        any_registered = 1
+        segment_count = split(registered, segment_list, ",")
+        for (segment_index = 1; segment_index <= segment_count; segment_index++) {
+          if (segment_list[segment_index] == "-") continue
+          entry = (flow == "" ? "" : flow "@") segment_list[segment_index]
+          if (!(entry in registered_seen)) { registered_seen[entry] = 1; registered_text = registered_text (registered_text == "" ? "" : ",") entry }
+        }
+        # 登记段的域与分片进度（文件头「按段登记」）：缺、漏段、认不得记下流名（弄坏开关 domains-missing-accepted 下缺与认不得当成没有登记段的域）；
+        #   对的照报的次序按流去重记下，分片段已判数字面全是 0 的另记那几段（弄坏开关 slice-progress-zero-accepted 下不记）
+        domains_problem = domains_problem_of_the_line()
+        if (domains_problem == 1 && domains_missing_accepted) { domains_problem = 0; domains = "-"; progress = "-"; split("", line_kind); split("", line_progress) }
+        if (domains_problem) {
+          domain_bad_lines++; domain_unknown = 1
+          if (!(flow_label in domain_bad_seen)) { domain_bad_seen[flow_label] = 1; domain_bad_flows = domain_bad_flows (domain_bad_flows == "" ? "" : "、") flow_label }
+        } else {
+          if (domains != "-") {
+            segment_count = split(domains, segment_list, ",")
+            for (segment_index = 1; segment_index <= segment_count; segment_index++) remember_one("domain", (flow == "" ? "" : flow "@") segment_list[segment_index])
+          }
+          # 分片段已判 0 态只在这一行现判与复用都是 0 时记（文件头「按段登记」）：states_checked_here= 与 states_reused= 有一个是正整数就不记（全复用的一趟不红）；
+          #   没报 states_reused= 的照 0 算。弄坏开关 slice-zero-despite-reuse 下不看这两个数
+          line_idle = ((checked !~ /^0*[1-9][0-9]*$/ && explicit !~ /^0*[1-9][0-9]*$/) || slice_zero_despite_reuse)
+          line_zero = 0
+          if (progress != "-") {
+            segment_count = split(progress, segment_list, ",")
+            for (segment_index = 1; segment_index <= segment_count; segment_index++) {
+              entry = (flow == "" ? "" : flow "@") segment_list[segment_index]
+              remember_one("progress", entry)
+              judged_here = segment_list[segment_index]; sub(/^[0-9]+:/, "", judged_here); sub(/\/.*/, "", judged_here)
+              if (judged_here ~ /^0+$/ && !slice_zero_accepted && line_idle) { line_zero = 1; remember_one("zero", entry) }
+            }
+          }
+          if (line_zero) zero_lines++
+        }
+      }
+      if (exhaustive != "true" && !(exhaustive == "false" && line_registered)) {
+        not_covered++; not_covered_label[not_covered] = flow_label; not_covered_false[not_covered] = (exhaustive == "false")
+      } else if (exhaustive == "false" && line_registered && !beyond_ignored) {
+        # 登了段的行：另有展开上限盖不住又没登记的段判红（记下那几段），没报这个字段照不穷举判红（记下流名）；是 - 的不算不穷举
+        if (!beyond_known) {
+          missing_lines++
+          if (!(flow_label in missing_seen)) { missing_seen[flow_label] = 1; missing_flows = missing_flows (missing_flows == "" ? "" : "、") flow_label }
+        } else if (beyond != "-") {
+          beyond_red_lines++; remember_entries(segment_entries_of(beyond, flow), "red")
+        }
+      }
       if (expand == "") expand = "?"
       if (!(expand in expands)) { expands[expand] = 1; distinct_expands++; only_expand = expand }
       # 分份行：share=<i>/<n>、n>1，或不带 share= 而 mode=two_hosts_* 的 flow= 行；导入行不是
@@ -338,14 +608,100 @@ summarize_the_item() { # <这一项的输出文件>
       if (lines == 0 || reuse_unknown) reused_text = "unknown"; else if (as_zero) reused_text = "0"; else reused_text = sprintf("%.0f", reused)
       exhaustive_text = (lines > 0 && !not_exhaustive) ? "true" : "false"
       expand_text = (distinct_expands == 1 && only_expand != "?") ? only_expand : "unknown"
+      # 按登记不判的两个数：各组取到的数相加；有组各行报的不同，这一项两个数写 unknown 并点名那条流
+      ignore_conflict_flows = ""
+      for (ignore_index = 1; ignore_index <= ignore_flow_count; ignore_index++) {
+        ignore_flow = ignore_flow_order[ignore_index]
+        if (ignore_flow in ignore_conflict) {
+          ignore_unknown = 1
+          ignore_conflict_flows = ignore_conflict_flows (ignore_conflict_flows == "" ? "" : "、") (ignore_flow == "" ? "没带flow=的行" : ignore_flow)
+        } else { ignored += ignore_points_of[ignore_flow]; skipped += ignore_states_of[ignore_flow] }
+      }
       if (lines == 0 || ignore_unknown) { ignored_text = "unknown"; skipped_text = "unknown" }
       else { ignored_text = sprintf("%.0f", ignored); skipped_text = sprintf("%.0f", skipped) }
-      printf "%d %.0f %.0f %s %s %s %d %.0f %d %s %s\n", lines, states_checked, red, reused_text, exhaustive_text, expand_text, stopped_lines, unjudged_blocks, bad_red, ignored_text, skipped_text
+      # 不穷举又没按段登记的行（弄坏开关 registered-excuses-the-whole-item 下，这一项有一行登了段就把 exhaustive=false 的行都算登记了）
+      uncovered_lines = 0; uncovered_flows = ""
+      for (line_index = 1; line_index <= not_covered; line_index++) {
+        if (registered_whole_item && any_registered && not_covered_false[line_index]) continue
+        uncovered_lines++; flow_label = not_covered_label[line_index]
+        if (!(flow_label in uncovered_seen)) { uncovered_seen[flow_label] = 1; uncovered_flows = uncovered_flows (uncovered_flows == "" ? "" : "、") flow_label }
+      }
+      report_text = (beyond_report_text != "" ? beyond_report_text : ((lines == 0 || beyond_unknown) ? "unknown" : "-"))
+      domain_text = (listed["domain"] != "" ? listed["domain"] : (domain_unknown ? "unknown" : "-"))
+      progress_text = (listed["progress"] != "" ? listed["progress"] : (domain_unknown ? "unknown" : "-"))
+      printf "%d %.0f %.0f %s %s %s %d %.0f %d %s %s %d %s %s %d %s %d %s %s %s %s %d %s %d %s %s\n", lines, states_checked, red, reused_text, exhaustive_text, expand_text, stopped_lines, unjudged_blocks, bad_red, ignored_text, skipped_text,
+        uncovered_lines, (uncovered_flows == "" ? "-" : uncovered_flows), (registered_text == "" ? "-" : registered_text),
+        beyond_red_lines, (beyond_red_text == "" ? "-" : beyond_red_text), missing_lines, (missing_flows == "" ? "-" : missing_flows), report_text,
+        domain_text, progress_text, domain_bad_lines, (domain_bad_flows == "" ? "-" : domain_bad_flows), zero_lines, (listed["zero"] == "" ? "-" : listed["zero"]),
+        (ignore_conflict_flows == "" ? "-" : ignore_conflict_flows)
     }' "$output_file"
 }
 
 item_fields() { # <登记行> <字段号 1..4>
   printf '%s' "$1" | cut -f"$2"
+}
+
+segments_of_the_item_for_the_success_line() { # <分项> <[<流>@]<段号>:<写数>[,…]>：打「段数<TAB><分项> 流 <流> 段 <段号>（<写数> 写）、…，…」（成功句用）
+  awk -v item="$1" -v list="$2" 'BEGIN {
+    count = split(list, entries, ",")
+    for (entry_index = 1; entry_index <= count; entry_index++) {
+      entry = entries[entry_index]; flow = ""
+      at = index(entry, "@"); if (at) { flow = substr(entry, 1, at - 1); entry = substr(entry, at + 1) }
+      split(entry, numbers, ":")
+      if (!(flow in flow_seen)) { flow_seen[flow] = 1; flow_order[++flows] = flow }
+      segments_of[flow] = segments_of[flow] (segments_of[flow] == "" ? "" : "、") "段 " numbers[1] "（" numbers[2] " 写）"
+      total++
+    }
+    text = ""
+    for (flow_index = 1; flow_index <= flows; flow_index++) {
+      flow = flow_order[flow_index]
+      text = text (text == "" ? "" : "，") item (flow == "" ? "" : " 流 " flow) " " segments_of[flow]
+    }
+    printf "%d\t%s\n", total, text
+  }'
+}
+
+domains_of_the_item_for_the_success_line() { # <分项> <[<流>@]<段号>:<full|slice>[,…]> <[<流>@]<段号>:<已判>/<总>[,…] 或 ->：
+  #   打「段数<TAB>全展开段数<TAB>分片段数<TAB><分项> 流 <流> 段 <段号>：全展开、<分项> 流 <流> 段 <段号>：分片，已判 <已判>/<总>、…」（成功句用；同一段几行报的进度用「与」连）
+  awk -v item="$1" -v list="$2" -v progress="$3" 'BEGIN {
+    count = split(progress, pieces, ",")
+    for (piece_index = 1; piece_index <= count; piece_index++) {
+      if (pieces[piece_index] == "-") continue
+      at = index(pieces[piece_index], "/"); head = substr(pieces[piece_index], 1, at - 1); colon = 0
+      for (position = length(head); position > 0; position--) if (substr(head, position, 1) == ":") { colon = position; break }
+      key = substr(head, 1, colon - 1); fraction = substr(pieces[piece_index], colon + 1)
+      progress_of[key] = progress_of[key] (progress_of[key] == "" ? "" : " 与 ") fraction
+    }
+    count = split(list, entries, ",")
+    for (entry_index = 1; entry_index <= count; entry_index++) {
+      entry = entries[entry_index]; flow = ""; key_part = entry; sub(/:[a-z]+$/, "", key_part); kind = substr(entry, length(key_part) + 2)
+      segment = key_part; at = index(segment, "@"); if (at) { flow = substr(segment, 1, at - 1); segment = substr(segment, at + 1) }
+      label = item (flow == "" ? "" : " 流 " flow) " 段 " segment
+      if (kind == "full") { label = label "：全展开"; full++ }
+      else { label = label "：分片，已判 " (key_part in progress_of ? progress_of[key_part] : "取不出"); sliced++ }
+      text = text (text == "" ? "" : "、") label
+      total++
+    }
+    printf "%d\t%d\t%d\t%s\n", total, full, sliced, text
+  }'
+}
+
+segments_by_flow() { # <[<流>@]<段号>:<写数>[,…]>：打「流 <流> 段 <段号>:<写数>、…；流 …」（红因用；没带 flow= 的行只写「段 …」）
+  awk -v list="$1" 'BEGIN {
+    count = split(list, entries, ",")
+    for (entry_index = 1; entry_index <= count; entry_index++) {
+      entry = entries[entry_index]; flow = ""
+      at = index(entry, "@"); if (at) { flow = substr(entry, 1, at - 1); entry = substr(entry, at + 1) }
+      if (!(flow in flow_seen)) { flow_seen[flow] = 1; flow_order[++flows] = flow }
+      segments_of[flow] = segments_of[flow] (segments_of[flow] == "" ? "" : "、") entry
+    }
+    text = ""
+    for (flow_index = 1; flow_index <= flows; flow_index++) {
+      flow = flow_order[flow_index]
+      text = text (text == "" ? "" : "；") (flow == "" ? "" : "流 " flow " ") "段 " segments_of[flow]
+    }
+    printf "%s", text
+  }'
 }
 
 list_items() { # 分项名、测试目标、用例函数、档位
@@ -410,12 +766,19 @@ run_selftest() {
   # 子进程的运行条件、每项输出都落在这里：多机配置指到不在的文件（两个开关都关），退役的私有显卡配置变量清掉，本次未跑不写进门禁的汇总
   export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home"
   unset SINGLEFS_GPU_CARDS_CONFIG CRASH_AMPLIFICATION_SELFTEST_RED_ITEM CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT CRASH_AMPLIFICATION_ITEM_SWITCHES CRASH_AMPLIFICATION_ITEM_CARDS GATE_NOT_RUN_FILE
+  unset SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT
+  # 按段登记的仓根（文件头「按段登记」）：合表照抄仓里那一份，按段登记文件只写一行核得过的（第 37 格临时换成写坏的一份、跑完换回）
+  local segments_root="$work/segments-root" segments_registry
+  segments_registry="$segments_root/.claude/gate.d/crash-point-replay-segments.tsv"
+  mkdir -p "$segments_root/.claude/gate.d"
+  cp -- "$repository_root/.claude/gate.d/crash-point-replay-items.tsv" "$segments_root/.claude/gate.d/crash-point-replay-items.tsv"
+  printf '%s\n' "# 自证的按段登记" "position-addressed-trees	stub	3	300	$(printf '0123456789abcdef%.0s' 1 2 3 4)" >"$segments_registry"
   stub="$work/driver.sh"
   cat >"$stub" <<'STUB'
 #!/usr/bin/env bash
-# 假的分项驱动：记下参数；形态按 STUB_SHAPE_<测试目标>（没给按 STUB_SHAPE，再没给 single-host）打几行 CRASH_AMPLIFICATION（照真驱动的几种行），
+# 假的分项驱动：记下参数与收到的按段登记文件路径；形态按 STUB_SHAPE_<测试目标>（没给按 STUB_SHAPE，再没给 single-host）打几行 CRASH_AMPLIFICATION（照真驱动的几种行），
 # 每行的 expand_up_to 照交进来的 --expand-up-to（给了 STUB_EXPAND_OVERRIDE 就报它：造一个不照参数跑的驱动）；测试目标名以 -red 结尾的退 1
-printf 'driver %s\n' "$*" >> "${STUB_LOG:?}"
+printf 'driver %s segments=[%s]\n' "$*" "${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY-unset}" >> "${STUB_LOG:?}"
 target="$1"; expand=""; previous=""
 for argument in "$@"; do
   if [[ "$previous" == --expand-up-to ]]; then expand="$argument"; fi
@@ -445,11 +808,29 @@ case "$shape" in
   partial-not-run) # 一条用例三条流、第 2 条借不到显存：借到的照判（一行判完的汇总行），没借到的那一条照真驱动打 CRASH_AMPLIFICATION_NOT_RUN 行，退 0
     echo "CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment flow=2/3 reason=等了 1800 秒，池里没有一张卡空得出 5120 MiB（假驱动）"
     echo "CRASH_AMPLIFICATION mode=single_host_cpu share=0/1 cards=0 states=10 states_checked_here=7 blocks_checked_here=2 imported_blocks=0 unjudged_blocks=0 red=0 expand_up_to=$expand exhaustive=true" ;;
+  judge-not-run) # 不带 gpu 特性的二进制遇到多机配置 ENABLE_GPU=1：判段这一趟不跑、录入段照录，分项驱动转打那一条流的 CRASH_AMPLIFICATION_NOT_RUN step=judge 行、退 0，没有 CRASH_AMPLIFICATION 行
+    echo "CRASH_AMPLIFICATION_NOT_RUN step=judge test=crash_amplification::run_from_environment flow=stub reason=配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性：判段这一趟不跑（假驱动）" ;;
   not-exhaustive) # 展开深度不够把每一段展开完
     echo "CRASH_AMPLIFICATION mode=single_host_cpu share=0/1 cards=0 states=10 states_checked_here=7 blocks_checked_here=2 imported_blocks=0 unjudged_blocks=0 red=0 expand_up_to=$expand exhaustive=false" ;;
   not-exhaustive-flow) # 一条用例两条流：stub 那条有一段长过展开上限（exhaustive=false），other 那条穷举
     echo "CRASH_AMPLIFICATION flow=stub mode=single_host_cpu states_checked_here=5 states_reused=1 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 expand_up_to=$expand exhaustive=false"
     echo "CRASH_AMPLIFICATION flow=other mode=single_host_cpu states_checked_here=3 states_reused=0 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 expand_up_to=$expand exhaustive=true" ;;
+  registered-flow) # 一条用例两条流：stub 那条登了第 3 段（300 写，exhaustive=false 只因它：别的段都盖得住），other 那条穷举、没登段
+    echo "CRASH_AMPLIFICATION flow=stub mode=single_host_cpu states_checked_here=5 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=1 exhaustive=false expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 registered_segments=3:300 unregistered_segments_beyond_expansion=- registered_segment_domains=3:full registered_segment_progress=-"
+    echo "CRASH_AMPLIFICATION flow=other mode=single_host_cpu states_checked_here=3 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=0 exhaustive=true expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 registered_segments=- unregistered_segments_beyond_expansion=- registered_segment_domains=- registered_segment_progress=-" ;;
+  registered-and-unregistered) # 一条用例两条流：stub 那条登了第 3 段（300 写）；other 那条也不穷举（第 0 段 40 写），却一段都没登（registered_segments=-）
+    echo "CRASH_AMPLIFICATION flow=stub mode=single_host_cpu states_checked_here=5 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=1 exhaustive=false expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 registered_segments=3:300 unregistered_segments_beyond_expansion=- registered_segment_domains=3:full registered_segment_progress=-"
+    echo "CRASH_AMPLIFICATION flow=other mode=single_host_cpu states_checked_here=3 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=0 exhaustive=false expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 registered_segments=- unregistered_segments_beyond_expansion=0:40 registered_segment_domains=- registered_segment_progress=-" ;;
+  registered-beyond) # 一条用例两条流：stub 那条登了第 0 段（322 写），第 1 段（290 写）没登、展开上限盖不住；other 那条穷举
+    echo "CRASH_AMPLIFICATION flow=stub mode=single_host_cpu states_checked_here=5 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=1 exhaustive=false expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 registered_segments=0:322 unregistered_segments_beyond_expansion=1:290 registered_segment_domains=0:full registered_segment_progress=-"
+    echo "CRASH_AMPLIFICATION flow=other mode=single_host_cpu states_checked_here=3 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=0 exhaustive=true expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 registered_segments=- unregistered_segments_beyond_expansion=- registered_segment_domains=- registered_segment_progress=-" ;;
+  registered-old-engine) # 旧引擎打的行：stub 那条登了第 3 段（exhaustive=false），没报 unregistered_segments_beyond_expansion=；other 那条穷举
+    echo "CRASH_AMPLIFICATION flow=stub mode=single_host_cpu states_checked_here=5 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=1 exhaustive=false expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 registered_segments=3:300"
+    echo "CRASH_AMPLIFICATION flow=other mode=single_host_cpu states_checked_here=3 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=0 exhaustive=true expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 registered_segments=-" ;;
+  registered-tail) # 一条用例两条流：stub 那条登了段、exhaustive=false，登记段那几个字段整段取 STUB_REGISTERED_TAIL（各格照要造的驱动行给）；other 那条穷举、没登段
+    #   stub 那条的现判态数、现判块数与复用态数取 STUB_TAIL_CHECKED、STUB_TAIL_BLOCKS、STUB_TAIL_REUSED（没给是 5、1、1）
+    echo "CRASH_AMPLIFICATION flow=stub mode=single_host_cpu states_checked_here=${STUB_TAIL_CHECKED:-5} blocks_checked_here=${STUB_TAIL_BLOCKS:-1} unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=${STUB_TAIL_REUSED:-1} exhaustive=false expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 ${STUB_REGISTERED_TAIL:?}"
+    echo "CRASH_AMPLIFICATION flow=other mode=single_host_cpu states_checked_here=3 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=0 exhaustive=true expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 registered_segments=- unregistered_segments_beyond_expansion=- registered_segment_domains=- registered_segment_progress=-" ;;
   stopped) # 被叫停：判了一部分，留着 2 块没判
     echo "CRASH_AMPLIFICATION mode=single_host_cpu share=0/1 cards=0 states=10 states_checked_here=4 blocks_checked_here=1 imported_blocks=0 unjudged_blocks=2 red=0 expand_up_to=$expand exhaustive=true stopped_early=true" ;;
   unjudged-flow) # 一台跑的流留着 3 块没判
@@ -507,6 +888,26 @@ case "$shape" in
     echo "CRASH_AMPLIFICATION flow=a mode=two_hosts_cpu states_checked_here=3 blocks_checked_here=1 unjudged_blocks=1 red=0 violations_in_the_library=0 states_reused=1 exhaustive=true expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0"
     echo "CRASH_AMPLIFICATION flow=b mode=two_hosts_cpu states_checked_here=2 blocks_checked_here=1 unjudged_blocks=1 red=0 violations_in_the_library=0 states_reused=0 exhaustive=true expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0"
     echo "CRASH_AMPLIFICATION flow=b mode=two_hosts_cpu states_checked_here=0 blocks_checked_here=0 unjudged_blocks=1 red=0 violations_in_the_library=0 states_reused=2 exhaustive=true expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0 import_run=true" ;;
+  ignored-three-runs) # σ 项那种形态：一条流 sigma，双机本机份、第二台份、导入三趟，每行都报同一份 1 个点 869269834 态。按登记不判的数每组只取一次：1 个点、869269834 态（按行相加是 3 个点、2607809502 态）
+    echo "CRASH_AMPLIFICATION flow=sigma mode=two_hosts_cpu states_checked_here=8 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=12 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=869269834"
+    echo "CRASH_AMPLIFICATION flow=sigma mode=two_hosts_cpu states_checked_here=6 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=4 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=869269834"
+    echo "CRASH_AMPLIFICATION flow=sigma mode=two_hosts_cpu states_checked_here=0 blocks_checked_here=0 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=20 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=869269834 import_run=true" ;;
+  ignored-resumed-four) # 叫停过再续的四行，同一条流 sigma：先判着被叫停的一行、两台分份两行、导入一行，每行都报同一份 1 个点 869269834 态：1 个点、869269834 态（按行相加是 4 个点）
+    echo "CRASH_AMPLIFICATION flow=sigma mode=two_hosts_cpu states_checked_here=3 blocks_checked_here=1 unjudged_blocks=5 red=0 violations_in_the_library=0 stopped_early=true states_reused=12 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=869269834 warm_up=true"
+    echo "CRASH_AMPLIFICATION flow=sigma mode=two_hosts_cpu states_checked_here=8 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=12 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=869269834"
+    echo "CRASH_AMPLIFICATION flow=sigma mode=two_hosts_cpu states_checked_here=6 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=4 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=869269834"
+    echo "CRASH_AMPLIFICATION flow=sigma mode=two_hosts_cpu states_checked_here=0 blocks_checked_here=0 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=20 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=869269834 import_run=true" ;;
+  ignored-two-flows) # 两条流各一份（a 报 1 个点 10 态、b 报 2 个点 20 态），a 流有两行（本机份与第二台份）报同一份：每组取一次，合计 3 个点、30 态
+    echo "CRASH_AMPLIFICATION flow=a mode=two_hosts_cpu states_checked_here=8 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=12 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=10"
+    echo "CRASH_AMPLIFICATION flow=b mode=single_host_cpu states_checked_here=5 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=0 exhaustive=true expand_up_to=$expand ignored_points=2 states_skipped_by_ignore=20"
+    echo "CRASH_AMPLIFICATION flow=a mode=two_hosts_cpu states_checked_here=6 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=4 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=10" ;;
+  ignored-no-flow-twice) # 两行都不带 flow=（归一组），各报 2 个点 50 态：2 个点、50 态（按行相加是 4 个点、100 态）
+    echo "CRASH_AMPLIFICATION mode=single_host_cpu share=0/1 cards=0 states=10 states_checked_here=7 blocks_checked_here=2 imported_blocks=0 unjudged_blocks=0 red=0 states_reused=3 exhaustive=true expand_up_to=$expand ignored_points=2 states_skipped_by_ignore=50"
+    echo "CRASH_AMPLIFICATION mode=single_host_cpu share=0/1 cards=0 states=10 states_checked_here=7 blocks_checked_here=2 imported_blocks=0 unjudged_blocks=0 red=0 states_reused=3 exhaustive=true expand_up_to=$expand ignored_points=2 states_skipped_by_ignore=50" ;;
+  ignored-flow-differs) # a 流两行报的不同（1 个点 10 态与 1 个点 11 态），b 流一份 2 个点 20 态：这一项两个数记 unknown、点名 a 流，不悄悄取最大或最小
+    echo "CRASH_AMPLIFICATION flow=a mode=two_hosts_cpu states_checked_here=8 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=12 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=10"
+    echo "CRASH_AMPLIFICATION flow=b mode=single_host_cpu states_checked_here=5 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=0 exhaustive=true expand_up_to=$expand ignored_points=2 states_skipped_by_ignore=20"
+    echo "CRASH_AMPLIFICATION flow=a mode=two_hosts_cpu states_checked_here=6 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=4 exhaustive=true expand_up_to=$expand ignored_points=1 states_skipped_by_ignore=11" ;;
 esac
 if [[ "$target" == *-red ]]; then exit 1; fi
 exit 0
@@ -528,7 +929,7 @@ STUB
     echo "     → 怎么办：$2" >&2
     failures=$((failures + 1))
   }
-  entry() { CRASH_AMPLIFICATION_ITEM_DRIVER="$stub" STUB_LOG="$log" bash "$0" "$@"; } # 用假驱动起一趟入口
+  entry() { CRASH_AMPLIFICATION_ITEM_DRIVER="$stub" STUB_LOG="$log" CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT="$segments_root" bash "$0" "$@"; } # 用假驱动起一趟入口
   local output errors exit_code first_item
   errors="$work/errors"
   first_item="$(item_fields "${ITEMS[0]}" 1)"
@@ -634,7 +1035,7 @@ STUB
   cells=$((cells + 1))
   output="$(STUB_SHAPE=not-exhaustive entry --item tree-split-streams 2>"$errors")"; exit_code=$?
   if [[ "$exit_code" != 1 ]] || ! grep -q 'CRASH_AMPLIFICATION_TOTAL dispatched=1 items=1 failed=1 ' <<<"$output" || ! grep -q '不是 exhaustive=true' "$errors"; then
-    selftest_cell_failed "全量的展开深度下有行不是穷举却没判红（退 $exit_code）：$output" "看主循环里 item_exhaustive 那一条：展开深度等于 FULL_EXPAND_UP_TO 时要每一行 exhaustive=true"
+    selftest_cell_failed "全量的展开深度下有行不是穷举却没判红（退 $exit_code）：$output" "看主循环里不穷举那一条与 summarize_the_item 的不穷举行数：展开深度等于 FULL_EXPAND_UP_TO 时要每一行 exhaustive=true，或 exhaustive=false 只因登记的段"
   fi
   # 第 16 格：缩过规模（--expand-up-to 6）：交给驱动的是 6，exhaustive=false 不红、退 0；ITEM 与 TOTAL 写出 6，成功句写「缩过规模：展开 6」、不说全量；
   #   点名两项，tree-split-streams 不穷举、fixed-script-through-rollback 穷举：成功句只点名不穷举的那一项
@@ -681,13 +1082,14 @@ STUB
   # 第 21 格：平常跑（不是自证起的子进程）时带了只供自证的变量：退 2、不起驱动，拒绝句点名带了的每一个。这一格只判入口拒不拒、
   #   不往下起清场与驱动（没拒的那一趟——弄坏开关 honor-test-variables-outside-selftest、或拒的那一段被删了——也一样）：换驱动的变量指到
   #   一份不在的文件，没拒时入口在「分项驱动不在」那一步就退 2，到不了经清场包装重起那一步；点名的分项也是登记表里没有的，
-  #   选分项那一步同样在清场之前退 2。拒没拒只认拒绝句。换驱动的变量每一次都带着、每一次都核它被点名；另外三个各试一次
+  #   选分项那一步同样在清场之前退 2。拒没拒只认拒绝句。换驱动的变量每一次都带着、每一次都核它被点名；另外四个各试一次
   cells=$((cells + 1))
   local variable value named refusal refused_all=1 missing_driver="$work/no-such-item-driver.sh"
-  for variable in CRASH_AMPLIFICATION_BREAK CRASH_AMPLIFICATION_SELFTEST_RED_ITEM CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT; do
+  for variable in CRASH_AMPLIFICATION_BREAK CRASH_AMPLIFICATION_SELFTEST_RED_ITEM CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT; do
     value=1
     [[ "$variable" == CRASH_AMPLIFICATION_BREAK ]] && value="${CRASH_AMPLIFICATION_BREAK:+$CRASH_AMPLIFICATION_BREAK,}swallow-exit"
     [[ "$variable" == CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT ]] && value=tree-split-streams
+    [[ "$variable" == CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT ]] && value="$segments_root"
     : > "$log"; : > "$QUIESCE_LOG"
     env -u CRASH_AMPLIFICATION_SELFTEST_MARK CRASH_AMPLIFICATION_ITEM_DRIVER="$missing_driver" STUB_LOG="$log" "$variable=$value" \
       bash "$0" --item no-such-item-for-cell-21 >/dev/null 2>"$errors"; exit_code=$?
@@ -698,7 +1100,7 @@ STUB
     done
   done
   if (( ! refused_all )); then
-    selftest_cell_failed "平常跑时带了只供自证的变量却没拒、或拒绝句没点名带了的那几个（最后一次退 $exit_code）" "看参数之后拒只供自证变量的那一段：running_under_selftest 为 0 时四个变量有一个非空就逐个点名、退 2"
+    selftest_cell_failed "平常跑时带了只供自证的变量却没拒、或拒绝句没点名带了的那几个（最后一次退 $exit_code）" "看参数之后拒只供自证变量的那一段：running_under_selftest 为 0 时五个变量有一个非空就逐个点名、退 2"
   fi
   # 第 22 格：前一项红（驱动退 0、red=2）、后一项驱动退 78：停在退 78 那一项、后面不派，退 78 的那一项在 ✗ 里点名，整趟退 1（有红先判）
   cells=$((cells + 1)); : > "$log"
@@ -727,7 +1129,7 @@ STUB
   local item_count="${#ITEMS[@]}"
   output="$(STUB_SHAPE=ignored entry 2>/dev/null)"; exit_code=$?
   success_line="$(grep '✓' <<<"$output")"
-  if [[ "$exit_code" != 0 ]] || [[ "$(grep -c '^CRASH_AMPLIFICATION_ITEM .* ignored_points=2 states_skipped_by_ignore=50$' <<<"$output")" != "$item_count" ]] \
+  if [[ "$exit_code" != 0 ]] || [[ "$(grep -c '^CRASH_AMPLIFICATION_ITEM .* ignored_points=2 states_skipped_by_ignore=50 registered_segments=- unregistered_segments_beyond_expansion=unknown registered_segment_domains=- registered_segment_progress=-$' <<<"$output")" != "$item_count" ]] \
      || ! grep -q "CRASH_AMPLIFICATION_TOTAL .* ignored_points=$((2 * item_count)) states_skipped_by_ignore=$((50 * item_count)) ignore_unknown=0\$" <<<"$output" \
      || ! grep -q "按登记整批不判：$((2 * item_count)) 个点、$((50 * item_count)) 态（类名取不出" <<<"$success_line" \
      || ! grep -q "有跳过的分项：$first_item" <<<"$success_line"; then
@@ -738,7 +1140,7 @@ STUB
   cells=$((cells + 1))
   output="$(STUB_SHAPE_crash_amplification_fixed_script_through_rollback=ignored entry --item fixed-script-through-rollback --item tree-split-streams 2>/dev/null)"; exit_code=$?
   success_line="$(grep '✓' <<<"$output")"
-  if [[ "$exit_code" != 0 ]] || ! grep -q '^CRASH_AMPLIFICATION_ITEM item=tree-split-streams .* verdict=green .* ignored_points=unknown states_skipped_by_ignore=unknown$' <<<"$output" \
+  if [[ "$exit_code" != 0 ]] || ! grep -q '^CRASH_AMPLIFICATION_ITEM item=tree-split-streams .* verdict=green .* ignored_points=unknown states_skipped_by_ignore=unknown registered_segments=- unregistered_segments_beyond_expansion=unknown registered_segment_domains=- registered_segment_progress=-$' <<<"$output" \
      || ! grep -q 'CRASH_AMPLIFICATION_TOTAL .* ignored_points=2 states_skipped_by_ignore=50 ignore_unknown=1$' <<<"$output" \
      || ! grep -q '按登记整批不判：取得出的 1 项 2 个点、50 态（类名取不出.*）；另有 1 项取不出：tree-split-streams' <<<"$success_line"; then
     selftest_cell_failed "驱动行没报按登记整批不判的两个数，却没照实报取不出（退 $exit_code）：$output" \
@@ -769,8 +1171,8 @@ STUB
   output="$(STUB_SHAPE_crash_amplification_fixed_script_through_rollback=warm-up-then-shares STUB_SHAPE_crash_enumeration_tree_split_streams=two-flows-two-hosts \
     entry --item fixed-script-through-rollback --item tree-split-streams 2>/dev/null)"; exit_code=$?
   if [[ "$exit_code" != 0 ]] \
-     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=fixed-script-through-rollback exit=0 states=60 reused=40 red=0 lines=4 expand_up_to=$FULL_EXPAND_UP_TO exhaustive=true verdict=green seconds=[0-9]+ ignored_points=0 states_skipped_by_ignore=0\$" <<<"$output" \
-     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=0 states=22 reused=18 red=0 lines=6 expand_up_to=$FULL_EXPAND_UP_TO exhaustive=true verdict=green seconds=[0-9]+ ignored_points=0 states_skipped_by_ignore=0\$" <<<"$output" \
+     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=fixed-script-through-rollback exit=0 states=60 reused=40 red=0 lines=4 expand_up_to=$FULL_EXPAND_UP_TO exhaustive=true verdict=green seconds=[0-9]+ ignored_points=0 states_skipped_by_ignore=0 registered_segments=- unregistered_segments_beyond_expansion=unknown registered_segment_domains=- registered_segment_progress=-\$" <<<"$output" \
+     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=0 states=22 reused=18 red=0 lines=6 expand_up_to=$FULL_EXPAND_UP_TO exhaustive=true verdict=green seconds=[0-9]+ ignored_points=0 states_skipped_by_ignore=0 registered_segments=- unregistered_segments_beyond_expansion=unknown registered_segment_domains=- registered_segment_progress=-\$" <<<"$output" \
      || ! grep -qE "^CRASH_AMPLIFICATION_TOTAL dispatched=2 items=2 failed=0 not_run=0 reuse_unknown=0 states=82 reused_known=58 red=0 expand_up_to=$FULL_EXPAND_UP_TO scope=items seconds=[0-9]+ ignored_points=0 states_skipped_by_ignore=0 ignore_unknown=0\$" <<<"$output" \
      || ! grep -q '2 项都退 0、0 红；现判 82 态、复用 58 态；派出 2 项、收回 2 项' <<<"$output"; then
     selftest_cell_failed "复用数没有每项只取一次：先判着之后的分份行、导入行或计划行的复用数被加了进去（退 $exit_code）：$output" \
@@ -782,8 +1184,8 @@ STUB
   output="$(STUB_SHAPE_crash_enumeration_tree_split_streams=flow-shares-then-import STUB_SHAPE_crash_enumeration_multi_record_publish_stream=flow-shares-import-missing \
     entry --item multi-record-publish --item tree-split-streams 2>"$errors")"; exit_code=$?
   if [[ "$exit_code" != 0 ]] \
-     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=multi-record-publish exit=0 states=11 reused=1 red=0 lines=5 expand_up_to=$FULL_EXPAND_UP_TO exhaustive=true verdict=not-run seconds=[0-9]+ ignored_points=0 states_skipped_by_ignore=0\$" <<<"$output" \
-     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=0 states=22 reused=18 red=0 lines=6 expand_up_to=$FULL_EXPAND_UP_TO exhaustive=true verdict=green seconds=[0-9]+ ignored_points=0 states_skipped_by_ignore=0\$" <<<"$output" \
+     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=multi-record-publish exit=0 states=11 reused=1 red=0 lines=5 expand_up_to=$FULL_EXPAND_UP_TO exhaustive=true verdict=not-run seconds=[0-9]+ ignored_points=0 states_skipped_by_ignore=0 registered_segments=- unregistered_segments_beyond_expansion=unknown registered_segment_domains=- registered_segment_progress=-\$" <<<"$output" \
+     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=0 states=22 reused=18 red=0 lines=6 expand_up_to=$FULL_EXPAND_UP_TO exhaustive=true verdict=green seconds=[0-9]+ ignored_points=0 states_skipped_by_ignore=0 registered_segments=- unregistered_segments_beyond_expansion=unknown registered_segment_domains=- registered_segment_progress=-\$" <<<"$output" \
      || ! grep -qE "^CRASH_AMPLIFICATION_TOTAL dispatched=2 items=2 failed=0 not_run=1 reuse_unknown=0 states=33 reused_known=19 red=0 expand_up_to=$FULL_EXPAND_UP_TO scope=items " <<<"$output" \
      || ! grep -q '本次未跑（这不是通过）：崩溃放量分项 multi-record-publish：留了 4 块没判（unjudged_blocks）' "$errors" \
      || grep -q '崩溃放量分项 tree-split-streams' "$errors"; then
@@ -836,7 +1238,7 @@ STUB
       "看主循环里 item_driver_not_run_lines：驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN 行，这一项记 not-run，原因写几条流没判"
   fi
   # 第 33 格：不带参数的全量（scope=full、展开深度是 FULL_EXPAND_UP_TO），只有 multi-record-publish 的驱动行报 exhaustive=false（flow=stub）：
-  #   红在这一项（ITEM 行 exhaustive=false verdict=red，✗ 点名它与不穷举的流、出路写「加大展开深度重跑，或查是哪一段超出」，重跑命令只点名它），
+  #   红在这一项（ITEM 行 exhaustive=false verdict=red，✗ 点名它与不穷举的流、出路写「按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开」，重跑命令只点名它），
   #   别的每一项 verdict=green、✗ 里不点名；TOTAL 报派出、收回都是登记的项数、failed=1、scope=full，整趟退 1、不打成功句
   local not_exhaustive_greens
   cells=$((cells + 1)); : > "$log"
@@ -846,13 +1248,249 @@ STUB
      || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=multi-record-publish exit=0 .* expand_up_to=$FULL_EXPAND_UP_TO exhaustive=false verdict=red " <<<"$output" \
      || [[ "$not_exhaustive_greens" != "$((item_count - 1))" ]] \
      || ! grep -qE "^CRASH_AMPLIFICATION_TOTAL dispatched=$item_count items=$item_count failed=1 not_run=0 .* expand_up_to=$FULL_EXPAND_UP_TO scope=full " <<<"$output" \
-     || ! grep -q "^  ✗ 分项 multi-record-publish：展开 $FULL_EXPAND_UP_TO 是全量的展开深度，却有 1 行驱动行不是 exhaustive=true（不穷举的流：stub）" "$errors" \
+     || ! grep -q "^  ✗ 分项 multi-record-publish：展开 $FULL_EXPAND_UP_TO 是全量的展开深度，却有 1 行驱动行不是 exhaustive=true、也没按段登记（不穷举的流：stub）" "$errors" \
      || [[ "$(grep -c '^  ✗ 分项 ' "$errors")" != 1 ]] \
-     || ! grep -q '加大展开深度重跑，或查是哪一段超出' "$errors" \
+     || ! grep -q '按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开' "$errors" \
      || ! grep -qE -- '只重跑判红的那几项：.* --item multi-record-publish$' "$errors" \
      || grep -q '✓' <<<"$output"; then
     selftest_cell_failed "不带参数的全量里一项不穷举，没有红在那一项：那一项没记红、别的项被连带判红、整趟没退 1、✗ 没点名不穷举的流或没给出路（退 $exit_code，绿项 $not_exhaustive_greens 个）：$output" \
-      "看主循环里 item_exhaustive 那一条：展开深度等于 FULL_EXPAND_UP_TO 时（scope 是 full 也算）有一行不是 exhaustive=true 就记这一项红，理由点名 not_exhaustive_flows、出路写加大展开深度重跑或查哪一段超出"
+      "看主循环里不穷举那一条：展开深度等于 FULL_EXPAND_UP_TO 时（scope 是 full 也算）有一行不是 exhaustive=true 又没按段登记就记这一项红，理由点名 item_not_exhaustive_flows、出路写按段登记或加深展开"
+  fi
+  # 第 34 格：不带参数的全量里一项的一行 exhaustive=false registered_segments=3:300 unregistered_segments_beyond_expansion=-（只因登记的段不穷举，flow=stub），
+  #   同一项另一条流穷举：这一项不红（ITEM 行照实写 exhaustive=false、verdict=green、registered_segments=stub@3:300、unregistered_segments_beyond_expansion=-），
+  #   别的项 registered_segments=- unregistered_segments_beyond_expansion=unknown（假驱动那几种行没报这个字段），整趟退 0、成功句说全量，
+  #   末尾报「按段登记 1 段（1 项…）：position-addressed-trees 流 stub 段 3（300 写）」与「展开上限盖不住又没登记的段：0 段（另有 7 项取不出：…）」
+  local registered_greens
+  cells=$((cells + 1))
+  output="$(STUB_SHAPE_crash_enumeration_position_addressed_trees=registered-flow entry 2>"$errors")"; exit_code=$?
+  success_line="$(grep '✓' <<<"$output")"
+  registered_greens="$(grep -cE "^CRASH_AMPLIFICATION_ITEM item=[^ ]+ exit=0 .* exhaustive=true verdict=green .* registered_segments=- unregistered_segments_beyond_expansion=unknown registered_segment_domains=- registered_segment_progress=-\$" <<<"$output")"
+  if [[ "$exit_code" != 0 ]] \
+     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees exit=0 .* expand_up_to=$FULL_EXPAND_UP_TO exhaustive=false verdict=green .* registered_segments=stub@3:300 unregistered_segments_beyond_expansion=- registered_segment_domains=stub@3:full registered_segment_progress=-\$" <<<"$output" \
+     || [[ "$registered_greens" != "$((item_count - 1))" ]] \
+     || ! grep -q "崩溃放量全量（展开 $FULL_EXPAND_UP_TO）" <<<"$success_line" \
+     || ! grep -q "；按段登记 1 段（1 项，只按甲二 ∪ 展开 6 判、没判全域）：position-addressed-trees 流 stub 段 3（300 写）；登记段的域（甲二 ∪ 展开 6）1 段（1 项；全展开 1 段、分片 0 段）：position-addressed-trees 流 stub 段 3：全展开；展开上限盖不住又没登记的段：0 段（另有 $((item_count - 1)) 项取不出：.*，驱动行没报 unregistered_segments_beyond_expansion=）\$" <<<"$success_line"; then
+    selftest_cell_failed "一行 exhaustive=false 只因登记的段（registered_segments=3:300），这一项却判了红、或 ITEM 行与成功句没报段号与写数（退 $exit_code，别的项绿 $registered_greens 个）：$output" \
+      "看 summarize_the_item 里 registered_segments 那一段（exhaustive=false 而登了段的行不算不穷举、段按流记下）与成功句的 registered_part"
+  fi
+  # 第 35 格：点名一项、展开深度是全量的那一个：stub 那条流登了第 3 段（exhaustive=false），other 那条也不穷举而 registered_segments=-：
+  #   这一项照旧红在 other（✗ 只点名 other，出路写按段登记或加深展开），ITEM 行照样报 stub 登的段，整趟退 1、不打成功句
+  cells=$((cells + 1))
+  output="$(STUB_SHAPE_crash_enumeration_position_addressed_trees=registered-and-unregistered entry --item position-addressed-trees 2>"$errors")"; exit_code=$?
+  if [[ "$exit_code" != 1 ]] \
+     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees exit=0 .* exhaustive=false verdict=red .* registered_segments=stub@3:300 unregistered_segments_beyond_expansion=other@0:40 registered_segment_domains=stub@3:full registered_segment_progress=-\$" <<<"$output" \
+     || ! grep -q "^  ✗ 分项 position-addressed-trees：展开 $FULL_EXPAND_UP_TO 是全量的展开深度，却有 1 行驱动行不是 exhaustive=true、也没按段登记（不穷举的流：other）" "$errors" \
+     || ! grep -q '按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开' "$errors" \
+     || grep -q '✓' <<<"$output"; then
+    selftest_cell_failed "一行 exhaustive=false registered_segments=- 没照旧判红在那一条流：没记红、把没登段的流也放过了、或 ✗ 点名了登了段的流（退 $exit_code）：$output" \
+      "看 summarize_the_item：只有 exhaustive=false 而本行 registered_segments= 是 <段号>:<写数>[,…] 的行才不算不穷举，- 与没报的照算，按行判、不按项判"
+  fi
+  # 第 36 格：每一趟分项驱动都收到按段登记文件的绝对路径（SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<被判仓根>/.claude/gate.d/crash-point-replay-segments.tsv，
+  #   假驱动记进调用记录），标准错误点名送了哪一份
+  local registry_calls
+  cells=$((cells + 1)); : > "$log"
+  entry --item fixed-script-through-rollback --item tree-split-streams >/dev/null 2>"$errors"; exit_code=$?
+  registry_calls="$(grep -cF " segments=[$segments_registry]" "$log")"
+  if [[ "$exit_code" != 0 || "$(wc -l <"$log")" != 2 || "$registry_calls" != 2 ]] \
+     || ! grep -qF "往引擎送按段登记文件 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=$segments_registry（1 行登记）" "$errors"; then
+    selftest_cell_failed "分项驱动没收到按段登记文件的绝对路径（退 $exit_code，2 趟里收到 $registry_calls 趟；调用记录 $(tr '\n' '|' <"$log")）" \
+      "看选分项之后「按段登记」那一段：核过之后 export SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<被判仓根>/.claude/gate.d/crash-point-replay-segments.tsv"
+  fi
+  # 第 37 格：按段登记文件写坏一行（摘要写成大写十六进制，lib_crash_point_replay_items.py 的 segment_problems 认的一种坏法）：整趟退 2、不清场、不起驱动，
+  #   标准错误逐处列出（那一处的原话）并点名那份文件
+  cells=$((cells + 1)); : > "$log"; : > "$QUIESCE_LOG"
+  cp -- "$segments_registry" "$work/segments-saved.tsv"
+  printf '%s\n' "# 自证的按段登记（写坏的）" "position-addressed-trees	stub	3	300	$(printf '0123456789ABCDEF%.0s' 1 2 3 4)" >"$segments_registry"
+  entry --item tree-split-streams >/dev/null 2>"$errors"; exit_code=$?
+  cp -- "$work/segments-saved.tsv" "$segments_registry"
+  if [[ "$exit_code" != 2 ]] || [[ -s "$log" || -s "$QUIESCE_LOG" ]] || ! grep -q '不是 64 位小写十六进制' "$errors" \
+     || ! grep -qF "按段登记文件 $segments_registry 核不过" "$errors"; then
+    selftest_cell_failed "按段登记文件写坏了却没整趟拒跑（退 $exit_code，驱动调用 $(wc -l <"$log") 次，清场记录 $(wc -l <"$QUIESCE_LOG") 笔）" \
+      "看选分项之后「按段登记」那一段：开跑前调 lib_crash_point_replay_items.py segments <被判仓根>，核不过打它逐处列的问题、退 2，在清场之前"
+  fi
+  # 第 38 格：stub 那条流登了第 0 段（322 写），驱动行报 unregistered_segments_beyond_expansion=1:290（第 1 段没登、展开上限盖不住）：
+  #   点名这一项、展开深度是全量的那一个：红在这一项，✗ 点名流 stub 与 1:290、出路写按段登记或加深展开，ITEM 行报 registered_segments=stub@0:322
+  #   unregistered_segments_beyond_expansion=stub@1:290，整趟退 1、不打成功句；
+  #   同一形态缩过规模（--expand-up-to 6，再点名一项不报这个字段的 tree-split-streams）：不红、退 0，成功句报这一段与取不出的那一项
+  local beyond_scaled_output beyond_scaled_exit
+  cells=$((cells + 1))
+  output="$(STUB_SHAPE_crash_enumeration_position_addressed_trees=registered-beyond entry --item position-addressed-trees 2>"$errors")"; exit_code=$?
+  beyond_scaled_output="$(STUB_SHAPE_crash_enumeration_position_addressed_trees=registered-beyond entry --expand-up-to 6 --item position-addressed-trees --item tree-split-streams 2>/dev/null)"
+  beyond_scaled_exit=$?
+  if [[ "$exit_code" != 1 ]] \
+     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees exit=0 .* exhaustive=false verdict=red .* registered_segments=stub@0:322 unregistered_segments_beyond_expansion=stub@1:290 registered_segment_domains=stub@0:full registered_segment_progress=-\$" <<<"$output" \
+     || ! grep -q "^  ✗ 分项 position-addressed-trees：展开 $FULL_EXPAND_UP_TO 是全量的展开深度，有 1 行驱动行登了段，可那条流里另有没登记、展开上限盖不住的段（流 stub 段 1:290）" "$errors" \
+     || ! grep -q '按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开' "$errors" \
+     || grep -q '✓' <<<"$output" \
+     || [[ "$beyond_scaled_exit" != 0 ]] \
+     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees exit=0 .* verdict=green .* unregistered_segments_beyond_expansion=stub@1:290 registered_segment_domains=stub@0:full registered_segment_progress=-\$" <<<"$beyond_scaled_output" \
+     || ! grep -q '；展开上限盖不住又没登记的段 1 段（1 项，没判全域）：position-addressed-trees 流 stub 段 1（290 写）（另有 1 项取不出：tree-split-streams，驱动行没报 unregistered_segments_beyond_expansion=）$' <<<"$beyond_scaled_output"; then
+    selftest_cell_failed "登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段：没记红、✗ 没点名流与段号写数、没给出路，或缩过规模的一趟 ITEM 行与成功句没报那几段（退 $exit_code，缩过规模那一趟退 $beyond_scaled_exit）：$output｜$beyond_scaled_output" \
+      "看 summarize_the_item 里 unregistered_segments_beyond_expansion 那一段（登了段的行这个字段不是 - 就记下那几段）与主循环里 item_beyond_lines 那一条红因、成功句的 beyond_part"
+  fi
+  # 第 39 格：旧引擎打的行：stub 那条登了第 3 段、exhaustive=false，没报 unregistered_segments_beyond_expansion=：点名这一项、展开深度是全量的那一个：
+  #   照不穷举红在这一项，✗ 点名流 stub，出路写「引擎没报 unregistered_segments_beyond_expansion=，重编引擎」，ITEM 行这个字段写 unknown，整趟退 1
+  cells=$((cells + 1))
+  output="$(STUB_SHAPE_crash_enumeration_position_addressed_trees=registered-old-engine entry --item position-addressed-trees 2>"$errors")"; exit_code=$?
+  if [[ "$exit_code" != 1 ]] \
+     || ! grep -qE "^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees exit=0 .* exhaustive=false verdict=red .* registered_segments=stub@3:300 unregistered_segments_beyond_expansion=unknown registered_segment_domains=unknown registered_segment_progress=unknown\$" <<<"$output" \
+     || ! grep -q "^  ✗ 分项 position-addressed-trees：展开 $FULL_EXPAND_UP_TO 是全量的展开深度，有 1 行驱动行登了段、exhaustive=false，却没报 unregistered_segments_beyond_expansion=（流：stub）" "$errors" \
+     || ! grep -q '引擎没报 unregistered_segments_beyond_expansion=，重编引擎' "$errors" \
+     || ! grep -q '^  → 登了段的行没报 unregistered_segments_beyond_expansion= 的项（position-addressed-trees）：' "$errors" \
+     || grep -q '✓' <<<"$output"; then
+    selftest_cell_failed "登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎（退 $exit_code）：$output" \
+      "看 summarize_the_item：登了段、exhaustive=false 的行没报这个字段（或写得认不得）记进没报的行数与流名，主循环里 item_beyond_missing_lines 那一条红因与「重编引擎」那一句出路"
+  fi
+  # 第 40–43 格：登记段装不进 u64 时的分片枚举（文件头「按段登记」），都用假驱动形态 registered-tail，stub 那条流登记段的几个字段由 STUB_REGISTERED_TAIL 给
+  # 总态数：3^290-1 的十进制（139 位）与一个 141 位的十进制串，都超过 u64（引擎的态数是 768 位宽整数，驱动行照十进制数字串报）
+  local slice_total=2318269218083089908234280468459894595445540070540355238386428052606631732586480323016481331702297098820479338186895528168360391078014797448
+  local slice_total_141=100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000515377520732011331036461129765621272702107522001
+  local tail_sliced="registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full,1:slice registered_segment_progress=1:4294967296/$slice_total"
+  local tail_forms="registered_segments=0:322,2:300 unregistered_segments_beyond_expansion=- registered_segment_domains=0:slice,2:slice registered_segment_progress=0:7/18446744073709551615,2:5/$slice_total_141"
+  local slice_item_line slice_forms_output slice_forms_exit slice_forms_item_line slice_forms_success slice_wrong slice_tail slice_run
+  local domain_bad_text='分项 position-addressed-trees：有 1 行驱动行登了段，registered_segment_domains= / registered_segment_progress= 缺了、没列全登记的段（或分片段没报进度）、或写法认不得（流：stub）'
+  tail_entry() { # <STUB_REGISTERED_TAIL> <入口参数…>：position-addressed-trees 用 registered-tail 形态起一趟入口
+    local tail="$1"; shift
+    STUB_SHAPE_crash_enumeration_position_addressed_trees=registered-tail STUB_REGISTERED_TAIL="$tail" entry "$@"
+  }
+  # 第 40 格：stub 那条流登了第 0 段（322 写，域全展开）与第 1 段（290 写，域分片：这一趟为止已判 4294967296 态、域共 3^290-1 态，照十进制 139 位报），别的段都盖得住：
+  #   点名这一项、展开深度是全量的那一个，不红、退 0；ITEM 行带两个字段（registered_segment_domains=stub@0:full,stub@1:slice
+  #   registered_segment_progress=stub@1:4294967296/<那 139 位>）；成功句报「段 0：全展开」「段 1：分片，已判 4294967296/<那 139 位>」。
+  #   第二趟换总态数的另两种长度（装得进 u64 的 18446744073709551615、141 位的十进制串）：照样不红，ITEM 行与成功句照原样报
+  cells=$((cells + 1))
+  output="$(tail_entry "$tail_sliced" --item position-addressed-trees 2>"$errors")"; exit_code=$?
+  success_line="$(grep '✓' <<<"$output")"
+  slice_item_line="$(grep '^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees ' <<<"$output")"
+  slice_forms_output="$(tail_entry "$tail_forms" --item position-addressed-trees 2>/dev/null)"; slice_forms_exit=$?
+  slice_forms_item_line="$(grep '^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees ' <<<"$slice_forms_output")"
+  slice_forms_success="$(grep '✓' <<<"$slice_forms_output")"
+  if [[ "$exit_code" != 0 ]] || grep -q '✗' "$errors" \
+     || [[ "$slice_item_line" != *" exhaustive=false verdict=green "* ]] \
+     || [[ "$slice_item_line" != *" registered_segments=stub@0:322,stub@1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=stub@0:full,stub@1:slice registered_segment_progress=stub@1:4294967296/$slice_total" ]] \
+     || [[ "$success_line" != *"崩溃放量点名的 1 项（展开 $FULL_EXPAND_UP_TO）"* ]] \
+     || [[ "$success_line" != *"；登记段的域（甲二 ∪ 展开 6）2 段（1 项；全展开 1 段、分片 1 段）：position-addressed-trees 流 stub 段 0：全展开、position-addressed-trees 流 stub 段 1：分片，已判 4294967296/$slice_total；"* ]] \
+     || [[ "$slice_forms_exit" != 0 ]] \
+     || [[ "$slice_forms_item_line" != *" verdict=green "*" registered_segment_domains=stub@0:slice,stub@2:slice registered_segment_progress=stub@0:7/18446744073709551615,stub@2:5/$slice_total_141" ]] \
+     || [[ "$slice_forms_success" != *"：position-addressed-trees 流 stub 段 0：分片，已判 7/18446744073709551615、position-addressed-trees 流 stub 段 2：分片，已判 5/$slice_total_141；"* ]]; then
+    selftest_cell_failed "登记段分片枚举（全展开一段、分片一段，总态数是超过 u64 的十进制串）判了红、或 ITEM 行没带 registered_segment_domains= / registered_segment_progress=、或成功句没报全展开与分片已判几态（退 $exit_code，另两种写法那一趟退 $slice_forms_exit）：$output｜$slice_forms_output" \
+      "看 summarize_the_item 的 domains_problem_of_the_line（两个字段的写法、进度的两个数只认十进制数字串）与主循环里 domains_of_the_item_for_the_success_line、成功句的 domain_part"
+  fi
+  # 第 41 格：分片段的进度是 1:0/<那 139 位>，stub 那条这一趟现判 0 态、复用 0 态（一个态都没判，也没复用）：点名这一项，展开深度是全量的那一个与缩过规模（--expand-up-to 6）都红在这一项，
+  #   ✗ 点名流 stub 与段 1，出路写「这一趟一个态都没判，看录入段与判段的日志」，整趟退 1、不打成功句
+  local slice_zero_scaled_exit
+  cells=$((cells + 1))
+  slice_tail="registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full,1:slice registered_segment_progress=1:0/$slice_total"
+  output="$(STUB_TAIL_CHECKED=0 STUB_TAIL_BLOCKS=0 STUB_TAIL_REUSED=0 tail_entry "$slice_tail" --item position-addressed-trees 2>"$errors")"; exit_code=$?
+  STUB_TAIL_CHECKED=0 STUB_TAIL_BLOCKS=0 STUB_TAIL_REUSED=0 tail_entry "$slice_tail" --expand-up-to 6 --item position-addressed-trees >/dev/null 2>&1; slice_zero_scaled_exit=$?
+  slice_item_line="$(grep '^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees ' <<<"$output")"
+  if [[ "$exit_code" != 1 || "$slice_zero_scaled_exit" != 1 ]] \
+     || [[ "$slice_item_line" != *" verdict=red "*" registered_segment_progress=stub@1:0/$slice_total" ]] \
+     || ! grep -qF "分项 position-addressed-trees：有 1 行驱动行的分片段已判 0 态（流 stub 段 1:0/$slice_total）：这一趟一个态都没判，看录入段与判段的日志" "$errors" \
+     || ! grep -q '^  → 分片段这一趟已判 0 态的项（position-addressed-trees）：这一趟一个态都没判，看录入段与判段的日志' "$errors" \
+     || grep -q '✓' <<<"$output"; then
+    selftest_cell_failed "分片段这一趟已判 0 态却没判红在那条流与那一段、或出路不是看录入段与判段的日志（退 $exit_code，缩过规模那一趟退 $slice_zero_scaled_exit）：$output" \
+      "看 summarize_the_item 里分片进度那一段（已判是 0 的段记进 zero）与主循环里 item_zero_lines 那一条红因（不看展开深度）、slice_zero_failed_names 那一句出路"
+  fi
+  # 第 42 格：登了段的行，两个字段没报全或写法认不得（四趟：两个都缺，即分片之前的引擎；只缺 registered_segment_progress=；域写成 1:partial；
+  #   总态数写成幂的形态 3^290-1，不是十进制数字串）：
+  #   每一趟都红在这一项，✗ 点名流 stub，出路写「引擎没报 registered_segment_domains= / registered_segment_progress=，重编引擎」，ITEM 行两个字段写 unknown，整趟退 1
+  cells=$((cells + 1)); slice_wrong=""; slice_run=0
+  for slice_tail in 'registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=-' \
+                    'registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full,1:slice' \
+                    'registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full,1:partial registered_segment_progress=-' \
+                    'registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full,1:slice registered_segment_progress=1:4294967296/3^290-1'; do
+    slice_run=$((slice_run + 1))
+    output="$(tail_entry "$slice_tail" --item position-addressed-trees 2>"$errors")"; exit_code=$?
+    slice_item_line="$(grep '^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees ' <<<"$output")"
+    if [[ "$exit_code" != 1 ]] || [[ "$slice_item_line" != *" verdict=red "*" registered_segment_domains=unknown registered_segment_progress=unknown" ]] \
+       || ! grep -qF "$domain_bad_text" "$errors" || ! grep -qF '引擎没报 registered_segment_domains= / registered_segment_progress=，重编引擎' "$errors" \
+       || ! grep -q '^  → 登了段的行没报全 registered_segment_domains= / registered_segment_progress= 的项（position-addressed-trees）：' "$errors" \
+       || grep -q '✓' <<<"$output"; then
+      slice_wrong="${slice_wrong}第 $slice_run 趟退 $exit_code：$output｜"
+    fi
+  done
+  if [[ -n "$slice_wrong" ]]; then
+    selftest_cell_failed "登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流、出路不是重编引擎：$slice_wrong" \
+      "看 summarize_the_item 的 domains_problem_of_the_line：两个字段都要报、写法认得（返回 1 的那几种），记进 domain_bad 的行数与流名；主循环里 item_domain_bad_lines 那一条红因与 domain_field_missing_failed_names 那一句出路"
+  fi
+  # 第 43 格：登了第 0、1 段，registered_segment_domains= 漏了段 1（0:full），或段 1 是分片而 registered_segment_progress= 没列它（-）：
+  #   两趟都红在这一项，✗ 与出路同第 42 格，ITEM 行两个字段写 unknown，整趟退 1
+  cells=$((cells + 1)); slice_wrong=""; slice_run=0
+  for slice_tail in 'registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full registered_segment_progress=-' \
+                    'registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full,1:slice registered_segment_progress=-'; do
+    slice_run=$((slice_run + 1))
+    output="$(tail_entry "$slice_tail" --item position-addressed-trees 2>"$errors")"; exit_code=$?
+    slice_item_line="$(grep '^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees ' <<<"$output")"
+    if [[ "$exit_code" != 1 ]] || [[ "$slice_item_line" != *" verdict=red "*" registered_segment_domains=unknown registered_segment_progress=unknown" ]] \
+       || ! grep -qF "$domain_bad_text" "$errors" || ! grep -qF '引擎没报 registered_segment_domains= / registered_segment_progress=，重编引擎' "$errors" \
+       || grep -q '✓' <<<"$output"; then
+      slice_wrong="${slice_wrong}第 $slice_run 趟退 $exit_code：$output｜"
+    fi
+  done
+  if [[ -n "$slice_wrong" ]]; then
+    selftest_cell_failed "registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红：$slice_wrong" \
+      "看 summarize_the_item 的 domains_problem_of_the_line：registered_segments= 列的每一段都要在域里、域里每个分片段都要在进度里（返回 2 的那两种）"
+  fi
+  # 第 44 格：按登记不判的 ignored_points= / states_skipped_by_ignore= 按流分组、每组只取一次（文件头「按登记整批不判」），点名 tree-split-streams 一项，五趟：
+  #   同一条流 sigma 的本机份、第二台份、导入三行（各报 1 个点 869269834 态）→ 1 个点、869269834 态；叫停再续的四行（同流）→ 同样 1 个点、869269834 态；
+  #   两条流各一份（1/10 与 2/20，a 流两行同报一份）→ 3 个点、30 态；两行都不带 flow=（归一组，各报 2/50）→ 2 个点、50 态。
+  #   每趟 ITEM 行与 TOTAL 行钉绝对值，退 0、成功句报同样的数。第五趟同流两行报的不同（a 流 1/10 与 1/11，b 流 2/20）：ITEM 两个数写 unknown、
+  #   TOTAL 的 ignore_unknown=1 且不加这一项，标准错误与成功句点名 a 流，退 0（不红）
+  local ignore_wrong="" ignore_run=0 ignore_shape ignore_expected_points ignore_expected_states
+  cells=$((cells + 1))
+  for ignore_shape in 'ignored-three-runs 1 869269834' 'ignored-resumed-four 1 869269834' 'ignored-two-flows 3 30' 'ignored-no-flow-twice 2 50'; do
+    read -r ignore_shape ignore_expected_points ignore_expected_states <<<"$ignore_shape"
+    ignore_run=$((ignore_run + 1))
+    output="$(STUB_SHAPE="$ignore_shape" entry --item tree-split-streams 2>"$errors")"; exit_code=$?
+    success_line="$(grep '✓' <<<"$output")"
+    if [[ "$exit_code" != 0 ]] \
+       || ! grep -qE " ignored_points=$ignore_expected_points states_skipped_by_ignore=$ignore_expected_states registered_segments=" <<<"$(grep '^CRASH_AMPLIFICATION_ITEM item=tree-split-streams ' <<<"$output")" \
+       || ! grep -qE "^CRASH_AMPLIFICATION_TOTAL dispatched=1 items=1 failed=0 .* ignored_points=$ignore_expected_points states_skipped_by_ignore=$ignore_expected_states ignore_unknown=0\$" <<<"$output" \
+       || ! grep -q "按登记整批不判：$ignore_expected_points 个点、$ignore_expected_states 态（类名取不出" <<<"$success_line"; then
+      ignore_wrong="${ignore_wrong}$ignore_shape 退 $exit_code（要 $ignore_expected_points 个点、$ignore_expected_states 态）：$(grep -E '^CRASH_AMPLIFICATION_(ITEM|TOTAL) ' <<<"$output" | tr '\n' '|')｜"
+    fi
+  done
+  ignore_run=$((ignore_run + 1))
+  output="$(STUB_SHAPE=ignored-flow-differs entry --item tree-split-streams 2>"$errors")"; exit_code=$?
+  success_line="$(grep '✓' <<<"$output")"
+  if [[ "$exit_code" != 0 ]] \
+     || ! grep -q ' ignored_points=unknown states_skipped_by_ignore=unknown registered_segments=' <<<"$(grep '^CRASH_AMPLIFICATION_ITEM item=tree-split-streams ' <<<"$output")" \
+     || ! grep -qE '^CRASH_AMPLIFICATION_TOTAL dispatched=1 items=1 failed=0 .* ignored_points=0 states_skipped_by_ignore=0 ignore_unknown=1$' <<<"$output" \
+     || ! grep -q '分项 tree-split-streams：同一条流各行报的 ignored_points= / states_skipped_by_ignore= 不同（流：a）' "$errors" \
+     || ! grep -q '按登记整批不判：取不出（1 项：tree-split-streams（同一条流各行报的数不同，流：a），' <<<"$success_line"; then
+    ignore_wrong="${ignore_wrong}ignored-flow-differs 退 $exit_code（要 unknown 并点名 a 流）：$(grep -E '^CRASH_AMPLIFICATION_(ITEM|TOTAL) ' <<<"$output" | tr '\n' '|')｜"
+  fi
+  if [[ -n "$ignore_wrong" ]]; then
+    selftest_cell_failed "按登记不判的点数与态数没按流分组、每组只取一次：同流各行重复计、不同的流没各取一次相加、没带 flow= 的行没归一组，或同流各行报的不同却没记 unknown 并点名那条流（共 $ignore_run 趟）：$ignore_wrong" \
+      "看 summarize_the_item 里 ignored_points / states_skipped_by_ignore 那一段：按 flow= 分组（没有的归一组），组里数相同取那一份、不同记 ignore_conflict 并让两个数写 unknown，各组相加；主循环 item_ignore_conflict_flows 那几处点名流"
+  fi
+  # 第 45 格：全部复用的一趟（文件头「按段登记」）：stub 那条流这一趟现判 0 态、0 块，复用 7 态，分片段的进度是 1:0/<那 139 位>：
+  #   分片段已判 0 态只在现判与复用都是 0 时红，这一趟不红：点名这一项、展开深度是全量的那一个，ITEM 行 states=3（只有 other 那条现判）
+  #   reused=7 verdict=green，标准错误里没有「分片段已判 0 态」，整趟退 0、打成功句
+  cells=$((cells + 1))
+  slice_tail="registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full,1:slice registered_segment_progress=1:0/$slice_total"
+  output="$(STUB_TAIL_CHECKED=0 STUB_TAIL_BLOCKS=0 STUB_TAIL_REUSED=7 tail_entry "$slice_tail" --item position-addressed-trees 2>"$errors")"; exit_code=$?
+  slice_item_line="$(grep '^CRASH_AMPLIFICATION_ITEM item=position-addressed-trees ' <<<"$output")"
+  if [[ "$exit_code" != 0 ]] || [[ "$slice_item_line" != *" states=3 reused=7 red=0 "*" verdict=green "* ]] \
+     || grep -q '分片段已判 0 态' "$errors" || ! grep -q '✓' <<<"$output"; then
+    selftest_cell_failed "全部复用的一趟（stub 那条现判 0、复用 7，分片段进度 1:0/…）判了红、或 ITEM 行没照实写现判 3 复用 7（退 $exit_code）：$output" \
+      "看 summarize_the_item 里 line_idle 那一句：分片段已判 0 态只在这一行 states_checked_here= 与 states_reused= 都不是正整数时记进 zero"
+  fi
+  # 第 46 格：分项驱动退 0、打了一行 CRASH_AMPLIFICATION_NOT_RUN step=judge（不带 gpu 特性的二进制遇到多机配置 ENABLE_GPU=1：判段这一趟不跑、录入段照录）、
+  #   没有 CRASH_AMPLIFICATION 行：两项里这一项 exit=0 lines=0 verdict=not-run、不红（不按「驱动退 0 却 0 行」判红），原因写 1 条流判段没跑与那一行的 reason=，
+  #   标准错误与 GATE_NOT_RUN_FILE 各一笔，整趟退 0、成功句写「本次未跑 1 项」；只点名这一项时一项都没判完，整趟退 77
+  cells=$((cells + 1)); : > "$not_run_file"
+  output="$(GATE_NOT_RUN_FILE="$not_run_file" STUB_SHAPE_crash_enumeration_tree_split_streams=judge-not-run \
+    entry --item fixed-script-through-rollback --item tree-split-streams 2>"$errors")"; exit_code=$?
+  STUB_SHAPE=judge-not-run entry --item tree-split-streams >/dev/null 2>&1; only_not_run_exit=$?
+  if [[ "$exit_code" != 0 || "$only_not_run_exit" != 77 ]] \
+     || ! grep -q '^CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=0 states=0 .* lines=0 .* verdict=not-run ' <<<"$output" \
+     || ! grep -q 'CRASH_AMPLIFICATION_TOTAL dispatched=2 items=2 failed=0 not_run=1 ' <<<"$output" \
+     || ! grep -q '本次未跑（这不是通过）：崩溃放量分项 tree-split-streams：分项驱动报 1 条流判段没跑（CRASH_AMPLIFICATION_NOT_RUN step=judge）：配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性，录入段照录、判段这一趟没判（配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性：判段这一趟不跑（假驱动））' "$errors" \
+     || ! grep -q '^崩溃放量分项 tree-split-streams：分项驱动报 1 条流判段没跑' "$not_run_file" \
+     || ! grep -q '本次未跑 1 项：tree-split-streams（分项驱动报 1 条流判段没跑' <<<"$output"; then
+    selftest_cell_failed "分项驱动报判段没跑（CRASH_AMPLIFICATION_NOT_RUN step=judge）的那一项没记本次未跑：判了红、没逐项报、原因没写判段没跑与那一行的 reason=、成功句没点名，或只点名这一项时没退 77（两项那一趟退 $exit_code、只点名这一项退 $only_not_run_exit）：$output" \
+      "看主循环里 item_judge_not_run_lines：驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行，这一项记 not-run，原因写几条流判段没跑"
   fi
   if (( failures > 0 )); then
     echo "  ✗ --selftest：$cells 格里 $failures 格判错" >&2
@@ -892,18 +1530,19 @@ STUB
     echo "     → 怎么办：红的格与表里写的不同，要么改那一处判法让开关红在点名的格，要么照实改文件头那一行；单看一个开关：CRASH_AMPLIFICATION_BREAK=<开关> $0 --selftest" >&2
     exit 1
   fi
-  echo "  ✓ --selftest：列项带档位、拒不认得的名与缺项名、全量带展开深度、点名取并集、清场次序、清场失败退 78、跑完与有项红都不复原、驱动退非 0 与 red>0 判红、复用数的取法与取不出照实报、两台的行、派出收回、0 行判红、全量不穷举判红（不带参数的全量里红在不穷举的那一项）、缩过规模照实写并点名不穷举的项、展开深度对不上判红、叫停与没判完报本次未跑与 77、驱动退 78 停下、平常跑拒只供自证的四个变量并逐个点名、有红又有项退 78 时退 1、退 78 而行里报红记红、按登记整批不判报数与取不出、red= 缺或坏判红、全量零态判红、复用数每项只取一次（先判着、导入、计划行不重复计）、两台分份的 flow= 行留的块同一组有导入行才不算、分项驱动退 77 记本次未跑（全是它时退 77）、几条流里有的没借到显存记本次未跑不算通过，$cells 格都对；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的那几格"
+  echo "  ✓ --selftest：列项带档位、拒不认得的名与缺项名、全量带展开深度、点名取并集、清场次序、清场失败退 78、跑完与有项红都不复原、驱动退非 0 与 red>0 判红、复用数的取法与取不出照实报、两台的行、派出收回、0 行判红、全量不穷举判红（不带参数的全量里红在不穷举的那一项）、缩过规模照实写并点名不穷举的项、展开深度对不上判红、叫停与没判完报本次未跑与 77、驱动退 78 停下、平常跑拒只供自证的四个变量并逐个点名、有红又有项退 78 时退 1、退 78 而行里报红记红、按登记整批不判报数与取不出、按登记整批不判的两个数按流分组每组只取一次（同流各行重复报不重复计，不同的流各取一次相加，同流各行不同记取不出并点名流）、red= 缺或坏判红、全量零态判红、复用数每项只取一次（先判着、导入、计划行不重复计）、两台分份的 flow= 行留的块同一组有导入行才不算、分项驱动退 77 记本次未跑（全是它时退 77）、几条流里有的没借到显存记本次未跑不算通过、只因登记的段不穷举不判红并报段号与写数（没登段的流照旧红）、每一趟往驱动送按段登记文件、登记文件写坏整趟拒跑、登了段的流里另有展开上限盖不住又没登记的段红在那条流与那几段（缩过规模时成功句报那几段）、驱动行没报那个字段照不穷举红（出路重编引擎）、登记段分片枚举不红而 ITEM 行与成功句报全展开与分片已判几态（总态数是超过 u64 的十进制串）、分片段已判 0 态而现判与复用都是 0 红在那条流与那一段、登了段的行登记段的域与分片进度没报全漏段或写坏照重编引擎红、全部复用的一趟不红、分项驱动报判段没跑（step=judge）记本次未跑，$cells 格都对；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的那几格"
   exit 0
 }
 if (( selftest )); then run_selftest; fi
 
-# 平常跑：只供自证的四个变量有一个非空就拒（自证起的子进程除外，文件头「只供自证」）
+# 平常跑：只供自证的五个变量有一个非空就拒（自证起的子进程除外，文件头「只供自证」）
 if (( ! running_under_selftest )) && ! crash_amplification_break_is honor-test-variables-outside-selftest; then
   test_only_given=()
   [[ -n "$crash_amplification_break_switches" ]] && test_only_given+=(CRASH_AMPLIFICATION_BREAK)
   [[ -n "$selftest_red_item" ]] && test_only_given+=(CRASH_AMPLIFICATION_SELFTEST_RED_ITEM)
   [[ -n "$selftest_drop_result" ]] && test_only_given+=(CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT)
   [[ -n "$test_item_driver" ]] && test_only_given+=(CRASH_AMPLIFICATION_ITEM_DRIVER)
+  [[ -n "$selftest_segments_root" ]] && test_only_given+=(CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT)
 
   if (( ${#test_only_given[@]} > 0 )); then
     echo "  ✗ 平常跑时带了只给自证用的变量：${test_only_given[*]}；拒跑，一项都没跑" >&2
@@ -911,7 +1550,7 @@ if (( ! running_under_selftest )) && ! crash_amplification_break_is honor-test-v
     exit 2
   fi
 fi
-unset CRASH_AMPLIFICATION_BREAK CRASH_AMPLIFICATION_SELFTEST_RED_ITEM CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT CRASH_AMPLIFICATION_ITEM_DRIVER
+unset CRASH_AMPLIFICATION_BREAK CRASH_AMPLIFICATION_SELFTEST_RED_ITEM CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT CRASH_AMPLIFICATION_ITEM_DRIVER CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT
 
 driver="${test_item_driver:-$crash_amplification_script_directory/crash-amplification-item.sh}"
 [[ -f "$driver" ]] || { echo "  ✗ 分项驱动不在：$driver" >&2; echo "  → 怎么办：scripts/crash/crash-amplification-item.sh 要在；自证起的子进程用 CRASH_AMPLIFICATION_ITEM_DRIVER 指假的" >&2; exit 2; }
@@ -943,6 +1582,24 @@ elif (( ${#selected[@]} > 0 )); then scope=items
 else scope=full; fi
 driver_arguments+=(--expand-up-to "$requested_expand_up_to")
 
+# 按段登记（文件头「按段登记」）：开跑前经 lib_crash_point_replay_items.py segments 核被判仓根下那一份，核不过退 2、一项都不跑、清场也不起；
+#   核过了往引擎送它的绝对路径（与 scripts/crash/crash-point-replay.sh 送的同一个文件）。自证起的子进程里仓根换成 CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT
+segments_root="${selftest_segments_root:-$repository_root}"
+segments_registry="$segments_root/.claude/gate.d/crash-point-replay-segments.tsv"   # 路径同 lib_crash_point_replay_items.py 的 SEGMENTS_TABLE
+if ! crash_amplification_break_is segments-registry-unchecked; then
+  if ! segments_listing="$(python3 "$crash_amplification_script_directory/lib_crash_point_replay_items.py" segments "$segments_root" 2>&1)"; then
+    printf '%s\n' "$segments_listing" >&2
+    echo "  ✗ 按段登记文件 $segments_registry 核不过（lib_crash_point_replay_items.py segments），一项都没跑" >&2
+    echo "  → 怎么办：照上面逐处列的改 .claude/gate.d/crash-point-replay-segments.tsv（写法在它的表头），再跑同一条命令" >&2
+    exit 2
+  fi
+fi
+if crash_amplification_break_is segments-registry-not-sent; then
+  unset SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY
+else
+  export SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY="$segments_registry"
+fi
+
 # 清场（文件头「清场」）：在清场包装底下（GPU_QUIESCE_HOLDER 指到包装登记的文件，文件名以父进程号加「-」起头）每项带 --quiesced；
 #   不在就经它带同一组参数重起自己，交回它的退出码（清场回读没过 78，别的是重起那一趟的）；跑完不复原
 quiesced_arguments=()
@@ -957,6 +1614,7 @@ elif ! crash_amplification_break_is no-quiesce; then
     [[ -n "$selftest_red_item" ]] && reexec_environment+=("CRASH_AMPLIFICATION_SELFTEST_RED_ITEM=$selftest_red_item")
     [[ -n "$selftest_drop_result" ]] && reexec_environment+=("CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT=$selftest_drop_result")
     [[ -n "$test_item_driver" ]] && reexec_environment+=("CRASH_AMPLIFICATION_ITEM_DRIVER=$test_item_driver")
+    [[ -n "$selftest_segments_root" ]] && reexec_environment+=("CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT=$selftest_segments_root")
   fi
   reexec_arguments=(${entry_original_arguments[@]+"${entry_original_arguments[@]}"})
   if [[ "${PREFLIGHT_FORCE_GIVEN:-0}" == 1 ]]; then reexec_arguments+=(--force); fi
@@ -972,15 +1630,20 @@ if ! mkdir -p -- "$entry_run_directory"; then
   echo "  → 怎么办：修好设备，或改配置：看 $crash_amplification_home 可不可写，或把 SINGLEFS_CRASH_AMPLIFICATION_HOME 指到可写、开机不清空的目录（退 78）" >&2
   exit 78
 fi
-
-
+if [[ -n "${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY:-}" ]]; then
+  echo "  · 往引擎送按段登记文件 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=$SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY（$(grep -cvE '^(#|[[:space:]]*$)' "$SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY") 行登记）" >&2
+fi
 
 started_at=$(date +%s)
 items_dispatched=0; items_run=0; items_failed=0; items_not_run=0; items_reuse_unknown=0
 reuse_unknown_items=""; not_run_items=""; not_run_entries=(); failed_entries=(); failed_names=()
 total_states=0; total_reused=0; total_red=0; stopped_by_condition=""
-total_ignored_points=0; total_states_skipped_by_ignore=0; items_ignore_unknown=0; ignore_unknown_items=""; ignored_items=""
-items_with_lines=0; items_not_exhaustive=0; not_exhaustive_items=""; not_exhaustive_failed_names=()
+total_ignored_points=0; total_states_skipped_by_ignore=0; items_ignore_unknown=0; ignore_unknown_items=""; ignored_items=""; ignore_conflict_seen=0
+items_with_lines=0; items_not_exhaustive=0; not_exhaustive_items=""; not_exhaustive_failed_names=(); engine_field_missing_failed_names=()
+registered_items=0; registered_segment_count=0; registered_entries=""
+beyond_items=0; beyond_segment_count=0; beyond_entries=""; beyond_unknown_items=0; beyond_unknown_names=""
+domain_field_missing_failed_names=(); slice_zero_failed_names=()
+domain_segment_count=0; domain_full_count=0; domain_slice_count=0; domain_items=0; domain_entries=""
 for row in "${rows_to_run[@]}"; do
   name="$(item_fields "$row" 1)"; target="$(item_fields "$row" 2)"; function_name="$(item_fields "$row" 3)"
   # 自证用：把测试目标改成带 -red 的名字，让假驱动退 1
@@ -996,34 +1659,35 @@ for row in "${rows_to_run[@]}"; do
   pipe_status=("${PIPESTATUS[@]}"); item_exit="${pipe_status[0]}"
   crash_amplification_break_is swallow-exit && item_exit=0
   read -r item_lines item_states item_red item_reused item_exhaustive item_expand item_stopped item_unjudged item_bad_red item_ignored item_skipped \
-    <<<"$(summarize_the_item "$item_output_file")"
+    item_not_exhaustive_lines item_not_exhaustive_flows item_registered_segments item_beyond_lines item_beyond_segments item_beyond_missing_lines item_beyond_missing_flows \
+    item_beyond_report item_domains item_progress item_domain_bad_lines item_domain_bad_flows item_zero_lines item_zero_segments item_ignore_conflict_flows <<<"$(summarize_the_item "$item_output_file")"
   item_lines="${item_lines:-0}"; item_states="${item_states:-0}"; item_red="${item_red:-0}"; item_reused="${item_reused:-unknown}"
   item_exhaustive="${item_exhaustive:-false}"; item_expand="${item_expand:-unknown}"; item_stopped="${item_stopped:-0}"; item_unjudged="${item_unjudged:-0}"
   item_bad_red="${item_bad_red:-0}"; item_ignored="${item_ignored:-unknown}"; item_skipped="${item_skipped:-unknown}"
+  # 不穷举又没按段登记的行数与流名（文件头「全量的展开深度」「按段登记」）、按段登记的段
+  item_not_exhaustive_lines="${item_not_exhaustive_lines:-0}"; item_not_exhaustive_flows="${item_not_exhaustive_flows:--}"; item_registered_segments="${item_registered_segments:--}"
+  # 登了段的行里另有展开上限盖不住又没登记的段、没报那个字段的（文件头「按段登记」），与 ITEM 行报的那个字段
+  item_beyond_lines="${item_beyond_lines:-0}"; item_beyond_segments="${item_beyond_segments:--}"
+  item_beyond_missing_lines="${item_beyond_missing_lines:-0}"; item_beyond_missing_flows="${item_beyond_missing_flows:--}"; item_beyond_report="${item_beyond_report:-unknown}"
+  # 登记段的域与分片进度（文件头「按段登记」）：ITEM 行报的两个字段、缺漏认不得的行与流名、分片段已判 0 态的行与那几段
+  item_domains="${item_domains:-unknown}"; item_progress="${item_progress:-unknown}"
+  item_domain_bad_lines="${item_domain_bad_lines:-0}"; item_domain_bad_flows="${item_domain_bad_flows:--}"
+  item_zero_lines="${item_zero_lines:-0}"; item_zero_segments="${item_zero_segments:--}"
+  # 按登记不判的两个数同一组各行报的不同的流名（文件头「按登记整批不判」）
+  item_ignore_conflict_flows="${item_ignore_conflict_flows:--}"
   if [[ "$item_reused" == unknown ]] && crash_amplification_break_is accept-unknown-reuse; then item_reused=0; fi
-  # 不穷举的行数与流名（文件头「全量的展开深度」）：exhaustive= 不是 true（含没报）的行，流名取 flow=，没有 flow= 的行写明
-  item_not_exhaustive_lines=0; item_not_exhaustive_flows=""
-  if (( item_lines > 0 )) && [[ "$item_exhaustive" != true ]]; then
-    read -r item_not_exhaustive_lines item_not_exhaustive_flows <<<"$(awk '
-      /^CRASH_AMPLIFICATION / {
-        exhaustive = ""; flow = ""
-        for (field = 2; field <= NF; field++) {
-          if ($field ~ /^exhaustive=/) exhaustive = substr($field, 12)
-          else if ($field ~ /^flow=/) flow = substr($field, 6)
-        }
-        if (exhaustive != "true") {
-          count++; flow_name = (flow == "" ? "没带flow=的行" : flow)
-          if (!(flow_name in seen)) { seen[flow_name] = 1; names = names (names == "" ? "" : "、") flow_name }
-        }
-      }
-      END { printf "%d %s\n", count, names }' "$item_output_file")"
-  fi
   # 分项驱动报的本次未跑（文件头「一项怎么判」not-run）：驱动退 77（一项都没跑到），或打了 CRASH_AMPLIFICATION_NOT_RUN 行（几条流里没借到的那几条）；
   #   原因取第一行的 reason=。弄坏开关 driver-77-as-failure 下退 77 照别的非 0 判红，driver-not-run-as-zero-lines 下不认那几行
-  item_driver_not_run=0; item_driver_not_run_reason=""; item_driver_not_run_step=""; item_driver_not_run_lines=0; item_exit_not_run=0
+  #   判段没跑的流（CRASH_AMPLIFICATION_NOT_RUN step=judge：配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性）另数一份，原因照它写；弄坏开关 judge-not-run-ignored 下不认那几行
+  item_driver_not_run=0; item_driver_not_run_reason=""; item_driver_not_run_step=""; item_driver_not_run_lines=0; item_exit_not_run=0; item_judge_not_run_lines=0
   if ! crash_amplification_break_is driver-not-run-as-zero-lines; then
     item_driver_not_run_lines="$(grep -c '^CRASH_AMPLIFICATION_NOT_RUN ' "$item_output_file" 2>/dev/null)"
     item_driver_not_run_lines="${item_driver_not_run_lines:-0}"
+    item_judge_not_run_lines="$(grep -c '^CRASH_AMPLIFICATION_NOT_RUN step=judge ' "$item_output_file" 2>/dev/null)"
+    item_judge_not_run_lines="${item_judge_not_run_lines:-0}"
+    if crash_amplification_break_is judge-not-run-ignored; then
+      item_driver_not_run_lines=$((item_driver_not_run_lines - item_judge_not_run_lines)); item_judge_not_run_lines=0
+    fi
     item_driver_not_run_reason="$(awk '/^CRASH_AMPLIFICATION_NOT_RUN / { at = index($0, " reason="); print (at ? substr($0, at + 8) : ""); exit }' "$item_output_file")"
     item_driver_not_run_step="$(awk '/^CRASH_AMPLIFICATION_NOT_RUN / { if (match($0, / step=[^ ]+/)) print substr($0, RSTART + 6, RLENGTH - 6); exit }' "$item_output_file")"
   fi
@@ -1058,12 +1722,36 @@ for row in "${rows_to_run[@]}"; do
     if [[ "$item_exit" == 0 ]] && (( item_lines == 0 && item_driver_not_run == 0 )) && ! crash_amplification_break_is accept-zero-lines; then
       reasons+=("驱动退 0 却 0 行 CRASH_AMPLIFICATION：看测试名还在不在（$target）、cargo 是不是筛出了 0 条（--test-filter $function_name）")
     fi
-    # 不穷举（文件头「全量的展开深度」）：展开深度是全量的那一个（不带参数的全量、点名都算）时有一行不是 exhaustive=true，这一项红。
+    # 不穷举（文件头「全量的展开深度」「按段登记」）：展开深度是全量的那一个（不带参数的全量、点名都算）时有一行不是 exhaustive=true、
+    #   又不是「exhaustive=false 只因登记了段」（registered_segments= 不是 -、unregistered_segments_beyond_expansion= 是 -），这一项红。
     #   弄坏开关 skip-not-exhaustive-in-full-scope 下不带参数的全量不判（点名的照判）
-    if (( item_lines > 0 )) && [[ "$requested_expand_up_to" == "$FULL_EXPAND_UP_TO" && "$item_exhaustive" != true ]] && ! crash_amplification_break_is accept-not-exhaustive \
+    full_depth_judged=0
+    if (( item_lines > 0 )) && [[ "$requested_expand_up_to" == "$FULL_EXPAND_UP_TO" ]] && ! crash_amplification_break_is accept-not-exhaustive \
        && ! { [[ "$scope" == full ]] && crash_amplification_break_is skip-not-exhaustive-in-full-scope; }; then
-      reasons+=("展开 $FULL_EXPAND_UP_TO 是全量的展开深度，却有 $item_not_exhaustive_lines 行驱动行不是 exhaustive=true（不穷举的流：$item_not_exhaustive_flows）：全量要每一行都穷举，这一项没判完全域；加大展开深度重跑，或查是哪一段超出")
+      full_depth_judged=1
+    fi
+    if (( full_depth_judged && item_not_exhaustive_lines > 0 )); then
+      reasons+=("展开 $FULL_EXPAND_UP_TO 是全量的展开深度，却有 $item_not_exhaustive_lines 行驱动行不是 exhaustive=true、也没按段登记（不穷举的流：$item_not_exhaustive_flows）：全量要每一行都穷举或只因登记的段不穷举，这一项没判完全域；按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开")
       not_exhaustive_failed_names+=("$name")
+    fi
+    # 登了段的行（文件头「按段登记」）：unregistered_segments_beyond_expansion= 不是 - 判红、点名流与那几段；没报（旧引擎）照不穷举判红，出路重编引擎
+    if (( full_depth_judged && item_beyond_lines > 0 )); then
+      reasons+=("展开 $FULL_EXPAND_UP_TO 是全量的展开深度，有 $item_beyond_lines 行驱动行登了段，可那条流里另有没登记、展开上限盖不住的段（$(segments_by_flow "$item_beyond_segments")）：那几段没判全域；按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开")
+      [[ " ${not_exhaustive_failed_names[*]-} " == *" $name "* ]] || not_exhaustive_failed_names+=("$name")
+    fi
+    if (( full_depth_judged && item_beyond_missing_lines > 0 )); then
+      reasons+=("展开 $FULL_EXPAND_UP_TO 是全量的展开深度，有 $item_beyond_missing_lines 行驱动行登了段、exhaustive=false，却没报 unregistered_segments_beyond_expansion=（流：$item_beyond_missing_flows）：判不出登记段之外还有没有展开上限盖不住的段，照不穷举判；引擎没报 unregistered_segments_beyond_expansion=，重编引擎")
+      engine_field_missing_failed_names+=("$name")
+    fi
+    # 登记段的域与分片进度（文件头「按段登记」）：不看展开深度。登了段的行缺两个字段之一、没列全登记的段（或分片段没报进度）、写法认不得，出路重编引擎；
+    #   分片段这一趟已判 0 态，出路看录入段与判段的日志；分片本身不判红
+    if (( item_domain_bad_lines > 0 )); then
+      reasons+=("有 $item_domain_bad_lines 行驱动行登了段，registered_segment_domains= / registered_segment_progress= 缺了、没列全登记的段（或分片段没报进度）、或写法认不得（流：$item_domain_bad_flows）：判不出登记段是全展开还是分片、分片判到了哪；引擎没报 registered_segment_domains= / registered_segment_progress=，重编引擎")
+      domain_field_missing_failed_names+=("$name")
+    fi
+    if (( item_zero_lines > 0 )); then
+      reasons+=("有 $item_zero_lines 行驱动行的分片段已判 0 态（$(segments_by_flow "$item_zero_segments")）：这一趟一个态都没判，看录入段与判段的日志")
+      slice_zero_failed_names+=("$name")
     fi
     if (( item_lines > 0 )) && [[ "$item_expand" != "$requested_expand_up_to" ]] && ! crash_amplification_break_is accept-expand-mismatch; then
       reasons+=("驱动行报的展开深度是 $item_expand，交下去的是 $requested_expand_up_to：驱动没照给的展开深度跑")
@@ -1076,6 +1764,12 @@ for row in "${rows_to_run[@]}"; do
         not_run_reason="分项驱动退 77（一项都没跑到），报本次未跑（CRASH_AMPLIFICATION_NOT_RUN step=${item_driver_not_run_step:-没写}）：借不到显存，这一项没判成（${item_driver_not_run_reason:-那一行没写 reason=}）"
       elif (( item_exit_not_run )); then
         not_run_reason="分项驱动退 77（一项都没跑到），没打 CRASH_AMPLIFICATION_NOT_RUN 行：原因看这一项的输出"
+      elif (( item_judge_not_run_lines > 0 )); then
+        item_judge_not_run_reason="$(awk '/^CRASH_AMPLIFICATION_NOT_RUN step=judge / { at = index($0, " reason="); print (at ? substr($0, at + 8) : ""); exit }' "$item_output_file")"
+        not_run_reason="分项驱动报 $item_judge_not_run_lines 条流判段没跑（CRASH_AMPLIFICATION_NOT_RUN step=judge）：配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性，录入段照录、判段这一趟没判（${item_judge_not_run_reason:-那一行没写 reason=}）"
+        if (( item_driver_not_run_lines > item_judge_not_run_lines )); then
+          not_run_reason="${not_run_reason}；另有 $((item_driver_not_run_lines - item_judge_not_run_lines)) 条流借不到显存没判"
+        fi
       else
         not_run_reason="分项驱动报 $item_driver_not_run_lines 条流本次未跑（CRASH_AMPLIFICATION_NOT_RUN）：借不到显存没判，借到的照判了（${item_driver_not_run_reason:-那一行没写 reason=}）"
       fi
@@ -1086,7 +1780,38 @@ for row in "${rows_to_run[@]}"; do
       (( item_unjudged > 0 )) && not_run_reason="${not_run_reason:+${not_run_reason}、}留了 $item_unjudged 块没判（unjudged_blocks）"
     fi
   fi
-  echo "CRASH_AMPLIFICATION_ITEM item=$name exit=$item_exit states=$item_states reused=$item_reused red=$item_red lines=$item_lines expand_up_to=$item_expand exhaustive=$item_exhaustive verdict=$verdict seconds=$(( $(date +%s) - item_started_at )) ignored_points=$item_ignored states_skipped_by_ignore=$item_skipped"
+  # 按段登记的段（文件头「按段登记」）：ITEM 行照实写出，成功句逐项、逐条流报段号与写数；弄坏开关 registered-segments-unreported 下两处都不报
+  crash_amplification_break_is registered-segments-unreported && item_registered_segments=-
+  # 展开上限盖不住又没登记的段（文件头「按段登记」）：ITEM 行照实写出，成功句逐项、逐条流报段号与写数；弄坏开关 beyond-expansion-unreported 下两处都不报
+  crash_amplification_break_is beyond-expansion-unreported && item_beyond_report=-
+  # 登记段的域与分片进度（文件头「按段登记」）：ITEM 行照实写出，成功句逐段报全展开或分片已判几态；弄坏开关 slice-domains-unreported 下两处都不报
+  if crash_amplification_break_is slice-domains-unreported; then item_domains=-; item_progress=-; fi
+  echo "CRASH_AMPLIFICATION_ITEM item=$name exit=$item_exit states=$item_states reused=$item_reused red=$item_red lines=$item_lines expand_up_to=$item_expand exhaustive=$item_exhaustive verdict=$verdict seconds=$(( $(date +%s) - item_started_at )) ignored_points=$item_ignored states_skipped_by_ignore=$item_skipped registered_segments=$item_registered_segments unregistered_segments_beyond_expansion=$item_beyond_report registered_segment_domains=$item_domains registered_segment_progress=$item_progress"
+  # 同一条流各行报的 ignored_points= / states_skipped_by_ignore= 不同：ITEM 行两个数写了 unknown，这里点名分项与流（不悄悄取最大或最小）
+  if [[ "$item_ignore_conflict_flows" != - ]]; then
+    echo "  ! 分项 $name：同一条流各行报的 ignored_points= / states_skipped_by_ignore= 不同（流：$item_ignore_conflict_flows），这一项两个数记 unknown；这两个数是那条流的测试代码预设的、各趟该相同，看这几条流各趟驱动行报的数为什么不一样（输出另存在 $item_output_file）" >&2
+  fi
+  if [[ "$item_domains" != - && "$item_domains" != unknown ]]; then
+    item_domain_text="$(domains_of_the_item_for_the_success_line "$name" "$item_domains" "$item_progress")"
+    IFS=$'\t' read -r item_domain_total item_domain_full item_domain_sliced item_domain_entries <<<"$item_domain_text"
+    domain_items=$((domain_items + 1)); domain_segment_count=$((domain_segment_count + item_domain_total))
+    domain_full_count=$((domain_full_count + item_domain_full)); domain_slice_count=$((domain_slice_count + item_domain_sliced))
+    domain_entries="${domain_entries:+${domain_entries}、}${item_domain_entries}"
+  fi
+  if [[ "$item_registered_segments" != - ]]; then
+    registered_items=$((registered_items + 1))
+    item_registered_text="$(segments_of_the_item_for_the_success_line "$name" "$item_registered_segments")"
+    registered_segment_count=$((registered_segment_count + ${item_registered_text%%$'\t'*}))
+    registered_entries="${registered_entries:+${registered_entries}，}${item_registered_text#*$'\t'}"
+  fi
+  if [[ "$item_beyond_report" == unknown ]]; then
+    beyond_unknown_items=$((beyond_unknown_items + 1)); beyond_unknown_names="${beyond_unknown_names:+${beyond_unknown_names}、}${name}"
+  elif [[ "$item_beyond_report" != - ]]; then
+    beyond_items=$((beyond_items + 1))
+    item_beyond_text="$(segments_of_the_item_for_the_success_line "$name" "$item_beyond_report")"
+    beyond_segment_count=$((beyond_segment_count + ${item_beyond_text%%$'\t'*}))
+    beyond_entries="${beyond_entries:+${beyond_entries}，}${item_beyond_text#*$'\t'}"
+  fi
   items_run=$((items_run + 1))
   if (( item_lines > 0 )); then
     items_with_lines=$((items_with_lines + 1))
@@ -1094,7 +1819,12 @@ for row in "${rows_to_run[@]}"; do
   fi
   total_states=$((total_states + item_states)); total_red=$((total_red + item_red))
   if [[ "$item_ignored" == unknown || "$item_skipped" == unknown ]]; then
-    items_ignore_unknown=$((items_ignore_unknown + 1)); ignore_unknown_items="${ignore_unknown_items:+${ignore_unknown_items}、}${name}"
+    items_ignore_unknown=$((items_ignore_unknown + 1))
+    if [[ "$item_ignore_conflict_flows" != - ]]; then
+      ignore_unknown_items="${ignore_unknown_items:+${ignore_unknown_items}、}${name}（同一条流各行报的数不同，流：${item_ignore_conflict_flows}）"; ignore_conflict_seen=1
+    else
+      ignore_unknown_items="${ignore_unknown_items:+${ignore_unknown_items}、}${name}"
+    fi
   else
     total_ignored_points=$((total_ignored_points + item_ignored)); total_states_skipped_by_ignore=$((total_states_skipped_by_ignore + item_skipped))
     if (( item_ignored > 0 || item_skipped > 0 )); then ignored_items="${ignored_items:+${ignored_items}、}${name}"; fi
@@ -1128,14 +1858,26 @@ if (( items_failed > 0 )); then
   echo "  ✗ $items_failed 个分项判红" >&2 # gate-lint:summary
   if (( ${#not_exhaustive_failed_names[@]} > 0 )); then
     not_exhaustive_failed_text="$(printf '%s、' "${not_exhaustive_failed_names[@]}")"
-    echo "  → 不穷举的项（${not_exhaustive_failed_text%、}）：加大展开深度重跑，或查是哪一段超出。先试 $0 --expand-up-to <比 $FULL_EXPAND_UP_TO 大的 N>$(printf ' --item %s' "${not_exhaustive_failed_names[@]}")（缩过规模的一趟，成功句点名还不穷举的项），都穷举了把文件头登记的 FULL_EXPAND_UP_TO 改成那个 N 再整趟跑；或查 ✗ 里点名的流是哪一段的写数超过 $FULL_EXPAND_UP_TO（写表是不是改长了）" >&2
+    echo "  → 不穷举的项（${not_exhaustive_failed_text%、}）：按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开。展开上限盖不住、整域又展不开的段（几百写的段）登进那份表，那几段只按甲二 ∪ 展开 6 判、成功句报段号与写数（登哪几段由用户点头）；盖得住的先试 $0 --expand-up-to <比 $FULL_EXPAND_UP_TO 大的 N>$(printf ' --item %s' "${not_exhaustive_failed_names[@]}")（缩过规模的一趟，成功句点名还不穷举的项），都穷举了把文件头登记的 FULL_EXPAND_UP_TO 改成那个 N 再整趟跑；或查 ✗ 里点名的流是哪一段的写数超过 $FULL_EXPAND_UP_TO（写表是不是改长了）" >&2
+  fi
+  if (( ${#engine_field_missing_failed_names[@]} > 0 )); then
+    engine_field_missing_text="$(printf '%s、' "${engine_field_missing_failed_names[@]}")"
+    echo "  → 登了段的行没报 unregistered_segments_beyond_expansion= 的项（${engine_field_missing_text%、}）：引擎没报 unregistered_segments_beyond_expansion=，重编引擎（驱动行要在 registered_segments= 之后报这条流里没登记、展开上限盖不住的段，crates/singlefs-checker-tier/src/crash_amplification.rs 打驱动行那一处）；重编之后只重跑这几项：$0$(printf ' --item %s' "${engine_field_missing_failed_names[@]}")" >&2
+  fi
+  if (( ${#domain_field_missing_failed_names[@]} > 0 )); then
+    domain_field_missing_text="$(printf '%s、' "${domain_field_missing_failed_names[@]}")"
+    echo "  → 登了段的行没报全 registered_segment_domains= / registered_segment_progress= 的项（${domain_field_missing_text%、}）：引擎没报 registered_segment_domains= / registered_segment_progress=，重编引擎（驱动行要在 unregistered_segments_beyond_expansion= 之后报每个登记段的域 <段号>:<full|slice> 与每个分片段的 <段号>:<已判态数>/<域的总态数>，crates/singlefs-checker-tier/src/crash_amplification.rs 打驱动行那一处）；重编之后只重跑这几项：$0$(printf ' --item %s' "${domain_field_missing_failed_names[@]}")" >&2
+  fi
+  if (( ${#slice_zero_failed_names[@]} > 0 )); then
+    slice_zero_text="$(printf '%s、' "${slice_zero_failed_names[@]}")"
+    echo "  → 分片段这一趟已判 0 态的项（${slice_zero_text%、}）：这一趟一个态都没判，看录入段与判段的日志（那一项的输出 $entry_run_directory/<分项>.log 里录入段与判段那几趟）；修好之后只重跑这几项：$0$(printf ' --item %s' "${slice_zero_failed_names[@]}")${expand_up_to_given:+ --expand-up-to $expand_up_to_given}" >&2
   fi
   echo "  → 怎么办：看那一项的输出（另存在 $entry_run_directory/<分项>.log）与它驱动日志目录里的 placement.log / run.log（动用了第二台的是 share-0.log / share-1.log / import.log）；修好之后只重跑判红的那几项：$0$(printf ' --item %s' "${failed_names[@]}")${expand_up_to_given:+ --expand-up-to $expand_up_to_given}" >&2
   run_verdict=1
 fi
 if [[ -n "$stopped_by_condition" ]]; then
   echo "  ✗ 分项 $stopped_by_condition 的驱动退 78（显卡或第二台用不上，或清场、多机配置不满足）：这一趟停在这一项，后面 $(( ${#rows_to_run[@]} - items_dispatched )) 项没派" >&2
-  echo "  → 怎么办：修好设备，或改配置：看那一项的输出（$entry_run_directory/$stopped_by_condition.log）里 ✗ 与 → 那几行；修好之后重跑同一条命令（判过的块在库里，接着判）" >&2
+  echo "  → 怎么办：修好设备，或改配置：看那一项的输出（$entry_run_directory/$stopped_by_condition.log）里拒绝与出路那几行；修好之后重跑同一条命令（判过的块在库里，接着判）" >&2
   # 有红先判（文件头「一项怎么判」）：这一趟有红就退 1，退 78 的那一项照上面点名
   if (( ! run_verdict )) || crash_amplification_break_is condition-before-red; then exit 78; fi
   echo "  · 这一趟有红，退 1（有红先判）；退 78 的那一项照上面的出路修好设备，与判红的几项一起重跑" >&2
@@ -1172,12 +1914,14 @@ ignore_classes=""
 if (( total_ignored_points > 0 || total_states_skipped_by_ignore > 0 )); then
   ignore_classes="（类名取不出：驱动行只报点数与态数、不报类名；有跳过的分项：$ignored_items）"
 fi
+ignore_unknown_reason="驱动行没报 ignored_points= / states_skipped_by_ignore="
+if (( ignore_conflict_seen )); then ignore_unknown_reason="驱动行没报 ignored_points= / states_skipped_by_ignore=，或同一条流各行报的数不同（括号里点名流）"; fi
 if (( items_ignore_unknown == 0 )); then
   ignore_part="按登记整批不判：$total_ignored_points 个点、$total_states_skipped_by_ignore 态$ignore_classes"
 elif (( items_ignore_unknown == items_run )); then
-  ignore_part="按登记整批不判：取不出（$items_ignore_unknown 项：${ignore_unknown_items}，驱动行没报 ignored_points= / states_skipped_by_ignore=）"
+  ignore_part="按登记整批不判：取不出（$items_ignore_unknown 项：${ignore_unknown_items}，${ignore_unknown_reason}）"
 else
-  ignore_part="按登记整批不判：取得出的 $(( items_run - items_ignore_unknown )) 项 $total_ignored_points 个点、$total_states_skipped_by_ignore 态$ignore_classes；另有 $items_ignore_unknown 项取不出：${ignore_unknown_items}，驱动行没报 ignored_points= / states_skipped_by_ignore="
+  ignore_part="按登记整批不判：取得出的 $(( items_run - items_ignore_unknown )) 项 $total_ignored_points 个点、$total_states_skipped_by_ignore 态$ignore_classes；另有 $items_ignore_unknown 项取不出：${ignore_unknown_items}，${ignore_unknown_reason}"
 fi
 crash_amplification_break_is skip-ignore-report && ignore_part=""
 # 缩过规模的一趟点名哪几项不穷举（文件头「全量的展开深度」与「输出」的成功句）；别的范围里不穷举已判红，到不了这里
@@ -1189,5 +1933,29 @@ if [[ "$scope" == scaled ]] && ! crash_amplification_break_is hide-scaled-not-ex
     scaled_part="有驱动行的 $items_with_lines 项都穷举"
   fi
 fi
-echo "  ✓ $success_head：$run_part${scaled_part:+；$scaled_part}；现判 $total_states 态、$reuse_part；派出 $items_dispatched 项、收回 $items_run 项${ignore_part:+；$ignore_part}"
+# 按段登记的一段（文件头「按段登记」）：登了段的项逐项、逐条流报段号与写数（那几段只按甲二 ∪ 展开 6 判，全量展开的态数不报）
+if (( registered_segment_count > 0 )); then
+  registered_part="按段登记 $registered_segment_count 段（$registered_items 项，只按甲二 ∪ 展开 6 判、没判全域）：$registered_entries"
+else
+  registered_part="按段登记：0 段"
+fi
+crash_amplification_break_is registered-segments-unreported && registered_part=""
+# 登记段的域的一段（文件头「按段登记」）：逐段报全展开，或分片、这一趟为止已判几态 / 域的总态数（两个数都是十进制数字串，原样打）
+if (( domain_segment_count > 0 )); then
+  domain_part="登记段的域（甲二 ∪ 展开 6）$domain_segment_count 段（$domain_items 项；全展开 $domain_full_count 段、分片 $domain_slice_count 段）：$domain_entries"
+else
+  domain_part="登记段的域：0 段"
+fi
+crash_amplification_break_is slice-domains-unreported && domain_part=""
+# 展开上限盖不住又没登记的段的一段（文件头「按段登记」）：逐项、逐条流报段号与写数，ITEM 行写 unknown 的项点名取不出
+if (( beyond_segment_count > 0 )); then
+  beyond_part="展开上限盖不住又没登记的段 $beyond_segment_count 段（$beyond_items 项，没判全域）：$beyond_entries"
+else
+  beyond_part="展开上限盖不住又没登记的段：0 段"
+fi
+if (( beyond_unknown_items > 0 )); then
+  beyond_part="${beyond_part}（另有 $beyond_unknown_items 项取不出：${beyond_unknown_names}，驱动行没报 unregistered_segments_beyond_expansion=）"
+fi
+crash_amplification_break_is beyond-expansion-unreported && beyond_part=""
+echo "  ✓ $success_head：$run_part${scaled_part:+；$scaled_part}；现判 $total_states 态、$reuse_part；派出 $items_dispatched 项、收回 $items_run 项${ignore_part:+；$ignore_part}${registered_part:+；$registered_part}${domain_part:+；$domain_part}${beyond_part:+；$beyond_part}"
 exit 0

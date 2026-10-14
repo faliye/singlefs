@@ -2826,6 +2826,7 @@ mod tests {
     }
 
     #[test]
+    // wallclock-assert-load-safe: 只比 20 帧至少花了 100 ms（下界，每帧先睡 5 ms），负载再高只会更久
     fn sleep_before_commit_receiver_spends_at_least_five_milliseconds_per_frame() {
         let directory = TestDirectory::new("sleep-receiver");
         let mut receiver = receiver_on_file_library(&directory.path, ReceiveMode::SleepBeforeCommit, 20);

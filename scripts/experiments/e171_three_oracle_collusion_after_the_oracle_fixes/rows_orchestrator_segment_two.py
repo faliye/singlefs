@@ -3,7 +3,7 @@
 在修订 6 树上跑」）的多机编排：281 行（第 1–117 行与第 118–281 行两张表）加补位，流一、流二，批 1 批 2，不跑执行器、不带探针。
 由 run_segment_two_on_the_revision_6_tree_multi_host.sh 起，在仓根跑。
 
-为什么另写一层、不改第一段那一份编排器：rows_orchestrator.py 被 cross_host_o3_check.py 按 sha256 7bfbdb84… 钉住（改一个字节它退 3，复跑行
+为什么另写一层、不改第一段那一份编排器：rows_orchestrator.py 被 cross_host_o3_check.py 按 sha256 1dcfb8d0… 钉住（改一个字节它退 3，复跑行
 driver_e171_r1_s1_revision_6_cross_host_check 跟着红）。这一层按路径载入那一份（开跑先核 sha256，不是就退 3），机器清单、资源、分配、预检、单台配置、
 发给别的台的快照与工具包、装产物都调它原来的函数；第二段不同的几处（行集、产物名、不跑执行器的合并与判法、补位协调、跨机对照那一行、逐行限时的超时重跑）写在这里。
 
@@ -14,12 +14,12 @@ driver_e171_r1_s1_revision_6_cross_host_check 跟着红）。这一层按路径�
   rows_orchestrator_segment_two.py plan <同上>
       只现查机器与资源、算分配、按每行推的用时推各台挂钟，打出来；一行都不起，不写产物。
   rows_orchestrator_segment_two.py --selftest [--cells 格,…]
-      假驱动、假 multi-host-run、假机器清单与资源走一遍各格（），连同第一段编排器自己的 --selftest；自证进程是子进程的收养者
+      假驱动、假 multi-host-run、假机器清单与资源走一遍各格（同目录的 fake_*），连同第一段编排器自己的 --selftest；自证进程是子进程的收养者
       （PR_SET_CHILD_SUBREAPER），每一格之后收掉它起的、还活着的每个进程，末尾数一遍自己的进程树，临时目录（自证给子进程的 TMPDIR）删掉；
       末尾逐个打开弄坏开关核它红在点名的格。末行「自证 N 项，红 M」。
 
 退出码：0 跑完（合并、判法、跨机对照、超时重跑都过）；1 停机或某一行没跑成（日志与 sequence.log 写停在哪、为什么）；2 用法错；
-  3 第一段编排器不是 7bfbdb84… 那一份；78 运行条件不满足（多机配置判不过、某台连不上或没读到资源、别的台的预检没过、此刻一条线道都放不下、
+  3 第一段编排器不是 1dcfb8d0… 那一份；78 运行条件不满足（多机配置判不过、某台连不上或没读到资源、别的台的预检没过、此刻一条线道都放不下、
   跨机对照那一行此刻放不下）——不悄悄退回单机，出路是修好那台或改配置，再用同一条命令起；143 收到 TERM / INT / HUP，收完尾退出。
 
 行集：两张坏实现表（bad-implementations-117.tsv、bad-implementations-expansion-164.tsv）的整表编号，必须恰是 1–281（登记第一节）。不跑空变异（第二段登记里没有）。
@@ -89,7 +89,7 @@ import urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SEGMENT_ONE_ORCHESTRATOR_PATH = os.path.join(HERE, "rows_orchestrator.py")
-SEGMENT_ONE_ORCHESTRATOR_SHA256 = "7bfbdb84559476033853794499836f752fdf8a3e803e17cd9539ae49ee3b7e0e"
+SEGMENT_ONE_ORCHESTRATOR_SHA256 = "1dcfb8d0c08a706077f41fe69d3566d7a99e16f3dcbffc10808a2f0d88d17853"
 SEGMENT_ONE_SELFTEST_LAST_LINE = "自证 34 项，红 0"
 TABLE_FILES = ("bad-implementations-117.tsv", "bad-implementations-expansion-164.tsv")
 WHOLE_TABLE_ROWS = tuple(range(1, 282))
@@ -109,7 +109,7 @@ PR_SET_CHILD_SUBREAPER = 36
 
 
 class WrongSegmentOneOrchestrator(Exception):
-    """第一段编排器文件的 sha256 不是 7bfbdb84…：这一层调的那几个函数不再是第一段跑的那一份。"""
+    """第一段编排器文件的 sha256 不是 1dcfb8d0…：这一层调的那几个函数不再是第一段跑的那一份。"""
 
 
 def load_segment_one_orchestrator(path: str = SEGMENT_ONE_ORCHESTRATOR_PATH) -> types.ModuleType:
@@ -118,7 +118,7 @@ def load_segment_one_orchestrator(path: str = SEGMENT_ONE_ORCHESTRATOR_PATH) -> 
         actual = hashlib.sha256(handle.read()).hexdigest()
     if actual != SEGMENT_ONE_ORCHESTRATOR_SHA256:
         raise WrongSegmentOneOrchestrator(f"{path} 的 sha256 是 {actual}，不是 {SEGMENT_ONE_ORCHESTRATOR_SHA256}")
-    specification = importlib.util.spec_from_file_location("rows_orchestrator_7bfbdb84", path)
+    specification = importlib.util.spec_from_file_location("rows_orchestrator_1dcfb8d0", path)
     module = importlib.util.module_from_spec(specification)
     sys.dont_write_bytecode = True
     sys.modules[specification.name] = module  # dataclasses 在类定义时按 __module__ 去 sys.modules 里找这个模块
@@ -968,9 +968,11 @@ def context_from_arguments_two(arguments: argparse.Namespace) -> ContextTwo:
 def main(argument_list: list[str]) -> int:
     if os.environ.get(BREAK_VARIABLE) and os.environ.get(SELFTEST_VARIABLE) != "1":
         print(f"✗ {BREAK_VARIABLE} 只在 --selftest 起的子进程里认；平常跑时设了它就拒（退 2）", file=sys.stderr)
+        print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
         return 2
     if os.environ.get("ROWS_ORCHESTRATOR_BREAK") and os.environ.get("ROWS_ORCHESTRATOR_SELFTEST") != "1":
         print("✗ ROWS_ORCHESTRATOR_BREAK（第一段编排器的弄坏开关，这一层调的函数里也认）只在自证里认；平常跑时设了它就拒（退 2）", file=sys.stderr)
+        print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
         return 2
     if os.environ.get(SELFTEST_ROWS_VARIABLE) and os.environ.get(SELFTEST_VARIABLE) != "1":
         print(f"✗ {SELFTEST_ROWS_VARIABLE} 只在 --selftest 起的子进程里认（平常跑整表 1–281）；设了它就拒（退 2）", file=sys.stderr)
@@ -1094,7 +1096,7 @@ def start_straggler(marker: str) -> None:
 
 # ── 自证：纯函数各格 ──
 REAL_REPOSITORY = one.REAL_REPOSITORY
-FAKES = os.path.join(HERE, "selftest_fakes")
+FAKES = HERE  # 假驱动 fake_*.py / fake_*.sh 与本文件同目录
 
 
 def cells_planning() -> list[tuple[str, bool, str]]:
@@ -1582,7 +1584,7 @@ def selftest(argument_list: list[str]) -> int:
         if wanted is not None and name not in wanted:
             continue
         red += 0 if cell_is_green else 1
-        print(f"{'✓' if cell_is_green else '✗'} 自证 {name}：{detail}", flush=True)
+        print(f"{'✓' if cell_is_green else '✗'} 自证 {name}：{detail}", flush=True)  # gate-lint:detail
     for switch, cell, caught, code in switch_results:
         red += 0 if caught else 1
         print(f"{'✓' if caught else '✗'} 弄坏开关 {switch} → 红在 {cell}：{'红了' if caught else f'没红（退 {code}）'}", flush=True)

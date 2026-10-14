@@ -122,7 +122,8 @@ def insert(path, anchor, where, line, absent, dry_run, literal=False):
         print("     → 怎么办：--%s 按正则认；要按字面找就改用 --%s-literal %s" % (where, where, shlex.quote(anchor)))
         return 3
     if len(matched) != 1:
-        print("  ✗ 锚点在 %s 里命中 %d 次，只认恰好一次（--%s%s）" % (path, len(matched), where, "-literal 按字面认" if literal else " 按正则认"))
+        # 出路由 anchor_hints 按命中 0 次与多次分别给（「→ 怎么办：」那几行）
+        print("  ✗ 锚点在 %s 里命中 %d 次，只认恰好一次（--%s%s）" % (path, len(matched), where, "-literal 按字面认" if literal else " 按正则认"))  # gate-lint:summary
         for line in anchor_hints(lines, anchor, where, literal, matched):
             print(line)
         return 3

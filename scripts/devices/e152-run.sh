@@ -13,6 +13,8 @@
 set -uo pipefail
 RESEARCH="$(cd "$(dirname "$0")/../experiments" && pwd)"
 REPOSITORY="$(cd "$RESEARCH/../.." && pwd)"
+# 三条 cargo build 不吃 cargo 自己的缺省（核数）：经 capped.sh default 起，编译并行度取登记的重活默认并行度（SINGLEFS_THREAD_CAP 设了取它）
+CAPPED_DEFAULT=(bash "$REPOSITORY/scripts/hosts/capped.sh" default)
 OUTPUT="${1:?用法：e152-run.sh <产物路径>}"
 ROUNDS="${E152_ROUNDS:-5}"
 CONFIGURATIONS="${E152_CONFIGURATIONS:-raw ext4 xfs f2fs btrfs bcachefs zfs singlefs}"
@@ -22,24 +24,25 @@ fail() { echo "  ✗ $1" >&2; echo "    → $2" >&2; exit 1; }
 
 case "$OUTPUT" in /*) ;; *) OUTPUT="$PWD/$OUTPUT" ;; esac
 cd "$RESEARCH" || fail "进不了 $RESEARCH" "从仓里跑"
-KERNEL="$(bash ../vm-kernel.sh --release "$RELEASE")" \
+KERNEL="$(bash ../devices/vm-kernel.sh --release "$RELEASE")" \
   || fail "拿不到 $RELEASE 的内核镜像" "单跑 bash scripts/devices/vm-kernel.sh --release $RELEASE 看报错"
-cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark >/dev/null 2>&1 \
+"${CAPPED_DEFAULT[@]}" cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark >/dev/null 2>&1 \
   || fail "来宾二进制编不过" "cd scripts/experiments && cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark"
-cargo build --release --bin e152-file-system-benchmark >/dev/null 2>&1 \
+"${CAPPED_DEFAULT[@]}" cargo build --release --bin e152-file-system-benchmark >/dev/null 2>&1 \
   || fail "宿主上的汇总二进制编不过" "cd scripts/experiments && cargo build --release --bin e152-file-system-benchmark"
-( cd "$REPOSITORY" && cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin new_pool_file_creation_on_device >/dev/null 2>&1 ) \
-  || fail "singlefs 的真设备二进制编不过" "在仓根跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin new_pool_file_creation_on_device"
+# singlefs 的真设备二进制与门禁 checker-tier-qemu-device-streams 同一种编法：glibc 目标加 +crt-static（checker 档默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器）
+( cd "$REPOSITORY" && "${CAPPED_DEFAULT[@]}" cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device >/dev/null 2>&1 ) \
+  || fail "singlefs 的真设备二进制编不过" "在仓根跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device"
 GUEST_BINARY="$RESEARCH/target/x86_64-unknown-linux-musl/release/e152-file-system-benchmark"
 HOST_BINARY="$RESEARCH/target/release/e152-file-system-benchmark"
-SINGLEFS_BINARY="$REPOSITORY/target/x86_64-unknown-linux-musl/release/new_pool_file_creation_on_device"
+SINGLEFS_BINARY="$REPOSITORY/target/x86_64-unknown-linux-gnu/release/new_pool_file_creation_on_device"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e152.XXXXXX")"
 trap 'rm -rf "${WORK:?}"' EXIT
 # 起跑时把要调的脚本复制一份，之后只调副本：bash 边读边执行脚本，仓里的原件中途被别的会话一改，
 # 正在跑的那一次就会读到错位的内容（2026-09-15 第二次正式跑实测：vm-bench.sh 开头注释被改，那一次报语法错退出）。
-mkdir -p "$WORK/scripts"
-cp scripts/devices/vm-bench.sh scripts/devices/e152-stage-root.sh "$WORK/scripts/" || fail "复制不了测试台脚本" "看 $WORK 的权限"
+mkdir -p "$WORK/scripts/devices"
+cp scripts/devices/vm-bench.sh scripts/devices/e152-stage-root.sh "$WORK/scripts/devices/" || fail "复制不了测试台脚本" "看 $WORK 的权限"
 bash "$WORK/scripts/devices/e152-stage-root.sh" "$WORK/root" "$RELEASE" "$SINGLEFS_BINARY" \
   || fail "附加根没建成" "单跑 bash scripts/devices/e152-stage-root.sh <新的空目录> $RELEASE $SINGLEFS_BINARY"
 

@@ -4,14 +4,14 @@
 # 驱动退出之后 checker-tier-crates-mutation-replay 在本机整张判一遍（命中判定库记录的复用、缺的现跑），判定与单机逐字相同（复用的报数不同），全绿标记照旧由本机写。
 #
 #   mutation-shard-run.sh <树根>       门禁 checker-tier-crates-mutation-replay（.claude/gate.d/checker-tier-crates-mutation-replay.sh）在本地多机配置写了 ENABLE_ACROSS_MACHINES=1
-#                                      （判法 layer0-shard-configuration-check.sh 退 0）时调（只由 checker-tier-crates-mutation-replay 调，输出进 checker-tier-crates-mutation-replay 的 stderr）；不认环境变量开。
+#                                      （判法 crash-point-replay-shard-configuration-check.sh 退 0）时调（只由 checker-tier-crates-mutation-replay 调，输出进 checker-tier-crates-mutation-replay 的 stderr）；不认环境变量开。
 #                                      退 0：两份都跑完、拷回的记录全收，或判法退 3（双机：关，报一行「双机：关」、不连第二台）；
 #                                      退 1：有一步没成（没判的行留给 checker-tier-crates-mutation-replay 最后那一趟）；退 2：用法错，或在选行模式下被调，或弄坏开关 MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外
-#   mutation-shard-run.sh --selftest   自证：「第二台」是本机上的另一个目录（只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1），
+#   mutation-shard-run.sh --selftest   自证：「第二台」是本机上的另一个目录（只供测试的开关 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1），
 #                                      假 cargo、真的内存包装，逐格见文件末尾 mutation_shard_selftest 的说明；格数由成功行现算
 #
 # 步骤：
-# ① 配置照 scripts/crash/layer0-shard-configuration-check.sh --emit-assignments（只调，与层 0 分片同一份）；判不过退 1，原因不在这里打；
+# ① 配置照 scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-assignments（只调，与崩溃点重放分片同一份）；判不过退 1，原因不在这里打；
 #    判法退 3（配置没写 ENABLE_ACROSS_MACHINES=1）报一行「双机：关」、退 0，什么都不分（checker-tier-crates-mutation-replay 在本机整张判）。
 # ② 两台工具链相同：rustc -Vv 前三行与 host 行、cargo -V。
 # ③ 分行：crates-mutation-rows.py row-plan 列出每一行有没有作数的抓到记录与上一次现跑的用时；没有作数记录的行按用时从长到短，
@@ -26,10 +26,12 @@
 #    进程号、退出码、输出各写第二台一个文件，驱动每 MUTATION_SHARD_RUN_POLL_SECONDS（默认 5）秒经 ssh 看一次；连续 60 次连不上、
 #    进程没了又没留退出码、60 次都没起来，就不等了。第二台那一份整份经那棵树副本里的 run-with-memory-cap.sh 起
 #    （上限 MUTATION_SHARD_PEER_MEMORY_CAP，默认 4G，键固定为「mutation-shard-run.sh 第二台那一份」：罩的是 checker-tier-crates-mutation-replay 自己在每条变异之外的进程；
-#    不用配置的 PEER_MEMORY_CAP：那是层 0 一片测试二进制的上限，拿它罩整份 checker-tier-crates-mutation-replay，它在第二台的账上就一直占着这么多、每条变异排在它后面），
+#    不用配置的 PEER_MEMORY_CAP：那是崩溃点重放一片测试二进制的上限，拿它罩整份 checker-tier-crates-mutation-replay，它在第二台的账上就一直占着这么多、每条变异排在它后面），
 #    每条变异在里面照 checker-tier-crates-mutation-replay 各自经包装，上限与限时与本机同一套（行键里有它们）。
 #    第二台跨趟保留的放 <PEER_REPOSITORY_DIRECTORY>/mutation-kept/：判定库记录与用时表（GATE_MUTATION_RECORDS_HOME=records）、
-#    编译目录（GATE_MUTATION_TARGET_DIR=target）、峰值表（RUN_WITH_MEMORY_CAP_PEAKS=memory-peaks.tsv），都不在这一趟会删的树里。
+#    编译目录（GATE_MUTATION_TARGET_DIR=target）、峰值表（RUN_WITH_MEMORY_CAP_PEAKS=memory-peaks.tsv）、变异复跑的崩溃判定库家目录
+#    （GATE_MUTATION_CRASH_LIBRARY_HOME=crash-library-home：变异版上走判定库的用例写这一份，不写进第二台真跑的长期库，crates-mutation-rows.py 文件头「变异复跑的判定库」），
+#    都不在这一趟会删的树里。本机那一份不另设：共用模块照本机真跑家目录底下的 mutation-replay/。
 #    带到第二台的环境：SINGLEFS_HEAVY_TESTS 原样；GATE_MUTATION_MEMORY_MAX、GATE_MUTATION_TIMEOUT、GATE_MUTATION_LONG_ROW_SECONDS、
 #    GATE_MUTATION_BREAK、RUN_WITH_MEMORY_CAP_RESERVE、GATE_MUTATION_LLVM_TOOLS 设了就带（后者是 llvm 工具的目录，第二台要在同一个路径上有同一份）；
 #    本机别的环境变量不带（真的第二台经 ssh 也拿不到）。
@@ -75,6 +77,8 @@
 #       ① 第二台那一份经 run-with-memory-cap.sh 起：跨趟保留的峰值表里有它的键（「跨趟保留的峰值表  行，没有键「mutation-shard-run.sh 第二台那一份」那一行」）
 #       ① 第二台每条变异的峰值记在跨趟保留的峰值表里（「峰值表里没有 cargo test --offline 的行」）
 #       ② import 拒了行键对不上的那一条、逐条列出（「stderr 里导入那几行：  … 导入：收了 6 条、拒了 0 条」）
+#   MUTATION_SHARD_RUN_BREAK=peer-crash-library-home-unset  不给第二台那一份设 GATE_MUTATION_CRASH_LIBRARY_HOME（改前的样子：变异版的结论照第二台真跑家目录底下的 mutation-replay/ 写，不跨趟留在 mutation-kept 下）
+#       ① 第二台那一份起 cargo 用 mutation-kept 下变异复跑自己的崩溃判定库家目录（「第二台那一份的输出里崩溃判定库家目录那一行：」）
 #   MUTATION_SHARD_RUN_BREAK=break-honored-anywhere  弄坏开关在 --selftest 之外也认（驱动与 checker-tier-crates-mutation-replay 都读这一项）
 #       ⑨ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外（不带自证的标记）：驱动拒、退 2，说设在 --selftest 之外（「退 0；输出：」）
 #       ⑩ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外：checker-tier-crates-mutation-replay 判红（退 1）、说设在 --selftest 之外（「退 0；输出：」）
@@ -87,7 +91,7 @@
 #          那样被 TERM 停的那一份不删它，「外面多出来的」后面不空；只开 crates-mutation-rows.py 那一个时「自证自己的 tmp/ 里剩下的」后面不空）
 #   共用库的 PEER_HOST_LIB_BREAK=no-redact  peer_host_redact 原样转出、不换私有的字
 #       ① 输出里没有配置的主机、第二台的目录与清场命令（「…/singlefs-mutation-shard-logs/…/peer.log 里有」）
-# 只供测试的开关：SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1（照层 0 分片）；MUTATION_SHARD_RUN_PEER_STOP_AFTER_ROWS=<k>
+# 只供测试的开关：SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1（照崩溃点重放分片）；MUTATION_SHARD_RUN_PEER_STOP_AFTER_ROWS=<k>
 #   给第二台那一份设 GATE_MUTATION_STOP_AFTER_ROWS=k 与 GATE_MUTATION_WORKERS=1（造「第二台那一份中途停了」：一个工作进程，判完 k 条就不再领活）。
 #
 # admission: always 每次调都分这一刻这棵树上没有作数记录的行；复用判定在判定库记录里，不在这里
@@ -218,7 +222,7 @@ mutation_shard_main() {
 
   # ① 配置
   local configuration_exit=0
-  peer_host_load_configuration "$mutation_shard_script_directory/../crash/layer0-shard-configuration-check.sh" "$tree_root" || configuration_exit=$?
+  peer_host_load_configuration "$mutation_shard_script_directory/../crash/crash-point-replay-shard-configuration-check.sh" "$tree_root" || configuration_exit=$?
   if (( configuration_exit == 3 )); then
     if mutation_shard_break_is switch-off-ignored; then
       echo "  ✗ 双机分片的本地配置判不过（弄坏开关 MUTATION_SHARD_RUN_BREAK=switch-off-ignored：判法退 3 当成判不过）"
@@ -230,7 +234,7 @@ mutation_shard_main() {
   fi
   (( configuration_exit == 0 )) || exit 1
   if [[ "$peer_host_is_this_machine" == 1 ]]; then
-    echo "  ! 第二台是本机上的另一个目录（只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1）"
+    echo "  ! 第二台是本机上的另一个目录（只供测试的开关 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1）"
   fi
   mutation_shard_scratch="$(mktemp -d)"
   trap mutation_shard_on_exit EXIT
@@ -337,6 +341,8 @@ PY_SPLIT
   fi
   peer_command+=" GATE_MUTATION_ROW_SELECTION=$(printf '%q' "$peer_selection_file") GATE_MUTATION_RECORDS_HOME=$(printf '%q' "$peer_kept/records")"
   peer_command+=" GATE_MUTATION_TARGET_DIR=$(printf '%q' "$peer_kept/target") RUN_WITH_MEMORY_CAP_PEAKS=$(printf '%q' "$peer_kept/memory-peaks.tsv")"
+  # 变异复跑的崩溃判定库家目录（文件头 ⑥）：第二台那一份写 mutation-kept 下自己的一份，不写第二台真跑的长期库
+  mutation_shard_break_is peer-crash-library-home-unset || peer_command+=" GATE_MUTATION_CRASH_LIBRARY_HOME=$(printf '%q' "$peer_kept/crash-library-home")"
   if mutation_shard_break_is peer-without-memory-cap; then
     echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=peer-without-memory-cap：第二台那一份不经 run-with-memory-cap.sh 起"
     peer_share_text="不经内存包装"
@@ -420,7 +426,7 @@ PY_SPLIT
 
 # ── 自证 ──────────────────────────────────────────────────────────────────────
 # 在临时目录里搭一棵小仓（本仓的 .claude/scripts、checker-tier-crates-mutation-replay 与登记表、scripts 整个目录、规范副本的符号链接，加一个 crates/tiny 与六行变异表），
-# 「第二台」是本机上的另一个目录（SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1），配置写在临时目录里（SINGLEFS_MULTI_HOST_CONFIG）。
+# 「第二台」是本机上的另一个目录（SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1），配置写在临时目录里（SINGLEFS_MULTI_HOST_CONFIG）。
 # 假 cargo（本机一份、第二台 PATH 上一份，各往自己目录下的 invocations.log 记起了哪几条）照 lib.rs 里「// TEST <名> NEEDS <原文>」判 ok / FAILED；
 # 每条变异照真的走 run-with-memory-cap.sh（上限 256M，排队与账都是真的）。逐格：
 #   单机那一趟：配置没写 ENABLE_ACROSS_MACHINES=1、环境里 GATE_MUTATION_ACROSS_MACHINES=1（原来的开法）：checker-tier-crates-mutation-replay 判绿、报「双机：关」、不调驱动（它的 stdout 是下面比对的基准）
@@ -471,9 +477,9 @@ mutation_shard_selftest() {
   rsync -a --exclude __pycache__ "$repository_root/.claude/scripts/" "$template/.claude/scripts/"
   cp -- "$repository_root/.claude/gate.d/checker-tier-crates-mutation-replay.sh" "$repository_root/.claude/gate.d/stage-inputs.tsv" "$template/.claude/gate.d/"
   rsync -a --exclude __pycache__ "$repository_root/.claude/gate.d/lib/" "$template/.claude/gate.d/lib/"   # checker-tier-crates-mutation-replay source 的格共用库
-  rsync -a --exclude __pycache__ --exclude memory-peaks.tsv "$repository_root/scripts/" "$template/scripts/"
+  rsync -a --exclude __pycache__ --exclude /experiments/target/ "$repository_root/scripts/" "$template/scripts/"   # 装置的编译目录几十 G，自证用不到
   ln -s "$repository_root/.claude/singlefs-ai-sop" "$template/.claude/singlefs-ai-sop"
-  printf 'target/\n__pycache__/\n/multi-host.env\n/scripts/hosts/memory-peaks.tsv\n/.claude/singlefs-ai-sop\n' > "$template/.gitignore"
+  printf 'target/\n__pycache__/\n/multi-host.env\n/.claude/singlefs-ai-sop\n' > "$template/.gitignore"
   printf '[workspace]\nmembers = ["crates/tiny"]\n' > "$template/Cargo.toml"
   printf '[package]\nname = "tiny"\nversion = "0.1.0"\n' > "$template/crates/tiny/Cargo.toml"
   cat > "$template/crates/tiny/src/lib.rs" <<'SAMPLE_SOURCE'
@@ -601,7 +607,7 @@ FAKE_LLVM
     scene_command=(env -u GATE_MUTATION_ROW_SELECTION -u GATE_MUTATION_START_OVER -u SINGLEFS_GATE_FULL -u SINGLEFS_REUSE_HOURS -u GATE_MUTATION_WORKERS
       -u GATE_MUTATION_MEMORY_MAX -u GATE_MUTATION_TIMEOUT -u GATE_MUTATION_RECORDS_HOME -u GATE_MUTATION_ACROSS_MACHINES -u GATE_MUTATION_MEMORY_CAP_RUNNER
       -u MUTATION_SHARD_RUN_PEER_STOP_AFTER_ROWS -u SINGLEFS_HEAVY_TESTS -u RUN_WITH_MEMORY_CAP_RESERVE
-      PATH="$scene/local-bin:$PATH" SINGLEFS_MULTI_HOST_CONFIG="$scene/multi-host.env" SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1
+      PATH="$scene/local-bin:$PATH" SINGLEFS_MULTI_HOST_CONFIG="$scene/multi-host.env" SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1
       MUTATION_SHARD_RUN_POLL_SECONDS=1 GATE_MUTATION_TARGET_DIR="$scene/local-target" RUN_WITH_MEMORY_CAP_PEAKS="$scene/local-peaks.tsv"
       GATE_MUTATION_LLVM_TOOLS="$work/llvm")
   }
@@ -685,6 +691,9 @@ FAKE_LLVM
   expect "① 输出里没有配置的主机、第二台的目录与清场命令" \
     "$(! grep -qE 'selftest-peer-host-name|peer-home|peer-bin|quiesce-marker-selftest' "$work/main/stdout" "$main_stderr" "$(dirname "$main_logs")/peer.log" 2>/dev/null; echo $?)" \
     "$(grep -lE 'selftest-peer-host-name|peer-home|peer-bin|quiesce-marker-selftest' "$work/main/stdout" "$main_stderr" "$(dirname "$main_logs")/peer.log" 2>/dev/null | sed "s|^$work/||" | tr '\n' ' ')里有"
+  expect "① 第二台那一份起 cargo 用 mutation-kept 下变异复跑自己的崩溃判定库家目录" \
+    "$(grep -qF '起 cargo 时的崩溃判定库家目录：GATE_MUTATION_CRASH_LIBRARY_HOME 设的那一份' "$(dirname "$main_logs")/peer.log" 2>/dev/null; echo $?)" \
+    "第二台那一份的输出里崩溃判定库家目录那一行：$(grep -h '崩溃判定库家目录' "$(dirname "$main_logs")/peer.log" 2>/dev/null | head -1)"
   local local_records_directory
   local_records_directory="$(scene_environment main env GATE_MUTATION_MEMORY_CAP_RUNNER="$work/main/repo/scripts/hosts/run-with-memory-cap.sh" \
     python3 "$work/main/repo/scripts/mutation/crates-mutation-rows.py" records-directory "$work/main/repo")"

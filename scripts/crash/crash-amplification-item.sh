@@ -7,7 +7,7 @@
 #
 #   crash-amplification-item.sh <测试目标> [--test-filter <用例函数名>] [--library <库目录>] [--expand-up-to <N>] [--threads <N>]
 #                               [--memory-cap <本机上限>] [--peer-memory-cap <第二台上限>] [--label <标签>] [--quiesced]
-#   crash-amplification-item.sh --selftest      拿造出来的派活计划行与日志走一遍「在哪跑」的判法、运行条件与失败分类、第二台失败时的去向、排计划那一趟借不到显存的本次未跑（不编、不跑、不上卡、不连第二台）
+#   crash-amplification-item.sh --selftest      拿造出来的派活计划行与日志走一遍「在哪跑」的判法、运行条件与失败分类、第二台失败时的去向、排计划那一趟借不到显存的本次未跑、判段没跑那一行的转打、往引擎送的按段登记文件（不编、不跑、不上卡、不连第二台）
 #
 # 测试目标是 crates/singlefs-checker-tier/tests/ 下一条走 crash_amplification::run_from_environment 的用例。
 # 运行条件分两半：配置上判得了的（多机配置开了 GPU 却一份卡都没写、点名的卡与双机开关对不上；配置怎么找见 crash-amplification-lib.sh 文件头「配置」）由文件头的 run-condition: check 在开跑之前判，
@@ -38,13 +38,20 @@
 # 库与日志：库默认 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library-by-conclusion-kind（开机不清空，重跑同一条命令就是续跑；
 #   子目录名是 crash-amplification-lib.sh 的 CRASH_AMPLIFICATION_LIBRARY_SUBDIRECTORY，按结论种类存之前的旧库 <家目录>/library 引擎开库就拒，不删、不读），
 #   日志在 <库的上层>/runs/<标签>/：placement.log（排计划那一趟）、run.log（本机一台跑的那一趟）；两台跑时是双机驱动那几份。
+# 按段登记（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J10）：往引擎送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY。
+#   调用方送了（崩溃放量入口与崩溃点重放入口都送 <被判仓根>/.claude/gate.d/crash-point-replay-segments.tsv，开跑前已核过）就照它；没送就送本树那一份的绝对路径
+#   （<本树根>/.claude/gate.d/crash-point-replay-segments.tsv，这里不核，写坏了由引擎在录入段拒）。录入段、排计划、本机判都从环境继承；
+#   两台跑时第二台那几趟由 crash-amplification-two-hosts.sh 把那份文件的快照送进第二台的树、改成那边的路径。
 # 输出：CRASH_AMPLIFICATION_PLACEMENT 行原样转打；一行 CRASH_AMPLIFICATION_DECISION where=<local|two-hosts|local-cpu|two-hosts-cpu|not-run> reason=<为什么> …；
 #   那一趟的 CRASH_AMPLIFICATION、CRASH_AMPLIFICATION_GPU_CARD、CRASH_AMPLIFICATION_GPU_TOTAL 行原样转打。
 #   排计划那一趟借不到显存而本次未跑（步骤 ②）：一行 CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment reason=<那一行 reason= 之后原样>，
 #   不打 CRASH_AMPLIFICATION 行；崩溃放量入口照这一行把这一项记 not-run（入口文件头「一项怎么判」）。几条流里只有几条没借到的，那几条各一行（带 flow=），
 #   跑的那一趟的 CRASH_AMPLIFICATION 行照转打。
+#   判段没跑（配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性：引擎每一趟判段打一行 CRASH_AMPLIFICATION_NOT_RUN step=judge test=crash_amplification::run_from_environment flow=<流> reason=…
+#   与一行 NOT_RUN_NO_GPU_ADAPTER、录入段照录、退 0）：本机一台跑的那一趟的 step=judge 行原样转打（两台跑时由双机驱动从导入那一趟转打），
+#   崩溃放量入口照它把这一项记 not-run（入口文件头「一项怎么判」）。
 # 退出码（0、2、77、78 的含义照 .claude/singlefs-ai-sop/rules/test-script-discipline.md「入口脚本：不带参数就是剪枝跑全部项」那张表）：
-#   0        跑的那一趟退 0。有流本次未跑也是 0（几条流里没借到的那几条打了 CRASH_AMPLIFICATION_NOT_RUN 行、真跑那一趟被叫停的行里 stopped_early=true）：
+#   0        跑的那一趟退 0。有流本次未跑也是 0（几条流里没借到的那几条打了 CRASH_AMPLIFICATION_NOT_RUN 行、判段没跑的流打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行、真跑那一趟被叫停的行里 stopped_early=true）：
 #            退 0 不等于全判过了，看有没有 CRASH_AMPLIFICATION_NOT_RUN 行与 stopped_early=true
 #   77       一项都没跑到：排计划那一趟借不到显存、一块都没判（打了 CRASH_AMPLIFICATION_NOT_RUN 行），或双机驱动退 77（第二台排计划那一趟借不到显存）。
 #            本次未跑，不是通过，也不是失败
@@ -62,7 +69,7 @@
 #   250–254  内存包装自己的结局（scripts/hosts/run-with-memory-cap.sh 文件头「退出码」）
 #   其余     跑的那一趟（cargo test）的退出码，原样
 # 重型：跑 checker 档用例，只在用户要求时跑（SINGLEFS_HEAVY_TESTS=user-request 由这里带给 cargo）。
-# 弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=<项>（只给 --selftest 证红用；格号是 run_selftest 里的第 1–25 格，判错的那一格打「✗ 自证第 <号> 格」）：
+# 弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=<项>（只给 --selftest 证红用；格号是 run_selftest 里的第 1–30 格，判错的那一格打「✗ 自证第 <号> 格」）：
 #   gpu-without-quiesce                开了 GPU、没带 --quiesced 也不经清场包装，照不清场直接跑                     第 7 格、第 11 格、第 15 格、第 16 格、第 17 格、第 18 格、第 19 格
 #   （清场包装 scripts/crash/gpu-quiesce-run.sh 的开关 GPU_QUIESCE_BREAK 带进这里的子进程也认：run-despite-failed-quiesce 红在第 16 格，
 #    restore-after-run 红在第 7 格、第 11 格、第 15 格、第 16 格、第 17 格、第 18 格、第 19 格（这几格的调用次序里多出 quiesce-start））
@@ -85,15 +92,25 @@
 #   （共用库 crash-amplification-lib.sh 里配置那几处的开关：cards-read-from-cards-file（显卡读退役的私有显卡配置 SINGLEFS_GPU_CARDS_CONFIG，不读多机配置）红在第 13 格、第 14 格；
 #    configuration-from-tree-root（多机配置按树根找、不按 git common-dir 找）红在第 21 格）
 #   （共用库的开关 given-states-run-condition-as-run-failure（给定状态表的判器借不到显存那一行 CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET 不认、不退 78）
-#    打开时这里 25 格一格不红：这里的格都不造那一行；它由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红，红在 local-share-given-states-run-condition 格）
+#    打开时这里 27 格一格不红：这里的格都不造那一行；它由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红，红在 local-share-given-states-run-condition 格）
+#   （共用库的开关 include-ignored-dropped（点名了用例的那一趟不带 --include-ignored，标 ignore 的用例一条都不跑）红在第 28 格：照崩溃点重放用例的样子造的假用例标着 ignore，
+#    录入段一条都不跑、一行录入行都没有、退 1；scripts/crash/crash-amplification-two-hosts.sh --selftest 另红在 named-test-runs-even-if-ignored、this-host-named-test-runs-even-if-ignored、
+#    crash-case-shaped-records-and-imports 三格）
+#   （共用库的开关 library-marker-not-accepted（录入段只认 CRASH_AMPLIFICATION_RECORDED 行、不认崩溃枚举用例经判定库两段跑时打的 CRASH_LIBRARY_RECORDED 行）红在第 28 格：
+#    照崩溃点重放用例的样子造的假用例录入段只打 CRASH_LIBRARY_RECORDED、退 1；scripts/crash/crash-amplification-two-hosts.sh --selftest 另红在 records-library-marker 等格）
 #   version-differs-as-run-failure     日志里结论版本对不上那一行不认（不退 78）                               第 23 格
 #   gpu-feature-missing-as-run-failure 日志里「这份二进制没有编进 gpu 特性」不认（不退 78）                    第 24 格
 #   library-in-the-old-directory       没给 --library 时照改前用 <家目录>/library（按结论种类存之前的旧库）      第 25 格
-#   （多机配置判法 scripts/crash/layer0-shard-configuration-check.sh 的开关 MULTI_HOST_CONFIGURATION_BREAK=gpu-card-keys-unknown 红在第 22 格）
+#   record-failure-ignored             录入段没跑成也照样往下排计划、判（「录入段没跑成，判段一趟都不起」判错）   第 26 格
+#   segments-registry-not-sent         调用方没送按段登记文件时也不送本树那一份（改前的样子）（「每一趟都带按段登记文件的绝对路径」判错）   第 27 格
+#   judge-not-run-dropped              本机一台跑的那一趟打的 CRASH_AMPLIFICATION_NOT_RUN step=judge 行不转打（「判段没跑记本次未跑」判错）   第 29 格
+#   threads-default-cores              没给线程数时取本机核数减一（改前的样子），不取登记的重活默认并行度        第 30 格
+#   （多机配置判法 scripts/crash/crash-point-replay-shard-configuration-check.sh 的开关 MULTI_HOST_CONFIGURATION_BREAK=gpu-card-keys-unknown 红在第 22 格）
 # 只供测试：CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY=<造好的 placement.log> 时不编不跑，只拿那份日志判在哪跑、打 CRASH_AMPLIFICATION_DECISION 行就退
 #   （一块都没判那一种另打 CRASH_AMPLIFICATION_NOT_RUN 行、退 77；有流没借到的照样逐条打那一行）；
 #   CRASH_AMPLIFICATION_ITEM_SWITCHES=<gpu>,<双机> 代替读配置里的这两样；CRASH_AMPLIFICATION_ITEM_CARDS=<显卡配置的值> 代替读显卡配置；
-#   CRASH_AMPLIFICATION_ITEM_LOCAL_RUN=<脚本> 换掉本机那一趟（调法：<脚本> <share> <库目录> <日志> [<附加环境 键=值>…]，自己写日志）；
+#   CRASH_AMPLIFICATION_ITEM_LOCAL_RUN=<脚本> 换掉本机那一趟（调法：<脚本> <share> <库目录> <日志> [<附加环境 键=值>…]，自己写日志；这一趟的 cargo test 参数
+#   ——共用库拼的 cargo_test_arguments，空格连起来——放进它环境里的 CRASH_AMPLIFICATION_ITEM_LOCAL_TEST_ARGUMENTS）；
 #   CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER=<脚本> 换掉双机驱动。换不掉的：真的那一趟由 crash-amplification-lib.sh 起 cargo，自证不碰它。
 #
 # gate-similar: crash-amplification-two-hosts.sh 它管两台各领一份、取回、导入那一趟；这里核配置、排派活计划、定一台还是两台，本机一台跑的那一趟自己跑
@@ -299,8 +316,33 @@ run_selftest() {
   cells=$((cells + 1))
   cat >"$work/local-run.sh" <<'STUB'
 #!/usr/bin/env bash
-# 假的本机那一趟：排计划的那一次写一行计划，真跑的那一次写一行汇总（STUB_RUN_DEVICE_FAILURE=1 时写一行卡用不了、退 101）；每次调记一笔
+# 假的本机那一趟：录入段那一次写一行 RECORDED（STUB_RECORD_EXIT 给了就照它退、不写那一行），排计划的那一次写一行计划，
+# 真跑的那一次写一行汇总（STUB_RUN_DEVICE_FAILURE=1 时写一行卡用不了、退 101）；每次调记一笔
 log="$3"
+# STUB_CASE_SHAPE=crash-case（第 28 格）：照崩溃点重放双机那几条用例的样子——标 #[ignore]：驱动交的 cargo test 参数（CRASH_AMPLIFICATION_ITEM_LOCAL_TEST_ARGUMENTS）里
+#   没有 --include-ignored 就像 libtest 那样一条都不跑、退 0（记一笔 ignored-not-run）；录入段只打 CRASH_LIBRARY_RECORDED、不打崩溃放量那一行，
+#   判段打 CRASH_POINT_REPLAY_PARALLEL_FINISHED、不打 CRASH_AMPLIFICATION 行
+if [[ "${STUB_CASE_SHAPE:-amplification}" == crash-case ]]; then
+  if [[ " ${CRASH_AMPLIFICATION_ITEM_LOCAL_TEST_ARGUMENTS:-} " != *" --include-ignored "* ]]; then
+    echo "ignored-not-run" >> "${STUB_CALLS:?}"
+    printf '%s\n' "running 0 tests" "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out" > "$log"
+    exit 0
+  fi
+  if [[ " $* " == *" SINGLEFS_CRASH_AMPLIFICATION_STAGE=record "* ]]; then
+    echo "record" >> "${STUB_CALLS:?}"
+    echo "CRASH_LIBRARY_RECORDED class=crash_state_enumeration item=stub::full manifest=0000000000000000 library=$2" > "$log"
+    exit 0
+  fi
+  echo "local-run" >> "${STUB_CALLS:?}"
+  echo "CRASH_POINT_REPLAY_PARALLEL_FINISHED states=1000 slices=4 worker_threads=1 judge=cpu" > "$log"
+  exit 0
+fi
+if [[ " $* " == *" SINGLEFS_CRASH_AMPLIFICATION_STAGE=record "* ]]; then
+  echo "record" >> "${STUB_CALLS:?}"
+  if [[ -n "${STUB_RECORD_EXIT:-}" ]]; then echo "test result: FAILED. 0 passed; 1 failed" > "$log"; exit "$STUB_RECORD_EXIT"; fi
+  echo "CRASH_AMPLIFICATION_RECORDED flow=stub recorded_flow=00 facts=00 packed_judge_tables=- blocks=4 exhaustive=true" > "$log"
+  exit 0
+fi
 if [[ " $* " == *" SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1 "* ]]; then
   echo "placement" >> "${STUB_CALLS:?}"
   if [[ "${STUB_PLACEMENT_NOT_RUN:-0}" == 1 ]]; then
@@ -350,7 +392,7 @@ STUB
   local failed_output failed_exit
   failed_output="$(STUB_CALLS="$work/calls" SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-quiesced.env" CRASH_AMPLIFICATION_ITEM_SWITCHES=1,1 CRASH_AMPLIFICATION_ITEM_CARDS="$both" CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" \
     CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" bash "$0" some-target --library "$work/library" 2>/dev/null)"; failed_exit=$?
-  if [[ "$failed_exit" != 249 ]] || [[ "$(tr '\n' ' ' <"$work/calls")" != "quiesce-stop placement two-hosts " ]] || grep -q 'where=local' <<<"$failed_output"; then
+  if [[ "$failed_exit" != 249 ]] || [[ "$(tr '\n' ' ' <"$work/calls")" != "quiesce-stop record placement two-hosts " ]] || grep -q 'where=local' <<<"$failed_output"; then
     selftest_cell_failed "第二台没量出速度时没有原样退 249、或改在本机一台跑了（退 $failed_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」）" "看末尾那个 case 里双机驱动退出之后那一段：原样退它的退出码"
   fi
   # 第 8 格：排计划那一趟没打计划行，日志里有卡用不了的原话 ⇒ 运行条件不满足，退 78
@@ -379,7 +421,7 @@ STUB
   STUB_CALLS="$work/calls" STUB_RUN_DEVICE_FAILURE=1 SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-quiesced.env" CRASH_AMPLIFICATION_ITEM_SWITCHES=1,0 CRASH_AMPLIFICATION_ITEM_CARDS="$local_only" \
     CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
     bash "$0" some-target --library "$work/library-device" >/dev/null 2>&1; device_run_exit=$?
-  if [[ "$device_run_exit" != 78 ]] || [[ "$(tr '\n' ' ' <"$work/calls")" != "quiesce-stop placement local-run " ]]; then
+  if [[ "$device_run_exit" != 78 ]] || [[ "$(tr '\n' ' ' <"$work/calls")" != "quiesce-stop record placement local-run " ]]; then
     selftest_cell_failed "本机那一趟卡用不了却没退 78、或没照「清场、排计划、跑」走（退 $device_run_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」）" "看 run_on_this_host_alone：退非 0 时经 crash_amplification_exit_code_of_a_failed_run 照 run.log 分类；清场看开了 GPU 而没带 --quiesced 时经 gpu-quiesce-run.sh 重起那一段"
   fi
   # 第 12 格：带值的选项缺值（放在末尾、或后面紧跟 --quiesced）：退 2（用法错）；各个带值的选项各试两次。
@@ -424,7 +466,7 @@ STUB
     fi
   }
   # 第 15 格：照常跑完 ⇒ 退 0，清场在排计划之前，重起的那一趟带着 --quiesced（DECISION 行 quiesced=1）
-  if quiesce_cell 0 "quiesce-stop placement local-run " "开了 GPU、没带 --quiesced 却没有照「清场、排计划、跑」走"; then
+  if quiesce_cell 0 "quiesce-stop record placement local-run " "开了 GPU、没带 --quiesced 却没有照「清场、排计划、跑」走"; then
     grep -q '^CRASH_AMPLIFICATION_DECISION where=local .* quiesced=1$' "$work/quiesce-$cells.out" \
       || selftest_cell_failed "经清场包装重起的那一趟没带 --quiesced（DECISION 行不是 quiesced=1）" "看重起的参数 item_reexec_arguments"
   fi
@@ -443,7 +485,7 @@ STUB
     no_restore_calls+="$(tr '\n' ' ' <"$work/calls")| "
     if grep -q '^GPU_QUIESCE step=restore result=not-restored ' "$work/no-restore-$no_restore_round.out"; then no_restore_lines=$((no_restore_lines + 1)); fi
   done
-  if [[ "$no_restore_exits" != "0 143 " || "$no_restore_calls" != "quiesce-stop placement local-run | quiesce-stop placement local-run | " || "$no_restore_lines" != 2 ]]; then
+  if [[ "$no_restore_exits" != "0 143 " || "$no_restore_calls" != "quiesce-stop record placement local-run | quiesce-stop record placement local-run | " || "$no_restore_lines" != 2 ]]; then
     selftest_cell_failed "跑完调了复原命令、或没照「清场、排计划、跑」走（照常跑完与被 TERM 打断两趟退「${no_restore_exits% }」，调用次序「$no_restore_calls」，GPU_QUIESCE step=restore result=not-restored 行 $no_restore_lines 趟有）" \
       "看开了 GPU 而没带 --quiesced 时经 scripts/crash/gpu-quiesce-run.sh 重起这里的那一段，与那份包装的 gpu_quiesce_leave：跑完不复原"
   fi
@@ -454,7 +496,7 @@ STUB
   STUB_CALLS="$work/calls" STUB_RUN_GPU_MEMORY=1 SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-quiesced.env" CRASH_AMPLIFICATION_ITEM_SWITCHES=1,0 CRASH_AMPLIFICATION_ITEM_CARDS="$local_only" \
     CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
     bash "$0" some-target --library "$work/library-gpu-memory" >"$work/gpu-memory.out" 2>&1; gpu_memory_exit=$?
-  if [[ "$gpu_memory_exit" != 245 ]] || ! grep -q '显存不够（那一趟退了非 0' "$work/gpu-memory.out" || [[ "$(tr '\n' ' ' <"$work/calls")" != "quiesce-stop placement local-run " ]]; then
+  if [[ "$gpu_memory_exit" != 245 ]] || ! grep -q '显存不够（那一趟退了非 0' "$work/gpu-memory.out" || [[ "$(tr '\n' ' ' <"$work/calls")" != "quiesce-stop record placement local-run " ]]; then
     selftest_cell_failed "本机那一趟经内存包装退 245 却没原样退 245、或没打显存不够的出路（退 $gpu_memory_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」，输出尾部 $(tail -n 3 "$work/gpu-memory.out" | tr '\n' '|')）" \
       "看 run_on_this_host_alone 与 exit_code_is_explained：245 走 crash-amplification-lib.sh 的 crash_amplification_explain_exit_code 那一支"
   fi
@@ -469,7 +511,7 @@ STUB
     CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
     bash "$0" some-target --library "$work/library-not-run" >"$work/not-run.out" 2>&1; not_run_exit=$?
   not_run_calls="$(tr '\n' ' ' <"$work/calls")"
-  if [[ "$not_run_exit" != 77 || "$not_run_calls" != "quiesce-stop placement " ]] \
+  if [[ "$not_run_exit" != 77 || "$not_run_calls" != "quiesce-stop record placement " ]] \
      || ! grep -q '^CRASH_AMPLIFICATION_DECISION where=not-run ' "$work/not-run.out" \
      || ! grep -q '^CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment reason=等了 1800 秒，池里没有一张卡空得出 2560 MiB' "$work/not-run.out" \
      || ! grep -q '本次未跑（这不是通过）：排派活计划那一趟借不到显存' "$work/not-run.out" || grep -q '^CRASH_AMPLIFICATION ' "$work/not-run.out"; then
@@ -483,7 +525,7 @@ STUB
     CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
     bash "$0" some-target --library "$work/library-not-run-failed" >"$work/not-run-failed.out" 2>&1; not_run_exit=$?
   not_run_calls="$(tr '\n' ' ' <"$work/calls")"
-  if [[ "$not_run_exit" != 101 || "$not_run_calls" != "quiesce-stop placement " ]] || grep -q '^CRASH_AMPLIFICATION_NOT_RUN ' "$work/not-run-failed.out"; then
+  if [[ "$not_run_exit" != 101 || "$not_run_calls" != "quiesce-stop record placement " ]] || grep -q '^CRASH_AMPLIFICATION_NOT_RUN ' "$work/not-run-failed.out"; then
     not_run_wrong+="排计划那一趟退 101 而日志里有那一行，退 $not_run_exit、调用次序「$not_run_calls」（要原样退 101、不跑、不打 CRASH_AMPLIFICATION_NOT_RUN）；"
   fi
   : > "$work/calls"
@@ -491,7 +533,7 @@ STUB
     CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
     bash "$0" some-target --quiesced --library "$work/library-peer-not-run" >"$work/peer-not-run.out" 2>&1; not_run_exit=$?
   not_run_calls="$(tr '\n' ' ' <"$work/calls")"
-  if [[ "$not_run_exit" != 77 || "$not_run_calls" != "placement two-hosts " ]] \
+  if [[ "$not_run_exit" != 77 || "$not_run_calls" != "record placement two-hosts " ]] \
      || ! grep -q '^CRASH_AMPLIFICATION_NOT_RUN step=peer-placement ' "$work/peer-not-run.out" \
      || ! grep -q '本次未跑（这不是通过）：第二台排派活计划那一趟借不到显存' "$work/peer-not-run.out" || grep -q '两台跑那一趟退 77' "$work/peer-not-run.out"; then
     not_run_wrong+="第二台排计划那一趟借不到显存（双机驱动退 77），退 $not_run_exit、调用次序「$not_run_calls」、输出尾部 $(tail -n 3 "$work/peer-not-run.out" | tr '\n' '|')（要原样退 77、报本次未跑、不报两台跑失败）；"
@@ -509,7 +551,7 @@ STUB
     CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
     bash "$0" some-target --quiesced --library "$work/library-partial" >"$work/partial.out" 2>&1; partial_exit=$?
   partial_calls="$(tr '\n' ' ' <"$work/calls")"
-  if [[ "$partial_exit" != 0 || "$partial_calls" != "placement local-run " ]] \
+  if [[ "$partial_exit" != 0 || "$partial_calls" != "record placement local-run " ]] \
      || ! grep -q '^CRASH_AMPLIFICATION_DECISION where=local .*pending_states=2000 ' "$work/partial.out" \
      || [[ "$(grep -c '^CRASH_AMPLIFICATION_NOT_RUN ' "$work/partial.out")" != 1 ]] \
      || ! grep -q '^CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment flow=2/3 reason=等了 1800 秒，池里没有一张卡空得出 5120 MiB（第 2 条流）$' "$work/partial.out" \
@@ -543,7 +585,7 @@ STUB
   else
     selftest_cell_failed "临时目录里建不出主仓与 worktree（git init、commit、worktree add 有一步没成）" "看 git 在不在 PATH 上、TMPDIR 可不可写"
   fi
-  # 第 22 格：多机配置判法（scripts/crash/layer0-shard-configuration-check.sh）认显卡的两个键、不认退役的 GPU_COMPUTATION_CLASSES：
+  # 第 22 格：多机配置判法（scripts/crash/crash-point-replay-shard-configuration-check.sh）认显卡的两个键、不认退役的 GPU_COMPUTATION_CLASSES：
   #   八个必写键加 GPU_CARDS_BY_PRIORITY、GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED、双机没开 ⇒ 退 3（判得过、双机：关，不连第二台）；再加一行 GPU_COMPUTATION_CLASSES ⇒ 退 1、点名这个键
   cells=$((cells + 1))
   local shard_check_exit shard_check_retired_exit
@@ -551,11 +593,11 @@ STUB
     QUIESCE_STOP_COMMAND= QUIESCE_STOPPED_CHECK_COMMAND= QUIESCE_START_COMMAND= QUIESCE_STARTED_CHECK_COMMAND= ENABLE_GPU=1 \
     'GPU_CARDS_BY_PRIORITY="local:0:15G"' 'GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED="local:0:24G"' >"$work/multi-host-merged.env"
   { cat "$work/multi-host-merged.env"; printf '%s\n' "GPU_COMPUTATION_CLASSES='crash_judge_gpu'"; } >"$work/multi-host-retired-key.env"
-  SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-merged.env" bash "$item_script_directory/layer0-shard-configuration-check.sh" "$work" >"$work/shard-check.out" 2>&1; shard_check_exit=$?
-  SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-retired-key.env" bash "$item_script_directory/layer0-shard-configuration-check.sh" "$work" >"$work/shard-check-retired.out" 2>&1; shard_check_retired_exit=$?
+  SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-merged.env" bash "$item_script_directory/crash-point-replay-shard-configuration-check.sh" "$work" >"$work/shard-check.out" 2>&1; shard_check_exit=$?
+  SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-retired-key.env" bash "$item_script_directory/crash-point-replay-shard-configuration-check.sh" "$work" >"$work/shard-check-retired.out" 2>&1; shard_check_retired_exit=$?
   if [[ "$shard_check_exit" != 3 || "$shard_check_retired_exit" != 1 ]] || ! grep -q 'GPU_COMPUTATION_CLASSES 不认得' "$work/shard-check-retired.out"; then
     selftest_cell_failed "多机配置写了显卡的两个键却判不过、或写了退役的 GPU_COMPUTATION_CLASSES 却判得过（两个键退 $shard_check_exit，应当 3；加退役的键退 $shard_check_retired_exit，应当 1、点名它：$(tr '\n' ' ' <"$work/shard-check-retired.out" | cut -c1-160)）" \
-      "看 scripts/crash/layer0-shard-configuration-check.sh 的 MULTI_HOST_GPU_CARD_KEYS 与认键那一段"
+      "看 scripts/crash/crash-point-replay-shard-configuration-check.sh 的 MULTI_HOST_GPU_CARD_KEYS 与认键那一段"
   fi
   # 第 23 格：排计划那一趟没打计划行，日志里是引擎打的结论版本对不上那一行（整趟不写库，引擎 E 报告第九节第 ① 条）⇒ 运行条件不满足，退 78
   cells=$((cells + 1))
@@ -575,22 +617,97 @@ STUB
     || selftest_cell_failed "开了 GPU 而二进制没编进 gpu 特性却没退 78：$(decision_of "$work/gpu-feature-missing.log" 1,0 "$local_only")" "看 crash-amplification-lib.sh 的 crash_amplification_failure_kind 认不认「这份二进制没有编进 gpu 特性」（build 那一类）"
   # 第 25 格：没给 --library ⇒ 判定库是 <家目录>/library-by-conclusion-kind（按结论种类存的新库），不碰旧的 <家目录>/library（文件头「库与日志」）
   cells=$((cells + 1))
-  printf '%s\n' '#!/usr/bin/env bash' 'echo "library=$2" >> "${STUB_CALLS:?}"' 'echo "CRASH_AMPLIFICATION mode=single_host_cpu states_checked_here=1 red=0" > "$3"' >"$work/library-run.sh"
+  printf '%s\n' '#!/usr/bin/env bash' 'echo "library=$2" >> "${STUB_CALLS:?}"' \
+    'if [[ " $* " == *" SINGLEFS_CRASH_AMPLIFICATION_STAGE=record "* ]]; then echo "CRASH_AMPLIFICATION_RECORDED flow=stub" > "$3"; exit 0; fi' \
+    'echo "CRASH_AMPLIFICATION mode=single_host_cpu states_checked_here=1 red=0" > "$3"' >"$work/library-run.sh"
   : > "$work/calls"
   local library_exit
   STUB_CALLS="$work/calls" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home-default-library" CRASH_AMPLIFICATION_ITEM_SWITCHES=0,0 \
     CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/library-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
     bash "$0" some-target >"$work/default-library.out" 2>&1; library_exit=$?
-  if [[ "$library_exit" != 0 || "$(tr '\n' ' ' <"$work/calls")" != "library=$work/home-default-library/library-by-conclusion-kind " ]] || [[ -e "$work/home-default-library/library" ]]; then
+  if [[ "$library_exit" != 0 || "$(tr '\n' ' ' <"$work/calls")" != "library=$work/home-default-library/library-by-conclusion-kind library=$work/home-default-library/library-by-conclusion-kind " ]] || [[ -e "$work/home-default-library/library" ]]; then
     selftest_cell_failed "没给 --library 时判定库应当是 <家目录>/library-by-conclusion-kind、不碰旧的 <家目录>/library（退 $library_exit，调用记录「$(tr '\n' ' ' <"$work/calls")」）" \
       "看 local_library 那一行与 crash-amplification-lib.sh 的 crash_amplification_default_library"
   fi
+  # 第 26 格：录入段那一趟退 101 ⇒ 这一项原样退 101，只调了录入段那一次，排计划与判段一趟都没起（两段：录入段没跑成，判段不起）
+  cells=$((cells + 1))
+  : > "$work/calls"
+  local record_failed_exit
+  STUB_CALLS="$work/calls" STUB_RECORD_EXIT=101 CRASH_AMPLIFICATION_ITEM_SWITCHES=0,0 \
+    CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
+    bash "$0" some-target >"$work/record-failed.out" 2>&1; record_failed_exit=$?
+  if [[ "$record_failed_exit" != 101 || "$(tr '\n' ' ' <"$work/calls")" != "record " ]]; then
+    selftest_cell_failed "录入段退 101 却没原样退 101、或之后还起了别的趟（退 $record_failed_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」）" \
+      "看 two_hosts_driver 那一行之后的 crash_amplification_record_on_this_host：录入段没跑成就 exit，判段一趟都不起"
+  fi
+  # 第 27 格：按段登记（文件头「按段登记」）：假的本机那一趟记下环境里的 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY。调用方没送 ⇒ 录入段与判段两趟
+  #   都收到本树那一份的绝对路径；调用方送了 <别的文件> ⇒ 两趟收到的都是它（不换成本树那一份）
+  cells=$((cells + 1))
+  printf '%s\n' '#!/usr/bin/env bash' 'echo "segments=[${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY-unset}]" >> "${STUB_CALLS:?}"' \
+    'if [[ " $* " == *" SINGLEFS_CRASH_AMPLIFICATION_STAGE=record "* ]]; then echo "CRASH_AMPLIFICATION_RECORDED flow=stub" > "$3"; exit 0; fi' \
+    'echo "CRASH_AMPLIFICATION mode=single_host_cpu states_checked_here=1 red=0" > "$3"' >"$work/segments-run.sh"
+  local segments_exit segments_given_exit segments_calls segments_given_calls own_registry="$repository_root/.claude/gate.d/crash-point-replay-segments.tsv"
+  : > "$work/calls"
+  env -u SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY STUB_CALLS="$work/calls" CRASH_AMPLIFICATION_ITEM_SWITCHES=0,0 \
+    CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/segments-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
+    bash "$0" some-target --library "$work/library-segments" >"$work/segments.out" 2>&1; segments_exit=$?
+  segments_calls="$(tr '\n' ' ' <"$work/calls")"
+  : > "$work/calls"
+  SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY="$work/given-segments.tsv" STUB_CALLS="$work/calls" CRASH_AMPLIFICATION_ITEM_SWITCHES=0,0 \
+    CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/segments-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
+    bash "$0" some-target --library "$work/library-segments-given" >"$work/segments-given.out" 2>&1; segments_given_exit=$?
+  segments_given_calls="$(tr '\n' ' ' <"$work/calls")"
+  if [[ "$segments_exit" != 0 || "$segments_given_exit" != 0 || "$segments_calls" != "segments=[$own_registry] segments=[$own_registry] " \
+        || "$segments_given_calls" != "segments=[$work/given-segments.tsv] segments=[$work/given-segments.tsv] " ]]; then
+    selftest_cell_failed "每一趟都带按段登记文件的绝对路径判错：调用方没送时两趟收到「$segments_calls」（应当都是 $own_registry，退 $segments_exit），送了 $work/given-segments.tsv 时收到「$segments_given_calls」（退 $segments_given_exit）" \
+      "看只判不跑那一段之后「按段登记」那一段：SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY 为空时 export <本树根>/.claude/gate.d/crash-point-replay-segments.tsv"
+  fi
+  # 第 28 格：照崩溃点重放双机那几条用例的样子（假的本机那一趟 STUB_CASE_SHAPE=crash-case：标 ignore、录入段只打 CRASH_LIBRARY_RECORDED）、点名用例、本机一台 CPU 跑 ⇒
+  #   录入段真跑（交给本机那一趟的 cargo test 参数带 --include-ignored，不记 ignored-not-run）、CRASH_LIBRARY_RECORDED 那一行算录入成了并转打出来、
+  #   之后照判段跑、退 0（调用次序「record local-run」）
+  cells=$((cells + 1))
+  : > "$work/calls"
+  local crash_case_shape_exit crash_case_shape_calls
+  STUB_CALLS="$work/calls" STUB_CASE_SHAPE=crash-case CRASH_AMPLIFICATION_ITEM_SWITCHES=0,0 \
+    CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
+    bash "$0" some-target --test-filter the_full_case --library "$work/library-crash-case-shape" >"$work/crash-case-shape.out" 2>&1; crash_case_shape_exit=$?
+  crash_case_shape_calls="$(tr '\n' ' ' <"$work/calls")"
+  if [[ "$crash_case_shape_exit" != 0 || "$crash_case_shape_calls" != "record local-run " ]] \
+     || ! grep -qxF "CRASH_LIBRARY_RECORDED class=crash_state_enumeration item=stub::full manifest=0000000000000000 library=$work/library-crash-case-shape" "$work/crash-case-shape.out" \
+     || grep -q '^CRASH_AMPLIFICATION_RECORDED ' "$work/crash-case-shape.out"; then
+    selftest_cell_failed "照崩溃点重放用例的样子造的用例（标 ignore、录入段只打 CRASH_LIBRARY_RECORDED）点名了用例：录入段应当真跑、那一行算录入成了并转打出来、之后照判段跑、退 0（退 $crash_case_shape_exit，调用次序「$crash_case_shape_calls」，输出尾部 $(tail -n 3 "$work/crash-case-shape.out" | tr '\n' '|')）" \
+      "看 crash-amplification-lib.sh 的 crash_amplification_prepare（test_filter 非空时 cargo test 参数要带 --include-ignored）与 crash_amplification_record_on_this_host 认的录入行（CRASH_LIBRARY_RECORDED 也算）"
+  fi
+  # 第 29 格：本机一台跑的那一趟判段没跑（没编进 gpu 特性的二进制遇到 ENABLE_GPU=1：打一行 CRASH_AMPLIFICATION_NOT_RUN step=judge 与一行 NOT_RUN_NO_GPU_ADAPTER、录入段照录、退 0）⇒
+  #   那一行原样转打、恰好一行，这一项退 0（入口照它记本次未跑）；NOT_RUN_NO_GPU_ADAPTER 那一行不转打
+  cells=$((cells + 1))
+  printf '%s\n' '#!/usr/bin/env bash' \
+    'if [[ " $* " == *" SINGLEFS_CRASH_AMPLIFICATION_STAGE=record "* ]]; then echo "CRASH_AMPLIFICATION_RECORDED flow=stub" > "$3"; exit 0; fi' \
+    'printf "%s\n" "CRASH_AMPLIFICATION_NOT_RUN step=judge test=crash_amplification::run_from_environment flow=stub reason=配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性（假的用例）" "NOT_RUN_NO_GPU_ADAPTER test=crash_amplification::run_from_environment reason=配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性（假的用例）" "CRASH_AMPLIFICATION flow=stub mode=single_host_cpu states_checked_here=0 red=0" > "$3"' >"$work/judge-not-run.sh"
+  local judge_not_run_exit
+  CRASH_AMPLIFICATION_ITEM_SWITCHES=0,0 CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/judge-not-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER="$work/two-hosts.sh" \
+    bash "$0" some-target --library "$work/library-judge-not-run" >"$work/judge-not-run.out" 2>&1; judge_not_run_exit=$?
+  if [[ "$judge_not_run_exit" != 0 ]] \
+     || [[ "$(grep -c '^CRASH_AMPLIFICATION_NOT_RUN step=judge test=crash_amplification::run_from_environment flow=stub reason=' "$work/judge-not-run.out")" != 1 ]] \
+     || grep -q '^NOT_RUN_NO_GPU_ADAPTER ' "$work/judge-not-run.out"; then
+    selftest_cell_failed "本机一台跑的那一趟判段没跑（打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行、退 0）：那一行应当原样转打恰好一行、NOT_RUN_NO_GPU_ADAPTER 那一行不转、退 0（退 $judge_not_run_exit，输出 $(tr '\n' '|' <"$work/judge-not-run.out")）" \
+      "看 run_on_this_host_alone：run.log 里行首 CRASH_AMPLIFICATION_NOT_RUN step=judge 的行原样转打"
+  fi
+  # 第 30 格：线程数的缺省 ⇒ 登记的重活默认并行度（共用库文件头「线程数的缺省」）：没设 SINGLEFS_THREAD_CAP 时本机与第二台都取 .claude/heavy-thread-default 第一条非注释行的数，
+  #   设了上限 7 取 7，显式给的 3 照它
+  cells=$((cells + 1))
+  local registered_threads default_threads_seen
+  registered_threads="$(grep -vE '^[[:space:]]*(#|$)' "$repository_root/.claude/heavy-thread-default" | head -n 1 | awk '{print $1}')"
+  default_threads_seen="$(env -u SINGLEFS_THREAD_CAP bash -c 'source "$1"; crash_amplification_threads_now local; crash_amplification_threads_now peer; crash_amplification_threads_now peer 3; SINGLEFS_THREAD_CAP=7 crash_amplification_threads_now local' _ "$item_script_directory/crash-amplification-lib.sh" | tr '\n' ' ')"
+  [[ -n "$registered_threads" && "$default_threads_seen" == "$registered_threads $registered_threads 3 7 " ]] \
+    || selftest_cell_failed "没给线程数时本机与第二台都应当取登记的重活默认并行度 $registered_threads、显式给的 3 照它、上限 7 取 7（实际「$default_threads_seen」）" \
+      "看 crash-amplification-lib.sh 的 crash_amplification_default_threads 与 crash_amplification_threads_now"
   if (( failures > 0 )); then
     echo "  ✗ --selftest：$cells 格里 $failures 格判错" >&2
     echo "     → 怎么办：照上面每一格给的出路改，再跑 $0 --selftest" >&2
     exit 1
   fi
-  echo "  ✓ --selftest：双机开着两台跑、双机没开本机跑、没开双机却点名第二台的卡退 78、开了双机第二台没卡退 78、几条流累加、没有计划行认不出原因退 247、第二台量不出原样退 249、卡用不了退 78、算法判不了退 248、开了 GPU 没写卡退 78、本机那一趟卡用不了退 78、本机那一趟显存不够原样退 245 并说显存不够、带值的选项缺值退 2、运行条件读多机配置里的显卡先后（不读退役的私有显卡配置）、开了 GPU 没带 --quiesced 经清场包装清场再跑（清场回读不过退 78 不跑；跑完、失败与被打断都不复原）、排计划那一趟借不到显存一项都没跑到退 77（别的用例名的那一行退 247、那一趟退了非 0 原样退、第二台借不到显存原样退 77）、几条流里没借到的逐条报本次未跑而借到的照判、没设 SINGLEFS_MULTI_HOST_CONFIG 时多机配置按 git common-dir 找、多机配置判法认显卡的两个键而不认退役的 GPU_COMPUTATION_CLASSES、结论版本对不上与没编进 gpu 特性都退 78、没给 --library 用按结论种类存的新库，$cells 格都对"
+  echo "  ✓ --selftest：双机开着两台跑、双机没开本机跑、没开双机却点名第二台的卡退 78、开了双机第二台没卡退 78、几条流累加、没有计划行认不出原因退 247、第二台量不出原样退 249、卡用不了退 78、算法判不了退 248、开了 GPU 没写卡退 78、本机那一趟卡用不了退 78、本机那一趟显存不够原样退 245 并说显存不够、带值的选项缺值退 2、运行条件读多机配置里的显卡先后（不读退役的私有显卡配置）、开了 GPU 没带 --quiesced 经清场包装清场再跑（清场回读不过退 78 不跑；跑完、失败与被打断都不复原）、排计划那一趟借不到显存一项都没跑到退 77（别的用例名的那一行退 247、那一趟退了非 0 原样退、第二台借不到显存原样退 77）、几条流里没借到的逐条报本次未跑而借到的照判、没设 SINGLEFS_MULTI_HOST_CONFIG 时多机配置按 git common-dir 找、多机配置判法认显卡的两个键而不认退役的 GPU_COMPUTATION_CLASSES、结论版本对不上与没编进 gpu 特性都退 78、没给 --library 用按结论种类存的新库、录入段没跑成就停（判段一趟都不起）、调用方没送按段登记文件时两趟都送本树那一份的绝对路径（送了照它）、照崩溃点重放用例的样子造的用例（标 ignore、录入段只打 CRASH_LIBRARY_RECORDED）点名了也照跑录入段并算录入成了、本机那一趟判段没跑时转打 CRASH_AMPLIFICATION_NOT_RUN step=judge 那一行、没给线程数时本机与第二台都取登记的重活默认并行度，$cells 格都对"
   exit 0
 }
 if (( selftest )); then run_selftest; fi
@@ -608,6 +725,11 @@ if [[ -n "${CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY:-}" ]]; then
     20) report_placement_not_run "$decided_not_run_line"; item_break_is not-run-exits-0 && exit 0; exit 77 ;;
     *) exit "${refused_exit_code:-247}" ;;
   esac
+fi
+
+# 按段登记（文件头「按段登记」）：调用方没送就送本树那一份的绝对路径；弄坏开关 segments-registry-not-sent 下不送
+if [[ -z "${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY:-}" ]] && ! item_break_is segments-registry-not-sent; then
+  export SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY="$repository_root/.claude/gate.d/crash-point-replay-segments.tsv"
 fi
 
 # 开了 GPU 而调用方没清场：经清场包装带 --quiesced 重起自己，交回包装的退出码（文件头「清场」）
@@ -630,7 +752,7 @@ if [[ -n "${CRASH_AMPLIFICATION_ITEM_SWITCHES:-}" ]]; then
 fi
 [[ -n "${CRASH_AMPLIFICATION_ITEM_CARDS:-}" ]] && gpu_cards_by_priority="$CRASH_AMPLIFICATION_ITEM_CARDS"
 if [[ -n "${CRASH_AMPLIFICATION_ITEM_LOCAL_RUN:-}" ]]; then
-  crash_amplification_run_on_this_host() { bash "$CRASH_AMPLIFICATION_ITEM_LOCAL_RUN" "$@"; }
+  crash_amplification_run_on_this_host() { CRASH_AMPLIFICATION_ITEM_LOCAL_TEST_ARGUMENTS="${cargo_test_arguments[*]}" bash "$CRASH_AMPLIFICATION_ITEM_LOCAL_RUN" "$@"; }
 fi
 crash_amplification_home="${SINGLEFS_CRASH_AMPLIFICATION_HOME:-$HOME/.local/share/singlefs/crash-amplification}"
 local_library="${library_directory:-$(crash_amplification_default_library "$crash_amplification_home")}"
@@ -638,9 +760,16 @@ run_directory="$(dirname "$local_library")/runs/$label"
 mkdir -p "$run_directory" || { echo "  ✗ 建不了 $run_directory" >&2; echo "  → 怎么办：看库的上层目录可不可写" >&2; exit 2; }
 two_hosts_driver="${CRASH_AMPLIFICATION_TWO_HOSTS_DRIVER:-$item_script_directory/crash-amplification-two-hosts.sh}"
 
+# 两段（用户 2026-10-11 定）：先在本机跑录入段，把这一项的流程写进库；之后排计划、本机判、两台判、导入每一趟都只跑判段（从库里读）
+crash_amplification_record_on_this_host "$local_library" "$run_directory/record.log"; record_exit=$?
+if (( record_exit != 0 )) && ! item_break_is record-failure-ignored; then exit "$record_exit"; fi
+export SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge
+
 run_on_this_host_alone() { # 本机一台跑整份，打它的汇总行；退 0，或照 run.log 分类之后该退的码
   crash_amplification_run_on_this_host 0/1 "$local_library" "$run_directory/run.log"; local run_exit=$?
   grep -hE '^CRASH_AMPLIFICATION(_GPU_CARD|_GPU_TOTAL)? ' "$run_directory/run.log" 2>/dev/null
+  # 判段没跑（文件头「输出」：没编进 gpu 特性的二进制遇到 ENABLE_GPU=1）那一趟打的本次未跑行原样转打；弄坏开关 judge-not-run-dropped 下不转
+  item_break_is judge-not-run-dropped || grep -h '^CRASH_AMPLIFICATION_NOT_RUN step=judge ' "$run_directory/run.log" 2>/dev/null
   if [[ "$run_exit" == 0 ]]; then return 0; fi
   local exit_code
   exit_code="$(crash_amplification_exit_code_of_a_failed_run "$run_exit" "$run_directory/run.log")"

@@ -13,6 +13,8 @@
 //! `checks`（不起卡的自检，确定性）、`plan`（清单各阶段的格数与子进程数，确定性）、`simulate`（在模型卡上跑某一格几轮，试 `judge` 用）。
 //! `run --simulated` 让每个子进程都跑在模型卡上，整条父子流水线（续跑、补轮、原文压缩、F1 停机）不起卡也走得通。
 
+// admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
+// run-condition: command python3
 use std::collections::BTreeMap;
 
 // ============================== 常量（登记里的数，各只一处） ==============================
@@ -3325,6 +3327,7 @@ fn exit_code_of(result: Result<i32, String>) -> i32 {
 }
 
 fn main() {
+    preflight();
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let rest = arguments.get(1..).unwrap_or(&[]);
     let exit_code = match arguments.first().map(String::as_str) {
@@ -3623,5 +3626,33 @@ mod tests {
         let mut device_lease = lease;
         device_lease.device_spread_mebibytes = 9;
         assert_eq!(device_lease.tau_device_mebibytes(), 9 + 2);
+    }
+}
+
+fn repository_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+}
+
+fn preflight() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let root = repository_root();
+    let source = root.join("scripts/experiments/e174_lease_drop_wait_memory_return.rs");
+    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    let mut command = std::process::Command::new("python3");
+    command.arg(&script).arg("check").arg(&source);
+    if arguments.iter().any(|argument| argument == "--force") {
+        command.arg("--force");
+    }
+    command.arg("--");
+    command.args(arguments.iter().filter(|argument| *argument != "--force"));
+    let output = command.output().unwrap_or_else(|error| {
+        eprintln!("  ✗ 起不了 python3 判准入：{error}");
+        eprintln!("  → 怎么办：装上 python3，或在有 python3 的机器上跑");
+        std::process::exit(78)
+    });
+    if !output.status.success() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        std::process::exit(output.status.code().unwrap_or(1));
     }
 }

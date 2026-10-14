@@ -105,6 +105,7 @@ const DIRTY_BYTES_THRESHOLD: u64 = 2 * 1024 * 1024 * 1024;
 /// ⚠️ **不是 `T_time` = 5 s**——代按发布走，fsync 触发的也是发布（D16 已定项 6）。
 const PUBLISHES_PER_SECOND: u64 = 2785;
 /// D5 已定项 2 骑手条款：代段宽度 **≥ 48 位**。已定条款，不是本实验的发现。
+#[cfg(test)]
 const GENERATION_BITS_FLOOR: u32 = 48;
 /// D8 已定项 2 + D18 已定项 9：索引节点 16 KiB，按 **16384** 对齐。
 const NODE_ALIGNMENT_BYTES: u64 = 16384;

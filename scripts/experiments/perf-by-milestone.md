@@ -3,8 +3,8 @@
 **这份文件做什么**：拿 singlefs 与六家现役文件系统（XFS、ext4、F2FS、Bcachefs、Btrfs、OpenZFS）在同一台虚机、同一组负载下比文件性能，
 每个里程碑一节，写 singlefs 在那个里程碑上能跑哪几维、和六家差多少、跑不了的维还缺什么能力。给人从头读；六家的数是基线，singlefs 那一列随里程碑往下长。
 
-**数从哪来**：全部来自 E152（按里程碑对比六家文件系统的文件性能） 的四次正式跑：单盘 `research/results/e152-file-system-benchmark-2026-09-15.out`、两盘镜像 `research/results/e152-file-system-benchmark-mirror-2026-09-15.out`、里程碑「覆盖写、释放、回退与复用」上只重跑 singlefs 一臂的 `research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out` 与收尾时再跑的 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`；
-第二节与第二·二节的表由 `python3 scripts/experiments/e152-tables.py <产物>` 从产物生成，不手抄。
+**数从哪来**：全部来自 E152（按里程碑对比六家文件系统的文件性能） 的六次正式跑：单盘 `research/results/e152-file-system-benchmark-2026-09-15.out`、两盘镜像 `research/results/e152-file-system-benchmark-mirror-2026-09-15.out`、里程碑「覆盖写、释放、回退与复用」上只重跑 singlefs 一臂的 `research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out` 与收尾时再跑的 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`，以及里程碑二收尾第 8 步与崩溃放量全量之后各再跑一次两盘镜像七家加 singlefs 的 `research/results/e152-file-system-benchmark-mirror-2026-09-28.out` 与 `research/results/e152-file-system-benchmark-mirror-2026-09-29.out`；
+第二节、第二·二节、第三·三节与第三·四节的表由 `python3 scripts/experiments/e152-tables.py <产物>` 从产物生成，不手抄。
 实验的口径与复跑命令在 `.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md`，跑前登记（含正式跑之前的六次修订与四次冒烟跑）在 `research/prompts/e152-preregistration.md`。
 
 **只出观测**：这份文件回答「差多少、差在哪一维」，不回答「singlefs 该怎么改」——那是设计推论，要按 `.claude/rules/three-way-inference.md` 另走三方论证。
@@ -120,7 +120,7 @@
 | Bcachefs | 31.1 ⚠25% | 16 384 | 1.00 | 92.0 | 90.6 |
 | OpenZFS（vdev 是分区） | 278 | 1 791 488 | 13.0 | 93.8 | 93.8 |
 
-#### singlefs（两块 16 GiB 盘，门禁 55 号的真设备二进制）
+#### singlefs（两块 16 GiB 盘，门禁 checker-tier-qemu-device-streams 的真设备二进制）
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 |
 |---|---|---|---|---|
@@ -183,7 +183,7 @@
 
 41 次虚机跑：第 1 轮 ext4（md raid1）第一次跑失败，是别的会话在跑的途中改了 vm-bench.sh（跑前登记第十一节有记录），同参数重跑成功，汇总只取成功的那一次；其余 40 次都是一次跑通。
 七个带对照的配置对照都是 5 / 5 有牙，没有格子被排除；四个 md 配置 40 次同步检查都没在同步。
-这一轮宿主负载比第一次高：每轮开跑前的 1 分钟负载 1.99–11.34（中位 6.46，第一次是 3.23），标 ⚠ 的格子也多。
+这一轮宿主负载比第一次高：每轮开跑前的 1 分钟负载 1.99–11.34（中位 6.64，第一次是 3.23），标 ⚠ 的格子也多。
 
 #### 大文件顺序写与顺序读（MiB/s，越大越好）
 
@@ -253,7 +253,7 @@
 | Bcachefs 双副本 | 23.4 ⚠43% | 32 768 | 2.00 | 92.0 | 90.6 |
 | OpenZFS mirror（vdev 是分区） | 546 | 3 586 048 | 26.0 | 46.9 | 46.9 |
 
-#### singlefs（两块 16 GiB 盘，门禁 55 号的真设备二进制）
+#### singlefs（两块 16 GiB 盘，门禁 checker-tier-qemu-device-streams 的真设备二进制）
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 |
 |---|---|---|---|---|
@@ -293,9 +293,9 @@
 - **冷挂载**：ext4（md）1.66 ms 最轻；OpenZFS mirror 的 import 要 6 125 ms，差不多是单盘时 3 102 ms 的两倍。
 - **容量**：md 上三家、Btrfs raid1、OpenZFS mirror 的可用空间是两块盘总量的 46.3%–49.2%。**Bcachefs 双副本那一格不能比**：它的 statfs 报的是两块盘的原始容量，没按两个副本折半——总容量 92.0%、可用 90.6%，与单盘那次的百分比逐字相同。
 
-## 三、里程碑「新池新建文件」（当前）
+## 三、里程碑「新池新建文件」（2026-09-15）
 
-里程碑的出口是步 7 的验收，2026-09-14 满足（层 0 全部 262 165 个崩溃状态零违例）；步 4 有两条验收要覆盖写、释放、回退与复用，没做。
+里程碑的出口是步 7 的验收，2026-09-14 满足（崩溃点重放全部 262 165 个崩溃状态零违例）；步 4 有两条验收要覆盖写、释放、回退与复用，没做。
 这个里程碑上的 singlefs 是一个纯用户态库，不挂载（D17（实现分层与第三方管道） 已定项 5），一个池只能写出一个文件，所以大部分维跑不了。
 
 ### singlefs 今天能跑哪几维
@@ -354,7 +354,7 @@ E7RESULT name=write_list writes=21 barriers=2 fua=1 named=8 units=t1@50180x32768
 E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_form=65543 kinds=[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]
 ```
 
-门禁 55 号已经在虚机里证过这条录制流与设备侧日志逐项相等。由它算出（算术，不是测量）：
+门禁 checker-tier-qemu-device-streams 已经在虚机里证过这条录制流与设备侧日志逐项相等。由它算出（算术，不是测量）：
 
 | 量 | 盘 0 | 盘 1 | 合计 |
 |---|---|---|---|
@@ -364,7 +364,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 - 表里写请求是二进制的写调用数；六家那一列是来宾块层计数，块层把每道屏障与每次 FUA 各多记一次写请求，同口径是盘 0 14、盘 1 12、合计 26（第三·二节「两处口径问题」）。
 - 一个 3000 字节的文件，每块盘落 172 544 字节，约 57.5 倍。
-- 每道屏障发给两块盘（`crates/singlefs-core/src/transaction.rs` 第 151–155 行），根槽的 FUA 只写根所在区域的那块盘；virtio 盘没有原生 FUA，来宾内核把它拆成写加 FLUSH（门禁 55 号的设备侧日志读法）。
+- 每道屏障发给两块盘（`crates/singlefs-core/src/transaction.rs` 第 151–155 行），根槽的 FUA 只写根所在区域的那块盘；virtio 盘没有原生 FUA，来宾内核把它拆成写加 FLUSH（门禁 checker-tier-qemu-device-streams 的设备侧日志读法）。
 - 挂载后第一次写之前还有一次性的取号（2 次写）与暖机（10 次写），每次挂载只付一回，没算在这张表里。
 - 格式化：13 次操作（11 次写、2 道屏障）、116 224 字节（实例表单元 32 768 × 2、树表单元 16 384 × 2、三个根槽 512 × 3、系统配置槽 4096 × 4）；真设备上还欠一次整环写 0（每块盘 768 MiB）。
 - 可用容量的上限：单元区从 784 MiB 起（前面是系统配置、根环与 768 MiB 的 journal 环），16 GiB 盘上单元区占一块盘的 95.2%；两盘互为镜像，池能装的是一块盘的单元区，占两块盘总量的 47.6%。树与记账还要再占一些，这一格没算。
@@ -428,7 +428,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 **计时**：汇总行里覆盖写、释放、回退与复用那一格（5.08 / 5.53 ms）取的是外层包装程序给 `name=transaction` 与 `name=file_overwrite` 两行打的时间戳之差。包装程序每读到子进程一行，先把它转打出去才读下一行、打下一个时间戳，所以时间戳里带着前面几行的打印积压。
 两行之间的真实间隔必然包住二进制在发布 B 前后自己计的那一段，而 10 轮里有 9 轮外层数反而更小；二进制连着打、中间只有几微秒计算的几行，时间戳最多跨了 25.8 ms。
-第一段挂钟「分两群」也是它：40 ms 上下的那 5 轮里纯打印占 21.7–25.8 ms。所以发布 B 的挂钟取二进制自己报的纳秒，这是看了产物之后换的取法，理由是外层数物理上不可能。装置已改（跑前登记第十四节）：先把子进程输出读完再转打，并报包含自检，外层不包住里层的轮不进中位；以后和六家比取二进制自己计的指标。这条坑怎么避写在 `.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」，门禁 65 号拦装置里的这种循环。证据行与逐轮数在 `.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md`「这几个数说明什么（覆盖写、释放、回退与复用，与两盘镜像的六家比）」一节第 4 条。
+第一段挂钟「分两群」也是它：40 ms 上下的那 5 轮里纯打印占 21.7–25.8 ms。所以发布 B 的挂钟取二进制自己报的纳秒，这是看了产物之后换的取法，理由是外层数物理上不可能。装置已改（跑前登记第十四节）：先把子进程输出读完再转打，并报包含自检，外层不包住里层的轮不进中位；以后和六家比取二进制自己计的指标。这条坑怎么避写在 `.claude/kb/vm-harness.md`「计时不在转发输出的循环里打时间戳」，共享 `gate.sh` 内置的「转发计时」阶段拦装置里的这种循环。证据行与逐轮数在 `.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md`「这几个数说明什么（覆盖写、释放、回退与复用，与两盘镜像的六家比）」一节第 4 条。
 
 **写请求**：六家的「每次写请求」是来宾块层计数；汇总行里 singlefs 那一格是二进制的写调用数。拿块层整程数减去二进制在发布 B 之前读的块层数，发布 B 在块层是盘 0 12 次、盘 1 14 次，字节与 FLUSH 与二进制计数逐个相同，写请求多出来的正好是屏障数加 FUA 数（发布 B 之前那一段两块盘也逐个对上）。同口径比取块层的 26；新池新建文件段序列同型，也是 26。逐盘读数在 `.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md`「这几个数说明什么（覆盖写、释放、回退与复用，与两盘镜像的六家比）」一节第 5 条。
 
@@ -442,7 +442,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 ### 收尾时再跑一次（2026-09-17，跑前登记第十三节）
 
-里程碑收尾时用户要求再跑一轮。上一次跑之后 `crates/` 改了四处（抬 F 回收的槽扣住到生效、提交内生块的 bump 游标绕开隔离位与扣住位、抬 F 接住读不出计数、checker 多判两条），真设备二进制的负载与判据不变。产物 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`，5 轮一次过，宿主 1 分钟负载 2.27–2.45（门禁 checker-tier-layer0-replay 的层 0 全量同时在跑，`nice -n 19`，照跑照记）。
+里程碑收尾时用户要求再跑一轮。上一次跑之后 `crates/` 改了四处（抬 F 回收的槽扣住到生效、提交内生块的 bump 游标绕开隔离位与扣住位、抬 F 接住读不出计数、checker 多判两条），真设备二进制的负载与判据不变。产物 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`，5 轮一次过，宿主 1 分钟负载 2.27–2.45（门禁 checker-tier-crash-point-replay 的崩溃点重放全量同时在跑，`nice -n 19`，照跑照记）。
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 覆盖写、释放、回退与复用（覆盖写 B）ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 | B 两盘写请求 | B 两盘写字节 | B 两盘屏障 | B 两盘 FUA 写 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -464,10 +464,10 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 ## 三·三、里程碑「覆盖写、释放、回退与复用」收尾重跑（2026-09-28，收尾第 8 步：两盘镜像七家 + singlefs 各 5 轮）
 
 产物 `research/results/e152-file-system-benchmark-mirror-2026-09-28.out`（1026 行，末行 `E7RESULT name=summary_done emitted=180`），40 次虚机跑全部 `vm_exit=0`、没有重试；
-宿主 1 分钟负载 1.59–2.55（本机的崩溃核对进程在跑之前 `kill -STOP` 暂停，跑完复原）。命令：
+宿主 1 分钟负载 1.06–6.33（本机的崩溃核对进程在跑之前 `kill -STOP` 暂停，跑完复原）。命令：
 `E152_CONFIGURATIONS="raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror singlefs" bash scripts/devices/e152-run.sh research/results/e152-file-system-benchmark-mirror-2026-09-28.out`。
 
-### 表（`python3 scripts/experiments/e152-tables.py research/results/e152-file-system-benchmark-mirror-2026-09-28.out`，整份原样）
+### 表（`python3 scripts/experiments/e152-tables.py research/results/e152-file-system-benchmark-mirror-2026-09-28.out`，六家各行原样；singlefs 一行的数见 singlefs 那张表）
 
 #### 大文件顺序写与顺序读（MiB/s，越大越好）
 
@@ -570,7 +570,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 ### 与 2026-09-17 那次 singlefs 一臂比（整行抄自两份产物的 `singlefs_timing` 行；9 月 17 日那份在版本库 3cff909b 之前）
 
-| 量 | 2026-09-17（负载 2.27–2.45） | 2026-09-28（负载 1.59–2.55） |
+| 量 | 2026-09-17（负载 2.27–2.45） | 2026-09-28（五轮负载 1.59–2.51） |
 |---|---|---|
 | 第一段（mkfs + 取号 + 暖机 + 新池新建文件）挂钟，5 轮 | 29.1 / 41.0 / 41.5 / 19.4 / 20.0 ms，中位 29.1 | 332 / 329 / 4 630 / 1 874 / 2 937 ms，中位 1 874，离散 230% |
 | 第一段每盘写字节 / 写请求（`device_0_write_bytes` / `device_0_write_requests`） | 423 936 / 47 | 805 959 680 / 1 598 |
@@ -582,7 +582,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 - **第一段慢了 64 倍，慢在 mkfs 真写了整条 journal 环**：每盘写字节从 423 936 涨到 805 959 680（768 MiB 的环 + 固定结构），写请求从 47 到 1 598——这是并行线四「mkfs 整环写 0」与 C484 / C486（mkfs 连根环一起清）落地之后的样子，mkfs 那一段 `kinds=[zero_fill×8,…]`；写 768 MiB 在 QEMU virtio 盘上 0.3–4.6 秒，5 轮离散 230% 是宿主页缓存与盘的事，不是事务路径。
   取号、暖机、新池新建文件那几步的写数没变（B 之外的四个计数见下）。
 - **B 从 21 次写涨到 29 次、4 道屏障涨到 6 道**：C577（发布返回之前、系统配置轮换之后加一道屏障）与取号 / 抬 F 前各多一道屏障（代码审阅第 19 条）之后每次发布多两道屏障、多 8 次写（journal 记录与系统配置槽的写各多一份），挂钟从 6.6 ms 到 19.4 ms——屏障数是设计定的（D16、D23），不是回归；第 3 轮 57.5 ms 与冷恢复 72.6 s 是同一轮的离群点（那一轮宿主负载 2.30，与别的轮没差别，原因没查出来）。
-- **冷恢复中位 7.7 s → 10.0 s**：读的字节与请求几乎相同（整环扫读 806 MB / 196 874 次），慢的 30% 没有对应的读量变化，与第 3 轮的离群一起记成「宿主当天的状态」，不下结论；扫整环这件事本身归 C29 / 层 0 之外的 journal 环缩读（D23 已定项 19 的环长是 mkfs 参数，默认 768 MiB）。
+- **冷恢复中位 7.7 s → 10.0 s**：读的字节与请求几乎相同（整环扫读 806 MB / 196 874 次），慢的 30% 没有对应的读量变化，与第 3 轮的离群一起记成「宿主当天的状态」，不下结论；扫整环这件事本身归 C29 / 崩溃点重放之外的 journal 环缩读（D23 已定项 19 的环长是 mkfs 参数，默认 768 MiB）。
 - 六家的数与 2026-09-15 那次两盘镜像（二·二）同一套装置、同一个内核 6.17.0-1028-oem；singlefs 与它们能比的仍只有三维（三·二那一节的口径），这一次没有新的可比维。
 
 ## 三·四、同一套装置再跑一次（2026-09-29，崩溃放量全量之后：两盘镜像七家 + singlefs 各 5 轮）
@@ -592,7 +592,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 singlefs 一臂的代码与 9 月 28 日那次同一个提交（dbcc0d2f，核心代码工作区没有改动）。命令：
 `E152_CONFIGURATIONS="raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror singlefs" bash scripts/devices/e152-run.sh research/results/e152-file-system-benchmark-mirror-2026-09-29.out`。
 
-### 表（`python3 scripts/experiments/e152-tables.py research/results/e152-file-system-benchmark-mirror-2026-09-29.out`，整份原样）
+### 表（`python3 scripts/experiments/e152-tables.py research/results/e152-file-system-benchmark-mirror-2026-09-29.out`，六家各行原样；singlefs 一行的数见 singlefs 那张表）
 
 #### 大文件顺序写与顺序读（MiB/s，越大越好）
 

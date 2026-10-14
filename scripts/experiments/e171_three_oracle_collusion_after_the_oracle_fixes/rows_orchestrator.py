@@ -11,13 +11,13 @@
   rows_orchestrator.py plan <同上>
       只现查机器与资源、算分配、按每行推的用时推各台挂钟，打出来；一行都不起，不写产物。
   rows_orchestrator.py --selftest [--cells 格,…]
-      假驱动、假 multi-host-run、假机器清单与资源走一遍各格（），末尾逐个打开弄坏开关核它红在点名的格。
+      假驱动、假 multi-host-run、假机器清单与资源走一遍各格（同目录的 fake_*），末尾逐个打开弄坏开关核它红在点名的格。
 
 退出码：0 跑完（第 11–13 步都绿）；1 停机或某一行没跑成（日志与 sequence.log 写停在哪、为什么）；2 用法错；
   78 运行条件不满足（多机配置判不过、某台连不上或没读到资源、别的台的预检没过（工具链、Python、离线编译、盘）、此刻一条线道都放不下、
   跨机对照那一行此刻放不下）——不悄悄退回单机，出路是修好那台或改配置，再用同一条命令起；143 收到 TERM / INT / HUP，收完尾退出。
 
-机器：scripts/crash/layer0-shard-configuration-check.sh --emit-hosts 解出的清单（本机是第 1 台，HOSTS 里依次是第 2、3…台；没写 HOSTS 就是 PEER_SSH_HOST
+机器：scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts 解出的清单（本机是第 1 台，HOSTS 里依次是第 2、3…台；没写 HOSTS 就是 PEER_SSH_HOST
   一台）。判法退 3（ENABLE_ACROSS_MACHINES 没开）只用本机、打一行；退 1 退 78。日志与产物里台名只写「本机」「第二台」……，不写别名与目录。
   别的台每行经 scripts/hosts/multi-host-run.sh --peer 起；它只读配置的 PEER_*，所以不是 PEER_SSH_HOST 的那几台，这里按 --emit-hosts 的
   MULTI_HOST_<号>_* 另写一份只给那一台用的配置（PEER_* 换成那一台的，草稿状态目录里、权限 600），经 SINGLEFS_MULTI_HOST_CONFIG 交给它；那一台没配仓目录或
@@ -29,7 +29,7 @@
     峰值表里没有这条命令，包装按上限记账）；别的台每槽 10G，是那 6G 加外层包装 --memory-cap 4G（multi-host-run.sh 在那边把驱动与编译整个套进一层包装，
     它在 slice 账上一直占着 4G 减已用；4G 管驱动加一次编译）。配置的内存上限（PEER_MEMORY_CAP、HOST_<号>_MEMORY_CAP）卡的是那台各层包装之和。
   实占（memory.available：MemAvailable 减包装账上还没涨到量的那一截）：每槽 10 GiB = 6G + 编译 3 GiB（cargo build 不在装置包装里；峰值表
-    scripts/hosts/memory-peaks.tsv 里 capped.sh 10 cargo build --release --offline -p singlefs-checker-tier --bin e171_… 那一行 2.54 GiB，向上取整）
+    ~/.local/share/singlefs/memory-peaks.tsv 里 capped.sh 10 cargo build --release --offline -p singlefs-checker-tier --bin e171_… 那一行 2.54 GiB，向上取整）
     + 驱动与杂项 1 GiB（推的）。本机的编译在 slice 外面，这一项防几道同时冷编译把 slice 外的余量吃光。
 行与派发：第 11 步 242、269（带探针）、第 12 步空变异 row-0 与 13 行、跨机对照 X（row-0 在另一台再跑一次），同进一个队列，第 11、12 步同时跑；
   每行一个单线道驱动（--lanes 1），哪一槽空了就从队列头取第一个放得下的（X 只放在第 12 步 row-0 那一台之外）；某一行没跑成就不再派新行，
@@ -216,7 +216,7 @@ def hosts_from_configuration(exit_code: int, text: str) -> tuple[list[Host], dic
     if exit_code == 3:
         return [local], {}, "双机开关 ENABLE_ACROSS_MACHINES 没开：只用本机"
     if exit_code != 0:
-        raise RunCondition(f"多机配置判不过（layer0-shard-configuration-check.sh --emit-hosts 退 {exit_code}；单跑它看原因）")
+        raise RunCondition(f"多机配置判不过（crash-point-replay-shard-configuration-check.sh --emit-hosts 退 {exit_code}；单跑它看原因）")
     values = parse_assignments(text)
     hosts = [local]
     for number in range(2, int(values.get("MULTI_HOST_COUNT") or 0) + 2):
@@ -1309,7 +1309,7 @@ def context_from_arguments(arguments: argparse.Namespace) -> Context:
         driver_path=os.path.abspath(driver_override) if driver_override else os.path.join(research_root, RESEARCH_RELATIVE, DRIVER_NAME),
         driver_overridden=bool(driver_override),
         multi_host_run=environment.get("ROWS_ORCHESTRATOR_MULTI_HOST_RUN") or os.path.join(os.path.abspath(arguments.repo), "scripts/hosts/multi-host-run.sh"),
-        hosts_command=environment.get("ROWS_ORCHESTRATOR_HOSTS_COMMAND") or "bash scripts/crash/layer0-shard-configuration-check.sh --emit-hosts",
+        hosts_command=environment.get("ROWS_ORCHESTRATOR_HOSTS_COMMAND") or "bash scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts",
         resources_command=environment.get("ROWS_ORCHESTRATOR_RESOURCES_COMMAND") or "python3 scripts/hosts/host-resources.py --json",
         poll_seconds=float(environment.get("ROWS_ORCHESTRATOR_POLL_SECONDS") or 10),
         peer_compile_check=environment.get("ROWS_ORCHESTRATOR_PEER_COMPILE_CHECK", "1") != "0")
@@ -1345,8 +1345,8 @@ def main(argument_list: list[str]) -> int:
 
 
 # ── 自证 ──
-REAL_REPOSITORY = "/home/fy5090/code/singlefs"
-FAKES = os.path.join(HERE, "selftest_fakes")
+REAL_REPOSITORY = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))  # 本文件在 scripts/experiments/<装置>/ 下
+FAKES = HERE  # 假驱动 fake_*.py / fake_*.sh 与本文件同目录
 
 
 def resources_entry(number: int, threads: int, available_gib: float, room_gib: float, read: bool = True) -> dict:
@@ -1394,7 +1394,7 @@ def cells_derived_configuration(scratch: str) -> list[tuple[str, bool, str]]:
     attempt = os.path.join(scratch, "derived")
     os.makedirs(attempt)
     path = configuration_for(dataclasses.replace(Context(*([""] * 8), "", "", "", "", "", False, "", "", "", 1.0, False), attempt_dir=attempt), hosts[2], values)
-    completed = subprocess.run(["bash", os.path.join(REAL_REPOSITORY, "scripts/crash/layer0-shard-configuration-check.sh"), "--emit-hosts", REAL_REPOSITORY],
+    completed = subprocess.run(["bash", os.path.join(REAL_REPOSITORY, "scripts/crash/crash-point-replay-shard-configuration-check.sh"), "--emit-hosts", REAL_REPOSITORY],
                                capture_output=True, text=True, env=dict(os.environ, SINGLEFS_MULTI_HOST_CONFIG=path))
     emitted = parse_assignments(completed.stdout)
     good = (len(hosts) == 3 and not hosts[2].is_peer and completed.returncode == 0 and emitted.get("PEER_SSH_HOST") == "third.host"
@@ -1701,7 +1701,7 @@ def selftest(argument_list: list[str]) -> int:
         if wanted is not None and name not in wanted:
             continue
         red += 0 if ok else 1
-        print(f"{'✓' if ok else '✗'} 自证 {name}：{detail}", flush=True)
+        print(f"{'✓' if ok else '✗'} 自证 {name}：{detail}", flush=True)  # gate-lint:detail
     if wanted is None and not os.environ.get("ROWS_ORCHESTRATOR_BREAK"):
         for switch, cell in SWITCH_CELLS.items():
             completed = subprocess.run(["python3", "-B", os.path.abspath(__file__), "--selftest", "--cells", cell], capture_output=True, text=True,

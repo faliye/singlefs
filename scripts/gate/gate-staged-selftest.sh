@@ -147,7 +147,7 @@ for mutation_index in "${!MUTATION_NAMES[@]}"; do
   scratch="$work/mutation-$mutation_index"; mkdir -p "$scratch"
   # 副本摆在与原件相同的相对位置（scripts/ 底下，旁边链上 .claude/scripts 与规范副本）：原件按相对路径 source .claude/scripts/preflight.sh，
   # 摆在别处的话 source 落空、preflight 一步没判还把参数清掉，副本就因为这个而不是因为改坏的那一处出结果
-  mkdir -p "$scratch/scripts" "$scratch/.claude"
+  mkdir -p "$scratch/scripts" "$scratch/scripts/gate" "$scratch/.claude"
   ln -s "$(cd "$(dirname "$TARGET")/../.." && pwd)/.claude/singlefs-ai-sop" "$scratch/.claude/singlefs-ai-sop"
   ln -s "$(cd "$(dirname "$TARGET")/../.." && pwd)/.claude/scripts" "$scratch/.claude/scripts"
   if ! occurrences="$(apply_mutation "$TARGET" "$scratch/scripts/gate/gate-staged.sh" "${MUTATION_ORIGINALS[$mutation_index]}" "${MUTATION_REPLACEMENTS[$mutation_index]}")"; then

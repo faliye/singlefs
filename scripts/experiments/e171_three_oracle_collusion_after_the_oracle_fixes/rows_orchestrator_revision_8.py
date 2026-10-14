@@ -2,7 +2,7 @@
 """E171 第 1 次重跑第一段·修订 8 那一趟：第 11–13 步的多机编排（登记 research/prompts/e171-r1-prereg.md 修订 8 第 8.4 节步表末行、第 8.9 节）。
 由 segment_one_units_revision_8.py 在第 0、1、2、2b、7 步（与研究一侧变异表，排了的话）都绿之后起，在仓根跑。
 
-为什么另写一层、不改第一段那一份编排器：rows_orchestrator.py 被 cross_host_o3_check.py、rows_orchestrator_segment_two.py 按 sha256 7bfbdb84… 钉住。
+为什么另写一层、不改第一段那一份编排器：rows_orchestrator.py 被 cross_host_o3_check.py、rows_orchestrator_segment_two.py 按 sha256 1dcfb8d0… 钉住。
 这一层按路径载入那一份（开跑先核 sha256，不是就退 3），行集、驱动参数、合并规则 ①–⑦、跨机一致对照（S17）的三样比法、第 13 步的规矩一字不改，调它原来的函数；
 改的只有第 8.4 节步表末行点名的几处，与「-resume2 跨机一致对照 S17 停机的处置」第 5 条要带上的那一处：
   - 树、快照摘要、T 的来源（修订 8 树第 7 步的 -timing 产物，--baseline-timing 给）、产物前缀与后缀、导出根，都从占位配置读（H3、H16）；RESUME_TAG 不用（空）：
@@ -50,9 +50,9 @@ import revision_8_selftest_harness as harness  # noqa: E402
 BREAK_VARIABLE = "ROWS_R8_BREAK"
 SELFTEST_VARIABLE = "ROWS_R8_SELFTEST"
 SEGMENT_ONE_ORCHESTRATOR_PATH = os.path.join(HERE, "rows_orchestrator.py")
-SEGMENT_ONE_ORCHESTRATOR_SHA256 = "7bfbdb84559476033853794499836f752fdf8a3e803e17cd9539ae49ee3b7e0e"
+SEGMENT_ONE_ORCHESTRATOR_SHA256 = "1dcfb8d0c08a706077f41fe69d3566d7a99e16f3dcbffc10808a2f0d88d17853"
 CROSS_HOST_CHECK_PATH = os.path.join(HERE, "cross_host_o3_check.py")
-CROSS_HOST_CHECK_SHA256 = "afc9a9b081b90e125c4050d01215dbbca2cf7f088604faa66243b23590c2bcc6"
+CROSS_HOST_CHECK_SHA256 = "4ab952419acc40890bb68e03135e1f18555dd29a5e02ff86581950f03ab297a5"
 SEGMENT_ONE_SELFTEST_LAST_LINE = "自证 34 项，红 0"
 CROSS_HOST_SELFTEST_LAST_LINE = "自证 38 项，红 0"
 PEER_LABEL_PREFIX = "e171s1r8"
@@ -79,7 +79,7 @@ def load_pinned(path: str, expected: str, module_name: str) -> types.ModuleType:
 
 
 try:
-    one = load_pinned(SEGMENT_ONE_ORCHESTRATOR_PATH, SEGMENT_ONE_ORCHESTRATOR_SHA256, "rows_orchestrator_7bfbdb84")
+    one = load_pinned(SEGMENT_ONE_ORCHESTRATOR_PATH, SEGMENT_ONE_ORCHESTRATOR_SHA256, "rows_orchestrator_1dcfb8d0")
     cross_host = load_pinned(CROSS_HOST_CHECK_PATH, CROSS_HOST_CHECK_SHA256, "cross_host_o3_check_pinned")
 except WrongPinnedFile as wrong_file:
     print(f"✗ {wrong_file}（这一层调的是钉住的那一份的函数；改过就先核这一层，再改钉的 sha256）", file=sys.stderr)
@@ -285,6 +285,7 @@ def main(argument_list: list[str]) -> int:
         config = judge.load_config(arguments.config)
     except judge.RunConditionError as error:
         print(f"✗ {error}", file=sys.stderr)
+        print('     → 怎么办：照上面那句补齐运行条件（配置、冻结树、设备文件）再用同一条命令起', file=sys.stderr)
         return one.EXIT_RUN_CONDITION
     configure(config, arguments.stop_file)
     context = context_of(config, os.path.abspath(arguments.repo), arguments.baseline_timing)

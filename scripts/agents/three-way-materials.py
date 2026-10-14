@@ -17,8 +17,9 @@
 - 顶上标题的直接子节：抄，按自己的标题取；再往下的子节：抄、理由以「随」起头，由父节带到；
 - `### 已定项` / `### 未定项` 的分项索引表：不抄，行区间（标题下一行到第一个 `####` 之前）作 --extra 按行取；它下面的 `####` 分项各按自己的标题取；
 - `## 历史版本` 及其子节：不抄（正文只引现状；--no-history 之外的默认）。
-读的文件：正文里写出的 `.claude/kb/…md` 路径、D / E 编号对应的决策与实验页、C 编号对应的欠账表、I-<n>.<m>（与类号 I-<n>）对应的不变量清单，加 --files 给的；
-认编号的读法是 quote-kb.py 的 cited_kb_sources(…, loose=True)，与 quote-kb.py --cited 判清单全不全是同一个函数（这里用宽读法，认出的是 --cited 的超集）；
+读的文件：正文里写出的 `.claude/kb/…md` 路径、D / E 编号对应的决策与实验页、C 编号对应的欠账表、I-<n>.<m>（与类号 I-<n>）所在的不变量类文件
+（`.claude/kb-directories` 登记的目录里含 `| I-<n>.` 表行的那几份，类号找不到文件的退回那个目录的 README.md），加 --files 给的；
+认编号与 I 号指到哪份文件的读法都是 quote-kb.py 的 cited_kb_sources(…, loose=True)（I 号经它的 invariant_files_for），与 quote-kb.py --cited 判清单全不全是同一个函数（这里用宽读法，认出的是 --cited 的超集）；
 正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号不当编号（代码围栏里的声明不算）。
 产出（都排他新建，已存在就停）：research/prompts/_<轮>-checklist.md、_<轮>-appendix.md、_<轮>-background.md、<轮>-snapshot/kb-sha256.txt。
 --resume：清单已在、另三样都还没有时，沿用那份清单（人改过的照用），正文或 --files 引到而清单里没有的文件各补一张（默认全抄），
@@ -39,6 +40,8 @@
       续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」：样本正文也点名了 I-7.4）
   THREE_WAY_MATERIALS_BREAK=no-resume  build() 不认 --resume，checklist-specs.py 判红时只给改前那条只补附录的命令
       续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」）
+  QUOTE_KB_BREAK=invariants-to-readme  quote-kb.py 的开关（I 号一律退回不变量目录的 README.md），读法是那一份，这里同样红
+      不变量号（「✗ 自检：正文点名 I-7.4」）、续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」：样本正文也点名了 I-7.4）
 """
 import contextlib
 import glob
@@ -59,7 +62,7 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 BROKEN = os.environ.get("THREE_WAY_MATERIALS_BREAK", "")
 KB_PATH = re.compile(r"\.claude/kb/[A-Za-z0-9_./\-一-鿿]+\.md")
 NUMBER = re.compile(r"(?<![A-Za-z0-9])([DECI])(\d+)(?![0-9])")
@@ -83,9 +86,10 @@ def not_numbers_declared(body_text):
 
 
 def own_number_reading(body_text, root):
-    """弄坏开关 own-number-reading 才走：改前这里自己抄的一份读法（I 编号只认 I<n>，认不出 I-7.4）。"""
+    """弄坏开关 own-number-reading 才走：改前这里自己抄的一份读法（I 编号只认 I<n>，认不出 I-7.4）；I 号指到哪份文件照 quote-kb.py 的 invariant_files_for。"""
     found = list(KB_PATH.findall(body_text))
     declared = not_numbers_declared(body_text)
+    quote_kb = quote_kb_module()
     for kind, number in NUMBER.findall(body_text):
         if f"{kind}{number}" in declared:
             continue
@@ -97,7 +101,7 @@ def own_number_reading(body_text, root):
         elif kind == "C":
             found.append(".claude/kb/checks-owed.md")
         elif kind == "I":
-            found.append(".claude/kb/invariants.md")
+            found += quote_kb.invariant_files_for(f"I-{number}", root)[0]
     return [(path, path) for path in found]
 
 
@@ -363,20 +367,31 @@ def selftest():
         checked += 1
         if code_declared != 0 or "165-恢复重放有界穷举.md" not in snapshot:
             failures.append(f"没声明的 E165 照拉：应当做成（退出码 0）且快照列 E165 的实验页，实际 {code_declared}，快照：{snapshot!r}；{' '.join(lines_declared)[-300:]}")
-        # 正文只点名不变量号 I-7.4：清单里自动带上 invariants.md，四样产出齐
-        open(os.path.join(work, ".claude", "kb", "invariants.md"), "w", encoding="utf-8").write(
-            "# 不变量清单\n\n开篇 INVARIANTHEAD。\n\n## I-7 根环 —— 类\n\n### I-7.4 样本\n\n正文 INVARIANT。\n")
+        # 不变量清单按类拆在登记的 kb 目录里（README.md 加类文件，形态照 crates/singlefs-checker/invariants/）：
+        # 正文只点名 I-7.4 与 I-8.3，清单里自动带上那两份类文件、不带 README.md，四样产出齐
+        invariants_directory = os.path.join("crates", "sample", "invariants")
+        os.makedirs(os.path.join(work, invariants_directory))
+        open(os.path.join(work, ".claude", "kb-directories"), "w", encoding="utf-8").write(
+            f".claude/kb  # 样本：决策、实验仍在这里\n{invariants_directory}  # 样本：不变量按类拆在这里\n")
+        for name, text in (("README.md", "# 不变量清单\n\n开篇 INVARIANTHEAD。\n\n## 哪类放哪\n\n| 文件 | 类 |\n|---|---|\n| 02-根环.md | I-7 |\n| 03-journal.md | I-8 |\n"),
+                           ("02-根环.md", "## I-7 根环 —— 类\n\n开篇 ROOTRING。\n\n| 编号 | 简称 | 陈述 |\n|---|---|---|\n| I-7.4 | 样本 | 正文 INVARIANT。 |\n"),
+                           ("03-journal.md", "## I-8 journal —— 类\n\n开篇 JOURNALHEAD。\n\n| 编号 | 简称 | 陈述 |\n|---|---|---|\n| I-8.3 | 样本 | 正文 JOURNALROW。 |\n")):
+            open(os.path.join(work, invariants_directory, name), "w", encoding="utf-8").write(text)
+        root_ring_file = f"{invariants_directory}/02-根环.md"
         open(os.path.join(work, "research", "prompts", "_t-r4-body.md"), "w", encoding="utf-8").write(
-            "# t-r4 正文\n\n判 I-7.4（样本不变量） 站不站得住。\n")
+            "# t-r4 正文\n\n判 I-7.4（样本不变量） 与 I-8.3（样本不变量） 站不站得住。\n")
         code_invariant, lines_invariant = build("t-r4", work, [], [], keep_history=False, quiet=True)
         produced = [os.path.join(work, "research", "prompts", name) for name in
                     ("_t-r4-checklist.md", "_t-r4-appendix.md", "_t-r4-background.md", os.path.join("t-r4-snapshot", "kb-sha256.txt"))]
         snapshot = open(produced[3], encoding="utf-8").read() if os.path.isfile(produced[3]) else ""
         appendix = open(produced[1], encoding="utf-8").read() if os.path.isfile(produced[1]) else ""
+        snapshot_files = sorted(line.split("  ", 1)[1] for line in snapshot.split("\n") if "  " in line)
         checked += 1
-        if code_invariant != 0 or not all(os.path.isfile(path) for path in produced) or ".claude/kb/invariants.md" not in snapshot or "INVARIANT。" not in appendix:
-            failures.append(f"正文点名 I-7.4：应当做成（退出码 0）、四样产出齐、快照列 invariants.md、附录含那一节，实际 {code_invariant}，快照：{snapshot!r}；"
-                            f"{' '.join(lines_invariant)[-400:]}")
+        if code_invariant != 0 or not all(os.path.isfile(path) for path in produced) \
+                or snapshot_files != [root_ring_file, f"{invariants_directory}/03-journal.md"] \
+                or "INVARIANT。" not in appendix or "JOURNALROW" not in appendix:
+            failures.append(f"正文点名 I-7.4 与 I-8.3：应当做成（退出码 0）、四样产出齐、快照只列 02-根环.md 与 03-journal.md 两份类文件（不带 README.md）、"
+                            f"附录含两份的表行，实际 {code_invariant}，快照：{snapshot!r}；{' '.join(lines_invariant)[-400:]}")
         # 两边同一份读法：同一段正文，这里拉的文件是 quote-kb.py --cited 要的（在的那几份）的超集
         quote_kb = quote_kb_module()
         bodies = [open(os.path.join(work, "research", "prompts", f"_t-r{index}-body.md"), encoding="utf-8").read() for index in (1, 2, 4)]
@@ -391,7 +406,7 @@ def selftest():
         if uncovered:
             failures.append(f"材料拉的文件不是 --cited 要的超集（两边读法不是同一份）：{'；'.join(uncovered)}")
         # 续做：kb 文件里有两个同名的「### 细节」，默认全抄时 checklist-specs.py 判红（标题命中 2 次）；把它们改成「不抄」、
-        # 再删掉清单里 invariants.md 那一张，照抄判红说明里给的 --resume 命令跑一次：缺的那张补上，附录、背景材料、快照齐
+        # 再删掉清单里 02-根环.md 那一张，照抄判红说明里给的 --resume 命令跑一次：缺的那张补上，附录、背景材料、快照齐
         open(os.path.join(work, ".claude", "kb", "decisions", "08-重名.md"), "w", encoding="utf-8").write(
             "## D8 重名 —— 已定\n\n开篇 DUPHEAD。\n\n### 细节\n\n甲的细节 DUPA。\n\n### 细节\n\n乙的细节 DUPB。\n\n### 别的\n\n别的正文 DUPOTHER。\n")
         open(os.path.join(work, "research", "prompts", "_t-r5-body.md"), "w", encoding="utf-8").write(
@@ -403,7 +418,7 @@ def selftest():
         if code_first == 1 and given and os.path.isfile(checklist_path):
             text = open(checklist_path, encoding="utf-8").read()
             text = text.replace("| ### 细节 | 抄 | 默认全抄（脚本生成） |", "| ### 细节 | 不抄 | 重名，样本里不抄 |")
-            text = text.split("\n\n### 小节清单：`.claude/kb/invariants.md`")[0] + "\n"
+            text = text.split(f"\n\n### 小节清单：`{root_ring_file}`")[0] + "\n"
             open(checklist_path, "w", encoding="utf-8").write(text)
             words = shlex.split(given[0])
             captured = io.StringIO()
@@ -417,10 +432,10 @@ def selftest():
         snapshot = open(produced[2], encoding="utf-8").read() if os.path.isfile(produced[2]) else ""
         checklist = open(checklist_path, encoding="utf-8").read() if os.path.isfile(checklist_path) else ""
         checked += 1
-        if not (code_first == 1 and given and resumed_code == 0 and "补了 1 张：.claude/kb/invariants.md" in resumed_output
-                and "### 小节清单：`.claude/kb/invariants.md`" in checklist and "DUPOTHER" in appendix and "INVARIANT。" in appendix
+        if not (code_first == 1 and given and resumed_code == 0 and f"补了 1 张：{root_ring_file}" in resumed_output
+                and f"### 小节清单：`{root_ring_file}`" in checklist and "DUPOTHER" in appendix and "INVARIANT。" in appendix
                 and "DUPA" not in appendix and "t-r5 正文" in background and "INVARIANT。" in background
-                and "08-重名.md" in snapshot and "invariants.md" in snapshot):
+                and "08-重名.md" in snapshot and root_ring_file in snapshot):
             failures.append(f"checklist-specs.py 判红之后照抄给出的 --resume 命令跑一次，应当补上缺的那张清单、附录、背景材料与快照一起齐；"
                             f"第一次退 {code_first}、给的命令 {given}、续做退 {resumed_code}：{resumed_output[-300:]}；{' '.join(lines_first)[-300:]}")
     finally:
@@ -432,7 +447,7 @@ def selftest():
         return 1
     print(f"  ✓ 自检通过（查了 {checked} 项）：索引表不抄而按行区间补抄、分项与细节按自己的标题或随父节抄、历史节不抄、"
           "附录与背景材料含该抄的每一段、快照列了 kb 文件、产出已存在时拒绝覆盖、not-numbers 声明的记号不当编号而没声明的照拉、"
-          "只点名 I-7.4 时带上 invariants.md、认编号与 quote-kb.py --cited 同一份读法、checklist-specs.py 判红后照抄 --resume 一次补齐")
+          "只点名 I-7.4 与 I-8.3 时带上那两份不变量类文件、认编号与 quote-kb.py --cited 同一份读法、checklist-specs.py 判红后照抄 --resume 一次补齐")
     return 0
 
 

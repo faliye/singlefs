@@ -36,7 +36,7 @@
 //! 不含并发；`pad` 那一臂是算术不是实测；换设备要重跑。
 
 use aes_gcm::{
-    aead::{AeadInPlace, KeyInit},
+    aead::{AeadInOut, KeyInit},
     Aes256Gcm, Nonce,
 };
 use e7_index_bench::Emitter;
@@ -108,7 +108,7 @@ fn open(path: &str) -> std::fs::File {
 fn write_arm(path: &str, grain_bytes: usize, units: u64, operation_count: u64, seed: u64, read_old: bool, sync: bool) -> Arm {
     let file = open(path);
     let cipher = Aes256Gcm::new_from_slice(&[0x42u8; 32]).unwrap();
-    let nonce = Nonce::from_slice(&[0u8; 12]);
+    let nonce = &Nonce::from([0u8; 12]);
     let mut unit_buffer = Aligned::new(grain_bytes);
     let mut random_state = seed | 1;
     let (mut sink, mut verify_nanoseconds) = (0u64, 0u64);
@@ -122,7 +122,7 @@ fn write_arm(path: &str, grain_bytes: usize, units: u64, operation_count: u64, s
             let verify_start = Instant::now();
             // 读回来的旧单元先验一遍：D4 的 Merkle 要求改之前先确认它没坏
             sink = sink.wrapping_add(
-                cipher.encrypt_in_place_detached(nonce, b"", &mut unit_buffer.as_mut_slice()[..grain_bytes])
+                cipher.encrypt_inout_detached(nonce, b"", (&mut unit_buffer.as_mut_slice()[..grain_bytes]).into())
                     .expect("验旧单元失败")[0] as u64);
             verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
         }
@@ -133,7 +133,7 @@ fn write_arm(path: &str, grain_bytes: usize, units: u64, operation_count: u64, s
         }
         let verify_start = Instant::now();
         sink = sink.wrapping_add(
-            cipher.encrypt_in_place_detached(nonce, b"", &mut unit_buffer.as_mut_slice()[..grain_bytes])
+            cipher.encrypt_inout_detached(nonce, b"", (&mut unit_buffer.as_mut_slice()[..grain_bytes]).into())
                 .expect("算新 MAC 失败")[0] as u64);
         verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
         file.write_all_at(unit_buffer.as_slice(), cursor * grain_bytes as u64).expect("写失败");

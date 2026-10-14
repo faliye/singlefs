@@ -285,9 +285,11 @@ def main(argument_list: list[str]) -> int:
         return write_contrast(repo, revision_6, revision_8, arguments.output)
     except (RunConditionError, judge.RunConditionError) as error:
         print(f"✗ {error}（退 78）", file=sys.stderr)
+        print('     → 怎么办：照上面那句补齐运行条件（配置、冻结树、设备文件）再用同一条命令起', file=sys.stderr)
         return EXIT_RUN_CONDITION
     except WrongPinnedFile as error:
         print(f"✗ {error}", file=sys.stderr)
+        print('     → 怎么办：被钉的那一份内容变了；照 .claude/rules/path-moves.md 第 6 步核 diff，只差路径就重钉，否则从 git 历史取那一版', file=sys.stderr)
         return EXIT_WRONG_PINNED_FILE
 
 

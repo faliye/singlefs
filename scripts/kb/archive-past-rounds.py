@@ -10,7 +10,19 @@
 用法：
   archive-past-rounds.py --check          还留着上一轮的记录就判红（门禁用）
   archive-past-rounds.py --apply          删掉；同时把指向被删文件的引用改成不带路径的说法
+  archive-past-rounds.py --apply --keep-registered   照删别的，被登记表点名的那几份留下、退 0（「把那份留下」这条出路）
   archive-past-rounds.py --selftest
+
+退出码：0 没有该删的、或删完了；1 --check 判红、取不到基准、删完有 include 指空；2 --apply 没给 GATE_BASE；
+        3 --apply 时有被登记表点名的上一轮产物：别的照删，点名的那几份没删，逐份列出哪张表哪一行点名。
+
+弄坏开关（只给 --selftest 证红用）：
+  ARCHIVE_PAST_ROUNDS_BREAK=registry-check-skipped   named_by_registries() 不查登记表，一份都不报
+      「✗ 自检失败：门禁登记表点名的上一轮产物」那一格红
+  ARCHIVE_PAST_ROUNDS_BREAK=gate-directory-default-only   registry_trees() 不读 .claude/gate-directory，门禁目录一律取默认
+      「✗ 自检失败：登记了别的门禁目录」那一格红
+  ARCHIVE_PAST_ROUNDS_BREAK=gitlinks-kept   past_round_files() 不滤模式位 160000，gitlink 当文件进候选
+      「✗ 自检失败：gitlink 进了候选」那一格红（--apply 对它 os.remove 抛 IsADirectoryError 的那条也跟着红）
 
 判据（机械，不靠人记）：
   删 —— `research/results/` 与 `research/prompts/` 下，**在 HEAD 里有、且这一轮没碰过**的文件；
@@ -18,7 +30,10 @@
         （`GATE_BASE`，否则 `@{upstream}` 的 merge-base，都没有就 HEAD），见 base_of 的说明。
         没改过 = 它是上一次提交固化下来的，属于上一轮及更早。
   留 —— 工作区里新加或改过的（本轮在产生的）、三方判决 `*-main-verification.md`（kb 的依据指着它）、
-        `abandoned-rounds.tsv`（登记表，门禁 doc-process-records 的 abandoned-rounds 格的输入）、还被代码当输入的产物（still_an_input）。
+        `abandoned-rounds.tsv`（登记表，门禁 doc-process-records 的 abandoned-rounds 格的输入）、还被代码当输入的产物（still_an_input）、
+        被检查读的登记表非注释行点名的产物（named_by_registries：门禁目录下的 .tsv，门禁目录照 .claude/gate-directory 登记、没登记取 .claude/gate.d；
+        scripts/ 与 crates/ 下的 .tsv，钉表、变异表 scripts/mutation/tables/、crates/mutations.tsv 都在里面）。
+        登记表点名的那几份 --apply 不删、退 3，逐份列出哪张表哪一行；出路是先改登记，或者把那份留下（--keep-registered）。
   ⚠️ 删文件会让别处指向它的链接指空，所以 --apply 同时把那些引用**只留文件名、去掉路径**，
      不留一个指空的路径——共享 `gate.sh` 的「链接指向」阶段（`.claude/singlefs-ai-sop/scripts/link-targets.py`）判的就是这个。「找不到就去 git 历史里看」写在 `.claude/agent-common.md`，不逐处重复。
 """
@@ -30,7 +45,7 @@ import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
 preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
-from project_preflight import preflight  # noqa: E402
+from project_preflight import preflight, shared_preflight_module  # noqa: E402
 
 DIRS = ("research/results", "research/prompts")
 KEEP = re.compile(r"-main-verification\.md$|abandoned-rounds\.tsv$")
@@ -40,6 +55,15 @@ SCAN = (".claude/kb", "records", ".claude/rules", "briefs")
 # 这些不是「记录」，删了不是「去 git 历史里查」，是**这道检查没得比 / 这个 crate 编不过**。
 INPUT_TREES = (".claude/gate.d", ".claude/scripts", "scripts", "crates")
 INPUT_SUFFIX = (".sh", ".py", ".rs", ".toml")
+# 被检查读的登记表：门禁目录（照 .claude/gate-directory 登记，见 registry_trees）与这两处下的 .tsv——钉表、变异表（scripts/mutation/tables/、
+# crates/mutations.tsv）、crate 里的登记表（verus-must-red-worlds.tsv 这类）。删之前查它们非注释行点名的路径
+# （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」：删之前查一遍被检查读的登记表点名的路径）。
+REGISTRY_TREES_BESIDE_GATE = ("scripts", "crates")
+REGISTRY_SUFFIX = ".tsv"
+REGISTRY_SKIPPED_DIRECTORIES = ("fixtures", "target", ".git")
+# 登记表一格里的产物路径：到空白、引号、括号、冒号（「文件:行号」）、井号、通配符为止；跟着通配符的是射程（e165-*-red-examples.tsv），不是点名
+REGISTRY_PATH = re.compile(r"research/(?:results|prompts)/[^\s`'\"<>|()（）\[\]\\,，。、；：:#*?]+")
+BROKEN = os.environ.get("ARCHIVE_PAST_ROUNDS_BREAK", "")
 
 
 def git(*args, root="."):
@@ -75,7 +99,15 @@ def base_of(root="."):
 
 
 def past_round_files(root="."):
-    tracked = [p for p in git("ls-files", *DIRS, root=root).splitlines() if p]
+    # gitlink（模式位 160000，子模块）不是文件：--apply 对它 os.remove 抛 IsADirectoryError，后面的 stale_exclusions 与 missing_code_inputs 一条都跑不到（C437）。
+    # 只有 ls-files --stage 带模式位；冲突时同一路径有几个阶段，去重。
+    tracked = []
+    for entry in git("ls-files", "--stage", *DIRS, root=root).splitlines():
+        meta, _, path = entry.partition("\t")
+        if not path or (meta.split()[0] == "160000" and BROKEN != "gitlinks-kept"):
+            continue
+        tracked.append(path)
+    tracked = sorted(set(tracked))
     dirty = set(p for p in git("diff", "--name-only", base_of(root), "--", *DIRS, root=root).splitlines() if p)
     return sorted(p for p in tracked if p not in dirty and not KEEP.search(p))
 
@@ -115,6 +147,57 @@ def still_an_input(root, candidates):
                     if base in text:
                         for relative in relatives:
                             found.setdefault(relative, []).append(os.path.relpath(source, root))
+    return found
+
+
+def registry_trees(root):
+    """要查的登记表在哪几棵树下：门禁目录 + scripts/ + crates/，相对仓根，嵌在别的树里的去掉。
+    门禁目录从项目根 .claude/gate-directory 登记读（上游 preflight.py 的 project_gate_directory，与门禁、lib.sh 读同一份），没登记取默认 .claude/gate.d。"""
+    if BROKEN == "gate-directory-default-only":
+        gate_directory = ".claude/gate.d"
+    else:
+        gate_directory = shared_preflight_module(__file__).project_gate_directory(root)
+    trees = []
+    for tree in (gate_directory, *REGISTRY_TREES_BESIDE_GATE):
+        tree = os.path.normpath(tree)
+        if any(tree == kept or tree.startswith(kept + os.sep) for kept in trees):
+            continue
+        trees = [kept for kept in trees if not kept.startswith(tree + os.sep)] + [tree]
+    return trees
+
+
+def named_by_registries(root, candidates):
+    """候选里被登记表非注释行点名的：{相对路径: ["<表>:<行号>", …]}。这些 --apply 不删。
+    点名只认整条文件路径，或 research/ 下的子目录（带不带结尾的 / 都算，目录下的候选都算点到）；research/results/、research/prompts/ 本身与带通配符的是射程，不算点名。
+    注释行（# 起头）里写的「依据见 research/…」是记录引用，不算——与 still_an_input 跳注释同一个理由。"""
+    if BROKEN == "registry-check-skipped":
+        return {}
+    candidates = set(candidates)
+    found = {}
+    for tree in registry_trees(root):
+        for directory, subdirectories, names in os.walk(os.path.join(root, tree)):
+            subdirectories[:] = sorted(name for name in subdirectories if name not in REGISTRY_SKIPPED_DIRECTORIES)
+            for name in sorted(names):
+                if not name.endswith(REGISTRY_SUFFIX):
+                    continue
+                table = os.path.join(directory, name)
+                try:
+                    lines = open(table, encoding="utf-8", errors="ignore").read().splitlines()
+                except OSError:
+                    continue
+                for number, line in enumerate(lines, 1):
+                    if not line.strip() or line.lstrip().startswith("#"):
+                        continue
+                    for match in REGISTRY_PATH.finditer(line):
+                        if line[match.end():match.end() + 1] in ("*", "?"):
+                            continue                # 通配：射程，不是点名
+                        target = match.group(0)
+                        directory_prefix = target.rstrip("/") + "/"
+                        hits = [path for path in candidates if path == target or path.startswith(directory_prefix)]
+                        naming = "%s:%d" % (os.path.relpath(table, root), number)
+                        for path in hits:
+                            if naming not in found.setdefault(path, []):   # 同一行点名两次只列一次
+                                found[path].append(naming)
     return found
 
 
@@ -210,7 +293,7 @@ def stale_exclusions(root):
     return stale
 
 
-def run(root, apply_changes):
+def run(root, apply_changes, keep_registered=False):
     # `--apply` 不给基准就拒绝跑，不是提醒、是拒绝。
     # 为什么非拒绝不可：门禁跑的时候 GATE_BASE 是设好的，人照着出路抄到自己的 shell 里就没了，
     # 于是它按 HEAD 算「这一轮」，把**这一次提交要带的**同步记录也当上一轮的删掉——删完门禁 doc-process-records 的 knowledge-sync 格
@@ -232,18 +315,27 @@ def run(root, apply_changes):
         return 1
     inputs = still_an_input(root, doomed)
     doomed = [p for p in doomed if p not in inputs]
+    registered = named_by_registries(root, doomed)
+    doomed = [p for p in doomed if p not in registered]
     if inputs:
         print("      留下 %d 份还被代码当输入的产物（门禁按名字读它比对、装置 include_str! 编译期读它）：" % len(inputs))
         for relative in sorted(inputs):                              # gate-lint:detail
             print("        %s  ← %s" % (relative, "、".join(sorted(set(inputs[relative])))))
+    if registered:
+        print("      留下 %d 份被检查读的登记表点名的产物（删了那一行就指空，读它的检查当场红；查的树：%s）："
+              % (len(registered), "、".join(registry_trees(root))))
+        for relative in sorted(registered):                          # gate-lint:detail
+            print("        %s  ← %s" % (relative, "、".join(registered[relative])))
     if not doomed:
+        if apply_changes and refuse_registered(registered, keep_registered):
+            return 3
         # 数磁盘上真有的，不数 git 索引：删过还没提交时索引里仍跟踪着那些文件，
         # 拿索引数报「现有多少份」会报出一个磁盘上不成立的数。
         kept = sum(len(names) for base in DIRS for _, _, names in os.walk(os.path.join(root, base)))
         print("  ✓ 没有上一轮留下的实验记录（%s 下磁盘上现有 %d 份，都是本轮的或按规则保留的；「这一轮」的起点 %s，取法同门禁 doc-process-records 的 knowledge-sync 格：changed-paths.sh 的 gate_diff_base gate）"
               % ("、".join(DIRS), kept, base_of(root)))
-        print("     保留的三类：三方判决 *-main-verification.md（kb 的依据指着它）、abandoned-rounds.tsv（门禁 doc-process-records 的 abandoned-rounds 格的输入）、"
-              "还被代码当输入的产物（这一次 %d 份，逐个列在上面）" % len(inputs))
+        print("     保留的四类：三方判决 *-main-verification.md（kb 的依据指着它）、abandoned-rounds.tsv（门禁 doc-process-records 的 abandoned-rounds 格的输入）、"
+              "还被代码当输入的产物（这一次 %d 份）、被检查读的登记表点名的产物（这一次 %d 份），后两类逐个列在上面" % (len(inputs), len(registered)))
         return 0
     if not apply_changes:
         by_dir = {}
@@ -269,6 +361,7 @@ def run(root, apply_changes):
     stale = stale_exclusions(root)
     losing = missing_code_inputs(root)
     print("  ✓ 删了 %d 份上一轮及更早的实验记录；%d 份文件里 %d 处引用去掉了路径、只留文件名" % (len(doomed), touched, changed))
+    refused = refuse_registered(registered, keep_registered)
     if losing:
         print("  ✗ 代码非注释行点名了这些产物，而磁盘上没有——那道检查没得比、那个 crate 编不过：")
         for entry in losing:                                       # gate-lint:detail
@@ -282,7 +375,18 @@ def run(root, apply_changes):
             print("      %s" % entry)
         print("     → 怎么办：把它们从各自的排除表里删掉——排除只缩不涨，指不到的排除会让人以为那批文件已经被绕开了。")
     print("     → 下一步：在仓库根单跑共享「链接指向」那一道 `python3 .claude/singlefs-ai-sop/scripts/link-targets.py` 确认没有指空的链接，再跑一次本脚本 --check 判绿。")
-    return 0
+    return 3 if refused else 0
+
+
+def refuse_registered(registered, keep_registered):
+    """--apply 时被登记表点名、因而没删的上一轮产物：没带 --keep-registered 就判拒（调用方退 3）。哪张表哪一行已经在「留下 … 登记表点名」那几行逐份列了。"""
+    if not registered or keep_registered:
+        return False
+    print("  ✗ 有 %d 份上一轮的产物被检查读的登记表点名，没删（别的照删；哪张表哪一行见上面「登记表点名」那几行）" % len(registered))
+    print("     → 怎么办：① 先改登记：那一行不再要这份产物的，删掉那一行或改指向（与归档同一次提交），再跑一次 --apply 把它删掉；")
+    print("               ② 把那份留下：读它的检查还要它，跑 --apply --keep-registered（别的照删、这几份留着、退 0），")
+    print("                  或者把它搬出 research/、放到读它的检查旁边并改登记指过去（.claude/rules/directory-layout.md「测试的定义与输入跟着测试放」）。")
+    return True
 
 
 def selftest():
@@ -293,10 +397,105 @@ def selftest():
     # 而单独手敲它又是绿的——`command-safety.md`「握手用的环境变量漏给子进程」那一格。
     inherited_base = os.environ.pop("GATE_BASE", None)
     try:
-        return selftest_in_temporary_directory()
+        code = selftest_registry_check()
+        if code != 0:
+            return code
+        code = selftest_in_temporary_directory()
+        if code != 0:
+            return code
+        return selftest_gitlink()
     finally:
         if inherited_base is not None:
             os.environ["GATE_BASE"] = inherited_base
+
+
+def selftest_registry_check():
+    """删之前查被检查读的登记表：点名的不删、--apply 退 3 并列出表与行；没点名的照删；--keep-registered 留下退 0；
+    --check 不把点名的算成该删；登记了别的门禁目录（.claude/gate-directory）时照那个目录找。"""
+    import contextlib
+    import io
+    import tempfile
+    failures, checked = [], 0
+    with tempfile.TemporaryDirectory() as work:
+        def write(relative, text):
+            path = os.path.join(work, relative)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            open(path, "w", encoding="utf-8").write(text)
+
+        def exists(name):
+            return os.path.exists(os.path.join(work, "research/results", name))
+
+        def commit(message):
+            git("add", "-A", root=work)
+            subprocess.run(["git", "commit", "-qm", message], cwd=work, check=True)
+
+        def apply(keep_registered=False):
+            buffer = io.StringIO()
+            os.environ["GATE_BASE"] = "HEAD"
+            try:
+                with contextlib.redirect_stdout(buffer):
+                    code = run(work, True, keep_registered)
+            finally:
+                os.environ.pop("GATE_BASE", None)
+            return code, buffer.getvalue()
+
+        git("init", "-q", root=work)
+        subprocess.run(["git", "config", "user.email", "t@t"], cwd=work, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=work, check=True)
+        for name in ("e5-named", "e6-unnamed", "e8-glob", "e11-mutation", "e12-in-directory/a"):
+            write(f"research/results/{name}.out", "上一轮\n")
+        write(".claude/gate.d/sample-ledgers.tsv",
+              "# 注释行里提到不算点名：research/results/e6-unnamed.out\n"
+              "research/results/e5-named.out\t门禁读的账\n"
+              "research/results/e8-*.out\t带通配的是射程，不是点名\n")
+        write("crates/mutations.tsv", "条目\tresearch/results/e11-mutation.out:3\n")
+        write("scripts/mutation/tables/sample.tsv", "说明（research/results/e12-in-directory/）\t旧串\t新串\n")
+        commit("上一轮")
+        code, output = apply()
+        checked += 1
+        if code != 3 or not exists("e5-named.out") or ".claude/gate.d/sample-ledgers.tsv:2" not in output:
+            failures.append(("门禁登记表点名的上一轮产物应当不删、--apply 退 3 并列出 .claude/gate.d/sample-ledgers.tsv:2，"
+                             f"实际退 {code}、那份{'还在' if exists('e5-named.out') else '删了'}：{output[-600:]}",
+                             "看 named_by_registries() 与 run() 里 doomed 减去 registered、refuse_registered() 那几步"))
+        checked += 1
+        if exists("e6-unnamed.out") or exists("e8-glob.out"):
+            failures.append(("没点名的（只在注释行里提到的、通配射程里的）应当照删", "看 named_by_registries() 跳注释行与跳通配那两处"))
+        checked += 1
+        if (not exists("e11-mutation.out") or not exists("e12-in-directory/a.out")
+                or "crates/mutations.tsv:1" not in output or "scripts/mutation/tables/sample.tsv:1" not in output):
+            failures.append(("变异表里「文件:行号」写法点名的、按子目录点名的应当不删并列出表与行", f"看 REGISTRY_PATH 与目录前缀那一步：{output[-600:]}"))
+        code_keep, output_keep = apply(keep_registered=True)
+        checked += 1
+        if code_keep != 0 or not exists("e5-named.out"):
+            failures.append((f"--apply --keep-registered 应当留下点名的那几份、退 0，实际退 {code_keep}：{output_keep[-300:]}",
+                             "看 refuse_registered() 的 keep_registered 分支"))
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code_check = run(work, False)
+        checked += 1
+        if code_check != 0:
+            failures.append((f"--check 不该把登记表点名、按规则留下的算成该删的，实际退 {code_check}：{buffer.getvalue()[-300:]}",
+                             "看 run() 里 doomed 减去 registered 是不是在 --check 那一支之前"))
+        for name in ("e13-old-gate-directory", "e14-registered-gate-directory"):
+            write(f"research/results/{name}.out", "上一轮\n")
+        write(".claude/gate-directory", "ops/gates  # 样本：门禁目录搬了家\n")
+        write("ops/gates/moved.tsv", "research/results/e14-registered-gate-directory.out\t搬家后的门禁登记表\n")
+        write(".claude/gate.d/stale.tsv", "research/results/e13-old-gate-directory.out\t不再是门禁目录的旧位置\n")
+        commit("门禁目录搬家")
+        code_moved, output_moved = apply(keep_registered=True)
+        checked += 1
+        if not exists("e14-registered-gate-directory.out") or exists("e13-old-gate-directory.out") or "ops/gates/moved.tsv:1" not in output_moved:
+            failures.append(("登记了别的门禁目录（.claude/gate-directory 写 ops/gates）时应当照那个目录找登记表、旧的默认目录不再算，"
+                             f"实际退 {code_moved}：{output_moved[-400:]}",
+                             "看 registry_trees() 是不是经 project_gate_directory 读的登记"))
+    for failure, howto in failures:
+        print(f"  ✗ 自检失败：{failure}")                 # gate-lint:detail
+        print(f"     → 怎么办：{howto}；ARCHIVE_PAST_ROUNDS_BREAK 设着的话这里本来就该红")
+    if failures:
+        return 1
+    print(f"  ✓ 自检（登记表，查了 {checked} 格）：门禁登记表、变异表点名的不删且 --apply 退 3 列出表与行、注释行与通配不算点名照删、"
+          "--keep-registered 留下退 0、--check 不算它们、登记了别的门禁目录时照那个目录找")
+    return 0
 
 
 def selftest_in_temporary_directory():
@@ -312,10 +511,10 @@ def selftest_in_temporary_directory():
         open(os.path.join(work, "research/prompts/r1-main-verification.md"), "w").write("判决\n")
         # 上一轮的产物，但装置源码在编译期读它：它不是记录，删了那个 crate 编不过
         open(os.path.join(work, "research/results/e3-input.out"), "w").write("input\n")
-        os.makedirs(os.path.join(work, "research/bench/src"))
-        open(os.path.join(work, "research/bench/src/probe.rs"), "w").write(
+        os.makedirs(os.path.join(work, "scripts/experiments"))
+        open(os.path.join(work, "scripts/experiments/probe.rs"), "w").write(
             '//! 依据见 research/results/e1-old.out\n'
-            'const P: &str = include_str!("../../results/e3-input.out");\n')
+            'const P: &str = include_str!("../../research/results/e3-input.out");\n')
         open(os.path.join(work, ".claude/kb/page.md"), "w").write(
             "产物 `research/results/e1-old.out`，判决 `research/prompts/r1-main-verification.md`，"
             "输入 `research/results/e3-input.out`\n")
@@ -360,14 +559,14 @@ def selftest_in_temporary_directory():
         # 「代码点名了磁盘上没有的产物」这条自己也要证明会红：造一处非注释行的引用
         gate_dir = os.path.join(work, ".claude", "gate.d")
         os.makedirs(gate_dir, exist_ok=True)
-        sample = os.path.join(work, "research/bench/src/gone.rs")
-        open(sample, "w").write('const G: &str = include_str!("../../results/e9-gone.out");\n')
+        sample = os.path.join(work, "scripts/experiments/gone.rs")
+        open(sample, "w").write('const G: &str = include_str!("../../research/results/e9-gone.out");\n')
         if not missing_code_inputs(work):
             print("  ✗ 自检失败：装置源码 include_str! 点名了磁盘上没有的产物，missing_code_inputs 却一条都没报")
             print("     → 怎么办：看 include 那条正则与它按 directory 解相对路径那一步。")
             return 1
         # 同一行挪进注释就该不报：注释里的引用是记录，归档改的正是它
-        open(sample, "w").write('// const G: &str = include_str!("../../results/e9-gone.out");\n')
+        open(sample, "w").write('// const G: &str = include_str!("../../research/results/e9-gone.out");\n')
         if missing_code_inputs(work):
             print("  ✗ 自检失败：注释行里的 include 被当成了输入")
             print("     → 怎么办：看 missing_code_inputs 跳注释那一步。")
@@ -429,13 +628,81 @@ def selftest_in_temporary_directory():
     return 0
 
 
+def selftest_gitlink():
+    """gitlink（子模块，模式位 160000）不是文件：不进候选、--apply 不对它 os.remove，stale_exclusions 与 missing_code_inputs 照常跑到（C437）。
+    gitlink 用 git update-index --cacheinfo 160000 造，不用真子模块，工作区里放一个空目录当它的检出位置。
+    两个场景：删完有指不到的排除项（打「排除项指不到东西」）、删完有 include 指空的产物（打「代码非注释行点名了这些产物」）。"""
+    import contextlib
+    import io
+    import tempfile
+    failures, checked = [], 0
+    gitlink = "research/results/sub-module"
+    for scene in ("排除项指不到", "include 指空"):
+        with tempfile.TemporaryDirectory() as work:
+            def write(relative, text):
+                path = os.path.join(work, relative)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                open(path, "w", encoding="utf-8").write(text)
+
+            git("init", "-q", root=work)
+            subprocess.run(["git", "config", "user.email", "t@t"], cwd=work, check=True)
+            subprocess.run(["git", "config", "user.name", "t"], cwd=work, check=True)
+            write("research/results/e1-old.out", "上一轮\n")
+            if scene == "排除项指不到":
+                write(".claude/sample-exclude", "research/results/e7-gone-directory/  # 样本：删完指不到\n")
+            else:
+                write("scripts/experiments/gone.rs", 'const G: &str = include_str!("../../research/results/e9-gone.out");\n')
+            git("add", "-A", root=work)
+            subprocess.run(["git", "commit", "-qm", "上一轮"], cwd=work, check=True)
+            tip = git("rev-parse", "HEAD", root=work).strip()
+            git("update-index", "--add", "--cacheinfo", f"160000,{tip},{gitlink}", root=work)
+            subprocess.run(["git", "commit", "-qm", "gitlink"], cwd=work, check=True)
+            os.makedirs(os.path.join(work, gitlink))        # 子模块检出位置：一个目录，os.remove 对它抛 IsADirectoryError
+            os.environ["GATE_BASE"] = "HEAD"
+            try:
+                checked += 1
+                if gitlink in past_round_files(work):
+                    failures.append((f"gitlink 进了候选（{scene}）：{gitlink} 是子模块不是文件，--apply 对它 os.remove 会抛 IsADirectoryError",
+                                     "看 past_round_files() 是不是读 ls-files --stage、把模式位 160000 的滤掉了"))
+                checked += 1
+                buffer = io.StringIO()
+                try:
+                    with contextlib.redirect_stdout(buffer):
+                        code = run(work, True)
+                except Exception as error:
+                    failures.append((f"有 gitlink 时 --apply（{scene}）抛了 {type(error).__name__}：{error}，后面的 stale_exclusions 与 missing_code_inputs 没跑到",
+                                     "看 past_round_files() 滤 gitlink 那一步，与 run() 里 os.remove 之前的候选"))
+                    continue
+                output = buffer.getvalue()
+                checked += 1
+                if os.path.exists(os.path.join(work, "research/results/e1-old.out")) or not os.path.isdir(os.path.join(work, gitlink)):
+                    failures.append((f"有 gitlink 时 --apply（{scene}）该删 e1-old.out、不动 {gitlink}：{output[-300:]}", "看 past_round_files() 与 run() 的 os.remove 那一段"))
+                checked += 1
+                if scene == "排除项指不到" and (code != 0 or "排除项指不到东西" not in output or ".claude/sample-exclude:1" not in output):
+                    failures.append((f"有 gitlink 时 --apply 该跑到 stale_exclusions 并列出 .claude/sample-exclude:1，实际退 {code}：{output[-400:]}",
+                                     "看 run() 里 os.remove 之后 stale_exclusions() 那一句"))
+                if scene == "include 指空" and (code != 1 or "代码非注释行点名了这些产物" not in output or "e9-gone.out" not in output):
+                    failures.append((f"有 gitlink 时 --apply 该跑到 missing_code_inputs 并列出 e9-gone.out、退 1，实际退 {code}：{output[-400:]}",
+                                     "看 run() 里 os.remove 之后 missing_code_inputs() 那一句"))
+            finally:
+                os.environ.pop("GATE_BASE", None)
+    for failure, howto in failures:
+        print(f"  ✗ 自检失败：{failure}")                 # gate-lint:detail
+        print(f"     → 怎么办：{howto}；ARCHIVE_PAST_ROUNDS_BREAK=gitlinks-kept 设着的话这里本来就该红")
+    if failures:
+        return 1
+    print(f"  ✓ 自检（gitlink，查了 {checked} 格）：research/results/ 下的 gitlink 不进候选、--apply 不抛异常也不动它、"
+          "删完照常跑到 stale_exclusions 与 missing_code_inputs")
+    return 0
+
+
 def main(argv):
     if "--selftest" in argv:
         return selftest()
     positional = [a for a in argv if not a.startswith("--")]
     root = os.path.abspath(positional[0]) if positional else os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..", ".."))
-    return run(root, "--apply" in argv)
+    return run(root, "--apply" in argv, "--keep-registered" in argv)
 
 
 if __name__ == "__main__":

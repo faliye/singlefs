@@ -15,7 +15,7 @@
 退出码：0 报完（给了命令时：此刻有一台放得下）；1 给了命令而此刻哪台都放不下（或都没读到）；2 用法错。
 
 机器：本机总在；别的从多机配置读（${SINGLEFS_MULTI_HOST_CONFIG:-主工作树的根/multi-host.env}，不进仓）：
-  scripts/crash/layer0-shard-configuration-check.sh --emit-hosts 判配置、解出机器清单（键 HOSTS 与 HOST_<号>_*，定义在那一份文件头「机器清单」；
+  scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts 判配置、解出机器清单（键 HOSTS 与 HOST_<号>_*，定义在那一份文件头「机器清单」；
   没写 HOSTS 时清单就是 PEER_SSH_HOST 一台）。它不连任何一台，连不上的那一台在这里报「没读到」，不算整份配置坏。
   判法退 3（跨机开关 ENABLE_ACROSS_MACHINES 没开）或判不过时只报本机，打一行原因。
   别的那几台经 scripts/hosts/peer-host-lib.sh 的 peer_host_run 用 ssh 读（错误输出里的主机名、目录换成「第二台」那几个字），
@@ -33,7 +33,7 @@
     别的计算进程（别的会话的活、归不到清场服务的）照占着算，逐个列进程号与占用。
   合计：读到的那几台相加；哪一台哪一项没读到，合计里写明不含它。
 给了命令：
-  历史：内存峰值表（RUN_WITH_MEMORY_CAP_PEAKS，默认 scripts/hosts/memory-peaks.tsv）与派发器的显存峰值表（HOST_DISPATCH_GPU_PEAKS），
+  历史：内存峰值表（RUN_WITH_MEMORY_CAP_PEAKS，默认 ${XDG_DATA_HOME:-~/.local/share}/singlefs/memory-peaks.tsv）与派发器的显存峰值表（HOST_DISPATCH_GPU_PEAKS），
     键同内存包装（memory_peaks_lib.command_key；RUN_WITH_MEMORY_CAP_KEY 给了就用它）；
     用时取用时表（memory_peaks_lib.py 文件头「用时表」：只有经 host-dispatch.py 派出去、跑完的才记），没有这条报「没有历史」。
   长活提醒：host-dispatch.py 的 long_run_check（文件头 ⓪，同一份判法）：用时表里的历史用时，没有就按 --estimated-hours；
@@ -62,7 +62,7 @@
   HOST_DISPATCH_BREAK=ignore-history           host-dispatch.py 的 predict 不看峰值表               fits-on-host、nothing-fits
   HOST_DISPATCH_BREAK=long-estimate-ignored    host-dispatch.py 的 long_run_check 不看预计挂钟      long-estimate-reminder
   HOST_DISPATCH_BREAK=shards-as-single         host-dispatch.py 的 hosts_of_dispatch 把 --shard 当只占一台  two-host-shards-no-reminder
-  MULTI_HOST_CONFIGURATION_BREAK=hosts-key-unknown    配置判法不认机器清单的键（写法见 layer0-shard-configuration-check.sh 文件头）  hosts-list、fits-on-host
+  MULTI_HOST_CONFIGURATION_BREAK=hosts-key-unknown    配置判法不认机器清单的键（写法见 crash-point-replay-shard-configuration-check.sh 文件头）  hosts-list、fits-on-host
   MULTI_HOST_CONFIGURATION_BREAK=hosts-reach-refuses  配置判法逐台 ssh、一台连不上就判整份配置坏                                 hosts-list、peer-unreachable、host-timeout
 
 常量的依据：HOST_TIMEOUT_SECONDS 12：本机读第二台（ssh 加 python3 起一份、一秒采样）实测两三秒，留余量，又要落在提醒钩子
@@ -249,7 +249,7 @@ def options_from_environment():
     settings = dispatcher().settings_from_environment()
     environment = settings.environment
     return Options(settings=settings,
-                   configuration_check=os.path.join(SCRIPT_DIRECTORY, "..", "crash", "layer0-shard-configuration-check.sh"),
+                   configuration_check=os.path.join(SCRIPT_DIRECTORY, "..", "crash", "crash-point-replay-shard-configuration-check.sh"),
                    peer_host_lib=os.path.join(SCRIPT_DIRECTORY, "peer-host-lib.sh"),
                    sample_seconds=float(environment.get("HOST_RESOURCES_SAMPLE_SECONDS") or SAMPLE_SECONDS),
                    host_timeout_seconds=float(environment.get("HOST_RESOURCES_HOST_TIMEOUT_SECONDS") or HOST_TIMEOUT_SECONDS))
@@ -261,7 +261,7 @@ def load_machines(options):
     if broken("peer-despite-switch-off"):
         environment["MULTI_HOST_CONFIGURATION_BREAK"] = ",".join(filter(None, [environment.get("MULTI_HOST_CONFIGURATION_BREAK"), "switch-off-is-on"]))
     loader = ('assignments="$(bash "$1" --emit-hosts "$2")"; status=$?; if ((status != 0)); then exit "$status"; fi; eval "$assignments"; '
-              'for name in ${!MULTI_HOST_@} LAYER0_SHARD_CONFIGURATION_FILE QUIESCE_STOP_COMMAND PEER_SSH_HOST; do printf "%s=%s\\0" "$name" "${!name}"; done')
+              'for name in ${!MULTI_HOST_@} CRASH_POINT_REPLAY_SHARD_CONFIGURATION_FILE QUIESCE_STOP_COMMAND PEER_SSH_HOST; do printf "%s=%s\\0" "$name" "${!name}"; done')
     completed = subprocess.run(["bash", "-c", loader, "host-resources", options.configuration_check, options.settings.repository_root],
                                capture_output=True, text=True, env=environment, stdin=subprocess.DEVNULL)
     machines = [Machine(1)]
@@ -269,7 +269,7 @@ def load_machines(options):
         return machines, {}, "多机配置里跨机开关 ENABLE_ACROSS_MACHINES 没开：只报本机"
     if completed.returncode != 0:
         return machines, {}, (f"多机配置判不过（判法 {os.path.basename(options.configuration_check)} 退 {completed.returncode}；"
-                              "单跑 bash scripts/crash/layer0-shard-configuration-check.sh --emit-hosts 看原因）：只报本机")
+                              "单跑 bash scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts 看原因）：只报本机")
     values = dict(item.split("=", 1) for item in completed.stdout.split("\0") if "=" in item)
     count = int(values.get("MULTI_HOST_COUNT") or 0)
     for number in range(2, count + 2):
@@ -724,9 +724,9 @@ class SelftestWorld:
         })
         hd = dispatcher()
         settings = hd.Settings(
-            repository_root=os.path.dirname(SCRIPT_DIRECTORY),
+            repository_root=os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY)),
             multi_host_run="/nonexistent/multi-host-run.sh", gpu_quiesce_run="/nonexistent/gpu-quiesce-run.sh",
-            configuration_check=os.path.join(SCRIPT_DIRECTORY, "..", "crash", "layer0-shard-configuration-check.sh"),
+            configuration_check=os.path.join(SCRIPT_DIRECTORY, "..", "crash", "crash-point-replay-shard-configuration-check.sh"),
             peer_host_lib=os.path.join(SCRIPT_DIRECTORY, "peer-host-lib.sh"),
             peak_table=self.peak_table, gpu_peak_table=self.gpu_peak_table,
             state_directory=os.path.join(self.directory, "dispatch-state"), quiesce_state_directory=os.path.join(self.directory, "quiesce-state"),
@@ -874,8 +874,8 @@ def selftest_cells(root):
     lines = []
     code = main(["--", "selftest-command"], world.options(), lines.append)
     text = "\n".join(lines)
-    check("long-history-reminder", code == 0 and "提醒：这条命令的历史用时 3.0 小时" in text and "layer0-shard-configuration-check.sh --emit-hosts" in text
-          and "host-resources.py --json" in text and "为什么分不了" in text and "用时 3.0 小时" in text,
+    check("long-history-reminder", code == 0 and "提醒：这条命令的历史用时 3.0 小时" in text and "crash-point-replay-shard-configuration-check.sh --emit-hosts" in text
+          and ".claude/heavy-thread-default" in text and "为什么分不了" in text and "用时 3.0 小时" in text,
           f"历史用时 3 小时、只占一台应当报提醒（历史用时与出路）、退 0；实际退 {code}，末尾几行：{lines[-1].splitlines()[-3:] if lines else '没打'}")
 
     # long-estimate-reminder：用时表里没有，给了 --estimated-hours 3 ⇒ 按预计挂钟报提醒

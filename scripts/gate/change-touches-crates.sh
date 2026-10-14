@@ -6,7 +6,7 @@
 #   change-touches-crates.sh [项目根] [输入前缀…]   判一次，把判据与依据打到 stdout（前缀不给按 `crates/`）
 #   change-touches-crates.sh --selftest   自证 6 格：只改文档判「没碰」、改一行 crates 判「碰了」、判不出来时判「碰了」、强制全跑判「碰了」、漏进来的 GATE_BASE 不污染判定
 #
-# 谁在用：`.claude/gate.d/` 里那几道只判 `crates/` 里代码的重阶段（层 0 崩溃点重放、QEMU 真设备、
+# 谁在用：`.claude/gate.d/` 里那几道只判 `crates/` 里代码的重阶段（崩溃点重放、QEMU 真设备、
 # 崩溃点重放、模型对拍）。没碰 `crates/` 时它们退 77（本次未跑），不退 0——
 # `.claude/singlefs-ai-sop/rules/show-me-test.md`：`exit 0` 的跳过在汇总里与「判过了」一模一样。
 #
@@ -45,7 +45,7 @@ base_of() {
   #
   # 拿前者当后者的基准，上一个提交已经验过的同一份 `crates/` 改动就会重新落进「这次改动」里。
   # 实测 2026-09-21：暂存区零行 `crates/`，相对 `HEAD~1` 却有 5 个 `crates/` 路径（全是上一个提交改的），
-  # 层 0 重放、QEMU、模型对拍、replay 四道重阶段全跑，白等 40 分钟。
+  # 崩溃点重放、QEMU、模型对拍、replay 四道重阶段全跑，白等 40 分钟。
   #
   # ⚠️ **别为了「跟门禁基准统一」把这里改回 `GATE_BASE`。** 看着整齐，代价是这道判定恒判「碰了」：
   # `gate.sh --staged` 必定给里层设 `GATE_BASE`，而写 `refs/sop/gate-ok` 的守卫要求它为空，
@@ -122,6 +122,8 @@ judge() {
 
 selftest() {
   local work; work="$(mktemp -d)"
+  # 中途报错、被打断也删（成功、失败都删；local 变量到退出时已不在，路径在这里就展开）
+  trap "rm -rf -- '$work'" EXIT
   local failures=0
   local checked=0
   # 造一个真仓：先提交一份基线，再分别造两种改动。
@@ -180,6 +182,7 @@ selftest() {
   echo "不是 git 工作树 ⇒ 应当保守判「碰了」"
   checked=$((checked + 1))
   local plain; plain="$(mktemp -d)"
+  trap "rm -rf -- '$work' '$plain'" EXIT
   if judge "$plain"; then
     echo "  ✓ 判「碰了（保守）」"
   else

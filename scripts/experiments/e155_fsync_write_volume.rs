@@ -30,8 +30,6 @@ const NAMED_ITEM_BYTES: u64 = 56;
 const DEVICE_COUNT: u64 = 2;
 /// 主几何下 journal 环安全系数 `F`（D22 已定项 2）。
 const RING_SAFETY_FACTOR_MAIN: u64 = 3;
-/// M19 反向取样点：环安全系数改 2（不是主几何）。
-const RING_SAFETY_FACTOR_REVERSE: u64 = 2;
 /// journal 环默认容量。
 const RING_DEFAULT_BYTES: u64 = 768 * 1024 * 1024;
 /// 挂载时夹过的有效 `T_dirty`（D16 已定项 5）。
@@ -483,7 +481,6 @@ struct Geometry {
     identity_reference: bool, // K3（false）/ K11（true）
     backlog_generations: u64, // g：主 24，反向 0
     physical_block_size_bytes: u64,
-    unaccounted_switchback: bool, // K10（true）：WAL 两臂 checkpoint 多写已释放记录，甲不受影响
 }
 
 impl Geometry {
@@ -493,7 +490,6 @@ impl Geometry {
             identity_reference: false,
             backlog_generations: 24,
             physical_block_size_bytes: PRIMARY_PHYSICAL_BLOCK_SIZE_BYTES,
-            unaccounted_switchback: false,
         }
     }
 
@@ -585,6 +581,7 @@ impl JiaPublishOutcome {
             + self.system_configuration_bytes
     }
 
+    #[cfg(test)]
     fn block_layer_write_requests(&self) -> u64 {
         self.write_calls + self.barriers + self.fua_count
     }
@@ -1082,8 +1079,8 @@ struct WriteAheadLogFsyncOutcome {
     inode_root_bytes: u64,
     record_bytes: u64,
     write_calls: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     barriers: u64,
-    named_items: u64,
     record_count: u64,
 }
 
@@ -1138,7 +1135,6 @@ fn solve_write_ahead_log_fsync(shape: PoolShape, arm: WriteAheadLogArm) -> Write
         record_bytes: record_count * RECORD_BYTES * DEVICE_COUNT,
         write_calls,
         barriers: 2 * DEVICE_COUNT,
-        named_items,
         record_count,
     }
 }
@@ -1156,9 +1152,8 @@ struct WriteAheadLogCheckpointOutcome {
     root_slot_bytes: u64,
     system_configuration_bytes: u64,
     write_calls: u64,
-    barriers: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     fua_count: u64,
-    named_items: u64,
     record_count: u64,
 }
 
@@ -1214,7 +1209,7 @@ fn solve_write_ahead_log_checkpoint(shape: PoolShape, arm: WriteAheadLogArm, int
     let allocation_dirty_total = sum_f64(&core.allocation_dirty);
     let mapping_dirty_total = sum_f64(&core.mapping_dirty);
 
-    let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+    let (extent_catch_up, _inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
         WriteAheadLogArm::WriteAheadLogFull => (0.0, 0.0, 0.0, 0u64),
         WriteAheadLogArm::WriteAheadLogLeaf => {
             // 乙每次 fsync 只写叶：checkpoint 要把第 1 层起的全部祖先追上来；容器（叶）已经在每次 fsync 里写过。
@@ -1248,9 +1243,7 @@ fn solve_write_ahead_log_checkpoint(shape: PoolShape, arm: WriteAheadLogArm, int
         root_slot_bytes: pbs,
         system_configuration_bytes: SYSTEM_CONFIGURATION_SLOT_BYTES * DEVICE_COUNT,
         write_calls: total_calls,
-        barriers: 2 * DEVICE_COUNT,
         fua_count: 1,
-        named_items,
         record_count,
     }
 }

@@ -2024,6 +2024,7 @@ E7RESULT name=done emitted=3\n";
     }
 
     #[test]
+    // wallclock-assert-load-safe: 比的是同一条单调时钟上先后盖的戳：每行时刻都在读完那一刻之前盖下，次序由读取先后定，耗时多长都不翻面
     fn arrival_reader_returns_every_child_line_in_order_with_nondecreasing_timestamps() {
         let child_output = "E7RESULT name=transaction root_txg=3\nnot a result line\nE7RESULT name=file_overwrite nanoseconds=6608505\nE7RESULT name=done emitted=3";
         let started = Instant::now();

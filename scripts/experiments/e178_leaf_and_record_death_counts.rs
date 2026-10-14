@@ -11,7 +11,7 @@
 //!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-three   第三段：X3 的崩溃那一半（F12 全部崩溃支）
 //!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-four [--shard i/k] [--no-reuse]
 //!                                                                                  第四段：登记修订 2 的两条新底座臂（B-stub、B-tsz）
-//! 线程数取环境变量 E178_THREADS（默认 6），产物按工作项的次序输出，与线程数无关。
+//! 线程数取环境变量 E178_THREADS（没设取 SINGLEFS_THREAD_CAP，都没设取登记的重活默认并行度 .claude/heavy-thread-default），产物按工作项的次序输出，与线程数无关。
 //! 第四段的分片、续跑与多机（登记修订 2 之十三）：997 个工作项，每项算完把产物行原子写进项目录（环境变量
 //! E178_SEGMENT_FOUR_ITEMS，默认 ~/.local/share/singlefs/work/e178-segment-four/items）下的 `<项名>.out`，第一行是键（项名、装置源
 //! sha256、几何参数）；同一条命令重起，键相同的项读回不重算。`--shard i/k` 只算序号 mod k = i 的项、只落项文件、不拼产物；
@@ -41,6 +41,8 @@
 //! 13. B-tsz 的「(o, b) 的记录在所有被择中的版本里都不收」与读出那一步施行整对象墓碑在这个模型里同值（同一个 inode 号只有一个对象
 //!     出生代），装置只在读出那一步施行；数据单元门用供出之后、施行整对象墓碑之前的那棵树（修订 2 之五数据单元门）。
 
+// admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
+// run-condition: command python3
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -108,7 +110,6 @@ const F11_CHANGES_BEFORE_ROLLBACK: u64 = 10;
 const F11_CHANGES_AFTER_ROLLBACK: u64 = 20;
 const F12_INODE_COUNT: u64 = 300;
 const F12_NEW_INODES_AFTER_RECOVERY: u64 = 5;
-const DEFAULT_THREADS: usize = 6;
 
 fn length_as_u64(length: usize) -> u64 {
     u64::try_from(length).expect("长度装得进 u64")
@@ -6851,15 +6852,19 @@ fn segment_four_options_from(arguments: &[String]) -> Result<SegmentFourOptions,
     Ok(SegmentFourOptions { shard, reuse, items_directory })
 }
 
+include!("heavy_threads_default/threads.rs");
+
+/// 线程数：`E178_THREADS`，没设取 `SINGLEFS_THREAD_CAP`，都没设取登记的重活默认并行度（`.claude/heavy-thread-default`）。
 fn threads_from_the_environment() -> usize {
     std::env::var("E178_THREADS")
         .ok()
         .and_then(|value| value.parse::<usize>().ok())
         .filter(|threads| *threads >= 1)
-        .unwrap_or(DEFAULT_THREADS)
+        .unwrap_or_else(|| default_heavy_threads(include_str!("../../.claude/heavy-thread-default")))
 }
 
 fn main() {
+    preflight();
     let arguments: Vec<String> = std::env::args().collect();
     let mode = arguments.get(1).cloned().unwrap_or_default();
     let threads = threads_from_the_environment();
@@ -7515,5 +7520,33 @@ mod tests {
         assert!(parse(&["--shard", "3/3"]).is_err());
         assert!(parse(&["--shard"]).is_err());
         assert!(parse(&["--bogus"]).is_err());
+    }
+}
+
+fn repository_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+}
+
+fn preflight() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let root = repository_root();
+    let source = root.join("scripts/experiments/e178_leaf_and_record_death_counts.rs");
+    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    let mut command = std::process::Command::new("python3");
+    command.arg(&script).arg("check").arg(&source);
+    if arguments.iter().any(|argument| argument == "--force") {
+        command.arg("--force");
+    }
+    command.arg("--");
+    command.args(arguments.iter().filter(|argument| *argument != "--force"));
+    let output = command.output().unwrap_or_else(|error| {
+        eprintln!("  ✗ 起不了 python3 判准入：{error}");
+        eprintln!("  → 怎么办：装上 python3，或在有 python3 的机器上跑");
+        std::process::exit(78)
+    });
+    if !output.status.success() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        std::process::exit(output.status.code().unwrap_or(1));
     }
 }

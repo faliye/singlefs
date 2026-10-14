@@ -48,7 +48,9 @@ def main(arguments):
         return 2
     os.makedirs(os.path.join(tree, "scripts", "experiments"))  # 照真的：scripts/experiments/target 不在 git 列得出的文件里，拷过去的树里没有它
     os.makedirs(os.path.join(tree, "research"))
-    os.symlink(os.path.join(REAL_REPOSITORY, "scripts", "experiments", "e7-index-bench"), os.path.join(tree, "scripts", "experiments", "e7-index-bench"))
+    for name in os.listdir(os.path.join(REAL_REPOSITORY, "scripts", "experiments")):
+        if name != "target":
+            os.symlink(os.path.join(REAL_REPOSITORY, "scripts", "experiments", name), os.path.join(tree, "scripts", "experiments", name))
     for name in os.listdir(os.path.join(REAL_REPOSITORY, "scripts")):
         if name not in ("experiments", "results"):
             os.symlink(os.path.join(REAL_REPOSITORY, "scripts", name), os.path.join(tree, "scripts", name))

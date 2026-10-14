@@ -70,6 +70,8 @@ claim() {
 selftest() {
   local root next rc_used rc_first rc_again
   root="$(mktemp -d)"
+  # 中途报错、被打断也删（成功、失败都删；local 变量到退出时已不在，路径在这里就展开）
+  trap "rm -rf -- '$root'" EXIT
   mkdir -p "$root/research/prompts" "$root/scripts/experiments" "$root/.claude/kb/experiments"
   : > "$root/research/prompts/e5-preregistration.md"
   : > "$root/scripts/experiments/e6_sample.rs"

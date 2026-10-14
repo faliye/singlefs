@@ -83,6 +83,7 @@ fn divergences_fixed_record(base: u64, narrow_chain_bytes: u64, wide_chain_bytes
 
 /// 「免费」判据：分岔数不超过门槛就算免费。原判据 2 的门槛 `tolerance = 0`；
 /// 第八节的判别力自证把门槛挪到 `d`（该格自己的分岔数），判定必须翻面（V5）。
+#[cfg(test)]
 fn is_free(divergent_count: u64, tolerance: u64) -> bool {
     divergent_count <= tolerance
 }
@@ -106,7 +107,6 @@ fn enough(at_least_once_probability: f64) -> bool {
 /// 78 = 84 − tail_lsn 8 + 2；84 = E23 原表；86 = jsn 加宽后；
 /// 93 / 95 = 加上已定项 7 的事务字段 9；99 = 再加 4 字节。
 const BASES: [u64; 6] = [78, 84, 86, 93, 95, 99];
-const CHAINS: [u64; 3] = [2, 4, 8];
 const UNITS: [u64; 2] = [512, 4096];
 const LARGEST_ITEM_COUNT: u64 = 2000;
 const BITS: [u32; 4] = [8, 16, 32, 64];

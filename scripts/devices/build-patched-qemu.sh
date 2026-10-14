@@ -17,7 +17,7 @@
 #
 # 环境变量：
 #   SINGLEFS_QEMU_HOME         私有目录，默认 $HOME/.local/share/singlefs/qemu；不许落在开机会清空的目录（/tmp、/run、/dev/shm、XDG_RUNTIME_DIR、tmpfs、ramfs）
-#   SINGLEFS_THREAD_CAP        make 的并行数（scripts/hosts/capped.sh 设它），没设取 nproc
+#   SINGLEFS_THREAD_CAP        make 的并行数（scripts/hosts/capped.sh 设它），没设取 .claude/heavy-thread-default 登记的重活默认（scripts/hosts/heavy-threads.sh）
 #   BUILD_PATCHED_QEMU_PATCH   补丁路径，默认仓里那一份；只给补丁还没进仓时用
 #   BUILD_PATCHED_QEMU_KEEP=1  编译目录留着（默认装完、失败都删），打印路径
 # 编译目录在 ${TMPDIR:-/tmp} 下，约 1 GiB。
@@ -30,6 +30,7 @@
 #   skip-version-match    不核系统 qemu-system-x86 的版本  → 「系统包版本不同」那一格
 #   skip-patch-readback   打完补丁不回读                   → 「源码树里没有补丁那一行」那一格
 #   stamp-ignores-patch   装过的戳不记补丁的 sha256        → 「补丁变了要重编」那一格
+#   threads-from-nproc    make 的并行数缺省取核数（改前）   → 「没设上限时 make 的并行数是登记的重活默认」那一格
 #
 # admission: always 每次调都现判私有目录里装的是不是这一份源码与补丁、核不核得过，装好了它自己什么都不做就退出
 # run-condition: single-instance
@@ -67,12 +68,17 @@ CONFIGURE_ARGUMENTS=(
   --disable-docs --disable-download --disable-install-blobs
   "--firmwarepath=$QEMU_FIRMWARE_PATH"
 )
-BREAK_ITEMS=(skip-dsc-checksum skip-file-checksum allow-volatile-home skip-version-match skip-patch-readback stamp-ignores-patch)
+BREAK_ITEMS=(skip-dsc-checksum skip-file-checksum allow-volatile-home skip-version-match skip-patch-readback stamp-ignores-patch threads-from-nproc)
 
 patch_path="${BUILD_PATCHED_QEMU_PATCH:-$repository_root/scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch}"
 install_home="${SINGLEFS_QEMU_HOME:-$HOME/.local/share/singlefs/qemu}"
-build_threads="${SINGLEFS_THREAD_CAP:-$(nproc)}"
+source "$script_directory/../hosts/heavy-threads.sh"
 build_break="${BUILD_PATCHED_QEMU_BREAK:-}"
+# make 的并行数：SINGLEFS_THREAD_CAP 设了取它，没设取登记的重活默认并行度（.claude/heavy-thread-default）；弄坏开关 threads-from-nproc 下取核数（改前的样子）
+default_build_threads() {
+  if [[ "$build_break" == threads-from-nproc ]]; then nproc; else heavy_thread_default; fi
+}
+build_threads="$(default_build_threads)"
 check_script="$script_directory/qemu-blklogwrites-check.sh"
 
 die() {
@@ -219,6 +225,16 @@ selftest_case() {
   fi
 }
 
+# build_threads_default_problem：没设 SINGLEFS_THREAD_CAP 时 make 的并行数不是登记文件第一条非注释行的数就成立问题（给「没设上限时 make 的并行数」那一格用）
+build_threads_default_problem() {
+  local registered got
+  registered="$(grep -vE '^[[:space:]]*(#|$)' "$repository_root/.claude/heavy-thread-default" | head -n 1 | awk '{print $1}')"
+  got="$(env -u SINGLEFS_THREAD_CAP bash -c 'source "$1"; build_break="$2"; '"$(declare -f default_build_threads)"'; default_build_threads' _ "$script_directory/../hosts/heavy-threads.sh" "$build_break")"
+  [[ -n "$registered" && "$got" == "$registered" ]] && return 0
+  printf '没设上限时 make 的并行数是「%s」，登记的重活默认并行度是「%s」\n' "$got" "$registered"
+  return 1
+}
+
 # dsc_listed_files_equals <.dsc> <期望的输出>
 dsc_listed_files_equals() {
   local actual
@@ -279,13 +295,14 @@ run_selftest() {
   selftest_case "源码树里没有补丁那一行" 1 skip-patch-readback patched_tree_problem "$scratch/unpatched-tree"
   selftest_case "戳与这一次的输入相同" 0 - stamp_is_current "$scratch/home-current" "$(printf '%064d' 1)"
   selftest_case "补丁变了要重编" 0 stamp-ignores-patch stamp_is_stale "$scratch/home-current" "$(printf '%064d' 2)"
+  selftest_case "没设上限时 make 的并行数是登记的重活默认" 0 threads-from-nproc build_threads_default_problem
   selftest_case "私有目录已在、不是本脚本装的" 1 - install_home_takeover_problem "$scratch/home-foreign"
   selftest_case "私有目录是本脚本装过的" 0 - install_home_takeover_problem "$scratch/home-current"
 
   local total=$((selftest_right + ${#selftest_wrong[@]}))
   if (( ${#selftest_wrong[@]} > 0 )); then
     printf '  ✗ 自证 %d 格里 %d 格判错：%s\n' "$total" "${#selftest_wrong[@]}" "${selftest_wrong[*]}"
-    printf '     → 怎么办：看上面每一格 ✗ 的说明；设了 BUILD_PATCHED_QEMU_BREAK 的话，判错的应当正是它点名的那几格\n'
+    printf '     → 怎么办：看上面每一格判错的说明；设了 BUILD_PATCHED_QEMU_BREAK 的话，判错的应当正是它点名的那几格\n'
     exit 1
   fi
   ok "自证 $total 格全部判对（不起网络、不编译）"
@@ -455,5 +472,6 @@ for binary in "${INSTALLED_BINARIES[@]}"; do
 done
 bash "$check_script" "$install_home/bin/qemu-io" \
   || die "装好的 $install_home/bin/qemu-io 核不过（暂存的那份核过了）" "带 --rebuild 重跑；还不过就看是不是装进去之后动态库换了"
+# gate-lint:nocount 主路径编译并装一份 QEMU，不扫一批对象；自证那一支的成功句另报格数
 ok "装好：$install_home（$QEMU_SOURCE_VERSION + 补丁 sha256 ${patch_sha256:0:12}）"
 echo "  仓根 qemu.env 里写：SINGLEFS_QEMU_HOME=$install_home"

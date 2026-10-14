@@ -6,9 +6,11 @@
 //!
 //! 用法（在 research/ 下）：
 //!   cargo run --release --bin e177-per-tree-resurrection-without-tombstones -- segment-one
-//! 线程数取环境变量 E177_THREADS（默认 8，按段切片）；产物按段的次序输出，与线程数无关。
+//! 线程数取环境变量 E177_THREADS（没设取 SINGLEFS_THREAD_CAP，都没设取登记的重活默认并行度 .claude/heavy-thread-default，按段切片）；产物按段的次序输出，与线程数无关。
 //! 产物是 `E7RESULT` 行，收尾 `E7RESULT name=done emitted=N`（N 把 config 行与 done 行都算进去）。
 
+// admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
+// run-condition: command python3
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -5597,15 +5599,19 @@ fn summary_lines(results: &[(SegmentResult, bool)], anchor: &AnchorOutcome) -> V
     lines
 }
 
+include!("heavy_threads_default/threads.rs");
+
+/// 线程数：`E177_THREADS`，没设取 `SINGLEFS_THREAD_CAP`，都没设取登记的重活默认并行度（`.claude/heavy-thread-default`）。
 fn threads_from_the_environment() -> usize {
     std::env::var("E177_THREADS")
         .ok()
         .and_then(|value| value.parse::<usize>().ok())
         .filter(|threads| *threads >= 1)
-        .unwrap_or(8)
+        .unwrap_or_else(|| default_heavy_threads(include_str!("../../.claude/heavy-thread-default")))
 }
 
 fn main() {
+    preflight();
     let mode = std::env::args().nth(1).unwrap_or_default();
     let threads = threads_from_the_environment();
     let mut emitted_lines: Vec<String> = Vec::new();
@@ -6151,5 +6157,33 @@ mod tests {
         let deleted: Vec<KeyFields> = reading.keys[Namespace::DeletedInodes.position()].keys().copied().collect();
         assert_eq!(deleted, vec![single_field_key(4)]);
         assert_eq!(reading.keys[Namespace::Inode.position()].len(), 2);
+    }
+}
+
+fn repository_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+}
+
+fn preflight() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let root = repository_root();
+    let source = root.join("scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs");
+    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    let mut command = std::process::Command::new("python3");
+    command.arg(&script).arg("check").arg(&source);
+    if arguments.iter().any(|argument| argument == "--force") {
+        command.arg("--force");
+    }
+    command.arg("--");
+    command.args(arguments.iter().filter(|argument| *argument != "--force"));
+    let output = command.output().unwrap_or_else(|error| {
+        eprintln!("  ✗ 起不了 python3 判准入：{error}");
+        eprintln!("  → 怎么办：装上 python3，或在有 python3 的机器上跑");
+        std::process::exit(78)
+    });
+    if !output.status.success() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        std::process::exit(output.status.code().unwrap_or(1));
     }
 }

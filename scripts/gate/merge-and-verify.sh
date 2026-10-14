@@ -4,6 +4,7 @@
 # 一批实现员交回之后的「合入后验证」：打全部补丁、编一次、跑 harness 档全部测试二进制、fmt、clippy 与 build，红的列出来。替掉派一个实现员做这件活。
 #
 #   merge-and-verify.sh [--memory <上限>] [--threads <N>] [--skip-apply] [--copy] <补丁目录> …
+#     --threads 缺省取登记的重活默认并行度（.claude/heavy-thread-default，scripts/hosts/heavy-threads.sh），不看忙闲。
 #   merge-and-verify.sh --selftest                     # 用假的 apply-writer-patch 与假 cargo 走一遍；MERGE_AND_VERIFY_BREAK=ignore-red 时必须判红
 #
 # --copy：不往这份脚本所在的仓里打，自己建一份副本在副本里打、编、验，收尾删掉它自己建的副本与编译目录（成功、失败、被 INT / TERM 停都删）：
@@ -31,18 +32,30 @@
 # 日志落 $MERGE_AND_VERIFY_LOG_DIRECTORY（默认工作根下的 merge-and-verify/<日期>-<进程号>，工作根只在 .claude/hooks/lib_work_root.py 里定义）。
 # cargo test 那一趟内存包装退 245（显存不够，run-with-memory-cap.sh 文件头「退出码」）：这一趟的测试结果（连同 FAILED 行）不算数，记一项红、
 #   报「显存不够」、不列 FAILED 也不给只重跑它们的命令（不是代码红），出路是看谁在用卡、等它跑完重跑这一条。退 250–254 照旧报包装自己的结局。
+# 改过的包都重编了没有（.claude/kb/milestone/03-third-txn.md「待优化：流程、门禁与装置上踩过的坑」第 1 行；判法在 scripts/gate/lib_rebuilt_packages.py，这里不另写）：
+#   改过的包从给的补丁目录里的 crates.patch 算（--skip-apply 时照样读给的补丁目录，只是不打）。编之前（刷源码戳之前）把补丁改过、落在包里的文件刷到此刻，
+#   编完核 test 与 build 两趟的编译输出：每个改过的包都要有「Compiling <包名> v…」行，缺一个记一项红，出路是刷源码修改时刻或换干净编译目录整趟重跑。
+#   只核包里改过的 .rs；包里改过的 .rs 一个都不在编译目录的 dep-info 里的包不核（这几趟编译不读它们，例如 checker 档包 gpu、verdict-store 下才编的模块）。
+#   没给补丁目录、或补丁里没有要核的包：报「重编核对本次未判」，不记红也不算核过。
+# 主工作区合入锁（同一张表第 20 行；判法与锁文件在 scripts/gate/lib_workspace_lock.py 的文件头，这里不另写）：不带 --copy 时，打补丁与编之前先拿锁，
+#   持有者是这个进程（$$），被别的合入占着就排队、每过一段时间报一行谁占着，持有者已死的判失效、报出来再接管；退出时（成功、红、被 INT / TERM 停）放掉。
+#   拿着锁时 export SINGLEFS_WORKSPACE_LOCK_HOLDER=$$，它起的 apply-writer-patch.py 认出是在持有者之下、不另拿。拿不成退 1、一个补丁都没打、没编。
+#   带 --copy 时在自己的副本里打与编，不拿这一把。
 # MERGE_AND_VERIFY_TREE（只给自证）：刷源码戳与编译在这棵树里（默认这份脚本所在的仓根）；打补丁照旧是 apply-writer-patch.py 自己的仓根。
 # MERGE_AND_VERIFY_CHECK_SH（只给自证）：从哪一份 check.sh 读 lint 表与四条写法（默认这份脚本所在仓的 .claude/singlefs-ai-sop/scripts/check.sh）。
-# 退出码：0 全绿；1 有红（测试、fmt、clippy、build、apply 退 1、显存不够、源码戳刷不成、check.sh 读不出、工作区成员排不掉 checker 档包）；
+# 退出码：0 全绿；1 有红（测试、fmt、clippy、build、apply 退 1、显存不够、源码戳刷不成、check.sh 读不出、工作区成员排不掉 checker 档包、
+#   改过的包没重编、主工作区合入锁没拿成）；
 #   2 补丁核不过（apply 退 2）、用法错。
 # 弄坏开关 MERGE_AND_VERIFY_BREAK=<项>（只给证红用；打开时自证退 1）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
 # （自证的三例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
 #   MERGE_AND_VERIFY_BREAK=ignore-red  verify() 抓到 FAILED 行、cargo test 退非 0 都不记红，一律报测试全绿
-#       「一条测试红时应当退 1、列出那条测试与只重跑它的命令」（实际退出码 0，报「✓ 测试全绿（0 个测试二进制）」）
+#       「一条测试红时应当退 1、列出那条测试与只重跑它的命令」（实际退出码 0，报「✓ 测试全绿（0 个测试二进制）」）；
+#       连带「--copy 测试红时也应当删掉副本与编译目录」（那一格的测试红被吞掉，退 0 不是要的 1）
 #   SINGLEFS_WORK_ROOT_BREAK=new-root-unknown（lib_work_root.py 的开关：工作根退回旧根 /tmp/claude-<uid>）  没设日志目录时日志落进旧根
 #       「没设日志目录时日志应当落在工作根下」（跑完删掉旧根下多出的那个 merge-and-verify/<日期>-<进程号>）
 #   MERGE_AND_VERIFY_BREAK=no-source-stamp  编之前不刷源码戳
-#       「往编过的副本里 rsync -a 铺新内容（旧 mtime）之后再验，应当重编改过的 walk.rs、测试全绿」（实际退出码 1，假 cargo 报 Fresh、那一条 FAILED）
+#       「往编过的副本里 rsync -a 铺新内容（旧 mtime）之后再验，应当重编改过的 walk.rs、测试全绿」（实际退出码 1，假 cargo 报 Fresh、那一条 FAILED）；
+#       连带「--copy 全绿时应当在副本里打补丁、收尾删掉副本与编译目录」（那一格还核源码戳记在 <日志目录>/target 下，不刷就没有那一行）
 #   MERGE_AND_VERIFY_BREAK=gpu-memory-as-test-red  cargo test 那一趟包装退 245 也照 FAILED 行报测试红
 #       「cargo test 那一趟包装退 245 时应当报显存不够、退 1，不列 FAILED、不给重跑命令」（实际报「红的测试 1 条」与重跑命令）
 #   MERGE_AND_VERIFY_BREAK=drop-discipline-lint  从 check.sh 读到的 lint 表丢掉最后一条再交给 clippy
@@ -59,18 +72,34 @@
 #   MERGE_AND_VERIFY_BREAK=zero-tests-green  cargo test 退 0 而一条测试都没数到时照报全绿
 #       「cargo test 退 0 却一条测试都没跑时应当退 1」（实际退 0）
 #   MERGE_AND_VERIFY_BREAK=keep-copy  --copy 收尾不删副本与编译目录、也不打路径（改前的样子：副本留在工作根下没人删）
-#       「--copy 全绿时应当在副本里打补丁、收尾删掉副本与编译目录」与「--copy 测试红时也应当删掉副本与编译目录」（实际两份都还在）
+#       「--copy 全绿时应当在副本里打补丁、收尾删掉副本与编译目录」与「--copy 测试红时也应当删掉副本与编译目录」（实际两份都还在）；
+#       连带「MERGE_AND_VERIFY_KEEP_COPY=1 时应当留着副本与编译目录、打出路径」（开关在留现场那一句之前就退出，路径不打）
 #   MERGE_AND_VERIFY_BREAK=cleanup-only-on-success  --copy 只在退 0 时删副本与编译目录，红了留着
 #       「--copy 测试红时也应当删掉副本与编译目录」（实际退 1、两份都还在）
+#   MERGE_AND_VERIFY_BREAK=skip-rebuild-check  编完不核改过的包有没有 Compiling 行
+#       「编译目录里的产物比源码新（共用编译目录）、补丁改过的 demo 没有 Compiling 行：应当退 1、点名 demo」（实际退 0）
+#       连带：「头一次编、补丁改过的 demo 有 Compiling 行：应当退 0、报都重编」「编过之后 --skip-apply 再验同一批补丁：改过的 demo 应当重编、退 0」（不核就不报「都重编了」，判这一句的两格跟着红）
+#   MERGE_AND_VERIFY_BREAK=no-touch-patched  编之前不把补丁改过的文件刷到此刻（刷源码戳照刷）
+#       「编过之后 --skip-apply 再验同一批补丁：改过的 demo 应当重编、退 0」（实际源码戳没变、没有 Compiling demo，退 1）
+#   MERGE_AND_VERIFY_BREAK=ignore-workspace-lock  不带 --copy 时不拿主工作区合入锁
+#       「两个合入同时起：后起的应当排队、报出前者的进程号、前者编完放锁后才编」（实际两趟的 cargo test 叠在一起）与
+#       「锁文件里的持有者已死：应当报出来、接管、照常验完、放锁后记录清空」（实际没报接管）
+#   本库 scripts/gate/lib_rebuilt_packages.py 的 REBUILT_PACKAGES_BREAK=any-compiling-line 也让「编译目录里的产物比源码新……」那一格红（另一个包有 Compiling 行就当 demo 也重编了）；
+#   scripts/gate/lib_workspace_lock.py 的 WORKSPACE_LOCK_BREAK=trust-dead-holder 让「锁文件里的持有者已死……」那一格红（排队等死掉的持有者，到 SINGLEFS_WORKSPACE_LOCK_GIVE_UP_SECONDS 退 1）；
+#   它的 WORKSPACE_LOCK_BREAK=no-wait 让「两个合入同时起……」与「锁文件里的持有者已死……」两格红（活着的持有者也照拿、不排队；死的不报接管）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
+source "$here/../hosts/heavy-threads.sh"
 APPLY="${MERGE_AND_VERIFY_APPLY:-$here/apply-writer-patch.py}"
 WRAPPER="${MERGE_AND_VERIFY_WRAPPER:-$here/../hosts/run-with-memory-cap.sh}"
 CAPPED="${MERGE_AND_VERIFY_CAPPED:-$here/../hosts/capped.sh}"
 STAMP="$here/../hosts/source-stamp.py"
+REBUILT="$here/lib_rebuilt_packages.py"          # 改过的包重编了没有（文件头）
+WORKSPACE_LOCK="$here/lib_workspace_lock.py"     # 主工作区合入锁（文件头）
+CHECK_PATCH_DIRS=()                              # 算改过的包用的补丁目录（绝对路径；--skip-apply 时也留着）
 GPU_MEMORY_HIT_EXIT=245   # run-with-memory-cap.sh：显存不够（命令退了非 0、起止之间内核报了 NV_ERR_NO_MEMORY），结果不算数
 CHECK_SH="${MERGE_AND_VERIFY_CHECK_SH:-$root/.claude/singlefs-ai-sop/scripts/check.sh}"
 CHECKER_TIER_PACKAGE=singlefs-checker-tier   # checker 档包：只归提交时的主 agent（.claude/rules/verification.md），这里的 cargo test 不挑它
@@ -108,6 +137,14 @@ cleanup_copy() {
     exit 1
   fi
   echo "  删了副本 $COPY_TREE${COPY_TARGET:+ 与编译目录 $COPY_TARGET}（共 ${kept_size:-?}；日志留在 $(dirname "$COPY_TREE")）"
+  exit "$rc"
+}
+
+# 不带 --copy 时的收尾（EXIT trap）：放掉主工作区合入锁（文件头「主工作区合入锁」）；放不成只报一行，退出码照旧
+release_workspace_lock() {
+  local rc=$?
+  trap - EXIT
+  python3 "$WORKSPACE_LOCK" release --root "$tree" --holder-pid "$$" || echo "  ! 放主工作区合入锁没成（上面一行是原因）：看 $WORKSPACE_LOCK status --root $tree"
   exit "$rc"
 }
 
@@ -199,8 +236,10 @@ verify() {
   local logs="$1"; shift
   local -a dirs=("$@")
   local dir rc applied=0 warned=0 failed_tests reds=0 test_count
-  local -a clippy_lints=()
+  local -a clippy_lints=() patch_arguments=() compile_logs=()
   mkdir -p "$logs"
+  rm -f -- "$logs/test.log" "$logs/build.log"   # 重编核对只认这一趟的编译输出（日志目录可能是调用方给的旧目录）
+  for dir in ${CHECK_PATCH_DIRS[@]+"${CHECK_PATCH_DIRS[@]}"}; do patch_arguments+=(--patch-dir "$dir"); done
   if ! read_check_sh "$CHECK_SH"; then
     if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "lint-table-optional" ]]; then
       echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=lint-table-optional：$CHECK_SH_PROBLEM，照常往下验"
@@ -222,6 +261,16 @@ verify() {
       *) die "补丁核不过、一个字没改：$dir（apply-writer-patch.py 退 $rc，日志 $logs/apply-$(basename "$dir").log）" "按那份日志给的下一步让实现员改补丁再交" 2 ;;
     esac
   done
+  # 补丁改过、落在包里的文件刷到此刻（文件头「改过的包都重编了没有」）：再验同一批补丁时源码戳没变，不刷就不会重编
+  if ((${#patch_arguments[@]} > 0)); then
+    if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "no-touch-patched" ]]; then
+      echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=no-touch-patched：编之前不把补丁改过的文件刷到此刻"
+    elif python3 "$REBUILT" touch --tree "$tree" "${patch_arguments[@]}" > "$logs/touch-patched.log" 2>&1; then
+      echo "$(tail -1 "$logs/touch-patched.log")"
+    else
+      die "编之前没把补丁改过的文件刷到此刻，没编（日志 $logs/touch-patched.log）" "照那份日志修好再跑（补丁目录在不在、树可不可写）" 1
+    fi
+  fi
   if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "no-source-stamp" ]]; then
     echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=no-source-stamp：编之前不刷源码戳"
   elif python3 "$STAMP" refresh "$tree" > "$logs/source-stamp.log" 2>&1; then
@@ -265,6 +314,23 @@ verify() {
     run_capped "$logs/build.log" cargo build --offline --all-targets; rc=$?
     if [[ $rc -ne 0 ]]; then reds=$((reds+1)); echo "  ✗ cargo build --all-targets 红（日志 $logs/build.log）"; echo "  → 怎么办：从日志里第一条 rustc 报错改起，后面的多半是它的连锁反应"; else echo "  ✓ build 过"; fi
   fi
+  # 改过的包这一趟都重编了没有（文件头）：test 与 build 两趟的编译输出合起来核
+  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "skip-rebuild-check" ]]; then
+    echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=skip-rebuild-check：不核改过的包重编了没有"
+  elif ((${#patch_arguments[@]} == 0)); then
+    echo "  - 重编核对本次未判：没给补丁目录，算不出改过的包"
+  else
+    compile_logs=(--log "$logs/test.log")
+    [[ ! -f "$logs/build.log" ]] || compile_logs+=(--log "$logs/build.log")
+    python3 "$REBUILT" check --tree "$tree" --target-dir "${CARGO_TARGET_DIR:-$tree/target}" "${compile_logs[@]}" "${patch_arguments[@]}" > "$logs/rebuilt.log" 2>&1; rc=$?
+    sed 's/^/  /' "$logs/rebuilt.log"
+    case "$rc" in
+      0|77) ;;
+      1) reds=$((reds+1)) ;;
+      *) reds=$((reds+1)); echo "  ✗ 重编核对判不了（lib_rebuilt_packages.py 退 $rc，日志 $logs/rebuilt.log）"
+         echo "  → 怎么办：照上面那一行修（编译日志在不在、补丁目录读不读得了）再整趟重跑；判不了不算绿" ;;
+    esac
+  fi
   echo "  汇总：打上 ${applied} 个补丁目录（其中 code-source-discipline 红 $warned 个），验证红 $reds 项，日志在 $logs"
   [[ $reds -eq 0 && $warned -eq 0 ]]
 }
@@ -273,6 +339,10 @@ selftest() {
   local scratch fake_cargo_dir failures=0 checked=0 out rc expected_lints expected_lint_count check_case
   unset MERGE_AND_VERIFY_KEEP_COPY   # 留现场那一格自己设；调用方设了不能带进别的格
   scratch="$(mktemp -d)"; fake_cargo_dir="$scratch/bin"; mkdir -p "$fake_cargo_dir" "$scratch/patch-a" "$scratch/patch-b"
+  # 主工作区合入锁：每一格的锁文件都是临时目录里这一份（不碰仓里 git common-dir 那一把）；排队时每 0.3 秒报一次、每 0.05 秒看一次；调用方的持有者变量不带进来
+  # 排队最多等 30 秒：锁永远拿不到（弄坏开关、或哪一格没放锁）时到点退 1、那一格红，不挂住
+  export SINGLEFS_WORKSPACE_LOCK_FILE="$scratch/main-workspace.lock" SINGLEFS_WORKSPACE_LOCK_REPORT_SECONDS=0.3 SINGLEFS_WORKSPACE_LOCK_POLL_SECONDS=0.05 SINGLEFS_WORKSPACE_LOCK_GIVE_UP_SECONDS=30
+  unset SINGLEFS_WORKSPACE_LOCK_HOLDER
   cat > "$scratch/fake-apply.py" <<'FAKE'
 import sys
 if "--root" in sys.argv:
@@ -403,6 +473,68 @@ FAKE
     MERGE_AND_VERIFY_TREE="$scratch/tree" env -u CARGO_TARGET_DIR bash "$0" --skip-apply > "$out" 2>&1; rc=$?
   if [[ $rc -ne 1 ]] || ! grep -q '显存不够' "$out" || grep -q 'rerun-failed-tests.py' "$out" || grep -q '红的测试' "$out"; then
     echo "  ✗ 自检：cargo test 那一趟包装退 245 时应当报显存不够、退 1，不列 FAILED、不给重跑命令，实际退出码 $rc：$(grep -E '✗|→' "$out" | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 改过的包重编了没有（文件头）：假 cargo 按包、按 mtime 判新不新鲜，重编时照真 cargo 打「Compiling <包名> v…」（lib_rebuilt_packages.py --write-selftest-cargo）；
+  # 补丁目录 rebuilt-patch 的 crates.patch 改的是 crates/demo/src/walk.rs（树里已经是改过的样子，--skip-apply 只验不打）
+  local rebuilt_tree="$scratch/rebuilt-tree" rebuilt_bin="$scratch/rebuilt-bin" rebuilt_patch="$scratch/rebuilt-patch"
+  mkdir -p "$rebuilt_tree/crates/demo/src" "$rebuilt_bin" "$rebuilt_patch"
+  write_workspace "$rebuilt_tree" singlefs-checker-tier
+  printf 'pub mod walk;\n' > "$rebuilt_tree/crates/demo/src/lib.rs"
+  printf 'pub fn walk() -> u32 { 22 }\n' > "$rebuilt_tree/crates/demo/src/walk.rs"
+  printf 'diff --git a/crates/demo/src/walk.rs b/crates/demo/src/walk.rs\n--- a/crates/demo/src/walk.rs\n+++ b/crates/demo/src/walk.rs\n@@ -1 +1 @@\n-pub fn walk() -> u32 { 1 }\n+pub fn walk() -> u32 { 22 }\n' \
+    > "$rebuilt_patch/crates.patch"
+  python3 "$REBUILT" --write-selftest-cargo "$rebuilt_bin/cargo"
+  rebuilt_case() { PATH="$rebuilt_bin:$PATH" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" MERGE_AND_VERIFY_WRAPPER=none MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-$1" \
+    MERGE_AND_VERIFY_TREE="$rebuilt_tree" env -u CARGO_TARGET_DIR bash "$0" --skip-apply "$rebuilt_patch" > "$out" 2>&1; rc=$?; }
+  # 绿样本：头一次编（编译目录是空的），demo 有 Compiling 行
+  out="$scratch/out-rebuilt-first.txt"; rebuilt_case rebuilt-first; checked=$((checked+1))
+  if [[ $rc -ne 0 ]] || ! grep -q '改过的包这一趟都重编了（核了 1 个包：demo）' "$out"; then
+    echo "  ✗ 自检：头一次编、补丁改过的 demo 有 Compiling 行：应当退 0、报都重编了，实际退出码 $rc：$(grep -E '✗|✓|重编' "$out" | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 编过之后再验同一批补丁：源码戳没变（refresh 一个都不 touch），要靠编之前把补丁改过的文件刷到此刻，demo 才重编
+  out="$scratch/out-rebuilt-rerun.txt"; rebuilt_case rebuilt-rerun; checked=$((checked+1))
+  if [[ $rc -ne 0 ]] || ! grep -q '改过的包这一趟都重编了（核了 1 个包：demo）' "$out"; then
+    echo "  ✗ 自检：编过之后 --skip-apply 再验同一批补丁：改过的 demo 应当重编、退 0，实际退出码 $rc：$(grep -E '✗|✓|重编|刷到此刻' "$out" | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 红样本：编译目录里 demo 的产物比源码新（另一份副本共用这个编译目录、后编的那种），源码的修改时刻比它旧；
+  # checker 档那个包的文件刷到此刻、照常重编（有一行别的 Compiling），demo 没有 Compiling 行，测试照样全绿
+  touch -d '+1 day' "$rebuilt_tree/target/debug/.fake/demo.d"
+  touch "$rebuilt_tree/crates/singlefs-checker-tier/Cargo.toml"
+  out="$scratch/out-rebuilt-stale.txt"; rebuilt_case rebuilt-stale; checked=$((checked+1))
+  if [[ $rc -ne 1 ]] || ! grep -q '改过的包这一趟没重编：demo' "$out" || ! grep -q 'Compiling singlefs-checker-tier' "$scratch/logs-rebuilt-stale/test.log" 2>/dev/null; then
+    echo "  ✗ 自检：编译目录里的产物比源码新（共用编译目录）、补丁改过的 demo 没有 Compiling 行：应当退 1、点名 demo，实际退出码 $rc：$(grep -E '✗|✓|重编' "$out" | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 主工作区合入锁（文件头）：两个合入同时起。A 的 cargo test 睡 1.5 秒；锁记录里出现 A 的进程号之后起 B；
+  # B 要报「在排队」与 A 的进程号，B 的 cargo test 要在 A 的结束之后才开始
+  local lock_tree="$scratch/lock-tree" timeline="$scratch/lock-timeline.txt" a_pid b_pid a_rc b_rc attempt holder_pid=""
+  mkdir -p "$lock_tree/crates/demo/src"; write_workspace "$lock_tree" singlefs-checker-tier; printf 'pub fn f() {}\n' > "$lock_tree/crates/demo/src/lib.rs"
+  PATH="$rebuilt_bin:$PATH" FAKE_CARGO_TIMELINE="$timeline" FAKE_CARGO_TAG=A FAKE_CARGO_SLEEP=1.5 MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" MERGE_AND_VERIFY_WRAPPER=none \
+    MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-lock-a" MERGE_AND_VERIFY_TREE="$lock_tree" env -u CARGO_TARGET_DIR bash "$0" --skip-apply > "$scratch/out-lock-a.txt" 2>&1 &
+  a_pid=$!
+  for attempt in $(seq 1 200); do
+    holder_pid="$(sed -n 's/^pid=//p' "$SINGLEFS_WORKSPACE_LOCK_FILE" 2>/dev/null)"
+    [[ -z "$holder_pid" ]] || break
+    kill -0 "$a_pid" 2>/dev/null || break   # A 已经跑完（不认锁时它根本不记），不再等
+    sleep 0.05
+  done
+  PATH="$rebuilt_bin:$PATH" FAKE_CARGO_TIMELINE="$timeline" FAKE_CARGO_TAG=B MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" MERGE_AND_VERIFY_WRAPPER=none \
+    MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-lock-b" MERGE_AND_VERIFY_TREE="$lock_tree" env -u CARGO_TARGET_DIR bash "$0" --skip-apply > "$scratch/out-lock-b.txt" 2>&1 &
+  b_pid=$!
+  if wait "$a_pid"; then a_rc=0; else a_rc=$?; fi
+  if wait "$b_pid"; then b_rc=0; else b_rc=$?; fi
+  local a_end b_start
+  a_end="$(awk '$1 == "end" && $2 == "A" { print $3 }' "$timeline" 2>/dev/null)"
+  b_start="$(awk '$1 == "start" && $2 == "B" { print $3 }' "$timeline" 2>/dev/null)"
+  checked=$((checked+1))
+  if [[ $a_rc -ne 0 || $b_rc -ne 0 || -z "$a_end" || -z "$b_start" || "$holder_pid" != "$a_pid" ]] || ((b_start <= a_end)) \
+     || ! grep -q "在排队.*进程 $a_pid" "$scratch/out-lock-b.txt"; then
+    lock_order_detail="A 的 cargo test 结束于 ${a_end:-没有}、B 的开始于 ${b_start:-没有}，B 报的：$(grep -E '排队|拿到|✗' "$scratch/out-lock-b.txt" | head -3 | tr '\n' ' ')"
+    echo "  ✗ 自检：两个合入同时起：后起的应当排队、报出前者的进程号、前者编完放锁后才编，实际 A 退 $a_rc（进程 $a_pid，锁记录里 ${holder_pid:-没有}）、B 退 $b_rc， $lock_order_detail"; failures=1; fi   # gate-lint:detail
+  # 锁文件里的持有者已死（记一个已经退出的进程）：报出来、接管、照常验完，放锁后记录清空
+  local dead_pid
+  bash -c 'exit 0' & dead_pid=$!
+  wait "$dead_pid"
+  printf 'pid=%s\nstart=1\nsession=死掉的会话\ncommand=merge-and-verify.sh 假的\nsince=%s\n' "$dead_pid" "$(date +%s)" > "$SINGLEFS_WORKSPACE_LOCK_FILE"
+  out="$scratch/out-lock-dead.txt"; checked=$((checked+1))
+  FAKE_CARGO_MODE=green SINGLEFS_WORKSPACE_LOCK_GIVE_UP_SECONDS=5 run_case lock-dead --skip-apply
+  if [[ $rc -ne 0 ]] || ! grep -q '已死.*死掉的会话.*接管' "$out" || grep -q '^pid=' "$SINGLEFS_WORKSPACE_LOCK_FILE"; then
+    echo "  ✗ 自检：锁文件里的持有者已死：应当报出来、接管、照常验完、放锁后记录清空，实际退出码 $rc：$(grep -E '锁|✗' "$out" | head -3 | tr '\n' ' ')；锁文件 $(tr '\n' ' ' < "$SINGLEFS_WORKSPACE_LOCK_FILE")"; failures=1; fi   # gate-lint:detail
   rm -rf "${scratch:?}"
   if [[ $failures -ne 0 ]]; then
     echo "    → 怎么办：看 verify() 抓 FAILED 行与退出码、编之前刷源码戳的那几处；MERGE_AND_VERIFY_BREAK 设着的话这里本来就该红"
@@ -412,12 +544,14 @@ FAKE
   echo "    往编过的副本里 rsync -a 铺旧 mtime 的新内容之后照样重编、包装退 245 报显存不够不报测试红、"
   echo "    clippy 带上 check.sh 的 $expected_lint_count 条编码纪律 lint、跑 build、cargo test 挑工作区成员减掉 checker 档包、"
   echo "    check.sh 读不出 lint 表或 clippy 那一行变了退 1 不编、成员里没有 checker 档包退 1 不编、一条测试都没跑退 1、"
-  echo "    --copy 在自己建的副本里打补丁与编、全绿与测试红收尾都删掉副本与编译目录、MERGE_AND_VERIFY_KEEP_COPY=1 留着并打出路径"
+  echo "    --copy 在自己建的副本里打补丁与编、全绿与测试红收尾都删掉副本与编译目录、MERGE_AND_VERIFY_KEEP_COPY=1 留着并打出路径、"
+  echo "    补丁改过的包头一次编与再验同一批补丁都有 Compiling 行、编译目录里的产物比源码新时点名没重编的包退 1、"
+  echo "    两个合入同时起后起的排队并报出前者、前者放锁后才编、锁文件里的持有者已死时报出来并接管"
   return 0
 }
 
 if [[ "${1:-}" == "--selftest" ]]; then selftest; exit $?; fi
-MEMORY="${REPLAY_MEMORY_CAP:-8G}"; THREADS="$(nproc)"; skip_apply=0; copy_mode=0; dirs=()
+MEMORY="${REPLAY_MEMORY_CAP:-8G}"; THREADS="$(heavy_thread_default)"; skip_apply=0; copy_mode=0; dirs=(); invocation="merge-and-verify.sh $*"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --memory) MEMORY="${2:?}"; shift 2 ;;
@@ -448,6 +582,23 @@ if ((copy_mode)); then
     || die "建副本没成（日志 $logs/copy-sync.log）" "照那份日志修（rsync 在不在、盘满没满）再跑；建了一半的副本收尾照删" 1
   tree="$COPY_TREE"
 fi
+# 主工作区合入锁（文件头）：不带 --copy 时拿，EXIT trap 放
+if ((copy_mode == 0)); then
+  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "ignore-workspace-lock" ]]; then
+    echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=ignore-workspace-lock：不拿主工作区合入锁"
+  else
+    python3 "$WORKSPACE_LOCK" acquire --root "$tree" --holder-pid "$$" --command "$invocation" \
+      || die "主工作区合入锁没拿成（上面一行是原因），一个补丁都没打、没编" "照上面那一行的出路办；要在别处验就加 --copy 在自己的副本里打与编" 1
+    trap release_workspace_lock EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    export SINGLEFS_WORKSPACE_LOCK_HOLDER="$$"
+  fi
+fi
+# 算改过的包用的补丁目录（文件头「改过的包都重编了没有」）：进树之前转成绝对路径，--skip-apply 时也留着
+for dir in ${dirs[@]+"${dirs[@]}"}; do
+  if [[ -d "$dir" ]]; then CHECK_PATCH_DIRS+=("$(cd "$dir" && pwd)"); else CHECK_PATCH_DIRS+=("$dir"); fi
+done
 cd "$tree" || die "进不去要编的树 $tree" "在仓里跑；MERGE_AND_VERIFY_TREE 只给自证用，平时不设"
 if [[ $skip_apply -eq 1 ]]; then dirs=(); fi
 verify "$logs" "${dirs[@]}"

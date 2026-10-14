@@ -25,7 +25,7 @@
 //! 判据与失败条款写在 `research/prompts/e140-preregistration.md`，装置写之前。
 
 use aes_gcm::{
-    aead::{AeadInPlace, KeyInit},
+    aead::{AeadInOut, KeyInit},
     Aes256Gcm, Nonce,
 };
 use e7_index_bench::Emitter;
@@ -221,7 +221,7 @@ fn verify_unit(
     nonce: &Nonce<aes_gcm::aes::cipher::consts::U12>,
     unit: &mut [u8],
 ) -> u8 {
-    let tag = cipher.encrypt_in_place_detached(nonce, b"", unit).expect("MAC 失败");
+    let tag = cipher.encrypt_inout_detached(nonce, b"", unit.into()).expect("MAC 失败");
     tag[0]
 }
 
@@ -247,7 +247,7 @@ struct ArmResult {
 fn cipher_and_nonce() -> (Aes256Gcm, Nonce<aes_gcm::aes::cipher::consts::U12>) {
     let key = [0x42u8; 32];
     let cipher = Aes256Gcm::new_from_slice(&key).expect("密钥长度固定 32");
-    (cipher, *Nonce::from_slice(&[0u8; 12]))
+    (cipher, Nonce::from([0u8; 12]))
 }
 
 /// 随机页读：每次读页 k 所在的单元（跨则两个），验满，按臂决定拷不拷。

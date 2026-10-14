@@ -11,7 +11,9 @@
 #   bash scripts/agents/watch.sh --processes                           只盯这个 Claude 实例底下已经在跑的长进程（主 agent 自己起的长命令）；
 #                                                                        找得到当前会话（CLAUDE_CODE_SESSION_ID）就同时查交回之后后台还在跑
 #   bash scripts/agents/watch.sh --report                              当前会话的全部子 agent 现在是什么样，报一次就退
-#   bash scripts/agents/watch.sh … --ack <agent 号>:<告警名>            看过、判定只是慢的那一条告警，这一次看门狗里不再为它叫醒（可给多次；进程告警——含「重型测试没带前缀」——写 --ack 进程:<pid>）
+#   bash scripts/agents/watch.sh … --ack <agent 号>:<告警名>            看过、判定只是慢的那一条告警，这一次看门狗里不再为它叫醒（可给多次；进程告警——含「重型测试没带前缀」——写 --ack 进程:<pid>）；
+#                                                                        「进程卡住」类告警连报到 watch.conf 的 terminate-after-unacknowledged-reports 次既没处置也没 --ack 的，
+#                                                                        看门狗终止那个进程并报出来（不带 agent 号与带 --processes 两种起法才记连报，判法在 agent-watch.py 文件头「调度方不响应就终止」）
 #   bash scripts/agents/watch.sh --dry-run …                           只打印要跑的命令，不跑
 #   bash scripts/agents/watch.sh --selftest
 set -uo pipefail
@@ -27,7 +29,7 @@ die() { echo "  ✗ $1" >&2; echo "     → 怎么办：$2" >&2; exit 2; }
 
 # 配置转成选项；不认识的 key、不是整数的值都拒绝，免得一个拼错的 key 被安静地丢掉
 config_options() {
-  local line key value known=" interval-seconds max-minutes tool-minutes wait-loop-minutes idle-minutes repeat-count context-tokens process-report-minutes process-stale-minutes process-max-minutes not-started-minutes active-minutes detection-poll-seconds leftover-background-grace-minutes ask-every-minutes process-rss-gibibytes progress-stale-minutes kept-copy-hours "
+  local line key value known=" interval-seconds max-minutes tool-minutes wait-loop-minutes idle-minutes repeat-count context-tokens process-report-minutes process-stale-minutes process-max-minutes not-started-minutes active-minutes detection-poll-seconds leftover-background-grace-minutes ask-every-minutes process-rss-gibibytes progress-stale-minutes kept-copy-hours scratch-idle-hours terminate-after-unacknowledged-reports "
   [[ -f "$conf" ]] || return 0
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%%#*}"
@@ -54,11 +56,14 @@ run_or_print() {
 selftest() {
   local scratch fail=0 out checked=0
   scratch="$(mktemp -d)"
+  # 中途报错、被打断也删（成功、失败都删；local 变量到退出时已不在，路径在这里就展开）
+  trap "rm -rf -- '$scratch'" EXIT
   # ① 配置里的 key 原样转成选项、agent 号逗号与空格都认
-  printf 'tool-minutes = 12\n# 注释\n\nmax-minutes=30\nleftover-background-grace-minutes=3\nprocess-rss-gibibytes=6\nkept-copy-hours=5\n' > "$scratch/ok.conf"
+  printf 'tool-minutes = 12\n# 注释\n\nmax-minutes=30\nleftover-background-grace-minutes=3\nprocess-rss-gibibytes=6\nkept-copy-hours=5\nscratch-idle-hours=4\nterminate-after-unacknowledged-reports=2\n' > "$scratch/ok.conf"
   out="$(WATCH_CONF="$scratch/ok.conf" bash "$0" --dry-run a0000000000000001,a0000000000000002 a0000000000000003 2>&1)"
   [[ "$out" == *"--agents a0000000000000001,a0000000000000002,a0000000000000003"* && "$out" == *"--tool-minutes 12"* && "$out" == *"--max-minutes 30"* \
-     && "$out" == *"--leftover-background-grace-minutes 3"* && "$out" == *"--process-rss-gibibytes 6"* && "$out" == *"--kept-copy-hours 5"* ]] \
+     && "$out" == *"--leftover-background-grace-minutes 3"* && "$out" == *"--process-rss-gibibytes 6"* && "$out" == *"--kept-copy-hours 5"* && "$out" == *"--scratch-idle-hours 4"* \
+     && "$out" == *"--terminate-after-unacknowledged-reports 2"* ]] \
     || { echo "  ✗ 自检①：配置或 agent 号没转对：$out"; fail=1; }   # gate-lint:detail
   checked=$((checked + 1))
   # ② 拼错的 key 必须拒绝，不许安静丢掉

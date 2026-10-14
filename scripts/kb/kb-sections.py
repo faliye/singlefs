@@ -13,7 +13,7 @@
 ⚠️ 射程只有开头这一段：别的标题的正文仍然由它自己那一行代表。
 
 **一级标题同样算标题**（2026-09-11 补）。此前只认二到六级，于是顶上是一级标题的文件——
-`checks-owed.md`、`invariants.md`、`layout/01-first-txn.md`——那个一级标题连同它下面、第一个
+`checks-owed.md`、`crates/singlefs-checker/invariants/README.md`、`layout/01-first-txn.md`——那个一级标题连同它下面、第一个
 下级标题之前的正文**一行都不发**。`checks-owed.md` 的整张欠账表（第 2-243 行）就住在那里，
 清单上根本看不见它，也就没有地方写「不抄，因为……」。实测是给 D19 未定项 6 第二轮备材料时
 逐行对清单才发现的。自证会红：`KB_SECTIONS_NO_H1=1` 强制走回旧行为，自检里那一行必须消失。
@@ -29,6 +29,8 @@
     kb-sections.py 文件.md [文件.md ...]      # 打印清单，抄 / 不抄两列留空待填
     kb-sections.py --help                      # 打这一段用法（-h 同），退 0
     kb-sections.py --selftest
+
+供别的脚本 import 的函数：heading_bounds(path) → ([(行号, 级别, 原文)], 总行数)，标题的认法与清单同一份（栅栏里的行不算）；quote-kb.py 用它另算一次 @标题 取法的起止行（C264）。
 
 退出码：0 打出清单（或 --help）；2 没给文件、不认的选项、文件不存在或读不了（stderr 写哪一份、怎么办，不抛 traceback）。
 
@@ -89,6 +91,20 @@ def sections(path):
     return out
 
 
+def heading_bounds(path):
+    """→ ([(行号, 级别, 原文)], 总行数)：每个标题一项，行号 1 起，级别是 `#` 的个数。
+    标题的认法与 sections() 同一份（is_head、fenced_lines），所以栅栏里的 `#` 行不算；总行数是整份文本按换行切开的段数（文件以换行收尾时最后一段是空串，也算一行），与 quote-kb.py 的 read() 数法一致。
+    给 quote-kb.py 另算一次 `@标题` 取法的起止行用（C264）：节从标题起，到下一个级别不更深的标题之前，没有就到文件末。"""
+    lines = io.open(path, encoding="utf-8").read().split("\n")
+    fenced = set() if os.environ.get("KB_SECTIONS_NO_FENCE") else fenced_lines(lines)
+    rows = []
+    for i, l in enumerate(lines, 1):
+        found = is_head(i, l, fenced)
+        if found:
+            rows.append((i, len(found.group(1)), l))
+    return rows, len(lines)
+
+
 def render(paths):
     buf = []
     for p in paths:
@@ -132,6 +148,12 @@ def selftest():
         frows = [t for t, _ in sections(g)]
         if any('栅栏里' in r for r in frows):
             print('selftest: 代码栅栏里的 `## ` 行被当成标题发了一行'); return 1
+        b = os.path.join(d, 'bounds.md')
+        io.open(b, 'w', encoding='utf-8').write(
+            '## 甲\n\n```bash\n# 像标题的注释\n```\n\n### 甲一\n\n正文\n\n## 乙\n\n末行\n')
+        brows, btotal = heading_bounds(b)
+        if brows != [(1, 2, '## 甲'), (7, 3, '### 甲一'), (11, 2, '## 乙')] or btotal != 14:
+            print(f'selftest: heading_bounds 给出的标题表不对（栅栏里的 # 行不算、级别是 # 的个数、总行数按换行切开数）——{brows} 共 {btotal} 行'); return 1
         # 命令行：--help / -h 打文件头的用法退 0；不认的选项退 2；读不了的文件（目录）报文件名与出路、不抛 traceback
         cli_cases = [(['--help'], 0, '用法：'), (['-h'], 0, '用法：'), (['--bogus'], 2, '不认的选项：--bogus'),
                      ([d], 2, f'读不了 {d}'), ([os.path.join(d, 'nothere.md')], 2, '这些文件不存在')]

@@ -2,7 +2,7 @@
 """E171 第 1 次重跑·修订 11：修订 8 那一趟第 0–10 步按单元编排，带复用（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.4、11.5、11.9、11.10 节
 与其后「主 agent 认定：修订 11 交回」）。由 run_segment_one_revision_11_multi_host.sh 起，在仓根跑。
 
-为什么另写一层：segment_one_units_revision_8.py（eff23f12…）与单元脚本 segment_one_unit_revision_8.sh 一个字节不改。这一层按路径载入前者（开跑先核 sha256，
+为什么另写一层：segment_one_units_revision_8.py（cc52fcfc…）与单元脚本 segment_one_unit_revision_8.sh 一个字节不改。这一层按路径载入前者（开跑先核 sha256，
 不是就退 3），单元表、依赖、次序与资源、续跑、一步停、逐行编排的起法都调它原来的函数；改的只有第 11.10 节表那几处：
   ① 单元脚本换成 segment_one_unit_revision_11.sh（修订 8 那份照抄，只在读数进程那几处加取用），逐行编排换成 rows_orchestrator_revision_11.py
     （修订 11 占位的路径经环境变量 E171_REVISION_11_CONFIG 交给它）；
@@ -52,7 +52,7 @@ BREAK_VARIABLE = "UNITS_R11_BREAK"
 SELFTEST_VARIABLE = "UNITS_R11_SELFTEST"
 CONFIG_VARIABLE = "E171_REVISION_11_CONFIG"
 UNITS_R8_PATH = os.path.join(HERE, "segment_one_units_revision_8.py")
-UNITS_R8_SHA256 = "eff23f1294027342d9041bff0296609ba221a35f148ea048b400cfc019b622fb"
+UNITS_R8_SHA256 = "cc52fcfc8e5de9854a012a92c129f74d75dd57b21ba857d624f0cb90d0ced0d8"
 UNIT_SCRIPT = os.path.join(HERE, "segment_one_unit_revision_11.sh")
 ROWS_ORCHESTRATOR = os.path.join(HERE, "rows_orchestrator_revision_11.py")
 EXIT_WRONG_PINNED_FILE = 3
@@ -74,7 +74,7 @@ def load_pinned(path: str, expected: str, module_name: str) -> types.ModuleType:
 
 
 try:
-    units8 = load_pinned(UNITS_R8_PATH, UNITS_R8_SHA256, "segment_one_units_revision_8_eff23f12")
+    units8 = load_pinned(UNITS_R8_PATH, UNITS_R8_SHA256, "segment_one_units_revision_8_cc52fcfc")
 except RuntimeError as wrong_file:
     print(f"✗ {wrong_file}（这一层调的是钉住的那一份的函数；改过就先核这一层，再改钉的 sha256）", file=sys.stderr)
     sys.exit(EXIT_WRONG_PINNED_FILE)
@@ -273,6 +273,7 @@ def plan_with_reuse(settings) -> int:
     inputs = tree_inputs(settings)
     if inputs is None:
         print(f"✗ 算键用的树认不全（S18 ②）：{state.inputs_error}")
+        print('     → 怎么办：把闭包里认不出的那几份（上面那句点名的）放进树里，或在登记里补上它们再起')
         return code
     for name in registered_readings(settings):
         reading = [unit for unit in list(reuse.SEGMENT_ONE_READING_UNITS) + reuse.step_4_row_units() if unit.name == name][0]

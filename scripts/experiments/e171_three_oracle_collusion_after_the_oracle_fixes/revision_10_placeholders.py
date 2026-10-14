@@ -376,9 +376,9 @@ def check_h24(repo: str, config: dict, revision_8_config: dict, phase: str) -> O
     clash = [] if broken("h24-old-names-accepted") else [name for name in names if name in taken]
     label_clash = [] if broken("h24-old-names-accepted") else [other for other in OTHER_LABEL_PREFIXES
                                                                   if f"{label}-".startswith(other) or other.startswith(label)]
-    shapes = (all(name.startswith("research/") for name in names) and len(set(names)) == len(names) and names[2].startswith("scripts/experiments/target/")
+    shapes = (all(name.startswith("research/") for index, name in enumerate(names) if index != 2) and len(set(names)) == len(names) and names[2].startswith("scripts/experiments/target/")
               and bool(label) and all(character.isalnum() or character in "._-" for character in label))
-    return Outcome(True, shapes and not clash and not label_clash, f"四个落点在 research/ 下、互不相同、取回的在 scripts/experiments/target/ 下、标签前缀能当标签 {str(shapes).lower()}；"
+    return Outcome(True, shapes and not clash and not label_clash, f"四个落点互不相同、取回的那个在 scripts/experiments/target/ 下、别的三个在 research/ 下、标签前缀能当标签 {str(shapes).lower()}；"
                                                                    f"与修订 6 第二段、修订 8 第一段同名的落点 {clash or '无'}、标签前缀相撞的 {label_clash or '无'}")
 
 
@@ -502,6 +502,7 @@ def main(argument_list: list[str]) -> int:
             return 0
     except judge.RunConditionError as error:
         print(f"✗ {error}")
+        print('     → 怎么办：照上面那句补齐运行条件（配置、冻结树、设备文件）再用同一条命令起')
         return EXIT_RUN_CONDITION
     if arguments.phase is None:
         parser.error("check 要给 --phase")

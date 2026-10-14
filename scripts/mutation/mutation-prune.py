@@ -85,7 +85,7 @@ import sys
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY, ".claude", "scripts"))
 from project_preflight import preflight  # noqa: E402
 

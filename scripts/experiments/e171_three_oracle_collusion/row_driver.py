@@ -2,12 +2,13 @@
 
 跑法（在仓根，经 `scripts/hosts/capped.sh`；装置与执行器本身经 `run-with-memory-cap.sh`）：
   python3 row_driver.py --repo-root <仓根> --work-root <草稿目录> --output-root <输出根> --rows 1,6 [--empty-mutation]
-      [--threads 6] [--memory-cap 4G] [--lanes 1] [--positive-control O1-对拍|O1-崩溃判官|O2|O3] [--disable-oracle O1|O2]
+      [--threads <每线道，缺省 = 登记的重活默认并行度 ÷ --lanes>] [--memory-cap 4G] [--lanes 1] [--positive-control O1-对拍|O1-崩溃判官|O2|O3] [--disable-oracle O1|O2]
       [--no-executor] [--o3-control-bad-states <E170 bad-states 的导出目录>] [--skip-finished] [--snapshot-from <冻住的树>]
       [--selected-rows <表>] [--other-selected-rows <别的表> …]
 F4 扩表（登记 5.2「扩表」）：`--selected-rows bad-implementations-expansion-164.tsv --other-selected-rows bad-implementations-117.tsv --all`；
 补位跳过两张表里的每一个名字（「扩表与补位都不重挑已跑过的行」）。
-一次跑里先把仓（或 `--snapshot-from` 给的树）拍一张快照（`Cargo.toml`、`Cargo.lock`、`.cargo`、`crates/`，不带 target），每条线道从快照同步出自己的树与编译目录（线道之间不共享，
+一次跑里先把仓（或 `--snapshot-from` 给的树）拍一张快照（`Cargo.toml`、`Cargo.lock`、`.cargo`、`crates/`，不带 target，外加每台默认重活线程数的登记文件
+`.claude/heavy-thread-default`：harness 包经 include_str! 在编译时读它，线道的树里没有就编不过；快照摘要只算 `.rs` 与 `Cargo.*`，不含它），每条线道从快照同步出自己的树与编译目录（线道之间不共享，
 同一条线道里跨行复用编译目录，所以第一行是冷编译、之后是增量），每行改一处、编、跑、再把改过的文件还原。
 增量编译的前提（登记修订 5）：cargo 只在一个包的源文件修改时间晚于上一次编它的时刻时重编；还原（`copy2`）与同步（`rsync -a`）都把修改时间带回快照那一刻，
 所以每条线道记一份 `build-record.tsv`（上一次编完的时刻、自那以后改过还没干净重编的文件），每行同步之后先把那几个文件的修改时间置成现在，编之前核它们内容与快照相同、
@@ -24,6 +25,8 @@ F4 扩表（登记 5.2「扩表」）：`--selected-rows bad-implementations-exp
 O3 一步：开跑前核一次冻结行（Z2，不过整趟不跑）；每行装置退 0、导出了至少一条流，就起冻结的执行器（只列导出了的流）；`--no-executor` 是 Q3-核「驱动不跑执行器」那一次。
 线道从一条共用的队列里领行（先到先得），每条线道一次一行。`--skip-finished`：输出根里已有 `row-result.tsv` 的行目录当作做完了、不重跑；没有 `row-result.tsv` 的行目录
 （上一次中途停下的）由驱动删掉重做。耗时在这个进程里用 `time.monotonic_ns` 计：拷仓与改坏、编、装置、执行器各一段，整表一段（`table` 行）；装置自己的分段耗时在它的 `E7TIMING` 行里。
+弄坏开关 E171_ROW_DRIVER_BREAK=registry-not-synced（只给 test_synced_entries 证红用）：快照与线道的树都不带 `.claude/heavy-thread-default`（改前的样子），
+  test_synced_entries 的 test_the_thread_registry_reaches_the_snapshot_and_the_lane_tree 红。
 """
 
 from __future__ import annotations
@@ -50,7 +53,9 @@ from bad_implementation_table import (MAXIMUM_SUBSTITUTIONS_PER_ROW, STATUS_ANCH
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEVICE_BINARY_NAME = "e171_three_oracle_collusion"
 DEVICE_PACKAGE = "singlefs-checker-tier"
-SYNCED_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "crates")
+THREAD_REGISTRY_ENTRY = ".claude/heavy-thread-default"   # harness 经 include_str! 编进来的登记文件（crates/singlefs-harness/src/heavy_threads.rs）
+SYNCED_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "crates", THREAD_REGISTRY_ENTRY)
+BREAK_VARIABLE = "E171_ROW_DRIVER_BREAK"
 MUTATIONS_TABLE = "crates/mutations.tsv"
 ROW_TIME_LIMIT_SECONDS = 1800
 QUEUE_WAIT_SECONDS = 1800
@@ -208,6 +213,8 @@ def sync_tree(source_root: str, destination_root: str) -> None:
     """`rsync -a --delete`：源与目的逐项同步，不动 target；没变的文件保留修改时间，所以编译目录里没变的包不重编。"""
     os.makedirs(destination_root, exist_ok=True)
     for entry in SYNCED_ENTRIES:
+        if entry == THREAD_REGISTRY_ENTRY and os.environ.get(BREAK_VARIABLE) == "registry-not-synced":
+            continue
         source = os.path.join(source_root, entry)
         if not os.path.exists(source):
             continue
@@ -215,6 +222,7 @@ def sync_tree(source_root: str, destination_root: str) -> None:
         if os.path.isdir(source):
             subprocess.run(["rsync", "-a", "--delete", "--exclude", "target", source + "/", destination + "/"], check=True)
         else:
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
             subprocess.run(["rsync", "-a", source, destination], check=True)
 
 
@@ -564,6 +572,16 @@ def lane_worker(lane: int, jobs: "queue.Queue[tuple[int, int, SelectedRow | None
             results[position] = {"row_number": number, "status": "driver_error", "error": f"{type(error).__name__}:{error}"}
 
 
+def threads_per_lane(threads: int | None, lanes: int, environment=os.environ) -> int:
+    """每条线道的线程数：给了照它；没给取登记的重活默认并行度（SINGLEFS_THREAD_CAP 设了取它）÷ 线道数，向下取整，至少 1。"""
+    if threads is not None:
+        return threads
+    # 现用现引：第二台上这份驱动单独拷在套件目录里，那里没有 scripts/hosts，不能在导入时引
+    sys.path.insert(0, os.path.join(HERE, "..", "..", "hosts"))
+    from heavy_threads import default_heavy_threads
+    return max(1, default_heavy_threads(environment) // max(1, lanes))
+
+
 def main(argument_list: list[str]) -> int:
     parser = argparse.ArgumentParser(description="E171 逐行驱动")
     parser.add_argument("--repo-root", required=True)
@@ -576,7 +594,7 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--first-slice", action="store_true", help="第一刀：每个文件 i = 0 那一行（24 行）")
     parser.add_argument("--all", action="store_true", help="117 行")
     parser.add_argument("--empty-mutation", action="store_true", help="另跑空变异：拿表里第一行、把替换文换成原文本身（行目录 row-0）")
-    parser.add_argument("--threads", type=int, default=6)
+    parser.add_argument("--threads", type=int, default=None, help="每条线道的线程数；不给取登记的重活默认并行度 ÷ --lanes（向下取整，至少 1）")
     parser.add_argument("--memory-cap", default="4G")
     parser.add_argument("--lanes", type=int, default=1)
     parser.add_argument("--positive-control", choices=["O1-对拍", "O1-崩溃判官", "O2", O3_CONTROL])
@@ -590,6 +608,7 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--rerun-compile-failed-from", action="append", default=[],
                         help="补位那一趟：只跑这几个输出根里结局是编不过的行（行从 --selected-rows 与 --other-selected-rows 的表里按序号取）")
     arguments = parser.parse_args(argument_list)
+    arguments.threads = threads_per_lane(arguments.threads, arguments.lanes)
     if os.path.abspath(arguments.output_root) in {os.path.abspath(root) for root in arguments.rerun_compile_failed_from}:
         parser.error("补位那一趟的 --output-root 要是新的，不能是 --rerun-compile-failed-from 里的输出根")
     if arguments.positive_control == O3_CONTROL and not arguments.o3_control_bad_states:

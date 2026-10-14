@@ -207,6 +207,7 @@ mod tests {
 
     /// 算力受限对照必须固定总工作量：线程数翻倍，单线程迭代数减半。
     #[test]
+    // wallclock-assert: 4 线程做同样总量的挂钟耗时比 1 线程短
     fn compute_control_holds_total_work_constant() {
         // 用极小的总量，只验分派逻辑不验性能
         let one_thread_nanoseconds = compute(1, 1_000_000);

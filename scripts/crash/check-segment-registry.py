@@ -5,7 +5,14 @@
 
 用法：
     check-segment-registry.py [--root 仓库根目录]
+    check-segment-registry.py [--root 仓库根目录] --print-mkfs-segments-line
     check-segment-registry.py --selftest
+
+`--print-mkfs-segments-line`：不比对，只把八节登记表「mkfs 种根」那一行登记的段序列、次操作、崩溃状态数与种类串
+拼成虚机二进制打的那种行（`E7RESULT name=segments path=mkfs operations=… segments=… closed_form=… kinds=…`，
+字段次序同 crates 里真设备二进制的输出）打到 stdout，一行；只读布局文件，不读 replay.sh 与产物。
+门禁 checker-tier-qemu-device-streams 拿它与虚机输出的 `path=mkfs` 那一行逐字比（那一行的权威是钉住活代码的用例，
+不是 E142 的产物）。那一行找不到、不止一行、四样缺一样，退 2。
 
 为什么要有它：`.claude/kb/checks-owed.md` C316（提交步骤的登记位有四处且互不相同） 收窄之后
 剩两半，第①半是「kb 登记表八与产物 `name=segments` 行之间没有逐字比对（表是人抄的）」——
@@ -29,10 +36,18 @@
 自证会红：`--selftest` 把当前这份 layout/01-first-txn.md 与 replay.sh 指向的真实产物，
 分别拷进两个临时目录（`green/` 原样、`red/` 改坏了 mkfs 那一行的一个段序列数字），
 断言 `green/` 判绿、`red/` 判红；改坏之前先确认那个数字串在整份文件里只出现一次，
-免得改错了别的地方也跟着变。
+免得改错了别的地方也跟着变。`--print-mkfs-segments-line` 那一支另有三份：未改动的拷贝打一行、按产物行解析回来四样与登记相符；
+「mkfs 种根」那一行段序列改一个数，打出的行跟着变；那一行改名、抄成两行，都退 2。
+比对那一支另有第四刀：八节开头那句「`path=…`」声明里多写一条没有表格行占它的路径（`selftest_unclaimed_path`），
+排除之后剩不下恰好一条，必须退 2，消息里点出实际剩了几条（`!= 1` 被改成 `< 1` 时多出来的那条被悄悄放过，退 0）。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪一项红（项名是 run_self_test() 里那一格的名字，括号里是那条「✗ --selftest 没通过：」的开头）：
+  CHECK_SEGMENT_REGISTRY_BREAK=accept-extra-path  build_merged_stream_entry() 把「排除之后恰好剩一条」当成「至少剩一条」判（`!= 1` 当 `< 1`）
+      多声明一条 path（「✗ --selftest 没通过：」下面「八节开头「`path=…`」声明里多写了一条 `selftest_unclaimed_path`」那一条）
 """
 import argparse
 import dataclasses
+import os
 import pathlib
 import re
 import shutil
@@ -60,10 +75,18 @@ OPERATION_COUNT_PATTERN = re.compile(r'(\d+)\s*次操作')
 CRASH_STATE_COUNT_PATTERN = re.compile(r'(\d+)\s*个(?:崩溃)?状态')
 E142_REPLAY_ROW_PATTERN = re.compile(r'^E142\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)$', re.MULTILINE)
 DEVICE_PINNED_NOTE_PATTERN = re.compile(
-    r'第二条流的段序列\s*`([0-9]+(?:\+[0-9]+)+)`\s*、\s*(\d+)\s*次写\s*、\s*(\d+)\s*个状态[^\n]*?装置钉住[^\n]*?`(crates/[^`]+\.rs)`'
+    r'覆盖写固定脚本流的段序列\s*`([0-9]+(?:\+[0-9]+)+)`\s*、\s*(\d+)\s*次写\s*、\s*(\d+)\s*个状态[^\n]*?装置钉住[^\n]*?`(crates/[^`]+\.rs)`'
 )  # 里程碑「覆盖写、释放、回退与复用」的固定脚本没有干跑产物，整条流由 harness 用例里钉的数组守着：数字串、写数、状态数、钉它的用例文件
 PRODUCT_SEGMENT_LINE_PREFIX = 'E7RESULT name=segments '
 PRODUCT_SEGMENT_LINE_REQUIRED_KEYS = ('path', 'operations', 'segments', 'closed_form')
+MKFS_ROW_LABEL = 'mkfs 种根'  # 八节登记表第一列的原文；--print-mkfs-segments-line 按它认那一行
+MKFS_PRODUCT_PATH_NAME = 'mkfs'  # 虚机二进制与 E142 产物里 mkfs 那一行的 path= 值
+EXTRA_DECLARED_PATH_NAME = 'selftest_unclaimed_path'  # --selftest 第四刀往八节开头的 path= 声明里多写的那一条（没有表格行占它）
+
+
+def broken(switch):
+    """弄坏开关（文件头的开关表）：只给 --selftest 证红用，平时不设。"""
+    return os.environ.get('CHECK_SEGMENT_REGISTRY_BREAK') == switch
 
 
 class CheckError(Exception):
@@ -75,7 +98,7 @@ class RegistryEntry:
     row_label: str
     origin_description: str  # '表格行' 或 '整条流提示'——只用来在成功摘要里分开计数，不参与比对
     is_anticipated: bool
-    is_device_pinned: bool  # 段序列标「装置钉住」：从第二条流推得、不与 E142 产物比，只计数
+    is_device_pinned: bool  # 段序列标「装置钉住」：从覆盖写固定脚本流推得、不与 E142 产物比，只计数
     product_path_name: str | None
     segment_sequence_text: str | None
     operation_count: int | None
@@ -222,11 +245,12 @@ def build_merged_stream_entry(section_text, table_entries):
 
     claimed_paths = {entry.product_path_name for entry in table_entries if entry.product_path_name is not None}
     remaining_paths = [path for path in declared_paths if path not in claimed_paths]
-    if len(remaining_paths) != 1:
+    remaining_path_count_is_wrong = len(remaining_paths) < 1 if broken('accept-extra-path') else len(remaining_paths) != 1
+    if remaining_path_count_is_wrong:
         raise CheckError(
             '开头「四行（`path=...`）」声明的路径集合是 ' + '、'.join(declared_paths) +
             '，表格行已经占用 ' + '、'.join(sorted(claimed_paths)) +
-            f'，排除之后应该剩一条给「整条流」那句提示，实际剩 {remaining_paths} 条——'
+            f'，排除之后应该剩一条给「整条流」那句提示，实际剩 {len(remaining_paths)} 条（{"、".join(remaining_paths) or "无"}）——'
             '八节的写法变了，这段解析要跟着改，不能再按排除法自动认领'
         )
     merged_stream_path_name = remaining_paths[0]
@@ -249,6 +273,32 @@ def build_registry_entries(section_text):
     table_entries = [row_to_entry(row_cells) for row_cells in parse_registry_table_rows(section_text)]
     merged_stream_entry = build_merged_stream_entry(section_text, table_entries)
     return table_entries + [merged_stream_entry]
+
+
+def registered_mkfs_segments_line(layout_text):
+    """八节登记表「mkfs 种根」那一行，拼成 `E7RESULT name=segments path=mkfs operations=… segments=… closed_form=… kinds=…`。
+
+    四样（段序列数字串、次操作、崩溃状态数、种类串）都从 row_to_entry 解析出来，与比对那一支是同一份解析；
+    那一行不是恰好一行、标了预想、或四样缺一样，都是 CheckError（登记表的写法变了，不猜）。
+    """
+    section_text = extract_section_eight(layout_text)
+    entries = [row_to_entry(row_cells) for row_cells in parse_registry_table_rows(section_text)]
+    matched_entries = [entry for entry in entries if entry.row_label == MKFS_ROW_LABEL]
+    if len(matched_entries) != 1:
+        raise CheckError(f'八节登记表里第一列是「{MKFS_ROW_LABEL}」的行有 {len(matched_entries)} 行，不是 1 行——那一行改了名、被删了或被重复登记')
+    entry = matched_entries[0]
+    if entry.is_anticipated:
+        raise CheckError(f'「{MKFS_ROW_LABEL}」那一行标了预想，没有可比的登记值')
+    missing_fields = [name for name, value in (
+        ('段序列数字串', entry.segment_sequence_text),
+        ('「N 次操作」', entry.operation_count),
+        ('「N 个崩溃状态」', entry.crash_state_count),
+        ('「种类 `[...]`」', entry.step_kinds_text),
+    ) if value is None]
+    if missing_fields:
+        raise CheckError(f'「{MKFS_ROW_LABEL}」那一行的段序列栏里认不出 {"、".join(missing_fields)}')
+    return (f'{PRODUCT_SEGMENT_LINE_PREFIX}path={MKFS_PRODUCT_PATH_NAME} operations={entry.operation_count} '
+            f'segments={entry.segment_sequence_text} closed_form={entry.crash_state_count} kinds={entry.step_kinds_text}')
 
 
 
@@ -331,7 +381,7 @@ def closed_form_crash_state_count(segment_lengths):
 
 
 def check_device_pinned_notes(section_text, repository_root):
-    """八节里「第二条流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」那些句子。
+    """八节里「覆盖写固定脚本流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」那些句子。
 
     这条流没有干跑产物，登记表能核的是三件事：数字串加起来是不是它自称的写数、
     闭式算出来是不是它自称的状态数、钉它的那份用例文件里有没有这个数组（rustfmt 会把长数组折行，
@@ -345,7 +395,7 @@ def check_device_pinned_notes(section_text, repository_root):
             match.group(1), int(match.group(2)), int(match.group(3)), match.group(4)
         )
         segment_lengths = [int(term) for term in segment_sequence_text.split('+')]
-        label = f'第二条流 `{segment_sequence_text}`'
+        label = f'覆盖写固定脚本流 `{segment_sequence_text}`'
         if sum(segment_lengths) != claimed_operation_count:
             mismatches.append(f'{label}：数字串加起来是 {sum(segment_lengths)} 次写，kb 写的是 {claimed_operation_count}')
         computed_crash_state_count = closed_form_crash_state_count(segment_lengths)
@@ -371,51 +421,63 @@ def check_device_pinned_notes(section_text, repository_root):
         checked_descriptions.append(f'{label}（{claimed_operation_count} 次写、{claimed_crash_state_count} 个状态，数组在 {test_file_relative_path} 里出现 {array_count} 次）')
     if not checked_descriptions:
         # 一句都认不出时不许当成「没有要核的」放过：那句登记被改了形状，这一格就再没人核（扫到 0 项不是通过）
-        mismatches.append('八节里一句「第二条流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」的登记都认不出：登记句的形状改了，第二条流就没人核')
+        mismatches.append('八节里一句「覆盖写固定脚本流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」的登记都认不出：登记句的形状改了，覆盖写固定脚本流就没人核')
     return mismatches, checked_descriptions
 
 
+def replace_once_inside(layout_text, region_text, original_span, mutated_span, where):
+    """--selftest 用：只在 `region_text`（八节，或八节表里的那一行）里把 `original_span` 换成 `mutated_span`，再把那一段放回原文。
+    要求那一串在这一段里恰好出现一次、这一段在整份文件里恰好出现一次：kb 别处写着同一串不碍事，换错了地方的也不会换。"""
+    if region_text.count(original_span) != 1:
+        raise CheckError(f'{where}里 {original_span} 出现了 {region_text.count(original_span)} 次，不是 1 次——自证定位不到唯一位置')
+    if layout_text.count(region_text) != 1:
+        raise CheckError(f'{where}这一段在整份文件里出现了 {layout_text.count(region_text)} 次，不是 1 次——自证放不回原处')
+    return layout_text.replace(region_text, region_text.replace(original_span, mutated_span, 1), 1)
+
+
+def registry_row_line_of(section_text, row_label, original_span):
+    """八节登记表里以 `row_label` 起头、又含 `original_span` 的那一行原文（自证只在这一行里动刀）。"""
+    lines = [line for line in section_text.split('\n') if line.strip().startswith('|') and row_label in line and original_span in line]
+    if len(lines) != 1:
+        raise CheckError(f'八节登记表里「{row_label}」又含 {original_span} 的行有 {len(lines)} 行，不是 1 行——自证定位不到唯一那一行')
+    return lines[0]
+
+
 def mutate_device_pinned_note(layout_text):
-    """--selftest 用：把第一句「第二条流的段序列」的最后一项加 1——闭式与用例里的数组都该对不上。"""
+    """--selftest 用：把第一句「覆盖写固定脚本流的段序列」的最后一项加 1——闭式与用例里的数组都该对不上。"""
     section_text = extract_section_eight(layout_text)
     match = DEVICE_PINNED_NOTE_PATTERN.search(section_text)
     if match is None:
-        raise CheckError('八节里找不到「第二条流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」这句登记，自证没法造出可判红的改动')
+        raise CheckError('八节里找不到「覆盖写固定脚本流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」这句登记，自证没法造出可判红的改动')
     original_segment_sequence_text = match.group(1)
     original_span = f'`{original_segment_sequence_text}`'
-    occurrence_count = layout_text.count(original_span)
-    if occurrence_count != 1:
-        raise CheckError(f'第二条流的段序列 {original_span} 在整份文件里出现了 {occurrence_count} 次，不是 1 次——自证定位不到唯一位置')
     terms = original_segment_sequence_text.split('+')
     terms[-1] = str(int(terms[-1]) + 1)
     mutated_segment_sequence_text = '+'.join(terms)
-    return (layout_text.replace(original_span, f'`{mutated_segment_sequence_text}`', 1),
+    return (replace_once_inside(layout_text, section_text, original_span, f'`{mutated_segment_sequence_text}`', '八节'),
             original_segment_sequence_text, mutated_segment_sequence_text, match.group(4))
 
 
-def mutate_one_segment_number(layout_text):
-    """--selftest 用：把八节表格第一条可比对的行，段序列的最后一项加 1。
+def mutate_one_segment_number(layout_text, row_label=None):
+    """--selftest 用：把八节表格第一条可比对的行（给了 row_label 就只看第一列是它的那一行），段序列的最后一项加 1。
 
-    先确认原样的反引号串（比如 `` `4+1+1+1+2` ``）在整份文件里只出现一次，
-    免得替换的时候顺手改坏了别的地方——那样测出来的「判红」证明的是别的东西，不是这条检查本身。
+    只在那一行里换（`replace_once_inside`），免得替换的时候顺手改坏了别的地方——那样测出来的「判红」证明的是别的东西，不是这条检查本身。
     """
     section_text = extract_section_eight(layout_text)
     for row_cells in parse_registry_table_rows(section_text):
         entry = row_to_entry(row_cells)
         if entry.is_anticipated or entry.is_device_pinned or entry.segment_sequence_text is None:
             continue
+        if row_label is not None and entry.row_label != row_label:
+            continue
         original_segment_sequence_text = entry.segment_sequence_text
         original_span = f'`{original_segment_sequence_text}`'
-        occurrence_count = layout_text.count(original_span)
-        if occurrence_count != 1:
-            raise CheckError(
-                f'「{entry.row_label}」这一行的段序列 {original_span} 在整份文件里出现了 '
-                f'{occurrence_count} 次，不是 1 次——自证选的这一行定位不到唯一位置，换一行，或者查一下文件是不是重复了'
-            )
+        row_line = registry_row_line_of(section_text, entry.row_label, original_span)
         terms = original_segment_sequence_text.split('+')
         terms[-1] = str(int(terms[-1]) + 1)
         mutated_segment_sequence_text = '+'.join(terms)
-        mutated_layout_text = layout_text.replace(original_span, f'`{mutated_segment_sequence_text}`', 1)
+        mutated_layout_text = replace_once_inside(layout_text, row_line, original_span, f'`{mutated_segment_sequence_text}`',
+                                                  f'「{entry.row_label}」那一行')
         return mutated_layout_text, entry.row_label, original_segment_sequence_text, mutated_segment_sequence_text
     raise CheckError('八节的登记表里找不到一条「不是预想、且带段序列数字串」的行，自证没法造出一个可判红的改动')
 
@@ -432,8 +494,7 @@ def mutate_one_step_kind(layout_text):
             continue
         # 表格单元格里的竖线在文件里写成 `\\|`，定位原文要按转义后的样子找。
         original_span = '`' + entry.step_kinds_text.replace('|', '\\|') + '`'
-        if layout_text.count(original_span) != 1:
-            raise CheckError(f'「{entry.row_label}」这一行的种类串在整份文件里不是恰好出现 1 次，自证定位不到唯一位置')
+        row_line = registry_row_line_of(section_text, entry.row_label, original_span)
         first_segment_end = entry.step_kinds_text.index(']')
         first_segment = entry.step_kinds_text[:first_segment_end]
         first_kind = first_segment[1:].split(',')[0]
@@ -444,9 +505,31 @@ def mutate_one_step_kind(layout_text):
             mutated_kind = f'{first_kind}×2'
         mutated_kinds_text = entry.step_kinds_text.replace(first_kind, mutated_kind, 1)
         mutated_span = '`' + mutated_kinds_text.replace('|', '\\|') + '`'
-        mutated_layout_text = layout_text.replace(original_span, mutated_span, 1)
+        mutated_layout_text = replace_once_inside(layout_text, row_line, original_span, mutated_span, f'「{entry.row_label}」那一行')
         return mutated_layout_text, entry.row_label, first_kind, mutated_kind
     raise CheckError('八节的登记表里找不到一条带「种类 `[...]`」的行，自证没法造出一个只改种类的改动')
+
+
+def mutate_declared_paths_with_extra(layout_text):
+    """--selftest 用：八节开头那句「`path=a / b / …`」声明末尾多写一条没有表格行占它的路径。
+
+    声明读的是八节里第一处「`path=…`」（parse_declared_product_paths），所以只在八节里换那一处；
+    表格行与整条流提示一个字不动，排除之后就从剩一条变成剩两条。返回 (改后的全文, 声明原文, 改后的声明, 改后排除之后该剩几条)。
+    """
+    section_text = extract_section_eight(layout_text)
+    declared_match = DECLARED_PRODUCT_PATHS_PATTERN.search(section_text)
+    if declared_match is None:
+        raise CheckError('八节里找不到「`path=mkfs / warm_up / …`」这句声明，自证没法往里多写一条路径')
+    declared_paths = parse_declared_product_paths(section_text)
+    if EXTRA_DECLARED_PATH_NAME in declared_paths:
+        raise CheckError(f'八节开头的声明里已经有 {EXTRA_DECLARED_PATH_NAME}，自证起的多余路径名要换一个')
+    claimed_paths = {entry.product_path_name for entry in (row_to_entry(cells) for cells in parse_registry_table_rows(section_text))
+                     if entry.product_path_name is not None}
+    original_span = declared_match.group(0)
+    mutated_span = original_span[:-1] + f' / {EXTRA_DECLARED_PATH_NAME}`'
+    expected_remaining_count = len([path for path in declared_paths + [EXTRA_DECLARED_PATH_NAME] if path not in claimed_paths])
+    return (replace_once_inside(layout_text, section_text, original_span, mutated_span, '八节'),
+            original_span, mutated_span, expected_remaining_count)
 
 
 def perform_check(repository_root):
@@ -483,7 +566,7 @@ def perform_check(repository_root):
             continue
         if entry.product_path_name is None:
             # 出处指到一条钉住活代码的用例（`<文件>.rs` 加一个测试函数名）时，按那条用例里写死的串比，
-            # 不按 E142 产物比：mkfs 那一行 2026-09-22 起就是这一种——E142 的装置是 research/ 下一份
+            # 不按 E142 产物比：mkfs 那一行 2026-09-22 起就是这一种——E142 的装置是 scripts/experiments/ 下一份
             # 独立手写模型、不读 crates/ 的 mkfs 实现，清零那八步它没有，拿它当基准两边会一起过时
             # （C485（segment-registry 格不读活代码，段序列变了照样绿））。
             pinned = compare_against_pinning_test(entry, repository_root)
@@ -548,7 +631,7 @@ def perform_check(repository_root):
     mismatches.extend(device_pinned_mismatches)
 
     if mismatches:
-        lines = [f'  ✗ 段序列登记表与 E142 产物的 name=segments 行（或第二条流与钉它的用例）对不上，共 {len(mismatches)} 处：']
+        lines = [f'  ✗ 段序列登记表与 E142 产物的 name=segments 行（或覆盖写固定脚本流与钉它的用例）对不上，共 {len(mismatches)} 处：']
         for mismatch in mismatches:
             lines.append(f'     {mismatch}')
         lines.append('     → 怎么办：表是抄错了，就照产物改 .claude/kb/layout/01-first-txn.md 那一行；')
@@ -562,14 +645,29 @@ def perform_check(repository_root):
         f'整条流提示 {compared_note_count} 处，段序列与每段步骤种类多重集都与 {product_path.name} 的 name=segments 行逐字一致），'
         f'跳过 {skipped_count} 条标预想的表格行；'
         f'{live_pinned_row_count} 条的出处指到钉住活代码的用例、按那条用例里写死的串比（不按产物比）；'
-        f'{device_pinned_row_count} 条标「装置钉住」的表格行不与产物比（形状从第二条流推得），'
-        f'第二条流的登记 {len(device_pinned_descriptions)} 处与钉它的用例相符：' + '；'.join(device_pinned_descriptions)
+        f'{device_pinned_row_count} 条标「装置钉住」的表格行不与产物比（形状从覆盖写固定脚本流推得），'
+        f'覆盖写固定脚本流的登记 {len(device_pinned_descriptions)} 处与钉它的用例相符：' + '；'.join(device_pinned_descriptions)
     ]
     return 0, lines
 
 
+def perform_print_mkfs_segments_line(repository_root):
+    """--print-mkfs-segments-line：返回 (退出码, 要打印的每一行)。成功时恰好一行，就是拼好的那一行。"""
+    layout_path = repository_root / LAYOUT_RELATIVE_PATH
+    try:
+        if not layout_path.is_file():
+            raise CheckError(f'找不到 {layout_path}')
+        return 0, [registered_mkfs_segments_line(layout_path.read_text(encoding='utf-8'))]
+    except CheckError as error:
+        return 2, [
+            f'  ✗ 取不出八节登记表「{MKFS_ROW_LABEL}」那一行的登记值：{error}',
+            f'     → 怎么办：看 {LAYOUT_RELATIVE_PATH}「八、」登记表第一列是「{MKFS_ROW_LABEL}」的那一行：恰好一行，'
+            '段序列栏里写全 `数字串`、「N 次操作」、「N 个崩溃状态」与「种类 `[...]`」（照钉它的那条用例写）。',
+        ]
+
+
 def build_fixture_root(root_path, layout_text, replay_script_text, product_file_name, product_text, pinned_test_files):
-    """在临时目录里按仓库的相对路径摆好三份文件加钉第二条流的用例文件，供 --selftest 各拿一份去跑真正的比对逻辑。"""
+    """在临时目录里按仓库的相对路径摆好三份文件加钉覆盖写固定脚本流的用例文件，供 --selftest 各拿一份去跑真正的比对逻辑。"""
     layout_path = root_path / LAYOUT_RELATIVE_PATH
     replay_script_path = root_path / REPLAY_SCRIPT_RELATIVE_PATH
     product_path = root_path / RESULTS_DIRECTORY_RELATIVE_PATH / product_file_name
@@ -598,7 +696,27 @@ def run_self_test():
          original_kind_text, mutated_kind_text) = mutate_one_step_kind(layout_text)
         (pinned_mutated_layout_text, original_pinned_text,
          mutated_pinned_text, pinned_test_relative_path) = mutate_device_pinned_note(layout_text)
+        # 第四刀：八节开头的 path= 声明多写一条没有表格行占它的路径，排除之后剩两条，要退 2（CheckError 那一支）
+        (extra_path_layout_text, _original_declaration,
+         mutated_declaration, expected_extra_path_remaining_count) = mutate_declared_paths_with_extra(layout_text)
+        # --print-mkfs-segments-line 那一支的三份：mkfs 那一行段序列最后一项加 1；那一行第一列改名（0 行）；那一行抄两遍（2 行）
+        (mkfs_mutated_layout_text, _mkfs_row_label,
+         original_mkfs_sequence_text, mutated_mkfs_sequence_text) = mutate_one_segment_number(layout_text, MKFS_ROW_LABEL)
         section_text = extract_section_eight(layout_text)
+        mkfs_row_line = registry_row_line_of(section_text, MKFS_ROW_LABEL, f'| {MKFS_ROW_LABEL} |')
+        mkfs_renamed_layout_text = replace_once_inside(layout_text, mkfs_row_line, f'| {MKFS_ROW_LABEL} |', f'| {MKFS_ROW_LABEL}（改名） |',
+                                                       f'「{MKFS_ROW_LABEL}」那一行')
+        mkfs_duplicated_layout_text = replace_once_inside(layout_text, section_text, mkfs_row_line, mkfs_row_line + '\n' + mkfs_row_line, '八节')
+        mkfs_entries = [entry for entry in (row_to_entry(row_cells) for row_cells in parse_registry_table_rows(section_text))
+                        if entry.row_label == MKFS_ROW_LABEL]
+        if len(mkfs_entries) != 1:
+            raise CheckError(f'真仓八节登记表里第一列是「{MKFS_ROW_LABEL}」的行有 {len(mkfs_entries)} 行，不是 1 行')
+        expected_mkfs_fields = {
+            'operation_count': mkfs_entries[0].operation_count,
+            'segment_sequence_text': mkfs_entries[0].segment_sequence_text,
+            'closed_form_crash_state_count': mkfs_entries[0].crash_state_count,
+            'step_kinds_text': mkfs_entries[0].step_kinds_text,
+        }
         pinned_test_files = {
             match.group(4): (real_repository_root / match.group(4)).read_text(encoding='utf-8')
             for match in DEVICE_PINNED_NOTE_PATTERN.finditer(section_text)
@@ -634,10 +752,29 @@ def run_self_test():
             workspace_path / 'pinned-red', pinned_mutated_layout_text, replay_script_text, real_product_path.name, product_text, pinned_test_files,
         )
 
+        extra_path_root = build_fixture_root(
+            workspace_path / 'extra-path', extra_path_layout_text, replay_script_text, real_product_path.name, product_text, pinned_test_files,
+        )
+
+        mkfs_red_root = build_fixture_root(
+            workspace_path / 'mkfs-red', mkfs_mutated_layout_text, replay_script_text, real_product_path.name, product_text, pinned_test_files,
+        )
+        mkfs_renamed_root = build_fixture_root(
+            workspace_path / 'mkfs-renamed', mkfs_renamed_layout_text, replay_script_text, real_product_path.name, product_text, pinned_test_files,
+        )
+        mkfs_duplicated_root = build_fixture_root(
+            workspace_path / 'mkfs-duplicated', mkfs_duplicated_layout_text, replay_script_text, real_product_path.name, product_text, pinned_test_files,
+        )
+
         green_exit_code, green_lines = perform_check(green_root)
         red_exit_code, red_lines = perform_check(red_root)
         kind_red_exit_code, _kind_red_lines = perform_check(kind_red_root)
         pinned_red_exit_code, _pinned_red_lines = perform_check(pinned_red_root)
+        extra_path_exit_code, extra_path_lines = perform_check(extra_path_root)
+        mkfs_green_exit_code, mkfs_green_lines = perform_print_mkfs_segments_line(green_root)
+        mkfs_red_exit_code, mkfs_red_lines = perform_print_mkfs_segments_line(mkfs_red_root)
+        mkfs_renamed_exit_code, mkfs_renamed_lines = perform_print_mkfs_segments_line(mkfs_renamed_root)
+        mkfs_duplicated_exit_code, mkfs_duplicated_lines = perform_print_mkfs_segments_line(mkfs_duplicated_root)
     finally:
         shutil.rmtree(workspace_path, ignore_errors=True)
 
@@ -656,8 +793,42 @@ def run_self_test():
         )
     if pinned_red_exit_code == 0:
         problems.append(
-            f'把第二条流的段序列 `{original_pinned_text}` 改成 `{mutated_pinned_text}` 之后，检查仍然判绿——'
+            f'把覆盖写固定脚本流的段序列 `{original_pinned_text}` 改成 `{mutated_pinned_text}` 之后，检查仍然判绿——'
             f'装置钉住那一半（闭式、{pinned_test_relative_path} 里的数组）没有判别力'
+        )
+    if extra_path_exit_code != 2 or f'实际剩 {expected_extra_path_remaining_count} 条' not in '\n'.join(extra_path_lines):
+        problems.append(
+            f'八节开头「`path=…`」声明里多写了一条 `{EXTRA_DECLARED_PATH_NAME}`（{mutated_declaration}，没有表格行占它）之后，'
+            f'检查本该退 2、消息点出「实际剩 {expected_extra_path_remaining_count} 条」，实际退 {extra_path_exit_code}：' + ' / '.join(extra_path_lines)
+        )
+    if mkfs_green_exit_code != 0 or len(mkfs_green_lines) != 1:
+        problems.append(
+            f'--print-mkfs-segments-line 对未改动的拷贝本该退 0、打一行，实际退出码 {mkfs_green_exit_code}、{len(mkfs_green_lines)} 行：\n       '
+            + '\n       '.join(mkfs_green_lines)
+        )
+    else:
+        try:
+            parsed_mkfs_fields = parse_product_segment_lines(mkfs_green_lines[0]).get(MKFS_PRODUCT_PATH_NAME)
+        except CheckError as error:
+            parsed_mkfs_fields = f'产物行的解析认不出它（{error}）'
+        if parsed_mkfs_fields != expected_mkfs_fields:
+            problems.append(
+                f'--print-mkfs-segments-line 打的 `{mkfs_green_lines[0]}` 按产物行解析回来是 {parsed_mkfs_fields}，'
+                f'登记表那一行是 {expected_mkfs_fields}——拼出来的行与登记的四样对不上'
+            )
+    if (mkfs_red_exit_code != 0 or len(mkfs_red_lines) != 1 or f' segments={mutated_mkfs_sequence_text} ' not in mkfs_red_lines[0]
+            or mkfs_red_lines == mkfs_green_lines):
+        problems.append(
+            f'把「{MKFS_ROW_LABEL}」那一行的段序列从 `{original_mkfs_sequence_text}` 改成 `{mutated_mkfs_sequence_text}` 之后，'
+            f'--print-mkfs-segments-line 打的不是带新段序列的那一行（退出码 {mkfs_red_exit_code}）：' + ' / '.join(mkfs_red_lines)
+        )
+    if mkfs_renamed_exit_code != 2:
+        problems.append(
+            f'把「{MKFS_ROW_LABEL}」那一行第一列改名之后，--print-mkfs-segments-line 本该退 2，实际退 {mkfs_renamed_exit_code}：' + ' / '.join(mkfs_renamed_lines)
+        )
+    if mkfs_duplicated_exit_code != 2:
+        problems.append(
+            f'把「{MKFS_ROW_LABEL}」那一行抄成两行之后，--print-mkfs-segments-line 本该退 2，实际退 {mkfs_duplicated_exit_code}：' + ' / '.join(mkfs_duplicated_lines)
         )
 
     if problems:
@@ -672,7 +843,10 @@ def run_self_test():
         '  ✓ --selftest 通过：未改动的拷贝判绿（退出码 0）；'
         f'把「{mutated_row_label}」的段序列改成 `{mutated_segment_sequence_text}` 之后判红（退出码 {red_exit_code}）；'
         f'只把「{kind_mutated_row_label}」第一段的种类 `{original_kind_text}` 改成 `{mutated_kind_text}` 也判红（退出码 {kind_red_exit_code}）；'
-        f'把第二条流的段序列改成 `{mutated_pinned_text}` 也判红（退出码 {pinned_red_exit_code}）'
+        f'把覆盖写固定脚本流的段序列改成 `{mutated_pinned_text}` 也判红（退出码 {pinned_red_exit_code}）；'
+        f'八节开头的 path= 声明多写一条 `{EXTRA_DECLARED_PATH_NAME}` 退 {extra_path_exit_code}、消息点出实际剩 {expected_extra_path_remaining_count} 条；'
+        f'--print-mkfs-segments-line 打出「{MKFS_ROW_LABEL}」那一行（`{mkfs_green_lines[0]}`，按产物行解析回来四样与登记相符），'
+        f'段序列改成 `{mutated_mkfs_sequence_text}` 跟着变，那一行改名、抄成两行都退 2'
     )
     return 0
 
@@ -687,7 +861,11 @@ def main():
     )
     parser.add_argument(
         '--selftest', action='store_true',
-        help='自证：改坏拷贝里的一个段序列数字，确认检查会转红；未改动的拷贝确认判绿。忽略 --root。',
+        help='自证：改坏拷贝里的一个段序列数字、一个种类、覆盖写固定脚本流的段序列，或在 path= 声明里多写一条路径，确认检查会转红（最后一种退 2）；未改动的拷贝确认判绿。忽略 --root。',
+    )
+    parser.add_argument(
+        '--print-mkfs-segments-line', action='store_true',
+        help='不比对：把八节登记表「mkfs 种根」那一行拼成 E7RESULT name=segments path=mkfs … 打一行（门禁 checker-tier-qemu-device-streams 用）',
     )
     arguments = parser.parse_args()
 
@@ -695,7 +873,10 @@ def main():
         sys.exit(run_self_test())
 
     repository_root = arguments.root.resolve() if arguments.root else default_repository_root()
-    exit_code, message_lines = perform_check(repository_root)
+    if arguments.print_mkfs_segments_line:
+        exit_code, message_lines = perform_print_mkfs_segments_line(repository_root)
+    else:
+        exit_code, message_lines = perform_check(repository_root)
     for line in message_lines:
         print(line)
     sys.exit(exit_code)

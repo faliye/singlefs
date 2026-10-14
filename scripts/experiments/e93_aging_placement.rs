@@ -88,7 +88,6 @@ impl Load {
 
 struct AgingSimulation {
     object_count: usize,
-    slot_count: usize,
     slots_per_segment: usize,
     slot_of: Vec<u32>,
     key_at: Vec<Option<u32>>,
@@ -121,7 +120,6 @@ impl AgingSimulation {
         }
         AgingSimulation {
             object_count,
-            slot_count,
             slots_per_segment: segment_slots,
             slot_of,
             key_at,

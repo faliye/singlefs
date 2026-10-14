@@ -244,6 +244,7 @@ mod tests {
     /// **阳性对照要真的跑一次 I/O**，否则「fdatasync 有没有到设备」只活在产物里、
     /// 没有任何检查看得见（变异 M1 实测：把 `if arm.issues_fdatasync()` 改成 `if false`，一个测试都不红）。
     #[test]
+    // wallclock-assert: 不 fdatasync 的臂每秒完成的同步次数至少是 fdatasync 臂的两倍
     fn fdatasync_actually_reaches_the_device() {
         // ⚠️ **这是计时断言，跑在与整个 workspace 并行的测试进程里**：60 轮的样本
         // 在负载高时会被调度噪声盖过（2026-08-31 实测：单跑 3/3 过，全量套件里 1 过 1 红）。

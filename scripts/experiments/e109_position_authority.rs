@@ -69,6 +69,7 @@ enum Arm {
 }
 
 impl Arm {
+    #[cfg(test)]
     fn name(self) -> &'static str {
         match self {
             Arm::Pointer => "ptr",

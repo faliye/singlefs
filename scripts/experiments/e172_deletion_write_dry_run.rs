@@ -10,6 +10,8 @@
 //!
 //! 退出码：0 = 跑完（判定写在产物行里，不进退出码）；2 = 命令行不对或导出读不了。
 
+// admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
+// run-condition: command python3
 use e7_index_bench::Emitter;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -3765,6 +3767,7 @@ fn row_two_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
 }
 
 fn main() {
+    preflight();
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let [first_export_path, second_export_path] = arguments.as_slice() else {
         eprintln!("用法：e172-deletion-write-dry-run <H1H2 导出文件> <H3 导出文件>，收到 {arguments:?}");
@@ -4330,5 +4333,33 @@ mod tests {
                     .contains(&format!(" expected=0:{slot}:generation{generation},1:{slot}:generation{generation} "))
             );
         }
+    }
+}
+
+fn repository_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+}
+
+fn preflight() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let root = repository_root();
+    let source = root.join("scripts/experiments/e172_deletion_write_dry_run.rs");
+    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    let mut command = std::process::Command::new("python3");
+    command.arg(&script).arg("check").arg(&source);
+    if arguments.iter().any(|argument| argument == "--force") {
+        command.arg("--force");
+    }
+    command.arg("--");
+    command.args(arguments.iter().filter(|argument| *argument != "--force"));
+    let output = command.output().unwrap_or_else(|error| {
+        eprintln!("  ✗ 起不了 python3 判准入：{error}");
+        eprintln!("  → 怎么办：装上 python3，或在有 python3 的机器上跑");
+        std::process::exit(78)
+    });
+    if !output.status.success() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        std::process::exit(output.status.code().unwrap_or(1));
     }
 }

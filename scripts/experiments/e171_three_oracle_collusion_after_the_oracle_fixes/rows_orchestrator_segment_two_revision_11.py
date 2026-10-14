@@ -2,8 +2,8 @@
 """E171 第 1 次重跑·修订 11：修订 8 那一趟第二段整表的多机编排，带复用（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.2–11.5、11.9、11.10 节）。
 由 run_segment_two_revision_11_multi_host.sh 起，在仓根跑；修订 11 占位（revision_11_placeholders.json 那一形）点名修订 10 那一份占位（revision_10_config）。
 
-为什么另写一层：rows_orchestrator_segment_two_revision_10.py（9dd8198b…）一个字节不改。这一层按路径载入它（开跑先核 sha256，不是就退 3；它照旧按 sha256
-载入 rows_orchestrator_segment_two.py 132731f8… 与第一段编排器 7bfbdb84…），修订 10 那一层的几处（树与 T₂、H8 核对、落点、起跑闸、本机闸、停派文件、让路、
+为什么另写一层：rows_orchestrator_segment_two_revision_10.py（627e48c6…）一个字节不改。这一层按路径载入它（开跑先核 sha256，不是就退 3；它照旧按 sha256
+载入 rows_orchestrator_segment_two.py 7d7b458b… 与第一段编排器 1dcfb8d0…），修订 10 那一层的几处（树与 T₂、H8 核对、落点、起跑闸、本机闸、停派文件、让路、
 输入清单、S17 联动）由它自己的 run_layer 原样装上；这一层只在第二段编排器上再换四处：
   ① 整表派发之前（phase_rows）：281 行（编排器现算的行集）照第 11.2、11.3 节算键（L 取 T₂ 那份计时的 process_wall），查库、写标记
     （<H23 导出根>/reuse-markers/segment-two-rows/）；取来的行数 M ≥ 1 时照 RC3 挑 k = max(3, ⌈0.02 × M⌉) 行现跑（按 sha256(H23 后缀 ‖ 键) 从小到大，
@@ -48,7 +48,7 @@ import revision_8_selftest_harness as harness  # noqa: E402
 BREAK_VARIABLE = "SEGMENT_TWO_R11_BREAK"
 SELFTEST_VARIABLE = "SEGMENT_TWO_R11_SELFTEST"
 SEGMENT_TWO_R10_PATH = os.path.join(HERE, "rows_orchestrator_segment_two_revision_10.py")
-SEGMENT_TWO_R10_SHA256 = "9dd8198b10bb32af636c91aea43d5ce4a1ffe01dec231b1e6c2200470cb3da82"
+SEGMENT_TWO_R10_SHA256 = "627e48c6f35e872f2eaf7be08f8c19ff4fead2d39e46bed23710f678108e2ace"
 EXIT_WRONG_PINNED_FILE = 3
 LEDGER_STEM = "reuse-ledger-rows"
 MARKERS_NAME = "segment-two-rows"
@@ -67,7 +67,7 @@ def load_pinned(path: str, expected: str, module_name: str) -> types.ModuleType:
 
 
 try:
-    layer10 = load_pinned(SEGMENT_TWO_R10_PATH, SEGMENT_TWO_R10_SHA256, "rows_orchestrator_segment_two_revision_10_9dd8198b")
+    layer10 = load_pinned(SEGMENT_TWO_R10_PATH, SEGMENT_TWO_R10_SHA256, "rows_orchestrator_segment_two_revision_10_627e48c6")
 except RuntimeError as wrong_file:
     print(f"✗ {wrong_file}（这一层调的是钉住的那一份的函数；改过就先核这一层，再改钉的 sha256）", file=sys.stderr)
     sys.exit(EXIT_WRONG_PINNED_FILE)
@@ -298,6 +298,7 @@ def main(argument_list: list[str]) -> int:
             return 2
     if os.environ.get(two.SELFTEST_ROWS_VARIABLE) and os.environ.get(two.SELFTEST_VARIABLE) != "1":
         print(f"✗ {two.SELFTEST_ROWS_VARIABLE} 只在自证起的子进程里认（平常跑整表 1–281）；设了它就拒（退 2）", file=sys.stderr)
+        print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
         return 2
     if argument_list[:1] == ["--selftest"]:
         return selftest(argument_list[1:])
@@ -327,6 +328,7 @@ def main(argument_list: list[str]) -> int:
                   f"H31 {'；'.join(reuse.h31_problems(repo, reuse_config)) or '与现在的文件逐个相同'}；修订 10 占位 {revision_10_path}")
     except (reuse.RunCondition, judge.RunConditionError, KeyError, OSError) as error:
         print(f"✗ 运行条件不满足（退 78）：{error}", flush=True)
+        print('     → 怎么办：照上面那句补齐运行条件（配置、冻结树、设备文件）再用同一条命令起', flush=True)
         return one.EXIT_RUN_CONDITION
     install(reuse_config, repo, segment_two)
     if arguments.mode == "plan":

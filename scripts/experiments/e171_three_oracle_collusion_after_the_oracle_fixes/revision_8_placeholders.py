@@ -338,9 +338,9 @@ def check_h18(repo: str, config: dict, phase: str) -> Outcome:
         return unfilled("没填：" + ",".join(absent))
     names = (h18["peer_kit"], h18["peer_snapshot"], h18["peer_out"])
     clash = [] if broken("h18-revision-6-names") else [name for name in names if name in REVISION_6_PEER_NAMES]
-    shapes = all(isinstance(name, str) and name.startswith("research/") for name in names) and len(set(names)) == 3 \
+    shapes = all(isinstance(name, str) for name in names) and all(name.startswith("research/") for name in names[:2]) and len(set(names)) == 3 \
         and str(h18["peer_out"]).startswith("scripts/experiments/target/")
-    return Outcome(True, shapes and not clash, f"三个落点都在 research/ 下、互不相同、取回的那个在 scripts/experiments/target/ 下 {str(shapes).lower()}；与修订 6 那一趟同名的 {clash or '无'}")
+    return Outcome(True, shapes and not clash, f"三个落点互不相同、送过去的两个在 research/ 下、取回的那个在 scripts/experiments/target/ 下 {str(shapes).lower()}；与修订 6 那一趟同名的 {clash or '无'}")
 
 
 def check_h20(repo: str, config: dict, phase: str) -> Outcome:
@@ -418,6 +418,7 @@ def check_command(repo: str, config_path: str, phase: str) -> int:
         config = judge.load_config(config_path)
     except judge.RunConditionError as error:
         print(f"✗ {error}")
+        print('     → 怎么办：照上面那句补齐运行条件（配置、冻结树、设备文件）再用同一条命令起')
         return EXIT_RUN_CONDITION
     unfilled_keys, failing, printed = check_config(repo, config, phase)
     for line in printed:

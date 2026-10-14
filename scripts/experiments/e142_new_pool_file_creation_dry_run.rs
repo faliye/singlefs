@@ -228,13 +228,15 @@ const TREE_IDENTIFIER_DELETED_INODES: u64 = 65544;
 const TREE_IDENTIFIER_TOMBSTONE: u64 = 65545;
 const TREE_IDENTIFIER_LINEAGE: u64 = 65546;
 const TREE_IDENTIFIER_LOGGED_OPERATIONS: u64 = 65547;
+/// 退役树：D18（块里携带什么信息） 已定项 24 第 6 条同批 day-1 零根注册，树 ID 照 D8（核心索引结构） 已定项 11 定案句（`layout/03`「树表退役树条目」那一行）。
+const TREE_IDENTIFIER_RETIREMENT: u64 = 65548;
 /// mkfs 那一刻一棵树都还没有，水位就是第一个要发的树 ID（D8 已定项 11「mkfs 时水位 65536」，单独一个常量，不借 extent 的号）；
-/// 发布之后 = 本次发出的最高树 ID + 1（D8 已定项 8 ②，第十二棵 logged_ops 的号 + 1）。
+/// 发布之后 = 本次发出的最高树 ID + 1（D8 已定项 8 ②，最后一棵退役树的号 + 1）。
 const TREE_IDENTIFIER_WATERMARK_AT_MKFS: u64 = 65536;
-const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_LOGGED_OPERATIONS + 1;
+const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_RETIREMENT + 1;
 /// 树的种类的码（D8（核心索引结构） 已定项 9 的登记表：0 无、1 extent、2 inode、3 分配记录、4 记账、
-/// 5 中央映射、6 livelist 共享树、7 稀疏旁表、8 deadlist、9 `deleted_inodes`、10 墓碑树、11 谱系树、12 logged_ops；
-/// 码 8 是 2026-09-14 用户定案加的，码 9..12 随 D18 已定项 24 第 6 条进登记表）。
+/// 5 中央映射、6 livelist 共享树、7 稀疏旁表、8 deadlist、9 `deleted_inodes`、10 墓碑树、11 谱系树、12 logged_ops、13 退役树；
+/// 码 8 是 2026-09-14 用户定案加的，码 9..12 随 D18 已定项 24 第 6 条进登记表，码 13 随 D18 已定项 11 的打包记录类型 3 进登记表）。
 const TREE_KIND_EXTENT: u16 = 1;
 const TREE_KIND_INODE: u16 = 2;
 const TREE_KIND_ALLOCATION: u16 = 3;
@@ -247,6 +249,7 @@ const TREE_KIND_DELETED_INODES: u16 = 9;
 const TREE_KIND_TOMBSTONE: u16 = 10;
 const TREE_KIND_LINEAGE: u16 = 11;
 const TREE_KIND_LOGGED_OPERATIONS: u16 = 12;
+const TREE_KIND_RETIREMENT: u16 = 13;
 
 /// D18（块里携带什么信息） 已定项 11 登记表的码。
 const UNIT_CLASS_DATA: u8 = 1;
@@ -677,9 +680,9 @@ enum StepKind {
     RootRecordFua,
     /// 系统配置槽的一次写。
     SystemConfigurationSlot,
-    /// mkfs 把根环三个区域与 journal 环各整段写 0（D22（单元原子性怎么合成） 已定项 8 第 3 条，
-    /// 2026-09-23 用户定案改写）：两者都由 mkfs 自己经块设备的写零动作发出，每块盘上四段（根环三个区域各一段 +
-    /// journal 环一段）各一次调用，区域归属只定根种在哪块盘、不定清哪块盘——两块盘各清全部四段，共 8 步；
+    /// mkfs 把每块盘的 [0, 根环基址)、根环三个区域与 journal 环各整段写 0（D22（单元原子性怎么合成） 已定项 8 第 3 条）：
+    /// 三者都由 mkfs 自己经块设备的写零动作发出，每块盘上五段（[0, 根环基址) 一段 + 根环三个区域各一段 + journal 环一段）
+    /// 各一次调用，区域归属只定根种在哪块盘、不定清哪块盘——两块盘各清全部五段，共 10 步；
     /// 录制流里各记一步整段清零，清零几段之间不加屏障。不是 FUA。
     ZeroFill,
 }
@@ -727,7 +730,7 @@ impl RecordedStepKind {
     }
     /// 种类串的规范序（E142 第十九次跑臂 N19 的 ④）：`zero_fill` 排最前，其余照 `unit_write`、`journal_record`、
     /// `root_record_fua`、`system_configuration_slot`、`barrier`。依据是 `.claude/kb/layout/01-first-txn.md` 八
-    /// 「mkfs 种根」那一行种类串原文 `[zero_fill×8,unit_write×4,barrier]`。只管种类串怎么排，不动 `StepKind` 的派生序。
+    /// 「mkfs 种根」那一行种类串原文 `[zero_fill×10,unit_write×4,barrier×2]`。只管种类串怎么排，不动 `StepKind` 的派生序。
     fn canonical_rank_in_kinds_text(self) -> u8 {
         match self {
             RecordedStepKind::Write(StepKind::ZeroFill) => 0,
@@ -774,8 +777,8 @@ impl RecordingPool {
         self.operations.push(RecordedOperation::Write(WriteRequest { device, offset, bytes: bytes.to_vec(), kind }));
     }
     /// mkfs 的整段清零（D22（单元原子性怎么合成） 已定项 8 第 3 条）：只记一步操作，不真的把字节灌进
-    /// `SparseDevice` 的扇区表。稀疏镜像没写过的扇区恒读 0（`SparseDevice` 的文档），根环区域与
-    /// journal 环这两类清零写的本来就是全 0 的字节，语义上跟真写一遍没有分别；journal 环有 768 MiB，
+    /// `SparseDevice` 的扇区表。稀疏镜像没写过的扇区恒读 0（`SparseDevice` 的文档），[0, 根环基址)、根环区域与
+    /// journal 环这三类清零都发在 mkfs 写任何字节之前、写的本来就是全 0 的字节，语义上跟真写一遍没有分别；journal 环有 768 MiB，
     /// 真按扇区写一遍会让 `mkfs()` 每次调用都往 `BTreeMap` 里插上百万条目——78 条变异 × 50 个单测
     /// 每条都要跑一次 `mkfs()`，会把这个装置拖到不可用，`mutate.sh` 单条变异 120 秒的超时也会被跑穿。
     fn record_zero_fill(&mut self, device: DeviceIdentity, offset: DeviceOffset) {
@@ -2266,12 +2269,14 @@ struct MkfsOutput {
 
 fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
     let mut pool = RecordingPool { pool: Pool { devices: vec![SparseDevice::default(); parameters.device_count], device_bytes: parameters.device_bytes }, operations: Vec::new() };
-    // D22（单元原子性怎么合成） 已定项 8 第 3 条（2026-09-23 用户定案改写，追平 C484（mkfs 不清根环，同 fsid 重来旧根还择得中））：
-    // 根环三个区域与 journal 环都由 mkfs 经写零动作清，每块盘上四段（根环三个区域各一段 + journal 环一段）各一次调用，
-    // 区域归属只定根种在哪块盘、不定清哪块盘——两块盘各清全部四段，8 步；段序列与步数以
-    // `.claude/kb/layout/01-first-txn.md` 八「mkfs 种根」那一行为准（`12+1+1+1+4`、21 次操作、4114 个崩溃状态，
-    // 种类 `[zero_fill×8,unit_write×4,barrier]|...`）；清零几段之间不加屏障。
+    // D22（单元原子性怎么合成） 已定项 8 第 3 条（追平 C484（mkfs 不清根环，同 fsid 重来旧根还择得中）与用户 2026-10-02 定的 W1）：
+    // 写任何元数据之前，每块盘先把 [0, 根环基址) 整段写 0（第一版 [0, 1 MiB) = 64 × 16 KiB），再把根环三个区域与 journal 环
+    // 各整段写 0；每块盘上五段各一次调用，区域归属只定根种在哪块盘、不定清哪块盘——两块盘各清全部五段，共 10 步；
+    // 段序列与步数以 `.claude/kb/layout/01-first-txn.md` 八「mkfs 种根」那一行为准（`14+1+1+1+4`、25 次操作（21 次写、
+    // 两道池屏障按设备记成 4 步）、16402 个崩溃状态，种类 `[zero_fill×10,unit_write×4,barrier×2]|...`）；清零几段之间不加屏障。
+    // 条款没定一块盘五段的先后；[0, 根环基址) 那一段放在最前，只记一步、不带字节、不改镜像（`record_zero_fill` 的约定）。
     for device in parameters.devices() {
+        pool.record_zero_fill(device, DeviceOffset(0)); // [0, 根环基址)
         for region_index in 0..RING_REGIONS {
             pool.record_zero_fill(device, ring_region_offset(region_index));
         }
@@ -2895,19 +2900,43 @@ const TOMBSTONE_TREE_INTERNAL_LEVELS_OF_A_ZERO_ROOT: u64 = 0;
 /// D8（核心索引结构） 已定项 6 的偏移表：mode 24、uid 28、gid 32 各 4 字节，nlink 紧接在 36（`layout/01` 第四节「偏移 24：mode / uid / gid / nlink 16」）。
 const INODE_RECORD_LINK_COUNT_OFFSET: usize = 36;
 
+/// `layout/03`「退役容器」那一行：退役记录 34 字节，一个 32 KiB 码 3 容器（含 29 字节预留位的头 136）装 ⌊(32768 − 136) ÷ 34⌋ = 959 条；
+/// D3（空间分配） 已定项 2 的 35 由它定。字面照登记值写，旁边一条单测核这道算术。
+const RETIREMENT_RECORDS_PER_CONTAINER: u64 = 959;
+/// D3（空间分配） 已定项 2：H_退役 是现行那一版退役树的内部层数，「零根与只有根时 0」。
+const RETIREMENT_TREE_INTERNAL_LEVELS_OF_A_ZERO_ROOT: u64 = 0;
+
 /// D3（空间分配） 已定项 2：每份副本、每个活对象摊的墓碑预付，41 = ⌈2 × 16384 ÷ 815⌉，先取整再乘 n_live。
 fn tombstone_prepayment_bytes_per_live_object() -> u64 {
     (2 * SLOT_BYTES).div_ceil(TOMBSTONE_RECORDS_PER_CONTAINER)
 }
 
-/// D3（空间分配） 已定项 2 定案句的式子：标签 6（已承诺预留）= 副本数 × ((2 + H + 1) × 16384 + 41 × n_live)，单位字节、按副本之和记；
+/// D3（空间分配） 已定项 2：每份副本、每条 inode 记录摊的退役记录预付，35 = ⌈32768 ÷ 959⌉，先取整再乘 n_记录。
+fn retirement_prepayment_bytes_per_inode_record() -> u64 {
+    (2 * SLOT_BYTES).div_ceil(RETIREMENT_RECORDS_PER_CONTAINER)
+}
+
+/// D3（空间分配） 已定项 2 定案句的式子：标签 6（已承诺预留）=
+/// 副本数 × ((2 + H_墓碑 + 1 + 2 + H_退役 + 1) × 16384 + 41 × n_live + 35 × n_记录)，单位字节、按副本之和记；
 /// 树表里没有 `deleted_inodes` 条目的版本取 0。
-fn committed_reservation_bytes(replica_count: u64, tombstone_tree_internal_levels: u64, live_object_count: u64, tree_table_has_deleted_inodes_entry: bool) -> u64 {
+fn committed_reservation_bytes(
+    replica_count: u64,
+    tombstone_tree_internal_levels: u64,
+    retirement_tree_internal_levels: u64,
+    live_object_count: u64,
+    inode_record_count: u64,
+    tree_table_has_deleted_inodes_entry: bool,
+) -> u64 {
     if !tree_table_has_deleted_inodes_entry {
         return 0;
     }
-    let resident_slots = 2 + tombstone_tree_internal_levels + 1;
-    replica_count * (resident_slots * SLOT_BYTES + tombstone_prepayment_bytes_per_live_object() * live_object_count)
+    let tombstone_resident_slots = 2 + tombstone_tree_internal_levels + 1;
+    let retirement_resident_slots = 2 + retirement_tree_internal_levels + 1;
+    let resident_slots = tombstone_resident_slots + retirement_resident_slots;
+    replica_count
+        * (resident_slots * SLOT_BYTES
+            + tombstone_prepayment_bytes_per_live_object() * live_object_count
+            + retirement_prepayment_bytes_per_inode_record() * inode_record_count)
 }
 
 /// H：从墓碑树的根指针现读。新池新建文件的墓碑树恒为零根（D18 已定项 24 第 6 条）；非零根时要从根节点码 2 头现读层数，
@@ -2919,6 +2948,15 @@ fn tombstone_tree_internal_levels(tombstone_root: &NodePointer) -> u64 {
     panic!("这条流里墓碑树恒为零根；非零根时 H 要从根节点码 2 头现读（D3 已定项 2），装置不写这一支")
 }
 
+/// H_退役：从树表里退役树那一条的根指针现读。新池新建文件的退役树恒为零根（D18 已定项 24 第 6 条）；
+/// 非零根时要从根节点码 2 头现读层数，同墓碑树那一支不在射程里，走到就停。
+fn retirement_tree_internal_levels(retirement_root: &NodePointer) -> u64 {
+    if retirement_root.is_empty_root() {
+        return RETIREMENT_TREE_INTERNAL_LEVELS_OF_A_ZERO_ROOT;
+    }
+    panic!("这条流里退役树恒为零根；非零根时 H_退役 要从根节点码 2 头现读（D3 已定项 2），装置不写这一支")
+}
+
 fn inode_record_link_count(record_bytes: &[u8]) -> u32 {
     let link_count_bytes: [u8; 4] = record_bytes[INODE_RECORD_LINK_COUNT_OFFSET..INODE_RECORD_LINK_COUNT_OFFSET + 4].try_into().expect("切了 4 字节");
     u32::from_le_bytes(link_count_bytes)
@@ -2927,6 +2965,11 @@ fn inode_record_link_count(record_bytes: &[u8]) -> u32 {
 /// n_live：这一版 inode 树叶容器里 nlink ≥ 1 的记录数（D3 已定项 2）。
 fn live_object_count_of_inode_records(inode_record_bytes: &[Vec<u8>]) -> u64 {
     inode_record_bytes.iter().filter(|record| inode_record_link_count(record) >= 1).count() as u64
+}
+
+/// n_记录：这一版 inode 树叶容器里全部记录数，含 nlink = 0 的（D3 已定项 2：退役项数 n_记录，不数 n_live）。
+fn record_count_of_inode_records(inode_record_bytes: &[Vec<u8>]) -> u64 {
+    u64::try_from(inode_record_bytes.len()).expect("记录数装得进 u64")
 }
 
 #[allow(clippy::too_many_arguments, reason = "字段表就是这么多段，收成结构体只会多一层没人验的名字（build_index_node 同一处理由）")]
@@ -3059,8 +3102,8 @@ fn publish_first_file(
     // 「空 ≠ 0」那条防线因此保住：读不到行是坏账，读到 0 是真的 0。seq 一律 1（D8 已定项 10：直落叶）。
     //
     // 已承诺预留要的四个量里，「树表里有没有 `deleted_inodes` 条目」与「墓碑树的根指针」住在树表第 1 版的条目表里。
-    // 树表里 day-1 注册、根指针为零的七条（D18 已定项 24 第 6 条）不引用任何别的单元，先建出来；带指针的四条要等记账树单元落了位才建得出来
-    // （它们引用记账树的根指针），树表单元仍在后面照 D8 已定项 8 的树 ID 升序组装，写出的字节与先前相同。
+    // 树表里 day-1 注册、根指针为零的八条（D18 已定项 24 第 6 条，含退役树）不引用任何别的单元，先建出来；带指针的四条要等记账树单元落了位才建得出来
+    // （它们引用记账树的根指针），树表单元仍在后面照 D8 已定项 8 的树 ID 升序组装。
     let day_one_zero_root_tree_table_entries = [
         TreeTableEntry { kind: TREE_KIND_LIVELIST, tree: TreeIdentifier(TREE_IDENTIFIER_LIVELIST), root: NodePointer::empty_root(), birth_txg: txg, head_identifier: TREE_TABLE_HEAD_IDENTIFIER_NONE },
         TreeTableEntry { kind: TREE_KIND_SHARE_COUNT, tree: TreeIdentifier(TREE_IDENTIFIER_SHARE_COUNT), root: NodePointer::empty_root(), birth_txg: txg, head_identifier: TREE_TABLE_HEAD_IDENTIFIER_NONE },
@@ -3069,6 +3112,8 @@ fn publish_first_file(
         TreeTableEntry { kind: TREE_KIND_TOMBSTONE, tree: TreeIdentifier(TREE_IDENTIFIER_TOMBSTONE), root: NodePointer::empty_root(), birth_txg: txg, head_identifier: TREE_IDENTIFIER_INODE },
         TreeTableEntry { kind: TREE_KIND_LINEAGE, tree: TreeIdentifier(TREE_IDENTIFIER_LINEAGE), root: NodePointer::empty_root(), birth_txg: txg, head_identifier: TREE_TABLE_HEAD_IDENTIFIER_NONE },
         TreeTableEntry { kind: TREE_KIND_LOGGED_OPERATIONS, tree: TreeIdentifier(TREE_IDENTIFIER_LOGGED_OPERATIONS), root: NodePointer::empty_root(), birth_txg: txg, head_identifier: TREE_TABLE_HEAD_IDENTIFIER_NONE },
+        // `layout/03`「树表退役树条目」：退役树一条，零根，头 ID 写 inode 树的树 ID（同墓碑树）。
+        TreeTableEntry { kind: TREE_KIND_RETIREMENT, tree: TreeIdentifier(TREE_IDENTIFIER_RETIREMENT), root: NodePointer::empty_root(), birth_txg: txg, head_identifier: TREE_IDENTIFIER_INODE },
     ];
     let tree_table_has_deleted_inodes_entry = day_one_zero_root_tree_table_entries.iter().any(|entry| entry.tree == TreeIdentifier(TREE_IDENTIFIER_DELETED_INODES));
     let tombstone_tree_root = day_one_zero_root_tree_table_entries
@@ -3076,10 +3121,18 @@ fn publish_first_file(
         .find(|entry| entry.tree == TreeIdentifier(TREE_IDENTIFIER_TOMBSTONE))
         .expect("树表第 1 版里墓碑树（65545）day-1 注册")
         .root;
+    let retirement_tree_root = day_one_zero_root_tree_table_entries
+        .iter()
+        .find(|entry| entry.tree == TreeIdentifier(TREE_IDENTIFIER_RETIREMENT))
+        .expect("树表第 1 版里退役树 day-1 注册")
+        .root;
+    let inode_leaf_record_bytes = [inode_record.to_bytes()];
     let committed_reservation = committed_reservation_bytes(
         u64::try_from(parameters.device_count).expect("设备数装得进 u64"),
         tombstone_tree_internal_levels(&tombstone_tree_root),
-        live_object_count_of_inode_records(&[inode_record.to_bytes()]),
+        retirement_tree_internal_levels(&retirement_tree_root),
+        live_object_count_of_inode_records(&inode_leaf_record_bytes),
+        record_count_of_inode_records(&inode_leaf_record_bytes),
         tree_table_has_deleted_inodes_entry,
     );
     let allocated_slots: u64 = allocated.iter().map(|(_, span, _, _)| u64::from(*span)).sum();
@@ -3181,11 +3234,11 @@ fn publish_first_file(
     index_node_header_widths.push(("mapping", index_node_header_bytes(MAPPING_KEY_BYTES as usize)));
     let mapping_pointer = node_pointer(TreeIdentifier(TREE_IDENTIFIER_MAPPING), SLOT_MAPPING_ROOT, &mapping_unit, mapping_sequence);
 
-    // t12 树表单元第 1 版：**十一条**条目按树 ID 升序（D8 已定项 8）；中央映射树的根住根记录、不进树表（D19 已定项 11）；
-    // livelist、稀疏旁表、deadlist 与 `deleted_inodes`、墓碑树、谱系树、logged_ops 七棵 day-1 注册、根指针为零（D18 已定项 24 第 6 条）。
+    // t12 树表单元第 1 版：**十二条**条目按树 ID 升序（D8 已定项 8）；中央映射树的根住根记录、不进树表（D19 已定项 11）；
+    // livelist、稀疏旁表、deadlist 与 `deleted_inodes`、墓碑树、谱系树、logged_ops、退役树八棵 day-1 注册、根指针为零（D18 已定项 24 第 6 条）。
     // 头 ID（D5 已定项 9，2026-09-14 用户定案；D8 已定项 8「头 ID 8 字节的取值」）：inode 树写自己（65537）、extent 树写它服务的那个头（65537）、
-    // `deleted_inodes` 与墓碑树写 inode 树的树 ID（65537），其余写 0。
-    // 带指针的四条（extent、inode、分配记录、记账）在这里建，后面接上先建好的七条（树 ID 65541..65547，次序同先前）。
+    // `deleted_inodes`、墓碑树与退役树写 inode 树的树 ID（65537），其余写 0。
+    // 带指针的四条（extent、inode、分配记录、记账）在这里建，后面接上先建好的八条（树 ID 从 livelist 到退役树，次序同先前）。
     let mut tree_table_entries = vec![
         TreeTableEntry { kind: TREE_KIND_EXTENT, tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT), root: extent_pointer, birth_txg: txg, head_identifier: TREE_IDENTIFIER_INODE },
         TreeTableEntry { kind: TREE_KIND_INODE, tree: TreeIdentifier(TREE_IDENTIFIER_INODE), root: inode_root_pointer, birth_txg: txg, head_identifier: TREE_IDENTIFIER_INODE },
@@ -3205,7 +3258,7 @@ fn publish_first_file(
         0,
         TREE_TABLE_KEY_WIDTH,
         &TREE_IDENTIFIER_EXTENT.to_le_bytes(),
-        &TREE_IDENTIFIER_LOGGED_OPERATIONS.to_le_bytes(),
+        &tree_table_entries.last().expect("树表第 1 版不空").tree.0.to_le_bytes(),
         txg,
         fsid,
         instance,
@@ -4377,6 +4430,22 @@ fn swallow_one_device_barrier_step_before_the_root(transaction_operations: &[Rec
 }
 
 /// `name=segments_sensitivity` 一行（⑥ 的 G10a / G10b，⑩ 的 G11 / G12a / G12b）：字段次序照登记 R19C-4 ⑥ ⑩。
+/// 取样点 G1B（一块盘、带屏障）上 mkfs 那一段的段序列行：切法（`split_into_segments(…, true)`）与字段同
+/// `name=segments path=mkfs` 那一行，只换几何。`crates/` 只造两块盘，这一行只有装置一侧（E142 第二十五次跑登记第八节）。
+fn segments_geometry_line_of_mkfs_on_one_device_with_barriers() -> String {
+    let (one_device_recording, _) = mkfs(&PoolParameters::one_device_with_barriers());
+    let operations = &one_device_recording.operations;
+    let (_, segments) = split_into_segments(operations, true);
+    let sizes: Vec<String> = segments.iter().map(|segment| segment.len().to_string()).collect();
+    format!(
+        "name=segments_geometry point=G1B path=mkfs operations={} segments={} closed_form={} kinds={}",
+        operations.len(),
+        sizes.join("+"),
+        closed_form_state_count(&segments),
+        format_segment_kinds(&segment_step_kinds(operations, true))
+    )
+}
+
 fn segments_sensitivity_line(point_fields: &str, path_name: &str, earlier_operations: &[RecordedOperation], path_operations: &[RecordedOperation]) -> String {
     let (_, segments) = split_into_segments(path_operations, true);
     let summary = three_state_summary(earlier_operations, path_operations);
@@ -4529,6 +4598,7 @@ fn for_each_layer0_state(writes_len: usize, segments: &[Vec<usize>], mut visit: 
     visit(persisted_before);
 }
 
+#[cfg(test)]
 fn enumerate_layer0(base: &Pool, writes: &[WriteRequest], segments: &[Vec<usize>], expected_content: &[u8], reader_mode: ReaderMode) -> Layer0Tally {
     // 被判的是这条流里最后一次根槽 FUA 写：暖机的两个根在它前面，主臂与阳性对照都取这一条。
     let root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("写流里有根槽那一条");
@@ -5017,10 +5087,12 @@ fn layer0_main_arm_verdict(tally: &Layer0Tally, closed_form: u64, comparison: &P
 
 /// 并行度取 `SINGLEFS_THREAD_CAP`（`scripts/hosts/capped.sh` 给「登记不到专属变量的实验装置」的通用兜底，
 /// 见该脚本文件头注释；这份装置在 `scripts/experiments/` 下，不是 `crates/singlefs-harness`，不在它专属
-/// 变量表里）。没设或解析不出正整数就退回 1（串行）。
+/// 变量表里）。没设或解析不出正整数就取登记的重活默认并行度（`.claude/heavy-thread-default`，用户 2026-10-12 定）。
 fn thread_cap_from_env() -> usize {
-    std::env::var("SINGLEFS_THREAD_CAP").ok().and_then(|value| value.parse::<usize>().ok()).filter(|&value| value >= 1).unwrap_or(1)
+    default_heavy_threads(include_str!("../../.claude/heavy-thread-default"))
 }
+
+include!("heavy_threads_default/threads.rs");
 
 /// 一次「单次发布」流：mkfs → 直接发布（阳性对照、G6 都是这个形状：没有取号、没有暖机）。
 struct SinglePublishFlow {
@@ -5028,6 +5100,7 @@ struct SinglePublishFlow {
     writes: Vec<WriteRequest>,
     segments: Vec<Vec<usize>>,
     closed_form: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     root_index: usize,
     journal_index: usize,
     /// 依赖集甲：这一窗口里全部单元写，每个单元一组（一盘时组内恰一个下标）。
@@ -5581,7 +5654,7 @@ const GAPS: &[(&str, &str)] = &[
     ("G16", "已收口（2026-09-13 D19已定项9）：出生序号从0起、同一棵树内码2与码3共用一个计数、换checkpoint清零、同一checkpoint里重写换新号"),
     ("G17", "已收口（2026-09-13 C313用户定案）：FUA写算段边界；装置主臂按它枚举，另一读法只报数不判"),
     ("G18", "D23已定项12按「12项事务恰占1条记录」算余量，而D16的事务切分纪律让一次带8个数据单元的fsync至少是8个事务、8条记录；两条已定条款对同一负载算出的记录数不同"),
-    ("G19", "mkfs种根的21次操作（19写+2屏障，段序列12+1+1+1+4、4114个崩溃状态，D22已定项8第3条2026-09-23用户定案改写之后含两块盘各清根环三区域与journal环共8步）不在层0枚举里：装置从mkfs之后的池起枚举（取号、暖机与事务），mkfs的崩溃状态没有任何东西判；段序列另发一行钉住，与layout/01-first-txn.md八「mkfs种根」那一行登记的真值一致"),
+    ("G19", "mkfs种根的25次操作（21写+两道池屏障按设备记成4步，段序列14+1+1+1+4、16402个崩溃状态，D22已定项8第3条含两块盘各清[0,根环基址)、根环三区域与journal环共10步）不在层0枚举里：装置从mkfs之后的池起枚举（取号、暖机与事务），mkfs的崩溃状态没有任何东西判；段序列另发一行钉住，与layout/01-first-txn.md八「mkfs种根」那一行登记的真值一致"),
     ("G20", "已收口（2026-09-14用户定案，C321还清）：映射条目回到一宽55⇒码2头那个u16的条目宽字段够用，声明长度=条目数×条目宽原样成立；装置删掉了「条目宽0当变长哨兵」那套自创取法，parse_index_node对条目宽0一律判结构错"),
     ("G21", "取号那一步（D23已定项16：第一次可写挂载写每一份系统配置之后才动单元）不是根槽写路径，layout/01-first-txn八那张表罩不到它；屏障怎么放没有条款，装置按最少屏障取「不另加屏障，靠暖机第一次空发布开头那道屏障收段」⇒段序列独占一行[system_configuration_slot×2]"),
     // E142 第十七次跑（问题单第 8 行，R19）：这条原来把空闲字节、全空聚簇段数、runs 三个数写成字面
@@ -6632,7 +6705,7 @@ fn is_id_component_prefix(value: &str, start: usize) -> bool {
     value[..start].trim_end_matches('_').ends_with("已定项")
 }
 
-/// `kinds=[unit_write×4,zero_fill×8,barrier]` 这类字段里 `×` 后面的数是「这个多重集里这种步骤出现几次」——
+/// `kinds=[unit_write×4,zero_fill×10,barrier]` 这类字段里 `×` 后面的数是「这个多重集里这种步骤出现几次」——
 /// 数字本身就是这个字段自己的构造规则给出来的（数出这个方括号里逗号分隔的项里有几个用这个 kind 起头，
 /// 应当恰好等于它），不是另配一个白名单条目；这里只判「紧跟在 × 后面」，不重新数一遍去核对相不相等
 /// （真出错时这条自检不判——只在角色名/文本数字自检覆盖不到的地方留一个已知边界，写进报告）。
@@ -6918,8 +6991,8 @@ fn push_layout_rows_for_units(image: &dyn BlockReader, rows: &mut Vec<LayoutFiel
     push_layout_row(rows, "L11", "t11_mapping_root", "code_one_entry_key", "228", "(1,65536,3,(1,1))", &code_one_key);
     let t12 = unit(50252, 16384);
     push_layout_row(rows, "L12", "t12_tree_table_first_version", "tree_identifier@42", "386", "0", &le_u64_at(&t12, 42).to_string());
-    push_layout_row(rows, "L13", "t12_tree_table_first_version", "entry_count@98", "386+49+78", "11", &le_u16_at(&t12, 98).to_string());
-    push_layout_row(rows, "L14", "t12_tree_table_first_version", "declared_length@8", "386", "2200", &le_u16_at(&t12, 8).to_string());
+    push_layout_row(rows, "L13", "t12_tree_table_first_version", "entry_count@98", "386+49+78", "12", &le_u16_at(&t12, 98).to_string());
+    push_layout_row(rows, "L14", "t12_tree_table_first_version", "declared_length@8", "386", "2400", &le_u16_at(&t12, 8).to_string());
     let field_names = ["tree_identifier", "kind", "root_slot", "head_identifier", "birth_txg", "previous_snapshot_txg"];
     let first_seven: [[&str; 6]; 7] = [
         ["65536", "1", "50240", "65537", "3", "0"],
@@ -6930,11 +7003,13 @@ fn push_layout_rows_for_units(image: &dyn BlockReader, rows: &mut Vec<LayoutFiel
         ["65542", "7", "zero", "0", "3", "0"],
         ["65543", "8", "zero", "0", "3", "0"],
     ];
-    let last_four: [[&str; 6]; 4] = [
+    // 第 8–12 条：`deleted_inodes`、墓碑树、谱系树、logged_ops 与退役树（`layout/03`「树表四条新条目」「树表退役树条目」两行）。
+    let last_five: [[&str; 6]; 5] = [
         ["65544", "9", "zero", "65537", "3", "0"],
         ["65545", "10", "zero", "65537", "3", "0"],
         ["65546", "11", "zero", "0", "3", "0"],
         ["65547", "12", "zero", "0", "3", "0"],
+        ["65548", "13", "zero", "65537", "3", "0"], // 退役树
     ];
     for (index, expected) in first_seven.iter().enumerate() {
         let actual = tree_table_entry_texts(&t12, index);
@@ -6942,7 +7017,7 @@ fn push_layout_rows_for_units(image: &dyn BlockReader, rows: &mut Vec<LayoutFiel
             push_layout_row(rows, "L15", "t12_tree_table_first_version", &format!("entry{index}_{field_name}"), "387+389-391", expected[field_index], &actual[field_index]);
         }
     }
-    for (offset_index, expected) in last_four.iter().enumerate() {
+    for (offset_index, expected) in last_five.iter().enumerate() {
         let index = 7 + offset_index;
         let actual = tree_table_entry_texts(&t12, index);
         for (field_index, field_name) in field_names.iter().enumerate() {
@@ -6959,12 +7034,12 @@ fn push_layout_rows_for_watermarks(final_image: &dyn BlockReader, after_mkfs_ima
     let w4 = layout_bytes(final_image, 0, 16_781_312, 4096);
     let t13 = layout_bytes(final_image, 0, 16_785_408, 4096);
     // 新根段从记录内偏移 99 起：树表指针 86、映射指针 86，树 ID 水位在 99 + 172 = 271。
-    push_layout_row(rows, "L17", "t13_journal_record", "new_root_segment_tree_identifier_watermark@271", "325+353", "65548", &le_u64_at(&t13, 271).to_string());
+    push_layout_row(rows, "L17", "t13_journal_record", "new_root_segment_tree_identifier_watermark@271", "325+353", "65549", &le_u64_at(&t13, 271).to_string());
     push_layout_row(rows, "L18", "w1_journal_record", "new_root_segment_tree_identifier_watermark@271", "325+353", "65536", &le_u64_at(&w1, 271).to_string());
     push_layout_row(rows, "L18", "w4_journal_record", "new_root_segment_tree_identifier_watermark@271", "325+353", "65536", &le_u64_at(&w4, 271).to_string());
     // 根记录 512 槽：t14 = 区域 0 的槽 1（设备 0，1 MiB + 4096），水位在记录内偏移 122（4 + 16 + 4 + 4 + 8 + 86）。
     let t14 = layout_bytes(final_image, 0, 1_052_672, 512);
-    push_layout_row(rows, "L19", "t14_root_record", "tree_identifier_watermark@122", "375", "65548", &le_u64_at(&t14, 122).to_string());
+    push_layout_row(rows, "L19", "t14_root_record", "tree_identifier_watermark@122", "375", "65549", &le_u64_at(&t14, 122).to_string());
     // 三个区域的槽 0：区域 r 在 1 MiB + r × 3 MiB，区域设备 0 / 1 / 0。
     let mkfs_root_region_0 = layout_bytes(after_mkfs_image, 0, 1_048_576, 512);
     let mkfs_root_region_1 = layout_bytes(after_mkfs_image, 1, 4_194_304, 512);
@@ -7085,7 +7160,7 @@ fn push_layout_rows_for_journal_headers(image: &dyn BlockReader, rows: &mut Vec<
     }
 }
 
-/// 字段表整张（174 行）。`final_image` 是整条流写完之后的池，`after_mkfs_image` 是 mkfs 刚写完那一刻的池（L20 要第 0 代根）。
+/// 字段表整张（180 行：第二十一次跑的 174 行加第二十五次跑的退役树条目 6 行）。`final_image` 是整条流写完之后的池，`after_mkfs_image` 是 mkfs 刚写完那一刻的池（L20 要第 0 代根）。
 fn layout_field_rows(final_image: &dyn BlockReader, after_mkfs_image: &dyn BlockReader) -> Vec<LayoutFieldRow> {
     let mut rows = Vec::new();
     push_layout_rows_for_units(final_image, &mut rows);
@@ -7216,6 +7291,8 @@ fn main() {
         let sizes: Vec<String> = path_segments.iter().map(|segment| segment.len().to_string()).collect();
         emit(&mut emitter, &format!("name=segments path={path_name} operations={} segments={} closed_form={} kinds={}", operations.len(), sizes.join("+"), closed_form_state_count(&path_segments), format_segment_kinds(&segment_step_kinds(operations, true))));
     }
+    // 第八节几何敏感性 G1B（E142 第二十五次跑臂 N25M 的 M③）：一块盘带屏障时 mkfs 那一段，「每块盘 5 步清零」在盘数另一侧的取样点。
+    emit(&mut emitter, &segments_geometry_line_of_mkfs_on_one_device_with_barriers());
     // E142 第十九次跑臂 N19 的 ③：五条路径各一行三态（`name=segments ` 那五行的字段集合与次序不动，⑦）。
     for (path_name, earlier_operations, operations) in new_pool_file_creation_stream_paths(&recording.operations, mkfs_operation_count, acquisition_operation_count, warm_up_operation_count) {
         let summary = three_state_summary(earlier_operations, operations);
@@ -8412,8 +8489,8 @@ mod tests {
         // D23 已定项 16：mkfs 写实例代号 0，单元写序 (0, 0)；树 ID 水位就是第一个要发的树 ID。
         assert_eq!(genesis.root.instance, InstanceGeneration(0));
         assert_eq!(genesis.root.tree_identifier_watermark, 65536, "mkfs 时水位 65536（D8 已定项 11，登记 7.2 B3）");
-        assert_eq!(TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH, 65548, "十二棵树取 65536..65547 ⇒ 发布后水位 65548（D8 已定项 8 ②、已定项 11；12 = 65548 − 65536，7.2 B4）");
-        assert_eq!(TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH - genesis.root.tree_identifier_watermark, 12, "第一次发布发十二个号");
+        assert_eq!(TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH, 65549, "十三棵树（最后一棵退役树）⇒ 发布后水位 65549（D8 已定项 8 ②、已定项 11；登记 7.2 A-T4）");
+        assert_eq!(genesis.root.tree_identifier_watermark + 13, TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH, "第一次发布发十三个号（7.2 A-T4：65549 − 65536 = 13）");
         assert_eq!(parse_packed_unit(&genesis.instance_table_unit).expect("实例表").write_order, WriteOrder { instance: InstanceGeneration(0), transaction: TransactionNumber(0) });
         // D22 已定项 16：mkfs 把每盘两个槽都种上世代号 1。
         for device_index in 0..2u32 {
@@ -8623,7 +8700,7 @@ mod tests {
 
     /// 段序列的五条路径由这条钉住，绝对值取 E142 第十九次跑登记 7.4 D1–D3 与 R19E-4 第 4 条（臂 N19M：屏障按设备各记一步、
     /// 同一块盘上连着的屏障并成一道、按设备放行切段、每次发布末尾一道屏障、种类串 `zero_fill` 排最前）：
-    /// mkfs 12+1+1+1+4（23 次操作、4114 个状态）、取号 2（2 次操作）、暖机 2+1+2+2+1+2（20 次操作）、
+    /// mkfs 14+1+1+1+4（25 次操作、16402 个状态；E142 第二十五次跑臂 N25M：每块盘多一段 [0, 根环基址) 清零）、取号 2（2 次操作）、暖机 2+1+2+2+1+2（20 次操作）、
     /// 事务 24+2+1+2（35 次操作）、整条流 2+2+1+2+2+1+2+24+2+1+2（57 次操作）。
     /// 改任何一条路径里屏障或 FUA 的位置都红——mkfs 那一行不进层 0 枚举，这里是它唯一的会红检查。
     ///
@@ -8640,9 +8717,9 @@ mod tests {
         let warm_up_operations = &recording.operations[acquisition_operation_count..warm_up_operation_count];
         let transaction_operations = &recording.operations[warm_up_operation_count..];
         let post_mkfs_operations = &recording.operations[mkfs_operation_count..];
-        assert_eq!(mkfs_operations.len(), 23, "mkfs：19 次写（两块盘各清根环三区域与 journal 环共 8、m1/m2 各两盘、三个第 0 代根、两盘各两个系统配置槽）+ 2 道池屏障 × 2 盘（登记 7.4 D2）");
-        assert_eq!(sizes(mkfs_operations), vec![12, 1, 1, 1, 4]);
-        assert_eq!(closed_form_state_count(&split_into_segments(mkfs_operations, true).1), 4114);
+        assert_eq!(mkfs_operations.len(), 25, "mkfs：21 次写（两块盘各清 [0, 根环基址)、根环三区域与 journal 环共 10、m1/m2 各两盘、三个第 0 代根、两盘各两个系统配置槽）+ 2 道池屏障 × 2 盘（E142 第二十五次跑登记 7.1 K1）");
+        assert_eq!(sizes(mkfs_operations), vec![14, 1, 1, 1, 4]);
+        assert_eq!(closed_form_state_count(&split_into_segments(mkfs_operations, true).1), 16402);
         assert_eq!(acquisition_operations.len(), 2, "取号：两盘各写一次系统配置槽，不另加屏障");
         assert_eq!(sizes(acquisition_operations), vec![2]);
         assert_eq!(warm_up_operations.len(), 20, "暖机：10 次写 + 每次空发布三道池屏障 × 2 次 × 2 盘，减去第二次开头那道与第一次发布尾那道连着、两块盘各并掉的一步（登记 R19E-4 第 4 条）");
@@ -8654,8 +8731,8 @@ mod tests {
 
         assert_eq!(
             kinds(mkfs_operations),
-            "[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]",
-            "mkfs：两块盘各清根环三区域与 journal 环（共 8）与 m1/m2 两个单元各两盘同一段、三个第 0 代根各自 FUA 一段、两盘各两个系统配置槽收尾"
+            "[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]",
+            "mkfs：两块盘各清 [0, 根环基址)、根环三区域与 journal 环（共 10）与 m1/m2 两个单元各两盘同一段、三个第 0 代根各自 FUA 一段、两盘各两个系统配置槽收尾"
         );
         assert_eq!(kinds(acquisition_operations), "[system_configuration_slot×2]", "取号那一段只有两次系统配置槽写");
         assert_eq!(
@@ -8762,7 +8839,7 @@ mod tests {
     fn three_state_rows_match_the_registered_anchors() {
         let BuiltPool { recording, mkfs_operation_count, acquisition_operation_count, warm_up_operation_count, .. } = built_pool();
         let anchors: [(usize, &str, &str, u64, u64); 5] = [
-            (19, "0+0+0+0+0", "none", 4114, 4114),
+            (21, "0+0+0+0+0", "none", 16402, 16402),
             (2, "2", "[system_configuration_slot×2]", 4, 9),
             (10, "0+0+2+0+0+2", "[system_configuration_slot×4]", 15, 25),
             (29, "0+0+0+2", "[system_configuration_slot×2]", 16_777_223, 16_777_228),
@@ -8779,7 +8856,7 @@ mod tests {
     fn g11_rows_match_the_anchors_of_the_stream_without_the_trailing_barrier() {
         let stream = record_new_pool_file_creation_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &sample_file());
         let expected: [(&str, usize, &str, u64, u64, &str, &str); 5] = [
-            ("mkfs", 23, "12+1+1+1+4", 4114, 4114, "0+0+0+0+0", "[zero_fill×8,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"),
+            ("mkfs", 25, "14+1+1+1+4", 16402, 16402, "0+0+0+0+0", "[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"),
             ("instance_acquisition", 2, "2", 4, 9, "2", "[system_configuration_slot×2]"),
             ("warm_up", 18, "2+1+2+2+1+2", 15, 25, "0+0+2+0+0+2", "[journal_record×2,barrier×4]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"),
             ("transaction", 33, "24+2+1+2", 16_777_223, 16_777_228, "0+0+0+2", "[unit_write×24,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"),
@@ -8844,6 +8921,69 @@ mod tests {
         }
     }
 
+    /// E142 第二十五次跑臂 N25M 的 M④ (i)：D22（单元原子性怎么合成） 已定项 8 第 3 条「每块盘上 [0, 根环基址)、根环三个区域与
+    /// journal 环各一次调用……每块盘 5 步、两块盘共 10 步」——主几何两块盘各恰 5 步整段清零，其中恰一步落在偏移 0
+    /// （[0, 根环基址) 那一段）；mkfs 之后的流里不再有整段清零（变异 M232、M233）。
+    #[test]
+    fn mkfs_zero_fills_five_areas_on_each_device_and_exactly_one_of_them_starts_at_offset_zero() {
+        let BuiltPool { recording, mkfs_operation_count, .. } = built_pool();
+        let zero_fills_in = |operations: &[RecordedOperation]| -> Vec<(DeviceIdentity, DeviceOffset)> {
+            operations
+                .iter()
+                .filter_map(|operation| match operation {
+                    RecordedOperation::Write(write) if write.kind == StepKind::ZeroFill => Some((write.device, write.offset)),
+                    RecordedOperation::Write(_) | RecordedOperation::Barrier(_) => None,
+                })
+                .collect()
+        };
+        let mkfs_zero_fills = zero_fills_in(&recording.operations[..mkfs_operation_count]);
+        assert_eq!(mkfs_zero_fills.len(), 10, "两块盘共 10 步整段清零");
+        for device in PoolParameters::settled_two_devices().devices() {
+            let offsets_on_device: Vec<DeviceOffset> = mkfs_zero_fills.iter().filter(|(zero_fill_device, _)| *zero_fill_device == device).map(|(_, offset)| *offset).collect();
+            assert_eq!(offsets_on_device.len(), 5, "设备 {} 上恰 5 步整段清零", device.0);
+            assert_eq!(offsets_on_device.iter().filter(|offset| **offset == DeviceOffset(0)).count(), 1, "设备 {} 上恰一步落在偏移 0（[0, 根环基址)）", device.0);
+        }
+        assert!(zero_fills_in(&recording.operations[mkfs_operation_count..]).is_empty(), "整段清零只在 mkfs 里发");
+    }
+
+    /// E142 第二十五次跑臂 N25M 的 M④ (ii)：取样点 G1B（一块盘、带屏障）那一行的四个字段钉登记 7.2 A-M2
+    /// （第一段 5 次清零 + 2 个单元写 = 7 写、1 步屏障；三次根 FUA 各一段；两个系统配置槽 + 1 步屏障）。A-M2 是把「每块盘 5 步」
+    /// 搬到一块盘上推的，条款的射程是两块盘的第一版。
+    #[test]
+    fn mkfs_on_one_device_with_barriers_matches_five_zero_fills_on_that_device() {
+        assert_eq!(
+            segments_geometry_line_of_mkfs_on_one_device_with_barriers(),
+            "name=segments_geometry point=G1B path=mkfs operations=14 segments=7+1+1+1+2 closed_form=134 kinds=[zero_fill×5,unit_write×2,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×2,barrier]"
+        );
+    }
+
+    /// E142 第二十五次跑臂 N25M 的 M④ (iii)：取样点 G11（不发发布末尾那道屏障）的 `path=mkfs` 那一行，`operations=`、`segments=`、
+    /// `closed_form=`、`kinds=` 四个字段与主几何 `name=segments path=mkfs` 那一行逐个相同——mkfs 不随发布这一侧的屏障旋钮变。
+    /// 主几何那一行的绝对值另由 `registered_segment_sequences_match_every_recorded_path` 钉住。
+    #[test]
+    fn mkfs_segment_fields_at_g11_equal_the_main_geometry() {
+        let BuiltPool { recording, mkfs_operation_count, .. } = built_pool();
+        let main_mkfs_operations = &recording.operations[..mkfs_operation_count];
+        let (_, main_segments) = split_into_segments(main_mkfs_operations, true);
+        let main_fields = [
+            format!("operations={}", main_mkfs_operations.len()),
+            format!("segments={}", main_segments.iter().map(|segment| segment.len().to_string()).collect::<Vec<_>>().join("+")),
+            format!("closed_form={}", closed_form_state_count(&main_segments)),
+            format!("kinds={}", format_segment_kinds(&segment_step_kinds(main_mkfs_operations, true))),
+        ];
+        assert_eq!(main_fields[0], "operations=25");
+        let g11_stream = record_new_pool_file_creation_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &sample_file());
+        let [(path_name, earlier_operations, operations), ..] =
+            new_pool_file_creation_stream_paths(&g11_stream.operations, g11_stream.mkfs_operation_count, g11_stream.acquisition_operation_count, g11_stream.warm_up_operation_count);
+        assert_eq!(path_name, "mkfs");
+        let g11_line = segments_sensitivity_line("point=G11 trailing_barrier=off", path_name, earlier_operations, operations);
+        for field in &main_fields {
+            let field_name = field.split('=').next().expect("字段名");
+            let g11_field = g11_line.split(' ').find(|token| token.split('=').next() == Some(field_name)).expect("G11 那一行有这个字段");
+            assert_eq!(g11_field, field, "G11 的 path=mkfs 那一行 {field_name} 与主几何不同");
+        }
+    }
+
     /// 窗口之前与窗口的计数（登记 7.4 C10、C11、D5）与判决格 `write_list_ok`（⑤ ⑨；变异 M192、M198）。
     #[test]
     fn before_window_and_window_counts_match_the_registered_anchors() {
@@ -8853,7 +8993,7 @@ mod tests {
         let count_writes = |operations: &[RecordedOperation]| operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(_))).count();
         let count_barrier_steps = |operations: &[RecordedOperation]| operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier(_))).count();
         let count_fua = |operations: &[RecordedOperation]| operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(write) if write.is_fua())).count();
-        assert_eq!((before_window.len(), count_writes(before_window)), (45, 31), "C10（R19E-4 第 4 条：暖机两道连着的屏障两块盘各并掉一步）");
+        assert_eq!((before_window.len(), count_writes(before_window)), (47, 33), "C10（R19E-4 第 4 条：暖机两道连着的屏障两块盘各并掉一步；E142 第二十五次跑登记 7.2 A-M4：mkfs 每块盘多一步写、没有多屏障）");
         assert_eq!((window.len(), count_writes(window), count_barrier_steps(window), count_fua(window)), (35, 29, 6, 1), "C11");
         assert!(new_pool_file_creation_write_list_matches(count_writes(window), count_barrier_steps(window), count_fua(window), 2));
         assert!(!new_pool_file_creation_write_list_matches(29, 4, 1, 2), "C577 之前的两道池屏障（每盘各一步）不算过");
@@ -9680,7 +9820,7 @@ mod tests {
         // 7.2 B10：根记录里 flags 20、水位 122（4 + 16 + 4 + 4 + 8 + 86）、自证校验和 138、实例表单元指针 [170, 256)、中央映射树根指针 [256, 342)、
         // 分配记录树根指针 [342, 428)（4 + 16 + 4 + 4 + 8 + 86 + 8 + 8 + 32 = 170）。
         assert_eq!(ROOT_CHECKSUM_OFFSET as u64 + WIDE_CHECKSUM_BYTES, 170, "实例表单元指针起点");
-        assert_eq!(&slot[122..130], &65548u64.to_le_bytes(), "水位在 122：新池新建文件的根写 65548");
+        assert_eq!(&slot[122..130], &65549u64.to_le_bytes(), "水位在 122：新池新建文件的根写 65549");
         let mut instance_table_pointer_bytes = ByteReader::at(&slot, 170);
         assert_eq!(NodePointer::read_from(&mut instance_table_pointer_bytes), output.root.instance_table);
         let mut mapping_pointer_at_256 = ByteReader::at(&slot, 256);
@@ -9703,7 +9843,7 @@ mod tests {
         assert_eq!(parsed, output.record);
         assert_eq!(parsed.new_tree_table.locations[0].slot, SlotNumber(SLOT_TREE_TABLE_FIRST_PUBLISH));
         assert_eq!(parsed.new_mapping_root.locations[0].slot, SlotNumber(SLOT_MAPPING_ROOT));
-        assert_eq!(parsed.new_tree_identifier_watermark, 65548, "十二棵 day-1 注册（65536..65547）⇒ 水位 65548（7.2 B3）");
+        assert_eq!(parsed.new_tree_identifier_watermark, 65549, "十三棵 day-1 注册（最后一棵退役树）⇒ 水位 65549（7.2 A-T4）");
         assert_eq!(parsed.new_rollback_floor, CheckpointTxg(0));
         assert_eq!(parsed.transaction, TransactionNumber(1));
         assert_eq!(parsed.fsid, unit_fsid(&FIXED_FSID), "记录头的 fsid 与单元头同口径（D23 已定项 4）");
@@ -9837,11 +9977,12 @@ mod tests {
         assert_eq!(value_of(STATISTIC_FRAGMENTATION_RUNS), 4, "空闲 run：[50179]、[50182, 50239]、[50241]、[50253, 单元区末]（第七节 B14）");
         assert_eq!(value_of(STATISTIC_INODE_WATERMARK), 2);
         // 准入不等式要的四项 day-1 各写一行：不可回收、待删占用两项 0（读不到行是坏账，读到 0 是真的 0），
-        // 已承诺预留照 D3（空间分配） 已定项 2 的式子（登记第七节 7.2 A1：2 × ((2 + 0 + 1) × 16384 + 41 × 1) = 98 386），defer 待释放 = 被 A 换下的 mkfs 树表 1 槽。
+        // 已承诺预留照 D3（空间分配） 已定项 2 的式子（第 25 次登记第七节 7.2 A-T1：2 × ((2 + 0 + 1 + 2 + 0 + 1) × 16384 + 41 × 1 + 35 × 1) = 196 760），
+        // defer 待释放 = 被 A 换下的 mkfs 树表 1 槽。
         for statistic in [STATISTIC_UNRECLAIMABLE_BYTES, STATISTIC_PENDING_DELETE_BYTES] {
             assert_eq!(value_of(statistic), 0);
         }
-        assert_eq!(value_of(STATISTIC_COMMITTED_RESERVATION_BYTES), 98_386, "A1：副本数 2 × ((2 + H 0 + 1) × 16384 + 41 × n_live 1)");
+        assert_eq!(value_of(STATISTIC_COMMITTED_RESERVATION_BYTES), 196_760, "A-T1：副本数 2 × ((2 + H_墓碑 0 + 1 + 2 + H_退役 0 + 1) × 16384 + 41 × n_live 1 + 35 × n_记录 1)");
         assert_eq!(value_of(STATISTIC_DEFER_QUEUE_BYTES), SLOT_BYTES, "mkfs 那片第 0 版树表单元进 defer 队列");
         // 哪几项带设备维、哪几项是池级的：逐项数行数**并逐项核 key 里的设备段**——
         // 只数行数抓不到「两行都写成池级」（那也是两行），这一格是第七次跑的变异 M55 逼出来的。
@@ -9859,32 +10000,84 @@ mod tests {
         let inode_watermark_row = output.accounting_entries.iter().find(|entry| entry.statistic == STATISTIC_INODE_WATERMARK).expect("水位");
         assert_eq!(inode_watermark_row.tree, TreeIdentifier(TREE_IDENTIFIER_INODE), "第 12 项带树维：树 ID 就是可写头的 inode 树");
         assert_eq!(inode_watermark_row.device, DeviceIdentity(STATISTIC_NO_DEVICE_DIMENSION), "不带设备维的设备段取 0xFFFF_FFFF");
-        assert_eq!(output.root.tree_identifier_watermark, 65548, "树 ID 65536..65547，水位 65548");
+        assert_eq!(output.root.tree_identifier_watermark, 65549, "最后一棵退役树之后水位 65549（7.2 A-T4）");
         assert_eq!(output.root.rollback_floor, CheckpointTxg(0));
         assert_eq!(output.root.mapping_root.head.birth_tree, TreeIdentifier(TREE_IDENTIFIER_MAPPING), "中央映射树的根住根记录");
     }
 
-    /// 已承诺预留（标签 6）的式子，绝对值取登记（`research/prompts/e142-r22-prereg.md`）第七节 7.2 A1–A3，由
-    /// `label6_anchor.py` 独立算出，不取任何一次产物的输出（M221–M227 的会红检查落在这里）。
+    /// 已承诺预留（标签 6）的式子，绝对值取第 25 次登记（`research/prompts/e142-r25-prereg.md`）第七节 7.2 A-T1、A-T2，由
+    /// `anchors_r25.py` 独立算出，不取任何一次产物的输出（M221–M227、M238、M241 的会红检查落在这里）。
     #[test]
     fn committed_reservation_formula_reproduces_the_d3_clause_anchors() {
-        let main_point = committed_reservation_bytes(2, 0, 1, true);
-        assert_eq!(main_point, 98_386, "A1：2 × ((2 + 0 + 1) × 16384 + 41 × 1)");
-        assert_eq!(main_point.to_le_bytes(), [0x52, 0x80, 0x01, 0, 0, 0, 0, 0], "A1：小端 8 字节 5280010000000000");
+        let main_point = committed_reservation_bytes(2, 0, 0, 1, 1, true);
+        assert_eq!(main_point, 196_760, "A-T1：2 × ((2 + 0 + 1 + 2 + 0 + 1) × 16384 + 41 × 1 + 35 × 1)");
+        assert_eq!(main_point.to_le_bytes(), [0x98, 0x00, 0x03, 0, 0, 0, 0, 0], "A-T1：小端 8 字节 9800030000000000");
         assert_eq!(tombstone_prepayment_bytes_per_live_object(), 41, "41 = ⌈2 × 16384 ÷ 815⌉（向下取整是 40）");
-        assert_eq!(committed_reservation_bytes(2, 0, 1, false), 0, "A2：树表里没有 deleted_inodes 条目的版本取 0");
-        assert_eq!(committed_reservation_bytes(2, 5, 7, false), 0, "A2：没有条目时别的三个量取什么都是 0");
-        // A3 的六个判别值：三个换输入就能直接调用（副本 1、H = 1、n_live = 2），三个是式子的另一种写法（常驻少一槽、41 改 40、槽宽 4096），
-        // 只能断言今天的值不是它们。
-        assert_eq!(committed_reservation_bytes(1, 0, 1, true), 49_193, "A3：副本 1");
-        assert_eq!(committed_reservation_bytes(2, 1, 1, true), 131_154, "A3：H = 1");
-        assert_eq!(committed_reservation_bytes(2, 0, 2, true), 98_468, "A3：n_live = 2");
-        for (name, wrong_value) in [("常驻少一槽", 65_618u64), ("41 改 40", 98_384), ("槽宽 4096", 24_658), ("副本 1", 49_193), ("H = 1", 131_154), ("n_live = 2", 98_468)] {
-            assert_ne!(main_point, wrong_value, "A3 判别值（{name}）必须与 A1 不同");
-        }
-        // H：零根读 0（M226 读成 1 会红）；每对象摊分在边界上先取整（M222）。
-        assert_eq!(tombstone_tree_internal_levels(&NodePointer::empty_root()), 0, "零根与只有根时 H = 0");
+        assert_eq!(retirement_prepayment_bytes_per_inode_record(), 35, "A-T2：35 = ⌈32768 ÷ 959⌉（向下取整是 34）");
+        // H：零根读 0（M226 读成 1 会红）；两项预付在边界上先取整（M222、M241）。
+        assert_eq!(tombstone_tree_internal_levels(&NodePointer::empty_root()), 0, "零根与只有根时 H_墓碑 = 0");
+        assert_eq!(retirement_tree_internal_levels(&NodePointer::empty_root()), 0, "零根与只有根时 H_退役 = 0");
         assert_eq!((2 * SLOT_BYTES) % TOMBSTONE_RECORDS_PER_CONTAINER, 168, "32768 = 40 × 815 + 168：除不尽，取整方向才有区别");
+        assert_eq!((2 * SLOT_BYTES) % RETIREMENT_RECORDS_PER_CONTAINER, 162, "32768 = 34 × 959 + 162：除不尽，取整方向才有区别");
+    }
+
+    /// `layout/03`「退役容器」那一行：一个 32 KiB 容器去掉 136 字节的头，按 34 字节一条装 959 条（7.2 A-T2）。
+    #[test]
+    fn retirement_container_holds_959_records_of_34_bytes() {
+        assert_eq!((2 * SLOT_BYTES - 136) / 34, RETIREMENT_RECORDS_PER_CONTAINER, "⌊(32768 − 136) ÷ 34⌋ = 959");
+        assert_eq!(RETIREMENT_RECORDS_PER_CONTAINER, 959);
+    }
+
+    /// 7.2 A-T6 的判别值之一：副本 1 ⇒ 98 380。
+    #[test]
+    fn committed_reservation_with_one_replica_is_98380() {
+        assert_eq!(committed_reservation_bytes(1, 0, 0, 1, 1, true), 98_380, "A-T6：副本 1");
+    }
+
+    /// 7.2 A-T6 的判别值之一：H_墓碑 = 1 ⇒ 229 528。
+    #[test]
+    fn committed_reservation_with_one_tombstone_tree_internal_level_is_229528() {
+        assert_eq!(committed_reservation_bytes(2, 1, 0, 1, 1, true), 229_528, "A-T6：H_墓碑 1");
+    }
+
+    /// 7.2 A-T6 的判别值之一：H_退役 = 1 ⇒ 229 528（M239 去掉 H_退役 时在这一点上红，主点上与原式同值）。
+    #[test]
+    fn committed_reservation_with_one_retirement_tree_internal_level_is_229528() {
+        assert_eq!(committed_reservation_bytes(2, 0, 1, 1, 1, true), 229_528, "A-T6：H_退役 1");
+    }
+
+    /// 7.2 A-T6 的判别值之一：n_live = n_记录 = 2 ⇒ 196 912。
+    #[test]
+    fn committed_reservation_with_two_live_objects_and_two_records_is_196912() {
+        assert_eq!(committed_reservation_bytes(2, 0, 0, 2, 2, true), 196_912, "A-T6：n_live 2、n_记录 2");
+    }
+
+    /// 7.2 A-T6 的判别值之一：n_live = 1、n_记录 = 2 ⇒ 196 830（M240 把退役项挂到 n_live 上时在这一点上红，主点上与原式同值）。
+    #[test]
+    fn committed_reservation_with_one_live_object_and_two_records_is_196830() {
+        assert_eq!(committed_reservation_bytes(2, 0, 0, 1, 2, true), 196_830, "A-T6：n_live 1、n_记录 2");
+    }
+
+    /// 7.2 A-T6 的判别值之一：树表里没有 `deleted_inodes` 条目的版本取 0，别的量取什么都是 0。
+    #[test]
+    fn committed_reservation_without_a_deleted_inodes_entry_is_zero() {
+        assert_eq!(committed_reservation_bytes(2, 0, 0, 1, 1, false), 0, "A-T6：没有 deleted_inodes 条目");
+        assert_eq!(committed_reservation_bytes(2, 5, 3, 7, 9, false), 0, "没有条目时别的五个量取什么都是 0");
+    }
+
+    /// 等价变异留档（登记第九节）：式子里 H_墓碑 与 H_退役 只相加，两者对调在所有输入上同值；
+    /// 在六个判别值的输入上逐个核一遍，对调之后相同。
+    #[test]
+    fn swapping_the_two_tree_internal_levels_leaves_the_committed_reservation_unchanged() {
+        for (replicas, tombstone_levels, retirement_levels, live_objects, records, has_entry) in
+            [(1u64, 0u64, 0u64, 1u64, 1u64, true), (2, 1, 0, 1, 1, true), (2, 0, 1, 1, 1, true), (2, 0, 0, 2, 2, true), (2, 0, 0, 1, 2, true), (2, 0, 0, 1, 1, false), (2, 3, 1, 4, 5, true)]
+        {
+            assert_eq!(
+                committed_reservation_bytes(replicas, tombstone_levels, retirement_levels, live_objects, records, has_entry),
+                committed_reservation_bytes(replicas, retirement_levels, tombstone_levels, live_objects, records, has_entry),
+                "H_墓碑 与 H_退役 对调同值"
+            );
+        }
     }
 
     /// n_live 只数 nlink ≥ 1 的记录（M225 把每条记录都算上会红）：合成 nlink = 0、1、2 的记录字节。
@@ -9903,6 +10096,18 @@ mod tests {
         assert_eq!(live_object_count_of_inode_records(&[]), 0);
     }
 
+    /// n_记录 数全部记录，含 nlink = 0 的（D3 已定项 2 的退役项）：合成 nlink = 0、1 的记录字节。
+    #[test]
+    fn inode_record_count_includes_records_whose_link_count_is_zero() {
+        let record = InodeRecord { inode: FIRST_INODE_NUMBER, object_birth: CheckpointTxg(3), size: 3000, change_count: 3 };
+        let linked = record.to_bytes();
+        let mut unlinked = record.to_bytes();
+        unlinked[INODE_RECORD_LINK_COUNT_OFFSET..INODE_RECORD_LINK_COUNT_OFFSET + 4].copy_from_slice(&0u32.to_le_bytes());
+        assert_eq!(record_count_of_inode_records(&[unlinked.clone()]), 1, "nlink = 0 的记录也算进 n_记录");
+        assert_eq!(record_count_of_inode_records(&[linked, unlinked]), 2);
+        assert_eq!(record_count_of_inode_records(&[]), 0);
+    }
+
     /// 记账树单元 t10 里各行的字节偏移与标签（登记 7.2 A4，由 D8 已定项 11 与 `layout/01` 第五节独立推出）、A6 前三个区域的落点。
     #[test]
     fn accounting_unit_carries_the_committed_reservation_at_the_registered_byte_offsets() {
@@ -9915,8 +10120,8 @@ mod tests {
         // 第 r 行条目起点 159 + 34 (r − 1)；key 22（标签 2 + 树 8 + 设备 4 + 代 8），value 紧接 key。
         assert_eq!((label_at(227), value_at(249)), (2, 3_472_605_184), "第 3 行：设备 0 的空闲字节，value [249, 257)");
         assert_eq!((label_at(261), value_at(283)), (2, 3_472_605_184), "第 4 行：设备 1 的空闲字节，value [283, 291)");
-        assert_eq!((label_at(465), value_at(487)), (6, 98_386), "第 10 行：已承诺预留，标签在 465，value [487, 495)");
-        assert_eq!(&unit[487..495], &[0x52, 0x80, 0x01, 0, 0, 0, 0, 0], "A1：盘上小端 5280010000000000");
+        assert_eq!((label_at(465), value_at(487)), (6, 196_760), "第 10 行：已承诺预留，标签在 465，value [487, 495)");
+        assert_eq!(&unit[487..495], &[0x98, 0x00, 0x03, 0, 0, 0, 0, 0], "A-T1：盘上小端 9800030000000000");
         assert_eq!((label_at(567), value_at(589)), (11, 3310), "第 13 行：设备 0 的全空聚簇段数，value [589, 597)");
         assert_eq!((label_at(601), value_at(623)), (11, 3310), "第 14 行：设备 1 的全空聚簇段数，value [623, 631)");
         // A6：t10、t11、t12 的（设备内偏移，长度）；t13、t14 的落点。
@@ -9926,38 +10131,43 @@ mod tests {
         assert_eq!(ring_slot_offset(0, 1).0, 1_052_672, "t14");
     }
 
-    /// 树表单元第 1 版 11 条（D8 已定项 8 / 已定项 9 / 已定项 11，D18 已定项 24 第 6 条；登记 7.2 B2、B3、第五节 N21 ④）：
-    /// 条目按树 ID 升序、树 ID 打头当 key、头 ID 按 D8 已定项 8「头 ID 8 字节的取值」、预留 76 恒 0。绝对值取登记 7.1 甲表 L13–L16，
-    /// 不取任何一次产物的输出（M204、M205、M207 的会红检查落在这里）。
+    /// 树表单元第 1 版 12 条（D8 已定项 8 / 已定项 9 / 已定项 11，D18 已定项 24 第 6 条；第 25 次登记 7.1 K2、K3，7.2 A-T3、A-T4）：
+    /// 条目按树 ID 升序、树 ID 打头当 key、头 ID 按 D8 已定项 8「头 ID 8 字节的取值」、预留 76 恒 0。绝对值取条款原文，
+    /// 不取任何一次产物的输出（M204、M205、M207、M234、M236、M237 的会红检查落在这里）。
     #[test]
-    fn the_tree_table_holds_eleven_entries_keyed_by_tree_identifier() {
+    fn the_tree_table_holds_twelve_entries_keyed_by_tree_identifier() {
         let BuiltPool { output, .. } = built_pool();
         let node = parse_index_node(&output.units_by_slot[11].2).expect("树表单元");
-        assert_eq!(node.entries.len(), 11);
+        assert_eq!(node.entries.len(), 12);
         assert_eq!(node.key_width, TREE_TABLE_KEY_WIDTH);
         let parsed: Vec<TreeTableEntry> = node.entries.iter().map(|bytes| TreeTableEntry::parse(bytes).expect("树表条目")).collect();
-        assert_eq!(parsed.iter().map(|entry| entry.tree.0).collect::<Vec<_>>(), vec![65536, 65537, 65538, 65539, 65541, 65542, 65543, 65544, 65545, 65546, 65547]);
-        assert_eq!(parsed.iter().map(|entry| entry.kind).collect::<Vec<_>>(), vec![1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12]);
-        assert_eq!(parsed.iter().map(|entry| entry.head_identifier).collect::<Vec<_>>(), vec![65537, 65537, 0, 0, 0, 0, 0, 65537, 65537, 0, 0]);
-        assert!(parsed.iter().all(|entry| entry.birth_txg == CheckpointTxg(3)), "十一条诞生 txg 都是 3");
-        assert_eq!(parsed.iter().filter(|entry| entry.root.is_empty_root()).count(), 7, "livelist / 稀疏旁表 / deadlist / deleted_inodes / 墓碑树 / 谱系树 / logged_ops 七条根指针为零");
+        assert_eq!(parsed.iter().map(|entry| entry.tree.0).collect::<Vec<_>>(), vec![65536, 65537, 65538, 65539, 65541, 65542, 65543, 65544, 65545, 65546, 65547, 65548]); // 末一条退役树
+        assert_eq!(parsed.iter().map(|entry| entry.kind).collect::<Vec<_>>(), vec![1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13]);
+        assert_eq!(parsed.iter().map(|entry| entry.head_identifier).collect::<Vec<_>>(), vec![65537, 65537, 0, 0, 0, 0, 0, 65537, 65537, 0, 0, 65537]);
+        assert!(parsed.iter().all(|entry| entry.birth_txg == CheckpointTxg(3)), "十二条诞生 txg 都是 3");
+        assert_eq!(parsed.iter().filter(|entry| entry.root.is_empty_root()).count(), 8, "livelist / 稀疏旁表 / deadlist / deleted_inodes / 墓碑树 / 谱系树 / logged_ops / 退役树八条根指针为零");
         assert!(parsed.windows(2).all(|pair| pair[0].tree < pair[1].tree), "条目按树 ID 严格升序（D8 已定项 8）");
+        // 7.1 K2：第 11 条（0 起数）是退役树：树 ID、种类码 13、零根、头 ID 65537、诞生 txg 3（`previous_snapshot_txg` 0 由字段表 L16 那六行核）。
+        let retirement_entry = &parsed[11];
+        assert_eq!((retirement_entry.tree, retirement_entry.kind, retirement_entry.head_identifier, retirement_entry.birth_txg), (TreeIdentifier(TREE_IDENTIFIER_RETIREMENT), 13, 65537, CheckpointTxg(3)), "退役树条目");
+        assert!(retirement_entry.root.is_empty_root(), "退役树零根");
         // 条目里 key 一律打头（D8 已定项 11，2026-09-14 用户定案）：区间就是首末两条的前 8 字节。
         assert_eq!(&node.entries[0][..8], &65536u64.to_le_bytes()[..]);
-        assert_eq!(&node.entries[10][..8], &65547u64.to_le_bytes()[..]);
+        assert_eq!(&node.entries[11][..8], &TREE_IDENTIFIER_RETIREMENT.to_le_bytes()[..]);
         assert_eq!(node.smallest_key, 65536u64.to_le_bytes().to_vec());
-        assert_eq!(node.largest_key, 65547u64.to_le_bytes().to_vec());
+        assert_eq!(node.largest_key, TREE_IDENTIFIER_RETIREMENT.to_le_bytes().to_vec());
+        assert_eq!(TREE_IDENTIFIER_RETIREMENT, 65548, "退役树的树 ID（7.2 A-T4b，D8 已定项 11）");
         let declared_length = u16::from_le_bytes(output.units_by_slot[11].2[8..10].try_into().expect("切了 2 字节"));
-        assert_eq!(declared_length, 2200, "11 × 200（7.2 B2）");
-        assert!(131 + 2200 <= NODE_BYTES, "条目区末尾 131 + 2200 = 2331 ≤ 16384，一个单元装得下（7.2 B2）");
+        assert_eq!(declared_length, 2400, "12 × 200（7.2 A-T3）");
+        assert!(131 + 2400 <= NODE_BYTES, "条目区末尾 131 + 2400 = 2531 ≤ 16384，一个单元装得下（7.2 A-T3）");
         assert_eq!((NODE_BYTES - 131) / TREE_TABLE_ENTRY_BYTES, 81, "每层装 ⌊(16384 − 131) / 200⌋ = 81 棵（7.2 B2）");
-        // 7.2 B3：树 ID 与水位的盘上字节（小端 8 字节）：65536 = 00 00 01 00 …；65536..65547 依次 00..0b 打头、其后 00 01 00 00 00 00 00。
+        // 树 ID 与水位的盘上字节（小端 8 字节）：65536 = 00 00 01 00 …；十二条依次 00..0c 打头（跳过 0x04）、其后 00 01 00 00 00 00 00。
         for (index, entry) in node.entries.iter().enumerate() {
             let mut expected_identifier = [0u8, 0, 1, 0, 0, 0, 0, 0];
             expected_identifier[0] = if index < 4 { index as u8 } else { index as u8 + 1 }; // 中央映射树 65540 住根记录、不在树表里：第 4 条起低字节比下标大 1
             assert_eq!(&entry[..8], &expected_identifier[..], "第 {index} 条的树 ID 小端字节");
         }
-        assert_eq!(output.root.tree_identifier_watermark.to_le_bytes(), [0x0c, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00], "65548 的盘上字节（7.2 B3）");
+        assert_eq!(output.root.tree_identifier_watermark.to_le_bytes(), [0x0d, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00], "65549 的盘上字节（7.2 A-T4）");
         assert_eq!(65536u64.to_le_bytes(), [0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00], "65536 的盘上字节（7.2 B3）");
         // 预留 76 里塞一个非零字节：条目解析当场拒绝。
         let mut tampered = node.entries[0].clone();
@@ -10440,7 +10650,7 @@ mod tests {
         mkfs(&PoolParameters::settled_two_devices()).0.pool.clone()
     }
 
-    /// R56 字段表：174 行（L1–L21 共 94 行、J1–J24 共 80 行，各号的行数逐个钉），主几何的字节与登记甲表的期望值逐行相等；
+    /// R56 字段表：180 行（L1–L21 共 100 行、J1–J24 共 80 行，各号的行数逐个钉；L16 含第二十五次跑加的退役树一条 6 行），主几何的字节与登记甲表的期望值逐行相等；
     /// 每一行的期望值是登记里的字面量，不取装置的常量（M204–M207、M210–M213 的会红检查也落在这里）。
     #[test]
     fn layout_field_table_has_174_rows_and_every_row_equals_the_registered_value() {
@@ -10452,7 +10662,7 @@ mod tests {
         }
         let expected_per_id: BTreeMap<&str, usize> = [
             ("L1", 1), ("L2", 1), ("L3", 1), ("L4", 1), ("L5", 1), ("L6", 1), ("L7", 5), ("L8", 1), ("L9", 1), ("L10", 1), ("L11", 1),
-            ("L12", 1), ("L13", 1), ("L14", 1), ("L15", 42), ("L16", 24), ("L17", 1), ("L18", 2), ("L19", 1), ("L20", 5), ("L21", 1),
+            ("L12", 1), ("L13", 1), ("L14", 1), ("L15", 42), ("L16", 30), ("L17", 1), ("L18", 2), ("L19", 1), ("L20", 5), ("L21", 1),
             ("J1", 3), ("J2", 3), ("J3", 3), ("J4", 3), ("J5", 3), ("J6", 3), ("J7", 3), ("J8", 3), ("J9", 3), ("J10", 3), ("J11", 3),
             ("J12", 3), ("J13", 3), ("J14", 2), ("J15", 3), ("J16", 3), ("J17", 3), ("J18", 3), ("J19", 3), ("J20", 3), ("J21", 3),
             ("J22", 3), ("J23", 3), ("J24", 12),
@@ -10460,8 +10670,8 @@ mod tests {
         .into_iter()
         .collect();
         assert_eq!(per_id, expected_per_id);
-        assert_eq!(rows.len(), 174);
-        assert_eq!(rows.iter().filter(|row| row.id.starts_with('L')).count(), 94);
+        assert_eq!(rows.len(), 174 + 6, "7.2 A-T5：退役树那一条多 6 行");
+        assert_eq!(rows.iter().filter(|row| row.id.starts_with('L')).count(), 100);
         assert_eq!(rows.iter().filter(|row| row.id.starts_with('J')).count(), 80);
         let unequal: Vec<String> = rows
             .iter()
@@ -10469,12 +10679,19 @@ mod tests {
             .map(|row| format!("{} {} {} expected={} actual={}", row.id, row.record_or_unit, row.field, row.expected, row.actual))
             .collect();
         assert!(unequal.is_empty(), "字段表不等的行：{unequal:#?}");
-        assert_eq!(layout_field_tally(&rows), (174, 0));
-        // 几行抽查实测值（不经比较函数）：树表条目数、声明长度、水位、两条反向链。
+        assert_eq!(layout_field_tally(&rows), (180, 0));
+        // 几行抽查实测值（不经比较函数）：树表条目数、声明长度、水位、退役树那一条、两条反向链。
         let actual_of = |id: &str, record_or_unit: &str, field: &str| rows.iter().find(|row| row.id == id && row.record_or_unit == record_or_unit && row.field == field).map(|row| row.actual.clone());
-        assert_eq!(actual_of("L13", "t12_tree_table_first_version", "entry_count@98").as_deref(), Some("11"));
-        assert_eq!(actual_of("L14", "t12_tree_table_first_version", "declared_length@8").as_deref(), Some("2200"));
-        assert_eq!(actual_of("L17", "t13_journal_record", "new_root_segment_tree_identifier_watermark@271").as_deref(), Some("65548"));
+        assert_eq!(actual_of("L13", "t12_tree_table_first_version", "entry_count@98").as_deref(), Some("12"));
+        assert_eq!(actual_of("L14", "t12_tree_table_first_version", "declared_length@8").as_deref(), Some("2400"));
+        assert_eq!(actual_of("L17", "t13_journal_record", "new_root_segment_tree_identifier_watermark@271").as_deref(), Some("65549"));
+        assert_eq!(actual_of("L19", "t14_root_record", "tree_identifier_watermark@122").as_deref(), Some("65549"));
+        let retirement_entry_actuals: Vec<Option<String>> = ["tree_identifier", "kind", "root_slot", "head_identifier", "birth_txg", "previous_snapshot_txg"]
+            .iter()
+            .map(|field| actual_of("L16", "t12_tree_table_first_version", &format!("entry11_{field}")))
+            .collect();
+        let retirement_entry_expected: Vec<Option<String>> = ["65548", "13", "zero", "65537", "3", "0"].iter().map(|value| Some((*value).to_string())).collect(); // 退役树（7.1 K2）
+        assert_eq!(retirement_entry_actuals, retirement_entry_expected, "L16 第 11 条：退役树");
         assert_eq!(actual_of("J13", "t13_journal_record", "back_chain@91").as_deref(), Some("2660362816"));
         assert_eq!(actual_of("J13", "w4_journal_record", "back_chain@91").as_deref(), Some("750278362"));
     }
@@ -10506,10 +10723,10 @@ mod tests {
         let rows = layout_field_rows(&recording.pool, &after_mkfs_pool());
         assert_eq!(layout_field_positive_control(&rows), (4, 4, true));
         // 主表那一份不受影响：注入只动副本。
-        assert_eq!(layout_field_tally(&rows), (174, 0));
+        assert_eq!(layout_field_tally(&rows), (180, 0));
     }
 
-    /// 字段表分得出一个字节：把 t14 根记录里的水位低字节取反（0x0c → 0xf3，65548 → 65779），恰有 L19 一行变不等。
+    /// 字段表分得出一个字节：把 t14 根记录里的水位低字节取反（0x0d → 0xf2，65549 → 65778，7.2 A-T4），恰有 L19 一行变不等。
     #[test]
     fn layout_field_table_notices_one_flipped_watermark_byte() {
         let BuiltPool { recording, .. } = built_pool();
@@ -10517,7 +10734,7 @@ mod tests {
         flip_byte(&mut damaged, DeviceIdentity(0), DeviceOffset(1_052_672), 122);
         let rows = layout_field_rows(&damaged, &after_mkfs_pool());
         let unequal: Vec<(&str, String)> = rows.iter().filter(|row| !layout_field_equal(&row.expected, &row.actual)).map(|row| (row.id, row.actual.clone())).collect();
-        assert_eq!(unequal, vec![("L19", "65779".to_string())]);
+        assert_eq!(unequal, vec![("L19", "65778".to_string())]);
     }
 
     /// 7.2 B11 的落点绝对值（独立算出的字节偏移）：t1 在 50180 × 16384、区域 1 与 2 的槽 0、t14（区域 0 槽 1）、journal 环里计数器 1、2、3。
@@ -10583,7 +10800,7 @@ mod tests {
             fsid: unit_fsid(&parameters.fsid),
             new_tree_table: other_pointer(60_000, 0x1111),
             new_mapping_root: other_pointer(60_001, 0x2222),
-            new_tree_identifier_watermark: 65548,
+            new_tree_identifier_watermark: 65549,
             new_rollback_floor: CheckpointTxg(0),
             new_instance_table: other_pointer(60_002, 0x3333),
             new_allocation_record_tree_root: other_pointer(60_003, 0x4444),
@@ -10681,7 +10898,7 @@ mod tests {
         find_field_value_excluding(rows, row_name, key, &[]).unwrap_or_else(|| panic!("{row_name} 行里没有 {key}"))
     }
 
-    /// 7.2 A5 与 A1：主点空闲每盘 3 472 605 184、全空段 3310 个；P8G 空闲每盘 7 767 572 480、全空段 7 406；runs 都是 4；标签 6 都是 98 386。
+    /// 7.2 A5 与 A1：主点空闲每盘 3 472 605 184、全空段 3310 个；P8G 空闲每盘 7 767 572 480、全空段 7 406；runs 都是 4；标签 6 都是 196 760（第 25 次登记 7.1 K6）。
     /// M228（单元区槽数仍按 4 GiB）、M230（段数上界写死 3312）在 P8G 这一格红，主点上不红。
     #[test]
     fn accounting_row_carries_the_registered_free_bytes_and_empty_segments_at_both_geometries() {
@@ -10694,7 +10911,7 @@ mod tests {
             assert_eq!(rows_field(&section.rows, "accounting", "free_bytes_per_device"), free_bytes, "{geometry}：空闲字节");
             assert_eq!(rows_field(&section.rows, "accounting", "empty_cluster_segments_per_device"), empty_segments, "{geometry}：全空聚簇段");
             assert_eq!(rows_field(&section.rows, "accounting", "fragmentation_runs_per_device"), "4", "{geometry}：空闲 run 数");
-            assert_eq!(rows_field(&section.rows, "accounting", "committed_reservation"), "98386", "{geometry}：标签 6 不随盘大小变（7.2 A1）");
+            assert_eq!(rows_field(&section.rows, "accounting", "committed_reservation"), "196760", "{geometry}：标签 6 不随盘大小变（7.1 K6，7.2 A-T1）");
         }
     }
 
@@ -10718,14 +10935,14 @@ mod tests {
     }
 
     /// 7.2 A4 的偏移（t10 在设备 0 的 823 296 000，第 3 / 4 行 value 在 [249, 257) / [283, 291)，第 10 行 [487, 495)，第 13 / 14 行 [589, 597) / [623, 631)）
-    /// 读 P8G 那一段打出的区域字节：盘上记的就是 P8G 的空闲与段数，标签 6 仍是 98 386。M229（P8G 一段打成主点那条流）在这里红。
+    /// 读 P8G 那一段打出的区域字节：盘上记的就是 P8G 的空闲与段数，标签 6 仍是 196 760（7.1 K6）。M229（P8G 一段打成主点那条流）在这里红。
     #[test]
     fn p8g_accounting_unit_bytes_carry_the_p8g_free_bytes_and_segment_counts_at_the_registered_offsets() {
         let (rows, _) = p8g_section_rows(&sample_file());
         let accounting_unit = region_bytes_at(&rows, "p8g_device_region_bytes", 0, 823_296_000);
         assert_eq!(little_endian_u64_at(&accounting_unit, 249), 7_767_572_480, "第 3 行 free_bytes_dev0");
         assert_eq!(little_endian_u64_at(&accounting_unit, 283), 7_767_572_480, "第 4 行 free_bytes_dev1");
-        assert_eq!(little_endian_u64_at(&accounting_unit, 487), 98_386, "第 10 行已承诺预留");
+        assert_eq!(little_endian_u64_at(&accounting_unit, 487), 196_760, "第 10 行已承诺预留");
         assert_eq!(little_endian_u64_at(&accounting_unit, 589), 7_406, "第 13 行 empty_cluster_segments_dev0");
         assert_eq!(little_endian_u64_at(&accounting_unit, 623), 7_406, "第 14 行 empty_cluster_segments_dev1");
         let main_point_section = stream_section(&PoolParameters::settled_two_devices(), &sample_file());
@@ -10771,14 +10988,14 @@ mod tests {
         assert_eq!(differing, registered_nine);
     }
 
-    /// R69、R72：174 行字段表在 P8G 上同一份期望值全相等，甲类 12 个判决字段全真；主点那条流同一个函数跑出的也全真（与主点 `name=verdict` 里同名字段同值）。
+    /// R69、R72：180 行字段表在 P8G 上同一份期望值全相等，甲类 12 个判决字段全真；主点那条流同一个函数跑出的也全真（与主点 `name=verdict` 里同名字段同值）。
     #[test]
     fn layout_field_table_is_equal_and_all_twelve_stream_verdict_fields_hold_at_both_geometries() {
         let file = sample_file();
         for (geometry, parameters) in [("主点", PoolParameters::settled_two_devices()), ("P8G", p8g_parameters())] {
             let section = stream_section(&parameters, &file);
-            assert_eq!(section.rows.iter().filter(|row| row.starts_with("name=layout_field ")).count(), 174, "{geometry}：字段表行数");
-            assert_eq!(rows_field(&section.rows, "layout_field_summary", "rows"), "174", "{geometry}");
+            assert_eq!(section.rows.iter().filter(|row| row.starts_with("name=layout_field ")).count(), 180, "{geometry}：字段表行数");
+            assert_eq!(rows_field(&section.rows, "layout_field_summary", "rows"), "180", "{geometry}");
             assert_eq!(rows_field(&section.rows, "layout_field_summary", "unequal"), "0", "{geometry}：字段表有不等的行");
             for (name, value) in section.verdict.as_named_fields() {
                 assert!(value, "{geometry}：判决字段 {name} 不是 true");
@@ -10799,7 +11016,7 @@ mod tests {
         assert!(rows.iter().all(|row| row.starts_with("name=p8g_")), "每一行都带前缀");
         let count = |row_name: &str| rows.iter().filter(|row| row.starts_with(&format!("name=p8g_{row_name} "))).count();
         assert_eq!(count("device_region_bytes"), 29);
-        assert_eq!(count("layout_field"), 174);
+        assert_eq!(count("layout_field"), 180);
         assert_eq!(count("layout_field_summary"), 1);
         assert_eq!(count("accounting"), 1);
         assert_eq!(count("verdict"), 1);

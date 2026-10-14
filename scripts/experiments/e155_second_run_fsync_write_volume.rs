@@ -675,7 +675,9 @@ struct JiaPublishOutcome {
     write_calls: u64,
     barriers: u64,
     fua_count: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     named_items: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     record_count: u64,
     extent_layers: Vec<u64>,
     extent_dirty: Vec<f64>,
@@ -685,7 +687,9 @@ struct JiaPublishOutcome {
     allocation_dirty: Vec<f64>,
     mapping_layers: Vec<u64>,
     mapping_dirty: Vec<f64>,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     accounting_dirty: f64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     written_units: f64,
     fixed_point_iterations: u64,
 }
@@ -705,6 +709,7 @@ impl JiaPublishOutcome {
             + self.system_configuration_bytes
     }
 
+    #[cfg(test)]
     fn block_layer_write_requests(&self) -> u64 {
         self.write_calls + self.barriers + self.fua_count
     }
@@ -720,7 +725,6 @@ const MAXIMUM_FIXED_POINT_ITERATIONS: u64 = 1000;
 #[derive(Clone, Copy, Debug)]
 enum TouchSpecification {
     Continuous(f64),
-    Scattered(f64),
     /// R6：散连续组——`group_count` 组、每组 `group_size` 条相邻。
     ScatteredContinuousGroups { group_count: f64, group_size: f64 },
     /// R8（第 7 行组提交，第一节「读法写死」）：`path_count` 条互不共享的路径，每条覆盖 `group_size`
@@ -738,16 +742,6 @@ fn touch_dirty_nodes_per_layer(layers: &[u64], leaf_capacity: u64, internal_capa
     match touch_specification {
         TouchSpecification::Continuous(touch_count) if touch_count <= 0.0 => vec![0.0; layers.len()],
         TouchSpecification::Continuous(touch_count) => single_group_dirty_nodes_per_layer(layers, leaf_capacity, internal_capacity, touch_count.round() as u64),
-        TouchSpecification::Scattered(touch_count) if touch_count <= 0.0 => vec![0.0; layers.len()],
-        TouchSpecification::Scattered(touch_count) => {
-            let mut result = Vec::with_capacity(layers.len());
-            let mut cov = leaf_capacity as f64;
-            for &node_count_at_layer in layers {
-                result.push(scattered_group_touch(touch_count, region_entries, cov).min(node_count_at_layer as f64));
-                cov *= internal_capacity as f64;
-            }
-            result
-        }
         TouchSpecification::ScatteredContinuousGroups { group_count, .. } if group_count <= 0.0 => vec![0.0; layers.len()],
         TouchSpecification::ScatteredContinuousGroups { group_count, group_size } => {
             let mut result = Vec::with_capacity(layers.len());
@@ -1565,8 +1559,9 @@ struct WriteAheadLogFsyncOutcome {
     inode_root_bytes: u64,
     record_bytes: u64,
     write_calls: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     barriers: u64,
-    named_items: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     record_count: u64,
 }
 
@@ -1618,7 +1613,6 @@ fn solve_write_ahead_log_fsync(shape: PoolShape, arm: WriteAheadLogArm) -> Write
         record_bytes: record_count * RECORD_BYTES * DEVICE_COUNT,
         write_calls,
         barriers: 2 * DEVICE_COUNT,
-        named_items,
         record_count,
     }
 }
@@ -1676,7 +1670,6 @@ fn solve_write_ahead_log_batch_fsync(shape: PoolShape, arm: WriteAheadLogArm, co
         record_bytes: record_count * RECORD_BYTES * DEVICE_COUNT,
         write_calls,
         barriers: 2 * DEVICE_COUNT,
-        named_items,
         record_count,
     }
 }
@@ -1694,15 +1687,15 @@ struct WriteAheadLogCheckpointOutcome {
     record_bytes: u64,
     root_slot_bytes: u64,
     system_configuration_bytes: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     write_calls: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     barriers: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     fua_count: u64,
-    named_items: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     record_count: u64,
     allocation_layers: Vec<u64>,
-    intermediate_version_data: f64,
-    intermediate_version_extent_total: f64,
-    intermediate_version_inode_total: f64,
     intermediate_version_total: f64,
     // F2（第十节）判定要的支撑量：这个 checkpoint 用的不动点核心，逐树第 0 层的节点数与脏节点数、
     // 与它跑了几轮迭代（第一半：`fixed_point_iterations >= MAXIMUM_FIXED_POINT_ITERATIONS` 未收敛；
@@ -1951,7 +1944,7 @@ fn solve_write_ahead_log_batch_checkpoint(shape: PoolShape, arm: WriteAheadLogAr
         0.0,
     );
 
-    let (intermediate_data, intermediate_extent_total, intermediate_inode_total, intermediate_total) = match intermediate_version_policy {
+    let (_, _, _, intermediate_total) = match intermediate_version_policy {
         IntermediateVersionPolicy::NotTracked => (0.0, 0.0, 0.0, 0.0),
         IntermediateVersionPolicy::ReleasedAndBacklogged => {
             intermediate_version_counts_batch(shape, arm, concurrent_fsync_count, shared, batches_in_interval, &core_zero.extent_layers, &core_zero.extent_dirty, &core_zero.inode_layers, &core_zero.inode_dirty, distinct_data_units_touched)
@@ -1979,7 +1972,7 @@ fn solve_write_ahead_log_batch_checkpoint(shape: PoolShape, arm: WriteAheadLogAr
     let allocation_dirty_total = sum_f64(&core.allocation_dirty);
     let mapping_dirty_total = sum_f64(&core.mapping_dirty);
 
-    let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+    let (extent_catch_up, _inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
         WriteAheadLogArm::WriteAheadLogFull => (0.0, 0.0, 0.0, 0u64),
         WriteAheadLogArm::WriteAheadLogLeaf => {
             let extent_ancestors: f64 = core.extent_dirty[1..].iter().sum();
@@ -2011,12 +2004,8 @@ fn solve_write_ahead_log_batch_checkpoint(shape: PoolShape, arm: WriteAheadLogAr
         write_calls: total_calls,
         barriers: 2 * DEVICE_COUNT,
         fua_count: 1,
-        named_items,
         record_count,
         allocation_layers: core.allocation_layers,
-        intermediate_version_data: intermediate_data,
-        intermediate_version_extent_total: intermediate_extent_total,
-        intermediate_version_inode_total: intermediate_inode_total,
         intermediate_version_total: intermediate_total,
         extent_layers: core.extent_layers,
         extent_dirty: core.extent_dirty,
@@ -2069,7 +2058,7 @@ fn solve_write_ahead_log_checkpoint(shape: PoolShape, arm: WriteAheadLogArm, int
         0.0,
     );
 
-    let (intermediate_data, intermediate_extent_total, intermediate_inode_total, intermediate_total) = match intermediate_version_policy {
+    let (_, _, _, intermediate_total) = match intermediate_version_policy {
         IntermediateVersionPolicy::NotTracked => (0.0, 0.0, 0.0, 0.0),
         IntermediateVersionPolicy::ReleasedAndBacklogged => intermediate_version_counts(shape, arm, interval_fsyncs, &core_zero.extent_layers, &core_zero.extent_dirty, &core_zero.inode_layers, &core_zero.inode_dirty, distinct_data_units_touched),
     };
@@ -2095,7 +2084,7 @@ fn solve_write_ahead_log_checkpoint(shape: PoolShape, arm: WriteAheadLogArm, int
     let allocation_dirty_total = sum_f64(&core.allocation_dirty);
     let mapping_dirty_total = sum_f64(&core.mapping_dirty);
 
-    let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+    let (extent_catch_up, _inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
         WriteAheadLogArm::WriteAheadLogFull => (0.0, 0.0, 0.0, 0u64),
         WriteAheadLogArm::WriteAheadLogLeaf => {
             let extent_ancestors: f64 = core.extent_dirty[1..].iter().sum();
@@ -2127,12 +2116,8 @@ fn solve_write_ahead_log_checkpoint(shape: PoolShape, arm: WriteAheadLogArm, int
         write_calls: total_calls,
         barriers: 2 * DEVICE_COUNT,
         fua_count: 1,
-        named_items,
         record_count,
         allocation_layers: core.allocation_layers,
-        intermediate_version_data: intermediate_data,
-        intermediate_version_extent_total: intermediate_extent_total,
-        intermediate_version_inode_total: intermediate_inode_total,
         intermediate_version_total: intermediate_total,
         extent_layers: core.extent_layers,
         extent_dirty: core.extent_dirty,
@@ -2485,11 +2470,13 @@ fn default_ring_in_flight_limit() -> u64 {
 /// （`.claude/kb/decisions/18-块里携带什么信息.md:592`）只是头；这里的 134 = 105 + 29，
 /// 29 是数据单元载荷上限公式 `UNIT_BYTES − 105 − 29 = 32634`（第七节 B1）里另算的那一段，
 /// 两个不是同一个量，故意不与 kb 那个名字撞名。
+#[cfg(test)]
 const DATA_UNIT_HEADER_AND_TRAILER_BYTES: u64 = 134;
 
 impl JiaPublishOutcome {
     /// Q1.6 分子（第一次登记）：extent、inode 两树的**非叶**节点 + 分配记录、记账、映射、树表四棵的**全部**
     /// 脏节点 + 根槽。这一次不进任何判据（Q1.6 判据已撤），只为让第一次变异表 M15 有目标。
+    #[cfg(test)]
     fn ancestor_and_fixed_point_share_numerator_bytes(&self) -> u64 {
         let extent_non_leaf_dirty: f64 = self.extent_dirty[1..].iter().sum();
         (extent_non_leaf_dirty * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT + self.inode_root_bytes + self.allocation_bytes + self.accounting_bytes + self.mapping_bytes + self.tree_table_bytes + self.root_slot_bytes
@@ -2497,6 +2484,7 @@ impl JiaPublishOutcome {
 }
 
 /// Q2.1–Q2.4：四样固定点各自的反事实上界 `U_X = 1 − B(甲|X 不写) / B(甲)`。
+#[cfg(test)]
 fn fixed_point_counterfactual_share(shape: PoolShape, suppressed: SuppressedFixedPoints) -> f64 {
     let baseline = solve_jia_publish(shape).total_bytes();
     let counterfactual = solve_jia_publish_with_suppressed_fixed_points(shape, suppressed).total_bytes();
@@ -2504,6 +2492,7 @@ fn fixed_point_counterfactual_share(shape: PoolShape, suppressed: SuppressedFixe
 }
 
 /// Q2.5：树表随树的棵数 T 的反事实上界，同一个 `U_X` 公式，X = 树表、T 可变。
+#[cfg(test)]
 fn tree_table_counterfactual_share(shape: PoolShape, tree_table_entry_count: u64) -> f64 {
     let baseline = solve_jia_publish_with_suppressed_fixed_points_and_tree_count(shape, SuppressedFixedPoints::default(), tree_table_entry_count).total_bytes();
     let suppressed = SuppressedFixedPoints { tree_table: true, ..SuppressedFixedPoints::default() };
@@ -2512,6 +2501,7 @@ fn tree_table_counterfactual_share(shape: PoolShape, tree_table_entry_count: u64
 }
 
 /// Q3.1 的取整：`⌈(H + c×w) / pbs⌉ × pbs`，不超过整单元宽度。
+#[cfg(test)]
 fn partial_rewrite_rounded_bytes(header: u64, conditions_per_node: f64, entry_width: u64, pbs: u64, full_width: u64) -> f64 {
     let rounded = ((header as f64 + conditions_per_node * entry_width as f64) / pbs as f64).ceil() * pbs as f64;
     rounded.min(full_width as f64)
@@ -2519,6 +2509,7 @@ fn partial_rewrite_rounded_bytes(header: u64, conditions_per_node: f64, entry_wi
 
 /// Q3.1：逐层展开一棵树省下的字节（单盘口径，调用处再乘 `DEVICE_COUNT`）。
 #[allow(clippy::too_many_arguments, reason = "登记 Q3.1 的公式本身要这么多输入，拆结构体不会让哪一步更好验")]
+#[cfg(test)]
 fn partial_rewrite_tree_savings(
     dirty_per_layer: &[f64],
     leaf_conditions: f64,
@@ -2548,6 +2539,7 @@ fn partial_rewrite_tree_savings(
 }
 
 /// Q3.1：改一条记录也整单元重写的反事实上界，在甲的这一格上算。
+#[cfg(test)]
 fn whole_unit_rewrite_counterfactual_share(shape: PoolShape, pbs: u64) -> f64 {
     let shape = PoolShape { geometry: Geometry { physical_block_size_bytes: pbs, ..shape.geometry }, ..shape };
     let outcome = solve_jia_publish(shape);
@@ -2585,6 +2577,7 @@ fn whole_unit_rewrite_counterfactual_share(shape: PoolShape, pbs: u64) -> f64 {
 }
 
 /// Q4.1：数据单元按内容取整的反事实上界。
+#[cfg(test)]
 fn data_unit_rounding_counterfactual_share(shape: PoolShape, content_bytes: u64, pbs: u64) -> f64 {
     let shape = PoolShape { geometry: Geometry { physical_block_size_bytes: pbs, ..shape.geometry }, ..shape };
     let baseline = solve_jia_publish(shape).total_bytes();
@@ -2595,11 +2588,13 @@ fn data_unit_rounding_counterfactual_share(shape: PoolShape, content_bytes: u64,
 }
 
 /// 六棵会长高的 / 恒定的树各自的树高（extent、inode、分配记录、记账、映射、树表）。
+#[cfg(test)]
 fn tree_heights(outcome: &JiaPublishOutcome) -> [usize; 6] {
     [outcome.extent_layers.len(), outcome.inode_layers.len(), outcome.allocation_layers.len(), 1, outcome.mapping_layers.len(), 1]
 }
 
 /// 一棵树高 `height` 的树，从叶到根走一条路径要写多少字节：inode 叶是容器（32768），其余每层 16384。
+#[cfg(test)]
 fn one_path_bytes(height: usize, leaf_is_inode_container: bool) -> u64 {
     assert!(height >= 1, "树高至少 1（根即叶）");
     if leaf_is_inode_container {
@@ -2610,6 +2605,7 @@ fn one_path_bytes(height: usize, leaf_is_inode_container: bool) -> u64 {
 }
 
 /// 甲这一格的 `A(P)`（`total_bytes`）与 `A_tree(P)`（六棵树的字节之和）。
+#[cfg(test)]
 fn total_bytes_and_tree_bytes(shape: PoolShape) -> (u64, u64) {
     let outcome = solve_jia_publish(shape);
     let tree_bytes = outcome.extent_bytes + outcome.inode_container_bytes + outcome.inode_root_bytes + outcome.allocation_bytes + outcome.accounting_bytes + outcome.mapping_bytes + outcome.tree_table_bytes;
@@ -2617,6 +2613,7 @@ fn total_bytes_and_tree_bytes(shape: PoolShape) -> (u64, u64) {
 }
 
 /// 三种「树高 × 棵数」界的读法。
+#[cfg(test)]
 fn rho_readings(shape: PoolShape) -> (f64, f64, f64) {
     let outcome = solve_jia_publish(shape);
     let tree_bytes = (outcome.extent_bytes + outcome.inode_container_bytes + outcome.inode_root_bytes + outcome.allocation_bytes + outcome.accounting_bytes + outcome.mapping_bytes + outcome.tree_table_bytes) as f64;
@@ -2631,6 +2628,7 @@ fn rho_readings(shape: PoolShape) -> (f64, f64, f64) {
 }
 
 /// 在 `[low, high]` 上二分，找「`height_at` 第一次超过 `base_height`」的最小 P。
+#[cfg(test)]
 fn bisect_first_threshold(low: u64, high: u64, base_height: usize, height_at: impl Fn(u64) -> usize) -> Option<u64> {
     if height_at(high) <= base_height {
         return None;
@@ -2649,6 +2647,7 @@ fn bisect_first_threshold(low: u64, high: u64, base_height: usize, height_at: im
 }
 
 /// 每棵树每次长高一层的门槛：从 P = 1 的高度开始，逐次二分找下一个跨越点，直到搜索上限。
+#[cfg(test)]
 fn height_growth_thresholds(search_upper_bound: u64, height_at: impl Fn(u64) -> usize) -> Vec<u64> {
     let mut thresholds = Vec::new();
     let mut base_height = height_at(1);

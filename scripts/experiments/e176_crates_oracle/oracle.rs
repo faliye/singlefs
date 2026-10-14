@@ -184,10 +184,13 @@ fn crates_unit_test_readings_from_crates() -> Vec<String> {
     ]
 }
 
+include!("../heavy_threads_default/threads.rs");
+
 fn main() {
+    // 线程数：SINGLEFS_THREAD_CAP（scripts/hosts/capped.sh 设），没设取登记的重活默认并行度（.claude/heavy-thread-default）；写错就停
     let threads = match std::env::var("SINGLEFS_THREAD_CAP") {
         Ok(text) => text.parse::<usize>().ok().filter(|threads| *threads >= 1).expect("SINGLEFS_THREAD_CAP 要是正整数"),
-        Err(_) => 1,
+        Err(_) => default_heavy_threads(include_str!("../../../.claude/heavy-thread-default")),
     };
     eprintln!("E176 对拍：{threads} 个线程（线程数不进产物）");
     let mut lines = Vec::new();

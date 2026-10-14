@@ -19,7 +19,7 @@
 import os
 import sys
 
-sys.path.insert(0, '/home/fy5090/code/singlefs/scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import frozen_o3  # noqa: E402
 
 STREAMS = ('new_pool_file_creation', 'fixed_script_through_e_then_unmount', 'first_file_unlinked_then_inodes_across_one_leaf')
@@ -58,9 +58,12 @@ def verdict(path, pairs):
     found = result_lines(path, 'verdict')
     if not found:
         print(f'✗ {path} 没有 verdict 行')
+        print('     → 怎么办：那份产物没跑完或不是这个实验的；照实验页的复跑命令重跑出产物再判')
         return 1
     wrong = check_pairs(found[-1], pairs)
     print(('✗ ' + '；'.join(wrong)) if wrong else f'✓ verdict 符合 {len(pairs)} 项')
+    if wrong:
+        print('     → 怎么办：逐项对着实验页的期望值看，是产物变了还是期望写错了；产物变了先查代码再重跑')
     return 1 if wrong else 0
 
 
@@ -70,6 +73,7 @@ def line(path, name, pairs):
         print(f'✓ 有一条 name={name} 符合 {len(pairs)} 项')
         return 0
     print(f'✗ name={name} 共 {len(found)} 条，没有一条同时符合 {pairs}')
+    print('     → 怎么办：看那几条 name 行的字段与期望，产物变了先查代码再重跑')
     return 1
 
 

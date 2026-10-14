@@ -120,6 +120,7 @@ def main(argument_list: list[str]) -> int:
                          else inputs_of(arguments.tree_b, arguments.dep_b_device, arguments.dep_b_e170, None), selected)
     except reuse.ClosureOutsideTheTree as error:
         print(f"✗ {error}（S18 ②：闭包认不全，退 78）", file=sys.stderr)
+        print('     → 怎么办：把闭包里认不出的那几份（上面那句点名的）放进树里，或在登记里补上它们再起', file=sys.stderr)
         return 78
     counts: collections.Counter = collections.Counter()
     first_sections: collections.Counter = collections.Counter()

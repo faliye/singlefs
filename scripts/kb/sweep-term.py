@@ -4,9 +4,12 @@
 r"""全仓术语改名：把一个概念的旧名换成新名，源码、文档、冻结提示与留存产物一起换。
 
 用法：
-  sweep-term.py --check                 # 全仓还剩多少处旧名（豁免的不算），剩了就退出码 1
-  sweep-term.py --apply                 # 换成新名
+  sweep-term.py --check [<仓根>] [--defer <路径>]…   # 全仓还剩多少处旧名（豁免的不算），剩了就退出码 1
+  sweep-term.py --apply [<仓根>] [--defer <路径>]…   # 换成新名
   sweep-term.py --selftest
+选项与位置参数分开解析，次序随意：`--defer` 吃掉紧跟它的那一个参数（分批落地先放着的路径，可写多次），
+剩下不以 `-` 起头的至多一个，是仓根；不给仓根时取当前目录所在 git 仓的根（`git rev-parse --show-toplevel`），
+当前目录不在 git 仓里就退 2。认不出的选项、`--defer` 后面没有路径、给了不止一个仓根，都退 2。
 
 为什么源码与产物要一起换：产物里的串来自源码里的串，只换一边，`replay.sh` 的 exact 判据下次复跑必然「对不上」；
 两边一起换，复跑出来的字节与换后的产物仍然逐字节一致 —— 这一条要靠复跑证明，不是声称。
@@ -27,8 +30,14 @@ r"""全仓术语改名：把一个概念的旧名换成新名，源码、文档�
 指向不存在的路径、行内锚命中 0 行或不止一行，都退 2（不起作用的豁免项会让人以为那批文件已经被绕开了，判据与 `.claude/doc-lint-exclude` 同）。
 
 扫哪些文件：根在 git 工作树里时只扫 `git ls-files --cached --others --exclude-standard` 列出的（跟踪的，加未跟踪而未忽略的），
-git 忽略的（`multi-host.env`、`scripts/hosts/memory-peaks.tsv` 这类本机私有的）不读、不改；不在 git 工作树里时走整棵目录树
+git 忽略的（`multi-host.env` 这类本机私有的）不读、不改；不在 git 工作树里时走整棵目录树
 （跳过 .git、target、node_modules）。根下有 `.git` 而 git 起不来、判不出是不是工作树，或 `git ls-files` 失败：退 2，不退回走整棵树。
+
+默认不扫的样本（写死在代码里，不进 `.claude/term-rename-exempt`）：门禁 doc-text 的 term-renames 格自己的判别力样本，
+即 `.claude/gate.d/fixtures/doc-text.sh/` 下目录名以 `term-renames-` 起头的那几个（`OWN_CELL_FIXTURE_PARENT`、`OWN_CELL_FIXTURE_PREFIX`）。
+那几份样本的登记表「旧」一列与带旧名的文件就是被换的那一侧，扫了它们，红样本换成绿样本，判别力归零，而那一格照样绿
+（checks-owed C441）。`--check` 与 `--apply` 都不扫，成功句与失败句报出排除了几个目录；
+别的格的样本目录、别的门禁文件名下叫 `term-renames-*` 的目录照扫。
 
 已归档产物的文件名不换也不报：一个文件名形态的串（`名字.out` / `.log` / `.txt` / `.tsv` / `.json` / `.csv`，名字从一段 `[A-Za-z0-9_.-]` 连续串的开头起认），
 版本库历史里 `research/results/` 下出现过、今天树里没有，它就是一份已归档产物的名字，产物改不了名，
@@ -51,9 +60,15 @@ git 忽略的（`multi-host.env`、`scripts/hosts/memory-peaks.tsv` 这类本机
       按行豁免（「✗ 自检失败：按行豁免那一格判错：同一份文件里没豁免的两行」）
   SWEEP_TERM_BREAK=ignored-files-walked  根在 git 工作树里也走整棵目录树，不按 git ls-files 列
       只扫 git 列出的（「✗ 自检失败：只扫 git 列出的那一格判错：git 忽略的 multi-host.env、memory-peaks.tsv 不该算进去」）
+  SWEEP_TERM_BREAK=header-as-row  load_renames() 不跳登记表的表头行（「旧」「新」「匹配」「是什么」那一行），当数据行读
+      表头不当记录（「✗ 自检失败：表头不当记录那一格判错：只有标记、表头与分隔行的登记表」…）
+  SWEEP_TERM_BREAK=own-fixtures-swept  不排除 term-renames 格自己的样本目录，照登记表扫、照旧名换
+      自己那一格的样本（「✗ 自检失败：自己那一格的样本那一格判错：--apply 之后样本里的旧名被换掉了」…）
+  SWEEP_TERM_BREAK=defer-value-as-root  位置参数照旧从全部参数里挑不以 -- 起头的，--defer 的值被当成仓根
+      参数解析（「✗ 自检失败：参数解析那一格判错：不带仓根、只带 --defer deferred.md」…）
 
 退出码：--check 0 搜不出旧名、1 还有旧名；--apply 0 换完、3 有文件没换上（那几份原文件没动、临时文件已删）；
-2 登记表或豁免表有问题（含写不对的正则、对不上的行内锚），或根在 git 工作树里而 git 列不出文件。
+2 登记表或豁免表有问题（含写不对的正则、对不上的行内锚），或根在 git 工作树里而 git 列不出文件，或参数写错、不给仓根而当前目录不在 git 仓里。
 """
 import os
 import sys
@@ -80,6 +95,9 @@ PRODUCT_NAME_PROBE_RUN_LENGTH = 65536
 PRODUCT_NAME_PROBE_SECONDS = 1.0
 ARCHIVED_PLACEHOLDER_PATTERN = re.compile("\x00archived(\\d+)\x00")
 EXEMPT_FILE = ".claude/term-rename-exempt"
+# 门禁 doc-text 的 term-renames 格自己的判别力样本：这个目录下、目录名以这个前缀起头的，默认不扫（文件头有说明，checks-owed C441）
+OWN_CELL_FIXTURE_PARENT = ".claude/gate.d/fixtures/doc-text.sh"
+OWN_CELL_FIXTURE_PREFIX = "term-renames-"
 RENAMES_PATH = ".claude/kb/term-renames.md"
 TABLE_MARK = "<!-- term-renames:table -->"
 MATCH_KINDS = ("整串", "词边界", "正则")
@@ -148,7 +166,9 @@ def load_renames(root):
         if not line.startswith("|"):
             continue
         cells = table_cells(line)
-        if len(cells) < 3 or cells[0] in ("旧", "") or set(cells[0]) <= set("-: "):
+        # 表头（旧 | 新 | 匹配 | 是什么）与分隔行不是记录（C443）；header-as-row 开关打开时表头当数据行读，给自证证红
+        is_header = cells[0] == "旧" and not broken("header-as-row")
+        if len(cells) < 3 or is_header or cells[0] == "" or set(cells[0]) <= set("-: "):
             continue
         old, new, how = cells[0], cells[1], cells[2]
         if how not in MATCH_KINDS:
@@ -261,6 +281,18 @@ def load_exempt(root):
     return entries, line_exemptions
 
 
+def own_cell_fixture_directory(relative):
+    """relative 是 term-renames 格自己的样本目录里的文件时，返回那个样本目录（相对根的路径），否则 None。
+    弄坏开关 own-fixtures-swept 打开时一律 None（不排除）。"""
+    if broken("own-fixtures-swept"):
+        return None
+    parent = OWN_CELL_FIXTURE_PARENT.split("/")
+    parts = os.path.normpath(relative).split(os.sep)
+    if len(parts) > len(parent) + 1 and parts[:len(parent)] == parent and parts[len(parent)].startswith(OWN_CELL_FIXTURE_PREFIX):
+        return "/".join(parts[:len(parent) + 1])
+    return None
+
+
 def exempt(relative, entries):
     for entry in entries:
         if relative == entry or relative.startswith(entry.rstrip("/") + "/"):
@@ -364,14 +396,15 @@ def candidate_files(root):
 
 def walk(root, entries):
     for relative in candidate_files(root)[0]:
-        if not exempt(relative, entries):
+        if not exempt(relative, entries) and own_cell_fixture_directory(relative) is None:
             yield relative
 
 
 def sweep(root, apply_changes, defer=(), tally=None):
     """defer 是**分批落地**用的，不是豁免：别的会话正在读那批文件时先放着，那一批照样要换，换完 --check 才绿。
     豁免只有 .claude/term-rename-exempt 一处，别把 defer 当第二处豁免用。
-    tally 给一个 dict 时填进 files（有旧名的份数）、occurrences（处数）、scanned（扫了的文本文件数），自证用。"""
+    tally 给一个 dict 时填进 files（有旧名的份数）、occurrences（处数）、scanned（扫了的文本文件数）、
+    excluded_fixture_directories（term-renames 格自己的样本目录排除了几个），自证用。"""
     entries, line_exemptions = load_exempt(root)
     entries = list(entries) + list(defer)
     exempt_line_count = sum(len(anchors) for anchors in line_exemptions.values())
@@ -380,10 +413,15 @@ def sweep(root, apply_changes, defer=(), tally=None):
     archived_names = archived_product_file_names(root)
     candidates, listing_note = candidate_files(root)
     files, occurrences, scanned = 0, 0, 0
+    own_fixture_directories = set()
     worst = []
     refused = []
     for relative in candidates:
         if exempt(relative, entries):
+            continue
+        own_fixture_directory = own_cell_fixture_directory(relative)
+        if own_fixture_directory is not None:
+            own_fixture_directories.add(own_fixture_directory)
             continue
         try:
             text = open(os.path.join(root, relative), encoding="utf-8").read()
@@ -411,9 +449,10 @@ def sweep(root, apply_changes, defer=(), tally=None):
         occurrences += count
         worst.append((count, relative))
     if tally is not None:
-        tally.update(files=files, occurrences=occurrences, scanned=scanned)
+        tally.update(files=files, occurrences=occurrences, scanned=scanned, excluded_fixture_directories=len(own_fixture_directories))
+    excluded_note = "；默认不扫 term-renames 格自己的样本目录 %d 个" % len(own_fixture_directories)
     if apply_changes:
-        print("  ✓ 换了 %d 份文件、%d 处（登记的改名 %d 条、豁免 %d 条、按行豁免 %d 行；范围：%s）" % (files, occurrences, len(pairs), len(entries), exempt_line_count, listing_note))
+        print("  ✓ 换了 %d 份文件、%d 处（登记的改名 %d 条、豁免 %d 条、按行豁免 %d 行；范围：%s%s）" % (files, occurrences, len(pairs), len(entries), exempt_line_count, listing_note, excluded_note))
         if refused:
             for relative, count, message in refused:                # gate-lint:detail
                 print("      %s（%d 处）：%s" % (relative, count, message))
@@ -427,7 +466,7 @@ def sweep(root, apply_changes, defer=(), tally=None):
     if occurrences:
         for count, relative in sorted(worst, reverse=True)[:20]:   # gate-lint:detail
             print("      %-72s %d 处" % (relative, count))
-        print("  ✗ 全仓还有 %d 份文件、%d 处旧名（登记的改名 %d 条、豁免 %d 条与按行豁免 %d 行不算；范围：%s）" % (files, occurrences, len(pairs), len(entries), exempt_line_count, listing_note))
+        print("  ✗ 全仓还有 %d 份文件、%d 处旧名（登记的改名 %d 条、豁免 %d 条与按行豁免 %d 行不算；范围：%s%s）" % (files, occurrences, len(pairs), len(entries), exempt_line_count, listing_note, excluded_note))
         print("     → 怎么办：跑 python3 scripts/kb/sweep-term.py --apply 换掉；")
         print("               确实该留旧名的，登记进 .claude/term-rename-exempt 并写明为什么：整份都该留的写路径，")
         print("               只有一句该留的写 <路径>:「<那一行里的一段原文>」只豁免那一行。")
@@ -435,11 +474,18 @@ def sweep(root, apply_changes, defer=(), tally=None):
     print("  ✓ 全仓搜不出登记过的旧名了：查了 %d 份文本文件（%s）、%d 条改名登记" % (scanned, listing_note, len(pairs)))
     print("     没扫的 %d 处（.claude/term-rename-exempt 登记，各有理由）：%s" % (len(entries), "、".join(entries)))
     print("     按行豁免 %d 行（%d 份文件里，那几行留原文、别的行照扫）" % (exempt_line_count, len(line_exemptions)))
+    print("     默认没扫 term-renames 格自己的样本目录 %d 个（%s/%s*，代码里写死，判别力样本里要留着旧名）" % (len(own_fixture_directories), OWN_CELL_FIXTURE_PARENT, OWN_CELL_FIXTURE_PREFIX))
     return 0
 
 
 def selftest():
     import tempfile
+    # 表头那一格放最前：header-as-row 打开时下面所有格的登记表都带表头，读表当场退 2，排在后面就走不到这一格
+    header_problem = check_header_only_table()
+    if header_problem:
+        print("  ✗ 自检失败：表头不当记录那一格判错：%s" % header_problem)
+        print("     → 怎么办：看 load_renames() 跳表头与分隔行那一句、与 0 条数据行时退 2 的那一句。")
+        return 1
     with tempfile.TemporaryDirectory() as work:
         os.makedirs(os.path.join(work, ".claude"))
         os.makedirs(os.path.join(work, "keep"))
@@ -527,7 +573,9 @@ def selftest():
     for cell_name, check, remedy in (
             ("正则匹配", check_regex_rows, "看 compile_rules() 里「正则」那一支有没有原样用「旧」一列（前后断言要留着）、table_cells() 的 \\| 还原、regex_row_problem() 的三样拒绝"),
             ("按行豁免", check_line_exemptions, "看 load_exempt() 读 <路径>:「<行内锚>」那一支与锚恰好命中一行的判法、mask_exempt_lines() 只换含锚的那一行"),
-            ("只扫 git 列出的", check_git_listing, "看 candidate_files()：根在 git 工作树里要走 git ls-files --cached --others --exclude-standard，不走整棵目录树")):
+            ("自己那一格的样本", check_own_cell_fixtures, "看 own_cell_fixture_directory() 与 sweep() 里 --check / --apply 跳过它的那一句：OWN_CELL_FIXTURE_PARENT 下目录名以 OWN_CELL_FIXTURE_PREFIX 起头的样本目录默认不扫"),
+            ("只扫 git 列出的", check_git_listing, "看 candidate_files()：根在 git 工作树里要走 git ls-files --cached --others --exclude-standard，不走整棵目录树"),
+            ("参数解析", check_argument_parsing, "看 parse_arguments()：--defer 要吃掉紧跟它的那一个参数，仓根只从剩下的里取；不给仓根时 root_of_current_directory() 取当前目录所在 git 仓的根")):
         problem = check()
         if problem:
             print("  ✗ 自检失败：%s那一格判错：%s" % (cell_name, problem))
@@ -545,12 +593,15 @@ def selftest():
               "以及 sweep() 里 --apply 那一段是不是还有就地写。")
         return 1
     print("  ✓ 自检：带旧名判红、换完判绿、豁免目录不被换、已归档产物的名字不换不报而树里还在的照换、豁免指不到文件判红、"
+          "term-renames 格自己的样本目录（.claude/gate.d/fixtures/doc-text.sh/term-renames-*）默认不扫、--apply 之后样本里的旧名原样在、在那份样本根上 --check 仍判红而别处的旧名与别的格、别的门禁文件名下的同名目录照换、"
           "%d 字的连续串掩码在 %.0f 秒内做完且与不加左边界时逐字相同；--apply 换上的是新 inode、权限位不变、"
           "改之前打开文件的读者接着读到旧内容、fsync 在改名之前、经符号链接改的是它指向的文件、"
           "有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件；"
           "「匹配」写正则的只打 D13 那一层的「层 1」「层 2」4 处、不打树层与外层那一行，\\| 还原成竖线，带捕获组、能匹配空串、编译不过的退 2；"
           "按行豁免只留锚那一行、同一份文件里另外 2 行照判照换，锚命中 0 行或不止一行、指不到文件、读不出锚都退 2；"
-          "在 git 工作树里只扫跟踪的与未跟踪而未忽略的 2 份，git 忽略的 multi-host.env、memory-peaks.tsv 不读不写"
+          "在 git 工作树里只扫跟踪的与未跟踪而未忽略的 2 份，git 忽略的 multi-host.env、memory-peaks.tsv 不读不写；"
+          "登记表只有标记、表头与分隔行时不把表头当规则、退 2 报一行数据都没有；"
+          "不带仓根只带 --defer 时仓根取当前目录所在的仓、--defer 的值不当仓根，仓根写在 --defer 之后照认，认不出的选项与缺值的 --defer 退 2"
           % (PRODUCT_NAME_PROBE_RUN_LENGTH, PRODUCT_NAME_PROBE_SECONDS))
     return 0
 
@@ -718,6 +769,58 @@ def check_line_exemptions():
     return ""
 
 
+OWN_FIXTURE_SAMPLE_RENAME_ROWS = [("超级块", "系统配置", "整串", "中文")]
+OWN_FIXTURE_SAMPLE_FILE = os.path.join("crates", "singlefs-core", "src", "sample.rs")
+
+
+def write_own_fixture_sample(base, with_tables):
+    """照 term-renames 格的样本布局在 base 下写一份样本根：一份带旧名的 rs，with_tables 时另有自己的登记表（旧名在「旧」一列）与排除表。"""
+    if with_tables:
+        write_selftest_tables(base, OWN_FIXTURE_SAMPLE_RENAME_ROWS, [])
+    os.makedirs(os.path.join(base, os.path.dirname(OWN_FIXTURE_SAMPLE_FILE)))
+    with open(os.path.join(base, OWN_FIXTURE_SAMPLE_FILE), "w", encoding="utf-8") as handle:
+        handle.write("// 超级块槽宽 4096\n")
+
+
+def check_own_cell_fixtures():
+    """自己那一格的样本：--apply 默认不扫门禁 doc-text 的 term-renames 格自己的样本目录（样本里的旧名原样在、仓里别处的换掉），
+    在那份样本根上 --check 仍判红；别的格的样本目录、别的门禁文件名下的 term-renames-* 目录照扫照换。返回空串是判对。"""
+    import tempfile
+    sample_roots = [os.path.join(OWN_CELL_FIXTURE_PARENT, name) for name in ("term-renames-red", "term-renames-green")]
+    swept_roots = [os.path.join(".claude", "gate.d", "fixtures", "doc-text.sh", "other-cell-red"),
+                   os.path.join(".claude", "gate.d", "fixtures", "other.sh", "term-renames-red")]
+    with tempfile.TemporaryDirectory() as root:
+        write_selftest_tables(root, OWN_FIXTURE_SAMPLE_RENAME_ROWS, [])
+        elsewhere = os.path.join(root, "crates", "elsewhere.rs")
+        os.makedirs(os.path.dirname(elsewhere))
+        with open(elsewhere, "w", encoding="utf-8") as handle:
+            handle.write("// 超级块在别处\n")
+        for relative in sample_roots:
+            write_own_fixture_sample(os.path.join(root, relative), True)
+        for relative in swept_roots:
+            write_own_fixture_sample(os.path.join(root, relative), False)
+        quietly(sweep, root, True)
+        original = "// 超级块槽宽 4096\n"
+        for relative in sample_roots:
+            kept = open(os.path.join(root, relative, OWN_FIXTURE_SAMPLE_FILE), encoding="utf-8").read()
+            if kept != original:
+                return "--apply 之后样本里的旧名被换掉了（%s 里的 sample.rs 变成 %r），红样本和绿样本换成了一样的内容" % (relative, kept)
+        if open(elsewhere, encoding="utf-8").read() != "// 系统配置在别处\n":
+            return "--apply 没换掉仓里别处的旧名"
+        for relative in swept_roots:
+            if open(os.path.join(root, relative, OWN_FIXTURE_SAMPLE_FILE), encoding="utf-8").read() != "// 系统配置槽宽 4096\n":
+                return "%s 不是 term-renames 格自己的样本，应当照扫照换" % relative
+        for relative in sample_roots:
+            code = quietly(sweep, os.path.join(root, relative), False)
+            if code != 1:
+                return "在样本根 %s 上跑 --check 应当退 1（红样本仍然红），实际退 %s" % (relative, code)
+        tally = {}
+        code = quietly(sweep, root, False, tally=tally)
+        if code != 0 or tally.get("excluded_fixture_directories") != 2:
+            return "--apply 之后仓根上 --check 应当退 0、排除 2 个样本目录，实际退 %s、排除 %s 个" % (code, tally.get("excluded_fixture_directories"))
+    return ""
+
+
 def check_git_listing():
     """只扫 git 列出的那一格：git 跟踪的与未跟踪而未忽略的照判照换，git 忽略的不读不写。返回空串是判对。"""
     import subprocess
@@ -728,7 +831,7 @@ def check_git_listing():
         write_selftest_tables(root, [("超级块", "系统配置", "整串", "中文")], [])
         ignored = {"multi-host.env": "PEER_REPOSITORY_DIRECTORY=/home/peer/超级块\n",
                    os.path.join("scripts", "hosts", "memory-peaks.tsv"): "超级块\t1G\n"}
-        os.makedirs(os.path.join(root, "scripts"))
+        os.makedirs(os.path.join(root, "scripts", "hosts"))
         with open(os.path.join(root, ".gitignore"), "w", encoding="utf-8") as handle:
             handle.write("multi-host.env\nmemory-peaks.tsv\n")
         for relative, text in ignored.items():
@@ -759,6 +862,73 @@ def check_git_listing():
     return ""
 
 
+def check_header_only_table():
+    """表头不当记录那一格（C443）：登记表只有标记、表头与分隔行（0 条数据行）时，load_renames 不把表头「旧 | 新 | 匹配 | 是什么」当一条规则，
+    --check 与 --apply 都报「一行数据都没有」退 2、不去全仓找「旧」，一份含「旧」「新」字样的文件原样不动；
+    表头之下加一条数据行后，只解析出那一条。返回空串是判对。"""
+    import contextlib
+    import io
+    import tempfile
+
+    def loudly(function, *arguments):
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            try:
+                result = function(*arguments)
+            except SystemExit as stop:
+                result = stop.code
+        return result, buffer.getvalue()
+    with tempfile.TemporaryDirectory() as root:
+        write_selftest_tables(root, [], [])
+        sample = os.path.join(root, "word.md")
+        text = "旧的说法，新的说法，匹配与是什么都在这一份里\n"
+        with open(sample, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        for label, function, arguments in (("load_renames", load_renames, (root,)), ("--check", sweep, (root, False)), ("--apply", sweep, (root, True))):
+            code, output = loudly(function, *arguments)
+            if code != 2 or "一行数据都没有" not in output:
+                return "只有标记、表头与分隔行的登记表，%s 应当退 2 并报「一行数据都没有」，实际退 %s：%s" % (label, code, output.strip()[-200:])
+        if open(sample, encoding="utf-8").read() != text:
+            return "只有表头的登记表，--apply 改了含「旧」「新」字样的文件：表头被当成了一条改名规则"
+        write_selftest_tables(root, [("超级块", "系统配置", "整串", "中文")], [])
+        pairs, output = loudly(load_renames, root)
+        if pairs != [("超级块", "系统配置", "整串")]:
+            return "表头之下一条数据行，load_renames 应当只解析出 [('超级块', '系统配置', '整串')]，实际 %r：%s" % (pairs, output.strip()[-200:])
+    return ""
+
+
+def check_argument_parsing():
+    """参数解析那一格：小 git 仓里只有 deferred.md 带旧名，在仓的子目录里不带仓根跑 --check --defer deferred.md 退 0，
+    不带 --defer 退 1（默认仓根确是当前目录所在的仓）；仓外的目录里把仓根写在 --defer 之后照样退 0；
+    认不出的选项、--defer 后面没有路径都退 2。返回空串是判对。"""
+    import subprocess
+    import tempfile
+    here = os.getcwd()
+    with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
+        subprocess.run(["git", "-C", root, "init", "-q"], check=True)
+        write_selftest_tables(root, [("超级块", "系统配置", "整串", "中文")], [])
+        os.makedirs(os.path.join(root, "sub"))
+        with open(os.path.join(root, "deferred.md"), "w", encoding="utf-8") as handle:
+            handle.write("这一份先放着：超级块\n")
+        with open(os.path.join(root, "sub", "clean.md"), "w", encoding="utf-8") as handle:
+            handle.write("系统配置\n")
+        cases = (
+            (os.path.join(root, "sub"), ["--check", "--defer", "deferred.md"], 0, "不带仓根、只带 --defer deferred.md"),
+            (os.path.join(root, "sub"), ["--check"], 1, "不带仓根、不带 --defer（deferred.md 里的旧名该判红）"),
+            (outside, ["--defer", "deferred.md", "--check", root], 0, "仓根写在 --defer 之后"),
+            (os.path.join(root, "sub"), ["--check", "--no-such-option"], 2, "认不出的选项"),
+            (os.path.join(root, "sub"), ["--check", "--defer"], 2, "--defer 后面没有路径"))
+        try:
+            for directory, argv, want, label in cases:
+                os.chdir(directory)
+                code = quietly(main, argv)
+                if code != want:
+                    return "%s（当前目录 %s，参数 %s）应当退 %d，实际退 %s" % (label, directory, " ".join(argv), want, code)
+        finally:
+            os.chdir(here)
+    return ""
+
+
 def apply_to_this_file_only(path):
     """自证用：把 path 所在的目录当仓根、登记一张只有「超级块 → 系统配置」的改名表，目录里别的条目全登记豁免，
     让 --apply 只换 path 这一份（经符号链接那一格就一定走链接那一个名字）。返回退出码。"""
@@ -778,17 +948,60 @@ def apply_to_this_file_only(path):
         return stop.code
 
 
+def argument_error(problem):
+    print("  ✗ 参数写错：%s" % problem)
+    print("     → 怎么办：写成 sweep-term.py --check|--apply [<仓根>] [--defer <路径>]…（--defer 可写多次），或 --selftest；"
+          "不给仓根就在要扫的仓里跑。")
+    sys.exit(2)
+
+
+def parse_arguments(argv):
+    """选项与位置参数分开解析：--defer 吃掉紧跟它的那一个，剩下不以 - 起头的至多一个是仓根。
+    返回 (仓根或 None, 是否 --apply, defer 列表)。弄坏开关 defer-value-as-root 照旧从全部参数里挑仓根，给自证证红。"""
+    options, defer, positional = set(), [], []
+    index = 0
+    while index < len(argv):
+        argument = argv[index]
+        if argument == "--defer":
+            if index + 1 >= len(argv):
+                argument_error("--defer 后面没有路径")
+            defer.append(argv[index + 1])
+            index += 2
+            continue
+        if argument in ("--check", "--apply"):
+            options.add(argument)
+        elif argument.startswith("-"):
+            argument_error("认不出的选项 %s" % argument)
+        else:
+            positional.append(argument)
+        index += 1
+    if broken("defer-value-as-root"):
+        positional = [a for a in argv if not a.startswith("--")]
+    elif len(positional) > 1:
+        argument_error("给了不止一个仓根：%s" % "、".join(positional))
+    return (positional[0] if positional else None), "--apply" in options, defer
+
+
+def root_of_current_directory():
+    """不给仓根时取当前目录所在 git 仓的根；不在 git 仓里退 2。"""
+    import subprocess
+    try:
+        probe = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    except OSError as error:
+        argument_error("没给仓根，又起不了 git 判当前目录在哪个仓（%s）" % error)
+    if probe.returncode != 0 or not probe.stdout.strip():
+        argument_error("没给仓根，当前目录 %s 又不在 git 仓里" % os.getcwd())
+    return probe.stdout.strip()
+
+
 def main(argv):
     if "--selftest" in argv:
         return selftest()
-    positional = [a for a in argv if not a.startswith("--")]
-    root = os.path.abspath(positional[0]) if positional else os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", ".."))
-    defer = [argv[i + 1] for i, a in enumerate(argv) if a == "--defer" and i + 1 < len(argv)]
-    positional = [a for a in positional if a not in defer]
+    root_argument, apply_changes, defer = parse_arguments(argv)
+    root = os.path.abspath(root_argument) if root_argument is not None else root_of_current_directory()
     if defer:
         print("  ⚠️ 这一批先放着（分批落地，不是豁免）：%s" % "、".join(defer))
-    return sweep(root, "--apply" in argv, defer)
+    return sweep(root, apply_changes, defer)
 
 
 if __name__ == "__main__":

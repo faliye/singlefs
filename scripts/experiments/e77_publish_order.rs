@@ -78,6 +78,7 @@ const UNITS: usize = 6;
 const RECORDS: usize = 3;
 /// 写 id 布局：0..6 单元，6..9 记录，9 根槽。
 const ROOT_SLOT_WRITE_INDEX: usize = UNITS + RECORDS;
+#[cfg(test)]
 const TOTAL_WRITES: usize = ROOT_SLOT_WRITE_INDEX + 1;
 
 /// 每条记录点名哪两个单元。R2（最后一条）带提交标记。

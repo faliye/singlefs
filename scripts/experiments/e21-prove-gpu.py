@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 量的是此刻这台机器的显卡，上一次量到的数不替这一次作保
+# run-condition: check python3 -c 'import sys, torch; sys.exit(0 if torch.cuda.is_available() else 1)' :: 装好带 CUDA 的 torch，并确认显卡在、驱动起得来（nvidia-smi 能列出卡）
 """证明 E21 那几个数确实是 GPU 跑出来的，不是 CPU 冒充的。
 
 三条独立证据，任意一条单独都够：
@@ -8,6 +10,12 @@
   3. **搬到 CPU 上跑同一段代码**，吞吐必须塌回内存带宽量级。
 """
 import subprocess, sys, threading, time, statistics, torch
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
+preflight(__file__)
 
 DEV = 0
 

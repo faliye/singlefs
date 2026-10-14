@@ -21,7 +21,12 @@
   --root 指的不是这份脚本所在的主工作区时，开头在 <副本根>/.prove-red.lock 上试拿排他锁（flock，不等），拿到了打完再放、拿不到就拒绝、退 2、一个字没改，
   出路写「副本上有证红在跑，等它跑完或换一份副本」。prove-red.sh 跑的时候拿着同一把锁（它按路径载入这里的 hold_copy_lock / release_copy_lock，锁的写法只在这一处）。
   锁随持有的进程放：正常收尾时删掉锁文件；被杀时内核放掉锁、文件留着，下一个照样拿得到。
-退出码：0 打上了（code-source-discipline 绿）；1 打上了但 code-source-discipline 红；2 核的时候就不对、或副本上有证红在跑，一个字没改。
+主工作区合入锁（.claude/kb/milestone/03-third-txn.md「待优化：流程、门禁与装置上踩过的坑」第 20 行）：
+  --root 是这份脚本所在的主工作区（不给 --root 就是）时，核与打之前先拿 scripts/gate/lib_workspace_lock.py 的主工作区合入锁（持有者是这个进程），
+  被别的合入占着就排队、每过一段时间报一行谁占着，持有者已死的判失效、报出来再接管；打完（成功、失败都）放掉。判法与锁文件在那份库的文件头，这里不另写。
+  merge-and-verify.sh 持着锁时起的这一份（SINGLEFS_WORKSPACE_LOCK_HOLDER 指着它的祖先）不另拿。拿不成（建不了锁文件、
+  SINGLEFS_WORKSPACE_LOCK_GIVE_UP_SECONDS 设了而等到点）退 2、一个字没改。副本上不拿这一把（副本锁管副本）。
+退出码：0 打上了（code-source-discipline 绿）；1 打上了但 code-source-discipline 红；2 核的时候就不对、副本上有证红在跑、或主工作区合入锁没拿成，一个字没改。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一份补丁目录的名字，括号里是那条「✗ 自检：」的开头）：
   APPLY_WRITER_PATCH_BREAK=append-duplicates  plan() 不核追加的变异名在表里有没有
@@ -34,10 +39,14 @@
       onlytable（「✗ 自检：打过的补丁数到提示线应当打提示」）
   APPLY_WRITER_PATCH_BREAK=copy-lock-ignored  apply() 不试拿副本锁，副本上有证红在跑也照打
       locked（「✗ 自检：副本锁被占着时应当拒绝、退 2、一个字不改」）
+  APPLY_WRITER_PATCH_BREAK=ignore-workspace-lock  apply() 打进主工作区时不认主工作区合入锁，别的合入拿着也照打
+      queued（「✗ 自检：主工作区合入锁被别的合入占着时应当排队、报出持有者、对方放锁后才打」）、
+      deadholder（「✗ 自检：主工作区合入锁的持有者已死时应当报出来、接管、照打」）
 """
 import fcntl
 import glob
 import hashlib
+import importlib.util
 import os
 import subprocess
 import sys
@@ -46,7 +55,7 @@ import time
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
 BROKEN = os.environ.get("APPLY_WRITER_PATCH_BREAK", "")
@@ -55,6 +64,21 @@ CHECKER_SECTION = "受影响的层 0 流与崩溃枚举用例"
 LOG_NAME = "singlefs-applied-writer-patches.tsv"
 MARKER_PREFIX = "singlefs-crash-case-green."
 COPY_LOCK_NAME = ".prove-red.lock"   # 副本锁（文件头「副本锁」）：放在副本根
+
+
+def load_workspace_lock():
+    """主工作区合入锁（文件头「主工作区合入锁」）：按路径载入同目录的 lib_workspace_lock.py（prove-red.sh 按路径载入这一份时 sys.path 里不一定有本目录）。"""
+    specification = importlib.util.spec_from_file_location("lib_workspace_lock_for_apply_writer_patch", os.path.join(SCRIPT_DIRECTORY, "lib_workspace_lock.py"))
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+WORKSPACE_LOCK = load_workspace_lock()
+
+
+def print_now(line):
+    print(line, flush=True)
 
 
 def hold_copy_lock(root):
@@ -167,10 +191,26 @@ def patches_since_last_crash_verification(root, log_path):
     return sum(1 for row in rows if row and float(row[0]) > since)
 
 
-def apply(patch_directory, root, dry_run, gate33):
-    """副本上先试拿副本锁（文件头「副本锁」），拿到了再核、再打，打完放锁；主工作区不拿。"""
+def apply(patch_directory, root, dry_run, gate33, main_workspace=None, say=print_now):
+    """副本上先试拿副本锁（文件头「副本锁」），拿到了再核、再打，打完放锁；主工作区拿主工作区合入锁（文件头「主工作区合入锁」，排队等）。
+    main_workspace 不给就按 root 是不是这份脚本所在的仓判（自证给 True，把临时仓当主工作区）。"""
+    if main_workspace is None:
+        main_workspace = os.path.realpath(root) == os.path.realpath(REPOSITORY_ROOT)
+    if main_workspace:
+        held = None
+        if BROKEN != "ignore-workspace-lock":
+            try:
+                held = WORKSPACE_LOCK.acquire(root, os.getpid(), f"apply-writer-patch.py {os.path.abspath(patch_directory)}", say=say)
+            except WORKSPACE_LOCK.LockError as error:
+                return 2, [f"✗ 主工作区合入锁没拿成：{error.problem}", f"→ 怎么办：{error.howto}；一个字都没改"]
+        try:
+            return apply_holding_the_lock(patch_directory, root, dry_run, gate33)
+        finally:
+            problem = WORKSPACE_LOCK.release(held)
+            if problem:
+                say(f"! 放主工作区合入锁：{problem}")
     lock = None
-    if os.path.realpath(root) != os.path.realpath(REPOSITORY_ROOT) and BROKEN != "copy-lock-ignored":
+    if BROKEN != "copy-lock-ignored":
         try:
             lock = hold_copy_lock(root)
         except OSError as error:
@@ -212,13 +252,20 @@ def apply_holding_the_lock(patch_directory, root, dry_run, gate33):
     count = patches_since_last_crash_verification(root, log_path)
     if count >= CRASH_VERIFY_HINT_PATCHES and BROKEN != "no-hint":
         lines.append(f"! 自上次崩溃验证全绿以来已打 {count} 个实现员补丁（提示线 {CRASH_VERIFY_HINT_PATCHES}，推的）：弹窗问用户要不要用 "
-                     "SINGLEFS_HEAVY_TESTS=user-request 由主 agent 跑一次（checker-tier-layer0-replay 按用例复用，只跑输入变了的崩溃枚举用例）；只提示，不拦")
+                     "SINGLEFS_HEAVY_TESTS=user-request 由主 agent 跑一次（checker-tier-crash-point-replay 按用例复用，只跑输入变了的崩溃枚举用例）；只提示，不拦")
     lines.append(f"调度表可贴的一行：| {os.path.basename(os.path.normpath(patch_directory))} | 已打（{time.strftime('%m-%d %H:%M', time.localtime())}） | code-source-discipline {gate.returncode} |")
     return (0 if gate.returncode == 0 else 1), lines
 
 
 def selftest():
     work = tempfile.mkdtemp(prefix="apply-writer-patch-selftest-")
+    # 主工作区合入锁那三格：锁文件用临时仓自己的 git common-dir，调用方设的锁位置、持有者变量与等待上限不带进来；排队时每 0.3 秒报一次、每 0.05 秒看一次
+    for name in (WORKSPACE_LOCK.LOCK_FILE_VARIABLE, WORKSPACE_LOCK.HOLDER_VARIABLE, WORKSPACE_LOCK.GIVE_UP_SECONDS_VARIABLE):
+        os.environ.pop(name, None)
+    os.environ[WORKSPACE_LOCK.REPORT_SECONDS_VARIABLE] = "0.3"
+    os.environ[WORKSPACE_LOCK.POLL_SECONDS_VARIABLE] = "0.05"
+    # 排队最多等 10 秒（queued 那一格对方只拿 1.5 秒）：弄坏开关让锁永远拿不到时到点退 2、记红，不挂住
+    os.environ[WORKSPACE_LOCK.GIVE_UP_SECONDS_VARIABLE] = "10"
     try:
         root = os.path.join(work, "repo")
         os.makedirs(os.path.join(root, "crates", "demo", "src"))
@@ -284,15 +331,76 @@ def selftest():
                 release_copy_lock(root, held)
         if held is None or code != 2 or not any("副本上有证红在跑" in line for line in lines) or after_refusal != before:
             failures.append(f"副本锁被占着时应当拒绝、退 2、一个字不改，实际 {code} {lines}（锁{'拿到了' if held is not None else '没拿到'}）")
+        if after_refusal != before:
+            # 上一格在弄坏开关（copy-lock-ignored）下照打了：表退回去，这一格只判自己的，不因为「locked-row 表里已经有了」连带红
+            with open(table_path, "w") as handle:
+                handle.write(before)
         code, lines = apply(locked, root, False, gate33)
         if code != 0 or "locked-row\t" not in open(table_path).read() or os.path.exists(os.path.join(root, COPY_LOCK_NAME)):
             failures.append(f"副本锁没被占着时应当照打、打完不留锁文件，实际 {code} {lines}")
+        # 主工作区合入锁（文件头「主工作区合入锁」）：临时仓当主工作区（main_workspace=True），锁文件在它的 git common-dir 里
+        lock_library = os.path.join(SCRIPT_DIRECTORY, "lib_workspace_lock.py")
+        timeline = os.path.join(work, "workspace-lock-timeline.txt")
+        # queued：另一个假的合入（bash 进程，持有者是它自己）先拿着锁 1.5 秒；这里排队、报出它、它放了才打
+        queued = patch_directory("queued", append="queued-row\tf\to\tr\t-p demo --lib\tt\n")
+        holder = subprocess.Popen(["bash", "-c", 'python3 "$0" acquire --root "$1" --holder-pid $$ --command "假合入 A" > /dev/null || exit 1; echo in >> "$2"; sleep 1.5; '
+                                   'echo "out $(date +%s%N)" >> "$2"; python3 "$0" release --root "$1" --holder-pid $$ > /dev/null', lock_library, root, timeline])
+        deadline = time.time() + 10
+        while time.time() < deadline and not (os.path.exists(timeline) and "in" in open(timeline).read()):
+            time.sleep(0.05)
+        said = []
+        code, lines = apply(queued, root, False, gate33, main_workspace=True, say=said.append)
+        try:
+            holder_code = holder.wait(timeout=15)   # 持锁的假合入自己拿锁最多等 10 秒（自证开头设的放弃时限），到点还没退就停掉它（只停自己起的这一个进程号）、判红
+        except subprocess.TimeoutExpired:
+            holder.kill()
+            holder.wait()
+            holder_code = "超时"
+        applied_at = os.stat(table_path).st_mtime_ns
+        released_at = [int(line.split()[1]) for line in open(timeline) if line.startswith("out ")] if os.path.exists(timeline) else []
+        if code != 0 or holder_code != 0 or not released_at or applied_at <= released_at[0] or "queued-row\t" not in open(table_path).read() \
+                or not any("在排队" in line and f"进程 {holder.pid}" in line for line in said):
+            failures.append(f"主工作区合入锁被别的合入占着时应当排队、报出持有者、对方放锁后才打，实际退 {code}、持锁的假合入退 {holder_code}、"
+                            f"表写于 {applied_at}、对方放锁于 {released_at}，报的 {said}")
+        # deadholder：锁文件里记着一个已经退出的进程：报「已死」、接管、照打，打完记录清空
+        deadholder = patch_directory("deadholder", append="dead-row\tf\to\tr\t-p demo --lib\tt\n")
+        dead = subprocess.Popen(["true"])
+        dead.wait()
+        lock_file = WORKSPACE_LOCK.lock_path(root)
+        with open(lock_file, "w") as handle:
+            handle.write(f"pid={dead.pid}\nstart=1\nsession=死掉的会话\ncommand=假合入 dead\nsince={time.time() - 30}\n")
+        said = []
+        code, lines = apply(deadholder, root, False, gate33, main_workspace=True, say=said.append)
+        if code != 0 or "dead-row\t" not in open(table_path).read() or not any("已死" in line and "接管" in line and "死掉的会话" in line for line in said) \
+                or WORKSPACE_LOCK.parse_record(open(lock_file).read()) is not None:
+            failures.append(f"主工作区合入锁的持有者已死时应当报出来、接管、照打、打完清空记录，实际退 {code}，报的 {said}，锁文件 {open(lock_file).read()!r}")
+        # reentry：父进程（当成持锁的 merge-and-verify.sh）拿着锁、SINGLEFS_WORKSPACE_LOCK_HOLDER 指着它，这个进程是它底下起的 apply：不排队、照打、不动记录
+        # 锁文件先清空：上一格在弄坏开关下留着的死记录不带进这一格（红只落在点名的那几格）；父进程要锁也有放弃时限（环境里的 10 秒），没拿成这一格判红、不挂住
+        reentry = patch_directory("reentry", append="reentry-row\tf\to\tr\t-p demo --lib\tt\n")
+        with open(lock_file, "w") as handle:
+            handle.write("")
+        said = []
+        try:
+            held = WORKSPACE_LOCK.acquire(root, os.getppid(), "假 merge-and-verify", say=lambda line: None)
+        except WORKSPACE_LOCK.LockError as error:
+            held, code, lines, still_held = None, 2, [f"父进程自己要锁就没拿成：{error.problem}"], None
+        if held is not None:
+            os.environ[WORKSPACE_LOCK.HOLDER_VARIABLE] = str(os.getppid())
+            try:
+                code, lines = apply(reentry, root, False, gate33, main_workspace=True, say=said.append)
+                still_held = WORKSPACE_LOCK.parse_record(open(lock_file).read())
+            finally:
+                os.environ.pop(WORKSPACE_LOCK.HOLDER_VARIABLE, None)
+                WORKSPACE_LOCK.release(held)
+        if code != 0 or "reentry-row\t" not in open(table_path).read() or not still_held or still_held.get("pid") != str(os.getppid()):
+            failures.append(f"merge-and-verify 持锁时起的 apply 应当不排队、照打、不动记录，实际退 {code} {lines}，报的 {said}，锁记录 {still_held}")
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
         if failures:
             print("  → 看 plan() / apply() 的判法；APPLY_WRITER_PATCH_BREAK 设着的话这里本来就该红")
             return 1
-        print("  ✓ apply-writer-patch 自检通过：好补丁打上、变异表按名字追加替换删除，动 checker 没那一节、追加重名、打不上的都在核的时候拒绝，到提示线打提示，副本锁被占着时拒绝、没占时照打（查了 6 种）")
+        print("  ✓ apply-writer-patch 自检通过：好补丁打上、变异表按名字追加替换删除，动 checker 没那一节、追加重名、打不上的都在核的时候拒绝，到提示线打提示，副本锁被占着时拒绝、没占时照打，"
+              "主工作区合入锁被别的合入占着时排队报出持有者、对方放了才打，持有者已死的报出来接管，merge-and-verify 持锁时起的不排队（查了 9 种）")
         return 0
     finally:
         import shutil

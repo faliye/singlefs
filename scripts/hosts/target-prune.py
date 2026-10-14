@@ -49,7 +49,7 @@ import tempfile  # noqa: E402
 import time  # noqa: E402
 
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 DEFAULT_CONFIG = os.path.join(SCRIPT_DIRECTORY, "target-prune.conf")
 PROFILES = ("debug", "release")
 PRUNED_KINDS = ("deps", "build", "incremental", ".fingerprint")
@@ -448,7 +448,7 @@ def run_selftest():
                 process.wait()
         shutil.rmtree(work, ignore_errors=True)
     if selftest.failures:
-        print(f"  ✗ target-prune.py 自证有 {len(selftest.failures)} 格判错（共 {selftest.cells} 格）：")
+        print(f"  ✗ target-prune.py 自证有 {len(selftest.failures)} 格判错（共 {selftest.cells} 格）：")  # gate-lint:summary
         for failure in selftest.failures:
             print(f"      ✗ 自证 {failure}")   # gate-lint:detail
         print("  → 怎么办：设了 TARGET_PRUNE_BREAK 的，这就是要的结果；没设的，照上面那几格看 prune、recent、processes_using 与 read_stale_days")

@@ -8,7 +8,7 @@
 # 两个函数：
 #   gate_diff_base <取法>
 #     gate：GATE_BASE 是个提交就用它；否则 @{upstream} 的 merge-base；都没有（或 merge-base 取不到）就 HEAD。
-#           一轮可以跨几个提交，问「这一轮碰了哪些」的阶段用它（doc-process-records 的 verdict-names-local-samples、crates-adversarial-review、knowledge-sync、agent-def-adversarial-review 四格，doc-experiments 用改动范围的六格，doc-registries 的 invariant-anchors 那一格）。
+#           一轮可以跨几个提交，问「这一轮碰了哪些」的阶段用它（doc-process-records 的 verdict-names-local-samples、crates-adversarial-review、code-round-snapshot、knowledge-sync、agent-def-adversarial-review 五格，doc-experiments 用改动范围的六格，doc-registries 的 invariant-anchors 那一格）。
 #           不认上游 gate.sh 导出的 GATE_DIFF_BASE（用户 2026-09-24 定）：带 --staged 那条路在里层把 GATE_BASE 设成上游
 #           diff_base，不带 --staged 的整轮用这里的回退次序；全推出去了时前者是 HEAD~1、后者是 HEAD，两条路判的窗口不同（C528）。
 #     head：HEAD。问「这一次提交要带哪些」的阶段用它（doc-process-records 的 batch-scope 格；为什么不用 GATE_BASE 写在 doc-process-records 文件头 batch-scope 那一段）。

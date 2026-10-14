@@ -6,6 +6,7 @@
 
 用法：
   hook-swap.py <规格.json> --hook <钩子> --scratch <草稿目录> [--feeds <喂法.json>] [--root <仓根>] [--dry-run]
+  hook-swap.py --feed-only --hook <钩子> [--feeds <喂法.json>] [--root <仓根>]   # 只喂不换：拿此刻的钩子逐条喂，一条一行写退出码，不写任何文件
   hook-swap.py --selftest        # HOOK_SWAP_BREAK=<项> 时必须判红
 
 <规格.json> 同 scripts/kb/replace-batch.py：JSON 数组，每项 {"file": 路径, "old": 旧串, "new": 新串, "count": 可省，默认 1}，
@@ -45,6 +46,8 @@
   skip-base-check        换上之前不核主工作区那几份在验的时候改没改：「验的时候主工作区那份被改了」那一格红
   skip-post-swap-check   换上之后不再验：「换上之后红回滚」那一格红
   rollback-whole-file    回滚时整份写回换上之前的内容（盖掉别的会话这段时间里的改动）：「换上之后红回滚」那一格红
+  stale-builtin-feed     内置喂法里混进一条脚本搬家之前的旧路径：「内置喂法里的脚本路径都在」那一格红
+  brace-feeds-dropped    内置喂法里不带花括号与参数通配那六条：「内置喂法带花括号与参数通配的六条」与「花括号写法上放行的钩子，先验停下」两格红
 不认识的值直接拒绝，免得拼错的开关被当成「没开」。
 """
 import hashlib
@@ -60,14 +63,15 @@ from typing import NamedTuple
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path[:0] = [os.path.join(REPOSITORY_ROOT, ".claude", "scripts"), SCRIPT_DIRECTORY]
 from project_preflight import preflight  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "kb"))
 from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename  # noqa: E402
 
 BREAK_VARIABLE = "HOOK_SWAP_BREAK"
-KNOWN_BREAK_MODES = ("swap-on-draft-red", "skip-embedded-python", "skip-base-check", "skip-post-swap-check", "rollback-whole-file")
+KNOWN_BREAK_MODES = ("swap-on-draft-red", "skip-embedded-python", "skip-base-check", "skip-post-swap-check", "rollback-whole-file", "stale-builtin-feed",
+                     "brace-feeds-dropped")
 HOOKS_DIRECTORY = os.path.join(".claude", "hooks")
 WORK_DIRECTORY_NAME = "hook-swap"
 FEED_TIMEOUT_SECONDS = 120
@@ -78,6 +82,16 @@ BROKEN_HOOK_MARKERS = ("没判成", "读不到共用模块")
 EMBEDDED_PYTHON_START = re.compile(r"\bpython3?\b[^\n]*?<<(-?)\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
 EXIT_SWAPPED, EXIT_DRAFT_RED, EXIT_BAD_INPUT, EXIT_CHANGED, EXIT_SWAP_FAILED, EXIT_ROLLED_BACK, EXIT_ROLLBACK_FAILED = 0, 1, 2, 3, 4, 5, 6
 WRITER = "implementation-writer"
+# 花括号与参数里的通配照 bash 展开再判（钩子自己的自证表 heavy-test-guard.sh「花括号与参数里的通配照 bash 展开再判」那几格，C644）：
+# 换上的钩子在这六条上退回放行，换之前的先验照样过，所以内置喂法里要有。路径写现位置 scripts/mutation/；正常写法用仓里真有的路径（stale_feed_paths 要展开得到）
+BRACE_AND_PARAMETER_GLOB_FEEDS = [
+    {"label": "实现员花括号起 mutate.sh 跑 crates 整表照拒", "agent_type": WRITER, "command": "bash scripts/mutation/mutate.{sh,x} crates/mutations.tsv", "exit": 2},
+    {"label": "实现员花括号起 checker-tier-crash-point-replay 照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-crash-point-replay.{sh,} {root}", "exit": 2},
+    {"label": "实现员参数里的通配点到 crates 整表照拒", "agent_type": WRITER, "command": "bash scripts/mutation/mutate.sh crates/mutation?.tsv", "exit": 2},
+    {"label": "实现员花括号写在包装上（{bash,-x}）照拒", "agent_type": WRITER, "command": "{bash,-x} scripts/mutation/mutate.sh crates/mutations.tsv", "exit": 2},
+    {"label": "实现员合法的花括号 ls 放行", "agent_type": WRITER, "command": "ls scripts/{kb,gate}/*.py", "exit": 0, "neutral": True},
+    {"label": "实现员合法的参数通配 cat 放行", "agent_type": WRITER, "command": "cat crates/*.toml", "exit": 0, "neutral": True},
+]
 # 内置喂法（钩子相对仓根的路径 → 喂法）。neutral 的几条新旧两版判得一样（回滚之后拿它们核钩子没坏）；
 # 别的几条钉的是这一版的判法（命令词带通配的照展开判，test-script-align-r2 判决 U1-1），旧版喂了会红
 BUILTIN_FEEDS = {
@@ -88,20 +102,20 @@ BUILTIN_FEEDS = {
         {"label": "实现员跑 checker 档包照拒", "agent_type": WRITER, "command": "bash scripts/hosts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier",
          "exit": 2, "neutral": True},
         {"label": "实现员单独跑登记成轻的自证放行", "agent_type": WRITER, "command": "python3 scripts/gate/admission.py --selftest", "exit": 0, "neutral": True},
-        {"label": "实现员 ls 合法的通配放行", "agent_type": WRITER, "command": "ls scripts/*.sh", "exit": 0},
-        {"label": "实现员通配起 checker-tier-layer0-replay 照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-layer0-replay.s? {root}", "exit": 2},
+        {"label": "实现员 ls 合法的通配放行", "agent_type": WRITER, "command": "ls scripts/*/*.sh", "exit": 0},
+        {"label": "实现员通配起 checker-tier-crash-point-replay 照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-crash-point-replay.s? {root}", "exit": 2},
         {"label": "实现员通配起 QEMU 那一道照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-qemu-device-streams.s? {root}", "exit": 2},
-        {"label": "实现员通配起 mutate.sh 跑 crates 整表照拒", "agent_type": WRITER, "command": "bash scripts/mutate.s? crates/mutations.tsv", "exit": 2},
-        {"label": "实现员通配起 vm-bench.sh --selftest 照拒", "agent_type": WRITER, "command": "bash scripts/vm-bench*.sh --selftest", "exit": 2},
-        {"label": "实现员通配起登记成重的自证照拒", "agent_type": WRITER, "command": "bash scripts/vm-bench.s? --selftest", "exit": 2},
+        {"label": "实现员通配起 mutate.sh 跑 crates 整表照拒", "agent_type": WRITER, "command": "bash scripts/mutation/mutate.s? crates/mutations.tsv", "exit": 2},
+        {"label": "实现员通配起 vm-bench.sh --selftest 照拒", "agent_type": WRITER, "command": "bash scripts/devices/vm-bench*.sh --selftest", "exit": 2},
+        {"label": "实现员通配起登记成重的自证照拒", "agent_type": WRITER, "command": "bash scripts/devices/vm-bench.s? --selftest", "exit": 2},
         # compile-then-swap.py 与双机驱动的自证换成假驱动、登记成 light 之后，通配起它们照展开判、放行（旧版登记成 heavy，喂了会红）
-        {"label": "实现员通配起登记成轻的 compile-then-swap 自证放行", "agent_type": WRITER, "command": "python3 scripts/compile-then-swap.p? --selftest", "exit": 0},
-        {"label": "实现员通配起登记成轻的双机驱动自证放行", "agent_type": WRITER, "command": "bash scripts/crash-amplification-two-host?.sh --selftest", "exit": 0},
+        {"label": "实现员通配起登记成轻的 compile-then-swap 自证放行", "agent_type": WRITER, "command": "python3 scripts/hosts/compile-then-swap.p? --selftest", "exit": 0},
+        {"label": "实现员通配起登记成轻的双机驱动自证放行", "agent_type": WRITER, "command": "bash scripts/crash/crash-amplification-two-host?.sh --selftest", "exit": 0},
         # 带 POSIX 字符类、等价类、整理符号的交给 bash 展开；崩溃放量三份入口按名字算重型（test-script-align-r3 攻方 A1、A2）
-        {"label": "实现员 POSIX 字符类起 mutate.sh 跑 crates 整表照拒", "agent_type": WRITER, "command": "bash scripts/mutat[[:alpha:]].sh crates/mutations.tsv", "exit": 2},
-        {"label": "实现员等价类起 checker-tier-layer0-replay 照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-layer0-replay.s[[=h=]] {root}", "exit": 2},
+        {"label": "实现员 POSIX 字符类起 mutate.sh 跑 crates 整表照拒", "agent_type": WRITER, "command": "bash scripts/mutation/mutat[[:alpha:]].sh crates/mutations.tsv", "exit": 2},
+        {"label": "实现员等价类起 checker-tier-crash-point-replay 照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-crash-point-replay.s[[=h=]] {root}", "exit": 2},
         {"label": "实现员整理符号起 QEMU 那一道照拒", "agent_type": WRITER, "command": "bash .claude/gate.d/checker-tier-qemu-device-streams.s[[.h.]] {root}", "exit": 2},
-        {"label": "实现员合法的 POSIX 字符类 ls 放行", "agent_type": WRITER, "command": "ls scripts/[[:alpha:]]*.sh", "exit": 0, "neutral": True},
+        {"label": "实现员合法的 POSIX 字符类 ls 放行", "agent_type": WRITER, "command": "ls scripts/*/[[:alpha:]]*.sh", "exit": 0, "neutral": True},
         {"label": "实现员起崩溃放量全量照拒", "agent_type": WRITER, "command": "bash scripts/crash/crash-amplification.sh", "exit": 2},
         {"label": "实现员起崩溃放量分项驱动照拒", "agent_type": WRITER,
          "command": "bash scripts/crash/crash-amplification-item.sh crash_amplification_fixed_script_through_rollback", "exit": 2},
@@ -109,8 +123,36 @@ BUILTIN_FEEDS = {
         {"label": "实现员单独跑 crash-amplification.sh --selftest 放行", "agent_type": WRITER, "command": "bash scripts/crash/crash-amplification.sh --selftest",
          "exit": 0, "neutral": True},
         {"label": "实现员列崩溃放量的分项放行", "agent_type": WRITER, "command": "bash scripts/crash/crash-amplification.sh --list-items", "exit": 0, "neutral": True},
+        *BRACE_AND_PARAMETER_GLOB_FEEDS,
     ],
 }
+
+
+def builtin_feeds_for(hook_relative, mode):
+    """钩子相对仓根的路径 → 内置喂法，没有交 None。brace-feeds-dropped 下去掉花括号与参数通配那六条（只给自证判红用）。"""
+    feeds = BUILTIN_FEEDS.get(hook_relative)
+    if feeds is not None and mode == "brace-feeds-dropped":
+        feeds = [feed for feed in feeds if feed not in BRACE_AND_PARAMETER_GLOB_FEEDS]
+    return feeds
+
+
+def stale_feed_paths(feeds, root):
+    """喂法命令里 scripts/、.claude/ 开头的词（带通配的交 bash 展开）在 root 下一个都对不上的：[(label, 词)]。
+    脚本搬进分类子目录之后旧路径只会让「该拒」的喂法退 0、「该放」的喂法空放，不报错。"""
+    stale = []
+    for feed in feeds:
+        for word in str(feed.get("command", "")).split():
+            if not word.startswith(("scripts/", ".claude/")):
+                continue
+            # 花括号要先于变量展开才展得开，所以这里 eval；词只收路径里会出现的字符，别的字符（$、;、引号、反引号）不 eval
+            if not re.fullmatch(r"[A-Za-z0-9_./*?\[\]{},:=+@-]+", word):
+                stale.append((feed.get("label", "?"), word))
+                continue
+            found = subprocess.run(["bash", "-c", 'shopt -s nullglob; eval "found=($1)"; [ -e "${found[0]:-}" ]', "bash", word], cwd=root, stdin=subprocess.DEVNULL,
+                                   capture_output=True)
+            if found.returncode != 0:
+                stale.append((feed.get("label", "?"), word))
+    return stale
 
 
 class BadInput(Exception):
@@ -273,10 +315,50 @@ def validate_feeds(feeds):
                            "→ 怎么办：每条写 {\"label\": 说明, \"command\": 命令, \"exit\": 0 或 2}，可加 agent_type、cwd、neutral")
 
 
-def feed_problems(hook_path, root, feeds, log_path, detections_path, only_neutral=False):
-    """逐条喂 hook_path；交 (问题列表, 喂了几条)。"""
+def feed_environment(root, detections_path):
     environment = {key: value for key, value in os.environ.items() if key != "SINGLEFS_HEAVY_TESTS"}
     environment.update(CLAUDE_PROJECT_DIR=root, AGENT_HOOK_DETECTIONS=detections_path, PYTHONDONTWRITEBYTECODE="1")
+    return environment
+
+
+def feed_only(hook, root, feeds=None):
+    """只喂不换：拿 root 下此刻的钩子逐条喂，一条一行 ✓/✗ 加实际退出码；交 (退出码, 提示行)。检出记录写临时目录、用完就删，仓里一个字节不写。"""
+    mode = break_mode()
+    root = os.path.realpath(root)
+    hook_path = os.path.realpath(hook if os.path.isabs(hook) else os.path.join(root, hook))
+    if os.path.dirname(hook_path) != os.path.realpath(os.path.join(root, HOOKS_DIRECTORY)) or not hook_path.endswith(".sh") or not os.path.isfile(hook_path):
+        raise BadInput(f"--hook {hook} 不是 {os.path.join(root, HOOKS_DIRECTORY)} 这一层里已有的 .sh\n→ 怎么办：--hook 写要喂 JSON 的那一份钩子（例如 .claude/hooks/heavy-test-guard.sh）")
+    hook_relative = os.path.relpath(hook_path, root)
+    if feeds is None:
+        feeds = builtin_feeds_for(hook_relative, mode)
+        if feeds is None:
+            raise BadInput(f"{hook_relative} 没有内置喂法\n→ 怎么办：--feeds 给一份喂法（放行几条、该拒几条，写法见文件头）")
+    validate_feeds(feeds)
+    lines, wrong = [], 0
+    with tempfile.TemporaryDirectory(prefix="hook-swap-feed-only-") as scratch:
+        environment = feed_environment(root, os.path.join(scratch, "detections.jsonl"))
+        for feed in feeds:
+            hook_input = hook_input_of(feed, root)
+            command = hook_input.get("tool_input", {}).get("command", "") if isinstance(hook_input, dict) else ""
+            try:
+                done = subprocess.run(["bash", hook_path], input=json.dumps(hook_input, ensure_ascii=False), capture_output=True, text=True,
+                                      env=environment, cwd=root, timeout=FEED_TIMEOUT_SECONDS)
+                code, stderr = done.returncode, done.stderr
+            except subprocess.TimeoutExpired:
+                code, stderr = "超时", ""
+            marker = next((marker for marker in BROKEN_HOOK_MARKERS if marker in stderr), None)
+            good = code == feed["exit"] and marker is None
+            wrong += 0 if good else 1
+            lines.append(f"  {'✓' if good else '✗'} 退 {code}（应当 {feed['exit']}）{'：stderr 里有「' + marker + '」' if marker else ''} {feed['label']} ← {command}")
+    lines.append(f"{'✗' if wrong else '✓'} 只喂不换：{hook_relative} 喂了 {len(feeds)} 条，{wrong} 条不对")  # gate-lint:summary
+    if wrong:
+        lines.append("→ 怎么办：不对的几条是钩子此刻的判法与喂法对不上；先看是钩子退回了、还是喂法写错了，再决定改哪边（这个模式不改任何文件）")
+    return (EXIT_DRAFT_RED if wrong else EXIT_SWAPPED), lines
+
+
+def feed_problems(hook_path, root, feeds, log_path, detections_path, only_neutral=False):
+    """逐条喂 hook_path；交 (问题列表, 喂了几条)。"""
+    environment = feed_environment(root, detections_path)
     problems, fed = [], 0
     with open(log_path, "a", encoding="utf-8") as log:
         for feed in feeds:
@@ -396,7 +478,7 @@ def swap(spec, hook, scratch, root, feeds=None, dry_run=False, after_draft=None,
         raise BadInput(f"--hook {hook} 不是 {os.path.join(root, HOOKS_DIRECTORY)} 这一层里已有的 .sh\n→ 怎么办：--hook 写要喂 JSON 的那一份钩子（例如 .claude/hooks/heavy-test-guard.sh）")
     hook_relative = os.path.relpath(hook_path, root)
     if feeds is None:
-        feeds = BUILTIN_FEEDS.get(hook_relative)
+        feeds = builtin_feeds_for(hook_relative, mode)
         if feeds is None:
             raise BadInput(f"{hook_relative} 没有内置喂法\n→ 怎么办：--feeds 给一份喂法（放行几条、该拒几条，写法见文件头）")
     validate_feeds(feeds)
@@ -615,6 +697,65 @@ def selftest():
     segments = embedded_python_segments("# python3 - <<'X'\npython3 - <<-'EOF'\nprint(1)\n\tEOF\npython3 /dev/fd/3 3<<PY\nx = (\n")
     if [(start, closed) for start, _, closed in segments] != [(2, True), (5, False)]:
         failures.append(f"内嵌 python 切段不对：{[(start, closed) for start, _, closed in segments]}（应当 [(2, True), (5, False)]）")
+    # 内置喂法里的脚本路径都在：绿是现在的 BUILTIN_FEEDS 一条都不旧；红是搬家之前的旧路径要被点名（开关 stale-builtin-feed 往真表里混一条旧的）
+    checked += 1
+    stale_sample = [{"label": "旧路径", "command": "bash scripts/mutate.s? crates/mutations.tsv"}, {"label": "带通配的新路径", "command": "bash scripts/mutation/mutate.s? x"}]
+    if [label for label, _ in stale_feed_paths(stale_sample, REPOSITORY_ROOT)] != ["旧路径"]:
+        failures.append("旧路径的喂法没被点名，或带通配的新路径被误点")
+    live_feeds = [feed for feeds in BUILTIN_FEEDS.values() for feed in feeds]
+    if break_mode() == "stale-builtin-feed":
+        live_feeds = live_feeds + stale_sample[:1]
+    for label, word in stale_feed_paths(live_feeds, REPOSITORY_ROOT):
+        failures.append(f"内置喂法「{label}」里的 {word} 在 {REPOSITORY_ROOT} 下对不上：脚本搬过家，这条喂法钉不住任何东西")
+    # 内置喂法带花括号与参数通配的六条（C644）：钩子自己的自证表里有，换上的钩子在这几条上退回放行时，内置喂法要能先验出来
+    # （开关 brace-feeds-dropped 下这一格与下面「花括号写法上放行的钩子，先验停下」红）
+    checked += 1
+    guard_relative = ".claude/hooks/heavy-test-guard.sh"
+    present = builtin_feeds_for(guard_relative, break_mode()) or []
+    missing = [feed["label"] for feed in BRACE_AND_PARAMETER_GLOB_FEEDS if feed not in present]
+    exits = sorted((feed["exit"] for feed in BRACE_AND_PARAMETER_GLOB_FEEDS))
+    if missing or len(BRACE_AND_PARAMETER_GLOB_FEEDS) != 6 or exits != [0, 0, 2, 2, 2, 2]:
+        failures.append(f"内置喂法带花括号与参数通配的六条：缺 {missing}，共 {len(BRACE_AND_PARAMETER_GLOB_FEEDS)} 条，退出码 {exits}（应当 4 条退 2、2 条退 0）")
+    # 照内置喂法的表答的假钩子：全对的先验过、换上；只在第一条花括号写法（mutate.{sh,x}）上退 0 的，先验停下并点名那一条
+    guard_table = {}
+    for feed in BUILTIN_FEEDS[guard_relative]:
+        guard_table[feed["command"]] = feed["exit"]
+    brace_feed = BRACE_AND_PARAMETER_GLOB_FEEDS[0]
+    brace_hook_text = ("#!/usr/bin/env bash\nset -uo pipefail\n# 版本 1\npython3 /dev/fd/3 3<<'PY'\nimport json, os, sys\n"
+                       f"table = json.loads({json.dumps(json.dumps(guard_table))})\nforgiven = json.loads({json.dumps(json.dumps([brace_feed['command']]))})\n"
+                       "command = json.load(sys.stdin).get('tool_input', {}).get('command', '').replace(os.environ['CLAUDE_PROJECT_DIR'], '{root}')\n"
+                       "code = 0 if command in forgiven else table.get(command, 0)\n"
+                       "if code:\n    print('✗ 被拒：' + command, file=sys.stderr)\n"
+                       "    print('     → 怎么办：自证用的假钩子，只按内置喂法的表答，没有别的出路', file=sys.stderr)\nsys.exit(code)\nPY\n")
+    correct_hook_text = brace_hook_text.replace("forgiven = json.loads(" + json.dumps(json.dumps([brace_feed["command"]])) + ")", "forgiven = []")
+    for label, text, want_code, want_text in (
+            ("内置喂法对全对的钩子：先验过、换上", correct_hook_text, EXIT_SWAPPED, "✓ 换上了 1 份"),
+            ("花括号写法上放行的钩子，先验停下（内置喂法点名 mutate.{sh,x} 那一条）", brace_hook_text, EXIT_DRAFT_RED, f"喂「{brace_feed['label']}」：退 0（应当 2）")):
+        checked += 1
+        root = os.path.join(work, f"guard-case-{checked}", "repo")
+        os.makedirs(os.path.join(root, HOOKS_DIRECTORY))
+        guard_path = os.path.join(root, guard_relative)
+        with open(guard_path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        try:
+            code, lines = swap([{"file": guard_relative, "old": "# 版本 1\n", "new": "# 版本 2\n"}], guard_relative, os.path.join(work, f"guard-case-{checked}", "scratch"), root)
+        except BadInput as error:
+            code, lines = EXIT_BAD_INPUT, str(error).splitlines()
+        problems = []
+        if code != want_code:
+            problems.append(f"退出码 {code}（应当 {want_code}）")
+        if not any(want_text in line for line in lines):
+            problems.append(f"输出里没有「{want_text}」")
+        wrong_lines = [line for line in lines if line.lstrip().startswith("- 喂「")]
+        if want_code == EXIT_DRAFT_RED and len(wrong_lines) != 1:
+            problems.append(f"点名的不对的喂法应当恰好一条，实际 {len(wrong_lines)} 条")
+        swapped_text = read_text(guard_path)
+        if want_code == EXIT_DRAFT_RED and swapped_text != text:
+            problems.append("先验红了钩子还是被改了")
+        if want_code == EXIT_SWAPPED and swapped_text != text.replace("# 版本 1\n", "# 版本 2\n"):
+            problems.append("全对的钩子没换成新版")
+        if problems:
+            failures.append(f"{label}：{'；'.join(problems)}；输出末几行 {lines[-4:]}")
     shutil.rmtree(work, ignore_errors=True)
     for failure in failures:
         print(f"  ✗ hook-swap 自检：{failure}")  # gate-lint:detail
@@ -623,16 +764,18 @@ def selftest():
         return 1
     print(f"  ✓ hook-swap 自检通过（查了 {checked} 种）：草稿与换上之后都验过的换上新 inode；钩子 bash 层语法错、内嵌 python 编译不过、判法改错的草稿一个字节不写；"
           "换上之后验不过的按反向定点替换回滚、别的会话这段时间里加的一行留着；验的时候主工作区被改了不换；"
-          "不在 .claude/hooks/ 的文件、回滚找不回原处的规格不收；内嵌 python 切段认 <<- 与没收尾的")
+          "不在 .claude/hooks/ 的文件、回滚找不回原处的规格不收；内嵌 python 切段认 <<- 与没收尾的；内置喂法里的脚本路径都在仓里；内置喂法带花括号与参数通配的六条，"
+          "在花括号写法上放行的钩子先验停下并点名那一条")
     return 0
 
 
 def main(arguments):
     if arguments == ["--selftest"]:
         return selftest()
-    usage = "hook-swap.py <规格.json> --hook <钩子> --scratch <草稿目录> [--feeds <喂法.json>] [--root <仓根>] [--dry-run]，或 hook-swap.py --selftest"
+    usage = ("hook-swap.py <规格.json> --hook <钩子> --scratch <草稿目录> [--feeds <喂法.json>] [--root <仓根>] [--dry-run]，"
+             "或 hook-swap.py --feed-only --hook <钩子>，或 hook-swap.py --selftest")
     options = {"--hook": None, "--scratch": None, "--feeds": None, "--root": REPOSITORY_ROOT}
-    dry_run, positional, position = False, [], 0
+    dry_run, feed_only_mode, positional, position = False, False, [], 0
     while position < len(arguments):
         argument = arguments[position]
         if argument in options and position + 1 < len(arguments):
@@ -641,9 +784,33 @@ def main(arguments):
             continue
         if argument == "--dry-run":
             dry_run = True
+        elif argument == "--feed-only":
+            feed_only_mode = True
         else:
             positional.append(argument)
         position += 1
+    if feed_only_mode:
+        if positional or options["--hook"] is None:
+            print("✗ 参数不对：--feed-only 只要 --hook（可带 --feeds、--root），不收规格与 --scratch")
+            print("→ 怎么办：hook-swap.py --feed-only --hook <钩子> [--feeds <喂法.json>] [--root <仓根>]")
+            return EXIT_BAD_INPUT
+        try:
+            feeds = None
+            if options["--feeds"] is not None:
+                with open(options["--feeds"], encoding="utf-8") as handle:
+                    feeds = json.load(handle)
+            code, lines = feed_only(options["--hook"], options["--root"], feeds=feeds)
+        except (OSError, ValueError) as error:
+            print(f"✗ 读不了喂法（{error}）")
+            print("→ 怎么办：喂法是 UTF-8 的 JSON 数组，写法见文件头")
+            return EXIT_BAD_INPUT
+        except BadInput as error:
+            problem, _, next_step = str(error).partition("\n")
+            print(f"✗ {problem}")
+            print(f"→ {next_step.lstrip('→ ') or usage}")
+            return EXIT_BAD_INPUT
+        print("\n".join(lines))
+        return code
     if len(positional) != 1 or options["--hook"] is None or options["--scratch"] is None:
         print("✗ 参数不对：要一份规格、--hook 与 --scratch")
         print(f"→ 怎么办：{usage}")

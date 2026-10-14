@@ -41,8 +41,6 @@ const RECORD_TREE_NODE_HEADER_BYTES: u64 = 86 + 2 * 10 + 29;
 const RECORDS_PER_NODE_SINGLE_GENERATION: u64 = (16384 - RECORD_TREE_NODE_HEADER_BYTES) / RECORD_WIDTH_BYTES_SINGLE_GENERATION;
 /// 单节点能装的 28 字节条目数（A1）。
 const RECORDS_PER_NODE_DUAL_GENERATION: u64 = (16384 - RECORD_TREE_NODE_HEADER_BYTES) / RECORD_WIDTH_BYTES_DUAL_GENERATION;
-/// defer 窗口最少保留的可退状态数（D16 已定项 1）。
-const MINIMUM_RETAINED_STATES: u64 = 4;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 enum Device {
@@ -286,13 +284,6 @@ impl PoolState {
 // 账户查询：I-3.1 的候选集去重求和（登记 walk.rs 46-72 的去重键 (设备, 起点槽, 跨度)）
 // ---------------------------------------------------------------------
 
-/// 一个引用：(起点槽, 跨度)，去重键含设备（这里只在单设备视角内去重，设备信息由调用方分开算）。
-type Reference = (u64, u64);
-
-fn sum_spans(references: &BTreeSet<Reference>) -> u64 {
-    references.iter().map(|(_, span)| span).sum()
-}
-
 // ---------------------------------------------------------------------
 // 主谓词
 // ---------------------------------------------------------------------
@@ -388,13 +379,6 @@ struct GeometryCell {
 impl GeometryCell {
     fn ring_capacity(self) -> u64 {
         ROOT_RING_REGIONS * self.slots_per_region
-    }
-    fn tag(self) -> String {
-        let placement = match self.placement {
-            PlacementPolicy::Low => "low",
-            PlacementPolicy::Impl => "impl",
-        };
-        format!("s{}_{}_rho{}", self.slots_per_region, placement, self.workload_period)
     }
 }
 
@@ -1266,13 +1250,12 @@ struct InvariantSnapshot {
 #[derive(Clone)]
 struct PublishOutcome {
     txg: u64,
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     instance: u64,
     is_nonempty: bool,
     label: &'static str,
     pre: [PreAllocationSnapshot; 5],
     accounting: [AccountingRow; 5],
-    violations_candidate: [u64; 5],
-    violations_abandoned: [u64; 5],
     invariant_snapshot: InvariantSnapshot,
     /// Q9 轨迹（第四段，见跑前登记第十二节）：这次发布持久之后，每条臂分配记录的条目数
     /// （`arm.ledger.len()`，「曾分配过、尚未被覆盖的落点数」，D3 已定项 7）。
@@ -1441,8 +1424,6 @@ impl World {
             label,
             pre,
             accounting,
-            violations_candidate,
-            violations_abandoned,
             invariant_snapshot,
             allocation_record_entries,
             reclaim_step_reads,
@@ -1575,8 +1556,6 @@ impl World {
             label: "warmup",
             pre,
             accounting,
-            violations_candidate: [0; 5],
-            violations_abandoned: [0; 5],
             invariant_snapshot,
             allocation_record_entries,
             reclaim_step_reads,
@@ -1741,8 +1720,6 @@ impl World {
                 label: "raise_floor_empty",
                 pre,
                 accounting,
-                violations_candidate: [0; 5],
-                violations_abandoned: [0; 5],
                 invariant_snapshot,
                 allocation_record_entries,
                 reclaim_step_reads,
@@ -1897,8 +1874,6 @@ impl World {
             label,
             pre,
             accounting,
-            violations_candidate: [0; 5],
-            violations_abandoned: [0; 5],
             invariant_snapshot,
             allocation_record_entries,
             reclaim_step_reads,
@@ -3076,8 +3051,6 @@ mod tests {
                 for _ in world.run_workload_segment(3 * ring_capacity, 1) {
                 }
                 let outcomes = world.raise_floor();
-                for outcome in &outcomes {
-                }
                 let expected_target_floor = 3 * ring_capacity - 1;
                 assert_eq!(world.pool.current_rollback_floor, expected_target_floor, "S={slots_per_region} placement={placement:?}");
                 assert_eq!(outcomes.len(), 2, "带新 F 的空发布推 2 次：S={slots_per_region} placement={placement:?}");

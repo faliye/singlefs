@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 每趟重跑三组配置、写新的输出，上一次的输出不替这一次作保
+# run-condition: check test -x scripts/experiments/target/release/e56_epsilon :: 先在 scripts/experiments/ 里构建：cargo build --release --bin e56_epsilon
 # E56 的跑批。三组配置，一次跑完：
 #   1. 测量：5 个种子 × 缓存 66 个节点（约占树 6.4%）
 #   2. 自检：把两条攒批臂的核心判据换成常量（缓冲=1），1 个种子 —— 结构性检查，不是测量
@@ -14,7 +16,9 @@
 #   2. 每一轮的收尾行必须是 `name=done emitted=N`，且 N 必须等于该轮实际 E7RESULT 行数；
 #   3. 任一轮退出码非 0 或条数对不上，整脚本判红，不许当成「跑过了」。
 set -uo pipefail
-cd "$(dirname "$0")/experiments"
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+cd "$(dirname "$0")" || { echo "进不去装置目录 $(dirname "$0")"; echo "→ 怎么办：从仓根照文件头的用法起"; exit 2; }
 OUT="${1:?用法：e56-sweep.sh <输出文件>}"
 BIN=./target/release/e56_epsilon
 [[ -x "$BIN" ]] || { echo "先构建：cargo build --release --bin e56_epsilon"; exit 2; }

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 量的是此刻这台机器的显卡，上一次量到的数不替这一次作保
+# run-condition: check python3 -c 'import sys, torch; sys.exit(0 if torch.cuda.is_available() else 1)' :: 装好带 CUDA 的 torch，并确认显卡在、驱动起得来（nvidia-smi 能列出卡）
 """E21 的**传输段**：主机 → 显存 → 主机的带宽。不含任何核函数。
 
 为什么单独测这一段就有用：E21 判据 1 是
@@ -15,6 +17,12 @@
   * N=5 取中位；先跑一轮丢弃（首次 CUDA 调用要建上下文）。
 """
 import sys, time, statistics, torch
+import os as preflight_os, sys as preflight_sys  # noqa: E402
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+preflight_sys.dont_write_bytecode = True
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
+from project_preflight import preflight  # noqa: E402
+preflight(__file__)
 
 DEV = 0
 SIZES_MIB = [1, 4, 16, 64, 256, 1024]

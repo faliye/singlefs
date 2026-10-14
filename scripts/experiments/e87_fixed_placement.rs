@@ -81,6 +81,7 @@ fn fallback(generation: u64, dead_device: usize) -> u64 {
 }
 
 /// 未种子的变体：mkfs 不写任何初始根（发布从 g=1 开始才有根）。用来钉「不种会全灭」这个洞。
+#[cfg(test)]
 fn fallback_unseeded(generation: u64, dead_device: usize) -> u64 {
     let mut generations_back = 0;
     loop {

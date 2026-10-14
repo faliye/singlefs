@@ -683,7 +683,7 @@ def plan(settings: Settings) -> int:
                                        exported_names(units, predicted), True)
         completed = subprocess.run(["bash", override("UNITS_R8_UNIT_SCRIPT", UNIT_SCRIPT), name], cwd=settings.repo, env=environment, capture_output=True, text=True)
         print(f"单元 {name}（第 {attempt} 次）：")
-        print(completed.stdout.rstrip("\n") + (f"\n  ✗ 单元脚本退 {completed.returncode}：{completed.stderr.strip()}" if completed.returncode else ""))
+        print(completed.stdout.rstrip("\n") + (f"\n  ✗ 单元脚本退 {completed.returncode}：{completed.stderr.strip()}" if completed.returncode else ""))  # gate-lint:detail
     print("── 第 11–13 步：逐行编排的 plan ──")
     command = rows_command(settings, predicted, "plan")
     print("$ " + " ".join(shlex.quote(word) for word in command))

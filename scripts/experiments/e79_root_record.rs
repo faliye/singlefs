@@ -64,6 +64,7 @@ const TREE_ENTRY: u64 = 8 + 31 + LOC_ENTRY * 2;
 /// 树表单元不带 key 区间 ⇒ 取最窄那档 68；三档给出同一个容量，由单测钉住。
 const NODE_BYTES: u64 = 16384;
 const UNIT_HDR: u64 = 68;
+#[cfg(test)]
 const NODE_HDR_TIERS: [u64; 3] = [68, 77, 86];
 /// D25 目标负载一次 fsync 的块数（8 叶 + 4 祖先 + 1 根槽 + 1 记录）。
 const FSYNC_BLOCKS: u64 = 14;

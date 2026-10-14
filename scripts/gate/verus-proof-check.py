@@ -34,8 +34,9 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
       证明错一条都没有、只剩 rlimit 用尽的那一行不作数、判红：红在算力额度上，不是证明失败（改替换文，或调高登记的 rlimit）。
       替换文里（去掉 // 注释之后）有 verifier::rlimit / verifier(rlimit …) 的那一行判红：它盖过命令行的 --rlimit。
   通用选项：--verus-root 目录（默认 $SINGLEFS_VERUS_ROOT，再默认 ${XDG_DATA_HOME:-~/.local/share}/<登记表 release 行第五列>）
-            --timeout 秒（默认 $GATE_VERUS_TIMEOUT_SECONDS，再默认 600）  --threads N（默认 $SINGLEFS_THREAD_CAP，再默认 nproc）
-            --jobs J（空真与必红世界几处同时验，默认 $GATE_VERUS_JOBS，再默认 min(处数, max(1, N / 4))；每一处的 Verus 取 N / J 条线程）
+            --timeout 秒（默认 $GATE_VERUS_TIMEOUT_SECONDS，再默认 600）  --threads N（默认 $SINGLEFS_THREAD_CAP，再默认登记的重活默认并行度 .claude/heavy-thread-default）
+            --jobs J（空真与必红世界几处同时验，默认 $GATE_VERUS_JOBS，再默认 min(处数, max(1, N // 4))；每一处的 Verus 取 N // J 条线程，至少 1；
+              N = 31 时同时至多验 7 处、每处 4 条线程起（7 处 4 条、1 处 31 条），合计不超过 N）
             --memory-cap 上限（每次 Verus 经 scripts/hosts/run-with-memory-cap.sh，默认 $GATE_VERUS_MEMORY_MAX，再默认 4G；
               限时交给它的 RUN_WITH_MEMORY_CAP_TIME_LIMIT，退 253 就是超时；退 245、250、251、252、254 是包装自己的结局，那一处判「没跑成」：
               这一格退 1，✗ 行写「没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 <码>」，行尾原样带上包装自己往 stderr 打的 ✗ 与 → 那几行，
@@ -193,6 +194,8 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
       reuse-red-not-recorded（「reuse-red-not-recorded 这一格判错」）；另有 1 格跟着判错：reuse-resume-after-kill
   VERUS_PROOF_CHECK_BREAK=reuse-records-whole-cell-only  一项判完不当场落盘，整格判完、一处问题都没有才一起记（被打断或有一项红，判过的全不留）
       reuse-resume-after-kill（第一趟 C 那一处被 kill -9，第二趟同一条命令要只判 C：「reuse-resume-after-kill 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=threads-default-cpu-count  --threads 的缺省取核数（改前的样子），不取登记的重活默认并行度
+      threads-default-registered（「threads-default-registered 这一格判错」）
 管不到的：spec 本身写得对不对；核与调它的 singlefs-core 之间（recovery.rs 调核那一段）没被证明的部分；插入点只认「requires 整行起头、函数体的 { 单独起行或是闭包那一行的头一个 {」
   这种写法（verusfmt 与本仓的写法），别的写法认不出就判红要求改写法。
 """
@@ -220,6 +223,8 @@ from project_preflight import preflight  # noqa: E402
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, SCRIPT_DIRECTORY)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "crash"))
+sys.path.insert(0, os.path.join(SCRIPT_DIRECTORY, "..", "hosts"))
+from heavy_threads import default_heavy_threads  # noqa: E402
 from lib_verdict_library import Tally, VerdictLibrary, digest_file, digest_text, digest_tree  # noqa: E402
 REGISTRY = ".claude/gate.d/verus-pins.tsv"
 EXIT_GREEN, EXIT_RED, EXIT_USAGE, EXIT_NOT_RUN = 0, 1, 2, 77
@@ -1342,10 +1347,17 @@ def tool_versions_text(root, override):
 
 # ── 命令行 ──
 
+def default_threads(environment=os.environ):
+    """--threads 的缺省：SINGLEFS_THREAD_CAP 设了取它，否则登记的重活默认并行度（.claude/heavy-thread-default）。"""
+    if "threads-default-cpu-count" in BREAK:   # 弄坏开关：改前的样子
+        return int(environment.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1)
+    return default_heavy_threads(environment)
+
+
 def parse_options(arguments):
     options = {"verus_root": None, "cargo_home": None, "launcher": None,
                "timeout": int(os.environ.get("GATE_VERUS_TIMEOUT_SECONDS") or 600),
-               "threads": int(os.environ.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1),
+               "threads": default_threads(),
                "jobs": int(os.environ.get("GATE_VERUS_JOBS") or 0),
                "memory_cap": os.environ.get("GATE_VERUS_MEMORY_MAX") or "4G",
                "items": [], "verdict_library": None, "reuse": True}
@@ -1455,7 +1467,7 @@ def main(arguments):
         print(f"{fingerprint}\t{count}")
         return EXIT_GREEN
     if arguments[0] == "tool-versions":
-        return tool_versions(os.path.abspath(positional[0]) if positional else os.path.dirname(SCRIPT_DIRECTORY), options["verus_root"])
+        return tool_versions(os.path.abspath(positional[0]) if positional else os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY)), options["verus_root"])
     if len(positional) != 1 or not os.path.isdir(positional[0]):
         report_red(f"{arguments[0]} 要恰好一个仓根", "例：verus-proof-check.py proof /path/to/singlefs")
         return EXIT_USAGE
@@ -2140,6 +2152,15 @@ def selftest():
         wrong.append("wrapper-queue-line-forwarded")
         print(f"    wrapper-queue-line-forwarded 这一格判错：交回 {queued!r}（退 9 是假包装等了 10 秒没见到转打），转打出来的 {forwarded!r}")  # gate-lint:detail
 
+    # --threads 的缺省：没设 SINGLEFS_THREAD_CAP 取登记文件第一条非注释行的数，设了取它
+    with open(os.path.join(SCRIPT_DIRECTORY, "..", "..", ".claude", "heavy-thread-default"), encoding="utf-8") as handle:
+        registered_default = next((int(line.split()[0]) for line in handle if line.strip() and not line.lstrip().startswith("#")), None)
+    cases += 1
+    unset_threads, capped_threads = default_threads({}), default_threads({"SINGLEFS_THREAD_CAP": "7"})
+    if registered_default is None or unset_threads != registered_default or capped_threads != 7:
+        wrong.append("threads-default-registered")
+        print(f"    threads-default-registered 这一格判错：登记 {registered_default}，没设上限得 {unset_threads}，上限 7 得 {capped_threads}")  # gate-lint:detail
+
     breaks_missed, breaks_proven = [], 0
     if not wrong and not BREAK:
         for item in ("commit-unchecked", "fingerprint-unchecked", "absent-kernel-not-run", "cheating-unchecked", "count-unchecked", "timeout-as-pass",
@@ -2152,7 +2173,7 @@ def selftest():
                      "tool-versions-rustup-ignored", "queue-refused-keeps-queueing",
                      "item-filter-ignored", "reuse-key-without-crate", "reuse-key-with-must-red-table", "reuse-key-without-toolchain", "reuse-key-without-row",
                      "reuse-ignores-key",
-                     "reuse-records-red", "reuse-records-whole-cell-only"):
+                     "reuse-records-red", "reuse-records-whole-cell-only", "threads-default-cpu-count"):
             completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
                                        env=dict(os.environ, VERUS_PROOF_CHECK_BREAK=item))
             if completed.returncode == 0:

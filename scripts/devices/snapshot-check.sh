@@ -57,6 +57,8 @@ check_snapshot() {   # $1 仓根 $2 轮名；stdout 逐行结论，返回 0 全�
 selftest() {
   local work failures=0 checked=0 out rc
   work="$(mktemp -d)"
+  # 中途报错、被打断也删（成功、失败都删；local 变量到退出时已不在，路径在这里就展开）
+  trap "rm -rf -- '$work'" EXIT
   git -C "$work" init -q && git -C "$work" config user.email t@t && git -C "$work" config user.name t
   mkdir -p "$work/.claude/kb" "$work/research/prompts/r1-snapshot"
   printf 'a\n' > "$work/.claude/kb/one.md"; printf 'b\n' > "$work/.claude/kb/two.md"; printf 'c\n' > "$work/.claude/kb/three.md"

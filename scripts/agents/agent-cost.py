@@ -34,7 +34,9 @@ preflight_sys.dont_write_bytecode = True
 preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
 from project_preflight import preflight  # noqa: E402
 
-DEFAULT_ROOT = os.path.expanduser("~/.claude/projects/-home-fy5090-code-singlefs")
+REPOSITORY_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+# Claude Code 按项目的绝对路径把 / 换成 - 起会话目录名（同 scripts/agents/watch.sh 的 ${root//\//-}）
+DEFAULT_ROOT = os.path.join(os.path.expanduser("~/.claude/projects"), REPOSITORY_ROOT.replace("/", "-"))
 BROKEN = os.environ.get("AGENT_COST_BREAK", "")
 UTC = datetime.timezone.utc   # clock-times:allow 会话记录的时间戳是 UTC，按它比较与切日期，不是给人看的钟点
 AGENT_ID = re.compile(r"a[0-9a-f]{16}")

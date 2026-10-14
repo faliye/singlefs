@@ -32,6 +32,8 @@
       简称与登记位不一致（「✗ 自检：简称与登记位不一致：应当判红」）
   KB_SPEC_CHECK_BREAK=dated-time  pointer_problems() 同一行带日期的时间指代也判红（③）
       时间指代带日期不算（「✗ 自检：时间指代带日期不算：应当判绿」）
+  KB_SPEC_CHECK_BREAK=flat-parens  following_name() 简称里一见嵌套括号就认不出（②，改前 FOLLOWING_NAME 的样子）
+      简称带嵌套括号（「✗ 自检：简称带嵌套括号：应当判绿」）
   KB_SPEC_CHECK_BREAK=no-history  check_entries() 不判决策变更史的形态（⑤）
       变更史用旧形态（「✗ 自检：变更史用旧形态：应当判红」）
   KB_SPEC_CHECK_BREAK=no-pairing  check_entries() 不判依据段与实验页的配对（④）
@@ -53,7 +55,7 @@ import tempfile
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
 BROKEN = os.environ.get("KB_SPEC_CHECK_BREAK", "")
@@ -62,7 +64,7 @@ REGISTRY_MARK = re.compile(r"<!--\s*doc-lint:registry\s+name-col=(\d+)\s*-->")
 NOT_NUMBERS_MARK = re.compile(r"<!--\s*doc-lint:not-numbers\s+(.*?)\s*-->")
 REGISTRY_HEADING = re.compile(r"^#{2,4}\s+([A-Z]{1,3}-?\d+(?:\.\d+)?)\s+(.+?)\s+——")
 NUMBER_TOKEN = re.compile(r"(?<![A-Za-z0-9_\-./])([A-Z]{1,3}-?\d+(?:\.\d+)?)(?![A-Za-z0-9_])")
-FOLLOWING_NAME = re.compile(r"[\s*`]*（([^（）]*)）")
+FOLLOWING_NAME_PREFIX = re.compile(r"[\s*`]*（")
 POSITION_WORDS = ["如上所述", "同上", "见上文", "前面提到", "前述", "下面会说", "见下节", "见上表", "上面那张表", "上述", "下文",
                   "下表", "以下是", "逐条如下：", "见上方", "见下方", "见下一段", "同上一行"]
 TIME_WORDS = ["本轮", "这一轮", "上一轮", "前一轮", "上轮"]
@@ -71,6 +73,24 @@ SELF_WORD_START = re.compile(r"(?:^|[。，；：！？、（(「\s>|*])(" + "|"
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 EVIDENCE_LABEL = "**依据**"
 EXPERIMENT_NUMBER = re.compile(r"(?<![A-Za-z0-9_\-])E(\d+)(?![0-9])")
+
+
+def following_name(line, position):
+    """line[position:] 起（跳过空白、星号、反引号）跟着一对配平的全角括号：→ 括号里的简称，简称里可以再套括号；没有、或括号没配平 → None。"""
+    opening = FOLLOWING_NAME_PREFIX.match(line, position)
+    if not opening:
+        return None
+    depth, start = 1, opening.end()
+    for cursor in range(start, len(line)):
+        if line[cursor] == "（":
+            if BROKEN == "flat-parens":   # 弄坏开关：简称里不许再有括号（改前的样子）
+                return None
+            depth += 1
+        elif line[cursor] == "）":
+            depth -= 1
+            if depth == 0:
+                return line[start:cursor]
+    return None
 
 
 def normalized_name(text):
@@ -168,10 +188,10 @@ def reference_problems(new, old, registry, not_numbers):
                 token = match.group(1)
                 if token not in registry or token in not_numbers or token == first_cell:
                     continue
-                following = FOLLOWING_NAME.match(line, match.end())
-                if following and (normalized_name(following.group(1)) == normalized_name(registry[token]) or BROKEN == "any-name"):
+                following = following_name(line, match.end())
+                if following is not None and (normalized_name(following) == normalized_name(registry[token]) or BROKEN == "any-name"):
                     continue
-                written = following.group(1) if following else "没带简称"
+                written = following if following is not None else "没带简称"
                 found.append(f"{token}（{written}）→ 登记位写的是「{token}（{registry[token]}）」")
         return found
     old_violations = violations(old)
@@ -290,7 +310,7 @@ def selftest():
         os.makedirs(os.path.join(kb, "decisions"))
         os.makedirs(os.path.join(kb, "experiments"))
         open(os.path.join(kb, "checks-owed.md"), "w", encoding="utf-8").write(
-            "# 欠的检查\n\n<!-- doc-lint:registry name-col=2 -->\n| 编号 | 简称 | 内容 |\n|---|---|---|\n| C120 | 锚点腐化 | 旧行 |\n| C121 | 另一笔 | 行 |\n")
+            "# 欠的检查\n\n<!-- doc-lint:registry name-col=2 -->\n| 编号 | 简称 | 内容 |\n|---|---|---|\n| C120 | 锚点腐化 | 旧行 |\n| C121 | 另一笔 | 行 |\n| C122 | 对拍（HashMap 理想文件系统） | 简称里套着括号 |\n")
         open(os.path.join(kb, "decisions", "03-空间分配.md"), "w", encoding="utf-8").write(
             "## D3 空间分配 —— 已定\n\n**依据**：E10（样本实验） 证明了 x。\n")
         open(os.path.join(kb, "experiments", "10-样本实验.md"), "w", encoding="utf-8").write("## E10 样本实验 —— 已跑\n\n### 影响的决策\n| D3 | 支撑 | 不受影响 |\n")
@@ -301,6 +321,10 @@ def selftest():
         owed = ".claude/kb/checks-owed.md"
         cases = [
             ("干净的一条", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 新行，见 C121（另一笔） |")], 0),
+            ("简称带嵌套括号", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C122（对拍（HashMap 理想文件系统））和 C121（另一笔） |")], 0),
+            ("嵌套括号简称写错", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C122（对拍（别的名字）） |")], 1),
+            ("嵌套括号简称只写了外层", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C122（对拍） |")], 1),
+            ("嵌套括号简称括号没配平", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C122（对拍（HashMap 理想文件系统） |")], 1),
             ("旧串 0 次", [entry(owed, "不在的行", "新")], 1),
             ("编号没带简称", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 新行，见 C121 |")], 1),
             ("简称与登记位不一致", [entry(owed, "| C120 | 锚点腐化 | 旧行 |", "| C120 | 锚点腐化 | 见 C121（别的名字） |")], 1),

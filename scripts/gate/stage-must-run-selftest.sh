@@ -85,10 +85,31 @@ git -C "$work" add -A && set_green "$(tree_now)"
 expect 1 "两行登记的路径都没变时可跳过" SINGLEFS_STAGED_TREE="$(tree_now)"
 printf 'v2\n' > "$work/docs/d.md" && git -C "$work" add -A
 expect 0 "只动第二行登记的路径也判要跑" SINGLEFS_STAGED_TREE="$(tree_now)"
+# 只改注释 ⇒ 可跳过：两棵树逐文件按源码摘要比，注释与空白不算（C800；scripts/gate/lib_source_digest.py）
+#    .rs 加一行 // 注释、改文档注释措辞、加行尾注释与换行；阶段脚本只改 # 行、加空行与行尾注释
+printf "# 清单\ndemo-stage.sh\tcrates/ Cargo.toml Cargo.lock\t# 跑 crates 里的东西\n" > "$work/.claude/gate.d/stage-inputs.tsv"
+rm -rf "${work:?}/docs"
+printf '/// 返回一\npub fn one() -> u32 { 1 }\n' > "$work/crates/demo/src/lib.rs"
+printf '#!/usr/bin/env bash\n# 阶段说明\nexit 0\n' > "$work/.claude/gate.d/demo-stage.sh"
+git -C "$work" add -A && set_green "$(tree_now)"
+printf '// 只加了一行注释\n/// 返回常数一（措辞换了）\npub fn one() -> u32 {\n    1 // 行尾注释\n}\n' > "$work/crates/demo/src/lib.rs"
+printf '#!/usr/bin/env bash\n# 阶段说明改了措辞\n\nexit 0   # 行尾注释\n' > "$work/.claude/gate.d/demo-stage.sh"
+git -C "$work" add -A
+comments_only_tree="$(tree_now)"
+expect 1 "只改注释（.rs 加一行 // 注释、改文档注释措辞、阶段脚本只改 # 行）判可跳过" SINGLEFS_STAGED_TREE="$comments_only_tree"
+# 同一棵只差注释的树，弄坏开关 gate-reuse-by-blob（退回逐字比）下判要跑：「只改注释判可跳过」那一格分得出逐字比与按摘要比
+expect 0 "弄坏开关 gate-reuse-by-blob 下「只改注释判可跳过」那一格转红（判要跑）" SINGLEFS_STAGED_TREE="$comments_only_tree" ADMISSION_BREAK=gate-reuse-by-blob
+# crates 下加一份没人读的 .md ⇒ 可跳过（不进指纹）
+printf '没人读的说明\n' > "$work/crates/demo/notes.md" && git -C "$work" add -A
+expect 1 "crates 下加一份没人读的 .md 判可跳过" SINGLEFS_STAGED_TREE="$(tree_now)"
+# 在只差注释的基础上改一个字面量 ⇒ 要跑
+printf '// 只加了一行注释\n/// 返回常数一（措辞换了）\npub fn one() -> u32 {\n    2 // 行尾注释\n}\n' > "$work/crates/demo/src/lib.rs"
+git -C "$work" add -A
+expect 0 "只差注释之外再改一个字面量（1 → 2）就判要跑" SINGLEFS_STAGED_TREE="$(tree_now)"
 
 if ((failures > 0)); then
   echo "  ✗ stage-must-run.sh 自证没过：$failures 格判错"
   echo "     → 怎么办：照上面每一格的「要 X 实际 Y」改被测脚本；判据与为什么这么定见它的文件头。"
   exit 1
 fi
-echo "  ✓ stage-must-run.sh 自证通过：$checked 格都对（没有绿树、不是 gate-staged.sh 起的、输入相同、crates 改了、清单外改了、清单自己变了、判绿那一次很久以前、强制全跑、阶段脚本自己变了、清单里同一道阶段写两行）"
+echo "  ✓ stage-must-run.sh 自证通过：$checked 格都对（没有绿树、不是 gate-staged.sh 起的、输入相同、crates 改了、清单外改了、清单自己变了、判绿那一次很久以前、强制全跑、阶段脚本自己变了、清单里同一道阶段写两行、只改注释、弄坏开关 gate-reuse-by-blob、crates 下没人读的 .md、改字面量）"

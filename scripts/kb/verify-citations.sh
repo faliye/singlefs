@@ -343,6 +343,8 @@ st_run() { # st_run <合成树目录> <断言表文件> [额外的环境赋值�
 selftest() {
   local work="" out="" rc=0 leftovers=0
   work="$(mktemp -d "${TMPDIR:-/tmp}/verify-citations-selftest-XXXXXX")"
+  # 中途报错、被打断也删（成功、失败都删；local 变量到退出时已不在，路径在这里就展开）
+  trap "rm -rf -- '$work'" EXIT
   mkdir -p "$work/refs/linux-6.17/fs/bcachefs" "$work/refs/zfs/include/sys" "$work/refs/docs" "$work/kern/fs/xfs"
   printf '#define BUCKET_GC_GEN_MAX\t96U\n' >"$work/refs/linux-6.17/fs/bcachefs/alloc_background.h"
   printf '#define SPA_BLKPTRSHIFT\t7\n'     >"$work/refs/zfs/include/sys/spa.h"

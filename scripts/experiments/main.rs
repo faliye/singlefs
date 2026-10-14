@@ -3,6 +3,8 @@
 //! 现在**只验证管道**——静态二进制能在 busybox initramfs 里跑、能拿到 /dev/vda、
 //! 结果行能被宿主抓到。索引候选的实现还没有，见 kb/experiments.md E7。
 
+// admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
+// run-condition: command python3
 use e7_index_bench::{Emitter, Sample};
 use std::alloc::{alloc, dealloc, Layout};
 use std::fs::OpenOptions;
@@ -59,6 +61,7 @@ fn next_random(state: &mut u64) -> u64 {
 }
 
 fn main() {
+    preflight();
     let device_path = match std::env::args().nth(1) {
         Some(device_path) => device_path,
         None => {
@@ -186,5 +189,33 @@ mod tests {
         let first_sequence: Vec<u64> = (0..50).map(|_| next_random(&mut first_state)).collect();
         let second_sequence: Vec<u64> = (0..50).map(|_| next_random(&mut second_state)).collect();
         assert_eq!(first_sequence, second_sequence, "同种子给出了不同的序列，实验不可复现");
+    }
+}
+
+fn repository_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+}
+
+fn preflight() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let root = repository_root();
+    let source = root.join("scripts/experiments/main.rs");
+    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    let mut command = std::process::Command::new("python3");
+    command.arg(&script).arg("check").arg(&source);
+    if arguments.iter().any(|argument| argument == "--force") {
+        command.arg("--force");
+    }
+    command.arg("--");
+    command.args(arguments.iter().filter(|argument| *argument != "--force"));
+    let output = command.output().unwrap_or_else(|error| {
+        eprintln!("  ✗ 起不了 python3 判准入：{error}");
+        eprintln!("  → 怎么办：装上 python3，或在有 python3 的机器上跑");
+        std::process::exit(78)
+    });
+    if !output.status.success() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        std::process::exit(output.status.code().unwrap_or(1));
     }
 }

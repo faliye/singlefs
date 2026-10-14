@@ -660,6 +660,7 @@ mod tests {
     }
 
     #[test]
+    // wallclock-assert: 断言实测的每次校验开销 nanoseconds 小于 100_000 ns、三轮离散 spread_bp 小于 1_000_000，两个都是挂钟量的上界，负载高会翻红
     fn cost_measurement_returns_positive_nanoseconds_and_a_spread() {
         let header = vec![1u8; 105];
         let (nanoseconds, spread_bp) = cost_nanoseconds(&header, Arm::Crc32c, 3, 2000);

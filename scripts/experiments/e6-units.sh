@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# admission: always 每趟各起一次虚机重量两档，上一次的产物不替这一次作保
+# run-condition: command cargo rustup qemu-system-x86_64
+# run-condition: check rustup target list --installed | grep -qx x86_64-unknown-linux-musl :: 装 musl 目标：rustup target add x86_64-unknown-linux-musl
 # E6 的单元大小 × CPU 特性档：两档各跑一次虚机，合成一份产物，并判三条跨档判据。
 #
 #   bash scripts/experiments/e6-units.sh [轮数]     # 默认 5 轮
@@ -12,11 +15,13 @@
 # （2026-08-31 实测：tag=2112edc9… 而外部实现给 62d27233…）。
 # 那一档的吞吐数字一个字都不能用，而它看起来完全正常——正是已知答案测试要拦的形态。
 set -uo pipefail
-cd "$(dirname "$0")/experiments"
+source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+cd "$(dirname "$0")" || { echo "进不去装置目录 $(dirname "$0")"; echo "→ 怎么办：从仓根照文件头的用法起"; exit 2; }
 
 ROUNDS="${1:-5}"
 BIN=target/x86_64-unknown-linux-musl/release/e6-units
-OUT="${E6_OUT:-results/e6-units-$(date +%Y-%m-%d).out}"
+OUT="${E6_OUT:-../../research/results/e6-units-$(date +%Y-%m-%d).out}"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e6units.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -27,7 +32,7 @@ cargo build --release --target x86_64-unknown-linux-musl --bin e6-units >/dev/nu
 run_arm() { # run_arm <档名> <VM_CPU> <落点>
   local tag="$1" cpu="$2" dst="$3"
   echo "── 档 $tag（VM_CPU=$cpu）"
-  VM_CPU="$cpu" bash ../vm-bench.sh "$BIN" "$ROUNDS" >"$dst" 2>&1
+  VM_CPU="$cpu" bash ../devices/vm-bench.sh "$BIN" "$ROUNDS" >"$dst" 2>&1
   local rc=$?
   grep -E '^E7RESULT' "$dst" >"$dst.res"
   if [[ $rc -ne 0 ]]; then

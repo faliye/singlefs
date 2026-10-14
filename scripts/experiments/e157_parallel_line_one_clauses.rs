@@ -55,6 +55,7 @@ use e7_index_bench::Emitter;
 /// 本模型不建 locality / inode 两段的模型（两臂在那两段上同值），只建第三段（offset 段）。
 const EXTENT_LEAF_KEY_BYTES: u64 = 24;
 /// extent 叶记录里指向数据单元的指针宽度（D19 已定项 4/7/8）。
+#[cfg(test)]
 const EXTENT_LEAF_POINTER_BYTES: u64 = 88;
 /// extent 叶记录总宽，与 A3 对拍：24 + 88 = 112。
 const EXTENT_LEAF_RECORD_BYTES: u64 = 112;

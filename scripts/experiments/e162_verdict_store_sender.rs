@@ -1323,6 +1323,7 @@ mod tests {
     }
 
     #[test]
+    // wallclock-assert-load-safe: 只比停手前至少过了 1 秒（下界），负载再高只会更久
     fn sender_that_never_hears_an_acknowledgement_stops_after_the_stall_limit_with_the_window_outstanding() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("绑得上回环端口");
         let address = listener.local_addr().expect("有地址").to_string();
@@ -1369,6 +1370,7 @@ mod tests {
     }
 
     #[test]
+    // wallclock-assert: 压 100 ms 节拍送 200 块的实测吞吐要落在 [9.0, 10.051] 块/秒的区间里，不压节奏的吞吐要高过上界，睡久了或被抢占就低于下界
     fn paced_cross_rate_control_lands_inside_nine_to_ten_point_zero_five_one_blocks_per_second() {
         let paced = paced_run_blocks_per_second(Some(Duration::from_millis(CROSS_RATE_CONTROL_PACE_MILLISECONDS)));
         assert!(

@@ -60,6 +60,7 @@
       取回的要是 13 段的账行、第 3、4、5、12、13 段与这一行的 ②③④⑦⑧ 逐字相同；账不在、没有那一行、段数不对或对不上、配的产物不在或 device_arguments= 认不出的逐行报出来、不填，
       取得到的照补；有取不到的退 1。写法与追加相同（读表时记 sha256、换上之前复核、写完回读补过的每一行）。没有要补的行退 0。
   e165-pin-red-examples.py --replay [--root 根] [--table 表] [--binary 可执行文件] [--memory-cap 上限|none] [--threads N] [--target 编译目录]
+      --threads 缺省取 $SINGLEFS_THREAD_CAP，再取登记的重活默认并行度（.claude/heavy-thread-default）。
       门禁 pinned-red-examples-replay 格：先判每行 ⑥ 点名的变异（<表>#<名>，几个用 + 连）还在它的表里（第 1 列等于那个名字的数据行），
       再用装置 e165_replay_bounded_enumeration --pinned-cases <表> 在今天的实现上逐行判：stdout 里以「E7RESULT name=state 」起头的行
       条数等于表的数据行数、第 i 行与第 i 个数据行的 ⑦ 逐字节相同、装置退 0（约定：每行一行结果，有行对不上或指纹漂了退非 0）。
@@ -195,6 +196,8 @@
       自证 pin-profile-unknown-argument 判错
   reuse-key-without-profile  按条复用的键不带档（「这一行」不算 ㉒、不单列「档」）
       自证 reuse-row-own-profile 判错（只差 ㉒ 的两行，只判过一行就拿它的判定当另一行的）
+  threads-default-cpu-count  --threads 的缺省取核数（改前的样子），不取登记的重活默认并行度
+      自证 threads-default-registered 判错
 """
 import glob
 import hashlib
@@ -211,6 +214,8 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "kb"))
 from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "crash"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "hosts"))
+from heavy_threads import default_heavy_threads  # noqa: E402
 from lib_verdict_library import Tally, VerdictLibrary, digest_file, digest_text  # noqa: E402
 import importlib.util  # noqa: E402
 import os as preflight_os, sys as preflight_sys  # noqa: E402
@@ -220,7 +225,7 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-DEFAULT_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+DEFAULT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 TABLE = ".claude/gate.d/e165-pinned-red-examples.tsv"
 LEDGER_GLOB = "research/results/e165-*-red-examples.tsv"
 LEDGER_SUFFIX, KILL_BOUNDS_SUFFIX = "-red-examples.tsv", "-kill-bounds.out"
@@ -1382,10 +1387,17 @@ def replay(root, table, options):
 
 # ── 命令行 ──
 
+def default_threads(environment=os.environ):
+    """--threads 的缺省：SINGLEFS_THREAD_CAP 设了取它，否则登记的重活默认并行度（.claude/heavy-thread-default）。"""
+    if "threads-default-cpu-count" in BREAK:   # 弄坏开关：改前的样子
+        return int(environment.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1)
+    return default_heavy_threads(environment)
+
+
 def main(arguments):
     if arguments[:1] == ["--selftest"]:
         return selftest()
-    options = {"root": DEFAULT_ROOT, "table": None, "kill_bounds": [], "binary": None, "threads": int(os.environ.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1),
+    options = {"root": DEFAULT_ROOT, "table": None, "kill_bounds": [], "binary": None, "threads": default_threads(),
                "memory_cap": os.environ.get("GATE_E165_PINNED_MEMORY_MAX") or "2G",
                "target": os.path.join(os.environ.get("GATE_CROSS_RUN_TMPDIR") or os.environ.get("TMPDIR") or "/tmp", "singlefs-e165-pinned-target"),
                "items": [], "verdict_library": None, "reuse": True, "block_rows": DEFAULT_BLOCK_ROWS}
@@ -2216,6 +2228,15 @@ def selftest():
         os.remove(r2_ledger)
         os.remove(r2_kill_bounds)
 
+    # --threads 的缺省：没设 SINGLEFS_THREAD_CAP 取登记文件第一条非注释行的数，设了取它
+    with open(os.path.join(SCRIPT_DIRECTORY, "..", "..", ".claude", "heavy-thread-default"), encoding="utf-8") as handle:
+        registered_default = next((int(line.split()[0]) for line in handle if line.strip() and not line.lstrip().startswith("#")), None)
+    cases += 1
+    unset_threads, capped_threads = default_threads({}), default_threads({"SINGLEFS_THREAD_CAP": "7"})
+    if registered_default is None or unset_threads != registered_default or capped_threads != 7:
+        wrong.append("threads-default-registered")
+        print(f"    threads-default-registered 这一格判错：登记 {registered_default}，没设上限得 {unset_threads}，上限 7 得 {capped_threads}")  # gate-lint:detail
+
     breaks_missed, breaks_proven = [], 0
     if not wrong and not BREAK:
         for item in ("pin-twice", "titles-unchecked", "no-recheck-before-write", "check-ignores-missing", "fingerprint-unchecked", "variant-unchecked", "replay-ignores-output",
@@ -2227,7 +2248,7 @@ def selftest():
                      "reuse-records-red", "reuse-records-whole-cell-only", "void-ledgers-ignored", "void-rows-unchecked", "void-complete-accepted",
                      "profile-read-as-r1", "same-profile-conflict-ignored", "check-ignores-profile", "replay-without-profile", "profile-column-unchecked",
                      "profile-arguments-unchecked", "reuse-key-without-profile", "reuse-key-without-judge-version", "list-items-pipe-unhandled", "superseded-replacement-pin-unchecked", "superseded-coverage-unchecked",
-                     "superseded-profile-unchecked", "superseded-rows-unchecked"):
+                     "superseded-profile-unchecked", "superseded-rows-unchecked", "threads-default-cpu-count"):
             completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
                                        env=dict(os.environ, E165_PIN_RED_EXAMPLES_BREAK=item))
             if completed.returncode == 0:

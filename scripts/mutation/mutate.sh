@@ -5,7 +5,18 @@
 # 红了哪几个（libtest 的「test <名字>[ - should panic] ... FAILED」行）与汇总行报没报失败，经 scripts/gate/lib_libtest_result_lines.py failed-names 取（全仓一份解析）：
 #   #[should_panic] 的用例那一段「 - should panic」不进名字；汇总行报了失败而一个名字都没取到，它退 3，这里记「抓名字的规则有盲区」。
 #
-#   mutate.sh <bin 名> <源文件> <变异表>      # 在 research/ 里跑；参数不够三个退 2，打用法与一条例子
+#   mutate.sh <bin 名> <源文件> <变异表>      # 在 scripts/experiments/ 里跑；参数不够三个退 2，打用法与一条例子
+#   mutate.sh --compile-only <bin 名> <源文件> <变异表>   # 只编不跑（门禁 checker-tier-research-build-and-replay 的 mutation-tables-compile 格调它），见下面「只编不跑」
+#   mutate.sh --binary-of <源文件>            # 打 cargo 从这份源文件编出的 bin 名（与下面「改的文件与跑的二进制对得上」那道核对同一份读法），在 scripts/experiments/ 里跑
+#
+# 只编不跑（--compile-only）：锚点核对、施加替换文、bin 与源文件的核对、required-features 的读法都与平常跑同一套；
+#   不同的只有每条跑什么：基线与每条变异只跑一次 `cargo check --profile test --bin <名>`（带同样的 --features），环境里 CARGO_PROFILE_TEST_DEBUG_ASSERTIONS=false，不跑测试。
+#   为什么是 test 档：平常跑的 cargo test --release 编的是带 cfg(test) 的那一份，`cargo check --release` 编的是不带的；只在测试外用不到的函数、常量
+#   在后者报 dead_code，在前者不报（2026-10-13 量的：E142 第二十五次那张旧表，`--release` 判 34 条编不过、多出 M153、M225、M229 三条，
+#   test 档判 31 条、与 research/results/e142-mutate-r25-2026-10-13.log 的 31 条 ⏭ 逐个相同）。test 档默认开 debug_assertions，release 不开，关掉它让 cfg 与 cargo test --release 相同。
+#   串行、一份副本、一个编译目录（MUTATE_TARGET_DIR，没设取 ${TMPDIR:-/tmp}/singlefs-mutate-target），增量编；不经内存包装（cargo check 不跑编出来的代码），不开工作进程。
+#   每条打一行：编得过「✅ [<名>] 编得过」，编不过「⏭  [<名>] 编不过：<cargo 输出里第一行 error>」；末尾打「计数：」一行，
+#   派出去的条数（表里的）与收回的判定份数对不上退 8。退出码：0 全编得过；1 有编不过的；2 用法、环境或基线（没改过的源码）就编不过；3、5、6、8 同平常跑。
 #
 # 变异表每行三段，用制表符分隔：变异名 <TAB> 原文 <TAB> 替换文（原文/替换文里的 \n 表示换行）
 # 替换必须命中，命中数为 0 直接报错退出 —— 静默失效的替换会让整份证明变成假的
@@ -19,6 +30,13 @@
 #                           再走一遍平常跑带只供自证的变量（每个变量各一次，都退 2、一次 cargo 都不调），
 #                           再走一遍会话里平常跑并行（不经自证的标记：一份原样副本配假包装，照包装的「日常一条」判，账上先放一条这个会话在跑的）：
 #                           MUTATE_JOBS=4 照样各条判对、整轮退 0，每次包装带各自的并行理由、--check 不带，调用方设了的理由不覆盖，基线排不上报「基线排不上」。
+#                           再走一遍只编不跑（--compile-only）的三种结局：编得过、编不过（整轮退 1、打第一行 error）、收回的判定与派出去的对不上（退 8）；
+#                           只在测试外用不到的那一条照 test 档判编得过，cargo 只调 check、参数逐字是「check --profile test --bin fake-bench」、一次 test 都不调；
+#                           基线编不过退 2；--binary-of 显式 [[bin]] 打声明的名字、没写的打文件名去掉 .rs。
+#                           再走一遍 deny 警告（假 cargo 记下每次收到的 RUSTFLAGS；替换文留死代码的那一条 RUSTFLAGS 里没有 --cap-lints warn 就编不过）：
+#                           平常跑调用方没设、设了 RUSTFLAGS 各一例判抓到，只编不跑一例判编得过；基线、那一条与还原之后那一次收到的 RUSTFLAGS 逐字相同，调用方的接在前面。
+#                           再喂环境里设了 CARGO_ENCODED_RUSTFLAGS 的三例（设空串、设了别的值各一例平常跑，设空串一例只编不跑；假 cargo 照真 cargo 只读它、不读 RUSTFLAGS）：
+#                           留死代码那一条照样判抓到 / 编得过，每个 cargo 收到的 CARGO_ENCODED_RUSTFLAGS 逐字是「调用方的（有就在前）+ 0x1f + --cap-lints + 0x1f + warn」，stderr 报的与收到的一致。
 #                           每一例各用一份自己的临时目录：假 cargo、假 workspace、编译目录、包装的锁与账（RUN_WITH_MEMORY_CAP_STATE_DIR）
 #                           与峰值表（RUN_WITH_MEMORY_CAP_PEAKS）都在里面，不读别的例留下的东西，也不读写主仓的峰值表
 #
@@ -27,9 +45,19 @@
 #   不带的话 cargo 不编这个 bin、直接退 101，基线停在「基线就是红的」，一条变异都没跑。
 #   那几个 feature 的依赖要的环境（E162 的 rocksdb 要 BINDGEN_EXTRA_CLANG_ARGS）由调用方设，原样传给 cargo。
 #
+# deny 警告：scripts/experiments/Cargo.toml 设了 [lints.rust] warnings = "deny"，替换文多半故意删掉用法、留下死代码，deny 下那是编译错
+#   （平常跑记「⏭ 无效」、只编不跑记「编不过」），不是被断言抓到。所以这里起的每个 cargo（基线、每条变异、还原之后那一次、只编不跑的 cargo check）
+#   都带 RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }--cap-lints warn"：调用方设了的 RUSTFLAGS 在前，后面接 --cap-lints warn，lint 一律压成警告，别的编译错照样编不过。
+#   这一份开跑前算一次（MUTATE_RUSTFLAGS），一张表里基线、每条变异与还原之后那一次逐字相同：RUSTFLAGS 进 cargo 的指纹，不同就来回重编。
+#   开跑时 stderr 打一行「每个 cargo 都带 RUSTFLAGS=「…」」。只有 mutate.sh 加：replay.sh 的产物复跑、门禁 research-unit-tests 格与研究 bin 平常的编译照 deny。
+#   调用方的 RUSTFLAGS 里自己带了 --cap-lints 的，rustc 认第一个（rustc 1.98 量的），以调用方的为准。
+#   环境里设了 CARGO_ENCODED_RUSTFLAGS（空串也算）时 cargo 只读它、不读 RUSTFLAGS，上面那个 RUSTFLAGS 就悄悄失效：所以这时再给每个 cargo 同时设
+#   CARGO_ENCODED_RUSTFLAGS="${CARGO_ENCODED_RUSTFLAGS:+$CARGO_ENCODED_RUSTFLAGS<0x1f>}--cap-lints<0x1f>warn"（各项以 0x1f 分隔，调用方设了的在前），RUSTFLAGS 照旧也设；
+#   开跑时 stderr 那一行改报 cargo 实收的那一个变量与值（「每个 cargo 都带 CARGO_ENCODED_RUSTFLAGS=「…」」，0x1f 显示成 ␟）。没设 CARGO_ENCODED_RUSTFLAGS 的，一个字不变。
+#
 # gate-overlap:copy-kept scripts/mutation/crates-mutation-rows.py 开几个工作进程（worker_count_and_head_line）照那边的 worker_count_for 写：各项取最小、至少 1、核数一半至多 16；两边的项不同（这里 MUTATE_JOBS 只能压小、第二项是表里的条数、另算每个 cargo 的编译并行度；那边 GATE_MUTATION_WORKERS 顶掉核数那一项、第二项是要现跑的条数），派活一边是 bash 子 shell 按目录认领、一边是 python 进程池，共用的只剩一个取最小值，抽成共用要这里每趟多起一个 python 只为算一个数、两边头一行的字也不同
 # 并行（command-safety.md「一个脚本里的检测项，能并行就并行」，形态照 .claude/gate.d/checker-tier-crates-mutation-replay.sh 与它的判法 scripts/mutation/crates-mutation-rows.py）：
-#   每个工作进程一份被测装置的副本（research/ 里编译要用的那部分）、一个自己的 CARGO_TARGET_DIR，不在同一份源码上并发改：
+#   每个工作进程一份被测装置的副本（scripts/experiments/ 里编译要用的那部分）、一个自己的 CARGO_TARGET_DIR，不在同一份源码上并发改：
 #   第 1 个用 MUTATE_TARGET_DIR（跨轮热着），第 i 个用它后面加 -w<i>（跨轮复用，第一次要冷编译）。
 #   工作进程数取 min(核数的一半且至多 16、表里的条数)，至少 1；MUTATE_JOBS 只能压小、不能加大（设成 1 就是原来的串行跑法）。
 #   实际开几个、各项给几个、卡在哪一项、每个 cargo 的编译并行度，打在 stderr 的头一行。
@@ -136,6 +164,17 @@
 #   RUN_WITH_MEMORY_CAP_BREAK=nocap  原样传给 run-with-memory-cap.sh：不进 scope、不设上限也不限时直接跑（改前的跑法）
 #       every-outcome（撞内存、超时那两条跑完了、记成没红）、unavailable（「D-Bus 连不上时应当退 7」：照跑了）、baseline-memory（「基线就撞上限时应当退 2」：基线没撞顶）、
 #       queued-admission（同 every-outcome；不进 scope 也就不排队，HANG 那一条跑满 30 秒）
+#   MUTATE_BREAK=compileassuccess  只编不跑时不看 cargo check 的退出码，每条都记编得过
+#       compile-only（「只编不跑：三条的表应当……整轮退 1」：编不过那一条记成「✅ [编不过] 编得过」、退 0）
+#   MUTATE_BREAK=compilenontest  只编不跑改回 `cargo check --release --bin <名>`（不带 cfg(test) 那一份，派发时写的跑法）
+#       compile-only（「只编不跑：三条的表应当整行打出「✅ [测试外死码] 编得过」」与「只编不跑：cargo 应当调 4 次……参数逐字是「check --profile test --bin fake-bench」」）
+#   上面的 droprow 与 countblind 在只编不跑那一支同样起作用：droprow 让 compile-only 退 8（「只编不跑：三条的表……应当整轮退 1」），
+#       compile-only-lost-result 本来就带着 droprow 跑，照样退 8；countblind 让 compile-only-lost-result 静默退 0（「只编不跑：丢了一份判定时应当退 8」）；
+#       compile-only-lost-result-unchecked 带着 droprow,countblind 跑，静默退 0、只报 2 条
+#   MUTATE_BREAK=no-cap-lints  起 cargo 时不加 --cap-lints warn，RUSTFLAGS 与 CARGO_ENCODED_RUSTFLAGS 都照调用方的原样（改前的跑法：装置的 deny 警告让留死代码的替换文编不过）
+#       cap-lints、cap-lints-existing、encoded-empty、encoded-other（「deny 警告：平常跑……留死代码那一条应当判抓到、整轮退 0」：记成「⏭  [留死代码]」无效）、
+#       compile-only-cap-lints、compile-only-encoded-empty（「deny 警告：只编不跑……应当判编得过、整轮退 0」：编不过、退 1），
+#       六例都另红「deny 警告：……每个 cargo 收到的 RUSTFLAGS 应当逐字是」与「……stderr 应当报」，encoded-empty、encoded-other、compile-only-encoded-empty 三例再红「……收到的 CARGO_ENCODED_RUSTFLAGS 应当逐字是」
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -185,6 +224,7 @@ run_selftest() {
     "RUN_WITH_MEMORY_CAP_WAIT_SECONDS=600"
   )
   local case_script="$SELF_PATH"   # run_case 跑哪一份 mutate.sh：会话里平常跑并行那一组换成自己的副本
+  local -a case_leading_arguments=()   # run_case 放在 bin 名之前的参数：只编不跑那几例是 --compile-only
   scratch="$(mktemp -d "${TMPDIR:-/tmp}/mutate-selftest-XXXXXX")"
   # 自证起的子进程的标记：只有这里设（文件头「只供自证」）；子进程读完就清
   printf '%s\n' "$SELFTEST_MARK_CONTENT" >"$scratch/mark"
@@ -243,17 +283,27 @@ rm -f -- "$FAKE_DAILY_LEDGER/$$.entry"
 exit "$status"
 FAKE_DAILY_WRAPPER
 
-  # 建一例自己的目录 $scratch/<标签>/：假 cargo、假 workspace（research/）、几张变异表、包装的锁与账。$1 标签；
+  # 建一例自己的目录 $scratch/<标签>/：假 cargo、假 workspace（scripts/experiments/）、几张变异表、包装的锁与账。$1 标签；
   # $2 被测源码里写的 BEHAVIOR（默认 PASS）；$3 bin 那一节追加的一行（默认不加，required-features 那一例给它挂 feature）
   prepare_case() {
     local case_directory="$scratch/$1" behavior="${2:-PASS}" bin_extra_line="${3:-}"
-    mkdir -p "$case_directory/bin" "$case_directory/research/bench/src/bin" "$case_directory/scripts/mutation/tables" "$case_directory/memory-cap-state"
+    mkdir -p "$case_directory/bin" "$case_directory/scripts/experiments/bench/src/bin" "$case_directory/scripts/mutation/tables" "$case_directory/memory-cap-state"
     cat >"$case_directory/bin/cargo" <<'FAKE_CARGO'
 #!/usr/bin/env bash
 # 假 cargo：只认 mutate.sh 调的 `cargo test --release --bin <名字>`，按被测源码里的 BEHAVIOR 演一种结局；
 # 每次被调记一行「当前目录|CARGO_TARGET_DIR|BEHAVIOR|参数」（并行的自证拿前两段数各用了几份副本、几个编译目录）
 behavior="$(sed -n 's/.*BEHAVIOR: \([A-Z]*\).*/\1/p' bench/src/bin/fake_bench.rs | head -1)"
 echo "$PWD|${CARGO_TARGET_DIR:-}|$behavior|$*" >>"$FAKE_CARGO_LOG"
+# 另记一行「BEHAVIOR|子命令|收到的 RUSTFLAGS」（没设记「（没设）」），deny 警告那几例拿它核每个 cargo 收到的 RUSTFLAGS
+echo "$behavior|${1:-}|${RUSTFLAGS-（没设）}" >>"$FAKE_CARGO_LOG.rustflags"
+# 同样另记收到的 CARGO_ENCODED_RUSTFLAGS（原样，含 0x1f；没设记「（没设）」，设了空串记空）
+echo "$behavior|${1:-}|${CARGO_ENCODED_RUSTFLAGS-（没设）}" >>"$FAKE_CARGO_LOG.encoded"
+# 照真 cargo：CARGO_ENCODED_RUSTFLAGS 设了（空串也算）就只读它（各项以 0x1f 分隔）、不读 RUSTFLAGS
+if [[ -v CARGO_ENCODED_RUSTFLAGS ]]; then effective_flags="${CARGO_ENCODED_RUSTFLAGS//$'\x1f'/ }"; else effective_flags="${RUSTFLAGS:-}"; fi
+# 照 [lints.rust] warnings = "deny"：DEADCODE（替换文留下死代码）在 cargo 实读的 flags 里没有 --cap-lints warn 时编不过，check 与 test 一样
+if [[ "$behavior" == DEADCODE && " $effective_flags " != *" --cap-lints warn "* ]]; then
+  printf 'error: function `left_unused` is never used\nerror: could not compile `bench` (bin "fake-bench" test) due to 1 previous error\n'; exit 101
+fi
 passing_output() { printf 'running 2 tests\ntest tests::adds ... ok\ntest tests::subtracts ... ok\n\ntest result: ok. 2 passed; 0 failed\n'; }
 # 照真 cargo：bin 挂了 required-features 而 --features 里没给全（写成 feature 或 包名/feature 都认），不编、退 101
 enabled=""; previous=""
@@ -267,9 +317,23 @@ for feature in $(grep '^required-features' bench/Cargo.toml | grep -o '"[^"]*"' 
     printf 'error: target `fake-bench` in package `bench` requires the features: `%s`\n' "$feature"; exit 101
   fi
 done
+# 只编不跑调的 cargo check：test 档要关 debug_assertions（照 cargo test --release 的 cfg）；BROKEN 编不过，
+# DEADOUTSIDETESTS 只在不带 cfg(test) 时编不过（只在测试外用不到的函数报 dead_code），别的都编得过
+if [[ "${1:-}" == check ]]; then
+  if [[ " $* " == *" --profile test "* && "${CARGO_PROFILE_TEST_DEBUG_ASSERTIONS:-}" != false ]]; then
+    printf 'error: 假 cargo：test 档没关 debug_assertions（CARGO_PROFILE_TEST_DEBUG_ASSERTIONS=false），cfg 与 cargo test --release 不同\n'; exit 101
+  fi
+  case "$behavior" in
+    BROKEN) printf 'error[E0425]: cannot find value `missing` in this scope\nerror: could not compile `bench`\n'; exit 101 ;;
+    DEADOUTSIDETESTS)
+      if [[ " $* " == *" --profile test "* ]]; then printf '    Finished `test` profile\n'; exit 0; fi
+      printf 'error: function `only_tests_use_it` is never used\nerror: could not compile `bench`\n'; exit 101 ;;
+    *) printf '    Finished\n'; exit 0 ;;
+  esac
+fi
 case "$behavior" in
   PASS) passing_output; exit 0 ;;
-  RED) printf 'running 2 tests\ntest tests::adds ... FAILED\ntest tests::subtracts ... ok\n\ntest result: FAILED. 1 passed; 1 failed\n'; exit 101 ;;
+  RED|DEADCODE) printf 'running 2 tests\ntest tests::adds ... FAILED\ntest tests::subtracts ... ok\n\ntest result: FAILED. 1 passed; 1 failed\n'; exit 101 ;;
   PANICS) printf 'running 2 tests\ntest tests::adds ... ok\ntest tests::answer_panics - should panic ... FAILED\n\ntest result: FAILED. 1 passed; 1 failed\n'; exit 101 ;;
   # 每次拿 16 MiB 写满、拿到 512 MiB 就停：上限 64M 时半路被杀；没有上限时分配完照常通过（改前被记成「没红」），吃不满机器
   HOG) python3 -c 'held = [b"\x01" * (16 * 1024 * 1024) for _ in range(32)]' || exit 101; passing_output; exit 0 ;;
@@ -280,9 +344,9 @@ esac
 FAKE_CARGO
     chmod +x "$case_directory/bin/cargo"
     printf '[workspace]\nmembers = ["bench"]\n' >"$case_directory/scripts/experiments/Cargo.toml"
-    printf '[package]\nname = "bench"\n\n[[bin]]\nname = "fake-bench"\npath = "src/bin/fake_bench.rs"\n' >"$case_directory/research/bench/Cargo.toml"
-    [[ -n "$bin_extra_line" ]] && printf '%s\n' "$bin_extra_line" >>"$case_directory/research/bench/Cargo.toml"
-    printf '// 注释行\nfn main() {} // BEHAVIOR: %s\n' "$behavior" >"$case_directory/research/bench/src/bin/fake_bench.rs"
+    printf '[package]\nname = "bench"\n\n[[bin]]\nname = "fake-bench"\npath = "src/bin/fake_bench.rs"\n' >"$case_directory/scripts/experiments/bench/Cargo.toml"
+    [[ -n "$bin_extra_line" ]] && printf '%s\n' "$bin_extra_line" >>"$case_directory/scripts/experiments/bench/Cargo.toml"
+    printf '// 注释行\nfn main() {} // BEHAVIOR: %s\n' "$behavior" >"$case_directory/scripts/experiments/bench/src/bin/fake_bench.rs"
     local tables="$case_directory/scripts/mutation/tables"
     printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n没红\t// 注释行\t// 改过的注释行\n撞内存\tBEHAVIOR: PASS\tBEHAVIOR: HOG\n超时\tBEHAVIOR: PASS\tBEHAVIOR: HANG\n无效\tBEHAVIOR: PASS\tBEHAVIOR: BROKEN\n' \
       >"$tables/every-outcome.tsv"
@@ -295,6 +359,9 @@ FAKE_CARGO
     printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n锚点腐化\tBEHAVIOR: GONE\tBEHAVIOR: RED\n' >"$tables/stale-anchor.tsv"
     printf '改注释\t// 注释行\t// 改过的注释行\n' >"$tables/comment-only.tsv"
     printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: PANICS\n' >"$tables/should-panic.tsv"
+    printf '编得过\tBEHAVIOR: PASS\tBEHAVIOR: RED\n编不过\tBEHAVIOR: PASS\tBEHAVIOR: BROKEN\n测试外死码\tBEHAVIOR: PASS\tBEHAVIOR: DEADOUTSIDETESTS\n' \
+      >"$tables/compile-only.tsv"
+    printf '留死代码\tBEHAVIOR: PASS\tBEHAVIOR: DEADCODE\n' >"$tables/dead-code.tsv"
   }
 
   # 在 prepare_case 建好的那一例目录里跑一次 mutate.sh：$1 标签、$2 变异表，其余是额外的环境变量；
@@ -303,10 +370,10 @@ FAKE_CARGO
     local label="$1" table="$2" case_directory="$scratch/$1"
     shift 2
     : >"$scratch/$label.cargo"
-    if (cd "$case_directory/research" && env PATH="$case_directory/bin:$PATH" FAKE_CARGO_LOG="$scratch/$label.cargo" MUTATE_MEMORY_MAX=64M \
+    if (cd "$case_directory/scripts/experiments" && env -u CARGO_ENCODED_RUSTFLAGS PATH="$case_directory/bin:$PATH" FAKE_CARGO_LOG="$scratch/$label.cargo" MUTATE_MEMORY_MAX=64M \
           MUTATE_TIMEOUT="$selftest_time_limit" MUTATE_TARGET_DIR="$case_directory/target" \
           RUN_WITH_MEMORY_CAP_STATE_DIR="$case_directory/memory-cap-state" RUN_WITH_MEMORY_CAP_PEAKS="$case_directory/memory-peaks.tsv" \
-          "${selftest_wrapper_environment[@]}" "$@" bash "$case_script" fake-bench bench/src/bin/fake_bench.rs "$table" \
+          "${selftest_wrapper_environment[@]}" "$@" bash "$case_script" ${case_leading_arguments[@]+"${case_leading_arguments[@]}"} fake-bench bench/src/bin/fake_bench.rs "$table" \
           >"$scratch/$label.stdout" 2>"$scratch/$label.stderr"); then
       echo 0 >"$scratch/$label.rc"
     else
@@ -317,7 +384,7 @@ FAKE_CARGO
   fail() { echo "  ✗ 自检：$1"; failures=$((failures + 1)); }   # gate-lint:detail
 
   prepare_case every-outcome
-  run_case every-outcome mutations/every-outcome.tsv
+  run_case every-outcome ../mutation/tables/every-outcome.tsv
   output="$(cat "$scratch/every-outcome.out")"; status="$(cat "$scratch/every-outcome.rc")"
   checked=$((checked + 1))
   [[ "$status" == 1 ]] || fail "五种结局各一条的表应当整轮判失败退 1，实际退 $status：$output"
@@ -338,14 +405,14 @@ FAKE_CARGO
     || fail "包装自己的话应当打在 mutate.sh 的 stderr 上（撞内存那一条的包装说的「run-with-memory-cap: 撞了内存上限 64M」），实际 stderr：$(cat "$scratch/every-outcome.stderr")"
 
   prepare_case caught-and-memory
-  run_case caught-and-memory mutations/caught-and-memory.tsv
+  run_case caught-and-memory ../mutation/tables/caught-and-memory.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/caught-and-memory.rc")"
   [[ "$status" == 1 ]] || fail "只有一条抓到、一条内存撞顶的表应当判失败退 1（撞顶与超时同类），实际退 $status：$(cat "$scratch/caught-and-memory.out")"
 
   # 没挂 required-features 的 bin、上限之内正常的变异：照旧判抓到、整轮退 0，每次 cargo 的参数与改前逐字相同（这一例自己的调用记录）
   prepare_case caught-only
-  run_case caught-only mutations/caught-only.tsv
+  run_case caught-only ../mutation/tables/caught-only.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/caught-only.rc")"
   output="$(cat "$scratch/caught-only.out")"
@@ -360,7 +427,7 @@ FAKE_CARGO
 
   # 带上限的 scope 起不来：退 7，假 cargo 一次都没被调（连基线都没跑，不退回无上限）
   prepare_case unavailable
-  run_case unavailable mutations/caught-only.tsv DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent XDG_RUNTIME_DIR=/nonexistent
+  run_case unavailable ../mutation/tables/caught-only.tsv DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent XDG_RUNTIME_DIR=/nonexistent
   checked=$((checked + 1))
   status="$(cat "$scratch/unavailable.rc")"
   if [[ "$status" != 7 || -s "$scratch/unavailable.cargo" ]] || ! grep -q '起不来' "$scratch/unavailable.out"; then
@@ -377,9 +444,9 @@ FAKE_CARGO
   ((expected_workers < 1)) && expected_workers=1
   # 同一个场景跑两次（MUTATE_JOBS=1 与 =4）再比对：各在自己的目录里跑，比的是两次的输出，不是一次读另一次留下的状态
   prepare_case serial
-  run_case serial mutations/every-outcome.tsv MUTATE_JOBS=1
+  run_case serial ../mutation/tables/every-outcome.tsv MUTATE_JOBS=1
   prepare_case parallel
-  run_case parallel mutations/every-outcome.tsv MUTATE_JOBS=4
+  run_case parallel ../mutation/tables/every-outcome.tsv MUTATE_JOBS=4
   checked=$((checked + 1))
   cmp -s "$scratch/serial.stdout" "$scratch/parallel.stdout" \
     || fail "MUTATE_JOBS=1 与 =4 的 stdout 应当逐字相同（判定行按表序打），实际不同：$(diff "$scratch/serial.stdout" "$scratch/parallel.stdout")"
@@ -409,14 +476,14 @@ FAKE_CARGO
 
   # 丢一份判定：收回的比派出去的少，整道退 8，不许少一条还报绿；再拿掉那道闸（countblind），同一个丢法要静默判绿，才说明退 8 是那道闸给的
   prepare_case lost-result
-  run_case lost-result mutations/three-caught.tsv MUTATE_JOBS=3 MUTATE_BREAK="droprow${BROKEN_JUDGEMENT:+,$BROKEN_JUDGEMENT}"
+  run_case lost-result ../mutation/tables/three-caught.tsv MUTATE_JOBS=3 MUTATE_BREAK="droprow${BROKEN_JUDGEMENT:+,$BROKEN_JUDGEMENT}"
   checked=$((checked + 1))
   status="$(cat "$scratch/lost-result.rc")"
   if [[ "$status" != 8 ]] || ! grep -qF "派出去 3 条" "$scratch/lost-result.stderr" || ! grep -qF "收回 2 份" "$scratch/lost-result.stderr"; then
     fail "丢了一份判定时应当退 8 并报「派出去 3 条……收回 2 份」，实际退 $status：$(cat "$scratch/lost-result.out")"
   fi
   prepare_case lost-result-unchecked
-  run_case lost-result-unchecked mutations/three-caught.tsv MUTATE_JOBS=3 MUTATE_BREAK=droprow,countblind
+  run_case lost-result-unchecked ../mutation/tables/three-caught.tsv MUTATE_JOBS=3 MUTATE_BREAK=droprow,countblind
   checked=$((checked + 1))
   status="$(cat "$scratch/lost-result-unchecked.rc")"
   if [[ "$status" != 0 || "$(grep -c '^✅' "$scratch/lost-result-unchecked.stdout")" != 2 ]]; then
@@ -425,7 +492,7 @@ FAKE_CARGO
 
   # MUTATE_JOBS 不是正整数：退 2，一次 cargo 都不调
   prepare_case bad-jobs
-  run_case bad-jobs mutations/caught-only.tsv MUTATE_JOBS=0
+  run_case bad-jobs ../mutation/tables/caught-only.tsv MUTATE_JOBS=0
   checked=$((checked + 1))
   status="$(cat "$scratch/bad-jobs.rc")"
   if [[ "$status" != 2 || -s "$scratch/bad-jobs.cargo" ]] || ! grep -qF "MUTATE_JOBS" "$scratch/bad-jobs.stderr"; then
@@ -435,7 +502,7 @@ FAKE_CARGO
   # MUTATE_TIMEOUT 不是正整数秒（包装的 RUN_WITH_MEMORY_CAP_TIME_LIMIT 只认正整数秒）：开跑之前退 2，一次 cargo 都不调，
   # 不等基线跑完、第一条变异时才被包装按用法错退 251、报成「scope 起不来」
   prepare_case bad-timeout
-  run_case bad-timeout mutations/caught-only.tsv MUTATE_TIMEOUT=1.5
+  run_case bad-timeout ../mutation/tables/caught-only.tsv MUTATE_TIMEOUT=1.5
   checked=$((checked + 1))
   status="$(cat "$scratch/bad-timeout.rc")"
   if [[ "$status" != 2 || -s "$scratch/bad-timeout.cargo" ]] || ! grep -qF "MUTATE_TIMEOUT" "$scratch/bad-timeout.stderr"; then
@@ -444,7 +511,7 @@ FAKE_CARGO
 
   # 锚点腐化：派活之前就退 3，连基线都不跑、一条判定都不打（并行下不能让前面几条先跑了、后面那条才炸）
   prepare_case stale-anchor
-  run_case stale-anchor mutations/stale-anchor.tsv
+  run_case stale-anchor ../mutation/tables/stale-anchor.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/stale-anchor.rc")"
   if [[ "$status" != 3 || -s "$scratch/stale-anchor.cargo" || -s "$scratch/stale-anchor.stdout" ]] \
@@ -456,7 +523,7 @@ FAKE_CARGO
   # 挂了两个 feature 的 bin：从清单现读、带「包名/feature」跑，基线绿、变异照常判抓到；
   # 不读（MUTATE_BREAK=nofeatures，改前的跑法）假 cargo 照真 cargo 退 101，停在基线、退 2
   prepare_case required-features PASS 'required-features = ["fake-feature", "fake-other"]'
-  run_case required-features mutations/caught-only.tsv
+  run_case required-features ../mutation/tables/caught-only.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/required-features.rc")"
   unexpected_arguments="$(cut -d'|' -f4- "$scratch/required-features.cargo" | grep -vxF 'test --release --bin fake-bench --features bench/fake-feature,bench/fake-other')"
@@ -468,7 +535,7 @@ FAKE_CARGO
   # 基线（没改的源码）就撞上限：退 2 并说是内存上限，不说成「基线就是红的」。
   # 表里的原文要在 HOG 版源码里命中得上（锚点在基线之前核，命中不上就先退 3 了），所以用只改注释的那张表
   prepare_case baseline-memory HOG
-  run_case baseline-memory mutations/comment-only.tsv
+  run_case baseline-memory ../mutation/tables/comment-only.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/baseline-memory.rc")"
   if [[ "$status" != 2 ]] || ! grep -q '基线.*撞了内存上限 64M' "$scratch/baseline-memory.out"; then
@@ -478,7 +545,7 @@ FAKE_CARGO
   # 基线就是红的（没改的源码上假 cargo 演 RED）：退 2，点出红的测试名、打末尾几行，整份基线输出留在 TMPDIR 下并点出路径
   prepare_case baseline-red RED
   mkdir -p "$scratch/baseline-red/tmp"
-  run_case baseline-red mutations/comment-only.tsv TMPDIR="$scratch/baseline-red/tmp"
+  run_case baseline-red ../mutation/tables/comment-only.tsv TMPDIR="$scratch/baseline-red/tmp"
   checked=$((checked + 1))
   status="$(cat "$scratch/baseline-red.rc")"
   kept_logs=("$scratch/baseline-red/tmp"/singlefs-mutate-baseline-*.log)
@@ -490,7 +557,7 @@ FAKE_CARGO
 
   # #[should_panic] 的用例：结果行在名字与「 ... 」之间多一段「 - should panic」，取名字（lib_libtest_result_lines.py）时不进名字
   prepare_case should-panic
-  run_case should-panic mutations/should-panic.tsv
+  run_case should-panic ../mutation/tables/should-panic.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/should-panic.rc")"
   if [[ "$status" != 0 ]] || ! grep -qxF "✅ [抓到] 红：tests::answer_panics" "$scratch/should-panic.stdout"; then
@@ -498,7 +565,7 @@ FAKE_CARGO
   fi
   prepare_case baseline-red-should-panic PANICS
   mkdir -p "$scratch/baseline-red-should-panic/tmp"
-  run_case baseline-red-should-panic mutations/comment-only.tsv TMPDIR="$scratch/baseline-red-should-panic/tmp"
+  run_case baseline-red-should-panic ../mutation/tables/comment-only.tsv TMPDIR="$scratch/baseline-red-should-panic/tmp"
   checked=$((checked + 1))
   status="$(cat "$scratch/baseline-red-should-panic.rc")"
   if [[ "$status" != 2 ]] || ! grep -qxF "        红的测试：tests::answer_panics" "$scratch/baseline-red-should-panic.stderr"; then
@@ -508,7 +575,7 @@ FAKE_CARGO
   # 参数不够三个：退 2、打用法与一条例子，不报 unbound variable，一次 cargo 都不调
   prepare_case usage
   : >"$scratch/usage.cargo"
-  if (cd "$scratch/usage/research" && env PATH="$scratch/usage/bin:$PATH" FAKE_CARGO_LOG="$scratch/usage.cargo" \
+  if (cd "$scratch/usage/scripts/experiments" && env PATH="$scratch/usage/bin:$PATH" FAKE_CARGO_LOG="$scratch/usage.cargo" \
         bash "$case_script" fake-bench >"$scratch/usage.stdout" 2>"$scratch/usage.stderr"); then
     echo 0 >"$scratch/usage.rc"
   else
@@ -517,7 +584,7 @@ FAKE_CARGO
   checked=$((checked + 1))
   status="$(cat "$scratch/usage.rc")"
   if [[ "$status" != 2 ]] || ! grep -qF "要三个参数，给了 1 个" "$scratch/usage.stderr" \
-     || ! grep -qF "→ 怎么办：在 research/ 目录里照这个例子跑：bash scripts/mutation/mutate.sh " "$scratch/usage.stderr" \
+     || ! grep -qF "→ 怎么办：在 scripts/experiments/ 目录里照这个例子跑：bash ../mutation/mutate.sh " "$scratch/usage.stderr" \
      || grep -qF "unbound variable" "$scratch/usage.stderr" || [[ -s "$scratch/usage.cargo" ]]; then
     fail "参数不够三个时应当退 2、打用法与一条例子、不报 unbound variable、一次 cargo 都不调，实际退 $status：$(cat "$scratch/usage.stderr")"
   fi
@@ -527,7 +594,7 @@ FAKE_CARGO
   # 限时从命令起跑算、不算排队，五种结局照样各归各类，只有 HANG 那一条记超时；限时套在包装外面（outertimeout，改前的跑法）时排队就吃满限时，
   # 抓到、没红、无效、撞内存几条全被记成超时。一个工作进程，免得几条在同一把锁上串着停、把这一例拖长
   prepare_case queued-admission
-  run_case queued-admission mutations/every-outcome.tsv MUTATE_JOBS=1 RUN_WITH_MEMORY_CAP_SELFTEST_ADMIT_PAUSE="$selftest_time_limit"
+  run_case queued-admission ../mutation/tables/every-outcome.tsv MUTATE_JOBS=1 RUN_WITH_MEMORY_CAP_SELFTEST_ADMIT_PAUSE="$selftest_time_limit"
   output="$(cat "$scratch/queued-admission.out")"; status="$(cat "$scratch/queued-admission.rc")"
   checked=$((checked + 1))
   [[ "$status" == 1 ]] || fail "包装每次放行前停 $selftest_time_limit 秒时，五种结局各一条的表照样整轮判失败退 1，实际退 $status：$output"
@@ -556,7 +623,7 @@ FAKE_CARGO
                   expected_count="被总上限挤掉 0 条、显存不够 1 条"; wrong_symbol="✅" ;;
     esac
     prepare_case "$outcome_label"
-    run_case "$outcome_label" mutations/caught-only.tsv MUTATE_SELFTEST_MEMORY_CAP_RUNNER="$scratch/fake-memory-cap.sh" \
+    run_case "$outcome_label" ../mutation/tables/caught-only.tsv MUTATE_SELFTEST_MEMORY_CAP_RUNNER="$scratch/fake-memory-cap.sh" \
       FAKE_WRAPPER_REAL="$real_memory_cap_runner" FAKE_WRAPPER_OUTCOME="$outcome_label"
     status="$(cat "$scratch/$outcome_label.rc")"
     checked=$((checked + 1))
@@ -569,7 +636,7 @@ FAKE_CARGO
 
   # 基线就被总上限挤掉（假包装在没施加变异的那几次退 254）：原样退 254、报「基线被内存总上限挤掉」、一条变异都不跑，不说成「基线就是红的」
   prepare_case baseline-squeezed
-  run_case baseline-squeezed mutations/caught-only.tsv MUTATE_SELFTEST_MEMORY_CAP_RUNNER="$scratch/fake-memory-cap.sh" \
+  run_case baseline-squeezed ../mutation/tables/caught-only.tsv MUTATE_SELFTEST_MEMORY_CAP_RUNNER="$scratch/fake-memory-cap.sh" \
     FAKE_WRAPPER_REAL="$real_memory_cap_runner" FAKE_WRAPPER_OUTCOME=baseline-squeezed
   status="$(cat "$scratch/baseline-squeezed.rc")"
   checked=$((checked + 1))
@@ -594,7 +661,7 @@ FAKE_CARGO
   prepare_daily_case() {
     local label="$1" tooling="$scratch/$1/tooling"
     prepare_case "$label"
-    mkdir -p "$tooling/scripts" "$scratch/$label/daily-ledger"
+    mkdir -p "$tooling/scripts" "$tooling/scripts/gate" "$tooling/scripts/hosts" "$tooling/scripts/mutation" "$scratch/$label/daily-ledger"
     ln -s "$repository_root/.claude" "$tooling/.claude"
     if [[ -n "$BROKEN_JUDGEMENT" ]]; then
       BAKED="$BROKEN_JUDGEMENT" SOURCE="$SELF_PATH" DESTINATION="$tooling/scripts/mutation/mutate.sh" python3 - <<'PY' || return 1
@@ -627,7 +694,7 @@ PY
   done
 
   # MUTATE_JOBS=4、四条都抓得到的表：调用方没给理由，mutate.sh 自己给每次包装设，照样各条判对、整轮退 0
-  run_daily_case daily-parallel mutations/four-caught.tsv MUTATE_JOBS=4
+  run_daily_case daily-parallel ../mutation/tables/four-caught.tsv MUTATE_JOBS=4
   status="$(cat "$scratch/daily-parallel.rc")"
   daily_log="$scratch/daily-parallel.daily"
   checked=$((checked + 1))
@@ -652,7 +719,7 @@ PY
   fi
 
   # 调用方设了的理由原样传、不覆盖
-  run_daily_case daily-caller-reason mutations/caught-only.tsv MUTATE_JOBS=4 RUN_WITH_MEMORY_CAP_PARALLEL_REASON="$caller_reason"
+  run_daily_case daily-caller-reason ../mutation/tables/caught-only.tsv MUTATE_JOBS=4 RUN_WITH_MEMORY_CAP_PARALLEL_REASON="$caller_reason"
   status="$(cat "$scratch/daily-caller-reason.rc")"
   daily_log="$scratch/daily-caller-reason.daily"
   checked=$((checked + 1))
@@ -663,7 +730,7 @@ PY
   fi
 
   # 调用方给的理由不够 8 个字（不覆盖）：基线就被拒，报「基线排不上」、退 2、一次 cargo 都不调，不说成「基线就是红的」
-  run_daily_case daily-baseline-refused mutations/caught-only.tsv RUN_WITH_MEMORY_CAP_PARALLEL_REASON="$short_caller_reason"
+  run_daily_case daily-baseline-refused ../mutation/tables/caught-only.tsv RUN_WITH_MEMORY_CAP_PARALLEL_REASON="$short_caller_reason"
   status="$(cat "$scratch/daily-baseline-refused.rc")"
   checked=$((checked + 1))
   if [[ "$status" != 2 || -s "$scratch/daily-baseline-refused.cargo" ]] || ! grep -qF "基线排不上" "$scratch/daily-baseline-refused.stderr" \
@@ -684,7 +751,7 @@ PY
     esac
     outside_label="outside-selftest-$variable"
     prepare_case "$outside_label"
-    run_case "$outside_label" mutations/caught-only.tsv MUTATE_SELFTEST_MARK= "$variable=$variable_value"
+    run_case "$outside_label" ../mutation/tables/caught-only.tsv MUTATE_SELFTEST_MARK= "$variable=$variable_value"
     status="$(cat "$scratch/$outside_label.rc")"
     checked=$((checked + 1))
     if [[ "$status" != 2 || -s "$scratch/$outside_label.cargo" ]] || ! grep -qF "只给自证用的变量" "$scratch/$outside_label.stderr" \
@@ -693,6 +760,134 @@ PY
     fi
   done
 
+  # ── 只编不跑（--compile-only）──
+  # 三条的表：编得过一条、编不过一条（打第一行 error、整轮退 1）、只在测试外用不到的一条（test 档编得过）；
+  # cargo 只调 check、参数逐字是 test 档那一句（基线一次加每条一次），一次 test 都不调
+  case_leading_arguments=(--compile-only)
+  prepare_case compile-only
+  run_case compile-only ../mutation/tables/compile-only.tsv
+  output="$(cat "$scratch/compile-only.out")"; status="$(cat "$scratch/compile-only.rc")"
+  checked=$((checked + 1))
+  [[ "$status" == 1 ]] || fail "只编不跑：三条的表（编得过、编不过、测试外死码各一条）应当整轮退 1，实际退 $status：$output"
+  for wanted in "基线：编得过" "✅ [编得过] 编得过" "⏭  [编不过] 编不过：error[E0425]: cannot find value \`missing\` in this scope" "✅ [测试外死码] 编得过" \
+                "计数：派出去 3 条，收回 3 份判定：编得过 2 条、编不过 1 条"; do
+    checked=$((checked + 1))
+    grep -qxF -- "$wanted" "$scratch/compile-only.stdout" || fail "只编不跑：三条的表应当整行打出「$wanted」，实际 stdout：$(cat "$scratch/compile-only.stdout")"
+  done
+  checked=$((checked + 1))
+  unexpected_arguments="$(cut -d'|' -f4- "$scratch/compile-only.cargo" | grep -vxF 'check --profile test --bin fake-bench')"
+  if [[ "$(grep -c . "$scratch/compile-only.cargo")" != 4 || -n "$unexpected_arguments" ]]; then
+    fail "只编不跑：cargo 应当调 4 次（基线一次、每条一次）、参数逐字是「check --profile test --bin fake-bench」，实际调了 $(grep -c . "$scratch/compile-only.cargo") 次、对不上的：${unexpected_arguments:-无}"
+  fi
+  checked=$((checked + 1))
+  [[ "$(head -1 "$scratch/compile-only.stderr")" == *"卡在「只编不跑」这一项"* ]] \
+    || fail "只编不跑：stderr 头一行应当报开 1 个工作进程、卡在「只编不跑」，实际：$(head -1 "$scratch/compile-only.stderr")"
+
+  # 丢一份判定：派出去 3 条、收回 2 份，退 8；再拿掉那道闸（countblind），同一个丢法静默退 0、只报 2 条
+  prepare_case compile-only-lost-result
+  run_case compile-only-lost-result ../mutation/tables/three-caught.tsv MUTATE_BREAK="droprow${BROKEN_JUDGEMENT:+,$BROKEN_JUDGEMENT}"
+  status="$(cat "$scratch/compile-only-lost-result.rc")"
+  checked=$((checked + 1))
+  if [[ "$status" != 8 ]] || ! grep -qF "派出去 3 条" "$scratch/compile-only-lost-result.stderr" || ! grep -qF "收回 2 份" "$scratch/compile-only-lost-result.stderr"; then
+    fail "只编不跑：丢了一份判定时应当退 8 并报「派出去 3 条……收回 2 份」，实际退 $status：$(cat "$scratch/compile-only-lost-result.out")"
+  fi
+  prepare_case compile-only-lost-result-unchecked
+  run_case compile-only-lost-result-unchecked ../mutation/tables/three-caught.tsv MUTATE_BREAK=droprow,countblind
+  status="$(cat "$scratch/compile-only-lost-result-unchecked.rc")"
+  checked=$((checked + 1))
+  if [[ "$status" != 0 || "$(grep -c '^✅' "$scratch/compile-only-lost-result-unchecked.stdout")" != 2 ]]; then
+    fail "只编不跑：拿掉计数闸之后同一个丢法应当静默退 0、只报 2 条编得过（这样上一项的退 8 才是那道闸给的），实际退 $status：$(cat "$scratch/compile-only-lost-result-unchecked.out")"
+  fi
+
+  # 基线（没改过的源码）就编不过：退 2、点出第一行 error，基线之后一次 cargo 都不调
+  prepare_case compile-only-baseline BROKEN
+  run_case compile-only-baseline ../mutation/tables/comment-only.tsv
+  status="$(cat "$scratch/compile-only-baseline.rc")"
+  checked=$((checked + 1))
+  if [[ "$status" != 2 || "$(grep -c . "$scratch/compile-only-baseline.cargo")" != 1 ]] \
+     || ! grep -qF "基线（没改过的源码）就编不过" "$scratch/compile-only-baseline.stderr" \
+     || ! grep -qF "第一处错：error[E0425]" "$scratch/compile-only-baseline.stderr"; then
+    fail "只编不跑：基线编不过时应当退 2、报「基线（没改过的源码）就编不过」与第一处错、cargo 只调基线那一次，实际退 $status、调了 $(grep -c . "$scratch/compile-only-baseline.cargo") 次：$(cat "$scratch/compile-only-baseline.out")"
+  fi
+  case_leading_arguments=()
+
+  # ── deny 警告（文件头「deny 警告」那一段）──
+  # 一条的表：替换文留死代码（DEADCODE），假 cargo 照 deny 判、RUSTFLAGS 里没有 --cap-lints warn 就编不过。MUTATE_JOBS=1：
+  # 平常跑调 cargo 3 次（基线、那一条、还原之后），只编不跑 2 次（基线、那一条）；每次收到的 RUSTFLAGS 逐字相同，调用方设了的接在前面
+  # 后三例环境里设了 CARGO_ENCODED_RUSTFLAGS（空串也算）：假 cargo 照真 cargo 只读它，所以 mutate.sh 得把 cap 接进它（0x1f 分隔，调用方的在前）
+  local rustflags_label rustflags_given rustflags_wanted wanted_line wanted_calls matched_rustflags
+  local unit_separator=$'\x1f' encoded_set encoded_given encoded_wanted matched_encoded received_encoded
+  for rustflags_label in cap-lints cap-lints-existing compile-only-cap-lints encoded-empty encoded-other compile-only-encoded-empty; do
+    encoded_set=0; encoded_given=""; encoded_wanted="（没设）"
+    case "$rustflags_label" in
+      cap-lints) rustflags_given=""; rustflags_wanted="--cap-lints warn"; wanted_line="✅ [留死代码] 红：tests::adds"; wanted_calls=3
+                 case_leading_arguments=() ;;
+      cap-lints-existing) rustflags_given="-Cdebuginfo=0"; rustflags_wanted="-Cdebuginfo=0 --cap-lints warn"; wanted_line="✅ [留死代码] 红：tests::adds"; wanted_calls=3
+                          case_leading_arguments=() ;;
+      compile-only-cap-lints) rustflags_given="-Cdebuginfo=0"; rustflags_wanted="-Cdebuginfo=0 --cap-lints warn"; wanted_line="✅ [留死代码] 编得过"; wanted_calls=2
+                              case_leading_arguments=(--compile-only) ;;
+      encoded-empty) rustflags_given=""; rustflags_wanted="--cap-lints warn"; wanted_line="✅ [留死代码] 红：tests::adds"; wanted_calls=3
+                     encoded_set=1; encoded_given=""; encoded_wanted="--cap-lints${unit_separator}warn"
+                     case_leading_arguments=() ;;
+      encoded-other) rustflags_given="-Cdebuginfo=0"; rustflags_wanted="-Cdebuginfo=0 --cap-lints warn"; wanted_line="✅ [留死代码] 红：tests::adds"; wanted_calls=3
+                     encoded_set=1; encoded_given="-Copt-level=1${unit_separator}-Cdebuginfo=2"; encoded_wanted="-Copt-level=1${unit_separator}-Cdebuginfo=2${unit_separator}--cap-lints${unit_separator}warn"
+                     case_leading_arguments=() ;;
+      compile-only-encoded-empty) rustflags_given=""; rustflags_wanted="--cap-lints warn"; wanted_line="✅ [留死代码] 编得过"; wanted_calls=2
+                                  encoded_set=1; encoded_given=""; encoded_wanted="--cap-lints${unit_separator}warn"
+                                  case_leading_arguments=(--compile-only) ;;
+    esac
+    prepare_case "$rustflags_label"
+    if ((encoded_set)); then
+      run_case "$rustflags_label" ../mutation/tables/dead-code.tsv MUTATE_JOBS=1 RUSTFLAGS="$rustflags_given" CARGO_ENCODED_RUSTFLAGS="$encoded_given"
+    else
+      run_case "$rustflags_label" ../mutation/tables/dead-code.tsv MUTATE_JOBS=1 RUSTFLAGS="$rustflags_given"
+    fi
+    status="$(cat "$scratch/$rustflags_label.rc")"
+    checked=$((checked + 1))
+    if [[ "$status" != 0 ]] || ! grep -qxF -- "$wanted_line" "$scratch/$rustflags_label.stdout"; then
+      fail "deny 警告：$( ((${#case_leading_arguments[@]})) && echo 只编不跑 || echo 平常跑)（调用方 RUSTFLAGS=「$rustflags_given」）留死代码那一条应当$( ((${#case_leading_arguments[@]})) && echo 判编得过 || echo 判抓到)、整轮退 0（整行「$wanted_line」），实际退 $status：$(cat "$scratch/$rustflags_label.out")"
+    fi
+    checked=$((checked + 1))
+    # 数逐字等于期望的那几行（不取「不等于的」再判空：收到空串的那几行取出来是空行，$( ) 一去尾就看不见了）
+    matched_rustflags="$(cut -d'|' -f3- "$scratch/$rustflags_label.cargo.rustflags" 2>/dev/null | grep -cxF -- "$rustflags_wanted")"
+    if [[ "$(grep -c . "$scratch/$rustflags_label.cargo.rustflags" 2>/dev/null)" != "$wanted_calls" || "$matched_rustflags" != "$wanted_calls" ]] \
+       || [[ "$(cut -d'|' -f1 "$scratch/$rustflags_label.cargo.rustflags" | sort -u | tr '\n' ' ')" != "DEADCODE PASS " ]]; then
+      fail "deny 警告：$rustflags_label 里每个 cargo 收到的 RUSTFLAGS 应当逐字是「$rustflags_wanted」、调 $wanted_calls 次、基线（PASS）与那一条（DEADCODE）都在，实际：$(cat "$scratch/$rustflags_label.cargo.rustflags" 2>/dev/null | tr '\n' ' ')"
+    fi
+    # CARGO_ENCODED_RUSTFLAGS：没设的三例每个 cargo 都收到「（没设）」（不凭空多出一个），设了的三例逐字是 encoded_wanted（0x1f 在 cat -v 里显示成 ^_）
+    checked=$((checked + 1))
+    matched_encoded="$(cut -d'|' -f3- "$scratch/$rustflags_label.cargo.encoded" 2>/dev/null | grep -cxF -- "$encoded_wanted")"
+    if [[ "$(grep -c . "$scratch/$rustflags_label.cargo.encoded" 2>/dev/null)" != "$wanted_calls" || "$matched_encoded" != "$wanted_calls" ]]; then
+      fail "deny 警告：$rustflags_label 里每个 cargo 收到的 CARGO_ENCODED_RUSTFLAGS 应当逐字是「$(printf '%s' "$encoded_wanted" | cat -v)」（0x1f 显示成 ^_）、调 $wanted_calls 次，实际：$(cat -v "$scratch/$rustflags_label.cargo.encoded" 2>/dev/null | tr '\n' ' ')"
+    fi
+    # stderr 开跑那一行报的与 cargo 实收的一致：设了 CARGO_ENCODED_RUSTFLAGS 的报它（0x1f 显示成 ␟）、不再说 RUSTFLAGS；没设的照旧报 RUSTFLAGS
+    checked=$((checked + 1))
+    if ((encoded_set)); then
+      received_encoded="$(head -n 1 "$scratch/$rustflags_label.cargo.encoded" 2>/dev/null | cut -d'|' -f3- | sed "s/$unit_separator/␟/g")"
+      if [[ -z "$received_encoded" ]] || ! grep -qF -- "mutate: 每个 cargo 都带 CARGO_ENCODED_RUSTFLAGS=「$received_encoded」" "$scratch/$rustflags_label.stderr" \
+         || grep -qF -- "mutate: 每个 cargo 都带 RUSTFLAGS=" "$scratch/$rustflags_label.stderr"; then
+        fail "deny 警告：$rustflags_label 里 stderr 应当报 cargo 实收的「CARGO_ENCODED_RUSTFLAGS=「$received_encoded」」（不再说 RUSTFLAGS），实际 stderr：$(cat "$scratch/$rustflags_label.stderr")"
+      fi
+    elif ! grep -qF -- "mutate: 每个 cargo 都带 RUSTFLAGS=「$rustflags_wanted」" "$scratch/$rustflags_label.stderr"; then
+      fail "deny 警告：$rustflags_label 里 stderr 应当报「每个 cargo 都带 RUSTFLAGS=「$rustflags_wanted」」，实际 stderr：$(cat "$scratch/$rustflags_label.stderr")"
+    fi
+  done
+  case_leading_arguments=()
+
+  # --binary-of：显式 [[bin]] 的打声明的名字；没写 [[bin]] 的打文件名去掉 .rs；源文件不在退 2
+  local binary_output binary_status
+  prepare_case binary-of
+  printf 'fn main() {}\n' >"$scratch/binary-of/scripts/experiments/bench/src/bin/other_tool.rs"
+  for wanted in "bench/src/bin/fake_bench.rs fake-bench" "bench/src/bin/other_tool.rs other_tool"; do
+    checked=$((checked + 1))
+    if binary_output="$(cd "$scratch/binary-of/scripts/experiments" && bash "$case_script" --binary-of "${wanted%% *}" 2>&1)"; then binary_status=0; else binary_status=$?; fi
+    [[ "$binary_status" == 0 && "$binary_output" == "${wanted##* }" ]] \
+      || fail "--binary-of ${wanted%% *} 应当退 0、只打「${wanted##* }」，实际退 $binary_status：$binary_output"
+  done
+  checked=$((checked + 1))
+  if binary_output="$(cd "$scratch/binary-of/scripts/experiments" && bash "$case_script" --binary-of bench/src/bin/absent.rs 2>&1)"; then binary_status=0; else binary_status=$?; fi
+  [[ "$binary_status" == 2 && "$binary_output" == *"→ 怎么办"* ]] || fail "--binary-of 给的源文件不在时应当退 2、给出路，实际退 $binary_status：$binary_output"
+
   rm -rf -- "${scratch:?}"
   if ((failures)); then
     echo "  ✗ mutate.sh 自检 $failures 处不对（查了 $checked 项）"
@@ -700,6 +895,8 @@ PY
     echo "    限时与包装 stderr 的去向在 run_capped_cargo_test，基线与收尾计数在主流程，"
     echo "    并行的在 worker_count_and_head_line、run_worker 与 print_judged_rows_in_table_order，required-features 在 read_required_features；"
     echo "    平常跑拒只供自证的变量在 --selftest 那一支后面（running_under_selftest），并行理由在 run_capped_cargo_test（CALLER_PARALLEL_REASON），基线排不上、基线被总上限挤掉在基线那一段；"
+    echo "    只编不跑在 run_compile_only（cargo 的参数在 CARGO_CHECK_COMMAND），--binary-of 在 find_declared_binary；"
+    echo "    每个 cargo 带的 RUSTFLAGS 与 CARGO_ENCODED_RUSTFLAGS 在 MUTATE_RUSTFLAGS、MUTATE_ENCODED_RUSTFLAGS 与 RUSTFLAGS_ENVIRONMENT（check_in_copy、run_capped_cargo_test 都用它）；"
     echo "    MUTATE_BREAK 或 RUN_WITH_MEMORY_CAP_BREAK 设着的话这里本来就该红"
     exit 1
   fi
@@ -711,7 +908,11 @@ PY
 required-features：没挂的 bin 的 cargo 参数逐字不变，挂了两个的带「包名/feature」跑得起来、照常判抓到；\
 包装每次放行前停 $selftest_time_limit 秒，五种结局照样各归各类、只有 HANG 那一条记超时；\
 包装退 252 记排不上、退 254 记被总上限挤掉、退 245 记显存不够，都整轮判失败并单列计数；平常跑带只供自证的 ${#TEST_ONLY_VARIABLES[@]} 个变量各一次都退 2；\
-会话里平常跑并行（假包装照「日常一条」判）：MUTATE_JOBS=4 各条判对退 0、每次包装带各自的并行理由而 --check 不带，调用方的理由不覆盖，基线排不上退 2 报「基线排不上」）"
+会话里平常跑并行（假包装照「日常一条」判）：MUTATE_JOBS=4 各条判对退 0、每次包装带各自的并行理由而 --check 不带，调用方的理由不覆盖，基线排不上退 2 报「基线排不上」；\
+只编不跑：编得过、编不过（退 1、打第一行 error）、测试外死码按 test 档编得过，cargo 只调 check --profile test，丢一份判定退 8 而拿掉那道闸就静默退 0，基线编不过退 2；\
+deny 警告：留死代码的那一条平常跑判抓到、只编不跑判编得过，基线、那一条与还原之后那一次的 RUSTFLAGS 逐字相同、都带 --cap-lints warn、调用方的接在前面；\
+环境里设了 CARGO_ENCODED_RUSTFLAGS（空串、别的值、只编不跑）时 cap 接进它、0x1f 分隔，cargo 实收的与 stderr 报的一致，没设的不凭空多出一个；\
+--binary-of 显式 [[bin]] 与没写的两种各打对名字、源文件不在退 2）"
 }
 
 if [[ "${1:-}" == "--selftest" ]]; then
@@ -730,33 +931,57 @@ if ((!running_under_selftest)) && ! is_broken honorbreakoutsideselftest; then
     exit 2
   fi
 fi
-# 参数不够三个：打用法与一条例子，退 2（文件头「退出码」：2 是用法错），不让 set -u 报 unbound variable
-if (($# < 3)) && ! is_broken bareusage; then
-  echo "mutate: 要三个参数，给了 $# 个；用法：mutate.sh <bin 名> <源文件> <变异表>" >&2
-  echo "        <bin 名> 是 Cargo.toml 里 [[bin]] 的 name（没写 [[bin]] 的是源文件名去掉 .rs）；<源文件> 与 <变异表> 都相对当前目录（research/）" >&2
-  echo "        → 怎么办：在 research/ 目录里照这个例子跑：bash scripts/mutation/mutate.sh e172-deletion-write-dry-run scripts/experiments/e172_deletion_write_dry_run.rs mutations/e172_deletion_write_dry_run.tsv" >&2
-  exit 2
-fi
-BIN="$1"; SRC="$2"; TABLE="$3"
+# 头一个参数是 --compile-only（只编不跑）或 --binary-of（只打 bin 名）的，拿掉之后照下面解析（文件头用法那几行）
+COMPILE_ONLY=0
+PRINT_BINARY_ONLY=0
+case "${1:-}" in
+  --compile-only) COMPILE_ONLY=1; shift ;;
+  --binary-of) PRINT_BINARY_ONLY=1; shift ;;
+esac
 
 # ⚠️ **先确认「改的文件」与「跑的二进制」对得上。**
 # 不确认的话，变异会改 X 而跑 Y 的测试：一条真能被抓的破坏被报成盲区
 # （2026-08-29 实测踩过：`e7_index.rs` 配上 crate 主二进制的名字，
 # 三条变异全被误报成盲区，换对名字后三条全被抓）。
 # 反方向更坏：Y 的测试恰好因别的原因红了，会被记成「变异被抓」。
-# 清单：从源文件所在目录一层层往上找最近的 Cargo.toml（实验工作区根是 scripts/experiments，src/bin 布局与自带清单的子 crate 同样认得）
-_manifest="" _manifest_directory="$(dirname "$SRC")"
-while [[ -z "$_manifest" ]]; do
-  if [[ -f "$_manifest_directory/Cargo.toml" ]]; then _manifest="$_manifest_directory/Cargo.toml"
-  elif [[ "$_manifest_directory" == . || "$_manifest_directory" == / ]]; then _manifest="Cargo.toml"
-  else _manifest_directory="$(dirname "$_manifest_directory")"; fi
-done
-_declared="$(awk -v src="$SRC" '
-  /^\[\[bin\]\]/ { name=""; path=""; next }
-  /^name *=/ { gsub(/.*= *"|"/,""); name=$0; next }
-  /^path *=/ { gsub(/.*= *"|"/,""); path=$0;
-               if (src ~ path"$") print name; next }
-' "$_manifest" 2>/dev/null | head -1)"
+# 清单：从源文件所在目录一层层往上找最近的 Cargo.toml（实验工作区根是 scripts/experiments，src/bin 布局与自带清单的子 crate 同样认得）。
+# find_declared_binary <源文件>：设 _manifest（那份清单）与 _declared（[[bin]] 里 path 对得上这份源文件的 name，没有是空串）；--binary-of 与下面的核对共用这一份读法
+find_declared_binary() {
+  local source_file="$1" manifest_directory
+  _manifest="" manifest_directory="$(dirname "$source_file")"
+  while [[ -z "$_manifest" ]]; do
+    if [[ -f "$manifest_directory/Cargo.toml" ]]; then _manifest="$manifest_directory/Cargo.toml"
+    elif [[ "$manifest_directory" == . || "$manifest_directory" == / ]]; then _manifest="Cargo.toml"
+    else manifest_directory="$(dirname "$manifest_directory")"; fi
+  done
+  _declared="$(awk -v src="$source_file" '
+    /^\[\[bin\]\]/ { name=""; path=""; next }
+    /^name *=/ { gsub(/.*= *"|"/,""); name=$0; next }
+    /^path *=/ { gsub(/.*= *"|"/,""); path=$0;
+                 if (src ~ path"$") print name; next }
+  ' "$_manifest" 2>/dev/null | head -1)"
+}
+if ((PRINT_BINARY_ONLY)); then
+  if (($# != 1)) || [[ ! -f "$1" ]]; then
+    echo "mutate: --binary-of 要一个参数、是在当前目录下找得到的源文件，给了 $# 个（${1:-无}）" >&2
+    echo "        → 怎么办：在 scripts/experiments/ 目录里照这个例子跑：bash ../mutation/mutate.sh --binary-of e172_deletion_write_dry_run.rs" >&2
+    exit 2
+  fi
+  find_declared_binary "$1"
+  echo "${_declared:-$(basename "$1" .rs)}"   # 没写 [[bin]] 的按 cargo 自动发现的规则：文件名去掉 .rs
+  exit 0
+fi
+
+# 参数不够三个：打用法与一条例子，退 2（文件头「退出码」：2 是用法错），不让 set -u 报 unbound variable
+if (($# < 3)) && ! is_broken bareusage; then
+  echo "mutate: 要三个参数，给了 $# 个；用法：mutate.sh [--compile-only] <bin 名> <源文件> <变异表>" >&2
+  echo "        <bin 名> 是 Cargo.toml 里 [[bin]] 的 name（没写 [[bin]] 的是源文件名去掉 .rs，可以用 mutate.sh --binary-of <源文件> 查）；<源文件> 与 <变异表> 都相对当前目录（scripts/experiments/）" >&2
+  echo "        → 怎么办：在 scripts/experiments/ 目录里照这个例子跑：bash ../mutation/mutate.sh e172-deletion-write-dry-run e172_deletion_write_dry_run.rs ../mutation/tables/e172_deletion_write_dry_run.tsv" >&2
+  exit 2
+fi
+BIN="$1"; SRC="$2"; TABLE="$3"
+
+find_declared_binary "$SRC"
 if [[ -n "$_declared" ]]; then
   if [[ "$_declared" != "$BIN" ]]; then
     echo "mutate: 源文件 $SRC 在 Cargo.toml 里声明的二进制是 '$_declared'，不是 '$BIN'" >&2
@@ -775,7 +1000,7 @@ fi
 
 # bin 挂了 required-features 的，cargo test 要带上那几个 feature（文件头 required-features 那一段）。
 # 从 $_manifest 里名字是 $BIN 的那一节 [[bin]] 现读，写成「包名/feature」逗号连起来打到 stdout；没挂、或清单里没有这一节，打空行。
-# 写成带包名的形式：research/ 是虚拟 workspace，在它的根上不带包名的 --features 要靠被选中的包碰巧有那个 feature
+# 写成带包名的形式：scripts/experiments/ 是 workspace 根，在它的根上不带包名的 --features 要靠被选中的包碰巧有那个 feature
 read_required_features() {
   MANIFEST="$_manifest" BIN="$BIN" python3 - <<'PY'
 import os, sys, tomllib
@@ -814,13 +1039,13 @@ if ! is_broken nofeatures; then
 fi
 
 # ⚠️ **变异只改副本，不碰工作区里的源文件**（2026-09-12 改）。此前是就地改 $SRC 再还原：一轮变异要几分钟，
-# 这几分钟里仓里那份源码是坏的——几个会话共写一个仓时，别的会话此刻跑门禁（checker-tier-research-build-and-replay 阶段会编译并跑 research 的全部单测）
+# 这几分钟里仓里那份源码是坏的——几个会话共写一个仓时，别的会话此刻跑门禁（checker-tier-research-build-and-replay 阶段会编译并跑实验装置的全部单测）
 # 就编到被改坏的源码，红得莫名其妙、还可能当成自己改坏的；此刻有人整份提交这个文件，提交进去的就是变异。
-# ⇒ 把 research/ 里编译要用的部分（workspace、crate 源码、include_str! 读的 results/、data/）拷到临时目录，
+# ⇒ 把 scripts/experiments/ 整个工作区（不带 target）拷到临时目录，include_str! 读的 research/results/ 在副本里链回仓里那一份，
 #   在那里改、在那里编；CARGO_TARGET_DIR 单独一份，不碰 scripts/experiments/target 里别人要用的二进制。跑完删掉副本。
 #   并行时每个工作进程各一份这样的副本、各一个编译目录（文件头「并行」那一段）。
 if [[ ! -f Cargo.toml ]] || ! grep -q '^\[workspace\]' Cargo.toml; then
-  echo "mutate: 要在 research/ 下跑（那里才有 workspace 的 Cargo.toml）" >&2; exit 2
+  echo "mutate: 要在 scripts/experiments/ 下跑（那里才有 workspace 的 Cargo.toml）" >&2; exit 2
 fi
 REQUESTED_JOBS="${MUTATE_JOBS:-}"
 if [[ -n "$REQUESTED_JOBS" && ! "$REQUESTED_JOBS" =~ ^[1-9][0-9]*$ ]]; then
@@ -843,8 +1068,10 @@ if is_broken exportparallelreason && [[ -z "${RUN_WITH_MEMORY_CAP_PARALLEL_REASO
   # 弄坏开关：并行理由 export 给之后起的每一条命令（--check 也看得见），不只设在自己起的那几次包装上
   export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="mutate.sh 起的每一条命令都照并行放行（弄坏开关 exportparallelreason）"
 fi
-# 开跑之前先试一次带上限的 scope 起不起得来：起不来就一条都不跑，不退回无上限（run-with-memory-cap.sh 自己把原因打到 stderr）
-if bash "$MEMORY_CAP_RUNNER" --check "$MEMORY_MAX"; then memory_cap_check=0; else memory_cap_check=$?; fi
+# 开跑之前先试一次带上限的 scope 起不起得来：起不来就一条都不跑，不退回无上限（run-with-memory-cap.sh 自己把原因打到 stderr）。
+# 只编不跑不经包装（cargo check 不跑编出来的代码），不试
+memory_cap_check=0
+if ((!COMPILE_ONLY)) && ! bash "$MEMORY_CAP_RUNNER" --check "$MEMORY_MAX"; then memory_cap_check=1; fi
 if [[ $memory_cap_check -ne 0 ]]; then
   echo "mutate: 带内存上限（MUTATE_MEMORY_MAX=$MEMORY_MAX）的 systemd scope 起不来，一条变异都没跑" >&2
   echo "        → 怎么办：看上面 run-with-memory-cap.sh 的报错，修好用户级 systemd / D-Bus 或上限的写法再跑；不许拿掉上限去跑（无界分配的变异会把整机拖进 OOM）" >&2
@@ -871,6 +1098,9 @@ worker_count_and_head_line() {
   if [[ -n "$REQUESTED_JOBS" ]]; then
     bound_names+=("MUTATE_JOBS"); bound_counts+=("$REQUESTED_JOBS"); bound_texts+=("MUTATE_JOBS 给 $REQUESTED_JOBS 个")
   fi
+  if ((COMPILE_ONLY)); then
+    bound_names+=("只编不跑"); bound_counts+=(1); bound_texts+=("只编不跑串行、一份副本、一个编译目录，给 1 个")
+  fi
   bound_names+=("表里的条数"); bound_counts+=("$mutation_count"); bound_texts+=("表里 $mutation_count 条")
   smallest="${bound_counts[0]}"
   for bound_index in "${!bound_counts[@]}"; do
@@ -895,7 +1125,7 @@ worker_count_and_head_line() {
 worker_count_and_head_line
 # 开几个工作进程那一行仍是 stderr 的头一行；挂了 required-features 的 bin 跟在它后面报带了哪几个
 if ((${#cargo_feature_arguments[@]})); then
-  echo "mutate: $BIN 在 $_manifest 里挂了 required-features，每次 cargo test 带 ${cargo_feature_arguments[*]}" >&2
+  echo "mutate: $BIN 在 $_manifest 里挂了 required-features，每次 cargo $( ((COMPILE_ONLY)) && echo check || echo test) 带 ${cargo_feature_arguments[*]}" >&2
 fi
 export CARGO_BUILD_JOBS="$CARGO_JOBS_PER_WORKER"
 
@@ -918,10 +1148,16 @@ cleanup() {
 }
 trap cleanup EXIT
 MUTATE_TARGET="${MUTATE_TARGET_DIR:-${TMPDIR:-/tmp}/singlefs-mutate-target}"
-copy_directory_of() { echo "$SHARD_ROOT/copy-$1"; }
+# 副本照仓里的层级放（copy-<i>/scripts/experiments/）：装置用 include_str!("../../research/results/…") 读留存产物，
+# 副本根下放一个符号链接指回仓里那一份（只读，变异不改它）
+copy_root_of() { echo "$SHARD_ROOT/copy-$1"; }
+copy_directory_of() { echo "$SHARD_ROOT/copy-$1/scripts/experiments"; }
+REPOSITORY_OF_WORKSPACE="$(cd ../.. && pwd)"
 target_directory_of() { if (($1 == 1)); then echo "$MUTATE_TARGET"; else echo "$MUTATE_TARGET-w$1"; fi; }
 
-if ! rsync -a --exclude target --exclude prompts --exclude mutations --exclude scripts ./ "$(copy_directory_of 1)/"; then
+if ! mkdir -p "$(copy_directory_of 1)" "$(copy_root_of 1)/research" \
+   || ! ln -s "$REPOSITORY_OF_WORKSPACE/research/results" "$(copy_root_of 1)/research/results" \
+   || ! rsync -a --exclude target ./ "$(copy_directory_of 1)/"; then
   echo "mutate: 拷副本失败" >&2; exit 2
 fi
 ORIGINAL_SUM="$(sha256sum "$SRC" | cut -d' ' -f1)"
@@ -951,7 +1187,7 @@ done
 
 # 第 2 份起的副本从第 1 份拷：同一份源码快照，不在拷的间隙里读到别人刚改的工作区
 for ((worker_index = 2; worker_index <= WORKER_COUNT; worker_index++)); do
-  if ! rsync -a "$(copy_directory_of 1)/" "$(copy_directory_of "$worker_index")/"; then
+  if ! rsync -a "$(copy_root_of 1)/" "$(copy_root_of "$worker_index")/"; then
     echo "mutate: 拷第 $worker_index 份副本失败" >&2; exit 2
   fi
 done
@@ -962,6 +1198,97 @@ done
 for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
   touch "$(copy_directory_of "$worker_index")/$SRC"
 done
+
+# 每个 cargo 一份同样的 RUSTFLAGS（文件头「deny 警告」那一段）：调用方设了的在前，后面接 --cap-lints warn；
+# 开跑前算一次，基线、每条变异、还原之后那一次与只编不跑的 check 都经 RUSTFLAGS_ENVIRONMENT 带它
+MUTATE_RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }--cap-lints warn"
+RUSTFLAGS_ENVIRONMENT=("RUSTFLAGS=$MUTATE_RUSTFLAGS")
+MUTATE_FLAGS_HINT="RUSTFLAGS='$MUTATE_RUSTFLAGS'"   # 出路里让人照抄的那一个变量赋值
+MUTATE_FLAGS_REPORT="RUSTFLAGS=「$MUTATE_RUSTFLAGS」（调用方设了的在前；--cap-lints warn 把装置的 deny 警告压成警告，替换文留下的死代码不算编不过）"
+# 环境里设了 CARGO_ENCODED_RUSTFLAGS（空串也算）时 cargo 只读它、不读 RUSTFLAGS：cap 也接进它（各项以 0x1f 分隔，调用方设了的在前），RUSTFLAGS 照旧也设
+MUTATE_ENCODED_RUSTFLAGS=""
+if [[ -v CARGO_ENCODED_RUSTFLAGS ]]; then
+  MUTATE_UNIT_SEPARATOR=$'\x1f'
+  MUTATE_ENCODED_RUSTFLAGS="${CARGO_ENCODED_RUSTFLAGS:+$CARGO_ENCODED_RUSTFLAGS$MUTATE_UNIT_SEPARATOR}--cap-lints${MUTATE_UNIT_SEPARATOR}warn"
+  RUSTFLAGS_ENVIRONMENT+=("CARGO_ENCODED_RUSTFLAGS=$MUTATE_ENCODED_RUSTFLAGS")
+  MUTATE_FLAGS_HINT="CARGO_ENCODED_RUSTFLAGS=$(printf '%q' "$MUTATE_ENCODED_RUSTFLAGS")"
+  MUTATE_FLAGS_REPORT="CARGO_ENCODED_RUSTFLAGS=「${MUTATE_ENCODED_RUSTFLAGS//$MUTATE_UNIT_SEPARATOR/␟}」（环境里设了它，cargo 只读它、不读 RUSTFLAGS，所以 cap 接在它里面，RUSTFLAGS 也同样带着；各项以 0x1f 分隔、这里显示成 ␟；调用方设了的在前；--cap-lints warn 把装置的 deny 警告压成警告，替换文留下的死代码不算编不过）"
+fi
+if is_broken no-cap-lints; then   # 弄坏开关：改前的跑法，RUSTFLAGS 与 CARGO_ENCODED_RUSTFLAGS 都照调用方的原样传（没设就不设）
+  MUTATE_RUSTFLAGS="${RUSTFLAGS:-}"; RUSTFLAGS_ENVIRONMENT=(); MUTATE_ENCODED_RUSTFLAGS=""
+  MUTATE_FLAGS_HINT="RUSTFLAGS='$MUTATE_RUSTFLAGS'"
+  MUTATE_FLAGS_REPORT="RUSTFLAGS=「$MUTATE_RUSTFLAGS」（调用方设了的在前；--cap-lints warn 把装置的 deny 警告压成警告，替换文留下的死代码不算编不过）"
+fi
+echo "mutate: 每个 cargo 都带 $MUTATE_FLAGS_REPORT" >&2
+
+# ── 只编不跑（文件头「只编不跑」）：一份副本、一个编译目录、串行；每条只跑 cargo check，跑完退出，不往下走 cargo test 那一支 ──
+CARGO_CHECK_COMMAND=(cargo check --profile test --bin "$BIN" ${cargo_feature_arguments[@]+"${cargo_feature_arguments[@]}"})
+if is_broken compilenontest; then   # 弄坏开关：不带 cfg(test) 的那一份（只在测试外用不到的函数报 dead_code，平常跑的 cargo test 不报）
+  CARGO_CHECK_COMMAND=(cargo check --release --bin "$BIN" ${cargo_feature_arguments[@]+"${cargo_feature_arguments[@]}"})
+fi
+# 在第 1 份副本上跑一次 cargo check，cargo 的 stdout 与 stderr 并进这里的 stdout；test 档关 debug_assertions，cfg 与 cargo test --release 相同
+check_in_copy() {
+  ( cd "$(copy_directory_of 1)" && exec env CARGO_TARGET_DIR="$(target_directory_of 1)" ${RUSTFLAGS_ENVIRONMENT[@]+"${RUSTFLAGS_ENVIRONMENT[@]}"} \
+      CARGO_PROFILE_TEST_DEBUG_ASSERTIONS=false "${CARGO_CHECK_COMMAND[@]}" 2>&1 )
+}
+# 一份 cargo 输出（$1 文件）里第一行 error：rustc 的「error[E…]: …」或「error: …」，打到 stdout，没有打空行
+first_error_line() { grep -m1 -E '^error(\[[A-Za-z0-9]+\])?:' -- "$1"; }
+run_compile_only() {
+  local row_index name row_exit first_error compiled_count=0 invalid_count=0 collected_count=0 baseline_exit
+  local row_log="$SHARD_ROOT/compile-row.log"
+  if check_in_copy >"$SHARD_ROOT/baseline-1.log"; then baseline_exit=0; else baseline_exit=$?; fi
+  if ((baseline_exit != 0)); then
+    echo "mutate: 基线（没改过的源码）就编不过：${CARGO_CHECK_COMMAND[*]} 退 $baseline_exit，一条变异都没编" >&2
+    first_error="$(first_error_line "$SHARD_ROOT/baseline-1.log")"
+    echo "        第一处错：${first_error:-（输出里没有 error 开头的行）}" >&2
+    echo "        输出末尾 15 行：" >&2
+    tail -n 15 -- "$SHARD_ROOT/baseline-1.log" | sed 's/^/          /' >&2
+    echo "        → 怎么办：在 scripts/experiments/ 里对没改过的源码单独跑 $MUTATE_FLAGS_HINT CARGO_PROFILE_TEST_DEBUG_ASSERTIONS=false ${CARGO_CHECK_COMMAND[*]}，照第一处错修好装置（或补上 feature 依赖要的环境），编得过再只编不跑整张表重跑" >&2
+    exit 2
+  fi
+  echo "基线：编得过"
+  for ((row_index = 0; row_index < mutation_count; row_index++)); do
+    name="${mutation_names[row_index]}"
+    if ! write_mutated_source "${mutation_originals[row_index]}" "${mutation_replacements[row_index]}" "$(copy_directory_of 1)/$SRC"; then
+      echo "mutate: [$name] 替换没命中，证明作废" >&2
+      echo "        → 怎么办：把变异表里这一条的原文改到源码今天的写法、让它恰好命中一次，再整张表重跑" >&2
+      exit 3
+    fi
+    if check_in_copy >"$row_log"; then row_exit=0; else row_exit=$?; fi
+    cp "$PRISTINE" "$(copy_directory_of 1)/$SRC"   # 还原：下一条从开跑时那一份改
+    if is_broken droprow && ((row_index == 1)); then continue; fi   # 弄坏开关：第 2 条的判定丢掉不记
+    collected_count=$((collected_count + 1))
+    if ((row_exit == 0)) || is_broken compileassuccess; then
+      echo "✅ [$name] 编得过"
+      compiled_count=$((compiled_count + 1))
+    else
+      first_error="$(first_error_line "$row_log")"
+      echo "⏭  [$name] 编不过：${first_error:-（cargo check 退 $row_exit，输出里没有 error 开头的行）}"
+      invalid_count=$((invalid_count + 1))
+    fi
+  done
+  # 派出去（表里）多少条就要收回多少份判定，对不上退 8（文件头「并行」那一段同一道闸）
+  if ((collected_count != mutation_count)) && ! is_broken countblind; then
+    echo "mutate: 只编不跑：派出去 $mutation_count 条变异，收回 $collected_count 份判定，这一轮的判定不算数" >&2
+    echo "        → 怎么办：这是收束的完整性闸红了，去查 run_compile_only 那一段为什么有一条没记判定，修好整张表重跑" >&2
+    exit 8
+  fi
+  echo "计数：派出去 $mutation_count 条，收回 $collected_count 份判定：编得过 $compiled_count 条、编不过 $invalid_count 条"
+  if [[ "$(sha256sum "$SRC" | cut -d' ' -f1)" != "$ORIGINAL_SUM" ]]; then
+    echo "mutate: $SRC 在这一轮只编不跑的时候被改过；上面的结果量的是开跑时那一份，改完之后重跑" >&2
+    exit 5
+  fi
+  if ((invalid_count)); then
+    echo "mutate: $invalid_count 条替换文编不过（上面 ⏭ 那几行），这几条在平常跑里是无效变异，整轮判失败" >&2
+    echo "        → 怎么办：改那几行替换文，让它编得过、仍改被测行为；或把装置改回能编。改完只编不跑再整张表跑一遍：bash ../mutation/mutate.sh --compile-only $BIN $SRC $TABLE" >&2
+    exit 1
+  fi
+  exit 0
+}
+if ((COMPILE_ONLY)); then
+  run_compile_only
+fi
+
 # 经内存包装跑一次 cargo test：$1 副本目录、$2 编译目录、$3 限时秒数（空串不限时：基线与还原之后那一次）、$4 第几个工作进程（写进并行理由）。
 # cargo 的 stdout 与 stderr 在 scope 里并成一路打到这里的 stdout（判结局读它）；包装自己的 stderr（排队时每 60 秒那一行、撞顶与超时的说明）
 # 打到开跑时的 stderr（WRAPPER_STDERR_FD），工作进程里起的也看得见，不混进判结局的输出。
@@ -985,7 +1312,7 @@ run_capped_cargo_test() {
     is_broken swallowwrapper && wrapper_stderr_fd=1   # 弄坏开关：改前的跑法，包装的话并进判结局的输出、看不见
   fi
   ( cd "$copy_directory" && exec env "${limit_environment[@]}" ${parallel_environment[@]+"${parallel_environment[@]}"} \
-      CARGO_TARGET_DIR="$target_directory" RUN_WITH_MEMORY_CAP_KEY="${CARGO_TEST_COMMAND[*]}" \
+      ${RUSTFLAGS_ENVIRONMENT[@]+"${RUSTFLAGS_ENVIRONMENT[@]}"} CARGO_TARGET_DIR="$target_directory" RUN_WITH_MEMORY_CAP_KEY="${CARGO_TEST_COMMAND[*]}" \
       ${outer_timeout[@]+"${outer_timeout[@]}"} bash "$MEMORY_CAP_RUNNER" "$MEMORY_MAX" bash -c 'exec "$@" 2>&1' mutate-cargo-test "${CARGO_TEST_COMMAND[@]}" ) \
     2>&"$wrapper_stderr_fd"
 }
@@ -1026,7 +1353,7 @@ report_red_baseline() {
   echo "        基线输出末尾 15 行：" >&2
   tail -n 15 -- "$kept" | sed 's/^/          /' >&2
   echo "        整份基线输出留在 $kept（看完自己删）" >&2
-  echo "        → 怎么办：在 research/ 里对没改过的源码单独跑一遍 ${CARGO_TEST_COMMAND[*]}（经 run-with-memory-cap.sh），照上面红的那几条修好，绿了再整张表重跑" >&2
+  echo "        → 怎么办：在 scripts/experiments/ 里对没改过的源码单独跑一遍 $MUTATE_FLAGS_HINT ${CARGO_TEST_COMMAND[*]}（经 run-with-memory-cap.sh），照上面红的那几条修好，绿了再整张表重跑" >&2
 }
 
 # 基线必须全绿，否则后面「红了」分不清是变异造成的还是本来就红。每份副本各跑一次、一起跑，按副本号逐个收退出码；

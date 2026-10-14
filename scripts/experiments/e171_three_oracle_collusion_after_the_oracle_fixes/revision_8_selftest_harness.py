@@ -156,7 +156,7 @@ def run_selftest(script: str, argument_list: list[str], cells: dict, switches: d
         for name, ok, detail in results:
             counted += 1
             red += 0 if ok else 1
-            print(f"{'✓' if ok else '✗'} 自证 {name}：{detail}", flush=True)
+            print(f"{'✓' if ok else '✗'} 自证 {name}：{detail}", flush=True)  # gate-lint:detail
         if rounds > 1:
             print(f"第 {round_number} 轮：{len(results)} 格，红 {sum(1 for _, ok, _ in results if not ok)}", flush=True)
     if wanted is None and not os.environ.get(break_variable):

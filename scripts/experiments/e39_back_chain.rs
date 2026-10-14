@@ -200,6 +200,7 @@ fn items_per_unit(chain_bytes: u64, unit: u64) -> u64 {
 /// ⚠️ 「链宽免费」这个结论**条件于 D23 已定项 4 已定的「记录头完整落在一个原子单元内」**。
 /// E23 已记：不对齐则空间不浪费，**但除第一条外都判不了撕裂**。
 /// 若那条决定被推翻，每条记录多的那几个字节就按比例收费——本函数把那一档也算出来。
+#[cfg(test)]
 fn packed_bytes(chain_bytes: u64, named_items: u64) -> u64 {
     RECORD_HEADER_BYTES + TRANSACTION_FIELD_BYTES + chain_bytes + named_items * ITEM_BYTES
 }

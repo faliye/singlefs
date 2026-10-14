@@ -149,13 +149,11 @@ struct WorldConfiguration {
     /// （记录按事务号顺序追加）。关掉 = 第五版的形态：后续事务照常追加，失败事务的作废信息随崩溃丢失
     records_stop_at_failure: bool,
     /// 第六版 P2 行回收：kind 0 行可删还要求根环里没有该实例发布的根（第五轮反推腿 4.1）
+    #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     row_reclaim_checks_ring: bool,
     /// 第八版 P2：恢复行的 W 按实例分——只有所选根那个实例的 W 可能非 0（jsn 在实例边界必然断号）。
     /// 关掉 = 第七版落地那句的字面：一个全局的「最大已施加事务号」写给每一个实例（第七轮反推腿 3.1）
     row_applied_counter_per_instance: bool,
-    /// 第八版 P3：码 3 的择新键取 (诞生代号, 实例代号)。关掉 = 第七版的「取写序最大者」——
-    /// 同实例连着两个 checkpoint 都不分配新事务号时两版容器写序逐字节相同（第七轮反推腿 2.1）
-    container_key_by_birth: bool,
     /// 生成器手工冻结容器写序的事务号那一维（只有第七轮反推腿 2.1 的世界用）：
     /// 真实形态里容器只在 checkpoint 的固定点写出、写序 = 那次 checkpoint 已分配的最大事务号，
     /// 模型按事务写容器，冻结是把「同一 checkpoint 内写序不变」这个性质手工造出来
@@ -181,7 +179,6 @@ impl WorldConfiguration {
         row_reclaim_checks_ring: true,
         row_published_txg_from_chosen_root: true,
         row_applied_counter_per_instance: true,
-        container_key_by_birth: true,
         container_write_sequence_frozen: false,
     };
 }
@@ -807,6 +804,7 @@ impl World {
 
     /// 第六版 P2 的行回收：kind 0 行可删 ⟺ 盘上不再有该实例按行判未发布的可读单元，
     /// 且（开关）根环里没有该实例发布的根——被抛弃的根留在环里时，它的行是回退候选判据的输入，不是垃圾的影子。
+    #[cfg(test)]
     fn reclaim_rows(&mut self) {
         let ring_instances: BTreeSet<u32> = self.history.iter().map(|history_entry| history_entry.1).chain(self.abandoned_roots.iter().map(|abandoned_root| abandoned_root.1)).collect();
         let watermark_instances: Vec<u32> = self.watermarks.keys().copied().collect();
@@ -818,6 +816,7 @@ impl World {
     }
 
     /// 第六版 P3 的回退候选集：根环里（有效的 + 被抛弃的）按实例表判仍有效的根。真值 = history 里的根。
+    #[cfg(test)]
     fn rollback_candidates(&self) -> Vec<(Txg, u32)> {
         self.history.iter().map(|history_entry| (history_entry.0, history_entry.1)).chain(self.abandoned_roots.iter().copied())
             .filter(|(root_txg, root_instance)| match self.watermarks.get(root_instance) { None => true, Some((published_txg, _)) => *root_txg <= *published_txg })

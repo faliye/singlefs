@@ -452,5 +452,6 @@ case "$UNIT" in
   reuse-selfproof) unit_reuse_selfproof ;;
   *) echo "认不得的单元：$UNIT" >&2; exit 2 ;;
 esac
+# gate-lint:nocount 一次只跑点名的一个单元，不扫一批对象；单元里判了多少写在它自己的输出里
 [ "$PRINT_ONLY" = 1 ] || say "✓ 单元 $UNIT 绿"
 exit 0

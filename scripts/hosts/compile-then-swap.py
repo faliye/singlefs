@@ -12,7 +12,8 @@
 <名>.rs 与 <名>/main.rs。<草稿副本> 与 <草稿目录> 都要在仓外。
 
 做法：
-  1. 把主工作区此刻的 Cargo.toml、Cargo.lock、.cargo/ 与 crates/（不带 target/）拷进 <草稿目录>/compile-then-swap/tree，
+  1. 把主工作区此刻的 Cargo.toml、Cargo.lock、.cargo/、crates/（不带 target/）与每台默认重活线程数的登记文件 .claude/heavy-thread-default
+     （harness 包经 include_str! 在编译时读它，副本里没有就编不过）拷进 <草稿目录>/compile-then-swap/tree，
      把草稿副本放到目标在副本里的位置；主工作区一个字节不碰。
   2. 在副本里 `nice -n 19 cargo build --offline -p <crate> --bin <名>` 与 `cargo test --offline --no-run -p <crate> --bin <名>`
      （后一条编 bin 里的 #[cfg(test)]），CARGO_TARGET_DIR 放 <草稿目录>/compile-then-swap/target。线程数照环境里的
@@ -46,6 +47,8 @@ PATH 上解到的 cargo 不是那一项自己的假 cargo，那一项不跑、�
   outside-crates       crates/ 以外的 .rs 不收，那里有自己的 Cargo.toml 也不收
   tree-removed         跑完之后仓副本不在草稿目录里
   clean-removes-work   --clean 删得掉编译目录
+  thread-registry-copied  库源码里有 include_str 登记文件的标记（假 cargo 照它找 .claude/heavy-thread-default，找不到照真 cargo 退 101）：
+                       仓副本里有那份登记文件，编过、换上
 以 root 跑时目录的只读权限挡不住写，swap-error 会红。
 
 弄坏开关（只给自证判红用，生效时往 stderr 打一行）：COMPILE_THEN_SWAP_BREAK=<一个值>。不认识的值直接拒绝，免得拼错的开关被当成「没开」。
@@ -74,6 +77,8 @@ PATH 上解到的 cargo 不是那一项自己的假 cargo，那一项不跑、�
       non-bin-source（「退出码 1（应当 2）」：假 cargo 照真 cargo 找不到那个 bin、退 101）
   outside-crates      不核目标在不在 crates/ 里
       outside-crates（「退出码 1（应当 2）」：仓副本里没有 tools/，假 cargo 找不到那个 bin）
+  registry-not-copied 仓副本里不拷 .claude/heavy-thread-default
+      thread-registry-copied（「退出码 1（应当 0）」：假 cargo 照 include_str 标记找不到登记文件、退 101）
 """
 import hashlib
 import os
@@ -86,7 +91,7 @@ import tomllib
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "scripts"))
 from project_preflight import preflight  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "kb"))
@@ -94,9 +99,10 @@ from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename  
 
 BREAK_VARIABLE = "COMPILE_THEN_SWAP_BREAK"
 KNOWN_BREAK_MODES = ("swap-on-failure", "skip-test-build", "build-in-root", "skip-race-check", "in-place-write", "swap-error-ignored",
-                     "skip-readback", "keep-tree", "draft-in-repo", "any-crates-source", "outside-crates")
+                     "skip-readback", "keep-tree", "draft-in-repo", "any-crates-source", "outside-crates", "registry-not-copied")
 WORK_DIRECTORY_NAME = "compile-then-swap"
-COPIED_ROOT_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates")
+THREAD_REGISTRY_ENTRY = ".claude/heavy-thread-default"   # harness 经 include_str! 编进来的登记文件（crates/singlefs-harness/src/heavy_threads.rs）
+COPIED_ROOT_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates", THREAD_REGISTRY_ENTRY)
 ERROR_LINES_SHOWN = 40
 EXIT_SWAPPED, EXIT_BUILD_FAILED, EXIT_BAD_INPUT, EXIT_CHANGED_DURING_BUILD, EXIT_SWAP_FAILED = 0, 1, 2, 3, 4
 
@@ -172,15 +178,18 @@ def locate_bin(target, root, mode=""):
     return crate_directory, package, bin_name
 
 
-def copy_workspace(root, tree):
+def copy_workspace(root, tree, mode=""):
     if os.path.lexists(tree):
         shutil.rmtree(tree)
     os.makedirs(tree)
     for entry in COPIED_ROOT_ENTRIES:
+        if entry == THREAD_REGISTRY_ENTRY and mode == "registry-not-copied":
+            continue
         source = os.path.join(root, entry)
         if os.path.isdir(source):
             shutil.copytree(source, os.path.join(tree, entry), symlinks=True, ignore=shutil.ignore_patterns("target", ".git"))
         elif os.path.isfile(source):
+            os.makedirs(os.path.dirname(os.path.join(tree, entry)), exist_ok=True)
             shutil.copy2(source, os.path.join(tree, entry))
 
 
@@ -258,7 +267,7 @@ def swap(draft, target, scratch, root, release=False, after_build=None, after_sw
     lines = [f"目标 {os.path.relpath(target, root)}（包 {package}，bin {bin_name}）；草稿副本 {draft}",
              f"主工作区那份开跑时 sha256 {sha256_of(before)}；草稿副本 sha256 {sha256_of(draft_bytes)}"]
     try:
-        copy_workspace(root, tree)
+        copy_workspace(root, tree, mode)
         tree_target = os.path.join(tree, os.path.relpath(target, root))
         os.makedirs(os.path.dirname(tree_target), exist_ok=True)
         with open(tree_target, "wb") as handle:
@@ -327,6 +336,8 @@ BAD_BIN = "fn main() {\n    println!(\"{}\", unit_check_fields);\n}\n// FAKE_CAR
 BAD_TEST_MODULE = (GOOD_BIN + "#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {\n        missing_helper();\n    }\n}\n"
                    "// FAKE_CARGO: test-build-fails\n")
 OTHER_WRITER_TEXT = GOOD_BIN + "// 别的会话的改动\n"
+REGISTRY_INCLUDE_MARKER = "// FAKE_CARGO: include_str ../../" + THREAD_REGISTRY_ENTRY + "\n"
+REGISTRY_SAMPLE_TEXT = "7  # 自证样本的登记\n"
 BOTH_CARGO_COMMANDS = ("build", "test")
 FAKE_CARGO_LOG_VARIABLE = "COMPILE_THEN_SWAP_FAKE_CARGO_LOG"
 FAKE_CARGO_SCRIPT = r"""#!/usr/bin/env bash
@@ -351,6 +362,16 @@ if [[ ! -f Cargo.toml ]]; then
   echo "error: could not find \`Cargo.toml\` in \`$PWD\` or any parent directory"
   exit 101
 fi
+# 照 include_str! 读编译时的文件：crates/<包>/src/ 下源码里的「FAKE_CARGO: include_str <相对包目录的路径>」标记点名的文件找不到，照真 cargo 退 101
+while IFS= read -r marker_line; do
+  marker_file="${marker_line%%:*}"
+  included="${marker_line##*FAKE_CARGO: include_str }"
+  crate_directory="${marker_file%%/src/*}"
+  if [[ ! -f "$crate_directory/$included" ]]; then
+    echo "error: couldn't read \`$crate_directory/$included\`: No such file or directory (os error 2)"
+    exit 101
+  fi
+done < <(grep -rHo 'FAKE_CARGO: include_str [^[:space:]]*' crates 2>/dev/null)
 source_file=""
 for candidate in crates/*/src/bin/"$bin".rs crates/*/src/bin/"$bin"/main.rs; do
   [[ -f "$candidate" ]] && source_file="$candidate"
@@ -521,6 +542,14 @@ def case_tree_removed(fixture):
     return problems
 
 
+def case_thread_registry_copied(fixture):
+    write_text(fixture.library, LIBRARY_SOURCE + REGISTRY_INCLUDE_MARKER)
+    os.makedirs(os.path.dirname(os.path.join(fixture.root, THREAD_REGISTRY_ENTRY)), exist_ok=True)
+    write_text(os.path.join(fixture.root, THREAD_REGISTRY_ENTRY), REGISTRY_SAMPLE_TEXT)
+    return check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAPPED, GOOD_BIN_CHANGED.encode(),
+                      BOTH_CARGO_COMMANDS)
+
+
 def case_clean_removes_work(fixture):
     problems = check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAPPED, GOOD_BIN_CHANGED.encode(),
                           BOTH_CARGO_COMMANDS)
@@ -545,6 +574,7 @@ SELFTEST_CASES = (
     ("outside-crates", case_outside_crates),
     ("tree-removed", case_tree_removed),
     ("clean-removes-work", case_clean_removes_work),
+    ("thread-registry-copied", case_thread_registry_copied),
 )
 
 
@@ -589,7 +619,7 @@ def selftest():
     print(f"  ✓ compile-then-swap 自检通过（查了 {len(SELFTEST_CASES)} 项，假 cargo 一共被调 {cargo_calls} 次，不起真编译）："
           "编不过的（bin 本身、#[cfg(test)]、新 bin）一个字节不写，编的时候主工作区那份被改了不盖，编过的整份换上且换的是新 inode、"
           "新 bin 建得出来，换上失败与回读对不上都退 4，bin 以外的源文件、crates/ 以外的 .rs、放在主工作区里的草稿都不收，"
-          "cargo 只在仓副本里调，仓副本跑完就删、--clean 删得掉编译目录")
+          "cargo 只在仓副本里调，仓副本带着 include_str 读的登记文件 .claude/heavy-thread-default，仓副本跑完就删、--clean 删得掉编译目录")
     return 0
 
 

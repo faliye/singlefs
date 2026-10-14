@@ -14,8 +14,6 @@ use std::collections::{BTreeMap, BTreeSet};
 /// 一个单元在盘上的身份。第一个引用者住单元头（O(1)，不进反向索引）。
 #[derive(Clone)]
 struct Unit {
-    /// 单元头里那个「我属于谁」——**恒有且只有一个**，定长头装得下。
-    owner: u32,
     /// 除单元头那个之外的引用者。**只有这些进反向索引。**
     extra_referrers: BTreeSet<u32>,
 }
@@ -46,7 +44,7 @@ impl Workload {
 /// 按负载造一批单元。共享引用均匀撒在前若干个单元上。
 fn build(workload: Workload) -> Vec<Unit> {
     let mut built_units: Vec<Unit> = (0..workload.units)
-        .map(|unit_index| Unit { owner: unit_index as u32, extra_referrers: BTreeSet::new() })
+        .map(|_unit_index| Unit { extra_referrers: BTreeSet::new() })
         .collect();
     let mut referrer: u32 = 1_000_000;
     for snapshot_index in 0..workload.snapshots {

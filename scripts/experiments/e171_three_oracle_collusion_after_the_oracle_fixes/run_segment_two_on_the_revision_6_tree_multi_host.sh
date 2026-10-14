@@ -42,10 +42,10 @@ fi
 mkdir -p "$DUMPS"
 if [ -s "$DUMPS/run-date" ]; then
   DATE=$(cat "$DUMPS/run-date")
-  if [ -n "${RUN_DATE:-}" ] && [ "$RUN_DATE" != "$DATE" ]; then echo "✗ RUN_DATE=$RUN_DATE 与 $DUMPS/run-date 记下的 $DATE 不同（续跑照记下的）" >&2; exit 2; fi
+  if [ -n "${RUN_DATE:-}" ] && [ "$RUN_DATE" != "$DATE" ]; then echo "✗ RUN_DATE=$RUN_DATE 与 $DUMPS/run-date 记下的 $DATE 不同（续跑照记下的）" >&2; echo "→ 怎么办：去掉 RUN_DATE 续跑，或换一个新的输出根从头跑" >&2; exit 2; fi
 else
   DATE=${RUN_DATE:-$(TZ=Asia/Tokyo date +%F)}
-  ( set -o noclobber; echo "$DATE" > "$DUMPS/run-date" ) || { echo "✗ 写不了 $DUMPS/run-date" >&2; exit 2; }
+  ( set -o noclobber; echo "$DATE" > "$DUMPS/run-date" ) || { echo "✗ 写不了 $DUMPS/run-date" >&2; echo "→ 怎么办：看 $DUMPS 在不在、有没有写权限，或那个文件已经被别的一趟建了" >&2; exit 2; }
 fi
 PREFIX=research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-$DATE-s2
 LOGS=$SCRATCH/sequence-segment-2-$DATE$SUFFIX

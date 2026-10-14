@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+# 警告按错误处理（.claude/singlefs-ai-sop/rules/code-discipline.md「用不到的代码删掉」、command-safety.md「警告是免费的信号」）：
+# 这个包自成一个工作区、不吃仓根的 lint 配置，在这里另写一份；只在单测里读的字段标 cfg_attr(not(test), expect(dead_code, …))。
+[lints.rust]
+warnings = "deny"
 
 [lib]
 path = "lib.rs"

@@ -9,7 +9,7 @@
 # 每一条：临时目录里建 16 MiB 数据盘与日志盘，blklogwrites 配置与 vm-bench.sh 同一套（数据节点 cache.direct=on,aio=native，日志节点 driver=file，
 # log-sector-size=512,log-append=off），一次 writev 交 N 个 4 KiB 段，每条用一个不同的填充字节。判五项：
 #   qemu-io 退 0，输出里有 wrote N*4096/N*4096 那一行、没有 failed；
-#   日志超级块魔数、版本、扇区大小对，条数恰好 2（那一笔 WRITE 加 qemu-io 关盘时刷的 FLUSH）；
+#   日志系统配置魔数、版本、扇区大小对，条数恰好 2（那一笔 WRITE 加 qemu-io 关盘时刷的 FLUSH）；
 #   第 1 扇区是 WRITE 条目头：盘扇区 0、N*8 扇区（全零就是空洞：那一笔日志没写进去），它之后第 N*8+2 扇区是 FLUSH 条目头；
 #   日志里那一条的数据与写进去的逐字节相同；
 #   数据盘前 N*4096 字节与写进去的逐字节相同。
@@ -18,7 +18,7 @@
 #
 # 弄坏开关 QEMU_BLKLOGWRITES_CHECK_BREAK=<项>（只给证红用；--selftest 里点名的那一格判错）：
 #   skip-qemu-io-status     不看 qemu-io 的退出码与 wrote 那一行 → 「qemu-io 报 writev failed，日志与数据盘都对」那一格
-#   skip-superblock-count   不核超级块条数                     → 「超级块条数多一条」那一格
+#   skip-system_configuration-count   不核系统配置条数                     → 「系统配置条数多一条」那一格
 #   skip-entry-shape        不核两个条目头（含空洞）           → 「第一条条目头的盘扇区写成 8」「原版 1023 段的空洞」两格
 #   skip-payload-compare    不比日志里那一条的数据             → 「日志数据错一个字节」那一格
 #   skip-disk-compare       不比数据盘                         → 「数据盘错一个字节」那一格
@@ -63,7 +63,7 @@ IOV_MAX = 1024
 LOG_MAGIC = 0x6A736677736872
 LOG_VERSION = 1
 FLUSH_FLAG = 1
-SUPERBLOCK_FORMAT = "<QQQI"
+SYSTEM_CONFIGURATION_FORMAT = "<QQQI"
 ENTRY_FORMAT = "<QQQQ"
 
 
@@ -74,9 +74,9 @@ def pad_to_sector(header_bytes):
 def write_images(disk_path, log_path, segment_count, pattern_byte, log_shape, mutation=""):
     """Write a data disk and a dm-log-writes log the way blklogwrites leaves them after one writev and a close.
 
-    log_shape "complete": superblock, WRITE entry with the data, FLUSH entry.
+    log_shape "complete": system_configuration, WRITE entry with the data, FLUSH entry.
     log_shape "hole": what unpatched QEMU 8.2.2 leaves after EINVAL on the log write: the WRITE entry
-    region stays zero, the FLUSH entry sits where it would have followed it, the superblock counts both.
+    region stays zero, the FLUSH entry sits where it would have followed it, the system_configuration counts both.
     """
     data_bytes = segment_count * SEGMENT_BYTES
     data_sectors = data_bytes // SECTOR_BYTES
@@ -89,9 +89,9 @@ def write_images(disk_path, log_path, segment_count, pattern_byte, log_shape, mu
         disk_payload[data_bytes // 2] ^= 0xFF
     with open(disk_path, "r+b") as disk_file:
         disk_file.write(disk_payload)
-    entry_count = 3 if mutation == "superblock-count-3" else 2
+    entry_count = 3 if mutation == "system_configuration-count-3" else 2
     with open(log_path, "r+b") as log_file:
-        log_file.write(pad_to_sector(struct.pack(SUPERBLOCK_FORMAT, LOG_MAGIC, LOG_VERSION, entry_count, SECTOR_BYTES)))
+        log_file.write(pad_to_sector(struct.pack(SYSTEM_CONFIGURATION_FORMAT, LOG_MAGIC, LOG_VERSION, entry_count, SECTOR_BYTES)))
         if log_shape == "complete":
             entry_disk_sector = 8 if mutation == "entry-sector-8" else 0
             log_file.seek(SECTOR_BYTES)
@@ -133,7 +133,7 @@ sys.exit(fake_main(sys.argv[1:]))
 '''
 
 CASE_SEGMENT_COUNTS = (1022, 1023, 1024, 2048)
-BREAK_ITEMS = ("skip-qemu-io-status", "skip-superblock-count", "skip-entry-shape", "skip-payload-compare", "skip-disk-compare")
+BREAK_ITEMS = ("skip-qemu-io-status", "skip-system_configuration-count", "skip-entry-shape", "skip-payload-compare", "skip-disk-compare")
 QEMU_IO_TIMEOUT_SECONDS = 120
 FIX_HOWTO = ("这份 qemu-io 的 blklogwrites 没打 scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch，或打了没生效；"
              "跑 scripts/devices/build-patched-qemu.sh 装补好的版本，再拿它装进的私有目录的 bin/qemu-io 重核")
@@ -167,14 +167,14 @@ def judge_case(segment_count, pattern_byte, qemu_io_status, qemu_io_output, disk
         if qemu_io_status != 0 or "failed" in qemu_io_output or wrote_line not in qemu_io_output:
             problems.append("qemu-io 退出码 %d、输出「%s」，要退 0 且有「%s」" % (qemu_io_status, " / ".join(qemu_io_output.split("\n")[:2]).strip(), wrote_line))
     with open(log_path, "rb") as log_file:
-        superblock = log_file.read(SECTOR_BYTES)
-        if len(superblock) < SECTOR_BYTES:
-            return problems + ["日志只有 %d 字节，读不出超级块" % len(superblock)]
-        magic, version, entry_count, sector_size = struct.unpack_from(SUPERBLOCK_FORMAT, superblock)
+        system_configuration = log_file.read(SECTOR_BYTES)
+        if len(system_configuration) < SECTOR_BYTES:
+            return problems + ["日志只有 %d 字节，读不出系统配置" % len(system_configuration)]
+        magic, version, entry_count, sector_size = struct.unpack_from(SYSTEM_CONFIGURATION_FORMAT, system_configuration)
         if (magic, version, sector_size) != (LOG_MAGIC, LOG_VERSION, SECTOR_BYTES):
-            return problems + ["日志超级块不对：魔数 0x%x、版本 %d、扇区 %d 字节，该是 0x%x、%d、%d" % (magic, version, sector_size, LOG_MAGIC, LOG_VERSION, SECTOR_BYTES)]
-        if break_item != "skip-superblock-count" and entry_count != 2:
-            problems.append("日志超级块记了 %d 条，该是 2 条（WRITE 加关盘时的 FLUSH）" % entry_count)
+            return problems + ["日志系统配置不对：魔数 0x%x、版本 %d、扇区 %d 字节，该是 0x%x、%d、%d" % (magic, version, sector_size, LOG_MAGIC, LOG_VERSION, SECTOR_BYTES)]
+        if break_item != "skip-system_configuration-count" and entry_count != 2:
+            problems.append("日志系统配置记了 %d 条，该是 2 条（WRITE 加关盘时的 FLUSH）" % entry_count)
         log_file.seek(SECTOR_BYTES)
         write_header = log_file.read(SECTOR_BYTES)
         logged_payload = log_file.read(data_bytes)
@@ -287,7 +287,7 @@ def selftest():
             # (格名, 段数, 日志形状, 手造的坏处, qemu-io 退出码, qemu-io 输出, 该红, 红的说明里要有的字, 弄坏哪个开关这一格判错)
             ("补好的形状、1023 段", 1023, "complete", "", 0, "wrote 4190208/4190208 bytes at offset 0", False, "", ""),
             ("qemu-io 报 writev failed，日志与数据盘都对", 1022, "complete", "", 1, "writev failed: Invalid argument", True, "qemu-io", "skip-qemu-io-status"),
-            ("超级块条数多一条", 1022, "complete", "superblock-count-3", 0, "wrote 4186112/4186112 bytes at offset 0", True, "超级块", "skip-superblock-count"),
+            ("系统配置条数多一条", 1022, "complete", "system_configuration-count-3", 0, "wrote 4186112/4186112 bytes at offset 0", True, "系统配置", "skip-system_configuration-count"),
             ("第一条条目头的盘扇区写成 8", 1022, "complete", "entry-sector-8", 0, "wrote 4186112/4186112 bytes at offset 0", True, "第一条条目头", "skip-entry-shape"),
             ("原版 1023 段的空洞", 1023, "hole", "", 0, "wrote 4190208/4190208 bytes at offset 0", True, "空洞", "skip-entry-shape"),
             ("日志数据错一个字节", 1022, "complete", "log-byte-flip", 0, "wrote 4186112/4186112 bytes at offset 0", True, "日志里那一条的数据", "skip-payload-compare"),
@@ -330,9 +330,9 @@ def selftest():
     total = judged_right + len(judged_wrong)
     if judged_wrong:
         print("  ✗ 自证 %d 格里 %d 格判错：%s" % (total, len(judged_wrong), "、".join(judged_wrong)))
-        print("     → 怎么办：看上面每一格 ✗ 的说明；设了 QEMU_BLKLOGWRITES_CHECK_BREAK 的话，判错的应当正是它点名的那一格")
+        print("     → 怎么办：看上面每一格判错的说明；设了 QEMU_BLKLOGWRITES_CHECK_BREAK 的话，判错的应当正是它点名的那一格")
         return 1
-    print("  ✓ 自证 %d 格全部判对（手造日志 %d 格、假 qemu-io 两种形状各走一遍）" % (total, len(direct_cases)))
+    print(f"  ✓ 自证 {judged_right + len(judged_wrong)} 格全部判对（手造日志 {len(direct_cases)} 格、假 qemu-io 两种形状各走一遍）")
     return 0
 
 

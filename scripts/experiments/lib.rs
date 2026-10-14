@@ -132,7 +132,7 @@ pub fn admission_decision_of(exit_code: Option<i32>, admission_stdout: &str) -> 
 /// 说明由准入模块直接打到 stderr。仓库根在编译时写进二进制（`CARGO_MANIFEST_DIR` 往上两级）。
 pub fn admit_experiment_run_or_exit(admission_key: &str) -> Vec<String> {
     let repository_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
-    let admission_script = repository_root.join("scripts").join("admission.py");
+    let admission_script = repository_root.join("scripts").join("gate").join("admission.py");
     let admission_output = match std::process::Command::new("python3")
         .arg(&admission_script)
         .arg("experiment")

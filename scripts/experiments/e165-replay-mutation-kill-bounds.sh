@@ -26,8 +26,8 @@
 #       列 7 行（基线 1 个、变体 6 个），不编不跑。
 #
 #   第 4 次重跑 research/prompts/e165-r4-prereg.md 9.3（第二段，加 --profile r4 模式；不给 --profile 仍是 r2 那一套，--profile r3 仍是 r3 那一套，一个字不改）：
-#   基线与每个变体调装置都是 --profile r4 --bounds segment1 --family root_choice_faults；变体名单是 9.1 那六个名字（登记名 v1822–v1827，r3 的编号当名字用，今天主工作区里是
-#   crates/mutations.tsv 的第 1821–1826 行；按名字选行，改的文件取变异行第二列，原文命中处要落在 choose_root_slot 或 choose_root 里）；每个变体逐 (域, M, U, 被判时故障,
+#   基线与每个变体调装置都是 --profile r4 --bounds segment1 --family root_choice_faults；变体名单是 9.1 那六个名字（登记名 v1822–v1827，r3 的编号当名字用，在
+#   根里的 crates/mutations.tsv 按名字选行，改的文件取变异行第二列，原文命中处要落在 choose_root_slot 或 choose_root 里）；每个变体逐 (域, M, U, 被判时故障,
 #   历史标签) 比 KJ0、KJ1、KJ1T、KJ2、KJ3 的违例数与 root_choice_fault_states 行，全跑不早停；产物每个变体一行（first_red_by_criterion 先 KJ1、KJ1T、KJ2 再 KJ0、KJ3，
 #   每格违例数合计 cells、ka_kj2 与 ka_pin、kg_pin、differs_on）；红例账不落。四个合法域任一子格上 KJ1、KJ1T、KJ2 与基线不同才记 red；只在 KG 或 KA 上与基线不同记
 #   not_red_within_bounds 并报 differs_on=KG|KA|KG+KA。变体在 KA 上 KJ2 的违例数不等于登记钉值（v1823 → 18、v1824 → 52、v1825 → 36、v1826 → 18）记 ka_pin=mismatch，
@@ -67,6 +67,8 @@
 #       「r5：给了 --pins r5 应当按 r5 钉值核对、在旧钉值的假仓上停在 RH1」（三个模式各一格；实际退 0）
 #   E165_KILL_BOUNDS_BREAK=r4gateignored  给了 --gate r2 而调装置不带 --gate r2
 #       「r5：--gate r2 整轮应当退 0、假装置每一次被调都带 --gate r2、产物带 gate=r2」（实际退 7：基线缺 R2 的闸字段、变体一个不编）
+#   E165_KILL_BOUNDS_BREAK=defaultone  --jobs、--threads 都不给时取 1 × 1（改前的样子），不取登记的重活默认并行度
+#       「--jobs、--threads 的缺省：…」（实际 (1, 1)）
 #
 #   e165-replay-mutation-kill-bounds.sh --list-items
 #       逐行列变体（基线 1 个、crates/mutations.tsv 里 21 种不同的替换、自造 5 条，共 27 行），不编不跑。
@@ -125,6 +127,8 @@
 #   （SQ5 要 Z5 的这一格；每个变体都报）。
 #
 # 并行：--jobs 个变体同时做，每个变体的编译与装置各用 --threads 条线程；经 scripts/hosts/capped.sh N 起时 jobs × threads 不许超过 N。
+#   缺省：--jobs 不给是 1；--threads 不给是 N ÷ --jobs（向下取整，至少 1），N = SINGLEFS_THREAD_CAP，没设取登记的重活默认并行度（.claude/heavy-thread-default，
+#   scripts/hosts/heavy_threads.py）；所以什么都不给是 1 个变体、N 条线程（登记 31 时 jobs 1 × threads 31，--jobs 4 时 4 × 7）。
 # 内存：跑编译出来的二进制一律经 scripts/hosts/run-with-memory-cap.sh（上限 E165_KILL_BOUNDS_MEMORY_CAP，默认 512M：
 #   2026-10-01 量到基线 --bounds segment1 --family legal 的峰值 47 MiB，变体的用量没逐个量过，留十倍）；退出码 245（显存不够：起止之间内核报了
 #   NV_ERR_NO_MEMORY，单独报「显存不够」）与 250–254 的那一次不算结果，那个变体不落行，整条退 1（判法 wrapper_own_problem，三套变体共用）。
@@ -208,7 +212,9 @@ import time
 sys.dont_write_bytecode = True
 SELF_PATH = os.environ["E165_KILL_BOUNDS_SELF_PATH"]
 SCRIPT_DIRECTORY = os.path.dirname(SELF_PATH)
-DEFAULT_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+sys.path.insert(0, os.path.join(SCRIPT_DIRECTORY, "..", "hosts"))
+from heavy_threads import default_heavy_threads  # noqa: E402
+DEFAULT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 BIN_NAME = "e165_replay_bounded_enumeration"
 RECOVERY_PATH = "crates/singlefs-core/src/recovery.rs"
 LIB_PATH = "crates/singlefs-replay-prefix/src/lib.rs"
@@ -250,15 +256,15 @@ REGISTERED = {
         (354, "增补 2 第 61 行（C519 已知丢失）：施加前的点名单元验证改成任一条位置条目验过即过（改法 Z2 被悄悄落地时已知丢失那条先红）", ["PD17"]),
         (355, "增补 2 第 62 行（C533 复现）：前缀跨实例边界，写行那条孤记录进了水位之上", ["PD1"]),
         (406, "并行线一：C376：每条记录都当成它那次发布的末条（发布边界不认，前缀停在发布中间也施加）", ["PD19"]),
-        (414, "并行线一：层 0：发布边界不认（每条记录都当末条）", ["PD19"]),
+        (414, "并行线一：崩溃点重放：发布边界不认（每条记录都当末条）", ["PD19"]),
         (448, "P6 后一半：锚点读不出时不看本次发布内序号，链首接在下一次发布的第二条上（三方第一轮 K4-b）", []),
         (512, "实二十：锚点取读法甲——所选根那次发布读得出的记录里 jsn 最大那条，不看末条标志（替换第 438 行那条锚点已腐化的变异）", ["PD3", "PD4"]),
         (513, "实二十：所选根那次发布带末条标志的多于一条时不停下（条款没写那一格照常接链）", ["PD4"]),
         (514, "实二十：一次发布之内跳号不断链", ["PD13"]),
         (515, "实二十：一个事务的提交标记没出现、下一条换了事务号也照接", ["PD14"]),
         (516, "实二十：末条不带提交标记也整次施加", ["PD15"]),
-        (517, "实二十：层 0 L8：恢复在不带提交标记的记录上就停（一事务一条时的旧写法，跨两条记录的事务永远施加不上）", ["PD15"]),
-        (518, "实二十：层 0 L8：恢复把不带末条标志的记录也当末条（半次发布施加上去）", ["PD20"]),
+        (517, "实二十：崩溃点重放 L8：恢复在不带提交标记的记录上就停（一事务一条时的旧写法，跨两条记录的事务永远施加不上）", ["PD15"]),
+        (518, "实二十：崩溃点重放 L8：恢复把不带末条标志的记录也当末条（半次发布施加上去）", ["PD20"]),
         (613, "实二二三 b（C539，D23 已定项 4 读者规则）：锚点读得出时下一次发布的首条序号不是 1 照接", ["PD11"]),
         (614, "实二二三 b（C540，D23 已定项 4 读者规则）：带末条标志的那一条之后同一 (实例, txg) 还有记录照字面按标志认边界", ["PD16"]),
         (920, "实审 A2a 第 25 条：链值不等的记录照样进重放前缀", ["PD8"]),
@@ -294,7 +300,7 @@ BREAK_MODES = ("noanchorcheck", "rerunall", "progressnever", "byrownumber", "nod
                "j6qnfromj6", "noprofile", "noprofilecheck", "zfirstfour",
                "r3itemsmissing", "r3firstredswap", "r3kapinunchecked", "r3noprofile",
                "r4itemsmissing", "r4firstredswap", "r4kgcountsasred", "r4kgpinunchecked", "r4noprofile",
-               "r5pinsignored", "r4gateignored", "gpumemoryasresult", "owntablesplit")
+               "r5pinsignored", "r4gateignored", "gpumemoryasresult", "owntablesplit", "defaultone")
 # 外面打开时自证的 r2 那几趟原样传进去的四项（文件头「弄坏开关」）
 R2_BREAK_MODES = ("j6qnfromj6", "noprofile", "noprofilecheck", "zfirstfour")
 # 外面打开时自证的 r3 那几趟原样传进去的四项（登记 r3 9.3 第 6 条的表）；别的趟不带
@@ -439,6 +445,14 @@ for mode in BREAK:
     if mode not in BREAK_MODES:
         sys.exit(f"  ✗ 不认识的弄坏开关：{mode}\n  → 怎么办：E165_KILL_BOUNDS_BREAK 只认 {'、'.join(BREAK_MODES)}")
     print(f"  ! 弄坏开关开着：{mode}（只给自证用，这一次的结果不算数）", file=sys.stderr)
+
+
+def default_jobs_and_threads(jobs, threads, environment=os.environ):
+    """没给 --jobs 是 1；没给 --threads 是 N ÷ jobs（向下取整，至少 1），N 是 SINGLEFS_THREAD_CAP，没设取登记的重活默认并行度。"""
+    if "defaultone" in BREAK:   # 弄坏开关：改前的样子
+        return jobs or 1, threads or 1
+    jobs = jobs or 1
+    return jobs, threads or max(1, default_heavy_threads(environment) // jobs)
 
 
 class Stop(Exception):
@@ -2278,6 +2292,7 @@ def main_run_r3(setup, options, item_names):
     print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}")
     if pin_mismatches:
         print(f"  ✗ KA 钉值对不上（TF8）：{' '.join(pin_mismatches)}；这几个变体的 K 族结果不能读成「没有取样点」，交主 agent；别的变体照判")
+        print("     → 怎么办：把这几个变体的 KA 读数与跑前登记 TF8 钉的值并排交主 agent，由主 agent 判是登记钉错还是装置算错")
     if outcomes.get("not_compared", 0):
         print("  ✗ 有变体选行不满足（TH5）记了 not_compared，交主 agent；别的变体照判")
     return EXIT_INCOMPLETE if pin_mismatches or outcomes.get("not_compared", 0) else EXIT_OK
@@ -2435,8 +2450,10 @@ def main_run_r4(setup, options, item_names):
     print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}")
     if pin_mismatches:
         print(f"  ✗ KA 钉值对不上（TF7）：{' '.join(pin_mismatches)}；这几个变体的合法域结果不能读成「没有取样点」，交主 agent；别的变体照判")
+        print("     → 怎么办：把这几个变体的 KA 读数与跑前登记 TF7 钉的值并排交主 agent，由主 agent 判是登记钉错还是装置算错")
     if kg_mismatches:
         print(f"  ✗ KG 钉值对不上（TF7）：{' '.join(kg_mismatches)}；这几个变体在 KG 上的落点不是登记写的那一种择根序加理想重放，交主 agent；别的变体照判")
+        print("     → 怎么办：把这几个变体在 KG 上的落点与跑前登记 TF7 写的择根序并排交主 agent，由主 agent 判是登记写错还是装置算错")
     if outcomes.get("not_compared", 0):
         print("  ✗ 有变体选行不满足（TH5）记了 not_compared，交主 agent；别的变体照判")
     return EXIT_INCOMPLETE if pin_mismatches or kg_mismatches or outcomes.get("not_compared", 0) else EXIT_OK
@@ -2452,7 +2469,7 @@ def measure(setup, options, name):
     directory = os.path.join(options["work"], "measure-" + name)
     binary, problem, build_seconds = prepare_and_build(setup, item, directory, options["threads"], wrap_build_for_measure=True)
     peak = "没读到"
-    peaks_path = os.path.join(setup.research_root, "scripts/hosts/memory-peaks.tsv")
+    peaks_path = os.environ.get("RUN_WITH_MEMORY_CAP_PEAKS") or os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "singlefs", "memory-peaks.tsv")
     if os.path.exists(peaks_path):
         for line in open(peaks_path, encoding="utf-8"):
             fields = line.rstrip("\n").split("\t")
@@ -2697,6 +2714,7 @@ while index < len(arguments):
         index += 1
 if 'root_choice' in rest and profile != 'r3':
     print('  ✗ --family root_choice 只在 --profile r3 时有', file=sys.stderr)
+    print('     → 怎么办：加 --profile r3 重跑，或换一个别的 --family', file=sys.stderr)
     sys.exit(2)
 rows = ['E7RESULT name=config experiment=E165 bounds=segment1 family=root_choice profile=r3']
 cells = [('K', 1, 0), ('K', 1, 1), ('K', 1, 2), ('K9', 1, 0), ('KW', 1, 0), ('KW', 1, 1)]
@@ -2882,11 +2900,20 @@ def selftest():
         with open(path, encoding="utf-8") as handle:
             return handle.read()
 
+    # --jobs、--threads 的缺省：登记文件第一条非注释行的数是 N；什么都不给 1 × N，只给 --jobs J 是 J × (N ÷ J)，设了上限 7 取 7，两个都给原样
+    registered = next((int(line.split()[0]) for line in read(os.path.join(DEFAULT_ROOT, ".claude", "heavy-thread-default")).splitlines()
+                       if line.strip() and not line.lstrip().startswith("#")), None)
+    defaults = (default_jobs_and_threads(None, None, {}), default_jobs_and_threads(4, None, {}), default_jobs_and_threads(None, None, {"SINGLEFS_THREAD_CAP": "7"}),
+                default_jobs_and_threads(2, 3, {}), default_jobs_and_threads(None, 5, {}))
+    expect(registered is not None and defaults == ((1, registered), (4, max(1, registered // 4)), (1, 7), (2, 3), (1, 5)),
+           f"--jobs、--threads 的缺省：什么都不给要 1 × 登记的重活默认并行度（{registered}）、只给 --jobs 4 要 4 × 登记值 ÷ 4、上限 7 要 1 × 7、给了的原样（实际 {defaults}）",
+           "看 default_jobs_and_threads 与 .claude/heavy-thread-default")
+
     with tempfile.TemporaryDirectory(prefix="e165-kill-bounds-selftest-") as temporary:
         # 内存包装自己的结局：不是自证模式的 Setup（经包装起），包装换成假的（它所在的根下 scripts/hosts/run-with-memory-cap.sh 只退给定的码），
         # 走 run_segment_two 跑一趟，再照三套变体共用的 wrapper_own_problem 判
         wrapper_root = os.path.join(temporary, "wrapper-root")
-        os.makedirs(os.path.join(wrapper_root, "scripts"))
+        os.makedirs(os.path.join(wrapper_root, "scripts", "hosts"))
         wrapper_codes = {}
         for wrapper_exit in (245, 252, 101):
             write(os.path.join(wrapper_root, "scripts/hosts/run-with-memory-cap.sh"),
@@ -3537,7 +3564,7 @@ def selftest():
 
 
 def main(arguments):
-    options = {"jobs": 1, "threads": 1}
+    options = {"jobs": None, "threads": None}   # 没给的由 default_jobs_and_threads 补
     item_names = []
     scratch = output = ledger = measure_name = None
     root = DEFAULT_ROOT
@@ -3590,6 +3617,7 @@ def main(arguments):
             if not re.match(r"^[1-9][0-9]*$", value):
                 raise Stop(EXIT_USAGE, f"  ✗ {argument} 要正整数，收到「{value}」\n  → 怎么办：写成 {argument} 4")
             options["jobs" if argument == "--jobs" else "threads"] = int(value)
+    options["jobs"], options["threads"] = default_jobs_and_threads(options["jobs"], options["threads"])
     if action == "selftest":
         return selftest()
     if gate is not None and (profile != "r4" or pins != "r5"):
@@ -3620,6 +3648,7 @@ def main(arguments):
         if os.path.exists(options["work"]):
             print(subprocess.run(["du", "-sh", options["work"]], stdout=subprocess.PIPE, text=True).stdout.strip())
             shutil.rmtree(options["work"])
+        # gate-lint:nocount 这一句是收尾删工作目录，判了多少写在各段的 E7RESULT 行与汇总里
         print(f"  ✓ 已删 {options['work']}")
         return EXIT_OK
     cap = os.environ.get("SINGLEFS_THREAD_CAP")

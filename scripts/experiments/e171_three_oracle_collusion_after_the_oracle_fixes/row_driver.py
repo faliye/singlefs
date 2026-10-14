@@ -11,7 +11,7 @@
 
 跑法（在仓根，经 `scripts/hosts/capped.sh`；装置与执行器本身经 `run-with-memory-cap.sh`）：
   python3 row_driver.py --repo-root <仓根> --work-root <草稿目录> --output-root <输出根> --rows 1,6 [--empty-mutation]
-      [--threads 6] [--memory-cap 4G] [--lanes 1] [--positive-control O1-对拍|O1-崩溃判官|O2|O3] [--disable-oracle O1|O2]
+      [--threads <每线道，缺省 = 登记的重活默认并行度 ÷ --lanes>] [--memory-cap 4G] [--lanes 1] [--positive-control O1-对拍|O1-崩溃判官|O2|O3] [--disable-oracle O1|O2]
       [--no-executor] [--o3-control-bad-states <E170 bad-states 的导出目录>] [--skip-finished] [--snapshot-from <冻住的树>]
       [--selected-rows <表>] [--other-selected-rows <别的表> …]
 F4 扩表（登记 5.2「扩表」）：`--selected-rows bad-implementations-expansion-164.tsv --other-selected-rows bad-implementations-117.tsv --all`；
@@ -614,6 +614,16 @@ def lane_worker(lane: int, jobs: "queue.Queue[tuple[int, int, SelectedRow | None
             results[position] = {"row_number": number, "status": "driver_error", "error": f"{type(error).__name__}:{error}"}
 
 
+def threads_per_lane(threads: int | None, lanes: int, environment=os.environ) -> int:
+    """每条线道的线程数：给了照它；没给取登记的重活默认并行度（SINGLEFS_THREAD_CAP 设了取它）÷ 线道数，向下取整，至少 1。"""
+    if threads is not None:
+        return threads
+    # 现用现引：第二台上这份驱动单独拷在套件目录里（rows_orchestrator 总是显式给 --threads），那里没有 scripts/hosts，不能在导入时引
+    sys.path.insert(0, os.path.join(HERE, "..", "..", "hosts"))
+    from heavy_threads import default_heavy_threads
+    return max(1, default_heavy_threads(environment) // max(1, lanes))
+
+
 def main(argument_list: list[str]) -> int:
     parser = argparse.ArgumentParser(description="E171 逐行驱动")
     parser.add_argument("--repo-root", required=True)
@@ -631,7 +641,7 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--first-slice", action="store_true", help="第一刀：每个文件 i = 0 那一行（24 行）")
     parser.add_argument("--all", action="store_true", help="117 行")
     parser.add_argument("--empty-mutation", action="store_true", help="另跑空变异：拿表里第一行、把替换文换成原文本身（行目录 row-0）")
-    parser.add_argument("--threads", type=int, default=6)
+    parser.add_argument("--threads", type=int, default=None, help="每条线道的线程数；不给取登记的重活默认并行度 ÷ --lanes（向下取整，至少 1）")
     parser.add_argument("--memory-cap", default="4G")
     parser.add_argument("--lanes", type=int, default=1)
     parser.add_argument("--positive-control", choices=list(DEVICE_POSITIVE_CONTROLS) + [O3_CONTROL])
@@ -651,6 +661,7 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--timing-output", required=True,
                         help="新文件（已存在就拒）：每行装置 device.out 里的 E7TIMING 行原样收进来，每行前一行 row_device（修订 2 第 2.6 节）")
     arguments = parser.parse_args(argument_list)
+    arguments.threads = threads_per_lane(arguments.threads, arguments.lanes)
     if os.path.exists(arguments.timing_output):
         parser.error(f"--timing-output {arguments.timing_output} 已存在，不覆盖")
     with open(arguments.baseline_timing, encoding="utf-8") as handle:

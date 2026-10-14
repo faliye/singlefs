@@ -2018,7 +2018,7 @@ fn solve_write_ahead_log_batch_checkpoint(shape: PoolShape, arm: WriteAheadLogAr
     let allocation_dirty_total = sum_f64(&core.allocation_dirty);
     let mapping_dirty_total = sum_f64(&core.mapping_dirty);
 
-    let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+    let (extent_catch_up, _inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
         WriteAheadLogArm::WriteAheadLogFull => (0.0, 0.0, 0.0, 0u64),
         WriteAheadLogArm::WriteAheadLogLeaf => {
             let extent_ancestors: f64 = core.extent_dirty[1..].iter().sum();
@@ -3387,6 +3387,7 @@ mod e159_anchor_and_rule_tests {
 
     /// M13 的变异目标：开环 `issued_at` 必须取排定时刻，不取实际发出时刻——发晚的那一段也算等待。
     #[test]
+    // wallclock-assert-load-safe: 睡 5 ms 之后只断言至少过了 4 ms，是下界，睡过头只会让差更大，负载高也过
     fn open_loop_issued_at_uses_scheduled_instant_not_actual() {
         let scheduled = Instant::now();
         std::thread::sleep(Duration::from_millis(5));
@@ -3477,6 +3478,7 @@ mod e159_anchor_and_rule_tests {
     /// A3：`made_durable_at` 必须是根槽那次 FUA（写 + 第 3 道屏障）返回之后的时刻，不能早于它
     /// （M2 的变异目标：在第一道屏障之后就把这个时刻报出去）。
     #[test]
+    // wallclock-assert-load-safe: 比的是同一线程里先后录下的两个时刻（根槽写与屏障先发生，made_durable_at 后取），单调时钟上次序由调用先后定，与耗时无关
     fn jia_durable_instant_is_not_earlier_than_the_root_slot_fua() {
         let (_plan, made_durable_at, log) = run_recorded_jia_batch(11);
         let last_root_related_timestamp = log
@@ -3553,6 +3555,7 @@ mod e159_anchor_and_rule_tests {
     /// 正确实现下，至少要有一个样本的 `batch_started_at − issued_at`（排队段）明显为正；
     /// 若 `issued_at` 被换成收批时刻，这一段恒为 0，断言必红。
     #[test]
+    // wallclock-assert: 真线程跑 400 ms 固定窗口，要求窗口内样本数不少于 4 且最大排队段至少 10 ms，窗口内能跑几批随负载变
     fn closed_loop_queueing_delay_is_counted_when_group_commit_is_off() {
         let device: Arc<dyn BlockDevice> = Arc::new(SleepingBlockDevice { barrier_delay: Duration::from_millis(15) });
         let configuration = CellConfiguration {
@@ -3585,6 +3588,7 @@ mod e159_anchor_and_rule_tests {
     /// （约等于注入时长），在没被注入的批上应当接近 0；两者都要出现，否则说明注入没起作用
     /// 或者起作用的时机不对。
     #[test]
+    // wallclock-assert: 真线程跑 300 ms 固定窗口，要求样本数不少于 4，且放行间隔既有不小于 15 ms 的注入批又有小于 15 ms 的未注入批，窗口内批数与间隔随负载变
     fn pc1_injected_wait_lands_before_release_not_after() {
         let inject = Duration::from_millis(30);
         let device: Arc<dyn BlockDevice> = Arc::new(SleepingBlockDevice { barrier_delay: Duration::from_millis(1) });

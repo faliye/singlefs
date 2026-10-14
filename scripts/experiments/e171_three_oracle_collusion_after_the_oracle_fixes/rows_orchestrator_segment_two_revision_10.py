@@ -3,9 +3,9 @@
 修订 10 第 10.2、10.3、10.7、10.9 节与「主 agent 认定：修订 10 交回」）。由 run_segment_two_revision_10_multi_host.sh 起，在仓根跑；
 值从 revision_10_placeholders.json 那一形的配置与它点名的修订 8 那一份配置、修订 8 那一趟的序列日志读（revision_10_placeholders.py）。
 
-为什么另写一层：rows_orchestrator_segment_two.py（132731f8…）与入口 run_segment_two_on_the_revision_6_tree_multi_host.sh（c582ee61…）一个字节不改
+为什么另写一层：rows_orchestrator_segment_two.py（7d7b458b…）与入口 run_segment_two_on_the_revision_6_tree_multi_host.sh（c582ee61…）一个字节不改
 （修订 6 那一趟的输入清单记着前者；入口里树、摘要、T、变异表写死成修订 6 树的值）。这一层按路径载入 rows_orchestrator_segment_two.py（开跑先核 sha256，
-不是就退 3；它照旧按 sha256 载入第一段编排器 7bfbdb84…），行集、驱动参数、分配、补位协调、合并规则 ①–⑦、判法 check_product.py rows_without_executor、
+不是就退 3；它照旧按 sha256 载入第一段编排器 1dcfb8d0…），行集、驱动参数、分配、补位协调、合并规则 ①–⑦、判法 check_product.py rows_without_executor、
 跨机对照的取法（权重最接近 1 的那一行，现算）与比法、超时重跑只留档、续跑都调它原来的函数。改的只有修订 10 第 10.2 节「这一趟改的几处」与第 10.3 节：
   ① 树、快照摘要（H3）、树里变异表（H8）、T₂ 那份计时产物（H21）从修订 8 那一份配置与序列日志读；产物前缀 …-<RUN_DATE>-s2、后缀 -r8、导出根、日志目录、
     工作根取 H23；
@@ -76,7 +76,7 @@ import revision_8_selftest_harness as harness  # noqa: E402
 BREAK_VARIABLE = "SEGMENT_TWO_R10_BREAK"
 SELFTEST_VARIABLE = "SEGMENT_TWO_R10_SELFTEST"
 SEGMENT_TWO_ORCHESTRATOR_PATH = os.path.join(HERE, "rows_orchestrator_segment_two.py")
-SEGMENT_TWO_ORCHESTRATOR_SHA256 = "132731f83e0582e80cfff6711299375569e6446958c027ca9c61b27df7a839a1"
+SEGMENT_TWO_ORCHESTRATOR_SHA256 = "7d7b458b95e0a2b8a650e5e9f45b5405902661ffc296b06643100f63cea98393"
 SEGMENT_TWO_SELFTEST_LAST_LINE = "自证 46 项，红 0"
 EXIT_WRONG_PINNED_FILE = 3
 YIELD_RECHECK_SECONDS = 30.0
@@ -108,7 +108,7 @@ def load_pinned(path: str, expected: str, module_name: str) -> types.ModuleType:
 
 
 try:
-    two = load_pinned(SEGMENT_TWO_ORCHESTRATOR_PATH, SEGMENT_TWO_ORCHESTRATOR_SHA256, "rows_orchestrator_segment_two_132731f8")
+    two = load_pinned(SEGMENT_TWO_ORCHESTRATOR_PATH, SEGMENT_TWO_ORCHESTRATOR_SHA256, "rows_orchestrator_segment_two_7d7b458b")
 except WrongPinnedFile as wrong_file:
     print(f"✗ {wrong_file}（这一层调的是钉住的那一份的函数；改过就先核这一层，再改钉的 sha256）", file=sys.stderr)
     sys.exit(EXIT_WRONG_PINNED_FILE)
@@ -409,6 +409,7 @@ def run_layer(repo: str, config_path: str, plan_only: bool) -> int:
         config, revision_8_config = placeholders.load_configs(repo, config_path)
     except judge.RunConditionError as error:
         print(f"✗ {error}（退 78）", flush=True)
+        print('     → 怎么办：照上面那句补齐运行条件（配置、冻结树、设备文件）再用同一条命令起', flush=True)
         return one.EXIT_RUN_CONDITION
     segment_one, segment_two = placeholders.segment_one_of(revision_8_config), placeholders.segment_two_of(config)
     if selftest_override("SEGMENT_TWO_R10_SKIP_CONFIG_CHECK") != "1":
@@ -418,10 +419,11 @@ def run_layer(repo: str, config_path: str, plan_only: bool) -> int:
         print(f"name=placeholders_verdict phase=start config={config_path} unfilled={','.join(unfilled_keys) or 'none'} failing={','.join(failing) or 'none'}", flush=True)
         if (unfilled_keys or failing) and not plan_only:
             print("✗ 两份配置有没填或核不过的（见上面 filled=false、holds=false 那几行）：不起（退 78）", flush=True)
+            print('     → 怎么办：把 filled=false、holds=false 那几行点名的键填上或改到核得过，再用同一条命令起', flush=True)
             return one.EXIT_RUN_CONDITION
     gate = placeholders.start_gate_problems(repo, segment_one)
     if gate and not plan_only and not broken("gate-ignored"):
-        print(f"✗ 起跑闸没过（{','.join(gate)}）：修订 8 那一趟第 0、1、2 步（与研究一侧变异表，排了的话）绿了再用同一条命令起（退 78）", flush=True)
+        print(f"✗ 起跑闸没过（{','.join(gate)}）：修订 8 那一趟第 0、1、2 步（与研究一侧变异表，排了的话）绿了再用同一条命令起（退 78）", flush=True)  # gate-lint:summary
         return one.EXIT_RUN_CONDITION
     try:
         timing = placeholders.resolve_baseline_timing(repo, segment_one)
@@ -430,6 +432,7 @@ def run_layer(repo: str, config_path: str, plan_only: bool) -> int:
             for line in plan_text(repo, segment_one, segment_two, None):
                 print(line)
         print(f"✗ {error}（退 78）", flush=True)
+        print('     → 怎么办：照上面那句补齐运行条件（配置、冻结树、设备文件）再用同一条命令起', flush=True)
         return one.EXIT_RUN_CONDITION
     configure(segment_one, segment_two)
     context = context_of(repo, segment_one, segment_two, timing)
@@ -470,6 +473,7 @@ def main(argument_list: list[str]) -> int:
             return 2
     if os.environ.get(two.SELFTEST_ROWS_VARIABLE) and os.environ.get(two.SELFTEST_VARIABLE) != "1":
         print(f"✗ {two.SELFTEST_ROWS_VARIABLE} 只在自证起的子进程里认（平常跑整表 1–281）；设了它就拒（退 2）", file=sys.stderr)
+        print('     → 怎么办：平常跑时 unset 那个变量再起；它只给 --selftest 起的子进程用', file=sys.stderr)
         return 2
     if argument_list[:1] == ["--selftest"]:
         return selftest(argument_list[1:])

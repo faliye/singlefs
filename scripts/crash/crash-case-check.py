@@ -3,8 +3,8 @@
 # run-condition: none 只读仓里的 Rust 源码与 .claude/gate.d/stage-inputs.tsv
 """测试源码的四样静态判据，判法只在这一份里；三道门禁各调各的那几样：
 
-  placement     崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记进崩溃点重放合表（checker-tier-layer0-replay 开跑前判）
-  modules       checker 档每个测试文件第一行声明它测哪几个模块（checker-tier-layer0-replay 开跑前判）
+  placement     崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记进崩溃点重放合表（checker-tier-crash-point-replay 开跑前判）
+  modules       checker 档每个测试文件第一行声明它测哪几个模块（checker-tier-crash-point-replay 开跑前判）
   file-names    测试文件名不按里程碑、步号起（code-source-discipline 的一格）
   one-scenario  harness 档一条用例一个场景（harness-model-differential-and-scenarios 的一格）
 
@@ -15,7 +15,7 @@
 判法：
   placement：
   ① 扫 crates/*/tests/*.rs（不进子目录：子目录是共用模块，不是测试目标）与 crates/*/src/**/*.rs（库与装置二进制里 #[cfg(test)] 的内联测试）
-     里每个带 #[test] 的函数：函数体里调了 enumerate_layer0 一族（名字以 enumerate_layer0 起头的函数，快档 quick_tier 那几个除外），
+     里每个带 #[test] 的函数：函数体里调了 enumerate_crash_states 一族（名字以 enumerate_crash_states 起头的函数，快档 quick_tier 那几个除外），
      或自己逐个造崩溃状态（名字带 every_crash；或某个 for 循环体里对录制操作取到循环变量为止的前缀去 apply、或造 CrashImage），
      或调了同一文件里一个（传递地）这样做的函数，算崩溃枚举用例；只造一个固定崩溃态的不算；
   ② 它要住在 crates/singlefs-checker-tier/tests/（checker 档，D13 已定项 15，.claude/rules/verification.md「崩溃枚举用例住哪、怎么登记」）：
@@ -94,7 +94,7 @@ import tempfile
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
-REPOSITORY_ROOT = os.path.dirname(SCRIPT_DIRECTORY)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
 BROKEN = os.environ.get("CRASH_CASE_CHECK_BREAK", "")
@@ -110,7 +110,7 @@ ITEMS = {
     "file-names": "测试文件名不按里程碑、步号起",
     "one-scenario": "harness 档一条用例一个场景",
 }
-ENUMERATION_CALL = re.compile(r"\b(enumerate_layer0\w*)\s*(?:::<[^>]*>)?\s*\(")
+ENUMERATION_CALL = re.compile(r"\b(enumerate_crash_states\w*)\s*(?:::<[^>]*>)?\s*\(")
 TEST_FUNCTION = re.compile(r"((?:[ \t]*#\[[^\]]*\][ \t]*\n|[ \t]*//[^\n]*\n)*)[ \t]*(?:pub\s+)?fn\s+(\w+)\s*\(")
 FOR_LOOP = re.compile(r"\bfor\s+\(?\s*(?:mut\s+)?([a-z_]\w*)[^{;]*?\bin\b")
 SWEEP_BY_NAME = re.compile(r"every_crash")
@@ -239,7 +239,7 @@ def problems_in(root):
 
 
 FRESH_POOL_CALL = re.compile(r"\b(?:build_pool\w*|build_through_\w+|format_pool)\s*\(|\bMemoryPool::with_devices\s*\(")
-TIER_MODULES = ["crash", "layer0_progress", "crash_injection", "writable_mount_phases", "crash_given_states", "bad_disk_input", "device_log", "on_device_modes", "crash_identity", "crash_amplification", "verdict_store", "gpu_unit_checks",
+TIER_MODULES = ["crash", "crash_state_enumeration", "crash_point_replay_progress", "crash_injection", "writable_mount_phases", "crash_given_states", "bad_disk_input", "device_log", "on_device_modes", "crash_identity", "crash_library", "crash_amplification", "verdict_store", "gpu_unit_checks",
     "crash_facts",
     "crash_verify_gpu",
     "crash_judge_tables",
@@ -335,7 +335,7 @@ def judge(root, items):
             results[item] = (scanned, problems,
                              f"崩溃枚举用例都住在 {CHECKER_PACKAGE} 包里、标了 #[ignore] 的都登记进了崩溃点重放合表（扫了 {scanned} 份测试源码，认出 {len(tests)} 条；"
                              f"合表 {len(table_items)} 项核过；"
-                             "按测试函数直接调 enumerate_layer0 一族、自己逐个造崩溃状态、或经同一文件里的函数传递地这样做认；"
+                             "按测试函数直接调 enumerate_crash_states 一族、自己逐个造崩溃状态、或经同一文件里的函数传递地这样做认；"
                              "经 tests/<子目录>/ 里的共用函数间接调的、宏展开出来的认不出）")
         elif item == "modules":
             tier_files, problems = module_declaration_problems(root)
@@ -420,8 +420,9 @@ def placement_world(work, name, stage_rows, table_rows, pipeline_rows):
     os.makedirs(os.path.join(root, "crates", CHECKER_PACKAGE, "tests"))
     os.makedirs(os.path.join(root, ".claude", "gate.d"))
     os.makedirs(os.path.join(root, "scripts"))
+    os.makedirs(os.path.join(root, "scripts", "crash"), exist_ok=True)
     open(os.path.join(root, "crates", CHECKER_PACKAGE, "tests", "streamy.rs"), "w").write(
-        "#[test]\n#[ignore]\nfn streamy_full() {\n    enumerate_layer0(&stream);\n}\n")
+        "#[test]\n#[ignore]\nfn streamy_full() {\n    enumerate_crash_states(&stream);\n}\n")
     open(os.path.join(root, ".claude", "gate.d", "stage-inputs.tsv"), "w").write("# 样本\n" + "".join(row + "\t# 样本\n" for row in stage_rows))
     open(os.path.join(root, ".claude", "gate.d", "crash-point-replay-items.tsv"), "w").write("# 样本\n" + "".join(row + "\t# 样本\n" for row in table_rows))
     open(os.path.join(root, "scripts", "crash", "crash-amplification.sh"), "w").write(
@@ -438,13 +439,13 @@ def selftest():
         os.makedirs(harness_tests_directory)
         os.makedirs(os.path.join(work, ".claude", "gate.d"))
         open(os.path.join(tests_directory, "plain.rs"), "w").write(
-            "#[test]\n#[ignore]\nfn registered_case() {\n    let report = enumerate_layer0_versions(&stream);\n}\n\n"
-            "#[test]\nfn quick_case() {\n    enumerate_layer0_quick_tier_versions(&stream);\n}\n\n"
-            "#[test]\nfn small_stream_in_the_quick_tier() {\n    enumerate_layer0_selecting(&small, 1);\n}\n\n"
+            "#[test]\n#[ignore]\nfn registered_case() {\n    let report = enumerate_crash_states_versions(&stream);\n}\n\n"
+            "#[test]\nfn quick_case() {\n    enumerate_crash_states_quick_tier_versions(&stream);\n}\n\n"
+            "#[test]\nfn small_stream_in_the_quick_tier() {\n    enumerate_crash_states_selecting(&small, 1);\n}\n\n"
             "#[test]\nfn unrelated() {\n    assert_eq!(1, 1);\n}\n")
         open(os.path.join(tests_directory, "synthetic.rs"), "w").write(
-            "// crash-case-check:not-a-crash-case 三步的合成流，单跑不到一秒\n#[test]\nfn tiny_stream() {\n    enumerate_layer0(&tiny);\n}\n")
-        open(os.path.join(harness_tests_directory, "daily.rs"), "w").write("#[test]\nfn daily_quick() {\n    enumerate_layer0_quick_tier_versions(&s);\n}\n")
+            "// crash-case-check:not-a-crash-case 三步的合成流，单跑不到一秒\n#[test]\nfn tiny_stream() {\n    enumerate_crash_states(&tiny);\n}\n")
+        open(os.path.join(harness_tests_directory, "daily.rs"), "w").write("#[test]\nfn daily_quick() {\n    enumerate_crash_states_quick_tier_versions(&s);\n}\n")
         open(os.path.join(work, ".claude", "gate.d", "stage-inputs.tsv"), "w").write(
             f"# 样本\ncrash-case:demo\tcrates/\ttest={CHECKER_PACKAGE}:plain:registered_case count-line=x\t#样本\n")
         open(os.path.join(work, ".claude", "gate.d", "crash-point-replay-items.tsv"), "w").write("# 样本合表\ndemo\tcrash-case:demo\t-\tplain\t# 样本\n")
@@ -468,9 +469,9 @@ def selftest():
         tests, problems = problems_in(work)
         if len(tests) != 2 or problems:
             failures.append(f"干净的样本应当认出 2 条（注明不是用例的那条不算）、0 处问题（checker 档包里不标 ignore 的快档放行），实际 {len(tests)} 条、{problems}")
-        open(os.path.join(tests_directory, "plain.rs"), "a").write("\n#[test]\n#[ignore]\nfn forgot_to_register() {\n    enumerate_layer0_selecting(&s, 1);\n}\n")
-        open(os.path.join(harness_tests_directory, "daily.rs"), "a").write("\n#[test]\nfn full_in_harness() {\n    enumerate_layer0(&s);\n}\n"
-            "\nfn prepare_and_enumerate(s: &S) {\n    enumerate_layer0_selecting(s, 1);\n}\n\n#[test]\nfn full_through_a_helper() {\n    prepare_and_enumerate(&s);\n}\n"
+        open(os.path.join(tests_directory, "plain.rs"), "a").write("\n#[test]\n#[ignore]\nfn forgot_to_register() {\n    enumerate_crash_states_selecting(&s, 1);\n}\n")
+        open(os.path.join(harness_tests_directory, "daily.rs"), "a").write("\n#[test]\nfn full_in_harness() {\n    enumerate_crash_states(&s);\n}\n"
+            "\nfn prepare_and_enumerate(s: &S) {\n    enumerate_crash_states_selecting(s, 1);\n}\n\n#[test]\nfn full_through_a_helper() {\n    prepare_and_enumerate(&s);\n}\n"
             "\n#[test]\nfn sweeps_every_prefix() {\n    for prefix in before..=operations.len() {\n        let mut image = pool();\n        image.apply(&operations[..prefix]);\n    }\n}\n"
             "\n#[test]\nfn crash_image_on_each_boundary() {\n    for count in 0..=segments.len() {\n        let image = CrashImage { persisted: through(count) };\n    }\n}\n"
             "\nfn lowest_at_every_crash_point(o: &[Op]) -> u64 {\n    0\n}\n\n#[test]\nfn through_a_named_sweep() {\n    lowest_at_every_crash_point(&o);\n}\n"
@@ -491,7 +492,7 @@ def selftest():
             "#[test]\nfn several_scenarios() {\n    for size in [1, 2] {\n        let pool = build_pool(\"x\");\n    }\n}\n"
             "\n// harness-test-granularity:one-scenario 同一个池按次序覆盖写，几轮合起来是一个场景\n#[test]\nfn one_scenario_waived() {\n    for seed in [1, 2] {\n        let pool = build_pool(\"y\");\n    }\n}\n")
         open(os.path.join(harness_tests_directory, "second_transaction_step_one_sample.rs"), "w").write("#[test]\nfn sample() {}\n")
-        open(os.path.join(tests_directory, "module_mismatch.rs"), "w").write("//! checker 档模块：crash\nuse singlefs_checker_tier::layer0_progress::X;\n")
+        open(os.path.join(tests_directory, "module_mismatch.rs"), "w").write("//! checker 档模块：crash\nuse singlefs_checker_tier::crash_point_replay_progress::X;\n")
         open(os.path.join(tests_directory, "no_declaration.rs"), "w").write("use singlefs_checker_tier::crash::Y;\n")
         open(os.path.join(tests_directory, "string_literal_names_a_module.rs"), "w").write(
             "//! checker 档模块：无（只读这个包的源码文本，不调它的任何模块）\n"
@@ -514,7 +515,7 @@ def selftest():
         if any("one_scenario_waived" in problem for problem in scenario):
             failures.append(f"写了 one-scenario 豁免的不该报，实际 {scenario}")
         _count, modules = module_declaration_problems(work)
-        if not any("module_mismatch.rs" in problem and "layer0_progress" in problem for problem in modules):
+        if not any("module_mismatch.rs" in problem and "crash_point_replay_progress" in problem for problem in modules):
             failures.append(f"声明与导入对不上的 checker 档测试文件应当报出来，实际 {modules}")
         if not any("no_declaration.rs" in problem for problem in modules):
             failures.append(f"第一行没声明模块的 checker 档测试文件应当报出来，实际 {modules}")

@@ -22,7 +22,7 @@
 //!    就写「补齐没有改变 E8 的结论」。**不许因为补齐的空间倍数很大就断言内联更好**——
 //!    空间不是本工程的判据，要赢得赢在 I/O 或延迟上。
 
-use aes_gcm::{aead::{AeadInPlace, KeyInit}, Aes256Gcm, Nonce};
+use aes_gcm::{aead::{AeadInOut, KeyInit}, Aes256Gcm, Nonce};
 use e7_index_bench::Emitter;
 use std::alloc::{alloc, dealloc, Layout};
 use std::fs::OpenOptions;
@@ -105,7 +105,7 @@ fn open(path: &str) -> std::fs::File {
 fn read_arm(path: &str, chunk: usize, slots: u64, operation_count: u64, seed: u64) -> Arm {
     let device_file = open(path);
     let cipher = Aes256Gcm::new_from_slice(&[0x42u8; 32]).unwrap();
-    let nonce = Nonce::from_slice(&[0u8; 12]);
+    let nonce = &Nonce::from([0u8; 12]);
     let mut chunk_buffer = Aligned::new(chunk);
     let (mut random_state, mut sink, mut verify_nanoseconds) = (seed | 1, 0u64, 0u64);
     let arm_start = Instant::now();
@@ -114,7 +114,7 @@ fn read_arm(path: &str, chunk: usize, slots: u64, operation_count: u64, seed: u6
         device_file.read_exact_at(chunk_buffer.as_mut_slice(), slot_index * chunk as u64).expect("读失败");
         let verify_start = Instant::now();
         sink = sink.wrapping_add(
-            cipher.encrypt_in_place_detached(nonce, b"", chunk_buffer.as_mut_slice()).expect("验失败")[0] as u64);
+            cipher.encrypt_inout_detached(nonce, b"", chunk_buffer.as_mut_slice().into()).expect("验失败")[0] as u64);
         verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
     }
     Arm { elapsed_nanoseconds: arm_start.elapsed().as_nanos() as u64, verify_nanoseconds, operation_count, sink }
@@ -123,7 +123,7 @@ fn read_arm(path: &str, chunk: usize, slots: u64, operation_count: u64, seed: u6
 fn write_one_arm(path: &str, chunk: usize, slots: u64, operation_count: u64, seed: u64, does_read_modify_write: bool) -> Arm {
     let device_file = open(path);
     let cipher = Aes256Gcm::new_from_slice(&[0x42u8; 32]).unwrap();
-    let nonce = Nonce::from_slice(&[0u8; 12]);
+    let nonce = &Nonce::from([0u8; 12]);
     let mut chunk_buffer = Aligned::new(chunk);
     let (mut random_state, mut sink, mut cursor, mut verify_nanoseconds) = (seed | 1, 0u64, 0u64, 0u64);
     let arm_start = Instant::now();
@@ -133,14 +133,14 @@ fn write_one_arm(path: &str, chunk: usize, slots: u64, operation_count: u64, see
             device_file.read_exact_at(chunk_buffer.as_mut_slice(), slot_index * chunk as u64).expect("RMW 读失败");
             let verify_start = Instant::now();
             sink = sink.wrapping_add(
-                cipher.encrypt_in_place_detached(nonce, b"", chunk_buffer.as_mut_slice()).expect("验失败")[0] as u64);
+                cipher.encrypt_inout_detached(nonce, b"", chunk_buffer.as_mut_slice().into()).expect("验失败")[0] as u64);
             verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
         }
         let random_word = next_random_word(&mut random_state);
         chunk_buffer.as_mut_slice()[0] = random_word as u8;
         let verify_start = Instant::now();
         sink = sink.wrapping_add(
-            cipher.encrypt_in_place_detached(nonce, b"", chunk_buffer.as_mut_slice()).expect("算 MAC 失败")[0] as u64);
+            cipher.encrypt_inout_detached(nonce, b"", chunk_buffer.as_mut_slice().into()).expect("算 MAC 失败")[0] as u64);
         verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
         device_file.write_all_at(chunk_buffer.as_slice(), cursor * chunk as u64).expect("写失败");
         cursor = (cursor + 1) % slots;
