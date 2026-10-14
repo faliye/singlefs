@@ -1,0 +1,2 @@
+.claude/kb  # 决策、实验、欠账、pitfalls 仍留在这里；登记是替换不是追加，要它仍被扫到就得显式列出来
+crates/singlefs-checker/invariants  # 不变量清单按类拆开挪到这里（README.md + 9 份类文件），不再是 .claude/kb/invariants.md 单文件
