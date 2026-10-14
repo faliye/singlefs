@@ -1,6 +1,6 @@
 # feature bit 记账表
 
-三张位图（incompat / compat_ro / compat）各 256 位，住系统配置。每分出去一位就在这里写一行，说清它叫什么、哪个格式版本哪次提交引进来、现在什么状态、语义是什么。
+三张位图（incompat / compat_ro / compat）各 256 位，住系统配置。每分出去一位就在这里写一行，说清它叫什么、哪个格式版本哪次提交引进来、什么状态、语义是什么。
 
 **位号的唯一登记位不在这个文件里，在 D15（格式冻结政策） 已定项 4 的登记表**（`.claude/kb/decisions/15-格式冻结政策.md`）。「第几位归谁」以那张表为准；两处对不上时改 `.claude/kb/feature-bits.md`，不改那张表。门禁 code-source-discipline 的 feature-bits 格（`.claude/gate.d/code-source-discipline.sh`）逐位比对两处，对不上判红。
 
@@ -12,7 +12,7 @@
 | 位号 | 类别 | 名称 | 引入版本 | 引入 commit | 状态 | 语义一句话 |
 |---|---|---|---|---|---|---|
 | 0 | incompat | INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT | 格式版本 1 | 53c9f38 | 退役 | 第一条纯 SSD 布局线；mkfs 起就置上，不认识这一位的读者挂不上（D12（目标介质） 已定项 1「每套布局一个 incompat 位」） |
-| 1 | incompat | INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT | 格式版本 1 | 待提交 | 在用 | 第一条纯 SSD 布局线（系统配置带回退下界 F、根记录带卸载记号、没有回退见证与回退行）；mkfs 起就置上，不认识这一位的读者挂不上；位 0 退役之后读者见到位 0 一律拒挂 |
+| 1 | incompat | INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT | 格式版本 1 | 45d49aaf | 在用 | 第一条纯 SSD 布局线（系统配置带回退下界 F、根记录带卸载记号、没有回退见证与回退行）；mkfs 起就置上，不认识这一位的读者挂不上；位 0 退役之后读者见到位 0 一律拒挂 |
 
 **compat_ro 与 compat 两张位图一位都没分，incompat 分了位 0（退役）与位 1，别的位一位都没分**（出处：D15（格式冻结政策） 已定项 4 登记表）。
 

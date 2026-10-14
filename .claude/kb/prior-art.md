@@ -3,7 +3,7 @@
 **全部为文档阅读或源码逐行核对所得，未在本工程验证**，也未编译、运行过任何一个项目。
 星数/提交数是页面当时显示的值（2026-08-25）。
 
-**来源固定点与复核机制（2026-08-29 起）**：承重引用的源码与文献固定在本机
+**来源固定点与复核机制**：承重引用的源码与文献固定在本机
 `~/code/fs-refs/`——`linux-6.17/fs/bcachefs/`（kernel.org 的 `linux-6.17.tar.xz`，260 个文件）、
 `zfs/`（OpenZFS master，`git log -1` = `58d73c9`，2026-08-27）、
 `docs/` 下 7 份文献（RFC 8439、NIST SP 800-38B / 800-38D、DJB *Cryptography in NaCl*、
@@ -44,7 +44,7 @@ btrfs qgroup 事后遍历 → 死；ZFS 与重写后的 bcachefs 事务时增量
 
 来源：[bcachefs Snapshots 设计文档](https://bcachefs.org/Snapshots/)、
 [Principles of Operation (2026-04-16, PDF)](https://bcachefs.org/bcachefs-principles-of-operation.pdf)。
-**后者是最新最权威的 bcachefs 设计文档，尚未通读。**
+**Principles of Operation 是最新最权威的 bcachefs 设计文档，尚未通读。**
 
 1. **bucket + generation 号**。盘切成 bucket，每个带一个代号；指针存「期望代号」，
    代号对不上说明这块已被回收 → 数据失效不需要更新任何反向索引。对 D1（数据可移动性 / 反向索引） 是直接减负。
@@ -83,11 +83,11 @@ btrfs qgroup 事后遍历 → 死；ZFS 与重写后的 bcachefs 事务时增量
 且尚未就「通用 vs 只服务简单文件系统」达成结论。
 
 来源：[Rust for filesystems (LWN)](https://lwn.net/Articles/978738/)。
-**与本工程当前关系不大**——D7（是否进 Linux 主线） 已定前几年不进主线。
+**与本工程关系不大**——D7（是否进 Linux 主线） 已定前几年不进主线。
 
 ## 五、索引结构（D8（核心索引结构） 专项调查）
 
-**口径**：以下来自 bcachefs *Principles of Operation* Rev 1.39.2（2026-08-25 修订）原文、
+**口径**：「五、索引结构」一节来自 bcachefs *Principles of Operation* Rev 1.39.2（2026-08-25 修订）原文、
 LWN、XFS 文档与论文摘要。**未在本工程验证，也未 clone/编译/运行任何一个实现。**
 
 ### 5.1 bcachefs：28 棵树，一套 btree 实现
@@ -359,8 +359,8 @@ MAC 对不上就判设备故障并很快停用它，
 
 | 实现 | 卷/文件身份进哪一层 | 逐单元输入里有什么 | 出处 |
 |---|---|---|---|
-| ext4 校验和 | `s_uuid` **挂载时折一次**进 `s_csum_seed` | 只有 `inum`、`gen`、块内容；`s_uuid` 一次也没出现 | `fs/ext4/super.c:4725`；`fs/ext4/ialloc.c:1301`、`fs/ext4/bitmap.c:33`、`fs/ext4/super.c:3275` |
-| fscrypt 密钥 | 每文件 nonce **建 inode 时取一次随机数**，持久化在盘上的 context | 派生出的每文件密钥 | `fs/crypto/keysetup.c:762 get_random_bytes(nonce, FSCRYPT_FILE_NONCE_SIZE)`；`fs/crypto/fscrypt_private.h:78 struct fscrypt_context_v2 { ...; u8 nonce[16]; }` |
+| ext4 校验和 | `s_uuid` **挂载时折一次**进 `s_csum_seed` | 只有 `inum`、`gen`、块内容；`s_uuid` 一次也没出现 | `fs/ext4/super.c` 的 `ext4_init_metadata_csum`；`fs/ext4/ialloc.c` 的 `__ext4_new_inode`、`fs/ext4/bitmap.c` 的 `ext4_inode_bitmap_csum_verify`、`fs/ext4/super.c` 的 `ext4_group_desc_csum` |
+| fscrypt 密钥 | 每文件 nonce **建 inode 时取一次随机数**，持久化在盘上的 context | 派生出的每文件密钥 | `fs/crypto/keysetup.c` 的 `fscrypt_prepare_new_inode` 里 `get_random_bytes(nonce, FSCRYPT_FILE_NONCE_SIZE)`；`fs/crypto/fscrypt_private.h` 的 `struct fscrypt_context_v2 { ...; u8 nonce[16]; }` |
 
 ⚠️ **fscrypt 不是「每次挂载换新盐」**——本工程曾在草稿里这么转述过，那是错的。
 nonce 在**创建 inode 时**生成一次并写进盘上 context，此后每次挂载读回同一个值。
@@ -380,8 +380,8 @@ nonce 在**创建 inode 时**生成一次并写进盘上 context，此后每次�
 > （`Documentation/admin-guide/device-mapper/dm-integrity.rst`）
 
 上游的处置不是「把水位算进 MAC」，而是**带密钥时默认禁掉那条路径**，
-要开必须显式加 `legacy_recalculate`（`drivers/md/dm-integrity.c:395
-dm_integrity_disable_recalculate()`）。
+要开必须显式加 `legacy_recalculate`（`drivers/md/dm-integrity.c` 的
+`dm_integrity_disable_recalculate()`）。
 
 **对本工程的意义**：I-6.5（nonce 水位单调） 的 nonce 水位是同一个形状，而后果更硬——
 回滚它不是「漏检一次篡改」，是**流密码 nonce 重用 ⇒ 两段明文直接 XOR**。
@@ -390,7 +390,7 @@ dm_integrity_disable_recalculate()`）。
 ### 6.7 AEAD 的 tag 长度：内核允许截断到 32 位
 
 `crypto_gcm_check_authsize()` 接受 4 / 8 / 12 / 13 / 14 / 15 / 16 字节
-（`include/crypto/gcm.h:13-26`，2026-08-29 现查）。
+（`include/crypto/gcm.h` 的 `crypto_gcm_check_authsize()`，2026-08-29 现查）。
 ⇒ 「MAC 一律 128 位不截断」是**本工程自己的设计约束，不是密码学或内核强加的**；
 它要付的空间代价（每单元 16 字节）应当按这个口径记，不能说成「没得选」。
 
@@ -437,7 +437,7 @@ FAST 2018 论文 2.1 与 4.x 节原文：
 
 **所以这组数字能证明的是**：消息缓冲区能把「一个 key 要被重写几次」从 O(树高) 降到 O(树高/B)。
 **它不能证明的是**：在「Merkle 校验和链 + AEAD」都在、且发布频率取某个具体值的前提下还剩多少收益。
-后者要靠 [experiments.md](experiments.md) E7（离线索引 harness） 自己量。
+还剩多少收益要靠 [experiments.md](experiments.md) E7（离线索引 harness） 自己量。
 
 ⚠️ **发布频率是这里的自由变量，不是常量。** 若本工程采用 checkpoint 语义
 （内存里攒脏节点、定期合并写一次），那么「一次小写不必立刻重写整条从叶子到根的路径」
@@ -450,7 +450,7 @@ E7（离线索引 harness） 的对照组因此必须区分两种「无消息缓
 
 对 D10（随机写 / 碎片化的真答案） 的意义：btrfs 的 `nodatacow` 是「关掉 COW 换随机写性能，代价是同时丢校验和与快照一致性」，
 而这条路是「把随机写吸收进索引的消息层」，校验和与快照都不动。
-**这是 D10（随机写 / 碎片化的真答案） 目前唯一一条有实测数字支撑的候选方向。**
+**这是 D10（随机写 / 碎片化的真答案） 唯一一条有实测数字支撑的候选方向。**
 
 **另一条顺带核实到的事实**：BetrFS 的所有版本都用**两棵** Bε-tree——
 一棵放文件数据，一棵放文件系统元数据（论文 2.2 节原文：
@@ -584,10 +584,10 @@ NoFS 的是「每块自证属于谁」的一个字段，D1（数据可移动性 
 **这一节记的是一个已经发生的失效，不是推测。**
 
 bcachefs 的 `bch2_check_allocations()` 用全量遍历重建记账、再与运行时计数器 `memcmp` 比对——
-**形态与本工程 [invariants.md](invariants.md) 的 I-3.1（已分配统计对得上） 相同**。但两侧共用同一段加减代码：
+**形态与本工程 [invariants/05-空间记账.md](../../crates/singlefs-checker/invariants/05-空间记账.md) 的 I-3.1（已分配统计对得上） 相同**。但两侧共用同一段加减代码：
 
 ```c
-this_cpu_add(e->v[gc][i], a.v->d[i]);        // fs/bcachefs/disk_accounting.h:208
+this_cpu_add(e->v[gc][i], a.v->d[i]);        // fs/bcachefs/disk_accounting.h，bch2_accounting_mem_mod_locked()
 ```
 
 `gc` 是唯一的差别——运行时写 `v[0]`，GC 重建写 `v[1]`。
@@ -603,7 +603,7 @@ if we run it multiple times」——**重建侧本身就是一串 `+=`**。
 同一段代码、同一次采样、同一个工具」。这一节是那条规则在真实系统里**已经被违反并产生盲区**的实例。
 处置见 [checks-owed.md](checks-owed.md) C12（增量语义共用）。
 
-**顺带记下的记账形态事实**（同批核实）：accounting 树在 `bcachefs_format.h:1415` 被
+**顺带记下的记账形态事实**（同批核实）：accounting 树在 `bcachefs_format.h` 的 `BCH_BTREE_IDS()` 里被
 **格式级**绑定 `BTREE_IS_write_buffer`；`disk_accounting_format.h` 原文
 「Unlike with other key types, **updates are _deltas_**」；
 合并函数是 `dst->v.d[i] += src.v->d[i]`；
@@ -624,7 +624,7 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 
 ### 8.1 ZFS：根环槽宽确实随设备粒度抬，但封顶 8 KiB，而且抬槽宽是减槽数不是多占地
 
-来源 `zfs/include/sys/vdev_impl.h:467-486` 与 `zfs/include/sys/uberblock_impl.h:37`，逐字：
+来源 `zfs/include/sys/vdev_impl.h` 里 `VDEV_UBERBLOCK_RING` 到 `VDEV_UBERBLOCK_SIZE(vd)` 那一段宏与 `zfs/include/sys/uberblock_impl.h` 的 `UBERBLOCK_SHIFT`，逐字：
 
 ```c
 #define	VDEV_UBERBLOCK_RING	(128 << 10)
@@ -655,7 +655,7 @@ ZFS 的 label 是每盘 4 份、每份 256 KiB 的**固定区域**，uberblock �
 而本工程的根环是 R 个区域按素数步长撒在盘上，**区域多大不是格式常量**——
 每区槽数 S 住系统配置（D22（单元原子性怎么合成） 已定项 2 逐字「S 住系统配置。**下界 1、上界由
 I-7.4（近 K 代块未被复用） 扣住的块数挂载时算**」）。⇒ 「抬槽宽 = 减槽数」这个等式在本工程
-**要先把「区域大小固定」写成条款**才成立，而仓里今天没有这条。
+**要先把「区域大小固定」写成条款**才成立，而仓里没有这条。
 
 ### 8.2 btrfs：靠走 commit root + 可暂停，而这条路在本工程被两道独立的闸排除
 
@@ -663,15 +663,15 @@ I-7.4（近 K 代块未被复用） 扣住的块数挂载时算**」）。⇒ �
 
 | 位置 | 逐字 |
 |---|---|
-| `scrub.c:463` / `scrub.c:465` | `sctx->extent_path.search_commit_root = 1;` / `sctx->csum_path.search_commit_root = 1;` |
-| `scrub.c:2607` | `path->search_commit_root = 1;` |
-| `transaction.c:190` / `:217` | `down_write(&fs_info->commit_root_sem);` / `up_write(&fs_info->commit_root_sem);` |
-| `ctree.c:1795` | `lockdep_assert_held_read(&lowest->fs_info->commit_root_sem);` |
-| `transaction.c:2360` | `btrfs_scrub_pause(fs_info);` |
+| `scrub.c` 的 `scrub_setup_ctx` 里两处 | `sctx->extent_path.search_commit_root = 1;` / `sctx->csum_path.search_commit_root = 1;` |
+| `scrub.c` 的 `scrub_enumerate_chunks` | `path->search_commit_root = 1;` |
+| `transaction.c` 的 `switch_commit_roots` 里一前一后 | `down_write(&fs_info->commit_root_sem);` / `up_write(&fs_info->commit_root_sem);` |
+| `ctree.c` 的 `finish_need_commit_sem_search` | `lockdep_assert_held_read(&lowest->fs_info->commit_root_sem);` |
+| `transaction.c` 的 `btrfs_commit_transaction` | `btrfs_scrub_pause(fs_info);` |
 
 ⚠️ **本工程用不了这条路，两道排除各自独立（2026-09-08 现查坐实）**：
 ① **提交间隔差 8.3 万倍**——btrfs 默认提交间隔逐字
-`#define BTRFS_DEFAULT_COMMIT_INTERVAL	(30)`（`linux-6.17/fs/btrfs/fs.h:302`，30 秒），
+`#define BTRFS_DEFAULT_COMMIT_INTERVAL	(30)`（`linux-6.17/fs/btrfs/fs.h`，30 秒），
 而本工程甲下发布间隔是 **0.36 毫秒**（2785 发布/秒）。btrfs 那套的隐含前提是
 「提交间隔远大于消费者的一段扫描」；搬过来的话 scrub 每秒要被停 2785 次，永远走不完一遍。
 **这条前提从没跟着那个做法一起被引用过。**
@@ -694,7 +694,7 @@ I-7.4（近 K 代块未被复用） 扣住的块数挂载时算**」）。⇒ �
 （清扫准入「释放代 ≤ 环里最旧根 txg」那条闸），保护宽度随之变」——
 **崩溃之后那一半，锁一个字都说不上话。**
 
-<!-- doc-lint:not-numbers EXT4 -->
+<!-- doc-lint:not-numbers EXT4 NILFS2 -->
 
 ## 九、每对象扩展槽：五家现役实现怎么放「属于这个对象、但不在主字段里」的数据（D21（权威态与派生态的分界） 已定项 3 ③ 的外部调研，2026-09-13 现查）
 
@@ -710,6 +710,199 @@ D21（权威态与派生态的分界） 已定项 3 ③ 逐字「用户要求的
 
 **五家共有的形态**：都是「对象记录内一段有上限的空间 + 装不下时指向外部」，上限 320 字节（ZFS 512 字节 dnode）到约 3.9 KiB（btrfs 一叶、APFS 3804）。**没有一家把扩展槽做成「只许一个指向、不许内联」**——这是本工程 D1（数据可移动性 / 反向索引） 已定项 3 独有的形态，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「没有任何现役实现走 X 这条路」是最值钱的一类外部信号：举证责任在本工程这边（理由记在 D1（数据可移动性 / 反向索引） 已定项 3 与 D21（权威态与派生态的分界） 硬约束 5）。
 **「为空」怎么编码，五家各自的做法**：ext4 靠 `e_value_size = 0` 与条目计数；XFS 靠 `count = 0`；btrfs 靠条目不存在；ZFS 靠 `dn_bonuslen = 0`；APFS 靠 `xf_num_exts = 0`——**都是「计数为 0」而不是「某个全零指针」**，与 D21（权威态与派生态的分界） 已定项 3 ②「全零不能直接当空用」那句同向。
+
+## 十、快照下的死块记账、搬被共享的块与 discard 时机
+
+取得日期 2026-10-12；每条未在本项目验证，是线索不是证据（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「别的项目怎么做，是线索不是证据」）。
+
+**查的版本与取法**
+
+| 对象 | 版本 / 提交 | 取法 |
+|---|---|---|
+| OpenZFS master | `4542a317e2fa524e24c1c28b6fbca9cd3634ba56`（2026-10-09，`git ls-remote` 与克隆 HEAD 一致） | `git clone --depth 1 --filter=blob:none --sparse`，检出 `module/zfs include/sys man cmd/zpool cmd/zfs` |
+| Linux 主线 | `24a19b953e2a3d0ea5a8c4951a0ab8f32720c907`（Linux 7.3-rc7，2026-10-11） | `--depth 1 --sparse`，检出 `fs/btrfs fs/f2fs fs/nilfs2 include/uapi/linux Documentation/filesystems` |
+| bcachefs | bcachefs-tools `efec39c7e8d1dda11fb16bad0e1e75d86ead3105`（2026-10-10）的 `fs/` 目录 | `--depth 1`。bcachefs 已不在主线：主线 HEAD `git ls-tree HEAD fs/ \| grep -c bcachefs` 输出 `0`；git.kernel.org 上 `fs/bcachefs/Kconfig` 在 v6.17 返回 200、v6.18-rc1 返回 404 |
+| nilfs-utils | master `26efb5daff0757365101035145331b0a5a85d9d9`（ls-remote HEAD） | raw.githubusercontent 取 `lib/gc.c`、`man/nilfs_cleanerd.conf.5` |
+| APFS | Apple File System Reference，PDF 元数据 CreationDate 2020-06-22，181 页 | developer.apple.com 下载，pypdf 抽文本 |
+| btrfs 文档 | btrfs.readthedocs.io/en/latest 的 Trim、btrfs-quota、Qgroups、btrfs-balance、btrfs-man5 页 | curl 取 |
+
+文件:行号一律指「查的版本与取法」表里的提交。本机原有的 `/home/fy5090/code/fs-refs/zfs`（`58d73c90`，2026-08-27）与 `/home/fy5090/linux-bug-fix/linux`（v7.3-rc1，浅克隆）比主线旧，没有拿来引。
+
+本工程一侧拿来写差异的事实只有两条，都是现查的：`.claude/kb/decisions/19-块指针的结构与宽度预算.md` 的「已定项 5：位置条目降为提示，中央映射是唯一入口」与「已定项 7：指针头部带出生 (树, txg)，各 8 字节」（简称「本工程走中央映射」「本工程指针带出生 txg」）。
+
+### 10.1 ZFS：deadlist、livelist、为什么没有 BP rewrite、device removal 的 indirect mapping
+
+| 事实 | 出处（OpenZFS `4542a317`） | 口径 | 与本工程的差异 |
+|---|---|---|---|
+| 内存结构：deadlist 是一棵按 `dle_mintxg` 排序的 AVL 树，每个条目带一个 bpobj；另有 `dl_cache`（按 mintxg 的字节数缓存）；盘上头 `dsl_deadlist_phys_t` 只存 used/comp/uncomp 三个总数 | `include/sys/dsl_deadlist.h` 中 `dsl_deadlist_phys_t`、`dsl_deadlist_t`、`dsl_deadlist_entry_t` 定义；`module/zfs/dsl_deadlist.c:106`（`dsl_deadlist_compare` 比 `dle_mintxg`） | 读源码 | 按出生 txg 分桶的 deadlist 这一做法：ZFS 的块指针是物理 DVA、没有中央映射；本工程走中央映射，指针带出生 txg |
+| 键在盘上：deadlist 对象是一个 ZAP，key 是 mintxg（十进制串），值是 bpobj 对象号 | `dsl_deadlist.c:534`（`zap_add_int_key(... mintxg, obj ...)`）、`:895-897`（merge 时 `zfs_strtonum(za->za_name)`） | 读源码 | ZFS 的块指针是物理 DVA、没有中央映射；本工程走中央映射，指针带出生 txg |
+| 入桶规则：被杀的块按 `BP_GET_BIRTH(bp)` 找 mintxg 严格小于它的最大键入桶（精确命中就退一格，「mintxg is not inclusive」） | `dsl_deadlist.c:477-491`；`:511-514` 注释 | 读源码 | ZFS 的块指针是物理 DVA、没有中央映射；本工程走中央映射，指针带出生 txg |
+| 何时进 deadlist：`dsl_dataset_block_kill` 里 birth > `ds_prev_snap_txg` 的块直接释放（gang/dedup/BRT 块进池级 free bpobj 延后），否则进 head 的 deadlist；在 zio 完成回调里时先进 `ds_pending_deadlist`，由 sync 线程补插 | `module/zfs/dsl_dataset.c:304-349`；补插在 `:2397-2398` | 读源码 | ZFS 的块指针是物理 DVA、没有中央映射；本工程走中央映射，指针带出生 txg |
+| 建快照：快照接走 head 原来的 deadlist 对象；head 换成一个克隆（同样的键、空 bpobj），再加一个新键 `ds_prev_snap_txg` | `dsl_dataset.c:1787`（`dsphys->ds_deadlist_obj = dsl_dataset_phys(ds)->ds_deadlist_obj`）、`:1842-1849`；`dsl_deadlist_clone` 在 `dsl_deadlist.c:700-730` | 读源码 | ZFS 的块指针是物理 DVA、没有中央映射；本工程走中央映射，指针带出生 txg |
+| 并发：deadlist 只在 syncing 线程改；除 insert 外要持 `dp_config_rwlock` 写锁 | `dsl_deadlist.c:25-31` | 读注释 | 并发模型差异不明，只能当线索 |
+| 删快照（新格式）：先用 `dsl_deadlist_space_range` 调 prev 的 unique 与 snapused；`dsl_deadlist_move_bpobj` 把 next 的 deadlist 里 mintxg ≥ 被删快照 `ds_prev_snap_txg` 的那些桶整桶挂到池的 `dp_free_bpobj`（这些块被删快照之后出生、死在 next 之前，没人再引用）；再 `dsl_deadlist_merge` 把被删快照自己的 deadlist 按键并进 next 的 deadlist；最后从 head 的 deadlist 删掉被删快照 creation_txg 那个键（`remove_key` 把该桶并进前一个桶） | `module/zfs/dsl_destroy.c:403-439`、`:478-487`；`dsl_deadlist.c:920-979`（move_bpobj）、`:855-918`（merge）、`:539-567`（remove_key） | 读源码 | ZFS 的块指针是物理 DVA、没有中央映射；本工程走中央映射，指针带出生 txg；本工程计划「删快照时 deadlist 并到更新的一侧」，ZFS 并入的是 next（更新的一侧） |
+| merge 与 move 是整桶挂 bpobj 子对象（`bpobj_enqueue_subobj` / `dle_enqueue_subobj`），不逐块搬；预取最多 128 个子 deadlist | `dsl_deadlist.c:822`、`:954`；`:882-891`、`:942-949` | 读源码 | ZFS 的块指针是物理 DVA、没有中央映射；本工程走中央映射，指针带出生 txg |
+| 旧盘上格式（deadlist 是单个 bpobj，`dl_oldfmt`）走 `process_old_deadlist`：逐块按 birth 与 `ds_prev_snap_txg` 比，留在 deadlist 或 `dsl_free_sync` | `dsl_destroy.c:127-151`、`:154-188` | 读源码 | 兼容包袱：本工程没有旧格式 |
+| livelist 是什么：同样用 `dsl_deadlist_t`，挂在克隆的 dsl_dir 上，只记克隆创建之后出生的块，每条标 FREE 或 ALLOC；删克隆时倒着扫，配对抵消 FREE/ALLOC，剩下的 ALLOC 释放；嵌入式块不记 | `dsl_deadlist.c:45-63`；`dsl_dataset.c:291-302`（`birth > dd_origin_txg` 才进 `dd_pending_frees`） | 读注释与源码 | 本工程计划只做只读快照；ZFS 的 livelist 只服务可写克隆，差异不明，只能当线索 |
+| livelist 何时用：pool feature `livelist` 开着时，建克隆就分配 livelist；共享比例 `(referenced-used)/referenced` ≤ `zfs_livelist_min_percent_shared`（默认 75）时在 sync 中关掉；promote 与 clone swap 时两侧都删掉 livelist；删克隆时有 livelist 走 `dsl_async_clone_destroy`，否则走 async destroy 或旧的同步遍历 | `dsl_dataset.c:1353-1365`、`:2169-2183`、`:2400-2404`、`:4019-4026`、`:4518-4524`；`dsl_deadlist.c:103`；`dsl_destroy.c:1139-1146` | 读源码 | 本工程计划只做只读快照；ZFS 的 livelist 只服务可写克隆，差异不明，只能当线索 |
+| livelist 分子表：子表超过 `zfs_livelist_max_entries`（默认 500000，注释写约 128M）开新子表；按 birth txg 分组保证同一块的 ALLOC/FREE 落在同一子表，所以能一个子表一个 sync 地增量删；另有定期 condense 线程 | `dsl_deadlist.c:64-75`、`:77-86`；`module/zfs/spa.c:3486`（`spa_livelist_condense_sync`）、`:3559`（`spa_livelist_condense_cb`） | 读注释与源码 | 本工程计划只做只读快照；ZFS 的 livelist 只服务可写克隆，差异不明，只能当线索 |
+| livelist 的特性页说明：克隆有大量随机/稀疏写时比传统方法删得快；克隆创建即 active，直到所有克隆删完 | `man/man7/zpool-features.7:775-782` | 读文档 | 本工程计划只做只读快照；ZFS 的 livelist 只服务可写克隆，差异不明，只能当线索 |
+
+ZFS 第二组：没有 block pointer rewrite，device removal 走 indirect mapping。
+
+| 事实 | 出处与日期 | 口径 | 与本工程的差异 |
+|---|---|---|---|
+| 源码自述的理由：indirect vdev 对应被移除的设备，「since we cannot rewrite block pointers of snapshots, etc.」，所以保留一张旧位置到新位置的映射，每次访问该 DVA 都查它 | `module/zfs/vdev_indirect.c:36-47`（`4542a317`） | 读注释 | 不改指针、在 SPA 层加一层旧→新映射 这一做法：ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 映射不按逻辑块边界建，一个 DVA 可能跨几段映射（split block），所以不是每个 DVA 都能换成一个等价的新 DVA，只能提供按段回调的 `vdev_remap` | `vdev_indirect.c:41-58` | 读注释 | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 设计者公开说法（Alex Reece，2015-01-13，Delphix 博客）：按块指针建旧→新映射「quickly requires an unreasonably large data structure that must be stored both on disk and kept in memory」；「Even a technique like the now-defunct BP rewrite project would require a huge temporary table (and brings its own set of problems)」；所以在 SPA 层按旧盘上连续分配段建映射 | 原 URL https://delphix.com/blog/delphix-engineering/openzfs-device-removal 现 302 到 perforce.com/blog；取的是 web.archive.org 的 2020 快照（`/web/2020id_/…`），正文第 104-107 行（抽文本后的行号） | 读文档（存档） | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 移除流程：停分配；独立线程按 LBA 序拷贝已分配段，sync task 更新部分映射；拷贝期间的 free 同时释放旧位置与已拷贝的新位置；完成后 vdev 变 indirect | `module/zfs/vdev_removal.c:43-73` | 读注释 | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 限制：普通分配类里不能有 raidz/draid 顶层 vdev（段拷贝不看块边界，算不出校验列）；所有顶层 vdev ashift 相同；加密数据集的 key 要已加载；所有 vdev 在线、健康 | `vdev_removal.c:75-92`；`man/man8/zpool-remove.8:50-52` | 读注释与文档 | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 已知未解：「device removal for RAID-Z」issue #9013（ahrens，2019-07-10 开，至 2026-10-12 仍 open）；「RFC: generic device removal」#9129（2019-08-05 开，仍 open） | GitHub API `repos/openzfs/zfs/issues/9013`、`/9129`，取于 2026-10-12 | 读 issue | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 内存代价：映射整张读进内存（`vmem_alloc(map_size)` 后 `dmu_read` 整个映射对象）；`zpool remove -n` 打印移除后映射表预计占用的内存；`zpool status` 打印「memory used for removed device mappings」 | `module/zfs/vdev_indirect_mapping.c:357-361`；`zpool-remove.8:78-83`；`cmd/zpool/zpool_main.c:10607` | 读源码与文档 | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 盘上每条映射 = `vimep_src`（u64，源偏移 63 位 + 1 位 mark）+ `vimep_dst`（`dva_t`）；asize 24 位，单条最多映射 8GB | `include/sys/vdev_indirect_mapping.h:29-43` | 读源码；条目字节数没有在源码里写明，按结构推是 8 + 16 = 24 字节（推的） | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 一个用户报的量：移除 6.94T 的 vdev 后「39.8M memory used for removed device mappings」 | issue #18930 正文（2026-08-15，TrueNAS，zfs-2.3.0） | 别人报的输出，未核负载与碎片度 | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 缩小映射：块被 free 或 remap 后对应映射段变 obsolete，按条目计数；obsolete 比例 ≥ `zfs_condense_indirect_obsolete_pct`（默认 25%）或 obsolete spacemap 超 1GB 就 condense，重写一张只含仍被引用条目的新映射，可断点续做；`obsolete_counts` 特性一旦 active 不回退 | `vdev_indirect.c:60-124`、`:126-171`、`:175-197`；`zpool-features.7:864-878` | 读注释与文档 | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| remap：写 indirect block 时把其中指向 indirect vdev 的 DVA 改成具体 DVA（能换才换，split block 换不了）；dedup 块、gang 块不 remap；被快照引用的旧 DVA 进 `ds_remap_deadlist`，删快照时按 deadlist 同一算法挪进 `dp_obsolete_bpobj` | `module/zfs/metaslab.c:5699-5730`；`module/zfs/dbuf.c:5270-5287`；`vdev_indirect.c:100-123`；`dsl_destroy.c:280-302` | 读源码 | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| `zfs remap` 子命令在 master 已不存在 | `grep -n '"remap"\|remap' cmd/zfs/zfs_main.c` 无输出 | 实测 grep（只查了这一个文件） | 兼容包袱：本工程没有 |
+| 读 split block 时若副本有坏，按组合重建，组合数超 `zfs_reconstruct_indirect_combinations_max`（默认 4096）时每次只随机试 100 种 | `vdev_indirect.c:207-215` | 读注释 | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 近期 indirect 相关缺陷（只列标题与状态）：#18930「Kernel NULL pointer dereference in vdev_indirect_mapping_duplicate_adjacent_entries() … on a pool with an indirect vdev」open；#19120「vdev_indirect: validate split-block copies before repair」closed（2026-09-16）；#12200「VERIFY3(0 == vdev_obsolete_sm_object(...)) failed」open | GitHub search API `q=repo:openzfs/zfs "indirect vdev"`，共 292 条命中，取于 2026-10-12 | 只读标题，#18930 读了正文开头 | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+| 相近的现役做法：`zfs rewrite` 把文件块原样重写到新位置；被快照共享的块重写后旧副本仍留给快照，空间会涨，`-S` 跳过与快照共享的块、`-C` 跳过 BRT 克隆块；`-P` 保留逻辑 birth（需 `physical_rewrite` 特性） | `man/man8/zfs-rewrite.8:31-57`、`:84-91`；`zpool-features.7:880-895` | 读文档 | ZFS 平时没有中央映射，只在移除设备后对那一个 vdev 加映射；本工程走中央映射，所有指针本来就经映射 |
+
+查过没找到的：OpenZFS 树里没有一份正面写「为什么不做 BP rewrite」的设计文档（在稀疏检出的 `module include man cmd` 上跑 `grep -rn -i 'bp rewrite\|bprewrite\|block pointer rewrite\|rewrite block pointers\|bp_rewrite'`，唯一命中是 `module/zfs/vdev_indirect.c:38` 那句注释；没检出的目录如 `tests`、`lib` 没查）；Delphix 原博客页已下线，只有存档；indirect mapping 读路径的延迟代价没找到任何公开量出来的数。
+
+### 10.2 btrfs：共享块引用计数、删快照、balance/relocation
+
+| 事实 | 出处（Linux `24a19b95`，7.3-rc7） | 口径 | 与本工程的差异 |
+|---|---|---|---|
+| 建快照：`btrfs_copy_root` 只复制根节点，对新根调一次 `btrfs_inc_ref`（给根节点的每个子指针 +1 引用），并把源树的 `last_snapshot` 设成当前 transid；除根节点之外的树块不复制 | `fs/btrfs/ctree.c:238-296`；`fs/btrfs/transaction.c:1798`、`:1827` | 读源码 | 共享靠 extent tree 里的引用计数与反向引用，COW 时惰性下推引用 这一做法：btrfs 的父节点直接存子块逻辑地址，没有中央映射；本工程走中央映射 |
+| 判是否可能共享：不可共享树、根节点、generation > `last_snapshot` 且不是 relocation 分配的块，判为不共享，不查 extent tree | `ctree.c:312-347` | 读源码 | btrfs 的父节点直接存子块逻辑地址，没有中央映射；本工程走中央映射 |
+| COW 一个可能共享的块（`update_ref_for_cow`）：refs > 1 时，若块属本树且无 FULL_BACKREF，对旧块 `btrfs_inc_ref(…, full_backref=true)` 并给旧块置 `BTRFS_BLOCK_FLAG_FULL_BACKREF`，否则对新块 inc_ref；refs == 1 且旧块是 FULL_BACKREF 时，新块 inc_ref、旧块 dec_ref | `ctree.c:349-451`（规则注释 `:362-377`，分支 `:414-449`） | 读源码 | btrfs 的父节点直接存子块逻辑地址，没有中央映射；本工程走中央映射 |
+| `btrfs_inc_ref`/`btrfs_dec_ref` 都进 `__btrfs_mod_ref`：逐个遍历块内的子指针（叶子里是 EXTENT_DATA 的 disk_bytenr，节点里是子块地址），对每个发一条 delayed ref；full_backref 时 `parent = buf->start`（共享反向引用按父块地址记），否则 parent = 0（按根 ID 记） | `fs/btrfs/extent-tree.c:2553-2649`（parent 取法 `:2580-2583`） | 读源码 | btrfs 的父节点直接存子块逻辑地址，没有中央映射；本工程走中央映射 |
+| 删快照 `btrfs_drop_snapshot`：遍历树，只被本树引用的块释放；遇到共享块只把引用减一不下探（`do_walk_down` 注释「if the block is shared and there is no need to update back, this function drops the reference」） | `extent-tree.c:6247-6259`、`:5902-5913` | 读注释 | btrfs 的父节点直接存子块逻辑地址，没有中央映射；本工程走中央映射；本工程计划用 deadlist 而不是遍历引用计数 |
+| 可中断续做：每轮把 `drop_progress`（key）与 `drop_level` 写进 root_item；`btrfs_should_end_transaction` 或 cleaner 需要让路时 `btrfs_update_root` 落盘后结束事务，非 relocation 情形返回 `-EAGAIN` 提前退出，root 加回 dead root 列表下次接着做；重启后从 `drop_progress` 搜回原位继续 | `extent-tree.c:6318-6373`、`:6403-6433`、`:6514-6519` | 读源码 | btrfs 的父节点直接存子块逻辑地址，没有中央映射；本工程走中央映射 |
+| 续做时防重复减引用：`wc->restarted` 时先 `check_ref_exists` 确认本树对该块的引用还在，找到之后才清 restarted | `extent-tree.c:5856-5869` | 读源码 | btrfs 的父节点直接存子块逻辑地址，没有中央映射；本工程走中央映射 |
+| qgroup 下删快照：遇到 refs > 1 的共享子树调 `btrfs_qgroup_trace_subtree`；子树根层级 ≥ `qgroup_drop_subtree_thres`（默认 3，sysfs `qgroups/drop_subtree_threshold` 可调）时不算账，直接把 qgroup 标成 inconsistent，理由写在注释里：「we are going to change ownership for quite a lot of extents, which will greatly slow down btrfs_commit_transaction()」 | `extent-tree.c:5871-5887`；`fs/btrfs/qgroup.c:2647-2658`；`fs/btrfs/qgroup.h:127`；`fs/btrfs/sysfs.c:2447-2448` | 读源码 | btrfs 的父节点直接存子块逻辑地址，没有中央映射；本工程走中央映射 |
+| 官方文档对 qgroup 的说法：「The qgroup mode is considered not recommended for daily usage, unless there is no planned new snapshot/subvolume creation and deletion」；「The core design of qgroup mode and snapshot are not compatible from day one」；快照创建与子卷删除「are heavily affected and can cause a system hang」 | https://btrfs.readthedocs.io/en/latest/btrfs-quota.html 「STABILITY AND PERFORMANCE IMPLICATIONS」节（抽文本第 112-123 行） | 读文档 | 本工程没有 qgroup 这层记账，差异不明，只能当线索 |
+| 同一文档的 squota 一节：qgroup「must count up the number of trees referring to an extent after its references change. This can slow down transaction commits and lead to unacceptable latencies, especially in cases where snapshots scale up」 | https://btrfs.readthedocs.io/en/latest/Qgroups.html 「Simple quotas (squota)」节（抽文本第 216-223 行） | 读文档 | 本工程没有 qgroup 这层记账，差异不明，只能当线索 |
+| relocation 总流程：块组置只读；记下块组内每个 extent；建 data reloc tree（一个 inode 装新搬的数据 extent）与 reloc tree（源树的特殊快照，装搬过的树块）；把源树与 reloc tree 交换；最后清理 reloc tree 与 data reloc tree（旧 extent 仍被 reloc tree 引用，清完才能释放块组） | `fs/btrfs/relocation.c:42-87` | 读注释 | 经典 relocation：反向引用回溯、reloc tree、改写所有引用方的指针 这一做法：btrfs 要改每个引用方里的地址；本工程走中央映射 |
+| 反向引用回溯：`build_backref_tree` 从一个树块的 backref 找上层引用块，再递归，直到树根或命中缓存，叶子对应引用它的各棵树的根 | `relocation.c:485-498` | 读注释 | btrfs 要改每个引用方里的地址；本工程走中央映射 |
+| 数据分两段：`MOVE_DATA_EXTENTS` 拷数据，写回并等 ordered extent 后切到 `UPDATE_DATA_PTRS`，再改各树里 file extent item 指向新位置（`replace_file_extents` 只在 UPDATE_DATA_PTRS 段做事；reloc tree 一律用 full backref）；循环直到某一轮找到的 extent 数为 0 | `relocation.c:5382-5431`、`:928-959` | 读源码 | btrfs 要改每个引用方里的地址；本工程走中央映射 |
+| 崩溃续做：`btrfs_recover_relocation`「resumes merging reloc trees with corresponding fs trees. this is important for keeping the sharing of tree blocks」；balance 进度存成内部状态，挂载时续做，除非 `skip_balance` | `relocation.c:5614-5620`；https://btrfs.readthedocs.io/en/latest/btrfs-balance.html（抽文本第 115-119 行） | 读注释与文档 | btrfs 要改每个引用方里的地址；本工程走中央映射 |
+| balance 文档：「Extent sharing is preserved and reflinks are not broken」；不带过滤器跑「will take a lot of time as it basically move data/metadata from the whole filesystem and needs to update all block pointers」 | btrfs-balance.html（抽文本第 111-112 行、第 121-123 行） | 读文档 | btrfs 要改每个引用方里的地址；本工程走中央映射 |
+| qgroup 与 relocation：交换子树时要追踪大量树块的 qgroup 归属，`qgroup_trace_extent_swap` 的注释画了 file tree 与 reloc tree 的换块例子；`btrfs_qgroup_add_swapped_blocks` 记下被换的子树根，延后追踪 | `qgroup.c:2297-2330`、`:4751-4765` | 读注释 | btrfs 要改每个引用方里的地址；本工程走中央映射 |
+| backref 回溯代价的现役规避：send 对引用数 > `SEND_MAX_EXTENT_REFS`（1024）的 extent 不做 clone 改发 write，注释原文「avoid hitting limitations of the backreference walking code (taking a lot of time and using too much memory for extents with large number of references)」 | `fs/btrfs/send.c:37-43`、`:1506-1514` | 读源码 | btrfs 要改每个引用方里的地址；本工程走中央映射 |
+
+btrfs 第二组：主线新加的 remap tree（relocation 不改引用方指针，改走一层地址重映射）。
+
+| 事实 | 出处与日期 | 口径 | 与本工程的差异 |
+|---|---|---|---|
+| 引入：incompat 位 `BTRFS_FEATURE_INCOMPAT_REMAP_TREE`（1ULL << 17）、树 ID `BTRFS_REMAP_TREE_OBJECTID` 13、三种 key `IDENTITY_REMAP`(234)/`REMAP`(235)/`REMAP_BACKREF`(236)、块组标志 `REMAPPED` 与 `METADATA_REMAP` | `include/uapi/linux/btrfs.h:339`；`include/uapi/linux/btrfs_tree.h:80`、`:288-290`、`:1174-1175`、`:1348-1355` | 读源码 | 块组级旧→新地址映射，I/O 时翻译 这一做法：btrfs 只对被搬的块组加这层映射，其余地址不经映射；本工程走中央映射，所有指针都经映射 |
+| 首次进主线的 tag：`include/uapi/linux/btrfs.h` 里 `INCOMPAT_REMAP_TREE` 在 v6.19 计数 0、v7.0-rc1 计数 1；引入提交 `ef6a31d035a1`「btrfs: add definitions and constants for remap-tree」，作者 Mark Harmstone 2026-01-07，提交者 David Sterba 2026-02-03 | git.kernel.org `plain/include/uapi/linux/btrfs.h?h=<tag>` 与 `commit/?id=ef6a31d…`，取于 2026-10-12 | 实测（curl + grep -c） | btrfs 只对被搬的块组加这层映射，其余地址不经映射；本工程走中央映射，所有指针都经映射 |
+| 仍是实验特性：sysfs 的 `remap_tree` 特性属性包在 `#ifdef CONFIG_BTRFS_EXPERIMENTAL` 里，注释「Remove once support for remap tree is feature complete」 | `fs/btrfs/sysfs.c:297-304`、`:333-337` | 读源码 | btrfs 只对被搬的块组加这层映射，其余地址不经映射；本工程走中央映射，所有指针都经映射 |
+| 哪些块组走它：开了 REMAP_TREE 且不是 SYSTEM、不是 METADATA_REMAP 块组；走它时先 `move_existing_remaps`、再 `start_block_group_remapping` 与 `do_remap_reloc`，不走旧的 `do_nonremap_reloc`；数据 extent 也不再走 `relocate_file_extent_cluster` | `fs/btrfs/relocation.h:15-24`；`relocation.c:5542-5559`、`:3747-3751`；`fs/btrfs/volumes.c:3745-3750` | 读源码 | btrfs 只对被搬的块组加这层映射，其余地址不经映射；本工程走中央映射，所有指针都经映射 |
+| I/O 翻译：映射块组时若块组带 REMAPPED，`btrfs_translate_remap` 在 remap tree 里找覆盖该地址的项，IDENTITY_REMAP 表示原地未搬，REMAP 项给出新起始地址，长度截到项的末尾 | `relocation.c:5256-5304`；`volumes.c:7258-7268`（另一处调用在 `:6756`） | 读源码 | btrfs 只对被搬的块组加这层映射，其余地址不经映射；本工程走中央映射，所有指针都经映射 |
+| 何时算空块组：REMAPPED 块组以 `identity_remap_count == 0` 为空，普通块组以 `used == 0 && remap_bytes == 0` 为空（discard 与删除未用块组都看这个） | `fs/btrfs/discard.c:218-235` | 读源码 | btrfs 只对被搬的块组加这层映射，其余地址不经映射；本工程走中央映射，所有指针都经映射 |
+| 作者 RFC 给的动机：「Our present system involves following backrefs to rewrite addresses in the metadata trees, which can be slow」，并「has knock-on effects such as breaking nocow files」；SYSTEM 与 REMAP 块组「relocation is as it is at the moment」 | Mark Harmstone，「[RFC PATCH 00/10] btrfs: remap tree」，linux-btrfs，2025-05-15，https://lwn.net/Articles/1021452/ | 读邮件（经 WebFetch 摘要，引文是摘要给出的原句，没有逐字回对原邮件） | btrfs 只对被搬的块组加这层映射，其余地址不经映射；本工程走中央映射，所有指针都经映射 |
+
+查过没找到的：btrfs 主线里没找到一处公开量过「qgroup 开着时 balance 慢多少」的数，只有文档里定性的说法；remap tree 在 7.x 里有没有已知缺陷清单没查（没翻 linux-btrfs 列表与 7.0–7.3 的 fixes）；remap tree 上被快照共享的 extent 搬迁时 qgroup 怎么算没读源码。
+
+### 10.3 bcachefs：快照树与键可见性、copygc 搬共享数据、backpointers
+
+| 事实 | 出处（bcachefs-tools `efec39c7`，路径相对 `fs/`） | 口径 | 与本工程的差异 |
+|---|---|---|---|
+| 四棵 btree 带快照（extents、inodes、dirents、xattrs）；每个 key 的位置里带快照 ID（`bpos.snapshot`），同一 btree 按 (inode, offset, snapshot) 排序；读某快照时，key 可见当且仅当它的快照 ID 是所求快照的祖先或本身、且没有更近的祖先覆盖它；快照内删除插 whiteout | `snapshots/snapshot.c:44-54` | 读文档注释 | 共享靠「键按快照 ID 可见」，不靠引用计数或 deadlist 这一做法：bcachefs 的共享单位是 btree key，快照树在 key 空间里；本工程计划按出生 txg 记 deadlist、走中央映射 |
+| 祖先判断：每个快照节点存 128 位祖先位图（ID 差 128 以内 O(1)）加三项随机跳表 | `snapshots/snapshot.c:56-60`；`snapshots/types.h:14`（`IS_ANCESTOR_BITMAP 128`） | 读注释与源码 | bcachefs 的共享单位是 btree key，快照树在 key 空间里；本工程计划按出生 txg 记 deadlist、走中央映射 |
+| 快照 ID 向下分配，子比父小，所以「祖先排在后面、最近的在前」，可见性过滤是一次前向扫描 | `snapshots/snapshot.c:62-84` | 读注释 | bcachefs 的共享单位是 btree key，快照树在 key 空间里；本工程计划按出生 txg 记 deadlist、走中央映射 |
+| 建快照：在源子卷当前快照节点下分两个子节点，一个给新快照、一个替换源子卷；不复制 key；注释直说与 btrfs「clones entire COW btrees on snapshot」不同 | `snapshots/snapshot.c:86-98` | 读注释 | bcachefs 的共享单位是 btree key，快照树在 key 空间里；本工程计划按出生 txg 记 deadlist、走中央映射 |
+| 不变量之一：不同快照里的两个 extent 要么范围完全相同、要么不重叠；写路径会切开祖先的 extent 让后代的写对齐 | `snapshots/snapshot.c:117-121` | 读注释 | bcachefs 的共享单位是 btree key，快照树在 key 空间里；本工程计划按出生 txg 记 deadlist、走中央映射 |
+| 删快照：先标记，再由 `delete_dead_snapshots` 恢复 pass（也在线跑）分一次或多次回收；「Cost is proportional to the data in the deleted snapshot」；无活后代的节点的 key 直接丢，只有一个活子节点的中间节点把 key 下移给那个子节点（`live_child`）；有两个活子节点的中间节点留着 | `snapshots/snapshot.c:128-163` | 读注释 | bcachefs 的共享单位是 btree key，快照树在 key 空间里；本工程计划按出生 txg 记 deadlist、走中央映射；本工程计划「deadlist 并到更新的一侧」，bcachefs 是把 key 下移给唯一的活后代 |
+| 删快照的中断语义：key 只往下移、inodes btree 最后处理，所以中断只会留下「内容 key 已移、inode 未移」这一种偏斜 | `snapshots/snapshot.c:215-218` | 读注释 | bcachefs 的共享单位是 btree key，快照树在 key 空间里；本工程计划按出生 txg 记 deadlist、走中央映射 |
+| copygc：桶只追加写，随机覆盖留下半空桶；copygc 选最碎的桶，经 backpointers 找到活数据，写到新桶并原子更新 extent 指针；保留 `copygc_reserve`（默认 8%，可设 5–20%）只给 copygc 用 | `data/copygc.c:6-28`；`doc/bcachefs-principles-of-operation.tex:308-321` | 读文档注释 | extent 按逻辑位置键控、值里存物理指针，搬迁改那一个 key 这一做法：bcachefs 的 key 带快照 ID，被多个快照共享的数据只有祖先快照里的一个 key，搬迁只改它；本工程走中央映射，搬迁改映射条目 |
+| 选桶：碎片 LRU 的索引是 `dirty_sectors / bucket_size` 按 2^31 缩放，活数据越少越靠前（即按活数据量贪心）；正在写的桶、设备不可写、backpointer 与桶计数对不上的桶不搬 | `alloc/background.h:127-145`；`data/copygc.c:98-140` | 读源码 | bcachefs 的 key 带快照 ID，被多个快照共享的数据只有祖先快照里的一个 key，搬迁只改它；本工程走中央映射，搬迁改映射条目 |
+| 搬迁提交：`bch2_data_update` 在原 key 的同一快照位置写回新 key（带 `BTREE_UPDATE_internal_snapshot_node`，即可以直接改中间快照节点的 key），并在 key 被切开时调 `bch2_insert_snapshot_whiteouts` 给后代里已覆盖该位置的快照补 whiteout | `data/update.c:431`、`:473-479`；`btree/update.h:89-110`；`btree/update.c:123-159` | 读源码 | bcachefs 的 key 带快照 ID，被多个快照共享的数据只有祖先快照里的一个 key，搬迁只改它；本工程走中央映射，搬迁改映射条目 |
+| 是否「因为按逻辑地址键控所以不用改指针」：源码显示搬迁仍要改 extent key 里的物理指针（同一 key 一次事务），不需要改的是「各快照各自的引用」，因为共享只有一个 key | `data/copygc.c:25-27`；`data/update.c:473-479` | 读源码；「不需要逐快照改」是从「共享只有一个 key」推的 | bcachefs 的 key 带快照 ID，被多个快照共享的数据只有祖先快照里的一个 key，搬迁只改它；本工程走中央映射，搬迁改映射条目 |
+| backpointers：每段有数据的盘上扇区都有一条反向指针，存在写缓冲 btree 里，key = (device, sector offset, discriminator)，值记拥有者 key 的 btree ID、level、位置（位置含快照 ID）、数据类型与桶 generation；由 extent trigger 自动增删 | `alloc/background.c:246-263`；结构 `bcachefs_format.h:568-577` | 读注释与源码 | bcachefs 的 key 带快照 ID，被多个快照共享的数据只有祖先快照里的一个 key，搬迁只改它；本工程走中央映射，搬迁改映射条目；backpointer 指向的是唯一那个 key，不是每个快照一条（从 key 共享推的） |
+| 一致性：backpointer 扇区数与桶扇区数相同就认为该桶一致，不对的才做双向全检；三个恢复 pass 互查 | `alloc/background.c:284-306` | 读注释 | bcachefs 的 key 带快照 ID，被多个快照共享的数据只有祖先快照里的一个 key，搬迁只改它；本工程走中央映射，搬迁改映射条目 |
+| 用 backpointers 的操作：copygc、设备撤出、scrub、reconcile | `alloc/background.c:271-282` | 读注释 | bcachefs 的 key 带快照 ID，被多个快照共享的数据只有祖先快照里的一个 key，搬迁只改它；本工程走中央映射，搬迁改映射条目 |
+
+查过没找到的：没找到 bcachefs 公开量过「快照很多时 copygc 或 delete_dead_snapshots 的代价」的数；`doc/bcachefs-principles-of-operation.tex` 第 722 行「Subvolumes and snapshots」一节没逐行读，只读了源码里的 `DOC_LATEX(snapshots)` 注释。
+
+### 10.4 F2FS 与 NILFS2：段清理
+
+F2FS（Linux `24a19b95`）：
+
+| 事实 | 出处 | 口径 | 与本工程的差异 |
+|---|---|---|---|
+| 三种选段算法 `GC_CB`（cost-benefit）、`GC_GREEDY`、`GC_AT`（age-threshold）；两种 GC 类型 `BG_GC`（后台）、`FG_GC`（按需） | `fs/f2fs/segment.h:132-154` | 读源码 | 日志结构段清理 这一做法：F2FS 没有快照，GC 从不处理共享块；本工程的 GC 要搬被快照共享的块 |
+| 缺省对应：BG_GC 用 CB（开了 atgc 用 AT），FG_GC 用 GREEDY；`gc_urgent` / `gc_idle` 各档可强制改成 CB、GREEDY 或 AT | `fs/f2fs/gc.c:248-273`；文档 `Documentation/filesystems/f2fs.rst:822-828` | 读源码与文档 | F2FS 没有快照，GC 从不处理共享块；本工程的 GC 要搬被快照共享的块 |
+| greedy 代价 = 段（或 section）里的有效块数；CB 代价 = `UINT_MAX - (100*(100-u)*age)/(100+u)`，u 是有效块百分比，age 按段 mtime 在全盘 min/max mtime 间线性归一 | `gc.c:390-410`、`:362-388` | 读源码 | F2FS 没有快照，GC 从不处理共享块；本工程的 GC 要搬被快照共享的块 |
+| 后台 GC 选过的 victim 记在 `victim_secmap`，前台 GC 优先拿它们；非前台、非 urgent-high 时搜索范围限 `max_victim_search` | `gc.c:343-360`、`:302-310` | 读源码 | F2FS 没有快照，GC 从不处理共享块；本工程的 GC 要搬被快照共享的块 |
+| 前台触发：空闲 section 不够时转 FG_GC；若 prefree 段够多，先写 checkpoint 把 prefree 变 free，可能就不用 FG_GC；GC 结束后空闲不够还会再写 checkpoint 回收 prefree | `gc.c:1986-2004`、`:2068-2075` | 读源码 | F2FS 没有快照，GC 从不处理共享块；本工程的 GC 要搬被快照共享的块 |
+| 搬迁的原子性：被清空的段先进 prefree，只有 `do_checkpoint` 成功之后 `f2fs_clear_prefree_segments` 才把它们清掉并（开 discard 时）发 discard；checkpoint 失败走 `f2fs_release_discard_addrs` | `fs/f2fs/checkpoint.c:2039-2046`；`fs/f2fs/segment.c:2209-2282` | 读源码 | F2FS 没有快照，GC 从不处理共享块；本工程的 GC 要搬被快照共享的块 |
+| SSR 在已脏段里找空位时取 `ckpt_valid_map | cur_valid_map` 的零位，上次 checkpoint 时有效的块在下次 checkpoint 前不会被覆盖 | `segment.c:3126-3140`；`segment.h:182-185` | 读源码 | F2FS 没有快照，GC 从不处理共享块；本工程的 GC 要搬被快照共享的块 |
+| 文档：「F2FS adopts the greedy algorithm for on-demand cleaner, while background cleaner adopts cost-benefit algorithm」 | `Documentation/filesystems/f2fs.rst:817-828` | 读文档 | F2FS 没有快照，GC 从不处理共享块；本工程的 GC 要搬被快照共享的块 |
+
+NILFS2（Linux `24a19b95` 内核侧，nilfs-utils `26efb5da` 用户态）：
+
+| 事实 | 出处 | 口径 | 与本工程的差异 |
+|---|---|---|---|
+| checkpoint 每几秒或每次同步写自动产生；用户可把选中的 checkpoint 转成 snapshot，转回 checkpoint 之前一直保留；`NILFS_IOCTL_CHANGE_CPMODE` 在两态之间切换 | `Documentation/filesystems/nilfs2.rst:14-18`、`:100-102` | 读文档 | 块号经 DAT 虚拟化、GC 改 DAT 不改树、存活按 checkpoint 区间判 这一做法：NILFS2 的 DAT 是一层虚拟块号到物理块号的映射，本工程走中央映射，两者都有一层间接；差异在 NILFS2 的快照是整卷 checkpoint、liveness 由用户态守护进程判 |
+| 删 checkpoint 时跳过 snapshot：区间删除遇到 snapshot 计数，最后返回 `-EBUSY`；单个删除对 snapshot 直接 `-EBUSY` | `fs/nilfs2/cpfile.c:507-513`、`:558-559`、`:750-777` | 读源码 | NILFS2 的 DAT 是一层虚拟块号到物理块号的映射，本工程走中央映射，两者都有一层间接；差异在 NILFS2 的快照是整卷 checkpoint、liveness 由用户态守护进程判 |
+| GC 在用户态：`nilfs_cleanerd` 选段、判存活，经 `NILFS_IOCTL_CLEAN_SEGMENTS` 一次把要删的 checkpoint 区间、要释放的虚拟块号、要搬的块、要释放的段交给内核 | `nilfs2.rst:138-141`；`fs/nilfs2/ioctl.c:850-860`（argv 五段） | 读文档与源码 | NILFS2 的 DAT 是一层虚拟块号到物理块号的映射，本工程走中央映射，两者都有一层间接；差异在 NILFS2 的快照是整卷 checkpoint、liveness 由用户态守护进程判 |
+| 选段策略：`selection_policy` 只支持 `timestamp`（从最旧到最新回收）；`nsegments_per_clean` 默认 2；`protection_period` 默认 3600 秒，「NILFS2 GC never deletes checkpoints and their blocks whose duration time is less than the value」 | nilfs-utils `man/nilfs_cleanerd.conf.5:22-26`、`:52-58` | 读文档 | NILFS2 的 DAT 是一层虚拟块号到物理块号的映射，本工程走中央映射，两者都有一层间接；差异在 NILFS2 的快照是整卷 checkpoint、liveness 由用户态守护进程判；F2FS 用 greedy/CB，NILFS2 只按时间 |
+| 存活判断（用户态）：块的生存区间 `[p_start, p_end)` 是 checkpoint 号；`p_end` 为 `NILFS_CNO_MAX` 或晚于保护期下限即活；否则对快照号数组二分，只要区间里有一个快照就活 | nilfs-utils `lib/gc.c:417-470` | 读源码 | NILFS2 的 DAT 是一层虚拟块号到物理块号的映射，本工程走中央映射，两者都有一层间接；差异在 NILFS2 的快照是整卷 checkpoint、liveness 由用户态守护进程判 |
+| 内核侧原子性：`nilfs_clean_segments` 先把 DAT 存进 shadow map，准备失败就从 shadow 恢复；然后以 `SC_LSEG_SR`（带 super root 的完整日志）写段，段的释放在同一次段构造的 SUFILE 阶段做（`nilfs_free_segments`），构造失败用 `nilfs_sufile_cancel_freev` 撤销；成功后开 discard 时才对释放的段发 discard | `fs/nilfs2/segment.c:2546-2580`、`:1260-1265`、`:1566-1573`、`:1880-1886` | 读源码 | NILFS2 的 DAT 是一层虚拟块号到物理块号的映射，本工程走中央映射，两者都有一层间接；差异在 NILFS2 的快照是整卷 checkpoint、liveness 由用户态守护进程判 |
+| 准备步骤可安全中止的理由写在注释里：删 checkpoint「can be removed independently」；DAT「is updated atomically using a copy-on-write technique」；标脏「nondestructive」 | `fs/nilfs2/ioctl.c:797-834` | 读注释 | NILFS2 的 DAT 是一层虚拟块号到物理块号的映射，本工程走中央映射，两者都有一层间接；差异在 NILFS2 的快照是整卷 checkpoint、liveness 由用户态守护进程判 |
+| 搬块改的是 DAT：GC 写新位置时 `nilfs_btree_assign_gc` 调 `nilfs_dat_move` 把虚拟块号对应的物理块号改成新地址，盘上 binfo 记的仍是虚拟块号，引用该块的各 checkpoint 的树不用改 | `fs/nilfs2/btree.c:2354-2379`；`fs/nilfs2/dat.c:317-331` | 读源码 | NILFS2 的 DAT 是一层虚拟块号到物理块号的映射，本工程走中央映射，两者都有一层间接；差异在 NILFS2 的快照是整卷 checkpoint、liveness 由用户态守护进程判 |
+| GC 读进来的块挂在 dummy inode（gcinode）上，每次拷进新日志后释放；注释写明当前代的脏块与 GC 要搬的块不会重叠 | `fs/nilfs2/gcinode.c:11-22` | 读注释 | NILFS2 的 DAT 是一层虚拟块号到物理块号的映射，本工程走中央映射，两者都有一层间接；差异在 NILFS2 的快照是整卷 checkpoint、liveness 由用户态守护进程判 |
+
+查过没找到的：F2FS 与 NILFS2 都没找到 GC 半途崩溃后的专门续做逻辑——F2FS 靠「上次 checkpoint 之前有效的块在下次 checkpoint 前不复用」回到上次 checkpoint，NILFS2 靠「段释放与新日志同一次写」，这两句是从 F2FS 与 NILFS2 的源码推的，没有找到文档原话；NILFS2 内核里没找到 GC 选段代码：`grep -rn -i 'victim\|greedy\|cost.benefit' fs/nilfs2 | wc -l` 输出 `0`。
+
+### 10.5 APFS：快照与空间回收的公开事实
+
+| 事实 | 出处与日期 | 口径 | 与本工程的差异 |
+|---|---|---|---|
+| 建快照时卷当前的 extent-reference tree 整棵移给快照，卷换一棵新的空 extent-reference tree | Apple File System Reference（2020-06-22 版）第 55 页 `apfs_extentref_tree_oid` 条 | 读官方文档 | 每个快照一棵 extent 引用树、物理 extent 带引用计数 这一做法：APFS 的引用计数按物理 extent 记，本工程计划按出生 txg 记 deadlist；APFS 有对象映射（omap）把虚拟 oid 映到物理地址，但文件数据 extent 直接用物理地址（第 102 页 `j_phys_ext_key_t` 的 key 是物理块地址），与本工程「所有指针经中央映射」不同 |
+| 快照元数据记录 `j_snap_metadata_val_t` 带 `extentref_tree_oid`、`sblock_oid` 等；文档原话「Snapshots are designed to be fast and inexpensive to create; however, deleting a snapshot involves more work」 | Apple File System Reference（2020-06-22 版）第 117-118 页 | 读官方文档 | APFS 的引用计数按物理 extent 记，本工程计划按出生 txg 记 deadlist；APFS 有对象映射（omap）把虚拟 oid 映到物理地址，但文件数据 extent 直接用物理地址（第 102 页 `j_phys_ext_key_t` 的 key 是物理块地址），与本工程「所有指针经中央映射」不同 |
+| 物理 extent 记录 `j_phys_ext_val_t` 有 `refcnt`，「The extent can be deleted when its reference count reaches zero」；「For a volume that has no snapshots, the kind is always APFS_KIND_NEW」 | Apple File System Reference（2020-06-22 版）第 102-103 页 | 读官方文档 | APFS 的引用计数按物理 extent 记，本工程计划按出生 txg 记 deadlist；APFS 有对象映射（omap）把虚拟 oid 映到物理地址，但文件数据 extent 直接用物理地址（第 102 页 `j_phys_ext_key_t` 的 key 是物理块地址），与本工程「所有指针经中央映射」不同 |
+| 对象映射有快照树（xid → `omap_snapshot_t`），访问时以 xid 为键 | Apple File System Reference（2020-06-22 版）第 17 页、第 47 页 | 读官方文档 | APFS 的引用计数按物理 extent 记，本工程计划按出生 txg 记 deadlist；APFS 有对象映射（omap）把虚拟 oid 映到物理地址，但文件数据 extent 直接用物理地址（第 102 页 `j_phys_ext_key_t` 的 key 是物理块地址），与本工程「所有指针经中央映射」不同 |
+| reaper 负责「deletion of objects that are too large to be deleted in the time between transactions」，跨多个事务保存删除进度；删快照用 `apfs_reap_state_t`（`last_pbn`、`cur_snap_xid`、`phase`）与 omap 的两个 reap 阶段（先 map tree、后 snapshot tree） | Apple File System Reference（2020-06-22 版）第 26 页、第 50 页、第 166-167 页 | 读官方文档（`apfs_reap_state_t` 文档写「No overview available」） | APFS 的引用计数按物理 extent 记，本工程计划按出生 txg 记 deadlist；APFS 有对象映射（omap）把虚拟 oid 映到物理地址，但文件数据 extent 直接用物理地址（第 102 页 `j_phys_ext_key_t` 的 key 是物理块地址），与本工程「所有指针经中央映射」不同；本工程计划的 deadlist 合并没有 reaper 这种跨事务删除对象 |
+| 空间管理器有 free queue，key 是 (xid, paddr)，结构 `spaceman_free_queue_t` 带 `sfq_oldest_xid`；文档对它的说明是「No overview available」，没有写块何时可再分配 | Apple File System Reference（2020-06-22 版）第 159-160 页 | 读官方文档 | 差异不明，只能当线索 |
+| 收缩分区用 evict-mapping tree 记「where the blocks are being moved to」 | Apple File System Reference（2020-06-22 版）第 33 页、第 42-43 页 | 读官方文档 | 差异不明，只能当线索 |
+| 二手说法（非 Apple）：删一个很小的快照「may take around 0.2 seconds, mainly with cleaning up the object map」，由容器唯一的 Reaper 做 | Howard Oakley，「APFS: Snapshots」，eclecticlight.co，2024-04-08（经 WebFetch 摘要，没逐字回对） | 读二手文章 | 差异不明，只能当线索 |
+
+查过没找到的：Apple 参考手册全文 `grep -c -i trim` 命中 7 行，全是 `INODE_ACTIVE_FILE_TRIMMED`（「overprovisioning file that has been trimmed」）及其索引，没有一处讲 TRIM 何时发、与块再分配的先后；手册没讲快照删除时怎么决定哪些 extent 释放、删新快照与删旧快照释放量的差别；Hansen 与 Toolan 的逆向论文（Digital Investigation，2017）这次没取到原文；Apple 开发者站上没找到另一份讲快照空间回收的官方文档（只搜了一次网页）。
+
+### 10.6 discard/TRIM：什么时候发、与块可再分配的先后
+
+| 事实 | 出处 | 口径 | 与本工程的差异 |
+|---|---|---|---|
+| ZFS 释放的块先进 `ms_defer[txg % TXG_DEFER_SIZE]`（`TXG_DEFER_SIZE` = 2），defer 期满放回 `ms_allocatable` 的同时，autotrim 开着就加进 `ms_trim`；空闲接近 slop、vdev 正在移除或 raidz 扩展时不 defer，直接把 `ms_freed` 加进 `ms_trim` | `module/zfs/metaslab.c:4616-4667`；`include/sys/txg.h:39` | 读源码 | 先可再分配、后 trim，分配时把范围从待 trim 集合里删掉 这一做法：ZFS 的 trim 以 metaslab 为单位，本工程以段为单位产出全空段再发 discard |
+| 分配时把范围从 `ms_trim` 里清掉，所以已被重新分配的范围不会再被 autotrim | `metaslab.c:4928-4929`、`:5945-5946` | 读源码 | ZFS 的 trim 以 metaslab 为单位，本工程以段为单位产出全空段再发 discard |
+| autotrim 线程每个 top-level vdev 一个，处理某个 metaslab 时先 `metaslab_disable` 停它的分配，再把 `ms_trim` 换成空树、对换出来的那棵发 TRIM；同一 metaslab 至少隔 `zfs_trim_txg_batch`（默认 32）个 txg 才再访问；≤ 32KiB 的范围跳过 | `module/zfs/vdev_trim.c:1257-1305`、`:54-78`、`:96`、`:115-129`；`metaslab.c:6304-6311` | 读源码 | ZFS 的 trim 以 metaslab 为单位，本工程以段为单位产出全空段再发 discard |
+| 手动 `zpool trim`：每个叶 vdev 一个线程，遍历所有 metaslab 的未分配范围，正在 trim 的 metaslab 不能分配；进度写盘，可暂停续做；autotrim 进度不写盘 | `vdev_trim.c:40-52`、`:71-72` | 读注释 | ZFS 的 trim 以 metaslab 为单位，本工程以段为单位产出全空段再发 discard |
+| `autotrim` 属性文档：「Automatic TRIM does not immediately reclaim blocks after a free」，会延迟以聚合小范围；默认 off | `man/man7/zpoolprops.7:444-458` | 读文档 | ZFS 的 trim 以 metaslab 为单位，本工程以段为单位产出全空段再发 discard |
+| btrfs `discard=sync`：事务提交收尾 `btrfs_finish_extent_commit` 里对每段 pinned 范围先 `btrfs_discard_extent`，再 `unpin_extent_range` 放回可分配；即同步 discard 在可再分配之前 | `fs/btrfs/extent-tree.c:2998-3013` | 读源码 | btrfs 两种 discard 与可分配的先后 这一做法：btrfs 的空闲空间按块组的内存 free space cache 管，本工程按段 |
+| btrfs `discard=async`：discard 状态只在内存的 free space cache 里，不持久化，挂载时全当未 discard；块组按空闲时间排 LRU，初始延迟 `BTRFS_DISCARD_DELAY` 120 秒「to give some chance for block reuse」，全空块组延迟 10 秒；IOPS 上限 1000 | `fs/btrfs/discard.c:16-61` | 读注释与源码 | btrfs 的空闲空间按块组的内存 free space cache 管，本工程按段 |
+| btrfs async 的先后：被 unpin 的范围先回到可分配，之后才由 discard worker 处理；处理一个范围时先 `unlink_free_space` 把它从 free space cache 取出（并计入 reserved），discard 完再以 TRIMMED 状态加回；分配会把 bitmap 的 trimmed 状态重置 | `extent-tree.c:3052-3054`；`fs/btrfs/free-space-cache.c:3768`、`:3794`、`:3650-3710`；`discard.c:44-52` | 读源码 | btrfs 的空闲空间按块组的内存 free space cache 管，本工程按段 |
+| btrfs 文档：sync discard「could have severe performance hit and is not recommended」；async 先在内存里记，攒够或过一段时间再 trim；「Since kernel 6.2 the discard=async mount option is automatically enabled on devices that support that」 | https://btrfs.readthedocs.io/en/latest/Trim.html（抽文本第 69-91 行） | 读文档 | btrfs 的空闲空间按块组的内存 free space cache 管，本工程按段 |
+| F2FS：prefree 段在 checkpoint 成功后才转 free，此时对它们发 discard；分配一个块时若有覆盖它的 discard 命令还没提交就把该块从命令里挖掉，已提交就等它完成 | `fs/f2fs/segment.c:2223-2282`、`:1874-1917`、`:3933` | 读源码 | 段式回收与本工程相近；F2FS 没有快照 |
+| NILFS2：GC 释放的段在带 super root 的日志写成功后才发 discard | `fs/nilfs2/segment.c:2560-2580` | 读源码 | 段式回收与本工程相近 |
+| bcachefs：桶由非空变空时 trigger 把 data_type 置 `need_discard`，进 need_discard btree；discard worker 发完 TRIM 才清标志、桶变 free 进 freespace btree；发之前要求桶变空的那条 journal 序号 ≤ 已落盘的 `flushed_seq_ondisk`，且 < `rewind_seq_ondisk`，否则推迟 | `alloc/background.c:1291-1300`、`:56-76`、`:383-391`；`alloc/discard.c:343-351` | 读源码 | bcachefs 是「先 discard、后可再分配」，与 ZFS/btrfs async 的先后相反；本工程一侧 discard 与再分配的先后没查 |
+| APFS：官方手册没有 TRIM 的说明 | APFS 手册对 TRIM 的情况见 10.5 末尾「查过没找到的」 | 读官方文档 | 差异不明 |
+
+查过没找到的：ZFS 与 btrfs 都没找到「discard 未完成时崩溃」的专门处理说明（btrfs async 注释只写了挂载时全当未 discard）；没量任何一家的 discard 延迟或吞吐。
+
+### 10.7 反证清单
+
+| 反证 | 查了哪几家 | 怎么查的 |
+|---|---|---|
+| 查过的几家里，没有一家把「按出生 txg 分桶的 deadlist」和「能搬被快照共享块的段清理」放在同一个实现里 | ZFS（有 deadlist，没有通用 GC，只有 device removal 加 indirect mapping）；btrfs（共享靠 extent 引用计数，删快照靠遍历树减引用）；bcachefs（共享靠键按快照 ID 可见，删快照靠移键）；F2FS（没有快照）；NILFS2（DAT 条目记 `de_start`/`de_end` checkpoint 区间，存活按区间与快照号判）；APFS（每个快照一棵 extent 引用树加物理 extent refcnt，GC 机制手册没写） | 读 10.1 到 10.5 所列源码与文档；「没有」只覆盖这六家与所列提交 |
+| OpenZFS master 里没有改写被快照引用的块指针的机制：源码自述「we cannot rewrite block pointers of snapshots」；`zfs rewrite` 对快照共享块是另写一份、旧副本留给快照 | 只查 ZFS | `vdev_indirect.c:36-40`；`zfs-rewrite.8:52-57`、`:84-91`；稀疏检出上 grep `bp rewrite` 一类字样只命中那一句注释 |
+| 查过的几家里，搬被快照共享的数据而不改各引用方的，都借了一层间接：NILFS2 改 DAT（虚拟块号→物理块号），ZFS device removal 加 indirect mapping，btrfs remap tree（实验特性）加块组级重映射，bcachefs 共享本来只有一个 key；直接改所有引用方指针的只有 btrfs 经典 relocation，作者在 remap tree RFC 里说它「can be slow」 | ZFS、btrfs、bcachefs、NILFS2；F2FS 不涉及；APFS 未知 | 10.1 到 10.4 的源码与 RFC 原句 |
+| ZFS 与 btrfs async 都是「块先回到可分配、之后才 trim，分配时把范围从待 trim 集合里删掉或从 free space 里暂时取出」；bcachefs 相反，「先 discard、后进 freespace」 | ZFS、btrfs、bcachefs；F2FS 是 checkpoint 后发 discard、分配时挖掉或等待；NILFS2 是日志写成后发 | 10.6 的源码 |
+
+口径补记：LWN 上 remap tree RFC 与 eclecticlight 的 APFS 文章的引文是 WebFetch 摘要给出的、没有逐字回对原文；Delphix 博客用的是 web.archive.org 的 2020 存档。
 
 ### 7.9 「七、近十年学术成果扫描（2012–2026）」的来源
 

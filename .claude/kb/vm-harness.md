@@ -33,7 +33,7 @@ VM_DISKS=4 VM_DISK_MB=64 bash scripts/devices/vm-bench.sh <静态二进制>
 |---|---|---|
 | **KVM 可读写** | `id -nG \| grep -w kvm`，再实测 `[ -r /dev/kvm ] && [ -w /dev/kvm ]` | 本机靠 **`kvm` 组成员身份**拿权限。不满足就 `sudo usermod -aG kvm $USER`（口令在 `.env` 的 `SUDO_PASS_A`）；当前 shell 用 `sg kvm -c '<命令>'` 立即取得，新会话自动带上 |
 | **内核镜像可读** | `bash scripts/devices/vm-kernel.sh --check` | 跑 `bash scripts/devices/vm-kernel.sh`，它打印一个可用路径；必要时用 `.env` 里的口令从 `/boot` 复制一份到 `TMPDIR` 并 chown。要量时间就跑 `bash scripts/devices/vm-kernel.sh --release $(uname -r)`：它只认 `/boot/vmlinuz-<版本>`，复制成 `TMPDIR` 下的 `singlefs-vmlinuz-<版本>`，不会先撞上 lockdep 那个 |
-| **二进制是静态的** | `file <二进制>` | 用 `--target x86_64-unknown-linux-musl` 编。musl 目标已装（`rustup target list --installed`） |
+| **二进制是静态的** | `file <二进制>` | 实验二进制用 `--target x86_64-unknown-linux-musl` 编，musl 目标已装（`rustup target list --installed`）；带 RocksDB 的 checker 档二进制用 `--target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]'` 编成 static-pie（`.claude/gate.d/checker-tier-qemu-device-streams.sh`） |
 
 ⚠️ **判断 KVM 前置一律查组并实测读写，不许查 ACL，也不许用 `setfacl` 去补。**
 `/dev/kvm` 带 `TAG+="uaccess"`（`/usr/lib/udev/rules.d/70-uaccess.rules:48`），
@@ -51,7 +51,7 @@ lockdep 内核量出来的时间连虚机之间都不宜比：锁校验的开销
 
 ## 跑之前先做卫生检查
 
-`vm-bench.sh` 现在带 `EXIT` 清理工作目录，但**开跑前仍然值得看一眼**
+`vm-bench.sh` 带 `EXIT` 清理工作目录，但**开跑前仍然值得看一眼**
 （这条清理是补上去的，补之前一次清出过 154 个目录、4.5 GB，详见文末历史版本）：
 
 ```bash
@@ -102,7 +102,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 
 **为什么要这道闸**（2026-08-31 实测踩过，E6（加密算法选型））：
 `-cpu host,-aes` 只摘掉 CPUID 的 `aes` 位，而 RustCrypto 的 `aes` 0.9.3
-**分别**探 `aes` 与 `vaes` 两个位（`src/lib.rs` 第 152–154 行）⇒ 来宾仍走 AES 指令：
+**分别**探 `aes` 与 `vaes` 两个位（`src/lib.rs` 里 `cpufeatures::new!(features_vaes256,` 那一段）⇒ 来宾仍走 AES 指令：
 
 | 观测 | `-aes` | `-aes,-vaes` |
 |---|---|---|
@@ -132,7 +132,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 | 来宾 `/sys/block/<名>/stat` 的写请求数 = 程序的写数 + FLUSH 数（盘 0：23 + 12 = 35） | 比对用写扇区数（= 字节 ÷ 512）与 FLUSH 数；FLUSH 数是 stat 的下标 15，不是 14（14 是 discard 耗时，读它会得到 0） |
 | 走页缓存时设备侧的写被合并 | m1（32 KiB）与 m2（16 KiB）回写成一个 48 KiB 的写；这是阳性对照判红的地方 |
 
-⚠️ **日志盘要装得下全部写的数据**：`log<d>.img` 的大小取 `VM_LOG_MB`（MiB），`vm-bench.sh` 自己的默认是 256。mkfs 按 4 MiB 一块写零 768 MiB 之后，每块盘的日志实用约 770 MiB（2026-09-27 实测，VM_DISKS=2、每盘 4096 MiB，六档都在 769–771 MiB）；256 MiB 时 direct、file-overwrite、second-instance 三档在 mkfs 里报 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`；page-cache、skip-new-pool-file-creation-barrier、raise-rollback-floor 三档那一次没报，为什么没查。门禁 checker-tier-qemu-device-streams 因此默认传 `VM_LOG_MB=4096`（一块数据盘的大小，镜像是稀疏文件，只占真写进去的那些）；别处开 blklogwrites 模式的，照写的数据量设 `VM_LOG_MB`。把那次 EIO 归给日志盘太小，这一归因 2026-10-01 没复核：同一句 `run_failed step=mkfs … I/O error` 也是 blklogwrites 超过 IOV_MAX 那个缺陷的症状，三档报、三档没报的形状与并发下随机撞上相容（推的，没量过）。
+⚠️ **日志盘要装得下全部写的数据**：`log<d>.img` 的大小取 `VM_LOG_MB`（MiB），`vm-bench.sh` 自己的默认是 256。mkfs 按 4 MiB 一块写零 768 MiB 之后，每块盘的日志实用约 770 MiB（2026-09-27 实测，VM_DISKS=2、每盘 4096 MiB，六档都在 769–771 MiB）；256 MiB 时 direct、file-overwrite、second-instance 三档在 mkfs 里报 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`；page-cache、skip-new-pool-file-creation-barrier、raise-rollback-floor 三档那一次没报，为什么没查。门禁 checker-tier-qemu-device-streams 因此默认传 `VM_LOG_MB=4096`（一块数据盘的大小，镜像是稀疏文件，只占真写进去的那些）；别处开 blklogwrites 模式的，照写的数据量设 `VM_LOG_MB`。把那次 EIO 归给日志盘太小，这一归因没复核：同一句 `run_failed step=mkfs … I/O error` 也是 blklogwrites 超过 IOV_MAX 那个缺陷的症状，三档报、三档没报的形状与并发下随机撞上相容（推的，没量过）。
 
 ⚠️ 这一档验的是「程序发出的写与 FLUSH 在虚拟设备上原样到达、次序不变」，不是真盘的持久语义：`cache=none` 下设备侧 FLUSH 映射成宿主上的 `fdatasync`，宿主盘自己的缓存不在射程里。
 
@@ -146,7 +146,7 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 ⚠️ **往附加根里放动态链接的程序，库（尤其 `/lib64/ld-linux-x86-64.so.2`）要带执行位。**
 内核执行动态程序时先执行 ELF 里写的那个加载器；加载器没有执行位，来宾里每个动态程序都报 Permission denied，而静态链接的程序照常跑。
 实测（2026-09-15，E152（按里程碑对比六家文件系统的文件性能） 第一次冒烟跑）：库按 0644 装，八个配置里七个卡在第一个外部命令，只有静态链接的 singlefs 二进制跑通。
-`e152-stage-root.sh` 现在按 0755 装，并在搭完时用搭好的加载器与库实际跑一次搭好的 fio，这一步没过就不交出附加根。
+`e152-stage-root.sh` 按 0755 装，并在搭完时用搭好的加载器与库实际跑一次搭好的 fio，这一步没过就不交出附加根。
 
 ## 计时不在转发输出的循环里打时间戳
 

@@ -1,8 +1,12 @@
 ## E175 产品路径上 inode 号水位退回与重发号 —— 已跑（够判）
 
-<!-- doc-lint:not-numbers W1 W2 W3 P1 P2 Q1 Q2 Q3 Q3b Q4 Q5 Q6 Q7 Q9 Q10 Q11 S1 S2 S3 V1 V2 V3 V4 V5 V717 A1 A2 A3 A4 A5 A6 A7 F1 F2 F3 F4 F5 F6 F7 F8 F9 F3a F3b F4 D1 D2 D3 G0 -->
+<!-- doc-lint:not-numbers W1 W2 W3 P1 P2 Q1 Q2 Q3 Q3b Q4 Q5 Q6 Q7 Q9 Q10 Q11 S1 S2 S3 V1 V2 V3 V4 V5 V717 F1 F2 F3 F4 F5 F6 F7 F8 F9 F3a F3b F4 -->
 
-跑前登记 `research/prompts/e175-preregistration.md`（照它跑两段时 sha256 `d68c9d2229bcf3800c5efd36c9194e6af9684b193a172258b58846474afae805`，问法定成读法 B：「重发号」只算同一条时间线上的；第十二节「修订」有两次：修订 1 是执行员写的 8 条读法钉死与装置写法，修订 2 是设计员写的「两段都在一份冻结副本上跑」与几何四点，判据、门槛、臂、量的去留都没动）。岔路单 `research/prompts/m3-3-5-forks.md` 第 11 行 W：C479（inode 号复用已发过的号今天造不出来） 剩下的「活记录被原地换」那一形，翻面观测是「产品路径上（不装只供测试的水位开关），有没有一段历史能让 inode 号水位退回去、造出重发号」，够判条件是在随机历史与带回退的历史上跑够登记的历史数、数到重发号与 I-9.29（同号只许一个出生代） 红的次数，有一次就够判。
+```text
+本页的本地臂名与记号写小写（a1、a2、a3、a4 ……）：跑前登记、装置、产物与命令里写作对应的大写，与全局登记的编号同形；kb 正文里改成小写只为与那些编号分开，读产物时按大写对。
+```
+
+跑前登记 `research/prompts/e175-preregistration.md`（照它跑两段时 sha256 `d68c9d2229bcf3800c5efd36c9194e6af9684b193a172258b58846474afae805`，问法定成读法 B：「重发号」只算同一条时间线上的；第十二节「修订」有两次：修订 1 是执行员写的 8 条读法钉死与装置写法，修订 2 是设计员写的「两段都在一份冻结副本上跑」与几何四点，判据、门槛、臂、量的去留都没动）。岔路单 `research/prompts/m3-3-5-forks.md` 里岔路 W：C479（inode 号复用已发过的号今天造不出来） 剩下的「活记录被原地换」那一形，翻面观测是「产品路径上（不装只供测试的水位开关），有没有一段历史能让 inode 号水位退回去、造出重发号」，够判条件是在随机历史与带回退的历史上跑够登记的历史数、数到重发号与 I-9.29（同号只许一个出生代） 红的次数，有一次就够判。
 
 **这一页的数全部出自仓副本装置，跑在一份冻结副本上**：装置照登记第五节「装置写在哪」写死，放在冻结副本 `~/.local/share/singlefs/work/e175-frozen-crates-2/repo/` 的 `crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs`，主工作区 `crates/` 不动（形式化线冻结期）；装置源码原样留在产物目录的 `device-source.rs`。冻结副本 `code_baseline=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb`，拷于 2026-10-08，根环线第 10z 批第十、十一块合入、合后验证全绿之后；HEAD `31e47115471ba5502a4531d25dffcc921be36899`（`baseline-frozen-crates.out` 第一行）。kb 别处引这些数要写明「仓副本装置、冻结副本」；装置要不要进 `crates/`、要不要在入库装置上重做一次，由主 agent 定。
 
@@ -13,13 +17,13 @@
 - **产品臂 P**：登记的 17 105 段历史（D 8、F3a 16 105、F2 256、F1 四组各 128、几何四点 64 + 64 + 64 + 32）里，同一条时间线上的重发号（Q1）0 次，I-9.29（同号只许一个出生代） 红 0 段（判不了 0 步；F1 四组与 G-long-F1 有不适用的步，F3a、F2、G-long、G-small、G-draw 每一步都判成立），水位退回（Q3）0 步，跨被抛弃时间线的重发号（Q3b）0 次；任何一条不变量在任何一步都没判红。
 - **路径跑到了**：跨过已发号的回退之后同一条时间线上又建了 inode 的窗口（Q5）F3a 7 870 个、F2 1 062 个，合计 8 932，过了登记的 50；第二段另有 F1 四组 572 个、几何四点 1 196 个。F1 四组抽到 `PublishFirstFile`（1 号重发唯一的路）：F1-broad 197 次、F1-reuse 68 次、F1-deleting 12 次、F1-newest 197 次，G-long-F1 203 次。
 - **阳性对照**：V1（回退取目标那一版的水位）与 V2（发布不加新建个数）在跑到的每一族都造出重发号、I-9.29（同号只许一个出生代） 红，R-V1 在 F3a、F2、F1 四组、G-long 上全过，R-V2 在 F3a、F2、F1 四组上全过（几何点照登记只跑 G-long 的 V1），登记第十节 F1、F2 没触发。
-- **停机条款**：S3 两条路判抛弃不一致 0 次、S1 与 S2 对不上（F3 两形）0 次、Q11（发的号不等于上一版水位）0 次、条款锚点 A1–A3 与独立锚点 A4–A7 全对上，都没触发。
+- **停机条款**：S3 两条路判抛弃不一致 0 次、S1 与 S2 对不上（F3 两形）0 次、Q11（发的号不等于上一版水位）0 次、条款锚点 a1–a3 与独立锚点 a4–a7 全对上，都没触发。
 - **W 行**：照登记第十一节「第二段跑完、F1 F2 F7 F8 都没触发，W 行够判」：登记的 17 105 段产品臂历史里没造出同一条时间线上的重发号，也没有一段 I-9.29（同号只许一个出生代） 红。这是「登记的历史里没造出」，不是「造不出」。
 
 ### 做了什么
 
 - **三样读法**（登记第六节）：S1 账：每一步之后用 `singlefs_core::recovery::readable_roots` 列可读根，同一根键只用 `rebuild_version` 重建一次，读那一版记账里的水位与 inode 树全部 (号, 出生代)，按号记「见过的出生代 → 持有过它的根」；S2：每一步对镜像调 `singlefs_checker::walk::check_pool_image`，判红不停，I-9.29（同号只许一个出生代）、I-9.6（水位大于两处最大号） 按成立 / 不适用 / 部分没判 / 违例四栏数；S3：被崩溃恢复抛弃的根两条路，路 1 用最新那条根的实例表按 `publish_is_abandoned_by_the_instance_table` 判，路 2 是步账（每次挂载做成，新实例接的是那一步之前模型根环里最新的那条根，同一旧实例里 txg 更大的根记被抛弃）。
-- **臂**：P（冻结副本 `crates/` 原样，与拷它那一刻的主工作区逐字节相同：`baseline-frozen-crates.out` 的 `main_before_copy_equal=true main_after_copy_equal=true`）、V1（`crates/singlefs-core/src/mount.rs` 第 7917 行回退那次的水位换成目标那一版的）、V2（`crates/singlefs-core/src/transaction.rs` 第 8035 行 `} + new_inodes_of_this_publish;` 换成 `} + 0;`）；V717（`crates/mutations.tsv` 第 717 行，名字「实三（D23 已定项 14「水位」）：回退那次的 inode 号水位只取环里读得出的根，不与内存里现行那一版的取 max」）登记写明 Q6 > 0 才跑，两段各族 Q6 都是 0，记「与 P 同输出（由 Q6 = 0 推出），未跑」。三处锚点的行号与命中数在 `baseline-frozen-crates.out` 的 `name=mutation_anchor` 三行；补丁原样在 `patch-V1.diff`、`patch-V2.diff`。每臂施加前与还原后在副本根对 `baseline-frozen-crates.sha` 核一次（`name=arm_check` 九行，`listed_mismatch=0 extra_files=0`）；三臂二进制各编一次，两段共用（`name=arm_binary` 三行）。
+- **臂**：P（冻结副本 `crates/` 原样，与拷它那一刻的主工作区逐字节相同：`baseline-frozen-crates.out` 的 `main_before_copy_equal=true main_after_copy_equal=true`）、V1（`crates/singlefs-core/src/mount.rs` 里回退那次的水位换成目标那一版的）、V2（`crates/singlefs-core/src/transaction.rs` 里 `} + new_inodes_of_this_publish;` 换成 `} + 0;`）；V717（`crates/mutations.tsv` 里名字为「实三（D23（journal 的角色与格式） 已定项 14「水位」）：回退那次的 inode 号水位只取环里读得出的根，不与内存里现行那一版的取 max」）登记写明 Q6 > 0 才跑，两段各族 Q6 都是 0，记「与 P 同输出（由 Q6 = 0 推出），未跑」。三处锚点的行号与命中数在 `baseline-frozen-crates.out` 的 `name=mutation_anchor` 三行；补丁原样在 `patch-V1.diff`、`patch-V2.diff`。每臂施加前与还原后在副本根对 `baseline-frozen-crates.sha` 核一次（`name=arm_check` 九行，`listed_mismatch=0 extra_files=0`）；三臂二进制各编一次，两段共用（`name=arm_binary` 三行）。
 - **执行**：`HistoryExecution { per_step_checker: Skipped, device_width: FourGibibytes（G-small 换 UnitAreaOf384Slots）, space_admission: JudgedByTheFormula }`，不调 `set_inode_number_watermark_source`、不加 `SharedFaultPlan`；5 个工作线程（派发提示的线程上限）按序号递增领活，合并按序号次序，与单线程逐字相同（快档 `one_thread_and_three_threads_give_the_same_lines`）；每段历史的挂钟在装置进程里自己计（结果行 `elapsed_ns`），被打断再跑同一条命令就续跑，跳过已有结果行的序号。每份结果文件第一行是 `# code_baseline=…` 文件头，续写时文件头不同就拒，汇总要求全部输入同一个 `code_baseline`、每一行汇总行带它（登记修订 2 第 2 条）。
 - **试跑**（登记修订 2 第 5 条）：F2 P 前 8 个种子 488 步，平均 281.86 毫秒 / 步 / 线程，外推第一段约 54 分钟；G-long P 前 4 个种子 604 步，272.74 毫秒 / 步，外推第二段约 45 分钟；都不到 2 小时，不分片（`trial-f2-P-first-8-seeds.out`、`trial-g-long-P-first-4-seeds.out`，按结果行 `elapsed_ns` 之和除以 `steps_observed` 之和）。
 
@@ -72,7 +76,7 @@ bash scripts/experiments/replay.sh E175
 
 ### 读数（命令与原样输出）
 
-在产物目录里跑，从两份汇总取每个族 × 臂的量（`sum_` 是各段相加，`segments_q2_one_birth_violated` 是 I-9.29（同号只许一个出生代） 红过的段数，`sum_i9_29_holds`、`sum_i9_29_not_applicable`、`sum_i9_29_partially_judged` 是 I-9.29 判成立、不适用、判不了的步数）：
+在产物目录里跑，从两份汇总取每个族 × 臂的量（`sum_` 是各段相加，`segments_q2_one_birth_violated` 是 I-9.29（同号只许一个出生代） 红过的段数，`sum_i9_29_holds`、`sum_i9_29_not_applicable`、`sum_i9_29_partially_judged` 是 I-9.29（同号只许一个出生代） 判成立、不适用、判不了的步数）：
 
 ```
 for s in one two; do echo "== $s"; head -1 summary-segment-$s.out; awk '/name=summary/{o=""; for(i=1;i<=NF;i++){split($i,a,"="); if(a[1]~/^(family|arm|histories|complete|duplicates|conflicts|ending_completed|sum_q1|sum_q3b|segments_q2_one_birth_violated|sum_i9_29_holds|sum_i9_29_not_applicable|sum_i9_29_partially_judged|sum_q9_still|sum_q9_gone|sum_q3_steps|max_q3_peak|sum_q4|sum_q5|sum_q6|sum_q7|q10_segments_issuing_at_least_two|sum_q11|sum_s1_unreadable|sum_s3_disagreements|sum_f3_still_but_holds|sum_f3_violated_without_two_births)$/) o=o" "$i}; print substr(o,2)}' summary-segment-$s.out; done
@@ -132,7 +136,7 @@ F1 四组按 `BROAD` / `REUSE_AFTER_RAISING_THE_FLOOR` / `DELETING_FILES_OF_SEVE
 |---|---|---|---|---|---|
 | Q1 同一时间线重发号（P） | 0 | 0 | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 | 没有 |
 | Q2 I-9.29（同号只许一个出生代） 红（P，段数） | 0（成立 159 440 步，不适用、判不了 0 步） | 0（成立 15 616 步） | 0（成立 3 638 / 3 917 / 3 910 / 3 638 步，不适用 330 / 51 / 58 / 330 步，判不了 0 步） | 0（成立 9 664 / 3 904 / 3 904 / 4 708 步，G-long-F1 不适用 124 步，判不了 0 步） | 没有 |
-| Q9（P 有 Q1 事件才有） | 无事件 | 无事件 | 无事件 | 无事件 | 不适用 |
+| Q9 | 无事件 | 无事件 | 无事件 | 无事件 | 不适用 |
 | Q3 水位退回（P，步数；峰值与期末） | 0，峰值 0、期末 0 | 0，峰值 0、期末 0 | 0，峰值 0、期末 0 | 0，峰值 0、期末 0 | 没有 |
 | Q3b 跨被抛弃时间线重发号（P） | 0 | 0 | 0 | 0 | 没有（附带） |
 | Q4 回退跨过发号（P） | 11 641 | 1 748 | 39 / 32 / 615 / 52 | 1 045 / 397 / 334 / 188 | 报数 |
@@ -145,21 +149,21 @@ F1 四组按 `BROAD` / `REUSE_AFTER_RAISING_THE_FLOOR` / `DELETING_FILES_OF_SEVE
 | R-V2（V2：Q10 ≥ 1 时 Q1 ≥ 1） | Q1 3 990 | Q1 696 | Q1 90 / 82 / 244 / 110 | 登记不跑 | 跑到的每一族都过 |
 | R-V717 | 未跑 | 未跑 | 未跑 | 未跑 | 与 P 同输出（由 Q6 = 0 推出），未跑 |
 
-几何敏感性（登记第八节）：G-long、G-small、G-draw、G-long-F1 四点各与 G0（F2，第一段）比，P 臂 Q1、Q2、Q9 的判定都是「没有」，不翻面；两点同值 0，门槛挪不进两点之间，判别力由 R-V1、R-V2 担（G-long 的 V1 臂 Q1 476、Q2 29 段）。
+几何敏感性（登记第八节）：G-long、G-small、G-draw、G-long-F1 四点各与 g0（F2，第一段）比，P 臂 Q1、Q2、Q9 的判定都是「没有」，不翻面；两点同值 0，门槛挪不进两点之间，判别力由 R-V1、R-V2 担（G-long 的 V1 臂 Q1 476、Q2 29 段）。
 
-失败与停机条款（登记第十、十一节）：F1、F2 没触发（上表 R-V1、R-V2）；F3 两形 0（`sum_f3_still_but_holds`、`sum_f3_violated_without_two_births` 二十六份全 0）；F4、F5 没触发（下一节）；F6、F9 只在 P 有 Q1 事件时做，没有事件、没做；F7 没触发（F2 + F3a 的 Q5 合计 8 932）；F8 没触发（S1 重建报错 0 次，P 臂看到根的次数 F3a 1 431 682、F2 304 853、F1 四组 54 585 / 67 690 / 57 613 / 60 489、几何四点 213 378 / 75 155 / 75 554 / 104 381，出自两份汇总的 `sum_s1_root_observations`）；S3 两路不一致 0 次、读不出实例表的步 0 步；合并不确定没触发（二十六份 `conflicts=0`、`duplicates=0`，快档多线程与单线程对拍过）。
+失败与停机条款（登记第十、十一节）：F1、F2 没触发（R-V1、R-V2 两行）；F3 两形 0（`sum_f3_still_but_holds`、`sum_f3_violated_without_two_births` 二十六份全 0）；F4、F5 没触发（「钉值（登记第七节，快档用例，三臂各跑一次）」一节）；F6、F9 只在 P 有 Q1 事件时做，没有事件、没做；F7 没触发（F2 + F3a 的 Q5 合计 8 932）；F8 没触发（S1 重建报错 0 次，P 臂看到根的次数 F3a 1 431 682、F2 304 853、F1 四组 54 585 / 67 690 / 57 613 / 60 489、几何四点 213 378 / 75 155 / 75 554 / 104 381，出自两份汇总的 `sum_s1_root_observations`）；S3 两路不一致 0 次、读不出实例表的步 0 步；合并不确定没触发（二十六份 `conflicts=0`、`duplicates=0`，快档多线程与单线程对拍过）。
 
-V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个出生代） 的判定交叉数：`grep -h '^E7RESULT name=event ' d-*.out f3a-*.out f2-*.out f1-*.out g-*.out | grep -o 'arm=[A-Z0-9]* .*kind=[a-z0-9_]* .*q9=[A-Za-z]* i9_29_at_step=[a-z_]*' | sed -E 's/index=[0-9]+ //; s/position=[^ ]* inode=[^ ]* new_birth=[^ ]* older_births=[^ ]* //' | awk '{print $1, $2, $3, $4}' | sort | uniq -c` 输出四行：`2 arm=V1 kind=q1_same_timeline q9=Gone i9_29_at_step=holds`、`9 arm=V1 kind=q1_same_timeline q9=Gone i9_29_at_step=violated`、`1917 arm=V1 kind=q1_same_timeline q9=Still i9_29_at_step=violated`、`5225 arm=V2 kind=q1_same_timeline q9=Still i9_29_at_step=violated`。判「还在」的事件那一步 I-9.29 全是违例（F3 第一形 0）。
+V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个出生代） 的判定交叉数：`grep -h '^E7RESULT name=event ' d-*.out f3a-*.out f2-*.out f1-*.out g-*.out | grep -o 'arm=[A-Z0-9]* .*kind=[a-z0-9_]* .*q9=[A-Za-z]* i9_29_at_step=[a-z_]*' | sed -E 's/index=[0-9]+ //; s/position=[^ ]* inode=[^ ]* new_birth=[^ ]* older_births=[^ ]* //' | awk '{print $1, $2, $3, $4}' | sort | uniq -c` 输出四行：`2 arm=V1 kind=q1_same_timeline q9=Gone i9_29_at_step=holds`、`9 arm=V1 kind=q1_same_timeline q9=Gone i9_29_at_step=violated`、`1917 arm=V1 kind=q1_same_timeline q9=Still i9_29_at_step=violated`、`5225 arm=V2 kind=q1_same_timeline q9=Still i9_29_at_step=violated`。判「还在」的事件那一步 I-9.29（同号只许一个出生代） 全是违例（F3 第一形 0）。
 
-阳性对照臂上「活记录被原地换」那一形（Q9「已转出」）出现 11 次：`grep -n 'q9=Gone' f2-V1.out g-long-V1.out` 命中 `f2-V1.out` 第 67、283、325、326、385 行与 `g-long-V1.out` 第 40、71、155、358、389、390 行。其中 `g-long-V1.out` 第 389、390 行（G-long V1 序号 24，第 92、95 步发号 7、8）那两步 I-9.29（同号只许一个出生代） 判成立：旧出生代已转出候选集、同一步候选集里也没有别的号有两个出生代，I-9.29 看不见那次重发——C479（inode 号复用已发过的号今天造不出来） 那一行写的「被换之前那一版转出候选集之后看不见」在 V1 臂上出现了；其余 9 次那一步另有号的两个出生代、I-9.29 判违例。P 臂上这一形 0 次。
+阳性对照臂上「活记录被原地换」那一形（Q9「已转出」）出现 11 次：`grep -n 'q9=Gone' f2-V1.out g-long-V1.out` 命中 `f2-V1.out` 第 67、283、325、326、385 行与 `g-long-V1.out` 第 40、71、155、358、389、390 行。其中 `g-long-V1.out` 里 `index=24 kind=q1_same_timeline` 的 `position=op92`、`position=op95` 两行（G-long V1 序号 24，第 92、95 步发号 7、8）那两步 I-9.29（同号只许一个出生代） 判成立：旧出生代已转出候选集、同一步候选集里也没有别的号有两个出生代，I-9.29（同号只许一个出生代） 看不见那次重发——C479（inode 号复用已发过的号今天造不出来） 那一行写的「被换之前那一版转出候选集之后看不见」在 V1 臂上出现了；其余 9 次那一步另有号的两个出生代、I-9.29（同号只许一个出生代） 判违例。P 臂上这一形 0 次。
 
 ### 钉值（登记第七节，快档用例，三臂各跑一次）
 
-- A1、A2（D1，起点）：`first_file_alone_reads_inode_one_born_at_three_and_watermark_two` 三臂都过，现行那一版 inode 树 {(1, 3)}、水位 2，与 D8（核心索引结构） 已定项 6「新池新建文件写」相同。
-- A3、A4（D2(k)、D3，P）：用例 `rollback_one_step_then_create_matches_the_arm` 等六条与 `creations_across_mounts_and_a_cold_start_match_the_arm` 在 P 臂上过（`quick-tests.out` 的 `===== q-P exit=0` 那一段，`test result: ok. 26 passed; 0 failed; 2 ignored`），断言 D2(1)–D2(3) 依次发 2、3、4，D3 发 2、3、4。`d-P.out` 的结果行与之相符：D2(1)、D2(2)、D2(3) 各 `issuances=4 watermark_final=5 rollbacks_applied=1`（起点 1 号加三次建）；D2(4) `issuances=3 watermark_final=4 rollbacks_applied=1`（回退到第一个文件还活着的那一版，之后建 inode 不调）；D2(5)、D2(6) `rollbacks_applied=0`，A3 那三格没有样本（修订 1 第 5 条）；D3 `issuances=4 watermark_final=5`。这一次快档没带 `--nocapture`，用例里的打印行没进 `quick-tests.out`。
-- A5（D2(1)，V1）：发 3、Q1 恰好 1、Q9「还在」、那一步 I-9.29（同号只许一个出生代） 违例，过；k = 2、3 上发的号 = S1 读到的目标那一版水位 2，过。
-- A6（D2(1)，V2）：前两次都发 2、第一次建之后那一步 I-9.6（水位大于两处最大号） 违例、第二次建那一步 Q1 恰好 1，过。
-- A7：`f3a_scale_matches_the_registered_counts` 过（16 105、1 464、143 335），产物里数出来的段数与步数也是这三个数；第二段规模 `second_segment_scales_match_the_registered_counts` 过（F1 P 15 360 步、F1 V 3 840 步、几何四点 P 22 080 步、G-long V1 4 800 步），产物里各族段数与登记相同（「读数」一节的 `histories=`）。
+- a1、a2（d1，起点）：`first_file_alone_reads_inode_one_born_at_three_and_watermark_two` 三臂都过，现行那一版 inode 树 {(1, 3)}、水位 2，与 D8（核心索引结构） 已定项 6「新池新建文件写」相同。
+- a3、a4（d2(k)、d3，P）：用例 `rollback_one_step_then_create_matches_the_arm` 等六条与 `creations_across_mounts_and_a_cold_start_match_the_arm` 在 P 臂上过（`quick-tests.out` 的 `===== q-P exit=0` 那一段，`test result: ok. 26 passed; 0 failed; 2 ignored`），断言 d2(1)–d2(3) 依次发 2、3、4，d3 发 2、3、4。`d-P.out` 的结果行与之相符：d2(1)、d2(2)、d2(3) 各 `issuances=4 watermark_final=5 rollbacks_applied=1`（起点 1 号加三次建）；d2(4) `issuances=3 watermark_final=4 rollbacks_applied=1`（回退到第一个文件还活着的那一版，之后建 inode 不调）；d2(5)、d2(6) `rollbacks_applied=0`，a3 那三格没有样本（修订 1 第 5 条）；d3 `issuances=4 watermark_final=5`。这一次快档没带 `--nocapture`，用例里的打印行没进 `quick-tests.out`。
+- a5（d2(1)，V1）：发 3、Q1 恰好 1、Q9「还在」、那一步 I-9.29（同号只许一个出生代） 违例，过；k = 2、3 上发的号 = S1 读到的目标那一版水位 2，过。
+- a6（d2(1)，V2）：前两次都发 2、第一次建之后那一步 I-9.6（水位大于两处最大号） 违例、第二次建那一步 Q1 恰好 1，过。
+- a7：`f3a_scale_matches_the_registered_counts` 过（16 105、1 464、143 335），产物里数出来的段数与步数也是这三个数；第二段规模 `second_segment_scales_match_the_registered_counts` 过（F1 P 15 360 步、F1 V 3 840 步、几何四点 P 22 080 步、G-long V1 4 800 步），产物里各族段数与登记相同（「读数」一节的 `histories=`）。
 
 ### 判决行的点名
 
@@ -169,7 +173,7 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 
 单测 28 条：`grep -c '^#\[test\]' device-source.rs` 输出 28，其中 2 条带 `#[ignore]`（大规模入口与汇总）；`quick-tests.out` 里三臂各 `test result: ok. 26 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out`。比第一段那一版多的 11 条：第二段规模与比重 2 条、每个新族序号 0 走一遍 8 条、汇总拒收两份代码混用或缺文件头的结果文件 1 条（`result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_summary`）。
 
-变异（登记第九节）6 条：V1、V2 是两条阳性对照臂，跑到的每一族都分得出（「判据逐条」一节 R-V1、R-V2 过）；V3、V4、V5 是装置里的弄坏开关，`quick-tests.out` 里各红在点名的那一条（三次都带 `--skip first_history_of`，跳过 8 条每族序号 0 的取样用例，`17 passed; 1 failed; 2 ignored; 0 measured; 8 filtered out`）：V3（账按号去重）与 V4（发号事件分类时每条根都判被抛弃）在 V1 臂上都红在 `rollback_one_step_then_create_matches_the_arm` 的「A5：Q1 恰好 1」（`left: 0`、`right: 1`；V4 那一次同一段打印 `q1=0 q3b=1`），V5（Q9 一律判「还在」）在 P 臂上红在 `q9_classification_says_gone_when_no_holder_is_readable`；V717 照登记有条件，Q6 = 0，没跑。抓到 5、无效 0、没红 0、未跑 1。装置不在 `research/` 下、也不进 `crates/mutations.tsv`，没有变异表，`mutate.sh` 不适用。装置文件头弄坏开关那张表给 V3 写的用例名 `rollback_one_step_then_create_on_v1_reissues_three_on_the_same_timeline` 与实际红的 `rollback_one_step_then_create_matches_the_arm` 不同（文件头的字没跟用例改名一起改），开关红在的是后者。
+变异（登记第九节）6 条：V1、V2 是两条阳性对照臂，跑到的每一族都分得出（「判据逐条」一节 R-V1、R-V2 过）；V3、V4、V5 是装置里的弄坏开关，`quick-tests.out` 里各红在点名的那一条（三次都带 `--skip first_history_of`，跳过 8 条每族序号 0 的取样用例，`17 passed; 1 failed; 2 ignored; 0 measured; 8 filtered out`）：V3（账按号去重）与 V4（发号事件分类时每条根都判被抛弃）在 V1 臂上都红在 `rollback_one_step_then_create_matches_the_arm` 的「a5：Q1 恰好 1」（`left: 0`、`right: 1`；V4 那一次同一段打印 `q1=0 q3b=1`），V5（Q9 一律判「还在」）在 P 臂上红在 `q9_classification_says_gone_when_no_holder_is_readable`；V717 照登记有条件，Q6 = 0，没跑。抓到 5、无效 0、没红 0、未跑 1。装置不在 `research/` 下、也不进 `crates/mutations.tsv`，没有变异表，`mutate.sh` 不适用。装置文件头弄坏开关那张表给 V3 写的用例名 `rollback_one_step_then_create_on_v1_reissues_three_on_the_same_timeline` 与实际红的 `rollback_one_step_then_create_matches_the_arm` 不同（文件头的字没跟用例改名一起改），开关红在的是后者。
 
 ### 岔路表
 
@@ -182,7 +186,7 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 - 「登记的历史里没造出」，不是「造不出」：P 臂 17 105 段是登记的取样（F3a 中段长到 4 的穷举、F2 / F1 / 几何点按种子随机），长度更长、回退目标或操作次序没被抽到的历史没有数。
 - 崩溃恢复抛弃根（双故障形，F3b）与写 / 刷盘故障注入后建 inode（F4）是登记第三段附带，够判后未跑；历史里抽到的 `CrashRecoveryAbandoningTheNewestRoot` 在 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙之后挂载被拒、不造被抛弃根，Q3b 的 0 不说明跨被抛弃时间线的重发不存在。装置没有数「判成被抛弃的根」的次数，两段里 S3 有没有判出过一条被抛弃根，页上不下结论。
 - Q6 的读法有一处局限：现行那一版取自这一步可读根里最新的那条，回退之前它自己就在环里读得出，Q6 > 0 只可能在现行那一版自己重建不出时出现；无读故障的历史里 Q6 = 0 由这个读法推得出，不是独立的观测。V717 因此在每一族都没跑，「回退取 max」那条护栏在这些历史里有没有被走到，这一页答不了。
-- 「活记录被原地换」那一形 I-9.29（同号只许一个出生代） 看不见：阳性对照 V1 臂 G-long 序号 24 的两次重发（`g-long-V1.out` 第 389、390 行）那两步 I-9.29 判成立。产品臂上没造出这一形，所以这一页答不了「产品路径上出现了 I-9.29 能不能抓」，只说 P 臂上它 0 次。
+- 「活记录被原地换」那一形 I-9.29（同号只许一个出生代） 看不见：阳性对照 V1 臂 G-long 序号 24 的两次重发（`g-long-V1.out` 里 `index=24 kind=q1_same_timeline` 的 `position=op92`、`position=op95` 两行）那两步 I-9.29（同号只许一个出生代） 判成立。产品臂上没造出这一形，所以这一页答不了「产品路径上出现了 I-9.29（同号只许一个出生代） 能不能抓」，只说 P 臂上它 0 次。
 - 「仓副本装置、冻结副本」：数出自 2026-10-08 拷的第二份冻结副本（`baseline-frozen-crates.out`），没在入库装置上重做过。拷完之后主工作区 `crates/` 又变了 6 个文件（`baseline-frozen-crates.out` 的 `name=main_drift_after_copy`），其中 `crates/singlefs-core/src/mount.rs` 与 `crates/singlefs-harness/src/gpu_memory_ledger.rs` 编进这个装置；F3a、F2、F1、几何点这些族没在漂移后的代码上重跑，只有 `scripts/experiments/replay.sh` 的 `driver_e175` 在漂移后的主工作区上编、跑 D 族 P 臂一次，输出去掉 `elapsed_ns` 与 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 相同。
 - 什么现象会推翻页上的读数：同一份冻结副本、同一装置重跑出任何一段 P 臂结果行与产物不同（续跑与多线程合并在快档对拍过）；或第三段 F3b / F4、或登记之外的历史里出现同一条时间线上 Q1 ≥ 1、I-9.29（同号只许一个出生代） 红。
 
@@ -195,14 +199,14 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 | 3 | S1 账的重发号（Q1） | 按号记出生代与持有它的根，一次发号碰上同号另一个出生代就记事件 | `research/results/e175-product-path-inode-watermark-regression-2026-10-08/device-source.rs:1028 HistoryAccount::observe`，重建 `crates/singlefs-core/src/recovery.rs:5405 rebuild_version` | `readable_roots`、`rebuild_version`、路 1 的抛弃判法 |
 | 4 | S2 checker 的 I-9.29（同号只许一个出生代） | 池级 checker 对每一步的镜像判 | `research/results/e175-product-path-inode-watermark-regression-2026-10-08/device-source.rs:1158 HistoryAccount::judge_with_the_checker`，`crates/singlefs-checker/src/walk.rs:10947 check_pool_image` | 只有镜像本身；与 1–3 不共用解析代码 |
 
-路 1 与路 2 判同一个量，逐根比、不一致计数（`device-source.rs` 第 865 行 `s3_path_disagreements`），两段二十六份结果文件都是 0 次；两路共用 `readable_roots` 列出的那一组根，它列错了两路会一起错。路 3 与路 4 不是同一个量，登记第十节 F3 把两者对着核（第 1188、1199 行），两段都是 0 次。跨路径的比较是计数、不是 `assert_eq!`，欠一条把两路连起来的断言。
+路 1 与路 2 判同一个量，逐根比、不一致计数（`device-source.rs` 里的计数 `s3_path_disagreements`），两段二十六份结果文件都是 0 次；两路共用 `readable_roots` 列出的那一组根，它列错了两路会一起错。路 3 与路 4 不是同一个量，登记第十节 F3 把两者对着核（第 1188、1199 行），两段都是 0 次。跨路径的比较是计数、不是 `assert_eq!`，欠一条把两路连起来的断言。
 
 ### 影响的决策
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D8（核心索引结构） 已定项 6 | 备料 | 2026-10-08 不受影响：W3 的 Opt2 定案（用户 Y1）只让合法的跨抛弃重发多 11.6%，被崩溃恢复抛弃那段里发过的号本来可以重发，射程「同一条时间线上 inode 号不复用」不变（`research/prompts/m3-w3-r3-main-verification.md` 第二节「Opt2 的代价」那一行与「回看决策」表）；两段在第二份冻结副本（`code_baseline=48e2809c…`）上的读数（登记的 17 105 段产品臂历史上 0 次重发、0 段 I-9.29（同号只许一个出生代） 红，W 行够判）是改之前的取法上量的；决策依据段没引 E175（产品路径上 inode 号水位退回与重发号），这一格该不该升成支撑交主 agent 定 |
-| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-08 改了：W3 的 Opt2 定案（用户 Y1），「水位」那一格的 inode 号水位改成 max(cur 那一版内存里的, 环里读得出、按实例表没被崩溃恢复抛弃的根的)，树 ID 水位照旧（`research/prompts/m3-w3-r3-main-verification.md` 第六节）；两段在第二份冻结副本（`code_baseline=48e2809c…`）上的读数（回退那次的水位取 max 这一格，D2(k) 上发 4（A3）、F3a / F2 / F1 / 几何点的 Q4 窗口里 0 次重发）是改之前取环里全部根的取法上量的；决策依据段没引 E175（产品路径上 inode 号水位退回与重发号），升不升成支撑交主 agent 定 |
+| D8（核心索引结构） 已定项 6 | 备料 | 2026-10-08 不受影响：W3 的 Opt2 定案（用户 Y1）只让合法的跨抛弃重发多 11.6%，被崩溃恢复抛弃那段里发过的号本来可以重发，射程「同一条时间线上 inode 号不复用」不变（`research/prompts/m3-w3-r3-main-verification.md` 第二节「Opt2 的代价」那一行与「回看决策」表）；两段在第二份冻结副本（`code_baseline=48e2809c…`）上的读数（登记的 17 105 段产品臂历史上 0 次重发、0 段 I-9.29（同号只许一个出生代） 红，W 行够判）是改之前的取法上量的；决策依据段没引 E175（产品路径上 inode 号水位退回与重发号），这一格该不该升成支撑交主 agent 定；2026-10-11 不受影响：只把行号引用换成锚，结论、数与产物不变 |
+| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-08 改了：W3 的 Opt2 定案（用户 Y1），「水位」那一格的 inode 号水位改成 max(cur 那一版内存里的, 环里读得出、按实例表没被崩溃恢复抛弃的根的)，树 ID 水位照旧（`research/prompts/m3-w3-r3-main-verification.md` 第六节）；两段在第二份冻结副本（`code_baseline=48e2809c…`）上的读数（回退那次的水位取 max 这一格，d2(k) 上发 4（a3）、F3a / F2 / F1 / 几何点的 Q4 窗口里 0 次重发）是改之前取环里全部根的取法上量的；决策依据段没引 E175（产品路径上 inode 号水位退回与重发号），升不升成支撑交主 agent 定；2026-10-11 不受影响：只把行号引用换成锚，结论、数与产物不变 |
 
 ## 历史版本
 
@@ -220,4 +224,4 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 
 ### 2026-10-08：建页，第一段已跑
 
-仓副本装置写好（单测 17 条，快档三臂各 15 过、2 条大规模入口忽略），跑前登记第十二节写了修订 1–8；第一段（D、F3a、F2 三族在 P、V1、V2 三臂上）跑完、汇总，状态「部分已跑（第一段；第二段待点名）」。`scripts/experiments/replay.sh` 登记一行 `E175|@driver_e175`，抽出驱动试跑一次，输出与 `d-P.out` 的 E7RESULT 行逐行相同、落成 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out`。
+仓副本装置写好（单测 17 条，快档三臂各 15 过、2 条大规模入口忽略），跑前登记第十二节写了修订 1–8；第一段（D、F3a、F2 三族在 P、V1、V2 三臂上）跑完、汇总，状态「部分已跑（第一段；第二段待点名）」。`scripts/experiments/replay.sh` 登记一行 E175（产品路径上 inode 号水位退回与重发号） `|@driver_e175`，抽出驱动试跑一次，输出与 `d-P.out` 的 E7RESULT 行逐行相同、落成 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out`。

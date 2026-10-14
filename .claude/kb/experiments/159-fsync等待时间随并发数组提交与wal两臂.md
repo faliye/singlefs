@@ -1,4 +1,4 @@
-## E159 fsync 等待时间随并发数：组提交与 WAL 两臂 —— 装置已写、计时未跑（2026-09-24，接续会话；纯计数部分确定性、55 单测 / 17 条变异全抓；正式计时的主网格、PC1–PC3、AA、G8、G1、G6 五轮尚未跑）
+## E159 fsync 等待时间随并发数：组提交与 WAL 两臂 —— 装置已写、计时未跑（2026-09-24，接续会话；纯计数部分确定性、55 单测 / 17 条变异全抓；正式计时的主网格、PC1–PC3、AA、G8、G1、G6 五轮尚未跑；装置的 `RECORD_HEADER_BYTES` 仍是 311、点名项钉 67，头 487、点名项 64 之后没跟着重跑，欠账 C776（E155、E159 装置停在头 311 与点名项 67））
 
 <!-- doc-lint:registry name-col=2 -->
 
@@ -18,9 +18,9 @@
 3. **停机条款 S2（拷贝块 diff 为空）**：`diff <(sed -n '39,2061p' e159_...) <(sed -n '36,2058p' e155_...)` 退出码 0。
 4. **停机条款 S3（来宾 `logical_block_size`）**：真机 VM 探针 `probe-device` 子命令读回 `logical_block_size=512`，与主几何 `physical_block_size_bytes` 常量一致，不触发。
 5. **单测与变异**：54 个单测全绿（`cargo test --release -p e7-index-bench --bin e159-fsync-wait-group-commit`）；变异表 `scripts/mutation/tables/e159_fsync_wait_group_commit.tsv` 14 条（M1–M14，覆盖第九节全部目标：甲发布去掉第二道屏障、第一道屏障后就放行、WAL 臂写混规划函数、组提交开也把批封顶为 1、`t_issue` 漏排队段、PC1 忙等挪到放行之后、随机取整改成向下取整、`T_time` 常量读错、系统配置槽写前不读、根槽宽度改错、J1（甲在某个 k 越过 M） 边界比较符改错、五轮合并改成多数轮说了算、开环 `issued_at` 改取实际发出时刻、`release_to_wake` 漏唤醒段），`mutate.sh` 跑两遍（源码改动前后各一遍）都 14/14 全抓、收尾「已还原，基线仍全绿」。M3–M6（组提交队列与真并发时序相关的四条）原本没有单测覆盖真并发引擎，这一段新增 6 条单测补齐：`plan_batch_for_arm_routes_each_arm_to_its_own_solver_not_a_different_one`（M3）、`drain_batch_from_queue_collects_everything_when_group_commit_is_on` / `_collects_only_one_when_group_commit_is_off`（M4）、`closed_loop_queueing_delay_is_counted_when_group_commit_is_off`（M5，用 `SleepingBlockDevice` 固定屏障延迟逼出排队，不需要真磁盘）、`pc1_injected_wait_lands_before_release_not_after`（M6，同样用 `SleepingBlockDevice`）、`checkpoint_time_threshold_constant_is_five_seconds`（M8，把 `T_time` 常量提成 `CHECKPOINT_TIME_THRESHOLD` 具名常量，`run_cell_subcommand` 与单测共用同一个落点，不再各写一份字面量）。
-6. **真机冒烟撞见一个真 bug，已修复**：`RealBlockDevice::read_at` 原实现把数据读进一块普通 `vec![0u8; length]`（不对齐）再传给 O_DIRECT 的 `read_exact_at`，第一次真跑（`--arm jia --k 1024`）当场 `panicked ... EINVAL`；这条路径此前 0 个单测覆盖到（全部旧单测只用 `RecordingBlockDevice`/`SleepingBlockDevice`）。改法：直接把数据读进按 `ALIGNMENT_BYTES` 对齐的 `AlignedBuffer`（新增 `AlignedBuffer::as_mut`），读完再拷出返回值；修复后同一条命令换成 k=4 不再 panic。产物见「结果整行抄自产物」。
+6. **真机冒烟撞见一个真 bug，已修复**：`RealBlockDevice::read_at` 原实现把数据读进一块普通 `vec![0u8; length]`（不对齐）再传给 O_DIRECT 的 `read_exact_at`，第一次真跑（`--arm jia --k 1024`）当场 `panicked ... EINVAL`；这条路径在 2026-09-24 修复之前 0 个单测覆盖到（全部旧单测只用 `RecordingBlockDevice`/`SleepingBlockDevice`）。改法：直接把数据读进按 `ALIGNMENT_BYTES` 对齐的 `AlignedBuffer`（新增 `AlignedBuffer::as_mut`），读完再拷出返回值；修复后同一条命令换成 k=4 不再 panic。产物见「结果整行抄自产物」。
 7. **真机冒烟：三条臂各跑通一格**（`VM_DISK_PREALLOCATE=1`，短 duration，只为验证装置真跑不崩、不为出正式数）：甲 k=1、wal_full-K10 k=2（duration 4s，未到 `T_time`=5s 与 `T_dirty`=256MiB，checkpoint_count=0，符合预期）、乙-M-K10 k=2（duration 6s，触发一次 checkpoint，checkpoint 机制真跑通过）。三条臂、组提交引擎、WAL checkpoint 线程都验证过端到端能跑通，没有再撞到新的 panic。
-8. **`print_anchors` 重构**：改成经 `Emitter` 发 `E7RESULT` 行、带 `name=done emitted=N` 收尾（此前是裸 `println!`，不满足 `scripts/experiments/replay.sh` 的完整性闸），并把甲那一行的单盘字节算法从 `outcome.total_bytes() / DEVICE_COUNT`（对根槽字段是错的近似，会把单盘专属的 512 字节根槽也腰斩）改成与单测共用的 `jia_outcome_single_device_bytes`（挪成模块顶层函数），输出从 172288 改回正确的 172544，与 B4 锚点一致。
+8. **`print_anchors` 重构**：改成经 `Emitter` 发 `E7RESULT` 行、带 `name=done emitted=N` 收尾（2026-09-24 重构之前是裸 `println!`，不满足 `scripts/experiments/replay.sh` 的完整性闸），并把甲那一行的单盘字节算法从 `outcome.total_bytes() / DEVICE_COUNT`（对根槽字段是错的近似，会把单盘专属的 512 字节根槽也腰斩）改成与单测共用的 `jia_outcome_single_device_bytes`（挪成模块顶层函数），输出从 172288 改回正确的 172544，与 B4 锚点一致。
 9. **命名纪律**：`naming-lint.sh` 对这个文件全程通过（唯一一条是 `naming-lint:external` 标注过的 `O_DIRECT` 外部标志名，不算违规）。
 
 ### 结果整行抄自产物
@@ -60,7 +60,7 @@ VM_DISK_PREALLOCATE=1 bash scripts/devices/vm-bench.sh <musl 二进制路径> ce
   --file-count 10000 --family f8a
 ```
 
-单测：`cargo test --release -p e7-index-bench --bin e159-fsync-wait-group-commit` → `55 passed; 0 failed`（2026-09-24 头 307 → 311 重跑新增 1 条）。变异：`cd scripts/experiments && bash ../mutate.sh e159-fsync-wait-group-commit e159_fsync_wait_group_commit.rs ../mutations/e159_fsync_wait_group_commit.tsv` → 17/17 全抓（新增 M15/M16/M17），收尾「已还原，基线仍全绿」（跑了两遍，源码改动前后各一遍，结论不变）。
+单测：`cargo test --release -p e7-index-bench --bin e159-fsync-wait-group-commit` → `55 passed; 0 failed`（2026-09-24 头 307 → 311 重跑新增 1 条）。变异：`cd scripts/experiments && bash ../mutation/mutate.sh e159-fsync-wait-group-commit e159_fsync_wait_group_commit.rs ../mutations/e159_fsync_wait_group_commit.tsv` → 17/17 全抓（新增 M15/M16/M17），收尾「已还原，基线仍全绿」（跑了两遍，源码改动前后各一遍，结论不变）。
 
 ### 它答不了的
 
@@ -72,17 +72,17 @@ VM_DISK_PREALLOCATE=1 bash scripts/devices/vm-bench.sh <musl 二进制路径> ce
 
 ### 影响的决策
 
-这一段只交装置与冒烟，没有计时结论；「影响的决策」表里每条分项的「依据」段目前都没有引用 E159（fsync 等待时间随并发数：组提交与 WAL 两臂）（逐条 `grep -n` 查各条决策文件，零命中），按格式演进纪律都记「备料」，等正式计时跑完再回看要不要升级成支撑或推翻。
+这一段只交装置与冒烟，没有计时结论；「影响的决策」表里每条分项的「依据」段都没有引用 E159（fsync 等待时间随并发数：组提交与 WAL 两臂）（逐条 `grep -n` 查各条决策文件，零命中），按格式演进纪律都记「备料」，等正式计时跑完再回看要不要升级成支撑或推翻。
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D23（journal 的角色与格式） 已定项 1 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D16（发布语义） 已定项 2 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D16（发布语义） 已定项 5 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；`T_time`=5s、有效 `T_dirty`=256MiB 两个常量在装置里对拍过（`checkpoint_time_threshold_constant_is_five_seconds`），没有产生新的代价数据；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D16（发布语义） 已定项 7 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；S1 核对了发布持久顺序与 fsync 返回条件，没有改变这条已定项；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D16（发布语义） 已定项 10 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；这是这个实验要量代价的那条政策本身（攒批组提交），量代价的正式计时还没跑，因此还谈不上支撑或推翻；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D16（发布语义） 已定项 11 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；装置的两条 WAL 臂与甲共用同一个 journal/checkpoint 节奏，没有另开一条日志格式，符合这条已定项的判据，未产生新代价数；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D25（目标负载优先级） 已定项 7 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
+| D23（journal 的角色与格式） 已定项 1 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D16（发布语义） 已定项 2 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D16（发布语义） 已定项 5 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D16（发布语义） 已定项 7 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D16（发布语义） 已定项 10 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D16（发布语义） 已定项 11 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D25（目标负载优先级） 已定项 7 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
 
 ## 历史版本
 

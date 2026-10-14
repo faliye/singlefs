@@ -1,17 +1,21 @@
 ## E176 inode 树叶合并三候选的容量与写代价 —— 已跑（两段）
 
-<!-- doc-lint:not-numbers M1 M2 M3 A1 A2 A3 A4 A5 A6 Q1 Q2 Q3 V1 V2 V3 V4 V5 V6 V7 V8 V9 V10 V11 V12 V13 V14 V15 V16 F1 F2 F3 F4 F5 F6 F7 -->
+<!-- doc-lint:not-numbers M1 M2 M3 Q1 Q2 Q3 V1 V2 V3 V4 V5 V6 V7 V8 V9 V10 V11 V12 V13 V14 V15 V16 F1 F2 F3 F4 F5 F6 F7 -->
+
+```text
+本页的本地臂名与记号写小写（a1、a2、a3、a4 ……）：跑前登记、装置、产物与命令里写作对应的大写，与全局登记的编号同形；kb 正文里改成小写只为与那些编号分开，读产物时按大写对。
+```
 
 跑前登记 `research/prompts/e176-preregistration.md`（第二段跑完时 sha256 `f7599076bb469dcc483f98cb0f557aca5bc6d79759fe674b4b52f150b8291fa9`，含第十二节「修订」三条：修订 1 补 M3 f = 59 变体的阳性对照与它的公共窗口读法；修订 2 把对拍 bin 从可选特性挪成独立 manifest，见「做了什么」；修订 3 补第二段的三个公共窗口、三个变体的阳性对照与变异 V14–V16，第二段产物之前写）。回答的是岔路单 `research/prompts/m3-3-5-forks.md` 的 M 那一行：inode 树叶容器删到稀疏时怎么回收，C116（叶容器的分裂 / 合并纪律没有会失败的检查） 合并那一半与 C536（inode 树的「左从右借」让容器号条件为假）。
 
-三个候选：M1 只删空即摘（`crates/` 今天）；M2 只做左吸收右（相邻两片合起来 ≤ 233 条就并）；M3 照 D8（核心索引结构） 已定项 6 原文，左吸收右加左从右借（主取样点下限 f = 117、均分借）。装置是独立手写模型 `scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs`，不与 `crates/` 共用代码；M1 那一臂另由对拍 bin `scripts/experiments/e176_crates_oracle/oracle.rs` 逐步比 `crates/singlefs-core/src/inode_tree.rs` 的两个纯函数。
+三个候选：M1 只删空即摘（E176（inode 树叶合并三候选的容量与写代价） 跑的时候 `crates/` 的做法；`crates/` 已是 M3）；M2 只做左吸收右（相邻两片合起来 ≤ 233 条就并）；M3 照 D8（核心索引结构） 已定项 6 原文，左吸收右加左从右借（主取样点下限 f = 117、均分借）。装置是独立手写模型 `scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs`，不与 `crates/` 共用代码；M1 那一臂另由对拍 bin `scripts/experiments/e176_crates_oracle/oracle.rs` 逐步比当时 `crates/singlefs-core/src/inode_tree.rs` 的两个纯函数（`crates/` 已是 M3，这一臂的对拍没重做）。
 
 **现状**：
 
 - 第一段跑完：22 条序列（W-R 随机插删 p = 0.55 / 0.75 / 0.95 各五个种子，W-S 按号顺序删三点，W-A 隔号删四点）× 四个臂变体（M1、M2、M3、M3 f = 59）。第六节每一行在三族主取样点上都有判定，第八节标「第一段」的旋钮都有方向相反的一点，岔路单 M 行的够判条件满足。
-- 总判定（主窗口，产物 `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out` 第 763–769 行）：Q1r 判「合并买到成倍容量」（W-R p = 0.55 五个种子 R12 都在 0.35 上下）；Q2p 两行（位置记法，Δ2p、Δ3p）判「不翻」，只差 W-R p = 0.75 种子 2 那一点（0.1046、0.1100 略过 0.10）；Q2c 两行（内容记法）与 Q3 两行判「可忽略」。f = 59 窗口六行判定与主窗口相同（第 770–775 行）。
+- 总判定（主窗口，产物 `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out` 里 `window=main` 的七行 `name=verdict scope=row`）：Q1r 判「合并买到成倍容量」（W-R p = 0.55 五个种子 R12 都在 0.35 上下）；Q2p 两行（位置记法，Δ2p、Δ3p）判「不翻」，只差 W-R p = 0.75 种子 2 那一点（0.1046、0.1100 略过 0.10）；Q2c 两行（内容记法）与 Q3 两行判「可忽略」。f = 59 窗口六行判定与主窗口相同（第 770–775 行）。
 - 敏感性：Q1r 对负载不稳定。同一行在 W-R p = 0.95、W-S 三点、W-A 留 3/4 上 R12 ≥ 0.90（判「代价小」），在 W-A 留 1/233 上 0.0711（判「成倍」）。Q2p 两行在插入概率旋钮上（0.55 对 0.75，种子 2）不稳定。
-- 第二段跑完（触发条件「第一段 Q2 或 Q3 有哪一行离门槛不到 0.05」成立：Q2p 两行在 W-R p = 0.75 五个种子上在 0.0724 … 0.1100 之间；主 agent 点名跑）。同 22 条序列加三个变体：M3 借到刚好够下限（`M3_just_enough`）、M2 先查左边（`M2_left_first`）、M3 先查左边（`M3_left_first`），各开一个公共窗口（`just_enough` 窗口 = M1、M2、M3_just_enough；`left_first` 窗口 = M1、M2_left_first、M3_left_first；修订 3）。总判定（产物 `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` 第 1137–1148 行）：
+- 第二段跑完（触发条件「第一段 Q2 或 Q3 有哪一行离门槛不到 0.05」成立：Q2p 两行在 W-R p = 0.75 五个种子上在 0.0724 … 0.1100 之间；主 agent 点名跑）。同 22 条序列加三个变体：M3 借到刚好够下限（`M3_just_enough`）、M2 先查左边（`M2_left_first`）、M3 先查左边（`M3_left_first`），各开一个公共窗口（`just_enough` 窗口 = M1、M2、M3_just_enough；`left_first` 窗口 = M1、M2_left_first、M3_left_first；修订 3）。总判定（产物 `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` 里 `window=just_enough` 与 `window=left_first` 的十二行 `name=verdict scope=row`）：
   - 先查左边窗口六行的判定与主窗口相同：Q2p 两行「不翻」（W-R p = 0.75 种子 2 上 Δ2p 0.1046、Δ3p 0.1111），Q2c、Q3 四行「可忽略」。
   - 借到刚好够下限窗口：Q2p 两行「不翻」；Q2c Δ3c、Q3 两行由主窗口的「可忽略」变成「不翻」。W-S 两个顺序删点上 Δ3c 0.5018、W-A 留 1/233 上 0.4568，都 < 1.00。三个窗口里没有一行判到「显著」，Q2p 也没有在哪个窗口判到「可忽略」。
   - 敏感性：「借多少」旋钮在 15 对上判定不同，都是主窗口「可忽略」、借到刚好够下限「不翻」：Δ3p 在 W-R p = 0.75 种子 1、4、5 上各 1 对，涉及 M3 的四行在 W-S 两个升序删点与 W-A 留 1/233 上各 4 对；「先查哪一对」旋钮 132 对判定全相同，其中 99 对两点值逐位相等，挪门槛自证做不了。
@@ -21,8 +25,8 @@
 
 ### 做了什么
 
-- **模型**：叶容器表按叶序存容器号与按号升序的记录号。插入照 `crates/` 今天的落法：最右片不满就追加，满了就末尾分裂出新片、容器号 = 这条的号；新建之后片数 > 135 就拒，树不变。删除：从装着它的那片删掉，删空就摘（三臂相同）；M2 摘完查新相邻的那一对、没删空就从那片起查右邻与左邻两对，和 ≤ 233 就左吸收右，并到没有一对装得下；M3 这次一次都没并、那片没删空、记录数 < f 且有右邻时，从右邻借最小的 ⌊(\|R\| − \|X\|) ÷ 2⌋ 条，借完让右邻与它右邻那一对照 M2 的规则查。
-- **两种重写记法**：位置记法 = 内容变了的叶，加上第一个被摘掉的位置及其右边每一片留下的叶（`crates/` 的重写清单就是这样，`inode_tree.rs` 第 308–311 行）；内容记法 = 只数内容变了、发布之后还在的叶。「一次 unlink」只数最后一批那一次发布。
+- **模型**：叶容器表按叶序存容器号与按号升序的记录号。插入照跑时 `crates/` 的落法：最右片不满就追加，满了就末尾分裂出新片、容器号 = 这条的号；新建之后片数 > 135 就拒，树不变。删除：从装着它的那片删掉，删空就摘（三臂相同）；M2 摘完查新相邻的那一对、没删空就从那片起查右邻与左邻两对，和 ≤ 233 就左吸收右，并到没有一对装得下；M3 这次一次都没并、那片没删空、记录数 < f 且有右邻时，从右邻借最小的 ⌊(\|R\| − \|X\|) ÷ 2⌋ 条，借完让右邻与它右邻那一对照 M2 的规则查。
+- **两种重写记法**：位置记法 = 内容变了的叶，加上第一个被摘掉的位置及其右边每一片留下的叶（写这一页时 `crates/` 的重写清单就是这样，`inode_tree.rs` 的 `remove_record_from_leaf_containers`）；内容记法 = 只数内容变了、发布之后还在的叶。「一次 unlink」只数最后一批那一次发布。
 - **逐步同走**：一条序列的四个臂变体一步一步同走，每条臂各用一个生成器实例、各算各的操作流 SHA-256；公共窗口 = 从头到窗口里三条臂最早一次不接受操作之前。主窗口三条臂是 M1、M2、M3；f = 59 窗口三条臂是 M1、M2、M3 f = 59（修订 1 第 2 行）。每条臂每次发布之后跑丙类断言：片内升序、每片 1 … 233 条、容器号 ≤ 片内最小号、沿叶序容器号严格递增、相邻两片 key 区间不交叠；I-9.4（容器号不超最小 key） 第三句在 M1、M2 上断言、在 M3 上计数；M2、M3 相邻两片之和 ≥ 234；内容记法 M1、M2 每次 ≤ 1 片、M3 ≤ 2 片。
 - **负载**：W-R 用 splitmix64（种子即初值），每一步取 53 位均匀数 u，活集合空或 u × 100 < p 百分数 × 2^53 就插入（按整数比，p 取精确十进制），否则删活集合第 next() mod 长度 个、swap_remove。W-S 一轮插 1000 条再删最小（或最大）的 D 个。W-A 一轮插 A 条连号，再按号升序删掉这一批里登记的那一份。每条臂最多吃 2 × 10⁷ 个操作；第一段 88 条臂都在上限内被拒，没有「未撞到」。
 - **对拍**：对拍 bin 把每条序列在 M1 被拒之前的每一步同时喂给模型 M1 与 `crates/` 的 `write_records_into_leaf_containers` / `remove_record_from_leaf_containers`，逐步比片数、每片（容器号、记录数、最小号、最大号）、位置记法重写清单逐项、内容记法、摘片数、被拒的那一步与拒的格。它以 `#[path]` 引同一份模型源码，用同一目录下自己的 `Cargo.toml` 编（自成一个 workspace，以路径依赖引 `crates/singlefs-core`、`crates/singlefs-format`，只读）。没挂在 `scripts/experiments/Cargo.toml` 的可选特性上，原因是可选的路径依赖照样要 cargo 读到 `../../crates` 下的 manifest，而 `scripts/mutation/mutate.sh` 只把 `research/` 拷进临时目录编译，那样整个包每一张变异表的基线都编不过（登记修订 2，第一次跑变异表时撞上）。
@@ -59,9 +63,9 @@ MUTATE_JOBS=4 MUTATE_CARGO_JOBS=2 MUTATE_MEMORY_MAX=4G bash scripts/mutation/mut
 | `research/results/e176-inode-leaf-merge-capacity-and-rewrites-oracle-discrimination-v1.out` | 第一段对拍的判别力：模型上打开 V1 之后的对拍输出（草稿目录副本上编的，判决行故意是 false） |
 | `research/results/e176-inode-leaf-merge-capacity-and-rewrites-oracle-discrimination-v1-2026-10-08.out` | 第二段对拍的判别力（第二段的源码上打开 V1）：与第一段那份逐字节相同（sha256 `29e6ab1ed77318939f8d377b7c90728c7a4028a24771d0e8aad080c71f909bb3`） |
 | `research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests.out` | 第一段的单测输出（14 个） |
-| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests-2026-10-08.out` | 第二段的单测输出（22 个，今天这份源码） |
+| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests-2026-10-08.out` | 第二段的单测输出（22 个，第二段的源码） |
 | `research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations.out` | 第一段 `mutate.sh` 整张表（13 条）的输出（stderr 头一行在前） |
-| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations-2026-10-08.out` | 第二段 `mutate.sh` 整张表（16 条，今天这份源码与变异表）的输出（stderr 头一行在前） |
+| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations-2026-10-08.out` | 第二段 `mutate.sh` 整张表（16 条，第二段的源码与变异表）的输出（stderr 头一行在前） |
 
 ### 判决（整行抄自产物）
 
@@ -124,9 +128,9 @@ research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out:136
 
 第二段的对拍那份没有 false 字段；判别力那份的两个 false 照第一段的理由是预期内的。第二段产物的判决行没有 false 或 not_run 字段，`m1_not_reached_points=0`。主窗口那几行（第 1130–1136 行）与第一段第 763–769 行判定相同。`equal_values_not_separable=131` 不是「没过」：它是挪门槛自证做不了的对数，两点值逐位相等、门槛挪不进两点之间（登记第八节没写这种情形怎么报，这里单列，不并进别的计数）。
 
-### 锚点与阳性对照（整行抄自 `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out` 第 2–32 行）
+### 锚点与阳性对照（整行抄自 `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out` 里全部 31 行 `name=anchor`）
 
-登记第七节甲、乙类全部格，加修订 1 的 f = 59 变体（A2 … A6 只报不判，`matches=unregistered`）。空间放大那一格（不设 135 上限的 M1 建满 10⁶ 再删九成）在第 29 行，`ratio=9.98` 与 D8（核心索引结构） 已定项 6 末尾「9.98 倍」那一句相同，F3 没打中。阳性对照 F1 没打中：A2 上 M2 活数 31 455 > M1 的 367，A3 上 M3 借 1 次，A5 上 M2 并 1 次。
+登记第七节甲、乙类全部格，加修订 1 的 f = 59 变体（a2 … a6 只报不判，`matches=unregistered`）。空间放大那一格（不设 135 上限的 M1 建满 10⁶ 再删九成）在第 29 行，`ratio=9.98` 与 D8（核心索引结构） 已定项 6 末尾「9.98 倍」那一句相同，F3 没打中。阳性对照 F1 没打中：a2 上 M2 活数 31 455 > M1 的 367，a3 上 M3 借 1 次，a5 上 M2 并 1 次。
 
 ```
 E7RESULT name=anchor cell=A1 arm=M1 refused_insert=31456 live=31455 containers=135 matches=true
@@ -237,7 +241,7 @@ wa_keep3of4_a1000 Q2p_delta2=0.0003 Q2p_delta3=0.0003 Q2c_delta2=0.0003 Q2c_delt
 
 两种记法下的结论各写一句，不合成一句：
 
-- **位置记法（`crates/` 今天的记法）**：Δ2p、Δ3p 总判定「不翻」。主取样点上两行都 ≤ 0.10（W-R p = 0.55 五个种子是负的，−0.0393 … −0.0076：M1 删空摘片时右边各片按位置左移全部重写，单次可到 133 片，M2 并得早、摘片时右边剩得少）。不利于「合并可忽略」的那一半：W-R p = 0.75 五个种子 Δ2p 0.0796 … 0.1046、Δ3p 0.0724 … 0.1100，种子 2 两行都略过 0.10。那一族 M1 在窗口里摘过的只有最右那一片（位置记法单次最大 1，产物里 M1 的 `position_largest=1`），M2、M3 的并把右边各片挪了位置（单次最大 90 … 105）。
+- **位置记法（跑时 `crates/` 的记法）**：Δ2p、Δ3p 总判定「不翻」。主取样点上两行都 ≤ 0.10（W-R p = 0.55 五个种子是负的，−0.0393 … −0.0076：M1 删空摘片时右边各片按位置左移全部重写，单次可到 133 片，M2 并得早、摘片时右边剩得少）。不利于「合并可忽略」的那一半：W-R p = 0.75 五个种子 Δ2p 0.0796 … 0.1046、Δ3p 0.0724 … 0.1100，种子 2 两行都略过 0.10。那一族 M1 在窗口里摘过的只有最右那一片（位置记法单次最大 1，产物里 M1 的 `position_largest=1`），M2、M3 的并把右边各片挪了位置（单次最大 90 … 105）。
 - **内容记法**：Δ2c、Δ3c 总判定「可忽略」，最大的是 W-S 两点的 Δ3c（0.0342、0.0343）与 W-A 留 1/233 的 0.0275；Δ2c 最大 0.0013。
 - **Q3（M3 − M2）**：两种记法都「可忽略」，最大 0.0343（W-S 顺序删 950 那一点，内容记法）。借在主取样点上真的发生了（F5 判决行 `main_point_m3_borrows=5930`），平均到每次 unlink 不到 0.035 片。
 
@@ -390,7 +394,7 @@ Q1r 对插入概率（0.55 对 0.95、0.55 对 0.75 两个方向五个种子都�
 
 ### 第二段：锚点与阳性对照
 
-第二段产物第 2–32 行与第一段第 2–32 行逐字相同（`diff <(sed -n 2,32p research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out) <(sed -n 2,32p research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out)` 没有输出）。第 33–48 行是三个变体新加的 16 格（修订 3：A1 按登记答案判，其余只报不判），整行抄：
+第二段产物第 2–32 行与第一段第 2–32 行逐字相同（`diff <(sed -n 2,32p research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out) <(sed -n 2,32p research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out)` 没有输出）。第 33–48 行是三个变体新加的 16 格（修订 3：a1 按登记答案判，其余只报不判），整行抄：
 
 ```
 E7RESULT name=anchor cell=A1 arm=M3_just_enough refused_insert=31456 live=31455 containers=135 matches=true
@@ -411,7 +415,7 @@ E7RESULT name=anchor cell=A6 arm=M2_left_first content=233 position=233 containe
 E7RESULT name=anchor cell=A6 arm=M3_left_first content=240 position=240 containers=1 merges=1 borrows=7 third_sentence_false=0 sizes=233 matches=unregistered
 ```
 
-先查左边在登记的手造格上与主旋钮的读数逐格相同（A2 … A6，M2、M3 各自对比），这几格分不出这个旋钮；分得出它的是单测里那组三片 117 / 117 / 117（修订 3 第 5 行，变异 V14 让它红）。借到刚好够下限在 A4 … A6 上借 116 次、主旋钮借 7 次（推的，没逐步看：每次只借到 117 条，下一次删就又低于下限、再借）。
+先查左边在登记的手造格上与主旋钮的读数逐格相同（a2 … a6，M2、M3 各自对比），这几格分不出这个旋钮；分得出它的是单测里那组三片 117 / 117 / 117（修订 3 第 5 行，变异 V14 让它红）。借到刚好够下限在 a4 … a6 上借 116 次、主旋钮借 7 次（推的，没逐步看：每次只借到 117 条，下一次删就又低于下限、再借）。
 
 ### 第二段读数：Q2、Q3（三个窗口）
 
@@ -597,9 +601,9 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 
 ### 单测与变异
 
-单测 22 个，今天这份源码（`grep -c '^test .* \.\.\. ok$' research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests-2026-10-08.out` 输出 22；同一份文件里 `test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s`）。第一段那 14 个（`research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests.out`）里钉绝对值的有：全部锚点格（26 格登记答案逐字比）、A1 与 A2 的 M1 另写成加法式、SHA-256 三个公开测试向量、四种负载生成器的前几步、丙类断言五种坏形态各自会红、门槛的边界取值、挪门槛自证、按序列分线程与单线程逐字相同、W-R 主取样点上三条臂操作流前缀相同。第二段加的 8 个：第二段的窗口表与三个变体的策略逐个钉死、第二段锚点（登记格 29、总 47）、三片 117 / 117 / 117 上先查右边与先查左边的末态与两种记法（M2、M3 各两条，共四条）、第二段六个臂变体分线程与单线程逐字相同、第二段敏感性行的旋钮与行逐个钉死并核对先查左边那一点取的是 `left_first` 窗口；随机长跑丙类断言那条单测加了 M3_left_first。
+单测 22 个，第二段的源码（`grep -c '^test .* \.\.\. ok$' research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests-2026-10-08.out` 输出 22；同一份文件里 `test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s`）。第一段那 14 个（`research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests.out`）里钉绝对值的有：全部锚点格（26 格登记答案逐字比）、a1 与 a2 的 M1 另写成加法式、SHA-256 三个公开测试向量、四种负载生成器的前几步、丙类断言五种坏形态各自会红、门槛的边界取值、挪门槛自证、按序列分线程与单线程逐字相同、W-R 主取样点上三条臂操作流前缀相同。第二段加的 8 个：第二段的窗口表与三个变体的策略逐个钉死、第二段锚点（登记格 29、总 47）、三片 117 / 117 / 117 上先查右边与先查左边的末态与两种记法（M2、M3 各两条，共四条）、第二段六个臂变体分线程与单线程逐字相同、第二段敏感性行的旋钮与行逐个钉死并核对先查左边那一点取的是 `left_first` 窗口；随机长跑丙类断言那条单测加了 M3_left_first。
 
-变异表 `scripts/mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv` 16 条（登记第九节 V1–V13，修订 3 补 V14–V16；锚点按今天的装置源码取，每条恰好命中一次）：抓到 16、无效 0、没红 0；`💥`、`⚠️`、`⏱`、`🧱` 各 0；收尾「计数：内存撞顶 0 条（上限 4G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条、显存不够 0 条」与「已还原，基线仍全绿」（`research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations-2026-10-08.out` 第 19、20 行；第一段那次 13 条全抓在 `research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations.out`）。V4 改的是序列与锚点格共用的 `live_inodes_at_refusal`；V13 在 W-R 主取样点上让作废断言当场红；V9 由丙类「相邻两片 key 区间不交叠」当场红；V14 由三片 117 / 117 / 117 那两条先查左边的单测抓到，V15 由 A3 借到刚好够下限那一格登记答案抓到，V16 由第二段窗口表那条单测抓到。
+变异表 `scripts/mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv` 16 条（登记第九节 V1–V13，修订 3 补 V14–V16；锚点按第二段的装置源码取，每条恰好命中一次）：抓到 16、无效 0、没红 0；`💥`、`⚠️`、`⏱`、`🧱` 各 0；收尾「计数：内存撞顶 0 条（上限 4G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条、显存不够 0 条」与「已还原，基线仍全绿」（`research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations-2026-10-08.out` 里「计数：」与「已还原，基线仍全绿」两行；第一段那次 13 条全抓在 `research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations.out`）。V4 改的是序列与锚点格共用的 `live_inodes_at_refusal`；V13 在 W-R 主取样点上让作废断言当场红；V9 由丙类「相邻两片 key 区间不交叠」当场红；V14 由三片 117 / 117 / 117 那两条先查左边的单测抓到，V15 由 a3 借到刚好够下限那一格登记答案抓到，V16 由第二段窗口表那条单测抓到。
 
 16 条全抓只说明写了断言的那几处被变异测过，不说明模型每一行都测过：判定与敏感性的算术（`point_verdict`、`overall_verdict`、`moved_threshold_verdicts`）由单测钉边界，变异表里没有一条动它们；第二段敏感性取哪个窗口（`segment_two_sensitivity_lines` 里按窗口名找下标）由单测核一点，没有变异。
 
@@ -626,17 +630,17 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 
 | # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |
 |---|---|---|---|---|
-| 1 | 独立手写模型 | 叶容器表只存号；插入末尾分裂、删空即摘、M2 并、M3 借，两种记法按这次发布动过的容器号与第一个摘片位置算。M1 与路径 2 比的是 22 条登记序列上 M1 被拒之前的每一步（枚举点，不是定义域：负载取登记的三族 22 点）；锚点格与路径 3 比 | `scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs:155 insert`、`:278 remove`、`:321 rewrites_of_this_publish` | 一片 233 条、根扇出 135（本地常量，值抄自 `crates/` 并在路径 2 那边回比）；位置记法的定义（读 `crates/singlefs-core/src/inode_tree.rs` 第 308–311 行得来）；负载生成器（对拍时两边吃同一个生成器的输出） |
-| 2 | `crates/` 的两个纯函数 | 今天实现的 M1：`write_records_into_leaf_containers` 追加 / 末尾分裂、片数 > 135 拒；`remove_record_from_leaf_containers` 删空摘片、右边各片全进重写清单 | `crates/singlefs-core/src/inode_tree.rs:181 write_records_into_leaf_containers`、`:286 remove_record_from_leaf_containers` | `INODE_LEAF_RECORDS`（`crates/singlefs-format/src/lib.rs:110`）、`leaf_containers_one_root_node_holds`（`inode_tree.rs:109`）；对拍时的负载生成器取自路径 1 |
+| 1 | 独立手写模型 | 叶容器表只存号；插入末尾分裂、删空即摘、M2 并、M3 借，两种记法按这次发布动过的容器号与第一个摘片位置算。M1 与路径 2 比的是 22 条登记序列上 M1 被拒之前的每一步（枚举点，不是定义域：负载取登记的三族 22 点）；锚点格与路径 3 比 | `scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs:155 insert`、`:278 remove`、`:321 rewrites_of_this_publish` | 一片 233 条、根扇出 135（本地常量，值抄自 `crates/` 并在路径 2 那边回比）；位置记法的定义（读当时 `crates/singlefs-core/src/inode_tree.rs` 的 `remove_record_from_leaf_containers` 得来）；负载生成器（对拍时两边吃同一个生成器的输出） |
+| 2 | `crates/` 的两个纯函数 | 今天实现的 M1：`write_records_into_leaf_containers` 追加 / 末尾分裂、片数 > 135 拒；`remove_record_from_leaf_containers` 删空摘片、右边各片全进重写清单 | `crates/singlefs-core/src/inode_tree.rs:181 write_records_into_leaf_containers`、`:286 remove_record_from_leaf_containers` | `INODE_LEAF_RECORDS`（`crates/singlefs-format/src/lib.rs`）、`leaf_containers_one_root_node_holds`（`inode_tree.rs`）；对拍时的负载生成器取自路径 1 |
 | 3 | 设计员的独立参照（Python） | 同样的三条臂，只在登记第七节的六个手造场景与空间放大那一格上算 | 无实现：只有抄本，在 `research/prompts/e176-preregistration.md` 第 500 行起的 `anchors.py` 代码块（草稿目录那份不入库） | 233、135；位置记法的同一个定义；它在 X 删空摘掉之后不查新相邻那一对（登记第十三节写明，六个格不受影响） |
 
-跨路径的比对断言：路径 1 对路径 2 钉在对拍 bin `scripts/experiments/e176_crates_oracle/oracle.rs:80 compare_one_sequence`（逐步比，第一处不同就停）；路径 1 对路径 3 钉在单测 `every_registered_anchor_matches_the_independent_reference`（同一份源码第 2154 行，26 格登记答案逐字比；第二段另有 `segment_two_anchors_judge_a1_for_the_three_variants_and_only_report_the_rest` 比 29 格）。共用项问句：233、135 若错，三条路径一起错，挡不住「kb 与实现一起取错」；位置记法三条路径同出一处读法，若那读法本身不是 `crates/` 想要的，三条一起错；负载生成器只在路径 1 里有一份，对拍证明不了生成器照登记生成（那一半靠单测里四种负载的前几步钉住）。
+跨路径的比对断言：路径 1 对路径 2 钉在对拍 bin `scripts/experiments/e176_crates_oracle/oracle.rs` 的 `compare_one_sequence`（逐步比，第一处不同就停）；路径 1 对路径 3 钉在单测 `every_registered_anchor_matches_the_independent_reference`（同一份源码第 2154 行，26 格登记答案逐字比；第二段另有 `segment_two_anchors_judge_a1_for_the_three_variants_and_only_report_the_rest` 比 29 格）。共用项问句：233、135 若错，三条路径一起错，挡不住「kb 与实现一起取错」；位置记法三条路径同出一处读法，若那读法本身不是 `crates/` 想要的，三条一起错；负载生成器只在路径 1 里有一份，对拍证明不了生成器照登记生成（那一半靠单测里四种负载的前几步钉住）。
 
 ### 影响的决策
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D8（核心索引结构） 已定项 6 | 支撑 | 2026-10-08 改了：用户定「M3 连借一起做」（岔路单 `research/prompts/m3-3-5-forks.md` M 那一行），借取均分（`research/prompts/m3-leaf-death-r1-main-verification.md` 第二节 K3、`research/prompts/m3-leaf-death-r2-main-verification.md` 第二节「均分借」）；已定项 6 的合并那一句改成左吸收右与左从右借都做、借取均分，依据段引了 E176（inode 树叶合并三候选的容量与写代价）：合并买到的容量（Q1r）与多重写的叶片（Q2、Q3）是选 M3 的代价数，借到刚好够下限那个窗口让内容记法的多重写由「可忽略」变「不翻」。空间放大那一格与条款的 9.98 相同（F3 没打中） |
+| D8（核心索引结构） 已定项 6 | 支撑 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
 
 ## 历史版本
 
