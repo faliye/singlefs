@@ -1,5 +1,5 @@
---- jia/crates/singlefs-core/src/mount.rs	2026-10-05 05:44:37.628526347 +0000
-+++ noq3/crates/singlefs-core/src/mount.rs	2026-10-05 07:56:28.338761666 +0000
+--- jia/crates/singlefs-core/src/mount.rs	2026-10-05
++++ noq3/crates/singlefs-core/src/mount.rs	2026-10-05
 @@ -2849,7 +2849,8 @@
          current.root.rollback_floor,
          &current_instance_table,

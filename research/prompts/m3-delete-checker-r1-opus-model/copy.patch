@@ -1,6 +1,6 @@
 diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-core/src/lib.rs m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/lib.rs
---- m3-delete-checker-r1/tree/crates/singlefs-core/src/lib.rs	2026-10-03 19:54:46.913184394 +0000
-+++ m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/lib.rs	2026-10-04 17:14:29.402950641 +0000
+--- m3-delete-checker-r1/tree/crates/singlefs-core/src/lib.rs	2026-10-03
++++ m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/lib.rs	2026-10-04
 @@ -25,6 +25,7 @@
  pub mod instance_table_sweep;
  pub mod journal;
@@ -10,8 +10,8 @@ diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-core/src/
  pub mod mount;
  pub mod mounted_read;
 diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-core/src/m3dc.rs m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/m3dc.rs
---- m3-delete-checker-r1/tree/crates/singlefs-core/src/m3dc.rs	1970-01-01 00:00:00.000000000 +0000
-+++ m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/m3dc.rs	2026-10-04 17:14:29.390558814 +0000
+--- m3-delete-checker-r1/tree/crates/singlefs-core/src/m3dc.rs	1970-01-01
++++ m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/m3dc.rs	2026-10-04
 @@ -0,0 +1,28 @@
 +//! 攻方腿副本专用（m3-delete-checker-r1-opus）：产品批大小的覆盖与几种删除改坏，全由环境变量开，只在副本里有。
 +use std::cell::Cell;
@@ -42,8 +42,8 @@ diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-core/src/
 +    pub static UNITS_PENDING_IN_THIS_DELETION_PUBLISH: Cell<Option<u64>> = const { Cell::new(None) };
 +}
 diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-core/src/transaction.rs m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/transaction.rs
---- m3-delete-checker-r1/tree/crates/singlefs-core/src/transaction.rs	2026-10-03 17:21:13.629171533 +0000
-+++ m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/transaction.rs	2026-10-04 17:39:33.199675598 +0000
+--- m3-delete-checker-r1/tree/crates/singlefs-core/src/transaction.rs	2026-10-03
++++ m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/transaction.rs	2026-10-04
 @@ -3979,7 +3979,11 @@
              DeletionStepOfThePublish::Batch {
                  data_units_kept, ..
@@ -248,8 +248,8 @@ diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-core/src/
          ),
      ];
 diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-core/src/unlink.rs m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/unlink.rs
---- m3-delete-checker-r1/tree/crates/singlefs-core/src/unlink.rs	2026-10-03 03:13:50.535229079 +0000
-+++ m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/unlink.rs	2026-10-04 17:14:29.403129439 +0000
+--- m3-delete-checker-r1/tree/crates/singlefs-core/src/unlink.rs	2026-10-03
++++ m3-delete-checker-r1-opus/tree/crates/singlefs-core/src/unlink.rs	2026-10-04
 @@ -90,9 +90,9 @@
  
      /// 一批释放几个数据单元。
@@ -263,8 +263,8 @@ diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-core/src/
          }
      }
 diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-harness/src/history.rs m3-delete-checker-r1-opus/tree/crates/singlefs-harness/src/history.rs
---- m3-delete-checker-r1/tree/crates/singlefs-harness/src/history.rs	2026-10-03 21:00:29.061496540 +0000
-+++ m3-delete-checker-r1-opus/tree/crates/singlefs-harness/src/history.rs	2026-10-04 17:15:02.638159096 +0000
+--- m3-delete-checker-r1/tree/crates/singlefs-harness/src/history.rs	2026-10-03
++++ m3-delete-checker-r1-opus/tree/crates/singlefs-harness/src/history.rs	2026-10-04
 @@ -5373,8 +5373,16 @@
                      });
                  }
@@ -283,8 +283,8 @@ diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-harness/s
                      &image,
                      step_position,
 diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-harness/src/model.rs m3-delete-checker-r1-opus/tree/crates/singlefs-harness/src/model.rs
---- m3-delete-checker-r1/tree/crates/singlefs-harness/src/model.rs	2026-10-03 17:25:34.023578788 +0000
-+++ m3-delete-checker-r1-opus/tree/crates/singlefs-harness/src/model.rs	2026-10-04 17:15:02.637190650 +0000
+--- m3-delete-checker-r1/tree/crates/singlefs-harness/src/model.rs	2026-10-03
++++ m3-delete-checker-r1-opus/tree/crates/singlefs-harness/src/model.rs	2026-10-04
 @@ -658,7 +658,8 @@
  
  /// 删除那几步每批释放几个数据单元：产品取一片下段叶罩的 144 个（D8（核心索引结构） 已定项 16 第 2 条，K 取
@@ -314,8 +314,8 @@ diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-harness/s
          } else {
              ModelPublishKind::FinalDeletionBatch
 diff -ruN '--exclude=target' m3-delete-checker-r1/tree/crates/singlefs-harness/tests/m3dc_candidates.rs m3-delete-checker-r1-opus/tree/crates/singlefs-harness/tests/m3dc_candidates.rs
---- m3-delete-checker-r1/tree/crates/singlefs-harness/tests/m3dc_candidates.rs	1970-01-01 00:00:00.000000000 +0000
-+++ m3-delete-checker-r1-opus/tree/crates/singlefs-harness/tests/m3dc_candidates.rs	2026-10-04 17:33:41.158368922 +0000
+--- m3-delete-checker-r1/tree/crates/singlefs-harness/tests/m3dc_candidates.rs	1970-01-01
++++ m3-delete-checker-r1-opus/tree/crates/singlefs-harness/tests/m3dc_candidates.rs	2026-10-04
 @@ -0,0 +1,728 @@
 +//! 攻方腿原型（m3-delete-checker-r1-opus，副本专用）：删除线 checker 五条不变量的各个读法候选，逐版判在合法历史与改坏的镜像上。
 +//! 每段历史每一步之后的镜像判根环里每一条读得出的根；每一步写出的那一段按层 0 的枚举域（前几段全持久、当前段任意整写子集）

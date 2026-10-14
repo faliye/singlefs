@@ -8,7 +8,7 @@
 
 ## 一、K4　回扫（静态读码：13 条已登记的崩溃枚举流各走到哪几支）
 
-`.claude/gate.d/stage-inputs.tsv` 在我开工之后被改过一次（文件时间 2026-10-07 03:32，第 43 行新加了 `crash-case:layer0-unlink-after-the-multi-record-publish-stream`）：我先读到 12 行、核引文时是 13 行，下面按 13 行写，行号是今天这份的（`grep -n '^crash-case:' .claude/gate.d/stage-inputs.tsv` 出 38–50）。
+`.claude/gate.d/stage-inputs.tsv` 在我开工之后被改过一次（文件时间 2026-10-07，第 43 行新加了 `crash-case:layer0-unlink-after-the-multi-record-publish-stream`）：我先读到 12 行、核引文时是 13 行，下面按 13 行写，行号是今天这份的（`grep -n '^crash-case:' .claude/gate.d/stage-inputs.tsv` 出 38–50）。
 
 三支改动落点（读冻结副本）：
 - C：可写挂载读阶段之后、重建分配器返回之后加一个挂钩，每次可写挂载都过它。第一轮正推腿的副本落点在 `crates/singlefs-core/src/mount.rs` 的 `rebuilt?` 之后，用读阶段已有的 `records` 与 `effective_root`；它只在「水位之上、没被施加的记录」存在时有东西可隔离。

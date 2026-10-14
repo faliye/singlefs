@@ -921,7 +921,7 @@ diff --git a/crates/singlefs-harness/src/gpu_memory_ledger.rs b/crates/singlefs-
 +    /// 它们的 Total、Free 不该被当成显存读）。
 +    fn nvidia_smi_report(cards: &[CardInTheReport<'_>]) -> String {
 +        let mut report = format!(
-+            "\n==============NVSMI LOG==============\n\nTimestamp                                              : Wed Oct  7 14:38:07 2026\n\
++            "\n==============NVSMI LOG==============\n\nTimestamp                                              : Wed Oct  7 2026\n\
 +             Driver Version                                         : 595.84\nCUDA Version                                           : 13.2\n\n\
 +             Attached GPUs                                          : {}\n",
 +            cards.len()

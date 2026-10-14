@@ -1,5 +1,5 @@
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-b-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-07 22:30:39.693490307 +0000
-+++ repo/crates/singlefs-core/src/allocator.rs	2026-10-07 22:52:31.809436645 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-b-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-07
++++ repo/crates/singlefs-core/src/allocator.rs	2026-10-07
 @@ -602,6 +602,12 @@
          self.isolated_slots
      }

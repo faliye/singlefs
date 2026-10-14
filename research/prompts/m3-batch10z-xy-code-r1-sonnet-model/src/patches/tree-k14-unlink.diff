@@ -1,5 +1,5 @@
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree/crates/singlefs-core/src/unlink.rs	2026-10-06 14:45:48.160012068 +0000
-+++ tree-k14/crates/singlefs-core/src/unlink.rs	2026-10-09 15:34:04.919637543 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree/crates/singlefs-core/src/unlink.rs	2026-10-06
++++ tree-k14/crates/singlefs-core/src/unlink.rs	2026-10-09
 @@ -23,7 +23,16 @@
  /// 产品路径是 [`DeletionSwitches::PRODUCT`]；都只住内存、不落盘（D18（块里携带什么信息） 已定项 24 第 3 条）。
  /// 经可写挂载的只供测试的开关链装在分配器上（`mount::mount_writable_with_test_only_switches_and_deletion_switches`，与空间准入开关同一个做法），

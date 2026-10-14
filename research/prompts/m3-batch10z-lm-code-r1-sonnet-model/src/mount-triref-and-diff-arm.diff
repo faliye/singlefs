@@ -1,5 +1,5 @@
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-08 15:06:26.796220181 +0000
-+++ tree-core/crates/singlefs-core/src/mount.rs	2026-10-08 16:25:31.521891021 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-08
++++ tree-core/crates/singlefs-core/src/mount.rs	2026-10-08
 @@ -2122,7 +2122,7 @@
      clippy::ptr_arg,
      reason = "placements_referenced_by_root 走 &dyn PoolReader，要一个有大小的读者：Vec 实现了它、切片不能转成 dyn"

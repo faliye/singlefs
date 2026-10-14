@@ -550,8 +550,8 @@ $ sha256sum out_r4.txt dump_r4.txt; grep -c '^DUMP' dump_r4.txt
 **命令四**（第 6 次的锚点脚本 `anchors_e156_r6.py`：命令三抽出的第 4 次脚本打下面这份补丁，只改门槛一处；K16、L5、L8、R1d 用它。补丁 sha256 `dfdb41929e23d5faf7bd8c7ffa0fac3c384ada3b771dca8ae2d758c9a5b4d316`，59 行，在这份登记第 553–611 行；执行员 `awk 'NR>=553 && NR<=611'` 抽出补丁、`patch` 到命令三的脚本上，打完核 sha256 = `bbce0391…`）：
 
 ```diff
---- anchors_e156_r4.py	2026-10-05 13:01:04.782253935 +0000
-+++ anchors_e156_r6.py	2026-10-05 13:01:28.853918423 +0000
+--- anchors_e156_r4.py	2026-10-05
++++ anchors_e156_r6.py	2026-10-05
 @@ -1,10 +1,15 @@
  #!/usr/bin/env python3
 -# E156 第 4 次重跑登记的独立锚点（岔路 1 的族）。不 import 装置、不读 crates/。只用下列条款句：

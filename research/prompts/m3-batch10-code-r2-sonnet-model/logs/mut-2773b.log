@@ -1,6 +1,6 @@
 run-with-memory-cap: 上限 3G 超过实测峰值 923M 的 2 倍，照理由放行：变异后要重编 core 与 checker，编译比测试占内存
 run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：多个子 agent 各跑各的，正推腿在自己的目录跑 harness 档用例
-run-with-memory-cap: 排队（已等 0 秒，至多 150 秒）：slice 已占 39.5 GiB，这一条要 923 MiB（按峰值表里上一次实测的峰值 923 MiB（2026-10-05T13:56:00Z 量的）算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 0 秒，至多 150 秒）：slice 已占 39.5 GiB，这一条要 923 MiB（按峰值表里上一次实测的峰值 923 MiB（2026-10-05 量的）算），总上限 40.1 GiB；账上在跑 3 条
 run-with-memory-cap: 排了 17 秒，起跑（singlefs-memory-cap-3765086-3233130568）
    Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-checker)
    Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-harness)

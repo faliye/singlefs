@@ -85,7 +85,7 @@ $ awk -F'\t' 'NR>1 {v=$10; sub(/[（：(].*/,"",v); print v}' cells.tsv | sort |
 CLAIMED	53	RUN	48
 MISSING	scripts/crash/layer0-shard-configuration-check.sh
 MISSING	scripts/crash/layer0-shard-run-selftest.sh
-MISSING	scripts/hosts/memory-peaks.tsv
+MISSING	~/.local/share/singlefs/memory-peaks.tsv
 MISSING	scripts/gate/rerun-failed-tests.py
 EXEMPT	scripts/devices/vm-bench.sh	自证要连起三次虚机，挂钟太重，不进每轮门禁
 ```
@@ -96,7 +96,7 @@ EXEMPT	scripts/devices/vm-bench.sh	自证要连起三次虚机，挂钟太重，
 |---|---|---|
 | scripts/crash/layer0-shard-configuration-check.sh | 没有，只在注释里提别人的 | :24「scripts/crash/layer0-shard-run.sh --selftest 里对应那一格判错」、:27「layer0-shard-run.sh --selftest 用」 |
 | scripts/crash/layer0-shard-run-selftest.sh | 没有，它是别人的自证本体 | :2「scripts/crash/layer0-shard-run.sh --selftest 的本体」；`layer0-shard-run.sh --selftest` 在 runner 表里（47 号:208） |
-| scripts/hosts/memory-peaks.tsv | 没有，是数据文件 | 内存包装写的峰值日志，第 248、249、598、743、1012、1081、2200、2207 行记的是别的命令行里的 `--selftest`；它被 .gitignore 挡着（`git check-ignore -v` → `.gitignore:14:/scripts/hosts/memory-peaks.tsv`），`--staged` 的临时树里没有它 |
+| ~/.local/share/singlefs/memory-peaks.tsv | 没有，是数据文件 | 内存包装写的峰值日志，第 248、249、598、743、1012、1081、2200、2207 行记的是别的命令行里的 `--selftest`；它被 .gitignore 挡着（`git check-ignore -v` → `.gitignore:14:/~/.local/share/singlefs/memory-peaks.tsv`），`--staged` 的临时树里没有它 |
 | scripts/gate/rerun-failed-tests.py | 有 | :8 用法「rerun-failed-tests.py --selftest」、:154 `if arguments == ["--selftest"]`；runner 表与 15 号都没调它 |
 
 所以四份里三份是认法认错（文本里提到而已），一份（rerun-failed-tests.py）是真有自证、没人跑。
@@ -110,7 +110,7 @@ EXEMPT	scripts/devices/vm-bench.sh	自证要连起三次虚机，挂钟太重，
   ✗ 这些 research 脚本声称有 --selftest，却没有任何门禁阶段在跑它：
       scripts/crash/layer0-shard-configuration-check.sh
       scripts/crash/layer0-shard-run-selftest.sh
-      scripts/hosts/memory-peaks.tsv
+      ~/.local/share/singlefs/memory-peaks.tsv
       scripts/gate/rerun-failed-tests.py
   → 怎么办：把它加进上面的 runner 表；确实不该每轮跑的，登记进 NOT_RUN_HERE 并写明为什么——没人跑的自证只在写它的那天跑过一次。
 rc=1 用时 344 秒

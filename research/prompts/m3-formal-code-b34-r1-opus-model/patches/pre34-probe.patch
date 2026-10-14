@@ -1,5 +1,5 @@
---- pkg/walk-reversed.rs	2026-10-06 02:04:02.283566629 +0000
-+++ tree/crates/b34-checker-pre34/src/walk.rs	2026-10-06 01:08:12.125152516 +0000
+--- pkg/walk-reversed.rs	2026-10-06
++++ tree/crates/b34-checker-pre34/src/walk.rs	2026-10-06
 @@ -10542,6 +10542,7 @@
          &instance_table_rows,
          effective_rollback_floor,

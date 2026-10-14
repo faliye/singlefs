@@ -1446,8 +1446,8 @@ diff --git a/crates/singlefs-checker-tier/tests/rollback_floor_written_into_the_
 ### diff -u 第 31 批冻结副本那一版 今天那一版
 
 ````diff
---- /tmp/claude-1000/m3-formal-code-b31-r1/tree/crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs	2026-10-05 11:42:05.011494305 +0000
-+++ crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs	2026-10-05 13:57:20.249082118 +0000
+--- /tmp/claude-1000/m3-formal-code-b31-r1/tree/crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs	2026-10-05
++++ crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs	2026-10-05
 @@ -10,7 +10,12 @@
  //!
  //! 只读驱动 `singlefs-core` / `singlefs-checker` 的公开入口，不改这两个 crate 的生产代码；产物按 `E7RESULT` 行打印，复跑登记在

@@ -1,5 +1,5 @@
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-harness/src/gpu_memory_ledger.rs	2026-10-08 14:30:25.168572823 +0000
-+++ tree-gpu/crates/singlefs-harness/src/gpu_memory_ledger.rs	2026-10-08 16:42:40.547714528 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-harness/src/gpu_memory_ledger.rs	2026-10-08
++++ tree-gpu/crates/singlefs-harness/src/gpu_memory_ledger.rs	2026-10-08
 @@ -5722,6 +5722,290 @@
          });
      }

@@ -1,5 +1,5 @@
---- /tmp/claude-1000/m3-formal-c655-c687-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-03 21:00:29.061329041 +0000
-+++ /tmp/claude-1000/m3-formal-c655-c687-r1-sonnet/work/crates/singlefs-core/src/allocator.rs	2026-10-04 18:21:10.732879497 +0000
+--- /tmp/claude-1000/m3-formal-c655-c687-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-03
++++ /tmp/claude-1000/m3-formal-c655-c687-r1-sonnet/work/crates/singlefs-core/src/allocator.rs	2026-10-04
 @@ -1646,6 +1646,9 @@
                  Ok(self.record_bumped(slot, footprint, generation))
              }

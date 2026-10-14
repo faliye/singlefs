@@ -1,6 +1,6 @@
 diff -ruN pa/crates/singlefs-checker/src/walk.rs pb/crates/singlefs-checker/src/walk.rs
---- pa/crates/singlefs-checker/src/walk.rs	2026-10-03 19:47:03.465517236 +0000
-+++ pb/crates/singlefs-checker/src/walk.rs	2026-10-03 19:47:03.470720628 +0000
+--- pa/crates/singlefs-checker/src/walk.rs	2026-10-03
++++ pb/crates/singlefs-checker/src/walk.rs	2026-10-03
 @@ -9133,3 +9133,106 @@
          );
      }
@@ -109,8 +109,8 @@ diff -ruN pa/crates/singlefs-checker/src/walk.rs pb/crates/singlefs-checker/src/
 +    }
 +}
 diff -ruN pa/crates/singlefs-core/src/allocator.rs pb/crates/singlefs-core/src/allocator.rs
---- pa/crates/singlefs-core/src/allocator.rs	2026-10-03 19:47:03.465045586 +0000
-+++ pb/crates/singlefs-core/src/allocator.rs	2026-10-03 19:47:03.465978285 +0000
+--- pa/crates/singlefs-core/src/allocator.rs	2026-10-03
++++ pb/crates/singlefs-core/src/allocator.rs	2026-10-03
 @@ -739,17 +739,28 @@
          cluster_segments: &BTreeSet<SlotNumber>,
      ) -> Option<SlotNumber> {
@@ -160,8 +160,8 @@ diff -ruN pa/crates/singlefs-core/src/allocator.rs pb/crates/singlefs-core/src/a
              .collect();
          for record in candidates {
 diff -ruN pa/crates/singlefs-harness/tests/b19_opus_probe.rs pb/crates/singlefs-harness/tests/b19_opus_probe.rs
---- pa/crates/singlefs-harness/tests/b19_opus_probe.rs	1970-01-01 00:00:00.000000000 +0000
-+++ pb/crates/singlefs-harness/tests/b19_opus_probe.rs	2026-10-03 19:47:03.472429687 +0000
+--- pa/crates/singlefs-harness/tests/b19_opus_probe.rs	1970-01-01
++++ pb/crates/singlefs-harness/tests/b19_opus_probe.rs	2026-10-03
 @@ -0,0 +1,324 @@
 +//! 第 19 批代码轮第一轮云端攻方原型（副本上跑，不入库装置）：I-5.5 f2 判据在合法历史上的误红与漏判。
 +//! 形 F：盘小到单元区没有全空聚簇段时，提交内生块回落到最小空槽（D3 已定项 8 第 2 条），树表单元落在 [U, U+64) 里，

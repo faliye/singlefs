@@ -1,5 +1,5 @@
---- pkg/walk-frozen.rs	2026-10-06 02:04:02.282224899 +0000
-+++ tree/crates/b34-checker-fl/src/walk.rs	2026-10-06 01:57:14.370679194 +0000
+--- pkg/walk-frozen.rs	2026-10-06
++++ tree/crates/b34-checker-fl/src/walk.rs	2026-10-06
 @@ -5517,7 +5517,9 @@
      records_as_the_recovery_reads_them
          .iter()

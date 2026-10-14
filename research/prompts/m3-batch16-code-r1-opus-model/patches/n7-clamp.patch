@@ -1,5 +1,5 @@
---- crates/singlefs-core/src/transaction.rs	2026-10-03 17:21:13.629171533 +0000
-+++ crates/singlefs-core/src/transaction.rs	2026-10-03 21:58:37.906129915 +0000
+--- crates/singlefs-core/src/transaction.rs	2026-10-03
++++ crates/singlefs-core/src/transaction.rs	2026-10-03
 @@ -5879,7 +5879,7 @@
                  nlink: NLINK_OF_AN_INODE_BEING_DELETED,
                  size: record.size,

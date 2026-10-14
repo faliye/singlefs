@@ -398,7 +398,7 @@ system configuration writes: acquire x2, raise-F x1, unmount x1, rotation after 
 | 48 | gpu2 §4 Q5 | naga 小程序一次没经 `capped.sh` | R:549 ⑤ 记这一条 | ✓ |
 | 49 | gpu2 §2 | 派发清单外多改 `crash_judge_checker_scan.wgsl` | R:549 收下 | ✓ |
 | 50 | named §1 | 取样点钉值断言是新加的（被测代码不读常量） | R:567 收下 | ✓ |
-| 51 | named §6 | `scripts/hosts/memory-peaks.tsv` 里记着旧用例名作键 | 无（records / checks-owed 里 `memory-peaks` 零命中）；该表在 `research/`，实现员没权改 | ✗（小） |
+| 51 | named §6 | `~/.local/share/singlefs/memory-peaks.tsv` 里记着旧用例名作键 | 无（records / checks-owed 里 `memory-peaks` 零命中）；该表在 `research/`，实现员没权改 | ✗（小） |
 | 52 | named §4 | clippy 红在 `an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs:181-182`（`shadow_unrelated`），不在改动里 | R:567「提交时分诊」 | ✓ |
 | 53 | named §1 | 六行改名走「删旧名 + 追加新整行」 | R:567 | ✓ |
 | 54 | 9-8 §1 | 多出的 4 次写来自回退追加谱系记录，合条款 | R:568、R:560 | ✓ |

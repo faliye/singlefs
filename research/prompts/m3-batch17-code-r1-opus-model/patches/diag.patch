@@ -1,5 +1,5 @@
---- crates/singlefs-core/src/allocator.rs	2026-10-04 22:52:54.597666119 +0000
-+++ crates/singlefs-core/src/allocator.rs	2026-10-04 22:52:54.606096034 +0000
+--- crates/singlefs-core/src/allocator.rs	2026-10-04
++++ crates/singlefs-core/src/allocator.rs	2026-10-04
 @@ -1853,6 +1853,7 @@
          }
          let reclaimed =
@@ -14,8 +14,8 @@
  }
 +
 +fn occupancy_len_for_diag(a: &PoolAllocator) -> usize { a.root_ring.as_ref().map_or(0, |o| o.occupants.len()) }
---- crates/singlefs-core/src/mount.rs	2026-10-04 22:52:54.597708839 +0000
-+++ crates/singlefs-core/src/mount.rs	2026-10-04 22:52:54.607225842 +0000
+--- crates/singlefs-core/src/mount.rs	2026-10-04
++++ crates/singlefs-core/src/mount.rs	2026-10-04
 @@ -1883,6 +1883,7 @@
          )),
          None => oldest_valid_root_in_the_window,

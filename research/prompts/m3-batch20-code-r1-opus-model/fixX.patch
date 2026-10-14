@@ -1,5 +1,5 @@
---- a/crates/singlefs-checker/src/walk.rs	2026-10-05 09:39:49.093797300 +0000
-+++ b/crates/singlefs-checker/src/walk.rs	2026-10-05 10:36:35.195932203 +0000
+--- a/crates/singlefs-checker/src/walk.rs	2026-10-05
++++ b/crates/singlefs-checker/src/walk.rs	2026-10-05
 @@ -7940,6 +7940,8 @@
      TreeTableEntryShorterThanTheFieldTable,
      DeletedInodesHeadIdentifierNamesNoSingleInodeTree,

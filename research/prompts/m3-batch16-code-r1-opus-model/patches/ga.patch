@@ -1,5 +1,5 @@
---- crates/singlefs-core/src/mount.rs	2026-10-03 21:14:38.431434968 +0000
-+++ crates/singlefs-core/src/mount.rs	2026-10-03 21:41:16.009154401 +0000
+--- crates/singlefs-core/src/mount.rs	2026-10-03
++++ crates/singlefs-core/src/mount.rs	2026-10-03
 @@ -1880,7 +1880,7 @@
          ),
          None => floor_of_the_reclaim,

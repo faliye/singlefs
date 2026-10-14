@@ -1,5 +1,5 @@
---- m3-batch10-code-r3/tree/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs	2026-10-06 00:13:48.157497807 +0000
-+++ m3-batch10-code-r3-sonnet/work/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs	2026-10-06 00:37:58.380654372 +0000
+--- m3-batch10-code-r3/tree/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs	2026-10-06
++++ m3-batch10-code-r3-sonnet/work/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs	2026-10-06
 @@ -212,6 +212,37 @@
      );
  }

@@ -1,5 +1,5 @@
---- a/crates/singlefs-core/src/unlink.rs	2026-10-03 03:13:50.535229079 +0000
-+++ b/crates/singlefs-core/src/unlink.rs	2026-10-05 05:14:11.661033721 +0000
+--- a/crates/singlefs-core/src/unlink.rs	2026-10-03
++++ b/crates/singlefs-core/src/unlink.rs	2026-10-05
 @@ -126,7 +126,8 @@
      UnlinkStep::Batch {
          data_units_kept,

@@ -1,5 +1,5 @@
---- /home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-opus/copy/crates/singlefs-core/src/retirement_tree.rs	2026-10-09 15:09:17.427399791 +0000
-+++ retirement_tree.rs	2026-10-09 15:53:58.231644527 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-opus/copy/crates/singlefs-core/src/retirement_tree.rs	2026-10-09
++++ retirement_tree.rs	2026-10-09
 @@ -91,7 +91,7 @@
      #[must_use]
      pub const fn records_per_container(self) -> u64 {

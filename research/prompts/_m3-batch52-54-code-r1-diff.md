@@ -2151,8 +2151,8 @@ index 9240663..09b0882 100644
 +}
 +
  /// 合法的回退不红（判决第三节第 5 条「回退照抄现行那一版的退役树」、第 8 条 I-9.33 只比谱系上的）：删到底（退役一条 (叶, F)）→
- /// 回退到意图那一版（那片叶又活了，退役树照抄、仍是那一条）→ 再删到底（同一片叶再死一次，追加 (叶, F′)）。
- /// 两条同身份，但 F 不在 F′ 那一版的父链上；每一版 checker 都一条不红，退役树那五条都成立。
+ /// 回退到意图那一版（那片叶又活了，退役树照抄、仍是那一条）→ 再删到底（同一片叶再死一次，追加 (叶, F_again)）。
+ /// 两条同身份，但 F 不在 F_again 那一版的父链上；每一版 checker 都一条不红，退役树那五条都成立。
 diff --git a/crates/singlefs-harness/tests/container_trees_grow_a_level_when_the_root_is_full.rs b/crates/singlefs-harness/tests/container_trees_grow_a_level_when_the_root_is_full.rs
 index 3ee99ac..637785e 100644
 --- a/crates/singlefs-harness/tests/container_trees_grow_a_level_when_the_root_is_full.rs

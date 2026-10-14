@@ -1,5 +1,5 @@
---- crates/singlefs-core/src/mount.rs	2026-10-08 02:00:03.207682484 +0000
-+++ crates/singlefs-core/src/mount.rs	2026-10-08 03:46:28.203894579 +0000
+--- crates/singlefs-core/src/mount.rs	2026-10-08
++++ crates/singlefs-core/src/mount.rs	2026-10-08
 @@ -1598,6 +1598,13 @@
          let placements = match placements_of_abandoned_roots
              .recorded_in_the_root_ring_table(root)
@@ -95,8 +95,8 @@
                          })
                          .map(|recorded| ((root.instance, root.checkpoint_txg), recorded))
                  })
---- Cargo.toml	2026-10-06 14:45:48.151012155 +0000
-+++ Cargo.toml	2026-10-08 02:45:58.158865233 +0000
+--- Cargo.toml	2026-10-06
++++ Cargo.toml	2026-10-08
 @@ -10,6 +10,7 @@
      "crates/singlefs-checker",
      "crates/singlefs-checker-tier",

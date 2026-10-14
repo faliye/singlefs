@@ -1,5 +1,5 @@
 run-with-memory-cap: 上限 3G 超过实测峰值 143M 的 2 倍，照理由放行：变异后重编 checker，编译比测试占内存
-run-with-memory-cap: 排队（已等 0 秒，至多 150 秒）：slice 已占 40.1 GiB，这一条要 143 MiB（按峰值表里上一次实测的峰值 143 MiB（2026-10-02T14:31:13Z 量的）算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排队（已等 0 秒，至多 150 秒）：slice 已占 40.1 GiB，这一条要 143 MiB（按峰值表里上一次实测的峰值 143 MiB（2026-10-02 量的）算），总上限 40.1 GiB；账上在跑 4 条
 run-with-memory-cap: 排了 14 秒，起跑（singlefs-memory-cap-3770970-18646160）
    Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-checker)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.98s

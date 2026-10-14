@@ -107,7 +107,7 @@
 
 - 用例：`two_inodes_whose_extents_name_one_data_unit_in_one_root_redden_the_disjoint_ranges_and_the_deletion_accounting_invariants`（`crates/singlefs-harness/tests/checker_cross_links_malformed_nodes_and_mapping_entries.rs:172`），断言改成「["I-5.1", "I-4.7"],」（`crates/singlefs-harness/tests/checker_cross_links_malformed_nodes_and_mapping_entries.rs:225`）：次序是 `IMPLEMENTED_INVARIANTS` 的次序（I-5.1 下标 20、I-4.7 下标 71）；另断言 I-4.7 的说明点名「inode {下一个号} 处于删除中（inode 树里没有它的记录）」，I-5.1 的说明仍含「被同一版引用了两次」。
 - 与判决 F1（取丙）的关系：这份镜像把 1 号的内联数据指针抄给 2 号，2 号在 inode 树里没有记录、extent 树里有数据单元、号不在队列里，正好落在 I-4.7 对象第二样（「extent 树里有数据单元、而 inode 树里没有 nlink ≥ 1 的记录的号」，`.claude/kb/invariants.md:183`）：I-4.7 红是条款的后果，不是误红；判决表 F1 那一行写的「只红自己」坏镜像是「孤儿单元」那一形（`research/prompts/m3-delete-checker-r1-main-verification.md:21`），这份镜像本来就同时违反 I-5.1，改成两条都红对得上。
-- 变异表：第 842 行把必须红的测试名换成新名、第 2616 行新增 I-4.7 一判恒成立（`true ||`），旧名在 `crates/`、kb 里已无引用（只剩 `scripts/hosts/memory-peaks.tsv` 第 8367 行一条本机内存峰值记录，该文件不进 git，过期的只是峰值键，不影响判定）。
+- 变异表：第 842 行把必须红的测试名换成新名、第 2616 行新增 I-4.7 一判恒成立（`true ||`），旧名在 `crates/`、kb 里已无引用（只剩 `~/.local/share/singlefs/memory-peaks.tsv` 第 8367 行一条本机内存峰值记录，该文件不进 git，过期的只是峰值键，不影响判定）。
 - lint：`unit` → `account_unit` 在 `remount` 里四处同时改（`crates/singlefs-harness/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs:119` 起 119、131、132、159），没有行为变化。
 
 判定：N7 一致。推翻它的现象：这份坏镜像上 I-4.7 不红（那说明对象第二样没落实），或除这两条外有第三条红。

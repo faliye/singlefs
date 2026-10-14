@@ -163,7 +163,7 @@
 | 4.3 | 我算的这一次的域与锚点：第一条流 D1-small 45、D1-stride 每大段 7 260、D1-quick 46、段头 4 096；第二条流取样段 11–26 逐段 `[16777215,3,1,8,8,262143,3,1,8,65535,3,1,8,65535,3,1]`、和 17 170 476、按发布 `[16777219, 262163, 65547, 65547]`、D1-small 393 261、D1-quick 52；W 49 与 527；整条第二条流最大一段 268 435 455 | 第十三节 `anchors_r2.py` | 进第七节 A2–A9。行 2 的「域的状态数算出来、写死」在设计时已经做完，跑的时候只核装置算出来的与它相同（Q2a） |
 | 4.4 | 两种读法在今天两条流上给同一个域；在第 1 次旧段形上都给回 37 与 1 441 821；把第二条流整条 78 段当取样段时两种分开（甲取 10 个大段，乙最大值并列、认不出）；甲的门槛取 19 与 24 都得 45，取 25、26 都得 16 777 260 | 第十三节 `anchors_r2_geometry.py` | 行 2 选哪种读法在今天的域上不改任何一格判据，所以两种都登记、文件头挂那一句。几何敏感性（第八节）用的就是这几格 |
 | 4.5 | 第 1 次可行性档：域是第一条流 D1-small 37、两条流 D1-quick 54 + 84、两个 26 写段各段头 4 096；装置 13 条单测全绿；产物 171 行、收尾 `name=done emitted=171`、退出码 0；10 线程约 3 分钟、复跑上限 16G | 第 1 次登记 12.2 F1（第 472 行）；实验页开头一段、「这一段做了什么」「复跑」两节（读了这三处） | 13 条单测与 171 行只当行 4、行 3 的对照形状，不进门槛；3 分钟用来定限时（5.8） |
-| 4.6 | 内存峰值（`scripts/hosts/memory-peaks.tsv`，只在本机成立）：第 1 次 `feasibility` 1 690 304 512 与 1 814 036 480 字节（上限 16G、8G）；第 1 次 13 条单测整跑（`singlefs-harness` 包、10 线程）8 688 500 736 字节；10-04 `cargo test --release --no-fail-fast -p singlefs-checker-tier --bin e156_… --bin e161_…` 记成上限 34 359 738 368（32G 撞顶）；09-29 只跑两条 3 351 248 896 | `grep -n 'e161' scripts/hosts/memory-peaks.tsv` 第 6211、6246、6252–6256、6894、7623、7673 行 | 定 5.8 每条命令的内存上限 |
+| 4.6 | 内存峰值（`~/.local/share/singlefs/memory-peaks.tsv`，只在本机成立）：第 1 次 `feasibility` 1 690 304 512 与 1 814 036 480 字节（上限 16G、8G）；第 1 次 13 条单测整跑（`singlefs-harness` 包、10 线程）8 688 500 736 字节；10-04 `cargo test --release --no-fail-fast -p singlefs-checker-tier --bin e156_… --bin e161_…` 记成上限 34 359 738 368（32G 撞顶）；09-29 只跑两条 3 351 248 896 | `grep -n 'e161' ~/.local/share/singlefs/memory-peaks.tsv` 第 6211、6246、6252–6256、6894、7623、7673 行 | 定 5.8 每条命令的内存上限 |
 | 4.7 | `layer0` 段内单元子集：第一条流段 7 的 24 次单元写全是两态（m = 0），第二条流段 11 同 | `anchors_r2.py` 认 m；crates `in_place_overwrite_torn_state_count.rs` 钉 `("unit_write", 24, 0)`（第三节） | 段头 4 096 = 2¹² 正好是段里前 12 次单元写的全部子集、后 12 次都没落。第 1 次的段头（26 写段，最低两位是三态的系统配置槽写）每 9 个序号走一遍两次轮换的组合，这一次段头里没有系统配置槽撕裂态（它们今天在 D1-small 的段 6）。这是行 3 的段头那几格内容变了的已知原因，第十节 F3 写明怎么记 |
 | 4.8 | 128 位键撞车概率上界：这一次全部域合起来不同键至多 33 947 736 个，n² / 2¹²⁹ ≈ 1.7 × 10⁻²⁴ | 第十三节命令 | 同第 1 次 7.3 最后一条：内容 hash 不靠这个界，逐字节核（V2） |
 
@@ -280,7 +280,7 @@ G1–G5 的臂同第 1 次 5.2（第 193–207 行），这一次不判 G 行（
 | 量 | 怎么算 | 门槛 | 判定 | 对应的行与翻面取值 |
 |---|---|---|---|---|
 | Q2a 域大小 | C3 产物 `name=anchor_stream` 两行的 `d1_small`、`d1_stride`、`d1_quick`、`d1_heads` 与对应的 `*_match`；C2 里 A4 那条与 I-10 那条测试 | 第七节 A4：第一条流 45、7 260、46、4 096；第二条流 393 261、7 260、52、4 096 | 全等记「域写死且装置算得对」；不等走第十一节 V8 或 S3（谁和 crates 一致见那两条） | 行 2 够判条件「域的状态数算出来、写死」 |
-| Q2b 跑得完 | C2、C3 各自的包装退出码；跑完后 `scripts/hosts/memory-peaks.tsv` 里这条命令的峰值行；C3 的挂钟由主 agent 记（只当参考，不进判定） | 退出码不是 250、253 | 是 250 或 253：记「跑不完」，那一条命令点名的是哪一段（C2 看最后一条在跑的测试名，C3 看产物最后一行），走停机条款 S8 | 行 2 翻面观测一「重定后的域在本机内存上限里跑不完」：两种读法域相同，一起翻 |
+| Q2b 跑得完 | C2、C3 各自的包装退出码；跑完后 `~/.local/share/singlefs/memory-peaks.tsv` 里这条命令的峰值行；C3 的挂钟由主 agent 记（只当参考，不进判定） | 退出码不是 250、253 | 是 250 或 253：记「跑不完」，那一条命令点名的是哪一段（C2 看最后一条在跑的测试名，C3 看产物最后一行），走停机条款 S8 | 行 2 翻面观测一「重定后的域在本机内存上限里跑不完」：两种读法域相同，一起翻 |
 | Q2c 没有对象的判据格数 | 逐格核下面九样，数「没有对象」的格：① 五个格（`first_small`、`first_quick`、`first_segment_head`、`second_quick`、`second_segment_head`）的 `name=g1` 行 `states` 各等于 45、46、4 096、52、4 096；② `positive_control_refeed` 的 `refed_state_unit_positions` > 0；③ `first_small` 的 `name=reuse_arm` 里 `arm=k2_consult` 的 `distinct_outcomes` ≥ 2（PC2b 的对象：读出文件与没有文件两种结局都在）；④ 五个格里至少一格 `arm=k4_full` 的 `distinct_outcomes` ≥ 2（PC4b 的对象）；⑤ `positive_control_timing` 六行 `states=1000` 且 `pc3_segment_holds=true`；⑥ `stop_clause_crates` 三格的 `compared_states` > 0（逐个是否相同归 S3 判，这里只问有没有对象）、`stop_clause_crates_per_state` 两格 `states=4096`；⑦ `stop_clause_determinism` 两行 `control_states` > 0；⑧ `positive_control_remove_one_position` 每行 `positions` > 0；⑨ `positive_control_device_memory` 两行都在 | 钉绝对值：= 0 | = 0 记「每格有对象」；≥ 1 逐格列，记「这几格失去对象」 | 行 2 翻面观测二「某个候选让第 1 次登记里某一格判据失去对象」：两种读法域相同，一起翻 |
 | Q2d 读法甲乙给的域是否相同 | 第十三节 `anchors_r2.py` 已算（`A==B first True second True`）；装置只实现选定的一种，不另跑 | — | 报数 | 行 2：说明两种读法在判据上不可分，交主 agent 按 1.4 的区别删一种 |
 
@@ -473,7 +473,7 @@ F3 用的已知差别表（设计时按第五节 5.5 与第四节 4.7 写，跑�
 | `.claude/skills/crash-test/commit-stages.md` | `crates-mutation-replay` grep 命中 3、19、20、22、23、36、40 |
 | `.claude/hooks/heavy-test-guard.sh` | 1–80 里 `run`、`bin`、`checker-tier` 的命中行 |
 | `scripts/hosts/run-with-memory-cap.sh` | 1–40 里退出码、上限的命中行；71–80；grep 25、84、85、93、119、145、187、188、191、249、645、653 |
-| `scripts/hosts/memory-peaks.tsv` | 1–8；`e161` grep 6211、6246、6252–6256、6894、7623、7673 |
+| `~/.local/share/singlefs/memory-peaks.tsv` | 1–8；`e161` grep 6211、6246、6252–6256、6894、7623、7673 |
 | `scripts/experiments/replay.sh` | grep 25、26、216、468、513、514、558、561、562 |
 | `scripts/kb/quote-kb.py` | `--help` 前 20 行 |
 | `scripts/kb/replace-once.py` | 1–30 |
@@ -491,7 +491,7 @@ grep -n '^#' ".claude/kb/experiments/161-崩溃放量的去重与分段耗时.md
 grep -n '^const\|^static\|^pub const\|^    const\|^fn \|^pub fn\|^mod \|^struct\|^enum\|^impl\|#\[test\]\|^    fn \|#\[path\|^use ' $F
 ls crates/singlefs-checker-tier/tests/; grep -n '2, 2, 1, 2, 2, 1' crates/singlefs-checker-tier/tests/*.rs crates/singlefs-harness/tests/*.rs
 grep -rn '14_960_689_284\|14960689284\|16_777_260\|16_777_215\|268_435_455\|file_read_states\|no_file_states' crates/ --include=*.rs | grep -v 'e161_'
-grep -n 'e161' crates/mutations.tsv; grep -n 'e161\|E161' scripts/experiments/replay.sh; grep -n 'e161' scripts/hosts/memory-peaks.tsv
+grep -n 'e161' crates/mutations.tsv; grep -n 'e161\|E161' scripts/experiments/replay.sh; grep -n 'e161' ~/.local/share/singlefs/memory-peaks.tsv
 git diff --cached --stat -- $F crates/mutations.tsv scripts/experiments/replay.sh; git diff --stat -- $F crates/mutations.tsv; git diff --cached -- $F | head -20
 git diff HEAD --numstat -- crates/singlefs-checker/src/image.rs crates/singlefs-checker-tier/src/crash.rs; git log --oneline -1 c3540c02; git log -1 --format='%h %ad' --date=short b970d824
 git rev-parse --short HEAD          # 31e47115

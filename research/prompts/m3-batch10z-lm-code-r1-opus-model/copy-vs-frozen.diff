@@ -1,6 +1,6 @@
 diff -ruN '--exclude=target' /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-core/src/allocator.rs copy/crates/singlefs-core/src/allocator.rs
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-08 07:30:13.751991583 +0000
-+++ copy/crates/singlefs-core/src/allocator.rs	2026-10-08 16:07:13.645007221 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-08
++++ copy/crates/singlefs-core/src/allocator.rs	2026-10-08
 @@ -2087,6 +2087,33 @@
  
      /// 回退的影子账：把一个只被被抛弃根引用的落点，或水位之上没施加的 journal 记录点名、不被候选根与现行账引用的落点（C694 的 C），
@@ -36,8 +36,8 @@ diff -ruN '--exclude=target' /home/fy5090/.local/share/singlefs/work/m3-batch10z
          let device_map = self
              .devices
 diff -ruN '--exclude=target' /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-core/src/mount.rs copy/crates/singlefs-core/src/mount.rs
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-08 15:06:26.796220181 +0000
-+++ copy/crates/singlefs-core/src/mount.rs	2026-10-08 16:40:44.012151498 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-08
++++ copy/crates/singlefs-core/src/mount.rs	2026-10-08
 @@ -1643,6 +1643,11 @@
      // 不豁免它们，第九项与「已分配」就把同一个槽数两遍。
      for placement in placements_named_by_unapplied_journal_records {
@@ -69,8 +69,8 @@ diff -ruN '--exclude=target' /home/fy5090/.local/share/singlefs/work/m3-batch10z
      }
  }
 diff -ruN '--exclude=target' /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-harness/src/gpu_memory_ledger.rs copy/crates/singlefs-harness/src/gpu_memory_ledger.rs
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-harness/src/gpu_memory_ledger.rs	2026-10-08 14:30:25.168572823 +0000
-+++ copy/crates/singlefs-harness/src/gpu_memory_ledger.rs	2026-10-08 16:36:10.232639260 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-harness/src/gpu_memory_ledger.rs	2026-10-08
++++ copy/crates/singlefs-harness/src/gpu_memory_ledger.rs	2026-10-08
 @@ -6895,7 +6895,7 @@
          fn reading(&self) -> CardMemoryReading {
              let occupied = self.occupied_by_this_process_mebibytes();
@@ -280,8 +280,8 @@ diff -ruN '--exclude=target' /home/fy5090/.local/share/singlefs/work/m3-batch10z
 +    }
  }
 diff -ruN '--exclude=target' /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-harness/tests/opus_lm_probe.rs copy/crates/singlefs-harness/tests/opus_lm_probe.rs
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-harness/tests/opus_lm_probe.rs	1970-01-01 00:00:00.000000000 +0000
-+++ copy/crates/singlefs-harness/tests/opus_lm_probe.rs	2026-10-08 16:43:29.805716441 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1/tree/crates/singlefs-harness/tests/opus_lm_probe.rs	1970-01-01
++++ copy/crates/singlefs-harness/tests/opus_lm_probe.rs	2026-10-08
 @@ -0,0 +1,560 @@
 +//! m3-batch10z-lm-code-r1 攻方探针（起点：jk 轮攻方 s2 探针加第十二块实现员的删除动作）；加 Q 一侧的账、谱系片、全部单元三种故障（只在草稿副本里跑）：起点取自第十块实现员 probe_10zj.rs，加前缀、按 txg 取回退目标、R_old 一侧的故障。
 +#![allow(clippy::all, unused, reason = "草稿探针")]

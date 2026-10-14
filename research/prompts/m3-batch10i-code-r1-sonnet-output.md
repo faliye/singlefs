@@ -180,5 +180,5 @@ E1 是定案，E2、E3 管数，E4 管影子账，E5 管解开。E1 之外 kb �
 - 没跑全量 `cargo test -p singlefs-harness`、checker 档、门禁、变异整表（不归子 agent）；变异只套了点名的二进制与 core 库，别的二进制里是否有测试在 P1 到 P4、A2、A3 下红，核不了。
 - 变异表另外 7 行替换（第 2299 行等）没逐行复跑。
 - 没在入库装置上重做数：本报告的变异与读序数是草稿副本上的复跑，按 `.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」那一节，进判决前由主 agent 在入库装置上重做；模型目录里的 `mutrun.py` 与 `p/` 可拷去重跑。
-- 包装在每次跑的时候会往 `scripts/hosts/memory-peaks.tsv` 记峰值（它自己的行为），我没动那份文件。
+- 包装在每次跑的时候会往 `~/.local/share/singlefs/memory-peaks.tsv` 记峰值（它自己的行为），我没动那份文件。
 - 草稿目录 `/tmp/claude-1000/m3-batch10i-code-r1-sonnet/` 里的 `work/`（冻结副本拷贝，19M）与 `target/`（编译目录，26G）：交回前已删（`rm -rf`，之后 `ls` 只剩日志与 `model/`、`progress.md`），不再有；`mut-*.log` 已拷进模型目录 `logs/`，草稿目录里留着原件。

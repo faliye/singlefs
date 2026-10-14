@@ -53,7 +53,7 @@
 
 ## 四、工具的事：字词损坏闸漏判三种形态
 
-本地辩方 `-s1.md` 的 `anewew`、`-s2.md` 的 `observationalomputational` 与 `root-reachableachable`，`scripts/kb/oov-check.py` 与 `corruption-check.py` 都判绿，是腿自己通读发现的（它没把这两份算干净样本）。核查员逐条定位原因：`oov-check.py` 的取词正则只扫 ≥ 9 个字母的词；`observational` 不在词表 `en-words.txt`（来自内核文档）里，前缀切不出来；「词 + 自己尾部片段的复读」（`reachable` + `achable`）四条拼接规则都没覆盖。按 `.claude/singlefs-ai-sop/rules/show-me-test.md`「踩过的坑要做成会失败的检查」，这三种形态该做成判别样本进 `oov-check.py` 的自证；这一轮没改，交用户定时机（另一个会话的本地腿也在用这道闸）。
+本地辩方 `-s1.md` 的 `anewew`、`-s2.md` 的 `observationalomputational` 与 `root-reachableachable`，`scripts/agents/oov-check.py` 与 `corruption-check.py` 都判绿，是腿自己通读发现的（它没把这两份算干净样本）。核查员逐条定位原因：`oov-check.py` 的取词正则只扫 ≥ 9 个字母的词；`observational` 不在词表 `en-words.txt`（来自内核文档）里，前缀切不出来；「词 + 自己尾部片段的复读」（`reachable` + `achable`）四条拼接规则都没覆盖。按 `.claude/singlefs-ai-sop/rules/show-me-test.md`「踩过的坑要做成会失败的检查」，这三种形态该做成判别样本进 `oov-check.py` 的自证；这一轮没改，交用户定时机（另一个会话的本地腿也在用这道闸）。
 
 ## 五、判决
 

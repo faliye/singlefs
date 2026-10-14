@@ -242,7 +242,7 @@ rules-lint exit=0
 3. **攻方第 3c 步「`cargo build` 也经它」**：照 `_m2-rollback-forward-r3-body.md` 第 59 行「编译与跑一律经」，比共用约束严（共用约束写 `cargo build` 不要求）；两处不矛盾，但同一件事两种要求，三方看要不要统一。
 4. **「执行前拒绝的写法」一条的射程**：派发只点了两份 hook，我另收了 `pattern-process-guard.sh` 与 `heavy-test-guard.sh`（第二节写了理由与现查）。⑤⑥⑦ 里没逐个喂的形态是照 hook 文件头归类的，写成「这一类」，没写成穷举。
 5. **main-agent 第 3 条只指不列**：87 号与 E152 装置靠指过去的那张清单罩着，字面不再出现在第 3 条里；主 agent 的上下文里有 `implementation-workflow.md`（`CLAUDE.md` `@` 了它）。
-6. **实现员第 1b 步「副本里跑的也算」**：包装按文件名认（`.claude/hooks/lib_shell_words.py:51` `WRAPPERS_TAKING_ONE_ARGUMENT = {"capped.sh", "run-with-memory-cap.sh"}`），副本里的那一份也认；账与锁在 `${XDG_RUNTIME_DIR}/singlefs-heavy-admission`（`run-with-memory-cap.sh:107`），各副本共用一份。峰值表从不带 `.git` 的副本里跑时落在副本自己的 `scripts/hosts/memory-peaks.tsv`（`run-with-memory-cap.sh:227–231`），与主仓那份不通；没写进定义，推的影响是峰值表记不到主仓。
+6. **实现员第 1b 步「副本里跑的也算」**：包装按文件名认（`.claude/hooks/lib_shell_words.py:51` `WRAPPERS_TAKING_ONE_ARGUMENT = {"capped.sh", "run-with-memory-cap.sh"}`），副本里的那一份也认；账与锁在 `${XDG_RUNTIME_DIR}/singlefs-heavy-admission`（`run-with-memory-cap.sh:107`），各副本共用一份。峰值表从不带 `.git` 的副本里跑时落在副本自己的 `~/.local/share/singlefs/memory-peaks.tsv`（`run-with-memory-cap.sh:227–231`），与主仓那份不通；没写进定义，推的影响是峰值表记不到主仓。
 
 ## 六、顺带看到、没改的（不在这一次的写范围里，交主 agent）
 

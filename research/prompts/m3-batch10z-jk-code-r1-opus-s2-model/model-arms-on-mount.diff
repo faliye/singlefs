@@ -1,5 +1,5 @@
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-jk-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-08 11:35:03.604091552 +0000
-+++ /home/fy5090/.local/share/singlefs/work/m3-batch10z-jk-code-r1-opus-s2/repo/crates/singlefs-core/src/mount.rs	2026-10-08 13:11:36.823497639 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-jk-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-08
++++ /home/fy5090/.local/share/singlefs/work/m3-batch10z-jk-code-r1-opus-s2/repo/crates/singlefs-core/src/mount.rs	2026-10-08
 @@ -2015,7 +2015,11 @@
                          txgs_of_the_roots_taking_the_current_account.push(root.checkpoint_txg);
                          let mut placements =

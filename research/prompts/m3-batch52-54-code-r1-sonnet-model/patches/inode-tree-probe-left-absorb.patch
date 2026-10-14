@@ -1,5 +1,5 @@
---- /home/fy5090/.local/share/singlefs/work/m3-fixes-code-r1/repo/crates/singlefs-core/src/inode_tree.rs	2026-10-09 20:46:09.003044741 +0000
-+++ /home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/pristine/inode_tree_with_probe.rs	2026-10-09 21:07:02.097932759 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-fixes-code-r1/repo/crates/singlefs-core/src/inode_tree.rs	2026-10-09
++++ /home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/pristine/inode_tree_with_probe.rs	2026-10-09
 @@ -1260,6 +1260,16 @@
          );
      }

@@ -127,7 +127,7 @@
 
 - 僵尸判死：一致。`/proc/<pid>/stat` 状态位 Z、X 判成不在：「Some("Z" | "X") => false,」（`crates/singlefs-harness/src/gpu_memory_ledger.rs:519`）；认不出状态或启动时刻的当它还在（宁可多等）；读的时候出了别的错也当它还在。真子进程被杀而没收尸的用例我复跑过（基线 30 条里 `a_killed_process_that_its_parent_has_not_reaped_yet_is_judged_not_alive`）。判活在每一次进锁时做：「.without_the_records_of_dead_processes(&settings.is_alive);」（`crates/singlefs-harness/src/gpu_memory_ledger.rs:843`）。
 - 驱动开销只记一份：一致（K1-1(5) 前半；单测 `a_process_whose_free_memory_reading_already_lacks_the_driver_share_of_a_registered_process_counts_that_share_once` 在基线里过，变异行点名它）。
-- 记账进程死了之后估计不动：F 涨多少、A 掉多少，F + A 不变（推的算术：F′ + A′ = F + A − A₁ + A₁），不会让后来的进程算漏或算重。
+- 记账进程死了之后估计不动：F 涨多少、A 掉多少，F + A 不变（推的算术：F_again + A_again = F + A − A₁ + A₁），不会让后来的进程算漏或算重。
 - 算重的形（读码，量级小）：登记上之后起设备失败的进程，驱动那一份留在账里直到这个进程退出（`registered_processes` 没有注销路径）。只在失败那种进程里发生，对别的进程是偏保守。
 - 算漏 / 算重的主要来源是 K1-1(3) 与 K1-1(4) 那两形（单进程不刷新估计、分配器块粒度），不是这一格点名的两样。
 - 没找到打中这一格的形。什么会推翻它：真子进程被杀之后账里仍有它的借据；或探针里两个先后开账的进程驱动那一份被记两次。

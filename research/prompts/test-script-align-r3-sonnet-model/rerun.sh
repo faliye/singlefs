@@ -43,7 +43,7 @@ awk 'NR==82' scripts/mutation/broad-mutation.py | cut -c1-160
 echo "== L6 记录里的尾巴在 checks-owed 里的命中数"
 for k in '基线就是红' 'BUILTIN_FEEDS' '版本表' '变异表证过红\|按变异表' 'selftest-pattern-words-judged' '函数名'; do echo -n "$k: "; grep -c "$k" .claude/kb/checks-owed.md; done
 echo -n "暂存的 memory-peaks 临时文件: "; git status --short scripts | grep memory-peaks || echo 无
-ls -la scripts/hosts/memory-peaks.tsv.*.partial 2>/dev/null
+ls -la ~/.local/share/singlefs/memory-peaks.tsv.*.partial 2>/dev/null
 
 echo "== L7 / 1.4 C409 引句在 D13 与 checks-owed 里的命中"
 echo -n "D13: "; grep -cF '里程碑收尾、动了崩溃点重放或判器的那一批提交之前 = 全量档全绿' .claude/kb/decisions/13-验证路线.md

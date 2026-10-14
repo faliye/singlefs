@@ -6,7 +6,7 @@
 
 - 正文 `research/prompts/_defs-m2-closeout-r3-body.md`，背景材料 `_defs-m2-closeout-r3-background.md`，附录二 `_defs-m2-closeout-r3-diff.md`，开工快照 `research/prompts/defs-m2-closeout-r3-snapshot/sha256sums.txt`（派核查员之前主 agent `sha256sum -c` 27 个全 OK）。
 - 腿：云端正推 `defs-m2-closeout-r3-sonnet-output.md`（探针 `defs-m2-closeout-r3-sonnet-model/`）；云端攻方 `defs-m2-closeout-r3-opus-output.md`（探针 `defs-m2-closeout-r3-opus-model/`）；本地攻方 `defs-m2-closeout-r3-local-attack-output-s1.md`、`-s2.md` 两份干净（`-void1.md` 被损坏闸判红作废：模型引了带 `**` 的通配路径，闸认成星号落单）。
-- 核查员 `defs-m2-closeout-r3-verifier-output.md`：79 处 ✓75 ✗2 分不清 2 核不动 1。两处 ✗ 都在正推腿：`.claude/gate.d/40-results-cited.sh:19` 应为第 33 行（它自己的 `rerun.sh` 输出就是 33），引第二轮判决第 22 行漏抄一个「号」字；都不改它的判定。分不清两处：正推引修定义的 agent 报告第 639 行（全文 495 行，原句在第 222 行，推的是抄错）；攻方引 `scripts/hosts/memory-peaks.tsv:910`，那一行今天在第 919 行，文件在攻方交回之后被别的会话追加过。两条云端腿的 `rerun.sh` 复跑都逐字节一致。
+- 核查员 `defs-m2-closeout-r3-verifier-output.md`：79 处 ✓75 ✗2 分不清 2 核不动 1。两处 ✗ 都在正推腿：`.claude/gate.d/40-results-cited.sh:19` 应为第 33 行（它自己的 `rerun.sh` 输出就是 33），引第二轮判决第 22 行漏抄一个「号」字；都不改它的判定。分不清两处：正推引修定义的 agent 报告第 639 行（全文 495 行，原句在第 222 行，推的是抄错）；攻方引 `~/.local/share/singlefs/memory-peaks.tsv:910`，那一行今天在第 919 行，文件在攻方交回之后被别的会话追加过。两条云端腿的 `rerun.sh` 复跑都逐字节一致。
 
 ## 二、逐格判
 

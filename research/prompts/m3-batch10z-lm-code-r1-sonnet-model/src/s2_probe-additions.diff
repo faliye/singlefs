@@ -1,5 +1,5 @@
---- /home/fy5090/.local/share/singlefs/work/m3-r1/batch10z-l/measure/crates/singlefs-harness/tests/opus_s2_probe.rs	2026-10-08 14:22:39.280854121 +0000
-+++ tree-core/crates/singlefs-harness/tests/s2_probe.rs	2026-10-08 16:34:54.443158805 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-r1/batch10z-l/measure/crates/singlefs-harness/tests/opus_s2_probe.rs	2026-10-08
++++ tree-core/crates/singlefs-harness/tests/s2_probe.rs	2026-10-08
 @@ -275,6 +275,28 @@
                      if std::env::var("S2_DEBUG").is_ok() { eprintln!("S2DEBUG oldacct locations={:?} ranges={:?}", old.allocation_record_tree_root.locations, out); }
                  }

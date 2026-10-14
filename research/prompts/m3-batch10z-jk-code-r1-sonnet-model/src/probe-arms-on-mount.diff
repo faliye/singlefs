@@ -1,5 +1,5 @@
---- tree-a/crates/singlefs-core/src/mount.rs	2026-10-08 11:35:03.604091552 +0000
-+++ tree-p/crates/singlefs-core/src/mount.rs	2026-10-08 13:09:36.390044979 +0000
+--- tree-a/crates/singlefs-core/src/mount.rs	2026-10-08
++++ tree-p/crates/singlefs-core/src/mount.rs	2026-10-08
 @@ -2070,6 +2070,7 @@
      let ring_length_in_txgs =
          usize::try_from(ROOT_RING_REGIONS * slots_per_region.count()).expect("环长 3S ≤ 48");

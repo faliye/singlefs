@@ -1,5 +1,5 @@
---- m3-batch10-code-r3/tree/crates/singlefs-core/src/mount.rs	2026-10-06 00:13:48.157251678 +0000
-+++ m3-batch10-code-r3-sonnet/work/crates/singlefs-core/src/mount.rs	2026-10-06 00:40:20.376202485 +0000
+--- m3-batch10-code-r3/tree/crates/singlefs-core/src/mount.rs	2026-10-06
++++ m3-batch10-code-r3-sonnet/work/crates/singlefs-core/src/mount.rs	2026-10-06
 @@ -2044,10 +2044,24 @@
              None => {
                  before_the_one_reread.before_rereading();

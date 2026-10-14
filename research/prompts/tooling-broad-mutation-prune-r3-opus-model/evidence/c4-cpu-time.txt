@@ -7,5 +7,5 @@ C4 multi threads=12 cpus=8-15 reps=3 wall-min=17.53 wall-max=21.71 cpu-min=106.6
 C4 multi threads=12 cpus=8-9 reps=3 wall-min=50.23 wall-max=50.54 cpu-min=99.92 cpu-max=100.14 exit-codes=[0]
 C4 multi threads=6 cpus=8-13 siblings-idle reps=3 wall-min=25.46 wall-max=25.64 cpu-min=103.17 cpu-max=104.14 exit-codes=[0]
 C4 multi threads=6 cpus=8-13 spinners-on-siblings-24-29 reps=3 wall-min=51.43 wall-max=51.84 cpu-min=203.98 cpu-max=205.36 exit-codes=[0]
- 14:33:51 up 2 days,  3:52,  4 users,  load average: 5.82, 6.47, 11.25
- 14:48:25 up 2 days,  4:07,  4 users,  load average: 11.70, 8.97, 9.04
+ up 2 days,  4 users,  load average: 5.82, 6.47, 11.25
+ up 2 days,  4 users,  load average: 11.70, 8.97, 9.04

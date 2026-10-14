@@ -4,7 +4,7 @@
 
 ## 0　先说结论
 
-1. 第 4 次重跑跑在「7-2 打进工作区之前」的那一版上（根 `/tmp/claude-1000/e165-r4-segment1b/root`，开工清单文件时间 2026-10-02 17:35 UTC = 日本时间 10-03 02:35；7-2 补丁 10-03 09:39 日本时间才打进，记录第 456 行）。那一版是旧格式：新根段 188、记录头 311、点名项 67（`diff` 原样见第 1 节）。
+1. 第 4 次重跑跑在「7-2 打进工作区之前」的那一版上（根 `/tmp/claude-1000/e165-r4-segment1b/root`，开工清单文件时间是 2026-10-02（东京日期 10-03）；7-2 补丁 10-03 才打进，记录第 456 行）。那一版是旧格式：新根段 188、记录头 311、点名项 67（`diff` 原样见第 1 节）。
 2. 格式改动全部来自 **7-2**；9-3、9-5 两个补丁都没改记录格式、没改 `journal.rs` 与 `recovery.rs`：9-3 只在 GPU 判器里照 7-2 的格式重写读法，9-5 加清扫器与读坏槽处置（第 2 节逐条核）。
 3. E165 装置对记录格式**直接调 `crates/singlefs-core` 的代码**（`JournalRecord::to_bytes` / `parse`、`back_chain_of`、`record_offset`、`scan_journal`、`replay_journal`、`choose_root`），没有抄编解码；本地抄的常量只有 7 个（都不是这三个被改的宽），启动时逐个回比。装置源码只因 `JournalRecord` 多三个字段补了五处结构体字面量。
 4. 要注意的不是宽度而是**施加规则**：施加一条记录时，实例表指针、分配记录树根、卸载记号现在取记录的，不再抄所选根。装置里 r2 / r3 档的 J7 判据与 `to_root_rebuilt_over` 还照旧规则登记，今天与新规则对不上（实现员在源码注释里自己写了，`e165_replay_bounded_enumeration.rs:380-387`）。第 4 次的 root_choice_faults 一族 KJ3 只比六个投影字段（`VersionFields`），不比这三项。
@@ -30,19 +30,19 @@
 
 ## 2　这些改动出自哪一批
 
-出处：`records/2026-09-30-里程碑三开工第一轮.md` 的行（现取）、三份补丁报告、`git log`。提交是按类型分笔的（一笔「格式常量」「核心层」「checker 档」……，2026-10-03 UTC），一笔里混着多批，**从提交号分不出批次**；批次靠记录与补丁文件清单定。
+出处：`records/2026-09-30-里程碑三开工第一轮.md` 的行（现取）、三份补丁报告、`git log`。提交是按类型分笔的（一笔「格式常量」「核心层」「checker 档」……，2026-10-03），一笔里混着多批，**从提交号分不出批次**；批次靠记录与补丁文件清单定。
 
 | # | 改动 | 出自 | 依据 |
 |---|---|---|---|
 | A | 用户定案：新根段回到甲（加三个字段）；窗口五处同改；读错判法先验证 R2 | 第 5 批 5-1 `m3-ring-r3`（终轮三方）的判决，用户 2026-10-02 | 记录第 353 行（「用户 2026-10-02 定：回到甲（三字段）；窗口五处同改；读错判法先验证 R2」）、第 377 行（5-1 行）；判决 `research/prompts/m3-ring-r3-main-verification.md` |
 | B | kb 里的格式常量 311 → 487、188 → 364、67 → 64（三个 `format-const:` 标记） | 第 5 批写回员乙（`/tmp/claude-1000/m3-r1/batch5-kb-b/report.md`）；记录说明「`crates/` 还没跟上，不许单独提交」 | 记录第 368 行（「头 311 → 487、新根段 188 → 364、点名项 67 → 64（三个 format-const 标记改了值）。**这是格式改动、`crates/` 还没跟上」）；第 384 行（「格式常量改了……`crates/` 里还没有根环实现」） |
-| C | **`crates/` 里的常量、编解码、施加、`JournalRecord` 多三个字段、卸载记号位 0 之外当损坏** | **第 7 批 7-2 根环实现**（implementation-writer，补丁 `/tmp/claude-1000/m3-r1/batch7-root-ring/patch/`，报告 `…/patch/report.md`） | 记录第 441 行（7-2 行：「新根段三字段与恢复施加（首个文件、卸载、实例表指针）」）；第 455 行（交回；「卸载记号位 0 之外非 0 当记录损坏」是用户 2026-10-03 弹窗定的第一条）；第 456 行（「7-2 补丁 10-03 09:39 打进工作区」）。补丁文件清单含 `crates/singlefs-format/src/lib.rs`、`crates/singlefs-core/src/journal.rs`、`recovery.rs`、`root_record.rs`、`e165_replay_bounded_enumeration.rs`（命令：`grep '^diff --git' …/batch7-root-ring/patch/crates.patch`）；报告第一节第 1 行「头 487、新根段 364、点名项 64；记录带实例表指针、分配记录树根、卸载记号（4 字节，与根记录 flags 同编码）；恢复施加七项全取记录」 |
+| C | **`crates/` 里的常量、编解码、施加、`JournalRecord` 多三个字段、卸载记号位 0 之外当损坏** | **第 7 批 7-2 根环实现**（implementation-writer，补丁 `/tmp/claude-1000/m3-r1/batch7-root-ring/patch/`，报告 `…/patch/report.md`） | 记录第 441 行（7-2 行：「新根段三字段与恢复施加（首个文件、卸载、实例表指针）」）；第 455 行（交回；「卸载记号位 0 之外非 0 当记录损坏」是用户 2026-10-03 弹窗定的第一条）；第 456 行（「7-2 补丁 10-03 打进工作区」）。补丁文件清单含 `crates/singlefs-format/src/lib.rs`、`crates/singlefs-core/src/journal.rs`、`recovery.rs`、`root_record.rs`、`e165_replay_bounded_enumeration.rs`（命令：`grep '^diff --git' …/batch7-root-ring/patch/crates.patch`）；报告第一节第 1 行「头 487、新根段 364、点名项 64；记录带实例表指针、分配记录树根、卸载记号（4 字节，与根记录 flags 同编码）；恢复施加七项全取记录」 |
 | D | 7-2 为让 E165 装置编得过，补五处 `JournalRecord` 字面量 | 同 C（7-2 报告「清单外动了的文件」表第一行） | 报告原文：「补的值一律取 r1 档那份常量（新加 `fields_beyond_the_projection_carried_by_every_generated_record`），r1 档逐态不变，r2 / r3 档的 J7 判据照……」；今天落在 `e165_replay_bounded_enumeration.rs:380-387`（函数）与五处字面量（第 3 节） |
 | E | 7-2 里另有一项不是格式、但碰了 E165 第 4 次的前提：系统配置读错取 R2（`recovery::system_configuration_witness_is_undecidable`，`recovery.rs:3322`；`mount.rs:5360` 用） | 同 C | 7-2 报告第一节第 3 行；第 4 次实验页第 616 行写着「闸取的是实现今天的取甲……R2 进了代码之后这一族要重跑」（第 4 次实验页 `.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md:616`） |
 | F | 9-3 GPU 簇：GPU 判器里照 C 的格式重写读法（RS5：恢复内核收卸载记号其余位、新根段四条指针头判全、施加末条取七项；RS6：走读内核施加版四条指针全取记录；I-8.10 后三段） | 第 9 批 9-3（补丁 `/tmp/claude-1000/m3-r1/batch9-gpu/patch/`）；**不改 `crates/singlefs-core`、`singlefs-format`** | 补丁文件清单（`grep '^diff --git'`）只有 `crash_judge_checker.wgsl`、`crash_judge_checker_common.wgsl`、`crash_judge_common.wgsl`、`crash_judge_dispatch.rs`、`crash_judge_gpu.rs`、一个 `tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs`；记录第 526 行（9-3 行）、第 538 行（交回）；报告第 2、3 行 |
 | G | 9-5 core 簇：RS1（读坏槽处置）、RS2 用例、RS3 抬 F 上限、`mount_transparency.rs` 改 R2、清扫器 `instance_table_sweep.rs` | 第 9 批 9-5（补丁 `/tmp/claude-1000/m3-r1/batch9-core2/patch/`）；**不改 journal 记录格式、不改 `journal.rs`、`recovery.rs`、format `lib.rs`** | 补丁文件清单只有 `allocator.rs`、`instance_table_sweep.rs`、`lib.rs`、`mount.rs`、`mount_transparency.rs`、`crash_injection.rs` 与几个用例；`grep -n "新根段\|journal.rs\|JOURNAL_\|487\|364\|replay_journal\|recovery.rs\|格式" …/batch9-core2/patch/report.md` 命中 0 行；记录第 528 行、第 541 行 |
 
-落进 git 的提交（2026-10-03 UTC）：格式常量在 `c3e9d9ed 格式常量模块小改`（`git log -1 -- crates/singlefs-format/src/lib.rs`），`journal.rs`、`recovery.rs`、`root_record.rs` 在 `5d637469 核心层源码调整，新增索引与分配相关模块`，E165 装置在 `13ca0a19 崩溃检查档测试与源码对齐，用例按模块与内容起名`（**这是 `e165_replay_bounded_enumeration.rs` 在 git 里的第一笔**：`git log -- 该文件` 只有这一笔，17677 行整份新增；第 4 次那一版的装置只在冻结根里，sha256 `4ecfa61fda6e2c0764e748533bba37abcfbed86c4c7129dac67d7f80539ac031`，与 4 次实验页写的相同）。9-3、9-5 的补丁在工作区里未提交（`git status`：`crash_judge_common.wgsl` 是 `M `，`crash_judge_gpu.rs` 是 `MM`，`instance_table_sweep.rs` 是 `A `）。
+落进 git 的提交（2026-10-03）：格式常量在 `c3e9d9ed 格式常量模块小改`（`git log -1 -- crates/singlefs-format/src/lib.rs`），`journal.rs`、`recovery.rs`、`root_record.rs` 在 `5d637469 核心层源码调整，新增索引与分配相关模块`，E165 装置在 `13ca0a19 崩溃检查档测试与源码对齐，用例按模块与内容起名`（**这是 `e165_replay_bounded_enumeration.rs` 在 git 里的第一笔**：`git log -- 该文件` 只有这一笔，17677 行整份新增；第 4 次那一版的装置只在冻结根里，sha256 `4ecfa61fda6e2c0764e748533bba37abcfbed86c4c7129dac67d7f80539ac031`，与 4 次实验页写的相同）。9-3、9-5 的补丁在工作区里未提交（`git status`：`crash_judge_common.wgsl` 是 `M `，`crash_judge_gpu.rs` 是 `MM`，`instance_table_sweep.rs` 是 `A `）。
 
 ## 3　E165 装置哪几段、哪几个文件读到这些格式
 

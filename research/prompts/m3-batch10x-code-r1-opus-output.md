@@ -292,14 +292,14 @@ $ for i in 1 2 3 4 5; do /usr/bin/time -f "%e s" nvidia-smi --query-gpu=pci.bus_
 
 ```text
 $ timeout 20 journalctl -k -n 1 -q --no-pager | cut -c1-200; echo "rc=$?"
-Oct 07 05:31:46 jplife-black kernel: Memory cgroup out of memory: Killed process 3611919 (python3) total-vm:280136kB, anon-rss:64000kB, file-rss:6856kB, shmem-rss:0kB, UID:1000 pgtables:192kB oom_scor
+Oct 07 〔本机主机名〕 kernel: Memory cgroup out of memory: Killed process 3611919 (python3) total-vm:280136kB, anon-rss:64000kB, file-rss:6856kB, shmem-rss:0kB, UID:1000 pgtables:192kB oom_scor（本机主机名已换掉）
 rc=0
 $ timeout 60 journalctl -k -q --no-pager --since "2026-09-20" | grep -cE 'NVRM.*NV_ERR_NO_MEMORY'
 0
 $ timeout 60 journalctl -k -q --no-pager -b -1 | grep -cE 'NVRM.*NV_ERR_NO_MEMORY'
 39
 $ timeout 60 journalctl -k -q --no-pager -b -1 | grep -E 'NVRM.*NV_ERR_NO_MEMORY' | head -3 | cut -c1-260   （第三行）
-Oct 06 08:29:48 jplife-black kernel: NVRM: GPU1 nvAssertOkFailedNoLog: Assertion failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from rmMemPoolReserve(pCtxBufPool->pMemPool[i], totalSize[i], 0) @ ctx_buf_pool.c:315
+Oct 06 08:29:48 〔本机主机名〕 kernel: NVRM: GPU1 nvAssertOkFailedNoLog: Assertion failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from rmMemPoolReserve(pCtxBufPool->pMemPool[i], totalSize[i], 0) @ ctx_buf_pool.c:315（本机主机名已换掉）
 ```
 
 （第一条 `--since` 只读到这次开机，这次开机以来 0 行；上一次开机 39 行。）

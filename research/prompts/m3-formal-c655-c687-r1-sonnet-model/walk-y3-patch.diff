@@ -1,5 +1,5 @@
---- /tmp/claude-1000/m3-formal-c655-c687-r1/tree/crates/singlefs-checker/src/walk.rs	2026-10-03 21:00:29.060576333 +0000
-+++ work/crates/singlefs-checker/src/walk.rs	2026-10-04 18:35:20.251814381 +0000
+--- /tmp/claude-1000/m3-formal-c655-c687-r1/tree/crates/singlefs-checker/src/walk.rs	2026-10-03
++++ work/crates/singlefs-checker/src/walk.rs	2026-10-04
 @@ -3495,6 +3495,28 @@
          judgements.judge("I-9.16", true, String::new);
          return;

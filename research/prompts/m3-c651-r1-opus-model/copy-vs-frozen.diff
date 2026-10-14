@@ -1,6 +1,6 @@
 diff -ru crates/singlefs-checker/src/image.rs /tmp/claude-1000/m3-c651-r1-attack/repo/crates/singlefs-checker/src/image.rs
---- crates/singlefs-checker/src/image.rs	2026-10-02 10:36:32.329750514 +0000
-+++ /tmp/claude-1000/m3-c651-r1-attack/repo/crates/singlefs-checker/src/image.rs	2026-10-02 10:57:32.728257420 +0000
+--- crates/singlefs-checker/src/image.rs	2026-10-02
++++ /tmp/claude-1000/m3-c651-r1-attack/repo/crates/singlefs-checker/src/image.rs	2026-10-02
 @@ -584,15 +584,70 @@
      slot_zero_of_each_device
          .into_iter()
@@ -76,8 +76,8 @@ diff -ru crates/singlefs-checker/src/image.rs /tmp/claude-1000/m3-c651-r1-attack
  /// I-7.7（系统配置实例代号不低于根环） 按这个读法取每盘的实例代号（2026-09-14 用户定案，C322（取号那一步的屏障怎么放没有条款） 三轮三方）。
  #[must_use]
 diff -ru crates/singlefs-core/src/make_filesystem.rs /tmp/claude-1000/m3-c651-r1-attack/repo/crates/singlefs-core/src/make_filesystem.rs
---- crates/singlefs-core/src/make_filesystem.rs	2026-10-02 10:36:34.486604331 +0000
-+++ /tmp/claude-1000/m3-c651-r1-attack/repo/crates/singlefs-core/src/make_filesystem.rs	2026-10-02 10:57:32.729014272 +0000
+--- crates/singlefs-core/src/make_filesystem.rs	2026-10-02
++++ /tmp/claude-1000/m3-c651-r1-attack/repo/crates/singlefs-core/src/make_filesystem.rs	2026-10-02
 @@ -548,6 +548,10 @@
      );
      let journal_ring_start = DeviceOffsetInBytes(JOURNAL_RING_START_SLOT * SLOT_BYTES);
@@ -90,8 +90,8 @@ diff -ru crates/singlefs-core/src/make_filesystem.rs /tmp/claude-1000/m3-c651-r1
              device.write_zeroes_at(region_start(region_to_clear), root_ring_region_bytes)?;
          }
 diff -ru crates/singlefs-core/src/recovery.rs /tmp/claude-1000/m3-c651-r1-attack/repo/crates/singlefs-core/src/recovery.rs
---- crates/singlefs-core/src/recovery.rs	2026-10-02 10:36:34.486682415 +0000
-+++ /tmp/claude-1000/m3-c651-r1-attack/repo/crates/singlefs-core/src/recovery.rs	2026-10-02 10:57:32.727167866 +0000
+--- crates/singlefs-core/src/recovery.rs	2026-10-02
++++ /tmp/claude-1000/m3-c651-r1-attack/repo/crates/singlefs-core/src/recovery.rs	2026-10-02
 @@ -1016,6 +1016,66 @@
      )
  }

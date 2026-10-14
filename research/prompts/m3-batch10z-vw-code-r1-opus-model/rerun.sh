@@ -32,7 +32,7 @@ t "" atk_k1_ways_out_of_another_pools_report other.log
 # K1-3 反面：有树而文件集合为空的一版上被宽护卡住
 t "" atk_k1_stuck_on_a_version_with_trees_and_no_file k1nofile.log
 # K1-4：要出路那一次读盘出错
-for c in 4:16:13 4:16:20 2:16:17 8:11:40; do t "ATK_STEP_N=1 ATK_CELLS=$c" atk_k1_read_faults_while_asking_for_the_ways_out "askrd-${c//:/-}.log"; done
+for c in 4:16:13 4:16:20 2:16:17 8:11:40; do t "ATK_STEP_N=1 ATK_CELLS=$c" atk_k1_read_faults_while_asking_for_the_ways_out "askrd-${c//:/-}.log"; done  # clock-times:allow 槽:代:行三元组，不是钟点
 # K3：造 F、H 推完之后那一段与 walkSkipped 分开
 t "ATK_RESTICK=1 ATK_OWS=$(seq -s, 0 22) ATK_LEAVES=$(seq -s, 0 90)" atk_k3_walk_stuck_with_a_push_that_goes_through k3walk-restick.log
 # K3：十五个攻方变异（每个从冻结副本另拷一份）

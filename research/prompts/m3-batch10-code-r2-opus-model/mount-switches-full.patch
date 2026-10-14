@@ -1,5 +1,5 @@
---- /tmp/claude-1000/m3-batch10-code-r2/tree/crates/singlefs-core/src/mount.rs	2026-10-05 13:27:06.902324457 +0000
-+++ crates/singlefs-core/src/mount.rs	2026-10-05 14:21:24.099963606 +0000
+--- /tmp/claude-1000/m3-batch10-code-r2/tree/crates/singlefs-core/src/mount.rs	2026-10-05
++++ crates/singlefs-core/src/mount.rs	2026-10-05
 @@ -1955,8 +1955,29 @@
      // 「已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)」）。拒在取号之前，盘上逐字节不变。
      let first_readings = read_every_root_ring_slot_once();

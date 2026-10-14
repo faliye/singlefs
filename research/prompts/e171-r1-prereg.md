@@ -2469,3 +2469,514 @@ $ TZ=Asia/Tokyo date +%F   # 2026-10-08
 10. 新代码避开第二段变异表 W7 的锚点，五张表锚点各恰 1 次。
 
 H30 认 `~/.local/share/singlefs/reuse/e171-r1/`（主 agent 已建目录）；H31 认 `revision_11_placeholders.json` 里填的 9 个 sha256（现核同 `h31.sha256`）。RP2、H33、H34 归拍树之后的执行员。修订 8 那一趟两段起法改用 `run_segment_one_revision_11_multi_host.sh` 与 `run_segment_two_revision_11_multi_host.sh`。
+
+### 修订 12（设计员，2026-10-13；批次 records/2026-10-11-崩溃放量两段与脚本审计.md#E171-流三段长重钉；接修订 11）
+
+<!-- doc-lint:not-numbers RS1 RS2 RS3 RS4 RS5 RS6 RS7 RS8 RA1 RA2 RA3 RX1 S19 F10 Z10 -->
+
+**编号**：现有最大是修订 11（`grep -n '^### 修订'`）；修订 9 仍留给第 8.2 节（修订 8 那一趟的常量与行号），这一条取修订 12。执行员照这一条做完，在末尾写修订 13（只抄第 12.12 节点名要抄的几样，判据一个字不改）。
+**时点**：修订 8 树还没拍，修订 8 那一趟一份产物都没有（「主 agent 认定：修订 11 实现交回」之后登记里没有新的认定）。这一条只改装置里一个本地常量（`LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 的两个数）与它的出处注释，加一行复跑。
+**依据**：问题单 `research/prompts/e171-r1-s3-segment-lengths-questions.md`（sha256 `4699e92615094fa887b4241c1962e6a9168a3b643cd30ff09e22c29ef07bf8bb`，9 行）。调查员报告 `~/.local/share/singlefs/work/investigate-e171-s3-segments/report.md`（sha256 `4e0ff64a…`，记录 `records/2026-10-11-崩溃放量两段与脚本审计.md` 2026-10-13 那一条）只当线索：它的数出自副本，照「判决由主 agent 做，不由投票做」一节不进 kb。
+**原判据原样保留**：第一至十一节、修订 1–11 与其后各条「主 agent 认定」一个字不改；Q1–Q5 的判据、阈值、限时、臂都不动。修订 6 第 6.2 节第 2 条的三条限制是那一次（装根环表）的预言，这一次不套用：段长表照修订 8 第 8.2 节归乙类（「随写流变，按定义现取」「乙类变了不停」），这一次的预言另写在第 12.7 节 RA1。
+
+#### 12.1 问题（问题单逐行）
+
+英文名：沿用第一节第 1 行 `three_oracle_collusion_after_the_oracle_fixes`；装置不另起，改的就是 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`。
+
+问题单第 5–9 行逐字（`sed -n '5,9p'` 原样）：
+
+| # | 问题 | 候选 | 翻面观测 | 够判条件 | 状态 |
+|---|---|---|---|---|---|
+| 1 | 把 `LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 换成今天 crates 现算的那一份（只有下标 15、43 两处不同）之后，`stream-constants --streams 1,2,3` 三条流的全部核对都 `holds=true`、退 0 吗 | 全过 / 哪一条不过 | 任一行 `holds=false` 或 `s1_failed_checks` 非 0 | 重钉后在入库装置上跑一次、产物登记进复跑 | 开着 |
+| 2 | 「互换由退役记录引起」在入库的装置上复现得出来吗：不写退役记录时 crates 现算的段长表与旧钉值逐项相同、写时与新钉值逐项相同 | 复现 / 不复现（哪一侧不同） | 关掉退役记录后段长表与旧钉值有任一项不同 | 入库装置上两种取法各跑一次（怎么关、关在哪一层由登记定；不许为此改 `crates/singlefs-core/` 的产品代码） | 开着 |
+| 3 | 2026-10-05 的 `-s1-stream-constants-r6-r2.out`、`-r6-r3.out` 两份产物里 `crates=` 一栏是旧钉值，复跑登记怎么对待它们 | 留作修订 6 树的历史、页里写明不再是现值 / 作废 / 换成新产物 | 复跑登记按 exact 判这两份而装置已换钉值 ⇒ 必红 | 登记里写明两份的去向、复跑表与页一致 | 开着 |
+
+**读法写死**：
+
+1. 「今天 crates 现算的那一份」= 执行员开跑那一刻的主工作区（HEAD 加暂存区加未暂存的 `crates/`、`Cargo.toml`、`Cargo.lock`、`.cargo`）编出的装置，在 `stream-constants --streams 1,2,3` 里打的 `check=first_file_unlinked_then_inodes_across_one_leaf_segment_lengths` 那一行的 `crates=` 一栏。取值来源是执行员那一趟重钉前的入库产物（第 12.12.2 节「重钉前」那一份），不是主 agent 的日志；日志那一栏只是预期（第 12.4 节第 1 条），对不上走 S19。
+2. 「全部 `holds=true`、退 0」：重钉后那一份产物里 `holds=false` 0 行、`name=verdict s1_failed_checks=0`、`cargo run` 退 0（三样各占一行判，第 12.6 节 RS1）。
+3. 第 2 行的两侧：「写退役记录」那一侧就是第 1 行那两趟（今天的 crates 本来就写）；「不写」那一侧在入库装置上做不到（第 12.5.3 节），判法与翻面观测照样写死（第 12.6 节 RS7），问题单这一行的状态由主 agent 改。
+4. 第 3 行的「复跑登记」= `scripts/experiments/replay.sh` 的表行（`E<号>|二进制|参数|产物|exact` 那种）。两份产物今天没有表行（第 12.4 节第 5 条），所以「按 exact 判 ⇒ 必红」在今天的表上不会出现；去向写死在第 12.12.3 节。
+5. 下标从 0 数，与问题单、调查员报告同。
+
+#### 12.2 被测条款与它引的定义
+
+`scripts/kb/quote-kb.py` 整段抄（命令在第 12.14 节，回读逐字节一致）。判决第三节第 3–6 条是被测条款；第 9 条是同一判决里「哪次发布写退役记录」的接口句，RA1 要用；修订 8 第 8.2 节「三类」是这一次重取常量照的规矩；修订 6 第 6.2 节第 2 条抄来说明为什么不套用；装置三段注释是要改的出处注释与照着写的流二那一段。
+
+**出处 `research/prompts/m3-retire-r1-main-verification.md:42-45`（整段抄，未转述）**
+
+```markdown
+3. **死亡 txg** = 身份消失那次发布的 checkpoint_txg（删空摘掉、合并被吸收那次）；不取 unlink 意图那次，不取最后一版的诞生代号。
+4. **写者只追加**：同一身份跨回退可以有多条，不去重、不覆盖。
+5. **形态照墓碑树**：码 2 根、条目 120 字节、孩子是码 3 打包记录类型 3 容器；容器号从 1 起、下一个号 = 树里最大号 + 1；有新记录的发布才重写开放容器；满了才关；第一版不回收；根满长高。管理员回退照抄 cur（不进 `mount.rs` 回退取 R_old 的那三种树）；崩溃恢复随所选根。
+6. **准入**：退役三个角色归普通分配（同墓碑），不进 ckpt_cost，D28 已定项 4 原文不改。D3 已定项 2 标签 6 的式子加退役那一项：(2 + H_退役 + 1) × 16384 + 35 × n_记录（35 = ⌈32768 ÷ 959⌉；n_记录 数 inode 树里全部记录，含 nlink = 0 的，因为退役记录写在最后一批）；D28 已定项 1 的环窗口 W 加 6 + H_退役（第二节 K4 那一行的上界，不论 M3 连不连锁）。
+```
+
+**出处 `research/prompts/m3-retire-r1-main-verification.md:54-54`（整段抄，未转述）**
+
+```markdown
+9. **M3 接口**：删空摘掉、左吸收右写退役记录；左从右借不写（右片保留身份，分隔 key 改成它这一版的最小 key）。
+```
+
+**出处 `research/prompts/e171-r1-prereg.md:1493-1496`（整段抄，未转述）**
+
+```markdown
+**三类**（修订 9 里每一项写明属于哪一类；下面没点名的项照乙类办，执行员在修订 9 里点名）：
+- **甲：定义钉死，不许变**。流三拆发布那一次 `third_stream_split_publish`（K = 234，第七节 A7，前提是 `INODE_LEAF_RECORDS` 仍为 233、与 ⌊(32768 − 136) ÷ 140⌋ 回比过）；三条流各自的根槽写数（等于各流发布调用的次数，调用序列由读法 2 定）；三条流的分配器带 mkfs 的根环表（修订 6 第 6.2 节第 1 条那三条 S1）；流一 `new_pool_file_creation_operations_equal_build_pool`；Q5 那一形的已确认调用与在途调用（第 2、3 次，装置第 256–257 行）；对拍末段里属于第 3 次调用的写数 6 与它们是三对镜像（修订 5 第 5.2 节，装置第 285、290 行）。甲类任一项不过：停机 S1，两边都查（`.claude/rules/implementation-first.md` 第 4 条），不拍树。
+- **乙：随写流变，按定义现取**。三条流的段长表、写数、全量 / 快档 / 闭式态数；Q5 那一形删的屏障下标、改成普通写的根槽写下标、两个截断点、主取样点末段写数与可撕裂写数与全枚举态数、K 的取法数（`LOCAL_CONFIRMED_LOSS_KEY_CHOICES`）、C 的写数、类数、类的态数、照原路径判的态数。新值取草稿副本那份产物里那一行 `crates=` 那一栏，旧值是 `local=` 那一栏。乙类变了不停：执行员照修订 7 的做法改装置里那几个常量（只改值与它们的出处注释），交主 agent 换进仓里（第 8.1 节第 2 条 e）。Q5 的定义（读法 7 的造法、修订 3 的候选二、修订 5 的 k = 6）不跟着变，变的只是这些定义在新写流上落到的下标与计数。
+- **丙：由乙推出的精确数**。对拍的态数（K 取法数 × 2⁶，装置第 287 行）；阳性对照「判态路 panic 单列」三件的态数（装置第 292–299 行，K 取法数 × 2⁴、× 2⁴、× 2³；修订 6 树上 K 取法数为 72，即 1 152、1 152、576）；第 6 步判法写死的 `q5 states=`（反向取样点，等于 K 取法数）与第 10 步的 `q5 states=`（主取样点全枚举态数）。丙类不另取，由乙类代进式子；第 6、10 步的期望值写进修订 9（H14）。
+```
+
+**出处 `research/prompts/e171-r1-prereg.md:1169-1173`（整段抄，未转述）**
+
+```markdown
+2. **流三本地常量重取**：S1 里流三的段长表、写数、根槽写数（原登记 5.3）是旧造法下实测写死的；根环转过之后回收，单元落点与分配记录树都会变，这几样可能跟着变。拍树之前，第一段执行员在草稿副本（`4d071c12…` 那棵整棵拷出、换上第 31 批合入后的装置）上编、跑 `stream-constants --streams 1,2,3`：
+   - 流一、流二的常量一项都不许变（变了走 S15 ⑤ 的同一个停机，交主 agent）；
+   - 流三的根槽写数与 K 不许变（K = 234，第七节 A7；根槽写数等于发布次数，调用序列没变）；
+   - 段长表与写数只许从「写 txg 26 那条根的那次调用」所在的段起变（与 S15 ⑥ 同一个预言）；
+   - 过了才改仓里装置的那几个常量，新旧对照在拍树之前写进第十二节一条修订（照修订 4 的做法，只抄、判据不改），这一处改动在 S15 ③ 的 hunk 表里单列。
+```
+
+**出处 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:175-178`（整段抄，未转述）**
+
+```markdown
+/// 流二的段长（78 段）：取今天 crates 现算的那一份，即这个装置 `baseline` 的 S1 `fixed_script_through_e_then_unmount_segment_lengths`
+/// 的 `crates=`（`research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export.out` 里 `step=z5`、`check=fixed_script_through_e_then_unmount_segment_lengths` 那一行）。与
+/// `tests/crash_enumeration_fixed_script_stream.rs` 的 `prepare` 里「固定脚本到 E 再正常卸载的段序列」那条断言只差第 33 段（回退 D 那次向前发布）：20 → 24，
+/// 多出的 4 次写是那次发布追加的谱系记录（D18（块里携带什么信息） 已定项 24 第 5 条）。
+```
+
+**出处 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:208-213`（整段抄，未转述）**
+
+```markdown
+// 流三（登记第一节读法 2、5.3「要读 crates/ 常量的量」）：没有用例文件可抄，取本装置 `stream-constants` 模式在冻结之前的主工作区上
+// 现算的那一份（`crates=` 那一栏；2026-10-04 那一次的输出与命令在 E171 第 1 次重跑第一段报告「本地常量怎么来的」一节），之后每一趟基线与
+// crates 现算的回比（S1）。
+// 流三的段长表、写数、全量状态数与闭式在登记修订 6 第 6.2 节第 1 条装上根环表之后重取（txg 26 起照可再分配谓词回收，
+// 分配记录跟着变）：2026-10-05 草稿副本上 `stream-constants` 的 `crates=` 那一栏，新旧对照在登记修订 7。
+// K 另有推的值 234（登记第七节 A7：删完之后 inode 树没有记录、一容器 233 条），不进回比，照实测记。
+```
+
+**出处 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:223-223`（整段抄，未转述）**
+
+```markdown
+/// 流三的段长、写数、根槽写数。
+```
+
+#### 12.3 实现今天的样子
+
+主 agent 观测之外，设计员现查（命令在第 12.14 节）：
+
+- **退役记录在哪写**：`crates/singlefs-core/src/transaction.rs` 第 5415–5417 行注释（引判决第三节第 3–5 条）、第 5431–5441 行 `append_retirement_records_to_the_open_container(…)`，实参第 5434 行 `&retirement_records_of_this_publish(&inode_tree.retired_identities(), self.txg),`；两个函数在 `crates/singlefs-core/src/retirement_tree.rs` 第 106、123 行，退役集合是 `crates/singlefs-core/src/inode_tree.rs` 第 169 行 `retired_identities`（「上一版的叶身份集 − 这一版的叶身份集」）。每次发布都调，退役集合空就整棵照抄。
+- **没有开关**：`grep -c 'env::var\|#\[cfg(feature' crates/singlefs-core/src/transaction.rs` 为 0，`grep -rn 'env::var' crates/singlefs-core/src/ | wc -l` 为 0，`crates/singlefs-core/Cargo.toml` 没有 `[features]` 一节。不改 core 的源码，关不掉退役记录。
+- **core 的未提交改动**：`transaction.rs`、`inode_tree.rs` 暂存区相对 HEAD 共 5 行增 5 行删，全是注释（把「第 N 行」改成按名字引）。
+- **装置**：主工作区那份 sha256 `c556d42d8bb28c04111a4e6a5682280bd343e7d9d57cfd4f04d532ebe63699a2`，12 674 行；HEAD 那份 `ab35105f…`（修订 6 起跑前认定第 1 条那一份）。两者之差全在暂存区（`git diff --cached` 213 行，14 个 hunk：层 0 取样改调 `sample_layer0_states_on_the_cpu`、出处注释从行号改成按名字引等），不是这一条的改动；未暂存的差为 0。
+  - 流三常量：第 208–213 行出处注释，第 223 行 `/// 流三的段长、写数、根槽写数。`，第 224–259 行 `LOCAL_THIRD_STREAM_SEGMENT_LENGTHS`（959 个数，与主 agent 日志那一行 `local=` 逐项相同），第 260–265 行写数、根槽写数、全量 / 快档 / 闭式。用到段长表的只有第 2131 行（S1 回比）与内联用例第 10018、10022 行（共 4 处 `grep -n` 命中）。
+  - 流二的写法（照着写的那一段）：第 175–178 行，doc 注释写「取今天 crates 现算的那一份，即这个装置 … 的 S1 `…_segment_lengths` 的 `crates=`（`research/results/…` 里 … 那一行）。与 … 只差第 33 段：20 → 24，多出的 4 次写是 …」。暂存区那一批正把出处从「第 N 行」改成按名字引，新注释照按名字引写。
+  - `stream-constants` 模式：`run_stream_constants`（第 9752 行起）只驱动、只回比、只打 `E7RESULT` 行，收尾 `name=done emitted=N`，不写导出、不判态；退 3 当且仅当有一条 S1 不过（第 9808–9812 行）。
+  - 删除只在流三：`publish_unlink_intent(`、`publish_unlink_step(` 在装置里只出现在 `run_the_third_stream_after_the_first_file`（第 1753 行起，第 1760、1786 行）与内联用例（第 12139、12163 行）。
+  - 内联用例 `local_segment_tables_reproduce_the_closed_forms_and_write_counts_copied_from_the_tests`（第 9994 行）拿段长表回算闭式与写数；这两样对段长的次序不敏感，下标 15、43 互换它看不出来（第 12.9 节）。
+  - `crates/mutations.tsv` 里点名这份装置的 47 行，锚点在今天那一份上各恰命中 1 次，没有一行落在第 200–270 行。
+- **研究一侧**：`scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/` 里没有文件引段长表（`grep -rln 'LOCAL_THIRD_STREAM_SEGMENT_LENGTHS\|segment_lengths'` 零命中）。修订 8 第 0 步判法 `frozen_tree_lines_revision_8.py` 第 67 行写死 `BASE_DEVICE_SHA256 = "ab35105f…"`，S16 ③ 要求树里装置相对它的每一块有来源，来源只认第 75 行 `BLOCK_SOURCE_KINDS = ("revision_9_constants", "core_refusal_arm", "main_agent_ruling")` 三种（第 12.13 节第 2 条）。
+- **复跑表**：`scripts/experiments/replay.sh` 里 E171 共 19 行（第 373–391 行），`grep -n 'stream-constants\|stream_constants' scripts/experiments/replay.sh` 零命中。装置类驱动的先例是 `e171_device`（第 1056–1059 行）：经内存包装起 `cargo run -q --release -p singlefs-checker-tier --bin …`，只留 `E7RESULT` 行。
+- **f8a9ddaa 之前**：装置文件是 f8a9ddaa（2026-10-10）一次新建的（`git log` 只这一条，12 645 行新增）；父提交 31e47115（2026-10-03）里只有旧装置 `e171_three_oracle_collusion.rs`，它的 core 与 f8a9ddaa 差 22 个文件（13 410 行增、3 628 行删），`retirement_records_of_this_publish` 命中 0 次。
+- **修订 6 树**：`scripts/experiments/target/e171-r1-frozen-tree-revision-6/`（仓里不跟踪的目录）在，`crates/singlefs-core/src/transaction.rs` 里 `retirement_records_of_this_publish` 命中 0 次，装置 sha256 `67e7a549…`。
+
+#### 12.4 跑之前已经存在的数
+
+1. **新钉值在跑之前就知道**。主 agent 日志 `~/.local/share/singlefs/work/commit-2026-10-11/e171-constants-2026-10-13.log`（86 行，`E7RESULT` 83 行，`holds=false` 1 行）那一行带行尾换行的 sha256 是 `aecd11c02041722f185c1cc57f23d9a7cd5c623c1903fd6e97756400d1cbb8c2`，`e171-s3-rerun-1.log`、`-2.log`、`e171-s3-head-only.log` 同。设计员逐项比两栏：959 对 959 段、和都是 5980、只有下标 15（local 20、crates 24）与 43（local 24、crates 20）不同；两栏的 1 + Σ(2^n − 1) 都是 362 808 742；`crates=` 一栏（方括号连同里面的数，不带换行）sha256 `fcec3e5e21df15d48891fc12d6dd366c282fff7306e58bc2144aac6bee2ac66c`，`local=` 一栏 `43d5bd3959c56382bc4bf220e35f964fda89b9d49af702d869bc31048aa6c5ce`，装置第 224–259 行解出来与 `local=` 逐项相同。大于 2 的非 20 段：local 是 (7, 24)、(11, 26)、(39, 24)、(43, 24)，crates 是 (7, 24)、(11, 26)、(15, 24)、(39, 24)。**影响**：第 1 行的答案大半已经在了；这一趟要做的是从一份入库产物里取值、证明别的一项都没动、证明阳性对照仍红。重钉后段长那一行 `holds=true` 是照抄的结果，不算判据（第 12.6 节 RS3）。
+2. **记录里的另一个摘要**：`records/2026-10-11-崩溃放量两段与脚本审计.md` 2026-10-13 那一条写四趟那一行 sha256 `a0c0d3e3…c1b5`；设计员与调查员都复现不出，带换行是 `aecd11c0…`。**影响**：这一条登记只用第 12.14 节那条命令定义的摘要。
+3. **2026-10-05 的三份产物**（入库，2026-10-10 提交 18b30adb）：`…-2026-10-05-s1-stream-constants-r6-r2.out` 与 `-r6-r3.out` 逐字节相同（sha256 `59048ff9f71a6e7a6b2fd980b7000b8db74504fe5e736d022c79c1b261113a26`，83 行），第 72 行 `local=` 与 `crates=` 两栏都是 `43d5bd39…`、`holds=true`；`…-on-the-draft-copy-r6.out` 第 72 行 `crates=` 也是 `43d5bd39…`、`local=` 是修订 7 改之前的旧值（`65573127…`）、`holds=false`。主 agent 日志的 `E7RESULT` 行与 `-r6-r2` 逐行比只差 5 行：第 33、49、65 行（三条流「分配器带 mkfs 的根环表」，两栏都是现算的摘要，两棵树上不同）、第 72 行（段长）、第 82 行（判决）。**影响**：定第 12.12.3 节的去向（两份是另一棵树的读数，不是同一份产物的旧版）；也是第 12.8 节流一、流二那一点的对照。
+4. **调查员副本上的数**（只当线索）：只把退役记录换成空列表后，那一行 `holds=true`、`crates=` 与钉值相同；调用 4 由 12 个单元变 10 个，调用 10、11 都是 12 个；叶 62 起槽 50344 = 62 × 812；段与调用的对应「调用 k（k ≥ 5）的单元写在第 4k − 1 段，调用 2、3、4 在第 7、11、15 段」。**影响**：不进任何门槛；RA1 的段号对应照段长表自己的周期写，注明副本上核过；反事实只进页的「它答不了的（修订 12）」。
+5. **现查的存在性**：`replay.sh` 里 `stream-constants` 零命中；修订 6 树与 f8a9ddaa 的父提交都没有退役记录（第 12.3 节）。**影响**：定第 12.5.3 节与第 12.12.3 节。
+6. 没打开的：`research/results/` 下别的 E171 产物与导出；实验页的结果与结论各节（只读了标题、第 615–618、642–656、750–755、843–850、970–976、1090–1093、1114–1133 行定落点，第 617 行是修订 6 那一趟 `stream-constants` 的判决行原样引）。
+
+#### 12.5 臂、阳性对照、真实基线
+
+##### 12.5.1 臂
+
+- **第 1 行**：唯一的被测对象是重钉后的常量。「全过」一臂：钉值换成今天 crates 的那一份之后，S1 每一条都成立。「哪一条不过」一臂（支持它的人认的样子）：今天的 crates 与修订 6 树之间不止退役记录一处差，钉值只换段长表，别的 S1 照样可能不过；或者 crates 在重钉前后两趟之间又被别的会话改了。这一臂由 RS1、RS2、RS4 各自判。
+- **第 2 行**：「写退役记录 ⇒ 新钉值」一侧就是今天的实现（真实基线）。对面「不是退役记录引起」一臂，支持它的人会说：修订 6 树到今天 core 改了很多处，下标 15、43 的互换可以来自别的改动（分配次序、对齐、根环），也可能是 crates 把退役记录写错了发布（条款要写在删空那次）。前一半入库装置上分不开（第 12.5.3 节）；后一半由 RA1 按条款判。
+
+##### 12.5.2 阳性对照与真实基线
+
+- **阳性对照**：重钉之前那一趟（旧钉值）。它必须红在、也只红在段长那一条，两栏只差下标 15、43（RS5）。这一趟证明 S1 那一条分得出这两处互换；内联用例分不出（第 12.9 节），所以对照只能由真跑担。第 2 行「写」一侧的对照也是这一趟：`crates=` 一栏与旧钉值不同，说明这一栏对这次差别是敏感的。
+- 「不写」一侧不跑，就没有对照，照实写（第 12.5.3 节）。
+- **真实基线**：执行员开跑那一刻的主工作区 crates（读法 1）。
+
+##### 12.5.3 「不写退役记录」那一侧怎么取：写死成「入库装置上做不到」
+
+三个候选逐个判：
+
+| 候选 | 判 | 依据 |
+|---|---|---|
+| 装置自己带开关、只给实验用 | 做不到 | 退役记录由 core 在每次发布里无条件追加（第 12.3 节第 1、2 条：第 5434 行那一处没有参数、特性或环境变量把它关掉）。装置只经 `publish_*` 公开入口驱动 core，能动的只有两样：换历史（不删文件就没有身份消失，但那是另一条流，不是「同一条流不写退役记录」）；或者事后从写流里抹掉那两个单元的写（抹不回分配落点：下标 43 那一处差是落点后推带出来的，抹写之后算出的不是 crates 现算的段长）。两样都答不了第 2 行 |
+| 从 f8a9ddaa 之前没有退役树的那棵树上取 | 做不到 | 仓里没有这样一次提交带着这份装置：装置是 f8a9ddaa 新建的，父提交 31e47115 里没有它；那棵树的 core 与 f8a9ddaa 差 22 个文件、一万多行，装置在那上面编不编得过没核过（它用的 checker 档接口多是同一次提交加的），编得过也分不开「退役记录」与另外 22 个文件的差。仓外的修订 6 树（没有退役记录）同理：那棵树与今天差的不止退役记录（修订 8 准备交回时数的是 140 个文件，「主 agent 认定：修订 8 装置准备交回」），它上面 `crates=` 等于旧钉值（第 12.4 节第 3 条）只说「相容」，不说归因 |
+| 判为入库装置上做不到，副本上的反事实只作线索 | **取这一条** | 上两条都做不到；派发提示不许为此改 `crates/singlefs-core/` 的产品代码。用 `crates/mutations.tsv` 加一行把第 5434 行的实参换成空列表、在副本里跑，也是改 core 的源码（只是临时的），与调查员副本同性质，同样不取 |
+
+**这样判之后**：第 2 行入库装置上只量得到「写」一侧（RS4）；「不写」一侧记「入库装置上做不到」，判法与翻面观测照写（RS7），状态由主 agent 改。副本上的反事实写进实验页「它答不了的（修订 12）」，标明出自副本、没在入库装置上复现（第 12.12.4 节）。要把它做成入库读数，得先在 core 里加一个只给实验用的开关，那是改产品代码，另立一题。
+
+##### 12.5.4 装置写在哪（写死）
+
+**入库装置**：改 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`（第五节 5.3 那一支）。理由：这一行问的是「`crates/` 今天这份代码在流三上算出什么段长」，另写一份独立模型答不了。这一条不新读 `crates/` 的常量：段长表本来就是本地常量，S1 现场拿它与 crates 现算的比，不引 crates 的值。执行员照执行员定义第 2 步第 ④ 条在草稿副本里改，经 `scripts/hosts/compile-then-swap.py` 换进主工作区，不直接写主工作区 `crates/` 下的 `.rs`。
+
+##### 12.5.5 谁跑什么、实现量、挂钟与分段
+
+一段，一个执行员，次序写死（每一步的命令与产物名在第 12.12 节）：
+
+1. 看负载（`ps -o pid,args -u "$(id -u)"`；有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio` 就停下报），记 `git rev-parse HEAD`、`git status --porcelain -- crates Cargo.toml Cargo.lock .cargo`、装置 sha256。
+2. 重钉前那一趟（阳性对照，旧钉值）→ 产物甲。
+3. 草稿副本里改两个数与出处注释 → `compile-then-swap.py` 编过换上 → `--clean`。
+4. 重钉后两趟（同一条命令）→ 第一趟落产物乙，第二趟只比 sha256（RS6）。
+5. 复跑登记、实验页、索引行、变更史、修订 13。
+
+实现量：装置改 2 个数与 4–6 行注释；`replay.sh` 加 1 行表行与 1 个驱动函数；没有新的变异行（第 12.9 节）。cargo 调用：`compile-then-swap.py` 里两条（`cargo build`、`cargo test --no-run`）加三趟 `cargo run`，共 5 次，在执行员定义第 1b 步的 10 次以内。
+
+预计挂钟：2 小时内。依据：派发提示「`stream-constants --streams 1,2,3` 一趟连编译不到 2 分钟」（量的，主 agent 2026-10-13 那一趟；日志里编译那一行 `Finished … in 18.08s`）；三趟合计约 6 分钟。`compile-then-swap.py` 在新的草稿编译目录里第一次编 checker 档包与依赖，推 10–30 分钟（推的，没量过）。合计推不到 1 小时。不超过 2 小时，没有分片、续跑、多机三行。
+
+前台限时：子 agent 每条前台命令不超过 240 秒。调查员在 `/tmp` 上碰到 IO 压力、一趟超过 235 秒被杀（报告「问题 1」末段）。所以三趟都设 `TMPDIR=/dev/shm/<执行员草稿名>`（调查员报告：tmpfs 与 `/tmp` 上那一行 sha256 相同），跑前建、跑后核空了再删。`compile-then-swap.py` 一次编不完被限时杀掉的，同一条命令再起（编译目录留着，接着增量编，主工作区一个字节没写）；起满 3 次还没编完，停下交回，命令写进报告「要主 agent 跑的命令」。任何一趟 `cargo run` 退 124（超时），那一趟不算产物，同样交回，不改放后台。
+
+#### 12.6 报哪些量与各自的判据
+
+产物甲 = 重钉前那一趟，产物乙 = 重钉后第一趟，丙 = 重钉后第二趟（只算 sha256，不入库）。「段长那一行」= `check=first_file_unlinked_then_inodes_across_one_leaf_segment_lengths` 那一行；「一栏的摘要」= 第 12.14 节那条命令算的 sha256（方括号连同里面的数，不带换行）。每个量一行、各判各的，不合成一个 true / false。
+
+| 量 | 怎么算 | 门槛 | 判定 | 对应问题单哪一行、取什么值翻面 |
+|---|---|---|---|---|
+| RS1 | 产物乙里 `grep -c 'holds=false'`；`grep 'name=verdict'` 那一行；`cargo run` 的退出码（三样各报） | `holds=false` 0 行；`s1_failed_checks=0`；退 0 | 三样都到门槛记「全过」，任一样不到记「不过」并逐行列出 `holds=false` 的行 | 第 1 行：任一行 `holds=false` 或 `s1_failed_checks` 非 0 ⇒ 由「全过」翻成「哪一条不过」。门槛不由臂的定义推出：钉值只换了段长表，另外 76 条 S1 成立与否与这次抄值无关（S1 共 77 条，主 agent 日志 `grep -c` 数的） |
+| RS2 | 甲、乙两份去掉段长那一行与 `name=verdict` 那一行之后 `diff` 的行数 | 0 行 | 0 记「别的一项都没动」；非 0 记「动了」，走 S19 | 第 1 行：非 0 ⇒ 这一趟答不了「换钉值之后全过」，因为被比的另一边也变了 |
+| RS3 | 产物乙段长那一行 `local=` 与 `crates=` 两栏逐项比；装置第 224 行起那张表解出来与产物甲 `crates=` 逐项比 | 都相同 | **不是判据**，只核抄对了没有（从臂的定义直接推得出）；不同就是抄错了，改了重来，不算一次结果 | 不对应哪一行 |
+| RS4 | 产物甲、产物乙段长那一行 `crates=` 一栏的摘要 | 两份相同，且等于 `fcec3e5e21df15d48891fc12d6dd366c282fff7306e58bc2144aac6bee2ac66c` | 三者相同记「写一侧与新钉值逐项相同」；甲、乙不同走 S19；甲、乙相同而不等于 `fcec3e5e…`，记「crates 在主 agent 那一趟之后又变了」，新钉值以产物甲为准、照报，不停 | 第 2 行「写」一侧：任一项与新钉值不同 ⇒ 「不复现（写一侧不同）」 |
+| RS5 | 产物甲：`holds=false` 的行数与名字；段长那一行两栏逐项比出的不同下标与值；`s1_failed_checks`；退出码 | `holds=false` 恰 1 行、是段长那一行；不同的下标恰为 15、43，(local, crates) 为 (20, 24)、(24, 20)；`s1_failed_checks=1`；退 3 | 都到记「阳性对照红在点名处」；不到走 S19，不重钉 | 第 1 行的对照：段长那一行在甲里 `holds=true` ⇒ S1 这一条没分出旧钉值，第 1 行的「全过」不作数 |
+| RS6 | 产物乙与丙整份 sha256 | 相同 | 相同记「两趟逐字节相同」（确定性的，两趟只说明没有隐藏状态）；不同走 Z10 | 第 1 行：不同 ⇒ 段长表不是确定的，钉不住 |
+| RS7 | 「不写退役记录」那一侧的段长表 | 入库装置上不量（第 12.5.3 节） | 记「入库装置上做不到」；页里写副本上的反事实是线索 | 第 2 行「不写」一侧：要是将来做成了，与旧钉值（`local=` 一栏摘要 `43d5bd39…`）有任一项不同 ⇒ 「不复现（不写一侧不同）」 |
+| RS8 | 改前、改后各跑一次 `grep -c 'stream-constants-r6-r[23]' scripts/experiments/replay.sh` | 都是 0 | 0 记「两份没有复跑行，按第 12.12.3 节去向办」；非 0 停下交回（有人加过行，去向要主 agent 重定） | 第 3 行：非 0 而那几行按 exact 判 ⇒ 装置换钉值之后与那两份比必红 |
+
+附带（够判后不跑）：没有。
+
+#### 12.7 钉绝对值的断言
+
+**出自被测条款本身**（不符走 F10「条款或实现可能不符」，两边都查）：
+
+- **RA1**：判决第三节第 3 条「死亡 txg = 身份消失那次发布的 checkpoint_txg（删空摘掉、合并被吸收那次）；不取 unlink 意图那次」与第 9 条「删空摘掉、左吸收右写退役记录」⇒ 流三里写退役记录的是删空 inode 叶容器 0 的那一次发布（调用 4，删第一个文件的最后一批；调用从 0 数：0 取号、1 暖机、2 第一个文件、3 意图、4 最后一批、5 起建 inode，共 5 + 235 = 240 次，与 `name=stream_constants` 流三那一行 `calls=240` 对得上），不是意图那一次（调用 3）。在产物甲 `crates=` 一栏上的形态：意图那次的单元写那一段（下标 11）与旧钉值同为 26；最后一批的单元写那一段（下标 15）= 旧钉值 20 + 4，4 = 2 个单元（退役叶容器、退役根；第 5 条「形态照墓碑树」，空树第一次有记录时两样都新写，推的）× 2 块盘（S1 `…_device_count` 那一行 `crates=2`）。段号与调用的对应照段长表自己的周期（每次发布 4 段、单元写在第 4k − 1 段）推，副本上核过（第 12.4 节第 4 条）。下标 43 那一处差出自分配落点，条款推不出，不进 RA1。
+
+**独立算出、用命令核过**（不符走 Z10）：
+
+- **RA2**：新钉值 959 个数、和 5980（= `LOCAL_THIRD_STREAM_WRITES`）、1 + Σ(2^n − 1) = 362 808 742（= `LOCAL_THIRD_STREAM_TWO_STATE_CLOSED_FORM`）。设计员在主 agent 日志那一栏上用第 12.14 节的命令算过；执行员在产物甲那一栏上用同一条命令再算。
+- **RA3**：新钉值是旧钉值的一个排列（两张表排序后相同），逐项不同的下标恰为 {15, 43}。同一条命令算。
+
+#### 12.8 轨迹与几何敏感性
+
+- **轨迹**：不适用。`stream-constants` 是一次确定的驱动加逐项相等，没有哪个量被条款当成跨轮的谓词输入，没有峰值、为正轮数、期末值可报。
+- **几何敏感性**（方向相反的取样点）：流一、流二没有删除（第 12.3 节：`publish_unlink_*` 只在流三），照 RA1 的条款不写退役记录，它们的常量不该因为这一处变。判：产物乙与 `…-2026-10-05-s1-stream-constants-r6-r2.out` 逐行比，不同的行恰为第 33、49、65 行（三条根环表摘要，两栏都现算）与第 72 行（流三段长）；流一、流二的段长、写数、根槽写数、全量 / 快档 / 闭式各行逐字节相同。报两点：流三变、流一流二不变。流一或流二有一行常量不同，照报为「不稳定」，交主 agent（它不翻第 1–3 行，但说明今天 crates 与修订 6 树之间另有一处改动碰到了写流）。
+
+#### 12.9 变异
+
+| 名 | 改坏哪里 | 在哪个取样点上改变输出 | 谁担 |
+|---|---|---|---|
+| RX1 | 段长表下标 15、43 换回旧值（就是旧钉值） | 流三 S1 段长那一行：`holds` 由 true 变 false，`s1_failed_checks` 由 0 变 1，退出码由 0 变 3 | 产物甲（重钉前那一趟就是这条变异在今天 crates 上的读数） |
+
+- 不往 `crates/mutations.tsv` 加行：变异行要点名一条会红的 `cargo test`，而唯一会拿段长表回算的内联用例 `local_segment_tables_reproduce_the_closed_forms_and_write_counts_copied_from_the_tests` 只比和与闭式，两样对次序不敏感，RX1 在它上面不红。这是取样点不敏感（`.claude/rules/mutation-sampling.md` 第三类），不记成等价变异；敏感的取样点是 `stream-constants` 真跑流三，由产物甲担。
+- 已有的 47 行：执行员改完草稿副本、换上之后，照第 12.14 节那条命令逐行核锚点仍各恰命中 1 次、没有一行落进改动的行。
+
+#### 12.10 失败条款
+
+- **F10（条款或实现可能不符）**：RA1 不成立。**什么观测会让它触发**：产物甲段长那一行 `crates=` 一栏下标 11 不是 26，或下标 15 不是 24。触发了就不重钉，两边都查（`.claude/rules/implementation-first.md` 第 4 条）：一边是判决第三节第 3、9 条，一边是 `transaction.rs` 第 5415–5441 行与 `inode_tree.rs` 第 169 行；查的结果与产物甲交主 agent，不默认哪一边对。
+- **第 1 行判成「哪一条不过」**：这不是装置坏了，是正当结果。**什么观测会让它触发**：RS1 三样里任一样不到门槛（产物乙有 `holds=false` 行，或 `s1_failed_checks` 非 0，或退出码非 0）。照实写进页与修订 13，实验页标题与索引状态写「流三段长重钉未过（修订 12）」，不再改钉值去凑。
+
+#### 12.11 作废条款与停机条款
+
+- **Z10（作废，这一趟的产物不算）**：
+  - RA2 或 RA3 在产物甲那一栏上不成立。**触发观测**：第 12.14 节那条命令对产物甲打出的长度不是 959、和不是 5980、闭式不是 362 808 742，或排序后与旧钉值不同。
+  - RS6 两趟不同。**触发观测**：产物乙与丙 sha256 不同。
+  - 内存包装退 245 或 250–254（那一趟的输出不算产物，命令与退出码写进报告，不绕开包装）；产物 `E7RESULT` 行数不等于 `name=done emitted=` 的数。**触发观测**：包装的退出码；`grep -c '^E7RESULT '` 与 `emitted=` 不等。
+- **S19（停机：装置或现场与预期对不上）**：停下交回，不往下重钉、不自己撤回已换上的装置（不做 git 写操作），两边都查（`implementation-first.md` 第 4 条），产物照留。
+  - RS5 不到门槛。**触发观测**：产物甲段长那一行 `holds=true`，或不同的下标不恰是 {15, 43}，或另有别的 `holds=false` 行。
+  - RS2 非 0 行。**触发观测**：甲、乙去掉段长与判决两行之后 `diff` 有输出。
+  - RS4 甲、乙的 `crates=` 摘要不同。**触发观测**：两份段长那一行 `crates=` 一栏摘要不等。
+  - 改装置时主工作区那份被别人改了。**触发观测**：`compile-then-swap.py` 退 3；或换上之前现算的主工作区装置 sha256 与第 1 步记的不同，且差落在第 208–265 行（落在别处的，照报、照常往下）。
+  - RS8 非 0。
+- **不作废也不当结果**：`compile-then-swap.py` 退 1（编不过）——照它报的错改草稿副本再起；只改了两个数与注释还编不过，交回。
+- **够判停机**：产物乙出来、RS1–RS6 判完、RS8 判完，问题单第 1、3 行就够判；第 2 行「写」一侧由 RS4 判完，「不写」一侧判为入库装置上做不到（RS7），这一条不再为它跑任何东西。够判之后没跑的量：RS7「不写」一侧，标「入库装置上做不到，未跑」，对应问题单第 2 行。
+
+#### 12.12 执行员要改的条目与落点
+
+下面 `<草稿>` 是派发提示给执行员的草稿目录，`<日期>` 是跑那天的 `TZ=Asia/Tokyo date +%F`，`D` = `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`。
+
+##### 12.12.1 装置：改哪个常量、注释怎么改（问题单第 1 行）
+
+1. `cp "$D" <草稿>/device-before.rs && cp "$D" <草稿>/device-draft.rs`，记三份 sha256（应同；`device-before.rs` 留作改前那份，只改 `device-draft.rs`；与第 12.3 节的 `c556d42d…` 不同的照记，只要第 208–265 行与今天相同就往下）。
+2. 草稿副本里只改 `LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 的值：取产物甲段长那一行 `crates=` 一栏，按下标逐个换进第 224 行起那张表（用草稿目录里的 Python 按下标替换数字，不手敲；排版不动——今天要换的只有下标 15（20 → 24）与下标 43（24 → 20），都是两位数）。换完核 RS3 第二半（解出来与 `crates=` 逐项相同）与 RA3（只有 {15, 43} 两处变了）。`LOCAL_THIRD_STREAM_WRITES`、`…_ROOT_WRITES`、`…_FULL_STATES`、`…_QUICK_TIER_STATES`、`…_TWO_STATE_CLOSED_FORM`、`…_SPLIT_PUBLISH`、`…_UNLINK_CALLS` 一个字不改（RA2）。
+3. 出处注释照流二的写法（第 175–178 行，按名字引、不写行号）改两处：
+   - 第 223 行 `/// 流三的段长、写数、根槽写数。` 换成下面四行（`<日期>` 填实）：
+     ```
+     /// 流三的段长（959 段）：取今天 crates 现算的那一份，即这个装置 `stream-constants` 的 S1 `first_file_unlinked_then_inodes_across_one_leaf_segment_lengths`
+     /// 的 `crates=`（`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s1-stream-constants-revision-12-before-the-repin.out` 里那一行）。
+     /// 与登记修订 7 那一份（2026-10-05 草稿副本的 `crates=`）只差下标 15（20 → 24）与下标 43（24 → 20），段数、写数、全量状态数与闭式不变；
+     /// 为什么变、哪一处只在副本上核过，见登记修订 12。写数、根槽写数在下面两行。
+     ```
+   - 第 212 行（「…新旧对照在登记修订 7。」）之后加一行：`// 段长表另按登记修订 12 重钉（出处在段长表自己的注释里）；写数、全量状态数与闭式仍是修订 7 那一份。`
+   - 别的注释、别的行一个字不动。
+4. 换进主工作区：`nice -n 19 python3 scripts/hosts/compile-then-swap.py <草稿>/device-draft.rs "$D" --scratch <草稿>`（派发提示给了线程上限 N 的，前面加 `bash scripts/hosts/capped.sh N`）。退 0 才往下；退 3 走 S19；退 1 照第 12.11 节。换上之后 `diff -u <草稿>/device-before.rs "$D" > <草稿>/device-repin.diff`（`device-before.rs` 是第 1 步拷的那份），diff 里只许有第 2、3 条的改动；记换上之后的 sha256。
+5. 第 12.9 节：47 行锚点逐行核恰命中 1 次（命令照第 12.14 节）。
+6. 全部跑完之后 `python3 scripts/hosts/compile-then-swap.py --clean --scratch <草稿>`。
+
+##### 12.12.2 产物与复跑登记（问题单第 1 行）
+
+三趟用同一条命令，只换输出文件名（甲在第 12.12.1 节第 4 步之前跑，乙、丙在之后）：
+
+```
+cd /home/fy5090/code/singlefs && mkdir -p /dev/shm/<草稿名> && (set -o pipefail && TMPDIR=/dev/shm/<草稿名> RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" timeout 235 nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G cargo run -q --offline --release -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes -- stream-constants --streams 1,2,3 | grep '^E7RESULT ' > <草稿>/<甲|乙|丙>.out); echo "exit=$?"
+```
+
+（给了线程上限的，在 `cargo run` 前加 `bash scripts/hosts/capped.sh N`。）退出码：甲应为 3、乙丙应为 0。每趟跑完 `ls -A /dev/shm/<草稿名>` 应为空，最后删掉这个目录。
+
+- **产物甲**（入库）：`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s1-stream-constants-revision-12-before-the-repin.out`。重钉前的装置换上之后就复跑不出，不登记复跑；实验页点名。
+- **产物乙**（入库）：`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s1-stream-constants-revision-12.out`。
+- **丙**：不入库，报告里写它与乙的 sha256。
+- 写之前 `ls` 确认没有同名的，同一天再跑加 `-r2`（执行员定义第 4 步）。这一份不是哪份旧产物的重跑（旧的几份出自修订 6 树），所以不照「旧名接日期」拼。
+- **复跑表行**（`scripts/experiments/replay.sh`，接在第 391 行 `E171|@driver_e171_r1_revision_11_tools_research_mutations||…` 之后）：
+  ```
+  E171|@driver_e171_r1_revision_12_stream_constants||e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s1-stream-constants-revision-12.out|exact
+  ```
+- **驱动函数**（接在 `driver_e171_r1_revision_11_tools_research_mutations()` 那个函数体之后；先 `grep -c 'driver_e171_r1_revision_12' scripts/experiments/replay.sh` 核为 0）：
+  ```
+  # E171 第 1 次重跑·修订 12（登记 `research/prompts/e171-r1-prereg.md` 修订 12）：入库装置 `stream-constants --streams 1,2,3` 在今天的 crates 上回比
+  # 三条流与 Q5 那一形的本地常量（S1）；只留 E7RESULT 行（这一模式不写导出、不带路径），exact 比。crates 改了写流这一行会红：照登记修订 8 第 8.2 节分类重取常量。
+  driver_e171_r1_revision_12_stream_constants() {
+    (set -o pipefail && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
+      bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes -- stream-constants --streams 1,2,3 | grep '^E7RESULT ')
+  }
+  ```
+  乙就是这条管道（多了 `TMPDIR`、`timeout`、`nice`、`--offline`，都不进输出）在今天的仓上的输出，不另跑一次驱动；整份 `replay.sh` 是重型，归提交时的主 agent。`E7RESULT` 行数与 `name=done emitted=` 核一次（应为 83）。
+
+##### 12.12.3 2026-10-05 两份产物的去向（问题单第 3 行）
+
+**定：留作修订 6 树的历史，写明不再是现值。** 不作废：那两份是修订 6 树（装置 `67e7a549…`、core 没有退役记录）上的读数，在那棵树上 S1 全过，修订 6 那一趟第 0 步照它判过（「主 agent 认定：修订 6 起跑前仓里装置与写法偏离」第 5 条）。不换成新产物：新产物乙出自另一份实现，与它们差 4 行以上（第 12.4 节第 3 条），不是同一份产物的新版。
+
+要改的行：
+- `scripts/experiments/replay.sh`：没有（两份本来没有表行，RS8 改前、改后各核一次为 0）。
+- 实验页：第 617 行（「作数的条件与 Q5（修订 6 那一趟）」里 `stream-constants-r6-r3.out:82` 那一句判决行引用）、第 753–754 行与第 845–848 行（两份「产物」清单里的文件名）都说的是修订 6 那一趟当时的事，照「把这句话里的旧值换成新值，它还是不是真话」判为「那一次」，一个字不改。新一节（第 12.12.4 节 a）里写一句：「`…-2026-10-05-s1-stream-constants-r6-r2.out`、`-r6-r3.out`（逐字节相同）是修订 6 树上的读数，`crates=` 是那棵树现算的值、与今天装置的钉值和今天 crates 的现算值都不同；留作修订 6 那一趟的记录，不再是现值；复跑表里本来没有它们的行。」`…-on-the-draft-copy-r6.out` 同样照留，同一句里点名。
+- 本登记：修订 7 与「主 agent 认定」各条不回改。
+
+##### 12.12.4 实验页、索引、变更史（问题单第 1–3 行的落点）
+
+a. **实验页** `.claude/kb/experiments/171-三oracle合谋测试.md`：在 `### 路径与结论登记` 之前（今天第 953 行，`grep -n` 现查）加一节 `### 第 1 次重跑·修订 12：流三段长重钉（<日期>）`，写：
+   1. 为什么：重钉前段长那一行不过——整行抄产物甲的 `name=verdict` 行；段长那一行 4 KB 多，不整行抄，贴第 12.14 节比对命令对产物甲的原样输出（不同的下标与值、和、闭式）。
+   2. 新旧对照：下标 15：20 → 24，下标 43：24 → 20；写数 5980、全量状态数 362 809 947、快档 3127、闭式 362 808 742 不变。
+   3. RS1–RS6、RS8 逐行判定（整行抄产物乙的 `name=verdict` 行；RS2、RS6 贴命令与输出），RA1–RA3 各一行，几何敏感性两点（第 12.8 节）。
+   4. 产物：甲、乙的文件名、行数、sha256；丙的 sha256；甲为什么不登记复跑。
+   5. 复跑：一张表一行（驱动 `driver_e171_r1_revision_12_stream_constants`、产物乙、「装置 `stream-constants --streams 1,2,3`，约 2 分钟」）。
+   6. 问题单第 2 行：写一侧 RS4 的判定；不写一侧「入库装置上做不到」，依据照第 12.5.3 节表的三行各一句。
+   7. 第 12.12.3 节那一句。
+   8. 子节 `#### 它答不了的（修订 12）`：① 「互换由退役记录引起」只在调查员副本上做过（core 里把退役记录换成空列表，报告路径照第 12.4 节第 4 条），副本上的数不进 kb，是线索，入库装置上做不到（第 12.5.3 节）；② 下标 43 为什么跟着变（分配记录树叶 62 的起槽与落点后推 4 个槽）同样只来自副本上的打印，推的；③ 修订 6 树上 `crates=` 等于旧钉值只说相容，那棵树与今天差的不止退役记录；④ 内联用例看不出这次互换（只比和与闭式），能看出的只有 `stream-constants` 真跑。
+b. **标题与索引**：实验页第 1 行标题里的「最终主线的修订 8 那一趟待拍树」改成「最终主线的修订 8 那一趟待拍树，流三段长已按修订 12 重钉」；`.claude/kb/experiments.md` 第 193 行状态列同一处改成一样的字（门禁 doc-experiments 以正文标题为准）。结论（简报）列不改：Q1–Q5 的判定没变。第 1 行判成「哪一条不过」的，两处都写「…待拍树，流三段长重钉未过（修订 12）」。
+c. **影响的决策**：表里 14 行（`awk` 数的）每一行的回看格换成「<日期> 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变」。关系列不改。
+d. **复跑一节**：`### 复跑` 开头那一段的括注（今天写「第 1 次重跑另三行不在这张表里，在「第 1 次重跑第一段·修订 6 那一趟：复跑与入库的跑法」一节」）改成按现数写：`grep -c '^E171|@driver_e171_r1_' scripts/experiments/replay.sh` 数出几行就写几行，指到页里实际的节名（`#### 比对器、复跑与入库的跑法（修订 6 那一趟）`、第二段那一节、新的修订 12 一节）；页里找不到的那几行列进报告，不在这一段另写别的节。
+e. **变更史** `.claude/kb/experiments-history.md`：`## E171（三oracle合谋测试）` 之下、`### 2026-10-07` 之上加 `### <日期>` 一块（新的日期在上；同节同一天只一块，已有同日块就并进去），形态照 `.claude/rules/changelog-format.md`：
+   ```
+   - 第 1 次重跑修订 12：流三段长钉值 `LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 重钉成今天 crates 现算的那一份，只差下标 15（20 → 24）与 43（24 → 20），写数 5980、全量状态数 362 809 947、闭式 362 808 742 不变；重钉后 `stream-constants --streams 1,2,3` <退 0、s1_failed_checks=0 / 照实>，重钉前那一趟退 3、只有流三段长那一条不过。
+     - **依据**：登记 `research/prompts/e171-r1-prereg.md` 修订 12、修订 13；产物 <甲>、<乙>；问题单 `research/prompts/e171-r1-s3-segment-lengths-questions.md`；判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 3 条。
+     - **改前**：`git show <HEAD>:crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 里 `LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 那一段；`git show <HEAD>:.claude/kb/experiments/171-三oracle合谋测试.md`。
+   - 「互换由退役记录引起」入库装置上做不到：不改 core 关不掉退役记录，f8a9ddaa 之前没有带这份装置的树；副本上的反事实只当线索，写进页「它答不了的（修订 12）」。
+     - **依据**：登记修订 12 第 12.5.3 节。
+   - 2026-10-05 的 `…-s1-stream-constants-r6-r2.out`、`-r6-r3.out` 留作修订 6 树的历史，不再是现值；复跑表里本来没有它们的行。
+     - **依据**：登记修订 12 第 12.12.3 节。
+   ```
+   `<HEAD>` 是执行员开跑时 `git rev-parse --short HEAD`（今天 `ce1457c3`）；尖括号里的照实填。
+
+##### 12.12.5 修订 13（执行员写，只抄）
+
+接在本登记末尾，标题 `### 修订 13（执行员，<日期>；只抄修订 12 第 12.12 节点名要抄的几样，判据一个字不改）`，写：开跑时的 HEAD 与 `git status --porcelain` 原样；装置改前、草稿、换上之后三份 sha256 与 `device-repin.diff` 全文；`compile-then-swap.py` 的退出码与末 5 行；甲、乙、丙的退出码、行数、sha256；RS1–RS8 与 RA1–RA3 每一行的读数；47 行锚点核对的输出；复跑表行与驱动函数原样。产物之后发现要改判据的，不写进修订 13，交主 agent。
+
+#### 12.13 待主 agent 认的几处
+
+1. 问题单第 2 行「不写退役记录」一侧取「入库装置上做不到」（第 12.5.3 节），这一行的状态怎么改归主 agent。
+2. 修订 8 第 0 步的 S16 ③：树里装置相对 `ab35105f…` 多了修订 12 这一块（两个数与注释），判法只认 `revision_9_constants`、`core_refusal_arm`、`main_agent_ruling` 三种来源。这一块要由主 agent 写一条认定点名（批次、修订 12 与修订 13、改了什么），填进块表时来源记 `main_agent_ruling`；或者等修订 9 重取常量时并进那一类。二选一归主 agent。暂存区里另一批对装置的改动（层 0 取样等，第 12.3 节）同样要有来源，不在这一条里。
+3. 修订 9（修订 8 那一趟拍树前的常量重取）照旧要做；那时流三段长那一行应已 `holds=true`，再变就照第 8.2 节乙类办。
+4. 装置在主工作区有别的批次的暂存改动；这一条的改动换上之后是未暂存的，怎么暂存、并进哪一次提交归主 agent。装置改了而测试代码没改，`show-me-test` 那一道可能拒收（内联用例看不出这次互换，补一条只把两个数再写一遍的用例是同义反复）；提交说明里写「旧钉值在产物甲上红」怎么确认会红，或者另定，归主 agent。
+5. 产物名不照执行员定义第 4 步的「旧名接日期」拼（第 12.12.2 节），因为不是哪份旧产物的重跑。
+6. 三趟都设 `TMPDIR=/dev/shm/<草稿名>`（第 12.5.5 节）；复跑驱动不设，照 `replay.sh` 的环境跑。
+7. 修订 6 第 6.2 节第 2 条的位置限制（「只许从写 txg 26 那条根的那次调用所在的段起变」）这一次不套用，下标 15 在那一段之前；依据是修订 8 第 8.2 节把段长表归乙类，这一次的预言另写成 RA1。
+
+#### 12.14 读过的文件与跑过的命令
+
+读过的（行号区间；`grep` 命中行也算）：
+- `.claude/agent-common.md` 全文；`.claude/agents/experiment-designer.md`（派发时给的定义）；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–126、`.claude/singlefs-ai-sop/rules/test-script-discipline.md` 1–103、`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–179、`.claude/rules/three-way-inference.md` 1–164、`.claude/rules/mutation-sampling.md` 1–90、`.claude/rules/implementation-first.md` 1–19、`.claude/rules/changelog-format.md` 1–46（都是全文）；`.claude/agents/experiment-runner.md` 30–52。
+- `research/prompts/e171-r1-s3-segment-lengths-questions.md` 全文；`~/.local/share/singlefs/work/investigate-e171-s3-segments/report.md` 全文（187 行）；`research/prompts/m3-retire-r1-main-verification.md` 标题行与 38–56；本登记 1–82、1161–1200、1370–1433、1487–1502、2049–2098、2372–2471 与 `grep -n` 命中行（标题行、`stream-constants`、`修订 9`、`S19`、`Z8`、`Z9`、`F10`）。
+- `records/2026-10-11-崩溃放量两段与脚本审计.md` 标题行与 115–121。
+- 装置（主工作区那份）150–272、1700–1760 的 `fn` 行、9751–9815、7000–7060 与 `grep -n` 命中行；暂存区 `git diff --cached` 全文落在 `<设计员草稿>/device-staged.diff`（213 行），读了 1–60 行与 `@@ -117,44`、`@@ -192,11` 两块。
+- `crates/singlefs-core/src/transaction.rs` 5405–5445 与 `grep -n` 命中行；`crates/singlefs-core/src/inode_tree.rs` 160–185；两份的暂存差（10 行）；`crates/singlefs-core/Cargo.toml` 的 `grep`。
+- `scripts/experiments/replay.sh` 1–80、1040–1066、1320–1370、1706–1760 与 `grep -n` 命中行；`scripts/hosts/compile-then-swap.py` 1–40；`.claude/hooks/agent-write-scope.tsv` 第 11–25 行；`.claude/gate.d/doc-experiments.sh` 的 `grep -n` 命中行（标题与状态、回看格）；`.claude/singlefs-ai-sop/scripts/show-me-test.sh` 的 `grep -n` 命中行；`scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_tree_lines_revision_8.py` 第 67、75 行与 `grep -n` 命中行，`revision_8_placeholders.py` 第 46–47、286、378–390 行。
+- 实验页：标题行，615–618、642–656、750–755、843–850、970–976、1090–1093、1114–1133；`.claude/kb/experiments.md` 第 22–24、192–193 行（截前 600 字）；`.claude/kb/experiments-history.md` 5228–5232、5281–5284 与标题行。
+- 主 agent 日志 `~/.local/share/singlefs/work/commit-2026-10-11/e171-constants-2026-10-13.log` 全部 `E7RESULT` 行（段长那一行只取两栏）；三份 `e171-s3-*.log` 只取段长那一行的 sha256。
+- `research/results/` 下三份 2026-10-05 `stream-constants` 产物：段长那一行、整份 sha256 与行数，以及与主 agent 日志的逐行 `diff`（不同的行只看了前 120 字）。
+
+跑过的命令（原样；输出在设计员报告里）：
+
+```
+$ wc -l <规则文件> research/prompts/e171-r1-prereg.md research/prompts/e171-r1-s3-segment-lengths-questions.md <调查员报告> research/prompts/m3-retire-r1-main-verification.md
+$ grep -n '^#' research/prompts/e171-r1-prereg.md; grep -n 'stream-constants\|segment_lengths\|THIRD_STREAM' research/prompts/e171-r1-prereg.md
+$ git status --porcelain -- <装置> crates/singlefs-core/src/transaction.rs crates/singlefs-core/src/inode_tree.rs scripts/experiments/replay.sh <实验页> <两份索引>; sha256sum <装置> <本登记> <问题单>; git show HEAD:<装置> | sha256sum
+$ git diff --cached -- <装置> > <设计员草稿>/device-staged.diff; git diff -- <装置> | wc -l          # 213 行；未暂存 0
+$ for f in <四份主 agent 日志>; do grep 'check=first_file_unlinked_then_inodes_across_one_leaf_segment_lengths' $f | sha256sum; done   # 四次 aecd11c0…
+$ python3 -I - <装置> <主 agent 日志>      # 装置第 224–259 行解出的表 == 日志 local= 一栏：True，959
+$ python3 -I - <<…  # crates/mutations.tsv 里点名装置的 47 行：锚点命中次数都是 1，没有一行落在第 200–270 行
+$ git log --format='%h %ad %s' --date=short -- <装置>; git show --stat f8a9ddaa; git show f8a9ddaa^:crates/singlefs-core/src/transaction.rs | grep -c retirement_records_of_this_publish   # 0
+$ grep -c 'env::var\|#\[cfg(feature' crates/singlefs-core/src/transaction.rs; grep -rn 'env::var' crates/singlefs-core/src/ | wc -l   # 0、0
+$ grep -c retirement_records_of_this_publish scripts/experiments/target/e171-r1-frozen-tree-revision-6/crates/singlefs-core/src/transaction.rs   # 0
+$ grep -rn 'stream-constants\|stream_constants' scripts/experiments/replay.sh .claude/gate.d/*.sh .claude/gate.d/*.tsv   # 0 行
+$ grep -rln 'stream-constants-r6\|stream-constants-on-the-draft-copy' --exclude-dir=target --exclude-dir=.git .
+$ diff <(grep '^E7RESULT ' <主 agent 日志>) research/results/…-2026-10-05-s1-stream-constants-r6-r2.out   # 第 33、49、65、72、82 行
+$ python3 scripts/kb/quote-kb.py <设计员草稿>/quotes.md <第 12.2 节七段>   # ✓ 7 段，回读逐字节一致
+$ TZ=Asia/Tokyo date +%F   # 2026-10-13
+```
+
+**段长那一行的比对命令**（RS3、RS4、RS5、RA1–RA3 都用它；`<文件>` 是产物或日志）：
+
+```
+grep 'check=first_file_unlinked_then_inodes_across_one_leaf_segment_lengths' <文件> | python3 -I -c '
+import sys,re,hashlib
+l=sys.stdin.read()
+cols={k:re.search(k+r"=(\[[0-9,]*\])",l).group(1) for k in ("local","crates")}
+a,b=([int(x) for x in cols[k][1:-1].split(",")] for k in ("local","crates"))
+cf=lambda s:1+sum(2**n-1 for n in s)
+print("lengths",len(a),len(b),"sums",sum(a),sum(b),"closed",cf(a),cf(b))
+print("differing",[(i,x,y) for i,(x,y) in enumerate(zip(a,b)) if x!=y])
+print("permutation",sorted(a)==sorted(b))
+print("index_11_15","local",a[11],a[15],"crates",b[11],b[15])
+for k in ("local","crates"): print(k+"_sha256",hashlib.sha256(cols[k].encode()).hexdigest())
+print("holds",l.strip().rsplit("holds=",1)[1])'
+```
+
+在主 agent 日志上（设计员跑的，原样）：`lengths 959 959 sums 5980 5980 closed 362808742 362808742`、`differing [(15, 20, 24), (43, 24, 20)]`、`permutation True`、`local_sha256 43d5bd39…`、`crates_sha256 fcec3e5e…`、`holds false`；在 `-r6-r3.out` 上：`differing []`，两栏都是 `43d5bd39…`，`holds true`。
+
+**锚点核对命令**（第 12.9 节；在仓根跑）：
+
+```
+python3 -I - <<'PY'
+D="crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
+src=open(D,encoding="utf-8").read(); rows=[]
+for line in open("crates/mutations.tsv",encoding="utf-8"):
+    f=line.rstrip("\n").split("\t")
+    if line.startswith("#") or len(f)<3 or f[1]!=D: continue
+    a=f[2].replace("\\n","\n"); i=src.find(a)
+    rows.append((f[0][:40],src.count(a),src[:i].count("\n")+1 if i>=0 else None))
+print("rows",len(rows)); print("count!=1",[r for r in rows if r[1]!=1]); print("in 200-270",[r for r in rows if r[2] and 200<=r[2]<=270])
+PY
+```
+
+今天的输出：`rows 47`、`count!=1 []`、`in 200-270 []`。
+
+## 主 agent 认定：修订 12 交回（2026-10-13，执行员动手之前）
+
+对第 12.13 节七处的认定，执行员照此做，不再问：
+
+1. 问题单 `research/prompts/e171-r1-s3-segment-lengths-questions.md` 第 2 行状态改成「够判：入库装置上做不到（修订 12 第 12.5.3 节），副本上的反事实只作线索、写进实验页『它答不了的（修订 12）』」；第 1、3 行等执行员交回后由主 agent 改。
+2. S16 ③ 的来源：修订 12 换的两个数与注释这一块，来源记 `main_agent_ruling`——认定如下：`LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 下标 15 由 20 改 24、下标 43 由 24 改 20，依据是调查员在 f8a9ddaa 原样副本、HEAD ce1457c3、HEAD + 2026-10-13 暂存区三棵树上现跑同一行逐字相同、与 2026-10-05 产物的 `crates=` 一栏只差这两处，机理是 2026-10-09 退役树判决落地后删第一个文件那次多写两个退役单元（`crates/singlefs-core/src/transaction.rs:5434`）；主 agent 现查过四趟日志那一行 sha256 相同（`~/.local/share/singlefs/work/commit-2026-10-11/e171-constants-2026-10-13.log` 等四份）。
+3. 修订 9 照旧要做，不并进这一次。
+4. 装置文件 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 在主工作区已有这一轮（C790 分片补丁）的暂存改动；执行员改完不 git add，由主 agent 整份暂存、并进 2026-10-11 那一轮的提交（同一次提交里 `crates/singlefs-checker-tier/tests/` 带着新用例，show-me-test 按整次改动判；这一块是常量重钉、不另写同义反复的用例，提交说明写明依据是本节第 2 条）。
+5. 产物名照第 12.12.2 节，不照「旧名接日期」的拼法（不是旧产物的重跑）。
+6. 三趟都设 `TMPDIR=/dev/shm/<草稿名>`；复跑驱动不设。
+7. 修订 6 第 6.2 节第 2 条的位置限制这一次不套用，照第 8.2 节乙类办，预言写成 RA1。
+
+### 修订 13（执行员，2026-10-13；只抄修订 12 第 12.12 节点名要抄的几样，判据一个字不改）
+
+<!-- doc-lint:not-numbers RS1 RS2 RS3 RS4 RS5 RS6 RS7 RS8 RA1 RA2 RA3 RX1 S19 F10 Z10 -->
+
+**谁做了什么**：执行员分两段。第一段（草稿目录 `~/.local/share/singlefs/work/e171-r12-runner/`）：看负载、记开跑状态、跑产物甲、在草稿副本里改两个数与注释、`compile-then-swap.py` 连起 3 次都被前台 235 秒限时杀掉（退 124）、按第 12.5.5 节停下交回。主 agent 后台做了第 12.12.1 节第 4 步（`compile-then-swap.py` 换上）与第 12.12.2 节乙、丙两趟 `cargo run`（链脚本 `e171-r12-swap-and-run.sh`，日志 `cts-main.log`）。第二段（草稿目录 `~/.local/share/singlefs/work/e171-r12-runner-2/`）：从现成产物读出 RS1–RS8 与几何敏感性、47 行锚点核对，改 `replay.sh`，写实验页、索引行、变更史与这一节，没起 cargo、没跑门禁、没重跑任何产物。
+
+**开跑时**（第一段，`~/.local/share/singlefs/work/e171-r12-runner/start-state.txt`）：`HEAD=ce1457c35e4d0a0d1646b8a715e13cb5d2551f5e`（短 `ce1457c3`）；`git status --porcelain -- crates Cargo.toml Cargo.lock .cargo` 共 146 行，`M ` 130、`A ` 14、`D ` 2，都在暂存区、没有未暂存的行（第二列全空；装置 `e171_three_oracle_collusion_after_the_oracle_fixes.rs` 与 `e171_three_oracle_collusion.rs` 都是 `M `）。这里只抄条数，146 行原文在上面那个文件里，摘出来的 146 行 sha256 是 `1bdaa9702878c5a3e21bf4928cb860e4d936f0923fed1bae2e5ab08b1383f662`（第二段摘的，只留以状态码起头的行）。负载：没有 `qemu-system`、`vm-bench.sh`、`e152-file-system-benchmark`、`fio`。换上之后装置的 `git status --porcelain` 是 `MM`（暂存区那一版之外多了这一块未暂存的改动）。
+
+**装置三份 sha256**：改前（`device-before.rs`）`c556d42d8bb28c04111a4e6a5682280bd343e7d9d57cfd4f04d532ebe63699a2`；草稿（`device-draft.rs`）与换上之后的主工作区装置都是 `6aa1bb8240633395f4de6122f5d2d343b7f672d1e18e549b0d8e44226e4f9412`。`diff -u` 全文（草稿目录里叫 `device-repin-draft.diff`，27 行，sha256 `605dde9da0a81db4c0b574df9abdd633c17d6ee541d5d70c68081625e59c0124`；这里去掉两行带时间戳的 `---` / `+++` 文件头，空行的单个前导空格也去掉；主 agent 链里 `diff -u` 换上之后的装置得 `device-swapped.diff`，去掉文件头后与它一致，链的 ② 步打了「换上的改动与草稿 diff 一致」，第二段另跑一次同一比较，输出 `same`）：
+
+```diff
+@@ -210,6 +210,7 @@
+ // crates 现算的回比（S1）。
+ // 流三的段长表、写数、全量状态数与闭式在登记修订 6 第 6.2 节第 1 条装上根环表之后重取（txg 26 起照可再分配谓词回收，
+ // 分配记录跟着变）：2026-10-05 草稿副本上 `stream-constants` 的 `crates=` 那一栏，新旧对照在登记修订 7。
++// 段长表另按登记修订 12 重钉（出处在段长表自己的注释里）；写数、全量状态数与闭式仍是修订 7 那一份。
+ // K 另有推的值 234（登记第七节 A7：删完之后 inode 树没有记录、一容器 233 条），不进回比，照实测记。
+
+ /// 一片 inode 叶容器装几条记录：`crates/singlefs-format/src/lib.rs` 的 `INODE_LEAF_RECORDS = 233`
+@@ -220,10 +221,13 @@
+ /// （D22（单元原子性怎么合成） 已定项 8「每盘两槽」）。
+ const LOCAL_SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE: usize = 2;
+ const LOCAL_SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
+-/// 流三的段长、写数、根槽写数。
++/// 流三的段长（959 段）：取今天 crates 现算的那一份，即这个装置 `stream-constants` 的 S1 `first_file_unlinked_then_inodes_across_one_leaf_segment_lengths`
++/// 的 `crates=`（`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-13-s1-stream-constants-revision-12-before-the-repin.out` 里那一行）。
++/// 与登记修订 7 那一份（2026-10-05 草稿副本的 `crates=`）只差下标 15（20 → 24）与下标 43（24 → 20），段数、写数、全量状态数与闭式不变；
++/// 为什么变、哪一处只在副本上核过，见登记修订 12。写数、根槽写数在下面两行。
+ const LOCAL_THIRD_STREAM_SEGMENT_LENGTHS: &[usize] = &[
+-    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 26, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1,
+-    2, 20, 2, 1, 2, 20, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2,
++    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 26, 2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1,
++    2, 20, 2, 1, 2, 20, 2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2,
+     20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20,
+     2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2,
+     1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1,
+```
+
+**`compile-then-swap.py`**：第一段连起 3 次都退 124（前台限时杀掉，`cts-1.log`、`cts-2.log`、`cts-3.log` 都是 0 字节，主工作区装置没动）；主 agent 的后台那一次（`cts-main.log`）退 0（链脚本打的 `compile-then-swap rc=0`，第二段只见到 `cts-main.log`，没见到链脚本的标准输出，退出码由派发提示转述）。`cts-main.log` 末 5 行（第 1 行是内存包装的上限说明，只抄开头）：
+
+```
+run-with-memory-cap: 照 slice singlefs-heavy.slice 已有的总上限 53808726016 字节走（自己按余量 20G 算的是 43071307776 字节，不改 slice 的 MemoryMax）：……
+目标 crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs（包 singlefs-checker-tier，bin e171_three_oracle_collusion_after_the_oracle_fixes）；草稿副本 /home/fy5090/.local/share/singlefs/work/e171-r12-runner/device-draft.rs
+主工作区那份开跑时 sha256 c556d42d8bb28c04111a4e6a5682280bd343e7d9d57cfd4f04d532ebe63699a2；草稿副本 sha256 6aa1bb8240633395f4de6122f5d2d343b7f672d1e18e549b0d8e44226e4f9412
+编译输出：/home/fy5090/.local/share/singlefs/work/e171-r12-runner/compile-then-swap/build-20261013T061531Z-134080.log；编译目录 /home/fy5090/.local/share/singlefs/work/e171-r12-runner/compile-then-swap/target 留着给下一次增量编，收工前 --clean --scratch /home/fy5090/.local/share/singlefs/work/e171-r12-runner
+✓ 编过（cargo build 与 cargo test --no-run，-p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes），已整份换进主工作区 crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs，回读 sha256 6aa1bb8240633395f4de6122f5d2d343b7f672d1e18e549b0d8e44226e4f9412
+```
+
+**甲、乙、丙**（都经 `run-with-memory-cap.sh 8G`、`capped.sh 8`、`TMPDIR=/dev/shm/…`；包装退出码都不在 245 与 250–254）：
+
+| 趟 | 文件 | 退出码 | 行数 | sha256 |
+|---|---|---|---|---|
+| 甲（重钉前，入库） | `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-13-s1-stream-constants-revision-12-before-the-repin.out` | 3 | 83 | `dcf5b558bed1a379437b91efb716a67fc15e5dbe5ac01ac6d4b10c7277137c9c` |
+| 乙（重钉后，入库） | `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-13-s1-stream-constants-revision-12.out` | 0 | 83 | `aef90046e0b565776288e5051c7267f706db4ee718bfceeb66dfb0272dfdd2a1` |
+| 丙（重钉后第二趟，不入库） | `~/.local/share/singlefs/work/e171-r12-runner/bing.out` | 0 | 83 | `aef90046e0b565776288e5051c7267f706db4ee718bfceeb66dfb0272dfdd2a1` |
+
+甲的退出码是第一段执行员亲见的；乙、丙的退出码取自主 agent 链脚本的输出，第二段由派发提示转述，没有见到那份输出文件。行数与 sha256 是第二段用 `wc -l`、`sha256sum` 现算的。
+
+**RS1–RS8、RA1–RA3 每一行的读数**（命令与产物行见实验页「第 1 次重跑·修订 12：流三段长重钉」一节；这里只抄读数）：
+
+| 量 | 读数 | 判定 |
+|---|---|---|
+| RS1 | 乙 `grep -c 'holds=false'` 为 0；`82:E7RESULT name=verdict s1_failed_checks=0`；`cargo run` 退 0 | 全过 |
+| RS2 | 甲乙去掉段长那一行与 `name=verdict` 那一行后 `diff … \| wc -l` 为 0；整份 `diff` 只有 `72c72`、`82c82` | 别的一项都没动 |
+| RS3 | 乙段长那一行 `differing []`、两栏摘要都是 `fcec3e5e21df15d48891fc12d6dd366c282fff7306e58bc2144aac6bee2ac66c`；草稿表与甲 `crates=` 逐项相同（第一段 `rs3-draft-check.txt`：`draft==crates(jia): True 959 5980`） | 抄对了（不是判据） |
+| RS4 | 甲、乙 `crates=` 一栏摘要都是 `fcec3e5e…`，等于登记写的新钉值摘要 | 写一侧与新钉值逐项相同 |
+| RS5 | 甲 `holds=false` 恰第 72 行；`differing [(15, 20, 24), (43, 24, 20)]`；`s1_failed_checks=1`；退 3 | 阳性对照红在点名处 |
+| RS6 | 乙、丙 sha256 都是 `aef90046e0b565776288e5051c7267f706db4ee718bfceeb66dfb0272dfdd2a1` | 两趟逐字节相同 |
+| RS7 | 入库装置上做不到，没量 | 记「入库装置上做不到」 |
+| RS8 | 改前（第一段，`rs8-before.txt`）0；改后（第二段，`replay.sh` 加行之后现算）0 | 两份没有复跑行，按第 12.12.3 节去向办 |
+| RA1 | 甲 `index_11_15 local 26 20 crates 26 24` | 成立，F10 未触发 |
+| RA2 | 甲 `lengths 959 959 sums 5980 5980 closed 362808742 362808742` | 成立 |
+| RA3 | 甲 `permutation True`、`differing [(15, 20, 24), (43, 24, 20)]` | 成立 |
+| RX1 | 甲就是它在今天 crates 上的读数：`holds=false`、`s1_failed_checks=1`、退 3 | 由产物甲担 |
+
+Z10 与 S19 没有触发：RA2、RA3 成立，RS6 相同，乙 `grep -c '^E7RESULT '` 为 83 等于 `name=done emitted=83`，RS5 到门槛，RS2 为 0，RS4 甲乙相同，RS8 为 0，`compile-then-swap.py` 退 0。几何敏感性：乙与 `…-2026-10-05-s1-stream-constants-r6-r2.out` 的 `diff` 只有 `33c33`、`49c49`、`65c65`、`72c72`，流三变、流一流二不变。
+
+**47 行锚点核对**（第 12.14 节的命令，换上之后在仓根跑）：
+
+```
+rows 47
+count!=1 []
+in 200-270 []
+```
+
+**复跑表行与驱动函数原样**（`scripts/experiments/replay.sh`；`grep -c 'driver_e171_r1_revision_12'` 加之前为 0，加之后 2 行命中：表行在第 392 行、函数在第 1418 行；`bash -n` 过）：
+
+```
+E171|@driver_e171_r1_revision_12_stream_constants||e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-13-s1-stream-constants-revision-12.out|exact
+```
+
+```
+# E171 第 1 次重跑·修订 12（登记 `research/prompts/e171-r1-prereg.md` 修订 12）：入库装置 `stream-constants --streams 1,2,3` 在今天的 crates 上回比
+# 三条流与 Q5 那一形的本地常量（S1）；只留 E7RESULT 行（这一模式不写导出、不带路径），exact 比。crates 改了写流这一行会红：照登记修订 8 第 8.2 节分类重取常量。
+driver_e171_r1_revision_12_stream_constants() {
+  (set -o pipefail && RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
+    bash scripts/hosts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes -- stream-constants --streams 1,2,3 | grep '^E7RESULT ')
+}
+```
+
+整份 `replay.sh` 没跑（重型，归提交时的主 agent）。`E7RESULT` 行数 83 与乙的 `name=done emitted=83` 核过一次。判据一个字没改；产物之后没有发现要改判据的地方。

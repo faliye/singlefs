@@ -1,5 +1,5 @@
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-08 22:43:28.402622625 +0000
-+++ /home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet/tree-core/crates/singlefs-core/src/allocator.rs	2026-10-08 23:35:17.255327941 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-08
++++ /home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet/tree-core/crates/singlefs-core/src/allocator.rs	2026-10-08
 @@ -430,6 +430,13 @@
          self.unit_area_start.slot().0 + self.unit_area_slots
      }
@@ -14,8 +14,8 @@
      /// 位图下标上的这一槽三种位（已分配、影子账隔离、抬 F 扣住）一个都没置。
      fn is_unblocked_at_index(&self, index: usize) -> bool {
          !self.allocated[index]
---- /home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-08 22:43:28.403622620 +0000
-+++ /home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet/tree-core/crates/singlefs-core/src/mount.rs	2026-10-09 00:02:46.972597759 +0000
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-08
++++ /home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet/tree-core/crates/singlefs-core/src/mount.rs	2026-10-09
 @@ -1616,6 +1616,9 @@
          };
          for (device, slot, span_slots) in placements.iter().copied() {

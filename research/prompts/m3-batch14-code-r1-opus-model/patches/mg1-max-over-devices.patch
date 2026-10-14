@@ -1,5 +1,5 @@
---- crates/singlefs-core/src/mount.rs	2026-10-03 17:21:13.629094603 +0000
-+++ crates/singlefs-core/src/mount.rs	2026-10-03 19:07:21.240733668 +0000
+--- crates/singlefs-core/src/mount.rs	2026-10-03
++++ crates/singlefs-core/src/mount.rs	2026-10-03
 @@ -2388,7 +2388,7 @@
          .into_iter()
          .collect::<Option<Vec<CheckpointTxg>>>()?

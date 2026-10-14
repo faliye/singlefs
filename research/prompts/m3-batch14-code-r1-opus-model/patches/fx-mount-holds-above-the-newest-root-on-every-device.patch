@@ -1,5 +1,5 @@
---- crates/singlefs-core/src/mount.rs	2026-10-03 17:21:13.629094603 +0000
-+++ crates/singlefs-core/src/mount.rs	2026-10-03 18:36:57.060635015 +0000
+--- crates/singlefs-core/src/mount.rs	2026-10-03
++++ crates/singlefs-core/src/mount.rs	2026-10-03
 @@ -1842,10 +1842,30 @@
                  .map(|unreadable| unreadable.lowest_txg_it_can_hold),
          )

@@ -139,7 +139,7 @@ naming-lint 全仓：开工时「✗ 230 处」（crates 里 108 处），现在
 | `tests/second_transaction_supplement_two_tree_nodes_and_the_central_mapping.rs:1079` | `a_leaf_of_a_two_level_lower_extent_segment_…` | kb 点名（`decisions/08-核心索引结构.md:409`） |
 
 kb 点名的 8 条要改，得 kb 与代码同一轮一起换：书记员改 kb 那几处引文，实现员改名。
-另外，`scripts/hosts/memory-peaks.tsv` 按命令记峰值，里面有 17 个我改过的旧测试名。改名之后那几行查不到，第一次按上限排队；我没改那张表（不在写范围）。
+另外，`~/.local/share/singlefs/memory-peaks.tsv` 按命令记峰值，里面有 17 个我改过的旧测试名。改名之后那几行查不到，第一次按上限排队；我没改那张表（不在写范围）。
 
 ## 六、钉死值：改前 / 改后 / 原因
 
@@ -259,7 +259,7 @@ kb 点名的 8 条要改，得 kb 与代码同一轮一起换：书记员改 kb 
    - 种子与注入点在 `logs/scan-findings.log`；
    - 大档 `#[ignore]` 那条今天跑会红。
 9. **命名剩的 8 个 kb 点名的名字**：要书记员改 kb 引文、实现员同一轮改名（第五节表）。
-   - `scripts/hosts/memory-peaks.tsv` 里有 17 个我改掉的旧测试名，不在写范围，没动。
+   - `~/.local/share/singlefs/memory-peaks.tsv` 里有 17 个我改掉的旧测试名，不在写范围，没动。
 10. **区域表那个 bin**：E142 第十五次跑起不再用它（`scripts/experiments/replay.sh:409` 起的注释）。今天只剩 `first_transaction_region_bytes` 测试钉着表与写清单一致。
     - kb `experiments/142-…` 第 191 行说的「21 行区域清单」是那时的事，要不要注一句，交书记员。
 

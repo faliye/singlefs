@@ -1,6 +1,6 @@
 diff -ru a/crates/singlefs-core/src/allocator.rs b/crates/singlefs-core/src/allocator.rs
---- a/crates/singlefs-core/src/allocator.rs	2026-10-07 16:17:03.384335408 +0000
-+++ b/crates/singlefs-core/src/allocator.rs	2026-10-07 16:17:03.384978211 +0000
+--- a/crates/singlefs-core/src/allocator.rs	2026-10-07
++++ b/crates/singlefs-core/src/allocator.rs	2026-10-07
 @@ -1096,6 +1096,22 @@
              .collect()
      }
@@ -25,8 +25,8 @@ diff -ru a/crates/singlefs-core/src/allocator.rs b/crates/singlefs-core/src/allo
      /// （一个槽两边任一边还罩着就不清），回收出来的槽里它们罩着的补隔离。
      fn placements_the_isolation_still_protects(&self) -> Vec<PlacementOnDevice> {
 diff -ru a/crates/singlefs-core/src/mount.rs b/crates/singlefs-core/src/mount.rs
---- a/crates/singlefs-core/src/mount.rs	2026-10-07 16:17:03.384229560 +0000
-+++ b/crates/singlefs-core/src/mount.rs	2026-10-07 16:17:03.384878692 +0000
+--- a/crates/singlefs-core/src/mount.rs	2026-10-07
++++ b/crates/singlefs-core/src/mount.rs	2026-10-07
 @@ -1505,6 +1505,7 @@
      current_records: &[AllocationRecord],
      placements_named_by_unapplied_journal_records: &[PlacementOnDevice],

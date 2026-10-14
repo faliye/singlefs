@@ -8,7 +8,7 @@
 
 先说三件事：
 1. K3 点名 20-1 原补丁 `/tmp/claude-1000/m3-formal-20-1/patch/crates.patch`，而禁读清单列了 `/tmp/claude-1000/m3-formal-20-1/` 这个目录。两句话在这一个文件上冲突，我只读了这一份补丁文件（它是代码，不是实现员的报告），目录里别的文件没读、没列。要按禁读清单严格算，K3-4 一格作废，主 agent 另核。
-2. 跑 harness 档时包装拒了第二条日常命令（同一会话里 Opus 腿在跑一条），我设了 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`（同一轮两腿各用各的副本与编译目录）放行，没绕开包装；包装自己记峰值表（`scripts/hosts/memory-peaks.tsv`，已在 `.gitignore` 里）。
+2. 跑 harness 档时包装拒了第二条日常命令（同一会话里 Opus 腿在跑一条），我设了 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON`（同一轮两腿各用各的副本与编译目录）放行，没绕开包装；包装自己记峰值表（`~/.local/share/singlefs/memory-peaks.tsv`，已在 `.gitignore` 里）。
 3. 背景材料里的 5999 行是合入后主仓的行号；冻结副本里同一处在 `crates/singlefs-checker-tier/src/crash_injection.rs` 第 5999 至 6003 行（调 `writable_mount_phase_of_each_write` 那一句），下面都用冻结副本的行号。
 
 ## K1　F1、F2、F5 的用例证不证得到点名的接错

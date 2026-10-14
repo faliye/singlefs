@@ -1,5 +1,5 @@
---- crates/singlefs-core/src/mounted_session.rs	2026-10-03 17:21:13.629171533 +0000
-+++ crates/singlefs-core/src/mounted_session.rs	2026-10-03 17:57:38.682931340 +0000
+--- crates/singlefs-core/src/mounted_session.rs	2026-10-03
++++ crates/singlefs-core/src/mounted_session.rs	2026-10-03
 @@ -254,7 +254,7 @@
              allocator,
              previous,

@@ -1985,8 +1985,8 @@ I-5.4：只判最新根那棵账	crates/singlefs-checker/src/walk.rs	        can
 ### diff -u 改前 今天
 
 ````diff
---- /tmp/claude-1000/-home-fy5090-code-singlefs/3c4dae2e-4622-4601-9f3b-0db4b8e8ce93/scratchpad/pin9-before.rs	2026-10-05 22:36:43.315236617 +0000
-+++ crates/singlefs-checker-tier/tests/crash_enumeration_sharded_across_processes.rs	2026-10-05 22:39:47.196185280 +0000
+--- /tmp/claude-1000/-home-fy5090-code-singlefs/3c4dae2e-4622-4601-9f3b-0db4b8e8ce93/scratchpad/pin9-before.rs	2026-10-05
++++ crates/singlefs-checker-tier/tests/crash_enumeration_sharded_across_processes.rs	2026-10-05
 @@ -842,14 +842,14 @@
  /// 计划哈希也是 `0370ad26…`、打的行只比主工作区少 `I-9.28=0/0/46` 那两项）。
  const GOLDEN_PRINTED_LINE_COUNT: usize = 58;

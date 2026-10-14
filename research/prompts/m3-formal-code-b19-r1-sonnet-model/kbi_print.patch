@@ -1,5 +1,5 @@
---- /tmp/claude-1000/m3-formal-code-b19-r1/tree/crates/singlefs-harness/tests/checker_known_bad_images.rs	2026-10-03 18:53:30.779091300 +0000
-+++ ws/crates/singlefs-harness/tests/kbi_print.rs	2026-10-03 19:36:20.888744974 +0000
+--- /tmp/claude-1000/m3-formal-code-b19-r1/tree/crates/singlefs-harness/tests/checker_known_bad_images.rs	2026-10-03
++++ ws/crates/singlefs-harness/tests/kbi_print.rs	2026-10-03
 @@ -6537,15 +6537,13 @@
              "干净镜像上 {invariant} 要真被评估过且成立：{verdicts_on_the_clean_image:?}"
          );

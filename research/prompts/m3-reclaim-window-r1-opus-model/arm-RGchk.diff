@@ -1,6 +1,6 @@
 diff -ru G/crates/singlefs-checker/src/walk.rs RGchk/crates/singlefs-checker/src/walk.rs
---- G/crates/singlefs-checker/src/walk.rs	2026-10-03 21:00:29.060576333 +0000
-+++ RGchk/crates/singlefs-checker/src/walk.rs	2026-10-04 16:51:50.306196338 +0000
+--- G/crates/singlefs-checker/src/walk.rs	2026-10-03
++++ RGchk/crates/singlefs-checker/src/walk.rs	2026-10-04
 @@ -7024,7 +7024,8 @@
  impl OneRevolutionWindow {
      /// txg 落在窗口里：txg > N − 3S，写成 txg + 3S > N（N < 3S 时整个环都在窗口里，不减出负数）。

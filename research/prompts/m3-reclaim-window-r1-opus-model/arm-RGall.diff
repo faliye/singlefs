@@ -1,6 +1,6 @@
 diff -ru G/crates/singlefs-checker/src/walk.rs RGall/crates/singlefs-checker/src/walk.rs
---- G/crates/singlefs-checker/src/walk.rs	2026-10-03 21:00:29.060576333 +0000
-+++ RGall/crates/singlefs-checker/src/walk.rs	2026-10-04 16:36:01.330477966 +0000
+--- G/crates/singlefs-checker/src/walk.rs	2026-10-03
++++ RGall/crates/singlefs-checker/src/walk.rs	2026-10-04
 @@ -7024,7 +7024,8 @@
  impl OneRevolutionWindow {
      /// txg 落在窗口里：txg > N − 3S，写成 txg + 3S > N（N < 3S 时整个环都在窗口里，不减出负数）。
@@ -12,8 +12,8 @@ diff -ru G/crates/singlefs-checker/src/walk.rs RGall/crates/singlefs-checker/src
  }
  
 diff -ru G/crates/singlefs-core/src/root_ring.rs RGall/crates/singlefs-core/src/root_ring.rs
---- G/crates/singlefs-core/src/root_ring.rs	2026-10-03 09:39:03.181537079 +0000
-+++ RGall/crates/singlefs-core/src/root_ring.rs	2026-10-04 16:36:01.329571529 +0000
+--- G/crates/singlefs-core/src/root_ring.rs	2026-10-03
++++ RGall/crates/singlefs-core/src/root_ring.rs	2026-10-04
 @@ -125,10 +125,8 @@
      window_anchor: CheckpointTxg,
      slots_per_region: RootRingSlotsPerRegion,

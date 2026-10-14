@@ -1,5 +1,5 @@
---- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-05 05:44:37.628526347 +0000
-+++ crates/singlefs-core/src/mount.rs	2026-10-05 09:08:06.016977807 +0000
+--- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-05
++++ crates/singlefs-core/src/mount.rs	2026-10-05
 @@ -3708,6 +3708,9 @@
          }
      };
@@ -92,8 +92,8 @@
      // 取号之前在拷贝上取的落点就是真发起来取的：同一个分配器、同一串分配动作。这一串里有一份换下的单元读盘核校验和对不上时不比——
      // 真发时那一份的分配记录留在已分配，拷贝上没做那一步、照常释放，那一槽若在这一串里被回收（崩溃恢复落到环里最旧的那条根、其余全被抛弃），两边可以不同
      // （`dry_run_of_the_publishes_after_acquisition` 的文档注释）；那一格取号之前判的与真发的不是同一串，是这一版留着的缺口。
---- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-05 02:35:11.585199015 +0000
-+++ crates/singlefs-core/src/allocator.rs	2026-10-05 09:08:03.844869938 +0000
+--- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-05
++++ crates/singlefs-core/src/allocator.rs	2026-10-05
 @@ -414,6 +414,12 @@
      /// 不在单元区里的那条根当「账读不出」只计数（代码审阅第 32 条）。
      /// 写成 `checked_sub(...).expect(...)` 而不是直接减：`Cargo.toml` 的 `overflow-checks = true` 下直接减也会炸，
@@ -119,8 +119,8 @@
      /// 抬 F 生效（带新 F 的根落满每块盘）之后，把扣住的回收槽放开。
      pub fn release_reclaim_holds(&mut self) {
          for device_map in &mut self.devices {
---- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/unlink.rs	2026-10-03 03:13:50.535229079 +0000
-+++ crates/singlefs-core/src/unlink.rs	2026-10-05 09:08:06.017435582 +0000
+--- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/unlink.rs	2026-10-03
++++ crates/singlefs-core/src/unlink.rs	2026-10-05
 @@ -114,9 +114,20 @@
  
  /// 现行那一版这个文件还剩 `data_units_remaining` 个数据单元时，下一步是哪一批：剩下的多于一批 ⇒ 释放尾部一批；
@@ -143,8 +143,8 @@
      if data_units_remaining <= data_units_per_batch {
          return UnlinkStep::FinalBatch {
              data_units_released: data_units_remaining,
---- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/mounted_session.rs	2026-10-03 17:21:13.629171533 +0000
-+++ crates/singlefs-core/src/mounted_session.rs	2026-10-05 09:08:06.017605478 +0000
+--- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/mounted_session.rs	2026-10-03
++++ crates/singlefs-core/src/mounted_session.rs	2026-10-05
 @@ -254,7 +254,14 @@
              allocator,
              previous,

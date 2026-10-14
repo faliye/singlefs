@@ -4885,8 +4885,8 @@ index 0000000..7969e80
 ## 删除线第 41 批：恢复内核钉值（不在 crates.patch 里，随第 41 批打）（/home/fy5090/.local/share/singlefs/work/m3-batch41/a/hunks/crash_judge_dispatch.rs.pin-not-in-crates-patch.patch）
 
 ````diff
---- a/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs	2026-10-08 00:10:20.894903693 +0000
-+++ b/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs	2026-10-08 00:10:20.902830877 +0000
+--- a/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs	2026-10-08
++++ b/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs	2026-10-08
 @@ -1339,13 +1339,13 @@
      }
  

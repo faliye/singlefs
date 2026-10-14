@@ -744,7 +744,7 @@ grep -o '^E7RESULT name=w_[a-z0-9_]* arm=[A-Za-z0-9_]*' research/results/e139-ti
 变异表 `scripts/mutation/tables/e139_tightened_floor.tsv` 26 条（原 16 + 新 10）：
 
 ```bash
-cd scripts/experiments && MUTATE_JOBS=3 MUTATE_CARGO_JOBS=2 bash ../mutate.sh e139_tightened_floor e139_tightened_floor.rs ../mutations/e139_tightened_floor.tsv
+cd scripts/experiments && MUTATE_JOBS=3 MUTATE_CARGO_JOBS=2 bash ../mutation/mutate.sh e139_tightened_floor e139_tightened_floor.rs ../mutations/e139_tightened_floor.tsv
 ```
 
 抓到 26、无效 0、没红 0（按每条结果行开头的符号数：`✅` 26、`⏭` 0、`❌` 0、`💥` 0、`⚠️` 0、`⏱` 0、`🧱` 0）；收尾「计数：内存撞顶 0 条（上限 2G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条」，「已还原，基线仍全绿」。

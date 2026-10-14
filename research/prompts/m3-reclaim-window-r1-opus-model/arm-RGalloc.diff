@@ -1,6 +1,6 @@
 diff -ru G/crates/singlefs-core/src/allocator.rs RGalloc/crates/singlefs-core/src/allocator.rs
---- G/crates/singlefs-core/src/allocator.rs	2026-10-03 21:00:29.061329041 +0000
-+++ RGalloc/crates/singlefs-core/src/allocator.rs	2026-10-04 16:36:01.331806091 +0000
+--- G/crates/singlefs-core/src/allocator.rs	2026-10-03
++++ RGalloc/crates/singlefs-core/src/allocator.rs	2026-10-04
 @@ -1051,13 +1051,6 @@
                  } => Some(*highest_txg_it_can_hold),
                  RootRingOccupant::AbandonedRoot { .. } => None,
@@ -16,8 +16,8 @@ diff -ru G/crates/singlefs-core/src/allocator.rs RGalloc/crates/singlefs-core/sr
      }
  
 diff -ru G/crates/singlefs-core/src/mount.rs RGalloc/crates/singlefs-core/src/mount.rs
---- G/crates/singlefs-core/src/mount.rs	2026-10-03 21:14:38.431434968 +0000
-+++ RGalloc/crates/singlefs-core/src/mount.rs	2026-10-04 16:36:01.332694322 +0000
+--- G/crates/singlefs-core/src/mount.rs	2026-10-03
++++ RGalloc/crates/singlefs-core/src/mount.rs	2026-10-04
 @@ -1846,7 +1846,7 @@
      // 窗口里有效根的最小 txg；挂载时读不出的槽按它在窗口里能住的最小 txg 算（门槛只会更低）。
      let oldest_valid_root_in_the_window = roots

@@ -1,5 +1,5 @@
---- jia/crates/singlefs-core/src/allocator.rs	2026-10-05 02:35:11.585199015 +0000
-+++ hi/crates/singlefs-core/src/allocator.rs	2026-10-05 07:52:33.706038863 +0000
+--- jia/crates/singlefs-core/src/allocator.rs	2026-10-05
++++ hi/crates/singlefs-core/src/allocator.rs	2026-10-05
 @@ -972,7 +972,8 @@
      /// 落到这个槽上、不晚于新实例第一次发布之前那个 txg 的最小 txg：回收门槛钉在这里（窗口之外留在洞里的旧根也罩得住）。
      #[must_use]

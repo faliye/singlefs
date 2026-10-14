@@ -14,7 +14,7 @@ const ME: u32 = 4242;
 fn report(free: u64, processes: &[(u32, &str)]) -> String {
     let field = |indent: usize, key: &str, value: &str| format!("{}{:<width$}: {value}\n", " ".repeat(indent), key, width = 55 - indent);
     let mut text = String::from("\n==============NVSMI LOG==============\n\n");
-    text += &field(0, "Timestamp", "Wed Oct  7 15:36:04 2026");
+    text += &field(0, "Timestamp", "Wed Oct  7 2026");
     text += &field(0, "Driver Version", "595.84");
     text += &field(0, "CUDA Version", "13.2");
     text += "\n";

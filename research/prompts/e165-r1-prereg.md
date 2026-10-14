@@ -311,7 +311,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 - 原登记全文（判据怎么定的那几节要读）：它第四节「推 1–推 11」、第七节的闭式状态数、第十二节修订 1、4、7 里的读数（C 小环的甲合法 / 乙合法数；对照界 n ≤ 3 里 A-互 的 1 024、3 424、2 400；A 域 n ≤ 3 的 788 838 态里 548 640 态含序号 0 的记录）。都不是 R1–R3 的答案，R1 比的是整份字节。
 - 实验页 `.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md` 只读了「这一段做了什么」「复跑」两节（第 18–25、209–214 行），读到：阳性对照合法历史一族 35 个读数、对抗一族 10 个；自检 13 项；`--list-items` 列 26 个变体；第二段在 `--jobs 4 --threads 4` 上整段 32 分钟、同机负载均值 17–90；第一段 10 线程与 7 线程、16 线程与 7 线程各跑两遍 `E7RESULT` 行逐字节相同。实验页的结果、结论、逐行判定、第二段表各节一行没读；`research/results/` 下 E165 的产物只算了 sha256、数了第二段产物里 `name=kill_bound ` 起头的行数（28），没读内容。
-- `scripts/hosts/memory-peaks.tsv` 里 E165 那几行（grep 命中，峰值与上限：第一段 `light` 11 MiB 级、第二段变体编译 1.4 GiB 级）。只用来知道量级，不进判据。
+- `~/.local/share/singlefs/memory-peaks.tsv` 里 E165 那几行（grep 命中，峰值与上限：第一段 `light` 11 MiB 级、第二段变体编译 1.4 GiB 级）。只用来知道量级，不进判据。
 - 5-1 实现员报告 `/tmp/claude-1000/m3-verus-codestyle-5-1/patch/report.md`「变异表改动」一节（第 177–214 行）：它对改锚点的三行写「语义同」，是它的判断，不是这个实验的答案。
 
 **设计时自己算出来的（命令在第十三节，可以重跑）**
@@ -622,7 +622,7 @@ R1 另钉一样：比对命令先把两份文件的行数各报出来（`wc -l`�
 | `scripts/experiments/e165-pin-red-examples.py` | 1–45 |
 | `.claude/gate.d/e165-pinned-red-examples.tsv` | 文件头注释前 8 行；非注释行数（151） |
 | `scripts/experiments/replay.sh` | grep `e165` 命中的 222–225、522–545 |
-| `scripts/hosts/memory-peaks.tsv` | grep `e165` 命中的 269、323、329、330、367、940、947、950–954、957–959、1262、2994–2997 |
+| `~/.local/share/singlefs/memory-peaks.tsv` | grep `e165` 命中的 269、323、329、330、367、940、947、950–954、957–959、1262、2994–2997 |
 | `research/prompts/m3-verus-land-code-r3-snapshot/crates-sha256.txt` | 前 5 行；整份经 `sha256sum -c` |
 | `/tmp/claude-1000/m3-verus-codestyle-5-1/patch/mutations-replacements.tsv` | 4 行各前 400 字符 |
 | `/tmp/claude-1000/m3-verus-codestyle-5-1/patch/report.md` | 标题行；177–214 |

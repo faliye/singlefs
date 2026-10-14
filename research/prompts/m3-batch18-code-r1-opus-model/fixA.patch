@@ -1,5 +1,5 @@
---- a/crates/singlefs-checker/src/walk.rs	2026-10-05 04:01:36.308137249 +0000
-+++ b/crates/singlefs-checker/src/walk.rs	2026-10-05 05:09:36.816629074 +0000
+--- a/crates/singlefs-checker/src/walk.rs	2026-10-05
++++ b/crates/singlefs-checker/src/walk.rs	2026-10-05
 @@ -7908,6 +7908,7 @@
      TreeTableUnreadable,
      TreeTableEntryShorterThanTheFieldTable,

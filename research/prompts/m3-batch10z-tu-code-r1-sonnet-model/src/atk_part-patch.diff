@@ -1,5 +1,5 @@
---- /home/fy5090/code/singlefs/research/prompts/m3-batch10z-pqrs-code-r1-opus-model/atk_part.rs	2026-10-09 03:03:45.558388625 +0000
-+++ src/atk/atk_part.rs	2026-10-09 06:45:25.107147904 +0000
+--- /home/fy5090/code/singlefs/research/prompts/m3-batch10z-pqrs-code-r1-opus-model/atk_part.rs	2026-10-09
++++ src/atk/atk_part.rs	2026-10-09
 @@ -329,7 +329,7 @@
          Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(no_space)) => {
              match &no_space.wide_protection_at_the_ceiling {

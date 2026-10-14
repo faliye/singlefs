@@ -1,5 +1,5 @@
---- a/Cargo.toml	2026-10-02 14:44:08.496410410 +0000
-+++ b/Cargo.toml	2026-10-05 10:14:36.218622021 +0000
+--- a/Cargo.toml	2026-10-02
++++ b/Cargo.toml	2026-10-05
 @@ -10,6 +10,7 @@
      "crates/singlefs-checker",
      "crates/singlefs-checker-tier",

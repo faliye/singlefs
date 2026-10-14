@@ -1,5 +1,5 @@
 run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：三方正推腿与同会话别的腿并行各跑各的小池探针
-run-with-memory-cap: 排队（已等 0 秒，至多 200 秒）：slice 已占 38.5 GiB，这一条要 2.0 GiB（这个键撞过顶（峰值表里记的 2.0 GiB 到了那一次的上限 2G，2026-10-04T18:34:27Z 记的），按它这一次的上限 2G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 0 秒，至多 200 秒）：slice 已占 38.5 GiB，这一条要 2.0 GiB（这个键撞过顶（峰值表里记的 2.0 GiB 到了那一次的上限 2G，2026-10-04 记的），按它这一次的上限 2G 算），总上限 40.1 GiB；账上在跑 3 条
 run-with-memory-cap: 排了 1 秒，起跑（singlefs-memory-cap-3091117-682012519）
 
 running 69 tests
