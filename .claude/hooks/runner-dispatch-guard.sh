@@ -31,6 +31,22 @@
 #      交回了（`<agent-message from="<id>">` 后跟 `[Subagent hand-back]`）、任务通知是 failed / killed / stopped、或被 TaskStop 停了；
 #      派发之后 10 分钟主会话记录里还没有它的，按没派出去删。
 #   ⑥ 快照冲突：派 kb-scribe、implementation-writer 时要改的文件在还没判完的三方轮开工快照里，拒（判法见 snapshot_conflict_verdict 上面那段）。
+#      用户叫停、不写判决的轮，在 research/prompts/abandoned-rounds.tsv 登记一行收掉（门禁 doc-process-records 的 abandoned-rounds 格读的是同一张表，只有这一处登记；
+#      <轮>-halted.md 这一支已撤，写了也不认）。一行收不收的判法只在同目录的 lib_abandoned_rounds.py 一份，门禁那一格调同一份（不收就是红）：
+#      第一列是轮名，四列不空，第二列日期是 YYYY-MM-DD，同一轮只一行；整行里要有出处「records/<文件>.md 第 N 行〔<原话>〕」（或 records/<文件>.md:N〔<原话>〕），
+#      〔〕里照抄出处那一行里的一段原话（原话所在的那一行含这一轮的名字）；文件是 records/ 下现存的 .md（路径里没有 ..，解到真路径后仍在 records/ 之内），
+#      拿原话在那份文件里找：恰好命中一次的取命中的那一行（行号只当提示，对不上而原话找得到照收）；命中几处而行号提示正落在其中一处的取提示那一行；
+#      原话找不到而行号提示那一行还有这一轮的名字、〔〕与那一行去掉 .claude/kb/term-renames.md 登记的新旧名与日期（再去掉空白与逗号）之后〔〕逐字落在那一行里的
+#      （只经过术语改名、删日期）取提示那一行；没带原话、找不到而提示那一行没有这一轮的名字、找不到而提示那一行去掉新旧名与日期之后对不上（〔〕写的是转述、
+#      改了别的字）、命中几处而提示不在其中都不收。
+#      取到的那一行里有这一轮的名字（前后不连着轮名字符）、
+#      除这一轮外没有别的轮名（别的轮名 = 仓里认得的轮名全集 ∪ 形如 <名>-r<数字> 的写法：全集是 research/prompts/ 下 _<轮>-body.md、<轮>-snapshot/、<轮>-main-verification.md 的轮名
+#      加登记表第一列，-r 形不看仓里有没有它的材料；同一行里别的轮的叫停原话不收）、并有一句「」括起来的用户原话（去掉空白后至少 6 个字）。
+#      不要求出处的只有库里写死的旧行名单（LEGACY_SOURCELESS_ROUNDS：c196-r1、d16-item1-r2、c364-r3、smalldata-ttime-r1，只缩不涨，不按日期判），门禁那一格用同一张名单，名单外的行一律要出处。
+#      指到这一轮自己的材料（research/prompts/<轮>*、_<轮>*）、规则与定义文件、仓外路径、别的轮的叫停原话、日期写坏、同一轮两行、
+#      原话找不到（行号提示那一行没有这一轮的名字，或去掉新旧名与日期之后对不上）或命中不止一次（行号提示不在其中）的都不收，那一轮照旧算开着，拒绝说明里写没收的原因。
+#      钩子认不出那句话是不是用户为这一轮说的（〔〕逐字照抄了同一轮另一句带名字与「」原话的话时也照收），那一半靠主 agent 核。
+#      读不到 lib_abandoned_rounds.py 时 ⑥ 不收任何叫停的轮（登记表当没有），stderr 写一句。
 #   ⑦ 并发与模型：本会话还在跑的子 agent（不分模型；主会话记录里派出去、没结束、会话记录 3 小时内动过或 3 小时内派的）
 #      已有 SUBAGENT_CONCURRENCY_LIMIT 个（5，用户 2026-10-02 定）就拒，没有放行行。同一条消息里并行派的几个，后几个判的时候前几个可能还没写进主会话记录，数不到。另外，主会话记录里 8 天内有 failed 任务通知写着「resets <时刻> (<时区缩写>)」、它的
 #      「model sent to the API」与新派的同一族（opus / sonnet / haiku），而现在还没到那个时刻，拒；那次失败之后同一族又派出去、没再撞限额的
@@ -42,10 +58,43 @@
 #   ⑩ 变异分诊员：提示里要有 `scripts/mutation/tables/…tsv` 或 `crates/mutations.tsv`——不接没有表的广谱活动。
 #   ⑪ 执行员：提示里写着「只修锚点」或「只补落产物」的放行这一条；否则要有「这一段回答的岔路：<非空>」；登记对应的实验已经有实验页的算续做，
 #      还要有「上一段岔路表里还差：<非空>」，写「无 / 没有」的拒（一行都不差就该交岔路表，不续派）。
-#   ⑭ 设计员、执行员的预计挂钟与长活声明（判法在同目录 lib_long_run.py，判据 .claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」
-#      「判定可复用：按输入存，按前缀剪」）：要有一行「预计挂钟：2 小时内」或「预计挂钟：超过 2 小时」（后面可接逗号与推的依据），没有或认不出就拒；
-#      超过的，同一份提示里要有「分片：」「续跑：」「多机：」三行（多机一行点名 --emit-hosts 与 host-resources.py、不写死台数线程内存），
+#   ⑭ 任务带长活的类型（LONG_RUN_AGENTS：experiment-designer，加 ⑮ 那张类型表）的预计挂钟与长活声明（判法在同目录 lib_long_run.py，判据
+#      .claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」）：
+#      要有一行「预计挂钟：2 小时内」或「预计挂钟：超过 2 小时」（后面可接逗号与推的依据），没有或认不出就拒；
+#      超过的，同一份提示里要有「分片：」「续跑：」「多机：」三行：多机一行只认骨架那一句规范写法（lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE，逐字：台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，
+#      每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量），这一行逐字等于它（可带句末句号），后面不许接任何说明（「；……」「，……」都拒），说明另起一行照普通正文写，
+#      别的写法一律拒（不再用现算词表去拦）、不许写死台数线程内存；
 #      缺的由一行「分不了：」点名（至少 8 个字），不齐就拒。在 ⑦ 之后、⑧ 之前判；lib_long_run.py 读不到时不判，stderr 写一句。
+#      「分片：」「续跑：」「多机：」每个标签只写一行：同一个标签出现第二行就拒（只读第一行，第二行写什么都没人判；lib_long_run.py 的 duplicate_prompt_problems），拒绝说明写「只写一行」，
+#      要补充的另起一行写成不以那个标签起头的普通正文。
+#      放行行「多机已判：<理由>」：用户给了逐台不同的台数或线程时写，逐台参数另起一行照普通正文写；有这一行时子 agent 照提示里逐台写的参数跑，没有就只照「多机：」那一句规范句。
+#      这一行理由不能空、不能是占位，只写一行，写坏了拒（hosts_valve_problems）；它不放宽别的：「多机：」一行照旧只认规范句、同一标签写两行照拒。与 ⑮ 一样不判代码块（照 CommonMark，闭合了的围栏块）里的行：预计挂钟、分片、续跑、多机的示例行放进代码块不被当成声明那一行，也不算重复；认代码块与 ⑮ 同一个函数、同一种认法（⑮ 条下写全）。
+#      脚本文件头的 # long-run-hosts: 与派发提示同一种登记值读法（judge 的 hosts_reading="registered"，detached-run.sh 与 host-dispatch.py 经 judge_script_header 判）；
+#      只有 .claude/long-run-live-hosts-exempt 登记、登记的 sha256 又对得上这份脚本现在文件的脚本文件头按现算读（sha256 对不上判红）。文件头写的读法与脚本真做的事是否一致，钩子看不到，由写的人保证。
+#   ⑮ 线程上限：提示里行首「线程上限：」后面只认一个十进制整数，整数后面什么都不接，括注也不行（任何括注都拒，不看里面写了什么）；要说明的另起一行照普通正文写，那一行不以「线程上限：」起头就不判；
+#      代码块（照 CommonMark，闭合了的围栏块）里的行不判（示例行、喂法样本放进去不被当成这一行，里面的「线程上限已判」也不当放行行）；没闭合的围栏块里的行照判；
+#      ⑭ 与这一条经同一个函数（without_code_blocks）认代码块，认法交 CommonMark 参照实现（markdown-it-py 的 commonmark 预设，本机 python3-markdown-it 3.0.0）：
+#      反引号与波浪线围栏、列表项与引用块里的围栏都认；只遮闭合了的围栏块（块的最后一行去掉引用块的 > 与缩进之后，是同一种围栏字符、不短于开头那一行），
+#      到文末没闭合的、在列表项或引用块结束处结束的照判；缩进代码块与 HTML 块（含 <!-- … --> 注释）不遮，里面露出的三个反引号也不开块；
+#      行首写在一行里的 ```…``` 是行内代码，不开块。标签行（这一条的「线程上限：」「线程上限已判：」，⑭ 的「预计挂钟：」「分片：」「续跑：」「多机：」「多机已判：」「分不了：」）
+#      在这一认法与宽的逐行认法（hidden_lines_by_wide_line_rule：反引号、波浪线都认，每一行先去掉行首的 > 与任意缩进，开块那一行往后第一行同一种字符三个以上、后面只有空白的当关块，
+#      反引号开块那一行后面不许再有反引号）下遮不遮不一致就拒（code_block_ambiguous_label_lines），拒绝说明逐行写两种认法各怎么认、叫把围栏写规整；
+#      代价：四个反引号套三个反引号的示范（外层四个、里面三个）也拒，示范围栏的外层用 ~~~。载不进 markdown-it-py 时不比两种认法，退回宽的逐行认法遮，stderr 写一句；
+#      整数要等于登记的每台默认重活线程数
+#      （.claude/heavy-thread-default，经 scripts/hosts/heavy_threads.py 的 default_heavy_threads 取，不看 SINGLEFS_THREAD_CAP 这类临时覆盖；
+#      用户 2026-10-12 定：没给参数每台默认登记值，双机两台各一份）。出现 ÷、/、「一半」、两个及以上数字、整数后面接括注或别的话（「31 的一半，即 15」「31（本机）」「31（机器忙时按负载降）」）、
+#      不等于登记值、认不出数的都拒。派 THREAD_LIMIT_REQUIRED_AGENTS（implementation-writer、investigator、tooling-writer、experiment-runner、mutation-triage、
+#      three-way-attack、clerk、three-way-forward、three-way-defense）而提示里没有这一行也拒；别的类型没写这一行不判。后三种里 clerk 的定义许编译、跑编译出来的代码，
+#      three-way-forward、three-way-defense 的定义只跑模型目录里的 tools/rerun.sh、不编译；三种多数派发并不带重活，不带重活的用放行行顶缺行。
+#      放行行「线程上限已判：<理由>」（用户给了参数、内存装不下、这件活不起重活这类）两种拒（缺行与写的不对）都放；拒绝说明的出路分两种写：
+#      要别的数的写「线程上限：N」再加已判行，单独的已判行只给确实不起重活的活（子 agent 拿到只有已判行的提示不起重活，要起就停下交回）。
+#      N 是 <填 …> 占位（SKELETON_PLACEHOLDER，⑬ 认的那一种）的交 ⑬；别的尖括号写法（<登记值>、<按机器忙闲定>）按认不出数拒，不当占位；读不到登记时放行、stderr 写一句。
+#   ⑯ 草稿目录写者锁（判法与锁的格式在同目录 lib_writer_lock.py，认锁的一半在 write-guard.sh 第九道）：提示里行首「草稿目录：<工作根或过渡期旧根下的目录>」（工作根本身不算）点名的目录，
+#      派发放行时在里面排他建 .writer-lock（派发它的会话号、派发时刻、提示的 sha256、记录路径、随机串）；目录里已有锁、持锁的子 agent 还在跑就拒
+#      （持锁的是认领文件里的那个 agent，没认领的按提示 sha256 与派发时刻在会话记录里找，还没落进记录的 10 分钟内算在跑，在跑的判法同 ⑦；
+#      还没落进记录、而这一次的提示与锁里登记的是同一份的，当上一次派发失败后的重试，直接接手）；
+#      持锁的已交回 / 失效 / 从没起来，或提示里写了「写者锁已判：<理由>」，新锁接手，旧写者之后写这个目录被 write-guard.sh 第九道拒。
+#      --check-prompt 不建锁、写成「派的那一刻另判」；只有钩子入口（stdin）真读锁、真建锁，自检里直接调 decide 不碰锁文件。
 # 放行行都写在行首（可带 - * > 与粗体），冒号后面是理由，理由不能空、不能是占位（<理由>）。
 # 这一道自己出错（读不了表、主会话记录、规格，JSON 解析不了、脚本跑不起来）不拒：放行，错误写进 stderr。
 #
@@ -187,9 +236,23 @@
 #   RUNNER_DISPATCH_GUARD_BREAK=long-run-unchecked  long_run_verdict 一进来就放行，预计挂钟与长活声明都不判（⑭）
 #       长活:设计员没写预计挂钟拒（应当返回 2，实际 0）；长活:执行员没写预计挂钟拒（应当返回 2，实际 0）；长活:预计挂钟写的认不出拒（应当返回 2，实际 0）；长活:超过 2 小时一样都没写拒（不分片的长跑法）（应当返回 2，实际 0）；
 #       长活:超过 2 小时只写了分片拒（半截声明）（应当返回 2，实际 0）；长活:多机一行写死额度拒（写死额度的派发）（应当返回 2，实际 0）；长活:分不了一行没点名缺的多机拒（应当返回 2，实际 0）；长活:分不了一行不到 8 个字拒（应当返回 2，实际 0）；
-#       stdin:超过 2 小时没写长活三样拒绝（退出码 2）（应当返回 2，实际 0）；stdin:长活拒绝的 stderr 写了三行的写法与判据出处（应当返回 1，实际 0）
+#       stdin:超过 2 小时没写长活三样拒绝（退出码 2）（应当返回 2，实际 0）；stdin:长活拒绝的 stderr 写了三行的写法与判据出处（应当返回 1，实际 0）；
+#       新加的拒绝格同样红（应当返回 2，实际 0）：长活:多机一行写 host-resources 现算拒、长活:多机一行写 available_threads 现算拒、长活:多机一行沿用旧写法（点名 host-resources、没点名登记值）拒、
+#       长活:多机一行没点名登记值拒、长活:多机一行没点名 --emit-hosts 拒、长活:多机一行写除以此刻在跑的重活数拒、长活:多机一行写线程按取核数的命令取拒（点名了 --emit-hosts 与登记值也拒）、
+#       长活:多机一行写按核数、忙闲、负载折算拒、长活:<implementation-writer、investigator、tooling-writer、mutation-triage、three-way-attack、clerk、three-way-forward、three-way-defense 各一>没写预计挂钟拒 / 超过 2 小时一样都没写拒、
+#       长活:多机一行写了两行拒（第一行规范句、第二行写现算）、长活:多机一行写了两行拒（两行都是规范句）、长活:分片一行写了两行拒、长活:续跑一行写了两行拒、长活:代码块里写了预计挂钟、块外没写拒、长活:没闭合的围栏遮不住后面的重复标签、stdin:长活重复标签拒绝（退出码 2）、stdin:长活重复标签的拒绝说明写了「只写一行」与重复的标签
+#       认围栏照 CommonMark 加的两格同样红（应当返回 2，实际 0）：长活:行首行内三反引号不开围栏，后面的多机一行照判拒（现算）、长活:行首行内三反引号不开围栏，后面的多机一行照判拒（一半）；
+#       比两种认法与多机已判加的四格同样红（应当返回 2，实际 0）：长活:列表项里开的围栏关在顶格，多机一行两种认法不一致拒、长活:多机已判没写理由拒、长活:多机已判写了两行拒、长活:写了多机已判，多机一行写两行照拒
+#   RUNNER_DISPATCH_GUARD_BREAK=long-run-duplicate-label-first-wins  「分片：」「续跑：」「多机：」同一标签写了第二行也只读第一行（⑭；改前的判法）
+#       长活:多机一行写了两行拒（第一行规范句、第二行写现算）、长活:分片一行写了两行拒、长活:续跑一行写了两行拒、长活:没闭合的围栏遮不住后面的重复标签、长活:写了多机已判，多机一行写两行照拒（以上应当返回 2，实际 0）；
+#       stdin:长活重复标签的拒绝说明写了「只写一行」与重复的标签（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=long-run-codeblock-judged  代码块里的行也判（⑭；改前的判法：预计挂钟、分片、续跑、多机的示例行当声明那一行，代码块里的第二行也算重复）
+#       长活:代码块里先写了「多机：」示例行、块外写规范句放行（应当返回 0，实际 2）；长活:代码块里第二行「多机：」示例不算重复放行（应当返回 0，实际 2）；
+#       长活:代码块里写了预计挂钟、块外没写拒（应当返回 2，实际 0）
 #   RUNNER_DISPATCH_GUARD_BREAK=wall-clock-optional  没写「预计挂钟：」一行当 2 小时内放行（⑭）
-#       长活:设计员没写预计挂钟拒（应当返回 2，实际 0）；长活:执行员没写预计挂钟拒（应当返回 2，实际 0）
+#       长活:设计员没写预计挂钟拒（应当返回 2，实际 0）；长活:执行员没写预计挂钟拒（应当返回 2，实际 0）；长活:<implementation-writer、investigator、tooling-writer、mutation-triage、three-way-attack、clerk、three-way-forward、three-way-defense 各一>没写预计挂钟拒（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=long-run-types-narrowed  ⑭ 只判 experiment-designer、experiment-runner（改前的类型）
+#       长活:<implementation-writer、investigator、tooling-writer、mutation-triage、three-way-attack、clerk、three-way-forward、three-way-defense 各一>没写预计挂钟拒；长活:<同八种各一>超过 2 小时一样都没写拒（以上应当返回 2，实际 0）
 #   RUNNER_DISPATCH_GUARD_BREAK=stop-at-first  judge_dispatch 只交第一条不成立的（退回逐条试、一次只报一样的旧样子）
 #       一次列全:缺三样的提示一次报出三样（重型测试一行、骨架占位、禁读清单）（应当返回 (2, True)，实际 (2, False)）；
 #       输入:缺的输入写明按字面子串认、给照抄的一行（应当返回 True，实际 False）
@@ -197,14 +260,204 @@
 #       输入:缺的输入写明按字面子串认、给照抄的一行（应当返回 True，实际 False）
 #   RUNNER_DISPATCH_GUARD_BREAK=check-mode-registers  --check-prompt 照派发那一刻判：读主会话记录、读写实现员登记、放行就登记
 #       检查模式:--check-prompt 放行时不登记实现员、写明派的那一刻另判的两条（应当返回 (0, True, True)，实际 (0, False, False)）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-ignored  open_three_way_rounds 不读 abandoned-rounds.tsv，叫停的轮照旧算开着（⑥）
+#       快照:叫停的轮在登记表里有出处完整的一行，放行（应当返回 0，实际 2）；快照:出处写成 文件:行号 也认，放行（应当返回 0，实际 2）；
+#       快照:轮名形如 <名>-r<数字>、出处那一行只有这一轮的名字，放行；快照:出处那一行另有仓里没有任何材料的名字，不当别的轮名，放行；快照:旧行名单里的轮没写出处也收，放行（门禁同一张名单）、快照:出处的行号对不上而〔〕原话恰好找到一次（行号只当提示），放行；
+#       快照:〔〕里的原话命中两次而行号提示落在其中一处，取那一行，放行；快照:〔〕是改名前的原话、行号提示那一行照改名表换了词，取那一行，放行；快照:〔〕带着记录里后来删掉的日期，取行号提示那一行，放行（以上应当返回 0，实际 2）；
+#       快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）（应当返回 True，实际 False）；
+#       快照:写坏的登记行在说明里点名第几行（应当返回 True，实际 False）；快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因（应当返回 True，实际 False）；
+#       快照:原话找不到、命中两次、没带原话的拒绝说明写了原因（应当返回 True，实际 False）；快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-unchecked  登记表里有这一轮的行就收，不看出处、行号、名字和原话（⑥）
+#       快照:登记行没有出处，照拒；快照:出处没写行号，照拒；快照:出处的行号超出文件、〔〕原话也找不到，照拒；快照:〔〕里的原话在出处文件里找不到（被删或改了字），照拒；快照:〔〕里的原话在出处文件里命中两次，照拒；快照:出处没带〔〕原话，照拒；
+#       快照:那一行没有这一轮的名字（引无关的一句），照拒；
+#       快照:那一行是别的轮的叫停原话，照拒；快照:原话不到 6 个字，照拒；快照:那一行没有「」括的原话，照拒；快照:那一行的名字是更长的另一轮名（前后连着轮名字符），照拒；
+#       快照:出处点名的文件不在，照拒；快照:出处指这一轮自己的正文，照拒；快照:出处指这一轮自己的 halted 文件，照拒；快照:出处指规则文件，照拒；
+#       快照:出处路径里有 ..（解到仓内别处），照拒；快照:出处用 .. 指到仓外，照拒；快照:出处是 records/ 下指到仓外的符号链接，照拒；快照:出处从 research/ 起头 .. 到仓外，照拒；
+#       快照:登记行不是四列（门禁也判红），不收；快照:出处那一行同时写着别的轮的叫停原话（轮名形如 <名>-r<数字>），照拒；快照:出处那一行同时写着登记表里别的轮名，照拒；
+#       快照:日期不是 YYYY-MM-DD（门禁也判红），出处合格也不收；快照:同一轮登记两行（两行出处都合格，门禁也判红），不收；快照:出处没写，2026-10-12 的行照拒（门禁同样判红）；
+#       快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒；快照:出处没写，2026-10-11 的行也照拒（免出处只给旧行名单里的轮，不按日期；门禁同样判红）；
+#       快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒
+#       （以上各格应当返回 2，实际 0）；快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）（应当返回 True，实际 False）；
+#       快照:原话找不到、命中两次、没带原话的拒绝说明写了原因（应当返回 True，实际 False）；快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-source-any-path  出处不限 records/：research/、.claude/ 起头的也收，真路径只要在仓根之内（⑥）
+#       快照:出处指这一轮自己的正文，照拒（应当返回 2，实际 0）；快照:出处指这一轮自己的 halted 文件，照拒（应当返回 2，实际 0）；快照:出处指规则文件，照拒（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-source-escapes  不核出处路径里的 .. 与解到真路径后是否还在 records/ 之内（⑥）
+#       快照:出处路径里有 ..（解到仓内别处），照拒（应当返回 2，实际 0）；快照:出处用 .. 指到仓外，照拒（应当返回 2，实际 0）；
+#       快照:出处是 records/ 下指到仓外的符号链接，照拒（应当返回 2，实际 0）；
+#       快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-line-unread  不找〔〕里的原话、不取那一行，整份文件里找名字和「」原话（〔〕原话不要求）（⑥）
+#       快照:〔〕里的原话在出处文件里找不到（被删或改了字），照拒（应当返回 2，实际 0）；快照:〔〕里的原话在出处文件里命中两次，照拒（应当返回 2，实际 0）；快照:出处没带〔〕原话，照拒（应当返回 2，实际 0）；
+#       快照:出处的行号超出文件、〔〕原话也找不到，照拒（应当返回 2，实际 0）；快照:那一行没有这一轮的名字（引无关的一句），照拒（应当返回 2，实际 0）；
+#       快照:原话不到 6 个字，照拒（应当返回 2，实际 0）；快照:那一行没有「」括的原话，照拒（应当返回 2，实际 0）；
+#       快照:出处那一行同时写着别的轮的叫停原话（轮名形如 <名>-r<数字>），照拒（应当返回 2，实际 0）；快照:出处那一行同时写着登记表里别的轮名，照拒（应当返回 2，实际 0）；
+#       快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒、快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒（应当返回 2，实际 0）；
+#       快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒（应当返回 2，实际 0）；
+#       快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）（应当返回 True，实际 False）；快照:原话找不到、命中两次、没带原话的拒绝说明写了原因（应当返回 True，实际 False）；
+#       快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-round-name-unchecked  那一行里不必有这一轮的名字（⑥）
+#       快照:那一行没有这一轮的名字（引无关的一句），照拒（应当返回 2，实际 0）；快照:那一行是别的轮的叫停原话，照拒（应当返回 2，实际 0）；
+#       快照:那一行的名字是更长的另一轮名（前后连着轮名字符），照拒（应当返回 2，实际 0）；
+#       快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-name-substring  轮名按子串找，不看前后连着的轮名字符（⑥）
+#       快照:那一行的名字是更长的另一轮名（前后连着轮名字符），照拒（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-quote-short-ok  「」里的原话一个字也收，不要求至少 6 个字（⑥）
+#       快照:原话不到 6 个字，照拒（应当返回 2，实际 0）；
+#       快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）（应当返回 True，实际 False）
+#   LIB_ABANDONED_ROUNDS_BREAK=<项>  叫停轮登记行的判法（同目录 lib_abandoned_rounds.py；门禁 doc-process-records 的 abandoned-rounds 格调同一份，红在那一道文件头点名的样本）。
+#       一次设一个（逗号可连几个），认不出的值让 ⑥ 把登记表当没读到。上面 snapshot-abandoned-<项> 的六项（source-any-path、source-escapes、line-unread、round-name-unchecked、
+#       name-substring、quote-short-ok）用这个变量设同名的项，红在同样的格。另外几项：
+#       columns-unchecked（不核四列不空）：快照:登记行不是四列（门禁也判红），不收（应当返回 2，实际 0）
+#       date-unchecked（不核日期是 YYYY-MM-DD）：快照:日期不是 YYYY-MM-DD（门禁也判红），出处合格也不收（应当返回 2，实际 0）；快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因（应当返回 True，实际 False）
+#       duplicate-unchecked（同一轮两行也不拒）：快照:同一轮登记两行（两行出处都合格，门禁也判红），不收（应当返回 2，实际 0）；快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因（应当返回 True，实际 False）
+#       other-round-name-ok（出处那一行有别的轮名也收）：快照:出处那一行同时写着别的轮的叫停原话（轮名形如 <名>-r<数字>），照拒；快照:出处那一行同时写着登记表里别的轮名，照拒；
+#           快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒、快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒（以上应当返回 2，实际 0）；
+#           快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因（应当返回 True，实际 False）
+#       other-form-ignored（别的轮名只认仓里认得的全集，不认 <名>-r<数字> 形；改前的判法）：快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒（应当返回 2，实际 0）；
+#           快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因（应当返回 True，实际 False）；其余格不红（有材料的、登记表里的、不以 -r<数字> 结尾而仓里有材料的名字仍照拒）
+#       other-name-by-form（别的轮名退回只认 <名>-r<数字> 形与登记表里的名字）：快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒（应当返回 2，实际 0）；
+#           快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因（应当返回 True，实际 False）；其余格不红（轮名形如 <名>-r<数字> 的那一格仍照拒）
+#       line-number-read（退回按行号读：取出处写的第 N 行判，〔〕原话不要求也不找；改前的判法）：快照:出处的行号对不上而〔〕原话恰好找到一次（行号只当提示），放行（应当返回 0，实际 2）；
+#           快照:〔〕里的原话在出处文件里命中两次，照拒（行号提示的第 26 行是另一句带这一轮名字与原话的补记）、快照:出处没带〔〕原话，照拒、
+#           快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒（以上应当返回 2，实际 0）；
+#           快照:原话找不到、命中两次、没带原话的拒绝说明写了原因（应当返回 True，实际 False）；快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）；其余格不红（行号对得上的照旧判那一行）
+#       legacy-by-date（免出处退回按日期，早于 2026-10-12 的行不要求）：快照:出处没写，2026-10-11 的行也照拒（门禁同样判红）（应当返回 2，实际 0）
+#       source-optional（出处一概不要求）：snapshot-abandoned-unchecked 条下点名的出处各格（登记行没有出处……出处从 research/ 起头 .. 到仓外）加快照:出处那一行同时写着别的轮的叫停原话、
+#           快照:出处那一行同时写着登记表里别的轮名、快照:出处没写，2026-10-12 的行照拒、快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒、快照:出处没写，2026-10-11 的行也照拒（以上应当返回 2，实际 0）；
+#           快照:不合格的拒绝说明写了没收的原因（应当返回 True，实际 False）；快照:原话找不到、命中两次、没带原话的拒绝说明写了原因（应当返回 True，实际 False）；快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）
+#       source-required-always（名单里的旧行也要出处）：快照:旧行名单里的轮没写出处也收，放行（门禁同一张名单）（应当返回 0，实际 2）；也红在门禁 abandoned-rounds 格的样本
+#       line-hint-ignored（不看行号提示：原话命中几处、或找不到，一律不收；改前的判法）：快照:〔〕里的原话命中两次而行号提示落在其中一处，取那一行，放行；
+#           快照:〔〕是改名前的原话、行号提示那一行照改名表换了词，取那一行，放行；快照:〔〕带着记录里后来删掉的日期，取行号提示那一行，放行（以上应当返回 0，实际 2）；
+#           快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）；也红在门禁 abandoned-rounds 格的样本；其余格不红
+#       hint-line-unmatched（原话找不到时不比〔〕与提示那一行，提示那一行有这一轮的名字就取它；改前的判法）：快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒（应当返回 2，实际 0）；
+#           快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上（应当返回 True，实际 False）；也红在门禁 abandoned-rounds 格的样本；其余格不红
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-note-accepted  整数后面接全角括注就放行（⑮；改前的判法：括注里没有数字、斜杠、一半就收）
+#       线程:数后面接括注拒（说明另起一行）；线程:整数后接中文括注拒；线程:整数与括注之间有空白拒；线程:括注里写中文数词（第二台十六）拒；线程:括注里写减半拒；线程:括注里写两台合计拒；线程:括注里写分之几拒；线程:括注里写各拒；线程:括注里写〇拒；
+#       线程:括注里只写说明性的词拒（登记值）；线程:括注里只写说明性的词拒（本机）；线程:括注里写按负载降拒；线程:括注里写全角数字拒；线程:括注里写尖括号拒（以上应当返回 2，实际 0）；
+#       线程:括注拒绝说明点名写错的那一段、括注一概不认、说明另起一行照普通正文写（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-codeblock-judged  代码块里的行也判，里面的「线程上限已判」也算放行行（⑮；改前的判法）
+#       线程:代码块里的示例行不判放行（应当返回 0，实际 2）；线程:缩进的围栏里的示例行不判放行（应当返回 0，实际 2）；
+#       线程:代码块里写线程上限、块外没写，缺行照拒（应当返回 2，实际 0）；线程:代码块里写已判行顶不了缺行（应当返回 2，实际 0）；
+#       线程:行内三反引号之后真代码块里的示例行不判放行；线程:波浪线代码块里的示例行不判放行；线程:嵌套列表里缩进 4 格的围栏里的示例行不判放行；
+#       线程:引用块里的围栏里的示例行不判放行；线程:外层波浪线套三个反引号的示例，两种认法一致放行；线程:载不进 markdown-it-py 时退回逐行认法，闭合了的反引号围栏里的示例行不判放行；
+#       线程:载不进 markdown-it-py 时退回逐行认法，波浪线围栏里的示例行不判放行（以上应当返回 0，实际 2）；线程:两种认法不一致的拒绝说明逐行点名、叫把围栏写规整（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=code-fence-loose  认代码块退回更早的逐行认法：行首任意缩进（含制表符、4 格以上）的三个反引号就开块、后面接什么都不看（行首写在一行里的 ```…``` 也当开头），
+#       关的那一行也不限缩进；不认波浪线、列表项与引用块的边界、HTML 块（⑭⑮，同一个函数 without_code_blocks）
+#       线程:行首行内三反引号不开围栏，后面的 16 照判拒（应当返回 2，实际 0）；线程:行首行内三反引号不开围栏，后面接括注的一行照判拒（应当返回 2，实际 0）；
+#       线程:缩进 4 格的三反引号不开围栏，后面一行照判拒（应当返回 2，实际 0）；线程:行内三反引号之后真代码块里的示例行不判放行（应当返回 0，实际 2）；
+#       长活:行首行内三反引号不开围栏，后面的多机一行照判拒（现算）（应当返回 2，实际 0）；长活:行首行内三反引号不开围栏，后面的多机一行照判拒（一半）（应当返回 2，实际 0）；
+#       另红在 code-block-line-rule 条下点名的各格（线程:嵌套列表里缩进 4 格的围栏里的示例行不判放行、线程:关的那一行多缩进 4 格，两种认法不一致拒 两格除外：这一种任意缩进都开块、都关块）
+#   RUNNER_DISPATCH_GUARD_BREAK=code-block-line-rule  认代码块退回改前的逐行认法（CODE_FENCE_OPEN）：只认反引号围栏，开头那一行至多缩进 3 个空格、语言名里不许有反引号，
+#       往后找第一行至多缩进 3 个空格、同样多个反引号的当关块；不认波浪线、列表项与引用块的边界、HTML 块（⑭⑮，同一个函数 without_code_blocks）
+#       线程:波浪线块里露出一行三个反引号，块外的 16 照判拒；线程:波浪线块里露出一行三个反引号，块外接括注的一行照判拒；线程:列表项里没闭合的围栏在列表项结束处结束，后面的 16 照判拒；
+#       线程:HTML 注释里的三个反引号不开块，后面的 16 照判拒；长活:波浪线块里露出一行三个反引号，块外的多机一行照判拒（现算）（以上应当返回 2，实际 0）；
+#       线程:波浪线代码块里的示例行不判放行；线程:嵌套列表里缩进 4 格的围栏里的示例行不判放行；线程:引用块里的围栏里的示例行不判放行；
+#       线程:载不进 markdown-it-py 时退回逐行认法，波浪线围栏里的示例行不判放行（以上应当返回 0，实际 2）；
+#       线程:引用块里开的围栏关的那一行漏 >，两种认法不一致拒；线程:关的那一行多缩进 4 格，两种认法不一致拒；线程:开四个反引号关三个，两种认法不一致拒；
+#       线程:四个反引号套三个反引号的示例，两种认法不一致拒（以上应当返回 2，实际 0）；线程:两种认法不一致的拒绝说明逐行点名、叫把围栏写规整（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=code-block-library-missing  当作载不进 markdown-it-py：不比两种认法，退回宽的逐行认法遮（⑭⑮，同一个函数 without_code_blocks）
+#       线程:缩进 4 格的三反引号不开围栏，后面一行照判拒；线程:列表项里没闭合的围栏在列表项结束处结束，后面的 16 照判拒；线程:HTML 注释里的三个反引号不开块，后面的 16 照判拒（以上应当返回 2，实际 0）；
+#       线程:两种认法不一致的拒绝说明逐行点名、叫把围栏写规整（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=code-block-ambiguity-unchecked  标签行不比两种认法，只照 CommonMark 认（⑭⑮，code_block_ambiguous_label_lines；改前的判法）
+#       线程:列表项里开的围栏关在顶格，两种认法不一致拒；线程:引用块里开的围栏关的那一行漏 >，两种认法不一致拒；线程:<details> 里有空行，两种认法不一致拒；线程:关的那一行多缩进 4 格，两种认法不一致拒；线程:开四个反引号关三个，两种认法不一致拒；线程:四个反引号套三个反引号的示例，两种认法不一致拒；长活:列表项里开的围栏关在顶格，多机一行两种认法不一致拒（以上应当返回 2，实际 0）；线程:两种认法不一致的拒绝说明逐行点名、叫把围栏写规整（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=code-block-fallback-unmasked  载不进 markdown-it-py 时一行都不遮，⑭⑮ 整份照判（⑭⑮，without_code_blocks；改前的退路）
+#       线程:载不进 markdown-it-py 时退回逐行认法，闭合了的反引号围栏里的示例行不判放行；线程:载不进 markdown-it-py 时退回逐行认法，波浪线围栏里的示例行不判放行（以上应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=hosts-valve-unchecked  「多机已判：」一行不判（没写理由、写两行都放；⑭，hosts_valve_problems）
+#       长活:多机已判没写理由拒；长活:多机已判写了两行拒（以上应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-valve-hint-merged  ⑮ 的拒绝说明退回改前：要别的数与不起重活并成一句、只给单独的已判行一条路
+#       stdin:没写线程上限的 stderr 写了缺哪一行、登记值与已判行的写法（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-angle-dropped  凡是 < 起头的值都当骨架占位丢掉，不只 <填 …>（⑮；改前的判法）
+#       线程:尖括号写的占位（<登记值>）按认不出数拒；线程:尖括号写的占位（<按机器忙闲定>）按认不出数拒；线程:尖括号里写数字（<7>）拒；线程:没闭合的 <填 … 不是骨架占位，认不出数拒（以上应当返回 2，实际 0）；
+#       线程:别的尖括号写法的拒绝说明点名认不出数、说清只有 <填 …> 是占位（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-required-six-types  ⑮ 要线程上限一行的类型、⑭ 判预计挂钟的类型退回改前的六种（不含 clerk、three-way-forward、three-way-defense）
+#       线程:派 <clerk、three-way-forward、three-way-defense 各一> 没写这一行拒；线程:派 <同三种各一> 已判行没写理由照拒；
+#       长活:<clerk、three-way-forward、three-way-defense 各一>没写预计挂钟拒；长活:<同三种各一>超过 2 小时一样都没写拒（以上应当返回 2，实际 0）；
+#       线程:代码块里写线程上限、块外没写，缺行照拒；线程:代码块里写已判行顶不了缺行（clerk 不在改前的六种里，缺行放行；以上应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-limit-unchecked  thread_limit_verdict 一进来就放行，线程上限不判（⑮）
+#       线程:N 不等于登记值拒（应当返回 2，实际 0）；线程:写成公式拒（应当返回 2，实际 0）；线程:粗体与列表记号也认（应当返回 2，实际 0）；
+#       线程:每处都要对（应当返回 2，实际 0）；线程:已判行没写理由照拒（应当返回 2，实际 0）；线程:真库的登记值加一拒（应当返回 2，实际 0）；
+#       stdin:线程上限不等于登记值拒绝（退出码 2）（应当返回 2，实际 0）；
+#       stdin:线程上限拒绝的 stderr 写了登记值、已判行的写法与出路（应当返回 1，实际 0）；
+#       stdin:登记读不到时放行并在 stderr 写一句（应当返回 (0, True)，实际 (0, False)）；
+#       新加的拒绝格同样红（应当返回 2，实际 0）：线程:代码块之后行首的那一行照判拒、线程:没闭合的围栏遮不住后面的行拒、线程:代码块里写线程上限、块外没写，缺行照拒、线程:代码块里写已判行顶不了缺行拒、线程:数后面接括注拒（说明另起一行）、线程:整数后接中文括注拒、线程:整数与括注之间有空白拒、线程:括注里只写说明性的词拒（登记值、本机）、线程:括注里写按负载降 / 全角数字 / 尖括号 / 英文说明（半角括号）拒、线程:括注拒绝说明点名写错的那一段（应当返回 True，实际 False）、线程:7 ÷ 2 拒、线程:7 的一半，即 3 拒、线程:本机之后另写第二台拒、线程:7/2 拒、线程:括注里写数字 / 斜杠 / 一半拒、线程:整数后接逗号和别的话拒、
+#       线程:半角括号不认拒、线程:全角数字认不出拒、线程:只写一半认不出拒、线程:括注里写中文数词 / 减半 / 两台合计 / 分之几 / 各 / 〇拒、线程:尖括号写的占位（<登记值>、<按机器忙闲定>）/ 尖括号里写数字 / 没闭合的 <填 拒、
+#       线程:派 <九种类型各一> 没写这一行拒 / 写成公式拒 / 已判行没写理由照拒；线程:括注里写中文数词的拒绝说明、尖括号写法的拒绝说明两格（应当返回 True，实际 False）；
+#       stdin:线程上限本机之外另写第二台拒绝（退出码 2）、stdin:派 tooling-writer 没写线程上限拒绝（退出码 2）、两条 stdin 的 stderr 格（应当返回 1，实际 0）；
+#       线程:行首行内三反引号不开围栏，后面的 16 照判拒、线程:行首行内三反引号不开围栏，后面接括注的一行照判拒、线程:缩进 4 格的三反引号不开围栏，后面一行照判拒（应当返回 2，实际 0）；
+#       比两种认法加的格同样红：线程:列表项里开的围栏关在顶格，两种认法不一致拒、线程:引用块里开的围栏关的那一行漏 >，两种认法不一致拒、线程:<details> 里有空行，两种认法不一致拒、
+#       线程:关的那一行多缩进 4 格，两种认法不一致拒、线程:开四个反引号关三个，两种认法不一致拒、线程:四个反引号套三个反引号的示例，两种认法不一致拒、
+#       线程:载不进 markdown-it-py 时退回逐行认法，代码块之后行首的那一行照判（以上应当返回 2，实际 0）；线程:两种认法不一致的拒绝说明逐行点名、叫把围栏写规整（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-limit-any-refused  线程上限写什么都拒，登记值也拒（⑮）
+#       线程:N 等于登记值放行（应当返回 0，实际 2）；线程:说明另起一行照普通正文写放行（那一行不判；应当返回 0，实际 2）；线程:代码块里的示例行不判放行、线程:缩进的围栏里的示例行不判放行（应当返回 0，实际 2）；线程:真库的登记值放行（应当返回 0，实际 2）；
+#       线程:派 <九种类型各一> 写了登记值放行（应当返回 0，实际 2）；线程:行内三反引号之后真代码块里的示例行不判放行（应当返回 0，实际 2）；
+#       线程:外层波浪线套三个反引号的示例，两种认法一致放行、线程:载不进 markdown-it-py 时退回逐行认法，闭合了的反引号围栏里的示例行不判放行、
+#       线程:载不进 markdown-it-py 时退回逐行认法，波浪线围栏里的示例行不判放行、长活:规范句加多机已判与逐台参数一行放行（以上应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-valve-ignored  「线程上限已判」放行行不认（⑮）
+#       线程:不等于但写了已判行放行（应当返回 0，实际 2）；线程:写公式但另写已判行放行（应当返回 0，实际 2）；线程:派 <九种类型各一> 没写这一行但写了已判行放行（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-valve-loose  「线程上限已判」只要有那几个字就放行，不看理由（⑮）
+#       线程:已判行没写理由照拒（应当返回 2，实际 0）
+#       （这一项下新加的格同样红：线程:派 <九种类型各一> 已判行没写理由照拒（应当返回 2，实际 0））
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-formula-accepted  只比整数开头的数，÷、/、一半、括注外接话、两个数字都不看（⑮；改前的判法）
+#       线程:7 ÷ 2 拒；线程:7 的一半，即 3 拒；线程:本机之后另写第二台拒；线程:7/2 拒；线程:括注里写数字拒；线程:括注里写斜杠拒；线程:括注里写一半拒；
+#       线程:整数后接逗号和别的话拒；线程:半角括号不认拒；线程:全角数字认不出拒；线程:括注里写中文数词 / 减半 / 两台合计 / 分之几 / 各 / 〇拒；线程:派 <九种类型各一> 写成公式拒；
+#       （以上各格应当返回 2，实际 0）；stdin:线程上限本机之外另写第二台拒绝（退出码 2）（应当返回 2，实际 0）；
+#       stdin:线程上限另写第二台的 stderr 点名写错的那一段和原因（应当返回 1，实际 0）；
+#       线程:数后面接括注拒（说明另起一行）、线程:整数后接中文括注拒、线程:整数与括注之间有空白拒、线程:括注里只写说明性的词拒（登记值、本机）、线程:括注里写按负载降 / 全角数字 / 尖括号 / 英文说明（半角括号）拒（以上应当返回 2，实际 0）；
+#       线程:括注拒绝说明点名写错的那一段、线程:别的尖括号写法的拒绝说明点名认不出数（应当返回 True，实际 False）；
+#       线程:行首行内三反引号不开围栏，后面接括注的一行照判拒（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-line-optional  任务带重活的类型没写「线程上限：」一行也放行（⑮）
+#       线程:派 <九种类型各一> 没写这一行拒；线程:派 <九种类型各一> 已判行没写理由照拒；线程:代码块里写线程上限、块外没写，缺行照拒；线程:代码块里写已判行顶不了缺行（以上应当返回 2，实际 0）；
+#       stdin:派 tooling-writer 没写线程上限拒绝（退出码 2）（应当返回 2，实际 0）；
+#       stdin:没写线程上限的 stderr 写了缺哪一行、登记值与已判行的写法（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=thread-required-only-writer  只有实现员没写「线程上限：」一行才拒，别的八种类型缺行放行（⑮）
+#       线程:派 investigator、mutation-triage、three-way-attack、tooling-writer、experiment-runner 没写这一行拒；其中每一种的已判行没写理由照拒；线程:代码块里写线程上限、块外没写，缺行照拒；线程:代码块里写已判行顶不了缺行（以上应当返回 2，实际 0）；
+#       stdin:派 tooling-writer 没写线程上限拒绝（退出码 2）（应当返回 2，实际 0）；
+#       stdin:没写线程上限的 stderr 写了缺哪一行、登记值与已判行的写法（应当返回 1，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-unchecked  writer_lock_verdict 一进来就放行，不建锁也不判（⑯）
+#       写者锁:建出的锁带会话号、提示 sha256 与随机串（应当返回 True，实际 False）；写者锁:同一目录再派、持锁的还在跑拒（应当返回 2，实际 0）；
+#       写者锁:拒绝说明点名持锁者、目录与已判行的写法（应当返回 True，实际 False）；写者锁:拒绝之后锁没动（应当返回 True，实际 False）；
+#       写者锁:接手之后锁换成新一次派发的（应当返回 True，实际 False）；写者锁:已判行接手之后锁换成新一次派发的（应当返回 True，实际 False）；写者锁:没起来的持锁者 10 分钟内算在跑，再派拒（应当返回 2，实际 0）；
+#       写者锁:--check-prompt 不建锁、写明派的那一刻另判（应当返回 (0, False, True)，实际 (0, False, False)）
+#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-live-ignored  持锁的在跑也当不在跑，直接接手（⑯）
+#       写者锁:同一目录再派、持锁的还在跑拒（应当返回 2，实际 0）；写者锁:拒绝说明点名持锁者、目录与已判行的写法（应当返回 True，实际 False）；
+#       写者锁:拒绝之后锁没动（应当返回 True，实际 False）；写者锁:没起来的持锁者 10 分钟内算在跑，再派拒（应当返回 2，实际 0）
+#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-stale-kept  持锁的不管交回没有都当在跑（⑯）
+#       写者锁:持锁的已交回，再派接手（应当返回 0，实际 2）；写者锁:接手之后锁换成新一次派发的（应当返回 True，实际 False）；
+#       写者锁:没起来的持锁者超过 10 分钟，再派接手（应当返回 0，实际 2）；写者锁:同一份提示没起来就重派，当重试接手（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-retry-refused  同一份提示重派、上一次没起来的也当在跑，不当重试（⑯）
+#       写者锁:同一份提示没起来就重派，当重试接手（应当返回 0，实际 2）
+#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-valve-ignored  「写者锁已判」放行行不认（⑯）
+#       写者锁:写了已判行接手（应当返回 0，实际 2）；写者锁:已判行接手之后锁换成新一次派发的（应当返回 True，实际 False）
+#   RUNNER_DISPATCH_GUARD_BREAK=writer-lock-root-locked  工作根本身也算草稿目录，在根里建锁（⑯）
+#       写者锁:草稿目录写成工作根本身不建锁（应当返回 False，实际 True）
+#   LIB_WRITER_LOCK_BREAK 的六个开关在同目录 lib_writer_lock.py：这个钩子的写者锁那几格只走建锁与接手、用不到认锁，那六个开关（claim-not-exclusive、holder-ignored、launch-ignored、
+#   stale-launch-accepted、no-walk-up、foreign-holder-unnamed）红在 write-guard.sh 的自检里。
 # 改法加的三格在下面这几个开关下也红：disable-check 下三格都红（一次列全那一格实得 (0, False)，检查模式那一格实得 (0, True, False)）；
 # disable-heavy-test、placeholders-ignored 下「一次列全」那一格红（实得 (2, False)）；inputs-ignored 下「一次列全」与「输入:缺的输入…」两格红。
+# 用户 2026-10-12 那一批加的 ⑥⑭⑮ 拒绝格（快照:… 登记表各「照拒」格、长活:多机一行 / 新增类型的拒绝格、线程:… 公式 / 缺行的拒绝格与两条 stdin）在 disable-check 下同样红（应当返回 2，实际 0）；
+# disable-snapshot 下 ⑥ 登记表各「照拒」格红；disable-heavy-test、placeholders-ignored、inputs-ignored 这三个开关下这一批的格不红（各判各的条）。
+# 认围栏照 CommonMark 加的五个拒绝格（线程:行首行内三反引号不开围栏…两格、线程:缩进 4 格的三反引号不开围栏…、长活:行首行内三反引号不开围栏…两格）在 disable-check 下同样红（应当返回 2，实际 0）。
 # 长活声明判法的弄坏开关在同目录 lib_long_run.py（LIB_LONG_RUN_BREAK，一次设一个；经 bash 起钩子的 stdin 那几项也带着；
-# script-unresolved-accepted 与 wrappers-not-skipped 只 scripts/hosts/detached-run.sh 用，这里不红）：
+# script-unresolved-accepted、wrappers-not-skipped、header-live-reading、live-exempt-ignored、exempt-sha256-unchecked 只 scripts/hosts/detached-run.sh 与门禁 code-tooling 的 long-run-header-exempt 格用，
+# exempt-path-unchecked、exempt-needless-unchecked、exempt-growth-unchecked、exempt-repin-unchecked 只门禁 code-tooling 的 long-run-header-exempt 格用，这里不红）：
 #   LIB_LONG_RUN_BREAK=partial-accepted  三样写了一样就当齐了（⑭）
 #       长活:超过 2 小时只写了分片拒（半截声明）（应当返回 2，实际 0）；长活:分不了一行没点名缺的多机拒（应当返回 2，实际 0）；长活:分不了一行不到 8 个字拒（应当返回 2，实际 0）
 #   LIB_LONG_RUN_BREAK=hosts-unchecked  多机一行不看内容（⑭）
-#       长活:多机一行写死额度拒（写死额度的派发）（应当返回 2，实际 0）
+#       长活:多机一行写不看忙闲（换了词的取法）拒、长活:多机一行写登记值的一半（换了词的取法）拒、长活:多机一行写按此刻余量少给（换了词的取法）拒、长活:多机一行规范句后接别的话（没有「；」）拒、长活:多机一行规范句后的说明里有数字拒、长活:多机一行规范句后接「；」与说明拒、长活:多机一行规范句后接按此刻空闲现算拒、长活:多机一行规范句后接机器忙时按负载降拒、
+#       长活:多机一行规范句后接除以此刻同时在跑的重活数拒、长活:多机一行规范句后接 host-resources 与 available_threads 拒（以上应当返回 2，实际 0）；
+#       长活:多机一行写死额度拒（写死额度的派发）（应当返回 2，实际 0）；长活:多机一行写 host-resources 现算拒（应当返回 2，实际 0）；长活:多机一行写 available_threads 现算拒（应当返回 2，实际 0）；
+#       长活:多机一行沿用旧写法（点名 host-resources、没点名登记值）拒（应当返回 2，实际 0）；长活:多机一行没点名登记值拒（应当返回 2，实际 0）；长活:多机一行没点名 --emit-hosts 拒（应当返回 2，实际 0）；
+#       长活:多机一行写除以此刻在跑的重活数拒（应当返回 2，实际 0）；长活:多机一行写线程按取核数的命令取拒（点名了 --emit-hosts 与登记值也拒）（应当返回 2，实际 0）；长活:多机一行写按核数、忙闲、负载折算拒（应当返回 2，实际 0）；
+#       长活:行首行内三反引号不开围栏，后面的多机一行照判拒（现算）、长活:行首行内三反引号不开围栏，后面的多机一行照判拒（一半）（应当返回 2，实际 0）
+#   LIB_LONG_RUN_BREAK=hosts-canonical-unchecked  多机一行不核是不是规范句（写了就放，只剩写死的额度那一条；登记值读法，派发提示与脚本文件头同一种读法，detached-run.sh 的文件头也红）（⑭）
+#       长活:多机一行写 host-resources 现算拒、长活:多机一行写 available_threads 现算拒、长活:多机一行写除以此刻在跑的重活数拒、长活:多机一行写线程按取核数的命令取拒（点名了 --emit-hosts 与登记值也拒）、
+#       长活:多机一行写按核数、忙闲、负载折算拒、长活:多机一行沿用旧写法（点名 host-resources、没点名登记值）拒、长活:多机一行没点名登记值拒、长活:多机一行没点名 --emit-hosts 拒、
+#       长活:多机一行写不看忙闲（换了词的取法）拒、长活:多机一行写登记值的一半（换了词的取法）拒、长活:多机一行写按此刻余量少给（换了词的取法）拒、长活:多机一行规范句后接别的话（没有「；」）拒、
+#       长活:多机一行规范句后的说明里有数字拒、长活:多机一行规范句后接「；」与说明拒、长活:多机一行规范句后接按此刻空闲现算拒、长活:多机一行规范句后接机器忙时按负载降拒、
+#       长活:多机一行规范句后接除以此刻同时在跑的重活数拒、长活:多机一行规范句后接 host-resources 与 available_threads 拒、
+#       长活:行首行内三反引号不开围栏，后面的多机一行照判拒（现算）、长活:行首行内三反引号不开围栏，后面的多机一行照判拒（一半）（以上应当返回 2，实际 0）
+#   LIB_LONG_RUN_BREAK=hosts-suffix-accepted  规范句后面接任何说明都放行（只核以规范句起头）（⑭）
+#       长活:多机一行规范句后接别的话（没有「；」）拒、长活:多机一行规范句后的说明里有数字拒、长活:多机一行规范句后接「；」与说明拒、长活:多机一行规范句后接按此刻空闲现算拒、
+#       长活:多机一行规范句后接机器忙时按负载降拒、长活:多机一行规范句后接除以此刻同时在跑的重活数拒、长活:多机一行规范句后接 host-resources 与 available_threads 拒（应当返回 2，实际 0）
 #   LIB_LONG_RUN_BREAK=unshardable-unchecked  分不了一行不看字数、不看点没点名（⑭）
 #       长活:分不了一行没点名缺的多机拒（应当返回 2，实际 0）；长活:分不了一行不到 8 个字拒（应当返回 2，实际 0）
 # 工作根的两个弄坏开关在同目录 lib_work_root.py（一次设一个；经 bash 起钩子的 stdin 那几项也带着）：
@@ -222,7 +475,7 @@ source "$HOOK_DIR/../singlefs-ai-sop/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON（与 agent-write-scope.sh 同一个坑）。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
-import glob, hashlib, json, os, re, shutil, subprocess, sys, tempfile, time
+import glob, hashlib, importlib.util, json, os, re, shutil, subprocess, sys, tempfile, time
 from datetime import datetime, timedelta, timezone
 
 try:   # 工作根与过渡期旧根的唯一定义：同目录的 lib_work_root.py（读不到时提示里那两处下的路径都认不出、不判，stderr 写一句）
@@ -236,6 +489,18 @@ try:   # 长活声明的判法：同目录的 lib_long_run.py（读不到时⑭�
     long_run_error = None
 except Exception as error:  # 文件不在、语法错都算读不到
     long_run, long_run_error = None, error
+
+try:   # 草稿目录写者锁的判法与锁的格式：同目录的 lib_writer_lock.py（读不到时⑯不判，stderr 写一句）
+    sys.path.insert(0, sys.argv[1]); import lib_writer_lock as writer_lock
+    writer_lock_error = None
+except Exception as error:  # 文件不在、语法错都算读不到
+    writer_lock, writer_lock_error = None, error
+try:   # 叫停轮登记表一行怎么判（与门禁 doc-process-records 的 abandoned-rounds 格共用）：同目录的 lib_abandoned_rounds.py（读不到时 ⑥ 不收任何叫停的轮，stderr 写一句）
+    sys.path.insert(0, sys.argv[1]); import lib_abandoned_rounds as abandoned_library
+    abandoned_library_error = None
+except Exception as error:  # 文件不在、语法错都算读不到
+    abandoned_library, abandoned_library_error = None, error
+SCRIPT_HOOK_DIR = sys.argv[1]   # 这个钩子自己所在的 .claude/hooks：登记的线程数、写者锁的库都按它找，不按派发提示里的仓根找
 
 NONE_WORDS = {"", "无", "没有", "无。", "-", "—", "空", "none"}
 
@@ -260,7 +525,8 @@ HEAVY_PERMISSION_CLAUSE_SPLIT = re.compile(r"[，,：:]")
 # 起测试的 cargo 点名 checker 档包（只编不跑的带 --no-run，不算）
 HEAVY_PERMISSION_CARGO_TEST = re.compile(r"cargo\s+(?:\+\S+\s+)?(?:test|t|nextest\s+run|bench|miri\s+test|llvm-cov|hack\s+test)\b[^，。；;`）)\n]*?"
                                          r"(?:-p|--package)[\s=]*singlefs-checker-tier\b[^，。；;`）)\n]*")
-HEAVY_PERMISSION_OBJECT = re.compile(r"checker\s*档|--include-ignored|重型测试|重测试")
+# 要跑的对象：checker 档、--include-ignored、重型测试，以及只有重型跑法的四道门禁的脚本名（轻型三条另由 HEAVY_PERMISSION_LIGHT_CAPABLE 判）
+HEAVY_PERMISSION_OBJECT = re.compile(r"checker\s*档|--include-ignored|重型测试|重测试|checker-tier-(?:crash-point-replay|qemu-device-streams|lkmm|broad-mutation)\.sh\b")
 HEAVY_PERMISSION_CHECKER_TIER = re.compile(r"checker\s*档")
 # 许可词后面八个字以内接跑 / 复跑 / 执行 / 运行（「跑过」「跑完」「跑的」「执行员」「跑不了」这类不是许可跑）
 HEAVY_PERMISSION_VERB_TAIL = r"(?:复跑|重跑|跑|执行|运行)(?![过完出的了掉通绿红前员者]|不[了动起完过成])"
@@ -275,7 +541,7 @@ HEAVY_PERMISSION_LINT_AFTER = re.compile(r"^[\s`]*的?[\s`]*(?:clippy|build|fmt|
 HEAVY_PERMISSION_MENTION_AFTER = re.compile(r"^\s*(?:闸|钩子|的钩子|的闸|一行|那一行)")
 HEAVY_PERMISSION_MAIN_AGENT = re.compile(r"主\s*agent")
 # 两档里有轻型的那三条（.claude/rules/verification.md「两档：轻型与重型」）：点名脚本文件（前面可带 bash 与路径）；同一段命令里有 --quick 或只查清单的参数的不是重型写法
-HEAVY_PERMISSION_LIGHT_CAPABLE = re.compile(r"(?:\bbash\s+)?(?:[\w.~/-]*/)?(?:crash-point-replay|checker-tier-formal-verification|checker-tier-crates-mutation-replay)\.sh\b")
+HEAVY_PERMISSION_LIGHT_CAPABLE = re.compile(r"(?:\bbash\s+)?(?:[\w.~/-]*/)?(?<![\w-])(?:crash-point-replay|checker-tier-formal-verification|checker-tier-crates-mutation-replay)\.sh\b")
 HEAVY_PERMISSION_LIGHT_OR_QUERY = re.compile(r"--(?:quick|list|list-items|selftest|tool-versions|write)(?![\w-])")
 COMMON_CONSTRAINTS_READ = re.compile(r"开工先读[^\n]*\.claude/agent-common\.md")
 SUBAGENT_CONCURRENCY_LIMIT = 5              # 用户 2026-10-02 定（原话「一个主agent 最多同时开5个subagent」）
@@ -631,12 +897,23 @@ def break_switch_is(name):
     """自检用的弄坏开关：RUNNER_DISPATCH_GUARD_BREAK 等于 name 时，那一处判法故意走错，自检必须判红。"""
     return os.environ.get("RUNNER_DISPATCH_GUARD_BREAK") == name
 
-def open_three_way_rounds(project_root):
-    """还没判完的三方轮：[(轮名, 快照目录)]。research/prompts/<轮>-snapshot/ 在、_<轮>-body.md 在、<轮>-main-verification.md 不在。"""
+ABANDONED_ROUNDS_TABLE = abandoned_library.TABLE_PATH if abandoned_library is not None else os.path.join("research", "prompts", "abandoned-rounds.tsv")   # 门禁 doc-process-records 的 abandoned-rounds 格读的同一张表：叫停的轮只在这一处登记；这张表一行怎么判只在 lib_abandoned_rounds.py 一处
+SNAPSHOT_HALTED_SUFFIX = "-halted.md"                                                 # 已撤的一支：文件还在时只在拒绝说明里提醒改道，不认
+ABANDONED_LEGACY_BREAK_MODES = ("source-any-path", "source-escapes", "line-unread", "name-substring", "round-name-unchecked", "quote-short-ok")   # 出处判法的这六项，派发闸里也认 RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-<项>
+
+def abandoned_break_modes():
+    """lib_abandoned_rounds.py 的弄坏开关（LIB_ABANDONED_ROUNDS_BREAK）加上派发闸自己的 snapshot-abandoned-<项>；LIB_ABANDONED_ROUNDS_BREAK 的值认不出时抛 ValueError。"""
+    return abandoned_library.breaks() | {mode for mode in ABANDONED_LEGACY_BREAK_MODES if break_switch_is("snapshot-abandoned-" + mode)}
+
+def open_three_way_rounds(project_root, notes=None):
+    """还没判完的三方轮：[(轮名, 快照目录)]。research/prompts/<轮>-snapshot/ 在、_<轮>-body.md 在、<轮>-main-verification.md 不在；
+    research/prompts/abandoned-rounds.tsv 登记了这一轮、而且这一轮的登记行过得了 lib_abandoned_rounds.py 的判法（四列不空、日期是 YYYY-MM-DD、同一轮只一行、
+    出处收得了；门禁 abandoned-rounds 格判同一份，不收就是红）的轮是用户叫停收掉的，不算；登记了而过不了的照旧算开着，原因记进 notes。
+    <轮>-halted.md 这一支已撤：文件还在的，开着的轮在 notes 里提醒改道登记表。"""
     prompts_directory = os.path.join(project_root, "research", "prompts")
     if not os.path.isdir(prompts_directory):
         return []
-    rounds = []
+    candidates = []
     for entry_name in sorted(os.listdir(prompts_directory)):
         snapshot_directory = os.path.join(prompts_directory, entry_name)
         if not entry_name.endswith(SNAPSHOT_DIRECTORY_SUFFIX) or not os.path.isdir(snapshot_directory):
@@ -645,7 +922,34 @@ def open_three_way_rounds(project_root):
         has_body = os.path.isfile(os.path.join(prompts_directory, f"_{round_name}-body.md"))
         has_verdict = os.path.exists(os.path.join(prompts_directory, f"{round_name}-main-verification.md"))
         if round_name and (has_body or break_switch_is("snapshot-body-optional")) and (not has_verdict or break_switch_is("snapshot-closed-round-open")):
-            rounds.append((round_name, snapshot_directory))
+            candidates.append((round_name, snapshot_directory))
+    judgement = None
+    if candidates and not break_switch_is("snapshot-abandoned-ignored"):
+        if abandoned_library is None:
+            if notes is not None:
+                notes.append(f"! 派发闸读不到同目录的 lib_abandoned_rounds.py（{abandoned_library_error!r}）：叫停的轮这一次都没收")
+        else:
+            rows, read_error = abandoned_library.read_rows(project_root)
+            if read_error is not None:
+                if notes is not None:
+                    notes.append(f"! 派发闸读不了 {ABANDONED_ROUNDS_TABLE}（{read_error}）：叫停的轮这一次都没收")
+            else:
+                try:
+                    judgement = abandoned_library.judge_table(project_root, rows, abandoned_break_modes(), only_names={name for name, _ in candidates})
+                except ValueError as error:
+                    if notes is not None:
+                        notes.append(f"! {error}：叫停的轮这一次都没收")
+    rounds = []
+    for round_name, snapshot_directory in candidates:
+        if judgement is not None and any(row.name == round_name for row in judgement.rows):
+            problem = None if break_switch_is("snapshot-abandoned-unchecked") else abandoned_library.round_problem(judgement, round_name)
+            if problem is None:
+                continue
+            if notes is not None:
+                notes.append(f"! {ABANDONED_ROUNDS_TABLE} 登记了 {round_name}，但收不了这一轮：{problem}")
+        if notes is not None and os.path.isfile(os.path.join(prompts_directory, f"{round_name}{SNAPSHOT_HALTED_SUFFIX}")):
+            notes.append(f"! research/prompts/{round_name}{SNAPSHOT_HALTED_SUFFIX} 在，但派发闸不再认这一支：叫停的轮改在 {ABANDONED_ROUNDS_TABLE} 登记一行")
+        rounds.append((round_name, snapshot_directory))
     return rounds
 
 def repository_path_of_snapshot_line(line):
@@ -742,9 +1046,9 @@ def snapshot_conflict_verdict(subagent_type, prompt, project_root):
         return 0, None
     notes = []
     try:
-        rounds = open_three_way_rounds(project_root)
+        rounds = open_three_way_rounds(project_root, notes)
         if not rounds:
-            return 0, None
+            return 0, ("\n".join(notes) or None)
         sources = [("派发提示", prompt)]
         if not break_switch_is("snapshot-spec-unread"):
             sources += [(f"规格 {path}", text) for path, text in specification_texts(prompt, notes)]
@@ -780,43 +1084,386 @@ def snapshot_conflict_verdict(subagent_type, prompt, project_root):
     return 2, (f"✗ 派 {subagent_type} 要改的文件落在还没判完的三方轮 {round_names} 的开工快照里：\n" + "\n".join(listing) + "\n"
                "→ 规矩：.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」：腿跑着的时候主 agent 不改这些文件，要改的等判决时一起改。\n"
                f"→ 怎么办：等 {round_names} 的判决写完再派，或把这几处改动并进判决；判过这次派发不碰那一轮的证据（例如只读不改），"
-               f"在派发提示里单起一行写{valve_lines}（理由不许空）。"
+               f"在派发提示里单起一行写{valve_lines}（理由不许空）；用户已叫停、不会写判决的轮，在 research/prompts/abandoned-rounds.tsv 加一行收掉它"
+               "（轮名、日期 YYYY-MM-DD、为什么撂下、去向，制表符分隔，同一轮只一行；门禁 doc-process-records 的 abandoned-rounds 格读同一张表、判同一份，这里不收那一格就红），"
+               "行里写出处「records/<文件>.md 第 N 行〔<那一行里含这一轮名字的一段原话，逐字照抄>〕」：〔〕里的原话在 records/ 下那份现存文件里恰好找到一次（行号只当提示），"
+               "命中几处时取行号提示落着的那一处，找不到时只在行号提示那一行有这一轮的名字、去掉改名表（.claude/kb/term-renames.md）的新旧名与日期之后〔〕逐字落在那一行里才取那一行（〔〕不写转述）；"
+               "取到的那一行里要有这一轮的名字、除这一轮外没有别的轮名、并有「」括起来的用户原话（去掉空白后至少 6 个字），"
+               "不认这一轮自己的材料、规则与定义文件、仓外路径（含 ..）、同一行写着别的轮叫停原话的行，之后这一轮的快照不再挡任何派发。"
                + ("\n" + "\n".join(notes) if notes else ""))
 
-LONG_RUN_AGENTS = {"experiment-designer", "experiment-runner"}
-LONG_RUN_RULE = ("→ 规矩：预计挂钟超过 2 小时的活默认分片、断点续跑、按多机配置自适应"
+THREAD_LIMIT_LINE = re.compile(LINE_START + r"线程上限[* \t]*[：:][* \t]*(.*?)[ \t]*$", re.M)
+CODE_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,})[^`]*$")   # 只有弄坏开关 code-block-line-rule 下还在用：改前逐行认的开头围栏行（至多缩进 3 个空格，三个及以上反引号，语言名里不许有反引号）
+CODE_FENCE_OPEN_LOOSE = re.compile(r"^[ \t]*(`{3,})")   # 只有弄坏开关 code-fence-loose 下还在用：更早的行首任意缩进的三个反引号就开块，后面接什么都不看
+CODE_BLOCK_CLOSING_PREFIX = re.compile(r"^(?:[ \t]*>)*[ \t]*")   # 围栏块最后一行前面的引用块 > 与缩进（列表项的缩进也在里面），去掉之后才是关的那一行围栏字符
+THREAD_LIMIT_LEADING_NUMBER = re.compile(r"(\d+)(?!\d|\.\d)")
+THREAD_LIMIT_VALUE = re.compile(r"[0-9]+")   # 一个十进制整数，后面什么都不接（括注也不行；说明另起一行照普通正文写，那一行不判）
+THREAD_LIMIT_VALUE_WITH_NOTE = re.compile(r"[0-9]+(?:[ \t]*（([^（）\n]*)）)?")   # 只有弄坏开关 thread-note-accepted 下还在用：改前整数后面至多一段中文（全角）括注
+THREAD_LIMIT_NOTE_START = re.compile(r"[0-9]+[ \t]*[（(]")   # 整数后面接了括注（全角或半角）
+THREAD_LIMIT_NUMBER = re.compile(r"[0-9]+")
+THREAD_LIMIT_FORMULA_MARKS = re.compile(r"÷|/|一半|除以")
+# 任务带重活的类型：提示里没有「线程上限：」一行也拒（⑮）；别的类型写了才判
+THREAD_LIMIT_REQUIRED_AGENTS = {"implementation-writer", "investigator", "tooling-writer", "experiment-runner", "mutation-triage", "three-way-attack",
+                                "clerk", "three-way-forward", "three-way-defense"}   # 后三种：clerk 的定义许编译、跑编译出来的代码（clerk.md）；three-way-forward、three-way-defense 的定义只跑模型目录里的 tools/rerun.sh、不编译，多数派发不带重活，不带重活的写「线程上限已判：<理由>」顶缺行
+THREAD_LIMIT_REQUIRED_AGENTS_BEFORE_CLERK = {"implementation-writer", "investigator", "tooling-writer", "experiment-runner", "mutation-triage", "three-way-attack"}   # 只有弄坏开关 thread-required-six-types 下还在用
+HEAVY_THREADS_LIBRARY_VARIABLE = "RUNNER_DISPATCH_GUARD_HEAVY_THREADS_LIBRARY"   # 自检把登记读成别的值、或读不到时用
+THREAD_OVERRIDE_VARIABLE = "SINGLEFS_THREAD_CAP"
+
+def registered_heavy_threads():
+    """登记的每台默认重活线程数（.claude/heavy-thread-default，经 scripts/hosts/heavy_threads.py 的 default_heavy_threads 取）→ (数, None)；读不到 → (None, 原因)。
+    临时覆盖（SINGLEFS_THREAD_CAP）不算：判的是登记值本身。"""
+    path = os.environ.get(HEAVY_THREADS_LIBRARY_VARIABLE) or os.path.join(os.path.dirname(os.path.dirname(SCRIPT_HOOK_DIR)), "scripts", "hosts", "heavy_threads.py")
+    try:
+        sys.path.insert(0, os.path.dirname(path))
+        spec = importlib.util.spec_from_file_location("heavy_threads_of_dispatch_guard", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        environment = {name: value for name, value in os.environ.items() if name != THREAD_OVERRIDE_VARIABLE}
+        return int(module.default_heavy_threads(environment=environment)), None
+    except Exception as error:   # 文件不在、语法错、接口对不上都算读不到
+        return None, error
+
+def thread_limit_form_problem(value):
+    """「线程上限：」后面这一段写得对不对：只认一个十进制整数，后面什么都不接（括注也不行，说明另起一行照普通正文写，那一行不判）。合返回 None，不合返回一句原因。"""
+    if value.startswith("<"):
+        return "尖括号写法认不出数，要写一个十进制整数（只有 <填 …> 是骨架占位，那一条交 ⑬）"
+    if THREAD_LIMIT_FORMULA_MARKS.search(value):
+        return "写成了公式或比例，不许出现 ÷、/、一半、除以"
+    numbers = THREAD_LIMIT_NUMBER.findall(value)
+    if len(numbers) >= 2:
+        return f"有 {len(numbers)} 个数字 {'、'.join(numbers[:4])}，只许一个"
+    if not numbers:
+        return "认不出数，要写一个十进制整数"
+    shape = (THREAD_LIMIT_VALUE_WITH_NOTE if break_switch_is("thread-note-accepted") else THREAD_LIMIT_VALUE).fullmatch(value)
+    if shape is None:
+        if THREAD_LIMIT_NOTE_START.match(value):
+            return "整数后面接了括注：括注一概不认，说明写得再好也不行，说明另起一行照普通正文写"
+        return "整数后面接了别的话：这一行只许一个十进制整数，说明另起一行照普通正文写"
+    return None
+
+def without_code_blocks_by_lines(prompt, loose):
+    """只有弄坏开关 code-block-line-rule、code-fence-loose 下还在用：改前逐行认围栏，只认反引号；开头那一行至多缩进 3 个空格、语言名里不许有反引号
+    （loose 时任意缩进的三个反引号就开块），往后找第一行同样多个反引号当关块（loose 时不限缩进），没找到的那一行照原样留着。不认波浪线、列表项与引用块的边界、HTML 块。"""
+    fence_open = CODE_FENCE_OPEN_LOOSE if loose else CODE_FENCE_OPEN
+    lines = prompt.split("\n")
+    kept, index = [], 0
+    while index < len(lines):
+        opening = fence_open.match(lines[index].rstrip("\r"))
+        if opening is not None:
+            closing = re.compile((r"[ \t]*`{" if loose else r" {0,3}`{") + str(len(opening.group(1))) + r",}[ \t]*")
+            end = next((later for later in range(index + 1, len(lines)) if closing.fullmatch(lines[later].rstrip("\r"))), None)
+            if end is not None:
+                kept.extend([""] * (end - index + 1))
+                index = end + 1
+                continue
+        kept.append(lines[index])
+        index += 1
+    return "\n".join(kept)
+
+code_block_library_note_printed = []   # 载不进 markdown-it-py 那一句 stderr 只写一次（⑭ ⑮ 各认一次代码块）
+CODE_BLOCK_LIBRARY_VARIABLE = "RUNNER_DISPATCH_GUARD_CODE_BLOCK_LIBRARY"   # 认 CommonMark 用的模块名（不设是 markdown_it）；自检设成一个不在的模块名，走载不进的那一路
+LINE_FENCE_OPEN = re.compile(r"(`{3,})[^`]*|(~{3,}).*")   # 宽的逐行认法的开块行（去掉行首的 > 与缩进之后）：反引号围栏后面不许再有反引号（那是行内代码），波浪线围栏后面接什么都行
+THREAD_LIMIT_LABEL_LINE = re.compile(LINE_START + r"线程上限(?:已判)?[* \t]*[：:]")   # ⑮ 读的标签行
+LONG_RUN_LABEL_LINE = re.compile(LINE_START + r"(?:预计挂钟|分片|续跑|多机(?:已判)?|分不了)[* \t]*[：:]")   # ⑭ 读的标签行
+
+def hidden_lines_by_commonmark(lines):
+    """照 CommonMark 认（markdown-it-py 的 commonmark 预设）：闭合了的围栏块（块的最后一行去掉引用块的 > 与缩进之后，是同一种围栏字符、不短于开头那一行）
+    从开块到关块的行号（从 0 起）；到文末没闭合的、在列表项或引用块结束处结束的、缩进代码块与 HTML 块都不算。载不进 markdown-it-py 交 None，stderr 写一句。"""
+    try:
+        if break_switch_is("code-block-library-missing"):
+            raise ImportError("弄坏开关 code-block-library-missing")
+        markdown_it = importlib.import_module(os.environ.get(CODE_BLOCK_LIBRARY_VARIABLE) or "markdown_it")
+        parser = markdown_it.MarkdownIt("commonmark")
+    except Exception as error:   # 没装、装坏了都按载不进办
+        if not code_block_library_note_printed:
+            code_block_library_note_printed.append(True)
+            print(f"! 派发闸载不进 markdown-it-py（{error!r}）：代码块这一次"
+                  + ("一行都不遮，⑭ ⑮ 整份照判" if break_switch_is("code-block-fallback-unmasked") else "照宽的逐行认法遮，不比两种认法"), file=sys.stderr)
+        return None
+    parsed = "\n".join(line.rstrip("\r").replace("\r", " ") for line in lines)   # 与 lines 一行对一行：markdown-it 把单独的 \r 也当换行
+    hidden = set()
+    for token in parser.parse(parsed):
+        if token.type != "fence" or not token.map:
+            continue
+        first, end = token.map
+        if end - first < 2 or end > len(lines):
+            continue
+        closing = CODE_BLOCK_CLOSING_PREFIX.sub("", lines[end - 1].rstrip("\r"), count=1)
+        if re.fullmatch(re.escape(token.markup[0]) + "{" + str(len(token.markup)) + r",}[ \t]*", closing):
+            hidden.update(range(first, end))
+    return hidden
+
+def hidden_lines_by_wide_line_rule(lines):
+    """宽的逐行认法：反引号、波浪线都认，每一行先去掉行首的引用块 > 与任意缩进；开块那一行（LINE_FENCE_OPEN）往后第一行是同一种字符三个以上、后面只有空白的当关块，
+    开块到关块的行号（从 0 起）都算；往后找不到关块的那一行不开块。不认列表项与引用块的边界、HTML 块，也不看关块的字符数够不够。"""
+    hidden, index = set(), 0
+    while index < len(lines):
+        opening = LINE_FENCE_OPEN.fullmatch(CODE_BLOCK_CLOSING_PREFIX.sub("", lines[index].rstrip("\r"), count=1))
+        if opening is not None:
+            closing = re.compile(re.escape((opening.group(1) or opening.group(2))[0]) + r"{3,}[ \t]*")
+            end = next((later for later in range(index + 1, len(lines))
+                        if closing.fullmatch(CODE_BLOCK_CLOSING_PREFIX.sub("", lines[later].rstrip("\r"), count=1))), None)
+            if end is not None:
+                hidden.update(range(index, end + 1))
+                index = end + 1
+                continue
+        index += 1
+    return hidden
+
+def without_code_blocks(prompt):
+    """去掉提示里闭合了的围栏代码块（照 CommonMark 认，hidden_lines_by_commonmark）：围栏行和块里的行都换成空行（行数不变）。⑭ 与 ⑮ 都经这一个函数认代码块，
+    遮之前各自先过 code_block_ambiguous_label_lines。载不进 markdown-it-py 时退回宽的逐行认法（hidden_lines_by_wide_line_rule）遮，stderr 写一句。"""
+    if break_switch_is("code-fence-loose") or break_switch_is("code-block-line-rule"):
+        return without_code_blocks_by_lines(prompt, loose=break_switch_is("code-fence-loose"))
+    lines = prompt.split("\n")
+    hidden = hidden_lines_by_commonmark(lines)
+    if hidden is None:
+        if break_switch_is("code-block-fallback-unmasked"):
+            return prompt
+        hidden = hidden_lines_by_wide_line_rule(lines)
+    return "\n".join("" if index in hidden else line for index, line in enumerate(lines))
+
+def code_block_ambiguous_label_lines(prompt, label_line):
+    """标签行（label_line 认的那几种）在 CommonMark 认法与宽的逐行认法下遮不遮不一致的：[(行号从 1 起, 那一行, CommonMark 遮不遮, 逐行认法遮不遮)]。
+    载不进 markdown-it-py（只剩一种认法）、弄坏开关 code-block-ambiguity-unchecked、code-fence-loose、code-block-line-rule 下交空表。"""
+    if break_switch_is("code-block-ambiguity-unchecked") or break_switch_is("code-fence-loose") or break_switch_is("code-block-line-rule"):
+        return []
+    lines = prompt.split("\n")
+    commonmark = hidden_lines_by_commonmark(lines)
+    if commonmark is None:
+        return []
+    wide = hidden_lines_by_wide_line_rule(lines)
+    return [(index + 1, line, index in commonmark, index in wide) for index, line in enumerate(lines)
+            if label_line.match(line) and (index in commonmark) != (index in wide)]
+
+def code_block_ambiguity_refusal(subagent_type, ambiguous, labels):
+    """两种认法遮不遮不一致的拒绝说明：逐行点名、两种认法各怎么认，出路是把围栏写规整。"""
+    shown = "\n".join(f"  第 {number} 行「{line.strip()[:50]}」：照 CommonMark 认{'在' if commonmark else '不在'}代码块里，照逐行配围栏认{'在' if wide else '不在'}代码块里"
+                      for number, line, commonmark, wide in ambiguous[:6])
+    return (f"✗ 派 {subagent_type} 的提示里{labels}这几行在不在代码块里，两种认法不一致（派发闸判的那一行与读提示的人读到的可能不是同一行）：\n{shown}\n"
+            "→ 规矩：⑭ ⑮ 只不判闭合了的围栏代码块（照 CommonMark 认）里的行，标签行在两种认法下遮不遮要一样（.claude/hooks/runner-dispatch-guard.sh 文件头 ⑮ 条）。\n"
+            "→ 怎么办：把围栏写规整：开和关用同一种字符（``` 或 ~~~）、同样多个，关的那一行与开的那一行同样缩进、在同一个列表项或引用块里（引用块里每一行都带 >），"
+            "<details> 这类 HTML 块里不留空行；围栏里要示范围栏的，外层用 ~~~、里面用 ```；或者把示例行改写成不以这几个标签起头的一行。")
+
+def thread_limit_verdict(subagent_type, prompt):
+    """⑮ 行首「线程上限：」后面只认一个十进制整数（后面什么都不接，括注也不行），整数要等于登记值；写成公式或比例（÷、/、一半）、两个以上数字、整数后面接括注或别的话、
+    不等于登记值、认不出数的拒；THREAD_LIMIT_REQUIRED_AGENTS 里的类型没写这一行也拒；除非另写「线程上限已判：<理由>」。代码块（照 CommonMark，without_code_blocks）里的行不判（里面的已判行也不算）。交回拒绝说明，放行交 None。"""
+    if break_switch_is("thread-limit-unchecked"):
+        return None
+    if not break_switch_is("thread-codeblock-judged"):
+        ambiguous = code_block_ambiguous_label_lines(prompt, THREAD_LIMIT_LABEL_LINE)
+        if ambiguous:
+            return code_block_ambiguity_refusal(subagent_type, ambiguous, "「线程上限：」「线程上限已判：」")
+        prompt = without_code_blocks(prompt)
+    required_types = THREAD_LIMIT_REQUIRED_AGENTS_BEFORE_CLERK if break_switch_is("thread-required-six-types") else THREAD_LIMIT_REQUIRED_AGENTS
+    required = subagent_type in required_types and not break_switch_is("thread-line-optional")
+    if break_switch_is("thread-required-only-writer"):
+        required = subagent_type == "implementation-writer"
+    written = [match.group(1) for match in THREAD_LIMIT_LINE.finditer(prompt)]
+    # 只有 <填 …>（⑬ 认的骨架占位，SKELETON_PLACEHOLDER）交 ⑬、这里不判；别的尖括号写法（<登记值>、<按机器忙闲定>）照样是写了这一行、认不出数
+    stated = [value for value in written if not (value.startswith("<") if break_switch_is("thread-angle-dropped") else SKELETON_PLACEHOLDER.match(value))]
+    missing = required and not written
+    if not stated and not missing:
+        return None
+    registered, error = registered_heavy_threads()
+    if registered is None:
+        print(f"! 派发闸读不到登记的每台默认重活线程数（{error!r}）：线程上限这一条这一次没判", file=sys.stderr)
+        return None
+    wrong = []   # [(写的那一段, 哪里不对)]
+    for value in stated:
+        problem = None if break_switch_is("thread-formula-accepted") else thread_limit_form_problem(value)
+        if problem is None:
+            number = THREAD_LIMIT_LEADING_NUMBER.match(value)
+            if number is None:
+                problem = "认不出数，要写一个十进制整数"
+            elif int(number.group(1)) != registered or break_switch_is("thread-limit-any-refused"):
+                problem = f"{number.group(1)} 不等于登记值 {registered}"
+        if problem is not None:
+            wrong.append((value, problem))
+    if not wrong and not missing:
+        return None
+    if break_switch_is("thread-valve-loose"):
+        valve = re.search(LINE_START + "线程上限已判", prompt, re.M) is not None
+    else:
+        valve = valve_reason(prompt, "线程上限已判") is not None and not break_switch_is("thread-valve-ignored")
+    if valve:
+        return None
+    if wrong:
+        shown = "、".join(f"「线程上限：{value[:40]}」（{problem}）" for value, problem in wrong[:4])
+        head = (f"✗ 派 {subagent_type} 的提示写了{shown}；这一行只认一个十进制整数、后面什么都不接（括注也不行），"
+                f"整数要等于登记的每台默认重活线程数 {registered}（.claude/heavy-thread-default）。\n")
+    else:
+        head = (f"✗ 派 {subagent_type} 的提示里没有「线程上限：N」一行；这一类型的活带重活，N 要写登记的每台默认重活线程数 {registered}（.claude/heavy-thread-default）。\n")
+    return (head
+            + "→ 规矩：用户 2026-10-12 定：没给参数每台默认登记值，双机时两台各一份，不按整机核数除以同时在跑的重活数算，机器忙也不降（records/2026-10-12-里程碑三工具与治理批.md 课题 10）。\n"
+            + f"→ 怎么办：写成单独一行「线程上限：{registered}」（python3 scripts/agents/dispatch-prompt.py <类型> 打的骨架默认就填它；这一行不接括注，不写 ÷、/、一半或第二个数，要说明的另起一行照普通正文写）；"
+            + ("这件活确要别的数（用户给了参数、内存装不下），或确实不起重活，提示里单起一行「线程上限已判：<理由>」。" if break_switch_is("thread-valve-hint-merged") else
+               "这件活确要别的数（用户给了参数、内存装不下），写「线程上限：N」再加一行「线程上限已判：<理由>」；"
+               "确实不起重活的，只写一行「线程上限已判：<理由>」（子 agent 拿到只有已判行的提示不起重活，要起就停下交回，.claude/agent-common.md「不做」一节线程上限那一条）。"))
+
+WRITER_LOCK_DIRECTORY_LINE = re.compile(LINE_START + r"草稿目录[* \t]*[：:][* \t]*`?(" + SCRATCH_MENTION_PREFIX + r"[^\s`'\"，。；：、（）()「」『』“”,;*<>]*)", re.M)
+WRITER_LOCK_HOLDER_UNLAUNCHED = "一个刚派出去、派发回执还没落进主会话记录的子 agent"
+
+def scratch_directories_named(prompt):
+    """提示里行首「草稿目录：<路径>」点名的目录（工作根或过渡期旧根底下的，展开成绝对路径，根本身不算）。"""
+    roots = [root.rstrip("/") for root in (work_roots.scratch_roots() if work_roots else ())]
+    found = []
+    for match in WRITER_LOCK_DIRECTORY_LINE.finditer(prompt):
+        path = os.path.normpath(expanded_mention(match.group(1)))
+        under_root = any(path.startswith(root + "/") for root in roots)
+        if (under_root or (break_switch_is("writer-lock-root-locked") and path in roots)) and path not in found:
+            found.append(path)
+    return found
+
+def writer_lock_holder_state(scratch, lock, launches, ended, current_transcript, new_digest):
+    """锁的持有者还在不在跑 → (在跑吗, 持锁者的 agent 号或 None)。认领文件里的 agent 是持锁者；没认领的，在派发那份会话记录里按提示 sha256 与派发时刻找回执；
+    都没有的看派发多久了（UNLAUNCHED_GRACE_SECONDS 以内算刚派出去；这一次派发的提示与锁里登记的是同一份、那一件又没起来的，当重试，不算在跑）。
+    在跑的判法同 ⑦ 的 is_running。"""
+    transcript = lock.get("transcript_path") or ""
+    if transcript and transcript != current_transcript:   # 别的会话派的：读它那份记录
+        launches, ended, _ = session_dispatch_events(transcript)
+    else:
+        transcript = current_transcript
+    now, dispatched = time.time(), lock["dispatched_at"]
+    claim = writer_lock.read_claim(scratch, lock)
+    holder = claim["agent_id"] if claim else None
+    if holder is None:
+        matching = [(moment, agent_id) for agent_id, (moment, _, digest) in launches.items()
+                    if digest == lock.get("prompt_sha256") and moment >= dispatched - writer_lock.LAUNCH_SLACK_SECONDS]
+        holder = max(matching)[1] if matching else None
+    if holder is not None and holder in launches:
+        return is_running(holder, launches, ended, transcript), holder
+    if holder is not None:   # 认领过，派发回执在读不到的记录里：按认领之后的动静估
+        return now - max(dispatched, claim.get("claimed_at", 0) if claim else 0) <= RUNNING_RECENT_SECONDS, holder
+    if lock.get("prompt_sha256") == new_digest and not break_switch_is("writer-lock-retry-refused"):
+        return False, None   # 同一份提示重派、上一次没起来（派发失败这类）：重试，不被自己上一次建的锁挡住
+    return now - dispatched <= UNLAUNCHED_GRACE_SECONDS, None
+
+def writer_lock_verdict(hook_input, prompt, subagent_type, launches, ended, session_judged, unjudged):
+    """⑯ → (拒绝说明或 None, 放行后要办的 [(草稿目录, 旧锁或 None)])。--check-prompt（session_judged 为假）不读锁、不判，记进 unjudged。"""
+    if break_switch_is("writer-lock-unchecked"):
+        return None, []
+    directories = scratch_directories_named(prompt)
+    if not directories:
+        return None, []
+    if writer_lock is None:
+        print(f"! 派发闸读不到同目录的 lib_writer_lock.py（{writer_lock_error!r}）：草稿目录写者锁这一次没建也没判", file=sys.stderr)
+        return None, []
+    if not session_judged:
+        unjudged.append("⑯ 草稿目录写者锁（派的那一刻按锁文件与主会话记录判）")
+        return None, []
+    valve = valve_reason(prompt, "写者锁已判") is not None and not break_switch_is("writer-lock-valve-ignored")
+    current_transcript = hook_input.get("transcript_path") or ""
+    actions, conflicts = [], []
+    for scratch in directories:
+        lock = writer_lock.read_lock(scratch)
+        if lock is None:
+            actions.append((scratch, None))
+            continue
+        alive, holder = writer_lock_holder_state(scratch, lock, launches, ended, current_transcript, writer_lock.prompt_digest(prompt))
+        if break_switch_is("writer-lock-live-ignored"):
+            alive = False
+        if break_switch_is("writer-lock-stale-kept"):
+            alive = True
+        if alive and not valve:
+            conflicts.append((scratch, lock, holder))
+        else:
+            actions.append((scratch, lock))
+    if not conflicts:
+        return None, actions
+    shown = "\n".join(f"  {scratch}：持锁的是 {holder or WRITER_LOCK_HOLDER_UNLAUNCHED}（派发 {lock.get('subagent_type') or '?'}，派发于 {str(lock.get('dispatched_date'))[:10]}）"
+                      for scratch, lock, holder in conflicts[:6])
+    return (f"✗ 派 {subagent_type} 的草稿目录里已经有写者锁，持锁的子 agent 还在跑：\n{shown}\n"
+            "→ 规矩：同一个草稿目录同一时刻只许一个子 agent 写（两位写者交替写同一份副本、互删副本，.claude/kb/milestone/03-third-txn.md 待优化表「草稿目录写者锁」一条）；"
+            "派发时在目录里建 .writer-lock，写范围闸（.claude/hooks/write-guard.sh 第九道）拒不是持锁者的 Write / Edit。\n"
+            "→ 怎么办：等持锁的交回再派，或给这一件换一个草稿目录；持锁的确实已经失效（客户端重启后留下的旧进程、已经停掉的），在提示里单起一行「写者锁已判：<理由>」接手，"
+            "接手之后旧写者的 Write / Edit 被拒。"), []
+
+def acquire_writer_locks(hook_input, prompt, subagent_type, actions):
+    """放行之后建锁（目录里没有锁的排他建，有锁的接手）。→ 建锁时被另一次派发抢先的拒绝说明，或 None。建不了锁（目录写不进）的只在 stderr 写一句、不拦派发。"""
+    for scratch, previous in actions:
+        lock = writer_lock.new_lock(hook_input.get("session_id"), prompt, subagent_type, hook_input.get("transcript_path"))
+        try:
+            if previous is None:
+                if not writer_lock.create_lock(scratch, lock):
+                    return (f"✗ 草稿目录 {scratch} 刚被另一次派发抢先建了写者锁。\n"
+                            "→ 怎么办：等那一件交回，或给这一件换一个草稿目录；那一件确已失效，重派一次并在提示里单起一行「写者锁已判：<理由>」接手。")
+            else:
+                writer_lock.replace_lock(scratch, lock)
+        except OSError as error:
+            print(f"! 派发闸建不了草稿目录写者锁 {scratch}：{error}；这一次没锁", file=sys.stderr)
+    return None
+
+LONG_RUN_AGENTS = {"experiment-designer"} | THREAD_LIMIT_REQUIRED_AGENTS   # 设计员，加上 ⑮ 那张任务带重活的类型表（用户 2026-10-12 定的判定射程）
+LONG_RUN_AGENTS_BEFORE_WIDENING = {"experiment-designer", "experiment-runner"}   # 只有弄坏开关 long-run-types-narrowed 下还在用
+LONG_RUN_RULE = ("→ 规矩：预计挂钟超过 2 小时的活默认分片、断点续跑、按多机配置自适应；多机配置里每台线程取登记值 .claude/heavy-thread-default，不现算"
                  "（.claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」）。\n")
-LONG_RUN_LINES = ("超过 2 小时的，同一份提示里写三行：「分片：<分片单元>」「续跑：<同一条命令重起只补没做完的，怎么认做完的>」"
-                  "「多机：<台数从 layer0-shard-configuration-check.sh --emit-hosts 读、每台的线程与内存从 host-resources.py --json 现算，不写常量>」；"
-                  "分不了的写「分不了：<点名缺的分片 / 续跑 / 多机与为什么，至少 8 个字>」。骨架 python3 scripts/agents/dispatch-prompt.py <类型> 带这几行。")
+def long_run_lines():
+    """拒绝说明里「怎么办」的三行写法；多机一行的规范句取 lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE（规范句只写在那一处），读不到库时只指过去。"""
+    sentence = long_run.CANONICAL_HOSTS_SENTENCE if long_run is not None else "<规范句见 .claude/hooks/lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE>"
+    return ("超过 2 小时的，同一份提示里写三行：「分片：<分片单元>」「续跑：<同一条命令重起只补没做完的，怎么认做完的>」"
+            f"「多机：{sentence}」"
+            "（多机这一行只认这一句，逐字，可带句末句号；后面不接任何说明，要说明另起一行写，别的说法一律不认；用户给了逐台不同的台数或线程的，另加一行「多机已判：<理由>」，逐台参数再另起一行照普通正文写）；"
+            "分不了的写「分不了：<点名缺的分片 / 续跑 / 多机与为什么，至少 8 个字>」。骨架 python3 scripts/agents/dispatch-prompt.py <类型> 带这几行。")
+
+HOSTS_VALVE_LABEL = "多机已判"   # 用户给了逐台不同的台数或线程时写的放行行（⑭）：有它时子 agent 照提示里逐台写的参数，没有就只照「多机：」那一句规范句
+HOSTS_VALVE_LINE = re.compile(LINE_START + HOSTS_VALVE_LABEL + r"[* \t]*[：:][* \t]*(.*?)[ \t]*$", re.M)
+
+def hosts_valve_problems(prompt):
+    """「多机已判：<理由>」一行写得对不对：理由不能空、不能是占位，只写一行。没写这一行交空表。"""
+    if break_switch_is("hosts-valve-unchecked"):
+        return []
+    values = [found.group(1).strip() for found in HOSTS_VALVE_LINE.finditer(prompt)]
+    problems = []
+    if len(values) >= 2:
+        problems.append(f"「{HOSTS_VALVE_LABEL}：」写了 {len(values)} 行：只写一行，理由写在同一行里")
+    if values and (values[0] in NONE_WORDS or values[0].startswith("<")):
+        problems.append(f"「{HOSTS_VALVE_LABEL}：」后面没写理由（写用户怎么给的逐台参数）")
+    return problems
 
 def long_run_verdict(subagent_type, prompt):
-    """⑭ 派设计员、执行员：预计挂钟一行，超过 2 小时时的分片、续跑、多机三行（判法在 lib_long_run.py）。交回拒绝说明，放行交 None。"""
-    if subagent_type not in LONG_RUN_AGENTS or break_switch_is("long-run-unchecked"):
+    """⑭ 派设计员与带重活的几种类型：预计挂钟一行，超过 2 小时时的分片、续跑、多机三行（判法在 lib_long_run.py，多机一行走登记值那一种）。交回拒绝说明，放行交 None。"""
+    covered = LONG_RUN_AGENTS_BEFORE_WIDENING if break_switch_is("long-run-types-narrowed") else LONG_RUN_AGENTS
+    if break_switch_is("thread-required-six-types"):
+        covered = {"experiment-designer"} | THREAD_LIMIT_REQUIRED_AGENTS_BEFORE_CLERK
+    if subagent_type not in covered or break_switch_is("long-run-unchecked"):
         return None
     if long_run is None:
         print(f"! 派发闸读不到同目录的 lib_long_run.py（{long_run_error!r}）：预计挂钟与长活声明这一次没判", file=sys.stderr)
         return None
+    if not break_switch_is("long-run-codeblock-judged"):
+        ambiguous = code_block_ambiguous_label_lines(prompt, LONG_RUN_LABEL_LINE)   # 与 ⑮ 一样：标签行在两种认法下遮不遮不一致就拒
+        if ambiguous:
+            return code_block_ambiguity_refusal(subagent_type, ambiguous, "「预计挂钟：」「分片：」「续跑：」「多机：」「多机已判：」「分不了：」")
+        prompt = without_code_blocks(prompt)   # 与 ⑮ 一样不判闭合了的围栏代码块（照 CommonMark 认）里的行（示例行、喂法样本放进去不被当成声明那一行）
     try:
         wall_clock, declared = long_run.prompt_declaration(prompt)
         if wall_clock is None and break_switch_is("wall-clock-optional"):
             wall_clock = long_run.WALL_CLOCK_WITHIN
         if wall_clock is None:
             return (f"✗ 派 {subagent_type} 的提示里没有「预计挂钟：…」一行（这件活的预计挂钟落在 2 小时内还是外）。\n" + LONG_RUN_RULE
-                    + "→ 怎么办：单起一行「预计挂钟：2 小时内」或「预计挂钟：超过 2 小时」（后面可接逗号与推的依据）；" + LONG_RUN_LINES)
+                    + "→ 怎么办：单起一行「预计挂钟：2 小时内」或「预计挂钟：超过 2 小时」（后面可接逗号与推的依据）；" + long_run_lines())
+        valve_problems = hosts_valve_problems(prompt)
+        if valve_problems:
+            shown = "\n".join(f"  {problem}" for problem in valve_problems)
+            return (f"✗ 派 {subagent_type} 的提示里「{HOSTS_VALVE_LABEL}：」一行写得不对：\n{shown}\n"
+                    f"→ 规矩：用户给了逐台不同的台数或线程时，写一行「{HOSTS_VALVE_LABEL}：<理由>」，逐台参数另起一行照普通正文写；子 agent 只在有这一行时照逐台写的参数跑，"
+                    "没有就只照「多机：」那一句规范句（.claude/agent-common.md「执行前拒绝的写法」派发闸那一条）。\n"
+                    f"→ 怎么办：只留一行「{HOSTS_VALVE_LABEL}：<用户怎么给的逐台参数>」；用户没给逐台参数的，删掉这一行。")
         if wall_clock == long_run.WALL_CLOCK_WITHIN:
             return None
         if wall_clock != long_run.WALL_CLOCK_OVER:
             return (f"✗ 派 {subagent_type} 的「预计挂钟：{wall_clock}」认不出：只认以「2 小时内」或「超过 2 小时」开头的写法。\n"
-                    "→ 怎么办：改成「预计挂钟：2 小时内」或「预计挂钟：超过 2 小时」，后面可接逗号与推的依据；" + LONG_RUN_LINES)
-        problems = long_run.judge(declared, long_run.PROMPT_SPELLING)
+                    "→ 怎么办：改成「预计挂钟：2 小时内」或「预计挂钟：超过 2 小时」，后面可接逗号与推的依据；" + long_run_lines())
+        duplicates = [] if break_switch_is("long-run-duplicate-label-first-wins") else long_run.duplicate_prompt_problems(prompt)   # 同一标签写了两行：只读第一行，第二行没人判，所以判红
+        problems = duplicates + long_run.judge(declared, long_run.PROMPT_SPELLING, hosts_reading="registered")
     except Exception as error:   # 判法自己出错（LIB_LONG_RUN_BREAK 写错这类）不拒
         print(f"! 派发闸判长活声明出错，这一次没判：{error!r}", file=sys.stderr)
         return None
     if not problems:
         return None
     shown = "\n".join(f"  {problem}" for problem in problems)
-    return (f"✗ 派 {subagent_type} 的提示写了预计挂钟超过 2 小时，长活声明不齐：\n{shown}\n" + LONG_RUN_RULE + "→ 怎么办：" + LONG_RUN_LINES)
+    return (f"✗ 派 {subagent_type} 的提示写了预计挂钟超过 2 小时，长活声明不齐：\n{shown}\n" + LONG_RUN_RULE + "→ 怎么办：" + long_run_lines())
 
 INPUT_EXAMPLE_FALLBACK = ("禁读清单", "禁读：")   # ③ 拒绝说明里「近义的不算」的例子：缺的名字太短或是 ASCII 时用这一对
 
@@ -863,9 +1510,10 @@ def runner_fork_verdict(prompt, project_root):
                 "→ 怎么办：按岔路单交岔路表给用户；剩下的量在实验页标「够判后未跑」，状态写「已跑（够判）」。")
     return None
 
-def decide(hook_input, project_root, hook_dir=None):
-    """返回 (0, None 或给 stderr 的提醒) 放行；(2, 说明) 拒绝。各条都判完（judge_dispatch），不成立的几条一次列全，每条带自己的出路。"""
-    refusals, notes, _ = judge_dispatch(hook_input, project_root, hook_dir)
+def decide(hook_input, project_root, hook_dir=None, take_locks=False):
+    """返回 (0, None 或给 stderr 的提醒) 放行；(2, 说明) 拒绝。各条都判完（judge_dispatch），不成立的几条一次列全，每条带自己的出路。
+    take_locks：放行时真的在草稿目录里建写者锁（钩子入口传真，自检里直接调 decide 不建）。"""
+    refusals, notes, _ = judge_dispatch(hook_input, project_root, hook_dir, take_locks=take_locks)
     if not refusals:
         return 0, notes
     subagent_type = (hook_input.get("tool_input") or {}).get("subagent_type") or "general-purpose"
@@ -956,7 +1604,7 @@ def heavy_permission_sentences(prompt):
     return hits
 
 
-def judge_dispatch(hook_input, project_root, hook_dir=None, check_only=False):
+def judge_dispatch(hook_input, project_root, hook_dir=None, check_only=False, take_locks=False):
     """派发闸的全部判法，各条都判完：→ ([(条名, 拒绝说明)], 给 stderr 的提醒或 None, [没判的几条])。
     check_only（dispatch-prompt.py --check 经 --check-prompt 调）：不读不写实现员登记、不读主会话记录，⑤ 撞文件与 ⑦ 并发、限额窗口交「没判」；
     不是 check_only 时实现员全过才登记。弄坏开关 stop-at-first 只交第一条（退回逐条试的旧样子）。"""
@@ -971,7 +1619,7 @@ def judge_dispatch(hook_input, project_root, hook_dir=None, check_only=False):
     if (subagent_type not in HEAVY_TEST_OWNERS and not break_switch_is("disable-heavy-test")
             and not HEAVY_TEST_LINE.search(prompt)):
         refusals.append(("重型测试一行", f"✗ 派 {subagent_type} 的提示里没有「重型测试：不跑」一行。\n"
-                   "→ 规矩：重型测试（层 0、QEMU、herd7、crates 变异整表、形式化验证（Verus）、全量测试、整轮门禁、全部实验复跑、E152 装置、真编 QEMU）只在提交代码时、或用户要求时跑，"
+                   "→ 规矩：重型测试（崩溃点重放、QEMU、herd7、crates 变异整表、形式化验证（Verus）、全量测试、整轮门禁、全部实验复跑、E152 装置、真编 QEMU）只在提交代码时、或用户要求时跑，"
                    "只由主 agent 跑（.claude/skills/crash-test/commit-stages.md 与 .claude/skills/gate/staged-gate.md）；执行时 .claude/hooks/heavy-test-guard.sh 也拒。\n"
                    "→ 怎么办：提示里单独写一行「重型测试：不跑」；提交时的重阶段与整轮门禁由主 agent 自己跑；提交之外确实要跑，先弹窗问用户，"
                    "用户同意了由主 agent 带 SINGLEFS_HEAVY_TESTS=user-request 跑。"))
@@ -1003,6 +1651,9 @@ def judge_dispatch(hook_input, project_root, hook_dir=None, check_only=False):
     missing = missing_required_inputs(fields or {}, prompt)
     if missing:
         refusals.append(("定义要的输入", missing_inputs_message(subagent_type, missing)))
+    thread_message = thread_limit_verdict(subagent_type, prompt)
+    if thread_message:
+        refusals.append(("线程上限", thread_message))
     outside = out_of_scope_mentions(project_root, subagent_type, prompt)
     if outside:
         refusals.append(("写范围", f"✗ 提示要 {subagent_type} 写进它写范围之外的路径：{'、'.join(outside)}（.claude/hooks/agent-write-scope.tsv）。\n"
@@ -1046,8 +1697,17 @@ def judge_dispatch(hook_input, project_root, hook_dir=None, check_only=False):
         runner_message = runner_fork_verdict(prompt, project_root)
         if runner_message:
             refusals.append(("执行员岔路", runner_message))
+    writer_lock_message, lock_actions = None, []
+    if take_locks or check_only:   # 钩子入口（take_locks）才真读锁、建锁；--check-prompt 只写「另判」；自检里直接调 decide 不碰锁文件
+        writer_lock_message, lock_actions = writer_lock_verdict(hook_input, prompt, subagent_type, launches, ended, session_judged, unjudged)
+    if writer_lock_message:
+        refusals.append(("草稿目录写者锁", writer_lock_message))
     if break_switch_is("stop-at-first"):
         refusals = refusals[:1]
+    if not refusals and take_locks and lock_actions:
+        lost_race_message = acquire_writer_locks(hook_input, prompt, subagent_type, lock_actions)
+        if lost_race_message:
+            refusals.append(("草稿目录写者锁", lost_race_message))
     if not refusals and writer_files is not None and session_judged:
         register_implementation_writer(hook_input, prompt, writer_files, writer_live_rows)
     return refusals, notes, unjudged
@@ -1075,6 +1735,11 @@ FOOTER_WITHOUT_HEAVY_LINE = WALL_CLOCK_WITHIN_LINE + "开工先读 `.claude/agen
 FOOTER = "重型测试：不跑\n" + FOOTER_WITHOUT_HEAVY_LINE
 FOOTER_WITHOUT_WALL_CLOCK = "重型测试：不跑\n开工先读 `.claude/agent-common.md`\n规格检查已判：自检样本不带规格\n"
 
+def thread_limit_line():
+    """自检样本里「线程上限：N」那一行（N 取此刻的登记值，自检把登记换成替身库时取替身的）；登记读不到时是空串。派 THREAD_LIMIT_REQUIRED_AGENTS 的样本默认补上它，只判别的那一条。"""
+    registered, _ = registered_heavy_threads()
+    return f"线程上限：{registered}\n" if registered is not None else ""
+
 def selftest(hook_dir):
     if work_roots is None:
         print(f"  ✗ 自检读不到工作根的定义 {os.path.join(hook_dir, 'lib_work_root.py')}：{work_roots_error!r}")
@@ -1097,16 +1762,18 @@ def selftest(hook_dir):
         # 默认给每个样本提示补上「重型测试：不跑」、开工先读共用约束与规格检查放行行，实现员再补一行各不相同的要动文件：
         # 这样各条样本只判它自己要判的那一条；要判那几条本身的样本用 footer 换掉或关掉
         writer_case_counter = [0]
-        def case_in(project_root, label, subagent_type, prompt, want, footer=True):
+        def case_in(project_root, label, subagent_type, prompt, want, footer=True, thread=True):
             footer_text = FOOTER if footer is True else (footer or "")
             text = prompt + ("\n" + footer_text if footer_text else "")
             if subagent_type == "implementation-writer" and footer_text and "要动的 crates 文件" not in text:
                 writer_case_counter[0] += 1
                 text += f"要动的 crates 文件：crates/selftest/src/case{writer_case_counter[0]}.rs\n"
+            if thread and subagent_type in THREAD_LIMIT_REQUIRED_AGENTS and "线程上限" not in text:   # ⑮ 要这一行的类型：默认补登记值，要判缺行的样本传 thread=False
+                text += ("" if text.endswith("\n") else "\n") + thread_limit_line()
             hook_input = {"tool_name": "Agent", "tool_input": {"subagent_type": subagent_type, "prompt": text}}
             return (label, want, decide(hook_input, project_root, hook_dir)[0])
-        def case(label, subagent_type, prompt, want, footer=True):
-            return case_in(work, label, subagent_type, prompt, want, footer)
+        def case(label, subagent_type, prompt, want, footer=True, thread=True):
+            return case_in(work, label, subagent_type, prompt, want, footer, thread)
         # 快照那一条的样本仓：r-open 开着（有正文、没判决）；r-closed 已判完；r-nobody 有快照没正文（普查一类）；r-odd 开着，清单里全是认不出的行
         def write_sample(project_root, relative_path, content):
             path = os.path.join(project_root, relative_path)
@@ -1173,14 +1840,14 @@ def selftest(hook_dir):
         write_sample(defs_work, ".claude/hooks/agent-write-scope.tsv",
                      "# 样本\nexperiment-runner\tresearch/results/**\t样本\nexperiment-runner\tresearch/prompts/e*-r*-prereg.md\t样本\nexperiment-runner\t$SINGLEFS_WORK_ROOT/**\t样本\n"
                      "implementation-writer\tcrates/**\t样本\nimplementation-writer\t$SINGLEFS_WORK_ROOT/**\t样本\nscope-probe\tcrates/**\t样本：写范围里没有工作根\n")
-        heavy_line = "重型测试：不跑\n" + WALL_CLOCK_WITHIN_LINE
+        heavy_line = "重型测试：不跑\n" + WALL_CLOCK_WITHIN_LINE + thread_limit_line()
         defs_case = lambda label, subagent_type, prompt, want: case_in(defs_work, label, subagent_type, heavy_line + prompt, want, footer=False)
         for index, sentence in enumerate(OLD_HEAVY_TEST_REFUSALS, 1):
             cases.append(case(f"重型:旧判法误拦的原句 {index} 带上那一行就放行", "experiment-designer", sentence, 0))
         cases += [
             case("重型:没写那一行（实现员）", "implementation-writer", "改完交回。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case("重型:没写那一行（通用 agent）", "general-purpose", "查一个文件。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
-            case("重型:派原来跑重型测试的类型名也要那一行", "crash-verifier", "提交流程里跑 checker-tier-layer0-replay --full。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
+            case("重型:派原来跑重型测试的类型名也要那一行", "crash-verifier", "提交流程里跑 checker-tier-crash-point-replay --full。", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case("重型:那一行带粗体与列表记号也认", "implementation-writer", "改完交回。\n- **重型测试**：不跑\n", 0, footer=FOOTER_WITHOUT_HEAVY_LINE),
             case("重型:写在句子中间不算那一行", "implementation-writer", "这一件的重型测试：不跑也行吧", 2, footer=FOOTER_WITHOUT_HEAVY_LINE),
             # 提示正文里许可子 agent 跑 checker 档的句子：带着「重型测试：不跑」一行照拒（调度记录 records/2026-09-30-里程碑三开工第一轮.md 第 936 行那两腿的原句；
@@ -1210,6 +1877,7 @@ def selftest(hook_dir):
             case("重型:正文许可跑崩溃点重放入口不带 --quick 拒", "clerk", "改完可以跑 `bash scripts/crash/crash-point-replay.sh --item fixed-script` 看绿。", 2),
             case("重型:正文直接写跑形式化那一道（不带 --quick）拒", "clerk", "改完跑 `bash .claude/gate.d/checker-tier-formal-verification.sh .` 核一遍。", 2),
             case("重型:正文许可跑 crates 变异那一道 --full 拒", "clerk", "允许跑 `bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --full .`。", 2),
+            case("重型:门禁 checker-tier-crash-point-replay 的名字里含轻型入口名，带 --quick 也不算轻型、照拒", "clerk", "改完可以跑 `bash .claude/gate.d/checker-tier-crash-point-replay.sh --quick .` 看绿。", 2),
             case("重型:harness 档带 --include-ignored 可以跑放行", "clerk",
                  "验收：`cargo test -p singlefs-harness --test reuse_after_raising_the_floor -- --include-ignored` 全过（经内存包装，harness 慢档你可以跑）。", 0),
             case_in(defs_work, "共用约束:通用 agent 没写开工先读", "general-purpose", heavy_line + "通用已判：要 WebSearch 查外部文档\n查一个文件。", 2, footer=False),
@@ -1358,10 +2026,15 @@ def selftest(hook_dir):
             case_in(unreadable_work, "快照:一份清单读不了，不拒", "kb-scribe", "规格：改 `.claude/kb/pitfalls.md`。", 0),
             case_in(unreadable_work, "快照:一份清单读不了，读得了的那份撞了照拒", "kb-scribe", collided, 2),
         ]
-        # ⑭ 预计挂钟与长活声明：派设计员、执行员要那一行；超过 2 小时要分片、续跑、多机三行，缺的由「分不了：」点名
+        # ⑭ 预计挂钟与长活声明：派设计员与带重活的类型（⑮ 那张类型表）要那一行；超过 2 小时要分片、续跑、多机三行，缺的由「分不了：」点名；
+        # 多机一行只认骨架那一句规范写法（lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE，逐字，可带句末句号），后面不许接任何说明（说明另起一行写）；别的写法（含现算、折算、换了词的取法）一律拒，不用词表去拦。
+        # 开关 long-run-types-narrowed 下类型表里除执行员之外的「没写预计挂钟拒」「超过 2 小时不齐拒」几格红；LIB_LONG_RUN_BREAK 的几个红在文件头点名的格
         runner_base = first + "这一段回答的岔路：岔路 1\n"
         over = "预计挂钟：超过 2 小时，推的：一千行 × 每行 2 分钟\n"
         two_lines = "分片：按行号 mod 片数切\n续跑：结果表里已有的行跳过，重起同一条命令只补没做完的\n"
+        registered_hosts = "多机：" + long_run.CANONICAL_HOSTS_SENTENCE + "\n"
+        inline_backticks_line = "```cargo test -p singlefs-harness --lib``` 是上一次的起法，照它起。\n"   # 行首写在一行里的三反引号：行内代码，不开围栏（⑭⑮；开关 code-fence-loose 下当开头）
+        core_count_command = "n" + "proc"   # 样本里要写出取核数的命令名；整个词写在 shell 文件的字符串里会被门禁 code-tooling 的 heavy-thread-defaults 格当成按核数取线程
         cases += [
             case("长活:设计员没写预计挂钟拒", "experiment-designer", "随便", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
             case("长活:执行员没写预计挂钟拒", "experiment-runner", runner_base, 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
@@ -1369,18 +2042,108 @@ def selftest(hook_dir):
             case("长活:超过 2 小时一样都没写拒（不分片的长跑法）", "experiment-runner", runner_base + over, 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
             case("长活:超过 2 小时只写了分片拒（半截声明）", "experiment-runner", runner_base + over + "分片：按行号 mod 片数切\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
             case("长活:多机一行写死额度拒（写死额度的派发）", "experiment-runner", runner_base + over + two_lines
-                 + "多机：本机 31 线程 30G、第二台 31 线程 50G（台数照 --emit-hosts，额度参考 host-resources.py）\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+                 + "多机：本机 31 线程 30G、第二台 31 线程 50G（台数照 --emit-hosts，线程照 .claude/heavy-thread-default）\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行写 host-resources 现算拒", "experiment-runner", runner_base + over + two_lines
+                 + "多机：台数取 --emit-hosts，每台线程取 .claude/heavy-thread-default，余量用 host-resources.py --json 现算\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行写 available_threads 现算拒", "experiment-runner", runner_base + over + two_lines
+                 + "多机：台数取 --emit-hosts，每台线程取 .claude/heavy-thread-default 与 available_threads 里小的那个\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行写除以此刻在跑的重活数拒", "experiment-runner", runner_base + over + two_lines
+                 + "多机：台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值除以此刻同时在跑的重活数\n", 2,
+                 footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行写线程按取核数的命令取拒（点名了 --emit-hosts 与登记值也拒）", "experiment-runner", runner_base + over + two_lines
+                 + f"多机：只在本机一台跑，不读 --emit-hosts；线程按 {core_count_command} 取，不用 .claude/heavy-thread-default\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行写按核数、忙闲、负载折算拒", "experiment-runner", runner_base + over + two_lines
+                 + "多机：台数取 --emit-hosts，每台线程取 .claude/heavy-thread-default 的登记值，机器忙闲、负载高时按核数打折\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行沿用旧写法（点名 host-resources、没点名登记值）拒", "experiment-runner", runner_base + over + two_lines
+                 + "多机：台数取 crash-point-replay-shard-configuration-check.sh --emit-hosts，每台的线程与内存取 host-resources.py --json 现算\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行没点名登记值拒", "experiment-runner", runner_base + over + two_lines
+                 + "多机：台数取 crash-point-replay-shard-configuration-check.sh --emit-hosts，每台线程按多机配置里写的\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行没点名 --emit-hosts 拒", "experiment-runner", runner_base + over + two_lines
+                 + "多机：每台线程取 .claude/heavy-thread-default 的登记值\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行写不看忙闲（换了词的取法）拒", "experiment-runner", runner_base + over + two_lines
+                 + "多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default，不看忙闲\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行写登记值的一半（换了词的取法）拒", "experiment-runner", runner_base + over + two_lines
+                 + "多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default 的一半\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行写按此刻余量少给（换了词的取法）拒", "experiment-runner", runner_base + over + two_lines
+                 + "多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default，第二台按此刻余量少给\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行规范句后接别的话（没有「；」）拒", "experiment-runner", runner_base + over + two_lines
+                 + registered_hosts.rstrip("\n") + "，机器忙也不降\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行规范句后的说明里有数字拒", "experiment-runner", runner_base + over + two_lines
+                 + registered_hosts.rstrip("\n") + "；见第 2 节\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行规范句后接「；」与说明拒", "experiment-runner", runner_base + over + two_lines
+                 + registered_hosts.rstrip("\n") + "；双机时两台各取这一个数，机器忙也不降\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行规范句后接按此刻空闲现算拒", "experiment-runner", runner_base + over + two_lines
+                 + registered_hosts.rstrip("\n") + "；按此刻空闲现算每台槽数与线程\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行规范句后接机器忙时按负载降拒", "experiment-runner", runner_base + over + two_lines
+                 + registered_hosts.rstrip("\n") + "；机器忙时按负载降\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行规范句后接除以此刻同时在跑的重活数拒", "experiment-runner", runner_base + over + two_lines
+                 + registered_hosts.rstrip("\n") + "；除以此刻同时在跑的重活数\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行规范句后接 host-resources 与 available_threads 拒", "experiment-runner", runner_base + over + two_lines
+                 + registered_hosts.rstrip("\n") + "；每台线程按 host-resources.py 的 available_threads 取\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行规范句带全角句末句号放行", "experiment-runner", runner_base + over + two_lines
+                 + registered_hosts.rstrip("\n") + "。\n", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行规范句带半角句末句点放行", "experiment-runner", runner_base + over + two_lines
+                 + registered_hosts.rstrip("\n") + ".\n", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:规范句之后另起一行写普通说明放行", "experiment-runner", runner_base + over + two_lines
+                 + registered_hosts + "说明：双机时两台各取这一个数，机器忙也不降\n", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行写了两行拒（第一行规范句、第二行写现算）", "experiment-runner", runner_base + over + two_lines + registered_hosts
+                 + "多机：每台线程按此刻空闲现算\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机一行写了两行拒（两行都是规范句）", "experiment-runner", runner_base + over + two_lines + registered_hosts + registered_hosts, 2,
+                 footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:分片一行写了两行拒", "experiment-runner", runner_base + over + two_lines + "分片：再按文件名切一层\n" + registered_hosts, 2,
+                 footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:续跑一行写了两行拒", "experiment-runner", runner_base + over + two_lines + "续跑：失败的整片重做\n" + registered_hosts, 2,
+                 footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:说明另起一行写成普通正文放行（不以标签起头）", "experiment-runner", runner_base + over + two_lines + registered_hosts
+                 + "说明：多机时每台线程都取登记值\n", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:代码块里先写了「多机：」示例行、块外写规范句放行", "experiment-runner", runner_base + over + two_lines
+                 + "喂法示例：\n```\n多机：每台线程按此刻空闲现算\n```\n" + registered_hosts, 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:代码块里第二行「多机：」示例不算重复放行", "experiment-runner", runner_base + over + two_lines + registered_hosts
+                 + "```text\n多机：每台线程按此刻空闲现算\n```\n", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:代码块里写了预计挂钟、块外没写拒", "experiment-runner", runner_base + "喂法示例：\n```\n预计挂钟：2 小时内\n```\n", 2,
+                 footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:没闭合的围栏遮不住后面的重复标签", "experiment-runner", runner_base + over + two_lines + registered_hosts + "```\n多机：每台线程按此刻空闲现算\n", 2,
+                 footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:行首行内三反引号不开围栏，后面的多机一行照判拒（现算）", "experiment-runner", runner_base + over + two_lines + inline_backticks_line
+                 + "多机：每台线程按此刻空闲现算，机器忙时按负载降\n骨架打的那一句：\n```\n" + registered_hosts + "```\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:行首行内三反引号不开围栏，后面的多机一行照判拒（一半）", "experiment-runner", runner_base + over + two_lines + inline_backticks_line
+                 + "多机：台数取 --emit-hosts，每台线程取登记值的一半\n骨架打的那一句：\n```\n" + registered_hosts + "```\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:波浪线块里露出一行三个反引号，块外的多机一行照判拒（现算）", "experiment-runner", runner_base + over + two_lines
+                 + "上一次给工具员讲围栏时贴的样子：\n~~~\n```\n~~~\n多机：每台线程按此刻空闲现算，机器忙时按负载降\n骨架打的那一句：\n```\n" + registered_hosts + "```\n", 2,
+                 footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:列表项里开的围栏关在顶格，多机一行两种认法不一致拒", "experiment-runner", runner_base + over + two_lines
+                 + "- 上一次的起法：\n  ```\n  cargo test -p singlefs-harness --lib\n```\n多机：每台线程按此刻空闲现算，机器忙时按负载降\n骨架打的那一句：\n```\n" + registered_hosts + "```\n", 2,
+                 footer=FOOTER_WITHOUT_WALL_CLOCK),
+            # 多机已判：用户给了逐台不同的台数或线程时写；理由不能空、只写一行，同一标签写两行照拒（开关 hosts-valve-unchecked 下两格红）
+            case("长活:规范句加多机已判与逐台参数一行放行", "experiment-runner", runner_base + over + two_lines + registered_hosts
+                 + "多机已判：用户给了逐台参数，第二台上在跑用户自己的基准\n逐台参数：本机照登记值，第二台 16 线程\n", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机已判没写理由拒", "experiment-runner", runner_base + over + two_lines + registered_hosts + "多机已判：\n逐台参数：第二台 16 线程\n", 2,
+                 footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:多机已判写了两行拒", "experiment-runner", runner_base + over + two_lines + registered_hosts
+                 + "多机已判：用户给了逐台参数\n多机已判：第二台 16 线程\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:写了多机已判，多机一行写两行照拒", "experiment-runner", runner_base + over + two_lines + registered_hosts
+                 + "多机已判：用户给了逐台参数\n多机：第二台 16 线程\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
             case("长活:分不了一行没点名缺的多机拒", "experiment-runner", runner_base + over + two_lines + "分不了：装置只认本机那块盘，第二台上没有这块盘\n", 2,
                  footer=FOOTER_WITHOUT_WALL_CLOCK),
             case("长活:分不了一行不到 8 个字拒", "experiment-runner", runner_base + over + two_lines + "分不了：多机不行\n", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
-            case("长活:三样齐了放行", "experiment-runner", runner_base + over + two_lines + "多机：台数取 layer0-shard-configuration-check.sh --emit-hosts，每台的线程与内存取 host-resources.py --json 现算\n", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:三样齐了放行（多机取登记值）", "experiment-runner", runner_base + over + two_lines + registered_hosts, 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
             case("长活:分不了点名了缺的多机放行", "experiment-runner", runner_base + over + two_lines + "分不了：多机这一段缺：装置只认本机那块盘\n", 0,
                  footer=FOOTER_WITHOUT_WALL_CLOCK),
             case("长活:2 小时内放行（设计员）", "experiment-designer", "预计挂钟：2 小时内，推的：12 条 × 5 分钟\n写跑前登记。", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
             case("长活:那几行带粗体与列表记号也认", "experiment-runner", runner_base + "- **预计挂钟**：超过 2 小时\n- **分片**：按行号 mod 片数切\n"
-                 "- **续跑**：已有的行跳过\n- **多机**：台数取 layer0-shard-configuration-check.sh --emit-hosts，每台的线程与内存取 host-resources.py --json 现算\n", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
-            case("长活:派别的类型不判", "implementation-writer", "改完交回。", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+                 "- **续跑**：已有的行跳过\n- **多机**：" + long_run.CANONICAL_HOSTS_SENTENCE + "\n", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            case("长活:不在类型表里的类型不判（sweep）", "sweep", "改完交回。", 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
         ]
+        # 类型表里除执行员之外的几种类型也判：没写预计挂钟拒，写了 2 小时内放行，超过 2 小时三样不齐拒、齐了放行（样本类型没有定义文件，只要开工先读；变异分诊员另给变异表）
+        for long_run_type, long_run_extra in (("implementation-writer", ""), ("investigator", ""), ("tooling-writer", ""),
+                                              ("mutation-triage", "变异表 crates/mutations.tsv。\n"), ("three-way-attack", ""),
+                                              ("clerk", ""), ("three-way-forward", ""), ("three-way-defense", "")):
+            cases += [
+                case(f"长活:{long_run_type}没写预计挂钟拒", long_run_type, long_run_extra + "改完交回。", 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+                case(f"长活:{long_run_type}写 2 小时内放行", long_run_type, long_run_extra + "改完交回。", 0),
+                case(f"长活:{long_run_type}超过 2 小时一样都没写拒", long_run_type, long_run_extra + over, 2, footer=FOOTER_WITHOUT_WALL_CLOCK),
+                case(f"长活:{long_run_type}超过 2 小时三样齐了放行", long_run_type, long_run_extra + over + two_lines + registered_hosts, 0, footer=FOOTER_WITHOUT_WALL_CLOCK),
+            ]
         script = os.path.join(hook_dir, "runner-dispatch-guard.sh")
         def run_hook(project_root, stdin_text):
             return subprocess.run(["bash", script], input=stdin_text, capture_output=True, text=True, env=dict(os.environ, CLAUDE_PROJECT_DIR=project_root))
@@ -1398,7 +2161,7 @@ def selftest(hook_dir):
         def registry_bytes():
             return open(registry_file, "rb").read() if os.path.exists(registry_file) else None
         writer_prompt_path = os.path.join(defs_work, "writer-prompt.md")
-        write_sample(defs_work, "writer-prompt.md", "重型测试：不跑\n要动的 crates 文件：crates/a/src/check-mode.rs\n")
+        write_sample(defs_work, "writer-prompt.md", "重型测试：不跑\n" + WALL_CLOCK_WITHIN_LINE + thread_limit_line() + "要动的 crates 文件：crates/a/src/check-mode.rs\n")
         registry_before = registry_bytes()
         checked_prompt = subprocess.run(["bash", script, "--check-prompt", writer_prompt_path, "--type", "implementation-writer", "--root", defs_work],
                                         capture_output=True, text=True, env=dict(os.environ))
@@ -1417,7 +2180,7 @@ def selftest(hook_dir):
         for label, prompt, want in (("stdin:续做没写还差", again + "这一段回答的岔路：岔路 1\n", 2),
                                     ("stdin:第一段点名了岔路", first + "这一段回答的岔路：岔路 1\n", 0)):
             completed = subprocess.run(["bash", script],
-                                       input=json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "experiment-runner", "prompt": prompt + FOOTER}}),
+                                       input=json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "experiment-runner", "prompt": prompt + FOOTER + thread_limit_line()}}),
                                        capture_output=True, text=True, env=dict(os.environ, CLAUDE_PROJECT_DIR=work))
             cases.append((label, want, completed.returncode))
         heavy = run_hook(work, json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "implementation-writer",
@@ -1433,13 +2196,373 @@ def selftest(hook_dir):
         cases.append(("stdin:拒绝时 stderr 的「→ 规矩」那一串列出真编 QEMU", 1,
                       int(any(line.startswith("→ 规矩：重型测试") and "真编 QEMU" in line for line in heavy.stderr.splitlines()))))
         long_run_refusal = run_hook(work, json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "experiment-runner",
-                                                                                 "prompt": runner_base + over + FOOTER_WITHOUT_WALL_CLOCK}}))
+                                                                                 "prompt": runner_base + over + FOOTER_WITHOUT_WALL_CLOCK + thread_limit_line()}}))
         cases.append(("stdin:超过 2 小时没写长活三样拒绝（退出码 2）", 2, long_run_refusal.returncode))
         cases.append(("stdin:长活拒绝的 stderr 写了三行的写法与判据出处", 1,
-                      int(all(needle in long_run_refusal.stderr for needle in ("分片：", "续跑：", "多机：", "--emit-hosts", "host-resources.py", "→ 怎么办", "用上现有的硬件加速")))))
+                      int(all(needle in long_run_refusal.stderr for needle in ("分片：", "续跑：", "多机：", "--emit-hosts", ".claude/heavy-thread-default", "→ 怎么办", "用上现有的硬件加速")))))
+        duplicate_refusal = run_hook(work, json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "experiment-runner",
+                                                                                 "prompt": runner_base + over + two_lines + registered_hosts + "多机：每台线程按此刻空闲现算\n"
+                                                                                 + FOOTER_WITHOUT_WALL_CLOCK + thread_limit_line()}}))
+        cases.append(("stdin:长活重复标签拒绝（退出码 2）", 2, duplicate_refusal.returncode))
+        cases.append(("stdin:长活重复标签的拒绝说明写了「只写一行」与重复的标签", 1,
+                      int(all(needle in duplicate_refusal.stderr for needle in ("「多机：」写了 2 行", "只写一行", "→ 怎么办")))))
+        # ── ⑥ 用户叫停、不写判决的轮：research/prompts/abandoned-rounds.tsv 登记一行收快照；<轮>-halted.md 这一支已撤 ──
+        # 出处是 records/ 下现存文件的行号加〔〕原话，原话在那份文件里恰好找到一次（行号只当提示），找到的那一行里有这一轮的名字与「」括的原话。开关 snapshot-abandoned-ignored 下放行的几格红；snapshot-abandoned-unchecked 下「照拒」各格与说明那一格红；
+        # snapshot-abandoned-source-any-path、snapshot-abandoned-source-escapes、snapshot-abandoned-line-unread、snapshot-abandoned-round-name-unchecked、snapshot-abandoned-quote-short-ok 各红在文件头点名的格
+        outside_directory = tempfile.mkdtemp()
+        other_directories.append(outside_directory)
+        write_sample(outside_directory, "note.md", "r-ab-outside 叫停：「仓外的一份笔记六个字以上」\n")
+        write_sample(outside_directory, "link-target.md", "r-ab-symlink 叫停：「符号链接指到仓外的六个字以上」\n")
+        write_sample(outside_directory, "research-note.md", "r-ab-research-outside 叫停：「从 research 起头拼出仓外的六个字以上」\n")
+        outside_from_records = os.path.relpath(os.path.join(outside_directory, "note.md"), os.path.join(work, "records"))
+        outside_from_research = os.path.relpath(os.path.join(outside_directory, "research-note.md"), os.path.join(work, "research"))
+        write_sample(work, "records/ab-sample.md",
+                     "- 用户 2026-10-11：r-ab-ok 叫停，「增加流程限制  测试代码不需要打， 改了直接测。」（样本）\n"
+                     "- 用户 2026-10-11：「这是一句和任何一轮都无关的话」\n"
+                     "- 用户 2026-10-11：r-ab-other 叫停，「别的轮的叫停原话也有六个字」\n"
+                     "- 用户 r-ab-short 叫停：「增加流程」\n"
+                     "- 用户 r-ab-noquote 叫停，没有引原话\n"
+                     "- 用户 r-ab-edge2 叫停：「名字更长的另一轮的原话」\n"
+                     "- 用户 r-ab-colon 叫停：「冒号加行号的写法也认」\n"
+                     "- 用户 r-ab-badrow 叫停：「写坏的登记行不收的样本」\n"
+                     "- r-ab-unrel r-ab-badline 的名字只在这一行出现，没有原话\n"
+                     "- 用户 2026-10-12：r-ab-away-r1 叫停：「这一轮先停掉不做了」；r-ab-multi-r1 照常跑，等腿交回。\n"     # 10  同一行别的轮的叫停原话（形如 <名>-r<数字>）
+                     "- 用户 r-ab-pair 与 r-ab-ok 一起叫停：「两轮一起先停下来吧」\n"                                     # 11  同一行是登记表里别的轮
+                     "- 用户 2026-10-12：r-ab-real-r1 叫停：「真轮名带 r1 的写法也认」\n"                                    # 12  轮名形如 <名>-r<数字>、行里只有它
+                     "- 用户 r-ab-baddate 叫停：「日期写成十月十三日的样本」\n"                                             # 13
+                     "- 用户 r-ab-dup 叫停：「同一轮登记两行的样本」\n"                                                    # 14
+                     "- 用户 r-ab-nameform 叫停：「别的轮名不带 r 数字的样本」；ab-close-b1 照常跑\n"                          # 15  同一行别的轮名不以 -r<数字> 结尾，但仓里有它的正文
+                     "- 用户 r-ab-unfiled 叫停：「别的名字仓里没有材料的样本」；ab-nofile-b2 照常跑\n"                        # 16  同一行另一个名字，仓里没有任何它的材料
+                     "- 用户 r-ab-formonly 叫停：「别的轮名只有形没有材料」；ab-ghost-r2 照常跑\n"                            # 17  同一行另一个名字形如 <名>-r<数字>，仓里没有任何它的材料
+                     "- 用户 r-ab-drift 叫停：「行号挪了原话还在的样本」\n"                                                 # 18  登记行写第 2 行，〔〕原话在这一行（行号只当提示）
+                     "- 用户 r-ab-gone 叫停：「原话后来改了字的样本」\n"                                                    # 19  登记行〔〕里写「叫停了」，这一行没有那几个字
+                     "- 用户 r-ab-twice 叫停：「同一段原话写了两遍的样本」\n"                                               # 20  与下一行逐字相同：〔〕原话命中两次
+                     "- 用户 r-ab-twice 叫停：「同一段原话写了两遍的样本」\n"                                               # 21
+                     "- 用户 r-ab-plain 叫停：「只写行号没带原话的样本」\n"                                                 # 22  登记行只写第 22 行，没带〔〕原话
+                     "- 用户 r-ab-pinned 叫停：「同一段原话写了两遍、行号落在其中一处」\n"                                    # 23  与下一行逐字相同：〔〕原话命中两次，行号提示写第 24 行
+                     "- 用户 r-ab-pinned 叫停：「同一段原话写了两遍、行号落在其中一处」\n"                                    # 24
+                     "- 用户 r-ab-reworded 叫停：「原话改了字而行号那一行还有轮名」\n"                                        # 25  登记行〔〕里写「已叫停」，找不到；行号提示的这一行有这一轮的名字
+                     "- 补记 r-ab-twice：「另一处提到这一轮的六个字以上」\n"                                                 # 26  r-ab-twice 的行号提示：带名字与原话、不含〔〕那几个字（line-number-read 下收）
+                     "- 用户 r-ab-renamed 叫停：「新称样本那一轮先停掉吧」\n"                                                  # 27  登记行〔〕写改名前的「旧称样本」，样本改名表登记了旧称样本 → 新称样本
+                     "- 用户 r-ab-dated 叫停（用户说「删了日期之后的六个字以上」）\n")                                        # 28  登记行〔〕带着后来删掉的日期 2026-10-12
+        write_sample(work, ".claude/kb/term-renames.md", "# 术语改名对照表（自检样本）\n\n<!-- term-renames:table -->\n| 旧 | 新 | 匹配 | 是什么 |\n|---|---|---|---|\n"
+                     "| 旧称样本 | 新称样本 | 整串 | 自检样本：r-ab-renamed 的出处那一行登记之后照这一行改了名 |\n")
+        os.symlink(os.path.join(outside_directory, "link-target.md"), os.path.join(work, "records", "ab-link.md"))
+        write_sample(work, ".claude/rules/ab-rule-sample.md", "r-ab-rule 的叫停：「规则文件里的一句六个字以上的话」\n")
+        write_sample(work, "research/prompts/_r-ab-dotdot-body.md", "r-ab-dotdot 正文「路径里带点点的六个字以上」\n")
+        write_sample(work, "research/prompts/_r-ab-away-r1-body.md", "# 别的轮（仓里认得的轮名：有正文）\n")      # r-ab-multi-r1 那一行写着它
+        write_sample(work, "research/prompts/_ab-close-b1-body.md", "# 别的轮（轮名不以 -r<数字> 结尾，仓里有正文）\n")   # r-ab-nameform 那一行写着它；ab-nofile-b2 没有任何文件
+        registered_on = "2026-10-12\t"
+        abandoned_rounds = [   # (轮名, 登记行里轮名之后的各列（日期起）或 None（不登记）, 应得, 项名)
+            ("r-ab-ok", registered_on + "用户叫停\trecords/ab-sample.md 第 1 行〔r-ab-ok 叫停〕", 0, "快照:叫停的轮在登记表里有出处完整的一行，放行"),
+            ("r-ab-colon", registered_on + "用户叫停\trecords/ab-sample.md:7〔r-ab-colon 叫停〕", 0, "快照:出处写成 文件:行号 也认，放行"),
+            ("r-ab-none", None, 2, "快照:登记表里没有这一轮，照拒"),
+            ("r-ab-nosource", registered_on + "用户叫停了这一轮\t不写判决", 2, "快照:登记行没有出处，照拒"),
+            ("r-ab-noline", registered_on + "用户叫停\trecords/ab-sample.md", 2, "快照:出处没写行号，照拒"),
+            ("r-ab-badline", registered_on + "用户叫停\trecords/ab-sample.md 第 99 行〔r-ab-badline 叫停了这一轮〕", 2, "快照:出处的行号超出文件、〔〕原话也找不到，照拒"),
+            ("r-ab-drift", registered_on + "用户叫停\trecords/ab-sample.md 第 2 行〔r-ab-drift 叫停〕", 0, "快照:出处的行号对不上而〔〕原话恰好找到一次（行号只当提示），放行"),
+            ("r-ab-gone", registered_on + "用户叫停\trecords/ab-sample.md 第 2 行〔r-ab-gone 叫停了〕", 2, "快照:〔〕里的原话在出处文件里找不到（被删或改了字），照拒"),   # 行号提示那一行没有这一轮的名字
+            ("r-ab-twice", registered_on + "用户叫停\trecords/ab-sample.md 第 26 行〔r-ab-twice 叫停〕", 2, "快照:〔〕里的原话在出处文件里命中两次，照拒"),   # 行号提示不在命中的两处里
+            ("r-ab-pinned", registered_on + "用户叫停\trecords/ab-sample.md 第 24 行〔r-ab-pinned 叫停〕", 0, "快照:〔〕里的原话命中两次而行号提示落在其中一处，取那一行，放行"),
+            ("r-ab-reworded", registered_on + "用户叫停\trecords/ab-sample.md 第 25 行〔r-ab-reworded 已叫停〕", 2, "快照:〔〕原话找不到、行号提示那一行有这一轮的名字与「」原话而〔〕对不上（转述或改了字，误登记），照拒"),
+            ("r-ab-renamed", registered_on + "用户叫停\trecords/ab-sample.md 第 27 行〔r-ab-renamed 叫停：「旧称样本那一轮先停掉吧」〕", 0, "快照:〔〕是改名前的原话、行号提示那一行照改名表换了词，取那一行，放行"),
+            ("r-ab-dated", registered_on + "用户叫停\trecords/ab-sample.md 第 28 行〔r-ab-dated 叫停（2026-10-12，用户说「删了日期之后的六个字以上」）〕", 0, "快照:〔〕带着记录里后来删掉的日期，取行号提示那一行，放行"),
+            ("r-ab-plain", registered_on + "用户叫停\trecords/ab-sample.md 第 22 行", 2, "快照:出处没带〔〕原话，照拒"),
+            ("r-ab-unrel", registered_on + "用户叫停\trecords/ab-sample.md 第 2 行〔这是一句和任何一轮都无关的话〕", 2, "快照:那一行没有这一轮的名字（引无关的一句），照拒"),
+            ("r-ab-borrow", registered_on + "用户叫停\trecords/ab-sample.md 第 3 行〔r-ab-other 叫停〕", 2, "快照:那一行是别的轮的叫停原话，照拒"),
+            ("r-ab-short", registered_on + "用户叫停\trecords/ab-sample.md 第 4 行〔r-ab-short 叫停〕", 2, "快照:原话不到 6 个字，照拒"),
+            ("r-ab-noquote", registered_on + "用户叫停\trecords/ab-sample.md 第 5 行〔r-ab-noquote 叫停〕", 2, "快照:那一行没有「」括的原话，照拒"),
+            ("r-ab-edge", registered_on + "用户叫停\trecords/ab-sample.md 第 6 行〔r-ab-edge2 叫停〕", 2, "快照:那一行的名字是更长的另一轮名（前后连着轮名字符），照拒"),
+            ("r-ab-missing", registered_on + "用户叫停\trecords/不在的文件.md 第 1 行〔r-ab-missing 叫停〕", 2, "快照:出处点名的文件不在，照拒"),
+            ("r-ab-self", registered_on + "用户叫停\tresearch/prompts/_r-ab-self-body.md 第 1 行〔r-ab-self 正文〕", 2, "快照:出处指这一轮自己的正文，照拒"),
+            ("r-ab-halted-cite", registered_on + "用户叫停\tresearch/prompts/r-ab-halted-cite-halted.md 第 1 行〔r-ab-halted-cite 叫停〕", 2, "快照:出处指这一轮自己的 halted 文件，照拒"),
+            ("r-ab-rule", registered_on + "用户叫停\t.claude/rules/ab-rule-sample.md 第 1 行〔r-ab-rule 的叫停〕", 2, "快照:出处指规则文件，照拒"),
+            ("r-ab-dotdot", registered_on + "用户叫停\trecords/../research/prompts/_r-ab-dotdot-body.md 第 1 行〔r-ab-dotdot 正文〕", 2, "快照:出处路径里有 ..（解到仓内别处），照拒"),
+            ("r-ab-outside", registered_on + f"用户叫停\trecords/{outside_from_records} 第 1 行〔r-ab-outside 叫停〕", 2, "快照:出处用 .. 指到仓外，照拒"),
+            ("r-ab-symlink", registered_on + "用户叫停\trecords/ab-link.md 第 1 行〔r-ab-symlink 叫停〕", 2, "快照:出处是 records/ 下指到仓外的符号链接，照拒"),
+            ("r-ab-research-outside", registered_on + f"用户叫停\tresearch/{outside_from_research} 第 1 行〔r-ab-research-outside 叫停〕", 2, "快照:出处从 research/ 起头 .. 到仓外，照拒"),
+            ("r-ab-badrow", registered_on + "records/ab-sample.md 第 8 行〔r-ab-badrow 叫停〕", 2, "快照:登记行不是四列（门禁也判红），不收"),
+            ("r-ab-halted-file", None, 2, "快照:只写 halted 文件、没登记，照拒（这一支已撤）"),
+            # 同一张表两边一个判法（lib_abandoned_rounds.py）：下面这几行门禁 abandoned-rounds 格同样判红
+            ("r-ab-multi-r1", registered_on + "用户叫停\trecords/ab-sample.md 第 10 行〔r-ab-multi-r1 照常跑〕", 2, "快照:出处那一行同时写着别的轮的叫停原话（轮名形如 <名>-r<数字>），照拒"),
+            ("r-ab-pair", registered_on + "用户叫停\trecords/ab-sample.md 第 11 行〔r-ab-pair 与 r-ab-ok 一起叫停〕", 2, "快照:出处那一行同时写着登记表里别的轮名，照拒"),
+            ("r-ab-real-r1", registered_on + "用户叫停\trecords/ab-sample.md 第 12 行〔r-ab-real-r1 叫停〕", 0, "快照:轮名形如 <名>-r<数字>、出处那一行只有这一轮的名字，放行"),
+            ("r-ab-nameform", registered_on + "用户叫停\trecords/ab-sample.md 第 15 行〔r-ab-nameform 叫停〕", 2, "快照:出处那一行同时写着仓里认得的别的轮名（不以 -r<数字> 结尾），照拒"),
+            ("r-ab-unfiled", registered_on + "用户叫停\trecords/ab-sample.md 第 16 行〔r-ab-unfiled 叫停〕", 0, "快照:出处那一行另有仓里没有任何材料、也不是 <名>-r<数字> 形的名字，不当别的轮名，放行"),
+            ("r-ab-formonly", registered_on + "用户叫停\trecords/ab-sample.md 第 17 行〔r-ab-formonly 叫停〕", 2, "快照:出处那一行同时写着 <名>-r<数字> 形而仓里没有材料的别的轮名，照拒"),
+            ("r-ab-baddate", "10月13日\t用户叫停\trecords/ab-sample.md 第 13 行〔r-ab-baddate 叫停〕", 2, "快照:日期不是 YYYY-MM-DD（门禁也判红），出处合格也不收"),
+            ("r-ab-dup", registered_on + "用户叫停\trecords/ab-sample.md 第 14 行〔r-ab-dup 叫停〕", 2, "快照:同一轮登记两行（两行出处都合格，门禁也判红），不收"),
+            ("r-ab-nosource-new", registered_on + "用户叫停，原话见调度记录\t不写判决", 2, "快照:出处没写，2026-10-12 的行照拒（门禁同样判红）"),
+            ("r-ab-nosource-dated", "2026-10-11\t用户叫停，原话见调度记录\t不写判决", 2, "快照:出处没写，2026-10-11 的行也照拒（免出处只给旧行名单里的轮，不按日期；门禁同样判红）"),
+            ("c196-r1", "2026-09-12\t云端腿没交\t下一轮重派", 0, "快照:旧行名单里的轮没写出处也收，放行（门禁同一张名单）"),
+        ]
+        write_sample(work, "research/prompts/r-ab-halted-cite-halted.md", "r-ab-halted-cite 叫停「这是一句自己写的六个字以上的话」\n")
+        write_sample(work, "research/prompts/r-ab-halted-file-halted.md", "出处：records/ab-sample.md 第 1 行「增加流程限制 测试代码不需要打，改了直接测。」\n")
+        table_lines = ["# 样本：叫停的三方轮次"]
+        abandoned_messages = {}
+        for abandoned_round, abandoned_row, abandoned_want, abandoned_label in abandoned_rounds:
+            write_sample(work, f"research/prompts/{abandoned_round}-snapshot/kb-sha256.txt", f"{digest}  .claude/kb/{abandoned_round}.md\n")
+            if not os.path.exists(os.path.join(work, "research", "prompts", f"_{abandoned_round}-body.md")):
+                write_sample(work, f"research/prompts/_{abandoned_round}-body.md", f"# {abandoned_round} 正文\n" if abandoned_round != "r-ab-self"
+                             else "r-ab-self 正文「这是一句自己写的六个字以上的话」\n")
+            if abandoned_row is not None:
+                table_lines.append(f"{abandoned_round}\t{abandoned_row}")   # 轮名、日期、为什么撂下、去向；r-ab-badrow 只有三列
+        table_lines.append(f"r-ab-dup\t{registered_on}用户叫停（第二行）\trecords/ab-sample.md 第 14 行〔r-ab-dup 叫停〕")   # r-ab-dup 的第二行：出处合格，两行都合格，只因同一轮两行不收
+        write_sample(work, "research/prompts/abandoned-rounds.tsv", "\n".join(table_lines) + "\n")
+        for abandoned_round, abandoned_row, abandoned_want, abandoned_label in abandoned_rounds:
+            abandoned_prompt = f"规格：改 `.claude/kb/{abandoned_round}.md` 里一行。\n" + FOOTER
+            abandoned_hook_input = {"tool_name": "Agent", "tool_input": {"subagent_type": "kb-scribe", "prompt": abandoned_prompt}}
+            abandoned_code, abandoned_messages[abandoned_round] = decide(abandoned_hook_input, work, hook_dir)
+            cases.append((abandoned_label, abandoned_want, abandoned_code))
+        def abandoned_message_has(abandoned_round, *fragments):
+            return all(fragment in (abandoned_messages[abandoned_round] or "") for fragment in fragments)
+        cases.append(("快照:不合格的拒绝说明写了没收的原因（原话找不到、没有名字、原话太短、路径里有 ..、指到仓外、没有出处）", True,
+                      abandoned_message_has("r-ab-badline", "收不了这一轮", "找不到〔r-ab-badline 叫停了这一轮〕")
+                      and abandoned_message_has("r-ab-unrel", "没有这一轮的名字 r-ab-unrel")
+                      and abandoned_message_has("r-ab-short", "至少 6 个字")
+                      and abandoned_message_has("r-ab-dotdot", "路径里有 ..")
+                      and abandoned_message_has("r-ab-symlink", "不在", "符号链接")
+                      and abandoned_message_has("r-ab-outside", "路径里有 ..")
+                      and abandoned_message_has("r-ab-nosource", "没有出处", "records/<文件>.md 第 N 行")))
+        cases.append(("快照:拒绝说明的出路改道登记表、不再写 halted", True,
+                      abandoned_message_has("r-ab-none", "research/prompts/abandoned-rounds.tsv 加一行", "doc-process-records", "records/<文件>.md 第 N 行")
+                      and "-halted.md 收掉它" not in (abandoned_messages["r-ab-none"] or "")))
+        cases.append(("快照:halted 文件还在时拒绝说明提醒这一支已撤、改道登记表", True,
+                      abandoned_message_has("r-ab-halted-file", "r-ab-halted-file-halted.md 在，但派发闸不再认这一支")))
+        cases.append(("快照:写坏的登记行在说明里点名第几行", True, abandoned_message_has("r-ab-badrow", "不是四列、或有空列")))
+        cases.append(("快照:原话找不到、命中两次、没带原话的拒绝说明写了原因", True,
+                      abandoned_message_has("r-ab-gone", "找不到〔r-ab-gone 叫停了〕这段原话", "行号提示的第 2 行里也没有这一轮的名字 r-ab-gone")
+                      and abandoned_message_has("r-ab-twice", "命中 2 次（第 20、21 行），行号提示的第 26 行不在其中")
+                      and abandoned_message_has("r-ab-plain", "没带〔〕括的原话")))
+        cases.append(("快照:〔〕原话找不到、行号提示那一行对不上的拒绝说明写了去掉改名与日期之后对不上", True,
+                      abandoned_message_has("r-ab-reworded", "找不到〔r-ab-reworded 已叫停〕这段原话", "行号提示的第 25 行有这一轮的名字，但去掉改名表")))
+        cases.append(("快照:别的轮名、日期写坏、同一轮两行的拒绝说明写了原因", True,
+                      abandoned_message_has("r-ab-multi-r1", "除这一轮外还有别的轮名 r-ab-away-r1")
+                      and abandoned_message_has("r-ab-pair", "除这一轮外还有别的轮名 r-ab-ok")
+                      and abandoned_message_has("r-ab-nameform", "除这一轮外还有别的轮名 ab-close-b1")
+                      and abandoned_message_has("r-ab-formonly", "除这一轮外还有别的轮名 ab-ghost-r2")
+                      and abandoned_message_has("r-ab-baddate", "日期不是 YYYY-MM-DD：10月13日")
+                      and abandoned_message_has("r-ab-dup", "登记了不止一行")))
+        # ── ⑮ 线程上限：N 等于登记值；登记值先换成替身库（返回 7），最后再用真库 ──
+        heavy_threads_directory = tempfile.mkdtemp()
+        other_directories.append(heavy_threads_directory)
+        write_sample(heavy_threads_directory, "heavy_threads.py", "def default_heavy_threads(environment=None):\n    return 7\n")
+        os.environ[HEAVY_THREADS_LIBRARY_VARIABLE] = os.path.join(heavy_threads_directory, "heavy_threads.py")
+        cases += [
+            case("线程:N 等于登记值放行", "clerk", "线程上限：7\n", 0),
+            case("线程:数后面接括注拒（说明另起一行）", "clerk", "线程上限：7（不看当前忙闲）\n", 2),
+            case("线程:说明另起一行照普通正文写放行（那一行不判）", "clerk", "线程上限：7\n本机，双机时两台各取这一个数（7 与 7）\n", 0),
+            case("线程:代码块里的示例行不判放行", "clerk", "线程上限：7\n喂法示例：\n```\n线程上限：31（本机）\n```\n", 0),
+            case("线程:缩进的围栏里的示例行不判放行", "clerk", "线程上限：7\n  ```text\n  线程上限：31（本机）\n  ```\n", 0),
+            case("线程:代码块之后行首的那一行照判", "clerk", "```\n线程上限：7\n```\n线程上限：16\n", 2),
+            case("线程:没闭合的围栏遮不住后面的行", "clerk", "线程上限：7\n```\n线程上限：16\n", 2),
+            case("线程:行首行内三反引号不开围栏，后面的 16 照判拒", "clerk", inline_backticks_line + "线程上限：16\n上一次派发的原文：\n```\n线程上限：7\n```\n", 2),
+            case("线程:行首行内三反引号不开围栏，后面接括注的一行照判拒", "clerk", inline_backticks_line + "线程上限：7（机器忙，按负载降到 4）\n上一次派发的原文：\n```\n线程上限：7\n```\n", 2),
+            case("线程:行内三反引号之后真代码块里的示例行不判放行", "clerk", "线程上限：7\n" + inline_backticks_line + "上一次派发的原文：\n```\n线程上限：7（本机）\n```\n", 0),
+            case("线程:缩进 4 格的三反引号不开围栏，后面一行照判拒", "clerk", "线程上限：7\n    ```\n线程上限：16\n```\n", 2),
+            # 代码块照 CommonMark 认（markdown-it-py）：波浪线块、HTML 注释里露出的三个反引号不开块，列表项里没闭合的围栏在列表项结束处结束；
+            # 波浪线、嵌套列表、引用块里闭合了的围栏块里的示例不判。开关 code-block-line-rule、code-block-library-missing 各红在文件头点名的格
+            case("线程:波浪线块里露出一行三个反引号，块外的 16 照判拒", "clerk", "上一次给工具员讲围栏时贴的样子：\n~~~\n```\n~~~\n线程上限：16\n上一次派发的原文：\n```\n线程上限：7\n```\n", 2),
+            case("线程:波浪线块里露出一行三个反引号，块外接括注的一行照判拒", "clerk",
+                 "上一次给工具员讲围栏时贴的样子：\n~~~\n```\n~~~\n线程上限：7（机器忙，按负载降到 4）\n上一次派发的原文：\n```\n线程上限：7\n```\n", 2),
+            case("线程:列表项里没闭合的围栏在列表项结束处结束，后面的 16 照判拒", "clerk",
+                 "- 上一次的起法：\n  ```\n  cargo test -p singlefs-harness --lib\n- 这一次照它起。\n\n线程上限：16\n上一次派发的原文：\n```\n线程上限：7\n```\n", 2),
+            case("线程:HTML 注释里的三个反引号不开块，后面的 16 照判拒", "clerk", "<!-- 旧写法：\n```\n-->\n线程上限：16\n上一次派发的原文：\n```\n线程上限：7\n```\n", 2),
+            case("线程:波浪线代码块里的示例行不判放行", "clerk", "线程上限：7\n上一次派发的原文：\n~~~\n线程上限：31（本机）\n~~~\n", 0),
+            case("线程:嵌套列表里缩进 4 格的围栏里的示例行不判放行", "clerk", "线程上限：7\n- 上一次：\n  - 派发原文：\n    ```\n    线程上限：31（本机）\n    ```\n", 0),
+            case("线程:引用块里的围栏里的示例行不判放行", "clerk", "线程上限：7\n> 上一次派发的原文：\n> ```\n> 线程上限：31（本机）\n> ```\n", 0),
+            case("线程:代码块里写线程上限、块外没写，缺行照拒", "clerk", "示例：\n```\n线程上限：7\n```\n", 2),
+            case("线程:代码块里写已判行顶不了缺行", "clerk", "```\n线程上限已判：这件活只读不起重活\n```\n", 2),
+            # 标签行在 CommonMark 认法与宽的逐行认法下遮不遮不一致就拒（code_block_ambiguous_label_lines；开关 code-block-ambiguity-unchecked 下这几格红）
+            case("线程:列表项里开的围栏关在顶格，两种认法不一致拒", "clerk",
+                 "- 上一次派发的原文：\n  ```\n  线程上限：7\n```\n线程上限：16\n上一次的骨架：\n```\n线程上限：7\n```\n", 2),
+            case("线程:引用块里开的围栏关的那一行漏 >，两种认法不一致拒", "clerk",
+                 "> 上一次派发的原文：\n> ```\n> 线程上限：7\n```\n线程上限：16\n上一次的骨架：\n```\n线程上限：7\n```\n", 2),
+            case("线程:<details> 里有空行，两种认法不一致拒", "clerk",
+                 "<details><summary>上一次派发的原文</summary>\n```\n重型测试：不跑\n\n活：照上一次的骨架改。\n```\n</details>\n\n线程上限：16\n上一次的骨架：\n```\n线程上限：7\n```\n", 2),
+            case("线程:关的那一行多缩进 4 格，两种认法不一致拒", "clerk",
+                 "上一次派发的原文：\n```\n线程上限：7\n    ```\n线程上限：16\n上一次的骨架：\n```\n线程上限：7\n```\n", 2),
+            case("线程:开四个反引号关三个，两种认法不一致拒", "clerk",
+                 "上一次派发的原文：\n````\n线程上限：7\n```\n线程上限：16\n上一次的骨架：\n````\n线程上限：7\n````\n", 2),
+            case("线程:四个反引号套三个反引号的示例，两种认法不一致拒", "clerk",
+                 "线程上限：7\n上一次给工具员讲围栏的原文：\n````\n```\n线程上限：31（本机）\n```\n````\n", 2),
+            case("线程:外层波浪线套三个反引号的示例，两种认法一致放行", "clerk",
+                 "线程上限：7\n上一次给工具员讲围栏的原文：\n~~~\n```\n线程上限：31（本机）\n```\n~~~\n", 0),
+            case("线程:N 不等于登记值拒", "clerk", "线程上限：16\n", 2),
+            case("线程:写成公式拒", "clerk", "线程上限：整机核数 ÷ 同时在跑的重活数\n", 2),
+            case("线程:粗体与列表记号也认", "clerk", "- **线程上限**：16\n", 2),
+            case("线程:每处都要对", "clerk", "线程上限：7\n线程上限：16\n", 2),
+            case("线程:不等于但写了已判行放行", "clerk", "线程上限：16\n线程上限已判：用户给了参数，内存只装得下 16 份编译\n", 0),
+            case("线程:已判行没写理由照拒", "clerk", "线程上限：16\n线程上限已判：\n", 2),
+            case("线程:没写这一行不判（不在类型表里的类型）", "sweep", "随便", 0),
+            # 只认一个十进制整数，后面什么都不接（括注也不行）；公式、比例、「一半」、两个以上数字、括注与别的话都拒（开关 thread-formula-accepted 下这几格红）
+            case("线程:整数后接中文括注拒", "clerk", "线程上限：7（本机）\n", 2),
+            case("线程:整数与括注之间有空白拒", "clerk", "线程上限：7  （每台）\n", 2),
+            case("线程:7 ÷ 2 拒", "clerk", "线程上限：7 ÷ 2\n", 2),
+            case("线程:7 的一半，即 3 拒", "clerk", "线程上限：7 的一半，即 3\n", 2),
+            case("线程:本机之后另写第二台拒", "clerk", "线程上限：7（本机），第二台 16\n", 2),
+            case("线程:7/2 拒", "clerk", "线程上限：7/2\n", 2),
+            case("线程:括注里写数字拒", "clerk", "线程上限：7（每台 7 个）\n", 2),
+            case("线程:括注里写斜杠拒", "clerk", "线程上限：7（本机/第二台）\n", 2),
+            case("线程:括注里写一半拒", "clerk", "线程上限：7（一半）\n", 2),
+            case("线程:整数后接逗号和别的话拒", "clerk", "线程上限：7，不看忙闲\n", 2),
+            case("线程:半角括号不认拒", "clerk", "线程上限：7(本机)\n", 2),
+            case("线程:全角数字认不出拒", "clerk", "线程上限：７\n", 2),
+            case("线程:只写一半认不出拒", "clerk", "线程上限：一半\n", 2),
+            case("线程:写公式但另写已判行放行", "clerk", "线程上限：7 ÷ 2\n线程上限已判：用户给了参数，内存只装得下一半\n", 0),
+            # 括注一概拒，不看里面写了什么（中文数词、说明性的词、全角数字、尖括号都一样）；开关 thread-note-accepted 下括注里没有数字、斜杠、一半的几格红
+            case("线程:括注里写中文数词（第二台十六）拒", "clerk", "线程上限：7（本机；第二台十六）\n", 2),
+            case("线程:括注里写减半拒", "clerk", "线程上限：7（第二台减半）\n", 2),
+            case("线程:括注里写两台合计拒", "clerk", "线程上限：7（两台合计）\n", 2),
+            case("线程:括注里写分之几拒", "clerk", "线程上限：7（实际用三分之一）\n", 2),
+            case("线程:括注里写各拒", "clerk", "线程上限：7（各台同值）\n", 2),
+            case("线程:括注里写〇拒", "clerk", "线程上限：7（〇）\n", 2),
+            case("线程:括注里只写说明性的词拒（登记值）", "clerk", "线程上限：7（登记值）\n", 2),
+            case("线程:括注里只写说明性的词拒（本机）", "clerk", "线程上限：7（本机）\n", 2),
+            case("线程:括注里写按负载降拒", "clerk", "线程上限：7（机器忙时按负载降）\n", 2),
+            case("线程:括注里写全角数字拒", "clerk", "线程上限：7（第２台１６）\n", 2),
+            case("线程:括注里写尖括号拒", "clerk", "线程上限：7（<登记值>）\n", 2),
+            case("线程:括注里写英文说明拒（半角括号）", "clerk", "线程上限：7 (other host: half)\n", 2),
+            # 只有 <填 …> 是骨架占位、交 ⑬；别的尖括号写法是写了这一行、认不出数（开关 thread-angle-dropped 下红）
+            case("线程:尖括号写的占位（<登记值>）按认不出数拒", "clerk", "线程上限：<登记值>\n", 2),
+            case("线程:尖括号写的占位（<按机器忙闲定>）按认不出数拒", "clerk", "线程上限：<按机器忙闲定>\n", 2),
+            case("线程:尖括号里写数字（<7>）拒", "clerk", "线程上限：<7>\n", 2),
+            case("线程:没闭合的 <填 … 不是骨架占位，认不出数拒", "clerk", "线程上限：<填 登记值\n", 2),
+        ]
+        ambiguity_hook_input = {"tool_name": "Agent", "tool_input": {"subagent_type": "clerk", "prompt":
+                                "- 上一次派发的原文：\n  ```\n  线程上限：7\n```\n线程上限：16\n上一次的骨架：\n```\n线程上限：7\n```\n" + FOOTER}}
+        ambiguity_code, ambiguity_message = decide(ambiguity_hook_input, work, hook_dir)
+        cases.append(("线程:两种认法不一致的拒绝说明逐行点名、叫把围栏写规整", True,
+                      ambiguity_code == 2 and "两种认法不一致" in (ambiguity_message or "") and "第 5 行「线程上限：16」：照 CommonMark 认在代码块里" in (ambiguity_message or "")
+                      and "把围栏写规整" in (ambiguity_message or "")))
+        # 载不进 markdown-it-py（CODE_BLOCK_LIBRARY_VARIABLE 设成一个不在的模块名）：退回宽的逐行认法遮代码块、不比两种认法（开关 code-block-fallback-unmasked 下一行都不遮，这几格红）
+        os.environ[CODE_BLOCK_LIBRARY_VARIABLE] = "markdown_it_absent_in_dispatch_guard_selftest"
+        code_block_library_note_printed.append(True)   # 自检里那一句「载不进」不往 stderr 写
+        cases += [
+            case("线程:载不进 markdown-it-py 时退回逐行认法，闭合了的反引号围栏里的示例行不判放行", "clerk", "线程上限：7\n上一次派发的原文：\n```\n线程上限：31（本机）\n```\n", 0),
+            case("线程:载不进 markdown-it-py 时退回逐行认法，波浪线围栏里的示例行不判放行", "clerk", "线程上限：7\n上一次派发的原文：\n~~~\n线程上限：31（本机）\n~~~\n", 0),
+            case("线程:载不进 markdown-it-py 时退回逐行认法，代码块之后行首的那一行照判", "clerk", "```\n线程上限：7\n```\n线程上限：16\n", 2),
+        ]
+        del os.environ[CODE_BLOCK_LIBRARY_VARIABLE]
+        code_block_library_note_printed.clear()
+        angle_fill_hook_input = {"tool_name": "Agent", "tool_input": {"subagent_type": "clerk", "prompt": "线程上限：<填 登记值>\n" + FOOTER}}
+        angle_fill_code, angle_fill_message = decide(angle_fill_hook_input, work, hook_dir)
+        angle_other_hook_input = {"tool_name": "Agent", "tool_input": {"subagent_type": "clerk", "prompt": "线程上限：<登记值>\n" + FOOTER}}
+        angle_other_code, angle_other_message = decide(angle_other_hook_input, work, hook_dir)
+        cases.append(("线程:<填 …> 占位只交骨架占位那一条，⑮ 不另报认不出数", True,
+                      angle_fill_code == 2 and "占位没填" in (angle_fill_message or "") and "尖括号写法认不出数" not in (angle_fill_message or "")))
+        cases.append(("线程:别的尖括号写法的拒绝说明点名认不出数、说清只有 <填 …> 是占位", True,
+                      angle_other_code == 2 and "尖括号写法认不出数" in (angle_other_message or "") and "<填 …>" in (angle_other_message or "")
+                      and "占位没填" not in (angle_other_message or "")))
+        note_hook_input = {"tool_name": "Agent", "tool_input": {"subagent_type": "clerk", "prompt": "线程上限：7（本机；第二台十六）\n" + FOOTER}}
+        note_code, note_message = decide(note_hook_input, work, hook_dir)
+        cases.append(("线程:括注拒绝说明点名写错的那一段、括注一概不认、说明另起一行照普通正文写", True,
+                      note_code == 2 and "整数后面接了括注：括注一概不认" in (note_message or "") and "「线程上限：7（本机；第二台十六）」" in (note_message or "")
+                      and "说明另起一行照普通正文写" in (note_message or "") and "线程上限说明" not in (note_message or "")))
+        # 任务带重活的类型没写这一行也拒（开关 thread-line-optional 下「没写这一行拒」几格红，thread-required-only-writer 下除实现员之外的几格红）
+        for thread_type in sorted(THREAD_LIMIT_REQUIRED_AGENTS):
+            thread_extra = {"mutation-triage": "变异表 crates/mutations.tsv。\n", "experiment-runner": "只补落产物。\n"}.get(thread_type, "")   # 各类型自己要的那一行（⑩ 变异表、⑪ 岔路），只判线程上限这一条
+            cases += [
+                case(f"线程:派 {thread_type} 没写这一行拒", thread_type, thread_extra + "改完交回。", 2, thread=False),
+                case(f"线程:派 {thread_type} 写了登记值放行", thread_type, thread_extra + "线程上限：7\n", 0, thread=False),
+                case(f"线程:派 {thread_type} 写成公式拒", thread_type, thread_extra + "线程上限：7 ÷ 2\n", 2, thread=False),
+                case(f"线程:派 {thread_type} 没写这一行但写了已判行放行", thread_type, thread_extra + "线程上限已判：这件活只读不起重活\n", 0, thread=False),
+                case(f"线程:派 {thread_type} 已判行没写理由照拒", thread_type, thread_extra + "线程上限已判：\n", 2, thread=False),
+                case(f"线程:派 {thread_type} 线程上限写成占位只交骨架占位那一条", thread_type, thread_extra + "线程上限：<填 登记值>\n", 2, thread=False),
+            ]
+        thread_refusal = run_hook(work, json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "clerk", "prompt": "线程上限：16\n" + FOOTER}}))
+        cases.append(("stdin:线程上限不等于登记值拒绝（退出码 2）", 2, thread_refusal.returncode))
+        cases.append(("stdin:线程上限拒绝的 stderr 写了登记值、已判行的写法与出路", 1,
+                      int(all(needle in thread_refusal.stderr for needle in ("登记的每台默认重活线程数 7", "线程上限已判：", "→ 怎么办", "dispatch-prompt.py")))))
+        thread_formula_refusal = run_hook(work, json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "clerk", "prompt": "线程上限：7（本机），第二台 16\n" + FOOTER}}))
+        cases.append(("stdin:线程上限本机之外另写第二台拒绝（退出码 2）", 2, thread_formula_refusal.returncode))
+        cases.append(("stdin:线程上限另写第二台的 stderr 点名写错的那一段和原因", 1,
+                      int(all(needle in thread_formula_refusal.stderr for needle in ("「线程上限：7（本机），第二台 16」", "有 2 个数字", "登记的每台默认重活线程数 7")))))
+        thread_missing_refusal = run_hook(work, json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "tooling-writer", "prompt": "改完交回。\n" + FOOTER}}))
+        cases.append(("stdin:派 tooling-writer 没写线程上限拒绝（退出码 2）", 2, thread_missing_refusal.returncode))
+        cases.append(("stdin:没写线程上限的 stderr 写了缺哪一行、登记值与已判行的写法", 1,
+                      int(all(needle in thread_missing_refusal.stderr for needle in ("没有「线程上限：N」一行", "登记的每台默认重活线程数 7", "→ 怎么办",
+                                                                                   "写「线程上限：N」再加一行「线程上限已判：", "确实不起重活的，只写一行「线程上限已判：")))))
+        os.environ[HEAVY_THREADS_LIBRARY_VARIABLE] = os.path.join(heavy_threads_directory, "missing.py")
+        thread_unreadable = run_hook(work, json.dumps({"tool_name": "Agent", "tool_input": {"subagent_type": "clerk", "prompt": "线程上限：16\n" + FOOTER}}))
+        cases.append(("stdin:登记读不到时放行并在 stderr 写一句", (0, True),
+                      (thread_unreadable.returncode, "读不到登记的每台默认重活线程数" in thread_unreadable.stderr)))
+        os.environ.pop(HEAVY_THREADS_LIBRARY_VARIABLE, None)
+        real_registered, real_registered_error = registered_heavy_threads()
+        cases.append(("线程:真库读得到登记值", True, real_registered is not None))
+        if real_registered is not None:
+            cases += [case("线程:真库的登记值放行", "clerk", f"线程上限：{real_registered}\n", 0),
+                      case("线程:真库的登记值加一拒", "clerk", f"线程上限：{real_registered + 1}\n", 2)]
+        # ── ⑯ 草稿目录写者锁：经钩子入口真派（SINGLEFS_WORK_ROOT 指到自检自己的工作根），锁与会话记录都在临时目录 ──
+        # 开关 writer-lock-unchecked、writer-lock-live-ignored、writer-lock-stale-kept、writer-lock-valve-ignored、writer-lock-root-locked 各红在文件头点名的格
+        lock_root = tempfile.mkdtemp()
+        other_directories.append(lock_root)
+        lock_transcript = os.path.join(session_work, "locks.jsonl")
+        write_session("locks", [])
+        def lock_launch(agent_id, text):
+            return launch(agent_id, "claude-opus-5", text, seconds_ago=0)
+        def lock_dispatch(directory_name, note):
+            text = heavy_line + f"草稿目录：{lock_root}/{directory_name}/\n报告：{lock_root}/{directory_name}/report.md\n{note}\n"
+            lock_input = {"tool_name": "Agent", "session_id": "locks", "transcript_path": lock_transcript,
+                          "tool_input": {"subagent_type": "clerk", "prompt": text}}
+            completed = subprocess.run(["bash", script], input=json.dumps(lock_input), capture_output=True, text=True,
+                                       env=dict(os.environ, CLAUDE_PROJECT_DIR=defs_work, SINGLEFS_WORK_ROOT=lock_root))
+            return completed, text
+        def lock_of(directory_name):
+            return writer_lock.read_lock(os.path.join(lock_root, directory_name)) if writer_lock is not None else None
+        def lock_is_for(directory_name, text):
+            lock = lock_of(directory_name)
+            return lock is not None and lock["prompt_sha256"] == hashlib.sha256(text.encode("utf-8")).hexdigest()
+        first_run, first_text = lock_dispatch("w1", "第一件")
+        first_lock = lock_of("w1")
+        cases.append(("写者锁:第一次派发建锁放行", 0, first_run.returncode))
+        cases.append(("写者锁:建出的锁带会话号、提示 sha256 与随机串", True,
+                      first_lock is not None and first_lock["session_id"] == "locks" and bool(first_lock["nonce"])
+                      and first_lock["prompt_sha256"] == hashlib.sha256(first_text.encode("utf-8")).hexdigest()))
+        write_session("locks", [lock_launch("a0000000000000aa1", first_text)])
+        second_run, _ = lock_dispatch("w1", "第二件")
+        cases.append(("写者锁:同一目录再派、持锁的还在跑拒", 2, second_run.returncode))
+        cases.append(("写者锁:拒绝说明点名持锁者、目录与已判行的写法", True,
+                      all(needle in second_run.stderr for needle in ("a0000000000000aa1", f"{lock_root}/w1", "写者锁已判：", "→ 怎么办"))))
+        cases.append(("写者锁:拒绝之后锁没动", True, first_lock is not None and lock_of("w1") is not None and lock_of("w1")["nonce"] == first_lock["nonce"]))
+        write_session("locks", [handed_back("a0000000000000aa1", seconds_ago=-2)])
+        third_run, third_text = lock_dispatch("w1", "第三件")
+        cases.append(("写者锁:持锁的已交回，再派接手", 0, third_run.returncode))
+        cases.append(("写者锁:接手之后锁换成新一次派发的", True, lock_is_for("w1", third_text)))
+        write_session("locks", [lock_launch("a0000000000000bb2", third_text)])
+        valve_run, valve_text = lock_dispatch("w1", "第四件\n写者锁已判：持锁的是客户端重启后留下的旧进程，已确认失效")
+        cases.append(("写者锁:写了已判行接手", 0, valve_run.returncode))
+        cases.append(("写者锁:已判行接手之后锁换成新一次派发的", True, lock_is_for("w1", valve_text)))
+        other_run, _ = lock_dispatch("w2", "别的目录")
+        cases.append(("写者锁:别的目录不冲突", 0, other_run.returncode))
+        lock_dispatch("w3", "没起来的一")
+        unlaunched_run, _ = lock_dispatch("w3", "没起来的二")
+        cases.append(("写者锁:没起来的持锁者 10 分钟内算在跑，再派拒", 2, unlaunched_run.returncode))
+        aged_lock = lock_of("w3")
+        if aged_lock is not None:
+            aged_lock["dispatched_at"] -= 700
+            with open(writer_lock.lock_path(os.path.join(lock_root, "w3")), "w", encoding="utf-8") as aged_file:
+                json.dump(aged_lock, aged_file, ensure_ascii=False)
+        aged_run, _ = lock_dispatch("w3", "没起来的三")
+        cases.append(("写者锁:没起来的持锁者超过 10 分钟，再派接手", 0, aged_run.returncode))
+        lock_dispatch("w6", "派发失败后重试的一件")
+        retry_run, _ = lock_dispatch("w6", "派发失败后重试的一件")
+        cases.append(("写者锁:同一份提示没起来就重派，当重试接手", 0, retry_run.returncode))
+        root_input = {"tool_name": "Agent", "session_id": "locks", "transcript_path": lock_transcript,
+                      "tool_input": {"subagent_type": "clerk", "prompt": heavy_line + f"草稿目录：{lock_root}/\n报告：{lock_root}/report.md\n"}}
+        subprocess.run(["bash", script], input=json.dumps(root_input), capture_output=True, text=True,
+                       env=dict(os.environ, CLAUDE_PROJECT_DIR=defs_work, SINGLEFS_WORK_ROOT=lock_root))
+        cases.append(("写者锁:草稿目录写成工作根本身不建锁", False, os.path.exists(os.path.join(lock_root, ".writer-lock"))))
+        check_prompt_path = os.path.join(defs_work, "lock-check-prompt.md")
+        write_sample(defs_work, "lock-check-prompt.md", heavy_line + f"草稿目录：{lock_root}/w9/\n报告：{lock_root}/w9/report.md\n检查模式\n")
+        checked_lock = subprocess.run(["bash", script, "--check-prompt", check_prompt_path, "--type", "clerk", "--root", defs_work],
+                                      capture_output=True, text=True, env=dict(os.environ, SINGLEFS_WORK_ROOT=lock_root))
+        cases.append(("写者锁:--check-prompt 不建锁、写明派的那一刻另判", (0, False, True),
+                      (checked_lock.returncode, os.path.exists(os.path.join(lock_root, "w9", ".writer-lock")), "⑯" in checked_lock.stdout)))
     finally:
         os.environ.pop("DISPATCH_GUARD_STATE_ROOT", None)
         os.environ.pop("RUNNER_DISPATCH_GUARD_ADMISSION_SCRIPT", None)
+        os.environ.pop(HEAVY_THREADS_LIBRARY_VARIABLE, None)
         shutil.rmtree(work)
         for directory in other_directories:
             shutil.rmtree(directory, ignore_errors=True)
@@ -1458,8 +2581,14 @@ def selftest(hook_dir):
           "限额窗口没到的同一族拒、换一族或时刻已过放行；书记员规格检查红或一份规格都认不出的拒；设计员重跑登记准入判输入没变的拒；"
           "变异分诊员没给表的拒；执行员没点名岔路、续做没写还差或还差写无的拒，只修锚点与只补落产物放行；"
           "派书记员或实现员时要改的文件在没判完的三方快照里就拒，已判完的轮、没正文的快照、写了放行行的、派别的 agent 的、认不出的清单行、不在的规格与读不了的清单放行；"
-          "派设计员、执行员没写预计挂钟或写得认不出的拒，超过 2 小时而分片、续跑、多机三行不齐（没写、半截、多机写死额度、分不了没点名或太短）的拒，齐了、点名了、2 小时内的放行；"
-          "各条都判完、不成立的一次列全，缺输入的写明按字面子串认哪几个字并给照抄的一行；--check-prompt 拿同一份判法核提示、不碰实现员登记")
+          "派设计员与带重活的类型（线程上限那张类型表）没写预计挂钟或写得认不出的拒，超过 2 小时而分片、续跑、多机三行不齐（没写、半截、多机写死额度、多机一行不是规范句（现算、折算、换了词的取法、规范句后接任何说明都算）、分不了没点名或太短、多机已判没写理由或写两行）的拒，齐了、点名了、规范句加多机已判与逐台参数一行、2 小时内的放行；"
+          "各条都判完、不成立的一次列全，缺输入的写明按字面子串认哪几个字并给照抄的一行；--check-prompt 拿同一份判法核提示、不碰实现员登记；"
+          "快照那一条：用户叫停的轮在 abandoned-rounds.tsv 登记一行、出处是 records/ 下现存文件的行号加〔〕原话（原话恰好找到一次，行号对不上照收；"
+          "命中两次而行号提示落在其中一处、或找不到而行号提示那一行有这一轮的名字、去掉改名表的新旧名与日期之后〔〕落在那一行里，取提示那一行；取到的那一行有这一轮的名字和「」括的原话）的放行，"
+          "没登记、没出处、没行号、没带〔〕原话、原话找不到而提示那一行没有名字、原话找不到而提示那一行去掉新旧名与日期之后对不上（〔〕写的是转述）、命中两次而提示不在其中、"
+          "那一行没有名字或原话太短或名字连着别的轮名或另写着仓里认得的别的轮名、没写出处而不在旧行名单里（不按日期免）、指到自己的材料或规则文件或带 .. 或符号链接指到仓外、登记行写坏、只写 halted 文件的照拒并写没收的原因；"
+          "线程上限：只认一个整数（后面接括注一概拒，说明另起一行照普通正文写；代码块照 CommonMark 认、闭合了的围栏块里的行不判：波浪线、列表、引用块里的围栏都认，行首的 ```…```、缩进 4 格的、波浪线块与 HTML 注释里露出的三个反引号不开块，列表项里没闭合的围栏在列表项结束处结束；标签行照 CommonMark 与照宽的逐行认法遮不遮不一致拒，载不进 markdown-it-py 时退回宽的逐行认法）、整数等于登记值放行，不等于、写成公式或比例（÷、/、一半）、两个以上数字、整数后接括注或别的话拒，任务带重活的九种类型没写这一行也拒，写了已判行放行、已判行没理由照拒、登记读不到放行；"
+          "草稿目录写者锁：第一次派发建锁，持锁的还在跑再派拒，交回了、没起来超过 10 分钟或写了已判行接手，别的目录与工作根本身不冲突，--check-prompt 不建锁")
     return 0
 
 CHECK_PROMPT_USAGE = ("  ✗ 用法：runner-dispatch-guard.sh --check-prompt <提示文件> --type <类型> [--model <模型>] [--root <仓根>]\n"
@@ -1514,7 +2643,7 @@ def main():
     project_root = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(os.path.dirname(hook_dir))
     if work_roots is None:
         print(f"! 派发闸读不到 {os.path.join(hook_dir, 'lib_work_root.py')}（{work_roots_error!r}）：提示里工作根与旧根下的路径这一次没判", file=sys.stderr)
-    code, message = decide(hook_input, project_root)
+    code, message = decide(hook_input, project_root, take_locks=True)
     if message:
         print(message, file=sys.stderr)
     return code

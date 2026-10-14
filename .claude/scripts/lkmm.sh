@@ -359,7 +359,7 @@ ok "herd7  $(herd7 -version 2>&1 | head -1)"
 
 # ── 跑 ──
 say ""
-cd "$KTREE/tools/memory-model"
+cd "$KTREE/tools/memory-model" || die "进不去内核树的 tools/memory-model：$KTREE/tools/memory-model" "核一下 LKMM 内核树的路径（文件头写着从哪取）；树不全就重新取一份"
 for f in "${FILES[@]}"; do
   rel="litmus/$(basename "$f")"   # 此时已 cd 进内核树，不能再算相对路径
   want="${EXPECT[$f]}"

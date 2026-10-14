@@ -1,0 +1,88 @@
+# 门禁 code-tooling 的 heavy-thread-defaults 格的排除表：自己定并行度默认值的写法里，不是重活默认、或这一批不改的那几处。
+# 写法：一行「<路径>:<锚串>  # 理由」（锚串与 # 之间至少两个空格，理由至少 4 个字）；那份文件里含锚串的被判行都放行。
+# 指向不存在的文件、锚串一处被判行都不命中，判红；只缩不涨：改动范围的基准那一版里没有的「路径:锚串」判红。改成经登记位取了就删掉那一行。
+# 每台默认重活线程数的登记位是 .claude/heavy-thread-default。
+
+# 盘点表（~/.local/share/singlefs/work/m3-tooling-b1-thread-defaults/report.md「不是重活、不该改的」）里这一格判得到的几条
+scripts/hosts/host-resources.py:min(len(SWITCH_EXPECTED_CELLS)  # 弄坏开关自证格的线程池，池大小被格数夹住，每格毫秒到秒级，不是重活
+scripts/hosts/host-dispatch.py:min(len(SWITCH_EXPECTED_CELLS)  # 弄坏开关自证格的线程池，池大小被格数夹住，每格毫秒到秒级，不是重活
+scripts/hosts/minimal-copy.py:min(len(SWITCH_EXPECTED_CELLS)  # 弄坏开关自证格的线程池，池大小被格数夹住，每格毫秒到秒级，不是重活
+scripts/hosts/source-stamp.py:min(len(SWITCH_EXPECTED_CELLS)  # 弄坏开关自证格的线程池，池大小被格数夹住，每格毫秒到秒级，不是重活
+scripts/experiments/e6_multicore.rs:available_parallelism  # 多核扩展性测量：核数阶梯本身是被测的量，改了产物就变
+scripts/experiments/e21_cpu.rs:available_parallelism  # 多核扩展性测量：核数阶梯本身是被测的量，改了产物就变
+scripts/experiments/e17_merge.rs:available_parallelism  # 多核扩展性测量：核数本身是被测的量，改了产物就变
+scripts/experiments/e162_crash_verdict_block_store.rs:available_parallelism  # 只把本机核数打进 processors / config 行，不起线程
+scripts/experiments/e162_crash_verdict_block_store.rs:&host, "nproc"  # 只把第二台的核数打进 processors 行，不起线程
+scripts/experiments/e162_verdict_store_network.rs:available_parallelism  # 只把本机核数打进 config 行，不起线程
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/fake_row_driver.py:parser.add_argument("--  # 自证用的假驱动，--threads 与 --lanes 的默认是假件的参数
+
+# 盘点表之外、同一类的几处：只量核数不起线程、自证与样本里给的数、弄坏开关照改前的写法、这一格自己的模式表
+scripts/gate/admission.py:os.cpu_count(), len(os.sched_getaffinity(0))  # machine_core_count 只量本机核数（判「本机多于 1 核」、记进标记），线程数取 registered_heavy_threads
+scripts/gate/admission.py:"nproc"  # 弄坏开关 cores-from-nproc 照改前取 nproc，自证在 PATH 上放假 nproc 证明本机核数不认它
+scripts/gate/admission.py:subprocess.run([nproc]  # 弄坏开关 cores-from-nproc 照改前起 nproc
+scripts/gate/verus-proof-check.py:"timeout": 5, "threads": 2, "jobs": 2  # 自证里给的参数，不是默认
+scripts/hosts/detached-run.sh:long-run-check -- bash "$scripts_directory/run-with-memory-cap.sh" 1G  # 自证里造的样本命令
+scripts/hosts/detached-run.sh:每台线程按 host-resources.py 的 available_threads 取  # 自证样本：多机一行规范句后接按 available_threads 现算的写法，是要被 long-run-check 拒的输入，不起线程
+scripts/hosts/run-with-memory-cap.sh:RUN_WITH_MEMORY_CAP_KEY=selftest-threads-capped  # 自证：经 capped.sh 3 跑的那一条记线程数 3
+scripts/hosts/run-with-memory-cap.sh:selftest-threads-unset  # 自证：线程变量都没设时峰值表显示整机核数，只是显示、不起线程
+scripts/hosts/host-resources.py:available_threads=max(0, cpu["cores"] - used)  # 只报此刻空闲线程，派发器与资源报告读它，不定并行度
+.claude/hooks/runner-dispatch-guard.sh:多机一行写 available_threads 现算拒  # 自证样本的名字：造一份多机行写 available_threads 现算的提示，证明派发闸拒，不起线程
+.claude/hooks/runner-dispatch-guard.sh:每台线程取 .claude/heavy-thread-default 与 available_threads 里小的那个  # 自证样本的提示正文：就是要被派发闸拒的现算写法，不起线程
+.claude/hooks/runner-dispatch-guard.sh:后接 host-resources 与 available_threads 拒  # 自证样本的名字：造一份多机行后接 host-resources 与 available_threads 的提示，证明派发闸拒，不起线程
+.claude/hooks/runner-dispatch-guard.sh:每台线程按 host-resources.py 的 available_threads 取  # 自证样本的提示正文：就是要被派发闸拒的现算写法，不起线程
+scripts/experiments/e171_three_oracle_collusion/test_collusion_pipeline.py:capped.sh", "6"  # 单测断言：拼出来的命令带调用方给的线程数
+scripts/experiments/e171_three_oracle_collusion/test_o3_columns.py:capped.sh", "3"  # 单测断言：拼出来的命令带调用方给的线程数
+scripts/experiments/e171_three_oracle_collusion/test_o3_columns.py:"threads": 2, "memory_cap": "1G"  # 单测输入，不是默认
+scripts/hosts/capped.sh:default-from-nproc  # 弄坏开关 default-from-nproc 照改前取本机核数，只给自证证红
+scripts/hosts/heavy-threads.sh:missing-registration-uses-core-count  # 弄坏开关照改前取本机核数，只给自证证红
+scripts/hosts/heavy_threads.py:return os.cpu_count() or 1  # 弄坏开关 missing-registration-uses-core-count 照改前取本机核数，只给自证证红
+scripts/devices/build-patched-qemu.sh:stamp-ignores-patch threads-from-nproc)  # 弄坏开关 BUILD_PATCHED_QEMU_BREAK=threads-from-nproc 的项名清单，开关名里带 nproc
+scripts/devices/build-patched-qemu.sh:== threads-from-nproc ]]; then nproc  # 弄坏开关 threads-from-nproc 照改前取本机核数当 make 并行数，只给自证证红
+scripts/devices/build-patched-qemu.sh:threads-from-nproc build_threads_default_problem  # 自证里打开弄坏开关 threads-from-nproc，证明「没设上限时 make 的并行数是登记的重活默认」那一格会红
+scripts/experiments/replay.sh:== jobs-from-nproc ]]  # 弄坏开关 REPLAY_BREAK=jobs-from-nproc 的判断，改前同时跑几条实验取核数的一半，只给自证证红
+scripts/experiments/replay.sh:$(nproc 2>/dev/null || echo 4) / 2  # 弄坏开关 REPLAY_BREAK=jobs-from-nproc 照改前取核数的一半，只给自证证红
+scripts/crash/crash-amplification-lib.sh:$(nproc) > 1 ? $(nproc) - 1 : 1  # 弄坏开关 threads-default-cores 照改前本机跑的那一步取核数减一，只给自证证红
+scripts/experiments/e165-pin-red-examples.py:or os.cpu_count() or 1)  # 弄坏开关 threads-default-cpu-count 照改前取 SINGLEFS_THREAD_CAP 或核数，只给自证证红
+scripts/gate/verus-proof-check.py:or os.cpu_count() or 1)  # 弄坏开关 threads-default-cpu-count 照改前取 SINGLEFS_THREAD_CAP 或核数，只给自证证红
+.claude/hooks/lib_heavy_tests.py:"scripts/hosts/capped.sh", "7", "cargo", "test", "--manifest-path", "probes/linked/Cargo.toml"  # 自证里造的 argv：判探针包经 capped.sh 起 cargo test 认得出 checker 档，7 是样本值
+scripts/experiments/e171_three_oracle_collusion/row_driver.py:parser.add_argument("--lanes", type=int, default=1)  # 线道数只切分每台默认重活线程数（threads_per_lane = 登记值 ÷ --lanes），默认 1 线道不另定并行度
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py:parser.add_argument("--lanes", type=int, default=1)  # 线道数只切分每台默认重活线程数（threads_per_lane = 登记值 ÷ --lanes），默认 1 线道不另定并行度
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/test_default_threads.py:max(1, registered // 2)  # 单测里 threads_per_lane 的期望式：登记值向下取整除以 2 线道
+.claude/gate.d/code-tooling.sh:thread_default_form(  # heavy-thread-defaults 格自己的模式表
+.claude/gate.d/code-tooling.sh:THREAD_DEFAULT_  # heavy-thread-defaults 格自己的模式表
+
+# E171 修订 6–11 的第一段编排器：rows_orchestrator.py 被 cross_host_o3_check.py、rows_orchestrator_revision_8.py、rows_orchestrator_segment_two.py、reuse_library.py 按 sha256 1dcfb8d0… 钉住，
+# 钉它的各层文件头都写「一个字节不改」；改它要同时重钉这几层与再往上钉这几层的哈希、改它们的文件头，这一批不动，另起一层或另批改（改前是按此刻空闲线程取小）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py:available_threads: int  # 按 sha256 钉住的冻结层，一个字节不改；HostResources 的字段读 host-resources.py 此刻空闲线程
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py:min(found.available_threads, HOST_THREADS_CEILING)  # 按 sha256 钉住的冻结层，一个字节不改；每台线程与此刻空闲取小，上限 31
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py:可用线程 {found.available_threads}  # 按 sha256 钉住的冻结层，一个字节不改；日志行报此刻空闲线程
+
+# 与依赖产物共用一起改（变异门禁 checker-tier-crates-mutation-replay 的工作进程数与 mutate.sh，gate-overlap copy-kept 一对）
+scripts/mutation/crates-mutation-rows.py:os.cpu_count() or 4  # 与依赖产物共用一起改：worker_count_for 与每个工作进程的编译并行度
+scripts/mutation/crates-mutation-rows.py:min(16, processor_count // 2)  # 与依赖产物共用一起改：worker_count_for 核数一半至多 16
+scripts/mutation/mutate.sh:MAXIMUM_WORKERS_BY_PROCESSOR=16  # 与依赖产物共用一起改：与 worker_count_for 同一个上限
+scripts/mutation/mutate.sh:processor_count="$(nproc  # 与依赖产物共用一起改：工作进程数与自证的期望按核数算
+scripts/mutation/mutate.sh:processor_count / 2  # 与依赖产物共用一起改：核数一半
+
+# crates/ 里的默认值：代码批改（这一批不动 crates/）
+crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:LARGE_SLICE_THREADS_WHEN_UNSET  # 代码批：P4 大片同时跑的上限（盘点表记它是内存护栏，算不算并行度默认由主 agent 判）
+
+# 判决 m3-defs-b6-r1 改法 L2 之后新点名、逐行判过不是重活默认的两处（引号里的线程变量名出现就算读，`&& X=N` 认成钉数）
+scripts/agents/dispatch-prompt.py:"THREAD_LIMIT_REQUIRED_AGENTS" in long_run_table.group(2)  # 读派发闸表那一行的文本：引号里是表名，拿来对表文本做字符串比较，不读环境变量
+scripts/experiments/replay.sh:&& REPLAY_JOBS=1  # 同时跑几条实验的并发度夹下限到 1（上一行已按登记值或上限取好），夹下限不是给默认值
+
+# 判决 m3-defs-b6-r2 改法 M2 之后新点名、逐行判过不是重活默认的几处（排除表按被判行匹配：装置读自己的线程变量，点名的是读它的那一行，同文件别的被判行上的锚串放行不了它）
+scripts/experiments/replay.sh:REPLAY_JOBS="${REPLAY_JOBS:-$(default_replay_jobs)}"  # 同时跑几条实验的并发度：缺省取 default_replay_jobs（登记的重活默认，不看忙闲），REPLAY_JOBS 只是调用方压过它的开关
+scripts/hosts/heavy_threads.py:BREAK_VARIABLE = "HEAVY_THREADS_BREAK"  # 弄坏开关的变量名，只给自证证红，不定并行度
+scripts/hosts/heavy-threads.sh:${HEAVY_THREADS_BREAK:-}  # 弄坏开关的变量名，只给自证证红，不定并行度
+scripts/hosts/run-with-memory-cap.sh:os.environ.get("RUN_WITH_MEMORY_CAP_THREADS_RESOLVED")  # 读 run_capped 经环境交来的线程数，只记进峰值表，不起线程
+scripts/mutation/mutate.sh:grep -qF "MUTATE_JOBS"  # 与依赖产物共用一起改：MUTATE_JOBS 是调用方把工作进程数压小的开关（只能压小，不能加大），不是并行度默认值；这是自证里第一次出现它的一行
+scripts/mutation/mutate.sh:REQUESTED_CARGO_JOBS="${MUTATE_CARGO_JOBS:-}"  # 与依赖产物共用一起改：MUTATE_CARGO_JOBS 是调用方指定每个 cargo 编译并行度的开关，没设按核数 ÷ 工作进程数，随 crates-mutation-rows.py 同改
+scripts/mutation/crates-mutation-rows.py:STAGE_VARIABLES = ("GATE_MUTATION_WORKERS"  # 与依赖产物共用一起改：自证起每一格之前从环境里清掉的变量名清单，GATE_MUTATION_WORKERS / GATE_MUTATION_CARGO_JOBS 是调用方压低并发度的开关，随 mutate.sh 同改
+scripts/gate/admission.py:"REPLAY_JOBS": "1"  # 自证里给假 replay 脚本的环境：同时跑 1 条，是场景本身，不是默认
+scripts/gate/admission.py:name not in (THREAD_CAP_VARIABLE, "HEAVY_THREADS_BREAK")  # 自证里从环境里去掉上限与弄坏开关两个变量，不读它们的值，不定并行度
+scripts/gate/admission.py:"OMP_NUM_THREADS": "1"  # 自证里给假环境放的 OMP_NUM_THREADS=1，证明本机核数不认它，是场景本身，不是默认
+scripts/gate/verus-proof-check.py:int(os.environ.get("GATE_VERUS_JOBS") or 0)  # 空真与必红世界几处同时验的处数，0 取 min(处数, N // 4)，每处自己的 Verus 线程仍取登记值，是并发处数不是线程默认
+scripts/crash/crash-amplification-two-hosts.sh:"${CRASH_AMPLIFICATION_PEER_THREADS:-}"  # 交给 crash_amplification_threads_now 的调用方覆盖值，没设由它现算第二台线程，不是默认
+.claude/hooks/runner-dispatch-guard.sh:HEAVY_THREADS_LIBRARY_VARIABLE = "RUNNER_DISPATCH_GUARD_HEAVY_THREADS_LIBRARY"  # 自检把登记读成别的值时放库路径的变量名，不是并行度
+crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs:LARGE_SLICE_THREADS_ENVIRONMENT_VARIABLE: &str  # 代码批：P4 大片同时跑的上限的变量名，没设取 1（内存护栏，同文件 LARGE_SLICE_THREADS_WHEN_UNSET 那一条已登记）

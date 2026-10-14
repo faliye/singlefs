@@ -60,6 +60,15 @@
         ]
       },
       {
+        "matcher": "CronCreate|ScheduleWakeup|RemoteTrigger|Skill|Monitor|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/timer-only-remind-guard.sh"
+          }
+        ]
+      },
+      {
         "matcher": "SubagentHandback",
         "hooks": [
           {
@@ -81,6 +90,16 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/remind-rearm-stop-guard.sh"
           }
         ]
       }

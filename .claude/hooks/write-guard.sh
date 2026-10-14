@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
 # run-condition: command python3
-# PreToolUse hook（Write、Edit、MultiEdit：.claude/settings.json 里注册在 matcher "Write|Edit|MultiEdit" 上）：写文件之前的八道判定（一至五、七、八写在下面，六是语法检查、写在 --selftest 那一段），合在一个 hook 里；拒绝的同时把它记进检出记录，交主 agent 看。
+# PreToolUse hook（Write、Edit、MultiEdit：.claude/settings.json 里注册在 matcher "Write|Edit|MultiEdit" 上）：写文件之前的九道判定（一至五、七至九写在下面，六是语法检查、写在 --selftest 那一段），合在一个 hook 里；拒绝的同时把它记进检出记录，交主 agent 看。
 #
 # 一、整份覆盖未跟踪文件（只管 Write）：仓里已存在、又没进 git 的文件，拒绝用 Write 整份覆盖。
 #    为什么：几个会话同时在一个仓里干活。2026-09-11 一个会话用 Write 新建 `research/prompts/e137-preregistration.md`，
@@ -46,8 +46,17 @@
 #    不判 old_string 中间行的行尾空白：new_string 那一行去掉的空白后面是换行，不会把两个词粘起来。
 #    出路：把框选范围收到不以空白结尾（多框到下一个非空白字符，或止于行尾）；确实要删行尾空白的，用 Bash 跑 scripts/kb/replace-once.py。
 #
-# 八道判定合在这一个 hook 里：一至五、七、八各占文件头一段，六写在 --selftest 那一行的说明里。
-# 八道都判完再报：不成立的几道一次列全，每道带自己的出路；钟点与会话号逐处列出（行号与总数）。只有一处例外：
+# 九、草稿目录写者锁（Write、Edit、MultiEdit，只判带 agent_id 的子 agent 调用）：目标在草稿根（工作根或过渡期旧根）底下、它所在的目录或往上的某一层有 .writer-lock，
+#    而这个子 agent 不是持锁的那一个就拒绝。主 agent（输入里没有 agent_id）、没有锁的目录、草稿根之外的目标不判；锁读不了、判法自己出错放行，stderr 写一句。
+#    锁由派发闸（runner-dispatch-guard.sh 的 ⑯）在派发那一刻排他建在提示里「草稿目录：」点名的目录里；持锁者是第一个被认领的子 agent：派发回执（主会话记录）里的提示 sha256
+#    对得上锁、回执时刻不早于锁的派发时刻的才认领，回执还没落进记录的先到先得；认领之后只有它（含 SendMessage 续做）能写，后来的与旧进程的写被拒。
+#    嵌套的草稿目录（目标往上经过几处有锁的目录）：只认最近一层的锁——父目录的持锁者 A 写子目录而子目录另派给 E 持锁时，A 写 E 的子目录被拒；E 写父目录，也被父目录的锁拦
+#    （lib_writer_lock.py 文件头「嵌套的草稿目录」）。
+#    回执对不上而最近一层还没有认领时，拒绝说明去派发会话的记录里找提示对得上这把锁的回执，点名持锁者的 agent_id；找不到写锁登记的提示 sha256 前 12 位、派发时刻与会话。
+#    为什么：客户端重启后旧进程又活了几分钟，旧子 agent 与重派的子 agent 写同一个草稿目录，交替写同一份副本、互删副本（.claude/kb/milestone/03-third-txn.md 待优化表「草稿目录写者锁」一条）。
+#    判法、锁与认领文件的格式、弄坏开关都在同目录 lib_writer_lock.py；读不到那份库时这一道不判，stderr 写一句。拦不住 Bash 里的写（这道闸只挂 Write / Edit / MultiEdit）。
+# 九道判定合在这一个 hook 里：一至五、七至九各占文件头一段，六写在 --selftest 那一行的说明里。
+# 九道都判完再报：不成立的几道一次列全，每道带自己的出路；钟点与会话号逐处列出（行号与总数）。只有一处例外：
 # 先编后换那一道拒了，写范围那一道不再报（目标是同一个，先编后换的出路已经写了范围外的交回主 agent）。
 # 它们拒的是一次写，不停任务和脚本；拒绝时退出码 2、stderr 交给做这次写的模型，同时往检出记录
 # （默认工作根下的 agent-hook-detections.jsonl，lib_work_root.py 的 default_detections_path；环境变量 AGENT_HOOK_DETECTIONS 可改）追加一行，
@@ -59,7 +68,7 @@
 #   write-guard.sh --selftest  # 走一遍各道判定的放行与拒绝；WRITE_GUARD_DISABLE_OVERWRITE=1、WRITE_GUARD_DISABLE_COMPILE_FIRST=1、
 #                              # WRITE_GUARD_DISABLE_SCOPE=1、WRITE_GUARD_DISABLE_CLOCK_TIMES=1、WRITE_GUARD_DISABLE_SESSION_NAMES=1、WRITE_GUARD_DISABLE_SYNTAX=1 或
 #                              # WRITE_GUARD_BREAK=trailing-blank-ignored（第八道放行以空白收尾的 old_string）时自检必须判红；
-#                              # WRITE_GUARD_BREAK=stop-at-first（decide() 判到第一道不成立就交回、后面几道不判）时「八道判完再报:覆盖、越界与钟点一次列全」一格红；
+#                              # WRITE_GUARD_BREAK=stop-at-first（decide() 判到第一道不成立就交回、后面几道不判）时「九道判完再报:覆盖、越界与钟点一次列全」一格红；
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK=first-hit-only（库的 all_hits 只交第一处）时「钟点:两处都报（行号与总数）」「会话号:两处都报（行号与总数）」两格红；
 #                              # 第二道里工作根那一条模式的三样各一个弄坏开关，打开时点名的几项红：
 #                              #   SINGLEFS_WORK_ROOT_BREAK=new-root-unknown（工作根退回旧根，lib_work_root.py）：「范围:工作根下的报告目录」「先编后换:experiment-runner 改草稿目录里的副本放行」
@@ -71,7 +80,34 @@
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键>（钟点的 date-zone-hour、date-zone-period、period-hour、hour-suffix、twelve-hour、
 #                              # bare-clock、iso-timestamp、zone-word，键写在 ../gate.d/lib-forbidden-notations.py）关掉一条判据行时，点名那一行的用例必须判红；
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=clock-times 时靠上下文放行的用例、LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=clock-times 时
-#                              # 带放行标记的用例必须判红
+#                              # 带放行标记的用例必须判红；
+#                              # 第九道（写者锁）：WRITE_GUARD_DISABLE_WRITER_LOCK=1 时「写者锁:提示对不上的子 agent 不能认领」「写者锁:同一份提示但派发早于这把锁的旧进程不能认领」
+#                              # 「写者锁:第二个写者被拒」「写者锁:第二个写者写子目录也被拒」「写者锁:拒绝说明点名持锁者与出路」「写者锁:先到先得之后第二个被拒」
+#                              # 「写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id」「写者锁:回执对不上又找不到持锁者的回执时，拒绝写锁登记的提示 sha256 前几位」
+#                              # 「写者锁:父目录锁的持有者写子目录另派给别人持锁的部分被拒」「写者锁:子目录锁的持有者写父目录仍被父目录锁拦」「写者锁:不持有任何一层锁的第三者写嵌套的子目录被拦」
+#                              # 「写者锁:父目录认领之后，认领者写别人持锁的子目录仍被拒」「stdin:第二个写者被拒（退出码 2）」「stdin:第二个写者的拒绝点名持锁者、锁的目录与出路」
+#                              # 「stdin:回执对不上的拒绝（退出码 2）」「stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路」「stdin:父目录锁的持有者写别人持锁的子目录被拒（退出码 2）」红；
+#                              # LIB_WRITER_LOCK_BREAK=<项>（一次设一个，lib_writer_lock.py 的开关）打开时点名的几格红：
+#                              #   claim-not-exclusive（认领不排他，后写的抢走持锁者）：「写者锁:先到先得之后第二个被拒」「写者锁:不持有任何一层锁的第三者写嵌套的子目录被拦」
+#                              #   holder-ignored（不比 agent_id）：「写者锁:提示对不上的子 agent 不能认领」「写者锁:同一份提示但派发早于这把锁的旧进程不能认领」「写者锁:第二个写者被拒」
+#                              #     「写者锁:第二个写者写子目录也被拒」「写者锁:拒绝说明点名持锁者与出路」「写者锁:先到先得之后第二个被拒」「写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id」
+#                              #     「写者锁:回执对不上又找不到持锁者的回执时，拒绝写锁登记的提示 sha256 前几位」「写者锁:父目录锁的持有者写子目录另派给别人持锁的部分被拒」
+#                              #     「写者锁:子目录锁的持有者写父目录仍被父目录锁拦」「写者锁:不持有任何一层锁的第三者写嵌套的子目录被拦」「写者锁:父目录认领之后，认领者写别人持锁的子目录仍被拒」
+#                              #     「stdin:第二个写者被拒（退出码 2）」「stdin:第二个写者的拒绝点名持锁者、锁的目录与出路」「stdin:回执对不上的拒绝（退出码 2）」
+#                              #     「stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路」「stdin:父目录锁的持有者写别人持锁的子目录被拒（退出码 2）」
+#                              #   launch-ignored（认领前不看派发回执）：「写者锁:提示对不上的子 agent 不能认领」「写者锁:持锁者第一次写放行」「写者锁:持锁者续写放行」「写者锁:持锁者写子目录放行」
+#                              #     「写者锁:第二个写者被拒」「写者锁:第二个写者写子目录也被拒」「写者锁:拒绝说明点名持锁者与出路」「写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id」
+#                              #     「写者锁:回执对不上又找不到持锁者的回执时，拒绝写锁登记的提示 sha256 前几位」「写者锁:父目录锁的持有者写子目录另派给别人持锁的部分被拒」
+#                              #     「写者锁:子目录锁的持有者写自己的子目录放行」「写者锁:子目录锁的持有者写父目录仍被父目录锁拦」「写者锁:父目录锁的持有者写父目录放行（认领父目录）」
+#                              #     「写者锁:父目录认领之后，认领者写别人持锁的子目录仍被拒」「写者锁:父目录认领之后，子目录锁的持有者写自己的子目录仍放行」
+#                              #     「stdin:第二个写者被拒（退出码 2）」「stdin:持锁者放行」「stdin:第二个写者的拒绝点名持锁者、锁的目录与出路」「stdin:回执对不上的拒绝（退出码 2）」
+#                              #     「stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路」「stdin:父目录锁的持有者写别人持锁的子目录被拒（退出码 2）」
+#                              #   stale-launch-accepted（认领前不比回执时刻）：「写者锁:同一份提示但派发早于这把锁的旧进程不能认领」「写者锁:持锁者第一次写放行」「写者锁:持锁者续写放行」
+#                              #     「写者锁:持锁者写子目录放行」「写者锁:拒绝说明点名持锁者与出路」「写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id」
+#                              #     「stdin:持锁者放行」「stdin:第二个写者的拒绝点名持锁者、锁的目录与出路」「stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路」
+#                              #   no-walk-up（只看目标所在那一层目录）：「写者锁:第二个写者写子目录也被拒」
+#                              #   foreign-holder-unnamed（回执对不上的拒绝不去记录里找持锁者）：「写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id」
+#                              #     「stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路」
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -79,7 +115,7 @@ HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON。
 # 写成 `python3 - <<PY` 时程序占了标准输入，JSON 读不到，判定一律放行——2026-09-17 写范围闸实测撞到的。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
-import importlib.util, json, os, re, shutil, subprocess, sys, tempfile
+import importlib.util, json, os, re, shutil, subprocess, sys, tempfile, time
 from datetime import datetime, timezone
 
 try:   # 工作根与过渡期旧根的唯一定义：同目录的 lib_work_root.py
@@ -88,6 +124,12 @@ try:   # 工作根与过渡期旧根的唯一定义：同目录的 lib_work_root
     DEFAULT_DETECTIONS, work_roots_error = work_roots.default_detections_path(), None
 except Exception as error:  # 文件不在、语法错、弄坏开关写错都算读不到
     work_roots, DEFAULT_DETECTIONS, work_roots_error = None, None, error
+
+try:   # 草稿目录写者锁的判法与锁的格式：同目录的 lib_writer_lock.py（读不到时第九道不判，stderr 写一句）
+    sys.path.insert(0, sys.argv[1]); import lib_writer_lock as writer_lock
+    writer_lock_error = None
+except Exception as error:  # 文件不在、语法错都算读不到
+    writer_lock, writer_lock_error = None, error
 
 def expanded_scope_patterns(patterns):
     """写范围表里的模式：$SINGLEFS_WORK_ROOT/ 起头的展开成工作根与过渡期旧根各一条；读不到 lib_work_root.py 时这样的模式丢掉（按拒判）。"""
@@ -171,6 +213,37 @@ def decide_scope(hook_input, project_root, table_path):
     return 2, (f"✗ {agent_type} 的写范围不含 {absolute}\n"
                f"→ 它的写范围：{'、'.join(patterns)}（.claude/hooks/agent-write-scope.tsv；$SINGLEFS_WORK_ROOT 是工作根 ~/.local/share/singlefs/work，过渡期另认旧根 /tmp/claude-<uid>）。\n"
                f"→ 怎么办：范围外的改动不自己做，写进报告交回主 agent，由主 agent 改或派该写的 agent。{unexpanded}")
+
+def decide_writer_lock(hook_input, project_root):
+    """九、子 agent 写草稿根底下的文件，那个目录（或往上的某一层）有写者锁、而它不是持锁的那一个。判法与锁的格式在 lib_writer_lock.py。"""
+    agent_id = hook_input.get("agent_id")
+    if not agent_id or os.environ.get("WRITE_GUARD_DISABLE_WRITER_LOCK") == "1":
+        return 0, None
+    if writer_lock is None or work_roots is None:
+        print(f"! 写者锁这一道读不到 lib_writer_lock.py 或 lib_work_root.py（{(writer_lock_error or work_roots_error)!r}），这一次没判", file=sys.stderr)
+        return 0, None
+    target = absolute_target(hook_input, project_root)
+    if not target:
+        return 0, None
+    transcript_path = hook_input.get("transcript_path") or ""
+    try:
+        scratch = writer_lock.find_lock_directory(target, work_roots.scratch_roots())   # 嵌套的草稿目录只认最近一层的锁（lib_writer_lock.py 文件头「嵌套的草稿目录」）
+        lock = writer_lock.read_lock(scratch) if scratch else None
+        if lock is None:
+            return 0, None
+        verdict, holder = writer_lock.writer_verdict(scratch, lock, agent_id, transcript_path)
+        if verdict == "holder":
+            return 0, None
+        unknown = None if holder else writer_lock.describe_unknown_holder(lock, agent_id, transcript_path)
+    except Exception as error:   # 挂在每一次写上的闸，坏了不能把所有写都挡住
+        print(f"! 写者锁这一道自己出错，这一次放行：{type(error).__name__}: {error}", file=sys.stderr)
+        return 0, None
+    owner = f"子 agent {holder}" if holder else f"{unknown}（你的派发回执不是这把锁登记的那一份提示，或早于这把锁）"
+    return 2, (f"✗ {target} 在草稿目录 {scratch} 里，这个目录的写者锁（派发 {lock.get('subagent_type') or '?'}，派发于 {str(lock.get('dispatched_date'))[:10]}）由{owner}持有，"
+               f"你（{agent_id}）不是：同一个草稿目录同一时刻只许持锁的那一个子 agent 写。\n"
+               "→ 怎么办：停下对这个目录的写，已经写的与没写完的在报告里交回主 agent；主 agent 给你换一个没人持锁的草稿目录重派，"
+               "或在派发提示里单起一行「写者锁已判：<理由>」接手这个目录（接手之后原持锁者写这个目录会被拒）。\n"
+               "→ 规矩：锁的格式与谁算持锁者见 .claude/hooks/lib_writer_lock.py 文件头；Bash 里的写这道闸看不见，同样不许写进别人持锁的目录。")
 
 # 四、先编后换：这几个项目 subagent 不直接写主工作区 crates/ 下的 .rs，出路是 scripts/hosts/compile-then-swap.py。
 # Bash 里的同一类写法由 bash-command-detector.sh 的 ⑨ 判，agent 名单与路径判据两边各写一份、改的时候一起改。
@@ -417,7 +490,7 @@ def decide_shell_syntax(hook_input, project_root):
                f"→ 怎么办：先在草稿目录里改到 `{checker_name}` 过，再写进来；钩子、门禁与脚本带着语法错误上线，之后每一次调用都会收到它的报错。")
 
 def decide(hook_input, project_root, table_path, prime_marks_library, clock_times_library=None):
-    """返回 (0, None, None) 放行；(2, 说明, 哪几道（「、」连）) 拒绝。八道都判完，不成立的按下面的次序一次列全；
+    """返回 (0, None, None) 放行；(2, 说明, 哪几道（「、」连）) 拒绝。九道都判完，不成立的按下面的次序一次列全；
     先编后换拒了不再判写范围，钟点那一道读不到判据时会话号那一道不再报同一句。弄坏开关 WRITE_GUARD_BREAK=stop-at-first 判到第一道不成立就交回。"""
     if clock_times_library is None:
         clock_times_library = prime_marks_library
@@ -428,7 +501,8 @@ def decide(hook_input, project_root, table_path, prime_marks_library, clock_time
               ("越出写范围", lambda: decide_scope(hook_input, project_root, table_path)),
               ("写进撇号类角标", lambda: decide_prime_marks(hook_input, prime_marks_library)),
               ("描述里写了钟点", lambda: decide_clock_times(hook_input, project_root, clock_times_library)),
-              ("写了会话号", lambda: decide_session_names(hook_input, project_root, clock_times_library)))
+              ("写了会话号", lambda: decide_session_names(hook_input, project_root, clock_times_library)),
+              ("写别的子 agent 持锁的草稿目录", lambda: decide_writer_lock(hook_input, project_root)))
     refused = []   # [(哪一道, 说明)]
     for label, judge in judges:
         already = {name for name, _ in refused}
@@ -448,7 +522,7 @@ def decide(hook_input, project_root, table_path, prime_marks_library, clock_time
     if len(refused) == 1:
         return 2, refused[0][1], labels
     blocks = [f"── 第 {number} 道：{label} ──\n{message}" for number, (label, message) in enumerate(refused, 1)]
-    return 2, (f"✗ 这一次写有 {len(refused)} 道判定不成立（{labels}）：八道都判完了，下面一次列全，逐道照各自的「→」改完再写。\n"
+    return 2, (f"✗ 这一次写有 {len(refused)} 道判定不成立（{labels}）：九道都判完了，下面一次列全，逐道照各自的「→」改完再写。\n"
                + "\n".join(blocks)), labels
 
 def record_detection(hook_input, finding, detections_path):
@@ -756,7 +830,7 @@ def selftest(hook_dir):
         ]
         cases += context_cases + allow_cases
         # 钟点、会话号逐处全报（行号与总数；LIB_FORBIDDEN_NOTATIONS_BREAK=first-hit-only 下前两格红）；Edit 的行号折算成文件里的行号；
-        # 八道判完再报：覆盖、越界与钟点三道一次列全（WRITE_GUARD_BREAK=stop-at-first 下末格红）
+        # 九道判完再报：覆盖、越界与钟点三道一次列全（WRITE_GUARD_BREAK=stop-at-first 下末格红）
         def refusal_of(tool_name, target, tool_input, agent=None):
             hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=f"{work}/{target}")}
             if agent:
@@ -770,7 +844,7 @@ def selftest(hook_dir):
         edit_lines, _ = refusal_of("Edit", "tracked.md", {"old_string": "a", "new_string": f"x\n用户 23{colon}10 定"})
         cases.append(("钟点:Edit 的行号折算成文件里的行号", True, "  第 2 行（" in edit_lines))
         _, three_labels = refusal_of("Write", "untracked.md", {"content": f"用户 23{colon}10 定\n"}, agent="kb-scribe")
-        cases.append(("八道判完再报:覆盖、越界与钟点一次列全", "整份覆盖未跟踪文件、越出写范围、描述里写了钟点", three_labels))
+        cases.append(("九道判完再报:覆盖、越界与钟点一次列全", "整份覆盖未跟踪文件、越出写范围、描述里写了钟点", three_labels))
         # 走真实入口：把脚本当子进程、从标准输入喂 JSON，防「判定函数对、入口读不到输入」；拒绝要落进检出记录
         script = os.path.join(hook_dir, "write-guard.sh")
         detections = os.path.join(work, "detections.jsonl")
@@ -809,6 +883,102 @@ def selftest(hook_dir):
                       run_entry({"tool_name": "Edit", "tool_input": {"file_path": f"{work}/records/x.md", "old_string": "python3 - ", "new_string": "python3 - "}}).returncode))
         recorded = sum(1 for _ in open(detections, encoding="utf-8")) if os.path.exists(detections) else 0
         cases.append(("stdin:七次拒绝都落进检出记录", 7, recorded))
+        # ── 九、草稿目录写者锁：SINGLEFS_WORK_ROOT 指到自检自己的工作根，锁与主会话记录都在里面 ──
+        # 开关见文件头 --selftest 一段；下面「写者锁:」「stdin:第二个写者」「stdin:持锁者」开头的格各自点名在开关下红
+        lock_root = tempfile.mkdtemp(dir=base)
+        work_root_before = os.environ.get("SINGLEFS_WORK_ROOT")
+        os.environ["SINGLEFS_WORK_ROOT"] = lock_root
+        try:
+            if writer_lock is None:
+                cases.append(("写者锁:库读得到", True, False))
+            else:
+                prompt_one, prompt_other, prompt_three = "写者锁自检的派发提示甲", "写者锁自检的派发提示乙", "写者锁自检的派发提示丙"
+                prompt_four = "写者锁自检的派发提示丁"   # 没有任何回执对得上它
+                lock_transcript = os.path.join(lock_root, "main-session.jsonl")
+                def make_lock(name, prompt_text):
+                    scratch = os.path.join(lock_root, name)
+                    writer_lock.create_lock(scratch, writer_lock.new_lock("self-test", prompt_text, "implementation-writer", lock_transcript))
+                    return scratch
+                def receipt(agent_id, prompt_text, seconds_ago=0):
+                    stamped = datetime.fromtimestamp(time.time() - seconds_ago, timezone.utc).isoformat().replace("+00:00", "Z")
+                    return json.dumps({"timestamp": stamped, "toolUseResult": {"status": "async_launched", "agentId": agent_id, "prompt": prompt_text}}, ensure_ascii=False)
+                for name in ("w1", "w2", "w4", "w5", "w6", "w7/sub", "w9"):
+                    os.makedirs(os.path.join(lock_root, name), exist_ok=True)
+                make_lock("w1", prompt_one)
+                make_lock("w4", prompt_three)
+                make_lock("w6", prompt_one)       # 回执对不上的拒绝点名持锁者：持锁者（提示甲）还没写过
+                make_lock("w7", prompt_one)       # 嵌套：父目录锁是持锁者甲的
+                make_lock("w7/sub", prompt_other)  # 嵌套：子目录锁是对手乙的
+                make_lock("w9", prompt_four)      # 没有回执对得上这把锁
+                open(os.path.join(lock_root, "w5", writer_lock.LOCK_NAME), "w", encoding="utf-8").write("{不是 JSON")
+                holder_id, rival_id, zombie_id, first_id, second_id = ("a0000000000000aa1", "a0000000000000bb2", "a0000000000000cc3", "a0000000000000dd4", "a0000000000000ee5")
+                with open(lock_transcript, "w", encoding="utf-8") as transcript_file:   # 回执：持锁者（提示甲、锁之后）、对手（提示乙）、旧进程（提示甲、一小时前）；w4 的两个写者没有回执
+                    transcript_file.write("\n".join([receipt(rival_id, prompt_other), receipt(zombie_id, prompt_one, seconds_ago=3600), receipt(holder_id, prompt_one)]) + "\n")
+                def lock_hook_input(agent_id, relative):
+                    return {"tool_name": "Write", "agent_id": agent_id, "agent_type": "implementation-writer", "transcript_path": lock_transcript,
+                            "tool_input": {"file_path": os.path.join(lock_root, relative), "content": "x"}}
+                def lock_case(label, agent_id, relative, want):
+                    return (label, want, decide(lock_hook_input(agent_id, relative), work, table, library)[0])
+                def refusal_names_holder():   # 持锁者认领之后才有「持锁者是谁」可写：在 cases 列表里按次序求值
+                    message = decide(lock_hook_input(rival_id, "w1/d.md"), work, table, library)[1] or ""
+                    return all(fragment in message for fragment in (holder_id, rival_id, "→ 怎么办", "写者锁已判："))
+                def foreign_message(agent_id, relative):   # 持锁者还没认领的目录里被拒的说明（在 cases 列表里按次序求值，w6、w9 没人认领过）
+                    return decide(lock_hook_input(agent_id, relative), work, table, library)[1] or ""
+                def foreign_names_expected_holder():
+                    rival_message, zombie_message = foreign_message(rival_id, "w6/a.md"), foreign_message(zombie_id, "w6/b.md")
+                    return (f"子 agent {holder_id}" in rival_message and "还没有认领文件" in rival_message and rival_id in rival_message and "→ 怎么办" in rival_message
+                            and f"子 agent {holder_id}" in zombie_message and zombie_message.count(zombie_id) == 1)
+                def foreign_unfound_names_registration():
+                    message = foreign_message(rival_id, "w9/a.md")
+                    return "主会话记录里没找到它的回执" in message and writer_lock.prompt_digest(prompt_four)[:writer_lock.PROMPT_DIGEST_SHOWN] in message and "→ 怎么办" in message
+                cases += [
+                    lock_case("写者锁:提示对不上的子 agent 不能认领", rival_id, "w1/a.md", 2),
+                    lock_case("写者锁:同一份提示但派发早于这把锁的旧进程不能认领", zombie_id, "w1/a.md", 2),
+                    lock_case("写者锁:持锁者第一次写放行", holder_id, "w1/a.md", 0),
+                    lock_case("写者锁:持锁者续写放行", holder_id, "w1/b.md", 0),
+                    lock_case("写者锁:持锁者写子目录放行", holder_id, "w1/sub/c.md", 0),
+                    lock_case("写者锁:第二个写者被拒", rival_id, "w1/c.md", 2),
+                    lock_case("写者锁:第二个写者写子目录也被拒", rival_id, "w1/sub/deeper/e.md", 2),
+                    ("写者锁:拒绝说明点名持锁者与出路", True, refusal_names_holder()),
+                    lock_case("写者锁:派发回执还没落进记录的先到先得", first_id, "w4/x.md", 0),
+                    lock_case("写者锁:先到先得之后第二个被拒", second_id, "w4/y.md", 2),
+                    lock_case("写者锁:先到先得的续写放行", first_id, "w4/z.md", 0),
+                    lock_case("写者锁:主 agent 不判", None, "w1/f.md", 0),
+                    lock_case("写者锁:没有锁的目录不判", rival_id, "w2/x.md", 0),
+                    lock_case("写者锁:锁文件读不了不拦", rival_id, "w5/x.md", 0),
+                    lock_case("写者锁:草稿根自己下面直接写不判", rival_id, "report.md", 0),
+                    ("写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id", True, foreign_names_expected_holder()),
+                    ("写者锁:回执对不上又找不到持锁者的回执时，拒绝写锁登记的提示 sha256 前几位", True, foreign_unfound_names_registration()),
+                    # 嵌套的草稿目录：w7 的锁是甲的、w7/sub 的锁是乙的，只认最近一层（writer_lock 文件头「嵌套的草稿目录」；开关 holder-ignored、launch-ignored 下第一格红）
+                    lock_case("写者锁:父目录锁的持有者写子目录另派给别人持锁的部分被拒", holder_id, "w7/sub/x.md", 2),
+                    lock_case("写者锁:子目录锁的持有者写自己的子目录放行", rival_id, "w7/sub/z.md", 0),
+                    lock_case("写者锁:子目录锁的持有者写父目录仍被父目录锁拦", rival_id, "w7/y.md", 2),
+                    lock_case("写者锁:不持有任何一层锁的第三者写嵌套的子目录被拦", first_id, "w7/sub/q.md", 2),
+                    lock_case("写者锁:父目录锁的持有者写父目录放行（认领父目录）", holder_id, "w7/h.md", 0),
+                    lock_case("写者锁:父目录认领之后，认领者写别人持锁的子目录仍被拒", holder_id, "w7/sub/x2.md", 2),
+                    lock_case("写者锁:父目录认领之后，子目录锁的持有者写自己的子目录仍放行", rival_id, "w7/sub/z2.md", 0),
+                    ("写者锁:草稿根之外不判", 0, decide({"tool_name": "Write", "agent_id": rival_id, "agent_type": "implementation-writer", "transcript_path": lock_transcript,
+                                                   "tool_input": {"file_path": f"{work}/crates/b.rs", "content": "x"}}, work, table, library)[0]),
+                ]
+                lock_environment = dict(environment, SINGLEFS_WORK_ROOT=lock_root)
+                def run_lock_entry(agent_id, relative):
+                    return subprocess.run(["bash", script], input=json.dumps(lock_hook_input(agent_id, relative)), capture_output=True, text=True, env=lock_environment)
+                second_entry = run_lock_entry(rival_id, "w1/g.md")
+                cases.append(("stdin:第二个写者被拒（退出码 2）", 2, second_entry.returncode))
+                cases.append(("stdin:第二个写者的拒绝点名持锁者、锁的目录与出路", True,
+                              all(fragment in second_entry.stderr for fragment in (holder_id, os.path.join(lock_root, "w1"), "→ 怎么办"))))
+                cases.append(("stdin:持锁者放行", 0, run_lock_entry(holder_id, "w1/h.md").returncode))
+                foreign_entry = run_lock_entry(rival_id, "w6/h.md")
+                cases.append(("stdin:回执对不上的拒绝（退出码 2）", 2, foreign_entry.returncode))
+                cases.append(("stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路", True,
+                              all(fragment in foreign_entry.stderr for fragment in (holder_id, os.path.join(lock_root, "w6"), "→ 怎么办"))))
+                cases.append(("stdin:父目录锁的持有者写别人持锁的子目录被拒（退出码 2）", 2, run_lock_entry(holder_id, "w7/sub/h2.md").returncode))
+        finally:
+            if work_root_before is None:
+                os.environ.pop("SINGLEFS_WORK_ROOT", None)
+            else:
+                os.environ["SINGLEFS_WORK_ROOT"] = work_root_before
+            shutil.rmtree(lock_root, ignore_errors=True)
         os.unlink(outside.name)
     finally:
         shutil.rmtree(work)
@@ -816,8 +986,8 @@ def selftest(hook_dir):
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
     if failures:
-        print("    → 看 decide_overwrite() / decide_compile_first() / decide_trailing_blank() / decide_shell_syntax() / decide_scope() / decide_prime_marks() / decide_clock_times() / decide_session_names() 与入口；"
-              "WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SYNTAX / WRITE_GUARD_DISABLE_SCOPE / WRITE_GUARD_DISABLE_CLOCK_TIMES / WRITE_GUARD_DISABLE_SESSION_NAMES、"
+        print("    → 看 decide_overwrite() / decide_compile_first() / decide_trailing_blank() / decide_shell_syntax() / decide_scope() / decide_prime_marks() / decide_clock_times() / decide_session_names() / decide_writer_lock() 与入口；"
+              "WRITE_GUARD_DISABLE_WRITER_LOCK / LIB_WRITER_LOCK_BREAK / WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SYNTAX / WRITE_GUARD_DISABLE_SCOPE / WRITE_GUARD_DISABLE_CLOCK_TIMES / WRITE_GUARD_DISABLE_SESSION_NAMES、"
               "WRITE_GUARD_BREAK=trailing-blank-ignored / scope-root-unanchored 或 SINGLEFS_WORK_ROOT_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {len(cases)} 种情形）：钩子、门禁、项目脚本、研究脚本目录下写进语法错误的 .sh（Write 与 Edit）与 .py 拒绝、语法对的与别处的放行；"
@@ -830,7 +1000,10 @@ def selftest(hook_dir):
           f".sh / .py / .rs 里带理由的放行标记 {len(allow_cases)} 例、仓外、排除的样本、hook 自检与 c510 提示、只在 old_string 里有放行，判据读不到拒绝；写进仓里的会话号（标签式、当主语、上游三语仓、长十六进制）拒绝，crate 名、上游仓目录名、临时目录名与 .sh 里带理由的放行标记放行；"
           "目标不是 .md / .mdx 时 Edit 与 MultiEdit 的 old_string 以空格或制表符收尾（.sh、.txt、.markdown，仓里仓外、主 agent 与子 agent 一样）拒绝并给出收窄框选与 replace-once.py 两条出路，"
           ".md / .mdx / .MD 目标、不以空白收尾、只在中间行或换行前有行尾空白、只有 new_string 以空白收尾与 Write 放行；"
-          "钟点与会话号逐处列出（行号与总数，Edit 折算成文件里的行号），几道都不成立的一次列全；拒绝都记进检出记录")
+          "钟点与会话号逐处列出（行号与总数，Edit 折算成文件里的行号），几道都不成立的一次列全；拒绝都记进检出记录；"
+          "草稿目录写者锁：提示对不上与派发早于锁的旧进程不能认领，持锁者写与续写（含子目录）放行，第二个写者（含子目录）拒绝并点名持锁者与出路，回执对不上的拒绝点名记录里找到的持锁者（找不到写锁登记的提示 sha256 前几位），"
+          "嵌套的子目录另派给别人持锁时，父目录锁的持有者写那个子目录、子目录锁的持有者写父目录与不持有任何一层的第三者都按最近一层的锁拦，回执还没落进记录的先到先得，"
+          "主 agent、没有锁的目录、坏锁文件、草稿根自己下面与草稿根之外不判")
     return 0
 
 hook_dir = sys.argv[1]

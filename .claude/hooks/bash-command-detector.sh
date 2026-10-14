@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
 # run-condition: command python3
-# PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法（主 agent 经 scripts/hosts/detached-run.sh start 起的放行，子 agent 用它照拒）、run_in_background 里后面没有 wait 的单独 `&`、整份覆盖 `research/results/` 下未跟踪产物的写法、打得到别人进程的终止写法与在同一个 inode 上改已有脚本的写法在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。
+# PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法（主 agent 经 scripts/hosts/detached-run.sh start 起的放行，子 agent 用它照拒）、run_in_background 里后面没有 wait 的单独 `&`、整份覆盖 `research/results/` 下未跟踪产物的写法、打得到别人进程的终止写法、在同一个 inode 上改已有脚本的写法与 `rm -r` 作用在工作根本身、它的上级或工作根下第一层通配上的写法在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。
 # hook-events: PreToolUse:Bash
-# gate-similar: heavy-test-guard.sh 同挂 PreToolUse[Bash]、按同一个切词模块认命令位置，但它只判重型测试与内存包装；这里判等待循环、放出追踪、单独的 &、覆盖产物、终止进程、同 inode 改脚本、就地改仓内文件，判据没有一条相同
+# gate-similar: heavy-test-guard.sh 同挂 PreToolUse[Bash]、按同一个切词模块认命令位置，但它只判重型测试与内存包装；这里判等待循环、放出追踪、单独的 &、覆盖产物、终止进程、同 inode 改脚本、就地改仓内文件、rm -r 通删工作根，判据没有一条相同
 # gate-similar: write-guard.sh 管 Write / Edit 的写范围与先编后换；这里 ⑧ 管有 Edit 的子 agent 绕到 Bash 里写仓内文件、⑨ 管执行员在 Bash 里写主工作区 crates/ 下的 .rs，两边判的工具不同
 # gate-similar: pattern-process-guard.sh（上游）同挂 Bash、拒按模式找进程；这里不判那一类
+# gate-similar: host-resources-reminder.sh 同挂 PreToolUse[Bash]、同用 lib_shell_words.py 切词；它认出重活或 GPU 命令时起报告脚本查各台资源、只出提醒从不拒，这里判命令的形状记检出或拒，不查外部资源
 #
 # 按模式找进程（`pgrep -f`、`pkill -f`、`killall`）不在这里判：上游 SOP 的 `.claude/singlefs-ai-sop/scripts/claude-hooks/pattern-process-guard.sh`
 # 在执行前拒绝（`.claude/settings.json` 里与本 hook 注册在同一条 Bash matcher 下），判据与 shell-lint 的 S2、S3 同一份、只认命令位置。
@@ -170,6 +171,17 @@
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、目标里有这一刻算不出的段（没赋过值的变量、命令替换、通配）、
 #   python 里从 sys.argv 或别的运行期值来的路径、`os.open` 与 `os.write`、经 subprocess 起的写法；`rsync --inplace` 这类别的就地写。
 #   Edit / Write 工具本来就换 inode，不经这个 hook。
+# ⑪ 命令位置上的 `rm -r`（`-r`、`-R`、`--recursive`，与别的短选项合写的、写在操作数后面的都算）作用在工作根本身、它的上级，或工作根下第一层带通配的路径上
+#   （`rm -rf ~/.local/share/singlefs/work/*`、`…/work/owed-*`、`…/work/*/target`、`rm -rf /tmp/claude-<uid>/*`、`rm -rf /tmp/*`、`cd <工作根> && rm -rf *`）。
+#   工作根是同目录 lib_work_root.py 的配置值（不看它的弄坏开关）与旧根 /tmp/claude-<uid>（旧根撤了也认），读不到它时按它的两条默认算。
+#   为什么：2026-10-12 主 agent 按目录名通删工作根下 506 项，别的会话在用的冻结副本、交回报告与只存在仓外的跑前登记一起没了（.claude/kb/checks-owed.md C792）。
+#   出路是 scripts/hosts/work-directory-ownership.sh：claim 写归属文件，sweep 只删归属是本会话、没有进程开着的，删前逐项连大小写日志。
+#   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。放行：工作根下一个具体目录（`rm -rf <工作根>/<目录>`）与它里面的通配（`<工作根>/<目录>/copy-*`）、
+#   同名前缀的兄弟目录、别处的 rm -r、不带 -r 的 rm、当数据写的（引号里、写进文件的 heredoc 正文、注释）。
+#   路径里 ~、$HOME、$SINGLEFS_WORK_ROOT 与这条命令里 export 过、命令前写过的变量代入，相对路径跟着 cd 算（没有 cd 按 hook 输入的 cwd，再没有按仓库根）；
+#   通配照 bash 的默认认（不开 dotglob：`~/*` 不碰 `~/.local`）。每一层（bash -c、喂给 shell 的 heredoc、命令替换）都判，前缀与 capped.sh 剥开。
+#   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、没赋过值的变量（`rm -rf "$d"/*`）、单独一行赋值的变量（`w=…; rm -rf "$w"/*`）、
+#   find -delete 与 find -exec rm、xargs rm、python 的 shutil.rmtree、旧根下 <项目>/ 那一层的通配（`/tmp/claude-<uid>/<项目>/*`）。
 #
 # 切词、切简单命令、认命令位置、剥前缀与包装、跟 cd：同目录的 lib_shell_words.py，与 heavy-test-guard.sh 共用一份，按文件路径导入，
 # 这里只留检出与拒绝的判定；那几个函数在 .claude/hooks/ 别的文件里再定义一份，门禁 code-tooling 的 agent-write-scope 格判红。
@@ -182,7 +194,7 @@
 #                                        # 逐项写开关名、弄坏哪一处、打开后自检哪几格红。格名照自检失败行「✗ 自检：」之后、「应当是」之前那一段原样写；
 #                                        # keep-selftest-scratch 那三格由 lib_selftest_scratch.py 报，失败行在格名后面接「：」与留下的名字；
 #                                        # 共用模块的 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 同样照自检输出逐字写格名（stdin: 前缀与「（退出码 N）」后缀都在格名里）：
-#                                        #   BASH_COMMAND_DETECTOR_BREAK=disable-check  findings_for() 不检出；③ 放出追踪与子 agent 用 detached-run.sh、② 前台等待循环、④ 单独的 &、⑤ 覆盖产物（连同它的检出）、⑥ 终止进程、⑦ 同 inode 改脚本、⑧ 就地改仓内文件、⑨ 先编后换都放行（① 起看门狗的错误写法照拒）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=disable-check  findings_for() 不检出；③ 放出追踪与子 agent 用 detached-run.sh、② 前台等待循环、④ 单独的 &、⑤ 覆盖产物（连同它的检出）、⑥ 终止进程、⑦ 同 inode 改脚本、⑧ 就地改仓内文件、⑨ 先编后换、⑪ 通删工作根都放行（① 起看门狗的错误写法照拒）
 #                                        #       「没有 timeout 的 until 等待」「喂给 bash 的 heredoc 里真是一段没超时的等待循环」「heredoc 之后的命令里是没超时的等待循环」「后台起的 nohup … & 加 disown」「后台起的命令末尾单独一个 &」「后台起的 & 在 wait 之后」「bg-notify-r1 X01」「bg-notify-r1 X02」「bg-notify-r1 X03」
 #                                        #       「bg-notify-r1 X04」「bg-notify-r1 X05」「bg-notify-r1 X06」「bg-notify-r1 X07」「bg-notify-r1 X08」「bg-notify-r1 X09」「bg-notify-r1 X10」「bg-notify-r1 X11」「bg-notify-r1 X12」
 #                                        #       「bg-notify-r1 F02（第三种不记；它的轮询循环没有 timeout，记的是第二种）」「bg-notify-r1 F06」「setsid -f 放后台」「等待循环:前台 until … sleep 没超时」「等待循环:run_in_background 里轮询后台任务的输出文件」「等待循环:run_in_background 里轮询后台任务输出、外面套了 timeout 也拒」
@@ -318,6 +330,8 @@
 #                                        #       「stdin:一条命令同时踩几类时一次列全（终止进程、放出追踪、前台等待循环）」（共 1 格）
 #                                        #   BASH_COMMAND_DETECTOR_BREAK=detection-outcome-dropped  检出记录不写结局（outcome：只记）
 #                                        #       「stdin:只记的检出记录写了结局「只记」」（共 1 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-work-root-removal  ⑪ rm -r 作用在工作根本身、它的上级或工作根下第一层通配上也放行
+#                                        #       「通删工作根:工作根下通配（~ 写法）」「通删工作根:工作根下通配（$HOME 写法、引号里外）」「通删工作根:工作根本身」「通删工作根:工作根本身带结尾的 /」「通删工作根:旧根下通配」「通删工作根:rm -fr」「通删工作根:rm -r -f 分开写」「通删工作根:rm --recursive --force」「通删工作根:rm -r 不带 -f」「通删工作根:工作根下第一层部分通配」「通删工作根:工作根下第一层通配再往下」「通删工作根:cd 进工作根之后 rm -rf *」「通删工作根:bash -c 里」「通删工作根:nice、sudo 前缀」「通删工作根:工作根的上级」「通删工作根:$SINGLEFS_WORK_ROOT 写法」「通删工作根:/tmp/* 盖住旧根」「通删工作根:前面 export 过的变量代入」「通删工作根:选项写在操作数后面」「通删工作根:喂给 bash 的 heredoc 里」「stdin:rm -rf 工作根下通配拒绝（退出码 2）」「stdin:通删工作根的拒绝写了出路（work-directory-ownership.sh 的 sweep 与 claim）」（共 22 格）
 #                                        #   （这两格在别的开关下也红：disable-check 下两格都红；allow-detaching、allow-foreground-wait-loop、allow-process-signals 下「一次列全」那一格红）
 #                                        #   LIB_SHELL_WORDS_BREAK=detached-run-force-kept  共用模块 lib_shell_words.py 的 detached_run_arguments_after_preflight() 原样交回参数：-- 之后、选项值位置上的 --force 不摘，`-- --force <放出追踪的命令>` 放过去
 #                                        #       「放出追踪:detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒」（共 1 格）
@@ -495,7 +509,8 @@ KNOWN_DETECTOR_BREAK_ITEMS = ("disable-check", "disable-self-background", "keep-
                               "detached-run-by-name", "detached-run-copy-by-cp-ln", "detached-run-start-directory", "allow-unwaited-ampersand",
                               "allow-background-task-output-wait", "allow-repository-in-place-edit", "allow-compile-first-bypass", "allow-results-overwrite",
                               "allow-process-signals", "ignore-private-config", "allow-script-in-place-write", "keep-selftest-scratch",
-                              "refuse-every-wait-loop", "stop-at-first-refusal", "detection-outcome-dropped")
+                              "refuse-every-wait-loop", "stop-at-first-refusal", "detection-outcome-dropped",
+                              "allow-work-root-removal")
 
 def detector_break_is_set(item):
     return item in os.environ.get(DETECTOR_BREAK_VARIABLE, "").split(",")
@@ -2065,6 +2080,104 @@ def scan_scripts(root, directories):
           f"没判的：{PENDING_LIST} 里的 {len(pending_hits)} 个文件 {pending_note}")
     return 0
 
+# ⑪ rm -r 作用在工作根本身、它的上级或工作根下第一层带通配：工作根下的目录分属不同会话，按名字通删认不出归属。
+#   出路是 scripts/hosts/work-directory-ownership.sh sweep（只删归属是本会话、没有进程开着的，删前逐项连大小写日志）。
+import fnmatch
+WORK_ROOT_SWEEP_SCRIPT = "scripts/hosts/work-directory-ownership.sh"
+REMOVAL_GLOB_CHARACTERS = set("*?[")
+REMOVAL_VARIABLE = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
+
+def work_root_removal_roots():
+    """⑪ 认的根：配置的工作根（不看弄坏开关）与旧根 /tmp/claude-<uid>（旧根撤了也认：里面是各会话的草稿），连同解开符号链接的写法。
+    同目录的 lib_work_root.py 读不到时按它的两条默认（SINGLEFS_WORK_ROOT 或 ~/.local/share/singlefs/work）算。"""
+    if work_roots:
+        roots = [work_roots.configured_work_root(), work_roots.legacy_root()]
+    else:
+        roots = [os.path.normpath(os.path.abspath(os.path.expanduser(os.environ.get("SINGLEFS_WORK_ROOT") or "~/.local/share/singlefs/work"))),
+                 f"/tmp/claude-{os.getuid()}"]
+    return list(dict.fromkeys(roots + [os.path.realpath(root) for root in roots]))
+
+def recursive_removal_operands(arguments):
+    """rm 的参数里带 -r / -R / --recursive（与别的短选项合写的也算，写在操作数后面的也算）时交回操作数；不带交 []。"""
+    recursive, operands, options_ended = False, [], False
+    for argument in arguments:
+        if not options_ended and argument == "--":
+            options_ended = True
+        elif not options_ended and argument.startswith("--"):
+            recursive = recursive or argument == "--recursive"
+        elif not options_ended and argument.startswith("-") and argument != "-":
+            recursive = recursive or "r" in argument[1:] or "R" in argument[1:]
+        else:
+            operands.append(argument)
+    return operands if recursive else []
+
+def removal_target_path(word, directory, environment, configured_root):
+    """rm 的一个操作数换成绝对路径（通配原样留着）：~、$HOME、$SINGLEFS_WORK_ROOT 与这条命令里设过的变量代入，相对路径按当时的目录；算不出交 None。"""
+    if word == "~" or word.startswith("~/"):
+        word = os.path.expanduser("~") + word[1:]
+    unknown = []
+    def substitute(match):
+        name = match.group(1) or match.group(2)
+        if name in environment:
+            return environment[name]
+        if name == "HOME":
+            return os.path.expanduser("~")
+        if name == "SINGLEFS_WORK_ROOT":
+            return os.environ.get(name) or configured_root
+        unknown.append(name)
+        return ""
+    word = REMOVAL_VARIABLE.sub(substitute, word)
+    if unknown or "$" in word or "`" in word:
+        return None
+    if not os.path.isabs(word):
+        if directory is None:
+            return None
+        word = os.path.join(directory, word)
+    return os.path.normpath(word)
+
+def removal_component_matches(name, pattern):
+    """一段路径名对一段可能带通配的写法：照 bash 的默认（不开 dotglob），通配起头的不认点开头的名字。"""
+    if not REMOVAL_GLOB_CHARACTERS & set(pattern):
+        return name == pattern
+    if name.startswith(".") and not pattern.startswith("."):
+        return False
+    return fnmatch.fnmatchcase(name, pattern)
+
+def removal_hits_work_root(path, root):
+    """rm -r 的一个目标（绝对路径，可能带通配）打到工作根本身、它的上级或工作根下第一层的通配，交回是哪一种；不是交 None。"""
+    parts = [part for part in path.split("/") if part]
+    root_parts = [part for part in root.split("/") if part]
+    if not all(removal_component_matches(name, pattern) for name, pattern in zip(root_parts, parts)):
+        return None
+    covered_by_glob = any(REMOVAL_GLOB_CHARACTERS & set(pattern) for pattern in parts[:len(root_parts)])
+    if len(parts) < len(root_parts):
+        return "通配盖住了工作根的上级" if covered_by_glob else "工作根的上级"
+    if len(parts) == len(root_parts):
+        return "通配盖住了工作根本身" if covered_by_glob else "工作根本身"
+    if REMOVAL_GLOB_CHARACTERS & set(parts[len(root_parts)]):
+        return "工作根下第一层带通配"
+    return None
+
+def work_root_removal_refusal(command, directory):
+    """命令位置上的 rm -r（每一层：bash -c、喂给 shell 的 heredoc、命令替换；前缀与 capped.sh 剥开；cd 与 export 跟着算）
+    作用在工作根本身、它的上级或工作根下第一层带通配的路径上，交回认出的写法；否则交 []。前台、run_in_background、主 agent 与子 agent 一样拒。"""
+    if (detector_break_is_set("disable-check")
+            or detector_break_is_set("allow-work-root-removal")):
+        return []
+    roots = work_root_removal_roots()
+    found = []
+    for at in shell_words.commands_at_command_position(command, directory).commands:
+        if not at.words or os.path.basename(at.words[0]) != "rm":
+            continue
+        for operand in recursive_removal_operands(at.words[1:]):
+            path = removal_target_path(operand, at.directory, at.environment, roots[0])
+            if path is None:
+                continue
+            hit = next(((root, reason) for root in roots for reason in [removal_hits_work_root(path, root)] if reason), None)
+            if hit:
+                found.append(f"rm -r {operand}（{hit[1]}：{hit[0]}）")
+    return list(dict.fromkeys(found))
+
 def selftest(hook_dir):
     if shell_words is None:
         print(f"  ✗ 自检：读不到共用切词模块 {shell_words_library_path(hook_dir)}（{shell_words_error!r}）")
@@ -2688,7 +2801,7 @@ def selftest_in(hook_dir, work):
         ("python3 -c 的 open(…, 'r+')", f"python3 -c \"open('{running}', 'r+').write('x')\"", 1),
         ("python3 -c 的 open(…, mode='wb')", "python3 -c \"open('scripts/tool.py', mode='wb').write(b'x')\"", 1),
         ("喂给 python 的 heredoc：只赋过一次的名字", f"python3 - <<'EOF'\npath = '{running}'\nwith open(path, 'w') as handle:\n    handle.write('x')\nEOF", 1),
-        ("喂给 python 的 heredoc：Path(…) / '…' 的 write_text", "python3 - <<'EOF'\nfrom pathlib import Path\n(Path('research') / 'scripts' / 'tool.py').write_text('x')\nEOF", 1),
+        ("喂给 python 的 heredoc：Path(…) / '…' 的 write_text", "python3 - <<'EOF'\nfrom pathlib import Path\n(Path('scripts') / 'tool.py').write_text('x')\nEOF", 1),
         ("喂给 python 的 heredoc：pathlib.Path(…).write_bytes", f"python3 <<'EOF'\nimport pathlib\npathlib.Path('{running}').write_bytes(b'x')\nEOF", 1),
         ("喂给 python 的 heredoc：Path(…).open('w')", f"python3 - <<'EOF'\nimport pathlib\nwith pathlib.Path('{running}').open('w') as handle:\n    handle.write('x')\nEOF", 1),
         ("喂给 python 的 heredoc：os.path.join 与 io.open", "python3 - <<'EOF'\nimport io, os\nio.open(os.path.join('scripts', 'tool.py'), 'w')\nEOF", 1),
@@ -2788,6 +2901,56 @@ def selftest_in(hook_dir, work):
     results.append(("stdin:就地改脚本拒了的不记检出", 0, in_place_recorded))
     python_in_place = through_entry(f"python3 - <<'EOF'\nopen('{running}', 'w').write('x')\nEOF", True)[0]
     results.append(("stdin:run_in_background 里喂给 python 的 open(…, 'w') 同样拒绝（退出码 2）", 2, python_in_place.returncode))
+    # ⑪ rm -r 通删工作根：(说明, 命令, 该不该拒)；样本路径照配置的工作根造（不看弄坏开关），旧根是 /tmp/claude-<uid>
+    removal_root = work_root_removal_roots()[0]
+    removal_home = os.path.expanduser("~")
+    removal_tilde = "~" + removal_root[len(removal_home):] if removal_root.startswith(removal_home + "/") else removal_root
+    removal_dollar = "$HOME" + removal_root[len(removal_home):] if removal_root.startswith(removal_home + "/") else removal_root
+    removal_legacy = f"/tmp/claude-{os.getuid()}"
+    removal_cases = [
+        ("工作根下通配（~ 写法）", f"rm -rf {removal_tilde}/*", 1),
+        ("工作根下通配（$HOME 写法、引号里外）", f'rm -rf "{removal_dollar}/"*', 1),
+        ("工作根本身", f"rm -rf {removal_root}", 1),
+        ("工作根本身带结尾的 /", f"rm -rf {removal_tilde}/", 1),
+        ("旧根下通配", f"rm -rf {removal_legacy}/*", 1),
+        ("rm -fr", f"rm -fr {removal_root}/*", 1),
+        ("rm -r -f 分开写", f"rm -r -f {removal_root}/*", 1),
+        ("rm --recursive --force", f"rm --recursive --force {removal_root}/*", 1),
+        ("rm -r 不带 -f", f"rm -r {removal_root}/*", 1),
+        ("工作根下第一层部分通配", f"rm -rf {removal_root}/owed-*", 1),
+        ("工作根下第一层通配再往下", f"rm -rf {removal_root}/*/target", 1),
+        ("cd 进工作根之后 rm -rf *", f"cd {removal_tilde} && rm -rf *", 1),
+        ("bash -c 里", f"bash -c 'rm -rf {removal_root}/*'", 1),
+        ("nice、sudo 前缀", f"nice -n 19 sudo rm -rf {removal_root}/*", 1),
+        ("工作根的上级", f"rm -rf {os.path.dirname(removal_root)}", 1),
+        ("$SINGLEFS_WORK_ROOT 写法", 'rm -rf "$SINGLEFS_WORK_ROOT"/*', 1),
+        ("/tmp/* 盖住旧根", "rm -rf /tmp/*", 1),
+        # 探针串拆成两段相邻字面量拼起来：探针要的就是「变量路径不带空值守卫」这个写法，整串写在源码里会被 shell 纪律检查当成本脚本自己的 rm -rf
+        ("前面 export 过的变量代入", f'export W={removal_root}; rm -rf "$' 'W"/*', 1),
+        ("选项写在操作数后面", f"rm {removal_root}/* -rf", 1),
+        ("喂给 bash 的 heredoc 里", f"bash <<'EOF'\nrm -rf {removal_root}/*\nEOF", 1),
+        ("工作根下一个具体目录放行", f"rm -rf {removal_tilde}/owed-c792-work-ownership", 0),
+        ("具体目录里面的通配放行", f"rm -rf {removal_root}/owed-x/copy-*", 0),
+        ("别处的 rm -rf 通配放行", "rm -rf /tmp/singlefs-mutation-x/*", 0),
+        ("仓里的相对路径放行", "rm -rf target/debug/incremental", 0),
+        ("不带 -r 的 rm 放行", f"rm -f {removal_root}/*.tmp", 0),
+        ("echo 引号里当数据写的放行", f"echo 'rm -rf {removal_root}/*'", 0),
+        ("grep 参数里的放行", "grep -n 'rm -rf' .claude/hooks/bash-command-detector.sh", 0),
+        ("算不出的变量放行", 'rm -rf "$d"/*', 0),
+        ("同名前缀的兄弟目录放行", f"rm -rf {removal_root}-other/*", 0),
+        ("旧根下一个具体目录放行", f"rm -rf {removal_legacy}/owed-x", 0),
+        ("写进文件的 heredoc 正文放行", f"cat > note.md <<'EOF'\nrm -rf {removal_root}/*\nEOF", 0),
+        ("家目录通配不碰点目录放行", "rm -rf ~/*", 0),
+    ]
+    for label, command, want in removal_cases:
+        results.append((f"通删工作根:{label}", want, 1 if work_root_removal_refusal(command, work) else 0))
+    removal_scene = through_entry(f"rm -rf {removal_root}/*")[0]
+    results.append(("stdin:rm -rf 工作根下通配拒绝（退出码 2）", 2, removal_scene.returncode))
+    results.append(("stdin:通删工作根的拒绝写了出路（work-directory-ownership.sh 的 sweep 与 claim）", 1,
+                    int("✗" in removal_scene.stderr and "→" in removal_scene.stderr
+                        and f"bash {WORK_ROOT_SWEEP_SCRIPT} sweep --dry-run" in removal_scene.stderr
+                        and f"bash {WORK_ROOT_SWEEP_SCRIPT} claim <目录> --purpose <一句>" in removal_scene.stderr)))
+    results.append(("stdin:rm -rf 工作根下一个具体目录放行（退出码 0）", 0, through_entry(f"rm -rf {removal_root}/owed-x")[0].returncode))
     # 走真实入口：experiment-runner 在 Bash 里 cp 进主工作区 crates/ 下的 .rs 拒绝（退出码 2）、stderr 点名先编后换那条脚本；implementation-writer 放行
     def entry_as(agent_type, command):
         return subprocess.run(["bash", os.path.join(repository_hooks, "bash-command-detector.sh")], capture_output=True, text=True,
@@ -2834,6 +2997,7 @@ def selftest_in(hook_dir, work):
     #   子 agent 的 start / stop 照拒（BASH_COMMAND_DETECTOR_BREAK=detached-run-by-name 下这六格红）；删掉签名行的拷贝认不出、list 放行
     detached_sample = "#!/usr/bin/env bash\n# detached-run-script-signature: 样本（bash-command-detector 自检造的）\necho sample\n"
     os.makedirs(os.path.join(work, "scripts"), exist_ok=True)
+    os.makedirs(os.path.join(work, "scripts", "hosts"), exist_ok=True)
     os.makedirs(os.path.join(work, "elsewhere"), exist_ok=True)
     for relative, text in (("dr-renamed.sh", detached_sample), ("scripts/hosts/detached-run.sh", "#!/usr/bin/env bash\necho 没有签名行的样本\n"),
                            ("dr-without-signature.sh", detached_sample.replace("# detached-run-script-signature:", "# 签名行删掉了："))):
@@ -2984,7 +3148,8 @@ def selftest_in(hook_dir, work):
               "detached-run.sh 那几格红的看 detached_run_refusal() / detached_run_calls() / detached_run_copy_destinations() / detached_run_inner_words() "
               "与 wrapped_commands()、共用模块的 detached_run_script() / detached_run_start_command()，"
               "BASH_COMMAND_DETECTOR_BREAK 的 allow-subagent-detached-run、opaque-detached-run、detached-run-by-name、detached-run-copy-by-cp-ln、detached-run-start-directory "
-              "或共用模块的 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 设着的话本来就该红")
+              "或共用模块的 LIB_SHELL_WORDS_BREAK=detached-run-force-kept 设着的话本来就该红；"
+              "「通删工作根:」红的看 work_root_removal_refusal() / recursive_removal_operands() / removal_target_path() / removal_hits_work_root()，BASH_COMMAND_DETECTOR_BREAK=allow-work-root-removal 设着的话本来就该红")
         return 1
     summary = ("没超时的等待循环、run_in_background 里又自己放后台记进检出记录，普通命令、重定向里的 & 、前台的 & 、写进文件的 heredoc 正文与按模式找进程（归上游钩子）不记；"
                "起看门狗不用 run_in_background、或带 &、nohup、setsid、disown、丢进 /dev/null 的拒绝（退出码 2），run_in_background 只写 watch.sh 的、把名字当参数的、"
@@ -3014,7 +3179,8 @@ def selftest_in(hook_dir, work):
                "os.replace、非脚本文件、仓外与 scratch 根外、当数据写的与算不出的放行；dd、truncate 现在 ⑤ 也认（同一段 overwrite_steps），⑤ 仍不认 python 的写法；"
                "先编后换：experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs（cp、cat >、>>、tee -a、mv 进目录、cd 之后 cp 到 .、sed -i、perl -pi、rsync、rm、mv 挪走、"
                "bash -c、变量里的目录、算不出而对得上已有装置的、python shutil.copy / open 'a' / os.replace）拒绝并点名 compile-then-swap.py，"
-               "经那条脚本换进来、拷进草稿目录、改草稿目录、追加 crates/mutations.tsv、只读、当数据写的与 implementation-writer、主 agent 放行")
+               "经那条脚本换进来、拷进草稿目录、改草稿目录、追加 crates/mutations.tsv、只读、当数据写的与 implementation-writer、主 agent 放行；"
+               "通删工作根：rm -r 作用在工作根本身、它的上级或工作根下第一层带通配上的（~、$HOME、$SINGLEFS_WORK_ROOT、export 的变量、cd 之后的 *、bash -c、喂给 bash 的 heredoc、前缀、-fr / -r -f / --recursive / 选项写在后面、旧根 /tmp/claude-<uid>/*、/tmp/*）拒绝并点名 work-directory-ownership.sh 的 sweep 与 claim，工作根下具体目录与它里面的通配、同名前缀的兄弟目录、别处、不带 -r、当数据写的与算不出的变量放行")
     print(f"  ✓ 自检通过（查了 {len(results)} 种）：{summary}")
     return 0
 
@@ -3176,6 +3342,21 @@ def main():
               "写范围闸只看 Write / Edit，这样写它看不见")
         refusal_lines.append("     → 怎么办：仓内文件用 Edit 改（旧串在文件里恰好命中一次），或用定义点名的脚本（replace-once.py、insert-row.py 这类）；"
               "草稿目录（工作根 ~/.local/share/singlefs/work/ 下，过渡期另有 /tmp/claude-<uid>/）里随便写。这一道只拒这种写法，不停你在跑的任何东西")
+    try:
+        removal_directory = hook_input.get("cwd")
+        removals = work_root_removal_refusal(tool_input.get("command") or "",
+                                             removal_directory if isinstance(removal_directory, str) and os.path.isdir(removal_directory)
+                                             else repository_root_of(hook_dir))
+    except Exception as error:
+        print(f"  ! bash-command-detector.sh 没判成 rm -r 通删工作根的写法（{error!r}），这条命令照常执行", file=sys.stderr)
+        removals = []
+    if removals:
+        refusal_lines.append(f"  ✗ rm -r 要删工作根本身、它的上级或工作根下第一层的通配（认出的写法：{'；'.join(removals)}）："
+              "工作根下的目录分属不同会话，按名字通删会连别的会话正在用的副本、报告与只存在仓外的跑前登记一起删掉，删了救不回来")
+        refusal_lines.append(f"     → 怎么办：清本会话自己的目录，先 `bash {WORK_ROOT_SWEEP_SCRIPT} sweep --dry-run` 看会删哪些，再 `bash {WORK_ROOT_SWEEP_SCRIPT} sweep`"
+              "（只删归属是本会话、没有进程开着的，删前逐项连大小写进 <工作根>/sweep-<日期>.log；别的会话的、没有归属文件的列出来交用户定）；"
+              f"在工作根下新建目录时 `bash {WORK_ROOT_SWEEP_SCRIPT} claim <目录> --purpose <一句>` 写归属文件。"
+              "删一个具体目录直接写它的路径（`rm -rf <工作根>/<目录>`，不带通配）。这一道只拒这种写法，不停你在跑的任何东西")
     if reasons:
         refusal_lines.append(f"  ✗ 看门狗起法不对（{'；'.join(reasons)}；认出的调用：{'、'.join(calls)}）：这样起的看门狗叫不醒主 agent，等于没盯")
         refusal_lines.append("     → 怎么办：看门狗用 Bash 的 run_in_background: true 起，命令只写 `bash scripts/agents/watch.sh [--ack …] <agent 号，逗号分隔>`，"

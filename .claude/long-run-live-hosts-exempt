@@ -1,0 +1,16 @@
+# 长活声明（# long-run-hosts:）按「现算」读的脚本：lib_long_run.py 的 judge_script_header 对表里的脚本文件头按现算读法判
+# （点名 --emit-hosts 与 host-resources.py），别的脚本文件头一律按登记值读法判（只认 lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE 那一句规范写法）。
+# 写法：一行「<相对仓根的路径>  <被豁免脚本文件的 sha256>  # 理由」（各段之间至少两个空格；sha256 是 64 位小写十六进制，取 sha256sum <脚本> 的前一栏；理由至少 4 个字）。
+# 豁免只给登记的那一版文件：脚本改过一个字节，sha256 就对不上，lib_long_run.py 不再按现算读它的文件头，exempt-check 判红。文件头写的读法与脚本真做的事是否一致，
+# 钩子看不到，由写文件头的人保证（钩子只判写法）；E171 下一次修订的入口不进这张表，文件头按规范句写。
+# 指向不存在的路径、sha256 对不上、脚本文件头已经按登记值写齐、按现算读法也不齐、比改动范围的基准那一版多出的行，都判红（门禁 code-tooling 的 long-run-header-exempt 格，判法 lib_long_run.py exempt-check）；
+# 只缩不涨：按（路径，sha256）成对跟基准那一版比，基准里没有这一对的行就算涨——新路径算涨，同一路径的 sha256 变了（改了脚本再换表里的 sha256 重钉）也算涨；
+# 基准那一版里该路径还是不带 sha256 的旧写法的，只比路径。改成登记值读法或脚本不再需要就删掉那一行，新脚本不往这里加。
+
+# E171 的六份多机入口被 sha256 钉住不能改，它们真按此刻空闲现算每台槽数与线程，固定每台 31 线程归 E171 下一次修订
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_on_the_revision_6_tree_multi_host.sh  949e21e2c29a05a2873fc891f6b5f9028aaf0348f938c710f0fa18731bb1f5c1  # E171 修订 6 那一趟第一段入口，被 sha256 钉住，真按此刻空闲现算
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_on_the_revision_6_tree_multi_host.sh  91b41f1a933839734b6966483ecee4c359d2632d1d915c4b17ba70c6d562cc02  # E171 修订 6 那一趟第二段入口，被 sha256 钉住，真按此刻空闲现算
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_on_the_revision_8_tree_multi_host.sh  b420d49fc796b66e141d5c19fb23e26519d8c4f17d1c0976bde0b50056e3aafb  # E171 修订 8 那一趟第一段入口，被 sha256 钉住，真按此刻空闲现算
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_revision_10_multi_host.sh  7c38b38d9a05dd10b2eb4d4f1acbf1b458a855c3b6629118e5f33d9c84c57f87  # E171 修订 10 第二段入口，被 sha256 钉住，真按此刻空闲现算
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh  732f411351a3f6502d84cfb4a6939d8bd84cfdccdc9db9d32be40cef88dfad70  # E171 修订 11 第一段入口，被 sha256 钉住，真按此刻空闲现算
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_revision_11_multi_host.sh  b16ef766c9861e3f3e81775d24e14e6ce8591578b2f6ab335b498ad13dd5a8f9  # E171 修订 11 第二段入口，被 sha256 钉住，真按此刻空闲现算

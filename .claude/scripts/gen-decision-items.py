@@ -16,11 +16,16 @@ checkpoint 序号怎么共存」曾让按行内关键字判状态的老版本把
 | 怎么跑 | 打印什么 | 谁消费 |
 |---|---|---|
 | 不带参数 | 索引页那段 `<!-- gen:decision-items -->` 生成块 | `.claude/gate.d/doc-decisions.sh` 的格「决策分项清单与正文同步」与格「未定项判过改不改新池新建文件的字节」 |
-| `--status-cells` | 每行 `D<n>\t<状态列该写什么>` | 同上，用来写回决策索引表的「状态」列 |
+| `--status-cells` | 每行 `D<n>\t<状态列该写什么>\t<进度列该写什么>` | 同上，用来写回决策索引表的「状态」列与「进度」列 |
 
 **状态列写的是分项计数**（`已定 6 项 / 未定 0 项`），不是三态词——
 「这条决策有几个分项、其中几个还没定」看一眼就有数，而三态词看不出这个。
 三态词的权威记录仍是各正文首行 `## D<n> 简称 —— 状态`，索引列不再抄它一遍。
+
+**进度列写的是实现计数**（`已实现 3 项 / 未实现 1 项`，有无对象的再带 ` / 无对象 2 项`；没有分项写 `无对象`）。
+每条分项的进度取它索引行末尾的规范标记 `**进度：已实现 / 未实现 / 无对象。**`，与 `**状态：…。**` 并排；
+缺标记、或一行写了两个不同的进度，生成器报错退出——索引页上没有「漏判」这一档。
+分项清单里每条写成 `—— 已定 · 已实现`。
 """
 import os, re, glob, sys
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -100,21 +105,40 @@ def name_of(txt):
 
 
 def harvest(sec):
-    """取一节里**顶格的**编号项：表格行优先，其次编号列表。
+    """取一节里**顶格的**编号项：表格行优先，其次编号列表。返回 [(编号, 名字那一格, 整行)]。
 
     只看该节的**索引表**，即第一个 `####` 子标题之前那一段——
     子标题之下是各分项各自的论证，里面另有编号列表与表格，那些不是分项。
+    整行带回去是为了取进度标记：它写在定案那一格的末尾，不在名字格里。
     """
     cut = re.search(r'^#{4}\s', sec, re.M)
     top = sec[:cut.start()] if cut else sec
-    rows = re.findall(r'^\|\s*(\d+)\s*\|([^|]*)\|', top, re.M)
+    rows = re.findall(r'^(\|\s*(\d+)\s*\|([^|]*)\|.*)$', top, re.M)
     if rows:
-        return rows
-    return re.findall(r'^(\d+)\.\s+(.*)$', top, re.M)
+        return [(n, name, row) for row, n, name in rows]
+    return [(n, txt, n + '. ' + txt) for n, txt in re.findall(r'^(\d+)\.\s+(.*)$', top, re.M)]
+
+
+PROGRESS_MARK = re.compile(r'进度：\s*\*{0,2}(已实现|未实现|无对象)')
+
+
+def progress_of(row, where, number):
+    """一条分项索引行的进度标记：恰好一个，取它的值；缺了或写了两个不同的值就报错退出，不猜。"""
+    marks = sorted(set(PROGRESS_MARK.findall(row)))
+    if len(marks) == 1:
+        return marks[0]
+    if not marks:
+        raise SystemExit(
+            f"  ✗ {where} 的分项 {number} 没写进度标记：{row[:60]}\n"
+            f"     → 在这一行的 **状态：…。** 之后补上 **进度：已实现。**、**进度：未实现。** 或 **进度：无对象。**"
+            f"（判法在 decisions.md「进度」一段）")
+    raise SystemExit(
+        f"  ✗ {where} 的分项 {number} 写了两个不同的进度标记（{'、'.join(marks)}）：{row[:60]}\n"
+        f"     → 一行只许一个「进度：」标记，删掉多余的那个")
 
 
 def items_of(body, where):
-    """返回 [(编号, 名字, 状态)]，两节合起来按编号排。where 是「文件（决策号）」，只用在报错里。"""
+    """返回 [(编号, 名字, 状态, 进度)]，两节合起来按编号排。where 是「文件（决策号）」，只用在报错里。"""
     res = []
     for head, st in (('已定项', '已定'), ('未定项', '**未定**')):
         m = re.search(r'^### %s\s*$(.*?)(?=^#{1,3} |\Z)' % head, body, re.M | re.S)
@@ -130,8 +154,8 @@ def items_of(body, where):
                 f"  ✗ {where} 的「### {head}」一节里取不到编号项\n"
                 f"     → 该节要有索引表（`| # | 分项 | 状态 |`）或编号列表，"
                 f"每条分项一行、编号连号不重排")
-        for n, txt in got:
-            res.append((n, name_of(txt), st))
+        for n, txt, row in got:
+            res.append((n, name_of(txt), st, progress_of(row, where, n)))
     res.sort(key=lambda r: int(r[0]))
     return res
 
@@ -155,7 +179,10 @@ for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
     num, name, status = mm.group(1), mm.group(2).strip(), mm.group(3).strip()
     body = s.split('\n## 历史版本')[0]
     its = items_of(body, f"{f}（{num}）")
-    open_n = sum(1 for _, _, st in its if '未定' in st)
+    open_n = sum(1 for _, _, st, _ in its if '未定' in st)
+    done_n = sum(1 for _, _, _, pg in its if pg == '已实现')
+    todo_n = sum(1 for _, _, _, pg in its if pg == '未实现')
+    none_n = sum(1 for _, _, _, pg in its if pg == '无对象')
     kind = re.match(r'(已定|半定|待定)', status)
     kind = kind.group(1) if kind else status[:6]
     head = f"- **{num}（{name}）** —— {kind}"
@@ -163,8 +190,10 @@ for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
     lines.append(head)
     # 一条决策没有分项时，「已定 0 项 / 未定 0 项」会被读成「什么都没定」——
     # 那一格改写成三态词，不含糊其辞。
+    progress_cell = (f"已实现 {done_n} 项 / 未实现 {todo_n} 项" + (f" / 无对象 {none_n} 项" if none_n else "")
+                     if its else "无对象")
     cells.append(f"{num}\t" + (f"已定 {len(its) - open_n} 项 / 未定 {open_n} 项"
-                               if its else f"无分项 · 整条{kind}"))
-    for n, nm, st in its:
-        lines.append(f"  - {n}. {nm} —— {st}")
+                               if its else f"无分项 · 整条{kind}") + f"\t{progress_cell}")
+    for n, nm, st, pg in its:
+        lines.append(f"  - {n}. {nm} —— {st} · {pg}")
 print('\n'.join(cells if cells_only else lines))

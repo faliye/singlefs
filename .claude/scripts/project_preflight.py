@@ -1,6 +1,6 @@
 """项目自己的 python 脚本从这一份取 preflight，不直接 import 规范副本里的 preflight.py（理由与同目录的 preflight.sh 相同）。
 
-规范副本 .claude/singlefs-ai-sop/ 被 .gitignore 挡着，git worktree 里没有它：提交时在「HEAD + 暂存区」临时树里跑 checker-tier-layer0-replay --full，
+规范副本 .claude/singlefs-ai-sop/ 被 .gitignore 挡着，git worktree 里没有它：提交时在「HEAD + 暂存区」临时树里跑 checker-tier-crash-point-replay --full，
 它调的 scripts/gate/admission.py 就在那种树里跑。直接 import 副本会当场 ImportError。
 这一份随仓走，每棵树里都在：先用这棵树里的副本，没有就用主仓（git 的公共目录所在的那一份仓）里的，
 两处都没有就判红退 1。只在调 preflight 时才去找，import 这一份本身不起子进程、不开文件。

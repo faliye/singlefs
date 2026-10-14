@@ -152,11 +152,18 @@ scripts/experiments/e97_entry_encoding.rs  # 还没改完：实验要写 inputs-
 scripts/experiments/e98_inode_record.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiments/e99_writebuffer_sequence.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiments/e9_keylayout.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 doc-process-records 的 crates-adversarial-review 格）
-crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 doc-process-records 的 crates-adversarial-review 格）
-crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 doc-process-records 的 crates-adversarial-review 格）
-crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 doc-process-records 的 crates-adversarial-review 格）
-crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试并走代码三方（门禁 doc-process-records 的 crates-adversarial-review 格）
+crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（checker 档包改完直接跑，不开代码轮）
+crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（checker 档包改完直接跑，不开代码轮）
+crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（checker 档包改完直接跑，不开代码轮）
+crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（checker 档包改完直接跑，不开代码轮）
+crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（checker 档包改完直接跑，不开代码轮）
 crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs  # 在虚机的 busybox initramfs 里跑的静态二进制，那里没有 python3，preflight 判不了条件
-crates/singlefs-checker-tier/src/bin/new_pool_file_creation_region_bytes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试并走代码三方（门禁 doc-process-records 的 crates-adversarial-review 格）
+crates/singlefs-checker-tier/src/bin/new_pool_file_creation_region_bytes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（checker 档包改完直接跑，不开代码轮）
 .claude/gate.d/lib-governance-refs.py  # 被门禁 doc-registries 调的函数库（治理文档里的门禁号、路径与「小节」指不指得到），不单独调
+scripts/experiments/lib.rs  # 实验二进制共用的库（e7_index_bench 这个包的 lib），被各个 bin 引用，没有自己的入口，不单独调
+crates/singlefs-checker-tier/src/bin/deletion_write_dump.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（checker 档包改完直接跑，不开代码轮）
+crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（checker 档包改完直接跑，不开代码轮）
+crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（checker 档包改完直接跑，不开代码轮）
+crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（checker 档包改完直接跑，不开代码轮）
+crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（checker 档包改完直接跑，不开代码轮）
+crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（checker 档包改完直接跑，不开代码轮）

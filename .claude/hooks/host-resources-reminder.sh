@@ -213,7 +213,7 @@ def selftest_cells(hook_dir, root):
     code, context, calls, _ = feed("compiled-code", "bash scripts/hosts/run-with-memory-cap.sh 8G cargo test -p singlefs-harness --test selftest_target")
     check("compiled-code", code == 0 and "资源提醒" in context and calls and calls[0].endswith("-- cargo test -p singlefs-harness --test selftest_target"),
           f"经内存包装的 harness 档 cargo test 应当出提醒、报告脚本拿剥掉包装的那一条；实际退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」")
-    code, context, calls, _ = feed("gpu-script", "cd scripts/experiments && bash ../gpu-quiesce-run.sh -- true")
+    code, context, calls, _ = feed("gpu-script", "cd scripts/experiments && bash ../crash/gpu-quiesce-run.sh -- true")
     check("gpu-script", code == 0 and "GPU" in context and calls and calls[0].startswith("--gpu --"),
           f"清场包装应当认成 GPU、报告脚本带 --gpu、退 0；实际退 {code}，提醒「{context[:120]}」，报告脚本收到「{calls}」")
     code, context, calls, _ = feed("gpu-feature", "cargo build --release -p singlefs-checker-tier --features verdict-store,gpu")

@@ -18,3 +18,348 @@ crates/singlefs-checker-tier/src/crash_judge_common.wgsl	# 查版本按 64 位�
 crates/singlefs-checker-tier/src/crash_judge_dispatch.rs	# shadow_unrelated 改名；判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行这一批（同步记录 research/prompts/m3-mask64-sync.md）
 crates/singlefs-checker-tier/src/crash_judge_tables.rs	# 组合掩码 u64、一个落点 64 次写；判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行这一批（同步记录 research/prompts/m3-mask64-sync.md）
 scripts/experiments/e152-tables.py	# 六家表末尾加 singlefs 行；判器组合掩码放到 64 位、崩溃放量全量重判与 E152 出表加 singlefs 行这一批（同步记录 research/prompts/m3-mask64-sync.md）
+.claude/agent-common.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/clerk.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/experiment-designer.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/experiment-runner.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/implementation-writer.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/investigator.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/kb-scribe.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/mutation-triage.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/sweep.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/three-way-attack.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/three-way-defense.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/three-way-forward.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/three-way-materials.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/agents/tooling-writer.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/checker-independence-and-sync.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/checker-tier-broad-mutation.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/checker-tier-crash-point-replay.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/checker-tier-crates-mutation-replay.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/checker-tier-formal-verification.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/checker-tier-layer0-replay.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/checker-tier-lkmm.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/checker-tier-qemu-device-streams.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/checker-tier-research-build-and-replay.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/code-source-discipline.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/code-tooling.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/cpu-judging-sites.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/crash-point-replay-items.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/crash-point-replay-segments.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/crates-mutation-light-rows.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/doc-decisions.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/doc-experiments.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/doc-process-records.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/doc-registries.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/doc-text.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/e165-pinned-red-examples.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/e165-void-red-example-ledgers.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/fixture-none-exempt.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/gpu-exemptions.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/harness-model-differential-and-scenarios.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/harness-test-environment.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/lib-forbidden-notations.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/lib-governance-refs.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/lib-trilingual.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/stage-inputs.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/stage-owners.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/timing-load-field-lag.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/gate.d/wallclock-assert-lag.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/agent-write-scope.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/bash-command-detector.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/heavy-test-guard.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/host-resources-reminder.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/lib_abandoned_rounds.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/lib_heavy_tests.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/lib_long_run.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/lib_shell_words.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/lib_workspace_cargo_lock.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/lib_writer_lock.py	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/remind-rearm-stop-guard.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/runner-dispatch-guard.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/selftest-registry.tsv	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/timer-only-remind-guard.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/hooks/write-guard.sh	# 2026-10-12 工具与治理批：门禁与钩子改名、新格、线程登记位，合入主树，再加提交前修红（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/changelog-format.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/directory-layout.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/format-evolution.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/fs-design.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/implementation-first.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/implementation-workflow.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/mutation-sampling.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/path-moves.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/three-way-inference.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/timer-only-remind.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/rules/verification.md	# 2026-10-12 工具与治理批：定义、共用约束与规则改名、重活线程登记位，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+.claude/settings.json	# 2026-10-12 工具与治理批合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bad_disk_input.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_given_states.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_identity.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_injection.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_judge_checker.wgsl	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_judge_conclusions.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_judge_gpu.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_judge_recovery.wgsl	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_library.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_point_replay_progress.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_state_enumeration.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/crash_verify_gpu.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/gpu_unit_checks.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/judging_closure.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/layer0_progress.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/lib.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker-tier/src/verdict_store.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker/src/image.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker/src/lib.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-checker/src/walk.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/admission.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/allocator.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/block_device.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/code_two_tree.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/inode_tree.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/make_filesystem.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/mount.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/mounted_read.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/mounted_session.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/pointer.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/recovery.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/root_record.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-core/src/transaction.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/fault_injection.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/gpu_memory_ledger.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/heavy_threads.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/history.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/lib.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/memory_pool.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/model.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/model_comparison.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/mount_transparency.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/read_tally.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/reference_filesystem_translation.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-harness/src/segments.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-reference-filesystem/src/lib.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+crates/singlefs-replay-prefix/src/lib.rs	# 里程碑三代码欠账批与课题 4 两段改动、全量前修红合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/README.md	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/README.md	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/agent-cost.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/agent-handover.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/agent-watch.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/ask-local-selftest.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/ask-local.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/checklist-specs.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/cite-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/dispatch-prompt.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/remind.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/three-way-materials.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/three-way-rerun-template.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/watch.conf	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/agents/watch.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/README.md	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/check-segment-registry.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/corruption-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/corruption-summary.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/cpu-judging-sites-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/crash-amplification-item.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/crash-amplification-lib.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/crash-amplification-two-hosts.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/crash-amplification.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/crash-case-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/crash-point-replay-shard-configuration-check.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/crash-point-replay-shard-run.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/crash-point-replay.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/gpu-exemptions-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/gpu-quiesce-run.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/layer0-shard-run-selftest.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/layer0-shard-run.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/crash/lib_crash_point_replay_items.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/data/en-words.txt	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/devices/README.md	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/devices/build-patched-qemu.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/devices/e152-run.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/devices/local-repro-tuned.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/devices/local-repro.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/devices/qemu-blklogwrites-check.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/devices/snapshot-check.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/Cargo.toml	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/README.md	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e104_current_version.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e106_stripe_member_table.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e109_position_authority.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e140_header_alignment.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e142_new_pool_file_creation_dry_run.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e144_header_checksum_cost.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e152_file_system_benchmark.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e153_ledger_shape_and_ring_holes.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e155_fourth_run_group_commit_concurrency.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e155_fsync_write_volume.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e155_second_run_fsync_write_volume.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e157_parallel_line_one_clauses.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e159_fsync_wait_group_commit.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e162_crash_verdict_block_store.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e162_verdict_store_network.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e162_verdict_store_sender.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e164_crash_amplification_design_function_test/probe_crash_states.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e165-pin-red-examples.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e165-replay-mutation-kill-bounds.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e166_parallel_commit_shared_state_partition.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e167_multi_inflight_crash_cut.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e169_parallel_commit_append_and_prefix_recovery.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e170_o3_spec_executor_with_witness_predicates/run_segment_three.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_known_bad_recopy_check.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion/row_driver.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion/select_bad_implementations.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion/test_default_threads.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/check_product.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/contrast_revision_6_against_revision_8.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/contrast_segment_two_revision_10.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/count_reusable_units.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/cross_host_o3_check.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/fake_multi_host_run.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/fake_multi_host_run.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/fake_row_driver.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/freeze-path-only-changes.tsv	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_o3.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_tree_lines_revision_8.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/peer_side.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/revision_10_placeholders.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/revision_8_placeholders.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/revision_8_selftest_harness.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_11.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_8.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_10.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_11.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_on_the_revision_6_tree_multi_host.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_on_the_revision_8_tree_multi_host.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_revision_11_multi_host.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_on_the_revision_6_tree_multi_host.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_revision_10_multi_host.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_revision_11_multi_host.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_11.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_8.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_11.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/test_default_threads.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/test_frozen_o3.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e172_deletion_write_dry_run.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e173_admission_ceiling_bad_ring_slot_dispositions.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e174_lease_drop_wait_memory_return.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e176_crates_oracle/oracle.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e177_per_tree_resurrection_without_tombstones.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e178_leaf_and_record_death_counts.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e21-compute.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e21-prove-gpu.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e21-transfer.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e39_back_chain.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e44_jsn_width.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e49_chain_width.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e56-report.py	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e56-sweep.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e58_csum_grain.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e6-units.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e65_write_grain.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e66_small_files.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e69_backref_cost.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e6_multicore.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e77_publish_order.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e78_replay_start.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e79_root_record.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e80_partial_stripe.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e87_fixed_placement.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e93_aging_placement.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e96_hybrid_consistency.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/e97_entry_encoding.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/heavy_threads_default/threads.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/lib.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/main.rs	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/perf-by-milestone.md	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/experiments/replay.sh	# 2026-10-12 工具与治理批：脚本路径补分类子目录与英文改名，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/README.md	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/admission.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/apply-writer-patch.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/change-touches-crates.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/changed-paths.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/closeout-status.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/crate-sources-reachable.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/data-name-lint.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/directory-layout-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/gate-staged-selftest.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/gate-structure-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/hook-swap.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/lib_libtest_result_lines.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/lib_rebuilt_packages.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/lib_source_digest.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/lib_workspace_lock.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/light-selftest-guard.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/merge-and-verify.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/stage-mine.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/stage-must-run-selftest.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/stage-must-run.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/verus-proof-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/gate/wallclock-assert-lint.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/README.md	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/capped.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/compile-then-swap.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/detached-run.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/heavy-threads.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/heavy_threads.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/host-dispatch.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/host-resources.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/memory_peaks_lib.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/minimal-copy.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/multi-host-run.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/peer-host-lib.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/run-with-memory-cap.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/source-stamp.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/target-prune.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/test-environment-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/hosts/work-directory-ownership.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/README.md	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/archive-past-rounds.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/claim-experiment.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/doc-consolidate.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/history-consolidate.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/insert-row.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/kb-sections.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/kb-spec-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/oov-check.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/pdf-text.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/quote-kb.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/quote-rust-items.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/rules-sweep-audit.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/stale-candidates-benchmark-facts.tsv	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/stale-candidates.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/sweep-term.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/kb/verify-citations.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/README.md	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/broad-mutation.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/crates-mutation-light-rows.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/crates-mutation-rows.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/mutate.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/mutation-prune.py	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/mutation-shard-run.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/prove-red.sh	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/tables/README.md	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/tables/e142_new_pool_file_creation_dry_run.tsv	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/tables/e29_blast_radius.tsv	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）
+scripts/mutation/tables/e67_device_subset.tsv	# 2026-10-12 工具与治理批：研究脚本改名、线程登记位、两段流水线脚本，合入主树（records/2026-10-13-复用键与全仓改名.md「2026-10-14 合入」一节）

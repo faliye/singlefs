@@ -5,7 +5,7 @@ description: 记录或变更 singlefs 的设计决策。定下一条决策、推
 
 正文在共享层，读它：`.claude/singlefs-ai-sop/skills/decide/SKILL.md`
 
-**不要把正文抄到这里。** 抄了别的项目看不到，下次又会被抄一遍。
+**不要把正文抄到这里。**
 
 ## 在本项目里
 

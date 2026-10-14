@@ -7,8 +7,10 @@
 认得出的：引号与反斜杠、词首的 # 注释、重定向（连同目标去掉，输出重定向的目标另交）、
 命令替换 `$(…)` 与反引号（引号里外都认：整段留在所在的词里，里面的命令另按一条完整的命令递归判；`$((…))` 算术整段留在词里、不判）、
 进程替换 `<(…)` 与 `>(…)`（只在引号外认，办法同命令替换：整段留在所在的词里，`)` 之后的词照旧是外层命令的参数）、
-命令前的关键字与赋值、nohup / setsid / nice / ionice / timeout / env / stdbuf / sudo / taskset / command / exec 这类前缀、
-`bash [选项] 脚本` 与 `bash -c '…'`（递归进去）、`python3 [选项] 脚本`、`source` / `.`（后面跟的像一个路径才算）、`capped.sh N …` 与 `run-with-memory-cap.sh <上限> …`，
+命令前的关键字与赋值、nohup / setsid / nice / ionice / timeout / env / stdbuf / sudo / taskset / command / exec 这类前缀
+（env 的选项照 getopt 切：短选项可以合写（`-iC 目录`、`-iCdir`、`-0iu NAME`），`-u` / `-C` / `-S` 的值贴着写或另起一个词，长选项认唯一前缀的缩写（`--chd 目录`），单独一个 `-` 等于 `-i`；
+`-S 字符串` / `--split-string=字符串` 的字符串按 GNU env 的规则拆成词、原地换进命令里再判，拆出来的词里还可以有选项、赋值与命令词：env_split_string、skip_prefixes_expanding）、
+`bash [选项] 脚本` 与 `bash -c '…'`（递归进去）、`python3 [选项] 脚本`、`source` / `.`（后面跟的像一个路径才算）、`capped.sh N …`（N 写 `default` 的一样剥）与 `run-with-memory-cap.sh <上限> …`，
 （被执行的只是脚本位上那一个词：`bash -n 脚本` 只查语法、`python3 - 词…` 的程序从标准输入读，后面的词都是参数，都不当被执行的脚本交出；
 弄坏开关 LIB_SHELL_WORDS_BREAK=arguments-as-executed 把这两种里的参数照旧当被执行的脚本，哪几份自证的哪几项红见「弄坏开关」一段），
 python 的选项照解释器的语义切（python_invocation）：短选项可以合写（`-Bu`），`-W`、`-X` 与 `--check-hash-based-pycs` 带一个值（贴着写或另起一个词），
@@ -86,6 +88,35 @@ detached-run.sh 以「✗ 自证格不对：」起头、标签之后不另写期
         放出追踪:detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒（「应当是 1，实际 0」）
       detached-run.sh --selftest：
         Ⓟ -- 之后的 --force 照 preflight 摘：命令收到 a b，闸切出的词与登记里的命令逐字相同
+  LIB_SHELL_WORDS_BREAK=env-chdir-ignored  skip_prefixes() 不交 env 的 -C / --chdir 换的目录：commands_at_command_position 里这一条命令照外面的当前目录判（改前的判法）
+      lib_heavy_tests.py --selftest：cargo 那张表里「env 换目录」开头的十一格里十格红（「换的目录只管这一条」那格不红）：
+        env 换目录：-C 换进探针再 cargo test -p 探针自己的包名（「应当是 checker-tier-cargo，实际 None」）
+        env 换目录：-C 换进 checker 档包目录裸跑、-C 贴着目录写、--chdir=目录、--chdir 目录（分两个词）、bash -c 里的 env -C（「应当是 checker-tier-cargo，实际 full-cargo」）
+        env 换目录：绝对路径、当前目录在别处、经内存包装（「应当是 checker-tier-cargo，实际 None」）
+        env 换目录：换进 harness 档目录裸跑放行、换进不依赖 checker 档包的探针裸跑放行、两个 -C 取最后一个（「应当是 None，实际 full-cargo」）
+      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那十项）：
+        实现员经内存包装 env -C 换进探针再 cargo test -p 探针自己的包名、env -C 换进 checker 档包目录裸跑、env --chdir=目录换进 checker 档包目录、env --chdir 目录（分两个词）、
+        主 agent 不带前缀 env -C 换进链接 checker 档包的探针 cargo run（「应当是 2，实际 0」）
+        实现员经内存包装 env -C 换进不依赖 checker 档包的探针裸跑 cargo test：放行（「应当是 0，实际 2」）
+        实现员经内存包装 env -iC 合写换进 checker 档包目录 cargo test：照拒、实现员经内存包装 env -S 拆串里先换目录再 cargo test：照拒（「应当是 2，实际 0」）
+        lib_heavy_tests.py 的自检（「应当是 0，实际 1」）
+      bash-command-detector.sh、detached-run.sh 的 --selftest 不红
+  LIB_SHELL_WORDS_BREAK=env-option-clusters-unparsed  skip_prefixes() 里 env 的选项退回只认整词 -u / --unset / -C / --chdir：合写的 -iC、-0iu、缩写的 --chd、单独的 - 与 -S / --split-string
+      不认（选项簇当不带值的开关，它的值词当命令词；-S 的字符串整个当命令词，改前的判法）
+      lib_heavy_tests.py --selftest：cargo 那张表里「env 选项」开头六格里五格红（「-iC 换进 harness 档目录裸跑放行」不红）、「env 拆串」开头七格里六格红（放行的一格不红）：
+        env 选项：-iC 合写、-iC 目录贴着写、--chd 缩写（「应当是 checker-tier-cargo，实际 None 或 full-cargo」）
+        env 选项：-0iu 合写、单独一个 -（「应当是 full-cargo，实际 None」）
+        env 拆串：-S、-iS、--split-string=、串里带 -C 与赋值、串后面还有参数、经内存包装与 capped.sh（「应当是 checker-tier-cargo，实际 None」）
+      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那十一项）：
+        实现员经内存包装 env -iC 合写换进 checker 档包目录 cargo test：照拒、env -S 拆串里是 checker 档包的 cargo test：照拒、env -S 拆串里先换目录再 cargo test：照拒（「应当是 2，实际 0」）
+        lib_heavy_tests.py 的自检（「应当是 0，实际 1」）
+      bash-command-detector.sh、detached-run.sh 的 --selftest 不红（两份自证里没有 env 带选项簇或 -S 的用例，未实跑，由主 agent 复跑核）
+  LIB_SHELL_WORDS_BREAK=env-split-string-unexpanded  skip_prefixes_expanding() 不拆 env 的 -S / --split-string（-S 与它的字符串整个跳过，里面的命令不判）
+      lib_heavy_tests.py --selftest：cargo 那张表里「env 拆串」开头七格里六格红（放行的「串里点名 harness 档包放行」不红；「应当是 checker-tier-cargo，实际 None」）
+      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那六项）：
+        实现员经内存包装 env -S 拆串里是 checker 档包的 cargo test：照拒、env -S 拆串里先换目录再 cargo test：照拒（「应当是 2，实际 0」）
+        lib_heavy_tests.py 的自检（「应当是 0，实际 1」）
+      bash-command-detector.sh、detached-run.sh 的 --selftest 不红（同上，未实跑）
 """
 import os
 import re
@@ -117,7 +148,8 @@ PYTHON_LONG_OPTIONS_WITH_VALUE = {"--check-hash-based-pycs"}
 SOURCE_TARGET = re.compile(r"^[^\s=,-][^\s=,]*$")
 HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1([^\n]*)\n(.*?)\n\s*\2[ \t]*(?=\n|$)", re.S)
 MAXIMUM_NESTING = 8
-# 先带一个参数、再接那条命令的包装脚本：capped.sh N（线程上限）、run-with-memory-cap.sh <上限>（内存上限）。剥掉它们两个词，往里判那条命令
+# 先带一个参数、再接那条命令的包装脚本：capped.sh N（线程上限；N 是正整数或 default，default 取 .claude/heavy-thread-default 的登记值）、
+# run-with-memory-cap.sh <上限>（内存上限）。参数不以 - 开头就剥掉它们两个词（不看是数还是 default），往里判那条命令
 WRAPPERS_TAKING_ONE_ARGUMENT = {"capped.sh", "run-with-memory-cap.sh"}
 # 其中给命令定内存上限的那一个：剥掉它的命令记 memory_capped（heavy-test-guard.sh 判子 agent 跑编译出来的代码经没经它）
 MEMORY_CAP_WRAPPER = "run-with-memory-cap.sh"
@@ -143,6 +175,8 @@ class PrefixSkip(NamedTuple):
     command_position: int | None  # 命令词的下标；这一条只有关键字、赋值与前缀时是 None
     prefix_names: set[str]         # 路过的前缀名（nohup、setsid、nice……）
     assignments: dict[str, str]    # 路过的赋值：命令前的 `名字=值` 与 env 参数里的 `名字=值`
+    chdir: str | None = None       # env 的 `-C 目录` / `-C目录` / `--chdir=目录` / `--chdir 目录` 里最后一个目录（照写的样子，没解开）；没有是 None
+    split: tuple[int, int, str] | None = None   # 只在 skip_prefixes(…, expand_split=True) 下有：env 的 -S / --split-string 在词表里占的 [起, 止) 与它的字符串，由调用方拆开换进去再判
 
 
 class ShellInvocation(NamedTuple):
@@ -183,7 +217,7 @@ def heredoc_feeds_shell(head):
         return False
     words = simple[-1]
     for _ in range(MAXIMUM_NESTING):
-        skipped = skip_prefixes(words)
+        skipped, words = skip_prefixes_expanding(words)
         if skipped.command_position is None:
             return False
         words = words[skipped.command_position:]
@@ -419,9 +453,145 @@ def simple_commands(tokens):
     return commands, output_targets, substitutions, redirections
 
 
-def skip_prefixes(words):
-    """跳过关键字、赋值与 nohup / setsid / nice / timeout / env / taskset 这类前缀，交回命令词的下标、路过的前缀名与赋值。"""
-    prefix_names, assignments = set(), {}
+def env_chdir_ignored():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=env-chdir-ignored：env 的 -C / --chdir 换的目录不跟（改前的判法：按外面的当前目录判，只给自检证红用）。"""
+    return "env-chdir-ignored" in os.environ.get("LIB_SHELL_WORDS_BREAK", "").split(",")
+
+
+def env_directory(directory, target):
+    """env -C 的目标解开成绝对路径：相对路径按命令开始时的当前目录。目标带变量、命令替换或当前目录认不出时交 directory 原样（照旧按外面的当前目录判，
+    不像 cd 那样交 None：交 None 会让这一条命令的目录类判定全部放过，比改前还松；罩不住的：env -C 的目录写在变量里）。"""
+    expanded = os.path.expanduser(target)
+    if "$" in expanded or "`" in expanded:
+        return directory
+    return resolve_path(directory, expanded) or directory
+
+
+class EnvOption(NamedTuple):
+    width: int                     # 这个选项连同它的值词占几个词
+    chdir: str | None = None       # -C / --chdir 的目录
+    split_string: str | None = None   # -S / --split-string 的字符串
+
+
+ENV_SHORT_OPTIONS_WITH_VALUE = "uCS"                                # env 的 -u NAME、-C 目录、-S 字符串；短选项可以合写（-iC 目录、-iS 字符串、-0u NAME），值贴着写或另起一个词
+ENV_LONG_OPTIONS_WITH_VALUE = ("chdir", "unset", "split-string")    # getopt_long 认唯一前缀的缩写（--chd 目录、--spl=字符串、--u NAME）；env 别的长选项没有值词
+
+
+def env_option_clusters_unparsed():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=env-option-clusters-unparsed：env 的选项退回只认整词 -u / --unset / -C / --chdir（合写的 -iC、缩写的 --chd、单独的 - 与 -- 当成不带值的开关或命令词；只给自检证红用）。"""
+    return "env-option-clusters-unparsed" in os.environ.get("LIB_SHELL_WORDS_BREAK", "").split(",")
+
+
+def env_split_string_unexpanded():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=env-split-string-unexpanded：env 的 -S / --split-string 不拆（-S 当不带值的开关，后面那个词整个当命令词；只给自检证红用）。"""
+    return "env-split-string-unexpanded" in os.environ.get("LIB_SHELL_WORDS_BREAK", "").split(",")
+
+
+def env_option(words, position):
+    """env 的第 position 个词若是选项（含合写的短选项簇）交 EnvOption，不是（赋值、命令词）交 None。
+    单独一个 `-` 等于 -i，`--` 之后不再有选项（由调用方停手）。带值的：-u、-C、-S（短选项簇里头一个带值的字母之后，贴着的是值、没有就取下一个词）和
+    --unset / --chdir / --split-string（`=值` 或下一个词，认唯一前缀的缩写）；别的字母与长选项（-i、-0、-v、--block-signal[=SIG]……）不带值词。"""
+    argument = words[position]
+    if argument in ("-", "--"):
+        return EnvOption(1)
+    if argument.startswith("--"):
+        name, equals, value = argument[2:].partition("=")
+        matched = next((long for long in ENV_LONG_OPTIONS_WITH_VALUE if name and long.startswith(name)), None)
+        if matched is None:
+            return EnvOption(1)
+        width = 1
+        if not equals:
+            value, width = (words[position + 1], 2) if position + 1 < len(words) else (None, 1)
+        return EnvOption(width, value if matched == "chdir" else None, value if matched == "split-string" else None)
+    if not argument.startswith("-"):
+        return None
+    letters = argument[1:]
+    for index, letter in enumerate(letters):
+        if letter in ENV_SHORT_OPTIONS_WITH_VALUE:
+            value, width = letters[index + 1:], 1
+            if not value:
+                value, width = (words[position + 1], 2) if position + 1 < len(words) else (None, 1)
+            return EnvOption(width, value if letter == "C" else None, value if letter == "S" else None)
+    return EnvOption(1)
+
+
+ENV_SPLIT_ESCAPES = {"n": "\n", "t": "\t", "f": "\f", "r": "\r", "v": "\v"}
+
+
+def env_split_string(text):
+    """GNU env -S 的拆词：空白（空格、制表、换行、\\v、\\f、\\r）与不在引号里的 `\\_` 隔开词；单引号里只认 `\\'` 与 `\\\\`；双引号里认 \\n \\t \\f \\r \\v \\_（空格）与 \\" \\$ \\\\；
+    不在引号里的词首 `#` 起到结尾是注释；`\\c` 到此为止；`$NAME`、`${NAME}` 不展开（照原文留着）；不认的反斜杠转义（env 自己会报错不跑）宽松地留下那个字符。"""
+    words, current, started, quote, index = [], [], False, None, 0
+    while index < len(text):
+        character = text[index]
+        if quote == "'":
+            if character == "'":
+                quote = None
+            elif character == "\\" and text[index + 1:index + 2] in ("'", "\\"):
+                index += 1
+                current.append(text[index])
+            else:
+                current.append(character)
+        elif character == "\\":
+            index += 1
+            following = text[index:index + 1]
+            if following == "c":
+                break
+            if following == "_" and quote is None:
+                if started:
+                    words.append("".join(current))
+                current, started = [], False
+            elif following == "_":
+                current.append(" ")
+            elif following in ENV_SPLIT_ESCAPES:
+                current.append(ENV_SPLIT_ESCAPES[following])
+                started = True
+            elif following:
+                current.append(following)
+                started = True
+            else:
+                current.append("\\")
+                started = True
+        elif quote == '"':
+            if character == '"':
+                quote = None
+            else:
+                current.append(character)
+        elif character in "'\"":
+            quote, started = character, True
+        elif character in " \t\n\v\f\r":
+            if started:
+                words.append("".join(current))
+            current, started = [], False
+        elif character == "#" and not started:
+            break
+        else:
+            current.append(character)
+            started = True
+        index += 1
+    if started:
+        words.append("".join(current))
+    return words
+
+
+def skip_prefixes_expanding(words):
+    """skip_prefixes，env 的 -S / --split-string 先按 env 的规则拆成词、原地换进命令里再判（拆出来的词里还可以有选项、赋值与命令词，MAXIMUM_NESTING 层为限）；
+    交回 (PrefixSkip, 换完之后的词表)：命令词的下标指的是换完之后的词表。（弄坏开关 LIB_SHELL_WORDS_BREAK=env-split-string-unexpanded 下不拆。）"""
+    for _ in range(MAXIMUM_NESTING):
+        skipped = skip_prefixes(words, expand_split=True)
+        if skipped.split is None:
+            return skipped, words
+        start, end, text = skipped.split
+        words = words[:start] + env_split_string(text) + words[end:]
+    return skip_prefixes(words), words
+
+
+def skip_prefixes(words, expand_split=False):
+    """跳过关键字、赋值与 nohup / setsid / nice / timeout / env / taskset 这类前缀，交回命令词的下标、路过的前缀名与赋值；
+    env 的 `-C 目录`、`-C目录`、`--chdir=目录`、`--chdir 目录` 换的目录（最后一个，GNU env 取最后一个）交在 chdir 里，由调用方按当前目录解开
+    （弄坏开关 LIB_SHELL_WORDS_BREAK=env-chdir-ignored 下不交）。env 的选项照 env_option 切（合写的 -iC、缩写、单独的 -）；-S / --split-string 的字符串：
+    expand_split 为真时交在 split 里（PrefixSkip.split，不往下判，由 skip_prefixes_expanding 拆开换进词表重来），为假时只跳过它与它的值词。"""
+    prefix_names, assignments, chdir = set(), {}, None
     position = 0
     while position < len(words):
         word = words[position]
@@ -435,14 +605,33 @@ def skip_prefixes(words):
             position += 1
             continue
         if name not in PREFIX_OPTIONS_WITH_VALUE:
-            return PrefixSkip(position, prefix_names, assignments)
+            return PrefixSkip(position, prefix_names, assignments, chdir)
         if name == "command" and words[position + 1:position + 2] in (["-v"], ["-V"]):
-            return PrefixSkip(position, prefix_names, assignments)  # command -v / -V 是查名字，不执行后面那个词
+            return PrefixSkip(position, prefix_names, assignments, chdir)  # command -v / -V 是查名字，不执行后面那个词
         prefix_names.add(name)
         position += 1
         positional_left = PREFIX_POSITIONAL_COUNT.get(name, 0)
+        options_done = False
         while position < len(words):
             argument = words[position]
+            if name == "env" and not options_done and not env_option_clusters_unparsed():
+                option = env_option(words, position)
+                if option is not None:
+                    if option.split_string is not None and not env_split_string_unexpanded():
+                        if expand_split:
+                            return PrefixSkip(None, prefix_names, assignments, chdir, (position, position + option.width, option.split_string))
+                    elif option.chdir is not None and not env_chdir_ignored():
+                        chdir = option.chdir
+                    options_done = argument == "--"
+                    position += option.width
+                    continue
+            if name == "env" and not env_chdir_ignored():
+                if argument in ("-C", "--chdir") and position + 1 < len(words):
+                    chdir = words[position + 1]
+                elif argument.startswith("--chdir="):
+                    chdir = argument[len("--chdir="):]
+                elif argument.startswith("-C") and len(argument) > 2:
+                    chdir = argument[2:]
             if argument in PREFIX_OPTIONS_WITH_VALUE[name]:
                 position += 2
             elif argument.startswith("-") and argument != "-":
@@ -456,7 +645,7 @@ def skip_prefixes(words):
                 position += 1
             else:
                 break
-    return PrefixSkip(None, prefix_names, assignments)
+    return PrefixSkip(None, prefix_names, assignments, chdir)
 
 
 def arguments_as_executed():
@@ -644,13 +833,16 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                                              if found and int(found.group(1)) < len(stripped_heredocs)),
         }
         command_environment = dict(exported)
+        command_directory = directory   # 这一条命令的当前目录：env -C 换的只管这一条，不像 cd 那样往后带
         remaining = words
         launcher = None
         command_memory_capped = memory_capped
         for _ in range(MAXIMUM_NESTING):
-            skipped = skip_prefixes(remaining)
+            skipped, remaining = skip_prefixes_expanding(remaining)
             prefix_names |= skipped.prefix_names
             command_environment.update(skipped.assignments)
+            if skipped.chdir is not None:
+                command_directory = env_directory(command_directory, skipped.chdir)
             if skipped.command_position is None:
                 break
             remaining = remaining[skipped.command_position:]
@@ -673,7 +865,7 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                 invocation = shell_invocation(arguments)
                 if invocation.code_string is not None:
                     if depth < MAXIMUM_NESTING:
-                        inner = commands_at_command_position(invocation.code_string, directory, command_environment, depth + 1, stripped_heredocs,
+                        inner = commands_at_command_position(invocation.code_string, command_directory, command_environment, depth + 1, stripped_heredocs,
                                                              command_memory_capped)
                         commands += inner.commands
                         prefix_names |= inner.prefix_names
@@ -681,7 +873,7 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                         output_targets += inner.output_targets
                     break
                 if invocation.script_index is None:
-                    commands.append(CommandAtPosition(remaining, directory, command_environment, **attached, memory_capped=command_memory_capped))
+                    commands.append(CommandAtPosition(remaining, command_directory, command_environment, **attached, memory_capped=command_memory_capped))
                     break
                 remaining = arguments[invocation.script_index:]
                 launcher = "shell"
@@ -695,26 +887,26 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                     continue
                 if invocation.code_string is not None or invocation.script_index is None:
                     # `python3 -c '…'`、`python3 -`、只有选项：没有被执行的脚本文件，交出 python 这一条本身
-                    commands.append(CommandAtPosition(remaining, directory, command_environment, **attached, memory_capped=command_memory_capped))
+                    commands.append(CommandAtPosition(remaining, command_directory, command_environment, **attached, memory_capped=command_memory_capped))
                     break
                 remaining = arguments[invocation.script_index:]
                 launcher = "python"
                 continue
             if name in ("source", "."):
                 if not arguments or not SOURCE_TARGET.match(arguments[0]):
-                    commands.append(CommandAtPosition(remaining, directory, command_environment, **attached, memory_capped=command_memory_capped))
+                    commands.append(CommandAtPosition(remaining, command_directory, command_environment, **attached, memory_capped=command_memory_capped))
                     break
                 remaining = arguments
                 launcher = "source"
                 continue
             if name in WRAPPERS_TAKING_ONE_ARGUMENT:
                 if not arguments or arguments[0].startswith("-") or len(arguments) < 2:
-                    commands.append(CommandAtPosition(remaining, directory, command_environment, **attached, memory_capped=command_memory_capped))
+                    commands.append(CommandAtPosition(remaining, command_directory, command_environment, **attached, memory_capped=command_memory_capped))
                     break
                 remaining = arguments[1:]
                 launcher = None
                 command_memory_capped = command_memory_capped or name == MEMORY_CAP_WRAPPER
                 continue
-            commands.append(CommandAtPosition(remaining, directory, command_environment, launcher, **attached, memory_capped=command_memory_capped))
+            commands.append(CommandAtPosition(remaining, command_directory, command_environment, launcher, **attached, memory_capped=command_memory_capped))
             break
     return ShellScan(commands, prefix_names, has_lone_ampersand, output_targets)

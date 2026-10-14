@@ -11,7 +11,7 @@ implementation-writer	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工�
 kb-scribe	.claude/kb/**	kb-scribe.md「写范围」；relabel-item.py 改写的别处文件只许那个脚本改，不经 Edit
 kb-scribe	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根；过渡期另放行旧根）
 experiment-runner	scripts/experiments/**	experiment-runner.md「写范围」：bin 源文件
-experiment-runner	crates/singlefs-checker-tier/src/bin/e*.rs	实验装置要驱动真实 crates/ 代码时的只读 bin（2026-09-22 E156 撞上：岔路问的是「今天这份代码的性质」，另写一份独立模型答不了）。限定 e 开头加数字，碰不到 new_pool_file_creation_* 那几个生产装置；这个 bin 不许改 core/checker，由代码三方与门禁 doc-process-records 的 crates-adversarial-review 格管
+experiment-runner	crates/singlefs-checker-tier/src/bin/e*.rs	实验装置要驱动真实 crates/ 代码时的只读 bin（2026-09-22 E156 撞上：岔路问的是「今天这份代码的性质」，另写一份独立模型答不了）。限定 e 开头加数字，碰不到 new_pool_file_creation_* 那几个生产装置；这个 bin 不许改 core/checker；checker 档包的改动改完直接跑、不开代码轮（`.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」），越界写由写闸管
 experiment-runner	crates/mutations.tsv	入库装置的变异行只追加进末尾（experiment-runner.md 第 2 步与「写范围」；2026-09-23 E158 撞上：闸拒了那次追加，三行落进 scripts/mutation/tables/ 下、门禁 checker-tier-crates-mutation-replay 复跑不到）
 experiment-runner	scripts/mutation/tables/**	变异表
 experiment-runner	research/results/**	这个实验的产物
