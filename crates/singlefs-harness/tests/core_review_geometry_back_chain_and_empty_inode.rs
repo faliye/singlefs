@@ -2,6 +2,7 @@
 //! mkfs 在任何写之前拒掉固定结构互相盖住、根槽装不下根记录、journal 环短于一条记录、环末尾的下一个槽不在聚簇段边界上、
 //! mkfs 写的单元落到盘外的几何，越过 784 MiB 的环把单元区起点带到环末尾的下一个槽
 //! （D23（journal 的角色与格式） 已定项 19 ③、D3（空间分配） 已定项 10 ④、D22（单元原子性怎么合成） 已定项 16、D2（RAID 条带策略） 已定项 19）；
+//! io_min 1 MiB 的盘在每个可取的 S 上都拒（C568（固定结构取严之后 io_min 1 MiB 的盘建不了卷））；
 //! 只读挂载打得开新建的空 inode；恢复照 I-8.6（反向链算法）把链值不等的记录挡在重放前缀之外；
 //! 槽 0 自证不过的盘按池里别的盘槽 0 记的槽距找它的槽 1。
 //! 盘都是内存稀疏盘（`singlefs_harness::memory_pool::SparseBlockDevice`），恢复与只读挂载读的是 `MemoryPool`。
@@ -458,6 +459,139 @@ fn root_ring_regions_longer_than_the_region_step_are_refused_and_regions_that_ju
         FixedStructure::RootRingRegion { region: 1 },
         "S = 8、槽距 384 KiB + 512",
     );
+}
+
+// ── C568（固定结构取严之后 io_min 1 MiB 的盘建不了卷）：io_min 1 MiB 在每个可取的 S 上都拒（D2（RAID 条带策略） 已定项 19 射程） ──
+
+/// io_min 1 MiB：槽距 = 4096 向上取整到 io_min 的整数倍 = 1 MiB，系统配置槽 1 与根环区域 0 同从 1 MiB 起。
+const ONE_MEBIBYTE_MINIMUM_INPUT_OUTPUT_BYTES: u32 = 1 << 20;
+
+/// 下面每个 S 一条的用例覆盖的 S。与实现收的 S 逐个相同由
+/// `every_slots_per_region_the_implementation_accepts_has_a_one_mebibyte_minimum_input_output_size_refusal_case` 判：实现改了 S 的取值集合，那一条先红。
+const SLOTS_PER_REGION_WITH_A_ONE_MEBIBYTE_MINIMUM_INPUT_OUTPUT_SIZE_REFUSAL_CASE: [u64; 13] =
+    [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+
+/// 实现收的 S：系统配置里 S 那一字节的每个取值逐个交给 `RootRingSlotsPerRegion::from_system_configuration_field`，收下的那些。
+fn slots_per_region_the_implementation_accepts() -> Vec<u64> {
+    (0..=u8::MAX)
+        .map(u64::from)
+        .filter(|declared_slots_per_region| {
+            RootRingSlotsPerRegion::from_system_configuration_field(*declared_slots_per_region)
+                .is_ok()
+        })
+        .collect()
+}
+
+/// 每区槽数 `declared_slots_per_region`、io_min 1 MiB、槽距按 io_min 取整：mkfs 在任何写之前拒，
+/// 报的是排布次序里第一对重叠的系统配置槽 1 与根环区域 0。
+fn assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(
+    declared_slots_per_region: u64,
+) {
+    let root_ring_slots_per_region =
+        RootRingSlotsPerRegion::from_system_configuration_field(declared_slots_per_region)
+            .expect("用例给的 S 是实现收的（`every_slots_per_region_the_implementation_accepts_has_a_one_mebibyte_minimum_input_output_size_refusal_case`）");
+    let fixed_structure_slot_spacing =
+        SystemImmutableSizes::slot_spacing_for(ONE_MEBIBYTE_MINIMUM_INPUT_OUTPUT_BYTES);
+    assert_eq!(
+        u64::from(fixed_structure_slot_spacing),
+        MEBIBYTE,
+        "io_min 1 MiB 时槽距 1 MiB"
+    );
+    let geometry_named = format!("io_min 1 MiB、S = {declared_slots_per_region}");
+    let observation = make_filesystem_on_patterned_devices(
+        &parameters_with(SystemImmutableSizes {
+            minimum_input_output_bytes: ONE_MEBIBYTE_MINIMUM_INPUT_OUTPUT_BYTES,
+            fixed_structure_slot_spacing,
+            root_ring_slots_per_region,
+            ..default_geometry()
+        }),
+        DEVICE_BYTES,
+    );
+    assert_overlap_refused(
+        &observation,
+        FixedStructure::SystemConfigurationSlot { slot_index: 1 },
+        FixedStructure::RootRingRegion { region: 0 },
+        &geometry_named,
+    );
+}
+
+#[test]
+fn every_slots_per_region_the_implementation_accepts_has_a_one_mebibyte_minimum_input_output_size_refusal_case(
+) {
+    assert_eq!(
+        SLOTS_PER_REGION_WITH_A_ONE_MEBIBYTE_MINIMUM_INPUT_OUTPUT_SIZE_REFUSAL_CASE.to_vec(),
+        slots_per_region_the_implementation_accepts(),
+        "io_min 1 MiB 的拒绝用例逐个罩住实现收的每个 S"
+    );
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_four_slots_per_region() {
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(4);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_five_slots_per_region() {
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(5);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_six_slots_per_region() {
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(6);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_seven_slots_per_region() {
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(7);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_eight_slots_per_region() {
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(8);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_nine_slots_per_region() {
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(9);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_ten_slots_per_region() {
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(10);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_eleven_slots_per_region() {
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(11);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_twelve_slots_per_region() {
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(12);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_thirteen_slots_per_region()
+{
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(13);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_fourteen_slots_per_region()
+{
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(14);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_fifteen_slots_per_region()
+{
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(15);
+}
+
+#[test]
+fn one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at_sixteen_slots_per_region()
+{
+    assert_a_one_mebibyte_minimum_input_output_size_is_refused_before_any_write_at(16);
 }
 
 /// physical_block_size 256：根槽装不下 457 字节的根记录。在 mkfs 开头拒，不走到 `RootRecord::to_slot` 的断言

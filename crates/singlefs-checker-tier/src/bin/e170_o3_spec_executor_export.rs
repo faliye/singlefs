@@ -1,8 +1,8 @@
 //! E170（O3规约执行器第一版） 第一段：入库导出装置。
 //!
 //! 登记：`research/prompts/e170-preregistration.md` 5.3（导出格式）、5.4（取样三批）、5.7（装置写在哪）、5.8「第一段」、
-//! 第十一节停机 S1、S4 与作废 V2、第九节 XE1–XE3。它回答问题单 Q2 的实现那一侧：两条层 0 流的录制写流按 5.3 的中性格式写出，
-//! 按 5.4 取三批状态，每个状态调 `crates/` 的层 0 判定（`singlefs_checker_tier::crash::judge_crash_image`）记实现的判定与单线程耗时。
+//! 第十一节停机 S1、S4 与作废 V2、第九节 XE1–XE3。它回答问题单 Q2 的实现那一侧：两条崩溃点重放流的录制写流按 5.3 的中性格式写出，
+//! 按 5.4 取三批状态，每个状态调 `crates/` 的崩溃点重放判定（`singlefs_checker_tier::crash::judge_crash_image`）记实现的判定与单线程耗时。
 //!
 //! 只读、只驱动、只观测：不改 `crates/singlefs-core`、`crates/singlefs-checker`、harness 与 format。
 //! 流一（新池新建文件）经 `#[path]` 引 `crates/singlefs-harness/tests/common/mod.rs` 的 `format_pool`、`parameters` 与内容生成式，
@@ -24,6 +24,24 @@
 //! 退出码：0 正常；2 命令行不对或输出目录已存在；3 停机条款 S1 或 S4 没过（产物照打，交主 agent）。
 //! 单线程：每个状态的 `judge_crash_image` 耗时在这个进程里用 `Instant` 计（登记 5.3 `impl-verdicts.tsv`）。
 
+/// 崩溃点重放取样过崩溃判定库的项（`crash_state_enumeration::sample_crash_states_on_the_cpu`）：项名与设点文件（这份装置自己）。
+const CRASH_POINT_REPLAY_SAMPLING_ITEM: CrashPointReplayItem<'static> = CrashPointReplayItem {
+    name: "e170_o3_spec_executor_export",
+    setting_file: "crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs",
+};
+
+/// 这一次取样的项名：装置一趟按不同的段、不同的序号区间取样几十次，每次是一条不同的流，项名各给一个（库里同一个项名下只登一份清单，
+/// 几次共用会撞；块键按内容算，下一趟照样复用判过的块）。
+fn sampling_item_name_of_this_call() -> String {
+    static NEXT_SAMPLING_NUMBER: std::sync::atomic::AtomicU64 =
+        std::sync::atomic::AtomicU64::new(0);
+    format!(
+        "{}-{}",
+        CRASH_POINT_REPLAY_SAMPLING_ITEM.name,
+        NEXT_SAMPLING_NUMBER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    )
+}
+
 #[path = "../../../singlefs-harness/tests/common/mod.rs"]
 mod common;
 
@@ -33,10 +51,13 @@ use std::time::Instant;
 
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker_tier::crash::{
-    full_expansion, judge_crash_image, judge_layer0_state_range, layer0_enumeration_tables,
-    layer0_plan_state_count, quick_tier_expansion, Layer0EnumerationTables, Layer0StateJudgement,
+    crash_point_replay_plan_state_count, crash_state_enumeration_tables, full_expansion,
+    judge_crash_image, quick_tier_expansion, CrashStateEnumerationTables, CrashStateJudgement,
 };
 use singlefs_checker_tier::crash_facts::{extract_flow_facts, FlowFacts};
+use singlefs_checker_tier::crash_state_enumeration::{
+    sample_crash_states_on_the_cpu, CrashPointReplayItem,
+};
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
@@ -76,40 +97,40 @@ use singlefs_harness::{
 
 // ───────────────────────────── 本地常量（登记 5.7、S1） ─────────────────────────────
 
-/// 盘数：`tests/common/mod.rs` 第 152–184 行 `formatted_recorded_images` 建两块盘（`for device_number in 0..2u32`）。
+/// 盘数：`tests/common/mod.rs` 的 `formatted_recorded_images` 建两块盘（`for device_number in 0..2u32`）。
 const LOCAL_DEVICE_COUNT: usize = 2;
-/// 每块盘的字节数：`tests/common/mod.rs` 第 29 行 `IMAGE_BYTES = 4 << 30`。
+/// 每块盘的字节数：`tests/common/mod.rs` 的 `IMAGE_BYTES = 4 << 30`。
 const LOCAL_DEVICE_BYTES: u64 = 4_294_967_296;
-/// 物理块与 io_min：`tests/common/mod.rs` 第 54–55 行 `physical_block_size: 512`、`minimum_input_output_bytes: 512`。
+/// 物理块与 io_min：`tests/common/mod.rs` 里 `physical_block_size: 512`、`minimum_input_output_bytes: 512`。
 const LOCAL_PHYSICAL_BLOCK_BYTES: u32 = 512;
 const LOCAL_MINIMUM_INPUT_OUTPUT_BYTES: u32 = 512;
 /// 导出格式的扇区宽（登记 5.3 `sector_bytes`（512））：与 `singlefs_harness::memory_pool::SECTOR_BYTES` 回比。
 const LOCAL_SECTOR_BYTES: u64 = 512;
-/// 固定 fsid：`tests/common/mod.rs` 第 33–35 行 `E142_FILESYSTEM_IDENTIFIER`。
+/// 固定 fsid：`tests/common/mod.rs` 的 `E142_FILESYSTEM_IDENTIFIER`。
 const LOCAL_FILESYSTEM_IDENTIFIER: [u8; 16] = [
     0x5f, 0x53, 0x46, 0x53, 0x2d, 0x45, 0x31, 0x34, 0x32, 0x2d, 0x30, 0x30, 0x30, 0x31, 0x2d, 0x00,
 ];
-/// 固定写时刻：`tests/common/mod.rs` 第 37 行 `FIXED_WRITE_TIME_SECONDS = 1_788_000_000`。
+/// 固定写时刻：`tests/common/mod.rs` 的 `FIXED_WRITE_TIME_SECONDS = 1_788_000_000`。
 const LOCAL_FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
-/// 第一个文件的字节数：`tests/common/mod.rs` 第 31 行 `FILE_BYTES = 3000`；内容 `index % 251`（第 71–75 行 `file_content`）。
+/// 第一个文件的字节数：`tests/common/mod.rs` 的 `FILE_BYTES = 3000`；内容 `index % 251`（`file_content`）。
 const LOCAL_FIRST_FILE_BYTES: usize = 3000;
 const LOCAL_FIRST_FILE_CONTENT_MODULUS: usize = 251;
 
-/// 流一的段长：`tests/crash_enumeration_new_pool_file_creation_stream.rs` 第 466 行。
+/// 流一的段长：`tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `prepare` 里的段长断言。
 const LOCAL_FIRST_STREAM_SEGMENT_LENGTHS: [usize; 11] = [2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2];
-/// 流一的写数：同一份文件第 471 行（取号 2 + 暖机两次各 5 + A 29）。
+/// 流一的写数：同一份文件 `prepare` 里的写数断言（取号 2 + 暖机两次各 5 + A 29）。
 const LOCAL_FIRST_STREAM_WRITES: usize = 41;
 /// 流一的根槽写数：暖机两次各一条 + A 一条。
 const LOCAL_FIRST_STREAM_ROOT_WRITES: usize = 3;
-/// 流一全量与快档的状态数：同一份文件第 446 行 `FULL_STATES`、第 450 行 `QUICK_TIER_STATES`。
+/// 流一全量与快档的状态数：同一份文件的 `FULL_STATES`、`QUICK_TIER_STATES`。
 const LOCAL_FIRST_STREAM_FULL_STATES: u64 = 16_777_260;
 const LOCAL_FIRST_STREAM_QUICK_TIER_STATES: u64 = 46;
-/// 流一每次写只取两态时的全量闭式：同一份文件第 442 行 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`（单测拿段长表回算它）。
+/// 流一每次写只取两态时的全量闭式：同一份文件的 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`（单测拿段长表回算它）。
 const LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM: u64 = 16_777_240;
 
 /// 流二的段长（78 段）：取今天 crates 现算的那一份，即 S1 `fixed_script_through_e_then_unmount_segment_lengths` 的 `crates=`
-/// （`research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export.out` 第 306 行）。与
-/// `tests/crash_enumeration_fixed_script_stream.rs` 第 438–441 行只差第 33 段（回退 D 那次向前发布）：20 → 24，
+/// （`research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export.out` 里 `step=z1`、`check=fixed_script_through_e_then_unmount_segment_lengths` 那一行）。与
+/// `tests/crash_enumeration_fixed_script_stream.rs` 的 `prepare` 里「固定脚本到 E 再正常卸载的段序列」那条断言只差第 33 段（回退 D 那次向前发布）：20 → 24，
 /// 多出的 4 次写是那次发布追加的谱系记录（D18（块里携带什么信息） 已定项 24 第 5 条）。
 const LOCAL_SECOND_STREAM_SEGMENT_LENGTHS: [usize; 78] = [
     2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2,
@@ -171,7 +192,7 @@ const STREAM_NAMES: [StreamName; 2] = [
 
 // ───────────────────────────── 流二的内容生成式（照抄测试文件） ─────────────────────────────
 
-/// `tests/crash_enumeration_fixed_script_stream.rs` 第 50–56 行。
+/// `tests/crash_enumeration_fixed_script_stream.rs` 的 `SECOND_FILE_BYTES` 与 `second_content`。
 const SECOND_FILE_BYTES: usize = 4100;
 
 fn second_content() -> Vec<u8> {
@@ -257,7 +278,7 @@ impl StopCheck {
     }
 }
 
-/// 流一的三次调用：照抄 `tests/common/mod.rs` 第 498–557 行 `build_pool`，每次调用返回时记流长。
+/// 流一的三次调用：照抄 `tests/common/mod.rs` 的 `build_pool`，每次调用返回时记流长。
 /// mkfs 那一截由 `common::format_pool` 做（与 `build_pool` 同一个 `formatted_recorded_images`）。
 fn drive_through_the_new_pool_file_creation(
     tag: &str,
@@ -337,7 +358,7 @@ fn drive_through_the_new_pool_file_creation(
     }
 }
 
-/// 照抄 `tests/crash_enumeration_fixed_script_stream.rs` 第 145–166 行 `overwrite`（写时刻取本地常量 + 60）。
+/// 照抄 `tests/crash_enumeration_fixed_script_stream.rs` 的 `overwrite`（写时刻取本地常量 + 60）。
 fn overwrite(
     pool: &mut common::BuiltPool,
     content: &[u8],
@@ -544,7 +565,7 @@ fn prepare_stream(name: StreamName) -> PreparedStream {
     };
     let all_operations = pool.retained_operations();
     let mkfs_operation_count = pool.mkfs_operation_count;
-    // 照抄 `tests/crash_enumeration_fixed_script_stream.rs` 第 198–216 行：入口段（卸载入口发的那几段）一起交给切段（C557）。
+    // 照抄 `tests/crash_enumeration_fixed_script_stream.rs` 的 `writes_and_segments_after_mkfs`：入口段（卸载入口发的那几段）一起交给切段（C557）。
     let entry_spans: Vec<RecordedEntrySpan> = pool
         .stream
         .entry_spans()
@@ -621,7 +642,7 @@ fn prepare_stream(name: StreamName) -> PreparedStream {
         .rposition(|write| write.kind == StepKind::RootRecordFua)
         .expect("写流里有根槽写");
     let versions = versions_of_the_script.unwrap_or_else(|| {
-        // 流一的版本表照 `tests/crash_enumeration_new_pool_file_creation_stream.rs` 第 391–399 行 `single_version`。
+        // 流一的版本表照 `tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `single_version`。
         let (instance, checkpoint_txg) =
             singlefs_harness::memory_pool::root_identity_of_write(&writes[judged_root_index]);
         vec![PublishedVersion {
@@ -1088,7 +1109,7 @@ struct ImplementationVerdict {
 }
 
 impl ImplementationVerdict {
-    fn of(judgement: &Layer0StateJudgement) -> Self {
+    fn of(judgement: &CrashStateJudgement) -> Self {
         let report_root = |report: &RecoveryReport| root_text(report.effective_root);
         Self {
             consulted_root: report_root(&judgement.consulted),
@@ -1127,7 +1148,7 @@ fn list_text(items: &[String]) -> String {
     }
 }
 
-/// 一个取样状态上看到的：批号、层 0 序号、段号、落地向量、两份镜像摘要之一（直接从 `CrashImage` 算的）、实现判定与耗时、两条自检。
+/// 一个取样状态上看到的：批号、崩溃状态序号、段号、落地向量、两份镜像摘要之一（直接从 `CrashImage` 算的）、实现判定与耗时、两条自检。
 struct StateObservation {
     batch: u8,
     ordinal: u64,
@@ -1140,12 +1161,13 @@ struct StateObservation {
     rejudge_matches: bool,
 }
 
-/// 按序号升序把取样的状态切成连续的几段，每段调一次 `judge_layer0_state_range`：回调里给的那个 `CrashImage` 折回落地向量、算摘要，
+/// 按序号升序把取样的状态切成连续的几段，每段调一次 `judge_crash_state_range`：回调里给的那个 `CrashImage` 折回落地向量、算摘要，
 /// 再在同一个镜像上单独计时调一次 `judge_crash_image`（单线程耗时；两次判定逐项比，记 `rejudge_matches`）。
 /// 回调的持久集合另与 `crash_facts` 按序号现算的掩码比（记 `mask_matches_the_facts`）。
+// gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn observe_sampled_states(
     stream: &PreparedStream,
-    tables: &Layer0EnumerationTables,
+    tables: &CrashStateEnumerationTables,
     facts: &FlowFacts,
     torn_image_index_by_write: &BTreeMap<usize, usize>,
     sampled: &SampledOrdinals,
@@ -1171,7 +1193,11 @@ fn observe_sampled_states(
     let recorded_write_count = stream.writes.len();
     let mut observations: Vec<StateObservation> = Vec::new();
     for run in runs {
-        let state_count_of_the_stream = judge_layer0_state_range(
+        let state_count_of_the_stream = sample_crash_states_on_the_cpu(
+            CrashPointReplayItem {
+                name: &sampling_item_name_of_this_call(),
+                setting_file: CRASH_POINT_REPLAY_SAMPLING_ITEM.setting_file,
+            },
             &stream.base,
             &stream.writes,
             &stream.segments,
@@ -1203,10 +1229,12 @@ fn observe_sampled_states(
                         == image.persisted,
                 });
             },
-        );
+        )
+        .judged()
+        .expect("实验装置不分只录、只判两趟跑：起它时不设 SINGLEFS_CRASH_AMPLIFICATION_STAGE");
         assert_eq!(
             state_count_of_the_stream, tables.state_count,
-            "judge_layer0_state_range 交回的整条流状态数与枚举表的相同"
+            "judge_crash_state_range 交回的整条流状态数与枚举表的相同"
         );
     }
     observations.sort_by_key(|observation| (observation.batch, observation.ordinal));
@@ -1287,19 +1315,19 @@ fn export_stream(name: StreamName, output_root: &Path) -> StreamExport {
     let started = Instant::now();
     let stream = prepare_stream(name);
     let mut checks = stream.checks.clone();
-    let tables = layer0_enumeration_tables(
+    let tables = crash_state_enumeration_tables(
         &stream.base,
         &stream.writes,
         &stream.segments,
         &full_expansion,
     );
-    let full_states = layer0_plan_state_count(
+    let full_states = crash_point_replay_plan_state_count(
         &stream.base,
         &stream.writes,
         &stream.segments,
         &full_expansion,
     );
-    let quick_tier_states = layer0_plan_state_count(
+    let quick_tier_states = crash_point_replay_plan_state_count(
         &stream.base,
         &stream.writes,
         &stream.segments,
@@ -1492,7 +1520,7 @@ fn calls_file_text(stream: &PreparedStream) -> String {
 fn write_stream_files(
     directory: &Path,
     stream: &PreparedStream,
-    tables: &Layer0EnumerationTables,
+    tables: &CrashStateEnumerationTables,
     observations: &[StateObservation],
     full_states: u64,
     quick_tier_states: u64,
@@ -2974,11 +3002,11 @@ fn bad_rows_of_stream(
     (bases, rows)
 }
 
-/// 底态的落地向量（只有 `2` 与 `0`）在层 0 序号里找同一个：只找每段序号区间的两端与 0、T − 1（调用边界落在段的边界上时，同一个持久集合
+/// 底态的落地向量（只有 `2` 与 `0`）在崩溃状态序号里找同一个：只找每段序号区间的两端与 0、T − 1（调用边界落在段的边界上时，同一个持久集合
 /// 就是前一段区间的末端或后一段区间的起点；登记 5.5「找不到照实报，仍用它」）。交回 (找到的序号, 找过的候选数)。
-fn layer0_ordinal_with_the_same_landing(
+fn crash_state_ordinal_with_the_same_landing(
     recorded_write_count: usize,
-    tables: &Layer0EnumerationTables,
+    tables: &CrashStateEnumerationTables,
     flow_facts: &FlowFacts,
     torn_image_index_by_write: &BTreeMap<usize, usize>,
     persisted: &[bool],
@@ -3011,6 +3039,7 @@ struct BadObservation {
     verdict: Result<ImplementationVerdict, String>,
 }
 
+// gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn observe_bad_row(stream: &PreparedStream, row: &BadRow) -> BadObservation {
     let base_image = CrashImage {
         base: &stream.base,
@@ -3194,7 +3223,7 @@ fn lower_bound_row_base_checks(
     checks
 }
 
-/// 一条流造完、判完的坏状态：底态（带层 0 序号对照）、行、实现那一侧的观测、回比。
+/// 一条流造完、判完的坏状态：底态（带崩溃状态序号对照）、行、实现那一侧的观测、回比。
 struct BadStreamExport {
     name: StreamName,
     bases: Vec<(BaseState, Option<u64>, usize)>,
@@ -3238,7 +3267,7 @@ fn bad_states_of_stream(
     let directory = dump_root.join(name.directory_name());
     let mut checks = stream.checks.clone();
     checks.extend(dump_agreement_checks(&stream, &directory));
-    let tables = layer0_enumeration_tables(
+    let tables = crash_state_enumeration_tables(
         &stream.base,
         &stream.writes,
         &stream.segments,
@@ -3266,7 +3295,7 @@ fn bad_states_of_stream(
         {
             continue;
         }
-        let (found, candidates) = layer0_ordinal_with_the_same_landing(
+        let (found, candidates) = crash_state_ordinal_with_the_same_landing(
             stream.writes.len(),
             &tables,
             &flow_facts,
@@ -3317,13 +3346,13 @@ fn bad_states_of_stream(
             observation.patched_digest,
             patch_list.join(",")
         ));
-        let layer0 = matched_bases
+        let crash_state_ordinal_of_the_matched_base = matched_bases
             .iter()
             .find(|(seen, _, _)| seen.label == row.base.label)
             .and_then(|(_, found, _)| *found)
             .map_or_else(|| "none".to_string(), |ordinal| ordinal.to_string());
         expected_text.push_str(&format!(
-            "{row_id}\t{}\t{}\t{}\t{}\t{}\t{}\t{layer0}\t{}\n",
+            "{row_id}\t{}\t{}\t{}\t{}\t{}\t{}\t{crash_state_ordinal_of_the_matched_base}\t{}\n",
             row.name,
             row.family.label(),
             row.base.label,

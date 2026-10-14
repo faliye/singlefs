@@ -226,7 +226,7 @@ impl UnitAreaStart {
     }
 
     /// 默认环长（`JOURNAL_RING_DEFAULT_BYTES`，768 MiB）下的单元区起点：槽 50176（784 MiB），与格式常量 `UNIT_AREA_START_SLOT` 同一个数
-    /// （实审 A2c 的用例钉住）。
+    /// （有用例钉住）。
     #[must_use]
     pub fn of_the_default_journal_ring() -> Self {
         Self::following_the_journal_ring(JOURNAL_RING_DEFAULT_BYTES).expect(
@@ -3614,7 +3614,7 @@ mod tests {
     /// 读不出、记录不齐、映射也现算不成，而现行账里有 C694 的 B 那道凭据时，`mount::placements_of_an_unapplied_publish_whose_account_is_unreadable`
     /// 交空串、照样记进 C 那一槽）：借到的是 `Some(空)`，不是 `None`。D16（发布语义） 已定项 1「根槽这一次读坏」那一行：C 那一圈在那一槽记着
     /// 同一条根时「照 C 那一圈记着的落点算、不读账、读不出不拒」，「C 也没记着的照今天读盘」——条目在就是记着了，空串照空串算，
-    /// 与根环表里记着空串（挂载时凭据放行，攻方 M7）同一处置；凭据说的是那条根引用的单元已经没有要护的。
+    /// 与根环表里记着空串（挂载时凭据放行）同一处置；凭据说的是那条根引用的单元已经没有要护的。
     #[test]
     fn placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_lend_an_empty_entry_as_some_empty(
     ) {

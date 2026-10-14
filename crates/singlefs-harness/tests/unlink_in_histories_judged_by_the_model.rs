@@ -40,7 +40,7 @@ fn unlinking_the_first_file_then_reading_back_and_mounting_runs_to_the_end_with_
     };
     let run = execute_history_with(
         &history,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         &SharedStream::new(),
         &mut |_| {},
     );
@@ -113,7 +113,7 @@ fn the_fast_tier_weights_draw_an_unlink_and_the_first_history_with_one_runs_to_t
     };
     let run = execute_history_with(
         &history,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         &SharedStream::new(),
         &mut |_| {},
     );
@@ -165,7 +165,7 @@ fn creating_inodes_after_the_first_file_was_deleted_runs_through_a_mount_with_th
     };
     let run = execute_history_with(
         &history,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         &SharedStream::new(),
         &mut |_| {},
     );
@@ -242,7 +242,7 @@ fn after_an_inode_is_created_on_the_emptied_version_a_rollback_to_before_the_unl
     };
     let run = execute_history_with(
         &history,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         &SharedStream::new(),
         &mut |_| {},
     );
@@ -303,7 +303,7 @@ fn the_fast_tier_weights_draw_an_inode_creation_after_an_unlink_and_the_first_hi
     };
     let run = execute_history_with(
         &history,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         &SharedStream::new(),
         &mut |_| {},
     );
@@ -351,7 +351,7 @@ fn history_after_rolling_back_to_the_intent_then(
     };
     let run = execute_history_with(
         &history,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         &SharedStream::new(),
         &mut |_| {},
     );

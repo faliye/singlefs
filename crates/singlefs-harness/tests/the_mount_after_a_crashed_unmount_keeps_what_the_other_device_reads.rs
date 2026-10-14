@@ -1,7 +1,7 @@
 //! 卸载半途崩溃（系统配置已带新 F、带新 F 的根没落满每块盘）之后的下一次可写挂载只放开一截（D16（发布语义） 已定项 1「正常卸载」那一行，
-//! 用户 2026-10-04 选甲，`research/prompts/m3-batch14-code-r1-forks.md` 第 1 行）：重建分配器时当场可用的只到
+//! 用户 2026-10-04 选甲，`research/prompts/m3-batch14-code-r1-forks.md`「甲 再挂也只放开一截」那一行）：重建分配器时当场可用的只到
 //! min(F_生效, 每块盘上最新有效根的 txg 取最小)，某块盘一条有效根都读不出时只到一圈窗口里最旧有效根（用户 2026-10-04 选甲，
-//! `research/prompts/m3-batch16-code-r1-forks.md` 第 1 行），其余扣到这次挂载的暖机在每块盘上都落了根（`mount::rebuilt_allocator`），
+//! `research/prompts/m3-batch16-code-r1-forks.md`「甲 只放到窗口里最旧有效根」那一行），其余扣到这次挂载的暖机在每块盘上都落了根（`mount::rebuilt_allocator`），
 //! 暖机落满之后放开（`mount::establish_instance`）。
 //! 形 R（判决 `research/prompts/m3-batch14-code-r1-main-verification.md` 第二节「形 R」那一行，攻方 `research/prompts/m3-batch14-code-r1-opus-output.md`
 //! 第一节 1.2）：卸载那一串只落了第一个系统配置写就崩 → 两块盘都在、再可写挂载 → 这次挂载取号、写行的单元写到一半再崩 → 丢掉盘 0。
@@ -618,7 +618,7 @@ fn slots_released_by_the_current_version(pool: &PoolUnderTest<SparseBlockDevice>
         .collect()
 }
 
-/// 放开挪到暖机之前那一刀（出处：第 17 批正文 `research/prompts/_m3-batch17-code-r1-body.md` 第 27 行「「放开挪到暖机之前」那一形没有用例钉」）：
+/// 放开挪到暖机之前那一刀（出处：第 17 批正文 `research/prompts/_m3-batch17-code-r1-body.md`「「放开挪到暖机之前」那一形没有用例钉」）：
 /// 不补环窗口、准入关着造的窄盘（单元区 176 槽），第一个文件之后不再写；卸载只落下第一个写就崩，两块盘都在、再可写挂载（准入判着、影子账开、
 /// 批大小 1）做成。写行那次与暖机每一次写下的单元一个都不落在卸载之前现行那一版换下的槽上：那几个槽扣到暖机落满每块盘才放开。
 /// 判别力：`mount::establish_instance` 里那一句 `release_reclaim_holds` 挪到暖机之前时，暖机那次的单元写进换下的槽 1410（盘 1 上最新的根还引用它）：
@@ -685,8 +685,8 @@ const UNMOUNT_WRITES_LANDED_BEFORE_A_MOUNT_THAT_WARMS_UP_TWICE: u64 = 15;
 /// 它们扣到暖机在每块盘上都落了根才放开（D16（发布语义） 已定项 1「正常卸载」那一行当场可用的只到 min(F_生效, 每块盘上最新有效根的 txg 最小者)，
 /// `mount::rebuilt_allocator` 扣、`mount::establish_instance` 暖机循环之后放开）。
 /// 判别力：第一次暖机之后就放开、取号之前的预演同样在那里放开（预演对真发那一判不分叉）时，第二次暖机的单元写进换下的槽，最后一项红
-/// （攻方原型上量过：这份历史写进换下的槽 2 个，`research/prompts/m3-batch19-code-r1-opus-model/out/n34-176-3-1-a036.txt` 第 150 行
-/// `inR=2`；丢盘 0 之后剩下那块盘读文件报 `DataUnitChecksumMismatchEverywhere`）。只在真发那一处放开、预演不放开时，挂载在预演对真发那一判上
+/// （攻方原型上量过：这份历史写进换下的槽 2 个，`research/prompts/m3-batch19-code-r1-opus-model/out/n34-176-3-1-a036.txt` 里
+/// `PREFIX S=176 K=3 U=1 n=15 state=4104 arm=6` 那一行的 `inR=2`；丢盘 0 之后剩下那块盘读文件报 `DataUnitChecksumMismatchEverywhere`）。只在真发那一处放开、预演不放开时，挂载在预演对真发那一判上
 /// panic，这一条同样红。卸载只落下第一个写的那几条暖机只推一次，「第一次暖机之后」与「暖机落满之后」是同一刻，判不出这一刀。
 /// 重建时当场放开到 min(F_生效, max(每块盘上最新有效根的 txg 最小者, F_生效 − 1))、只扣现行那一版换下的（攻方
 /// `research/prompts/m3-batch21-code-r1-opus-model/patches/w2.patch`）时，写行那次的单元写进倒数第二次覆盖写换下的槽，最后一项红；

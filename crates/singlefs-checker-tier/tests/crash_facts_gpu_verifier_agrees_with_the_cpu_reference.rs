@@ -1,4 +1,4 @@
-//! checker 档模块：crash、gpu_unit_checks、crash_facts、crash_verify_gpu
+//! checker 档模块：crash、crash_state_enumeration、crash_library、gpu_unit_checks、crash_facts、crash_verify_gpu
 //! 崩溃放量三段流的第 ②、③ 段在新池新建文件那条流上：① 抽事实；② GPU 内核与 CPU 参照按同一张事实表判每个状态，逐状态相等、健康流全 0；
 //! ③ 改坏一次单元写的一个字节之后，两份仍逐状态相等，那次写持久的每个状态都红，而且每个红状态在 CPU 判器上也红（核对红 ⇒ 判器红）。
 //! 要本机一张空闲显存够的 NVIDIA 独显：本机没有 NVIDIA 卡时打一行 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、返回成功，
@@ -15,12 +15,20 @@ mod common;
 
 use std::collections::BTreeSet;
 
+/// 这份测试文件的仓内路径：崩溃点重放取样过库的设点文件。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_facts_gpu_verifier_agrees_with_the_cpu_reference.rs";
+
 use common::{build_pool, file_content, geometry};
 use singlefs_checker_tier::crash::{
-    judge_layer0_state_range, layer0_plan_state_count, Layer0SegmentExpansion,
+    crash_point_replay_plan_state_count, CrashPointReplaySegmentExpansion,
 };
 use singlefs_checker_tier::crash_facts::{
     extract_flow_facts, verdict_bits, verify_states_from_facts, FlowFacts, BASE_IMAGE_SOURCE,
+};
+use singlefs_checker_tier::crash_library::{facts_through_the_pairing_library, StageOutcome};
+use singlefs_checker_tier::crash_state_enumeration::{
+    sample_crash_states_on_the_cpu, CrashPointReplayItem,
 };
 use singlefs_checker_tier::crash_verify_gpu::{gpu_verifier_digest, GpuFactsVerifier};
 use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
@@ -33,11 +41,11 @@ use singlefs_harness::segments::StepKind;
 
 const LARGEST_EXPANDED_SEGMENT_WRITES: usize = 6;
 
-fn expansion(_segment_index: usize, segment: &[usize]) -> Layer0SegmentExpansion {
+fn expansion(_segment_index: usize, segment: &[usize]) -> CrashPointReplaySegmentExpansion {
     if segment.len() <= LARGEST_EXPANDED_SEGMENT_WRITES {
-        Layer0SegmentExpansion::EveryProperSubset
+        CrashPointReplaySegmentExpansion::EveryProperSubset
     } else {
-        Layer0SegmentExpansion::NotExpanded
+        CrashPointReplaySegmentExpansion::NotExpanded
     }
 }
 
@@ -73,16 +81,21 @@ fn record_new_pool_file_creation(tag: &str) -> Recorded {
     }
 }
 
-/// CPU 判器（`judge_crash_image`）在每个状态上红不红，按序号。
-fn judge_red_ordinals(recorded: &Recorded) -> BTreeSet<u64> {
+/// CPU 判器（`judge_crash_image`）在每个状态上红不红，按序号（流先过库再取样）；只录那一趟交 `None`。
+fn judge_red_ordinals(recorded: &Recorded, item_label: &str) -> Option<BTreeSet<u64>> {
     let mut reds = BTreeSet::new();
-    let state_count = layer0_plan_state_count(
+    let state_count = crash_point_replay_plan_state_count(
         &recorded.base,
         &recorded.writes,
         &recorded.segments,
         &expansion,
     );
-    let _state_count = judge_layer0_state_range(
+    let item_name = format!("facts_pairing::judge_red_ordinals::{item_label}");
+    sample_crash_states_on_the_cpu(
+        CrashPointReplayItem {
+            name: &item_name,
+            setting_file: THIS_FILE,
+        },
         &recorded.base,
         &recorded.writes,
         &recorded.segments,
@@ -95,8 +108,9 @@ fn judge_red_ordinals(recorded: &Recorded) -> BTreeSet<u64> {
                 reds.insert(ordinal);
             }
         },
-    );
-    reds
+    )
+    .judged()?;
+    Some(reds)
 }
 
 /// GPU 核对器在卡上要占多少显存（MiB，向上取整）：事实表每一项上卡展成 u32 表，展开之后不超过它在事实表 KV 字节
@@ -134,6 +148,10 @@ fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_
     };
     let healthy = record_new_pool_file_creation("crash-facts-gpu-healthy");
     let facts = facts_of(&healthy);
+    // 事实表先入库（对拍那一类的库）、再读库，CPU 参照与 GPU 核对器都只拿读回的那一份
+    let StageOutcome::Judged(facts) = facts_through_the_pairing_library(TEST_NAME, &facts) else {
+        return;
+    };
     let Some(lease) = cards.lease_card_or_report_not_run(
         TEST_NAME,
         FACTS_VERIFIERS_ALIVE_AT_ONCE * mebibytes_a_facts_verifier_needs(&facts),
@@ -158,7 +176,7 @@ fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_
     assert!(facts.newest_base_root.is_some());
     assert_eq!(
         FlowFacts::from_bytes(&facts.to_bytes()).as_ref(),
-        Some(&facts),
+        Some(&*facts),
         "事实表往返 KV 的字节不丢"
     );
     let cpu = verify_states_from_facts(&facts, 0..facts.state_count);
@@ -175,10 +193,10 @@ fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_
             .take(5)
             .collect::<Vec<_>>()
     );
-    assert!(
-        judge_red_ordinals(&healthy).is_empty(),
-        "CPU 判器在健康流上也全绿"
-    );
+    let Some(healthy_reds) = judge_red_ordinals(&healthy, "healthy") else {
+        return;
+    };
+    assert!(healthy_reds.is_empty(), "CPU 判器在健康流上也全绿");
     // 分两块核，与一次核完逐位相同（块边界不改结论）
     let half = facts.state_count / 2;
     let mut in_two_blocks = verifier.verify_states(0..half);
@@ -235,6 +253,12 @@ fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_
         WrittenContents::Zeros { .. } => panic!("单元写是普通写"),
     }
     let half_facts = facts_of(&half_broken);
+    // 事实表先入库（对拍那一类的库）、再读库，CPU 参照与 GPU 核对器都只拿读回的那一份
+    let StageOutcome::Judged(half_facts) =
+        facts_through_the_pairing_library(&format!("{TEST_NAME}::half_broken"), &half_facts)
+    else {
+        return;
+    };
     let half_cpu = verify_states_from_facts(&half_facts, 0..half_facts.state_count);
     assert!(
         half_cpu.iter().all(|bits| *bits == 0),
@@ -245,6 +269,12 @@ fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_
         half_cpu
     );
     let broken_facts = facts_of(&broken);
+    // 事实表先入库（对拍那一类的库）、再读库，CPU 参照与 GPU 核对器都只拿读回的那一份
+    let StageOutcome::Judged(broken_facts) =
+        facts_through_the_pairing_library(&format!("{TEST_NAME}::broken"), &broken_facts)
+    else {
+        return;
+    };
     let broken_cpu = verify_states_from_facts(&broken_facts, 0..broken_facts.state_count);
     let broken_verifier = GpuFactsVerifier::new(card, &broken_facts);
     let broken_gpu = broken_verifier.verify_states(0..broken_facts.state_count);
@@ -276,7 +306,9 @@ fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_
         }
     }
     // 第 ③ 段的判据：核对红 ⇒ CPU 判器红（判器覆盖得更宽，反过来不要求）
-    let judge_reds = judge_red_ordinals(&broken);
+    let Some(judge_reds) = judge_red_ordinals(&broken, "broken") else {
+        return;
+    };
     for ordinal in &red_states {
         assert!(
             judge_reds.contains(&(*ordinal as u64)),
@@ -307,6 +339,7 @@ fn facts_of_one_segment(
         segments: vec![singlefs_checker_tier::crash_facts::SegmentFact {
             writes: segment_writes,
             states: 0..states,
+            slice_start: None,
         }],
         state_count: states + 1,
         units: vec![],
@@ -332,6 +365,20 @@ fn the_gpu_verifier_decodes_in_place_subsets_with_copy_on_write_none_or_all_like
     ];
     for segment_writes in [vec![0, 1, 2, 3, 4], vec![2, 3, 4, 0, 1]] {
         let facts = facts_of_one_segment(5, segment_writes.clone(), 7);
+        // 事实表先入库（对拍那一类的库）、再读库，CPU 参照与 GPU 核对器都只拿读回的那一份
+        let StageOutcome::Judged(facts) = facts_through_the_pairing_library(
+            &format!(
+                "{TEST_NAME}::{}",
+                segment_writes
+                    .iter()
+                    .map(|write| write.to_string())
+                    .collect::<Vec<String>>()
+                    .join("_")
+            ),
+            &facts,
+        ) else {
+            return;
+        };
         let Some(lease) =
             cards.lease_card_or_report_not_run(TEST_NAME, mebibytes_a_facts_verifier_needs(&facts))
         else {
@@ -363,6 +410,10 @@ fn the_gpu_verifier_decodes_an_ordinal_of_a_thirty_three_write_segment_past_thir
         return;
     };
     let facts = facts_of_one_segment(33, (0..33).collect(), (1u64 << 33) - 1);
+    // 事实表先入库（对拍那一类的库）、再读库，CPU 参照与 GPU 核对器都只拿读回的那一份
+    let StageOutcome::Judged(facts) = facts_through_the_pairing_library(TEST_NAME, &facts) else {
+        return;
+    };
     let Some(lease) = cards.lease_card_or_report_not_run(TEST_NAME, 16) else {
         return;
     };
@@ -398,7 +449,11 @@ fn crash_facts_decode_in_place_subsets_with_copy_on_write_none_or_all_like_the_c
         &expansion,
     );
     let mut states = 0u64;
-    let judged = judge_layer0_state_range(
+    let Some(judged) = sample_crash_states_on_the_cpu(
+        CrashPointReplayItem {
+            name: "facts_pairing::in_place_subsets_like_the_crash_enumeration",
+            setting_file: THIS_FILE,
+        },
         &recorded.base,
         &recorded.writes,
         &recorded.segments,
@@ -414,7 +469,90 @@ fn crash_facts_decode_in_place_subsets_with_copy_on_write_none_or_all_like_the_c
                 "序号 {ordinal}"
             );
         },
-    );
+    )
+    .judged() else {
+        return;
+    };
     assert_eq!(judged, facts.state_count);
     assert_eq!(states, facts.state_count);
+}
+
+/// 分片的段（C790）：一段 70 次写（68 次原地写，其中写 3、写 10 取三态，加一组两次单元写），整域 3^2 · 2^66 · 2 − 1 个态、装不进 u64；
+/// 只判它域里从 2^64 + 12345 起的 300 个态。CPU 参照拆出的持久集合就是 2^64 + 12345 + i 按混合进位（最低一位单元写那一组、再原地写各一位）
+/// 拆出的那一个；核对内核（探针入口）从片起点的各位起加片内序号、逐位进位拆出的掩码与 CPU 逐序号相同，两份核对位逐状态相同。
+#[test]
+fn the_gpu_verifier_decodes_a_sliced_segment_from_its_slice_start_like_the_cpu() {
+    const TEST_NAME: &str =
+        "the_gpu_verifier_decodes_a_sliced_segment_from_its_slice_start_like_the_cpu";
+    const WRITES: u32 = 70;
+    const SLICE_STATES: u64 = 300;
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let in_place_writes: Vec<u32> = (0..68).collect();
+    let expansions = vec![
+        singlefs_checker_tier::crash_facts::SegmentExpansionFact::InPlaceSubsetsWithCopyOnWriteNoneOrAll {
+            in_place_writes: in_place_writes.clone(),
+            copy_on_write_writes: vec![68, 69],
+        },
+    ];
+    let mut facts = facts_of_one_segment(WRITES, (0..WRITES).collect(), SLICE_STATES);
+    facts.is_tearable[3] = true;
+    facts.is_tearable[10] = true;
+    let radices = expansions[0].digit_radices(&facts.segments[0], &facts.is_tearable);
+    let slice_start_value: u128 = (1u128 << 64) + 12345;
+    let slice_start = singlefs_checker_tier::crash::StateCount1280Bits::from_u64(u64::MAX)
+        .checked_add_u64(12346)
+        .expect("2^64 + 12345 装得进 1280 位");
+    facts.segments[0].slice_start =
+        Some(singlefs_checker_tier::crash_facts::SegmentSliceStartFact::of(slice_start, &radices));
+    // 事实表先入库（对拍那一类的库）、再读库，CPU 参照与 GPU 核对器都只拿读回的那一份
+    let StageOutcome::Judged(facts) = facts_through_the_pairing_library(TEST_NAME, &facts) else {
+        return;
+    };
+    for ordinal_within_the_slice in 0..SLICE_STATES {
+        let number = slice_start_value + u128::from(ordinal_within_the_slice);
+        let mut expected = vec![false; 70];
+        expected[68] = number % 2 == 1;
+        expected[69] = number % 2 == 1;
+        let mut rest = number / 2;
+        for write in &in_place_writes {
+            let index = usize::try_from(*write).expect("装得进 usize");
+            let choices = if facts.is_tearable[index] { 3 } else { 2 };
+            expected[index] = rest % choices == choices - 1;
+            rest /= choices;
+        }
+        assert_eq!(
+            facts.persisted_writes_of_state_by_the_segment_expansions(&expansions, ordinal_within_the_slice),
+            expected,
+            "片内第 {ordinal_within_the_slice} 个是段内编号 2^64 + 12345 + {ordinal_within_the_slice}（三态的写撕裂那一态记成没持久）"
+        );
+    }
+    let Some(lease) =
+        cards.lease_card_or_report_not_run(TEST_NAME, mebibytes_a_facts_verifier_needs(&facts))
+    else {
+        return;
+    };
+    let verifier =
+        GpuFactsVerifier::new_by_the_segment_expansions(lease.card(), &facts, &expansions);
+    let masks = verifier.persisted_masks_of_states(0..facts.state_count);
+    for (ordinal, words) in masks.iter().enumerate() {
+        let ordinal = u64::try_from(ordinal).expect("装得进 u64");
+        assert_eq!(
+            singlefs_checker_tier::crash_verify_gpu::persisted_set_of_the_mask_words(words, 70),
+            facts.persisted_writes_of_state_by_the_segment_expansions(&expansions, ordinal),
+            "序号 {ordinal}"
+        );
+    }
+    assert_eq!(
+        verifier.verify_states(0..facts.state_count),
+        singlefs_checker_tier::crash_facts::verify_states_from_facts_by_the_segment_expansions(
+            &facts,
+            &expansions,
+            0..facts.state_count
+        ),
+        "两份核对位逐状态相同"
+    );
+    drop(verifier);
+    drop(lease);
 }

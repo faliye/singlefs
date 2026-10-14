@@ -133,7 +133,7 @@ fn crash_image_where_only_the_rotation_of_an_overwrite_landed() -> (MemoryPool, 
     (healthy, crash_image)
 }
 
-/// 原地覆写写到一半的那份字节：旧字节与新字节不同的那一截，前一半取新、后一半取旧（与层 0 撕裂第三态同一个取法，
+/// 原地覆写写到一半的那份字节：旧字节与新字节不同的那一截，前一半取新、后一半取旧（与崩溃点重放撕裂第三态同一个取法，
 /// checker 档 `crash::torn_image_of_in_place_overwrite`；harness 档不依赖 checker 档，这里留一份）。新旧逐字节相同时交回新字节。
 fn torn_image_of_an_in_place_overwrite(old: &[u8], new: &[u8]) -> Vec<u8> {
     assert_eq!(old.len(), new.len(), "旧字节与这次写一样长");

@@ -1,4 +1,4 @@
-//! checker 档模块：无（自己逐个造崩溃状态，只用 harness 档的内存池与池级 checker）
+//! checker 档模块：crash_point_replay_progress、crash_given_states、crash_library、crash_amplification
 //! I-7.8（根记录树 ID 水位不低于全池最大树 ID） 扫描方向的改法 D（`research/prompts/m2-wave3-code-r1-main-verification.md`
 //! 第三节 Y1、第四节第 1 条，被攻过零轮）：第一个文件版本那次发布崩在录制流的每一个前缀上 → 可写挂载 → 挂载之后六种动作，
 //! 池级 checker 一条违例都没有。流：mkfs → 取号 → 暖机 → 第一个文件版本（从水位 65536 发十三棵树，D8（核心索引结构） 已定项 11：退役树 65548、水位 65549）。
@@ -8,9 +8,12 @@
 //! 崩在记录落盘之前的那几个前缀上，盘上留着那次发布写出的码 2 节点（孤儿），头里的树 ID 不低于根环里的水位；
 //! 下一个实例第一次发布取的 txg 等于孤儿的诞生代号（D23（journal 的角色与格式） 已定项 14 注 3 的「≥ max(…) + 1」取等号），
 //! 只按「诞生代号 ≤ 根环最大 txg」数的读法就把孤儿数进「出现过的」、判红——而实例表行 (崩掉的实例, Ti, ·) 说它只被施加到 Ti，
-//! 诞生代号 > Ti 的节点没发布过（`.claude/kb/invariants.md` I-7.8 那一行的 checker 读法注：崩在发布之前的孤儿不算「出现过」）。
+//! 诞生代号 > Ti 的节点没发布过（`crates/singlefs-checker/invariants/02-根环.md` I-7.8 那一行的 checker 读法注：崩在发布之前的孤儿不算「出现过」）。
 //! 用例同时数出改法 D 之前那个读法会在几格上红（[`the_birth_txg_only_reading_would_redden`]），每条流都要大于 0：
 //! 那个数是 0 就说明扫描根本没走到孤儿留在盘上的状态，「全绿」不算数。
+//! 每格挂载与动作之后那张盘上的池级 checker 走两段（用户 2026-10-13 定「能走两段的都走两段」）：那张盘作一张给定状态表
+//! （基线就是那张盘、写表空、一个空持久集合）交崩溃点重放的给定状态引擎（`crash_amplification::GivenStatesEngine`），录入段写进给定状态表
+//! 那一类的判定库，判段从库里读回判（配了 GPU 走 GPU 判器，没配由 CPU 判器判），判过的复用；可写挂载与动作是在崩溃态上真跑实现，留在 CPU。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
@@ -19,9 +22,15 @@ use common::{
     crash_state_devices, memory_pool_of_sparse_devices, parameters, FIXED_WRITE_TIME_SECONDS,
     IMAGE_BYTES,
 };
-use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::index_node_view;
-use singlefs_checker::walk::check_pool_image;
+use singlefs_checker_tier::crash_amplification::{
+    one_test_changes_the_environment_at_a_time, GivenStatesEngine, GivenStatesItem,
+};
+use singlefs_checker_tier::crash_given_states::{
+    GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
+};
+use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
+use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::journal::back_chain_of;
@@ -246,6 +255,10 @@ fn the_birth_txg_only_reading_would_redden(image: &MemoryPool) -> bool {
     })
 }
 
+/// 这份文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_points_tree_identifier_watermark_orphans.rs";
+
 /// 一次扫完数出来的格子：每格一个 (前缀, 动作)。
 #[derive(Debug, Default)]
 struct SweepTally {
@@ -255,14 +268,33 @@ struct SweepTally {
     red_cells: Vec<String>,
 }
 
-/// 那段发布的每一个前缀 × 挂载之后的每一种动作：崩溃镜像 → 可写挂载 → 那个动作 → 池级 checker。
-/// 每一格的违例都收下来，扫完再判（改法 D 被拿掉时报的是一共红了几格、红在哪条上）。
+/// 那段发布的每一个前缀 × 挂载之后的每一种动作：崩溃镜像 → 可写挂载 → 那个动作 → 池级 checker（那张盘作一张给定状态表交给定状态引擎两段判）。
+/// 每一格的违例都收下来，扫完再判（改法 D 被拿掉时报的是一共红了几格、红在哪条上）。只录那一趟、表归别的机器判的那一趟交 `None`（用例当场返回）。
+///
+/// # Panics
+/// 可写挂载挂不上；引擎起不了、判不了某一格的表（不退回别处判）；GPU 判不了的格（第三轮正文 H6 判红）。
+// gpu-exempt: writable-mount
 fn sweep_every_crash_inside_the_publish(
     publish: &FirstFilePublishInTheStream,
     stream_name: &str,
-) -> SweepTally {
+    stream_label: &str,
+) -> Option<SweepTally> {
     let operations = publish.stream.retained_operations();
     let mut tally = SweepTally::default();
+    let engine = {
+        let _one_test_at_a_time = one_test_changes_the_environment_at_a_time();
+        GivenStatesEngine::start_from_environment(
+            GivenStatesItem {
+                item_name: "crash_points_tree_identifier_watermark_orphans".to_string(),
+                setting_file: THIS_FILE.to_string(),
+                seeds_and_scale: format!("stream={stream_label}"),
+            },
+            &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &repository_root_of_this_crate(),
+        )
+        .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+    };
+    let mut every_table_judged_here = true;
     for prefix in publish.start..=publish.end {
         let mut crash_image = empty_memory_pool();
         crash_image.apply(&operations[..prefix]);
@@ -280,14 +312,31 @@ fn sweep_every_crash_inside_the_publish(
             if the_birth_txg_only_reading_would_redden(&image) {
                 tally.cells_where_the_birth_txg_only_reading_reddens += 1;
             }
-            let violated: Vec<String> = check_pool_image(&image)
-                .into_iter()
-                .filter_map(|(invariant, verdict)| match verdict {
-                    InvariantVerdict::Violated(detail) => Some(format!("{invariant}：{detail}")),
-                    InvariantVerdict::Holds
-                    | InvariantVerdict::NotApplicable(_)
-                    | InvariantVerdict::PartiallyJudged(_) => None,
+            let table_name = format!("{stream_label}/prefix-{prefix}/{action:?}");
+            let judged = engine
+                .judge_the_given_states(&GivenStatesOfATable {
+                    table_name: table_name.clone(),
+                    base: &image,
+                    writes: &[],
+                    segments: &[],
+                    seams: &[],
+                    persisted_sets: vec![Vec::new()],
                 })
+                .unwrap_or_else(|reason| {
+                    panic!("{stream_name} 前缀 {prefix}、挂载之后 {action:?} 那张给定状态表 {table_name} 判不了（不退回别处判）：{reason}")
+                });
+            match judged.source {
+                GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+                GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
+                | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => {
+                    every_table_judged_here = false;
+                }
+            }
+            let violated: Vec<String> = judged
+                .states
+                .iter()
+                .flat_map(|state| state.pool_checker_violations())
+                .map(|(invariant, detail)| format!("{invariant}：{detail}"))
                 .collect();
             if !violated.is_empty() {
                 tally
@@ -296,7 +345,12 @@ fn sweep_every_crash_inside_the_publish(
             }
         }
     }
-    tally
+    assert_eq!(
+        engine.finish().red_items(),
+        Vec::<String>::new(),
+        "GPU 判不了的格照第三轮正文 H6 判红"
+    );
+    every_table_judged_here.then_some(tally)
 }
 
 fn assert_the_sweep_stays_green_and_reached_the_orphans(tally: &SweepTally, stream_name: &str) {
@@ -321,6 +375,10 @@ fn assert_the_sweep_stays_green_and_reached_the_orphans(tally: &SweepTally, stre
 fn every_crash_inside_the_first_file_version_after_mkfs_then_a_writable_mount_leaves_the_orphans_out_of_the_tree_identifier_watermark(
 ) {
     let (publish, _) = first_file_publish_after_mkfs();
-    let tally = sweep_every_crash_inside_the_publish(&publish, "流 ①（mkfs 之后）");
+    let Some(tally) =
+        sweep_every_crash_inside_the_publish(&publish, "流 ①（mkfs 之后）", "after-mkfs")
+    else {
+        return;
+    };
     assert_the_sweep_stays_green_and_reached_the_orphans(&tally, "流 ①（mkfs 之后）");
 }

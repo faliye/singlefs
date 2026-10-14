@@ -23,7 +23,9 @@ wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan", "w
 pollster = { version = "=1.0.1", optional = true }
 
 [features]
-# 判定存储（src/verdict_store.rs）与它的 RocksDB 依赖默认不编：只有用到 KV 的崩溃放量打开，平常编 checker 档不付现编 C++ 的代价。
+# 判定存储（src/verdict_store.rs）与它的 RocksDB 依赖：崩溃点重放枚举与按序号段判只吃从库里读回的流（src/crash_library.rs），默认就编；
+# 关掉（--no-default-features）编不过（src/lib.rs 的 compile_error）。
+default = ["verdict-store"]
 verdict-store = ["dep:rocksdb"]
 # GPU 核对默认不编：配置里 ENABLE_GPU=1 的跑法才开（单机或双机的 CPU + GPU）。
 gpu = ["dep:wgpu", "dep:pollster"]

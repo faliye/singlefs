@@ -59,7 +59,7 @@ use singlefs_harness::model::ObservedReadBack;
 use singlefs_harness::model_comparison::observed_read_back;
 use singlefs_harness::SharedStream;
 
-/// 坏盘输入的工作线程数从这个环境变量取（十进制正整数）；没设就取 [`std::thread::available_parallelism`]。
+/// 坏盘输入的工作线程数从这个环境变量取（十进制正整数）；没设就取每台默认重活线程数（`SINGLEFS_THREAD_CAP`，再没设取 `.claude/heavy-thread-default` 的登记值；判法在 [`CrashInjectionWorkerThreads::from_the_environment_variable_named`]）。
 pub const BAD_DISK_INPUT_WORKER_THREADS_ENVIRONMENT_VARIABLE: &str =
     "SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS";
 
@@ -1063,6 +1063,26 @@ pub fn feed_bad_disk_inputs_from_history(
     weights: &GenerationWeights,
     execution: HistoryExecution,
 ) -> HistoryBadDiskInput {
+    feed_bad_disk_inputs_from_history_handing_out_the_damaged_images(
+        seed,
+        operations_per_history,
+        weights,
+        execution,
+        &mut |_, _| {},
+    )
+}
+
+/// 同 [`feed_bad_disk_inputs_from_history`]，另把每一份坏镜像（连同它坏的是哪一档的基线）喂给三个读者之前交给 `hand_out`，
+/// 次序就是喂的次序：GPU 判器对坏输入的对拍拿这同一组坏镜像（经库）判，与 CPU 池级 checker 逐张比
+/// （`tests/bad_disk_input_campaign.rs` 的 `the_gpu_judge_agrees_with_the_cpu_pool_checker_on_every_damaged_image_of_the_first_fast_tier_seeds`）。
+#[must_use]
+pub fn feed_bad_disk_inputs_from_history_handing_out_the_damaged_images(
+    seed: HistorySeed,
+    operations_per_history: usize,
+    weights: &GenerationWeights,
+    execution: HistoryExecution,
+    hand_out: &mut dyn FnMut(BaseImageTier, &DamagedImage),
+) -> HistoryBadDiskInput {
     let history = generate_history_with_weights(seed, operations_per_history, weights);
     let mut committed_contents: BTreeSet<Option<Vec<u8>>> = BTreeSet::new();
     let mut last_image: Option<MemoryPool> = None;
@@ -1143,6 +1163,7 @@ pub fn feed_bad_disk_inputs_from_history(
             };
             *tally.damaged_images_by_kind.entry(kind.name()).or_insert(0) += 1;
             *tally.damaged_images_by_tier.entry(tier.name()).or_insert(0) += 1;
+            hand_out(*tier, &damaged);
             let observation = feed_a_damaged_image(
                 &damaged,
                 &committed_contents,
@@ -1262,6 +1283,12 @@ fn render_observation(observation: &BadDiskObservation) -> String {
 /// panic 是被测代码的缺口，不是这里该崩的理由；接住之后照实记下位置与消息。
 ///
 /// 三个读者各读一份自己的镜像拷贝：可写挂载会往盘上写（取号、写行、暖机），不能让它改到别人读的那一份。
+///
+/// 三个读者都在 CPU 上真跑：被测对象就是它们自己在坏输入上不 panic、不读回没提交过的内容（池级 checker 那一截判的是 CPU 那一份 checker 的代码，
+/// GPU 判器是照它另写的一份，判不了它）。GPU 判器在同一组坏输入上的结论另由对拍用例经库与 CPU 池级 checker 逐张比。
+// gpu-exempt: checker-under-test-on-bad-disk-inputs
+// gpu-exempt: implementation-under-test-on-bad-disk-inputs
+// gpu-exempt: writable-mount
 #[must_use]
 pub fn feed_a_damaged_image(
     damaged: &DamagedImage,

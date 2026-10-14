@@ -1,4 +1,4 @@
-//! checker 档模块：crash、crash_injection
+//! checker 档模块：crash、crash_point_replay_progress、crash_injection、crash_library、crash_amplification
 //! 崩溃注入第二、三截交给记录核对器的记录流（代码审阅第 2 条「崩溃注入层补可写挂载」的收尾）。
 //!
 //! 第二截（崩溃后镜像上可写挂载、再发一次布之后的池）与第三截（挂载途中的二次崩溃）交的都是整条历史录制流接上挂载那一段录制流，
@@ -16,15 +16,36 @@ use std::collections::BTreeMap;
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_checker_tier::crash::check_records_against;
+use singlefs_checker_tier::crash_amplification::{GivenStatesEngine, GivenStatesItem};
 use singlefs_checker_tier::crash_injection::{
     inject_crashes_into_history, materialized_crash_image,
     mount_and_publish_once_on_the_crash_image, CrashInjectionTally, CrashPoint, CrashPointDraw,
     HistoryThenWritableMountRecords, WritableMountOnTheCrashImage, WritableMountOutcome,
 };
+use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
+use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
 use singlefs_core::admission::SpaceAdmission;
+
+/// 这份测试文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs";
+
+/// 给定状态表交崩溃点重放的引擎判：表与结论进家目录下给定状态表那一类的判定库（判过的复用），配了 GPU 且编进了 `gpu` 特性上卡、否则 CPU。
+fn given_states_engine(seeds_and_scale: &str) -> GivenStatesEngine {
+    GivenStatesEngine::start_from_environment(
+        GivenStatesItem {
+            item_name: "crash-injection-record-checker-across-a-second-crash".to_string(),
+            setting_file: THIS_FILE.to_string(),
+            seeds_and_scale: seeds_and_scale.to_string(),
+        },
+        &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+        &repository_root_of_this_crate(),
+    )
+    .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+}
 use singlefs_core::recovery::{recover, JournalPolicy, PoolReader};
 use singlefs_harness::history::{
     execute_history_with, generate_history, ContentChoice, ContentLength, GeneratedHistory,
@@ -975,6 +996,7 @@ fn every_crash_state_runs_the_record_checker_after_the_writable_mount_and_on_eve
                 crash_points_per_history: 2,
             },
             None,
+            &given_states_engine("record_checker_across_a_second_crash"),
         );
         tally.absorb(&injection.tally);
         new_findings.extend(injection.new_findings);

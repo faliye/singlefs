@@ -101,7 +101,11 @@ fn words_to_bytes(values: &[u32]) -> Vec<u8> {
         .collect()
 }
 
-/// 一条流打包好的表：打包一次，几张卡各上一份。
+/// [`PackedJudgeTables::to_bytes`] 的头：换了编码就换头。
+const PACKED_JUDGE_TABLES_MAGIC: &[u8; 8] = b"SFJTAB01";
+
+/// 一条流打包好的表：录入段打包一次、写进库，判段从库里读回、几张卡各上一份。
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PackedJudgeTables {
     words: Vec<u32>,
     state_count: u64,
@@ -116,6 +120,41 @@ impl PackedJudgeTables {
         }
     }
 
+    /// 录入段写进库的字节：头 8 字节、状态数（8 字节小端）、每个字 4 字节小端。
+    #[must_use]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = PACKED_JUDGE_TABLES_MAGIC.to_vec();
+        bytes.extend_from_slice(&self.state_count.to_le_bytes());
+        for word in &self.words {
+            bytes.extend_from_slice(&word.to_le_bytes());
+        }
+        bytes
+    }
+
+    /// 从库里的字节读回；头不对、长度不是 4 的倍数交回 `None`。
+    #[must_use]
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        let rest = bytes.strip_prefix(PACKED_JUDGE_TABLES_MAGIC.as_slice())?;
+        let (state_count, words) = rest.split_at_checked(8)?;
+        let (chunks, remainder) = words.as_chunks::<4>();
+        if !remainder.is_empty() {
+            return None;
+        }
+        Some(Self {
+            words: chunks
+                .iter()
+                .map(|chunk| u32::from_le_bytes(*chunk))
+                .collect(),
+            state_count: u64::from_le_bytes(state_count.try_into().ok()?),
+        })
+    }
+
+    /// 这几张表的状态数。
+    #[must_use]
+    pub fn state_count(&self) -> u64 {
+        self.state_count
+    }
+
     /// 表上卡之后占多少显存（MiB，向上取整）。
     #[must_use]
     pub fn mebibytes(&self) -> u64 {
@@ -124,6 +163,45 @@ impl PackedJudgeTables {
             .div_ceil(1024 * 1024)
     }
 }
+
+/// 从判定库里读回、核过摘要的一份打包判表：GPU 判器（[`GpuCrashJudge`]）只收它。字段私有，只有
+/// [`PackedJudgeTablesReadBack::from_the_library_bytes`] 造得出（读库、写库那两步在判定库那一侧：`crash_library::read_packed_judge_tables_back`、
+/// `crash_library::record_the_judge_tables_and_read_them_back`）：判表先入库、再读库，GPU 才照库里那一份算（卡怎么分活也照它）。
+/// 这一份不引判定库，派活里没有存取布局。读它照读 [`PackedJudgeTables`]。
+#[derive(Debug)]
+pub struct PackedJudgeTablesReadBack {
+    tables: PackedJudgeTables,
+}
+
+impl PackedJudgeTablesReadBack {
+    /// 库里按 `digest` 存的那份字节：核摘要、解码。只给判定库那一侧读回时用。
+    ///
+    /// # Errors
+    /// 字节的摘要对不上（库里那份被改过）；解不开。
+    pub(crate) fn from_the_library_bytes(
+        bytes: &[u8],
+        digest: &[u8; DIGEST_BYTES],
+    ) -> Result<Self, String> {
+        if sha256_digest(bytes) != *digest {
+            return Err("GPU 判表摘要对不上：库里那份坏了，重跑录入段".to_string());
+        }
+        let tables = PackedJudgeTables::from_bytes(bytes)
+            .ok_or_else(|| "GPU 判表解不出（字节坏了或编码换了）：重跑录入段".to_string())?;
+        Ok(Self { tables })
+    }
+}
+
+impl std::ops::Deref for PackedJudgeTablesReadBack {
+    type Target = PackedJudgeTables;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tables
+    }
+}
+
+// 对拍用例借卡判一条流（`judge_every_state_on_a_card_leased_from_the_pool`）要经对拍那一类的库：测试文件照这一份的路径调它，留在这里
+// （这一份在判法闭包之外，`crate::crash_identity::FILES_THE_JUDGES_MUST_NOT_REACH`，引判定库不进判器的摘要）
+use crate::crash_library::{judge_tables_through_the_pairing_library, StageOutcome};
 
 /// 一张卡按给它的显存（MiB）一次派活带得了几个状态：表与留给驱动的那一份先扣掉，剩下的装草稿区。
 /// 本机的卡传它的 [`GpuCard::memory_budget_mebibytes`]；别的机器上的卡按配置的额度算（绑定上限按本机的卡估）。
@@ -476,41 +554,15 @@ fn compile_the_three_judge_kernels(
 }
 
 impl<'card> GpuCrashJudge<'card> {
-    /// 把一条流的表上卡、编内核。
+    /// 把一条流从判定库读回的打包判表上卡、编内核（几张卡共用一份读回的）。一次派活的状态数照旧被这张卡的显存额度、
+    /// 草稿缓冲的条数与这条流的状态数压住，至少 1（[`states_in_one_dispatch_capped_by_the_state_count`]）。
     ///
     /// # Panics
     /// 打包的表超过这张卡的存储缓冲绑定上限（表太大，GPU 判不了这条流）。
     #[must_use]
-    pub fn new(card: &'card GpuCard, tables: &JudgeTables) -> Self {
-        Self::with_states_per_dispatch(card, tables, usize::MAX)
-    }
-
-    /// 同 [`Self::new`]，一次派活的状态数另给（量速度、规划显卡用）：照旧被这张卡的显存额度、草稿缓冲的条数与这条流的状态数压住，至少 1
-    /// （[`states_in_one_dispatch_capped_by_the_state_count`]：草稿区不为这条流没有的状态开）。
-    ///
-    /// # Panics
-    /// 同 [`Self::new`]。
-    #[must_use]
-    pub fn with_states_per_dispatch(
-        card: &'card GpuCard,
-        tables: &JudgeTables,
-        requested_states_per_dispatch: usize,
-    ) -> Self {
-        Self::on_card_with_packed_tables(
-            card,
-            &PackedJudgeTables::of(tables),
-            requested_states_per_dispatch,
-        )
-    }
-
-    /// 同 [`Self::with_states_per_dispatch`]，表是打包好的（几张卡共用一份打包）。
-    ///
-    /// # Panics
-    /// 同 [`Self::new`]。
-    #[must_use]
     pub fn on_card_with_packed_tables(
         card: &'card GpuCard,
-        tables: &PackedJudgeTables,
+        tables: &PackedJudgeTablesReadBack,
         requested_states_per_dispatch: usize,
     ) -> Self {
         Self::on_card_compiling_these_kernel_sources(
@@ -522,16 +574,17 @@ impl<'card> GpuCrashJudge<'card> {
     }
 
     /// 同 [`Self::on_card_with_packed_tables`]，编的是调用方给的三份内核源码。判器的结论按判法摘要
-    /// （`crate::crash_judge_gpu::gpu_judge_digest`，罩 [`JudgeKernelSources::of_the_judge`] 那三份）入库，
-    /// 编别的源码判出的结论与那个摘要对不上：只给对拍用例用（在内核里种假违例位；把三棵容器树的旋钮值编进扫描内核，
-    /// [`JudgeKernelSources::of_the_judge_given_the_container_capacity_knobs`]），判定入库的路径不调它。
+    /// （`crate::crash_judge_gpu::gpu_judge_digest`，罩 [`JudgeKernelSources::of_the_judge`] 那三份与旋钮常量的写法）入库。
+    /// 判定入库的路径只编一种别的源码：给定状态表那一栏旋钮值编进扫描内核（[`JudgeKernelSources::of_the_judge_given_the_container_capacity_knobs`]，
+    /// `crate::crash_amplification::GivenStatesEngine` 照表上那一栏编；旋钮值进那张表的块键，用户 2026-10-14 弹窗定「给定状态表加旋钮栏」）。
+    /// 对拍用例另拿它在内核里种假违例位、判旋钮压小写出的镜像，那几份结论不入库。
     ///
     /// # Panics
-    /// 同 [`Self::new`]。
+    /// 同 [`Self::on_card_with_packed_tables`]。
     #[must_use]
     pub fn on_card_compiling_these_kernel_sources(
         card: &'card GpuCard,
-        tables: &PackedJudgeTables,
+        tables: &PackedJudgeTablesReadBack,
         requested_states_per_dispatch: usize,
         kernel_sources: &JudgeKernelSources,
     ) -> Self {
@@ -1062,19 +1115,28 @@ pub fn persisted_masks_on_the_card(
     out
 }
 
-/// GPU 对拍用例在卡池里借一张卡判一条流的每个状态，按序号次序交回每个状态的结论字：表打包一次，一次派活带一条草稿缓冲那么多个状态
+/// GPU 对拍用例在卡池里借一张卡判一条流的每个状态，按序号次序交回每个状态的结论字：表打包、先入库再读库（项名是用例名，
+/// [`judge_tables_through_the_pairing_library`]），一次派活带一条草稿缓冲那么多个状态
 /// （按池里绑定上限最小的那张卡估，与这条流的状态数取小，[`mebibytes_a_judge_needs`] 按它借），判完先丢判器、再还卡。
-/// 等满了借不到时借卡那一层打「本次未跑」那一行，这里交 `None`（调用的用例当场返回）。
+/// 等满了借不到时借卡那一层打「本次未跑」那一行，这里交 `None`（调用的用例当场返回）；只录那一趟同样交 `None`、打一行 `JUDGE_TABLES_RECORDED_ONLY`。
 ///
 /// # Panics
-/// 同 [`crate::gpu_unit_checks::gpu_test_start::GpuCardPool::lease_card_or_report_not_run`] 与 [`GpuCrashJudge::new`]。
+/// 同 [`crate::gpu_unit_checks::gpu_test_start::GpuCardPool::lease_card_or_report_not_run`]、[`judge_tables_through_the_pairing_library`] 与 [`GpuCrashJudge::on_card_with_packed_tables`]。
 #[must_use]
 pub fn judge_every_state_on_a_card_leased_from_the_pool(
     cards: &'static crate::gpu_unit_checks::gpu_test_start::GpuCardPool,
     test_name: &str,
     tables: &JudgeTables,
 ) -> Option<Vec<[u32; VERDICT_WORDS]>> {
-    let packed = PackedJudgeTables::of(tables);
+    // 判表先入库、再读库，GPU 只拿读回的那一份算
+    let packed =
+        match judge_tables_through_the_pairing_library(test_name, &PackedJudgeTables::of(tables)) {
+            StageOutcome::Judged(packed) => packed,
+            StageOutcome::RecordedOnly | StageOutcome::JudgedMyShareOnly { .. } => {
+                println!("JUDGE_TABLES_RECORDED_ONLY test={test_name}");
+                return None;
+            }
+        };
     let states_per_dispatch =
         states_per_scratch_lane(cards.smallest_max_storage_buffer_binding_size());
     let lease = cards.lease_card_or_report_not_run(
@@ -1103,15 +1165,15 @@ mod tests {
     #[test]
     fn states_in_one_dispatch_follow_the_scratch_memory_up_to_the_lane_limit() {
         let bytes_per_state = u64::try_from(SCRATCH_WORDS * 4).expect("装得进 u64");
-        // 每个状态 419 768 × 4 = 1 679 072 字节：2 147 483 644 ÷ 1 679 072 = 1278 个（向下取整）
-        assert_eq!(states_per_scratch_lane(BINDING_LIMIT), 1278);
+        // 每个状态 423 864 × 4 = 1 695 456 字节：2 147 483 644 ÷ 1 695 456 = 1266 个（向下取整）
+        assert_eq!(states_per_scratch_lane(BINDING_LIMIT), 1266);
         assert_eq!(states_per_scratch_lane(1), 1, "再小的上限也带一个");
-        // 12 GiB 的草稿区：12 × 1024 × 1024 × 1024 ÷ 1 679 072 = 7673 个（向下取整）
+        // 12 GiB 的草稿区：12 × 1024 × 1024 × 1024 ÷ 1 695 456 = 7599 个（向下取整）
         assert_eq!(
             states_per_dispatch(BINDING_LIMIT, 12 * 1024),
             usize::try_from(12 * 1024 * 1024 * 1024 / bytes_per_state).expect("装得进 usize")
         );
-        assert_eq!(states_per_dispatch(BINDING_LIMIT, 12 * 1024), 7673);
+        assert_eq!(states_per_dispatch(BINDING_LIMIT, 12 * 1024), 7599);
         assert_eq!(
             states_per_dispatch(BINDING_LIMIT, 0),
             1,
@@ -1119,15 +1181,15 @@ mod tests {
         );
         assert_eq!(
             states_per_dispatch(BINDING_LIMIT, 1024 * 1024),
-            1278 * MAXIMUM_SCRATCH_LANES,
+            1266 * MAXIMUM_SCRATCH_LANES,
             "显存再多也只到条数上限"
         );
     }
 
     /// 卡池按 [`super::mebibytes_a_judge_needs`] 借给用例的卡（额度是借的量加驱动那一份）上，判器开的草稿区不少于借的时候算进去的状态数：
     /// 小流（45、489 个状态）照状态数、大流（131 195 个）照要的宽度（一条缓冲那么窄、三条缓冲加窄的那一档那么宽）。
-    /// 表取 1 MiB：每个状态草稿区 419 768 × 4 加两份结论字 2 × 20 × 4，共 1 679 232 字节，
-    /// 45 个状态要 1 + ⌈45 × 1 679 232 ÷ 1 048 576⌉ = 1 + ⌈75 565 440 ÷ 1 048 576⌉ = 1 + 73 = 74 MiB。
+    /// 表取 1 MiB：每个状态草稿区 423 864 × 4 加两份结论字 2 × 24 × 4，共 1 695 648 字节，
+    /// 45 个状态要 1 + ⌈45 × 1 695 648 ÷ 1 048 576⌉ = 1 + ⌈76 304 160 ÷ 1 048 576⌉ = 1 + 73 = 74 MiB。
     #[test]
     fn a_card_lent_what_a_judge_needs_opens_scratch_for_every_state_it_was_lent_for() {
         use super::{mebibytes_a_judge_needs, states_in_flight_within, PackedJudgeTables};
@@ -1506,23 +1568,38 @@ mod tests {
     /// I-3.9 已释放记录加桶表）扫描 396 569 → 392 371、走读 345 075 → 340 071，恢复不变（E13 副本上用同一个草稿工具量的：在改之前那一份上量回
     /// 334 332 / 396 569 / 345 075，改之后三份都经 naga 解析、校验得过）；崩溃点重放合并实现 E14 把扫描内核 I-9.20 不重号那一句的墓碑两两比换成
     /// 「在谱系上的墓碑记键、排一次序、比相邻两行」（排序借库里那一份 order_rows_by_their_first_four_words，多一个调用点）扫描 392 371 → 392 197，
-    /// 恢复与走读不变（E14 副本上用 E13 那一份草稿工具量的：在改之前那一份上量回 334 332 / 392 371 / 340 071，改之后三份都经 naga 解析、校验得过）：
+    /// 恢复与走读不变（E14 副本上用 E13 那一份草稿工具量的：在改之前那一份上量回 334 332 / 392 371 / 340 071，改之后三份都经 naga 解析、校验得过）；
+    /// C790 分片的段（三个内核共用的 `crash_judge_common.wgsl` 里 `begin_state` 多了「片起点的各位加片内序号、逐位进位」那一支与它的判不了原因码）
+    /// 恢复 334 332 → 334 531、扫描 392 197 → 392 396、走读 340 071 → 340 270，扫描余量 7 803 → 7 604（批次 4-3 实现员副本上用草稿工具直接调库里的
+    /// `kernel_inlined_size` 与三个 `*_kernel_source` 量的：把五份 WGSL 换回 HEAD 那一份再量，量回 334 332 / 392 197 / 340 071，与旧钉值逐个相等）；
+    /// 批次 4-4 走读内核在被抛弃根那一半记 I-7.4 违例细节点名的那一条根、入口清零、收尾写进结论的四个字（用户 2026-10-14 弹窗定「GPU 判器加细节输出」）
+    /// 走读 340 270 → 341 147、余量 59 730 → 58 853，恢复与扫描不变（结论字号常量加了六个，三个内核的表达式数都没跟着变）（批次 4-4 实现员副本上用同一个草稿工具量的：
+    /// 把五份 WGSL 换回改之前那一份再量，量回 334 531 / 392 396 / 340 270，与旧钉值逐个相等）；
+    /// 批次 4-6 第二截恢复自称的那一版照判表里那一栏取（用户 2026-10-14 弹窗定「照字面改：表里记下根的来路」：恢复内核 `check_records` 读
+    /// `claimed_versions` 那一张、多判一位，三个内核共用的 `begin_state` 记下给定状态的序号）恢复 334 531 → 334 651、余量 65 469 → 65 349，
+    /// 扫描 392 396 → 392 398、余量 7 604 → 7 602，走读 341 147 → 341 149、余量 58 853 → 58 851（批次 4-6 实现员副本上用草稿工具直接调库里的
+    /// `kernel_inlined_size` 与三个 `*_kernel_source` 量的：把五份 WGSL 换回改之前那一份、照库里的拼法拼出来再量，量回 334 531 / 392 396 / 341 147，
+    /// 与旧钉值逐个相等；改之后三份都经 naga 解析、校验得过）；
+    /// harness 场景交出来的镜像上 GPU 判不了的四处（分配记录、实例表行、inode → 对象出生代、一版 inode 记录与 I-9.29 跨版本那张表抬上限，
+    /// 后四张加散列索引：`crash_judge_checker_common.wgsl` 的 ⑫ ⑬，找与记各合成一个调用点）恢复不变、扫描 392 398 → 395 761、余量 7 602 → 4 239，
+    /// 走读 341 149 → 345 743、余量 58 851 → 54 257（实现员副本上用草稿工具量的：naga 30.0.1 解析、校验，展开的数法照抄 `kernel_inlined_size`，
+    /// 五份 WGSL 照库里的拼法拼、生成的那几行常量以同名占位代入；在改之前那一份上量回 334 651 / 392 398 / 341 149，与旧钉值逐个相等）：
     /// 改了哪个内核的源码，这里先红，量过新数、确认余量还够之后再改钉值，免得余量悄悄耗光、等上卡时才撞预算。
     #[test]
     fn each_kernel_keeps_its_pinned_inlined_size_and_margin_under_the_budget() {
         for (name, source, pinned_expressions, pinned_margin) in [
-            ("recovery", recovery_kernel_source(), 334_332, 65_668),
+            ("recovery", recovery_kernel_source(), 334_651, 65_349),
             (
                 "checker-scan",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
-                392_197,
-                7_803,
+                395_761,
+                4_239,
             ),
             (
                 "checker-walk",
                 crate::crash_judge_gpu::checker_walk_kernel_source(),
-                340_071,
-                59_929,
+                345_743,
+                54_257,
             ),
         ] {
             let size = super::kernel_inlined_size(&source);

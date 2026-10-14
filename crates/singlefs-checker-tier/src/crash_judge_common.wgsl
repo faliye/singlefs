@@ -51,7 +51,7 @@ const BIT_IGNORED_ORACLE: u32 = 8u;     // 位 8..14
 const BIT_ROOT_WITHOUT_RECORD: u32 = 16u;
 const BIT_CLAIMED_STATE_MISSING_UNIT: u32 = 17u;
 const BIT_UNDECIDABLE: u32 = 31u;
-// oracle 七类（与 Layer0OracleViolationKind::EVERY_KIND 同序）
+// oracle 七类（与 CrashPointReplayOracleViolationKind::EVERY_KIND 同序）
 const ORACLE_NONE: u32 = NONE;
 const ORACLE_NO_ROOT_CHOSEN: u32 = 0u;
 const ORACLE_RECOVERED_TO_AN_OLDER_ROOT: u32 = 1u;
@@ -72,6 +72,8 @@ const UNDECIDABLE_TOO_MANY_ROOTS: u32 = 6u;
 const UNDECIDABLE_SPLICED_READ_MATCHES: u32 = 7u;
 // 序号落进了一段不展开的段（那种段的序号区间是空的）：表与派活的序号对不上
 const UNDECIDABLE_STATE_IN_A_SEGMENT_NOT_EXPANDED: u32 = 8u;
+// 分片的段（C790）：片起点的各位加片内序号之后还有进位（越过段的域），或片内序号装不进 32 位：表与派活的序号对不上
+const UNDECIDABLE_SLICE_PAST_ITS_DOMAIN: u32 = 9u;
 
 // 格式常量
 const SLOT_SHIFT: u32 = 14u;                 // 16384 = 1 << 14
@@ -151,18 +153,30 @@ const MAX_MAPPING_ENTRIES: u32 = 1024u;
 const R_MAPPING: u32 = 12384u;                               // 3072：字节基、条目偏移、条目宽
 const MAX_ACCOUNTING_ENTRIES: u32 = 512u;
 const R_ACCOUNTING: u32 = 15456u;                            // 1536
-const MAX_ALLOCATION_RECORDS: u32 = 2048u;
+// 恢复内核读一版分配记录树的那张表（allocation_count 条，满了记判不了、原因 3）：从 2048 抬到 4096 条，与扫描内核分配记录那张表
+// （crash_judge_checker_common.wgsl 的 C_MAX_ALLOC_RECORDS）同宽。容器树旋钮压到一片 1 条、2 条的随机历史第 48、52 步起最新根的分配记录多于 2048 条
+// （CPU 一侧数到第 59 步 2534 条、2342 条），两个内核在这里与站点 20 判不了。表本身挪到草稿区末尾（R_ALLOCATION，接在池级 checker 那几张表之后）：
+// 16992 起原来那 12288 个字空着，其后的偏移不挪
+const MAX_ALLOCATION_RECORDS: u32 = 4096u;
 const ALLOCATION_RECORD_WORDS: u32 = 6u;
-const R_ALLOCATION: u32 = 16992u;                            // 12288
 const MAX_SEEN: u32 = 512u;
 const R_SEEN: u32 = 29280u;                                  // 1024
 const MAX_DATA_POINTERS: u32 = 256u;
 const R_DATA: u32 = 30304u;                                  // 512：字节基、偏移
 const MAX_UPPER_ENTRIES: u32 = 256u;
 const R_UPPER: u32 = 30816u;                                 // 512：字节基、偏移
-const MAX_ROWS: u32 = 512u;
-const R_ROWS: u32 = 31328u;                                  // 1536：实例、txg lo、txg hi
+// 恢复内核读一条根的实例表全部行的那张表（load_rows_of_the_instance_table_chain 与恢复落到的那一版那一读，满了记判不了、原因 3）：每行实例、txg lo、txg hi。
+// 从 512 抬到 24576 行，与扫描内核读一条根自己实例表的那张表（C_R_MAX_ROWS）同宽：取号之后崩溃 65 × 369 次再挂载十二次的那个场景，
+// 最新根的实例表 23997 行、66 片。表挪到草稿区末尾（R_ROWS）：31328 起原来那 1536 个字空着
+const MAX_ROWS: u32 = 24576u;
+// 共用那一半原地的表到这里为止，池级 checker 的表从这里起（crash_judge_checker_common.wgsl 的 C_REFERENCES0）
 const SCRATCH_WORDS_REQUIRED: u32 = 32864u;
+// 共用那一半挪到草稿区末尾的两张表：接在池级 checker 原有那几张表的末端（crash_judge_checker_common.wgsl 的 SCRATCH_END_BEFORE_THE_TABLES_GREW）之后，
+// 池级 checker 抬上限之后挪过来的那几张表再接在它们后面（C_ALLOC_RECORDS 起）。恢复内核与两个池级 checker 内核共用每个状态的草稿区，
+// 恢复内核写这两张、池级 checker 内核不碰它们
+const R_ALLOCATION: u32 = 423864u;                           // 24576：盘、槽 lo/hi、跨度、代 lo/hi
+const R_ROWS: u32 = R_ALLOCATION + ALLOCATION_RECORD_WORDS * MAX_ALLOCATION_RECORDS;   // 73728：实例、txg lo、txg hi
+const END_OF_THE_RECOVERY_TABLES_MOVED_PAST_THE_CHECKER_TABLES: u32 = R_ROWS + 3u * MAX_ROWS;
 
 const MAX_DEVICES: u32 = 8u;
 const MAX_FRAMES: u32 = 12u;
@@ -183,6 +197,9 @@ var<private> seen_count: u32;
 var<private> data_count: u32;
 var<private> upper_count: u32;
 var<private> row_count: u32;
+// 给定状态表里这个状态的序号（crash_judge_tables::JudgeStateSource::GivenPersistedSets：第 k 个持久掩码、第 k 个恢复自称的那一版）；
+// 按段展开的流不用它
+var<private> given_state_ordinal: u32;
 // 走读里一个读树、读节点的函数交回读不出、判不过时，它照 CPU 恢复那一处会报的 RecoveryFailure 成员记下失败点码（FAILURE_POINT_*，
 // crash_judge_gpu.rs 的 gpu_failure_point_code）；调用它的那一处照它交 walk_failed。只在恢复内核的走读路径上写
 var<private> walk_failure_point: u32;
@@ -3651,6 +3668,7 @@ fn begin_state(local: u32) {
     }
     // 给定状态表（crash_judge_tables::JudgeStateSource::GivenPersistedSets）：这张表不空，第 k 个状态就是表里第 k 个持久掩码
     // （每个 ⌈枚举写数 ÷ 32⌉ 个字），撕裂镜像与重放已在掩码里，不再按段拆
+    given_state_ordinal = ordinal_lo;
     if (table_length(T_GIVEN_PERSISTED_SETS) != 0u) {
         let words_per_state = (hdr(1u) + 31u) / 32u;
         for (var word = 0u; word < words_per_state; word = word + 1u) {
@@ -3698,25 +3716,63 @@ fn begin_state(local: u32) {
             let digit_count = tab(T_SEGMENTS, s * SEGMENT_WORDS + 1u);
             let group_first = tab(T_SEGMENTS, s * SEGMENT_WORDS + 7u);
             let group_count = tab(T_SEGMENTS, s * SEGMENT_WORDS + 8u);
-            // 甲二有单元写：段内序号的最低一位是「单元写全落」，其余拆到原地写上（crash::Layer0StatePlan 同一次序）
-            if (group_count > 0u) {
-                if ((remaining.x & 1u) == 1u) {
-                    for (var k = 0u; k < group_count; k = k + 1u) {
-                        set_persisted(tab(T_SEGMENT_WRITES, group_first + k));
+            let slice_digit_first = tab(T_SEGMENTS, s * SEGMENT_WORDS + 9u);
+            let slice_digit_count = tab(T_SEGMENTS, s * SEGMENT_WORDS + 10u);
+            // 分片的段（C790）：段内编号 = 片起点 + 片内序号。片起点拆成的各位（段写表里从 slice_digit_first 起，单元写那一组那一位在前）
+            // 加上片内序号、逐位进位，每一步只用 u32（片长不超过 2^32，片内序号装得进低 32 位；crash::add_to_the_mixed_radix_digits 同一个算法）
+            if (slice_digit_count > 0u) {
+                if (remaining.y != 0u) {
+                    undecidable = UNDECIDABLE_SLICE_PAST_ITS_DOMAIN;
+                } else {
+                    var carry = remaining.x;
+                    var position = 0u;
+                    if (group_count > 0u) {
+                        let sum = tab(T_SEGMENT_WRITES, slice_digit_first) + carry % 2u;
+                        carry = carry / 2u + sum / 2u;
+                        if (sum % 2u == 1u) {
+                            for (var k = 0u; k < group_count; k = k + 1u) {
+                                set_persisted(tab(T_SEGMENT_WRITES, group_first + k));
+                            }
+                        }
+                        position = 1u;
+                    }
+                    for (var k = 0u; k < digit_count; k = k + 1u) {
+                        let write = tab(T_SEGMENT_WRITES, digit_first + k);
+                        let choices = tab(T_RECORDED, write * 4u);
+                        let sum = tab(T_SEGMENT_WRITES, slice_digit_first + position + k) + carry % choices;
+                        carry = carry / choices + sum / choices;
+                        let digit = sum % choices;
+                        if (digit == choices - 1u) {
+                            set_persisted(write);
+                        } else if (digit == 1u) {
+                            torn[write >> 5u] = torn[write >> 5u] | (1u << (write & 31u));
+                        }
+                    }
+                    if (carry != 0u) {
+                        undecidable = UNDECIDABLE_SLICE_PAST_ITS_DOMAIN;
                     }
                 }
-                remaining = shr64(remaining, 1u);
-            }
-            for (var k = 0u; k < digit_count; k = k + 1u) {
-                let write = tab(T_SEGMENT_WRITES, digit_first + k);
-                let choices = tab(T_RECORDED, write * 4u);
-                let divided = divide_by_a_divisor_below_65536(remaining, choices);
-                let digit = divided.remainder;
-                remaining = divided.quotient;
-                if (digit == choices - 1u) {
-                    set_persisted(write);
-                } else if (digit == 1u) {
-                    torn[write >> 5u] = torn[write >> 5u] | (1u << (write & 31u));
+            } else {
+                // 甲二有单元写：段内序号的最低一位是「单元写全落」，其余拆到原地写上（crash::CrashStatePlan 同一次序）
+                if (group_count > 0u) {
+                    if ((remaining.x & 1u) == 1u) {
+                        for (var k = 0u; k < group_count; k = k + 1u) {
+                            set_persisted(tab(T_SEGMENT_WRITES, group_first + k));
+                        }
+                    }
+                    remaining = shr64(remaining, 1u);
+                }
+                for (var k = 0u; k < digit_count; k = k + 1u) {
+                    let write = tab(T_SEGMENT_WRITES, digit_first + k);
+                    let choices = tab(T_RECORDED, write * 4u);
+                    let divided = divide_by_a_divisor_below_65536(remaining, choices);
+                    let digit = divided.remainder;
+                    remaining = divided.quotient;
+                    if (digit == choices - 1u) {
+                        set_persisted(write);
+                    } else if (digit == 1u) {
+                        torn[write >> 5u] = torn[write >> 5u] | (1u << (write & 31u));
+                    }
                 }
             }
         }

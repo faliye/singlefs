@@ -6,23 +6,24 @@
 //! 登记：`research/prompts/e161-preregistration.md`（5.5「第一段」：D1-small、D1-stride、D1-quick，停机条款 S1–S6、
 //! 锚点 A1–A7、5.3 全部阳性对照、第八节几何敏感性里 D1-quick 与线程数 1 那两格）。第二、三段（D2、D3 全量）是同一个装置换取样域，
 //! 本文件给了模式名但这一段不跑。
-//! 第 2 次重跑登记：`research/prompts/e161-r2-prereg.md`（C577 那道屏障之后的段形：第一条流 11 段、第二条流 78 段取段 11–26，
+//! 第 2 次重跑登记：`research/prompts/e161-r2-prereg.md`（C577 那道屏障之后的段形：新池新建文件流 11 段、覆盖写固定脚本流 78 段取段 11–26，
 //! 取样域照它 5.5 的读法甲重定，装置的改动照它 5.6 的 I-1 到 I-12）。
 //!
 //! 只读、只驱动、只观测：不改 `crates/singlefs-core`、`crates/singlefs-checker`、harness 已有的文件。
-//! 第一条流经 `#[path]` 引 `tests/common/mod.rs` 的 `build_pool`；第二条流的脚本照抄
-//! `crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs:217-492`（到 E 再正常卸载那一支）。
+//! 新池新建文件流经 `#[path]` 引 `tests/common/mod.rs` 的 `build_pool`；覆盖写固定脚本流的脚本照抄
+//! `crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs` 的 `prepare`（到 E 再正常卸载那一支）。
 //! 决定几何与门槛的数都写成本地常量（值抄自登记第十一节 S1 与第七节），`main` 开头逐条与 crates 的同名常量回比（S1）。
 //! 枚举计划与撕裂镜像表是本文件自己的一份，与 crates 私有的那一份逐状态对拍（S3）。
 //!
 //!   e161_crash_state_dedup_and_time_split segment-one
 //!
-//! 线程数取环境变量 `E161_THREADS`，没设取 `available_parallelism`。产物是 `E7RESULT` 行，收尾 `name=done emitted=N`。
+//! 线程数取环境变量 `E161_THREADS`，没设取每台默认重活线程数（`SINGLEFS_THREAD_CAP`，再没设取 `.claude/heavy-thread-default` 的登记值）。产物是 `E7RESULT` 行，收尾 `name=done emitted=N`。
 //! 退出码：0 正常；2 命令行不对；3 停机条款没过（S1–S5，产物照打、交主 agent）；preflight 拒绝时照它的退出码退。
 
 #[path = "../../../singlefs-harness/tests/common/mod.rs"]
 mod common;
 
+use singlefs_checker_tier::crash_judge_conclusions::recovery_passes_differ;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::hint::black_box;
@@ -34,7 +35,9 @@ use singlefs_checker::image::{
     chosen_system_configurations, valid_roots, ImageReader, InvariantVerdict,
 };
 use singlefs_checker::walk::check_pool_image;
-use singlefs_checker_tier::crash::{check_records, Layer0SegmentExpansion, Layer0Tally};
+use singlefs_checker_tier::crash::{
+    check_records, CrashPointReplaySegmentExpansion, CrashPointReplayTally,
+};
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
@@ -62,7 +65,7 @@ const LOCAL_JOURNAL_RING_START_SLOT: u64 = 1_024;
 const LOCAL_JOURNAL_RING_DEFAULT_BYTES: u64 = 805_306_368;
 /// 单元区起点槽（S1：`UNIT_AREA_START_SLOT` 50176）。
 const LOCAL_UNIT_AREA_START_SLOT: u64 = 50_176;
-/// 层 0 扇区（S1：`singlefs_harness::memory_pool::SECTOR_BYTES` 512）。
+/// 崩溃点重放用的扇区字节数（S1：`singlefs_harness::memory_pool::SECTOR_BYTES` 512）。
 const LOCAL_SECTOR_BYTES: u64 = 512;
 /// 五种 key 宽（S1：extent 24、inode 8、分配 10、记账 22、映射 27）与树表 8。
 const LOCAL_KEY_WIDTH_EXTENT: usize = 24;
@@ -85,7 +88,7 @@ const SHARE_MARGIN_FOR_ENOUGH: f64 = 0.1;
 const STRIDE_STEP: u64 = 2_311;
 /// 对照样本里大段各取序号最小的这么多个（5.5）。
 const CONTROL_SAMPLE_PER_LARGE_SEGMENT: usize = 4_096;
-/// PC3：第二条流段 16（第 1 次登记的段 14，同一批写）里序号最小的 1000 个状态、每个计时区各加 2 ms 忙等（5.3；重跑登记 I-6）。
+/// PC3：覆盖写固定脚本流段 16（第 1 次登记的段 14，同一批写）里序号最小的 1000 个状态、每个计时区各加 2 ms 忙等（5.3；重跑登记 I-6）。
 const TIMING_CONTROL_STATES: usize = 1_000;
 const TIMING_CONTROL_BUSY_WAIT: Duration = Duration::from_millis(2);
 /// PC3 的判据：加忙等的那个区多出 ≥ 1.8 s，其余每个区变化 < 1 s。
@@ -97,10 +100,10 @@ const LARGEST_CARD_MEBIBYTES: u128 = 32_607;
 const SMALLEST_SIXTEEN_GIGABYTE_CARD_MEBIBYTES: u128 = 16_303;
 const FIVE_CARDS_MEBIBYTES: u128 = 97_843;
 const CARD_COUNT: u128 = 5;
-/// 外推点：问题单的 10¹⁰，另报第二条流整条流的全量状态数（第四节 4.2；重跑登记 A7：C577 之后 78 段）。
+/// 外推点：问题单的 10¹⁰，另报覆盖写固定脚本流整条流的全量状态数（第四节 4.2；重跑登记 A7：C577 之后 78 段）。
 const EXTRAPOLATED_STATES: u128 = 10_000_000_000;
 const SECOND_STREAM_FULL_STATES: u128 = 1_678_377_204;
-/// A7：第二条流整条流最大一段 2²⁸ − 1（重跑登记 A7：28 个单元写的段，C577 之前是 3² · 2²⁸ − 1 的 30 写段）。
+/// A7：覆盖写固定脚本流整条流最大一段 2²⁸ − 1（重跑登记 A7：28 个单元写的段，C577 之前是 3² · 2²⁸ − 1 的 30 写段）。
 const SECOND_STREAM_LARGEST_SEGMENT_STATES: u128 = 268_435_455;
 /// 容量的 95% 到 100% 之间记「临界」（第六节 G5 表下）。
 const CRITICAL_BAND_PERCENT: u128 = 95;
@@ -289,9 +292,9 @@ fn fingerprint_of_debug_text(value: &dyn std::fmt::Debug) -> Digest128 {
 /// 哪一条流（登记第一节「读法写死」）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum StreamName {
-    /// 层 0 第一条流：mkfs → 取号 → 暖机两次 → 新池新建文件。
+    /// 崩溃点重放的新池新建文件流：mkfs → 取号 → 暖机两次 → 新池新建文件。
     First,
-    /// 层 0 第二条流：固定脚本到 E 再正常卸载，取段 11–26。
+    /// 崩溃点重放的覆盖写固定脚本流：固定脚本到 E 再正常卸载，取段 11–26。
     Second,
 }
 
@@ -315,7 +318,7 @@ struct PreparedStream {
     root_write_count: usize,
 }
 
-/// 第一条流：照 `tests/crash_enumeration_new_pool_file_creation_stream.rs:457-489` 的 `prepare`（S2 的段长与写数断言照它）。
+/// 新池新建文件流：照 `tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `prepare`（S2 的段长与写数断言照它）。
 fn prepare_first_stream() -> PreparedStream {
     let pool = common::build_pool("e161-first");
     let base = pool.memory_pool_after_mkfs();
@@ -361,7 +364,7 @@ fn root_identity_of_root_write(write: &RetainedWrite) -> (InstanceGeneration, Ch
     )
 }
 
-/// 第二条流的内容与脚本照抄 `crash_enumeration_fixed_script_stream.rs:49-55`、`116-149`、`153-201`。
+/// 覆盖写固定脚本流的内容与脚本照抄 `crash_enumeration_fixed_script_stream.rs` 里的同名常量与函数（`SECOND_FILE_BYTES` 到 `writes_and_segments_after_mkfs` 那一串）。
 const SECOND_FILE_BYTES: usize = 4100;
 
 fn second_content() -> Vec<u8> {
@@ -464,7 +467,7 @@ fn version(instance: u32, txg: u64, content: Vec<u8>) -> PublishedVersion {
     }
 }
 
-/// 第二条流：`crash_enumeration_fixed_script_stream.rs:217-492` 的 `prepare`，`Script::ReuseAfterRaisingFloorThenNormalUnmount` 那一支。
+/// 覆盖写固定脚本流：`crash_enumeration_fixed_script_stream.rs` 的 `prepare`，`Script::ReuseAfterRaisingFloorThenNormalUnmount` 那一支。
 /// 脚本里的断言（E 的数据单元落在 50176、卸载两次空发布是 txg 18、19）原样留着，S2 另核段长表、写数与根数。
 fn prepare_second_stream() -> PreparedStream {
     let mut pool = common::build_pool("e161-second");
@@ -566,12 +569,13 @@ fn prepare_second_stream() -> PreparedStream {
     }
 }
 
-/// S2 的锚点（重跑登记 A8，C577 那道屏障之后的段形）：第一条流 11 段的段长、41 次写
-/// （`crash_enumeration_new_pool_file_creation_stream.rs:466`、`:470-472`）；
-/// 第二条流 78 段的段长表、481 次写、19 条根（`crash_enumeration_fixed_script_stream.rs:439-457`、`:489`，到 E 再正常卸载那一支）。
+/// S2 的锚点（重跑登记 A8，C577 那道屏障之后的段形）：新池新建文件流 11 段的段长、41 次写
+/// （`crash_enumeration_new_pool_file_creation_stream.rs` 的 `prepare` 里段长与写数那两条 `assert_eq!`）；
+/// 覆盖写固定脚本流 78 段的段长表、481 次写、19 条根（`crash_enumeration_fixed_script_stream.rs` 的 `prepare` 里「固定脚本到 E 再正常卸载的段序列」那条断言、紧跟的写数断言与
+/// `expected_roots`，到 E 再正常卸载那一支）。
 const FIRST_STREAM_SEGMENT_LENGTHS: [usize; 11] = [2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2];
 const FIRST_STREAM_WRITES: usize = 41;
-/// 第一条流的根槽写：暖机两次各一条、新池新建文件一条（段表里三个 1 写段，收严：登记 S2 没列这一格）。
+/// 新池新建文件流的根槽写：暖机两次各一条、新池新建文件一条（段表里三个 1 写段，收严：登记 S2 没列这一格）。
 const FIRST_STREAM_ROOTS: usize = 3;
 const SECOND_STREAM_SEGMENT_LENGTHS: [usize; 78] = [
     2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2, 24, 2,
@@ -580,7 +584,7 @@ const SECOND_STREAM_SEGMENT_LENGTHS: [usize; 78] = [
 ];
 const SECOND_STREAM_WRITES: usize = 481;
 const SECOND_STREAM_ROOTS: usize = 19;
-/// 第二条流取段 11–26（重跑登记 1.3「第二条流的取样段」）；段 0–10 与第一条流段 0–10 逐字节相同（S2），不枚举。
+/// 覆盖写固定脚本流取段 11–26（重跑登记 1.3「覆盖写固定脚本流的取样段」）；段 0–10 与新池新建文件流段 0–10 逐字节相同（S2），不枚举。
 const SECOND_STREAM_FIRST_SAMPLED_SEGMENT: usize = 11;
 const SECOND_STREAM_LAST_SAMPLED_SEGMENT: usize = 26;
 const SHARED_PREFIX_SEGMENTS: usize = 11;
@@ -608,7 +612,7 @@ fn check_stream_shape(stream: &PreparedStream) -> StreamCheck {
     }
 }
 
-/// S2：两条流的基镜像逐字节相同；第二条流段 0–10 的写与第一条流段 0–10 逐字节相同。
+/// S2：两条流的基镜像逐字节相同；覆盖写固定脚本流段 0–10 的写与新池新建文件流段 0–10 逐字节相同。
 fn shared_prefix_is_identical(first: &PreparedStream, second: &PreparedStream) -> (bool, bool) {
     let bases_identical = first.base == second.base;
     let prefix_of = |stream: &PreparedStream| -> Vec<RetainedWrite> {
@@ -802,7 +806,7 @@ fn run_segment_one(output: &mut ResultLines) -> i32 {
     }
     let (first_outcome, first_discriminating) = process_stream(output, &first, threads);
     let (second_outcome, second_discriminating) = process_stream(output, &second, threads);
-    // 8.2 线程数那一格：第一条流的 D1-stride 用线程数 1 再跑一遍，全部计数与结果行（去掉计时字段）逐字比（V6）。
+    // 8.2 线程数那一格：新池新建文件流的 D1-stride 用线程数 1 再跑一遍，全部计数与结果行（去掉计时字段）逐字比（V6）。
     let first_table = TornWriteTable::of(&first);
     let first_context = EvaluationContext::new(&first, &first_table);
     let first_full = LocalPlan::new(
@@ -851,7 +855,7 @@ fn run_segment_one(output: &mut ResultLines) -> i32 {
             unweighted_unit_share(&single_thread_summary)
         ),
     ));
-    // 8.2 掩码宽那一格：第一条流的 D1 用第二条流整条流的 W 重判 Q5b、Q5c。
+    // 8.2 掩码宽那一格：新池新建文件流的 D1 用覆盖写固定脚本流整条流的 W 重判 Q5b、Q5c。
     for arm in [Arm::WalkUnits, Arm::AllUnits, Arm::FullReadSet] {
         let mut relabelled = first_outcome.union.clone();
         relabelled.label = "first_d1_with_second_stream_w".to_string();
@@ -877,7 +881,7 @@ fn run_segment_one(output: &mut ResultLines) -> i32 {
 
 // ───────────────────────────── 自己的枚举计划与撕裂镜像表（S3、A1） ─────────────────────────────
 
-/// 一段怎么展开（本文件自己的一份，与 crates 的 `Layer0SegmentExpansion` 在 S3 里逐段对拍状态数）。
+/// 一段怎么展开（本文件自己的一份，与 crates 的 `CrashPointReplaySegmentExpansion` 在 S3 里逐段对拍状态数）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum LocalExpansion {
     /// 不展开：只以整段持久进入后面的状态。
@@ -889,12 +893,12 @@ enum LocalExpansion {
 }
 
 impl LocalExpansion {
-    fn crates_expansion(self) -> Layer0SegmentExpansion {
+    fn crates_expansion(self) -> CrashPointReplaySegmentExpansion {
         match self {
-            Self::Skipped => Layer0SegmentExpansion::NotExpanded,
-            Self::EveryCombination => Layer0SegmentExpansion::EveryProperSubset,
+            Self::Skipped => CrashPointReplaySegmentExpansion::NotExpanded,
+            Self::EveryCombination => CrashPointReplaySegmentExpansion::EveryProperSubset,
             Self::InPlaceCombinationsWithUnitWritesNoneOrAll => {
-                Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll
+                CrashPointReplaySegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll
             }
         }
     }
@@ -1967,7 +1971,7 @@ struct ControlStateData {
     verdict_outcome: Digest128,
 }
 
-/// 一个状态评完交回的东西（计数记进调用方给的 `Layer0Tally` 与内容表，其余在这里）。
+/// 一个状态评完交回的东西（计数记进调用方给的 `CrashPointReplayTally` 与内容表，其余在这里）。
 struct StateResult {
     segment: usize,
     timings: StateTimings,
@@ -2011,12 +2015,13 @@ impl EvaluationContext<'_> {
 
 /// 照跑一个状态（5.1 第 1 步，真实基线）：次序与 `crash.rs` 的 `evaluate_state_recording_findings` 逐步相同，每一步各用一对
 /// `Instant` 包住，外面再包一对量整个状态；计数照它记进 `tally`。交回两遍恢复的报告与判定表。
+// gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn evaluate_baseline(
     context: &EvaluationContext<'_>,
     image: &CrashImage<'_>,
     busy_zone: Option<TimingZone>,
     timings: &mut StateTimings,
-    tally: &mut Layer0Tally,
+    tally: &mut CrashPointReplayTally,
 ) -> (
     RecoveryReport,
     RecoveryReport,
@@ -2062,14 +2067,8 @@ fn evaluate_baseline(
     if image.persisted[context.stream.judged_root_index] {
         tally.root_persisted_states += 1;
     }
-    if consulted.outcome != ignored.outcome {
+    if recovery_passes_differ(&consulted, &ignored) {
         tally.journal_differing_states += 1;
-    }
-    if consulted.journal.verification_passed + consulted.journal.verification_failed > 0 {
-        tally.verification_ran_states += 1;
-    }
-    if consulted.journal.verification_failed > 0 {
-        tally.verification_failed_states += 1;
     }
     match &consulted.outcome {
         RecoveryOutcome::NoFile { .. } => tally.no_file_states += 1,
@@ -2091,7 +2090,7 @@ fn evaluate_baseline(
                 *tally.checker_evaluated_states.entry(invariant).or_insert(0) += 1;
                 *tally.checker_violated_states.entry(invariant).or_insert(0) += 1;
             }
-            // 部分没判不红、不算评估过：与层 0 那一路（`crash.rs`）同一个口径，计进不适用这一格。
+            // 部分没判不红、不算评估过：与崩溃点重放那一路（`crash.rs`）同一个口径，计进不适用这一格。
             InvariantVerdict::NotApplicable(_) | InvariantVerdict::PartiallyJudged(_) => {
                 *tally
                     .checker_not_applicable_states
@@ -2206,6 +2205,7 @@ fn replay_checker_reads(
     clippy::too_many_arguments,
     reason = "每个参数各是一样东西：输入、序号、段、持久集合、忙等区、要不要留对照数据、内容表、计数"
 )]
+// gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn evaluate_state(
     context: &EvaluationContext<'_>,
     ordinal: u64,
@@ -2214,7 +2214,7 @@ fn evaluate_state(
     busy_zone: Option<TimingZone>,
     keep_control_data: bool,
     tables: &RefCell<ContentTables>,
-    tally: &mut Layer0Tally,
+    tally: &mut CrashPointReplayTally,
 ) -> StateResult {
     let image = CrashImage {
         base: &context.stream.base,
@@ -2487,7 +2487,7 @@ impl TimingSums {
 }
 
 /// 把 `from` 的 S4 那几项加进 `into`。
-fn add_tally(into: &mut Layer0Tally, from: &Layer0Tally) {
+fn add_tally(into: &mut CrashPointReplayTally, from: &CrashPointReplayTally) {
     into.states += from.states;
     into.violations += from.violations;
     into.ignored_violations += from.ignored_violations;
@@ -2496,8 +2496,6 @@ fn add_tally(into: &mut Layer0Tally, from: &Layer0Tally) {
     into.file_read_states += from.file_read_states;
     into.failed_states += from.failed_states;
     into.journal_differing_states += from.journal_differing_states;
-    into.verification_ran_states += from.verification_ran_states;
-    into.verification_failed_states += from.verification_failed_states;
     into.record_root_without_record += from.record_root_without_record;
     into.record_claimed_state_missing_unit += from.record_claimed_state_missing_unit;
     for (invariant, count) in &from.checker_evaluated_states {
@@ -2515,9 +2513,9 @@ fn add_tally(into: &mut Layer0Tally, from: &Layer0Tally) {
 }
 
 /// S4 比的那几项拼成一段文本（两边各拼一份逐字比）。
-fn tally_text(tally: &Layer0Tally) -> String {
+fn tally_text(tally: &CrashPointReplayTally) -> String {
     format!(
-        "states={} violations={} ignored_violations={} root_persisted={} no_file={} file_read={} failed={} journal_differing={} verification_ran={} verification_failed={} record_root_without_record={} record_claimed_state_missing_unit={} checker=[{}]",
+        "states={} violations={} ignored_violations={} root_persisted={} no_file={} file_read={} failed={} journal_differing={} record_root_without_record={} record_claimed_state_missing_unit={} checker=[{}]",
         tally.states,
         tally.violations,
         tally.ignored_violations,
@@ -2526,8 +2524,6 @@ fn tally_text(tally: &Layer0Tally) -> String {
         tally.file_read_states,
         tally.failed_states,
         tally.journal_differing_states,
-        tally.verification_ran_states,
-        tally.verification_failed_states,
         tally.record_root_without_record,
         tally.record_claimed_state_missing_unit,
         tally.checker_counts_by_invariant()
@@ -2536,7 +2532,7 @@ fn tally_text(tally: &Layer0Tally) -> String {
 
 /// 一格（一条流上的一个取样域）跑完的全部累计。各项都是可交换的加法或取最小，与线程数、片的完成次序无关。
 struct StreamDomainTotals {
-    tally: Layer0Tally,
+    tally: CrashPointReplayTally,
     tables: ContentTables,
     timing_by_segment: BTreeMap<usize, TimingSums>,
     arm_stores: Vec<ArmRecordStore>,
@@ -2557,7 +2553,7 @@ struct StreamDomainTotals {
 impl StreamDomainTotals {
     fn new() -> Self {
         Self {
-            tally: Layer0Tally::default(),
+            tally: CrashPointReplayTally::default(),
             tables: ContentTables::default(),
             timing_by_segment: BTreeMap::new(),
             arm_stores: ARMS
@@ -2637,17 +2633,36 @@ impl StreamDomainTotals {
     }
 }
 
-/// 线程数：`E161_THREADS`，没设取 `available_parallelism`（5.6）。
+/// 线程数：`E161_THREADS`，没设取每台默认重活线程数（`SINGLEFS_THREAD_CAP`，再没设取 `.claude/heavy-thread-default` 的登记值；
+/// 登记 5.6 的「没设取 `available_parallelism`」按用户 2026-10-12 定的每台默认改；线程数不进产物）。
 fn threads_from_environment() -> usize {
-    match std::env::var(THREADS_ENVIRONMENT_VARIABLE) {
-        Ok(text) => text
+    threads_of_the_variable_values(
+        std::env::var(THREADS_ENVIRONMENT_VARIABLE).ok().as_deref(),
+        singlefs_harness::numeric_environment_variable::process_environment_variable(
+            singlefs_harness::heavy_threads::THREAD_CAP_ENVIRONMENT_VARIABLE,
+        )
+        .as_deref(),
+    )
+}
+
+/// [`threads_from_environment`] 的判法，两个变量的值由调用方给（`None` 是没设）。
+///
+/// # Panics
+/// `E161_THREADS` 设了而不是正整数；落到默认时 `SINGLEFS_THREAD_CAP` 设了而不是正整数。
+fn threads_of_the_variable_values(
+    e161_threads_value: Option<&str>,
+    thread_cap_value: Option<&str>,
+) -> usize {
+    match e161_threads_value {
+        Some(text) => text
             .parse::<usize>()
             .ok()
             .filter(|threads| *threads > 0)
             .unwrap_or_else(|| panic!("{THREADS_ENVIRONMENT_VARIABLE} 要是正整数，读到 {text:?}")),
-        Err(_not_set) => {
-            std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
-        }
+        None => singlefs_harness::heavy_threads::default_heavy_threads_of_the_cap_value(
+            thread_cap_value,
+        )
+        .get(),
     }
 }
 
@@ -2736,7 +2751,7 @@ fn evaluate_stream_domain(run: &StreamDomainRun<'_>) -> StreamDomainTotals {
 
 // ───────────────────────────── 取样域（5.5） ─────────────────────────────
 
-/// 这条流的取样段（第一条流全部；第二条流段 11–26）。
+/// 这条流的取样段（新池新建文件流全部；覆盖写固定脚本流段 11–26）。
 fn is_sampled_segment(stream: StreamName, segment_index: usize) -> bool {
     match stream {
         StreamName::First => true,
@@ -2746,7 +2761,7 @@ fn is_sampled_segment(stream: StreamName, segment_index: usize) -> bool {
     }
 }
 
-/// 全部持久那一个在不在域里：第一条流在（第一条流全量 16777260 含它），第二条流不在（段 27 起不取）。
+/// 全部持久那一个在不在域里：新池新建文件流在（新池新建文件流全量 16777260 含它），覆盖写固定脚本流不在（段 27 起不取）。
 fn includes_every_write_persisted(stream: StreamName) -> bool {
     match stream {
         StreamName::First => true,
@@ -2766,13 +2781,13 @@ fn domain_expansions(stream: &PreparedStream, expansion: LocalExpansion) -> Vec<
         .collect()
 }
 
-/// 大段的写数：24 写段（D1-stride 取步长、可行性档取段头的那两段：第一条流段 7、第二条流段 11）。
+/// 大段的写数：24 写段（D1-stride 取步长、可行性档取段头的那两段：新池新建文件流段 7、覆盖写固定脚本流段 11）。
 /// 重跑登记读法甲：第 1 次的 26 写段（3² · 2²⁴ − 1 个状态）在 C577 之后拆成轮换 2 写与单元 24 写，阈值照改成 24。
 const STRIDED_SEGMENT_WRITES: usize = 24;
 /// 对照样本里「大段」的写数下限（18 写段与 24 写段，5.5）。
 const CONTROL_SAMPLE_LARGE_SEGMENT_WRITES: usize = 18;
 
-/// D1-small：取样段里写数少于 24 的每一段的全部状态（第一条流再加全部持久那一个）；按全量计划的序号。
+/// D1-small：取样段里写数少于 24 的每一段的全部状态（新池新建文件流再加全部持久那一个）；按全量计划的序号。
 fn small_domain_ordinals(stream: &PreparedStream, plan: &LocalPlan<'_>) -> Vec<u64> {
     let mut ordinals = Vec::new();
     for (segment_index, segment) in stream.segments.iter().enumerate() {
@@ -2812,7 +2827,7 @@ fn every_ordinal(stream: &PreparedStream, plan: &LocalPlan<'_>) -> Vec<u64> {
     (0..last).collect()
 }
 
-/// 对照样本（5.5）：D1 里每一段，18 写及以上的段取序号最小的 4096 个，其余段取全部；第一条流的全部持久那一个也在。
+/// 对照样本（5.5）：D1 里每一段，18 写及以上的段取序号最小的 4096 个，其余段取全部；新池新建文件流的全部持久那一个也在。
 fn control_ordinals(
     stream: &PreparedStream,
     plan: &LocalPlan<'_>,
@@ -2855,7 +2870,7 @@ struct SegmentCountCheck {
 }
 
 /// 逐个数：只展开 `segment_index` 那一段的计划里，每个序号的持久集合真生成出来，数不同的有几个。取样段里一律逐个数（段内这一段的写、
-/// 它们的撕裂镜像与重放至多 32 个位置时用位图，否则用集合）；取样段之外（第二条流段 0–10 与段 27 起，一段至多 2²⁸ − 1 个）按计划的组合数报。
+/// 它们的撕裂镜像与重放至多 32 个位置时用位图，否则用集合）；取样段之外（覆盖写固定脚本流段 0–10 与段 27 起，一段至多 2²⁸ − 1 个）按计划的组合数报。
 /// 交回（数出来的个数，是不是逐个数的）。
 fn count_distinct_persisted_sets(
     stream: &PreparedStream,
@@ -2939,15 +2954,15 @@ fn segment_count_checks_up_to(
                 enumeration_limit,
             );
             let crates_count =
-                singlefs_checker_tier::crash::layer0_state_count_with_torn_in_place_overwrites(
+                singlefs_checker_tier::crash::crash_state_count_with_torn_in_place_overwrites(
                     &stream.base,
                     &stream.writes,
                     &stream.segments,
                     &|index, _segment| {
                         if index == segment_index {
-                            Layer0SegmentExpansion::EveryProperSubset
+                            CrashPointReplaySegmentExpansion::EveryProperSubset
                         } else {
-                            Layer0SegmentExpansion::NotExpanded
+                            CrashPointReplaySegmentExpansion::NotExpanded
                         }
                     },
                 ) - 1;
@@ -2974,78 +2989,174 @@ fn segment_count_checks_up_to(
         .collect()
 }
 
+/// crates 那一遍枚举的判段这一趟没跑、交不回整份结论时，S3、S4 那一格报的本次未跑（不 panic、不判红，也不算过）：
+/// 多机配置开了 GPU 而这份二进制没编进 `gpu` 特性（判段不跑、只录，`crash_amplification::judge_not_run_without_the_gpu_feature`），
+/// 或设了只录那一段、两台分片里只判了自己那一份。装置不带 `gpu` 特性也编得过、跑得起（`Cargo.toml` 不登 `required-features`：
+/// 登了之后不带特性的 `cargo build`、clippy 与快档都不再编它、不跑它的内联单测，复跑登记的起法也跟着起不来）；要这一格的结论，
+/// 配置开了 GPU 时编进 `gpu` 特性起（`cargo run … --features verdict-store,gpu`）。
+const CRATES_COMPARISON_NOT_RUN_EXIT_CODE: i32 = 77;
+
+/// S3、S4 在一个取样域上的结论：判了（两条过没过），或 crates 那一遍枚举的判段这一趟没跑（[`CRATES_COMPARISON_NOT_RUN_EXIT_CODE`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CratesComparisonClauses {
+    Judged {
+        enumeration_clause_holds: bool,
+        tally_clause_holds: bool,
+    },
+    JudgeStageNotRun,
+}
+
+/// 几个取样域上的 S3、S4 并起来：判了的那几格各自取与，有一格判段没跑就记下来（整个模式照本次未跑收尾）。
+struct CratesComparisonVerdicts {
+    enumeration_clause_holds: bool,
+    tally_clause_holds: bool,
+    judge_stage_not_run: bool,
+}
+
+impl CratesComparisonVerdicts {
+    fn new() -> Self {
+        Self {
+            enumeration_clause_holds: true,
+            tally_clause_holds: true,
+            judge_stage_not_run: false,
+        }
+    }
+
+    fn absorb(&mut self, clauses: CratesComparisonClauses) {
+        match clauses {
+            CratesComparisonClauses::Judged {
+                enumeration_clause_holds,
+                tally_clause_holds,
+            } => {
+                self.enumeration_clause_holds &= enumeration_clause_holds;
+                self.tally_clause_holds &= tally_clause_holds;
+            }
+            CratesComparisonClauses::JudgeStageNotRun => self.judge_stage_not_run = true,
+        }
+    }
+}
+
 /// S3 与 S4 在一个取样域上的结果：crates 枚举交给观察者的写表与持久集合逐个与装置比，crates 的计数交回来给 S4 比。
 struct CratesComparison {
     observed_states: u64,
     compared_states: u64,
     writes_table_differs: bool,
     persisted_mismatches: u64,
-    crates_tally: Layer0Tally,
+    crates_tally: CrashPointReplayTally,
+}
+
+/// S3 那个观察者另读的输入的摘要（进它的版本；取样域、装置的写表或计划一变它就变，看过的块不按旧的复用）：取样域的每个序号与装置计划在它上面的
+/// 持久集合，装置那一张写表逐个写的盘、种类、FUA、偏移与内容（整段清零只记长度）。
+fn crates_comparison_observer_extra_inputs_digest(
+    table: &TornWriteTable,
+    plan: &LocalPlan<'_>,
+    ordinals: &[u64],
+) -> [u8; singlefs_harness::sha256::DIGEST_BYTES] {
+    let mut bytes: Vec<u8> = Vec::new();
+    for ordinal in ordinals {
+        bytes.extend_from_slice(format!("ordinal={ordinal} persisted=").as_bytes());
+        bytes.extend(
+            plan.persisted_of(*ordinal)
+                .iter()
+                .map(|is_persisted| u8::from(*is_persisted)),
+        );
+        bytes.push(b'\n');
+    }
+    for write in &table.writes {
+        bytes.extend_from_slice(
+            format!(
+                "write device={:?} kind={:?} force_unit_access={} offset={:?} ",
+                write.device, write.kind, write.is_force_unit_access, write.offset
+            )
+            .as_bytes(),
+        );
+        match &write.contents {
+            WrittenContents::Bytes(contents) => {
+                bytes.extend_from_slice(format!("bytes={} ", contents.len()).as_bytes());
+                bytes.extend_from_slice(contents);
+            }
+            WrittenContents::Zeros { length } => {
+                bytes.extend_from_slice(format!("zeros={length}").as_bytes());
+            }
+        }
+        bytes.push(b'\n');
+    }
+    singlefs_harness::sha256::sha256_digest(&bytes)
 }
 
 /// 在 `ordinals`（装置计划的序号，按次序）那个域上跑一遍 crates 的枚举（只展开 `expansion_of` 给的那几段），逐状态核 S3，交回 crates 的计数。
-/// crates 最后多出的全部持久那一个（域里不含它时）不比。
+/// crates 最后多出的全部持久那一个（域里不含它时）不比。判段这一趟没跑、交不回整份结论时交 `None`（[`CRATES_COMPARISON_NOT_RUN_EXIT_CODE`]）。
 fn compare_with_the_crates(
     stream: &PreparedStream,
     table: &TornWriteTable,
     plan: &LocalPlan<'_>,
     ordinals: &[u64],
-    expansion_of: &dyn Fn(usize) -> Layer0SegmentExpansion,
-) -> CratesComparison {
-    let mut observed_states = 0u64;
-    let mut compared_states = 0u64;
-    let mut writes_table_differs = false;
-    let mut writes_table_checked: Option<*const RetainedWrite> = None;
-    let mut persisted_mismatches = 0u64;
-    let mut observe =
-        |image: &CrashImage<'_>,
+    expansion_of: &dyn Fn(usize) -> CrashPointReplaySegmentExpansion,
+) -> Option<CratesComparison> {
+    // 观察者经崩溃判定库那一路按块看（并行、不按序号先后），要记的数全经计数记：crates 枚举里序号 k 的状态就是 crates 次序里第 k 个，
+    // 对装置计划的第 k 个序号；写表只在第一个取样的状态上比一次（整条流的枚举写表是同一张）
+    let observe =
+        |ordinal: u64,
+         image: &CrashImage<'_>,
          _report: &RecoveryReport,
-         _counts: &mut singlefs_checker_tier::crash::Layer0ObserverCounts| {
-            let position = usize::try_from(observed_states).expect("序号");
-            observed_states += 1;
-            let Some(ordinal) = ordinals.get(position) else {
+         counts: &mut singlefs_checker_tier::crash::CrashPointReplayObserverCounts| {
+            counts.add("observed_states", 1);
+            let Some(device_ordinal) = usize::try_from(ordinal)
+                .ok()
+                .and_then(|position| ordinals.get(position))
+            else {
                 return;
             };
-            compared_states += 1;
-            match writes_table_checked {
-                Some(pointer) if std::ptr::eq(pointer, image.writes.as_ptr()) => {}
-                Some(_) | None => {
-                    if image.writes != table.writes.as_slice() {
-                        writes_table_differs = true;
-                    }
-                    writes_table_checked = Some(image.writes.as_ptr());
-                }
+            counts.add("compared_states", 1);
+            if ordinal == 0 && image.writes != table.writes.as_slice() {
+                counts.add("writes_table_differs", 1);
             }
-            if image.persisted != plan.persisted_of(*ordinal) {
-                persisted_mismatches += 1;
+            if image.persisted != plan.persisted_of(*device_ordinal) {
+                counts.add("persisted_mismatches", 1);
             }
         };
-    let crates_tally = singlefs_checker_tier::crash::enumerate_layer0_in_state_slices(
-        &stream.base,
-        &stream.writes,
-        &stream.segments,
-        stream.judged_root_index,
-        &stream.versions,
-        &|segment_index, _segment| expansion_of(segment_index),
-        singlefs_checker_tier::crash::Layer0Parallelism::from_environment(),
-        Some(&mut observe),
-        &singlefs_checker_tier::layer0_progress::Layer0Resume::NoProgressFile,
-    );
-    CratesComparison {
-        observed_states,
-        compared_states,
-        writes_table_differs,
-        persisted_mismatches,
+    let crates_tally =
+        singlefs_checker_tier::crash_state_enumeration::enumerate_crash_states_with_expansion(
+            singlefs_checker_tier::crash_state_enumeration::CrashPointReplayItem {
+                name: "e161_crates_comparison",
+                setting_file:
+                    "crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs",
+            },
+            &stream.base,
+            &stream.writes,
+            &stream.segments,
+            stream.judged_root_index,
+            singlefs_checker_tier::crash::CrashPointReplayVersionTable::with_a_file_only(
+                &stream.versions,
+            ),
+            &|segment_index, _segment| expansion_of(segment_index),
+            &[
+                singlefs_checker_tier::crash_state_enumeration::CrashPointReplayObserver {
+                    name: "e161_crates_comparison",
+                    extra_inputs_digest: crates_comparison_observer_extra_inputs_digest(
+                        table, plan, ordinals,
+                    ),
+                    observe: &observe,
+                },
+            ],
+        )
+        .judged()?;
+    let counts = &crates_tally.observer_counts;
+    Some(CratesComparison {
+        observed_states: counts.count_named("observed_states"),
+        compared_states: counts.count_named("compared_states"),
+        writes_table_differs: counts.count_named("writes_table_differs") > 0,
+        persisted_mismatches: counts.count_named("persisted_mismatches"),
         crates_tally,
-    }
+    })
 }
 
-/// 装置这一格的计数加上（第二条流 S4 要比的）crates 多跑的全部持久那一个的照跑计数。
+/// 装置这一格的计数加上（覆盖写固定脚本流 S4 要比的）crates 多跑的全部持久那一个的照跑计数。
 fn tally_with_every_write_persisted(
     context: &EvaluationContext<'_>,
-    tally: &Layer0Tally,
-) -> Layer0Tally {
-    let mut combined = Layer0Tally::default();
+    tally: &CrashPointReplayTally,
+) -> CrashPointReplayTally {
+    let mut combined = CrashPointReplayTally::default();
     add_tally(&mut combined, tally);
     if !includes_every_write_persisted(context.stream.name) {
         let every_write = LocalPlan::new(
@@ -3924,7 +4035,7 @@ const ANCHOR_FIRST_STREAM_SEGMENT_STATES: [u64; 11] = [8, 3, 1, 8, 3, 1, 8, 16_7
 const ANCHOR_FIRST_STREAM_STATES: u64 = 16_777_260;
 /// txg1、txg2、txg3、最后一条根之后。
 const ANCHOR_FIRST_STREAM_BY_PUBLISH: [u64; 4] = [12, 12, 16_777_227, 8];
-/// 第二条流取样段 11–26 逐段。
+/// 覆盖写固定脚本流取样段 11–26 逐段。
 const ANCHOR_SECOND_STREAM_SEGMENT_STATES: [u64; 16] = [
     16_777_215, 3, 1, 8, 8, 262_143, 3, 1, 8, 65_535, 3, 1, 8, 65_535, 3, 1,
 ];
@@ -3939,7 +4050,7 @@ const ANCHOR_FIRST_STREAM_QUICK: u64 = 46;
 const ANCHOR_SECOND_STREAM_QUICK: u64 = 52;
 /// 段头：每条流的大段（24 写段）各取段内序号 0–4095（重跑登记 I-4 新加的一格）。
 const ANCHOR_SEGMENT_HEADS_PER_STREAM: u64 = 4_096;
-/// A5：取三态的写数（第一条流 8 次系统配置槽写，第二条流 46 次）。
+/// A5：取三态的写数（新池新建文件流 8 次系统配置槽写，覆盖写固定脚本流 46 次）。
 const ANCHOR_FIRST_STREAM_IN_PLACE_OVERWRITES: usize = 8;
 const ANCHOR_SECOND_STREAM_IN_PLACE_OVERWRITES: usize = 46;
 /// A6：容量的字节数。
@@ -4002,13 +4113,13 @@ fn whole_stream_states_by_the_formula(
 
 /// 一条流的锚点核下来的两样。
 struct StreamAnchorOutcome {
-    /// A1、A2 / A3、A4、A5 与（第二条流）A7 全部对上。
+    /// A1、A2 / A3、A4、A5 与（覆盖写固定脚本流）A7 全部对上。
     every_anchor_holds: bool,
     /// 可行性档要评的三个域（D1-small、D1-quick、段头）的大小都等于 A4（重跑登记 I-7 的域守卫只看这一样）。
     evaluated_domain_sizes_hold: bool,
 }
 
-/// 一条流的锚点 A1、A2 / A3、A5 与 A4 的域大小（第二条流另核 A7 的整条流全量与最大一段）。
+/// 一条流的锚点 A1、A2 / A3、A5 与 A4 的域大小（覆盖写固定脚本流另核 A7 的整条流全量与最大一段）。
 fn report_stream_anchors(
     output: &mut ResultLines,
     stream: &PreparedStream,
@@ -4151,7 +4262,8 @@ fn capacity_anchors_hold() -> bool {
 
 // ───────────────────────────── 模式 stop-clauses：S1–S6 与 A1–A7（跑产物之前） ─────────────────────────────
 
-/// S3 + S4 在一个域上：crates 的枚举与装置自己照跑的计数逐项比。交回（S3 过没过，S4 过没过）。
+/// S3 + S4 在一个域上：crates 的枚举与装置自己照跑的计数逐项比。交回 S3、S4 过没过；crates 那一遍判段没跑的，打一行这一格本次未跑
+/// （连同崩溃点重放判段本次未跑那一行记号）、交回 [`CratesComparisonClauses::JudgeStageNotRun`]，装置自己那一遍不跑。
 #[allow(
     clippy::too_many_arguments,
     reason = "每个参数各是一样东西：输出、格名、输入、计划、序号、crates 的展开、线程数"
@@ -4162,11 +4274,24 @@ fn report_crates_comparison(
     context: &EvaluationContext<'_>,
     plan: &LocalPlan<'_>,
     ordinals: &[u64],
-    expansion_of: &dyn Fn(usize) -> Layer0SegmentExpansion,
+    expansion_of: &dyn Fn(usize) -> CrashPointReplaySegmentExpansion,
     threads: usize,
-) -> (bool, bool) {
-    let comparison =
-        compare_with_the_crates(context.stream, context.table, plan, ordinals, expansion_of);
+) -> CratesComparisonClauses {
+    let Some(comparison) =
+        compare_with_the_crates(context.stream, context.table, plan, ordinals, expansion_of)
+    else {
+        output.line(format!(
+            "name=stop_clause_crates cell={label} domain_states={} judge_stage=not_run",
+            ordinals.len()
+        ));
+        println!(
+            "{}",
+            singlefs_checker_tier::crash_state_enumeration::crash_point_replay_judge_not_run_line(
+                "e161_crates_comparison"
+            )
+        );
+        return CratesComparisonClauses::JudgeStageNotRun;
+    };
     let device = evaluate_stream_domain(&StreamDomainRun {
         label: format!("{label}-baseline"),
         context,
@@ -4203,7 +4328,10 @@ fn report_crates_comparison(
     output.line(format!(
         "name=stop_clause_tally cell={label} side=crates {crates_text}"
     ));
-    (enumeration_clause_holds, tally_clause_holds)
+    CratesComparisonClauses::Judged {
+        enumeration_clause_holds,
+        tally_clause_holds,
+    }
 }
 
 /// 对照样本上跑两遍（5.1 的四件事），第二遍与第一遍逐状态比键与结局（PC2a、PC4a）、两遍的照跑结局（PC2d、PC4d）；
@@ -4333,6 +4461,7 @@ fn run_stop_clauses(output: &mut ResultLines) -> i32 {
     ));
     let mut enumeration_clause_holds = true;
     let mut tally_clause_holds = true;
+    let mut crates_comparison_verdicts = CratesComparisonVerdicts::new();
     let mut determinism_clause_holds = true;
     let mut walk_subset_clause_holds = true;
     for stream in [&first, &second] {
@@ -4349,7 +4478,7 @@ fn run_stop_clauses(output: &mut ResultLines) -> i32 {
             .iter()
             .map(|ordinal| full.segment_of(*ordinal))
             .collect();
-        let (small_enumeration_holds, small_tally_holds) = report_crates_comparison(
+        crates_comparison_verdicts.absorb(report_crates_comparison(
             output,
             &format!("{}_small", stream.name.label()),
             &context,
@@ -4357,15 +4486,13 @@ fn run_stop_clauses(output: &mut ResultLines) -> i32 {
             &small,
             &|segment_index| {
                 if small_segments.contains(&segment_index) {
-                    Layer0SegmentExpansion::EveryProperSubset
+                    CrashPointReplaySegmentExpansion::EveryProperSubset
                 } else {
-                    Layer0SegmentExpansion::NotExpanded
+                    CrashPointReplaySegmentExpansion::NotExpanded
                 }
             },
             threads,
-        );
-        enumeration_clause_holds &= small_enumeration_holds;
-        tally_clause_holds &= small_tally_holds;
+        ));
         let quick = LocalPlan::new(
             stream,
             &table,
@@ -4375,7 +4502,7 @@ fn run_stop_clauses(output: &mut ResultLines) -> i32 {
             ),
         );
         let quick_ordinals = every_ordinal(stream, &quick);
-        let (quick_enumeration_holds, quick_tally_holds) = report_crates_comparison(
+        crates_comparison_verdicts.absorb(report_crates_comparison(
             output,
             &format!("{}_quick", stream.name.label()),
             &context,
@@ -4383,9 +4510,7 @@ fn run_stop_clauses(output: &mut ResultLines) -> i32 {
             &quick_ordinals,
             &|segment_index| quick.expansion_by_segment[segment_index].crates_expansion(),
             threads,
-        );
-        enumeration_clause_holds &= quick_enumeration_holds;
-        tally_clause_holds &= quick_tally_holds;
+        ));
         let mut domain: Vec<u64> = small
             .iter()
             .chain(&stride_domain_ordinals(stream, &full))
@@ -4403,6 +4528,15 @@ fn run_stop_clauses(output: &mut ResultLines) -> i32 {
         );
         determinism_clause_holds &= control_determinism_holds;
         walk_subset_clause_holds &= control_walk_subset_holds;
+    }
+    enumeration_clause_holds &= crates_comparison_verdicts.enumeration_clause_holds;
+    tally_clause_holds &= crates_comparison_verdicts.tally_clause_holds;
+    if crates_comparison_verdicts.judge_stage_not_run {
+        output.line(
+            "name=verdict scope=stop_clauses clause_S3_holds=not_run clause_S4_holds=not_run judge_stage=not_run"
+                .to_string(),
+        );
+        return CRATES_COMPARISON_NOT_RUN_EXIT_CODE;
     }
     output.line(format!(
         "name=verdict scope=stop_clauses clause_S1_holds={} clause_S2_holds={} clause_S3_holds={} clause_S4_holds={} clause_S5_holds={} clause_S6_holds={} anchors_a1_to_a7_hold={}",
@@ -4427,7 +4561,7 @@ fn run_stop_clauses(output: &mut ResultLines) -> i32 {
     }
 }
 
-/// 开发用：只在第一条流与第二条流的甲二域上跑 S3、S4 与对照样本（第一条流）的两遍，几分钟之内看出装置有没有写错；不出产物。
+/// 开发用：只在新池新建文件流与覆盖写固定脚本流的甲二域上跑 S3、S4 与对照样本（新池新建文件流）的两遍，几分钟之内看出装置有没有写错；不出产物。
 fn run_first_stream_stop_clause_probe(output: &mut ResultLines) -> i32 {
     let threads = threads_from_environment();
     let first = prepare_first_stream();
@@ -4475,9 +4609,9 @@ fn run_first_stream_stop_clause_probe(output: &mut ResultLines) -> i32 {
         &small,
         &|segment_index| {
             if small_segments.contains(&segment_index) {
-                Layer0SegmentExpansion::EveryProperSubset
+                CrashPointReplaySegmentExpansion::EveryProperSubset
             } else {
-                Layer0SegmentExpansion::NotExpanded
+                CrashPointReplaySegmentExpansion::NotExpanded
             }
         },
         threads,
@@ -4812,7 +4946,7 @@ fn process_stream(
     (outcome, discriminating)
 }
 
-/// PC1：第一条流全部持久那个状态当一个额外状态再喂一遍（新的序号），数去重臂的不同内容数变没变、逐状态臂加了多少。
+/// PC1：新池新建文件流全部持久那个状态当一个额外状态再喂一遍（新的序号），数去重臂的不同内容数变没变、逐状态臂加了多少。
 /// 交回（不同内容数没变，逐状态次数恰好加上它的不同单元位置数，它的不同单元位置数）。
 fn refeed_every_write_persisted(
     context: &EvaluationContext<'_>,
@@ -4822,7 +4956,7 @@ fn refeed_every_write_persisted(
 ) -> (bool, bool, u64) {
     let refed_ordinal = u64::MAX - 1;
     let tables = RefCell::new(ContentTables::default());
-    let mut tally = Layer0Tally::default();
+    let mut tally = CrashPointReplayTally::default();
     let result = evaluate_state(
         context,
         refed_ordinal,
@@ -4944,7 +5078,7 @@ impl TimingControlSegmentShape {
     }
 }
 
-/// PC3：第二条流段 16 序号最小的 1000 个状态，先照常跑一遍，再六遍各在一个计时区里加 2 ms 忙等。交回全部六个区都过没过。
+/// PC3：覆盖写固定脚本流段 16 序号最小的 1000 个状态，先照常跑一遍，再六遍各在一个计时区里加 2 ms 忙等。交回全部六个区都过没过。
 /// 那一段不是写行那 18 个单元写、或不够 1000 个状态时，六个区一律判不过、一个状态都不评（`pc3_segment_holds=false`）。
 fn report_timing_control(
     output: &mut ResultLines,
@@ -5025,7 +5159,7 @@ fn report_timing_control(
     every_zone_holds
 }
 
-/// PC3 取的段（5.3：第 1 次第二条流段 14「写行发布 18 个单元写」那一段；C577 之后同一批写是段 16，重跑登记 I-6、A9）。
+/// PC3 取的段（5.3：第 1 次覆盖写固定脚本流段 14「写行发布 18 个单元写」那一段；C577 之后同一批写是段 16，重跑登记 I-6、A9）。
 const TIMING_CONTROL_SEGMENT: usize = 16;
 /// PC3 那一段的写数：写行发布的 18 个单元写（重跑登记 A9）。
 const TIMING_CONTROL_SEGMENT_WRITES: usize = 18;
@@ -5356,6 +5490,7 @@ fn strided_segment_heads(stream: &PreparedStream, plan: &LocalPlan<'_>) -> Vec<u
 
 /// S4 在大段段头上的形态：crates 按段枚举要把整段 1677 万个跑完，这里改用 crates 的单状态入口
 /// `evaluate_state_for_versions`，在装置给的同一批持久集合上逐个评，计数与装置照跑的逐项比。交回相不相同。
+// gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn report_per_state_crates_comparison(
     output: &mut ResultLines,
     label: &str,
@@ -5375,12 +5510,12 @@ fn report_per_state_crates_comparison(
         depth: EvaluationDepth::BaselineOnly,
     });
     let chunk = ordinals.len().div_ceil(threads.max(1)).max(1);
-    let merged = Mutex::new(Layer0Tally::default());
+    let merged = Mutex::new(CrashPointReplayTally::default());
     std::thread::scope(|scope| {
         for part in ordinals.chunks(chunk) {
             let merged = &merged;
             scope.spawn(move || {
-                let mut tally = Layer0Tally::default();
+                let mut tally = CrashPointReplayTally::default();
                 for ordinal in part {
                     let _report = singlefs_checker_tier::crash::evaluate_state_for_versions(
                         &context.stream.base,
@@ -5413,7 +5548,7 @@ fn report_per_state_crates_comparison(
     holds
 }
 
-/// 可行性档（用户 2026-09-27 定）：第一条流 D1-small、两条流的 D1-quick、两个大段（24 写段）各取段头 4096 个状态；
+/// 可行性档（用户 2026-09-27 定）：新池新建文件流 D1-small、两条流的 D1-quick、两个大段（24 写段）各取段头 4096 个状态；
 /// 停机条款、阳性对照与 crates 的对拍都只在这个小域上做。G 行一律不判（只跑了可行性档）。
 /// 要评的三个域的大小先与 A4 比，对不上一个状态都不评、退 3（重跑登记 I-7 的域守卫）。
 #[allow(
@@ -5486,6 +5621,7 @@ fn run_feasibility(output: &mut ResultLines) -> i32 {
     }
     let mut enumeration_clause_holds = true;
     let mut tally_clause_holds = true;
+    let mut crates_comparison_verdicts = CratesComparisonVerdicts::new();
     let mut determinism_clause_holds = true;
     let mut walk_subset_clause_holds = true;
     let mut positive_controls: Vec<(String, bool)> = Vec::new();
@@ -5516,7 +5652,7 @@ fn run_feasibility(output: &mut ResultLines) -> i32 {
                 .iter()
                 .map(|ordinal| full.segment_of(*ordinal))
                 .collect();
-            let (small_enumeration_holds, small_tally_holds) = report_crates_comparison(
+            crates_comparison_verdicts.absorb(report_crates_comparison(
                 output,
                 &format!("{name}_small"),
                 &context,
@@ -5524,17 +5660,15 @@ fn run_feasibility(output: &mut ResultLines) -> i32 {
                 &small,
                 &|segment_index| {
                     if small_segments.contains(&segment_index) {
-                        Layer0SegmentExpansion::EveryProperSubset
+                        CrashPointReplaySegmentExpansion::EveryProperSubset
                     } else {
-                        Layer0SegmentExpansion::NotExpanded
+                        CrashPointReplaySegmentExpansion::NotExpanded
                     }
                 },
                 threads,
-            );
-            enumeration_clause_holds &= small_enumeration_holds;
-            tally_clause_holds &= small_tally_holds;
+            ));
         }
-        let (quick_enumeration_holds, quick_tally_holds) = report_crates_comparison(
+        crates_comparison_verdicts.absorb(report_crates_comparison(
             output,
             &format!("{name}_quick"),
             &context,
@@ -5542,9 +5676,7 @@ fn run_feasibility(output: &mut ResultLines) -> i32 {
             &quick_ordinals,
             &|segment_index| quick.expansion_by_segment[segment_index].crates_expansion(),
             threads,
-        );
-        enumeration_clause_holds &= quick_enumeration_holds;
-        tally_clause_holds &= quick_tally_holds;
+        ));
         tally_clause_holds &= report_per_state_crates_comparison(
             output,
             &format!("{name}_segment_head"),
@@ -5662,6 +5794,15 @@ fn run_feasibility(output: &mut ResultLines) -> i32 {
         .iter()
         .map(|(name, holds)| format!("{name}={}", bool_text(*holds)))
         .collect();
+    enumeration_clause_holds &= crates_comparison_verdicts.enumeration_clause_holds;
+    tally_clause_holds &= crates_comparison_verdicts.tally_clause_holds;
+    if crates_comparison_verdicts.judge_stage_not_run {
+        output.line(
+            "name=verdict scope=feasibility clause_S3_holds=not_run clause_S4_holds=not_run judge_stage=not_run"
+                .to_string(),
+        );
+        return CRATES_COMPARISON_NOT_RUN_EXIT_CODE;
+    }
     output.line(format!(
         "name=verdict scope=feasibility clause_S1_holds={} clause_S2_holds={} clause_S3_holds={} clause_S4_holds={} clause_S5_holds={} clause_S6_holds={} anchors_a1_to_a7_hold={} {} g1=not_judged_feasibility_only g2=not_judged_feasibility_only g3=not_judged_feasibility_only g4=not_judged_feasibility_only g5=not_judged_feasibility_only",
         bool_text(constants_clause_holds),
@@ -5692,7 +5833,19 @@ fn run_feasibility(output: &mut ResultLines) -> i32 {
 mod tests {
     use super::*;
 
-    /// 第一条流的 D1-small（45 个状态）跑一遍 5.1 的四件事；各测试共用这一份搭建的写法。
+    /// 线程数：`E161_THREADS` 先读；没设读 `SINGLEFS_THREAD_CAP`；都没设取登记的每台默认重活线程数，不取本机核数。
+    #[test]
+    fn threads_read_e161_threads_first_then_the_heavy_thread_default() {
+        assert_eq!(threads_of_the_variable_values(Some("3"), Some("5")), 3);
+        assert_eq!(threads_of_the_variable_values(None, Some("5")), 5);
+        assert_eq!(
+            threads_of_the_variable_values(None, None),
+            singlefs_harness::heavy_threads::registered_heavy_threads().get(),
+            "都没设取 .claude/heavy-thread-default 的登记值"
+        );
+    }
+
+    /// 新池新建文件流的 D1-small（45 个状态）跑一遍 5.1 的四件事；各测试共用这一份搭建的写法。
     /// 评之前先核 D1-small 的个数（重跑登记 I-7 的域守卫）：段形或阈值一变，D1-small 会把 1677 万个状态的段整段收进来，
     /// 不先核就一路评到撞内存上限。
     fn evaluate_the_first_stream_small_domain(
@@ -5712,7 +5865,7 @@ mod tests {
             assert_eq!(
                 small.len(),
                 45,
-                "域守卫：第一条流 D1-small 是 45 个状态（重跑登记 A4），对不上就不评"
+                "域守卫：新池新建文件流 D1-small 是 45 个状态（重跑登记 A4），对不上就不评"
             );
             let control: BTreeSet<u64> = small.iter().copied().collect();
             let totals = evaluate_stream_domain(&StreamDomainRun {
@@ -5783,7 +5936,7 @@ mod tests {
         assert_eq!(
             formula_segment_state_count(24, 0),
             16_777_215,
-            "2²⁴ − 1：C577 之后第一条流段 7 的 24 个单元写"
+            "2²⁴ − 1：C577 之后新池新建文件流段 7 的 24 个单元写"
         );
     }
 
@@ -5807,33 +5960,33 @@ mod tests {
         assert_eq!(
             small_domain_ordinals(&stream, &full).len(),
             45,
-            "A4：D1-small 第一条流"
+            "A4：D1-small 新池新建文件流"
         );
         assert_eq!(
             stride_domain_ordinals(&stream, &full).len(),
             7_260,
-            "A4：D1-stride 第一条流唯一的 24 写段（段 7）"
+            "A4：D1-stride 新池新建文件流唯一的 24 写段（段 7）"
         );
         assert_eq!(
             every_ordinal(&stream, &quick).len(),
             46,
-            "A4：D1-quick 第一条流"
+            "A4：D1-quick 新池新建文件流"
         );
         assert_eq!(
             strided_segment_heads(&stream, &full).len(),
             4_096,
-            "A4：段头，第一条流段 7 序号最小的 4096 个"
+            "A4：段头，新池新建文件流段 7 序号最小的 4096 个"
         );
     }
 
-    /// 重跑登记 I-10：只搭第二条流、建计划，一个状态都不评。
+    /// 重跑登记 I-10：只搭覆盖写固定脚本流、建计划，一个状态都不评。
     #[test]
     fn second_stream_shape_and_sampled_domains_have_the_registered_sizes() {
         let first = prepare_first_stream();
         let stream = prepare_second_stream();
-        assert_eq!(stream.segments.len(), 78, "A8：第二条流 78 段");
-        assert_eq!(stream.writes.len(), 481, "A8：第二条流 481 次写");
-        assert_eq!(stream.root_write_count, 19, "A8：第二条流 19 条根");
+        assert_eq!(stream.segments.len(), 78, "A8：覆盖写固定脚本流 78 段");
+        assert_eq!(stream.writes.len(), 481, "A8：覆盖写固定脚本流 481 次写");
+        assert_eq!(stream.root_write_count, 19, "A8：覆盖写固定脚本流 19 条根");
         let shape = check_stream_shape(&stream);
         assert!(shape.segment_lengths_match, "S2：段长表与本地常量逐段相同");
         assert!(shape.writes_match, "S2：写数与本地常量相同");
@@ -5842,7 +5995,7 @@ mod tests {
         assert!(bases_identical, "S2：两条流的基镜像逐字节相同");
         assert!(
             prefix_identical,
-            "S2：第二条流前 11 段的写与第一条流 11 段逐字节相同"
+            "S2：覆盖写固定脚本流前 11 段的写与新池新建文件流 11 段逐字节相同"
         );
         let table = TornWriteTable::of(&stream);
         let full = LocalPlan::new(
@@ -5872,22 +6025,22 @@ mod tests {
         assert_eq!(
             small_domain_ordinals(&stream, &full).len(),
             393_261,
-            "A4：D1-small 第二条流"
+            "A4：D1-small 覆盖写固定脚本流"
         );
         assert_eq!(
             stride_domain_ordinals(&stream, &full).len(),
             7_260,
-            "A4：D1-stride 第二条流唯一的 24 写段（段 11）"
+            "A4：D1-stride 覆盖写固定脚本流唯一的 24 写段（段 11）"
         );
         assert_eq!(
             every_ordinal(&stream, &quick).len(),
             52,
-            "A4：D1-quick 第二条流"
+            "A4：D1-quick 覆盖写固定脚本流"
         );
         assert_eq!(
             strided_segment_heads(&stream, &full).len(),
             4_096,
-            "A4：段头，第二条流段 11 序号最小的 4096 个"
+            "A4：段头，覆盖写固定脚本流段 11 序号最小的 4096 个"
         );
         let timing_control = TimingControlSegmentShape::of(&stream, &full);
         assert_eq!(
@@ -5906,18 +6059,18 @@ mod tests {
             whole_stream_states_by_the_formula(&stream, &table);
         assert_eq!(
             whole_stream_states, 1_678_377_204,
-            "A7：第二条流整条流全量（公式，1 + Σ 各段）"
+            "A7：覆盖写固定脚本流整条流全量（公式，1 + Σ 各段）"
         );
         assert_eq!(
             whole_stream_largest, 268_435_455,
-            "A7：第二条流整条流最大一段 2²⁸ − 1"
+            "A7：覆盖写固定脚本流整条流最大一段 2²⁸ − 1"
         );
     }
 
     #[test]
     fn recorded_recovery_answers_exactly_like_the_baseline_on_the_first_stream() {
         let (_stream, totals, _small) = evaluate_the_first_stream_small_domain(2, None);
-        assert_eq!(totals.states(), 45, "D1-small 第一条流 45 个状态");
+        assert_eq!(totals.states(), 45, "D1-small 新池新建文件流 45 个状态");
         assert_eq!(
             totals.consult_report_differs, 0,
             "S5：记录跑看 journal 那一遍与照跑逐项相同"
@@ -6058,7 +6211,7 @@ mod tests {
             .map(|ordinal| plan.segment_of(*ordinal))
             .collect();
         let mut output = ResultLines::new();
-        let (enumeration_clause_holds, tally_clause_holds) = report_crates_comparison(
+        let clauses = report_crates_comparison(
             &mut output,
             "test-first-small",
             &context,
@@ -6066,13 +6219,21 @@ mod tests {
             &small,
             &|segment_index| {
                 if small_segments.contains(&segment_index) {
-                    Layer0SegmentExpansion::EveryProperSubset
+                    CrashPointReplaySegmentExpansion::EveryProperSubset
                 } else {
-                    Layer0SegmentExpansion::NotExpanded
+                    CrashPointReplaySegmentExpansion::NotExpanded
                 }
             },
             2,
         );
+        let CratesComparisonClauses::Judged {
+            enumeration_clause_holds,
+            tally_clause_holds,
+        } = clauses
+        else {
+            // 判段这一趟没跑（配置开了 GPU 而没编进 gpu 特性）：上面已打本次未跑那一行，不判
+            return;
+        };
         assert!(enumeration_clause_holds, "S3：持久集合与写表逐个相同");
         assert!(tally_clause_holds, "S4：装置照跑的计数与 crates 逐项相同");
     }

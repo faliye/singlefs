@@ -142,6 +142,17 @@ pub trait BlockDevice {
     fn barrier(&mut self) -> Result<(), BlockDeviceError>;
     fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes;
     fn size_in_bytes(&self) -> u64;
+    /// journal 环里可能有字节的记录槽偏移：恢复扫环时只读这些槽；`None` 是不知道，恢复按记录宽逐槽扫全环。
+    /// 默认 `None`：文件后端与真设备不记哪些扇区写过。只记写过的扇区的内存盘答得出，答出的集合要罩住环里每个可能过得了
+    /// journal magic 的槽——漏一个槽就少读一条记录，恢复落到的那一版与全环扫描不同
+    /// （对拍在 `crates/singlefs-harness/tests/sparse_block_device_journal_hint_matches_the_full_ring_scan.rs`）。
+    fn journal_record_offsets_hint(
+        &self,
+        _ring_start: DeviceOffsetInBytes,
+        _ring_bytes: u64,
+    ) -> Option<Vec<DeviceOffsetInBytes>> {
+        None
+    }
 }
 
 /// 文件后端的写零怎么落到镜像文件上。

@@ -102,7 +102,7 @@ use crate::unit::{
 use crate::write_accounting::WritesByStructureKind;
 use crate::write_request_split::data_unit_count_of_a_sequential_write;
 
-/// 恢复路径读盘的口子。两个实现：文件后端的池（`Vec<(DeviceIdentity, Device)>`）与层 0 枚举出的崩溃镜像（harness）。
+/// 恢复路径读盘的口子。两个实现：文件后端的池（`Vec<(DeviceIdentity, Device)>`）与崩溃点重放枚举出的崩溃镜像（harness）。
 pub trait PoolReader {
     fn device_identities(&self) -> Vec<DeviceIdentity>;
     /// 这块盘有多少字节；池里没有这块盘就 `None`。
@@ -144,13 +144,15 @@ impl<Device: BlockDevice> PoolReader for [(DeviceIdentity, Device)] {
         block_device.read_at(offset, &mut buffer).ok()?;
         Some(buffer)
     }
+    /// 盘自己答（[`BlockDevice::journal_record_offsets_hint`]）：真盘答 `None`、全环扫描；只记写过的扇区的内存盘答它写过的记录槽。
     fn journal_record_offsets_hint(
         &self,
-        _device: DeviceIdentity,
-        _ring_start: DeviceOffsetInBytes,
-        _ring_bytes: u64,
+        device: DeviceIdentity,
+        ring_start: DeviceOffsetInBytes,
+        ring_bytes: u64,
     ) -> Option<Vec<DeviceOffsetInBytes>> {
-        None
+        let (_, block_device) = self.iter().find(|(identity, _)| *identity == device)?;
+        block_device.journal_record_offsets_hint(ring_start, ring_bytes)
     }
 }
 
@@ -351,7 +353,7 @@ pub struct RecoveryReport {
     pub devices_without_a_mountable_system_configuration_slot: Vec<DeviceIdentity>,
 }
 
-/// 要不要看 journal：正常恢复看；层 0 里与「不看」逐状态比，问 journal 在这条流里承不承重；
+/// 要不要看 journal：正常恢复看；崩溃点重放里与「不看」逐状态比，问 journal 在这条流里承不承重；
 /// 「看但不验点名单元」只供测试强制进入（`.claude/rules/fs-design.md` 五条硬要求第 2 条），证明验证那一步承重。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JournalPolicy {
@@ -4673,7 +4675,7 @@ impl CentralMappingTreeReadOnFirstUse<'_> {
 }
 
 // ─── 冷走读与从盘上重建上一版共用的判定 ───
-// 代码审阅第 24 / 33 条，用户定案（`records/2026-09-27-代码审阅38条去向.md` 第 51 行）：「重建时把已经读到的节点照冷走读那套判全，
+// 代码审阅第 24 / 33 条，用户定案（`records/2026-09-27-代码审阅38条去向.md`「可写挂载判全树头与 key 次序」那一行）：「重建时把已经读到的节点照冷走读那套判全，
 // 坏了报错拒挂载，不多读盘」。下面每一道只判两边都已经读到手的字节，[`walk_to_file`] 与 [`rebuild_version`] 各在读到那一样的地方调，
 // 报的成员两边相同；一道判定一处定义，不各写一份（`code-discipline.md`「重复要生成，不许手抄」）。
 

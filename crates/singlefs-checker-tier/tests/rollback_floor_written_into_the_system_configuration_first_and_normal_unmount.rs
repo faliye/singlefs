@@ -1,4 +1,4 @@
-//! checker 档模块：crash
+//! checker 档模块：crash、crash_point_replay_progress、crash_given_states、crash_library、crash_amplification
 //! 回退改形态的第二批（SysPre 与 B1）落到 `crates/` 上：
 //! - F 的生效值 = max(根上带的 F, 系统配置里读得出的 F)（D16（发布语义） 已定项 1「生效」）；
 //! - 抬 F 那一串（准入与卸载共用）第一次发布之前先把新 F 写进每块盘的系统配置、过一道屏障，先写那一步任何一块盘失败就一条根都不发、
@@ -6,7 +6,7 @@
 //! - 非抬 F 的系统配置写（取号、发布末尾的轮换、取号失败的回卷）带整池的 F 生效值；
 //! - 正常卸载把 F 抬到现行那一版的 txg、不判上限，那一串空发布的根全带卸载记号（「正常卸载」那一行，D22（单元原子性怎么合成） 已定项 7）；
 //! - 录制流核「卸载记号只由卸载入口打」（C557（卸载记号只由卸载入口打没有检查））；
-//! - 层 0 的记录核对器把系统配置里的 F 算进回收谓词的界（C556（checker 与层 0 不读系统配置里的 F） 的层 0 那一半）。
+//! - 崩溃点重放的记录核对器把系统配置里的 F 算进回收谓词的界（C556（checker 与崩溃点重放不读系统配置里的 F） 的崩溃点重放那一半）。
 //!
 //! 条款没写的一格按「停在那一处」做成错误成员、在任何写之前拒：往下「抬」F（新 F 低于盘上的 F 生效值）。
 //! 树表 0 条的一版上卸载：一个字节都不写、卸载照常做成。
@@ -18,9 +18,16 @@ use common::{
     build_pool, disk_snapshot, file_content, format_pool, geometry, parameters,
     publish_overwrite_in_process, BuiltPool, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
 };
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
-use singlefs_checker_tier::crash::{evaluate_state_for_versions, Layer0Tally};
+use singlefs_checker::image::IMPLEMENTED_INVARIANTS;
+use singlefs_checker_tier::crash::{evaluate_state_for_versions, CrashPointReplayTally};
+use singlefs_checker_tier::crash_amplification::{
+    one_test_changes_the_environment_at_a_time, GivenStatesEngine, GivenStatesItem,
+};
+use singlefs_checker_tier::crash_given_states::{
+    GivenStateConclusion, GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
+};
+use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
+use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
@@ -49,7 +56,7 @@ use singlefs_harness::fault_injection::{
 };
 use singlefs_harness::memory_pool::{
     unmount_markers_outside_the_unmount_entry, writes_and_segments,
-    writes_and_segments_with_stream_indexes, PublishedVersion, SparseBlockDevice,
+    writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion, SparseBlockDevice,
     UnmountMarkerOutsideTheUnmountEntry, WrittenContents,
 };
 use singlefs_harness::segments::StepKind;
@@ -211,20 +218,68 @@ fn make_the_root_unreadable(pool: &mut BuiltPool, txg: CheckpointTxg) {
         .expect("改坏根槽");
 }
 
-fn violated_invariants(verdicts: &[(&'static str, InvariantVerdict)]) -> Vec<&'static str> {
-    verdicts
-        .iter()
-        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
-        .map(|(invariant, _)| *invariant)
-        .collect()
+/// 这份文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
+const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs";
+
+/// 一张盘上的池级 checker 走两段（用户 2026-10-13 定「能走两段的都走两段」）：那张盘作一张给定状态表（基线就是那张盘、写表空、一个空持久集合）
+/// 交崩溃点重放的给定状态引擎（`crash_amplification::GivenStatesEngine`），录入段写进给定状态表那一类的判定库，判段从库里读回判
+/// （配了 GPU 走 GPU 判器，没配由 CPU 判器判），判过的复用。只录那一趟、表归别的机器判的那一趟交 `None`（用例当场返回）。
+///
+/// # Panics
+/// 引擎起不了、判不了这张表（不退回别处判）；GPU 判不了这张盘（第三轮正文 H6 判红）。
+fn pool_checker_conclusion_through_the_given_states_engine(
+    table_name: &str,
+    image: &MemoryPool,
+) -> Option<GivenStateConclusion> {
+    let engine = {
+        let _one_test_at_a_time = one_test_changes_the_environment_at_a_time();
+        GivenStatesEngine::start_from_environment(
+            GivenStatesItem {
+                item_name: "rollback_floor_written_into_the_system_configuration_first".to_string(),
+                setting_file: THIS_FILE.to_string(),
+                seeds_and_scale: "fixed".to_string(),
+            },
+            &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &repository_root_of_this_crate(),
+        )
+        .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+    };
+    let judged = engine
+        .judge_the_given_states(&GivenStatesOfATable {
+            table_name: table_name.to_string(),
+            base: image,
+            writes: &[],
+            segments: &[],
+            seams: &[],
+            persisted_sets: vec![Vec::new()],
+        })
+        .unwrap_or_else(|reason| {
+            panic!("给定状态表 {table_name} 判不了（不退回别处判）：{reason}")
+        });
+    assert_eq!(
+        engine.finish().red_items(),
+        Vec::<String>::new(),
+        "GPU 判不了的盘照第三轮正文 H6 判红"
+    );
+    match judged.source {
+        GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+        GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
+        | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => return None,
+    }
+    let [conclusion] = <[GivenStateConclusion; 1]>::try_from(judged.states)
+        .unwrap_or_else(|states| panic!("一个状态一份结论，交回 {} 份", states.len()));
+    Some(conclusion)
 }
 
-fn verdict_of(verdicts: &[(&'static str, InvariantVerdict)], invariant: &str) -> InvariantVerdict {
-    verdicts
+/// 池级 checker 在这个结论里把 `invariant` 真判过（成立或违例，不是不适用、部分没判）且没判违例。
+fn invariant_is_judged_and_holds(conclusion: &GivenStateConclusion, invariant: &str) -> bool {
+    let position = IMPLEMENTED_INVARIANTS
         .iter()
-        .find(|(name, _)| *name == invariant)
-        .map(|(_, verdict)| verdict.clone())
-        .expect("checker 每条都报")
+        .position(|implemented| *implemented == invariant)
+        .unwrap_or_else(|| panic!("{invariant} 在池级 checker 的清单里"));
+    let bit = 1u128 << position;
+    conclusion.words.pool_checker_judged_bits & bit != 0
+        && conclusion.words.pool_checker_violated_bits & bit == 0
 }
 
 /// SysPre（D16（发布语义） 已定项 1「抬 F 那一串」、已定项 7）：新池新建文件之后覆盖写三次（txg 4–6），抬 F 到上限 3——
@@ -587,16 +642,24 @@ fn normal_unmount_raises_the_floor_to_the_current_txg_with_marked_empty_publishe
                 root.checkpoint_txg.0
             );
         }
-        let verdicts = check_pool_image(&image);
+        let Some(conclusion) = pool_checker_conclusion_through_the_given_states_engine(
+            &format!("after-the-unmount-of-{overwrites}-overwrites"),
+            &image,
+        ) else {
+            return;
+        };
+        let violations = conclusion.pool_checker_violations();
         assert_eq!(
-            violated_invariants(&verdicts),
+            violations
+                .iter()
+                .map(|(invariant, _)| *invariant)
+                .collect::<Vec<&str>>(),
             Vec::<&str>::new(),
-            "卸载之后的镜像一条都不红：{verdicts:?}"
+            "卸载之后的镜像一条都不红：{violations:?}"
         );
         for invariant in ["I-7.9", "I-7.12"] {
-            assert_eq!(
-                verdict_of(&verdicts, invariant),
-                InvariantVerdict::Holds,
+            assert!(
+                invariant_is_judged_and_holds(&conclusion, invariant),
                 "{invariant} 真被评估过且成立"
             );
         }
@@ -1008,7 +1071,7 @@ fn unmount_markers_are_judged_against_the_recorded_unmount_entry() {
     );
 }
 
-/// C557 那一道接在层 0 切写表的入口上（`crash::writes_and_segments_with_stream_indexes`）：没记入口的流里一条带卸载记号的根槽写都不许有。
+/// C557 那一道接在崩溃点重放切写表的入口上（`crash::writes_and_segments_with_stream_indexes`）：没记入口的流里一条带卸载记号的根槽写都不许有。
 /// 卸载那一串的流不带入口段交给它，当场停，停的理由点名 C557；卸载之前那一段流（没有带记号的根槽写）照常切。
 #[test]
 fn cutting_a_stream_with_an_unmount_marker_outside_any_recorded_unmount_entry_panics() {
@@ -1043,7 +1106,7 @@ fn cutting_a_stream_with_an_unmount_marker_outside_any_recorded_unmount_entry_pa
     assert!(message.contains("C557"), "停的理由点名 C557：{message}");
 }
 
-/// C556（checker 与层 0 不读系统配置里的 F） 的层 0 那一半：记录核对器的复用豁免判「那次复用过不过得了回收谓词」时，
+/// C556（checker 与崩溃点重放不读系统配置里的 F） 的崩溃点重放那一半：记录核对器的复用豁免判「那次复用过不过得了回收谓词」时，
 /// F 生效值的界把系统配置槽写带的 F 也算进去（生效值取根上带的与系统配置里的最大值）。
 /// 造法同 `record_checker_reuse_exemption_legality.rs`：复用窗口置 0，txg 5 的数据单元落回 txg 4 的那一对槽 50178，
 /// 崩在 txg 5 的单元写全部落盘、记录与根槽都没落盘那一刻——只按根上的 F（0）界，这次复用过不了回收谓词、记录核对器判红；
@@ -1105,7 +1168,7 @@ fn the_record_checker_bounds_the_effective_floor_by_the_floor_written_into_the_s
     ];
     let record_checker_red_states =
         |write_table: &[singlefs_harness::memory_pool::RetainedWrite]| {
-            let mut tally = Layer0Tally::default();
+            let mut tally = CrashPointReplayTally::default();
             let _report = evaluate_state_for_versions(
                 &base,
                 write_table,

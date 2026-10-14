@@ -13,10 +13,10 @@
 //!
 //! 不收参数、不读环境、不碰真设备、不写任何文件。退出码：0 = 正常；1 = 命令行给了参数。
 //!
-//! **已实测：这个装置跑不出产物**——`crates/singlefs-core/src/make_filesystem.rs:194` 有一条硬编码断言
+//! **已实测：这个装置跑不出产物**——`crates/singlefs-core/src/make_filesystem.rs` 的 `make_filesystem` 开头有一条硬编码断言
 //! 「第一版跑 2 块盘（D2（RAID 条带策略） 已定项 9）」，`assert_eq!(devices.len(), 2)`，不是 `MakeFilesystemError`
-//! 走不到 `Result`，一盘调用必定 panic（2026-09-25 现跑过：`thread 'main' panicked at
-//! crates/singlefs-core/src/make_filesystem.rs:194:5`）。这正是跑前登记第八节 G4 那一格允许的结局
+//! 走不到 `Result`，一盘调用必定 panic（2026-09-25 现跑过：panic 报在
+//! 这条断言上）。这正是跑前登记第八节 G4 那一格允许的结局
 //! 「`crates/` 侧造不出这个几何」——按只驱动、只观测的写范围，这个装置不改 `singlefs-core` 去放开那条断言，
 //! 如实记「G4 只在一个几何上量过」，不停机、不作废（模型一侧的数已经由
 //! `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` 里
@@ -45,7 +45,7 @@ use singlefs_harness::{
 };
 
 /// G4 那套几何：一块盘，三个区域全落在盘 0 上；`physical_block_size` = io_min = 512（与主几何同一档）。
-/// 值抄自模型 `PoolParameters::control_one_device_no_barriers()`（第 2029–2031 行：
+/// 值抄自模型 `PoolParameters::control_one_device_no_barriers()`（那个函数里的
 /// `device_count = 1`、`region_devices = [DeviceIdentity(0); 3]`）。
 const DEVICE_COUNT: u32 = 1;
 const PHYSICAL_BLOCK_SIZE_IN_BYTES: u32 = 512;

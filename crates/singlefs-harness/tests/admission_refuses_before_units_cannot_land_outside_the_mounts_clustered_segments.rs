@@ -5,27 +5,23 @@
 //! 小盘为环窗口补足之后（用户 2026-10-02 定 Q-N「甲」）普通写被式子先拒，那两格改用删除类发布（不判式子、落点那一判照判）去撞（Q-T「甲」），
 //! 数据单元那一半由一格造盘面的覆盖写罩着；另有一格数据单元落得下、提交内生块落不下的；再加一格对照：准入用只供测试的开关关掉时
 //! 落点那一道照样兜着，会话推过抬 F 再发成。盘都是内存里的稀疏盘，两块、单元区 256 / 384 槽（`HistoryDeviceWidth` 那两档）。
-
 mod common_admission;
+mod common_images_for_the_checker_tier;
+#[path = "common_images_for_the_checker_tier/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs"]
+mod scenarios_of_admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments;
 
-use common_admission::{
-    checker_violations_on, content_of, plain_devices_on, start_plain, PoolUnderTest,
-    OVERWRITE_BYTES,
-};
-use singlefs_core::address::{
-    CheckpointTxg, DeviceIdentity, InodeNumber, InstanceGeneration, SlotNumber,
-};
+use common_admission::{content_of, plain_devices_on, start_plain, PoolUnderTest, OVERWRITE_BYTES};
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use singlefs_core::address::{DeviceIdentity, InodeNumber, InstanceGeneration, SlotNumber};
 use singlefs_core::admission::{
     admission_reading_before_a_publish, checkpoint_cost_of_the_version_to_build_on,
     space_budget_of_role, AvailableBytesOnOneDevice, BytesOnOneDevice, DeviceShortOfDemand,
-    SpaceAdmission, SpaceBudgetOfARole,
+    SpaceBudgetOfARole,
 };
-use singlefs_core::allocator::{PlacementRefusal, PoolAllocator};
-use singlefs_core::journal::back_chain_of;
+use singlefs_core::allocator::PoolAllocator;
 use singlefs_core::transaction::{
-    publish_overwrite, publish_unlink_intent, publish_unlink_step, publish_version, FirstFile,
-    InstanceTablePlan, PoolVersion, PoolWriter, PublishError, PublishPlan, TransactionOutput,
-    TransactionUnit, FIRST_INODE_NUMBER,
+    publish_overwrite, publish_unlink_intent, publish_unlink_step, FirstFile, PoolVersion,
+    PoolWriter, PublishError, TransactionOutput, TransactionUnit, FIRST_INODE_NUMBER,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_core::unlink::{UnlinkBatchDataUnitsCappedForTests, UnlinkBatchSize};
@@ -35,38 +31,6 @@ use singlefs_harness::memory_pool::SparseBlockDevice;
 
 /// 删除的就是第一个文件。
 const FIRST_FILE: InodeNumber = InodeNumber(FIRST_INODE_NUMBER);
-
-/// 这次挂载的会话上直接发一次空发布（暖机、抬 F 与卸载推的那一种：不写文件内容、实例表照抄），不经会话的准入与推抬 F。
-fn publish_an_empty_version_directly_on_the_session(pool: &mut PoolUnderTest<SparseBlockDevice>) {
-    let session = pool.session.as_mut().expect("这次挂载的会话");
-    let PoolVersion::WithFile(current) = &session.current else {
-        panic!("第一个文件之后现行那一版带文件");
-    };
-    let current = current.clone();
-    let mut writer = PoolWriter::new(&pool.parameters, pool.devices.as_mut_slice());
-    let published = publish_version(
-        &mut writer,
-        &mut session.allocator,
-        PublishPlan {
-            txg: CheckpointTxg(current.root.checkpoint_txg.0 + 1),
-            counter: current.record.counter + 1,
-            transaction: 0,
-            highest_transaction_number_before_this_publish: current
-                .highest_transaction_number_in_this_instance,
-            instance: current.root.instance,
-            back_chain: back_chain_of(&current.record_bytes),
-            file: None,
-            new_inode_records: &[],
-            instance_table: InstanceTablePlan::Carry(current.root.instance_table),
-            tree_birth_txg: current.tree_birth_txg(),
-            tree_identifier_watermark: current.root.tree_identifier_watermark,
-            rollback_floor: current.root.rollback_floor,
-        },
-        Some(&current),
-    )
-    .expect("空发布做成：它不判准入，固定点从这次挂载开的聚簇段里 bump");
-    session.current = PoolVersion::WithFile(published);
-}
 
 /// 每块盘上两槽都空（没分配、没隔离、没扣住）的偶数起点槽对：落在这次挂载开过的聚簇段外的几对、段内的几对。逐槽扫（用例这一侧，
 /// 不读分配器增量维护的计数）。
@@ -509,65 +473,11 @@ fn a_write_whose_data_unit_lands_but_whose_commit_generated_units_find_no_unbloc
     );
 }
 
-/// 第一格那一形，会话的准入用只供测试的开关关掉（`SpaceAdmission::SkippedByTheTestOnlySwitch`：式子与落得下两判都不判）：
-/// 落点那一道照样兜着。两块单元区 384 槽的小盘，崩了再挂、直接推 200 次空发布之后，经会话把文件顺序写到 2、3……29 个数据单元，都一次做成；
-/// 写到 30 个单元：走固定点时在分配器的拷贝上取不到数据单元 19 的落点，交回 `PlacementRefused { Data(19), NoFreeSlotOnAnyDevice }`，
-/// 会话照 D16（发布语义） 已定项 1「准入」那一行（准入放行而落点取不到也推）推一串抬 F、回收之后再发，做成——推过的只这一串、
-/// 推它的是那一次落点被拒；F 抬上去了，池级 checker 0 违例。
-/// 判别力：会话只在准入拒时推（落点被拒原样交回）时，写到 30 个单元报 `UserChangeRefused::Publish { PlacementRefused }`。
-/// A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是「80 次空发布、写到 6 个、第 7 个推」，与第一格同一次改（草稿探针在新几何上现跑的数）；
-/// 环窗口真扣、小盘放大 815 槽（用户 2026-10-02 定「甲」）之前是「写到 6 个、数据单元 0 被拒」，放大之后 200、400 次空发布都是写到 26 个、
-/// 数据单元 19 被拒（三·2 第 6 条实现员副本上的草稿探针）；第 50 批补足 815 → 1007 槽（退役树那几项）之后是写到 30 个、数据单元 19 被拒
-/// （第 50 批实现员副本上现跑：29 个之前都一次做成）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments::with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write(
 ) {
-    let mut pool = start_plain(HistoryDeviceWidth::UnitAreaOf384Slots);
-    pool.crash_and_mount_writable()
-        .expect("第一个文件之后崩了再挂");
-    pool.session
-        .as_mut()
-        .expect("这次挂载的会话")
-        .allocator
-        .set_space_admission(SpaceAdmission::SkippedByTheTestOnlySwitch);
-    for _ in 0..200 {
-        publish_an_empty_version_directly_on_the_session(&mut pool);
-    }
-    for data_units in 2..=29 {
-        let published = pool
-            .sequential_write(data_units * data_unit_payload_capacity())
-            .unwrap_or_else(|refusal| {
-                panic!("经会话顺序写到 {data_units} 个数据单元做成：{refusal:?}")
-            });
-        assert!(
-            published.floor_raises.is_empty(),
-            "顺序写到 {data_units} 个数据单元一次做成，没推抬 F"
-        );
-    }
-    let floor_before = pool.rollback_floor();
-    let published = pool
-        .sequential_write(30 * data_unit_payload_capacity())
-        .unwrap_or_else(|refusal| {
-            panic!("经会话顺序写到 30 个数据单元，推过抬 F 之后做成：{refusal:?}")
-        });
-    assert!(
-        matches!(
-            published.refusals_that_pushed_the_floor_raises.as_slice(),
-            [PublishError::PlacementRefused {
-                unit: TransactionUnit::Data(singlefs_core::address::DataUnitIndexInFile(19)),
-                refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
-            }]
-        ),
-        "推过一串抬 F，推它的是数据单元 19 的落点被拒：{:?}",
-        published.refusals_that_pushed_the_floor_raises
-    );
-    assert!(
-        pool.rollback_floor() > floor_before,
-        "F 从 {floor_before:?} 抬上去了"
-    );
-    assert_eq!(
-        checker_violations_on(&pool.image()),
-        Vec::<String>::new(),
-        "推过抬 F 再写成之后池级 checker 0 违例"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments::with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write,
     );
 }

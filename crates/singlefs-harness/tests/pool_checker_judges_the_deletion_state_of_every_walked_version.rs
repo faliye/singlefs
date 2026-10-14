@@ -42,9 +42,9 @@ use common_deletion_in_progress::{
     set_the_nlink_of_an_inode_record_in_the_leaf_at_to_zero,
     set_the_nlink_of_an_inode_record_to_zero, set_the_nlink_of_the_queued_first_file_back_to_one,
     set_the_pending_deletion_occupancy_row_to_one, set_tombstone_field, tombstone_field,
-    tree_table_slot_of_the_newest_root, unlink_to_the_end, verdict_of, violated_invariants,
-    zero_both_copies_of_the_unit_at, TOMBSTONE_RECORD_DEATH_TXG_OFFSET,
-    TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET, TOMBSTONE_RECORD_RANGE_END_OFFSET,
+    tree_table_slot_of_the_newest_root, unlink_to_the_end, zero_both_copies_of_the_unit_at,
+    TOMBSTONE_RECORD_DEATH_TXG_OFFSET, TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET,
+    TOMBSTONE_RECORD_RANGE_END_OFFSET,
 };
 use common_pointer_head_corruption::{data_unit_bytes, node_bytes, unit_bytes_at};
 use singlefs_checker::image::{
@@ -61,6 +61,29 @@ use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::records::{TREE_KIND_DELETED_INODES, TREE_KIND_EXTENT};
 use singlefs_core::transaction::TransactionUnit;
 use singlefs_harness::memory_pool::MemoryPool;
+
+/// 判违例的不变量，按 checker 报的次序（池级 checker 自己的单测，手造的镜像就地判：这份文件登记在 `cpu-judging-sites.tsv` 的 excluded 里；
+/// 原先在 `common_deletion_in_progress/mod.rs`，那里还有别的产出再判的调用方，判法挪到 checker 档之后只剩这一份用）。
+fn violated_invariants(image: &MemoryPool) -> Vec<&'static str> {
+    singlefs_checker::walk::check_pool_image(image)
+        .into_iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(_) => Some(invariant),
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
+        })
+        .collect()
+}
+
+/// 一条不变量的判定。
+fn verdict_of(image: &MemoryPool, invariant: &str) -> InvariantVerdict {
+    singlefs_checker::walk::check_pool_image(image)
+        .into_iter()
+        .find(|(identifier, _)| *identifier == invariant)
+        .expect("清单里有这一条")
+        .1
+}
 
 /// 第一处违例的说明；这一条没判违例就当场失败。
 fn first_violation_of(image: &MemoryPool, invariant: &str) -> String {
@@ -122,7 +145,7 @@ fn assert_the_base_image_is_clean(image: &MemoryPool, base: &str) {
 
 /// I-9.5 正方向，只红自己的那一形（判决第二节最后一行）：空 inode 2 发完意图之后队列 {2} 改成 {7}，7 号在 inode 树里没有记录、
 /// extent 树里也没有单元（队列只一个号，I-9.24 照旧成立；2 号 nlink 0 而不在队列里，反方向也红在 I-9.5 上）。
-/// I-9.18（删除队列里的号有谱系上的墓碑） 对 7 号判不了、不判红（`.claude/kb/invariants.md` I-9.18 那一行：这一形只让 I-9.5 红）。
+/// I-9.18（删除队列里的号有谱系上的墓碑） 对 7 号判不了、不判红（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.18 那一行：这一形只让 I-9.5 红）。
 #[test]
 fn a_queue_number_without_an_inode_record_reddens_only_the_deletion_queue_invariant() {
     let clean = image_after_the_intent_of_an_empty_inode("deletion-checker-queue-without-record");
@@ -172,7 +195,7 @@ fn an_inode_record_with_nlink_zero_outside_the_queue_reddens_only_the_deletion_q
     );
 }
 
-/// 形式化接入那条线攻方的 `being-deleted` 那一形（`research/prompts/m3-formal-code-b21-r1-opus-model/out/k2a.txt` 第 5 行：
+/// 形式化接入那条线攻方的 `being-deleted` 那一形（`research/prompts/m3-formal-code-b21-r1-opus-model/out/k2a.txt` 里 `variant=being-deleted` 那一行：
 /// 一次建 inode 的发布写出一条新记录 (3, 9, nlink 0, size 0)、号不在队列里，那时池级 checker 一条都不红；C708 的验收）：
 /// 一次发布建两个空 inode（2、3 号），把这次新写出的 3 号记录 nlink 改成 0。池级 checker 在这一形上红 I-9.5。
 #[test]
@@ -286,7 +309,7 @@ fn an_accounting_tree_without_the_pending_deletion_occupancy_row_reddens_only_th
     );
 }
 
-/// I-9.6 墓碑那一半（`.claude/kb/invariants.md` I-9.6 那一行：水位 > 所选根的墓碑树里全部已发布的墓碑记录的对象 ID）：
+/// I-9.6 墓碑那一半（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.6 那一行：水位 > 所选根的墓碑树里全部已发布的墓碑记录的对象 ID）：
 /// 3 号删完、根环转过一圈之后那条墓碑的对象 ID 3 → 记账里的 inode 号水位，inode 树里最大的 key 仍小于水位——只判「水位 > 树内最大 key」
 /// 那一半时它全绿。在意图那一版上改会连带 I-9.18（意图那一版的队列 {3} 找不到 3 号的墓碑），所以等意图那一版转出候选集再改
 /// （判决 `research/prompts/m3-delete-checker-r2-main-verification.md` 第二节 T9、攻方第五节的造法）。
@@ -416,7 +439,7 @@ fn an_intermediate_version_whose_inode_leaf_does_not_read_back_is_not_judged_rat
 /// 阳性对照：三个单元的文件按批大小 1 删完（意图、留 2、留 1、最后一批），每一步的镜像上一条违例都没有；
 /// I-9.5、I-3.4、I-4.7、I-4.6 真被评估过且成立（最后一批之后，回退候选集里意图与各批那几版还在，删除中的号仍有对象），
 /// 墓碑与谱系那几条（I-9.10 墓碑那一个等号、I-9.18、I-9.19、I-9.20、I-9.23、I-9.24、I-9.29）也真被评估过且成立，
-/// I-4.4 报不适用、理由照 `.claude/kb/invariants.md` I-4.4 那一行。
+/// I-4.4 报不适用、理由照 `crates/singlefs-checker/invariants/06-事务与崩溃一致性.md` I-4.4 那一行。
 #[test]
 fn every_published_step_of_unlinking_a_three_unit_file_holds_the_deletion_invariants() {
     let mut pool = pool_with_a_three_unit_file("deletion-checker-every-step-holds");
@@ -831,7 +854,7 @@ fn a_tombstone_container_that_does_not_read_back_leaves_the_watermark_invariant_
     );
 }
 
-/// I-9.6 墓碑那一半「已发布」那一支（`.claude/kb/invariants.md` I-9.6 那一行：只算已发布的墓碑）：意图之后那片墓碑容器头里写序的实例代号
+/// I-9.6 墓碑那一半「已发布」那一支（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.6 那一行：只算已发布的墓碑）：意图之后那片墓碑容器头里写序的实例代号
 /// 1 → 2（大于挂载根的实例，已发布谓词判它不是已发布），墓碑对象 ID 也抬到水位 2。这片容器不算进墓碑那一半，I-9.6 照旧成立
 /// （对照：只抬对象 ID、不改实例的那一份红 I-9.6，见 `a_tombstone_whose_object_identifier_reaches_the_inode_number_watermark_reddens_only_the_watermark_invariant`）。
 #[test]
@@ -850,7 +873,7 @@ fn a_tombstone_container_outside_the_published_predicate_does_not_count_toward_t
     );
 }
 
-/// I-4.6 size = 0 那一支（`.claude/kb/invariants.md` I-4.6 那一行：size 为 0 时 0 或 1 个单元）：第一个文件顺序写成空内容（size 0、一个数据单元，
+/// I-4.6 size = 0 那一支（`crates/singlefs-checker/invariants/06-事务与崩溃一致性.md` I-4.6 那一行：size 为 0 时 0 或 1 个单元）：第一个文件顺序写成空内容（size 0、一个数据单元，
 /// 长度 0 的顺序写照样写一个单元），再发 unlink 的意图——1 号 nlink 0、size 0、一个单元，是发布路径自己写出来的合法中间态。
 #[test]
 fn an_inode_being_deleted_with_size_zero_and_one_data_unit_holds_the_intermediate_state_invariant()
@@ -948,7 +971,7 @@ fn an_intermediate_version_with_data_units_of_an_inode_without_a_record_reddens_
     );
 }
 
-/// C708（树里 nlink = 0 的 inode 不在删除队列里，池级 checker 判不出） 还差的那一形：I-9.5 正方向「队列里的号在树里 nlink ≠ 0」。
+/// C708（nlink 为 0 却不在删除队列，checker 判不出） 还差的那一形：I-9.5 正方向「队列里的号在树里 nlink ≠ 0」。
 /// 意图之后队列 {1} 不动，1 号那条记录的 nlink 0 → 1。按条款同红 I-9.19（谱系上的墓碑不指活对象）：墓碑 (1, 1 号的出生代) 在谱系上而那条记录
 /// nlink 1（判决 `research/prompts/m3-delete-checker-r2-main-verification.md` 第二节 T9 那一行）；I-9.18 只要有那条墓碑、不看 nlink，照旧成立。
 #[test]
@@ -1254,7 +1277,7 @@ fn unlinking_then_rolling_back_before_the_intent_and_back_to_the_emptied_version
     );
 }
 
-/// 「删 → 回退到删之前 → 再删」的合法历史（`.claude/kb/invariants.md` I-9.20 那一行：不按谱系过滤的写法在这一段上判红）：墓碑树里有两条
+/// 「删 → 回退到删之前 → 再删」的合法历史（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.20 那一行：不按谱系过滤的写法在这一段上判红）：墓碑树里有两条
 /// (2, 2 号的出生代)，第一条死于被回退抛弃的那一段、不在谱系上，不重号那一句只判谱系上的，成立；一条违例都没有。
 #[test]
 fn unlinking_the_same_inode_again_after_a_rollback_before_its_intent_holds_the_tombstone_record_invariant(

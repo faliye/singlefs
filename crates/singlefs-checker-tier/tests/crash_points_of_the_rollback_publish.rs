@@ -1,5 +1,8 @@
-//! checker 档模块：无（自己逐个造崩溃状态，只用 harness 档的内存池与池级 checker）
+//! checker 档模块：crash_point_replay_progress、crash_given_states、crash_library、crash_amplification
 //! 里程碑「覆盖写、释放、回退与复用」步 4（管理员回退改成挂着时的向前发布）：回退那次发布 D 的每个崩溃点各恢复一次。
+//! 每个前缀那一张镜像上的池级 checker 走两段（用户 2026-10-13 定「能走两段的都走两段」）：D 的每个前缀作一个给定状态（基线是 D 之前的盘、
+//! 写表是 D 那一段录制流里的写），整张表交崩溃点重放的给定状态引擎（`crash_amplification::GivenStatesEngine`）：录入段写进给定状态表那一类的
+//! 判定库，判段从库里读回判（配了 GPU 走 GPU 判器，没配由 CPU 判器判），判过的复用。
 //! 它逐个前缀造崩溃状态，归 checker 档（`.claude/rules/verification.md`「定义与名字」）；
 //! 同一条脚本的日常用例在 `crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs`，
 //! 这里用到的几个搭建函数从那里抄了一份（两档宁可各留一份，不让 harness 依赖 checker 档）。
@@ -8,17 +11,25 @@
 mod common;
 
 use common::{
-    build_pool, file_content, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+    build_pool, file_content, geometry, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS,
+    IMAGE_BYTES,
 };
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
+use singlefs_checker_tier::crash_amplification::{
+    one_test_changes_the_environment_at_a_time, GivenStatesEngine, GivenStatesItem,
+};
+use singlefs_checker_tier::crash_given_states::{
+    GivenStateConclusion, GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
+};
+use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
+use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::mount::{
     mount_writable, roll_back_by_a_forward_publish, RollbackError, RollbackTarget, RolledBack,
 };
 use singlefs_core::recovery::{recover, JournalPolicy, RecoveryOutcome};
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
-use singlefs_harness::memory_pool::MemoryPool;
+use singlefs_harness::memory_pool::{writes_and_segments_with_stream_indexes, MemoryPool};
+use singlefs_harness::RetainedOperation;
 
 const SECOND_FILE_BYTES: usize = 4100;
 const THIRD_FILE_BYTES: usize = 2500;
@@ -102,22 +113,79 @@ fn roll_back(pool: &mut BuiltPool, target: RollbackTarget) -> Result<RolledBack,
     )
 }
 
-/// 池级 checker 一条违例都没有；交回全部判定，调用方再点名要真被判过（不是「不适用」）的那几条。
-fn verdicts_without_any_violation(
-    image: &MemoryPool,
-    step: &str,
-) -> Vec<(&'static str, InvariantVerdict)> {
-    let verdicts = check_pool_image(image);
-    let violated: Vec<(&str, &InvariantVerdict)> = verdicts
+/// 这份文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_points_of_the_rollback_publish.rs";
+
+/// D 的每个前缀那一张镜像上的池级 checker 违例（不变量、细节），与 `prefixes` 同序：D 的每个前缀作一个给定状态
+/// （基线是 D 之前的盘、写表是 D 那一段录制流里的写，前缀 p 的持久集合是录制流下标小于 p 的写），整张表交崩溃点重放的给定状态引擎两段判
+/// （录入段写进库、判段从库里读回判，配了 GPU 走 GPU 判器）。只录那一趟、表归别的机器判的那一趟交 `None`（用例当场返回）。
+///
+/// # Panics
+/// 引擎起不了、判不了这张表（不退回别处判）；GPU 判不了的状态（第三轮正文 H6 判红）。
+fn pool_checker_violations_of_the_prefixes(
+    operations: &[RetainedOperation],
+    operations_before: usize,
+    prefixes: &[usize],
+) -> Option<Vec<Vec<(&'static str, String)>>> {
+    let mut base = MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
+    base.apply(&operations[..operations_before]);
+    let (writes, segments, stream_indexes) =
+        writes_and_segments_with_stream_indexes(&operations[operations_before..], &geometry());
+    let persisted_sets: Vec<Vec<bool>> = prefixes
         .iter()
-        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
-        .map(|(invariant, verdict)| (*invariant, verdict))
+        .map(|prefix| {
+            stream_indexes
+                .iter()
+                .map(|stream_index| operations_before + stream_index < *prefix)
+                .collect()
+        })
         .collect();
-    assert!(
-        violated.is_empty(),
-        "{step}：池级 checker 一条违例都没有：{violated:?}"
+    let engine = {
+        let _one_test_at_a_time = one_test_changes_the_environment_at_a_time();
+        GivenStatesEngine::start_from_environment(
+            GivenStatesItem {
+                item_name: "crash_points_of_the_rollback_publish".to_string(),
+                setting_file: THIS_FILE.to_string(),
+                seeds_and_scale: format!("prefixes={}", prefixes.len()),
+            },
+            &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &repository_root_of_this_crate(),
+        )
+        .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+    };
+    let judged = engine
+        .judge_the_given_states(&GivenStatesOfATable {
+            table_name: "every-prefix-of-the-rollback-publish".to_string(),
+            base: &base,
+            writes: &writes,
+            segments: &segments,
+            seams: &[],
+            persisted_sets,
+        })
+        .unwrap_or_else(|reason| panic!("D 的前缀那张给定状态表判不了（不退回别处判）：{reason}"));
+    assert_eq!(
+        engine.finish().red_items(),
+        Vec::<String>::new(),
+        "GPU 判不了的状态照第三轮正文 H6 判红"
     );
-    verdicts
+    match judged.source {
+        GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+        GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
+        | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => return None,
+    }
+    assert_eq!(
+        judged.states.len(),
+        prefixes.len(),
+        "判器逐状态交回结论，与前缀同序"
+    );
+    Some(
+        judged
+            .states
+            .iter()
+            .map(GivenStateConclusion::pool_checker_violations)
+            .collect(),
+    )
 }
 
 /// 验收「崩在 D 的每个崩溃点」：录制流里 D 那一段的每一个前缀各恢复一次——D 的记录还没持久（它那一段写之前、屏障之前）⇒ 恢复到 C (2, 8)、
@@ -132,8 +200,14 @@ fn every_crash_point_of_the_rollback_publish_recovers_to_the_third_version_or_to
     roll_back(&mut pool, first_root()).expect("回退到 A");
     let operations = pool.retained_operations();
     assert!(operations.len() > operations_before + 10, "D 写了一段");
+    let prefixes: Vec<usize> = (operations_before..=operations.len()).collect();
+    let Some(violations_of_each_prefix) =
+        pool_checker_violations_of_the_prefixes(&operations, operations_before, &prefixes)
+    else {
+        return;
+    };
     let mut recovered_to_the_rollback_publish_at: Option<usize> = None;
-    for prefix in operations_before..=operations.len() {
+    for (prefix, violations) in prefixes.into_iter().zip(violations_of_each_prefix) {
         let mut image =
             MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
         image.apply(&operations[..prefix]);
@@ -166,7 +240,10 @@ fn every_crash_point_of_the_rollback_publish_recovers_to_the_third_version_or_to
                 "前缀 {prefix}：恢复到过 D 之后前缀更长又回到 C"
             );
         }
-        verdicts_without_any_violation(&image, &format!("D 的前缀 {prefix}"));
+        assert!(
+            violations.is_empty(),
+            "D 的前缀 {prefix}：池级 checker 一条违例都没有：{violations:?}"
+        );
     }
     let recovered_to_the_rollback_publish_at =
         recovered_to_the_rollback_publish_at.expect("整条 D 落完之后恢复到 D");

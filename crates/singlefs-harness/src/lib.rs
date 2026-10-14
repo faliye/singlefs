@@ -16,6 +16,7 @@ use singlefs_core::block_device::{
 
 pub mod fault_injection;
 pub mod gpu_memory_ledger;
+pub mod heavy_threads;
 pub mod hexadecimal;
 pub mod history;
 pub mod memory_pool;
@@ -36,7 +37,7 @@ pub enum RecordedOperationKind {
     Write,
     WriteForceUnitAccess,
     /// 整段清零：一次 [`BlockDevice::write_zeroes_at`] 记成**一步**，不是底下拆出来的那几次写
-    /// （用户 2026-09-19 定案「录制流登记成一种新步骤、层 0 认它」）。内容由 `offset` 与 `length` 全定：整段全 0。
+    /// （用户 2026-09-19 定案「录制流登记成一种新步骤、崩溃点重放认它」）。内容由 `offset` 与 `length` 全定：整段全 0。
     WriteZeroes,
     Barrier,
 }
@@ -440,6 +441,16 @@ impl<Inner: BlockDevice> BlockDevice for RecordingBlockDevice<Inner> {
 
     fn size_in_bytes(&self) -> u64 {
         self.inner.size_in_bytes()
+    }
+
+    /// 录制不改盘上有什么，提示照里面那块盘答。
+    fn journal_record_offsets_hint(
+        &self,
+        ring_start: DeviceOffsetInBytes,
+        ring_bytes: u64,
+    ) -> Option<Vec<DeviceOffsetInBytes>> {
+        self.inner
+            .journal_record_offsets_hint(ring_start, ring_bytes)
     }
 }
 

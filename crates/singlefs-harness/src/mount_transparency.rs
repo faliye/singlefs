@@ -11,7 +11,7 @@
 //! 正确实现摆不出这份盘面，拒得不合法，[`judge_writable_mount_refusal_of_a_crash_state`]）。
 //!
 //! 读盘的只有 [`read_recovery_fields`] 与那两个判拒绝的函数里在崩溃镜像上复算拒的判据那一截；[`judge_mount_transparency`]
-//! 只吃读好的字段与挂载交回值。checker 档的崩溃注入调它，harness 档的轻用例也调它（harness 档不依赖 checker 档）。
+//! 只吃读好的字段与挂载交回值。checker 档的崩溃注入调它，harness 档的快档用例也调它（harness 档不依赖 checker 档）。
 //! r5 判决标「推的」的几样（树 ID 水位、两个根指针、txg、扫描报告）照写进判法，每一样红的时候在交回值里单独标出它是推的还是量过的
 //! （[`MountTransparencyField::basis`]）。
 
@@ -108,7 +108,7 @@ pub struct VersionFieldsRead {
 }
 
 /// 一个池上的一次只读恢复（看 journal）连同挂载透明要比的字段（[`read_recovery_fields`] 读出来的）。
-/// 字段没有不变量，直接公开：harness 的轻用例改坏其中一样，证判法会红。
+/// 字段没有不变量，直接公开：harness 的快档用例改坏其中一样，证判法会红。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecoveryFieldsRead {
     /// 那一次只读恢复的报告（`recover(reader, JournalPolicy::Consult)`）。

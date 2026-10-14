@@ -3,17 +3,15 @@
 //!
 //! 五段取样的种子基都是 `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`：永久固定、不重抽
 //! （为什么见它的文档注释），崩溃注入那个二进制用的是同一个；种子数照旧写死，里程碑的验收说的是「写死的种子数之内判红」。
-
 mod common;
+mod common_images_for_the_checker_tier;
+#[path = "common_images_for_the_checker_tier/random_histories.rs"]
+mod scenarios_of_random_histories;
 
-use std::io::Write as _;
-
-use common::{
-    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, disk_snapshot,
-    publish_overwrite_in_process, BuiltPool, FIXED_WRITE_TIME_SECONDS,
-};
-use singlefs_checker::image::{chosen_system_configurations, valid_roots, InvariantVerdict};
-use singlefs_checker::walk::check_pool_image;
+use common::disk_snapshot;
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use scenarios_of_random_histories::pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version;
+use singlefs_checker::image::{chosen_system_configurations, valid_roots};
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
@@ -21,23 +19,27 @@ use singlefs_core::mount::{
     mount_writable_with_space_admission, roll_back_by_a_forward_publish,
     RollbackCandidateExclusion, RollbackError, RollbackTarget,
 };
-use singlefs_core::transaction::TransactionOutput;
 use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultOccurrence, FaultPlacement, FaultSchedule,
     InjectedFault, SharedFaultPlan,
 };
+use singlefs_harness::heavy_threads::{
+    own_variable_or_default_heavy_threads, registered_heavy_threads,
+    THREAD_CAP_ENVIRONMENT_VARIABLE,
+};
 use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
     allocation_records_on_the_image_under, classify_failure, environment_assignments_in_line,
-    execute_history, execute_history_observing, execute_history_with, execute_history_with_faults,
-    generate_history, generate_history_with_weights, raised_floor_lands_only_on_abandoned_roots,
-    random_history_to_reproduce_from_environment, run_history_campaign, shrink_to_reproduction,
-    AppliedEffect, ColdStartReadBack, ContentChoice, ContentLength, FailureObservation,
-    FailureSignature, FindingShrinking, FloorTargetChoice, GeneratedHistory, GenerationWeights,
-    HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind,
-    HistoryRun, HistorySampling, HistorySeed, HistoryStartingPoint, HistoryTally,
-    MountAllocationComparison, MountSpaceAdmissionOutcome, NewFindingReport, PerStepChecker,
-    RecordReuse, RollbackTargetChoice, StepOutcome, StepPosition, RANDOM_HISTORY_VARIABLE_PREFIX,
+    execute_history_handing_out_every_step_image, execute_history_with,
+    execute_history_with_faults, generate_history, generate_history_with_weights,
+    raised_floor_lands_only_on_abandoned_roots, random_history_to_reproduce_from_environment,
+    run_history_campaign, shrink_to_reproduction, AppliedEffect, ColdStartReadBack, ContentChoice,
+    ContentLength, FailureObservation, FailureSignature, FindingShrinking, FloorTargetChoice,
+    GeneratedHistory, GenerationWeights, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
+    HistoryOperation, HistoryOperationKind, HistoryRun, HistorySampling, HistorySeed,
+    HistoryStartingPoint, HistoryTally, MountAllocationComparison, MountSpaceAdmissionOutcome,
+    NewFindingReport, PerStepChecker, RecordReuse, RollbackTargetChoice, StepOutcome, StepPosition,
+    RANDOM_HISTORY_VARIABLE_PREFIX,
 };
 use singlefs_harness::memory_pool::{MemoryPool, RecordCheck, SparseBlockDevice};
 use singlefs_harness::model::{
@@ -49,62 +51,65 @@ use singlefs_harness::numeric_environment_variable::{
     number_from_the_variable_value_panicking_when_unreadable, process_environment_variable,
 };
 use singlefs_harness::SharedStream;
-
-// 下面五段的种子基都是同一个：永久固定、不重抽的那个数
-// （`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，崩溃注入那个二进制用的是同一个；用户 2026-09-27 定）。
-// 种子**数**（96 / 48 / 48 / 32 / 32）与每段步数照旧写死：里程碑的验收说的是「写死的种子数之内判红」，管的是数不是基。
-// 要多测别的历史只往后追加种子区间、不重抽这个基：这五段的判出率与它们的产物一直有效。
+use std::io::Write as _;
 
 /// 快档的种子区间与每段步数：门禁每次跑同一批。
 const FAST_TIER_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+
 const FAST_TIER_SEEDS: u64 = 96;
+
 const FAST_TIER_OPERATIONS_PER_HISTORY: usize = 30;
 
 /// 第 121 行那一类的专门取样点：种子区间与每段步数，写死（判出率与窗口大小见那条用例的注释）。
 const REUSE_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+
 const REUSE_SAMPLING_SEEDS: u64 = 48;
+
 const REUSE_SAMPLING_OPERATIONS_PER_HISTORY: usize = 30;
 
 /// 理想模型 B2 那一格的专门取样点：种子区间与每段步数，写死（判出率见那条用例的注释）。
 const ROLLBACK_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+
 const ROLLBACK_SAMPLING_SEEDS: u64 = 48;
+
 const ROLLBACK_SAMPLING_OPERATIONS_PER_HISTORY: usize = 30;
 
 /// 原分配记录墙那一格的取样点：种子区间与每段步数，写死（判出率见那条用例的注释）。
 const WALL_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+
 const WALL_SAMPLING_SEEDS: u64 = 32;
+
 const WALL_SAMPLING_OPERATIONS_PER_HISTORY: usize = 150;
 
 /// 单元区墙那一格的取样点（两块小盘）：种子区间与每段步数，写死（判出率见那条用例的注释）。
 const UNIT_AREA_WALL_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
-const UNIT_AREA_WALL_SAMPLING_SEEDS: u64 = 32;
-const UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY: usize = 150;
 
-// 下面六段的取样参数（种子之外复现一段历史要的全部：步数、比重、跑法）各写成一个常量：取样用例拿它跑，
-// 「复现行喂回入口」那几条自证拿同一个常量造复现行，两边不会各写一份。
+const UNIT_AREA_WALL_SAMPLING_SEEDS: u64 = 32;
+
+const UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY: usize = 150;
 
 const FAST_TIER_SAMPLING: HistorySampling = HistorySampling {
     operations_per_history: FAST_TIER_OPERATIONS_PER_HISTORY,
     weights: GenerationWeights::BROAD,
-    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+    execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
 };
 
 const REUSE_SAMPLING: HistorySampling = HistorySampling {
     operations_per_history: REUSE_SAMPLING_OPERATIONS_PER_HISTORY,
     weights: GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
-    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+    execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
 };
 
 const ROLLBACK_SAMPLING: HistorySampling = HistorySampling {
     operations_per_history: ROLLBACK_SAMPLING_OPERATIONS_PER_HISTORY,
     weights: GenerationWeights::ROLLBACK_AFTER_RAISING_THE_FLOOR,
-    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+    execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
 };
 
 const WALL_SAMPLING: HistorySampling = HistorySampling {
     operations_per_history: WALL_SAMPLING_OPERATIONS_PER_HISTORY,
     weights: GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL,
-    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+    execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
 };
 
 /// 单元区墙那一格空间准入关掉的那一段：两块单元区 256 槽的小盘。
@@ -112,7 +117,7 @@ const UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_SKIPPED: HistorySampling 
     operations_per_history: UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY,
     weights: GenerationWeights::TOWARD_THE_UNIT_AREA_WALL,
     execution: HistoryExecution {
-        per_step_checker: PerStepChecker::Run,
+        per_step_checker: PerStepChecker::Skipped,
         device_width: HistoryDeviceWidth::UnitAreaOf256Slots,
         space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
     },
@@ -123,7 +128,7 @@ const UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED: HistorySampling =
     operations_per_history: UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY,
     weights: GenerationWeights::TOWARD_THE_UNIT_AREA_WALL,
     execution: HistoryExecution {
-        per_step_checker: PerStepChecker::Run,
+        per_step_checker: PerStepChecker::Skipped,
         device_width: HistoryDeviceWidth::UnitAreaOf256Slots,
         space_admission: SpaceAdmission::JudgedByTheFormula,
     },
@@ -133,11 +138,11 @@ const UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED: HistorySampling =
 const LARGE_TIER_DEFAULT_SAMPLING: HistorySampling = HistorySampling {
     operations_per_history: 60,
     weights: GenerationWeights::BROAD,
-    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+    execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
 };
 
 /// 五段的种子基都是这个测试周期的常量：两个二进制（随机历史与崩溃注入）同基，
-/// `crates/mutations.tsv` 第 146–178 行那些「这条变异必须红」与里程碑的验收才是可判的命题——
+/// `crates/mutations.tsv` 里名字以「增补 3 第 2 件」起头的那些「这条变异必须红」与里程碑的验收才是可判的命题——
 /// 哪一段被改回写死的别的数，那一段跑的就是另一批历史，那些判红不再是同一个命题。
 /// 常量本身是不是这个周期 2026-09-20 抽出来的那个数，由崩溃注入那个二进制的
 /// `the_test_cycle_seed_base_is_the_number_drawn_for_this_cycle` 钉。
@@ -166,12 +171,6 @@ fn print_uncaptured(text: &str) {
     let mut standard_output = std::io::stdout();
     let _ = standard_output.write_all(text.as_bytes());
     let _ = standard_output.flush();
-}
-
-fn worker_threads_by_default() -> usize {
-    std::thread::available_parallelism()
-        .map_or(1, usize::from)
-        .min(16)
 }
 
 fn count_of(counts: &std::collections::BTreeMap<String, u64>, key: &str) -> u64 {
@@ -300,19 +299,95 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
         count_of(&tally.recovery_outcomes, "FileRead") >= 1,
         "冷启动一次都没读回文件"
     );
-    // I-3.11（已分配减 defer 等于最新根走读）、I-7.9（回退下界 F 不高于抬 F 的上限） 与 I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）
-    // 也要在随机历史上真被判成立过：零违例之外，还要分得开「判过、成立」与「全是不适用」。
-    for invariant in ["I-3.1", "I-5.4", "I-3.11", "I-7.9", "I-9.15"] {
-        assert!(
-            tally.invariant_holds.get(invariant).copied().unwrap_or(0) >= 1,
-            "checker 一次都没判过 {invariant}（全是不适用）"
-        );
-    }
+    // 池级 checker 那一遍归 checker 档两段（用户 2026-10-13 定）：harness 一条不变量都不判，每一步的镜像经钩子交出去。
+    // I-3.1、I-5.4、I-3.11、I-7.9、I-9.15 在同一批历史上真被判成立过，由 checker 档那一份用例核
+    // （`crates/singlefs-checker-tier/tests/crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library.rs`）。
+    assert_the_harness_ran_no_pool_checker_and_handed_every_step_image_out(tally);
     assert!(
         tally.histories_that_turned_the_root_ring >= 1,
         "没有一段历史转过根环"
     );
     assert_the_model_judged_every_kind_of_answer(tally);
+}
+
+/// harness 档不逐步跑池级 checker（那一遍归 checker 档两段），每一步的镜像都交出去了：checker 一次都没跑，交出去的镜像至少一张。
+fn assert_the_harness_ran_no_pool_checker_and_handed_every_step_image_out(tally: &HistoryTally) {
+    assert_eq!(
+        tally.checker_runs, 0,
+        "harness 档跑了池级 checker：每一步的池级 checker 归 checker 档两段，harness 只与理想模型比"
+    );
+    assert!(
+        tally.step_images_handed_out >= tally.histories,
+        "每段历史起点之后至少交出一张镜像：交了 {} 张、{} 段",
+        tally.step_images_handed_out,
+        tally.histories
+    );
+}
+
+/// 每步镜像那个钩子（checker 档两段的录入段照它把每一步的镜像作为给定状态写进判定库）：快档那组比重、种子基那一段 12 步，
+/// harness 一次池级 checker 都不跑；起点之后与每一步写过盘之后各交一张，交出去的张数与计数相同、录制流里的步数逐张变多，
+/// 每一张都等于空盘叠上录制流头那么多步（checker 档按录制流重建给定状态，判的就是这一张）。
+/// 判别力：harness 偷回逐步池级 checker（执行器里每张交出去的镜像又就地判一遍、记进计数），checker 跑过的次数不再是 0；
+/// 钩子收到了却不交出去，交出去的张数与计数对不上。
+// harness-test-granularity:one-scenario 一段历史跑一遍，循环里逐张重建的是同一条录制流的前缀、拿来比这一段交出去的那几张，不是几个独立场景
+#[test]
+fn every_step_image_is_handed_out_as_the_recorded_stream_prefix_and_the_harness_runs_no_pool_checker(
+) {
+    let execution = HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES;
+    let history = generate_history_with_weights(
+        HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
+        12,
+        &FAST_TIER_SAMPLING.weights,
+    );
+    let stream = SharedStream::retaining_contents();
+    let mut handed_out: Vec<(usize, MemoryPool)> = Vec::new();
+    let run = execute_history_handing_out_every_step_image(
+        &history,
+        execution,
+        &stream,
+        &SharedFaultPlan::unarmed(execution.device_width.fixed_geometry()),
+        &mut |_| {},
+        &mut |step_image| {
+            handed_out.push((step_image.operations_recorded, step_image.image.clone()));
+        },
+    );
+    assert_eq!(run.tally.checker_runs, 0, "harness 档不逐步跑池级 checker");
+    assert_eq!(
+        run.tally.step_images_handed_out,
+        u64::try_from(handed_out.len()).expect("装得进 u64"),
+        "计数与交出去的张数相同"
+    );
+    assert!(
+        handed_out.len() >= 2,
+        "起点之后与至少一步写过盘之后都交了：{}",
+        handed_out.len()
+    );
+    assert!(
+        handed_out.windows(2).all(|pair| pair[0].0 < pair[1].0),
+        "每一张都是写过盘之后交的，录制流里的步数逐张变多"
+    );
+    let operations = stream.retained_operations();
+    for (index, (operations_recorded, image)) in handed_out.iter().enumerate() {
+        let mut rebuilt = MemoryPool::with_devices(
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+            execution.device_width.device_bytes(),
+        );
+        rebuilt.apply(&operations[..*operations_recorded]);
+        assert!(
+            rebuilt == *image,
+            "交出去的第 {index} 张：空盘叠上录制流头 {operations_recorded} 步与交出去的镜像不同"
+        );
+    }
+}
+
+/// 一段历史在两块 4 GiB 的盘上跑，harness 不跑每一步的池级 checker（每一步的镜像经钩子交出去，那一遍归 checker 档两段）。
+fn execute_history_without_the_pool_checker(history: &GeneratedHistory) -> HistoryRun {
+    execute_history_with(
+        history,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
+        &SharedStream::new(),
+        &mut |_| {},
+    )
 }
 
 /// 理想模型真的判过：该拒而拒、该成而成都有，比过根、分配记录、冷启动读回的内容、抬 F 的上限（第 2 件；阴性结果要能和「模型没跑到」分开）。
@@ -352,7 +427,7 @@ fn random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_ope
         FAST_TIER_SAMPLING.operations_per_history,
         &FAST_TIER_SAMPLING.weights,
         FAST_TIER_SAMPLING.execution,
-        worker_threads_by_default(),
+        worker_threads_from_environment(),
         FindingShrinking::ReportSeedsOnly,
     );
     let rendered = report.render();
@@ -382,7 +457,7 @@ fn reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red
         REUSE_SAMPLING.operations_per_history,
         &REUSE_SAMPLING.weights,
         REUSE_SAMPLING.execution,
-        worker_threads_by_default(),
+        worker_threads_from_environment(),
         FindingShrinking::ReportSeedsOnly,
     );
     let rendered = report.render();
@@ -420,7 +495,7 @@ fn rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_re
         ROLLBACK_SAMPLING.operations_per_history,
         &ROLLBACK_SAMPLING.weights,
         ROLLBACK_SAMPLING.execution,
-        worker_threads_by_default(),
+        worker_threads_from_environment(),
         FindingShrinking::ReportSeedsOnly,
     );
     let rendered = report.render();
@@ -460,11 +535,11 @@ fn newest_system_configuration_slot_zeros_sampling_mounts_writable_and_ends_only
         24,
         &GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS,
         HistoryExecution {
-            per_step_checker: PerStepChecker::Run,
+            per_step_checker: PerStepChecker::Skipped,
             device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
             space_admission: SpaceAdmission::JudgedByTheFormula,
         },
-        worker_threads_by_default(),
+        worker_threads_from_environment(),
         FindingShrinking::ReportSeedsOnly,
     );
     let rendered = report.render();
@@ -509,7 +584,7 @@ fn allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_
         WALL_SAMPLING.operations_per_history,
         &WALL_SAMPLING.weights,
         WALL_SAMPLING.execution,
-        worker_threads_by_default(),
+        worker_threads_from_environment(),
         FindingShrinking::ReportSeedsOnly,
     );
     let rendered = report.render();
@@ -522,7 +597,7 @@ fn allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_
         "新发现（checker 的判红、模型、执行器的判定与 panic）：\n{rendered}"
     );
     assert!(
-        report.tally.checker_runs > 0,
+        report.tally.step_images_handed_out > 0,
         "这一段每一步之后跑池级 checker"
     );
     assert!(
@@ -552,7 +627,7 @@ fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_skipped_run
         UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_SKIPPED.operations_per_history,
         &UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_SKIPPED.weights,
         UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_SKIPPED.execution,
-        worker_threads_by_default(),
+        worker_threads_from_environment(),
         FindingShrinking::ReportSeedsOnly,
     );
     let rendered = report.render();
@@ -581,7 +656,7 @@ fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_skipped_run
                 .tally
                 .model_counts
                 .unit_area_wall_refusals_in_the_interval,
-            report.tally.checker_runs,
+            report.tally.step_images_handed_out,
         ),
         (32, 0, 0, 1141),
         "32 段全跑完、「每块盘上都没有」0 次、单元区墙区间里放行 0 次、池级 checker 跑 1141 次（2026-10-03 量）：\n{rendered}"
@@ -607,7 +682,7 @@ fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_r
         UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED.operations_per_history,
         &UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED.weights,
         UNIT_AREA_WALL_SAMPLING_WITH_THE_SPACE_ADMISSION_JUDGED.execution,
-        worker_threads_by_default(),
+        worker_threads_from_environment(),
         FindingShrinking::ReportSeedsOnly,
     );
     let rendered = report.render();
@@ -657,7 +732,7 @@ fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_r
         "准入判着时式子先拒，落点那一道走不到"
     );
     assert!(
-        report.tally.checker_runs > 0,
+        report.tally.step_images_handed_out > 0,
         "这一段每一步之后跑池级 checker"
     );
 }
@@ -741,12 +816,17 @@ fn allocation_records_counted_on_the_image_are_one_per_unit_per_device_and_zero_
     });
     let count_after_each_step = |history: &GeneratedHistory| {
         let mut counted: Vec<Option<u64>> = Vec::new();
-        let run = execute_history_observing(history, &SharedStream::new(), &mut |observation| {
-            counted.push(allocation_records_on_the_image_under(
-                observation.image,
-                newest_root_on_the_image(observation.image),
-            ));
-        });
+        let run = execute_history_with(
+            history,
+            HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
+            &SharedStream::new(),
+            &mut |observation| {
+                counted.push(allocation_records_on_the_image_under(
+                    observation.image,
+                    newest_root_on_the_image(observation.image),
+                ));
+            },
+        );
         assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
         counted
     };
@@ -808,7 +888,7 @@ fn eighteen_empty_overwrites_on_240_slot_devices_with_the_admission_skipped_leav
     let run = execute_history_with(
         &history,
         HistoryExecution {
-            per_step_checker: PerStepChecker::Run,
+            per_step_checker: PerStepChecker::Skipped,
             device_width,
             space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
         },
@@ -896,7 +976,7 @@ fn rolling_back_while_mounted_to_the_oldest_ring_root_on_a_small_device_and_over
     let run = execute_history_with(
         &history,
         HistoryExecution {
-            per_step_checker: PerStepChecker::Run,
+            per_step_checker: PerStepChecker::Skipped,
             device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
             space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
         },
@@ -981,7 +1061,10 @@ fn overwrites_raising_the_floor_and_rolling_back_past_812_allocation_records_all
         most_counted > 812,
         "镜像上数的分配记录条数要越过 812，最多 {most_counted} 条"
     );
-    assert!(run.tally.checker_runs > 0, "每一步之后跑池级 checker");
+    assert!(
+        run.tally.step_images_handed_out > 0,
+        "每一步之后跑池级 checker"
+    );
 }
 
 /// 一段写死的历史在 4 GiB 的盘上每一步之后跑池级 checker、跑完，交回每一步之后（含起点）镜像上最新那条根下的分配记录条数。
@@ -991,7 +1074,7 @@ fn run_counting_allocation_records_after_each_step(
     let mut counted_after_each_step: Vec<Option<u64>> = Vec::new();
     let run = execute_history_with(
         history,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         &SharedStream::new(),
         &mut |observation| {
             counted_after_each_step.push(allocation_records_on_the_image_under(
@@ -1033,7 +1116,7 @@ fn rolling_back_below_the_effective_floor_is_refused_for_being_below_the_floor()
             }),
         ],
     };
-    let run = execute_history(&history);
+    let run = execute_history_without_the_pool_checker(&history);
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert!(
         matches!(
@@ -1087,7 +1170,7 @@ fn rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_th
             HistoryOperation::ColdStartRecover,
         ],
     };
-    let run = execute_history(&history);
+    let run = execute_history_without_the_pool_checker(&history);
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert!(
         matches!(
@@ -1142,10 +1225,10 @@ fn turning_the_root_ring_with_overwrites_in_one_mount_runs_to_the_end_with_the_c
             .chain(std::iter::repeat_n(overwrite, 25))
             .collect(),
     };
-    let run = execute_history(&history);
+    let run = execute_history_without_the_pool_checker(&history);
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert_eq!(
-        run.tally.checker_runs, 27,
+        run.tally.step_images_handed_out, 27,
         "起点、挂载、25 次覆盖写之后各跑一次 checker，一次都没红"
     );
 }
@@ -1168,10 +1251,10 @@ fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_
         starting_point: HistoryStartingPoint::AfterFirstFile,
         operations: std::iter::repeat_n(overwrite, 25).collect(),
     };
-    let run = execute_history(&history);
+    let run = execute_history_without_the_pool_checker(&history);
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert_eq!(
-        run.tally.checker_runs, 26,
+        run.tally.step_images_handed_out, 26,
         "起点与 25 次覆盖写之后各跑一次 checker，一次都没红"
     );
     assert_eq!(
@@ -1216,7 +1299,7 @@ fn the_history_that_raised_the_floor_into_a_rollback_gap_completes_under_the_for
             }),
         ],
     };
-    let run = execute_history(&history);
+    let run = execute_history_without_the_pool_checker(&history);
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert!(
         matches!(
@@ -1239,116 +1322,12 @@ fn the_history_that_raised_the_floor_into_a_rollback_gap_completes_under_the_for
     );
 }
 
-fn content_seeded_by(length: usize, seed: usize) -> Vec<u8> {
-    (0..length)
-        .map(|index| u8::try_from((index * 7 + seed) % 253).expect("小于 256"))
-        .collect()
-}
-
-/// 同一个进程里对建好的池覆盖写一次，`pool.output` 换成这一版。
-fn overwrite_the_built_pool(
-    pool: &mut BuiltPool,
-    content: &[u8],
-    instance: InstanceGeneration,
-) -> TransactionOutput {
-    let previous = pool.output.clone();
-    let output = publish_overwrite_in_process(
-        pool,
-        &previous,
-        content,
-        FIXED_WRITE_TIME_SECONDS + 60,
-        instance,
-    )
-    .expect("覆盖写");
-    pool.output = output.clone();
-    output
-}
-
-/// 建池（第一个文件 A，txg 3）→ 同一个进程里覆盖写 B（txg 4）、C（txg 5）→ 崩溃恢复抛弃 C：`tests/common` 的
-/// `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`——C 的根槽与数据单元暂时读不出、见证 C 的系统配置槽坏掉
-/// （系统配置没见证到 C：C554 乙罩不到、照旧抛弃的那一形），择根落到 B、实例 2 写行 txg 6、暖机 txg 7，再把 C 写回，C 按实例 2 的表判被抛弃。
-/// 随机历史生成器的「崩溃恢复抛弃根」一步藏的是系统配置见证过的最新根，C554 乙之后一律被拒、造不出被抛弃的根，要它的用例从这里造。
-/// 交回池（现行版本是实例 2 暖机那一版）与 C 那一版。
-fn pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version(
-    tag: &str,
-) -> (BuiltPool, TransactionOutput) {
-    let mut pool = build_pool(tag);
-    overwrite_the_built_pool(
-        &mut pool,
-        &content_seeded_by(4100, 3),
-        InstanceGeneration(1),
-    );
-    let third = overwrite_the_built_pool(
-        &mut pool,
-        &content_seeded_by(2500, 11),
-        InstanceGeneration(1),
-    );
-    let abandoning =
-        abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &third);
-    assert_eq!(
-        (
-            third.root.checkpoint_txg,
-            abandoning.output.effective_root.checkpoint_txg,
-            abandoning.output.instance,
-            abandoning.output.row_publish.root().checkpoint_txg,
-            pool.output.root.checkpoint_txg
-        ),
-        (
-            CheckpointTxg(5),
-            CheckpointTxg(4),
-            InstanceGeneration(2),
-            CheckpointTxg(6),
-            CheckpointTxg(7)
-        ),
-        "C 是 txg 5；恢复落到 B（txg 4），实例 2 写行 txg 6、暖机 txg 7"
-    );
-    (pool, third)
-}
-
-fn violations_on_the_image(image: &MemoryPool) -> Vec<(&'static str, String)> {
-    check_pool_image(image)
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .collect()
-}
-
-/// 双故障形（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出））：第一个文件 A（txg 3）之后覆盖写 B（4）、C（5），
-/// 崩溃恢复抛弃 C——择根落到 B，实例 2 写行 6、暖机 7；再覆盖写四次（8–11）。那次挂载时 C 的根槽读不出、系统配置没见证 C（乙罩不到的那一格，
-/// `research/prompts/m2-impl-c554-yi-implementer-report.md` 第六节 Q1），影子账看不见 C；可写挂载时的预隔离（D23（journal 的角色与格式） 已定项 14
-/// 「可写挂载时的预隔离」）把水位之上没施加的 C 的记录点名的落点与 C 的账里的落点隔离到这个进程写掉 txg 5 那一槽为止，四次覆盖写发不出 C 的单元，
-/// 抬 F 之前池级 checker 一条都不红。被抛弃的 C 由 [`pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version`] 造
-/// （系统配置没见证到 C 的那一形；生成器的那一步 C554 乙之后造不出）。
-/// 判别力：挂载时不隔离那一份（变异「第37批 可写挂载时的预隔离不隔离水位之上没施加的记录点名的落点」）时 C 引用的单元又被发出去，
-/// I-7.4（近 K 代块未被复用）红、点名实例 1、txg 5 那条被抛弃的根，这一条红。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_random_histories::crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_leaves_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_leaves_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units(
 ) {
-    let (mut pool, abandoned) =
-        pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version("random-history-row-43");
-    for seed in [17usize, 19, 23, 29] {
-        overwrite_the_built_pool(
-            &mut pool,
-            &content_seeded_by(3000 + seed, seed),
-            InstanceGeneration(2),
-        );
-    }
-    assert_eq!(pool.output.root.checkpoint_txg, CheckpointTxg(11));
-    assert_eq!(
-        (abandoned.root.instance, abandoned.root.checkpoint_txg),
-        (InstanceGeneration(1), CheckpointTxg(5)),
-        "被抛弃的是 C：实例 1、txg 5"
-    );
-    let violations = violations_on_the_image(&pool.memory_pool());
-    assert!(
-        violations.is_empty(),
-        "抬 F 之前池级 checker 一条都不红（C 的单元被预隔离护着）：{violations:?}"
-    );
+    scenarios_of_random_histories::crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_leaves_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units(&mut PoolCheckerImages::left_to_the_checker_tier());
 }
 
 /// 崩溃恢复抛弃的那条根不在回退的候选集里：照 [`pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version`] 造出被抛弃的 C
@@ -1405,7 +1384,7 @@ fn rolling_back_to_a_root_crash_recovery_abandoned_without_a_system_configuratio
 #[test]
 fn cold_start_after_a_swallowed_root_slot_write_reads_back_the_version_its_applied_record_rebuilt_and_the_model_agrees(
 ) {
-    let execution = HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES;
+    let execution = HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES;
     let parameters = execution.device_width.parameters();
     let root_slot_of_the_overwrite = singlefs_core::root_ring::target_for_publish(
         CheckpointTxg(4),
@@ -1488,11 +1467,16 @@ fn an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_
             .collect(),
     };
     let mut image_before_raising: Option<MemoryPool> = None;
-    let run = execute_history_observing(&history, &SharedStream::new(), &mut |observation| {
-        if observation.position == StepPosition::Operation(3) {
-            image_before_raising = Some(observation.image.clone());
-        }
-    });
+    let run = execute_history_with(
+        &history,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
+        &SharedStream::new(),
+        &mut |observation| {
+            if observation.position == StepPosition::Operation(3) {
+                image_before_raising = Some(observation.image.clone());
+            }
+        },
+    );
     assert_eq!(run.ending, HistoryEnding::Completed, "今天的代码上这段跑完");
     let StepOutcome::Applied(AppliedEffect::RaisedFloor { new_floor, .. }) = run.outcomes[4] else {
         panic!("第 4 步抬 F 要成：{:?}", run.outcomes[4]);
@@ -1570,7 +1554,7 @@ fn row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_
             HistoryOperation::CloseAndMountWritable,
         ],
     };
-    let run = execute_history(&history);
+    let run = execute_history_without_the_pool_checker(&history);
     assert_eq!(
         run.ending,
         HistoryEnding::Completed,
@@ -1602,18 +1586,23 @@ fn the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice() {
     let history = generate_history(HistorySeed(7), 24);
     let run_keeping_every_image = || {
         let mut images: Vec<MemoryPool> = Vec::new();
-        let run = execute_history_observing(&history, &SharedStream::new(), &mut |observation| {
-            images.push(observation.image.clone());
-        });
+        let run = execute_history_with(
+            &history,
+            HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
+            &SharedStream::new(),
+            &mut |observation| {
+                images.push(observation.image.clone());
+            },
+        );
         (run, images)
     };
     let (first, first_images) = run_keeping_every_image();
     let (second, second_images) = run_keeping_every_image();
     assert_eq!(first, second);
     assert!(
-        first.tally.checker_runs >= 2,
+        first.tally.step_images_handed_out >= 2,
         "起点之后与至少一步写之后都跑了 checker：{}",
-        first.tally.checker_runs
+        first.tally.step_images_handed_out
     );
     assert!(
         first_images.len() >= 2,
@@ -1642,7 +1631,7 @@ fn the_floor_raise_on_narrow_devices_with_the_admission_skipped_has_its_outcome_
     let run = execute_history_with(
         &history,
         HistoryExecution {
-            per_step_checker: PerStepChecker::Run,
+            per_step_checker: PerStepChecker::Skipped,
             device_width: HistoryDeviceWidth::UnitAreaOf240Slots,
             space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
         },
@@ -1710,7 +1699,7 @@ fn seed_4000000001_on_240_slot_devices_with_the_admission_skipped_raises_the_flo
 /// `_CHECKER`、`_DEVICES`、`_SPACE_ADMISSION`），没设的取 `LARGE_TIER_DEFAULT_SAMPLING`；
 /// 种子基没给就用这个测试周期写死的那一个，跟上面五段同基（给了什么就跑什么）。
 #[test]
-#[ignore = "大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起（没给就用这个测试周期写死的种子基），SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS（broad、reuse、rollback、wall、unit-area-wall），checker SINGLEFS_RANDOM_HISTORY_CHECKER（run、skip），盘宽 SINGLEFS_RANDOM_HISTORY_DEVICES（4gib、unit-area-384、unit-area-256、unit-area-240），空间准入 SINGLEFS_RANDOM_HISTORY_SPACE_ADMISSION（judged、skipped），收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑"]
+#[ignore = "大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起（没给就用这个测试周期写死的种子基），SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS（broad、reuse、rollback、wall、unit-area-wall），checker SINGLEFS_RANDOM_HISTORY_CHECKER（只认 skip），盘宽 SINGLEFS_RANDOM_HISTORY_DEVICES（4gib、unit-area-384、unit-area-256、unit-area-240），空间准入 SINGLEFS_RANDOM_HISTORY_SPACE_ADMISSION（judged、skipped），收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑"]
 fn random_histories_large_tier_seeds_and_length_from_the_environment() {
     let first_seed = number_from_environment(
         "SINGLEFS_RANDOM_HISTORY_FIRST_SEED",
@@ -1776,7 +1765,7 @@ fn history_to_reproduce_from(
 /// 收缩一个种子：快档与各取样点只报种子，判红时打的复现行（`random_history_reproduction_line`，带种子、步数、比重、checker、盘宽、空间准入）
 /// 照抄过来跑这一条，生成的历史与跑法与判红那一段逐项相同，再把它收到最短复现。
 #[test]
-#[ignore = "收缩一个种子：照判红时打的「复现：」那一行设环境变量；SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，其余没设的取快档的（30 步、broad、run、4gib、judged），SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核"]
+#[ignore = "收缩一个种子：照判红时打的「复现：」那一行设环境变量；SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，其余没设的取快档的（30 步、broad、skip、4gib、judged），SINGLEFS_RANDOM_HISTORY_THREADS 默认取每台默认重活线程数（SINGLEFS_THREAD_CAP，再没设取 .claude/heavy-thread-default 的登记值）"]
 fn shrink_one_failing_seed_from_the_environment() {
     let (history, sampling) = history_to_reproduce_from(&process_environment_variable);
     let worker_threads = worker_threads_from_environment();
@@ -1962,28 +1951,50 @@ fn count_from_environment(name: &str, default: u64) -> u64 {
 
 const WORKER_THREADS_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_RANDOM_HISTORY_THREADS";
 
-/// 线程数变量的值（`None` 是没设）：没设取本机可用并行度（取不到是 1）；设了而不是正整数（0 也算）就 panic、消息带变量名与原值，
-/// 与仓里别的线程数变量同一口径（经数值环境变量共用的那一份解析，取 `NonZeroUsize`）。
+/// 线程数变量的值（`None` 是没设）：设了照它，没设取每台默认重活线程数（`thread_cap_value` 是 `SINGLEFS_THREAD_CAP` 的值，
+/// 设了照它，再没设取 `.claude/heavy-thread-default` 的登记值，判法在 `singlefs_harness::heavy_threads`）；快档、取样活动与大档同一个取法。
+/// 设了而不是正整数（0 也算）就 panic、消息带变量名与原值，与仓里别的线程数变量同一口径（经数值环境变量共用的那一份解析，取 `NonZeroUsize`）。
 ///
 /// # Panics
-/// 设了而不是正整数。
-fn worker_threads_from_the_value(value: Option<&str>) -> usize {
-    number_from_the_variable_value_panicking_when_unreadable::<std::num::NonZeroUsize>(
+/// 设了而不是正整数；落到默认时 `SINGLEFS_THREAD_CAP` 设了而不是正整数。
+fn worker_threads_from_the_value(value: Option<&str>, thread_cap_value: Option<&str>) -> usize {
+    own_variable_or_default_heavy_threads(
         WORKER_THREADS_ENVIRONMENT_VARIABLE,
         value,
+        thread_cap_value,
     )
-    .unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::MIN))
     .get()
 }
 
-/// 进程环境里的线程数变量，判法同 [`worker_threads_from_the_value`]。
+/// 进程环境里的线程数变量与 `SINGLEFS_THREAD_CAP`，判法同 [`worker_threads_from_the_value`]。
 ///
 /// # Panics
 /// 设了而不是正整数，或值不是 UTF-8。
 fn worker_threads_from_environment() -> usize {
     worker_threads_from_the_value(
         process_environment_variable(WORKER_THREADS_ENVIRONMENT_VARIABLE).as_deref(),
+        process_environment_variable(THREAD_CAP_ENVIRONMENT_VARIABLE).as_deref(),
     )
+}
+
+/// 线程数变量没设：取登记的每台默认重活线程数（不取本机核数，也不再夹到 16）；设了照它。
+#[test]
+fn random_history_worker_threads_take_the_registered_heavy_thread_default_when_unset() {
+    assert_eq!(
+        worker_threads_from_the_value(None, None),
+        registered_heavy_threads().get(),
+        "SINGLEFS_RANDOM_HISTORY_THREADS 与 SINGLEFS_THREAD_CAP 都没设取 .claude/heavy-thread-default 的登记值"
+    );
+    assert_eq!(
+        worker_threads_from_the_value(None, Some("5")),
+        5,
+        "没设自己的变量读 SINGLEFS_THREAD_CAP"
+    );
+    assert_eq!(
+        worker_threads_from_the_value(Some("3"), Some("5")),
+        3,
+        "自己的变量先读"
+    );
 }
 
 #[test]
@@ -2010,17 +2021,18 @@ fn a_random_history_seed_count_of_zero_panics_naming_the_variable_and_the_value(
 #[test]
 #[should_panic(expected = "SINGLEFS_RANDOM_HISTORY_THREADS=\"0\" 认不出")]
 fn a_random_history_worker_thread_count_of_zero_panics_naming_the_variable_and_the_value() {
-    let _threads = worker_threads_from_the_value(Some("0"));
+    let _threads = worker_threads_from_the_value(Some("0"), None);
 }
 
 /// 删除多于一片下段叶的文件那一格（代码轮 U13）的取样点：种子区间与每段步数，写死。
 const DELETION_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+
 const DELETION_SAMPLING_SEEDS: u64 = 48;
 
 const DELETION_SAMPLING: HistorySampling = HistorySampling {
     operations_per_history: 30,
     weights: GenerationWeights::DELETING_FILES_OF_SEVERAL_LOWER_LEAVES,
-    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+    execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
 };
 
 /// 删除多于一片下段叶的文件那一格（代码轮第一轮判决 U13：模型罩多个数据单元的文件、随机历史里出现 ≥ 2 片下段叶的删除批；
@@ -2039,7 +2051,7 @@ fn random_histories_deleting_files_of_several_lower_leaves_compare_every_batch_a
         DELETION_SAMPLING.operations_per_history,
         &DELETION_SAMPLING.weights,
         DELETION_SAMPLING.execution,
-        worker_threads_by_default(),
+        worker_threads_from_environment(),
         FindingShrinking::ReportSeedsOnly,
     );
     let rendered = report.render();
@@ -2101,7 +2113,7 @@ fn deleting_a_file_of_two_lower_leaves_publishes_a_batch_keeping_data_units_that
             HistoryOperation::Unlink,
         ],
     };
-    let run = execute_history(&history);
+    let run = execute_history_without_the_pool_checker(&history);
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert!(
         run.outcomes
@@ -2148,7 +2160,7 @@ fn deleting_a_file_of_two_lower_leaves_then_rolling_back_to_its_intent_walks_two
             HistoryOperation::CreateInode,
         ],
     };
-    let run = execute_history(&history);
+    let run = execute_history_without_the_pool_checker(&history);
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert!(
         matches!(
@@ -2197,7 +2209,7 @@ fn a_file_of_three_lower_leaves_grows_the_central_mapping_tree_below_its_root_an
             HistoryOperation::Unlink,
         ],
     };
-    let run = execute_history(&history);
+    let run = execute_history_without_the_pool_checker(&history);
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert!(
         run.outcomes

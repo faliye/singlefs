@@ -1,5 +1,5 @@
-//! checker 档模块：crash
-//! 只做过 mkfs 的池上的可写挂载（里程碑「覆盖写、释放、回退与复用」步 3 的另一格）在层 0 的证据：mkfs → 进程退出、重开走可写挂载
+//! checker 档模块：crash、crash_state_enumeration
+//! 只做过 mkfs 的池上的可写挂载（里程碑「覆盖写、释放、回退与复用」步 3 的另一格）在崩溃点重放的证据：mkfs → 进程退出、重开走可写挂载
 //! （取号 1、零单元的写行发布 txg 1 与暖机 txg 2）→ 同一个进程里发布第一个文件版本（txg 3），把 mkfs 之后的整条录制流按 D13（验证路线） 已定项 4
 //! 取崩溃状态，快的那条（26 写的那一段不展开）跑恢复 + 多版本 oracle、池级 checker、记录核对器。
 //! 这条流的基线、写表（带内容）、段序列与 mkfs 同一个进程里跑新池新建文件那条流逐项相同（用例钉住），全量枚举就是新池新建文件那条流的全量，不另跑。
@@ -11,9 +11,16 @@ use common::{
     build_pool, file_content, format_pool, geometry, parameters, FIXED_WRITE_TIME_SECONDS,
 };
 use singlefs_checker_tier::crash::{
-    enumerate_layer0_selecting_versions, layer0_state_count_with_torn_in_place_overwrites,
-    Layer0SegmentExpansion, Layer0Tally,
+    crash_state_count_with_torn_in_place_overwrites, CrashPointReplaySegmentExpansion,
+    CrashPointReplayTally,
 };
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_selecting_versions, CrashPointReplayItem,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_enumeration_writable_mount_of_a_formatted_pool.rs";
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::mount::mount_writable;
 use singlefs_core::transaction::{publish_first_file, FirstFile, PoolWriter};
@@ -89,7 +96,7 @@ fn prepare(tag: &str) -> Prepared {
     }
 }
 
-fn assert_checker_and_record_checker_clean(tally: &Layer0Tally) {
+fn assert_checker_and_record_checker_clean(tally: &CrashPointReplayTally) {
     assert_eq!(
         (
             tally.record_root_without_record,
@@ -133,7 +140,7 @@ fn assert_checker_and_record_checker_clean(tally: &Layer0Tally) {
 #[test]
 fn the_formatted_pool_mount_and_first_file_stream_keeps_the_new_pool_file_creation_segment_sequence(
 ) {
-    let prepared = prepare("formatted-layer0-registered");
+    let prepared = prepare("formatted-crash-point-replay-registered");
     assert_eq!(prepared.segments.len(), 11);
     assert_eq!(
         closed_form_state_count(&prepared.segments),
@@ -148,16 +155,23 @@ fn the_formatted_pool_mount_and_first_file_stream_keeps_the_new_pool_file_creati
 #[test]
 fn every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recovers_to_the_version_its_root_claims(
 ) {
-    let prepared = prepare("formatted-layer0-fast");
+    let prepared = prepare("formatted-crash-point-replay-fast");
     let expand = |_segment_index: usize, segment: &[usize]| segment.len() < 10;
-    let tally = enumerate_layer0_selecting_versions(
+    let Some(tally) = enumerate_crash_states_selecting_versions(
+        CrashPointReplayItem {
+            name: "formatted_pool_mount::outside_the_unit_segment",
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
         &prepared.versions,
         &expand,
-    );
+    )
+    .judged() else {
+        return;
+    };
     let expanded: Vec<Vec<usize>> = prepared
         .segments
         .iter()
@@ -171,19 +185,19 @@ fn every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recove
     );
     assert_eq!(
         tally.states,
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &prepared.base,
             &prepared.writes,
             &prepared.segments,
             &|segment_index, segment| {
                 if expand(segment_index, segment) {
-                    Layer0SegmentExpansion::EveryProperSubset
+                    CrashPointReplaySegmentExpansion::EveryProperSubset
                 } else {
-                    Layer0SegmentExpansion::NotExpanded
+                    CrashPointReplaySegmentExpansion::NotExpanded
                 }
             },
         ),
-        "展开的段按层 0 的枚举域数（原地覆写取三态）"
+        "展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
     assert_eq!(
         tally.states,
@@ -207,14 +221,14 @@ fn every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recove
 }
 
 /// 这条流的崩溃状态与新池新建文件那条流逐个相同，所以不另跑全量：只做过 mkfs 的池可写挂载再发第一个文件版本，与 mkfs 同一个进程里
-/// 新池新建文件，两条流的基线镜像（mkfs 之后）、写表（带内容）、段序列逐项相等——层 0 按「基线 + 写表 + 段」枚举，三样相等就是同一批镜像，
-/// 新池新建文件那条流的全量枚举（`crash_enumeration_new_pool_file_creation_stream.rs`，门禁 checker-tier-layer0-replay）已经罩住（m2-emptypool-nonempty-r1 云端攻方腿 Z4）。
-/// 层 0 每个状态只跑恢复与 checker、不重开挂载，挂载路径在崩溃之后怎样不在这条证据里。
+/// 新池新建文件，两条流的基线镜像（mkfs 之后）、写表（带内容）、段序列逐项相等——崩溃点重放按「基线 + 写表 + 段」枚举，三样相等就是同一批镜像，
+/// 新池新建文件那条流的全量枚举（`crash_enumeration_new_pool_file_creation_stream.rs`，门禁 checker-tier-crash-point-replay）已经罩住（m2-emptypool-nonempty-r1 云端攻方腿 Z4）。
+/// 崩溃点重放每个状态只跑恢复与 checker、不重开挂载，挂载路径在崩溃之后怎样不在这条证据里。
 #[test]
 fn formatted_pool_mount_stream_has_the_same_base_writes_and_segments_as_the_new_pool_file_creation_stream(
 ) {
-    let prepared = prepare("formatted-layer0-same-as-new-pool-file-creation");
-    let reference = build_pool("formatted-layer0-new-pool-file-creation-reference");
+    let prepared = prepare("formatted-crash-point-replay-same-as-new-pool-file-creation");
+    let reference = build_pool("formatted-crash-point-replay-new-pool-file-creation-reference");
     let (reference_writes, reference_segments) = writes_and_segments(
         &reference.retained_operations()[reference.mkfs_operation_count..],
         &geometry(),

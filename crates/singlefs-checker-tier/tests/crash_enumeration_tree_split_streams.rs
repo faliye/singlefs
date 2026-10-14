@@ -1,5 +1,5 @@
-//! checker 档模块：crash
-//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 28 行的层 0：记账树与中央映射树分裂的每一种写序进崩溃点（三方
+//! checker 档模块：crash、crash_state_enumeration
+//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 28 行的崩溃点重放：记账树与中央映射树分裂的每一种写序进崩溃点（三方
 //! `m2-treesplit-r1` T4 的写法）。**起点镜像不枚举，只录分裂那一次发布**：分裂之前那一大截（mkfs、取号、暖机、
 //! 第一个文件版本、铺垫的空发布）全部施加成起点镜像，录制流从那一次发布的第一个单元写切起——段长只随那一次发布写几个单元涨，
 //! 不随树里有多少条涨。每条流枚举那一次发布的全部崩溃状态（D13（验证路线） 已定项 4 的段模型：单元写段、记录段、根槽 FUA、
@@ -14,7 +14,7 @@
 //! 左边那片叶留着这两条），其余都是一次空发布：只换分配记录树与记账树节点的映射 key，
 //! 写的单元最少（分配记录树 + 记账树的节点 + 中央映射树改了的那条路径 + 树表），状态数最小。
 //!
-//! **比已有的流多罩了什么**：已有的五条层 0 流里记账树与中央映射树恒是根兼叶，一次发布写一个记账节点、一个映射节点；
+//! **比已有的流多罩了什么**：已有的五条崩溃点重放流里记账树与中央映射树恒是根兼叶，一次发布写一个记账节点、一个映射节点；
 //! 这七条里一次发布写出 1–6 个映射树节点或 3–4 个记账树节点（分裂出来的新节点与路径上的祖先），它们与别的单元同一段
 //! （D8（核心索引结构） 已定项 11 ①：不加写序步骤、不加屏障），单元写段里的子集第一次包括「新叶落了、新根没落」「新根落了、
 //! 某片新叶没落」「被照抄的叶之外全落了」这一类；根降高那一条里新根记录指着的映射树只有一个节点而上一版有三个。
@@ -34,9 +34,16 @@ use common_tree_split::{
     CENTRAL_MAPPING_OF_THE_NODE_FORMAT,
 };
 use singlefs_checker_tier::crash::{
-    enumerate_layer0_selecting_versions, layer0_state_count_with_torn_in_place_overwrites,
-    Layer0SegmentExpansion, Layer0Tally,
+    crash_state_count_with_torn_in_place_overwrites, CrashPointReplaySegmentExpansion,
+    CrashPointReplayTally,
 };
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_selecting_versions, CrashPointReplayItem,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_enumeration_tree_split_streams.rs";
 use singlefs_core::transaction::{
     publish_new_inodes, CodeTwoTreeNodeCapacities, MultiLevelCodeTwoTree, PoolWriter,
 };
@@ -217,27 +224,31 @@ impl TreeSplitStream {
         }
     }
 
-    /// 全量用例里这条流那一行计数行的前缀：门禁 checker-tier-layer0-replay 按前缀认计数行（每个前缀恰好一行、只许大写字母、数字、`_`），
+    /// 全量用例里这条流那一行计数行的前缀：门禁 checker-tier-crash-point-replay 按前缀认计数行（每个前缀恰好一行、只许大写字母、数字、`_`），
     /// 七条流各一个，登记在 `.claude/gate.d/stage-inputs.tsv` 那一条崩溃枚举用例的 `count-line=` 里。
     fn full_enumeration_count_line_prefix(self) -> &'static str {
         match self {
             TreeSplitStream::CentralMappingRootSplit => {
-                "LAYER0_TREE_SPLIT_CENTRAL_MAPPING_ROOT_SPLIT"
+                "CRASH_POINT_REPLAY_TREE_SPLIT_CENTRAL_MAPPING_ROOT_SPLIT"
             }
             TreeSplitStream::CentralMappingLeafSplit => {
-                "LAYER0_TREE_SPLIT_CENTRAL_MAPPING_LEAF_SPLIT"
+                "CRASH_POINT_REPLAY_TREE_SPLIT_CENTRAL_MAPPING_LEAF_SPLIT"
             }
             TreeSplitStream::CentralMappingTwoLevelsSplitInARow => {
-                "LAYER0_TREE_SPLIT_CENTRAL_MAPPING_TWO_LEVELS_SPLIT_IN_A_ROW"
+                "CRASH_POINT_REPLAY_TREE_SPLIT_CENTRAL_MAPPING_TWO_LEVELS_SPLIT_IN_A_ROW"
             }
             TreeSplitStream::CentralMappingEmptyLeafDropped => {
-                "LAYER0_TREE_SPLIT_CENTRAL_MAPPING_EMPTY_LEAF_DROPPED"
+                "CRASH_POINT_REPLAY_TREE_SPLIT_CENTRAL_MAPPING_EMPTY_LEAF_DROPPED"
             }
             TreeSplitStream::CentralMappingRootLowered => {
-                "LAYER0_TREE_SPLIT_CENTRAL_MAPPING_ROOT_LOWERED"
+                "CRASH_POINT_REPLAY_TREE_SPLIT_CENTRAL_MAPPING_ROOT_LOWERED"
             }
-            TreeSplitStream::AccountingRootSplit => "LAYER0_TREE_SPLIT_ACCOUNTING_ROOT_SPLIT",
-            TreeSplitStream::AccountingLeafSplit => "LAYER0_TREE_SPLIT_ACCOUNTING_LEAF_SPLIT",
+            TreeSplitStream::AccountingRootSplit => {
+                "CRASH_POINT_REPLAY_TREE_SPLIT_ACCOUNTING_ROOT_SPLIT"
+            }
+            TreeSplitStream::AccountingLeafSplit => {
+                "CRASH_POINT_REPLAY_TREE_SPLIT_ACCOUNTING_LEAF_SPLIT"
+            }
         }
     }
 }
@@ -314,7 +325,7 @@ fn expected_segment_sizes(units_written: usize) -> Vec<usize> {
     vec![2 * units_written, 2, 1, 2]
 }
 
-fn assert_clean(stream: TreeSplitStream, tally: &Layer0Tally) {
+fn assert_clean(stream: TreeSplitStream, tally: &CrashPointReplayTally) {
     assert_eq!(
         tally.violations, 0,
         "{stream:?} oracle：{:?}",
@@ -350,8 +361,14 @@ fn assert_clean(stream: TreeSplitStream, tally: &Layer0Tally) {
 
 /// 枚举一条流：`expand` 为真的段展开（每次写各取它的几态、任意组合，系统配置槽写是原地覆写、取三态），
 /// 别的段只以整段持久进入后面的状态。
-fn enumerate(stream: TreeSplitStream, expand: &dyn Fn(usize, &[usize]) -> bool) -> Layer0Tally {
+/// 只录那一趟（`SINGLEFS_CRASH_AMPLIFICATION_STAGE=record`）流写进判定库就交回 `None`，不判。
+fn enumerate(
+    stream: TreeSplitStream,
+    item_label: &str,
+    expand: &dyn Fn(usize, &[usize]) -> bool,
+) -> Option<CrashPointReplayTally> {
     let prepared = prepare(stream);
+    let item_name = format!("tree_split::{stream:?}::{item_label}");
     let plan = stream.plan();
     let sizes: Vec<usize> = prepared.segments.iter().map(Vec::len).collect();
     assert_eq!(
@@ -359,42 +376,46 @@ fn enumerate(stream: TreeSplitStream, expand: &dyn Fn(usize, &[usize]) -> bool) 
         expected_segment_sizes(plan.units_written),
         "{stream:?}：只录那一次发布，四段"
     );
-    let tally = enumerate_layer0_selecting_versions(
+    let tally = enumerate_crash_states_selecting_versions(
+        CrashPointReplayItem {
+            name: &item_name,
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
         &prepared.versions,
         expand,
-    );
+    )
+    .judged()?;
     assert_eq!(
         tally.states,
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &prepared.base,
             &prepared.writes,
             &prepared.segments,
             &|segment_index, segment| {
                 if expand(segment_index, segment) {
-                    Layer0SegmentExpansion::EveryProperSubset
+                    CrashPointReplaySegmentExpansion::EveryProperSubset
                 } else {
-                    Layer0SegmentExpansion::NotExpanded
+                    CrashPointReplaySegmentExpansion::NotExpanded
                 }
             },
         ),
-        "{stream:?}：展开的段按层 0 的枚举域数（原地覆写取三态）"
+        "{stream:?}：展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
     println!(
-        "LAYER0_TREE_SPLIT stream={stream:?} states={} closed_form_of_every_segment={} root_persisted_states={} journal_differing_states={} verification_ran_states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
+        "CRASH_POINT_REPLAY_TREE_SPLIT stream={stream:?} states={} closed_form_of_every_segment={} root_persisted_states={} journal_differing_states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
         tally.states,
         closed_form_state_count(&prepared.segments),
         tally.root_persisted_states,
         tally.journal_differing_states,
-        tally.verification_ran_states,
         tally.states_by_publish_text(),
         tally.checker_counts_by_invariant()
     );
     assert_clean(stream, &tally);
-    tally
+    Some(tally)
 }
 
 /// 平时跑的那一份：每条流的单元写段只以整段持久进入后面的状态（不展开），记录段、根槽、系统配置槽轮换那几段全展开——
@@ -402,7 +423,11 @@ fn enumerate(stream: TreeSplitStream, expand: &dyn Fn(usize, &[usize]) -> bool) 
 #[test]
 fn every_tree_split_stream_recovers_cleanly_in_every_state_after_its_unit_writes() {
     for stream in TreeSplitStream::ALL {
-        let tally = enumerate(stream, &|_segment_index, segment| segment.len() < 4);
+        let Some(tally) = enumerate(stream, "small_segments", &|_segment_index, segment| {
+            segment.len() < 4
+        }) else {
+            continue;
+        };
         assert_eq!(
             tally.states,
             1 + 3 + 1 + (3 * 3 - 1),
@@ -414,17 +439,19 @@ fn every_tree_split_stream_recovers_cleanly_in_every_state_after_its_unit_writes
 /// 全量：每条流那一次发布的全部崩溃状态，单元写段 2^(2 × 单元数) − 1 个，轮换那一段 3² − 1 个（系统配置槽写取三态）。
 /// 单元写段：9 个单元 262143（摘空）、10 个 1048575（中央映射根分裂、根降高、记账根分裂）、11 个 4194303（两条叶分裂）、
 /// 13 个 67108863（两层连着分裂）；七条流各加记录段 3、根槽 1、轮换 8、全部持久 1，合计 78905428 个状态。
-/// 登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），门禁 checker-tier-layer0-replay --full 在 release 下跑：每条流跑完打一行计数行
-/// （前缀 `full_enumeration_count_line_prefix`，带 `exhaustive=`）。枚举不留进度文件、不认双机分片开关。
+/// 登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），门禁 checker-tier-crash-point-replay --full 在 release 下跑：每条流跑完打一行计数行
+/// （前缀 `full_enumeration_count_line_prefix`，带 `exhaustive=`）。判过的状态在判定库里（崩溃枚举用例那一类），不走双机。
 #[test]
-#[ignore = "七条流合计 78905428 个状态、每个两遍恢复 + checker；登记成崩溃枚举用例，门禁 checker-tier-layer0-replay --full 在 release 下跑"]
+#[ignore = "七条流合计 78905428 个状态、每个两遍恢复 + checker；登记成崩溃枚举用例，门禁 checker-tier-crash-point-replay --full 在 release 下跑"]
 fn full_enumeration_of_every_tree_split_stream_is_exhaustive_and_clean() {
     for stream in TreeSplitStream::ALL {
-        let tally = enumerate(stream, &|_segment_index, _segment| true);
+        let Some(tally) = enumerate(stream, "full", &|_segment_index, _segment| true) else {
+            continue;
+        };
         let units_written = stream.plan().units_written;
         let closed_form = 1 + ((1u64 << (2 * units_written)) - 1) + 3 + 1 + (3 * 3 - 1);
         println!(
-            "{} states={} closed_form={closed_form} exhaustive={} violations={} ignored_violations={} failed={} root_persisted_states={} journal_differing_states={} verification_ran_states={} record_root_without_record={} record_claimed_state_missing_unit={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
+            "{} states={} closed_form={closed_form} exhaustive={} violations={} ignored_violations={} failed={} root_persisted_states={} journal_differing_states={} record_root_without_record={} record_claimed_state_missing_unit={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
             stream.full_enumeration_count_line_prefix(),
             tally.states,
             tally.states == closed_form,
@@ -433,7 +460,6 @@ fn full_enumeration_of_every_tree_split_stream_is_exhaustive_and_clean() {
             tally.failed_states,
             tally.root_persisted_states,
             tally.journal_differing_states,
-            tally.verification_ran_states,
             tally.record_root_without_record,
             tally.record_claimed_state_missing_unit,
             tally.states_by_publish_text(),

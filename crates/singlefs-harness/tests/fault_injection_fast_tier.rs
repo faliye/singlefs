@@ -3,62 +3,51 @@
 //!
 //! 被测的两条性质：注入之后 `singlefs-core` **返回错误而不是 panic**；出错之后**重开恢复到模型允许的版本**。
 //! 种子基是这个测试周期写死的那一个（`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，随机历史与崩溃注入那两个二进制用的是同一个）。
+mod common_images_for_the_checker_tier;
+#[path = "common_images_for_the_checker_tier/fault_injection_fast_tier.rs"]
+mod scenarios_of_fault_injection_fast_tier;
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::io::Write as _;
-
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use scenarios_of_fault_injection_fast_tier::{
+    ordinal_of_the_root_slot_write_within_the_step, overwrite_with_fill_seed,
+    the_fixed_history_with_its_root_slot_write_swallowed,
+    the_history_whose_make_filesystem_fails_at_its_first_barrier, FAST_TIER_OPERATIONS_PER_HISTORY,
+    HANDING_EVERY_STEP_IMAGE_OUT,
+};
+use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
-use singlefs_core::block_device::PhysicalBlockSizeInBytes;
-use singlefs_core::make_filesystem::{allocator_after_make_filesystem, make_filesystem};
-use singlefs_core::recovery::{
-    choose_system_configuration, readable_roots, recover, JournalPolicy, RecoveryOutcome,
-};
-use singlefs_core::transaction::{
-    acquire_instance, publish_first_file, publish_overwrite, resend_the_frozen_publish, warm_up,
-    FirstFile, PoolVersion, PoolWriter, PublishError,
-};
-use singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE;
+use singlefs_core::recovery::{recover, JournalPolicy};
 use singlefs_harness::fault_injection::{
-    inject_faults_into_history, inject_one_fault_into_the_segment, run_fault_injection_campaign,
-    AcquiredInstanceLeft, AcquiredInstanceLeftAfterAFailedMount, DrawnFault, FaultCounting,
-    FaultDeviceSelector, FaultInjectingBlockDevice, FaultInjectionCampaign, FaultInjectionReport,
-    FaultInjectionTally, FaultInjectionWorkerThreads, FaultOccurrence, FaultOutcome,
-    FaultPlacement, FaultSchedule, FaultedSegment, FaultedSegmentKind, FlippedBit, InjectedFault,
-    KnownRedAtAFault, KnownRedFormAtAFault, KnownRedFormOnlyAfterAFault, SharedFaultPlan,
+    inject_faults_into_history,
+    inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier,
+    inject_one_fault_into_the_segment, run_fault_injection_campaign, AcquiredInstanceLeft,
+    AcquiredInstanceLeftAfterAFailedMount, DrawnFault, FaultCounting, FaultDeviceSelector,
+    FaultInjectionCampaign, FaultInjectionReport, FaultInjectionTally, FaultInjectionWorkerThreads,
+    FaultOccurrence, FaultOutcome, FaultPlacement, FaultSchedule, FaultedSegment,
+    FaultedSegmentKind, FlippedBit, ImagesAfterAFault, InjectedFault,
+    PoolCheckerVerdictsAfterAFault, SharedFaultPlan,
 };
 use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
-    count_from_reproduction_environment, environment_assignments_in_line, execute_history_with,
+    count_from_reproduction_environment, environment_assignments_in_line,
     execute_history_with_faults, generate_history_with_weights,
-    number_from_reproduction_environment, render_environment_assignments, ContentChoice,
-    ContentLength, FailureSignature, FloorTargetChoice, GeneratedHistory, GenerationWeights,
-    HarnessJudgement, HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation,
-    HistoryOperationKind, HistoryRun, HistorySampling, HistorySeed, HistoryStartingPoint,
-    PerStepChecker, ReproductionEnvironmentError, ReproductionVariablePrefix, StartingPointStep,
-    StepPosition,
+    number_from_reproduction_environment, render_environment_assignments, FailureSignature,
+    FloorTargetChoice, GeneratedHistory, GenerationWeights, HarnessJudgement, HistoryDeviceWidth,
+    HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind, HistoryRun,
+    HistorySampling, HistorySeed, HistoryStartingPoint, PerStepChecker,
+    ReproductionEnvironmentError, ReproductionVariablePrefix, StartingPointStep, StepPosition,
 };
-use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::model::ModelDisagreementAspect;
 use singlefs_harness::numeric_environment_variable::process_environment_variable;
-use singlefs_harness::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
-use singlefs_harness::segments::{FixedGeometry, StepKind};
-use singlefs_harness::{RecordingBlockDevice, SharedStream};
-
-/// 写死的那几条用例里两块内存盘各多大（与各步用例、随机历史的 4 GiB 档相同）。
-const IMAGE_BYTES: u64 = 4 << 30;
+use singlefs_harness::SharedStream;
+use std::collections::{BTreeMap, BTreeSet};
+use std::io::Write as _;
 
 /// 快档的规模：段数、每段步数、每段注入几次。每次注入都要把这段历史整个重跑一遍，所以规模按「别显著变慢」定。
 const FAST_TIER_SEEDS: u64 = 24;
-const FAST_TIER_OPERATIONS_PER_HISTORY: usize = 20;
-const FAST_TIER_FAULTS_PER_HISTORY: usize = 4;
 
-/// 注入之后这段历史怎么跑：每一步之后跑池级 checker、判红就停，两块 4 GiB 的盘。
-/// 跑 checker 是这一件的一半——注入之后盘面坏没坏，只有它看得见。
-const CHECKED_AFTER_EVERY_STEP: HistoryExecution =
-    HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES;
+const FAST_TIER_FAULTS_PER_HISTORY: usize = 4;
 
 /// 报告直接写进进程的标准输出，不经 libtest 的捕获：通过时计数照样出现在 `check.sh` 的输出里
 /// （`test-discipline.md`「阴性结果要能和「代码没跑到」分开」）。
@@ -183,7 +172,7 @@ fn fast_tier_campaign(worker_threads: FaultInjectionWorkerThreads) -> FaultInjec
         operations_per_history: FAST_TIER_OPERATIONS_PER_HISTORY,
         faults_per_history: FAST_TIER_FAULTS_PER_HISTORY,
         weights: GenerationWeights::BROAD,
-        execution: CHECKED_AFTER_EVERY_STEP,
+        execution: HANDING_EVERY_STEP_IMAGE_OUT,
         worker_threads,
     }
 }
@@ -258,13 +247,9 @@ fn assert_every_fault_injection_path_was_exercised(report: &FaultInjectionReport
         tally.faults_on_segment(FaultedSegmentKind::TheStartingPoint) > 0,
         "起点段上一次都没注入过：`draw_faults` 的候选区间又把第 0 段排掉了\n{rendered}"
     );
-    // 说谎的设备真的丢掉过内容：这一格是零的话，说谎那两种注得进去却什么也没碰着，
-    // `InjectedFault::the_device_lies` 的那道豁免就成了一张白给的免罪符，判别力要重新量
-    //（`mutation-sampling.md`「取样点不敏感」）。
-    assert!(
-        tally.faults_where_a_lying_device_left_the_image_inconsistent > 0,
-        "说谎的设备一次都没把盘面弄脏：说谎那两种抽到了却什么也没碰着\n{rendered}"
-    );
+    // 说谎的设备真的丢掉过内容（盘面不一致只有池级 checker 看得见）：这一格归 checker 档两段，同一批种子在
+    // `crates/singlefs-checker-tier/tests/crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library.rs`
+    // 里核说谎的设备留下的不一致至少一次（`mutation-sampling.md`「取样点不敏感」）。
     assert!(
         tally.reopens_reading_a_file > 0 && tally.reopens_without_a_file > 0,
         "重开的两种结局没都见过：读回文件 {}、没有文件 {}\n{rendered}",
@@ -301,20 +286,25 @@ fn assert_every_fault_injection_path_was_exercised(report: &FaultInjectionReport
         "重开走到了模型都不允许的版本：{}\n{rendered}",
         how_to_replay(report)
     );
-    assert!(
-        tally.checker_runs_on_the_image_after_the_fault >= tally.faults,
-        "每次注入之后都要对镜像跑一次池级 checker\n{rendered}"
+    assert_eq!(
+        tally.images_after_the_fault_handed_out, tally.faults,
+        "每次注入之后重开的盘都要交出去一次（池级 checker 那一遍归 checker 档两段）\n{rendered}"
+    );
+    assert_eq!(
+        tally.checker_runs_on_the_image_after_the_fault, 0,
+        "harness 档不在注入之后的盘上跑池级 checker\n{rendered}"
     );
 }
 
 /// 大档没设环境变量时每段几步、注入几次（大档撞出的单段回归用例照同一组规模重放那一段）。
 const LARGE_TIER_OPERATIONS_PER_HISTORY: u64 = 30;
+
 const LARGE_TIER_FAULTS_PER_HISTORY: u64 = 6;
 
-/// 大档注入之后这段历史怎么跑：每一步之后跑池级 checker、空间准入按公式判，盘宽由调用方给（大档从环境变量取）。
+/// 大档注入之后这段历史怎么跑：harness 不跑池级 checker（那一遍归 checker 档两段）、空间准入按公式判，盘宽由调用方给（大档从环境变量取）。
 fn large_tier_execution(device_width: HistoryDeviceWidth) -> HistoryExecution {
     HistoryExecution {
-        per_step_checker: PerStepChecker::Run,
+        per_step_checker: PerStepChecker::Skipped,
         device_width,
         space_admission: SpaceAdmission::JudgedByTheFormula,
     }
@@ -361,7 +351,7 @@ fn a_fault_injection_fault_count_of_zero_panics_naming_the_variable_and_the_valu
 /// 大档：规模与取样参数照判红时打的重放行从环境变量取，后台跑（`cargo test --release -p singlefs-harness --test
 /// fault_injection_fast_tier -- --ignored --nocapture`）。
 #[test]
-#[ignore = "大档：照判红时打的重放行设环境变量；SINGLEFS_FAULT_INJECTION_FIRST_SEED 起 SINGLEFS_FAULT_INJECTION_SEEDS 段、每段 SINGLEFS_FAULT_INJECTION_OPERATIONS 步、每段注入 SINGLEFS_FAULT_INJECTION_FAULTS 次，比重 SINGLEFS_FAULT_INJECTION_WEIGHTS（broad、reuse、rollback、wall、unit-area-wall），checker SINGLEFS_FAULT_INJECTION_CHECKER（run、skip），盘宽 SINGLEFS_FAULT_INJECTION_DEVICES（4gib、unit-area-384、unit-area-256、unit-area-240），空间准入 SINGLEFS_FAULT_INJECTION_SPACE_ADMISSION（judged、skipped），线程数 SINGLEFS_FAULT_INJECTION_WORKER_THREADS；没设的取大档默认（种子基、512 段、30 步、6 次、broad、run、4gib、judged）；按里程碑「增补 3」后台跑"]
+#[ignore = "大档：照判红时打的重放行设环境变量；SINGLEFS_FAULT_INJECTION_FIRST_SEED 起 SINGLEFS_FAULT_INJECTION_SEEDS 段、每段 SINGLEFS_FAULT_INJECTION_OPERATIONS 步、每段注入 SINGLEFS_FAULT_INJECTION_FAULTS 次，比重 SINGLEFS_FAULT_INJECTION_WEIGHTS（broad、reuse、rollback、wall、unit-area-wall），checker SINGLEFS_FAULT_INJECTION_CHECKER（只认 skip），盘宽 SINGLEFS_FAULT_INJECTION_DEVICES（4gib、unit-area-384、unit-area-256、unit-area-240），空间准入 SINGLEFS_FAULT_INJECTION_SPACE_ADMISSION（judged、skipped），线程数 SINGLEFS_FAULT_INJECTION_WORKER_THREADS；没设的取大档默认（种子基、512 段、30 步、6 次、broad、skip、4gib、judged）；按里程碑「增补 3」后台跑"]
 fn fault_injection_large_tier_from_the_environment() {
     let started = std::time::Instant::now();
     let report =
@@ -457,6 +447,7 @@ fn replay_line_of_a_batch_unlike_the_large_tier_defaults_runs_the_same_campaign_
         operations_per_history: 11,
         faults_per_history: 2,
         weights: GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
+        // 每一步的池级 checker 只剩不跑那一种（那一遍归 checker 档两段），那一项取不出与默认不同的值，前提断言不核它
         execution: HistoryExecution {
             per_step_checker: PerStepChecker::Skipped,
             device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
@@ -471,10 +462,9 @@ fn replay_line_of_a_batch_unlike_the_large_tier_defaults_runs_the_same_campaign_
             && campaign.operations_per_history != defaults.operations_per_history
             && campaign.faults_per_history != defaults.faults_per_history
             && campaign.weights != defaults.weights
-            && campaign.execution.per_step_checker != defaults.execution.per_step_checker
             && campaign.execution.device_width != defaults.execution.device_width
             && campaign.execution.space_admission != defaults.execution.space_admission,
-        "前提：这一批的每一项都与大档的默认不同：{campaign:?} 对 {defaults:?}"
+        "前提：这一批除每一步的池级 checker 之外的每一项都与大档的默认不同：{campaign:?} 对 {defaults:?}"
     );
     the_replay_line_printed_for_a_batch_runs_the_same_campaign_on_the_large_tier_entry(&campaign);
 }
@@ -486,54 +476,39 @@ fn replay_line_of_a_batch_unlike_the_large_tier_defaults_runs_the_same_campaign_
 /// 取样点写死成一段历史与一个注入点，不按种子从比重表里抽：此前钉的是种子 7463871032432355210 在 `GenerationWeights::BROAD` 上抽出的
 /// 第 25 步覆盖写那次根槽写，删除批把比重表里可写挂载那一格切出 unlink 之后同一个种子抽出的历史变了、那次被吞的写不在了，用例跟着红
 /// （调度记录 `records/2026-10-01-删除与并发事务.md` 第 11 批的慢档红调查问 1；比重表一改，种子钉的取样点就会再丢一次）。
-/// 这一段：第一个文件（txg 3）之后覆盖写五次（txg 4–8），txg 7 那次（第 3 步）的根槽 FUA 写被吞；每一步之后照跑池级 checker，
-/// txg 8 那次覆盖写之后 checker 只判红 I-3.1（被吞的根槽留下的，被吞的写插回去就消失）。它要按注入点认成说谎的设备留下的、
-/// 记进说谎那一格，不算新发现——带着注入跑的那一遍里每一步之后的池级 checker 判红那一处、注入之后的镜像上再跑的那一遍，各记一次。
+/// 这一段：第一个文件（txg 3）之后覆盖写五次（txg 4–8），txg 7 那次（第 3 步）的根槽 FUA 写被吞；harness 不跑池级 checker，
+/// 带着注入跑的那一遍每一步的镜像、重开的盘与被吞的写插回去之后的盘经钩子交出去（快档与大档那一遍归 checker 档两段），
+/// checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）在交出去的盘上
+/// 经给定状态引擎判池级 checker、交归类（核的是归类那一截）：txg 8 那次覆盖写之后 checker 只判红 I-3.1（被吞的根槽留下的，
+/// 被吞的写插回去就消失）。它要按注入点认成说谎的设备留下的，不算新发现——带着注入跑的那一遍里第一张判红的每步镜像、重开的那张盘，各一条。
+/// 这里只核注入的结局与交出去的盘。
 #[test]
 fn swallowed_write_after_which_the_checker_flags_only_the_allocated_statistic_invariant_is_excused_as_what_the_lying_device_may_leave(
 ) {
-    const STEP_OF_THE_SWALLOWED_ROOT_SLOT_WRITE: usize = 3;
-    let history = GeneratedHistory {
-        seed: HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
-        starting_point: HistoryStartingPoint::AfterFirstFile,
-        operations: (1..=5).map(overwrite_with_fill_seed).collect(),
-    };
-    let injection = inject_one_fault_into_the_segment(
-        &history,
-        CHECKED_AFTER_EVERY_STEP,
-        InjectedFault::WriteIsSwallowed,
-        FaultedSegment::Operation {
-            step_index: STEP_OF_THE_SWALLOWED_ROOT_SLOT_WRITE,
-            operation_kind: HistoryOperationKind::PublishOverwrite,
-        },
-        ordinal_of_the_root_slot_write_within_the_step(
-            &history,
-            STEP_OF_THE_SWALLOWED_ROOT_SLOT_WRITE,
-        ),
-    );
+    let (injection, handed_out) = the_fixed_history_with_its_root_slot_write_swallowed();
     assert!(
         injection.new_findings.is_empty(),
-        "说谎的设备留下的 I-3.1 要被白名单豁免，不算新发现：{:?}",
+        "harness 那一截（模型、RefFS、执行器）不许有新发现：{:?}",
         injection.new_findings
     );
-    assert_eq!(
-        injection
-            .tally
-            .lying_device_signatures
-            .get("CheckerViolations { invariants: [\"I-3.1\"] }"),
-        Some(&2),
-        "这一段里被吞掉的那一次写之后只判红 I-3.1，记进说谎那一格——带着注入跑的那一遍里每一步之后的池级 checker 判红那一处、\
-         注入之后的镜像上再跑的那一遍，各记一次：{:?}",
-        injection.tally.lying_device_signatures
+    let [images] = handed_out.as_slice() else {
+        panic!("一个注入点交出去一份盘：交了 {} 份", handed_out.len());
+    };
+    assert!(
+        images.image_with_the_swallowed_writes_landed.is_some(),
+        "被吞了写，要交被吞的写插回去之后的那张盘"
     );
 }
 
 /// 大档（这个测试周期的种子基起 512 段）撞出的一段，单独跑：种子 7463871032432355397，规模与执行方式与大档没设环境变量时逐项相同。
-/// 抽出的 6 个注入点里有一次被吞掉的写（`write_is_swallowed`，整池第 471 次写调用，第 17 步覆盖写那次发布的根槽写，落在根环区域 0 槽 6）；
-/// 第 18 步挂着时回退判候选集读根环，这个进程知道住着根的区域 0 槽 6 读坏、重读仍坏，拒在任何写之前
-/// （`RollbackError::CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot)`，D16（发布语义） 已定项 1
-/// 「根槽这一次读坏」那一行的读法）。模型不知道根槽没落、说该成；回退点名的槽正是被吞那次写的槽，要记进说谎那一格，不算新发现。
-/// 回退路径不把点名的槽交给模型比对时（`crates/mutations.tsv` 钉着的那一格），这一格判不出是说谎的设备留下的，照报新发现。
+/// 抽出的 6 个注入点里有两次被吞掉的写（`write_is_swallowed`）：整池第 481 次写调用（第 17 步覆盖写那次发布的根槽写）与第 448 次
+/// （第 16 步挂着时回退那次向前发布的根槽写）。两个注入点上历史都走到第 18 步挂着时回退：判候选集读根环，这个进程知道住着根的那一槽
+/// （被吞那次写的槽）读坏、重读仍坏，拒在任何写之前（`RollbackError::CandidateJudgementStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot)`，
+/// D16（发布语义） 已定项 1「根槽这一次读坏」那一行的读法）。模型不知道根槽没落、说该成；回退点名的槽正是被吞那次写的槽，各记进说谎那一格一次，
+/// 不算新发现。回退路径不把点名的槽交给模型比对时（`crates/mutations.tsv` 钉着的那一格），这一格判不出是说谎的设备留下的，照报新发现。
+/// 原先 harness 每一步就地判池级 checker、判红就停：第 448 次那个注入点上第 17 步之后的镜像判红 I-3.1、I-3.9（被吞的根留下的），
+/// 历史停在那里、走不到第 18 步，这一格只记一次；池级 checker 那一遍搬进 checker 档两段之后 harness 不停，两个注入点各记一次
+/// （照判红就停那一档的口径并进 checker 档结论的是合并入口 `inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`）。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rollback_refused_on_the_root_ring_slot_whose_write_the_lying_device_swallowed_is_excused_as_what_the_lying_device_may_leave(
@@ -572,8 +547,8 @@ fn rollback_refused_on_the_root_ring_slot_whose_write_the_lying_device_swallowed
             .tally
             .lying_device_signatures
             .get("ModelDisagreement { aspect: \"模型说该成、实现拒了\" }"),
-        Some(&1),
-        "回退那一次「模型说该成、实现拒了」要按点名的槽等于被吞根槽写的槽放过、记进说谎那一格，只这一次：\n{rendered}"
+        Some(&2),
+        "回退那两次「模型说该成、实现拒了」要按点名的槽等于被吞根槽写的槽放过、记进说谎那一格，两个注入点各一次：\n{rendered}"
     );
 }
 
@@ -586,7 +561,7 @@ fn one_fixed_history_injects_twelve_faults_and_none_of_them_panics() {
         24,
         &GenerationWeights::BROAD,
     );
-    let injection = inject_faults_into_history(&history, CHECKED_AFTER_EVERY_STEP, 12);
+    let injection = inject_faults_into_history(&history, HANDING_EVERY_STEP_IMAGE_OUT, 12);
     let rendered = injection.tally.render();
     print_uncaptured(&format!("── 故障注入：一段写死的历史 ──\n{rendered}"));
     assert!(
@@ -614,7 +589,7 @@ fn the_drawn_injection_points_reach_the_starting_segment() {
         8,
         &GenerationWeights::BROAD,
     );
-    let injection = inject_faults_into_history(&history, CHECKED_AFTER_EVERY_STEP, 12);
+    let injection = inject_faults_into_history(&history, HANDING_EVERY_STEP_IMAGE_OUT, 12);
     let rendered_faults: Vec<String> = injection
         .drawn_faults
         .iter()
@@ -650,7 +625,7 @@ fn run_the_starting_point(
     history: &GeneratedHistory,
     failing_write_ordinal: Option<u64>,
 ) -> (HistoryRun, SharedFaultPlan) {
-    let geometry = CHECKED_AFTER_EVERY_STEP.device_width.fixed_geometry();
+    let geometry = HANDING_EVERY_STEP_IMAGE_OUT.device_width.fixed_geometry();
     let plan = match failing_write_ordinal {
         None => SharedFaultPlan::unarmed(geometry),
         Some(ordinal) => SharedFaultPlan::armed(
@@ -660,7 +635,7 @@ fn run_the_starting_point(
     };
     let run = execute_history_with_faults(
         history,
-        CHECKED_AFTER_EVERY_STEP,
+        HANDING_EVERY_STEP_IMAGE_OUT,
         &SharedStream::new(),
         &plan,
         &mut |_| {},
@@ -742,8 +717,9 @@ fn every_entry_in_the_starting_segment_returns_an_error_instead_of_panicking() {
     }
 }
 
-/// 起点段失败时跑不跑池级 checker：**mkfs 自己就报错那一次不跑**（盘上没有一个做完了的文件系统，
-/// checker 判的每一条都没有对象），**取号 / 暖机 / 第一个文件报错那几次照跑**（mkfs 已经做完，盘上有池）。
+/// 起点段失败时池级 checker 要判的那张镜像交不交出去（harness 不跑 checker，那一遍归 checker 档两段，镜像经每步镜像那个钩子交出去）：
+/// **mkfs 自己就报错那一次不交**（盘上没有一个做完了的文件系统，checker 判的每一条都没有对象），
+/// **取号 / 暖机 / 第一个文件报错那几次照交**（mkfs 已经做完，盘上有池）。
 ///
 /// 用户 2026-09-21 定的口径，分界与「重开走读失败算不算失败」同一条：mkfs 做没做完
 /// （`history.rs` 的 `StartingPointStep::finished_filesystem_is_on_the_devices`）。
@@ -751,7 +727,7 @@ fn every_entry_in_the_starting_segment_returns_an_error_instead_of_panicking() {
 #[test]
 fn the_pool_checker_runs_on_a_starting_point_failure_only_when_make_filesystem_finished() {
     let history = history_with_only_the_starting_point();
-    // 不注入时起点段跑完，起点之后跑一次 checker：下面那两格拿它当对照。
+    // 不注入时起点段跑完，起点之后交一张镜像：下面那两格拿它当对照。
     let (measured, measurement) = run_the_starting_point(&history, None);
     assert!(
         matches!(measured.ending, HistoryEnding::Completed),
@@ -759,35 +735,36 @@ fn the_pool_checker_runs_on_a_starting_point_failure_only_when_make_filesystem_f
         measured.ending
     );
     assert_eq!(
-        measured.tally.checker_runs, 1,
-        "起点段跑完之后该跑一次池级 checker"
+        measured.tally.step_images_handed_out, 1,
+        "起点段跑完之后该交一张镜像"
     );
-    let mut checker_runs_by_step: BTreeMap<&'static str, BTreeSet<u64>> = BTreeMap::new();
+    assert_eq!(measured.tally.checker_runs, 0, "harness 档不跑池级 checker");
+    let mut step_images_handed_out_by_step: BTreeMap<&'static str, BTreeSet<u64>> = BTreeMap::new();
     for ordinal in 1..=measurement.calls().writes {
         let (run, _plan) = run_the_starting_point(&history, Some(ordinal));
         let Some(step) = the_starting_point_step_that_returned_an_error(&run, ordinal) else {
             continue;
         };
-        checker_runs_by_step
+        step_images_handed_out_by_step
             .entry(step.name())
             .or_default()
-            .insert(run.tally.checker_runs);
-        let expected_checker_runs = u64::from(step.finished_filesystem_is_on_the_devices());
+            .insert(run.tally.step_images_handed_out);
+        let expected_step_images = u64::from(step.finished_filesystem_is_on_the_devices());
         assert_eq!(
-            run.tally.checker_runs,
-            expected_checker_runs,
-            "起点段第 {ordinal} 次写上注入、停在{}：mkfs 做完了才该跑 checker",
+            run.tally.step_images_handed_out,
+            expected_step_images,
+            "起点段第 {ordinal} 次写上注入、停在{}：mkfs 做完了才该交那张镜像",
             step.name()
         );
     }
     print_uncaptured(&format!(
-        "── 起点段失败时的 checker ──\n每一步报错时 checker 跑过几次：{checker_runs_by_step:?}\n"
+        "── 起点段失败时交出去的镜像 ──\n每一步报错时交了几张：{step_images_handed_out_by_step:?}\n"
     ));
     // 两边都要有样本，不然上面那条断言是空过的。
     assert_eq!(
-        checker_runs_by_step.get(StartingPointStep::MakeFilesystem.name()),
+        step_images_handed_out_by_step.get(StartingPointStep::MakeFilesystem.name()),
         Some(&BTreeSet::from([0])),
-        "mkfs 报错那几次要有样本，而且一次 checker 都没跑：{checker_runs_by_step:?}"
+        "mkfs 报错那几次要有样本，而且一张镜像都没交：{step_images_handed_out_by_step:?}"
     );
     for step in [
         StartingPointStep::AcquireInstance,
@@ -795,17 +772,13 @@ fn the_pool_checker_runs_on_a_starting_point_failure_only_when_make_filesystem_f
         StartingPointStep::PublishFirstFile,
     ] {
         assert_eq!(
-            checker_runs_by_step.get(step.name()),
+            step_images_handed_out_by_step.get(step.name()),
             Some(&BTreeSet::from([1])),
-            "{}报错那几次要有样本，而且各跑过一次 checker：{checker_runs_by_step:?}",
+            "{}报错那几次要有样本，而且各交过一张：{step_images_handed_out_by_step:?}",
             step.name()
         );
     }
 }
-
-/// 快档在 2026-10-03 落进这一形的那一段：种子基 + 7（7463871032432355120），快档的规模与比重。
-const SEED_WHERE_MAKE_FILESYSTEM_FAILS_BEFORE_ANY_SYSTEM_CONFIGURATION_SLOT_LANDS: u64 =
-    SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + 7;
 
 /// 用户 2026-10-03 定：mkfs 在写到系统配置之前失败的盘面就是全池皆废，I-8.5（tail 槽有效集非空）照判红，红是对的；
 /// 故障注入的「已知红」清单加这一类。快档在种子 7463871032432355120 上摆的那一个注入点（整池第 1 次 barrier 报错，落在 mkfs 第一道屏障上，
@@ -813,22 +786,12 @@ const SEED_WHERE_MAKE_FILESYSTEM_FAILS_BEFORE_ANY_SYSTEM_CONFIGURATION_SLOT_LAND
 /// 重开走读失败，判法记成那一条「已知红」，不记新发现。
 ///
 /// 判别力自证：判法改回不认这一类（`known_red_form_only_after_a_fault` 恒交回 None，`crates/mutations.tsv` 同名那一条），
-/// 这一次落成新发现 `CheckerViolations { invariants: ["I-8.5"] }`，这里红。
+/// 这一次落成新发现 `CheckerViolations { invariants: ["I-8.5"] }`，checker 档同名用例红（池级 checker 那一遍与归类在那里，
+/// `crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）；这里只核注入的结局与交出去的盘。
 #[test]
 fn make_filesystem_failing_at_its_first_barrier_before_any_system_configuration_slot_lands_ends_known_red_not_a_new_finding(
 ) {
-    let history = generate_history_with_weights(
-        HistorySeed(SEED_WHERE_MAKE_FILESYSTEM_FAILS_BEFORE_ANY_SYSTEM_CONFIGURATION_SLOT_LANDS),
-        FAST_TIER_OPERATIONS_PER_HISTORY,
-        &GenerationWeights::BROAD,
-    );
-    let injection = inject_one_fault_into_the_segment(
-        &history,
-        CHECKED_AFTER_EVERY_STEP,
-        InjectedFault::BarrierFails,
-        FaultedSegment::TheStartingPoint,
-        1,
-    );
+    let (injection, handed_out) = the_history_whose_make_filesystem_fails_at_its_first_barrier();
     let rendered = injection.tally.render();
     print_uncaptured(&format!(
         "── mkfs 第一道屏障报错：全池皆废、只红 I-8.5 ──\n{rendered}"
@@ -857,32 +820,27 @@ fn make_filesystem_failing_at_its_first_barrier_before_any_system_configuration_
         "重开走读失败、盘上本来就没有一版立得住\n{rendered}"
     );
     assert!(
-        injection.new_findings.is_empty(),
-        "mkfs 在系统配置槽落盘之前报错、只红 I-8.5 是认下的「已知红」，不是新发现：{:?}\n{rendered}",
+        injection.new_findings.is_empty() && injection.known_red_hits.is_empty(),
+        "harness 那一截（模型、RefFS、执行器）既没有新发现、也没有已知红（I-8.5 那一判归池级 checker）：{:?}\n{rendered}",
         injection
             .new_findings
             .iter()
             .map(|finding| &finding.signature)
             .collect::<Vec<_>>()
     );
-    let expected_form = KnownRedFormAtAFault::OnlyAfterAFault(
-        KnownRedFormOnlyAfterAFault::MakeFilesystemFailedBeforeAnySystemConfigurationSlotLanded,
-    );
     assert_eq!(
-        injection.known_red_hits,
-        vec![KnownRedAtAFault {
-            seed: HistorySeed(
-                SEED_WHERE_MAKE_FILESYSTEM_FAILS_BEFORE_ANY_SYSTEM_CONFIGURATION_SLOT_LANDS
-            ),
-            form: expected_form,
-            drawn: expected_drawn,
-        }],
-        "这一次记成「mkfs 没写下系统配置槽」那一条已知红\n{rendered}"
+        injection.tally.checker_runs_on_the_image_after_the_fault, 0,
+        "harness 不在注入之后的盘上跑池级 checker（那一遍归 checker 档两段）\n{rendered}"
     );
-    assert_eq!(
-        injection.tally.faults_ending_known_red,
-        BTreeMap::from([(expected_form, 1)]),
-        "计数里以这一条已知红收尾一次\n{rendered}"
+    let [images] = handed_out.as_slice() else {
+        panic!(
+            "一个注入点交出去一份盘：交了 {} 份\n{rendered}",
+            handed_out.len()
+        );
+    };
+    assert!(
+        images.step_images_of_the_run_with_the_fault.is_empty(),
+        "mkfs 自己报错，一张每步镜像都不交\n{rendered}"
     );
     assert_eq!(injection.tally.faults_that_panicked, 0, "{rendered}");
 }
@@ -907,177 +865,11 @@ fn the_report_is_the_same_text_with_one_worker_thread_and_with_four() {
     );
 }
 
-/// 增补 2 收口表第 40 行（C381（根已落盘之后发布失败，分配器仍退回））那一格，按 D23（journal 的角色与格式） 已定项 14
-/// 「这一版的失败处置」（用户 2026-09-24 定：发布不接受失败，失败的那次冻结，下一次发布之前逐字节原样重发它）：
-/// 发布 B 在最后一步（系统配置槽）失败时根已 FUA 落盘、分配器退回——改之前同一个写入口拿同一个上一版再发一次 C，就把那条根指着的单元
-/// 原地盖掉，那一次再断电，盘上留下「最新的那条根指着一份内容已经换掉的单元」（池级 checker 判 I-7.4 / I-7.2 红、冷启动走不到那条根）。
-/// 现在 B 冻结在分配器上：再发 C 在任何写之前被拒；原样重发 B 之后那条根指着的单元就是它自己写的那一份，checker 不红、冷启动读回 B；
-/// 之后 C 接在 B 上照常发布。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_fault_injection_fast_tier::publish_that_fails_on_the_system_configuration_slot_is_frozen_so_the_next_publish_cannot_overwrite_the_units_of_its_root`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn publish_that_fails_on_the_system_configuration_slot_is_frozen_so_the_next_publish_cannot_overwrite_the_units_of_its_root(
 ) {
-    let parameters = e142_parameters(512, 512);
-    let geometry = FixedGeometry {
-        fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
-        journal_ring_bytes: parameters.geometry.journal_ring_bytes,
-        root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
-    };
-    let stream = SharedStream::retaining_contents();
-    let plan = SharedFaultPlan::unarmed(geometry);
-    let mut devices: Vec<(DeviceIdentity, FaultInjectingBlockDevice<_>)> = (0..2u32)
-        .map(|device_number| {
-            let identity = DeviceIdentity(device_number);
-            (
-                identity,
-                FaultInjectingBlockDevice::new(
-                    identity,
-                    RecordingBlockDevice::with_shared_stream(
-                        identity,
-                        SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
-                        stream.clone(),
-                    ),
-                    plan.clone(),
-                ),
-            )
-        })
-        .collect();
-    let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
-    // mkfs 同一个进程里接着写的分配器照 mkfs 按环长现算的单元区起点建（实审 A3b 报告 Q8：环境变量选小盘那一档时环不是默认的 768 MiB，
-    // 起点不是编译期常量 50176），并装上 mkfs 刚写下的根环。
-    let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
-    let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
-    let instance = acquire_instance(&mut writer).expect("取号");
-    let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
-    let first = publish_first_file(
-        &mut writer,
-        &mut allocator,
-        warmed.roots.last().expect("暖机两代根"),
-        FirstFile {
-            content: &first_file_content(),
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS,
-        },
-        instance,
-        &warmed.last_record_bytes,
-    )
-    .expect("新池新建文件");
-    assert_eq!(first.root.checkpoint_txg, CheckpointTxg(3));
-
-    // 一、发布 B：系统配置槽那两次写全报错。根槽 FUA 写在它们之前，已经落盘。
-    plan.arm(FaultSchedule {
-        fault: InjectedFault::WriteFails,
-        device: FaultDeviceSelector::EveryDevice,
-        placement: FaultPlacement::OffsetBelow(
-            SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
-                * u64::from(parameters.geometry.fixed_structure_slot_spacing),
-        ),
-        counting: FaultCounting::AcrossThePool,
-        occurrence: FaultOccurrence::EVERY_MATCHING_CALL,
-    });
-    let refused = publish_overwrite(
-        &mut writer,
-        &mut allocator,
-        &first,
-        FirstFile {
-            content: &second_content(),
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
-        },
-        instance,
-    )
-    .expect_err("系统配置槽写报错，这次发布必须失败");
-    assert!(
-        matches!(refused, PublishError::BlockDevice(_)),
-        "报的应当是块设备错：{refused:?}"
-    );
-    let fired = plan.fired();
-    assert_eq!(fired.len(), 1, "系统配置槽第一次写就报错、发布到此为止");
-    assert_eq!(
-        fired[0].written_structure,
-        Some(StepKind::SystemConfigurationSlot),
-        "注入的那一次要落在系统配置槽上"
-    );
-    let image_after_the_failed_publish = image_from(&stream);
-    let roots_after: Vec<u64> = readable_root_txgs(&image_after_the_failed_publish);
-    assert!(
-        roots_after.contains(&4),
-        "C381 的前提：这次发布报了失败，txg 4 那条根却已经 FUA 落盘、在环里读得出来；读到的是 {roots_after:?}"
-    );
-
-    // 二、同一个写入口、同一个上一版再发一次：B 冻结着，第一道就拒，一个写都不发。
-    let fired_before_the_refused_publish = plan.fired_count();
-    let operations_before_the_refused_publish = stream.operations().len();
-    let refused_again = publish_overwrite(
-        &mut writer,
-        &mut allocator,
-        &first,
-        FirstFile {
-            content: &third_content(),
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120,
-        },
-        instance,
-    )
-    .expect_err("B 冻结着，另建一次发布必须被拒");
-    assert!(
-        matches!(
-            refused_again,
-            PublishError::PublishFrozenAfterAWriteFailureIsNotResentYet {
-                checkpoint_txg: CheckpointTxg(4),
-                ..
-            }
-        ),
-        "报的应当是「B 冻结着、还没重发」：{refused_again:?}"
-    );
-    assert_eq!(
-        (plan.fired_count(), stream.operations().len()),
-        (
-            fired_before_the_refused_publish,
-            operations_before_the_refused_publish
-        ),
-        "被拒的那一次一个写、一道屏障都没发"
-    );
-
-    // 三、盘好了，原样重发 B；之后 C 接在 B 上照常发布。
-    plan.disarm();
-    let second = resend_the_frozen_publish(&mut writer, &mut allocator)
-        .expect("盘好了，重发这一遍不再报错")
-        .and_then(PoolVersion::into_file_version)
-        .expect("冻结着的是带文件的发布 B");
-    assert_eq!(second.root.checkpoint_txg, CheckpointTxg(4));
-    let image_after_the_resend = image_from(&stream);
-    let violations_after_the_resend: Vec<&'static str> = check_pool_image(&image_after_the_resend)
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(_) => Some(invariant),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .collect();
-    assert!(
-        violations_after_the_resend.is_empty(),
-        "重发之后最新那条根（B 的 txg 4）指着的单元就是它自己写的那一份：checker 不红，判红的是 {violations_after_the_resend:?}"
-    );
-    let recovery = recover(&image_after_the_resend, JournalPolicy::Consult);
-    assert!(
-        matches!(
-            &recovery.outcome,
-            RecoveryOutcome::FileRead { root, content }
-                if *root == (instance, CheckpointTxg(4)) && *content == second_content()
-        ),
-        "冷启动读回 B：{:?}",
-        recovery.outcome
-    );
-    let third = publish_overwrite(
-        &mut writer,
-        &mut allocator,
-        &second,
-        FirstFile {
-            content: &third_content(),
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120,
-        },
-        instance,
-    )
-    .expect("重发之后 C 照常发布");
-    assert_eq!(third.root.checkpoint_txg, CheckpointTxg(5));
+    scenarios_of_fault_injection_fast_tier::publish_that_fails_on_the_system_configuration_slot_is_frozen_so_the_next_publish_cannot_overwrite_the_units_of_its_root(&mut PoolCheckerImages::left_to_the_checker_tier());
 }
 
 /// 起点（mkfs、取号 1、暖机、第一个文件）之后只做一步：关掉会话、可写挂载（取号 2 → 写行 → 暖机）。
@@ -1095,6 +887,7 @@ fn history_that_mounts_once_after_the_first_file() -> GeneratedHistory {
 /// （这一步一共 46 次写：暖机一次 21 次）。分配记录树按位置寻址（D8（核心索引结构） 已定项 14）之前那棵树只有一个节点，
 /// 写行那次 15 次写、这一格摆在第 18 次；照旧摆在第 18 次就落进写行那次、记成「新号一条根都没有」。
 const FIRST_ROW_PUBLISH_WRITE_OF_THE_MOUNT: u64 = 3;
+
 const FIRST_WARM_UP_WRITE_OF_THE_MOUNT: u64 = 26;
 
 /// C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）按用户 2026-09-23 定的那一边（认了，写成已知行为；
@@ -1127,7 +920,7 @@ fn write_error_after_the_acquisition_leaves_the_new_instance_in_the_system_confi
     ] {
         let injection = inject_one_fault_into_the_segment(
             &history,
-            CHECKED_AFTER_EVERY_STEP,
+            HANDING_EVERY_STEP_IMAGE_OUT,
             InjectedFault::WriteFails,
             mount_step,
             call_within_the_mount,
@@ -1192,70 +985,6 @@ fn write_error_after_the_acquisition_leaves_the_new_instance_in_the_system_confi
             "认下的行为不算新发现，别的也不许有\n{rendered}"
         );
     }
-}
-
-/// 发布 B 的内容（4100 字节，与虚机二进制 `file-overwrite` 模式相同）。
-fn second_content() -> Vec<u8> {
-    (0..4100usize)
-        .map(|index| u8::try_from((index * 7 + 3) % 253).expect("小于 256"))
-        .collect()
-}
-
-/// 发布 C 的内容：与发布 B 不同，单元字节才会真的变。
-fn third_content() -> Vec<u8> {
-    (0..4100usize)
-        .map(|index| u8::try_from((index * 11 + 5) % 251).expect("小于 256"))
-        .collect()
-}
-
-/// 录制流里真正落到盘上的那些写重建出来的镜像。
-fn image_from(stream: &SharedStream) -> MemoryPool {
-    let mut image = MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
-    image.apply(&stream.retained_operations());
-    image
-}
-
-/// 第一个文件（txg 3）之后覆盖写，每次换一份内容。
-fn overwrite_with_fill_seed(fill_seed: u64) -> HistoryOperation {
-    HistoryOperation::PublishOverwrite(ContentChoice {
-        length: ContentLength::InsideOneDataUnit { selector: 2999 },
-        fill_seed,
-    })
-}
-
-/// 不注入跑一遍这段历史，数第 `step_index` 步发出的写里落在根槽上的那一次是这一步的第几次写（1 起）：
-/// `inject_one_fault_into_the_segment` 按「这一段发出的第几次写」摆注入点。
-fn ordinal_of_the_root_slot_write_within_the_step(
-    history: &GeneratedHistory,
-    step_index: usize,
-) -> u64 {
-    let stream = SharedStream::new();
-    let mut stream_length_after: BTreeMap<StepPosition, usize> = BTreeMap::new();
-    let run = execute_history_with(
-        history,
-        CHECKED_AFTER_EVERY_STEP,
-        &stream,
-        &mut |observation| {
-            stream_length_after.insert(observation.position, stream.operation_count());
-        },
-    );
-    assert_eq!(run.ending, HistoryEnding::Completed, "不注入时这段历史跑完");
-    let step_start = match step_index.checked_sub(1) {
-        None => stream_length_after[&StepPosition::StartingPoint],
-        Some(previous) => stream_length_after[&StepPosition::Operation(previous)],
-    };
-    let step_end = stream_length_after[&StepPosition::Operation(step_index)];
-    let geometry = CHECKED_AFTER_EVERY_STEP.device_width.fixed_geometry();
-    let writes_of_the_step: Vec<_> = stream.operations()[step_start..step_end]
-        .iter()
-        .filter(|operation| operation.kind != singlefs_harness::RecordedOperationKind::Barrier)
-        .cloned()
-        .collect();
-    let index = writes_of_the_step
-        .iter()
-        .position(|operation| geometry.classify(operation) == StepKind::RootRecordFua)
-        .expect("一次发布恰好写一次根槽");
-    u64::try_from(index + 1).expect("一步至多几十次写")
 }
 
 /// 按注入点认说谎的设备留下的那两格（主 agent 2026-09-26 定，实七；实四丙交回 ③ offset 339 与 ④ offset 284 那两形）：
@@ -1454,7 +1183,7 @@ fn floor_raise_in_the_same_process_after_a_swallowed_root_slot_write_is_refused_
 #[test]
 fn mount_after_a_swallowed_root_slot_write_writes_the_transaction_of_the_record_it_applied_while_the_model_expects_none_applied(
 ) {
-    let execution = CHECKED_AFTER_EVERY_STEP;
+    let execution = HANDING_EVERY_STEP_IMAGE_OUT;
     let parameters = execution.device_width.parameters();
     let root_slot_of_the_overwrite = singlefs_core::root_ring::target_for_publish(
         CheckpointTxg(4),
@@ -1550,7 +1279,7 @@ fn the_rows_written_after_a_swallowed_root_slot_write_are_recognised_by_the_rows
     };
     let injection = inject_one_fault_into_the_segment(
         &history,
-        CHECKED_AFTER_EVERY_STEP,
+        HANDING_EVERY_STEP_IMAGE_OUT,
         InjectedFault::WriteIsSwallowed,
         FaultedSegment::Operation {
             step_index: 0,
@@ -1577,18 +1306,195 @@ fn the_rows_written_after_a_swallowed_root_slot_write_are_recognised_by_the_rows
     );
 }
 
-/// 环里自证过的根的 txg，从小到大。
-fn readable_root_txgs(image: &MemoryPool) -> Vec<u64> {
-    let system_configuration = choose_system_configuration(image).expect("择系统配置");
-    let mut txgs: Vec<u64> = readable_roots(
-        image,
-        &system_configuration.immutable.region_devices,
-        &system_configuration.immutable.sizes,
-        &system_configuration.immutable.filesystem_identifier,
-    )
-    .into_iter()
-    .map(|root| root.checkpoint_txg.0)
-    .collect();
-    txgs.sort_unstable();
-    txgs
+/// 合并入口那两条用例用的那一段历史与注入次数：快档那组比重、种子基那一段 8 步，每段抽 6 次。
+const MERGED_HISTORY_OPERATIONS: usize = 8;
+
+const MERGED_FAULTS_PER_HISTORY: usize = 6;
+
+/// 合并入口那一条用例里，用例替 checker 档判红的那一条不变量（真名，归类只看名字）与它的细节。
+const INVARIANT_THE_TEST_JUDGES_RED: &str = "I-2.1";
+
+/// 用例替 checker 档判的结论：起点之后的每一步（`StepPosition::Operation`）的镜像一律判红 [`INVARIANT_THE_TEST_JUDGES_RED`]，
+/// 起点那一张不红；重开那张盘就是录制流整条，历史走到过起点之后写过盘的一步就红（同一个判法：那张盘是那一步镜像的延续）。
+/// 被吞的写插回去那张盘不红。
+fn verdicts_red_after_the_starting_point(
+    images: &ImagesAfterAFault,
+) -> PoolCheckerVerdictsAfterAFault {
+    let red = || {
+        vec![(
+            INVARIANT_THE_TEST_JUDGES_RED,
+            "用例替 checker 档判红".to_string(),
+        )]
+    };
+    let violations_of_the_step_images: Vec<Vec<(&'static str, String)>> = images
+        .step_images_of_the_run_with_the_fault
+        .iter()
+        .map(|step_image| match step_image.position {
+            StepPosition::StartingPoint => Vec::new(),
+            StepPosition::Operation(_) => red(),
+        })
+        .collect();
+    let reached_a_step_after_the_starting_point = violations_of_the_step_images
+        .iter()
+        .any(|violations| !violations.is_empty());
+    PoolCheckerVerdictsAfterAFault {
+        violations_of_the_step_images,
+        violations_after_the_fault: if reached_a_step_after_the_starting_point {
+            red()
+        } else {
+            Vec::new()
+        },
+        invariants_still_violated_if_the_swallowed_writes_had_landed: BTreeSet::new(),
+    }
+}
+
+/// 合并入口收到的结论一条都不红：交回的与 harness 不判池级 checker、把盘交出去的那一路（[`inject_faults_into_history`]）逐项相同，
+/// 只差「交出去几次」那一格（合并入口交给判的不记在那一格）。每个注入点只交一次判。
+/// 判别力：合并入口在不红的结论上也截短重跑、或把结论并错地方，交回的与那一路不同；交判的次数不是注入点数。
+#[test]
+fn merging_pool_checker_verdicts_that_never_turn_red_returns_what_the_harness_alone_judges() {
+    let history = generate_history_with_weights(
+        HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
+        MERGED_HISTORY_OPERATIONS,
+        &GenerationWeights::BROAD,
+    );
+    let mut hand_outs = 0usize;
+    let mut merged =
+        inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier(
+            &history,
+            HANDING_EVERY_STEP_IMAGE_OUT,
+            MERGED_FAULTS_PER_HISTORY,
+            &mut |images| {
+                hand_outs += 1;
+                PoolCheckerVerdictsAfterAFault {
+                    violations_of_the_step_images: vec![
+                        Vec::new();
+                        images
+                            .step_images_of_the_run_with_the_fault
+                            .len()
+                    ],
+                    violations_after_the_fault: Vec::new(),
+                    invariants_still_violated_if_the_swallowed_writes_had_landed: BTreeSet::new(),
+                }
+            },
+        );
+    let mut handed_out = inject_faults_into_history(
+        &history,
+        HANDING_EVERY_STEP_IMAGE_OUT,
+        MERGED_FAULTS_PER_HISTORY,
+    );
+    assert!(!merged.drawn_faults.is_empty(), "前提：这一段摆出了注入点");
+    assert_eq!(
+        hand_outs,
+        merged.drawn_faults.len(),
+        "结论都不红时每个注入点只交一次判"
+    );
+    assert_eq!(
+        (
+            merged.tally.images_after_the_fault_handed_out,
+            handed_out.tally.images_after_the_fault_handed_out
+        ),
+        (
+            0,
+            u64::try_from(handed_out.drawn_faults.len()).expect("装得进 u64")
+        ),
+        "合并入口交给判的不记在「交出去几次」那一格，交出去的那一路每个注入点记一次"
+    );
+    merged.tally.images_after_the_fault_handed_out = 0;
+    handed_out.tally.images_after_the_fault_handed_out = 0;
+    assert_eq!(
+        merged, handed_out,
+        "结论一条都不红时合并入口交回的与 harness 自己判的那一路逐项相同"
+    );
+}
+
+/// 合并入口收到某个注入点上一张每步镜像判红：照判红就停那一档的口径，历史停在那一步——这个注入点截短重跑一遍，重跑那一遍交出去的每步镜像
+/// 就是整段那一遍到判红那一张为止（含）的那几张、重开的正是那一张的盘，再交一次判；新发现里的那一条停在判红那一步、违例是判红的那一条。
+/// 用例替 checker 档判（[`verdicts_red_after_the_starting_point`]：起点之后的每一步都红），逐次记它被交了什么。
+/// 判别力：不截短（`crates/mutations.tsv` 同名那一行把找第一张判红的那一处改成永远找不到），第二次交判没了、新发现落在注入点那一段而不是判红那一步。
+#[test]
+fn a_step_image_the_checker_tier_judges_red_stops_the_merged_history_at_that_step() {
+    let history = generate_history_with_weights(
+        HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
+        MERGED_HISTORY_OPERATIONS,
+        &GenerationWeights::BROAD,
+    );
+    let mut asked: Vec<ImagesAfterAFault> = Vec::new();
+    let merged = inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier(
+        &history,
+        HANDING_EVERY_STEP_IMAGE_OUT,
+        MERGED_FAULTS_PER_HISTORY,
+        &mut |images| {
+            asked.push(images.clone());
+            verdicts_red_after_the_starting_point(images)
+        },
+    );
+    let mut asked_in_order = asked.iter();
+    let mut stopped_positions: Vec<StepPosition> = Vec::new();
+    for drawn in &merged.drawn_faults {
+        let run_through = asked_in_order
+            .next()
+            .unwrap_or_else(|| panic!("{} 没交判", drawn.render()));
+        assert_eq!(run_through.drawn, *drawn, "交判的次序就是注入点的次序");
+        let Some(first_red) = run_through
+            .step_images_of_the_run_with_the_fault
+            .iter()
+            .position(|step_image| matches!(step_image.position, StepPosition::Operation(_)))
+        else {
+            continue;
+        };
+        let stopped = asked_in_order.next().unwrap_or_else(|| {
+            panic!(
+                "{} 的第 {first_red} 张每步镜像判红，要截短重跑、再交一次判，没交",
+                drawn.render()
+            )
+        });
+        assert_eq!(stopped.drawn, *drawn, "截短重跑的是同一个注入点");
+        assert_eq!(
+            stopped.step_images_of_the_run_with_the_fault.as_slice(),
+            &run_through.step_images_of_the_run_with_the_fault[..=first_red],
+            "{}：截短重跑那一遍停在判红那一张",
+            drawn.render()
+        );
+        assert_eq!(
+            stopped.image_after_the_fault.operations.len(),
+            run_through.step_images_of_the_run_with_the_fault[first_red].operations_recorded,
+            "{}：截短重跑那一遍重开的就是判红那一步的盘",
+            drawn.render()
+        );
+        stopped_positions
+            .push(run_through.step_images_of_the_run_with_the_fault[first_red].position);
+    }
+    assert!(
+        asked_in_order.next().is_none(),
+        "交判的只有每个注入点整段那一遍与判红时截短那一遍"
+    );
+    assert!(
+        !stopped_positions.is_empty(),
+        "前提：至少一个注入点上历史走到了起点之后写过盘的一步（有判红的每步镜像）"
+    );
+    let red_signature = FailureSignature::CheckerViolations {
+        invariants: vec![INVARIANT_THE_TEST_JUDGES_RED],
+    };
+    let red_finding = merged
+        .new_findings
+        .iter()
+        .find(|finding| finding.signature == red_signature)
+        .unwrap_or_else(|| panic!("判红那一条要成新发现：{:?}", merged.new_findings));
+    assert!(
+        stopped_positions.contains(&red_finding.observation.position),
+        "新发现停在判红的那一步（{:?} 之一），不在注入点那一段：{:?}",
+        stopped_positions,
+        red_finding.observation.position
+    );
+    assert_eq!(
+        red_finding
+            .observation
+            .violations
+            .iter()
+            .map(|(invariant, _)| *invariant)
+            .collect::<Vec<_>>(),
+        vec![INVARIANT_THE_TEST_JUDGES_RED],
+        "停下那一步的违例就是判红的那一条"
+    );
 }

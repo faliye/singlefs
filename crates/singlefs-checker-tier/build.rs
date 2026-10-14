@@ -57,7 +57,13 @@ fn watched_paths(
         "Cargo.lock".to_string(),
         "Cargo.toml".to_string(),
         judging_closure::CONCLUSION_CANDIDATE_DIRECTORY.to_string(),
+        judging_closure::CONCLUSION_CANDIDATE_BINARY_DIRECTORY.to_string(),
     ];
+    watched.extend(
+        judging_closure::CONCLUSION_CANDIDATE_LIBRARY_FILES
+            .iter()
+            .map(|file| (*file).to_string()),
+    );
     for crate_directory in reader.crate_directories() {
         watched.push(format!("{crate_directory}/Cargo.toml"));
         watched.push(format!("{crate_directory}/src"));

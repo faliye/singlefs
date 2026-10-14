@@ -1,4 +1,4 @@
-//! checker 档模块：crash、layer0_progress
+//! checker 档模块：crash、crash_state_enumeration
 //! 代码审阅第 1、3 条（A 合并，按设备记屏障）与第 4 条（原地覆写补第三态，全量也跑）：
 //! 录制器按设备记屏障；切段时当前段里每块有写的盘都被自己的屏障或 FUA 放行了才关段，FUA 只放行它自己那块盘；
 //! 原地覆写的写取第三态「新旧都读不出」，那一态真生成镜像喂 checker 与记录核对器。
@@ -8,11 +8,18 @@ mod common;
 
 use common::{file_content, geometry, parameters, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES};
 use singlefs_checker_tier::crash::{
-    check_records, enumerate_layer0_in_state_slices, enumerate_layer0_selecting, full_expansion,
-    layer0_state_count, layer0_state_count_with_torn_in_place_overwrites, quick_tier_expansion,
-    Layer0ObserverCounts, Layer0Parallelism, Layer0SegmentExpansion, TearableInPlaceOverwrites,
+    crash_state_count, crash_state_count_with_torn_in_place_overwrites, full_expansion,
+    quick_tier_expansion, CrashPointReplayObserverCounts, CrashPointReplaySegmentExpansion,
+    CrashPointReplayVersionTable, TearableInPlaceOverwrites,
 };
-use singlefs_checker_tier::layer0_progress::Layer0Resume;
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_selecting, enumerate_crash_states_with_expansion, CrashPointReplayItem,
+    CrashPointReplayObserver,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_segments_per_device_and_torn_in_place_overwrites.rs";
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::{
@@ -374,11 +381,11 @@ fn a_barrier_on_every_device_cuts_the_same_segments_as_one_pool_barrier() {
 }
 
 /// 真流上的判别力（第 1 条）：只吞盘 1 在一处的屏障——新池新建文件里「journal 记录 → 根槽」那一组里盘 1 那一道，吞在录制器外面。
-/// 盘 1 那份记录没被放行，按 A 那道屏障不关段：记录两份、根槽与之后的两次系统配置槽写并成一段，层 0 小流（只展开 5 个写以内的段）里
+/// 盘 1 那份记录没被放行，按 A 那道屏障不关段：记录两份、根槽与之后的两次系统配置槽写并成一段，崩溃点重放小流（只展开 5 个写以内的段）里
 /// 摆得出「根在案而记录一份都不在」，记录核对器报出来；每盘都发屏障的同一条流报 0。合并屏障的录制器把盘 0 那一道记成整个池的，
 /// 两条流逐步相同，报不出来。
 #[test]
-// crash-case-check:not-a-crash-case 第一条流只展开 5 个写以内的段、24 写那一段不展开，一百来个状态，单跑几秒
+// crash-case-check:not-a-crash-case 新池新建文件流只展开 5 个写以内的段、24 写那一段不展开，一百来个状态，单跑几秒
 fn one_device_missing_its_barrier_before_the_root_slot_is_reported_by_the_record_checker() {
     let (every_device_barriers, stream_lengths_at_barrier_calls_on_device_one) =
         new_pool_file_creation_stream(None);
@@ -393,7 +400,8 @@ fn one_device_missing_its_barrier_before_the_root_slot_is_reported_by_the_record
         .expect("盘 1 在根槽写之前发过屏障");
     let (device_one_misses_one_barrier, _) =
         new_pool_file_creation_stream(Some(barrier_call_before_the_root));
-    let record_checker_reports = |recorded: &RecordedNewPoolFileCreationStream| {
+    let record_checker_reports = |recorded: &RecordedNewPoolFileCreationStream,
+                                  item_label: &str| {
         let (writes, segments) = writes_and_segments(
             &recorded.operations[recorded.mkfs_operation_count..],
             &geometry(),
@@ -402,19 +410,36 @@ fn one_device_missing_its_barrier_before_the_root_slot_is_reported_by_the_record
             .iter()
             .rposition(|write| write.kind == StepKind::RootRecordFua)
             .expect("根槽");
-        let tally = enumerate_layer0_selecting(
+        let item_name = format!("segments_per_device::barriers::{item_label}");
+        let tally = enumerate_crash_states_selecting(
+            CrashPointReplayItem {
+                name: &item_name,
+                setting_file: THIS_FILE,
+            },
             &recorded.base,
             &writes,
             &segments,
             root_index,
             &file_content(),
             &|_segment_index, segment| segment.len() <= 5,
-        );
+        )
+        .judged()?;
         let sizes: Vec<usize> = segments.iter().map(Vec::len).collect();
-        (sizes, tally.record_root_without_record, tally.violations)
+        Some((sizes, tally.record_root_without_record, tally.violations))
     };
-    let (every_device_sizes, every_device_reports, every_device_violations) =
-        record_checker_reports(&every_device_barriers);
+    // 两条流都先过一次库（只录那一趟两条都录下），再判
+    let every_device = record_checker_reports(&every_device_barriers, "every_device_barriers");
+    let missing = record_checker_reports(
+        &device_one_misses_one_barrier,
+        "device_one_misses_one_barrier",
+    );
+    let (
+        Some((every_device_sizes, every_device_reports, every_device_violations)),
+        Some((missing_sizes, missing_reports, _)),
+    ) = (every_device, missing)
+    else {
+        return;
+    };
     assert_eq!(
         every_device_sizes,
         vec![2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2],
@@ -425,8 +450,6 @@ fn one_device_missing_its_barrier_before_the_root_slot_is_reported_by_the_record
         (0, 0),
         "每盘都发屏障：记录核对器与 oracle 都不报"
     );
-    let (missing_sizes, missing_reports, _) =
-        record_checker_reports(&device_one_misses_one_barrier);
     assert_eq!(
         missing_sizes,
         vec![2, 2, 1, 2, 2, 1, 2, 24, 5],
@@ -434,7 +457,7 @@ fn one_device_missing_its_barrier_before_the_root_slot_is_reported_by_the_record
     );
     assert!(
         missing_reports > 0,
-        "盘 1 漏发屏障：层 0 要摆出根在案而记录一份都不在的状态，记录核对器报出来（报了 {missing_reports} 个）"
+        "盘 1 漏发屏障：崩溃点重放要摆出根在案而记录一份都不在的状态，记录核对器报出来（报了 {missing_reports} 个）"
     );
 }
 
@@ -563,16 +586,11 @@ fn in_place_overwrites_take_three_states_and_every_other_write_two() {
         "系统配置槽写与第二次 journal 写是原地覆写"
     );
     assert_eq!(
-        layer0_state_count_with_torn_in_place_overwrites(
-            &base,
-            &writes,
-            &segments,
-            &full_expansion
-        ),
+        crash_state_count_with_torn_in_place_overwrites(&base, &writes, &segments, &full_expansion),
         1 + 23 + 1 + 2
     );
     assert_eq!(
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &base,
             &writes,
             &segments,
@@ -582,7 +600,7 @@ fn in_place_overwrites_take_three_states_and_every_other_write_two() {
     );
     assert_eq!(closed_form_state_count(&segments), 1 + 15 + 1 + 1);
     assert_eq!(
-        layer0_state_count(&writes, &segments, &quick_tier_expansion),
+        crash_state_count(&writes, &segments, &quick_tier_expansion),
         1 + 7 + 1 + 1
     );
     let empty_base = MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], 1 << 30);
@@ -595,7 +613,7 @@ fn in_place_overwrites_take_three_states_and_every_other_write_two() {
         "基镜像全 0、没有更早的写与它重叠：一次原地覆写都没有"
     );
     assert_eq!(
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &empty_base,
             first_writes_only,
             &first_segments,
@@ -604,17 +622,17 @@ fn in_place_overwrites_take_three_states_and_every_other_write_two() {
         closed_form_state_count(&first_segments)
     );
     assert_eq!(
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &empty_base,
             first_writes_only,
             &first_segments,
             &quick_tier_expansion
         ),
-        layer0_state_count(first_writes_only, &first_segments, &quick_tier_expansion)
+        crash_state_count(first_writes_only, &first_segments, &quick_tier_expansion)
     );
 }
 
-/// 新池新建文件那条流（层 0 从 mkfs 之后枚举的整条流）：每盘都发屏障，段序列与补第三态之前的闭式与今天逐字相同；
+/// 新池新建文件那条流（崩溃点重放从 mkfs 之后枚举的整条流）：每盘都发屏障，段序列与补第三态之前的闭式与今天逐字相同；
 /// 取三态的只有系统配置槽写（8 次，每次都罩住更早写下的旧槽），全量 16777260、甲二 46 个状态（C577 之前暖机第二次的轮换与 A 的
 /// 单元写同段，150994980、54）。
 #[test]
@@ -632,7 +650,7 @@ fn the_new_pool_file_creation_stream_keeps_its_segments_and_takes_the_third_stat
     );
     assert_eq!(closed_form_state_count(&segments), 16_777_240);
     assert_eq!(
-        layer0_state_count(&writes, &segments, &quick_tier_expansion),
+        crash_state_count(&writes, &segments, &quick_tier_expansion),
         26
     );
     let tearable = TearableInPlaceOverwrites::of(&base, &writes);
@@ -647,17 +665,12 @@ fn the_new_pool_file_creation_stream_keeps_its_segments_and_takes_the_third_stat
         "取号 2 + 两次暖机各 2 + A 的轮换 2"
     );
     assert_eq!(
-        layer0_state_count_with_torn_in_place_overwrites(
-            &base,
-            &writes,
-            &segments,
-            &full_expansion
-        ),
+        crash_state_count_with_torn_in_place_overwrites(&base, &writes, &segments, &full_expansion),
         16_777_260,
         "24 写的单元段 2²⁴ − 1、四个系统配置槽段各 3² − 1、其余同今天"
     );
     assert_eq!(
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &base,
             &writes,
             &segments,
@@ -668,12 +681,12 @@ fn the_new_pool_file_creation_stream_keeps_its_segments_and_takes_the_third_stat
     );
 }
 
-/// 撕裂那一态真生成镜像、喂给恢复、checker 与记录核对器：第一条流只展开最后一段（A 的根之后两块盘的系统配置槽轮换），
+/// 撕裂那一态真生成镜像、喂给恢复、checker 与记录核对器：新池新建文件流只展开最后一段（A 的根之后两块盘的系统配置槽轮换），
 /// 3² − 1 个状态再加全部持久那一个。每个状态按盘上字节认那两次写怎么落（与这次写的字节相同是落了、与写之前的相同是没落、
 /// 都不同是撕裂）：撕裂的那一槽解不开（新旧都读不出），五个状态里至少一槽撕裂；恢复读出文件、oracle、池级 checker、
 /// 记录核对器都不报，checker 在每个状态上都跑过（评估过的 + 不适用的 = 状态数）。
 #[test]
-// crash-case-check:not-a-crash-case 第一条流只展开最后那一段两个写，九个状态，单跑几秒
+// crash-case-check:not-a-crash-case 新池新建文件流只展开最后那一段两个写，九个状态，单跑几秒
 fn the_torn_state_of_a_system_configuration_rotation_is_generated_and_fed_to_the_checker_and_the_record_checker(
 ) {
     let pool = common::build_pool("torn-third-state-generated");
@@ -715,61 +728,78 @@ fn the_torn_state_of_a_system_configuration_rotation_is_generated_and_fed_to_the
         .collect();
     let only_the_last_segment = |segment_index: usize, _segment: &[usize]| {
         if segment_index == last_segment {
-            Layer0SegmentExpansion::EveryProperSubset
+            CrashPointReplaySegmentExpansion::EveryProperSubset
         } else {
-            Layer0SegmentExpansion::NotExpanded
+            CrashPointReplaySegmentExpansion::NotExpanded
         }
     };
-    let mut states_with_a_torn_slot = 0u64;
-    let mut torn_slots = 0u64;
-    let tally = enumerate_layer0_in_state_slices(
+    // 观察者经崩溃判定库那一路按块看：要记的数全经观察者计数。记录核对器不在观察者里跑：判段从库里读回每个状态判
+    // （配了 GPU 在卡上判），撕裂的状态在内，下面照 tally 的两格判（用户 2026-10-13 定「能走两段的都走两段」）
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   _consulted_report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        let mut torn_in_this_state = 0u64;
+        for (write_index, (old, new)) in rotation_writes
+            .iter()
+            .zip(&old_and_new_of_each_rotation_write)
+        {
+            let write = &writes[*write_index];
+            let on_disk =
+                PoolReader::read(image, write.device, write.offset, 4096).expect("槽读得出");
+            if on_disk != *old && on_disk != *new {
+                torn_in_this_state += 1;
+                assert!(
+                    SystemConfiguration::parse_slot(&on_disk).is_err(),
+                    "撕裂的那一槽新旧都读不出（盘 {}）",
+                    write.device.0
+                );
+                assert!(
+                    !image.persisted[*write_index],
+                    "撕裂那一态在持久集合里是「原来那次写没持久」"
+                );
+            }
+        }
+        if torn_in_this_state > 0 {
+            counts.add("states_with_a_torn_slot", 1);
+            counts.add("torn_slots", torn_in_this_state);
+        }
+    };
+    // 观察者另读的输入：轮换那几次写的下标与每一次写的旧、新两份字节（写表本身在流的输入里）
+    let observer_extra_inputs_digest = singlefs_harness::sha256::sha256_digest(
+        format!(
+            "rotation_writes={rotation_writes:?}\nold_and_new_of_each_rotation_write={old_and_new_of_each_rotation_write:?}\n"
+        )
+        .as_bytes(),
+    );
+    let Some(tally) = enumerate_crash_states_with_expansion(
+        CrashPointReplayItem {
+            name: "segments_per_device::torn_system_configuration_rotation",
+            setting_file: THIS_FILE,
+        },
         &base,
         &writes,
         &segments,
         root_index,
-        &versions,
+        CrashPointReplayVersionTable::with_a_file_only(&versions),
         &only_the_last_segment,
-        Layer0Parallelism::from_environment(),
-        Some(&mut |image: &CrashImage<'_>,
-                   consulted_report: &RecoveryReport,
-                   _counts: &mut Layer0ObserverCounts| {
-            let mut torn_in_this_state = 0u64;
-            for (write_index, (old, new)) in rotation_writes
-                .iter()
-                .zip(&old_and_new_of_each_rotation_write)
-            {
-                let write = &writes[*write_index];
-                let on_disk =
-                    PoolReader::read(image, write.device, write.offset, 4096).expect("槽读得出");
-                if on_disk != *old && on_disk != *new {
-                    torn_in_this_state += 1;
-                    assert!(
-                        SystemConfiguration::parse_slot(&on_disk).is_err(),
-                        "撕裂的那一槽新旧都读不出（盘 {}）",
-                        write.device.0
-                    );
-                    assert!(
-                        !image.persisted[*write_index],
-                        "撕裂那一态在持久集合里是「原来那次写没持久」"
-                    );
-                }
-            }
-            if torn_in_this_state > 0 {
-                states_with_a_torn_slot += 1;
-                torn_slots += torn_in_this_state;
-            }
-            let records = check_records(image, consulted_report.effective_root);
-            assert!(
-                !records.root_without_record && !records.claimed_state_missing_unit,
-                "记录核对器在撕裂镜像上照判、不报"
-            );
-        }),
-        &Layer0Resume::NoProgressFile,
-    );
+        &[CrashPointReplayObserver {
+            name: "torn_slots",
+            extra_inputs_digest: extra_inputs_digest_that_was_computed(
+                observer_extra_inputs_digest,
+            ),
+            observe: &observe,
+        }],
+    )
+    .judged() else {
+        return;
+    };
+    let states_with_a_torn_slot = tally.observer_counts.count_named("states_with_a_torn_slot");
+    let torn_slots = tally.observer_counts.count_named("torn_slots");
     assert_eq!(tally.states, 9, "最后一段 3² − 1，再加全部持久那一个");
     assert_eq!(
         tally.states,
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &base,
             &writes,
             &segments,
@@ -796,7 +826,8 @@ fn the_torn_state_of_a_system_configuration_rotation_is_generated_and_fed_to_the
             tally.record_root_without_record,
             tally.record_claimed_state_missing_unit
         ),
-        (0, 0)
+        (0, 0),
+        "记录核对器在撕裂镜像上照判、不报（判段从库里读回每个状态判）"
     );
     for invariant in singlefs_checker::image::IMPLEMENTED_INVARIANTS {
         assert_eq!(
@@ -824,4 +855,16 @@ fn the_torn_state_of_a_system_configuration_rotation_is_generated_and_fed_to_the
             "{invariant}：checker 在每个状态（撕裂的在内）上都跑过"
         );
     }
+}
+
+/// 观察者另读的输入的摘要要真算：全零就是没算（另读输入不同的两趟会共用看过的块）。
+fn extra_inputs_digest_that_was_computed(
+    digest: [u8; singlefs_harness::sha256::DIGEST_BYTES],
+) -> [u8; singlefs_harness::sha256::DIGEST_BYTES] {
+    assert_ne!(
+        digest,
+        [0; singlefs_harness::sha256::DIGEST_BYTES],
+        "观察者另读的输入的摘要真算（全零就是没算：另读输入不同的两趟会共用看过的块）"
+    );
+    digest
 }

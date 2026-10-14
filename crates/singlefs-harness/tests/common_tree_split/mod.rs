@@ -1,6 +1,6 @@
 //! 记账树与中央映射树的分裂（D8（核心索引结构） 已定项 11）用例共用的搭建：两块稀疏内存盘上 mkfs → 取号 → 暖机 → 第一个文件版本，
 //! 写入口装上压小节点容量的只供测试的开关（`CodeTwoTreeNodeCapacities::CappedForTests`），之后按场景接着推空发布或覆盖写。
-//! 录制流开内容保留：层 0 用例按「分裂那一次发布之前的流全部施加成起点镜像、只录那一次」切（三方 `m2-treesplit-r1` T4）。
+//! 录制流开内容保留：崩溃枚举用例按「分裂那一次发布之前的流全部施加成起点镜像、只录那一次」切（三方 `m2-treesplit-r1` T4）。
 //! 盘是内存里的（`SparseBlockDevice`），不建文件镜像：内容与文件镜像同一份字节，「进程退出、重开」就是按此刻的盘面重新包一层录制器。
 #![allow(dead_code, reason = "两份用例各自只用到其中一部分")]
 
@@ -232,7 +232,7 @@ fn memory_devices(stream: &SharedStream) -> Vec<(DeviceIdentity, RecordedMemoryD
         .collect()
 }
 
-/// 录着的池：盘、分配器与现行那一版，外加每次发布之前录制流里有几步（层 0 按它切起点）。
+/// 录着的池：盘、分配器与现行那一版，外加每次发布之前录制流里有几步（崩溃点重放按它切起点）。
 pub struct TreeSplitPool {
     pub stream: SharedStream,
     pub devices: Vec<(DeviceIdentity, RecordedMemoryDevice)>,
@@ -240,7 +240,7 @@ pub struct TreeSplitPool {
     pub output: TransactionOutput,
     /// 现行那一版之前的每一版，按发布先后（第一个文件版本在最前）。
     pub earlier_versions: Vec<TransactionOutput>,
-    /// 现行那一版的发布之前录制流里有几步：起点镜像施加到这里，层 0 只录它之后的。
+    /// 现行那一版的发布之前录制流里有几步：起点镜像施加到这里，崩溃点重放只录它之后的。
     pub operations_before_the_current_version: usize,
 }
 
@@ -406,7 +406,7 @@ impl TreeSplitPool {
         }
     }
 
-    /// 现行那一版的发布之前的镜像（层 0 的起点，不枚举）：录制流从头施加到那一次发布之前。
+    /// 现行那一版的发布之前的镜像（崩溃点重放的起点，不枚举）：录制流从头施加到那一次发布之前。
     #[must_use]
     pub fn memory_pool_before_the_current_version(&self) -> MemoryPool {
         let mut pool =

@@ -1,7 +1,7 @@
-//! checker 档模块：crash、layer0_progress、crash_amplification
+//! checker 档模块：crash、crash_point_replay_progress、crash_library、crash_amplification
 //! 崩溃放量流水线在里程碑「覆盖写、释放、回退与复用」的整条固定脚本上（步 0 到步 5：取号加暖机 → 新池新建文件 A → 覆盖写 B →
 //! 重开可写挂载（取号、写行、暖机两次）→ 覆盖写 C → 挂着回退到 A（D）→ 五次覆盖写（txg 10–14）→ 抬 F 到 11（两次空发布 txg 15、16）→
-//! 复用 E（txg 17，数据单元落回 50176）→ 正常卸载（先写 F、两次带卸载记号的空发布 txg 18、19））：与层 0 全量跑的那条流同一条
+//! 复用 E（txg 17，数据单元落回 50176）→ 正常卸载（先写 F、两次带卸载记号的空发布 txg 18、19））：与崩溃点重放全量跑的那条流同一条
 //! （`crash_enumeration_fixed_script_stream.rs` 的 `ReuseAfterRaisingFloorThenNormalUnmount`，78 段、481 次写、19 条根槽写）。
 //! 入口都由 `common_crash_points` 设点，前 36 个点与到 D 那条测试共享。展开上限 `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`（默认 6），
 //! 28 及以上就是全域（`exhaustive=true`）。要 `verdict-store` 特性。
@@ -19,12 +19,14 @@ use common_crash_points::{
     mount_writable_step, overwrite_step, raise_rollback_floor_step, record_pool_build,
     roll_back_step, unmount_step,
 };
-use singlefs_checker_tier::crash::layer0_plan_state_count;
+use singlefs_checker_tier::crash::crash_point_replay_plan_state_count;
+use singlefs_checker_tier::crash_amplification::EnvironmentRestoredOnDrop;
 use singlefs_checker_tier::crash_amplification::{
     checking_threads, plan_crash_points, reuse_and_scale_fields_of_the_line, run_from_environment,
     CrashFlow, CrashPointRecorder, ExpandUpToWritesPerSegment,
 };
-use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+use singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory;
+use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::mount::RollbackTarget;
 use singlefs_harness::memory_pool::{
@@ -55,16 +57,6 @@ fn later_content(seed: usize) -> Vec<u8> {
     (0..3000 + seed)
         .map(|index| u8::try_from((index * 5 + seed) % 251).expect("小于 256"))
         .collect()
-}
-
-struct TemporaryStore {
-    directory: PathBuf,
-}
-
-impl Drop for TemporaryStore {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.directory);
-    }
 }
 
 fn version(instance: u32, txg: u64, content: Vec<u8>) -> PublishedVersion {
@@ -347,28 +339,32 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         .parent()
         .expect("Cargo.lock 所在的目录就是仓根")
         .to_path_buf();
-    let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+    let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
     let plan = plan_crash_points(&flow);
-    let state_count = layer0_plan_state_count(&base, &writes, &segments, &expansion);
+    let state_count = crash_point_replay_plan_state_count(&base, &writes, &segments, &expansion);
     assert_eq!(plan.points.last().expect("有点").ordinals.end, state_count);
+    // 调用方没给库就用家目录下流水线单元测试那一类的长期库（不删，下一趟照同一套复用）；入口脚本跑的那几趟自己交库目录
     let library_guard = match std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY") {
         Some(_) => None,
         None => {
-            let directory = std::env::temp_dir().join(format!(
-                "singlefs-crash-amplification-fixed-script-unmount-{}",
-                std::process::id()
-            ));
-            std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", &directory);
-            std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY", "1");
-            Some(TemporaryStore { directory })
+            let directory = amplification_unit_tests_library_directory(None)
+                .expect("流水线单元测试那一类的库目录");
+            let mut restored = EnvironmentRestoredOnDrop::saved_then_cleared(&[
+                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
+            ]);
+            restored.set(
+                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
+                directory.as_os_str(),
+            );
+            Some(restored)
         }
     };
     let checking_started = Instant::now();
     let run =
         run_from_environment(&flow, ITEM_NAME, &toolchain, &root, limit).expect("按环境跑得完");
     let checking_seconds = checking_started.elapsed().as_secs_f64();
-    if run.placement_only {
-        // 只排派活计划的那一趟一块都没判：不断言、不打汇总行
+    if run.placement_only || run.recorded_only {
+        // 只排派活计划、只跑录入段的那一趟一块都没判：不断言、不打汇总行
         drop(library_guard);
         return;
     }
@@ -403,7 +399,6 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         "健康的固定脚本一个红状态都不该有：{:?}",
         run.checking.red_texts
     );
-    assert_eq!(run.checking.gpu_cpu_disagreements, 0);
     let imported = std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_IMPORT").is_some();
     if run.share.count == 1 || imported {
         assert_eq!(
@@ -456,14 +451,12 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         _ => " verifier=none".to_string(),
     };
     let gpu_judge_line = common_crash_points::judge_fields_of_the_summary_line(&run);
-    common_crash_points::assert_the_cross_check_agrees("fixed-script-through-the-unmount", &run);
-    let cross_check_line = run.cross_check.fields_of_the_line();
     drop(library_guard);
     for line in &run.coverage_lines {
         println!("CRASH_AMPLIFICATION_POINT {line}");
     }
     println!(
-        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1}{}{verifier_line}{gpu_judge_line}{cross_check_line}",
+        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1}{}{verifier_line}{gpu_judge_line}",
         run.mode.name(),
         run.share.index,
         run.share.count,

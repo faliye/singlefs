@@ -26,6 +26,25 @@
 //! 退出码：0 正常；2 命令行不对或输出目录已存在；3 停机条款 S1、S3、S5、S9、S13 没过，或 `confirmed-loss-form` 那一趟 Q5 没跑
 //! （判决行带 `q5_not_run=`）（产物照打，交主 agent）。
 
+/// 崩溃点重放取样过崩溃判定库的项（`crash_state_enumeration::sample_crash_states_on_the_cpu`）：项名与设点文件（这份装置自己）。
+const CRASH_POINT_REPLAY_SAMPLING_ITEM: CrashPointReplayItem<'static> = CrashPointReplayItem {
+    name: "e171_three_oracle_collusion_after_the_oracle_fixes",
+    setting_file:
+        "crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs",
+};
+
+/// 这一次取样的项名：装置一趟按不同的段、不同的序号区间取样几十次，每次是一条不同的流，项名各给一个（库里同一个项名下只登一份清单，
+/// 几次共用会撞；块键按内容算，下一趟照样复用判过的块）。
+fn sampling_item_name_of_this_call() -> String {
+    static NEXT_SAMPLING_NUMBER: std::sync::atomic::AtomicU64 =
+        std::sync::atomic::AtomicU64::new(0);
+    format!(
+        "{}-{}",
+        CRASH_POINT_REPLAY_SAMPLING_ITEM.name,
+        NEXT_SAMPLING_NUMBER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    )
+}
+
 #[path = "../../../singlefs-harness/tests/common/mod.rs"]
 mod common;
 
@@ -43,12 +62,13 @@ use std::time::Instant;
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_checker_tier::crash::{
-    check_records, classified_oracle_violation_for_versions, full_expansion,
-    judge_layer0_state_range, layer0_enumeration_tables, layer0_plan_state_count,
-    quick_tier_expansion, Layer0EnumerationTables, Layer0OracleViolation, Layer0StateJudgement,
-    LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE, LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE,
-    LAYER0_RED_PASS_POOL_CHECKER, LAYER0_RED_PASS_RECORD_CHECKER,
-    RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT, RECORD_CHECKER_ROOT_WITHOUT_RECORD,
+    check_records, classified_oracle_violation_for_versions, crash_point_replay_plan_state_count,
+    crash_state_enumeration_tables, full_expansion, quick_tier_expansion,
+    CrashPointReplayOracleViolation, CrashStateEnumerationTables, CrashStateJudgement,
+    CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE,
+    CRASH_POINT_REPLAY_RED_PASS_JOURNAL_IGNORED_ORACLE, CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER,
+    CRASH_POINT_REPLAY_RED_PASS_RECORD_CHECKER, RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT,
+    RECORD_CHECKER_ROOT_WITHOUT_RECORD,
 };
 use singlefs_checker_tier::crash_facts::{
     extract_flow_facts, persisted_writes_of_state, SegmentFact, TornImageFact,
@@ -56,6 +76,9 @@ use singlefs_checker_tier::crash_facts::{
 };
 use singlefs_checker_tier::crash_injection::{
     materialized_crash_image, writable_mount_alone_on, WritableMountAlone,
+};
+use singlefs_checker_tier::crash_state_enumeration::{
+    sample_crash_states_on_the_cpu, CrashPointReplayItem,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InodeNumber, InstanceGeneration,
@@ -117,44 +140,44 @@ use singlefs_harness::{
 
 // ───────────────────────────── 本地常量（登记 5.3、S1） ─────────────────────────────
 //
-// 下面这一批与 `e170_o3_spec_executor_export.rs` 第 78–140 行同一批、同样的值与出处注释；`baseline` 开头与 crates 的同名公开常量或现算值回比，
+// 下面这一批与 `e170_o3_spec_executor_export.rs`「本地常量（登记 5.7、S1）」那一节同一批、同样的值与出处注释；`baseline` 开头与 crates 的同名公开常量或现算值回比，
 // 不直接引（决定几何与工作量的数写成本地常量：引了就等于装置与实现共用一个数，两边一起错而逐格相等）。
 // 这些常量只在基线那一趟回比：坏实现改了写流，这些数在坏实现那一趟本来就会变，照数记进产物。
 
-/// 盘数：`tests/common/mod.rs` 第 152–184 行 `formatted_recorded_images` 建两块盘（`for device_number in 0..2u32`）。
+/// 盘数：`tests/common/mod.rs` 的 `formatted_recorded_images` 建两块盘（`for device_number in 0..2u32`）。
 const LOCAL_DEVICE_COUNT: usize = 2;
-/// 每块盘的字节数：`tests/common/mod.rs` 第 29 行 `IMAGE_BYTES = 4 << 30`。
+/// 每块盘的字节数：`tests/common/mod.rs` 的 `IMAGE_BYTES = 4 << 30`。
 const LOCAL_DEVICE_BYTES: u64 = 4_294_967_296;
-/// 物理块与 io_min：`tests/common/mod.rs` 第 54–55 行 `physical_block_size: 512`、`minimum_input_output_bytes: 512`。
+/// 物理块与 io_min：`tests/common/mod.rs` 里 `physical_block_size: 512`、`minimum_input_output_bytes: 512`。
 const LOCAL_PHYSICAL_BLOCK_BYTES: u32 = 512;
 const LOCAL_MINIMUM_INPUT_OUTPUT_BYTES: u32 = 512;
 /// 导出格式的扇区宽（登记 5.3 `sector_bytes`（512））：与 `singlefs_harness::memory_pool::SECTOR_BYTES` 回比。
 const LOCAL_SECTOR_BYTES: u64 = 512;
-/// 固定 fsid：`tests/common/mod.rs` 第 33–35 行 `E142_FILESYSTEM_IDENTIFIER`。
+/// 固定 fsid：`tests/common/mod.rs` 的 `E142_FILESYSTEM_IDENTIFIER`。
 const LOCAL_FILESYSTEM_IDENTIFIER: [u8; 16] = [
     0x5f, 0x53, 0x46, 0x53, 0x2d, 0x45, 0x31, 0x34, 0x32, 0x2d, 0x30, 0x30, 0x30, 0x31, 0x2d, 0x00,
 ];
-/// 固定写时刻：`tests/common/mod.rs` 第 37 行 `FIXED_WRITE_TIME_SECONDS = 1_788_000_000`。
+/// 固定写时刻：`tests/common/mod.rs` 的 `FIXED_WRITE_TIME_SECONDS = 1_788_000_000`。
 const LOCAL_FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
-/// 第一个文件的字节数：`tests/common/mod.rs` 第 31 行 `FILE_BYTES = 3000`；内容 `index % 251`（第 71–75 行 `file_content`）。
+/// 第一个文件的字节数：`tests/common/mod.rs` 的 `FILE_BYTES = 3000`；内容 `index % 251`（`file_content`）。
 const LOCAL_FIRST_FILE_BYTES: usize = 3000;
 const LOCAL_FIRST_FILE_CONTENT_MODULUS: usize = 251;
 
-/// 流一的段长：`tests/crash_enumeration_new_pool_file_creation_stream.rs` 第 466 行。
+/// 流一的段长：`tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `prepare` 里的段长断言。
 const LOCAL_FIRST_STREAM_SEGMENT_LENGTHS: [usize; 11] = [2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2];
-/// 流一的写数：同一份文件第 471 行（取号 2 + 暖机两次各 5 + A 29）。
+/// 流一的写数：同一份文件 `prepare` 里的写数断言（取号 2 + 暖机两次各 5 + A 29）。
 const LOCAL_FIRST_STREAM_WRITES: usize = 41;
 /// 流一的根槽写数：暖机两次各一条 + A 一条。
 const LOCAL_FIRST_STREAM_ROOT_WRITES: usize = 3;
-/// 流一全量与快档的状态数：同一份文件第 446 行 `FULL_STATES`、第 450 行 `QUICK_TIER_STATES`。
+/// 流一全量与快档的状态数：同一份文件的 `FULL_STATES`、`QUICK_TIER_STATES`。
 const LOCAL_FIRST_STREAM_FULL_STATES: u64 = 16_777_260;
 const LOCAL_FIRST_STREAM_QUICK_TIER_STATES: u64 = 46;
-/// 流一每次写只取两态时的全量闭式：同一份文件第 442 行 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`（单测拿段长表回算它）。
+/// 流一每次写只取两态时的全量闭式：同一份文件的 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`（单测拿段长表回算它）。
 const LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM: u64 = 16_777_240;
 
 /// 流二的段长（78 段）：取今天 crates 现算的那一份，即这个装置 `baseline` 的 S1 `fixed_script_through_e_then_unmount_segment_lengths`
-/// 的 `crates=`（`research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export.out` 第 438 行，step=z5）。与
-/// `tests/crash_enumeration_fixed_script_stream.rs` 第 438–441 行只差第 33 段（回退 D 那次向前发布）：20 → 24，
+/// 的 `crates=`（`research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export.out` 里 `step=z5`、`check=fixed_script_through_e_then_unmount_segment_lengths` 那一行）。与
+/// `tests/crash_enumeration_fixed_script_stream.rs` 的 `prepare` 里「固定脚本到 E 再正常卸载的段序列」那条断言只差第 33 段（回退 D 那次向前发布）：20 → 24，
 /// 多出的 4 次写是那次发布追加的谱系记录（D18（块里携带什么信息） 已定项 24 第 5 条）。
 const LOCAL_SECOND_STREAM_SEGMENT_LENGTHS: [usize; 78] = [
     2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2,
@@ -190,20 +213,24 @@ const LOCAL_SECOND_STREAM_UNMOUNT_TXGS: [u64; 2] = [18, 19];
 // crates 现算的回比（S1）。
 // 流三的段长表、写数、全量状态数与闭式在登记修订 6 第 6.2 节第 1 条装上根环表之后重取（txg 26 起照可再分配谓词回收，
 // 分配记录跟着变）：2026-10-05 草稿副本上 `stream-constants` 的 `crates=` 那一栏，新旧对照在登记修订 7。
+// 段长表另按登记修订 12 重钉（出处在段长表自己的注释里）；写数、全量状态数与闭式仍是修订 7 那一份。
 // K 另有推的值 234（登记第七节 A7：删完之后 inode 树没有记录、一容器 233 条），不进回比，照实测记。
 
-/// 一片 inode 叶容器装几条记录：`crates/singlefs-format/src/lib.rs` 第 110 行 `INODE_LEAF_RECORDS = 233`
+/// 一片 inode 叶容器装几条记录：`crates/singlefs-format/src/lib.rs` 的 `INODE_LEAF_RECORDS = 233`
 /// （D8（核心索引结构） 已定项 6「一容器 233 条」，⌊(32768 − 136) ÷ 140⌋）。
 const LOCAL_INODE_LEAF_RECORDS: u64 = 233;
 /// 每块盘的系统配置槽数与一槽的字节数（读法 8 (i)「少于两槽」的门槛、阳性对照「见证」重编的槽长）：
-/// `crates/singlefs-format/src/lib.rs` 第 251 行 `SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE = 2`、第 257 行 `SYSTEM_CONFIGURATION_SLOT_BYTES = 4096`
+/// `crates/singlefs-format/src/lib.rs` 的 `SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE = 2`、`SYSTEM_CONFIGURATION_SLOT_BYTES = 4096`
 /// （D22（单元原子性怎么合成） 已定项 8「每盘两槽」）。
 const LOCAL_SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE: usize = 2;
 const LOCAL_SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
-/// 流三的段长、写数、根槽写数。
+/// 流三的段长（959 段）：取今天 crates 现算的那一份，即这个装置 `stream-constants` 的 S1 `first_file_unlinked_then_inodes_across_one_leaf_segment_lengths`
+/// 的 `crates=`（`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-13-s1-stream-constants-revision-12-before-the-repin.out` 里那一行）。
+/// 与登记修订 7 那一份（2026-10-05 草稿副本的 `crates=`）只差下标 15（20 → 24）与下标 43（24 → 20），段数、写数、全量状态数与闭式不变；
+/// 为什么变、哪一处只在副本上核过，见登记修订 12。写数、根槽写数在下面两行。
 const LOCAL_THIRD_STREAM_SEGMENT_LENGTHS: &[usize] = &[
-    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 26, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1,
-    2, 20, 2, 1, 2, 20, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2,
+    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 26, 2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1,
+    2, 20, 2, 1, 2, 20, 2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2,
     20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20,
     2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2,
     1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1, 2, 20, 2, 1,
@@ -365,7 +392,7 @@ fn stream_names_of_the_numbers(text: &str) -> Option<Vec<StreamName>> {
 
 // ───────────────────────────── 流二的内容生成式（照抄测试文件） ─────────────────────────────
 
-/// `tests/crash_enumeration_fixed_script_stream.rs` 第 50–56 行。
+/// `tests/crash_enumeration_fixed_script_stream.rs` 的 `SECOND_FILE_BYTES` 与 `second_content`。
 const SECOND_FILE_BYTES: usize = 4100;
 
 fn second_content() -> Vec<u8> {
@@ -1065,9 +1092,9 @@ type ThirdStreamPublish<'closure> = dyn Fn(
     ) -> Result<TransactionOutput, singlefs_core::transaction::PublishError>
     + 'closure;
 
-/// 一条流驱动时的池：只做过 mkfs 的两块文件镜像（`FormattedPool` 管镜像文件，丢掉就删）、分配器、现行那一版、层 0 手写 oracle 的版本表。
-/// 流一照抄 `tests/common/mod.rs` 第 677 行 `build_pool` 的取号、暖机、新池新建文件三步，流二照抄
-/// `tests/crash_enumeration_fixed_script_stream.rs` 第 218 行起的 `Script::ReuseAfterRaisingFloorThenNormalUnmount` 那一支，
+/// 一条流驱动时的池：只做过 mkfs 的两块文件镜像（`FormattedPool` 管镜像文件，丢掉就删）、分配器、现行那一版、崩溃点重放手写 oracle 的版本表。
+/// 流一照抄 `tests/common/mod.rs` 的 `build_pool` 的取号、暖机、新池新建文件三步，流二照抄
+/// `tests/crash_enumeration_fixed_script_stream.rs` 的 `prepare` 里 `Script::ReuseAfterRaisingFloorThenNormalUnmount` 那一支，
 /// 流三接着流一删第一个文件、再一次建一个 inode 直到 inode 树的叶容器第一次变成两片、再多建一次（读法 2）；每一步都经 [`StreamDriver::call`]。
 struct LiveStream {
     driver: StreamDriver,
@@ -1843,7 +1870,7 @@ fn unmounted_txgs_of(raised: &UnmountRaisedTheFloor) -> Vec<u64> {
 impl LiveStream {
     /// 整条流的脚本：任一步出错或 panic 就停（这条流不再往下驱动、截在那里照判）。流一是取号、暖机、新池新建文件；流二接着照
     /// `tests/crash_enumeration_fixed_script_stream.rs` 的脚本走到 E 再正常卸载；流三接着删第一个文件、建 inode 跨一片叶。
-    /// 每一步成功之后才往层 0 手写 oracle 的版本表里记一版（流三只记第一个文件那一版：之后的版本没有文件，手写版本表写不出，那张表只进附带的 `red_items`）。
+    /// 每一步成功之后才往崩溃点重放手写 oracle 的版本表里记一版（流三只记第一个文件那一版：之后的版本没有文件，手写版本表写不出，那张表只进附带的 `red_items`）。
     fn run_the_script(&mut self) {
         if !self.step_acquire_and_warm_up() || !self.step_publish_first_file() {
             return;
@@ -2006,7 +2033,7 @@ fn prepared_stream_of_the_live_stream(
     let ending = ending_of_the_driver(&live.driver);
     let all_operations = live.formatted.retained_operations();
     let mkfs_operation_count = live.formatted.mkfs_operation_count;
-    // 照抄 `tests/crash_enumeration_fixed_script_stream.rs` 第 198–216 行：入口段（卸载入口发的那几段）一起交给切段（C557）。
+    // 照抄 `tests/crash_enumeration_fixed_script_stream.rs` 的 `writes_and_segments_after_mkfs`：入口段（卸载入口发的那几段）一起交给切段（C557）。
     let entry_spans: Vec<RecordedEntrySpan> = live
         .formatted
         .stream
@@ -2043,7 +2070,7 @@ fn prepared_stream_of_the_live_stream(
         .rposition(|write| write.kind == StepKind::RootRecordFua)
         .unwrap_or(usize::MAX);
     let versions = if name == StreamName::NewPoolFileCreation && judged_root_index != usize::MAX {
-        // 流一的版本表照 `tests/crash_enumeration_new_pool_file_creation_stream.rs` 第 391–399 行 `single_version`。
+        // 流一的版本表照 `tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `single_version`。
         let (instance, checkpoint_txg) =
             singlefs_harness::memory_pool::root_identity_of_write(&writes[judged_root_index]);
         vec![PublishedVersion {
@@ -2072,7 +2099,7 @@ fn prepared_stream_of_the_live_stream(
 }
 
 /// S1 里跟流有关的几条（只在基线那一趟）：段长表、写数、根槽写数、盘数与盘字节数对本地常量；流一整条流逐条与 `build_pool` 比。
-/// 与 `e170_o3_spec_executor_export.rs` 第 550–636 行同一批。
+/// 与 `e170_o3_spec_executor_export.rs` 的 `prepare_stream` 里那一批 S1 回比同一批。
 #[allow(
     clippy::too_many_arguments,
     reason = "这几样是 prepare_stream 驱动完之后手里同时有的，拆成结构体只会多一层搬运"
@@ -2265,9 +2292,9 @@ fn sample_ordinals(
 
 // ───────────────────────────── 落地向量与镜像摘要（登记 5.3） ─────────────────────────────
 
-/// 层 0 序号 → 持久掩码：由枚举表现造，掩码按 `crash_facts::persisted_writes_of_state`（事实表与 GPU 判器共用的那一份，与层 0
-/// `Layer0StatePlan` 同一套数字次序）算，不走 `extract_flow_facts`——那一个给 GPU 判器抽事实，枚举写表多于 2048 次写的流（流三）它当场 panic。
-/// 回调里层 0 给的持久集合与这一份逐态比（`crash_facts_mask` 那一行），两份是两段代码。
+/// 崩溃状态序号 → 持久掩码：由枚举表现造，掩码按 `crash_facts::persisted_writes_of_state`（事实表与 GPU 判器共用的那一份，与崩溃点重放
+/// `CrashStatePlan` 同一套数字次序）算，不走 `extract_flow_facts`——那一个给 GPU 判器抽事实，枚举写表多于 2048 次写的流（流三）它当场 panic。
+/// 回调里崩溃点重放给的持久集合与这一份逐态比（`crash_facts_mask` 那一行），两份是两段代码。
 struct StateMasks {
     recorded_write_count: usize,
     enumerated_write_count: usize,
@@ -2278,7 +2305,7 @@ struct StateMasks {
 }
 
 impl StateMasks {
-    fn of(tables: &Layer0EnumerationTables, segments: &[Vec<usize>]) -> Self {
+    fn of(tables: &CrashStateEnumerationTables, segments: &[Vec<usize>]) -> Self {
         let write_index = |index: usize| u32::try_from(index).expect("写表下标装得进 u32");
         Self {
             recorded_write_count: tables.is_tearable_by_write.len(),
@@ -2303,6 +2330,8 @@ impl StateMasks {
                 .map(|(segment, states)| SegmentFact {
                     writes: segment.iter().map(|index| write_index(*index)).collect(),
                     states: states.clone(),
+                    // 这一装置的流都不分片（C790 的分片只在崩溃放量按段登记的段上）
+                    slice_start: None,
                 })
                 .collect(),
             state_count: tables.state_count,
@@ -2325,7 +2354,7 @@ impl StateMasks {
 /// `extract_flow_facts` 数出的状态总数（S1 那一条）：枚举写表多于 GPU 掩码宽（2048）的流抽不了，交 `None`。
 fn flow_facts_state_count(
     stream: &PreparedStream,
-    tables: &Layer0EnumerationTables,
+    tables: &CrashStateEnumerationTables,
 ) -> Option<u64> {
     (tables.enumerated_writes.len() <= MAXIMUM_ENUMERATED_WRITES).then(|| {
         extract_flow_facts(
@@ -2676,41 +2705,53 @@ struct ImplementationVerdict {
 
 impl ImplementationVerdict {
     /// 回调链 panic 了的那一态（修订 5 第 5.1 节第 4 条）：各格取各件自己的结果，panic 的件写 `panic`，没跑的写 `not_run`。
-    /// `red_items` 照 [`Layer0StateJudgement::red_items`] 的次序与写法列跑完了的那几件判红的项，panic 与没跑的件记成
+    /// `red_items` 照 [`CrashStateJudgement::red_items`] 的次序与写法列跑完了的那几件判红的项，panic 与没跑的件记成
     /// `panic:<项>`、`not_run:<项>`（不以 `<项>:` 起头，不进按项数红的计数）。
     fn of_the_pieces(
         consulted: &PieceOutcome<RecoveryReport>,
         ignored: &PieceOutcome<RecoveryReport>,
-        layer0_oracles: &PieceOutcome<Layer0OraclesOfThePieces>,
+        crash_point_replay_oracles: &PieceOutcome<CrashPointReplayOraclesOfThePieces>,
         pool_checker: &PieceOutcome<Vec<(&'static str, InvariantVerdict)>>,
         record_checker: &PieceOutcome<RecordCheck>,
     ) -> Self {
         let mut red_items = Vec::new();
-        let oracles: [(&str, Result<Option<&Layer0OracleViolation>, &str>); 2] =
-            match layer0_oracles {
-                PieceOutcome::Done(Layer0OraclesOfThePieces {
+        let oracles: [(&str, Result<Option<&CrashPointReplayOracleViolation>, &str>); 2] =
+            match crash_point_replay_oracles {
+                PieceOutcome::Done(CrashPointReplayOraclesOfThePieces {
                     consulted: consulted_oracle,
                     ignored: ignored_oracle,
                 }) => [
                     (
-                        LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE,
+                        CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE,
                         consulted_oracle
                             .as_ref()
                             .map(Option::as_ref)
                             .ok_or("not_run"),
                     ),
                     (
-                        LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE,
+                        CRASH_POINT_REPLAY_RED_PASS_JOURNAL_IGNORED_ORACLE,
                         ignored_oracle.as_ref().map(Option::as_ref).ok_or("not_run"),
                     ),
                 ],
                 PieceOutcome::Panicked(_) => [
-                    (LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE, Err("panic")),
-                    (LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE, Err("panic")),
+                    (
+                        CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE,
+                        Err("panic"),
+                    ),
+                    (
+                        CRASH_POINT_REPLAY_RED_PASS_JOURNAL_IGNORED_ORACLE,
+                        Err("panic"),
+                    ),
                 ],
                 PieceOutcome::NotRun => [
-                    (LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE, Err("not_run")),
-                    (LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE, Err("not_run")),
+                    (
+                        CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE,
+                        Err("not_run"),
+                    ),
+                    (
+                        CRASH_POINT_REPLAY_RED_PASS_JOURNAL_IGNORED_ORACLE,
+                        Err("not_run"),
+                    ),
                 ],
             };
         for (pass, oracle) in oracles {
@@ -2726,33 +2767,41 @@ impl ImplementationVerdict {
             PieceOutcome::Done(verdicts) => red_items.extend(
                 violated_invariant_names(verdicts)
                     .into_iter()
-                    .map(|invariant| format!("{LAYER0_RED_PASS_POOL_CHECKER}:{invariant}")),
+                    .map(|invariant| {
+                        format!("{CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER}:{invariant}")
+                    }),
             ),
             PieceOutcome::Panicked(_) => {
-                red_items.push(format!("panic:{LAYER0_RED_PASS_POOL_CHECKER}"));
+                red_items.push(format!("panic:{CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER}"));
             }
             PieceOutcome::NotRun => {
-                red_items.push(format!("not_run:{LAYER0_RED_PASS_POOL_CHECKER}"));
+                red_items.push(format!(
+                    "not_run:{CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER}"
+                ));
             }
         }
         match record_checker {
             PieceOutcome::Done(records) => {
                 if records.root_without_record {
                     red_items.push(format!(
-                        "{LAYER0_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_ROOT_WITHOUT_RECORD}"
+                        "{CRASH_POINT_REPLAY_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_ROOT_WITHOUT_RECORD}"
                     ));
                 }
                 if records.claimed_state_missing_unit {
                     red_items.push(format!(
-                        "{LAYER0_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT}"
+                        "{CRASH_POINT_REPLAY_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT}"
                     ));
                 }
             }
             PieceOutcome::Panicked(_) => {
-                red_items.push(format!("panic:{LAYER0_RED_PASS_RECORD_CHECKER}"));
+                red_items.push(format!(
+                    "panic:{CRASH_POINT_REPLAY_RED_PASS_RECORD_CHECKER}"
+                ));
             }
             PieceOutcome::NotRun => {
-                red_items.push(format!("not_run:{LAYER0_RED_PASS_RECORD_CHECKER}"));
+                red_items.push(format!(
+                    "not_run:{CRASH_POINT_REPLAY_RED_PASS_RECORD_CHECKER}"
+                ));
             }
         }
         Self {
@@ -2772,7 +2821,7 @@ impl ImplementationVerdict {
                 .cell_text(|records| records.claimed_state_missing_unit.to_string()),
         }
     }
-    fn of(judgement: &Layer0StateJudgement) -> Self {
+    fn of(judgement: &CrashStateJudgement) -> Self {
         let report_root = |report: &RecoveryReport| root_text(report.effective_root);
         Self {
             consulted_root: report_root(&judgement.consulted),
@@ -3169,6 +3218,7 @@ fn crash_moment_text(moment: ReferenceFileSystemCrashMoment) -> String {
 
 /// 一个崩溃态上 RefFS 的票（`TranslatedHistory::judge_a_crash` 的同一套走法）：从头交事件到崩溃那一步，hi 取那一步最后进序列的操作号
 /// （那一步一个都没进是「都返回过之后」的号）；翻译停在崩溃之前或崩溃落在停下的那一步里弃权；读回失败判红；读回不在允许集合里判红。
+// gpu-exempt: reference-filesystem
 fn reference_filesystem_vote_of_a_state(
     stream: &ReferenceFileSystemStream,
     moment: ReferenceFileSystemCrashMoment,
@@ -3366,8 +3416,8 @@ struct WritableMountProbe {
     refused_for_the_system_configuration_witness: bool,
 }
 
-/// 第二截判拒绝时交的「这一态没注入读故障」：本装置的崩溃态都是层 0 截断出来的，没有注入任何读故障（读法 8）。
-const READ_FAULTS_OF_A_LAYER0_STATE: ReadFaultsInTheCrashState =
+/// 第二截判拒绝时交的「这一态没注入读故障」：本装置的崩溃态都是崩溃点重放截断出来的，没有注入任何读故障（读法 8）。
+const READ_FAULTS_OF_A_CRASH_STATE: ReadFaultsInTheCrashState =
     ReadFaultsInTheCrashState::NoneInjected;
 
 /// 一个崩溃态上的可写挂载探针（读法 8；入参逐项照崩溃注入第二截那一处取，停机 S10）：崩溃镜像落成内存池
@@ -3421,7 +3471,7 @@ fn writable_mount_probe_on(
                     &refusal,
                     disk,
                     read_only_read_back,
-                    READ_FAULTS_OF_A_LAYER0_STATE,
+                    READ_FAULTS_OF_A_CRASH_STATE,
                 );
                 let second_crop = match verdict {
                     WritableMountRefusalVerdict::Legal(_) => "legal".to_string(),
@@ -3532,7 +3582,7 @@ fn raise_the_witnessed_counter_past_the_selected_version(
 
 // ───── 一个取样态上的 oracle 与它的记录 ─────
 
-/// 一个取样状态上看到的：批号、层 0 序号、段号、落地向量、镜像摘要、`judge_crash_image` 的判定（`impl-verdicts.tsv`）、
+/// 一个取样状态上看到的：批号、崩溃状态序号、段号、落地向量、镜像摘要、`judge_crash_image` 的判定（`impl-verdicts.tsv`）、
 /// O1 三个子列与 O2 的结论与各自耗时、触达的最后一次调用、可写挂载探针（开了才有）。看 journal 那一遍恢复 panic 的态 `recovery_panic` 有值
 /// （修订 5 第 5.1 节第 5 条：含义收窄，回调链上别的件 panic 不算）；判态路上 panic 了的件记在 `piece_panics`。
 struct StateObservation {
@@ -3568,7 +3618,7 @@ struct StateObservation {
     consulted_report: Option<RecoveryReport>,
     /// 回调链 panic 了的态上，逐件重做时 panic 的件（[`JudgingPiece`] 的次序）；回调链没 panic 的态是空的（修订 5 第 5.1 节第 5 条）。
     piece_panics: Vec<JudgingPiece>,
-    /// 正常那一路（`judge_layer0_state_range` 的回调链）panic 了的态是那一次 panic 的消息（不进产物），没 panic 的态是 None。
+    /// 正常那一路（`judge_crash_state_range` 的回调链）panic 了的态是那一次 panic 的消息（不进产物），没 panic 的态是 None。
     /// 有值而 `piece_panics` 是空的态数进 `unattributed_panic_states=`（[`unattributed_panic_states_of`]）。
     judging_path_panic: Option<String>,
 }
@@ -3583,7 +3633,7 @@ enum JudgingPiece {
     /// 被判那次根槽写落没落（`image.persisted[judged_root_index]`）。
     RootPersisted,
     /// 两份 `classified_oracle_violation_for_versions`（连同它们吃的「盘上已持久的最新根」）。
-    Layer0Oracles,
+    CrashPointReplayOracles,
     /// `check_pool_image`（`judge_crash_image` 里那次与装置直调那次是同一函数、同一镜像，算一件）。
     PoolChecker,
     /// `check_records(image, consulted.effective_root)`。
@@ -3606,7 +3656,7 @@ impl JudgingPiece {
         JudgingPiece::ConsultedRecovery,
         JudgingPiece::IgnoredRecovery,
         JudgingPiece::RootPersisted,
-        JudgingPiece::Layer0Oracles,
+        JudgingPiece::CrashPointReplayOracles,
         JudgingPiece::PoolChecker,
         JudgingPiece::RecordChecker,
         JudgingPiece::CrashJudge,
@@ -3628,7 +3678,7 @@ impl JudgingPiece {
             JudgingPiece::ConsultedRecovery => "consulted_recovery",
             JudgingPiece::IgnoredRecovery => "ignored_recovery",
             JudgingPiece::RootPersisted => "root_persisted",
-            JudgingPiece::Layer0Oracles => "layer0_oracles",
+            JudgingPiece::CrashPointReplayOracles => "layer0_oracles",
             JudgingPiece::PoolChecker => "pool_checker",
             JudgingPiece::RecordChecker => "record_checker",
             JudgingPiece::CrashJudge => "crash_judge",
@@ -3683,10 +3733,10 @@ fn judging_piece_outcome<Value>(
     }
 }
 
-/// 逐件重做时两份层 0 oracle 的结局：各自吃的那一遍恢复 panic 了是 None（记 `not_run`），跑了是它交回的（没有违例是 `Some(None)`）。
-struct Layer0OraclesOfThePieces {
-    consulted: Option<Option<Layer0OracleViolation>>,
-    ignored: Option<Option<Layer0OracleViolation>>,
+/// 逐件重做时两份崩溃点重放 oracle 的结局：各自吃的那一遍恢复 panic 了是 None（记 `not_run`），跑了是它交回的（没有违例是 `Some(None)`）。
+struct CrashPointReplayOraclesOfThePieces {
+    consulted: Option<Option<CrashPointReplayOracleViolation>>,
+    ignored: Option<Option<CrashPointReplayOracleViolation>>,
 }
 
 /// 一件 panic 了就记下它的名字（[`StateObservation::piece_panics`]）。
@@ -3932,7 +3982,7 @@ fn judge_runs_continuing_past_panicking_states(
 /// 观测要的、与这一条流绑在一起的几样：流、枚举表、按序号现算掩码的事实表、撕裂镜像的下标、RefFS 的翻译。
 struct ObservationContext<'stream> {
     stream: &'stream PreparedStream,
-    tables: &'stream Layer0EnumerationTables,
+    tables: &'stream CrashStateEnumerationTables,
     facts: &'stream StateMasks,
     torn_image_index_by_write: &'stream BTreeMap<usize, usize>,
     reference_filesystem: &'stream ReferenceFileSystemStream,
@@ -3960,12 +4010,13 @@ impl ObservationContext<'_> {
 }
 
 /// 一个判完了的态（`judge_crash_image` 交回了判定）上的全部 oracle（O1 三个子列、O2、探针）。
+// gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn observation_of_a_judged_state(
     context: &ObservationContext<'_>,
     batch: u8,
     ordinal: u64,
     image: &CrashImage<'_>,
-    judgement: &Layer0StateJudgement,
+    judgement: &CrashStateJudgement,
     controls: &mut ObservationControls,
 ) -> StateObservation {
     let stream = context.stream;
@@ -4027,20 +4078,32 @@ fn observation_of_a_judged_state(
         ReferenceFileSystemVoteOfAState::Off
     };
     let o1_nanoseconds = crash_judge_started.elapsed().as_nanos();
-    let pool_checker_started = Instant::now();
     let pool_checker_control = switches.positive_control == Some(PositiveControl::PoolChecker)
         && stream.name == StreamName::NewPoolFileCreation
         && ordinal == context.tables.state_count - 1;
-    let pool_checker_red =
+    // O2 逐状态计时量的是 CPU 池级 checker 本身（豁免截名 experiment-measures-the-cpu-judge-itself）：CPU 这一遍只计时；
+    // 判红的名单走两段（同一张盘作一张给定状态表交引擎，阳性对照那一态是改坏的那一张），不在计时里
+    let pool_checker_started = Instant::now();
+    let pool_checker_timed_on_the_cpu =
         (switches.disabled_oracle != Some(DisabledOracle::PoolChecker)).then(|| {
-            let direct = if pool_checker_control {
+            if pool_checker_control {
                 pool_checker_on_the_first_known_bad_image(image)
             } else {
                 check_pool_image(image)
-            };
-            violated_invariant_names(&direct)
+            }
         });
     let o2_nanoseconds = pool_checker_started.elapsed().as_nanos();
+    let image_digest = sha256_text(&crash_image_digest(image));
+    // None 有两种：O2 这路 oracle 关着；或引擎这一趟只录没判（占位，判归编进 gpu 特性的那一趟）——两种都不与判决比
+    let pool_checker_red = pool_checker_timed_on_the_cpu.and_then(|_| {
+        pool_checker_red_names_of_a_sampled_state_through_the_given_states_engine(
+            stream.name,
+            ordinal,
+            &image_digest,
+            image,
+            pool_checker_control,
+        )
+    });
     let pool_checker_matches_the_judgement = pool_checker_red
         .as_ref()
         .is_none_or(|direct| *direct == verdict.pool_checker_red)
@@ -4074,7 +4137,7 @@ fn observation_of_a_judged_state(
         ordinal,
         segment_index,
         landing_vector,
-        image_digest: sha256_text(&crash_image_digest(image)),
+        image_digest,
         verdict,
         judge_nanoseconds: o1_nanoseconds + o2_nanoseconds + recovery_nanoseconds,
         mask_matches_the_facts: context.facts.persisted_writes_of_state(ordinal) == image.persisted,
@@ -4107,6 +4170,7 @@ fn observation_of_a_judged_state(
 /// `judge_panic`；别的件 panic 不改这两列（第 3 条）。O2 照判，panic 记 `pool_checker_panic`、按红计（第 4 条）。
 /// 阳性对照的翻读回、见证改写与 O2 的坏镜像都只在正常那一路做，这一路不做。`judging_path_panic` 是正常那一路 panic 的消息，
 /// 记进 [`StateObservation::judging_path_panic`]、不进产物。
+// gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn observation_of_a_panicking_state(
     context: &ObservationContext<'_>,
     batch: u8,
@@ -4159,11 +4223,11 @@ fn observation_of_a_panicking_state(
         JudgingPiece::RootPersisted,
         &root_persisted,
     );
-    // 两份层 0 oracle 各吃自己那一遍恢复：那一遍 panic 了，那一份记 `not_run`；两遍都 panic 了这一件整个不跑。
-    let layer0_oracles = if consulted.done().is_none() && ignored.done().is_none() {
+    // 两份崩溃点重放 oracle 各吃自己那一遍恢复：那一遍 panic 了，那一份记 `not_run`；两遍都 panic 了这一件整个不跑。
+    let crash_point_replay_oracles = if consulted.done().is_none() && ignored.done().is_none() {
         PieceOutcome::NotRun
     } else {
-        judging_piece_outcome(JudgingPiece::Layer0Oracles, injected, || {
+        judging_piece_outcome(JudgingPiece::CrashPointReplayOracles, injected, || {
             let newest_persisted = newest_persisted_root(image.writes, &image.persisted);
             let oracle_of = |report: &RecoveryReport| {
                 classified_oracle_violation_for_versions(
@@ -4173,7 +4237,7 @@ fn observation_of_a_panicking_state(
                     &stream.versions,
                 )
             };
-            Layer0OraclesOfThePieces {
+            CrashPointReplayOraclesOfThePieces {
                 consulted: consulted.done().map(oracle_of),
                 ignored: ignored.done().map(oracle_of),
             }
@@ -4181,8 +4245,8 @@ fn observation_of_a_panicking_state(
     };
     note_a_piece_panic(
         &mut piece_panics,
-        JudgingPiece::Layer0Oracles,
-        &layer0_oracles,
+        JudgingPiece::CrashPointReplayOracles,
+        &crash_point_replay_oracles,
     );
     let pool_checker_started = Instant::now();
     let pool_checker = judging_piece_outcome(JudgingPiece::PoolChecker, injected, || {
@@ -4295,7 +4359,7 @@ fn observation_of_a_panicking_state(
     let verdict = ImplementationVerdict::of_the_pieces(
         &consulted,
         &ignored,
-        &layer0_oracles,
+        &crash_point_replay_oracles,
         &pool_checker,
         &record_checker,
     );
@@ -4340,7 +4404,7 @@ fn observation_of_a_panicking_state(
     }
 }
 
-/// 按序号升序把取样的状态切成连续的几段，每段调一次 `judge_layer0_state_range`：回调里给的那个 `CrashImage` 上算全部 oracle
+/// 按序号升序把取样的状态切成连续的几段，每段调一次 `judge_crash_state_range`：回调里给的那个 `CrashImage` 上算全部 oracle
 /// （[`observation_of_a_judged_state`]）。某个状态上 panic：记成恢复 panic 的态、接着判它后面的（[`judge_runs_continuing_past_panicking_states`]）。
 fn observe_sampled_states(
     context: &ObservationContext<'_>,
@@ -4382,8 +4446,13 @@ fn observe_sampled_states(
     {
         let mut judge_run = |run: std::ops::Range<u64>| -> Result<(), u64> {
             let mut next_ordinal = run.start;
-            let judged = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                judge_layer0_state_range(
+            let judged =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    sample_crash_states_on_the_cpu(
+                CrashPointReplayItem {
+                    name: &sampling_item_name_of_this_call(),
+                    setting_file: CRASH_POINT_REPLAY_SAMPLING_ITEM.setting_file,
+                },
                     &stream.base,
                     &stream.writes,
                     &stream.segments,
@@ -4403,12 +4472,14 @@ fn observe_sampled_states(
                         next_ordinal = ordinal + 1;
                     },
                 )
-            }));
+        .judged()
+        .expect("实验装置不分只录、只判两趟跑：起它时不设 SINGLEFS_CRASH_AMPLIFICATION_STAGE")
+                }));
             match judged {
                 Ok(state_count_of_the_stream) => {
                     assert_eq!(
                         state_count_of_the_stream, context.tables.state_count,
-                        "judge_layer0_state_range 交回的整条流状态数与枚举表的相同"
+                        "judge_crash_state_range 交回的整条流状态数与枚举表的相同"
                     );
                     Ok(())
                 }
@@ -4699,10 +4770,10 @@ fn stream_status_file_text(stream: &PreparedStream) -> String {
     )
 }
 
-/// `oracle-verdicts.tsv`：每个取样状态一行（次序与 `states.tsv` 相同）——状态号、批号、层 0 序号、段号、触达的最后一次调用、
+/// `oracle-verdicts.tsv`：每个取样状态一行（次序与 `states.tsv` 相同）——状态号、批号、崩溃状态序号、段号、触达的最后一次调用、
 /// O1-模型崩溃判官（`green` / `red` / `na` / `off` / `recovery_panic`）与红的内容、O2（同）与判红的不变量、O2 直接调与
 /// `judge_crash_image` 内那一遍是否一致、看 journal 那一遍恢复的摘要（根、结局、读回 sha256、施加记录数）、不看 journal 那一遍的摘要、
-/// 层 0 的 `red_items`（附带），加第 1 次重跑的五列：O1-RefFS 的票（`green` / `red` / `abstained` / `recovery_panic` / `off`）、
+/// 崩溃点重放的 `red_items`（附带），加第 1 次重跑的五列：O1-RefFS 的票（`green` / `red` / `abstained` / `recovery_panic` / `off`）、
 /// 弃权种类或红的理由、RefFS 的崩溃时刻、允许集合的下标、看 journal 那一遍恢复 panic 的消息（没有写 `-`），加修订 5 第 5.1 节第 5 条的
 /// `piece_panics`：回调链 panic 了的态上逐件重做时 panic 的件名，按 [`JudgingPiece`] 的次序逗号连起来（没有写 `-`）。
 fn oracle_verdicts_file_text(observations: &[StateObservation]) -> String {
@@ -4773,7 +4844,7 @@ fn piece_panics_text(piece_panics: &[JudgingPiece]) -> String {
     }
 }
 
-/// `writable-mount-probe.tsv`（读法 8，登记 5.3 第 6 样）：每个探过的态一行——流名、批号、层 0 序号、状态号、(i) 判不出那一支、
+/// `writable-mount-probe.tsv`（读法 8，登记 5.3 第 6 样）：每个探过的态一行——流名、批号、崩溃状态序号、状态号、(i) 判不出那一支、
 /// (ii) 计数那一支（为真写是哪一句，假写 `false`）、c_见证、所选版本、挂载结局、拒的成员、单子上的理由、第二截判定。
 fn writable_mount_probe_file_text(stream: StreamName, observations: &[StateObservation]) -> String {
     observations
@@ -4817,7 +4888,7 @@ const WRITABLE_MOUNT_PROBE_FILE: &str = "writable-mount-probe.tsv";
 fn write_stream_files(
     directory: &Path,
     stream: &PreparedStream,
-    tables: &Layer0EnumerationTables,
+    tables: &CrashStateEnumerationTables,
     observations: &[StateObservation],
     full_states: u64,
     quick_tier_states: u64,
@@ -5102,19 +5173,19 @@ fn export_prepared_stream(
         export.elapsed_nanoseconds = started.elapsed().as_nanos();
         return export;
     }
-    let tables = layer0_enumeration_tables(
+    let tables = crash_state_enumeration_tables(
         &stream.base,
         &stream.writes,
         &stream.segments,
         &full_expansion,
     );
-    let full_states = layer0_plan_state_count(
+    let full_states = crash_point_replay_plan_state_count(
         &stream.base,
         &stream.writes,
         &stream.segments,
         &full_expansion,
     );
-    let quick_tier_states = layer0_plan_state_count(
+    let quick_tier_states = crash_point_replay_plan_state_count(
         &stream.base,
         &stream.writes,
         &stream.segments,
@@ -5255,11 +5326,11 @@ fn export_prepared_stream(
 }
 
 /// S1 里跟状态数有关的几条（只在基线那一趟）：全量与快档状态数、每次写只取两态时的闭式、枚举表与 `crash_facts` 数的总数，
-/// 对本地常量。与 `e170_o3_spec_executor_export.rs` 第 1298–1334 行同一批。
+/// 对本地常量。与 `e170_o3_spec_executor_export.rs` 的 `export_stream` 里那一批 S1 回比同一批。
 fn state_count_checks_against_the_crates(
     name: StreamName,
     stream: &PreparedStream,
-    tables: &Layer0EnumerationTables,
+    tables: &CrashStateEnumerationTables,
     flow_facts_state_count: Option<u64>,
     full_states: u64,
     quick_tier_states: u64,
@@ -5425,7 +5496,7 @@ fn timing_summary(mut nanoseconds: Vec<u128>) -> (u128, u128, u128, u128) {
     unused_imports,
     clippy::all,
     clippy::pedantic,
-    reason = "逐行照抄 checker_known_bad_images.rs 的辅助函数与坏镜像表：那份文件里别的族用的辅助函数在这里没人调，抄来的写法也不照本文件的 lint 改"
+    reason = "照抄 checker_known_bad_images.rs 的辅助函数与坏镜像表，删了没人调的 verdict：那份文件里别的族用的辅助函数在这里没人调，抄来的写法也不照本文件的 lint 改"
 )]
 mod known_bad_images_copied_from_the_harness_test {
     use super::common::{
@@ -5795,14 +5866,6 @@ mod known_bad_images_copied_from_the_harness_test {
             );
         }
         changed_records.get()
-    }
-
-    fn verdict(pool: &MemoryPool, invariant: &str) -> InvariantVerdict {
-        check_pool_image(pool)
-            .into_iter()
-            .find(|(identifier, _)| *identifier == invariant)
-            .expect("清单里有")
-            .1
     }
 
     /// journal 记录头里这三个字段的偏移（D23（journal 的角色与格式） 已定项 17 的字段表；记录头自证校验和在 46、罩整条 4096）。
@@ -6936,10 +6999,16 @@ fn materialized_memory_pool(image: &CrashImage<'_>) -> MemoryPool {
     pool
 }
 
-/// 阳性对照 O2：把已知坏镜像族的第一条改法施加在这一态的物化镜像上，再交 `check_pool_image`。
+/// 阳性对照 O2：把已知坏镜像族的第一条改法施加在这一态的物化镜像上，再交 `check_pool_image`（只为计时，名单走两段）。
+// gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn pool_checker_on_the_first_known_bad_image(
     image: &CrashImage<'_>,
 ) -> Vec<(&'static str, InvariantVerdict)> {
+    check_pool_image(&first_known_bad_image_of(image))
+}
+
+/// 这一态的物化镜像上施加已知坏镜像族的第一条改法之后的那张盘（阳性对照 O2 判的那一张）。
+fn first_known_bad_image_of(image: &CrashImage<'_>) -> MemoryPool {
     let clean = materialized_memory_pool(image);
     let entries =
         known_bad_images_copied_from_the_harness_test::entries_of_the_known_bad_images(&clean);
@@ -6948,7 +7017,104 @@ fn pool_checker_on_the_first_known_bad_image(
         .expect("已知坏镜像族至少一条（照抄的那一份 43 条）");
     let mut bad = clean.clone();
     apply_the_first_entry(&mut bad);
-    check_pool_image(&bad)
+    bad
+}
+
+/// 这份装置判取样那几态 O2 名单的给定状态引擎（进程里一份，第一次用时起；用户 2026-10-14 定：O2 的名单按判到位与违例位能两段，
+/// 计时与按件 panic 留 CPU）：每张要判的盘作一张给定状态表，录入段写进家目录下给定状态表那一类的判定库，判段从库里读回判
+/// （配了 GPU 且编进了 `gpu` 特性在卡上判，否则由 CPU 判器判），判过的复用。产物只收这份装置自己打的行：引擎不调 `finish`，不打收尾行。
+/// 照第一段装置（`e171_three_oracle_collusion.rs`）的同名函数。
+///
+/// # Panics
+/// 引擎起不了（配了 GPU 卡用不上、结论版本与编译时对不上……都不退回 CPU）。
+fn given_states_engine_of_this_experiment(
+) -> &'static singlefs_checker_tier::crash_amplification::GivenStatesEngine {
+    static ENGINE: std::sync::OnceLock<
+        singlefs_checker_tier::crash_amplification::GivenStatesEngine,
+    > = std::sync::OnceLock::new();
+    ENGINE.get_or_init(|| {
+        singlefs_checker_tier::crash_amplification::GivenStatesEngine::start_from_environment(
+            singlefs_checker_tier::crash_amplification::GivenStatesItem {
+                item_name: "e171_three_oracle_collusion_after_the_oracle_fixes".to_string(),
+                setting_file: CRASH_POINT_REPLAY_SAMPLING_ITEM.setting_file.to_string(),
+                seeds_and_scale: "fixed".to_string(),
+            },
+            &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
+        )
+        .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+    })
+}
+
+/// 取样的一态上 O2 判红的不变量名（按 `IMPLEMENTED_INVARIANTS` 的次序，与 [`violated_invariant_names`] 同一个次序），走两段：
+/// 这一态的物化镜像（阳性对照那一态是改坏的那一张，[`first_known_bad_image_of`]）作一张给定状态表（基线就是那张盘、写表空、一个空持久集合）
+/// 交 [`given_states_engine_of_this_experiment`]。表名带流、序号与镜像摘要（同名的表内容就相同，判过的复用）。
+///
+/// 交回 `None` 是这一趟没判名单：引擎只录了这张表、交占位结论（配置开了 GPU 而这份二进制没编进 `gpu` 特性，或设了只录那一段），
+/// 判归编进特性的那一趟；引擎开跑时已打了本次未跑那一行（`given_states_not_run_line_without_the_gpu_feature`），
+/// 这里不退回 CPU 判，也不把占位当 panic 记进按件 panic 的计数。
+///
+/// # Panics
+/// 引擎判不了这张表（不退回别处判）；这张表归别的机器判（实验装置不分片）。
+fn pool_checker_red_names_of_a_sampled_state_through_the_given_states_engine(
+    stream_name: StreamName,
+    ordinal: u64,
+    image_digest: &str,
+    image: &CrashImage<'_>,
+    pool_checker_control: bool,
+) -> Option<Vec<String>> {
+    use singlefs_checker_tier::crash_given_states::{
+        GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
+    };
+    let (table_name, judged_image) = if pool_checker_control {
+        (
+            format!(
+                "sampled-state/{}/ordinal={ordinal}/image={image_digest}/first-known-bad-entry",
+                stream_name.directory_name()
+            ),
+            first_known_bad_image_of(image),
+        )
+    } else {
+        (
+            format!(
+                "sampled-state/{}/ordinal={ordinal}/image={image_digest}",
+                stream_name.directory_name()
+            ),
+            materialized_memory_pool(image),
+        )
+    };
+    let judged = given_states_engine_of_this_experiment()
+        .judge_the_given_states(&GivenStatesOfATable {
+            table_name: table_name.clone(),
+            base: &judged_image,
+            writes: &[],
+            segments: &[],
+            seams: &[],
+            persisted_sets: vec![Vec::new()],
+        })
+        .unwrap_or_else(|reason| {
+            panic!("给定状态表 {table_name} 判不了（不退回别处判）：{reason}")
+        });
+    match judged.source {
+        GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+        GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => return None,
+        GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost => panic!(
+            "实验装置不分片：起它时不设 SINGLEFS_CRASH_AMPLIFICATION_SHARE（{table_name} 归别的机器判）"
+        ),
+    }
+    let [conclusion] = judged.states.as_slice() else {
+        panic!(
+            "{table_name}：一个状态一份结论，交回 {} 份",
+            judged.states.len()
+        );
+    };
+    Some(
+        conclusion
+            .pool_checker_violations()
+            .into_iter()
+            .map(|(invariant, _)| invariant.to_string())
+            .collect(),
+    )
 }
 
 /// 一条流各项计数（[`report_stream`] 交回、`run_dump` 合起来写判决行）。
@@ -7836,7 +8002,7 @@ fn confirmed_loss_prepared_stream(
 /// 末段每个写的取法数之积（整写 2 种，可撕裂的 3 种；第七节 A10），与末段写数、可撕裂写数。
 fn last_segment_product(
     stream: &PreparedStream,
-    tables: &Layer0EnumerationTables,
+    tables: &CrashStateEnumerationTables,
 ) -> (usize, usize, u64) {
     let last_segment = stream.segments.last().cloned().unwrap_or_default();
     let tearable = last_segment
@@ -7859,7 +8025,7 @@ fn confirmed_loss_form_checks_against_the_crates() -> Vec<StopCheck> {
     let live = second_stream_through_the_first_overwrite(RunSwitches::default());
     let (prepared, shape) =
         confirmed_loss_prepared_stream(live, ConfirmedLossTruncation::BeforeTheInFlightBarrier);
-    let tables = layer0_enumeration_tables(
+    let tables = crash_state_enumeration_tables(
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
@@ -7882,7 +8048,7 @@ fn confirmed_loss_form_checks_against_the_crates() -> Vec<StopCheck> {
             EQUIVALENCE_PAIRING_IN_FLIGHT_WRITES_KEPT,
         ),
     );
-    let pairing_tables = layer0_enumeration_tables(
+    let pairing_tables = crash_state_enumeration_tables(
         &pairing_stream.base,
         &pairing_stream.writes,
         &pairing_stream.segments,
@@ -8575,7 +8741,7 @@ const EQUIVALENCE_PAIRING_IN_FLIGHT_WRITES_KEPT: usize = 6;
 
 /// [`ObservationContext`] 借的几张表，由一条流现算（与 [`export_prepared_stream`] 里同一套算法；按等价类判与「等价类对拍」用）。
 struct ObservationTables {
-    tables: Layer0EnumerationTables,
+    tables: CrashStateEnumerationTables,
     facts: StateMasks,
     torn_image_index_by_write: BTreeMap<usize, usize>,
     reference_filesystem: ReferenceFileSystemStream,
@@ -8583,7 +8749,7 @@ struct ObservationTables {
 
 impl ObservationTables {
     fn of(stream: &PreparedStream) -> Self {
-        let tables = layer0_enumeration_tables(
+        let tables = crash_state_enumeration_tables(
             &stream.base,
             &stream.writes,
             &stream.segments,
@@ -8625,7 +8791,7 @@ impl ObservationTables {
     }
 }
 
-/// 末段的写按层 0 的混合进制排开（`crash.rs` 的 `Layer0StatePlan::assign_landings`）：段内序号 = Σ 数字 × 权，末段第一个写是最低位，
+/// 末段的写按崩溃点重放的混合进制排开（`crash.rs` 的 `CrashStatePlan::assign_landings`）：段内序号 = Σ 数字 × 权，末段第一个写是最低位，
 /// 进制是它能取几态（整写 2、可撕裂的 3），数字 0 是「没落」、最大是「持久」（可撕裂的写 1 是撕裂）。末段之后没有段，
 /// 段内序号取满（每位取最大）就是最后那个全持久态，所以末段与全持久态合起来恰是 `first_ordinal..first_ordinal + 组合数`。
 struct LastSegmentDigits {
@@ -8636,7 +8802,7 @@ struct LastSegmentDigits {
 }
 
 impl LastSegmentDigits {
-    fn of(stream: &PreparedStream, tables: &Layer0EnumerationTables) -> Self {
+    fn of(stream: &PreparedStream, tables: &CrashStateEnumerationTables) -> Self {
         let write_indexes = stream.segments.last().cloned().unwrap_or_default();
         let first_ordinal = tables
             .state_ranges_by_segment
@@ -8658,7 +8824,7 @@ impl LastSegmentDigits {
             weights.push(weight);
             weight = weight
                 .checked_mul(*radix)
-                .expect("末段的组合数装得进 u64（层 0 的计划同样要求）");
+                .expect("末段的组合数装得进 u64（崩溃点重放的计划同样要求）");
         }
         assert_eq!(
             first_ordinal + weight,
@@ -9162,7 +9328,7 @@ struct EquivalenceCheckCounts {
     input_list_mismatches: usize,
     /// ②：C 的写经 `geometry.classify` 是根槽写、系统配置槽写或 journal 记录写的个数。
     in_flight_writes_of_a_forbidden_kind: usize,
-    /// ④ 前一半：代表上经读者跑的那一遍恢复，与层 0 判同一态交的 `judgement.consulted` 不同的代表数。
+    /// ④ 前一半：代表上经读者跑的那一遍恢复，与崩溃点重放判同一态交的 `judgement.consulted` 不同的代表数。
     recording_report_mismatches: usize,
     /// ④ 后一半：「C 全落」那一态照原路径判的恢复、两个崩溃子列与 RefFS 一票，与它所在的类推出的不同的态数。
     derived_class_mismatches: usize,
@@ -9523,7 +9689,7 @@ struct EquivalencePairingShapeFacts {
 
 fn equivalence_pairing_shape_facts(
     stream: &PreparedStream,
-    tables: &Layer0EnumerationTables,
+    tables: &CrashStateEnumerationTables,
 ) -> EquivalencePairingShapeFacts {
     let call_of_write = call_index_of_each_write(stream);
     let in_flight_writes: Vec<usize> = stream
@@ -9607,7 +9773,7 @@ fn crash_columns_and_consulted_recovery(
     )
 }
 
-/// 注入那一遍对不注入那一遍，两个崩溃子列或看 journal 那遍恢复的结局不同的态数（按层 0 序号配对；不注入那一遍里没有的序号也算不同）。
+/// 注入那一遍对不注入那一遍，两个崩溃子列或看 journal 那遍恢复的结局不同的态数（按崩溃状态序号配对；不注入那一遍里没有的序号也算不同）。
 fn o1_columns_differing(plain: &[StateObservation], injected: &[StateObservation]) -> usize {
     let plain_of_ordinal: BTreeMap<u64, &StateObservation> = plain
         .iter()
@@ -9683,7 +9849,7 @@ fn piece_panic_control_of(
     plain: &EquivalencePairing,
     replacing_the_built_in_rules: Option<&PiecePanicInjection>,
 ) -> PiecePanicControl {
-    let tables = layer0_enumeration_tables(
+    let tables = crash_state_enumeration_tables(
         &stream.base,
         &stream.writes,
         &stream.segments,
@@ -9732,14 +9898,14 @@ fn run_stream_constants(streams: &[StreamName]) -> i32 {
     checks.extend(confirmed_loss_form_checks_against_the_crates());
     for name in streams {
         let stream = prepare_stream(*name, RunSwitches::default(), true);
-        let tables = layer0_enumeration_tables(
+        let tables = crash_state_enumeration_tables(
             &stream.base,
             &stream.writes,
             &stream.segments,
             &full_expansion,
         );
         let full_states = tables.state_count;
-        let quick_tier_states = layer0_plan_state_count(
+        let quick_tier_states = crash_point_replay_plan_state_count(
             &stream.base,
             &stream.writes,
             &stream.segments,
@@ -9816,6 +9982,83 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 单测里判池级 checker 的给定状态引擎（用户 2026-10-13 定「能走两段的都走两段」）：每张要判的盘作一张给定状态表（基线就是那张盘、写表空、
+    /// 一个空持久集合），录入段写进家目录下给定状态表那一类的判定库，判段从库里读回判（配了 GPU 且编进了 `gpu` 特性在卡上判，否则由 CPU 判器判），
+    /// 判过的复用。交回每张盘上池级 checker 判到而没违例的不变量与违例的不变量；只录那一趟、表归别的机器判的那一趟交 `None`（用例当场返回）。
+    ///
+    /// # Panics
+    /// 引擎起不了、判不了某一张（不退回别处判）；GPU 判不了某一张（第三轮正文 H6 判红）。
+    fn pool_checker_holds_and_violations_through_the_given_states_engine(
+        images: &[(String, MemoryPool)],
+    ) -> Option<Vec<(Vec<&'static str>, Vec<&'static str>)>> {
+        use singlefs_checker_tier::crash_amplification::{GivenStatesEngine, GivenStatesItem};
+        use singlefs_checker_tier::crash_given_states::{
+            GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
+        };
+        let engine = GivenStatesEngine::start_from_environment(
+            GivenStatesItem {
+                item_name: "e171_three_oracle_collusion_after_the_oracle_fixes::tests".to_string(),
+                setting_file:
+                    "crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
+                        .to_string(),
+                seeds_and_scale: "fixed".to_string(),
+            },
+            &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
+        )
+        .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"));
+        let mut judged_images = Vec::with_capacity(images.len());
+        let mut every_table_judged_here = true;
+        for (table_name, image) in images {
+            let judged = engine
+                .judge_the_given_states(&GivenStatesOfATable {
+                    table_name: table_name.clone(),
+                    base: image,
+                    writes: &[],
+                    segments: &[],
+                    seams: &[],
+                    persisted_sets: vec![Vec::new()],
+                })
+                .unwrap_or_else(|reason| {
+                    panic!("给定状态表 {table_name} 判不了（不退回别处判）：{reason}")
+                });
+            match judged.source {
+                GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+                GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
+                | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => {
+                    every_table_judged_here = false;
+                }
+            }
+            let [conclusion] = judged.states.as_slice() else {
+                panic!(
+                    "{table_name}：一个状态一份结论，交回 {} 份",
+                    judged.states.len()
+                );
+            };
+            let invariants_with = |bits: u128| -> Vec<&'static str> {
+                singlefs_checker::image::IMPLEMENTED_INVARIANTS
+                    .iter()
+                    .enumerate()
+                    .filter(|(position, _)| bits & (1u128 << position) != 0)
+                    .map(|(_, invariant)| *invariant)
+                    .collect()
+            };
+            judged_images.push((
+                invariants_with(
+                    conclusion.words.pool_checker_judged_bits
+                        & !conclusion.words.pool_checker_violated_bits,
+                ),
+                invariants_with(conclusion.words.pool_checker_violated_bits),
+            ));
+        }
+        assert_eq!(
+            engine.finish().red_items(),
+            Vec::<String>::new(),
+            "GPU 判不了的盘照第三轮正文 H6 判红"
+        );
+        every_table_judged_here.then_some(judged_images)
+    }
 
     /// 空消息的 sha256（`python3 -c "import hashlib; print(hashlib.sha256(b'').hexdigest())"` 现算）。
     const EMPTY_MESSAGE_SHA256: &str =
@@ -11520,7 +11763,7 @@ mod tests {
         fixture
     }
 
-    /// S0 里层 0 序号是 `ordinal` 的那一态在观测里的下标。
+    /// S0 里崩溃状态序号是 `ordinal` 的那一态在观测里的下标。
     fn observation_index_of(fixture: &UntamperedPairing, ordinal: u64) -> usize {
         fixture
             .pairing
@@ -11688,7 +11931,7 @@ mod tests {
 
     /// U4（修订 5 第 5.4 节，KM4；V23：类核对 ④ 前一半不计数，这里红）：S0，代表 0 的记读那一遍恢复换成 panic，④ 前一半数到它。
     #[test]
-    fn a_recording_recovery_that_differs_from_the_layer0_report_is_counted() {
+    fn a_recording_recovery_that_differs_from_the_crash_point_replay_report_is_counted() {
         let mut fixture = untampered_pairing();
         let digits = LastSegmentDigits::of(&fixture.stream, &fixture.tables.tables);
         let representative = fixture
@@ -11963,7 +12206,7 @@ mod tests {
     #[test]
     fn the_pairing_keeps_the_first_three_mirrored_pairs_of_the_in_flight_call() {
         let stream = equivalence_pairing_stream_keeping(EQUIVALENCE_PAIRING_IN_FLIGHT_WRITES_KEPT);
-        let tables = layer0_enumeration_tables(
+        let tables = crash_state_enumeration_tables(
             &stream.base,
             &stream.writes,
             &stream.segments,
@@ -12246,22 +12489,28 @@ mod tests {
         let mut image = live.formatted.memory_pool_after_mkfs();
         // 跨轮带的是镜像上已经施加到 mkfs 之后第几条操作；每一轮只补施加这一次调用发出的那一截。
         let mut operations_applied_after_mkfs = 0usize;
-        let mut publishes_judged = 0usize;
-        for call in live.driver.calls.iter().skip(2) {
+        let mut images_after_each_publish: Vec<(String, MemoryPool)> = Vec::new();
+        for (publish_index, call) in live.driver.calls.iter().skip(2).enumerate() {
             image.apply(
                 &operations[mkfs_operation_count + operations_applied_after_mkfs
                     ..mkfs_operation_count + call.return_point],
             );
             operations_applied_after_mkfs = call.return_point;
-            let verdicts = check_pool_image(&image);
-            let allocated_statistic_verdict = verdicts
-                .iter()
-                .find(|(invariant, _)| *invariant == "I-3.1")
-                .map(|(_, verdict)| verdict)
-                .expect("池级 checker 每张镜像都判 I-3.1");
+            images_after_each_publish.push((
+                format!("third-stream/after-publish-{publish_index}-{}", call.label),
+                image.clone(),
+            ));
+        }
+        let Some(judged_images) = pool_checker_holds_and_violations_through_the_given_states_engine(
+            &images_after_each_publish,
+        ) else {
+            return;
+        };
+        let mut publishes_judged = 0usize;
+        for (call, (held, violated)) in live.driver.calls.iter().skip(2).zip(&judged_images) {
             assert!(
-                matches!(allocated_statistic_verdict, InvariantVerdict::Holds),
-                "第 {publishes_judged} 次发布（{}）之后 I-3.1 成立：{allocated_statistic_verdict:?}",
+                held.contains(&"I-3.1"),
+                "第 {publishes_judged} 次发布（{}）之后 I-3.1 成立：判到而成立的 {held:?}，违例的 {violated:?}",
                 call.label
             );
             publishes_judged += 1;
@@ -12341,7 +12590,7 @@ mod tests {
     fn first_in_flight_write_and_the_states_where_it_landed(
         stream: &PreparedStream,
     ) -> (usize, usize) {
-        let tables = layer0_enumeration_tables(
+        let tables = crash_state_enumeration_tables(
             &stream.base,
             &stream.writes,
             &stream.segments,
@@ -12533,7 +12782,7 @@ mod tests {
             },
         );
         let judged_states = {
-            let tables = layer0_enumeration_tables(
+            let tables = crash_state_enumeration_tables(
                 &shapes.main.base,
                 &shapes.main.writes,
                 &shapes.main.segments,

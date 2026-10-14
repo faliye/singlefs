@@ -15,7 +15,7 @@
 mod common;
 
 use common::{build_pool, file_content, geometry, publish_overwrite_in_process};
-use singlefs_checker_tier::crash::{evaluate_state_for_versions, Layer0Tally};
+use singlefs_checker_tier::crash::{evaluate_state_for_versions, CrashPointReplayTally};
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration, SlotNumber};
 use singlefs_core::allocator::ReuseWindow;
 use singlefs_core::recovery::{PoolReader, RecoveryOutcome};
@@ -138,7 +138,7 @@ fn an_illegal_reuse_whose_later_write_landed_no_longer_excuses_the_missing_unit_
             content: fifth_content,
         },
     ];
-    let mut tally = Layer0Tally::default();
+    let mut tally = CrashPointReplayTally::default();
     let report = evaluate_state_for_versions(
         &base,
         &writes,

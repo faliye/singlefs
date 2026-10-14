@@ -1292,7 +1292,7 @@ mod tests {
 
     /// 场景：上一版右叶的分隔 key 是 6、叶里最小的 key 是 5（分隔 key 把 5 藏起来了），这一版删掉 5。
     /// 预期：规划交回 `PreviousShapeRoutesAKeyAwayFromTheLeafHoldingIt`；分隔 key 是 5 的同一棵树照常删得掉。
-    /// 从盘上重建的上一版照冷走读判了分隔 key（实审 A3a，代码审阅第 33 条）之后，这样的形状从盘上进不来，这一道是规划自己的最后一道。
+    /// 从盘上重建的上一版照冷走读判了分隔 key 之后，这样的形状从盘上进不来，这一道是规划自己的最后一道。
     #[test]
     fn a_previous_shape_whose_separator_hides_a_key_is_refused_by_the_planner() {
         assert!(

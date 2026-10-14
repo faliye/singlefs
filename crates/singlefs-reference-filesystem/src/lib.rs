@@ -1,7 +1,7 @@
 //! RefFS：语义级的参照文件系统。只在内存里按 POSIX 操作走，判一次崩溃之后恢复读出的内容落不落在允许集合里。
 //!
-//! 依据：`.claude/kb/decisions/13-验证路线.md@已定项 3：RefFS 做到极致，自己处理持久化与崩溃语义`（不与实现共用崩溃点枚举的那段代码）；
-//! `.claude/kb/decisions/17-实现分层与第三方管道.md@已定项 4：入口 = RefFS 的操作面`（fsync 的持久性承诺由 RefFS 的崩溃语义定义）。
+//! 依据：`D13（验证路线） .claude/kb/decisions/13-验证路线.md@已定项 3：RefFS 做到极致，自己处理持久化与崩溃语义`（不与实现共用崩溃点枚举的那段代码）；
+//! `D17（实现分层与第三方管道） .claude/kb/decisions/17-实现分层与第三方管道.md@已定项 4：入口 = RefFS 的操作面`（fsync 的持久性承诺由 RefFS 的崩溃语义定义）。
 //! 形态是用户 2026-10-02 的定案：语义级（`research/prompts/m3-formal-7-forks.md` Y2）；按发布边界的前缀 Q、另起、单独一个包
 //! （`research/prompts/m3-formal-r4-main-verification.md` 用户定案 F1、F3、F4）；回退目标作输入
 //! （`research/prompts/m3-formal-r5-main-verification.md` 用户定案 G2）。条款候选取那份判决第二节 U1、U2、U4 与第四节第 1、2、4、8 条（零轮）。
@@ -158,9 +158,9 @@ impl EnteredKind {
     fn ends_a_publish(self) -> bool {
         match self {
             // 发布边界只取历史里的显式发布点：发布调用与 fsync（r5 判决第二节 U2 ①）；fsync 触发的发布也是发布：
-            // .claude/kb/decisions/16-发布语义.md@已定项 6：发布计数器，四个等号写成一条
+            // D16（发布语义） .claude/kb/decisions/16-发布语义.md@已定项 6：发布计数器，四个等号写成一条
             EnteredKind::ExplicitPublish | EnteredKind::Fsync => true,
-            // 回退是挂着时的一次向前发布：.claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换
+            // 回退是挂着时的一次向前发布：D23（journal 的角色与格式） .claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换
             EnteredKind::RollBack => true,
             EnteredKind::ContentChange => false,
         }
@@ -180,7 +180,7 @@ fn confirmed_publishes_among(
 ) -> impl Iterator<Item = &VisibleState> {
     operations
         .iter()
-        // 写了之后报错的发布两可，不算已确认：.claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么
+        // 写了之后报错的发布两可，不算已确认：D16（发布语义） .claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么
         .filter(|operation| {
             operation.kind.ends_a_publish() && operation.outcome == EnteredOutcome::Succeeded
         })
@@ -207,10 +207,10 @@ fn allowed_set_for_a_crash_in(
     // （r5 判决第二节 U1：返回成功的才抬）。
     let returned_before_the_crash = &operations[..crash_falls_in.0 - 1];
     // lo = 崩溃之前最后一次返回成功的发布调用、fsync 或回退的末尾（r6 用户定案 H1-收严：三者同一个返回条件——
-    // .claude/kb/decisions/16-发布语义.md@已定项 7：发布的持久顺序 里「fsync 等系统配置轮换持久之后才返回」与回退
+    // D16（发布语义） .claude/kb/decisions/16-发布语义.md@已定项 7：发布的持久顺序 里「fsync 等系统配置轮换持久之后才返回」与回退
     // 「它的根持久之后才向管理员确认，与 fsync 同一个返回条件」）。位置 p（从 0 起）上的是第 p + 1 个操作，施加之后是 S_{p+1}；
     // 发布调用与 fsync 不改内容，S_{p+1} 与调用之前那一刻相同。没有时 lo = 0，起点是上一次恢复读出的内容。
-    // 报错时下界停在上一次返回成功的那一个：.claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么
+    // 报错时下界停在上一次返回成功的那一个：D16（发布语义） .claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么
     let lower_bound = returned_before_the_crash
         .iter()
         .enumerate()
@@ -221,9 +221,9 @@ fn allowed_set_for_a_crash_in(
         .map_or(StateIndex(0), |(position, _)| StateIndex(position + 1));
     let upper_bound = crash_falls_in.state_after();
     // Q：j 只取 lo 与恰是某次显式发布末尾的下标，lo ≤ j ≤ hi（用户定案 F1）。一次发布整体施加或整体不施加，
-    // 切开一次发布的 S_j 不在集合里：.claude/kb/decisions/16-发布语义.md@已定项 4：一次发布整体施加或整体不施加，第二份 replay 停在句法层；
-    // .claude/kb/decisions/16-发布语义.md@已定项 12：中间状态的合法性语义改写成「根 + journal 任意前缀」；
-    // 单元级的切分（.claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换
+    // 切开一次发布的 S_j 不在集合里：D16（发布语义） .claude/kb/decisions/16-发布语义.md@已定项 4：一次发布整体施加或整体不施加，第二份 replay 停在句法层；
+    // D16（发布语义） .claude/kb/decisions/16-发布语义.md@已定项 12：中间状态的合法性语义改写成「根 + journal 任意前缀」；
+    // 单元级的切分（D23（journal 的角色与格式） .claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换
     // 「崩溃原子性的单位是一个单元」）落在一次发布里面，不在发布末尾，Q 里不出现。
     // 判的是状态下标，不是「lo 之前的操作必须在」：回退会让早先的操作合法消失。
     let mut allowed = vec![AllowedState {
@@ -237,7 +237,7 @@ fn allowed_set_for_a_crash_in(
         .skip(lower_bound.0)
     {
         // 位置 position 上的是第 position + 1 个操作，施加之后是 S_{position+1}，lo < position + 1 ≤ hi。
-        // 写了之后报错的发布也算末尾：那次发布可在可不在（.claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么）
+        // 写了之后报错的发布也算末尾：那次发布可在可不在（D16（发布语义） .claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么）
         if operation.kind.ends_a_publish() {
             allowed.push(AllowedState {
                 index: StateIndex(position + 1),
@@ -312,7 +312,7 @@ impl ReferenceFileSystem {
             requested: number,
             versions_so_far: versions.len(),
         };
-        // 第 m 版从 1 起数，在第 m − 1 位：.claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换
+        // 第 m 版从 1 起数，在第 m − 1 位：D23（journal 的角色与格式） .claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换
         // （回退的新根取 R_old 那一版的用户可见树）
         let Some(position) = number.0.checked_sub(1) else {
             return Err(not_a_version);
@@ -334,15 +334,15 @@ impl ReferenceFileSystem {
     ) -> Result<SubmittedOperation, OperationNotAccepted> {
         let entered_outcome = match outcome {
             // 在任何写之前拒＝这一步没发生：不进序列、不占号（r5 判决第二节 U1「已接受」= 取号成功、没被拒）；
-            // .claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换（「在任何写之前拒」）
+            // D23（journal 的角色与格式） .claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换（「在任何写之前拒」）
             OperationOutcome::RefusedBeforeAnyWrite => return Ok(SubmittedOperation::DidNotHappen),
             OperationOutcome::Succeeded => EnteredOutcome::Succeeded,
-            // 原样重发成功＝做成：.claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换
+            // 原样重发成功＝做成：D23（journal 的角色与格式） .claude/kb/decisions/23-journal的角色与格式.md@已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换
             // （「这一版的失败处置」：重发成功才建下一次发布）；r6 判决第二节「G2 回退被拒」一行补的结局
             OperationOutcome::SucceededOnAVerbatimResendAfterFailingWhileWriting => {
                 EnteredOutcome::Succeeded
             }
-            // 写了之后报错＝两可：.claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么
+            // 写了之后报错＝两可：D16（发布语义） .claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么
             OperationOutcome::FailedAfterWriting => EnteredOutcome::FailedAfterWriting,
         };
         let state_so_far = self.state_after_every_operation_so_far();
@@ -393,7 +393,7 @@ impl ReferenceFileSystem {
         }
         let started_before_the_crash = &operations[..crash_falls_in.0.min(operations.len())];
         // 报错之后的操作接在下一次恢复读出的状态上判（r5 判决第二节 U1）；报错之后不许照旧复用同一份内存态：
-        // .claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么
+        // D16（发布语义） .claude/kb/decisions/16-发布语义.md@已定项 17：fsync 报错之后，调用方能假设什么
         if let Some(failed_position) = started_before_the_crash
             .iter()
             .position(|operation| operation.outcome == EnteredOutcome::FailedAfterWriting)

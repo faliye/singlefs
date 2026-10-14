@@ -1,5 +1,5 @@
 //! 崩溃放量三段流的第 ② 段在 GPU 上：只读第 ① 段的事实表（`crate::crash_facts::FlowFacts`），一次派活核一整块状态——每个调用判一个状态：
-//! 按序号现算持久掩码（与层 0 同一套混合进制）、找最新持久的根、判它自证与四条指针的落点、判持久的单元写两道校验和都对。
+//! 按序号现算持久掩码（与崩溃点重放同一套混合进制）、找最新持久的根、判它自证与四条指针的落点、判持久的单元写两道校验和都对。
 //! 判据与 `crate::crash_facts::verify_state_from_facts` 逐条相同，两份逐状态相等是这一份的判别力自证；结论按位交回
 //! （`crate::crash_facts::verdict_bits`），第 ③ 段再与 CPU 判器比。
 //!
@@ -8,13 +8,14 @@
 //! 核对代码的摘要 [`gpu_verifier_digest`] 进核对表的键：着色器改一个字，旧行留着当历史，新行另起。
 //! 段内序号按段的展开方式拆（全量、甲二；判决 `research/prompts/m3-crash-enumeration-merge-r2-main-verification.md` 第二节 L6-2），
 //! 满 64 位（同一判决 L1-7）：与 `crate::crash_facts::persisted_writes_of_state_by_the_segment_expansions` 同一套数字次序。
+//! 分片的段（C790）：段内编号 = 片起点 + 片内序号，片起点拆成的各位随段写表上卡，内核从那几位起加片内序号、逐位进位（只用 u32，不做宽整数除法）。
 use std::ops::Range;
 
 use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
 use crate::crash_facts::{
-    segment_expansion_code_wgsl_constants, FlowFacts, SegmentExpansionFact, BASE_IMAGE_SOURCE,
-    MAXIMUM_ENUMERATED_WRITES,
+    check_the_slice_starts_against_the_expansions, segment_expansion_code_wgsl_constants,
+    verdict_bits, SegmentExpansionFact, BASE_IMAGE_SOURCE, MAXIMUM_ENUMERATED_WRITES,
 };
 use crate::gpu_unit_checks::GpuCard;
 
@@ -24,8 +25,9 @@ const WORKGROUP_SIZE: usize = 64;
 /// 这几个表宽公开给崩溃放量记显存账（`crate::crash_amplification` 的 `facts_verifier_buffer_footprint`，今天在那边抄了一份）。
 pub const FACTS_VERIFIER_WORDS_PER_RECORDED_WRITE: usize = 4;
 /// 每一段在 `segments` 表里占几个 u32：数位那一组写的起点与条数、状态起点 lo/hi、状态终点 lo/hi、展开方式码
-/// （[`SegmentExpansionFact::code`]）、整组落的单元写那一组的起点与条数（只有甲二段有，别的段 0 条；两组合起来是段里全部的写）。
-pub const FACTS_VERIFIER_WORDS_PER_SEGMENT: usize = 9;
+/// （[`SegmentExpansionFact::code`]）、整组落的单元写那一组的起点与条数（只有甲二段有，别的段 0 条；两组合起来是段里全部的写）、
+/// 分片的段（C790）片起点各位在 `segment_writes` 里的起点与位数（不分片的段是 NONE 与 0；各位一位一个字，接在段写表里）。
+pub const FACTS_VERIFIER_WORDS_PER_SEGMENT: usize = 11;
 /// 每个单元在 `units` 表里占几个 u32：来源、盘、槽 lo/hi、校验和都对、整单元 CRC。
 pub const FACTS_VERIFIER_WORDS_PER_UNIT: usize = 6;
 /// 每条根在 `roots` 表里占几个 u32：来源、自证过、四条指针各（全零、两份位置条目各 盘、槽 lo/hi、校验和）。
@@ -67,6 +69,8 @@ const BIT_NO_ROOT_AT_ALL: u32 = 8u;
 
 var<private> persisted: array<u32, 64>;
 var<private> torn: array<u32, 64>;
+// 分片的段片起点的各位加片内序号越过了段的域（或片内序号装不进 32 位）：main 记 BIT_SLICE_PAST_ITS_DOMAIN
+var<private> slice_past_its_domain: bool;
 
 fn set_persisted(index: u32) {
     persisted[index >> 5u] = persisted[index >> 5u] | (1u << (index & 31u));
@@ -113,6 +117,7 @@ fn decode_the_persisted_set_of_the_state(local: u32) {
         persisted[word] = 0u;
         torn[word] = 0u;
     }
+    slice_past_its_domain = false;
     // 序号落在哪一段：第一段终点大于序号的；都不大于就是最后全部持久那一个状态
     var segment_of_state = header.segment_count;
     for (var s = 0u; s < header.segment_count; s = s + 1u) {
@@ -153,30 +158,67 @@ fn decode_the_persisted_set_of_the_state(local: u32) {
             let digit_count = segments[s * SEGMENT_WORDS + 1u];
             let group_first = segments[s * SEGMENT_WORDS + 7u];
             let group_count = segments[s * SEGMENT_WORDS + 8u];
-            // 甲二有单元写：最低一位是「单元写全落」，其余拆到原地写上
-            if (group_count > 0u) {
-                if ((remaining.x & 1u) == 1u) {
-                    for (var k = 0u; k < group_count; k = k + 1u) {
-                        set_persisted(segment_writes[group_first + k]);
+            let slice_digit_first = segments[s * SEGMENT_WORDS + 9u];
+            let slice_digit_count = segments[s * SEGMENT_WORDS + 10u];
+            if (slice_digit_count > 0u) {
+                // 分片的段：片起点的各位（单元写那一组那一位在前）加片内序号、逐位进位（crash::add_to_the_mixed_radix_digits 同一个算法）
+                if (remaining.y != 0u) {
+                    slice_past_its_domain = true;
+                } else {
+                    var carry = remaining.x;
+                    var position = 0u;
+                    if (group_count > 0u) {
+                        let sum = segment_writes[slice_digit_first] + carry % 2u;
+                        carry = carry / 2u + sum / 2u;
+                        if (sum % 2u == 1u) {
+                            for (var k = 0u; k < group_count; k = k + 1u) {
+                                set_persisted(segment_writes[group_first + k]);
+                            }
+                        }
+                        position = 1u;
+                    }
+                    for (var k = 0u; k < digit_count; k = k + 1u) {
+                        let write = segment_writes[digit_first + k];
+                        let choices = select(2u, 3u, recorded[write * 4u] != 0u);
+                        let sum = segment_writes[slice_digit_first + position + k] + carry % choices;
+                        carry = carry / choices + sum / choices;
+                        let digit = sum % choices;
+                        if (digit == choices - 1u) {
+                            set_persisted(write);
+                        } else if (digit == 1u) {
+                            set_torn(write);
+                        }
+                    }
+                    if (carry != 0u) {
+                        slice_past_its_domain = true;
                     }
                 }
-                remaining = vec2<u32>((remaining.x >> 1u) | (remaining.y << 31u), remaining.y >> 1u);
-            }
-            for (var k = 0u; k < digit_count; k = k + 1u) {
-                let write = segment_writes[digit_first + k];
-                let choices = select(2u, 3u, recorded[write * 4u] != 0u);
-                let divided = divide_by_a_divisor_below_65536(remaining, choices);
-                let digit = divided.remainder;
-                remaining = divided.quotient;
-                if (choices == 2u) {
-                    if (digit == 1u) {
-                        set_persisted(write);
+            } else {
+                // 甲二有单元写：最低一位是「单元写全落」，其余拆到原地写上
+                if (group_count > 0u) {
+                    if ((remaining.x & 1u) == 1u) {
+                        for (var k = 0u; k < group_count; k = k + 1u) {
+                            set_persisted(segment_writes[group_first + k]);
+                        }
                     }
-                } else {
-                    if (digit == 2u) {
-                        set_persisted(write);
-                    } else if (digit == 1u) {
-                        set_torn(write);
+                    remaining = vec2<u32>((remaining.x >> 1u) | (remaining.y << 31u), remaining.y >> 1u);
+                }
+                for (var k = 0u; k < digit_count; k = k + 1u) {
+                    let write = segment_writes[digit_first + k];
+                    let choices = select(2u, 3u, recorded[write * 4u] != 0u);
+                    let divided = divide_by_a_divisor_below_65536(remaining, choices);
+                    let digit = divided.remainder;
+                    remaining = divided.quotient;
+                    if (choices == 2u) {
+                        if (digit == 1u) {
+                            set_persisted(write);
+                        }
+                    } else {
+                        if (digit == 2u) {
+                            set_persisted(write);
+                        } else if (digit == 1u) {
+                            set_torn(write);
+                        }
                     }
                 }
             }
@@ -222,6 +264,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     decode_the_persisted_set_of_the_state(local);
+    if (slice_past_its_domain) {
+        verdicts[local] = BIT_SLICE_PAST_ITS_DOMAIN;
+        return;
+    }
     var bits = 0u;
     var newest = NONE;
     var newest_source = 0u;
@@ -306,7 +352,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 #[must_use]
 pub fn verifier_shader_source() -> String {
     format!(
-        "const SEGMENT_WORDS: u32 = {FACTS_VERIFIER_WORDS_PER_SEGMENT}u;\n{}\n{GPU_VERIFIER_SHADER_SOURCE}",
+        "const SEGMENT_WORDS: u32 = {FACTS_VERIFIER_WORDS_PER_SEGMENT}u;\nconst BIT_SLICE_PAST_ITS_DOMAIN: u32 = {}u;\n{}\n{GPU_VERIFIER_SHADER_SOURCE}",
+        verdict_bits::SLICE_PAST_ITS_DOMAIN,
         segment_expansion_code_wgsl_constants()
     )
 }
@@ -314,7 +361,7 @@ pub fn verifier_shader_source() -> String {
 /// GPU 核对代码的摘要：进核对表的键。
 #[must_use]
 pub fn gpu_verifier_digest() -> [u8; DIGEST_BYTES] {
-    let mut message = b"gpu-facts-verifier-v3\n".to_vec();
+    let mut message = b"gpu-facts-verifier-v4\n".to_vec();
     message.extend_from_slice(verifier_shader_source().as_bytes());
     sha256_digest(&message)
 }
@@ -352,7 +399,7 @@ impl<'card> GpuFactsVerifier<'card> {
     /// # Panics
     /// 同 [`Self::new_by_the_segment_expansions`]。
     #[must_use]
-    pub fn new(card: &'card GpuCard, facts: &FlowFacts) -> Self {
+    pub fn new(card: &'card GpuCard, facts: &crate::crash_facts::FlowFactsReadBack) -> Self {
         Self::new_by_the_segment_expansions(
             card,
             facts,
@@ -364,11 +411,12 @@ impl<'card> GpuFactsVerifier<'card> {
     /// `crate::crash_facts::verify_states_from_facts_by_the_segment_expansions`）。
     ///
     /// # Panics
-    /// 枚举写表超过掩码装得下的数；`segment_expansions` 与段数不一样长；展开了的段按它的拆法展开出的状态数与它的序号区间对不上（拆法给错了）。
+    /// 枚举写表超过掩码装得下的数；`segment_expansions` 与段数不一样长；展开了的不分片的段按它的拆法展开出的状态数与它的序号区间对不上
+    /// （拆法给错了）；分片的段片起点与它的各位对不上、或片越过了段的域（`crate::crash_facts::check_the_slice_starts_against_the_expansions`）。
     #[must_use]
     pub fn new_by_the_segment_expansions(
         card: &'card GpuCard,
-        facts: &FlowFacts,
+        facts: &crate::crash_facts::FlowFactsReadBack,
         segment_expansions: &[SegmentExpansionFact],
     ) -> Self {
         assert!(
@@ -403,12 +451,20 @@ impl<'card> GpuFactsVerifier<'card> {
         let mut segments =
             Vec::with_capacity(facts.segments.len() * FACTS_VERIFIER_WORDS_PER_SEGMENT);
         let mut segment_writes = Vec::new();
+        if let Err(segment_index) = check_the_slice_starts_against_the_expansions(
+            &facts.segments,
+            segment_expansions,
+            &facts.is_tearable,
+        ) {
+            panic!("段 {segment_index} 的片起点与它的各位对不上，或片越过了段的域：事实表坏了，重跑录入段");
+        }
         for (segment_index, (segment, expansion)) in
             facts.segments.iter().zip(segment_expansions).enumerate()
         {
             let states_of_the_segment = segment.states.end - segment.states.start;
             assert!(
                 states_of_the_segment == 0
+                    || segment.slice_start.is_some()
                     || expansion.state_count(segment, &facts.is_tearable)
                         == Some(states_of_the_segment),
                 "段 {segment_index} 的拆法（{expansion:?}）展开出的状态数与它的序号区间 {:?} 对不上",
@@ -422,6 +478,17 @@ impl<'card> GpuFactsVerifier<'card> {
             segment_writes.extend_from_slice(digit_writes);
             let group_first = u32::try_from(segment_writes.len()).expect("装得进");
             segment_writes.extend_from_slice(copy_on_write_group);
+            let (slice_digit_first, slice_digit_count) = match &segment.slice_start {
+                None => (NONE, 0),
+                Some(slice_start) => {
+                    let first = u32::try_from(segment_writes.len()).expect("装得进");
+                    segment_writes.extend(slice_start.digits.iter().map(|digit| u32::from(*digit)));
+                    (
+                        first,
+                        u32::try_from(slice_start.digits.len()).expect("装得进"),
+                    )
+                }
+            };
             segments.extend_from_slice(&[
                 digit_first,
                 u32::try_from(digit_writes.len()).expect("装得进"),
@@ -432,6 +499,8 @@ impl<'card> GpuFactsVerifier<'card> {
                 expansion.code(),
                 group_first,
                 u32::try_from(copy_on_write_group.len()).expect("装得进"),
+                slice_digit_first,
+                slice_digit_count,
             ]);
         }
         let mut units = Vec::with_capacity(facts.units.len() * FACTS_VERIFIER_WORDS_PER_UNIT);

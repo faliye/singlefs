@@ -590,8 +590,8 @@ pub struct MountedReadOnly {
 /// `journal` 仍是对原来所选根扫环、施加那一趟的报告。
 ///
 /// **扫环只在这一步发生一次**：之后每一次 [`OpenFileForRead::read_at`] 都不碰 journal 环。
-/// 层 0 的每个恢复结果上也能跑这一条——`reader` 换成那个崩溃镜像即可（并行线二验收第 3 条；
-/// 枚举那一半归 checker 档，由主 agent 经门禁 checker-tier-layer0-replay 跑）。
+/// 崩溃点重放的每个恢复结果上也能跑这一条——`reader` 换成那个崩溃镜像即可（并行线二验收第 3 条；
+/// 枚举那一半归 checker 档，由主 agent 经门禁 checker-tier-crash-point-replay 跑）。
 ///
 /// # Errors
 /// 见 [`MountReadOnlyFailure`]。

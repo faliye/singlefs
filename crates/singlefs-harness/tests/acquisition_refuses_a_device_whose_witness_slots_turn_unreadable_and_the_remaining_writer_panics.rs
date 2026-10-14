@@ -9,7 +9,7 @@
 //! 这一核在第一道屏障之前做一遍（拒的时候录制流一步不多），屏障之后取见证值时再读一遍，对不上就不写。
 //!
 //! 二、代码审阅 38 条里落在写者这一侧、今天还开着的几处 panic 面（实审 A2c 报告「停下交主 agent 的」第 4 条、
-//! C476 普查「缺口」表 `inode_tree.rs:88` 那一行）：零单元发布判一次记录条数上限；inode 叶容器装满 233 条那道断言靠读者的哪一道判定。
+//! C476 普查「缺口」表 `INODE_LEAF_RECORDS - records.len()` 那一行）：零单元发布判一次记录条数上限；inode 叶容器装满 233 条那道断言靠读者的哪一道判定。
 //!
 //! 盘：第一节用 `common` 的文件镜像（录制流开着，`DiskSnapshot` 比录制流步数），第二节用内存稀疏盘（改盘上字节之后重封每一道校验和）。
 mod common;
@@ -648,7 +648,7 @@ fn a_zero_unit_publish_on_a_ring_with_no_record_in_flight_is_refused_before_any_
 /// 场景：第一个文件那一版 inode 树唯一那片叶容器的头改成装 234 条、每条 140 字节（记录数住 69、声明长度住 8，载荷与头校验和重封），
 /// inode 树根里指着它的那条指针、树表、映射树与根记录的校验和都重算：读者按指针读得到它、校验和对得上。
 /// 预期：可写挂载在任何写之前报 `RecoveryFailure::UnitMalformed { what: "inode 叶容器" }`（记录区越过单元末尾），两块盘逐字节不变。
-/// 这是 C476 普查「缺口」表 `inode_tree.rs:88` 那一行（`InodeLeafContainer::free_record_slots` 的 233 条上限）从盘上走不到的依据：
+/// 这是 C476 普查「缺口」表 `INODE_LEAF_RECORDS - records.len()` 那一行（`InodeLeafContainer::free_record_slots` 的 233 条上限）从盘上走不到的依据：
 /// 读者判记录宽 140（`recovery::inode_leaf_container_judged_against_its_entry`）、记录区不越过单元末尾（`unit::parse_packed_unit`），
 /// 于是盘上读来的一片至多 ⌊(32768 − 107 − 29) ÷ 140⌋ = 233 条。
 #[test]

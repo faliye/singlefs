@@ -11,7 +11,8 @@
 //! 多盘域 M、M6、MC（登记 `research/prompts/e165-r2-prereg.md` 5.3，第三段）只在 `--profile r2 --family multi_disk` 时跑：每条记录在 0、1 号盘
 //! 同一落点各一份、各自落或没落，「完整在盘上」取任一份，直接建表先 0 号盘再 1 号盘；`--family all` 仍只含合法历史与对抗两族。
 //! 择根与重放合判一族 K、K9、KW、KA（登记 `research/prompts/e165-r3-prereg.md` 5.3 至 5.5）只在 `--profile r3 --family root_choice` 时跑：真 `choose_root`、`scan_journal`、`replay_journal` 三步串起来，判据 KJ0 至 KJ3 各报各的；`--family all` 不含它。带读故障的择根合判一族 KF、KF3、KF9、KFW、KG、KA（登记 `research/prompts/e165-r4-prereg.md` 5.3 至 5.6）只在 `--profile r4 --family root_choice_faults` 时跑：同样调真三步，多出每块盘两个系统配置槽、挂载开头的读故障、可写挂载读到的更新状态读不出那道闸（实现的取甲）与被判时的读故障，判据加 KJ1T，`--profile r4` 的其余族与 r3 档相同。
-//! 线程数取环境变量 `E165_THREADS`，没设取 `SINGLEFS_THREAD_CAP`，都没设取 `available_parallelism`；计数与线程数无关。
+//! 线程数取环境变量 `E165_THREADS`，没设取每台默认重活线程数（`SINGLEFS_THREAD_CAP`，再没设取 `.claude/heavy-thread-default` 的登记值）；
+//! 内联单测用同一个取法；计数与线程数无关。
 //! 产物是 `E7RESULT` 行，收尾 `name=done emitted=N`；耗时另打 `E7TIMING` 行，不进逐字比对。
 //! `light` 档的界：L 到 9、U 到 5、A 到 3，其余同第一段（2026-10-01 在 10 线程上量到每态挂钟 0.24–1.2 微秒，每个域取到 3 秒之内）。
 //!
@@ -68,21 +69,21 @@ use singlefs_harness::sha256::sha256_hexadecimal;
 
 // ── 本地常量：值抄自 kb，不从 `crates/` 引；[`cross_check_local_constants_against_the_implementation`] 逐个回比（登记第三节、停机条款 H2）。
 
-/// journal 记录字节数。抄自 `.claude/kb/layout/01-first-txn.md:45`（「journal 环……记录 4096」）与
-/// `.claude/kb/decisions/23-journal的角色与格式.md:313`（已定项 12：记录尺寸取 4 KiB）。
+/// journal 记录字节数。抄自 `.claude/kb/layout/01-first-txn.md`「journal 环，两盘互为镜像，记录 4096」那一行与
+/// D23（journal 的角色与格式） 已定项 12「记录尺寸取 4 KiB」。
 const LOCAL_JOURNAL_RECORD_BYTES: u64 = 4096;
-/// 在飞上限的安全系数 F。抄自 `.claude/kb/decisions/23-journal的角色与格式.md:492`（已定项 18：「在飞记录数上限 = 环槽数 ÷ F」，默认环下 196608 ÷ 3）。
+/// 在飞上限的安全系数 F。抄自 D23（journal 的角色与格式） 已定项 18「在飞记录数上限的取值与语义」（「在飞记录数上限 = 环槽数 ÷ F」，默认环下 196608 ÷ 3）。
 const LOCAL_JOURNAL_SAFETY_FACTOR: u64 = 3;
-/// journal 环起点槽号。抄自 `.claude/kb/layout/01-first-txn.md:45`（环从 16 MiB 起：16 MiB ÷ 16384 = 槽 1024）。
+/// journal 环起点槽号。抄自 `.claude/kb/layout/01-first-txn.md`「journal 环，两盘互为镜像，记录 4096」那一行（环从 16 MiB 起：16 MiB ÷ 16384 = 槽 1024）。
 const LOCAL_JOURNAL_RING_START_SLOT: u64 = 1024;
-/// 落点粒度：一个槽 16384 字节。抄自 `.claude/kb/layout/01-first-txn.md:45` 那一行的 16 MiB 与槽 1024 之比。
+/// 落点粒度：一个槽 16384 字节。抄自 `.claude/kb/layout/01-first-txn.md`「journal 环，两盘互为镜像，记录 4096」那一行的 16 MiB 与槽 1024 之比。
 const LOCAL_SLOT_BYTES: u64 = 16384;
-/// 第一个 jsn 计数器。抄自 `.claude/kb/invariants.md:89`（I-8.6：落点式 `(计数器 − 1) mod 槽数 × 4096` 从计数器 1 起）。
+/// 第一个 jsn 计数器。抄自 `crates/singlefs-checker/invariants/03-journal.md`「`| I-8.6 |`」那一行（I-8.6：落点式 `(计数器 − 1) mod 槽数 × 4096` 从计数器 1 起）。
 const LOCAL_FIRST_JOURNAL_COUNTER: u64 = 1;
-/// 索引节点单元字节数。抄自 `.claude/kb/decisions/08-核心索引结构.md:43`（`format-const: NODE_BYTES = 16384`）。
+/// 索引节点单元字节数。抄自 `.claude/kb/decisions/08-核心索引结构.md` 里的 `format-const: NODE_BYTES = 16384`。
 const LOCAL_INDEX_NODE_UNIT_BYTES: u64 = 16384;
 /// 点名项里索引节点的类标签（码 2）。抄自 `.claude/kb/decisions/23-journal的角色与格式.md` 已定项 17 的点名项字段表「类标签 1」与
-/// `.claude/kb/decisions/08-核心索引结构.md:43` 所在那一条（码 2 是索引节点）。
+/// D8（核心索引结构） 已定项 2「节点大小 16 KiB，钉成常量」那一条（码 2 是索引节点）。
 const LOCAL_UNIT_CLASS_INDEX_NODE: u8 = 2;
 
 /// 大环槽数（登记 5.1：64 槽，在飞上限 21）。
@@ -111,7 +112,6 @@ const MEMORY_DISK_DEVICE_BYTES: u64 = 1 << 40;
 const NAMED_UNIT_FIRST_SLOT: u64 = 60_000;
 
 const THREADS_ENVIRONMENT_VARIABLE: &str = "E165_THREADS";
-const SHARED_THREAD_CAP_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_THREAD_CAP";
 
 /// 环几何：只有槽数一个旋钮（登记第八节）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -9887,7 +9887,7 @@ struct RootChoicePublishPlan {
     checkpoint_txg: u64,
     publish_ordinal: u64,
     first_counter: u64,
-    first_transaction: u64,
+    new_pool_file_creation: u64,
     record_count: usize,
     commit_marker_bits: u32,
     /// 本实例写的上一条记录的 487 字节头算出的链值；本实例第一条记录没有，取 0（I-8.6）。
@@ -9904,7 +9904,7 @@ fn root_choice_publish_material(plan: &RootChoicePublishPlan) -> RootChoicePubli
     let segment = NewRootSegment::of_timeline_publish(plan.publish_ordinal, plan.checkpoint_txg);
     let mut material = root_material_without_records(plan.instance, plan.checkpoint_txg, segment);
     material.is_user_publish = plan.is_user_publish;
-    let mut transaction = plan.first_transaction;
+    let mut transaction = plan.new_pool_file_creation;
     let mut back_chain = plan.previous_chain_value.unwrap_or(0);
     for record_position in 0..plan.record_count {
         let is_last_record_of_the_publish = record_position + 1 == plan.record_count;
@@ -11255,7 +11255,7 @@ impl RootChoiceMountCursor {
             checkpoint_txg: self.next_checkpoint_txg,
             publish_ordinal: publishes_started,
             first_counter: self.next_counter,
-            first_transaction: self.next_transaction,
+            new_pool_file_creation: self.next_transaction,
             record_count,
             commit_marker_bits,
             previous_chain_value: self.previous_chain_value,
@@ -17605,21 +17605,39 @@ fn generator_and_criteria_fields_of_the_run_rows(run_profile: RunProfile) -> Str
     }
 }
 
-/// 线程数：`E165_THREADS`，没设取 `SINGLEFS_THREAD_CAP`，都没设取 `available_parallelism`。
+/// 线程数：`E165_THREADS`，没设取每台默认重活线程数（`SINGLEFS_THREAD_CAP`，再没设取 `.claude/heavy-thread-default` 的登记值）。
 fn thread_count_from_the_environment() -> usize {
-    for variable in [
-        THREADS_ENVIRONMENT_VARIABLE,
-        SHARED_THREAD_CAP_ENVIRONMENT_VARIABLE,
-    ] {
-        if let Ok(text) = env::var(variable) {
-            return text
-                .parse::<usize>()
-                .ok()
-                .filter(|thread_count| *thread_count > 0)
-                .unwrap_or_else(|| panic!("{variable} 要是正整数，收到的是「{text}」"));
-        }
+    thread_count_of_the_variable_values(
+        env::var(THREADS_ENVIRONMENT_VARIABLE).ok().as_deref(),
+        singlefs_harness::numeric_environment_variable::process_environment_variable(
+            singlefs_harness::heavy_threads::THREAD_CAP_ENVIRONMENT_VARIABLE,
+        )
+        .as_deref(),
+    )
+}
+
+/// [`thread_count_from_the_environment`] 的判法，两个变量的值由调用方给（`None` 是没设）：`E165_THREADS` 设了照它，
+/// 没设经 `singlefs_harness::heavy_threads` 取每台默认重活线程数（`SINGLEFS_THREAD_CAP` 那一级在那里，这里不另留一份）。
+///
+/// # Panics
+/// `E165_THREADS` 设了而不是正整数；落到默认时 `SINGLEFS_THREAD_CAP` 设了而不是正整数。
+fn thread_count_of_the_variable_values(
+    e165_threads_value: Option<&str>,
+    thread_cap_value: Option<&str>,
+) -> usize {
+    match e165_threads_value {
+        Some(text) => text
+            .parse::<usize>()
+            .ok()
+            .filter(|thread_count| *thread_count > 0)
+            .unwrap_or_else(|| {
+                panic!("{THREADS_ENVIRONMENT_VARIABLE} 要是正整数，收到的是「{text}」")
+            }),
+        None => singlefs_harness::heavy_threads::default_heavy_threads_of_the_cap_value(
+            thread_cap_value,
+        )
+        .get(),
     }
-    std::thread::available_parallelism().map_or(1, std::num::NonZero::get)
 }
 
 fn main() {
@@ -17919,6 +17937,18 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 线程数：`E165_THREADS` 先读；没设读 `SINGLEFS_THREAD_CAP`；都没设取登记的每台默认重活线程数，不取本机核数。
+    #[test]
+    fn thread_count_reads_e165_threads_first_then_the_heavy_thread_default() {
+        assert_eq!(thread_count_of_the_variable_values(Some("3"), Some("5")), 3);
+        assert_eq!(thread_count_of_the_variable_values(None, Some("5")), 5);
+        assert_eq!(
+            thread_count_of_the_variable_values(None, None),
+            singlefs_harness::heavy_threads::registered_heavy_threads().get(),
+            "都没设取 .claude/heavy-thread-default 的登记值"
+        );
+    }
 
     #[test]
     fn local_constants_equal_the_implementation_constants_and_the_in_flight_limits_are_21_3_2() {
@@ -18273,10 +18303,10 @@ mod tests {
     /// 一种建表法、一种盘次序、一种标记奇偶；每个单元跑出对照的判据恰好是那条驱动产物里 `name=control` 的那一份（写死成字面，
     /// 不从 `is_judged_under`、`Criterion::family` 现算，那是被核的东西），且读数全红；全部单元并起来罩全表。不把几档、几族并起来判：
     /// 并起来时一个单元少跑的对照会被别的单元的读数补上（判决 `research/prompts/m3-formal-code-b37-r1-main-verification.md` B1-甲、
-    /// `research/prompts/m3-formal-code-b37-r2-main-verification.md` C3-甲）。对抗一族那几行要扫到 n = 3，用上全部核。
+    /// `research/prompts/m3-formal-code-b37-r2-main-verification.md` C3-甲）。对抗一族那几行要扫到 n = 3，线程数照装置的取法（[`thread_count_from_the_environment`]）。
     #[test]
     fn every_criterion_has_a_positive_control_and_every_control_is_red() {
-        let thread_count = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
+        let thread_count = thread_count_from_the_environment();
         let even = MarkerParity::EvenVersionsWrittenByTheUnmountSequence;
         let odd = MarkerParity::OddVersionsWrittenByTheUnmountSequence;
         let labels: std::collections::BTreeSet<&str> = Criterion::ALL
@@ -18676,8 +18706,9 @@ mod tests {
         }
     }
 
-    /// 钉住的表 `.claude/gate.d/e165-pinned-red-examples.tsv` 第 20、27 行的 ①②③⑦ 原样抄来：拿 ⑦ 重算的指纹要等于 ①。
-    /// 第 27 行的 state= 在 ;first= 之后还有 ;expected=，截掉的是 ;first= 起的整段。
+    /// 钉住的表 `.claude/gate.d/e165-pinned-red-examples.tsv` 里 ⑤ 指 2026-10-01 第二段红例账、① 为下面两个指纹的行，①②③⑦ 原样抄来
+    /// （A 域那样的行有两行，⑥ 不同、①②③⑦ 相同）：拿 ⑦ 重算的指纹要等于 ①。
+    /// A 域那一行的 state= 在 ;first= 之后还有 ;expected=，截掉的是 ;first= 起的整段。
     #[test]
     fn the_input_fingerprint_recomputed_from_a_pinned_state_row_equals_the_one_the_table_carries() {
         let cross_instance_state_row = "E7RESULT name=state domain=X ring_slots=64 n=2 ordinal=2 counters=states,j6_premise_holds_judged state=shape=1c0/next_instance:1c0;on_disk=-,good;residue_at=none;chosen=0;farthest=0;verify=true;first=returned:txg100:watermark1000:applied0";
@@ -18740,7 +18771,7 @@ mod tests {
         "E7RESULT name=state domain=X ring_slots=64 n=2 ordinal=2 counters=states,J1,J2,J3,J4,j6_premise_holds_judged,off_timeline_landings state=shape=1c0/next_instance:1c0;on_disk=-,good;residue_at=none;chosen=0;farthest=0;verify=true;first=returned:txg101:watermark1001:applied1",
     ];
 
-    /// 那一行 ⑤ 指的红例账 `research/results/e165-replay-bounded-enumeration-2026-10-01-segment2-red-examples.tsv` 第 2 行的十三段（原样抄来）。
+    /// 那一行 ⑤ 指的红例账 `research/results/e165-replay-bounded-enumeration-2026-10-01-segment2-red-examples.tsv` 里 `tsv-23` 那一行的十三段（原样抄来）。
     const LEDGER_COLUMNS_OF_THE_PINNED_CROSS_INSTANCE_ROW: [&str; 13] = [
         "tsv-23",
         "23+355",
@@ -19074,7 +19105,7 @@ mod tests {
     #[test]
     fn the_root_choice_state_counts_of_the_smallest_cells_equal_the_pinned_values_and_the_kw_wrap_cells_read_four_and_one(
     ) {
-        let thread_count = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
+        let thread_count = thread_count_from_the_environment();
         for (domain, mounts, user_publishes) in [
             (RootChoiceDomain::BigRing, 1, 0),
             (RootChoiceDomain::BigRing, 1, 1),
@@ -19139,7 +19170,7 @@ mod tests {
     /// 每条判据在每个被判的格上各有对照读数、都红；读数条数照格数逐条判据数（删掉某条判据的某一行对照，条数对不上）。
     #[test]
     fn every_root_choice_criterion_has_a_positive_control_and_every_control_is_red() {
-        let thread_count = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
+        let thread_count = thread_count_from_the_environment();
         let big_ring_cells: Vec<RootChoiceCell> = [(1, 0), (1, 2), (1, 3)]
             .into_iter()
             .map(|(mounts, user_publishes)| RootChoiceCell {

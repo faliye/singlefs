@@ -11,10 +11,16 @@
 //! 池是只做过 mkfs 的池，根照 mkfs 那条根改几项、重新编码写进 mkfs 那条根之后空着的槽（择根只读根环，不看别的结构）；
 //! 只读挂载那一格要沿根读中央映射树与树表，用建过新池新建文件的池，根照新池新建文件那条根改。
 mod common;
+mod common_images_for_the_checker_tier;
+#[path = "common_images_for_the_checker_tier/root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance.rs"]
+mod scenarios_of_root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance;
 
-use common::{build_pool, format_pool, parameters};
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
+use common::{build_pool, parameters};
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use scenarios_of_root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance::{
+    mkfs_pool_with_two_empty_slots_after_its_root, ring_slot_holds_a_self_verified_root,
+    write_root_into_ring_slot, MkfsPoolWithTwoEmptySlotsAfterItsRoot,
+};
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::mount::mount_writable;
@@ -22,104 +28,24 @@ use singlefs_core::mounted_read::mount_read_only;
 use singlefs_core::recovery::{
     choose_root, choose_system_configuration,
     effective_rollback_floor_rereading_the_newest_instance_table_once, every_root_ring_slot,
-    instance_table_chain_of_root, read_root_ring_slot, readable_roots_with_ring_slots, recover,
-    JournalPolicy, RecoveryOutcome, RootRingSlotReading,
+    instance_table_chain_of_root, readable_roots_with_ring_slots, recover, JournalPolicy,
+    RecoveryOutcome,
 };
 use singlefs_core::root_record::RootRecord;
-use singlefs_core::root_ring::{slot_offset, RootRingSlot};
 use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 
 /// txg 大的那条根（排在前面的槽里）的实例代号：比另一条低。
 const INSTANCE_OF_THE_NEWER_CHECKPOINT_TXG_ROOT: InstanceGeneration = InstanceGeneration(1);
+
 /// 实例代号高的那条根（排在后面的槽里）的实例代号。
 const INSTANCE_OF_THE_HIGHER_INSTANCE_ROOT: InstanceGeneration = InstanceGeneration(2);
+
 /// txg 大的那条根比 mkfs 那条根新几个 txg。
 const CHECKPOINT_TXGS_OF_THE_NEWER_CHECKPOINT_TXG_ROOT_ABOVE_THE_MKFS_ROOT: u64 = 2;
+
 /// 实例代号高的那条根比 mkfs 那条根新几个 txg（比上一条少一个）。
 const CHECKPOINT_TXGS_OF_THE_HIGHER_INSTANCE_ROOT_ABOVE_THE_MKFS_ROOT: u64 = 1;
-
-fn ring_slot_holds_a_self_verified_root(
-    image: &MemoryPool,
-    system_configuration: &SystemConfiguration,
-    ring_slot: RootRingSlot,
-) -> bool {
-    match read_root_ring_slot(
-        image,
-        &system_configuration.immutable.region_devices,
-        &system_configuration.immutable.sizes,
-        &system_configuration.immutable.filesystem_identifier,
-        ring_slot,
-    ) {
-        RootRingSlotReading::SelfVerified(_) => true,
-        RootRingSlotReading::Bad(_) => false,
-    }
-}
-
-fn write_root_into_ring_slot(
-    image: &mut MemoryPool,
-    system_configuration: &SystemConfiguration,
-    ring_slot: RootRingSlot,
-    root: &RootRecord,
-) {
-    let immutable = &system_configuration.immutable;
-    let device = immutable.region_devices[usize::try_from(ring_slot.region).expect("区域号")];
-    let root_slot_bytes = usize::try_from(immutable.sizes.physical_block_size).expect("根槽宽");
-    image.devices.get_mut(&device).expect("池里有这块盘").write(
-        slot_offset(ring_slot, immutable.sizes.fixed_structure_slot_spacing),
-        &root.to_slot(root_slot_bytes),
-    );
-}
-
-/// 只做过 mkfs 的池：mkfs 那条根、读根环次序里它之后第一个与最后一个空槽。
-struct MkfsPoolWithTwoEmptySlotsAfterItsRoot {
-    image: MemoryPool,
-    system_configuration: SystemConfiguration,
-    mkfs_root: RootRecord,
-    earlier_empty_slot: RootRingSlot,
-    later_empty_slot: RootRingSlot,
-}
-
-fn mkfs_pool_with_two_empty_slots_after_its_root(
-    tag: &str,
-) -> MkfsPoolWithTwoEmptySlotsAfterItsRoot {
-    let image = format_pool(tag).memory_pool();
-    let system_configuration =
-        choose_system_configuration(&image).expect("mkfs 之后择得出系统配置");
-    let mkfs_root = choose_root(&image, &system_configuration).expect("mkfs 写了一条根");
-    let ring_slots = every_root_ring_slot(&system_configuration.immutable.sizes);
-    let mkfs_root_slot_position = ring_slots
-        .iter()
-        .position(|ring_slot| {
-            ring_slot_holds_a_self_verified_root(&image, &system_configuration, *ring_slot)
-        })
-        .expect("根环里有 mkfs 那条根");
-    let empty_slots_after_the_mkfs_root: Vec<RootRingSlot> = ring_slots
-        [mkfs_root_slot_position + 1..]
-        .iter()
-        .copied()
-        .filter(|ring_slot| {
-            !ring_slot_holds_a_self_verified_root(&image, &system_configuration, *ring_slot)
-        })
-        .collect();
-    let earlier_empty_slot = *empty_slots_after_the_mkfs_root
-        .first()
-        .expect("mkfs 那条根之后有空槽");
-    let later_empty_slot = *empty_slots_after_the_mkfs_root
-        .last()
-        .expect("mkfs 那条根之后有空槽");
-    assert!(
-        earlier_empty_slot < later_empty_slot,
-        "要两个不同的空槽，一前一后"
-    );
-    MkfsPoolWithTwoEmptySlotsAfterItsRoot {
-        image,
-        system_configuration,
-        mkfs_root,
-        earlier_empty_slot,
-        later_empty_slot,
-    }
-}
 
 /// 前一个空槽写 txg 大、实例代号低的根，后一个空槽写实例代号高、txg 小的根；两条除这两项之外照抄 mkfs 那条根。
 struct PoolWhereTheNewerCheckpointTxgSitsInAnEarlierSlot {
@@ -445,45 +371,11 @@ fn of_two_roots_with_the_same_choice_key_the_effective_floor_reads_the_instance_
     );
 }
 
-/// 同一份造法（择新键完全相同的两条根：前面是 mkfs 那条，后面那条只把实例表指针两条位置条目的校验和改掉），问池级 checker：
-/// 它择最新根走读（I-7.2「最新的根走得完」），键相同取读根环次序里前面那条，与 `choose_root` 同（代码轮第二轮判决辩方 D3）。
-/// 前面那条的实例表读得出，I-7.2 成立；取了后面那条，实例表读不出，I-7.2 判违例。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance::of_two_roots_with_the_same_choice_key_the_pool_checker_walks_the_root_in_the_earlier_slot_as_choose_root_does`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn of_two_roots_with_the_same_choice_key_the_pool_checker_walks_the_root_in_the_earlier_slot_as_choose_root_does(
 ) {
-    let MkfsPoolWithTwoEmptySlotsAfterItsRoot {
-        mut image,
-        system_configuration,
-        mkfs_root,
-        earlier_empty_slot: _,
-        later_empty_slot,
-    } = mkfs_pool_with_two_empty_slots_after_its_root("tied-choice-key-pool-checker");
-    let mut same_key_root_with_an_unreadable_instance_table = mkfs_root;
-    for location in &mut same_key_root_with_an_unreadable_instance_table
-        .instance_table
-        .locations
-    {
-        location.unit_checksum = !location.unit_checksum;
-    }
-    write_root_into_ring_slot(
-        &mut image,
-        &system_configuration,
-        later_empty_slot,
-        &same_key_root_with_an_unreadable_instance_table,
-    );
-    assert_eq!(
-        choose_root(&image, &system_configuration),
-        Some(mkfs_root),
-        "实现择根取前面那条（mkfs 那条）"
-    );
-
-    let newest_root_walk_verdict = check_pool_image(&image)
-        .into_iter()
-        .find(|(invariant, _)| *invariant == "I-7.2")
-        .map(|(_, verdict)| verdict);
-    assert_eq!(
-        newest_root_walk_verdict,
-        Some(InvariantVerdict::Holds),
-        "checker 择最新根取读根环次序里前面那条（实例表读得出），走得完；取后面那条（实例表读不出）I-7.2 就判违例"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance::of_two_roots_with_the_same_choice_key_the_pool_checker_walks_the_root_in_the_earlier_slot_as_choose_root_does,
     );
 }

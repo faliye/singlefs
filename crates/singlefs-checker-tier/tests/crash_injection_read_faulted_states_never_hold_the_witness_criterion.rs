@@ -1,4 +1,4 @@
-//! checker 档模块：layer0_progress、crash_injection、crash_amplification、gpu_unit_checks
+//! checker 档模块：crash_point_replay_progress、crash_injection、crash_library、crash_amplification、gpu_unit_checks
 //! C696（崩溃注入的读故障一支在随机历史里从没触发）判别力自证里「第三截调用点写死成 NoneInjected」那一种接错，在随机历史上是等价变异
 //! （第 26 批 C696 设计调查报告第三节）：写死之后只在三样都成立的态上改判定——第一次崩溃那一态注入过读故障、
 //! 它上面那次可写挂载途中的二次崩溃镜像上再挂以判据 N-配置 拒、那个二次崩溃镜像上判据 W（`judge_writable_mount_refusal_of_a_crash_state`
@@ -11,11 +11,9 @@
 //! 段内只摆前缀、第三截只摆挂载写的前缀；更宽的范围没量。
 //! 同一批崩溃态与二次崩溃镜像另判池级 checker、两遍恢复、记录核对器（用户 2026-10-10 定「读故障那一项也接给定状态表，加判镜像那几样」）：
 //! 交给定状态表（`crash_injection::GivenStatesOfATable`，基线是 mkfs 之后的池；第三截一张表在历史与挂载之间断开），编进 `verdict-store`
-//! 特性时经崩溃点重放的引擎（照本机多机配置走 GPU 或 CPU、配了 GPU 时 CPU 同一批也判逐状态比），没编进来时在 CPU 上就地判；一个都不许红。
+//! 特性时经崩溃点重放的引擎（照本机多机配置只走 GPU 或只走 CPU，表先写进判定库、从库里读回来判），没编进来时在 CPU 上就地判；一个都不许红。
 //! W 照旧在 CPU 上判（豁免表 `witness-criterion-w` 那一行）。
 
-#[cfg(not(feature = "verdict-store"))]
-use singlefs_checker_tier::crash_injection::GivenStatesJudgedOnTheCpuInPlace;
 use singlefs_checker_tier::crash_injection::{
     GivenStatesJudge, GivenStatesOfATable, HistoryAfterTheMakeFilesystem,
 };
@@ -48,7 +46,10 @@ use singlefs_checker_tier::crash_amplification::{
     FaultPutOnTheGpuSide, GivenStatesEngine, GivenStatesItem, GivenStatesRun,
 };
 #[cfg(feature = "verdict-store")]
-use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
+
+#[cfg(feature = "gpu")]
+mod common_gpu_cards_of_the_caller;
 
 const WIDTH: HistoryDeviceWidth = HistoryDeviceWidth::UnitAreaOf384Slots;
 const DEVICES: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
@@ -383,28 +384,57 @@ fn repository_root() -> std::path::PathBuf {
         .to_path_buf()
 }
 
-/// 前 `histories` 段经崩溃点重放的引擎判给定状态表（`fault` 只给证明对照会红的那条用例）。
+/// 起引擎时拿不拿改环境的锁（同 `crash_injection_campaign.rs` 的 `EngineStart`）：拿着 `CrashAmplificationEnvironment` 的调用方不许再拿
+/// （同一把锁，不可重入），别的调用方要拿。引擎起步不是一下读完环境（先读多机配置与分片，照树算完结论版本才读库目录），读到一半同一个进程里
+/// 别的用例拿着守卫换了多机配置、分片与库目录，这一趟就读成一半调用方的、一半那条用例的：分片照调用方的、库是那条用例起跑清空的那一份，
+/// 两条用例往同一份库里判同一批键相同的表（项名、种子与规模、表名都相同），那条用例「从空库起、一张都不复用」的账就不成立。
+#[cfg(feature = "verdict-store")]
+#[derive(Clone, Copy)]
+enum EngineStart {
+    #[cfg_attr(
+        not(feature = "gpu"),
+        allow(
+            dead_code,
+            reason = "拿着环境守卫起引擎的只有带 gpu 特性的 GPU 与 CPU 两趟对拍"
+        )
+    )]
+    UnderTheCallersEnvironmentGuard,
+    HoldingTheEnvironmentLock,
+}
+
+/// 前 `histories` 段经崩溃点重放的引擎判给定状态表（`fault` 只给证明 GPU 与 CPU 两趟的结论会不同的那条用例）。
 #[cfg(feature = "verdict-store")]
 fn read_faulted_states_through_the_given_states_engine(
     histories: usize,
     fault: FaultPutOnTheGpuSide,
+    start: EngineStart,
 ) -> (ReadFaultedStatesOfTheBatch, GivenStatesRun) {
-    let engine = GivenStatesEngine::start_from_environment_putting_a_fault_on_the_gpu_side(
-        GivenStatesItem {
-            item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale: seeds_and_scale_of(histories),
-        },
-        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root(),
-        fault,
-    )
-    .expect("崩溃点重放的引擎照本机配置起得来（配了 GPU 卡用不上、结论版本与编译时对不上都在这里红，不退回 CPU）");
+    let start_the_engine = || {
+        GivenStatesEngine::start_from_environment_putting_a_fault_on_the_gpu_side(
+            GivenStatesItem {
+                item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
+                setting_file: THIS_FILE.to_string(),
+                seeds_and_scale: seeds_and_scale_of(histories),
+            },
+            &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &repository_root(),
+            fault,
+        )
+        .expect("崩溃点重放的引擎照本机配置起得来（配了 GPU 卡用不上、结论版本与编译时对不上都在这里红，不退回 CPU）")
+    };
+    let engine = match start {
+        EngineStart::UnderTheCallersEnvironmentGuard => start_the_engine(),
+        EngineStart::HoldingTheEnvironmentLock => {
+            let _one_test_at_a_time =
+                singlefs_checker_tier::crash_amplification::one_test_changes_the_environment_at_a_time();
+            start_the_engine()
+        }
+    };
     let batch = judge_the_read_faulted_states(&engine, histories);
     (batch, engine.finish())
 }
 
-/// 前 `histories` 段：编进 `verdict-store` 特性时经崩溃点重放的引擎（对照比不上、GPU 判不了都在这里红），没编进来时在 CPU 上就地判。
+/// 前 `histories` 段：编进 `verdict-store` 特性时经崩溃点重放的引擎（GPU 判不了都在这里红），没编进来时在 CPU 上就地判。
 /// 引擎那一趟被叫停、或两台分片而别的机器的表还没导回来时这一批不作数：打「本次未跑」那一行（`test_name` 是用例名）、交 `None`。
 fn read_faulted_states_through_the_crash_point_replay_entry(
     histories: usize,
@@ -416,11 +446,12 @@ fn read_faulted_states_through_the_crash_point_replay_entry(
         let (batch, run) = read_faulted_states_through_the_given_states_engine(
             histories,
             FaultPutOnTheGpuSide::NoFault,
+            EngineStart::HoldingTheEnvironmentLock,
         );
         assert_eq!(
             run.red_items(),
             Vec::<String>::new(),
-            "给定状态表那一路判红（对照比不上、GPU 判不了）"
+            "给定状态表那一路判红（GPU 判不了）"
         );
         if run.stopped_early {
             println!(
@@ -430,6 +461,19 @@ fn read_faulted_states_through_the_crash_point_replay_entry(
                     &format!(
                         "叫停了（SINGLEFS_CRASH_AMPLIFICATION_STOP_FILE 指的文件在）：取了 {} 段就停，判过的表在库里",
                         batch.histories_taken
+                    )
+                )
+            );
+            return None;
+        }
+        if run.recorded_only() {
+            println!(
+                "{}",
+                gpu_not_run_line(
+                    test_name,
+                    &format!(
+                        "只跑了录入段（SINGLEFS_CRASH_AMPLIFICATION_STAGE=record）：{} 张给定状态表写进库、没判，判段那一趟从库里读回判",
+                        run.tally.tables_recorded_only
                     )
                 )
             );
@@ -449,14 +493,6 @@ fn read_faulted_states_through_the_crash_point_replay_entry(
             return None;
         }
         Some(batch)
-    }
-    #[cfg(not(feature = "verdict-store"))]
-    {
-        let _ = test_name;
-        Some(judge_the_read_faulted_states(
-            &GivenStatesJudgedOnTheCpuInPlace,
-            histories,
-        ))
     }
 }
 
@@ -523,87 +559,182 @@ fn the_first_read_faulted_history_judged_through_the_crash_point_replay_entry_ho
     );
 }
 
-/// 开 GPU 的头一段历史：这一趟自己写一份开 GPU 的多机配置、在环境守卫里跑，库是临时的；`fault` 塞在 GPU 那一侧。
+/// 开 GPU 的头一段历史：这一趟自己写一份开 GPU 的多机配置、在环境守卫里跑；`fault` 塞在 GPU 那一侧。库是家目录下流水线单元测试那一类里
+/// 以用例标签命名的那一份、起跑先清空、跑完留着：不用给定状态表那一类的长期库——塞了故障的那一趟会把错的 GPU 结论存进去、下一趟复用，
+/// 一致那一趟又会把上一趟判过的全复用、一个状态都不在卡上判。
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 fn the_first_read_faulted_history_judged_on_the_gpu(
     tag: &str,
     fault: FaultPutOnTheGpuSide,
 ) -> (ReadFaultedStatesOfTheBatch, GivenStatesRun) {
     use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
-    let directory = std::env::temp_dir().join(format!(
-        "singlefs-read-faulted-given-states-on-the-gpu-{tag}-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&directory);
-    std::fs::create_dir_all(&directory).expect("建得了临时目录");
+    let directory =
+        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
+            &format!("read-faulted-given-states-on-the-gpu-{tag}"),
+        )
+        .expect("流水线单元测试那一类里这条用例的目录");
+    let library = directory.join("library");
     let configuration = directory.join("multi-host-with-gpu.env");
-    // 清场之下要清场之后那一份显卡先后：照抄调用方给这个进程的那一份（用例自己写上；不读此刻的环境）
-    let cards = singlefs_checker_tier::crash_amplification::card_priority_lines_of_the_caller(
-        &repository_root(),
-    )
-    .expect("本机的多机配置读得了");
-    std::fs::write(&configuration, format!("ENABLE_GPU=1\n{cards}")).expect("写得了开 GPU 的配置");
-    let environment = CrashAmplificationEnvironment::cleared_then_set(&[(
-        "SINGLEFS_MULTI_HOST_CONFIG",
-        configuration.as_os_str(),
-    )]);
-    let judged =
-        read_faulted_states_through_the_given_states_engine(HISTORIES_OF_THE_SMALL_BATCH, fault);
+    std::fs::write(&configuration, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
+    // 清场之下要清场之后那一份显卡先后：调用方给这个进程的那一份经环境变量交给引擎（不读此刻的环境；
+    // 抄进配置在调用方的显卡先后只写在仓根 multi-host.env、副本里又没有那一份时抄成空串，见 common_gpu_cards_of_the_caller）
+    let cards =
+        common_gpu_cards_of_the_caller::card_priority_value_of_the_caller(&repository_root());
+    // 机器角色同样照抄调用方给这个进程的那一份：守卫连它一起清掉，引擎取卡按此刻的环境认这台机器、卡池按调用方那一份认，
+    // 不设回去时第二台上的引擎认成本机、拿本机那几张卡去对第二台的卡池（同 crash_injection_campaign.rs 的 settings_of_an_engine_on_the_gpu）
+    use singlefs_checker_tier::gpu_card_configuration::{
+        GpuConfigurationOfTheCaller, CARDS_BY_PRIORITY_KEY, HOST_ROLE_ENVIRONMENT_VARIABLE,
+        MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+    };
+    let host_of_the_caller = GpuConfigurationOfTheCaller::of_this_process()
+        .host()
+        .expect("调用方给的机器角色是 local 或 peer（写错时卡池起不来，用例开头起池那一步先红）");
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&[
+        (
+            MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+            configuration.as_os_str(),
+        ),
+        (
+            HOST_ROLE_ENVIRONMENT_VARIABLE,
+            std::ffi::OsStr::new(host_of_the_caller.name()),
+        ),
+        (CARDS_BY_PRIORITY_KEY, std::ffi::OsStr::new(&cards)),
+        ("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", library.as_os_str()),
+    ]);
+    let judged = read_faulted_states_through_the_given_states_engine(
+        HISTORIES_OF_THE_SMALL_BATCH,
+        fault,
+        EngineStart::UnderTheCallersEnvironmentGuard,
+    );
     drop(environment);
-    let _ = std::fs::remove_dir_all(&directory);
     judged
 }
 
-/// 验收第 1 条（崩溃点重放合并第三轮判决 J6）：配了 GPU 时这一项的崩溃态与二次崩溃镜像由 GPU 判器判、CPU 判器同一批也判，逐状态比对拍字，
-/// 一个都不差；比过的状态是两类态之和。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
-// crash-case-check:not-a-crash-case 一段历史的小规模对拍，只核 GPU 与 CPU 逐状态对得上；全量是同文件 read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_criterion
+/// 没开 GPU 的头一段历史：这一趟自己写一份 `ENABLE_GPU=0` 的多机配置、在环境守卫里跑，库同 [`the_first_read_faulted_history_judged_on_the_gpu`]
+/// （用例标签命名、起跑清空、跑完留着）：GPU 那一趟的对拍对象，两趟各判各的、各写各的库。
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+fn the_first_read_faulted_history_judged_on_the_cpu(
+    tag: &str,
+) -> (ReadFaultedStatesOfTheBatch, GivenStatesRun) {
+    use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
+    use singlefs_checker_tier::gpu_card_configuration::MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE;
+    let directory =
+        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
+            &format!("read-faulted-given-states-on-the-cpu-{tag}"),
+        )
+        .expect("流水线单元测试那一类里这条用例的目录");
+    let library = directory.join("library");
+    let configuration = directory.join("multi-host-on-the-cpu.env");
+    std::fs::write(&configuration, "ENABLE_GPU=0\n").expect("写得了没开 GPU 的配置");
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&[
+        (
+            MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+            configuration.as_os_str(),
+        ),
+        ("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", library.as_os_str()),
+    ]);
+    let judged = read_faulted_states_through_the_given_states_engine(
+        HISTORIES_OF_THE_SMALL_BATCH,
+        FaultPutOnTheGpuSide::NoFault,
+        EngineStart::UnderTheCallersEnvironmentGuard,
+    );
+    drop(environment);
+    judged
+}
+
+/// GPU 判器与 CPU 判器的对拍是独立的两趟（用户 2026-10-11 定：一段里 CPU 不既跑数据又对拍）：同一段历史一趟配了 GPU、由 GPU 判器判，
+/// 一趟没开 GPU、由 CPU 判器判，各写各的库；两趟摆出的崩溃态与二次崩溃镜像一样多，W 为真的态与给定状态表判红的态逐个相同，
+/// 两趟都没有判不了的。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
+// crash-case-check:not-a-crash-case 一段历史的小规模对拍，只核 GPU 与 CPU 两趟的结论相同；全量是同文件 read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_criterion
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 #[test]
-fn the_first_read_faulted_history_judged_on_the_gpu_agrees_with_the_cpu_judge_state_by_state() {
-    use singlefs_checker_tier::crash_amplification::{CrossCheckOfTheGivenStates, JudgedBy};
+fn the_first_read_faulted_history_judged_in_a_gpu_run_and_in_a_cpu_run_reports_the_same_states() {
+    use singlefs_checker_tier::crash_amplification::JudgedBy;
     use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
     if gpu_card_pool_or_report_not_run(
-        "the_first_read_faulted_history_judged_on_the_gpu_agrees_with_the_cpu_judge_state_by_state",
+        "the_first_read_faulted_history_judged_in_a_gpu_run_and_in_a_cpu_run_reports_the_same_states",
     )
     .is_none()
     {
         return;
     }
-    let (batch, run) =
+    let (gpu_batch, gpu_run) =
         the_first_read_faulted_history_judged_on_the_gpu("agrees", FaultPutOnTheGpuSide::NoFault);
-    assert_eq!(run.judged_by, JudgedBy::GpuJudge, "配了 GPU：GPU 判器判");
-    assert_eq!(run.cross_check, CrossCheckOfTheGivenStates::Compared);
+    let (cpu_batch, cpu_run) = the_first_read_faulted_history_judged_on_the_cpu("agrees");
     assert_eq!(
-        run.tally.cross_check_states_compared,
-        batch.read_faulted_crash_states + batch.second_crash_images,
-        "两类态都比过"
+        gpu_run.judged_by,
+        JudgedBy::GpuJudge,
+        "配了 GPU 的那一趟：GPU 判器判"
     );
     assert_eq!(
-        run.red_items(),
+        cpu_run.judged_by,
+        JudgedBy::CpuJudge,
+        "没开 GPU 的那一趟：CPU 判器判"
+    );
+    assert_eq!(
+        gpu_run.red_items(),
         Vec::<String>::new(),
-        "cross_check_disagreements=0、GPU 都判得了"
+        "GPU 那一趟都判得了"
+    );
+    assert_eq!(cpu_run.red_items(), Vec::<String>::new());
+    assert!(
+        gpu_batch.read_faulted_crash_states > 0 && gpu_batch.second_crash_images > 0,
+        "两类态都摆出来了"
+    );
+    assert!(
+        gpu_run.tally.states_judged_by_the_gpu_here > 0 && gpu_run.tally.states_reused == 0,
+        "GPU 那一趟从空库起、每个状态都是这一趟在卡上判的，不是复用的：{:?}",
+        gpu_run.tally
+    );
+    assert!(
+        cpu_run.tally.states_judged_by_the_cpu_here > 0 && cpu_run.tally.states_reused == 0,
+        "CPU 那一趟从空库起、每个状态都是这一趟判的，不是复用的：{:?}",
+        cpu_run.tally
+    );
+    assert_eq!(
+        (
+            gpu_batch.histories_taken,
+            gpu_batch.read_faulted_crash_states,
+            gpu_batch.second_crash_images,
+            &gpu_batch.images_holding_the_witness_criterion,
+            &gpu_batch.images_red_on_the_given_states,
+        ),
+        (
+            cpu_batch.histories_taken,
+            cpu_batch.read_faulted_crash_states,
+            cpu_batch.second_crash_images,
+            &cpu_batch.images_holding_the_witness_criterion,
+            &cpu_batch.images_red_on_the_given_states,
+        ),
+        "GPU 那一趟与 CPU 那一趟逐态相同"
     );
 }
 
-/// 验收第 1 条的另一半：往 GPU 那一侧塞一个已知故障，对照要比得出来、判红。
-// crash-case-check:not-a-crash-case 一段历史的小规模对拍，只核塞在 GPU 那一侧的故障被对照抓到；全量是同文件 read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_criterion
+/// 上一条的判别力：往 GPU 那一侧塞一个已知故障（每张表第一个状态的第一条不变量违例位翻过来），GPU 那一趟判红的态与 CPU 那一趟不同。
+// crash-case-check:not-a-crash-case 一段历史的小规模对拍，只核塞在 GPU 那一侧的故障让两趟的结论分开；全量是同文件 read_faulted_crash_states_and_their_second_crashes_never_hold_the_witness_criterion
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 #[test]
-fn a_fault_put_on_the_gpu_side_of_the_first_read_faulted_history_turns_the_cross_check_red() {
+fn a_fault_put_on_the_gpu_side_of_the_first_read_faulted_history_makes_the_gpu_run_differ_from_the_cpu_run(
+) {
     use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
     if gpu_card_pool_or_report_not_run(
-        "a_fault_put_on_the_gpu_side_of_the_first_read_faulted_history_turns_the_cross_check_red",
+        "a_fault_put_on_the_gpu_side_of_the_first_read_faulted_history_makes_the_gpu_run_differ_from_the_cpu_run",
     )
     .is_none()
     {
         return;
     }
-    let (_batch, run) = the_first_read_faulted_history_judged_on_the_gpu(
+    let (gpu_batch, _gpu_run) = the_first_read_faulted_history_judged_on_the_gpu(
         "fault",
         FaultPutOnTheGpuSide::FirstInvariantViolatedBitFlippedOnTheFirstStateOfEachTable,
     );
+    let (cpu_batch, _cpu_run) = the_first_read_faulted_history_judged_on_the_cpu("fault");
     assert!(
-        !run.tally.cross_check_disagreements.is_empty(),
-        "GPU 那一侧塞了故障，对照一条都没比出来"
+        !gpu_batch.images_red_on_the_given_states.is_empty(),
+        "GPU 那一侧塞了故障，GPU 那一趟一个红态都没判出来"
+    );
+    assert_ne!(
+        gpu_batch.images_red_on_the_given_states, cpu_batch.images_red_on_the_given_states,
+        "GPU 那一侧塞了故障，两趟判红的态却相同"
     );
 }

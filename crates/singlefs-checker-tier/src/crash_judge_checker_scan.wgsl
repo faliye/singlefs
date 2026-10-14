@@ -53,9 +53,9 @@ const C_RELEASED_BUCKET_COUNT: u32 = 2u * C_MAX_RELEASED;
 const C_RELEASED_BUCKETS: u32 = C_JOURNAL_GROUP_KEYS;
 
 // 借的那几段装得下（解析内核时判，不进展开量）：已释放记录的桶表与 I-1.8 的检查字在 C_JOURNAL_GROUP_KEYS 里，I-1.8 的次序在 C_ROW_ORDER 里
-const_assert C_RELEASED_BUCKET_COUNT <= SCRATCH_END - C_JOURNAL_GROUP_KEYS;
+const_assert C_RELEASED_BUCKET_COUNT <= C_JOURNAL_GROUP_KEYS_END - C_JOURNAL_GROUP_KEYS;
 
-const_assert C_MAX_SCANNED <= SCRATCH_END - C_JOURNAL_GROUP_KEYS;
+const_assert C_MAX_SCANNED <= C_JOURNAL_GROUP_KEYS_END - C_JOURNAL_GROUP_KEYS;
 
 const_assert C_MAX_SCANNED <= C_JOURNAL_GROUP_KEYS - C_ROW_ORDER;
 
@@ -1098,6 +1098,9 @@ fn judge_allocation_records_disjoint() {
 const C_EXAMINED_BUCKET_COUNT: u32 = 4096u;
 
 const C_EXAMINED_BUCKETS: u32 = C_JOURNAL_GROUP_KEYS;
+
+// 借的那一段装得下：越过 C_JOURNAL_GROUP_KEYS_END 就压到它后面的表上
+const_assert C_EXAMINED_BUCKET_COUNT <= C_JOURNAL_GROUP_KEYS_END - C_JOURNAL_GROUP_KEYS;
 
 fn c_examined_first_bucket(device: u32, slot: vec2<u32>, generation: vec2<u32>) -> u32 {
     var hash = device * 0x9E3779B1u;
@@ -2384,18 +2387,23 @@ const DELETION_TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET: u32 = 14u;
 
 var<private> d_inode_record_count: u32;
 
+// 这一版 inode 记录那一张（键是 inode 号，crash_judge_checker_common.wgsl 的 ⑬）与它的桶表建过没有
+fn d_inode_record_table() -> KeyedTable {
+    return KeyedTable(D_INODE_RECORDS, D_INODE_RECORD_WORDS, 2u, D_INODE_RECORD_BUCKETS, D_INODE_RECORD_BUCKET_COUNT);
+}
+
+var<private> d_inode_records_are_indexed: bool;
+
 // 这一版的一条 inode 记录记进 D_INODE_RECORDS：同一个号已有一行就盖掉（walk.rs 是按号插入的 BTreeMap，后读到的盖掉先读到的）；表满交回 false
 fn d_note_inode_record(inode: vec2<u32>, nlink: u32, size_in_bytes: vec2<u32>, object_birth: vec2<u32>) -> bool {
-    for (var i = 0u; i < d_inode_record_count; i = i + 1u) {
-        let row = D_INODE_RECORDS + i * D_INODE_RECORD_WORDS;
-        if (sw(row) == inode.x && sw(row + 1u) == inode.y) {
-            sws(row + 2u, nlink);
-            sws(row + 3u, size_in_bytes.x);
-            sws(row + 4u, size_in_bytes.y);
-            sws(row + 5u, object_birth.x);
-            sws(row + 6u, object_birth.y);
-            return true;
-        }
+    let existing = d_inode_record_row_of(inode);
+    if (existing != NONE) {
+        sws(existing + 2u, nlink);
+        sws(existing + 3u, size_in_bytes.x);
+        sws(existing + 4u, size_in_bytes.y);
+        sws(existing + 5u, object_birth.x);
+        sws(existing + 6u, object_birth.y);
+        return true;
     }
     if (d_inode_record_count >= D_MAX_INODE_RECORDS) {
         undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (49u << 8u);
@@ -2409,7 +2417,10 @@ fn d_note_inode_record(inode: vec2<u32>, nlink: u32, size_in_bytes: vec2<u32>, o
     sws(row + 4u, size_in_bytes.y);
     sws(row + 5u, object_birth.x);
     sws(row + 6u, object_birth.y);
-    d_inode_record_count = d_inode_record_count + 1u;
+    let appended = d_inode_record_count;
+    d_inode_record_count = appended + 1u;
+    d_inode_records_are_indexed = keyed_table_after_a_row_was_appended(d_inode_record_table(), d_inode_record_count,
+        d_inode_records_are_indexed, appended);
     return true;
 }
 
@@ -2424,13 +2435,12 @@ fn d_inode_record_object_birth(row: u32) -> vec2<u32> {
 
 // 这一版 inode 记录表里号 inode 的那一行（没有交回 NONE）
 fn d_inode_record_row_of(inode: vec2<u32>) -> u32 {
-    for (var i = 0u; i < d_inode_record_count; i = i + 1u) {
-        let row = D_INODE_RECORDS + i * D_INODE_RECORD_WORDS;
-        if (sw(row) == inode.x && sw(row + 1u) == inode.y) {
-            return row;
-        }
+    let row_index = keyed_first_row_of(d_inode_record_table(), d_inode_record_count, d_inode_records_are_indexed,
+        vec4<u32>(inode.x, inode.y, 0u, 0u));
+    if (row_index == NONE) {
+        return NONE;
     }
-    return NONE;
+    return D_INODE_RECORDS + row_index * D_INODE_RECORD_WORDS;
 }
 
 // 这一版 extent 树里号 inode 的数据单元数（没有的号是 0）
@@ -2466,6 +2476,7 @@ fn d_push_container_tree_entries_in_reverse(node: Node, pending: ptr<function, u
 // 条目宽 ≥ 120）往下走，别的类型段、读不出、形状不对都交回 false（判不了）
 fn d_read_inode_records(root_pointer: Ptr) -> bool {
     d_inode_record_count = 0u;
+    d_inode_records_are_indexed = false;
     if (root_pointer.all_zero) {
         return true;
     }
@@ -2979,7 +2990,7 @@ fn d_lineage_or_retirement_capacity_mask(knob_records: u32) -> u32 {
 // 违例位是并集，这里不去重。三棵容器树装没装只供测试的容量旋钮看扫描内核源码前面的三个常量 D_TOMBSTONE_CONTAINER_CAPACITY_KNOB、
 // D_LINEAGE_CONTAINER_CAPACITY_KNOB、D_RETIREMENT_CONTAINER_CAPACITY_KNOB（每片记录数，0 是没装；crash_judge_gpu.rs 的
 // container_capacity_knob_wgsl_constants 生成，第 56 批 G6）：没装的判产品那一条（I-9.21、I-9.36），装了的判旋钮那一条（I-9.22、I-9.37），
-// 同 walk.rs check_pool_image_given_the_container_capacity_knobs。层 0 与放量编的是三个都为 0 的那一份。不按已发布与否滤墓碑（第二节 T4）。
+// 同 walk.rs check_pool_image_given_the_container_capacity_knobs。崩溃点重放与放量编的是三个都为 0 的那一份。不按已发布与否滤墓碑（第二节 T4）。
 // 表越过上限（一棵树的容器、一版的谱系记录、跨版本那张表、两两比不重号的墓碑总数）判不了，交 CPU
 
 var<private> d_container_count: u32;
@@ -2999,7 +3010,7 @@ var<private> d_object_birth_count: u32;
 // I-9.29 跨版本那张表比不比：走读内核的主走读沿最新根的实例表链走到了末片（交接段 H_NEWEST_INSTANCE_TABLE_CHAIN_REACHED_ITS_LAST_PAGE，
 // 与候选集的滤法用同一遍走读，同 walk.rs 的 Walk::abandoned_roots_filtering）才比；没走到末片（一片读不出、解不开、身份不对、链指针记录不合法、
 // 链成了环）时回退候选集滤不掉被崩溃恢复抛弃的根，被抛弃的线上同号可以是另一个对象，CPU 报部分没判
-// （walk.rs 的 AbandonedRootsFilteringOfTheCandidateSet；`.claude/kb/invariants.md` I-9.29 那一行「最新根的实例表读不出、被崩溃恢复抛弃的根滤不掉时记判不了」），
+// （walk.rs 的 AbandonedRootsFilteringOfTheCandidateSet；`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.29 那一行「最新根的实例表读不出、被崩溃恢复抛弃的根滤不掉时记判不了」），
 // 这里一个号都不记、不置位。不记也就不会撞上那张表的上限：CPU 那一支一个号都不比，这里没有判不了的理由。
 // 不用 r_instance_rows 判：它拒收的比主走读多（链指针记录之前有不是行的记录、载荷 CRC 对不上），候选集已经滤全时会说没滤全
 // （判决 `research/prompts/m3-batch23-code-r1-main-verification.md` 第二节 K2 N5）
@@ -3155,9 +3166,10 @@ fn d_number_was_issued_before_a_step(inode: vec2<u32>, object_birth: vec2<u32>) 
     return false;
 }
 
-// 最新根一棵记账树（根指针在 (base, offset)，非零）里标签 12、设备段 0xFFFF_FFFF 的行接着收进 D_INODE_NUMBER_WATERMARK_ROWS：读法同
-// d_judge_pending_deletion_occupancy_of_an_accounting_tree（key 宽 22；叶条目宽 ≥ 34；内部条目宽 ≥ 108、子指针非零、孩子层级 = 父层级 − 1）；
-// 读不全交回 false、这棵树收的行退回去（CPU 只取走全了的记账树的行）
+// 最新根一棵记账树（根指针在 (base, offset)，非零）里标签 12、设备段 0xFFFF_FFFF 的行接着收进 D_INODE_NUMBER_WATERMARK_ROWS：key 宽 22；
+// 叶条目宽 = 34、内部条目宽 = 108（等于、不是不小于：CPU 的行取自主走读 walk.rs walk_code_two_subtree，条目宽按 I-1.10 判、不等就不往下走、
+// 这棵树不算走全；d_judge_pending_deletion_occupancy_of_an_accounting_tree 照的是 collect_accounting_rows_without_judging，那一份是不小于）、
+// 子指针非零、孩子层级 = 父层级 − 1；读不全交回 false、这棵树收的行退回去（CPU 只取走全了的记账树的行）
 fn d_collect_inode_number_watermark_rows_of_an_accounting_tree(base: u32, offset: u32) -> bool {
     let rows_before_this_tree = d_inode_number_watermark_row_count;
     var pending = 1u;
@@ -3175,7 +3187,7 @@ fn d_collect_inode_number_watermark_rows_of_an_accounting_tree(base: u32, offset
             return false;
         }
         if (n.level == 0u) {
-            if (n.entry_width < DELETION_ACCOUNTING_ENTRY_BYTES) {
+            if (n.entry_width != DELETION_ACCOUNTING_ENTRY_BYTES) {
                 d_inode_number_watermark_row_count = rows_before_this_tree;
                 return false;
             }
@@ -3200,7 +3212,7 @@ fn d_collect_inode_number_watermark_rows_of_an_accounting_tree(base: u32, offset
             }
             continue;
         }
-        if (n.entry_width < DELETION_ACCOUNTING_INTERNAL_ENTRY_BYTES) {
+        if (n.entry_width != DELETION_ACCOUNTING_INTERNAL_ENTRY_BYTES) {
             d_inode_number_watermark_row_count = rows_before_this_tree;
             return false;
         }
@@ -3405,14 +3417,14 @@ fn d_note_object_birth(inode_tree: vec2<u32>, inode: vec2<u32>, object_birth: ve
     }
     // 表里有一个号就判过（walk.rs judge_one_object_birth_per_inode_number 每个号判一次）
     judge(INVARIANT_I_9_29, true);
-    for (var birth_index = 0u; birth_index < d_object_birth_count; birth_index = birth_index + 1u) {
-        let row = D_OBJECT_BIRTHS + birth_index * D_OBJECT_BIRTH_WORDS;
-        if (sw(row) == inode_tree.x && sw(row + 1u) == inode_tree.y && sw(row + 2u) == inode.x && sw(row + 3u) == inode.y) {
-            if (!eq64(vec2<u32>(sw(row + 4u), sw(row + 5u)), object_birth)) {
-                violate(INVARIANT_I_9_29);
-            }
-            return;
+    let existing = keyed_first_row_of(d_object_birth_table(), d_object_birth_count, d_object_births_are_indexed,
+        vec4<u32>(inode_tree.x, inode_tree.y, inode.x, inode.y));
+    if (existing != NONE) {
+        let row = D_OBJECT_BIRTHS + existing * D_OBJECT_BIRTH_WORDS;
+        if (!eq64(vec2<u32>(sw(row + 4u), sw(row + 5u)), object_birth)) {
+            violate(INVARIANT_I_9_29);
         }
+        return;
     }
     if (d_object_birth_count >= D_MAX_OBJECT_BIRTHS) {
         undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (59u << 8u);
@@ -3425,8 +3437,18 @@ fn d_note_object_birth(inode_tree: vec2<u32>, inode: vec2<u32>, object_birth: ve
     sws(row + 3u, inode.y);
     sws(row + 4u, object_birth.x);
     sws(row + 5u, object_birth.y);
-    d_object_birth_count = d_object_birth_count + 1u;
+    let appended = d_object_birth_count;
+    d_object_birth_count = appended + 1u;
+    d_object_births_are_indexed = keyed_table_after_a_row_was_appended(d_object_birth_table(), d_object_birth_count,
+        d_object_births_are_indexed, appended);
 }
+
+// I-9.29 跨版本那一张（键是 (inode 树, 号) 四个字，crash_judge_checker_common.wgsl 的 ⑬）与它的桶表建过没有
+fn d_object_birth_table() -> KeyedTable {
+    return KeyedTable(D_OBJECT_BIRTHS, D_OBJECT_BIRTH_WORDS, 4u, D_OBJECT_BIRTH_BUCKETS, D_OBJECT_BIRTH_BUCKET_COUNT);
+}
+
+var<private> d_object_births_are_indexed: bool;
 
 // 一条墓碑（容器字节基 base、记录偏移 o）是不是整对象 [0, 2⁶⁴ − 1]（walk.rs TombstoneRecordOfTheScan::covers_the_whole_object：区间起 < 区间止照条款原文合取）
 fn d_tombstone_covers_the_whole_object(base: u32, o: u32) -> bool {
@@ -4310,6 +4332,7 @@ fn d_judge_tombstones_and_the_lineage_of_a_version(base: u32, tree_table_pointer
 // 全部扫完时 I-9.29 那张表已经判完（d_note_object_birth 见到第二个出生代当场判）；主走读没沿最新根的实例表链走到末片时那张表不比
 fn judge_tombstones_and_the_lineage_of_the_versions() {
     d_object_birth_count = 0u;
+    d_object_births_are_indexed = false;
     d_object_births_are_compared = sw(H_BASE + H_NEWEST_INSTANCE_TABLE_CHAIN_REACHED_ITS_LAST_PAGE) == 1u;
     // 候选集滤不掉被崩溃恢复抛弃的根：I-9.29 与 I-9.35 报部分没判（walk.rs judge_tombstones_and_the_lineage_of_the_versions 末段）
     if (!d_object_births_are_compared) {

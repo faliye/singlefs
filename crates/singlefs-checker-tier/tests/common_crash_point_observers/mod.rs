@@ -2,13 +2,15 @@
 //! （`common_crash_points::OBSERVERS_ON_THE_STANDARD_PREFIX`，名字住在公共模块）挂上观察者跑一趟崩溃放量的入口。
 //! 这一份单独放：公共模块（标准前缀的设点文件）不引它，标准前缀上的点的 CPU 判器版本不收观察者代码（第三轮正文 H4「观察者代码不进计划哈希、
 //! 不进判器版本」）；观察者的版本从这一份出发算（`crash_identity::ConclusionVersionRequest::Observer` 的 `observer_code_file`）。
-//! 可写挂载续做观察者从删除流的层 0 用例搬来，那一份用例照旧调这里的同一个。
+//! 可写挂载续做观察者从删除流的崩溃枚举用例搬来，那一份用例照旧调这里的同一个。
+//! 两段（用户 2026-10-13 定「观察者改走两段、池级 checker 上 GPU、按恢复结果去重」）：观察者在录入段的 CPU 上真跑可写挂载与续做，
+//! 交回挂载发的写与挂完的盘；挂完的盘上的池级 checker 不在这里跑，判段从库里读回来判（配了 GPU 上卡）。
 #![allow(
     dead_code,
     reason = "共用的观察者模块：每个测试文件只用其中几样，没用的在那个测试二进制里就是没用到"
 )]
 
-use super::common::{build_pool, parameters};
+use super::common::{build_pool, geometry, parameters};
 #[cfg(feature = "verdict-store")]
 use super::common_crash_points;
 use super::common_crash_points::{
@@ -17,9 +19,10 @@ use super::common_crash_points::{
 };
 #[cfg(feature = "verdict-store")]
 use super::common_crash_points::{ObserverOfTheStandardPrefix, OBSERVERS_ON_THE_STANDARD_PREFIX};
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
-use singlefs_checker_tier::crash::Layer0ObserverCounts;
+use singlefs_checker_tier::crash::CrashPointReplayObserverCounts;
+use singlefs_checker_tier::crash_amplification::{
+    ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver,
+};
 use singlefs_checker_tier::writable_mount_phases::materialized_crash_image;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
@@ -30,14 +33,20 @@ use singlefs_core::mount::{
 };
 use singlefs_core::recovery::RecoveryReport;
 use singlefs_core::transaction::{PoolVersion, TransactionOutput};
-use singlefs_harness::memory_pool::{CrashImage, MemoryPool, SparseBlockDevice};
+use singlefs_harness::memory_pool::{
+    writes_and_segments, CrashImage, MemoryPool, SparseBlockDevice,
+};
 use singlefs_harness::scenario::deletion_history_switches;
+use singlefs_harness::{RecordingBlockDevice, SharedStream};
+
+/// 判段在可写挂载续做之后的盘上判池级 checker、一条不变量都不判违例时加一的计数（每个状态挂完的盘都判过：计数等于状态数）。
+pub const POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER: &str = "pool_checker_clean_after_the_mount";
 
 /// 这一份的仓内路径（观察者代码文件，与 `file!()` 归一之后相同）。
 pub const THIS_FILE: &str =
     "crates/singlefs-checker-tier/tests/common_crash_point_observers/mod.rs";
 
-// ============================== 可写挂载续做观察者（崩溃点重放合并第三轮判决 J4；从删除流的层 0 用例搬来） ==============================
+// ============================== 可写挂载续做观察者（崩溃点重放合并第三轮判决 J4；从删除流的崩溃枚举用例搬来） ==============================
 
 /// 删除的一次发布落到之后，可写挂载的续做还差几步。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -142,18 +151,22 @@ fn landed_version(
 
 /// 这一状态上可写挂载一次（批大小同录流，三个容量照产品路径）：续做把队列走到空，步数等于恢复落到的那一版还差几步；
 /// 落到删除那几版上的，挂完是「有树、文件集合为空」那一版；落到 A、B、C 上的挂完照旧有文件；落到 A 之前的挂完照旧没有树。
-/// 挂完的盘再跑一遍池级 checker，一条不变量都不许判违例。删除流的层 0 用例与挂在标准前缀上的放量观察者（`common_crash_points::OBSERVERS_ON_THE_STANDARD_PREFIX`）
-/// 调的都是这一份。
+/// 挂载发的每一次写录在一条录制流上，连同挂完的盘交回：判段在挂完的盘上跑池级 checker（一条不变量都不许判违例，判干净时
+/// [`POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER`] 加一；配了 GPU 上卡）。删除流的崩溃枚举用例与挂在标准前缀上的放量观察者
+/// （`common_crash_points::OBSERVERS_ON_THE_STANDARD_PREFIX`）调的都是这一份。可写挂载与续做真跑实现，只能在 CPU 上
+/// （豁免表 `.claude/gate.d/gpu-exemptions.tsv` 的 writable-mount、continuation 两行）。它交回的只随镜像字节、恢复报告与另读的输入变，
+/// 录入段按恢复镜像去重。
 // gpu-exempt: writable-mount
 // gpu-exempt: continuation
 pub fn observe_the_mount_continuation(
     inputs: &MountContinuationInputs,
     image: &CrashImage<'_>,
     report: &RecoveryReport,
-    counts: &mut Layer0ObserverCounts,
-) {
+    counts: &mut CrashPointReplayObserverCounts,
+) -> ImageAfterTheObserver {
     let materialized = materialized_crash_image(image);
     let mount_parameters = parameters();
+    let stream = SharedStream::retaining_contents();
     let mut devices: Vec<_> = materialized
         .devices
         .iter()
@@ -163,7 +176,10 @@ pub fn observe_the_mount_continuation(
                 PhysicalBlockSizeInBytes(mount_parameters.geometry.physical_block_size),
             );
             device.image = sectors.clone();
-            (*identity, device)
+            (
+                *identity,
+                RecordingBlockDevice::with_shared_stream(*identity, device, stream.clone()),
+            )
         })
         .collect();
     let mounted = mount_writable_with_test_only_switches_and_deletion_switches(
@@ -221,28 +237,22 @@ pub fn observe_the_mount_continuation(
         "continuation_steps_numbered_next_in_the_instance",
         u64::try_from(mounted.output.deletion_queue_continuation.len()).expect("步数装得进 u64"),
     );
-    let mounted_disks = MemoryPool {
+    let disks_after_the_observer = MemoryPool {
         devices: devices
-            .into_iter()
-            .map(|(identity, device)| (identity, device.image))
+            .iter()
+            .map(|(identity, device)| (*identity, device.wrapped_device().image.clone()))
             .collect(),
         device_size_in_bytes: materialized.device_size_in_bytes,
     };
-    let violated_after_the_mount: Vec<(&str, String)> = check_pool_image(&mounted_disks)
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(reason) => Some((invariant, reason)),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .collect();
-    assert!(
-        violated_after_the_mount.is_empty(),
-        "恢复落到 {:?}、可写挂载续做之后的盘，池级 checker 一条都不许判违例（同 assert_clean 的口径）：{violated_after_the_mount:?}",
-        report.effective_root
-    );
-    counts.add("pool_checker_clean_after_the_mount", 1);
+    let (writes_on_the_crash_image, _segments_of_the_mount) =
+        writes_and_segments(&stream.retained_operations(), &geometry());
+    ImageAfterTheObserver {
+        writes_on_the_crash_image,
+        disks_after_the_observer,
+        invariants_judged: InvariantsJudgedOnTheImageAfterTheObserver::EveryImplementedInvariant,
+        counter_when_the_pool_checker_is_clean: POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER
+            .to_string(),
+    }
 }
 
 /// 这次挂载里一次发布：续做的一步，或续做里为空间推的抬 F 那一串里的一次空发布。
@@ -337,13 +347,13 @@ fn assert_the_continuation_publishes_take_the_next_numbers_of_the_instance(outpu
 
 /// 每个状态挂完的盘都过了池级 checker；续做发成的每一步都核了代与事务号（续做 k 步的状态各核 k 步）。
 pub fn assert_the_mounted_disks_and_the_continuation_numbers_were_checked_on_every_state(
-    counts: &Layer0ObserverCounts,
+    counts: &CrashPointReplayObserverCounts,
     states: u64,
 ) {
     assert_eq!(
-        counts.count_named("pool_checker_clean_after_the_mount"),
+        counts.count_named(POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER),
         states,
-        "每个状态挂完的盘都过了池级 checker"
+        "每个状态挂完的盘都过了池级 checker（判段在挂完的盘上判，配了 GPU 上卡）"
     );
     assert_eq!(
         counts.count_named("continuation_steps_numbered_next_in_the_instance"),
@@ -357,8 +367,10 @@ pub fn assert_the_mounted_disks_and_the_continuation_numbers_were_checked_on_eve
 /// 一条走过标准前缀的流（多记录流、删除流：前缀由 `common_crash_points::record_the_multi_record_publishes` 设点）按环境跑一趟崩溃放量，连同登记表
 /// `common_crash_points::OBSERVERS_ON_THE_STANDARD_PREFIX` 上挂在它经过的标准前缀节点上的全部观察者。观察者另读的输入照录（第三轮判决 M4 第 10 条：
 /// 单跑一项要的别项流程照录）：可写挂载续做观察者读删除流的发布表，这里录一遍删除流取它（[`mount_continuation_inputs_of_the_unlink_stream`]），
-/// 多记录流单跑也一样。观察者计数的断言每一趟都判（J7，这一趟看的与库里复用的块读回来的合起来）：经过标准前缀的每个状态都可写挂载过一次、
-/// 挂完的盘都过了池级 checker、续做发成的每一步都核了代与事务号，一个状态都不判红。其余同 `common_crash_points::amplify_prepared_flow_against_the_version_table`。
+/// 多记录流单跑也一样。观察者走两段（用户 2026-10-13 定）：录入段在 CPU 上可写挂载、续做（按恢复镜像去重，同一张镜像只挂一次），
+/// 判段在挂完的盘上判池级 checker（配了 GPU 上卡）；两段各打一行「现判 N、去重复用 M」。观察者计数的断言每一趟都判（J7，这一趟拼的与库里复用的
+/// 块读回来的合起来）：经过标准前缀的每个状态都可写挂载过一次、挂完的盘都过了池级 checker、续做发成的每一步都核了代与事务号，一个状态都不判红。
+/// 只录、只排派活计划、叫停、判段报本次未跑的那一趟不判。其余同 `common_crash_points::amplify_prepared_flow_against_the_version_table`。
 #[allow(
     clippy::too_many_arguments,
     reason = "一条流的八样各自独立，收成一个结构体只是把八个字段挪个地方"
@@ -375,13 +387,18 @@ pub fn amplify_a_flow_through_the_standard_prefix(
     crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
     default_expand_up_to: usize,
 ) -> singlefs_checker_tier::crash_amplification::EnvironmentRun {
-    use singlefs_checker_tier::crash_amplification::{NodeOfAnObserver, ObserverOnTheNodes};
+    use singlefs_checker_tier::crash_amplification::{
+        NodeOfAnObserver, ObserverCode, ObserverDeduplication, ObserverOnTheNodes,
+    };
     use singlefs_checker_tier::crash_identity::ObserverName;
     let mount_continuation_inputs =
         mount_continuation_inputs_of_the_unlink_stream(&format!("{flow_name}-observer-inputs"));
     let observe_the_mount =
-        |image: &CrashImage<'_>, report: &RecoveryReport, counts: &mut Layer0ObserverCounts| {
-            observe_the_mount_continuation(&mount_continuation_inputs, image, report, counts);
+        |_ordinal: u64,
+         image: &CrashImage<'_>,
+         report: &RecoveryReport,
+         counts: &mut CrashPointReplayObserverCounts| {
+            observe_the_mount_continuation(&mount_continuation_inputs, image, report, counts)
         };
     let mut every_observer: Vec<ObserverOfTheStandardPrefix> = Vec::new();
     for (_entry_name, observers_of_the_node) in OBSERVERS_ON_THE_STANDARD_PREFIX.iter() {
@@ -412,7 +429,12 @@ pub fn amplify_a_flow_through_the_standard_prefix(
                 })
                 .collect(),
             observe: match observer {
-                ObserverOfTheStandardPrefix::WritableMountAndContinuation => &observe_the_mount,
+                ObserverOfTheStandardPrefix::WritableMountAndContinuation => {
+                    ObserverCode::HandsBackAnImage {
+                        observe: &observe_the_mount,
+                        deduplication: ObserverDeduplication::ByTheRecoveredImageBytes,
+                    }
+                }
             },
         })
         .collect();
@@ -429,9 +451,24 @@ pub fn amplify_a_flow_through_the_standard_prefix(
             default_expand_up_to,
             &observers,
         );
-    if let Some(observing) = &run.observing {
+    if let Some(recording) = &run.observer_recording {
+        // 录入段的「现判 N、去重复用 M」：这一趟真挂的恢复镜像张数、镜像已经看过（这一趟早先的状态或库里存着的）因而不再挂的状态数
         println!(
-            "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} blocks_observed_here={} states_observed_here={} states={:?} red={:?}",
+            "CRASH_POINT_REPLAY_OBSERVERS_RECORDING flow={flow_name} images_observed_fresh={} states_reusing_an_observed_image={} blocks_recorded_here={} states_recorded_here={} blocks_already_recorded={}",
+            recording.images_observed_here,
+            recording.states_reusing_an_observed_image,
+            recording.blocks_recorded_here,
+            recording.states_recorded_here,
+            recording.blocks_already_recorded
+        );
+    }
+    if let Some(observing) = &run.observing {
+        // 判段的「现判 N、去重复用 M」：这一趟在挂完的盘上判池级 checker 的张数（其中在卡上的）、库里这一把判器版本早先判过的张数
+        println!(
+            "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?}",
+            observing.images_judged_here,
+            observing.images_judged_on_the_gpu_here,
+            observing.image_judgements_reused,
             observing.blocks_observed_here,
             observing.states_observed_here,
             observing.states_of_each_observer,
@@ -474,9 +511,9 @@ pub fn amplify_a_flow_through_the_standard_prefix(
                         "流 {flow_name}：经过标准前缀的每个状态都可写挂载过一次"
                     );
                     assert_eq!(
-                        count_named("pool_checker_clean_after_the_mount"),
+                        count_named(POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER),
                         states,
-                        "流 {flow_name}：每个状态挂完的盘都过了池级 checker"
+                        "流 {flow_name}：每个状态挂完的盘都过了池级 checker（判段判，配了 GPU 上卡）"
                     );
                     assert_eq!(
                         count_named("continuation_steps_numbered_next_in_the_instance"),

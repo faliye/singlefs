@@ -1,10 +1,10 @@
-//! checker 档模块：crash、crash_judge_tables
-//! io_min 8192（固定结构槽距 8192）的池上第一次可写挂载在层 0 的证据：mkfs(io_min 8192) → 可写挂载（取号 1、写行发布 txg 1、暖机 txg 2），
+//! checker 档模块：crash、crash_state_enumeration、crash_judge_tables
+//! io_min 8192（固定结构槽距 8192）的池上第一次可写挂载在崩溃点重放的证据：mkfs(io_min 8192) → 可写挂载（取号 1、写行发布 txg 1、暖机 txg 2），
 //! 把 mkfs 之后的整条录制流按 D13（验证路线） 已定项 4 取崩溃状态，跑恢复 + 多版本 oracle、池级 checker、记录核对器。
 //!
-//! 比已有的流多罩的崩溃状态：已有的层 0 流全是槽距 4096 的池（`crates/singlefs-harness/tests/common/mod.rs` 的 `parameters()`），
+//! 比已有的流多罩的崩溃状态：已有的崩溃点重放流全是槽距 4096 的池（`crates/singlefs-harness/tests/common/mod.rs` 的 `parameters()`），
 //! 这一条的基线镜像是槽距 8192 的池，系统配置槽 1 在 8192 处。取号那一段与暖机那次轮换那一段各有一个「两块盘的槽 0 同时撕裂」的状态
-//! （全池没有可用的槽 0），恢复与池级 checker 都要逐档找槽 1（C651（全池没有可用的系统配置槽 0 时 checker 与实现找槽 1 的读法不同）
+//! （全池没有可用的槽 0），恢复与池级 checker 都要逐档找槽 1（C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同）
 //! 第一轮判决第四节第 3 条，`research/prompts/m3-c651-r1-main-verification.md`）：checker 按最小槽距 4096 读时这两个状态判 I-8.5 红。
 //! 多跑的一步：没有；流到第一次可写挂载为止（取号、两次零单元发布），不发文件版本，每个状态只跑恢复与 checker、不重开挂载。
 //! 盘是内存稀疏盘外面包录制器（同一个进程里 mkfs 与挂载，不经文件镜像）。
@@ -14,9 +14,17 @@ use singlefs_checker::image::{
     SystemConfigurationSlotReading,
 };
 use singlefs_checker_tier::crash::{
-    enumerate_layer0_quick_tier_versions, enumerate_layer0_selecting_versions_observing_each_state,
-    full_expansion, layer0_state_count_with_torn_in_place_overwrites, Layer0Tally,
+    crash_state_count_with_torn_in_place_overwrites, full_expansion,
+    CrashPointReplayObserverCounts, CrashPointReplayTally, CrashPointReplayVersionTable,
 };
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_quick_tier_versions, enumerate_crash_states_with_expansion,
+    CrashPointReplayItem, CrashPointReplayObserver,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_enumeration_writable_mount_of_an_io_min_8192_pool.rs";
 use singlefs_core::address::DeviceIdentity;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
@@ -134,7 +142,7 @@ fn prepare() -> Prepared {
     }
 }
 
-fn assert_recovery_checker_and_record_checker_clean(tally: &Layer0Tally) {
+fn assert_recovery_checker_and_record_checker_clean(tally: &CrashPointReplayTally) {
     assert_eq!(
         tally.violations, 0,
         "多版本 oracle 的第一处违例：{:?}",
@@ -203,7 +211,7 @@ fn the_first_writable_mount_of_an_io_min_8192_pool_has_seven_segments_and_33_cra
         "每次写只取两态时：1 + 五个 2 写段各 3 + 两个 1 写段各 1"
     );
     assert_eq!(
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &prepared.base,
             &prepared.writes,
             &prepared.segments,
@@ -212,13 +220,20 @@ fn the_first_writable_mount_of_an_io_min_8192_pool_has_seven_segments_and_33_cra
         FULL_STATES,
         "原地覆写取三态的全量：1 + 3 × (3² − 1) + 2 × 3 + 2 × 1"
     );
-    let tally = enumerate_layer0_quick_tier_versions(
+    let Some(tally) = enumerate_crash_states_quick_tier_versions(
+        CrashPointReplayItem {
+            name: "io_min_8192_mount::quick_tier",
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
         &[],
-    );
+    )
+    .judged() else {
+        return;
+    };
     assert!(tally.states > 1, "快档展开出了崩溃状态");
     assert_recovery_checker_and_record_checker_clean(&tally);
 }
@@ -226,58 +241,76 @@ fn the_first_writable_mount_of_an_io_min_8192_pool_has_seven_segments_and_33_cra
 /// 全量：33 个崩溃状态逐个跑恢复与 checker，零违例；两块盘的槽 0 都不可用的状态恰好两个（取号那一段、暖机那次轮换那一段各一个
 /// 两盘同撕），每一个上 checker 两块盘的槽 1 都在 8192 处读成可用，checker 与恢复择到的世代号相同。
 #[test]
-#[ignore = "checker 档全量：崩溃枚举用例，由门禁 checker-tier-layer0-replay --full 按 crash-case 登记跑"]
+#[ignore = "checker 档全量：崩溃枚举用例，由门禁 checker-tier-crash-point-replay --full 按 crash-case 登记跑"]
 fn every_crash_state_of_the_first_writable_mount_of_an_io_min_8192_pool_recovers_and_the_checker_reads_slot_one_at_8192(
 ) {
     let prepared = prepare();
-    let mut states_without_a_usable_slot_zero: u64 = 0;
-    let mut disagreements: Vec<String> = Vec::new();
-    let tally = enumerate_layer0_selecting_versions_observing_each_state(
+    // 观察者经崩溃判定库那一路按块看：要记的数全经观察者计数；槽 1 读得不对的状态当场 panic（判段把那一句带出来、用例红）
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   _report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        let readings = system_configuration_slot_readings(image);
+        let no_usable_slot_zero = readings
+            .iter()
+            .all(|(_, slots)| !matches!(slots[0], SystemConfigurationSlotReading::Usable(..)));
+        if !no_usable_slot_zero {
+            return;
+        }
+        counts.add("states_without_a_usable_slot_zero", 1);
+        let slot_one_spacings: Vec<Option<u64>> = readings
+            .iter()
+            .map(|(_, slots)| match &slots[1] {
+                SystemConfigurationSlotReading::Usable(_, geometry) => Some(geometry.slot_spacing),
+                SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses { .. }
+                | SystemConfigurationSlotReading::NotSelfVerified
+                | SystemConfigurationSlotReading::SelfVerifiedButNotChoosable => None,
+            })
+            .collect();
+        let checker_generation_of_device_zero = chosen_system_configurations(image)
+            .into_iter()
+            .find(|(device, _)| *device == 0)
+            .and_then(|(_, chosen)| chosen.map(|(view, _)| view.slot_generation));
+        let recovery_generation = choose_system_configuration(image)
+            .ok()
+            .map(|chosen| chosen.quantities.slot_generation);
+        assert!(
+                slot_one_spacings == vec![Some(SLOT_SPACING_IN_BYTES); 2]
+                    && checker_generation_of_device_zero.is_some()
+                    && checker_generation_of_device_zero == recovery_generation,
+                "全池没有可用的槽 0 时，checker 两块盘的槽 1 都在 8192 处可用、与恢复择同一个世代号：槽 1 读到的槽距 {slot_one_spacings:?}、checker 盘 0 择的世代号 {checker_generation_of_device_zero:?}、恢复择的 {recovery_generation:?}"
+            );
+    };
+    let Some(tally) = enumerate_crash_states_with_expansion(
+        CrashPointReplayItem {
+            name: "io_min_8192_mount::full",
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
-        &[],
-        &|_segment_index, _segment| true,
-        &mut |image: &CrashImage<'_>, _report: &RecoveryReport| {
-            let readings = system_configuration_slot_readings(image);
-            let no_usable_slot_zero = readings
-                .iter()
-                .all(|(_, slots)| !matches!(slots[0], SystemConfigurationSlotReading::Usable(..)));
-            if !no_usable_slot_zero {
-                return;
-            }
-            states_without_a_usable_slot_zero += 1;
-            let slot_one_spacings: Vec<Option<u64>> = readings
-                .iter()
-                .map(|(_, slots)| match &slots[1] {
-                    SystemConfigurationSlotReading::Usable(_, geometry) => {
-                        Some(geometry.slot_spacing)
-                    }
-                    SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses { .. }
-                    | SystemConfigurationSlotReading::NotSelfVerified
-                    | SystemConfigurationSlotReading::SelfVerifiedButNotChoosable => None,
-                })
-                .collect();
-            let checker_generation_of_device_zero = chosen_system_configurations(image)
-                .into_iter()
-                .find(|(device, _)| *device == 0)
-                .and_then(|(_, chosen)| chosen.map(|(view, _)| view.slot_generation));
-            let recovery_generation = choose_system_configuration(image)
-                .ok()
-                .map(|chosen| chosen.quantities.slot_generation);
-            if slot_one_spacings != vec![Some(SLOT_SPACING_IN_BYTES); 2]
-                || checker_generation_of_device_zero.is_none()
-                || checker_generation_of_device_zero != recovery_generation
-            {
-                disagreements.push(format!(
-                    "槽 1 读到的槽距 {slot_one_spacings:?}、checker 盘 0 择的世代号 {checker_generation_of_device_zero:?}、恢复择的 {recovery_generation:?}"
-                ));
-            }
-        },
-    );
+        CrashPointReplayVersionTable::with_a_file_only(&[]),
+        &full_expansion,
+        &[CrashPointReplayObserver {
+            name: "slot_one_at_8192",
+            // 观察者另读的输入：槽 1 该在的槽距（镜像与恢复报告之外它只比这一个数）
+            extra_inputs_digest: extra_inputs_digest_that_was_computed(
+                singlefs_harness::sha256::sha256_digest(
+                    format!("slot_spacing_in_bytes={SLOT_SPACING_IN_BYTES}\n").as_bytes(),
+                ),
+            ),
+            observe: &observe,
+        }],
+    )
+    .judged() else {
+        return;
+    };
+    let states_without_a_usable_slot_zero = tally
+        .observer_counts
+        .count_named("states_without_a_usable_slot_zero");
     println!(
-        "LAYER0_IO_MIN_8192_MOUNT states={} closed_form={FULL_STATES} exhaustive={} states_without_a_usable_slot_zero={states_without_a_usable_slot_zero} violations={} failed={} checker_by_invariant(evaluated/violated/not_applicable) {}",
+        "CRASH_POINT_REPLAY_IO_MIN_8192_MOUNT states={} closed_form={FULL_STATES} exhaustive={} states_without_a_usable_slot_zero={states_without_a_usable_slot_zero} violations={} failed={} checker_by_invariant(evaluated/violated/not_applicable) {}",
         tally.states,
         tally.states == FULL_STATES,
         tally.violations,
@@ -290,9 +323,16 @@ fn every_crash_state_of_the_first_writable_mount_of_an_io_min_8192_pool_recovers
         states_without_a_usable_slot_zero, 2,
         "两块盘的槽 0 都不可用的状态：取号那一段两盘同撕、暖机那次轮换两盘同撕，各一个"
     );
-    assert_eq!(
-        disagreements,
-        Vec::<String>::new(),
-        "全池没有可用的槽 0 时，checker 两块盘的槽 1 都在 8192 处可用、与恢复择同一个世代号"
+}
+
+/// 观察者另读的输入的摘要要真算：全零就是没算（另读输入不同的两趟会共用看过的块）。
+fn extra_inputs_digest_that_was_computed(
+    digest: [u8; singlefs_harness::sha256::DIGEST_BYTES],
+) -> [u8; singlefs_harness::sha256::DIGEST_BYTES] {
+    assert_ne!(
+        digest,
+        [0; singlefs_harness::sha256::DIGEST_BYTES],
+        "观察者另读的输入的摘要真算（全零就是没算：另读输入不同的两趟会共用看过的块）"
     );
+    digest
 }

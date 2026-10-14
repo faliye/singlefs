@@ -1,4 +1,4 @@
-//! checker 档模块：crash、layer0_progress、crash_given_states、crash_identity、crash_amplification、verdict_store、gpu_unit_checks
+//! checker 档模块：crash、crash_state_enumeration、crash_point_replay_progress、crash_given_states、crash_identity、crash_library、crash_amplification、verdict_store、gpu_unit_checks
 //! 崩溃放量流水线在新池新建文件那条流（取号与暖机、发布两个崩溃点）上的端到端用例：录入 → 核对 → 第二趟复用 → 两方分工与对账 →
 //! 两个库并成一个 → ignore 的点不出状态 → 版本表写错要红；经公共模块按环境真跑两趟，驱动行带复用数、全域与否、展开上限；
 //! 被叫停、导入别的库、只排派活计划的那一趟照实报复用数（L1）；两台分片之后按计划点名导入，流水线那一侧与给定状态表那一侧
@@ -13,19 +13,24 @@ mod common_crash_points;
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::MutexGuard;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use common::{build_pool, file_content, geometry};
 use singlefs_checker_tier::crash::{
-    layer0_plan_state_count, Layer0ObserverCounts, Layer0SegmentExpansion,
-    LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE, LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE,
+    crash_point_replay_plan_state_count, CrashPointReplayObserverCounts,
+    CrashPointReplaySegmentExpansion, CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE,
+    CRASH_POINT_REPLAY_RED_PASS_JOURNAL_IGNORED_ORACLE,
 };
 use singlefs_checker_tier::crash_amplification::{
     check_blocks_where_until, check_recorded_blocks, compare_judge_and_verifier, plan_crash_points,
-    read_violations, record_crash_points, unjudged_blocks, unjudged_blocks_of_the_flow,
-    verify_blocks_from_facts, ConclusionsStoredUnder, CrashFlow, CrashPlan, CrashPointSpan,
-    EnvironmentRun, ExpandUpToWritesPerSegment, FactsVerifierOn, GivenStatesEngine,
-    GivenStatesItem, GivenStatesRun, NodeOfAnObserver, ObserverOnTheNodes, PipelineJudgingCode,
-    UnitChecksumsOn, WeightedShares, END_OF_FLOW_NODE_NAME, ENVIRONMENT_VARIABLES_READ_BY_A_RUN,
+    read_violations, record_crash_points, record_the_flow_and_read_it_back, unjudged_blocks,
+    unjudged_blocks_of_the_flow, verify_blocks_from_facts, ConclusionsStoredUnder, CrashFlow,
+    CrashPlan, CrashPointSpan, EnvironmentRun, ExpandUpToWritesPerSegment, FactsVerifierOn,
+    GivenStatesEngine, GivenStatesItem, GivenStatesRun, NodeOfAnObserver, ObserverCode,
+    ObserverOnTheNodes, PipelineJudgingCode, WeightedShares, END_OF_FLOW_NODE_NAME,
+    ENVIRONMENT_VARIABLES_READ_BY_A_RUN,
 };
 use singlefs_checker_tier::crash_given_states::{
     GivenStatesConclusionsOfATable, GivenStatesJudge, GivenStatesOfATable,
@@ -33,9 +38,14 @@ use singlefs_checker_tier::crash_given_states::{
 use singlefs_checker_tier::crash_identity::{
     ConclusionKind, ConclusionVersion, CoverageReport, ObserverName,
 };
+use singlefs_checker_tier::crash_library::{
+    amplification_unit_tests_library_directory,
+    amplification_unit_tests_library_directory_emptied_at_the_start, LibraryOpenInThisProcess,
+    LibraryRole,
+};
+use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 #[cfg(feature = "gpu")]
 use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
-use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
 use singlefs_checker_tier::verdict_store::{
     BlockCountVector, EncodedVerdictVector, JudgeVersion, JudgingDevice, RecoveryWordsOfState,
     StateOffsetInBlock, VerdictBlockKey, VerdictStore, VerdictVectorNumber,
@@ -46,7 +56,7 @@ use singlefs_harness::memory_pool::{
     RetainedWrite,
 };
 use singlefs_harness::segments::StepKind;
-use singlefs_harness::sha256::DIGEST_BYTES;
+use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
 const THIS_FILE: &str =
     "crates/singlefs-checker-tier/tests/crash_amplification_pipeline_records_checks_and_reuses.rs";
@@ -63,11 +73,11 @@ fn repository_root() -> PathBuf {
         .to_path_buf()
 }
 
-fn expansion(_segment_index: usize, segment: &[usize]) -> Layer0SegmentExpansion {
+fn expansion(_segment_index: usize, segment: &[usize]) -> CrashPointReplaySegmentExpansion {
     if segment.len() <= LARGEST_EXPANDED_SEGMENT_WRITES {
-        Layer0SegmentExpansion::EveryProperSubset
+        CrashPointReplaySegmentExpansion::EveryProperSubset
     } else {
-        Layer0SegmentExpansion::NotExpanded
+        CrashPointReplaySegmentExpansion::NotExpanded
     }
 }
 
@@ -149,38 +159,70 @@ fn record_new_pool_file_creation(
 fn judging_code() -> PipelineJudgingCode {
     PipelineJudgingCode::of_the_judges(
         &repository_root(),
-        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
+        &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
     )
     .expect("判法代码摘要算得出")
 }
 
-/// 判定行上的判法版本：两个判器的闭包摘要。
-fn judge_version() -> JudgeVersion {
-    judging_code().version()
+/// 这条用例的库：家目录下流水线单元测试那一类的长期库里以用例标签命名的那一份（`crash_library::amplification_unit_tests_library_directory`），
+/// 用例结束库还在，下一趟照同一套复用：流、路径与块键按摘要复用，这一趟的判定写在这一趟自己的判法版本下（[`fresh_judge_version`]）。
+struct UnitTestLibrary {
+    handle: LibraryOpenInThisProcess,
 }
 
-/// 库放在临时目录，用例结束（成功、失败、panic）都删掉。
-struct TemporaryStore {
-    directory: PathBuf,
-}
-
-impl TemporaryStore {
+impl UnitTestLibrary {
     fn new(tag: &str) -> Self {
-        let directory = std::env::temp_dir().join(format!(
-            "singlefs-crash-amplification-{tag}-{}",
-            std::process::id()
-        ));
-        Self { directory }
+        let directory = amplification_unit_tests_library_directory(Some(tag))
+            .expect("流水线单元测试那一类的库目录");
+        Self::opened(directory)
     }
-    fn create(&self) -> VerdictStore {
-        VerdictStore::create_empty(&self.directory).expect("建得了判定库")
+
+    /// 同 [`Self::new`]，起跑先清空用例标签命名的那一份目录（`crash_library::amplification_unit_tests_library_directory_emptied_at_the_start`），
+    /// 库建在它底下的 `library`（库只在不存在的目录上建）：整份库的账（哪些块没判、存了几份结论）从空库数起的用例用；
+    /// 上一趟留下的块与结论会算进整份库的账。
+    fn emptied_at_the_start(tag: &str) -> Self {
+        let directory = amplification_unit_tests_library_directory_emptied_at_the_start(tag)
+            .expect("流水线单元测试那一类的库目录清空重建");
+        Self::opened(directory.join("library"))
+    }
+
+    fn opened(directory: std::path::PathBuf) -> Self {
+        let handle =
+            LibraryOpenInThisProcess::open_or_share(&directory, LibraryRole::ThisHostsLibrary)
+                .unwrap_or_else(|refusal| {
+                    panic!("开得了用例的库 {}：{refusal}", directory.display())
+                });
+        Self { handle }
+    }
+    fn store(&self) -> MutexGuard<'_, VerdictStore> {
+        self.handle.lock()
     }
 }
 
-impl Drop for TemporaryStore {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.directory);
-    }
+/// 这一趟自己的判法版本（进程号、纳秒与一个流水号的摘要）：长期库里这一版下一块都没判过，用例钉的「第一趟全判、第二趟全复用」
+/// 那一套账每趟都成立；别的趟判过的块都在别的版本下，流、路径与块键照摘要复用。
+fn fresh_version_digest() -> [u8; DIGEST_BYTES] {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("时钟在 1970 之后")
+        .as_nanos();
+    sha256_digest(
+        format!(
+            "fresh-version process={} nanos={nanos} number={}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::SeqCst)
+        )
+        .as_bytes(),
+    )
+}
+
+fn fresh_judge_version() -> JudgeVersion {
+    JudgeVersion(fresh_version_digest())
+}
+
+fn fresh_conclusion_version() -> ConclusionVersion {
+    ConclusionVersion(fresh_version_digest())
 }
 
 fn total_blocks(plan: &CrashPlan) -> u64 {
@@ -201,7 +243,7 @@ fn records_checks_and_then_reuses_every_block_of_the_new_pool_file_creation_flow
         plan.points[0].ordinals.end, plan.points[1].ordinals.start,
         "两个点的状态序号首尾相接"
     );
-    let state_count = layer0_plan_state_count(
+    let state_count = crash_point_replay_plan_state_count(
         &recorded.base,
         &recorded.writes,
         &recorded.segments,
@@ -230,18 +272,20 @@ fn records_checks_and_then_reuses_every_block_of_the_new_pool_file_creation_flow
             && plan.points[2].path_number.matches('/').count() == 2,
         "路径编号一点一段（末节点接在最后一个点下面）"
     );
-    let temporary = TemporaryStore::new("reuse");
-    let mut store = temporary.create();
+    let library = UnitTestLibrary::new("reuse");
+    let mut store = library.store();
+    let version = fresh_judge_version();
+    // 判法只吃库里读回的那一份：流先写进库再读回，下面判、核、对账都用读回的。
+    let read_back =
+        record_the_flow_and_read_it_back(&mut store, &flow).expect("流写得进库、读得回");
+    let flow_read_back_from_the_library = read_back.flow();
     let mut report = CoverageReport::default();
-    let recording =
-        record_crash_points(&mut store, &plan, &judge_version(), &mut report).expect("录得进");
+    let recording = record_crash_points(&mut store, &plan, &version, &mut report).expect("录得进");
     assert_eq!(recording.blocks_recorded, total_blocks(&plan));
     assert_eq!(recording.states_recorded, state_count);
     assert_eq!(recording.blocks_already_judged, 0);
     assert_eq!(
-        unjudged_blocks(&store, &judge_version())
-            .expect("对得了账")
-            .len(),
+        unjudged_blocks(&store, &version).expect("对得了账").len(),
         usize::try_from(total_blocks(&plan)).expect("装得进")
     );
     assert!(
@@ -260,12 +304,11 @@ fn records_checks_and_then_reuses_every_block_of_the_new_pool_file_creation_flow
     );
     let checking = check_recorded_blocks(
         &mut store,
-        &flow,
+        &flow_read_back_from_the_library,
         &plan,
         &WeightedShares::new(vec![1]),
         0,
-        &UnitChecksumsOn::CpuOnly,
-        &judge_version(),
+        &version,
     )
     .expect("核得完");
     assert_eq!(checking.blocks_checked, total_blocks(&plan));
@@ -275,19 +318,18 @@ fn records_checks_and_then_reuses_every_block_of_the_new_pool_file_creation_flow
         "健康的流一个红状态都不该有：{:?}",
         checking.red_texts
     );
-    assert_eq!(checking.gpu_cpu_disagreements, 0);
     assert!(
-        unjudged_blocks(&store, &judge_version())
+        unjudged_blocks(&store, &version)
             .expect("对得了账")
             .is_empty(),
         "核完对账为空"
     );
-    assert!(read_violations(&store, &plan, &judge_version())
+    assert!(read_violations(&store, &plan, &version)
         .expect("读得了违例")
         .is_empty());
     let mut second_report = CoverageReport::default();
-    let second = record_crash_points(&mut store, &plan, &judge_version(), &mut second_report)
-        .expect("录得进");
+    let second =
+        record_crash_points(&mut store, &plan, &version, &mut second_report).expect("录得进");
     assert_eq!(
         second.blocks_already_judged,
         total_blocks(&plan),
@@ -304,12 +346,11 @@ fn records_checks_and_then_reuses_every_block_of_the_new_pool_file_creation_flow
     );
     let nothing_left = check_recorded_blocks(
         &mut store,
-        &flow,
+        &flow_read_back_from_the_library,
         &plan,
         &WeightedShares::new(vec![1]),
         0,
-        &UnitChecksumsOn::CpuOnly,
-        &judge_version(),
+        &version,
     )
     .expect("核得完");
     assert_eq!(nothing_left.blocks_checked, 0, "复用的块不再核");
@@ -322,20 +363,20 @@ fn a_flow_reconciles_its_own_blocks_and_not_the_blocks_another_flow_recorded() {
         record_new_pool_file_creation("crash-amplification-own-blocks", false, file_content());
     let flow = recorded.flow();
     let plan = plan_crash_points(&flow);
-    let temporary = TemporaryStore::new("own-blocks");
-    let mut store = temporary.create();
-    record_crash_points(
-        &mut store,
-        &plan,
-        &judge_version(),
-        &mut CoverageReport::default(),
-    )
-    .expect("录得进");
+    let library = UnitTestLibrary::new("own-blocks");
+    let mut store = library.store();
+    let version = fresh_judge_version();
+    // 判法只吃库里读回的那一份：流先写进库再读回，下面判、核、对账都用读回的。
+    let read_back =
+        record_the_flow_and_read_it_back(&mut store, &flow).expect("流写得进库、读得回");
+    let flow_read_back_from_the_library = read_back.flow();
+    record_crash_points(&mut store, &plan, &version, &mut CoverageReport::default())
+        .expect("录得进");
     assert_eq!(
         unjudged_blocks_of_the_flow(
             &store,
             &plan,
-            &ConclusionsStoredUnder::TheJudgeVersion(&judge_version()),
+            &ConclusionsStoredUnder::TheJudgeVersion(&version),
         )
         .expect("对得了账")
         .len(),
@@ -343,7 +384,7 @@ fn a_flow_reconciles_its_own_blocks_and_not_the_blocks_another_flow_recorded() {
         "录了还没判：两个点与末节点各一块，都在这条流自己的账上"
     );
     // 别的流录进同一份库的一块（拿这条流第一块的键换一个起点序号造出来），一直没判
-    let mut block_of_another_flow = unjudged_blocks(&store, &judge_version())
+    let mut block_of_another_flow = unjudged_blocks(&store, &version)
         .expect("对得了账")
         .first()
         .expect("录了三块")
@@ -355,26 +396,25 @@ fn a_flow_reconciles_its_own_blocks_and_not_the_blocks_another_flow_recorded() {
         .expect("录得进");
     check_recorded_blocks(
         &mut store,
-        &flow,
+        &flow_read_back_from_the_library,
         &plan,
         &WeightedShares::new(vec![1]),
         0,
-        &UnitChecksumsOn::CpuOnly,
-        &judge_version(),
+        &version,
     )
     .expect("核得完");
     assert!(
         unjudged_blocks_of_the_flow(
             &store,
             &plan,
-            &ConclusionsStoredUnder::TheJudgeVersion(&judge_version()),
+            &ConclusionsStoredUnder::TheJudgeVersion(&version),
         )
         .expect("对得了账")
         .is_empty(),
         "这条流的块都判完了，它自己的账是空的"
     );
     assert_eq!(
-        unjudged_blocks(&store, &judge_version()).expect("对得了账"),
+        unjudged_blocks(&store, &version).expect("对得了账"),
         vec![(block_of_another_flow, 7)],
         "整份库的账照旧报出别的流那一块"
     );
@@ -388,19 +428,23 @@ fn cpu_conclusions_store_the_recovery_words_of_every_state_without_the_gpu_featu
         record_new_pool_file_creation("crash-amplification-recovery-words", false, file_content());
     let flow = recorded.flow();
     let plan = plan_crash_points(&flow);
-    let temporary = TemporaryStore::new("recovery-words");
-    let mut store = temporary.create();
-    let version_of_each_point = vec![ConclusionVersion([5; 32]); plan.points.len()];
+    // 数的是整份库里存了几份结论：从空库起
+    let library = UnitTestLibrary::emptied_at_the_start("recovery-words");
+    let mut store = library.store();
+    // 判法只吃库里读回的那一份：流先写进库再读回，下面判、核、对账都用读回的。
+    let read_back =
+        record_the_flow_and_read_it_back(&mut store, &flow).expect("流写得进库、读得回");
+    let flow_read_back_from_the_library = read_back.flow();
+    let version_of_each_point = vec![fresh_conclusion_version(); plan.points.len()];
     let conclusions = ConclusionsStoredUnder::TheConclusionKind {
         kind: ConclusionKind::CpuJudge,
         version_of_each_point: &version_of_each_point,
     };
     let checking = check_blocks_where_until(
         &mut store,
-        &flow,
+        &flow_read_back_from_the_library,
         &plan,
         &|_block| true,
-        &UnitChecksumsOn::CpuOnly,
         &conclusions,
         &|| false,
     )
@@ -443,36 +487,51 @@ fn the_count_vectors_read_back_are_checked_against_the_plan_every_run() {
         record_new_pool_file_creation("crash-amplification-count-vectors", false, file_content());
     let flow = recorded.flow();
     let plan = plan_crash_points(&flow);
-    let temporary = TemporaryStore::new("count-vectors");
-    let mut store = temporary.create();
-    let judged_versions = vec![ConclusionVersion([5; 32]); plan.points.len()];
+    let library = UnitTestLibrary::new("count-vectors");
+    let mut store = library.store();
+    // 判法只吃库里读回的那一份：流先写进库再读回，下面判、核、对账都用读回的。
+    let read_back =
+        record_the_flow_and_read_it_back(&mut store, &flow).expect("流写得进库、读得回");
+    let flow_read_back_from_the_library = read_back.flow();
+    let judged_versions = vec![fresh_conclusion_version(); plan.points.len()];
     let judged = ConclusionsStoredUnder::TheConclusionKind {
         kind: ConclusionKind::CpuJudge,
         version_of_each_point: &judged_versions,
     };
     check_blocks_where_until(
         &mut store,
-        &flow,
+        &flow_read_back_from_the_library,
         &plan,
         &|_block| true,
-        &UnitChecksumsOn::CpuOnly,
         &judged,
         &|| false,
     )
     .expect("核得完");
     assert_eq!(
-        count_vector_disagreements_of_the_flow(&store, &flow, &plan, &judged, &|_block| true)
-            .expect("读得了"),
+        count_vector_disagreements_of_the_flow(
+            &store,
+            &flow_read_back_from_the_library,
+            &plan,
+            &judged,
+            &|_block| true
+        )
+        .expect("读得了"),
         Vec::<String>::new(),
         "判器存的计数向量与计划对得上"
     );
     let empty_vector = store
         .register_verdict_vector(&EncodedVerdictVector(Vec::new()))
         .expect("登记得了");
-    let blank_versions = vec![ConclusionVersion([6; 32]); plan.points.len()];
-    for (key, kind, version) in store.stored_conclusion_keys().expect("列得了结论") {
+    let blank_versions = vec![fresh_conclusion_version(); plan.points.len()];
+    // 只改这条流自己的块：长期库里还有别的趟、别的流的结论
+    for key in plan.points.iter().flat_map(|point| {
+        point
+            .blocks()
+            .into_iter()
+            .map(move |local| point.block_key(&local))
+    }) {
         let stored = store
-            .read_conclusion_block(&key, &kind, &version)
+            .read_conclusion_block(&key, &ConclusionKind::CpuJudge, &judged_versions[0])
             .expect("读得了")
             .expect("列出来的读得回来");
         let states = stored.block.verdict_vector_number_of_each_state().len();
@@ -495,9 +554,14 @@ fn the_count_vectors_read_back_are_checked_against_the_plan_every_run() {
         kind: ConclusionKind::CpuJudge,
         version_of_each_point: &blank_versions,
     };
-    let disagreements =
-        count_vector_disagreements_of_the_flow(&store, &flow, &plan, &blank, &|_block| true)
-            .expect("读得了");
+    let disagreements = count_vector_disagreements_of_the_flow(
+        &store,
+        &flow_read_back_from_the_library,
+        &plan,
+        &blank,
+        &|_block| true,
+    )
+    .expect("读得了");
     assert!(
         disagreements
             .iter()
@@ -521,44 +585,40 @@ fn a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_th
     let flow = recorded.flow();
     let plan = plan_crash_points(&flow);
     assert_eq!(total_blocks(&plan), 3, "两个点与末节点各一块");
-    let temporary = TemporaryStore::new("stop");
-    let mut store = temporary.create();
-    record_crash_points(
-        &mut store,
-        &plan,
-        &judge_version(),
-        &mut CoverageReport::default(),
-    )
-    .expect("录得进");
+    let library = UnitTestLibrary::new("stop");
+    let mut store = library.store();
+    let version = fresh_judge_version();
+    // 判法只吃库里读回的那一份：流先写进库再读回，下面判、核、对账都用读回的。
+    let read_back =
+        record_the_flow_and_read_it_back(&mut store, &flow).expect("流写得进库、读得回");
+    let flow_read_back_from_the_library = read_back.flow();
+    record_crash_points(&mut store, &plan, &version, &mut CoverageReport::default())
+        .expect("录得进");
     // 领第一块之前问一次（不停），领第二块之前再问一次（停）
     let asked = std::sync::atomic::AtomicUsize::new(0);
     let stop_before_the_second_block =
         || asked.fetch_add(1, std::sync::atomic::Ordering::SeqCst) >= 1;
     let stopped = check_blocks_where_until(
         &mut store,
-        &flow,
+        &flow_read_back_from_the_library,
         &plan,
         &|_block| true,
-        &UnitChecksumsOn::CpuOnly,
-        &ConclusionsStoredUnder::TheJudgeVersion(&judge_version()),
+        &ConclusionsStoredUnder::TheJudgeVersion(&version),
         &stop_before_the_second_block,
     )
     .expect("核得完");
     assert_eq!(stopped.blocks_checked, 1, "被叫停之前只判了第一块");
     assert_eq!(
-        unjudged_blocks(&store, &judge_version())
-            .expect("对得了账")
-            .len(),
+        unjudged_blocks(&store, &version).expect("对得了账").len(),
         2,
         "第二块与末节点那一块还没判"
     );
     let resumed = check_blocks_where_until(
         &mut store,
-        &flow,
+        &flow_read_back_from_the_library,
         &plan,
         &|_block| true,
-        &UnitChecksumsOn::CpuOnly,
-        &ConclusionsStoredUnder::TheJudgeVersion(&judge_version()),
+        &ConclusionsStoredUnder::TheJudgeVersion(&version),
         &|| false,
     )
     .expect("核得完");
@@ -568,7 +628,7 @@ fn a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_th
         plan.points.last().expect("有点").ordinals.end,
         "两趟合起来每个状态恰好判一次"
     );
-    assert!(unjudged_blocks(&store, &judge_version())
+    assert!(unjudged_blocks(&store, &version)
         .expect("对得了账")
         .is_empty());
 }
@@ -582,27 +642,27 @@ fn two_shares_leave_the_other_side_unjudged_until_that_side_checks_and_two_libra
     let plan = plan_crash_points(&flow);
     assert_eq!(total_blocks(&plan), 3, "两个点与末节点各一块");
     let shares = WeightedShares::new(vec![1, 1]);
-    let first_temporary = TemporaryStore::new("share-a");
-    let second_temporary = TemporaryStore::new("share-b");
-    let mut first = first_temporary.create();
-    let mut second = second_temporary.create();
+    let first_library = UnitTestLibrary::new("share-a");
+    let second_library = UnitTestLibrary::new("share-b");
+    let mut first = first_library.store();
+    let mut second = second_library.store();
+    let version = fresh_judge_version();
+    // 两方各从自己的库里读回流来判：判法只吃库里读回的那一份。
+    let first_read_back =
+        record_the_flow_and_read_it_back(&mut first, &flow).expect("流写得进第一方的库、读得回");
+    let second_read_back =
+        record_the_flow_and_read_it_back(&mut second, &flow).expect("流写得进第二方的库、读得回");
     for store in [&mut first, &mut second] {
-        record_crash_points(
-            store,
-            &plan,
-            &judge_version(),
-            &mut CoverageReport::default(),
-        )
-        .expect("录得进");
+        record_crash_points(store, &plan, &version, &mut CoverageReport::default())
+            .expect("录得进");
     }
     let first_tally = check_recorded_blocks(
         &mut first,
-        &flow,
+        &first_read_back.flow(),
         &plan,
         &shares,
         0,
-        &UnitChecksumsOn::CpuOnly,
-        &judge_version(),
+        &version,
     )
     .expect("核得完");
     assert_eq!(
@@ -610,32 +670,32 @@ fn two_shares_leave_the_other_side_unjudged_until_that_side_checks_and_two_libra
         "第一方只核分到它的那两块（平滑加权轮转：第 0、2 块）"
     );
     assert_eq!(
-        unjudged_blocks(&first, &judge_version())
-            .expect("对得了账")
-            .len(),
+        unjudged_blocks(&first, &version).expect("对得了账").len(),
         1,
         "另一方那一块在第一方的库里对账为没核完"
     );
     let second_tally = check_recorded_blocks(
         &mut second,
-        &flow,
+        &second_read_back.flow(),
         &plan,
         &shares,
         1,
-        &UnitChecksumsOn::CpuOnly,
-        &judge_version(),
+        &version,
     )
     .expect("核得完");
     assert_eq!(second_tally.blocks_checked, 1);
     let imported = first.import_from(&second).expect("导得进");
-    assert_eq!(imported, 1, "第二方那一块导进第一方的库");
     assert!(
-        unjudged_blocks(&first, &judge_version())
+        imported >= 1,
+        "第二方那一块导进第一方的库（整库导入连长期库里上几趟的块也算已导入）：{imported}"
+    );
+    assert!(
+        unjudged_blocks(&first, &version)
             .expect("对得了账")
             .is_empty(),
         "并成一个库之后对账为空"
     );
-    assert!(read_violations(&first, &plan, &judge_version())
+    assert!(read_violations(&first, &plan, &version)
         .expect("读得了违例")
         .is_empty());
 }
@@ -691,10 +751,15 @@ fn an_ignored_crash_point_keeps_its_place_in_the_tree_and_contributes_no_state_b
         other_plan.points[1].reuse_key, full_plan.points[1].reuse_key,
         "判法改了复用键也不动：块键只由流程定"
     );
-    let temporary = TemporaryStore::new("ignored");
-    let mut store = temporary.create();
+    let library = UnitTestLibrary::new("ignored");
+    let mut store = library.store();
+    let version = fresh_judge_version();
+    let other_version = fresh_judge_version();
+    // 判法只吃库里读回的那一份：流先写进库再读回。
+    let read_back =
+        record_the_flow_and_read_it_back(&mut store, &recorded.flow()).expect("流写得进库、读得回");
     let mut report = CoverageReport::default();
-    record_crash_points(&mut store, &plan, &judging.version(), &mut report).expect("录得进");
+    record_crash_points(&mut store, &plan, &version, &mut report).expect("录得进");
     assert!(
         report.lines()[1].ends_with(" ignored"),
         "{:?}",
@@ -703,26 +768,20 @@ fn an_ignored_crash_point_keeps_its_place_in_the_tree_and_contributes_no_state_b
     assert!(report.lines()[0].ends_with(" checked"));
     let checking = check_recorded_blocks(
         &mut store,
-        &recorded.flow(),
+        &read_back.flow(),
         &plan,
         &WeightedShares::new(vec![1]),
         0,
-        &UnitChecksumsOn::CpuOnly,
-        &judging.version(),
+        &version,
     )
     .expect("核得完");
     assert!(checking.blocks_checked > 0);
-    assert!(unjudged_blocks(&store, &judging.version())
+    assert!(unjudged_blocks(&store, &version)
         .expect("对得了账")
         .is_empty());
     let mut other_report = CoverageReport::default();
-    let other_recording = record_crash_points(
-        &mut store,
-        &plan,
-        &other_judging.version(),
-        &mut other_report,
-    )
-    .expect("录得进");
+    let other_recording =
+        record_crash_points(&mut store, &plan, &other_version, &mut other_report).expect("录得进");
     assert_eq!(
         other_recording.blocks_already_judged, 0,
         "判法版本换了，旧版本的判定一块都不复用"
@@ -732,14 +791,14 @@ fn an_ignored_crash_point_keeps_its_place_in_the_tree_and_contributes_no_state_b
         "同样的块在新版本下全部待判"
     );
     assert_eq!(
-        unjudged_blocks(&store, &other_judging.version())
+        unjudged_blocks(&store, &other_version)
             .expect("对得了账")
             .len(),
         usize::try_from(checking.blocks_checked).expect("块数"),
         "新版本下对账列出全部块"
     );
     assert!(
-        unjudged_blocks(&store, &judging.version())
+        unjudged_blocks(&store, &version)
             .expect("对得了账")
             .is_empty(),
         "旧版本的行还在"
@@ -758,23 +817,22 @@ fn a_wrong_version_table_makes_the_pipeline_store_red_states_the_gate_can_read()
     let recorded = record_new_pool_file_creation("crash-amplification-red", false, wrong_content);
     let flow = recorded.flow();
     let plan = plan_crash_points(&flow);
-    let temporary = TemporaryStore::new("red");
-    let mut store = temporary.create();
-    record_crash_points(
-        &mut store,
-        &plan,
-        &judge_version(),
-        &mut CoverageReport::default(),
-    )
-    .expect("录得进");
+    let library = UnitTestLibrary::new("red");
+    let mut store = library.store();
+    let version = fresh_judge_version();
+    // 判法只吃库里读回的那一份：流先写进库再读回，下面判、核、对账都用读回的。
+    let read_back =
+        record_the_flow_and_read_it_back(&mut store, &flow).expect("流写得进库、读得回");
+    let flow_read_back_from_the_library = read_back.flow();
+    record_crash_points(&mut store, &plan, &version, &mut CoverageReport::default())
+        .expect("录得进");
     let checking = check_recorded_blocks(
         &mut store,
-        &flow,
+        &flow_read_back_from_the_library,
         &plan,
         &WeightedShares::new(vec![1]),
         0,
-        &UnitChecksumsOn::CpuOnly,
-        &judge_version(),
+        &version,
     )
     .expect("核得完");
     assert!(
@@ -789,7 +847,7 @@ fn a_wrong_version_table_makes_the_pipeline_store_red_states_the_gate_can_read()
                 .all(|(_, _, text)| !text.is_empty()),
         "每个红状态有自己现算的正文"
     );
-    let violations = read_violations(&store, &plan, &judge_version()).expect("读得了违例");
+    let violations = read_violations(&store, &plan, &version).expect("读得了违例");
     assert_eq!(
         u64::try_from(violations.len()).expect("装得进"),
         checking.red_states,
@@ -797,10 +855,9 @@ fn a_wrong_version_table_makes_the_pipeline_store_red_states_the_gate_can_read()
     );
     for red in &violations {
         assert!(
-            red.items.iter().all(
-                |item| item.starts_with(LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE)
-                    || item.starts_with(LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE)
-            ),
+            red.items.iter().all(|item| item
+                .starts_with(CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE)
+                || item.starts_with(CRASH_POINT_REPLAY_RED_PASS_JOURNAL_IGNORED_ORACLE)),
             "只有 oracle 那一道该红：{:?}",
             red.items
         );
@@ -823,52 +880,64 @@ fn the_cpu_facts_verifier_agrees_with_the_judge_on_every_state_and_reuses_its_bl
         record_new_pool_file_creation("crash-amplification-verifier", false, file_content());
     let flow = recorded.flow();
     let plan = plan_crash_points(&flow);
-    let temporary = TemporaryStore::new("verifier");
-    let mut store = temporary.create();
-    record_crash_points(
-        &mut store,
-        &plan,
-        &judge_version(),
-        &mut CoverageReport::default(),
-    )
-    .expect("录得进");
+    let library = UnitTestLibrary::new("verifier");
+    let mut store = library.store();
+    let version = fresh_judge_version();
+    // 判法只吃库里读回的那一份：流先写进库再读回，下面判、核、对账都用读回的。
+    let read_back =
+        record_the_flow_and_read_it_back(&mut store, &flow).expect("流写得进库、读得回");
+    let flow_read_back_from_the_library = read_back.flow();
+    record_crash_points(&mut store, &plan, &version, &mut CoverageReport::default())
+        .expect("录得进");
     let checking = check_recorded_blocks(
         &mut store,
-        &flow,
+        &flow_read_back_from_the_library,
         &plan,
         &WeightedShares::new(vec![1]),
         0,
-        &UnitChecksumsOn::CpuOnly,
-        &judge_version(),
+        &version,
     )
     .expect("核得完");
     assert_eq!(checking.red_states, 0);
     let on = FactsVerifierOn::Cpu;
-    let tally = verify_blocks_from_facts(&mut store, &flow, &plan, &|_| true, &on).expect("核得完");
+    let tally = verify_blocks_from_facts(
+        &mut store,
+        &flow_read_back_from_the_library,
+        &plan,
+        &|_| true,
+        &on,
+    )
+    .expect("核得完");
     assert_eq!(
-        tally.states_verified, checking.states_checked,
-        "第 ② 段核了每个状态"
+        tally.blocks_verified + tally.blocks_already_verified,
+        total_blocks(&plan),
+        "第 ② 段每一块都核了或早核过（长期库：上一趟这一版核对代码核过的块照摘要复用）"
     );
     assert_eq!(tally.verifier_red_states, 0, "健康流第 ② 段也全绿");
-    assert_eq!(tally.blocks_already_verified, 0);
     let comparison =
-        compare_judge_and_verifier(&store, &plan, &on.verifier_digest(), &judge_version())
-            .expect("比得完");
+        compare_judge_and_verifier(&store, &plan, &on.verifier_digest(), &version).expect("比得完");
     assert_eq!(comparison.states_compared, checking.states_checked);
     assert_eq!(comparison.both_green, checking.states_checked);
     assert_eq!(comparison.disagreements, 0);
     assert_eq!(comparison.blocks_without_verifier, 0);
     assert_eq!(comparison.blocks_without_judge, 0);
-    let again = verify_blocks_from_facts(&mut store, &flow, &plan, &|_| true, &on).expect("核得完");
+    let again = verify_blocks_from_facts(
+        &mut store,
+        &flow_read_back_from_the_library,
+        &plan,
+        &|_| true,
+        &on,
+    )
+    .expect("核得完");
     assert_eq!(again.blocks_verified, 0, "同一版核对代码第二趟全部复用");
-    assert_eq!(again.blocks_already_verified, tally.blocks_verified);
+    assert_eq!(again.blocks_already_verified, total_blocks(&plan));
     // 换一版「核对代码」（摘要不同）：旧行留着，新版从头核
     let mut other_digest = on.verifier_digest();
     other_digest[0] ^= 0x01;
     let elsewhere =
-        compare_judge_and_verifier(&store, &plan, &other_digest, &judge_version()).expect("比得完");
+        compare_judge_and_verifier(&store, &plan, &other_digest, &version).expect("比得完");
     assert_eq!(elsewhere.states_compared, 0, "别的摘要下一块都没核过");
-    assert_eq!(elsewhere.blocks_without_verifier, tally.blocks_verified);
+    assert_eq!(elsewhere.blocks_without_verifier, total_blocks(&plan));
 }
 
 #[test]
@@ -879,35 +948,40 @@ fn a_wrong_version_table_is_judge_red_only_for_the_facts_verifier() {
         record_new_pool_file_creation("crash-amplification-verifier-red", false, wrong_content);
     let flow = recorded.flow();
     let plan = plan_crash_points(&flow);
-    let temporary = TemporaryStore::new("verifier-red");
-    let mut store = temporary.create();
-    record_crash_points(
-        &mut store,
-        &plan,
-        &judge_version(),
-        &mut CoverageReport::default(),
-    )
-    .expect("录得进");
+    let library = UnitTestLibrary::new("verifier-red");
+    let mut store = library.store();
+    let version = fresh_judge_version();
+    // 判法只吃库里读回的那一份：流先写进库再读回，下面判、核、对账都用读回的。
+    let read_back =
+        record_the_flow_and_read_it_back(&mut store, &flow).expect("流写得进库、读得回");
+    let flow_read_back_from_the_library = read_back.flow();
+    record_crash_points(&mut store, &plan, &version, &mut CoverageReport::default())
+        .expect("录得进");
     let checking = check_recorded_blocks(
         &mut store,
-        &flow,
+        &flow_read_back_from_the_library,
         &plan,
         &WeightedShares::new(vec![1]),
         0,
-        &UnitChecksumsOn::CpuOnly,
-        &judge_version(),
+        &version,
     )
     .expect("核得完");
     assert!(checking.red_states > 0, "版本表写错，判器红");
     let on = FactsVerifierOn::Cpu;
-    let tally = verify_blocks_from_facts(&mut store, &flow, &plan, &|_| true, &on).expect("核得完");
+    let tally = verify_blocks_from_facts(
+        &mut store,
+        &flow_read_back_from_the_library,
+        &plan,
+        &|_| true,
+        &on,
+    )
+    .expect("核得完");
     assert_eq!(
         tally.verifier_red_states, 0,
         "版本表是判器的输入，不是盘上的事实：第 ② 段看不见它"
     );
     let comparison =
-        compare_judge_and_verifier(&store, &plan, &on.verifier_digest(), &judge_version())
-            .expect("比得完");
+        compare_judge_and_verifier(&store, &plan, &on.verifier_digest(), &version).expect("比得完");
     assert_eq!(
         comparison.judge_red_only, checking.red_states,
         "判器红而核对绿的正是那些状态"
@@ -938,22 +1012,24 @@ fn amplify(recorded: &RecordedFlow, flow_name: &str) -> (EnvironmentRun, Option<
     )
 }
 
-/// 按环境跑的用例的临时目录：一份空的多机配置（单机 CPU）与一份库，环境守卫只设这三个、别的全清。
+/// 按环境跑的用例的目录：家目录下流水线单元测试那一类的长期库里以用例标签命名的一份目录，里面一份空的多机配置（单机 CPU）与一份库 `library`
+/// （两台分片的用例再放几份）；环境守卫只设这两个、别的全清。这几条用例钉的是空库起跑的账（第一趟全判、第二趟全复用、两台各判各的再导入），
+/// 起跑先清空这一份（`crash_library::amplification_unit_tests_library_directory_emptied_at_the_start`），跑完留着不删。
 struct EnvironmentRunDirectory {
-    temporary: TemporaryStore,
+    directory: PathBuf,
     configuration: PathBuf,
     library: PathBuf,
 }
 
 impl EnvironmentRunDirectory {
     fn new(tag: &str) -> Self {
-        let temporary = TemporaryStore::new(tag);
-        std::fs::create_dir_all(&temporary.directory).expect("建得了临时目录");
-        let configuration = temporary.directory.join("multi-host.env");
+        let directory = amplification_unit_tests_library_directory_emptied_at_the_start(tag)
+            .expect("流水线单元测试那一类里这条用例的目录");
+        let configuration = directory.join("multi-host.env");
         std::fs::write(&configuration, "").expect("写得了空配置");
-        let library = temporary.directory.join("library");
+        let library = directory.join("library");
         Self {
-            temporary,
+            directory,
             configuration,
             library,
         }
@@ -965,10 +1041,6 @@ impl EnvironmentRunDirectory {
             (
                 "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
                 self.library.as_os_str(),
-            ),
-            (
-                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
-                OsStr::new("1"),
             ),
         ])
     }
@@ -1064,7 +1136,7 @@ fn a_run_stopped_with_every_block_already_judged_reports_them_as_reused() {
     let directory = EnvironmentRunDirectory::new("stopped-reuse");
     let mut environment = directory.environment();
     let (first_run, _) = amplify(&recorded, "stopped-reuse");
-    let stop_file = directory.temporary.directory.join("stop");
+    let stop_file = directory.directory.join("stop");
     std::fs::write(&stop_file, "").expect("放得了叫停文件");
     environment.set(
         "SINGLEFS_CRASH_AMPLIFICATION_STOP_FILE",
@@ -1104,7 +1176,7 @@ fn a_run_importing_another_library_reports_the_states_judged_before_the_import_a
     let directory = EnvironmentRunDirectory::new("import-reuse");
     let mut environment = directory.environment();
     let (first_run, _) = amplify(&recorded, "import-reuse");
-    let other_library = directory.temporary.directory.join("other-library");
+    let other_library = directory.directory.join("other-library");
     drop(VerdictStore::create_empty(&other_library).expect("建得了要导入的那一份空库"));
     environment.set(
         "SINGLEFS_CRASH_AMPLIFICATION_IMPORT",
@@ -1209,15 +1281,22 @@ fn amplify_with_observers(
 /// 把第 0、2 块分给 0/2、第 1 块（发布那个点）分给 1/2；发布那个点挂一个只数状态的观察者。导入之后这条流一块没判的都没有；
 /// 本机库里每块每种结论（两种判器、观察者）按内容读回，与一台把整条流判完的那份库逐项相同；导入写的结论块数等于第二台那一份库里的
 /// 结论块数，钉成绝对值 2（CPU 判器 1 块、观察者 1 块；没配 GPU，GPU 判器那一种两边都没有）。
+/// 四趟都没开 GPU（第 ② 段由 CPU 参照核），第二台那一块只在第二台的库里核过（攻方 P4-1 的 h02 形状）：
+/// 导入那一趟第 ③ 段比对没有一块缺核对行，本机库里每块在 CPU 核对代码下的核对行与一台判完的逐项相同。
+/// 再带同一份导入跑一趟（P5-2）：要导的全是本库已有且相同的，`imported_blocks` 照数，与第一次导入相同。
 /// 判别力（`crates/mutations.tsv`）：排键时选块条件反过来（点的是本机那一份），第二台那一块导不进来、对账剩 1 块；
-/// 排键漏掉观察者那一种，导入只写 1 块、本机库里发布那一块没有观察者的结论。
+/// 排键漏掉观察者那一种，导入只写 1 块、本机库里发布那一块没有观察者的结论；排键一行核对行都不点，导入那一趟比对缺 1 块核对行；
+/// 导入块数只数写下的、不数已有且相同的，再导一次报 0。
 #[test]
 fn importing_the_other_share_names_its_blocks_and_reads_back_like_one_host_judging_the_whole_flow()
 {
     let recorded =
         record_new_pool_file_creation("crash-amplification-import-planned", false, file_content());
     let observe_by_counting =
-        |_image: &CrashImage<'_>, _report: &RecoveryReport, counts: &mut Layer0ObserverCounts| {
+        |_ordinal: u64,
+         _image: &CrashImage<'_>,
+         _report: &RecoveryReport,
+         counts: &mut CrashPointReplayObserverCounts| {
             counts.add(STATES_SEEN_BY_THE_IMPORT_PROBE_COUNTER, 1);
         };
     let observers = [ObserverOnTheNodes {
@@ -1228,7 +1307,7 @@ fn importing_the_other_share_names_its_blocks_and_reads_back_like_one_host_judgi
             setting_file: THIS_FILE.to_string(),
             entry_name: "publish_first_file".to_string(),
         }],
-        observe: &observe_by_counting,
+        observe: ObserverCode::CountsOnly(&observe_by_counting),
     }];
     let plan = plan_crash_points(&recorded.flow());
     assert_eq!(total_blocks(&plan), 3, "前提：两个点与末节点各一块");
@@ -1241,8 +1320,8 @@ fn importing_the_other_share_names_its_blocks_and_reads_back_like_one_host_judgi
         "前提：1/2 那一份只有第 1 块（发布那个点）"
     );
     let directory = EnvironmentRunDirectory::new("import-planned");
-    let one_host_library = directory.temporary.directory.join("one-host-library");
-    let other_share_library = directory.temporary.directory.join("other-share-library");
+    let one_host_library = directory.directory.join("one-host-library");
+    let other_share_library = directory.directory.join("other-share-library");
     let this_share_library = directory.library.clone();
     let mut environment = directory.environment();
     environment.set(
@@ -1267,8 +1346,31 @@ fn importing_the_other_share_names_its_blocks_and_reads_back_like_one_host_judgi
         other_share_library.as_os_str(),
     );
     let importing_run = amplify_with_observers(&recorded, "import-planned", &observers);
+    let importing_again_run = amplify_with_observers(&recorded, "import-planned", &observers);
     drop(environment);
     assert_eq!(one_host_run.unjudged_blocks, 0, "一台判完整条流");
+    let comparison_of_the_import = importing_run
+        .comparison
+        .as_ref()
+        .expect("没开 GPU：第 ② 段由 CPU 参照核，导入那一趟核了、比了");
+    assert_eq!(
+        (
+            comparison_of_the_import.blocks_without_verifier,
+            comparison_of_the_import.blocks_without_judge,
+            comparison_of_the_import.disagreements
+        ),
+        (0, 0, 0),
+        "导入那一趟第 ③ 段：第二台那一块的核对行随结论一起导进来，没有一块缺核对行"
+    );
+    assert_eq!(
+        (
+            importing_again_run.imported_blocks,
+            importing_again_run.checking.blocks_checked,
+            importing_again_run.unjudged_blocks
+        ),
+        (importing_run.imported_blocks, 0, 0),
+        "再导一次：要导的全是本库已有且相同的，导入块数照数、与第一次相同，一块不判"
+    );
     assert_eq!(
         (
             other_share_run.checking.blocks_checked,
@@ -1333,6 +1435,41 @@ fn importing_the_other_share_names_its_blocks_and_reads_back_like_one_host_judgi
             block_key.stream_or_node_name.as_str()
         );
     }
+    let cpu_verifier_digest = FactsVerifierOn::Cpu.verifier_digest();
+    let mut block_keys_of_the_flow: Vec<&VerdictBlockKey> = Vec::new();
+    for (block_key, _, _) in &one_host_conclusions {
+        if !block_keys_of_the_flow.contains(&block_key) {
+            block_keys_of_the_flow.push(block_key);
+        }
+    }
+    assert_eq!(block_keys_of_the_flow.len(), 3, "前提：这条流 3 块");
+    for block_key in block_keys_of_the_flow {
+        let verifier_row_of_one_host = one_host_store
+            .read_verifier_block(block_key, &cpu_verifier_digest)
+            .expect("读得了一台判完的核对行")
+            .unwrap_or_else(|| {
+                panic!(
+                    "一台判完、核了：块 {} 有 CPU 核对代码的核对行",
+                    block_key.stream_or_node_name.as_str()
+                )
+            });
+        assert_eq!(
+            this_share_store
+                .read_verifier_block(block_key, &cpu_verifier_digest)
+                .expect("读得了导入之后的核对行")
+                .as_ref(),
+            Some(&verifier_row_of_one_host),
+            "块 {} 的核对行：导入之后的本机库与一台判完的读回不同",
+            block_key.stream_or_node_name.as_str()
+        );
+        let facts_of_one_host = one_host_store
+            .read_flow_facts(&verifier_row_of_one_host.facts_digest)
+            .expect("读得了一台判完的事实行");
+        assert!(
+            facts_of_one_host.is_some(),
+            "一台判完：核对行点名的事实行在库里"
+        );
+    }
     drop((one_host_store, other_share_store, this_share_store));
     drop(directory);
 }
@@ -1381,7 +1518,7 @@ fn judge_every_given_states_table(
             setting_file: THIS_FILE.to_string(),
             seeds_and_scale: "new_pool_file_creation import_probe".to_string(),
         },
-        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
+        &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
         &repository_root(),
     )
     .expect("CPU 配置的给定状态表引擎起得来");
@@ -1403,8 +1540,9 @@ fn judge_every_given_states_table(
 /// 一张都不现判。与旧的整库导入对拍（`VerdictStore::import_from` 把 B 整个导进一份空库，再在那份库上起本机这一份、不设导入，判同一批）：
 /// 两边交回的结论逐张相同；按名导入的库里这一项的（块键，种类，版本）与整库导入的那份里这一项的逐项相同、按内容读回逐项相同，
 /// 另一项的一行都没有。账钉成绝对值：导入 4 块（每张表一块 CPU 判器结论；没配 GPU，GPU 判器那一种 B 里没有）、复用 4 张、现判 0 张。
+/// 再带同一份导入判一遍这 4 张表（P5-2）：要导的全是本库已有且相同的，导入块数照数，账与第一次相同。
 /// 判别力（`crates/mutations.tsv`）：归别的机器的表不导（导入条件里的归属反过来），引擎判第一张表就报「导入之后库里还是没有」；
-/// 点名漏掉 CPU 判器那一种，同样报错。
+/// 点名漏掉 CPU 判器那一种，同样报错；导入块数只数写下的、不数已有且相同的，再导一遍报 0。
 #[test]
 fn given_states_tables_of_another_host_are_imported_by_name_and_read_back_like_the_whole_library_import(
 ) {
@@ -1418,8 +1556,8 @@ fn given_states_tables_of_another_host_are_imported_by_name_and_read_back_like_t
     let other_item_tables =
         given_states_tables_of_the_flow(&recorded, GIVEN_STATES_TABLES_OF_THE_OTHER_ITEM);
     let directory = EnvironmentRunDirectory::new("given-states-import");
-    let other_host_library = directory.temporary.directory.join("other-host-library");
-    let whole_import_library = directory.temporary.directory.join("whole-import-library");
+    let other_host_library = directory.directory.join("other-host-library");
+    let whole_import_library = directory.directory.join("whole-import-library");
     let named_import_library = directory.library.clone();
     let mut environment = directory.environment();
     environment.set(
@@ -1460,6 +1598,8 @@ fn given_states_tables_of_another_host_are_imported_by_name_and_read_back_like_t
     );
     let (after_the_named_import, named_import_run) =
         judge_every_given_states_table(GIVEN_STATES_IMPORTED_ITEM, &tables);
+    let (after_importing_again, importing_again_run) =
+        judge_every_given_states_table(GIVEN_STATES_IMPORTED_ITEM, &tables);
     drop(environment);
     assert_eq!(
         (
@@ -1486,6 +1626,15 @@ fn given_states_tables_of_another_host_are_imported_by_name_and_read_back_like_t
         tally_counts(&named_import_run),
         (4, 4, 0, 0),
         "按名导入：导入 4 块、复用 4 张、现判 0 张、留给别的机器 0 张"
+    );
+    assert_eq!(
+        tally_counts(&importing_again_run),
+        tally_counts(&named_import_run),
+        "再导一遍：要导的 4 块全是本库已有且相同的，导入块数照数，账与第一次相同"
+    );
+    assert_eq!(
+        after_importing_again, after_the_named_import,
+        "再导一遍之后引擎交回的结论与第一次逐张相同"
     );
     assert_eq!(
         after_the_named_import, after_the_whole_import,
@@ -1589,10 +1738,7 @@ fn a_placement_only_run_reports_the_states_judged_at_recording_as_reused() {
     let directory = EnvironmentRunDirectory::new("placement-reuse");
     let mut environment = directory.environment();
     // 两趟都开 GPU：结论按（块键，结论种类，版本）存（崩溃点重放合并第三轮判决 J8），CPU 判过的块不是 GPU 那一种的复用
-    let gpu_configuration = directory
-        .temporary
-        .directory
-        .join("multi-host-with-gpu.env");
+    let gpu_configuration = directory.directory.join("multi-host-with-gpu.env");
     std::fs::write(&gpu_configuration, format!("ENABLE_GPU=1\n{cards}"))
         .expect("写得了开 GPU 的配置");
     environment.set("SINGLEFS_MULTI_HOST_CONFIG", gpu_configuration.as_os_str());
@@ -1638,10 +1784,10 @@ fn the_environment_guard_clears_what_a_run_reads_and_restores_the_values_left_by
         for name in ENVIRONMENT_VARIABLES_READ_BY_A_RUN {
             assert_eq!(std::env::var_os(name), None, "守卫里 {name} 是清掉的");
         }
-        inner.set("SINGLEFS_CRASH_AMPLIFICATION_VERIFY", OsStr::new("cpu"));
+        inner.set("SINGLEFS_CRASH_AMPLIFICATION_STAGE", OsStr::new("judge"));
         assert_eq!(
-            std::env::var("SINGLEFS_CRASH_AMPLIFICATION_VERIFY").as_deref(),
-            Ok("cpu"),
+            std::env::var("SINGLEFS_CRASH_AMPLIFICATION_STAGE").as_deref(),
+            Ok("judge"),
             "用例设的那一个照它的"
         );
     }
@@ -1656,9 +1802,204 @@ fn the_environment_guard_clears_what_a_run_reads_and_restores_the_values_left_by
         "调用方设了的写回原值"
     );
     assert_eq!(
-        std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_VERIFY"),
+        std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_STAGE"),
         None,
         "调用方没设的仍然没设"
     );
     drop(caller);
+}
+
+/// 用户 2026-10-13 定「配 GPU 必用 GPU」：配置开了 GPU 而这份二进制没编进 gpu 特性（提交时快档不带特性那一趟），这一趟判段不跑、报本次未跑
+/// （不判红、不退回 CPU 判：一块都不判），录入段照录（库里有这条流的清单）；带特性那一趟这条用例不编，照常上 GPU 判
+/// （`crash_amplification_planned_import_names_the_gpu_conclusions.rs`）。判别力（`crates/mutations.tsv`）：不带特性时照 CPU 判下去，这条红。
+#[cfg(not(feature = "gpu"))]
+#[test]
+fn a_binary_without_the_gpu_feature_reports_the_judge_not_run_when_the_configuration_switches_the_gpu_on(
+) {
+    let recorded = record_new_pool_file_creation(
+        "crash-amplification-gpu-without-the-feature",
+        false,
+        file_content(),
+    );
+    let directory = EnvironmentRunDirectory::new("gpu-without-the-feature");
+    std::fs::write(&directory.configuration, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
+    let environment = directory.environment();
+    let (run, line) = amplify(&recorded, "gpu-without-the-feature");
+    drop(environment);
+    assert!(
+        run.not_run_without_the_gpu_feature
+            .as_ref()
+            .is_some_and(|reason| reason.contains("ENABLE_GPU=1")),
+        "判段报本次未跑：{:?}",
+        run.not_run_without_the_gpu_feature
+    );
+    assert!(run.recorded_only, "录入段照录、判段没跑");
+    assert_eq!(
+        (run.checking.blocks_checked, run.checking.states_checked),
+        (0, 0),
+        "不退回 CPU 判：一块都不判"
+    );
+    assert_eq!(line, None, "判段没跑的那一趟不打判过的那一行");
+    let (store, _) = VerdictStore::open_existing(&directory.library).expect("开得了库");
+    assert!(
+        store
+            .read_recorded_run_manifest("gpu-without-the-feature")
+            .expect("读得了清单")
+            .is_some(),
+        "录入段照录：库里有这条流的清单"
+    );
+}
+
+/// 用户 2026-10-13 定「配 GPU 必用 GPU、做不到报错不降级」：崩溃枚举用例那一路（`crash_state_enumeration::enumerate_crash_states_with_expansion`）
+/// 遇配置开了 GPU 而这份二进制没编进 gpu 特性，照崩溃放量那一处的写法：录入段照录（库里有这一项的清单），判段不判、报本次未跑
+/// （`crash_state_enumeration::crash_point_replay_judge_not_run_line`）、交只录（`.judged()` 是 `None`，用例照它收工），库里一块判器结论都没有
+/// （不退回 CPU 判）。新池新建文件那条流当一个崩溃点，只展开写数不超过 6 的段。带特性那一趟这条用例不编，照常上 GPU 判。
+/// 判别力（`crates/mutations.tsv`）：选路把这一种退回 CPU 判，这条红；判段闭包不先交只录，这条红。
+// crash-case-check:not-a-crash-case 新池新建文件那条流只展开写数不超过 6 的段，几十个状态，判段又不判，单跑几秒
+#[cfg(not(feature = "gpu"))]
+#[test]
+fn a_crash_enumeration_case_without_the_gpu_feature_records_and_reports_the_judge_not_run_when_the_configuration_switches_the_gpu_on(
+) {
+    use singlefs_checker_tier::crash_state_enumeration::{
+        enumerate_crash_states_with_expansion, CrashPointReplayItem,
+    };
+    let recorded = record_new_pool_file_creation(
+        "crash-enumeration-gpu-without-the-feature",
+        false,
+        file_content(),
+    );
+    let directory = EnvironmentRunDirectory::new("crash-enumeration-gpu-without-the-feature");
+    std::fs::write(&directory.configuration, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
+    let environment = directory.environment();
+    let expansion = |_segment_index: usize, segment: &[usize]| {
+        if segment.len() <= LARGEST_EXPANDED_SEGMENT_WRITES {
+            CrashPointReplaySegmentExpansion::EveryProperSubset
+        } else {
+            CrashPointReplaySegmentExpansion::NotExpanded
+        }
+    };
+    let item_name = "crash_enumeration_gpu_without_the_feature";
+    let outcome = enumerate_crash_states_with_expansion(
+        CrashPointReplayItem {
+            name: item_name,
+            setting_file: THIS_FILE,
+        },
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        recorded.judged_root_index,
+        singlefs_checker_tier::crash::CrashPointReplayVersionTable::with_a_file_only(
+            &recorded.versions,
+        ),
+        &expansion,
+        &[],
+    );
+    drop(environment);
+    assert!(outcome.judged().is_none(), "判段不判、交只录：用例照它收工");
+    let (store, _) = VerdictStore::open_existing(&directory.library).expect("开得了库");
+    assert!(
+        store
+            .read_recorded_run_manifest(item_name)
+            .expect("读得了清单")
+            .is_some(),
+        "录入段照录：库里有这一项的清单"
+    );
+    let judge_conclusions = store
+        .stored_conclusion_keys()
+        .expect("列得出库里的结论")
+        .into_iter()
+        .filter(|(_key, kind, _version)| {
+            matches!(kind, ConclusionKind::CpuJudge | ConclusionKind::GpuJudge)
+        })
+        .count();
+    assert_eq!(
+        judge_conclusions, 0,
+        "不退回 CPU 判：库里一块判器结论都没有"
+    );
+}
+
+/// 用户 2026-10-13 定「能走两段的都走两段」：CPU 取样（`crash_state_enumeration::sample_crash_states_on_the_cpu`，实验装置逐状态取样那一路）
+/// 从库里读回流、逐状态在 CPU 上判，取样序号段整块罩住的块照 CPU 判器那一处（`JudgedBy::CpuJudge`）存进崩溃点重放枚举那一类的库。
+/// 新池新建文件那条流当一个崩溃点（取样那一路的流加末节点）：先取一个空序号段得整条流的状态数（一块都不存），再取全部状态，
+/// 库里 CPU 判器那一种结论的块数等于这条流计划的块数（崩溃点那一块加末节点那一块）。
+/// 判别力（`crates/mutations.tsv`）：取样一块都不认（结论不入库），这条红。
+// crash-case-check:not-a-crash-case 新池新建文件那条流只展开写数不超过 6 的段，几十个状态，单跑几秒
+#[test]
+fn sampling_every_crash_state_on_the_cpu_stores_the_cpu_judge_conclusion_of_every_block() {
+    use singlefs_checker_tier::crash::CrashStateJudgement;
+    use singlefs_checker_tier::crash_state_enumeration::{
+        sample_crash_states_on_the_cpu, CrashPointReplayItem,
+    };
+    let recorded = record_new_pool_file_creation(
+        "crash-amplification-sampled-on-the-cpu",
+        false,
+        file_content(),
+    );
+    let directory = EnvironmentRunDirectory::new("sampled-on-the-cpu");
+    let environment = directory.environment();
+    let expansion = |_segment_index: usize, segment: &[usize]| {
+        if segment.len() <= LARGEST_EXPANDED_SEGMENT_WRITES {
+            CrashPointReplaySegmentExpansion::EveryProperSubset
+        } else {
+            CrashPointReplaySegmentExpansion::NotExpanded
+        }
+    };
+    let item = CrashPointReplayItem {
+        name: "sampled_new_pool_file_creation",
+        setting_file: THIS_FILE,
+    };
+    let states = sample_crash_states_on_the_cpu(
+        item,
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        recorded.judged_root_index,
+        &recorded.versions,
+        &expansion,
+        0..0,
+        &mut |_ordinal: u64, _image: &CrashImage<'_>, _judgement: &CrashStateJudgement| {},
+    )
+    .judged()
+    .expect("两段先后跑：判段交回整条流的状态数");
+    let (store_before_sampling, _) =
+        VerdictStore::open_existing(&directory.library).expect("开得了库");
+    let cpu_judge_blocks_of = |store: &VerdictStore| {
+        store
+            .stored_conclusion_keys()
+            .expect("列得出库里的结论")
+            .into_iter()
+            .filter(|(_key, kind, _version)| *kind == ConclusionKind::CpuJudge)
+            .count()
+    };
+    assert_eq!(
+        cpu_judge_blocks_of(&store_before_sampling),
+        0,
+        "空序号段一块都不存"
+    );
+    drop(store_before_sampling);
+    let mut sampled = 0u64;
+    sample_crash_states_on_the_cpu(
+        item,
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        recorded.judged_root_index,
+        &recorded.versions,
+        &expansion,
+        0..states,
+        &mut |_ordinal: u64, _image: &CrashImage<'_>, _judgement: &CrashStateJudgement| {
+            sampled += 1;
+        },
+    )
+    .judged()
+    .expect("两段先后跑：判段判完");
+    drop(environment);
+    assert_eq!(sampled, states, "取样把每个状态都交回装置");
+    let (store_after_sampling, _) =
+        VerdictStore::open_existing(&directory.library).expect("开得了库");
+    assert_eq!(
+        cpu_judge_blocks_of(&store_after_sampling),
+        2,
+        "整条流取样完：崩溃点那一块与末节点那一块的 CPU 判器结论都在库里"
+    );
 }

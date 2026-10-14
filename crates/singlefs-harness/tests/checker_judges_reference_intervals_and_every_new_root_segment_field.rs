@@ -1,7 +1,7 @@
 //! 池级 checker 里程碑三第 8 批的几处判法，每条一份镜像（干净的，或改一处之后重封、沿引用链补到根槽的）：
 //! - I-3.5（引用区间的精确性）的出现规则：诞生代号下界 (a)、按树继承下界（TF）、再次出现也判（β）、候选集有洞（gap）、
 //!   实例表行接得上就照判（gap-row）、接不上时只放过用户可见树里的单元（N3）——`research/prompts/m3-birth-floor-r3-main-verification.md`，
-//!   用户 2026-10-03 定丙；措辞是 `.claude/kb/invariants.md` I-3.5 那一行；
+//!   用户 2026-10-03 定丙；措辞是 `crates/singlefs-checker/invariants/05-空间记账.md` I-3.5 那一行；
 //! - I-9.25（树表条目的 previous_snapshot_txg 取值）：树表被几版共享时每一版拿自己的 txg 各判一次（回到 kb 字面）；
 //! - I-8.10（记录新根段与同代根相同）：七段里新加的实例表指针、分配记录树根指针、卸载记号三段，与写行那次发布的记录（RR3 的观察者）；
 //! - 记录新根段卸载记号位 0 之外有位为 1：池级 checker 与恢复收下同一批记录（m3-root-ring-code-r1 判决 RR1）。
@@ -608,7 +608,7 @@ fn image_with_a_hole_the_instance_table_rows_do_not_bridge(
 }
 
 /// gap（缺口）：同一个改法——C 新写的数据单元诞生代号改小到 A 的 txg——在没有洞的镜像上红（与 B 相邻），在 B 的根槽读不出、
-/// 实例表行接不上的那份上不判（N3 只放过用户可见树里的单元：盲区，`.claude/kb/invariants.md` I-3.5 射程），I-3.5 成立。
+/// 实例表行接不上的那份上不判（N3 只放过用户可见树里的单元：盲区，`crates/singlefs-checker/invariants/05-空间记账.md` I-3.5 射程），I-3.5 成立。
 /// 去掉缺口那一条（洞上的用户可见树单元照判）这一条红。
 #[test]
 fn in_a_hole_the_instance_table_rows_do_not_bridge_a_user_visible_unit_born_before_the_hole_is_not_judged(

@@ -69,7 +69,7 @@ pub fn slot_shared_by_both_location_entries(
 /// 一条盘上指针的两条位置条目不按设备身份严格升序（I-2.5（位置条目按设备身份升序）：相同或逆序一律判损坏）。
 /// **这是一份坏镜像，不是我们的不变量被破坏**：写者（[`NodePointer::write_to`] / [`DataPointer::write_to`]）按升序写、在那里断言，
 /// 而照抄上一版的发布会把盘上读来的指针原样写回去（树表条目、多层码 2 树的内部条目、根记录）——不在读进来的地方判，
-/// 坏镜像就走到写者的断言上（C476 普查「缺口」那张表 `pointer.rs` 那一行，实审 A3a 实测坐实）。
+/// 坏镜像就走到写者的断言上（C476（盘上内容可控时走得到的 panic 有 21 处） 普查「缺口」那张表 `pointer.rs` 那一行，实测坐实）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LocationEntriesNotAscendingByDevice {
     pub devices: [DeviceIdentity; 2],

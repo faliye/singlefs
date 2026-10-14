@@ -794,6 +794,7 @@ pub fn refusal_reason_of_rollback_error(error: &RollbackError) -> ObservedRefusa
         | RollbackError::UserVisibleUnitWithoutItsRecordInTheCurrentAccount { .. }
         | RollbackError::UserVisibleUnitStillAllocatedUnderAnotherGeneration { .. }
         | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. }
+        | RollbackError::IsolatedUnitCopyUnreadableOrMismatched { .. }
         // 判候选集读根环或算 F_生效 重读一次仍读坏（实审 A3b Q7）：读路径上注入故障、或同一个进程里一次根槽写被说谎的设备吞掉
         // （那一槽这个进程知道住着根、盘上却不是它写的那一份）才有，与 `MountError::Recovery(_)` 同一处置。
         | RollbackError::CandidateJudgementStillUnreadableAfterOneReread(_) => {
@@ -985,6 +986,7 @@ pub fn root_ring_slot_still_bad_after_one_reread_of_rollback_error(
         | RollbackError::UserVisibleUnitWithoutItsRecordInTheCurrentAccount { .. }
         | RollbackError::UserVisibleUnitStillAllocatedUnderAnotherGeneration { .. }
         | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. }
+        | RollbackError::IsolatedUnitCopyUnreadableOrMismatched { .. }
         | RollbackError::CurrentVersionUnitNotReleasable { .. }
         | RollbackError::Publish(_) => None,
     }
@@ -1050,7 +1052,7 @@ pub fn observed_read_back(outcome: &RecoveryOutcome) -> ObservedReadBack {
 /// 不取 `RecoveryOutcome` 里带的那条。两者的差别只在崩溃状态上看得见：`crates/singlefs-core/src/recovery.rs` 的 `recover` 里
 /// `root_key` 取的是 `choose_root`（施加之前所选的根），`walk_to_file` 走的却是 `effective_root`（施加之后的根）——
 /// 不建崩溃时记录都在水位之下、两者相等，崩溃状态上记录前缀一施加就不等了，读回的内容属于后者。
-/// 层 0 的 oracle（`crash::oracle_violation_for_versions`）判该读出哪一版拿的也是 `effective_root`。
+/// 崩溃点重放的 oracle（`crash::oracle_violation_for_versions`）判该读出哪一版拿的也是 `effective_root`。
 #[must_use]
 pub fn observed_read_back_after_a_crash(report: &RecoveryReport) -> ObservedReadBack {
     let Some((instance, checkpoint_txg)) = report.effective_root else {

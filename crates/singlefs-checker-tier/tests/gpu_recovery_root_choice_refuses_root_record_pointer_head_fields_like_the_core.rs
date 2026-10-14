@@ -1,4 +1,4 @@
-//! checker 档模块：crash、crash_amplification、gpu_unit_checks、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
+//! checker 档模块：crash、crash_state_enumeration、crash_amplification、gpu_unit_checks、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
 //! GPU 恢复内核择根与 core 同判根记录四条指针的头部（第 34 批代码轮第一轮判决 `research/prompts/m3-formal-code-b34-r1-main-verification.md`
 //! 第二节 P3、第三节第 1 条）：core 读根槽经 `RootRecord::parse_slot`（`crates/singlefs-core/src/root_record.rs`），树表、实例表、中央映射树、
 //! 分配记录树四条指针都经 `NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from` 读，头部五段（`pointer.rs` 的
@@ -20,18 +20,27 @@ mod common;
 use common::{build_pool, file_content, geometry};
 use singlefs_checker::image::{InvariantVerdict, IMPLEMENTED_INVARIANTS};
 use singlefs_checker_tier::crash::{
-    judge_layer0_state_range, layer0_plan_state_count, Layer0OracleViolationKind,
-    Layer0SegmentExpansion, Layer0StateJudgement,
+    crash_point_replay_plan_state_count, CrashPointReplayOracleViolationKind,
+    CrashPointReplaySegmentExpansion, CrashStateJudgement,
 };
 use singlefs_checker_tier::crash_amplification::{gpu_recovery_words, recovery_words_of};
 use singlefs_checker_tier::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
+use singlefs_checker_tier::crash_state_enumeration::{
+    sample_crash_states_on_the_cpu, CrashPointReplayItem,
+};
+
+/// 这份测试文件的仓内路径：崩溃点重放取样过库的设点文件。
+const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/gpu_recovery_root_choice_refuses_root_record_pointer_head_fields_like_the_core.rs";
 use singlefs_checker_tier::crash_judge_gpu::{
     cross_check_words_of_cpu_judgement, cross_check_words_of_gpu_verdict,
     pool_checker_violated_bits, verdict_bits, CrossCheckWords, POOL_CHECKER_UNDECIDABLE_WORD,
     VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
-use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
+    gpu_card_pool_or_report_not_run,
+    image_with_every_write_landed_read_back_from_the_pairing_library,
+};
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::recovery::{choose_root, choose_system_configuration};
 use singlefs_harness::memory_pool::{
@@ -137,27 +146,29 @@ fn reseal_root_record(bytes: &mut [u8]) {
         .copy_from_slice(&digest);
 }
 
-/// 每个写都落了的镜像上 core 择到的根的 checkpoint_txg（core 只读恢复与挂载择的是它）。
+/// 每个写都落了的镜像上 core 择到的根的 checkpoint_txg（core 只读恢复与挂载择的是它）。镜像的输入先经对拍那一类的库
+/// （写进去再读回，用户 2026-10-13 定：CPU 参照也从库读），择的是读回的那一份；只录那一趟交 `None`。
 fn checkpoint_txg_of_the_root_the_core_chooses_with_every_write_landed(
     base: &MemoryPool,
     writes: &[RetainedWrite],
-) -> u64 {
-    let mut image = base.clone();
-    image.apply_writes(writes);
+) -> Option<u64> {
+    let image = image_with_every_write_landed_read_back_from_the_pairing_library(base, writes)?;
     let system_configuration = choose_system_configuration(&image).expect("系统配置择得到");
-    choose_root(&image, &system_configuration)
-        .expect("择得到根")
-        .checkpoint_txg
-        .0
+    Some(
+        choose_root(&image, &system_configuration)
+            .expect("择得到根")
+            .checkpoint_txg
+            .0,
+    )
 }
 
 /// 新池新建文件那条流，发布的根里 `pointer` 那条指针头部的 `field` 那一段（本来是第一版的取值）写成非第一版的取值、重封。
-/// 改之前每个写都落了的镜像上 core 择到发布的根、改之后退到更早的根，在这里当场断言（取卡之前、CPU 上判）。
+/// 改之前每个写都落了的镜像上 core 择到发布的根、改之后退到更早的根，在这里当场断言（取卡之前、CPU 上判）；只录那一趟交 `None`。
 fn new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
     tag: &str,
     pointer: RootRecordPointer,
     field: PointerHeadFieldWrittenOutsideTheFirstVersion,
-) -> RecordedFlow {
+) -> Option<RecordedFlow> {
     let pool = build_pool(tag);
     let operations = pool.retained_operations();
     let (mut writes, segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
@@ -204,17 +215,17 @@ fn new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
         checkpoint_txg_of_the_root_the_core_chooses_with_every_write_landed(
             &base,
             &writes_before_the_rewrite
-        ),
+        )?,
         publish_checkpoint_txg,
         "改之前每个写都落了的镜像上 core 择到发布的根"
     );
     let chosen_checkpoint_txg_after_the_rewrite =
-        checkpoint_txg_of_the_root_the_core_chooses_with_every_write_landed(&base, &writes);
+        checkpoint_txg_of_the_root_the_core_chooses_with_every_write_landed(&base, &writes)?;
     assert!(
         chosen_checkpoint_txg_after_the_rewrite < publish_checkpoint_txg,
         "根记录 {pointer:?} 指针头部 {field:?} 那一段不是第一版的取值，core 择根要退到发布之前那条根（择到 txg {chosen_checkpoint_txg_after_the_rewrite}，发布的根 txg {publish_checkpoint_txg}）"
     );
-    RecordedFlow {
+    Some(RecordedFlow {
         base,
         writes,
         segments,
@@ -224,12 +235,12 @@ fn new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
             checkpoint_txg: CheckpointTxg(publish_checkpoint_txg),
             content: file_content(),
         }],
-    }
+    })
 }
 
-fn oracle_index(kind: Layer0OracleViolationKind) -> u32 {
+fn oracle_index(kind: CrashPointReplayOracleViolationKind) -> u32 {
     u32::try_from(
-        Layer0OracleViolationKind::EVERY_KIND
+        CrashPointReplayOracleViolationKind::EVERY_KIND
             .iter()
             .position(|candidate| *candidate == kind)
             .expect("七类之一"),
@@ -238,7 +249,7 @@ fn oracle_index(kind: Layer0OracleViolationKind) -> u32 {
 }
 
 /// CPU 判定 → GPU 结论第 0 字那一套红位（两遍 oracle 各一类、记录核对器两条）。
-fn red_bits_on_the_cpu(judgement: &Layer0StateJudgement) -> u32 {
+fn red_bits_on_the_cpu(judgement: &CrashStateJudgement) -> u32 {
     let mut bits = 0u32;
     if let Some(violation) = &judgement.consulted_oracle {
         bits |= 1 << (verdict_bits::CONSULTED_ORACLE_FIRST + oracle_index(violation.kind));
@@ -256,7 +267,7 @@ fn red_bits_on_the_cpu(judgement: &Layer0StateJudgement) -> u32 {
 }
 
 /// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`（与 GPU 判器结论里那一段同一个编号）。
-fn pool_checker_bits_on_the_cpu(judgement: &Layer0StateJudgement) -> u128 {
+fn pool_checker_bits_on_the_cpu(judgement: &CrashStateJudgement) -> u128 {
     judgement
         .pool_checker
         .iter()
@@ -299,9 +310,9 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_every_state(test_name: &str, flow
     };
     let expansion = |_segment_index: usize, segment: &[usize]| {
         if segment.len() <= EXPAND_UP_TO {
-            Layer0SegmentExpansion::EveryProperSubset
+            CrashPointReplaySegmentExpansion::EveryProperSubset
         } else {
-            Layer0SegmentExpansion::NotExpanded
+            CrashPointReplaySegmentExpansion::NotExpanded
         }
     };
     let tables = build_judge_tables(&JudgeFlow {
@@ -313,7 +324,8 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_every_state(test_name: &str, flow
         expansion: &expansion,
     })
     .expect("建得出表");
-    let state_count = layer0_plan_state_count(&flow.base, &flow.writes, &flow.segments, &expansion);
+    let state_count =
+        crash_point_replay_plan_state_count(&flow.base, &flow.writes, &flow.segments, &expansion);
     assert_eq!(tables.state_count, state_count);
     let Some(gpu): Option<Vec<[u32; VERDICT_WORDS]>> =
         judge_every_state_on_a_card_leased_from_the_pool(cards, test_name, &tables)
@@ -321,7 +333,11 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_every_state(test_name: &str, flow
         return;
     };
     let mut cpu: Vec<JudgedOnTheCpu> = Vec::new();
-    let judged_on_the_cpu = judge_layer0_state_range(
+    let Some(judged_on_the_cpu) = sample_crash_states_on_the_cpu(
+        CrashPointReplayItem {
+            name: test_name,
+            setting_file: THIS_FILE,
+        },
         &flow.base,
         &flow.writes,
         &flow.segments,
@@ -337,7 +353,10 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_every_state(test_name: &str, flow
                 cross_check_words: cross_check_words_of_cpu_judgement(judgement),
             });
         },
-    );
+    )
+    .judged() else {
+        return;
+    };
     assert_eq!(judged_on_the_cpu, state_count);
     assert_eq!(cpu.len(), gpu.len(), "两边判的状态数相同");
     let mismatches: Vec<String> = cpu
@@ -379,51 +398,63 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_every_state(test_name: &str, flow
 #[test]
 fn the_gpu_recovery_refuses_a_root_whose_tree_table_pointer_carries_a_non_zero_mac_byte_like_the_core(
 ) {
+    let Some(flow) = new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
+        "gpu-recovery-root-tree-table-pointer-first-mac-byte",
+        RootRecordPointer::TreeTable,
+        PointerHeadFieldWrittenOutsideTheFirstVersion::FirstMacByteToOne,
+    ) else {
+        return;
+    };
     assert_the_gpu_judge_agrees_with_the_cpu_on_every_state(
         "the_gpu_recovery_refuses_a_root_whose_tree_table_pointer_carries_a_non_zero_mac_byte_like_the_core",
-        &new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
-            "gpu-recovery-root-tree-table-pointer-first-mac-byte",
-            RootRecordPointer::TreeTable,
-            PointerHeadFieldWrittenOutsideTheFirstVersion::FirstMacByteToOne,
-        ),
+        &flow,
     );
 }
 
 #[test]
 fn the_gpu_recovery_refuses_a_root_whose_mapping_root_pointer_carries_an_algorithm_type_like_the_core(
 ) {
+    let Some(flow) = new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
+        "gpu-recovery-root-mapping-root-pointer-algorithm-type",
+        RootRecordPointer::MappingRoot,
+        PointerHeadFieldWrittenOutsideTheFirstVersion::AlgorithmTypeToOne,
+    ) else {
+        return;
+    };
     assert_the_gpu_judge_agrees_with_the_cpu_on_every_state(
         "the_gpu_recovery_refuses_a_root_whose_mapping_root_pointer_carries_an_algorithm_type_like_the_core",
-        &new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
-            "gpu-recovery-root-mapping-root-pointer-algorithm-type",
-            RootRecordPointer::MappingRoot,
-            PointerHeadFieldWrittenOutsideTheFirstVersion::AlgorithmTypeToOne,
-        ),
+        &flow,
     );
 }
 
 #[test]
 fn the_gpu_recovery_refuses_a_root_whose_allocation_record_tree_root_pointer_carries_a_compression_algorithm_code_like_the_core(
 ) {
+    let Some(flow) = new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
+        "gpu-recovery-root-allocation-record-tree-root-pointer-compression-code",
+        RootRecordPointer::AllocationRecordTreeRoot,
+        PointerHeadFieldWrittenOutsideTheFirstVersion::CompressionAlgorithmCodeToOne,
+    ) else {
+        return;
+    };
     assert_the_gpu_judge_agrees_with_the_cpu_on_every_state(
         "the_gpu_recovery_refuses_a_root_whose_allocation_record_tree_root_pointer_carries_a_compression_algorithm_code_like_the_core",
-        &new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
-            "gpu-recovery-root-allocation-record-tree-root-pointer-compression-code",
-            RootRecordPointer::AllocationRecordTreeRoot,
-            PointerHeadFieldWrittenOutsideTheFirstVersion::CompressionAlgorithmCodeToOne,
-        ),
+        &flow,
     );
 }
 
 #[test]
 fn the_gpu_recovery_refuses_a_root_whose_instance_table_pointer_carries_a_compressed_length_without_compression_like_the_core(
 ) {
+    let Some(flow) = new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
+        "gpu-recovery-root-instance-table-pointer-compressed-length",
+        RootRecordPointer::InstanceTable,
+        PointerHeadFieldWrittenOutsideTheFirstVersion::CompressedLengthToOneWithoutCompression,
+    ) else {
+        return;
+    };
     assert_the_gpu_judge_agrees_with_the_cpu_on_every_state(
         "the_gpu_recovery_refuses_a_root_whose_instance_table_pointer_carries_a_compressed_length_without_compression_like_the_core",
-        &new_pool_with_a_root_record_pointer_head_field_outside_the_first_version(
-            "gpu-recovery-root-instance-table-pointer-compressed-length",
-            RootRecordPointer::InstanceTable,
-            PointerHeadFieldWrittenOutsideTheFirstVersion::CompressedLengthToOneWithoutCompression,
-        ),
+        &flow,
     );
 }

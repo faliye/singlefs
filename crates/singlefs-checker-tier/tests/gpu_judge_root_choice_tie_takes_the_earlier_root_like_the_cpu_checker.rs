@@ -1,4 +1,4 @@
-//! checker 档模块：crash、gpu_unit_checks、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
+//! checker 档模块：crash、crash_state_enumeration、gpu_unit_checks、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
 //! GPU 判器里池级 checker 那一份的择根平局（代码轮第三轮判决 `research/prompts/m3-formal-code-r3-main-verification.md` 辩方 Z1）：
 //! 根环里两条自证过的根 (txg, 实例) 相同、内容不同时，CPU 的池级 checker 取读根环次序里最前的那条（`crates/singlefs-checker/src/walk.rs`
 //! 择根的 fold，只在严格更大时换），GPU 判器要取同一条。造法：新池新建文件那条流，把发布的根抄一份、树表指针与映射根指针换成暖机那条根的、
@@ -18,14 +18,23 @@ use common::{build_pool, file_content, geometry};
 use singlefs_checker::image::{InvariantVerdict, IMPLEMENTED_INVARIANTS};
 use singlefs_checker::walk::check_pool_image;
 use singlefs_checker_tier::crash::{
-    judge_layer0_state_range, layer0_plan_state_count, Layer0SegmentExpansion, Layer0StateJudgement,
+    crash_point_replay_plan_state_count, CrashPointReplaySegmentExpansion, CrashStateJudgement,
 };
 use singlefs_checker_tier::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
+use singlefs_checker_tier::crash_state_enumeration::{
+    sample_crash_states_on_the_cpu, CrashPointReplayItem,
+};
+
+/// 这份测试文件的仓内路径：崩溃点重放取样过库的设点文件。
+const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/gpu_judge_root_choice_tie_takes_the_earlier_root_like_the_cpu_checker.rs";
 use singlefs_checker_tier::crash_judge_gpu::{
     pool_checker_violated_bits, verdict_bits, POOL_CHECKER_UNDECIDABLE_WORD, VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
-use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
+    gpu_card_pool_or_report_not_run,
+    image_with_every_write_landed_read_back_from_the_pairing_library,
+};
 use singlefs_core::address::{CheckpointTxg, DeviceOffsetInBytes, InstanceGeneration};
 use singlefs_core::recovery::PoolReader;
 use singlefs_harness::memory_pool::{
@@ -163,11 +172,15 @@ fn new_pool_with_two_roots_of_the_publish_key(
     }
 }
 
-/// 全部写都落了的那个镜像上，CPU 池级 checker 判红的不变量。
-fn invariants_violated_with_every_write_landed(flow: &RecordedFlow) -> BTreeSet<&'static str> {
-    let mut image = flow.base.clone();
-    image.apply_writes(&flow.writes);
-    check_pool_image(&image)
+/// 全部写都落了的那个镜像上，CPU 池级 checker 判红的不变量：镜像的输入先经对拍那一类的库（写进去再读回，用户 2026-10-13 定：
+/// CPU 参照也从库读），判的是读回的那一份；只录那一趟交 `None`。
+// cpu-reference-for-gpu-comparison
+fn invariants_violated_with_every_write_landed(
+    flow: &RecordedFlow,
+) -> Option<BTreeSet<&'static str>> {
+    let image =
+        image_with_every_write_landed_read_back_from_the_pairing_library(&flow.base, &flow.writes)?;
+    let violated = check_pool_image(&image)
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(_) => Some(invariant),
@@ -175,11 +188,12 @@ fn invariants_violated_with_every_write_landed(flow: &RecordedFlow) -> BTreeSet<
             | InvariantVerdict::NotApplicable(_)
             | InvariantVerdict::PartiallyJudged(_) => None,
         })
-        .collect()
+        .collect();
+    Some(violated)
 }
 
 /// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`（与 GPU 判器结论里那一段同一个编号）。
-fn pool_checker_bits_on_the_cpu(judgement: &Layer0StateJudgement) -> u128 {
+fn pool_checker_bits_on_the_cpu(judgement: &CrashStateJudgement) -> u128 {
     judgement
         .pool_checker
         .iter()
@@ -214,12 +228,19 @@ fn gpu_judge_takes_the_earlier_of_two_roots_with_the_same_key_like_the_cpu_check
     );
     // 前提（取卡之前、CPU 上判）：两条同键的根换位之后池级 checker 判出的违例不同——择到哪一条决定判定，
     // GPU 择错时会有状态的违例位与 CPU 不同；换位不改判定的话这条流分不出择根平局，用例无效。
-    let violated_with_the_publish_root_first = invariants_violated_with_every_write_landed(&flow);
-    let violated_with_the_warm_up_trees_first =
+    let Some(violated_with_the_publish_root_first) =
+        invariants_violated_with_every_write_landed(&flow)
+    else {
+        return;
+    };
+    let Some(violated_with_the_warm_up_trees_first) =
         invariants_violated_with_every_write_landed(&new_pool_with_two_roots_of_the_publish_key(
             "gpu-judge-root-choice-tie-swapped",
             WhichRootIsReadFirst::TheRootWithTheWarmUpTrees,
-        ));
+        ))
+    else {
+        return;
+    };
     assert_ne!(
         violated_with_the_publish_root_first, violated_with_the_warm_up_trees_first,
         "两条同键的根换位之后池级 checker 判出的违例要不同，这条流才分得出择根平局"
@@ -231,9 +252,9 @@ fn gpu_judge_takes_the_earlier_of_two_roots_with_the_same_key_like_the_cpu_check
     };
     let expansion = |_segment_index: usize, segment: &[usize]| {
         if segment.len() <= EXPAND_UP_TO {
-            Layer0SegmentExpansion::EveryProperSubset
+            CrashPointReplaySegmentExpansion::EveryProperSubset
         } else {
-            Layer0SegmentExpansion::NotExpanded
+            CrashPointReplaySegmentExpansion::NotExpanded
         }
     };
     let tables = build_judge_tables(&JudgeFlow {
@@ -245,7 +266,8 @@ fn gpu_judge_takes_the_earlier_of_two_roots_with_the_same_key_like_the_cpu_check
         expansion: &expansion,
     })
     .expect("建得出表");
-    let state_count = layer0_plan_state_count(&flow.base, &flow.writes, &flow.segments, &expansion);
+    let state_count =
+        crash_point_replay_plan_state_count(&flow.base, &flow.writes, &flow.segments, &expansion);
     assert_eq!(tables.state_count, state_count);
     let Some(gpu): Option<Vec<[u32; VERDICT_WORDS]>> =
         judge_every_state_on_a_card_leased_from_the_pool(cards, TEST_NAME, &tables)
@@ -253,7 +275,11 @@ fn gpu_judge_takes_the_earlier_of_two_roots_with_the_same_key_like_the_cpu_check
         return;
     };
     let mut cpu: Vec<u128> = Vec::new();
-    let judged_on_the_cpu = judge_layer0_state_range(
+    let Some(judged_on_the_cpu) = sample_crash_states_on_the_cpu(
+        CrashPointReplayItem {
+            name: TEST_NAME,
+            setting_file: THIS_FILE,
+        },
         &flow.base,
         &flow.writes,
         &flow.segments,
@@ -262,7 +288,10 @@ fn gpu_judge_takes_the_earlier_of_two_roots_with_the_same_key_like_the_cpu_check
         &expansion,
         0..state_count,
         &mut |_ordinal, _image, judgement| cpu.push(pool_checker_bits_on_the_cpu(judgement)),
-    );
+    )
+    .judged() else {
+        return;
+    };
     assert_eq!(judged_on_the_cpu, state_count);
     assert_eq!(cpu.len(), gpu.len(), "两边判的状态数相同");
     let mismatches: Vec<String> = cpu

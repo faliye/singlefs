@@ -7,12 +7,11 @@
 #![allow(dead_code, reason = "两份测试文件各自只用到其中一部分")]
 
 use singlefs_checker::image::{
-    InvariantVerdict, DATA_UNIT_COUNT_OF_AN_INODE_BEING_DELETED_MATCHES_ITS_SIZE,
+    DATA_UNIT_COUNT_OF_AN_INODE_BEING_DELETED_MATCHES_ITS_SIZE,
     DELETION_QUEUE_AND_THE_NLINK_ZERO_RECORDS_NAME_THE_SAME_INODES,
     INODE_BEING_DELETED_IS_QUEUED_OR_HAS_NO_DATA_UNIT_LEFT,
     PENDING_DELETION_OCCUPANCY_STATISTIC_IS_ZERO,
 };
-use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, InodeNumber, InstanceGeneration, SlotNumber};
 use singlefs_core::bytes::ByteReader;
 use singlefs_core::checksum::crc32_castagnoli;
@@ -349,28 +348,6 @@ pub fn pool_with_inode_two_unlinked_then_rolled_back_before_the_intent_and_the_r
     pool
 }
 
-/// 判违例的不变量，按 checker 报的次序。
-pub fn violated_invariants(image: &MemoryPool) -> Vec<&'static str> {
-    check_pool_image(image)
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(_) => Some(invariant),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .collect()
-}
-
-/// 一条不变量的判定。
-pub fn verdict_of(image: &MemoryPool, invariant: &str) -> InvariantVerdict {
-    check_pool_image(image)
-        .into_iter()
-        .find(|(identifier, _)| *identifier == invariant)
-        .expect("清单里有这一条")
-        .1
-}
-
 /// 改过的单元重封：载荷 CRC 与头校验和（码 3 罩 [107, 32768)、住 89，头 [0, 107)；码 2 罩 [86 + 2k, 16384)、住 76 + 2k，头 [0, 86 + 2k)）。
 fn reseal_unit(bytes: &mut [u8]) {
     let (header_end, payload_checksum_offset) = match bytes[6] {
@@ -511,7 +488,7 @@ pub fn set_the_nlink_of_an_inode_record_in_the_leaf_at_to_zero(
     });
 }
 
-/// I-9.5 正方向「队列里的号在树里 nlink ≠ 0」那一形（C708（树里 nlink = 0 的 inode 不在删除队列里，池级 checker 判不出） 还差的那一形）：
+/// I-9.5 正方向「队列里的号在树里 nlink ≠ 0」那一形（C708（nlink 为 0 却不在删除队列，checker 判不出） 还差的那一形）：
 /// 意图之后队列 {1} 不动，1 号那条记录的 nlink 0 → 1（size、单元都不动）。
 pub fn set_the_nlink_of_the_queued_first_file_back_to_one(image: &mut MemoryPool) {
     change_the_inode_record(image, FIRST_INODE_NUMBER, |record| {
@@ -527,7 +504,7 @@ pub fn set_the_nlink_of_the_queued_first_file_back_to_one(image: &mut MemoryPool
 /// I-9.5 正方向「队列里的号没有记录」那一形（判决第二节最后一行：只红 I-9.5）：空 inode 2 发完意图之后的 `deleted_inodes` 根 {2} 改成 {7}
 /// （条目与头里的最小、最大 key 2 → 7），7 号在 inode 树里没有记录、extent 树里也没有单元。队列只一个号（I-9.24 照旧成立）；
 /// 2 号 nlink 0 而不在队列里，反方向也红在 I-9.5 上；2 号没有数据单元、size 0，I-4.7、I-4.6 照旧成立；
-/// 7 号没有记录，I-9.18 那一个号判不了（`.claude/kb/invariants.md` I-9.18 那一行）。
+/// 7 号没有记录，I-9.18 那一个号判不了（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.18 那一行）。
 pub fn replace_the_queued_inode_with_a_number_without_a_record(image: &mut MemoryPool) {
     const INODE_NUMBER_WITHOUT_A_RECORD: u64 = 7;
     const QUEUED_EMPTY_INODE: u64 = 2;

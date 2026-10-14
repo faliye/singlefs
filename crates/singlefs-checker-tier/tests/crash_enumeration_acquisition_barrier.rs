@@ -1,6 +1,6 @@
-//! checker 档模块：crash
-//! 里程碑「覆盖写、释放、回退与复用」步 3 验收的变异「取号之后没有屏障 ⇒ 层 0 里出现「系统配置已是 2、单元却先持久」的状态，
-//! I-7.7（系统配置实例代号不低于根环） 那一族判红」要红在的那一条层 0 用例。
+//! checker 档模块：crash、crash_state_enumeration
+//! 里程碑「覆盖写、释放、回退与复用」步 3 验收的变异「取号之后没有屏障 ⇒ 崩溃点重放里出现「系统配置已是 2、单元却先持久」的状态，
+//! I-7.7（系统配置实例代号不低于根环） 那一族判红」要红在的那一条崩溃枚举用例。
 //!
 //! 流：mkfs → 取号 1 → 暖机 → A → B（同一个进程）→ 进程退出、重开可写挂载（取号 2 → 写行 → 暖机）。
 //! 取号写之前一道屏障把取号那两次系统配置槽写与 B 的两次系统配置槽轮换隔开（代码审阅第 19 条；改之前两者同一段，
@@ -10,11 +10,11 @@
 //! 枚举就摆得出「实例 2 的单元已持久、两块盘的系统配置还都是 1」的状态。
 //! 展开哪几段按写在录制流里的位置挑（重开之后的第一个写起），不按段的写数挑：并段之后段变长，按写数挑会把并出来的那一段漏掉。
 //!
-//! 这条流的段序列就是第二条流（`crash_enumeration_fixed_script_stream.rs`）发 C 之前那一截：28 段逐段相同，
-//! 末段是暖机第二次的系统配置槽轮换（C577 之后发布末尾那道屏障让它在第二条流里也自成一段；改之前那边与 C 的单元写并成 26 写一段、
-//! 只有前 23 段相同）。展开的这两段在第二条流里是第 16、17 段（C577 之前第 14、15 段），
-//! 全量（门禁 checker-tier-layer0-replay `--full`）已经罩着；这一条不多罩崩溃状态，多的是在平时的 `cargo test` 里展开它们、按 I-7.7 判——
-//! 第二条流的快用例按甲二展开，写行那一段（18 个单元写）只取全不落或全落。
+//! 这条流的段序列就是覆盖写固定脚本流（`crash_enumeration_fixed_script_stream.rs`）发 C 之前那一截：28 段逐段相同，
+//! 末段是暖机第二次的系统配置槽轮换（C577 之后发布末尾那道屏障让它在覆盖写固定脚本流里也自成一段；改之前那边与 C 的单元写并成 26 写一段、
+//! 只有前 23 段相同）。展开的这两段在覆盖写固定脚本流里是第 16、17 段（C577 之前第 14、15 段），
+//! 全量（门禁 checker-tier-crash-point-replay `--full`）已经罩着；这一条不多罩崩溃状态，多的是在平时的 `cargo test` 里展开它们、按 I-7.7 判——
+//! 覆盖写固定脚本流的快用例按甲二展开，写行那一段（18 个单元写）只取全不落或全落。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
@@ -24,9 +24,15 @@ use common::{
     FIXED_WRITE_TIME_SECONDS,
 };
 use singlefs_checker_tier::crash::{
-    enumerate_layer0_selecting_versions, layer0_state_count_with_torn_in_place_overwrites,
-    Layer0SegmentExpansion,
+    crash_state_count_with_torn_in_place_overwrites, CrashPointReplaySegmentExpansion,
 };
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_selecting_versions, CrashPointReplayItem,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_enumeration_acquisition_barrier.rs";
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::mount::mount_writable;
 use singlefs_harness::memory_pool::{
@@ -49,7 +55,7 @@ const SYSTEM_CONFIGURATION_INSTANCE_INVARIANT: &str = "I-7.7";
 #[test]
 fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_crash_state_of_the_remount(
 ) {
-    let mut pool = build_pool("acquisition-barrier-layer0");
+    let mut pool = build_pool("acquisition-barrier-crash-point-replay");
     let previous = pool.output.clone();
     let second = publish_overwrite_in_process(
         &mut pool,
@@ -127,14 +133,21 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
         .iter()
         .rposition(|write| write.kind == StepKind::RootRecordFua)
         .expect("写流里有根槽写");
-    let tally = enumerate_layer0_selecting_versions(
+    let Some(tally) = enumerate_crash_states_selecting_versions(
+        CrashPointReplayItem {
+            name: "acquisition_barrier::remount_after_the_first_file",
+            setting_file: THIS_FILE,
+        },
         &base,
         &writes,
         &segments,
         judged_root_index,
         &versions,
         &expand,
-    );
+    )
+    .judged() else {
+        return;
+    };
     let expanded: Vec<Vec<usize>> = segments
         .iter()
         .enumerate()
@@ -142,7 +155,7 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
         .map(|(_, segment)| segment.clone())
         .collect();
     println!(
-        "LAYER0_ACQUISITION_BARRIER states={} expanded_segment_sizes={:?} checker_by_invariant(evaluated/violated/not_applicable) {}",
+        "CRASH_POINT_REPLAY_ACQUISITION_BARRIER states={} expanded_segment_sizes={:?} checker_by_invariant(evaluated/violated/not_applicable) {}",
         tally.states,
         expanded.iter().map(Vec::len).collect::<Vec<usize>>(),
         tally.checker_counts_by_invariant()
@@ -206,22 +219,22 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
     );
     assert_eq!(
         tally.states,
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &base,
             &writes,
             &segments,
             &|segment_index, segment| {
                 if expand(segment_index, segment) {
-                    Layer0SegmentExpansion::EveryProperSubset
+                    CrashPointReplaySegmentExpansion::EveryProperSubset
                 } else {
-                    Layer0SegmentExpansion::NotExpanded
+                    CrashPointReplaySegmentExpansion::NotExpanded
                 }
             },
         ),
-        "展开的段按层 0 的枚举域数（原地覆写取三态）"
+        "展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
     assert_eq!(tally.states, 1 + (3 * 3 - 1) + 262_143);
-    // 与第二条流发 C 之前那一截逐段相同（门禁 52 号核的那个数组的前 28 段），末段 2 写是暖机第二次的系统配置槽轮换。
+    // 与覆盖写固定脚本流发 C 之前那一截逐段相同（门禁 52 号核的那个数组的前 28 段），末段 2 写是暖机第二次的系统配置槽轮换。
     // C577 之后每次轮换过了发布末尾那道屏障、自成一段：A、B 的 24 个单元写与暖机两次的 16 个单元写不再并上一次的轮换
     // （改之前 26、26、18、18），段号跟着后移两位。
     assert_eq!(
@@ -229,11 +242,11 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
         vec![
             2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2
         ],
-        "段序列是第二条流发 C 之前那一截"
+        "段序列是覆盖写固定脚本流发 C 之前那一截"
     );
     assert_eq!(
         (acquisition_segment, first_unit_segment),
         (15, 16),
-        "展开的是第二条流的第 16、17 段（从 1 数）"
+        "展开的是覆盖写固定脚本流的第 16、17 段（从 1 数）"
     );
 }

@@ -1,8 +1,8 @@
-//! checker 档模块：crash、layer0_progress、crash_identity、crash_amplification
+//! checker 档模块：crash、crash_state_enumeration、crash_identity、crash_amplification
 //! 删除类发布崩在中间（K-U6 F1：接在多记录流后面 unlink 那个文件）：多记录流「取号 → 暖机 × 2 → A → B → C」之后
 //! unlink 第一个文件（C 之后三个数据单元）：意图那次发布 → 按只供测试的批大小 1 删两批 → 最后一批（D8（核心索引结构） 已定项 16），
 //! 整条录制流按 D13（验证路线） 已定项 4 枚举崩溃状态。每个状态跑恢复 + 多版本 oracle、池级 checker、记录核对器；
-//! 版本表是 A、B、C 三版有文件，意图那一版起没有文件（D8（核心索引结构） 已定项 16 第 4 条，`crash::Layer0VersionTable`），
+//! 版本表是 A、B、C 三版有文件，意图那一版起没有文件（D8（核心索引结构） 已定项 16 第 4 条，`crash::CrashPointReplayVersionTable`），
 //! 两批与最后一批不进表、照比它旧的最新那一项（意图那一版）判。另逐状态核三样（快档与全量都核）：
 //! - 多记录发布的发布边界（照多记录流）；
 //! - 删除那几次发布崩在中间：这次发布的单元写落了至少一个、记录一份都没落、根没落 ⇒ 实际走的根是上一版
@@ -13,13 +13,13 @@
 //!   判决 `research/prompts/m3-batch33r-code-r1-main-verification.md` 第三节第 2 条；这一个观察者与删除流的录法住在公共模块
 //!   `tests/common_crash_point_observers/mod.rs`、删除流的录法住在公共模块 `tests/common_crash_points/mod.rs`，崩溃放量那一路照登记表把它挂在标准前缀的节点上，
 //!   崩溃点重放合并第三轮判决 J4）。挂载是每个状态上的重活，观察者放在工作线程上跑
-//!   （`crash::Layer0StateObserving::OnTheWorkerThreads`），一个工作线程、四个工作线程与观察者在调用线程上三种跑法的计数逐项相同（快档对拍）。
+//!   （`crash::CrashStateObserving::OnTheWorkerThreads`），一个工作线程、四个工作线程与观察者在调用线程上三种跑法的计数逐项相同（快档对拍）。
 //!
-//! **比已有的流多罩了什么**：已有的层 0 流上没有删除类发布；这里意图那次（13 个单元：墓碑容器、`deleted_inodes` 根、inode 叶容器与根……）、
+//! **比已有的流多罩了什么**：已有的崩溃点重放流上没有删除类发布；这里意图那次（13 个单元：墓碑容器、`deleted_inodes` 根、inode 叶容器与根……）、
 //! 两批（12、11 个单元）、最后一批（12 个单元：inode 叶容器删空不写，退役树开第一片容器、写根）各自的单元段、记录段、根槽写与之后的系统配置槽轮换第一次被枚举到；
 //! 多跑的一步是每个状态上的可写挂载（取号、写行、暖机、续做），与挂完的盘上那一遍池级 checker。
 //!
-//! 快档只展开写数小于 10 的段（七个单元段不展开，只以整段持久进入后面的状态）；全量标 ignored（层 0 的枚举域 1463812278 个状态，
+//! 快档只展开写数小于 10 的段（七个单元段不展开，只以整段持久进入后面的状态）；全量标 ignored（崩溃点重放的枚举域 1463812278 个状态，
 //! 七个单元段占 1463812089；每次写只取两态时的闭式 1463812228），登记成崩溃枚举用例，带断点续跑、可双机分片（与多记录流同一个入口）。
 //! 系统配置槽写是原地覆写，取三态（`crash::TearableInPlaceOverwrites`），其余写取两态。
 
@@ -27,8 +27,6 @@
 mod common;
 mod common_crash_point_observers;
 mod common_crash_points;
-
-use std::num::NonZeroUsize;
 
 use common::{build_pool, file_content, geometry, BuiltPool};
 use common_crash_point_observers::{
@@ -40,12 +38,20 @@ use common_crash_points::{
     DELETION_BATCHES_BEFORE_THE_FINAL_BATCH, UNLINKED_FILE,
 };
 use singlefs_checker_tier::crash::{
-    enumerate_layer0_against_the_version_table_or_one_shard, full_expansion,
-    layer0_state_count_with_torn_in_place_overwrites, Layer0EnumerationOutcome,
-    Layer0ObserverCounts, Layer0Parallelism, Layer0SegmentExpansion, Layer0SliceLength,
-    Layer0StateObserving, Layer0Tally, Layer0VersionTable, Layer0WorkerThreadsSource,
+    crash_state_count_with_torn_in_place_overwrites, full_expansion,
+    CrashPointReplayObserverCounts, CrashPointReplaySegmentExpansion, CrashPointReplayTally,
+    CrashPointReplayVersionTable,
 };
-use singlefs_checker_tier::layer0_progress::Layer0Resume;
+use singlefs_checker_tier::crash_amplification::{
+    ObserveACrashStateHandingBackAnImage, ObserverDeduplication,
+};
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_with_every_kind_of_observer, CrashPointReplayItem,
+    CrashPointReplayObserver, CrashPointReplayObserverHandingBackAnImage,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs";
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::journal::record_offset;
 use singlefs_core::records::NLINK_OF_AN_INODE_BEING_DELETED;
@@ -57,12 +63,6 @@ use singlefs_harness::memory_pool::{
     PublishedVersion, PublishedVersionWithoutAFile, RecordStreamContinuity, RetainedWrite,
 };
 use singlefs_harness::segments::StepKind;
-
-/// 全量那一趟的流名：进断点续跑的进度文件名与双机分片的账本名（`singlefs_checker_tier::layer0_progress`）。
-const FULL_ENUMERATION_STREAM_NAME: &str = "unlink_after_the_multi_record_publish";
-
-/// 快档对拍里多线程那一趟的工作线程数。
-const WORKER_THREADS_OF_THE_MULTI_THREADED_COMPARISON: usize = 4;
 
 /// 写表里写到某个 journal 记录槽（两盘同偏移）的那几格。
 fn writes_to_record(writes: &[RetainedWrite], counter: u64) -> Vec<usize> {
@@ -172,8 +172,8 @@ struct Prepared {
 }
 
 impl Prepared {
-    fn version_table(&self) -> Layer0VersionTable<'_> {
-        Layer0VersionTable::new(&self.versions, &self.versions_without_a_file)
+    fn version_table(&self) -> CrashPointReplayVersionTable<'_> {
+        CrashPointReplayVersionTable::new(&self.versions, &self.versions_without_a_file)
     }
 }
 
@@ -367,7 +367,7 @@ fn observe_the_publish_boundary(
     prepared: &Prepared,
     image: &CrashImage<'_>,
     report: &RecoveryReport,
-    counts: &mut Layer0ObserverCounts,
+    counts: &mut CrashPointReplayObserverCounts,
 ) {
     for (publish_index, publish) in prepared.multi_record_publishes.iter().enumerate() {
         if !publish.is_cut_before_its_last_record(&image.persisted) {
@@ -398,7 +398,7 @@ fn observe_the_deletion_cut_in_the_middle(
     prepared: &Prepared,
     image: &CrashImage<'_>,
     report: &RecoveryReport,
-    counts: &mut Layer0ObserverCounts,
+    counts: &mut CrashPointReplayObserverCounts,
 ) {
     for (publish_index, publish) in prepared.deletion_publishes.iter().enumerate() {
         if !publish.is_cut_after_some_unit_and_before_its_record(&image.persisted) {
@@ -431,20 +431,19 @@ fn observe_the_deletion_cut_in_the_middle(
     }
 }
 
-/// 每个状态上核的三样：发布边界、删除的中间态、可写挂载续做（连同续做各步的代与事务号、挂完的盘过池级 checker）。
-/// 只读 `prepared`，各工作线程共用一份。
+/// 每个状态上核的两样（只记计数、逐状态看：判法读持久集合的结构）：发布边界、删除的中间态。可写挂载续做是另一个观察者
+/// （[`mount_continuation_observer`]：交回挂完的盘，按恢复镜像去重，盘上的池级 checker 在判段判）。只读 `prepared`，各工作线程共用一份。
 fn observe_every_state(
     prepared: &Prepared,
     image: &CrashImage<'_>,
     report: &RecoveryReport,
-    counts: &mut Layer0ObserverCounts,
+    counts: &mut CrashPointReplayObserverCounts,
 ) {
     observe_the_publish_boundary(prepared, image, report, counts);
     observe_the_deletion_cut_in_the_middle(prepared, image, report, counts);
-    observe_the_mount_continuation(&prepared.mount_continuation_inputs, image, report, counts);
 }
 
-fn assert_clean(tally: &Layer0Tally) {
+fn assert_clean(tally: &CrashPointReplayTally) {
     assert_eq!(tally.violations, 0, "oracle：{:?}", tally.first_violation);
     assert_eq!(
         tally.ignored_violations, 0,
@@ -477,79 +476,91 @@ fn assert_clean(tally: &Layer0Tally) {
 fn expansion_of_the_segments_shorter_than_ten(
     _segment_index: usize,
     segment: &[usize],
-) -> Layer0SegmentExpansion {
+) -> CrashPointReplaySegmentExpansion {
     if segment.len() < 10 {
-        Layer0SegmentExpansion::EveryProperSubset
+        CrashPointReplaySegmentExpansion::EveryProperSubset
     } else {
-        Layer0SegmentExpansion::NotExpanded
+        CrashPointReplaySegmentExpansion::NotExpanded
     }
 }
 
-/// 逐状态的观察者在哪个线程上看。
-#[derive(Clone, Copy, Debug)]
-enum ObserverThread {
-    WorkerThreads,
-    CallingThread,
+/// 每个状态上核的两样当一个只记计数的观察者挂进崩溃判定库那一路（两段：录入段逐状态看、写进库，判段拼结论、按块存、复用）：
+/// 观察者另读的输入是这条流的发布表（与续做观察者读的删除流发布表同一份录法）。
+fn observer_of_every_state<'prepared>(
+    prepared: &'prepared Prepared,
+    observe: &'prepared (dyn Fn(u64, &CrashImage<'_>, &RecoveryReport, &mut CrashPointReplayObserverCounts)
+                    + Sync),
+) -> CrashPointReplayObserver<'prepared> {
+    CrashPointReplayObserver {
+        name: "every_state",
+        extra_inputs_digest: prepared.mount_continuation_inputs.digest(),
+        observe,
+    }
 }
 
-/// 快档那一趟：七个单元段不展开，每个状态交 [`observe_every_state`]，不留进度文件。
+/// 可写挂载续做观察者（交回挂完的盘）：录入段在 CPU 上挂、按恢复镜像的字节去重（同一张镜像只挂一次），判段在挂完的盘上判池级 checker
+/// （配了 GPU 上卡；用户 2026-10-13 定「观察者改走两段、池级 checker 上 GPU、按恢复结果去重」）。另读的输入是删除流的发布表。
+fn mount_continuation_observer<'prepared>(
+    prepared: &'prepared Prepared,
+    observe: &'prepared ObserveACrashStateHandingBackAnImage<'prepared>,
+) -> CrashPointReplayObserverHandingBackAnImage<'prepared> {
+    CrashPointReplayObserverHandingBackAnImage {
+        name: "mount_continuation",
+        extra_inputs_digest: prepared.mount_continuation_inputs.digest(),
+        observe,
+        deduplication: ObserverDeduplication::ByTheRecoveredImageBytes,
+    }
+}
+
+/// 快档那一趟：七个单元段不展开，每个状态交 [`observe_every_state`]。
 fn enumerate_the_quick_tier(
     prepared: &Prepared,
-    parallelism: Layer0Parallelism,
-    observer_thread: ObserverThread,
-) -> Layer0Tally {
-    let observe_on_the_worker_threads: &(dyn Fn(&CrashImage<'_>, &RecoveryReport, &mut Layer0ObserverCounts)
-          + Sync) = &|image, report, counts| observe_every_state(prepared, image, report, counts);
-    let observe_on_the_calling_thread: &mut dyn FnMut(
-        &CrashImage<'_>,
-        &RecoveryReport,
-        &mut Layer0ObserverCounts,
-    ) = &mut |image, report, counts| observe_every_state(prepared, image, report, counts);
-    let observing = match observer_thread {
-        ObserverThread::WorkerThreads => {
-            Layer0StateObserving::OnTheWorkerThreads(observe_on_the_worker_threads)
-        }
-        ObserverThread::CallingThread => {
-            Layer0StateObserving::OnTheCallingThread(observe_on_the_calling_thread)
-        }
+    item_label: &str,
+) -> Option<CrashPointReplayTally> {
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        observe_every_state(prepared, image, report, counts);
     };
-    match enumerate_layer0_against_the_version_table_or_one_shard(
+    let observe_the_mount =
+        |_ordinal: u64,
+         image: &CrashImage<'_>,
+         report: &RecoveryReport,
+         counts: &mut CrashPointReplayObserverCounts| {
+            observe_the_mount_continuation(
+                &prepared.mount_continuation_inputs,
+                image,
+                report,
+                counts,
+            )
+        };
+    let item_name = format!("unlink_after_multi_record::quick_tier::{item_label}");
+    enumerate_crash_states_with_every_kind_of_observer(
+        CrashPointReplayItem {
+            name: &item_name,
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
         prepared.version_table(),
         &expansion_of_the_segments_shorter_than_ten,
-        parallelism,
-        observing,
-        &Layer0Resume::NoProgressFile,
-    ) {
-        Layer0EnumerationOutcome::WholeStream(tally) => tally,
-        Layer0EnumerationOutcome::OneShardWrittenToItsLedger(written) => panic!(
-            "不留进度文件、不分片的一趟交回整条流的计数，实际写了第 {} 片的账本",
-            written.shard.text()
-        ),
-    }
-}
-
-fn worker_threads_given_by_the_test(worker_threads: usize) -> Layer0Parallelism {
-    Layer0Parallelism {
-        worker_threads: NonZeroUsize::new(worker_threads).expect("工作线程数不是 0"),
-        worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller,
-        slice_length: Layer0SliceLength::ScaledToWorkerThreads,
-    }
+        &[observer_of_every_state(prepared, &observe)],
+        &[mount_continuation_observer(prepared, &observe_the_mount)],
+    )
+    .judged()
 }
 
 /// 平时跑的那一份：七个单元段不展开，其余每段任意真子集；每个状态核发布边界、删除的中间态，再在工作线程上可写挂载一次核续做走到空。
 #[test]
 fn every_crash_state_of_an_unlink_after_the_multi_record_publish_recovers_to_the_version_before_the_cut_and_the_mount_continues_to_empty(
 ) {
-    let prepared = prepare("unlink-after-multi-record-layer0-fast");
-    let tally = enumerate_the_quick_tier(
-        &prepared,
-        Layer0Parallelism::from_environment(),
-        ObserverThread::WorkerThreads,
-    );
+    let prepared = prepare("unlink-after-multi-record-crash-point-replay-fast");
+    let Some(tally) = enumerate_the_quick_tier(&prepared, "fast") else {
+        return;
+    };
     let expanded: Vec<Vec<usize>> = prepared
         .segments
         .iter()
@@ -563,13 +574,13 @@ fn every_crash_state_of_an_unlink_after_the_multi_record_publish_recovers_to_the
     );
     assert_eq!(
         tally.states,
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &prepared.base,
             &prepared.writes,
             &prepared.segments,
             &expansion_of_the_segments_shorter_than_ten,
         ),
-        "展开的段按层 0 的枚举域数（原地覆写取三态）"
+        "展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
     assert_eq!(
         tally.states,
@@ -615,7 +626,7 @@ fn every_crash_state_of_an_unlink_after_the_multi_record_publish_recovers_to_the
         tally.states,
     );
     println!(
-        "LAYER0_UNLINK_AFTER_MULTI_RECORD_FAST states={} observer {:?} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
+        "CRASH_POINT_REPLAY_UNLINK_AFTER_MULTI_RECORD_FAST states={} observer {:?} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
         tally.states,
         counts,
         tally.states_by_publish_text(),
@@ -624,48 +635,31 @@ fn every_crash_state_of_an_unlink_after_the_multi_record_publish_recovers_to_the
     assert_clean(&tally);
 }
 
-/// 观察者挪进工作线程之后判定不变：同一趟快档，一个工作线程、四个工作线程（观察者都在工作线程上）与观察者在调用线程上，
-/// 三份计数（状态数、违例、checker 逐条、发现表、观察者计数）逐项相同。
+/// 复用不改判定：同一趟快档跑两遍，第二遍的块与观察者结论全照库里的，两份计数（状态数、违例、checker 逐条、发现表、观察者计数）逐项相同，
+/// 每个状态都看过。
 #[test]
-fn the_unlink_stream_quick_tier_counts_the_same_on_one_worker_thread_on_four_and_with_the_observer_on_the_calling_thread(
-) {
-    let prepared = prepare("unlink-after-multi-record-layer0-threads");
-    let on_one_worker_thread = enumerate_the_quick_tier(
-        &prepared,
-        worker_threads_given_by_the_test(1),
-        ObserverThread::WorkerThreads,
-    );
-    let on_several_worker_threads = enumerate_the_quick_tier(
-        &prepared,
-        worker_threads_given_by_the_test(WORKER_THREADS_OF_THE_MULTI_THREADED_COMPARISON),
-        ObserverThread::WorkerThreads,
-    );
-    let observed_on_the_calling_thread = enumerate_the_quick_tier(
-        &prepared,
-        worker_threads_given_by_the_test(WORKER_THREADS_OF_THE_MULTI_THREADED_COMPARISON),
-        ObserverThread::CallingThread,
-    );
+fn the_unlink_stream_quick_tier_counts_the_same_when_rerun_from_the_library() {
+    let prepared = prepare("unlink-after-multi-record-crash-point-replay-rerun");
+    let Some(first_run) = enumerate_the_quick_tier(&prepared, "rerun") else {
+        return;
+    };
+    let Some(second_run) = enumerate_the_quick_tier(&prepared, "rerun") else {
+        return;
+    };
+    assert_eq!(second_run, first_run, "第二遍全照库里复用，计数逐项相同");
     assert_eq!(
-        on_several_worker_threads, on_one_worker_thread,
-        "观察者在工作线程上：四个工作线程与一个工作线程的计数逐项相同"
-    );
-    assert_eq!(
-        on_several_worker_threads, observed_on_the_calling_thread,
-        "观察者在工作线程上与在调用线程上的计数逐项相同"
-    );
-    assert_eq!(
-        on_several_worker_threads.observed_states, on_several_worker_threads.states,
+        first_run.observed_states, first_run.states,
         "每个状态都看过"
     );
 }
 
 /// 全量：35 段。七个单元段各 2^n − 1（n = 26、24、22、24 是删除那四次），每个状态两遍恢复 + checker，逐状态核发布边界、删除的中间态，
-/// 并在工作线程上可写挂载一次核续做走到空。登记成崩溃枚举用例，checker-tier-layer0-replay 认下面打印的
-/// `LAYER0_UNLINK_AFTER_MULTI_RECORD` 行里 `exhaustive=true`；带断点续跑、可双机分片（同多记录流）。
+/// 并在工作线程上可写挂载一次核续做走到空。登记成崩溃枚举用例，checker-tier-crash-point-replay 认下面打印的
+/// `CRASH_POINT_REPLAY_UNLINK_AFTER_MULTI_RECORD` 行里 `exhaustive=true`；带断点续跑、可双机分片（同多记录流）。
 #[test]
-#[ignore = "全量 1463812278 个状态（十四亿多）、每个两遍恢复 + checker + 一次可写挂载；门禁 checker-tier-layer0-replay --full 在 release 下跑，带断点续跑、可双机分片"]
+#[ignore = "全量 1463812278 个状态（十四亿多）、每个两遍恢复 + checker + 一次可写挂载；门禁 checker-tier-crash-point-replay --full 在 release 下跑，带断点续跑、可双机分片"]
 fn full_enumeration_of_the_unlink_after_the_multi_record_publish_stream_is_exhaustive_and_clean() {
-    let prepared = prepare("unlink-after-multi-record-layer0-full");
+    let prepared = prepare("unlink-after-multi-record-crash-point-replay-full");
     let closed_form_with_two_states_per_write = closed_form_state_count(&prepared.segments);
     assert_eq!(
         closed_form_with_two_states_per_write,
@@ -684,7 +678,7 @@ fn full_enumeration_of_the_unlink_after_the_multi_record_publish_stream_is_exhau
         "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，三十五段"
     );
     assert_eq!(closed_form_with_two_states_per_write, 1_463_812_228);
-    let closed_form = layer0_state_count_with_torn_in_place_overwrites(
+    let closed_form = crash_state_count_with_torn_in_place_overwrites(
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
@@ -707,24 +701,43 @@ fn full_enumeration_of_the_unlink_after_the_multi_record_publish_stream_is_exhau
         "枚举域的闭式：十个系统配置槽 2 写段各 3² − 1、七个记录 2 写段各 3、九个 1 写段、七个单元段各 2^n − 1、4 写段 15、6 写段 63"
     );
     assert_eq!(closed_form, 1_463_812_278);
-    let observe_on_the_worker_threads: &(dyn Fn(&CrashImage<'_>, &RecoveryReport, &mut Layer0ObserverCounts)
-          + Sync) = &|image, report, counts| observe_every_state(&prepared, image, report, counts);
-    let tally = match enumerate_layer0_against_the_version_table_or_one_shard(
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        observe_every_state(&prepared, image, report, counts);
+    };
+    let observe_the_mount =
+        |_ordinal: u64,
+         image: &CrashImage<'_>,
+         report: &RecoveryReport,
+         counts: &mut CrashPointReplayObserverCounts| {
+            observe_the_mount_continuation(
+                &prepared.mount_continuation_inputs,
+                image,
+                report,
+                counts,
+            )
+        };
+    let Some(tally) = enumerate_crash_states_with_every_kind_of_observer(
+        CrashPointReplayItem {
+            name: "unlink_after_multi_record::full",
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
         prepared.version_table(),
         &full_expansion,
-        Layer0Parallelism::from_environment(),
-        Layer0StateObserving::OnTheWorkerThreads(observe_on_the_worker_threads),
-        &Layer0Resume::from_environment(FULL_ENUMERATION_STREAM_NAME),
-    ) {
-        Layer0EnumerationOutcome::WholeStream(tally) => tally,
-        Layer0EnumerationOutcome::OneShardWrittenToItsLedger(_written) => return,
+        &[observer_of_every_state(&prepared, &observe)],
+        &[mount_continuation_observer(&prepared, &observe_the_mount)],
+    )
+    .judged() else {
+        return;
     };
     println!(
-        "LAYER0_UNLINK_AFTER_MULTI_RECORD states={} closed_form={closed_form} exhaustive={} violations={} observer {:?} states_by_publish=[{}] checker {} first_violation={}",
+        "CRASH_POINT_REPLAY_UNLINK_AFTER_MULTI_RECORD states={} closed_form={closed_form} exhaustive={} violations={} observer {:?} states_by_publish=[{}] checker {} first_violation={}",
         tally.states,
         tally.states == closed_form,
         tally.violations,
@@ -853,9 +866,9 @@ fn crash_amplification_of_the_unlink_after_the_multi_record_publish_stream_is_cl
     );
 }
 
-/// 两份造法写表摘要相等（崩溃点重放合并第三轮判决 J3，第一轮判决 K2-2）：层 0 那一份（[`prepare`]，不录崩溃点）与录制器那一份
+/// 两份造法写表摘要相等（崩溃点重放合并第三轮判决 J3，第一轮判决 K2-2）：崩溃点重放那一份（[`prepare`]，不录崩溃点）与录制器那一份
 /// （B、C 两次顺序写挪进公共模块之后）录下的起点镜像与整张带屏障的写表逐字节相同、段一样切、被判的根槽写与版本表相同。
-/// 两份都调公共模块里同一个 `sequential_write`；层 0 那一份的写法与挪之前逐字相同。摘要打一行 `CRASH_POINT_REPLAY_WRITE_TABLE`。
+/// 两份都调公共模块里同一个 `sequential_write`；崩溃点重放那一份的写法与挪之前逐字相同。摘要打一行 `CRASH_POINT_REPLAY_WRITE_TABLE`。
 #[cfg(feature = "verdict-store")]
 #[test]
 fn the_unlink_stream_writes_the_same_table_through_the_crash_point_recorder_as_without_it() {
@@ -913,7 +926,8 @@ fn the_unlink_stream_writes_the_same_table_through_the_crash_point_recorder_as_w
 
 /// 删除流与多记录流共享到 C（崩溃点重放合并第三轮正文 H3，主 agent 定）：计划里的点细到每个屏障段（`<入口>.<周期>.<步>`），按点名的前缀认
 /// 公共模块设的四个节点——取号加暖机、新池新建文件、B、C（B、C 都是 `sequential_write`：同一个入口里点名重复出现，就是下一个节点起头）。
-/// 两条流这四个节点的每一个点身份、判器另读的输入、计划哈希、状态序号区间与块逐个相同（块键全同、判定共享）；整条流最后全部持久那一个状态
+/// 两条流这四个节点的每一个点身份、判器另读的输入、状态序号区间与块逐个相同；计划哈希除 C 尾（C 那次发布根槽写之后的系统配置槽轮换，
+/// 它按发布分的态数要往下游找：用户 2026-10-11 定「乙」，下游第一次根槽写进块键）之外逐个相同（块键全同、判定共享），C 尾两条流不同；整条流最后全部持久那一个状态
 /// 不归 C，各自另立成流自己的末节点 `end_of_flow`（`crash_amplification::plan_crash_points`）：多记录流在 C 之后只剩它，删除流在 C 之后
 /// 还有意图、各批与它自己的末节点；两条流的末节点身份与计划哈希各不相同。
 #[cfg(feature = "verdict-store")]
@@ -928,9 +942,9 @@ fn the_unlink_stream_shares_the_nodes_through_c_with_the_multi_record_publish_st
         record_through_the_crash_point_recorder("multi-record-shares-the-prefix", true);
     let expansion = |_segment_index: usize, segment: &[usize]| {
         if segment.len() <= 6 {
-            Layer0SegmentExpansion::EveryProperSubset
+            CrashPointReplaySegmentExpansion::EveryProperSubset
         } else {
-            Layer0SegmentExpansion::NotExpanded
+            CrashPointReplaySegmentExpansion::NotExpanded
         }
     };
     let plan_of = |recorded: &RecordedThroughTheCrashPointRecorder| {
@@ -1011,6 +1025,7 @@ fn the_unlink_stream_shares_the_nodes_through_c_with_the_multi_record_publish_st
         unlink_plan.points.len() > points_through_c + 1,
         "删除流在 C 之后还有意图、各批与它自己的末节点"
     );
+    let tail_of_c = points_through_c - 1;
     for index in 0..points_through_c {
         let (unlink_point, multi_record_point) =
             (&unlink_plan.points[index], &multi_record_plan.points[index]);
@@ -1023,19 +1038,32 @@ fn the_unlink_stream_shares_the_nodes_through_c_with_the_multi_record_publish_st
             unlink_point.judge_inputs, multi_record_point.judge_inputs,
             "第 {index} 个点（{name}）判器另读的输入相同"
         );
-        assert_eq!(
-            unlink_point.plan_hash, multi_record_point.plan_hash,
-            "第 {index} 个点（{name}）计划哈希相同：C 也是，整条流最后那一个状态不归它了"
-        );
+        if index == tail_of_c {
+            assert_ne!(
+                unlink_point.plan_hash, multi_record_point.plan_hash,
+                "C 尾（第 {index} 个点 {name}）计划哈希不同：它按发布分的态数要往下游找，多记录流后面没有根槽写、删除流归意图那次发布，\
+                 下游第一次根槽写进块键（用户 2026-10-11 定「乙」）"
+            );
+        } else {
+            assert_eq!(
+                unlink_point.plan_hash, multi_record_point.plan_hash,
+                "第 {index} 个点（{name}）计划哈希相同：C 尾之前的点照旧共享，整条流最后那一个状态不归 C 了"
+            );
+        }
         assert_eq!(
             (unlink_point.ordinals.clone(), unlink_point.blocks()),
             (
                 multi_record_point.ordinals.clone(),
                 multi_record_point.blocks()
             ),
-            "第 {index} 个点（{name}）状态序号区间与块相同：块键全同、判定共享"
+            "第 {index} 个点（{name}）状态序号区间与块相同：C 尾之前块键全同、判定共享"
         );
     }
+    assert!(
+        !multi_record_plan.points[tail_of_c].blocks().is_empty(),
+        "C 尾（{}）有状态",
+        multi_record_plan.points[tail_of_c].name
+    );
     let unlink_end = unlink_plan.points.last().expect("计划至少一个点");
     let multi_record_end = multi_record_plan.points.last().expect("计划至少一个点");
     for end in [unlink_end, multi_record_end] {
@@ -1053,5 +1081,294 @@ fn the_unlink_stream_shares_the_nodes_through_c_with_the_multi_record_publish_st
     assert_ne!(
         unlink_end.plan_hash, multi_record_end.plan_hash,
         "两条流的末节点计划哈希不同"
+    );
+}
+
+/// 一份计划里的一块：点下标与点名、块键的四样（与 `verdict_store::VerdictBlockKey` 同：复用键、身份、计划哈希、块起点）、
+/// 一块按发布分的态数（按段的序号区间现算：每段与这一块重叠的那几个归这一段的那次发布，最后全部持久那一个归 `every_write_persisted`；
+/// 与崩溃放量 GPU 判器存计数向量的归法同一种）。
+#[cfg(feature = "verdict-store")]
+struct BlockCountedStateByState {
+    point_index: usize,
+    point_name: String,
+    block_key: (
+        singlefs_checker_tier::crash_identity::ReuseKey,
+        String,
+        [u8; singlefs_harness::sha256::DIGEST_BYTES],
+        u64,
+    ),
+    states_by_publish: std::collections::BTreeMap<
+        singlefs_checker_tier::crash::CrashPointReplayPublishOfState,
+        u64,
+    >,
+}
+
+/// 计划里的每一块按发布分的态数（按段的序号区间现算）；展开照计划的（`CrashPlan::segment_expansion`）。
+#[cfg(feature = "verdict-store")]
+fn blocks_of_the_plan_counted_state_by_state(
+    flow: &singlefs_checker_tier::crash_amplification::CrashFlow<'_>,
+    plan: &singlefs_checker_tier::crash_amplification::CrashPlan,
+) -> Vec<BlockCountedStateByState> {
+    use singlefs_checker_tier::crash::{
+        crash_state_ranges_by_segment, publish_of_each_segment, CrashPointReplayPublishOfState,
+    };
+    let point_expansion = |segment_index: usize, segment: &[usize]| {
+        plan.segment_expansion(flow, segment_index, segment)
+    };
+    let (ranges_by_segment, state_count) =
+        crash_state_ranges_by_segment(flow.base, flow.writes, flow.segments, &point_expansion);
+    let publish_of_segment = publish_of_each_segment(flow.writes, flow.segments);
+    let mut blocks = Vec::new();
+    for (point_index, point) in plan.points.iter().enumerate() {
+        for local in point.blocks() {
+            let mut states_by_publish = std::collections::BTreeMap::new();
+            let ordinals = point.ordinals.start + local.start..point.ordinals.start + local.end;
+            for (range, publish) in ranges_by_segment.iter().zip(&publish_of_segment) {
+                let overlap = range
+                    .end
+                    .min(ordinals.end)
+                    .saturating_sub(range.start.max(ordinals.start));
+                if overlap > 0 {
+                    *states_by_publish.entry(*publish).or_insert(0) += overlap;
+                }
+            }
+            if ordinals.start < state_count && ordinals.end >= state_count {
+                *states_by_publish
+                    .entry(CrashPointReplayPublishOfState::EveryWritePersisted)
+                    .or_insert(0) += 1;
+            }
+            blocks.push(BlockCountedStateByState {
+                point_index,
+                point_name: point.name.clone(),
+                block_key: (
+                    point.reuse_key,
+                    point.identity.clone(),
+                    point.plan_hash,
+                    local.start,
+                ),
+                states_by_publish,
+            });
+        }
+    }
+    blocks
+}
+
+/// 落在点下标 `points` 那几个点上的块，按计划里的次序。
+#[cfg(feature = "verdict-store")]
+fn blocks_of_the_points(
+    blocks: &[BlockCountedStateByState],
+    points: std::ops::Range<usize>,
+) -> Vec<&BlockCountedStateByState> {
+    blocks
+        .iter()
+        .filter(|block| points.contains(&block.point_index))
+        .collect()
+}
+
+/// 崩溃点重放枚举（每个状态照判，不挂观察者）按计划的展开数出来的 `CrashPointReplayTally`。
+#[cfg(feature = "verdict-store")]
+fn crash_point_replay_tally_under_the_expansion_of_the_plan(
+    recorded: &RecordedThroughTheCrashPointRecorder,
+    item_label: &str,
+    flow: &singlefs_checker_tier::crash_amplification::CrashFlow<'_>,
+    plan: &singlefs_checker_tier::crash_amplification::CrashPlan,
+) -> Option<CrashPointReplayTally> {
+    let point_expansion = |segment_index: usize, segment: &[usize]| {
+        plan.segment_expansion(flow, segment_index, segment)
+    };
+    let item_name = format!("unlink_after_multi_record::under_the_plan::{item_label}");
+    enumerate_crash_states_with_every_kind_of_observer(
+        CrashPointReplayItem {
+            name: &item_name,
+            setting_file: THIS_FILE,
+        },
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        recorded.judged_root_index,
+        CrashPointReplayVersionTable::new(&recorded.versions, &recorded.versions_without_a_file),
+        &point_expansion,
+        &[],
+        &[],
+    )
+    .judged()
+}
+
+/// 块上存的按发布分的态数跟着块键走（崩溃点重放合并第三轮判决 J7：每一趟照判复用块的计数向量，`count_vector_disagreements_of_the_flow`）：
+/// 按发布分的态数要往下游找的块，下游第一次根槽写进块键（用户 2026-10-11 定「乙」，`crash_amplification::plan_crash_points`）。
+/// 删除流与多记录流共享到 C：C 尾那一块（多记录流末节点之前最后一个点，C 那次发布根槽写之后的系统配置槽轮换）在多记录流里后面没有根槽写、
+/// 归 `after_the_last_root`，在删除流里归意图那次发布，两条流块键不同；C 尾之前的每一块两条流块键相同、逐状态数归哪次发布也相同。
+/// 每条流逐块按发布分的态数（按段的序号区间现算，CPU 判器存计数向量照的那一份），全部块合起来与崩溃点重放枚举的
+/// `CrashPointReplayTally::states_by_publish` 逐项相同（同一种展开）。
+// crash-case-check:not-a-crash-case 两条合成流只展开写数不超过 6 的段，一两百个状态，只比按发布分的计数，单跑几秒
+#[cfg(feature = "verdict-store")]
+#[test]
+fn the_tail_of_c_is_keyed_apart_in_the_two_streams_and_every_block_counts_its_states_by_publish_as_the_crash_point_replay_tally(
+) {
+    use singlefs_checker_tier::crash::CrashPointReplayPublishOfState;
+    use singlefs_checker_tier::crash_amplification::{
+        plan_crash_points, CrashFlow, END_OF_FLOW_NODE_NAME,
+    };
+    let unlink = record_through_the_crash_point_recorder("unlink-keys-the-tail-of-c-apart", false);
+    let multi_record =
+        record_through_the_crash_point_recorder("multi-record-keys-the-tail-of-c-apart", true);
+    let expansion = |_segment_index: usize, segment: &[usize]| {
+        if segment.len() <= 6 {
+            CrashPointReplaySegmentExpansion::EveryProperSubset
+        } else {
+            CrashPointReplaySegmentExpansion::NotExpanded
+        }
+    };
+    let unlink_flow = CrashFlow {
+        base: &unlink.base,
+        writes: &unlink.writes,
+        segments: &unlink.segments,
+        judged_root_index: unlink.judged_root_index,
+        versions: &unlink.versions,
+        versions_without_a_file: &unlink.versions_without_a_file,
+        expansion: &expansion,
+        crash_points: unlink.crash_points.clone(),
+    };
+    let multi_record_flow = CrashFlow {
+        base: &multi_record.base,
+        writes: &multi_record.writes,
+        segments: &multi_record.segments,
+        judged_root_index: multi_record.judged_root_index,
+        versions: &multi_record.versions,
+        versions_without_a_file: &multi_record.versions_without_a_file,
+        expansion: &expansion,
+        crash_points: multi_record.crash_points.clone(),
+    };
+    let unlink_plan = plan_crash_points(&unlink_flow);
+    let multi_record_plan = plan_crash_points(&multi_record_flow);
+    let unlink_blocks = blocks_of_the_plan_counted_state_by_state(&unlink_flow, &unlink_plan);
+    let multi_record_blocks =
+        blocks_of_the_plan_counted_state_by_state(&multi_record_flow, &multi_record_plan);
+
+    // 一、每条流：全部块逐状态数的按发布分的态数合起来，与崩溃点重放枚举的计数逐项相同
+    for (stream, item_label, recorded, flow, plan, blocks) in [
+        (
+            "删除流",
+            "unlink",
+            &unlink,
+            &unlink_flow,
+            &unlink_plan,
+            &unlink_blocks,
+        ),
+        (
+            "多记录流",
+            "multi_record",
+            &multi_record,
+            &multi_record_flow,
+            &multi_record_plan,
+            &multi_record_blocks,
+        ),
+    ] {
+        let mut summed_over_the_blocks = std::collections::BTreeMap::new();
+        for block in blocks {
+            for (publish, states) in &block.states_by_publish {
+                *summed_over_the_blocks.entry(*publish).or_insert(0) += states;
+            }
+        }
+        let Some(tally) = crash_point_replay_tally_under_the_expansion_of_the_plan(
+            recorded, item_label, flow, plan,
+        ) else {
+            continue;
+        };
+        assert!(tally.states > 0, "{stream}：崩溃点重放枚举到了状态");
+        assert_eq!(
+            summed_over_the_blocks, tally.states_by_publish,
+            "{stream}：逐块逐状态数的按发布分的态数合起来，与崩溃点重放枚举的 CrashPointReplayTally::states_by_publish 逐项相同"
+        );
+    }
+
+    // 二、C 尾：两条流同一个树节点、同样几块，块键不同，各自归各自下游的那次发布
+    let tail_of_c = multi_record_plan.points.len() - 2;
+    assert_eq!(
+        multi_record_plan.points[tail_of_c + 1].name,
+        END_OF_FLOW_NODE_NAME,
+        "多记录流 C 尾之后只剩末节点"
+    );
+    assert_eq!(
+        unlink_plan.points[tail_of_c].identity, multi_record_plan.points[tail_of_c].identity,
+        "C 尾在两条流里是树上同一个节点：设点文件、名字、复用键相同"
+    );
+    let intent = unlink
+        .versions_without_a_file
+        .first()
+        .expect("删除流的版本表带意图那一版");
+    let unlink_tail = blocks_of_the_points(&unlink_blocks, tail_of_c..tail_of_c + 1);
+    let multi_record_tail = blocks_of_the_points(&multi_record_blocks, tail_of_c..tail_of_c + 1);
+    assert!(!multi_record_tail.is_empty(), "C 尾至少一块");
+    assert_eq!(
+        unlink_tail.len(),
+        multi_record_tail.len(),
+        "C 尾两条流一样多块"
+    );
+    for (unlink_block, multi_record_block) in unlink_tail.iter().zip(&multi_record_tail) {
+        let place = format!(
+            "C 尾 {} 块 {}",
+            multi_record_block.point_name, multi_record_block.block_key.3
+        );
+        assert_ne!(
+            unlink_block.block_key, multi_record_block.block_key,
+            "{place}：两条流块键不同（下游第一次根槽写进了计划哈希）"
+        );
+        assert_eq!(
+            multi_record_block
+                .states_by_publish
+                .keys()
+                .copied()
+                .collect::<Vec<CrashPointReplayPublishOfState>>(),
+            vec![CrashPointReplayPublishOfState::AfterTheLastRoot],
+            "{place}：多记录流 C 尾后面没有根槽写"
+        );
+        assert!(
+            !unlink_block.states_by_publish.is_empty()
+                && unlink_block.states_by_publish.keys().all(|publish| matches!(
+                    publish,
+                    CrashPointReplayPublishOfState::UpToTheRootOf { instance, checkpoint_txg, .. }
+                        if (*instance, *checkpoint_txg) == (intent.instance, intent.checkpoint_txg)
+                )),
+            "{place}：删除流 C 尾归意图那次发布，实际 {:?}",
+            unlink_block.states_by_publish
+        );
+        assert_eq!(
+            unlink_block.states_by_publish.values().sum::<u64>(),
+            multi_record_block.states_by_publish.values().sum::<u64>(),
+            "{place}：两条流这一块状态数相同"
+        );
+    }
+
+    // 三、C 尾之前：两条流逐块块键相同，逐状态数归哪次发布也相同
+    let unlink_before_the_tail = blocks_of_the_points(&unlink_blocks, 0..tail_of_c);
+    let multi_record_before_the_tail = blocks_of_the_points(&multi_record_blocks, 0..tail_of_c);
+    assert!(!multi_record_before_the_tail.is_empty(), "C 尾之前至少一块");
+    assert_eq!(
+        unlink_before_the_tail.len(),
+        multi_record_before_the_tail.len(),
+        "C 尾之前两条流一样多块"
+    );
+    let disagreements: Vec<String> = unlink_before_the_tail
+        .iter()
+        .zip(&multi_record_before_the_tail)
+        .filter(|(unlink_block, multi_record_block)| {
+            unlink_block.block_key != multi_record_block.block_key
+                || unlink_block.states_by_publish != multi_record_block.states_by_publish
+        })
+        .map(|(unlink_block, multi_record_block)| {
+            format!(
+                "点 {} 块 {}：块键相同 {}，删除流里按发布分 {:?}，多记录流里 {:?}",
+                multi_record_block.point_name,
+                multi_record_block.block_key.3,
+                unlink_block.block_key == multi_record_block.block_key,
+                unlink_block.states_by_publish,
+                multi_record_block.states_by_publish
+            )
+        })
+        .collect();
+    assert!(
+        disagreements.is_empty(),
+        "C 尾之前两条流逐块块键相同、按发布分的态数相同（判定共享）：{disagreements:?}"
     );
 }

@@ -20,8 +20,8 @@ use singlefs_core::transaction::{
 };
 use singlefs_core::unit::{build_packed_unit, parse_packed_unit};
 use singlefs_harness::history::{
-    execute_history, AppliedEffect, GeneratedHistory, HistoryDeviceWidth, HistoryEnding,
-    HistoryOperation, HistorySeed, HistoryStartingPoint, StepOutcome,
+    execute_history_with, AppliedEffect, GeneratedHistory, HistoryDeviceWidth, HistoryEnding,
+    HistoryExecution, HistoryOperation, HistorySeed, HistoryStartingPoint, StepOutcome,
 };
 use singlefs_harness::memory_pool::SparseBlockDevice;
 use singlefs_harness::model::{
@@ -32,6 +32,7 @@ use singlefs_harness::model_comparison::{
     model_instance, model_instance_row, model_root_key,
     observed_mount_carrying_to_zero_unit_publishes, observed_root_of_version_without_file_carrying,
 };
+use singlefs_harness::SharedStream;
 
 const DEVICE_WIDTH: HistoryDeviceWidth = HistoryDeviceWidth::FourGibibytes;
 
@@ -388,7 +389,12 @@ fn the_session_carries_the_row_publish_down_to_the_zero_unit_publishes_after_the
             HistoryOperation::PublishWithoutUnits,
         ],
     };
-    let run = execute_history(&history);
+    let run = execute_history_with(
+        &history,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
+        &SharedStream::new(),
+        &mut |_| {},
+    );
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert!(
         matches!(

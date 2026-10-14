@@ -513,6 +513,7 @@ enum EventApplied {
     NothingEntered,
 }
 
+// gpu-exempt: reference-filesystem
 fn apply_event(
     model: &mut ReferenceFileSystem,
     event: &ReferenceFileSystemEvent,
@@ -862,6 +863,7 @@ fn read_out_of(read_back: &ObservedReadBack) -> Result<VisibleState, String> {
 }
 
 /// 在 `model` 上判一次崩溃（落在第 `crash_falls_in` 个操作里）之后恢复读回的东西。
+// gpu-exempt: reference-filesystem
 fn judge_the_recovery(
     mut model: ReferenceFileSystem,
     crash_falls_in: OperationNumber,

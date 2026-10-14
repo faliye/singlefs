@@ -1,11 +1,12 @@
-//! C554 乙-配置续（岔路单 `research/prompts/c554-fix-forks.md` 第 2 行；定义取自 E158 第 3 次跑登记
-//! `research/prompts/e158-r3-prereg.md` 第 348 行与第 4 次跑登记 `research/prompts/e158-r4-prereg.md` 第 413 行）：取号那一写的 tail
+//! C554 乙-配置续（岔路单 `research/prompts/c554-fix-forks.md` #2「乙-配置的判据只认系统配置槽里见证的 tail」；定义取自 E158 第 3 次跑登记
+//! `research/prompts/e158-r3-prereg.md`「`| **N-配置续** |`」那一行与第 4 次跑登记 `research/prompts/e158-r4-prereg.md`
+//! 「N-配置 在 `replay_journal` 交回之后另读每块盘两个系统配置槽」那一条）：取号那一写的 tail
 //! 不写 0，写取号那一刻按判据 N-配置 同一取法读到的见证值 c_见证（每块盘两槽里全部自证过的系统配置槽的 `journal_tail` 取最大，
 //! 一份都没有时 0）；取号失败的回卷写带同一个值。
 //!
 //! 为什么要它：C554 乙（可写挂载读到的样子里有更新的东西读不出就重读一次，仍读不出就拒可写）判「更新」靠系统配置见证的 tail。
 //! 连着两次取号之后崩溃、中间没有发布轮换（E158 第 3 段 H1g a = 2 那一形），每块盘两槽都换成了取号写；取号写 tail 0 时见证就丢了，
-//! 最新那条根暂时读不出的时候可写挂载判不出、照常挂载并把它当成被抛弃（`research/prompts/e158-r4-seg3-runner-report.md` 第 9 行：
+//! 最新那条根暂时读不出的时候可写挂载判不出、照常挂载并把它当成被抛弃（`research/prompts/e158-r4-seg3-runner-report.md`「H1g 上 -配置 四臂」那一条：
 //! -配置 四臂各丢写 16/32、全在 a = 2，-配置续 0/32）。
 //!
 //! 每条用例从盘上的字节核（`recovery::verified_system_configuration_slots` 解录制流施加出来的镜像），不经写者算的量。

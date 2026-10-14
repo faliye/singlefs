@@ -563,7 +563,7 @@ pub fn scratch_states_to_book_on_each_card(
 }
 
 /// GPU 用例与产品路径报「本次未跑」那一行的记号（`singlefs_checker_tier::gpu_unit_checks::gpu_test_start::not_run_line` 照它打；
-/// 门禁 `checker-tier-layer0-replay` 的 feature-gated-tests 格按它逐条报本次未跑）。
+/// 门禁 `checker-tier-crash-point-replay` 的 feature-gated-tests 格按它逐条报本次未跑）。
 pub const GPU_NOT_RUN_MARKER: &str = "NOT_RUN_NO_GPU_ADAPTER";
 
 /// 「本次未跑」那一行：`<记号> test=<用例或产品路径的名字> reason=<为什么>`。
@@ -3769,7 +3769,7 @@ mod tests {
     /// 它们的 Total、Free 不该被当成显存读）。
     fn nvidia_smi_report(cards: &[CardInTheReport<'_>]) -> String {
         let mut report = format!(
-            "\n==============NVSMI LOG==============\n\nTimestamp                                              : Wed Oct  7 14:38:07 2026\n\
+            "\n==============NVSMI LOG==============\n\nTimestamp                                              : Wed Oct  7 2026\n\
              Driver Version                                         : 595.84\nCUDA Version                                           : 13.2\n\n\
              Attached GPUs                                          : {}\n",
             cards.len()
@@ -6877,7 +6877,7 @@ mod tests {
         );
     }
 
-    /// wgpu 因显存不够丢设备时给的那一句：`wgpu_hal::DeviceError::OutOfMemory` 说的（wgpu-hal 30.0.1 `src/lib.rs` 第 382 行），
+    /// wgpu 因显存不够丢设备时给的那一句：`wgpu_hal::DeviceError::OutOfMemory` 说的（wgpu-hal 30.0.1 `src/lib.rs` 里 `DeviceError::OutOfMemory` 的 `#[error("Out of memory")]`），
     /// 丢失回调照 `{reason:?}：{message}` 记（`singlefs_checker_tier::gpu_unit_checks`）。
     const LOST_FOR_LACK_OF_MEMORY: &str = "Unknown：Out of memory";
 

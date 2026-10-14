@@ -1,13 +1,15 @@
-//! 随机历史（里程碑「覆盖写、释放、回退与复用」增补 3 第 1 件）：按种子生成一段操作序列，操作只调 `crates/` 今天的公开入口；每一步之后对镜像跑
-//! 池级 checker。入口返回 `Err` 算合法结局；panic 与 checker 违例算失败——撞到「已知红」清单（`KNOWN_RED_FORMS`）里的形态照记、
-//! 这段历史到此为止，清单外的算新发现，收缩到最短复现（`shrink_operations`）。
+//! 随机历史（里程碑「覆盖写、释放、回退与复用」增补 3 第 1 件）：按种子生成一段操作序列，操作只调 `crates/` 今天的公开入口；每一步之后的镜像
+//! 经每步镜像那个钩子交出去（`execute_history_handing_out_every_step_image`），池级 checker 那一遍归 checker 档两段（用户 2026-10-13 定：
+//! 镜像作为给定状态写进判定库、判段从库读、判在 GPU），harness 一条不变量都不判（`PerStepChecker::Skipped`）。
+//! 入口返回 `Err` 算合法结局；panic、模型对不上（与故障注入的合并入口照 checker 档判回的结论停下的那一步上的 checker 违例）算失败——撞到「已知红」清单
+//! （`KNOWN_RED_FORMS`）里的形态照记、这段历史到此为止，清单外的算新发现，收缩到最短复现（`shrink_operations`）。
 //! 第 2 件接上了理想模型（`crate::model`）：每一步调入口之前问模型该成、该拒还是区间里都行，调完拿实现的结局与它比（胶水在
 //! `crate::model_comparison`）——冷启动读回的内容、回退与抬 F 该不该被拒、根的身份与 F、单元的分配代都由它判，对不上算失败。
 //!
 //! 生成与执行分开：一步操作只带「做什么 + 选择子」，写多长、回退到哪条根、F 抬到多少，执行时按那一刻的盘面与会话现解——
 //! 删掉前面几步之后，后面的操作照样有意义，收缩靠的就是这一条。
 //!
-//! 第 3 至 5 件在这里生成的历史上做：录制流由调用方给（`execute_history_observing`；崩溃注入给开了内容保留的流，截断点从流里取），
+//! 第 3 至 5 件在这里生成的历史上做：录制流由调用方给（`execute_history_with`；崩溃注入给开了内容保留的流，截断点从流里取），
 //! 每一步之后的镜像经观察者交出去（坏盘输入拿它当合法镜像）；故障注入（第 4 件）在**录制器外面**包了一层
 //! `crate::fault_injection::FaultInjectingBlockDevice`，注入计划由调用方给（`execute_history_with_faults`），
 //! 不注入时它只数调用、每一次都原样交给录制器——报错的写、被吞掉的写与被吞掉的屏障都不进录制流，
@@ -21,10 +23,8 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, Once};
 
-use singlefs_checker::image::{
-    chosen_system_configurations, valid_roots, ImageReader, InvariantVerdict,
-};
-use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+use singlefs_checker::image::{chosen_system_configurations, valid_roots, ImageReader};
+use singlefs_checker::walk::allocation_record_count_under_root;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::allocator::{AllocationRecord, PlacementRefusal, PoolAllocator, UnitAreaStart};
@@ -464,8 +464,8 @@ pub struct FloorTargetChoice {
     /// 新 F = 现行版本根记录的 F + `steps_above_current_floor mod (现行 txg − 现行 F + 3)`：最大到现行 txg + 2，
     /// 而上限（D16（发布语义） 已定项 1）不超过每块盘上最新的有效根 ≤ 现行 txg，所以超过上限的目标一定取得到。
     /// 生成器的前提：目标只取现行 F 及以上，不往下抬。没有条款明写，按入口的文档注释取的读法——
-    /// `crates/singlefs-core/src/mount.rs` 第 590 行「抬回退下界 F 到 `new_floor`（D16（发布语义） 已定项 1）」，已定项 1 在
-    /// `.claude/kb/decisions/16-发布语义.md` 第 107 行；往下的目标这个入口接不接、接了算不算合法没有条款（F 回落在增补 2 收口表第 ② 行里打回重议）。
+    /// `crates/singlefs-core/src/mount.rs` 的 `raise_rollback_floor` 文档注释「抬回退下界 F 到 `new_floor`（D16（发布语义） 已定项 1）」，已定项 1 在
+    /// `.claude/kb/decisions/16-发布语义.md`「已定项 1：defer 窗口取按盘回退下界的收严形态，按状态数读」；往下的目标这个入口接不接、接了算不算合法没有条款（F 回落在增补 2 收口表第 ② 行里打回重议）。
     /// 以后要测：前提之外调它应当返回 `Err`，不许 panic（增补 3 记着，2026-09-18 主 agent 定）。
     pub steps_above_current_floor: u64,
 }
@@ -846,8 +846,9 @@ impl GenerationWeights {
 
     /// 原分配记录墙那一格（增补 3 第 2 件代码三方第一轮判决第三节第 1 条）的取样点：一律从第一个文件起，带文件的版本上多半覆盖写，
     /// 夹着可写挂载、抬 F（回收之后复用改写记录，条数涨得慢）与少量回退，把分配记录攒过 812 条。分配记录树按绝对槽号按位置寻址之后
-    /// （D8（核心索引结构） 已定项 14）那道墙拆了，这一段看的是越过 812 条之后多叶的树每一步都判绿、模型对得上。配 `PerStepChecker::Run` 跑
-    /// （第二轮判决第三节第 3 条：第一轮配的是 `Skipped`，攻方两条只有 checker 看得见的变异在它上面一段都不红）。
+    /// （D8（核心索引结构） 已定项 14）那道墙拆了，这一段看的是越过 812 条之后多叶的树每一步都判绿、模型对得上。每一步的池级 checker 要判
+    /// （第二轮判决第三节第 3 条：第一轮一步都不判，攻方两条只有 checker 看得见的变异在它上面一段都不红）：那一遍归 checker 档两段，
+    /// 每一步的镜像经钩子交出去。
     pub const TOWARD_THE_ALLOCATION_RECORD_WALL: GenerationWeights = GenerationWeights {
         name: "越过原分配记录墙（812 条那一格的取样点）",
         named: NamedGenerationWeights::TowardTheAllocationRecordWall,
@@ -1444,6 +1445,7 @@ pub struct ModelVerdict {
 }
 
 /// 拿实现的结局与模型的答案比，对得上就让模型往前走（模型答不了的，答案本身就是那一格对不上）。
+// gpu-exempt: comparison-with-the-ideal-model
 fn judge_by_model(
     model: &mut IdealModel,
     answer: Result<ModelAnswer, ModelDisagreement>,
@@ -1588,6 +1590,7 @@ impl HistoryPool {
                     step: StartingPointStep::MakeFilesystem,
                     error: format!("{error:?}"),
                     image: image_of(&devices, device_width),
+                    operations_written_by_make_filesystem: stream.operation_count(),
                 })
             }
         };
@@ -1622,6 +1625,7 @@ impl HistoryPool {
                                 step: StartingPointStep::ReadThePoolForTheSession,
                                 error: format!("{error:?}"),
                                 image: image_of(&devices, device_width),
+                                operations_written_by_make_filesystem,
                             })
                         }
                     };
@@ -1640,6 +1644,7 @@ impl HistoryPool {
                             step,
                             error,
                             image: image_of(&devices, device_width),
+                            operations_written_by_make_filesystem,
                         })
                     }
                 };
@@ -1696,8 +1701,8 @@ pub enum MissingPrecondition {
     /// 现行版本树表 0 条：覆盖写与抬 F 都要一个带文件的上一版（`TransactionOutput`）。
     CurrentVersionWithoutFile,
     /// 现行版本带文件：零单元发布只给树表 0 条的一版；带文件的一版上的空发布要重写固定点单元（分配记录树要改的那几个节点 + 记账 + 映射 + 树表），那是挂载内部的 `publish_version`，
-    /// 不是这个入口。生成器的前提，没有条款明写调用约定，按入口的文档注释取的读法——`crates/singlefs-core/src/transaction.rs` 第 506 行
-    /// 「零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）」，已定项 9 在 `.claude/kb/decisions/16-发布语义.md` 第 192 行。
+    /// 不是这个入口。生成器的前提，没有条款明写调用约定，按入口的文档注释取的读法——`crates/singlefs-core/src/transaction.rs` 的 `publish_without_units`
+    /// 文档注释「零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）」，已定项 9 在 `.claude/kb/decisions/16-发布语义.md`「已定项 9：一次空发布也写单元」。
     /// 以后要测：前提之外调它应当返回 `Err`，不许 panic（增补 3 记着，2026-09-18 主 agent 定）。
     CurrentVersionWithFile,
     /// 按 checker 的读法，根环里一条可读根都没有：回退的目标无从取。
@@ -1919,6 +1924,8 @@ pub struct StartingPointFailure {
     /// 那一步交回的错误成员，`{:?}` 出来的一行。
     pub error: String,
     pub image: MemoryPool,
+    /// 录制流头上 mkfs 写的步数（mkfs 自己报错时就是这一刻录制流里的全部步数）。
+    pub operations_written_by_make_filesystem: usize,
 }
 
 /// 一步操作的结局本身判不判失败：冷启动读回报错就算（不看读回的内容对不对，那是第 2 件模型的事）。
@@ -2383,12 +2390,17 @@ pub struct HistoryTally {
     pub histories_with_a_walk_of_several_steps_before_a_user_change: u64,
     /// 会话里一次用户改动之前先走空、走空被空间拒推了抬 F、模型逐串逐步比过的段数（N3「走空被空间拒」）。
     pub histories_with_a_walk_before_a_user_change_refused_for_space: u64,
+    /// harness 就地跑池级 checker 的次数：那一遍归 checker 档两段，harness 一次都不跑（[`PerStepChecker`]），这一格恒为 0，
+    /// 用例照它核 harness 没把逐步 checker 偷回来。
     pub checker_runs: u64,
     /// 这一步一个写都没发（录制流一步没多）：镜像逐字节不变，checker 的结论沿用上一次，不重跑。
     pub checker_runs_skipped_because_nothing_was_written: u64,
+    /// 经每步镜像那个钩子交出去的镜像张数（[`execute_history_handing_out_every_step_image`]）：起点之后、每一步写过盘之后各一张，
+    /// 起点段报错而 mkfs 做完了的那一张也算；跑不跑池级 checker 都交。
+    pub step_images_handed_out: u64,
     pub invariant_holds: BTreeMap<&'static str, u64>,
     pub invariant_not_applicable: BTreeMap<&'static str, u64>,
-    /// 判成「部分没判」（[`InvariantVerdict::PartiallyJudged`]）的次数：不红，也不算判绿。
+    /// 判成「部分没判」（`singlefs_checker::image::InvariantVerdict::PartiallyJudged`）的次数：不红，也不算判绿。
     pub invariant_partially_judged: BTreeMap<&'static str, u64>,
     /// 理想模型判过的步数（起点那次第一个文件也算一步；前提不满足、入口没调的不算）与各格计数。
     pub model_judged_steps: u64,
@@ -2471,6 +2483,7 @@ impl HistoryTally {
         self.checker_runs += other.checker_runs;
         self.checker_runs_skipped_because_nothing_was_written +=
             other.checker_runs_skipped_because_nothing_was_written;
+        self.step_images_handed_out += other.step_images_handed_out;
         for (invariant, count) in &other.invariant_holds {
             *self.invariant_holds.entry(invariant).or_insert(0) += count;
         }
@@ -2714,8 +2727,10 @@ impl HistoryTally {
         );
         let _ = writeln!(
             text,
-            "  checker 跑了 {} 次；一个写都没发、沿用上一次结论的 {} 步",
-            self.checker_runs, self.checker_runs_skipped_because_nothing_was_written
+            "  checker 跑了 {} 次；一个写都没发、沿用上一次结论的 {} 步；每步镜像交出去 {} 张",
+            self.checker_runs,
+            self.checker_runs_skipped_because_nothing_was_written,
+            self.step_images_handed_out
         );
         let counts = &self.model_counts;
         let _ = writeln!(
@@ -2769,9 +2784,9 @@ pub struct HistoryRun {
     /// 每一步操作的结局，按次序；失败在第几步就到第几步为止（panic 的那一步没有结局）。
     pub outcomes: Vec<StepOutcome>,
     pub tally: HistoryTally,
-    /// mkfs 占了录制流开头的几步：崩溃注入（增补 3 第 3 件）的基线与层 0 一样取「mkfs 之后」——
+    /// mkfs 占了录制流开头的几步：崩溃注入（增补 3 第 3 件）的基线与崩溃点重放一样取「mkfs 之后」——
     /// mkfs 不是事务，它写到一半的盘面上没有池，恢复报不出根是对的，不该拿事务的 oracle 去判
-    /// （层 0 那一路同样从 `mkfs_operation_count` 之后起枚举，见 `crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs`）。
+    /// （崩溃点重放那一路同样从 `mkfs_operation_count` 之后起枚举，见 `crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs`）。
     pub operations_written_by_make_filesystem: usize,
     /// 这段历史停下时模型根环里的每一条根（`IdealModel::committed_versions`）：故障注入（增补 3 第 4 件）拿它当
     /// 「模型认下来的每一版」判重开走到的那一版——失败那一步的根，模型认了就在里面，没认（判定对不上、模型没往前走）就不在。
@@ -3145,6 +3160,9 @@ fn rollback_error_member(error: &RollbackError) -> String {
         }
         RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. } => {
             "ResurrectedUnitCopyUnreadableOrMismatched".to_string()
+        }
+        RollbackError::IsolatedUnitCopyUnreadableOrMismatched { .. } => {
+            "IsolatedUnitCopyUnreadableOrMismatched".to_string()
         }
         RollbackError::CurrentVersionUnitNotReleasable { cause } => {
             format!("CurrentVersionUnitNotReleasable({})", publish_error_member(cause))
@@ -5236,26 +5254,20 @@ fn file_the_current_version_by_what_the_rollback_took(pool: &mut HistoryPool) {
     }
 }
 
-/// 对一份镜像跑池级 checker，记每条不变量判绿、不适用各几次，交回判红的那几条。
-fn violations_on(image: &MemoryPool, tally: &mut HistoryTally) -> Vec<(&'static str, String)> {
-    tally.checker_runs += 1;
-    let mut violations = Vec::new();
-    for (invariant, verdict) in check_pool_image(image) {
-        match verdict {
-            InvariantVerdict::Holds => *tally.invariant_holds.entry(invariant).or_insert(0) += 1,
-            InvariantVerdict::NotApplicable(_) => {
-                *tally.invariant_not_applicable.entry(invariant).or_insert(0) += 1;
-            }
-            InvariantVerdict::PartiallyJudged(_) => {
-                *tally
-                    .invariant_partially_judged
-                    .entry(invariant)
-                    .or_insert(0) += 1;
-            }
-            InvariantVerdict::Violated(detail) => violations.push((invariant, detail)),
-        }
-    }
-    violations
+/// 下一张交出去的镜像在交出去的次序里的下标（从 0 数）：已经交了几张就是几。
+fn step_image_index_of_the_next_hand_out(tally: &HistoryTally) -> usize {
+    usize::try_from(tally.step_images_handed_out)
+        .expect("一段历史交出去的镜像张数不超过步数加一，装得进 usize")
+}
+
+/// 把一张池级 checker 本来要判的镜像交给每步镜像那个钩子，记一张。
+fn hand_out_a_step_image(
+    step_images: &mut dyn FnMut(&StepImage<'_>),
+    tally: &mut HistoryTally,
+    step_image: &StepImage<'_>,
+) {
+    tally.step_images_handed_out += 1;
+    step_images(step_image);
 }
 
 /// 一次失败对「已知红」清单：按清单次序第一条对得上的就是它，都对不上是新发现。
@@ -5274,12 +5286,15 @@ pub fn classify_failure(observation: FailureObservation) -> HistoryEnding {
 }
 
 enum_listing_every_member! {
-/// 每一步之后跑不跑池级 checker、判红了停不停。
+/// 每一步之后 harness 自己跑不跑池级 checker：一律不跑，每一步的镜像经钩子交出去（[`execute_history_handing_out_every_step_image`]），
+/// 池级 checker 那一遍归 checker 档两段（镜像作为给定状态写进判定库、判段从库读、判在 GPU；
+/// `crates/singlefs-checker-tier/tests/crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library.rs`），
+/// harness 随时跑的只剩与理想模型、RefFS 比对那一截（用户 2026-10-13 定）。原先 harness 就地判、判红就停的那一种删了（用户 2026-10-14 定）：
+/// 要判红就停那一档口径的调用方（E158 的故障注入）经故障注入的合并入口收 checker 档判回的结论
+/// （`crate::fault_injection::inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PerStepChecker {
-    /// 起点之后与每一步写过盘之后都跑，判红就停（第 1 件的执行器；快档、各取样点与大档都是这一种）。
-    Run,
-    /// 不跑：只由理想模型、执行器自己的判定与 panic 让历史停下（崩溃注入、坏盘输入这些在历史之外另有判据的装置用它，省下每一步的 checker）。
+    /// 不跑：只由理想模型、执行器自己的判定与 panic 让历史停下，每一步的镜像经钩子交出去（harness 档的用例、崩溃注入、坏盘输入、故障注入都用它）。
     Skipped,
 }
 }
@@ -5288,15 +5303,7 @@ impl PerStepChecker {
     #[must_use]
     pub fn name(self) -> &'static str {
         match self {
-            PerStepChecker::Run => "每一步之后跑池级 checker",
             PerStepChecker::Skipped => "不跑池级 checker（只由模型、执行器的判定与 panic 判）",
-        }
-    }
-
-    fn runs_the_checker(self) -> bool {
-        match self {
-            PerStepChecker::Run => true,
-            PerStepChecker::Skipped => false,
         }
     }
 
@@ -5304,7 +5311,6 @@ impl PerStepChecker {
     #[must_use]
     pub const fn environment_value(self) -> &'static str {
         match self {
-            PerStepChecker::Run => "run",
             PerStepChecker::Skipped => "skip",
         }
     }
@@ -5321,12 +5327,14 @@ pub struct HistoryExecution {
 }
 
 impl HistoryExecution {
-    /// 第 1 件的执行器：每一步之后跑 checker、判红就停，两块 4 GiB 的盘（快档、前两个取样点、大档）。
-    pub const CHECKED_ON_FOUR_GIBIBYTE_DEVICES: HistoryExecution = HistoryExecution {
-        per_step_checker: PerStepChecker::Run,
-        device_width: HistoryDeviceWidth::FourGibibytes,
-        space_admission: SpaceAdmission::JudgedByTheFormula,
-    };
+    /// harness 档用例的执行器：harness 不跑每一步的池级 checker，每一步的镜像经钩子交出去（池级 checker 那一遍归 checker 档两段），
+    /// 两块 4 GiB 的盘、判空间准入。
+    pub const HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES: HistoryExecution =
+        HistoryExecution {
+            per_step_checker: PerStepChecker::Skipped,
+            device_width: HistoryDeviceWidth::FourGibibytes,
+            space_admission: SpaceAdmission::JudgedByTheFormula,
+        };
 
     /// 报告里的名字。
     #[must_use]
@@ -5716,34 +5724,8 @@ pub fn random_history_to_reproduce_from_environment(
     Ok((HistorySeed(seed), sampling))
 }
 
-/// 跑一段历史，每一步之后跑池级 checker、两块 4 GiB 的盘，录制流不留内容（第 1 件只看镜像）。
-#[must_use]
-pub fn execute_history(history: &GeneratedHistory) -> HistoryRun {
-    execute_history_with(
-        history,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
-        &SharedStream::new(),
-        &mut |_| {},
-    )
-}
-
-/// 跑一段历史，每一步之后跑池级 checker、两块 4 GiB 的盘（`execute_history_with` 的 `HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES`）。
-pub fn execute_history_observing(
-    history: &GeneratedHistory,
-    stream: &SharedStream,
-    observer: &mut dyn FnMut(&StepObservation<'_>),
-) -> HistoryRun {
-    execute_history_with(
-        history,
-        HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
-        stream,
-        observer,
-    )
-}
-
-/// 跑一段历史：在 `execution.device_width` 那么宽的两块盘上，起点之后与每一步写过盘之后按 `execution.per_step_checker` 对镜像跑池级
-/// checker，再把那一刻的镜像交给观察者。第一次失败（违例、执行器判出的、模型对不上、panic）就停。盘上的写与屏障录进 `stream`
-/// （崩溃注入给开了内容保留的流）。
+/// 跑一段历史：在 `execution.device_width` 那么宽的两块盘上，起点之后与每一步写过盘之后把那一刻的镜像交给观察者（harness 不跑池级 checker，
+/// [`PerStepChecker`]）。第一次失败（执行器判出的、模型对不上、panic）就停。盘上的写与屏障录进 `stream`（崩溃注入给开了内容保留的流）。
 pub fn execute_history_with(
     history: &GeneratedHistory,
     execution: HistoryExecution,
@@ -5768,11 +5750,68 @@ pub fn execute_history_with_faults(
     fault_plan: &SharedFaultPlan,
     observer: &mut dyn FnMut(&StepObservation<'_>),
 ) -> HistoryRun {
-    let per_step_checker = execution.per_step_checker;
+    execute_history_handing_out_every_step_image(
+        history,
+        execution,
+        stream,
+        fault_plan,
+        observer,
+        &mut |_| {},
+    )
+}
+
+/// 经每步镜像那个钩子交出去的一张镜像：池级 checker 本来在这一刻判的那一张（起点之后、每一步写过盘之后，起点段报错而 mkfs 做完了的那一张）。
+/// checker 档把它作为给定状态写进判定库：录制流开了内容保留时，这张镜像就是空盘叠上录制流头 `operations_recorded` 步（录制流只记落了盘的写）。
+pub struct StepImage<'step> {
+    pub position: StepPosition,
+    pub operation_kind: Option<HistoryOperationKind>,
+    /// 这一刻录制流里有几步（写与屏障；[`SharedStream::operation_count`]）。
+    pub operations_recorded: usize,
+    pub image: &'step MemoryPool,
+}
+
+/// 同 [`execute_history_with_faults`]，另把池级 checker 本来要判的每一张镜像交给 `step_images`（harness 一条不变量都不判，
+/// 历史只由模型、执行器的判定与 panic 停下）。交出去的次序就是历史里的次序，历史停下的那一步写过盘也交（那一步不调观察者）。
+pub fn execute_history_handing_out_every_step_image(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    stream: &SharedStream,
+    fault_plan: &SharedFaultPlan,
+    observer: &mut dyn FnMut(&StepObservation<'_>),
+    step_images: &mut dyn FnMut(&StepImage<'_>),
+) -> HistoryRun {
+    execute_history_stopping_at_the_given_pool_checker_violations(
+        history,
+        execution,
+        stream,
+        fault_plan,
+        observer,
+        step_images,
+        &mut |_| Vec::new(),
+    )
+}
+
+/// 同 [`execute_history_handing_out_every_step_image`]，另由调用方给每一张交出去的镜像上池级 checker 判红的那几条
+/// （`given_pool_checker_violations` 收那一张在交出去的次序里的下标，从 0 数）：给的不空，历史就停在那一步、那几条违例进停下那一步的观察，
+/// 与 harness 原先就地判、判红就停的那一档同一个口径（那一档删了，池级 checker 归 checker 档两段）。只给故障注入的合并入口
+/// （`crate::fault_injection::inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`）用：它把 checker 档
+/// 判回的每步镜像结论交进来，截短重跑那一遍。
+pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    stream: &SharedStream,
+    fault_plan: &SharedFaultPlan,
+    observer: &mut dyn FnMut(&StepObservation<'_>),
+    step_images: &mut dyn FnMut(&StepImage<'_>),
+    given_pool_checker_violations: &mut dyn FnMut(usize) -> Vec<(&'static str, String)>,
+) -> HistoryRun {
     let mut tally = HistoryTally::default();
     let mut outcomes: Vec<StepOutcome> = Vec::new();
     let mut pool_slot: Option<HistoryPool> = None;
     let position = Cell::new(StepPosition::StartingPoint);
+    // 起点段报错（会话没建起来）时 mkfs 写了几步：checker 档把交出去的镜像建成给定状态表时，mkfs 那几步进基线
+    let operations_written_by_make_filesystem_before_the_start_failed: Cell<Option<usize>> =
+        Cell::new(None);
     let mut completed_after_the_root_ring_turned = false;
     let body_result = with_panic_capture(|| -> Option<FailureObservation> {
         let started = HistoryPool::start(
@@ -5785,12 +5824,23 @@ pub fn execute_history_with_faults(
         let (started_pool, starting_verdict) = match started {
             Ok(started) => started,
             Err(failure) => {
-                // 起点段有一个入口返回了错误（只有故障注入把注入点摆进起点段时走得到）。mkfs 自己就报错的那一格不跑池级
-                // checker：盘上没有一个做完了的文件系统，checker 判的每一条都没有对象。
-                let violations = if per_step_checker.runs_the_checker()
-                    && failure.step.finished_filesystem_is_on_the_devices()
-                {
-                    violations_on(&failure.image, &mut tally)
+                operations_written_by_make_filesystem_before_the_start_failed
+                    .set(Some(failure.operations_written_by_make_filesystem));
+                // 起点段有一个入口返回了错误（只有故障注入把注入点摆进起点段时走得到）。mkfs 自己就报错的那一格不交镜像、
+                // 也没有池级 checker 的结论：盘上没有一个做完了的文件系统，checker 判的每一条都没有对象。
+                let violations = if failure.step.finished_filesystem_is_on_the_devices() {
+                    let step_image_index = step_image_index_of_the_next_hand_out(&tally);
+                    hand_out_a_step_image(
+                        step_images,
+                        &mut tally,
+                        &StepImage {
+                            position: StepPosition::StartingPoint,
+                            operation_kind: None,
+                            operations_recorded: stream.operation_count(),
+                            image: &failure.image,
+                        },
+                    );
+                    given_pool_checker_violations(step_image_index)
                 } else {
                     Vec::new()
                 };
@@ -5812,11 +5862,19 @@ pub fn execute_history_with_faults(
         let pool = pool_slot.insert(started_pool);
         let mut image = pool.image();
         let mut checked_stream_length = stream.operation_count();
-        let violations_after_the_starting_point = if per_step_checker.runs_the_checker() {
-            violations_on(&image, &mut tally)
-        } else {
-            Vec::new()
-        };
+        let starting_point_step_image_index = step_image_index_of_the_next_hand_out(&tally);
+        hand_out_a_step_image(
+            step_images,
+            &mut tally,
+            &StepImage {
+                position: StepPosition::StartingPoint,
+                operation_kind: None,
+                operations_recorded: checked_stream_length,
+                image: &image,
+            },
+        );
+        let violations_after_the_starting_point =
+            given_pool_checker_violations(starting_point_step_image_index);
         if let Some(verdict) = &starting_verdict {
             tally.note_model_verdict(verdict);
         }
@@ -5882,9 +5940,18 @@ pub fn execute_history_with_faults(
             } else {
                 let image_before_this_step = std::mem::replace(&mut image, pool.image());
                 checked_stream_length = stream_length;
-                if per_step_checker.runs_the_checker() {
-                    violations = violations_on(&image, &mut tally);
-                }
+                let step_image_index = step_image_index_of_the_next_hand_out(&tally);
+                hand_out_a_step_image(
+                    step_images,
+                    &mut tally,
+                    &StepImage {
+                        position: step_position,
+                        operation_kind: Some(operation.kind()),
+                        operations_recorded: stream_length,
+                        image: &image,
+                    },
+                );
+                violations = given_pool_checker_violations(step_image_index);
                 if !violations.is_empty() {
                     raised_floor_lands_only_on_abandoned = raised_floor.and_then(|new_floor| {
                         raised_floor_lands_only_on_abandoned_roots(
@@ -6004,10 +6071,15 @@ pub fn execute_history_with_faults(
         ending,
         outcomes,
         tally,
-        // mkfs 在 `HistoryPool::start` 里跑，它自己 panic 时（`pool_slot` 还没填）流里还没有别的东西，报 0。
-        operations_written_by_make_filesystem: pool_slot
-            .as_ref()
-            .map_or(0, |pool| pool.operations_written_by_make_filesystem),
+        // mkfs 在 `HistoryPool::start` 里跑：起点段报错时（`pool_slot` 没填）报那一刻 mkfs 写了的步数；它自己 panic 时流里还没有别的东西，报 0。
+        operations_written_by_make_filesystem: pool_slot.as_ref().map_or_else(
+            || {
+                operations_written_by_make_filesystem_before_the_start_failed
+                    .get()
+                    .unwrap_or(0)
+            },
+            |pool| pool.operations_written_by_make_filesystem,
+        ),
         committed_versions_at_the_end: pool_slot.as_ref().map_or_else(Vec::new, |pool| {
             pool.model
                 .committed_versions()
@@ -6223,7 +6295,7 @@ pub fn shrink_operations(
                     .into_iter()
                     .map(|evaluation| {
                         evaluation.join().expect(
-                            "still_fails 自己不 panic：历史里的 panic 在 execute_history 里接住",
+                            "still_fails 自己不 panic：历史里的 panic 在 execute_history_with 里接住",
                         )
                     })
                     .collect()
@@ -6467,7 +6539,7 @@ impl CampaignReport {
 /// 新发现按签名归类，按 `shrinking` 收缩各类的第一个种子。
 ///
 /// # Panics
-/// 某个线程在历史之外 panic（历史里的 panic 在 `execute_history` 里接住，走不到这里）。
+/// 某个线程在历史之外 panic（历史里的 panic 在 `execute_history_with` 里接住，走不到这里）。
 #[must_use]
 pub fn run_history_campaign(
     first_seed: u64,
@@ -6647,7 +6719,7 @@ mod tests {
         };
         let history =
             history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring();
-        let execution = HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES;
+        let execution = HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES;
         let stream = SharedStream::retaining_contents();
         let mut image_after_the_last_step = None;
         let run = execute_history_with(&history, execution, &stream, &mut |observation| {
@@ -6656,7 +6728,7 @@ mod tests {
         assert_eq!(
             run.ending,
             HistoryEnding::Completed,
-            "这段历史每一步都做成、checker 与模型都不红：{:?}",
+            "这段历史每一步都做成、模型不红（每一步的池级 checker 归 checker 档两段）：{:?}",
             run.outcomes
         );
         assert!(
@@ -6730,14 +6802,14 @@ mod tests {
         assert_eq!(other.next_word(), 0x2c73_f084_5854_0fa5);
     }
 
-    /// 复现行的赋值那一截写出的每一种取样参数（每一组比重、两种 checker、四档盘宽、空间准入两臂，各配一个步数）都能经复现入口的解析原样读回：
+    /// 复现行的赋值那一截写出的每一种取样参数（每一组比重、每一种 checker（只剩不跑那一种）、四档盘宽、空间准入两臂，各配一个步数）都能经复现入口的解析原样读回：
     /// 一项的取值写了读不回（名字对不上、两项同名），或解析漏读一项，这里就红。
     #[test]
     fn every_sampling_choice_reads_back_from_its_own_reproduction_assignments() {
         let defaults = HistorySampling {
             operations_per_history: 1,
             weights: GenerationWeights::BROAD,
-            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         };
         let mut combinations = 0usize;
         for weights in GenerationWeights::NAMED {
@@ -6809,7 +6881,7 @@ mod tests {
         let defaults = HistorySampling {
             operations_per_history: 1,
             weights: GenerationWeights::BROAD,
-            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         };
         for (position, member) in NamedGenerationWeights::ALL.into_iter().enumerate() {
             assert_eq!(
@@ -6842,14 +6914,14 @@ mod tests {
 
     /// 照 [`run_history_campaign`] 汇总的一条新发现（造一个假发现，不必真红）打出的复现行，原样喂回复现入口
     /// （[`random_history_to_reproduce_from_environment`]，「收缩一个种子」那条入口读的就是它），读回的种子与取样参数就是这一批的，
-    /// 重新生成的历史与那一段逐步相同。取样参数的每一项都取与入口默认（快档那一种）不同的值：哪一项在汇总时装错了，读回就不同
+    /// 重新生成的历史与那一段逐步相同。取样参数的每一项都取与入口默认（快档那一种）不同的值（checker 只剩一种取值，那一项取不出不同的）：哪一项在汇总时装错了，读回就不同
     /// （代码三方 test-script-align-code-r1 判决 C607：这一处装配原先没有用例经过）。
     #[test]
     fn the_reproduction_line_of_a_campaign_finding_regenerates_the_history_the_campaign_ran() {
         let defaults = HistorySampling {
             operations_per_history: 30,
             weights: GenerationWeights::BROAD,
-            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         };
         let sampling = HistorySampling {
             operations_per_history: 17,
@@ -6990,7 +7062,7 @@ mod tests {
         let defaults = HistorySampling {
             operations_per_history: 30,
             weights: GenerationWeights::BROAD,
-            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         };
         let refused = HistorySampling::from_environment(
             RANDOM_HISTORY_VARIABLE_PREFIX,
@@ -7021,7 +7093,7 @@ mod tests {
         let defaults = HistorySampling {
             operations_per_history: 30,
             weights: GenerationWeights::BROAD,
-            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         };
         let assignments = BTreeMap::from([
             (
@@ -7043,7 +7115,8 @@ mod tests {
                 HistorySampling {
                     operations_per_history: 24,
                     weights: GenerationWeights::BROAD,
-                    execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+                    execution:
+                        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
                 }
             )),
             "种子与每段步数前后的空白都去掉读回"
@@ -7056,7 +7129,7 @@ mod tests {
         let defaults = HistorySampling {
             operations_per_history: 30,
             weights: GenerationWeights::BROAD,
-            execution: HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
         };
         assert_eq!(
             HistorySampling::from_environment(

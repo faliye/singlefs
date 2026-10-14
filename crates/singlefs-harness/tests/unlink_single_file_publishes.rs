@@ -1,17 +1,19 @@
 //! unlink 单文件的三种发布（D8（核心索引结构） 已定项 16 第 1、2、4、6、7 条；D18（块里携带什么信息） 已定项 24）：
 //! 意图那次、不是最后一批的一批、最后一批。三个单元的文件按只供测试的批大小 1 删：意图 → 留 2 → 留 1 → 最后一批。
-
 mod common;
 mod common_deletion_in_progress;
+mod common_images_for_the_checker_tier;
 mod common_pointer_head_corruption;
+#[path = "common_images_for_the_checker_tier/unlink_single_file_publishes.rs"]
+mod scenarios_of_unlink_single_file_publishes;
 
-use common::{parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
+use common::{parameters, FIXED_WRITE_TIME_SECONDS};
 use common_deletion_in_progress::{
     batches_of_one_data_unit, pool_with_a_three_unit_file, publish_the_next_step_in_batches_of_one,
     FIRST_FILE, INSTANCE_OF_THE_PUBLISHES,
 };
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use scenarios_of_unlink_single_file_publishes::publish_the_intent;
 use singlefs_core::address::CheckpointTxg;
 use singlefs_core::allocator::Placement;
 use singlefs_core::mounted_read::{mount_read_only, OpenFileFailure};
@@ -23,48 +25,13 @@ use singlefs_core::recovery::{
     rebuild_version, recover, JournalPolicy, RebuiltVersion, RecoveryOutcome,
 };
 use singlefs_core::transaction::{
-    publish_overwrite, publish_unlink_intent, publish_unlink_steps_until_the_queue_is_empty,
-    FirstFile, PoolWriter, PublishError, TransactionOutput, TransactionUnit, FIRST_INODE_NUMBER,
+    publish_overwrite, publish_unlink_steps_until_the_queue_is_empty, FirstFile, PoolWriter,
+    PublishError, TransactionOutput, TransactionUnit, FIRST_INODE_NUMBER,
 };
 use singlefs_core::unit::{data_unit_payload_capacity, PACKED_TYPE_TOMBSTONE};
-use singlefs_harness::memory_pool::MemoryPool;
-
-/// 意图那次被拒要交回错（已经删完的那一格），`common_deletion_in_progress::publish_the_intent` 被拒就 panic：这一份照旧留在这里。
-fn publish_the_intent(pool: &mut BuiltPool) -> Result<TransactionOutput, PublishError> {
-    let publish_parameters = parameters();
-    let previous = pool.output.clone();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
-    // 第一个文件那条记录现有的时间（已经删完的那一格没有记录，意图在任何写之前被拒，给的时间不落盘）。
-    let write_time_seconds = previous
-        .inode_record
-        .map_or(FIXED_WRITE_TIME_SECONDS, |record| record.write_time_seconds);
-    let output = publish_unlink_intent(
-        &mut writer,
-        &mut pool.allocator,
-        &previous,
-        FIRST_FILE,
-        write_time_seconds,
-        INSTANCE_OF_THE_PUBLISHES,
-    )?;
-    pool.output = output.clone();
-    Ok(output)
-}
 
 fn tags_of(roles: &[TransactionUnit]) -> Vec<String> {
     roles.iter().map(|role| role.tag()).collect()
-}
-
-fn violations(image: &MemoryPool) -> Vec<String> {
-    check_pool_image(image)
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(detail) => Some(format!("{invariant}: {detail}")),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .collect()
 }
 
 fn root_pointer_of_the_tree_kind(version: &TransactionOutput, kind: u16) -> NodePointer {
@@ -269,21 +236,11 @@ fn the_final_batch_removes_the_record_the_queue_key_and_every_remaining_unit_in_
     }
 }
 
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_unlink_single_file_publishes::the_pool_checker_finds_no_violation_after_the_intent_and_after_every_batch`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn the_pool_checker_finds_no_violation_after_the_intent_and_after_every_batch() {
-    let mut pool = pool_with_a_three_unit_file("unlink-checker-between-batches");
-    publish_the_intent(&mut pool).expect("意图");
-    let mut versions_judged = vec![("意图".to_string(), violations(&pool.memory_pool()))];
-    for batch in 1..=3 {
-        publish_the_next_step_in_batches_of_one(&mut pool);
-        versions_judged.push((format!("第 {batch} 批"), violations(&pool.memory_pool())));
-    }
-    assert!(pool.output.deleted_inodes.is_empty(), "三批之后删完");
-    assert!(
-        versions_judged
-            .iter()
-            .all(|(_, violated)| violated.is_empty()),
-        "每一版池级 checker 全绿：{versions_judged:?}"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_unlink_single_file_publishes::the_pool_checker_finds_no_violation_after_the_intent_and_after_every_batch,
     );
 }
 

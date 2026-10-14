@@ -1,23 +1,23 @@
 //! checker 档模块：crash
-//! 代码审阅第 4 条（这一批只量、不实现）：层 0 把一次写的撕裂态并进「没持久」，对原地覆写不成立——原地覆写撕裂时，那一处的旧内容
+//! 代码审阅第 4 条（这一批只量、不实现）：崩溃点重放把一次写的撕裂态并进「没持久」，对原地覆写不成立——原地覆写撕裂时，那一处的旧内容
 //! 也没了，而「没持久」留着完整的旧内容。改法是「原地覆写补第三态」（新旧都读不出），状态数先量：
 //! 这里按段序列算「原地覆写的写取 3 态（没持久 / 持久 / 新旧都读不出）、其余写取 2 态」时全量与甲二快档的闭式，与今天的并排。
 //!
 //! 原地覆写的写怎么认（[`is_tearable_in_place_overwrite`]），三条都成立才算：
 //! 1. 不是单元写：单元写是 COW，落在分配器交出来的槽上，那一槽的旧内容没有谁还要（回收谓词管着），撕裂与没持久一样，照旧 2 态；
-//! 2. 长于一个扇区：一个扇区的写撕不开（层 0 的撕裂粒度就是扇区），根槽写是一个物理块，照旧 2 态；
+//! 2. 长于一个扇区：一个扇区的写撕不开（崩溃点重放的撕裂粒度就是扇区），根槽写是一个物理块，照旧 2 态；
 //! 3. 它罩住的范围里原来有东西：基镜像那一段有非零字节，或写表里更早有一次同一块盘上、不是整段清零的写与它重叠。
 //!
 //! 一段 n 个写、其中 m 个取 3 态：全量 3^m · 2^(n−m) − 1（去掉整段全持久那一个，它就是下一段的空子集）；
 //! 甲二快档（原地写任意组合 × 单元写全不落或全落）原地写 k 个、其中 m 个取 3 态、单元写 c 个：3^m · 2^(k−m) ·（c > 0 时 2，否则 1）− 1。
 //! 整条流再加全部持久那一个。m 全为 0 时两式就是今天的闭式（第一条用例拿 `crash::closed_form_state_count` 与
-//! `crash::layer0_state_count` 对拍）。
+//! `crash::crash_state_count` 对拍）。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
 
 use singlefs_checker_tier::crash::{
-    full_expansion, layer0_state_count, quick_tier_expansion, Layer0SegmentExpansion,
+    crash_state_count, full_expansion, quick_tier_expansion, CrashPointReplaySegmentExpansion,
 };
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::recovery::PoolReader;
@@ -71,7 +71,7 @@ fn segment_state_count_with_the_torn_third_state(
     base: &MemoryPool,
     writes: &[RetainedWrite],
     segment: &[usize],
-    expansion: Layer0SegmentExpansion,
+    expansion: CrashPointReplaySegmentExpansion,
 ) -> u128 {
     let states_of_the_writes = |write_indexes: &[usize]| -> u128 {
         write_indexes
@@ -86,9 +86,9 @@ fn segment_state_count_with_the_torn_third_state(
             .product()
     };
     match expansion {
-        Layer0SegmentExpansion::NotExpanded => 0,
-        Layer0SegmentExpansion::EveryProperSubset => states_of_the_writes(segment) - 1,
-        Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll => {
+        CrashPointReplaySegmentExpansion::NotExpanded => 0,
+        CrashPointReplaySegmentExpansion::EveryProperSubset => states_of_the_writes(segment) - 1,
+        CrashPointReplaySegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll => {
             let (copy_on_write_writes, in_place_writes): (Vec<usize>, Vec<usize>) = segment
                 .iter()
                 .copied()
@@ -111,11 +111,11 @@ fn segment_state_count_with_the_torn_third_state(
 }
 
 /// 整条流：各段按 `expansion` 展开的状态数之和，再加全部持久那一个。
-fn layer0_state_count_with_the_torn_third_state(
+fn crash_state_count_with_the_torn_third_state(
     base: &MemoryPool,
     writes: &[RetainedWrite],
     segments: &[Vec<usize>],
-    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
 ) -> u128 {
     1 + segments
         .iter()
@@ -186,21 +186,17 @@ fn without_any_tearable_overwrite_the_counts_are_todays_closed_forms() {
         );
     }
     assert_eq!(
-        layer0_state_count_with_the_torn_third_state(&base, &writes, &segments, &full_expansion),
+        crash_state_count_with_the_torn_third_state(&base, &writes, &segments, &full_expansion),
         u128::from(closed_form_state_count(&segments))
     );
     assert_eq!(
-        layer0_state_count_with_the_torn_third_state(
+        crash_state_count_with_the_torn_third_state(
             &base,
             &writes,
             &segments,
             &quick_tier_expansion
         ),
-        u128::from(layer0_state_count(
-            &writes,
-            &segments,
-            &quick_tier_expansion
-        ))
+        u128::from(crash_state_count(&writes, &segments, &quick_tier_expansion))
     );
 }
 
@@ -241,12 +237,12 @@ fn a_tearable_in_place_overwrite_takes_a_third_state_and_every_other_write_two()
     );
     // 全量：第一段 3 · 2 · 2 · 2 − 1 = 23，第二段 2 − 1 = 1，第三段 3 − 1 = 2，再加全部持久那一个。
     assert_eq!(
-        layer0_state_count_with_the_torn_third_state(&base, &writes, &segments, &full_expansion),
+        crash_state_count_with_the_torn_third_state(&base, &writes, &segments, &full_expansion),
         1 + 23 + 1 + 2
     );
     // 甲二快档：第一段原地写（系统配置槽 3 态、journal 2 态）6 × 单元写全不落或全落 2 − 1 = 11，其余两段同全量。
     assert_eq!(
-        layer0_state_count_with_the_torn_third_state(
+        crash_state_count_with_the_torn_third_state(
             &base,
             &writes,
             &segments,
@@ -257,12 +253,12 @@ fn a_tearable_in_place_overwrite_takes_a_third_state_and_every_other_write_two()
     // 今天的数（每个写 2 态）：全量 1 + 15 + 1 + 1，甲二 1 + 7 + 1 + 1。
     assert_eq!(closed_form_state_count(&segments), 1 + 15 + 1 + 1);
     assert_eq!(
-        layer0_state_count(&writes, &segments, &quick_tier_expansion),
+        crash_state_count(&writes, &segments, &quick_tier_expansion),
         1 + 7 + 1 + 1
     );
 }
 
-/// 量：新池新建文件那条流（层 0 从 mkfs 之后枚举的整条流，段序列 `2+2+1+2+2+1+2+24+2+1+2`；C577 之前暖机第二次的轮换与新池新建文件的
+/// 量：新池新建文件那条流（崩溃点重放从 mkfs 之后枚举的整条流，段序列 `2+2+1+2+2+1+2+24+2+1+2`；C577 之前暖机第二次的轮换与新池新建文件的
 /// 单元写同段，`2+2+1+2+2+1+26+2+1+2`）补第三态之后的状态数。
 /// 这条流上取 3 态的只有系统配置槽写（8 次，每次都罩住 mkfs 写下的旧槽）；journal 记录都写在 mkfs 清过的环里、没有覆写，
 /// 根槽写一个扇区、单元写 COW，都照旧 2 态。
@@ -291,14 +287,10 @@ fn the_new_pool_file_creation_stream_counts_with_the_torn_third_state_as_measure
         tearable_writes_by_kind.push((kind.name(), of_this_kind.len(), tearable));
     }
     let today_full = u128::from(closed_form_state_count(&segments));
-    let today_quick_tier = u128::from(layer0_state_count(
-        &writes,
-        &segments,
-        &quick_tier_expansion,
-    ));
+    let today_quick_tier = u128::from(crash_state_count(&writes, &segments, &quick_tier_expansion));
     let torn_full =
-        layer0_state_count_with_the_torn_third_state(&base, &writes, &segments, &full_expansion);
-    let torn_quick_tier = layer0_state_count_with_the_torn_third_state(
+        crash_state_count_with_the_torn_third_state(&base, &writes, &segments, &full_expansion);
+    let torn_quick_tier = crash_state_count_with_the_torn_third_state(
         &base,
         &writes,
         &segments,

@@ -1,9 +1,9 @@
-//! checker 档模块：crash、crash_amplification、gpu_unit_checks、crash_judge_tables、crash_judge_dispatch
+//! checker 档模块：crash、crash_state_enumeration、crash_point_replay_progress、crash_given_states、crash_library、crash_amplification、gpu_unit_checks、crash_judge_tables、crash_judge_dispatch
 //! C561（记录核对器的复用豁免在复用只落一半时假红）：记录核对器第二条判据按扇区、拿枚举器给的持久集合判一份单元副本缺不缺席
 //! （D13（验证路线） 已定项 7：记录核对器的入参含持久集合；判据原文在 `crash::check_records_against` 的文档注释上）。
 //!
 //! C561 那一行要的四格各一条用例，前三格都在同一条可达历史 `UOOUOMSU` 上（A、B 之后：卸载重挂、覆盖写两次、卸载重挂、覆盖写、
-//! 进程重开重挂、写一个十几字节的小文件、卸载重挂；层 0 规模第二、三轮攻方的历史，字母的意思照他们的探针）：
+//! 进程重开重挂、写一个十几字节的小文件、卸载重挂；崩溃点重放规模第二、三轮攻方的历史，字母的意思照他们的探针）：
 //! - B（txg 4）在相邻两槽写两个 16K 节点 u、u2；txg 17 的 32K 数据单元 l 复用这两槽；txg 25 在同样两槽写两个 16K 节点 y、x，
 //!   y、x 与 σ 那一段的其余 14 个单元写同段（σ：16 个单元写；C577（发布返回之前、系统配置轮换之后一道屏障）之前上一次发布的
 //!   两个系统配置槽轮换也在这一段，2 个原地写 + 16 个单元写，C577 之后它们过了那道屏障、在 σ 前一段）；
@@ -16,7 +16,9 @@
 //! - C513（复用豁免不判那次复用合不合法） 那三个状态（复用窗口置 0、txg 5 的数据单元落回 txg 4 的那一对槽）：解释那一槽的后写落了、
 //!   但过不了回收谓词，照判缺席。
 //!
-//! σ 那一段全部 2^16 个状态（C577 之前 2^18）的记录核对器判定另有一条标了 ignore 的全量（崩溃枚举，用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 跑，提交时的快档只核它的全绿标记）。
+//! σ 那一段全部 2^16 个状态（C577 之前 2^18）的记录核对器判定另有一条标了 ignore 的全量（崩溃枚举，用户要求时由主 agent 经门禁 checker-tier-crash-point-replay --full 跑，提交时的快档只核它的全绿标记）。
+//! 全量与它的小段那一条都经给定状态表那一类的判定库两段跑（用户 2026-10-13 定「能走两段的都走两段」）：掩码区间切成固定的几片、一片一张给定状态表，
+//! 录入段写进库、判段从库里读回判（配了 GPU 走 GPU 判器，没配由 CPU 判器判），结论按块存、判过的片下一趟复用，打断重跑同一条命令只补没判的片。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
@@ -26,13 +28,36 @@ mod common_crash_points;
 use common::{
     build_pool, file_content, geometry, parameters, publish_overwrite_in_process, BuiltPool,
 };
-use singlefs_checker_tier::crash::{
-    check_records, Layer0Parallelism, Layer0SliceLength, Layer0WorkerThreadsSource,
+use singlefs_checker_tier::crash_state_enumeration::crash_point_replay_worker_threads;
+#[cfg(feature = "gpu")]
+use singlefs_checker_tier::crash_state_enumeration::{
+    sample_crash_states_on_the_cpu, CrashPointReplayItem,
 };
+
+/// 这份测试文件的仓内路径：崩溃点重放取样过库的设点文件（GPU 对拍那一条的 CPU 一侧用）、σ 那几张给定状态表的设点文件。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs";
+
+/// 这一趟掩码切片的工作线程数与它从哪来（崩溃点重放判段同一个读法：`SINGLEFS_CRASH_POINT_REPLAY_THREADS`，`scripts/hosts/capped.sh` 设它）。
+#[derive(Clone, Copy, Debug)]
+struct WorkerThreadsOfTheRun {
+    worker_threads: std::num::NonZeroUsize,
+    worker_threads_source: &'static str,
+}
+
+impl WorkerThreadsOfTheRun {
+    fn from_environment() -> Self {
+        let (worker_threads, worker_threads_source) = crash_point_replay_worker_threads();
+        Self {
+            worker_threads: std::num::NonZeroUsize::new(worker_threads).expect("至少 1 个"),
+            worker_threads_source,
+        }
+    }
+}
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration, SlotNumber};
 use singlefs_core::allocator::ReuseWindow;
 use singlefs_core::mount::{mount_writable, unmount, ShadowLedger, Unmounted};
-use singlefs_core::recovery::{recover, JournalPolicy, PoolReader};
+use singlefs_core::recovery::PoolReader;
 use singlefs_core::transaction::PoolVersion;
 use singlefs_harness::memory_pool::{
     closed_form_state_count, root_identity_written_by, writes_and_segments,
@@ -48,19 +73,43 @@ const NODE_SLOT_BYTES: u64 = 16 * 1024;
 #[cfg(feature = "gpu")]
 const CPU_THREADS_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_CRASH_JUDGE_CPU_THREADS";
 
-/// σ 对拍里 CPU 判器线程数变量的值（`None` 是没设）：没设取本机可用并行度；设了而不是正整数（0 也算）就 panic、消息带变量名与原值，
-/// 不悄悄换成本机并行度（与 `SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO` 同一判法，经
+/// σ 对拍里 CPU 判器线程数变量的值（`None` 是没设）：设了照它，没设取每台默认重活线程数（`thread_cap_value` 是 `SINGLEFS_THREAD_CAP`
+/// 的值，设了照它，再没设取 `.claude/heavy-thread-default` 的登记值，判法在 `singlefs_harness::heavy_threads`）；设了而不是正整数（0 也算）
+/// 就 panic、消息带变量名与原值，不悄悄换成默认（与 `SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO` 同一判法，经
 /// `singlefs_harness::numeric_environment_variable::number_from_the_variable_value_panicking_when_unreadable`）。
 ///
 /// # Panics
-/// 设了而不是正整数。
+/// 设了而不是正整数；落到默认时 `SINGLEFS_THREAD_CAP` 设了而不是正整数。
 #[cfg(feature = "gpu")]
-fn cpu_threads_from_the_value_of_the_variable(value: Option<&str>) -> std::num::NonZeroUsize {
-    singlefs_harness::numeric_environment_variable::number_from_the_variable_value_panicking_when_unreadable(
+fn cpu_threads_from_the_value_of_the_variable(
+    value: Option<&str>,
+    thread_cap_value: Option<&str>,
+) -> std::num::NonZeroUsize {
+    singlefs_harness::heavy_threads::own_variable_or_default_heavy_threads(
         CPU_THREADS_ENVIRONMENT_VARIABLE,
         value,
+        thread_cap_value,
     )
-    .unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::MIN))
+}
+
+/// CPU 判器线程数变量没设：取登记的每台默认重活线程数，不取本机核数；设了照它。
+#[cfg(feature = "gpu")]
+#[test]
+fn crash_judge_cpu_threads_of_the_sigma_comparison_take_the_registered_heavy_thread_default_when_unset(
+) {
+    assert_eq!(
+        cpu_threads_from_the_value_of_the_variable(None, None),
+        singlefs_harness::heavy_threads::registered_heavy_threads(),
+        "SINGLEFS_CRASH_JUDGE_CPU_THREADS 与 SINGLEFS_THREAD_CAP 都没设取 .claude/heavy-thread-default 的登记值"
+    );
+    assert_eq!(
+        cpu_threads_from_the_value_of_the_variable(None, Some("5")).get(),
+        5
+    );
+    assert_eq!(
+        cpu_threads_from_the_value_of_the_variable(Some("3"), Some("5")).get(),
+        3
+    );
 }
 
 /// 这条流的入口文件不引随机历史脚手架（`singlefs_harness` 的 `history` 模块）：登记的崩溃枚举用例按模块引用收判法代码，
@@ -86,7 +135,7 @@ fn this_flow_does_not_reference_the_random_history_scaffolding() {
 #[test]
 #[should_panic(expected = "SINGLEFS_CRASH_JUDGE_CPU_THREADS=\"sixteen\" 认不出")]
 fn an_unreadable_crash_judge_cpu_threads_value_panics_naming_the_variable_and_the_value() {
-    let _threads = cpu_threads_from_the_value_of_the_variable(Some("sixteen"));
+    let _threads = cpu_threads_from_the_value_of_the_variable(Some("sixteen"), None);
 }
 
 fn second_content() -> Vec<u8> {
@@ -457,18 +506,115 @@ fn set_both_copies(
     persisted[copy_on_the_other_device(writes, index_on_device_zero)] = is_persisted;
 }
 
-/// 恢复实际走的根与记录核对器的判定。
-fn judge(
+/// 这几条逐个摆状态的用例判状态的给定状态引擎（`crash_amplification::GivenStatesEngine`，用户 2026-10-13 定「能走两段的都走两段」）：
+/// 摆出来的状态作一张给定状态表，录入段写进给定状态表那一类的判定库，判段从库里读回判（看 journal 那一遍恢复、记录核对器；配了 GPU 走 GPU 判器，
+/// 没配由 CPU 判器判），结论按表存进库、判过的复用。项名按用例起，每条用例一个。
+///
+/// # Panics
+/// 引擎起不了（配了 GPU 卡用不上、结论版本与编译时对不上……都不退回 CPU）。
+fn given_states_engine_of_this_test(
+    test_name: &str,
+) -> singlefs_checker_tier::crash_amplification::GivenStatesEngine {
+    let _one_test_at_a_time =
+        singlefs_checker_tier::crash_amplification::one_test_changes_the_environment_at_a_time();
+    singlefs_checker_tier::crash_amplification::GivenStatesEngine::start_from_environment(
+        singlefs_checker_tier::crash_amplification::GivenStatesItem {
+            item_name: format!("record_checker_judges_absence::{test_name}"),
+            setting_file: THIS_FILE.to_string(),
+            seeds_and_scale: "history=fixed".to_string(),
+        },
+        &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+        &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
+    )
+    .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+}
+
+/// 一遍恢复落到的根在结论里那两个字换回 (实例, txg)：txg 只带低 32 位（这几段历史的 txg 都在几十以内），没落到根是 `None`。
+fn effective_root_of_the_landed_root_words(
+    landed: singlefs_checker_tier::crash_judge_conclusions::LandedRootWords,
+) -> Option<(InstanceGeneration, CheckpointTxg)> {
+    (landed != singlefs_checker_tier::crash_judge_conclusions::LandedRootWords::NOT_LANDED).then(
+        || {
+            (
+                InstanceGeneration(landed.instance),
+                CheckpointTxg(u64::from(landed.checkpoint_txg_low)),
+            )
+        },
+    )
+}
+
+/// 一个状态上恢复实际走的根与记录核对器的判定。
+type EffectiveRootAndRecordCheck = (Option<(InstanceGeneration, CheckpointTxg)>, RecordCheck);
+
+/// 恢复实际走的根与记录核对器的判定，逐状态（与 `persisted_sets` 同序）：这几个状态作一张给定状态表交 `engine` 两段判
+/// （[`given_states_engine_of_this_test`]）。只录那一趟、表归别的机器判的那一趟交 `None`（用例当场返回）。
+///
+/// # Panics
+/// 引擎判不了这张表（不退回别处判）。
+fn judge_the_states(
+    engine: &singlefs_checker_tier::crash_amplification::GivenStatesEngine,
     recorded: &RecordedHistory,
-    persisted: &[bool],
-) -> (Option<(InstanceGeneration, CheckpointTxg)>, RecordCheck) {
-    let image = CrashImage {
-        base: &recorded.base,
-        writes: &recorded.writes,
-        persisted: persisted.to_vec(),
+    table_name: &str,
+    persisted_sets: Vec<Vec<bool>>,
+) -> Option<Vec<EffectiveRootAndRecordCheck>> {
+    use singlefs_checker_tier::crash_given_states::{
+        GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
     };
-    let effective_root = recover(&image, JournalPolicy::Consult).effective_root;
-    (effective_root, check_records(&image, effective_root))
+    let state_count = persisted_sets.len();
+    let judged = engine
+        .judge_the_given_states(&GivenStatesOfATable {
+            table_name: table_name.to_string(),
+            base: &recorded.base,
+            writes: &recorded.writes,
+            segments: &recorded.segments,
+            seams: &[],
+            persisted_sets,
+        })
+        .unwrap_or_else(|reason| {
+            panic!("给定状态表 {table_name} 判不了（不退回别处判）：{reason}")
+        });
+    match judged.source {
+        GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+        GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
+        | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => return None,
+    }
+    assert_eq!(
+        judged.states.len(),
+        state_count,
+        "判器逐状态交回结论，与表里的状态同序"
+    );
+    Some(
+        judged
+            .states
+            .iter()
+            .map(|state| {
+                (
+                    effective_root_of_the_landed_root_words(state.words.consulted_pass_landed_root),
+                    state.record_check(),
+                )
+            })
+            .collect(),
+    )
+}
+
+/// 恢复实际走的根与记录核对器的判定（一个状态的 [`judge_the_states`]）。
+fn judge(
+    engine: &singlefs_checker_tier::crash_amplification::GivenStatesEngine,
+    recorded: &RecordedHistory,
+    table_name: &str,
+    persisted: &[bool],
+) -> Option<EffectiveRootAndRecordCheck> {
+    judge_the_states(engine, recorded, table_name, vec![persisted.to_vec()])
+        .map(|mut judged| judged.remove(0))
+}
+
+/// 收尾：关库、打引擎那一行；GPU 判不了的状态照第三轮正文 H6 判红。
+fn finish_the_engine(engine: singlefs_checker_tier::crash_amplification::GivenStatesEngine) {
+    assert_eq!(
+        engine.finish().red_items(),
+        Vec::<String>::new(),
+        "GPU 判不了的状态照第三轮正文 H6 判红"
+    );
 }
 
 /// 两个状态的崩溃镜像在写表碰过的每一处上逐字节相同（其余地方两边都是基线）。
@@ -524,8 +670,21 @@ fn the_false_red_and_the_misaligned_hole_have_identical_crash_images_and_only_th
         "X 与 Y 的崩溃镜像逐字节相同：只看盘上字节分不开它们"
     );
 
-    let (false_red_root, false_red_check) = judge(&recorded, &false_red);
-    let (hole_root, hole_check) = judge(&recorded, &misaligned_hole);
+    let engine = given_states_engine_of_this_test("false_red_and_misaligned_hole");
+    let Some(judged) = judge_the_states(
+        &engine,
+        &recorded,
+        "false-red-and-misaligned-hole",
+        vec![false_red, misaligned_hole],
+    ) else {
+        return;
+    };
+    finish_the_engine(engine);
+    let [(false_red_root, false_red_check), (hole_root, hole_check)] = judged.as_slice() else {
+        panic!("两个状态两份结论，交回 {} 份", judged.len());
+    };
+    let (false_red_root, false_red_check, hole_root, hole_check) =
+        (*false_red_root, *false_red_check, *hole_root, *hole_check);
     assert_eq!(false_red_root, hole_root, "镜像相同，恢复走同一条根");
     assert!(
         false_red_root.is_some_and(|(_, txg)| txg >= CheckpointTxg(17)),
@@ -563,7 +722,12 @@ fn a_data_unit_only_half_covered_by_a_landed_later_node_is_missing() {
         true,
     );
     set_both_copies(&mut half_covered, writes, chain.data_unit, false);
-    let (effective_root, check) = judge(&recorded, &half_covered);
+    let engine = given_states_engine_of_this_test("half_covered");
+    let Some((effective_root, check)) = judge(&engine, &recorded, "half-covered", &half_covered)
+    else {
+        return;
+    };
+    finish_the_engine(engine);
     assert!(
         effective_root.is_some_and(|(_, txg)| txg >= CheckpointTxg(17)),
         "恢复自称的 txg ≥ l 那次发布（{effective_root:?}）"
@@ -583,7 +747,13 @@ fn a_node_whose_every_later_write_to_the_same_offset_never_landed_is_missing() {
     let mut same_offset_hole = persisted_before_the_units_of_sigma(&recorded, chain.sigma);
     set_both_copies(&mut same_offset_hole, writes, chain.first_node_of_b, false);
     set_both_copies(&mut same_offset_hole, writes, chain.data_unit, false);
-    let (effective_root, check) = judge(&recorded, &same_offset_hole);
+    let engine = given_states_engine_of_this_test("same_offset_hole");
+    let Some((effective_root, check)) =
+        judge(&engine, &recorded, "same-offset-hole", &same_offset_hole)
+    else {
+        return;
+    };
+    finish_the_engine(engine);
     assert!(
         effective_root.is_some_and(|(_, txg)| txg >= CheckpointTxg(17)),
         "恢复自称的 txg ≥ l 那次发布（{effective_root:?}）"
@@ -612,7 +782,8 @@ fn partial_landing_of_the_two_later_nodes_never_reports_a_unit_missing() {
     ];
     let before_sigma = persisted_before_the_units_of_sigma(&recorded, chain.sigma);
     let mut states = 0u64;
-    let mut reported_missing = Vec::new();
+    let mut masks_of_each_state: Vec<(u32, u32)> = Vec::new();
+    let mut persisted_sets: Vec<Vec<bool>> = Vec::new();
     for in_place_mask in 0..1u32 << in_place_writes_of_sigma.len() {
         for later_node_mask in 0..1u32 << later_node_copies.len() {
             let mut persisted = before_sigma.clone();
@@ -623,11 +794,26 @@ fn partial_landing_of_the_two_later_nodes_never_reports_a_unit_missing() {
                 persisted[*write_index] = later_node_mask & (1 << bit) != 0;
             }
             states += 1;
-            if judge(&recorded, &persisted).1.claimed_state_missing_unit {
-                reported_missing.push((in_place_mask, later_node_mask));
-            }
+            masks_of_each_state.push((in_place_mask, later_node_mask));
+            persisted_sets.push(persisted);
         }
     }
+    let engine = given_states_engine_of_this_test("partial_landing_of_the_two_later_nodes");
+    let Some(judged) = judge_the_states(
+        &engine,
+        &recorded,
+        "partial-landing-of-the-two-later-nodes",
+        persisted_sets,
+    ) else {
+        return;
+    };
+    finish_the_engine(engine);
+    let reported_missing: Vec<(u32, u32)> = masks_of_each_state
+        .into_iter()
+        .zip(&judged)
+        .filter(|(_, (_, check))| check.claimed_state_missing_unit)
+        .map(|(masks, _)| masks)
+        .collect();
     assert_eq!(
         (in_place_writes_of_sigma.len(), states),
         (0, 16),
@@ -641,22 +827,30 @@ fn partial_landing_of_the_two_later_nodes_never_reports_a_unit_missing() {
 }
 
 /// 一段的全部子集（这一段之前整段持久、之后一个都不落，`persisted_before` 给这一段之外的写）逐个评过之后的数：
-/// 评了几个状态、闭式该有几个、切成几片、起了几个工作线程、线程数从哪来、记录核对器判缺席几次、用了多久。
+/// 评了几个状态、闭式该有几个、切成几片、起了几个工作线程、线程数从哪来、记录核对器判缺席几次、几片照库里复用、用了多久。
+#[cfg(feature = "verdict-store")]
 struct SubsetsOfOneSegmentEnumerated {
     states: u64,
     /// `crash::closed_form_state_count` 只对这一段算：1 + (2^|段| − 1) = 2^|段|（整段全落那一个就是闭式里那个 1）。
     closed_form_states: u64,
     slices: usize,
     spawned_worker_threads: usize,
-    parallelism: Layer0Parallelism,
+    parallelism: WorkerThreadsOfTheRun,
     reported_missing: u64,
+    /// 判定库里这一把判器版本早先判过、这一趟照库里复用的片数（一片一张给定状态表）。
+    slices_reused: u64,
     elapsed_seconds: f64,
 }
 
-/// 一片是掩码区间 [起, 止)：片数取 max(64, 16 × 工作线程数)（与层 0 按线程数定片长同一个取法），不多于状态数。
-fn mask_slices(state_count: u64, worker_threads: usize) -> Vec<std::ops::Range<u64>> {
-    let wanted = u64::try_from(worker_threads.saturating_mul(16).max(64)).expect("片数装得进 u64");
-    let slice_count = wanted.min(state_count).max(1);
+/// 掩码区间切成几片：固定 [`SIGMA_TABLE_SLICES`] 片（与线程数无关：一片一张给定状态表，表名与内容不随线程数变，判过的片下一趟复用），
+/// 不多于状态数。
+#[cfg(feature = "verdict-store")]
+const SIGMA_TABLE_SLICES: u64 = 64;
+
+/// 一片是掩码区间 [起, 止)。
+#[cfg(feature = "verdict-store")]
+fn mask_slices(state_count: u64) -> Vec<std::ops::Range<u64>> {
+    let slice_count = SIGMA_TABLE_SLICES.min(state_count).max(1);
     (0..slice_count)
         .map(|slice_index| {
             state_count * slice_index / slice_count..state_count * (slice_index + 1) / slice_count
@@ -664,22 +858,47 @@ fn mask_slices(state_count: u64, worker_threads: usize) -> Vec<std::ops::Range<u
         .collect()
 }
 
-/// 把 `segment` 的全部子集按掩码区间切片、多线程跑（`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」）：
-/// 每个状态一遍看 journal 的恢复加记录核对器，工作线程按片号领片，调用线程收到一片就打一行 `C561_SIGMA_PROGRESS`
-/// （片号、掩码区间、已跑完的片数与状态数），再按片号次序并计数——结果与线程数、调度次序无关。
+/// 把 `segment` 的全部子集按掩码区间切片、一片一张给定状态表、多线程交崩溃点重放的引擎（`crash_amplification::GivenStatesEngine`）两段判
+/// （`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」；用户 2026-10-13 定「能走两段的都走两段」）：录入段把表写进
+/// 给定状态表那一类的判定库，判段从库里读回判（每个状态两遍恢复、池级 checker、记录核对器；配了 GPU 走 GPU 判器），结论按块存、判过的片复用。
+/// 工作线程按片号领片，调用线程收到一片就打一行 `C561_SIGMA_PROGRESS`（片号、掩码区间、已跑完的片数与状态数），再按片号次序并计数——
+/// 结果与线程数、调度次序无关。只录、叫停、两台分片还没导回来的那一趟打「本次未跑」那一行、交 `None`。
 ///
 /// # Panics
-/// 评状态的线程 panic；有一片领了却没交回（按片号并不齐）。
+/// 引擎起不了、判不了一张表；评状态的线程 panic；有一片领了却没交回（按片号并不齐）；GPU 判不了某几个状态（判红）。
+#[cfg(feature = "verdict-store")]
 fn enumerate_every_subset_of_one_segment(
     recorded: &RecordedHistory,
     segment: &[usize],
     persisted_before: &[bool],
-    parallelism: Layer0Parallelism,
-) -> SubsetsOfOneSegmentEnumerated {
+    parallelism: WorkerThreadsOfTheRun,
+    item_name: &str,
+) -> Option<SubsetsOfOneSegmentEnumerated> {
+    use singlefs_checker_tier::crash_amplification::{GivenStatesEngine, GivenStatesItem};
+    use singlefs_checker_tier::crash_given_states::{GivenStatesJudge, GivenStatesOfATable};
     let started = std::time::Instant::now();
     let state_count = 1u64 << segment.len();
-    let slices = mask_slices(state_count, parallelism.worker_threads.get());
+    let slices = mask_slices(state_count);
     let spawned_worker_threads = parallelism.worker_threads.get().min(slices.len());
+    let engine = {
+        let _one_test_at_a_time =
+            singlefs_checker_tier::crash_amplification::one_test_changes_the_environment_at_a_time(
+            );
+        GivenStatesEngine::start_from_environment(
+            GivenStatesItem {
+                item_name: item_name.to_string(),
+                setting_file: THIS_FILE.to_string(),
+                seeds_and_scale: format!(
+                    "history=UOOUOMSU segment_writes={} slices={}",
+                    segment.len(),
+                    slices.len()
+                ),
+            },
+            &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
+        )
+        .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+    };
     let next_slice_index = std::sync::atomic::AtomicUsize::new(0);
     let finished_by_slice = std::thread::scope(|scope| {
         let (sender, receiver) = std::sync::mpsc::channel::<(usize, u64, u64)>();
@@ -687,24 +906,45 @@ fn enumerate_every_subset_of_one_segment(
             let sender = sender.clone();
             let slices = &slices;
             let next_slice_index = &next_slice_index;
+            let engine = &engine;
             scope.spawn(move || loop {
                 let slice_index =
                     next_slice_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 let Some(slice) = slices.get(slice_index) else {
                     break;
                 };
-                let mut evaluated = 0u64;
-                let mut reported_missing = 0u64;
-                for mask in slice.clone() {
-                    let mut persisted = persisted_before.to_vec();
-                    for (bit, write_index) in segment.iter().enumerate() {
-                        persisted[*write_index] = mask & (1 << bit) != 0;
-                    }
-                    evaluated += 1;
-                    if judge(recorded, &persisted).1.claimed_state_missing_unit {
-                        reported_missing += 1;
-                    }
-                }
+                let persisted_sets: Vec<Vec<bool>> = slice
+                    .clone()
+                    .map(|mask| {
+                        let mut persisted = persisted_before.to_vec();
+                        for (bit, write_index) in segment.iter().enumerate() {
+                            persisted[*write_index] = mask & (1 << bit) != 0;
+                        }
+                        persisted
+                    })
+                    .collect();
+                let table = GivenStatesOfATable {
+                    table_name: format!("masks={}..{}", slice.start, slice.end),
+                    base: &recorded.base,
+                    writes: &recorded.writes,
+                    segments: &recorded.segments,
+                    seams: &[],
+                    persisted_sets,
+                };
+                let judged = engine
+                    .judge_the_given_states(&table)
+                    .unwrap_or_else(|reason| {
+                        panic!("σ 那一片给定状态表 {} 判不了：{reason}", table.table_name)
+                    });
+                let evaluated = u64::try_from(judged.states.len()).expect("装得进 u64");
+                let reported_missing = u64::try_from(
+                    judged
+                        .states
+                        .iter()
+                        .filter(|state| state.record_check().claimed_state_missing_unit)
+                        .count(),
+                )
+                .expect("装得进 u64");
                 if sender
                     .send((slice_index, evaluated, reported_missing))
                     .is_err()
@@ -738,7 +978,28 @@ fn enumerate_every_subset_of_one_segment(
         (0..slices.len()).collect::<Vec<usize>>(),
         "每一片都交回了：少了说明有工作线程领了片却没交回"
     );
-    SubsetsOfOneSegmentEnumerated {
+    let run = engine.finish();
+    if run.recorded_only() || run.stopped_early || run.left_tables_to_the_other_hosts() {
+        println!(
+            "{}",
+            singlefs_harness::gpu_memory_ledger::gpu_not_run_line(
+                item_name,
+                &format!(
+                    "σ 那几张给定状态表这一趟没判完（只录={}、叫停={}、归别的机器={}）：判过的在库里，判段那一趟接着判",
+                    run.recorded_only(),
+                    run.stopped_early,
+                    run.tally.tables_left_to_the_other_hosts
+                )
+            )
+        );
+        return None;
+    }
+    assert_eq!(
+        run.red_items(),
+        Vec::<String>::new(),
+        "GPU 判不了的状态照第三轮正文 H6 判红"
+    );
+    Some(SubsetsOfOneSegmentEnumerated {
         states: finished_by_slice
             .values()
             .map(|(evaluated, _)| evaluated)
@@ -748,12 +1009,14 @@ fn enumerate_every_subset_of_one_segment(
         spawned_worker_threads,
         parallelism,
         reported_missing: finished_by_slice.values().map(|(_, missing)| missing).sum(),
+        slices_reused: run.tally.tables_reused,
         elapsed_seconds: started.elapsed().as_secs_f64(),
-    }
+    })
 }
 
 /// 计数行：`<前缀> states=… closed_form_states=… exhaustive=… record_claimed_state_missing_unit=…`。
-/// `exhaustive=true` 只在评过的状态数等于闭式算的数时打（门禁 checker-tier-layer0-replay 的 `exhaustive=` 判它，`scripts/gate/admission.py`）。
+/// `exhaustive=true` 只在评过的状态数等于闭式算的数时打（门禁 checker-tier-crash-point-replay 的 `exhaustive=` 判它，`scripts/gate/admission.py`）。
+#[cfg(feature = "verdict-store")]
 fn count_line(prefix: &str, enumerated: &SubsetsOfOneSegmentEnumerated) -> String {
     format!(
         "{prefix} states={} closed_form_states={} exhaustive={} record_claimed_state_missing_unit={}",
@@ -764,28 +1027,27 @@ fn count_line(prefix: &str, enumerated: &SubsetsOfOneSegmentEnumerated) -> Strin
     )
 }
 
-/// 与 `crash::enumerate_layer0_in_state_slices` 打的那一行同形的线程行（门禁 checker-tier-layer0-replay 的 `threads=` 按 `states=` 找它，
+/// 与崩溃点重放判段（`crash_state_enumeration`）打的那一行同形的线程行（门禁 checker-tier-crash-point-replay 的 `threads=` 按 `states=` 找它，
 /// 读 `worker_threads=`、`slices=`、`resumed_slices=`、`freshly_run_slices=`，`admission.py` 的 `judge_worker_threads`）。
-/// 不留进度文件：读回的片恒 0，这一趟跑的片就是全部片。
+/// 这条用例经给定状态表那一类的判定库：复用的片是库里早先判过的，这一趟跑的片是其余的。
+#[cfg(feature = "verdict-store")]
 fn parallel_finished_line(enumerated: &SubsetsOfOneSegmentEnumerated) -> String {
-    let worker_threads_source = match enumerated.parallelism.worker_threads_source {
-        Layer0WorkerThreadsSource::EnvironmentVariable => "environment_variable",
-        Layer0WorkerThreadsSource::AvailableParallelism => "available_parallelism",
-        Layer0WorkerThreadsSource::AvailableParallelismUnknown => "available_parallelism_unknown",
-        Layer0WorkerThreadsSource::GivenByCaller => "given_by_caller",
-    };
+    let worker_threads_source = enumerated.parallelism.worker_threads_source;
+    let slices = u64::try_from(enumerated.slices).expect("片数装得进 u64");
     format!(
-        "LAYER0_PARALLEL_FINISHED states={} slices={} worker_threads={} configured_worker_threads={} worker_threads_source={worker_threads_source} resumed_slices=0 freshly_run_slices={} progress_file_after_completion=none elapsed_seconds={:.1}",
+        "CRASH_POINT_REPLAY_PARALLEL_FINISHED states={} slices={} worker_threads={} configured_worker_threads={} worker_threads_source={worker_threads_source} resumed_slices={} freshly_run_slices={} progress_file_after_completion=none elapsed_seconds={:.1}",
         enumerated.states,
         enumerated.slices,
         enumerated.spawned_worker_threads,
         enumerated.parallelism.worker_threads,
-        enumerated.slices,
+        enumerated.slices_reused,
+        slices - enumerated.slices_reused,
         enumerated.elapsed_seconds
     )
 }
 
 /// 一行里 `键=值` 那几段（与 `scripts/gate/admission.py` 的 `fields_of_line` 同一个切法：按空白切、第一个 `=` 分开）。
+#[cfg(feature = "verdict-store")]
 fn fields_of_line(line: &str) -> std::collections::BTreeMap<&str, &str> {
     line.split_whitespace()
         .filter_map(|token| token.split_once('='))
@@ -793,6 +1055,7 @@ fn fields_of_line(line: &str) -> std::collections::BTreeMap<&str, &str> {
 }
 
 /// σ 之前整段持久、σ 与它之后的写一个都不落：σ 的全部子集拿它当底。
+#[cfg(feature = "verdict-store")]
 fn persisted_before_sigma(recorded: &RecordedHistory, sigma: usize) -> Vec<bool> {
     let mut before_sigma = persisted_before_the_units_of_sigma(recorded, sigma);
     for write_index in &recorded.segments[sigma] {
@@ -801,23 +1064,28 @@ fn persisted_before_sigma(recorded: &RecordedHistory, sigma: usize) -> Vec<bool>
     before_sigma
 }
 
-/// σ 那一段全部 2^16 个状态（σ 之前整段持久；C577 之前 σ 带上一次的轮换、2^18 个）：记录核对器一个都不判缺席。层 0 规模第二轮攻方
+/// σ 那一段全部 2^16 个状态（σ 之前整段持久；C577 之前 σ 带上一次的轮换、2^18 个）：记录核对器一个都不判缺席。崩溃点重放规模第二轮攻方
 /// 在冻结副本上量过按整份判的那一版在这里红 32768 个（那时 σ 18 个写；`research/prompts/m2-layer0-scale-r2-opus-output.md` 第一节，
 /// 核查员复跑逐字一致）。每个状态一遍看 journal 的恢复加记录核对器，
-/// 按掩码区间切片多线程跑（线程数与层 0 同一个来源）；打计数行 `C561_SIGMA_FULL`（状态数等于闭式时带 `exhaustive=true`）
-/// 与一行 `LAYER0_PARALLEL_FINISHED` 同形的线程行，门禁 checker-tier-layer0-replay 按这两行判穷尽没有、线程用没用上。
+/// 按掩码区间切成固定的几片、一片一张给定状态表经判定库两段判（线程数与崩溃点重放同一个来源）；打计数行 `C561_SIGMA_FULL`
+/// （状态数等于闭式时带 `exhaustive=true`）与一行 `CRASH_POINT_REPLAY_PARALLEL_FINISHED` 同形的线程行（复用的片是库里早先判过的），
+/// 门禁 checker-tier-crash-point-replay 按这两行判穷尽没有、线程用没用上。
+#[cfg(feature = "verdict-store")]
 #[test]
-#[ignore = "崩溃枚举（65536 个状态、每个一遍恢复）：用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 按输入哈希跑（release），提交时的快档只核它的全绿标记，平时不跑"]
+#[ignore = "崩溃枚举（65536 个状态、每个两遍恢复、池级 checker、记录核对器）：用户要求时由主 agent 经门禁 checker-tier-crash-point-replay --full 按输入哈希跑（release），提交时的快档只核它的全绿标记，平时不跑"]
 fn every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present() {
     let recorded = record_history("c561-sigma-full", &HISTORY_UOOUOMSU);
     let chain = misaligned_reuse_chain(&recorded);
     let sigma_segment = recorded.segments[chain.sigma].clone();
-    let enumerated = enumerate_every_subset_of_one_segment(
+    let Some(enumerated) = enumerate_every_subset_of_one_segment(
         &recorded,
         &sigma_segment,
         &persisted_before_sigma(&recorded, chain.sigma),
-        Layer0Parallelism::from_environment(),
-    );
+        WorkerThreadsOfTheRun::from_environment(),
+        "c561-sigma-full",
+    ) else {
+        return;
+    };
     println!("{}", parallel_finished_line(&enumerated));
     println!("{}", count_line("C561_SIGMA_FULL", &enumerated));
     assert_eq!(
@@ -835,11 +1103,13 @@ fn every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present
 }
 
 /// σ 全量那两行的打法，拿同一条历史上 σ 前面一段只有几个写的小段核（全量本身标了 ignore，平时不跑）：
-/// 评过的状态数等于闭式 2^|段| 时计数行带 `exhaustive=true`；线程行与层 0 那一行同形、`states=` 与计数行相同，
-/// 读回的片 + 这一趟跑的片 = 总片数、起了至少一个工作线程、不多于配的线程数与片数——门禁 checker-tier-layer0-replay 按这几样判。
-/// 两个工作线程与一个工作线程并出来的计数相同。
+/// 评过的状态数等于闭式 2^|段| 时计数行带 `exhaustive=true`；线程行与崩溃点重放那一行同形、`states=` 与计数行相同，
+/// 读回的片 + 这一趟跑的片 = 总片数、起了至少一个工作线程、不多于配的线程数与片数——门禁 checker-tier-crash-point-replay 按这几样判。
+/// 两个工作线程与一个工作线程并出来的计数相同；后一趟的每一片都照库里那一趟的复用（经判定库，不在内存里现判）。
+#[cfg(feature = "verdict-store")]
 #[test]
-fn the_sigma_enumeration_prints_exhaustive_true_and_a_thread_line_of_the_layer0_shape() {
+fn the_sigma_enumeration_prints_exhaustive_true_and_a_thread_line_of_the_crash_point_replay_shape()
+{
     let recorded = record_history("c561-sigma-lines", &HISTORY_UOOUOMSU);
     let chain = misaligned_reuse_chain(&recorded);
     let small_segment_index = (0..chain.sigma)
@@ -853,19 +1123,28 @@ fn the_sigma_enumeration_prints_exhaustive_true_and_a_thread_line_of_the_layer0_
             &recorded,
             &small_segment,
             &persisted_before,
-            Layer0Parallelism {
+            WorkerThreadsOfTheRun {
                 worker_threads: std::num::NonZeroUsize::new(worker_threads).expect("至少 1 个"),
-                worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller,
-                slice_length: Layer0SliceLength::ScaledToWorkerThreads,
+                worker_threads_source: "given_by_caller",
             },
+            "c561-sigma-lines",
         )
     };
-    let on_two = on_threads(2);
-    let on_one = on_threads(1);
+    let Some(on_two) = on_threads(2) else {
+        return;
+    };
+    let Some(on_one) = on_threads(1) else {
+        return;
+    };
     assert_eq!(
         (on_two.states, on_two.reported_missing),
         (on_one.states, on_one.reported_missing),
         "线程数不改计数"
+    );
+    assert_eq!(
+        on_one.slices_reused,
+        u64::try_from(on_one.slices).expect("片数装得进 u64"),
+        "后一趟的每一片都照库里前一趟判过的复用：片经判定库，不在内存里现判"
     );
     assert_eq!(on_two.states, 1u64 << small_segment.len());
     let counted = count_line("C561_SIGMA_LINES", &on_two);
@@ -878,7 +1157,7 @@ fn the_sigma_enumeration_prints_exhaustive_true_and_a_thread_line_of_the_layer0_
     );
     let threads = parallel_finished_line(&on_two);
     assert!(
-        threads.starts_with("LAYER0_PARALLEL_FINISHED states="),
+        threads.starts_with("CRASH_POINT_REPLAY_PARALLEL_FINISHED states="),
         "{threads}"
     );
     let thread_fields = fields_of_line(&threads);
@@ -990,7 +1269,20 @@ fn an_illegal_reuse_does_not_explain_the_overwritten_unit_in_any_of_the_three_st
         ),
         ("全部落了", vec![true; write_count]),
     ];
-    for (state_name, persisted) in &three_states {
+    let engine = given_states_engine_of_this_test("illegal_reuse_three_states");
+    let Some(judged) = judge_the_states(
+        &engine,
+        &recorded,
+        "illegal-reuse-three-states",
+        three_states
+            .iter()
+            .map(|(_, persisted)| persisted.clone())
+            .collect(),
+    ) else {
+        return;
+    };
+    finish_the_engine(engine);
+    for ((state_name, persisted), (effective_root, check)) in three_states.iter().zip(judged) {
         let image = CrashImage {
             base: &recorded.base,
             writes: &recorded.writes,
@@ -1009,7 +1301,6 @@ fn an_illegal_reuse_does_not_explain_the_overwritten_unit_in_any_of_the_three_st
                 );
             }
         }
-        let (effective_root, check) = judge(&recorded, persisted);
         assert!(
             effective_root.is_some_and(|(_, txg)| txg >= CheckpointTxg(4)),
             "{state_name}：恢复自称的 txg ≥ 4（{effective_root:?}）"
@@ -1063,7 +1354,7 @@ fn sigma_publish_writes(recorded: &RecordedHistory) -> std::ops::Range<usize> {
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_written_more_than_thirty_two_times(
 ) {
-    use singlefs_checker_tier::crash::{judge_layer0_state_range, Layer0SegmentExpansion};
+    use singlefs_checker_tier::crash::CrashPointReplaySegmentExpansion;
     use singlefs_checker_tier::crash_amplification::{
         gpu_recovery_words, gpu_verdict_items, recovery_words_of,
     };
@@ -1077,9 +1368,9 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_
             .iter()
             .all(|write_index| sigma_publish.contains(write_index))
         {
-            Layer0SegmentExpansion::EveryProperSubset
+            CrashPointReplaySegmentExpansion::EveryProperSubset
         } else {
-            Layer0SegmentExpansion::NotExpanded
+            CrashPointReplaySegmentExpansion::NotExpanded
         }
     };
     let judged_root_index = recorded
@@ -1134,10 +1425,14 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_
         return;
     };
     // CPU 判器按区间切片并行判（每个状态十几到几十毫秒，单线程判 6.5 万态要一个多小时）：线程数从
-    // SINGLEFS_CRASH_JUDGE_CPU_THREADS 取，没设取本机可用并行度；每线程 8 片，按片序拼回，与单线程逐状态相同
+    // SINGLEFS_CRASH_JUDGE_CPU_THREADS 取，没设取每台默认重活线程数；每线程 8 片，按片序拼回，与单线程逐状态相同
     let threads = cpu_threads_from_the_value_of_the_variable(
         singlefs_harness::numeric_environment_variable::process_environment_variable(
             CPU_THREADS_ENVIRONMENT_VARIABLE,
+        )
+        .as_deref(),
+        singlefs_harness::numeric_environment_variable::process_environment_variable(
+            singlefs_harness::heavy_threads::THREAD_CAP_ENVIRONMENT_VARIABLE,
         )
         .as_deref(),
     )
@@ -1165,7 +1460,11 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_
                             break;
                         };
                         let mut items = Vec::new();
-                        let state_count = judge_layer0_state_range(
+                        let Some(state_count) = sample_crash_states_on_the_cpu(
+                            CrashPointReplayItem {
+                                name: "record_checker::sigma_gpu_pairing_cpu_side",
+                                setting_file: THIS_FILE,
+                            },
                             &recorded.base,
                             &recorded.writes,
                             &recorded.segments,
@@ -1176,7 +1475,11 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_
                             &mut |_ordinal, _image, judgement| {
                                 items.push((judgement.red_items(), recovery_words_of(judgement)));
                             },
-                        );
+                        )
+                        .judged() else {
+                            // 只录那一趟：流写进了判定库，这条线程不再领片
+                            break;
+                        };
                         assert_eq!(
                             state_count, tables.state_count,
                             "CPU 判器与判器的表数的状态总数相同"
@@ -1197,6 +1500,9 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_
             .flat_map(|worker| worker.join().expect("判器线程不 panic"))
             .collect()
     });
+    if !singlefs_checker_tier::crash_library::RunStage::of_this_process().judges() {
+        return;
+    }
     judged_slices.sort_by_key(|(index, _)| *index);
     let cpu: Vec<CpuVerdict> = judged_slices
         .into_iter()

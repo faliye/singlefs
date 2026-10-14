@@ -1,9 +1,9 @@
-//! C554 乙（重读后再判，R = 1；岔路单 `research/prompts/c554-fix-forks.md` 第 1 行）：可写挂载读到的样子里
+//! C554 乙（重读后再判，R = 1；岔路单 `research/prompts/c554-fix-forks.md` #1「挂载时有一条根（或它引用的账）暂时读不出」）：可写挂载读到的样子里
 //! 有一样更新的东西读不出，就重读一次（D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」）；重读读得出就照常挂载——
 //! 用读出的那条根择根，不把它当成被抛弃；仍读不出就拒可写（`MountError::NewerStateStillUnreadableAfterOneReread`，取号之前、
 //! 盘上逐字节不变），只读挂载照常。「更新的东西」两样：
 //!
-//! - 系统配置见证过一次比所选那一版新的发布（判据 N-配置，E158 第 3 次跑登记 `research/prompts/e158-r3-prereg.md` 第 347 行）：
+//! - 系统配置见证过一次比所选那一版新的发布（判据 N-配置，E158 第 3 次跑登记 `research/prompts/e158-r3-prereg.md`「`| **N-配置** |`」那一行）：
 //!   系统配置在一次发布的根槽 FUA 之后才轮换，写这次发布末条记录的计数器（D16（发布语义） 已定项 7），见证到的发布它的根落过盘；
 //! - 重建影子账时最新那条根的实例表（代码审阅第 22 条：改之前读不出就按「没有一条根被抛弃」往下走，无声关掉隔离）。
 //!
@@ -12,6 +12,9 @@
 //! 暂时读不出时照旧被抛弃，这一格乙-配置罩不到，由 `a_newest_root_the_system_configuration_never_witnessed_is_abandoned_without_a_reread`
 //! 钉住。
 mod common;
+mod common_images_for_the_checker_tier;
+#[path = "common_images_for_the_checker_tier/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs"]
+mod scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable;
 
 use common::{
     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, disk_snapshot,
@@ -19,8 +22,12 @@ use common::{
     with_unreadable_ranges, without_unreadable_ranges, BuiltPool, FailingReadsOfARange,
     SharedUnreadableRanges, UnreadableRange, UnreadableRangeReadBack, FIXED_WRITE_TIME_SECONDS,
 };
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::{
+    content_of, pool_with_a_witnessed_newest_publish, root_slot_and_data_units_of,
+    selected_against_its_last_record, version_of, version_of_root, PoolWithAWitnessedNewestPublish,
+    SECOND_VERSION_BYTES,
+};
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, FileOffsetInBytes, InodeNumber, InstanceGeneration,
 };
@@ -28,98 +35,16 @@ use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::journal::record_offset;
 use singlefs_core::mount::{
     mount_writable, mount_writable_with_test_only_switches_and_a_hook_before_the_one_reread,
-    BeforeTheOneReread, InstanceRow, InstanceTableOfTheNewestRootRead, MountError,
-    NewerPublishWitness, ReadStageSettled, RereadsOfThisMount, RollbackTarget,
-    RootRingOfTheRebuiltAllocatorRead, SelectedVersionAgainstTheWitness, ShadowLedger,
-    StillUnreadableAfterOneReread, WitnessedCounterComparison,
+    BeforeTheOneReread, InstanceTableOfTheNewestRootRead, MountError, NewerPublishWitness,
+    ReadStageSettled, RereadsOfThisMount, RollbackTarget, RootRingOfTheRebuiltAllocatorRead,
+    SelectedVersionAgainstTheWitness, ShadowLedger, StillUnreadableAfterOneReread,
+    WitnessedCounterComparison,
 };
 use singlefs_core::mounted_read::mount_read_only;
 use singlefs_core::pointer::NodePointer;
-use singlefs_core::recovery::{
-    instance_table_of_root, recover, root_is_abandoned_by_the_instance_table, JournalPolicy,
-    RecoveryOutcome,
-};
+use singlefs_core::recovery::{instance_table_of_root, root_is_abandoned_by_the_instance_table};
 use singlefs_core::transaction::{TransactionOutput, FIRST_INODE_NUMBER};
 use singlefs_format::{DATA_UNIT_BYTES, JOURNAL_RECORD_BYTES};
-
-fn content_of(length: usize, seed: usize) -> Vec<u8> {
-    (0..length)
-        .map(|index| u8::try_from((index * 7 + seed) % 253).expect("小于 256"))
-        .collect()
-}
-
-/// B 与 C 两次覆盖写的内容。
-const SECOND_VERSION_BYTES: usize = 4100;
-const NEWEST_VERSION_BYTES: usize = 2500;
-
-/// 新池新建文件（A，实例 1，txg 3）之后在同一个进程里覆盖写 B（txg 4）、C（txg 5），每次一条记录：C 的根 FUA 之后系统配置轮换，
-/// 写的是 C 那条记录的计数器——系统配置见证了 C。
-struct PoolWithAWitnessedNewestPublish {
-    pool: BuiltPool,
-    second: TransactionOutput,
-    newest: TransactionOutput,
-}
-
-fn pool_with_a_witnessed_newest_publish(tag: &str) -> PoolWithAWitnessedNewestPublish {
-    let mut pool = build_pool(tag);
-    let first = pool.output.clone();
-    let second = publish_overwrite_in_process(
-        &mut pool,
-        &first,
-        &content_of(SECOND_VERSION_BYTES, 3),
-        FIXED_WRITE_TIME_SECONDS + 60,
-        InstanceGeneration(1),
-    )
-    .expect("B");
-    let newest = publish_overwrite_in_process(
-        &mut pool,
-        &second,
-        &content_of(NEWEST_VERSION_BYTES, 11),
-        FIXED_WRITE_TIME_SECONDS + 120,
-        InstanceGeneration(1),
-    )
-    .expect("C");
-    pool.output = newest.clone();
-    assert_eq!(
-        (
-            second.root.checkpoint_txg,
-            second.record.counter,
-            newest.root.checkpoint_txg,
-            newest.record.counter
-        ),
-        (CheckpointTxg(4), 4, CheckpointTxg(5), 5),
-        "暖机 txg 1、2（jsn 1、2），A txg 3（jsn 3），B、C 各一条记录：txg 4、5，jsn 4、5"
-    );
-    PoolWithAWitnessedNewestPublish {
-        pool,
-        second,
-        newest,
-    }
-}
-
-/// C 的根槽（第 0 段）与它两份数据单元：择根看不见 C、C 那条记录施加前验点名单元验不过——恢复落到 B（崩溃恢复抛弃根的造法）。
-fn root_slot_and_data_units_of(
-    publish: &TransactionOutput,
-    failing_reads: FailingReadsOfARange,
-) -> Vec<UnreadableRange> {
-    std::iter::once(unreadable_root_slot_of(
-        publish.root.checkpoint_txg,
-        failing_reads,
-    ))
-    .chain(
-        publish
-            .data_pointers
-            .iter()
-            .flat_map(|pointer| pointer.locations)
-            .map(|location| UnreadableRange {
-                device: location.device,
-                offset_in_bytes: location.slot.to_device_offset().0,
-                length_in_bytes: DATA_UNIT_BYTES,
-                failing_reads,
-            }),
-    )
-    .collect()
-}
 
 /// 一次发布末条记录的两份（每块盘同一个偏移，D23（journal 的角色与格式） 已定项 14「两份镜像」）。
 fn last_record_of(publish: &TransactionOutput) -> Vec<UnreadableRange> {
@@ -134,41 +59,6 @@ fn last_record_of(publish: &TransactionOutput) -> Vec<UnreadableRange> {
             .0,
             length_in_bytes: JOURNAL_RECORD_BYTES,
             failing_reads: FailingReadsOfARange::Every,
-        })
-        .collect()
-}
-
-fn version_of(publish: &TransactionOutput) -> RollbackTarget {
-    RollbackTarget {
-        instance: publish.root.instance,
-        checkpoint_txg: publish.root.checkpoint_txg,
-    }
-}
-
-/// 读阶段选出 `selected` 那一版、系统配置见证到 `witnessed_journal_counter`、`selected` 那次发布的末条记录读得出时的读数。
-fn selected_against_its_last_record(
-    selected: &TransactionOutput,
-    witnessed_journal_counter: u64,
-) -> SelectedVersionAgainstTheWitness {
-    SelectedVersionAgainstTheWitness {
-        selected_version: version_of(selected),
-        witness: NewerPublishWitness {
-            witnessed_journal_counter,
-            comparison: WitnessedCounterComparison::AgainstTheSelectedVersionsLastRecord {
-                selected_version_last_record_counter: selected.record.counter,
-            },
-        },
-    }
-}
-
-fn violated_invariants(pool: &BuiltPool) -> Vec<(&'static str, String)> {
-    check_pool_image(&pool.memory_pool())
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -248,151 +138,25 @@ fn a_witnessed_newest_root_still_unreadable_after_the_one_reread_refuses_the_wri
     );
 }
 
-/// 同一段历史，C 的根槽与数据单元暂时读不出、撤在重读之前（钩子里撤）：`read_back` 两种造法各走一遍——读报错、读回全 0。
-/// 读回全 0 那一种靠读缓存「全 0 的不收」（E158 第 4 次跑登记 5.5 第 1 条）：第一遍读回的全 0 进了缓存，重读就还是全 0。
-fn mount_with_the_newest_root_unreadable_until_the_one_reread(
-    tag: &str,
-    read_back: UnreadableRangeReadBack,
-) {
-    let PoolWithAWitnessedNewestPublish {
-        mut pool,
-        second,
-        newest,
-    } = pool_with_a_witnessed_newest_publish(tag);
-    let unreadable = SharedUnreadableRanges::new(
-        root_slot_and_data_units_of(&newest, FailingReadsOfARange::Every),
-        read_back,
-    );
-    let mut devices = with_unreadable_ranges(pool.reopen_recorded(), &unreadable);
-    let lifting = unreadable.clone();
-    let mut hook_calls = 0;
-    let mut lift_before_the_reread = || {
-        hook_calls += 1;
-        lifting.lift();
-    };
-    let mounted = mount_writable_with_test_only_switches_and_a_hook_before_the_one_reread(
-        &parameters(),
-        &mut devices,
-        SpaceAdmission::JudgedByTheFormula,
-        ShadowLedger::On,
-        BeforeTheOneReread::CallTheTestOnlyHookFirst(&mut lift_before_the_reread),
-    )
-    .expect("重读读得出：照常可写挂载");
-    assert_eq!(
-        hook_calls, 1,
-        "{read_back:?}：钩子只在读阶段重读之前调了一次"
-    );
-    assert!(
-        unreadable.failed_reads() > 0,
-        "{read_back:?}：第一遍真读坏过"
-    );
-    assert_eq!(
-        mounted.output.rereads,
-        RereadsOfThisMount {
-            read_stage: ReadStageSettled::OnTheOneReread {
-                first_read: selected_against_its_last_record(&second, newest.record.counter),
-                reread: selected_against_its_last_record(&newest, newest.record.counter),
-            },
-            instance_table_of_the_newest_root: InstanceTableOfTheNewestRootRead::OnTheFirstRead,
-            root_ring_of_the_rebuilt_allocator: RootRingOfTheRebuiltAllocatorRead::OnTheFirstRead,
-        },
-        "{read_back:?}：第一遍落到 B、判据为真；重读落到 C、判据为假，往下走用重读那一遍"
-    );
-    assert_eq!(
-        (
-            version_of_root(&mounted.output.chosen_root),
-            version_of_root(&mounted.output.effective_root)
-        ),
-        (version_of(&newest), version_of(&newest)),
-        "{read_back:?}：择根择的是 C，不是它前一条"
-    );
-    assert_eq!(
-        mounted.output.rows_written,
-        vec![InstanceRow {
-            instance: InstanceGeneration(1),
-            selected_root_txg: newest.root.checkpoint_txg,
-            applied_transaction_high_water: 0,
-        }],
-        "{read_back:?}：实例 1 那一行记到 C 的 txg，C 不被抛弃"
-    );
-    assert_eq!(
-        (
-            mounted.output.isolated_slots_per_device.clone(),
-            mounted.output.abandoned_roots_unreadable
-        ),
-        (vec![(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)], 0),
-        "{read_back:?}：没有被抛弃的根，影子账一槽不隔离"
-    );
-    pool.devices = Some(without_unreadable_ranges(devices));
-    assert_eq!(
-        violated_invariants(&pool),
-        Vec::new(),
-        "{read_back:?}：池级 checker 一条不红（I-7.4 在内）"
-    );
-    assert_eq!(
-        recover(&pool.memory_pool(), JournalPolicy::Consult).outcome,
-        RecoveryOutcome::FileRead {
-            root: (InstanceGeneration(2), mounted.current.root().checkpoint_txg),
-            content: content_of(NEWEST_VERSION_BYTES, 11),
-        },
-        "{read_back:?}：冷启动读回 C 的内容"
-    );
-}
-
-fn version_of_root(root: &singlefs_core::root_record::RootRecord) -> RollbackTarget {
-    RollbackTarget {
-        instance: root.instance,
-        checkpoint_txg: root.checkpoint_txg,
-    }
-}
-
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::a_witnessed_newest_root_that_reads_back_an_error_until_just_before_the_one_reread_is_chosen_and_nothing_is_abandoned`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn a_witnessed_newest_root_that_reads_back_an_error_until_just_before_the_one_reread_is_chosen_and_nothing_is_abandoned(
 ) {
-    mount_with_the_newest_root_unreadable_until_the_one_reread(
-        "c554-yi-lifted-device-error",
-        UnreadableRangeReadBack::DeviceError,
-    );
+    scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::a_witnessed_newest_root_that_reads_back_an_error_until_just_before_the_one_reread_is_chosen_and_nothing_is_abandoned(&mut PoolCheckerImages::left_to_the_checker_tier());
 }
 
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::a_witnessed_newest_root_that_reads_back_zeros_until_just_before_the_one_reread_is_chosen_because_zeros_stay_out_of_the_read_cache`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn a_witnessed_newest_root_that_reads_back_zeros_until_just_before_the_one_reread_is_chosen_because_zeros_stay_out_of_the_read_cache(
 ) {
-    mount_with_the_newest_root_unreadable_until_the_one_reread(
-        "c554-yi-lifted-zeros",
-        UnreadableRangeReadBack::Zeros,
-    );
+    scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::a_witnessed_newest_root_that_reads_back_zeros_until_just_before_the_one_reread_is_chosen_because_zeros_stay_out_of_the_read_cache(&mut PoolCheckerImages::left_to_the_checker_tier());
 }
 
-/// 产品路径（`mount_writable`，重读之前不等）：C 的根槽与数据单元每段只坏第一次读 ⇒ 立即重读就读得出，择根择 C。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::a_witnessed_newest_root_whose_reads_fail_only_once_is_chosen_by_the_immediate_reread_of_the_product_path`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn a_witnessed_newest_root_whose_reads_fail_only_once_is_chosen_by_the_immediate_reread_of_the_product_path(
 ) {
-    let PoolWithAWitnessedNewestPublish {
-        mut pool,
-        second,
-        newest,
-    } = pool_with_a_witnessed_newest_publish("c554-yi-fails-only-once");
-    let unreadable = SharedUnreadableRanges::new(
-        root_slot_and_data_units_of(&newest, FailingReadsOfARange::OnlyTheFirst),
-        UnreadableRangeReadBack::DeviceError,
-    );
-    let mut devices = with_unreadable_ranges(pool.reopen_recorded(), &unreadable);
-    let mounted = mount_writable(&parameters(), &mut devices).expect("立即重读读得出");
-    pool.devices = Some(without_unreadable_ranges(devices));
-    assert_eq!(
-        mounted.output.rereads.read_stage,
-        ReadStageSettled::OnTheOneReread {
-            first_read: selected_against_its_last_record(&second, newest.record.counter),
-            reread: selected_against_its_last_record(&newest, newest.record.counter),
-        },
-        "第一遍落到 B，立即重读落到 C"
-    );
-    assert_eq!(
-        version_of_root(&mounted.output.effective_root),
-        version_of(&newest)
-    );
-    assert_eq!(violated_invariants(&pool), Vec::new());
+    scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::a_witnessed_newest_root_whose_reads_fail_only_once_is_chosen_by_the_immediate_reread_of_the_product_path(&mut PoolCheckerImages::left_to_the_checker_tier());
 }
 
 /// 乙-配置罩不到的那一格：C 那次发布之后轮换的系统配置槽坏了、系统配置只见证到 B（`common::abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`），
@@ -425,7 +189,7 @@ fn a_newest_root_the_system_configuration_never_witnessed_is_abandoned_without_a
     );
 }
 
-/// 判据 N-配置 另两支（E158 第 3 次跑登记第 347 行）：B 那次发布的末条记录两份也读不出 ⇒ 拿计数器等于 c_见证 的那条记录比——
+/// 判据 N-配置 另两支（E158 第 3 次跑登记 `research/prompts/e158-r3-prereg.md`「`| **N-配置** |`」那一行）：B 那次发布的末条记录两份也读不出 ⇒ 拿计数器等于 c_见证 的那条记录比——
 /// C 的记录读得出，它的 (实例, txg) 比 B 新，判真；C 的记录也读不出 ⇒ 判不出，按真。两格读故障都持续，重读仍判真、拒可写。
 #[test]
 fn without_the_last_record_of_the_selected_version_the_record_at_the_witnessed_counter_decides_and_without_both_the_mount_counts_it_as_witnessed(
@@ -492,7 +256,7 @@ fn without_the_last_record_of_the_selected_version_the_record_at_the_witnessed_c
 
 /// 判据的第一支：只做过 mkfs 的池两块盘的系统配置 tail 都是 0 ⇒ 没有见证，判假、读阶段不重读。
 /// 重建分配器读根环那一遍也不重读：mkfs 在三个区域的槽 0 各写一份第 0 代根（区域 0、2 在盘 0，区域 1 在盘 1），一条根按读出它的那个槽
-/// 所在的区域归盘，两块盘各读出一条有效根，Q4 rr2（用户 2026-10-05 定，岔路单 `research/prompts/m3-batch10-code-r1-forks.md` 第 4 行）
+/// 所在的区域归盘，两块盘各读出一条有效根，Q4 rr2（用户 2026-10-05 定，岔路单 `research/prompts/m3-batch10-code-r1-forks.md` Q4 那一行）
 /// 「任一块盘没读出」不成立。
 /// 判别力：归盘改回按 txg 的落点公式（`crates/mutations.tsv`「第10h批 rr2 改回按 txg 的落点公式归盘」）时三份第 0 代根都归到盘 0，
 /// 盘 1 算成一条都没有、整环重读一次，最后一项报 `OnTheOneReread`、这一条红（判决

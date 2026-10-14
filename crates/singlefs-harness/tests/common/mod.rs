@@ -200,11 +200,11 @@ impl BuiltPool {
     pub fn memory_pool(&self) -> MemoryPool {
         memory_pool_of(&self.retained_operations())
     }
-    /// 只施加 mkfs 那 13 步：层 0 枚举的基线。
+    /// 只施加 mkfs 那 13 步：崩溃点重放枚举的基线。
     pub fn memory_pool_after_mkfs(&self) -> MemoryPool {
         memory_pool_of(&self.retained_operations()[..self.mkfs_operation_count])
     }
-    /// 重开镜像并继续录进同一条流：进程重开之后的可写挂载与发布都要进层 0 的整条流（里程碑「覆盖写、释放、回退与复用」步 0 / 步 3）。
+    /// 重开镜像并继续录进同一条流：进程重开之后的可写挂载与发布都要进崩溃点重放的整条流（里程碑「覆盖写、释放、回退与复用」步 0 / 步 3）。
     pub fn reopen_recorded(&mut self) -> Vec<(DeviceIdentity, Recorded)> {
         drop(self.devices.take());
         reopen_recorded_images(&self.paths, &self.stream)

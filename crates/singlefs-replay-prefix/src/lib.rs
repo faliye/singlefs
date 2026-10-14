@@ -3821,7 +3821,7 @@ pub fn replay_core<
             index += 1;
             continue ;
         }
-        // 在飞上限（已定项 18）：一次恢复重放的前缀最多这么多条
+        // 在飞上限（D23（journal 的角色与格式） 已定项 18）：一次恢复重放的前缀最多这么多条
         if records_taken_toward_the_in_flight_limit >= in_flight_limit {
             break ;
         }

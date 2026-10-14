@@ -19,7 +19,7 @@ use singlefs_harness::hexadecimal::hexadecimal_text;
 use singlefs_harness::memory_pool::{MemoryPool, RetainedWrite, WrittenContents};
 use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
-use crate::layer0_progress::Layer0ToolchainIdentity;
+use crate::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 
 const SECTOR_BYTES: u64 = 512;
 
@@ -347,6 +347,26 @@ pub const RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED: &[RandomHistoryThrough
         library_module: "crates/singlefs-harness/src/fault_injection.rs",
         reason: "读故障那一项拿随机历史当输入：带读故障执行历史，经 crash_injection.rs 与 RefFS 翻译层收进故障注入的结局类型，故障注入又引随机历史脚手架的执行器",
     },
+    RandomHistoryThroughALibraryModuleAllowed {
+        test_target: "crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library",
+        library_module: "crates/singlefs-checker-tier/src/crash_injection.rs",
+        reason: "随机历史与故障注入经库判那一项拿随机历史当输入：按 harness 原先逐步跑 checker 的那几段种子生成并执行随机历史，经 crash_injection.rs 取 mkfs 之后的基线与写表（HistoryAfterTheMakeFilesystem）把每一步的镜像建成给定状态表交引擎判，判定本来就随随机历史与它的建表变",
+    },
+    RandomHistoryThroughALibraryModuleAllowed {
+        test_target: "crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library",
+        library_module: "crates/singlefs-harness/src/fault_injection.rs",
+        reason: "随机历史与故障注入经库判那一项拿故障注入当输入：经 fault_injection.rs 的注入点钩子拿每个注入点重开的盘与归类函数，故障注入又引随机历史脚手架的执行器，判定随带故障执行历史的写法变",
+    },
+    RandomHistoryThroughALibraryModuleAllowed {
+        test_target: "crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library",
+        library_module: "crates/singlefs-harness/src/model_comparison.rs",
+        reason: "随机历史与故障注入经库判那一项经 crash_injection.rs 按文件收进闭包（崩溃注入用它对理想模型）；它只在自己的单元测试模块里引随机历史脚手架（词法闭包照收）",
+    },
+    RandomHistoryThroughALibraryModuleAllowed {
+        test_target: "crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library",
+        library_module: "crates/singlefs-harness/src/reference_filesystem_translation.rs",
+        reason: "随机历史与故障注入经库判那一项经 crash_injection.rs 与故障注入收进 RefFS 翻译层，翻译层直接引随机历史脚手架的操作与观察类型，判定随历史怎么生成、怎么执行变",
+    },
 ];
 
 /// 随机历史脚手架的一个引入者判下来是什么。
@@ -399,7 +419,7 @@ fn is_a_library_module(file: &str) -> bool {
 pub fn random_history_scaffolding_introducers_judged(
     repository_root: &Path,
     test_target: &str,
-    toolchain: &Layer0ToolchainIdentity,
+    toolchain: &CrashPointReplayToolchainIdentity,
     allowed: &[RandomHistoryThroughALibraryModuleAllowed],
 ) -> Result<Vec<JudgedRandomHistoryIntroducer>, JudgingCodeError> {
     let entry = format!("crates/singlefs-checker-tier/tests/{test_target}.rs");
@@ -445,7 +465,9 @@ pub fn random_history_scaffolding_introducers_judged(
         .collect())
 }
 
-fn closure_toolchain_lines(toolchain: &Layer0ToolchainIdentity) -> ClosureToolchainLines<'_> {
+fn closure_toolchain_lines(
+    toolchain: &CrashPointReplayToolchainIdentity,
+) -> ClosureToolchainLines<'_> {
     ClosureToolchainLines {
         rustc_version_lines: &toolchain.rustc_version_lines,
         cargo_version: &toolchain.cargo_version,
@@ -459,7 +481,7 @@ fn closure_toolchain_lines(toolchain: &Layer0ToolchainIdentity) -> ClosureToolch
 /// 同 [`judging_code_by_module_references_stopping_at`]。
 pub fn judging_code_of_the_judges(
     repository_root: &Path,
-    toolchain: &Layer0ToolchainIdentity,
+    toolchain: &CrashPointReplayToolchainIdentity,
 ) -> Result<JudgingCode, JudgingCodeError> {
     let stop_files: Vec<&str> = JUDGE_CLOSURE_STOP_FILES
         .iter()
@@ -480,7 +502,7 @@ pub fn judging_code_of_the_judges(
 pub fn judging_code_by_module_references(
     repository_root: &Path,
     entry_files: &[&str],
-    toolchain: &Layer0ToolchainIdentity,
+    toolchain: &CrashPointReplayToolchainIdentity,
 ) -> Result<JudgingCode, JudgingCodeError> {
     judging_code_by_module_references_stopping_at(repository_root, entry_files, &[], toolchain)
 }
@@ -496,7 +518,7 @@ pub fn judging_code_by_module_references_stopping_at(
     repository_root: &Path,
     entry_files: &[&str],
     stop_files: &[&str],
-    toolchain: &Layer0ToolchainIdentity,
+    toolchain: &CrashPointReplayToolchainIdentity,
 ) -> Result<JudgingCode, JudgingCodeError> {
     ClosureTreeReader::new(repository_root)?.judging_code_stopping_at(
         entry_files,
@@ -613,7 +635,7 @@ impl ConclusionVersionRequest<'_> {
     fn version_of_code(
         &self,
         code_digest: &[u8; DIGEST_BYTES],
-        toolchain: &Layer0ToolchainIdentity,
+        toolchain: &CrashPointReplayToolchainIdentity,
     ) -> ConclusionVersion {
         let extra_inputs = match self {
             Self::GpuJudge | Self::CpuJudge { .. } => "-".to_string(),
@@ -667,7 +689,7 @@ pub fn conclusion_code_digest_table_from_the_tree(
 pub fn conclusion_version_from_the_tree(
     repository_root: &Path,
     request: &ConclusionVersionRequest<'_>,
-    toolchain: &Layer0ToolchainIdentity,
+    toolchain: &CrashPointReplayToolchainIdentity,
 ) -> Result<ConclusionVersion, JudgingCodeError> {
     let code = ClosureTreeReader::new(repository_root)?
         .conclusion_code(&request.code_entry().entry_files())?;
@@ -678,7 +700,7 @@ pub fn conclusion_version_from_the_tree(
 #[must_use]
 pub fn conclusion_version_compiled_in(
     request: &ConclusionVersionRequest<'_>,
-    toolchain: &Layer0ToolchainIdentity,
+    toolchain: &CrashPointReplayToolchainIdentity,
 ) -> Option<ConclusionVersion> {
     compiled_conclusion_code_digest_table()
         .digest_of_each_entry
@@ -721,7 +743,7 @@ impl ConclusionVersionCheck {
 pub fn conclusion_version_checked_against_the_build(
     repository_root: &Path,
     request: &ConclusionVersionRequest<'_>,
-    toolchain: &Layer0ToolchainIdentity,
+    toolchain: &CrashPointReplayToolchainIdentity,
 ) -> Result<ConclusionVersionCheck, JudgingCodeError> {
     let from_the_tree = conclusion_version_from_the_tree(repository_root, request, toolchain)?;
     Ok(match conclusion_version_compiled_in(request, toolchain) {
@@ -874,7 +896,7 @@ mod tests {
     fn the_judging_closure_of_the_judges_holds_recovery_the_checker_and_the_kernels_and_stops_before_the_pipeline(
     ) {
         let root = repository_root();
-        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
         let code = judging_code_of_the_judges(&root, &toolchain).expect("算得出");
         println!(
             "JUDGING_CODE entry=judges files={} raw={} stopped={} digest={}",
@@ -923,13 +945,23 @@ mod tests {
             "crates/singlefs-checker-tier/src/crash_amplification.rs",
             "crates/singlefs-checker-tier/src/verdict_store.rs",
             "crates/singlefs-checker-tier/src/crash_identity.rs",
-            "crates/singlefs-checker-tier/src/layer0_progress.rs",
+            "crates/singlefs-checker-tier/src/crash_point_replay_progress.rs",
+            "crates/singlefs-checker-tier/src/crash_library.rs",
+            "crates/singlefs-checker-tier/src/crash_state_enumeration.rs",
             "crates/singlefs-checker-tier/src/crash_verify_gpu.rs",
             "crates/singlefs-checker-tier/src/lib.rs",
             "crates/singlefs-core/src/lib.rs",
         ] {
             assert!(!has(excluded), "{excluded} 不判对错，不该在判器的闭包里");
         }
+        // 给定状态表的形态与它的 CPU 判法：GPU 判器要的（点名的被抛弃根、恢复自称的那一版）住在判器一侧的 `crash_judge_conclusions`，
+        // GPU 判器引这一份就把它连同它引的 `writable_mount_phases` 拉进判器闭包（批次 4-5 合入之后这三条用例红在这里）。断言消息里
+        // 「经 impl 头把 crash_amplification.rs 拉进闭包」是闭包算法只认条目级 `impl` 块之前的样子：那时流水线参数类型里的
+        // `impl FnOnce(&GivenStatesOfATable)` 被当成 `impl` 头；消息没跟着改，改它会换掉收 `crash_identity.rs` 的那几把结论版本
+        assert!(
+            !has("crates/singlefs-checker-tier/src/crash_given_states.rs"),
+            "crash_given_states.rs 是给定状态表的形态与 CPU 判法，判器不该引它（引它就经 impl 头把 crash_amplification.rs 拉进闭包）"
+        );
         let outside: Vec<&String> = code
             .files
             .iter()
@@ -972,7 +1004,7 @@ mod tests {
         "crates/singlefs-checker-tier/tests/crash_enumeration_tree_split_streams.rs",
     ];
 
-    /// 判定只随判器变：在仓副本里给流水线五份、身份、核对、crate 根各加一条真语句，今天的判法摘要不动、三种结论的版本也一把都不动；
+    /// 判定只随判器变：在仓副本里给流水线那几份、身份、核对、crate 根各加一条真语句，今天的判法摘要不动、三种结论的版本也一把都不动；
     /// 给 CPU 判器、GPU 判器、它的输入表、恢复、取前缀核、池级 checker 走树各加一条，今天的判法摘要变；一份内核原文改一个字节也变。
     /// 三种结论各一把版本（第三轮判决 J8）：改只在 GPU 判器闭包里的文件只换 GPU 版本；改一份设点文件只换它那把 CPU 版本（GPU 版本、
     /// 另一份设点文件的 CPU 版本、观察者版本不动）；改观察者代码只换观察者版本；CPU 与 GPU 两边都收的文件（恢复、走树）两把都换。
@@ -993,7 +1025,7 @@ mod tests {
             "pub fn observed_states_probe(states: u64) -> u64 {\n    states\n}\n",
         )
         .expect("副本里写得了观察者代码");
-        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
         let observer_name = ObserverName::new("judging_contract_probe").expect("名字非空、不长");
         let requests = [
             ConclusionVersionRequest::GpuJudge,
@@ -1073,7 +1105,7 @@ mod tests {
         for unchanged in [
             "crates/singlefs-checker-tier/src/crash_amplification.rs",
             "crates/singlefs-checker-tier/src/verdict_store.rs",
-            "crates/singlefs-checker-tier/src/layer0_progress.rs",
+            "crates/singlefs-checker-tier/src/crash_point_replay_progress.rs",
             "crates/singlefs-checker-tier/src/crash_verify_gpu.rs",
             "crates/singlefs-checker-tier/src/crash_judge_dispatch.rs",
             "crates/singlefs-checker-tier/src/gpu_unit_checks.rs",
@@ -1132,7 +1164,7 @@ mod tests {
             [true, false, false, false],
         );
         // 改结论的几处搬进判器一侧（第三轮判决 J8、正文 H8）：红项编码、恢复字与失败点码表、计数向量在 `crash_judge_conclusions.rs`，
-        // 两个判器的闭包都收它（CPU 判器经 `Layer0StateJudgement` 的 `impl` 头，GPU 判器 `use` 它），改一个字 GPU 与每份设点文件的 CPU 版本都换；
+        // 两个判器的闭包都收它（CPU 判器经 `CrashStateJudgement` 的 `impl` 头，GPU 判器 `use` 它），改一个字 GPU 与每份设点文件的 CPU 版本都换；
         // GPU 结论换红项、GPU 恢复字的换法在 `crash_judge_gpu.rs`（上面只换 GPU 那一把的那一组）。
         for in_both_judges in [
             "crates/singlefs-checker-tier/src/crash_judge_conclusions.rs",
@@ -1163,13 +1195,13 @@ mod tests {
         std::fs::remove_dir_all(&copy).expect("删得掉副本");
     }
 
-    /// 从七份设点文件出发的结论闭包都停在流水线五份门外（攻方模型那一行 `crash_amplification.rs=1` 变 0）；只按判器的停止表停时
-    /// 五份里不在判器停止表的每一份都被某份设点文件引到（停止表每一条都真的拦到了，不是死条目）；GPU 与 CPU 判器的结论闭包
+    /// 从七份设点文件出发的结论闭包都停在流水线那几份门外（攻方模型那一行 `crash_amplification.rs=1` 变 0）；只按判器的停止表停时
+    /// 流水线那几份里不在判器停止表的每一份都被某份设点文件引到（停止表每一条都真的拦到了，不是死条目）；GPU 与 CPU 判器的结论闭包
     /// 停下的只在判器的停止表里（判器自己引不到流水线）。
     #[test]
-    fn the_conclusion_closures_from_every_setting_file_stop_before_the_five_pipeline_files() {
+    fn the_conclusion_closures_from_every_setting_file_stop_before_the_pipeline_files() {
         let root = repository_root();
-        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
         let mut reader = ClosureTreeReader::new(&root).expect("读得了树");
         let judge_stop_files: Vec<&str> = JUDGE_CLOSURE_STOP_FILES
             .iter()
@@ -1227,7 +1259,7 @@ mod tests {
     #[test]
     fn the_conclusion_code_digest_table_compiled_in_equals_the_one_computed_from_the_tree() {
         let root = repository_root();
-        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
         let compiled_in = compiled_conclusion_code_digest_table();
         let from_the_tree = conclusion_code_digest_table_from_the_tree(&root).expect("算得出");
         println!(
@@ -1282,7 +1314,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&copy);
         copy_tree(&root.join("crates"), &copy.join("crates"));
         std::fs::copy(root.join("Cargo.lock"), copy.join("Cargo.lock")).expect("拷得了 Cargo.lock");
-        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
         let request = ConclusionVersionRequest::CpuJudge {
             setting_file: SETTING_FILES[1],
         };
@@ -1399,7 +1431,7 @@ mod tests {
     #[test]
     fn conclusion_versions_of_different_kinds_never_coincide_and_follow_the_toolchain() {
         let code_digest = [5; DIGEST_BYTES];
-        let toolchain = Layer0ToolchainIdentity {
+        let toolchain = CrashPointReplayToolchainIdentity {
             rustc_version_lines: "rustc 0.0.0-probe".to_string(),
             cargo_version: "cargo 0.0.0-probe".to_string(),
             target_triple: "x86_64-probe".to_string(),
@@ -1424,7 +1456,7 @@ mod tests {
             versions.len(),
             "三种结论、两份另读输入，四把版本两两不同：{versions:?}"
         );
-        let other_toolchain = Layer0ToolchainIdentity {
+        let other_toolchain = CrashPointReplayToolchainIdentity {
             rustc_version_lines: "rustc 0.0.0-probe".to_string(),
             cargo_version: "cargo 0.0.1-probe".to_string(),
             target_triple: "x86_64-probe".to_string(),
@@ -1508,7 +1540,7 @@ mod tests {
             std::fs::create_dir_all(path.parent().expect("文件有上层")).expect("建得了目录");
             std::fs::write(&path, contents).expect("写得了小仓的文件");
         }
-        let toolchain = Layer0ToolchainIdentity {
+        let toolchain = CrashPointReplayToolchainIdentity {
             rustc_version_lines: "rustc 0.0.0-probe\nbinary: rustc\ncommit-hash: probe".to_string(),
             cargo_version: "cargo 0.0.0-probe".to_string(),
             target_triple: "x86_64-probe".to_string(),
@@ -1595,7 +1627,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&copy);
         copy_tree(&root.join("crates"), &copy.join("crates"));
         std::fs::copy(root.join("Cargo.lock"), copy.join("Cargo.lock")).expect("拷得了 Cargo.lock");
-        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
         let entry =
             "crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs";
         let original =
@@ -1686,7 +1718,7 @@ mod tests {
     fn every_registered_crash_case_depends_on_recovery_and_the_checker_walk_but_not_on_apparatus_binaries(
     ) {
         let root = repository_root();
-        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
         let targets = match crash_case_registration_under(&root) {
             CrashCaseRegistration::Registered { targets } => targets,
             CrashCaseRegistration::RegistryAbsent { looked_at } => {
@@ -1837,7 +1869,7 @@ mod tests {
         let root = repository_where_the_second_file_in_the_closure_references_the_random_history_through_a_library_module(
             "unregistered",
         );
-        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
         let registered_for_another_case = [RandomHistoryThroughALibraryModuleAllowed {
             test_target: "another_case",
             library_module: LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY,
@@ -1877,7 +1909,7 @@ mod tests {
         let root = repository_where_the_second_file_in_the_closure_references_the_random_history_through_a_library_module(
             "registered",
         );
-        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
         let registered_for_this_case = [RandomHistoryThroughALibraryModuleAllowed {
             test_target: "probe_case",
             library_module: LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY,

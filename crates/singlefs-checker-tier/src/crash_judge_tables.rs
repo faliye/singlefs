@@ -19,9 +19,10 @@ use singlefs_core::recovery::PoolReader;
 use singlefs_core::root_ring::region_start;
 use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_format::{
-    DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, JOURNAL_HEADER_BYTES, JOURNAL_RECORD_BYTES,
-    JOURNAL_RING_START_SLOT, NODE_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES, ROOT_RECORD_BYTES,
-    ROOT_RING_REGIONS, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
+    DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
+    JOURNAL_HEADER_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, NODE_BYTES,
+    NONCE_MAC_ALGORITHM_RESERVED_BYTES, ROOT_RECORD_BYTES, ROOT_RING_REGIONS, SLOT_BYTES,
+    SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
 use singlefs_harness::memory_pool::{
     publishes_in, root_identity_of_write, MemoryPool, PublishedVersion,
@@ -31,20 +32,26 @@ use singlefs_harness::memory_pool::{
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
+use crate::crash_judge_conclusions::ClaimedVersionOfAGivenState;
+
 use crate::crash::{
-    layer0_enumeration_tables, reuse_is_not_proven_illegal_by_the_reclaim_predicate,
-    Layer0EnumerationTables, Layer0SegmentExpansion, Layer0VersionTable,
+    crash_state_enumeration_tables_with_slices, no_segment_slices,
+    reuse_is_not_proven_illegal_by_the_reclaim_predicate, CrashPointReplaySegmentExpansion,
+    CrashPointReplaySegmentSlice, CrashPointReplayVersionTable, CrashStateEnumerationTables,
 };
 use crate::crash_facts::{
+    check_the_slice_starts_against_the_expansions,
     persisted_writes_of_state_by_the_segment_expansions, segment_expansion_facts,
-    SegmentExpansionFact, SegmentFact, TornImageFact, MAXIMUM_ENUMERATED_WRITES,
+    segment_facts_of_the_tables, SegmentExpansionFact, SegmentFact, TornImageFact,
+    MAXIMUM_ENUMERATED_WRITES,
 };
 
 /// 表的形态版本：落点、版本、检查字或发布表的布局变了就抬它（4：版本表最前面两条全零单元、落点第 9–11 字记它之后没写过的槽，
 /// [`ZERO_UNIT_VERSIONS`]；5：期望版本表第 5 字记这一版有没有文件，[`EXPECTED_VERSION_WITHOUT_A_FILE`]；6：版本表每条多一个第 8 字，
 /// [`VERSION_WORD_CRC_SHIFTED_PAST_SIXTEEN_ZERO_KIBIBYTES`]；7：段表每条 [`SEGMENT_WORDS`] 个字、带段的展开方式与甲二那一组单元写，
-/// 多一张点名的持久掩码表（[`JudgeStateSource::GivenPersistedSets`]））。
-pub const JUDGE_TABLES_VERSION: u32 = 7;
+/// 多一张点名的持久掩码表（[`JudgeStateSource::GivenPersistedSets`]）；8：段表每条多两个字，分片的段的片起点各位接在段写表里，C790；
+/// 9：给定状态表多一张逐状态恢复自称的那一版的表，[`CLAIMED_VERSION_WORDS`]）。
+pub const JUDGE_TABLES_VERSION: u32 = 9;
 
 /// 一个落点最多被几次写盖住：GPU 内核里组合掩码是两个 u32（版本表里一个版本的第 0 字是低 32 位、第 7 字是高 32 位）。
 /// 错位复用那条历史把系统配置 0 号槽写了 34 次，32 位装不下。
@@ -154,7 +161,7 @@ pub struct JudgePublish {
     pub unit_copy_groups: Vec<Vec<u32>>,
 }
 
-/// 期望版本表里的一版：有文件（读回的要是 `chunks` 那几个单元），还是文件从这一版起没有了（`crash::Layer0VersionTable` 的两样，
+/// 期望版本表里的一版：有文件（读回的要是 `chunks` 那几个单元），还是文件从这一版起没有了（`crash::CrashPointReplayVersionTable` 的两样，
 /// D8（核心索引结构） 已定项 16 第 4 条）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FileOfTheExpectedVersion {
@@ -189,7 +196,8 @@ pub struct JudgeTables {
     /// 池里的盘，按 `PoolReader::device_identities` 的次序。
     pub devices: Vec<u32>,
     pub device_bytes: u64,
-    /// 单元区起点（字节）：基线第一块盘系统配置槽 0 记的几何。单元区里没有落点的 16 KiB 槽每个崩溃状态都是全零（[`ZERO_UNIT_VERSIONS`]）。
+    /// 单元区起点（字节）：基线里择出的那一份系统配置记的几何（[`system_configuration_the_locations_are_laid_out_by`]）。单元区里没有落点的
+    /// 16 KiB 槽每个崩溃状态都是全零（[`ZERO_UNIT_VERSIONS`]）。
     pub unit_area_start_in_bytes: u64,
     pub judged_root_index: u32,
     pub writes: Vec<JudgeWrite>,
@@ -205,8 +213,12 @@ pub enum JudgeStateSource {
     /// 序号按段展开拆成持久掩码（[`JudgeTables::segment_expansions`]），状态数是各段展开出来的加最后全部持久那一个。
     SegmentExpansions,
     /// 给定状态表（判决 `research/prompts/m3-crash-enumeration-merge-r2-main-verification.md` 第二节 L6-3：随机历史两项上 GPU 要的那一种展开）：
-    /// 第 k 个状态就是第 k 个持久掩码（按枚举写表给，每个与枚举写表一样长），状态数是清单的长度。
-    GivenPersistedSets(Vec<Vec<bool>>),
+    /// 第 k 个状态就是第 k 个持久掩码（按枚举写表给，每个与枚举写表一样长），状态数是清单的长度；`claimed_versions` 与它逐个对应，
+    /// 是第 k 个状态那一栏恢复自称的那一版（恢复内核记录核对器第二条判据照它取那一版，D13（验证路线） 已定项 7 第二截）。
+    GivenPersistedSets {
+        persisted_sets: Vec<Vec<bool>>,
+        claimed_versions: Vec<ClaimedVersionOfAGivenState>,
+    },
 }
 
 /// 建表要的一条流（与 `crash_amplification::CrashFlow` 同一组东西，不带崩溃点）。
@@ -216,13 +228,13 @@ pub struct JudgeFlow<'flow> {
     pub segments: &'flow [Vec<usize>],
     pub judged_root_index: usize,
     pub versions: &'flow [PublishedVersion],
-    pub expansion: &'flow dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    pub expansion: &'flow dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
 }
 
 /// 建表时撞上的、GPU 判不了的形态。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum JudgeTablesRefusal {
-    /// 基线里第一块盘的系统配置槽 0 解不开：落点几何无从取。
+    /// 基线里每块盘的两个系统配置槽都解不开（[`system_configuration_the_locations_are_laid_out_by`] 一份都找不到）：落点几何无从取。
     BaseSystemConfigurationUnreadable,
     /// 枚举写表里有清零写：清零的范围可以横跨几千个槽，落点模型不接它。
     ZeroFillInTheEnumeratedWrites { write_index: usize },
@@ -240,7 +252,8 @@ pub enum JudgeTablesRefusal {
     WriteOutsideEverySegment { write_index: usize },
     /// 枚举写表的写多于内核持久掩码的宽（[`MAXIMUM_ENUMERATED_WRITES`]）：掩码表满了。
     EnumeratedWritesPastTheMaskWidth { enumerated_writes: usize },
-    /// 一段按它的展开方式展开出的状态数装不进 u64（段内序号拆不开），或与它的序号区间对不上：段表核段长没过。
+    /// 一段按它的展开方式展开出的状态数装不进 u64（段内序号拆不开），或与它的序号区间对不上：段表核段长没过；分片的段是片起点与它的
+    /// 各位对不上，或片越过了段的域（`crate::crash_facts::check_the_slice_starts_against_the_expansions`）。
     SegmentStateCountNotRepresentable { segment_index: usize },
     /// 打包之后这张表的起点或长度装不进目录的 u32：这张表满了（[`JudgeTablesWords::every_table_name`] 里的名字）。
     PackedTablePastThirtyTwoBitOffsets {
@@ -266,7 +279,7 @@ fn slot_bytes() -> u64 {
     SLOT_BYTES
 }
 
-/// 一次写每个扇区的落地：与层 0 一致（0 没持久、1 撕裂、2 持久）。
+/// 一次写每个扇区的落地：与崩溃点重放一致（0 没持久、1 撕裂、2 持久）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Landing {
     NotPersisted,
@@ -292,10 +305,30 @@ pub fn build_judge_tables(flow: &JudgeFlow<'_>) -> Result<JudgeTables, JudgeTabl
 /// [`JudgeTablesRefusal`] 的各成员。
 ///
 /// # Panics
-/// 枚举写表里的写越过盘尾；同一个根既在 `flow.versions` 里又在 `versions_without_a_file` 里（[`Layer0VersionTable::new`]）。
+/// 枚举写表里的写越过盘尾；同一个根既在 `flow.versions` 里又在 `versions_without_a_file` 里（[`CrashPointReplayVersionTable::new`]）。
 pub fn build_judge_tables_against_the_version_table(
     flow: &JudgeFlow<'_>,
     versions_without_a_file: &[PublishedVersionWithoutAFile],
+) -> Result<JudgeTables, JudgeTablesRefusal> {
+    build_judge_tables_against_the_version_table_with_slices(
+        flow,
+        versions_without_a_file,
+        &no_segment_slices(flow.segments.len()),
+    )
+}
+
+/// 同 [`build_judge_tables_against_the_version_table`]，分片的段照 `segment_slices`（与段同序，C790）：段表里它的序号区间是片长、
+/// 带片起点拆成的各位（内核从那几位起加片内序号、逐位进位）。
+///
+/// # Errors
+/// 同 [`build_judge_tables_against_the_version_table`]。
+///
+/// # Panics
+/// 同 [`build_judge_tables_against_the_version_table`]；片越过了段的域（`crate::crash` 建计划时停下）。
+pub fn build_judge_tables_against_the_version_table_with_slices(
+    flow: &JudgeFlow<'_>,
+    versions_without_a_file: &[PublishedVersionWithoutAFile],
+    segment_slices: &[Option<CrashPointReplaySegmentSlice>],
 ) -> Result<JudgeTables, JudgeTablesRefusal> {
     build_judge_tables_from_the_state_source(
         flow,
@@ -303,13 +336,14 @@ pub fn build_judge_tables_against_the_version_table(
         JudgeStateSource::SegmentExpansions,
         &[],
         PublishesSplitFrom::TheEnumeratedWrites,
+        segment_slices,
     )
 }
 
 /// GPU 的发布表从哪一张写表分（[`judge_publishes`]）：与同一批状态上 CPU 记录核对器拿到的那一张相同。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PublishesSplitFrom {
-    /// 枚举写表（录制流接撕裂镜像与重放）：层 0 的 CPU 记录核对器（`crash::check_records`）拿的就是它。
+    /// 枚举写表（录制流接撕裂镜像与重放）：崩溃点重放的 CPU 记录核对器（`crash::check_records`）拿的就是它。
     TheEnumeratedWrites,
     /// 只取录制流：随机历史的 CPU 记录核对器（`crash_injection::judge_a_given_state_on_the_cpu`）拿的写表不带撕裂镜像与重放。
     /// 枚举写表接在后面的撕裂根槽写分不出另一次发布：mkfs 的根槽写叠在 mkfs 之后的基线上（创世发布进记录核对器，用户 2026-10-10 定），
@@ -319,7 +353,7 @@ enum PublishesSplitFrom {
 
 /// 给定状态表（[`JudgeStateSource::GivenPersistedSets`]）：GPU 判 `given_persisted_sets` 里的每一个持久掩码（按枚举写表给，第 k 个是序号 k 的状态），
 /// 不按段展开拆序号。落点的版本只取这几个掩码叠得出来的那几种；枚举写表照 `flow` 的段建（撕裂镜像与重放接在哪由段定）。
-/// 期望版本表同 [`build_judge_tables_against_the_version_table`]。发布表与层 0 一样从枚举写表分（掩码可以点名撕裂态，对的是层 0 的 CPU 判器）。
+/// 期望版本表同 [`build_judge_tables_against_the_version_table`]。发布表与崩溃点重放一样从枚举写表分（掩码可以点名撕裂态，对的是崩溃点重放的 CPU 判器）。
 ///
 /// # Errors
 /// [`JudgeTablesRefusal`] 的各成员；掩码与枚举写表不一样长是 [`JudgeTablesRefusal::GivenPersistedSetOfAnotherLength`]。
@@ -331,12 +365,20 @@ pub fn build_judge_tables_for_the_given_persisted_sets(
     versions_without_a_file: &[PublishedVersionWithoutAFile],
     given_persisted_sets: Vec<Vec<bool>>,
 ) -> Result<JudgeTables, JudgeTablesRefusal> {
+    let claimed_versions = vec![
+        ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery;
+        given_persisted_sets.len()
+    ];
     build_judge_tables_from_the_state_source(
         flow,
         versions_without_a_file,
-        JudgeStateSource::GivenPersistedSets(given_persisted_sets),
+        JudgeStateSource::GivenPersistedSets {
+            persisted_sets: given_persisted_sets,
+            claimed_versions,
+        },
         &[],
         PublishesSplitFrom::TheEnumeratedWrites,
+        &no_segment_slices(flow.segments.len()),
     )
 }
 
@@ -362,35 +404,84 @@ pub fn build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams(
     given_persisted_sets: Vec<Vec<bool>>,
     seams: &[RecordStreamSeam],
 ) -> Result<JudgeTables, JudgeTablesRefusal> {
+    let claimed_versions = vec![
+        ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery;
+        given_persisted_sets.len()
+    ];
+    build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams_with_their_claimed_versions(
+        flow,
+        versions_without_a_file,
+        given_persisted_sets,
+        &claimed_versions,
+        seams,
+    )
+}
+
+/// 同 [`build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams`]，每个状态另带那一栏恢复自称的那一版（`claimed_versions`，
+/// 与 `given_persisted_sets` 逐个对应；崩溃注入第二截那张表里挂载之后的池那个状态写挂载与那次发布写出的最新那条根）：进判表
+/// （[`JudgeStateSource::GivenPersistedSets`] 的 `claimed_versions`，打包成 `claimed_versions` 那一张），恢复内核照它判第二条判据。
+///
+/// # Errors
+/// 同 [`build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams`]。
+///
+/// # Panics
+/// 同 [`build_judge_tables_against_the_version_table`]；`claimed_versions` 与 `given_persisted_sets` 不一样长（建表的一方写错了）。
+pub fn build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams_with_their_claimed_versions(
+    flow: &JudgeFlow<'_>,
+    versions_without_a_file: &[PublishedVersionWithoutAFile],
+    given_persisted_sets: Vec<Vec<bool>>,
+    claimed_versions: &[ClaimedVersionOfAGivenState],
+    seams: &[RecordStreamSeam],
+) -> Result<JudgeTables, JudgeTablesRefusal> {
+    assert_eq!(
+        claimed_versions.len(),
+        given_persisted_sets.len(),
+        "恢复自称的那一版那一栏与持久掩码逐个对应"
+    );
     build_judge_tables_from_the_state_source(
         flow,
         versions_without_a_file,
-        JudgeStateSource::GivenPersistedSets(given_persisted_sets),
+        JudgeStateSource::GivenPersistedSets {
+            persisted_sets: given_persisted_sets,
+            claimed_versions: claimed_versions.to_vec(),
+        },
         seams,
         PublishesSplitFrom::TheRecordedWritesOnly,
+        &no_segment_slices(flow.segments.len()),
     )
 }
 
 /// `seams_of_the_given_sets` 只在给定状态表上可以不空（[`build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams`]）；
-/// 按段展开那一路恒给空表（层 0 的流是一条录制流）。`publishes_split_from` 说发布表从哪一张写表分（[`PublishesSplitFrom`]）。
+/// 按段展开那一路恒给空表（崩溃点重放的流是一条录制流）。`publishes_split_from` 说发布表从哪一张写表分（[`PublishesSplitFrom`]）。
+/// `segment_slices` 与段同序（分片的段，C790）；给定状态表那两路恒不分片。
 fn build_judge_tables_from_the_state_source(
     flow: &JudgeFlow<'_>,
     versions_without_a_file: &[PublishedVersionWithoutAFile],
     state_source: JudgeStateSource,
     seams_of_the_given_sets: &[RecordStreamSeam],
     publishes_split_from: PublishesSplitFrom,
+    segment_slices: &[Option<CrashPointReplaySegmentSlice>],
 ) -> Result<JudgeTables, JudgeTablesRefusal> {
     let _version_table_without_contradictions =
-        Layer0VersionTable::new(flow.versions, versions_without_a_file);
-    let tables: Layer0EnumerationTables =
-        layer0_enumeration_tables(flow.base, flow.writes, flow.segments, flow.expansion);
+        CrashPointReplayVersionTable::new(flow.versions, versions_without_a_file);
+    let tables: CrashStateEnumerationTables = crash_state_enumeration_tables_with_slices(
+        flow.base,
+        flow.writes,
+        flow.segments,
+        flow.expansion,
+        segment_slices,
+    );
     let enumerated = &tables.enumerated_writes;
     if enumerated.len() > MAXIMUM_ENUMERATED_WRITES {
         return Err(JudgeTablesRefusal::EnumeratedWritesPastTheMaskWidth {
             enumerated_writes: enumerated.len(),
         });
     }
-    if let JudgeStateSource::GivenPersistedSets(given_persisted_sets) = &state_source {
+    if let JudgeStateSource::GivenPersistedSets {
+        persisted_sets: given_persisted_sets,
+        claimed_versions: _,
+    } = &state_source
+    {
         if let Some((position, persisted)) = given_persisted_sets
             .iter()
             .enumerate()
@@ -418,7 +509,7 @@ fn build_judge_tables_from_the_state_source(
         .base
         .device_size_in_bytes(flow.base.device_identities()[0])
         .expect("池里第一块盘说得出字节数");
-    let geometry = base_geometry(flow.base, devices[0])?;
+    let geometry = base_geometry(flow.base)?;
     let mut locations =
         enumerate_locations(flow.base, enumerated, &devices, device_bytes, &geometry);
     locations.sort_by_key(|location| (location.device, location.offset));
@@ -485,9 +576,10 @@ fn build_judge_tables_from_the_state_source(
                 &expanded_segments,
                 location,
             )?,
-            JudgeStateSource::GivenPersistedSets(given_persisted_sets) => {
-                combinations_of_the_given_persisted_sets(location, given_persisted_sets)?
-            }
+            JudgeStateSource::GivenPersistedSets {
+                persisted_sets: given_persisted_sets,
+                claimed_versions: _,
+            } => combinations_of_the_given_persisted_sets(location, given_persisted_sets)?,
         };
         push_the_versions_of_the_combinations(flow.base, enumerated, location, combinations);
     }
@@ -522,34 +614,35 @@ fn build_judge_tables_from_the_state_source(
                 }),
         )
         .collect();
-    let segments: Vec<SegmentFact> = flow
-        .segments
-        .iter()
-        .zip(&tables.state_ranges_by_segment)
-        .map(|(segment, states)| SegmentFact {
-            writes: segment
-                .iter()
-                .map(|write| u32::try_from(*write).expect("下标装得进 u32"))
-                .collect(),
-            states: states.clone(),
-        })
-        .collect();
+    let segments: Vec<SegmentFact> =
+        segment_facts_of_the_tables(flow.writes, flow.segments, flow.expansion, &tables);
     let segment_expansions = segment_expansion_facts(flow.writes, flow.segments, flow.expansion);
-    // 核段长：每段按它的展开方式现算的状态数装得进 u64、与它的序号区间相同（内核按这一份拆满 64 位的段内序号）
+    // 核段长：不分片的段按它的展开方式现算的状态数装得进 u64、与它的序号区间相同（内核按这一份拆满 64 位的段内序号）；
+    // 分片的段核片起点与它的各位对得上、片没越过段的域（内核从片起点的各位起加片内序号）
     for (segment_index, (segment, expansion)) in
         segments.iter().zip(&segment_expansions).enumerate()
     {
-        if expansion.state_count(segment, &tables.is_tearable_by_write)
-            != Some(segment.states.end - segment.states.start)
+        if segment.slice_start.is_none()
+            && expansion.state_count(segment, &tables.is_tearable_by_write)
+                != Some(segment.states.end - segment.states.start)
         {
             return Err(JudgeTablesRefusal::SegmentStateCountNotRepresentable { segment_index });
         }
     }
+    check_the_slice_starts_against_the_expansions(
+        &segments,
+        &segment_expansions,
+        &tables.is_tearable_by_write,
+    )
+    .map_err(
+        |segment_index| JudgeTablesRefusal::SegmentStateCountNotRepresentable { segment_index },
+    )?;
     let state_count = match &state_source {
         JudgeStateSource::SegmentExpansions => tables.state_count,
-        JudgeStateSource::GivenPersistedSets(given_persisted_sets) => {
-            u64::try_from(given_persisted_sets.len()).expect("清单长装得进 u64")
-        }
+        JudgeStateSource::GivenPersistedSets {
+            persisted_sets: given_persisted_sets,
+            claimed_versions: _,
+        } => u64::try_from(given_persisted_sets.len()).expect("清单长装得进 u64"),
     };
     let judge_tables = JudgeTables {
         recorded_write_count: u32::try_from(flow.writes.len()).expect("写数装得进 u32"),
@@ -590,7 +683,7 @@ fn build_judge_tables_from_the_state_source(
     Ok(judge_tables)
 }
 
-/// 基线里第一块盘系统配置槽 0 记的几何：落点从它来。
+/// 基线里择出的那一份系统配置记的几何（[`system_configuration_the_locations_are_laid_out_by`]）：落点从它来。
 struct BaseGeometry {
     fixed_structure_slot_spacing: u64,
     physical_block_size: u64,
@@ -600,18 +693,60 @@ struct BaseGeometry {
     unit_area_start_slot: u64,
 }
 
-fn base_geometry(base: &MemoryPool, first_device: u32) -> Result<BaseGeometry, JudgeTablesRefusal> {
+/// 基线里 `device` 上偏移 `offset` 那一个系统配置槽自证得过（`SystemConfiguration::parse_slot` 交 Ok）时解出的那一份；读不出、解不开交 None。
+fn self_verified_system_configuration_slot_at(
+    base: &MemoryPool,
+    device: singlefs_core::address::DeviceIdentity,
+    offset: u64,
+) -> Option<SystemConfiguration> {
     let slot_bytes_of_system_configuration =
         usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     let bytes = PoolReader::read(
         base,
-        singlefs_core::address::DeviceIdentity(first_device),
-        DeviceOffsetInBytes(0),
+        device,
+        DeviceOffsetInBytes(offset),
         slot_bytes_of_system_configuration,
-    )
-    .ok_or(JudgeTablesRefusal::BaseSystemConfigurationUnreadable)?;
-    let system_configuration = SystemConfiguration::parse_slot(&bytes)
-        .map_err(|_refusal| JudgeTablesRefusal::BaseSystemConfigurationUnreadable)?;
+    )?;
+    SystemConfiguration::parse_slot(&bytes).ok()
+}
+
+/// 落点几何取基线里哪一份系统配置：照恢复择系统配置的找法（`singlefs_core::recovery::choose_system_configuration`）在每块盘的两个槽里找，
+/// 取第一份自证得过的；一份都没有才交 None。CPU 恢复与池级 checker 判得了的镜像（一块盘两槽全废、或每块盘的槽 0 都抹掉而槽 1 在），
+/// GPU 判表照样建得出。次序：先按池里盘的次序读每块盘的槽 0；全池没有一个槽 0 自证得过时槽距无处可读，按池里盘的次序在格式允许的每一档槽距
+/// （不小于 [`FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES`]、扇区宽 [`SECTOR_BYTES`] 的整数倍、槽 1 整槽落在根环基址之前，同 core 的
+/// `slot_one_found_by_trying_every_slot_spacing_the_format_allows`）上各读一槽，只收自己记的槽距正好等于它所在偏移的那一槽。
+/// 几何那几样（槽距、根槽宽、每区槽数、区域盘、环长）是池级不可变字段，哪块盘哪一槽交出来都一样；这里只取几何，不判读者收不收那几个池级值
+/// （那一判在 GPU 恢复内核与池级 checker 内核里，与 CPU 同判）。
+fn system_configuration_the_locations_are_laid_out_by(
+    base: &MemoryPool,
+) -> Option<SystemConfiguration> {
+    let devices = PoolReader::device_identities(base);
+    if let Some(slot_zero) = devices
+        .iter()
+        .find_map(|device| self_verified_system_configuration_slot_at(base, *device, 0))
+    {
+        return Some(slot_zero);
+    }
+    let largest_spacing = region_start(0).0 - SYSTEM_CONFIGURATION_SLOT_BYTES;
+    let spacing_step = usize::try_from(SECTOR_BYTES).expect("512");
+    // 迭代上界：盘数 × 档数（(1 MiB − 4096 − 4096) ÷ 512 + 1 = 2033 档）；找到第一份就交回
+    devices.iter().find_map(|device| {
+        (FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES..=largest_spacing)
+            .step_by(spacing_step)
+            .find_map(|candidate_spacing| {
+                self_verified_system_configuration_slot_at(base, *device, candidate_spacing).filter(
+                    |slot_one| {
+                        u64::from(slot_one.immutable.sizes.fixed_structure_slot_spacing)
+                            == candidate_spacing
+                    },
+                )
+            })
+    })
+}
+
+fn base_geometry(base: &MemoryPool) -> Result<BaseGeometry, JudgeTablesRefusal> {
+    let system_configuration = system_configuration_the_locations_are_laid_out_by(base)
+        .ok_or(JudgeTablesRefusal::BaseSystemConfigurationUnreadable)?;
     let sizes = &system_configuration.immutable.sizes;
     Ok(BaseGeometry {
         fixed_structure_slot_spacing: u64::from(sizes.fixed_structure_slot_spacing),
@@ -627,6 +762,9 @@ fn base_geometry(base: &MemoryPool, first_device: u32) -> Result<BaseGeometry, J
 }
 
 /// 全部落点（还没填写与版本）：系统配置每盘两槽、根环全部槽、journal 环里基线或枚举写碰过的记录槽、单元区里基线或枚举写碰过的 16 KiB 槽。
+/// 只在池里的盘（`devices`）上建落点：系统配置记的区域盘可以不在池里（卸载掉电之后只剩一块盘的镜像，丢掉的那块住着根环的两个区域），
+/// CPU 的读者读那块盘交 None（`MemoryPool::read`，恢复与池级 checker 都当这一槽读不出），GPU 在那块盘上找不到落点、`read_at` 交没有版本的切片，
+/// 同一个结局；给那块盘建落点就要从基线读它的字节，读不出。
 fn enumerate_locations(
     base: &MemoryPool,
     enumerated: &[RetainedWrite],
@@ -637,7 +775,10 @@ fn enumerate_locations(
     let mut locations: Vec<JudgeLocation> = Vec::new();
     let mut starts: BTreeSet<(u32, u64)> = BTreeSet::new();
     let mut push = |device: u32, offset: u64, length: u64, kind: JudgeLocationKind| {
-        if offset + length > device_bytes || !starts.insert((device, offset)) {
+        if !devices.contains(&device)
+            || offset + length > device_bytes
+            || !starts.insert((device, offset))
+        {
             return;
         }
         locations.push(JudgeLocation {
@@ -736,7 +877,7 @@ struct ExtendedWriteOrigins {
 }
 
 impl ExtendedWriteOrigins {
-    fn of(tables: &Layer0EnumerationTables, recorded_write_count: usize) -> Self {
+    fn of(tables: &CrashStateEnumerationTables, recorded_write_count: usize) -> Self {
         let mut origin = BTreeMap::new();
         for torn in &tables.torn_images {
             origin.insert(torn.torn_image_index, (torn.write_index, None));
@@ -901,7 +1042,7 @@ fn push_the_versions_of_the_combinations(
         DeviceOffsetInBytes(location.offset),
         usize::try_from(location.length).expect("落点长度装得进 usize"),
     )
-    .expect("落点在盘内、按扇区对齐");
+    .expect("落点在池里的盘上（enumerate_locations 只给池里的盘建落点）、在盘内、按扇区对齐");
     let location_start = location.offset;
     let location_length = u64::from(location.length);
     for combination in combinations {
@@ -1280,7 +1421,10 @@ fn judge_publishes(
             );
             None
         }
-        JudgeStateSource::GivenPersistedSets(given_persisted_sets) => {
+        JudgeStateSource::GivenPersistedSets {
+            persisted_sets: given_persisted_sets,
+            claimed_versions: _,
+        } => {
             if seams_of_the_given_sets.is_empty() {
                 None
             } else {
@@ -1432,7 +1576,7 @@ fn expected_version_chunks(version: &PublishedVersion) -> ExpectedVersionChunks 
 }
 
 impl JudgeTables {
-    /// 序号 → 持久掩码：按段展开时与层 0、事实表同一套数字次序（每段照它的展开方式拆，
+    /// 序号 → 持久掩码：按段展开时与崩溃点重放、事实表同一套数字次序（每段照它的展开方式拆，
     /// `crate::crash_facts::persisted_writes_of_state_by_the_segment_expansions`）；给定状态表时是清单里的第 `ordinal` 个。
     ///
     /// # Panics
@@ -1452,9 +1596,10 @@ impl JudgeTables {
                     ordinal,
                 )
             }
-            JudgeStateSource::GivenPersistedSets(given_persisted_sets) => {
-                given_persisted_sets[usize::try_from(ordinal).expect("序号装得进 usize")].clone()
-            }
+            JudgeStateSource::GivenPersistedSets {
+                persisted_sets: given_persisted_sets,
+                claimed_versions: _,
+            } => given_persisted_sets[usize::try_from(ordinal).expect("序号装得进 usize")].clone(),
         }
     }
 
@@ -1608,7 +1753,9 @@ impl JudgeTables {
             }
         }
         // 段表每条 [`SEGMENT_WORDS`] 个字：数位那一组写的起点与条数、状态起点 lo/hi、状态终点 lo/hi、展开方式码（[`SegmentExpansionFact::code`]）、
-        // 整组落的单元写那一组的起点与条数（只有甲二段有）；两组合起来是段里全部的写，之前的段整段持久时两组都置
+        // 整组落的单元写那一组的起点与条数（只有甲二段有）；两组合起来是段里全部的写，之前的段整段持久时两组都置。
+        // 第 9、10 字是分片的段（C790）片起点拆成的各位在段写表里的起点与位数（一位一个字：单元写那一组那一位在前，再是数位那一组写各一位）；
+        // 不分片的段是 NONE 与 0
         let mut segments = Vec::new();
         let mut segment_writes = Vec::new();
         for (segment, expansion) in self.segments.iter().zip(&self.segment_expansions) {
@@ -1624,10 +1771,34 @@ impl JudgeTables {
             segments.push(index(segment_writes.len()));
             segments.push(index(copy_on_write_group.len()));
             segment_writes.extend(copy_on_write_group.iter().copied());
+            match &segment.slice_start {
+                None => segments.extend([NONE, 0]),
+                Some(slice_start) => {
+                    segments.push(index(segment_writes.len()));
+                    segments.push(index(slice_start.digits.len()));
+                    segment_writes.extend(slice_start.digits.iter().map(|digit| u32::from(*digit)));
+                }
+            }
         }
         // 给定状态表：每个状态 ⌈枚举写数 ÷ 32⌉ 个字的持久掩码（位 i 在第 i / 32 字的第 i % 32 位），按序号接；按段展开时这张表是空的
         let mut given_persisted_sets = Vec::new();
-        if let JudgeStateSource::GivenPersistedSets(sets) = &self.state_source {
+        // 给定状态表每个状态那一栏恢复自称的那一版，每个 [`CLAIMED_VERSION_WORDS`] 个字：码（[`CLAIMED_VERSION_LANDED_ON_BY_THE_CONSULTED_RECOVERY`]
+        // 一族）、实例代号、checkpoint_txg lo/hi（没写根的两种码后三个字是 NONE），按序号接；按段展开时这张表是空的
+        let mut claimed_versions = Vec::new();
+        if let JudgeStateSource::GivenPersistedSets {
+            persisted_sets: _,
+            claimed_versions: claimed_version_of_each_state,
+        } = &self.state_source
+        {
+            for claimed_version in claimed_version_of_each_state {
+                claimed_versions.extend(claimed_version_words(*claimed_version));
+            }
+        }
+        if let JudgeStateSource::GivenPersistedSets {
+            persisted_sets: sets,
+            claimed_versions: _,
+        } = &self.state_source
+        {
             let words_per_state = usize::try_from(self.enumerated_write_count)
                 .expect("装得进 usize")
                 .div_ceil(32);
@@ -1836,12 +2007,49 @@ impl JudgeTables {
             expected,
             chunks,
             given_persisted_sets,
+            claimed_versions,
         }
     }
 }
 
+/// 恢复自称的那一版那一张表每个状态几个字（布局写在 [`JudgeTables::words`] 填它的地方；内核里的同名常量由 `crate::crash_judge_gpu` 从这里生成）。
+pub const CLAIMED_VERSION_WORDS: usize = 4;
+/// 那一张表每个状态第 0 字的码：没写（取看 journal 那一遍落到的根）、写了而那一版没有根、写了一条根（第 1–3 字是它的实例代号与 checkpoint_txg lo/hi）。
+pub const CLAIMED_VERSION_LANDED_ON_BY_THE_CONSULTED_RECOVERY: u32 = 0;
+pub const CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITHOUT_A_ROOT: u32 = 1;
+pub const CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITH_A_ROOT: u32 = 2;
+
+/// 一个状态那一栏恢复自称的那一版在判表里的 [`CLAIMED_VERSION_WORDS`] 个字。
+fn claimed_version_words(
+    claimed_version: ClaimedVersionOfAGivenState,
+) -> [u32; CLAIMED_VERSION_WORDS] {
+    match claimed_version {
+        ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery => [
+            CLAIMED_VERSION_LANDED_ON_BY_THE_CONSULTED_RECOVERY,
+            NONE,
+            NONE,
+            NONE,
+        ],
+        ClaimedVersionOfAGivenState::NewestRootWrittenByTheMountAndItsPublish(None) => [
+            CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITHOUT_A_ROOT,
+            NONE,
+            NONE,
+            NONE,
+        ],
+        ClaimedVersionOfAGivenState::NewestRootWrittenByTheMountAndItsPublish(Some((
+            instance,
+            checkpoint_txg,
+        ))) => [
+            CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITH_A_ROOT,
+            instance.0,
+            u32::try_from(checkpoint_txg.0 & 0xFFFF_FFFF).expect("低 32 位"),
+            u32::try_from(checkpoint_txg.0 >> 32).expect("高 32 位"),
+        ],
+    }
+}
+
 /// 段表每条几个 u32（布局写在 [`JudgeTables::words`] 填它的地方；内核里的同名常量由 `crate::crash_judge_gpu` 从这里生成）。
-pub const SEGMENT_WORDS: usize = 9;
+pub const SEGMENT_WORDS: usize = 11;
 
 /// 表里「没有」的写法。
 pub const NONE: u32 = u32::MAX;
@@ -1927,6 +2135,8 @@ pub struct JudgeTablesWords {
     pub chunks: Vec<u32>,
     /// 给定状态表的持久掩码（[`JudgeStateSource::GivenPersistedSets`]）；按段展开时是空的，内核按它空不空认状态从哪来。
     pub given_persisted_sets: Vec<u32>,
+    /// 给定状态表每个状态那一栏恢复自称的那一版（[`CLAIMED_VERSION_WORDS`] 个字一个）；按段展开时是空的，内核按它空不空认要不要照它判第二条判据。
+    pub claimed_versions: Vec<u32>,
 }
 
 impl JudgeTablesWords {
@@ -1967,6 +2177,7 @@ impl JudgeTablesWords {
             "expected",
             "chunks",
             "given_persisted_sets",
+            "claimed_versions",
         ]
     }
 
@@ -1994,12 +2205,13 @@ impl JudgeTablesWords {
             &self.expected,
             &self.chunks,
             &self.given_persisted_sets,
+            &self.claimed_versions,
         ]
     }
 }
 
 /// 打包表里几张表（内核里的 `TABLE_COUNT` 由 `crate::crash_judge_gpu` 从这里生成）。
-pub const JUDGE_TABLE_COUNT: usize = 20;
+pub const JUDGE_TABLE_COUNT: usize = 21;
 
 /// 字节按小端 4 个一组装进 u32，末尾补 0。
 #[must_use]
@@ -2019,12 +2231,13 @@ pub fn bytes_to_words(bytes: &[u8]) -> Vec<u32> {
 
 #[cfg(test)]
 mod tests {
+    use super::build_judge_tables_for_the_given_persisted_sets;
     use super::{
-        build_judge_tables, crc_shifted_past_sixteen_zero_kibibytes, judge_publishes, JudgeFlow,
-        JudgeLocationKind, JudgePublish, JudgeStateSource, JudgeTables, JudgeTablesRefusal,
-        JudgeTablesWords, SEGMENT_WORDS,
+        build_judge_tables, crc_shifted_past_sixteen_zero_kibibytes, judge_publishes,
+        ClaimedVersionOfAGivenState, JudgeFlow, JudgeLocationKind, JudgePublish, JudgeStateSource,
+        JudgeTables, JudgeTablesRefusal, JudgeTablesWords, NONE, SEGMENT_WORDS,
     };
-    use crate::crash::Layer0SegmentExpansion;
+    use crate::crash::CrashPointReplaySegmentExpansion;
     use crate::crash_facts::{
         SegmentExpansionFact, SegmentFact,
         SEGMENT_EXPANSION_CODE_IN_PLACE_SUBSETS_WITH_COPY_ON_WRITE_NONE_OR_ALL,
@@ -2032,9 +2245,17 @@ mod tests {
     use singlefs_core::address::{
         CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
     };
+    use singlefs_core::block_device::PhysicalBlockSizeInBytes;
     use singlefs_core::checksum::crc32_castagnoli;
+    use singlefs_core::journal::slot_after_the_journal_ring;
+    use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
+    use singlefs_core::root_ring::RootRingSlotsPerRegion;
+    use singlefs_core::system_configuration::SystemImmutableSizes;
+    use singlefs_format::{
+        JOURNAL_RING_DEFAULT_BYTES, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
+    };
     use singlefs_harness::memory_pool::{
-        MemoryPool, RecordStreamSeam, RetainedWrite, WrittenContents,
+        MemoryPool, RecordStreamSeam, RetainedWrite, SparseBlockDevice, WrittenContents,
     };
     use singlefs_harness::segments::StepKind;
 
@@ -2073,6 +2294,7 @@ mod tests {
             SegmentFact {
                 writes: vec![2, 3, 4, 0, 1],
                 states: 0..7,
+                slice_start: None,
             },
             SegmentExpansionFact::InPlaceSubsetsWithCopyOnWriteNoneOrAll {
                 in_place_writes: vec![0, 1],
@@ -2094,7 +2316,9 @@ mod tests {
                 0,
                 SEGMENT_EXPANSION_CODE_IN_PLACE_SUBSETS_WITH_COPY_ON_WRITE_NONE_OR_ALL,
                 2,
-                3
+                3,
+                NONE,
+                0
             ]
         );
         assert_eq!(words.segment_writes, vec![0, 1, 2, 3, 4]);
@@ -2109,6 +2333,53 @@ mod tests {
         );
     }
 
+    /// 分片的段（C790）：段表第 9、10 字是片起点各位在段写表里的起点与位数，各位接在两组写之后（单元写那一组那一位在前）；
+    /// 判表按片起点加片内序号拆，与不分片时同一个段内编号拆出的相同。
+    #[test]
+    fn a_sliced_segment_lays_out_the_digits_of_its_slice_start_after_its_two_groups_of_writes() {
+        let expansion = SegmentExpansionFact::InPlaceSubsetsWithCopyOnWriteNoneOrAll {
+            in_place_writes: vec![0, 1],
+            copy_on_write_writes: vec![2, 3, 4],
+        };
+        let whole = tables_of_one_segment(
+            SegmentFact {
+                writes: vec![2, 3, 4, 0, 1],
+                states: 0..7,
+                slice_start: None,
+            },
+            expansion.clone(),
+            JudgeStateSource::SegmentExpansions,
+            8,
+        );
+        let sliced = tables_of_one_segment(
+            SegmentFact {
+                writes: vec![2, 3, 4, 0, 1],
+                states: 0..2,
+                slice_start: Some(crate::crash_facts::SegmentSliceStartFact::of(
+                    crate::crash::StateCount1280Bits::from_u64(5),
+                    &[2, 2, 2],
+                )),
+            },
+            expansion,
+            JudgeStateSource::SegmentExpansions,
+            3,
+        );
+        let words = sliced.words();
+        assert_eq!(words.segments[9..], [5, 3], "各位从段写表第 5 个字起、三位");
+        assert_eq!(
+            words.segment_writes,
+            vec![0, 1, 2, 3, 4, 1, 0, 1],
+            "5 = 1 + 2 × (0 + 2 × 1)：单元写那一位是 1，两次原地写那两位是 0、1"
+        );
+        for ordinal_within_the_slice in 0..2 {
+            assert_eq!(
+                sliced.persisted_writes_of_state(ordinal_within_the_slice),
+                whole.persisted_writes_of_state(5 + ordinal_within_the_slice),
+                "片内第 {ordinal_within_the_slice} 个"
+            );
+        }
+    }
+
     /// 给定状态表：每个状态 ⌈枚举写数 ÷ 32⌉ 个字的掩码按序号接；序号 k 的持久集合就是清单里第 k 个。
     #[test]
     fn given_persisted_sets_are_laid_out_one_mask_per_state_and_read_back_by_ordinal() {
@@ -2121,9 +2392,16 @@ mod tests {
             SegmentFact {
                 writes: vec![0, 1, 2, 3, 4],
                 states: 0..31,
+                slice_start: None,
             },
             SegmentExpansionFact::EveryProperSubset,
-            JudgeStateSource::GivenPersistedSets(vec![first.clone(), second.clone()]),
+            JudgeStateSource::GivenPersistedSets {
+                persisted_sets: vec![first.clone(), second.clone()],
+                claimed_versions: vec![
+                    ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery;
+                    2
+                ],
+            },
             2,
         );
         assert_eq!(
@@ -2160,8 +2438,9 @@ mod tests {
         let segments: Vec<Vec<usize>> = (0..writes.len())
             .map(|write_index| vec![write_index])
             .collect();
-        let expansion =
-            |_segment_index: usize, _segment: &[usize]| Layer0SegmentExpansion::NotExpanded;
+        let expansion = |_segment_index: usize, _segment: &[usize]| {
+            CrashPointReplaySegmentExpansion::NotExpanded
+        };
         let refusal = build_judge_tables(&JudgeFlow {
             base: &base,
             writes: &writes,
@@ -2220,7 +2499,10 @@ mod tests {
     fn the_publishes_of_given_persisted_sets_follow_where_the_crash_seam_is_put() {
         let writes = history_of_two_publishes_then_a_mount_of_one();
         let persisted = vec![true, true, true, true, true, false, false, false];
-        let state_source = JudgeStateSource::GivenPersistedSets(vec![persisted]);
+        let state_source = JudgeStateSource::GivenPersistedSets {
+            persisted_sets: vec![persisted],
+            claimed_versions: vec![ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery],
+        };
         let seam_at = |first_write_after_the_crash: usize| RecordStreamSeam::AfterACrash {
             first_write_after_the_crash,
             version_landed_on_after_the_crash: Some((InstanceGeneration(1), CheckpointTxg(1))),
@@ -2275,7 +2557,13 @@ mod tests {
         let refusal = judge_publishes(
             &writes,
             writes.len(),
-            &JudgeStateSource::GivenPersistedSets(vec![landed_on_the_first, landed_on_the_second]),
+            &JudgeStateSource::GivenPersistedSets {
+                persisted_sets: vec![landed_on_the_first, landed_on_the_second],
+                claimed_versions: vec![
+                    ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery;
+                    2
+                ],
+            },
             &[RecordStreamSeam::AfterACrash {
                 first_write_after_the_crash: 6,
                 version_landed_on_after_the_crash: Some((InstanceGeneration(1), CheckpointTxg(1))),
@@ -2325,6 +2613,167 @@ mod tests {
             ),
             0,
             "journal 记录槽不会被拼读，记 0"
+        );
+    }
+
+    /// 两块盘 mkfs 一次的池的盘宽：与 harness 档建池用的盘同宽（稀疏盘，只存写过的扇区）。
+    const FORMATTED_DEVICE_BYTES: u64 = 4 << 30;
+
+    /// 两块盘 mkfs 一次的池（io_min 512、槽距 4096；根环区域 0 / 1 / 2 在盘 0 / 1 / 0 上），没有文件。
+    fn formatted_pool_of_two_devices() -> MemoryPool {
+        let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> =
+            [DeviceIdentity(0), DeviceIdentity(1)]
+                .into_iter()
+                .map(|identity| {
+                    (
+                        identity,
+                        SparseBlockDevice::new(
+                            FORMATTED_DEVICE_BYTES,
+                            PhysicalBlockSizeInBytes(512),
+                        ),
+                    )
+                })
+                .collect();
+        make_filesystem(
+            &MakeFilesystemParameters {
+                filesystem_identifier: *b"singlefs-tables!",
+                region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
+                geometry: SystemImmutableSizes {
+                    physical_block_size: 512,
+                    minimum_input_output_bytes: 512,
+                    fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(512),
+                    journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+                    root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
+                },
+            },
+            &mut devices,
+        )
+        .expect("两块空盘上 mkfs 做得成");
+        MemoryPool {
+            devices: devices
+                .iter()
+                .map(|(identity, device)| (*identity, device.image.clone()))
+                .collect(),
+            device_size_in_bytes: FORMATTED_DEVICE_BYTES,
+        }
+    }
+
+    /// 一张镜像建成的给定状态表（写表为空、一个空的持久集合：harness 场景交出来的镜像在给定状态引擎里就是这样建表的）。
+    fn judge_tables_of_one_image(image: &MemoryPool) -> Result<JudgeTables, JudgeTablesRefusal> {
+        let not_expanded = |_segment_index: usize, _segment: &[usize]| {
+            CrashPointReplaySegmentExpansion::NotExpanded
+        };
+        build_judge_tables_for_the_given_persisted_sets(
+            &JudgeFlow {
+                base: image,
+                writes: &[],
+                segments: &[],
+                judged_root_index: 0,
+                versions: &[],
+                expansion: &not_expanded,
+            },
+            &[],
+            vec![Vec::new()],
+        )
+    }
+
+    /// 系统配置槽那一类落点在哪几处（盘、偏移），升序。
+    fn system_configuration_locations_of(tables: &JudgeTables) -> Vec<(u32, u64)> {
+        tables
+            .locations
+            .iter()
+            .filter(|location| location.kind == JudgeLocationKind::SystemConfiguration)
+            .map(|location| (location.device, location.offset))
+            .collect()
+    }
+
+    /// 盘 0 两槽与盘 1 的槽 0 都抹成 0、只剩盘 1 的槽 1 自证得过（CPU 恢复与池级 checker 都择它、照常判）：判表照样建得出，
+    /// 落点几何取的就是那一槽——单元区起点是 journal 环末尾的下一槽，两块盘各有偏移 0 与槽距那两个系统配置槽的落点。
+    /// 只读第一块盘槽 0 的取法在这里交 `BaseSystemConfigurationUnreadable`，这条红。
+    #[test]
+    fn the_judge_tables_take_their_geometry_from_the_one_self_verified_slot_one_of_the_second_device(
+    ) {
+        let mut image = formatted_pool_of_two_devices();
+        let spacing = u64::from(SystemImmutableSizes::slot_spacing_for(512));
+        let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+        for (device, offset) in [
+            (DeviceIdentity(0), 0),
+            (DeviceIdentity(0), spacing),
+            (DeviceIdentity(1), 0),
+        ] {
+            image
+                .devices
+                .get_mut(&device)
+                .expect("池里有这块盘")
+                .write(DeviceOffsetInBytes(offset), &vec![0u8; slot_bytes]);
+        }
+        let tables = judge_tables_of_one_image(&image)
+            .expect("盘 1 的槽 1 自证得过：判表建得出，不报基线系统配置读不出");
+        assert_eq!(
+            tables.unit_area_start_in_bytes,
+            slot_after_the_journal_ring(JOURNAL_RING_DEFAULT_BYTES).0 * SLOT_BYTES,
+            "单元区起点取自盘 1 槽 1 记的环长"
+        );
+        assert_eq!(
+            system_configuration_locations_of(&tables),
+            vec![(0, 0), (0, spacing), (1, 0), (1, spacing)],
+            "两块盘各有偏移 0 与槽距（盘 1 槽 1 记的 {spacing}）两个系统配置槽的落点"
+        );
+    }
+
+    /// 两块盘各两槽都抹成 0：一份自证得过的系统配置都没有，判表交 `BaseSystemConfigurationUnreadable`、不建表。
+    #[test]
+    fn the_judge_tables_are_refused_when_no_system_configuration_slot_of_any_device_verifies_itself(
+    ) {
+        let mut image = formatted_pool_of_two_devices();
+        let spacing = u64::from(SystemImmutableSizes::slot_spacing_for(512));
+        let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+        for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+            for offset in [0, spacing] {
+                image
+                    .devices
+                    .get_mut(&device)
+                    .expect("池里有这块盘")
+                    .write(DeviceOffsetInBytes(offset), &vec![0u8; slot_bytes]);
+            }
+        }
+        assert_eq!(
+            judge_tables_of_one_image(&image).err(),
+            Some(JudgeTablesRefusal::BaseSystemConfigurationUnreadable),
+            "每块盘两槽都自证不过：落点几何无从取"
+        );
+    }
+
+    /// 只剩盘 1 的池（盘 0 整块不在池里，而系统配置记的根环区域 0 与 2 在盘 0 上）：判表建得出、不 panic，
+    /// 盘 0 上一个落点都不建（CPU 读那块盘交 None，GPU 在那块盘上找不到落点、读到没有版本的切片），盘 1 上的根环区域 1 照建。
+    /// 给区域盘一律建落点的取法从基线读盘 0 的字节读不出，在「落点在盘内、按扇区对齐」那一处 panic，这条红。
+    #[test]
+    fn a_pool_without_a_device_that_holds_root_ring_regions_builds_its_tables_with_no_location_on_that_device(
+    ) {
+        let mut image = formatted_pool_of_two_devices();
+        image
+            .devices
+            .remove(&DeviceIdentity(0))
+            .expect("mkfs 之后池里有盘 0");
+        let tables = judge_tables_of_one_image(&image)
+            .expect("只剩盘 1 的池：判表建得出（盘 1 的系统配置槽自证得过）");
+        assert_eq!(tables.devices, vec![1], "池里只有盘 1");
+        assert!(
+            tables.locations.iter().all(|location| location.device == 1),
+            "落点都在盘 1 上：{:?}",
+            tables
+                .locations
+                .iter()
+                .map(|location| (location.device, location.offset, location.kind))
+                .filter(|(device, _, _)| *device != 1)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            tables
+                .locations
+                .iter()
+                .any(|location| location.kind == JudgeLocationKind::RootSlot),
+            "盘 1 上的根环区域 1 照建落点"
         );
     }
 }

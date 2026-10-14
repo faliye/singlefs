@@ -117,8 +117,8 @@ const FIRST_FILE_BYTES: usize = 96;
 const OVERWRITE_FILE_BYTES: usize = 96;
 const FIXED_WRITE_TIME_SECONDS: u64 = 1_800_000_000;
 
-/// 项目全仓统一的产物完整性闸口径（`scripts/experiments/replay.sh` 第 11 行「收尾行必须是
-/// `name=done emitted=N`」）：每一条结果行都以 `E7RESULT` 起头，`main` 收尾打一条
+/// 项目全仓统一的产物完整性闸口径（`scripts/experiments/replay.sh` 文件头「收尾行必须是
+/// `name=done emitted=N`」那一条）：每一条结果行都以 `E7RESULT` 起头，`main` 收尾打一条
 /// `E7RESULT name=done emitted=N`，N = 本进程打过的 `E7RESULT` 行数（含收尾这一条）。
 static EMITTED_RESULT_LINES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
@@ -2004,7 +2004,7 @@ fn raise_floor_targets_for(
 /// `raise_rollback_floor` 交回的 `RaisedFloor::abandoned_roots_unreadable` 是从盘上现读实例表 +
 /// 现行根的候选集算出来的（`isolate_slots_referenced_only_by_abandoned_roots`，与
 /// `mount_writable`/`mount_rollback` 那两种 op1 共用同一条计数管道，`crates/singlefs-core/src/
-/// mount.rs` 第 1027 行起），不依赖装置自己的内存时间线；与 `MountRollbackTo` 分支同理——那个分支
+/// mount.rs` 里的同名函数），不依赖装置自己的内存时间线；与 `MountRollbackTo` 分支同理——那个分支
 /// 交回的 `mounted.output.warm_up_publishes` 等中间根同样只用来读它的最终 `abandoned_roots_
 /// unreadable` 字段，从不追加进任何时间线（`attempt_faulted_operation` 整体是「试一次看结局，用完
 /// 即弃」，不产出可继续使用的 `SimNode`）。两步用的字节不共享（`devices_from_pool` 每次都深拷贝，
@@ -2443,7 +2443,7 @@ fn tree_table_crates_has_a_path(
 /// 有快照、多版本共享落点的情形没有覆盖（第一版这批历史都不产生快照，见交回报告）。
 ///
 /// **只读一层、把根当叶解**——实十九（2026-09-24 落地）之后，中央映射树条目数一旦
-/// 超过单节点叶容量（`transaction.rs` 第 1334 行「中央映射树叶 294」）就会长成多层，那时根节点是
+/// 超过单节点叶容量（`transaction.rs` 里「中央映射树叶 294」那一句）就会长成多层，那时根节点是
 /// 内部节点（`level > 0`），装着的是子节点指针、不是 `parse_mapping_entry` 认得的叶条目格式。
 /// 这里显式核 `level == 0` 再往下解，不靠「宽度不够、`parse_mapping_entry` 自然读不出」这种隐式失败
 /// 兜底——内部条目宽约 114 字节（`transaction.rs` 同一行「内部 143」按 16384 / 143 反推），比
@@ -2483,10 +2483,10 @@ fn allocation_record_tree_reachable_placements_via_central_mapping(
 
 /// 候选 (b) 分配记录树指称「从内容树反推占用集合」走全（session s8，跑前登记 5.2 ②「它答不了的」
 /// 缺口①）：在上一个函数（只走中央映射树这一条内容树）的基础上，把「码 2」结构节点自己的落点也并进
-/// 占用集合——`AllocationRecord`（`crates/singlefs-core/src/allocator.rs` 第 31 行）记的是**任意
+/// 占用集合——`AllocationRecord`（`crates/singlefs-core/src/allocator.rs` 的 `pub struct AllocationRecord`）记的是**任意
 /// 已分配的跨度**，不只是中央映射树指向的数据单元；树表自己、树表里 `TREE_KIND_INODE` /
 /// `TREE_KIND_EXTENT` / `TREE_KIND_ACCOUNTING` 三种子树各自的根节点、以及中央映射树**自己**的根节点
-/// （区别于它指向的数据单元），都是「码 2 节点取最低空槽」（`allocator.rs` 第 6 行）分配出来的、理应
+/// （区别于它指向的数据单元），都是「码 2 节点取最低空槽」（`allocator.rs` 文件头）分配出来的、理应
 /// 出现在「未释放」集合里的落点。`TREE_KIND_ALLOCATION` 不并进来——那是分配记录树自己，并进来是把
 /// 要验证的账当成账的输入，循环论证。**这仍不是穷举**：`TREE_KIND_LIVELIST` / `_SPARSE_SIDE_TABLE` /
 /// `_DEADLIST` 三种树表里可能存在的种类没有并入（第一版这批历史是否会产生它们、要不要算，留给下一段）。
@@ -2522,7 +2522,7 @@ fn allocation_record_tree_reachable_placements_via_all_structural_trees(
     Ok(placements)
 }
 
-/// session s9（跑前登记 5.2 ②「它答不了的」缺口①，`m2-rootchoice-repair-r1-forks.md` 第 1 行还差项）：
+/// session s9（跑前登记 5.2 ②「它答不了的」缺口①，`m2-rootchoice-repair-r1-forks.md` #1「被抛弃根的账读不出时，「修复」指什么动作」还差项）：
 /// `subset_of_pristine` 那些格里，`pristine − 走全` 差集的每一个 (设备, 槽) 按结构归类——先按跑前登记
 /// 5.2 表原文点名的五类结构逐项核对（分配记录树自己的节点；树表登记的 `LIVELIST` / `SPARSE_SIDE_TABLE`
 /// / `DEADLIST` 根，`transaction.rs` 的 `table_entry` 调用点显示这三类树表条目的根**恒为
@@ -2541,13 +2541,13 @@ fn classify_diff_pair(
     // 根因排查②的实测结果（session s9）：171 格的差集**逐字节等于** `root.instance_table.locations`
     // （实例表自己的物理节点，`RootRecord` 第 23 行，与 `tree_table` / `mapping_root` 是三条并列的独立
     // 指针，不挂在树表的七条条目里，`allocation_record_tree_reachable_placements_via_all_structural_trees`
-    // 从未读过它）——`crates/singlefs-core/src/make_filesystem.rs` 第 44 行
+    // 从未读过它）——`crates/singlefs-core/src/make_filesystem.rs` 里
     // `INSTANCE_TABLE_SLOT = SlotNumber(UNIT_AREA_START_SLOT)`，`crates/singlefs-format/src/lib.rs`
     // 第 231 行 `UNIT_AREA_START_SLOT: u64 = 50176`，与实测 `device=0/1 slot=50176` 逐位吻合；
     // `mark_format_time_units` 给它的 `Placement { slot: INSTANCE_TABLE_SLOT, span: 2 }` 与实测
     // `span=2`、`generation=0`（格式时刻分配，不是任何一次真实发布的 txg）吻合。**这不是 LIVELIST /
     // SPARSE_SIDE_TABLE / DEADLIST 三种树的节点**（那三种树表条目的根恒为 `NodePointer::empty_root()`，
-    // `transaction.rs` 第 3644–3660 行 `publish_admitted` 每次发布都这样写，这批历史、乃至今天全仓任何
+    // `transaction.rs` 的 `publish_admitted` 每次发布都这样写，这批历史、乃至今天全仓任何
     // 一条写路径都不产生它们的物理节点——判定见交回报告）。
     if root
         .instance_table
@@ -4173,7 +4173,7 @@ fn attempt_a_faulted_mount_writable_and_append(
     })
 }
 
-/// PC2 甲：复现攻方腿 H-A（`research/prompts/m2-rootchoice-repair-r1-opus-output.md:73`–`105`）。
+/// PC2 甲：复现攻方腿 H-A（`research/prompts/m2-rootchoice-repair-r1-opus-output.md`「二·一　修法甲「计数器从全环最大 + 1 起」：历史 H-A（挡不住）」那一节）。
 /// 第一次尝试重用 `search_minimum_weight_that_triggers_rootback`（穷举下界那一套）在
 /// `overwrites_before_the_rootback_probe = 4` 上跑，**20000 个子集全试完、一次都没打中**——查出
 /// 原因：那一套靠 `attempt_rootback_probe_and_advance` 按 `effective_root` 截断时间线，H-A 的机制
@@ -4244,7 +4244,7 @@ fn run_positive_control_for_the_root_ring_txg_only_candidate(geometry: &Geometry
     ));
 }
 
-/// PC2 乙：复现攻方腿 H-B1（`research/prompts/m2-rootchoice-repair-r1-opus-output.md:114`–`148`）。
+/// PC2 乙：复现攻方腿 H-B1（`research/prompts/m2-rootchoice-repair-r1-opus-output.md`「二·二　修法乙「系统配置带 txg」：历史 H-B1（挡不住，0 个注入故障）」那一节）。
 /// 造一次「崩在取号之后、写行发布最早的字节之前」——`acquire_instance`（`crates/singlefs-core`
 /// 公开函数）自己只做「逐盘写系统配置槽 + 一道屏障」两步（`transaction.rs` 的 `write_acquired_
 /// instance`），中途没有别的写；单独调它、原样收工，产生的设备字节与那个崩溃点完全相同，不需要层
@@ -4312,7 +4312,7 @@ fn run_positive_control_for_the_configuration_published_txg_candidate(geometry: 
     ));
 }
 
-/// H-C1 直接构造（判决 K2 给丙的具体历史，`m2-rootchoice-repair-r1-main-verification.md:50`：
+/// H-C1 直接构造（判决 K2 给丙的具体历史，`m2-rootchoice-repair-r1-main-verification.md`「K2」一节「丙　记录扫描水位」那一行：
 /// 「12 个」= 4 根槽 + 4 条记录各在两块盘上都读不出，总权重 4×1 + 4×2 = 12）。丙 = 今天的
 /// `first_txg_of_new_instance`，同时取根环与记录两路的 max（`mount.rs` 的
 /// `highest_ring_txg.max(highest_record_txg)`）——只挡根环（甲-txg 那种攻法）挡不住它：记录那一路
@@ -4535,7 +4535,7 @@ fn run_record_scan_watermark_lower_bound_probe(geometry: &Geometry, weight_ceili
 // ============================================================================
 // 十三点六、H-C2 直接构造（session s8，岔路单第 2 行 Φ2 系统配置槽这一类证据）：
 //
-//    机制假说：`choose_system_configuration`（`crates/singlefs-core/src/recovery.rs` 第 516 行起
+//    机制假说：`choose_system_configuration`（`crates/singlefs-core/src/recovery.rs` 里
 //    现查）按 `reader.device_identities()` 的顺序取**第一块「至少有一份自证槽」的盘**的
 //    `best_on_device` 直接当 `chosen`——`chosen` 只在 `None` 时被赋值一次（第 559–560 行），后面的
 //    盘只核对 `filesystem_identifier` / `device_count` 一致，**不参与「取哪块盘的值」这一步**。
@@ -5050,7 +5050,7 @@ const PUBLISHES_PER_ADMISSION_AT_MOST_LOCAL: u64 = 4 + 2 * 2;
 const PHYSICAL_WRITE_ATOMIC_BOUNDARY_BYTES: u64 = 512;
 /// 落点粒度（跑前登记 5.6 `SLOT_BYTES`）：第 2 次跑算单元字节区间用的就是这一个。
 const SLOT_BYTES_LOCAL: u64 = 16384;
-/// 这个测试周期的种子基（抄自 `crates/singlefs-checker-tier/src/crash_injection.rs:70` `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，
+/// 这个测试周期的种子基（抄自 `crates/singlefs-harness/src/history.rs` 的 `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，
 /// 开跑时回比）；实七报告「交主 agent 的」第 1 条点名的两段历史都从它数（`research/prompts/m2-impl7-implementer-report.md`）。
 const SEED_BASE_OF_THIS_TEST_CYCLE_LOCAL: u64 = 7_463_871_032_432_355_113;
 /// 故障注入大档那一段：种子基 + 110、每段 30 步、注入 6 次（大档默认规模，
@@ -6924,14 +6924,29 @@ fn run_seventh_batch_reproductions(arm: &str) {
         SEVENTH_BATCH_FAULT_REPRODUCTION_OPERATIONS,
         &GenerationWeights::BROAD,
     );
-    let fault_injection = singlefs_harness::fault_injection::inject_faults_into_history(
+    // 池级 checker 那一遍在 checker 档两段判，照判红就停那一档的口径并进 harness 的判定（原先 harness 就地判、判红就停，用户 2026-10-14 定）
+    let fault_execution = HistoryExecution {
+        per_step_checker: PerStepChecker::Skipped,
+        device_width: HistoryDeviceWidth::FourGibibytes,
+        space_admission: singlefs_core::admission::SpaceAdmission::JudgedByTheFormula,
+    };
+    let fault_engine = given_states_engine_of_this_experiment("e158_fault_reproduction");
+    let mut images_judged = 0usize;
+    let fault_injection = singlefs_harness::fault_injection::inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier(
         &fault_history,
-        HistoryExecution {
-            per_step_checker: PerStepChecker::Run,
-            device_width: HistoryDeviceWidth::FourGibibytes,
-            space_admission: singlefs_core::admission::SpaceAdmission::JudgedByTheFormula,
-        },
+        fault_execution,
         SEVENTH_BATCH_FAULT_REPRODUCTION_FAULTS,
+        &mut |images| {
+            images_judged += 1;
+            pool_checker_verdicts_of_the_images_after_a_fault_through_the_engine(
+                &fault_engine,
+                &format!(
+                    "seventh-batch-fault-reproduction/seed={fault_seed}/hand-out={images_judged}"
+                ),
+                fault_execution,
+                images,
+            )
+        },
     );
     for drawn in &fault_injection.drawn_faults {
         emit_result(&format!(
@@ -6982,6 +6997,7 @@ fn run_seventh_batch_reproductions(arm: &str) {
             crash_points_per_history: SEVENTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS,
         },
         None,
+        &given_states_engine_of_this_experiment("e158_crash_reproduction"),
     );
     for crash_point in &crash_injection.crash_points {
         emit_result(&format!(
@@ -7401,7 +7417,7 @@ fn run_second_run_mode(mode: &str) -> bool {
 }
 
 // ============================================================================
-// 十一、第 3 次跑（`research/prompts/e158-r3-prereg.md`）：C554 怎么修（岔路单 `research/prompts/c554-fix-forks.md` 第 1 行），
+// 十一、第 3 次跑（`research/prompts/e158-r3-prereg.md`）：C554 怎么修（岔路单 `research/prompts/c554-fix-forks.md` #1「挂载时有一条根（或它引用的账）暂时读不出」），
 //      第一段（登记 5.7）：5.6 常量回比、第七节锚点、九条臂各一份副本、故障设备与虚拟时钟、确认账与真值、
 //      PC-N、PC-O、PC-N0、PC-丢写、PC-只读（每一臂）；H1d 与 H1e（G0，全部臂）。PC-多读、Q5 与跨臂对拍在 `r3-compare` 模式里算。
 //      第 2 次跑那几个模式（`r2-*`）调的函数这里只调用、不改语义；要改的一律复制一份（登记第一节「上一次执行员交来的两件」）。
@@ -11282,7 +11298,7 @@ mod third_run_tests {
 }
 
 // ============================================================================
-// 十二、第 4 次跑（`research/prompts/e158-r4-prereg.md`）：C554 怎么修（岔路单 `research/prompts/c554-fix-forks.md` 第 1 行）。
+// 十二、第 4 次跑（`research/prompts/e158-r4-prereg.md`）：C554 怎么修（岔路单 `research/prompts/c554-fix-forks.md` #1「挂载时有一条根（或它引用的账）暂时读不出」）。
 //      装置按登记 5.7 的五段写，模式 `r4-seg1` … `r4-seg5`，跨臂的量在 `r4-compare`。第 2、3 次跑的函数只调用、不改语义；
 //      要改的一律复制一份给 `r4-*` 用（登记文件头「装置写在哪」）。
 // ============================================================================
@@ -17467,8 +17483,8 @@ mod fourth_run_tests {
 mod fourth_run_segment_two {
     use super::*;
 
-    use singlefs_checker::image::InvariantVerdict;
-    use singlefs_checker::walk::check_pool_image;
+    use singlefs_checker_tier::crash_amplification::GivenStatesEngine;
+    use singlefs_checker_tier::crash_given_states::GivenStatesOfATable;
     use singlefs_checker_tier::crash_injection::{inject_crashes_into_history, CrashPointDraw};
     use singlefs_core::admission::SpaceAdmission;
     use singlefs_core::journal::back_chain_of;
@@ -17479,13 +17495,16 @@ mod fourth_run_segment_two {
     use singlefs_core::mounted_session::{MountedSession, UserChange, UserChangeRefused};
     use singlefs_core::recovery::RecoveryReport;
     use singlefs_core::transaction::{publish_without_units, ZeroUnitPublishPlan};
-    use singlefs_harness::fault_injection::{inject_faults_into_history, FaultCallCounts};
+    use singlefs_harness::fault_injection::{
+        inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier,
+        FaultCallCounts,
+    };
     use singlefs_harness::history::{
-        execute_history, execute_history_with_faults, generate_history_with_weights,
-        with_panic_capture, ContentChoice, ContentLength, FloorTargetChoice, GeneratedHistory,
-        GenerationWeights, HistoryDevice, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
-        HistoryOperation, HistorySeed, HistoryStartingPoint, PerStepChecker, RollbackTargetChoice,
-        StepPosition,
+        execute_history_handing_out_every_step_image, execute_history_with_faults,
+        generate_history_with_weights, with_panic_capture, ContentChoice, ContentLength,
+        FloorTargetChoice, GeneratedHistory, GenerationWeights, HistoryDevice, HistoryDeviceWidth,
+        HistoryEnding, HistoryExecution, HistoryOperation, HistorySeed, HistoryStartingPoint,
+        PerStepChecker, RollbackTargetChoice, StepPosition,
     };
     use singlefs_harness::memory_pool::{writes_and_segments_with_stream_indexes, RetainedWrite};
     use singlefs_harness::scenario::{
@@ -17501,7 +17520,7 @@ mod fourth_run_segment_two {
     const FAST_TIER_SEEDS_LOCAL: u64 = 96;
     const FAST_TIER_OPERATIONS_PER_HISTORY_LOCAL: usize = 30;
 
-    /// H-随 (a) 的 28 个种子偏移（登记 5.6、7.2：调查员报告 `research/prompts/m2-investigate-gate74-reds-report.md` 第 61 行那一串各减种子基）。
+    /// H-随 (a) 的 28 个种子偏移（登记 5.6、7.2：调查员报告 `research/prompts/m2-investigate-gate74-reds-report.md`「新发现 CheckerViolations { invariants: ["I-7.4"] }：第一个种子」那一行的同签名种子各减种子基）。
     const RANDOM_HISTORY_RED_SEED_OFFSETS: [u64; 28] = [
         2, 6, 9, 11, 15, 16, 18, 21, 23, 24, 29, 31, 35, 52, 54, 55, 58, 65, 70, 71, 76, 79, 81,
         84, 85, 86, 90, 92,
@@ -17512,8 +17531,8 @@ mod fourth_run_segment_two {
     /// 7.2：H-随 的段数 28 + 1 + 1（登记第 7.2 节那一行）。
     const RANDOM_HISTORY_SEGMENTS_REGISTERED: usize = 30;
 
-    /// 实八：崩溃注入种子基 + 2、24 步、4 个崩溃状态（r3 登记第 373–391 行那张表「实八」一行；
-    /// 步数与抽法同崩溃注入快档 `crates/singlefs-checker-tier/tests/crash_injection_campaign.rs` 第 39、41 行）。
+    /// 实八：崩溃注入种子基 + 2、24 步、4 个崩溃状态（r3 登记「5.3　历史族」那张表「实八」一行；
+    /// 步数与抽法同崩溃注入快档 `crates/singlefs-checker-tier/tests/crash_injection_campaign.rs` 的 `FAST_TIER_OPERATIONS_PER_HISTORY`、`FAST_TIER_DRAW`）。
     const EIGHTH_BATCH_CRASH_REPRODUCTION_SEED_OFFSET: u64 = 2;
     const EIGHTH_BATCH_CRASH_REPRODUCTION_OPERATIONS: usize = 24;
     const EIGHTH_BATCH_CRASH_REPRODUCTION_CRASH_POINTS: usize = 4;
@@ -17533,10 +17552,6 @@ mod fourth_run_segment_two {
 
     /// harness 执行器撞到判红就停（它的缺省）。登记 5.3 要这一族把它关掉、照原操作序列走完；变异 M22 把它打开。
     const RANDOM_HISTORIES_STOP_AT_THE_FIRST_CHECKER_RED: bool = false;
-
-    /// checker 判 I-7.4 被抛弃根那一半时违例细节的开头（`singlefs_checker::walk` 的那一句）：后面跟「（实例 X、txg Y）」。
-    const ABANDONED_ROOT_VIOLATION_PREFIX: &str = "被抛弃的根（实例 ";
-    const ABANDONED_ROOT_INVARIANT: &str = "I-7.4";
 
     /// 这一段跑的历史从哪来。
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -18577,11 +18592,12 @@ mod fourth_run_segment_two {
         failure_clause_six: Option<bool>,
     }
 
-    /// checker 在一步之后的判定：红的不变量与 I-7.4 被抛弃根那一半点名的根。
+    /// checker 在一步之后的判定：红的不变量与 I-7.4 被抛弃根那一半点名的根（去重的一份，与按违例细节里的次序、重复的照留的一份）。
     #[derive(Clone, Debug, Default, PartialEq, Eq)]
     struct CheckerReading {
         red_invariants: Vec<&'static str>,
         abandoned_roots_named: Vec<TimelineRoot>,
+        abandoned_roots_named_in_the_order_of_the_detail: Vec<TimelineRoot>,
     }
 
     impl CheckerReading {
@@ -18590,54 +18606,105 @@ mod fourth_run_segment_two {
         }
     }
 
-    /// 「被抛弃的根（实例 X、txg Y）引用的单元……」里的 (X, Y)。
-    fn abandoned_root_named_by(detail: &str) -> Vec<TimelineRoot> {
-        let mut named = Vec::new();
-        let mut rest = detail;
-        while let Some(start) = rest.find(ABANDONED_ROOT_VIOLATION_PREFIX) {
-            let after = &rest[start + ABANDONED_ROOT_VIOLATION_PREFIX.len()..];
-            let instance_text: String = after.chars().take_while(char::is_ascii_digit).collect();
-            let after_instance = &after[instance_text.len()..];
-            let txg_start = after_instance
-                .find("txg ")
-                .map(|index| index + "txg ".len());
-            let txg_text: String = txg_start
-                .map(|index| {
-                    after_instance[index..]
-                        .chars()
-                        .take_while(char::is_ascii_digit)
-                        .collect()
-                })
-                .unwrap_or_default();
-            if let (Ok(instance), Ok(txg)) = (instance_text.parse::<u32>(), txg_text.parse::<u64>())
-            {
-                named.push((instance, txg));
-            }
-            rest = after_instance;
-        }
-        named
+    /// 一张镜像上池级 checker 的判定，交崩溃点重放的给定状态引擎两段判（用户 2026-10-14 弹窗定「GPU 判器加细节输出」：GPU 判器与判定库的结论
+    /// 带出 I-7.4 点名的被抛弃根，这一处就不再在 CPU 上就地跑池级 checker）。镜像建成一张给定状态表：基线就是这张镜像、写表为空、一个空的持久集合
+    /// （池级 checker 判的就是这张镜像本身，记录核对器在空写表上没有发布可判）；录入段写进家目录下给定状态表那一类的判定库、判段从库里读回判
+    /// （配了 GPU 且编进 `gpu` 特性在卡上判，否则 CPU 判器判），判过的复用。表名带镜像指纹（[`image_fingerprint`]）：同一趟里内容不同的两张镜像
+    /// 不同名（同名而内容不同的两张表，引擎录入段报错）。
+    /// 红的不变量按 `IMPLEMENTED_INVARIANTS` 的次序（与池级 checker 交回的次序相同）；点名的根取结论里 I-7.4 违例细节点名的那一栏
+    /// （`crash_given_states::GivenStateConclusion::abandoned_roots_named_by_the_pool_checker`，按细节里的次序、重复的照留），去重的那一份在这里去重。
+    ///
+    /// # Panics
+    /// 同 [`super::given_states_judged_on_this_host_through_the_engine`]。
+    fn checker_reading_of(engine: &GivenStatesEngine, image: &MemoryPool) -> CheckerReading {
+        let table = GivenStatesOfATable {
+            table_name: format!(
+                "checker-reading/image-fingerprint={:016x}",
+                image_fingerprint(image)
+            ),
+            base: image,
+            writes: &[],
+            segments: &[],
+            seams: &[],
+            persisted_sets: vec![Vec::new()],
+        };
+        let mut states = given_states_judged_on_this_host_through_the_engine(engine, &table);
+        assert_eq!(states.len(), 1, "一张镜像一个状态，判器交回一份结论");
+        checker_reading_of_the_conclusion(&states.pop().expect("上一句核过恰好一份结论"))
     }
 
-    fn checker_reading_of(image: &MemoryPool) -> CheckerReading {
-        let mut reading = CheckerReading::default();
-        for (invariant, verdict) in check_pool_image(image) {
-            match verdict {
-                InvariantVerdict::Violated(detail) => {
-                    reading.red_invariants.push(invariant);
-                    if invariant == ABANDONED_ROOT_INVARIANT {
-                        for root in abandoned_root_named_by(&detail) {
-                            if !reading.abandoned_roots_named.contains(&root) {
-                                reading.abandoned_roots_named.push(root);
-                            }
-                        }
-                    }
-                }
-                InvariantVerdict::Holds
-                | InvariantVerdict::NotApplicable(_)
-                | InvariantVerdict::PartiallyJudged(_) => {}
+    /// 一个状态的结论换成这一段记的判定（[`checker_reading_of`] 的后一半，纯函数）：红的不变量照结论的违例位按 `IMPLEMENTED_INVARIANTS` 的次序；
+    /// I-7.4 点名的根按细节里的次序、重复的照留一份，去重（第一次出现的次序）另一份。
+    fn checker_reading_of_the_conclusion(
+        conclusion: &singlefs_checker_tier::crash_given_states::GivenStateConclusion,
+    ) -> CheckerReading {
+        let red_invariants: Vec<&'static str> = conclusion
+            .pool_checker_violations()
+            .into_iter()
+            .map(|(invariant, _detail)| invariant)
+            .collect();
+        let abandoned_roots_named_in_the_order_of_the_detail: Vec<TimelineRoot> = conclusion
+            .abandoned_roots_named_by_the_pool_checker
+            .iter()
+            .map(|named| (named.instance.0, named.checkpoint_txg.0))
+            .collect();
+        let mut abandoned_roots_named: Vec<TimelineRoot> = Vec::new();
+        for root in &abandoned_roots_named_in_the_order_of_the_detail {
+            if !abandoned_roots_named.contains(root) {
+                abandoned_roots_named.push(*root);
             }
         }
-        reading
+        CheckerReading {
+            red_invariants,
+            abandoned_roots_named,
+            abandoned_roots_named_in_the_order_of_the_detail,
+        }
+    }
+
+    /// 每一步写过盘之后池级 checker 那一遍怎么判（登记 5.3：要它的那几族每一步跑池级 checker，[`SegmentTwoFamily::checks_every_step`]）。
+    #[derive(Clone, Copy)]
+    enum PoolCheckerOnEveryStep<'engine> {
+        /// 这一族不逐步跑池级 checker（H-随全、注入分支）。
+        Skipped,
+        /// 每张镜像交给定状态引擎判（[`checker_reading_of`]）。
+        ThroughTheGivenStatesEngine(&'engine GivenStatesEngine),
+        /// 只供测试：判定换成测试给的函数（不跑池级 checker），钉与判法无关的执行器行为（「判红不截断」，变异 M22）。
+        #[cfg(test)]
+        ReadingsGivenByATest(fn(&MemoryPool) -> CheckerReading),
+    }
+
+    impl<'engine> PoolCheckerOnEveryStep<'engine> {
+        /// 这一族照 [`SegmentTwoFamily::checks_every_step`]：要就交 `engine` 判，不要就不跑。
+        fn of_the_family(family: SegmentTwoFamily, engine: &'engine GivenStatesEngine) -> Self {
+            if family.checks_every_step() {
+                PoolCheckerOnEveryStep::ThroughTheGivenStatesEngine(engine)
+            } else {
+                PoolCheckerOnEveryStep::Skipped
+            }
+        }
+
+        fn runs_on_every_step(self) -> bool {
+            match self {
+                PoolCheckerOnEveryStep::Skipped => false,
+                PoolCheckerOnEveryStep::ThroughTheGivenStatesEngine(_) => true,
+                #[cfg(test)]
+                PoolCheckerOnEveryStep::ReadingsGivenByATest(_) => true,
+            }
+        }
+
+        /// 这张镜像的判定；这一族不逐步跑池级 checker 时 None。
+        fn reading_of(self, image: &MemoryPool) -> Option<CheckerReading> {
+            match self {
+                PoolCheckerOnEveryStep::Skipped => None,
+                PoolCheckerOnEveryStep::ThroughTheGivenStatesEngine(engine) => {
+                    Some(checker_reading_of(engine, image))
+                }
+                #[cfg(test)]
+                PoolCheckerOnEveryStep::ReadingsGivenByATest(reading_given_by_the_test) => {
+                    Some(reading_given_by_the_test(image))
+                }
+            }
+        }
     }
 
     /// 一步的记录：操作、结局、这一步之后的镜像指纹、checker 的判定（这一族不跑 checker 或这一步没写盘时 None）。
@@ -18661,7 +18728,7 @@ mod fourth_run_segment_two {
     }
 
     /// 一段历史在一臂上的一次执行（一个分支：主路径、一个注入点、一个崩溃状态之前的主路径都是它）。
-    struct RandomExecutor {
+    struct RandomExecutor<'engine> {
         arm: FourthRunArm,
         parameters: MakeFilesystemParameters,
         devices: Vec<(DeviceIdentity, HistoryDevice)>,
@@ -18678,7 +18745,7 @@ mod fourth_run_segment_two {
         crash_recovery_events: Vec<CrashRecoveryEvent>,
         /// 跑 checker 的那几族：最后一次跑 checker 时录制流有几步（harness 只在这一步写过盘时跑）。
         checked_stream_length: usize,
-        checks_every_step: bool,
+        pool_checker_on_every_step: PoolCheckerOnEveryStep<'engine>,
         panicked: Option<(usize, String)>,
         stopped_at_the_first_red: Option<usize>,
         starting_point_error: Option<String>,
@@ -18708,13 +18775,13 @@ mod fourth_run_segment_two {
         format!("refused:{}", error_member_of_debug(error_debug))
     }
 
-    impl RandomExecutor {
+    impl<'engine> RandomExecutor<'engine> {
         /// 起点（harness `HistoryPool::start` 的同一串）：mkfs；`AfterFirstFile` 再在同一个进程里取号、暖机、发第一个文件（内容 `first_file_content`）。
         fn start(
             arm: FourthRunArm,
             starting_point: HistoryStartingPoint,
             plan: SharedFaultPlan,
-            checks_every_step: bool,
+            pool_checker_on_every_step: PoolCheckerOnEveryStep<'engine>,
         ) -> Self {
             let parameters = HistoryDeviceWidth::FourGibibytes.parameters();
             let stream = SharedStream::retaining_contents();
@@ -18753,7 +18820,7 @@ mod fourth_run_segment_two {
                 calls_after_step: Vec::new(),
                 crash_recovery_events: Vec::new(),
                 checked_stream_length: 0,
-                checks_every_step,
+                pool_checker_on_every_step,
                 panicked: None,
                 stopped_at_the_first_red: None,
                 starting_point_error: None,
@@ -18854,9 +18921,11 @@ mod fourth_run_segment_two {
             } else {
                 image_fingerprint(&self.image())
             };
-            let checker = if self.checks_every_step && !self.devices.is_empty() {
+            let checker = if self.pool_checker_on_every_step.runs_on_every_step()
+                && !self.devices.is_empty()
+            {
                 self.checked_stream_length = self.stream.operation_count();
-                Some(checker_reading_of(&self.image()))
+                self.pool_checker_on_every_step.reading_of(&self.image())
             } else {
                 None
             };
@@ -18934,13 +19003,14 @@ mod fourth_run_segment_two {
                 self.carry_new_ring_roots(default_number);
                 let image = self.image();
                 let stream_length = self.stream.operation_count();
-                let checker =
-                    if self.checks_every_step && stream_length != self.checked_stream_length {
-                        self.checked_stream_length = stream_length;
-                        Some(checker_reading_of(&image))
-                    } else {
-                        None
-                    };
+                let checker = if self.pool_checker_on_every_step.runs_on_every_step()
+                    && stream_length != self.checked_stream_length
+                {
+                    self.checked_stream_length = stream_length;
+                    self.pool_checker_on_every_step.reading_of(&image)
+                } else {
+                    None
+                };
                 let red = checker
                     .as_ref()
                     .is_some_and(|reading| !reading.red_invariants.is_empty());
@@ -19555,7 +19625,7 @@ mod fourth_run_segment_two {
         }
     }
 
-    impl RandomExecutor {
+    impl RandomExecutor<'_> {
         /// 每一步做完：记各版单元第一次被改的那一步；要留的那一步的镜像留下。
         fn after_a_step(&mut self, order: usize, image: &MemoryPool) {
             let ring_roots = independent_geometry(image)
@@ -19922,30 +19992,54 @@ mod fourth_run_segment_two {
         positions
     }
 
-    /// harness 执行器（每一步跑 checker、判红就停，快档那一档）第一次判红在哪一步（步序：起点 0，第 i 步 i + 1）、
-    /// I-7.4 被抛弃根那一半点名了哪几条根。跑完没判红交回 None。
+    /// harness 执行器（快档那一档：两块 4 GiB 的盘、准入按公式判）上「每一步跑 checker、判红就停」时第一次判红在哪一步
+    /// （步序：起点 0，第 i 步 i + 1）、I-7.4 被抛弃根那一半点名了哪几条根、红了哪几条。跑完没判红交回 None。
+    /// harness 不再逐步跑池级 checker（`PerStepChecker::Skipped`，判红就停那一档删了）：这里照不逐步跑 checker 的执行器跑一遍，
+    /// 每一步写过盘的镜像经钩子交出来，按历史的次序判到第一张红的为止（之后的不判）。判红就停那一档的结局与这里一一对上：
+    /// 第一张红的镜像在执行器自己停下的那一步之前或就是那一步，判红就停那一档就停在它上面、红的就是它的违例；没有，就停在执行器停下的那一步、
+    /// 一条违例都不带（那一步的镜像不红）；执行器跑完、一张都不红是 None。每张镜像交 `engine` 判（[`checker_reading_of`]）。
     fn harness_first_red(
+        engine: &GivenStatesEngine,
         history: &GeneratedHistory,
     ) -> Option<(usize, Vec<TimelineRoot>, Vec<&'static str>)> {
-        let run = execute_history(history);
-        match run.ending {
-            HistoryEnding::Completed => None,
-            HistoryEnding::KnownRed { observation, .. }
-            | HistoryEnding::NewFinding { observation, .. } => {
-                let order = match observation.position {
-                    StepPosition::StartingPoint => 0,
-                    StepPosition::Operation(index) => index + 1,
-                };
-                let mut named = Vec::new();
-                let mut invariants = Vec::new();
-                for (invariant, detail) in &observation.violations {
-                    invariants.push(*invariant);
-                    if *invariant == ABANDONED_ROOT_INVARIANT {
-                        named.extend(abandoned_root_named_by(detail));
+        let order_of = |position: StepPosition| match position {
+            StepPosition::StartingPoint => 0,
+            StepPosition::Operation(index) => index + 1,
+        };
+        let execution = harness_execution(PerStepChecker::Skipped);
+        let mut first_red_step_image: Option<(usize, CheckerReading)> = None;
+        let run = execute_history_handing_out_every_step_image(
+            history,
+            execution,
+            &SharedStream::new(),
+            &SharedFaultPlan::unarmed(execution.device_width.fixed_geometry()),
+            &mut |_| {},
+            &mut |step_image| {
+                if first_red_step_image.is_none() {
+                    let reading = checker_reading_of(engine, step_image.image);
+                    if !reading.red_invariants.is_empty() {
+                        first_red_step_image = Some((order_of(step_image.position), reading));
                     }
                 }
-                Some((order, named, invariants))
+            },
+        );
+        let order_where_the_executor_stopped = match &run.ending {
+            HistoryEnding::Completed => None,
+            HistoryEnding::KnownRed { observation, .. }
+            | HistoryEnding::NewFinding { observation, .. } => Some(order_of(observation.position)),
+        };
+        match (first_red_step_image, order_where_the_executor_stopped) {
+            (Some((order, reading)), stopped)
+                if stopped.is_none_or(|stopped_order| order <= stopped_order) =>
+            {
+                Some((
+                    order,
+                    reading.abandoned_roots_named_in_the_order_of_the_detail,
+                    reading.red_invariants,
+                ))
             }
+            (Some(_) | None, Some(stopped_order)) => Some((stopped_order, Vec::new(), Vec::new())),
+            (Some(_) | None, None) => None,
         }
     }
 
@@ -19958,8 +20052,14 @@ mod fourth_run_segment_two {
         for (order, fingerprint, calls) in trace {
             let mine = executor.steps.iter().find(|step| step.order == *order);
             let my_calls = executor.calls_after_step.get(*order);
+            // 读次数不要求相等：harness 那一侧的稀疏盘答日志环记录槽提示、不读没写过的槽；装置这一侧不答提示、照真盘全环扫
+            // （实验量的是真盘的读开销），所以装置的读不少于 harness 的。写与屏障两侧没有这层差别，逐字相等。
             let agrees = mine.is_some_and(|step| step.fingerprint_after == *fingerprint)
-                && my_calls == Some(calls);
+                && my_calls.is_some_and(|device_counts| {
+                    device_counts.writes == calls.writes
+                        && device_counts.barriers == calls.barriers
+                        && device_counts.reads >= calls.reads
+                });
             if !agrees {
                 mismatches.push(format!(
                     "order{order}:harness_fingerprint={fingerprint:016x}:device_fingerprint={}:harness_calls={}/{}/{}:device_calls={}",
@@ -20250,16 +20350,18 @@ mod fourth_run_segment_two {
     }
 
     /// 一段历史的主路径（不注入）：跑完操作、接尾巴（这一族要的话）、按每一次崩溃恢复抛弃根那一步立格。
-    fn run_the_main_branch(
+    /// 每一步的池级 checker 照 `pool_checker_on_every_step` 判（产品那一趟是 [`PoolCheckerOnEveryStep::of_the_family`]）。
+    fn run_the_main_branch<'engine>(
         arm: FourthRunArm,
         segment: &SegmentTwoHistory,
-    ) -> (RandomExecutor, BranchResult) {
+        pool_checker_on_every_step: PoolCheckerOnEveryStep<'engine>,
+    ) -> (RandomExecutor<'engine>, BranchResult) {
         let family = segment.family;
         let mut executor = RandomExecutor::start(
             arm,
             segment.history.starting_point,
             SharedFaultPlan::unarmed(HistoryDeviceWidth::FourGibibytes.fixed_geometry()),
-            family.checks_every_step(),
+            pool_checker_on_every_step,
         );
         executor.run_the_operations(&segment.history);
         let finished = executor.panicked.is_none()
@@ -20343,8 +20445,12 @@ mod fourth_run_segment_two {
             HistoryDeviceWidth::FourGibibytes.fixed_geometry(),
             FaultSchedule::the_nth_call_across_the_pool(point.fault, arm_ordinal),
         );
-        let mut executor =
-            RandomExecutor::start(arm, segment.history.starting_point, plan.clone(), false);
+        let mut executor = RandomExecutor::start(
+            arm,
+            segment.history.starting_point,
+            plan.clone(),
+            PoolCheckerOnEveryStep::Skipped,
+        );
         executor.capture_after_order = Some(point.order);
         if point.order == 0 {
             executor.captured_image = Some(executor.image());
@@ -21305,10 +21411,12 @@ mod fourth_run_segment_two {
         )
     }
 
+    /// H-随、H-随全：每段历史的主路径（逐步的池级 checker 交 `checker_engine` 判）、执行器比对与 harness 那一侧第一次判红。
     fn run_the_random_families(
         arm: FourthRunArm,
         family: SegmentTwoFamily,
         histories: Vec<SegmentTwoHistory>,
+        checker_engine: &GivenStatesEngine,
     ) -> FamilyRun {
         let mut lines = Vec::new();
         let mut tally = FamilyTally::default();
@@ -21316,7 +21424,11 @@ mod fourth_run_segment_two {
         let mut mismatches: Vec<String> = Vec::new();
         let mut segments_without_an_abandoned_red = Vec::new();
         for segment in &histories {
-            let (executor, branch) = run_the_main_branch(arm, segment);
+            let (executor, branch) = run_the_main_branch(
+                arm,
+                segment,
+                PoolCheckerOnEveryStep::of_the_family(family, checker_engine),
+            );
             tally.segments += 1;
             if executor.panicked.is_some() {
                 tally.segments_panicked += 1;
@@ -21332,7 +21444,7 @@ mod fourth_run_segment_two {
                         .map(|mismatch| format!("{}:{mismatch}", segment.label)),
                 );
                 if family == SegmentTwoFamily::RandomRed {
-                    let harness_red = harness_first_red(&segment.history);
+                    let harness_red = harness_first_red(checker_engine, &segment.history);
                     lines.push(format!(
                         "name=r4_harness_first_red family={} seed={} arm={} harness_first_red_order={} harness_abandoned_named={:?} harness_invariants={:?} device_first_abandoned_red={}",
                         family.name(),
@@ -21469,12 +21581,21 @@ mod fourth_run_segment_two {
         FamilyRun { lines, stop }
     }
 
-    /// 实七-甲（故障注入）。今天那一臂：harness 在这一份副本上抽 6 个注入点（`inject_faults_into_history`），用 harness 测量跑的调用数
+    /// 实七-甲（故障注入）。今天那一臂：harness 在这一份副本上抽 6 个注入点（`inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`），用 harness 测量跑的调用数
     /// 换成「步、步内第几次」；S5 按 harness 那一遍与装置这一遍各自复现不复现判。别的臂：从今天那一臂的产物读注入点。
-    fn run_the_seventh_fault_family(arm: FourthRunArm, today_points: &TodayPoints) -> FamilyRun {
+    /// 主路径逐步的池级 checker 交 `checker_engine` 判。
+    fn run_the_seventh_fault_family(
+        arm: FourthRunArm,
+        today_points: &TodayPoints,
+        checker_engine: &GivenStatesEngine,
+    ) -> FamilyRun {
         let family = SegmentTwoFamily::SeventhFault;
         let segment = seventh_fault_history();
-        let (main, main_branch) = run_the_main_branch(arm, &segment);
+        let (main, main_branch) = run_the_main_branch(
+            arm,
+            &segment,
+            PoolCheckerOnEveryStep::of_the_family(family, checker_engine),
+        );
         let mut lines = Vec::new();
         let mut stop = None;
         let mut harness_reproduces = false;
@@ -21488,11 +21609,27 @@ mod fourth_run_segment_two {
                         .to_string(),
                 );
             }
-            let injection = inject_faults_into_history(
-                &segment.history,
-                harness_execution(PerStepChecker::Run),
-                SEVENTH_BATCH_FAULT_REPRODUCTION_FAULTS,
-            );
+            // 池级 checker 那一遍在 checker 档两段判，照判红就停那一档的口径并进 harness 的判定（原先 harness 就地判、判红就停，用户 2026-10-14 定）
+            let fault_engine = given_states_engine_of_this_experiment("e158_seventh_fault_family");
+            let mut images_judged = 0usize;
+            let injection =
+                inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier(
+                    &segment.history,
+                    harness_execution(PerStepChecker::Skipped),
+                    SEVENTH_BATCH_FAULT_REPRODUCTION_FAULTS,
+                    &mut |images| {
+                        images_judged += 1;
+                        pool_checker_verdicts_of_the_images_after_a_fault_through_the_engine(
+                            &fault_engine,
+                            &format!(
+                                "seventh-fault-family/{}/hand-out={images_judged}",
+                                segment.label
+                            ),
+                            harness_execution(PerStepChecker::Skipped),
+                            images,
+                        )
+                    },
+                );
             harness_reproduces = injection.new_findings.iter().any(|finding| {
                 finding.reopen.contains(&format!(
                     "MappingStillUnreadable {{ slot: SlotNumber({SEVENTH_BATCH_SIGNATURE_SLOT}) }}"
@@ -21637,13 +21774,19 @@ mod fourth_run_segment_two {
 
     /// 实七-乙、实八（崩溃注入）。今天那一臂：harness 在这一份副本上抽 4 个崩溃状态（`inject_crashes_into_history`），按装置这一遍的录制流
     /// 换成「第一个写落在哪一步、那一步里第几段、段内持久哪几个」（段号与写数与 harness 那一遍逐个核，对不上走 S7）。
+    /// 主路径逐步的池级 checker 与 harness 那一侧第一次判红都交 `checker_engine` 判。
     fn run_a_crash_family(
         arm: FourthRunArm,
         family: SegmentTwoFamily,
         segment: &SegmentTwoHistory,
         today_points: &TodayPoints,
+        checker_engine: &GivenStatesEngine,
     ) -> FamilyRun {
-        let (main, main_branch) = run_the_main_branch(arm, segment);
+        let (main, main_branch) = run_the_main_branch(
+            arm,
+            segment,
+            PoolCheckerOnEveryStep::of_the_family(family, checker_engine),
+        );
         let stream = segmented_stream_of(&main);
         let mut lines = Vec::new();
         let mut stop = None;
@@ -21669,6 +21812,7 @@ mod fourth_run_segment_two {
                     },
                 },
                 None,
+                &given_states_engine_of_this_experiment("e158_crash_reproduction"),
             );
             harness_reproduces = match family {
                 SegmentTwoFamily::SeventhCrash => injection.new_findings.iter().any(|finding| {
@@ -21679,8 +21823,10 @@ mod fourth_run_segment_two {
                 SegmentTwoFamily::EighthCrash
                 | SegmentTwoFamily::RandomRed
                 | SegmentTwoFamily::RandomAll
-                | SegmentTwoFamily::SeventhFault => harness_first_red(&segment.history)
-                    .is_some_and(|(_, named, _)| named.contains(&EIGHTH_BATCH_SIGNATURE_ROOT)),
+                | SegmentTwoFamily::SeventhFault => {
+                    harness_first_red(checker_engine, &segment.history)
+                        .is_some_and(|(_, named, _)| named.contains(&EIGHTH_BATCH_SIGNATURE_ROOT))
+                }
             };
             lines.push(format!(
                 "name=r4_harness_signature family={} arm={} harness_reproduces={harness_reproduces} crash_points={} new_findings={} findings={:?}",
@@ -21867,6 +22013,9 @@ mod fourth_run_segment_two {
             today_points.crash_points.values().map(Vec::len).sum::<usize>(),
             today_points.stopped_families
         ));
+        // 逐步的池级 checker 与 harness 那一侧第一次判红，五族共用一个给定状态引擎（一份判定库，判过的镜像跨族、跨臂复用）
+        let checker_engine =
+            given_states_engine_of_this_experiment("e158_segment_two_checker_reading");
         for family in [
             SegmentTwoFamily::RandomRed,
             SegmentTwoFamily::RandomAll,
@@ -21896,18 +22045,28 @@ mod fourth_run_segment_two {
             }
             let run = match family {
                 SegmentTwoFamily::RandomRed => {
-                    run_the_random_families(arm, family, random_red_histories())
+                    run_the_random_families(arm, family, random_red_histories(), &checker_engine)
                 }
                 SegmentTwoFamily::RandomAll => {
-                    run_the_random_families(arm, family, random_all_histories())
+                    run_the_random_families(arm, family, random_all_histories(), &checker_engine)
                 }
-                SegmentTwoFamily::SeventhFault => run_the_seventh_fault_family(arm, &today_points),
-                SegmentTwoFamily::SeventhCrash => {
-                    run_a_crash_family(arm, family, &seventh_crash_history(), &today_points)
+                SegmentTwoFamily::SeventhFault => {
+                    run_the_seventh_fault_family(arm, &today_points, &checker_engine)
                 }
-                SegmentTwoFamily::EighthCrash => {
-                    run_a_crash_family(arm, family, &eighth_crash_history(), &today_points)
-                }
+                SegmentTwoFamily::SeventhCrash => run_a_crash_family(
+                    arm,
+                    family,
+                    &seventh_crash_history(),
+                    &today_points,
+                    &checker_engine,
+                ),
+                SegmentTwoFamily::EighthCrash => run_a_crash_family(
+                    arm,
+                    family,
+                    &eighth_crash_history(),
+                    &today_points,
+                    &checker_engine,
+                ),
             };
             emit_family(family, run);
         }
@@ -21973,11 +22132,71 @@ mod fourth_run_segment_two {
             );
         }
 
+        /// 给定状态引擎交回的一份结论换成这一段的判定：红的不变量照违例位、按 `IMPLEMENTED_INVARIANTS` 的次序（不按位号以外的次序）；
+        /// I-7.4 点名的根按细节次序、重复照留的一份原样交，去重的一份按第一次出现的次序（变异：去重那一句恒真、根的 txg 错一）。
         #[test]
-        fn abandoned_root_named_by_reads_the_instance_and_the_txg() {
-            let detail = "被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头；被抛弃的根（实例 12、txg 340）引用的单元已被重新分配";
-            assert_eq!(abandoned_root_named_by(detail), vec![(1, 5), (12, 340)]);
-            assert!(abandoned_root_named_by("别的违例").is_empty());
+        fn the_checker_reading_of_a_conclusion_keeps_the_invariant_order_and_dedups_only_the_named_roots_kept_once(
+        ) {
+            use singlefs_checker::image::IMPLEMENTED_INVARIANTS;
+            use singlefs_checker_tier::crash_given_states::{
+                AbandonedRootNamedByThePoolChecker, GivenStateConclusion,
+            };
+            use singlefs_checker_tier::crash_judge_conclusions::{
+                CrossCheckWords, LandedRootWords,
+            };
+            use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+            let position_of = |invariant: &str| {
+                IMPLEMENTED_INVARIANTS
+                    .iter()
+                    .position(|implemented| *implemented == invariant)
+                    .expect("用例点名的不变量在已实现的表里")
+            };
+            let later_invariant = "I-7.4";
+            let earlier_invariant = IMPLEMENTED_INVARIANTS[0];
+            assert!(position_of(earlier_invariant) < position_of(later_invariant));
+            let violated_bits =
+                (1u128 << position_of(later_invariant)) | (1u128 << position_of(earlier_invariant));
+            let named = |instance: u32, checkpoint_txg: u64| AbandonedRootNamedByThePoolChecker {
+                instance: InstanceGeneration(instance),
+                checkpoint_txg: CheckpointTxg(checkpoint_txg),
+            };
+            let conclusion = GivenStateConclusion {
+                words: CrossCheckWords {
+                    red_bits: 0,
+                    pool_checker_violated_bits: violated_bits,
+                    consulted_pass_landed_root: LandedRootWords::NOT_LANDED,
+                    ignored_pass_landed_root: LandedRootWords::NOT_LANDED,
+                    consulted_pass_outcome: 0,
+                    ignored_pass_outcome: 0,
+                    consulted_pass_failure_point: 0,
+                    ignored_pass_failure_point: 0,
+                    pool_checker_judged_bits: violated_bits,
+                    gpu_could_not_judge: false,
+                },
+                pool_checker_violation_details: Vec::new(),
+                abandoned_roots_named_by_the_pool_checker: vec![
+                    named(1, 5),
+                    named(12, 340),
+                    named(1, 5),
+                ],
+            };
+            let reading = checker_reading_of_the_conclusion(&conclusion);
+            assert_eq!(
+                reading.red_invariants,
+                vec![earlier_invariant, later_invariant],
+                "红的不变量按已实现那张表的次序"
+            );
+            assert_eq!(
+                reading.abandoned_roots_named_in_the_order_of_the_detail,
+                vec![(1, 5), (12, 340), (1, 5)],
+                "按细节次序、重复照留的那一份原样交"
+            );
+            assert_eq!(
+                reading.abandoned_roots_named,
+                vec![(1, 5), (12, 340)],
+                "去重的那一份按第一次出现的次序"
+            );
+            assert!(reading.abandoned_half_is_red());
         }
 
         #[test]
@@ -22082,11 +22301,13 @@ mod fourth_run_segment_two {
             assert_eq!(genesis.literal, "older:0");
         }
 
-        /// 装置执行器在今天那一臂上与 harness 执行器逐步同一份镜像、同样多的调用（S9 末句、S7 的前提；变异 M35 让藏起来的那几段不再读回全 0）。
+        /// 装置执行器在今天那一臂上与 harness 执行器逐步同一份镜像、同样多的写与屏障、读不少于 harness（它的稀疏盘答日志环记录槽提示、少读没写过的槽）
+        /// （S9 末句、S7 的前提；变异 M35 让藏起来的那几段不再读回全 0）。
         #[test]
         fn device_executor_agrees_with_the_harness_executor_on_the_two_written_histories() {
             for segment in [shortest(), row_forty_three()] {
-                let (executor, _) = run_the_main_branch(today(), &segment);
+                let (executor, _) =
+                    run_the_main_branch(today(), &segment, PoolCheckerOnEveryStep::Skipped);
                 let (compared, mismatches) =
                     executor_agreement(&executor, &harness_trace(&segment.history));
                 assert!(compared > 0, "{}：harness 一步都没观察到", segment.label);
@@ -22094,22 +22315,48 @@ mod fourth_run_segment_two {
             }
         }
 
-        /// 比对真的看调用数：把 harness 那一份的读数改大一次，就对不上（变异 M34）。
+        /// 比对真的看调用数：把 harness 那一份的写数改大一次，就对不上（变异 M34）；把 harness 那一份的读数改到比装置的多，也对不上。
         #[test]
         fn executor_agreement_catches_a_different_call_count() {
             let segment = shortest();
-            let (executor, _) = run_the_main_branch(today(), &segment);
+            let (executor, _) =
+                run_the_main_branch(today(), &segment, PoolCheckerOnEveryStep::Skipped);
             let mut trace = harness_trace(&segment.history);
-            trace[1].2.reads += 1;
+            trace[1].2.writes += 1;
             let (_, mismatches) = executor_agreement(&executor, &trace);
-            assert_eq!(mismatches.len(), 1);
+            assert_eq!(mismatches.len(), 1, "写数多一次要对不上");
+            let mut trace_reading_more_than_the_device = harness_trace(&segment.history);
+            trace_reading_more_than_the_device[1].2.reads = u64::MAX;
+            let (_, read_mismatches) =
+                executor_agreement(&executor, &trace_reading_more_than_the_device);
+            assert_eq!(read_mismatches.len(), 1, "harness 读得比装置多要对不上");
         }
 
         /// 登记 5.3：这一族判红不截断，第 43 行那条 8 步走完、尾巴跑了（变异 M22 打开「判红就停」）。
+        /// 每一步的判定由用例给、每一步都红（I-7.4 红、不点名根）：判红不截断是执行器的行为，与判法无关，不经给定状态引擎
+        /// （配了 GPU 而这份二进制没编进 `gpu` 特性时引擎只录不判，这一条照样判得出）。
         #[test]
         fn row_forty_three_walks_every_step_and_runs_the_tail() {
             let segment = row_forty_three();
-            let (executor, branch) = run_the_main_branch(today(), &segment);
+            let every_step_is_red = |_image: &MemoryPool| CheckerReading {
+                red_invariants: vec!["I-7.4"],
+                abandoned_roots_named: Vec::new(),
+                abandoned_roots_named_in_the_order_of_the_detail: Vec::new(),
+            };
+            let (executor, branch) = run_the_main_branch(
+                today(),
+                &segment,
+                PoolCheckerOnEveryStep::ReadingsGivenByATest(every_step_is_red),
+            );
+            assert!(
+                executor
+                    .steps
+                    .iter()
+                    .filter(|step| step.order >= 1)
+                    .filter_map(|step| step.checker.as_ref())
+                    .any(|reading| !reading.red_invariants.is_empty()),
+                "用例给的判定逐步都红：执行器至少记下一步判红的（不然「判红不截断」无从核）"
+            );
             let walked = executor
                 .steps
                 .iter()
@@ -22132,7 +22379,7 @@ mod fourth_run_segment_two {
                 today(),
                 history.starting_point,
                 SharedFaultPlan::unarmed(HistoryDeviceWidth::FourGibibytes.fixed_geometry()),
-                false,
+                PoolCheckerOnEveryStep::Skipped,
             );
             executor.run_the_operations(&GeneratedHistory {
                 seed: history.seed,
@@ -22173,7 +22420,7 @@ mod fourth_run_segment_two {
                 today(),
                 segment.history.starting_point,
                 SharedFaultPlan::unarmed(HistoryDeviceWidth::FourGibibytes.fixed_geometry()),
-                false,
+                PoolCheckerOnEveryStep::Skipped,
             );
             executor.run_the_operations(&segment.history);
             let stream = segmented_stream_of(&executor);
@@ -22201,7 +22448,8 @@ mod fourth_run_segment_two {
         #[test]
         fn crash_branch_read_back_after_its_mount_goes_by_the_roots_that_branch_wrote() {
             let segment = seventh_crash_history();
-            let (mut main, _) = run_the_main_branch(today(), &segment);
+            let (mut main, _) =
+                run_the_main_branch(today(), &segment, PoolCheckerOnEveryStep::Skipped);
             let stream = segmented_stream_of(&main);
             let point = CrashPointKey {
                 index: 0,
@@ -22253,7 +22501,7 @@ mod fourth_run_segment_two {
         #[test]
         fn fault_point_fires_at_the_arm_ordinal_of_the_named_call_within_the_step() {
             let segment = shortest();
-            let (main, _) = run_the_main_branch(today(), &segment);
+            let (main, _) = run_the_main_branch(today(), &segment, PoolCheckerOnEveryStep::Skipped);
             let order = (1..main.calls_after_step.len())
                 .find(|order| {
                     main.calls_after_step[*order].barriers
@@ -22271,6 +22519,215 @@ mod fourth_run_segment_two {
             assert_eq!(branch.fired_call_ordinal, Some(barriers_before + 2));
         }
     }
+}
+
+/// 崩溃注入的给定状态表交崩溃点重放的引擎判（表与结论进家目录下给定状态表那一类的判定库；配了 GPU 且编进了 `gpu` 特性上卡，否则 CPU）。
+/// 这份装置的产物只收它自己打的行：引擎不调 `finish`，不打收尾行。
+fn given_states_engine_of_this_experiment(
+    seeds_and_scale: &str,
+) -> singlefs_checker_tier::crash_amplification::GivenStatesEngine {
+    singlefs_checker_tier::crash_amplification::GivenStatesEngine::start_from_environment(
+        singlefs_checker_tier::crash_amplification::GivenStatesItem {
+            item_name: "e158_root_choice_repair".to_string(),
+            setting_file: "crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs".to_string(),
+            seeds_and_scale: seeds_and_scale.to_string(),
+        },
+        &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+        &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
+    )
+    .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+}
+
+/// 故障注入（`singlefs_harness::fault_injection::inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`，
+/// 原先那两处 harness 就地判、判红就停的那一档换成它，用户 2026-10-14 定）一个注入点交出去的盘交 `engine` 两段判，
+/// 交回池级 checker 的结论：重开那张盘的录制流的前缀（每步镜像各一个、整条一个）建成给定状态表，被吞的写插回去那张盘另一张表；
+/// 录入段写进家目录下给定状态表那一类的判定库、判段从库里读回判（配了 GPU 且编进 `gpu` 特性在卡上判，否则 CPU 判器判），判过的复用。
+/// 表名是 `table_name` 接上前缀那一截；一个注入点每交一次给一个新名字（同一趟里同名而持久集合不同的两张表，录入段报错）。
+///
+/// # Panics
+/// 引擎判不了某张表（不退回别处判）；某张表交回的是占位结论（这一趟只录：配置开了 GPU 而没编进 `gpu` 特性，或设了只录那一段；
+/// 或那张表归别的机器判）：装置要的是判过的结论，交不出就停，不拿占位往下走。
+fn pool_checker_verdicts_of_the_images_after_a_fault_through_the_engine(
+    engine: &singlefs_checker_tier::crash_amplification::GivenStatesEngine,
+    table_name: &str,
+    execution: singlefs_harness::history::HistoryExecution,
+    images: &singlefs_harness::fault_injection::ImagesAfterAFault,
+) -> singlefs_harness::fault_injection::PoolCheckerVerdictsAfterAFault {
+    let mut prefixes: Vec<usize> = images
+        .step_images_of_the_run_with_the_fault
+        .iter()
+        .map(|step_image| step_image.operations_recorded)
+        .collect();
+    prefixes.push(images.image_after_the_fault.operations.len());
+    let mut violations_of_the_prefixes = pool_checker_violations_of_the_prefixes_through_the_engine(
+        engine,
+        table_name,
+        &images.image_after_the_fault,
+        execution,
+        &prefixes,
+    );
+    let violations_after_the_fault = violations_of_the_prefixes
+        .pop()
+        .expect("整条录制流那一个前缀在最后");
+    let invariants_still_violated_if_the_swallowed_writes_had_landed = images
+        .image_with_the_swallowed_writes_landed
+        .as_ref()
+        .map_or_else(BTreeSet::new, |landed| {
+            pool_checker_violations_of_the_prefixes_through_the_engine(
+                engine,
+                &format!("{table_name}/swallowed-writes-landed"),
+                landed,
+                execution,
+                &[landed.operations.len()],
+            )
+            .into_iter()
+            .flatten()
+            .map(|(invariant, _)| invariant)
+            .collect()
+        });
+    singlefs_harness::fault_injection::PoolCheckerVerdictsAfterAFault {
+        violations_of_the_step_images: violations_of_the_prefixes,
+        violations_after_the_fault,
+        invariants_still_violated_if_the_swallowed_writes_had_landed,
+    }
+}
+
+/// 一张盘的录制流的若干个前缀（`prefixes`：每个是录制流里的步数）建成给定状态表交 `engine` 判，交回与 `prefixes` 同序的池级 checker 违例：
+/// 录制流里 mkfs 写的那几步进基线，每个前缀一个持久集合（前缀里的写全落、之后的一个都没落），掉电接缝相同的几个前缀一张表。
+/// 表的建法照抄 `crates/singlefs-checker-tier/tests/crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library.rs`
+/// 的 `judge_prefixes_of_a_recorded_stream`（那份用例自己的计数去掉）。
+///
+/// # Panics
+/// 同 [`pool_checker_verdicts_of_the_images_after_a_fault_through_the_engine`]。
+fn pool_checker_violations_of_the_prefixes_through_the_engine(
+    engine: &singlefs_checker_tier::crash_amplification::GivenStatesEngine,
+    table_name: &str,
+    recorded: &singlefs_harness::fault_injection::RecordedStreamOfAnImage,
+    execution: singlefs_harness::history::HistoryExecution,
+    prefixes: &[usize],
+) -> Vec<Vec<(&'static str, String)>> {
+    use singlefs_checker_tier::crash_given_states::GivenStatesOfATable;
+    use singlefs_checker_tier::crash_injection::HistoryAfterTheMakeFilesystem;
+    use singlefs_harness::memory_pool::{
+        writes_and_segments_with_stream_indexes, RecordStreamSeam,
+    };
+    let geometry = execution.device_width.fixed_geometry();
+    let (writes, segments, stream_indexes) =
+        writes_and_segments_with_stream_indexes(&recorded.operations, &geometry);
+    let history_after_the_make_filesystem = HistoryAfterTheMakeFilesystem::of(
+        &writes,
+        &segments,
+        &stream_indexes,
+        recorded.operations_written_by_make_filesystem,
+        execution,
+    );
+    // 每次掉电之后第一个写在写表里的下标：取录制流下标不小于掉电之后第一步的第一个写（写表不算屏障），掉电之后一个写都没录下的取写表长度
+    let first_write_after_each_power_loss: Vec<usize> = recorded
+        .first_stream_index_after_each_power_loss
+        .iter()
+        .map(|first_stream_index_after_the_power_loss| {
+            stream_indexes
+                .iter()
+                .position(|stream_index| *stream_index >= *first_stream_index_after_the_power_loss)
+                .unwrap_or(stream_indexes.len())
+        })
+        .collect();
+    let mut prefixes_by_power_losses: BTreeMap<Vec<usize>, Vec<usize>> = BTreeMap::new();
+    let mut persisted_writes_of_each_prefix: Vec<usize> = Vec::with_capacity(prefixes.len());
+    for (prefix_index, operations_recorded) in prefixes.iter().enumerate() {
+        let persisted_writes = stream_indexes
+            .iter()
+            .filter(|stream_index| **stream_index < *operations_recorded)
+            .count();
+        persisted_writes_of_each_prefix.push(persisted_writes);
+        let power_losses_before_the_prefix_ends: Vec<usize> = first_write_after_each_power_loss
+            .iter()
+            .copied()
+            .filter(|first_write_after_the_power_loss| {
+                *first_write_after_the_power_loss <= persisted_writes
+            })
+            .collect();
+        prefixes_by_power_losses
+            .entry(power_losses_before_the_prefix_ends)
+            .or_default()
+            .push(prefix_index);
+    }
+    let mut violations: Vec<Option<Vec<(&'static str, String)>>> = vec![None; prefixes.len()];
+    for (power_losses, prefix_indexes) in prefixes_by_power_losses {
+        let seams: Vec<RecordStreamSeam> = power_losses
+            .iter()
+            .map(
+                |first_write_after_the_power_loss| RecordStreamSeam::AfterAPowerLoss {
+                    first_write_after_the_power_loss: history_after_the_make_filesystem
+                        .index_in_the_table(*first_write_after_the_power_loss),
+                },
+            )
+            .collect();
+        let persisted_sets: Vec<Vec<bool>> = prefix_indexes
+            .iter()
+            .map(|prefix_index| {
+                let persisted_writes = persisted_writes_of_each_prefix[*prefix_index];
+                let persisted_over_the_whole_write_table: Vec<bool> = (0..writes.len())
+                    .map(|write_index| write_index < persisted_writes)
+                    .collect();
+                history_after_the_make_filesystem
+                    .persisted_set_of_the_table(&persisted_over_the_whole_write_table)
+            })
+            .collect();
+        let table = GivenStatesOfATable {
+            table_name: format!("{table_name}/power-losses={power_losses:?}"),
+            base: history_after_the_make_filesystem.base(),
+            writes: history_after_the_make_filesystem.writes(),
+            segments: history_after_the_make_filesystem.segments(),
+            seams: &seams,
+            persisted_sets,
+        };
+        let states = given_states_judged_on_this_host_through_the_engine(engine, &table);
+        assert_eq!(
+            states.len(),
+            prefix_indexes.len(),
+            "判器逐状态交回结论，与表里的状态同序"
+        );
+        for (prefix_index, conclusion) in prefix_indexes.into_iter().zip(states) {
+            violations[prefix_index] = Some(conclusion.pool_checker_violations());
+        }
+    }
+    violations
+        .into_iter()
+        .map(|violations| violations.expect("每个前缀恰好落在一组掉电接缝里"))
+        .collect()
+}
+
+/// 一张给定状态表交 `engine` 判，交回逐状态的结论（与表里的持久集合同序）：这一台判的或从判定库读回的才收。
+///
+/// # Panics
+/// 引擎判不了这张表（不退回别处判）；交回的是占位结论（这一趟只录：配置开了 GPU 而没编进 `gpu` 特性，或设了只录那一段；
+/// 或那张表归别的机器判）：装置要的是判过的结论，交不出就停，不拿占位往下走。
+fn given_states_judged_on_this_host_through_the_engine(
+    engine: &singlefs_checker_tier::crash_amplification::GivenStatesEngine,
+    table: &singlefs_checker_tier::crash_given_states::GivenStatesOfATable<'_>,
+) -> Vec<singlefs_checker_tier::crash_given_states::GivenStateConclusion> {
+    use singlefs_checker_tier::crash_given_states::{
+        GivenStatesConclusionsSource, GivenStatesJudge,
+    };
+    let judged_table = engine
+        .judge_the_given_states(table)
+        .unwrap_or_else(|reason| {
+            panic!(
+                "给定状态表 {} 判不了（不退回别处判）：{reason}",
+                table.table_name
+            )
+        });
+    match judged_table.source {
+        GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+        GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
+        | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => panic!(
+            "给定状态表 {} 交回的是占位结论：实验装置不分只录、只判两趟跑，也不分片（起它时不设 SINGLEFS_CRASH_AMPLIFICATION_STAGE 与 \
+             SINGLEFS_CRASH_AMPLIFICATION_SHARE）；多机配置开了 GPU 时要编进 gpu 特性起（不编进时判段不跑、只录）",
+            table.table_name
+        ),
+    }
+    judged_table.states
 }
 
 fn main() {
@@ -23359,7 +23816,7 @@ mod tests {
 
     /// H-C2 机制假说的最小复现，不依赖任何臂改法：只把设备 0 上世代号更高的系统配置槽读失败，
     /// `singlefs_core::recovery::choose_system_configuration` 交回的 `slot_generation` 应当退回
-    /// 设备 0 自己更旧的那一份，不看设备 1（`recovery.rs` 第 516 行起，`chosen` 只在 `None` 时
+    /// 设备 0 自己更旧的那一份，不看设备 1（`recovery.rs` 的 `choose_system_configuration`，`chosen` 只在 `None` 时
     /// 赋值一次）。这条测试不碰任何臂改法，验证的是「今天」这份 `choose_system_configuration`
     /// 本身的行为——H-C2 三个驱动函数（十三点六节）依赖的正是这个行为。
     #[test]
@@ -23752,7 +24209,7 @@ mod tests {
     }
 
     /// session s9（实十九提醒，2026-09-24 落地）：中央映射树条目数超过单节点叶容量
-    /// （`transaction.rs` 第 1334 行「中央映射树叶 294」）会长成多层，根节点变成内部节点
+    /// （`transaction.rs` 里「中央映射树叶 294」那一句）会长成多层，根节点变成内部节点
     /// （`level > 0`）。这里手工构造一个合法但 `level=1` 的假节点，覆盖真实中央映射树根的两份物理
     /// 拷贝，验证 `allocation_record_tree_reachable_placements_via_central_mapping` 显式拦下它——
     /// 不是靠 `parse_mapping_entry` 的宽度检查侥幸拦住：内部条目宽约 114 字节（`transaction.rs`

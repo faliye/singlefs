@@ -27,25 +27,27 @@
 //! - 五、core 读系统配置的 journal 环起点（偏移 325）与根环起点（偏移 371），与第一版常量不等整池拒（Y4-a）。
 //!
 //! 盘：两块内存稀疏盘（`SparseBlockDevice`），改盘上字节之后重封每一道校验和；读故障用这个文件自己的包装盘按「这一段第几次读」坏。
-use std::cell::RefCell;
-use std::collections::BTreeSet;
-use std::rc::Rc;
+mod common_images_for_the_checker_tier;
+#[path = "common_images_for_the_checker_tier/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs"]
+mod scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over;
 
-use singlefs_checker::image::{ImageReader, InvariantVerdict};
-use singlefs_checker::walk::check_pool_image;
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::{
+    chosen_read_faults_of, content_of, parameters_with_journal_ring_bytes,
+    pool_after_the_first_file, sparse_devices, system_configuration_slot_bytes,
+    with_chosen_read_faults, without_chosen_read_faults, ChosenReadFault, ChosenReadFaultsOfARange,
+    DeviceFailingChosenReads, PoolAfterTheFirstFile, SparseDevices, FOUR_GIBIBYTES, MEBIBYTE,
+    SECTOR_PHYSICAL_BLOCK_SIZE, WRITE_TIME_SECONDS,
+};
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
-use singlefs_core::allocator::{
-    PoolAllocator, UnitAreaStart, UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
-};
-use singlefs_core::block_device::{
-    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
-};
+use singlefs_core::allocator::UnitAreaStartOffTheClusterSegmentBoundaryUnsupported;
+use singlefs_core::block_device::BlockDevice;
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
 use singlefs_core::make_filesystem::{
-    allocator_after_make_filesystem, make_filesystem, MakeFilesystemError,
-    MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
+    make_filesystem, MakeFilesystemError, MakeFilesystemParameters, INSTANCE_TABLE_SLOT,
+    TREE_TABLE_GENESIS_SLOT,
 };
 use singlefs_core::mount::{
     mount_writable, raise_rollback_floor, ring_slots_known_to_hold_a_root_by,
@@ -59,20 +61,18 @@ use singlefs_core::recovery::{
     effective_rollback_floor_rereading_unreadable_reads_once, every_root_ring_slot,
     read_root_ring_slot, readable_roots,
     readable_roots_rereading_ring_slots_known_to_hold_a_root_once, readable_roots_with_ring_slots,
-    recover, verified_system_configuration_slots, BadRootRingSlotReading,
-    InstanceTableOfTheNewestRootStillUnreadableAfterOneReread, JournalPolicy, RecoveryFailure,
-    RecoveryOutcome, RootRingSlotKnownToHoldARootStillBadAfterOneReread, RootRingSlotReading,
+    verified_system_configuration_slots, BadRootRingSlotReading,
+    InstanceTableOfTheNewestRootStillUnreadableAfterOneReread, RecoveryFailure,
+    RootRingSlotKnownToHoldARootStillBadAfterOneReread, RootRingSlotReading,
     SystemConfigurationValueOutsideWhatThisReaderAccepts,
 };
 use singlefs_core::root_record::RootRecord;
-use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
+use singlefs_core::root_ring::{slot_offset, RootRingSlot};
 use singlefs_core::system_configuration::{
-    unit_area_start_slot_recorded_in_the_slot, SystemImmutableSizes,
-    SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+    unit_area_start_slot_recorded_in_the_slot, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
 };
 use singlefs_core::transaction::{
-    acquire_instance, publish_first_file, publish_new_inodes, publish_overwrite, warm_up,
-    FirstFile, PoolWriter, TransactionOutput,
+    acquire_instance, publish_new_inodes, publish_overwrite, FirstFile, PoolWriter,
 };
 use singlefs_core::unit::seal_header_checksum;
 use singlefs_format::{
@@ -80,60 +80,13 @@ use singlefs_format::{
     JOURNAL_SAFETY_FACTOR, NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES, ROOT_RING_BASE_SLOT,
     SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
-use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice, SECTOR_BYTES};
+use singlefs_harness::memory_pool::{SparseBlockDevice, SparseDevice, SECTOR_BYTES};
 
-const FOUR_GIBIBYTES: u64 = 4 << 30;
-const MEBIBYTE: u64 = 1 << 20;
-const FILESYSTEM_IDENTIFIER: [u8; 16] = *b"singlefs-rev-a3b";
-const WRITE_TIME_SECONDS: u64 = 1_788_000_000;
-/// 内存稀疏盘按 512 字节扇区存：物理块宽 512。
-const SECTOR_PHYSICAL_BLOCK_SIZE: PhysicalBlockSizeInBytes = PhysicalBlockSizeInBytes(512);
-const FIRST_FILE_BYTES: usize = 3000;
 /// 系统配置槽里 journal 环长那 8 字节（`SystemConfiguration::to_slot` 的写法；`parse_slot` 按它读回）。
 const JOURNAL_RING_BYTES_OFFSET: usize = 333;
+
 /// 系统配置槽里单元区起始槽号那 8 字节（字段表 `layout/01-first-txn.md` 一）。
 const UNIT_AREA_START_SLOT_OFFSET: usize = 417;
-
-type SparseDevices = Vec<(DeviceIdentity, SparseBlockDevice)>;
-
-fn geometry_with_journal_ring_bytes(journal_ring_bytes: u64) -> SystemImmutableSizes {
-    SystemImmutableSizes {
-        physical_block_size: 512,
-        minimum_input_output_bytes: 512,
-        fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(512),
-        journal_ring_bytes,
-        root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
-    }
-}
-
-fn parameters_with_journal_ring_bytes(journal_ring_bytes: u64) -> MakeFilesystemParameters {
-    MakeFilesystemParameters {
-        filesystem_identifier: FILESYSTEM_IDENTIFIER,
-        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
-        geometry: geometry_with_journal_ring_bytes(journal_ring_bytes),
-    }
-}
-
-fn content_of(length_in_bytes: usize, seed: u64) -> Vec<u8> {
-    (0..length_in_bytes)
-        .map(|index| {
-            let index = u64::try_from(index).expect("长度装得进 u64");
-            u8::try_from((index * 131 + seed * 7 + 1) % 251).expect("小于 256")
-        })
-        .collect()
-}
-
-fn sparse_devices(device_bytes: u64) -> SparseDevices {
-    [DeviceIdentity(0), DeviceIdentity(1)]
-        .into_iter()
-        .map(|identity| {
-            (
-                identity,
-                SparseBlockDevice::new(device_bytes, SECTOR_PHYSICAL_BLOCK_SIZE),
-            )
-        })
-        .collect()
-}
 
 fn images_of(
     devices: &[(DeviceIdentity, SparseBlockDevice)],
@@ -150,98 +103,6 @@ fn device_mut(devices: &mut SparseDevices, device: DeviceIdentity) -> &mut Spars
         .find(|(identity, _)| *identity == device)
         .expect("池里有这块盘")
         .1
-}
-
-fn memory_pool_of(
-    devices: &[(DeviceIdentity, SparseBlockDevice)],
-    device_bytes: u64,
-) -> MemoryPool {
-    MemoryPool {
-        devices: devices
-            .iter()
-            .map(|(identity, device)| (*identity, device.image.clone()))
-            .collect(),
-        device_size_in_bytes: device_bytes,
-    }
-}
-
-/// 池级 checker 判红的不变量名（`check_pool_image` 交回的判定里 `Violated` 的那几条）。
-fn checker_violations(image: &MemoryPool) -> Vec<(&'static str, String)> {
-    check_pool_image(image)
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .collect()
-}
-
-/// 两块内存盘上 mkfs → 取号 1 → 暖机 → 第一个文件（txg 3），分配器是 mkfs 同一个进程那一条（`allocator_after_make_filesystem`）。
-struct PoolAfterTheFirstFile {
-    parameters: MakeFilesystemParameters,
-    device_bytes: u64,
-    devices: SparseDevices,
-    unit_area_start: UnitAreaStart,
-    allocator: PoolAllocator,
-    instance: InstanceGeneration,
-    first: TransactionOutput,
-}
-
-fn pool_after_the_first_file(journal_ring_bytes: u64, device_bytes: u64) -> PoolAfterTheFirstFile {
-    let parameters = parameters_with_journal_ring_bytes(journal_ring_bytes);
-    let mut devices = sparse_devices(device_bytes);
-    let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
-    let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
-    let content = content_of(FIRST_FILE_BYTES, 0);
-    let (instance, first) = {
-        let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
-        let instance = acquire_instance(&mut writer).expect("取号 1");
-        let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
-        let first = publish_first_file(
-            &mut writer,
-            &mut allocator,
-            warmed.roots.last().expect("暖机写了两条根"),
-            FirstFile {
-                content: &content,
-                write_time_seconds: WRITE_TIME_SECONDS,
-            },
-            instance,
-            &warmed.last_record_bytes,
-        )
-        .expect("第一个文件");
-        (instance, first)
-    };
-    PoolAfterTheFirstFile {
-        parameters,
-        device_bytes,
-        devices,
-        unit_area_start: genesis.unit_area_start,
-        allocator,
-        instance,
-        first,
-    }
-}
-
-/// 一块盘系统配置槽 `slot_index`（0 或 1）的原样字节。
-fn system_configuration_slot_bytes(
-    devices: &[(DeviceIdentity, SparseBlockDevice)],
-    device: DeviceIdentity,
-    slot_index: u64,
-    parameters: &MakeFilesystemParameters,
-) -> Vec<u8> {
-    let offset = slot_index * u64::from(parameters.geometry.fixed_structure_slot_spacing);
-    devices
-        .iter()
-        .find(|(identity, _)| *identity == device)
-        .expect("池里有这块盘")
-        .1
-        .image
-        .read(
-            DeviceOffsetInBytes(offset),
-            usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096"),
-        )
 }
 
 /// 两块盘各两个系统配置槽逐个改一下、整槽校验和重封：池级字段两盘四槽同值，改就四槽一起改。
@@ -289,8 +150,6 @@ fn crc32_of_the_images(devices: &[(DeviceIdentity, SparseBlockDevice)], device_b
     }
     crc32_castagnoli(&fed)
 }
-
-// ─── 一、单元区起点随环长走 ───
 
 /// 默认环 768 MiB 上 mkfs → 取号 → 暖机 → 第一个文件之后，两块盘整盘镜像的 CRC-32C。钉值是下面最后一次换钉那一版代码写出的字节，
 /// 不是实审 A3b 改单元区起点之前那一版的：最初钉的是那一版（实审 A3b 开工时主工作区的副本上同一段流程现算，
@@ -353,98 +212,20 @@ fn the_default_journal_ring_keeps_the_unit_area_at_slot_50176_and_the_new_pool_f
     );
 }
 
-/// 一条非默认环长上走完 mkfs → 第一个文件 → 可写挂载 → 冷走读 → 池级 checker，逐处核单元区起点都是环长现算的那个 `expected_start`。
-fn assert_the_unit_area_follows_a_journal_ring_of(
-    journal_ring_bytes: u64,
-    device_bytes: u64,
-    expected_start: u64,
-) {
-    let mut pool = pool_after_the_first_file(journal_ring_bytes, device_bytes);
-    assert_eq!(
-        pool.unit_area_start.slot(),
-        SlotNumber(expected_start),
-        "mkfs 按环长现算的单元区起点"
-    );
-    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
-        assert_eq!(
-            unit_area_start_slot_recorded_in_the_slot(&system_configuration_slot_bytes(
-                &pool.devices,
-                device,
-                0,
-                &pool.parameters,
-            )),
-            SlotNumber(expected_start),
-            "系统配置偏移 417 的 8 字节写的是现算的起点（盘 {device:?}）"
-        );
-    }
-    let genesis_instance_table_slot = pool.first.root.instance_table.locations[0].slot;
-    assert_eq!(
-        genesis_instance_table_slot,
-        SlotNumber(expected_start),
-        "mkfs 的实例表第 0 片就写在单元区起点（第一个文件照抄它的指针）"
-    );
-    assert!(
-        pool.first
-            .allocation_records
-            .iter()
-            .all(|record| record.slot.0 >= expected_start),
-        "第一个文件的每一条分配记录都落在单元区起点之后：{:?}",
-        pool.first.allocation_records
-    );
-    let journal_ring_end_slot =
-        (JOURNAL_RING_START_SLOT * SLOT_BYTES + journal_ring_bytes).div_ceil(SLOT_BYTES);
-    assert!(
-        journal_ring_end_slot <= expected_start,
-        "单元区起点不在 journal 环里"
-    );
-    let image_after_the_first_file = memory_pool_of(&pool.devices, pool.device_bytes);
-    for device in [0, 1] {
-        let candidates = ImageReader::candidate_unit_slots(&image_after_the_first_file, device)
-            .expect("内存镜像交得出单元扫描候选");
-        assert!(
-            candidates.contains(&expected_start)
-                && candidates.iter().all(|slot| *slot >= expected_start),
-            "崩溃镜像的单元扫描候选从盘上记着的单元区起点起、罩住 mkfs 的实例表（盘 {device}）：{:?}",
-            candidates.iter().take(4).collect::<Vec<_>>()
-        );
-    }
-    let violations = checker_violations(&image_after_the_first_file);
-    assert!(
-        violations.is_empty(),
-        "池级 checker 按偏移 417 那 8 字节划单元区，一条不红：{violations:?}"
-    );
-    let mounted = mount_writable(&pool.parameters, &mut pool.devices).expect("可写挂载");
-    for device_map in &mounted.allocator.devices {
-        assert_eq!(
-            device_map.unit_area_start().slot(),
-            SlotNumber(expected_start),
-            "挂载按盘上系统配置建的空闲图从现算的起点起"
-        );
-    }
-    let report = recover(&pool.devices, JournalPolicy::Consult);
-    assert!(
-        matches!(report.outcome, RecoveryOutcome::FileRead { ref content, .. } if *content == content_of(FIRST_FILE_BYTES, 0)),
-        "冷走读读回第一个文件：{:?}",
-        report.outcome
-    );
-    let violations_after_the_mount =
-        checker_violations(&memory_pool_of(&pool.devices, pool.device_bytes));
-    assert!(
-        violations_after_the_mount.is_empty(),
-        "可写挂载写行、暖机之后池级 checker 一条不红：{violations_after_the_mount:?}"
-    );
-}
-
-/// 环 1 GiB（改之前 mkfs 按「环末端越过编译期的单元区起点」拒）：单元区从 1024 + 65536 = 66560 起，mkfs、第一个文件、可写挂载、冷走读、checker 都按它。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::a_one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn a_one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker() {
-    assert_the_unit_area_follows_a_journal_ring_of(1 << 30, FOUR_GIBIBYTES, 66_560);
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::a_one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker,
+    );
 }
 
-/// 环 128 MiB（改之前单元区照旧从 50176 起、白扔 640 MiB）：单元区从 1024 + 8192 = 9216 起。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::a_128_mebibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn a_128_mebibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker() {
-    assert_the_unit_area_follows_a_journal_ring_of(128 * MEBIBYTE, FOUR_GIBIBYTES, 9216);
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::a_128_mebibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker,
+    );
 }
 
 /// 环 128 MiB 加一槽：末尾的下一个槽 9217 不在 64 槽段边界上，mkfs 在任何写之前拒成 `UnitAreaStartOffTheClusterSegmentBoundaryUnsupported`，
@@ -537,8 +318,6 @@ fn a_system_configuration_whose_in_flight_limit_overflows_its_four_bytes_is_refu
     );
 }
 
-// ─── 二、在飞上限装不进 4 字节：mkfs 在任何写之前拒 ───
-
 /// 两块 200 TiB 的稀疏盘（环长上界「≤ 容量 ÷ 4」放行 48 TiB 的环）上 mkfs：在任何写之前拒成
 /// `JournalInFlightRecordLimitWiderThanItsFourByteField { 48 TiB, 2³² }`，两块盘一个扇区都没写。改之前清完根环与 journal 环、写完两个单元与三条根，
 /// 在写系统配置那一步 panic（`to_slot` 里「在飞上限 4 字节」那句 expect）。
@@ -568,8 +347,6 @@ fn a_journal_ring_whose_in_flight_limit_overflows_four_bytes_is_refused_by_mkfs_
     );
 }
 
-// ─── 三、树表条目的排序契约（实审 A3c Q-A 甲） ───
-
 /// 码 2 节点第 `index` 条条目在节点里的字节范围（条目区从 86 + 2k + 29 起，条目宽住 84 + 2k）。
 fn entry_range_in_node(node: &[u8], index: usize) -> std::ops::Range<usize> {
     let key_width = usize::from(node[51]);
@@ -592,6 +369,7 @@ fn reseal_index_node(node: &mut [u8]) {
 
 /// 树表条目里种类那 2 字节的偏移（树 ID 8 + 条目长度 2 之后，D8（核心索引结构） 已定项 8）。
 const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
+
 /// 树表里种类是 `kind` 的那一条的下标；找遍第一个文件那一版树表的全部条目（格式常量 `NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES`）。
 fn index_of_the_entry_of_kind(node: &[u8], kind: u16) -> usize {
     let tree_table_entries_of_a_file_version =
@@ -739,153 +517,6 @@ fn a_tree_table_whose_two_entries_carry_the_same_tree_identifier_is_refused_by_t
     );
 }
 
-// ─── 四、读不出就不无声放过（C554 乙报告 Q6） ───
-
-/// 这个文件自己的读故障：几段落点，每一段按它自己被读的次数（从 1 数，一次读碰到这一段就算一次）点名哪几次读坏。
-/// 两块盘共用一份。
-struct ChosenReadFaults {
-    ranges: Vec<ChosenReadFaultsOfARange>,
-}
-
-/// 点名的那几次读怎么坏。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ChosenReadFault {
-    /// 块设备报 `InputOutput`（读不出）。
-    Fails,
-    /// 读得出，这一段落在这次读里的第一个字节取反（根槽里是 magic 那一字节：自证不过）。
-    ReturnsTheFirstByteOfTheRangeFlipped,
-}
-
-struct ChosenReadFaultsOfARange {
-    device: DeviceIdentity,
-    offset_in_bytes: u64,
-    length_in_bytes: u64,
-    failing_read_numbers: BTreeSet<u64>,
-    fault: ChosenReadFault,
-    reads_so_far: u64,
-}
-
-/// 这一次读里点名要坏的那一段：它怎么坏，和它在这次读里从第几个字节起。
-struct ChosenReadGoingBad {
-    fault: ChosenReadFault,
-    first_byte_of_the_range_in_the_read: usize,
-}
-
-impl ChosenReadFaults {
-    /// 记下这一次读碰到的每一段被读了一次；这一次读里有一段点名这一次坏，就交回第一段点名的那一个。
-    fn note_a_read_and_tell_how_it_goes_bad(
-        &mut self,
-        device: DeviceIdentity,
-        offset_in_bytes: u64,
-        length_in_bytes: u64,
-    ) -> Option<ChosenReadGoingBad> {
-        let mut going_bad = None;
-        for range in &mut self.ranges {
-            let overlaps = range.device == device
-                && offset_in_bytes < range.offset_in_bytes + range.length_in_bytes
-                && range.offset_in_bytes < offset_in_bytes + length_in_bytes;
-            if !overlaps {
-                continue;
-            }
-            range.reads_so_far += 1;
-            if going_bad.is_none() && range.failing_read_numbers.contains(&range.reads_so_far) {
-                going_bad = Some(ChosenReadGoingBad {
-                    fault: range.fault,
-                    first_byte_of_the_range_in_the_read: usize::try_from(
-                        range.offset_in_bytes.saturating_sub(offset_in_bytes),
-                    )
-                    .expect("一次读里的偏移装得进 usize"),
-                });
-            }
-        }
-        going_bad
-    }
-}
-
-/// 按 [`ChosenReadFaults`] 读坏的内存盘；写、写零、屏障原样交给里面那块盘。
-struct DeviceFailingChosenReads {
-    identity: DeviceIdentity,
-    inner: SparseBlockDevice,
-    faults: Rc<RefCell<ChosenReadFaults>>,
-}
-
-impl BlockDevice for DeviceFailingChosenReads {
-    fn read_at(
-        &self,
-        offset: DeviceOffsetInBytes,
-        buffer: &mut [u8],
-    ) -> Result<(), BlockDeviceError> {
-        let length_in_bytes = u64::try_from(buffer.len()).expect("一次读的长度装得进 u64");
-        let going_bad = self
-            .faults
-            .borrow_mut()
-            .note_a_read_and_tell_how_it_goes_bad(self.identity, offset.0, length_in_bytes);
-        match going_bad {
-            None => self.inner.read_at(offset, buffer),
-            Some(ChosenReadGoingBad {
-                fault: ChosenReadFault::Fails,
-                ..
-            }) => Err(BlockDeviceError::InputOutput(std::io::Error::other(
-                "用例点名的这一次读坏",
-            ))),
-            Some(ChosenReadGoingBad {
-                fault: ChosenReadFault::ReturnsTheFirstByteOfTheRangeFlipped,
-                first_byte_of_the_range_in_the_read,
-            }) => {
-                self.inner.read_at(offset, buffer)?;
-                buffer[first_byte_of_the_range_in_the_read] ^= 0xff;
-                Ok(())
-            }
-        }
-    }
-
-    fn write_at(
-        &mut self,
-        offset: DeviceOffsetInBytes,
-        bytes: &[u8],
-        durability: WriteDurability,
-    ) -> Result<(), BlockDeviceError> {
-        self.inner.write_at(offset, bytes, durability)
-    }
-
-    fn write_zeroes_at(
-        &mut self,
-        offset: DeviceOffsetInBytes,
-        length: u64,
-    ) -> Result<(), BlockDeviceError> {
-        self.inner.write_zeroes_at(offset, length)
-    }
-
-    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
-        self.inner.barrier()
-    }
-
-    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
-        self.inner.probe_physical_block_size()
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        self.inner.size_in_bytes()
-    }
-}
-
-/// 一段读故障：哪块盘、从哪个字节起、多长，这一段第几次读坏（读不出）。
-fn chosen_read_faults_of(
-    device: DeviceIdentity,
-    offset_in_bytes: u64,
-    length_in_bytes: u64,
-    failing_read_numbers: &[u64],
-) -> ChosenReadFaultsOfARange {
-    ChosenReadFaultsOfARange {
-        device,
-        offset_in_bytes,
-        length_in_bytes,
-        failing_read_numbers: failing_read_numbers.iter().copied().collect(),
-        fault: ChosenReadFault::Fails,
-        reads_so_far: 0,
-    }
-}
-
 /// 同 [`chosen_read_faults_of`]，点名的那几次读得出、这一段第一个字节取反（自证不过）。
 fn chosen_corrupted_reads_of(
     device: DeviceIdentity,
@@ -901,35 +532,6 @@ fn chosen_corrupted_reads_of(
         fault: ChosenReadFault::ReturnsTheFirstByteOfTheRangeFlipped,
         reads_so_far: 0,
     }
-}
-
-fn with_chosen_read_faults(
-    devices: SparseDevices,
-    ranges: Vec<ChosenReadFaultsOfARange>,
-) -> Vec<(DeviceIdentity, DeviceFailingChosenReads)> {
-    let faults = Rc::new(RefCell::new(ChosenReadFaults { ranges }));
-    devices
-        .into_iter()
-        .map(|(identity, inner)| {
-            (
-                identity,
-                DeviceFailingChosenReads {
-                    identity,
-                    inner,
-                    faults: faults.clone(),
-                },
-            )
-        })
-        .collect()
-}
-
-fn without_chosen_read_faults(
-    devices: Vec<(DeviceIdentity, DeviceFailingChosenReads)>,
-) -> SparseDevices {
-    devices
-        .into_iter()
-        .map(|(identity, device)| (identity, device.inner))
-        .collect()
 }
 
 /// 第一个文件之后在同一个进程里覆盖写三次（txg 4、5、6），现行版本跟着往前推：抬 F 到 3 在上限之内。
@@ -1602,110 +1204,18 @@ fn the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_mem
     );
 }
 
-/// 管理员回退算水位的树 ID 那一半（D23（journal 的角色与格式） 已定项 14「水位」、D8（核心索引结构） 已定项 8 ②「号永不重发」；
-/// C586（回退取树 ID 水位的那一半没有用例），攻方 `research/prompts/m2-closeout-code-r3-opus-output.md`「X1-e」）：
-/// 第一个文件（txg 3）十三棵树发 65536..65549、水位 65549，覆盖写一次（txg 4）照带 65549；环里别的根（mkfs 与暖机）都带 mkfs 种下的 65536。
-/// 回退到 txg 3 时这两条根的槽判候选那两遍（各自第 1、2 次读）读得出，算水位那一遍（第 3 次，`readable_roots`，不重读）都瞬时读不出：
-/// 环里读得出的根都是 65536，只有内存里的现行那一版带 65549。回退那次发布的树 ID 水位仍是 65549——树表里 65536..65549 那几棵树都在水位之下（I-7.8 不红），
-/// 之后再发树 ID 从 65549 起、不重发 65536..65549。只取环里读得出的根时是 65536——`crates/mutations.tsv` 里 C586 那一行证这条断言红。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it(
 ) {
-    let mut pool = pool_after_the_first_file(JOURNAL_RING_DEFAULT_BYTES, FOUR_GIBIBYTES);
-    let sizes = pool.parameters.geometry;
-    let overwritten = {
-        let content = content_of(2097, 1);
-        let mut writer = PoolWriter::new(&pool.parameters, pool.devices.as_mut_slice());
-        publish_overwrite(
-            &mut writer,
-            &mut pool.allocator,
-            &pool.first,
-            FirstFile {
-                content: &content,
-                write_time_seconds: WRITE_TIME_SECONDS + 60,
-            },
-            pool.instance,
-        )
-        .expect("覆盖写")
-    };
-    assert_eq!(overwritten.root.checkpoint_txg, CheckpointTxg(4));
-    assert_eq!(overwritten.root.tree_identifier_watermark, 65549);
-    let roots_in_the_ring = readable_roots_with_ring_slots(
-        &pool.devices,
-        &pool.parameters.region_devices,
-        &sizes,
-        &pool.parameters.filesystem_identifier,
-    );
-    let slots_of_the_roots_carrying_the_first_file_version_watermark: Vec<RootRingSlot> =
-        roots_in_the_ring
-            .iter()
-            .filter(|(_, root)| root.tree_identifier_watermark == 65549)
-            .map(|(ring_slot, _)| *ring_slot)
-            .collect();
-    assert_eq!(
-        roots_in_the_ring
-            .iter()
-            .filter(|(_, root)| root.tree_identifier_watermark == 65549)
-            .map(|(_, root)| root.checkpoint_txg)
-            .collect::<BTreeSet<_>>(),
-        BTreeSet::from([CheckpointTxg(3), CheckpointTxg(4)]),
-        "带 65549 的只有第一个文件与覆盖写那两条根"
-    );
-    assert!(
-        roots_in_the_ring
-            .iter()
-            .all(|(_, root)| root.tree_identifier_watermark == 65549
-                || root.tree_identifier_watermark == 65536),
-        "环里别的根都带 mkfs 种下的 65536"
-    );
-    let parameters = pool.parameters.clone();
-    let mut faulty = with_chosen_read_faults(
-        std::mem::take(&mut pool.devices),
-        slots_of_the_roots_carrying_the_first_file_version_watermark
-            .iter()
-            .map(|ring_slot| {
-                chosen_read_faults_of(
-                    parameters.region_devices[usize::try_from(ring_slot.region).expect("区域号")],
-                    slot_offset(*ring_slot, sizes.fixed_structure_slot_spacing).0,
-                    u64::from(sizes.physical_block_size),
-                    &[3],
-                )
-            })
-            .collect(),
-    );
-    let mut current = overwritten;
-    roll_back_by_a_forward_publish(
-        &parameters,
-        &mut faulty,
-        &mut pool.allocator,
-        &mut current,
-        RollbackTarget {
-            instance: InstanceGeneration(1),
-            checkpoint_txg: CheckpointTxg(3),
-        },
-    )
-    .expect("判候选两遍读得出，回退做成");
-    pool.devices = without_chosen_read_faults(faulty);
-    assert_eq!(
-        current.root.checkpoint_txg,
-        CheckpointTxg(5),
-        "回退那次发布"
-    );
-    assert_eq!(
-        current.root.tree_identifier_watermark, 65549,
-        "回退那次发布的树 ID 水位 = max(现行那一版内存里的 65549, 环里读得出的根的 65536)"
-    );
-    assert_eq!(
-        checker_violations(&memory_pool_of(&pool.devices, pool.device_bytes)),
-        Vec::<(&'static str, String)>::new(),
-        "回退之后池级 checker 不红：树表里的树 ID 都在回退那一版的水位之下（I-7.8）"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it,
     );
 }
 
-// ─── 五、core 读系统配置的 journal 环起点与根环起点（代码三方 m2-closeout-code-r2 Y4-a） ───
-
 /// 系统配置槽里 journal 环起点那 8 字节（16 KiB 槽号，字段表 `layout/01-first-txn.md` 一）。
 const JOURNAL_RING_START_SLOT_OFFSET: usize = 325;
+
 /// 系统配置槽里根环起点那 8 字节（16 KiB 槽号，D22（单元原子性怎么合成） 已定项 16 第 1 句）。
 const ROOT_RING_BASE_SLOT_OFFSET: usize = 371;
 

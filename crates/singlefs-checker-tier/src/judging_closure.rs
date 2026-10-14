@@ -202,7 +202,7 @@ fn note_introducer(
         .insert(introducer);
 }
 
-/// 摘要里记的工具链三行（与 `layer0_progress::Layer0ToolchainIdentity` 的三个字段一一对应；这里不引它，本模块只用 std）。
+/// 摘要里记的工具链三行（与 `crash_point_replay_progress::CrashPointReplayToolchainIdentity` 的三个字段一一对应；这里不引它，本模块只用 std）。
 #[derive(Clone, Copy, Debug)]
 pub struct ClosureToolchainLines<'lines> {
     pub rustc_version_lines: &'lines str,
@@ -545,12 +545,29 @@ fn declared_names(tokens: &[String]) -> BTreeSet<String> {
         .collect()
 }
 
-/// 文件里 `impl` 块给哪些类型写：头（`impl` 到第一个 `{` 或 `;`）里有 `for` 的取 `for` 之后的标识符（被实现 trait 的那个类型），
+/// `impl` 前一个词法单元是这几样之一时，这个 `impl` 起头的是一个条目（`impl` 块）：上一个条目或语句收尾的 `}`、`;`，
+/// 属性收尾的 `]`，模块体、函数体开头的 `{`，`unsafe impl` 的 `unsafe`。别的前一个单元（参数与绑定类型的 `:`、返回类型 `->` 的 `>`、
+/// 元组与泛型实参的 `,`、`(`、`<`，引用的 `&`、`mut`）说明它在类型位置上，是 `impl Trait`，不是 `impl` 块。
+const TOKENS_AN_ITEM_LEVEL_IMPL_FOLLOWS: &[&str] = &["}", ";", "]", "{", "unsafe"];
+
+/// 下标 `position` 上的 `impl` 起头的是不是条目级的 `impl` 块（文件第一个单元，或紧跟在 [`TOKENS_AN_ITEM_LEVEL_IMPL_FOLLOWS`] 之一后面）。
+fn is_an_item_level_impl(tokens: &[String], position: usize) -> bool {
+    match position.checked_sub(1) {
+        None => true,
+        Some(previous_position) => {
+            TOKENS_AN_ITEM_LEVEL_IMPL_FOLLOWS.contains(&tokens[previous_position].as_str())
+        }
+    }
+}
+
+/// 文件里条目级的 `impl` 块给哪些类型写：头（`impl` 到第一个 `{` 或 `;`）里有 `for` 的取 `for` 之后的标识符（被实现 trait 的那个类型），
 /// 没有 `for` 的取整个头。给外部 trait 写 `impl` 的文件（测试设备实现 `BlockDevice` 这类）不因 trait 名被收进来。
+/// 类型位置上的 `impl Trait`（`fn f(judge: impl FnOnce(&GivenStatesOfATable))`、`-> impl Iterator<Item = X>`）不是 `impl` 块，
+/// 不取：流水线的参数类型里写了判器一侧声明的类型，不因此把流水线拉进判器的闭包。
 fn names_in_impl_headers(tokens: &[String]) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for (position, token) in tokens.iter().enumerate() {
-        if token != "impl" {
+        if token != "impl" || !is_an_item_level_impl(tokens, position) {
             continue;
         }
         let mut header: Vec<&String> = tokens[position + 1..]
@@ -648,10 +665,6 @@ pub const GPU_JUDGE_ENTRY_FILE: &str = JUDGE_ENTRY_FILES[1];
 /// 判器引到、而不参与判对错的文件：闭包到这里就停，不收它、也不顺着它往下收。每条写明判器为什么引它、它为什么不判对错。
 pub const JUDGE_CLOSURE_STOP_FILES: &[(&str, &str)] = &[
     (
-        "crates/singlefs-checker-tier/src/layer0_progress.rs",
-        "`crash` 的枚举驱动经它写进度文件、分片账本与发现日志、取工具链身份；判一个状态的路径一行都不读它，工具链身份另拼进摘要",
-    ),
-    (
         "crates/singlefs-checker-tier/src/lib.rs",
         "只有模块声明与 crate 级属性；判器文件测试模块里的 `use super::…` 落不到模块文件时兜底落到它，加一个模块不改任何判定",
     ),
@@ -673,7 +686,7 @@ pub const FILES_THE_JUDGES_MUST_NOT_REACH: &[(&str, &str)] = &[
     ),
 ];
 
-/// 流水线五份（第三轮判决 M2-1、J8）：设点的测试文件都引录制器、存储与进度模块，三种结论的闭包从设点文件出发时停在它们门外，
+/// 流水线七份（第三轮判决 M2-1、J8）：设点的测试文件都引录制器、存储与进度模块，三种结论的闭包从设点文件出发时停在它们门外，
 /// 不收、不往下收——只改派活、存储、对账的提交不换任何一把结论版本。改结论的几处由引擎那一路照 H8 搬进判器一侧的文件。
 pub const PIPELINE_FILES_THE_CONCLUSION_CLOSURES_STOP_AT: &[(&str, &str)] = &[
     (
@@ -693,12 +706,20 @@ pub const PIPELINE_FILES_THE_CONCLUSION_CLOSURES_STOP_AT: &[(&str, &str)] = &[
         "判定库的存取布局：结论怎么按块存、怎么读回，不判一个状态",
     ),
     (
-        "crates/singlefs-checker-tier/src/layer0_progress.rs",
-        "进度文件、分片账本、发现日志与工具链身份；工具链身份另拼进版本",
+        "crates/singlefs-checker-tier/src/crash_point_replay_progress.rs",
+        "发现日志与工具链身份；工具链身份另拼进版本",
+    ),
+    (
+        "crates/singlefs-checker-tier/src/crash_library.rs",
+        "几类测试各一份的长期判定库与两段协议：录入段写库、判段凭项名读回；不判一个状态",
+    ),
+    (
+        "crates/singlefs-checker-tier/src/crash_state_enumeration.rs",
+        "崩溃枚举用例经判定库的两段：整条流当一个崩溃点录进库、判段领块交判器、从库重建计数；判一个状态的逻辑在判器",
     ),
 ];
 
-/// 三种结论的闭包用的停止表：判器的停止表 ∪ 流水线五份，去重、按路径排。
+/// 三种结论的闭包用的停止表：判器的停止表 ∪ 流水线七份，去重、按路径排。
 #[must_use]
 pub fn conclusion_closure_stop_files() -> Vec<&'static str> {
     JUDGE_CLOSURE_STOP_FILES
@@ -1154,9 +1175,17 @@ pub const CONCLUSION_CODE_DIGEST_TABLE_FILE_NAME: &str = "conclusion_code_digest
 /// 表的第一行：表的写法换了就换这一行。
 const CONCLUSION_CODE_DIGEST_TABLE_HEADER: &str = "# singlefs conclusion code digest table 1";
 
-/// 设点文件与观察者代码文件的候选：checker 档 `tests/` 下的每份测试目标（`tests/*.rs`）与每个搭建模块（`tests/*/mod.rs`）。
-/// 设点的测试与观察者今天都住在这里；不在这里的入口编译时没算，跑时比对报「编译时没算」，调用方照「不等」处理。
+/// 设点文件与观察者代码文件的候选：checker 档 `tests/` 下的每份测试目标（`tests/*.rs`）与每个搭建模块（`tests/*/mod.rs`），
+/// 加 [`CONCLUSION_CANDIDATE_BINARY_DIRECTORY`] 下的每份实验装置与 [`CONCLUSION_CANDIDATE_LIBRARY_FILES`] 里的几份。
+/// 不在候选里的入口编译时没算，跑时比对报「编译时没算」，调用方照「不等」处理。
 pub const CONCLUSION_CANDIDATE_DIRECTORY: &str = "crates/singlefs-checker-tier/tests";
+
+/// 实验装置二进制（`src/bin/*.rs`）也设给定状态表的项与崩溃点重放的项：各算一行。
+pub const CONCLUSION_CANDIDATE_BINARY_DIRECTORY: &str = "crates/singlefs-checker-tier/src/bin";
+
+/// 库里自己设项的文件：崩溃注入模块的单测起引擎判给定状态表，设点文件就是它自己。
+pub const CONCLUSION_CANDIDATE_LIBRARY_FILES: &[&str] =
+    &["crates/singlefs-checker-tier/src/crash_injection.rs"];
 
 /// 三种结论的代码摘要表：每个入口一行（种类、文件、摘要）。编译时 `build.rs` 在编它的那棵树上算一份写进二进制，
 /// 跑时从盘上再算一份比（`crash_identity` 的结论版本那一节）。
@@ -1172,23 +1201,37 @@ pub struct ConclusionCodeDigestTableUnreadable {
     pub reason: &'static str,
 }
 
-/// [`CONCLUSION_CANDIDATE_DIRECTORY`] 下的候选文件（仓内路径），按路径排：顶层的 `.rs` 与一层子目录里的 `mod.rs`。
+/// 候选文件（仓内路径），按路径排：[`CONCLUSION_CANDIDATE_DIRECTORY`] 与 [`CONCLUSION_CANDIDATE_BINARY_DIRECTORY`] 顶层的 `.rs`
+/// 与一层子目录里的 `mod.rs`，加 [`CONCLUSION_CANDIDATE_LIBRARY_FILES`]。
 fn conclusion_candidate_files(repository_root: &Path) -> Result<Vec<String>, JudgingCodeError> {
-    let directory = repository_root.join(CONCLUSION_CANDIDATE_DIRECTORY);
-    let entries = std::fs::read_dir(&directory).map_err(|error| JudgingCodeError {
-        reason: format!("读不了 {CONCLUSION_CANDIDATE_DIRECTORY}：{error}"),
-    })?;
     let mut candidates = BTreeSet::new();
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let path = entry.path();
-        if path.is_dir() {
-            if path.join("mod.rs").is_file() {
-                candidates.insert(format!("{CONCLUSION_CANDIDATE_DIRECTORY}/{name}/mod.rs"));
+    for candidate_directory in [
+        CONCLUSION_CANDIDATE_DIRECTORY,
+        CONCLUSION_CANDIDATE_BINARY_DIRECTORY,
+    ] {
+        let directory = repository_root.join(candidate_directory);
+        let entries = std::fs::read_dir(&directory).map_err(|error| JudgingCodeError {
+            reason: format!("读不了 {candidate_directory}：{error}"),
+        })?;
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let path = entry.path();
+            if path.is_dir() {
+                if path.join("mod.rs").is_file() {
+                    candidates.insert(format!("{candidate_directory}/{name}/mod.rs"));
+                }
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                candidates.insert(format!("{candidate_directory}/{name}"));
             }
-        } else if path.extension().is_some_and(|extension| extension == "rs") {
-            candidates.insert(format!("{CONCLUSION_CANDIDATE_DIRECTORY}/{name}"));
         }
+    }
+    for library_file in CONCLUSION_CANDIDATE_LIBRARY_FILES {
+        if !repository_root.join(library_file).is_file() {
+            return Err(JudgingCodeError {
+                reason: format!("候选表点名的 {library_file} 不在"),
+            });
+        }
+        candidates.insert((*library_file).to_string());
     }
     Ok(candidates.into_iter().collect())
 }
@@ -1283,4 +1326,82 @@ fn digest_of_hexadecimal_text(text: &str) -> Option<[u8; DIGEST_BYTES]> {
         *byte = u8::from_str_radix(pair, 16).ok()?;
     }
     Some(digest)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 小仓：判器一侧声明 `GivenStatesOfATable`；同一 crate 里一份条目级 `impl` 块给它写（该收），一份流水线只在参数类型与
+    /// 返回类型的 `impl Trait` 里点名它（不该收）。
+    const IMPL_TRAIT_IN_TYPE_POSITION_REPOSITORY_FILES: &[(&str, &str)] = &[
+        ("Cargo.lock", "# lock\n"),
+        (
+            "crates/singlefs-alpha/Cargo.toml",
+            "[package]\nname = \"singlefs-alpha\"\n",
+        ),
+        (
+            "crates/singlefs-alpha/src/lib.rs",
+            "pub mod judge;\npub mod judgement_display;\npub mod pipeline;\n",
+        ),
+        (
+            "crates/singlefs-alpha/src/judge.rs",
+            "pub struct GivenStatesOfATable { pub rows: usize }\n\
+             pub fn judge(table: &GivenStatesOfATable) -> usize { table.rows }\n",
+        ),
+        (
+            "crates/singlefs-alpha/src/judgement_display.rs",
+            "use std::fmt;\n\
+             impl fmt::Display for crate::judge::GivenStatesOfATable {\n    \
+             fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { write!(formatter, \"{}\", self.rows) }\n}\n",
+        ),
+        (
+            "crates/singlefs-alpha/src/pipeline.rs",
+            "pub fn judge_each_recorded_table(judge: impl FnOnce(&crate::judge::GivenStatesOfATable) -> usize) -> usize { 0 }\n\
+             pub fn recorded_tables() -> impl Iterator<Item = crate::judge::GivenStatesOfATable> { std::iter::empty() }\n",
+        ),
+    ];
+
+    /// 参数位置与返回类型上的 `impl Trait` 不是 `impl` 块：流水线在那里点名判器一侧声明的类型，不因此进判器的闭包，也不记成引入者；
+    /// 同一 crate 里给那个类型写的条目级 `impl` 块照收（阳性对照）。
+    #[test]
+    fn an_impl_trait_in_a_parameter_or_return_type_naming_a_judge_type_does_not_pull_its_file_into_the_closure(
+    ) {
+        let root = std::env::temp_dir().join(format!(
+            "singlefs-closure-impl-trait-in-type-position-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        for (file, contents) in IMPL_TRAIT_IN_TYPE_POSITION_REPOSITORY_FILES {
+            let path = root.join(file);
+            std::fs::create_dir_all(path.parent().expect("文件有上层")).expect("建得了目录");
+            std::fs::write(&path, contents).expect("写得了小仓的文件");
+        }
+        let toolchain = ClosureToolchainLines {
+            rustc_version_lines: "rustc 0.0.0-probe",
+            cargo_version: "cargo 0.0.0-probe",
+            target_triple: "x86_64-probe",
+        };
+        let judge = "crates/singlefs-alpha/src/judge.rs";
+        let judgement_display = "crates/singlefs-alpha/src/judgement_display.rs";
+        let pipeline = "crates/singlefs-alpha/src/pipeline.rs";
+        let computed = ClosureTreeReader::new(&root)
+            .and_then(|mut reader| reader.judging_code_stopping_at(&[judge], &[], &toolchain));
+        std::fs::remove_dir_all(&root).expect("删得掉小仓");
+        let code = computed.expect("小仓算得出");
+        assert_eq!(
+            code.files,
+            vec![judge.to_string(), judgement_display.to_string()],
+            "收判器与给它的类型写条目级 impl 块的那一份，不收只在 impl Trait 里点名它的流水线"
+        );
+        assert_eq!(
+            code.reason_of_each_file[judgement_display], "impl names GivenStatesOfATable",
+            "条目级 impl 块经 impl 头收进来"
+        );
+        assert!(
+            !code.introducers_of_each_file.contains_key(pipeline),
+            "流水线没有引入者：参数与返回类型里的 impl Trait 不算 impl 头点名（{:?}）",
+            code.introducers_of_each_file.get(pipeline)
+        );
+    }
 }

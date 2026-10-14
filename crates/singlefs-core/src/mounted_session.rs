@@ -10,7 +10,7 @@
 //! （`research/prompts/m2-safety-r3-sonnet-output.md` 第二节）。这一层怎么放是实现员提的（交主 agent 定）：它持着挂载认下的池
 //! （`mount::ParametersAndDeviceTableOfTheMount`：盘上择到的系统配置里的参数、挂载时核过的盘表），写入口只按那份参数建、不收调用方的参数；
 //! 盘本身不持，每次调用由调用方把盘表交进来——用例在两次调用之间照样摸得到盘（拷镜像、注入故障）——交进来的盘表与挂载时的逐项比，
-//! 对不上在任何读写之前拒（实审 A1b Q2、Q3）；身份对得上，还要每块盘「可见」（两个系统配置槽里至少一份本池自证过的），
+//! 对不上在任何读写之前拒；身份对得上，还要每块盘「可见」（两个系统配置槽里至少一份本池自证过的），
 //! 有一块不可见就在任何写之前拒（代码三方 m2-closeout-code-r1 Z3-A 乙：只比身份时，换上去的一块空盘照样收到本池的写）；
 //! 「可见」之后再核每块盘自证槽里的本盘设备号是盘表给它的身份、这块盘不落后于现行那一版又缺它的单元或它的根（D18（块里携带什么信息） 已定项 11
 //! 「挂着之后收盘表的每个入口……核三样」，用户 2026-09-27 定；代码三方 m2-closeout-code-r2「盘体对调的盘表」「同池旧快照的盘经入口洗白」；
@@ -100,7 +100,7 @@ pub type VersionsPublishedInThisChange = Vec<TransactionOutput>;
 #[derive(Debug)]
 pub enum UserChangeRefused {
     /// 交进来的盘表的设备身份（按次序）与这次挂载核过的那一份不同（多一块、少一块、换了次序、同一个身份交两次）：
-    /// 写入口按盘表逐项写系统配置与单元，拿别的盘表发，多出来的盘收到本池的写、设备数与本盘设备号被改写（实审 A1b Q3）。
+    /// 写入口按盘表逐项写系统配置与单元，拿别的盘表发，多出来的盘收到本池的写、设备数与本盘设备号被改写。
     /// 在任何读写之前返回，盘上逐字节不变、会话不动。推环入口与要出路先核同一判（[`RootRingPushRefused::DeviceTableOtherThanTheOneOfTheMount`]、
     /// [`WaysOutOfTheWideProtectionRefused::DeviceTableOtherThanTheOneOfTheMount`]）：三个入口收盘表同一判。
     DeviceTableOtherThanTheOneOfTheMount {
@@ -111,7 +111,7 @@ pub enum UserChangeRefused {
     /// 不经这一层），在任何读写之前返回；或有树而文件集合为空（`PoolVersion::WithTreesAndNoFile`，D8（核心索引结构） 已定项 16 第 5 条：
     /// 删完之后只许建 inode（size 0）、写行与空发布）而这次改动不是建 inode——先走空队列（那一版的 `deleted_inodes` 根指针置零，
     /// 走空一个写都不发；走空把带文件的一版走成文件集合为空的，那几步已落盘），再拒这次改动。
-    /// 走空发成的那几版与走空里为空间推的那几串抬 F 已落盘、带在这里（代码轮 U10：与别的被拒成员一样交回被拒之前发成的，
+    /// 走空发成的那几版与走空里为空间推的那几串抬 F 已落盘、带在这里（与别的被拒成员一样交回被拒之前发成的，
     /// 调用方逐版比得到）；树表 0 条那一格与队列本来就空的那一格没有走空，三样都是空的。
     NoFileVersionToChange {
         floor_raises: Vec<RaisedFloor>,
@@ -159,7 +159,7 @@ pub enum UserChangeRefused {
     NoSpaceAfterRaisingTheFloor(Box<NoSpaceAfterRaisingTheFloor>),
     /// 发布被拒是空间不够、为它推一串抬 F 时抬 F 自己报了不是空间不够的错（块设备错、读不出、预演被别的理由拒……）：不是「推满仍不够」，
     /// 不报空间不够（代码审阅第 23 条），错原样在 [`FloorRaiseFailedWhilePushingForSpace`] 里。抬 F 那一串自己也取不到落点、被空间准入拒的
-    /// 是推满仍不够，走 `NoSpaceAfterRaisingTheFloor`（实审 A1b Q1）。装箱同 `NoSpaceAfterRaisingTheFloor`。
+    /// 是推满仍不够，走 `NoSpaceAfterRaisingTheFloor`。装箱同 `NoSpaceAfterRaisingTheFloor`。
     FloorRaiseFailedWhilePushingForSpace(Box<FloorRaiseFailedWhilePushingForSpace>),
 }
 
@@ -1027,7 +1027,7 @@ impl MountedSession {
     /// 发布一次用户改动：被拒是空间不够的那两种（[`refusal_is_short_of_space`]）就推一串抬 F 的空发布、再重判，
     /// 直到发成或不再推（D16（发布语义） 已定项 1「准入」那一行）。发成时 `current` 换成新的一版；推了的那几串已落盘，
     /// 没发成时 `current` 停在最后一次落盘的空发布上。写入口只按会话持着的那份参数建（`parameters_and_device_table`），
-    /// 交进来的盘表先与它逐项比（实审 A1b Q2、Q3），再读每块盘的两个系统配置槽核它「可见」（Z3-A 乙），再核本盘设备号与落后支
+    /// 交进来的盘表先与它逐项比，再读每块盘的两个系统配置槽核它「可见」（Z3-A 乙），再核本盘设备号与落后支
     /// （D18（块里携带什么信息） 已定项 11「挂着之后收盘表的每个入口……核三样」：「每次发布」按「每次用户改动」读）。
     /// 三样在进循环之前核一次：一次调用里盘表借着、换不了盘；循环里推的每一串抬 F 在它自己的第一个写之前再核一遍三样
     /// （`mount::push_one_floor_raise_within_the_admission_budget` 经 `caller_inputs_agreeing_with_the_disk`），
@@ -1168,7 +1168,7 @@ impl MountedSession {
         }
         let mut publishes_pushed = 0;
         // 按成员分流（类型上放什么）：有树而文件集合为空的一版只接建 inode。走空把带文件的一版走成这一形时，走空的那几步与推的抬 F
-        // 已落盘，带在这个拒绝里（`NoFileVersionToChange` 的三样，代码轮 U10）。
+        // 已落盘，带在这个拒绝里（`NoFileVersionToChange` 的三样）。
         let version_to_change = match current {
             PoolVersion::WithFile(file_version) => file_version,
             PoolVersion::WithTreesAndNoFile(emptied_version) => match change {

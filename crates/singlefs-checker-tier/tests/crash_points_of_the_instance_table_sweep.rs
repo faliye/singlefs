@@ -1,4 +1,4 @@
-//! checker 档模块：crash、layer0_progress、writable_mount_phases
+//! checker 档模块：crash、crash_state_enumeration、writable_mount_phases、crash_amplification
 //! 实例表清扫的崩溃点（D18（块里携带什么信息） 已定项 11「回收」一条；判决 `research/prompts/m3-sweep-and-tree-id-r1-main-verification.md`
 //! 第三节 F5 与第二节 Q5；C597（实例表行只增不删，删行的条件没有条款） 的判别力自证）。
 //!
@@ -6,7 +6,7 @@
 //! （孤儿：按实例 1 那一行判未发布）→ 实例 2 可写挂载、覆盖写到 txg 19（实例 1 的根全部轮出环）→ 实例 3 可写挂载，末尾清扫（有一行就扫）：
 //! 抹孤儿的头、每块盘一道屏障、发清扫发布删掉实例 1 那一行。基线是实例 3 那次挂载之前的盘面，枚举的是那次挂载的全部写。
 //!
-//! 比已有的流多罩的崩溃状态：已有的层 0 流与崩溃注入里没有一次挂载写过清扫的抹头与清扫发布（产品路径的阈值占位 369 行，那几条流到不了）；
+//! 比已有的流多罩的崩溃状态：已有的崩溃点重放流与崩溃注入里没有一次挂载写过清扫的抹头与清扫发布（产品路径的阈值占位 369 行，那几条流到不了）；
 //! 这一条的挂载末尾两段（`writable_mount_phases::WritableMountPhase` 的抹头与清扫发布）上每个崩溃状态都枚举。
 //! 多跑的一步：清扫两段上的每个崩溃状态再起一次可写挂载（也是有一行就扫），判挂载做成、池级 checker 不红、F5 照判。
 //!
@@ -16,7 +16,7 @@
 #[path = "../../singlefs-harness/tests/common_root_ring_holes/mod.rs"]
 mod common_root_ring_holes;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use common_root_ring_holes::{
     content_of_the_version, devices_of, fixed_geometry_of_the_ring_hole_pools,
@@ -25,10 +25,20 @@ use common_root_ring_holes::{
     WRITE_TIME_SECONDS_OF_THE_RING_HOLE_POOLS,
 };
 use singlefs_checker_tier::crash::{
-    enumerate_layer0_in_state_slices, full_expansion, quick_tier_expansion, Layer0ObserverCounts,
-    Layer0Parallelism, Layer0SegmentExpansion, Layer0Tally,
+    full_expansion, quick_tier_expansion, CrashPointReplayObserverCounts,
+    CrashPointReplaySegmentExpansion, CrashPointReplayTally, CrashPointReplayVersionTable,
 };
-use singlefs_checker_tier::layer0_progress::Layer0Resume;
+use singlefs_checker_tier::crash_amplification::{
+    ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver, ObserverDeduplication,
+};
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_with_every_kind_of_observer, enumerate_crash_states_with_expansion,
+    CrashPointReplayItem, CrashPointReplayObserver, CrashPointReplayObserverHandingBackAnImage,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_points_of_the_instance_table_sweep.rs";
 // 经 `writable_mount_phases` 引、不经 `crash_injection`：这条流是手写的、不拿随机历史当输入，不该把随机历史脚手架带进判法闭包。
 use singlefs_checker_tier::writable_mount_phases::{
     materialized_crash_image, publishes_before_the_instance_table_sweep_of_the_mount_output,
@@ -445,7 +455,7 @@ fn deletion_took_effect_and_no_unpublished_unit_is_left(
     true
 }
 
-fn assert_the_recovery_and_the_checker_are_clean(tally: &Layer0Tally) {
+fn assert_the_recovery_and_the_checker_are_clean(tally: &CrashPointReplayTally) {
     assert_eq!(
         (tally.violations, tally.first_violation.clone()),
         (0, None),
@@ -460,30 +470,45 @@ fn assert_the_recovery_and_the_checker_are_clean(tally: &Layer0Tally) {
     );
 }
 
-/// 枚举清扫那次挂载的写，每个状态照 F5 判；交回 tally 与删行那一版生效的状态数。
+/// 枚举清扫那次挂载的写，每个状态照 F5 判（观察者挂进崩溃判定库那一路，判到的数经观察者计数带出来）；交回 tally 与删行那一版生效的状态数。
 fn enumerate_the_sweeping_mount_judging_f5(
     recorded: &RecordedSweepingMount,
-    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
-) -> (Layer0Tally, u64) {
-    let mut states_where_the_deletion_took_effect = 0u64;
-    let mut observe =
-        |image: &CrashImage<'_>, report: &RecoveryReport, _counts: &mut Layer0ObserverCounts| {
-            if deletion_took_effect_and_no_unpublished_unit_is_left(recorded, image, report) {
-                states_where_the_deletion_took_effect += 1;
-            }
-        };
-    let tally = enumerate_layer0_in_state_slices(
+    item_label: &str,
+    expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
+) -> Option<(CrashPointReplayTally, u64)> {
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        if deletion_took_effect_and_no_unpublished_unit_is_left(recorded, image, report) {
+            counts.add("deletion_took_effect", 1);
+        }
+    };
+    let item_name = format!("instance_table_sweep::mount::{item_label}");
+    let tally = enumerate_crash_states_with_expansion(
+        CrashPointReplayItem {
+            name: &item_name,
+            setting_file: THIS_FILE,
+        },
         &recorded.base,
         &recorded.writes,
         &recorded.segments,
         recorded.judged_root_index,
-        &recorded.versions,
+        CrashPointReplayVersionTable::with_a_file_only(&recorded.versions),
         expansion,
-        Layer0Parallelism::from_environment(),
-        Some(&mut observe),
-        &Layer0Resume::NoProgressFile,
-    );
-    (tally, states_where_the_deletion_took_effect)
+        // 观察者另读的输入：删前那一行（F5 对着它判未发布的单元剩几个）
+        &[CrashPointReplayObserver {
+            name: "f5_after_the_deletion",
+            extra_inputs_digest: singlefs_harness::sha256::sha256_digest(
+                format!("row_deleted={:?}\n", recorded.row_deleted).as_bytes(),
+            ),
+            observe: &observe,
+        }],
+    )
+    .judged()?;
+    let states_where_the_deletion_took_effect =
+        tally.observer_counts.count_named("deletion_took_effect");
+    Some((tally, states_where_the_deletion_took_effect))
 }
 
 /// 快档：清扫那次挂载的写按甲二展开，每个状态跑恢复、oracle、池级 checker 与 F5。
@@ -495,8 +520,11 @@ fn quick_tier_of_the_sweeping_mount_leaves_no_unpublished_unit_of_the_deleted_ro
         !recorded.writes_of_the_sweep_phases.is_empty(),
         "前提：挂载写里有清扫两段"
     );
-    let (tally, states_where_the_deletion_took_effect) =
-        enumerate_the_sweeping_mount_judging_f5(&recorded, &quick_tier_expansion);
+    let Some((tally, states_where_the_deletion_took_effect)) =
+        enumerate_the_sweeping_mount_judging_f5(&recorded, "quick_tier", &quick_tier_expansion)
+    else {
+        return;
+    };
     assert_the_recovery_and_the_checker_are_clean(&tally);
     assert!(
         states_where_the_deletion_took_effect > 0,
@@ -507,11 +535,14 @@ fn quick_tier_of_the_sweeping_mount_leaves_no_unpublished_unit_of_the_deleted_ro
 
 /// 全量：清扫那次挂载的每一段都展开（D13（验证路线） 已定项 4 的全量），每个状态跑恢复、oracle、池级 checker 与 F5。
 #[test]
-#[ignore = "checker 档全量崩溃枚举：登记在 .claude/gate.d/stage-inputs.tsv 的 crash-case:instance-table-sweep-mount，由 checker-tier-layer0-replay --full 跑"]
+#[ignore = "checker 档全量崩溃枚举：登记在 .claude/gate.d/stage-inputs.tsv 的 crash-case:instance-table-sweep-mount，由 checker-tier-crash-point-replay --full 跑"]
 fn every_crash_state_of_the_sweeping_mount_leaves_no_unpublished_unit_of_the_deleted_row() {
     let recorded = record_the_sweeping_mount();
-    let (tally, states_where_the_deletion_took_effect) =
-        enumerate_the_sweeping_mount_judging_f5(&recorded, &full_expansion);
+    let Some((tally, states_where_the_deletion_took_effect)) =
+        enumerate_the_sweeping_mount_judging_f5(&recorded, "full", &full_expansion)
+    else {
+        return;
+    };
     assert_the_recovery_and_the_checker_are_clean(&tally);
     assert!(
         states_where_the_deletion_took_effect > 0,
@@ -522,7 +553,7 @@ fn every_crash_state_of_the_sweeping_mount_leaves_no_unpublished_unit_of_the_del
 /// 清扫两段（抹头、清扫发布）上的每个崩溃状态再起一次可写挂载（有一行就扫）：挂载做成，之后的盘面上那几条不变量不红，
 /// 删行那一版在那一刻生效的照 F5 判一个不剩；挂载之后实例 1 那一行要么已删、要么这一次挂载又删了（清扫这一轮整轮重扫重抹，判决第二节 Q5）。
 #[test]
-#[ignore = "checker 档全量崩溃枚举：登记在 .claude/gate.d/stage-inputs.tsv 的 crash-case:instance-table-sweep-phases-remount，由 checker-tier-layer0-replay --full 跑"]
+#[ignore = "checker 档全量崩溃枚举：登记在 .claude/gate.d/stage-inputs.tsv 的 crash-case:instance-table-sweep-phases-remount，由 checker-tier-crash-point-replay --full 跑"]
 fn every_crash_state_inside_the_two_sweep_phases_remounts_writable_and_ends_without_the_deleted_row(
 ) {
     let recorded = record_the_sweeping_mount();
@@ -532,127 +563,110 @@ fn every_crash_state_inside_the_two_sweep_phases_remounts_writable_and_ends_with
             .iter()
             .any(|write_index| sweep_phase_writes.contains(write_index))
         {
-            Layer0SegmentExpansion::EveryProperSubset
+            CrashPointReplaySegmentExpansion::EveryProperSubset
         } else {
-            Layer0SegmentExpansion::NotExpanded
+            CrashPointReplaySegmentExpansion::NotExpanded
         }
     };
-    let mut persisted_sets: Vec<Vec<bool>> = Vec::new();
-    let mut enumerated_writes: Option<Vec<RetainedWrite>> = None;
-    let mut collect =
-        |image: &CrashImage<'_>, report: &RecoveryReport, _counts: &mut Layer0ObserverCounts| {
-            deletion_took_effect_and_no_unpublished_unit_is_left(&recorded, image, report);
-            enumerated_writes.get_or_insert_with(|| image.writes.to_vec());
-            persisted_sets.push(image.persisted.clone());
-        };
-    let parallelism = Layer0Parallelism::from_environment();
-    let tally = enumerate_layer0_in_state_slices(
+    // 清扫两段上的每个崩溃状态当交回镜像的观察者再起一次可写挂载（有一行就扫；两段，用户 2026-10-13 定：录入段在 CPU 上挂，
+    // 豁免表的 writable-mount 那一行，按恢复镜像去重）：挂不上、行还在、删前那一行判未发布的单元还剩，都当场 panic（记成红项、用例红），
+    // 挂成的记一个数；挂完的盘上那几条不变量在判段判（配了 GPU 上卡），判干净时 `checker_clean_after_the_remount` 加一
+    // gpu-exempt: writable-mount
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts|
+     -> ImageAfterTheObserver {
+        deletion_took_effect_and_no_unpublished_unit_is_left(&recorded, image, report);
+        let mut materialized = recorded.base.clone();
+        let landed: Vec<RetainedWrite> = image
+            .writes
+            .iter()
+            .zip(&image.persisted)
+            .filter(|(_, is_persisted)| **is_persisted)
+            .map(|(write, _)| write.clone())
+            .collect();
+        materialized.apply_writes(&landed);
+        let stream = SharedStream::retaining_contents();
+        let mut devices = recording_of(&materialized, &stream);
+        let mounted = mount_writable_with_instance_table_sweep_configuration(
+            &parameters_of_the_ring_hole_pools(),
+            &mut devices,
+            SpaceAdmission::JudgedByTheFormula,
+            ShadowLedger::On,
+            sweeping_on_any_row(),
+        )
+        .unwrap_or_else(|error| panic!("再挂被拒：{error:?}"));
+        let mut after = materialized.clone();
+        after.apply(&stream.retained_operations());
+        let rows_after: Vec<InstanceGeneration> =
+            instance_table_chain_of_root(&after, mounted.current.root())
+                .map(|chain| chain.records.rows.iter().map(|row| row.instance).collect())
+                .unwrap_or_default();
+        assert!(
+            !rows_after.contains(&recorded.row_deleted.instance),
+            "再挂之后实例 1 那一行还在：{rows_after:?}"
+        );
+        let left = unpublished_units_of_the_row_left_on(&after, &recorded.row_deleted);
+        assert_eq!(left, 0, "再挂之后删前那一行判未发布的单元剩 {left} 个");
+        counts.add("remounted_without_the_deleted_row", 1);
+        let (writes_on_the_crash_image, _segments_of_the_mount) = writes_and_segments(
+            &stream.retained_operations(),
+            &fixed_geometry_of_the_ring_hole_pools(),
+        );
+        ImageAfterTheObserver {
+            writes_on_the_crash_image,
+            disks_after_the_observer: after,
+            invariants_judged: InvariantsJudgedOnTheImageAfterTheObserver::Only(
+                INVARIANTS_JUDGED_AFTER_THE_REMOUNT.to_vec(),
+            ),
+            counter_when_the_pool_checker_is_clean: "checker_clean_after_the_remount".to_string(),
+        }
+    };
+    let Some(tally) = enumerate_crash_states_with_every_kind_of_observer(
+        CrashPointReplayItem {
+            name: "instance_table_sweep::phases_remount",
+            setting_file: THIS_FILE,
+        },
         &recorded.base,
         &recorded.writes,
         &recorded.segments,
         recorded.judged_root_index,
-        &recorded.versions,
+        CrashPointReplayVersionTable::with_a_file_only(&recorded.versions),
         &expand_the_sweep_phases_only,
-        parallelism,
-        Some(&mut collect),
-        &Layer0Resume::NoProgressFile,
-    );
+        &[],
+        // 观察者另读的输入：删前那一行（判行在不在、未发布的单元剩几个都对着它）、挂载的参数与清扫的配置
+        &[CrashPointReplayObserverHandingBackAnImage {
+            name: "remount_after_the_sweep_phases",
+            extra_inputs_digest: singlefs_harness::sha256::sha256_digest(
+                format!(
+                    "row_deleted={:?}\nparameters={:?}\nsweep={:?}\n",
+                    recorded.row_deleted,
+                    parameters_of_the_ring_hole_pools(),
+                    sweeping_on_any_row()
+                )
+                .as_bytes(),
+            ),
+            observe: &observe,
+            deduplication: ObserverDeduplication::ByTheRecoveredImageBytes,
+        }],
+    )
+    .judged() else {
+        return;
+    };
     assert_the_recovery_and_the_checker_are_clean(&tally);
-    let enumerated_writes = enumerated_writes.expect("观察者至少看过一个状态");
-    let worker_threads = parallelism.worker_threads.get();
-    let chunk_length = persisted_sets.len().div_ceil(worker_threads).max(1);
-    let failures: Vec<String> = std::thread::scope(|scope| {
-        let handles: Vec<_> = persisted_sets
-            .chunks(chunk_length)
-            .map(|chunk| {
-                let base = &recorded.base;
-                let writes = &enumerated_writes;
-                let row_deleted = recorded.row_deleted;
-                scope.spawn(move || {
-                    let mut failures = Vec::new();
-                    for persisted in chunk {
-                        let mut image = base.clone();
-                        let landed: Vec<RetainedWrite> = writes
-                            .iter()
-                            .zip(persisted)
-                            .filter(|(_, is_persisted)| **is_persisted)
-                            .map(|(write, _)| write.clone())
-                            .collect();
-                        image.apply_writes(&landed);
-                        let stream = SharedStream::retaining_contents();
-                        let mut devices = recording_of(&image, &stream);
-                        let remounted = mount_writable_with_instance_table_sweep_configuration(
-                            &parameters_of_the_ring_hole_pools(),
-                            &mut devices,
-                            SpaceAdmission::JudgedByTheFormula,
-                            ShadowLedger::On,
-                            sweeping_on_any_row(),
-                        );
-                        let mounted = match remounted {
-                            Ok(mounted) => mounted,
-                            Err(error) => {
-                                failures.push(format!("再挂被拒：{error:?}"));
-                                continue;
-                            }
-                        };
-                        let mut after = image.clone();
-                        after.apply(&stream.retained_operations());
-                        let violations: Vec<String> =
-                            singlefs_checker::walk::check_pool_image(&after)
-                                .into_iter()
-                                .filter(|(invariant, _)| {
-                                    INVARIANTS_JUDGED_AFTER_THE_REMOUNT.contains(invariant)
-                                })
-                                .filter_map(|(invariant, verdict)| match verdict {
-                                    singlefs_checker::image::InvariantVerdict::Violated(detail) => {
-                                        Some(format!("{invariant}：{detail}"))
-                                    }
-                                    singlefs_checker::image::InvariantVerdict::Holds
-                                    | singlefs_checker::image::InvariantVerdict::NotApplicable(_)
-                                    | singlefs_checker::image::InvariantVerdict::PartiallyJudged(
-                                        _,
-                                    ) => None,
-                                })
-                                .collect();
-                        if !violations.is_empty() {
-                            failures.push(format!("再挂之后 checker 红：{violations:?}"));
-                        }
-                        let rows_after: Vec<InstanceGeneration> =
-                            instance_table_chain_of_root(&after, mounted.current.root())
-                                .map(|chain| {
-                                    chain.records.rows.iter().map(|row| row.instance).collect()
-                                })
-                                .unwrap_or_default();
-                        if rows_after.contains(&row_deleted.instance) {
-                            failures.push(format!("再挂之后实例 1 那一行还在：{rows_after:?}"));
-                        }
-                        let left = unpublished_units_of_the_row_left_on(&after, &row_deleted);
-                        if left != 0 {
-                            failures.push(format!("再挂之后删前那一行判未发布的单元剩 {left} 个"));
-                        }
-                    }
-                    failures
-                })
-            })
-            .collect();
-        handles
-            .into_iter()
-            .flat_map(|handle| handle.join().expect("工作线程没 panic"))
-            .collect()
-    });
-    let distinct: BTreeMap<String, usize> =
-        failures
-            .iter()
-            .fold(BTreeMap::new(), |mut counts, failure| {
-                *counts
-                    .entry(failure.chars().take(160).collect())
-                    .or_insert(0) += 1;
-                counts
-            });
-    assert!(
-        failures.is_empty(),
-        "清扫两段上的 {} 个崩溃态里 {} 个再挂不对：{distinct:?}",
-        persisted_sets.len(),
-        failures.len()
+    assert_eq!(
+        tally
+            .observer_counts
+            .count_named("remounted_without_the_deleted_row"),
+        tally.states,
+        "清扫两段上的每个崩溃态都再挂成、行已删、单元不剩"
+    );
+    assert_eq!(
+        tally
+            .observer_counts
+            .count_named("checker_clean_after_the_remount"),
+        tally.states,
+        "清扫两段上的每个崩溃态再挂之后的盘，那几条不变量判段一条都不判违例"
     );
 }

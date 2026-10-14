@@ -534,15 +534,40 @@ fn abandoned_by_rows(instance: u32, txg: vec2<u32>) -> bool {
 struct RecordVerdict {
     root_without_record: bool,
     claimed_state_missing_unit: bool,
+    claimed_version_not_landed_on_by_the_recovery: bool,
 };
-// crash::check_records（层 0：两份镜像同一份，一条录制流）
+// crash::check_records（崩溃点重放：两份镜像同一份，一条录制流）。恢复自称的那一版：给定状态表带了那一栏（T_CLAIMED_VERSIONS 不空，
+// crash_judge_tables::JudgeStateSource::GivenPersistedSets 的 claimed_versions）而这个状态写了的，照写的那一版（崩溃注入第二截挂载之后的池：
+// 挂载与那次发布写出的最新那条根，crash_given_states::judge_a_given_state_on_the_cpu 同取法），写的那一版与看 journal 那一遍落到的不同另判红；
+// 没写的照看 journal 那一遍落到的根
 fn check_records(consulted: Recovery) -> RecordVerdict {
     var out: RecordVerdict;
     out.root_without_record = false;
     out.claimed_state_missing_unit = false;
+    out.claimed_version_not_landed_on_by_the_recovery = false;
+    var claimed_has_a_root = consulted.has_effective;
+    var claimed_instance = consulted.effective_instance;
+    var claimed_txg = consulted.effective_txg;
+    if (table_length(T_CLAIMED_VERSIONS) != 0u) {
+        let claimed_at = given_state_ordinal * CLAIMED_VERSION_WORDS;
+        let claimed_code = tab(T_CLAIMED_VERSIONS, claimed_at);
+        if (claimed_code != CLAIMED_VERSION_LANDED_ON_BY_THE_CONSULTED_RECOVERY) {
+            claimed_has_a_root = claimed_code == CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITH_A_ROOT;
+            claimed_instance = tab(T_CLAIMED_VERSIONS, claimed_at + 1u);
+            claimed_txg = vec2<u32>(tab(T_CLAIMED_VERSIONS, claimed_at + 2u), tab(T_CLAIMED_VERSIONS, claimed_at + 3u));
+            if (claimed_has_a_root != consulted.has_effective) {
+                out.claimed_version_not_landed_on_by_the_recovery = true;
+            } else if (claimed_has_a_root
+                && (claimed_instance != consulted.effective_instance
+                    || claimed_txg.x != consulted.effective_txg.x
+                    || claimed_txg.y != consulted.effective_txg.y)) {
+                out.claimed_version_not_landed_on_by_the_recovery = true;
+            }
+        }
+    }
     var have_table = false;
-    if (consulted.has_effective) {
-        have_table = load_instance_table_of_the_effective_root(consulted.effective_instance, consulted.effective_txg);
+    if (claimed_has_a_root) {
+        have_table = load_instance_table_of_the_effective_root(claimed_instance, claimed_txg);
     }
     let count = hdr(7u);
     for (var i = 0u; i < count; i = i + 1u) {
@@ -565,7 +590,7 @@ fn check_records(consulted: Recovery) -> RecordVerdict {
                 out.root_without_record = true;
             }
         }
-        if (consulted.has_effective && le64(txg, consulted.effective_txg)) {
+        if (claimed_has_a_root && le64(txg, claimed_txg)) {
             var abandoned = false;
             if (have_table) {
                 abandoned = abandoned_by_rows(instance, txg);
@@ -620,6 +645,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     if (records.claimed_state_missing_unit) {
         bits = bits | (1u << BIT_CLAIMED_STATE_MISSING_UNIT);
+    }
+    if (records.claimed_version_not_landed_on_by_the_recovery) {
+        bits = bits | (1u << BIT_CLAIMED_VERSION_NOT_LANDED_ON_BY_THE_RECOVERY);
     }
     if (undecidable != 0u) {
         bits = bits | (1u << BIT_UNDECIDABLE);

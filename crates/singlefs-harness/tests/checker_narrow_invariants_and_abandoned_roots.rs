@@ -41,7 +41,7 @@ use singlefs_format::{DATA_UNIT_BYTES, JOURNAL_RING_DEFAULT_BYTES, NODE_BYTES, S
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
-/// 新立那一条不变量：I-1.11（映射 key 与单元头相符），登记在 `.claude/kb/invariants.md`。
+/// 新立那一条不变量：I-1.11（映射 key 与单元头相符），登记在 `crates/singlefs-checker/invariants/01-块自描述.md`。
 const MAPPING_KEY_INVARIANT: &str = "I-1.11";
 
 /// 第一个文件版本的单元区只用到 50 26x 附近：这两个槽在两块盘上都没被分配、没被引用。

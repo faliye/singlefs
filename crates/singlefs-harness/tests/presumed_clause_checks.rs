@@ -9,7 +9,8 @@
 //!   写行 txg 取 max(根环里全部根记录的 txg, 环里全部自证通过的记录的 checkpoint_txg) + 1，之后每次空发布加一，
 //!   按根环落点看落哪块盘，推到本实例的根覆盖每块盘为止，至多 R 次（写行 txg ≡ 2 (mod 3) 时白推一次，认下）。
 //! - C499（干净关闭标记有没有没有条款）：D23（journal 的角色与格式） 已定项 14「第一版没有干净关闭标记」——
-//!   干净关闭再挂载与崩溃后再挂载走同一条恢复路径（全环扫描、逐条验证、择根、按前缀口径施加）。
+//!   干净关闭再挂载与崩溃后再挂载走同一条恢复路径（扫环、逐条验证、择根、按前缀口径施加）。扫环读哪些槽看盘答不答 journal 提示，
+//!   两种盘各一条：不答的（像真盘）两条历史都逐槽扫全环，答的（只记写过的扇区的内存盘）两条历史都恰好读写过的记录槽。
 
 mod common;
 
@@ -19,7 +20,9 @@ use common::{
     build_pool, crash_state_devices, file_content, format_pool, geometry, parameters,
     publish_overwrite_in_process, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
 };
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
+use singlefs_core::address::{
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
+};
 use singlefs_core::block_device::BlockDevice;
 use singlefs_core::mount::{
     mount_writable, roll_back_by_a_forward_publish, Mounted, RollbackTarget,
@@ -35,9 +38,14 @@ use singlefs_harness::fault_injection::{
     FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
     FaultSchedule, InjectedFault, SharedFaultPlan,
 };
-use singlefs_harness::memory_pool::{writes_and_segments, MemoryPool};
+use singlefs_harness::memory_pool::{
+    writes_and_segments, MemoryPool, RetainedWrite, SparseBlockDevice,
+};
+use singlefs_harness::read_tally::{
+    BlockDeviceReadLog, JournalHintAnswer, JournalRingRegion, ReadLoggingBlockDevice,
+};
 use singlefs_harness::segments::StepKind;
-use singlefs_harness::SharedStream;
+use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 const BOTH_DEVICES: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
 
@@ -348,60 +356,58 @@ fn c498_warm_up_publishes_after_remounts_rollback_and_a_crash_in_the_middle_of_a
 // C499：第一版没有干净关闭标记
 // ---------------------------------------------------------------------------------------------
 
-/// 一次可写挂载写出的东西、它在每块盘上读了几次（按 `BOTH_DEVICES` 的次序），与挂载完仍开着的设备（冷恢复接着读它们）。
-struct MountWithReadCounts<Device: BlockDevice> {
-    mounted: Mounted,
-    reads_per_device: Vec<u64>,
-    devices: Vec<(DeviceIdentity, FaultInjectingBlockDevice<Device>)>,
+/// 两条历史共用的那种盘：只记写过的扇区的内存盘，外面包录制器（`crash_state_devices` 交回的）。
+type MemoryDisk = RecordingBlockDevice<SparseBlockDevice>;
+
+/// 两条历史的盘面与各自写过的记录槽（盘号、槽起点）。两条都从 A（txg 3）之后发布 B（txg 4）起：
+/// - 干净关闭：B 整次落盘，进程退出；
+/// - 崩溃：B 的单元与记录落盘、根槽与系统配置槽没落就崩。
+struct CleanCloseAndCrashHistories {
+    clean_close_devices: Vec<(DeviceIdentity, MemoryDisk)>,
+    crash_devices: Vec<(DeviceIdentity, MemoryDisk)>,
+    clean_close_written_record_slots: BTreeSet<(DeviceIdentity, DeviceOffsetInBytes)>,
+    crash_written_record_slots: BTreeSet<(DeviceIdentity, DeviceOffsetInBytes)>,
+    second_version_content: Vec<u8>,
 }
 
-/// 一次可写挂载，数它在每块盘上读了几次（注入计划不开，只数）。
-fn mount_counting_reads<Device: BlockDevice>(
-    devices: Vec<(DeviceIdentity, Device)>,
-) -> MountWithReadCounts<Device> {
-    let plan = SharedFaultPlan::unarmed(geometry());
-    let mut counted: Vec<(DeviceIdentity, FaultInjectingBlockDevice<Device>)> = devices
-        .into_iter()
-        .map(|(identity, device)| {
-            (
-                identity,
-                FaultInjectingBlockDevice::new(identity, device, plan.clone()),
-            )
+/// 这几条写里 journal 记录那几条的落点（盘号、槽起点）；记录写都是一整条记录宽、落在环里。
+fn record_slots_written_by<'write>(
+    writes: impl Iterator<Item = &'write RetainedWrite>,
+) -> BTreeSet<(DeviceIdentity, DeviceOffsetInBytes)> {
+    let ring = journal_ring();
+    writes
+        .filter(|write| write.kind == StepKind::JournalRecord)
+        .map(|write| {
+            assert!(
+                write.bytes().is_some() && write.length_in_bytes() == JOURNAL_RECORD_BYTES,
+                "journal 记录写是一整条记录宽的普通写：{:?} 偏移 {}",
+                write.device,
+                write.offset.0
+            );
+            assert!(
+                ring.contains(write.offset)
+                    && (write.offset.0 - ring.start.0).is_multiple_of(JOURNAL_RECORD_BYTES),
+                "journal 记录写落在环里的记录槽起点上：{:?} 偏移 {}",
+                write.device,
+                write.offset.0
+            );
+            (write.device, write.offset)
         })
-        .collect();
-    let mounted = mount_writable(&parameters(), &mut counted).expect("可写挂载");
-    let reads_per_device = BOTH_DEVICES
-        .iter()
-        .map(|device| plan.counts_of_device(*device).reads)
-        .collect();
-    MountWithReadCounts {
-        mounted,
-        reads_per_device,
-        devices: counted,
-    }
+        .collect()
 }
 
-/// 挂载之后冷恢复读回的内容与施加之后的根。
-fn cold_read_back<Device: BlockDevice>(
-    mount: &MountWithReadCounts<Device>,
-) -> (RecoveryOutcome, Option<(InstanceGeneration, CheckpointTxg)>) {
-    let report = recover(&mount.devices, JournalPolicy::Consult);
-    (report.outcome, report.effective_root)
+/// 第一版的 journal 环：标准起点、默认长度（`parameters()` 的几何）。
+fn journal_ring() -> JournalRingRegion {
+    assert_eq!(
+        parameters().geometry.journal_ring_bytes,
+        JOURNAL_RING_DEFAULT_BYTES,
+        "这个文件的池用默认环长"
+    );
+    JournalRingRegion::starting_at_the_standard_slot(JOURNAL_RING_DEFAULT_BYTES)
 }
 
-/// C499：D23（journal 的角色与格式） 已定项 14「第一版没有干净关闭标记：每次挂载一律走恢复（全环扫描、逐条验证、择根，
-/// 按六条口径与注 1–4 施加），不按上一次是不是干净关闭分支」。第一版没有关闭动作：干净关闭 = 最后一次发布整次落盘之后进程退出。
-/// 两条历史都从 A（txg 3）之后发布 B（txg 4）起：
-/// - 干净关闭：B 整次落盘，进程退出，重开可写挂载；
-/// - 崩溃：B 的单元与记录落盘、根槽与系统配置槽没落就崩，重开可写挂载。
-///
-/// 两次挂载都做了一遍全环扫描（每块盘读的次数不少于整环的记录槽数 196 608）、都看到环里全部四条记录；
-/// 干净关闭那次择到 B 的根、一条都不用施加，崩溃那次择到 A 的根、验过点名单元施加 B 那一条——施加之后的根都是 (1, 4)；
-/// 之后写行 txg 5、jsn 5、暖机 txg 6、7 逐项相同，冷恢复都读回 B 的内容。
-/// 判别力自证：给挂载加一道「上一次干净关闭就只取 tail 那一条、不扫全环」的分支，干净关闭那一条历史当场红（`crates/mutations.tsv`）。
-#[test]
-fn c499_remount_after_a_clean_close_and_after_a_crash_both_scan_the_whole_ring_and_recover_by_the_same_rules(
-) {
+/// 建池、发布 B，造出两条历史的内存盘。
+fn build_the_clean_close_and_the_crash_histories() -> CleanCloseAndCrashHistories {
     let mut pool = build_pool("c499-no-clean-close-marker");
     let operations_before_the_second_version = pool.stream.operation_count();
     let first_version = pool.output.clone();
@@ -421,12 +427,15 @@ fn c499_remount_after_a_clean_close_and_after_a_crash_both_scan_the_whole_ring_a
         ),
         (CheckpointTxg(4), 4)
     );
-    pool.output = second_version;
 
-    // 崩溃那条历史的盘面：B 的写里根槽写之前的全部持久（单元与记录），根槽与系统配置槽一个都没有。
     let operations = pool.retained_operations();
     let mut base = MemoryPool::with_devices(&BOTH_DEVICES, IMAGE_BYTES);
     base.apply(&operations[..operations_before_the_second_version]);
+    let (writes_before_the_second_version, _segments_before_the_second_version) =
+        writes_and_segments(
+            &operations[..operations_before_the_second_version],
+            &geometry(),
+        );
     let (writes, _segments) = writes_and_segments(
         &operations[operations_before_the_second_version..],
         &geometry(),
@@ -441,37 +450,116 @@ fn c499_remount_after_a_clean_close_and_after_a_crash_both_scan_the_whole_ring_a
             .any(|write| write.kind == StepKind::JournalRecord),
         "根槽写之前 B 的记录已经写了"
     );
-    let persisted: Vec<bool> = (0..writes.len())
+    let every_write_persisted = vec![true; writes.len()];
+    // 崩溃那条历史的盘面：B 的写里根槽写之前的全部持久（单元与记录），根槽与系统配置槽一个都没有。
+    let persisted_before_the_first_root_write: Vec<bool> = (0..writes.len())
         .map(|write_index| write_index < first_root_write)
         .collect();
-    let crash_devices = crash_state_devices(
-        &base,
-        &writes,
-        &persisted,
-        &SharedStream::retaining_contents(),
-    );
-
-    let full_ring_scan_reads_per_device = JOURNAL_RING_DEFAULT_BYTES / JOURNAL_RECORD_BYTES;
-    let clean_close = mount_counting_reads(pool.reopen_recorded());
-    let crash = mount_counting_reads(crash_devices);
-    for (history, mounted, reads) in [
-        (
-            "干净关闭再挂载",
-            &clean_close.mounted,
-            &clean_close.reads_per_device,
+    let record_slots_before_the_second_version =
+        record_slots_written_by(writes_before_the_second_version.iter());
+    let mut clean_close_written_record_slots = record_slots_before_the_second_version.clone();
+    clean_close_written_record_slots.extend(record_slots_written_by(writes.iter()));
+    let mut crash_written_record_slots = record_slots_before_the_second_version;
+    crash_written_record_slots.extend(record_slots_written_by(writes[..first_root_write].iter()));
+    CleanCloseAndCrashHistories {
+        clean_close_devices: crash_state_devices(
+            &base,
+            &writes,
+            &every_write_persisted,
+            &SharedStream::retaining_contents(),
         ),
-        ("崩溃后再挂载", &crash.mounted, &crash.reads_per_device),
+        crash_devices: crash_state_devices(
+            &base,
+            &writes,
+            &persisted_before_the_first_root_write,
+            &SharedStream::retaining_contents(),
+        ),
+        clean_close_written_record_slots,
+        crash_written_record_slots,
+        second_version_content,
+    }
+}
+
+/// 一次可写挂载写出的东西、挂载完那一刻每块盘上的读（冷恢复的读不在里面），与挂载完仍开着的设备（冷恢复接着读它们）。
+struct MountWithReadLogs<Device: BlockDevice> {
+    mounted: Mounted,
+    read_logs: Vec<(DeviceIdentity, BlockDeviceReadLog)>,
+    devices: Vec<(DeviceIdentity, ReadLoggingBlockDevice<Device>)>,
+}
+
+impl<Device: BlockDevice> MountWithReadLogs<Device> {
+    /// 挂载里起点落在 journal 环里的读读到的（盘号、偏移），去重。
+    fn journal_ring_read_slots(&self) -> BTreeSet<(DeviceIdentity, DeviceOffsetInBytes)> {
+        self.read_logs
+            .iter()
+            .flat_map(|(device, read_log)| {
+                read_log
+                    .journal_ring_read_offsets
+                    .iter()
+                    .map(|offset| (*device, *offset))
+            })
+            .collect()
+    }
+
+    /// 挂载里起点落在 journal 环里的读一共几次（同一槽读几次算几次）。
+    fn journal_ring_reads(&self) -> usize {
+        self.read_logs
+            .iter()
+            .map(|(_, read_log)| read_log.journal_ring_read_offsets.len())
+            .sum()
+    }
+}
+
+/// 一次可写挂载，每块盘外面包一层记读的装置，journal 提示照 `journal_hint_answer` 答。
+fn mount_logging_reads<Device: BlockDevice>(
+    devices: Vec<(DeviceIdentity, Device)>,
+    journal_hint_answer: JournalHintAnswer,
+) -> MountWithReadLogs<Device> {
+    let mut logged: Vec<(DeviceIdentity, ReadLoggingBlockDevice<Device>)> = devices
+        .into_iter()
+        .map(|(identity, device)| {
+            (
+                identity,
+                ReadLoggingBlockDevice::new(device, journal_ring(), journal_hint_answer),
+            )
+        })
+        .collect();
+    let mounted = mount_writable(&parameters(), &mut logged).expect("可写挂载");
+    let read_logs = logged
+        .iter()
+        .map(|(identity, device)| (*identity, device.read_log()))
+        .collect();
+    MountWithReadLogs {
+        mounted,
+        read_logs,
+        devices: logged,
+    }
+}
+
+/// 挂载之后冷恢复读回的内容与施加之后的根。
+fn cold_read_back<Device: BlockDevice>(
+    mount: &MountWithReadLogs<Device>,
+) -> (RecoveryOutcome, Option<(InstanceGeneration, CheckpointTxg)>) {
+    let report = recover(&mount.devices, JournalPolicy::Consult);
+    (report.outcome, report.effective_root)
+}
+
+/// C499 的后一半，两条用例共用：两条历史照同一套规则恢复——都看到环里四条记录，干净关闭那次择到 B 的根、一条都不用施加，
+/// 崩溃那次择到 A 的根、验过点名单元施加 B 那一条，施加之后的根都是 (1, 4)；之后写行 txg 5、jsn 5、暖机 txg 6、7 逐项相同，
+/// 冷恢复都读回 B 的内容。`case` 只进断言消息。
+fn assert_the_two_histories_recover_by_the_same_rules<Device: BlockDevice>(
+    clean_close: &MountWithReadLogs<Device>,
+    crash: &MountWithReadLogs<Device>,
+    second_version_content: &[u8],
+    case: &str,
+) {
+    for (history, mounted) in [
+        ("干净关闭再挂载", &clean_close.mounted),
+        ("崩溃后再挂载", &crash.mounted),
     ] {
-        for (device, reads_on_device) in BOTH_DEVICES.iter().zip(reads.iter()) {
-            assert!(
-                *reads_on_device >= full_ring_scan_reads_per_device,
-                "{history}：盘 {} 上只读了 {reads_on_device} 次，不够扫一遍整环（{full_ring_scan_reads_per_device} 个记录槽）",
-                device.0
-            );
-        }
         assert_eq!(
             mounted.output.journal.valid_records, 4,
-            "{history}：全环扫描看到 jsn 1–4 四条"
+            "{case}，{history}：恢复扫环看到 jsn 1–4 四条"
         );
         assert_eq!(
             (
@@ -479,17 +567,17 @@ fn c499_remount_after_a_clean_close_and_after_a_crash_both_scan_the_whole_ring_a
                 mounted.output.effective_root.checkpoint_txg
             ),
             (InstanceGeneration(1), CheckpointTxg(4)),
-            "{history}：施加之后的根是 B 那一版"
+            "{case}，{history}：施加之后的根是 B 那一版"
         );
         assert_eq!(
             row_and_warm_up_txgs(mounted),
             (CheckpointTxg(5), vec![CheckpointTxg(6), CheckpointTxg(7)]),
-            "{history}：写行 txg 5、暖机 txg 6、7"
+            "{case}，{history}：写行 txg 5、暖机 txg 6、7"
         );
         assert_eq!(
             mounted.output.row_publish.record().counter,
             5,
-            "{history}：写行 jsn 5"
+            "{case}，{history}：写行 jsn 5"
         );
     }
     assert_eq!(
@@ -499,7 +587,7 @@ fn c499_remount_after_a_clean_close_and_after_a_crash_both_scan_the_whole_ring_a
             clean_close.mounted.output.journal.prefix_applied
         ),
         (CheckpointTxg(4), 0, 0),
-        "干净关闭：择到 B 的根，水位之上没有记录"
+        "{case}，干净关闭：择到 B 的根，水位之上没有记录"
     );
     assert_eq!(
         (
@@ -509,27 +597,177 @@ fn c499_remount_after_a_clean_close_and_after_a_crash_both_scan_the_whole_ring_a
             crash.mounted.output.journal.prefix_applied
         ),
         (CheckpointTxg(3), 1, 1, 1),
-        "崩溃：择到 A 的根，验过点名单元施加 B 那一条"
+        "{case}，崩溃：择到 A 的根，验过点名单元施加 B 那一条"
     );
     for (history, read_back) in [
-        ("干净关闭再挂载", cold_read_back(&clean_close)),
-        ("崩溃后再挂载", cold_read_back(&crash)),
+        ("干净关闭再挂载", cold_read_back(clean_close)),
+        ("崩溃后再挂载", cold_read_back(crash)),
     ] {
         assert_eq!(
             read_back,
             (
                 RecoveryOutcome::FileRead {
                     root: (InstanceGeneration(2), CheckpointTxg(7)),
-                    content: second_version_content.clone()
+                    content: second_version_content.to_vec()
                 },
                 Some((InstanceGeneration(2), CheckpointTxg(7)))
             ),
-            "{history}：冷恢复读回 B 的内容"
+            "{case}，{history}：冷恢复读回 B 的内容"
         );
     }
     assert_ne!(
         second_version_content,
         file_content(),
         "B 的内容与 A 不同，读回哪一版分得出"
+    );
+}
+
+/// C499：D23（journal 的角色与格式） 已定项 14「第一版没有干净关闭标记：每次挂载一律走恢复（全环扫描、逐条验证、择根，
+/// 按六条口径与注 1–4 施加），不按上一次是不是干净关闭分支」。第一版没有关闭动作：干净关闭 = 最后一次发布整次落盘之后进程退出。
+/// 这一条是盘不答 journal 提示（像文件后端与真设备，`JournalHintAnswer::AnswerUnknownLikeARealDevice`）的那一格：
+/// 两次挂载都逐槽扫了全环——每块盘上起点落在环里的读不少于整环的记录槽数 196 608，读到的是环里每一个记录槽，两条历史读的槽相同；
+/// 再照同一套规则恢复（`assert_the_two_histories_recover_by_the_same_rules`）。
+/// 判别力自证：给挂载加一道「上一次干净关闭就只取 tail 那一条、不扫全环」的分支，干净关闭那一条历史当场红（`crates/mutations.tsv`）。
+#[test]
+fn c499_remount_on_devices_that_do_not_answer_the_journal_hint_scans_the_whole_ring_after_a_clean_close_and_after_a_crash_and_recovers_by_the_same_rules(
+) {
+    let histories = build_the_clean_close_and_the_crash_histories();
+    let clean_close = mount_logging_reads(
+        histories.clean_close_devices,
+        JournalHintAnswer::AnswerUnknownLikeARealDevice,
+    );
+    let crash = mount_logging_reads(
+        histories.crash_devices,
+        JournalHintAnswer::AnswerUnknownLikeARealDevice,
+    );
+
+    let ring = journal_ring();
+    let full_ring_scan_reads_per_device = ring.full_scan_reads_per_device();
+    let every_record_slot_of_the_ring: BTreeSet<DeviceOffsetInBytes> = (0
+        ..full_ring_scan_reads_per_device)
+        .map(|record_index| DeviceOffsetInBytes(ring.start.0 + record_index * JOURNAL_RECORD_BYTES))
+        .collect();
+    for (history, mount) in [("干净关闭再挂载", &clean_close), ("崩溃后再挂载", &crash)]
+    {
+        assert_eq!(
+            mount
+                .read_logs
+                .iter()
+                .map(|(device, _)| *device)
+                .collect::<Vec<_>>(),
+            BOTH_DEVICES.to_vec(),
+            "{history}：两块盘都记了读"
+        );
+        for (device, read_log) in &mount.read_logs {
+            let reads_inside_the_ring =
+                u64::try_from(read_log.journal_ring_read_offsets.len()).expect("读次数装得进 u64");
+            assert!(
+                reads_inside_the_ring >= full_ring_scan_reads_per_device,
+                "{history}：盘 {} 上起点落在环里的读只有 {reads_inside_the_ring} 次，不够扫一遍整环（{full_ring_scan_reads_per_device} 个记录槽）",
+                device.0
+            );
+            let slots_read: BTreeSet<DeviceOffsetInBytes> =
+                read_log.journal_ring_read_offsets.iter().copied().collect();
+            let slots_never_read = every_record_slot_of_the_ring
+                .difference(&slots_read)
+                .count();
+            let offsets_off_the_record_slots = slots_read
+                .difference(&every_record_slot_of_the_ring)
+                .count();
+            assert!(
+                slots_never_read == 0 && offsets_off_the_record_slots == 0,
+                "{history}：盘 {} 上读到的是环里每一个记录槽：没读到的槽 {slots_never_read} 个，不在记录槽起点上的读 {offsets_off_the_record_slots} 个",
+                device.0
+            );
+        }
+    }
+    let clean_close_slots = clean_close.journal_ring_read_slots();
+    let crash_slots = crash.journal_ring_read_slots();
+    assert!(
+        clean_close_slots == crash_slots,
+        "两条历史读的记录槽相同：只有干净关闭读了的 {} 个，只有崩溃读了的 {} 个",
+        clean_close_slots.difference(&crash_slots).count(),
+        crash_slots.difference(&clean_close_slots).count()
+    );
+    assert_the_two_histories_recover_by_the_same_rules(
+        &clean_close,
+        &crash,
+        &histories.second_version_content,
+        "盘不答提示",
+    );
+}
+
+/// C499 盘答 journal 提示（只记写过的扇区的内存盘，`JournalHintAnswer::PassTheInnerDeviceAnswerThrough`）的那一格：
+/// 恢复扫环只读盘答的记录槽（`singlefs_core::recovery::scan_journal`），所以「走了恢复」量成：两次挂载读的记录槽都恰好是盘答的那几个、
+/// 也恰好是这条历史写过的记录槽（A 那几次与 B 的记录，崩溃那条在根槽写之前已经落了 B 的记录，所以两条相同），每个槽读一次；
+/// 再照同一套规则恢复（`assert_the_two_histories_recover_by_the_same_rules`）。
+/// 判别力自证：内存盘答的提示漏掉一个写过的记录槽，当场红（`crates/mutations.tsv`）。
+#[test]
+fn c499_remount_on_devices_that_answer_the_journal_hint_reads_exactly_the_written_record_slots_after_a_clean_close_and_after_a_crash_and_recovers_by_the_same_rules(
+) {
+    let histories = build_the_clean_close_and_the_crash_histories();
+    let ring = journal_ring();
+    let hinted_record_slots = |devices: &[(DeviceIdentity, MemoryDisk)]| {
+        devices
+            .iter()
+            .flat_map(|(identity, device)| {
+                device
+                    .journal_record_offsets_hint(ring.start, ring.length_in_bytes)
+                    .expect("只记写过的扇区的内存盘答得出提示")
+                    .into_iter()
+                    .map(|offset| (*identity, offset))
+            })
+            .collect::<BTreeSet<(DeviceIdentity, DeviceOffsetInBytes)>>()
+    };
+    let clean_close_hinted_slots = hinted_record_slots(&histories.clean_close_devices);
+    let crash_hinted_slots = hinted_record_slots(&histories.crash_devices);
+    let clean_close = mount_logging_reads(
+        histories.clean_close_devices,
+        JournalHintAnswer::PassTheInnerDeviceAnswerThrough,
+    );
+    let crash = mount_logging_reads(
+        histories.crash_devices,
+        JournalHintAnswer::PassTheInnerDeviceAnswerThrough,
+    );
+
+    for (history, mount, hinted_slots, written_record_slots) in [
+        (
+            "干净关闭再挂载",
+            &clean_close,
+            &clean_close_hinted_slots,
+            &histories.clean_close_written_record_slots,
+        ),
+        (
+            "崩溃后再挂载",
+            &crash,
+            &crash_hinted_slots,
+            &histories.crash_written_record_slots,
+        ),
+    ] {
+        let slots_read = mount.journal_ring_read_slots();
+        assert_eq!(
+            &slots_read, hinted_slots,
+            "{history}：恢复读的记录槽恰好是盘答的那几个"
+        );
+        assert_eq!(
+            &slots_read, written_record_slots,
+            "{history}：恢复读的记录槽恰好是这条历史写过的记录槽"
+        );
+        assert_eq!(
+            mount.journal_ring_reads(),
+            written_record_slots.len(),
+            "{history}：起点落在环里的读恰好是写过的记录槽数，每个槽读一次"
+        );
+    }
+    assert_eq!(
+        clean_close.journal_ring_read_slots(),
+        crash.journal_ring_read_slots(),
+        "两条历史读的记录槽相同"
+    );
+    assert_the_two_histories_recover_by_the_same_rules(
+        &clean_close,
+        &crash,
+        &histories.second_version_content,
+        "盘答提示",
     );
 }

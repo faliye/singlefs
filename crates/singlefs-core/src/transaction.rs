@@ -148,7 +148,9 @@ pub const NEW_POOL_FILE_CREATION_NUMBER: u64 = 1;
 /// 无归属的树 ID（树表单元自己、mkfs 的固定单元）。
 pub const TREE_IDENTIFIER_NONE: u64 = 0;
 
-/// 提交步骤的封闭枚举：五种步骤种类（D17（实现分层与第三方管道） 已定项 2），`match` 不写通配臂——少一个臂编译不过。
+/// 提交步骤的封闭枚举，五个成员，`match` 不写通配臂——少一个臂编译不过。
+/// D17（实现分层与第三方管道） 已定项 2 说的六种步骤种类是录制流一侧的 `StepKind`（`crates/singlefs-harness/src/segments.rs`），
+/// 不是这五个成员：多出的整段清零（`StepKind::ZeroFill`）在这里没有对应成员，它是 mkfs 清零根环基址之前那一段、根环与 journal 环时直接发的 `write_zeroes_at`，不经提交步骤。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CommitStep<'publish> {
     WriteUnitToEveryDevice {
@@ -782,7 +784,7 @@ fn highest_system_configuration_instance<Device: BlockDevice>(
         .unwrap_or(MKFS_INSTANCE_GENERATION)
 }
 
-/// 判据 N-配置 的「没有这样的槽 ⇒ c_见证 = 0」（E158 第 3 次跑登记 `research/prompts/e158-r3-prereg.md` 第 347 行），与 mkfs 写进每个槽的
+/// 判据 N-配置 的「没有这样的槽 ⇒ c_见证 = 0」（E158 第 3 次跑登记 `research/prompts/e158-r3-prereg.md`「`| **N-配置** |`」那一行），与 mkfs 写进每个槽的
 /// tail 同值。取号时有一块盘两槽都读不出就拒（[`self_verified_system_configurations_of_every_device`]），所以取号读到的见证值只在
 /// 盘表为空、一个槽都没有可读的时候取它。
 const JOURNAL_TAIL_WITNESSED_BY_NO_SYSTEM_CONFIGURATION: u64 = 0;
@@ -846,7 +848,7 @@ fn self_verified_system_configurations_of_every_device<Device: BlockDevice>(
 }
 
 /// 取号那一刻的见证值 c_见证（C554 乙-配置续，用户 2026-09-27 定；定义取自 `research/prompts/e158-r3-prereg.md`
-/// 第 348 行「N-配置续」与 `research/prompts/e158-r4-prereg.md` 第 413 行）：每块盘两槽里全部自证过的系统配置的 journal tail 的最大值，
+/// 「`| **N-配置续** |`」那一行与 `research/prompts/e158-r4-prereg.md`「N-配置 在 `replay_journal` 交回之后另读每块盘两个系统配置槽」那一条）：每块盘两槽里全部自证过的系统配置的 journal tail 的最大值，
 /// 与可写挂载判 N-配置 同一取法（`mount.rs` 的 `newer_publish_witness`）。`slots_of_every_device` 是
 /// [`self_verified_system_configurations_of_every_device`] 那一次读到的（每块盘至少一份）；盘表为空时
 /// [`JOURNAL_TAIL_WITNESSED_BY_NO_SYSTEM_CONFIGURATION`]。
@@ -1040,7 +1042,7 @@ fn write_acquired_instance<Device: BlockDevice>(
     }
     // 取号那一写带的 tail 是这一刻的见证值（C554 乙-配置续，用户 2026-09-27 定），不是 0：连着几次取号之后崩溃、中间没有
     // 发布轮换，两槽都换成了取号写，写 0 就把上一次轮换见证的那次发布抹掉，下一次可写挂载的 N-配置 判不出、会抛弃暂时读不出的最新根。
-    // 第一道屏障之后、第一个取号写之前另读每块盘两槽一次（E158 第 4 次跑登记第 413 行）；逐盘取号写与回卷写都用这一次读到的。
+    // 第一道屏障之后、第一个取号写之前另读每块盘两槽一次（E158 第 4 次跑登记 `research/prompts/e158-r4-prereg.md`「N-配置 在 `replay_journal` 交回之后另读每块盘两个系统配置槽」那一条）；逐盘取号写与回卷写都用这一次读到的。
     // 屏障前那一核与这一次读之间又判不出或有一块盘一份都读不出，就不写（判定与写读同一份输入：写之前重算、对不上不写）。
     // mkfs 写的 tail 是 0，mkfs 之后第一次取号读到的就是 0：新池新建文件的字节不变。
     let witnessed_journal_tail =
@@ -6001,7 +6003,7 @@ pub fn publish_first_file<Device: BlockDevice>(
                 // 改动计数 = 最后一次改动所在发布的 checkpoint_txg（D8（核心索引结构） 已定项 6 偏移 88 的字段表定义）：
                 // 就是这次发布的 txg（mkfs 同一个进程里那条流上是 3）。写 1 是 2026-09-18 之前的老样子
                 // （暖机把新池新建文件从 txg 1 推到 3 时这一格没跟着改，增补 2 第 11 行）。
-                // 这里不写 `txg.0`：`crates/mutations.tsv` 第 22 行按那串字面锚在 `publish_overwrite` 上，同一份文件里出现两次它就腐化。
+                // 这里不写 `txg.0`：`crates/mutations.tsv`「步 1 变异：改动计数留 1」那一行按那串字面锚在 `publish_overwrite` 上，同一份文件里出现两次它就腐化。
                 change_count: first_file_version_txg.0,
             }),
             // 新池新建文件只建第一个文件那一个 inode：树是空的，这条记录建第一片容器（D8（核心索引结构） 已定项 6）。

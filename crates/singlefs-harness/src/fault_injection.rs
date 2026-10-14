@@ -31,10 +31,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::time::Instant;
 
-use singlefs_checker::image::{
-    InvariantVerdict, SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
-};
-use singlefs_checker::walk::check_pool_image;
+use singlefs_checker::image::SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION;
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration};
 use singlefs_core::block_device::{
     BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
@@ -47,11 +44,15 @@ use singlefs_core::recovery::{
 use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
 use singlefs_format::{ROOT_RING_REGIONS, ROOT_RING_SLOTS_PER_REGION_MAXIMUM};
 
+use crate::heavy_threads::{
+    default_heavy_threads_of_the_cap_value, THREAD_CAP_ENVIRONMENT_VARIABLE,
+};
 use crate::history::{
-    classify_failure, execute_history_with_faults, generate_history_with_weights,
-    newest_ring_root_and_slot_count, raised_floor_lands_only_on_abandoned_roots, AppliedEffect,
-    ColdStartReadBack, FailureObservation, FailureSignature, GeneratedHistory, GenerationWeights,
-    HarnessJudgement, HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind,
+    classify_failure, execute_history_stopping_at_the_given_pool_checker_violations,
+    execute_history_with_faults, generate_history_with_weights, newest_ring_root_and_slot_count,
+    raised_floor_lands_only_on_abandoned_roots, AppliedEffect, ColdStartReadBack,
+    FailureObservation, FailureSignature, GeneratedHistory, GenerationWeights, HarnessJudgement,
+    HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind,
     HistoryRun, HistorySeed, PerStepChecker, SeededRandomSource, StartingPointStep, StepOutcome,
     StepPosition,
 };
@@ -66,7 +67,9 @@ use crate::model::{
 use crate::model_comparison::{
     model_ring_position, model_root_key, observed_read_back_after_a_crash,
 };
-use crate::numeric_environment_variable::number_from_the_variable_value_panicking_when_unreadable;
+use crate::numeric_environment_variable::{
+    number_from_the_variable_value_panicking_when_unreadable, process_environment_variable,
+};
 use crate::reference_filesystem_translation::{
     JointVerdictOfTheReferenceFileSystemAndTheModel, ReferenceFileSystemTranslation,
     ReferenceFileSystemVote, WhatTheReopenMustRecover,
@@ -74,7 +77,8 @@ use crate::reference_filesystem_translation::{
 use crate::segments::{FixedGeometry, StepKind};
 use crate::{RecordedOperation, RecordedOperationKind, SharedStream};
 
-/// 故障注入的工作线程数从这个环境变量取（十进制正整数）；没设就取 [`std::thread::available_parallelism`]。
+/// 故障注入的工作线程数从这个环境变量取（十进制正整数）；没设就取每台默认重活线程数
+/// （[`crate::heavy_threads::default_heavy_threads`]：`SINGLEFS_THREAD_CAP`，再没设取登记值）。
 pub const FAULT_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE: &str =
     "SINGLEFS_FAULT_INJECTION_WORKER_THREADS";
 
@@ -354,7 +358,7 @@ impl RootRingSlotTarget {
 /// 同一个开关（`RootRingSlotTarget`）的第二个口子：包在**读者**外面，不是包在块设备外面。
 ///
 /// 块设备那个口子（`FaultInjectingBlockDevice` + `FaultSchedule::every_read_of_named_root_ring_slots_fails`）
-/// 罩得住走 `Vec<(DeviceIdentity, Device)>` 的路径（可写挂载、回退、抬 F）；层 0 枚举出来的崩溃镜像
+/// 罩得住走 `Vec<(DeviceIdentity, Device)>` 的路径（可写挂载、回退、抬 F）；崩溃点重放枚举出来的崩溃镜像
 /// （`crate::memory_pool::MemoryPool` / `CrashImage`）不是块设备、只是 `PoolReader`，那一路要这个口子。
 /// 两个口子判「这一次读落在哪个点名的槽里」用的是同一个 `RootRingSlotTarget::slot_covering`。
 ///
@@ -1116,6 +1120,17 @@ impl<Inner: BlockDevice> BlockDevice for FaultInjectingBlockDevice<Inner> {
     fn size_in_bytes(&self) -> u64 {
         self.inner.size_in_bytes()
     }
+
+    /// 提示照里面那块盘答：注入的故障不改哪些槽可能有记录——吞掉或失败的写在里面那块盘上没留字节，全环扫描在那一槽读到的也是 0；
+    /// 读失败与读到翻位的槽，按提示扫与全环扫描读到的是同一槽的同一个结果（没写过的槽读出来是 0，翻一位过不了 journal 的校验）。
+    fn journal_record_offsets_hint(
+        &self,
+        ring_start: DeviceOffsetInBytes,
+        ring_bytes: u64,
+    ) -> Option<Vec<DeviceOffsetInBytes>> {
+        self.inner
+            .journal_record_offsets_hint(ring_start, ring_bytes)
+    }
 }
 
 /// 注入点落在这段历史的哪一段上：起点段，还是起点之后的第几步（那一步是哪一类操作）。
@@ -1513,10 +1528,15 @@ pub struct FaultInjectionTally {
     pub reopens_by_the_reference_filesystem_and_model_verdicts:
         BTreeMap<JointVerdictOfTheReferenceFileSystemAndTheModel, u64>,
     pub reference_filesystem_abstentions_at_the_reopen: BTreeMap<&'static str, u64>,
+    /// harness 在注入之后重开的盘上就地跑池级 checker 的次数：那一遍归 checker 档两段，harness 一次都不跑，这一格恒为 0
+    /// （用例照它核 harness 没把就地判偷回来）；下面三格（判绿、不适用、部分没判的条次）同样恒空。
     pub checker_runs_on_the_image_after_the_fault: u64,
+    /// 注入之后重开的盘经钩子交出去的次数（[`ImagesAfterAFault`]，每个注入点一次；池级 checker 那一遍归 checker 档两段）。
+    /// 合并入口（[`inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`]）交给判的那几次不记在这一格。
+    pub images_after_the_fault_handed_out: u64,
     pub invariant_holds: BTreeMap<&'static str, u64>,
     pub invariant_not_applicable: BTreeMap<&'static str, u64>,
-    /// 判成「部分没判」（[`InvariantVerdict::PartiallyJudged`]）的条次：不红，也不算判绿。
+    /// 判成「部分没判」（`singlefs_checker::image::InvariantVerdict::PartiallyJudged`）的条次：不红，也不算判绿。
     pub invariant_partially_judged: BTreeMap<&'static str, u64>,
     pub faults_ending_known_red: BTreeMap<KnownRedFormAtAFault, u64>,
     pub faults_ending_new_finding: u64,
@@ -1586,6 +1606,7 @@ impl FaultInjectionTally {
         }
         self.checker_runs_on_the_image_after_the_fault +=
             other.checker_runs_on_the_image_after_the_fault;
+        self.images_after_the_fault_handed_out += other.images_after_the_fault_handed_out;
         for (key, count) in &other.invariant_holds {
             *self.invariant_holds.entry(key).or_insert(0) += count;
         }
@@ -1725,7 +1746,8 @@ impl FaultInjectionTally {
         );
         let _ = writeln!(
             text,
-            "注入之后的镜像上跑池级 checker {} 次：判绿 {} 条次、不适用 {} 条次、部分没判 {} 条次",
+            "注入之后重开的盘交出去 {} 次；harness 就地在上面跑池级 checker {} 次：判绿 {} 条次、不适用 {} 条次、部分没判 {} 条次",
+            self.images_after_the_fault_handed_out,
             self.checker_runs_on_the_image_after_the_fault,
             self.invariant_holds.values().sum::<u64>(),
             self.invariant_not_applicable.values().sum::<u64>(),
@@ -1875,32 +1897,6 @@ fn raised_floor_of_the_newest_root_lands_only_on_abandoned_roots(
     raised_floor_lands_only_on_abandoned_roots(image, newest_root.rollback_floor)
 }
 
-/// 对一份镜像跑池级 checker，记每条不变量判绿、不适用各几次，交回判红的那几条（与 `history.rs` 的 `violations_on` 同一条口径，
-/// 计数进的是故障注入自己的那一份）。
-fn checker_violations_on(
-    image: &MemoryPool,
-    tally: &mut FaultInjectionTally,
-) -> Vec<(&'static str, String)> {
-    tally.checker_runs_on_the_image_after_the_fault += 1;
-    let mut violations = Vec::new();
-    for (invariant, verdict) in check_pool_image(image) {
-        match verdict {
-            InvariantVerdict::Holds => *tally.invariant_holds.entry(invariant).or_insert(0) += 1,
-            InvariantVerdict::NotApplicable(_) => {
-                *tally.invariant_not_applicable.entry(invariant).or_insert(0) += 1;
-            }
-            InvariantVerdict::PartiallyJudged(_) => {
-                *tally
-                    .invariant_partially_judged
-                    .entry(invariant)
-                    .or_insert(0) += 1;
-            }
-            InvariantVerdict::Violated(detail) => violations.push((invariant, detail)),
-        }
-    }
-    violations
-}
-
 /// 随机注入抽 [`InjectedFault`] 的全部六种，等概率。前四种是里程碑「增补 3」第 4 件逐字写的
 /// 「让任意一次写、读、刷盘返回 `BlockDeviceError`，或让一次读返回改坏的字节」；
 /// 后两种是**设备说谎**（[`InjectedFault::WriteIsSwallowed`]、[`InjectedFault::BarrierIsSwallowed`]），
@@ -2003,13 +1999,89 @@ pub fn inject_faults_into_history(
     execution: HistoryExecution,
     faults_per_history: usize,
 ) -> HistoryFaultInjection {
+    inject_faults_into_history_handing_out_the_images(
+        history,
+        execution,
+        faults_per_history,
+        &mut |_| {},
+    )
+}
+
+/// 同 [`inject_faults_into_history`]，另把每个注入点重开的盘交给 `hand_out`（[`ImagesAfterAFault`]）：harness 不在上面跑池级 checker，
+/// 那一遍归 checker 档两段，结论交回 [`classify_the_pool_checker_verdicts_of_the_images_after_a_fault`] 归类。交出去的次序是注入点的次序。
+#[must_use]
+pub fn inject_faults_into_history_handing_out_the_images(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    faults_per_history: usize,
+    hand_out: &mut dyn FnMut(ImagesAfterAFault),
+) -> HistoryFaultInjection {
     let mut tally = FaultInjectionTally {
         histories: 1,
         ..FaultInjectionTally::default()
     };
     let marks = measure_history(history, execution, &mut tally);
     let drawn_faults = draw_faults(history.seed, &marks, faults_per_history);
-    inject_the_drawn_faults(history, execution, &marks, drawn_faults, tally)
+    inject_the_drawn_faults(
+        history,
+        execution,
+        &marks,
+        drawn_faults,
+        tally,
+        PoolCheckerOfTheImagesAfterAFault::HandedOutToTheCheckerTier(hand_out),
+    )
+}
+
+/// checker 档判回的、一个注入点交出去的那几张盘上池级 checker 判红的（[`inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`]
+/// 收它）。违例细节可以是占位的一句（GPU 判的、从判定库读回的没有细节）：归类只看判红的是哪几条。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PoolCheckerVerdictsAfterAFault {
+    /// 与 [`ImagesAfterAFault::step_images_of_the_run_with_the_fault`] 逐张对应。
+    pub violations_of_the_step_images: Vec<Vec<(&'static str, String)>>,
+    /// 重开那张盘（[`ImagesAfterAFault::image_after_the_fault`]）上判红的。
+    pub violations_after_the_fault: Vec<(&'static str, String)>,
+    /// 被吞的写插回去之后那张盘（[`ImagesAfterAFault::image_with_the_swallowed_writes_landed`]）上判红的不变量；没吞写时空。
+    pub invariants_still_violated_if_the_swallowed_writes_had_landed: BTreeSet<&'static str>,
+}
+
+/// 同 [`inject_faults_into_history`]，池级 checker 那一遍由 checker 档判（`pool_checker_verdicts_of` 收一个注入点交出去的盘，交回 checker 档
+/// 从判定库读回的结论），照 harness 原先就地判、判红就停的那一档的口径并进 harness 自己的判定，交回与那一档逐字相同的失败观察与归类
+/// （那一档删了，用户 2026-10-14 定；要它的产物不变的调用方是 E158 的故障注入）：
+///
+/// 1. 每个注入点先照不判池级 checker 跑一遍，交出去判；
+/// 2. 带着注入跑的那一遍里一张每步镜像都不红：历史与判红就停那一档跑的是同一段，重开那张盘与被吞的写插回去那张盘的结论并进归类；
+/// 3. 有一张判红：判红就停那一档的历史停在那一步（之后的步不跑，注入点在那之后的就没走到，重开的是那一步的盘）。照那几张的结论把这个注入点
+///    截短重跑一遍（每步镜像那个钩子收调用方给的结论，`history::execute_history_stopping_at_the_given_pool_checker_violations`），
+///    重跑那一遍交出去的盘再交一次判，重开那张盘与被吞的写插回去那张盘的结论并进归类。
+///
+/// 一个注入点因此交出去一次或两次。判红就停那一档里池级 checker 自己 panic 会被历史接住、记成那一步的 panic；这里 checker 档判不出
+/// panic 来，那一格不罩（推的：E158 入库产物里没有这种行）。判红就停那一档在重开的盘上记的每条不变量判绿、不适用的计数
+/// （[`FaultInjectionTally::invariant_holds`] 那几格）不记：结论里只有判红的。
+///
+/// # Panics
+/// 交回的每步镜像结论与交出去的每步镜像张数不同；截短重跑那一遍交出去的每步镜像与整段那一遍判红那一张之前（含）逐张不同
+/// （同一个种子、同一个注入点重跑，不同就是执行器不确定了）。
+#[must_use]
+pub fn inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    faults_per_history: usize,
+    pool_checker_verdicts_of: &mut dyn FnMut(&ImagesAfterAFault) -> PoolCheckerVerdictsAfterAFault,
+) -> HistoryFaultInjection {
+    let mut tally = FaultInjectionTally {
+        histories: 1,
+        ..FaultInjectionTally::default()
+    };
+    let marks = measure_history(history, execution, &mut tally);
+    let drawn_faults = draw_faults(history.seed, &marks, faults_per_history);
+    inject_the_drawn_faults(
+        history,
+        execution,
+        &marks,
+        drawn_faults,
+        tally,
+        PoolCheckerOfTheImagesAfterAFault::MergedFromTheCheckerTier(pool_checker_verdicts_of),
+    )
 }
 
 /// 同 [`inject_faults_into_history`]，注入点不按种子抽，由调用方写死：`segment` 那一段发出的第 `call_within_the_segment` 次
@@ -2024,6 +2096,29 @@ pub fn inject_one_fault_into_the_segment(
     fault: InjectedFault,
     segment: FaultedSegment,
     call_within_the_segment: u64,
+) -> HistoryFaultInjection {
+    inject_one_fault_into_the_segment_handing_out_the_images(
+        history,
+        execution,
+        fault,
+        segment,
+        call_within_the_segment,
+        &mut |_| {},
+    )
+}
+
+/// 同 [`inject_one_fault_into_the_segment`]，另把那个注入点重开的盘交给 `hand_out`（同 [`inject_faults_into_history_handing_out_the_images`]）。
+///
+/// # Panics
+/// 同 [`inject_one_fault_into_the_segment`]。
+#[must_use]
+pub fn inject_one_fault_into_the_segment_handing_out_the_images(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    fault: InjectedFault,
+    segment: FaultedSegment,
+    call_within_the_segment: u64,
+    hand_out: &mut dyn FnMut(ImagesAfterAFault),
 ) -> HistoryFaultInjection {
     let mut tally = FaultInjectionTally {
         histories: 1,
@@ -2047,7 +2142,14 @@ pub fn inject_one_fault_into_the_segment(
         call_ordinal: calls_before(&marks, index).of(kind) + call_within_the_segment,
         segment,
     };
-    inject_the_drawn_faults(history, execution, &marks, vec![drawn], tally)
+    inject_the_drawn_faults(
+        history,
+        execution,
+        &marks,
+        vec![drawn],
+        tally,
+        PoolCheckerOfTheImagesAfterAFault::HandedOutToTheCheckerTier(hand_out),
+    )
 }
 
 /// 测量跑：不注入，不跑池级 checker（那一档由随机历史与崩溃注入罩着），只要每一步的调用数、模型目录与系统配置的实例代号。
@@ -2095,13 +2197,26 @@ fn measure_history(
     marks
 }
 
-/// 摆好的每个注入点各重跑一遍这段历史（[`inject_one_fault`]），攒成一段的结果。
+/// 每个注入点重开的盘上池级 checker 那一遍怎么办（[`inject_the_drawn_faults`]）。harness 自己一条不变量都不判。
+enum PoolCheckerOfTheImagesAfterAFault<'hook> {
+    /// 盘交给钩子，那一遍归 checker 档两段，结论交回 [`classify_the_pool_checker_verdicts_of_the_images_after_a_fault`] 归类。
+    HandedOutToTheCheckerTier(&'hook mut dyn FnMut(ImagesAfterAFault)),
+    /// checker 档判回的结论交进来，照判红就停那一档的口径并进 harness 的判定
+    /// （[`inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`]）。
+    MergedFromTheCheckerTier(
+        &'hook mut dyn FnMut(&ImagesAfterAFault) -> PoolCheckerVerdictsAfterAFault,
+    ),
+}
+
+/// 摆好的每个注入点各重跑一遍这段历史（[`run_one_fault_up_to_the_pool_checker`]），池级 checker 那一遍照 `pool_checker` 交出去或并进来，
+/// 攒成一段的结果。
 fn inject_the_drawn_faults(
     history: &GeneratedHistory,
     execution: HistoryExecution,
     marks: &[StepMark],
     drawn_faults: Vec<DrawnFault>,
     mut tally: FaultInjectionTally,
+    pool_checker: PoolCheckerOfTheImagesAfterAFault<'_>,
 ) -> HistoryFaultInjection {
     if drawn_faults.is_empty() {
         tally.histories_without_any_injection_point = 1;
@@ -2116,8 +2231,37 @@ fn inject_the_drawn_faults(
             new_findings: &mut new_findings,
             acquired_instances_left: &mut acquired_instances_left,
         };
-        for drawn in &drawn_faults {
-            inject_one_fault(history, execution, marks, drawn, &mut accumulator);
+        match pool_checker {
+            PoolCheckerOfTheImagesAfterAFault::HandedOutToTheCheckerTier(hand_out) => {
+                for drawn in &drawn_faults {
+                    let one_fault = run_one_fault_up_to_the_pool_checker(
+                        history, execution, marks, drawn, None,
+                    );
+                    settle_one_fault_with_the_pool_checker_verdicts(
+                        &one_fault,
+                        Vec::new(),
+                        BTreeSet::new(),
+                        &mut accumulator,
+                    );
+                    // 重开的盘交出去：池级 checker 那一遍归 checker 档两段
+                    accumulator.tally.images_after_the_fault_handed_out += 1;
+                    hand_out(one_fault.images);
+                }
+            }
+            PoolCheckerOfTheImagesAfterAFault::MergedFromTheCheckerTier(
+                pool_checker_verdicts_of,
+            ) => {
+                for drawn in &drawn_faults {
+                    merge_one_fault_with_the_pool_checker_verdicts(
+                        history,
+                        execution,
+                        marks,
+                        drawn,
+                        pool_checker_verdicts_of,
+                        &mut accumulator,
+                    );
+                }
+            }
         }
     }
     HistoryFaultInjection {
@@ -2139,6 +2283,47 @@ struct FaultInjectionAccumulator<'run> {
 }
 
 impl FaultInjectionAccumulator<'_> {
+    /// 一条注入之后的失败归好类之后记账：「已知红」照形态计、说谎的设备留下的按签名计、新发现同一个签名只留第一个。
+    fn settle_a_failure_after_a_fault(
+        &mut self,
+        seed: HistorySeed,
+        drawn: DrawnFault,
+        classified: FailureAfterAFault,
+        reopen_text: &str,
+    ) {
+        match classified {
+            FailureAfterAFault::KnownRed(form) => self.record_a_known_red_hit(seed, form, drawn),
+            FailureAfterAFault::LeftByTheLyingDevice { signature } => {
+                self.tally
+                    .faults_where_a_lying_device_left_the_image_inconsistent += 1;
+                *self
+                    .tally
+                    .lying_device_signatures
+                    .entry(format!("{signature:?}"))
+                    .or_insert(0) += 1;
+            }
+            FailureAfterAFault::NewFinding {
+                signature,
+                observation,
+            } => {
+                self.tally.faults_ending_new_finding += 1;
+                if !self
+                    .new_findings
+                    .iter()
+                    .any(|finding| finding.signature == signature)
+                {
+                    self.new_findings.push(FaultFinding {
+                        signature,
+                        seed,
+                        drawn,
+                        observation: *observation,
+                        reopen: reopen_text.to_string(),
+                    });
+                }
+            }
+        }
+    }
+
     /// 一次注入以「已知红」收尾：按形态计一次，再记下是哪个种子上的哪一次注入。
     fn record_a_known_red_hit(
         &mut self,
@@ -2226,7 +2411,7 @@ pub struct WhatTheSwallowedWritesExplain {
 ///
 /// 一条不是注入点造成的违例（插回去仍红）、一次读坏的槽不是被吞那次写的、一行与重算的对不上，照报新发现——这是判别力那一半。
 ///
-/// 它替下的是按签名写死两组的白名单（主 agent 2026-09-21 定的收严，`records/2026-09-21-增补3第4件与checker补三条.md:27`）：
+/// 它替下的是按签名写死两组的白名单（主 agent 2026-09-21 定的收严，`records/2026-09-21-增补3第4件与checker补三条.md`「签名白名单写死两组、名单外照报」那一句）：
 /// 白名单早于 I-3.10 的实现，大档撞出的六组里有四组（I-3.10、I-9.1、旧根复活连带的五条、抬 F 的上限）都是说谎的设备丢一份内容的投影、
 /// 却不在名单里（实四丙交回第二节）。
 #[must_use]
@@ -2289,8 +2474,215 @@ pub fn left_by_the_lying_device(
     every_violation_is_explained && disagreement_is_explained
 }
 
-/// 被吞的那几次写要是都落了盘，录制流该是哪一串：各自插在录制流里第 `writes_recorded_before` 次写之后（屏障不改镜像，
-/// 排在那几道屏障前后都一样）。从写数最大的那一次往前插：插进去的写只挪它后面的，排在前面的那几次的位置不变。
+/// 一张重开的盘在录制流里的样子：空盘叠上 `operations` 就是它（录制流只记落了盘的写）。checker 档照它建给定状态表：
+/// mkfs 写的那几步进基线（`operations_written_by_make_filesystem`），掉电接缝照 `first_stream_index_after_each_power_loss` 断开记录核对器的发布表。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecordedStreamOfAnImage {
+    pub operations: Vec<crate::RetainedOperation>,
+    /// 录制流头上 mkfs 写的步数（[`HistoryRun::operations_written_by_make_filesystem`]）。
+    pub operations_written_by_make_filesystem: usize,
+    /// 每次掉电之后录制流里第一步的下标（[`HistoryRun::first_stream_index_after_each_power_loss`]）。
+    pub first_stream_index_after_each_power_loss: Vec<usize>,
+}
+
+/// 一个注入点重开的盘经钩子交出去的那一份（[`inject_faults_into_history_handing_out_the_images`]）：池级 checker 那一遍归 checker 档两段
+/// （用户 2026-10-13 定：镜像作为给定状态写进判定库、判段从库读、判在 GPU），判出的违例交回
+/// [`classify_the_pool_checker_verdicts_of_the_images_after_a_fault`] 照这里带的事实归类（故障注入自己那条「已知红」、说谎的设备留下的不一致、新发现）。
+/// 模型、RefFS 与执行器判出的失败 harness 自己归类过，不在这里。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ImagesAfterAFault {
+    pub seed: HistorySeed,
+    pub drawn: DrawnFault,
+    pub device_width: HistoryDeviceWidth,
+    /// 注入之后重开的那张盘。
+    pub image_after_the_fault: RecordedStreamOfAnImage,
+    /// 带着注入跑的那一遍每一步的镜像（[`crate::history::StepImage`]，次序同历史）：都是 `image_after_the_fault` 录制流的前缀。
+    pub step_images_of_the_run_with_the_fault: Vec<StepImageInTheRecordedStream>,
+    /// 说谎的设备吞掉了写时：被吞的写按原位插回去之后的那张盘（实现以为自己写下的那一份；判「这条失败是不是它留下的」）。
+    pub image_with_the_swallowed_writes_landed: Option<RecordedStreamOfAnImage>,
+    /// 这个注入点上池级 checker 判红时那一条失败除违例之外的样子（位置、根环、抬 F 落没落在空档里），违例一栏是空的。
+    pub observation_without_the_pool_checker_violations: FailureObservation,
+    pub facts_after_the_fault: FactsAfterTheFault,
+    /// 说谎的设备吞掉了写时判「这条失败是不是它留下的」要的那几样，池级 checker 那一项（插回去之后仍红的不变量）是空的、由归类那一刻填。
+    pub what_the_swallowed_writes_explain_without_the_pool_checker:
+        Option<WhatTheSwallowedWritesExplain>,
+    /// 重开走到了哪一版（给人看的一句，新发现带着它）。
+    pub reopen: String,
+}
+
+/// 带着注入跑的那一遍里一张每步镜像：空盘叠上重开那张盘录制流的头 `operations_recorded` 步，连同 harness 交出去那一刻读的根环
+/// （池级 checker 在它上面判红时那一条失败要带）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StepImageInTheRecordedStream {
+    pub position: StepPosition,
+    pub operation_kind: Option<HistoryOperationKind>,
+    pub operations_recorded: usize,
+    pub newest_ring_root_txg: Option<u64>,
+    pub root_ring_slot_count: Option<u64>,
+}
+
+/// 一条注入之后的失败归到哪一格（[`classify_a_failure_after_a_fault`]）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FailureAfterAFault {
+    KnownRed(KnownRedFormAtAFault),
+    /// 说谎的设备吞掉写之后盘面不一致：设备丢的，不是实现的缺口（[`left_by_the_lying_device`]）；按签名计数、不算新发现。
+    LeftByTheLyingDevice {
+        signature: FailureSignature,
+    },
+    NewFinding {
+        signature: FailureSignature,
+        observation: Box<FailureObservation>,
+    },
+}
+
+/// 一条注入之后的失败归类：故障注入自己那几条「已知红」先认，再对共用清单，清单外的说谎的设备留下的不一致单记，其余是新发现。
+/// harness 就地判的失败与 checker 档两段判出的池级 checker 违例走同一个归类。
+#[must_use]
+pub fn classify_a_failure_after_a_fault(
+    observation: FailureObservation,
+    facts: &FactsAfterTheFault,
+    fault: InjectedFault,
+    what_the_swallowed_writes_explain: Option<&WhatTheSwallowedWritesExplain>,
+) -> FailureAfterAFault {
+    // 「已知红」先认：清单里那几条是认下来的形态（共用清单是实现与 checker 读法对不上的老账，增补 2 收口表第 ②、43 行；
+    // 故障注入自己那一条是用户 2026-10-03 定的「mkfs 没写下系统配置槽，全池皆废判红是对的」），
+    // 与设备说不说谎无关，说谎的设备把它撞出来时照样记进「已知红」那一格，不许被下面那一条接走。
+    if let Some(form) = known_red_form_only_after_a_fault(&observation, facts) {
+        return FailureAfterAFault::KnownRed(KnownRedFormAtAFault::OnlyAfterAFault(form));
+    }
+    match classify_failure(observation) {
+        HistoryEnding::KnownRed { form, .. } => {
+            FailureAfterAFault::KnownRed(KnownRedFormAtAFault::SharedWithRandomHistories(form))
+        }
+        HistoryEnding::NewFinding {
+            signature,
+            observation,
+        } => {
+            // 说谎的设备吞掉写之后盘面不一致：设备丢的，不是实现的缺口（`InjectedFault::the_device_lies`）。
+            // 按注入点认（`left_by_the_lying_device`，主 agent 2026-09-26 定，实七）：被吞的写插回去就消失的违例、
+            // 去掉被吞的根之后模型重算对得上的上限才豁免，别的照报成新发现。
+            // panic 不走这一格——说谎的设备也不许把实现打 panic，那一条照样报成新发现。
+            if fault.the_device_lies()
+                && what_the_swallowed_writes_explain
+                    .is_some_and(|explained| left_by_the_lying_device(&observation, explained))
+            {
+                FailureAfterAFault::LeftByTheLyingDevice { signature }
+            } else {
+                FailureAfterAFault::NewFinding {
+                    signature,
+                    observation: Box::new(observation),
+                }
+            }
+        }
+        HistoryEnding::Completed => {
+            unreachable!("classify_failure 只交回「已知红」或新发现，不交回跑完")
+        }
+    }
+}
+
+/// checker 档两段判出的池级 checker 结论归类（harness 不判，那一遍的结论交回这里；要判红就停那一档口径的调用方改走
+/// [`inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`]）：
+/// `violations_of_the_step_images` 与 [`ImagesAfterAFault::step_images_of_the_run_with_the_fault`] 逐张对应，
+/// `violations_after_the_fault` 是重开那张盘上判红的，`invariants_still_violated_if_the_swallowed_writes_had_landed` 是被吞的写插回去之后
+/// 那张盘上判红的不变量（没吞写时空）。交回归好类的失败：每步镜像里第一张判红的（harness 就地判时历史停在那一步，之后的步不跑），
+/// 重开那张判红的，各一条；都不红交回空。
+///
+/// # Panics
+/// `violations_of_the_step_images` 与每步镜像张数不同。
+#[must_use]
+pub fn classify_the_pool_checker_verdicts_of_the_images_after_a_fault(
+    images: &ImagesAfterAFault,
+    violations_of_the_step_images: Vec<Vec<(&'static str, String)>>,
+    violations_after_the_fault: Vec<(&'static str, String)>,
+    invariants_still_violated_if_the_swallowed_writes_had_landed: BTreeSet<&'static str>,
+) -> Vec<FailureAfterAFault> {
+    assert_eq!(
+        violations_of_the_step_images.len(),
+        images.step_images_of_the_run_with_the_fault.len(),
+        "每步镜像的结论与交出去的每步镜像逐张对应"
+    );
+    let explained = images
+        .what_the_swallowed_writes_explain_without_the_pool_checker
+        .clone()
+        .map(|explained| WhatTheSwallowedWritesExplain {
+            invariants_still_violated_if_the_swallowed_writes_had_landed,
+            ceiling_without_the_swallowed_roots: explained.ceiling_without_the_swallowed_roots,
+            root_ring_slots_of_the_swallowed_root_slot_writes: explained
+                .root_ring_slots_of_the_swallowed_root_slot_writes,
+            instance_rows_with_the_swallowed_roots_rebuilt_from_their_records: explained
+                .instance_rows_with_the_swallowed_roots_rebuilt_from_their_records,
+        });
+    let first_red_step_image = images
+        .step_images_of_the_run_with_the_fault
+        .iter()
+        .zip(violations_of_the_step_images)
+        .find(|(_, violations)| !violations.is_empty())
+        .map(|(step_image, violations)| FailureObservation {
+            position: step_image.position,
+            operation_kind: step_image.operation_kind,
+            violations,
+            panic: None,
+            newest_ring_root_txg: step_image.newest_ring_root_txg,
+            root_ring_slot_count: step_image.root_ring_slot_count,
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots: None,
+            record_check: RecordCheck::default(),
+        });
+    let template = &images.observation_without_the_pool_checker_violations;
+    let red_after_the_fault =
+        (!violations_after_the_fault.is_empty()).then(|| FailureObservation {
+            position: template.position,
+            operation_kind: template.operation_kind,
+            violations: violations_after_the_fault,
+            panic: None,
+            newest_ring_root_txg: template.newest_ring_root_txg,
+            root_ring_slot_count: template.root_ring_slot_count,
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots: template
+                .raised_floor_lands_only_on_abandoned_roots,
+            record_check: RecordCheck::default(),
+        });
+    first_red_step_image
+        .into_iter()
+        .chain(red_after_the_fault)
+        .map(|observation| {
+            classify_a_failure_after_a_fault(
+                observation,
+                &images.facts_after_the_fault,
+                images.drawn.fault,
+                explained.as_ref(),
+            )
+        })
+        .collect()
+}
+
+/// 被吞的那一次写要是落了盘，录制流里它排在第几步之前（插进去的下标）：录制流里第 `writes_recorded_before` 次写之后（屏障不改镜像，
+/// 排在那几道屏障前后都一样）。
+fn stream_index_the_swallowed_write_lands_at(
+    operations: &[crate::RetainedOperation],
+    write: &SwallowedWrite,
+) -> usize {
+    if write.writes_recorded_before == 0 {
+        return 0;
+    }
+    operations
+        .iter()
+        .enumerate()
+        .filter(|(_, retained)| retained.operation.kind != RecordedOperationKind::Barrier)
+        .nth(write.writes_recorded_before - 1)
+        .map(|(index, _)| index + 1)
+        .unwrap_or_else(|| {
+            panic!(
+                "被吞的写之前记着 {} 次写，录制流里的写不够这么多：注入层与录制器数的写对不上",
+                write.writes_recorded_before
+            )
+        })
+}
+
+/// 被吞的那几次写要是都落了盘，录制流该是哪一串：各自插在 [`stream_index_the_swallowed_write_lands_at`] 那一处。
+/// 从写数最大的那一次往前插：插进去的写只挪它后面的，排在前面的那几次的位置不变。
 fn operations_with_the_swallowed_writes_landed(
     operations: &[crate::RetainedOperation],
     swallowed: &[SwallowedWrite],
@@ -2299,25 +2691,44 @@ fn operations_with_the_swallowed_writes_landed(
     let mut by_position: Vec<&SwallowedWrite> = swallowed.iter().collect();
     by_position.sort_by_key(|write| write.writes_recorded_before);
     for write in by_position.into_iter().rev() {
-        let stream_index = if write.writes_recorded_before == 0 {
-            0
-        } else {
-            operations
-                .iter()
-                .enumerate()
-                .filter(|(_, retained)| retained.operation.kind != RecordedOperationKind::Barrier)
-                .nth(write.writes_recorded_before - 1)
-                .map(|(index, _)| index + 1)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "被吞的写之前记着 {} 次写，录制流里的写不够这么多：注入层与录制器数的写对不上",
-                        write.writes_recorded_before
-                    )
-                })
-        };
+        let stream_index = stream_index_the_swallowed_write_lands_at(operations, write);
         landed.insert(stream_index, write.as_retained_operation());
     }
     landed
+}
+
+/// 被吞的写插回去之后的那张盘（[`RecordedStreamOfAnImage`]）：mkfs 的步数与掉电之后第一步的下标跟着插进去的写往后挪。
+/// 插在 mkfs 那几步之后第一处（恰好插在边界上）的算 mkfs 之后写的；插在掉电之后第一步之前（恰好插在接缝上）的算掉电之前写的。
+fn stream_with_the_swallowed_writes_landed(
+    stream: &RecordedStreamOfAnImage,
+    swallowed: &[SwallowedWrite],
+) -> RecordedStreamOfAnImage {
+    let landing_indexes: Vec<usize> = swallowed
+        .iter()
+        .map(|write| stream_index_the_swallowed_write_lands_at(&stream.operations, write))
+        .collect();
+    let landed_strictly_before = |boundary: usize| {
+        landing_indexes
+            .iter()
+            .filter(|landing_index| **landing_index < boundary)
+            .count()
+    };
+    let landed_at_or_before = |stream_index: usize| {
+        landing_indexes
+            .iter()
+            .filter(|landing_index| **landing_index <= stream_index)
+            .count()
+    };
+    RecordedStreamOfAnImage {
+        operations: operations_with_the_swallowed_writes_landed(&stream.operations, swallowed),
+        operations_written_by_make_filesystem: stream.operations_written_by_make_filesystem
+            + landed_strictly_before(stream.operations_written_by_make_filesystem),
+        first_stream_index_after_each_power_loss: stream
+            .first_stream_index_after_each_power_loss
+            .iter()
+            .map(|first_stream_index| first_stream_index + landed_at_or_before(*first_stream_index))
+            .collect(),
+    }
 }
 
 /// 「重开走读失败」是不是这一次注入的正确答案：盘上本来就没有一版立得住。两种：
@@ -2346,14 +2757,181 @@ fn make_filesystem_left_no_finished_filesystem(
     )
 }
 
-/// 注入一次：armed 的计划重跑这段历史，判 panic、判那一段的结局、再重开判恢复到的那一版。
-fn inject_one_fault(
+/// 一个注入点跑到池级 checker 之前的样子（[`run_one_fault_up_to_the_pool_checker`]）：harness 自己判完的那几样（理想模型、RefFS、执行器）
+/// 连同计数，池级 checker 那一遍的结论还没并进来（[`settle_one_fault_with_the_pool_checker_verdicts`] 并）。
+struct OneFaultBeforeThePoolChecker {
+    /// 这一个注入点自己的计数，并进来时整份加进这一段的计数（截短重跑时整段那一遍的计数不加）。
+    tally: FaultInjectionTally,
+    /// C378 那一格（取号之后挂载报错、新号没回卷），没落进去是 None。
+    acquired_instance_left: Option<AcquiredInstanceLeft>,
+    /// 历史停在别的东西上（不是注入那一步返回的错）时停下那一步的那一条失败。
+    failure_where_the_history_stopped: Option<FailureObservation>,
+    /// 重开读回的那一版理想模型不允许时对不上的那一格。
+    model_disagreement_at_the_reopen: Option<crate::model::ModelDisagreement>,
+    /// 重开上 RefFS 判红的那一项（借违例那一栏带着走）。
+    reference_filesystem_violation_at_the_reopen: Option<(&'static str, String)>,
+    /// 交给 checker 档判的盘与归类要的事实。
+    images: ImagesAfterAFault,
+}
+
+/// 照 checker 档判回的结论把一个注入点并进来（[`inject_faults_into_history_merging_the_pool_checker_verdicts_of_the_checker_tier`] 的那三步）：
+/// 不判池级 checker 跑一遍、交出去判；每步镜像里有判红的，照那几张的结论截短重跑一遍、再交一次判；并进来的是历史与判红就停那一档跑的那一遍。
+fn merge_one_fault_with_the_pool_checker_verdicts(
     history: &GeneratedHistory,
     execution: HistoryExecution,
     marks: &[StepMark],
     drawn: &DrawnFault,
+    pool_checker_verdicts_of: &mut dyn FnMut(&ImagesAfterAFault) -> PoolCheckerVerdictsAfterAFault,
     accumulator: &mut FaultInjectionAccumulator<'_>,
 ) {
+    let run_through = run_one_fault_up_to_the_pool_checker(history, execution, marks, drawn, None);
+    let verdicts = pool_checker_verdicts_of(&run_through.images);
+    assert_eq!(
+        verdicts.violations_of_the_step_images.len(),
+        run_through
+            .images
+            .step_images_of_the_run_with_the_fault
+            .len(),
+        "checker 档交回的每步镜像结论与交出去的每步镜像逐张对应（种子 {} {}）",
+        history.seed.0,
+        drawn.render()
+    );
+    let Some(first_red_step_image) = verdicts
+        .violations_of_the_step_images
+        .iter()
+        .position(|violations| !violations.is_empty())
+    else {
+        settle_one_fault_with_the_pool_checker_verdicts(
+            &run_through,
+            verdicts.violations_after_the_fault,
+            verdicts.invariants_still_violated_if_the_swallowed_writes_had_landed,
+            accumulator,
+        );
+        return;
+    };
+    let stopped = run_one_fault_up_to_the_pool_checker(
+        history,
+        execution,
+        marks,
+        drawn,
+        Some(&verdicts.violations_of_the_step_images[..=first_red_step_image]),
+    );
+    assert_eq!(
+        stopped
+            .images
+            .step_images_of_the_run_with_the_fault
+            .as_slice(),
+        &run_through.images.step_images_of_the_run_with_the_fault[..=first_red_step_image],
+        "截短重跑那一遍停在判红的那一张、之前（含）逐张与整段那一遍相同（种子 {} {}）",
+        history.seed.0,
+        drawn.render()
+    );
+    let verdicts_of_the_stopped_run = pool_checker_verdicts_of(&stopped.images);
+    assert_eq!(
+        verdicts_of_the_stopped_run
+            .violations_of_the_step_images
+            .len(),
+        stopped.images.step_images_of_the_run_with_the_fault.len(),
+        "checker 档交回的每步镜像结论与截短重跑那一遍交出去的每步镜像逐张对应（种子 {} {}）",
+        history.seed.0,
+        drawn.render()
+    );
+    settle_one_fault_with_the_pool_checker_verdicts(
+        &stopped,
+        verdicts_of_the_stopped_run.violations_after_the_fault,
+        verdicts_of_the_stopped_run.invariants_still_violated_if_the_swallowed_writes_had_landed,
+        accumulator,
+    );
+}
+
+/// 一个注入点跑到池级 checker 之前判完的那几样，连同池级 checker 在重开那张盘与被吞的写插回去那张盘上的结论，归好类记进这一段：
+/// 停下那一步的失败（历史停在别的东西上时）、重开那张盘上的失败（池级 checker、RefFS 判红或理想模型对不上时），各一条。
+fn settle_one_fault_with_the_pool_checker_verdicts(
+    one_fault: &OneFaultBeforeThePoolChecker,
+    pool_checker_violations_after_the_fault: Vec<(&'static str, String)>,
+    invariants_still_violated_if_the_swallowed_writes_had_landed: BTreeSet<&'static str>,
+    accumulator: &mut FaultInjectionAccumulator<'_>,
+) {
+    accumulator.tally.absorb(&one_fault.tally);
+    if let Some(left) = one_fault.acquired_instance_left {
+        accumulator.acquired_instances_left.push(left);
+    }
+    let images = &one_fault.images;
+    // 三、判：注入那一步返回错误的那一格不算失败；别的失败（panic、checker 判红、重开走到模型或 RefFS 不允许的版本）逐条分类。
+    // RefFS 判红的那一项借违例那一栏带着走（注入真落了的每一档 RefFS 都弃权，只有注入点没走到的那几次投票；没走到时说谎的设备
+    // 什么也没丢，不会落进 `left_by_the_lying_device` 的豁免）。
+    let mut violations_after_the_fault = pool_checker_violations_after_the_fault;
+    violations_after_the_fault.extend(
+        one_fault
+            .reference_filesystem_violation_at_the_reopen
+            .clone(),
+    );
+    let mut failures: Vec<FailureObservation> = Vec::new();
+    failures.extend(one_fault.failure_where_the_history_stopped.clone());
+    if !violations_after_the_fault.is_empty()
+        || one_fault.model_disagreement_at_the_reopen.is_some()
+    {
+        let template = &images.observation_without_the_pool_checker_violations;
+        failures.push(FailureObservation {
+            position: template.position,
+            operation_kind: template.operation_kind,
+            violations: violations_after_the_fault,
+            panic: None,
+            newest_ring_root_txg: template.newest_ring_root_txg,
+            root_ring_slot_count: template.root_ring_slot_count,
+            harness_judgement: None,
+            model_disagreement: one_fault.model_disagreement_at_the_reopen.clone(),
+            raised_floor_lands_only_on_abandoned_roots: template
+                .raised_floor_lands_only_on_abandoned_roots,
+            record_check: RecordCheck::default(),
+        });
+    }
+    let what_the_swallowed_writes_explain = images
+        .what_the_swallowed_writes_explain_without_the_pool_checker
+        .clone()
+        .map(|explained| WhatTheSwallowedWritesExplain {
+            invariants_still_violated_if_the_swallowed_writes_had_landed,
+            ceiling_without_the_swallowed_roots: explained.ceiling_without_the_swallowed_roots,
+            root_ring_slots_of_the_swallowed_root_slot_writes: explained
+                .root_ring_slots_of_the_swallowed_root_slot_writes,
+            instance_rows_with_the_swallowed_roots_rebuilt_from_their_records: explained
+                .instance_rows_with_the_swallowed_roots_rebuilt_from_their_records,
+        });
+    for observation in failures {
+        if observation.panic.is_some() {
+            accumulator.tally.faults_that_panicked += 1;
+        }
+        accumulator.settle_a_failure_after_a_fault(
+            images.seed,
+            images.drawn,
+            classify_a_failure_after_a_fault(
+                observation,
+                &images.facts_after_the_fault,
+                images.drawn.fault,
+                what_the_swallowed_writes_explain.as_ref(),
+            ),
+            &images.reopen,
+        );
+    }
+}
+
+/// 注入一次：armed 的计划重跑这段历史，判 panic、判那一段的结局、再重开判恢复到的那一版（与理想模型、RefFS 比），
+/// 交回判完的这几样连同交给 checker 档判的盘（[`OneFaultBeforeThePoolChecker`]）。harness 不判池级 checker：
+/// `pool_checker_violations_of_the_step_images` 是 None 时历史不因池级 checker 停；是 `Some` 时那是 checker 档在整段那一遍交出去的每步镜像上
+/// 判红的（到第一张判红的为止），历史照判红就停那一档的口径停在第一张判红的那一步（合并入口截短重跑的那一遍）。
+///
+/// # Panics
+/// 给了每步镜像的结论而历史没停在最后那一张上（交出去的镜像比给的结论多：同一个种子、同一个注入点重跑，执行器不确定了）。
+// gpu-exempt: comparison-with-the-ideal-model
+// gpu-exempt: reference-filesystem
+fn run_one_fault_up_to_the_pool_checker(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    marks: &[StepMark],
+    drawn: &DrawnFault,
+    pool_checker_violations_of_the_step_images: Option<&[Vec<(&'static str, String)>]>,
+) -> OneFaultBeforeThePoolChecker {
+    let mut tally = FaultInjectionTally::default();
     let geometry = execution.device_width.fixed_geometry();
     let plan = SharedFaultPlan::armed(
         geometry,
@@ -2367,35 +2945,63 @@ fn inject_one_fault(
     // RefFS 的输入（G1 用户定案：重开的判定 = RefFS ∧ O1 判官全四条）：开着注入跑的那一遍逐步攒，停下的那一步跑完之后补。
     let mut reference_filesystem_translation =
         ReferenceFileSystemTranslation::for_a_history_starting(history.starting_point);
-    let run = execute_history_with_faults(history, execution, &stream, &plan, &mut |observation| {
-        for (key, file) in observation.model.committed_versions() {
-            committed_by_the_armed_run.insert(key, file);
+    // 带着注入跑的那一遍每一步的镜像（池级 checker 本来在那一刻判的那几张）：只记它在录制流里的位置与根环，盘本身随重开那一份交出去
+    let mut step_images_of_the_run_with_the_fault: Vec<StepImageInTheRecordedStream> = Vec::new();
+    let run = execute_history_stopping_at_the_given_pool_checker_violations(
+        history,
+        execution,
+        &stream,
+        &plan,
+        &mut |observation| {
+            for (key, file) in observation.model.committed_versions() {
+                committed_by_the_armed_run.insert(key, file);
+            }
+            model_at_the_last_observation = Some(observation.model.clone());
+            stream_length_at_the_last_observation = stream.operation_count();
+            reference_filesystem_translation
+                .note_an_observed_step(observation, stream_length_at_the_last_observation);
+        },
+        &mut |step_image| {
+            let (newest_ring_root_txg, root_ring_slot_count) =
+                newest_ring_root_and_slot_count(step_image.image);
+            step_images_of_the_run_with_the_fault.push(StepImageInTheRecordedStream {
+                position: step_image.position,
+                operation_kind: step_image.operation_kind,
+                operations_recorded: step_image.operations_recorded,
+                newest_ring_root_txg,
+                root_ring_slot_count,
+            });
+        },
+        &mut |step_image_index| {
+            match pool_checker_violations_of_the_step_images {
+            None => Vec::new(),
+            Some(violations_of_the_step_images) => violations_of_the_step_images
+                .get(step_image_index)
+                .cloned()
+                .unwrap_or_else(|| {
+                    panic!(
+                        "截短重跑那一遍要停在给了结论的最后一张上，交出去了第 {step_image_index} 张（给了 {} 张的结论）",
+                        violations_of_the_step_images.len()
+                    )
+                }),
         }
-        model_at_the_last_observation = Some(observation.model.clone());
-        stream_length_at_the_last_observation = stream.operation_count();
-        reference_filesystem_translation
-            .note_an_observed_step(observation, stream_length_at_the_last_observation);
-    });
+        },
+    );
     reference_filesystem_translation.note_the_step_the_history_stopped_in(
         &history.operations,
         &run,
         stream.operation_count(),
     );
     let fired = plan.fired();
-    accumulator.tally.faults += 1;
-    *accumulator
-        .tally
-        .faults_by_kind
-        .entry(drawn.fault.name())
-        .or_insert(0) += 1;
+    tally.faults += 1;
+    *tally.faults_by_kind.entry(drawn.fault.name()).or_insert(0) += 1;
     if let Some(first) = fired.first() {
         let point = InjectionPoint {
             segment: drawn.segment.kind(),
             call: drawn.fault.call_kind(),
             written_structure: first.written_structure,
         };
-        *accumulator
-            .tally
+        *tally
             .faults_by_injection_point
             .entry(point.render())
             .or_insert(0) += 1;
@@ -2411,17 +3017,12 @@ fn inject_one_fault(
     });
     if surfaced {
         if let Some(StepOutcome::Refused { member }) = run.outcomes.last() {
-            *accumulator
-                .tally
-                .refusal_members
-                .entry(member.clone())
-                .or_insert(0) += 1;
+            *tally.refusal_members.entry(member.clone()).or_insert(0) += 1;
         }
         if let Some(HarnessJudgement::TheStartingPointReturnedAnError { step, .. }) =
             ending_observation.and_then(|observation| observation.harness_judgement.as_ref())
         {
-            *accumulator
-                .tally
+            *tally
                 .starting_point_failures
                 .entry(step.name())
                 .or_insert(0) += 1;
@@ -2439,11 +3040,7 @@ fn inject_one_fault(
             }
         }
     };
-    *accumulator
-        .tally
-        .faults_by_outcome
-        .entry(outcome.name())
-        .or_insert(0) += 1;
+    *tally.faults_by_outcome.entry(outcome.name()).or_insert(0) += 1;
 
     // 二、重开：拿录制流（只记真正落到盘上的那些写）重建镜像，跑恢复，问模型走到的这一版允不允许。
     let operations = stream.retained_operations();
@@ -2458,11 +3055,11 @@ fn inject_one_fault(
     let newest_persisted = newest_persisted_root(&writes, &all_persisted)
         .map(|(checkpoint_txg, instance)| model_root_key(instance, checkpoint_txg));
     let recovery = recover(&image, JournalPolicy::Consult);
-    accumulator.tally.reopens += 1;
+    tally.reopens += 1;
     match &recovery.outcome {
-        RecoveryOutcome::FileRead { .. } => accumulator.tally.reopens_reading_a_file += 1,
-        RecoveryOutcome::NoFile { .. } => accumulator.tally.reopens_without_a_file += 1,
-        RecoveryOutcome::Failed { .. } => accumulator.tally.reopens_that_failed += 1,
+        RecoveryOutcome::FileRead { .. } => tally.reopens_reading_a_file += 1,
+        RecoveryOutcome::NoFile { .. } => tally.reopens_without_a_file += 1,
+        RecoveryOutcome::Failed { .. } => tally.reopens_that_failed += 1,
     }
     let read_back = observed_read_back_after_a_crash(&recovery);
     // 模型认下来的每一版：这段历史（开着注入跑的那一遍）停下时模型根环里的那几条。观察者攒的那一份漏掉失败那一步——
@@ -2568,8 +3165,7 @@ fn inject_one_fault(
             },
             &read_back,
         );
-    *accumulator
-        .tally
+    *tally
         .reopens_by_the_reference_filesystem_and_model_verdicts
         .entry(JointVerdictOfTheReferenceFileSystemAndTheModel::of(
             &reference_filesystem_vote,
@@ -2577,71 +3173,57 @@ fn inject_one_fault(
         ))
         .or_insert(0) += 1;
     if let ReferenceFileSystemVote::Abstained(reason) = &reference_filesystem_vote {
-        *accumulator
-            .tally
+        *tally
             .reference_filesystem_abstentions_at_the_reopen
             .entry(reason.name())
             .or_insert(0) += 1;
     }
     let reopened = if nothing_was_left_to_recover {
-        accumulator
-            .tally
-            .reopens_that_correctly_found_nothing_to_recover += 1;
+        tally.reopens_that_correctly_found_nothing_to_recover += 1;
         ReopenedVersion::NothingWasLeftToRecoverAndTheReopenSaidSo
     } else if crash_recovery_disagreement(&committed_by_the_model, newest_persisted, &read_back)
         .is_none()
     {
-        accumulator
-            .tally
-            .reopened_into_a_version_the_model_committed += 1;
+        tally.reopened_into_a_version_the_model_committed += 1;
         ReopenedVersion::CommittedByTheModel
     } else if disagreement.is_none() {
-        accumulator
-            .tally
-            .reopened_into_the_version_the_faulted_step_was_writing += 1;
+        tally.reopened_into_the_version_the_faulted_step_was_writing += 1;
         ReopenedVersion::TheVersionTheFaultedStepWasWriting
     } else {
-        accumulator
-            .tally
-            .reopens_outside_everything_the_model_allows += 1;
+        tally.reopens_outside_everything_the_model_allows += 1;
         ReopenedVersion::OutsideEverythingTheModelAllows
     };
-    let mut violations_after_the_fault = checker_violations_on(&image, accumulator.tally);
+    // 池级 checker 那一遍归 checker 档两段（重开的盘随交回的那一份交出去），harness 一条不变量都不判
     let reopen_text = format!("{reopened:?}（{}）", describe_read_back(&read_back));
     // C378：注入落在一次挂载里、那一步返回了错误，而重开的盘上系统配置的实例代号比这一步之前大——取号之后的写行或暖机报了错，
     // 新号没回卷。认下的已知行为：记进这一格、在报告里点名，不进新发现，也不挡下面的判定。
-    if surfaced {
-        if let Some(left) = acquired_instance_left_after_a_failed_mount(&image, marks, *drawn) {
-            *accumulator
-                .tally
-                .acquired_instances_left_after_a_failed_mount
-                .entry(left.kind.name())
-                .or_insert(0) += 1;
-            accumulator.acquired_instances_left.push(left);
-        }
+    let acquired_instance_left = if surfaced {
+        acquired_instance_left_after_a_failed_mount(&image, marks, *drawn)
+    } else {
+        None
+    };
+    if let Some(left) = &acquired_instance_left {
+        *tally
+            .acquired_instances_left_after_a_failed_mount
+            .entry(left.kind.name())
+            .or_insert(0) += 1;
     }
 
     // 说谎的设备吞掉的写（只有 `WriteIsSwallowed` 有）要是都落了盘，盘面与抬 F 的上限该是什么样：判「这条失败是不是它留下的」要的两样。
     let swallowed_writes = plan.swallowed_writes();
+    let stream_after_the_fault = RecordedStreamOfAnImage {
+        operations,
+        operations_written_by_make_filesystem: run.operations_written_by_make_filesystem,
+        first_stream_index_after_each_power_loss: run
+            .first_stream_index_after_each_power_loss
+            .clone(),
+    };
+    let stream_with_the_swallowed_writes_landed = (!swallowed_writes.is_empty()).then(|| {
+        stream_with_the_swallowed_writes_landed(&stream_after_the_fault, &swallowed_writes)
+    });
     let what_the_swallowed_writes_explain = (!swallowed_writes.is_empty()).then(|| {
-        let mut image_with_the_swallowed_writes_landed = MemoryPool::with_devices(
-            &[DeviceIdentity(0), DeviceIdentity(1)],
-            execution.device_width.device_bytes(),
-        );
-        image_with_the_swallowed_writes_landed.apply(&operations_with_the_swallowed_writes_landed(
-            &operations,
-            &swallowed_writes,
-        ));
-        let invariants_still_violated_if_the_swallowed_writes_had_landed =
-            check_pool_image(&image_with_the_swallowed_writes_landed)
-                .into_iter()
-                .filter_map(|(invariant, verdict)| match verdict {
-                    InvariantVerdict::Violated(_) => Some(invariant),
-                    InvariantVerdict::Holds
-                    | InvariantVerdict::NotApplicable(_)
-                    | InvariantVerdict::PartiallyJudged(_) => None,
-                })
-                .collect();
+        // 池级 checker 那一项（插回去之后仍红的不变量）在并进来那一刻由 checker 档的结论填：那张盘随交回的那一份交出去判
+        let invariants_still_violated_if_the_swallowed_writes_had_landed = BTreeSet::new();
         let swallowed_root_slot_writes: Vec<&SwallowedWrite> = swallowed_writes
             .iter()
             .filter(|write| {
@@ -2701,32 +3283,14 @@ fn inject_one_fault(
         }
     });
 
-    // 三、判：注入那一步返回错误的那一格不算失败；别的失败（panic、checker 判红、重开走到模型或 RefFS 不允许的版本）逐条分类。
-    // RefFS 判红的那一项借违例那一栏带着走（注入真落了的每一档 RefFS 都弃权，只有注入点没走到的那几次投票；没走到时说谎的设备
-    // 什么也没丢，不会落进 `left_by_the_lying_device` 的豁免）。
-    violations_after_the_fault.extend(reference_filesystem_vote.violation());
-    let mut failures: Vec<FailureObservation> = Vec::new();
-    if !surfaced {
-        if let Some(observation) = ending_observation {
-            failures.push(observation.clone());
-        }
-    }
-    if !violations_after_the_fault.is_empty() || disagreement.is_some() {
-        let (newest_ring_root_txg, root_ring_slot_count) = newest_ring_root_and_slot_count(&image);
-        failures.push(FailureObservation {
-            position: drawn.segment.position(),
-            operation_kind: drawn.segment.operation_kind(),
-            violations: violations_after_the_fault,
-            panic: None,
-            newest_ring_root_txg,
-            root_ring_slot_count,
-            harness_judgement: None,
-            model_disagreement: disagreement,
-            raised_floor_lands_only_on_abandoned_roots:
-                raised_floor_of_the_newest_root_lands_only_on_abandoned_roots(&image),
-            record_check: RecordCheck::default(),
-        });
-    }
+    let failure_where_the_history_stopped = if surfaced {
+        None
+    } else {
+        ending_observation.cloned()
+    };
+    let (newest_ring_root_txg, root_ring_slot_count) = newest_ring_root_and_slot_count(&image);
+    let raised_floor_lands_only_on_abandoned_roots =
+        raised_floor_of_the_newest_root_lands_only_on_abandoned_roots(&image);
     let facts_after_the_fault = FactsAfterTheFault {
         starting_point_step_that_returned_an_error: ending_observation.and_then(|observation| {
             match &observation.harness_judgement {
@@ -2740,70 +3304,39 @@ fn inject_one_fault(
             .count(),
         reopened,
     };
-    for observation in failures {
-        if observation.panic.is_some() {
-            accumulator.tally.faults_that_panicked += 1;
-        }
-        // 「已知红」先认：清单里那几条是认下来的形态（共用清单是实现与 checker 读法对不上的老账，增补 2 收口表第 ②、43 行；
-        // 故障注入自己那一条是用户 2026-10-03 定的「mkfs 没写下系统配置槽，全池皆废判红是对的」），
-        // 与设备说不说谎无关，说谎的设备把它撞出来时照样记进「已知红」那一格，不许被下面那一条接走。
-        if let Some(form) = known_red_form_only_after_a_fault(&observation, &facts_after_the_fault)
-        {
-            accumulator.record_a_known_red_hit(
-                history.seed,
-                KnownRedFormAtAFault::OnlyAfterAFault(form),
-                *drawn,
-            );
-            continue;
-        }
-        match classify_failure(observation) {
-            HistoryEnding::Completed => {}
-            HistoryEnding::KnownRed { form, .. } => {
-                accumulator.record_a_known_red_hit(
-                    history.seed,
-                    KnownRedFormAtAFault::SharedWithRandomHistories(form),
-                    *drawn,
-                );
-            }
-            HistoryEnding::NewFinding {
-                signature,
-                observation,
-            } => {
-                // 说谎的设备吞掉写之后盘面不一致：设备丢的，不是实现的缺口（`InjectedFault::the_device_lies`）。
-                // 按注入点认（`left_by_the_lying_device`，主 agent 2026-09-26 定，实七）：被吞的写插回去就消失的违例、
-                // 去掉被吞的根之后模型重算对得上的上限才豁免，别的照报成新发现。
-                // panic 不走这一格——说谎的设备也不许把实现打 panic，那一条照样报成新发现。
-                if drawn.fault.the_device_lies()
-                    && what_the_swallowed_writes_explain
-                        .as_ref()
-                        .is_some_and(|explained| left_by_the_lying_device(&observation, explained))
-                {
-                    accumulator
-                        .tally
-                        .faults_where_a_lying_device_left_the_image_inconsistent += 1;
-                    *accumulator
-                        .tally
-                        .lying_device_signatures
-                        .entry(format!("{signature:?}"))
-                        .or_insert(0) += 1;
-                    continue;
-                }
-                accumulator.tally.faults_ending_new_finding += 1;
-                if !accumulator
-                    .new_findings
-                    .iter()
-                    .any(|finding| finding.signature == signature)
-                {
-                    accumulator.new_findings.push(FaultFinding {
-                        signature,
-                        seed: history.seed,
-                        drawn: *drawn,
-                        observation,
-                        reopen: reopen_text.clone(),
-                    });
-                }
-            }
-        }
+
+    // 四、交回：判完的这几样，连同交给 checker 档判的盘（池级 checker 那一遍归 checker 档两段）
+    let images = ImagesAfterAFault {
+        seed: history.seed,
+        drawn: *drawn,
+        device_width: execution.device_width,
+        image_after_the_fault: stream_after_the_fault,
+        step_images_of_the_run_with_the_fault,
+        image_with_the_swallowed_writes_landed: stream_with_the_swallowed_writes_landed,
+        observation_without_the_pool_checker_violations: FailureObservation {
+            position: drawn.segment.position(),
+            operation_kind: drawn.segment.operation_kind(),
+            violations: Vec::new(),
+            panic: None,
+            newest_ring_root_txg,
+            root_ring_slot_count,
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots,
+            record_check: RecordCheck::default(),
+        },
+        facts_after_the_fault,
+        what_the_swallowed_writes_explain_without_the_pool_checker:
+            what_the_swallowed_writes_explain,
+        reopen: reopen_text,
+    };
+    OneFaultBeforeThePoolChecker {
+        tally,
+        acquired_instance_left,
+        failure_where_the_history_stopped,
+        model_disagreement_at_the_reopen: disagreement,
+        reference_filesystem_violation_at_the_reopen: reference_filesystem_vote.violation(),
+        images,
     }
 }
 
@@ -2831,36 +3364,35 @@ fn describe_read_back(read_back: &ObservedReadBack) -> String {
 pub enum FaultInjectionWorkerThreads {
     /// 环境变量 [`FAULT_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE`] 显式给的。
     FromTheEnvironmentVariable(usize),
-    /// 没设环境变量，取 `available_parallelism`。
-    FromAvailableParallelism(usize),
-    /// 没设环境变量，`available_parallelism` 也报不出来：只用 1 个线程，照实报出来。
-    AvailableParallelismUnknown,
+    /// 没设环境变量，取每台默认重活线程数（[`crate::heavy_threads::default_heavy_threads`]）。
+    FromTheHeavyThreadDefault(usize),
     /// 调用方在代码里直接给的（用例拿不同线程数对拍）。
     GivenByCaller(usize),
 }
 
 impl FaultInjectionWorkerThreads {
-    /// 线程数取环境变量，没设就取 `available_parallelism`。
+    /// 线程数取环境变量，没设就取每台默认重活线程数（`SINGLEFS_THREAD_CAP`，再没设取登记值）。
     ///
     /// # Panics
-    /// 环境变量设了却不是正整数（含 0、空串、非 UTF-8）：配错了就停，不悄悄退回单线程。
+    /// 环境变量设了却不是正整数（含 0、空串、非 UTF-8）：配错了就停，不悄悄退回单线程；落到默认时 `SINGLEFS_THREAD_CAP` 设了而不是正整数同样停。
     #[must_use]
     pub fn from_the_environment() -> Self {
         Self::from_the_environment_value(
             std::env::var(FAULT_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE),
-            std::thread::available_parallelism,
+            process_environment_variable(THREAD_CAP_ENVIRONMENT_VARIABLE).as_deref(),
         )
     }
 
-    /// [`Self::from_the_environment`] 的判定本身：环境变量读到什么、`available_parallelism` 报什么都由调用方给
+    /// [`Self::from_the_environment`] 的判定本身：环境变量读到什么、`SINGLEFS_THREAD_CAP` 的值（`None` 是没设）都由调用方给
     /// （用例不改进程的环境变量）。
     ///
     /// # Panics
-    /// 环境变量设了却不是正整数（含 0、空串；解析经数值环境变量共用的那一份，消息带变量名与原值），或不是 UTF-8。
+    /// 环境变量设了却不是正整数（含 0、空串；解析经数值环境变量共用的那一份，消息带变量名与原值），或不是 UTF-8；
+    /// 落到默认时 `SINGLEFS_THREAD_CAP` 设了而不是正整数。
     #[must_use]
     fn from_the_environment_value(
         variable: Result<String, std::env::VarError>,
-        available_parallelism: impl Fn() -> std::io::Result<std::num::NonZeroUsize>,
+        thread_cap_value: Option<&str>,
     ) -> Self {
         let value = match variable {
             Ok(text) => Some(text),
@@ -2874,10 +3406,9 @@ impl FaultInjectionWorkerThreads {
             value.as_deref(),
         ) {
             Some(count) => Self::FromTheEnvironmentVariable(count.get()),
-            None => match available_parallelism() {
-                Ok(count) => Self::FromAvailableParallelism(count.get()),
-                Err(_) => Self::AvailableParallelismUnknown,
-            },
+            None => Self::FromTheHeavyThreadDefault(
+                default_heavy_threads_of_the_cap_value(thread_cap_value).get(),
+            ),
         }
     }
 
@@ -2885,9 +3416,8 @@ impl FaultInjectionWorkerThreads {
     pub fn count(self) -> usize {
         match self {
             Self::FromTheEnvironmentVariable(count)
-            | Self::FromAvailableParallelism(count)
+            | Self::FromTheHeavyThreadDefault(count)
             | Self::GivenByCaller(count) => count,
-            Self::AvailableParallelismUnknown => 1,
         }
     }
 
@@ -2895,8 +3425,7 @@ impl FaultInjectionWorkerThreads {
     pub fn source_name(self) -> &'static str {
         match self {
             Self::FromTheEnvironmentVariable(_) => "environment_variable",
-            Self::FromAvailableParallelism(_) => "available_parallelism",
-            Self::AvailableParallelismUnknown => "available_parallelism_unknown",
+            Self::FromTheHeavyThreadDefault(_) => "heavy_thread_default",
             Self::GivenByCaller(_) => "given_by_caller",
         }
     }
@@ -2974,6 +3503,19 @@ impl FaultInjectionReport {
 /// 有一片领了却没交回。
 #[must_use]
 pub fn run_fault_injection_campaign(campaign: &FaultInjectionCampaign) -> FaultInjectionReport {
+    run_fault_injection_campaign_handing_out_the_images(campaign, &|_| {})
+}
+
+/// 同 [`run_fault_injection_campaign`]，另把每个注入点重开的盘交给 `hand_out`（[`inject_faults_into_history_handing_out_the_images`]）：
+/// 工作线程各自调它，交出去的次序按线程领片的次序、不按种子（调用方要按种子归并就照 [`ImagesAfterAFault::seed`] 与注入点排）。
+///
+/// # Panics
+/// 同 [`run_fault_injection_campaign`]。
+#[must_use]
+pub fn run_fault_injection_campaign_handing_out_the_images(
+    campaign: &FaultInjectionCampaign,
+    hand_out: &(dyn Fn(ImagesAfterAFault) + Sync),
+) -> FaultInjectionReport {
     let FaultInjectionCampaign {
         first_seed,
         seed_count,
@@ -3013,7 +3555,12 @@ pub fn run_fault_injection_campaign(campaign: &FaultInjectionCampaign) -> FaultI
                             operations_per_history,
                             &weights,
                         );
-                        inject_faults_into_history(&history, execution, faults_per_history)
+                        inject_faults_into_history_handing_out_the_images(
+                            &history,
+                            execution,
+                            faults_per_history,
+                            &mut |images| hand_out(images),
+                        )
                     })
                     .collect();
                 if sender.send((slice_index, injections)).is_err() {
@@ -3362,42 +3909,45 @@ mod tests {
         assert_eq!(buffer, [0xabu8; 512], "报错的读不动缓冲区");
     }
 
-    /// 线程数从环境变量取，没设取 `available_parallelism`；设了不是正整数就停，不悄悄退回单线程。
+    /// 线程数从环境变量取，没设取每台默认重活线程数（`SINGLEFS_THREAD_CAP`，再没设取登记值，不看本机核数）；
+    /// 设了不是正整数就停，不悄悄退回单线程。
     #[test]
-    fn worker_thread_count_comes_from_the_environment_variable_or_available_parallelism() {
-        let four = || Ok(std::num::NonZeroUsize::new(4).expect("4"));
+    fn worker_thread_count_comes_from_the_environment_variable_or_the_heavy_thread_default() {
         assert_eq!(
-            FaultInjectionWorkerThreads::from_the_environment_value(Ok("3".to_string()), four),
-            FaultInjectionWorkerThreads::FromTheEnvironmentVariable(3)
+            FaultInjectionWorkerThreads::from_the_environment_value(Ok("3".to_string()), Some("5")),
+            FaultInjectionWorkerThreads::FromTheEnvironmentVariable(3),
+            "自己的变量先读"
         );
         assert_eq!(
             FaultInjectionWorkerThreads::from_the_environment_value(
                 Err(std::env::VarError::NotPresent),
-                four
+                Some("5")
             ),
-            FaultInjectionWorkerThreads::FromAvailableParallelism(4)
+            FaultInjectionWorkerThreads::FromTheHeavyThreadDefault(5),
+            "没设自己的变量读 SINGLEFS_THREAD_CAP"
         );
+        let registered = crate::heavy_threads::registered_heavy_threads().get();
         assert_eq!(
             FaultInjectionWorkerThreads::from_the_environment_value(
                 Err(std::env::VarError::NotPresent),
-                || Err(std::io::Error::other("报不出来"))
+                None
             ),
-            FaultInjectionWorkerThreads::AvailableParallelismUnknown
+            FaultInjectionWorkerThreads::FromTheHeavyThreadDefault(registered),
+            "都没设取 .claude/heavy-thread-default 的登记值"
         );
         assert_eq!(
-            FaultInjectionWorkerThreads::AvailableParallelismUnknown.count(),
-            1
+            FaultInjectionWorkerThreads::FromTheHeavyThreadDefault(registered).source_name(),
+            "heavy_thread_default"
         );
     }
 
-    /// 线程数变量写成认不出的字样：经数值环境变量共用的那一份解析 panic，消息带变量名与原值，不悄悄退回本机并行度。
+    /// 线程数变量写成认不出的字样：经数值环境变量共用的那一份解析 panic，消息带变量名与原值，不悄悄退回默认。
     #[test]
     #[should_panic(expected = "SINGLEFS_FAULT_INJECTION_WORKER_THREADS=\"twelve\" 认不出")]
     fn an_unreadable_fault_injection_worker_thread_count_panics_naming_the_variable_and_the_value()
     {
-        let four = || Ok(std::num::NonZeroUsize::new(4).expect("4"));
         let _threads =
-            FaultInjectionWorkerThreads::from_the_environment_value(Ok("twelve".to_string()), four);
+            FaultInjectionWorkerThreads::from_the_environment_value(Ok("twelve".to_string()), None);
     }
 
     /// 随机抽的六种全抽得到：`draw_injected_fault` 的 `below(6)` 改回 `below(4)`，说谎那两种一次都抽不到，这里必红

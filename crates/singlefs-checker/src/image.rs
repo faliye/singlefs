@@ -34,14 +34,14 @@ pub enum InvariantVerdict {
     Violated(String),
     NotApplicable(&'static str),
     /// 部分没判（用户 2026-10-04 定，第四种判定）：判到的那一部分都对得上，射程里另有一部分这张镜像上判不了，说明逐条列出没判到的
-    /// 是什么（例如 I-9.28 那几条根：盘号、txg、为什么没判）。**它不是红，也不是成立**：计红、计违例的地方算不红（层 0 与崩溃放量
+    /// 是什么（例如 I-9.28 那几条根：盘号、txg、为什么没判）。**它不是红，也不是成立**：计红、计违例的地方算不红（崩溃点重放与崩溃放量
     /// 把它算成不红），计「成立」的地方不算成立。今天 I-9.28 报它（树表读不出、条目比字段表短的根），I-5.5 报它（某一版树表读不出、
     /// 条目窄、extent 树或分配记录树读不全、种类 1 / 3 条数不对，`research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y3）。
     PartiallyJudged(String),
 }
 
 /// 「中央映射条目的 key 与它指的单元头相符」那一条（用户 2026-09-27 定新立，实审 B2），
-/// 编号 I-1.11（映射 key 与单元头相符），登记在 `.claude/kb/invariants.md`。
+/// 编号 I-1.11（映射 key 与单元头相符），登记在 `crates/singlefs-checker/invariants/01-块自描述.md`。
 pub const MAPPING_KEY_MATCHES_THE_UNIT_HEADER: &str = "I-1.11";
 
 /// 「自证过的系统配置槽里，池级字段都在这一版读者收的范围里」那一条（实审 A3-checker-2，用户 2026-09-27 定系统配置越界整池拒）：
@@ -57,7 +57,7 @@ pub const SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS: &str = "I
 /// 「每块盘每个自证过的系统配置槽里的本盘设备号，等于这块盘在池里的身份」那一条（实审 Y2-b 越格线索：盘体对调之后的池
 /// 可写挂载因本盘设备号拒，而 checker 读本盘设备号却没有一条不变量拿它比盘的身份，0 违例）。实现那一侧是
 /// `crates/singlefs-core/src/mount.rs` 的 `device_table_disagreeing_with`（`OwnDeviceNumberDiffersFromTheIdentityHandedIn`），
-/// checker 自己按字段表读一份（[`judge_own_device_number_is_the_device_identity`]）。编号 I-7.14，登记在 `.claude/kb/invariants.md`；
+/// checker 自己按字段表读一份（[`judge_own_device_number_is_the_device_identity`]）。编号 I-7.14，登记在 `crates/singlefs-checker/invariants/02-根环.md`；
 /// 改号只改这一处。
 pub const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY: &str = "I-7.14";
 
@@ -72,8 +72,8 @@ pub const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY: &str = 
 /// `invariants.md` 那一行由 kb 第八批写。池级走读每读一版的树表判一次（`walk` 的 `judge_tree_table_entries_ordering`）。
 ///
 /// 第 50 条起是里程碑三二·1 那一批（两份判决 `research/prompts/m3-inv-a-r1-main-verification.md`、
-/// `research/prompts/m3-inv-b-r1-main-verification.md`，用户 2026-10-01 定案），**只往末尾追加**：层 0 的违例位按下标 i ↔ 这张表第 i 条，
-/// 前 49 条的下标不动。位宽改到 ≥ 128 之前，下标 64 起的那一条在层 0 的 GPU 判器上没有位（另一个实现员在 checker 档改）。
+/// `research/prompts/m3-inv-b-r1-main-verification.md`，用户 2026-10-01 定案），**只往末尾追加**：崩溃点重放的违例位按下标 i ↔ 这张表第 i 条，
+/// 前 49 条的下标不动。位宽改到 ≥ 128 之前，下标 64 起的那一条在崩溃点重放的 GPU 判器上没有位（另一个实现员在 checker 档改）。
 /// 第 66 条（下标 65）是 I-3.5（里程碑三第 8 批）：GPU 判器内核还没判它（`crash_judge_gpu` 的覆盖表另列）。
 ///
 /// 第 67、68 条（下标 66、67）是 C673（三 oracle 合谋测试的补 oracle 改法没做） ⑤ ⑥ 那两条：I-9.27（树表条目的头 ID 取值）与
@@ -108,7 +108,7 @@ pub const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY: &str = 
 /// 第 53 批，与 I-9.21、I-9.22 同形）：I-9.36、I-9.37，同样只往末尾追加。在墓碑与谱系那一遍里每一版各判；I-9.37 的旋钮值从镜像外给
 /// （`walk::check_pool_image_given_the_container_capacity_knobs`）。GPU 判器的扫描内核同判 I-9.36；第 56 批 G6 起旋钮值经扫描内核源码前面的常量
 /// 传进 GPU（`crash_judge_gpu` 的 `JudgeKernelSources::of_the_judge_given_the_container_capacity_knobs`），装了旋钮的那一棵 GPU 同判 I-9.37
-/// （墓碑旋钮同判 I-9.22）；层 0 与放量走产品那一份（三棵都没装），I-9.22、I-9.37 在那里照旧不置位。
+/// （墓碑旋钮同判 I-9.22）；崩溃点重放与放量走产品那一份（三棵都没装），I-9.22、I-9.37 在那里照旧不置位。
 pub const IMPLEMENTED_INVARIANTS: [&str; 92] = [
     "I-1.1",
     "I-1.2",
@@ -275,7 +275,7 @@ pub const INODE_BEING_DELETED_IS_QUEUED_OR_HAS_NO_DATA_UNIT_LEFT: &str = "I-4.7"
 pub const DATA_UNIT_COUNT_OF_AN_INODE_BEING_DELETED_MATCHES_ITS_SIZE: &str = "I-4.6";
 /// I-4.4（意图只描述目标态）：第一版报不适用（用户 2026-10-05 定，岔路单同上），理由见 [`INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION`]。
 pub const INTENT_DESCRIBES_ONLY_THE_TARGET_STATE: &str = "I-4.4";
-/// I-4.4 在第一版报不适用的理由，照 `.claude/kb/invariants.md` I-4.4 那一行的状态列。
+/// I-4.4 在第一版报不适用的理由，照 `crates/singlefs-checker/invariants/06-事务与崩溃一致性.md` I-4.4 那一行的状态列。
 pub const INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION: &str = "第一版不适用：意图载体（nlink = 0 的记录、`deleted_inodes` 的 key、墓碑）没有可装增量的字段；logged_ops 有字段表时实现";
 /// I-9.17（谱系树条目身份与子头相符）：谱系树每条内部条目的类型段 ∈ {0, 5}；0 ⇒ 子单元是码 2、身份引用三段为 0；5 ⇒ 子容器头四段与身份引用逐字相等、
 /// 子指针头部出生树相等、子容器打包记录类型 5。身份不符单独判红，不记走读失败（判决第二节 T7 取 a）。
@@ -293,7 +293,7 @@ pub const TOMBSTONES_ON_THE_LINEAGE_ARE_DISTINCT_AND_EVERY_TOMBSTONE_IS_WELL_FOR
 /// 每片（含最右那片）至少一条（第 56 批 G2）、最右那片之外每片记录数 == 815；零根或只一片容器没有对象。
 pub const NON_RIGHTMOST_TOMBSTONE_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE: &str = "I-9.21";
 /// I-9.22（测试镜像里墓碑容器不超旋钮值）：装了旋钮（新入口给了旋钮值）时，每一版墓碑树里沿叶序第一片容器号是 1、相邻两片容器号加一、
-/// 每片至少一条（第 56 批 G2）、每片记录数 ≤ 旋钮值；零根没有对象。
+/// 每片至少一条（第 56 批 G2）、每片记录数 ≤ 旋钮值、最右那片之外每片记录数 == 旋钮值（第 57 批 H1）；零根没有对象。
 pub const TOMBSTONE_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOB_ON_A_TEST_IMAGE: &str = "I-9.22";
 /// I-9.23（墓碑树条目身份与子头相符）：与 I-9.17 同形，类型段 ∈ {0, 1}、子容器打包记录类型 1。
 pub const TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER: &str = "I-9.23";
@@ -336,7 +336,7 @@ pub const RETIREMENT_RECORDS_ACCOUNT_FOR_EVERY_LEAF_GONE_SINCE_THE_PARENT_VERSIO
 pub const NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE: &str =
     "I-9.36";
 /// I-9.37（测试镜像里谱系与退役容器不超旋钮值，与 I-9.22 同形）：那一棵装了旋钮（新入口给了旋钮值）时，每一版那棵树里沿叶序第一片容器号是 1、
-/// 相邻两片容器号加一、每片至少一条（第 56 批 G2）、每片记录数 ≤ 旋钮值；零根没有对象。
+/// 相邻两片容器号加一、每片至少一条（第 56 批 G2）、每片记录数 ≤ 旋钮值、最右那片之外每片记录数 == 旋钮值（第 57 批 H1）；零根没有对象。
 pub const LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE: &str =
     "I-9.37";
 
@@ -814,7 +814,7 @@ const LARGEST_SLOT_SPACING_THIS_READER_ACCEPTS: u64 =
 /// 全池没有一个可用的槽 0 时，一块盘的槽 1：槽距无处可读，在格式允许的每个槽距上各读一槽（不小于 4096、512 的整数倍、
 /// 不越过 [`LARGEST_SLOT_SPACING_THIS_READER_ACCEPTS`]），只收可用、且自述的固定结构槽距等于所在偏移的槽
 /// （槽 i 的设备内偏移 = i × 固定结构槽距，D22（单元原子性怎么合成） 已定项 16）；几档都收得到时取世代号最大的，
-/// 世代号相同取偏移小的（C651（全池没有可用的系统配置槽 0 时 checker 与实现找槽 1 的读法不同） 第一轮判决第四节第 1、2 条，
+/// 世代号相同取偏移小的（C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同） 第一轮判决第四节第 1、2 条，
 /// `research/prompts/m3-c651-r1-main-verification.md`）。
 ///
 /// 读到的某一档带这一版读者不收的值（[`SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses`]）：交回按偏移升序读到的第一个，
@@ -1136,7 +1136,7 @@ pub fn judge_root_records_live_in_the_slot_their_txg_names(
 
 /// [`JOURNAL_RING_GEOMETRY_FIELDS_AGREE`]（I-8.1）的三个字段等式：每块盘每个可择的系统配置槽（[`SystemConfigurationSlotReading::Usable`]；
 /// 带越界值的槽归 I-7.13 整池拒、不可择的槽 checker 不读它的几何），三格各判一次——
-/// 槽里的 F 等于格式常量 `JOURNAL_SAFETY_FACTOR`（`.claude/kb/invariants.md` I-8.1 那一行「F = 格式常量，任一不等判红」，
+/// 槽里的 F 等于格式常量 `JOURNAL_SAFETY_FACTOR`（`crates/singlefs-checker/invariants/03-journal.md` I-8.1 那一行「F = 格式常量，任一不等判红」，
 /// 与实现择系统配置时同判，`research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 3 行）；
 /// 在飞上限 = ⌊环长 ÷ 4096 ÷ F⌋（F 取同一槽里的那个字段，F 为 0 时这一格判红、不除）；最坏占用 = 在飞上限 × 4096
 /// （乘出来溢出判红）。「环长 ≥ F × 最坏占用」是这三格的推论，不另判（`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 4 行）。
@@ -1490,7 +1490,7 @@ const ROOT_RECORD_ALGORITHM_NONCE_AND_MAC: std::ops::Range<usize> = 428..457;
 
 /// I-2.4（头校验和覆盖范围） 射程里根记录那一处：根环里每一条读得出、自证过的根（`valid_roots`，不按候选集滤），根槽偏移 428..457
 /// （算法类型、nonce、MAC）全是 0。这一版 checker 只收加密类型 0 的系统配置，加密关着时它们恒 0、读者遇到非 0 判该结构损坏——
-/// 与单元头那 29 字节、指针头部 MAC / nonce 由同一条规则守（`.claude/kb/invariants.md` I-2.4 那一行；判决
+/// 与单元头那 29 字节、指针头部 MAC / nonce 由同一条规则守（`crates/singlefs-checker/invariants/04-校验和.md` I-2.4 那一行；判决
 /// `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y1「算法、nonce、MAC」那一行：单镜像性质，归池级 checker，
 /// 挂载透明不比）。实现今天不判这 29 字节（`crates/singlefs-core/src/root_record.rs` 的 `parse_slot` 跳过它们），checker 自己判一份。
 /// 只判不断：这条根照样进候选集、照样走。

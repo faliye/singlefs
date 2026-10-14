@@ -61,18 +61,18 @@ const RELEASE_TXG_OF_THE_MKFS_INSTANCE_TABLE: u64 = 3;
 /// 写它之前环里最旧有效根比它早一圈（3S 槽），k = S + 2 时是 5 ≥ 释放代 3，U、U + 1 已回收（k = S + 1 时是 2 < 3，还没有；S ≥ 5 时两个 k 都 ≥ 6，
 /// 落在式子成立的范围里）。S 取 mkfs 写进系统配置的那一个（`ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM`，今天 8：第 10 次挂载、txg 29）；
 /// mkfs 这条路径上 S 只能取 5–15（`crates/singlefs-core/src/root_ring.rs` 的 `at_make_filesystem_checked_at_compile_time`：4、16 编不过）。
-/// 攻方在 S = 8 上量过翻转点 9 → 10（`research/prompts/m3-formal-code-b17-r1-opus-model/out/runA1.log` 第 15、17 行）；正推在 S = 5、6、7、8、12、15
+/// 攻方在 S = 8 上量过翻转点 9 → 10（`research/prompts/m3-formal-code-b17-r1-opus-model/out/runA1.log` 里 `name=shape_a ring=default k=9`、`k=10` 两行）；正推在 S = 5、6、7、8、12、15
 /// 上量过这两条用例照原样绿、放宽一个 txg 的变异红（判决 `research/prompts/m3-formal-code-b23-r1-main-verification.md` 第二节「K3 H2 前提断言」；
 /// 翻转在 S + 2、放宽一个 txg 的翻转在 S + 1 见判决 `research/prompts/m3-formal-code-b21-r1-main-verification.md` 第二节 K1-a）。
 const WARM_UP_ONLY_MOUNTS_UNTIL_THE_MKFS_INSTANCE_TABLE_IS_RECLAIMED: u64 =
     ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM + 2;
 /// 比上一个少一次（S + 1）：这一次挂载上的第一个文件版本写之前环里最旧有效根 2，比释放代 3 差一个 txg，mkfs 的实例表那一对还没过回收门槛。
 /// 回收门槛放松一个 txg（释放代 ≤ 下界 + 1）的坏实现在这一格提前回收、落 U（判决 `research/prompts/m3-formal-code-b19-r1-main-verification.md`
-/// 第二节 K2-1，攻方量过 `research/prompts/m3-formal-code-b19-r1-opus-model/out/h2-slack0.txt` 第 9 行与 `h2-slack1.txt` 第 9 行）。
+/// 第二节 K2-1，攻方量过 `research/prompts/m3-formal-code-b19-r1-opus-model/out/h2-slack0.txt` 与 `h2-slack1.txt` 里 `mounts=9` 那一行）。
 const WARM_UP_ONLY_MOUNTS_ONE_SHORT_OF_RECLAIMING_THE_MKFS_INSTANCE_TABLE: u64 =
     WARM_UP_ONLY_MOUNTS_UNTIL_THE_MKFS_INSTANCE_TABLE_IS_RECLAIMED - 1;
 /// 实例 2 里接连推这么多次零单元发布之后写的第一个文件版本落到 U（攻方量过翻转点 21 → 22，
-/// `research/prompts/m3-formal-code-b17-r1-opus-model/out/runB1.log` 第 28、29 行）。
+/// `research/prompts/m3-formal-code-b17-r1-opus-model/out/runB1.log` 里 `name=shape_b z=21`、`z=22` 两行）。
 const ZERO_UNIT_PUBLISHES_UNTIL_THE_MKFS_INSTANCE_TABLE_IS_RECLAIMED: u64 = 22;
 
 /// 两块空的内存稀疏盘，写录进同一条流。

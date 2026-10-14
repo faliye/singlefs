@@ -1,4 +1,4 @@
-//! checker 档模块：crash、layer0_progress
+//! checker 档模块：crash、crash_state_enumeration、crash_point_replay_progress、crash_given_states、crash_library、crash_amplification
 //! 里程碑「新池新建文件」步 7 的验收：拿步 5 的录制流按 D13（验证路线） 已定项 4 枚举全部崩溃状态，每个状态跑三件事——
 //! 步 6 的恢复与 oracle、池级 checker（一元判决）、记录核对器（二元判决）。oracle 那一半的计数与 E142（新池新建文件的干跑）
 //! 第八次跑产物的 `name=layer0` / `name=journal_effect` 行逐字对；再加一组靶向的阳性对照。
@@ -23,15 +23,30 @@ use singlefs_checker::image::{
     TOMBSTONE_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOB_ON_A_TEST_IMAGE,
     TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT, TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
 };
-use singlefs_checker::walk::check_pool_image;
 use singlefs_checker_tier::crash::{
-    check_records, enumerate_layer0_in_state_slices_or_one_shard, enumerate_layer0_selecting,
-    evaluate_state, full_expansion, layer0_state_count,
-    layer0_state_count_with_torn_in_place_overwrites, oracle_violation, quick_tier_expansion,
-    Layer0EnumerationOutcome, Layer0ObserverCounts, Layer0Parallelism, Layer0SegmentExpansion,
-    Layer0Tally,
+    check_records, crash_point_replay_plan_state_count, crash_state_count,
+    crash_state_count_with_torn_in_place_overwrites, evaluate_state, full_expansion,
+    oracle_violation, quick_tier_expansion, CrashPointReplayObserverCounts,
+    CrashPointReplaySegmentExpansion, CrashPointReplayTally, CrashPointReplayVersionTable,
 };
-use singlefs_checker_tier::layer0_progress::Layer0Resume;
+use singlefs_checker_tier::crash_amplification::{
+    one_test_changes_the_environment_at_a_time, GivenStatesEngine, GivenStatesItem,
+};
+use singlefs_checker_tier::crash_given_states::{
+    GivenStateConclusion, GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
+};
+use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
+use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_selecting, enumerate_crash_states_with_expansion,
+    sample_crash_states_on_the_cpu_against_the_version_table,
+    sample_crash_states_on_the_cpu_with_threads_against_the_version_table, CrashPointReplayItem,
+    CrashPointReplayObserver,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs";
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::recovery::RecoveryReport;
 use singlefs_core::recovery::{recover, JournalPolicy};
@@ -53,12 +68,10 @@ struct OracleCounts {
     file_read_states: u64,
     failed_states: u64,
     journal_differing_states: u64,
-    verification_ran_states: u64,
-    verification_failed_states: u64,
     first_violation: Option<String>,
 }
 
-fn oracle_counts(tally: &Layer0Tally) -> OracleCounts {
+fn oracle_counts(tally: &CrashPointReplayTally) -> OracleCounts {
     OracleCounts {
         states: tally.states,
         violations: tally.violations,
@@ -67,14 +80,12 @@ fn oracle_counts(tally: &Layer0Tally) -> OracleCounts {
         file_read_states: tally.file_read_states,
         failed_states: tally.failed_states,
         journal_differing_states: tally.journal_differing_states,
-        verification_ran_states: tally.verification_ran_states,
-        verification_failed_states: tally.verification_failed_states,
         first_violation: tally.first_violation.clone(),
     }
 }
 
 /// checker 与记录核对器那一半打成一行：每条不变量「评估过的状态数 / 判违例的状态数」。
-fn checker_line(tally: &Layer0Tally) -> String {
+fn checker_line(tally: &CrashPointReplayTally) -> String {
     let per_invariant: Vec<String> = singlefs_checker::image::IMPLEMENTED_INVARIANTS
         .iter()
         .map(|invariant| {
@@ -115,9 +126,9 @@ fn checker_line(tally: &Layer0Tally) -> String {
 /// 种子根与暖机根指着的第 0 版树表是空的，没有分配记录树；
 /// I-1.10（码 2 条目宽等于字段表宽） 同一个理由：第 0 版树表一条条目都没有，没有哪个码 2 节点的条目宽可比）；
 /// I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 单列一类：它除了回退候选集里那几版，还读下一次挂载会先施加的那一版
-/// （`.claude/kb/invariants.md` I-3.10 那一行射程 ④），txg 3 的记录至少一份已落、根槽没落的状态上也评估，
+/// （`crates/singlefs-checker/invariants/05-空间记账.md` I-3.10 那一行射程 ④），txg 3 的记录至少一份已落、根槽没落的状态上也评估，
 /// 评估过的状态数由调用方按录制流逐状态现算（[`TransactionPublishInRecordedStream::allocation_generation_read_set_in`]），不写死；
-/// I-5.4（分配记录罩住的槽互不相交） 在这一类里：按版本那一层也判下一次挂载先施加的那一版（第 34 批改法 RV，`.claude/kb/invariants.md`
+/// I-5.4（分配记录罩住的槽互不相交） 在这一类里：按版本那一层也判下一次挂载先施加的那一版（第 34 批改法 RV，`crates/singlefs-checker/invariants/07-分配器.md`
 /// I-5.4 那一行），两条认这一版用的是池级 checker 里同一个函数，这条流上评估过的状态逐个相同，理由写在函数里那张表旁边；
 /// I-9.14（树表条目的诞生 txg 跨根不变）在这条流上一个状态都评估不到，I-9.28（全部读得出的根之间同一树 ID 的诞生 txg 相同） 同一个理由；
 /// I-3.12（实例表行 T 低于引用它的根的 txg） 也评估不到：这条流上没有哪次发布重写实例表（取号只写系统配置，暖机与 A 照抄
@@ -131,7 +142,7 @@ fn checker_line(tally: &Layer0Tally) -> String {
 /// 违例只许出现在 I-7.7（系统配置实例代号不低于根环）：C322（取号那一步的屏障怎么放没有条款） 未还，
 /// 取号只落了一块盘的那 2 个状态里两份系统配置的实例代号不等。
 fn assert_checker_counts(
-    tally: &Layer0Tally,
+    tally: &CrashPointReplayTally,
     every_state: u64,
     root_persisted_states: u64,
     states_with_an_empty_journal_ring: u64,
@@ -220,7 +231,7 @@ fn assert_checker_counts(
     ];
     // 没有删除、没有回退：txg 3 那一版的墓碑树、谱系树都是零根（全部持久那个状态就是 `checker_known_bad_images.rs` 的干净镜像，
     // 那里这几条报不适用），主走读走不到它们的内部条目（I-9.17、I-9.23），删除态扫描读出的墓碑容器是空的（I-9.19、I-9.20 没有墓碑可判，
-    // I-9.21 在旧入口上要至少两片容器）；I-9.22 只在新入口装了旋钮时判，层 0 走旧入口 `check_pool_image`。全是推的。
+    // I-9.21 在旧入口上要至少两片容器）；I-9.22 只在新入口装了旋钮时判，崩溃点重放走旧入口 `check_pool_image`。全是推的。
     let never_has_a_tombstone_or_lineage_record_on_this_stream = [
         LINEAGE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
         TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
@@ -239,7 +250,7 @@ fn assert_checker_counts(
         RETIREMENT_RECORDS_ON_THE_LINEAGE_ARE_DISTINCT,
         RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF,
     ];
-    // 谱系树与退役树的容器容量那两条（第 53 批）：这条流上两棵都是零根，没有非最右的容器（I-9.36 没有对象）；层 0 走池级 checker 的旧入口，
+    // 谱系树与退役树的容器容量那两条（第 53 批）：这条流上两棵都是零根，没有非最右的容器（I-9.36 没有对象）；崩溃点重放走池级 checker 的旧入口，
     // 没有谱系与退役的旋钮值（I-9.37 一格都不判）。推的：两条都是 0/0，没跑。
     let never_has_two_lineage_or_retirement_containers_on_this_stream = [
         NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
@@ -340,7 +351,7 @@ enum TransactionVersionInAllocationGenerationReadSet {
 
 /// 录制流里承载新池新建文件的那次发布：它的根槽写之前、上一条根槽写之后有单元写（两次暖机是零单元的空发布）。
 /// I-3.10 那一类评估过的状态数按它逐状态现算：只看录制流里的写种类、写次序、根槽写里写下的根身份与这一状态里哪几次写持久了，
-/// 不读盘、不经 checker 的代码（`.claude/kb/invariants.md`：判的一方不许与被判的一方共用同一段代码）。
+/// 不读盘、不经 checker 的代码（`crates/singlefs-checker/invariants/README.md`「状态」一节「与实现只共享常量模块」：判的一方不许与被判的一方共用同一段代码）。
 struct TransactionPublishInRecordedStream {
     /// 它的根槽写（新根）。
     root_write_index: usize,
@@ -405,7 +416,18 @@ impl TransactionPublishInRecordedStream {
         }
     }
 
-    /// 层 0 的写要么整条落、要么整条不落：落了而没被更晚的已持久写盖过的那份记录，盘上字节就是录制流里写下的那一条，照原样自证。
+    /// 观察者另读的这几样（根槽写与记录写的下标、前一版的根身份）的摘要：进观察者的版本，录制流一变它就变，判过的块不按旧的复用。
+    fn extra_inputs_digest(&self) -> [u8; singlefs_harness::sha256::DIGEST_BYTES] {
+        singlefs_harness::sha256::sha256_digest(
+            format!(
+                "root_write_index={}\nrecord_write_indexes={:?}\nprevious_root_identity={:?}\n",
+                self.root_write_index, self.record_write_indexes, self.previous_root_identity
+            )
+            .as_bytes(),
+        )
+    }
+
+    /// 崩溃点重放的写要么整条落、要么整条不落：落了而没被更晚的已持久写盖过的那份记录，盘上字节就是录制流里写下的那一条，照原样自证。
     fn allocation_generation_read_set_in(
         &self,
         writes: &[RetainedWrite],
@@ -476,16 +498,16 @@ struct AllocationGenerationReadSetCounts {
     states_through_the_record_the_next_mount_applies_first: u64,
 }
 
-/// 观察者计数里这两类的名字（随进度文件续跑，`crash::Layer0ObserverCounts`）。
+/// 观察者计数里这两类的名字（按块存进库、判段重建，`crash::CrashPointReplayObserverCounts`）。
 const STATES_THROUGH_THE_LANDED_ROOT: &str = "states_through_the_landed_root";
 const STATES_THROUGH_THE_RECORD_THE_NEXT_MOUNT_APPLIES_FIRST: &str =
     "states_through_the_record_the_next_mount_applies_first";
 
 impl AllocationGenerationReadSetCounts {
-    /// 一个状态记进观察者计数：续跑时读回的片不再给观察者看，这两类的累计要随片进进度文件。
+    /// 一个状态记进观察者计数：从库里复用的块不再给观察者看，这两类的累计按块存在库里。
     fn count_into(
         read_set: TransactionVersionInAllocationGenerationReadSet,
-        counts: &mut Layer0ObserverCounts,
+        counts: &mut CrashPointReplayObserverCounts,
     ) {
         match read_set {
             TransactionVersionInAllocationGenerationReadSet::ThroughItsLandedRoot => {
@@ -498,7 +520,7 @@ impl AllocationGenerationReadSetCounts {
         }
     }
 
-    fn from_observer_counts(counts: &Layer0ObserverCounts) -> Self {
+    fn from_observer_counts(counts: &CrashPointReplayObserverCounts) -> Self {
         Self {
             states_through_the_landed_root: counts.count_named(STATES_THROUGH_THE_LANDED_ROOT),
             states_through_the_record_the_next_mount_applies_first: counts
@@ -512,7 +534,7 @@ impl AllocationGenerationReadSetCounts {
     }
 }
 
-/// 单版本形态的 oracle 那一份版本表：被判的那次根槽写出的那一代就是唯一带文件的版本（与 `enumerate_layer0_selecting` 里造的相同）。
+/// 单版本形态的 oracle 那一份版本表：被判的那次根槽写出的那一代就是唯一带文件的版本（与 `enumerate_crash_states_selecting` 里造的相同）。
 fn single_version(prepared: &Prepared) -> Vec<PublishedVersion> {
     let (checkpoint_txg, instance) = root_identity_of(&prepared.writes[prepared.root_index]);
     vec![PublishedVersion {
@@ -522,45 +544,148 @@ fn single_version(prepared: &Prepared) -> Vec<PublishedVersion> {
     }]
 }
 
-/// 按段枚举（`expansion` 决定每一段怎么展开），每个状态上逐个现算 I-3.10 那一类，记进观察者计数（续跑时随进度文件接上；
-/// 双机分片时随账本到 merge 那一趟）。分片跑一片（`SINGLEFS_LAYER0_SHARD=<i>/<n>`）时交回 `None`：这一片的计数进了账本，整条流的等 merge。
+/// 按段枚举（`expansion` 决定每一段怎么展开），每个状态上逐个现算 I-3.10 那一类，记进观察者计数（按块存进库，判段重建）。
+/// 只录那一趟与只判自己那一份的那一趟交回 `None`：整条流的计数等判完全部块的那一趟。
 fn enumerate_counting_allocation_generation_read_sets(
     prepared: &Prepared,
-    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
-    resume: &Layer0Resume,
-) -> Option<(Layer0Tally, AllocationGenerationReadSetCounts)> {
+    item_label: &str,
+    expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
+) -> Option<(CrashPointReplayTally, AllocationGenerationReadSetCounts)> {
     let versions = single_version(prepared);
-    let outcome = enumerate_layer0_in_state_slices_or_one_shard(
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   _consulted_report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        AllocationGenerationReadSetCounts::count_into(
+            prepared
+                .transaction_publish
+                .allocation_generation_read_set_in(image.writes, &image.persisted),
+            counts,
+        );
+    };
+    let item_name = format!("new_pool_file_creation::{item_label}");
+    let tally = enumerate_crash_states_with_expansion(
+        CrashPointReplayItem {
+            name: &item_name,
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.root_index,
-        &versions,
+        CrashPointReplayVersionTable::with_a_file_only(&versions),
         expansion,
-        Layer0Parallelism::from_environment(),
-        Some(&mut |image: &CrashImage<'_>,
-                   _consulted_report: &RecoveryReport,
-                   counts: &mut Layer0ObserverCounts| {
-            AllocationGenerationReadSetCounts::count_into(
-                prepared
-                    .transaction_publish
-                    .allocation_generation_read_set_in(image.writes, &image.persisted),
-                counts,
-            );
-        }),
-        resume,
-    );
-    let tally = match outcome {
-        Layer0EnumerationOutcome::WholeStream(tally) => tally,
-        Layer0EnumerationOutcome::OneShardWrittenToItsLedger(_written) => return None,
-    };
+        &[CrashPointReplayObserver {
+            name: "allocation_generation_read_sets",
+            extra_inputs_digest: extra_inputs_digest_that_was_computed(
+                prepared.transaction_publish.extra_inputs_digest(),
+            ),
+            observe: &observe,
+        }],
+    )
+    .judged()?;
     let read_set_counts =
         AllocationGenerationReadSetCounts::from_observer_counts(&tally.observer_counts);
     Some((tally, read_set_counts))
 }
 
-/// 全量那条流在进度文件名里的名字（断点续跑按「输入指纹 + 流名 + 计划哈希」分格）。
-const FULL_ENUMERATION_STREAM_NAME: &str = "new_pool_file_creation_stream";
+/// 崩溃点重放取样多线程与单线程的对拍（`.claude/singlefs-ai-sop/rules/test-script-discipline.md`「编译与算法都要快」：多线程与单线程的对拍进快档）：
+/// 同一条流、同一个序号段（整条流的前 20 个状态，三条线程切成不止一段），单线程那一支与三条线程那一支交回的都是整条流的状态数，
+/// 每个序号各判一次，逐序号的红项与两遍恢复的结局逐字相同。判别力：多线程那一支交回判了几个、或把各段看到的整条流状态数相加
+/// （`crates/mutations.tsv` 那两行）。
+#[test]
+fn sampling_with_three_threads_returns_the_whole_flow_state_count_and_judges_each_ordinal_once_like_one_thread(
+) {
+    let prepared = prepare("crash-point-replay-threaded-sampling");
+    let versions = single_version(&prepared);
+    let whole_flow_states = crash_point_replay_plan_state_count(
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        &quick_tier_expansion,
+    );
+    let sampled = 0..whole_flow_states.min(20);
+    assert!(
+        sampled.end >= 3,
+        "序号段要切得出不止一段：{sampled:?}（整条流 {whole_flow_states} 个状态）"
+    );
+    let item = CrashPointReplayItem {
+        name: "new_pool_file_creation::threaded_sampling",
+        setting_file: THIS_FILE,
+    };
+    let judgement_words = |judgement: &singlefs_checker_tier::crash::CrashStateJudgement| {
+        format!(
+            "consulted={:?} ignored={:?}",
+            judgement.consulted.outcome, judgement.ignored.outcome
+        )
+    };
+    let mut by_one_thread: Vec<(u64, Vec<String>, String)> = Vec::new();
+    let Some(one_thread_states) = sample_crash_states_on_the_cpu_against_the_version_table(
+        item,
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        prepared.root_index,
+        CrashPointReplayVersionTable::with_a_file_only(&versions),
+        &quick_tier_expansion,
+        sampled.clone(),
+        &mut |ordinal, _image, judgement| {
+            by_one_thread.push((ordinal, judgement.red_items(), judgement_words(judgement)))
+        },
+    )
+    .judged() else {
+        // 只录那一趟：流写进了判定库，不判
+        return;
+    };
+    let by_three_threads: std::sync::Mutex<Vec<(u64, Vec<String>, String)>> =
+        std::sync::Mutex::new(Vec::new());
+    let Some(three_thread_states) =
+        sample_crash_states_on_the_cpu_with_threads_against_the_version_table(
+            item,
+            &prepared.base,
+            &prepared.writes,
+            &prepared.segments,
+            prepared.root_index,
+            CrashPointReplayVersionTable::with_a_file_only(&versions),
+            &quick_tier_expansion,
+            sampled.clone(),
+            std::num::NonZeroUsize::new(3).expect("3 不是 0"),
+            &|ordinal, _image, judgement| {
+                by_three_threads.lock().expect("判定线程不 panic").push((
+                    ordinal,
+                    judgement.red_items(),
+                    judgement_words(judgement),
+                ))
+            },
+        )
+        .judged()
+    else {
+        return;
+    };
+    assert_eq!(
+        one_thread_states, whole_flow_states,
+        "单线程那一支交回整条流的状态数"
+    );
+    assert_eq!(
+        three_thread_states, whole_flow_states,
+        "三条线程那一支交回的也是整条流的状态数：不是各段的和，也不是判了几个"
+    );
+    assert_eq!(
+        by_one_thread
+            .iter()
+            .map(|(ordinal, _, _)| *ordinal)
+            .collect::<Vec<u64>>(),
+        sampled.clone().collect::<Vec<u64>>(),
+        "单线程那一支按序号各判一次"
+    );
+    let mut by_three_threads = by_three_threads.into_inner().expect("判定线程不 panic");
+    by_three_threads.sort_by_key(|(ordinal, _, _)| *ordinal);
+    assert_eq!(
+        by_three_threads, by_one_thread,
+        "三条线程那一支逐序号的红项与两遍恢复的结局与单线程逐字相同"
+    );
+}
+
 /// 每次写只取两态时的闭式：1 + Σ(2^|段| − 1)，A 的 24 个单元写自成一段占 2^24 − 1。C577（发布返回之前、系统配置轮换之后加一道屏障）
 /// 之前暖机第二次的系统配置槽轮换与 A 的单元写同段（26 写，2^26 − 1，67108885）；之后轮换那 2 写自成一段：
 /// 1 + (3 + 3 + 1 + 3 + 3 + 1 + 3 + 3 + 1 + 3) + (2^24 − 1) = 16777240（E142（新池新建文件的干跑） 产物 `closed_form=` 那个数要跟着重出）。
@@ -630,43 +755,39 @@ fn prepare(tag: &str) -> Prepared {
     }
 }
 
-/// 全量：[`FULL_STATES`] 个状态。跑得慢（每个状态两遍恢复 + checker + 记录核对器），门禁 checker-tier-layer0-replay 在 release 下跑它；平时 `cargo test` 跳过。
-/// 带断点续跑（`singlefs_checker_tier::layer0_progress`）：进度目录、输入指纹与强制从头跑的开关都从环境变量取，没设进度目录就不留进度文件；
-/// I-3.10 那一类的逐状态计数记在观察者计数里，续跑时随进度文件接上。双机分片（`SINGLEFS_LAYER0_SHARD`，
-/// `scripts/crash/layer0-shard-run.sh`）：跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
+/// 全量：[`FULL_STATES`] 个状态。跑得慢（每个状态两遍恢复 + checker + 记录核对器），门禁 checker-tier-crash-point-replay 在 release 下跑它；平时 `cargo test` 跳过。
+/// 判过的状态都在判定库里（崩溃枚举用例那一类，`crash_state_enumeration` 的两段：流先录进库，判段从库读回判，被杀之后下一趟接着判没判过的）；
+/// I-3.10 那一类的逐状态计数记在观察者计数里，按块存进库、判段重建。双机（`scripts/crash/crash-point-replay-shard-run.sh` 经崩溃放量的双机驱动）：
+/// 两台各判自己那一份，那几趟不打计数行、不判下面的断言；导入第二台的库之后再跑的那一趟拿整条流的计数照下面逐项判、逐字打同样的行。
 #[test]
-#[ignore = "全量六千七百多万个状态，门禁 checker-tier-layer0-replay （.claude/gate.d/checker-tier-layer0-replay.sh）在 release 下跑，带断点续跑"]
-fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations() {
-    let prepared = prepare("layer0-full");
+#[ignore = "全量六千七百多万个状态，门禁 checker-tier-crash-point-replay （.claude/gate.d/checker-tier-crash-point-replay.sh）在 release 下跑，带断点续跑"]
+fn crash_point_replay_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations() {
+    let prepared = prepare("crash-point-replay-full");
     assert_eq!(
         closed_form_state_count(&prepared.segments),
         FULL_STATES_WITH_TWO_STATES_PER_WRITE,
         "每次写只取两态时的闭式（E142 产物的 closed_form）"
     );
-    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态），checker-tier-layer0-replay 认 exhaustive=true 就是枚举到的恰好这么多。
-    let closed_form = layer0_state_count_with_torn_in_place_overwrites(
+    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态），checker-tier-crash-point-replay 认 exhaustive=true 就是枚举到的恰好这么多。
+    let closed_form = crash_state_count_with_torn_in_place_overwrites(
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         &full_expansion,
     );
-    let Some((tally, read_set_counts)) = enumerate_counting_allocation_generation_read_sets(
-        &prepared,
-        &full_expansion,
-        &Layer0Resume::from_environment(FULL_ENUMERATION_STREAM_NAME),
-    ) else {
+    let Some((tally, read_set_counts)) =
+        enumerate_counting_allocation_generation_read_sets(&prepared, "full", &full_expansion)
+    else {
         return;
     };
     println!(
-        "LAYER0 states={} closed_form={closed_form} violations={} root_persisted_states={} no_file={} file_read={} failed={} verification_ran={} verification_failed={} journal_differing={} exhaustive={} states_by_publish=[{}]",
+        "CRASH_POINT_REPLAY states={} closed_form={closed_form} violations={} root_persisted_states={} no_file={} file_read={} failed={} journal_differing={} exhaustive={} states_by_publish=[{}]",
         tally.states,
         tally.violations,
         tally.root_persisted_states,
         tally.no_file_states,
         tally.file_read_states,
         tally.failed_states,
-        tally.verification_ran_states,
-        tally.verification_failed_states,
         tally.journal_differing_states,
         tally.states == closed_form,
         tally.states_by_publish_text()
@@ -679,9 +800,9 @@ fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violation
         tally.first_ignored_violation
     );
     // 读出文件、根槽已持久、journal 承重、验证跑过的那几格都在 A 那一段之后（记录段、根槽段、轮换段、全部持久），与甲二快档相同；
-    // A 那一段的单元写只落一部分的状态上 A 的记录与根都没落，恢复落在暖机 txg 2 的根上、没有文件（实六推的，checker-tier-layer0-replay 全量核）。
+    // A 那一段的单元写只落一部分的状态上 A 的记录与根都没落，恢复落在暖机 txg 2 的根上、没有文件（实六推的，checker-tier-crash-point-replay 全量核）。
     // 系统配置槽撕裂的状态（第三态）与那次写没持久的同一状态恢复得一样：撕裂的那一槽解不开，择的是同一块盘上另一槽，
-    // 而没持久时那一槽里是更旧的一代、择的也是另一槽（推的，补第三态之后 checker-tier-layer0-replay 全量核）；它们不带待施加的记录，journal 承重、验证那几格不变。
+    // 而没持久时那一槽里是更旧的一代、择的也是另一槽（推的，补第三态之后 checker-tier-crash-point-replay 全量核）；它们不带待施加的记录，journal 承重、验证那几格不变。
     assert_eq!(
         oracle_counts(&tally),
         OracleCounts {
@@ -691,14 +812,12 @@ fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violation
             no_file_states: FULL_STATES - FILE_READ_STATES,
             file_read_states: FILE_READ_STATES,
             failed_states: 0,
-            journal_differing_states: 3,
-            verification_ran_states: 6,
-            verification_failed_states: 0,
+            journal_differing_states: JOURNAL_DIFFERING_STATES,
             first_violation: None,
         }
     );
     assert_eq!(closed_form, FULL_STATES, "全量：枚举到的状态数等于闭式");
-    // 按发布分（里程碑「覆盖写、释放、回退与复用」步 6 验收第 1 条的口径，第一条流同样报）：暖机 txg 1、2 各 8 + 3 + 1（取号、轮换那一段各 3² − 1），
+    // 按发布分（里程碑「覆盖写、释放、回退与复用」验收「每次发布各多少」那一条的口径，新池新建文件流同样报）：暖机 txg 1、2 各 8 + 3 + 1（取号、轮换那一段各 3² − 1），
     // A 是暖机第二次的轮换段 8 + 单元段 2²⁴ − 1 = 16777215 + 记录段 3 + 根槽段 1 = 16777227（C577 之前轮换与单元同段、
     // 3² · 2²⁴ − 1 + 3 + 1 = 150994947），A 的系统配置槽轮换 8，再加全部持久那一个。
     assert_eq!(
@@ -725,17 +844,26 @@ fn assert_allocation_generation_read_set_reached_through_the_record(
     );
 }
 
+/// 两遍恢复落到的根、结局码或失败点不同的状态数（`crash_judge_conclusions::recovery_passes_differ`）：A 那一段的记录落了、根槽没落的 3 个状态
+/// 看 journal 那一遍读到文件、不看的那一遍没有；A 的根槽落了而系统配置槽没轮换的 3 个状态两遍都读到文件、看 journal 那一遍落到 A 的根、
+/// 不看的那一遍落到暖机 txg 2 的根（只比结局时这 3 个不算，钉 3）。快档与全量同一个数（少展开的那几个状态两遍落到同一个根）。
+const JOURNAL_DIFFERING_STATES: u64 = 6;
+
 /// 平时跑的那一份（甲二快档，用户 2026-09-26 定）：每段原地写各取它的几态、任意组合 × 单元写全不落或全落——A 的 24 个单元写那一段
 /// 只取全不落（1 个），其余十段全展开——[`QUICK_TIER_STATES`] 个状态；报出来的是「不是全量」。
 #[test]
-fn layer0_quick_tier_matches_the_full_tally_shape() {
-    let prepared = prepare("layer0-partial");
-    let (tally, read_set_counts) = enumerate_counting_allocation_generation_read_sets(
+fn crash_point_replay_quick_tier_matches_the_full_tally_shape() {
+    let prepared = prepare("crash-point-replay-partial");
+    // 交回 None 是这一趟没判：只录那一趟、只判自己那一份的分片，或配置开了 GPU 而这份二进制没编进 gpu 特性
+    // （引擎开跑时已打本次未跑那一行，判归带特性那一趟）；这条快档用例的计数等判完全部块的那一趟
+    let Some((tally, read_set_counts)) = enumerate_counting_allocation_generation_read_sets(
         &prepared,
+        "quick_tier",
         &quick_tier_expansion,
-        &Layer0Resume::NoProgressFile,
-    )
-    .expect("不留进度文件就不分片，交回整条流的计数");
+    ) else {
+        println!("快档用例 crash_point_replay_quick_tier_matches_the_full_tally_shape：这一趟没判、不比计数（只录、分片或判归带 gpu 特性那一趟）");
+        return;
+    };
     println!("{}", checker_line(&tally));
     println!("CHECKER_FIRST {:?}", tally.checker_first_violation);
     assert_eq!(
@@ -747,12 +875,10 @@ fn layer0_quick_tier_matches_the_full_tally_shape() {
             no_file_states: QUICK_TIER_STATES - FILE_READ_STATES,
             file_read_states: FILE_READ_STATES,
             failed_states: 0,
-            journal_differing_states: 3,
-            verification_ran_states: 6,
-            verification_failed_states: 0,
+            journal_differing_states: JOURNAL_DIFFERING_STATES,
             first_violation: None,
         },
-        "少展开的只有 A 那一段单元写只落一部分的组合：文件在 / 根已持久 / 验证跑过 / journal 承重的状态数都与全量相同"
+        "少展开的只有 A 那一段单元写只落一部分的组合：文件在 / 根已持久 / journal 承重的状态数都与全量相同"
     );
     assert_eq!(
         tally.states_by_publish_text(),
@@ -760,7 +886,7 @@ fn layer0_quick_tier_matches_the_full_tally_shape() {
         "甲二按发布分：少的只在 A 那一格（暖机第二次的轮换段 8 + A 的单元段 1 + 记录段 3 + 根槽段 1）"
     );
     assert_eq!(
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &prepared.base,
             &prepared.writes,
             &prepared.segments,
@@ -770,7 +896,7 @@ fn layer0_quick_tier_matches_the_full_tally_shape() {
         "甲二按闭式数"
     );
     assert_eq!(
-        layer0_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
+        crash_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
         26,
         "每次写只取两态时甲二的闭式（补第三态之前的数）：1 + 4 × 3 + 1 + 3 × 3 + 3 × 1（C577 之前 A 那一段 2² · 2 − 1 = 7，共 29）"
     );
@@ -788,12 +914,82 @@ fn layer0_quick_tier_matches_the_full_tally_shape() {
     );
 }
 
-/// checker 在写完新池新建文件的镜像上：每条第一版不变量的判定。
+/// 一张盘上的池级 checker 走两段（用户 2026-10-13 定「能走两段的都走两段」）：那张盘作一张给定状态表（基线就是那张盘、写表空、一个空持久集合）
+/// 交崩溃点重放的给定状态引擎（`crash_amplification::GivenStatesEngine`），录入段写进给定状态表那一类的判定库，判段从库里读回判
+/// （配了 GPU 走 GPU 判器，没配由 CPU 判器判），判过的复用。只录那一趟、表归别的机器判的那一趟交 `None`（用例当场返回）。
+///
+/// # Panics
+/// 引擎起不了、判不了这张表（不退回别处判）；GPU 判不了这张盘（第三轮正文 H6 判红）。
+fn pool_checker_conclusion_through_the_given_states_engine(
+    table_name: &str,
+    image: &MemoryPool,
+) -> Option<GivenStateConclusion> {
+    let engine = {
+        let _one_test_at_a_time = one_test_changes_the_environment_at_a_time();
+        GivenStatesEngine::start_from_environment(
+            GivenStatesItem {
+                item_name: "crash_enumeration_new_pool_file_creation_stream".to_string(),
+                setting_file: THIS_FILE.to_string(),
+                seeds_and_scale: "fixed".to_string(),
+            },
+            &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &repository_root_of_this_crate(),
+        )
+        .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+    };
+    let judged = engine
+        .judge_the_given_states(&GivenStatesOfATable {
+            table_name: table_name.to_string(),
+            base: image,
+            writes: &[],
+            segments: &[],
+            seams: &[],
+            persisted_sets: vec![Vec::new()],
+        })
+        .unwrap_or_else(|reason| {
+            panic!("给定状态表 {table_name} 判不了（不退回别处判）：{reason}")
+        });
+    assert_eq!(
+        engine.finish().red_items(),
+        Vec::<String>::new(),
+        "GPU 判不了的盘照第三轮正文 H6 判红"
+    );
+    match judged.source {
+        GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+        GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
+        | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => return None,
+    }
+    let [conclusion] = <[GivenStateConclusion; 1]>::try_from(judged.states)
+        .unwrap_or_else(|states| panic!("一个状态一份结论，交回 {} 份", states.len()));
+    Some(conclusion)
+}
+
+/// checker 在写完新池新建文件的镜像上：每条第一版不变量的判定（判到位与违例位；违例带细节的是这一趟 CPU 判的，GPU 判的与从库里读回的不带）。
 #[test]
 fn checker_report_on_the_final_image() {
     let pool = build_pool("checker-final");
-    for (invariant, verdict) in check_pool_image(&pool.memory_pool()) {
-        println!("FINAL {invariant} {verdict:?}");
+    let Some(conclusion) =
+        pool_checker_conclusion_through_the_given_states_engine("final-image", &pool.memory_pool())
+    else {
+        return;
+    };
+    let violations = conclusion.pool_checker_violations();
+    for (position, invariant) in singlefs_checker::image::IMPLEMENTED_INVARIANTS
+        .iter()
+        .enumerate()
+    {
+        let bit = 1u128 << position;
+        let verdict = if conclusion.words.pool_checker_violated_bits & bit != 0 {
+            violations
+                .iter()
+                .find(|(violated, _)| violated == invariant)
+                .map_or_else(String::new, |(_, detail)| format!("Violated({detail:?})"))
+        } else if conclusion.words.pool_checker_judged_bits & bit != 0 {
+            "Holds".to_string()
+        } else {
+            "NotApplicable or PartiallyJudged".to_string()
+        };
+        println!("FINAL {invariant} {verdict}");
     }
 }
 
@@ -801,9 +997,9 @@ fn checker_report_on_the_final_image() {
 /// oracle 对 12 个单元逐个都要判红；全部持久那一个判绿；根槽已持久而 journal 记录两份都没持久不算违例（根自己带着全部字段）。
 #[test]
 fn positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle() {
-    let prepared = prepare("layer0-control");
+    let prepared = prepare("crash-point-replay-control");
     let all_persisted = vec![true; prepared.writes.len()];
-    let mut tally = Layer0Tally::default();
+    let mut tally = CrashPointReplayTally::default();
     let report = evaluate_state(
         &prepared.base,
         &prepared.writes,
@@ -830,7 +1026,7 @@ fn positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle() {
         for index in pair {
             persisted[*index] = false;
         }
-        let mut control_tally = Layer0Tally::default();
+        let mut control_tally = CrashPointReplayTally::default();
         let control_report = evaluate_state(
             &prepared.base,
             &prepared.writes,
@@ -868,7 +1064,7 @@ fn positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle() {
     for index in journal_indices {
         persisted[index] = false;
     }
-    let mut control_tally = Layer0Tally::default();
+    let mut control_tally = CrashPointReplayTally::default();
     evaluate_state(
         &prepared.base,
         &prepared.writes,
@@ -921,14 +1117,21 @@ fn removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker() {
         .expect("根槽");
     // A 的 24 个单元写那一段不展开（只以整段持久进入后面的状态），其余每段任意子集；最后那一段 5 个写，选择器放到 5 才展开得到它
     // （留在 3 时这一段只以整段持久进来，根在案而记录不在的状态一个都摆不出来）。
-    let tally = enumerate_layer0_selecting(
+    let Some(tally) = enumerate_crash_states_selecting(
+        CrashPointReplayItem {
+            name: "new_pool_file_creation::barrier_removed_before_the_root_slot",
+            setting_file: THIS_FILE,
+        },
         &base,
         &writes,
         &segments,
         root_index,
         &file_content(),
         &|_segment_index, segment| segment.len() <= 5,
-    );
+    )
+    .judged() else {
+        return;
+    };
     assert_eq!(tally.violations, 0, "oracle 不红：根记录自己带着全部字段");
     // 五个写那一段（记录 2、根槽 1、系统配置槽轮换 2）里根槽落了、两份记录都没落的状态：两次轮换写是原地覆写、各取三态（没落、落了、撕开），
     // 3² = 9 个，都是真子集（记录没落）。记录核对器的「根在案而记录不在」只看盘上的根槽与记录写，不看系统配置槽（推的，checker 档没跑）。
@@ -992,4 +1195,16 @@ fn applying_a_record_whose_units_are_missing_is_caught_by_the_record_checker() {
     );
     assert!(!check_records(&image, validating.effective_root).claimed_state_missing_unit);
     assert!(!check_records(&image, validating.effective_root).root_without_record);
+}
+
+/// 观察者另读的输入的摘要要真算：全零就是没算（另读输入不同的两趟会共用看过的块）。
+fn extra_inputs_digest_that_was_computed(
+    digest: [u8; singlefs_harness::sha256::DIGEST_BYTES],
+) -> [u8; singlefs_harness::sha256::DIGEST_BYTES] {
+    assert_ne!(
+        digest,
+        [0; singlefs_harness::sha256::DIGEST_BYTES],
+        "观察者另读的输入的摘要真算（全零就是没算：另读输入不同的两趟会共用看过的块）"
+    );
+    digest
 }

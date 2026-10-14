@@ -2444,7 +2444,7 @@ mod tests {
     /// 暖机与新池新建文件的分界不是从流尾往回数几步：`ScenarioPoint::BeforeNewPoolFileCreation` 处量到的流长度，
     /// 与 `new_pool_file_creation_publish.rs` 的 `warm_up_operation_count`（该文件第 189、201 行）量的是同一处
     /// ——暖机 `warm_up()` 已调完、`publish_first_file()` 还没调。这里在内存盘上走同一条路径，用它切出五段，
-    /// 钉住该文件那五处断言的操作数：25、2、20、35、57（mkfs 清 [0, 根环基址)（C651）之后每块盘多一步整段清零：mkfs 23 → 25；C577 之后每次发布末尾轮换之后多一道池屏障、两块盘各记一步：暖机两次发布
+    /// 钉住该文件那五处断言的操作数：25、2、20、35、57（mkfs 清 [0, 根环基址)（C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同））之后每块盘多一步整段清零：mkfs 23 → 25；C577（系统配置没见证到的最新根，乙罩不到） 之后每次发布末尾轮换之后多一道池屏障、两块盘各记一步：暖机两次发布
     /// 18 → 20——第一次末尾那一道顶替了第二次开头那道没有写在前的屏障、只多第二次末尾那 2 步——、新池新建文件 33 → 35，
     /// mkfs 之后整条 2 + 20 + 35 = 57）。
     #[test]
@@ -2813,7 +2813,7 @@ mod tests {
         // C577 之后发布 D 以一道池屏障收尾，抬 F 那一串开的新写入口开头又一道，两道之间没有写：录制器
         // （`SharedStream::push` 的末尾一串屏障去重）把后一道并掉，设备照收两次 FLUSH，所以每块盘设备一层比录制流投出的多 1。
         // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
-        // 盘 0 的 12 / 13 是合入后验证一那一次跑出来的；盘 1 同一个机制推的，没跑（singlefs-checker-tier 是 checker 档，提交时由主 agent 经门禁 checker-tier-layer0-replay 快档跑）。
+        // 盘 0 的 12 / 13 是合入后验证一那一次跑出来的；盘 1 同一个机制推的，没跑（singlefs-checker-tier 是 checker 档，提交时由主 agent 经门禁 checker-tier-crash-point-replay 快档跑）。
         let flushes_the_recorder_merged_into_the_barrier_that_closed_publish_d: u64 = 1;
         for (index, identity) in [DeviceIdentity(0), DeviceIdentity(1)]
             .into_iter()
@@ -3104,7 +3104,7 @@ mod tests {
         // 两道之间没有写，录制器（`SharedStream::push` 的末尾一串屏障去重）把后一道并进上一段，设备在这一段照收一次 FLUSH。
         // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
         // 发布 B 那一段是 0（合入后验证一那一次两块盘都过了）；重开那一段盘 0 的 16 / 17 是那一次跑出来的，盘 1 同一个机制推的，没跑
-        // （singlefs-checker-tier 是 checker 档，提交时由主 agent 经门禁 checker-tier-layer0-replay 快档跑）。
+        // （singlefs-checker-tier 是 checker 档，提交时由主 agent 经门禁 checker-tier-crash-point-replay 快档跑）。
         let windows = [
             (
                 "file_overwrite",

@@ -1054,10 +1054,12 @@ fn w_start(context: u32, judging: bool) {
         w_checksum_count = 0u;
         w_tree_id_count = 0u;
         w_inode_birth_count = 0u;
+        w_inode_births_are_indexed = false;
         w_data_object_count = 0u;
         w_accounting_row_count = 0u;
         w_accounting_seen = false;
         w_instance_row_count = 0u;
+        w_instance_rows_are_indexed = false;
         w_inode_tree_walked = false;
         w_have_largest_inode = false;
         w_largest_inode = vec2<u32>(0u, 0u);
@@ -1766,22 +1768,9 @@ fn w_walk_instance_table_chain(first: Ptr, judge_rows: bool, fsid_low: vec2<u32>
                 let kind = rd8(p.base, o);
                 if (kind == 0u) {
                     let instance = rd32(p.base, o + 1u);
-                    for (var i = 0u; i < w_instance_row_count; i = i + 1u) {
-                        if (sw(C_INSTANCE_ROWS + i * C_ROW_WORDS) == instance) {
-                            rows_unique = false;
-                        }
-                    }
-                    if (w_instance_row_count >= C_MAX_INSTANCE_ROWS) {
-                        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (8u << 8u);
-                    } else {
-                        sws(C_INSTANCE_ROWS + w_instance_row_count * C_ROW_WORDS, instance);
-                        let row_txg = rd64(p.base, o + 5u);
-                        let row_high_water = rd64(p.base, o + 13u);
-                        sws(C_INSTANCE_ROWS + w_instance_row_count * C_ROW_WORDS + 1u, row_txg.x);
-                        sws(C_INSTANCE_ROWS + w_instance_row_count * C_ROW_WORDS + 2u, row_txg.y);
-                        sws(C_INSTANCE_ROWS + w_instance_row_count * C_ROW_WORDS + 3u, row_high_water.x);
-                        sws(C_INSTANCE_ROWS + w_instance_row_count * C_ROW_WORDS + 4u, row_high_water.y);
-                        w_instance_row_count = w_instance_row_count + 1u;
+                    // 这个实例之前已有一行：I-3.8 行唯一不成立（表满时照判，行不记、站点 8 判不了）
+                    if (w_append_an_instance_row(instance, rd64(p.base, o + 5u), rd64(p.base, o + 13u))) {
+                        rows_unique = false;
                     }
                     if (instance >= w_mount_instance) {
                         rows_below = false;
@@ -2852,24 +2841,21 @@ fn w_walk_inode_root(root: Node, tree: vec2<u32>, root_device: u32, root_slot: v
                 if (w_context == 0u) {
                     // inode → 对象出生代（后写的覆盖先写的）
                     let birth = rd64(p.base, ro + INODE_RECORD_OBJECT_BIRTH_OFFSET);
-                    var found = false;
-                    for (var i = 0u; i < w_inode_birth_count; i = i + 1u) {
-                        if (sw(C_INODE_BIRTHS + i * 4u) == inode.x && sw(C_INODE_BIRTHS + i * 4u + 1u) == inode.y) {
-                            sws(C_INODE_BIRTHS + i * 4u + 2u, birth.x);
-                            sws(C_INODE_BIRTHS + i * 4u + 3u, birth.y);
-                            found = true;
-                        }
-                    }
-                    if (!found) {
-                        if (w_inode_birth_count >= C_MAX_INODE_BIRTHS) {
-                            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (13u << 8u);
-                        } else {
-                            sws(C_INODE_BIRTHS + w_inode_birth_count * 4u, inode.x);
-                            sws(C_INODE_BIRTHS + w_inode_birth_count * 4u + 1u, inode.y);
-                            sws(C_INODE_BIRTHS + w_inode_birth_count * 4u + 2u, birth.x);
-                            sws(C_INODE_BIRTHS + w_inode_birth_count * 4u + 3u, birth.y);
-                            w_inode_birth_count = w_inode_birth_count + 1u;
-                        }
+                    let birth_row_index = w_inode_birth_row_of(inode);
+                    if (birth_row_index != NONE) {
+                        sws(C_INODE_BIRTHS + birth_row_index * 4u + 2u, birth.x);
+                        sws(C_INODE_BIRTHS + birth_row_index * 4u + 3u, birth.y);
+                    } else if (w_inode_birth_count >= C_MAX_INODE_BIRTHS) {
+                        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (13u << 8u);
+                    } else {
+                        let appended = w_inode_birth_count;
+                        sws(C_INODE_BIRTHS + appended * 4u, inode.x);
+                        sws(C_INODE_BIRTHS + appended * 4u + 1u, inode.y);
+                        sws(C_INODE_BIRTHS + appended * 4u + 2u, birth.x);
+                        sws(C_INODE_BIRTHS + appended * 4u + 3u, birth.y);
+                        w_inode_birth_count = appended + 1u;
+                        w_inode_births_are_indexed = keyed_table_after_a_row_was_appended(w_inode_birth_table(), w_inode_birth_count,
+                            w_inode_births_are_indexed, appended);
                     }
                     if (!w_have_largest_inode || lt64(w_largest_inode, inode)) {
                         w_largest_inode = inode;
@@ -3658,15 +3644,8 @@ fn appearance_hole_between(previous_txg: vec2<u32>, version_txg: vec2<u32>, vers
             if (!is_zero64(row_txg) || !is_zero64(row_high_water)) {
                 every_row_between_published_nothing = false;
             }
-            // 中间的实例按不同的代号数（同一个实例有两行只算一个）
-            var counted_before = false;
-            for (var j = 0u; j < k; j = j + 1u) {
-                if (sw(C_INSTANCE_ROWS + j * C_ROW_WORDS) == instance) {
-                    counted_before = true;
-                    break;
-                }
-            }
-            if (!counted_before) {
+            // 中间的实例按不同的代号数（同一个实例有两行只算一个）：第 k 行之前有同实例的行 ⟺ 这个实例的第一行不是第 k 行
+            if (w_first_instance_row_of(instance) == k) {
                 instances_between = instances_between + 1u;
             }
         }
@@ -4034,6 +4013,13 @@ const WALK_PHASE_DONE: u32 = 7u;
 const WALK_REACHED_THE_ROOT_RING: u32 = 3u;
 const WALK_REACHED_THE_HAND_OFF: u32 = 4u;
 
+// 池级 checker 判 I-7.4 时违例细节里点名的那一条被抛弃的根（walk.rs 的 judge_blocks_referenced_by_abandoned_roots：细节以
+// 「被抛弃的根（实例 X、txg Y）」起头；crash_given_states.rs 的 abandoned_roots_named_in_a_pool_checker_detail 从细节里读出同一条）。
+// 入口每个状态清零，走完写进结论的 ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD 起那四个字。
+var<private> named_abandoned_root_present: bool;
+var<private> named_abandoned_root_instance: u32;
+var<private> named_abandoned_root_txg: vec2<u32>;
+
 // 走读那一批连同收尾：择最新根、候选根、由记录施加出来的版本、被抛弃根，判走读之后那几条；
 // 收尾是候选集之外的根整遍走一次收位置项校验和（第三批判隔离的记录要），F 之下、没被抛弃的根各走一遍，
 // 它们引用的、候选版本没走到的槽记进交接段（第三批算 defer 那一格要），再把计数与几何写进交接段；
@@ -4126,12 +4112,11 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                             continue;
                         }
                         var applied = false;
-                        for (var k = 0u; k < w_instance_row_count; k = k + 1u) {
-                            if (sw(C_INSTANCE_ROWS + k * C_ROW_WORDS) == r.instance) {
-                                let row_txg = vec2<u32>(sw(C_INSTANCE_ROWS + k * C_ROW_WORDS + 1u), sw(C_INSTANCE_ROWS + k * C_ROW_WORDS + 2u));
-                                if (le64(r.txg, row_txg)) {
-                                    applied = true;
-                                }
+                        for (var row_index = w_first_instance_row_of(r.instance); row_index != NONE;
+                            row_index = w_next_instance_row_after(row_index)) {
+                            let row = C_INSTANCE_ROWS + row_index * C_ROW_WORDS;
+                            if (le64(r.txg, vec2<u32>(sw(row + 1u), sw(row + 2u)))) {
+                                applied = true;
                             }
                         }
                         if (!applied) {
@@ -4234,11 +4219,12 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                 for (var i = 0u; i < w_data_object_count; i = i + 1u) {
                     let inode = vec2<u32>(sw(C_DATA_OBJECTS + i * 4u), sw(C_DATA_OBJECTS + i * 4u + 1u));
                     let unit_birth = vec2<u32>(sw(C_DATA_OBJECTS + i * 4u + 2u), sw(C_DATA_OBJECTS + i * 4u + 3u));
-                    for (var k = 0u; k < w_inode_birth_count; k = k + 1u) {
-                        if (sw(C_INODE_BIRTHS + k * 4u) == inode.x && sw(C_INODE_BIRTHS + k * 4u + 1u) == inode.y) {
-                            let record_birth = vec2<u32>(sw(C_INODE_BIRTHS + k * 4u + 2u), sw(C_INODE_BIRTHS + k * 4u + 3u));
-                            judge(INVARIANT_I_9_10, eq64(record_birth, unit_birth));
-                        }
+                    // inode → 对象出生代那一张一个号至多一行（记的时候同号就地盖掉）
+                    let birth_row_index = w_inode_birth_row_of(inode);
+                    if (birth_row_index != NONE) {
+                        let birth_row = C_INODE_BIRTHS + birth_row_index * 4u;
+                        let record_birth = vec2<u32>(sw(birth_row + 2u), sw(birth_row + 3u));
+                        judge(INVARIANT_I_9_10, eq64(record_birth, unit_birth));
                     }
                 }
                 // I-5.1：同一块盘上不同的引用不许占重叠的槽（按 (槽, 跨度) 排序后相邻两条比 ⟺ 任两条比）
@@ -4318,12 +4304,12 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                     let write_order_instance = unit_write_order_instance(s, fsid_low);
                     var written_after_applied = false;
                     if (write_order_instance != NONE) {
-                        for (var k = 0u; k < w_instance_row_count; k = k + 1u) {
-                            if (sw(C_INSTANCE_ROWS + k * C_ROW_WORDS) == write_order_instance) {
-                                let row_txg = vec2<u32>(sw(C_INSTANCE_ROWS + k * C_ROW_WORDS + 1u), sw(C_INSTANCE_ROWS + k * C_ROW_WORDS + 2u));
-                                if (!is_zero64(row_txg) && lt64(row_txg, birth_txg)) {
-                                    written_after_applied = true;
-                                }
+                        for (var row_index = w_first_instance_row_of(write_order_instance); row_index != NONE;
+                            row_index = w_next_instance_row_after(row_index)) {
+                            let row_txg = vec2<u32>(sw(C_INSTANCE_ROWS + row_index * C_ROW_WORDS + 1u),
+                                sw(C_INSTANCE_ROWS + row_index * C_ROW_WORDS + 2u));
+                            if (!is_zero64(row_txg) && lt64(row_txg, birth_txg)) {
+                                written_after_applied = true;
                             }
                         }
                     }
@@ -4498,7 +4484,17 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
             w_judge(INVARIANT_I_7_4, !walked_into);
             w_judge(INVARIANT_I_4_8, !walked_into);
         } else if (phase == WALK_PHASE_ABANDONED_ROOTS) {
-            judge(INVARIANT_I_7_4, !(w_failures > 0u || w_mismatches > 0u));
+            let walked_into_a_reallocated_or_erased_unit = w_failures > 0u || w_mismatches > 0u;
+            // CPU 池级 checker 一条不变量只记第一处违例的说明：I-7.4 此前没红过、这条被抛弃的根是第一处违例时，细节点名的就是它
+            let reuse_invariant_was_violated_before = (violated[INVARIANT_I_7_4 / 32u] & (1u << (INVARIANT_I_7_4 % 32u))) != 0u;
+            if (walked_into_a_reallocated_or_erased_unit && !reuse_invariant_was_violated_before) {
+                // 这一条根是这一阶段刚取的那一条：取的时候游标已经挪到它后面
+                let abandoned = checker_root_of(cursor - 1u);
+                named_abandoned_root_present = true;
+                named_abandoned_root_instance = abandoned.instance;
+                named_abandoned_root_txg = abandoned.txg;
+            }
+            judge(INVARIANT_I_7_4, !walked_into_a_reallocated_or_erased_unit);
         } else if (phase == WALK_PHASE_REPLAYED_VERSION) {
             // I-4.1：施加出来的那一版走不完（任一单元两份都读不对、头用不了、条目解不开）
             judge(INVARIANT_I_4_1, w_failures == 0u);
@@ -4847,6 +4843,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     begin_state(local);
     clear_violated();
     clear_judged();
+    named_abandoned_root_present = false;
+    named_abandoned_root_instance = 0u;
+    named_abandoned_root_txg = vec2<u32>(0u, 0u);
     let out = local * VERDICT_WORDS;
     sws(H_BASE + H_VALID, 0u);
     let device_count = hdr(3u);
@@ -4861,4 +4860,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     store_judged(out);
     verdicts[out + POOL_CHECKER_REACHED_WORD] = reached;
     verdicts[out + POOL_CHECKER_UNDECIDABLE_WORD] = undecidable;
+    if (named_abandoned_root_present) {
+        verdicts[out + ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD] = ABANDONED_ROOT_NAMED;
+    } else {
+        verdicts[out + ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD] = NO_ABANDONED_ROOT_NAMED;
+    }
+    verdicts[out + ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD] = named_abandoned_root_instance;
+    verdicts[out + ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD] = named_abandoned_root_txg.x;
+    verdicts[out + ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD] = named_abandoned_root_txg.y;
 }

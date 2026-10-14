@@ -1,9 +1,9 @@
-//! checker 档模块：crash、layer0_progress
+//! checker 档模块：crash、crash_state_enumeration、crash_amplification
 //! 里程碑「覆盖写、释放、回退与复用」收尾实现批次实五：崩在准入推的那一串空发布中间（安全设计轮第三轮攻方 `research/prompts/m2-safety-r3-opus-output.md`
 //! 第六节那一形；D16（发布语义） 已定项 1「准入」那一行，C283（准入失败时不先推发布就报 ENOSPC））。取一条历史、只录会话推的那一串抬 F，
-//! 按层 0 的枚举域做小枚举（状态数照层 0 的口径另算：原地覆写取三态，每段 3^m · 2^(n−m) − 1 再加全部持久那一个，控制在 10⁶ 以内），
+//! 按崩溃点重放的枚举域做小枚举（状态数照崩溃点重放的口径另算：原地覆写取三态，每段 3^m · 2^(n−m) − 1 再加全部持久那一个，控制在 10⁶ 以内），
 //! 恢复之后与挂载之后两份镜像的池级 checker 都判；挂载那一遍照枚举用的写表叠，撕裂那一态的镜像也交给挂载。
-//! 名字里不带 layer0：它不是层 0 的全量流，是一条历史上的一小段，平时跑得起。
+//! 它不是崩溃点重放的全量流，是一条历史上的一小段，平时跑得起。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
@@ -14,15 +14,26 @@ mod common_admission_pool;
 mod common_crash_points;
 
 use common_admission_pool::{
-    checker_violations_on, content_of, device_bytes_of_the_384_slot_small_devices,
+    content_of, device_bytes_of_the_384_slot_small_devices,
     fixed_geometry_of_the_384_slot_small_devices, parameters_of_the_384_slot_small_devices,
     plain_devices_on, PoolUnderTest, OVERWRITE_BYTES,
 };
 use singlefs_checker_tier::crash::{
-    enumerate_layer0_in_state_slices, full_expansion,
-    layer0_state_count_with_torn_in_place_overwrites, Layer0Parallelism,
+    crash_state_count_with_torn_in_place_overwrites, full_expansion,
+    CrashPointReplayObserverCounts, CrashPointReplayVersionTable,
 };
-use singlefs_checker_tier::layer0_progress::Layer0Resume;
+use singlefs_checker_tier::crash_amplification::{
+    ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver, ObserverDeduplication,
+};
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_with_every_kind_of_observer, CrashPointReplayItem,
+    CrashPointReplayObserverHandingBackAnImage,
+};
+use singlefs_core::recovery::RecoveryReport;
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_enumeration_floor_raise_pushed_by_admission.rs";
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::mount::{
     mount_writable_with_space_admission, push_one_floor_raise_within_the_admission_budget,
@@ -30,7 +41,7 @@ use singlefs_core::mount::{
 };
 use singlefs_core::transaction::{FirstFile, PoolVersion, PoolWriter, PublishError};
 use singlefs_harness::memory_pool::{
-    writes_and_segments, MemoryPool, PublishedVersion, RetainedWrite, SparseBlockDevice,
+    writes_and_segments, CrashImage, MemoryPool, PublishedVersion, RetainedWrite, SparseBlockDevice,
 };
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
@@ -46,7 +57,7 @@ struct RecordedFloorRaise {
 }
 
 /// 会话覆盖写 61 次之后直接发布到准入先拒（写这条用例时拒在第 62 次，准入的式子改过之后往后挪，按实际拒的那一次取）、推一串抬 F、
-/// 再把那一次覆盖写重发做成；只录推的那一串。层 0 用例与流水线用例共用这一段。
+/// 再把那一次覆盖写重发做成；只录推的那一串。崩溃枚举用例与流水线用例共用这一段。
 fn record_the_floor_raise_pushed_by_the_session() -> RecordedFloorRaise {
     let stream = SharedStream::retaining_contents();
     let stream_for_the_devices = stream.clone();
@@ -162,12 +173,12 @@ fn record_the_floor_raise_pushed_by_the_session() -> RecordedFloorRaise {
 /// `an_overwrite_whose_data_unit_has_no_slot_pair_outside_the_cluster_segments_is_refused_by_the_admission_and_published_after_raising_the_floor_in_the_session`；
 /// ckpt_cost 按最坏情况计之后第 18、32、47 次是式子先拒、会话推过再发成，第 62 次是「这次的单元落得下」那一判先拒——C545 用户 2026-09-27 定准入先拒，
 /// 此前那一次是走固定点时落点被拒），
-/// 只录会话推的那一串抬 F（先把新 F 写进每块盘的系统配置、那几次带新 F 的空发布），按层 0 的枚举域（每一段都展开）枚举这条流的每个崩溃状态：
+/// 只录会话推的那一串抬 F（先把新 F 写进每块盘的系统配置、那几次带新 F 的空发布），按崩溃点重放的枚举域（每一段都展开）枚举这条流的每个崩溃状态：
 /// 恢复之后 oracle 与池级 checker 0 违例（枚举器自己判）；再可写挂载（空间准入判着），挂载之后的镜像池级 checker 0 违例；
-/// 挂载全做成。状态数照层 0 的口径另算（系统配置槽写是原地覆写、取三态，[`layer0_state_count_with_torn_in_place_overwrites`]），
+/// 挂载全做成。状态数照崩溃点重放的口径另算（系统配置槽写是原地覆写、取三态，[`crash_state_count_with_torn_in_place_overwrites`]），
 /// 落在 10⁶ 以内才枚举；挂载那一遍的镜像照观察者交来的枚举用写表叠（录制流里的写在前，撕裂镜像与重放接在后面），不只叠录制流那几次写。
 #[test]
-#[ignore = "崩溃枚举：用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 按输入哈希跑（release），提交时的快档只核它的全绿标记，平时不跑"]
+#[ignore = "崩溃枚举：用户要求时由主 agent 经门禁 checker-tier-crash-point-replay --full 按输入哈希跑（release），提交时的快档只核它的全绿标记，平时不跑"]
 fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount_with_the_checker_green(
 ) {
     const STATES_AT_MOST: u64 = 1_000_000;
@@ -179,7 +190,7 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         last_root_write: last_root_write_of_the_raise,
         versions,
     } = record_the_floor_raise_pushed_by_the_session();
-    let states = layer0_state_count_with_torn_in_place_overwrites(
+    let states = crash_state_count_with_torn_in_place_overwrites(
         &base,
         &writes_of_the_raise,
         &segments_of_the_raise,
@@ -189,39 +200,102 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         states > 0 && states <= STATES_AT_MOST,
         "推的那一串的崩溃状态数 {states} 在 10⁶ 以内"
     );
-    // 线程数与层 0 同一个来源（环境变量 `SINGLEFS_LAYER0_THREADS`，`scripts/hosts/capped.sh` 设它），挂载那一遍也按它分片。
-    let parallelism = Layer0Parallelism::from_environment();
-    // 观察者交来的 `image.writes` 是枚举用的写表（`CrashImage` 的文档：录制流里的写在前，原地覆写的撕裂镜像与重放接在后面），
-    // `image.persisted` 与它逐条对应、比录制流长。整趟枚举只有这一张表：头一次收下，之后每个状态核它一样长。
-    let mut enumerated_writes: Option<Vec<RetainedWrite>> = None;
-    let mut persisted_sets: Vec<Vec<bool>> = Vec::new();
-    let mut collect =
-        |image: &singlefs_harness::memory_pool::CrashImage<'_>,
-         _report: &singlefs_core::recovery::RecoveryReport,
-         _counts: &mut singlefs_checker_tier::crash::Layer0ObserverCounts| {
-            let table = enumerated_writes.get_or_insert_with(|| image.writes.to_vec());
-            assert_eq!(
-                table.len(),
-                image.writes.len(),
-                "每个状态交来的都是这一趟枚举用的那一张写表"
-            );
-            persisted_sets.push(image.persisted.clone());
-        };
-    // 不留进度文件：观察者把持久集合收进自己的变量，续跑接不上。
-    let tally = enumerate_layer0_in_state_slices(
+    // 每个崩溃状态可写挂载一次、挂载之后的镜像跑池级 checker：当交回镜像的观察者挂进崩溃判定库那一路（两段，用户 2026-10-13 定）：
+    // 录入段在 CPU 上挂（挂载真跑实现，豁免表的 writable-mount 那一行；按恢复镜像去重），挂不上当场 panic（记成红项、用例红）；
+    // 判段在挂完的盘上判池级 checker（配了 GPU 上卡），判干净时 `mounted_and_checker_clean` 加一。观察者交来的 `image.writes` 是枚举用的写表
+    // （录制流里的写在前、原地覆写的撕裂镜像与重放接在后面），`image.persisted` 与它逐条对应。
+    // gpu-exempt: writable-mount
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   _report: &RecoveryReport,
+                   _counts: &mut CrashPointReplayObserverCounts|
+     -> ImageAfterTheObserver {
+        assert!(
+            image.writes.len() > writes_of_the_raise.len(),
+            "那一串先把新 F 写进每块盘的系统配置（原地覆写），撕裂镜像接在录制流那 {} 次写后面：枚举用的写表 {} 次",
+            writes_of_the_raise.len(),
+            image.writes.len()
+        );
+        let mut materialized = base.clone();
+        for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
+            if *is_persisted {
+                write.contents.apply_to(
+                    materialized
+                        .devices
+                        .get_mut(&write.device)
+                        .expect("写落在池里的盘上"),
+                    write.offset,
+                );
+            }
+        }
+        let stream = SharedStream::retaining_contents();
+        let mut devices: Vec<_> = plain_devices_on(&materialized)
+            .into_iter()
+            .map(|(identity, device)| {
+                (
+                    identity,
+                    RecordingBlockDevice::with_shared_stream(identity, device, stream.clone()),
+                )
+            })
+            .collect();
+        match mount_writable_with_space_admission(
+            &pool.parameters,
+            &mut devices,
+            SpaceAdmission::JudgedByTheFormula,
+        ) {
+            Ok(_) => {
+                let disks_after_the_observer = MemoryPool {
+                    devices: devices
+                        .iter()
+                        .map(|(identity, device)| {
+                            (*identity, device.wrapped_device().image.clone())
+                        })
+                        .collect(),
+                    device_size_in_bytes: materialized.device_size_in_bytes,
+                };
+                let (writes_on_the_crash_image, _segments_of_the_mount) = writes_and_segments(
+                    &stream.retained_operations(),
+                    &fixed_geometry_of_the_384_slot_small_devices(),
+                );
+                ImageAfterTheObserver {
+                    writes_on_the_crash_image,
+                    disks_after_the_observer,
+                    invariants_judged:
+                        InvariantsJudgedOnTheImageAfterTheObserver::EveryImplementedInvariant,
+                    counter_when_the_pool_checker_is_clean: "mounted_and_checker_clean".to_string(),
+                }
+            }
+            Err(error) => panic!("挂载失败：{error:?}"),
+        }
+    };
+    let Some(tally) = enumerate_crash_states_with_every_kind_of_observer(
+        CrashPointReplayItem {
+            name: "floor_raise_pushed_by_the_session::full",
+            setting_file: THIS_FILE,
+        },
         &base,
         &writes_of_the_raise,
         &segments_of_the_raise,
         last_root_write_of_the_raise,
-        &versions,
+        CrashPointReplayVersionTable::with_a_file_only(&versions),
         &full_expansion,
-        parallelism,
-        Some(&mut collect),
-        &Layer0Resume::NoProgressFile,
-    );
+        &[],
+        // 观察者另读的输入：挂载参数（录这一串那个池的参数，几何与小盘一致）——它不随状态变，进版本与去重键时只取它的调试写法的摘要
+        &[CrashPointReplayObserverHandingBackAnImage {
+            name: "writable_mount_after_the_crash",
+            extra_inputs_digest: singlefs_harness::sha256::sha256_digest(
+                format!("{:?}", pool.parameters).as_bytes(),
+            ),
+            observe: &observe,
+            deduplication: ObserverDeduplication::ByTheRecoveredImageBytes,
+        }],
+    )
+    .judged() else {
+        return;
+    };
     assert_eq!(
         tally.states, states,
-        "每一段都展开，状态数与按层 0 口径另算的相同（原地覆写三态、其余两态）"
+        "每一段都展开，状态数与按崩溃点重放口径另算的相同（原地覆写三态、其余两态）"
     );
     assert_eq!(
         (tally.violations, tally.first_violation.clone()),
@@ -234,82 +308,18 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         "恢复之后池级 checker 0 违例：{:?}",
         tally.checker_first_violation
     );
-    assert_eq!(u64::try_from(persisted_sets.len()).expect("状态数"), states);
-    let enumerated_writes = enumerated_writes.expect("观察者至少看过一个状态");
-    assert!(
-        enumerated_writes.len() > writes_of_the_raise.len(),
-        "那一串先把新 F 写进每块盘的系统配置（原地覆写），撕裂镜像接在录制流那 {} 次写后面：枚举用的写表 {} 次",
-        writes_of_the_raise.len(),
-        enumerated_writes.len()
-    );
-    // 每个崩溃状态可写挂载一次、挂载之后的镜像跑池级 checker：按线程分片并行（观察者在调用线程上，逐个挂载太慢）。
-    let worker_threads = parallelism.worker_threads.get();
-    let chunk_length = persisted_sets.len().div_ceil(worker_threads);
-    let failures: Vec<String> = std::thread::scope(|scope| {
-        let handles: Vec<_> = persisted_sets
-            .chunks(chunk_length.max(1))
-            .map(|chunk| {
-                let base = &base;
-                let writes = &enumerated_writes;
-                let parameters = &pool.parameters;
-                scope.spawn(move || {
-                    let mut failures = Vec::new();
-                    for persisted in chunk {
-                        let mut image = base.clone();
-                        for (write, is_persisted) in writes.iter().zip(persisted) {
-                            if *is_persisted {
-                                write.contents.apply_to(
-                                    image
-                                        .devices
-                                        .get_mut(&write.device)
-                                        .expect("写落在池里的盘上"),
-                                    write.offset,
-                                );
-                            }
-                        }
-                        let mut devices = plain_devices_on(&image);
-                        match mount_writable_with_space_admission(
-                            parameters,
-                            &mut devices,
-                            SpaceAdmission::JudgedByTheFormula,
-                        ) {
-                            Ok(_) => {
-                                let mounted_image = MemoryPool {
-                                    devices: devices
-                                        .iter()
-                                        .map(|(identity, device)| (*identity, device.image.clone()))
-                                        .collect(),
-                                    device_size_in_bytes: image.device_size_in_bytes,
-                                };
-                                let violations = checker_violations_on(&mounted_image);
-                                if !violations.is_empty() {
-                                    failures.push(format!("挂载之后 checker 判红：{violations:?}"));
-                                }
-                            }
-                            Err(error) => failures.push(format!("挂载失败：{error:?}")),
-                        }
-                    }
-                    failures
-                })
-            })
-            .collect();
-        handles
-            .into_iter()
-            .flat_map(|handle| handle.join().expect("挂载那一片的线程不 panic"))
-            .collect()
-    });
     assert_eq!(
-        failures.first(),
-        None,
-        "每个崩溃状态都挂得上、挂载之后池级 checker 0 违例（{} 个状态里 {} 个不成）",
+        tally
+            .observer_counts
+            .count_named("mounted_and_checker_clean"),
         states,
-        failures.len()
+        "每个崩溃状态都挂得上、挂载之后池级 checker 0 违例"
     );
 }
 
 /// 抬 F 那一串接进崩溃放量流水线（用户 2026-09-29 定：崩溃注入之外的崩溃枚举用例都进流水线、由 GPU 判）：推之前的镜像是起点，
 /// 只录推的那一串，一个点全部展开；判器是流水线的（两遍恢复、oracle、池级 checker、记录核对器）。挂载那一遍不在流水线里，
-/// 归上面的层 0 用例。展开上限从环境取（`SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`，没设 6）。
+/// 归上面的崩溃枚举用例。展开上限从环境取（`SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`，没设 6）。
 #[cfg(feature = "verdict-store")]
 #[test]
 fn crash_amplification_of_the_floor_raise_pushed_by_the_session_is_clean() {

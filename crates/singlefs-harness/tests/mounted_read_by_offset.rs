@@ -4,8 +4,8 @@
 //! 1. 打开之后随机读 K 次 4 KiB，每次内容与写入逐字节相同；K 次读期间 journal 环一次都不扫
 //!    （块层读计数由 `singlefs_harness::read_tally` 数，整扫一遍环是 196 608 次 / 盘，读期间要恒 0）；
 //! 2. 改坏一个数据单元的一个字节 ⇒ 落在它上面的读报校验和错，**别的读不受影响**；
-//! 3. 同一个镜像冷走读（`recovery::recover`）与挂载态读逐字节相同——层 0 的每个恢复结果上再跑一遍那一半归
-//!    checker 档（主 agent 经门禁 checker-tier-layer0-replay 跑），这里只把接口（`mounted_read::mount_read_only`）做出来并钉住「同一个镜像两条路同字节」；
+//! 3. 同一个镜像冷走读（`recovery::recover`）与挂载态读逐字节相同——崩溃点重放的每个恢复结果上再跑一遍那一半归
+//!    checker 档（主 agent 经门禁 checker-tier-crash-point-replay 跑），这里只把接口（`mounted_read::mount_read_only`）做出来并钉住「同一个镜像两条路同字节」；
 //! 4. 读路径报得出「这次读了几个单元」与「位置提示过期的多跳次数」（D19（块指针的结构与宽度预算） 已定项 5 硬规则 3）。
 //!
 //! **跨单元的页**：净荷 32634 不是 4096 的整数倍 ⇒ 约 12.5% 的 4 KiB 页跨两个单元（D4（校验和位置） 已定项 5）。
@@ -656,7 +656,7 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
 ///
 /// 顺带把验收第 1 条那个对照摆出来：**挂载那一步**要全环扫一遍（两块盘各 196 608 次记录读，
 /// 因为文件后端交不出 journal 记录落点的提示），**打开之后的读**一次都不碰环。
-/// 层 0 的每个恢复结果上再跑一遍这一条归 checker 档（主 agent 经门禁 checker-tier-layer0-replay 跑）：接口是 `mount_read_only`，`reader` 换成崩溃镜像即可。
+/// 崩溃点重放的每个恢复结果上再跑一遍这一条归 checker 档（主 agent 经门禁 checker-tier-crash-point-replay 跑）：接口是 `mount_read_only`，`reader` 换成崩溃镜像即可。
 #[test]
 fn the_same_image_read_cold_and_read_through_the_mount_state_gives_the_same_bytes() {
     let mut pool = build_pool("parallel-line-two-cold-versus-mounted");

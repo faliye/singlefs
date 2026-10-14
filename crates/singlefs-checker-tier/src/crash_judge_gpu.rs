@@ -13,7 +13,9 @@
 //! 实例代号与 checkpoint_txg 低 32 位；第 4 / 5 字它的走读结局与失败点（失败点码是 [`gpu_failure_point_code`] 那一张表）；第 6 / 7 字不看那一遍的结局与失败点；
 //! 第 8..12 字池级 checker 的违例位（[`POOL_CHECKER_VIOLATED_WORDS`] 个字，128 位）；第 12 字池级 checker 走到第几步；第 13 字它判不了的原因；
 //! 第 14 / 15 字不看 journal 那一遍落到的实例代号与 checkpoint_txg 低 32 位（判决 `research/prompts/m3-crash-enumeration-merge-r2-main-verification.md`
-//! 第二节 L1-6）；第 16..20 字池级 checker 逐条不变量的「判到」位（成立或违例，与 CPU 计数里「评估过」同一口径；同一判决 L1-4）。
+//! 第二节 L1-6）；第 16..20 字池级 checker 逐条不变量的「判到」位（成立或违例，与 CPU 计数里「评估过」同一口径；同一判决 L1-4）；
+//! 第 20..24 字池级 checker 判 I-7.4 时违例细节里点名的那一条被抛弃的根（点没点名、实例代号、checkpoint_txg 低 / 高 32 位，
+//! [`ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD`]）。
 //! 这几个字号、打包表的表号与段表宽、段的展开方式码、失败点码在内核里的常量由 [`kernel_prelude_wgsl_constants`] 从 Rust 生成、
 //! 接在每个内核源码前面，不在 WGSL 里另写一份。对拍比的是 [`CrossCheckWords`]：GPU 与 CPU 两侧各由一个构造函数换出来。
 //! 判法代码的摘要 [`gpu_judge_digest`] 进判定表的键：内核改一个字，旧行留着当历史，新行另起。
@@ -26,16 +28,23 @@ use singlefs_checker::walk::ContainerCapacityKnobs;
 use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
 use crate::crash::{
-    Layer0OracleViolationKind, LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE,
-    LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE, LAYER0_RED_PASS_POOL_CHECKER,
-    LAYER0_RED_PASS_RECORD_CHECKER, RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT,
+    CrashPointReplayOracleViolationKind, CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE,
+    CRASH_POINT_REPLAY_RED_PASS_JOURNAL_IGNORED_ORACLE, CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER,
+    CRASH_POINT_REPLAY_RED_PASS_RECORD_CHECKER, RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT,
     RECORD_CHECKER_ROOT_WITHOUT_RECORD,
 };
 use crate::crash_facts::segment_expansion_code_wgsl_constants;
 use crate::crash_judge_conclusions::{
-    recovery_words_of_the_cross_check_words, RecoveryWordsOfState,
+    recovery_words_of_the_cross_check_words, AbandonedRootNamedByThePoolChecker,
+    RecoveryWordsOfState,
 };
-use crate::crash_judge_tables::{JudgeTablesWords, JUDGE_TABLE_COUNT, SEGMENT_WORDS};
+use crate::crash_judge_tables::{
+    JudgeTablesWords, CLAIMED_VERSION_LANDED_ON_BY_THE_CONSULTED_RECOVERY,
+    CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITHOUT_A_ROOT,
+    CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITH_A_ROOT, CLAIMED_VERSION_WORDS, JUDGE_TABLE_COUNT,
+    SEGMENT_WORDS,
+};
+use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 
 /// 不挂 `gpu` 特性的那一半（失败点码表、红位、走读结局的码、对拍比的那几个字与它的 CPU 一侧）在 `crate::crash_judge_conclusions`
 /// （崩溃点重放合并第三轮判决 J8：改结论的几处搬进判器一侧；失败点码表挪出 `gpu` 特性，没编进卡的 CPU 结论也带恢复字），
@@ -102,8 +111,25 @@ pub const IGNORED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD: usize =
 pub const POOL_CHECKER_JUDGED_FIRST_WORD: usize = IGNORED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD + 1;
 /// 判到位占几个字（与违例位一样宽）。
 pub const POOL_CHECKER_JUDGED_WORDS: usize = POOL_CHECKER_VIOLATED_WORDS;
-/// 每个状态的结论几个 u32：恢复内核 8 个，池级 checker 内核违例位、走到第几步、判不了的原因，不看 journal 那一遍落到的根，判到位。
-pub const VERDICT_WORDS: usize = POOL_CHECKER_JUDGED_FIRST_WORD + POOL_CHECKER_JUDGED_WORDS;
+/// 池级 checker 判 I-7.4 时违例细节里点名的那一条被抛弃的根（`crate::crash_judge_conclusions::AbandonedRootNamedByThePoolChecker`；
+/// 用户 2026-10-14 弹窗定「GPU 判器加细节输出」）：走读内核在被抛弃根那一半走完一条根、判它红而 I-7.4 此前还没红过时记下它
+/// （CPU 池级 checker 一条不变量只记第一处违例的说明）。第一个字是点没点名（[`ABANDONED_ROOT_NAMED`] 或 [`NO_ABANDONED_ROOT_NAMED`]），
+/// 之后是实例代号、checkpoint_txg 低 32 位与高 32 位（没点名时三个字都是 0）。
+pub const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD: usize =
+    POOL_CHECKER_JUDGED_FIRST_WORD + POOL_CHECKER_JUDGED_WORDS;
+pub const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD: usize =
+    ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD + 1;
+pub const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD: usize =
+    ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD + 1;
+pub const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD: usize =
+    ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD + 1;
+/// 点名那一字的两个值。
+pub const NO_ABANDONED_ROOT_NAMED: u32 = 0;
+pub const ABANDONED_ROOT_NAMED: u32 = 1;
+/// 每个状态的结论几个 u32：恢复内核 8 个，池级 checker 内核违例位、走到第几步、判不了的原因，不看 journal 那一遍落到的根，判到位，
+/// I-7.4 点名的被抛弃根。
+pub const VERDICT_WORDS: usize =
+    ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD + 1;
 
 // 违例位装得下池级 checker 的每一条不变量；读出来的是一个 u128，字数再多就装不进。
 const _: () = assert!(
@@ -131,7 +157,7 @@ const _: () = assert!(
 /// 墓碑与谱系那一遍在同一份版本清单上判 I-9.18、I-9.19、I-9.20、I-9.21（没装旋钮那一支）与 I-9.10 墓碑那一个等号（并进下标 43），
 /// I-9.29 收各版的号 → 对象出生代进一张跨版本的表判，最新根的实例表沿链读不出时那张表不比、不置位（CPU 报部分没判，第 24 批）；
 /// 一棵树的容器、一版的谱系记录、跨版本那张表、两两比不重号的墓碑总数越过上限的判不了。
-/// 下标 79 的 I-9.22 只在池级 checker 带旋钮值的入口上判，层 0 与放量走旧入口（`check_pool_image`，恒报不适用）、编的是三棵容器树都没装旋钮的
+/// 下标 79 的 I-9.22 只在池级 checker 带旋钮值的入口上判，崩溃点重放与放量走旧入口（`check_pool_image`，恒报不适用）、编的是三棵容器树都没装旋钮的
 /// 那一份内核（[`JudgeKernelSources::of_the_judge`]），那里恒不置位；对拍用例拿 [`JudgeKernelSources::of_the_judge_given_the_container_capacity_knobs`]
 /// 把旋钮值编进扫描内核时同判（第 56 批 G6）。I-9.4 第四句（同一片 inode 叶容器里记录号严格递增）走读内核一并判、并进下标 40。
 /// 下标 83 是根环线第 10j 批新立的 I-3.14（实例表每片记录形态合法）：走读内核在实例表链走到的每一片上判四格（kind 只有 0 或 1、
@@ -216,17 +242,30 @@ pub fn verdict_layout_wgsl_constants() -> String {
          const IGNORED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD: u32 = {IGNORED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD}u;\n\
          const POOL_CHECKER_JUDGED_FIRST_WORD: u32 = {POOL_CHECKER_JUDGED_FIRST_WORD}u;\n\
          const POOL_CHECKER_JUDGED_WORDS: u32 = {POOL_CHECKER_JUDGED_WORDS}u;\n\
+         const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD: u32 = {ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD}u;\n\
+         const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD: u32 = {ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD}u;\n\
+         const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD: u32 = {ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD}u;\n\
+         const ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD: u32 = {ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD}u;\n\
+         const NO_ABANDONED_ROOT_NAMED: u32 = {NO_ABANDONED_ROOT_NAMED}u;\n\
+         const ABANDONED_ROOT_NAMED: u32 = {ABANDONED_ROOT_NAMED}u;\n\
          const OUTCOME_NO_FILE: u32 = {RECOVERY_OUTCOME_CODE_NO_FILE}u;\n\
          const OUTCOME_FILE_READ: u32 = {RECOVERY_OUTCOME_CODE_FILE_READ}u;\n\
-         const OUTCOME_FAILED: u32 = {RECOVERY_OUTCOME_CODE_FAILED}u;\n"
+         const OUTCOME_FAILED: u32 = {RECOVERY_OUTCOME_CODE_FAILED}u;\n\
+         const BIT_CLAIMED_VERSION_NOT_LANDED_ON_BY_THE_RECOVERY: u32 = {}u;\n",
+        verdict_bits::CLAIMED_VERSION_NOT_LANDED_ON_BY_THE_RECOVERY
     )
 }
 
-/// 打包表的表数、表号与段表宽在内核里的常量（WGSL 源码）：表号就是 [`JudgeTablesWords::every_table_name`] 里的次序，名字大写、前面加 `T_`。
+/// 打包表的表数、表号、段表宽与恢复自称的那一版那一张表的宽与码在内核里的常量（WGSL 源码）：表号就是 [`JudgeTablesWords::every_table_name`]
+/// 里的次序，名字大写、前面加 `T_`。
 #[must_use]
 pub fn judge_table_layout_wgsl_constants() -> String {
     let mut constants = format!(
-        "const TABLE_COUNT: u32 = {JUDGE_TABLE_COUNT}u;\nconst SEGMENT_WORDS: u32 = {SEGMENT_WORDS}u;\n"
+        "const TABLE_COUNT: u32 = {JUDGE_TABLE_COUNT}u;\nconst SEGMENT_WORDS: u32 = {SEGMENT_WORDS}u;\n\
+         const CLAIMED_VERSION_WORDS: u32 = {CLAIMED_VERSION_WORDS}u;\n\
+         const CLAIMED_VERSION_LANDED_ON_BY_THE_CONSULTED_RECOVERY: u32 = {CLAIMED_VERSION_LANDED_ON_BY_THE_CONSULTED_RECOVERY}u;\n\
+         const CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITHOUT_A_ROOT: u32 = {CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITHOUT_A_ROOT}u;\n\
+         const CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITH_A_ROOT: u32 = {CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITH_A_ROOT}u;\n"
     );
     for (index, name) in JudgeTablesWords::every_table_name().iter().enumerate() {
         constants.push_str(&format!(
@@ -295,7 +334,65 @@ pub fn cross_check_words_of_gpu_verdict(words: &[u32]) -> CrossCheckWords {
     }
 }
 
-/// 一个状态的 GPU 结论字换成与 CPU `Layer0StateJudgement::red_items` 逐项同名、同序的红项；判不了的状态交回 `None`
+/// 判不了的原因字的写法：低 8 位是原因码（内核里的 `UNDECIDABLE_*`），往上是站点号（池级 checker 两个内核判不了的那一处写
+/// `UNDECIDABLE_… | (站点 << 8u)`；恢复内核与没写站点的那几处是 0）。
+pub const UNDECIDABLE_SITE_SHIFT: u32 = 8;
+
+/// 一个状态的 GPU 结论里「判不了」那一句的原因：恢复内核判不了（第 0 字判不了那一位置了）时第 1 字的原因字，池级 checker 内核判不了时
+/// [`POOL_CHECKER_UNDECIDABLE_WORD`] 那一字，各拆成原因码与站点号（[`UNDECIDABLE_SITE_SHIFT`]）。两个内核都判得了交回 `None`。
+/// 给定状态那一路 GPU 判不了一个状态时照它打进判不了那一句（`crate::crash_amplification` 的给定状态引擎）：看站点号就知道是哪一张表满了。
+#[must_use]
+pub fn undecidable_reasons_of_the_gpu_verdict(words: &[u32; VERDICT_WORDS]) -> Option<String> {
+    let reason_and_site = |kernel: &str, reason_word: u32| {
+        format!(
+            "{kernel}原因字 {reason_word:#x}（原因码 {}、站点 {}）",
+            reason_word & ((1 << UNDECIDABLE_SITE_SHIFT) - 1),
+            reason_word >> UNDECIDABLE_SITE_SHIFT
+        )
+    };
+    let mut reasons = Vec::new();
+    if words[0] & (1 << verdict_bits::UNDECIDABLE) != 0 {
+        reasons.push(reason_and_site("恢复内核", words[1]));
+    }
+    if words[POOL_CHECKER_UNDECIDABLE_WORD] != 0 {
+        reasons.push(reason_and_site(
+            "池级 checker 内核",
+            words[POOL_CHECKER_UNDECIDABLE_WORD],
+        ));
+    }
+    (!reasons.is_empty()).then(|| reasons.join("；"))
+}
+
+/// GPU 一个状态的结论字里池级 checker 判 I-7.4 时违例细节里点名的被抛弃根（与 CPU 判器从细节里读出的
+/// `crate::crash_judge_conclusions::abandoned_roots_named_in_a_pool_checker_detail` 同口径：第一处违例是被抛弃根那一半判的才点名，至多一条）。
+///
+/// # Panics
+/// 点名那一字既不是 [`ABANDONED_ROOT_NAMED`] 也不是 [`NO_ABANDONED_ROOT_NAMED`]：走读内核每个状态都写这一字，别的值说明这个状态的结论没被
+/// 走读内核写过（调用方先核 [`verdict_was_written_by_both_kernels`] 或判不了那几位）。
+#[must_use]
+pub fn abandoned_roots_named_by_the_pool_checker_of_the_gpu_verdict(
+    words: &[u32; VERDICT_WORDS],
+) -> Vec<AbandonedRootNamedByThePoolChecker> {
+    match words[ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD] {
+        NO_ABANDONED_ROOT_NAMED => Vec::new(),
+        ABANDONED_ROOT_NAMED => vec![AbandonedRootNamedByThePoolChecker {
+            instance: InstanceGeneration(
+                words[ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD],
+            ),
+            checkpoint_txg: CheckpointTxg(
+                u64::from(words[ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD])
+                    | (u64::from(
+                        words[ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD],
+                    ) << 32),
+            ),
+        }],
+        unwritten => panic!(
+            "点名的被抛弃根那一字是 {unwritten}：走读内核每个状态都写 0 或 1，这个状态的结论没被走读内核写过"
+        ),
+    }
+}
+
+/// 一个状态的 GPU 结论字换成与 CPU `CrashStateJudgement::red_items` 逐项同名、同序的红项；判不了的状态交回 `None`
 /// （崩溃放量第 ① 段收卡上结论那一段遇到它整趟停下）。红项换成判定向量的编码在 `crate::crash_judge_conclusions`。
 #[must_use]
 pub fn gpu_verdict_items(words: &[u32; VERDICT_WORDS]) -> Option<Vec<String>> {
@@ -304,20 +401,26 @@ pub fn gpu_verdict_items(words: &[u32; VERDICT_WORDS]) -> Option<Vec<String>> {
         return None;
     }
     let mut items = Vec::new();
-    for (index, kind) in Layer0OracleViolationKind::EVERY_KIND.iter().enumerate() {
+    for (index, kind) in CrashPointReplayOracleViolationKind::EVERY_KIND
+        .iter()
+        .enumerate()
+    {
         let shift = verdict_bits::CONSULTED_ORACLE_FIRST + u32::try_from(index).expect("七类");
         if bits & (1 << shift) != 0 {
             items.push(format!(
-                "{LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE}:{}",
+                "{CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE}:{}",
                 kind.name()
             ));
         }
     }
-    for (index, kind) in Layer0OracleViolationKind::EVERY_KIND.iter().enumerate() {
+    for (index, kind) in CrashPointReplayOracleViolationKind::EVERY_KIND
+        .iter()
+        .enumerate()
+    {
         let shift = verdict_bits::IGNORED_ORACLE_FIRST + u32::try_from(index).expect("七类");
         if bits & (1 << shift) != 0 {
             items.push(format!(
-                "{LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE}:{}",
+                "{CRASH_POINT_REPLAY_RED_PASS_JOURNAL_IGNORED_ORACLE}:{}",
                 kind.name()
             ));
         }
@@ -325,23 +428,25 @@ pub fn gpu_verdict_items(words: &[u32; VERDICT_WORDS]) -> Option<Vec<String>> {
     let violated = pool_checker_violated_bits(words);
     for (index, invariant) in IMPLEMENTED_INVARIANTS.iter().enumerate() {
         if violated & (1u128 << index) != 0 {
-            items.push(format!("{LAYER0_RED_PASS_POOL_CHECKER}:{invariant}"));
+            items.push(format!(
+                "{CRASH_POINT_REPLAY_RED_PASS_POOL_CHECKER}:{invariant}"
+            ));
         }
     }
     if bits & (1 << verdict_bits::ROOT_WITHOUT_RECORD) != 0 {
         items.push(format!(
-            "{LAYER0_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_ROOT_WITHOUT_RECORD}"
+            "{CRASH_POINT_REPLAY_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_ROOT_WITHOUT_RECORD}"
         ));
     }
     if bits & (1 << verdict_bits::CLAIMED_STATE_MISSING_UNIT) != 0 {
         items.push(format!(
-            "{LAYER0_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT}"
+            "{CRASH_POINT_REPLAY_RED_PASS_RECORD_CHECKER}:{RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT}"
         ));
     }
     Some(items)
 }
 
-/// GPU 一个状态的恢复字（与 CPU 那一份 `Layer0StateJudgement::recovery_words` 同一种八个字，对照逐字比）：结论字先换成对拍比的那几个字
+/// GPU 一个状态的恢复字（与 CPU 那一份 `CrashStateJudgement::recovery_words` 同一种八个字，对照逐字比）：结论字先换成对拍比的那几个字
 /// （[`cross_check_words_of_gpu_verdict`]），再取那八个。
 ///
 /// # Panics
@@ -374,7 +479,19 @@ pub fn gpu_recovery_words(words: &[u32; VERDICT_WORDS]) -> [u32; 4] {
 /// 再之后两两比与组首判那几处换成「排一次序、按序走一遍」（一个状态一条线程，那几处随条数平方长，墓碑容器那条流与分配记录满表那两条流
 /// 一次派活撞驱动的上下文切换时限），末尾接两张表：journal 组、I-5.1、I-5.4 轮着借的行号次序 `C_ROW_ORDER`（取三者最大的 `C_MAX_REFERENCES` = 4096 字）、
 /// journal 组键 `C_JOURNAL_GROUP_KEYS`（4 字一条 × `MAX_RECORDS` 2048 = 8192 字，扫描内核 I-3.10 的去重桶借它）：407 480 + 4096 + 8192 = 419 768。
-pub const SCRATCH_WORDS: usize = 419_768;
+/// 再之后走读内核主走读的 inode → 对象出生代表 `C_MAX_INODE_BIRTHS` 从 512 抬到 1024（unlink 借、借完再吸收的两个场景七百来个 inode，
+/// 在站点 13 判不了）：从原处挪到末尾（原处 2048 字空着、其后的偏移不挪），4 字一条 × 1024 = 4096 字，419 768 + 4096 = 423 864。
+/// 再之后 harness 场景交出来的镜像搬进 checker 档、配了 GPU 只由 GPU 判，几张表的上限按那几张镜像现数的条数抬（原处都空着、其后的偏移不挪，
+/// 抬过的表依次接在 423 864 之后，`crash_judge_checker_common.wgsl` 的 ⑫）：恢复内核一版的分配记录 `MAX_ALLOCATION_RECORDS` 与扫描内核一条根的
+/// 分配记录 `C_MAX_ALLOC_RECORDS` 从 2048 抬到 4096（6 字一条 24 576 字、8 字一条 32 768 字；容器树旋钮下的随机历史最多 2534 条），
+/// 跟着它的已释放记录表与「哪条候选根引用它」（5 字、2 字一条，20 480 + 8192 字）；恢复内核读一条根实例表的 `MAX_ROWS` 与扫描内核那一张
+/// `C_R_MAX_ROWS` 从 512 抬到 24 576 行（各 3 字一行，73 728 字两份；66 片实例表的那个场景 23 997 行）；走读内核最新根实例表的行
+/// `C_MAX_INSTANCE_ROWS` 从 1024 抬到 32 768 行（5 字一行 163 840 字，加桶表 65 536 字、同实例下一行 32 768 字）；主走读 inode → 对象出生代
+/// `C_MAX_INODE_BIRTHS`、扫描内核一版的 inode 记录 `D_MAX_INODE_RECORDS` 与 I-9.29 跨版本那张表 `D_MAX_OBJECT_BIRTHS` 抬到 16 384 条
+/// （4、7、6 字一条 65 536 + 114 688 + 98 304 字，各加桶表 32 768 字；点名超过一条 journal 记录的那个场景 12 582 个号）：
+/// 423 864 + 24 576 + 73 728 + 32 768 + 20 480 + 8192 + 163 840 + 65 536 + 32 768 + 73 728 + 65 536 + 32 768 + 114 688 + 32 768
+/// + 98 304 + 32 768 = 1 296 312（每个状态 5 185 248 字节，原来 1 695 456 字节）。
+pub const SCRATCH_WORDS: usize = 1_296_312;
 /// 内核的工作组大小（三个内核都是 `@workgroup_size(64)`）：派 n 个状态要 ⌈n ÷ 64⌉ 个工作组。
 pub const WORKGROUP_SIZE: usize = 64;
 /// 内核的四个绑定（`crash_judge_common.wgsl` 开头）：派活参数、打包的表、结论、草稿区。
@@ -412,10 +529,12 @@ pub fn verdict_was_written_by_both_kernels(words: &[u32; VERDICT_WORDS]) -> bool
 }
 
 /// 判法代码的摘要：内核前面那一份生成的常量（[`kernel_prelude_wgsl_constants`]）、三棵容器树都没装旋钮的那一份旋钮常量与五份内核源码，
-/// 连同一个版本前缀。
+/// 连同一个版本前缀（v7：结论加了 I-7.4 点名的被抛弃根那四个字）。旋钮值本身不进这个摘要：给定状态表那一栏旋钮值进那张表的块键
+/// （`crate::crash_amplification::GivenStatesEngine` 的块键），同一张表换了旋钮值是另一块，不复用；旋钮常量的写法（[`container_capacity_knob_wgsl_constants`]）
+/// 在这份文件里，改它照样换 GPU 判器的结论版本。
 #[must_use]
 pub fn gpu_judge_digest() -> [u8; DIGEST_BYTES] {
-    let mut message = b"gpu-crash-judge-v6\n".to_vec();
+    let mut message = b"gpu-crash-judge-v7\n".to_vec();
     message.extend_from_slice(kernel_prelude_wgsl_constants().as_bytes());
     message.extend_from_slice(
         container_capacity_knob_wgsl_constants(ContainerCapacityKnobs::PRODUCT).as_bytes(),
@@ -524,7 +643,7 @@ pub fn container_capacity_knob_wgsl_constants(knobs: ContainerCapacityKnobs) -> 
     )
 }
 
-/// 池级 checker 扫描内核的整份源码（三棵容器树都没装旋钮：层 0 与放量编的那一份）。
+/// 池级 checker 扫描内核的整份源码（三棵容器树都没装旋钮：崩溃点重放与放量编的那一份）。
 #[must_use]
 pub fn checker_scan_kernel_source() -> String {
     checker_scan_kernel_source_given_the_container_capacity_knobs(ContainerCapacityKnobs::PRODUCT)
@@ -559,8 +678,9 @@ impl JudgeKernelSources {
     }
 
     /// 同 [`Self::of_the_judge`]，三棵容器树的旋钮值编进扫描内核（第 56 批 G6）：判出的池级 checker 违例位要与
-    /// `singlefs_checker::walk::check_pool_image_given_the_container_capacity_knobs` 带同一组旋钮值逐位相同。旋钮值不进判法摘要：
-    /// 只给对拍用例判旋钮压小写出的镜像，判定入库的路径编 [`Self::of_the_judge`]。
+    /// `singlefs_checker::walk::check_pool_image_given_the_container_capacity_knobs` 带同一组旋钮值逐位相同。旋钮值不进判法摘要
+    /// （[`gpu_judge_digest`]）：判定入库的路径里给定状态表的引擎（`crate::crash_amplification::GivenStatesEngine`）照表上那一栏旋钮值编它
+    /// （用户 2026-10-14 弹窗定「给定状态表加旋钮栏」），旋钮值进那张表的块键；对拍用例拿它判旋钮压小写出的镜像。
     #[must_use]
     pub fn of_the_judge_given_the_container_capacity_knobs(knobs: ContainerCapacityKnobs) -> Self {
         Self {
@@ -655,6 +775,10 @@ mod tests {
             super::POOL_CHECKER_UNDECIDABLE_WORD,
             super::IGNORED_PASS_LANDED_INSTANCE_WORD,
             super::IGNORED_PASS_LANDED_CHECKPOINT_TXG_LOW_WORD,
+            super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD,
+            super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD,
+            super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD,
+            super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD,
         ];
         indexes.extend(
             POOL_CHECKER_VIOLATED_FIRST_WORD
@@ -909,6 +1033,26 @@ mod tests {
         );
     }
 
+    /// 判不了那一句的原因：池级 checker 内核写的原因字拆成原因码与站点号（`UNDECIDABLE_TOO_MANY_ENTRIES | (13u << 8u)` 是原因码 3、站点 13），
+    /// 恢复内核判不了时取第 1 字；两个内核都判得了没有这一句（第 1 字照旧带重放停在哪一道，不当原因读）。
+    #[test]
+    fn the_undecidable_reasons_of_a_verdict_name_the_reason_code_and_the_site_of_each_kernel() {
+        let mut words = [0u32; VERDICT_WORDS];
+        words[1] = 0x0005_0002;
+        assert_eq!(super::undecidable_reasons_of_the_gpu_verdict(&words), None);
+        words[super::POOL_CHECKER_UNDECIDABLE_WORD] = 3 | (13 << super::UNDECIDABLE_SITE_SHIFT);
+        assert_eq!(
+            super::undecidable_reasons_of_the_gpu_verdict(&words).as_deref(),
+            Some("池级 checker 内核原因字 0xd03（原因码 3、站点 13）")
+        );
+        words[0] = 1 << super::verdict_bits::UNDECIDABLE;
+        words[1] = 2;
+        assert_eq!(
+            super::undecidable_reasons_of_the_gpu_verdict(&words).as_deref(),
+            Some("恢复内核原因字 0x2（原因码 2、站点 0）；池级 checker 内核原因字 0xd03（原因码 3、站点 13）")
+        );
+    }
+
     /// 池级 checker 一份判定的违例位与判到位：违例与成立算判到，不适用与部分没判都不算。
     #[test]
     fn violated_and_judged_bits_count_holds_and_violations_as_judged_only() {
@@ -979,6 +1123,31 @@ mod tests {
             pool_checker_violated_bits(&words),
             1u128 | (1u128 << 64) | (1u128 << 127),
             "走到第几步与判不了的原因那两个字不算进违例位"
+        );
+    }
+
+    /// 结论里 I-7.4 点名的被抛弃根：点名那一字是 0 交空；是 1 交一条，checkpoint_txg 由低、高 32 位两个字拼回（高位那一字不丢）。
+    #[test]
+    fn the_abandoned_root_named_in_a_gpu_verdict_takes_its_instance_and_both_halves_of_its_txg() {
+        use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+        let mut words = [0u32; VERDICT_WORDS];
+        assert_eq!(
+            super::abandoned_roots_named_by_the_pool_checker_of_the_gpu_verdict(&words),
+            Vec::new(),
+            "点名那一字是 0：没点名"
+        );
+        words[super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD] = super::ABANDONED_ROOT_NAMED;
+        words[super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_INSTANCE_WORD] = 3;
+        words[super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_LOW_WORD] = 7;
+        words[super::ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_CHECKPOINT_TXG_HIGH_WORD] = 2;
+        assert_eq!(
+            super::abandoned_roots_named_by_the_pool_checker_of_the_gpu_verdict(&words),
+            [
+                crate::crash_judge_conclusions::AbandonedRootNamedByThePoolChecker {
+                    instance: InstanceGeneration(3),
+                    checkpoint_txg: CheckpointTxg((2u64 << 32) | 7),
+                }
+            ]
         );
     }
 

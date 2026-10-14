@@ -3,20 +3,21 @@
 //! 这个进程写的根盖掉环里最旧的有效根之后，谓词放行的槽在同一次挂载里回到空闲、下一次分配拿得到，不用重挂。
 //! 分配器那张根环表（`allocator::RootRingOccupancy`）挂载时从盘上读、mkfs 同一个进程那条会话里按 mkfs 刚写下的样子装，
 //! 之后这个进程每写一条根记一条。
-
 mod common;
+mod common_images_for_the_checker_tier;
+#[path = "common_images_for_the_checker_tier/root_ring_turn_in_one_mount.rs"]
+mod scenarios_of_root_ring_turn_in_one_mount;
 
-use common::{build_pool, format_pool, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, DataUnitIndexInFile, InstanceGeneration};
+use common::{format_pool, parameters, FIXED_WRITE_TIME_SECONDS};
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use scenarios_of_root_ring_turn_in_one_mount::content_of;
+use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::journal::back_chain_of;
-use singlefs_core::make_filesystem::TREE_TABLE_GENESIS_SLOT;
 use singlefs_core::mount::mount_writable;
 use singlefs_core::transaction::{
-    publish_first_file, publish_overwrite, publish_without_units, FirstFile, PoolVersion,
-    PoolWriter, TransactionOutput, TransactionUnit, ZeroUnitPublishPlan,
+    publish_first_file, publish_without_units, FirstFile, PoolVersion, PoolWriter,
+    ZeroUnitPublishPlan,
 };
 use singlefs_harness::history::{
     execute_history_with, ContentChoice, ContentLength, FloorTargetChoice, GeneratedHistory,
@@ -25,113 +26,13 @@ use singlefs_harness::history::{
 };
 use singlefs_harness::SharedStream;
 
-fn content_of(length: usize, seed: usize) -> Vec<u8> {
-    (0..length)
-        .map(|index| u8::try_from((index * 7 + seed) % 253).expect("小于 256"))
-        .collect()
-}
-
-fn overwrite_in_process(pool: &mut BuiltPool, instance: InstanceGeneration) -> TransactionOutput {
-    let publish_parameters = parameters();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
-    let previous = pool.output.clone();
-    let seed = usize::try_from(previous.root.checkpoint_txg.0).expect("txg 很小");
-    let output = publish_overwrite(
-        &mut writer,
-        &mut pool.allocator,
-        &previous,
-        FirstFile {
-            content: &content_of(2000 + seed, seed),
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
-        },
-        instance,
-    )
-    .expect("覆盖写");
-    pool.output = output.clone();
-    output
-}
-
-/// 镜像上判红的不变量（判不适用的不算）。
-fn violated_invariants(pool: &BuiltPool) -> Vec<&'static str> {
-    check_pool_image(&pool.memory_pool())
-        .into_iter()
-        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
-        .map(|(invariant, _)| invariant)
-        .collect()
-}
-
-/// C518 的验收：新池新建文件（txg 3）之后可写挂载一次（实例 2：写行 txg 4、暖机 txg 5），同一次挂载里连着覆盖写（txg 6 起）。
-/// 根环 R × S = 24 槽：txg 24、25、26 依次盖掉第 0 代根与两条暖机根。txg 2 的暖机根是最后一条引用 mkfs 那片第 0 版树表
-/// （50178，1 槽，第一个文件版本在 txg 3 换下）的根；txg 26 盖掉它之后环里最旧有效根是 3，那一槽按谓词回收——
-/// 同一次发布的记账行就按回收之后的数写，checker 的 I-3.1（已分配统计对得上） 在这一版上成立（修之前这一步判红）；
-/// txg 27 的数据单元（用户数据取最低的两槽空位）落回 50178。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_root_ring_turn_in_one_mount::turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it(
 ) {
-    let mut pool = build_pool("root-ring-turn-in-one-mount");
-    let mut devices = pool.reopen_recorded();
-    let mounted = mount_writable(&parameters(), &mut devices).expect("可写挂载");
-    pool.devices = Some(devices);
-    pool.allocator = mounted.allocator;
-    pool.output = mounted
-        .current
-        .into_file_version()
-        .expect("第一个文件之后重开，现行那一版带文件");
-    assert_eq!(
-        pool.output.root.checkpoint_txg,
-        CheckpointTxg(5),
-        "写行 txg 4、暖机 txg 5"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_root_ring_turn_in_one_mount::turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it,
     );
-    while pool.output.root.checkpoint_txg < CheckpointTxg(25) {
-        overwrite_in_process(&mut pool, InstanceGeneration(2));
-    }
-    for device_map in &pool.allocator.devices {
-        assert!(
-            !device_map.is_free(TREE_TABLE_GENESIS_SLOT),
-            "盘 {:?}：txg 25 之后 txg 2 的暖机根还在环里、还引用着 mkfs 那片树表",
-            device_map.device
-        );
-    }
-    let deferred_before_txg_26: Vec<u64> = pool
-        .allocator
-        .devices
-        .iter()
-        .map(|device_map| device_map.deferred_slots())
-        .collect();
-
-    let txg_26 = overwrite_in_process(&mut pool, InstanceGeneration(2));
-    assert_eq!(txg_26.root.checkpoint_txg, CheckpointTxg(26));
-    let released_by_txg_26: u64 = txg_26.released.iter().map(|placement| placement.span).sum();
-    for (device_map, deferred_before) in pool.allocator.devices.iter().zip(&deferred_before_txg_26)
-    {
-        assert!(
-            device_map.is_free(TREE_TABLE_GENESIS_SLOT),
-            "盘 {:?}：txg 26 盖掉 txg 2 之后 mkfs 那片树表按谓词回收，同一次挂载里就回到空闲",
-            device_map.device
-        );
-        assert_eq!(
-            device_map.deferred_slots() + 1,
-            deferred_before + released_by_txg_26,
-            "盘 {:?}：defer 队列加上 txg 26 换下的，减去回收的那 1 槽",
-            device_map.device
-        );
-    }
-    assert_eq!(
-        violated_invariants(&pool),
-        Vec::<&str>::new(),
-        "txg 26 这一版的记账按回收之后的数写：checker 一条都不红"
-    );
-
-    let txg_27 = overwrite_in_process(&mut pool, InstanceGeneration(2));
-    assert_eq!(
-        txg_27
-            .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
-            .slot,
-        TREE_TABLE_GENESIS_SLOT,
-        "回收回来的那一槽与旁边从没分配过的 50179 是全池最低的两槽空位：txg 27 的数据单元落在那里"
-    );
-    assert_eq!(violated_invariants(&pool), Vec::<&str>::new());
 }
 
 /// 只做过 mkfs 的池可写挂载（实例 1：写行与暖机都是零单元发布，txg 1、2）之后，调用方自己又发一次零单元发布（txg 3，不经分配器），

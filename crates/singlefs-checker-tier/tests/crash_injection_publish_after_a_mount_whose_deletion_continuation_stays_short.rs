@@ -37,7 +37,7 @@ use singlefs_harness::scenario::FIXED_WRITE_TIME_SECONDS;
 /// 窄盘的单元区槽数（改法 B1，判决 `research/prompts/m3-formal-code-b21-r1-main-verification.md` 第二节「K2 改法 b 判别力」与第三节第 2 条）：
 /// 续做照样推满仍放不下、第一个文件那条记录 nlink = 0，而这一档上建 0 个 inode 的空发布落得下、建 1 个落不下——
 /// 攻方量过 136 槽时正确判法 `Explained(UnitAreaWall)`、只看 Some 是 `Unexplained`、那一支建 0 个是 `Published`
-/// （`research/prompts/m3-formal-code-b21-r1-opus-model/out/k2b.txt` 第 2、4、6 行）。128 槽（攻方探针按 100..=320 步 2 扫出的第一个短续做盘面）
+/// （`research/prompts/m3-formal-code-b21-r1-opus-model/out/k2b.txt` 里 `slots=136` 的三行）。128 槽（攻方探针按 100..=320 步 2 扫出的第一个短续做盘面）
 /// 上建 0 个也被落点拒（`PlacementRefused`）、照样记 `UnitAreaWall`，分不开那一支建几个。
 const UNIT_AREA_SLOTS: u64 = 136;
 

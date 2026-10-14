@@ -1,27 +1,26 @@
-//! checker 档模块：crash、layer0_progress、crash_injection、crash_amplification、gpu_unit_checks
+//! checker 档模块：crash、crash_point_replay_progress、crash_injection、crash_library、crash_amplification、gpu_unit_checks
 //! 里程碑「覆盖写、释放、回退与复用」增补 3 第 3 件：崩溃注入。生成器、执行器与理想模型在第 1、2 件（`singlefs_harness::history`、
 //! `singlefs_harness::model`），切段、摆崩溃状态、重建与判定在 `singlefs_checker_tier::crash_injection`；
 //! 这里是快档（普通 `cargo test`）、多线程对拍、写死的那几段历史（段内真子集全枚举）与大档（`#[ignore]`，规模从环境变量取）。
 //!
-//! 枚举域与层 0 同一个（屏障与 FUA 写切段、段内任意真子集）；差别在怎么取：层 0 在两条写死的流上全枚举（门禁 checker-tier-layer0-replay），
+//! 枚举域与崩溃点重放同一个（屏障与 FUA 写切段、段内任意真子集）；差别在怎么取：崩溃点重放在两条写死的流上全枚举（门禁 checker-tier-crash-point-replay），
 //! 这里在随机历史上抽样。种子基是这个测试周期写死的那一个（`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，随机历史那个二进制用的是同一个），
 //! 打在报告第一行与失败信息里（随机说的是一个测试周期与下一个之间，不是每次跑重抽）。
 //! 第一截与第三截上只读一张镜像的那几样（池级 checker、两遍恢复、记录核对器）交给定状态表判（崩溃点重放合并第三轮判决 J3、J5、J6）：
-//! 编进 `verdict-store` 特性时快档、小快档与大档经崩溃点重放的引擎（`crash_amplification::GivenStatesEngine`：照本机多机配置走 GPU 或 CPU、
-//! 配了 GPU 时 CPU 同一批也判逐状态比、结论存进判定库），没编进来时在 CPU 上就地判；编进 `gpu` 特性另有两条小规模用例核 GPU 与 CPU 对得上、
-//! 往 GPU 那一侧塞一个故障对照要红。
+//! 编进 `verdict-store` 特性时快档、小快档与大档经崩溃点重放的引擎（`crash_amplification::GivenStatesEngine`：照本机多机配置只走 GPU 或只走 CPU、
+//! 结论存进判定库），没编进来时在 CPU 上就地判；编进 `gpu` 特性另有两条小规模用例：同一小批 GPU 一趟、CPU 一趟分开判，两趟的报告逐样相同，
+//! 往 GPU 那一侧塞一个故障两趟就不同。
 
 use std::collections::BTreeMap;
 use std::io::Write as _;
 
 use singlefs_checker::walk::InstanceTableOfRootRecord;
-use singlefs_checker_tier::crash::{check_records, check_records_against};
+use singlefs_checker_tier::crash::check_records_against;
 use singlefs_checker_tier::crash_injection::{
     crash_injection_campaign_from_environment, inject_crashes_into_history,
-    run_crash_injection_campaign, CrashInjectionAssertions, CrashInjectionCampaign,
-    CrashInjectionReport, CrashInjectionTally, CrashInjectionWorkerThreads, CrashPoint,
-    CrashPointDraw, CrashPointFinding, CrashStateStage, FailureImageRetention,
-    HistoryCrashInjection,
+    CrashInjectionAssertions, CrashInjectionCampaign, CrashInjectionReport, CrashInjectionTally,
+    CrashInjectionWorkerThreads, CrashPoint, CrashPointDraw, CrashPointFinding, CrashStateStage,
+    FailureImageRetention, HistoryAfterTheMakeFilesystem, HistoryCrashInjection,
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
@@ -36,8 +35,8 @@ use singlefs_harness::history::{
     HistoryStartingPoint, PerStepChecker, RollbackTargetChoice, StepOutcome, StepPosition,
 };
 use singlefs_harness::memory_pool::{
-    root_identity_written_by, writes_and_segments, CrashImage, MemoryPool, RecordCheck,
-    RecordStreamContinuity, RetainedWrite,
+    root_identity_written_by, writes_and_segments, writes_and_segments_with_stream_indexes,
+    CrashImage, MemoryPool, RecordCheck, RecordStreamContinuity, RetainedWrite,
 };
 use singlefs_harness::numeric_environment_variable::process_environment_variable;
 use singlefs_harness::segments::StepKind;
@@ -49,11 +48,14 @@ use singlefs_checker_tier::crash_amplification::{
 };
 use singlefs_checker_tier::crash_injection::{
     run_crash_injection_campaign_judging_the_given_states_with, GivenStatesConclusionsOfATable,
-    GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesJudgedOnTheCpuInPlace,
-    GivenStatesOfATable, GIVEN_STATES_TABLES_LEFT_TO_OTHER_HOSTS_NOTE,
+    GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
+    GivenStatesOfATableWithItsColumns, GIVEN_STATES_TABLES_LEFT_TO_OTHER_HOSTS_NOTE,
 };
 #[cfg(feature = "verdict-store")]
-use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
+
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+mod common_gpu_cards_of_the_caller;
 
 /// 这份测试文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
 #[cfg(feature = "verdict-store")]
@@ -88,51 +90,124 @@ fn seeds_and_scale_of(campaign: &CrashInjectionCampaign) -> String {
     )
 }
 
-/// 一批崩溃注入经崩溃点重放的引擎判给定状态表（`fault` 只给证明对照会红的那条用例），交回这一批的报告与引擎那一趟。
+/// 一批崩溃注入经崩溃点重放的引擎判给定状态表（`fault` 只给证明 GPU 与 CPU 两趟的报告会不同的那条用例），交回这一批的报告与引擎那一趟。
 #[cfg(feature = "verdict-store")]
 fn campaign_through_the_given_states_engine(
     campaign: &CrashInjectionCampaign,
     fault: FaultPutOnTheGpuSide,
 ) -> (CrashInjectionReport, GivenStatesRun) {
-    let engine = GivenStatesEngine::start_from_environment_putting_a_fault_on_the_gpu_side(
-        GivenStatesItem {
-            item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale: seeds_and_scale_of(campaign),
-        },
-        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root(),
+    campaign_through_the_given_states_engine_started(
+        campaign,
         fault,
+        EngineStart::UnderTheCallersEnvironmentGuard,
     )
-    .expect("崩溃点重放的引擎照本机配置起得来（配了 GPU 卡用不上、结论版本与编译时对不上都在这里红，不退回 CPU）");
+}
+
+/// 起引擎时拿不拿改环境的锁：拿着 [`CrashAmplificationEnvironment`] 的调用方不许再拿（同一把锁，不可重入），别的调用方要拿
+/// （同一个进程里别的用例拿着守卫换叫停文件、分片与库目录，引擎起步读环境那一刻不许撞上）。
+#[derive(Clone, Copy)]
+enum EngineStart {
+    UnderTheCallersEnvironmentGuard,
+    HoldingTheEnvironmentLock,
+}
+
+fn campaign_through_the_given_states_engine_started(
+    campaign: &CrashInjectionCampaign,
+    fault: FaultPutOnTheGpuSide,
+    start: EngineStart,
+) -> (CrashInjectionReport, GivenStatesRun) {
+    let start_the_engine = || {
+        GivenStatesEngine::start_from_environment_putting_a_fault_on_the_gpu_side(
+            GivenStatesItem {
+                item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
+                setting_file: THIS_FILE.to_string(),
+                seeds_and_scale: seeds_and_scale_of(campaign),
+            },
+            &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &repository_root(),
+            fault,
+        )
+        .expect("崩溃点重放的引擎照本机配置起得来（配了 GPU 卡用不上、结论版本与编译时对不上都在这里红，不退回 CPU）")
+    };
+    let engine = match start {
+        EngineStart::UnderTheCallersEnvironmentGuard => start_the_engine(),
+        EngineStart::HoldingTheEnvironmentLock => {
+            let _one_test_at_a_time = singlefs_checker_tier::crash_amplification::one_test_changes_the_environment_at_a_time();
+            start_the_engine()
+        }
+    };
     let report = run_crash_injection_campaign_judging_the_given_states_with(campaign, &engine);
     (report, engine.finish())
 }
 
-/// 快档、小快档与大档跑一批：编进 `verdict-store` 特性时给定状态表经崩溃点重放的引擎判（对照比不上、GPU 判不了都在这里红），
-/// 没编进来时在 CPU 上就地判（[`run_crash_injection_campaign`]）。引擎那一趟被叫停、或两台分片而别的机器的表还没导回来时，
-/// 这一批的报告不作数：打「本次未跑」那一行（`test_name` 是用例名）、交 `None`，调用方不判。
+/// 快档、小快档与大档跑一批：给定状态表经崩溃点重放的引擎判（GPU 判不了在这里红）。引擎那一趟被叫停、或两台分片而别的机器的表
+/// 还没导回来时，这一批的报告不作数：打「本次未跑」那一行（`test_name` 是用例名）、交 `None`，调用方不判。
 fn campaign_judging_the_given_states_through_the_crash_point_replay_entry(
     campaign: &CrashInjectionCampaign,
     test_name: &str,
 ) -> Option<CrashInjectionReport> {
-    #[cfg(feature = "verdict-store")]
-    {
-        let (report, run) =
-            campaign_through_the_given_states_engine(campaign, FaultPutOnTheGpuSide::NoFault);
-        assert_eq!(
-            run.red_items(),
-            Vec::<String>::new(),
-            "给定状态表那一路判红（对照比不上、GPU 判不了）；{}",
-            how_to_replay(&report)
-        );
-        report_of_a_whole_run_or_print_why_not(report, &run, test_name)
-    }
-    #[cfg(not(feature = "verdict-store"))]
-    {
-        let _ = test_name;
-        Some(run_crash_injection_campaign(campaign))
-    }
+    let (report, run) = campaign_through_the_given_states_engine_started(
+        campaign,
+        FaultPutOnTheGpuSide::NoFault,
+        EngineStart::HoldingTheEnvironmentLock,
+    );
+    assert_eq!(
+        run.red_items(),
+        Vec::<String>::new(),
+        "给定状态表那一路判红（GPU 判不了）；{}",
+        how_to_replay(&report)
+    );
+    report_of_a_whole_run_or_print_why_not(report, &run, test_name)
+}
+
+/// 一批崩溃注入经引擎判（表与结论进家目录下给定状态表那一类的判定库，判过的复用；配了 GPU 且编进了 `gpu` 特性上卡、否则 CPU），
+/// 只要报告、不看引擎那一趟的账。
+fn run_through_the_engine(campaign: &CrashInjectionCampaign) -> CrashInjectionReport {
+    campaign_through_the_given_states_engine_started(
+        campaign,
+        FaultPutOnTheGpuSide::NoFault,
+        EngineStart::HoldingTheEnvironmentLock,
+    )
+    .0
+}
+
+/// 靶向用例（手摆的一段历史、一个崩溃状态）的给定状态表交引擎判：项名与设点文件同这份文件，种子与规模写用例给的那一句。
+fn given_states_engine_for(seeds_and_scale: &str) -> GivenStatesEngine {
+    // 起引擎时拿着改环境的锁：同一个进程里别的用例拿着环境守卫换叫停文件、分片与库目录（调这一函数的用例都不拿守卫）
+    let _one_test_at_a_time =
+        singlefs_checker_tier::crash_amplification::one_test_changes_the_environment_at_a_time();
+    given_states_engine_under_the_callers_environment_guard(seeds_and_scale)
+}
+
+/// 同 [`given_states_engine_for`]，调用方自己拿着环境守卫（[`CrashAmplificationEnvironment`]，同一把锁、不可重入）：照守卫里设的环境起。
+fn given_states_engine_under_the_callers_environment_guard(
+    seeds_and_scale: &str,
+) -> GivenStatesEngine {
+    GivenStatesEngine::start_from_environment(
+        GivenStatesItem {
+            item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
+            setting_file: THIS_FILE.to_string(),
+            seeds_and_scale: seeds_and_scale.to_string(),
+        },
+        &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+        &repository_root(),
+    )
+    .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+}
+
+/// 两台分片与两个引擎的用例用的目录：家目录下流水线单元测试那一类的长期库里以用例标签命名的一份（不放开机会清空的目录，引擎拒那里的库），
+/// 里面一份 CPU 配置与几份库。这几条用例钉的是空库起跑的账，起跑先清空这一份，跑完留着不删。
+fn directory_under_the_library_home_with_a_configuration_on_the_cpu(
+    tag: &str,
+) -> (std::path::PathBuf, std::path::PathBuf) {
+    let directory =
+        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
+            &format!("crash-injection-given-states-{tag}"),
+        )
+        .expect("流水线单元测试那一类里这条用例的目录");
+    let configuration = directory.join("multi-host-on-the-cpu.env");
+    std::fs::write(&configuration, "ENABLE_GPU=0\n").expect("写得了配置");
+    (directory, configuration)
 }
 
 /// 引擎这一趟作不作数：被叫停（崩溃注入不再领新的一片）、两台分片而有表归别的机器判又还没导回来，都打「本次未跑」那一行
@@ -157,6 +232,19 @@ fn report_of_a_whole_run_or_print_why_not(
         );
         return None;
     }
+    if run.recorded_only() {
+        println!(
+            "{}",
+            gpu_not_run_line(
+                test_name,
+                &format!(
+                    "只跑了录入段（SINGLEFS_CRASH_AMPLIFICATION_STAGE=record）：{} 张给定状态表写进库、没判，判段那一趟从库里读回判",
+                    run.tally.tables_recorded_only
+                )
+            )
+        );
+        return None;
+    }
     if run.left_tables_to_the_other_hosts() {
         println!(
             "{}",
@@ -173,9 +261,105 @@ fn report_of_a_whole_run_or_print_why_not(
     Some(report)
 }
 
+/// 一趟交引擎判的给定状态表里交回占位结论的张数（[`GivenStatesConclusionsSource`] 的两种占位）：两台分片、表归别的机器判又还没导回来的，
+/// 与这一趟只跑录入段、表写进库没判的。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PlaceholderTablesOfTheRun {
+    left_to_other_hosts: u64,
+    recorded_only: u64,
+}
+
+impl PlaceholderTablesOfTheRun {
+    /// 崩溃注入一段历史或一批交回的计数里记下的那几张（崩溃注入照每张表结论的来源数）。
+    fn of_the_tally(tally: &CrashInjectionTally) -> Self {
+        Self {
+            left_to_other_hosts: tally.given_states_tables_left_to_other_hosts,
+            recorded_only: tally.given_states_tables_recorded_only,
+        }
+    }
+
+    /// 用例自己交引擎判的一张表。
+    fn of_one_table(source: GivenStatesConclusionsSource) -> Self {
+        match source {
+            GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => Self {
+                left_to_other_hosts: 0,
+                recorded_only: 0,
+            },
+            GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost => Self {
+                left_to_other_hosts: 1,
+                recorded_only: 0,
+            },
+            GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => Self {
+                left_to_other_hosts: 0,
+                recorded_only: 1,
+            },
+        }
+    }
+}
+
+/// 靶向用例经 [`given_states_engine_for`]、小批经 [`run_through_the_engine`] 照调用方的分片与选段起引擎：崩溃点重放入口两台分片跑时
+/// （本机 `SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/2`、第二台 `1/2`，不导入）归别的机器判的表、只跑录入段时的每张表，引擎交的是占位结论
+/// （判到位全 0、记录核对器两位都不红），阳性对照在它上面红，计数为 0 与「没有新发现」的断言在它上面空过。有一张占位就交这一趟为什么不作数
+/// （[`report_of_a_whole_run_or_print_why_not`] 那一类「本次未跑」的原因），调用方不判，判归导入那一趟（或判段那一趟）；一张都没有交 None，调用方照判。
+fn why_the_placeholder_conclusions_leave_this_run_unjudged(
+    placeholders: PlaceholderTablesOfTheRun,
+) -> Option<String> {
+    if placeholders.left_to_other_hosts > 0 {
+        return Some(format!(
+            "两台分片：{} 张给定状态表归别的机器判、还没导回来，引擎交的是占位结论（导入那一台的库之后再跑一趟才作数）",
+            placeholders.left_to_other_hosts
+        ));
+    }
+    if placeholders.recorded_only > 0 {
+        return Some(format!(
+            "只跑了录入段（SINGLEFS_CRASH_AMPLIFICATION_STAGE=record）：{} 张给定状态表写进库、没判，引擎交的是占位结论（判段那一趟从库里读回判）",
+            placeholders.recorded_only
+        ));
+    }
+    None
+}
+
+/// 同 [`why_the_placeholder_conclusions_leave_this_run_unjudged`]，有原因时照 [`report_of_a_whole_run_or_print_why_not`] 那一类打「本次未跑」那一行
+/// （`test_name` 是用例名）、交 true，调用方直接返回；没有交 false，调用方照判。
+fn printed_not_run_because_the_engine_gave_placeholder_conclusions(
+    placeholders: PlaceholderTablesOfTheRun,
+    test_name: &str,
+) -> bool {
+    use singlefs_harness::gpu_memory_ledger::gpu_not_run_line;
+    match why_the_placeholder_conclusions_leave_this_run_unjudged(placeholders) {
+        Some(reason) => {
+            println!("{}", gpu_not_run_line(test_name, &reason));
+            true
+        }
+        None => false,
+    }
+}
+
+/// 靶向状态这一趟判没判：判了（断言都过了），或引擎交了占位结论、没判（带上为什么，打不打「本次未跑」那一行由调用方定：
+/// 用例自己打；两台分片那条用例把两份都跑一遍，不打，免得整项被记成本次未跑）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum TargetedCaseOutcome {
+    Judged,
+    NotRunOnPlaceholderConclusions { reason: String },
+}
+
+/// 靶向用例照 [`TargetedCaseOutcome`] 收尾：没判的打「本次未跑」那一行。
+fn print_not_run_when_the_targeted_case_was_not_judged(
+    outcome: TargetedCaseOutcome,
+    test_name: &str,
+) {
+    use singlefs_harness::gpu_memory_ledger::gpu_not_run_line;
+    match outcome {
+        TargetedCaseOutcome::Judged => {}
+        TargetedCaseOutcome::NotRunOnPlaceholderConclusions { reason } => {
+            println!("{}", gpu_not_run_line(test_name, &reason));
+        }
+    }
+}
+
 /// 快档的规模：段数、每段步数与每段摆几个崩溃状态。规模与种子基都写死（种子基是这个测试周期的常量）。
 /// 每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后（代码审阅第 2 条），这一档 debug 下单跑一百来秒，标了 ignore，
-/// 用户要求时由主 agent 经门禁 checker-tier-layer0-replay `--full`（`crash-case:crash-injection-fast-tier`）在 release 下跑，提交时的快档只核它的全绿标记；普通 `cargo test` 由小快档守。
+/// 用户要求时由主 agent 经门禁 checker-tier-crash-point-replay `--full`（`crash-case:crash-injection-fast-tier`）在 release 下跑，提交时的快档只核它的全绿标记；普通 `cargo test` 由小快档守。
 const FAST_TIER_SEEDS: u64 = 24;
 const FAST_TIER_OPERATIONS_PER_HISTORY: usize = 24;
 const FAST_TIER_DRAW: CrashPointDraw = CrashPointDraw::Sampled {
@@ -215,7 +399,7 @@ fn how_to_replay(report: &CrashInjectionReport) -> String {
 ///
 /// 这一条钉两样：
 /// 1. 常量就是当前这个周期（里程碑「覆盖写、释放、回退与复用」）2026-09-20 抽出来的那个数。改成别的数 = 把这个周期的实验数据整批换掉，
-///    而 `crates/mutations.tsv` 第 146–178 行那些「这条变异必须红」与里程碑那几条验收，量的都是这一批历史；
+///    而 `crates/mutations.tsv` 里名字以「增补 3 第 2 件」起头的那些「这条变异必须红」与里程碑那几条验收，量的都是这一批历史；
 /// 2. 从它起跑出来的报告把它带了回来（报告第一行与重放那一行都带着它），判红了才重放得出来。
 ///
 /// 随机历史那个二进制的五段用的是同一个常量——两边同基，那一半由它自己那条用例钉
@@ -228,7 +412,7 @@ fn the_test_cycle_seed_base_is_the_number_drawn_for_this_cycle() {
         "种子基不是 2026-09-20 抽的那个数：它永久固定，换了就让绑在这批历史上的判红、镜像与过程文件整批作废\
          （为什么固定、要多测历史怎么追加区间，写在 SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE 的文档注释里）"
     );
-    let report = run_crash_injection_campaign(&CrashInjectionCampaign {
+    let report = run_through_the_engine(&CrashInjectionCampaign {
         first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
         seed_count: 2,
         operations_per_history: 8,
@@ -262,7 +446,7 @@ fn the_test_cycle_seed_base_is_the_number_drawn_for_this_cycle() {
 /// 计数照打，并核各条路径真的跑到了：四种落点都扣下过、段内摆出过洞、起点那一段摆到过、截在发布中间过、
 /// 截回到最后一版之前过、恢复三种结局见过两种（失败一次都不许有）、journal 记录真的施加过、模型真的比过内容。
 #[test]
-#[ignore = "快档：每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后 debug 下单跑一百来秒；用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 按 crash-case:crash-injection-fast-tier 在 release 下跑、提交时的快档只核它的全绿标记，普通 cargo test 由 crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committed 守"]
+#[ignore = "快档：每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后 debug 下单跑一百来秒；用户要求时由主 agent 经门禁 checker-tier-crash-point-replay --full 按 crash-case:crash-injection-fast-tier 在 release 下跑、提交时的快档只核它的全绿标记，普通 cargo test 由 crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committed 守"]
 fn crash_injection_fast_tier_recovers_only_into_versions_the_model_committed() {
     let started = std::time::Instant::now();
     let Some(report) = campaign_judging_the_given_states_through_the_crash_point_replay_entry(
@@ -354,7 +538,7 @@ fn assert_at_least_one_crash_state_was_judged(report: &CrashInjectionReport) {
 #[test]
 #[should_panic(expected = "这一批一个崩溃状态都没判过")]
 fn a_batch_that_judged_no_crash_state_is_red_under_the_new_findings_only_assertions() {
-    let report = run_crash_injection_campaign(&CrashInjectionCampaign {
+    let report = run_through_the_engine(&CrashInjectionCampaign {
         first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
         seed_count: 0,
         operations_per_history: 8,
@@ -555,7 +739,7 @@ fn assert_every_crash_injection_path_was_exercised(report: &CrashInjectionReport
 fn one_thread_and_four_threads_render_the_same_report() {
     let first_seed = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
     let campaign = |worker_threads: usize| {
-        run_crash_injection_campaign(&CrashInjectionCampaign {
+        run_through_the_engine(&CrashInjectionCampaign {
             first_seed,
             seed_count: 8,
             operations_per_history: 16,
@@ -568,10 +752,19 @@ fn one_thread_and_four_threads_render_the_same_report() {
             image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
             assertions: CrashInjectionAssertions::NewFindingsOnly,
         })
-        .render()
     };
-    let on_one_thread = campaign(1);
-    let on_four_threads = campaign(4);
+    let report_on_one_thread = campaign(1);
+    let report_on_four_threads = campaign(4);
+    for report in [&report_on_one_thread, &report_on_four_threads] {
+        if printed_not_run_because_the_engine_gave_placeholder_conclusions(
+            PlaceholderTablesOfTheRun::of_the_tally(&report.tally),
+            "one_thread_and_four_threads_render_the_same_report",
+        ) {
+            return;
+        }
+    }
+    let on_one_thread = report_on_one_thread.render();
+    let on_four_threads = report_on_four_threads.render();
     assert_eq!(
         on_one_thread, on_four_threads,
         "线程数不改结论（种子基 {first_seed}）"
@@ -619,11 +812,18 @@ fn every_crash_state_of_a_written_out_history_recovers_into_a_committed_version(
             sampled_in_longer_segments: 8,
         },
         None,
+        &given_states_engine_for("crash_injection_campaign_targeted_history"),
     );
     print_uncaptured(&format!(
         "── 崩溃注入：写死的一段历史，段内真子集全枚举 ──\n{}",
         injection.tally.render()
     ));
+    if printed_not_run_because_the_engine_gave_placeholder_conclusions(
+        PlaceholderTablesOfTheRun::of_the_tally(&injection.tally),
+        "every_crash_state_of_a_written_out_history_recovers_into_a_committed_version",
+    ) {
+        return;
+    }
     assert!(
         injection.new_findings.is_empty(),
         "写死的这段历史上崩溃状态判红：{:#?}",
@@ -709,11 +909,18 @@ fn crash_states_of_the_history_that_raised_the_floor_into_a_rollback_gap_are_cle
             sampled_in_longer_segments: 1,
         },
         None,
+        &given_states_engine_for("crash_injection_campaign_targeted_history"),
     );
     print_uncaptured(&format!(
         "── 崩溃注入：原先抬 F 落进回退空档那一段历史（向前回退） ──\n{}",
         injection.tally.render()
     ));
+    if printed_not_run_because_the_engine_gave_placeholder_conclusions(
+        PlaceholderTablesOfTheRun::of_the_tally(&injection.tally),
+        "crash_states_of_the_history_that_raised_the_floor_into_a_rollback_gap_are_clean_under_the_forward_rollback",
+    ) {
+        return;
+    }
     assert!(
         injection.new_findings.is_empty(),
         "一条清单外的失败都不许有：{:#?}",
@@ -783,11 +990,18 @@ fn crash_states_land_in_zero_unit_publishes_and_first_files_but_never_in_cold_st
             sampled_in_longer_segments: 1,
         },
         None,
+        &given_states_engine_for("crash_injection_campaign_targeted_history"),
     );
     print_uncaptured(&format!(
         "── 崩溃注入：零单元发布、第一个文件、冷启动与崩溃恢复抛弃根各摆几个崩溃状态 ──\n{}",
         injection.tally.render()
     ));
+    if printed_not_run_because_the_engine_gave_placeholder_conclusions(
+        PlaceholderTablesOfTheRun::of_the_tally(&injection.tally),
+        "crash_states_land_in_zero_unit_publishes_and_first_files_but_never_in_cold_starts_or_refused_crash_recoveries",
+    ) {
+        return;
+    }
     let crash_points_in = |kind: HistoryOperationKind| {
         injection
             .tally
@@ -870,7 +1084,8 @@ fn unit_write_is_still_on_disk(image: &CrashImage<'_>, write: &RetainedWrite) ->
 /// 今天的底座上把 C577 那道屏障去掉它照样造不出（探针量过，合入后验证一报告）：不可达是 C554 乙定的，不是 C577。
 /// 这一条保留原来的构造（同一串步），改钉今天的样子：整条流都落了盘的那个状态上恢复落到 (1, 4)（实例 1），流里没有实例 2 的发布，
 /// 记录核对器不判红；判别力那两次扣单元照旧，扣的是 (1, 3) 与流里最后一次发布 (1, 4)。把 C554 乙那一判关掉，挂载照旧做成、落到实例 2，
-/// 红在「落到实例 1」那一条（`crates/mutations.tsv`）。
+/// 红在「落到实例 1」那一条（`crates/mutations.tsv`）。三态（全落、扣 (1, 3) 的、扣 (1, 4) 的）一张给定状态表交崩溃点重放的引擎判
+/// （两段：表先写进判定库、读回再判，配了 GPU 走 GPU）；「落到哪一版」那几条前提是实现的恢复，照旧在 CPU 上跑。
 #[test]
 fn units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_publish_missing_a_unit_is_still_red(
 ) {
@@ -895,7 +1110,7 @@ fn units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_
     let stream = SharedStream::retaining_contents();
     let run = execute_history_with(&history, execution, &stream, &mut |_| {});
     assert_eq!(run.ending, HistoryEnding::Completed, "这段历史跑完");
-    let (writes, _segments) = writes_and_segments(
+    let (writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
         &stream.retained_operations(),
         &execution.device_width.fixed_geometry(),
     );
@@ -926,32 +1141,30 @@ fn units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_
         publishes.iter().all(|((instance, _), _)| *instance <= 1),
         "流里只有 mkfs（实例 0）与实例 1 的发布、没有实例 2 的：{publishes:?}"
     );
-    assert_eq!(
-        check_records(&every_write_landed, report.effective_root),
-        RecordCheck::default(),
-        "整条流都落了盘：记录核对器一条都不判红"
-    );
 
     let last_overwrite = publishes.last().expect("流里至少一次发布").0;
-    for kept in [(1, 3), last_overwrite] {
+    let kept_publishes = [(1, 3), last_overwrite];
+    // 整条流都落了盘的那一态，再接两态：没被抛弃的那两次发布各扣下一个数据单元的两份（两块盘各一份）
+    let mut persisted_sets = vec![vec![true; writes.len()]];
+    for kept in kept_publishes {
         let data_unit = *units_of(kept)
             .iter()
             .find(|unit| writes[**unit].length_in_bytes() == DATA_UNIT_BYTES)
             .unwrap_or_else(|| panic!("{kept:?} 那次发布写了数据单元"));
-        // 这次发布写在这个偏移上的每一份（两块盘各一份）都扣下。
         let mut persisted = vec![true; writes.len()];
         for unit in units_of(kept) {
             if writes[*unit].offset == writes[data_unit].offset {
                 persisted[*unit] = false;
             }
         }
-        let a_kept_unit_withheld = CrashImage {
-            base: &base,
-            writes: &writes,
-            persisted,
-        };
-        let recovery_with_the_unit_withheld =
-            recover(&a_kept_unit_withheld, JournalPolicy::Consult);
+        let recovery_with_the_unit_withheld = recover(
+            &CrashImage {
+                base: &base,
+                writes: &writes,
+                persisted: persisted.clone(),
+            },
+            JournalPolicy::Consult,
+        );
         assert!(
             recovery_with_the_unit_withheld
                 .effective_root
@@ -959,12 +1172,51 @@ fn units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_
             "恢复落到的那一版不早于 {kept:?}：{:?}",
             recovery_with_the_unit_withheld.effective_root
         );
+        persisted_sets.push(persisted);
+    }
+    // 三态一张给定状态表交崩溃点重放的引擎判（两段：表先写进判定库、读回再判，配了 GPU 走 GPU；用户 2026-10-13 定「能走两段的都走两段」）
+    let history_after_the_make_filesystem = HistoryAfterTheMakeFilesystem::of(
+        &writes,
+        &segments,
+        &stream_indexes,
+        run.operations_written_by_make_filesystem,
+        execution,
+    );
+    let conclusions =
+        given_states_engine_for("crash_recovery_abandoning_the_newest_root_then_three_overwrites")
+            .judge_the_given_states(&GivenStatesOfATable {
+                table_name: "every-write-landed-and-a-kept-unit-withheld".to_string(),
+                base: history_after_the_make_filesystem.base(),
+                writes: history_after_the_make_filesystem.writes(),
+                segments: history_after_the_make_filesystem.segments(),
+                seams: &[],
+                persisted_sets: persisted_sets
+                    .iter()
+                    .map(|persisted| {
+                        history_after_the_make_filesystem.persisted_set_of_the_table(persisted)
+                    })
+                    .collect(),
+            })
+            .unwrap_or_else(|reason| panic!("引擎判得了这张表：{reason}"));
+    if printed_not_run_because_the_engine_gave_placeholder_conclusions(
+        PlaceholderTablesOfTheRun::of_one_table(conclusions.source),
+        "units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_publish_missing_a_unit_is_still_red",
+    ) {
+        return;
+    }
+    assert_eq!(
+        conclusions.states.len(),
+        1 + kept_publishes.len(),
+        "判器逐状态交回结论"
+    );
+    assert_eq!(
+        conclusions.states[0].record_check(),
+        RecordCheck::default(),
+        "整条流都落了盘：记录核对器一条都不判红"
+    );
+    for (kept, conclusion) in kept_publishes.iter().zip(&conclusions.states[1..]) {
         assert!(
-            check_records(
-                &a_kept_unit_withheld,
-                recovery_with_the_unit_withheld.effective_root
-            )
-            .claimed_state_missing_unit,
+            conclusion.record_check().claimed_state_missing_unit,
             "{kept:?} 没被抛弃，它的数据单元两份都没落，照判红"
         );
     }
@@ -1157,11 +1409,18 @@ fn crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_i
         UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
         FAST_TIER_DRAW,
         None,
+        &given_states_engine_for("crash_injection_campaign_targeted_history"),
     );
     print_uncaptured(&format!(
         "── 崩溃注入：种子基 + 2 那段历史，C554 乙之后找「恢复落到由记录重建的一版、它的实例表抛弃了单元被复用的发布」那一形 ──\n{}",
         injection.tally.render()
     ));
+    if printed_not_run_because_the_engine_gave_placeholder_conclusions(
+        PlaceholderTablesOfTheRun::of_the_tally(&injection.tally),
+        "crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_its_instance_table_abandons",
+    ) {
+        return;
+    }
     let crash_recovery_outcomes = outcomes_of_the_crash_recovery_steps(&history);
     assert!(
         !crash_recovery_outcomes.is_empty()
@@ -1205,6 +1464,7 @@ fn on_the_whole_stream_a_kept_publish_missing_a_unit_under_a_version_rebuilt_fro
         UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
         FAST_TIER_DRAW,
         None,
+        &given_states_engine_for("crash_injection_campaign_targeted_history"),
     );
     let crash_recovery_outcomes = outcomes_of_the_crash_recovery_steps(&history);
     assert!(
@@ -1230,13 +1490,19 @@ fn on_the_whole_stream_a_kept_publish_missing_a_unit_under_a_version_rebuilt_fro
 /// 各类操作各摆到几个照打进报告，给人看。
 #[test]
 fn crash_states_land_inside_rollbacks_and_floor_raises() {
-    let report = run_crash_injection_campaign(&rollback_sampling_campaign(
+    let report = run_through_the_engine(&rollback_sampling_campaign(
         CrashInjectionWorkerThreads::from_the_environment(),
     ));
     let rendered = report.render();
     print_uncaptured(&format!(
         "── 崩溃注入：偏向抬 F 之后回退的取样点 ──\n{rendered}"
     ));
+    if printed_not_run_because_the_engine_gave_placeholder_conclusions(
+        PlaceholderTablesOfTheRun::of_the_tally(&report.tally),
+        "crash_states_land_inside_rollbacks_and_floor_raises",
+    ) {
+        return;
+    }
     judge_crash_injection_report(&report);
 }
 
@@ -1331,6 +1597,7 @@ fn drawing_crash_points_does_not_change_the_generated_history() {
             crash_points_per_history: 0,
         },
         None,
+        &given_states_engine_for("crash_injection_campaign_targeted_history"),
     );
     let with_five = inject_crashes_into_history(
         &history,
@@ -1339,6 +1606,7 @@ fn drawing_crash_points_does_not_change_the_generated_history() {
             crash_points_per_history: 5,
         },
         None,
+        &given_states_engine_for("crash_injection_campaign_targeted_history"),
     );
     assert_eq!(with_five.seed, HistorySeed(5));
     assert_eq!(
@@ -1619,6 +1887,19 @@ fn finding_on_the_crash_image(injection: &HistoryCrashInjection) -> &CrashPointF
 #[test]
 fn a_crash_state_with_the_root_but_neither_of_its_records_is_a_finding_of_the_record_checker_alone()
 {
+    print_not_run_when_the_targeted_case_was_not_judged(
+        the_root_without_either_of_its_records_is_found_by_the_record_checker_alone(
+            &given_states_engine_for("crash_injection_campaign_targeted_history"),
+        ),
+        "a_crash_state_with_the_root_but_neither_of_its_records_is_a_finding_of_the_record_checker_alone",
+    );
+}
+
+/// [`a_crash_state_with_the_root_but_neither_of_its_records_is_a_finding_of_the_record_checker_alone`] 那一个靶向状态交 `judge` 判：
+/// 引擎交了占位结论就不判、交回为什么（[`why_the_placeholder_conclusions_leave_this_run_unjudged`]）。
+fn the_root_without_either_of_its_records_is_found_by_the_record_checker_alone(
+    judge: &dyn GivenStatesJudge,
+) -> TargetedCaseOutcome {
     let history = history_of_a_first_file_and_two_overwrites();
     let (writes, segments) = writes_and_segments_of(&history);
     let first_write = segments[21][0];
@@ -1649,11 +1930,17 @@ fn a_crash_state_with_the_root_but_neither_of_its_records_is_a_finding_of_the_re
             withheld_among_them: &[0, 1],
         },
         None,
+        judge,
     );
     print_uncaptured(&format!(
         "── 崩溃注入：记录核对器第一条判据的靶向崩溃状态 ──\n{}",
         injection.tally.render()
     ));
+    if let Some(reason) = why_the_placeholder_conclusions_leave_this_run_unjudged(
+        PlaceholderTablesOfTheRun::of_the_tally(&injection.tally),
+    ) {
+        return TargetedCaseOutcome::NotRunOnPlaceholderConclusions { reason };
+    }
     assert_eq!(injection.crash_points.len(), 1, "只摆写死的那一个崩溃状态");
     assert_eq!(
         injection.tally.record_root_without_record, 1,
@@ -1672,6 +1959,7 @@ fn a_crash_state_with_the_root_but_neither_of_its_records_is_a_finding_of_the_re
             && finding.observation.model_disagreement.is_none(),
         "池级 checker、RefFS 与模型都不红，这一条新发现只来自记录核对器：{finding:#?}"
     );
+    TargetedCaseOutcome::Judged
 }
 
 /// 记录核对器第二条判据（恢复自称的那一版不早于某次发布、而那次发布写出的某个单元两份都不在）接进崩溃注入之后真的判得出东西（K3-⑨）：
@@ -1685,6 +1973,19 @@ fn a_crash_state_with_the_root_but_neither_of_its_records_is_a_finding_of_the_re
 #[test]
 fn a_crash_state_landing_after_a_publish_whose_data_unit_never_landed_is_a_finding_of_the_record_checker(
 ) {
+    print_not_run_when_the_targeted_case_was_not_judged(
+        the_claimed_state_missing_a_data_unit_is_found_by_the_record_checker(
+            &given_states_engine_for("crash_injection_campaign_targeted_history"),
+        ),
+        "a_crash_state_landing_after_a_publish_whose_data_unit_never_landed_is_a_finding_of_the_record_checker",
+    );
+}
+
+/// [`a_crash_state_landing_after_a_publish_whose_data_unit_never_landed_is_a_finding_of_the_record_checker`] 那一个靶向状态交 `judge` 判：
+/// 引擎交了占位结论就不判、交回为什么（[`why_the_placeholder_conclusions_leave_this_run_unjudged`]）。
+fn the_claimed_state_missing_a_data_unit_is_found_by_the_record_checker(
+    judge: &dyn GivenStatesJudge,
+) -> TargetedCaseOutcome {
     let history = history_of_a_first_file_and_two_overwrites();
     let (writes, segments) = writes_and_segments_of(&history);
     let first_write = segments[12][0];
@@ -1724,11 +2025,17 @@ fn a_crash_state_landing_after_a_publish_whose_data_unit_never_landed_is_a_findi
             withheld_among_them: &[0, 1],
         },
         None,
+        judge,
     );
     print_uncaptured(&format!(
         "── 崩溃注入：记录核对器第二条判据的靶向崩溃状态 ──\n{}",
         injection.tally.render()
     ));
+    if let Some(reason) = why_the_placeholder_conclusions_leave_this_run_unjudged(
+        PlaceholderTablesOfTheRun::of_the_tally(&injection.tally),
+    ) {
+        return TargetedCaseOutcome::NotRunOnPlaceholderConclusions { reason };
+    }
     assert_eq!(injection.crash_points.len(), 1, "只摆写死的那一个崩溃状态");
     assert_eq!(
         injection.tally.record_claimed_state_missing_unit, 1,
@@ -1746,6 +2053,65 @@ fn a_crash_state_landing_after_a_publish_whose_data_unit_never_landed_is_a_findi
         finding.observation.model_disagreement.is_none(),
         "恢复落到 (1, 4) 并读回它的内容，模型认：{finding:#?}"
     );
+    TargetedCaseOutcome::Judged
+}
+
+/// 两台分片的那一趟（崩溃点重放入口双机跑时给本机设 `SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/2`、给第二台设 `1/2`，各一份库、不导入），
+/// 照这一趟造：环境守卫里照一份单机 CPU 配置、两份分片各起一个引擎（各一份起跑清空的库，库里没有可复用的结论），各判记录核对器那两条阳性对照的
+/// 靶向状态。每张给定状态表恰好归一台，所以每条阳性对照在两份里至少有一份拿到占位结论：那一份不判、交回为什么（用例自己跑时打「本次未跑」，
+/// 这一条不打）；判了的那一份阳性照判（过了断言才交回「判了」）。判归导入那一趟，这一条不跑导入（导入那一趟第二台的库里缺的表另有一处毛病，
+/// 调查报告「另看到的」第 1 条）。
+/// 判别力：断言阳性之前不核归别的机器判的占位（`crates/mutations.tsv` 那一行），首截表归另一台的那一份红在阳性对照的计数断言上（`left: 0 right: 1`）。
+#[test]
+fn the_record_checker_positive_controls_are_not_run_on_the_share_given_placeholder_conclusions_of_the_other_host(
+) {
+    use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
+    /// 一条记录核对器阳性对照：把它那一个靶向状态交一个判器判。
+    type RecordCheckerPositiveControl = fn(&dyn GivenStatesJudge) -> TargetedCaseOutcome;
+    let (directory, configuration) =
+        directory_under_the_library_home_with_a_configuration_on_the_cpu(
+            "record-checker-positive-controls-under-two-shares",
+        );
+    let positive_controls: [(&str, RecordCheckerPositiveControl); 2] = [
+        (
+            "the_root_without_either_of_its_records_is_found_by_the_record_checker_alone",
+            the_root_without_either_of_its_records_is_found_by_the_record_checker_alone,
+        ),
+        (
+            "the_claimed_state_missing_a_data_unit_is_found_by_the_record_checker",
+            the_claimed_state_missing_a_data_unit_is_found_by_the_record_checker,
+        ),
+    ];
+    for (positive_control_name, positive_control) in positive_controls {
+        let mut outcome_of_each_share = Vec::new();
+        for share in ["0/2", "1/2"] {
+            let library = directory.join(format!(
+                "{positive_control_name}-share-{}",
+                share.replace('/', "-of-")
+            ));
+            let environment = CrashAmplificationEnvironment::cleared_then_set(&[
+                ("SINGLEFS_MULTI_HOST_CONFIG", configuration.as_os_str()),
+                ("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", library.as_os_str()),
+                (
+                    "SINGLEFS_CRASH_AMPLIFICATION_SHARE",
+                    std::ffi::OsStr::new(share),
+                ),
+            ]);
+            let engine = given_states_engine_under_the_callers_environment_guard(
+                "crash_injection_campaign_targeted_history",
+            );
+            drop(environment);
+            outcome_of_each_share.push((share, positive_control(&engine)));
+        }
+        // 不打「本次未跑」那一行：占位那一份是这一条要的样子，打了整项会被入口记成本次未跑
+        assert!(
+            outcome_of_each_share.iter().any(|(_, outcome)| matches!(
+                outcome,
+                TargetedCaseOutcome::NotRunOnPlaceholderConclusions { .. }
+            )),
+            "{positive_control_name}：每张表恰好归一台，两份里至少有一份拿到占位结论、不判：{outcome_of_each_share:?}"
+        );
+    }
 }
 
 /// 崩溃注入第一截交给记录核对器的写表取整条历史录制流（`crash_injection.rs` 第一截那一次 `check_records_against`），
@@ -1943,11 +2309,18 @@ fn a_crash_state_missing_a_unit_of_a_publish_whose_root_left_the_ring_is_a_findi
             withheld_among_them: &[4, 5],
         },
         None,
+        &given_states_engine_for("crash_injection_campaign_targeted_history"),
     );
     print_uncaptured(&format!(
         "── 崩溃注入：只有记录核对器判得出的第二条判据靶向崩溃状态 ──\n{}",
         injection.tally.render()
     ));
+    if printed_not_run_because_the_engine_gave_placeholder_conclusions(
+        PlaceholderTablesOfTheRun::of_the_tally(&injection.tally),
+        "a_crash_state_missing_a_unit_of_a_publish_whose_root_left_the_ring_is_a_finding_of_the_record_checker_alone",
+    ) {
+        return;
+    }
     assert_eq!(injection.crash_points.len(), 1, "只摆写死的那一个崩溃状态");
     assert_eq!(
         injection.tally.record_claimed_state_missing_unit, 1,
@@ -1968,37 +2341,96 @@ fn a_crash_state_missing_a_unit_of_a_publish_whose_root_left_the_ring_is_a_findi
     );
 }
 
-/// 写一份开 GPU 的多机配置，显卡先后照抄调用方给这个进程的那一份（清场之下要清场之后那一份显卡先后：用例自己写上，
-/// `gpu_card_configuration::card_priority_lines_of_the_caller`；不读此刻的环境）。
+/// 写一份开 GPU 的多机配置，只写开关：显卡先后照调用方给这个进程的那一份、经环境变量交给引擎（[`settings_of_an_engine_on_the_gpu`] 的
+/// `cards`，`common_gpu_cards_of_the_caller` 文件头写了为什么不抄进配置）。
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 fn write_a_configuration_with_the_gpu_enabled(configuration: &std::path::Path) {
-    let cards = singlefs_checker_tier::crash_amplification::card_priority_lines_of_the_caller(
-        &repository_root(),
-    )
-    .expect("本机的多机配置读得了");
-    std::fs::write(configuration, format!("ENABLE_GPU=1\n{cards}")).expect("写得了开 GPU 的配置");
+    std::fs::write(configuration, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
 }
 
-/// 开 GPU 的小规模一批（两段、每段 8 步、每段 2 个崩溃状态）：这一趟自己写一份开 GPU 的多机配置、在环境守卫里跑（清掉、跑完还原一趟读的变量），
-/// 库是临时的。给定状态表交 GPU 判器判、CPU 判器同一批也判；`fault` 塞在 GPU 那一侧。
+/// 调用方给这个进程的显卡先后（清场之下是清场之后那一份；不读此刻的环境），交 [`settings_of_an_engine_on_the_gpu`] 设成环境变量。
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+fn cards_of_the_caller() -> String {
+    common_gpu_cards_of_the_caller::card_priority_value_of_the_caller(&repository_root())
+}
+
+/// 调用方给这个进程的机器角色（`GpuConfigurationOfTheCaller`：进程第一次换环境之前的那一份，卡池照它挑卡；不读此刻的环境）。
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+fn host_of_the_caller() -> singlefs_checker_tier::crash_amplification::CardHost {
+    singlefs_checker_tier::gpu_card_configuration::GpuConfigurationOfTheCaller::of_this_process()
+        .host()
+        .expect("调用方给的机器角色是 local 或 peer（写错时卡池起不来，用例开头起池那一步先红）")
+}
+
+/// 用例在环境守卫里起开 GPU 的引擎时设的变量：多机配置指到用例写的那一份（[`write_a_configuration_with_the_gpu_enabled`]），
+/// 这台机器的角色写 `host`（用例传 [`host_of_the_caller`]）。守卫把一趟读的变量连同机器角色一起清掉，引擎取卡按此刻的环境认这台机器、
+/// 卡池按调用方那一份认：不把角色设回去，第二台（双机驱动送 `SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer`）上的引擎认成本机，
+/// 拿配置里本机那几张卡去对第二台的卡池，两份显卡配置对不上。显卡先后写 `cards`（用例传 [`cards_of_the_caller`]）：配置只写开关，
+/// 清场之下引擎要清场之后那一份显卡先后，环境变量设了（空串也算）就照它。
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+fn settings_of_an_engine_on_the_gpu<'settings>(
+    configuration: &'settings std::path::Path,
+    host: singlefs_checker_tier::crash_amplification::CardHost,
+    cards: &'settings str,
+) -> [(&'static str, &'settings std::ffi::OsStr); 3] {
+    use singlefs_checker_tier::gpu_card_configuration::{
+        CARDS_BY_PRIORITY_KEY, HOST_ROLE_ENVIRONMENT_VARIABLE,
+        MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+    };
+    [
+        (
+            MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+            configuration.as_os_str(),
+        ),
+        (
+            HOST_ROLE_ENVIRONMENT_VARIABLE,
+            std::ffi::OsStr::new(host.name()),
+        ),
+        (CARDS_BY_PRIORITY_KEY, std::ffi::OsStr::new(cards)),
+    ]
+}
+
+/// 第二台上起的进程（调用方给的角色是 `peer`）在环境守卫里起开 GPU 的引擎：守卫里此刻的环境认的这台机器也是第二台，
+/// 与卡池认的那一台相同。不要卡、不起引擎，只核守卫设好之后引擎取卡读到的机器角色；本机上跑照样判得出（角色由参数给，不靠这个进程在哪台机器上起）。
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+#[test]
+fn the_environment_of_an_engine_on_the_gpu_keeps_the_peer_role_of_the_caller() {
+    use singlefs_checker_tier::crash_amplification::{CardHost, CrashAmplificationEnvironment};
+    let configuration = std::path::Path::new("multi-host-with-gpu-of-the-peer.env");
+    let environment = CrashAmplificationEnvironment::cleared_then_set(
+        &settings_of_an_engine_on_the_gpu(configuration, CardHost::Peer, ""),
+    );
+    let host_seen_by_the_engine = CardHost::of_this_process();
+    drop(environment);
+    assert_eq!(
+        host_seen_by_the_engine,
+        Ok(CardHost::Peer),
+        "调用方是第二台：守卫里引擎取卡认的也要是第二台，不然拿本机那几张卡去对第二台的卡池"
+    );
+}
+
+/// 开 GPU 的小规模一批（两段、每段 8 步、每段 2 个崩溃状态）：这一趟自己写一份开 GPU 的多机配置、在环境守卫里跑（清掉、跑完还原一趟读的变量）。
+/// 库是家目录下流水线单元测试那一类里以用例标签命名的那一份、起跑先清空（上一趟或同一进程里别的用例在给定状态表那一类的长期库里
+/// 判过同一批表，这一趟就全复用、一张表都不判，塞在 GPU 那一侧的故障碰不到任何状态），跑完留着。给定状态表只交 GPU 判器判；`fault` 塞在 GPU 那一侧。
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 fn small_campaign_judged_on_the_gpu(
     tag: &str,
     fault: FaultPutOnTheGpuSide,
 ) -> (CrashInjectionReport, GivenStatesRun) {
     use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
-    let directory = std::env::temp_dir().join(format!(
-        "singlefs-crash-injection-given-states-on-the-gpu-{tag}-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&directory);
-    std::fs::create_dir_all(&directory).expect("建得了临时目录");
+    let directory =
+        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
+            &format!("crash-injection-given-states-on-the-gpu-{tag}"),
+        )
+        .expect("流水线单元测试那一类里这条用例的目录");
     let configuration = directory.join("multi-host-with-gpu.env");
     write_a_configuration_with_the_gpu_enabled(&configuration);
-    let environment = CrashAmplificationEnvironment::cleared_then_set(&[(
-        "SINGLEFS_MULTI_HOST_CONFIG",
-        configuration.as_os_str(),
-    )]);
+    let library = directory.join("library");
+    let cards = cards_of_the_caller();
+    let mut settings =
+        settings_of_an_engine_on_the_gpu(&configuration, host_of_the_caller(), &cards).to_vec();
+    settings.push(("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", library.as_os_str()));
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&settings);
     let judged = campaign_through_the_given_states_engine(
         &CrashInjectionCampaign {
             first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
@@ -2016,67 +2448,101 @@ fn small_campaign_judged_on_the_gpu(
         fault,
     );
     drop(environment);
-    let _ = std::fs::remove_dir_all(&directory);
     judged
 }
 
-/// 验收第 1 条（崩溃点重放合并第三轮判决 J6，用户 2026-10-10 定「第一截与第三截都上 GPU」）：配了 GPU 时第一截与第三截的给定状态表由 GPU 判器判、
-/// CPU 判器同一批也判，逐状态比红项（池级 checker 违例逐条、记录核对器两条）与两遍各自落到的根、结局、失败点，一个都不差；
-/// 比过的状态不是 0（不是空判）。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」；借不到显存时引擎已打「本次未跑」那一行。
+/// 同一小批在 CPU 上经引擎判（这一趟自己写一份 `ENABLE_GPU=0` 的多机配置，库同 [`small_campaign_judged_on_the_gpu`]：用例标签命名、起跑清空、跑完留着）：
+/// GPU 那一趟的对拍对象，两趟各判各的、各写各的库。
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+fn small_campaign_judged_on_the_cpu(tag: &str) -> (CrashInjectionReport, GivenStatesRun) {
+    let (directory, configuration) =
+        directory_under_the_library_home_with_a_configuration_on_the_cpu(&format!(
+            "on-the-cpu-{tag}"
+        ));
+    let library = directory.join("library");
+    campaign_through_the_engine_with(
+        &small_campaign_judged_on_the_cpu_through_the_engine(),
+        &[
+            ("SINGLEFS_MULTI_HOST_CONFIG", configuration.as_os_str()),
+            ("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", library.as_os_str()),
+        ],
+    )
+}
+
+/// 验收第 1 条（用户 2026-10-10 定「第一截与第三截都上 GPU」；用户 2026-10-11 定 GPU 与 CPU 的对拍是独立的两趟，一段里 CPU 不既跑数据又对拍）：
+/// 同一小批一趟配了 GPU、第一截与第三截的给定状态表由 GPU 判器判，一趟没开 GPU、由 CPU 判器判，各写各的库；两趟的崩溃注入报告逐样相同
+/// （摆出的状态数、已知红、新发现），两趟都没有判不了的。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 #[test]
-fn a_small_campaign_judged_on_the_gpu_agrees_with_the_cpu_judge_state_by_state() {
-    use singlefs_checker_tier::crash_amplification::{CrossCheckOfTheGivenStates, JudgedBy};
+fn a_small_campaign_judged_in_a_gpu_run_and_in_a_cpu_run_reports_the_same() {
+    use singlefs_checker_tier::crash_amplification::JudgedBy;
     use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
     if gpu_card_pool_or_report_not_run(
-        "a_small_campaign_judged_on_the_gpu_agrees_with_the_cpu_judge_state_by_state",
+        "a_small_campaign_judged_in_a_gpu_run_and_in_a_cpu_run_reports_the_same",
     )
     .is_none()
     {
         return;
     }
-    let (report, run) = small_campaign_judged_on_the_gpu("agrees", FaultPutOnTheGpuSide::NoFault);
-    assert_eq!(run.judged_by, JudgedBy::GpuJudge, "配了 GPU：GPU 判器判");
+    let (gpu_report, gpu_run) =
+        small_campaign_judged_on_the_gpu("agrees", FaultPutOnTheGpuSide::NoFault);
+    let (cpu_report, cpu_run) = small_campaign_judged_on_the_cpu("agrees");
     assert_eq!(
-        run.cross_check,
-        CrossCheckOfTheGivenStates::Compared,
-        "配了 GPU、没被授权跳过：对照照跑"
+        gpu_run.judged_by,
+        JudgedBy::GpuJudge,
+        "配了 GPU 的那一趟：GPU 判器判"
+    );
+    assert_eq!(
+        cpu_run.judged_by,
+        JudgedBy::CpuJudge,
+        "没开 GPU 的那一趟：CPU 判器判"
     );
     assert!(
-        report.tally.crash_points > 0 && report.tally.second_crash_points > 0,
+        gpu_report.tally.crash_points > 0 && gpu_report.tally.second_crash_points > 0,
         "两截都摆出了状态"
     );
-    assert_eq!(
-        run.tally.cross_check_states_compared,
-        report.tally.crash_points + report.tally.second_crash_points,
-        "第一截与第三截的每个状态都比过"
+    assert!(
+        gpu_run.tally.states_judged_by_the_gpu_here > 0 && gpu_run.tally.states_reused == 0,
+        "GPU 那一趟从空库起、每个状态都是这一趟在卡上判的，不是复用的：{:?}",
+        gpu_run.tally
+    );
+    assert!(
+        cpu_run.tally.states_judged_by_the_cpu_here > 0 && cpu_run.tally.states_reused == 0,
+        "CPU 那一趟从空库起、每个状态都是这一趟判的，不是复用的：{:?}",
+        cpu_run.tally
     );
     assert_eq!(
-        run.red_items(),
+        gpu_run.red_items(),
         Vec::<String>::new(),
-        "cross_check_disagreements=0、GPU 都判得了"
+        "GPU 那一趟都判得了"
+    );
+    assert_eq!(cpu_run.red_items(), Vec::<String>::new());
+    assert_eq!(
+        gpu_report, cpu_report,
+        "GPU 那一趟与 CPU 那一趟的报告逐样相同"
     );
 }
 
-/// 验收第 1 条的另一半：往 GPU 那一侧塞一个已知故障（每张表第一个状态的第一条不变量违例位翻过来），对照要比得出来、判红。
+/// 上一条的判别力：往 GPU 那一侧塞一个已知故障（每张表第一个状态的第一条不变量违例位翻过来），GPU 那一趟的报告与 CPU 那一趟不同。
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 #[test]
-fn a_fault_put_on_the_gpu_side_of_a_small_campaign_turns_the_cross_check_red() {
+fn a_fault_put_on_the_gpu_side_of_a_small_campaign_makes_the_gpu_run_differ_from_the_cpu_run() {
     use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
     if gpu_card_pool_or_report_not_run(
-        "a_fault_put_on_the_gpu_side_of_a_small_campaign_turns_the_cross_check_red",
+        "a_fault_put_on_the_gpu_side_of_a_small_campaign_makes_the_gpu_run_differ_from_the_cpu_run",
     )
     .is_none()
     {
         return;
     }
-    let (_report, run) = small_campaign_judged_on_the_gpu(
+    let (gpu_report, _gpu_run) = small_campaign_judged_on_the_gpu(
         "fault",
         FaultPutOnTheGpuSide::FirstInvariantViolatedBitFlippedOnTheFirstStateOfEachTable,
     );
-    assert!(
-        !run.tally.cross_check_disagreements.is_empty(),
-        "GPU 那一侧塞了故障，对照一条都没比出来"
+    let (cpu_report, _cpu_run) = small_campaign_judged_on_the_cpu("fault");
+    assert_ne!(
+        gpu_report, cpu_report,
+        "GPU 那一侧塞了故障，两趟的报告却相同"
     );
 }
 
@@ -2179,8 +2645,8 @@ fn a_campaign_whose_stop_file_is_there_takes_no_slice_and_reports_every_history_
 fn two_shares_judged_apart_and_then_imported_judge_every_table_once_and_render_the_report_of_one_host(
 ) {
     let campaign = small_campaign_judged_on_the_cpu_through_the_engine();
-    let (directory, configuration) = temporary_directory_with_a_configuration_on_the_cpu("shares");
-    let temporary = std::ffi::OsStr::new("1");
+    let (directory, configuration) =
+        directory_under_the_library_home_with_a_configuration_on_the_cpu("shares");
     let library = |name: &str| directory.join(name);
     let settings_of = |library_directory: &std::path::Path| {
         vec![
@@ -2191,10 +2657,6 @@ fn two_shares_judged_apart_and_then_imported_judge_every_table_once_and_render_t
             (
                 "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
                 library_directory.as_os_str().to_os_string(),
-            ),
-            (
-                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
-                temporary.to_os_string(),
             ),
         ]
     };
@@ -2214,18 +2676,27 @@ fn two_shares_judged_apart_and_then_imported_judge_every_table_once_and_render_t
         )
     };
     let (whole_report, whole_run) = run_with(settings_of(&library("whole")), &[]);
-    let every_table = whole_run.tally.tables_judged_here;
-    assert!(every_table > 0, "前提：整份那一趟判了表");
+    // 整份：现判的加同一趟里读回的（同一批里内容相同的表，第二张照库里的复用）
+    let every_table = whole_run.tally.tables_judged_here + whole_run.tally.tables_reused;
+    assert!(
+        whole_run.tally.tables_judged_here > 0,
+        "前提：整份那一趟判了表"
+    );
     let (_, first_share) = run_with(settings_of(&library("share-0")), &[share("0/2")]);
     let (_, second_share) = run_with(settings_of(&library("share-1")), &[share("1/2")]);
     assert_eq!(
-        first_share.tally.tables_judged_here + second_share.tally.tables_judged_here,
+        first_share.tally.tables_judged_here
+            + first_share.tally.tables_reused
+            + second_share.tally.tables_judged_here
+            + second_share.tally.tables_reused,
         every_table,
-        "两份判的表加起来恰好是整份的：一张表只归一台"
+        "两份判的（连同各自趟里读回的）加起来恰好是整份的：一张表只归一台"
     );
     for run in [&first_share, &second_share] {
         assert_eq!(
-            run.tally.tables_judged_here + run.tally.tables_left_to_the_other_hosts,
+            run.tally.tables_judged_here
+                + run.tally.tables_reused
+                + run.tally.tables_left_to_the_other_hosts,
             every_table,
             "每一份判的加留给另一台的是整份的（分片 {}/{}）",
             run.share.index,
@@ -2276,25 +2747,19 @@ fn two_shares_judged_apart_and_then_imported_judge_every_table_once_and_render_t
         missing.is_err(),
         "导入的库里没有归第 1 份的表：对账不为空，判红"
     );
-    let _ = std::fs::remove_dir_all(&directory);
 }
 
 /// 创世发布上 GPU（用户 2026-10-10 弹窗定「先查 GPU 能不能核，不能就 CPU 核一遍」，查下来 GPU 核得到）：一段历史跑完、每个写都落了的那一态，
-/// 与同一张写表末尾再种两个盖掉创世树表单元两份副本的单元写、也都落了的那一态，交配了 GPU 的引擎判（CPU 判器同一批也判、逐状态比）。
-/// GPU 判器的记录核对器在种了的那一态上判「恢复自称的状态缺了一次发布的单元」，没种的那一态不红；对照两态都对得上。
+/// 与同一张写表末尾再种两个盖掉创世树表单元两份副本的单元写、也都落了的那一态，交配了 GPU 的引擎判（只由 GPU 判器判）。
+/// GPU 判器的记录核对器在种了的那一态上判「恢复自称的状态缺了一次发布的单元」，没种的那一态不红；两态 GPU 都判得了。
 /// 要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
 /// 判别力：给定状态表的写表把 mkfs 的写留在表外，创世发布不进 GPU 的发布表，种了也不红（`crates/mutations.tsv` 那一行）。
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 #[test]
 fn a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_checker() {
-    use singlefs_checker_tier::crash_amplification::{
-        CrashAmplificationEnvironment, CrossCheckOfTheGivenStates, JudgedBy,
-    };
-    use singlefs_checker_tier::crash_injection::{
-        GivenStatesJudge, GivenStatesOfATable, HistoryAfterTheMakeFilesystem,
-    };
+    use singlefs_checker_tier::crash_amplification::{CrashAmplificationEnvironment, JudgedBy};
     use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
-    use singlefs_harness::memory_pool::{writes_and_segments_with_stream_indexes, WrittenContents};
+    use singlefs_harness::memory_pool::WrittenContents;
     const TEST_NAME: &str =
         "a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_checker";
     if gpu_card_pool_or_report_not_run(TEST_NAME).is_none() {
@@ -2371,10 +2836,10 @@ fn a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_check
     std::fs::create_dir_all(&directory).expect("建得了临时目录");
     let configuration = directory.join("multi-host-with-gpu.env");
     write_a_configuration_with_the_gpu_enabled(&configuration);
-    let environment = CrashAmplificationEnvironment::cleared_then_set(&[(
-        "SINGLEFS_MULTI_HOST_CONFIG",
-        configuration.as_os_str(),
-    )]);
+    let cards = cards_of_the_caller();
+    let environment = CrashAmplificationEnvironment::cleared_then_set(
+        &settings_of_an_engine_on_the_gpu(&configuration, host_of_the_caller(), &cards),
+    );
     let engine = GivenStatesEngine::start_from_environment(
         GivenStatesItem {
             item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
@@ -2383,7 +2848,7 @@ fn a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_check
                 "history_of_a_first_file_and_two_overwrites genesis-tree-table-overwritten"
                     .to_string(),
         },
-        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
+        &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
         &repository_root(),
     )
     .expect("配了 GPU 的引擎起得来（卡用不上在这里红，不退回 CPU）");
@@ -2398,11 +2863,10 @@ fn a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_check
         JudgedBy::GpuJudge,
         "配了 GPU：GPU 判器判"
     );
-    assert_eq!(engine_run.cross_check, CrossCheckOfTheGivenStates::Compared);
     assert_eq!(
         engine_run.red_items(),
         Vec::<String>::new(),
-        "两态 GPU 与 CPU 对得上、GPU 都判得了"
+        "两态 GPU 都判得了"
     );
     assert_eq!(
         conclusions.states[0].record_check(),
@@ -2417,10 +2881,19 @@ fn a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_check
     );
 }
 
-/// 给定状态表的替身判器：照 CPU 就地判，每张表的结论都标成「两台分片里归别的机器判、交的占位结论」，数它判了几张表。
-#[derive(Default)]
+/// 给定状态表的替身判器：照引擎判（表与结论进给定状态表那一类的判定库），每张表的结论都标成「两台分片里归别的机器判、交的占位结论」，数它判了几张表。
 struct EveryTableLeftToAnotherHost {
     tables: std::sync::atomic::AtomicU64,
+    engine: GivenStatesEngine,
+}
+
+impl EveryTableLeftToAnotherHost {
+    fn judging_with(engine: GivenStatesEngine) -> Self {
+        Self {
+            tables: std::sync::atomic::AtomicU64::new(0),
+            engine,
+        }
+    }
 }
 
 impl GivenStatesJudge for EveryTableLeftToAnotherHost {
@@ -2434,7 +2907,21 @@ impl GivenStatesJudge for EveryTableLeftToAnotherHost {
     ) -> Result<GivenStatesConclusionsOfATable, String> {
         self.tables
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let mut conclusions = GivenStatesJudgedOnTheCpuInPlace.judge_the_given_states(table)?;
+        let mut conclusions = self.engine.judge_the_given_states(table)?;
+        conclusions.source = GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost;
+        Ok(conclusions)
+    }
+
+    /// 带两栏的表（第二截那张）同样照引擎判、标成占位的：引擎照两栏判，不走没重写的那一份。
+    fn judge_the_given_states_with_its_columns(
+        &self,
+        table_with_its_columns: GivenStatesOfATableWithItsColumns<'_, '_>,
+    ) -> Result<GivenStatesConclusionsOfATable, String> {
+        self.tables
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let mut conclusions = self
+            .engine
+            .judge_the_given_states_with_its_columns(table_with_its_columns)?;
         conclusions.source = GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost;
         Ok(conclusions)
     }
@@ -2442,10 +2929,25 @@ impl GivenStatesJudge for EveryTableLeftToAnotherHost {
 
 /// 占位结论在报告里标出来（E4 报告第三节第 5 条）：判器交了占位结论的表（两台分片、归别的机器判、库里又没有），崩溃注入数进报告的计数，
 /// `render()` 多一行注明「这一批不作数」；就地 CPU 判的同一批一张不记、没有那一行。不要特性：判器是替身（照 CPU 就地判、每张都标成占位的）。
+/// 两个引擎都在环境守卫里照一份单机 CPU 配置起，不跟调用方的分片走：崩溃点重放入口两台分片跑时调用方给了 `SINGLEFS_CRASH_AMPLIFICATION_SHARE`，
+/// 照它起的引擎把归别的机器判的表也交成占位结论，就地那一趟就不是「一张都不是占位的」。
 /// 判别力：崩溃注入不数占位结论的表（`crates/mutations.tsv` 那一行），记 0、`render()` 没那一行。
 #[test]
 fn tables_left_to_another_host_with_placeholder_conclusions_are_counted_in_the_report_and_noted_in_its_render(
 ) {
+    use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
+    let (_directory, configuration) =
+        directory_under_the_library_home_with_a_configuration_on_the_cpu("placeholder-note");
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&[(
+        "SINGLEFS_MULTI_HOST_CONFIG",
+        configuration.as_os_str(),
+    )]);
+    let engine_judging_here =
+        given_states_engine_under_the_callers_environment_guard("placeholder_note_judged_here");
+    let judge = EveryTableLeftToAnotherHost::judging_with(
+        given_states_engine_under_the_callers_environment_guard("placeholder_probe"),
+    );
+    drop(environment);
     let campaign = CrashInjectionCampaign {
         first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
         seed_count: 2,
@@ -2459,10 +2961,8 @@ fn tables_left_to_another_host_with_placeholder_conclusions_are_counted_in_the_r
         image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
         assertions: CrashInjectionAssertions::NewFindingsOnly,
     };
-    let judged_here = run_crash_injection_campaign_judging_the_given_states_with(
-        &campaign,
-        &GivenStatesJudgedOnTheCpuInPlace,
-    );
+    let judged_here =
+        run_crash_injection_campaign_judging_the_given_states_with(&campaign, &engine_judging_here);
     assert_eq!(
         judged_here.tally.given_states_tables_left_to_other_hosts, 0,
         "就地 CPU 判的：一张都不是占位的"
@@ -2473,7 +2973,6 @@ fn tables_left_to_another_host_with_placeholder_conclusions_are_counted_in_the_r
             .contains(GIVEN_STATES_TABLES_LEFT_TO_OTHER_HOSTS_NOTE),
         "就地 CPU 判的：render 里没有占位那一行"
     );
-    let judge = EveryTableLeftToAnotherHost::default();
     let left = run_crash_injection_campaign_judging_the_given_states_with(&campaign, &judge);
     let tables = judge.tables.load(std::sync::atomic::Ordering::Relaxed);
     assert!(tables > 0, "前提：这一批建了给定状态表");
@@ -2490,18 +2989,17 @@ fn tables_left_to_another_host_with_placeholder_conclusions_are_counted_in_the_r
     );
 }
 
-/// 同一个进程里同时起两个引擎（两条快档用例并行跑撞同一个库）：没设库目录时两个引擎各建各的临时库（目录不同），各自判完同一批、
-/// 收尾各删各的；设了同一个库目录时两个都起得来（共用这个进程里开着的那一份库，不撞 RocksDB 的锁），先判的那个现判每一张表，
-/// 后判的那个同一批全照库里的复用，两个都收尾之后库还在。CPU 配置，不要卡。
-/// 判别力：临时库目录不带每个引擎一个的号（`crates/mutations.tsv` 那一行），两个引擎同名同 pid，第二个开库撞锁；同一个库目录不共用
-/// 这个进程里已经开着的那一份（另一行），第二个开库撞锁。
+/// 同一个进程里同时起两个引擎（两条快档用例并行跑撞同一个库）：没设库目录时两个引擎都开家目录下给定状态表那一类的长期库（同一个目录，
+/// 共用这个进程里开着的那一份），设了同一个库目录时也一样——两个都起得来（不撞 RocksDB 的锁），先判的那个把库里还没有的表现判、
+/// 后判的那个同一批全照库里的复用，两个都收尾之后库还在，两份报告相同。CPU 配置，不要卡。
+/// 判别力：同一个库目录不共用这个进程里已经开着的那一份（`crates/mutations.tsv` 那一行），第二个开库撞锁。
 #[cfg(feature = "verdict-store")]
 #[test]
 fn two_engines_started_at_once_in_one_process_both_judge_with_or_without_a_library_directory_set() {
     use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
     let campaign = small_campaign_judged_on_the_cpu_through_the_engine();
     let (directory, configuration) =
-        temporary_directory_with_a_configuration_on_the_cpu("two-engines");
+        directory_under_the_library_home_with_a_configuration_on_the_cpu("two-engines");
     let start = || {
         GivenStatesEngine::start_from_environment(
             GivenStatesItem {
@@ -2509,94 +3007,731 @@ fn two_engines_started_at_once_in_one_process_both_judge_with_or_without_a_libra
                 setting_file: THIS_FILE.to_string(),
                 seeds_and_scale: seeds_and_scale_of(&campaign),
             },
-            &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
+            &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
             &repository_root(),
         )
     };
-    let environment = CrashAmplificationEnvironment::cleared_then_set(&[(
-        "SINGLEFS_MULTI_HOST_CONFIG",
-        configuration.as_os_str(),
-    )]);
-    let first = start().expect("没设库目录：第一个引擎起得来");
-    let second = start().expect("没设库目录：第一个还开着时第二个也起得来（各建各的临时库）");
-    let first_report =
-        run_crash_injection_campaign_judging_the_given_states_with(&campaign, &first);
-    let second_report =
-        run_crash_injection_campaign_judging_the_given_states_with(&campaign, &second);
-    let first_run = first.finish();
-    let second_run = second.finish();
-    drop(environment);
-    assert_ne!(
-        first_run.library_directory, second_run.library_directory,
-        "没设库目录：两个引擎的临时库目录不同"
+    let library_of_both_engines = directory.join("library-of-both-engines");
+    for (library_setting, how) in [
+        (None, "没设库目录"),
+        (Some(library_of_both_engines.as_path()), "设了同一个库目录"),
+    ] {
+        let mut settings: Vec<(&str, &std::ffi::OsStr)> =
+            vec![("SINGLEFS_MULTI_HOST_CONFIG", configuration.as_os_str())];
+        if let Some(library) = library_setting {
+            settings.push(("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", library.as_os_str()));
+        }
+        let environment = CrashAmplificationEnvironment::cleared_then_set(&settings);
+        let first = start().unwrap_or_else(|refusal| panic!("{how}：第一个引擎起得来：{refusal}"));
+        let second = start().unwrap_or_else(|refusal| {
+            panic!("{how}：第一个还开着时第二个也起得来（共用这个进程里开着的那一份库，不撞 RocksDB 的锁）：{refusal}")
+        });
+        let first_report =
+            run_crash_injection_campaign_judging_the_given_states_with(&campaign, &first);
+        let second_report =
+            run_crash_injection_campaign_judging_the_given_states_with(&campaign, &second);
+        let first_run = first.finish();
+        let second_run = second.finish();
+        drop(environment);
+        assert_eq!(
+            first_run.library_directory, second_run.library_directory,
+            "{how}：两个引擎开的是同一份库"
+        );
+        let every_table = first_run.tally.tables_judged_here + first_run.tally.tables_reused;
+        assert!(every_table > 0, "前提：这一批有表");
+        assert_eq!(
+            (
+                second_run.tally.tables_judged_here,
+                second_run.tally.tables_reused
+            ),
+            (0, every_table),
+            "{how}：后判的那个全照同一份库里的复用"
+        );
+        assert!(
+            first_run.library_directory.join("CURRENT").exists(),
+            "{how}：两个都收尾之后库还在"
+        );
+        assert_eq!(
+            first_report.render(),
+            second_report.render(),
+            "{how}：复用的那一趟报告与现判的相同"
+        );
+    }
+}
+
+/// 第二截那张表的一种摆法（[`the_gpu_record_checker_after_the_writable_mount_agrees_with_the_cpu_on_the_crash_state_image_and_the_recovered_image`]）：
+/// 第一次崩溃状态（整条历史写表上的持久集合）、挂载那一段的写与切段、之后那一次发布的写与切段，与它在表名里的名字。
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+struct FirstCrashAndTheWritableMountAfterIt {
+    name: &'static str,
+    persisted_over_the_whole_history: Vec<bool>,
+    mount_writes: Vec<RetainedWrite>,
+    mount_segments: Vec<Vec<usize>>,
+    publish_writes: Vec<RetainedWrite>,
+    publish_segments: Vec<Vec<usize>>,
+}
+
+/// 手摆的那一种：最后一次带 journal 记录的那次发布，根槽写落了、记录写一个都没落；挂载那一段只有一个写，把那次发布的根槽盖成同一块盘上
+/// 更早写的一条根（历史那次发布的根槽被挂载的写覆盖），之后没有发布。两份镜像判第一条判据红、只读挂载之后的池时放过
+/// （`tests/crash_injection_writable_mount_after_the_crash.rs` 里同一种摆法）。
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+fn the_root_of_a_history_publish_overwritten_by_the_mount(
+    writes: &[RetainedWrite],
+) -> FirstCrashAndTheWritableMountAfterIt {
+    let every_write = vec![true; writes.len()];
+    let last_publish_with_records = singlefs_harness::memory_pool::publishes_in(
+        writes,
+        &every_write,
+        RecordStreamContinuity::OneRecording,
+    )
+    .into_iter()
+    .rev()
+    .find(|publish| !publish.records.is_empty())
+    .expect("前提：覆盖写那几次发布写了 journal 记录");
+    let overwritten_root = &writes[last_publish_with_records.root];
+    let earlier_root_on_the_same_device = writes[..last_publish_with_records.root]
+        .iter()
+        .rev()
+        .find(|write| {
+            write.kind == StepKind::RootRecordFua
+                && write.device == overwritten_root.device
+                && write.length_in_bytes() == overwritten_root.length_in_bytes()
+        })
+        .expect("前提：那次发布之前同一块盘上写过别的根");
+    let mut persisted_over_the_whole_history = every_write;
+    for record in &last_publish_with_records.records {
+        persisted_over_the_whole_history[*record] = false;
+    }
+    FirstCrashAndTheWritableMountAfterIt {
+        name: "root-of-the-last-publish-with-records-overwritten-by-the-mount",
+        persisted_over_the_whole_history,
+        mount_writes: vec![RetainedWrite {
+            device: overwritten_root.device,
+            kind: StepKind::RootRecordFua,
+            is_force_unit_access: true,
+            offset: overwritten_root.offset,
+            contents: earlier_root_on_the_same_device.contents.clone(),
+        }],
+        mount_segments: vec![vec![0]],
+        publish_writes: Vec::new(),
+        publish_segments: Vec::new(),
+    }
+}
+
+/// 真跑的那一种：第一次崩溃摆在最后一条根槽写所在的段上、只扣下那一条（更早的段整段落、更晚的段一个都没落），在那份崩溃后镜像上
+/// 真起一次可写挂载、再发一次布（崩溃注入第二截同一个入口）。
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+fn the_last_root_withheld_then_the_writable_mount(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+) -> FirstCrashAndTheWritableMountAfterIt {
+    use singlefs_checker_tier::crash_injection::{
+        materialized_crash_image, mount_and_publish_once_on_the_crash_image, WritableMountOutcome,
+    };
+    let last_root = writes
+        .iter()
+        .rposition(|write| write.kind == StepKind::RootRecordFua)
+        .expect("历史写过根槽");
+    let segment_index = segments
+        .iter()
+        .position(|segment| segment.contains(&last_root))
+        .expect("每个写都在某一段里");
+    let segment = &segments[segment_index];
+    let first_write_of_the_segment = segment[0];
+    let persisted_within_the_segment: Vec<bool> =
+        segment.iter().map(|write| *write != last_root).collect();
+    let mut persisted_over_the_whole_history = vec![false; writes.len()];
+    persisted_over_the_whole_history[..first_write_of_the_segment].fill(true);
+    persisted_over_the_whole_history
+        [first_write_of_the_segment..first_write_of_the_segment + segment.len()]
+        .copy_from_slice(&persisted_within_the_segment);
+    let mut base = MemoryPool::with_devices(
+        &[DeviceIdentity(0), DeviceIdentity(1)],
+        execution.device_width.device_bytes(),
     );
-    let every_table = first_run.tally.tables_judged_here;
-    assert!(every_table > 0, "前提：这一批判了表");
-    assert_eq!(
-        (
-            second_run.tally.tables_judged_here,
-            second_run.tally.tables_reused
-        ),
-        (every_table, 0),
-        "没设库目录：两个临时库互不相干，第二个也现判每一张表"
+    base.apply_writes(&writes[..first_write_of_the_segment]);
+    let crash_point = CrashPoint {
+        segment_index,
+        persisted_within_the_segment: persisted_within_the_segment.clone(),
+        step: StepPosition::StartingPoint,
+        operation_kind: None,
+    };
+    let mount_run = mount_and_publish_once_on_the_crash_image(
+        &materialized_crash_image(&CrashImage {
+            base: &base,
+            writes: &writes[first_write_of_the_segment..first_write_of_the_segment + segment.len()],
+            persisted: persisted_within_the_segment,
+        }),
+        &execution.device_width.parameters(),
+        execution,
+        history.seed,
+        &crash_point,
     );
     assert!(
-        !first_run.library_directory.exists() && !second_run.library_directory.exists(),
-        "没设库目录：收尾各删各的临时库"
+        matches!(mount_run.outcome, WritableMountOutcome::Published),
+        "前提：崩溃之后的可写挂载与之后那一次发布都做成：{:?}",
+        mount_run.outcome
+    );
+    let geometry = execution.device_width.fixed_geometry();
+    let (mount_writes, mount_segments) =
+        writes_and_segments(&mount_run.mount_operations, &geometry);
+    let (publish_writes, publish_segments) =
+        writes_and_segments(&mount_run.publish_operations, &geometry);
+    FirstCrashAndTheWritableMountAfterIt {
+        name: "last-root-withheld-then-the-writable-mount",
+        persisted_over_the_whole_history,
+        mount_writes,
+        mount_segments,
+        publish_writes,
+        publish_segments,
+    }
+}
+
+/// GPU 对拍的 CPU 参照：第二截那张表经对拍那一类的库读回（`gpu_test_start::cpu_reference_table_read_back_from_the_pairing_library`），
+/// 第一次崩溃那份镜像（崩溃态镜像）与挂载之后的池（实现恢复后的镜像）各从读回的那一份叠出来，记录核对器两份镜像一次判
+/// （`crash::check_records_against`：第一条判据读崩溃态镜像、第二条读恢复后的镜像）。恢复自称的那一版照 D13（验证路线） 已定项 7 的字面从读回的
+/// 那一份现取：崩溃那道接缝之后（挂载与那次发布）写出的最新那条根，一条都没有时退回接缝上记的第一次崩溃落到的那一版
+/// （`crash_injection::newest_root_written_after_the_crash`，判器那一侧照表里那一栏取的同一个）；它与恢复后的镜像上看 journal 那一遍落到的根
+/// 不同另记一位。交回（记录核对器两条判据，那一位）；只录那一趟交 None。
+// cpu-reference-for-gpu-comparison
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+fn cpu_record_check_on_the_two_images_read_back_from_the_pairing_library(
+    table: &singlefs_checker_tier::crash_injection::GivenStatesTableAfterTheFirstCrash<'_>,
+) -> Option<(RecordCheck, bool)> {
+    use singlefs_checker_tier::crash_amplification::RecordedGivenStatesTable;
+    use singlefs_checker_tier::crash_injection::{
+        materialized_crash_image, newest_root_written_after_the_crash,
+        StateOfTheTableAfterTheWritableMount,
+    };
+    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::cpu_reference_table_read_back_from_the_pairing_library;
+    use singlefs_harness::memory_pool::RecordStreamSeam;
+    let read_back = cpu_reference_table_read_back_from_the_pairing_library(
+        &RecordedGivenStatesTable::of(&table.given_states_table()),
+    )?;
+    Some(read_back.with_the_table(|read_back_table| {
+        let image_of = |state: StateOfTheTableAfterTheWritableMount| {
+            materialized_crash_image(&CrashImage {
+                base: read_back_table.base,
+                writes: read_back_table.writes,
+                persisted: read_back_table.persisted_sets[state.position()].clone(),
+            })
+        };
+        let crash_state_image = image_of(StateOfTheTableAfterTheWritableMount::FirstCrashImage);
+        let recovered_image = image_of(StateOfTheTableAfterTheWritableMount::PoolAfterTheMount);
+        let (first_write_after_the_crash, version_landed_on_after_the_crash) = read_back_table
+            .seams
+            .iter()
+            .find_map(|seam| match seam {
+                RecordStreamSeam::AfterACrash {
+                    first_write_after_the_crash,
+                    version_landed_on_after_the_crash,
+                } => Some((
+                    *first_write_after_the_crash,
+                    *version_landed_on_after_the_crash,
+                )),
+                RecordStreamSeam::AfterAPowerLoss { .. } => None,
+            })
+            .expect("第二截那张表在历史与挂载之间有一道崩溃接缝");
+        let claimed_version = newest_root_written_after_the_crash(
+            &read_back_table.writes[first_write_after_the_crash..],
+            version_landed_on_after_the_crash,
+        );
+        let landed_on = recover(&recovered_image, JournalPolicy::Consult).effective_root;
+        (
+            check_records_against(
+                &crash_state_image,
+                &recovered_image,
+                read_back_table.writes,
+                &read_back_table.persisted_sets
+                    [StateOfTheTableAfterTheWritableMount::PoolAfterTheMount.position()],
+                read_back_table.continuity(),
+                claimed_version,
+            ),
+            claimed_version != landed_on,
+        )
+    }))
+}
+
+/// 第二截记录核对器两份镜像的输入上 GPU 与 CPU 对拍（欠账 C832，D13（验证路线） 已定项 7「崩溃后镜像是两份」）：第一个文件之后覆盖写两次的历史上
+/// 摆两种第一次崩溃状态（手摆的「历史那次发布的根槽被挂载的写覆盖」、真跑的「扣下最后一条根槽写再可写挂载」），各建第二截那张两个状态的表，
+/// 交配了 GPU 的引擎判（只由 GPU 判器判），两个状态的结论合成第二截记录核对器的两条判据；CPU 一侧从对拍那一类的库读回同一张表，
+/// 叠出两份镜像、记录核对器两份镜像一次判。两侧逐条相同；手摆那一态两份镜像判第一条判据红（对拍的输入里真有一态分得开两种读法）；
+/// GPU 判器两态都判得了。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
+// crash-case-check:not-a-crash-case 只判写死的两个第一次崩溃状态（手摆一个、扣下最后一条根槽写一个），不枚举崩溃状态
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+#[test]
+fn the_gpu_record_checker_after_the_writable_mount_agrees_with_the_cpu_on_the_crash_state_image_and_the_recovered_image(
+) {
+    use singlefs_checker_tier::crash_amplification::{CrashAmplificationEnvironment, JudgedBy};
+    use singlefs_checker_tier::crash_injection::GivenStatesAfterTheFirstCrash;
+    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+    const TEST_NAME: &str =
+        "the_gpu_record_checker_after_the_writable_mount_agrees_with_the_cpu_on_the_crash_state_image_and_the_recovered_image";
+    if gpu_card_pool_or_report_not_run(TEST_NAME).is_none() {
+        return;
+    }
+    let history = history_of_a_first_file_and_two_overwrites();
+    let execution = UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES;
+    let stream = SharedStream::retaining_contents();
+    let run = execute_history_with(&history, execution, &stream, &mut |_| {});
+    assert_eq!(run.ending, HistoryEnding::Completed, "前提：这段历史跑完");
+    let (writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
+        &stream.retained_operations(),
+        &execution.device_width.fixed_geometry(),
+    );
+    let history_after_the_make_filesystem = HistoryAfterTheMakeFilesystem::of(
+        &writes,
+        &segments,
+        &stream_indexes,
+        run.operations_written_by_make_filesystem,
+        execution,
+    );
+    let first_crashes = [
+        the_root_of_a_history_publish_overwritten_by_the_mount(&writes),
+        the_last_root_withheld_then_the_writable_mount(&history, execution, &writes, &segments),
+    ];
+    let directory = std::env::temp_dir().join(format!(
+        "singlefs-record-checker-after-the-mount-on-the-gpu-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&directory);
+    std::fs::create_dir_all(&directory).expect("建得了临时目录");
+    let configuration = directory.join("multi-host-with-gpu.env");
+    write_a_configuration_with_the_gpu_enabled(&configuration);
+    let cards = cards_of_the_caller();
+    let environment = CrashAmplificationEnvironment::cleared_then_set(
+        &settings_of_an_engine_on_the_gpu(&configuration, host_of_the_caller(), &cards),
+    );
+    let engine = GivenStatesEngine::start_from_environment(
+        GivenStatesItem {
+            item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
+            setting_file: THIS_FILE.to_string(),
+            seeds_and_scale:
+                "history_of_a_first_file_and_two_overwrites record-checker-after-the-writable-mount"
+                    .to_string(),
+        },
+        &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+        &repository_root(),
+    )
+    .expect("配了 GPU 的引擎起得来（卡用不上在这里红，不退回 CPU）");
+    let mut compared = Vec::new();
+    for first_crash in &first_crashes {
+        let version_landed_on_after_the_first_crash = recover(
+            &CrashImage {
+                base: history_after_the_make_filesystem.base(),
+                writes: history_after_the_make_filesystem.writes(),
+                persisted: history_after_the_make_filesystem
+                    .persisted_set_of_the_table(&first_crash.persisted_over_the_whole_history),
+            },
+            JournalPolicy::Consult,
+        )
+        .effective_root;
+        let given = GivenStatesAfterTheFirstCrash::new(
+            &engine,
+            &history_after_the_make_filesystem,
+            &first_crash.persisted_over_the_whole_history,
+            &[],
+            version_landed_on_after_the_first_crash,
+            &first_crash.publish_writes,
+            &first_crash.publish_segments,
+        );
+        let table_name = format!("first-file-and-two-overwrites/{}", first_crash.name);
+        let conclusions_on_the_gpu = given.judge_the_pool_after_the_writable_mount(
+            &first_crash.mount_writes,
+            &first_crash.mount_segments,
+            table_name.clone(),
+        );
+        let gpu = (
+            conclusions_on_the_gpu.record_check(),
+            conclusions_on_the_gpu
+                .on_the_pool_after_the_mount
+                .claimed_version_is_not_landed_on(),
+        );
+        let Some(cpu) = cpu_record_check_on_the_two_images_read_back_from_the_pairing_library(
+            &given.table_after_the_writable_mount(
+                &first_crash.mount_writes,
+                &first_crash.mount_segments,
+                table_name,
+            ),
+        ) else {
+            return;
+        };
+        assert_eq!(
+            gpu, cpu,
+            "{}：GPU 判器两个状态合成的第二截记录核对器（连同恢复落到的根是不是挂载与那次发布写出的最新那条根）与 CPU 两份镜像一次判的逐条相同",
+            first_crash.name
+        );
+        compared.push((first_crash.name, cpu.0));
+    }
+    let engine_run = engine.finish();
+    drop(environment);
+    let _ = std::fs::remove_dir_all(&directory);
+    assert_eq!(
+        engine_run.judged_by,
+        JudgedBy::GpuJudge,
+        "配了 GPU：GPU 判器判"
     );
     assert_eq!(
-        first_report.render(),
-        second_report.render(),
-        "没设库目录：两个引擎判同一批，报告相同"
+        engine_run.red_items(),
+        Vec::<String>::new(),
+        "两张表的四个状态 GPU 都判得了"
     );
-    let library = directory.join("library-of-both-engines");
-    let environment_with_the_library = CrashAmplificationEnvironment::cleared_then_set(&[
-        ("SINGLEFS_MULTI_HOST_CONFIG", configuration.as_os_str()),
-        ("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", library.as_os_str()),
+    assert!(
+        compared
+            .iter()
+            .any(|(name, record_check)| *name == first_crashes[0].name
+                && record_check.root_without_record),
+        "手摆那一态两份镜像判第一条判据红：{compared:?}"
+    );
+}
+
+// ─── 第二截恢复自称的那一版照 D13（验证路线） 已定项 7 的字面取（用户 2026-10-14 弹窗定「照字面改：表里记下根的来路」） ───
+
+/// 只建表、不判的判器：[`second_stage_table_whose_pool_after_the_mount_lands_below_the_newest_root_written`] 拿 `GivenStatesAfterTheFirstCrash`
+/// 建第二截那张表，表不交它判。
+#[cfg(feature = "verdict-store")]
+struct GivenStatesTableBuiltOnly;
+
+#[cfg(feature = "verdict-store")]
+impl GivenStatesJudge for GivenStatesTableBuiltOnly {
+    fn stop_is_requested(&self) -> bool {
+        false
+    }
+
+    fn judge_the_given_states(
+        &self,
+        table: &GivenStatesOfATable<'_>,
+    ) -> Result<GivenStatesConclusionsOfATable, String> {
+        Err(format!(
+            "这个判器只用来建第二截那张表，表 {} 不该交它判",
+            table.table_name
+        ))
+    }
+}
+
+/// 手摆一张第二截的表，挂载之后的池那个状态上恢复落到挂载与那次发布写出的最新那条根之下：第一个文件之后覆盖写两次的历史整条落了、
+/// 不崩，在那份镜像上真起一次可写挂载、再发一次布（崩溃注入第二截同一个入口），建第二截那张表（挂载之后的池那个状态那一栏写那次发布的根）；
+/// 再把挂载之后的池那个状态里之后那次发布的 journal 记录、它的根槽写与之后的写、它的一个单元（那个偏移上的每一份副本）都改成没落
+/// （判段之前把那条根与它的记录从镜像上拿掉：恢复落到挂载最后写的那条根）。交回读回用的那一份（表连同两栏）与那一栏写的那条根。
+#[cfg(feature = "verdict-store")]
+fn second_stage_table_whose_pool_after_the_mount_lands_below_the_newest_root_written() -> (
+    singlefs_checker_tier::crash_amplification::RecordedGivenStatesTableWithItsColumns,
+    (InstanceGeneration, CheckpointTxg),
+) {
+    use singlefs_checker::walk::ContainerCapacityKnobs;
+    use singlefs_checker_tier::crash_amplification::{
+        RecordedGivenStatesTable, RecordedGivenStatesTableWithItsColumns,
+    };
+    use singlefs_checker_tier::crash_injection::{
+        materialized_crash_image, mount_and_publish_once_on_the_crash_image,
+        ClaimedVersionOfAGivenState, GivenStatesAfterTheFirstCrash,
+        StateOfTheTableAfterTheWritableMount, WritableMountOutcome,
+    };
+    let history = history_of_a_first_file_and_two_overwrites();
+    let execution = UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES;
+    let stream = SharedStream::retaining_contents();
+    let run = execute_history_with(&history, execution, &stream, &mut |_| {});
+    assert_eq!(run.ending, HistoryEnding::Completed, "前提：这段历史跑完");
+    let (writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
+        &stream.retained_operations(),
+        &execution.device_width.fixed_geometry(),
+    );
+    let history_after_the_make_filesystem = HistoryAfterTheMakeFilesystem::of(
+        &writes,
+        &segments,
+        &stream_indexes,
+        run.operations_written_by_make_filesystem,
+        execution,
+    );
+    let every_history_write = vec![true; writes.len()];
+    let version_landed_on_after_the_first_crash = recover(
+        &CrashImage {
+            base: history_after_the_make_filesystem.base(),
+            writes: history_after_the_make_filesystem.writes(),
+            persisted: history_after_the_make_filesystem
+                .persisted_set_of_the_table(&every_history_write),
+        },
+        JournalPolicy::Consult,
+    )
+    .effective_root;
+    let last_segment_index = segments.len() - 1;
+    let last_segment = &segments[last_segment_index];
+    let first_write_of_the_last_segment = last_segment[0];
+    let mut base_before_the_last_segment = MemoryPool::with_devices(
+        &[DeviceIdentity(0), DeviceIdentity(1)],
+        execution.device_width.device_bytes(),
+    );
+    base_before_the_last_segment.apply_writes(&writes[..first_write_of_the_last_segment]);
+    let crash_point = CrashPoint {
+        segment_index: last_segment_index,
+        persisted_within_the_segment: vec![true; last_segment.len()],
+        step: StepPosition::StartingPoint,
+        operation_kind: None,
+    };
+    let mount_run = mount_and_publish_once_on_the_crash_image(
+        &materialized_crash_image(&CrashImage {
+            base: &base_before_the_last_segment,
+            writes: &writes[first_write_of_the_last_segment
+                ..first_write_of_the_last_segment + last_segment.len()],
+            persisted: vec![true; last_segment.len()],
+        }),
+        &execution.device_width.parameters(),
+        execution,
+        history.seed,
+        &crash_point,
+    );
+    assert!(
+        matches!(mount_run.outcome, WritableMountOutcome::Published),
+        "前提：可写挂载与之后那一次发布都做成：{:?}",
+        mount_run.outcome
+    );
+    let geometry = execution.device_width.fixed_geometry();
+    let (mount_writes, mount_segments) =
+        writes_and_segments(&mount_run.mount_operations, &geometry);
+    let (publish_writes, publish_segments) =
+        writes_and_segments(&mount_run.publish_operations, &geometry);
+    let given = GivenStatesAfterTheFirstCrash::new(
+        &GivenStatesTableBuiltOnly,
+        &history_after_the_make_filesystem,
+        &every_history_write,
+        &[],
+        version_landed_on_after_the_first_crash,
+        &publish_writes,
+        &publish_segments,
+    );
+    let mut table = given.table_after_the_writable_mount(
+        &mount_writes,
+        &mount_segments,
+        "first-file-and-two-overwrites/whole-history-landed/pool-after-the-mount-lands-below-the-newest-root-written"
+            .to_string(),
+    );
+    let pool_after_the_mount = StateOfTheTableAfterTheWritableMount::PoolAfterTheMount.position();
+    let ClaimedVersionOfAGivenState::NewestRootWrittenByTheMountAndItsPublish(Some(claimed_root)) =
+        table.claimed_versions[pool_after_the_mount]
+    else {
+        panic!(
+            "挂载与那次发布写了根：挂载之后的池那个状态那一栏写那条根：{:?}",
+            table.claimed_versions
+        );
+    };
+    let publish_after_the_mount = singlefs_harness::memory_pool::publishes_in(
+        &table.writes,
+        &table.persisted_sets[pool_after_the_mount],
+        RecordStreamContinuity::BrokenAtSeams(&table.seams),
+    )
+    .pop()
+    .expect("写表里有发布");
+    assert_eq!(
         (
-            "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
-            std::ffi::OsStr::new("1"),
+            InstanceGeneration(publish_after_the_mount.instance),
+            CheckpointTxg(publish_after_the_mount.checkpoint_txg)
+        ),
+        claimed_root,
+        "前提：写表里最后那次发布就是挂载之后那一次，它的根就是那一栏写的那一条"
+    );
+    let first_unit_offset = publish_after_the_mount
+        .units
+        .iter()
+        .map(|unit| table.writes[*unit].offset.0)
+        .min()
+        .expect("前提：挂载之后那一次发布写了单元");
+    let persisted = &mut table.persisted_sets[pool_after_the_mount];
+    for record in &publish_after_the_mount.records {
+        persisted[*record] = false;
+    }
+    persisted[publish_after_the_mount.root..].fill(false);
+    for unit in &publish_after_the_mount.units {
+        if table.writes[*unit].offset.0 == first_unit_offset {
+            persisted[*unit] = false;
+        }
+    }
+    let recorded = RecordedGivenStatesTableWithItsColumns {
+        table: RecordedGivenStatesTable::of(&table.given_states_table()),
+        container_capacity_knobs: ContainerCapacityKnobs::PRODUCT,
+        claimed_versions: table.claimed_versions.clone(),
+    };
+    (recorded, claimed_root)
+}
+
+/// 第二截恢复自称的那一版照字面取（D13（验证路线） 已定项 7「恢复自称的那一版取挂载与那次发布写出的最新那条根」）：手摆的那张表
+/// （[`second_stage_table_whose_pool_after_the_mount_lands_below_the_newest_root_written`]）上，挂载之后的池那个状态恢复落到那条根之下。
+/// 旧取法（第二条判据取恢复落到的根）放过：那次发布比恢复落到的那一版新，它缺的那个单元没人核，那一位也不置；照那一栏取（新取法）判红：
+/// 第二条判据核到那次发布缺单元，「恢复落到的根不是挂载与那次发布写出的最新那条根」那一位也红。CPU 判器就地判一次，再经崩溃点重放的引擎
+/// （两段：表连同两栏写进判定库、读回再判，照一份单机 CPU 配置）判一次，两次逐字相同。
+/// 判别力（`crates/mutations.tsv`）：CPU 判器第二条判据改回取恢复落到的根、那一位恒不置、第二截建表时那一栏不写，各红这一条。
+// crash-case-check:not-a-crash-case 一段两次覆盖写的历史上手摆一张两个状态的表，不枚举崩溃状态
+#[cfg(feature = "verdict-store")]
+#[test]
+fn a_pool_after_the_mount_whose_recovery_lands_below_the_newest_root_written_is_red_only_under_the_claimed_version(
+) {
+    use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
+    use singlefs_checker_tier::crash_injection::{
+        judge_the_given_states_on_the_cpu, StateOfTheTableAfterTheWritableMount,
+    };
+    use singlefs_checker_tier::crash_library::CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE;
+    let (recorded, claimed_root) =
+        second_stage_table_whose_pool_after_the_mount_lands_below_the_newest_root_written();
+    let pool_after_the_mount = StateOfTheTableAfterTheWritableMount::PoolAfterTheMount.position();
+    let (under_the_landed_root, under_the_claimed_version) =
+        recorded.with_the_table(|table_with_its_columns| {
+            (
+                judge_the_given_states_on_the_cpu(table_with_its_columns.table),
+                judge_the_given_states_on_the_cpu(table_with_its_columns),
+            )
+        });
+    let landed_on = under_the_claimed_version.states[pool_after_the_mount]
+        .words
+        .consulted_pass_landed_root;
+    assert_ne!(
+        (landed_on.instance, landed_on.checkpoint_txg_low),
+        (
+            claimed_root.0 .0,
+            u32::try_from(claimed_root.1 .0 & 0xFFFF_FFFF).expect("低 32 位")
+        ),
+        "前提：挂载之后的池那个状态上看 journal 那一遍恢复落到那一栏写的根 {claimed_root:?} 之下"
+    );
+    let old_reading = &under_the_landed_root.states[pool_after_the_mount];
+    assert!(
+        !old_reading.record_check().claimed_state_missing_unit
+            && !old_reading.claimed_version_is_not_landed_on(),
+        "旧取法（取恢复落到的根）放过：{:?}",
+        old_reading.words
+    );
+    let literal_reading = &under_the_claimed_version.states[pool_after_the_mount];
+    assert!(
+        literal_reading.record_check().claimed_state_missing_unit,
+        "照那一栏取的那一版判第二条判据：挂载之后那一次发布缺了一个单元，判红：{:?}",
+        literal_reading.words
+    );
+    assert!(
+        literal_reading.claimed_version_is_not_landed_on(),
+        "恢复落到的根不是挂载与那次发布写出的最新那条根，判红：{:?}",
+        literal_reading.words
+    );
+    let (directory, configuration) =
+        directory_under_the_library_home_with_a_configuration_on_the_cpu("claimed-version");
+    let library = directory.join("library");
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&[
+        ("SINGLEFS_MULTI_HOST_CONFIG", configuration.as_os_str()),
+        (
+            CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+            library.as_os_str(),
         ),
     ]);
-    let first_on_the_library = start().expect("设了库目录：第一个引擎起得来");
-    let second_on_the_library = start().expect(
-        "设了同一个库目录：第一个还开着时第二个也起得来（共用这个进程里开着的那一份库，不撞 RocksDB 的锁）",
+    let engine = given_states_engine_under_the_callers_environment_guard(
+        "claimed_version_of_the_pool_after_the_mount",
     );
-    let first_report_on_the_library = run_crash_injection_campaign_judging_the_given_states_with(
-        &campaign,
-        &first_on_the_library,
-    );
-    let second_report_on_the_library = run_crash_injection_campaign_judging_the_given_states_with(
-        &campaign,
-        &second_on_the_library,
-    );
-    let first_run_on_the_library = first_on_the_library.finish();
-    let second_run_on_the_library = second_on_the_library.finish();
-    drop(environment_with_the_library);
+    let through_the_library = recorded
+        .with_the_table(|table_with_its_columns| {
+            engine.judge_the_given_states_with_its_columns(table_with_its_columns)
+        })
+        .unwrap_or_else(|reason| panic!("引擎判不了（不退回别处判）：{reason}"));
+    let engine_run = engine.finish();
+    drop(environment);
     assert_eq!(
-        (
-            first_run_on_the_library.tally.tables_judged_here,
-            first_run_on_the_library.tally.tables_reused
-        ),
-        (every_table, 0),
-        "设了库目录：先判的那个现判每一张表"
+        engine_run.tally.tables_judged_here, 1,
+        "这一趟从空库起、这张表现判：{:?}",
+        engine_run.tally
     );
     assert_eq!(
-        (
-            second_run_on_the_library.tally.tables_judged_here,
-            second_run_on_the_library.tally.tables_reused
-        ),
-        (0, every_table),
-        "设了同一个库目录：后判的那个全照同一份库里的复用"
+        through_the_library
+            .states
+            .iter()
+            .map(|state| state.words)
+            .collect::<Vec<_>>(),
+        under_the_claimed_version
+            .states
+            .iter()
+            .map(|state| state.words)
+            .collect::<Vec<_>>(),
+        "经判定库两段判的与就地照那一栏判的逐字相同（两栏跟着表录进库、读回照它判）"
     );
+}
+
+/// 上一条那张表上 GPU 判器与 CPU 判器对拍（两趟独立、各从自己那一份库读回）：一趟配了 GPU（只由 GPU 判器判，恢复内核照判表里那一栏取那一版），
+/// 一趟没开 GPU（CPU 判器），两个状态的对拍字逐字相同，挂载之后的池那个状态两边都判第二条判据红、那一位红。要本机一张 NVIDIA 独显：
+/// 一张适配器都没有时报「本次未跑」。判别力（`crates/mutations.tsv`）：恢复内核第二条判据改回取看 journal 那一遍落到的根，GPU 那一趟放过，这条红。
+// crash-case-check:not-a-crash-case 一段两次覆盖写的历史上手摆一张两个状态的表，不枚举崩溃状态
+#[cfg(all(feature = "verdict-store", feature = "gpu"))]
+#[test]
+fn the_gpu_judges_the_claimed_version_of_the_pool_after_the_mount_like_the_cpu_when_the_recovery_lands_below_it(
+) {
+    use singlefs_checker_tier::crash_amplification::{CrashAmplificationEnvironment, JudgedBy};
+    use singlefs_checker_tier::crash_injection::StateOfTheTableAfterTheWritableMount;
+    use singlefs_checker_tier::crash_library::CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE;
+    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+    const TEST_NAME: &str =
+        "the_gpu_judges_the_claimed_version_of_the_pool_after_the_mount_like_the_cpu_when_the_recovery_lands_below_it";
+    if gpu_card_pool_or_report_not_run(TEST_NAME).is_none() {
+        return;
+    }
+    let (recorded, _claimed_root) =
+        second_stage_table_whose_pool_after_the_mount_lands_below_the_newest_root_written();
+    let (directory, cpu_configuration) =
+        directory_under_the_library_home_with_a_configuration_on_the_cpu("claimed-version-paired");
+    let gpu_configuration = directory.join("multi-host-with-gpu.env");
+    write_a_configuration_with_the_gpu_enabled(&gpu_configuration);
+    let cards = cards_of_the_caller();
+    let judged_in_a_run = |run: &str, gpu_enabled: bool| {
+        let library = directory.join(format!("library-{run}"));
+        let mut settings: Vec<(&str, &std::ffi::OsStr)> = if gpu_enabled {
+            settings_of_an_engine_on_the_gpu(&gpu_configuration, host_of_the_caller(), &cards)
+                .to_vec()
+        } else {
+            vec![("SINGLEFS_MULTI_HOST_CONFIG", cpu_configuration.as_os_str())]
+        };
+        settings.push((
+            CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+            library.as_os_str(),
+        ));
+        let environment = CrashAmplificationEnvironment::cleared_then_set(&settings);
+        let engine = given_states_engine_under_the_callers_environment_guard(&format!(
+            "claimed_version_of_the_pool_after_the_mount_paired {run}"
+        ));
+        let judged = recorded
+            .with_the_table(|table_with_its_columns| {
+                engine.judge_the_given_states_with_its_columns(table_with_its_columns)
+            })
+            .unwrap_or_else(|reason| panic!("{run} 那一趟判不了（不退回别处判）：{reason}"));
+        let engine_run = engine.finish();
+        drop(environment);
+        (judged, engine_run)
+    };
+    let (on_the_gpu, gpu_run) = judged_in_a_run("on-the-gpu", true);
+    let (on_the_cpu, cpu_run) = judged_in_a_run("on-the-cpu", false);
+    assert_eq!(
+        (gpu_run.judged_by, cpu_run.judged_by),
+        (JudgedBy::GpuJudge, JudgedBy::CpuJudge),
+        "一趟由 GPU 判器判、一趟由 CPU 判器判"
+    );
+    assert_eq!(
+        gpu_run.red_items(),
+        Vec::<String>::new(),
+        "GPU 判器判得了这张表的两个状态"
+    );
+    assert_eq!(
+        on_the_gpu
+            .states
+            .iter()
+            .map(|state| state.words)
+            .collect::<Vec<_>>(),
+        on_the_cpu
+            .states
+            .iter()
+            .map(|state| state.words)
+            .collect::<Vec<_>>(),
+        "两个状态 GPU 与 CPU 的对拍字逐字相同"
+    );
+    let pool_after_the_mount =
+        &on_the_gpu.states[StateOfTheTableAfterTheWritableMount::PoolAfterTheMount.position()];
     assert!(
-        library.join("CURRENT").exists(),
-        "设了库目录：两个都收尾之后库还在"
+        pool_after_the_mount
+            .record_check()
+            .claimed_state_missing_unit
+            && pool_after_the_mount.claimed_version_is_not_landed_on(),
+        "GPU 判器照那一栏取那一版：第二条判据红、恢复落到的根不是那一栏写的那一条也红：{:?}",
+        pool_after_the_mount.words
     );
-    assert_eq!(
-        first_report_on_the_library.render(),
-        second_report_on_the_library.render(),
-        "设了库目录：复用的那一趟报告与现判的相同"
-    );
-    let _ = std::fs::remove_dir_all(&directory);
 }

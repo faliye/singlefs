@@ -4,7 +4,7 @@
 //! 只建到第三片的两条（`model_compares_inode_creations_into_the_third_inode_leaf_container`、
 //! `model_compares_a_rollback_to_a_version_with_fewer_inode_leaf_containers`）分不开「第 k 片」与「第三片及以后都当第三片」，
 //! 也分不开「回退取回、丢掉右侧每一片」与「只取回第二片」「只丢第三片」（第 29 批代码轮判决
-//! `research/prompts/m3-formal-code-b29-r1-main-verification.md` L1 第三行）。
+//! `research/prompts/m3-formal-code-b29-r1-main-verification.md`「L1　第 27 批」表里「第 3 片用例与 KX1 / KX2 换取样点」那一行）。
 //! 每一步的池级 checker 不跑（`PerStepChecker::Skipped`）：这几条判的是 O1 逐片记的账。
 
 use singlefs_core::admission::SpaceAdmission;

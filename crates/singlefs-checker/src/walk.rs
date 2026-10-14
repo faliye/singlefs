@@ -624,7 +624,7 @@ fn hole_in_the_candidate_set_between(
 }
 
 /// I-3.5（引用区间的精确性） 的出现规则（TF + β + gap + gap-row + N3，`research/prompts/m3-birth-floor-r3-main-verification.md`、
-/// 用户 2026-10-03 定丙；措辞是 `.claude/kb/invariants.md` I-3.5 那一行）：回退候选集（走过的每一版，与 I-7.4 同一份）按 txg 升序，
+/// 用户 2026-10-03 定丙；措辞是 `crates/singlefs-checker/invariants/05-空间记账.md` I-3.5 那一行）：回退候选集（走过的每一版，与 I-7.4 同一份）按 txg 升序，
 /// 同 txg 的几条并成一条（R⁻ 侧引用集合取并，R 侧逐条各判一次），相邻两条 (R⁻, R) 逐对判。R 引用而 R⁻ 不引用的每个单元 b
 /// （第一次出现与再次出现都判）满足 (a) birth(b) > R⁻.txg；或 (b) b 落在 R 树表里一棵用户可见树的子树里，那棵树的根指针出生 txg
 /// 严格小于 R⁻.txg，且 R 里那棵子树每个读得出的单元头的诞生代号都不大于那个出生 txg。birth(b) 取单元头里的诞生代号，头读不出的不判。
@@ -1070,7 +1070,7 @@ impl<'reader> Walk<'reader> {
     ///    四处：树根出生序号与指针不符、inode 叶的出生身份与子指针不符、inode 叶写序实例与子指针不符、
     ///    数据单元头与指针的出生身份不符），池级 checker 自己按字段表解一份，不从实现拿偏移。
     ///    **扫描方向那一半（「任一单元」都按谓词判，i > 挂载根实例 ⇒ 判损坏）池级 checker 判不了**，
-    ///    理由写在 [`PublishedPredicate::holds_for`] 与 `.claude/kb/invariants.md` I-1.2 的状态列里。
+    ///    理由写在 [`PublishedPredicate::holds_for`] 与 `crates/singlefs-checker/invariants/01-块自描述.md` I-1.2 的状态列里。
     ///
     /// ② **I-4.2（无被引用未提交块）**：这几段按 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P2 的
     ///    已发布谓词判成已发布——「未提交」在本工程里就是「按那个谓词判不成已发布」，被引用的块必须已提交。
@@ -1107,7 +1107,7 @@ impl<'reader> Walk<'reader> {
         };
         let is_published = published.holds_for(identity.write_order);
         // 借的是 `instance_table_rows` 这一个字段，`judge` 要的是 `judgements` 那一个：两处不重叠。
-        // 不 clone：层 0 每个崩溃状态都要在每个被引用单元上走一遍这里。
+        // 不 clone：崩溃点重放每个崩溃状态都要在每个被引用单元上走一遍这里。
         let rows = &self.instance_table_rows;
         self.judgements.judge("I-4.2", is_published, || {
             format!(
@@ -2625,7 +2625,7 @@ impl<'reader> Walk<'reader> {
 
     /// 走读不往下读的孩子（墓碑树、谱系树、inode 树内部条目里类型段不认得的，与孩子自证成类型段之外另一类的；墓碑树、谱系树层级 1 节点里
     /// 类型段 0 的，第 31 批 F-L0）：每一份副本照判
-    /// I-2.1（`.claude/kb/invariants.md` I-2.1「任一被引用的块，其校验和与内容匹配」；判决 `research/prompts/m3-batch27-code-r1-main-verification.md`
+    /// I-2.1（`crates/singlefs-checker/invariants/04-校验和.md` I-2.1「任一被引用的块，其校验和与内容匹配」；判决 `research/prompts/m3-batch27-code-r1-main-verification.md`
     /// 第二节 H-J3a、H-J3b 两行与第三节第 1 条）。一份对不对得上按
     /// [`copy_matches_its_location_checksum_at_the_length_its_header_names`] 判；两份都对不上记走读失败（I-4.8、I-7.2、I-7.4 照旧跟着）。
     /// 只判这两样：不往下走，引用由调用方按它定的形状先登记。
@@ -4270,7 +4270,7 @@ const TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8 + 
 /// 一个数据单元占几个 16 KiB 槽（32768 字节，起点 32768 对齐 ⇒ 起点槽号是它的整数倍）：I-5.5 按槽对找落点。
 const DATA_UNIT_SLOTS: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
 
-/// I-9.27：树表条目的头 ID 按种类该等于什么（`.claude/kb/invariants.md` I-9.27 那一行；D8（核心索引结构） 已定项 8「头 ID 8 字节的取值」
+/// I-9.27：树表条目的头 ID 按种类该等于什么（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.27 那一行；D8（核心索引结构） 已定项 8「头 ID 8 字节的取值」
 /// 句末的关系判据：判的是关系，不拿字面 65537 比）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum HeadIdentifierOfATreeTableEntry {
@@ -4766,7 +4766,7 @@ fn judge_an_inode_entry_whose_child_does_not_read_back(
 
 /// 这一遍里读过的码 2 单元：(设备身份, 起点槽, 位置条目里的整单元校验和) → 解开的节点（解不开记 None）。
 /// 候选集里几条根常指着同一个单元（暖机那几代都指着 mkfs 种的第 0 版树表，共享子树在每条根上都要算一遍），
-/// 按位置条目记一份，省掉重复的整单元 CRC——层 0 每个崩溃状态都要跑这一遍。
+/// 按位置条目记一份，省掉重复的整单元 CRC——崩溃点重放每个崩溃状态都要跑这一遍。
 type IndexNodeCache = BTreeMap<(u32, u64, u32), Option<crate::IndexNodeView>>;
 
 fn read_index_node_without_judging(
@@ -4790,7 +4790,7 @@ fn read_index_node_without_judging(
 
 /// 这一遍要走多深。I-9.14（树表条目的诞生 txg 跨根不变） 只要每条根的树表；I-3.9（释放代落在停止引用它的那一格区间里）
 /// 要这条根引用的全部落点，而那要把每棵树都走到叶——最新根那棵账里一条已释放记录都没有时，别的根就不必走那么深
-/// （层 0 上多数崩溃状态是这一类：最新的根还是暖机那几代，树表是空的）。
+/// （崩溃点重放上多数崩溃状态是这一类：最新的根还是暖机那几代，树表是空的）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ReferenceScanDepth {
     TreeTableOnly,
@@ -5533,7 +5533,7 @@ fn open_cluster_segment_named_by_the_tree_table_on_a_device(
 /// 迭代上界：跳过开放段至多一次（候选只增不减），其余每一轮跳过的那一对里至少有一个被占的槽，合计不超过被占槽数 + 1 轮。
 ///
 /// 下面几样 checker 在这一版的盘面上复算不出，只能近似（攻方报告 `research/prompts/m3-formal-code-b17-r1-opus-output.md`
-/// 「K2-1、K2-2 打中之后的四句」第 2 句与「改法表」），都照实写进 `.claude/kb/invariants.md` I-5.5 那一行：
+/// 「K2-1、K2-2 打中之后的四句」第 2 句与「改法表」），都照实写进 `crates/singlefs-checker/invariants/07-分配器.md` I-5.5 那一行：
 /// - 回收门槛：已释放的记录一律当占着。实现按「释放代 ≤ max(F_生效, 环里最旧有效根)」回收（D3（空间分配） 已定项 7 清扫准入），
 ///   这一版根里的 F、txg 与根环槽数盘上有，被抛弃的根与挂载那一刻读不出的槽盘上没有，门槛复算不出；记录在被重新分配之前一直写着已释放。
 ///   ⇒ 写死从 U + 4 起扫的坏实现（攻方 H1）在「U、U + 1 已回收、还没被重新分配」的那几版上判成立，抓不到。
@@ -5588,7 +5588,7 @@ struct TreeTableEntrySighting {
 /// I-3.9（释放代落在停止引用它的那一格区间里）：对最新根那棵账里每条带已释放标志的分配记录，在候选集里取还引用这个落点的
 /// 最新一条有效根（L）与最早不再引用它的有效根（T，L 之后的第一条），释放代必须落在 `(L, T]` 里；每条有效根都还引用它的
 /// （L 之后没有根），它不许带已释放标志。候选集里一条根都没引用过它的（已经回收、还没被复用：见证它释放的根已不在候选集里）
-/// 跳过不判，全是这一类时整条报不适用——三处都照 `.claude/kb/invariants.md` I-3.9 那一行。
+/// 跳过不判，全是这一类时整条报不适用——三处都照 `crates/singlefs-checker/invariants/05-空间记账.md` I-3.9 那一行。
 ///
 /// 为什么是区间：根环里的 txg 可以有洞——一次发布的根槽从没写过、而它的 journal 记录在挂载时被施加（D23（journal 的角色与格式）：
 /// 记录自带新根段），那次发布做的释放就写着一个环里没有根的 txg。`crash_enumeration_fixed_script_stream.rs` 的残留记录那条流
@@ -5935,7 +5935,7 @@ struct VersionToJudgeTheAllocationRecordsOf<'record> {
 }
 
 /// I-5.4（分配记录罩住的槽互不相交）：候选集里每条有效根的分配记录树，同一块盘上任意两条记录（不论已分配、已释放、释放代是否已低于
-/// 回退下界）罩住的槽区间 [槽号, 槽号 + 跨度) 互不相交（`.claude/kb/invariants.md` I-5.4 那一行）。I-5.1（物理范围不重叠） 管的是
+/// 回退下界）罩住的槽区间 [槽号, 槽号 + 跨度) 互不相交（`crates/singlefs-checker/invariants/07-分配器.md` I-5.4 那一行）。I-5.1（物理范围不重叠） 管的是
 /// 树里的引用，判不出记录之间的重叠：代码三方第二轮 Z1-d 的镜像上引用互不重叠，而两条分配记录罩住同一个槽，下一次可写挂载重建分配器时 panic。
 /// 几条根指着同一个分配记录树根时（照抄上一版的根）那棵树只判一次；每个 (树, 盘) 判一格，那块盘上只有一条记录也算判过。
 /// 树按位置寻址、可以多层（D8（核心索引结构） 已定项 14）：整棵读下来，同一块盘上跨叶的记录一起比。
@@ -5984,7 +5984,7 @@ fn judge_allocation_records_disjoint(
     let mut versions_whose_tree_table_pointer_is_all_zero: Vec<String> = Vec::new();
     // 树表读得出、0 条，分配记录树由根记录直接持有（C512（树表 0 条的一版上被换下的单元记在哪））而那棵树走不到叶的那几版：
     // 这一版自己的分配记录树没判（判决 `research/prompts/m3-formal-code-b30-r1-main-verification.md` 第二节 M2「I-5.4 按版本：坏盘」
-    // 那一行改法 F1 的同形，`research/prompts/m3-formal-code-b30-r1-opus-output.md` 第 201 行记下、第 33 批造盘面证实）。
+    // 那一行改法 F1 的同形，`research/prompts/m3-formal-code-b30-r1-opus-output.md`「另记一处同形、没造盘面（推的）」那一段记下、第 33 批造盘面证实）。
     let mut versions_whose_root_record_allocation_record_tree_does_not_read_back: Vec<String> =
         Vec::new();
     for version in versions {
@@ -6263,7 +6263,7 @@ fn allocation_record_node_pointers_of_the_candidate_versions(
 }
 
 /// I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）：任一**未带已释放标志**的分配记录，它的分配代等于它罩住的那个单元头里的
-/// 诞生代号——记录与单元是同一次发布写出来的，两个数同源（`.claude/kb/invariants.md` I-3.10 那一行）。射程照那一行：
+/// 诞生代号——记录与单元是同一次发布写出来的，两个数同源（`crates/singlefs-checker/invariants/05-空间记账.md` I-3.10 那一行）。射程照那一行：
 /// ① 只管未释放的记录（已释放的那一半归 I-3.9（释放代落在停止引用它的那一格区间里））；
 /// ② 记录罩住多个槽时（数据单元跨两槽）取起点槽那个单元头——记录的 key 就是起点槽，按它读；
 /// ③ 那个槽上读不出可用的单元头时这一格没有对象，不判（[`birth_txg_in_a_usable_unit_header`]）。
@@ -6712,7 +6712,7 @@ fn judge_rollback_floor_raises_against_their_ceilings(
             // 带卸载记号那一支：正常卸载把 F 抬到现行那一版的 txg、不另判上限（D16（发布语义） 已定项 1「抬 F 的上限」），
             // 判 F 不高于它之前的根里 txg 最大的那条的 txg。「之前的根」与准入那一支取同一组：txg 比它小、落在锚在这张镜像最新根上的
             // 一圈窗口里（用户 2026-10-04 定「乙，两支都取两个窗口」；同日 RGall 之后锚在它自己 txg 上的那一个被这一个罩住、拿掉）；
-            // 一条都没有（镜像比它新出一圈以上、它前面那几条已被盖掉）这条根不判。记号是不是只由卸载入口打，盘上没有别的东西核它，归层 0（C557）。
+            // 一条都没有（镜像比它新出一圈以上、它前面那几条已被盖掉）这条根不判。记号是不是只由卸载入口打，盘上没有别的东西核它，归崩溃点重放（C557）。
             crate::UnmountMarkerView::WrittenByTheUnmountSequence => {
                 let Some(newest_root_txg_before_the_raise) = roots
                     .iter()
@@ -7162,7 +7162,7 @@ const UNIT_HEADER_CHECKSUM_OFFSET: usize = 10;
 /// 写序那 10 字节里事务号低 48 位从第 4 字节起（D18（块里携带什么信息） 已定项 7：实例代号 4 + 事务号 6）。
 const WRITE_ORDER_TRANSACTION_OFFSET: usize = 4;
 
-/// I-1.8（归并后版本全序） 罩得到的两类单元。码 2 不进这一条（`.claude/kb/invariants.md` I-1.8 逐字「码 2 不进这条」：
+/// I-1.8（归并后版本全序） 罩得到的两类单元。码 2 不进这一条（`crates/singlefs-checker/invariants/01-块自描述.md` I-1.8 逐字「码 2 不进这条」：
 /// 它的写序已收窄成只有实例代号，多版在条目级合并、不在容器级择版本）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ContentUnitClass {
@@ -7189,7 +7189,7 @@ struct ContentUnitHeaderOffsets {
     merge_key_after_payload_checksum: std::ops::Range<usize>,
 }
 
-/// 已发布谓词的输入，按单元类的两种取法分成两个成员（`.claude/kb/invariants.md` I-1.2（块头写序已发布） 那一行逐字：
+/// 已发布谓词的输入，按单元类的两种取法分成两个成员（`crates/singlefs-checker/invariants/01-块自描述.md` I-1.2（块头写序已发布） 那一行逐字：
 /// 「有行 (i, T_pub, W) ⇒ 码 1 要 b ≤ T_pub ∨ n ≤ W、码 2 / 3 要 b ≤ T_pub」）：码 1 那一支带事务号 n，
 /// 码 2 / 码 3 那一支不带——它们的取法不读 n，分成两个成员就不必给一个用不上的 n 编个值。
 /// 码 2 与码 3 在谓词上是同一支，而它们在 I-1.8（归并后版本全序） 上不是（码 2 不进 I-1.8），
@@ -7305,7 +7305,7 @@ impl PublishedPredicate<'_> {
     /// **i > 挂载根实例这一支在这里判成「不是已发布」，不判损坏**：I-1.2（块头写序已发布） 那一行逐字是
     /// 「i > 挂载根实例 ⇒ 判损坏」，而那句话站在恢复刚发布完新根的那一刻——那时不存在比挂载根更高的实例。
     /// 池级 checker 对着的是任意一份崩溃镜像：上一次挂载取了号、写出单元、一个根都没发布就崩了，盘上就有
-    /// i > 最新根实例的单元，而它是合法的在飞垃圾。所以扫描方向这一支判不了（射程见 `.claude/kb/invariants.md`
+    /// i > 最新根实例的单元，而它是合法的在飞垃圾。所以扫描方向这一支判不了（射程见 `crates/singlefs-checker/invariants/01-块自描述.md`
     /// I-1.2 的状态列），这里只把它挡在「已发布」之外：I-1.8（归并后版本全序） 的射程要的正是这个。
     /// 被引用的单元走的是另一条路——遍历方向由 I-4.2（无被引用未提交块） 判，见
     /// [`Walk::judge_birth_identity_of_a_referenced_unit`]。
@@ -7341,7 +7341,7 @@ impl PublishedPredicate<'_> {
 /// I-1.8 ② 的那个全序键。
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum TotalOrderKey {
-    /// 码 3：(诞生代号, 实例代号, 事务号) 三元，诞生代号打头（`.claude/kb/invariants.md` I-1.8 那一行写死）。
+    /// 码 3：(诞生代号, 实例代号, 事务号) 三元，诞生代号打头（`crates/singlefs-checker/invariants/01-块自描述.md` I-1.8 那一行写死）。
     OfPackedRecordUnit(Vec<u64>),
     /// 码 1：**两处条款给的是两个键，没定哪一个作数，这一半停在这里**——I-1.8 那一行逐字「码 1 的键是写序」，
     /// 而 D18（块里携带什么信息） 已定项 1 的射程逐字「同 key 已发布版本的定序靠诞生代号 + 每事务每 key 一种净效果就够，
@@ -7478,7 +7478,7 @@ fn payload_checksum_holds_on_disk(reader: &dyn ImageReader, unit: &ScannedConten
 ///    **② 这一半今天只判码 3**：码 1 的键在两处条款里不是同一个，见 `TotalOrderKey::UndecidedForDataUnit`。
 /// 射程 w = 2（每次写两盘各一份，D2（RAID 条带策略） 已定项 6）：正常镜像上一组就是同一个单元的两个副本。
 /// **「可读」的后半截只在要判红的那一步才现算**：一组里载荷校验和字段全相同时 ① 已经成立、不必把载荷读回来；
-/// 字段不同才逐份验载荷——整单元 CRC 是这里最贵的一步，而层 0 每个崩溃状态都要跑这一遍。
+/// 字段不同才逐份验载荷——整单元 CRC 是这里最贵的一步，而崩溃点重放每个崩溃状态都要跑这一遍。
 /// 交回判了几次：一次都没判到时调用方报「不适用」，不报成立（`test-discipline.md`「检查本身也可能是错的」）。
 fn judge_merged_version_total_order(
     reader: &dyn ImageReader,
@@ -7577,7 +7577,7 @@ const GENESIS_CHECKPOINT_TXG: u64 = 0;
 
 /// I-7.3（环健康性）：S（根槽里自证校验和通过的记录集合）中除代号最大者外，至少还存在一条更早代号的记录，
 /// 不存在即判红——某次提交把上一代直接覆盖了，轮换逻辑已失效。**例外只有一个**：S 全部是第 0 代时判绿
-/// （`.claude/kb/invariants.md` I-7.3 那一行的例外原样照搬；「崩溃后回退到这个态的镜像同样判绿」落在同一支上——
+/// （`crates/singlefs-checker/invariants/02-根环.md` I-7.3 那一行的例外原样照搬；「崩溃后回退到这个态的镜像同样判绿」落在同一支上——
 /// 判据只读 S 里的代号，不读这个态是怎么来的）。
 /// 调用点在 I-7.1（根槽有效集非空） 之后：S 空时这一条报「不适用」，没有「代号最大者」可谈。
 fn judge_root_ring_health(roots: &[(u64, u64, crate::RootView)], judgements: &mut Judgements) {
@@ -8386,7 +8386,7 @@ impl VersionAppliedOnlyByRecords {
 /// ① **它被施加过**：最新那条根指着的实例表里有这个实例的行 (i, Ti, Wi)，而这条记录的 checkpoint_txg ≤ Ti。
 ///    行里的 Ti 就是那次恢复停在哪一版（`crates/singlefs-core/src/mount.rs` 写行时取恢复之后的有效根的 txg），
 ///    施加出来的每一版的 txg 都不超过它；没有这个实例的行 ⇒ 还没有哪一次恢复把它施加出来，环里的记录只是残留
-///    （层 0 残留记录那条流里「链接得到残留记录」的 19 个状态就是这一格：施加要等下一次挂载，这一刻还不算）。
+///    （崩溃点重放残留记录那条流里「链接得到残留记录」的 19 个状态就是这一格：施加要等下一次挂载，这一刻还不算）。
 ///    记录要带提交标记（D23（journal 的角色与格式） 已定项 7：不带的是恢复要丢的尾巴）。
 /// ② **它的根槽读不出**：根环里自证过的根没有一条是 (i, 这个 txg)。读得出的那一版照常由根环那一路走。
 /// ③ **不低于回退下界**：txg ≥ 最新根带的 F，与根环里的候选根同一条（D16（发布语义） 已定项 1）。
@@ -9928,7 +9928,7 @@ fn judge_data_unit_counts_of_the_inodes_being_deleted_against_their_size(
 
 /// I-9.6 墓碑那一半：所选根（最新的那条根）的树表里墓碑树（种类 10）整棵读、不判，交回已发布的（按所选根指着的实例表判，
 /// [`PublishedPredicate`]）墓碑容器里全部记录的对象 ID 最大值，一条都没有时 `Ok(None)`。被崩溃恢复抛弃的时间线上写的墓碑
-/// 不在所选根的墓碑树里（`.claude/kb/invariants.md` I-9.6 那一行）。墓碑树根之下：类型段 1 的条目指码 3 墓碑容器，
+/// 不在所选根的墓碑树里（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.6 那一行）。墓碑树根之下：类型段 1 的条目指码 3 墓碑容器，
 /// 类型段 0 的指下一层码 2 节点（层级 = 父层级 − 1，且 ≥ 1）；读不全交回 [`DeletionScanGap::TombstoneTreeUnreadable`]。
 fn largest_published_tombstone_object_identifier(
     reader: &dyn ImageReader,
@@ -10198,7 +10198,7 @@ const TOMBSTONE_AND_LINEAGE_SCAN_INVARIANTS: [&str; 4] = [
 
 /// 回退候选集滤没滤得掉被崩溃恢复抛弃的根：候选集按最新根指着的实例表判被抛弃的根（D23（journal 的角色与格式） 已定项 14 回退段的候选集规则），
 /// 那张表读不全时滤不全，被抛弃时间线上的根可能进了候选集。I-9.29（同号只许一个出生代） 跨版本比，这时记判不了
-/// （`.claude/kb/invariants.md` I-9.29 那一行「最新根的实例表读不出、被崩溃恢复抛弃的根滤不掉时记判不了」）：被抛弃的线上同号可以是另一个对象。
+/// （`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.29 那一行「最新根的实例表读不出、被崩溃恢复抛弃的根滤不掉时记判不了」）：被抛弃的线上同号可以是另一个对象。
 /// 读没读全看的是候选集滤法用的那一遍（主走读，`Walk::walk_instance_table_chain`），不另读一遍：另一个读法（只读不判的
 /// [`instance_table_rows_of_root_without_judging`]）拒收的比主走读多（载荷 CRC 对不上；I-3.14 的五形两边一样当解不开，第 10k 批、第 10u 批），
 /// 用它当门会在候选集已经滤全时报判不了（判决 `research/prompts/m3-batch23-code-r1-main-verification.md` 第二节 K2 N5）。
@@ -11744,7 +11744,7 @@ fn judge_tombstones_and_the_lineage_of_a_version(
 
 /// I-9.18（删除队列里的号有谱系上的墓碑）在一版的一棵 inode 树上：经头 ID 配这棵树的 `deleted_inodes`（恰好一条）与墓碑树（恰好一条），
 /// 队列里每个号 N 要在墓碑树里有 (N, N 的记录的对象出生代, 整对象) 且死亡 txg 在这一版的父链上；N 没有记录的那一形判不了、不判红
-/// （`.claude/kb/invariants.md` I-9.18 那一行：这一形只让 I-9.5 红）。队列空的一版没有对象。
+/// （`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.18 那一行：这一形只让 I-9.5 红）。队列空的一版没有对象。
 #[allow(
     clippy::too_many_arguments,
     reason = "版本、树表条目、这棵 inode 树与它的记录、墓碑树、父链、缓存与判定累加器各有名字与类型，不为凑短签名收成结构体"
@@ -12404,7 +12404,7 @@ pub fn check_pool_image_given_the_container_capacity_knobs(
         &mut root_ring_judgements,
     );
     // 每块盘两槽里自证过、fsid 与本池相同的系统配置槽（与实现取号同一读法，D18（块里携带什么信息） 已定项 11）：
-    // I-7.12 逐盘比，回退候选集的 F 生效值取它们带的 F 的最大值（C556（checker 与层 0 不读系统配置里的 F））。
+    // I-7.12 逐盘比，回退候选集的 F 生效值取它们带的 F 的最大值（C556（checker 与崩溃点重放不读系统配置里的 F））。
     let verified_system_configurations_of_this_pool: Vec<(
         u32,
         Vec<crate::SystemConfigurationView>,
@@ -12547,7 +12547,7 @@ pub fn check_pool_image_given_the_container_capacity_knobs(
     // 池里自证过的系统配置槽带的 F)。有效 = 按最新根指着的实例表判不是被抛弃的；每块盘取落在它上面的根环区域里 (txg, 实例) 最大的那一条
     // （最新根的实例表读不出时一行都没有、不滤）；被抛弃时间线上的根带的 F 也算进来（D16（发布语义） 已定项 1，用户 2026-09-28 定「算进」）。
     // 只读根上的 F 时，带新 F 的根全坏、系统配置里的新 F 还在的合法镜像上，F 之下、单元已被合法复用的根会被当成候选，
-    // I-7.4（近 K 代块未被复用） 等按候选集判的几条误红（C556（checker 与层 0 不读系统配置里的 F））。
+    // I-7.4（近 K 代块未被复用） 等按候选集判的几条误红（C556（checker 与崩溃点重放不读系统配置里的 F））。
     let mut newest_valid_root_on_each_device: BTreeMap<u32, &crate::RootView> = BTreeMap::new();
     for (region, _, root) in &roots {
         if abandoned_by_the_newest_roots_table(root) {
@@ -12787,7 +12787,7 @@ pub fn check_pool_image_given_the_container_capacity_knobs(
             "扫描方向没有两份归并到一起、或两组归并到同一个 key 的码 1 / 码 3 已发布单元：归并与定序都比不出来",
         );
     }
-    // 这两遍各自按候选集里每条根读树表与树节点：共用一份按位置条目记的缓存，候选根常指着同一个单元，层 0 每个崩溃状态都跑。
+    // 这两遍各自按候选集里每条根读树表与树节点：共用一份按位置条目记的缓存，候选根常指着同一个单元，崩溃点重放每个崩溃状态都跑。
     let mut index_node_cache = IndexNodeCache::new();
     judge_release_generation_and_tree_table_birth(
         reader,
@@ -13928,7 +13928,7 @@ mod tests {
             .1
     }
 
-    /// I-9.27 多于一条种类 2 条目时放宽成「等于其中某一条的树 ID」（`.claude/kb/invariants.md` I-9.27 那一行，收严留给多头那一批）：
+    /// I-9.27 多于一条种类 2 条目时放宽成「等于其中某一条的树 ID」（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.27 那一行，收严留给多头那一批）：
     /// 表里两条 inode 树（65537、65549），extent 树条目的头 ID 写第二条的树 ID 65549——成立；只认第一条的读法在这里误红。
     #[test]
     fn an_extent_entry_naming_the_second_of_two_inode_tree_entries_holds_the_head_identifier_relation(

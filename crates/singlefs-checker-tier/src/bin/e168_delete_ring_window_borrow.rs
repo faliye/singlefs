@@ -17,7 +17,7 @@
 //! 单元、压满之后」那块盘本身（修订第 11 条）。
 //!
 //! 梯子组与阳性对照各格按片并行（登记第十二节修订第 12 条：只改调度、不改判据）：线程数取 `E168_THREADS`，没设取
-//! `SINGLEFS_THREAD_CAP`，都没设取 `available_parallelism`；P4（4 GiB）的片另有一个同时跑的上限 `E168_LARGE_SLICE_THREADS`
+//! `SINGLEFS_THREAD_CAP`，都没设取 `.claude/heavy-thread-default` 的登记值（每台默认重活线程数）；P4（4 GiB）的片另有一个同时跑的上限 `E168_LARGE_SLICE_THREADS`
 //! （没设取 1，8G 在 P4-S4-K144 撞过 oom-kill）。每片打的行先攒着，主线程按片的次序整片打出，线程数不同输出逐字相同；
 //! 每 5 分钟每片往标准错误打一行 `E168-progress`（不进产物）。
 
@@ -26,11 +26,13 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex, Once};
+use std::sync::{Arc, Condvar, Mutex, Once, OnceLock};
 use std::time::Duration;
 
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
+use singlefs_checker_tier::crash_amplification::{GivenStatesEngine, GivenStatesItem};
+use singlefs_checker_tier::crash_given_states::{
+    GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
+};
 use singlefs_core::address::{DeviceIdentity, InstanceGeneration, SlotNumber};
 use singlefs_core::admission::{
     admission_reading_before_a_publish, checkpoint_cost_of_the_version_to_build_on,
@@ -55,44 +57,44 @@ use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::sha256::sha256_hexadecimal;
 
-// 下面这些常量抄自 `crates/singlefs-format/src/lib.rs` 与 `crates/singlefs-core/src/admission.rs`（行号在各自的注释里），
+// 下面这些常量抄自 `crates/singlefs-format/src/lib.rs` 与 `crates/singlefs-core/src/admission.rs`（各自对应的常量名在各自的注释里），
 // 写成本地常量：装置与实现不共用一个数，两边一起错时 `local_constants_against_the_implementation` 逐个回比会红
 // （登记 5.0「装置读 `crates/` 的这些常量时一律写成本地常量加回比断言」）。这一条挡不住 kb 与实现一起取错。
-/// `singlefs-format/src/lib.rs:14`。
+/// `singlefs-format/src/lib.rs` 的 `SLOT_BYTES`。
 const SLOT_BYTES: u64 = 16384;
-/// `singlefs-format/src/lib.rs:20`。
+/// `singlefs-format/src/lib.rs` 的 `DATA_UNIT_BYTES`。
 const DATA_UNIT_BYTES: u64 = 32768;
-/// `singlefs-format/src/lib.rs:238`。
+/// `singlefs-format/src/lib.rs` 的 `ROOT_RING_REGIONS`。
 const ROOT_RING_REGIONS: u64 = 3;
-/// `singlefs-format/src/lib.rs:247`。
+/// `singlefs-format/src/lib.rs` 的 `ROOT_RING_SLOTS_PER_REGION_MINIMUM`。
 const ROOT_RING_SLOTS_PER_REGION_MINIMUM: u64 = 4;
-/// `singlefs-format/src/lib.rs:252`。
+/// `singlefs-format/src/lib.rs` 的 `ROOT_RING_SLOTS_PER_REGION_MAXIMUM`。
 const ROOT_RING_SLOTS_PER_REGION_MAXIMUM: u64 = 16;
-/// `singlefs-format/src/lib.rs:256`。
+/// `singlefs-format/src/lib.rs` 的 `ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM`。
 const ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
-/// `singlefs-format/src/lib.rs:156`；登记 5.4 的产品批大小 K = 144。
+/// `singlefs-format/src/lib.rs` 的 `EXTENT_TREE_LOWER_LEAF_DATA_UNITS`；登记 5.4 的产品批大小 K = 144。
 const EXTENT_TREE_LOWER_LEAF_DATA_UNITS: u64 = 144;
-/// `singlefs-format/src/lib.rs:153`。
+/// `singlefs-format/src/lib.rs` 的 `EXTENT_TREE_INTERNAL_FANOUT`。
 const EXTENT_TREE_INTERNAL_FANOUT: u64 = 147;
-/// `singlefs-format/src/lib.rs:140`。
+/// `singlefs-format/src/lib.rs` 的 `ALLOCATION_RECORD_TREE_LEAF_SLOTS`。
 const ALLOCATION_RECORD_TREE_LEAF_SLOTS: u64 = 812;
-/// `singlefs-format/src/lib.rs:146`。
+/// `singlefs-format/src/lib.rs` 的 `ALLOCATION_RECORD_TREE_INTERNAL_FANOUT`。
 const ALLOCATION_RECORD_TREE_INTERNAL_FANOUT: u64 = 169;
-/// `singlefs-format/src/lib.rs:209`。
+/// `singlefs-format/src/lib.rs` 的 `JOURNAL_RING_START_SLOT`。
 const JOURNAL_RING_START_SLOT: u64 = 1024;
-/// `singlefs-format/src/lib.rs:213`。
+/// `singlefs-format/src/lib.rs` 的 `JOURNAL_RING_DEFAULT_BYTES`。
 const JOURNAL_RING_DEFAULT_BYTES: u64 = 805_306_368;
-/// `singlefs-format/src/lib.rs:271`。
+/// `singlefs-format/src/lib.rs` 的 `CLUSTER_SEGMENT_SLOTS`。
 const CLUSTER_SEGMENT_SLOTS: u64 = 64;
-/// `singlefs-format/src/lib.rs:198`（一条 journal 记录的字节数）。
+/// `singlefs-format/src/lib.rs` 的 `JOURNAL_RECORD_BYTES`（一条 journal 记录的字节数）。
 const JOURNAL_RECORD_BYTES: u64 = 4096;
-/// `singlefs-format/src/lib.rs:228`（F：在飞记录数上限 = 环槽数 ÷ F）。
+/// `singlefs-format/src/lib.rs` 的 `JOURNAL_SAFETY_FACTOR`（F：在飞记录数上限 = 环槽数 ÷ F）。
 const JOURNAL_SAFETY_FACTOR: u64 = 3;
-/// `singlefs-core/src/admission.rs:160`（N_switch）。
+/// `singlefs-core/src/admission.rs` 的 `INSTANCE_SWITCHES_ALLOWED_PER_MOUNT`（N_switch）。
 const INSTANCE_SWITCHES_PER_MOUNT: u64 = 3;
-/// `singlefs-core/src/admission.rs:163`（R）。
+/// `singlefs-core/src/admission.rs` 的 `WARM_UP_EMPTY_PUBLISHES_AT_MOST_PER_INSTANCE_SWITCH`（R）。
 const WARM_UP_EMPTY_PUBLISHES_PER_SWITCH: u64 = 3;
-/// `singlefs-core/src/admission.rs:167`。
+/// `singlefs-core/src/admission.rs` 的 `INSTANCE_ROWS_PER_INSTANCE_TABLE_PAGE`。
 const INSTANCE_ROWS_PER_PAGE: u64 = 369;
 /// `TransactionUnit::InstanceTable.span_slots()`（实例表一片 32768 字节）。
 const INSTANCE_TABLE_PAGE_SLOTS: u64 = 2;
@@ -299,10 +301,8 @@ fn stop_with_the_line(stop_line: String) -> ! {
 
 /// 进度行的间隔（`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」：5 分钟）。
 const PROGRESS_INTERVAL: Duration = Duration::from_secs(300);
-/// 线程数：先读这个，没设读 [`SHARED_THREAD_CAP_ENVIRONMENT_VARIABLE`]，都没设取 `available_parallelism`。
+/// 线程数：先读这个，没设取每台默认重活线程数（`singlefs_harness::heavy_threads`：`SINGLEFS_THREAD_CAP`，再没设取登记值）。
 const THREADS_ENVIRONMENT_VARIABLE: &str = "E168_THREADS";
-/// `scripts/hosts/capped.sh` 设的通用线程上限。
-const SHARED_THREAD_CAP_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_THREAD_CAP";
 /// 大片（P4）同时跑的上限。
 const LARGE_SLICE_THREADS_ENVIRONMENT_VARIABLE: &str = "E168_LARGE_SLICE_THREADS";
 /// 大片上限没设时取 1：P4 上一格单线程就要 8G 以上（2026-10-01 第一段 r3 在 P4-S4-K144 撞 8G oom-kill，r4 用 24G 跑完梯子）。
@@ -608,25 +608,22 @@ fn end_the_run_after_a_slice_panicked(payload: Box<dyn Any + Send>) -> ! {
     std::process::exit(PANIC_EXIT_CODE)
 }
 
-/// 线程数：`E168_THREADS`，没设取 `SINGLEFS_THREAD_CAP`，都没设取 `available_parallelism`；设了而不是正整数就 panic。
-fn thread_count_from(
-    e168_threads: Option<&str>,
-    shared_thread_cap: Option<&str>,
-    available_parallelism: usize,
-) -> usize {
-    for (variable, value) in [
-        (THREADS_ENVIRONMENT_VARIABLE, e168_threads),
-        (SHARED_THREAD_CAP_ENVIRONMENT_VARIABLE, shared_thread_cap),
-    ] {
-        if let Some(text) = value {
-            return text
-                .parse::<usize>()
-                .ok()
-                .filter(|thread_count| *thread_count > 0)
-                .unwrap_or_else(|| panic!("{variable} 要是正整数，收到的是「{text}」"));
-        }
+/// 线程数：`E168_THREADS`，没设取每台默认重活线程数（`thread_cap_value` 是 `SINGLEFS_THREAD_CAP` 的值，设了照它，再没设取
+/// `.claude/heavy-thread-default` 的登记值；那一级在 `singlefs_harness::heavy_threads`，这里不另留一份）；设了而不是正整数就 panic。
+fn thread_count_from(e168_threads: Option<&str>, thread_cap_value: Option<&str>) -> usize {
+    match e168_threads {
+        Some(text) => text
+            .parse::<usize>()
+            .ok()
+            .filter(|thread_count| *thread_count > 0)
+            .unwrap_or_else(|| {
+                panic!("{THREADS_ENVIRONMENT_VARIABLE} 要是正整数，收到的是「{text}」")
+            }),
+        None => singlefs_harness::heavy_threads::default_heavy_threads_of_the_cap_value(
+            thread_cap_value,
+        )
+        .get(),
     }
-    available_parallelism
 }
 
 /// 大片上限：`E168_LARGE_SLICE_THREADS`，没设取 [`LARGE_SLICE_THREADS_WHEN_UNSET`]；设了而不是正整数就 panic。
@@ -647,8 +644,7 @@ fn slice_scheduling_from_the_environment() -> SliceScheduling {
     let scheduling = SliceScheduling {
         thread_count: thread_count_from(
             read(THREADS_ENVIRONMENT_VARIABLE).as_deref(),
-            read(SHARED_THREAD_CAP_ENVIRONMENT_VARIABLE).as_deref(),
-            std::thread::available_parallelism().map_or(1, std::num::NonZero::get),
+            read(singlefs_harness::heavy_threads::THREAD_CAP_ENVIRONMENT_VARIABLE).as_deref(),
         ),
         large_slice_thread_count: large_slice_thread_count_from(
             read(LARGE_SLICE_THREADS_ENVIRONMENT_VARIABLE).as_deref(),
@@ -692,7 +688,7 @@ fn allocation_record_tree_span_in_slots_at_level(level: u32) -> u64 {
     ALLOCATION_RECORD_TREE_LEAF_SLOTS * ALLOCATION_RECORD_TREE_INTERNAL_FANOUT.pow(level)
 }
 
-/// 分配记录树的根层级（`allocation_record_tree.rs:92` 的规则）：最小的 R 使 Σ_盘 ⌈盘绝对槽数 ÷ S_(R−1)⌉ ≤ 169。
+/// 分配记录树的根层级（`allocation_record_tree.rs` 的 `AllocationRecordTreeGeometry::of_devices` 的规则）：最小的 R 使 Σ_盘 ⌈盘绝对槽数 ÷ S_(R−1)⌉ ≤ 169。
 fn allocation_record_tree_root_level(absolute_slots_of_each_device: &[u64]) -> u32 {
     let mut root_level = 1;
     loop {
@@ -738,7 +734,7 @@ fn allocation_record_tree_positions_by_the_clause(
     (root_level, 1 + positions_below_the_root)
 }
 
-/// 单元区起点 = journal 环起点 + ⌈环长 ÷ 16384⌉（`journal.rs:185`）。
+/// 单元区起点 = journal 环起点 + ⌈环长 ÷ 16384⌉（`journal.rs` 的 `slot_after_the_journal_ring`）。
 fn unit_area_start_slot(journal_ring_bytes: u64) -> u64 {
     JOURNAL_RING_START_SLOT + journal_ring_bytes.div_ceil(SLOT_BYTES)
 }
@@ -1256,16 +1252,60 @@ fn device_image_digest(device: &SparseBlockDevice) -> String {
     sha256_hexadecimal(digests.as_bytes())
 }
 
-/// 池级 checker 判红的不变量（停机条款 S7）。
-fn checker_violations(image: &MemoryPool) -> Vec<String> {
-    check_pool_image(image)
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(detail) => Some(format!("{invariant}:{detail}")),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
+/// 这份装置判池级 checker 的给定状态引擎（进程里一份，第一次用时起；用户 2026-10-13 定「能走两段的都走两段」）：每张要判的盘作一张给定状态表，
+/// 录入段写进家目录下给定状态表那一类的判定库，判段从库里读回判（配了 GPU 且编进了 `gpu` 特性在卡上判，否则由 CPU 判器判），判过的复用。
+/// 产物只收这份装置自己打的行：引擎不调 `finish`，不打收尾行。
+///
+/// # Panics
+/// 引擎起不了（配了 GPU 卡用不上、结论版本与编译时对不上……都不退回 CPU）。
+fn given_states_engine_of_this_experiment() -> &'static GivenStatesEngine {
+    static ENGINE: OnceLock<GivenStatesEngine> = OnceLock::new();
+    ENGINE.get_or_init(|| {
+        GivenStatesEngine::start_from_environment(
+            GivenStatesItem {
+                item_name: "e168_delete_ring_window_borrow".to_string(),
+                setting_file: "crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs"
+                    .to_string(),
+                seeds_and_scale: "fixed".to_string(),
+            },
+            &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
+        )
+        .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+    })
+}
+
+/// 池级 checker 判红的不变量（停机条款 S7），「不变量:细节」一条一项：那张盘作一张给定状态表（基线就是那张盘、写表空、一个空持久集合）
+/// 交 [`given_states_engine_of_this_experiment`] 两段判。细节是这一趟 CPU 判的才带原句，GPU 判的与从库里读回的是
+/// `crash_given_states::POOL_CHECKER_VIOLATION_WITHOUT_ITS_DETAIL` 那一句（只进停机行，产物行只打条数 0）。
+///
+/// # Panics
+/// 引擎判不了这张表（不退回别处判）；这一趟只录、或这张表归别的机器判（实验装置不分两趟跑、不分片）。
+fn checker_violations(table_name: &str, image: &MemoryPool) -> Vec<String> {
+    let judged = given_states_engine_of_this_experiment()
+        .judge_the_given_states(&GivenStatesOfATable {
+            table_name: table_name.to_string(),
+            base: image,
+            writes: &[],
+            segments: &[],
+            seams: &[],
+            persisted_sets: vec![Vec::new()],
         })
+        .unwrap_or_else(|reason| {
+            panic!("给定状态表 {table_name} 判不了（不退回别处判）：{reason}")
+        });
+    match judged.source {
+        GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+        GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
+        | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => panic!(
+            "实验装置不分只录、只判两趟跑，也不分片：起它时不设 SINGLEFS_CRASH_AMPLIFICATION_STAGE 与 SINGLEFS_CRASH_AMPLIFICATION_SHARE（{table_name}）"
+        ),
+    }
+    judged
+        .states
+        .iter()
+        .flat_map(|state| state.pool_checker_violations())
+        .map(|(invariant, detail)| format!("{invariant}:{detail}"))
         .collect()
 }
 
@@ -2576,7 +2616,7 @@ fn check_the_finished_delete(
             ),
         );
     }
-    let violations = checker_violations(&pool.image());
+    let violations = checker_violations(&format!("s7-finished-delete/{label}"), &pool.image());
     if remaining_data_units != 0 || publishes != expected_publishes || !violations.is_empty() {
         stop_with(
             "s7_finished_delete_is_not_what_the_patch_should_leave",
@@ -4257,6 +4297,12 @@ mod tests {
 
     #[test]
     fn a_publish_after_the_filled_slots_are_unmarked_leaves_a_pool_the_checker_holds() {
+        // 池级 checker 那一判经给定状态表两段判：配置开了 GPU 而这份二进制没编进 gpu 特性时判段不跑，照本次未跑交回
+        if singlefs_checker_tier::crash_amplification::judging_test_not_run_without_the_gpu_feature(
+            "e168_delete_ring_window_borrow::a_publish_after_the_filled_slots_are_unmarked_leaves_a_pool_the_checker_holds",
+        ) {
+            return;
+        }
         let PoolWithAFile::Written(mut pool) = pool_with_a_file(
             narrow_geometry_with_the_ring_window_reserved(ROOT_RING_SLOTS_PER_REGION_MINIMUM),
             1,
@@ -4292,7 +4338,10 @@ mod tests {
             panic!("撤掉压满之后式子可用回到压满之前，覆盖写一个单元放得进：{refusal:?}");
         }
         assert_eq!(
-            checker_violations(&pool.image()),
+            checker_violations(
+                "unit-test/a-publish-after-the-filled-slots-are-unmarked",
+                &pool.image()
+            ),
             Vec::<String>::new(),
             "撤掉压满之后再发一次，记账按分配器重写，checker 不判红（不撤就是 S7 那两条 I-3.1、I-3.11）"
         );
@@ -4507,21 +4556,22 @@ mod tests {
     }
 
     #[test]
-    fn thread_count_reads_e168_threads_first_then_the_shared_cap_then_the_available_parallelism() {
+    fn thread_count_reads_e168_threads_first_then_the_shared_cap_then_the_registered_heavy_thread_default(
+    ) {
         assert_eq!(
-            thread_count_from(Some("3"), Some("8"), 16),
+            thread_count_from(Some("3"), Some("8")),
             3,
             "E168_THREADS 先读"
         );
         assert_eq!(
-            thread_count_from(None, Some("8"), 16),
+            thread_count_from(None, Some("8")),
             8,
             "没设 E168_THREADS 读 SINGLEFS_THREAD_CAP"
         );
         assert_eq!(
-            thread_count_from(None, None, 16),
-            16,
-            "都没设取 available_parallelism"
+            thread_count_from(None, None),
+            singlefs_harness::heavy_threads::registered_heavy_threads().get(),
+            "都没设取 .claude/heavy-thread-default 的登记值，不取本机核数"
         );
         assert_eq!(large_slice_thread_count_from(None), 1, "大片上限没设取 1");
         assert_eq!(

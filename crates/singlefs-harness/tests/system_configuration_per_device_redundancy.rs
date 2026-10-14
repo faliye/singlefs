@@ -6,11 +6,16 @@
 //! （攻方腿 K1 的冻结证据，不回改也不搬进来）；那里的断言钉的是修之前「当场 return Err」的样子，这里跟着改法翻面。
 //! 「读不出来」在这里摆在 `PoolReader` 这一层：它的文档写的就是「读不到（没有那块盘、越界）返回 None」，
 //! 块设备报 I/O 错时恢复看到的也正是 None（`impl PoolReader for [(DeviceIdentity, Device)]` 里的 `.ok()?`）。
-
 mod common;
+mod common_images_for_the_checker_tier;
+#[path = "common_images_for_the_checker_tier/system_configuration_per_device_redundancy.rs"]
+mod scenarios_of_system_configuration_per_device_redundancy;
 
 use common::{build_pool, file_content, parameters};
-use singlefs_checker::image::InvariantVerdict;
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use scenarios_of_system_configuration_per_device_redundancy::{
+    system_configuration_slot_offsets, BYTE_FLIPPED_IN_THE_RESERVED_AREA_OF_THE_SLOT,
+};
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
@@ -21,11 +26,6 @@ use singlefs_core::recovery::{
 use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES;
 use singlefs_harness::memory_pool::MemoryPool;
-
-/// 翻掉槽里的这一个字节来制造「读得出来但自证不过」：它落在系统配置槽的保留区，
-/// magic（0..4）、incompat 位图（6..38）、宽校验和字段（155..187）都不含它，
-/// 于是只有覆盖整槽的那个宽校验和抓得到它（`SystemConfiguration::parse_slot` 的三道检查）。
-const BYTE_FLIPPED_IN_THE_RESERVED_AREA_OF_THE_SLOT: u64 = 2048;
 
 /// 把点名的那几个系统配置槽读成「读不出来」：`PoolReader::read` 对那几个 (盘, 盘内偏移) 返回 None，
 /// 别的盘、别的偏移原样透传给底下的镜像。根环、journal 环、单元区一个字节都没动，
@@ -93,12 +93,6 @@ impl PoolReader for PoolWithUnreadableSystemConfigurationSlots<'_> {
         self.image
             .journal_record_offsets_hint(device, ring_start, ring_bytes)
     }
-}
-
-/// 一块盘上两个系统配置槽的盘内偏移：槽 0 在 0，槽 1 在槽距处（D22（单元原子性怎么合成） 已定项 16）。
-fn system_configuration_slot_offsets() -> [DeviceOffsetInBytes; 2] {
-    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
-    [DeviceOffsetInBytes(0), DeviceOffsetInBytes(spacing)]
 }
 
 /// 完好的池恢复出来的那一版：第一个文件的内容与它那条根。往下每条用例都跟它逐项比。
@@ -270,57 +264,11 @@ fn no_valid_system_configuration_slot_on_any_device_fails_and_names_the_first_de
     );
 }
 
-/// 池级 checker 对这种镜像不许整片报「不适用」：一块盘的两个系统配置槽都自证不过时，
-/// 恢复改用别的盘那一份、照常挂上，checker 早退就等于对一个挂得上的合法镜像一条都不判
-/// （`.claude/kb/checks-owed.md` 的 C461）。故障注入让一块盘的两个槽先后写失败就造得出它。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_system_configuration_per_device_redundancy::the_pool_checker_still_judges_every_invariant_when_one_device_has_no_valid_system_configuration`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn the_pool_checker_still_judges_every_invariant_when_one_device_has_no_valid_system_configuration()
 {
-    let pool = build_pool("system-configuration-redundancy-checker-still-judges");
-    let mut image = pool.memory_pool();
-
-    let clean = singlefs_checker::walk::check_pool_image(&image);
-    let clean_not_applicable = clean
-        .iter()
-        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::NotApplicable(_)))
-        .count();
-
-    for offset in system_configuration_slot_offsets() {
-        image.flip_byte(
-            DeviceIdentity(0),
-            offset,
-            BYTE_FLIPPED_IN_THE_RESERVED_AREA_OF_THE_SLOT,
-        );
-    }
-    let after = singlefs_checker::walk::check_pool_image(&image);
-    let after_not_applicable = after
-        .iter()
-        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::NotApplicable(_)))
-        .count();
-
-    assert_eq!(
-        after.len(),
-        clean.len(),
-        "报出来的条数不变：一块盘的系统配置全废不改变要判哪些不变量"
-    );
-    assert!(
-        after_not_applicable < after.len(),
-        "不许整片报不适用：{after_not_applicable}/{} 条不适用",
-        after.len()
-    );
-    let newly_not_applicable: Vec<&str> = after
-        .iter()
-        .filter(|(invariant, verdict)| {
-            matches!(verdict, InvariantVerdict::NotApplicable(_))
-                && clean.iter().any(|(clean_invariant, clean_verdict)| {
-                    clean_invariant == invariant
-                        && !matches!(clean_verdict, InvariantVerdict::NotApplicable(_))
-                })
-        })
-        .map(|(invariant, _)| *invariant)
-        .collect();
-    assert!(
-        newly_not_applicable.len() <= 1,
-        "坏掉盘 0 的系统配置最多让一条从判得了变成判不了，实际 {newly_not_applicable:?}（干净镜像上不适用 {clean_not_applicable} 条）"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_system_configuration_per_device_redundancy::the_pool_checker_still_judges_every_invariant_when_one_device_has_no_valid_system_configuration,
     );
 }

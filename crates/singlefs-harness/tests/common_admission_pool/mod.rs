@@ -1,5 +1,5 @@
 //! 准入那几条用例的池：两块内存稀疏盘上 mkfs、取号、暖机、第一个文件，之后经挂着的会话（`singlefs_core::mounted_session`）发布、
-//! 崩了再挂，记下每条根带的文件内容（层 0 的 oracle 按它判读回什么）。
+//! 崩了再挂，记下每条根带的文件内容（崩溃点重放的 oracle 按它判读回什么）。
 //! 这一份不引随机历史脚手架（`singlefs_harness::history`）与它带的故障注入、对拍：登记的崩溃枚举用例
 //! `crash_enumeration_floor_raise_pushed_by_admission.rs` 直接经它搭池，引了那几份，改随机历史就让那一格整格重判
 //! （`crates/singlefs-checker-tier/src/crash_identity.rs` 的 `RANDOM_HISTORY_SCAFFOLDING_FILE`）。
@@ -8,8 +8,6 @@
 
 use std::collections::BTreeMap;
 
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::allocator::UnitAreaStart;
@@ -108,7 +106,7 @@ impl DeviceOverASparseImage for RecordingBlockDevice<SparseBlockDevice> {
     }
 }
 
-/// 用例里的一个池：两块盘、这一刻的会话（没有会话 = 进程退出之后还没挂），与每条写过的根带的文件内容（层 0 的 oracle 按它判读回什么）。
+/// 用例里的一个池：两块盘、这一刻的会话（没有会话 = 进程退出之后还没挂），与每条写过的根带的文件内容（崩溃点重放的 oracle 按它判读回什么）。
 pub struct PoolUnderTest<Device: DeviceOverASparseImage> {
     pub parameters: MakeFilesystemParameters,
     pub device_bytes: u64,
@@ -356,7 +354,7 @@ impl<Device: DeviceOverASparseImage> PoolUnderTest<Device> {
         )
     }
 
-    /// 已写过的每一版（(实例, txg) → 文件内容）：层 0 的 oracle 按实际走的根判读回的是哪一版。
+    /// 已写过的每一版（(实例, txg) → 文件内容）：崩溃点重放的 oracle 按实际走的根判读回的是哪一版。
     pub fn published_versions(&self) -> Vec<PublishedVersion> {
         self.content_of_each_root
             .iter()
@@ -367,19 +365,6 @@ impl<Device: DeviceOverASparseImage> PoolUnderTest<Device> {
             })
             .collect()
     }
-}
-
-/// 一份镜像上池级 checker 判违例的那几条（名字加第一处）。
-pub fn checker_violations_on(image: &MemoryPool) -> Vec<String> {
-    check_pool_image(image)
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(detail) => Some(format!("{invariant}: {detail}")),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .collect()
 }
 
 pub fn plain_device(_identity: DeviceIdentity, device: SparseBlockDevice) -> SparseBlockDevice {

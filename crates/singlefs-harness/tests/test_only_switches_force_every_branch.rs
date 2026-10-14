@@ -8,12 +8,16 @@
 //! 见 `reuse_window_forced_to_zero_...`）；根槽读失败撑的是必红八条第八条的 ② 格（在
 //! `rollback_by_a_forward_publish.rs`），以及 C332（回退实例两个根都读不出时回退被撤销）、
 //! C335（根槽持续读不出时实例表只增不减）、C393（被抛弃根的账读不出时修复没有条款）。
-
 mod common;
+mod common_images_for_the_checker_tier;
+#[path = "common_images_for_the_checker_tier/test_only_switches_force_every_branch.rs"]
+mod scenarios_of_test_only_switches_force_every_branch;
 
-use common::{build_pool, geometry, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
+use common::{build_pool, geometry, parameters};
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use scenarios_of_test_only_switches_force_every_branch::{
+    content_of, overwrite_in_process, run_two_overwrites_with,
+};
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
 use singlefs_core::allocator::ReuseWindow;
 use singlefs_core::recovery::{
@@ -21,80 +25,11 @@ use singlefs_core::recovery::{
     RecoveryFailure, RecoveryOutcome,
 };
 use singlefs_core::root_ring::{target_for_publish, RootRingSlot, RootRingSlotsPerRegion};
-use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
 use singlefs_harness::fault_injection::{
     FaultInjectingBlockDevice, FaultSchedule, NamedRootRingSlots,
     PoolReaderWithUnreadableRootRingSlots, RootRingSlotTarget, SharedFaultPlan,
 };
 use singlefs_harness::memory_pool::MemoryPool;
-
-fn content_of(length: usize, seed: usize) -> Vec<u8> {
-    (0..length)
-        .map(|index| u8::try_from((index * 7 + seed) % 253).expect("小于 256"))
-        .collect()
-}
-
-fn overwrite_in_process(
-    pool: &mut BuiltPool,
-    content: &[u8],
-    instance: InstanceGeneration,
-) -> TransactionOutput {
-    let publish_parameters = parameters();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
-    let previous = pool.output.clone();
-    let output = publish_overwrite(
-        &mut writer,
-        &mut pool.allocator,
-        &previous,
-        FirstFile {
-            content,
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
-        },
-        instance,
-    )
-    .expect("覆盖写");
-    pool.output = output.clone();
-    output
-}
-
-/// 一次跑的可观测读数：开关自己报的分支名、它在 `release` 里当场回收掉的落点数、两次覆盖写的数据落点、
-/// 第一个文件那一版（txg 3，F = 0 时仍是候选根）的数据落点、checker 判红的不变量。
-struct ReuseWindowRun {
-    branch_name: &'static str,
-    reclaimed_on_release: u64,
-    first_file_data_slot: SlotNumber,
-    overwrite_data_slots: [SlotNumber; 2],
-    violated_invariants: Vec<String>,
-}
-
-/// 同一条固定脚本跑一遍：mkfs → 新池新建文件（txg 3）→ 覆盖写两次（txg 4、5），复用窗口按入参装。
-fn run_two_overwrites_with(reuse_window: ReuseWindow, tag: &str) -> ReuseWindowRun {
-    let mut pool = build_pool(tag);
-    pool.allocator.set_reuse_window(reuse_window);
-    let first_file_data_slot = pool.output.data_pointers[0].locations[0].slot;
-    let fourth = overwrite_in_process(&mut pool, &content_of(3100, 3), InstanceGeneration(1));
-    let fifth = overwrite_in_process(&mut pool, &content_of(2900, 7), InstanceGeneration(1));
-    assert_eq!(fourth.root.checkpoint_txg, CheckpointTxg(4));
-    assert_eq!(fifth.root.checkpoint_txg, CheckpointTxg(5));
-    let verdicts = check_pool_image(&pool.memory_pool());
-    ReuseWindowRun {
-        branch_name: pool.allocator.reuse_window().name(),
-        reclaimed_on_release: pool
-            .allocator
-            .placements_reclaimed_on_release_by_the_forced_zero_reuse_window(),
-        first_file_data_slot,
-        overwrite_data_slots: [
-            fourth.data_pointers[0].locations[0].slot,
-            fifth.data_pointers[0].locations[0].slot,
-        ],
-        violated_invariants: verdicts
-            .iter()
-            .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
-            .map(|(name, _)| (*name).to_string())
-            .collect(),
-    }
-}
 
 /// 开关一：复用窗口置 0，证明它改变了走的分支。同一条脚本两遍，比的是**落点**：
 /// 关着（产品路径）时释放的槽要等 F 抬到释放代之上才可再分配，两次覆盖写都往前拿新槽；
@@ -173,34 +108,12 @@ fn the_forced_zero_reuse_window_switch_makes_the_second_overwrite_land_on_a_slot
     );
 }
 
-/// 必红八条第四条（复用窗口置 0，C22（刚释放的块立即重分配））：**走正常的发布路径**把复用造出来——
-/// 开关装在分配器上，释放与再分配都由 `publish_overwrite` 自己做，用例一次都不调回收。
-/// F = 0 ⇒ txg 3 那条根还在回退候选集里，而它引用的数据单元已经被 txg 5 那一版盖掉 ⇒
-/// checker 从那条根走进去，校验和对不上（I-2.1）、近 K 代根不自洽（I-4.8）。
-/// 关着时同一条脚本全绿：判别力自证就是这两遍的差。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_test_only_switches_force_every_branch::reuse_window_forced_to_zero_lets_a_publish_overwrite_a_unit_a_candidate_root_still_references_and_the_checker_goes_red`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn reuse_window_forced_to_zero_lets_a_publish_overwrite_a_unit_a_candidate_root_still_references_and_the_checker_goes_red(
 ) {
-    let gated = run_two_overwrites_with(
-        ReuseWindow::GatedByTheRollbackFloor,
-        "must-red-reuse-window-gated",
-    );
-    assert!(
-        gated.violated_invariants.is_empty(),
-        "关着时 checker 全绿：{:?}",
-        gated.violated_invariants
-    );
-
-    let forced = run_two_overwrites_with(ReuseWindow::ForcedToZero, "must-red-reuse-window-forced");
-    assert!(
-        forced.violated_invariants.contains(&"I-2.1".to_string()),
-        "被盖掉的那片数据的校验和与父指针对不上：{:?}",
-        forced.violated_invariants
-    );
-    assert!(
-        forced.violated_invariants.contains(&"I-4.8".to_string()),
-        "从候选根出发的遍历要红（C22（刚释放的块立即重分配） 第 ② 条点名 I-4.8）：{:?}",
-        forced.violated_invariants
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_test_only_switches_force_every_branch::reuse_window_forced_to_zero_lets_a_publish_overwrite_a_unit_a_candidate_root_still_references_and_the_checker_goes_red,
     );
 }
 

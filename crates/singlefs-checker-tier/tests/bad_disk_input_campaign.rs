@@ -1,4 +1,4 @@
-//! checker 档模块：bad_disk_input
+//! checker 档模块：crash、bad_disk_input、crash_amplification、gpu_unit_checks、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
 //! 里程碑「覆盖写、释放、回退与复用」增补 3 第 5 件：坏盘输入。合法镜像由第 1 件的生成器造（`singlefs_harness::history`），
 //! 坏法、三个读者与判定在 `singlefs_checker_tier::bad_disk_input`；这里是快档（普通 `cargo test`）、逐个坏法的落点、
 //! 判别力自证与大档（`#[ignore]`，规模从环境变量取）。
@@ -1147,8 +1147,9 @@ fn replay_line_of_a_batch_unlike_the_large_tier_defaults_runs_the_same_campaign_
         seed_count: 3,
         operations_per_history: 11,
         weights: GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
+        // 每一步的池级 checker 只剩不跑那一种（那一遍归 checker 档两段），那一项取不出与默认不同的值，前提断言不核它
         execution: HistoryExecution {
-            per_step_checker: PerStepChecker::Run,
+            per_step_checker: PerStepChecker::Skipped,
             device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
             space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
         },
@@ -1160,10 +1161,9 @@ fn replay_line_of_a_batch_unlike_the_large_tier_defaults_runs_the_same_campaign_
             && campaign.seed_count != defaults.seed_count
             && campaign.operations_per_history != defaults.operations_per_history
             && campaign.weights != defaults.weights
-            && campaign.execution.per_step_checker != defaults.execution.per_step_checker
             && campaign.execution.device_width != defaults.execution.device_width
             && campaign.execution.space_admission != defaults.execution.space_admission,
-        "前提：这一批的每一项都与大档的默认不同：{campaign:?} 对 {defaults:?}"
+        "前提：这一批除每一步的池级 checker 之外的每一项都与大档的默认不同：{campaign:?} 对 {defaults:?}"
     );
     the_replay_line_printed_for_a_batch_runs_the_same_campaign_on_the_large_tier_entry(&campaign);
 }
@@ -1204,4 +1204,205 @@ fn base_image_for(seed: HistorySeed) -> BaseImageForOneHistory {
         ),
         committed_contents,
     }
+}
+
+/// GPU 判器对坏输入的对拍跑多少段：快档头这几段（每段步数、比重、执行器与快档相同，每段两档基线、每档全部坏法）。
+#[cfg(feature = "gpu")]
+const GPU_PAIRING_SEEDS: u64 = 2;
+
+/// 一份坏镜像上两边的结论怎么比：两边都判了、逐条不变量判到位与违例位都相同；不同；GPU 判不了（建不出判表，或结论里判不了那一位，
+/// 不算相同，逐张报出）；CPU 池级 checker 在它上面 panic 了（快档那一判照旧判红，这里不算相同）。
+#[cfg(feature = "gpu")]
+#[derive(Debug)]
+enum DamagedImagePairing {
+    Same,
+    Different { cpu: String, gpu: String },
+    GpuCouldNotJudge { why: String },
+    CpuCheckerPanicked { panic: String },
+}
+
+/// 坏盘输入的 GPU 对拍（用户 2026-10-13 定：被测对象含池级 checker 本身的那一截留在 CPU、登豁免，GPU 判器对坏输入的行为另对拍）：
+/// 快档头 [`GPU_PAIRING_SEEDS`] 段的每一份坏镜像（`feed_bad_disk_inputs_from_history_handing_out_the_damaged_images` 交出的那一组），
+/// 两边的输入都经对拍那一类的库：GPU 那一侧把坏镜像当基线、一个空持久集合建判表，判表先入库再读回上卡（项名按种子、基线档、坏法起）；
+/// CPU 那一侧把坏镜像作一张给定状态表写进库、读回，池级 checker 判读回的那一份。逐张比池级 checker 逐条判到位与违例位；
+/// GPU 判不了的那几张逐张报出、不算相同；张数对账：比了的、判不了的、CPU panic 的加起来就是交出的坏镜像数。
+/// 要本机一张 NVIDIA 独显：一张适配器都没有时打一行 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」。
+/// 判别力：比的时候漏一张（张数对账少一张）、或 CPU 那一侧判的不是从库里读回的那一份坏镜像（读回的另一张），这里红。
+#[cfg(feature = "gpu")]
+#[test]
+// cpu-reference-for-gpu-comparison
+fn the_gpu_judge_agrees_with_the_cpu_pool_checker_on_every_damaged_image_of_the_first_fast_tier_seeds(
+) {
+    use singlefs_checker::walk::check_pool_image;
+    use singlefs_checker_tier::bad_disk_input::feed_bad_disk_inputs_from_history_handing_out_the_damaged_images;
+    use singlefs_checker_tier::crash::CrashPointReplaySegmentExpansion;
+    use singlefs_checker_tier::crash_amplification::RecordedGivenStatesTable;
+    use singlefs_checker_tier::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
+    use singlefs_checker_tier::crash_judge_gpu::{
+        cross_check_words_of_gpu_verdict, pool_checker_violated_and_judged_bits,
+    };
+    use singlefs_checker_tier::crash_judge_tables::{
+        build_judge_tables_for_the_given_persisted_sets, JudgeFlow,
+    };
+    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
+        cpu_reference_table_read_back_from_the_pairing_library, gpu_card_pool_or_report_not_run,
+    };
+    use singlefs_harness::history::with_panic_capture;
+
+    const TEST_NAME: &str =
+        "the_gpu_judge_agrees_with_the_cpu_pool_checker_on_every_damaged_image_of_the_first_fast_tier_seeds";
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let mut damaged_images: Vec<(String, DamagedImage)> = Vec::new();
+    for seed_offset in 0..GPU_PAIRING_SEEDS {
+        let seed = HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + seed_offset);
+        let _fed = feed_bad_disk_inputs_from_history_handing_out_the_damaged_images(
+            seed,
+            FAST_TIER_OPERATIONS_PER_HISTORY,
+            &GenerationWeights::BROAD,
+            UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            &mut |tier, damaged| {
+                let tier_index = EVERY_BASE_IMAGE_TIER
+                    .iter()
+                    .position(|candidate| *candidate == tier)
+                    .expect("交出的基线档在全集里");
+                let kind_index = EVERY_DAMAGE_KIND
+                    .iter()
+                    .position(|candidate| *candidate == damaged.kind)
+                    .expect("交出的坏法在全集里");
+                damaged_images.push((
+                    format!(
+                        "{TEST_NAME}/seed-{}/tier-{tier_index}/kind-{kind_index}",
+                        seed.0
+                    ),
+                    damaged.clone(),
+                ));
+            },
+        );
+    }
+    assert!(
+        !damaged_images.is_empty(),
+        "快档头 {GPU_PAIRING_SEEDS} 段一份坏镜像都没交出来"
+    );
+    let not_expanded =
+        |_segment_index: usize, _segment: &[usize]| CrashPointReplaySegmentExpansion::NotExpanded;
+    let mut pairings: Vec<(String, String, DamagedImagePairing)> = Vec::new();
+    for (item_name, damaged) in &damaged_images {
+        let Some(read_back) =
+            cpu_reference_table_read_back_from_the_pairing_library(&RecordedGivenStatesTable {
+                table_name: item_name.clone(),
+                base: damaged.image.clone(),
+                writes: Vec::new(),
+                segments: Vec::new(),
+                seams: Vec::new(),
+                persisted_sets: vec![Vec::new()],
+            })
+        else {
+            return;
+        };
+        let cpu = with_panic_capture(|| check_pool_image(&read_back.base))
+            .map(|verdicts| pool_checker_violated_and_judged_bits(&verdicts));
+        let tables = build_judge_tables_for_the_given_persisted_sets(
+            &JudgeFlow {
+                base: &damaged.image,
+                writes: &[],
+                segments: &[],
+                judged_root_index: 0,
+                versions: &[],
+                expansion: &not_expanded,
+            },
+            &[],
+            vec![Vec::new()],
+        );
+        let pairing = match (cpu, tables) {
+            (Err(panic), _) => DamagedImagePairing::CpuCheckerPanicked {
+                panic: format!("{panic:?}"),
+            },
+            (Ok(_), Err(refusal)) => DamagedImagePairing::GpuCouldNotJudge {
+                why: format!("建不出判表：{refusal:?}"),
+            },
+            (Ok((cpu_violated, cpu_judged)), Ok(tables)) => {
+                let Some(gpu) =
+                    judge_every_state_on_a_card_leased_from_the_pool(cards, item_name, &tables)
+                else {
+                    return;
+                };
+                let [gpu_words] = gpu.as_slice() else {
+                    panic!("{item_name}：一个状态一份结论，交回 {} 份", gpu.len());
+                };
+                let gpu_words = cross_check_words_of_gpu_verdict(gpu_words);
+                if gpu_words.gpu_could_not_judge {
+                    DamagedImagePairing::GpuCouldNotJudge {
+                        why: "结论里判不了那一位置了".to_string(),
+                    }
+                } else if (
+                    gpu_words.pool_checker_violated_bits,
+                    gpu_words.pool_checker_judged_bits,
+                ) == (cpu_violated, cpu_judged)
+                {
+                    DamagedImagePairing::Same
+                } else {
+                    DamagedImagePairing::Different {
+                        cpu: format!("违例 {cpu_violated:#x} 判到 {cpu_judged:#x}"),
+                        gpu: format!(
+                            "违例 {:#x} 判到 {:#x}",
+                            gpu_words.pool_checker_violated_bits,
+                            gpu_words.pool_checker_judged_bits
+                        ),
+                    }
+                }
+            }
+        };
+        pairings.push((item_name.clone(), damaged.what.clone(), pairing));
+    }
+    let count_of = |wanted: fn(&DamagedImagePairing) -> bool| {
+        pairings
+            .iter()
+            .filter(|(_, _, pairing)| wanted(pairing))
+            .count()
+    };
+    let same = count_of(|pairing| matches!(pairing, DamagedImagePairing::Same));
+    let different = count_of(|pairing| matches!(pairing, DamagedImagePairing::Different { .. }));
+    let gpu_could_not_judge =
+        count_of(|pairing| matches!(pairing, DamagedImagePairing::GpuCouldNotJudge { .. }));
+    let cpu_checker_panicked =
+        count_of(|pairing| matches!(pairing, DamagedImagePairing::CpuCheckerPanicked { .. }));
+    print_uncaptured(&format!(
+        "BAD_DISK_INPUT_GPU_PAIRING damaged_images={} same={same} different={different} gpu_could_not_judge={gpu_could_not_judge} cpu_checker_panicked={cpu_checker_panicked}\n"
+    , damaged_images.len()));
+    for (item_name, what, pairing) in &pairings {
+        if let DamagedImagePairing::GpuCouldNotJudge { why } = pairing {
+            print_uncaptured(&format!(
+                "BAD_DISK_INPUT_GPU_COULD_NOT_JUDGE item={item_name} why={why:?} damage={what:?}\n"
+            ));
+        }
+    }
+    assert_eq!(
+        same + different + gpu_could_not_judge + cpu_checker_panicked,
+        damaged_images.len(),
+        "每一份交出的坏镜像都比过（比了的、判不了的、CPU panic 的加起来就是交出的张数）"
+    );
+    let not_the_same: Vec<String> = pairings
+        .iter()
+        .filter_map(|(item_name, what, pairing)| match pairing {
+            DamagedImagePairing::Different { cpu, gpu } => {
+                Some(format!("{item_name}（{what}）：CPU {cpu}；GPU {gpu}"))
+            }
+            DamagedImagePairing::CpuCheckerPanicked { panic } => Some(format!(
+                "{item_name}（{what}）：CPU 池级 checker panic {panic}"
+            )),
+            DamagedImagePairing::Same | DamagedImagePairing::GpuCouldNotJudge { .. } => None,
+        })
+        .collect();
+    assert!(
+        not_the_same.is_empty(),
+        "{} 份坏镜像上 GPU 判器与 CPU 池级 checker 的结论不同：\n{}",
+        not_the_same.len(),
+        not_the_same.join("\n")
+    );
+    assert!(
+        same > 0,
+        "一份坏镜像都没比成（全是 GPU 判不了）：GPU 判器在坏输入上一张都没判过"
+    );
 }

@@ -166,7 +166,7 @@ pub enum MakeFilesystemError {
     },
     /// 在飞记录数上限（环槽数 ÷ F，D23（journal 的角色与格式） 已定项 18）装不进系统配置里它那 4 字节
     /// （`layout/01-first-txn.md` 一「journal 在飞记录数上限 | 4」）：环长 ≥ 2³² × 12288 字节（约 48 TiB）才走得到，
-    /// 要一块 ≥ 192 TiB 的盘才过得了环长上界那一关。该拒还是该改字段宽，条款没写（实审 C11b 报告顺带看到的第 5 条）；
+    /// 要一块 ≥ 192 TiB 的盘才过得了环长上界那一关。该拒还是该改字段宽，条款没写；
     /// 第一版在任何写之前拒，改之前 mkfs 写系统配置那一步 panic（`SystemConfiguration::to_slot` 的 expect），那时根环、journal 环
     /// 已清、两个单元与三条第 0 代根已写。`in_flight_record_limit` 是这个环长算出来的上限。
     JournalInFlightRecordLimitWiderThanItsFourByteField {
@@ -174,7 +174,7 @@ pub enum MakeFilesystemError {
         in_flight_record_limit: u64,
     },
     /// 按环长现算的单元区起点（journal 环末尾的下一个槽，D3（空间分配） 已定项 10 ④）不落在 64 槽聚簇段边界上：
-    /// 这样的单元区怎么分段条款没写，第一版不支持（`allocator::UnitAreaStart` 的不变量，实审 A2c）。环长落在 1 MiB 整数倍上
+    /// 这样的单元区怎么分段条款没写，第一版不支持（`allocator::UnitAreaStart` 的不变量）。环长落在 1 MiB 整数倍上
     /// （更一般：环末尾所在的槽数是 64 的整数倍）的都在边界上。
     UnitAreaStartOffTheClusterSegmentBoundaryUnsupported(
         UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
@@ -380,7 +380,7 @@ fn check_geometry(
         );
     }
     // 在飞上限写进系统配置的是 4 字节（`SystemConfiguration::to_slot`）：装不下就在这里拒，不走到写系统配置那一步的 expect——
-    // 那时根环与 journal 环已经清过、两个单元与三条第 0 代根已经写了（实审 C11b 顺带看到的第 5 条）。
+    // 那时根环与 journal 环已经清过、两个单元与三条第 0 代根已经写了。
     if !journal_in_flight_record_limit_fits_its_four_byte_field(ring_bytes) {
         return Err(
             MakeFilesystemError::JournalInFlightRecordLimitWiderThanItsFourByteField {
@@ -406,7 +406,7 @@ fn check_geometry(
         });
     }
     // 单元区起点按这一次的环长现算（journal 环末尾的下一个槽，D3（空间分配） 已定项 10 ④；C475（非默认环长下单元区起点取编译期常量）），
-    // mkfs 写实例表单元的就是这个槽；不在聚簇段边界上第一版不支持（实审 A2c）。
+    // mkfs 写实例表单元的就是这个槽；不在聚簇段边界上第一版不支持。
     let unit_area_start = UnitAreaStart::following_the_journal_ring(ring_bytes)
         .map_err(MakeFilesystemError::UnitAreaStartOffTheClusterSegmentBoundaryUnsupported)?;
     let end_of_the_units_written_by_make_filesystem =
@@ -538,8 +538,8 @@ pub fn make_filesystem<Device: BlockDevice>(
     // 次序与屏障：清零按设备内偏移升序发（[0, 1 MiB)，根环 1 / 4 / 7 MiB，journal 环 16 MiB），几段之间不另加屏障——
     // 它们互不重叠，也不与同一段里的单元写重叠（`check_geometry` 判过固定结构两两不重叠；单元区起点是环末尾的下一个槽）；真正重叠的是清根环与根槽 FUA 写
     //（区域 r 的槽 0）、清 [0, 1 MiB) 与系统配置两槽的写，这两对都由原有的那道屏障（单元写之后、根 FUA 之前）隔开，不靠发出次序。
-    // mkfs 中途崩溃第一版没有条款（层 0 从 mkfs 之后的池起枚举，`.claude/kb/layout/01-first-txn.md` 八
-    // mkfs 那一行的「层 0 枚举」格写「不在」），不为一个没有条款的语义加屏障。
+    // mkfs 中途崩溃第一版没有条款（崩溃点重放从 mkfs 之后的池起枚举，`.claude/kb/layout/01-first-txn.md` 八
+    // mkfs 那一行的「崩溃点重放枚举」格写「不在」），不为一个没有条款的语义加屏障。
     // 清的是 S 个槽那么长的一段，S 取 mkfs 参数里的那个——这一次写进系统配置的也是它，
     // 于是「mkfs 清了多长」与「挂载时按多长读」出自同一个数。
     let root_ring_region_bytes = region_length_in_bytes(
@@ -550,7 +550,7 @@ pub fn make_filesystem<Device: BlockDevice>(
     // 根环基址之前那一段 [0, 根环基址) 也整段清零，每块盘一次调用、发在最前（按偏移升序）：系统配置两槽住在这一段里，
     // 槽 1 的偏移随槽距走。在用过的盘上换一个 io_min 重做 mkfs，旧池写在别的槽距上的槽 1 自证得过、记的槽距也等于它所在的偏移，
     // 全池没有可用的槽 0 时逐档读槽 1 的读者（恢复与池级 checker）分不出它与本池的槽 1、按世代号会择中它
-    // （C651（全池没有可用的系统配置槽 0 时 checker 与实现找槽 1 的读法不同） 第一轮判决岔路 W，用户 2026-10-02 定 W1 mkfs 清零，
+    // （C651（没有可用槽 0 时 checker 与实现找槽 1 读法不同） 第一轮判决岔路 W，用户 2026-10-02 定 W1 mkfs 清零，
     // `research/prompts/m3-c651-r1-main-verification.md`「用户定案」）。与根环、journal 环的清零同一种动作。
     let root_ring_base = region_start(0);
     for (_, device) in devices.iter_mut() {

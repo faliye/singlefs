@@ -39,12 +39,12 @@ use singlefs_harness::{
 
 /// E142 那套几何：两块同构盘，`physical_block_size` = io_min = 512。
 /// 值抄自跑前登记第一节「装置写在哪」第 2 条 ①：模型
-/// `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` 第 132 行 `DEVICE_BYTES`、
-/// 第 15 行 `PHYSICAL_BLOCK_BYTES`（两者在这个装置里都是 512 那一档的推论，逐项断言见 `main` 开头）。
+/// `scripts/experiments/e142_new_pool_file_creation_dry_run.rs` 的 `const DEVICE_BYTES`、
+/// `const PHYSICAL_BLOCK_BYTES`（两者在这个装置里都是 512 那一档的推论，逐项断言见 `main` 开头）。
 const DEVICE_COUNT: u32 = 2;
 const PHYSICAL_BLOCK_SIZE_IN_BYTES: u32 = 512;
 const MINIMUM_INPUT_OUTPUT_BYTES: u32 = 512;
-/// 值抄自跑前登记同一条：模型第 245–247 行 `FIXED_FSID` / `FIXED_WRITE_TIME_SECONDS` / `FIRST_INODE_NUMBER`，
+/// 值抄自跑前登记同一条：模型的 `FIXED_FSID` / `FIXED_WRITE_TIME_SECONDS` / `FIRST_INODE_NUMBER`，
 /// 文件 3000 字节、内容 `index % 251`、改动计数 = 3（改动计数不是这个导出要驱动的量，新池新建文件只跑一次）。
 const EXPECTED_FILE_BYTES: usize = 3000;
 
@@ -217,7 +217,7 @@ fn main() {
     let mut devices = two_recording_memory_devices(device_bytes, &stream);
 
     // 窗口的起点：`ScenarioPoint::BeforeNewPoolFileCreation` 那一次回调时录制流的长度
-    // （与 `new_pool_file_creation_region_bytes.rs:94-101` 同一个取法，跑前登记第一节「装置写在哪」第 2 条末句）。
+    // （与 `new_pool_file_creation_region_bytes.rs` 的 `main` 里 `ScenarioPoint::BeforeNewPoolFileCreation` 那一臂同一个取法，跑前登记第一节「装置写在哪」第 2 条末句）。
     let mut steps_before_new_pool_file_creation: Option<usize> = None;
     let path =
         run_new_pool_file_creation(

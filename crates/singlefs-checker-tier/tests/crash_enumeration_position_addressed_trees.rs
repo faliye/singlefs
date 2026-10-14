@@ -1,5 +1,5 @@
-//! checker 档模块：crash
-//! 分配记录树与 extent 树按 key 空间定形状（D8（核心索引结构） 已定项 14 的 K1–K4）的层 0：
+//! checker 档模块：crash、crash_state_enumeration
+//! 分配记录树与 extent 树按 key 空间定形状（D8（核心索引结构） 已定项 14 的 K1–K4）的崩溃点重放：
 //! 两棵按位置寻址的树每一种新写序进崩溃点。**起点镜像不枚举，只录被判的那一次发布（或那一次挂载）**，同
 //! `crash_enumeration_tree_split_streams.rs` 的切法：之前那一大截全部施加成起点镜像，录制流从那一次的第一个写切起。
 //! 每个状态跑两遍恢复（看 / 不看 journal）+ 多版本 oracle + 池级 checker（两棵树逐节点按位置核 I-1.1、每个节点有分配记录 I-3.10）
@@ -15,13 +15,13 @@
 //! - `VersionWithoutFileRowPublishWithItsOwnTree`：树表 0 条的一版上写 370 行（两片实例表）：写行那次按位置建起这一版自己的
 //!   分配记录树（根、每盘第 1 层与叶 61），之后零单元暖机。录的是那一次可写挂载的整串（取号、写行、暖机）。
 //!
-//! **比已有的流多罩了什么**：已有的层 0 流里分配记录树恒是一个节点、extent 树恒是根兼叶装 extent 记录；这五条里一次发布写出分配记录树
+//! **比已有的流多罩了什么**：已有的崩溃点重放流里分配记录树恒是一个节点、extent 树恒是根兼叶装 extent 记录；这五条里一次发布写出分配记录树
 //! 5–7 个节点（叶、第 1 层、根，与别的单元同一段，D8（核心索引结构） 已定项 14 不加写序步骤、不加屏障），单元写段里的子集第一次包括
 //! 「新叶落了、新根没落」「一块盘的叶落了、另一块盘的没落」这一类；extent 树第一次出现上段叶条目的三种标签之间的换代与下段的长高、
 //! 缩回。多跑的一步：前四条只有恢复本身；第五条多一次取号与写行、暖机（可写挂载），恢复落在树表 0 条那几代上（只许报没有文件）。
 //! 与已有流的基线镜像、写表、段序列都不相同，各自全量枚举（第三条的单元写段与记录段太大、全量枚举不出来，见那条用例的注）。
 //!
-//! 按派活的约束这一份只要求编译通过，一条都没跑；快档提交时由主 agent 经门禁 checker-tier-layer0-replay 跑，全量由主 agent 在用户要求时经它的 `--full` 跑。
+//! 按派活的约束这一份只要求编译通过，一条都没跑；快档提交时由主 agent 经门禁 checker-tier-crash-point-replay 跑，全量由主 agent 在用户要求时经它的 `--full` 跑。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
@@ -36,9 +36,16 @@ use common::{
 };
 use common_tree_split::TreeSplitPool;
 use singlefs_checker_tier::crash::{
-    enumerate_layer0_selecting_versions, layer0_state_count_with_torn_in_place_overwrites,
-    Layer0SegmentExpansion, Layer0Tally,
+    crash_state_count_with_torn_in_place_overwrites, CrashPointReplaySegmentExpansion,
+    CrashPointReplayTally,
 };
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_selecting_versions, CrashPointReplayItem,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_enumeration_position_addressed_trees.rs";
 use singlefs_core::address::DeviceIdentity;
 use singlefs_core::allocation_record_tree::{
     AllocationRecordTreeNode, AllocationRecordTreeNodePosition,
@@ -368,7 +375,7 @@ fn prepare(stream: PositionAddressedStream) -> PreparedStream {
     }
 }
 
-fn assert_clean(stream: PositionAddressedStream, tally: &Layer0Tally) {
+fn assert_clean(stream: PositionAddressedStream, tally: &CrashPointReplayTally) {
     assert_eq!(
         tally.violations, 0,
         "{stream:?} oracle：{:?}",
@@ -421,48 +428,55 @@ fn closed_form_of_every_segment_for_the_count_line(segments: &[Vec<usize>]) -> S
 
 /// 枚举一条流：`expand` 为真的段展开（每次写各取它的几态、任意组合，系统配置槽写是原地覆写、取三态），
 /// 别的段只以整段持久进入后面的状态。
+/// 只录那一趟（`SINGLEFS_CRASH_AMPLIFICATION_STAGE=record`）流写进判定库就交回 `None`，不判。
 fn enumerate(
     stream: PositionAddressedStream,
+    item_label: &str,
     expand: &dyn Fn(usize, &[usize]) -> bool,
-) -> Layer0Tally {
+) -> Option<CrashPointReplayTally> {
     let prepared = prepare(stream);
-    let tally = enumerate_layer0_selecting_versions(
+    let item_name = format!("position_addressed::{stream:?}::{item_label}");
+    let tally = enumerate_crash_states_selecting_versions(
+        CrashPointReplayItem {
+            name: &item_name,
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
         &prepared.versions,
         expand,
-    );
+    )
+    .judged()?;
     assert_eq!(
         tally.states,
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &prepared.base,
             &prepared.writes,
             &prepared.segments,
             &|segment_index, segment| {
                 if expand(segment_index, segment) {
-                    Layer0SegmentExpansion::EveryProperSubset
+                    CrashPointReplaySegmentExpansion::EveryProperSubset
                 } else {
-                    Layer0SegmentExpansion::NotExpanded
+                    CrashPointReplaySegmentExpansion::NotExpanded
                 }
             },
         ),
-        "{stream:?}：展开的段按层 0 的枚举域数（原地覆写取三态）"
+        "{stream:?}：展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
     println!(
-        "LAYER0_POSITION_ADDRESSED stream={stream:?} segments={:?} states={} closed_form_of_every_segment={} root_persisted_states={} journal_differing_states={} verification_ran_states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
+        "CRASH_POINT_REPLAY_POSITION_ADDRESSED stream={stream:?} segments={:?} states={} closed_form_of_every_segment={} root_persisted_states={} journal_differing_states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
         prepared.segments.iter().map(Vec::len).collect::<Vec<_>>(),
         tally.states,
         closed_form_of_every_segment_for_the_count_line(&prepared.segments),
         tally.root_persisted_states,
         tally.journal_differing_states,
-        tally.verification_ran_states,
         tally.states_by_publish_text(),
         tally.checker_counts_by_invariant()
     );
     assert_clean(stream, &tally);
-    tally
+    Some(tally)
 }
 
 /// 平时跑的那一份：每条流写数不到 10 的段全展开（记录段、根槽、系统配置槽轮换，第五条的取号与暖机那几段），
@@ -470,7 +484,11 @@ fn enumerate(
 #[test]
 fn every_position_addressed_tree_stream_recovers_cleanly_in_every_state_of_its_small_segments() {
     for stream in PositionAddressedStream::ALL {
-        let tally = enumerate(stream, &|_segment_index, segment| segment.len() < 10);
+        let Some(tally) = enumerate(stream, "small_segments", &|_segment_index, segment| {
+            segment.len() < 10
+        }) else {
+            continue;
+        };
         assert!(tally.states > 1, "{stream:?}：至少展开了一段");
     }
 }
@@ -478,10 +496,12 @@ fn every_position_addressed_tree_stream_recovers_cleanly_in_every_state_of_its_s
 /// 全量：单元写段的全部子集也展开（分配记录树那一条单元写段约 2 × 14 写，状态数上亿级；两条 extent 流约 2 × 10 写）。
 /// 第三条（145 个数据单元）不在里面：单元写段约 300 写、记录段 290 写，全量枚举不出来——那一格要按段内取样，条款与装置都没有，交回里写明。
 #[test]
-#[ignore = "单元写段全展开，状态数上亿、每个两遍恢复 + checker；用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 在 release 下跑，提交时的快档只核它的全绿标记"]
+#[ignore = "单元写段全展开，状态数上亿、每个两遍恢复 + checker；用户要求时由主 agent 经门禁 checker-tier-crash-point-replay --full 在 release 下跑，提交时的快档只核它的全绿标记"]
 fn full_enumeration_of_every_enumerable_position_addressed_tree_stream_is_exhaustive_and_clean() {
     for stream in PositionAddressedStream::ENUMERABLE_IN_FULL {
-        let tally = enumerate(stream, &|_segment_index, _segment| true);
+        let Some(tally) = enumerate(stream, "full", &|_segment_index, _segment| true) else {
+            continue;
+        };
         assert!(tally.states > 1, "{stream:?}");
     }
 }

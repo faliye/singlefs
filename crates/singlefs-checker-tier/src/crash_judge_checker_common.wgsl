@@ -161,7 +161,7 @@ const INVARIANT_I_4_4: u32 = 73u;
 
 // 第 75–83 条：里程碑三·3 墓碑与谱系那九条（只往末尾追加）。走读内核判 I-9.17、I-9.23（墓碑树、谱系树每条内部条目的身份）；
 // 扫描内核在删除态扫描那一份版本清单上判 I-9.18–I-9.21、I-9.24、I-9.29。I-9.22 恒不置位：它只在池级 checker 带旋钮值的入口上判，
-// 层 0 与放量都走旧入口（`check_pool_image`，当没装旋钮、恒报不适用），GPU 手里也没有旋钮值——照 I-4.4 的先例登记、内核不置它那一位
+// 崩溃点重放与放量都走旧入口（`check_pool_image`，当没装旋钮、恒报不适用），GPU 手里也没有旋钮值——照 I-4.4 的先例登记、内核不置它那一位
 const INVARIANT_I_9_17: u32 = 74u;
 
 const INVARIANT_I_9_18: u32 = 75u;
@@ -200,7 +200,7 @@ const INVARIANT_I_9_35: u32 = 89u;
 
 // 第 91、92 条：第 53 批谱系树与退役树的容器容量那两条（walk.rs 的 NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE、
 // LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE）。扫描内核在墓碑与谱系那一遍判 I-9.36；I-9.37 照 I-9.22 恒不置位
-// （层 0 与放量走池级 checker 的旧入口，GPU 也没有旋钮值）
+// （崩溃点重放与放量走池级 checker 的旧入口，GPU 也没有旋钮值）
 const INVARIANT_I_9_36: u32 = 90u;
 
 const INVARIANT_I_9_37: u32 = 91u;
@@ -449,9 +449,8 @@ const C_MAX_TREE_IDS: u32 = 64u;
 
 const C_TREE_IDS: u32 = 184928u;             // lo、hi
 
-const C_MAX_INODE_BIRTHS: u32 = 512u;
-
-const C_INODE_BIRTHS: u32 = 185056u;         // inode lo/hi、出生代 lo/hi
+// 185056 起的 2048 个字（到 C_DATA_OBJECTS 为止）空着：原来是 512 条的 inode → 对象出生代表，抬到 C_MAX_INODE_BIRTHS 条时挪到草稿区末尾
+// （C_INODE_BIRTHS），其后各表的偏移不挪
 
 const C_MAX_DATA_OBJECTS: u32 = 1024u;
 
@@ -463,9 +462,8 @@ const C_ACCOUNTING_ROWS: u32 = 191200u;      // 统计量、盘、值 lo/hi
 
 const C_ROW_WORDS: u32 = 5u;                // 实例、txg lo/hi、W lo/hi
 
-const C_MAX_INSTANCE_ROWS: u32 = 1024u;
-
-const C_INSTANCE_ROWS: u32 = 191456u;
+// 191456 起的 5120 个字（到 C_CHILDREN 为止）空着：原来是 1024 行的最新根实例表行，抬到 C_MAX_INSTANCE_ROWS 行时挪到草稿区末尾
+// （C_INSTANCE_ROWS，连同它的散列索引），其后各表的偏移不挪
 
 const C_CHILD_WORDS: u32 = 7u;              // 种类、最小 key 基/偏移、最大 key 基/偏移、分隔 key 基/偏移
 
@@ -493,9 +491,8 @@ const C_SCRATCH_END: u32 = 211424u;
 // tests/crash_judge_gpu_tables_at_their_capacity.rs）
 const C_MAX_RELEASED: u32 = C_MAX_ALLOC_RECORDS;
 
-const C_RELEASED: u32 = 211424u;              // 盘、槽 lo/hi、释放代 lo/hi
-
-const C_REFERENCED_BY: u32 = 221664u;         // 每条已释放记录两个字：位 c ↔ 第 c 条候选根引用它
+// 211424 起的 14336 个字（到 C_CANDIDATES 为止）空着：原来是 2048 条的已释放记录表（C_RELEASED，盘、槽 lo/hi、释放代 lo/hi）与它的
+// 「哪条候选根引用它」（C_REFERENCED_BY，每条两个字：位 c ↔ 第 c 条候选根引用它），随 C_MAX_ALLOC_RECORDS 抬到 4096 条时挪到草稿区末尾，其后各表的偏移不挪
 
 const C_MAX_CANDIDATES: u32 = 48u;
 
@@ -514,9 +511,16 @@ const C_CANDIDATE_INFO: u32 = 225808u;
 
 const C_ALLOC_RECORD_WORDS: u32 = 8u;        // 盘、槽 lo/hi、跨度、代 lo/hi、已释放、0
 
-const C_MAX_ALLOC_RECORDS: u32 = 2048u;
+// 扫描内核收一条根的分配记录那张表（c_append_allocation_record，满了记站点 20）：从 2048 抬到 4096 条，与恢复内核那张（MAX_ALLOCATION_RECORDS）同宽。
+// 容器树旋钮压到一片 1 条、2 条的随机历史第 48、52 步起最新根的分配记录多于 2048 条（CPU 一侧数到第 59 步 2534 条、2342 条；已释放的 2292 条，
+// 多于原来的 C_MAX_RELEASED）。表挪到草稿区末尾（C_ALLOC_RECORDS）；228400 起原来那 16384 个字留给走读内核的四张桶表借（W_REFERENCE_BUCKETS 起）。
+// 走读内核的引用集合、位置项校验和、I-3.5 落点表三张仍是 4096 条：分配记录多于 4096 条时先满的是这一张（站点 20），不回收的流上那三张与分配记录同数；
+// 那几条随机历史上三张各至多 800 条（各版累计，CPU 一侧数的）
+const C_MAX_ALLOC_RECORDS: u32 = 4096u;
 
-const C_ALLOC_RECORDS: u32 = 228400u;
+// 走读内核四张桶表借的那一段的起点：扫描内核原来的分配记录表在这里起，挪走之后这一段只剩扫描内核写过才读的那几张表（C_R_SEEN、C_R_PENDING、
+// C_SEEN_NODES、C_EXAMINED）
+const C_SCAN_TABLES_THE_WALK_BUCKETS_BORROW: u32 = 228400u;
 
 const C_R_MAX_SEEN: u32 = 512u;
 
@@ -543,9 +547,9 @@ const C_SCANNED: u32 = 262704u;              // 读出来那一份切片的字�
 // r_instance_rows 读一条根自己那张实例表的全部行（扫描内核站点 32 判满）。与恢复内核读同一种表的 MAX_ROWS（crash_judge_common.wgsl）同宽：
 // 256 行时取号之后崩溃 369 次再挂载写 370 行那条流（crash_enumeration_position_addressed_trees.rs）在这里判不了而恢复内核判得了；
 // 同宽之后恢复内核装得下的行数扫描内核也装得下。从 256 加到 512 时这张表每行 3 字多 256 × 3 = 768 字，其后的草稿区偏移各后移 768 字
-const C_R_MAX_ROWS: u32 = 512u;
-
-const C_R_ROWS: u32 = 264752u;               // 实例、txg lo/hi
+// 从 512 抬到 24576 时（取号之后崩溃 65 × 369 次再挂载十二次的那个场景，最新根的实例表 23997 行、66 片，在站点 32 判不了）挪到草稿区末尾
+// （C_R_ROWS），264752 起原来那 1536 个字空着，其后各表的偏移不挪
+const C_R_MAX_ROWS: u32 = MAX_ROWS;
 
 const C_VALID_BEFORE_WORDS: u32 = 6u;        // 根下标、有指针、inode 基、inode 偏移、extent 基、extent 偏移
 
@@ -649,18 +653,18 @@ fn w_published(birth_txg: vec2<u32>, instance: u32, is_data_unit: bool, transact
     if (instance == w_mount_instance) {
         return le64(birth_txg, w_mount_txg);
     }
-    for (var i = 0u; i < w_instance_row_count; i = i + 1u) {
-        if (sw(C_INSTANCE_ROWS + i * C_ROW_WORDS) != instance) {
-            continue;
-        }
-        let row_txg = vec2<u32>(sw(C_INSTANCE_ROWS + i * C_ROW_WORDS + 1u), sw(C_INSTANCE_ROWS + i * C_ROW_WORDS + 2u));
-        let row_high_water = vec2<u32>(sw(C_INSTANCE_ROWS + i * C_ROW_WORDS + 3u), sw(C_INSTANCE_ROWS + i * C_ROW_WORDS + 4u));
-        if (is_data_unit) {
-            return le64(birth_txg, row_txg) || le64(transaction, row_high_water);
-        }
-        return le64(birth_txg, row_txg);
+    // 看这个实例的第一行（按记进的次序）
+    let first = w_first_instance_row_of(instance);
+    if (first == NONE) {
+        return true;
     }
-    return true;
+    let row = C_INSTANCE_ROWS + first * C_ROW_WORDS;
+    let row_txg = vec2<u32>(sw(row + 1u), sw(row + 2u));
+    let row_high_water = vec2<u32>(sw(row + 3u), sw(row + 4u));
+    if (is_data_unit) {
+        return le64(birth_txg, row_txg) || le64(transaction, row_high_water);
+    }
+    return le64(birth_txg, row_txg);
 }
 
 // key 形态：0 记账 [2,8,4,8]、1 映射 [1,8,8,4,6]、2 树表与 inode [8]、3 extent [8,8,8]、4 分配记录 [4,6]
@@ -729,12 +733,10 @@ fn w_chain_record_kind(base: u32, o: u32, width: u32) -> u32 {
 
 // 被最新根指着的实例表判抛弃：有行 (i, Ti, ·) 且 T > Ti
 fn w_root_abandoned(instance: u32, txg: vec2<u32>) -> bool {
-    for (var i = 0u; i < w_instance_row_count; i = i + 1u) {
-        if (sw(C_INSTANCE_ROWS + i * C_ROW_WORDS) == instance) {
-            let row_txg = vec2<u32>(sw(C_INSTANCE_ROWS + i * C_ROW_WORDS + 1u), sw(C_INSTANCE_ROWS + i * C_ROW_WORDS + 2u));
-            if (lt64(row_txg, txg)) {
-                return true;
-            }
+    for (var row_index = w_first_instance_row_of(instance); row_index != NONE; row_index = w_next_instance_row_after(row_index)) {
+        let row = C_INSTANCE_ROWS + row_index * C_ROW_WORDS;
+        if (lt64(vec2<u32>(sw(row + 1u), sw(row + 2u)), txg)) {
+            return true;
         }
     }
     return false;
@@ -908,9 +910,10 @@ const C_APPEARANCE_WALKED_TREE_TABLES: u32 = 374704u;
 //    后读到的盖掉先读到的。一版一棵树地重填
 const D_INODE_RECORD_WORDS: u32 = 7u;
 
-const D_MAX_INODE_RECORDS: u32 = 1024u;
-
-const D_INODE_RECORDS: u32 = 377520u;
+// 从 1024 抬到 16384 时（一次建的 inode 多到点名超过一条 journal 记录的那个场景，一版一万两千多个 inode：CPU 一侧数到各版合起来 12582 个号）
+// 挪到草稿区末尾（D_INODE_RECORDS，连同它的散列索引），
+// 377520 起原来那 7168 个字空着，其后各表的偏移不挪
+const D_MAX_INODE_RECORDS: u32 = 16384u;
 
 // ② 这一版 extent 树里每个号的数据单元数（walk.rs data_unit_count_of_each_inode_without_judging，全零数据指针不数）：号 lo/hi、单元数
 const D_DATA_UNIT_COUNT_WORDS: u32 = 3u;
@@ -939,9 +942,8 @@ const D_LINEAGE_RECORDS: u32 = 389040u;
 //    回退候选集里各版读完一起判，不一版一版重填；多于 D_MAX_OBJECT_BIRTHS 个 (树, 号) 判不了
 const D_OBJECT_BIRTH_WORDS: u32 = 6u;
 
-const D_MAX_OBJECT_BIRTHS: u32 = 2048u;
-
-const D_OBJECT_BIRTHS: u32 = 390576u;
+// 从 2048 抬到 16384 时（同上那个场景，跨版本 12582 个号）挪到草稿区末尾（D_OBJECT_BIRTHS，连同它的散列索引），390576 起原来那 12288 个字空着
+const D_MAX_OBJECT_BIRTHS: u32 = 16384u;
 
 // ⑥ I-9.30 那一判读的最新根记账里 inode 号水位那一统计量（不带设备维）的每一行（walk.rs Walk::inode_number_watermark_rows）：代段 lo/hi、值 lo/hi。
 //    最新根一棵记账树一棵树地收（读不全的那棵退回去不收）；多于 D_MAX_INODE_NUMBER_WATERMARK_ROWS 行判不了
@@ -978,8 +980,74 @@ const C_JOURNAL_GROUP_KEY_WORDS: u32 = 4u;
 
 const C_JOURNAL_GROUP_KEYS: u32 = 411576u;
 
+// C_JOURNAL_GROUP_KEYS 那一段的末端（每条记录一行，至多 MAX_RECORDS 行）：扫描内核借这一段的几处按它判装不装得下
+const C_JOURNAL_GROUP_KEYS_END: u32 = 419768u;
+
+const_assert C_JOURNAL_GROUP_KEYS_END == C_JOURNAL_GROUP_KEYS + C_JOURNAL_GROUP_KEY_WORDS * MAX_RECORDS;
+
+// ⑪ 走读内核主走读收的 inode → 对象出生代（I-9.10 拿数据单元的对象出生代与它比），inode lo/hi、出生代 lo/hi 一条四个字。
+//    条数是走到的 inode 记录里不同的号：原来 512 条，unlink 借、借完再吸收的两个场景（各七百来个 inode）在站点 13 判不了；1024 条时
+//    一次建的 inode 多到点名超过一条 journal 记录的那个场景（各版合起来 12582 个号，CPU 一侧数的）同样判不了。取 inode 树一版的记录那张表
+//    （D_MAX_INODE_RECORDS）的条数。419768 起原来那 4096 个字（1024 条时的这张表）空着
+const C_MAX_INODE_BIRTHS: u32 = 16384u;
+
+const_assert C_MAX_INODE_BIRTHS == D_MAX_INODE_RECORDS;
+
+// 草稿区抬上限之前到这里为止；共用那一半挪过来的两张表（crash_judge_common.wgsl 的 R_ALLOCATION、R_ROWS）从这里接，抬上限的几张接在它们后面
+const SCRATCH_END_BEFORE_THE_TABLES_GREW: u32 = 423864u;
+
+const_assert R_ALLOCATION == SCRATCH_END_BEFORE_THE_TABLES_GREW;
+
+// ⑫ 抬了上限、挪到末尾的几张表（各自的条数与为什么抬见定义它们上限的那一处），按这个次序首尾相接：
+//    扫描内核一条根的分配记录、最新根的已释放记录与「哪条候选根引用它」、最新根实例表的行与它的散列索引（桶表、同实例下一行）、
+//    扫描内核一条根自己实例表的行、主走读的 inode → 对象出生代与它的桶表、这一版 inode 记录与它的桶表、I-9.29 跨版本那张表与它的桶表。
+//    几张桶表的写法见 ⑬
+const C_ALLOC_RECORDS: u32 = END_OF_THE_RECOVERY_TABLES_MOVED_PAST_THE_CHECKER_TABLES;
+
+const C_RELEASED: u32 = C_ALLOC_RECORDS + C_ALLOC_RECORD_WORDS * C_MAX_ALLOC_RECORDS;   // 盘、槽 lo/hi、释放代 lo/hi
+
+const C_REFERENCED_BY: u32 = C_RELEASED + 5u * C_MAX_RELEASED;   // 每条已释放记录两个字：位 c ↔ 第 c 条候选根引用它
+
+// 最新根实例表的行（walk.rs 的 Walk::instance_table_rows）：一张表 66 片、23997 行的那个场景之外，取号之后崩溃 24575 次再挂载的那条流 24576 行；
+// 比扫描内核与恢复内核那两张（C_R_MAX_ROWS、MAX_ROWS）宽，那两张满了而这一张装得下（扫描内核站点 32、恢复内核记判不了的那一形照旧走得到）
+const C_MAX_INSTANCE_ROWS: u32 = 32768u;
+
+const C_INSTANCE_ROWS: u32 = C_REFERENCED_BY + 2u * C_MAX_RELEASED;
+
+const W_INSTANCE_ROW_BUCKET_COUNT: u32 = 2u * C_MAX_INSTANCE_ROWS;
+
+const W_INSTANCE_ROW_BUCKETS: u32 = C_INSTANCE_ROWS + C_ROW_WORDS * C_MAX_INSTANCE_ROWS;
+
+// 第 k 行之后、同一个实例的下一行的下标 + 1（0 是没有下一行）：记第 k 行时写 0，同实例再记一行时改它前一行的这个字
+const W_INSTANCE_ROW_NEXT: u32 = W_INSTANCE_ROW_BUCKETS + W_INSTANCE_ROW_BUCKET_COUNT;
+
+const C_R_ROWS: u32 = W_INSTANCE_ROW_NEXT + C_MAX_INSTANCE_ROWS;   // 实例、txg lo/hi
+
+const C_INODE_BIRTHS: u32 = C_R_ROWS + 3u * C_R_MAX_ROWS;
+
+const W_INODE_BIRTH_BUCKET_COUNT: u32 = 2u * C_MAX_INODE_BIRTHS;
+
+const W_INODE_BIRTH_BUCKETS: u32 = C_INODE_BIRTHS + 4u * C_MAX_INODE_BIRTHS;
+
+const D_INODE_RECORDS: u32 = W_INODE_BIRTH_BUCKETS + W_INODE_BIRTH_BUCKET_COUNT;
+
+const D_INODE_RECORD_BUCKET_COUNT: u32 = 2u * D_MAX_INODE_RECORDS;
+
+const D_INODE_RECORD_BUCKETS: u32 = D_INODE_RECORDS + D_INODE_RECORD_WORDS * D_MAX_INODE_RECORDS;
+
+const D_OBJECT_BIRTHS: u32 = D_INODE_RECORD_BUCKETS + D_INODE_RECORD_BUCKET_COUNT;
+
+const D_OBJECT_BIRTH_BUCKET_COUNT: u32 = 2u * D_MAX_OBJECT_BIRTHS;
+
+const D_OBJECT_BIRTH_BUCKETS: u32 = D_OBJECT_BIRTHS + D_OBJECT_BIRTH_WORDS * D_MAX_OBJECT_BIRTHS;
+
 // 每个状态的草稿区到这里为止：crash_judge_gpu.rs 的 SCRATCH_WORDS 与它相等（那一份的单测核）
-const SCRATCH_END: u32 = 419768u;
+const SCRATCH_END: u32 = 1296312u;
+
+const_assert SCRATCH_END == D_OBJECT_BIRTH_BUCKETS + D_OBJECT_BIRTH_BUCKET_COUNT;
+
+// 扫描内核 I-5.4 把一条根的分配记录按行号次序排进 C_ROW_ORDER（那一段 C_MAX_REFERENCES 个字）：装得下
+const_assert C_MAX_ALLOC_RECORDS <= C_JOURNAL_GROUP_KEYS - C_ROW_ORDER;
 
 // ⑩ 随条数线性找的几张集合加散列索引（一个状态一条线程，那几处每记一条、每找一条都从表头比到表尾，条数平方长，一次派活撞驱动的上下文切换时限）。
 //    表本身照旧按记进的次序一行一行追加（读前若干条的、按行号排序的那几处都不变），旁边另放一张桶表：每个桶记一行的下标 + 1，0 是空桶，
@@ -1025,12 +1093,13 @@ fn hashed_row_of(buckets: u32, bucket_count: u32, rows: u32, stride: u32, device
 }
 
 // 走读内核主走读（上下文 0）的四张桶表：引用集合 C_REFERENCES0（比到跨度）、位置项校验和 C_CHECKSUMS（比到校验和）、I-3.5 落点表、
-// 走过的单元 C_VISITED0。w_start(0) 清空。借扫描内核从 C_ALLOC_RECORDS 起的那几张表的地方（到 W_BUCKETS_END 为止，不过 C_SCANNED）：
+// 走过的单元 C_VISITED0。w_start(0) 清空。借扫描内核从 C_SCAN_TABLES_THE_WALK_BUCKETS_BORROW 起的那几张表的地方（到 W_BUCKETS_END 为止，不过 C_SCANNED）：
 // 扫描内核在走读内核之后跑，那几张表都按自己的条数从头写、写过才读，不读走读内核留在那里的字；走读内核在那一段里只写这四张桶表
-// （它写的 C_CANDIDATES 在 C_ALLOC_RECORDS 之前）
+// （它写的 C_CANDIDATES 在那一段之前）。实例表行与 inode → 对象出生代那两张的桶表不借这一段：前一张扫描内核还要读（w_published），
+// 两张都放在草稿区末尾（⑫），按 ⑬ 的写法清
 const W_REFERENCE_BUCKET_COUNT: u32 = 2u * C_MAX_REFERENCES;
 
-const W_REFERENCE_BUCKETS: u32 = C_ALLOC_RECORDS;
+const W_REFERENCE_BUCKETS: u32 = C_SCAN_TABLES_THE_WALK_BUCKETS_BORROW;
 
 const W_CHECKSUM_BUCKET_COUNT: u32 = 2u * C_MAX_CHECKSUMS;
 
@@ -1048,6 +1117,163 @@ const W_BUCKETS_END: u32 = W_VISITED_BUCKETS + W_VISITED_BUCKET_COUNT;
 
 // 四张桶表不越进扫描内核 I-1.8 存扫描项的那一段（解析内核时判，不进展开量）
 const_assert W_BUCKETS_END <= C_SCANNED;
+
+// ⑬ 抬到上万条的四张表的散列索引：最新根实例表的行（C_INSTANCE_ROWS，键是实例，同实例可以有几行）、主走读的 inode → 对象出生代（C_INODE_BIRTHS，
+//    键是 inode 号）、这一版 inode 记录（D_INODE_RECORDS，键是 inode 号）、I-9.29 跨版本那张表（D_OBJECT_BIRTHS，键是 (inode 树, 号)）。
+//    那几处原来每记一行、每找一行都从表头比到表尾，几万行时条数平方长（一个状态一条线程，撞驱动的上下文切换时限）。表照旧按记进的次序一行一行追加；
+//    条数不过 KEYED_TABLE_ROWS_FOUND_BY_SCANNING_AT_MOST 时照旧从表头比到表尾找（一个状态多半只有几行，不为它清一张上万个桶的桶表），
+//    记进第 KEYED_TABLE_ROWS_FOUND_BY_SCANNING_AT_MOST + 1 行那一刻把桶表整张清掉、把已有各行按键记进去，之后按桶表找。桶的写法同 ⑩：
+//    一个桶记一行的下标 + 1，0 是空桶，撞了往后挪一个（线性探测，不删），桶数取表的两倍（都是 2 的幂，表满时也至少一半是空桶）。
+//    键相同的几行只有第一行进桶表，找到的总是按记进次序的第一行，与从表头比到表尾找到的是同一行。草稿区里的桶表可能留着上一个状态的字：
+//    只在这一个状态清过之后才读它（「建过没有」记在每张表各自的私有变量里，扫描内核按交接来的条数照同一个界认实例表行那一张）
+const KEYED_TABLE_ROWS_FOUND_BY_SCANNING_AT_MOST: u32 = 64u;
+
+// 一张带散列索引的表：rows 起每行 stride 个字、前 key_words 个字是键（至多四个），桶表在 buckets 起、bucket_count 个桶
+struct KeyedTable {
+    rows: u32,
+    stride: u32,
+    key_words: u32,
+    buckets: u32,
+    bucket_count: u32,
+};
+
+fn keyed_first_bucket(key: vec4<u32>, bucket_count: u32) -> u32 {
+    var hash = key.x * 0x9E3779B1u;
+    hash = (hash ^ key.y) * 0x85EBCA77u;
+    hash = (hash ^ key.z) * 0xC2B2AE3Du;
+    hash = (hash ^ key.w) * 0x27D4EB2Fu;
+    return (hash ^ (hash >> 15u)) & (bucket_count - 1u);
+}
+
+// 起点在 row 的那一行的键是不是 key（比前 key_words 个字）
+fn keyed_row_carries_the_key(row: u32, key: vec4<u32>, key_words: u32) -> bool {
+    return sw(row) == key.x && (key_words < 2u || sw(row + 1u) == key.y)
+        && (key_words < 3u || sw(row + 2u) == key.z) && (key_words < 4u || sw(row + 3u) == key.w);
+}
+
+// 表前 count 行里键是 key 的第一行（按记进的次序）的下标，没有是 NONE；indexed：这一个状态里桶表建过没有。
+// 桶表没建过时第 step 步比第 step 行（至多 count 步）；建过时第 step 步比从首桶往后第 step 个桶记的那一行，撞到空桶就是没有（至多 bucket_count 步，
+// 表满时也至少一半是空桶，走不满）。两种找法合成一个循环、比键只一个调用点（展开预算，同 keyed_table_after_a_row_was_appended）
+fn keyed_first_row_of(table: KeyedTable, count: u32, indexed: bool, key: vec4<u32>) -> u32 {
+    var bucket = keyed_first_bucket(key, table.bucket_count);
+    let steps = select(count, table.bucket_count, indexed);
+    for (var step = 0u; step < steps; step = step + 1u) {
+        var row_index = step;
+        if (indexed) {
+            let row_plus_one = sw(table.buckets + bucket);
+            if (row_plus_one == 0u) {
+                return NONE;
+            }
+            row_index = row_plus_one - 1u;
+            bucket = (bucket + 1u) & (table.bucket_count - 1u);
+        }
+        if (keyed_row_carries_the_key(table.rows + row_index * table.stride, key, table.key_words)) {
+            return row_index;
+        }
+    }
+    return NONE;
+}
+
+// 第 row_index 行记进桶表：从它的键的首桶起往后找，先撞到键相同的一行（记进得更早）就不记，撞到空桶就记在那里
+fn keyed_put_the_row_into_the_buckets(table: KeyedTable, row_index: u32) {
+    let row = table.rows + row_index * table.stride;
+    let key = vec4<u32>(sw(row), select(0u, sw(row + 1u), table.key_words >= 2u), select(0u, sw(row + 2u), table.key_words >= 3u),
+        select(0u, sw(row + 3u), table.key_words >= 4u));
+    var bucket = keyed_first_bucket(key, table.bucket_count);
+    for (var probe = 0u; probe < table.bucket_count; probe = probe + 1u) {
+        let row_plus_one = sw(table.buckets + bucket);
+        if (row_plus_one == 0u) {
+            sws(table.buckets + bucket, row_index + 1u);
+            return;
+        }
+        if (keyed_row_carries_the_key(table.rows + (row_plus_one - 1u) * table.stride, key, table.key_words)) {
+            return;
+        }
+        bucket = (bucket + 1u) & (table.bucket_count - 1u);
+    }
+}
+
+// 第 row_index 行刚记进表（它是最后一行，count 是记进之后的行数）：桶表建过就把这一行记进去；没建过而条数刚越过
+// KEYED_TABLE_ROWS_FOUND_BY_SCANNING_AT_MOST，清桶表、按记进的次序把每一行记进去。交回记过之后桶表建过没有。
+// 两种情形合成一个循环、一个调用点（GPU 程序把每个调用点展开成一份拷贝，扫描内核离展开预算只剩几千个表达式）
+fn keyed_table_after_a_row_was_appended(table: KeyedTable, count: u32, indexed: bool, row_index: u32) -> bool {
+    if (!indexed && count <= KEYED_TABLE_ROWS_FOUND_BY_SCANNING_AT_MOST) {
+        return false;
+    }
+    var first_row_to_put = row_index;
+    if (!indexed) {
+        for (var bucket = 0u; bucket < table.bucket_count; bucket = bucket + 1u) {
+            sws(table.buckets + bucket, 0u);
+        }
+        first_row_to_put = 0u;
+    }
+    for (var row_to_put = first_row_to_put; row_to_put < count; row_to_put = row_to_put + 1u) {
+        keyed_put_the_row_into_the_buckets(table, row_to_put);
+    }
+    return true;
+}
+
+// 最新根实例表的行那一张（键是实例）
+fn w_instance_row_table() -> KeyedTable {
+    return KeyedTable(C_INSTANCE_ROWS, C_ROW_WORDS, 1u, W_INSTANCE_ROW_BUCKETS, W_INSTANCE_ROW_BUCKET_COUNT);
+}
+
+var<private> w_instance_rows_are_indexed: bool;
+
+// 实例 instance 在最新根实例表里的第一行（按记进的次序）的下标，没有是 NONE
+fn w_first_instance_row_of(instance: u32) -> u32 {
+    return keyed_first_row_of(w_instance_row_table(), w_instance_row_count, w_instance_rows_are_indexed, vec4<u32>(instance, 0u, 0u, 0u));
+}
+
+// 第 row_index 行之后同一个实例的下一行的下标，没有是 NONE（W_INSTANCE_ROW_NEXT 只指向更靠后的行：沿着走总走得到头）
+fn w_next_instance_row_after(row_index: u32) -> u32 {
+    let next_plus_one = sw(W_INSTANCE_ROW_NEXT + row_index);
+    if (next_plus_one == 0u) {
+        return NONE;
+    }
+    return next_plus_one - 1u;
+}
+
+// 最新根实例表记一行 (instance, txg, W)：同实例已有行就接在那几行的最后一行后面（W_INSTANCE_ROW_NEXT），交回记之前这个实例有没有行；
+// 表满记站点 8 判不了、不记
+fn w_append_an_instance_row(instance: u32, row_txg: vec2<u32>, row_high_water: vec2<u32>) -> bool {
+    let first = w_first_instance_row_of(instance);
+    if (w_instance_row_count >= C_MAX_INSTANCE_ROWS) {
+        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (8u << 8u);
+        return first != NONE;
+    }
+    let row_index = w_instance_row_count;
+    if (first != NONE) {
+        var last = first;
+        for (var next = w_next_instance_row_after(first); next != NONE; next = w_next_instance_row_after(next)) {
+            last = next;
+        }
+        sws(W_INSTANCE_ROW_NEXT + last, row_index + 1u);
+    }
+    let row = C_INSTANCE_ROWS + row_index * C_ROW_WORDS;
+    sws(row, instance);
+    sws(row + 1u, row_txg.x);
+    sws(row + 2u, row_txg.y);
+    sws(row + 3u, row_high_water.x);
+    sws(row + 4u, row_high_water.y);
+    sws(W_INSTANCE_ROW_NEXT + row_index, 0u);
+    w_instance_row_count = row_index + 1u;
+    w_instance_rows_are_indexed = keyed_table_after_a_row_was_appended(w_instance_row_table(), w_instance_row_count,
+        w_instance_rows_are_indexed, row_index);
+    return first != NONE;
+}
+
+// 主走读 inode → 对象出生代那一张（键是 inode 号）
+fn w_inode_birth_table() -> KeyedTable {
+    return KeyedTable(C_INODE_BIRTHS, 4u, 2u, W_INODE_BIRTH_BUCKETS, W_INODE_BIRTH_BUCKET_COUNT);
+}
+
+var<private> w_inode_births_are_indexed: bool;
+
+// inode 号 inode 在那一张里的行的下标，没有是 NONE
+fn w_inode_birth_row_of(inode: vec2<u32>) -> u32 {
+    return keyed_first_row_of(w_inode_birth_table(), w_inode_birth_count, w_inode_births_are_indexed, vec4<u32>(inode.x, inode.y, 0u, 0u));
+}
 
 // 草稿区里 rows 起每行 stride 个字、前四个字当键（键 0、键 1 lo/hi、键 2）的一张表：第 a 行排在第 b 行前面——按 (键 0, 键 1, 键 2, 行号) 比，
 // 行号放最后，次序是全序、同键的按行号升序（「同组里按表里的次序走」那几处靠这一点）
@@ -1124,6 +1350,8 @@ fn handoff_unit_area_start_slot() -> vec2<u32> {
 // 扫描内核开工：把走读内核留下的计数装回私有变量
 fn handoff_load() {
     w_instance_row_count = sw(H_BASE + H_ROW_COUNT);
+    // 走读内核记到第 KEYED_TABLE_ROWS_FOUND_BY_SCANNING_AT_MOST + 1 行那一刻建了这张表的桶表（⑬），之后没清过：条数过了那个界就是建过
+    w_instance_rows_are_indexed = w_instance_row_count > KEYED_TABLE_ROWS_FOUND_BY_SCANNING_AT_MOST;
     w_reference_count[0] = sw(H_BASE + H_REFERENCE_COUNT);
     w_reference_count[1] = 0u;
     c_newest_reference_count = sw(H_BASE + H_NEWEST_REFERENCE_COUNT);

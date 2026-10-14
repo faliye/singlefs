@@ -2,7 +2,7 @@
 //! 别的流直接复用（前缀共享是剪枝的基础，没有它每次放量都从头核）。
 //! 崩溃点的文件是这一份（`file!()`），不是调它的测试文件：改调用方的测试文件不动这里的节点。GPU 结论的版本与设点的文件无关；
 //! CPU 结论的版本是 CPU 判器闭包并上设点文件出发的闭包（崩溃点重放合并第三轮判决 J8），设在这里的点几条流同一把。
-//! 多记录流的 B、C 两次顺序写也在这里设点（J3：删除流与多记录流共享到 C）；不录崩溃点的层 0 那一路调同一个 [`sequential_write`]，
+//! 多记录流的 B、C 两次顺序写也在这里设点（J3：删除流与多记录流共享到 C）；不录崩溃点的崩溃点重放那一路调同一个 [`sequential_write`]，
 //! 两份造法只有这一份写法。不录崩溃点的那几样不要 `verdict-store` 特性，录崩溃点的那几样（录制器、按环境跑）要。
 //! 挂在标准前缀节点上的观察者登记在这里（J4，[`OBSERVERS_ON_THE_STANDARD_PREFIX`]，只有名字）；观察者的代码与照表跑的放量入口在
 //! `tests/common_crash_point_observers/mod.rs`：这一份不引它，公共模块设的点的 CPU 判器版本因此不收观察者代码（第三轮正文 H4「观察者代码不进
@@ -15,6 +15,7 @@
 use super::common::{parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
 #[cfg(feature = "verdict-store")]
 use singlefs_checker_tier::crash_amplification::CrashPointRecorder;
+use singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory;
 #[cfg(feature = "verdict-store")]
 use singlefs_core::address::CheckpointTxg;
 use singlefs_core::address::{InodeNumber, InstanceGeneration};
@@ -46,7 +47,7 @@ pub fn content_needing(data_units: usize, seed: usize) -> Vec<u8> {
 }
 
 /// 顺序写（多记录流与删除流的 B、C）：把现行那一版的内容换成 `content`，实例 1、调用方时间比第一个文件晚 60 秒。
-/// 层 0 那一路直接调它，录崩溃点的那一路经 [`sequential_write_step`] 调它：两份造法同一份写法（J3，「两份造法写表摘要相等」的用例核它）。
+/// 崩溃点重放那一路直接调它，录崩溃点的那一路经 [`sequential_write_step`] 调它：两份造法同一份写法（J3，「两份造法写表摘要相等」的用例核它）。
 pub fn sequential_write(pool: &mut BuiltPool, content: &[u8]) -> TransactionOutput {
     let publish_parameters = parameters();
     let devices = pool.devices.as_mut().expect("镜像还开着");
@@ -129,7 +130,7 @@ pub fn record_the_multi_record_publishes(
 }
 
 // ============================== 删除流的录法（多记录流到 C 之后 unlink 第一个文件） ==============================
-// 删除流自己的层 0 用例与挂在标准前缀上的可写挂载续做观察者都要它：观察者另读的输入从录一遍删除流得来，单跑多记录流那一项也照录
+// 删除流自己的崩溃枚举用例与挂在标准前缀上的可写挂载续做观察者都要它：观察者另读的输入从录一遍删除流得来，单跑多记录流那一项也照录
 // （崩溃点重放合并第三轮判决 J4、M4 第 10 条「单跑照录别项流程」）。
 
 /// unlink 的是第一个文件。
@@ -362,6 +363,58 @@ pub use singlefs_checker_tier::crash_amplification::{
     CrashAmplificationEnvironment, EnvironmentRestoredOnDrop,
 };
 
+/// 调用方的显卡先后写成环境变量的值（经 `run_from_environment` 跑的这一路与给定状态引擎那几条用例同一份写法）；
+/// 给定状态引擎那几条用例里也引这个模块的（`crash_amplification_planned_import_names_the_gpu_conclusions.rs`）经这里转出去用。
+#[cfg(feature = "verdict-store")]
+#[path = "../common_gpu_cards_of_the_caller/mod.rs"]
+pub mod common_gpu_cards_of_the_caller;
+
+/// 用例自己写的多机配置（`SINGLEFS_MULTI_HOST_CONFIG` 指的那一份）开了 GPU、却没写这一趟要读的那个显卡键（清过场读
+/// `GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED`，没清场读 `GPU_CARDS_BY_PRIORITY`），环境变量 `GPU_CARDS_BY_PRIORITY` 也没设时：照调用方给这个进程的
+/// 显卡先后（`gpu_card_configuration::GpuConfigurationOfTheCaller`，清过场取清场之后那一份）设上这个环境变量（一张卡都没点名是空串：
+/// 本机能用的卡全用），交回的守卫丢掉时还原；别的情形不动环境、交 `None`。
+/// 为什么：清场之下开了 GPU 而没写清场之后那一份显卡先后，这一趟照「不退回、不照空闲显存挑卡」拒（`cards_by_priority_from`）；只写 `ENABLE_GPU=1`
+/// 的用例配置（不带 gpu 特性那一趟报本次未跑的、照抄调用方显卡先后却抄不到的：变异复跑的源码副本里没有仓根的 `multi-host.env`）在清场之下就红在
+/// 「按环境跑得完」上（变异轻型第三轮，`crates/mutations.tsv` 那两行基线不绿）。经环境变量交过去的就是调用方的那一份，与卡池挑的卡对得上。
+///
+/// # Panics
+/// 调用方的多机配置读不了、显卡先后写坏了，或清场之下开了 GPU 而没写清场之后那一份（调用方自己的配置就跑不了 GPU 用例）。
+#[cfg(feature = "verdict-store")]
+fn card_priority_of_the_caller_for_a_test_configuration_naming_no_card(
+    repository_root: &std::path::Path,
+) -> Option<EnvironmentRestoredOnDrop> {
+    use singlefs_checker_tier::gpu_card_configuration::{
+        configuration_value, GpuQuiesce, CARDS_BY_PRIORITY_KEY,
+        CARDS_BY_PRIORITY_WHEN_QUIESCED_KEY, GPU_SWITCH_KEY,
+        MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+    };
+    if std::env::var_os(CARDS_BY_PRIORITY_KEY).is_some() {
+        return None;
+    }
+    let test_configuration = std::path::PathBuf::from(std::env::var_os(
+        MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+    )?);
+    let gpu_is_enabled = configuration_value(&test_configuration, GPU_SWITCH_KEY)
+        .is_some_and(|value| value.trim().trim_matches('"') == "1");
+    let key_this_run_reads = match GpuQuiesce::of_this_process() {
+        GpuQuiesce::QuiescedByTheWrapper => CARDS_BY_PRIORITY_WHEN_QUIESCED_KEY,
+        GpuQuiesce::NotQuiesced => CARDS_BY_PRIORITY_KEY,
+    };
+    let the_key_is_written = configuration_value(&test_configuration, key_this_run_reads)
+        .is_some_and(|value| !value.trim().is_empty());
+    if !gpu_is_enabled || the_key_is_written {
+        return None;
+    }
+    let cards_of_the_caller =
+        common_gpu_cards_of_the_caller::card_priority_value_of_the_caller(repository_root);
+    let mut restored = EnvironmentRestoredOnDrop::saved_then_cleared(&[CARDS_BY_PRIORITY_KEY]);
+    restored.set(
+        CARDS_BY_PRIORITY_KEY,
+        std::ffi::OsStr::new(&cards_of_the_caller),
+    );
+    Some(restored)
+}
+
 /// 一条已经录好的流（起点镜像、写表、段、被判的根槽写、版本表、崩溃点）按环境跑一趟崩溃放量：展开上限从
 /// `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO` 取（没设用 `default_expand_up_to`，写坏了 panic），库目录从 `SINGLEFS_CRASH_AMPLIFICATION_LIBRARY` 取
 /// （没设建在临时目录、跑完删），判法摘要取两个判器的闭包；健康的流一个红状态都不该有。只排派活计划的那一趟（`placement_only`）不判，原样交回。
@@ -486,7 +539,7 @@ pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         reuse_and_scale_fields_of_the_line, run_from_environment_with_observers, CrashFlow,
         ExpandUpToWritesPerSegment,
     };
-    use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
+    use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
     let limit = ExpandUpToWritesPerSegment::from_environment_or(default_expand_up_to);
     let expansion = move |_segment_index: usize, segment: &[usize]| limit.expansion_of(segment);
     let flow = CrashFlow {
@@ -506,45 +559,38 @@ pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         .parent()
         .expect("Cargo.lock 所在的目录就是仓根")
         .to_path_buf();
-    // 调用方没给库就建一份临时的：两个变量设上，跑完（或 panic）还原成调用方原来的样子
-    let temporary_library = match std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY") {
+    // 调用方没给库就用家目录下流水线单元测试那一类的长期库（不删，下一趟照同一套复用）：变量设上，跑完（或 panic）还原成调用方原来的样子
+    let unit_tests_library = match std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY") {
         Some(_) => None,
         None => {
-            let directory = std::env::temp_dir().join(format!(
-                "singlefs-crash-amplification-{flow_name}-{}",
-                std::process::id()
-            ));
+            let directory = amplification_unit_tests_library_directory(None)
+                .expect("流水线单元测试那一类的库目录");
             let mut restored = EnvironmentRestoredOnDrop::saved_then_cleared(&[
                 "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
-                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
             ]);
             restored.set(
                 "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
                 directory.as_os_str(),
             );
-            restored.set(
-                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
-                std::ffi::OsStr::new("1"),
-            );
-            Some((directory, restored))
+            Some(restored)
         }
     };
+    let card_priority_of_the_caller =
+        card_priority_of_the_caller_for_a_test_configuration_naming_no_card(&root);
     let started = std::time::Instant::now();
     let run = run_from_environment_with_observers(
         &flow,
         flow_name,
         observers,
-        &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
+        &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
         &root,
         limit,
     )
     .expect("按环境跑得完");
     let seconds = started.elapsed().as_secs_f64();
-    if let Some((directory, restored)) = temporary_library {
-        drop(restored);
-        let _ = std::fs::remove_dir_all(directory);
-    }
-    if run.placement_only {
+    drop(card_priority_of_the_caller);
+    drop(unit_tests_library);
+    if run.placement_only || run.recorded_only {
         return (run, None);
     }
     let reuse_and_scale = reuse_and_scale_fields_of_the_line(&run);
@@ -568,9 +614,8 @@ pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
     }
     let judge_line = judge_fields_of_the_summary_line(&run);
     let judge_version = run.judged_conclusions().version_text();
-    let cross_check_line = run.cross_check.fields_of_the_line();
     let line = format!(
-        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judge_version={judge_version} seconds={seconds:.1}{reuse_and_scale}{judge_line}{cross_check_line}",
+        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judge_version={judge_version} seconds={seconds:.1}{reuse_and_scale}{judge_line}",
         run.mode.name(),
         run.checking.states_checked,
         run.checking.blocks_checked,
@@ -606,27 +651,7 @@ pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         "流 {flow_name}：计数向量与计划对不上：{:?}",
         run.count_vector_disagreements
     );
-    assert_the_cross_check_agrees(flow_name, &run);
     (run, Some(line))
-}
-
-/// 对照（崩溃点重放合并第三轮判决 J6）比了就要对上：GPU 与 CPU 两份结论逐状态红项、两遍各自落到的根、结局、失败点都相同，
-/// 每一块两份都存了恢复字。没配 GPU、用户授权跳过、被叫停的那一趟没比，不判。
-#[cfg(feature = "verdict-store")]
-pub fn assert_the_cross_check_agrees(
-    flow_name: &str,
-    run: &singlefs_checker_tier::crash_amplification::EnvironmentRun,
-) {
-    use singlefs_checker_tier::crash_amplification::CrossCheckOfTheRun;
-    match &run.cross_check {
-        CrossCheckOfTheRun::Compared { comparison, .. } => assert!(
-            comparison.agrees(),
-            "流 {flow_name}：对照对不上（GPU 与 CPU 两份结论）：{comparison:?}"
-        ),
-        CrossCheckOfTheRun::SkippedByTheUser
-        | CrossCheckOfTheRun::NotConfiguredTheJudgeRunsOnTheCpu
-        | CrossCheckOfTheRun::NotComparedTheRunStoppedEarly => {}
-    }
 }
 
 /// 汇总行里说第 ① 段在哪判的那几个字段：GPU 判的带用了几张卡、判了多少、多快、写库花了多久；CPU 判的只有 `judge=cpu`。

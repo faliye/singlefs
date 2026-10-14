@@ -1,27 +1,30 @@
-//! checker 档模块：crash、layer0_progress
+//! checker 档模块：crash、crash_state_enumeration
 //! 里程碑「覆盖写、释放、回退与复用」步 0 在发布 B 上的那一半：把「取号 → 暖机 → A → B」整条录制流按 D13（验证路线） 已定项 4 枚举全部崩溃状态，
 //! 与新池新建文件同一种切法（上一次发布的系统配置槽写与下一次发布的单元写落在同一段，登记表八末尾那条 ⚠️），
 //! 每个状态跑恢复 + 多版本 oracle（实际走的根是哪一代就得读出那一代的内容）、池级 checker、记录核对器。
-//! 平时 `cargo test` 跑甲二快档（每段原地写各取它的几态、任意组合 × 单元写全不落或全落，`crash::Layer0SegmentExpansion`；
+//! 平时 `cargo test` 跑甲二快档（每段原地写各取它的几态、任意组合 × 单元写全不落或全落，`crash::CrashPointReplaySegmentExpansion`；
 //! 系统配置槽写是原地覆写、多一态「新旧都读不出」，代码审阅第 4 条）；
-//! 全量那条标 ignored，门禁 checker-tier-layer0-replay 在 release 下跑它（带断点续跑）。再加四组靶向的阳性对照。
+//! 全量那条标 ignored，门禁 checker-tier-crash-point-replay 在 release 下跑它（带断点续跑）。再加四组靶向的阳性对照。
 //! 另有两条只展开小段的流：基镜像里预置一条残留记录（步 0 预想的细节第三条的正例），与到 E 之后再复用两次、改坏 tail（步 6 必红「陈旧 tail + 已复用的块」）。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
 
-use std::num::{NonZeroU64, NonZeroUsize};
-
 use common::{build_pool, file_content, geometry, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
 use singlefs_checker_tier::crash::{
-    enumerate_layer0_in_state_slices, enumerate_layer0_in_state_slices_or_one_shard,
-    enumerate_layer0_quick_tier_versions, enumerate_layer0_selecting_versions_observing_each_state,
-    evaluate_state_for_versions, full_expansion, layer0_state_count,
-    layer0_state_count_with_torn_in_place_overwrites, quick_tier_expansion,
-    Layer0EnumerationOutcome, Layer0ObserverCounts, Layer0Parallelism, Layer0SegmentExpansion,
-    Layer0SliceLength, Layer0Tally, Layer0WorkerThreadsSource,
+    crash_state_count, crash_state_count_with_torn_in_place_overwrites,
+    evaluate_state_for_versions, full_expansion, quick_tier_expansion,
+    CrashPointReplayObserverCounts, CrashPointReplaySegmentExpansion, CrashPointReplayTally,
+    CrashPointReplayVersionTable,
 };
-use singlefs_checker_tier::layer0_progress::Layer0Resume;
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_quick_tier_versions, enumerate_crash_states_with_expansion,
+    CrashPointReplayItem, CrashPointReplayObserver,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs";
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration, SlotNumber};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::checksum::crc32_castagnoli;
@@ -66,7 +69,7 @@ struct Prepared {
     versions: Vec<PublishedVersion>,
 }
 
-/// 固定脚本跑到哪一步（里程碑「覆盖写、释放、回退与复用」步 0）：到 B 为止是靶向对照用的两次发布流；到 E 再正常卸载是层 0 全量跑的那条流。
+/// 固定脚本跑到哪一步（里程碑「覆盖写、释放、回退与复用」步 0）：到 B 为止是靶向对照用的两次发布流；到 E 再正常卸载是崩溃点重放全量跑的那条流。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Script {
     SecondVersionOnly,
@@ -78,7 +81,7 @@ enum Script {
     /// 到 E 为止再正常卸载：回退之后再覆盖写五次（txg 10–14，第一次释放 D 复活的 A 的数据单元、释放代 10），抬 F 到 11
     /// （两次空发布 txg 15、16），再发布 E（txg 17）——数据单元落回 mkfs 实例表那两槽 50176；最后正常卸载（B1，D16（发布语义）
     /// 已定项 1「正常卸载」）：先把 F = 17 写进每块盘的系统配置、过一道屏障，再推带卸载记号的空发布直到每块盘上都有一条（txg 18、19）。
-    /// 这是层 0 全量跑的那条流。卸载放在最后：它把 F 抬到现行 txg，排在回退之前的话回退候选集里就没有 A 了（D16（发布语义）
+    /// 这是崩溃点重放全量跑的那条流。卸载放在最后：它把 F 抬到现行 txg，排在回退之前的话回退候选集里就没有 A 了（D16（发布语义）
     /// 已定项 1 的候选集要 txg ≥ F_生效，与「抬 F 排在回退之后」同一个理由）。
     ReuseAfterRaisingFloorThenNormalUnmount,
     /// 到 E 之后（不卸载）再覆盖写两次：txg 18 的数据单元落回 50178–50179（mkfs 那片第 0 版树表那一槽起，没有哪条记录点名它），
@@ -86,8 +89,6 @@ enum Script {
     ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish,
 }
 
-/// 全量那条流在进度文件名里的名字（断点续跑按「输入指纹 + 流名 + 计划哈希」分格）。
-const FULL_ENUMERATION_STREAM_NAME: &str = "file_overwrite_fixed_script_through_e_then_unmount";
 /// 到 E 再正常卸载那条流：每次写只取两态时的全量闭式 1 + Σ(2^|段| − 1)（78 段；六个 28 写段各 2^28 − 1 占 96%）。代码审阅第 19 条之后
 /// 取号、抬 F、卸载先写系统配置之前各多一道屏障，把上一次轮换那 2 写与它们的 2 写拆成两段：三处各 15 → 3 + 3，比改之前的 6649413746 少 27。
 /// C577（发布返回之前、系统配置轮换之后加一道屏障）之后每次轮换那 2 写都自成一段，不再与下一次发布的单元写同段：十四处 2 + n 写段
@@ -112,7 +113,7 @@ const FULL_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT: &str = "instance1_txg1=12 inst
      instance2_txg11=268435467 instance2_txg12=268435467 instance2_txg13=268435467 \
      instance2_txg14=268435467 instance2_txg15=65555 instance2_txg16=65547 instance2_txg17=268435467 \
      instance2_txg18=65555 instance2_txg19=65547 after_the_last_root=8 every_write_persisted=1";
-/// 甲二快档的状态数（`crash::layer0_state_count_with_torn_in_place_overwrites` 按甲二的闭式；每次写只取两态时 163）。
+/// 甲二快档的状态数（`crash::crash_state_count_with_torn_in_place_overwrites` 按甲二的闭式；每次写只取两态时 163）。
 /// C577 之前轮换与单元写同段（3² · 2 − 1 = 17），之后拆成轮换段 8 与只有单元写的一段 1：十四处各少 8，390 → 278
 /// （两态时各少 7 − 3 − 1 = 3，205 → 163）。
 const QUICK_TIER_STATES_THROUGH_THE_UNMOUNT: u64 = 278;
@@ -559,14 +560,14 @@ fn prepare(tag: &str, script: Script) -> Prepared {
     }
 }
 
-fn assert_checker_and_record_checker_clean(tally: &Layer0Tally) {
+fn assert_checker_and_record_checker_clean(tally: &CrashPointReplayTally) {
     assert_checker_and_record_checker_counts(tally, &[]);
 }
 
 /// `known_checker_violations` 只给一条只展开小段的流用：它钉的是一处口径未定的分歧的现状（见那条用例的注释），
 /// 不是认下来的行为；其余不变量判违例的状态数必须是 0。
 fn assert_checker_and_record_checker_counts(
-    tally: &Layer0Tally,
+    tally: &CrashPointReplayTally,
     known_checker_violations: &[(&str, u64)],
 ) {
     assert_eq!(
@@ -575,9 +576,9 @@ fn assert_checker_and_record_checker_counts(
             tally.record_claimed_state_missing_unit
         ),
         (0, 0),
-        "记录核对器两条判据在层 0 这条负载上**结构上**到不了、不是语义上保证恒 0：段按屏障切，\
+        "记录核对器两条判据在崩溃点重放这条负载上**结构上**到不了、不是语义上保证恒 0：段按屏障切，\
          一次发布的单元写、journal 记录写与根槽写两两不同段（这几条流上同时含两类的段现查都是 0 个），\
-         「根在案而记录一条都不在」与「恢复自称的 txg ≥ 某次发布而它的单元两份都不在」这两个状态，层 0 枚举摆不出来。\
+         「根在案而记录一条都不在」与「恢复自称的 txg ≥ 某次发布而它的单元两份都不在」这两个状态，崩溃点重放枚举摆不出来。\
          这两条判据的判别力在手搭状态那一路（同一份文件里 \
          a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missing_by_the_record_checker）\
          与崩溃注入那一路（增补 3 第 3 件）"
@@ -643,7 +644,7 @@ fn assert_checker_and_record_checker_counts(
 /// 抬过 F 的两个脚本（`Script::ReuseAfterRaisingFloorThenNormalUnmount` 与 `Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish`，E 之前把 F 抬到 11）：
 /// I-7.9（回退下界 F 不高于抬 F 的上限，收口表第 26 行）在抬 F 的根（txg 15）落盘之后的状态上真被评估过——阴性结果要与「代码没跑到」分开。
 /// 没抬过 F 的状态（txg 15 的根还没落盘）上它报不适用，共用的那一道已钉住「评估过的 + 不适用的 = 状态数」。
-fn assert_the_rollback_floor_raise_was_judged(tally: &Layer0Tally) {
+fn assert_the_rollback_floor_raise_was_judged(tally: &CrashPointReplayTally) {
     assert!(
         tally
             .checker_evaluated_states
@@ -657,30 +658,30 @@ fn assert_the_rollback_floor_raise_was_judged(tally: &Layer0Tally) {
 }
 
 /// 到 C 为止的固定脚本：段序列登记表（layout/01-first-txn.md 八）「装置钉住」的那条数组由 `prepare` 里的断言钉住；
-/// 层 0 全量与甲二快档都在到 E 再卸载的脚本上跑。32 段、每次写只取两态时闭式 50724921、甲二 69；
-/// 系统配置槽写补第三态（代码审阅第 4 条）之后层 0 枚举的是全量 50724971、甲二 119。
+/// 崩溃点重放全量与甲二快档都在到 E 再卸载的脚本上跑。32 段、每次写只取两态时闭式 50724921、甲二 69；
+/// 系统配置槽写补第三态（代码审阅第 4 条）之后崩溃点重放枚举的是全量 50724971、甲二 119。
 /// C577（发布末尾轮换之后一道屏障）之前 27 段、202113066、84、454426691、159：A、B、C 的 24 个单元写与写行之后两次暖机的 16 个单元写
 /// 各与上一次的轮换同段（26、26、26、18、18），五处各拆成 2 与 n——两态闭式每处少 3 · 2^n − 3（共 9 · 2^24 + 6 · 2^16 − 15 = 151388145），
 /// 三态全量每处少 8 · 2^n − 8，甲二每处 17 → 8 + 1、两态时 7 → 3 + 1。代码审阅第 19 条之后取号写之前多一道屏障，
 /// B 的轮换与取号那 4 写一段拆成 2、2：闭式与甲二各少 15 − 3 − 3 = 9（再往前 26 段、202113075、93）。
 #[test]
 fn the_fixed_script_through_the_third_publish_keeps_its_registered_segment_sequence() {
-    let prepared = prepare("layer0-c-registered", Script::ThirdVersion);
+    let prepared = prepare("crash-point-replay-c-registered", Script::ThirdVersion);
     assert_eq!(prepared.segments.len(), 32);
     assert_eq!(closed_form_state_count(&prepared.segments), 50_724_921);
     assert_eq!(
-        layer0_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
+        crash_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
         69
     );
     assert_eq!(
         (
-            layer0_state_count_with_torn_in_place_overwrites(
+            crash_state_count_with_torn_in_place_overwrites(
                 &prepared.base,
                 &prepared.writes,
                 &prepared.segments,
                 &full_expansion
             ),
-            layer0_state_count_with_torn_in_place_overwrites(
+            crash_state_count_with_torn_in_place_overwrites(
                 &prepared.base,
                 &prepared.writes,
                 &prepared.segments,
@@ -698,22 +699,25 @@ fn the_fixed_script_through_the_third_publish_keeps_its_registered_segment_seque
 /// 代码审阅第 19 条之前 29 段、206307382、104。
 #[test]
 fn the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_sequence() {
-    let prepared = prepare("layer0-d-registered", Script::RollbackToFirstVersion);
+    let prepared = prepare(
+        "crash-point-replay-d-registered",
+        Script::RollbackToFirstVersion,
+    );
     assert_eq!(prepared.segments.len(), 36);
     assert_eq!(closed_form_state_count(&prepared.segments), 67_502_143);
     assert_eq!(
-        layer0_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
+        crash_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
         77
     );
     assert_eq!(
         (
-            layer0_state_count_with_torn_in_place_overwrites(
+            crash_state_count_with_torn_in_place_overwrites(
                 &prepared.base,
                 &prepared.writes,
                 &prepared.segments,
                 &full_expansion
             ),
-            layer0_state_count_with_torn_in_place_overwrites(
+            crash_state_count_with_torn_in_place_overwrites(
                 &prepared.base,
                 &prepared.writes,
                 &prepared.segments,
@@ -724,24 +728,31 @@ fn the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_se
     );
 }
 
-/// 平时跑的那一份（甲二快档）：每段原地写取任意子集 × 单元写全不落或全落（`crash::Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll`）。
-/// 单元写只落一部分才显出来的那一类它看不见，那一类归全量（下面标 ignored 的那条，门禁 checker-tier-layer0-replay 提交时跑）。
+/// 平时跑的那一份（甲二快档）：每段原地写取任意子集 × 单元写全不落或全落（`crash::CrashPointReplaySegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll`）。
+/// 单元写只落一部分才显出来的那一类它看不见，那一类归全量（下面标 ignored 的那条，门禁 checker-tier-crash-point-replay 提交时跑）。
 #[test]
 fn every_crash_state_of_the_quick_tier_recovers_to_the_version_its_root_claims() {
     let prepared = prepare(
-        "layer0-e-fast",
+        "crash-point-replay-e-fast",
         Script::ReuseAfterRaisingFloorThenNormalUnmount,
     );
-    let tally = enumerate_layer0_quick_tier_versions(
+    let Some(tally) = enumerate_crash_states_quick_tier_versions(
+        CrashPointReplayItem {
+            name: "fixed_script::quick_tier",
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
         &prepared.versions,
-    );
+    )
+    .judged() else {
+        return;
+    };
     assert_eq!(
         tally.states,
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &prepared.base,
             &prepared.writes,
             &prepared.segments,
@@ -754,17 +765,17 @@ fn every_crash_state_of_the_quick_tier_recovers_to_the_version_its_root_claims()
         "甲二的状态数"
     );
     assert_eq!(
-        layer0_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
+        crash_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
         163,
         "每次写只取两态时甲二的闭式（补第三态之前的数；C577 之前 205）"
     );
     println!(
-        "LAYER0B_FAST states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
+        "CRASH_POINT_REPLAY_FIXED_SCRIPT_FAST states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
         tally.states,
         tally.states_by_publish_text(),
         tally.checker_counts_by_invariant()
     );
-    // 步 6 验收第 1 条「每次发布各多少」：按段归到后面最近的那次根槽写（`crash::Layer0PublishOfState`）。
+    // 步 6 验收第 1 条「每次发布各多少」：按段归到后面最近的那次根槽写（`crash::CrashPointReplayPublishOfState`）。
     assert_eq!(
         tally.states_by_publish_text(),
         QUICK_TIER_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT,
@@ -790,82 +801,15 @@ fn every_crash_state_of_the_quick_tier_recovers_to_the_version_its_root_claims()
     assert_the_rollback_floor_raise_was_judged(&tally);
 }
 
-/// 层 0 按状态序号区间切片、多线程跑（2026-09-18 用户定：测试与崩溃检测优先多线程）：到 E 再卸载的固定脚本、甲二快档那些状态，
-/// 切成每片 1 个状态、8 个线程抢着跑，与整条流 1 片、1 个线程逐个跑相比，计数逐项相同、「第一处违例」是序号最小的那一处、
-/// 观察者按同一个次序看到同一串持久集合。版本表故意把 B（实例 1 第 4 代）的内容换成 C 的，让违例散在很多个状态上，「第一处」才有得选。
-#[test]
-fn one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_order_as_one_slice_on_one_thread(
-) {
-    let prepared = prepare(
-        "layer0-slices-merge",
-        Script::ReuseAfterRaisingFloorThenNormalUnmount,
-    );
-    let mut versions_with_the_wrong_second_content = prepared.versions.clone();
-    versions_with_the_wrong_second_content
-        .iter_mut()
-        .find(|version| {
-            version.instance == InstanceGeneration(1) && version.checkpoint_txg == CheckpointTxg(4)
-        })
-        .expect("版本表里有 B 那一版")
-        .content = third_content();
-    let run = |parallelism: Layer0Parallelism| {
-        let mut observed_persisted_sets: Vec<Vec<bool>> = Vec::new();
-        let tally = enumerate_layer0_in_state_slices(
-            &prepared.base,
-            &prepared.writes,
-            &prepared.segments,
-            prepared.judged_root_index,
-            &versions_with_the_wrong_second_content,
-            &quick_tier_expansion,
-            parallelism,
-            Some(&mut |crash_image: &CrashImage<'_>,
-                       _consulted_report: &RecoveryReport,
-                       _counts: &mut Layer0ObserverCounts| {
-                observed_persisted_sets.push(crash_image.persisted.clone());
-            }),
-            &Layer0Resume::NoProgressFile,
-        );
-        (tally, observed_persisted_sets)
-    };
-    let (one_slice_tally, one_slice_order) = run(Layer0Parallelism {
-        worker_threads: NonZeroUsize::MIN,
-        worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller,
-        slice_length: Layer0SliceLength::StatesPerSlice(NonZeroU64::MAX),
-    });
-    let (one_state_slices_tally, one_state_slices_order) = run(Layer0Parallelism {
-        worker_threads: NonZeroUsize::new(8).expect("8 不是 0"),
-        worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller,
-        slice_length: Layer0SliceLength::StatesPerSlice(NonZeroU64::MIN),
-    });
-    assert_eq!(
-        one_slice_tally.states, QUICK_TIER_STATES_THROUGH_THE_UNMOUNT,
-        "甲二快档那些状态"
-    );
-    assert!(
-        one_slice_tally.violations >= 2 && one_slice_tally.ignored_violations >= 2,
-        "B 的内容换掉之后违例散在多个状态上：{} 个、不看 journal 那一遍 {} 个",
-        one_slice_tally.violations,
-        one_slice_tally.ignored_violations
-    );
-    assert_eq!(
-        one_state_slices_order, one_slice_order,
-        "观察者按序号次序看到同一串持久集合"
-    );
-    assert_eq!(
-        one_state_slices_tally, one_slice_tally,
-        "计数与每一处「第一处」都逐项相同"
-    );
-}
-
 /// 全量：固定脚本到 E 再正常卸载，闭式 [`FULL_STATES_THROUGH_THE_UNMOUNT`] 个状态（段序列由 `prepare` 钉住）。
-/// 门禁 checker-tier-layer0-replay 在 release 下跑它，认下面打印的 `LAYER0B` 行里 `exhaustive=true`。带断点续跑（`singlefs_checker_tier::layer0_progress`）：
-/// 进度目录、输入指纹与强制从头跑的开关都从环境变量取，没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，
-/// `scripts/crash/layer0-shard-run.sh`）：跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
+/// 门禁 checker-tier-crash-point-replay 在 release 下跑它，认下面打印的 `CRASH_POINT_REPLAY_FIXED_SCRIPT` 行里 `exhaustive=true`。判过的状态都在判定库里（崩溃枚举用例那一类，
+/// `crash_state_enumeration` 的两段：流先录进库，判段从库读回判，被杀之后下一趟接着判没判过的）。双机（`scripts/crash/crash-point-replay-shard-run.sh` 经崩溃放量的双机驱动）：
+/// 两台各判自己那一份，那几趟不打计数行、不判下面的断言；导入第二台的库之后再跑的那一趟拿整条流的计数照下面逐项判、逐字打同样的行。
 #[test]
-#[ignore = "全量五十多亿个状态、每个两遍恢复 + checker；门禁 checker-tier-layer0-replay 在 release 下跑，带断点续跑"]
+#[ignore = "全量五十多亿个状态、每个两遍恢复 + checker；门禁 checker-tier-crash-point-replay 在 release 下跑，带断点续跑"]
 fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
     let prepared = prepare(
-        "layer0-e-full",
+        "crash-point-replay-e-full",
         Script::ReuseAfterRaisingFloorThenNormalUnmount,
     );
     assert_eq!(
@@ -873,8 +817,8 @@ fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
         FULL_STATES_WITH_TWO_STATES_PER_WRITE_THROUGH_THE_UNMOUNT,
         "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)"
     );
-    // 计数行的 closed_form 报枚举域的闭式（系统配置槽写三态），checker-tier-layer0-replay 认 exhaustive=true 就是枚举到的恰好这么多。
-    let closed_form = layer0_state_count_with_torn_in_place_overwrites(
+    // 计数行的 closed_form 报枚举域的闭式（系统配置槽写三态），checker-tier-crash-point-replay 认 exhaustive=true 就是枚举到的恰好这么多。
+    let closed_form = crash_state_count_with_torn_in_place_overwrites(
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
@@ -884,26 +828,28 @@ fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
         closed_form, FULL_STATES_THROUGH_THE_UNMOUNT,
         "闭式：每段 3^m · 2^(n−m) − 1 之和再加 1"
     );
-    let tally = match enumerate_layer0_in_state_slices_or_one_shard(
+    let Some(tally) = enumerate_crash_states_with_expansion(
+        CrashPointReplayItem {
+            name: "fixed_script::full",
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
-        &prepared.versions,
+        CrashPointReplayVersionTable::with_a_file_only(&prepared.versions),
         &full_expansion,
-        Layer0Parallelism::from_environment(),
-        None,
-        &Layer0Resume::from_environment(FULL_ENUMERATION_STREAM_NAME),
-    ) {
-        Layer0EnumerationOutcome::WholeStream(tally) => tally,
-        Layer0EnumerationOutcome::OneShardWrittenToItsLedger(_written) => return,
+        &[],
+    )
+    .judged() else {
+        return;
     };
     let checker_violations: u64 = tally.checker_violated_states.values().sum();
     // 每条不变量报成 `I-x.y=评估过/判违例/不适用` 夹在 checker_violations 与 first_violation 之间（步 6 验收第 3 条：阴性结果与「代码没跑到」分开）；
-    // 门禁 checker-tier-layer0-replay 只认行首 `LAYER0B ` 与 `exhaustive=true`，整行原样报出来。按发布分的状态数（步 6 验收第 1 条）夹在
+    // 门禁 checker-tier-crash-point-replay 只认行首 `CRASH_POINT_REPLAY_FIXED_SCRIPT ` 与 `exhaustive=true`，整行原样报出来。按发布分的状态数（步 6 验收第 1 条）夹在
     // checker 那一段与 first_violation 之间，随整行一起进门禁的成功句。
     println!(
-        "LAYER0B states={} closed_form={closed_form} exhaustive={} violations={} root_persisted_states={} no_file={} file_read={} failed={} journal_differing={} verification_ran={} verification_failed={} record_root_without_record={} record_claimed_state_missing_unit={} checker_violations={checker_violations} {} states_by_publish=[{}] first_violation={}",
+        "CRASH_POINT_REPLAY_FIXED_SCRIPT states={} closed_form={closed_form} exhaustive={} violations={} root_persisted_states={} no_file={} file_read={} failed={} journal_differing={} record_root_without_record={} record_claimed_state_missing_unit={} checker_violations={checker_violations} {} states_by_publish=[{}] first_violation={}",
         tally.states,
         tally.states == closed_form,
         tally.violations,
@@ -912,8 +858,6 @@ fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
         tally.file_read_states,
         tally.failed_states,
         tally.journal_differing_states,
-        tally.verification_ran_states,
-        tally.verification_failed_states,
         tally.record_root_without_record,
         tally.record_claimed_state_missing_unit,
         tally.checker_counts_by_invariant(),
@@ -945,7 +889,7 @@ fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
 /// 靶向的阳性对照：把持久集合手工摆成四个形状，oracle、journal 承重、记录核对器各要在它该红的那一格红。
 #[test]
 fn targeted_controls_on_the_second_publish_go_red_where_they_should() {
-    let prepared = prepare("layer0-b-controls", Script::SecondVersionOnly);
+    let prepared = prepare("crash-point-replay-b-controls", Script::SecondVersionOnly);
     let all = vec![true; prepared.writes.len()];
     let is_second_publish = |index: usize| index > prepared.first_root_index;
     let kinds_of_second_publish = |kind: StepKind| -> Vec<usize> {
@@ -964,7 +908,7 @@ fn targeted_controls_on_the_second_publish_go_red_where_they_should() {
         (24, 2)
     );
     let evaluate = |persisted: Vec<bool>| {
-        let mut tally = Layer0Tally::default();
+        let mut tally = CrashPointReplayTally::default();
         let report = evaluate_state_for_versions(
             &prepared.base,
             &prepared.writes,
@@ -1245,7 +1189,7 @@ fn prepare_with_residual_record_seeded(tag: &str) -> Prepared {
 #[test]
 fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_whose_chain_reaches_it(
 ) {
-    let prepared = prepare_with_residual_record_seeded("layer0-residual-record");
+    let prepared = prepare_with_residual_record_seeded("crash-point-replay-residual-record");
     let root_indexes: Vec<usize> = prepared
         .writes
         .iter()
@@ -1277,55 +1221,85 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
     let expand = |segment_index: usize, segment: &[usize]| {
         segment_index > second_publish_root_segment_index && segment.len() < 10
     };
-    let mut states_whose_chain_reaches_the_residual_record = 0u64;
-    let mut states_contradicting_the_predicate: Vec<String> = Vec::new();
-    let tally = enumerate_layer0_selecting_versions_observing_each_state(
+    // 观察者经崩溃判定库那一路按块看：要记的数全经观察者计数，谓词对不上的状态当场 panic（判段把那一句带出来、用例红）
+    let observe = |_ordinal: u64,
+                   crash_image: &CrashImage<'_>,
+                   consulted_report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        let persisted = &crash_image.persisted;
+        assert!(
+            persisted[second_publish_root_index]
+                && second_publish_record_indexes
+                    .iter()
+                    .all(|record_index| persisted[*record_index]),
+            "展开的状态里 B 的记录与根槽都已持久"
+        );
+        // B 的根槽已持久、所选根的实例表（mkfs 那一版）里没有回退行：水位还在 (1, 4)，链从 jsn 4 接到 jsn 5，直到实例 2 的某条根持久。
+        let chain_reaches_the_residual_record = !second_instance_root_indexes
+            .iter()
+            .any(|root_index| persisted[*root_index]);
+        if chain_reaches_the_residual_record {
+            counts.add("chain_reaches_the_residual_record", 1);
+        }
+        let landed_on_the_residual_record = consulted_report.effective_root
+            == Some(RESIDUAL_RECORD_ROOT)
+            && consulted_report.outcome
+                == (RecoveryOutcome::FileRead {
+                    root: (InstanceGeneration(1), CheckpointTxg(4)),
+                    content: residual_content(),
+                });
+        assert!(
+                chain_reaches_the_residual_record == landed_on_the_residual_record,
+                "该施加残留记录与恢复实际落在 (1, 5) 对不上：谓词 {chain_reaches_the_residual_record}、实际走的根 {:?}、施加 {}",
+                consulted_report.effective_root,
+                consulted_report.journal.prefix_applied
+            );
+    };
+    let Some(tally) = enumerate_crash_states_with_expansion(
+        CrashPointReplayItem {
+            name: "fixed_script::residual_record_seeded",
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
-        &prepared.versions,
-        &expand,
-        &mut |crash_image, consulted_report| {
-            let persisted = &crash_image.persisted;
-            assert!(
-                persisted[second_publish_root_index]
-                    && second_publish_record_indexes
-                        .iter()
-                        .all(|record_index| persisted[*record_index]),
-                "展开的状态里 B 的记录与根槽都已持久"
-            );
-            // B 的根槽已持久、所选根的实例表（mkfs 那一版）里没有回退行：水位还在 (1, 4)，链从 jsn 4 接到 jsn 5，直到实例 2 的某条根持久。
-            let chain_reaches_the_residual_record = !second_instance_root_indexes
-                .iter()
-                .any(|root_index| persisted[*root_index]);
-            if chain_reaches_the_residual_record {
-                states_whose_chain_reaches_the_residual_record += 1;
-            }
-            let landed_on_the_residual_record = consulted_report.effective_root
-                == Some(RESIDUAL_RECORD_ROOT)
-                && consulted_report.outcome
-                    == (RecoveryOutcome::FileRead {
-                        root: (InstanceGeneration(1), CheckpointTxg(4)),
-                        content: residual_content(),
-                    });
-            if chain_reaches_the_residual_record != landed_on_the_residual_record {
-                states_contradicting_the_predicate.push(format!(
-                    "谓词 {chain_reaches_the_residual_record}、实际走的根 {:?}、施加 {}",
-                    consulted_report.effective_root, consulted_report.journal.prefix_applied
-                ));
+        CrashPointReplayVersionTable::with_a_file_only(&prepared.versions),
+        &|segment_index, segment| {
+            if expand(segment_index, segment) {
+                CrashPointReplaySegmentExpansion::EveryProperSubset
+            } else {
+                CrashPointReplaySegmentExpansion::NotExpanded
             }
         },
-    );
-    let states_of_the_expanded_segments = layer0_state_count_with_torn_in_place_overwrites(
+        &[CrashPointReplayObserver {
+            name: "residual_record_chain",
+            // 观察者另读的输入：B 的根槽与记录、实例 2 那几条根的写表下标，残留记录那一版的根与内容
+            extra_inputs_digest: extra_inputs_digest_that_was_computed(singlefs_harness::sha256::sha256_digest(
+                format!(
+                    "second_publish_root_index={second_publish_root_index}\nsecond_publish_record_indexes={second_publish_record_indexes:?}\nsecond_instance_root_indexes={second_instance_root_indexes:?}\nresidual_record_root={RESIDUAL_RECORD_ROOT:?}\nresidual_content={:?}\n",
+                    residual_content()
+                )
+                .as_bytes(),
+            )),
+            observe: &observe,
+        }],
+    )
+    .judged() else {
+        return;
+    };
+    let states_whose_chain_reaches_the_residual_record = tally
+        .observer_counts
+        .count_named("chain_reaches_the_residual_record");
+    let states_of_the_expanded_segments = crash_state_count_with_torn_in_place_overwrites(
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         &|segment_index, segment| {
             if expand(segment_index, segment) {
-                Layer0SegmentExpansion::EveryProperSubset
+                CrashPointReplaySegmentExpansion::EveryProperSubset
             } else {
-                Layer0SegmentExpansion::NotExpanded
+                CrashPointReplaySegmentExpansion::NotExpanded
             }
         },
     );
@@ -1335,10 +1309,6 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
         states_whose_chain_reaches_the_residual_record,
         tally.violations,
         tally.checker_counts_by_invariant()
-    );
-    assert!(
-        states_contradicting_the_predicate.is_empty(),
-        "该施加残留记录与恢复实际落在 (1, 5) 对不上的状态：{states_contradicting_the_predicate:?}"
     );
     assert_eq!(tally.states, states_of_the_expanded_segments);
     assert_eq!(
@@ -1369,6 +1339,35 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
 
 /// 改坏 tail 的 tail 值：窗口 [3, 19] 里有 A 那条记录（jsn 3），它点名的 50180 在 txg 19 被合法复用。
 const STALE_JOURNAL_TAIL: u64 = 2;
+
+/// 改坏 tail 那一条的观察者另读的输入的摘要：陈旧的 tail 值，与 tail 没改坏的那一张写表逐个写的盘、种类、FUA、偏移与内容
+/// （整段清零只记长度）。
+fn digest_of_the_stale_tail_and_the_true_tail_writes(
+    stale_tail: u64,
+    true_tail_writes: &[RetainedWrite],
+) -> [u8; singlefs_harness::sha256::DIGEST_BYTES] {
+    let mut bytes = format!("stale_tail={stale_tail}\n").into_bytes();
+    for write in true_tail_writes {
+        bytes.extend_from_slice(
+            format!(
+                "write device={:?} kind={:?} force_unit_access={} offset={:?} ",
+                write.device, write.kind, write.is_force_unit_access, write.offset
+            )
+            .as_bytes(),
+        );
+        match &write.contents {
+            WrittenContents::Bytes(contents) => {
+                bytes.extend_from_slice(format!("bytes={} ", contents.len()).as_bytes());
+                bytes.extend_from_slice(contents);
+            }
+            WrittenContents::Zeros { length } => {
+                bytes.extend_from_slice(format!("zeros={length}").as_bytes());
+            }
+        }
+        bytes.push(b'\n');
+    }
+    singlefs_harness::sha256::sha256_digest(&bytes)
+}
 
 /// 改坏 tail：录制流里每一次系统配置槽写都换成 tail = `stale_tail` 的那一份（按字段重写、校验和重算，其余字段原样）。
 fn writes_with_stale_journal_tail(writes: &[RetainedWrite], stale_tail: u64) -> Vec<RetainedWrite> {
@@ -1441,7 +1440,7 @@ fn records_after_tail_naming_a_mismatched_unit(
 fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_to_the_same_end_state(
 ) {
     let prepared = prepare(
-        "layer0-stale-tail",
+        "crash-point-replay-stale-tail",
         Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish,
     );
     let stale_writes = writes_with_stale_journal_tail(&prepared.writes, STALE_JOURNAL_TAIL);
@@ -1472,68 +1471,98 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
     let expand = |segment_index: usize, segment: &[usize]| {
         segment_index > reuse_units_segment_index && segment.len() < 10
     };
-    let mut states_with_a_reused_named_unit_after_the_stale_tail = 0u64;
-    let mut records_with_a_reused_named_unit: Vec<u64> = Vec::new();
-    let mut states_differing_from_the_true_tail: Vec<String> = Vec::new();
-    let tally = enumerate_layer0_selecting_versions_observing_each_state(
+    // 观察者经崩溃判定库那一路按块看：要记的数全经观察者计数（点名了被复用单元的记录按 jsn 各一个计数），终态不同的状态当场 panic
+    let observe = |_ordinal: u64,
+                   stale_tail_image: &CrashImage<'_>,
+                   stale_tail_report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        assert_eq!(
+            choose_system_configuration(stale_tail_image)
+                .expect("系统配置")
+                .quantities
+                .journal_tail,
+            STALE_JOURNAL_TAIL,
+            "展开的状态里择到的系统配置都带陈旧的 tail"
+        );
+        let mismatched =
+            records_after_tail_naming_a_mismatched_unit(stale_tail_image, STALE_JOURNAL_TAIL);
+        if !mismatched.is_empty() {
+            counts.add("states_with_a_reused_named_unit_after_the_stale_tail", 1);
+            for record in &mismatched {
+                counts.add(&format!("record_{record}_names_a_reused_unit"), 1);
+            }
+        }
+        // 枚举用的写表在录制流里的写后面接着撕裂镜像（系统配置槽写的第三态，代码审阅第 4 条）：tail 没改坏的那一份镜像照样接上，
+        // 撕裂的那一槽同样新旧都读不出，持久集合逐条对得上。
+        let true_tail_writes: Vec<RetainedWrite> = prepared
+            .writes
+            .iter()
+            .chain(&stale_tail_image.writes[prepared.writes.len()..])
+            .cloned()
+            .collect();
+        let true_tail_image = CrashImage {
+            base: &prepared.base,
+            writes: &true_tail_writes,
+            persisted: stale_tail_image.persisted.clone(),
+        };
+        let true_tail_report = recover(&true_tail_image, JournalPolicy::Consult);
+        assert!(
+                *stale_tail_report == true_tail_report,
+                "改坏 tail 之后恢复的终态与 tail 没改坏的同一个状态不同：tail 陈旧：{:?} 走 {:?}；tail 没改坏：{:?} 走 {:?}",
+                stale_tail_report.outcome,
+                stale_tail_report.effective_root,
+                true_tail_report.outcome,
+                true_tail_report.effective_root
+            );
+    };
+    let Some(tally) = enumerate_crash_states_with_expansion(
+        CrashPointReplayItem {
+            name: "fixed_script::stale_tail_with_a_reused_named_unit",
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &stale_writes,
         &prepared.segments,
         prepared.judged_root_index,
-        &prepared.versions,
-        &expand,
-        &mut |stale_tail_image, stale_tail_report| {
-            assert_eq!(
-                choose_system_configuration(stale_tail_image)
-                    .expect("系统配置")
-                    .quantities
-                    .journal_tail,
-                STALE_JOURNAL_TAIL,
-                "展开的状态里择到的系统配置都带陈旧的 tail"
-            );
-            let mismatched =
-                records_after_tail_naming_a_mismatched_unit(stale_tail_image, STALE_JOURNAL_TAIL);
-            if !mismatched.is_empty() {
-                states_with_a_reused_named_unit_after_the_stale_tail += 1;
-                records_with_a_reused_named_unit = mismatched;
-            }
-            // 枚举用的写表在录制流里的写后面接着撕裂镜像（系统配置槽写的第三态，代码审阅第 4 条）：tail 没改坏的那一份镜像照样接上，
-            // 撕裂的那一槽同样新旧都读不出，持久集合逐条对得上。
-            let true_tail_writes: Vec<RetainedWrite> = prepared
-                .writes
-                .iter()
-                .chain(&stale_tail_image.writes[prepared.writes.len()..])
-                .cloned()
-                .collect();
-            let true_tail_image = CrashImage {
-                base: &prepared.base,
-                writes: &true_tail_writes,
-                persisted: stale_tail_image.persisted.clone(),
-            };
-            let true_tail_report = recover(&true_tail_image, JournalPolicy::Consult);
-            if *stale_tail_report != true_tail_report {
-                states_differing_from_the_true_tail.push(format!(
-                    "tail 陈旧：{:?} 走 {:?}；tail 没改坏：{:?} 走 {:?}",
-                    stale_tail_report.outcome,
-                    stale_tail_report.effective_root,
-                    true_tail_report.outcome,
-                    true_tail_report.effective_root
-                ));
+        CrashPointReplayVersionTable::with_a_file_only(&prepared.versions),
+        &|segment_index, segment| {
+            if expand(segment_index, segment) {
+                CrashPointReplaySegmentExpansion::EveryProperSubset
+            } else {
+                CrashPointReplaySegmentExpansion::NotExpanded
             }
         },
-    );
+        &[CrashPointReplayObserver {
+            name: "stale_tail",
+            // 观察者另读的输入：陈旧的 tail 值与 tail 没改坏的那一张写表（流的写表是改坏了 tail 的那一张）
+            extra_inputs_digest: extra_inputs_digest_that_was_computed(
+                digest_of_the_stale_tail_and_the_true_tail_writes(
+                    STALE_JOURNAL_TAIL,
+                    &prepared.writes,
+                ),
+            ),
+            observe: &observe,
+        }],
+    )
+    .judged() else {
+        return;
+    };
+    let states_with_a_reused_named_unit_after_the_stale_tail = tally
+        .observer_counts
+        .count_named("states_with_a_reused_named_unit_after_the_stale_tail");
+    let records_with_a_reused_named_unit: Vec<String> = tally
+        .observer_counts
+        .iter()
+        .filter(|(name, _)| name.starts_with("record_"))
+        .map(|(name, count)| format!("{name}={count}"))
+        .collect();
     println!(
-        "STALE_TAIL states={} states_with_a_reused_named_unit_after_the_stale_tail={} records_with_a_reused_named_unit={:?} violations={} failed={} verification_failed={}",
+        "STALE_TAIL states={} states_with_a_reused_named_unit_after_the_stale_tail={} records_with_a_reused_named_unit={:?} violations={} failed={}",
         tally.states,
         states_with_a_reused_named_unit_after_the_stale_tail,
         records_with_a_reused_named_unit,
         tally.violations,
-        tally.failed_states,
-        tally.verification_failed_states
-    );
-    assert!(
-        states_differing_from_the_true_tail.is_empty(),
-        "改坏 tail 之后恢复的终态与 tail 没改坏的同一个状态不同：{states_differing_from_the_true_tail:?}"
+        tally.failed_states
     );
     assert_eq!(
         tally.states, 13,
@@ -1544,7 +1573,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
             states_with_a_reused_named_unit_after_the_stale_tail,
             records_with_a_reused_named_unit
         ),
-        (13, vec![3]),
+        (13, vec!["record_3_names_a_reused_unit=13".to_string()]),
         "13 个状态里 txg 19 的单元写都已持久：陈旧 tail 之后 A 那条记录（jsn 3）点名的 50180 两份都已被复用"
     );
     assert_eq!(
@@ -1553,10 +1582,6 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
         tally.first_violation
     );
     assert_eq!(tally.failed_states, 0, "恢复在每个状态上都完成");
-    assert_eq!(
-        tally.verification_failed_states, 0,
-        "陈旧失配不进施加前验证的计数器：水位之下的记录不验"
-    );
     assert_eq!(tally.ignored_violations, 0);
     // 记录核对器第二条判据（恢复自称的 txg ≥ 某次发布、那次发布的某个单元两份都不在）在这 13 个状态上判绿：
     // A（txg 3）的数据单元两份被 txg 19 合法复用了，而「被流里更晚的、**已经持久**的、过了回收谓词的写盖过的那几个扇区不算缺席」——
@@ -1589,7 +1614,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
     let persisted_before_the_reuse_root: Vec<bool> = (0..torn_writes.len())
         .map(|write_index| write_index < prepared.judged_root_index)
         .collect();
-    let mut torn_tally = Layer0Tally::default();
+    let mut torn_tally = CrashPointReplayTally::default();
     let torn_report = evaluate_state_for_versions(
         &prepared.base,
         &torn_writes,
@@ -1616,7 +1641,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
 }
 
 /// C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑） 收严之后要买到的那一半：**更晚那次同槽的写没落盘**的崩溃状态里，
-/// 早先那个单元是真的缺席。手搭的状态（层 0 段枚举产生不出它：段是按屏障切的，一次发布的单元写与它的根槽写永远不同段）：
+/// 早先那个单元是真的缺席。手搭的状态（崩溃点重放段枚举产生不出它：段是按屏障切的，一次发布的单元写与它的根槽写永远不同段）：
 /// 固定脚本到 txg 19 为止，txg 19 那次复用 50180 的写连同它的记录、根槽一个字节没落盘；它之前的写全部持久，
 /// 只把 A（txg 3）那两份落在 50180 的数据单元写摘成不持久——A 的记录与根槽照样在盘上。
 /// 恢复走 (2, 18)，oracle 看不出问题（txg 18 那一版自己完好、读得出它的内容）；而 A 的数据单元两份都不在盘上、
@@ -1626,7 +1651,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
 fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missing_by_the_record_checker(
 ) {
     let prepared = prepare(
-        "layer0-reuse-that-never-landed",
+        "crash-point-replay-reuse-that-never-landed",
         Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish,
     );
     let first_data_unit_offset = SlotNumber(FIRST_DATA_UNIT_SLOT).to_device_offset();
@@ -1700,7 +1725,7 @@ fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missi
             "50180 上这四份写一份都不在盘上（写表下标 {copy}）：盘上是 mkfs 之后、这条流之前的字节"
         );
     }
-    let mut tally = Layer0Tally::default();
+    let mut tally = CrashPointReplayTally::default();
     let report = evaluate_state_for_versions(
         &prepared.base,
         &prepared.writes,
@@ -1744,4 +1769,16 @@ fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missi
         (0, 1),
         "记录核对器第二条判据报这个洞：恢复自称到了 (2, 18) ≥ A 的 txg 3，而 A 的数据单元两份都不在盘上"
     );
+}
+
+/// 观察者另读的输入的摘要要真算：全零就是没算（另读输入不同的两趟会共用看过的块）。
+fn extra_inputs_digest_that_was_computed(
+    digest: [u8; singlefs_harness::sha256::DIGEST_BYTES],
+) -> [u8; singlefs_harness::sha256::DIGEST_BYTES] {
+    assert_ne!(
+        digest,
+        [0; singlefs_harness::sha256::DIGEST_BYTES],
+        "观察者另读的输入的摘要真算（全零就是没算：另读输入不同的两趟会共用看过的块）"
+    );
+    digest
 }

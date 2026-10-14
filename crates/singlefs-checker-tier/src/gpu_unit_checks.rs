@@ -1,6 +1,7 @@
 //! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例）。
 //! 这一版 GPU 接单元级那一截：一批单元的头校验和与载荷 CRC 在 GPU 上算（CRC-32C，参数与 D18（块里携带什么信息） 已定项 17 相同），
-//! 同一批在 CPU 上再算一遍逐个对拍，对不上就判红（`GpuCpuDisagreement`）；走树、恢复、记录核对器照旧在 CPU 上。
+//! CPU 参照（`check_unit_checksums_on_the_cpu`）是另一趟、由对拍用例逐个比，两边的输入都经库读回
+//! （`gpu_test_start::cpu_reference_table_read_back_from_the_pairing_library`，用户 2026-10-13 定）；走树、恢复、记录核对器照旧在 CPU 上。
 //! 着色器与多卡枚举取自 E163（GPU多卡算单元校验和） 的装置（那边两卡 2560/2560 与 CPU 逐个相同）。
 //! 分工按显卡空闲显存（`nvidia-smi` 的 memory.free，按 PCI 总线号对上 wgpu 的适配器），空闲显存低于门槛的卡不用；
 //! GPU 用例共用的卡池（[`gpu_test_start::GpuCardPool`]）不看这个门槛，能不能借由这个进程的显存账在借的那一刻判
@@ -332,15 +333,75 @@ struct DiscoveredCard {
     reported: ReportedCard,
 }
 
+/// 这个进程的 Vulkan 实例，整个进程只建一份、第一次用时建。
+///
+/// 为什么只建一份：每建一个实例，Vulkan 加载器都把本机装着的每个 ICD（intel、radeon、lvp 带整份 LLVM、nouveau……）dlopen 一遍，
+/// 它们的线程局部存储吃掉 glibc 给动态库预留的静态 TLS 余量，dlclose 不一定还回来；几十次之后再 dlopen NVIDIA 的
+/// `libnvidia-tls.so` 就报「cannot allocate memory in static TLS block」，加载器只剩 llvmpipe，配置点名的卡「用不了」
+/// （2026-10-14 库单测进程里跑到 `crash_injection::tests::` 那一段才起第一个实例就撞上，单跑同一条用例绿）。
+/// 一份实例从头用到尾，ICD 只装一次。
+fn vulkan_instance_of_this_process() -> &'static wgpu::Instance {
+    static VULKAN_INSTANCE: std::sync::OnceLock<wgpu::Instance> = std::sync::OnceLock::new();
+    VULKAN_INSTANCE.get_or_init(|| {
+        VULKAN_INSTANCES_CREATED_IN_THIS_PROCESS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        enable_the_driver_shader_disk_cache();
+        load_only_the_nvidia_vulkan_driver_when_the_user_named_none();
+        wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::VULKAN,
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
+        })
+    })
+}
+
+/// [`vulkan_instance_of_this_process`] 建了几次实例（只供单测核「整个进程一份」）。
+static VULKAN_INSTANCES_CREATED_IN_THIS_PROCESS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+/// 本机 NVIDIA 驱动的 Vulkan ICD 清单文件（Ubuntu 的包放在这里）。
+const NVIDIA_VULKAN_ICD_MANIFEST: &str = "/usr/share/vulkan/icd.d/nvidia_icd.json";
+
+/// 用户没点名 Vulkan 驱动（`VK_DRIVER_FILES`、`VK_ICD_FILENAMES` 都没设）而本机有 NVIDIA 的 ICD 清单时，只让加载器装 NVIDIA 这一份：
+/// 判器只认 NVIDIA 独显，别的 ICD（Mesa 的 intel、radeon、lvp……）装了也只是白占静态 TLS 与时间；用户设了的照用户的。
+fn load_only_the_nvidia_vulkan_driver_when_the_user_named_none() {
+    if std::env::var_os("VK_DRIVER_FILES").is_some()
+        || std::env::var_os("VK_ICD_FILENAMES").is_some()
+    {
+        return;
+    }
+    if std::path::Path::new(NVIDIA_VULKAN_ICD_MANIFEST).is_file() {
+        std::env::set_var("VK_DRIVER_FILES", NVIDIA_VULKAN_ICD_MANIFEST);
+    }
+}
+
 /// 本机 Vulkan 下每张 NVIDIA 独显，带 `nvidia-smi` 按 PCI 总线号报的序号与空闲显存（`nvidia-smi` 里对不上的卡不算）；一个设备都不起。
 fn nvidia_discrete_cards_reported_by_nvidia_smi() -> Vec<DiscoveredCard> {
-    enable_the_driver_shader_disk_cache();
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::VULKAN,
-        ..wgpu::InstanceDescriptor::new_without_display_handle()
-    });
+    let instance = vulkan_instance_of_this_process();
     let reported_by_bus = reported_cards_by_pci_bus();
-    pollster::block_on(instance.enumerate_adapters(wgpu::Backends::VULKAN))
+    let adapters = pollster::block_on(instance.enumerate_adapters(wgpu::Backends::VULKAN));
+    if adapters.is_empty() {
+        // 一张卡都没枚举到时把看到的说出来：是 Vulkan 这一层没给适配器（驱动、ICD、实例起不来），还是 nvidia-smi 那边对不上
+        eprintln!(
+            "GPU_DISCOVERY_EMPTY backend=vulkan adapters=0 nvidia_smi_rows={} __GL_SHADER_DISK_CACHE_PATH={:?} VK_ICD_FILENAMES={:?} VK_DRIVER_FILES={:?}",
+            reported_by_bus.len(),
+            std::env::var_os("__GL_SHADER_DISK_CACHE_PATH"),
+            std::env::var_os("VK_ICD_FILENAMES"),
+            std::env::var_os("VK_DRIVER_FILES"),
+        );
+    }
+    let adapter_summaries: Vec<String> = adapters
+        .iter()
+        .map(|adapter| {
+            let information = adapter.get_info();
+            format!(
+                "(vendor={:#x} type={:?} pci={:?} name={:?})",
+                information.vendor,
+                information.device_type,
+                information.device_pci_bus_id,
+                information.name
+            )
+        })
+        .collect();
+    let discovered: Vec<DiscoveredCard> = adapters
         .into_iter()
         .filter_map(|adapter| {
             let information = adapter.get_info();
@@ -363,7 +424,16 @@ fn nvidia_discrete_cards_reported_by_nvidia_smi() -> Vec<DiscoveredCard> {
                 reported,
             })
         })
-        .collect()
+        .collect();
+    if discovered.is_empty() && !adapter_summaries.is_empty() {
+        // 枚举到了适配器却一张都没对上：把每张的厂商、类型、PCI 号与 nvidia-smi 报的总线号都说出来
+        eprintln!(
+            "GPU_DISCOVERY_UNMATCHED adapters={} nvidia_smi_buses={:?}",
+            adapter_summaries.join(" "),
+            reported_by_bus.keys().collect::<Vec<_>>()
+        );
+    }
+    discovered
 }
 
 /// 驱动的名字与版本那一句（wgpu adapter info 的 `driver`、`driver_info` 两项，空格接起来；两项都空写一句没报）。
@@ -459,14 +529,33 @@ fn start_the_device_and_the_pipeline(
 #[must_use]
 pub fn gpu_cards_by_priority(configured: &[(u32, u64)]) -> Vec<GpuCard> {
     let named_indices: Vec<u32> = configured.iter().map(|(index, _)| *index).collect();
-    let mut usable: Vec<GpuCard> = nvidia_discrete_cards_reported_by_nvidia_smi()
+    let discovered_cards = nvidia_discrete_cards_reported_by_nvidia_smi();
+    // 点名的卡找不到时下面那一行 GPU_CARD_NOT_USABLE 分不出是哪一步没过，先把找到的每张卡（序号、空闲显存）与 nvidia-smi 报的行数记下来
+    let discovered_summary: Vec<(u32, u64)> = discovered_cards
+        .iter()
+        .map(|card| (card.reported.index, card.reported.free_memory_mebibytes))
+        .collect();
+    let nvidia_smi_rows = reported_cards_by_pci_bus().len();
+    let mut usable: Vec<GpuCard> = discovered_cards
         .iter()
         .filter(|discovered| named_indices.contains(&discovered.reported.index))
         .filter(|discovered| {
             discovered.reported.free_memory_mebibytes >= MINIMUM_FREE_MEMORY_MEBIBYTES
         })
         .filter_map(|discovered| {
-            start_the_card(discovered, DeviceOwnerOnTheCard::OutsideTheCardPool).ok()
+            start_the_card(discovered, DeviceOwnerOnTheCard::OutsideTheCardPool)
+                .map_err(|failure| {
+                    // 起不来的原因打出来，不让下面那一行 GPU_CARD_NOT_USABLE 把它吞成「用不了」三个字
+                    let reason = match &failure {
+                        CardStartFailure::OutOfGpuMemory { reason }
+                        | CardStartFailure::DeviceNotStarted { reason } => reason,
+                    };
+                    eprintln!(
+                        "GPU_CARD_START_FAILED index={}：{reason}",
+                        discovered.reported.index
+                    );
+                })
+                .ok()
         })
         .collect();
     let mut cards = Vec::with_capacity(configured.len());
@@ -478,7 +567,8 @@ pub fn gpu_cards_by_priority(configured: &[(u32, u64)]) -> Vec<GpuCard> {
                 cards.push(card);
             }
             None => eprintln!(
-                "GPU_CARD_NOT_USABLE index={index}：配置点名了这张卡，本机却用不了它（没有这个序号、空闲显存低于 {MINIMUM_FREE_MEMORY_MEBIBYTES} MiB、或上下文起不来）"
+                "GPU_CARD_NOT_USABLE index={index}：配置点名了这张卡，本机却用不了它（没有这个序号、空闲显存低于 {MINIMUM_FREE_MEMORY_MEBIBYTES} MiB、或上下文起不来）；\
+                 这一次 Vulkan 下与 nvidia-smi 对上的 NVIDIA 独显（序号, 空闲 MiB）：{discovered_summary:?}，nvidia-smi 报了 {nvidia_smi_rows} 张卡"
             ),
         }
     }
@@ -783,74 +873,105 @@ pub enum UnitChecksumVerdict {
     NotAUnitThisCheckReads,
     HeaderChecksumMismatch,
     PayloadCrcMismatch,
-    /// GPU 与 CPU 算出的 CRC 不同：GPU 这一截本身错了，整批不作数。
-    GpuCpuDisagreement,
 }
 
-/// 一批单元在一张卡上核两道校验和，同一批在 CPU 上再算一遍逐个对拍。
+/// 一个单元按它头里的布局切成要算 CRC 的两段：头那一段（头校验和字段清零之后的副本）与载荷那一段，连同头里存着的两道校验和。
+/// 类标签不认得、长度不对的交回 None（[`UnitChecksumVerdict::NotAUnitThisCheckReads`]）。
+struct UnitChecksumRanges<'unit> {
+    header_with_its_checksum_field_zeroed: Vec<u8>,
+    payload: &'unit [u8],
+    stored_header_checksum: u32,
+    stored_payload_crc: u32,
+}
+
+fn unit_checksum_ranges(unit: &[u8]) -> Option<UnitChecksumRanges<'_>> {
+    let layout = unit_checksum_layout(unit).filter(|layout| {
+        u64::try_from(unit.len()).ok() == Some(layout.expected_length_in_bytes)
+            && layout.header_end <= unit.len()
+    })?;
+    let mut header_with_its_checksum_field_zeroed = unit[..layout.header_end].to_vec();
+    let field = UNIT_HEADER_CHECKSUM_BYTE_OFFSET..UNIT_HEADER_CHECKSUM_BYTE_OFFSET + 32;
+    let stored_header_checksum = u32::from_le_bytes(
+        unit[field.start..field.start + 4]
+            .try_into()
+            .expect("4 字节"),
+    );
+    header_with_its_checksum_field_zeroed[field].fill(0);
+    let stored_payload_crc = u32::from_le_bytes(
+        unit[layout.payload_crc_offset..layout.payload_crc_offset + 4]
+            .try_into()
+            .expect("4 字节"),
+    );
+    Some(UnitChecksumRanges {
+        header_with_its_checksum_field_zeroed,
+        payload: &unit[layout.header_end..],
+        stored_header_checksum,
+        stored_payload_crc,
+    })
+}
+
+/// 两道算出来的 CRC 与头里存着的比，交回这个单元的核对结果。
+fn unit_checksum_verdict(
+    ranges: &UnitChecksumRanges<'_>,
+    computed_header_checksum: u32,
+    computed_payload_crc: u32,
+) -> UnitChecksumVerdict {
+    if computed_header_checksum != ranges.stored_header_checksum {
+        UnitChecksumVerdict::HeaderChecksumMismatch
+    } else if computed_payload_crc != ranges.stored_payload_crc {
+        UnitChecksumVerdict::PayloadCrcMismatch
+    } else {
+        UnitChecksumVerdict::BothHold
+    }
+}
+
+/// 一批单元在一张卡上核两道校验和（CRC 在卡上算）。CPU 参照另是一趟（[`check_unit_checksums_on_the_cpu`]）：
+/// 两边各判各的、由对拍用例逐个比（用户 2026-10-11 定：一段里 CPU 不既跑数据又对拍），两边的输入都从库里读回（用户 2026-10-13 定）。
 #[must_use]
 pub fn check_unit_checksums_on_gpu(card: &GpuCard, units: &[&[u8]]) -> Vec<UnitChecksumVerdict> {
-    let mut header_copies: Vec<Vec<u8>> = Vec::new();
-    let mut plan: Vec<Option<(usize, u32, u32)>> = Vec::with_capacity(units.len());
-    for unit in units {
-        match unit_checksum_layout(unit).filter(|layout| {
-            u64::try_from(unit.len()).ok() == Some(layout.expected_length_in_bytes)
-                && layout.header_end <= unit.len()
-        }) {
-            Some(layout) => {
-                let mut covered = unit[..layout.header_end].to_vec();
-                let field = UNIT_HEADER_CHECKSUM_BYTE_OFFSET..UNIT_HEADER_CHECKSUM_BYTE_OFFSET + 32;
-                let stored_header = u32::from_le_bytes(
-                    unit[field.start..field.start + 4]
-                        .try_into()
-                        .expect("4 字节"),
-                );
-                covered[field].fill(0);
-                let stored_payload = u32::from_le_bytes(
-                    unit[layout.payload_crc_offset..layout.payload_crc_offset + 4]
-                        .try_into()
-                        .expect("4 字节"),
-                );
-                plan.push(Some((layout.header_end, stored_header, stored_payload)));
-                header_copies.push(covered);
-            }
-            None => plan.push(None),
-        }
-    }
-    let mut ranges: Vec<&[u8]> = Vec::new();
-    let mut header_index = 0usize;
-    for (unit, entry) in units.iter().zip(&plan) {
-        if let Some((header_end, _, _)) = entry {
-            ranges.push(&header_copies[header_index]);
-            ranges.push(&unit[*header_end..]);
-            header_index += 1;
-        }
-    }
+    let plan: Vec<Option<UnitChecksumRanges<'_>>> = units
+        .iter()
+        .map(|unit| unit_checksum_ranges(unit))
+        .collect();
+    let ranges: Vec<&[u8]> = plan
+        .iter()
+        .flatten()
+        .flat_map(|unit_ranges| {
+            [
+                unit_ranges.header_with_its_checksum_field_zeroed.as_slice(),
+                unit_ranges.payload,
+            ]
+        })
+        .collect();
     let gpu = card.crc32c_of_ranges(&ranges);
-    let mut verdicts = Vec::with_capacity(units.len());
-    let mut next = 0usize;
-    for entry in &plan {
-        let Some((_, stored_header, stored_payload)) = entry else {
-            verdicts.push(UnitChecksumVerdict::NotAUnitThisCheckReads);
-            continue;
-        };
-        let (gpu_header, gpu_payload) = (gpu[next], gpu[next + 1]);
-        let (cpu_header, cpu_payload) = (
-            crc32_castagnoli_table(ranges[next]),
-            crc32_castagnoli_table(ranges[next + 1]),
-        );
-        next += 2;
-        verdicts.push(if gpu_header != cpu_header || gpu_payload != cpu_payload {
-            UnitChecksumVerdict::GpuCpuDisagreement
-        } else if gpu_header != *stored_header {
-            UnitChecksumVerdict::HeaderChecksumMismatch
-        } else if gpu_payload != *stored_payload {
-            UnitChecksumVerdict::PayloadCrcMismatch
-        } else {
-            UnitChecksumVerdict::BothHold
-        });
-    }
-    verdicts
+    // 每个切得开的单元在卡上算两段 CRC（头那一段、载荷那一段），按切得开的单元的次序挨着回来
+    let mut next_crc = 0usize;
+    plan.iter()
+        .map(|entry| match entry {
+            None => UnitChecksumVerdict::NotAUnitThisCheckReads,
+            Some(unit_ranges) => {
+                let (header_crc, payload_crc) = (gpu[next_crc], gpu[next_crc + 1]);
+                next_crc += 2;
+                unit_checksum_verdict(unit_ranges, header_crc, payload_crc)
+            }
+        })
+        .collect()
+}
+
+/// [`check_unit_checksums_on_gpu`] 的 CPU 参照：同一套切段、同一个判法，CRC 在 CPU 上算。
+#[must_use]
+pub fn check_unit_checksums_on_the_cpu(units: &[&[u8]]) -> Vec<UnitChecksumVerdict> {
+    units
+        .iter()
+        .map(|unit| match unit_checksum_ranges(unit) {
+            None => UnitChecksumVerdict::NotAUnitThisCheckReads,
+            Some(unit_ranges) => unit_checksum_verdict(
+                &unit_ranges,
+                crc32_castagnoli_table(&unit_ranges.header_with_its_checksum_field_zeroed),
+                crc32_castagnoli_table(unit_ranges.payload),
+            ),
+        })
+        .collect()
 }
 
 /// GPU 对拍用例开跑前取卡，只给测试用（`tests/` 下的 GPU 对拍与库内要卡的计时用例都经它）。
@@ -863,6 +984,115 @@ pub fn check_unit_checksums_on_gpu(card: &GpuCard, units: &[&[u8]]) -> Vec<UnitC
 /// 读 Vulkan 与 PCI 在取卡那一层（[`gpu_test_start::usable_cards_or_report_not_run`]）。
 pub mod gpu_test_start {
     use super::{usable_gpu_cards, GpuCard, NVIDIA_VENDOR_IDENTIFIER};
+    use crate::crash_amplification::RecordedGivenStatesTable;
+    use crate::crash_library::{
+        repository_root_of_this_crate, two_stages, CrashLibrary, CrashLibraryClass, ItemManifest,
+        ItemName, StageOutcome,
+    };
+    use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
+
+    /// CPU 参照经库的那一份在清单里叫什么。
+    pub const CPU_REFERENCE_TABLE_IN_THE_MANIFEST: &str = "cpu_reference_given_states_table";
+
+    /// CPU 参照那一份给定状态表在对拍那一类库里的项名：按这张表的摘要起（同一张表同一个名字，几条用例、几个线程录同一张表不撞名）。
+    #[must_use]
+    pub fn cpu_reference_item_name(digest: &[u8; DIGEST_BYTES]) -> String {
+        let mut name = String::from("cpu_reference/");
+        for byte in &digest[..16] {
+            name.push_str(&format!("{byte:02x}"));
+        }
+        name
+    }
+
+    /// GPU 对拍用例里 CPU 参照的输入经对拍那一类的库（用户 2026-10-13 定：CPU 参照也从库读，两段之间不在内存里交数据）：
+    /// 录入段把 CPU 参照要判的那几张镜像（一张给定状态表：基线、写表、持久集合）按摘要写进
+    /// [`CrashLibraryClass::JudgeTablesPairing`] 那一类的库（家目录下长期存放）、按项名（[`cpu_reference_item_name`]）登清单；
+    /// 判段凭项名读清单、按摘要读回、核摘要，CPU 参照只判读回的那一份。只录那一趟打一行 `CPU_REFERENCE_RECORDED_ONLY`、交 `None`
+    /// （调用的用例当场返回）。镜像是用例手造的那一张时，写表是空的、持久集合是一个空集合，基线就是那张镜像。
+    ///
+    /// # Panics
+    /// 库开不了、写不进、读不回；读回的字节解不出、摘要对不上。
+    #[must_use]
+    pub fn cpu_reference_table_read_back_from_the_pairing_library(
+        table: &RecordedGivenStatesTable,
+    ) -> Option<RecordedGivenStatesTable> {
+        let bytes = table.to_bytes();
+        let digest = sha256_digest(&bytes);
+        let item_text = cpu_reference_item_name(&digest);
+        let item =
+            ItemName::new(&item_text).unwrap_or_else(|refusal| panic!("CPU 参照的项名：{refusal}"));
+        let outcome = two_stages(
+            CrashLibraryClass::JudgeTablesPairing,
+            &repository_root_of_this_crate(),
+            &item,
+            |library| {
+                library
+                    .lock()
+                    .store_given_states_table(&digest, &bytes)
+                    .map_err(|error| format!("CPU 参照那张表写不进库：{error:?}"))?;
+                Ok(ItemManifest {
+                    kind: "cpu_reference_pairing".to_string(),
+                    digests: vec![(CPU_REFERENCE_TABLE_IN_THE_MANIFEST.to_string(), digest)],
+                })
+            },
+            |library, manifest| {
+                Ok(StageOutcome::Judged(cpu_reference_table_of_the_manifest(
+                    library, manifest,
+                )?))
+            },
+        )
+        .unwrap_or_else(|refusal| panic!("CPU 参照那张表（{item_text}）过库失败：{refusal}"));
+        let read_back = outcome.judged();
+        if read_back.is_none() {
+            println!("CPU_REFERENCE_RECORDED_ONLY item={item_text}");
+        }
+        read_back
+    }
+
+    /// CPU 参照要判的「全部写都落了」那一张镜像经对拍那一类的库读回（[`cpu_reference_table_read_back_from_the_pairing_library`]：
+    /// 基线与写表作一张一个状态、全落的给定状态表写进去），交回读回的那一份叠出来的镜像；只录那一趟交 `None`。
+    ///
+    /// # Panics
+    /// 同 [`cpu_reference_table_read_back_from_the_pairing_library`]。
+    #[must_use]
+    pub fn image_with_every_write_landed_read_back_from_the_pairing_library(
+        base: &singlefs_harness::memory_pool::MemoryPool,
+        writes: &[singlefs_harness::memory_pool::RetainedWrite],
+    ) -> Option<singlefs_harness::memory_pool::MemoryPool> {
+        let read_back =
+            cpu_reference_table_read_back_from_the_pairing_library(&RecordedGivenStatesTable {
+                table_name: "every-write-landed".to_string(),
+                base: base.clone(),
+                writes: writes.to_vec(),
+                segments: Vec::new(),
+                seams: Vec::new(),
+                persisted_sets: vec![vec![true; writes.len()]],
+            })?;
+        let mut image = read_back.base;
+        image.apply_writes(&read_back.writes);
+        Some(image)
+    }
+
+    /// 判段：按清单里 [`CPU_REFERENCE_TABLE_IN_THE_MANIFEST`] 那一样的摘要从库里读回那张表、核摘要、解码。
+    ///
+    /// # Errors
+    /// 清单里没有那一样；库读失败；库里没有那个摘要；摘要对不上；解不出。
+    pub fn cpu_reference_table_of_the_manifest(
+        library: &CrashLibrary,
+        manifest: &ItemManifest,
+    ) -> Result<RecordedGivenStatesTable, String> {
+        let digest = manifest.digest_named(CPU_REFERENCE_TABLE_IN_THE_MANIFEST)?;
+        let bytes = library
+            .lock()
+            .read_given_states_table(&digest)
+            .map_err(|error| format!("读 CPU 参照那张表失败：{error:?}"))?
+            .ok_or_else(|| "CPU 参照那张表不在库里：先跑录入段".to_string())?;
+        if sha256_digest(&bytes) != digest {
+            return Err("CPU 参照那张表从库里读回的摘要与清单里的对不上".to_string());
+        }
+        RecordedGivenStatesTable::from_bytes(&bytes)
+            .ok_or_else(|| "CPU 参照那张表从库里读回的字节解不出".to_string())
+    }
 
     /// PCI 设备 class（24 位：基类、子类、编程接口各一字节）的基类是这个值的是显示控制器；同一块卡的 HDA 音频功能基类是 0x04，不算。
     pub const PCI_DISPLAY_CONTROLLER_BASE_CLASS: u32 = 0x03;
@@ -1046,10 +1276,7 @@ pub mod gpu_test_start {
     /// 本机 Vulkan 枚举出的每个适配器（与 [`usable_gpu_cards`] 同一个后端）。
     #[must_use]
     pub fn enumerate_vulkan_adapters() -> Vec<EnumeratedAdapter> {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::VULKAN,
-            ..wgpu::InstanceDescriptor::new_without_display_handle()
-        });
+        let instance = super::vulkan_instance_of_this_process();
         pollster::block_on(instance.enumerate_adapters(wgpu::Backends::VULKAN))
             .into_iter()
             .map(|adapter| {
@@ -1942,6 +2169,25 @@ pub mod gpu_test_start {
 /// 总线看得见而设备表列不出、某个设备读不出照旧判红。判定是纯函数，读 PCI 用假的 sysfs 树，不要显卡。
 #[cfg(test)]
 mod tests {
+    /// 整个进程只建一份 Vulkan 实例：两次取到的是同一份，建的次数记 1（每建一次加载器就把本机每个 ICD 再 dlopen 一遍，
+    /// 静态 TLS 吃光之后 NVIDIA 的驱动装不上，`vulkan_instance_of_this_process` 的文档注释写了来历）。
+    /// 判别力（`crates/mutations.tsv`「GPU 取卡 Vulkan 实例每次新建」）：改成每次新建一份，两次取到的不是同一份、建的次数是 2。
+    #[test]
+    fn the_vulkan_instance_is_created_once_per_process_and_reused() {
+        let first = super::vulkan_instance_of_this_process();
+        let second = super::vulkan_instance_of_this_process();
+        assert!(
+            std::ptr::eq(first, second),
+            "两次取到的 Vulkan 实例要是同一份"
+        );
+        assert_eq!(
+            super::VULKAN_INSTANCES_CREATED_IN_THIS_PROCESS
+                .load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "整个进程只建一份实例"
+        );
+    }
+
     use super::gpu_test_start::{
         decide_gpu_test_start, read_pci_nvidia_display_controllers_on_the_bus, GpuTestStart,
         PciNvidiaDisplayControllers, PCI_DEVICES_SUBDIRECTORY_NAME,
@@ -2241,8 +2487,8 @@ mod tests {
         );
     }
 
-    /// 第 10z 批第五块（第 10z 批第三块代码轮判决 K1-4 攻方甲形，wgpu-core 30.0.1 `src/device/resource.rs` 第 706 行、wgpu-hal 30.0.1
-    /// `src/lib.rs` 第 382 行）：wgpu 因显存不够丢设备时给的那一句认成显存不够，别的认成别的原因；回调照它记，之后一段因设备丢了而失败的活、
+    /// 第 10z 批第五块（第 10z 批第三块代码轮判决 K1-4 攻方甲形，wgpu-core 30.0.1 `src/device/resource.rs` 的 `handle_hal_error`、wgpu-hal 30.0.1
+    /// `src/lib.rs` 的 `DeviceError::OutOfMemory`（`#[error("Out of memory")]`））：wgpu 因显存不够丢设备时给的那一句认成显存不够，别的认成别的原因；回调照它记，之后一段因设备丢了而失败的活、
     /// 不在同一组而这段活开始之后一条 Out of Memory 都没记过，也说成显存不够。不要卡。
     /// 第 10z 批第六块（第 10z 批第五块代码轮判决 K3，攻方 F5）：期望的那一句写死成 wgpu-hal 30.0.1 `DeviceError::OutOfMemory` 的
     /// `#[error("Out of memory")]`，不与产品代码取自同一个 `to_string()`：wgpu 改了这一句，这里先红。

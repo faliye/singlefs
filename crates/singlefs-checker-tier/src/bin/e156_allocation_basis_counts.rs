@@ -21,9 +21,13 @@
 //! `scripts/` 与门禁 47 号，理由与改动记在登记第十二节。
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::OnceLock;
 
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
+use singlefs_checker::image::{InvariantVerdict, IMPLEMENTED_INVARIANTS};
+use singlefs_checker_tier::crash_amplification::{GivenStatesEngine, GivenStatesItem};
+use singlefs_checker_tier::crash_given_states::{
+    GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
+};
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
@@ -69,18 +73,19 @@ const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
 const IMAGE_BYTES: u64 = 4 << 30;
 /// 一个单元的槽数（跨度 2 的数据单元 / inode 叶容器 / 实例表单元，登记「一」读法写死）。
 const INSTANCE_TABLE_SPAN_SLOTS: u64 = 2;
-/// β0、U11、U13 那几段历史的每区槽数 S：**本地常量**，值抄自 `.claude/kb/layout/01-first-txn.md:138`「每区槽数 S」那一行
+/// β0、U11、U13 那几段历史的每区槽数 S：**本地常量**，值抄自 `.claude/kb/layout/01-first-txn.md`「每区槽数 S」那一行
 /// （`| 几何 | 每区槽数 S | 1 | 8 |`）。[`main`] 开头那条断言把它与实现侧 mkfs 默认回比。
 const E156_SLOTS_PER_REGION: u64 = 8;
-/// 岔路 1 的 S 三个取样点（第 4 次重跑登记表头第 1 行，全部都跑）：值抄自 `.claude/kb/decisions/22-单元原子性怎么合成.md:58`
-/// 「每区槽数 S」那一行（下界 4、上界 16，「4..16 之间取值」）与 `.claude/kb/layout/01-first-txn.md:138`（mkfs 写 8）。
+/// 岔路 1 的 S 三个取样点（第 4 次重跑登记表头第 1 行，全部都跑）：值抄自 `.claude/kb/decisions/22-单元原子性怎么合成.md`
+/// 「每区槽数 S」那一行（`| **每区槽数 S** |`：下界 4、上界 16，「4..16 之间取值」）与 `.claude/kb/layout/01-first-txn.md`
+/// 「每区槽数 S」那一行（`| 几何 | 每区槽数 S | 1 | 8 |`，mkfs 写 8）。
 /// [`main`] 开头回比实现侧的上下界与 mkfs 默认；每格另核「系统配置里读回来的 S = 本地值」（K8）。
 const E156_SLOTS_PER_REGION_SAMPLING_POINTS: [u64; 3] = [4, 8, 16];
 const E156_SLOTS_PER_REGION_MINIMUM: u64 = 4;
 const E156_SLOTS_PER_REGION_MAXIMUM: u64 = 16;
 /// 区域设备（登记表头第 2 行，D22（单元原子性怎么合成） 已定项 1 的区域归属 [0, 1, 0]）；[`main`] 开头与 mkfs 参数回比。
 const E156_REGION_DEVICE_NUMBERS: [u32; 3] = [0, 1, 0];
-/// 区域数 R（登记表头第 2 行；`.claude/kb/decisions/22-单元原子性怎么合成.md:55`「区域数 R | 3」）：根环 3S 槽、U13 (a) 的 3N 次覆盖写都从它算；
+/// 区域数 R（登记表头第 2 行；`.claude/kb/decisions/22-单元原子性怎么合成.md`「`| **区域数 R** | **3**`」那一行）：根环 3S 槽、U13 (a) 的 3N 次覆盖写都从它算；
 /// [`main`] 开头与 `singlefs_format::ROOT_RING_REGIONS` 回比。
 const E156_ROOT_RING_REGIONS: u64 = 3;
 /// 判据门槛（登记表头第 3 行）：一个跨度 2 的单元 2 槽、跨度 1 的单元 1 槽（原登记「一」读法写死「一个单元的槽数」行；
@@ -121,11 +126,11 @@ const E156_NEW_POOL_FILE_CREATION_PLACEMENTS: [(u64, u64); 12] = [
 const E156_OVERWRITES_CHECKED_BEFORE_THE_RING_WRAPS: u64 = 4;
 const E156_OVERWRITE_RELEASED_SLOTS_BEFORE_THE_RING_WRAPS: u64 = 14;
 const E156_OVERWRITE_RECORD_DELTA_BEFORE_THE_RING_WRAPS: u64 = 24;
-/// R-3 本地常量①：分配记录树叶宽 W。**本地常量，值抄自 kb，不从 `crates/` 引**：抄自 `.claude/kb/decisions/08-核心索引结构.md:251`
+/// R-3 本地常量①：分配记录树叶宽 W。**本地常量，值抄自 kb，不从 `crates/` 引**：抄自 `.claude/kb/decisions/08-核心索引结构.md` 里的
 /// `<!-- format-const: ALLOCATION_RECORD_TREE_LEAF_SLOTS = 812 -->`。[`main`] 里 `anchor_a_d8` 那一行把它
 /// 与 `singlefs_format::ALLOCATION_RECORD_TREE_LEAF_SLOTS` 回比（只观测，F21：对不上不作废、不停机）。
 const E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS: u64 = 812;
-/// R-3 本地常量②：分配记录树内部扇出 F。抄自 `.claude/kb/decisions/08-核心索引结构.md:254`
+/// R-3 本地常量②：分配记录树内部扇出 F。抄自 `.claude/kb/decisions/08-核心索引结构.md` 里的
 /// `<!-- format-const: ALLOCATION_RECORD_TREE_INTERNAL_FANOUT = 169 -->`。
 const E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT: u64 = 169;
 /// R-3：一次覆盖写里，非分配记录树自身的「其余单元」在 D0 上的释放槽数（E156 第 3 次重跑登记「七」7.2
@@ -684,12 +689,83 @@ fn memory_pools_read_back_identically(first: &MemoryPool, second: &MemoryPool) -
     })
 }
 
-fn verdict(pool: &MemoryPool, invariant: &str) -> InvariantVerdict {
-    check_pool_image(pool)
-        .into_iter()
-        .find(|(name, _)| *name == invariant)
-        .map(|(_, verdict)| verdict)
-        .unwrap_or(InvariantVerdict::NotApplicable("checker 没有报这一条"))
+/// 这份装置判池级 checker 的给定状态引擎（进程里一份，第一次用时起；用户 2026-10-13 定「能走两段的都走两段」）：每张要判的盘作一张给定状态表，
+/// 录入段写进家目录下给定状态表那一类的判定库，判段从库里读回判（配了 GPU 且编进了 `gpu` 特性在卡上判，否则由 CPU 判器判），判过的复用。
+/// 产物只收这份装置自己打的行：引擎不调 `finish`，不打收尾行。
+///
+/// # Panics
+/// 引擎起不了（配了 GPU 卡用不上、结论版本与编译时对不上……都不退回 CPU）。
+fn given_states_engine_of_this_experiment() -> &'static GivenStatesEngine {
+    static ENGINE: OnceLock<GivenStatesEngine> = OnceLock::new();
+    ENGINE.get_or_init(|| {
+        GivenStatesEngine::start_from_environment(
+            GivenStatesItem {
+                item_name: "e156_allocation_basis_counts".to_string(),
+                setting_file: "crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs"
+                    .to_string(),
+                seeds_and_scale: "fixed".to_string(),
+            },
+            &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
+            &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
+        )
+        .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
+    })
+}
+
+/// 池级 checker 在这张盘上判 `invariant` 的结果：那张盘作一张给定状态表（基线就是那张盘、写表空、一个空持久集合）交
+/// [`given_states_engine_of_this_experiment`] 两段判。结论里只有判到位与违例位：判到而没违例是成立，违例带细节（这一趟 CPU 判的才是原句），
+/// 没判到的「不适用」与「部分没判」分不开、一律记不适用（产物只打 holds / violated / not_applicable，入库产物里没有 partially_judged）。
+///
+/// # Panics
+/// 引擎判不了这张表（不退回别处判）；这一趟只录、或这张表归别的机器判（实验装置不分两趟跑、不分片）。
+fn verdict(table_name: &str, pool: &MemoryPool, invariant: &str) -> InvariantVerdict {
+    let Some(position) = IMPLEMENTED_INVARIANTS
+        .iter()
+        .position(|implemented| *implemented == invariant)
+    else {
+        return InvariantVerdict::NotApplicable("checker 没有报这一条");
+    };
+    let judged = given_states_engine_of_this_experiment()
+        .judge_the_given_states(&GivenStatesOfATable {
+            table_name: table_name.to_string(),
+            base: pool,
+            writes: &[],
+            segments: &[],
+            seams: &[],
+            persisted_sets: vec![Vec::new()],
+        })
+        .unwrap_or_else(|reason| {
+            panic!("给定状态表 {table_name} 判不了（不退回别处判）：{reason}")
+        });
+    match judged.source {
+        GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+        GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
+        | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => panic!(
+            "实验装置不分只录、只判两趟跑，也不分片：起它时不设 SINGLEFS_CRASH_AMPLIFICATION_STAGE 与 SINGLEFS_CRASH_AMPLIFICATION_SHARE（{table_name}）"
+        ),
+    }
+    let [conclusion] = judged.states.as_slice() else {
+        panic!(
+            "{table_name}：一个状态一份结论，交回 {} 份",
+            judged.states.len()
+        );
+    };
+    let bit = 1u128 << position;
+    if conclusion.words.pool_checker_violated_bits & bit != 0 {
+        let detail = conclusion
+            .pool_checker_violations()
+            .into_iter()
+            .find(|(violated, _)| *violated == invariant)
+            .map(|(_, detail)| detail)
+            .expect("违例位置了，pool_checker_violations 就列着这一条");
+        InvariantVerdict::Violated(detail)
+    } else if conclusion.words.pool_checker_judged_bits & bit != 0 {
+        InvariantVerdict::Holds
+    } else {
+        InvariantVerdict::NotApplicable(
+            "池级 checker 没判这一条（不适用或部分没判；两段判的结论里这两种不分）",
+        )
+    }
 }
 fn is_red(verdict: &InvariantVerdict) -> bool {
     matches!(verdict, InvariantVerdict::Violated(_))
@@ -821,8 +897,8 @@ struct RestoredAfterPublishing {
     root_slot_and_system_configuration: MemoryPool,
 }
 
-/// 系统配置每块盘几槽（`.claude/kb/decisions/22-单元原子性怎么合成.md:26`「系统配置每盘 2 槽按世代号 mod 2 轮换」）、一槽几字节
-/// （同一文件第 60 行「系统配置槽宽 = 格式常量 4096」）：本地常量，[`emit_static_anchors`] 与 `singlefs_format` 同名常量回比。
+/// 系统配置每块盘几槽（`.claude/kb/decisions/22-单元原子性怎么合成.md`「系统配置每盘 2 槽按世代号 mod 2 轮换」）、一槽几字节
+/// （同一文件「`| **系统配置槽宽** | **格式常量 4096**`」那一行）：本地常量，[`emit_static_anchors`] 与 `singlefs_format` 同名常量回比。
 const E156_SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE: u64 = 2;
 const E156_SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 
@@ -2381,7 +2457,11 @@ impl HhRunState {
             }
         }
         let checker_on_hole = if request.judge_checker_on_hole_states && reading.missing_txgs > 0 {
-            let red = is_red(&verdict(&memory_pool_snapshot(&self.devices), "I-3.1"));
+            let red = is_red(&verdict(
+                &format!("hole-state/{}/txg-{txg}", request.family),
+                &memory_pool_snapshot(&self.devices),
+                "I-3.1",
+            ));
             outcome.checker_judged_hole_states += 1;
             if red {
                 outcome.checker_red_on_hole_states += 1;
@@ -3673,7 +3753,11 @@ fn run_rollback_to_the_oldest_candidate() -> OldestCandidateRollback {
         instance_table_rows_after: instance_table_row_count(&devices, &current.root),
         item1_slots,
         item5_slots,
-        allocated_minus_deferred_verdict: verdict(&pool, "I-3.11"),
+        allocated_minus_deferred_verdict: verdict(
+            "oldest-candidate-rollback/allocated-minus-deferred",
+            &pool,
+            "I-3.11",
+        ),
     }
 }
 
@@ -5795,6 +5879,12 @@ mod tests {
     /// K12 的前三样成立。第 5 项只报数（产物 `name=u13a_rollback_to_oldest_candidate`），这里不钉。
     #[test]
     fn rolling_back_to_the_oldest_candidate_after_seventy_two_overwrites_is_one_forward_publish() {
+        // 池级 checker 那几格经给定状态表两段判：配置开了 GPU 而这份二进制没编进 gpu 特性时判段不跑，照本次未跑交回
+        if singlefs_checker_tier::crash_amplification::judging_test_not_run_without_the_gpu_feature(
+            "e156_allocation_basis_counts::rolling_back_to_the_oldest_candidate_after_seventy_two_overwrites_is_one_forward_publish",
+        ) {
+            return;
+        }
         let rollback = run_rollback_to_the_oldest_candidate();
         assert_eq!(rollback.overwrites, 72, "3N = 3 × 3S = 72（S = 8）");
         assert_eq!(

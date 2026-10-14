@@ -4094,7 +4094,7 @@ fn image_after_a_recovery_abandoned_the_third_root_whose_inode_record_names_anot
     image
 }
 
-/// I-9.29（同号只许一个出生代） 判不了那一形（`.claude/kb/invariants.md` I-9.29 那一行「最新根的实例表读不出、被崩溃恢复抛弃的根滤不掉时记判不了」；
+/// I-9.29（同号只许一个出生代） 判不了那一形（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.29 那一行「最新根的实例表读不出、被崩溃恢复抛弃的根滤不掉时记判不了」；
 /// 第 22 批 C 实现员报告「交主 agent 的设计判断」第 5 条）。镜像见
 /// [`image_after_a_recovery_abandoned_the_third_root_whose_inode_record_names_another_object_birth`]：被抛弃的 C 与现行线上的 A、B 同号不同出生代。
 /// ① 最新根的实例表读得出：C 按实例 3 的实例表判出局、不进候选集，I-9.29 真被评估过且成立，判红的只是干净镜像上那几条（一条都没有）。
@@ -5138,7 +5138,7 @@ fn live_unit_recorded_as_deferred_reddens_only_the_allocated_minus_deferred_inva
     }
 }
 
-/// I-3.11（已分配减 defer 等于最新根走读） 判别力自证那一格（`.claude/kb/invariants.md` I-3.11 那一行的 ⚠️）：
+/// I-3.11（已分配减 defer 等于最新根走读） 判别力自证那一格（`crates/singlefs-checker/invariants/05-空间记账.md` I-3.11 那一行的 ⚠️）：
 /// 「不减第 5 项就转绿」在可达状态上造不出来——每次发布都把换下的单元放进 defer，第 5 项恒 ≥ 1——所以在**造出来的基底**上做
 /// （E156（alloc-basis 四条岔路的代价数） 的 β_syn）：发布 B 之后的镜像，把两块盘的 defer 那一行都整个挪回去
 /// （每盘已分配 −15 槽、空闲 +15 槽、defer 置 0）。这份基底上 I-3.11 与 I-5.2 成立、I-3.1 红（记账少于遍历，造它就是这样），
@@ -5616,7 +5616,7 @@ fn marked_root_raising_the_floor_above_the_previous_root_reddens_only_the_rollba
     }
 }
 
-/// C556（checker 与层 0 不读系统配置里的 F）：步 5 那段历史上抬到 11、再发两版 E0、E（txg 17、18，E 的数据单元落回 mkfs 种的第 0 版树表那一槽），
+/// C556（checker 与崩溃点重放不读系统配置里的 F）：步 5 那段历史上抬到 11、再发两版 E0、E（txg 17、18，E 的数据单元落回 mkfs 种的第 0 版树表那一槽），
 /// 然后把四条带 F 11 的根（txg 15–18）都改坏——根环里读得出的根带的 F 全是 0，两块盘的系统配置里还是 11（抬 F 先写进去的）。
 /// checker 的回退候选集下界取 F 生效值 max(最新根带的, 系统配置里的) = 11：被复用的那一槽只有 txg 11 之下的根引用，它们不在候选集里，
 /// 一条都不红；I-3.1 报不适用（最新根 txg 14 带 F 0，它的记账按 0 记，与按 11 取的候选集并集不可比）。
@@ -7435,7 +7435,7 @@ fn set_the_extent_offset_of_the_pointer_from_parent_to_child(
 /// 树表条目里 `previous_snapshot_txg` 那 8 字节的偏移：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86
 /// （D8（核心索引结构） 已定项 8 的字段表）。
 const TREE_TABLE_ENTRY_PREVIOUS_SNAPSHOT_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86;
-/// 树的种类码里 inode 树那一个（`.claude/kb/invariants.md` I-9.25 那一行「种类码 ≠ 2」）。
+/// 树的种类码里 inode 树那一个（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.25 那一行「种类码 ≠ 2」）。
 const TREE_KIND_INODE: u16 = 2;
 /// 新池新建文件那一版树表的条目数（十一条，见 `LIVELIST_TREE_TABLE_ENTRY_INDEX` 那一行）。
 const TREE_TABLE_ENTRIES_AFTER_THE_FIRST_FILE: usize = 11;
@@ -10022,7 +10022,7 @@ fn image_after_the_first_file_on_the_version_whose_rows_were_written(
     (pool.memory_pool(), root_record_allocation_tree_root_slot)
 }
 
-/// I-5.4 按版本，树表 0 条、根记录直接持有的分配记录树读不出（改法 F1 的同形，`research/prompts/m3-formal-code-b30-r1-opus-output.md` 第 201 行记下、没造盘面）：
+/// I-5.4 按版本，树表 0 条、根记录直接持有的分配记录树读不出（改法 F1 的同形，`research/prompts/m3-formal-code-b30-r1-opus-output.md`「另记一处同形、没造盘面（推的）」那一段记下、没造盘面）：
 /// 写行那一版之上发了第一个文件版本的镜像上，把写行那一版根记录那一项指着的分配记录树根两份清零。判红的是读不出的单元那几条，
 /// 与改之前相同；改之前写行那两版（txg 3、4）整版不进评估，第一个文件版本的树走到了叶，I-5.4 就报成立。
 #[test]
@@ -10345,7 +10345,7 @@ const CONTAINER_TREE_ENTRY_CHILD_POINTER_OFFSET: usize = 34;
 const CONTAINER_TREE_ENTRY_CHILD_POINTER_BYTES: usize = 86;
 
 /// E1（判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L4 第一行）：unlink 意图之后，墓碑树码 2 根里指向墓碑容器的
-/// 子指针头部 extent 偏移改 1。走读跟随这条指针时按 I-2.4 判 extent 偏移（`.claude/kb/invariants.md` I-2.4 那一行），只红 I-2.4
+/// 子指针头部 extent 偏移改 1。走读跟随这条指针时按 I-2.4 判 extent 偏移（`crates/singlefs-checker/invariants/04-校验和.md` I-2.4 那一行），只红 I-2.4
 /// （改之前 `walk_container_tree_root` 只判 MAC / nonce，I-2.4 报成立、一条都不红）。
 #[test]
 fn an_extent_offset_on_the_container_pointer_of_the_tombstone_tree_root_reddens_only_the_pointer_head_invariant(
@@ -11319,8 +11319,8 @@ fn a_lineage_container_holding_more_records_than_the_knob_reddens_only_the_knob_
 }
 
 /// 合法的回退不红（判决第三节第 5 条「回退照抄现行那一版的退役树」、第 8 条 I-9.33 只比谱系上的）：删到底（退役一条 (叶, F)）→
-/// 回退到意图那一版（那片叶又活了，退役树照抄、仍是那一条）→ 再删到底（同一片叶再死一次，追加 (叶, F′)）。
-/// 两条同身份，但 F 不在 F′ 那一版的父链上；每一版 checker 都一条不红，退役树那五条都成立。
+/// 回退到意图那一版（那片叶又活了，退役树照抄、仍是那一条）→ 再删到底（同一片叶再死一次，追加 (叶, F_again)）。
+/// 两条同身份，但 F 不在 F_again 那一版的父链上；每一版 checker 都一条不红，退役树那五条都成立。
 #[test]
 fn unlinking_rolling_back_and_unlinking_again_writes_a_second_record_of_the_same_leaf_and_no_invariant_reddens(
 ) {
@@ -12486,7 +12486,7 @@ fn flip_a_byte_of_the_whole_unit_checksum_in_a_child_location(
 }
 
 /// 走读不往下读的孩子每一份副本照判 I-2.1（判决 `research/prompts/m3-batch27-code-r1-main-verification.md` 第二节 H-J3a、H-J3b 两行与第三节第 1 条，
-/// `.claude/kb/invariants.md` I-2.1「任一被引用的块，其校验和与内容匹配」）：`image` 红的恰好是 `expected_violations`，
+/// `crates/singlefs-checker/invariants/04-校验和.md` I-2.1「任一被引用的块，其校验和与内容匹配」）：`image` 红的恰好是 `expected_violations`，
 /// I-2.1 的违例说明点名「走读不往下读的孩子」（红在新判的那一处，不是别的单元）；`expected_violations` 里有 I-7.2 的，
 /// 它的违例说明点名两份都对不上（走读失败是这一处记的）。
 fn assert_the_child_the_walk_does_not_go_into_reddens_exactly(
@@ -13142,7 +13142,7 @@ fn assert_the_violation_in_the_copy_of_the_entry_type_reddens_whichever_device_h
             );
         }
         // G4（判决 `research/prompts/m3-batch30-code-r1-main-verification.md` 第二节 K1 M3 缺口 G4 那一行、第三节第 4 条）：码 2 那一份按类型段那一类
-        // （码 3）的 32 KiB 读回比校验和，对不上，I-2.1 红，I-4.8、I-7.4 跟着（`.claude/kb/invariants.md` I-9.2 / I-9.17 / I-9.23「另一份按同一长度读回比校验和，
+        // （码 3）的 32 KiB 读回比校验和，对不上，I-2.1 红，I-4.8、I-7.4 跟着（`crates/singlefs-checker/invariants/09-inode树结构.md` I-9.2 / I-9.17 / I-9.23「另一份按同一长度读回比校验和，
         // 对不上照红 I-2.1」）。中央映射条目读那片容器时同一份也对不上，这三条不只由 F-W 这一读红。
         for invariant_of_the_checksum_family in ["I-2.1", "I-4.8", "I-7.4"] {
             assert!(

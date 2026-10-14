@@ -1,4 +1,4 @@
-//! checker 档模块：crash_amplification、gpu_unit_checks、crash_judge_dispatch
+//! checker 档模块：crash_library、crash_amplification、gpu_unit_checks、crash_judge_dispatch
 //! 起过 GPU 用例共用的卡池的进程里，崩溃放量产品路径（`crash_amplification::run_from_environment`）在卡上建的缓冲都在这个进程的显存账上借
 //! （`crash_amplification` 文件头第 5 条）：第 ① 段判器的草稿区、第 ① 段由 CPU 判时单元校验和对拍的缓冲、第 ② 段核对的缓冲。
 //! 两条用例各在新池新建文件那条流上按环境真跑一趟，看这一趟交回的借的量，再看用的那一刻核账（判器建好与判完、对拍与核对做完时那一笔借据
@@ -12,12 +12,12 @@
 mod common;
 mod common_crash_points;
 
-use std::ffi::OsStr;
 use std::path::PathBuf;
 
 use common::{build_pool, file_content, geometry};
 use singlefs_checker_tier::crash_amplification::{CrashPointSpan, EnvironmentRun, GpuCardsSource};
 use singlefs_checker_tier::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER;
+use singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start;
 use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
     gpu_card_pool_or_report_not_run, not_run_line,
 };
@@ -87,22 +87,20 @@ fn record_new_pool_file_creation(tag: &str) -> RecordedFlow {
     }
 }
 
-/// 临时目录：一份开了 GPU 的多机配置（单机）与一份库，用例结束（成功、失败、panic）都删掉。配置里的显卡先后照抄本机这一趟的
+/// 用例的目录（家目录下流水线单元测试那一类的长期库里以用例标签命名的一份，起跑先清空、跑完留着）：一份开了 GPU 的多机配置（单机）与一份库。
+/// 配置里的显卡先后照抄本机这一趟的
 /// （清场之下要清场之后那一份显卡先后：用例自己写上，`crash_amplification::card_priority_lines_of_the_caller`，抄的是调用方给这个进程的那一份）。
 struct GpuRunDirectory {
-    directory: PathBuf,
     configuration: PathBuf,
     library: PathBuf,
 }
 
 impl GpuRunDirectory {
     fn new(tag: &str) -> Self {
-        let directory = std::env::temp_dir().join(format!(
-            "singlefs-crash-amplification-booking-{tag}-{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&directory);
-        std::fs::create_dir_all(&directory).expect("建得了临时目录");
+        let directory = amplification_unit_tests_library_directory_emptied_at_the_start(&format!(
+            "booking-{tag}"
+        ))
+        .expect("流水线单元测试那一类里这条用例的目录");
         let configuration = directory.join("multi-host-with-gpu.env");
         let repository_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../Cargo.lock")
@@ -119,21 +117,14 @@ impl GpuRunDirectory {
             .expect("写得了开 GPU 的配置");
         let library = directory.join("library");
         Self {
-            directory,
             configuration,
             library,
         }
     }
 }
 
-impl Drop for GpuRunDirectory {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.directory);
-    }
-}
-
-/// 在这个进程的卡池上按环境真跑一趟：配置开 GPU、单机（判器、核对、单元校验和三类都走 GPU，对照那一遍 CPU 判器同时判、单元校验和交卡对拍；
-/// 崩溃点重放合并第三轮判决 J5、J6），库是新建的空库（每个块都要判）。
+/// 在这个进程的卡池上按环境真跑一趟：配置开 GPU、单机（判器、核对两类都走 GPU，崩溃点重放合并第三轮判决 J5；CPU 不在同一段判同一批），
+/// 库起跑清空过（每个块都要判）。
 /// 本机没卡（卡池报了「本次未跑」）、或产品路径显存不够（这一趟照叫停的样子交回），交 `None`，调用的用例报「本次未跑」当场返回。
 fn amplify_on_the_card_pool(test_name: &str) -> Option<EnvironmentRun> {
     gpu_card_pool_or_report_not_run(test_name)?;
@@ -147,10 +138,6 @@ fn amplify_on_the_card_pool(test_name: &str) -> Option<EnvironmentRun> {
         (
             "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
             directory.library.as_os_str(),
-        ),
-        (
-            "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
-            OsStr::new("1"),
         ),
     ]);
     let run = common_crash_points::amplify_prepared_flow(
@@ -235,32 +222,20 @@ fn the_product_path_judges_on_scratch_it_booked_on_the_card_pool() {
     }
 }
 
-/// 对照那一遍 CPU 判器的单元校验和交卡对拍，第 ② 段在卡上核（配置开了 GPU 三类都走 GPU）：
-/// 两样在卡上建的缓冲都在显存账上借了（借的量不为 0）、做完那一刻那一笔借据还在账上、第 ② 段在卡上核了。哪一样改回不借，
-/// 对应的借的量是 `None`；借了又在用完之前还掉，核账不是 `Some(true)`：这条都红。
+/// 第 ② 段在卡上核（配置开了 GPU，判器与核对都走 GPU）：核对在卡上建的缓冲在显存账上借了（借的量不为 0）、核完那一刻那一笔借据还在账上、
+/// 第 ② 段在卡上核了。改回不借，借的量是 `None`；借了又在用完之前还掉，核账不是 `Some(true)`：这条都红。
 #[test]
-fn the_product_path_books_the_unit_checksum_and_facts_verifier_buffers_on_the_card_pool() {
+fn the_product_path_books_the_facts_verifier_buffers_on_the_card_pool() {
     let Some(run) = amplify_on_the_card_pool(
-        "the_product_path_books_the_unit_checksum_and_facts_verifier_buffers_on_the_card_pool",
+        "the_product_path_books_the_facts_verifier_buffers_on_the_card_pool",
     ) else {
         return;
     };
-    assert!(
-        run.unit_checksum_buffers_booked_mebibytes
-            .is_some_and(|booked| booked > 0),
-        "单元校验和对拍的缓冲要在显存账上借：{:?}",
-        run.unit_checksum_buffers_booked_mebibytes
-    );
     assert!(
         run.facts_verifier_buffers_booked_mebibytes
             .is_some_and(|booked| booked > 0),
         "第 ② 段核对的缓冲要在显存账上借：{:?}",
         run.facts_verifier_buffers_booked_mebibytes
-    );
-    assert_eq!(
-        run.unit_checksum_buffers_lease_on_the_books_after_checking,
-        Some(true),
-        "单元校验和对拍完那一刻核账：对拍的缓冲那一笔借据要还在账上"
     );
     assert_eq!(
         run.facts_verifier_buffers_lease_on_the_books_after_verifying,

@@ -1,4 +1,4 @@
-//! checker 档模块：crash、gpu_unit_checks、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
+//! checker 档模块：crash、crash_state_enumeration、gpu_unit_checks、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
 //! GPU 判器里池级 checker 那一份的 I-7.8（根记录树 ID 水位不低于全池最大树 ID）判两格，与 CPU 的池级 checker 同判（C674）：
 //! 根环全部根的水位取 max 那一格，与最新那条根自己的水位那一格（`crates/singlefs-checker/src/walk.rs` 的 `check_pool_image` 末尾）。
 //! 造法：新池新建文件（发布 A，发出十二棵树）再覆盖写一次（发布 B）那条流，把 B 的根（最新那条）的水位压到 mkfs 时的水位、重封，
@@ -23,14 +23,23 @@ use common::{
 use singlefs_checker::image::{InvariantVerdict, IMPLEMENTED_INVARIANTS};
 use singlefs_checker::walk::check_pool_image;
 use singlefs_checker_tier::crash::{
-    judge_layer0_state_range, layer0_plan_state_count, Layer0SegmentExpansion, Layer0StateJudgement,
+    crash_point_replay_plan_state_count, CrashPointReplaySegmentExpansion, CrashStateJudgement,
 };
 use singlefs_checker_tier::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
+use singlefs_checker_tier::crash_state_enumeration::{
+    sample_crash_states_on_the_cpu, CrashPointReplayItem,
+};
+
+/// 这份测试文件的仓内路径：崩溃点重放取样过库的设点文件。
+const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/gpu_judge_tree_identifier_watermark_of_the_newest_root_like_the_cpu_checker.rs";
 use singlefs_checker_tier::crash_judge_gpu::{
     pool_checker_violated_bits, verdict_bits, POOL_CHECKER_UNDECIDABLE_WORD, VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
-use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
+    gpu_card_pool_or_report_not_run,
+    image_with_every_write_landed_read_back_from_the_pairing_library,
+};
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::journal::JournalRecord;
 use singlefs_core::root_record::RootRecord;
@@ -199,11 +208,15 @@ fn overwrite_flow(tag: &str, newest_root_watermark: NewestRootWatermark) -> Reco
     }
 }
 
-/// 全部写都落了的那个镜像上，CPU 池级 checker 判红的不变量与各自第一格违例的说明。
-fn violations_with_every_write_landed(flow: &RecordedFlow) -> BTreeMap<&'static str, String> {
-    let mut image = flow.base.clone();
-    image.apply_writes(&flow.writes);
-    check_pool_image(&image)
+/// 全部写都落了的那个镜像上，CPU 池级 checker 判红的不变量与各自第一格违例的说明（GPU 判器对拍的 CPU 参照那一侧）。
+// cpu-reference-for-gpu-comparison
+fn violations_with_every_write_landed(
+    flow: &RecordedFlow,
+) -> Option<BTreeMap<&'static str, String>> {
+    // 镜像的输入先经对拍那一类的库（写进去再读回，用户 2026-10-13 定：CPU 参照也从库读），判的是读回的那一份；只录那一趟交 None
+    let image =
+        image_with_every_write_landed_read_back_from_the_pairing_library(&flow.base, &flow.writes)?;
+    let violations = check_pool_image(&image)
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
@@ -211,11 +224,12 @@ fn violations_with_every_write_landed(flow: &RecordedFlow) -> BTreeMap<&'static 
             | InvariantVerdict::NotApplicable(_)
             | InvariantVerdict::PartiallyJudged(_) => None,
         })
-        .collect()
+        .collect();
+    Some(violations)
 }
 
 /// CPU 池级 checker 的违例位：位 i ↔ `IMPLEMENTED_INVARIANTS[i]`（与 GPU 判器结论里那一段同一个编号）。
-fn pool_checker_bits_on_the_cpu(judgement: &Layer0StateJudgement) -> u128 {
+fn pool_checker_bits_on_the_cpu(judgement: &CrashStateJudgement) -> u128 {
     judgement
         .pool_checker
         .iter()
@@ -247,10 +261,12 @@ fn gpu_judge_reddens_a_newest_root_whose_own_tree_identifier_watermark_is_low_li
 {
     // 前提（取卡之前、CPU 上判）：原样的流全部落盘时 I-7.8 不红；压低之后只红 I-7.8，而且红的是最新那条根自己那一格、
     // 取 max 那一格没红——这条流只在这一格上分得出 GPU 判没判这一格。
-    let as_published = violations_with_every_write_landed(&overwrite_flow(
+    let Some(as_published) = violations_with_every_write_landed(&overwrite_flow(
         "gpu-judge-newest-root-watermark-as-published",
         NewestRootWatermark::AsPublished,
-    ));
+    )) else {
+        return;
+    };
     assert!(
         !as_published.contains_key("I-7.8"),
         "原样的流全部落盘时 I-7.8 不红，实际 {as_published:?}"
@@ -259,7 +275,9 @@ fn gpu_judge_reddens_a_newest_root_whose_own_tree_identifier_watermark_is_low_li
         "gpu-judge-newest-root-watermark-lowered",
         NewestRootWatermark::LoweredToTheMkfsWatermark,
     );
-    let lowered = violations_with_every_write_landed(&flow);
+    let Some(lowered) = violations_with_every_write_landed(&flow) else {
+        return;
+    };
     assert_eq!(
         lowered.keys().copied().collect::<Vec<_>>(),
         vec!["I-7.8"],
@@ -277,9 +295,9 @@ fn gpu_judge_reddens_a_newest_root_whose_own_tree_identifier_watermark_is_low_li
     };
     let expansion = |_segment_index: usize, segment: &[usize]| {
         if segment.len() <= EXPAND_UP_TO {
-            Layer0SegmentExpansion::EveryProperSubset
+            CrashPointReplaySegmentExpansion::EveryProperSubset
         } else {
-            Layer0SegmentExpansion::NotExpanded
+            CrashPointReplaySegmentExpansion::NotExpanded
         }
     };
     let tables = build_judge_tables(&JudgeFlow {
@@ -291,7 +309,8 @@ fn gpu_judge_reddens_a_newest_root_whose_own_tree_identifier_watermark_is_low_li
         expansion: &expansion,
     })
     .expect("建得出表");
-    let state_count = layer0_plan_state_count(&flow.base, &flow.writes, &flow.segments, &expansion);
+    let state_count =
+        crash_point_replay_plan_state_count(&flow.base, &flow.writes, &flow.segments, &expansion);
     assert_eq!(tables.state_count, state_count);
     let Some(gpu): Option<Vec<[u32; VERDICT_WORDS]>> =
         judge_every_state_on_a_card_leased_from_the_pool(cards, TEST_NAME, &tables)
@@ -299,7 +318,11 @@ fn gpu_judge_reddens_a_newest_root_whose_own_tree_identifier_watermark_is_low_li
         return;
     };
     let mut cpu: Vec<u128> = Vec::new();
-    let judged_on_the_cpu = judge_layer0_state_range(
+    let Some(judged_on_the_cpu) = sample_crash_states_on_the_cpu(
+        CrashPointReplayItem {
+            name: TEST_NAME,
+            setting_file: THIS_FILE,
+        },
         &flow.base,
         &flow.writes,
         &flow.segments,
@@ -308,7 +331,10 @@ fn gpu_judge_reddens_a_newest_root_whose_own_tree_identifier_watermark_is_low_li
         &expansion,
         0..state_count,
         &mut |_ordinal, _image, judgement| cpu.push(pool_checker_bits_on_the_cpu(judgement)),
-    );
+    )
+    .judged() else {
+        return;
+    };
     assert_eq!(judged_on_the_cpu, state_count);
     assert_eq!(cpu.len(), gpu.len(), "两边判的状态数相同");
     let tree_identifier_watermark_bit = 1u128

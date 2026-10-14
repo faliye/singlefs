@@ -1,6 +1,7 @@
-//! checker 档模块：crash、crash_judge_tables
+//! checker 档模块：crash、crash_library、crash_amplification、crash_judge_tables
 //! GPU 判器输入表的落点版本模型在新池新建文件那条流上的判别力自证：每个崩溃状态、每个落点，按持久掩码查到的版本的字节要与
-//! 层 0 崩溃镜像在那个落点上读出的字节逐字节相同；逐扇区等不等的掩码要与「那次写还在盘上」逐扇区相同；
+//! 崩溃点重放的崩溃镜像在那个落点上读出的字节逐字节相同（崩溃镜像那一侧是 CPU 参照：基线、枚举写与每个状态的持久集合作一张给定状态表
+//! 先写进对拍那一类的库、再读回，镜像按读回的那一份叠，用户 2026-10-13 定：CPU 参照也从库读）；逐扇区等不等的掩码要与「那次写还在盘上」逐扇区相同；
 //! 两条根槽写的根身份、发布分组与记录核对器同一个分法。改坏叠写的次序（后写的不盖前写的）时第一条断言必红（写法见文件末尾的注释）。
 #![allow(
     clippy::doc_markdown,
@@ -12,10 +13,16 @@ mod common;
 
 use common::{build_pool, file_content, geometry};
 use singlefs_checker_tier::crash::{
-    layer0_enumeration_tables, layer0_plan_state_count, Layer0SegmentExpansion,
+    crash_point_replay_plan_state_count, crash_state_enumeration_tables,
+    CrashPointReplaySegmentExpansion,
 };
+use singlefs_checker_tier::crash_amplification::RecordedGivenStatesTable;
 use singlefs_checker_tier::crash_judge_tables::{
     build_judge_tables, JudgeFlow, JudgeLocationKind, MAXIMUM_LOCATION_SECTORS,
+};
+use singlefs_checker_tier::crash_library::{
+    repository_root_of_this_crate, two_stages, CrashLibraryClass, ItemManifest, ItemName,
+    StageOutcome,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
@@ -28,11 +35,56 @@ use singlefs_harness::segments::StepKind;
 
 const LARGEST_EXPANDED_SEGMENT_WRITES: usize = 6;
 
-fn expansion(_segment_index: usize, segment: &[usize]) -> Layer0SegmentExpansion {
+/// 崩溃镜像那一侧（CPU 参照）的输入在对拍那一类库里的项名，与清单里那张表那一样的名字。
+const CPU_REFERENCE_ITEM: &str = "crash_judge_tables_versions/cpu-reference";
+const CPU_REFERENCE_TABLE_IN_THE_MANIFEST: &str = "cpu_reference_given_states_table";
+
+/// 崩溃镜像那一侧（CPU 参照）的输入先入库、再读回：录入段把这张给定状态表按摘要写进对拍那一类的库、按项名登清单；判段凭项名读清单、
+/// 按摘要读回、核摘要，交回读回的那一份。只录那一趟交 `None`（用例当场返回）。
+fn crash_images_read_back_from_the_pairing_library(
+    table: &RecordedGivenStatesTable,
+) -> Option<RecordedGivenStatesTable> {
+    let bytes = table.to_bytes();
+    let digest = singlefs_harness::sha256::sha256_digest(&bytes);
+    let item = ItemName::new(CPU_REFERENCE_ITEM).expect("写死的项名合规矩");
+    two_stages(
+        CrashLibraryClass::JudgeTablesPairing,
+        &repository_root_of_this_crate(),
+        &item,
+        |library| {
+            library
+                .lock()
+                .store_given_states_table(&digest, &bytes)
+                .map_err(|error| format!("崩溃镜像那一侧的表写不进库：{error:?}"))?;
+            Ok(ItemManifest {
+                kind: "cpu_reference_pairing".to_string(),
+                digests: vec![(CPU_REFERENCE_TABLE_IN_THE_MANIFEST.to_string(), digest)],
+            })
+        },
+        |library, manifest| {
+            let recorded = manifest.digest_named(CPU_REFERENCE_TABLE_IN_THE_MANIFEST)?;
+            let read_back = library
+                .lock()
+                .read_given_states_table(&recorded)
+                .map_err(|error| format!("读崩溃镜像那一侧的表失败：{error:?}"))?
+                .ok_or_else(|| "崩溃镜像那一侧的表不在库里：先跑录入段".to_string())?;
+            if singlefs_harness::sha256::sha256_digest(&read_back) != recorded {
+                return Err("崩溃镜像那一侧的表从库里读回的摘要对不上".to_string());
+            }
+            RecordedGivenStatesTable::from_bytes(&read_back)
+                .map(StageOutcome::Judged)
+                .ok_or_else(|| "崩溃镜像那一侧的表从库里读回的字节解不出".to_string())
+        },
+    )
+    .unwrap_or_else(|refusal| panic!("崩溃镜像那一侧的表过库失败：{refusal}"))
+    .judged()
+}
+
+fn expansion(_segment_index: usize, segment: &[usize]) -> CrashPointReplaySegmentExpansion {
     if segment.len() <= LARGEST_EXPANDED_SEGMENT_WRITES {
-        Layer0SegmentExpansion::EveryProperSubset
+        CrashPointReplaySegmentExpansion::EveryProperSubset
     } else {
-        Layer0SegmentExpansion::NotExpanded
+        CrashPointReplaySegmentExpansion::NotExpanded
     }
 }
 
@@ -63,11 +115,11 @@ fn every_location_version_reproduces_the_crash_image_bytes_and_sector_equality_o
         expansion: &expansion,
     };
     let tables = build_judge_tables(&flow).expect("新池新建文件那条流建得出表");
-    let enumeration = layer0_enumeration_tables(&base, &writes, &segments, &expansion);
+    let enumeration = crash_state_enumeration_tables(&base, &writes, &segments, &expansion);
     let enumerated = &enumeration.enumerated_writes;
     assert_eq!(
         tables.state_count,
-        layer0_plan_state_count(&base, &writes, &segments, &expansion)
+        crash_point_replay_plan_state_count(&base, &writes, &segments, &expansion)
     );
     assert_eq!(
         usize::try_from(tables.enumerated_write_count).expect("装得进"),
@@ -110,17 +162,35 @@ fn every_location_version_reproduces_the_crash_image_bytes_and_sector_equality_o
             .count(),
         "每条根槽写一次发布"
     );
+    let Some(crash_images) =
+        crash_images_read_back_from_the_pairing_library(&RecordedGivenStatesTable {
+            table_name: "crash-judge-tables-versions".to_string(),
+            base: base.clone(),
+            writes: enumerated.clone(),
+            segments: Vec::new(),
+            seams: Vec::new(),
+            persisted_sets: (0..tables.state_count)
+                .map(|ordinal| tables.persisted_writes_of_state(ordinal))
+                .collect(),
+        })
+    else {
+        return;
+    };
+    assert_eq!(
+        u64::try_from(crash_images.persisted_sets.len()).expect("装得进 u64"),
+        tables.state_count,
+        "读回的表里每个状态一个持久集合"
+    );
     let mut versions_checked = 0u64;
     let mut sectors_checked = 0u64;
-    for ordinal in 0..tables.state_count {
-        let persisted = tables.persisted_writes_of_state(ordinal);
+    for (ordinal, persisted) in (0..tables.state_count).zip(&crash_images.persisted_sets) {
         let image = CrashImage {
-            base: &base,
-            writes: enumerated,
+            base: &crash_images.base,
+            writes: &crash_images.writes,
             persisted: persisted.clone(),
         };
         for location in &tables.locations {
-            let version = tables.version_of(location, &persisted).unwrap_or_else(|| {
+            let version = tables.version_of(location, persisted).unwrap_or_else(|| {
                 panic!(
                     "状态 {ordinal} 在落点 (盘 {}, 偏移 {}) 上的组合没有版本",
                     location.device, location.offset
@@ -143,7 +213,7 @@ fn every_location_version_reproduces_the_crash_image_bytes_and_sector_equality_o
             versions_checked += 1;
             let sector_bytes = usize::try_from(SECTOR_BYTES).expect("512");
             for (position, entry) in location.writes.iter().enumerate() {
-                let write = &enumerated[usize::try_from(*entry).expect("下标")];
+                let write = &crash_images.writes[usize::try_from(*entry).expect("下标")];
                 let mask = version.sector_equals[position];
                 let sector_count = usize::try_from(location.length).expect("长度") / sector_bytes;
                 assert!(sector_count <= MAXIMUM_LOCATION_SECTORS);

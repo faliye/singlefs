@@ -7,433 +7,43 @@
 //!
 //! 旧形态（挂载时回退：回退那次挂载取号 3、写回退行 txg 9、暖机 txg 10，覆盖写四次 txg 11–14）下这里的几个数不同，改前改后见实三报告的钉死值表。
 mod common;
+mod common_images_for_the_checker_tier;
+#[path = "common_images_for_the_checker_tier/reuse_after_raising_the_floor.rs"]
+mod scenarios_of_reuse_after_raising_the_floor;
 
 use common::{
     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, parameters,
-    BuiltPool, FIXED_WRITE_TIME_SECONDS,
+    BuiltPool,
 };
-use singlefs_checker::image::{
-    InvariantVerdict, EVERY_RETIREMENT_RECORD_IS_WELL_FORMED,
-    INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION,
-    LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE,
-    NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
-    NON_RIGHTMOST_TOMBSTONE_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
-    QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE, RETIREMENT_RECORDS_ON_THE_LINEAGE_ARE_DISTINCT,
-    RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF,
-    RETIREMENT_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
-    TOMBSTONES_ON_THE_LINEAGE_ARE_DISTINCT_AND_EVERY_TOMBSTONE_IS_WELL_FORMED,
-    TOMBSTONE_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOB_ON_A_TEST_IMAGE,
-    TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT, TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
-};
-use singlefs_checker::walk::{
-    check_pool_image, NO_LINEAGE_OR_RETIREMENT_CONTAINER_CAPACITY_KNOB,
-    NO_NON_RIGHTMOST_LINEAGE_OR_RETIREMENT_CONTAINER, NO_NON_RIGHTMOST_TOMBSTONE_CONTAINER,
-    NO_QUEUED_INODE_IN_ANY_WALKED_VERSION, NO_RETIREMENT_RECORD_IN_ANY_WALKED_VERSION,
-    NO_RETIREMENT_RECORD_ON_THE_LINEAGE_IN_ANY_WALKED_VERSION,
-    NO_RETIREMENT_TREE_ENTRY_IN_ANY_WALKED_VERSION,
-    NO_TOMBSTONE_CONTAINER_CAPACITY_KNOB_ON_THE_OLD_ENTRY, NO_TOMBSTONE_IN_ANY_WALKED_VERSION,
-    NO_TOMBSTONE_ON_THE_LINEAGE_NAMING_A_RECORD, NO_TOMBSTONE_TREE_ENTRY_IN_ANY_WALKED_VERSION,
+use common_images_for_the_checker_tier::PoolCheckerImages;
+use scenarios_of_reuse_after_raising_the_floor::{
+    build_through_rollback, content_of, five_overwrites_after_the_rollback, newest_root_floor,
+    overwrite_in_process, raise_floor, roll_back,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
-use singlefs_core::allocator::{Placement, ReclaimedReuse};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::journal::record_offset;
 use singlefs_core::mount::{
-    mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, MountError, RaisedFloor,
-    RollbackCandidateExclusion, RollbackError, RollbackTarget, RolledBack, ShadowLedger,
+    mount_writable, MountError, RollbackCandidateExclusion, RollbackError, RollbackTarget,
     StillUnreadableAfterOneReread,
 };
 use singlefs_core::recovery::{
-    choose_system_configuration, readable_roots, recover, scan_journal, BadRootRingSlotReading,
-    JournalPolicy, PoolReader, RecoveryOutcome,
+    choose_system_configuration, scan_journal, BadRootRingSlotReading, PoolReader,
 };
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::system_configuration::SystemConfiguration;
-use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
 use singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES;
 
-/// 没有删除的会话上，删除线那几条各自报的不适用理由（池级 checker `walk` 里为每条写的那一句）：不变量 → 只认的那一句。
-/// 前六行是墓碑与删除队列那几条（I-9.18–I-9.23）；后六行是退役树与谱系、退役容器容量那几条（I-9.31–I-9.34、I-9.36、I-9.37），
-/// 逐条照池级 checker 在 E 之后的镜像上实际报的登记：这条会话没有 unlink，退役树每一版都是零根，I-9.31 没有内部条目、I-9.32 没有退役记录、
-/// I-9.33 与 I-9.34 没有谱系上的退役记录；回退 D 只写了一条谱系记录，谱系树只一片容器、退役树零根，I-9.36 没有非最右的容器；
-/// `check_pool_image` 是旧入口、没给谱系与退役旋钮，I-9.37 不判。I-9.35（退役完备）不登记：候选集里相邻两版的父版读得出、叶身份集没少，
-/// 真被判过、要成立。
-const DELETION_INVARIANTS_WITHOUT_AN_OBJECT_ON_A_SESSION_WITHOUT_DELETION: &[(&str, &str)] = &[
-    (
-        QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE,
-        NO_QUEUED_INODE_IN_ANY_WALKED_VERSION,
-    ),
-    (
-        TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT,
-        NO_TOMBSTONE_ON_THE_LINEAGE_NAMING_A_RECORD,
-    ),
-    (
-        TOMBSTONES_ON_THE_LINEAGE_ARE_DISTINCT_AND_EVERY_TOMBSTONE_IS_WELL_FORMED,
-        NO_TOMBSTONE_IN_ANY_WALKED_VERSION,
-    ),
-    (
-        NON_RIGHTMOST_TOMBSTONE_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
-        NO_NON_RIGHTMOST_TOMBSTONE_CONTAINER,
-    ),
-    (
-        TOMBSTONE_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOB_ON_A_TEST_IMAGE,
-        NO_TOMBSTONE_CONTAINER_CAPACITY_KNOB_ON_THE_OLD_ENTRY,
-    ),
-    (
-        TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
-        NO_TOMBSTONE_TREE_ENTRY_IN_ANY_WALKED_VERSION,
-    ),
-    (
-        RETIREMENT_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
-        NO_RETIREMENT_TREE_ENTRY_IN_ANY_WALKED_VERSION,
-    ),
-    (
-        EVERY_RETIREMENT_RECORD_IS_WELL_FORMED,
-        NO_RETIREMENT_RECORD_IN_ANY_WALKED_VERSION,
-    ),
-    (
-        RETIREMENT_RECORDS_ON_THE_LINEAGE_ARE_DISTINCT,
-        NO_RETIREMENT_RECORD_ON_THE_LINEAGE_IN_ANY_WALKED_VERSION,
-    ),
-    (
-        RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF,
-        NO_RETIREMENT_RECORD_ON_THE_LINEAGE_IN_ANY_WALKED_VERSION,
-    ),
-    (
-        NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
-        NO_NON_RIGHTMOST_LINEAGE_OR_RETIREMENT_CONTAINER,
-    ),
-    (
-        LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE,
-        NO_LINEAGE_OR_RETIREMENT_CONTAINER_CAPACITY_KNOB,
-    ),
-];
-
-fn content_of(length: usize, seed: usize) -> Vec<u8> {
-    (0..length)
-        .map(|index| u8::try_from((index * 7 + seed) % 253).expect("小于 256"))
-        .collect()
-}
-
-fn overwrite_in_process(
-    pool: &mut BuiltPool,
-    content: &[u8],
-    instance: InstanceGeneration,
-) -> TransactionOutput {
-    let publish_parameters = parameters();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
-    let previous = pool.output.clone();
-    let output = publish_overwrite(
-        &mut writer,
-        &mut pool.allocator,
-        &previous,
-        FirstFile {
-            content,
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
-        },
-        instance,
-    )
-    .expect("覆盖写");
-    pool.output = output.clone();
-    output
-}
-
-/// 固定脚本到 D：A、B、重开取号 2、写行、暖机两次、C、挂着的时候回退到 (1, 3)——一次向前发布 D（txg 9，实例仍是 2）。
-fn build_through_rollback(tag: &str) -> BuiltPool {
-    let mut pool = build_pool(tag);
-    overwrite_in_process(&mut pool, &content_of(4100, 3), InstanceGeneration(1));
-    let mut devices = pool.reopen_recorded();
-    let mounted = mount_writable(&parameters(), &mut devices).expect("可写挂载");
-    pool.devices = Some(devices);
-    pool.allocator = mounted.allocator;
-    pool.output = mounted
-        .current
-        .into_file_version()
-        .expect("B 之后重开，现行那一版带文件");
-    overwrite_in_process(&mut pool, &content_of(2500, 11), InstanceGeneration(2));
-    roll_back(
-        &mut pool,
-        RollbackTarget {
-            instance: InstanceGeneration(1),
-            checkpoint_txg: CheckpointTxg(3),
-        },
-    )
-    .expect("挂着的时候回退到 A");
-    assert_eq!(pool.output.root.checkpoint_txg, CheckpointTxg(9));
-    pool
-}
-
-/// 挂着的时候回退：做成时 `pool.output` 换成回退那次发布之后的一版。
-fn roll_back(pool: &mut BuiltPool, target: RollbackTarget) -> Result<RolledBack, RollbackError> {
-    let rollback_parameters = parameters();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    roll_back_by_a_forward_publish(
-        &rollback_parameters,
-        devices,
-        &mut pool.allocator,
-        &mut pool.output,
-        target,
-    )
-}
-
-/// 回退之后再覆盖写五次（txg 10–14）：第一次释放 D 引用、它不引用的用户可见单元（A 的四个文件单元）与 D 那一版的固定点（释放代 10）。
-fn five_overwrites_after_the_rollback(pool: &mut BuiltPool) -> Vec<TransactionOutput> {
-    [13usize, 17, 19, 23, 29]
-        .iter()
-        .map(|seed| {
-            overwrite_in_process(pool, &content_of(3000 + seed, *seed), InstanceGeneration(2))
-        })
-        .collect()
-}
-
-fn raise_floor(pool: &mut BuiltPool, new_floor: CheckpointTxg) -> Result<RaisedFloor, MountError> {
-    let mut current = pool.output.clone();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let raised = raise_rollback_floor(
-        &parameters(),
-        devices,
-        &mut pool.allocator,
-        &mut current,
-        new_floor,
-        ShadowLedger::On,
-    );
-    pool.output = current;
-    raised
-}
-
-fn newest_root_floor(pool: &BuiltPool) -> CheckpointTxg {
-    let image = pool.memory_pool();
-    let system_configuration = choose_system_configuration(&image).expect("系统配置");
-    readable_roots(
-        &image,
-        &system_configuration.immutable.region_devices,
-        &system_configuration.immutable.sizes,
-        &system_configuration.immutable.filesystem_identifier,
-    )
-    .into_iter()
-    .max_by_key(|root| (root.checkpoint_txg, root.instance))
-    .expect("根")
-    .rollback_floor
-}
-
-/// 验收第一、二条：上限 11；两次空发布带 F = 11 落到两块盘；释放代 ≤ 11 的 86 个落点（95 槽）回收、defer 队列从 143 槽减到 64；
-/// A 的数据落点 50180（D 复活、txg 10 那次覆盖写换下，释放代 10）在回收的里面；E 的数据单元落 50176、它的分配记录改写成代 17、未释放；
-/// 后释放的（代 12–14）仍占着；冷启动读回 E；根记录 F = 11；checker 全绿（A、B 的根在 F 之下、不在候选集）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_reuse_after_raising_the_floor::raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it(
 ) {
-    let mut pool = build_through_rollback("step-five-reuse");
-    let overwrites = five_overwrites_after_the_rollback(&mut pool);
-    assert_eq!(overwrites[0].root.checkpoint_txg, CheckpointTxg(10));
-    assert_eq!(overwrites[4].root.checkpoint_txg, CheckpointTxg(14));
-    for device in &pool.allocator.devices {
-        // 向前回退不重建分配器：F = 0、环里最旧的有效根是 txg 0，一条已释放的记录都回收不了，每一次发布放掉的都还在 defer 里。
-        assert_eq!(
-            device.deferred_slots(),
-            143,
-            "按释放代：3 的 1 槽（A 换下 mkfs 树表）、4 的 8、5 的 10（写行那次，含 mkfs 实例表 2 槽）、6 与 7 各 8（两次暖机）、\
-             8 的 14（C）、9 的 14（D 放掉 C 引用、它不引用的用户可见单元与 C 那一版的固定点）、10–14 各 16（五次覆盖写）"
-        );
-    }
-    let raised = raise_floor(&mut pool, CheckpointTxg(11)).expect("抬 F 到 11");
-    assert_eq!(
-        raised.ceiling,
-        CheckpointTxg(11),
-        "min(每块盘最新的有效根 14 / 13, 第 4 个不同状态 11)"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_reuse_after_raising_the_floor::raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it,
     );
-    assert_eq!(
-        raised
-            .publishes
-            .iter()
-            .map(|publish| (
-                publish.root.checkpoint_txg.0,
-                publish.root.rollback_floor.0,
-                publish.record.transaction
-            ))
-            .collect::<Vec<_>>(),
-        vec![(15, 11, 0), (16, 11, 0)],
-        "两次带新 F 的空发布"
-    );
-    assert!(raised.reclaimed.contains(&Placement {
-        slot: SlotNumber(50180),
-        span: 2
-    }));
-    assert_eq!(
-        raised.reclaimed.len(),
-        86,
-        "释放代 ≤ 11 的落点：代 3 的 1 个、4 的 8 个、5 的 9 个、6 与 7 各 8 个、8 与 9 各 12 个、10 与 11 各 14 个"
-    );
-    for device in &pool.allocator.devices {
-        assert_eq!(
-            device.deferred_slots(),
-            64,
-            "回收了 1 + 8 + 10 + 8 + 8 + 14 + 14 + 16 + 16 = 95 个槽，抬 F 的两次空发布又各放掉上一版的 8 个"
-        );
-        assert!(device.is_free(SlotNumber(50180)) && device.is_free(SlotNumber(50181)));
-        for later in &overwrites[1..4] {
-            let slot = later.data_pointers[0].locations[0].slot;
-            assert!(
-                !device.is_free(slot),
-                "释放代 > F 的数据单元 {slot:?} 仍占着"
-            );
-        }
-    }
-    let reuse = overwrite_in_process(&mut pool, &content_of(2000, 31), InstanceGeneration(2));
-    assert_eq!(reuse.root.checkpoint_txg, CheckpointTxg(17));
-    assert_eq!(
-        reuse.data_pointers[0].locations[0].slot,
-        SlotNumber(50176),
-        "E 的数据单元落回最低的可再分配偶数槽对 50176–50177：mkfs 实例表那 2 槽（实例 2 写行那次换下、释放代 5）回收了，\
-         引用它的 A、B 在 F 之下、不在候选集，影子账不隔离"
-    );
-    let reused_record = pool
-        .allocator
-        .record_for(DeviceIdentity(0), SlotNumber(50176))
-        .expect("50176 的记录");
-    assert_eq!(
-        (
-            reused_record.generation,
-            reused_record.is_released,
-            reused_record.span_slots
-        ),
-        (CheckpointTxg(17), false, 2),
-        "复用时那条记录改写"
-    );
-    assert_eq!(
-        pool.allocator
-            .records()
-            .iter()
-            .filter(|record| record.device == DeviceIdentity(0) && record.slot == SlotNumber(50176))
-            .count(),
-        1,
-        "同盘同槽只有一条记录"
-    );
-    for device in &pool.allocator.devices {
-        assert_eq!(device.deferred_slots(), 80, "E 又释放了第五版的 16 个槽");
-    }
-    assert_eq!(newest_root_floor(&pool), CheckpointTxg(11));
-    let image = pool.memory_pool();
-    let report = recover(&image, JournalPolicy::Consult);
-    assert_eq!(
-        report.outcome,
-        RecoveryOutcome::FileRead {
-            root: (InstanceGeneration(2), CheckpointTxg(17)),
-            content: content_of(2000, 31)
-        },
-        "{:?}",
-        report.journal
-    );
-    let verdicts = check_pool_image(&image);
-    for (invariant, verdict) in &verdicts {
-        if *invariant == "I-8.8" {
-            // 一事务一条、每条都带提交标记：I-8.8（前缀里的事务不被切开） 的 ③ ④ 没有对象，报不适用
-            // （判别力在 `checker_known_bad_images.rs`）。
-            assert!(
-                matches!(verdict, InvariantVerdict::NotApplicable(_)),
-                "{invariant} 在 E 之后的镜像上报不适用：{verdict:?}"
-            );
-            continue;
-        }
-        if *invariant == "I-4.1" {
-            // 镜像是 E 发布完才看的，所选根 txg 17 之上没有记录：I-4.1（重放后树可遍历） 一次都不施加、报不适用，
-            // 可遍历归 I-7.2；只认这一种理由，别的不适用照红（判别力在 `checker_known_bad_images.rs`）。
-            assert!(
-                matches!(
-                    verdict,
-                    InvariantVerdict::NotApplicable(reason) if reason.contains("所选根之上一次发布都不施加")
-                ),
-                "{invariant} 在 E 之后的镜像上报「所选根之上一次发布都不施加」的不适用：{verdict:?}"
-            );
-            continue;
-        }
-        if *invariant == "I-5.5" {
-            // E 之后的候选集（F_生效 = 11）是 txg 11–17 七条根，树表条目的诞生 txg 都是 3、不等于各自的 txg，认法 ② 不成立：
-            // 候选集里没有从 mkfs 水位第一次建树的那一版，I-5.5（从 mkfs 水位建树那一版的 t1 落点） 一版都不判、报不适用；
-            // 满足 ①② 的只有 txg 3 那一版，它在 F 之下。只认池级 checker 给这一形写的专门理由，不认 `Judgements::into_report` 的缺省理由
-            // （那一句与「I-5.5 的判法一次都没跑」分不开，判决 `research/prompts/m3-formal-code-b33-r1-main-verification.md` 第二节 P3
-            // 「四支豁免」那一行）；别的不适用照红（同一机理的先例与判别力在
-            // `pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs`）。
-            assert!(
-                matches!(
-                    verdict,
-                    InvariantVerdict::NotApplicable(reason)
-                        if *reason == singlefs_checker::walk::NO_VERSION_BUILDS_TREES_FROM_THE_MKFS_WATERMARK
-                ),
-                "{invariant} 在 E 之后的镜像上报「候选集里没有从 mkfs 水位第一次建树的那一版」的专门不适用理由：{verdict:?}"
-            );
-            continue;
-        }
-        if *invariant == "I-4.7" {
-            // 这条会话没有删除：走读到的每一版里都没有 nlink = 0 的记录，也没有有数据单元而没有 nlink ≥ 1 记录的号，
-            // I-4.7（删除中 inode 有账） 没有对象、报不适用；只认这一种理由，别的不适用照红（判别力在 `checker_known_bad_images.rs`
-            // 与 `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`）。
-            assert!(
-                matches!(
-                    verdict,
-                    InvariantVerdict::NotApplicable(reason)
-                        if reason.contains("走读到的每一版里都没有处于删除中的 inode")
-                ),
-                "{invariant} 在 E 之后的镜像上报「走读到的每一版里都没有处于删除中的 inode」的不适用：{verdict:?}"
-            );
-            continue;
-        }
-        if *invariant == "I-4.6" {
-            // 同上，没有删除：I-4.6（中间态其余不变量成立） 自己判的那一格（nlink = 0 的记录单元数对 size）没有对象、报不适用；
-            // 只认这一种理由，别的不适用照红（判别力在 `checker_known_bad_images.rs` 与
-            // `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`）。
-            assert!(
-                matches!(
-                    verdict,
-                    InvariantVerdict::NotApplicable(reason)
-                        if reason.contains("走读到的每一版 inode 树里都没有 nlink = 0 的记录")
-                ),
-                "{invariant} 在 E 之后的镜像上报「走读到的每一版 inode 树里都没有 nlink = 0 的记录」的不适用：{verdict:?}"
-            );
-            continue;
-        }
-        if *invariant == "I-4.4" {
-            // I-4.4（意图只描述目标态） 第一版恒报不适用（用户 2026-10-05 定）；只认池级 checker 写的那一句理由，别的不适用照红
-            // （判别力在 `checker_known_bad_images.rs` 与 `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`）。
-            assert_eq!(
-                *verdict,
-                InvariantVerdict::NotApplicable(INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION),
-                "{invariant} 在 E 之后的镜像上报第一版不适用"
-            );
-            continue;
-        }
-        if let Some((_, reason)) =
-            DELETION_INVARIANTS_WITHOUT_AN_OBJECT_ON_A_SESSION_WITHOUT_DELETION
-                .iter()
-                .find(|(exempted, _)| exempted == invariant)
-        {
-            // 删除线那几条（I-9.18–I-9.23、I-9.31–I-9.34、I-9.36、I-9.37）在这条没有删除的会话上没有对象：每一版的队列都空、
-            // 墓碑树与退役树都是零根、谱系树只一片容器、旧入口没给谱系与退役旋钮，报不适用；
-            // 每条只认池级 checker 为它写的那一句理由，别的不适用（含缺省理由「这个镜像上没有它判的对象」）照红
-            // （判别力在 `checker_known_bad_images.rs` 与 `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`）。
-            // 回退 D 写出了谱系树，I-9.17 在 E 之后的镜像上真被评估过、要成立；I-9.24（空队列报成立）、I-9.29 与 I-9.35 同样要成立。
-            assert_eq!(
-                *verdict,
-                InvariantVerdict::NotApplicable(reason),
-                "{invariant} 在 E 之后的镜像上报「{reason}」的不适用"
-            );
-            continue;
-        }
-        assert_eq!(
-            *verdict,
-            InvariantVerdict::Holds,
-            "{invariant} 在 E 之后的镜像上要成立"
-        );
-    }
-    for must_hold in ["I-2.1", "I-3.1", "I-5.2", "I-7.2"] {
-        assert!(
-            verdicts.iter().any(|(name, _)| *name == must_hold),
-            "{must_hold} 真被判过"
-        );
-    }
 }
 
 /// 生效（D16（发布语义） 已定项 1「生效」，2026-09-26 取 SysPre）：F_生效 = max(根上带的 F, 系统配置里读得出的 F)——把 txg 16 的根槽
@@ -592,79 +202,13 @@ fn torn_journal_record_does_not_turn_its_root_into_an_empty_root_for_the_floor_c
     );
 }
 
-/// 「4 个不同状态」按 (inode 树根指针, extent 树根指针) 去重（D16（发布语义） 已定项 1 的根环容量边界）：回退那次发布照抄目标那一版的
-/// 两棵树，新根与目标是同一个状态。D（txg 9）是 A 的状态；覆盖写甲（txg 10）、再挂着的时候回退到 D（txg 11，又是 A 的状态）、覆盖写乙（txg 12）。
-/// 按新到旧去重：12、11、10、（9 与 11 同一个状态，不再算）、8 ⇒ 第 4 个不同状态是 C 的 8；每块盘上最新的有效根是 12 与 11，
-/// 上限 min(11, 8) = 8，抬到 9 被拒。不去重（每条带文件的根各算一个）的话第 4 新的是 9，上限 9、抬到 9 做成。
-/// checker 那一侧同一条规则：把入口骗过（告诉入口今天的 F 是 9，入口按 txg ≥ 9 的根算，不同状态只剩 12、11、10 三个，上限落到最旧的有效根 9）
-/// 抬到 9，镜像上 I-7.9（回退下界 F 不高于抬 F 的上限） 按抬之前的 F（0）去重算出上限 8，只红它；checker 不去重的话上限 9、判成立。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_reuse_after_raising_the_floor::the_state_repeated_by_rollbacks_is_counted_once_for_the_floor_ceiling_by_the_entry_and_by_the_checker`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_state_repeated_by_rollbacks_is_counted_once_for_the_floor_ceiling_by_the_entry_and_by_the_checker(
 ) {
-    let build = |tag: &str| {
-        let mut pool = build_through_rollback(tag);
-        overwrite_in_process(&mut pool, &content_of(3017, 17), InstanceGeneration(2));
-        roll_back(
-            &mut pool,
-            RollbackTarget {
-                instance: InstanceGeneration(2),
-                checkpoint_txg: CheckpointTxg(9),
-            },
-        )
-        .expect("挂着的时候回退到 D");
-        overwrite_in_process(&mut pool, &content_of(3019, 19), InstanceGeneration(2));
-        assert_eq!(pool.output.root.checkpoint_txg, CheckpointTxg(12));
-        pool
-    };
-    let mut pool = build("step-five-ceiling-repeated-state");
-    let refused = raise_floor(&mut pool, CheckpointTxg(9));
-    assert!(
-        matches!(
-            refused,
-            Err(MountError::RollbackFloorAboveCeiling {
-                requested: CheckpointTxg(9),
-                ceiling: CheckpointTxg(8)
-            })
-        ),
-        "A 的状态只算一次、第 4 个不同状态是 C：{:?}",
-        refused.as_ref().err()
-    );
-    raise_floor(&mut pool, CheckpointTxg(8)).expect("抬到上限 8");
-    let at_the_ceiling = pool.memory_pool();
-    assert_eq!(
-        check_pool_image(&at_the_ceiling)
-            .into_iter()
-            .find(|(invariant, _)| *invariant == "I-7.9")
-            .expect("清单里有 I-7.9")
-            .1,
-        InvariantVerdict::Holds,
-        "抬到上限 8：I-7.9 真被评估过且成立"
-    );
-
-    let mut above = build("step-five-ceiling-repeated-state-above");
-    let mut current = above.output.clone();
-    current.root.rollback_floor = CheckpointTxg(9);
-    let devices = above.devices.as_mut().expect("镜像还开着");
-    raise_rollback_floor(
-        &parameters(),
-        devices,
-        &mut above.allocator,
-        &mut current,
-        CheckpointTxg(9),
-        ShadowLedger::On,
-    )
-    .expect("入口被骗过：按 txg ≥ 9 的根算上限 9");
-    let verdicts = check_pool_image(&above.memory_pool());
-    let violated: Vec<&str> = verdicts
-        .iter()
-        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
-        .map(|(invariant, _)| *invariant)
-        .collect();
-    assert_eq!(
-        violated,
-        ["I-7.9"],
-        "F 抬到 9、去重之后的上限 8：只红 I-7.9：{verdicts:?}"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_reuse_after_raising_the_floor::the_state_repeated_by_rollbacks_is_counted_once_for_the_floor_ceiling_by_the_entry_and_by_the_checker,
     );
 }
 
@@ -759,45 +303,13 @@ fn raising_the_floor_is_refused_when_a_valid_root_tree_table_is_unreadable() {
     );
 }
 
-/// 必红（C22（刚释放的块立即重分配）、复用窗口置 0）：不抬 F、直接把释放代 ≤ 11 的落点回收，E 落回 mkfs 实例表那 2 槽 50176——
-/// F = 0 时 A（txg 3）还是候选、它的根指着那片实例表；checker 走 A 时那片实例表的校验和对不上 ⇒ I-2.1 红。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_reuse_after_raising_the_floor::reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_references_and_the_checker_goes_red`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_references_and_the_checker_goes_red(
 ) {
-    let mut pool = build_through_rollback("step-five-window-zero");
-    five_overwrites_after_the_rollback(&mut pool);
-    let reclaimed = pool
-        .allocator
-        .reclaim_released_up_to(CheckpointTxg(11), ReclaimedReuse::Immediately);
-    assert_eq!(
-        reclaimed.len(),
-        86,
-        "释放代 ≤ 11 的落点：代 3 的 1 个、4 的 8 个、5 的 9 个、6 与 7 各 8 个、8 与 9 各 12 个、10 与 11 各 14 个"
-    );
-    let reuse = overwrite_in_process(&mut pool, &content_of(2000, 31), InstanceGeneration(2));
-    assert_eq!(
-        reuse.data_pointers[0].locations[0].slot,
-        SlotNumber(50176),
-        "mkfs 实例表那 2 槽被拿走：A（F = 0 时仍是候选）的根还指着它"
-    );
-    assert_eq!(newest_root_floor(&pool), CheckpointTxg(0), "F 没抬");
-    let verdicts = check_pool_image(&pool.memory_pool());
-    let violated: Vec<&str> = verdicts
-        .iter()
-        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
-        .map(|(name, _)| *name)
-        .collect();
-    assert!(
-        violated.contains(&"I-2.1"),
-        "A 的根还是候选，它的数据单元被盖了：{verdicts:?}"
-    );
-    // C22（刚释放的块立即重分配） 的「怎么拦」第 ① 条点的是 I-4.8（近 K 代根校验和自洽）：从最近 K 代任一根遍历，校验和必须全对。
-    // 只断言 I-2.1 红，拦的是「有一个单元的校验和与父指针对不上」，没说那是从一条**候选根**出发的遍历走进去的
-    // （收口表第 22 行 2026-09-17 逐句核出来的那一句）。
-    assert!(
-        violated.contains(&"I-4.8"),
-        "复用窗口置 0 之后 I-4.8 必须变红：不红说明这条约束根本没被检查（C22（刚释放的块立即重分配） 第 ② 条）：{verdicts:?}"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_reuse_after_raising_the_floor::reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_references_and_the_checker_goes_red,
     );
 }
 
@@ -879,7 +391,8 @@ fn rolling_back_after_the_floor_carrier_this_process_wrote_on_device_one_reads_n
 /// 不经抬 F 的路径，把两块盘四个系统配置槽里的 F 改成 9、经读者解开再由写者重写（整槽校验和随之重封）——即 SysPre 先把新 F 写进每块盘的
 /// 系统配置、带新 F 的根还一条没落的那个盘面（抬 F 的第一次空发布失败时留下的样子）。挂着的时候回退到 C（txg 8 < 9）：
 /// 拒成 `TargetNotACandidate { BelowEffectiveFloor }`，在任何写之前：盘上逐字节不变、现行版本与分配器不动。
-/// 原来守这一判的是 `second_transaction_step_five_reuse.rs:641` 那一条（载体根被改坏、F 只剩系统配置里那一份），它改钉成「已知根读坏重读仍坏就拒」
+/// 原来守这一判的是 `file_overwrite_step_five_reuse.rs` 的
+/// `floor_carried_by_only_one_device_root_and_the_system_configuration_keeps_the_roots_below_it_out_of_the_rollback_candidates` 那一条（载体根被改坏、F 只剩系统配置里那一份），它改钉成「已知根读坏重读仍坏就拒」
 /// 之后这一判没有用例了；只取根上带的 F 时 F_生效 是 0、C 是候选、回退照做（`crates/mutations.tsv`）。
 #[test]
 fn rolling_back_while_mounted_takes_the_floor_from_the_system_configuration_when_it_is_above_every_root_carried_floor(
@@ -1007,59 +520,12 @@ fn slots_reclaimed_by_raising_the_floor_are_not_handed_out_before_the_floor_take
     assert_eq!(newest_root_floor(&pool), CheckpointTxg(8));
 }
 
-/// C502（抬 F 时现行版本里没有实例表单元）：mkfs 同一个进程里新池新建文件之后再覆盖写三次（txg 4、5、6），抬 F 做成。
-/// 这个进程的现行版本是 `publish_first_file` 那一版往下接的，`TransactionOutput::units` 里一个实例表单元都没有；
-/// 候选集按现行那一版的根指针上读出来的实例表判（mkfs 那片 0 行的表），不看那个内存数组。
-/// 上限 = min(每块盘上最新的有效根 min(6, 4), 第 4 新的非空有效根 3) = 3（D16（发布语义） 已定项 1）；两次空发布 txg 7（盘 1）、8（盘 0）
-/// 让两块盘各有一条带 F = 3 的根；释放代 ≤ 3 的只有第一个文件版本换下的 mkfs 那片第 0 版树表（1 槽）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_reuse_after_raising_the_floor::raising_the_floor_in_the_make_filesystem_process_after_three_overwrites_reads_the_instance_table_through_the_root`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn raising_the_floor_in_the_make_filesystem_process_after_three_overwrites_reads_the_instance_table_through_the_root(
 ) {
-    let mut pool = build_pool("step-five-raise-in-the-make-filesystem-process");
-    for seed in [3usize, 5, 7] {
-        overwrite_in_process(
-            &mut pool,
-            &content_of(3000 + seed, seed),
-            InstanceGeneration(1),
-        );
-    }
-    assert_eq!(pool.output.root.checkpoint_txg, CheckpointTxg(6));
-    assert!(
-        pool.output
-            .units
-            .iter()
-            .all(|unit| unit.identity != singlefs_core::transaction::TransactionUnit::InstanceTable),
-        "这个进程内存里的现行版本不带实例表单元：抬 F 要的那张表只在根指针后面"
-    );
-    let raised = raise_floor(&mut pool, CheckpointTxg(3)).expect("抬 F 到 3");
-    assert_eq!(raised.ceiling, CheckpointTxg(3), "上限 min(4, 3)");
-    assert_eq!(
-        raised
-            .publishes
-            .iter()
-            .map(|publish| publish.root.checkpoint_txg)
-            .collect::<Vec<_>>(),
-        vec![CheckpointTxg(7), CheckpointTxg(8)],
-        "两次空发布让两块盘各有一条带新 F 的根"
-    );
-    assert_eq!(
-        raised.reclaimed,
-        vec![Placement {
-            slot: singlefs_core::make_filesystem::TREE_TABLE_GENESIS_SLOT,
-            span: 1
-        }],
-        "释放代 ≤ 3 的只有 mkfs 那片第 0 版树表"
-    );
-    assert_eq!(newest_root_floor(&pool), CheckpointTxg(3));
-    let verdicts = check_pool_image(&pool.memory_pool());
-    let violated: Vec<&str> = verdicts
-        .iter()
-        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
-        .map(|(invariant, _)| *invariant)
-        .collect();
-    assert!(
-        violated.is_empty(),
-        "抬 F 之后 checker 一条都不红：{verdicts:?}"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_reuse_after_raising_the_floor::raising_the_floor_in_the_make_filesystem_process_after_three_overwrites_reads_the_instance_table_through_the_root,
     );
 }
 
@@ -1156,137 +622,22 @@ fn raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable() {
     assert_eq!(raised.abandoned_roots_unreadable, 1, "C 的账读不出");
 }
 
-/// 建池（第一个文件 A，txg 3）→ 同一个进程里覆盖写 B（txg 4）、C（txg 5）→ 崩溃恢复抛弃 C（C 的根槽与数据单元暂时读不出，
-/// 择根落到 B、C 那条记录验不过；实例 2 写行 txg 6、暖机 txg 7；再写回，C 按实例 2 的表判被抛弃）→ 实例 2 覆盖写四次（txg 8–11）。
-fn pool_after_a_recovery_abandoned_the_third_version_and_four_overwrites(tag: &str) -> BuiltPool {
-    let mut pool = build_pool(tag);
-    overwrite_in_process(&mut pool, &content_of(4100, 3), InstanceGeneration(1));
-    let third = overwrite_in_process(&mut pool, &content_of(2500, 11), InstanceGeneration(1));
-    let abandoning =
-        abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &third);
-    assert_eq!(
-        (
-            third.root.checkpoint_txg,
-            abandoning.output.effective_root.checkpoint_txg,
-            abandoning.output.instance,
-            abandoning.output.row_publish.root().checkpoint_txg,
-            pool.output.root.checkpoint_txg
-        ),
-        (
-            CheckpointTxg(5),
-            CheckpointTxg(4),
-            InstanceGeneration(2),
-            CheckpointTxg(6),
-            CheckpointTxg(7)
-        ),
-        "C 是 txg 5；恢复落到 B（txg 4），实例 2 写行 txg 6、暖机 txg 7"
-    );
-    for seed in [17usize, 19, 23, 29] {
-        overwrite_in_process(
-            &mut pool,
-            &content_of(3000 + seed, seed),
-            InstanceGeneration(2),
-        );
-    }
-    assert_eq!(pool.output.root.checkpoint_txg, CheckpointTxg(11));
-    pool
-}
-
-/// 双故障形（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出））：崩溃恢复抛弃 C（实例 1、txg 5）之后实例 2 覆盖写四次。
-/// 那次挂载时 C 的根槽读不出、系统配置没见证 C（C554 乙罩不到的那一格），影子账看不见 C；可写挂载时的预隔离（D23（journal 的角色与格式）
-/// 已定项 14「可写挂载时的预隔离」）把水位之上没施加的 C 的记录点名的落点与 C 的账里的落点隔离到这个进程写掉 txg 5 那一槽为止，
-/// 四次覆盖写发不出 C 的单元，抬 F 之前池级 checker 一条都不红（`random_histories.rs` 那一条同形、同样改钉）。
-/// 判别力：挂载时不隔离那一份（变异「删除线第38批 可写挂载时的预隔离不隔离水位之上没施加的记录点名的落点（reuse_after_raising_the_floor 双故障形）」）
-/// 时 C 引用的单元又被发出去，I-7.4（近 K 代块未被复用）红、点名实例 1、txg 5 那条被抛弃的根，这一条红。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_reuse_after_raising_the_floor::four_overwrites_after_crash_recovery_abandoned_the_third_version_leave_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn four_overwrites_after_crash_recovery_abandoned_the_third_version_leave_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units(
 ) {
-    let pool =
-        pool_after_a_recovery_abandoned_the_third_version_and_four_overwrites("step-five-gap-5");
-    let violations: Vec<(&'static str, String)> = check_pool_image(&pool.memory_pool())
-        .into_iter()
-        .filter_map(|(invariant, verdict)| match verdict {
-            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds
-            | InvariantVerdict::NotApplicable(_)
-            | InvariantVerdict::PartiallyJudged(_) => None,
-        })
-        .collect();
-    assert!(
-        violations.is_empty(),
-        "抬 F 之前池级 checker 一条都不红（C 的单元被预隔离护着）：{violations:?}"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_reuse_after_raising_the_floor::four_overwrites_after_crash_recovery_abandoned_the_third_version_leave_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units,
     );
 }
 
-/// 事务号按实例计数、从 1 起（D23（journal 的角色与格式） 已定项 7），**不承载事务的空发布写 0 也不许把计数拉回去**。
-///
-/// 抬 F 推的两次空发布在记录上写事务号 0；发布 E 若取「上一条记录的事务号 + 1」就拿到 0 + 1 = 1，
-/// 与实例 2 的 C 用过的 1 重号。回退那次发布 D 的记录也写 0（它不施加也不删除任何记录，实现取 0，条款没写，见实三报告）。重号之后同一实例的两个版本写序逐字节相同（写序存事务号低 48 位），
-/// I-1.8（归并后版本全序） 判不开它们，而实例表行的 W 能当精确前缀也正是靠「记录按事务号顺序追加」这条纪律。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_reuse_after_raising_the_floor::the_transaction_number_keeps_counting_per_instance_across_the_empty_publishes_that_raise_the_floor`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_transaction_number_keeps_counting_per_instance_across_the_empty_publishes_that_raise_the_floor(
 ) {
-    let mut pool = build_through_rollback("txn-number-per-instance");
-    let five = five_overwrites_after_the_rollback(&mut pool);
-    let before_raising: Vec<u64> = five
-        .iter()
-        .map(|output| output.record.transaction)
-        .collect();
-    assert_eq!(
-        before_raising,
-        vec![2, 3, 4, 5, 6],
-        "实例 2 的五次覆盖写接在 C 的 1 之后按实例计数（D 写 0，不推进）"
-    );
-
-    raise_floor(&mut pool, CheckpointTxg(11)).expect("抬到 11");
-    assert_eq!(
-        pool.output.record.transaction, 0,
-        "抬 F 推的空发布不承载事务，记录上写 0（D23 已定项 19 ①）"
-    );
-
-    let after_raising =
-        overwrite_in_process(&mut pool, &content_of(3100, 31), InstanceGeneration(2));
-    assert_eq!(
-        after_raising.record.transaction, 7,
-        "空发布不推进计数，也不许把它拉回去：E 接在 6 之后是 7，不是 0 + 1"
-    );
-
-    let mut used: Vec<u64> = before_raising;
-    used.push(after_raising.record.transaction);
-    let mut deduplicated = used.clone();
-    deduplicated.sort_unstable();
-    deduplicated.dedup();
-    assert_eq!(
-        deduplicated.len(),
-        used.len(),
-        "同一个实例里非 0 的事务号互不重复：{used:?}"
-    );
-
-    // 盘上的样子，兼 I-8.7（实例内事务号不重号） 那条射程「事务号 0 不进序列」的阳性对照：抬 F 推出来的两条空发布记录
-    // （事务号 0）**夹在**实例 2 的 6 与 7 中间，而池级 checker 在这份镜像上判 I-8.7 绿且真被评估过。
-    // 把 0 也算进序列的写法在这里就红了（4 → 0 不是严格递增），它红不了才说明 0 真被排除掉。
-    let image = pool.memory_pool();
-    let system_configuration = choose_system_configuration(&image).expect("系统配置");
-    let transactions_of_the_second_instance: Vec<u64> = scan_journal(&image, &system_configuration)
-        .into_iter()
-        .filter(|((instance, _), _)| *instance == InstanceGeneration(2))
-        .map(|(_, record)| record.transaction)
-        .collect();
-    assert_eq!(
-        transactions_of_the_second_instance,
-        vec![0, 0, 0, 1, 0, 2, 3, 4, 5, 6, 0, 0, 7],
-        "实例 2 按 jsn 排下来的事务号：写行与两次暖机空发布 0，C 是 1，回退那次发布 D 写 0，五次覆盖写 2–6，抬 F 两次空发布 0，E 是 7"
-    );
-    let verdicts = check_pool_image(&image);
-    assert_eq!(
-        verdicts
-            .iter()
-            .find(|(invariant, _)| *invariant == "I-8.7")
-            .expect("清单里有 I-8.7")
-            .1,
-        InvariantVerdict::Holds,
-        "I-8.7 要真被评估过且成立：中间夹着的空发布记录不进那个序列：{verdicts:?}"
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_checker_tier(
+        scenarios_of_reuse_after_raising_the_floor::the_transaction_number_keeps_counting_per_instance_across_the_empty_publishes_that_raise_the_floor,
     );
 }

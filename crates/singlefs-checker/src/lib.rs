@@ -52,7 +52,7 @@ pub fn crc32_castagnoli_bitwise(bytes: &[u8]) -> u32 {
 }
 
 /// 查表的 CRC-32C（反射多项式 0x82F63B78，一次一个字节、一张 256 项的表）：与按位那一份逐字节同值（单测对拍），
-/// 与实现那份 slicing-by-8 仍是两种写法；池级 checker 在层 0 的每个崩溃状态上要算几十个单元，按位算太慢。
+/// 与实现那份 slicing-by-8 仍是两种写法；池级 checker 在崩溃点重放的每个崩溃状态上要算几十个单元，按位算太慢。
 #[must_use]
 pub fn crc32_castagnoli_table(bytes: &[u8]) -> u32 {
     static TABLE: std::sync::OnceLock<[u32; 256]> = std::sync::OnceLock::new();
@@ -179,7 +179,7 @@ pub struct SystemConfigurationView {
     pub journal_tail: u64,
     pub journal_instance: u32,
     /// 系统配置里另记的那一份回退下界 F（D22（单元原子性怎么合成） 已定项 9 字段表最后一行；D16（发布语义） 已定项 1「生效」取
-    /// max(根上带的, 系统配置里读得出的)）。C556（checker 与层 0 不读系统配置里的 F） 那一半读它。
+    /// max(根上带的, 系统配置里读得出的)）。C556（checker 与崩溃点重放不读系统配置里的 F） 那一半读它。
     pub rollback_floor: u64,
 }
 

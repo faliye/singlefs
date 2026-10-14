@@ -1,5 +1,5 @@
-//! checker 档模块：crash
-//! 层 0 流 L8（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 36 行、调度表「实二十」；三方 `m2-treesplit-r1` T4 列的八条流里的最后一条）：
+//! checker 档模块：crash、crash_state_enumeration
+//! 崩溃点重放流 L8（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 36 行、调度表「实二十」；三方 `m2-treesplit-r1` T4 列的八条流里的最后一条）：
 //! 一次发布多条记录、共享点名跨记录。D23（journal 的角色与格式） 已定项 17：最后一个事务要点名的项多于
 //! 一条记录装得下的 64 项时末条再跨记录，只有真正的最后一条带「本次发布末条」标志；已定项 7：同一事务的记录共享事务号、
 //! 提交标记只在它的最后一条；已定项 14 第六条：恢复按记录标志位 0 认发布边界，末条没到的发布整体不施加。
@@ -15,7 +15,7 @@
 //! （3² − 1 = 8，`crash::TearableInPlaceOverwrites`），加全部持久那一个，共 25 个；
 //! 单元段 130 写的 2^130 − 1 个子集枚举不了，它只以整段持久进入后面的状态。单元段里的状态上这次发布的记录一份都没落
 //! （记录段在一道屏障之后），恢复见到的与起点镜像相同的那一版加上几份没人点名的单元——那一格已有的流都罩着。
-//! **比已有的流多罩了什么**：已有的多记录发布（并行线一的层 0 流）一条记录一个事务、每条都带提交标记；这里一个事务跨两条记录，
+//! **比已有的流多罩了什么**：已有的多记录发布（并行线一的崩溃点重放流）一条记录一个事务、每条都带提交标记；这里一个事务跨两条记录，
 //! 第一条不带提交标记，共享的提交内生块分在两条里点名——记录段 15 个状态里：两条都至少落了一份的 8 个（加上根槽那一段的 1 个）
 //! 要由记录施加这一版（恢复不许停在不带提交标记的第一条上），只落了其中一条的 6 个要整次不施加（第一条落了而末条没落是半次发布，
 //! 末条落了而第一条没落是断号）。多跑的一步只有恢复本身（这条流上没有重开、挂载）。每个状态照常跑两遍恢复 + 多版本 oracle、
@@ -28,9 +28,16 @@ use common::{
     build_pool, crash_state_devices, file_content, geometry, parameters, FIXED_WRITE_TIME_SECONDS,
 };
 use singlefs_checker_tier::crash::{
-    enumerate_layer0_selecting_versions_observing_each_state,
-    layer0_state_count_with_torn_in_place_overwrites, Layer0SegmentExpansion, Layer0Tally,
+    crash_state_count_with_torn_in_place_overwrites, CrashPointReplayObserverCounts,
+    CrashPointReplaySegmentExpansion, CrashPointReplayTally, CrashPointReplayVersionTable,
 };
+use singlefs_checker_tier::crash_state_enumeration::{
+    enumerate_crash_states_with_expansion, CrashPointReplayItem, CrashPointReplayObserver,
+};
+
+/// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
+const THIS_FILE: &str =
+    "crates/singlefs-checker-tier/tests/crash_enumeration_record_spill_over_stream.rs";
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::allocator::PoolAllocator;
 use singlefs_core::journal::record_offset;
@@ -257,11 +264,24 @@ struct PublishBoundaryStates {
     root_persisted: u64,
 }
 
+impl PublishBoundaryStates {
+    /// 从崩溃点重放计数里读回的观察者计数（判段从库里读回、这一趟看的与复用的合起来）。
+    fn from_the_observer_counts(counts: &CrashPointReplayObserverCounts) -> Self {
+        Self {
+            no_record: counts.count_named("no_record"),
+            only_one_of_the_two_records: counts.count_named("only_one_of_the_two_records"),
+            both_records_without_the_root: counts.count_named("both_records_without_the_root"),
+            root_persisted: counts.count_named("root_persisted"),
+        }
+    }
+}
+
+/// 观察者在一个状态上记的数经观察者计数（[`CrashPointReplayObserverCounts`]）带出来：四格各一个名字（[`PublishBoundaryStates::from_the_observer_counts`]）。
 fn observe_the_publish_boundary(
     prepared: &Prepared,
     image: &CrashImage<'_>,
     report: &RecoveryReport,
-    counts: &mut PublishBoundaryStates,
+    counts: &mut CrashPointReplayObserverCounts,
 ) {
     let is_persisted = |copies: &[usize]| copies.iter().any(|copy| image.persisted[*copy]);
     let first_record = is_persisted(&prepared.record_writes_in_order[0]);
@@ -269,7 +289,7 @@ fn observe_the_publish_boundary(
     let root = image.persisted[prepared.judged_root_index];
     let (expected_root, expected_applied, what) = match (root, first_record, last_record) {
         (true, _, _) => {
-            counts.root_persisted += 1;
+            counts.add("root_persisted", 1);
             (
                 prepared.version_of_the_spilling_publish,
                 0,
@@ -277,7 +297,7 @@ fn observe_the_publish_boundary(
             )
         }
         (false, true, true) => {
-            counts.both_records_without_the_root += 1;
+            counts.add("both_records_without_the_root", 1);
             (
                 prepared.version_of_the_spilling_publish,
                 2,
@@ -285,7 +305,7 @@ fn observe_the_publish_boundary(
             )
         }
         (false, true, false) | (false, false, true) => {
-            counts.only_one_of_the_two_records += 1;
+            counts.add("only_one_of_the_two_records", 1);
             (
                 prepared.version_before,
                 0,
@@ -293,7 +313,7 @@ fn observe_the_publish_boundary(
             )
         }
         (false, false, false) => {
-            counts.no_record += 1;
+            counts.add("no_record", 1);
             (prepared.version_before, 0, "记录一条都没落：还是上一版")
         }
     };
@@ -305,7 +325,7 @@ fn observe_the_publish_boundary(
     );
 }
 
-fn assert_clean(tally: &Layer0Tally) {
+fn assert_clean(tally: &CrashPointReplayTally) {
     assert_eq!(tally.violations, 0, "oracle：{:?}", tally.first_violation);
     assert_eq!(
         tally.ignored_violations, 0,
@@ -353,35 +373,66 @@ fn assert_clean(tally: &Layer0Tally) {
 #[test]
 fn every_crash_state_of_a_publish_whose_one_transaction_spills_over_two_records_applies_it_whole_or_not_at_all(
 ) {
-    let prepared = prepare("spill-over-layer0");
+    let prepared = prepare("spill-over-crash-point-replay");
     let expand = |_segment_index: usize, segment: &[usize]| segment.len() < 64;
-    let mut counts = PublishBoundaryStates::default();
-    let tally = enumerate_layer0_selecting_versions_observing_each_state(
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        observe_the_publish_boundary(&prepared, image, report, counts);
+    };
+    let Some(tally) = enumerate_crash_states_with_expansion(
+        CrashPointReplayItem {
+            name: "record_spill_over::two_records_whole_or_not_at_all",
+            setting_file: THIS_FILE,
+        },
         &prepared.base,
         &prepared.writes,
         &prepared.segments,
         prepared.judged_root_index,
-        &prepared.versions,
-        &expand,
-        &mut |image, report| {
-            observe_the_publish_boundary(&prepared, image, report, &mut counts);
+        CrashPointReplayVersionTable::with_a_file_only(&prepared.versions),
+        &|segment_index, segment| {
+            if expand(segment_index, segment) {
+                CrashPointReplaySegmentExpansion::EveryProperSubset
+            } else {
+                CrashPointReplaySegmentExpansion::NotExpanded
+            }
         },
-    );
+        &[CrashPointReplayObserver {
+            name: "publish_boundary",
+            // 观察者另读的输入：两条记录的写表下标、被判的根槽下标、这次发布与它之前那一版的根
+            extra_inputs_digest: extra_inputs_digest_that_was_computed(singlefs_harness::sha256::sha256_digest(
+                format!(
+                    "record_writes_in_order={:?}\njudged_root_index={}\nversion_before={:?}\nversion_of_the_spilling_publish={:?}\n",
+                    prepared.record_writes_in_order,
+                    prepared.judged_root_index,
+                    prepared.version_before,
+                    prepared.version_of_the_spilling_publish
+                )
+                .as_bytes(),
+            )),
+            observe: &observe,
+        }],
+    )
+    .judged() else {
+        return;
+    };
+    let counts = PublishBoundaryStates::from_the_observer_counts(&tally.observer_counts);
     assert_eq!(
         tally.states,
-        layer0_state_count_with_torn_in_place_overwrites(
+        crash_state_count_with_torn_in_place_overwrites(
             &prepared.base,
             &prepared.writes,
             &prepared.segments,
             &|segment_index, segment| {
                 if expand(segment_index, segment) {
-                    Layer0SegmentExpansion::EveryProperSubset
+                    CrashPointReplaySegmentExpansion::EveryProperSubset
                 } else {
-                    Layer0SegmentExpansion::NotExpanded
+                    CrashPointReplaySegmentExpansion::NotExpanded
                 }
             },
         ),
-        "展开的段按层 0 的枚举域数（原地覆写取三态）"
+        "展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
     assert_eq!(
         tally.states,
@@ -400,10 +451,22 @@ fn every_crash_state_of_a_publish_whose_one_transaction_spills_over_two_records_
          之后 9 个根槽已落（系统配置槽那一段 3² − 1 + 全部持久 1）"
     );
     println!(
-        "LAYER0_SPILL_OVER states={} publish_boundary={counts:?} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
+        "CRASH_POINT_REPLAY_SPILL_OVER states={} publish_boundary={counts:?} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
         tally.states,
         tally.states_by_publish_text(),
         tally.checker_counts_by_invariant()
     );
     assert_clean(&tally);
+}
+
+/// 观察者另读的输入的摘要要真算：全零就是没算（另读输入不同的两趟会共用看过的块）。
+fn extra_inputs_digest_that_was_computed(
+    digest: [u8; singlefs_harness::sha256::DIGEST_BYTES],
+) -> [u8; singlefs_harness::sha256::DIGEST_BYTES] {
+    assert_ne!(
+        digest,
+        [0; singlefs_harness::sha256::DIGEST_BYTES],
+        "观察者另读的输入的摘要真算（全零就是没算：另读输入不同的两趟会共用看过的块）"
+    );
+    digest
 }

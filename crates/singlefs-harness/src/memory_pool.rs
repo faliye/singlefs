@@ -32,7 +32,7 @@ pub struct SparseDevice {
 }
 
 impl SparseDevice {
-    /// 写过的扇区（扇区号 → 512 字节），只读：层 0 枚举器按它判基镜像在某段有没有非零字节、按它算续跑的输入摘要。
+    /// 写过的扇区（扇区号 → 512 字节），只读：崩溃点重放枚举器按它判基镜像在某段有没有非零字节、按它算续跑的输入摘要。
     #[must_use]
     pub fn written_sectors(&self) -> &BTreeMap<u64, Vec<u8>> {
         &self.sectors
@@ -215,6 +215,20 @@ impl singlefs_core::block_device::BlockDevice for SparseBlockDevice {
     fn size_in_bytes(&self) -> u64 {
         self.size_in_bytes
     }
+    /// 写过的扇区所在的记录槽（与 [`MemoryPool`] 当 `PoolReader` 时给恢复的提示同一个算法 [`record_slot_offsets`]）：
+    /// 可写挂载在稀疏的内存盘上不用每个状态把 768 MiB 的环逐槽读一遍。
+    fn journal_record_offsets_hint(
+        &self,
+        ring_start: DeviceOffsetInBytes,
+        ring_bytes: u64,
+    ) -> Option<Vec<DeviceOffsetInBytes>> {
+        Some(record_slot_offsets(
+            self.image
+                .written_sectors_in(ring_start, ring_bytes)
+                .into_iter(),
+            ring_start,
+        ))
+    }
 }
 
 /// 一个池在内存里的样子：从带内容的录制流重建。
@@ -385,7 +399,7 @@ impl PoolReader for MemoryPool {
     fn device_identities(&self) -> Vec<DeviceIdentity> {
         self.devices.keys().copied().collect()
     }
-    /// 层 0 的内存池每块盘一样大，字节数住 `device_size_in_bytes` 那个字段；池里没有这块盘就 `None`。
+    /// 崩溃点重放的内存池每块盘一样大，字节数住 `device_size_in_bytes` 那个字段；池里没有这块盘就 `None`。
     fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
         self.devices
             .contains_key(&device)
@@ -425,7 +439,7 @@ impl PoolReader for MemoryPool {
     }
 }
 
-/// 层 0 枚举出的一个崩溃状态：基线 + 这一状态里持久了的写（按 `writes` 的次序叠）。
+/// 崩溃点重放枚举出的一个崩溃状态：基线 + 这一状态里持久了的写（按 `writes` 的次序叠）。
 /// 枚举器交给观察者的那一份，`writes` 是枚举用的写表：录制流里的写原样在前（下标不变），原地覆写的撕裂镜像与它之后的重放接在后面
 /// （[`TearableInPlaceOverwrites`]），`persisted` 与它逐条对应——撕裂那一态是「原来那次写没持久、它的撕裂镜像持久」。
 pub struct CrashImage<'base> {
@@ -606,7 +620,7 @@ pub fn writes_and_segments_with_stream_indexes_and_entries(
 }
 
 /// E77（发布的持久顺序） 的闭式：1 + Σ(2^|段| − 1)，每次写只取两态（没持久 / 持久）时的全量。
-/// 写表里有原地覆写的写时层 0 全量枚举出来的比它多（第三态），数见 [`layer0_state_count_with_torn_in_place_overwrites`]。
+/// 写表里有原地覆写的写时崩溃点重放全量枚举出来的比它多（第三态），数见 [`crash_state_count_with_torn_in_place_overwrites`]。
 #[must_use]
 pub fn closed_form_state_count(segments: &[Vec<usize>]) -> u64 {
     1 + segments
@@ -770,7 +784,7 @@ impl ImageReader for CrashImage<'_> {
     }
 }
 
-/// 记录核对器两条判据在一个状态上的结论。可比大小：层 0 发现表把它当签名的一段（[`Layer0RedPass::RecordChecker`]）。
+/// 记录核对器两条判据在一个状态上的结论。可比大小：崩溃点重放发现表把它当签名的一段（[`CrashPointReplayRedPass::RecordChecker`]）。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RecordCheck {
     /// 某次发布的根槽写已在盘上，而那次发布的 journal 记录一份都不在（E77（发布的持久顺序） b_ur 臂的「记录流有洞」）。
@@ -791,7 +805,7 @@ pub struct PublishedVersion {
 
 /// 文件从这一版起没有了：哪次发布（实例代号 + checkpoint_txg）之后冷走读答「没有文件」（D8（核心索引结构） 已定项 16 第 4 条：
 /// 删除意图那次发布起）。与 [`PublishedVersion`] 一起排成一条流的版本表：落到的根两边都不在时，看比它旧的最新那一项
-/// （`singlefs_checker_tier::crash::Layer0VersionTable`）。
+/// （`singlefs_checker_tier::crash::CrashPointReplayVersionTable`）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PublishedVersionWithoutAFile {
     pub instance: InstanceGeneration,
@@ -845,7 +859,7 @@ pub fn root_identity_of_write(write: &RetainedWrite) -> (InstanceGeneration, Che
 }
 
 /// 一次落在根环里的写写下的根身份：实例代号在偏移 24（4 字节）、checkpoint_txg 在偏移 28（8 字节）。
-/// 崩溃注入（增补 3 第 3 件）拿它从截断了的录制流里数「盘上已持久的最新根槽」，写表与层 0 那一份不共用
+/// 崩溃注入（增补 3 第 3 件）拿它从截断了的录制流里数「盘上已持久的最新根槽」，写表与崩溃点重放那一份不共用
 /// （那一份要整条流的 `RetainedWrite`，这里只有录制流本身）。
 ///
 /// # Panics
@@ -979,7 +993,7 @@ impl RecordStreamSeam {
 /// 交给记录核对器的写表是怎么来的：一条录制流从头到尾，还是在几道接缝处断开的几截录制流（[`publishes_in`] 按它分发布）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecordStreamContinuity<'seams> {
-    /// 一条录制流从头到尾（层 0；崩溃注入第一截在崩溃之前没掉过电的历史上）。
+    /// 一条录制流从头到尾（崩溃点重放；崩溃注入第一截在崩溃之前没掉过电的历史上）。
     OneRecording,
     /// 写表在每道接缝处断开，接缝按写表下标从小到大；最后一道接缝之后那一截是一条录制流。崩溃注入第一截给崩溃之前那几道掉电接缝；
     /// 第二、三截给那几道掉电接缝，再加历史与挂载之间那一道崩溃接缝。
