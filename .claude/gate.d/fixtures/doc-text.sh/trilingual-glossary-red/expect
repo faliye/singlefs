@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-glossary
+want=翻译术语表与译文有 3 处不对（表自己 0 处；查了 2 组、3 条术语）
+want=README：中文「崩溃点」在 zh 里出现，en 里找不到「crash point」
+want=README：中文「重放」在 zh 里出现，ja 里找不到「リプレイ」
+want=briefs/2026-09-14：中文「门禁」在 zh 里出现，ja 里找不到「ゲート」
+want=doc-text.sh：1 格里 1 格红（trilingual-glossary）

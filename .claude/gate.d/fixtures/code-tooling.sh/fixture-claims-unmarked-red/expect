@@ -1,0 +1,6 @@
+exit=1
+want=2 个阶段头部没写 # gate-fixture: 标记，判不出它声称不声称有判别力样本
+want=60-prose-only.sh：头部注释块里没有 # gate-fixture: 行
+want=61-late-marker.sh：头部注释块里没有 # gate-fixture: 行
+want=「# gate-fixture: yes」
+want=头部别的句子里写 fixtures/<它> 不算声称

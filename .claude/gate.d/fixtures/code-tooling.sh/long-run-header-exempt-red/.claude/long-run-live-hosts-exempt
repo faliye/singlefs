@@ -1,0 +1,7 @@
+# 样本：六行里五行不对
+scripts/gone.sh  0000000000000000000000000000000000000000000000000000000000000000  # 样本：路径不存在
+scripts/registered.sh  42f2a26ebecf8eca3689cd1cddd73a5882cd4371d38a7d974419e39c6d097b07  # 样本：文件头已经按登记值写齐
+scripts/half.sh  77d0549d20428055f8c2548ce09f3fd4e5488fe13f9f735a133500ef66fe7f60  # 样本：只写了分片一样，按现算读也不齐
+scripts/bad-row.sh 没有井号和理由
+scripts/live.sh  c0edb89935e6075b2173acb75ca8922f4e3083592f91295ad83a9bb8883544a1  # 样本：好的一行，文件头按现算写、不能改
+scripts/grown.sh  c0edb89935e6075b2173acb75ca8922f4e3083592f91295ad83a9bb8883544a1  # 样本：基准那一版里没有的一行，表涨了

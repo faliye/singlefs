@@ -1,0 +1,2 @@
+# 样本档标记目录里的假 cargo 不可执行、退 2（不放 quick-tier，走全量那一路），算给崩溃枚举用例那一格；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-case-replay

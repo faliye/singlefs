@@ -1,0 +1,6 @@
+exit=1
+want=tests/plain_stream.rs：CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=gpu_feature_not_compiled_in threads=4
+want=✗ checker 档快档不带 gpu 特性那一趟：多机配置
+want=日志里有 1 处判段判在 CPU（上面列了前 20 处），配了 GPU 不退回 CPU
+want=逐格：crash-case-replay：红；feature-gated-tests：无对象可判
+want=✗ 快档有 1 格判红：crash-case-replay（各自的出路在上面）

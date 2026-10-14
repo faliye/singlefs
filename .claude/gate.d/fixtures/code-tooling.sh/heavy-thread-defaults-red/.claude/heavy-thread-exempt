@@ -1,0 +1,4 @@
+# 样本：一行指向不存在的文件、一行锚串一处都不命中、最后一行是基准之后才加的（setup.sh 提交基准时去掉它）
+scripts/hosts/gone.sh:nproc  # 样本：指向不存在的文件
+scripts/hosts/half.sh:no-such-anchor  # 样本：锚串一处都不命中
+scripts/hosts/half.sh:grown-row  # 样本：基准之后才加的一行

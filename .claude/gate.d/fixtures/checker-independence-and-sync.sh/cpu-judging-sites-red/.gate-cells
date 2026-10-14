@@ -1,0 +1,2 @@
+# 判器调用点不合规：harness 档 src 里一处没标记的池级 checker 调用，登记表一行一份文件都对不上；判的是 cpu-judging-sites 格
+cpu-judging-sites

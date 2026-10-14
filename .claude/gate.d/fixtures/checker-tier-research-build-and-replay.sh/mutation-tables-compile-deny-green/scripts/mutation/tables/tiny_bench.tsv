@@ -1,0 +1,2 @@
+两条之一_加改成减	    left + right	    left.wrapping_sub(right)
+两条之二_留死代码_不再调用加倍	double(add(2, 2))	add(2, 2) * 2

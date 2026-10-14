@@ -1,0 +1,6 @@
+# 样本表：五处对不上
+91-yes-listed.sh  # 头部写的是 yes 却登记在这里
+99-vanished.sh  # 阶段已经删掉而登记还留着
+92-listed-twice.sh  # 第一行：要真起虚机，样本里装不出来
+92-listed-twice.sh  # 第二行：同一道阶段登记了两遍
+93-short-reason.sh  # 太短

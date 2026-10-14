@@ -8,4 +8,3 @@
 # 判红的：缺段或有段空着、理由不到 8 个字、③ 不是「文件:行号」、登记的账不在、同一份登记两次、登记的账配得上一份有收尾行
 #   E7RESULT name=verdict 且 ledger_sha256= 等于它此刻 sha256 的同一趟 kill-bounds 产物（那一趟是完整的，不是作废的：删掉那一行，让它照常钉全；被同档后一趟取代的改登记进被取代表）。
 # 只登记实验页已写明作废的账；新跑出来的账要么钉全、要么先在实验页写明作废再登记。--list-items 与 --replay 不读这张表。
-research/results/e165-replay-bounded-enumeration-2026-10-02-r2-segment2-red-examples.tsv	segment2b 那一遍的第二段作废（SV3：kill_bound 23 行、比了 22 行，五个变体启动自检 panic 没有行），产物没有收尾三行，不进复跑登记，22 行只当线索	.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md:346

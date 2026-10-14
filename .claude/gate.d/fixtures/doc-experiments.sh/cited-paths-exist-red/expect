@@ -1,0 +1,9 @@
+exit=1
+want=✗ kb 点名的 2 个路径（3 处引用）树里没有、版本库历史里也没有：
+want=     .claude/kb/notes.md:4、.claude/kb/notes.md:7 点名 research/results/e9-missing.out（research/results 下的产物）
+want=     .claude/kb/notes.md:5 点名 scripts/mutation/tables/e9-no-such-table.tsv（变异表）
+want=样本只跑 .gate-cells 点名的格：cited-paths-exist
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（cited-paths-exist）
+want=→ cited-paths-exist：补回那份文件
+want=bash .claude/gate.d/doc-experiments.sh --check cited-paths-exist

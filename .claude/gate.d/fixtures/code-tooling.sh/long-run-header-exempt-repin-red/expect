@@ -1,0 +1,4 @@
+exit=1
+want=.claude/long-run-live-hosts-exempt 有 1 处不对（共 1 行）
+want=第 2 行 scripts/live.sh 登记的 sha256 bed5bfa5f9dadabc3e464ce65097d544dc50fde74196939fc233117c55c1d1fc 与基准那一版里的 8379edbf039f1661b1e092671335c269e362eb278b6171a458d55b05518e055f 不同（豁免表重钉了：改了脚本正文再换表里的 sha256 也算涨）
+want=→ 怎么办：豁免只缩不涨，表里的 sha256 不能换

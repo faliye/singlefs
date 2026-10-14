@@ -1,0 +1,5 @@
+exit=1
+want=1 个候选代号在同一份决策的两个分项候选表里复用
+want=.claude/kb/decisions/01-候选代号复用.md 的候选代号「丙」同时在 已定项 1（第 15 行）、已定项 2（第 23 行）的候选表里
+want=  candidate-codes：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（candidate-codes）

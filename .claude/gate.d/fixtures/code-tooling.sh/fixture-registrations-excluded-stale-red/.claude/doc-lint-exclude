@@ -1,0 +1,4 @@
+# doc-lint 扫描要绕开的目录。一行一条：<相对目录>  # 为什么
+.claude/gate.d/fixtures/live-sample.sh/  # 样本造了带登记标题的 D5 决策页，与真表同号不同名，扫它只会报登记冲突
+.claude/gate.d/fixtures/gone-sample.sh/  # 这一道阶段的样本已经删了，这一行留下来了
+research/prompts/  # 不在 fixtures 下的行不归这一格判

@@ -1,0 +1,13 @@
+# 样本登记表：只有库里旧行名单（LEGACY_SOURCELESS_ROUNDS）里的轮不要出处；前四行各错一处，datedold-r1 是 2026-10-11 的行、没出处、不在名单里（不按日期免），named-r1 的出处那一行另写着仓里认得的别的轮 close-b1（不以 -r<数字> 结尾），formonly-r1 的出处那一行另写着形如 <名>-r<数字> 而仓里没有任何材料的 ghost-r2（别的轮名 = 仓里认得的全集 ∪ -r 形，两样都拒），gone-r1 的〔〕原话改了一个字、在出处文件里找不到，twice-r1 的〔〕原话在出处文件里命中两次，plain-r1 只写行号没带〔〕原话，misread-r1 的〔〕写的是转述（记录里没有这段字），行号提示的第 10 行有这一轮的名字与「」原话、说的却是写判决，去掉改名与日期之后对不上，最后一行是名单里的 d16-item1-r2、没有出处，不点名
+nosrc-r1	2026-10-13	用户叫停	不写判决，原话见调度记录
+multi-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 2 行〔multi-r1 照常跑〕
+ownbody-r1	2026-10-13	用户叫停	不写判决；出处 research/prompts/_ownbody-r1-body.md 第 1 行〔样本腿提示〕「自己写的六个字以上的话」
+short-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 3 行〔用户叫停 short-r1〕
+datedold-r1	2026-10-11	用户叫停	不写判决，原话见调度记录
+named-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 4 行〔用户叫停 named-r1〕
+formonly-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 5 行〔用户叫停 formonly-r1〕
+gone-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 3 行〔用户叫停了 gone-r1〕
+twice-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 9 行〔用户叫停 twice-r1〕
+plain-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 9 行
+misread-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 10 行〔misread-r1 用户叫停，不再打〕
+d16-item1-r2	2026-09-11	云端腿没交	等样本定案后重派

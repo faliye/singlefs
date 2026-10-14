@@ -2,10 +2,11 @@
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 模型对拍那几格要 cargo：缺了就在格里那一步 cargo test 判红，不交给 gate.sh 预判；此外只要跑门禁本身就要的 bash、git、python3
 # gate-stage: harness 类：harness 档一条用例一个场景；模型对拍（随机历史快档与五个取样点，每一步拿实现的结局与只住内存的理想模型比，每段一格、各点名一条用例）
+# gate-fixture: yes
 # gate-category: harness 类
 # gate-covers: 模型对拍
 # gate-similar: code-source-discipline.sh 它的 test-file-names 格也调 crash-case-check.py，但调的是 file-names 那一样、判测试文件名，归代码类；这里判用例里面的循环与模型对拍
-# gate-similar: checker-tier-layer0-replay.sh 开跑前也调 crash-case-check.py，但调的是 placement 与 modules 两样（崩溃枚举用例住哪、登记没有，checker 档测试文件声明模块），它跑的是 checker 档的崩溃点重放，归 checker-tier 类；这里只判 harness 档
+# gate-similar: checker-tier-crash-point-replay.sh 开跑前也调 crash-case-check.py，但调的是 placement 与 modules 两样（崩溃枚举用例住哪、登记没有，checker 档测试文件声明模块），它跑的是 checker 档的崩溃点重放，归 checker-tier 类；这里只判 harness 档
 # gate-similar: code-tooling.sh 它的 research-script-selftests 格只跑 crash-case-check.py 与 stage-run-or-skip.sh 的 --selftest（判别力），不在真仓上判；这里在真仓上判
 # gate-similar: checker-tier-crates-mutation-replay.sh 它按 crates/mutations.tsv 把点名 random_histories 的变异逐条施加再跑，证明模型对拍自己会红；这里在不改代码的仓上判模型对拍跑了、每段都判过
 # gate-similar: checker-tier-research-build-and-replay.sh 也经内存包装跑 cargo test --release，但编的是 research 工作区的实验，不跑 crates/singlefs-harness 的测试二进制
@@ -52,6 +53,7 @@
 # 弄坏开关 GATE_MODEL_DIFFERENTIAL_BREAK=<项>：
 #   ignored-left-out   cargo 命令去掉 --include-ignored：model-differential-green 里核命令的那几条 want 找不到
 #   zero-steps-passed  步数为 0 的段按判过记：model-reuse-sampling-red、model-allocation-record-wall-red 退 0
+#   threads-not-defaulted  cargo 命令不经 scripts/hosts/capped.sh default（改前的样子，吃 cargo 自己的缺省）：model-differential-green 里核「经 capped.sh default 起」的那条 want 找不到
 # 共用库的 STAGE_CELLS_BREAK=red-swallowed 让各 red 样本退 0。
 #
 # 样本（fixtures/harness-model-differential-and-scenarios.sh/，每份的 .gate-cells 点名它判的格）：
@@ -166,6 +168,11 @@ model_differential_cell() {
   cargo_command=(cargo test --release -p singlefs-harness --test "$TEST_BINARY" -- --include-ignored --exact "$test_name" --nocapture)
   if [[ "${GATE_MODEL_DIFFERENTIAL_BREAK:-}" == ignored-left-out ]]; then
     cargo_command=(cargo test --release -p singlefs-harness --test "$TEST_BINARY" -- --exact "$test_name" --nocapture)
+  fi
+  # 编译与测试线程不吃 cargo 自己的缺省（核数）：经 capped.sh default 起，取登记的重活默认并行度（.claude/heavy-thread-default，SINGLEFS_THREAD_CAP 设了取它）；
+  # 弄坏开关 GATE_MODEL_DIFFERENTIAL_BREAK=threads-not-defaulted 下不加，是改前的样子
+  if [[ "${GATE_MODEL_DIFFERENTIAL_BREAK:-}" != threads-not-defaulted ]]; then
+    cargo_command=(bash "$REPO_ROOT/scripts/hosts/capped.sh" default "${cargo_command[@]}")
   fi
 
   log="$(mktemp)"

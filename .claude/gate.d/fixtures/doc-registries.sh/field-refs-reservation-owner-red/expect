@@ -1,0 +1,6 @@
+exit=1
+want=  field-refs：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（field-refs）
+want=01-first-txn.md:17 算法类型写「D9 已定项 12 第 4 项」，该是第 1 项（节标题「六、journal」）：表里点名了自证单元「journal 记录头」
+want=01-first-txn.md:31 写「D9 已定项 12 第 4 项」，而它所在的表（节标题「杂项」）没点名自证单元
+want=字段表里有 1 处指向有误

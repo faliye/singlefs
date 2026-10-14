@@ -1,0 +1,2 @@
+# 开跑前的静态判据判红（标了 #[ignore] 而没登记 crash-case: 的用例、没声明模块的测试文件），判的是崩溃枚举用例那一格；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-case-replay

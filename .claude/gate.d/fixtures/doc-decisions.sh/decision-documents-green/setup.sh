@@ -53,7 +53,7 @@ git init -q -b master .
 git config color.ui always && git config color.diff always
 GIT_COMMITTER_DATE="2026-08-31T00:00:00" GIT_AUTHOR_DATE="2026-08-31T00:00:00" sh -c 'git add -A && git commit -qm base'
 printf '%s\n' '## D11 戊样本 —— 已定' '' '### 已定项' '' '| # | 分项 | 定案 |' '|---|---|---|' \
-  '| 1 | **乙问题** | 取甲 **状态：已定。** |' '' '## 历史版本' '' '无。' > .claude/kb/decisions/11-戊样本.md
+  '| 1 | **乙问题** | 取甲 **状态：已定。** **进度：未实现。** |' '' '## 历史版本' '' '无。' > .claude/kb/decisions/11-戊样本.md
 sed -i 's/^| D11（戊样本） | 已定 0 项 \/ 未定 1 项 |/| D11（戊样本） | 已定 1 项 \/ 未定 0 项 |/' .claude/kb/decisions.md
 sed -i 's/那边不定它就定不了/那边不定它就定不了（2026-09-01 复核 D11：它定的是乙问题，这一项仍然开着）/' .claude/kb/decisions/10-丁样本.md
 GIT_COMMITTER_DATE="2026-09-01T00:00:00" GIT_AUTHOR_DATE="2026-09-01T00:00:00" sh -c 'git add -A && git commit -qm settle'

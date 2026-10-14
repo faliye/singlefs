@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：trilingual-changed-together
+want=这次改动碰到的 3 组三语文件，每组三份都碰了
+want=doc-text.sh：1 格里 1 格绿（trilingual-changed-together），0 格本次未跑（无）

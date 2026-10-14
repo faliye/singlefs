@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：ordinal-names
+want=名字里没有序号与位置词（扫了 4 份 .rs / .sh / .py、5 个目录，词表 2 个词，排除 1 条）
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=ordinal-names：绿
+want=code-source-discipline.sh：1 格里 1 格绿（ordinal-names），0 格本次未跑（无）

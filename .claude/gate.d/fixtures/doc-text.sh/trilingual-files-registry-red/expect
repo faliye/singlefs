@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-files
+want=三语文件有 3 处不对（登记表 3 处，三份没配齐的 0 组，共 2 组）
+want=.claude/trilingual-documents:2：模式 guide/*.md 指不到任何文件
+want=.claude/trilingual-documents:3：模式 briefs/*.md 没写理由
+want=.claude/trilingual-documents:4：模式 notes.zh.md 带语言后缀
+want=doc-text.sh：1 格里 1 格红（trilingual-files）

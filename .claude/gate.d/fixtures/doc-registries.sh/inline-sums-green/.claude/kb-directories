@@ -1,0 +1,2 @@
+.claude/kb  # 样本：正文在这里
+crates/sample/invariants  # 样本：不变量类文件住在这里，登记的目录一并扫

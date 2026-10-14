@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# checker-tier-crash-point-replay 判别力样本的假 rustc：-V、-Vv 打版本，别的退 0
+[[ "${1:-}" == -V || "${1:-}" == -Vv ]] && echo "rustc 0.0.0-crash-point-replay-sample"
+exit 0

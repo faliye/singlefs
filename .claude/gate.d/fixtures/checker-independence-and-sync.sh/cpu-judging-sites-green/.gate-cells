@@ -1,0 +1,2 @@
+# 判器调用点都合规：判定段整份、按函数登记的判定段、判器本体、带 gpu-exempt 标记的各一处，排除表里那一份整份不判；判的是 cpu-judging-sites 格
+cpu-judging-sites

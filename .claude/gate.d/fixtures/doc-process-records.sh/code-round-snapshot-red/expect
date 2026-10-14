@@ -1,0 +1,10 @@
+exit=1
+want=新写的判决里 1 份点名了产品代码 crates 文件，开工快照没立住（共 1 处）
+want=      research/prompts/demo-r1-main-verification.md：
+want=        research/prompts/demo-r1-snapshot/crates-sha256.txt 没有 crates/demo/src/other.rs 的一行
+want=→ 怎么办：派腿之前 sha256sum <判决点名的 crates 文件…> > research/prompts/<轮>-snapshot/crates-sha256.txt
+want=样本只跑 .gate-cells 点名的格：code-round-snapshot
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格红（code-round-snapshot）
+want=→ code-round-snapshot：派腿之前 sha256sum
+want=bash .claude/gate.d/doc-process-records.sh --check code-round-snapshot

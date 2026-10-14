@@ -1,0 +1,3 @@
+# 样本登记表：两行的〔〕都带着出处那一行登记时写在括号里的日期；之后 date-once 的出路（doc-consolidate.py migrate）把全角括号连日期一起删了（bracketed-date-r1），halfwidth-date-r1 那一行的半角括号连日期是手删的；两行原话都找不到，去掉日期、空白与逗号、剩下的空括号之后落在行号提示那一行里，照提示取那一行
+bracketed-date-r1	2026-10-13	用户叫停	不写判决；出处 records/2026-10-13-halt.md 第 2 行〔用户叫停 bracketed-date-r1（2026-10-13）〕
+halfwidth-date-r1	2026-10-13	用户叫停	不写判决；出处 records/2026-10-13-halt.md 第 3 行〔用户叫停 halfwidth-date-r1(2026-10-13)〕

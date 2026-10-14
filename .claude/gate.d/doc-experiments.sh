@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 实验页与产物（十格：索引行与正文标题、产物写回、产物与依据落在仓里、决策与实验双向登记、判决行的 false 被点名、复跑命令、实验号有正文、整行抄的产物行、上一轮记录已归档、多路径互证的登记）
+# gate-stage: 实验页与产物（十一格：索引行与正文标题、产物写回、产物与依据落在仓里、决策与实验双向登记、判决行的 false 被点名、复跑命令、实验号有正文、整行抄的产物行、上一轮记录已归档、多路径互证的登记、点名的路径找得到）
+# gate-fixture: yes
 # gate-category: 文档类
 # 不声明 gate-covers：未实现清单（.claude/gate-not-implemented.tsv）里的两项判被测代码的行为，这一道只判文本。
 # gate-similar: checker-tier-research-build-and-replay.sh 它的 experiment-replay 格按 scripts/experiments/replay.sh 登记表逐条复跑装置、逐字节比产物，要编译、归重型；这一道只读登记表、实验页与产物的文本，判产物有没有被点名、判决行的 false 有没有被解释、整行抄的产物行找不找得到，不跑装置
@@ -18,21 +19,27 @@
 # gate-cell: verdict-false-named 实验产物判决行里的 false 字段有没有被实验页点名
 # gate-cell: repro-command 跑过的实验有没有留下复跑命令
 # gate-cell: experiment-orphans research 里的实验号在 kb 里有没有正文
-# gate-cell: quoted-result-lines kb 与 research 正文里整行抄的产物行，产物里逐字找得到
+# gate-cell: quoted-result-lines kb 与 research 正文里整行抄的产物行（含历史节里这次新增的行），产物里逐字找得到
 # gate-cell: archive-past-rounds 上一轮及更早的实验记录已经归档进版本库，工作区里不留
 # gate-cell: multipath-registry 多条路径互证的实验，路径与共用项要登记且指得到
+# gate-cell: cited-paths-exist kb 全部正文点名的实验产物、变异表、实验源码路径，在树里或版本库历史里找得到
 #
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码经 lib/stage-cells.sh；每格自己打判定行（成功行报查了多少项，红行带出路）。
 #
-# 样本 fixtures/doc-experiments.sh/：每格一对 <格名>-red / <格名>-green，另有 verdict-false-named-zero（登记表一行都读不到）、
-# decision-links-formatting-green、evidence-in-repo-worktree-red / -green（链接 worktree）；每份样本根的 .gate-cells 只点名它判的那一格。
+# 样本 fixtures/doc-experiments.sh/：每格一对 <格名>-red / <格名>-green（cited-paths-exist-green 的 setup.sh 先提交再删掉一个产物，造「只在历史里」），另有 verdict-false-named-zero（登记表一行都读不到）、
+# decision-links-formatting-green、decision-links-no-experiment-green、quoted-result-lines-history-added-red、quoted-result-lines-history-old-green、evidence-in-repo-worktree-red / -green（链接 worktree）；每份样本根的 .gate-cells 只点名它判的那一格。
 # 各样本放了什么写在那一格的注释里。
 # 弄坏开关：
 #   STAGE_CELLS_BREAK=red-swallowed（共用库）                       每份红样本整道退 0，样本判错
-#   STAGE_CELLS_BREAK=marker-ignored（共用库）                      每份样本十格全跑，汇总那条「跑了 1 格」的 want 找不到
+#   STAGE_CELLS_BREAK=marker-ignored（共用库）                      每份样本十一格全跑，汇总那条「跑了 1 格」的 want 找不到
 #   GATE_VERDICT_FALSE_SKIP_NAMED_CHECK=1                           verdict-false-named 把每个 false 字段都当成已点名：verdict-false-named-red 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=worktree-skips-whole-cell   evidence-in-repo 在链接 worktree 里整格退 77、判据二也不判：evidence-in-repo-worktree-red 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=worktree-trusts-timestamps  链接 worktree 里照信检出时写的修改时刻：evidence-in-repo-worktree-green 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=no-experiment-counted       decision-links 把依据段「无实验：」之后的 E<号>（ 也记成引用：decision-links-no-experiment-green 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=progress-mark-counted       decision-links 量索引表定案格的字数时把行末「**进度：…**」也算进去：decision-links-progress-mark-green 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-added-lines-skipped quoted-result-lines 退回历史节整节不判：quoted-result-lines-history-added-red 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-lookup-skipped      cited-paths-exist 不查历史，树里没有的一律算缺：cited-paths-exist-green 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=existence-unchecked         cited-paths-exist 把每个点名的路径都当成在：cited-paths-exist-red 判错
 #
 #   bash .claude/gate.d/doc-experiments.sh [项目根]                              十格按格名表的次序全跑
 #   bash .claude/gate.d/doc-experiments.sh --list                                逐行打格名与判什么，不跑格
@@ -64,12 +71,14 @@ stage_cell repro-command cell_repro_command "跑过的实验有没有留下复�
   "在实验页正文的口径一节补一句复跑命令（格式与别处一致）；原始输出确实没留的写明「原始输出未留存」"
 stage_cell experiment-orphans cell_experiment_orphans "research 里的实验号在 kb 里有没有正文" \
   "给这个实验号建正文 .claude/kb/experiments/<号>-*.md（测什么 / 判据 / 失败条款 / 口径 / 复跑命令），并登记进 experiments.md 的索引表"
-stage_cell quoted-result-lines cell_quoted_result_lines "kb 与 research 正文里整行抄的产物行，产物里逐字找得到" \
+stage_cell quoted-result-lines cell_quoted_result_lines "kb 与 research 正文里整行抄的产物行（含历史节里这次新增的行），产物里逐字找得到" \
   "打开这个实验复跑命令登记的那份产物，把对应的 E7RESULT 行原样抄回来，别手改数；产物换了就连同引它的正文一起换"
 stage_cell archive-past-rounds cell_archive_past_rounds "上一轮及更早的实验记录已经归档进版本库，工作区里不留" \
   "照这一格打出来的基准跑 python3 scripts/kb/archive-past-rounds.py --apply 删掉上一轮的记录（不带基准会把这一次提交要带的也删掉）"
 stage_cell multipath-registry cell_multipath_registry "多条路径互证的实验，路径与共用项要登记且指得到" \
   "在实验页写「### 路径与结论登记」一节（形态见 .claude/rules/format-evolution.md），源码落点写现存路径、共用项写实；multipath-registry-lag.tsv 只缩不涨，补齐的删行"
+stage_cell cited-paths-exist cell_cited_paths_exist "kb 全部正文点名的实验产物、变异表、实验源码路径，在树里或版本库历史里找得到" \
+  "补回那份文件；或把那一行改成写明「原件未留存、从哪次提交取」；或改成现存的路径（移过位置的用 git log --all --diff-filter=A --name-only -- '*<文件名>' 找新路径）"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -741,9 +750,11 @@ PY
 #   认不出标题的实验页（首个二级标题不是「## E<号> 」）与决策文件（不是「## D<号> 」）判红，不静默跳过；
 #   ⑤ 取某一页的新增行时 git diff 失败，判红，不当成那一页没改。
 #   ⑦ 瘦身形态（待回填清单之外的决策）：首行 `## D<号> 简称 —— 状态` 后面不带括注；分项标题不带日期；
-#      每个已定项有「**定案**：」「**射程**：」「**依据**：」「**欠**：」四块；索引表的定案格不带日期、不超过 100 字。
+#      每个已定项有「**定案**：」「**射程**：」「**依据**：」「**欠**：」四块；索引表的定案格不带日期、不超过 100 字
+#      （行末「**状态：…**」「**进度：…**」两个规范标记与未定项登记行那两句判定不算字数、不判日期）。
 #   ⑧ 有实验才有决策：已定项的依据段至少引一个实验，或写「无实验：理由」（理由至少八个字）；
-#      成功行报出写「无实验」的已定项有几个。
+#      成功行报出写「无实验」的已定项有几个。「无实验：」到行尾是理由，理由里点名的实验（`E<号>（`）不算这条分项引的依据，
+#      不进③的双向检查：不要求那个实验页回指这条分项；「无实验：」之前、或依据段别的行里引的实验照算。
 #   ⑨ 实验必须对应决策：待回填清单之外的实验页，表里至少一行关系是支撑 / 推翻 / 备料；
 #      标题里写着「结论……作废」或「结论……退役」的实验不判（它们留着是为了记下那条路不通）。
 #
@@ -754,6 +765,11 @@ PY
 # 两版整理后的正文按行排序逐字相同就是），样本 decision-links-formatting-green 判绿、成功行报「不算正文改了 1 份」。
 # 样本：decision-links-red 在一个临时仓里把上面每一条各犯一次（want 逐条点名）；decision-links-green 放瘦身的与没瘦身的决策、
 # 待回填清单、结论作废的实验、这次改动改了正文与产物又回看了表、新判决带「## 回看决策」、搬了家的实验页，必须判绿并报对数。
+# decision-links-no-experiment-green 放一条依据写「无实验：」、理由里点名一个实验（只有备料关系、没有回指这条分项）的已定项，必须判绿；
+# 弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=no-experiment-counted 退回把理由里的实验也记成引用，这份样本判红（不对称）。
+# decision-links-progress-mark-green 的索引行去掉「**状态：已定。**」「**进度：已实现。**」之后 95 字、带上是 104 字，必须判绿；
+# 弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=progress-mark-counted 下把进度标记算进字数，这份样本判红。
+# decision-links-progress-mark-red 的索引行去掉两个标记之后 101 字，照样判红在那一行（现在 101 字）。
 cell_decision_links() {
   if [[ ! -d .claude/kb/experiments || ! -d .claude/kb/decisions ]]; then
     echo "  ✗ 找不到 .claude/kb/experiments 或 .claude/kb/decisions"
@@ -779,7 +795,7 @@ cell_decision_links() {
     changed_list="$SHARED_CHANGED_PATHS"
   fi
   # 只删同日日期、只并同日小节的改动不算「正文改了」：判法借 scripts/kb/doc-consolidate.py（门禁 doc-text 的 date-once 格用同一份）
-  DOC_CONSOLIDATE="$(dirname "$LIB_CHANGED_PATHS")/doc-consolidate.py"
+  DOC_CONSOLIDATE="$(dirname "$LIB_CHANGED_PATHS")/../kb/doc-consolidate.py"
   export DOC_CONSOLIDATE
   python3 - "$ROOT" "$base" "$in_git" "$changed_list" <<'PY'
 import glob, importlib.util, os, re, subprocess, sys
@@ -789,6 +805,8 @@ changed = {line for line in open(sys.argv[4], encoding='utf-8').read().split('\n
 kb = os.path.join(root, '.claude', 'kb')
 RELATIONS = ('支撑', '推翻', '备料', '不影响')
 BASIS_RELATIONS = ('支撑', '推翻')
+if os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK', '') == 'no-experiment-counted':
+    print('  ! 弄坏开关 no-experiment-counted：依据段里「无实验：」之后的 E<号>（ 也记成引用')
 E_REF = re.compile(r'(?<![A-Za-z0-9])E(\d+)（')
 D_REF = re.compile(r'(?<![A-Za-z0-9])D(\d+)（')
 # 「决策正文引了它」按 doc-lint 认引用的写法认：粗体、反引号、编号与括号之间有空格、半角括号都算
@@ -894,7 +912,12 @@ for path in sorted(glob.glob(os.path.join(kb, 'decisions', '*.md'))):
             elif re.match(r'^\*\*[^*]{1,12}\*\*：', inner) or level:
                 in_basis = False
             if in_basis:
-                cited |= {int(e) for e in E_REF.findall(inner)}
+                # 「无实验：」到行尾是不引实验的理由，理由里点名的实验不是这条分项引的依据，不进 cited（C535）
+                scanned = inner
+                cut = inner.find('无实验：')
+                if cut >= 0 and os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK', '') != 'no-experiment-counted':
+                    scanned = inner[:cut]
+                cited |= {int(e) for e in E_REF.findall(scanned)}
                 basis_text += inner + '\n'
         basis[key] = cited
         shapes.append((key, line, labels, cited, basis_text))
@@ -977,12 +1000,14 @@ for decision, info in sorted(decisions.items()):
             else:
                 bad('没有实验', f'{where}：D{decision} 已定项 {item_number} 的依据一个实验都没引——有实验才有决策；实在没有可量的，写「无实验：理由」')
     for kind, item_number, cell in info['index_cells']:
-        # 定案格里两类规范标记不算字数、不判日期：「**状态：…**」是 doc-decisions.sh 要的检索标记；
-        # 「改新池新建文件的字节：…」「动不动格式：…」是 doc-decisions.sh 的 blocking-verdict 格要写在登记行里、必须带日期的两句。
+        # 定案格里这几样规范标记不算字数、不判日期：「**状态：…**」是 doc-decisions.sh 要的检索标记，「**进度：…**」是行末三选一的进度标记
+        # （.claude/rules/format-evolution.md「决策正文只写现状」）；「改新池新建文件的字节：…」「动不动格式：…」是 doc-decisions.sh 的
+        # blocking-verdict 格要写在登记行里、必须带日期的两句。弄坏开关 progress-mark-counted 下「**进度：…**」照算字数
         without_marks = cell
         for mark in ('改新池新建文件的字节', '动不动格式'):
             without_marks = re.sub(mark + r'：[^（(]*[（(][^）)]*[）)]', '', without_marks)
-        plain = re.sub(r'\*\*|`', '', re.sub(r'\*\*状态：[^*]*\*\*', '', without_marks)).strip()
+        counted_marks = r'\*\*状态：[^*]*\*\*' if os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK', '') == 'progress-mark-counted' else r'\*\*(状态|进度)：[^*]*\*\*'
+        plain = re.sub(r'\*\*|`', '', re.sub(counted_marks, '', without_marks)).strip()
         if DATE.search(plain) or len(plain) > 100:
             bad('瘦身形态', f'{where}：D{decision} {kind}索引表第 {item_number} 行的定案格要一句话、不带日期、不超过 100 字（现在 {len(plain)} 字）')
 
@@ -1468,7 +1493,7 @@ cell_repro_command() {
   EXP_DIR=.claude/kb/experiments
   [[ -d "$EXP_DIR" ]] || { echo "  ! 找不到 $EXP_DIR，这一格跳过"; exit 77; }
   PRODUCT_RE='research/results/[A-Za-z0-9._-]+\.out'
-  REPRO_RE='cargo run --release --bin |scripts/(replay|vm-bench)\.sh'
+  REPRO_RE='cargo run --release --bin |scripts/(experiments/replay|devices/vm-bench)\.sh'
 
   bad=(); unreadable=(); exempt=(); pointing=0
   for f in "$EXP_DIR"/*.md; do
@@ -1511,10 +1536,10 @@ cell_repro_command() {
 
 # ── 格 experiment-orphans：research 里的实验号在 kb 里有没有正文
 #
-# 判据：research/ 下（逐层往下扫，target/ 不扫）以 eNN 命名的东西（提示、产物、源码、变异表、数据），以及
+# 判据：research/、scripts/experiments/、scripts/mutation/tables/ 下（逐层往下扫，target/ 不扫）以 eNN 命名的东西（提示、产物、源码、变异表、数据），以及
 # crates/singlefs-checker-tier/src/bin/ 下的实验装置（eNN_*.rs），kb/experiments/ 里都要有对应编号的正文：跑过的东西没入库，
 # 会以「我们量过」的形式活在对话里，谁也复核不了。results-cited 格按名字排除的（*local* 这类）也在这里判到。
-# 样本：experiment-orphans-red 里 scripts/data/ 与 crates/singlefs-checker-tier/src/bin/ 下各一个 kb 里没有正文的实验号；
+# 样本：experiment-orphans-red 里 scripts/experiments/ 与 crates/singlefs-checker-tier/src/bin/ 下各一个 kb 里没有正文的实验号；
 # experiment-orphans-green 里的实验号都有正文。
 cell_experiment_orphans() {
   EXP_DIR=.claude/kb/experiments
@@ -1560,8 +1585,8 @@ cell_experiment_orphans() {
 
 # ── 格 quoted-result-lines：kb 与 research 正文里整行抄的产物行，产物里逐字找得到
 #
-# 判据：kb 正文（「## 历史版本」之前；*-history.md 与 decisions-history/ 不算）里去掉首尾空白后
-# 以 `E7RESULT ` 开头的行，必须在 research/results/*.out 的某一行里逐字出现。
+# 判据：kb 正文（*-history.md 与 decisions-history/ 不算）里去掉首尾空白后以 `E7RESULT ` 开头的行，
+# 必须在 research/results/*.out 的某一行里逐字出现；「## 历史版本」之后的行只判这次改动新增的（射程 3）。
 # 找不到 = 抄的时候改了数，或者产物重跑之后正文没跟。
 #
 # 射程（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）：
@@ -1570,11 +1595,16 @@ cell_experiment_orphans() {
 #      引错了实验认不出来。**这次改动新增或改写的行只对照 `scripts/experiments/replay.sh` 登记着的产物**
 #      （树里还留着的旧一轮产物不算：登记的已经是新一轮，正文却新抄了旧一轮的行，就是「重跑之后正文没跟」）；
 #      登记的产物已归档出了树的，去版本库历史里取它最后那一版。退回全量判时照旧对照全部产物加全部归档。
-#   3. 历史节里的旧行不判：旧产物被删掉之后，历史节里留着当时抄的那一行是对的。
+#   3. 历史节里的旧行不判：旧产物被删掉之后，历史节里留着当时抄的那一行是对的。历史节里**这次改动新增的行**照判（C438），
+#      新增与否按行号认（该页相对基准的 git diff -U0，未跟踪的页整份算新增），不按文字认；退回全量判时历史节整节不判（分不出新旧）。
+#      历史节里新增的行对照的产物与正文新增的行一样，只是登记着的那些；git diff 取不到时判红。
 #   4. 只判这次改动新增或改写的行：正文里早先抄下的行是历史，那时的产物按归档规则删掉了，再判就是判一个不存在的对照；
 #      要推翻早先的结论按 `.claude/rules/three-way-inference.md` 重跑。不在 git 仓里、或取不到新增行时退回全量判（宁可多判，不可漏判）。
 # 样本：quoted-result-lines-red 里一页未跟踪的新实验页整行抄了两行在登记着的产物里找不到的产物行（一行只在没登记的旧一轮产物里有）；
 # quoted-result-lines-green 里正文抄的那一行在产物里逐字找得到、历史节里的旧行不判。
+# quoted-result-lines-history-added-red 是已跟踪的页：基准里历史节已有一行错引文，这次改动在历史节里又新增一行错引文，必须红并只点名新增的那一行；
+# quoted-result-lines-history-old-green 同一页这次改动只在正文新抄一行对的，历史节里早先的错行不判（成功行的「没判的」里列着它）。
+# 弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-added-lines-skipped 退回整节排除，history-added-red 判绿，样本判错。
 cell_quoted_result_lines() {
   [[ -d .claude/kb ]] || { echo "  ! 找不到 .claude/kb，这一格无对象可判"; exit 77; }
 
@@ -1602,15 +1632,41 @@ kb = sorted(f for f in glob.glob('.claude/kb/**/*.md', recursive=True)
             if not f.endswith('-history.md') and '/decisions-history/' not in f
             and not f.startswith('research/prompts/') and not f.startswith('research/results/'))
 quoted = []
+history_quoted = []   # 「## 历史版本」之后整行抄的产物行：只有这次改动新增的那几行判（C438）
 for path in kb:
     text = open(path, encoding='utf-8').read()
-    cut = text.find('\n## 历史版本')
-    body = text if cut < 0 else text[:cut]
-    for number, line in enumerate(body.split('\n'), 1):
+    in_history = False
+    for number, line in enumerate(text.split('\n'), 1):
+        if number > 1 and line.startswith('## 历史版本'):
+            in_history = True
         stripped = line.strip()
         if stripped.startswith('E7RESULT '):
-            quoted.append((path, number, stripped))
-# 只判这次改动新增或改写的行；SCOPE_BASE 为空（不在 git 仓里或取不到新增行）就退回全量判。
+            (history_quoted if in_history else quoted).append((path, number, stripped))
+# 弄坏开关 history-added-lines-skipped：退回整节排除，历史节里新增的行也不判
+if os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK', '') == 'history-added-lines-skipped':
+    print('  ! 弄坏开关 history-added-lines-skipped：「## 历史版本」整节不判，历史节里这次新增的行也跳过')
+    history_quoted = []
+
+
+def new_line_numbers(path, base):
+    """path 里这次改动（相对 base）新增的行的行号集合；未跟踪的文件整份算新增，返回 None。git 取不到就红，不当成一行没改。"""
+    if subprocess.run(['git', '-c', 'core.quotepath=false', 'ls-files', '--error-unmatch', '--', path], capture_output=True).returncode != 0:
+        return None
+    shown = subprocess.run(['git', '-c', 'core.quotepath=false', 'diff', '--no-renames', '--no-color', '--no-ext-diff', '-U0', base, '--', path],
+                           capture_output=True, text=True)
+    if shown.returncode != 0:
+        print(f'  ✗ {path}：git diff 相对基准 {base} 失败（退 {shown.returncode}：{shown.stderr.strip()[:80]}），这一页历史节里新增了哪些行判不了，不是没改')
+        print('     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑。')
+        sys.exit(1)
+    numbers = set()
+    for diff_line in shown.stdout.split('\n'):
+        hunk = re.match(r'^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@', diff_line)
+        if hunk:
+            numbers |= set(range(int(hunk.group(1)), int(hunk.group(1)) + (int(hunk.group(2)) if hunk.group(2) is not None else 1)))
+    return numbers
+
+
+# 只判这次改动新增或改写的行；SCOPE_BASE 为空（不在 git 仓里或取不到新增行）就退回全量判（全量里历史节整节不判）。
 scope = '全量'
 all_quoted = list(quoted)
 if os.environ.get('SCOPE_BASE', '').strip():
@@ -1622,10 +1678,17 @@ if os.environ.get('SCOPE_BASE', '').strip():
                 added.add((added_path, added_text.strip()))
     quoted = [(path, number, stripped) for path, number, stripped in quoted
               if (path, stripped) in added]
+    # 历史节：按行号认这次新增的行（同一句话早先留在历史节里、正文又新抄一遍，不能按文字冒充新增）
+    for history_path in sorted({path for path, _, _ in history_quoted}):
+        new_numbers = new_line_numbers(history_path, os.environ['SCOPE_BASE'].strip())
+        for item in (entry for entry in history_quoted if entry[0] == history_path):
+            all_quoted.append(item)
+            if new_numbers is None or item[1] in new_numbers:
+                quoted.append(item)
     scope = '这次改动新增或改写的'
 
 if not quoted:
-    print('  ! %s kb 正文里没有整行抄的 E7RESULT 行，这一格无对象可判' % scope)
+    print('  ! %s kb 正文与历史节里没有整行抄的 E7RESULT 行，这一格无对象可判' % scope)
     sys.exit(77)
 
 # 登记的产物：replay.sh 登记表每一行的第 4 列（与 verdict-false-named 格、experiment-replay 格同一个形状）
@@ -1711,7 +1774,7 @@ if missing:
 if missing:
     compared_what = (f'research/results/ 的 {len(products)} 份产物' if scope == '全量'
                      else f'{REPLAY} 登记着的 {len(registered)} 份产物')
-    print(f'  ✗ {scope} kb 正文里有 {len(missing)} 行整行抄的产物行，在 {compared_what}里一份都找不到：')
+    print(f'  ✗ {scope} kb 正文与历史节里有 {len(missing)} 行整行抄的产物行，在 {compared_what}里一份都找不到：')
     for path, number, stripped in missing:
         print(f'     {path}:{number}  {stripped[:160]}')  # gate-lint:detail
         unregistered = sorted(line_sources.get(stripped, ()))
@@ -1721,7 +1784,7 @@ if missing:
     print('               正文里照这几行写的结论句一起回对。产物确实没留存，就删掉这几行并写明「原始输出未留存」。')
     sys.exit(1)
 compared_count = len(products) if scope == '全量' else len(registered)
-print(f'  ✓ {scope} kb 正文里整行抄的产物行都在产物里逐字找得到（判了 {len(quoted)} 行，对照 {compared_count} 份'
+print(f'  ✓ {scope} kb 正文与历史节里整行抄的产物行都在产物里逐字找得到（判了 {len(quoted)} 行，对照 {compared_count} 份'
       + ('产物）' if scope == '全量' else '登记着的产物）'))
 judged = {(path, number) for path, number, _ in quoted}
 skipped = {}
@@ -1933,6 +1996,121 @@ if checked_pages == 0 and not lagging and not lag_pages_by_number:
 compared = f"与基准 {base} 比没涨" if baseline_numbers is not None else "基准里还没有这张表（或不是 git 仓），只缩不涨这一条没比"
 print(f"  ✓ 登记了路径与共用项的实验页判过了（{checked_pages} 份、{checked_rows} 条路径）；"
       f"还没写登记节的 {len(lagging)} 份在 {os.path.basename(lag_path)} 里、每一份都现存且确实还没写，{compared}；逐份补齐后删行")
+PY
+}
+
+# ── 格 cited-paths-exist：kb 点名的实验产物、变异表、实验源码，路径要在树里或版本库历史里
+#
+# 这是 C43 反向那一半的存量判：results-cited 格第三道只判「这次改动新增或改写的点名行」、只判 research/results/ 下的产物，
+# 存量的点名行与变异表、实验源码两类它都不看。分工：results-cited 第三道按这次改动、认裸文件名、带登记在 replay.sh 的那一道判法；
+# 这一格不看改动范围，每次判 kb 全部正文，只判存在性。
+#
+# 扫哪些文件：.claude/kb 与 crates/singlefs-checker/invariants 下全部 .md（含历史节、含子目录），
+# 再加 .claude/kb-directories 登记的别的目录；目录不在就跳过，一份 .md 都扫不到退 77。
+# 认哪三类路径（整路径形态，反引号、括号、链接里都认；`../../research/results/…` 这种相对链接按仓内路径算）：
+#   research/results/<名>.out（名里可带子目录）、scripts/mutation/tables/<名>.tsv、scripts/experiments/<名>.rs。
+# 光写文件名不带目录的不认（那是 results-cited 第二道的事）；带通配符、占位符（`e17-*.out`、`<名>.out`）或写成区间（`c113-r1..r6-local.out`）的不是一个具体路径，不认。
+# 每个路径去重后判一次：工作区里在、或 git ls-files 里在 → 树里；不在 → git log --all --diff-filter=A 找得到加入过 → 只在历史里；都没有 → 红。
+# 不在 git 仓里没有历史可查，树里没有的一律判红。
+#
+# 判别力：fixtures/doc-experiments.sh/cited-paths-exist-red 一页点名一个树里与历史里都没有的产物 e9-missing.out、
+# 一张不存在的变异表、一个只在写法上带区间的名字（不该被认）和一个存在的实验源码，必须判红且只点名那两处；
+# cited-paths-exist-green 点名三类各一个在树里的、另一个产物先提交后删掉（只在历史里），必须判绿并报「只在历史里 1 个」。
+# 弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-lookup-skipped：历史里找得到也算缺，green 判红；
+# existence-unchecked：一律当在，red 判绿。
+cell_cited_paths_exist() {
+  python3 - "$ROOT" <<'PY'
+import os, re, subprocess, sys
+
+root = sys.argv[1]
+break_switch = os.environ.get('EXPERIMENT_PAGES_AND_PRODUCTS_BREAK', '')
+os.chdir(root)
+
+NAME = r'[A-Za-z0-9_+-]+(?:\.[A-Za-z0-9_+-]+)*'
+KINDS = [
+    ('research/results 下的产物', r'research/results/(?:' + NAME + r'/)*' + NAME + r'\.out'),
+    ('变异表', r'scripts/mutation/tables/(?:' + NAME + r'/)*' + NAME + r'\.tsv'),
+    ('实验源码', r'scripts/experiments/(?:' + NAME + r'/)*' + NAME + r'\.rs'),
+]
+cited_path = re.compile(r'(?<![A-Za-z0-9_-])(' + '|'.join(f'(?P<k{i}>{pattern})' for i, (_label, pattern) in enumerate(KINDS))
+                        + r')(?![A-Za-z0-9_+-]|\.[A-Za-z0-9])')
+
+directories = ['.claude/kb', 'crates/singlefs-checker/invariants']
+if os.path.isfile('.claude/kb-directories'):
+    with open('.claude/kb-directories', encoding='utf-8') as registry:
+        for line in registry:
+            entry = line.split('#', 1)[0].strip()
+            if entry and entry not in directories:
+                directories.append(entry)
+
+pages = []
+for directory in directories:
+    for walked, _names, files in os.walk(directory):
+        pages.extend(os.path.join(walked, name) for name in files if name.endswith('.md'))
+pages = sorted(set(pages))
+if not pages:
+    print(f"  ! 没有可扫的 .md（{', '.join(directories)} 下一份都没有），这一格无对象可判")
+    sys.exit(77)
+
+places = {}      # 路径 -> [(页, 行号)]
+kind_of = {}
+for page in pages:
+    with open(page, encoding='utf-8', errors='replace') as handle:
+        for number, line in enumerate(handle, 1):
+            for found in cited_path.finditer(line):
+                path = found.group(1)
+                places.setdefault(path, []).append((page, number))
+                kind_of[path] = next(i for i in range(len(KINDS)) if found.group(f'k{i}'))
+
+in_git = subprocess.run(['git', 'rev-parse', '--is-inside-work-tree'], capture_output=True, text=True).returncode == 0
+tracked = set()
+if in_git:
+    listed = subprocess.run(['git', '-c', 'core.quotepath=false', 'ls-files', '-z'], capture_output=True)
+    if listed.returncode != 0:
+        print(f"  ✗ git ls-files 退 {listed.returncode}（{listed.stderr.decode('utf-8', 'replace').strip()[:80]}），树里有没有没判成")   # gate-lint:summary
+        print("     → 怎么办：先让 git 在这个仓里能正常跑（索引锁、仓损坏），再重跑这一格；不许把没判成当成都在。")   # gate-lint:detail
+        sys.exit(1)
+    tracked = set(listed.stdout.decode('utf-8', 'replace').split('\0'))
+
+in_tree, only_history, absent = [], [], []
+for path in sorted(places):
+    if break_switch != 'existence-unchecked' and not (os.path.isfile(path) or path in tracked):
+        found_in_history = False
+        if in_git and break_switch != 'history-lookup-skipped':
+            logged = subprocess.run(['git', '-c', 'core.quotepath=false', 'log', '--all', '--diff-filter=A', '-n1', '--format=%H', '--', path],
+                                    capture_output=True, text=True)
+            if logged.returncode != 0:
+                print(f"  ✗ git log 查 {path} 的历史退 {logged.returncode}（{logged.stderr.strip()[:80]}），这一个没判成")   # gate-lint:summary
+                print("     → 怎么办：先让 git 在这个仓里能正常跑，再重跑这一格；不许把没判成当成历史里有。")   # gate-lint:detail
+                sys.exit(1)
+            found_in_history = bool(logged.stdout.strip())
+        (only_history if found_in_history else absent).append(path)
+    else:
+        in_tree.append(path)
+
+if absent:
+    reference_count = sum(len(places[path]) for path in absent)
+    print(f"  ✗ kb 点名的 {len(absent)} 个路径（{reference_count} 处引用）树里没有、版本库历史里也没有：")   # gate-lint:summary
+    for path in absent:
+        shown = '、'.join(f'{page}:{number}' for page, number in places[path][:3])
+        more = f" 等 {len(places[path])} 处" if len(places[path]) > 3 else ''
+        print(f"     {shown}{more} 点名 {path}（{KINDS[kind_of[path]][0]}）")   # gate-lint:detail
+    print("     → 怎么办：补回那份文件；或把那一行改成写明「原件未留存、从哪次提交取」；或改成现存的路径")
+    print("               （移过位置的在 git log --all --diff-filter=A --name-only -- '*<文件名>' 里找新路径）。")
+    print("               只写文件名不写目录的不在这一格的射程里，改成不带目录的写法不算修好——取不回来的就如实写原件未留存。")
+    sys.exit(1)
+
+by_kind = [sum(1 for path in places if kind_of[path] == i) for i in range(len(KINDS))]
+reference_total = sum(len(spots) for spots in places.values())
+if not places:
+    print(f"  ! 本次无对象可判：扫了 {len(pages)} 份 .md，一个整路径形态的产物、变异表、实验源码路径都没有")
+    sys.exit(77)
+kinds_text = '、'.join(f'{KINDS[i][0]} {by_kind[i]}' for i in range(len(KINDS)))
+print(f"  ✓ {len(pages)} 份 .md 点名的 {len(places)} 个路径（{reference_total} 处引用；{kinds_text}）都找得到：树里 {len(in_tree)} 个、只在历史里 {len(only_history)} 个")
+if only_history:
+    print("     只在历史里的（树里没有，git log --all --diff-filter=A 找得到它加入过）：")
+    for path in only_history:
+        print(f"       {path}")
 PY
 }
 

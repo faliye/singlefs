@@ -33,6 +33,7 @@ printf '%s\n' '第 3 点前后两句' '3 点意见' '1000 个崩溃点' '全量�
   printf '%s\n' '门禁 20:09-sample-stage.sh 那一行'
   printf '%s\n' '触发的那一处（decisions/06-快照实现模型.md:42），06:42 正是没抽到的那一行'
   printf '%s\n' '撞键 `3:10`：冷重开是 `2:11`'
+  printf '%s\n' 'candidates=[ 1:15=ok@1:24 3:26=ok@3:26] rows=1:12/3/4;2:13/5/6'
   printf '%s\n' 'taken_jst=2026-09-27T01:20:12+09:00 started_jst=2026-09-15T03:12'
 } > records/colon-pairs.md
 printf '%s\n' "TZ=${utc}-14 date +%F  # clock-times:allow 环境变量写法：POSIX 的时区串，符号与东京时间相反" > .claude/scripts/tz.sh

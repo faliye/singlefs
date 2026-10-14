@@ -1,0 +1,9 @@
+exit=1
+want=kb 正文里 5 条内联算式左右不等（扫 2 份、判了 6 条）
+want=.claude/kb/notes.md:3 「84 = 42 + 8 + 1 + 16 + 8 + 8 + 4 + 4 + 2 + 1」左边是 84，右边是 94（右边比左边多 10）
+want=.claude/kb/notes.md:4 「**35** = key 22 + value 8 + seq 4」左边是 35，右边是 34（右边比左边少 1）
+want=.claude/kb/notes.md:5 「20 字节 = key 10 字节 + value 11 字节」左边是 20，右边是 21（右边比左边多 1）
+want=.claude/kb/notes.md:6 「17 = 头部 10 + 尾 6 + `flags` 2」左边是 17，右边是 18（右边比左边多 1）
+want=crates/sample/invariants/classes.md:3 「9 = 4 + 4」左边是 9，右边是 8（右边比左边少 1）
+want=  inline-sums：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（inline-sums）

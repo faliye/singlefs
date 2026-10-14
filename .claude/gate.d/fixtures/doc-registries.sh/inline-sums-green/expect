@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：inline-sums
+want=kb 正文里的内联算式左右相等：扫 2 份 kb 文件（「## 历史版本」之后、代码围栏、变更史除外），判了 5 条；跳过 5 条含乘除减括号的、3 条带小数、其他单位或认不出写法的
+want=doc-registries.sh：1 格里 1 格绿（inline-sums），0 格本次未跑（无）

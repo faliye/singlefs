@@ -1,0 +1,43 @@
+# 判器调用点登记表（scripts/crash/cpu-judging-sites-check.py 文件头；门禁 checker-independence-and-sync 的 cpu-judging-sites 格调它）：
+# checker 档与 harness 档里调池级 checker、记录核对器、RefFS 允许集合比对与下面判器本体的每一处，要么落在这里登记的判定段或判器本体里，
+# 要么包住它的函数前面写了 // gpu-exempt: <截名>（豁免表 .claude/gate.d/gpu-exemptions.tsv 登记同名一行）或 // cpu-reference-for-gpu-comparison（GPU 对拍的 CPU 参照那一侧）。
+# 一行一条，制表符分隔三段：种类、文件（judging-stage 与 excluded 可带 * 通配）或 文件::函数名、# 为什么（至少 8 个字）。种类：
+#   judging-stage  判定段：从判定库里读回的流、表上判（配了 GPU 判在 GPU，没配由 CPU 判），里面每一处判器调用都合规
+#   judging-body   判器本体：函数体就是判法（把池级 checker 与记录核对器包一层），里面那几处不判，调它的地方照判器调用点判
+#   judge-self-test 判器自测：函数级（文件::函数名），函数判的是判器自己的契约（手摆盘、手给根、给判器塞已知坏法），不是「产出再判」；同一份文件里别的函数照判
+#   excluded       整份不判：不是「产出再判」的（手造一张镜像、断言判器结论的判法自证），每行写为什么
+# 文件（通配）在扫的范围里一份都对不上、::函数名在那份文件里找不到定义，都判红；挪了、改名了就改这一行，没了就删这一行。
+judging-stage	crates/singlefs-checker-tier/src/crash_judge_*.rs	# 判定段：GPU 判器的输入表、判法、派活与结论（D13（验证路线） 已定项 15），读的都是从判定库读回的判表
+judging-stage	crates/singlefs-checker-tier/src/crash_facts.rs	# 判定段：三段流第 ① 段的事实表与它的 CPU 参照核对，读的是从判定库读回的事实表
+judging-stage	crates/singlefs-checker-tier/src/crash_library.rs::two_stages	# 判定段：两段协议本身，判段那一趟只从库里读回再交给调用方的判器
+judging-stage	crates/singlefs-checker-tier/src/crash_amplification.rs::judge_the_images_after_the_observers_on_the_cpu	# 判定段：观察者交回的盘没配 GPU 时的 CPU 那一路，判的是从判定库读回的盘
+judging-stage	crates/singlefs-checker-tier/src/crash_given_states.rs::judge_the_given_states_on_the_cpu	# 判定段：给定状态表没配 GPU 时的 CPU 那一路，判的是从判定库读回的表
+judging-stage	crates/singlefs-checker-tier/src/crash_library.rs::facts_through_the_pairing_library	# 判定段：第 ② 段核对的对拍过库，事实表先入库、再从库里读回
+judging-stage	crates/singlefs-checker-tier/src/crash_library.rs::judge_tables_through_the_pairing_library	# 判定段：GPU 判器与 CPU 判器的对拍过库，判表先入库、再从库里读回
+judging-stage	crates/singlefs-checker-tier/src/crash.rs::judge_crash_state_range_of_the_read_back_flow_with_slices	# 判定段：判从判定库读回的流的一段状态（配置没开 GPU 时的 CPU 那一路）
+judging-body	crates/singlefs-checker-tier/src/crash.rs::check_records	# 判器本体：记录核对器的入口，把 check_records_against 包一层
+judging-body	crates/singlefs-checker-tier/src/crash.rs::judge_crash_image	# 判器本体：一张崩溃镜像的 CPU 判器（池级 checker 加记录核对器），调它的地方另判
+judging-body	crates/singlefs-checker-tier/src/crash.rs::judge_crash_image_against_the_version_table	# 判器本体：照版本表判一张崩溃镜像（池级 checker 加记录核对器），调它的地方另判
+judging-body	crates/singlefs-checker-tier/src/crash.rs::evaluate_state_recording_findings	# 判器本体：手摆的一个状态的 CPU 判器加记账（照版本表判一张崩溃镜像，结论记进计数），调它的地方另判
+judging-body	crates/singlefs-checker-tier/src/crash.rs::evaluate_state	# 判器本体：单版本形态的手摆状态判法入口（把 evaluate_state_for_versions 包一层），调它的地方另判
+judging-body	crates/singlefs-checker-tier/src/crash.rs::evaluate_state_for_versions	# 判器本体：手摆状态的判法入口（把 evaluate_state_recording_findings 包一层），调它的地方另判
+judging-body	crates/singlefs-checker-tier/src/crash_given_states.rs::judge_a_given_state_on_the_cpu	# 判器本体：给定状态表里一个状态的 CPU 判器（池级 checker 加记录核对器），调它的地方另判
+judge-self-test	crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs::applying_a_record_whose_units_are_missing_is_caught_by_the_record_checker	# 判器自测：手摆崩溃态盘，手给恢复落到的根，断言记录核对器对「单元缺席却自称到了那版」判红
+judge-self-test	crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs::the_root_and_its_records_are_judged_on_the_crash_state_image_and_unit_presence_on_the_recovered_image	# 判器自测：手摆写表与两份盘，断言记录核对器两份镜像各判什么
+judge-self-test	crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs::publishes_cut_off_by_the_crash_are_on_the_resumed_timeline_only_if_their_root_landed_or_the_recovery_landed_on_them	# 判器自测：手摆写表与手给恢复落到的根，断言记录核对器在接缝处怎么分发布
+judge-self-test	crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs::writes_left_without_a_root_at_the_end_of_the_cut_recording_do_not_join_the_first_publish_after_the_crash	# 判器自测：手摆写表，断言记录核对器不把截断流末尾没等到根槽写的单元写归进接缝之后的发布
+judge-self-test	crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs::checker_is_silent_on	# 判器自测：帮手：弄坏单元之后看池级 checker 判不判红，给记录核对器的契约用例做对照
+judge-self-test	crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs::history_publishes_missing_units_on_the_second_crash_image_are_red_on_the_whole_stream	# 判器自测：在二次崩溃镜像上翻字节弄坏历史发布的单元，断言记录核对器判红、不弄坏时不判
+judge-self-test	crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs::first_crashes_cut_inside_publishes_leave_every_second_crash_and_the_pool_after_the_mount_clean	# 判器自测：换几种交法给记录核对器，断言接缝处断开的不假红、两种接成一条的各有判红的
+judge-self-test	crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs::the_pool_after_the_mount_exempts_what_the_newest_mount_version_abandons_by_its_instance_table_on_the_recovered_image	# 判器自测：手给恢复自称的根并换实例表的读法，断言记录核对器豁免被抛弃的发布
+judge-self-test	crates/singlefs-checker-tier/src/crash_injection.rs::record_check_after_the_writable_mount	# 判器自测：记录核对器第二截的契约入口：只供上面那份契约用例文件调，函数体就是照契约手给两份镜像交记录核对器
+judge-self-test	crates/singlefs-checker-tier/src/crash_injection.rs::record_check_after_a_second_crash	# 判器自测：记录核对器第三截的契约入口：只供上面那份契约用例文件调，函数体就是照契约手给两份镜像交记录核对器
+judge-self-test	crates/singlefs-checker-tier/tests/crash_injection_campaign.rs::a_version_rebuilt_from_records_missing_a_unit_is_judged_only_on_the_whole_stream_and_the_verifying_recovery_never_lands_on_it	# 判器自测：手给不验名单元那一遍落到的根交记录核对器，断言只有整条流才判红
+judge-self-test	crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs::targeted_controls_on_the_second_publish_go_red_where_they_should	# 判器自测：把持久集合手摆成五个形状，断言 oracle、journal 承重与记录核对器各在该红的那一格红
+judge-self-test	crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs::stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_to_the_same_end_state	# 判器自测：里面直接调判器的只有手摆持久集合加改坏单元字节的撕裂注入，断言施加前验证恰判失败一次
+judge-self-test	crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs::a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missing_by_the_record_checker	# 判器自测：手摆持久集合（摘掉早先那次写的单元写），断言记录核对器第二条判据报缺席
+judge-self-test	crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs::positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle	# 判器自测：阳性对照，根槽已持久而逐个抽掉单元，断言 oracle 判红、记录两份都缺时记录核对器判红
+judge-self-test	crates/singlefs-checker-tier/tests/record_checker_reuse_exemption_legality.rs::an_illegal_reuse_whose_later_write_landed_no_longer_excuses_the_missing_unit_in_the_record_checker	# 判器自测：手摆复用窗口置 0 的状态，断言记录核对器不为过不了回收谓词的复用开脱
+judge-self-test	crates/singlefs-checker-tier/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs::the_record_checker_bounds_the_effective_floor_by_the_floor_written_into_the_system_configuration	# 判器自测：手改写表里的系统配置槽写，断言记录核对器的复用豁免按系统配置里的回滚下界收放
+excluded	crates/singlefs-harness/tests/checker_*.rs	# 池级 checker 自己的单测：手造一张镜像、断言判器的结论，判的是判器本身，不是产出再判（harness 档随时跑）
+excluded	crates/singlefs-harness/tests/pool_checker_*.rs	# 池级 checker 自己的单测：手造一张镜像、断言判器的结论，判的是判器本身，不是产出再判（harness 档随时跑）

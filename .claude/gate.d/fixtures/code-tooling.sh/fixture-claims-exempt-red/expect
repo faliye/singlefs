@@ -1,0 +1,8 @@
+exit=1
+want=5 处豁免表 .claude/gate.d/fixture-none-exempt.tsv 与阶段头部对不上
+want=90-none-unlisted.sh：头部写了 none，而 .claude/gate.d/fixture-none-exempt.tsv 里没有它这一行
+want=91-yes-listed.sh 登记了，而它头部写的是 yes
+want=99-vanished.sh 不是 .claude/gate.d 下的阶段
+want=92-listed-twice.sh 重复登记
+want=93-short-reason.sh 的理由不到 8 个字
+want=豁免表只缩不涨

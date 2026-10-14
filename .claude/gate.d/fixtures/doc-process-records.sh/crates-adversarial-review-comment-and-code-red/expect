@@ -1,0 +1,7 @@
+exit=1
+want=crates 改动里 2 个文件没有三方判决点名
+want=      crates/demo/src/code.rs
+want=      crates/demo/src/doctest.rs
+want=只改了注释、不走三方的产品代码 1 个
+want=crates-adversarial-review：红（退出 1）
+want=样本只跑 .gate-cells 点名的格：crates-adversarial-review

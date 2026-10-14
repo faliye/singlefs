@@ -1,0 +1,7 @@
+exit=77
+want=这次改动没碰产品代码的 crates/*/src（测试代码 0 个不归这一格，只改注释的产品代码 2 个不走三方），这一格无对象可判（基准 HEAD）
+want=只改了注释、不走三方的产品代码 2 个
+want=      crates/demo/src/lib.rs
+want=      crates/demo/src/named.rs
+want=crates-adversarial-review：本次未跑
+want=样本只跑 .gate-cells 点名的格：crates-adversarial-review

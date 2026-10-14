@@ -1,0 +1,4 @@
+exit=77
+want=样本只跑 .gate-cells 点名的格：private-values
+want=这台机器没有 multi-host.env（别人的克隆、第二台，或还没配多机），没有私有值可比，这一格本次无对象可判（这不是通过）
+want=doc-text.sh：跑到的 1 格都本次无对象可判，这一道本次未跑（不记通过）

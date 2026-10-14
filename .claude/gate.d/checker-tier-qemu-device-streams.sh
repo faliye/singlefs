@@ -2,9 +2,11 @@
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 scripts/gate/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
 # gate-stage: QEMU 真设备上的新池新建文件、发布 B、第二个实例、发布 D 与抬 F（两块 virtio 盘、设备侧独立录制、漏一道屏障与走页缓存两个对照必须判红）
+# gate-fixture: yes
 # gate-category: checker-tier 类
-# gate-similar: checker-tier-layer0-replay.sh 它也验 crates 写路的崩溃一致性、也是 checker-tier 类，但在宿主上枚举崩溃状态、判录制流截断重放；这里起 QEMU 虚机在两块 virtio 盘上跑真负载、判设备侧独立录制与程序录制逐项相同，要 QEMU、/dev/kvm 与内核镜像，前提、登记的输入与失败方式都不同
-# gate-similar: checker-tier-research-build-and-replay.sh 它的复跑那一格也读 E142 的产物，但比的是纯模型实验的整份输出；这里只从 E142 产物取段序列与反向链当虚机跑的对照，判的是真设备上收到的写
+# gate-similar: checker-tier-crash-point-replay.sh 它也验 crates 写路的崩溃一致性、也是 checker-tier 类，但在宿主上枚举崩溃状态、判录制流截断重放；这里起 QEMU 虚机在两块 virtio 盘上跑真负载、判设备侧独立录制与程序录制逐项相同，要 QEMU、/dev/kvm 与内核镜像，前提、登记的输入与失败方式都不同
+# gate-similar: checker-tier-research-build-and-replay.sh 它的复跑那一格也读 E142 的产物，但比的是纯模型实验的整份输出；这里只从 E142 产物取 path=mkfs 之外那几行段序列与反向链当虚机跑的对照（mkfs 那一行与布局表八登记的值比），判的是真设备上收到的写
+# gate-similar: doc-registries.sh 它的 segment-registry 格经同一份 scripts/crash/check-segment-registry.py 读布局表八，判的是登记表与 E142 产物、钉住活代码的用例对不对得上；这里只拿登记表「mkfs 种根」那一行当虚机输出的对照，判的是真设备上 mkfs 发出的步骤
 #
 # gate-cell: device-streams QEMU 真设备上各档负载跑完，设备侧独立录制与程序录制逐项相同、两个对照红在该红的地方
 # 参数解析、每格一个子 shell、汇总与退出码经 lib/stage-cells.sh。
@@ -22,15 +24,28 @@
 # 读的环境变量：VM_LOG_MB（每块盘的设备侧日志 MiB，默认 4096）；GATE_QEMU_DEVICE_STREAMS_KEEP_WORK=1（判绿也留现场，重录样本时拷四件套用）；
 #   SINGLEFS_GATE_FULL=1 由 stage-must-run.sh 与 change-touches-crates.sh 读（不复用、不按改动范围跳过）。
 #
-# 样本 fixtures/checker-tier-qemu-device-streams.sh/{red,direct-divergence-red,e142-row-missing-red,e142-row-duplicate-red,green}（stage-selftest.sh 跑，各放 .gate-cells 点名 device-streams）：
+# 样本 fixtures/checker-tier-qemu-device-streams.sh/{red,direct-divergence-red,e142-row-missing-red,e142-row-duplicate-red,mkfs-segments-red,segments-step-red,green}（stage-selftest.sh 跑，各放 .gate-cells 点名 device-streams）：
 # 样本根放 .qemu-prerecorded，按 <模式>/out.txt、vm-exit、check.txt、check-exit 摆某一轮真跑的原样输出，本阶段不起虚机、不编译，
 # 用同一段判定代码判（只供测试的开关：.claude/rules/fs-design.md 五条硬要求第 2 条）。预录档全过这一格退 77：退 0 与真起过虚机的一档在汇总里分不出。
+# 走到段序列那一步的样本另放 .claude/kb/layout/01-first-txn.md：只有「八、」标题与登记表「mkfs 种根」一行的合成副本，登记值写那一趟录样本时的值。
+#
+# 段序列分两处比：path=mkfs 那一行与布局表八（.claude/kb/layout/01-first-txn.md「八、」）「mkfs 种根」那一行登记的段序列、次操作、崩溃状态数、种类串比，
+#   登记值经 scripts/crash/check-segment-registry.py --print-mkfs-segments-line 现取（同一份解析器，这里不抄第二份）；那一行的权威是活代码
+#   （crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs 的 recorded_stream_matches_the_registered_mkfs_segment_sequence 钉住），
+#   E142 的装置是独立手写模型、清零步数与活代码不同，不拿它比这一行。其余四行（instance_acquisition、warm_up、transaction、post_mkfs_stream）
+#   照旧与 E142 产物的 name=segments 行逐字比，两边都先滤掉 path=mkfs 那一行。
 #
 # 弄坏开关（只给样本证红用）：GATE_QEMU_DEVICE_STREAMS_BREAK=direct-divergence-unread 让 direct 那一档只看退出码与宿主读回、不逐盘读 divergence=none 那一行，
 #   direct-divergence-red（direct 的 check.txt 里盘 1 那一行改成 device=2、退出码仍是 0）判绿退 77、expect 里那几条 want 找不到。
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=e142-all-rows 让取 E142 产物的那一步退回「取复跑表里全部 E142 行的第 4 列」、不数行数：
 #   green（复跑表里两行 E142，真仓现在的形态）取到两个文件名，红在「从 replay.sh 的 @driver_e142 那一行解析不出产物文件」、不是预期的退 77，expect 里的 want 对不上；
 #   e142-row-missing-red（@driver_e142 那一行缺了）取到别的行的文件名，过了这一处，红不在「第 2 列是 @driver_e142 的 E142 行取到 0 行」。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=mkfs-from-e142 让 path=mkfs 那一行退回与 E142 产物的 path=mkfs 行比、不读布局表八的登记值：
+#   mkfs-segments-red（样本登记行的段序列 12+1+1+1+4 改成 14+1+1+1+4，虚机输出与 E142 产物都是 12+1+1+1+4）判绿退 77，
+#   红不在「mkfs 段序列与登记表不一致」，expect 里的 want 对不上。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=segments-diff-skipped 让虚机输出与 E142 产物的 name=segments 行（path=mkfs 之外那几行）逐字比对那一步跳过：
+#   segments-step-red（只摆 direct 一档，direct/out.txt 里 path=transaction 那一行的段序列 24+2+1+2 改成 23+2+1+2，E142 产物与登记行都不动）判绿退 77，
+#   红不在「段序列（path=mkfs 之外那几行）与 E142 产物的 name=segments 行不一致」，expect 里的 want 对不上。
 #
 # 准入：读的路径与三个前提（QEMU、/dev/kvm、内核镜像）都登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行，复用判定与改动范围都从它取，
 # 那一行不在判红；判法在 scripts/gate/admission.py。
@@ -117,7 +132,7 @@ cold_root_of() {
 required_lines_of() {
   case "$1" in
     file-overwrite|second-instance|raise-rollback-floor)
-      # file_overwrite 单元写 24：kb layout/01-first-txn.md 第八节第二条流「A、B、C 各 24」（来宾单测不钉 B 的段序列）
+      # file_overwrite 单元写 24：kb layout/01-first-txn.md「根槽写路径的段序列登记表」一节里覆盖写固定脚本流那一句「A、B、C 各 24」（来宾单测不钉 B 的段序列）
       cat <<'PATTERNS'
 name=file_overwrite root_txg=4 transaction=2 released=
 name=file_overwrite .*segments=24+2+1+2 closed_form=
@@ -147,7 +162,7 @@ PATTERNS
   case "$1" in
     raise-rollback-floor)
       # fourth_transaction 单元写 28：来宾单测 new_pool_file_creation_on_device.rs 的 raise_rollback_floor_mode_publishes_the_fourth_version_raises_the_floor_to_its_ceiling_above_zero_and_every_window_matches_the_device_layer_count 钉的值
-      # raise_rollback_floor：kb layout/01-first-txn.md 第八节第二条流「抬 F 与卸载开头先写的系统配置与上一次的轮换各自成段（2、2）」「抬 F 与卸载推的空发布各 16」，D 的轮换算在 D 自己的窗口里
+      # raise_rollback_floor：kb layout/01-first-txn.md「根槽写路径的段序列登记表」一节里覆盖写固定脚本流那一句「抬 F 与卸载开头先写的系统配置与上一次的轮换各自成段（2、2）」「抬 F 与卸载推的空发布各 16」，D 的轮换算在 D 自己的窗口里
       cat <<'PATTERNS'
 name=fourth_transaction root_txg=9 transaction=2 released=
 name=fourth_transaction .*segments=28+2+1+2 closed_form=
@@ -201,8 +216,8 @@ if ((prerecorded == 0)); then
  else
   # 先问能不能复用上一次整轮全绿的判定，再问这次改动碰没碰它判的东西（前缀含本阶段脚本自己）；两样都退 77（本次未跑），不退 0。
   # 判法在 scripts/gate/stage-must-run.sh 与 change-touches-crates.sh 的文件头。范围判定只摘得掉零行代码的改动，细的那一半欠在 C8（门禁范围判不出来）。
-  source "$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
-  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/stage-must-run.sh" "复用上一次整轮全绿的判定" \
+  source "$STAGE_REPOSITORY/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
+  stage_run_or_skip "$STAGE_REPOSITORY/scripts/gate/stage-must-run.sh" "复用上一次整轮全绿的判定" \
     "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
   # 改动范围的前缀：登记表本阶段那一行的路径（admission.py paths，不另抄一份），加本阶段脚本自己
   qemu_registered_input_paths=()
@@ -222,10 +237,12 @@ if ((prerecorded == 0)); then
   # 三个前置（QEMU、/dev/kvm、内核镜像）登记在 stage-inputs.tsv 本阶段那一行第三列，没齐判红
   python3 "$ADMISSION_MODULE" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1
 
-  if ! cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin new_pool_file_creation_on_device >/dev/null 2>&1; then
-    fail "虚机二进制（musl 静态）编不过" "单跑 cargo build --release --target x86_64-unknown-linux-musl -p singlefs-checker-tier --bin new_pool_file_creation_on_device 看报错。"
+  # 虚机二进制要静态链接（initramfs 里没有动态库）：glibc 目标加 +crt-static 编成 static-pie。不编 musl 目标：checker 档默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器
+  # 两条 cargo build 不吃 cargo 自己的缺省（核数）：经 capped.sh default 起，编译并行度取登记的重活默认并行度（.claude/heavy-thread-default，SINGLEFS_THREAD_CAP 设了取它）
+  if ! bash "$STAGE_REPOSITORY/scripts/hosts/capped.sh" default cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device >/dev/null 2>&1; then
+    fail "虚机二进制（glibc 静态 PIE）编不过" "单跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device 看报错。"
   fi
-  if ! cargo build -p singlefs-checker-tier --bin new_pool_file_creation_device_log_check >/dev/null 2>&1; then
+  if ! bash "$STAGE_REPOSITORY/scripts/hosts/capped.sh" default cargo build -p singlefs-checker-tier --bin new_pool_file_creation_device_log_check >/dev/null 2>&1; then
     fail "宿主一侧的设备日志检查编不过" "单跑 cargo build -p singlefs-checker-tier --bin new_pool_file_creation_device_log_check 看报错。"
   fi
 fi
@@ -244,6 +261,20 @@ PRODUCT="research/results/$e142_product_names"
 # 反向链从产物里现取，不写死：写死的数在格式常量一改就过期，红起来像是写路错了。
 EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$PRODUCT" | head -1)"
 [[ -n "$EXPECTED_BACK_CHAIN" ]] || fail "产物里取不出 name=root_record 的 back_chain（$PRODUCT）" "看 $PRODUCT 有没有 name=root_record 那一行、它的 back_chain 字段还在不在。"
+# path=mkfs 那一行的对照是布局表八「mkfs 种根」那一行登记的值（文件头「段序列分两处比」）：解析器按本阶段自己的位置取，--root 指被判的仓，
+# 样本把 cwd 换成样本根时，读的是样本里那份合成的布局表、跑的仍是仓里的解析器。开虚机之前取，登记表写坏了不白等虚机。
+SEGMENT_REGISTRY_SCRIPT="$STAGE_REPOSITORY/scripts/crash/check-segment-registry.py"
+if ! registered_mkfs_segments_output="$(python3 "$SEGMENT_REGISTRY_SCRIPT" --root "$ROOT" --print-mkfs-segments-line)"; then
+  printf '%s\n' "$registered_mkfs_segments_output" | sed 's/^/        /'
+  fail "取不出 .claude/kb/layout/01-first-txn.md「八、」登记表「mkfs 种根」那一行的登记值（段序列、次操作、崩溃状态数、种类串）" \
+       "照上面 scripts/crash/check-segment-registry.py 的报错改那一行；它不在就从 git 找回来（门禁 doc-registries 的 segment-registry 格用的是同一份）。"
+fi
+EXPECTED_MKFS_SEGMENTS_LINE="$registered_mkfs_segments_output"
+EXPECTED_MKFS_SEGMENTS_SOURCE="布局表八「mkfs 种根」那一行"
+if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == mkfs-from-e142 ]]; then
+  EXPECTED_MKFS_SEGMENTS_LINE="$(grep -ao 'E7RESULT name=segments path=mkfs .*' "$PRODUCT" | tr -d '\r')"
+  EXPECTED_MKFS_SEGMENTS_SOURCE="E142 产物 $PRODUCT 的 path=mkfs 行"
+fi
 
 if ((prerecorded)); then
   # 预录档：不起虚机、不编译，只判样本目录里摆好的那几个模式。被判的模式现算，不写死——
@@ -270,7 +301,7 @@ else
   # 判绿才清理：判红时出路点名的 check.txt、out.txt 都在 $work 底下，留着现场、印出路径，删不删由看的人定。
   trap 'stage_exit_code=$?; if ((stage_exit_code == 0)) && [[ "${GATE_QEMU_DEVICE_STREAMS_KEEP_WORK:-0}" != 1 ]]; then rm -rf "${work:?}"; elif ((stage_exit_code == 0)); then echo "     ! GATE_QEMU_DEVICE_STREAMS_KEEP_WORK=1，判绿的现场留着：$work（看完自己删）"; else echo "     ! 判红，现场没清：$work（出路里点名的文件都在这底下，看完自己删）"; fi' EXIT
   missing=()
-  BIN="target/x86_64-unknown-linux-musl/release/new_pool_file_creation_on_device"
+  BIN="target/x86_64-unknown-linux-gnu/release/new_pool_file_creation_on_device"
   CHECK="target/debug/new_pool_file_creation_device_log_check"
   pids=()
   for mode in "${MODES[@]}"; do
@@ -290,8 +321,19 @@ for mode in "${MODES[@]}"; do
     fail "虚机跑 $mode 没过（vm-bench.sh 的退出码或条数闸）" "单跑：VM_DISKS=2 VM_DISK_MB=4096 VM_LOG_MB=$QEMU_DEVICE_LOG_MEGABYTES VM_BLKLOGWRITES_DIR=<目录> bash scripts/devices/vm-bench.sh <musl 二进制> $mode"
   fi
   checks=$((checks + 1))
-  if ! diff <(grep -ao 'E7RESULT name=segments .*' "$PRODUCT" | tr -d '\r') <(grep -ao 'E7RESULT name=segments .*' "$out" | tr -d '\r') >/dev/null; then
-    fail "虚机跑 $mode 的段序列与 E142 产物的 name=segments 行不一致" "对照 $PRODUCT 与虚机输出的 name=segments 行；真设备上的写路发出的步骤与装置不同，先查是哪一段。"
+  # path=mkfs 那一行：恰好一行，与登记值逐字相同（段序列、次操作、崩溃状态数、种类串四样都在这一行里）
+  vm_mkfs_segments_lines="$(grep -ao 'E7RESULT name=segments path=mkfs .*' "$out" | tr -d '\r')"
+  if [[ "$vm_mkfs_segments_lines" != "$EXPECTED_MKFS_SEGMENTS_LINE" ]]; then
+    fail "虚机跑 $mode 的 mkfs 段序列与登记表不一致（虚机：${vm_mkfs_segments_lines:-一行 path=mkfs 都没有}；${EXPECTED_MKFS_SEGMENTS_SOURCE}：$EXPECTED_MKFS_SEGMENTS_LINE）" \
+         "登记表那一行由 crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs 的 recorded_stream_matches_the_registered_mkfs_segment_sequence 钉在活代码上：虚机里的 mkfs 发出的步骤与它不同，先查虚机二进制编的是不是这份 crates/ 与真设备写路差在哪一段；登记表抄错了，照那条用例改 .claude/kb/layout/01-first-txn.md「八、」那一行。"
+  fi
+  checks=$((checks + 1))
+  # 其余几行与 E142 产物逐字比：两边都先滤掉 path=mkfs 那一行（它在上一条与登记表比过）
+  if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != segments-diff-skipped ]] \
+     && ! segments_diff="$(diff <(grep -ao 'E7RESULT name=segments .*' "$PRODUCT" | tr -d '\r' | grep -v '^E7RESULT name=segments path=mkfs ') \
+                                <(grep -ao 'E7RESULT name=segments .*' "$out" | tr -d '\r' | grep -v '^E7RESULT name=segments path=mkfs '))"; then
+    printf '%s\n' "$segments_diff" | sed 's/^/        /'   # 「<」是 E142 产物的行，「>」是虚机输出的行：先看是哪一档哪一行差了
+    fail "虚机跑 $mode 的段序列（path=mkfs 之外那几行）与 E142 产物的 name=segments 行不一致" "对照 $PRODUCT 与虚机输出 path=mkfs 之外的 name=segments 行（上面「<」是产物、「>」是虚机输出的差异行）；真设备上的写路发出的步骤与装置不同，先查是哪一段。"
   fi
   checks=$((checks + 1))
   cold_root="$(cold_root_of "$mode")"

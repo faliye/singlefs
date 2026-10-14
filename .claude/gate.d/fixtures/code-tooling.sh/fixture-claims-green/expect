@@ -1,5 +1,7 @@
 exit=0
-want=阶段头部声称的判别力样本都在
+want=阶段头部声称的判别力样本都在（判了 3 道：yes 2 道、none 1 道（逐个列名见下））
+want=    yes 2 道：50-good.sh cells-covered.sh
+want=    none 1 道（都登记在 .claude/gate.d/fixture-none-exempt.tsv）：55-negated.sh
 want=没有孤儿目录
 want=日期都可能是真的
 want=3 条带日期

@@ -1,4 +1,4 @@
 exit=0
 want=样本只跑 .gate-cells 点名的格：crash-point-replay-segments
-want=✓ 崩溃点重放按段登记核过：3 行（2 项）
+want=✓ 崩溃点重放按段登记核过：4 行（2 项、3 条流）
 want=crash-point-replay-segments：绿

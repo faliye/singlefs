@@ -1,4 +1,4 @@
 exit=0
 want=research 脚本的自证都通过（这一格跑了 2 条，表取自 样本根的 .selftest-runners
 want=登记成 light 的 1 条经 light-selftest-guard.py 盯着进程树
-want=本次未盯 1 条：「bash scripts/sample-pass-a.sh --selftest」
+want=本次未盯 1 条：「bash scripts/gate/sample-pass-a.sh --selftest」

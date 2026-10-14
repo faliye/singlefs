@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的 Rust 源码、测试文件名、kb 文本、登记表与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 代码类的源码纪律：名字不只由空泛词拼成、测试文件不按里程碑起名；kb 登记的格式常量、条文集合与 feature bit 位号与代码逐个对得上；实验二进制有成形的变异表且锚点唯一、有钉绝对值的断言、种子不折叠与读数不恒为字面量 0；crates/ 里放开 unsafe 的地方与登记表逐处对上；crates 变异表的轻型登记在改坏对象在 crates/singlefs-core/src/ 下的行里每个测试目标一行；不走 GPU 的计算与豁免表逐项对上；崩溃点重放的按段登记成形
+# gate-stage: 代码类的源码纪律：名字不只由空泛词拼成、测试文件不按里程碑起名；kb 登记的格式常量、条文集合与 feature bit 位号与代码逐个对得上；实验二进制有成形的变异表且锚点唯一、有钉绝对值的断言、种子不折叠与读数不恒为字面量 0；crates/ 里放开 unsafe 的地方与登记表逐处对上；crates 变异表的轻型登记在改坏对象在 crates/singlefs-core/src/ 下的行里每个测试目标一行；不走 GPU 的计算与豁免表逐项对上；崩溃点重放的按段登记成形；代码里我们自己的名字不带序号与位置词
+# gate-fixture: yes
 # gate-category: 代码类
-# gate-similar: doc-text.sh 也是全仓扫写法，但判的是登记过的禁用写法与改过名的术语的旧名，对象是全部文本文件；这里的 vague-names 与 test-file-names 两格判 .rs 里声明的名字由哪些词拼成、测试文件叫什么
+# gate-similar: doc-text.sh 也是全仓扫写法，但判的是登记过的禁用写法与改过名的术语的旧名，对象是全部文本文件；这里的 vague-names 与 test-file-names 两格判 .rs 里声明的名字由哪些词拼成、测试文件叫什么；ordinal-names 格判 crates/、scripts/、.claude/gate.d、.claude/hooks 下 .rs、.sh、.py 里的标识符、环境变量名与文件名按词边界含不含词表里的序号与位置词，注释与字符串先剥掉，不判文本（注释与文档里的旧名归 doc-text 的 term-renames 格，只认登记过的）
 # gate-similar: harness-model-differential-and-scenarios.sh 也调 scripts/crash/crash-case-check.py，但调的是 one-scenario 那一样、判用例里面的循环，归 harness 类；这里的 test-file-names 格只调 file-names 那一样，判的是文件名
-# gate-similar: .claude/singlefs-ai-sop/scripts/naming-lint.sh 是上游的命名纪律，判单字母与常见缩写、词表写死在上游；空泛词表是本项目定的，上游这一批不发版，先放项目本地
-# gate-similar: doc-registries.sh 它判欠账表的形状、里程碑收口表收全开着的欠账号、总审核记录每行有去向，读 kb 与 records/；这里的 kb 对账三格拿登记表把决策分项正文里的名字与 Rust 枚举变体配对、把 format-const 标记的值与源码 const 比、把 feature bit 位号与代码常量比，reading-discipline 格按同一份 lib-owed.py 只判两张豁免表挂的欠账号还开着，对象是实验二进制源码；它判 kb 里字段表、字节布局表、段序列登记表与里程碑各步之间的对账，field-table-sums 那一格也经 lib-format-const.py 读标记，判的是字段表加和与结构总宽，不读代码；这里的 format-constants 格拿标记的值与 research/、crates/ 源码里的 const 比、旧值字面串不许留，不做算术；它的 declared-counts 那一格也按 lib-owed.py 读欠账表，只数得出欠着多少条；这里只拿开着的编号核豁免表
+# gate-similar: .claude/singlefs-ai-sop/scripts/naming-lint.sh 是上游的命名纪律，判单字母与常见缩写、词表写死在上游；空泛词表是本项目定的，上游这一批不发版，先放项目本地；序号与位置词表（ordinal-names 格）同样是本项目 2026-10-13 定的，而且要判 .sh、.py，上游那份只扫 .rs
+# gate-similar: doc-registries.sh 它判欠账表的形状、里程碑收口表收全开着的欠账号、总审核记录每行有去向，读 kb 与 records/；这里的 kb 对账三格拿登记表把决策分项正文里的名字与 Rust 枚举变体配对、把 format-const 标记的值与源码 const 比、把 feature bit 位号与代码常量比，reading-discipline 格按同一份 lib-owed.py 只判两张豁免表挂的欠账号还开着，对象是实验二进制源码；它判 kb 里字段表、字节布局表、段序列登记表与里程碑各步之间的对账，field-table-sums 那一格也经 lib-format-const.py 读标记，判的是字段表加和与结构总宽，不读代码；这里的 format-constants 格拿标记的值与 scripts/experiments/、research/、crates/ 源码里的 const 比、旧值字面串不许留，不做算术；它的 declared-counts 那一格也按 lib-owed.py 读欠账表，只数得出欠着多少条；这里只拿开着的编号核豁免表
 # gate-similar: checker-independence-and-sync.sh 它也经 lib-format-const.py 读标记、按 lib-owed.py 判布局滞后登记表点名的欠账号还开着，看的是这次改动里布局常量变了 checker 跟没跟；这里看此刻两边的值相等，对象是实验二进制源码与变异表
 # gate-similar: checker-tier-crates-mutation-replay.sh 它按 crates/mutations.tsv 逐条改坏源码再跑点名的测试，要编译、跑几个钟头；这里的 mutation-tables 格经同一个模块 scripts/mutation/crates-mutation-rows.py 的 static-check 只做静态判，不跑变异
 # gate-similar: doc-experiments.sh 它的 evidence-in-repo 格看这一轮改过的装置与变异表在 research/results/ 里有没有一份不比它旧的产物；这里判变异表本身成不成形、锚点对不对，与实验源码里的断言和读数，不看产物
 #
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就十三格按下面的次序全跑，格名写错退 2）：
+# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就十五格按下面的次序全跑，格名写错退 2）：
 # gate-cell: vague-names 函数名与类型名不只由空泛词拼成
 # gate-cell: test-file-names 测试文件名不按里程碑、步号起
 # gate-cell: format-constants 格式常量在 kb 与实验源码之间同步
@@ -23,8 +24,10 @@
 # gate-cell: unsafe-allowances crates/ 里放开 unsafe 的地方与登记表逐处对上（core 恰好打洞那一处、别的 crate 零处）
 # gate-cell: mutation-light-rows crates/mutations.tsv 里改坏对象在 crates/singlefs-core/src/ 下的行里每个测试目标在轻型变异登记表里恰好一行、点名的行都在变异表里
 # gate-cell: gpu-exemptions 不走 GPU 的计算与豁免表逐项对上：代码里每一处 // gpu-exempt: <截名> 都有表行、每一行都有标记
-# gate-cell: crash-point-replay-segments 崩溃点重放的按段登记成形：项名在合表里、段号与段写数是非负整数且段写数大于 0、摘要是 64 位小写十六进制、同一项同一段只一行
+# gate-cell: crash-point-replay-segments 崩溃点重放的按段登记成形：每行五段、项名在合表里、流名合写法、段号与段写数是非负整数且段写数大于 0、摘要是 64 位小写十六进制、同一条流同一段只一行
 # gate-cell: crate-sources-reachable 每一份 .rs 都是某个 crate 的目标，或经 #[path]、mod、include! 引到，没有 cargo 不编的落空源文件
+# gate-cell: ordinal-names 代码里我们自己的名字（函数、变量、常量、模块、测试、环境变量、文件与目录）不带序号与位置词
+# gate-cell: data-names 字符串字面量（元组首列、=> 右侧、键= 的键名）与 kb 表格里名字形态的串也按命名纪律判：单字母、没登记的缩写判红
 #   vague-names          词表 .claude/naming-vague-words，还没改完的文件 .claude/naming-vague-exclude
 #   test-file-names      跑 scripts/crash/crash-case-check.py --only file-names
 #   format-constants     调 lib-format-const.py；冻结证据登记在 .claude/format-constants-exclude（一行 <路径>  # 理由）
@@ -36,8 +39,10 @@
 #   unsafe-allowances    .claude/gate.d/unsafe-allowances.tsv 与 crates/ 下全部 .rs
 #   mutation-light-rows  .claude/gate.d/crates-mutation-light-rows.tsv 与 crates/mutations.tsv（经 scripts/mutation/crates-mutation-light-rows.py check）
 #   gpu-exemptions       .claude/gate.d/gpu-exemptions.tsv 与 crates/ 下全部 .rs（经 scripts/crash/gpu-exemptions-check.py check）
-#   crash-point-replay-segments  .claude/gate.d/crash-point-replay-segments.tsv 与合表 .claude/gate.d/crash-point-replay-items.tsv（经 scripts/crash/lib_crash_point_replay_items.py segments）
+#   crash-point-replay-segments  .claude/gate.d/crash-point-replay-segments.tsv（五列：项名、流名、段号、段写数、段写表摘要）与合表 .claude/gate.d/crash-point-replay-items.tsv（经 scripts/crash/lib_crash_point_replay_items.py segments）
 #   crate-sources-reachable  scripts/experiments 与 crates 下全部 .rs（经 scripts/gate/crate-sources-reachable.py，判法在它文件头）
+#   ordinal-names        词表 .claude/naming-ordinal-tokens，还没改完的文件 .claude/naming-ordinal-exclude；扫 crates/、scripts/、.claude/gate.d、.claude/hooks 下 git 列出的 .rs、.sh、.py
+#   data-names           scripts/experiments/*.rs 与 crates/*/src/**/*.rs 的字符串字面量、.claude/kb/**/*.md 的表格单元格（经 scripts/gate/data-name-lint.py，判法在它文件头）；登记表 .claude/abbreviations，存量排除表 .claude/data-name-lint-exclude
 # 每格的判据、射程、管不到的写在它自己那一段注释里。
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、汇总与退出码在共用库 lib/stage-cells.sh。
 # 规则：.claude/rules/verification.md「门禁的结构」「门禁管哪一半」。
@@ -47,17 +52,17 @@
 # 弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/code-source-discipline.sh/ 下的目录名，
 # 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   STAGE_CELLS_BREAK=red-swallowed  共用库吞红：红格按绿记、整道退 0
-#       absolute-assertions-red、clause-enums-red、crash-point-replay-segments-red、feature-bits-red、format-constants-exclusion-red、format-constants-red、gpu-exemptions-red、mutation-light-rows-red、
-#       mutation-tables-red、reading-discipline-red、test-file-names-red、crate-sources-reachable-red、
+#       absolute-assertions-red、clause-enums-red、crash-point-replay-segments-red、data-names-red、feature-bits-red、format-constants-exclusion-red、format-constants-red、gpu-exemptions-red、mutation-light-rows-red、
+#       mutation-tables-red、ordinal-names-red、reading-discipline-red、test-file-names-red、crate-sources-reachable-red、
 #       unsafe-allowances-no-safety-red、unsafe-allowances-other-crate-red、unsafe-allowances-reason-empty-red、unsafe-allowances-root-blank-red、
 #       unsafe-allowances-safety-vague-red、unsafe-allowances-source-missing-red、unsafe-allowances-two-allows-red、unsafe-allowances-wrong-function-red、
 #       vague-names-red（期望退出 1，实测 0）
-#   STAGE_CELLS_BREAK=marker-ignored  共用库不认 .gate-cells：每份样本十三格都跑
-#       absolute-assertions-green、clause-enums-green、crash-point-replay-segments-green、feature-bits-green、format-constants-green、gpu-exemptions-green、mutation-light-rows-green、
-#       mutation-tables-green、reading-discipline-green、
+#   STAGE_CELLS_BREAK=marker-ignored  共用库不认 .gate-cells：每份样本十五格都跑
+#       absolute-assertions-green、clause-enums-green、crash-point-replay-segments-green、data-names-green、feature-bits-green、format-constants-green、gpu-exemptions-green、mutation-light-rows-green、
+#       mutation-tables-green、ordinal-names-green、reading-discipline-green、
 #       test-file-names-green、crate-sources-reachable-green、unsafe-allowances-deny-one-green、unsafe-allowances-green、vague-names-green（期望退出 0，实测 1）；absolute-assertions-red、
-#       clause-enums-red、crash-point-replay-segments-red、feature-bits-red、format-constants-exclusion-red、format-constants-red、gpu-exemptions-red、mutation-light-rows-red、mutation-tables-red、
-#       reading-discipline-red、test-file-names-red、crate-sources-reachable-red、
+#       clause-enums-red、crash-point-replay-segments-red、data-names-red、feature-bits-red、format-constants-exclusion-red、format-constants-red、gpu-exemptions-red、mutation-light-rows-red、mutation-tables-red、
+#       ordinal-names-red、reading-discipline-red、test-file-names-red、crate-sources-reachable-red、
 #       unsafe-allowances-no-safety-red、unsafe-allowances-other-crate-red、unsafe-allowances-reason-empty-red、unsafe-allowances-root-blank-red、
 #       unsafe-allowances-safety-vague-red、unsafe-allowances-source-missing-red、unsafe-allowances-two-allows-red、unsafe-allowances-wrong-function-red、
 #       vague-names-red（输出里找不到「样本只跑 .gate-cells 点名的格：…」）
@@ -73,12 +78,14 @@
 #       format-constants-green（期望退出 0，实测 1）
 #   CODE_CONSTANTS_ENUMS_BITS_MATCH_KB_BREAK=format-constants-ignored-files-scanned  按盘上有什么扫，不按 git 列出的扫：被 .gitignore 忽略的编译副本也判
 #       format-constants-green（期望退出 0，实测 1）
+#   CODE_CONSTANTS_ENUMS_BITS_MATCH_KB_BREAK=format-constants-research-unscanned  research/ 整片不扫（只扫 scripts/experiments/ 与 crates/）：冻结证据里的旧值看不见，排除表登记的冻结证据排不到文件
+#       format-constants-green（期望退出 0，实测 1）；format-constants-red（输出里找不到「research/prompts/frozen-round/src/main.rs:1  const SAMPLE_HDR = 85」）
 #   CODE_CONSTANTS_ENUMS_BITS_MATCH_KB_BREAK=format-constants-exclusion-missing-path-unjudged  排除表里指向不存在的路径不判
 #       format-constants-exclusion-red（输出里找不到「.claude/format-constants-exclude:1 指向不存在的路径 research/prompts/gone/」）
 #   CODE_CONSTANTS_ENUMS_BITS_MATCH_KB_BREAK=format-constants-exclusion-no-match-unjudged  排除表里一份文件都没排到的路径不判
 #       format-constants-exclusion-red（输出里找不到「.claude/format-constants-exclude:2 scripts/experiments/target/copy/ 下一份被 git 列出的 .rs 都没排到」）
 #   CODE_CONSTANTS_ENUMS_BITS_MATCH_KB_BREAK=format-constants-exclusion-reason-unjudged  排除表里没写理由的行不判
-#       format-constants-exclusion-red（输出里找不到「.claude/format-constants-exclude:3 research/frozen.rs 没写为什么排除」）
+#       format-constants-exclusion-red（输出里找不到「.claude/format-constants-exclude:3 research/prompts/frozen.rs 没写为什么排除」）
 #   CODE_CONSTANTS_ENUMS_BITS_MATCH_KB_BREAK=clause-enums  表里的名字按子串认作正文列举的一项
 #       clause-enums-red（输出里找不到「表里的「乙」不是 D99 已定项 1 正文那串列举里的一项」）
 #   CODE_CONSTANTS_ENUMS_BITS_MATCH_KB_BREAK=feature-bits  不判同一个（类别，位号）登记两行
@@ -122,11 +129,42 @@
 #       crash-point-replay-segments-red（输出里找不到「段号「01」不是非负整数」）
 #   CRASH_POINT_REPLAY_ITEMS_BREAK=segment-digest-unchecked  按段登记的摘要不核
 #       crash-point-replay-segments-red（输出里找不到「不是 64 位小写十六进制」）
-#   CRASH_POINT_REPLAY_ITEMS_BREAK=segment-duplicate-accepted  按段登记同一项同一段两行不红
+#   CRASH_POINT_REPLAY_ITEMS_BREAK=segment-duplicate-accepted  按段登记同一条流同一段两行不红
 #       crash-point-replay-segments-red（输出里找不到「已在第 」）
+#   CRASH_POINT_REPLAY_ITEMS_BREAK=segment-flow-name-unchecked  按段登记的流名不核写法
+#       crash-point-replay-segments-red（输出里找不到「流名「other-piped」不合写法」）
+#   CRASH_POINT_REPLAY_ITEMS_BREAK=segment-column-count-unchecked  按段登记不核每行五段
+#       crash-point-replay-segments-red（输出里找不到「crash-point-replay-segments.tsv:9 是 4 段，要五段」）
+#   GATE_ORDINAL_NAMES_BREAK=compound-names-unseen  ordinal-names 只认整名等于词表里的词，不按词边界认复合名
+#       ordinal-names-green（期望退出 0，实测 1）；ordinal-names-red（输出里找不到「crates/demo/src/main.rs:1 名字 enumerate_」）
+#   GATE_ORDINAL_NAMES_BREAK=shell-unscanned  ordinal-names 不扫 .sh
+#       ordinal-names-red（输出里找不到「scripts/demo/run.sh:2 变量 stream」）
+#   GATE_ORDINAL_NAMES_BREAK=comments-and-strings-judged  ordinal-names 不剥注释与字符串，里面的词也当名字判
+#       ordinal-names-green（期望退出 0，实测 1）
+#   GATE_ORDINAL_NAMES_BREAK=exclusions-ignored  ordinal-names 不认排除表
+#       ordinal-names-green（期望退出 0，实测 1）
+#   data-names 格的判法开关在 scripts/gate/data-name-lint.py（文件头列全，--selftest 证红）；这一道里打开时判错的样本：
+#   DATA_NAME_LINT_BREAK=string-literals-skipped  data-names 三种字面量形态一个都不扫
+#       data-names-green（期望退出 0，实测 1）；data-names-red（输出里找不到「scripts/experiments/e1_demo.rs:1  元组首列」）
+#   DATA_NAME_LINT_BREAK=kb-tables-skipped  data-names 不扫 kb 表格
+#       data-names-red（输出里找不到「.claude/kb/demo.md:3  kb 表格单元格」）
+#   DATA_NAME_LINT_BREAK=single-letters-passed  data-names 单字母放行
+#       data-names-red（输出里找不到「「x」是单字母」）
+#   DATA_NAME_LINT_BREAK=registered-ignored  data-names 不认样本自己的 .claude/abbreviations 里登记的缩写
+#       data-names-green（期望退出 0，实测 1）
+#   DATA_NAME_LINT_BREAK=numbered-ignored  data-names 不认 e<数字> 这类整类登记
+#       data-names-green（期望退出 0，实测 1）
+#   DATA_NAME_LINT_BREAK=exclusions-ignored  data-names 不认排除表
+#       data-names-green（期望退出 0，实测 1）
+#   DATA_NAME_LINT_BREAK=stale-exclusions-passed  data-names 排除表里已经没有违规的行、指向不存在路径的行不判
+#       data-names-red（输出里找不到「已经一个违规都没有了」）
+#   DATA_NAME_LINT_BREAK=comments-scanned  data-names 注释里的串也扫
+#       data-names-green（期望退出 0，实测 1）
+#   DATA_NAME_LINT_BREAK=call-arguments-judged  data-names 函数调用的字符串实参（左括号前是标识符）也当元组首列
+#       data-names-green（期望退出 0，实测 1）
 # mutation-tables、absolute-assertions 没有弄坏开关，reading-discipline 只有共用库那一项，判别力靠各自的样本。
 #
-#   bash .claude/gate.d/code-source-discipline.sh [项目根]                                十二格都跑
+#   bash .claude/gate.d/code-source-discipline.sh [项目根]                                十五格都跑
 #   bash .claude/gate.d/code-source-discipline.sh --list                                  逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/code-source-discipline.sh --check <格名>[,<格名>…] [项目根]         只跑点名的格
 set -uo pipefail
@@ -165,10 +203,14 @@ stage_cell mutation-light-rows cell_mutation_light_rows "crates/mutations.tsv �
   "照上面逐处列的改 .claude/gate.d/crates-mutation-light-rows.tsv（写法与挑法在它的表头）：缺测试目标的照那一句补行，点名的行被删或改名的换成同一个测试目标剩下行号最小的那一条；改完单跑 python3 scripts/mutation/crates-mutation-light-rows.py check 到它退 0"
 stage_cell gpu-exemptions cell_gpu_exemptions "不走 GPU 的计算与豁免表逐项对上：代码里每一处 // gpu-exempt: <截名> 都有表行、每一行都有标记" \
   "代码里不走 GPU 的那一截在函数上一行写 // gpu-exempt: <截名>，豁免表 .claude/gate.d/gpu-exemptions.tsv 登记同名一行（每加一行先问用户点头）；表里一处标记都没有的行，那一截上了 GPU 就删掉、没上就补标记；改完单跑 python3 scripts/crash/gpu-exemptions-check.py check 到它退 0"
-stage_cell crash-point-replay-segments cell_crash_point_replay_segments "崩溃点重放的按段登记成形：项名在合表里、段号与段写数是非负整数且段写数大于 0、摘要是 64 位小写十六进制、同一项同一段只一行" \
-  "照上面逐处列的改 .claude/gate.d/crash-point-replay-segments.tsv（写法在它的表头）：项名照合表 .claude/gate.d/crash-point-replay-items.tsv 写，段号与段写数写十进制整数、段写数大于 0，摘要写那一段写表的 sha256（64 位小写十六进制），同一项同一段只留一行；文件不在就照表头建回来；改完单跑 python3 scripts/crash/lib_crash_point_replay_items.py segments 到它退 0"
+stage_cell crash-point-replay-segments cell_crash_point_replay_segments "崩溃点重放的按段登记成形：每行五段、项名在合表里、流名合写法、段号与段写数是非负整数且段写数大于 0、摘要是 64 位小写十六进制、同一条流同一段只一行" \
+  "照上面逐处列的改 .claude/gate.d/crash-point-replay-segments.tsv（写法在它的表头）：每行五段（项名、流名、段号、段写数、段写表摘要），项名照合表 .claude/gate.d/crash-point-replay-items.tsv 写，流名照引擎驱动行的 flow= 写（字母起头，只许字母、数字与 _），段号与段写数写十进制整数、段写数大于 0，摘要写那一段写表的 sha256（64 位小写十六进制），同一条流同一段只留一行；文件不在就照表头建回来；改完单跑 python3 scripts/crash/lib_crash_point_replay_items.py segments 到它退 0"
 stage_cell crate-sources-reachable cell_crate_sources_reachable "每一份 .rs 都是某个 crate 的目标，或经 #[path]、mod、include! 引到，没有 cargo 不编的落空源文件" \
   "照上面逐份列的办：要编的在它那个 crate 的 Cargo.toml 里登记成 [[bin]]（或 [lib]、[[test]]），或从某个目标用 #[path]、mod 引它；不要了就删掉。判法在 scripts/gate/crate-sources-reachable.py 文件头"
+stage_cell ordinal-names cell_ordinal_names "代码里我们自己的名字（函数、变量、常量、模块、测试、环境变量、文件与目录）不带序号与位置词" \
+  "照 .claude/agent-common.md「写」一节改成说内容的名字（写它是什么、做什么，例 enumerate_crash_states、new_pool_file_creation_stream），改过的名字登记进 .claude/kb/term-renames.md；一时改不完的文件登记进 .claude/naming-ordinal-exclude（一行 <路径>  # 理由），排除表里指向不存在的与已经改完的行删掉，排除只缩不涨；词表是 .claude/naming-ordinal-tokens"
+stage_cell data-names cell_data_names "字符串字面量（元组首列、=> 右侧、键= 的键名）与 kb 表格里名字形态的串也按命名纪律判：单字母、没登记的缩写判红" \
+  "名字写全，或把缩写登记进 .claude/abbreviations（一行 <缩写>  # 全称与含义）；已经落进留存产物、改名要连产物一起重跑的存量登记进 .claude/data-name-lint-exclude（一行 <路径>:<串>  # 理由），排除表里已经没有违规的行与指向不存在路径的行删掉，排除只缩不涨；判法与开关在 scripts/gate/data-name-lint.py 文件头"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -313,9 +355,9 @@ cell_test_file_names() {
 # 权威在 kb 的 format-const 标记，紧挨着定这个值的那句话（文法与解析在 lib-format-const.py，doc-registries、checker-independence-and-sync 共用）：
 #     <!-- format-const: JOURNAL_HEADER_BYTES = 86 stale=hdr=84|room=428 -->
 # 判红：标记按文法读不出来（多写了键、值不是整数）；同一个名字登记两处（同一份文件里两次也算）；
-# research/、crates/ 源码里同名 const 的值与标记不等（只认类型是单个标识符、值是整数字面量的 const，同名的数组扫描表不算）；
+# scripts/experiments/、research/、crates/ 源码里同名 const 的值与标记不等（只认类型是单个标识符、值是整数字面量的 const，同名的数组扫描表不算）；
 # stale= 列的旧值字面串还留在 kb 正文或源码里。旧值只许留在「## 历史版本」之后与 *-history.md 里。
-# 扫哪些源码：`git ls-files --cached --others --exclude-standard` 列出的 research/、crates/ 下的 .rs（已跟踪的与还没跟踪、没被忽略的）；
+# 扫哪些源码：`git ls-files --cached --others --exclude-standard` 列出的 scripts/experiments/、research/、crates/ 下的 .rs（已跟踪的与还没跟踪、没被忽略的；research/ 下只剩 prompts/ 与 results/，扫它是为了冻结证据里的旧值照判、由排除表逐份放行）；
 # 被 .gitignore 忽略的编译副本不扫（例如 scripts/experiments/target/ 下的 crates 副本：本机有、干净的克隆里没有，扫它等于两台机器判出两个结果）。
 # 冻结证据（research/prompts/ 下原样保存的模型产出）改了就不是原样（.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」），
 # 登记在 .claude/format-constants-exclude（一行 <路径>  # 理由，目录写成以 / 结尾）：登记路径下的 .rs 既不比 const 的值、也不查旧值字面串。没有这个文件按空表算。
@@ -374,10 +416,14 @@ if not marks and not bad:
 
 # ---- 2. 源码里的 const 定义必须等于 kb 的现行值 ----
 # 格式常量模块住 crates/singlefs-format，同一套标记绑住它
+# 实验源码在 scripts/experiments/，冻结证据在 research/prompts/（排除表逐份放行），crates/ 照判
+scanned_roots = ["scripts/experiments", "research", "crates"]
+if format_constants_break == "format-constants-research-unscanned":
+    scanned_roots = ["scripts/experiments", "crates"]   # 弄坏开关：research/ 整片不扫，冻结证据里的旧值看不见、排除表那一行排不到文件
 if format_constants_break == "format-constants-ignored-files-scanned":
-    listed_sources = glob.glob('scripts/experiments/**/*.rs', recursive=True) + glob.glob('crates/**/*.rs', recursive=True)   # 弄坏开关：按盘上有什么扫，被忽略的编译副本也进来
+    listed_sources = [path for root in scanned_roots for path in glob.glob(f'{root}/**/*.rs', recursive=True)]   # 弄坏开关：按盘上有什么扫，被忽略的编译副本也进来
 else:
-    listing = subprocess.run(["git", "-c", "core.quotepath=false", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "scripts/experiments", "crates"], capture_output=True)
+    listing = subprocess.run(["git", "-c", "core.quotepath=false", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", *scanned_roots], capture_output=True)
     if listing.returncode != 0:
         print(f"  ⊘ 本次未跑：git ls-files 退 {listing.returncode}（{listing.stderr.decode('utf-8', 'replace').strip()[:200]}），分不出哪些 .rs 被 git 忽略")
         print("     → 在 git 仓里跑这一格；不是仓的目录（拷出来的树）判不了。")
@@ -1022,8 +1068,8 @@ PY
 # 另判三样那一道不判的：两行重复；点名的测试标了 #[ignore] 而参数里没有 --include-ignored；
 # `--` 之后的筛选词一个都筛不到点名的测试（libtest 比的是完整测试名：模块路径由点名的函数在哪个文件、套在哪几层内联 mod 里算出）。
 #
-# 这一格不跑变异（全表要逐条重编译，量级是小时），只保证装置在、形状对。research 那侧「表今天还会不会红」靠改实验代码时手跑
-# scripts/mutation/mutate.sh，门禁不跑：C40（变异表没存）。
+# 这一格不跑测试、不判抓不抓得到（逐条施加替换文只编译，归 checker-tier-research-build-and-replay 的 mutation-tables-compile 格），只保证装置在、形状对。
+# research 那侧「表今天还会不会红」靠改实验代码时手跑 scripts/mutation/mutate.sh，门禁不判：C40（变异表没存）。
 #
 # 样本：red 里 research 那侧有一份没有同名表的实验二进制（e2_naked）、一条锚点命中 0 次、一条替换文带 \& 的、一张不是 UTF-8 的表（setup.sh 现造）；
 # crates/mutations.tsv 那侧有锚点腐化、转义写进源码、文件列是目录、点名慢档用例没带开关、两种筛选词对不上、文件在拷贝范围外、
@@ -1036,6 +1082,7 @@ MUT_DIR=scripts/mutation/tables
 
 missing=(); malformed=()
 for src in "$BIN_DIR"/*.rs; do
+  case "$(basename "$src")" in lib.rs|main.rs) continue ;; esac   # crate 根的库与主二进制不是一份实验
   stem="$(basename "$src" .rs)"
   tsv="$MUT_DIR/$stem.tsv"
   if [[ ! -f "$tsv" ]]; then missing+=("$tsv 不存在（被测的是 $src）"); continue; fi
@@ -1347,7 +1394,7 @@ if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} +
   fi
   exit 1
 fi
-n=$(ls "$BIN_DIR"/*.rs | wc -l)
+n=$(ls "$BIN_DIR"/*.rs | grep -cvE '/(lib|main)\.rs$')   # 与上面的循环同一个射程：crate 根的库与主二进制不算
 crates_summary="；没有 crates/mutations.tsv"
 [[ -f crates/mutations.tsv ]] && crates_summary="；crates/mutations.tsv ${scope_row_count} 条的原文各命中源码一次（成形：六段，替换文可以空、其余五段不空；点名的测试名都是用例名）"
 crates_summary+="；门禁 checker-tier-crates-mutation-replay 的拷贝范围（${scope_copied}）：变异表 ${scope_row_count} 行改的文件都在里面，crates/ 下 ${scope_source_count} 份 .rs 里逃出 crates/ 的相对路径字面量 ${scope_literal_count} 处都在里面"
@@ -1550,7 +1597,8 @@ def blank_out(text):
     return "".join(out)
 
 # ── 被扫集合：一次扫描，两条判据与「没查的是哪些」都从它现算 ───────────────
-paths = sorted(path for pattern in BIN_GLOBS for path in glob.glob(pattern))
+paths = sorted(path for pattern in BIN_GLOBS for path in glob.glob(pattern)
+               if os.path.basename(path) not in ("lib.rs", "main.rs"))   # crate 根的库与主二进制不是一份实验
 if not paths:
     print(f"  ✗ {BIN_GLOB} 一个文件都没扫到")
     print("     → 怎么办：实验 bin 目录搬了家就同步改这一格里的 BIN_GLOBS（.claude/rules/path-moves.md）；")
@@ -2106,9 +2154,9 @@ cell_gpu_exemptions() {
 }
 
 # ── 格 crash-point-replay-segments：崩溃点重放的按段登记成形（判决 m3-crash-enumeration-merge-r3 第三节 J10、M4 第 15 条）
-# 判法只在 scripts/crash/lib_crash_point_replay_items.py segments（入口 scripts/crash/crash-point-replay.sh 开跑前调同一份）：
-# .claude/gate.d/crash-point-replay-segments.tsv 每一行四段（项名、段号、段写数、段写表摘要），项名在合表 .claude/gate.d/crash-point-replay-items.tsv 里，
-# 段号与段写数是非负整数且段写数大于 0，摘要是 64 位小写十六进制，同一项同一段只一行。
+# 判法只在 scripts/crash/lib_crash_point_replay_items.py segments（两个入口 scripts/crash/crash-point-replay.sh、scripts/crash/crash-amplification.sh 开跑前调同一份）：
+# .claude/gate.d/crash-point-replay-segments.tsv 每一行五段（项名、流名、段号、段写数、段写表摘要），项名在合表 .claude/gate.d/crash-point-replay-items.tsv 里，
+# 流名匹配 ^[A-Za-z][A-Za-z0-9_]*$（引擎按它取这条流的行），段号与段写数是非负整数且段写数大于 0，摘要是 64 位小写十六进制，同一（流名，段号）只一行。
 # 被判的根里合表与按段登记文件都没有：这一格本次无对象可判；合表在而按段登记文件不在判红（入口开跑前要读它）。
 # 管不到的：摘要是不是那一段写表真的 sha256、段号与段写数对不对得上那条流（引擎跑起来才知道），靠引擎那一侧与 review。
 cell_crash_point_replay_segments() {
@@ -2135,6 +2183,409 @@ cell_crate_sources_reachable() {
     return 77
   fi
   python3 "$STAGE_REPOSITORY/scripts/gate/crate-sources-reachable.py" "${directories[@]}"
+}
+
+# ── 格 ordinal-names：代码里我们自己的名字不带序号与位置词（用户 2026-10-13 定，records/2026-10-13-复用键与全仓改名.md）
+# 判据：git 列出的 crates/、scripts/、.claude/gate.d、.claude/hooks 下每一份 .rs、.sh、.py（这几处里的样本也算），下面三样名字按词边界含了
+#   词表 .claude/naming-ordinal-tokens 里的一个词，判违规，逐处列「文件:行 种类 名字（含 词）」：
+#   ① 文件名与它上面每一级目录名（目录名的违规记在那一级目录的路径上，同一个目录只报一次）；
+#   ② 源码里的名字：.rs 把注释与字符串字面量（含原始串、字节串、字符字面量）抹成空白之后的每一个标识符（函数、变量、常量、模块、类型、字段、
+#      测试、生命周期都在内；同一份文件同一个名字只报第一处）；.sh 的函数名、赋值（含 local / export / declare / readonly 与命令前的 X=…）、
+#      for / read 的变量与 $ 展开里的变量名（# 注释与单引号串去掉，双引号串里只留 $ 展开，引号可以跨行）；.py 经 tokenize 出来的每一个标识符
+#      （关键字除外）；.sh 里起 python 的 heredoc 正文按 .py 判，别的 heredoc 正文当数据，只认界符不带引号时里面的 $ 展开；
+#   ③ 环境变量名：.rs 里 env::var / var_os / env! / option_env! / set_var / remove_var / .env(…) 的字符串参数，.py 里 os.environ.get / [] / setdefault / pop、
+#      getenv / putenv / unsetenv 的字符串参数（.sh 里的环境变量就是变量，归 ②）。
+# 词边界：名字与词都先摊平——驼峰拆开（FooBar 拆成 foo、bar 两段）、大小写不分、字母数字之外的字符（_、-、.、/）一律当边界——
+#   词前后紧挨的不是字母或数字就算命中，复合名里夹着的也算；词后面紧跟一位数字的不算（那是另一个号）。
+# 判法是纯函数（ordinal_tokens_in 输入一个名字、输出命中的词；names_in 输入一份源文件的路径与文本、输出它的名字表），不起 cargo、不编译。
+# 词表一行一个小写词（字母起头，只含字母、数字与 _），# 后写为什么它是序号或位置词；写坏的行、同一个词登两行、没写理由的行判红，词表不在判红。
+# 还没改完的逐处登记在 .claude/naming-ordinal-exclude（一行 <路径>  # 理由；路径是文件，或目录名本身带词的那一级目录），登记的那一处的违规不判；
+#   排除项指向不存在的路径、那一处已经一个违规都没有了、或没写理由，判红（排除只缩不涨）。排除表不在等于一条都没排。
+# tokenize 认不出的 .py（与 .sh 里认不出的 python heredoc）逐个列在「扫了…」那一行，不算判过；一份 .rs / .sh / .py 都没列出来：这一格本次无对象可判。
+# 管不到的：注释、文档与输出文字里的序数与位置代称（归 doc-text 的 term-renames 格，只认 .claude/kb/term-renames.md 登记过的旧名，没登记的靠 review）；
+#   词表外的写法（别的序数词、位置词，要判就往词表里加）；词在名字里其实是别的意思（说「流里最早那一个下标」的名字也照判，改名或登记排除）；
+#   .sh 里命令的参数与数组下标、Rust 宏展开出来的名字。
+# red：一份 .rs 带 enumerate_ 接层序号的函数、一份 .sh 给带流序号的变量赋值，排除表一行指向已经改好名的文件、一行指向不存在的文件；
+# green：同样的词只出现在 .rs / .sh / .py 的注释与字符串里、词后面紧跟一位数字的名字、登记在排除表里还没改完的那一份 .rs。
+cell_ordinal_names() {
+python3 - <<'PY'
+import bisect, io, keyword, os, re, subprocess, sys, tokenize
+
+TOKENS_FILE = ".claude/naming-ordinal-tokens"
+EXCLUDE_FILE = ".claude/naming-ordinal-exclude"
+SCANNED_DIRECTORIES = ("crates", "scripts", ".claude/gate.d", ".claude/hooks")
+SUFFIXES = (".rs", ".sh", ".py")
+BROKEN = os.environ.get("GATE_ORDINAL_NAMES_BREAK", "")
+
+
+def registry(path):
+    """一行一条 `<条目>  # 理由` 的登记表：[(行号, 条目, 理由)]；文件不在返回 None。"""
+    if not os.path.isfile(path):
+        return None
+    entries = []
+    for number, line in enumerate(open(path, encoding="utf-8"), 1):
+        body = line.split("#", 1)[0].strip()
+        if body:
+            entries.append((number, body, line.split("#", 1)[1].strip() if "#" in line else ""))
+    return entries
+
+
+def normalized_words(name):
+    """名字按词边界摊平：驼峰拆开、全部小写、字母数字之外的一律当成 `_`。"""
+    name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
+    name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
+    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def token_patterns(tokens):
+    patterns = []
+    for token in tokens:
+        flat = re.escape(normalized_words(token))
+        if BROKEN == "compound-names-unseen":
+            patterns.append((token, re.compile("^" + flat + "$")))
+        else:
+            patterns.append((token, re.compile(r"(?<![a-z0-9])" + flat + r"(?![a-z0-9])")))
+    return patterns
+
+
+def ordinal_tokens_in(name, patterns):
+    """纯函数：名字里按词边界含了词表里的哪几个词（次序照词表）。"""
+    flat = normalized_words(name)
+    return [token for token, pattern in patterns if pattern.search(flat)]
+
+
+# ── 各语言里我们自己的名字：(行号, 种类, 名字) ──
+
+RUST_ENVIRONMENT = re.compile(r"(?:\benv::var(?:_os)?|\bvar(?:_os)?|\benv!|\boption_env!|\bset_var|\bremove_var|\.env|\.env_remove)\s*\(\s*$")
+RUST_LEXEME_START = re.compile(r"//|/\*|(?<![A-Za-z0-9_])b?r#*\"|(?<![A-Za-z0-9_])b\"|\"|'")
+RUST_BLOCK_COMMENT_EDGE = re.compile(r"/\*|\*/")
+RUST_STRING_BODY = re.compile(r"(?:\\.|[^\"\\])*\"", re.DOTALL)
+RUST_CHARACTER_LITERAL = re.compile(r"'(?:\\(?:u\{[0-9A-Fa-f]+\}|x[0-9A-Fa-f]{2}|.)|[^\\'\n])'")
+IDENTIFIER = re.compile(r"(?<![A-Za-z0-9_])(?:r#)?([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def line_of(line_starts, offset):
+    return bisect.bisect_right(line_starts, offset)
+
+
+def rust_names(text):
+    """.rs：注释与字符串字面量抹成空白后的每一个标识符（含生命周期与标签），加读写环境变量处字符串里的变量名。"""
+    names, code, index, length = [], [], 0, len(text)
+    line_starts = [0] + [match.end() for match in re.finditer("\n", text)]
+    blank = lambda piece: re.sub(r"[^\n]", " ", piece)
+    while index < length:
+        start = RUST_LEXEME_START.search(text, index)
+        if not start:
+            code.append(text[index:]); break
+        code.append(text[index:start.start()])
+        lexeme, index = start.group(0), start.start()
+        if lexeme == "//":
+            end = text.find("\n", index)
+            end = length if end < 0 else end
+        elif lexeme == "/*":
+            depth, end = 1, index + 2
+            while depth:
+                edge = RUST_BLOCK_COMMENT_EDGE.search(text, end)
+                if not edge:
+                    end = length; break
+                depth += 1 if edge.group(0) == "/*" else -1
+                end = edge.end()
+        elif lexeme == "'":
+            literal = RUST_CHARACTER_LITERAL.match(text, index)
+            if not literal:
+                code.append("'"); index += 1; continue
+            end = literal.end()
+        else:
+            opening = start.end()
+            hashes = lexeme.count("#") if "r" in lexeme else None
+            if hashes is None:
+                body = RUST_STRING_BODY.match(text, opening)
+                end = body.end() if body else length
+            else:
+                closing = text.find('"' + "#" * hashes, opening)
+                end = length if closing < 0 else closing + 1 + hashes
+            content = text[opening:end - 1 - (hashes or 0)]
+            if RUST_ENVIRONMENT.search("".join(code[-8:])[-40:]) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", content):
+                names.append((line_of(line_starts, index), "环境变量", content))
+        if BROKEN == "comments-and-strings-judged":
+            code.append(text[index:end])
+        else:
+            code.append(blank(text[index:end]))
+        index = end
+    stripped = "".join(code)
+    seen = set()
+    for match in IDENTIFIER.finditer(stripped):
+        name = match.group(1)
+        if name in seen:
+            continue
+        seen.add(name)
+        names.append((line_of(line_starts, match.start()), "名字", name))
+    return names
+
+
+SHELL_HEREDOC = re.compile(r"<<(-?)\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+SHELL_ASSIGNMENT = re.compile(r"(?:^|[\s;&|(`{!])([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]]*\])?\+?=")
+SHELL_FUNCTION = re.compile(r"^\s*(?:function\s+([A-Za-z_][A-Za-z0-9_:.-]*)|([A-Za-z_][A-Za-z0-9_:.-]*)\s*\(\s*\))")
+SHELL_EXPANSION = re.compile(r"\$\{?#?!?([A-Za-z_][A-Za-z0-9_]*)")
+SHELL_FOR = re.compile(r"(?:^|[\s;&|(])(?:for|select)\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b")
+SHELL_READ = re.compile(r"(?:^|[\s;&|(])read((?:\s+[^\s;&|<>)]+)+)")
+
+
+def read_variables(arguments):
+    """read 的参数里哪几个是变量名：-a 后面那一个是数组名，-d -i -n -N -p -t -u 后面那一个是选项值。"""
+    words, names, index = arguments.split(), [], 0
+    while index < len(words):
+        word = words[index]
+        if word.startswith("-"):
+            if word[-1] in "dinNptu":
+                index += 1
+            elif word[-1] == "a" and index + 1 < len(words):
+                names.append(words[index + 1]); index += 1
+        elif re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", word):
+            names.append(word)
+        index += 1
+    return names
+
+
+def shell_names(text, unjudged):
+    """.sh：函数名、赋值（含 local / export / declare / readonly 与命令前的 X=…）的变量名、for / read 的变量、$ 展开里的变量名。
+    逐字扫一遍：# 注释去掉，单引号串（与 $'…'）抹成空白，双引号串里只留 $ 展开，引号可以跨行；
+    heredoc 起头那一行起 python 的，heredoc 正文按 python 判；别的 heredoc 正文是数据，只认界符不带引号时里面的 $ 展开。"""
+    names, lines, number, quote = [], text.split("\n"), 0, None
+    while number < len(lines):
+        line = lines[number]
+        number += 1
+        out, index, heredocs = [], 0, []
+        while index < len(line):
+            character = line[index]
+            if BROKEN == "comments-and-strings-judged" and quote is None:
+                heredoc = SHELL_HEREDOC.match(line, index) if line.startswith("<<", index) and not line.startswith("<<<", index) else None
+                if heredoc:
+                    heredocs.append((heredoc.group(3), bool(heredoc.group(2)), heredoc.group(1) == "-"))
+                    index = heredoc.end(); continue
+                out.append(character); index += 1; continue
+            if quote is None:
+                if character == "#" and (index == 0 or line[index - 1] in " \t;|&("):
+                    break
+                if character == "\\":
+                    out.append(line[index:index + 2]); index += 2; continue
+                if line.startswith("<<", index) and not line.startswith("<<<", index):
+                    heredoc = SHELL_HEREDOC.match(line, index)
+                    if heredoc:
+                        heredocs.append((heredoc.group(3), bool(heredoc.group(2)), heredoc.group(1) == "-"))
+                        out.append(" " * (heredoc.end() - index)); index = heredoc.end(); continue
+                if line.startswith("$'", index):
+                    quote = "$'"; out.append("@ "); index += 2; continue
+                if character in "'\"":
+                    quote = character; out.append("@"); index += 1; continue
+                out.append(character)
+            elif quote in ("'", "$'"):
+                if quote == "$'" and character == "\\":
+                    out.append("  "); index += 2; continue
+                if character == "'":
+                    quote = None
+                out.append(" ")
+            else:
+                if character == "\\":
+                    out.append("  "); index += 2; continue
+                if character == '"':
+                    quote = None; out.append(" ")
+                elif character == "$":
+                    expansion = SHELL_EXPANSION.match(line, index)
+                    if expansion:
+                        out.append(" " + expansion.group(0)); index = expansion.end(); continue
+                    out.append(" ")
+                else:
+                    out.append(" ")
+            index += 1
+        code = "".join(out)
+        for match in SHELL_FUNCTION.finditer(code):
+            names.append((number, "函数", match.group(1) or match.group(2)))
+        for match in SHELL_ASSIGNMENT.finditer(code):
+            names.append((number, "变量", match.group(1)))
+        for match in SHELL_FOR.finditer(code):
+            names.append((number, "变量", match.group(1)))
+        for match in SHELL_READ.finditer(code):
+            names.extend((number, "变量", name) for name in read_variables(match.group(1)))
+        for match in SHELL_EXPANSION.finditer(code):
+            names.append((number, "变量", match.group(1)))
+        for delimiter, quoted, strip_tabs in heredocs:
+            body_start = number
+            while number < len(lines) and (lines[number].lstrip("\t") if strip_tabs else lines[number]).rstrip() != delimiter:
+                number += 1
+            body = lines[body_start:number]
+            number += 1
+            if re.search(r"(?<![A-Za-z0-9_./-])python3?(?![A-Za-z0-9_.-])", line):
+                inner_names = python_names("\n".join(body))
+                if inner_names is None:
+                    unjudged.append(f"第 {body_start} 行起的 python heredoc")
+                    continue
+                names.extend((body_start + inner, kind, name) for inner, kind, name in inner_names)
+            elif not quoted:
+                for offset, body_line in enumerate(body, 1):
+                    for match in SHELL_EXPANSION.finditer(body_line):
+                        names.append((body_start + offset, "变量", match.group(1)))
+    return names
+
+
+PYTHON_ENVIRONMENT_CALLS = ("environ.get", "environ.setdefault", "environ.pop", "getenv", "putenv", "unsetenv", "environ[")
+
+
+def python_names(text):
+    """.py：tokenize 出来的每一个标识符（关键字除外，f 串花括号里的表达式也算），加读写环境变量处字符串里的变量名；认不出返回 None。"""
+    names, previous, seen = [], [], set()
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(text).readline))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return None
+    for token in tokens:
+        if token.type == tokenize.NAME and not keyword.iskeyword(token.string) and token.string not in seen:
+            seen.add(token.string)
+            names.append((token.start[0], "名字", token.string))
+        elif token.type == tokenize.STRING:
+            tail = "".join(previous[-4:])
+            literal = re.fullmatch(r"[rRbBuU]?(['\"])([A-Za-z_][A-Za-z0-9_]*)\1", token.string)
+            if literal and any(tail.endswith(call) or tail.endswith(call + "(") for call in PYTHON_ENVIRONMENT_CALLS):
+                names.append((token.start[0], "环境变量", literal.group(2)))
+        if BROKEN == "comments-and-strings-judged" and token.type in (tokenize.STRING, tokenize.COMMENT):
+            for word in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", token.string):
+                names.append((token.start[0], "名字", word))
+        if token.type not in (tokenize.NL, tokenize.NEWLINE, tokenize.COMMENT, tokenize.INDENT, tokenize.DEDENT):
+            previous.append(token.string)
+    return names
+
+
+def names_in(path, text, unjudged):
+    """纯函数：一份源文件里我们自己的名字 [(行号, 种类, 名字)]；认不出的部分记进 unjudged（逐个列出，不算判过）。"""
+    if path.endswith(".rs"):
+        return rust_names(text)
+    if path.endswith(".sh"):
+        if BROKEN == "shell-unscanned":
+            return []
+        inner_unjudged = []
+        names = shell_names(text, inner_unjudged)
+        unjudged.extend(f"{path} {part}" for part in inner_unjudged)
+        return names
+    names = python_names(text)
+    if names is None:
+        unjudged.append(path)
+        return []
+    return names
+
+
+def main():
+    tokens = registry(TOKENS_FILE)
+    if tokens is None:
+        print(f"  ✗ 读不到序号与位置词表 {TOKENS_FILE}")
+        print("     → 怎么办：从 git 恢复它；这一格没有词表就什么都判不了，不是通过。")
+        return 1
+    table_problems = []
+    seen_tokens = {}
+    for number, token, reason in tokens:
+        if not re.fullmatch(r"[a-z][a-z0-9_]*", token):
+            table_problems.append(f"{TOKENS_FILE}:{number}「{token}」不是小写字母起头、只含小写字母、数字与 _ 的词")
+        elif normalized_words(token) in seen_tokens:
+            table_problems.append(f"{TOKENS_FILE}:{number}「{token}」与第 {seen_tokens[normalized_words(token)]} 行登记的是同一个词")
+        else:
+            seen_tokens[normalized_words(token)] = number
+        if len(reason) < 4:
+            table_problems.append(f"{TOKENS_FILE}:{number}「{token}」没写为什么算序号或位置词（# 后面至少 4 个字）")
+    patterns = token_patterns([token for _number, token, _reason in tokens])
+    excluded = registry(EXCLUDE_FILE) or []
+
+    listed = subprocess.run(["git", "-c", "core.quotepath=false", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", *SCANNED_DIRECTORIES],
+                            capture_output=True)
+    if listed.returncode != 0:
+        print(f"  ✗ git ls-files 退 {listed.returncode}：{listed.stderr.decode('utf-8', 'replace').strip()}")
+        print("     → 怎么办：在 git 仓的根上跑这一道；列不出文件就判不了，不是通过。")
+        return 1
+    paths = sorted(path for path in listed.stdout.decode("utf-8", "replace").split("\0") if path.endswith(SUFFIXES) and os.path.isfile(path))
+    if not paths:
+        print("  ! 本次无对象可判：" + "、".join(SCANNED_DIRECTORIES) + " 下一份 .rs、.sh、.py 都没列出来")
+        return 77
+
+    violations = {}  # 违规记在哪一处（文件或目录的路径） -> [行]
+    unparsed = []
+    directories_seen = set()
+    for path in paths:
+        parts = path.split("/")
+        for depth in range(1, len(parts)):
+            directory = "/".join(parts[:depth])
+            if directory in directories_seen:
+                continue
+            directories_seen.add(directory)
+            hit = ordinal_tokens_in(parts[depth - 1], patterns)
+            if hit:
+                violations.setdefault(directory, []).append(f"{directory}/ 目录名「{parts[depth - 1]}」（含 {'、'.join(hit)}）")
+        hit = ordinal_tokens_in(parts[-1], patterns)
+        if hit:
+            violations.setdefault(path, []).append(f"{path} 文件名（含 {'、'.join(hit)}）")
+        text = open(path, encoding="utf-8", errors="replace").read()
+        reported = set()
+        for number, kind, name in names_in(path, text, unparsed):
+            if (kind, name) in reported:
+                continue
+            hit = ordinal_tokens_in(name, patterns)
+            if hit:
+                reported.add((kind, name))
+                violations.setdefault(path, []).append(f"{path}:{number} {kind} {name}（含 {'、'.join(hit)}）")
+
+    excluded_paths = {entry for _number, entry, _reason in excluded}
+    problems, exclusion_problems = [], []
+    for owner in sorted(violations):
+        if owner in excluded_paths and BROKEN != "exclusions-ignored":
+            continue
+        problems += violations[owner]
+    for number, entry, reason in excluded:
+        if not os.path.exists(entry):
+            exclusion_problems.append(f"{EXCLUDE_FILE}:{number} 指向不存在的路径 {entry}")
+        elif entry not in violations:
+            exclusion_problems.append(f"{EXCLUDE_FILE}:{number} {entry} 里已经一个带序号或位置词的名字都没有了，这一行删掉")
+        elif len(reason) < 4:
+            exclusion_problems.append(f"{EXCLUDE_FILE}:{number} {entry} 没写为什么先不改（# 后面至少 4 个字）")
+
+    unparsed_note = "无" if not unparsed else "、".join(unparsed)
+    print(f"  · 扫了 {len(paths)} 份 .rs / .sh / .py 与它们所在的 {len(directories_seen)} 个目录，词表 {len(patterns)} 个词，排除 {len(excluded)} 条；"
+          f"tokenize 认不出、没判的 {len(unparsed)} 处：{unparsed_note}")
+    for problem in table_problems:
+        print(f"  ✗ {problem}")  # gate-lint:detail
+    if table_problems:
+        print(f"  ✗ {TOKENS_FILE} 有 {len(table_problems)} 行写坏了")  # gate-lint:summary
+        print("     → 怎么办：一行一个小写词（字母起头，只含字母、数字与 _），同一个词只登一行，# 后面写为什么它是序号或位置词。")
+    for problem in problems:
+        print(f"  ✗ {problem}")  # gate-lint:detail
+    if problems:
+        print(f"  ✗ {len(problems)} 处名字带序号或位置词（词表 {TOKENS_FILE}，按词边界认，复合名也算）")  # gate-lint:summary
+        print("     → 怎么办：按 .claude/agent-common.md「写」一节「名字、注释、文档、输出文字都不用序数或位置代称」改成说内容的名字（例 enumerate_crash_states、new_pool_file_creation_stream），")
+        print("                改过的名字登记进 .claude/kb/term-renames.md；一时改不完的文件登记进 " + EXCLUDE_FILE + "（一行 <路径>  # 理由），改完删那一行。")
+    for problem in exclusion_problems:
+        print(f"  ✗ {problem}")  # gate-lint:detail
+    if exclusion_problems:
+        print(f"  ✗ {EXCLUDE_FILE} 有 {len(exclusion_problems)} 行不起作用或没写理由")  # gate-lint:summary
+        print("     → 怎么办：指向不存在的与已经改完的那几行删掉；留着的每一行写明为什么先不改。排除只缩不涨。")
+    if table_problems or problems or exclusion_problems:
+        return 1
+    print(f"  ✓ 名字里没有序号与位置词（扫了 {len(paths)} 份 .rs / .sh / .py、{len(directories_seen)} 个目录，词表 {len(patterns)} 个词，排除 {len(excluded)} 条）")
+    return 0
+
+
+sys.exit(main())
+PY
+}
+
+# ── 格 data-names：以数据形式存在的名字也按命名纪律判（欠账 C430）
+# 判法只在 scripts/gate/data-name-lint.py：naming-lint 只查我们声明的名字，而字符串字面量与 kb 表格里还活着一批人真正读到的名字——
+#   scripts/experiments/*.rs 与 crates/*/src/**/*.rs 里的元组首列 ("名字", …)、=> "名字" 右侧、格式串里 键= 的键名，
+#   .claude/kb/**/*.md 表格单元格里反引号包着的名字（只认整串是 [a-z][a-z0-9_]*）。
+# 按同一套判：_ 切词，单字母判红，词在 naming-lint.sh 的缩写词表里（脚本从那份读，不另抄一份）或在脚本的补充缩写里（mac）而没登记进 .claude/abbreviations 判红；
+#   e<数字>、c<数字> 这类整类登记的编号放行。已经落进留存产物、改名要连产物一起重跑的存量逐条登记在 .claude/data-name-lint-exclude
+#   （一行 <路径>:<串>  # 理由；指向不存在的路径、已经一个违规都没有了的行、没写理由的行判红，排除只缩不涨）。
+# 成功句报：扫了几份文件、几个串，排除表放行了几条。扫不到一份 .rs 与 kb：这一格本次无对象可判（退 77）。
+# 管不到的：不是这三种形态的名字（结构体字段赋的字符串、函数调用的实参、拼出来的名字），词表之外的缩写，名字起得好不好，靠 review。
+# red：一份 .rs 里元组首列、=> 右侧、键= 各一个带缩写或单字母的名字，一份 kb 表格里一个带缩写的单元格，排除表一行指向已经改好名的串、一行指向不存在的文件；
+# green：样本自己的 .claude/abbreviations 登记了缩写与整类编号，同样的词只出现在注释、函数调用实参、围栏代码块与表格外的正文里，排除表登记的那个串还在。
+cell_data_names() {
+  python3 "$STAGE_REPOSITORY/scripts/gate/data-name-lint.py" "$ROOT"
 }
 
 stage_cells_run "$ROOT"

@@ -8,14 +8,14 @@
 #   核法与缺行时该补哪一行：python3 scripts/mutation/crates-mutation-light-rows.py check（门禁 code-source-discipline 的 mutation-light-rows 格调它）。
 # 2026-10-10 照挑法生成：变异表 3774 条成形的行里 1396 条改坏对象在 crates/singlefs-core/src/ 下，涉及 171 个测试目标，171 行。
 逐盘核退回只核总数	-p singlefs-core --lib
-空闲不随分配减（I-5.2 要红）	-p singlefs-harness --test overwrite_in_one_instance
-步 3：不写行（实例表照抄）	-p singlefs-harness --test writable_mount_takes_a_second_instance
+释放时清位图（立即复用）	-p singlefs-harness --test overwrite_in_one_instance
+步 3：暖机只推一次	-p singlefs-harness --test writable_mount_takes_a_second_instance
 步 4：影子账一个槽都不隔离	-p singlefs-harness --test rollback_by_a_forward_publish
 步 5：抬 F 的上限不看第 4 新的非空根	-p singlefs-harness --test reuse_after_raising_the_floor
 步 5：回收门槛不看环里最旧有效根	-p singlefs-core reclaim_floor_takes
 步 5：重建分配器时不认第 0 版树表单元（另一个进程里的第一个文件版本漏释放它）	-p singlefs-core rebuild_from_records_remembers
 步 5：提交内生块的 bump 游标不绕开开段之后才隔离或扣住的槽	-p singlefs-core commit_generated_bump_skips
-步 3：只做过 mkfs 的池重开后分配器不认 mkfs 写在单元区里的两个单元	-p singlefs-harness --test writable_mount_of_a_formatted_pool
+步 3：取号不核判定时算出的号（瞬时读错让判定与取号算出不同号，写进新号之后才发现）	-p singlefs-harness --test writable_mount_of_a_formatted_pool
 步 3：记录与根之间少一道屏障（实二二三起三条发布路径共用 persist_publish_writes，零单元发布那一段也少了这一道）	-p singlefs-checker-tier --test crash_enumeration_writable_mount_of_a_formatted_pool
 新池新建文件 步 1：mkfs 不核根环区域归属是不是第一版写死的 0 / 1 / 0	-p singlefs-harness --test mkfs_bytes_judged_by_the_checker
 增补 1：发布路径漏计数据单元的写（新池新建文件按种类的合计对不上录制器在设备一层记下的写）	-p singlefs-harness --test write_accounting_per_structure
@@ -24,11 +24,9 @@
 增补 2：提交内生块段耗尽不回落（C369）	-p singlefs-harness --test commit_generated_units_fall_back_when_the_segment_runs_out
 步 6：恢复从系统配置 tail 起逐条验证记录的点名单元、失配即中止（E78 的自我中止形态）	-p singlefs-checker-tier --test crash_enumeration_fixed_script_stream
 增补 2 第 21 行：暖机把 jsn 计数器写成 txg（C366；接在 jsn 40 之后时记录落进 jsn 1、2 那两格、tail 写 2）	-p singlefs-harness --test warm_up_journal_counter
-增补 2 第 20a 行：取号之前的预演只演写行那一次、暖机那几次不演（预演与真发取到的落点对不上，挂载自己的断言判出）	-p singlefs-harness --test row_publish_admission
 增补 2 第 11 行：新池新建文件的改动计数写回 1（字段表定义是最后一次改动所在发布的 checkpoint_txg = 3）	-p singlefs-harness --test new_pool_file_creation_publish
-Z1-d：复用时新记录罩住的已回收记录不删（I-5.4 要红）	-p singlefs-harness --test reused_allocation_record_overlap
 增补 3 第 1 件：随机历史快档判出「复用时追加记录而不改写」（第 41 行同一处）	-p singlefs-harness --test random_histories
-增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2h）：分配器用户数据那一处把「每块盘上都没有」报成「小盘写满」；小盘段判出	-p singlefs-harness --test admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments
+实审 A4d C545 准入先拒（用户 2026-09-27 定）：发布路径不在走固定点之前判「这次的单元落得下」（改回去：段外落不下时走到固定点、交回 PlacementRefused）	-p singlefs-harness --test admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments
 系统配置四类：整理三水位不再写内置默认的 0（字节数不变、盘上 24 字节变了）	-p singlefs-harness --test system_configuration_mutability_classes
 增补 3 第 4 件（被测的性质）：发布落盘阶段的块设备错改成 panic，不再把错返回上来	-p singlefs-harness --test fault_injection_fast_tier
 增补 3 第 4 件：一块盘两个系统配置槽都无效就整体 return Err（每盘一份的冗余当场作废，D22 已定项 8 第 1 条）	-p singlefs-harness --test system_configuration_per_device_redundancy
@@ -39,7 +37,7 @@ Z1-d：复用时新记录罩住的已回收记录不删（I-5.4 要红）	-p sin
 恢复先信 tail：扫描的范围从全环改成「tail 为它作过证的那些记录」（counter ≤ 系统配置槽里的 tail），tail 陈旧时它之上必须施加的记录整段丢掉（C29、D23 已定项 3 硬要求 1）	-p singlefs-harness --test recovery_reads_the_created_file_after_reopen
 增补 2 收口第 27 行：影子账隔离只铺记录起点那一槽，不按记录的跨度铺位	-p singlefs-harness --test unreadable_abandoned_root_slot
 C506：挂载不判每区槽数 S 的区间（盘上自述 3 或 17 照样挂）	-p singlefs-harness --test system_configuration_slots_per_region
-步 3 验收：取号之后没有屏障（取号的系统配置槽写与写行那次发布的单元写并成一段）	-p singlefs-checker-tier --test crash_enumeration_acquisition_barrier
+步 3 验收：取号之后没有屏障（取号的系统配置槽写与写行那次发布的单元写并成一段）	-p singlefs-checker-tier --release --test crash_enumeration_acquisition_barrier
 C511 第 3 步（D8 已定项 8 ②）：回退行那次发布的树 ID 水位沿回退到的那一版带，不取根环里的 max；偏向回退的随机历史抽样判出 I-7.8（这一档的必红是抽样断言，随测试周期的种子基重验）	-p singlefs-harness --test tree_identifier_watermark_after_the_first_file_root_is_abandoned
 增补 2 第 61 行（C519 已知丢失）：施加前的点名单元验证改成任一条位置条目验过即过（改法 Z2 被悄悄落地时已知丢失那条先红）	-p singlefs-harness --test whole_device_loss_after_warm_up
 增补 2 第 9 行 P1（C497）：树表 0 条的一版上写行时分配记录树节点先于实例表取落点	-p singlefs-harness --test presumed_clause_checks
@@ -47,30 +45,28 @@ C511 第 3 步（D8 已定项 8 ②）：回退行那次发布的树 ID 水位�
 C483 ②：树节点的位置提示读不出时不经映射回退（直接报 UnitUnreadable，挂载态与冷走读一起退回）	-p singlefs-harness --test tree_nodes_and_the_central_mapping_on_mounted_read
 C318 实现：准入读数的「被抛弃根独占量」不取影子账隔离的槽、恒 0（影子账隔离的单元又不进不等式）	-p singlefs-harness --test admission_formula_on_the_mounted_state
 实例表第二片：读者读到第 0 片就停，下一片的行不接	-p singlefs-harness --test instance_table_chain_read
-实例表第二片：片数向下取整（370 行算一片）	-p singlefs-harness --test instance_table_page_full
+实例表第二片写路径：写行那次只给第 0 片取落点（多于一片的链装不出来，一次挂载写 370 行就失败）	-p singlefs-harness --test instance_table_page_full
 C394（释放判定不核映射条目位置项里的单元校验和）：释放之前读盘核校验和那一核拿掉（位置项的校验和比不比都当对得上），被改坏的那一份照常回到空闲池	-p singlefs-harness --test release_checksum_quarantine
 并行线一：C490：extent 叶记录 key 的 offset 段写成单元序号（并行线一验收第 4 条第二个变异：读回错位判红）	-p singlefs-harness --test sequential_write_split_into_one_unit_transactions
-K2：extent 树下段根的层级取「罩的单元数大于单元数」的最低一层（144 个单元装满一片叶时白长一层）	-p singlefs-harness --test multi_unit_file_write_and_read
-并行线一：层 0：一次多条记录的发布每条记录都带末条标志（里程碑并行线一验收第 4 条第一个变异「提交标记提前到第一条记录」：崩在记录之间时半次发布施加上去）	-p singlefs-checker-tier --test crash_enumeration_multi_record_publish_stream
-C518（一次挂载之内环转过一圈之后不回收）：挂载内不按根环表回收（表照记、谓词放行的槽留在 defer 里）	-p singlefs-harness --test root_ring_turn_in_one_mount
+并行线一：C394：释放之前读盘核校验和只走这次重写的角色（文件变短换下的尾巴不核，被改坏的那一份照常回到空闲池）	-p singlefs-harness --test multi_unit_file_write_and_read
+并行线一：崩溃点重放：一次多条记录的发布每条记录都带末条标志（里程碑并行线一验收第 4 条第一个变异「提交标记提前到第一条记录」：崩在记录之间时半次发布施加上去）	-p singlefs-checker-tier --test crash_enumeration_multi_record_publish_stream
+C517（固定点分配被拒之后同一进程里写不出去）：挂载内不回收时同一次挂载里写不出去（C518 那一处）	-p singlefs-harness --test root_ring_turn_in_one_mount
 C518（一次挂载之内环转过一圈之后不回收）：挂载内不回收时，环转过 (1, 5) 之后那一版的记账又多于遍历（C518 那一处）	-p singlefs-harness --test checker_known_bad_images
 增补 2 收口表第 39 行那一族：取号之前的预演取不到落点也照样取号（240 槽小盘上可写挂载取号之后才被落点拒绝、盘上已经写了）	-p singlefs-harness --test admission_raises_the_floor_before_refusing
 收口表第 13 行 N2：重建时读不出的数据单元不容下（照今天整次挂载失败）	-p singlefs-harness --test rebuild_with_an_unreadable_data_unit
-实二十：层 0 L8：恢复把不带末条标志的记录也当末条（半次发布施加上去）	-p singlefs-checker-tier --test crash_enumeration_record_spill_over_stream
+实二十：崩溃点重放 L8：恢复把不带末条标志的记录也当末条（半次发布施加上去）	-p singlefs-checker-tier --test crash_enumeration_record_spill_over_stream
 实例表第二片写路径（D3 已定项 10 ⑤，用户 2026-09-24 定尾片先）：各片在 bump 次序里第 0 片先（头片先）	-p singlefs-harness --test instance_table_second_page_write
-树分裂 内部节点头里的 key 区间写成 [最小, 最小]（不是子树覆盖区间，D18 已定项 2）	-p singlefs-harness --test accounting_and_mapping_tree_split
+实审 A3d：重建读中央映射树不判节点头（分隔 key 藏住一把 key：可写挂载改由规划那一步拒，不是重建报 I-1.1）	-p singlefs-harness --test accounting_and_mapping_tree_split
 树分裂 映射树内部节点容量按 key + 87 算（143 变 142）	-p singlefs-harness --test mapping_tree_capacity_admission
 树分裂 记账树叶容量按格式多算一条（478：80 块盘切成 240 + 243）	-p singlefs-harness --test accounting_tree_node_full
-树分裂 层 0：冷走读核映射条目数时记账树按一个节点算（多层记账树的镜像走读失败）	-p singlefs-checker-tier --test crash_enumeration_tree_split_streams
+树分裂 崩溃点重放：冷走读核映射条目数时记账树按一个节点算（多层记账树的镜像走读失败）	-p singlefs-checker-tier --test crash_enumeration_tree_split_streams
 增补 2 第 20a 行：取号之前的预演报了写行那次的错也照样取号（取号之后发布才被拒，实例代号已经烧掉）	-p singlefs-harness --test row_publish_checks_before_acquisition
-实二二三 a（D23 已定项 14「这一版的失败处置」）：冻结着一次没重发的发布时发布路径不拒（另建下一次发布，同一 (实例, txg) 留下两条末条）	-p singlefs-harness --test publish_failure_resent_unchanged
-实二二三 f（D23 已定项 17，实十六接续 Q7）：树表 0 条的一版上写行不按写入口装的「一条记录装几项」切（点名项装不下一条也只写一条）	-p singlefs-harness --test multi_record_publishes_of_transaction_zero
 实二六（代码三方 m2-final-code-r3 判决第三节「算术」、第四节第 3 条）：读侧把盘尾那半个槽算成一槽（读侧与写侧分叉，根层级差一层）	-p singlefs-harness --test allocation_record_tree_root_level_of_writer_and_reader
-实二七（fsync 失败掉盘的核查，调度记录 2026-09-24 第三节；D2 已定项 13 挂载准入、D18 已定项 11 可写挂载的顺序与前提）：有盘不带所选那一版也照样取号（拒可写那一句关掉），盘 1 是空盘时挂成可写	-p singlefs-harness --test fsync_drop_and_devices_without_the_selected_version
+实二七（fsync 失败掉盘的核查，调度记录 2026-09-24 第三节；D2 已定项 13 挂载准入、D18 已定项 11 可写挂载的顺序与前提）：所选那一版那次发布末条记录的 jsn 计数器取 0，停在旧状态的盘不算落后	-p singlefs-harness --test fsync_drop_and_devices_without_the_selected_version
 实一（回退改形态：格式与系统配置，D22 已定项 9 / 15、D15 已定项 4、D22 已定项 7）：读系统配置槽不读 F、一律交回 0	-p singlefs-harness --test system_configuration_rollback_floor_and_layout_identity
 实二（回退改形态：SysPre 与 B1，D16 已定项 1 / 7、D22 已定项 7 / 9、I-7.9 / I-7.12、C556 / C557）：F_生效 不读系统配置里的 F、只取根上带的	-p singlefs-checker-tier --test rollback_floor_written_into_the_system_configuration_first_and_normal_unmount
 实三（D23 已定项 14「水位」）：回退那次的 inode 号水位只取环里读得出的根，不与内存里现行那一版的取 max	-p singlefs-harness --test unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over
-实五 崩在准入推的那一串空发布中间：抬 F 那一串不先写系统配置（带新 F 的根落盘而系统配置里还是旧 F，I-7.12 判红）	-p singlefs-checker-tier --test crash_enumeration_floor_raise_pushed_by_admission
+实五 崩在准入推的那一串空发布中间：抬 F 那一串不先写系统配置（带新 F 的根落盘而系统配置里还是旧 F，I-7.12 判红）	-p singlefs-checker-tier --release --test crash_enumeration_floor_raise_pushed_by_admission
 实审A1 第17条：可写挂载不逐项比调用方参数与盘上系统配置（一律当一致）	-p singlefs-harness --test writable_mount_refuses_caller_parameters_disagreeing_with_the_system_configuration_on_disk
 实审A1 第18条：盘表里同一个设备身份交两次不拒	-p singlefs-harness --test writable_mount_refuses_a_device_identity_handed_in_twice
 实审A1 第19条：取号写之前不过屏障（上一次轮换与取号写同段）	-p singlefs-harness --test system_configuration_slot_is_overwritten_only_after_a_barrier
@@ -90,15 +86,13 @@ Z3-A 乙：挂着之后收盘表的入口不核盘「可见」（正常卸载收
 实审 B3c-3（树表 0 条的一版上写行那一版比实例表与分配代）：写行那次发布不交回这次写出的单元	-p singlefs-harness --test model_comparison_judges_the_instance_table_and_allocation_generations_of_a_version_without_a_file
 A3a 第 33 条：重建读记账树退回只按形状核（重复 key 的记账叶又交给写行那次发布规划）	-p singlefs-harness --test corrupt_on_disk_content_is_refused_instead_of_panicking
 C554 乙-配置续：取号写的 tail 退回 0（连着两次取号之后见证丢了，可写挂载抛弃读不出的最新根）	-p singlefs-harness --test acquisition_writes_the_witnessed_journal_tail_so_two_crashed_acquisitions_still_witness_the_newest_publish
-C554 乙 模型跟进：可写挂载只写上一个实例那一行、不写中间实例行（烧掉的号那一形护；崩溃恢复写 (2, 0, 0) 那一形乙之后拒可写、checker 那份改走事务层）	-p singlefs-harness --test row_publish_record_without_its_root
 实审 A3c Q1：取号屏障之前不核每块盘两槽读不读得出（读不出的盘拒到屏障之后，录制流多一道屏障）	-p singlefs-harness --test acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics
 C577：发布在系统配置轮换之后不过屏障就返回（每条发布路径返回之后见证值可以落后）	-p singlefs-checker-tier --test a_publish_returns_only_after_the_system_configuration_rotation_is_durable
 I-9.16 树表排序：冷走读不判（改回只在重建上一版里判）	-p singlefs-harness --test tree_table_ordering_is_judged_by_the_cold_walk_and_the_checker
 合入后验证一：C554 乙关掉，崩溃恢复抛弃根又造得出被抛弃的根（落到实例 2）	-p singlefs-checker-tier --test crash_injection_campaign
 C577 结清 ③：零单元发布落盘失败时原样重发一次（冻结再重发的形态），轮换之后那道屏障报错一次时挂载照常做成	-p singlefs-harness --test a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error
 代码三方第二轮 Y2-a：会话发布不核落后支（旧快照的盘照常收到本池的写）	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices
-合入后验证二第 10 件②（core 与 checker 收同一张表，C 格）：core 读者不判根环起点等不等第一版常量，根环起点写 65 core 照挂而 checker 报 I-7.13	-p singlefs-harness --test system_configuration_fields_core_and_checker_refuse_the_same_table
-C393 (b)-从映射现算（用户 2026-09-28 定）：从映射一律现算不成，回到读不出就重读、再拒可写	-p singlefs-harness --test an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping
+遗留改动代码轮 LR3（攻方变异 raise-no-restore）：抬 F 那一串的影子账交 Err 时不把分配器换回抬 F 之前那一份	-p singlefs-harness --test an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping
 收口表第 ② 行算进（用户 2026-09-28 定）：实现的 F_生效 不算被抛弃根带的 F	-p singlefs-harness --test an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor
 胶水把核报的「所选根那次发布带末条标志的多于一条」当不变量破坏 panic（G6 改回去）	-p singlefs-harness --test recovery_anchor_failure_carries_the_counters_the_prefix_kernel_saw
 文件后端写零退回真写（C603：不打洞，每次都逐块写 0，一池 1.5 GiB 的 0 进页缓存）	-p singlefs-harness --test mkfs_on_image_files_punches_the_zeroed_ranges
@@ -123,7 +117,6 @@ C581 树表条目的根指针不判 extent 偏移	-p singlefs-harness --test poi
 三·2 第 7 条 ④：标签 6 的 n_live 恒取 0（每一版标签 6 与镜像现算的对不上）	-p singlefs-harness --test unlink_idempotence_criteria_and_rollback_to_the_emptied_version
 三·2 第 5 条：ckpt_cost 不算谱系那一项	-p singlefs-harness --test rollback_lineage_record_and_its_checkpoint_cost_term
 三·2 第 7 条：长高那次把留在原位置的旧根当作被这次换下（释放还在用的节点）	-p singlefs-harness --test container_trees_grow_a_level_when_the_root_is_full
-三·2 删除批代码轮 U2：删除批只改尾叶那一判把「末个单元等于留下的个数」那片叶也算整片留下（< 改 <=）	-p singlefs-harness --test unlink_of_a_file_spanning_two_extent_lower_leaves_in_product_batches
 K3-⑨ 两道防线至少留一道：恢复交给前缀核的点名验证开关恒为不验（记录已持久而它点名的单元两份都没落时照样施加、走读失败）	-p singlefs-harness --test named_unit_verification_stands_in_for_the_barrier_before_the_record
 根环补洞甲：由记录重建的根的实例表指针照抄所选根（专用清扫发布崩在记录已持久、根槽没持久那一形施加出旧链）	-p singlefs-harness --test replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment
 系统配置见证读取 R2（C331，用户 2026-10-03 定）：判不出的后一半拿掉（有槽报读错就判不出，回到甲-读错）	-p singlefs-harness --test system_configuration_witness_is_undecidable_only_when_a_slot_reports_a_read_error_and_no_device_verified_both
@@ -131,7 +124,6 @@ E171 装置 取号那一核「一份自证过的都没有」写成「不多于�
 遗留改动代码轮 LR1（攻方变异 slot1-only-both）：见证读只看每块盘的槽 1，最新的偶数世代那一槽（槽 0）两盘都报读错照样可写挂载	-p singlefs-harness --test a_writable_mount_with_system_configuration_slot_zero_unreadable
 C673 ④ 理想模型给卸载的答（D16 已定项 1「正常卸载」）：实现卸载把 F 抬到现行那一版带的 F（原地不动）而不是它的 txg（E171 第 42 行的形态，由模型对拍判）	-p singlefs-harness --test model_answers_unmount_with_the_floor_at_the_current_version
 C670（16-3）判别力（E171 第 242 行）：发布的持久顺序把系统配置槽轮换挪到根槽 FUA 写之前，崩溃注入第二截判拒得不合法	-p singlefs-checker-tier --lib
-E2 进程内重读了挂载时读不出的槽却不按读到的改根环表	-p singlefs-harness --test root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window
 RR2 M-F：恢复由记录重建根时卸载记号照抄所选根	-p singlefs-harness --test unmount_marker_of_a_root_rebuilt_from_the_records_of_the_unmount_sequence
 只读挂载把 inode 树内部条目子指针不能解引用报成条目宽窄于字段表	-p singlefs-harness --test mounted_read_tells_a_narrow_inode_internal_entry_from_a_child_pointer_it_cannot_dereference
 D19 已定项 3 树表条目的根指针只判 extent 偏移（MAC 非 0 照读）	-p singlefs-harness --test pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_every_tree_reader
@@ -140,24 +132,17 @@ C673 ⑤ I-9.27 判别力（攻方 M1）：发布写树表时非 0 的头 ID 一
 C673 ⑥ I-5.5 判别力（实审 A2c 第 15 条那一形）：用户数据落点不从单元区起点起扫，新池新建文件的数据单元不在 U + 4（默认环）	-p singlefs-harness --test pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement
 删除批第 14 批 GA：卸载那一格回收的槽整截当场放开（改回丙1，不按每块盘上最新有效根取小），h2 窄盘续做之后单盘幸存读回	-p singlefs-harness --test a_lone_surviving_device_reads_back_what_it_read_before_the_unmount
 第9批 RS1：重读读出有效根的那一槽不算这个进程知道住着根的槽（之后那一槽读坏，准入抬 F 按没有根往下走、发了写）	-p singlefs-harness --test root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread
-第9批 清扫 C597 判别力「不抹就删」：抹头那一步不写（照发清扫发布删行，孤儿头留在盘上）	-p singlefs-harness --test instance_table_sweep_at_the_end_of_a_writable_mount
-第9批 清扫 C597 判别力 F5「不抹就删」：抹头那一步不写，删行那一版生效的崩溃态里孤儿头都还在（层 0 观察者 F5 红）	-p singlefs-checker-tier --test crash_points_of_the_instance_table_sweep
+第9批 清扫认领规则：认出一个单元之后只跳一槽（数据单元第二个槽里内容的伪头被当成单元抹掉）	-p singlefs-harness --test instance_table_sweep_at_the_end_of_a_writable_mount
+第9批 清扫 C597 判别力 F5「不抹就删」：抹头那一步不写，删行那一版生效的崩溃态里孤儿头都还在（崩溃点重放观察者 F5 红）	-p singlefs-checker-tier --test crash_points_of_the_instance_table_sweep
 删除批第 16 批 甲：可写挂载重建分配器时当场放开不取 min(F_生效, m)（照原门槛整截当场放开），形 R 剩下盘 1 读回（h2 窄盘与 4 GiB 盘两形同一个测试二进制）	-p singlefs-harness --test the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads
-RGall 进程内回收门槛改回一圈窗口（K1 连崩 11 次之后挂载：实例 1 留在洞里的根引用的单元当场回收）	-p singlefs-harness --test reclaim_floor_takes_the_oldest_valid_root_of_the_whole_ring_after_crashes_before_the_row_root
-RGall 进程内回收门槛改回一圈窗口（洞里 txg 7 的根引用的单元在 txg 35 起被回收）	-p singlefs-harness --test one_revolution_window_after_a_hole_in_the_root_ring
-RGall 回退候选集改回判一圈窗口（洞里 txg 7 的根在现行那一版的窗口外，回退被拒）	-p singlefs-harness --test rollback_target_left_in_a_hole_outside_the_one_revolution_window_is_a_candidate
-RGall 抬 F 的上限与「非空」改回只取一圈窗口里的有效根（洞里 txg 6、7、8 不算，上限从 6 抬到 21）	-p singlefs-harness --test raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount
 26-3 分配器回落计数不加	-p singlefs-harness --test allocator_fallback_count_on_small_devices_after_repeated_mounts_and_the_first_file
 O1 跨叶容器 135 片边界（实现）：叶容器数的上限放宽一片，第 136 片照收	-p singlefs-harness --test inode_tree_leaf_containers_appended_one_at_a_time_up_to_what_one_root_node_holds
 第28批 G1 攻方 MUT-A：core 的 T_time 内置默认 5000 毫秒改 4000（挂载透明「R2 = 内置默认」的期望照条款写死才抓得到）	-p singlefs-harness --test mount_transparency_judged_field_by_field_after_a_writable_mount
-第10e批 重建分配器读根环那一遍一条有效根都没读出时不重读、当场拒（删掉重读那一遍）	-p singlefs-harness --test rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read
+第10e批 重读那一遍还读不出有效根时不拒、照旧给空表往下写	-p singlefs-harness --test rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read
 删除批第 19 批 C2：unlink 的产品批大小改成整个文件一批（data_units_per_batch 的产品那一臂取 u32::MAX），一次发布换下整个文件的数据单元	-p singlefs-harness --test unlink_writes_per_transaction_do_not_grow_with_the_file
-C479：写入口装 inode 号水位开关那一句不生效（压回去也照记账的水位发号）	-p singlefs-harness --test inode_number_watermark_pressed_back_reissues_a_number
-C551：记根时环转了也不回收（mkfs 同进程会话转过根环之后 defer 不放、I-3.1 红）	-p singlefs-harness --test root_ring_turn_in_the_make_filesystem_session
 E171R1 装置 U12 那一侧：第 31 批 core 记根断言删掉、没装根环表的分配器静默返回（登记修订 6 第 6.7 节第 4 条）	-p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes
 E156 M35（第 5 次重跑登记第九节改写）：真实分配器装着根环表而记根时不回收（原 PC-分配器 的现象）	-p singlefs-checker-tier --bin e156_allocation_basis_counts
 第 21 批 C479 新池新建文件那一支：发布路径不读开关、照旧写死 2（开关装着发新池新建文件也不 panic）	-p singlefs-harness --test inode_number_watermark_switch_on_a_publish_without_a_previous_version
-第10g批 Q4 rr2 拿掉「一块盘没读出也重读」（192 槽起点只坏重建那一遍、盘 0 报读错：m 取不到、当场只放到环里最旧有效根，窄盘上取号之前拒）	-p singlefs-harness --test rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root
 第10g批 影子账候选过滤改回一圈窗口（锚取这一遍读出的最新有效根、长 3S：洞里窗口外的有效根不豁免它与被抛弃的根同引用的槽，隔离数变多）	-p singlefs-harness --test shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring
 I-2.4 根记录的树表指针只判 extent 偏移（树表指针算法类型 1 的根照择）	-p singlefs-harness --test root_record_pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_both_mounts
 第33批 三·4 删除流（接在多记录流后面 unlink）：最后一批不删 deleted_inodes 那条 key（删 key 不与最后一批同一次发布），流的判器红	-p singlefs-checker-tier --test crash_enumeration_unlink_after_the_multi_record_publish_stream
@@ -168,7 +153,7 @@ I-2.4 根记录的树表指针只判 extent 偏移（树表指针算法类型 1 
 第33批T F2 乙末条读得出那一支恒见证过（不退）	-p singlefs-harness --test recovery_and_both_mounts_fall_back_to_the_version_the_system_configuration_witnessed
 第33批T C695 甲映射根是空指针时照旧先读映射	-p singlefs-harness --test mounted_read_reports_an_empty_tree_table_before_reading_an_empty_mapping_root
 第36批 V ①b 每批写入时间带进程内计数（意图之后的镜像）	-p singlefs-harness --test unlink_crash_image_remounted_twice_continues_to_identical_disks
-第10z批 抬 F 那一串的被抛弃根改回从盘上重读账（挂上之后 C 的账读不出：正常卸载照 B 拒）	-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table
+第10z批第四块 H1 有效根的槽读坏重读仍坏也不拒（抬 F 那一遍知道住着根的槽一个都不按拒处置）	-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table
 第37批 回收时补隔离不看水位之上没施加的记录点名的落点（删掉 placements_the_isolation_still_protects 里那一句 protected.extend，现行账里被豁免、这次挂载释放又回收的槽当场空闲）	-p singlefs-harness --test writable_mount_keeps_a_released_slot_named_by_an_unapplied_record_isolated_until_its_root_ring_slot_is_overwritten
 删除线第38批 C_NEWER_ROOTS C 不并较新可读根的账（覆盖写 R 的映射根与记录读回全零）	-p singlefs-harness --test writable_mount_isolates_newer_readable_roots_and_mapping_recomputed_accounts_when_records_are_missing
 删除线第38批 F1_AFTER_F2 F2 退回之后不按退到的那一版再判 F1（缺第 1 条、树表读回全零）	-p singlefs-harness --test writable_mount_rejudges_missing_records_after_falling_back_to_the_witnessed_version
@@ -176,6 +161,9 @@ I-2.4 根记录的树表指针只判 extent 偏移（树表指针算法类型 1 
 删除线第42批 F2_NEWEST 不按所选根的实例表滤（只有 R 的实例表抛弃 V 的世界上 CPU 退到 V、不落 V⁻）	-p singlefs-checker-tier --features verdict-store,gpu --test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state
 删除线第43批 C_MAPPING 那一拒照旧报被抛弃根那一个成员（与 C393 那一拒分不开）	-p singlefs-harness --test writable_mount_refusal_for_an_unreadable_account_with_incomplete_records_judged_on_the_d23_list
 第49批 W3 补做 ckpt_cost：记账树那一项退回拿上一版的节点数（台阶行跨过一片叶那次少算）	-p singlefs-harness --test accounting_tree_grows_a_level_when_inode_number_watermark_steps_cross_one_leaf
-第 50 批 R1：退役记录的死亡 txg 取这次发布的前一个 txg（不是身份消失那一次）	-p singlefs-harness --test inode_leaf_absorb_and_borrow_on_the_unlink_path
+第 50 批补做 R3：发布路径上左吸收右之后右边每一片按位置重写、按位置换下（退回改之前的写法，40 片那一次比 20 片多写）	-p singlefs-harness --test inode_leaf_absorb_and_borrow_on_the_unlink_path
 第53批 F1 M3 先查左邻：随机历史上发布路径与按条款另写的叶形状参照逐次比（攻方 M4）	-p singlefs-harness --test inode_leaf_merge_and_borrow_against_an_independent_reference
-第57批 H1 写侧早关一片（攻方 w-close-one-early：旋钮 K ≥ 2 装 K − 1 条就开新片）	-p singlefs-harness --release --test container_trees_grow_a_level_when_the_root_is_full
+第57批 H1 写侧早关一片（攻方 w-close-one-early：旋钮 K ≥ 2 装 K − 1 条就开新片）	-p singlefs-checker-tier --release --test crash_given_states_of_the_images_harness_scenarios_hand_out
+切片读口子不传盘的 journal 提示（可写挂载退回全环扫描要红）	-p singlefs-harness --test sparse_block_device_journal_hint_matches_the_full_ring_scan
+空闲不随分配减（I-5.2 要红）	-p singlefs-checker-tier --test crash_given_states_of_the_images_harness_scenarios_hand_out
+实二五 D19 已定项 5（同一处）：读得出而对不上不重读；故障注入快档判出（一次坏读隔离一对好槽，I-3.11 红）	-p singlefs-checker-tier --test crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library

@@ -1,0 +1,4 @@
+exit=1
+want=✗ 2 处自己定并行度默认值的写法没经登记位取
+want=scripts/experiments/mentions_capped.py:4  读自己的线程变量 SAMPLE_OWN_JOBS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值
+want=scripts/hosts/mentions_capped.sh:2  读自己的线程变量 SAMPLE_SHELL_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值

@@ -1,0 +1,2 @@
+exit=0
+want=  ✓ .claude/gate.d/ 顶层 3 道阶段里扫了 2 道有 cd 到项目根的，cd 之后都没再用 dirname 找自己的位置（判红 0 处）；没有那一行 cd 的另外 1 道不判

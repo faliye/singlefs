@@ -1,0 +1,6 @@
+exit=1
+want=4 处自己定并行度默认值的写法没经登记位取
+want=scripts/hosts/var_from_literal.sh:3  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/var_mixed.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/literal_default.sh:2  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/arith_default.sh:4  写死的线程数默认（|| / && 赋值）

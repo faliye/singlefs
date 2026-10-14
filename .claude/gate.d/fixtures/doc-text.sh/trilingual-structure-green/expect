@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：trilingual-structure
+want=查了 2 组三份的结构：编号集合、链接目标集合、各级标题个数、表格行个数、围栏代码块个数都对得上
+want=doc-text.sh：1 格里 1 格绿（trilingual-structure），0 格本次未跑（无）

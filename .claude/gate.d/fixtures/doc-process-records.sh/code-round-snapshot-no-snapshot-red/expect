@@ -1,0 +1,13 @@
+exit=1
+want=新写的判决里 4 份点名了产品代码 crates 文件，开工快照没立住（共 4 处）
+want=      research/prompts/badhash-r1-main-verification.md：
+want=        research/prompts/badhash-r1-snapshot/crates-sha256.txt 第 1 行点名了 crates/demo/src/lib.rs，但哈希不是 64 位十六进制
+want=      research/prompts/nodir-r1-main-verification.md：
+want=        目录 research/prompts/nodir-r1-snapshot/ 不在树里
+want=      research/prompts/nomanifest-r1-main-verification.md：
+want=        目录里没有 research/prompts/nomanifest-r1-snapshot/crates-sha256.txt（也没有别的 *sha256.txt 清单）
+want=      research/prompts/nomention-r1-main-verification.md：
+want=        正文没写开工快照目录 research/prompts/nomention-r1-snapshot/
+want=样本只跑 .gate-cells 点名的格：code-round-snapshot
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格红（code-round-snapshot）

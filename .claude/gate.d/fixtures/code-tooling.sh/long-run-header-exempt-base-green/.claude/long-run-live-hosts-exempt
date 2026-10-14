@@ -1,0 +1,2 @@
+# 样本：基准那一版与工作区的表逐字相同（同一路径的 sha256 没变），脚本也没改
+scripts/live.sh  bed5bfa5f9dadabc3e464ce65097d544dc50fde74196939fc233117c55c1d1fc  # 样本：文件头按现算写、不能改；sha256 对得上

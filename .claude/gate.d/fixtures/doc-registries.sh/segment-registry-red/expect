@@ -13,6 +13,6 @@ want=辛路径：出处指的用例文件 crates/demo/tests/gone.rs 不存在
 want=壬路径：出处指的用例文件里找不到 `fn renamed_sequence`
 want=癸路径：这一行不是预想，「出处」栏里既没有 `path=...` 引用、也没有指到一条钉住活代码的用例（`<文件>.rs` 加测试函数名），登记表这一行本身要修
 want=⚠️ 整条流（发布与下一次发布之间没有屏障那句提示）（path=m）：kb 写的崩溃状态数是 4，产物里 closed_form 是 3
-want=第二条流 `2+1`：数字串加起来是 3 次写，kb 写的是 4
-want=第二条流 `2+1`：用例文件 crates/demo/tests/pin.rs 里没有钉这个数组 `[2, 1]`
-want=第二条流 `2+1`：用例文件 crates/demo/tests/pin.rs 里没有钉状态数 5
+want=覆盖写固定脚本流 `2+1`：数字串加起来是 3 次写，kb 写的是 4
+want=覆盖写固定脚本流 `2+1`：用例文件 crates/demo/tests/pin.rs 里没有钉这个数组 `[2, 1]`
+want=覆盖写固定脚本流 `2+1`：用例文件 crates/demo/tests/pin.rs 里没有钉状态数 5

@@ -1,0 +1,7 @@
+# 挂钟断言的滞后表：判法 scripts/gate/wallclock-assert-lint.py 立之前就在仓里、断言按挂钟判、还没人复核登记的测试。
+# 一行一个测试：`scripts/experiments/<文件>.rs::<函数名>  # 理由`，理由至少 8 个字（写它量的是什么、初判怕不怕负载、为什么还没登记）。
+# 读它的是 scripts/gate/wallclock-assert-lint.py（文件头「滞后表」一段）：落在表里的没登记的挂钟断言不判红，成功行另报「另有 N 条在滞后表里」；
+#   表里的行对应的测试已经登记、不再有挂钟断言或函数不在了，判红（陈旧行）。
+# 只缩不涨：复核一条就在同一次改动里给它写登记位（怕负载的写 `// wallclock-assert:`，只是一行注释，门禁的单测格按名 --skip 它；不怕的写 `// wallclock-assert-load-safe:`）并删掉这一行；
+#   新写的挂钟断言直接写登记位，不往这里加新行去绕开判法。门禁不判涨，靠 review。
+# 登记位的两种写法见 scripts/gate/wallclock-assert-lint.py 文件头。下面的「初判」是立表时看源码的结论，不是复核：

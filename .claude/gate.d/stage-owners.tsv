@@ -2,10 +2,11 @@
 # 四列用制表符分隔：门禁文件名、格名（那道门禁文件头的 # gate-cell: 行，--list 打的就是它）、判红时派给谁修（agent 名，逗号分隔，每个名字要有 .claude/agents/<名字>.md）、为什么派给它。
 # 派给谁照合并之前那一道的归属（旧名到今天门禁的对照：records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」）；合并之后新加的格写明没有旧归属。
 # 表与门禁目录、格名表、定义逐格一致由 code-tooling 的 stage-owners 格判。
-checker-tier-layer0-replay.sh	layer0-replay	investigator	层 0 崩溃点重放与 stage-inputs.tsv 里登记的崩溃枚举用例（crash-case: 行，逐条按输入复用）：提交时在 HEAD 加暂存区的 worktree 里跑，红了归主 agent看
-checker-tier-layer0-replay.sh	feature-gated-tests	investigator	快档带特性那一趟（tests/ 里 cfg 点到的 verdict-store、gpu 这类）：挂特性的测试文件跑到 0 条与没卡的 GPU 对拍报本次未跑，cargo 退非 0 判红；提交时跑，红了归主 agent看
+checker-tier-crash-point-replay.sh	crash-case-replay	investigator	崩溃点重放与 stage-inputs.tsv 里登记的崩溃枚举用例（crash-case: 行，逐条按输入复用）：提交时在 HEAD 加暂存区的 worktree 里跑，红了归主 agent看
+checker-tier-crash-point-replay.sh	feature-gated-tests	investigator	快档带特性那一趟（tests/ 里 cfg 点到的 verdict-store、gpu 这类）：挂特性的测试文件跑到 0 条与没卡的 GPU 对拍报本次未跑，cargo 退非 0 判红；提交时跑，红了归主 agent看
 checker-independence-and-sync.sh	checker-implementation-disjoint	implementation-writer,investigator	checker 与实现只许共享常量模块：两边的代码都由实现员改，记账对账那一处归主 agent
 checker-independence-and-sync.sh	layout-checker-sync	implementation-writer,kb-scribe	布局的格式常量变了 checker 判定路径要跟：格式定义一边是 crates/singlefs-format（实现员改），一边是 kb 的字节布局表（书记员改）
+checker-independence-and-sync.sh	cpu-judging-sites	implementation-writer,tooling-writer	判器调用点没落在判定段、也没带标记：标记写在 crates/ 里那一截的函数上一行，由改 crates/ 的实现员加（豁免表 .claude/gate.d/gpu-exemptions.tsv 每加一行先问用户点头）；判定段与判器本体的登记表 .claude/gate.d/cpu-judging-sites.tsv 在 gate.d 下，由工具实现员改。新立，没有合并之前的旧归属
 checker-tier-broad-mutation.sh	library-version-is-staged-tree	investigator	广谱变异库目录不是这一次暂存树那一版：提交时由主 agent 照 .claude/skills/crash-test/commit-stages.md 把库目录换到包着暂存树的提交、只现判改到的，再跑这一道。没有合并之前的旧归属，2026-10-02 新立
 checker-tier-broad-mutation.sh	gate-verdict	investigator,implementation-writer	没有结论的由主 agent补跑驱动（--changed-since HEAD）；没红的要加能杀它的测试，改 crates/ 归实现员。没有合并之前的旧归属，2026-10-02 新立
 checker-tier-crates-mutation-replay.sh	crates-mutation-rows	investigator	crates 变异表复跑，提交时由主 agent 跑、红了派调查员查
@@ -18,7 +19,9 @@ checker-tier-formal-verification.sh	pinned-red-examples-replay	implementation-wr
 checker-tier-lkmm.sh	litmus-verdicts	investigator	herd7 内存序，提交时由主 agent 跑、红了派调查员查
 checker-tier-qemu-device-streams.sh	device-streams	investigator	QEMU 真设备，提交时由主 agent 跑、红了派调查员查
 checker-tier-research-build-and-replay.sh	research-unit-tests	investigator	research 构建与单测（全工作区十几分钟），收尾跑整轮门禁时判，红了先由主 agent 分诊、派调查员查
+checker-tier-research-build-and-replay.sh	wallclock-asserts-registered	experiment-runner	实验单测里按挂钟判的断言没带 // wallclock-assert: 登记位（C465）：断言在实验装置源码的测试里，登记位（一行注释）由写实验装置的实验执行员补；判法脚本本身（scripts/gate/wallclock-assert-lint.py）判错了归工具实现员。没有合并之前的旧归属，2026-10-13 新立
 checker-tier-research-build-and-replay.sh	experiment-replay	investigator	入库实验复现（全部实验复跑十几分钟），收尾跑整轮门禁时判，红了先由主 agent 分诊、派调查员查；执行员只管自己那一个实验
+checker-tier-research-build-and-replay.sh	mutation-tables-compile	experiment-runner	研究侧变异表逐条施加替换文只编译（C795）：编不过的那一行替换文由实验执行员改（编得过、仍改被测行为），装置改坏了的也归它改回能编；mutate.sh --compile-only 自己没判完的（退 2、3、5、6、8）先由主 agent 分诊。没有合并之前的旧归属，2026-10-13 新立
 code-source-discipline.sh	vague-names	investigator	函数名与类型名不许只由空泛词拼成：谁写 .rs 都可能起出 run_cell 这种名字，收尾跑整轮门禁时一并判
 code-source-discipline.sh	test-file-names	investigator	测试文件不按里程碑起名：谁改 crates/ 下测试都可能起错，收尾跑整轮门禁时一并判
 code-source-discipline.sh	format-constants	kb-scribe,experiment-runner	kb 登记的格式常量与实验源码两边：kb 那一边书记员改，实验源码那一边执行员改
@@ -32,6 +35,8 @@ code-source-discipline.sh	mutation-light-rows	tooling-writer	轻型变异登记�
 code-source-discipline.sh	gpu-exemptions	implementation-writer,tooling-writer	代码里的 // gpu-exempt: 标记写在 crates/ 里不走 GPU 的那一截上，由改 crates/ 的实现员加删；豁免表 .claude/gate.d/gpu-exemptions.tsv 在 gate.d 下，每加一行先问用户点头，由工具实现员改。新立，没有合并之前的旧归属
 code-source-discipline.sh	crash-point-replay-segments	tooling-writer	按段登记文件 .claude/gate.d/crash-point-replay-segments.tsv 在 gate.d 下，登记哪一段由引擎那一路定、行由工具实现员写；合表改了项名之后照合表改。新立，没有合并之前的旧归属
 code-source-discipline.sh	crate-sources-reachable	tooling-writer	判法在 scripts/gate/crate-sources-reachable.py；红了多半是有人挪了源文件或删了 [[bin]] 登记，修清单或引用的是改 scripts/experiments、crates 的那一方，判法本身错了归工具实现员
+code-source-discipline.sh	ordinal-names	implementation-writer,tooling-writer	名字带序号或位置词：crates/ 里的名字由改 crates/ 的实现员改，scripts/、.claude/gate.d、.claude/hooks 里的名字与这一格的判法由工具实现员改；词表与排除表在项目根 .claude/ 下，归主 agent。新立（用户 2026-10-13 定），没有合并之前的旧归属
+code-source-discipline.sh	data-names	experiment-runner,implementation-writer,kb-scribe,tooling-writer	字符串字面量与 kb 表格里名字形态的串带没登记的缩写或单字母：scripts/experiments/ 里的名字由实验执行员写，crates/ 里的由改 crates/ 的实现员写，kb 表格里的由书记员写；登记表 .claude/abbreviations 与排除表 .claude/data-name-lint-exclude 在项目根 .claude/ 下，判法 scripts/gate/data-name-lint.py 由工具实现员改。新立（欠账 C430），没有合并之前的旧归属
 code-tooling.sh	research-script-selftests	three-way-materials	材料员用的抽取脚本的自证
 code-tooling.sh	research-script-selftest-coverage	three-way-materials	研究脚本实现了 --selftest 就要有门禁在跑它，材料员的抽取脚本与本地腿脚本最常新加
 code-tooling.sh	rules-manifest	investigator	看 CLAUDE.md 的规则引用，收尾跑整轮门禁时一并判
@@ -40,9 +45,14 @@ code-tooling.sh	agent-write-scope	investigator	看项目 settings 里的写范�
 code-tooling.sh	change-range-single-source	investigator	门禁自己算 diff 基准、列路径不带 quotepath：谁改门禁都可能再抄一份取法，提交前核
 code-tooling.sh	research-gate-lint	investigator	研究脚本与钩子由主 agent 与各执行员改，没有哪个 agent 专管它们；提交前核
 code-tooling.sh	fixture-claims	investigator	门禁头部声称的判别力样本与 fixtures 目录对不对得上、每一格有没有一红一绿：谁加门禁都可能漏，收尾跑整轮门禁时一并判
+code-tooling.sh	fixture-registrations-excluded	investigator	样本里造的决策页与实验页带编号登记位而没进 doc-lint 排除表：谁加门禁样本都可能漏，整轮门禁的 doc-lint 才炸；收尾跑整轮门禁时一并判
 code-tooling.sh	kb-registry	kb-scribe	kb 目录与 CLAUDE.md 那张职责表逐项一致：建 kb 文件的是书记员
 code-tooling.sh	gate-structure	tooling-writer	合并之后新加的格，没有旧归属：格名表、--list、--check 是门禁文件自己的结构，门禁由工具实现员改
 code-tooling.sh	stage-order	tooling-writer	合并之后新加的格，没有旧归属：环境检查那一道排在跑测试的门禁之后靠门禁文件名，门禁由工具实现员改
+code-tooling.sh	directory-layout	tooling-writer	目录规矩 .claude/rules/directory-layout.md 的会红那一半；判法 scripts/gate/directory-layout-check.py 与门禁都由工具实现员改
+code-tooling.sh	stage-location-before-cd	tooling-writer	2026-10-13 新立，没有旧归属：阶段 cd 之后不再找自己旁边的文件（欠账 C525），门禁阶段由工具实现员改
+code-tooling.sh	heavy-thread-defaults	tooling-writer	合并之后新加的格，没有旧归属：门禁、钩子与脚本里的默认并行度与排除表由工具实现员改；红在 crates/ 里的交实现员走代码批
+code-tooling.sh	long-run-header-exempt	tooling-writer	长活声明按现算读的脚本豁免表与它的判法（lib_long_run.py exempt-check）由工具实现员改；表里的脚本被 sha256 钉住，红了删行；改被钉的脚本要重钉 sha256，按只缩不涨判红，交用户；基准那一版没有这张表时不比；重钉提交进基准之后不再红
 doc-decisions.sh	kb-shape	kb-scribe	kb 用词、指代、链接、条数与标题，归写 kb 的书记员
 doc-decisions.sh	item-ref-status	kb-scribe	分项引用写的状态与正文分项表相符，归写 kb 的书记员
 doc-decisions.sh	status-redundancy	kb-scribe	分项状态别重复标注，归写 kb 的书记员
@@ -60,6 +70,7 @@ doc-decisions.sh	write-frequency	kb-scribe	决策正文里的频率断言与写�
 doc-decisions.sh	entry-added	kb-scribe	决策正文改了要在变更史留条目，归写 kb 的书记员
 doc-decisions.sh	shape	kb-scribe	变更史的形状，归写 kb 的书记员
 doc-decisions.sh	history-loss	kb-scribe	变更史整理不许丢数与编号，归整理变更史的书记员
+doc-decisions.sh	candidate-codes	kb-scribe	同一份决策里候选代号不许在两个分项的候选表里复用，归写 kb 的书记员
 doc-experiments.sh	index-sync	experiment-runner	实验索引行与正文标题，实验页由执行员写
 doc-experiments.sh	results-cited	experiment-runner	实验产物写回，归跑实验的执行员
 doc-experiments.sh	evidence-in-repo	experiment-runner,kb-scribe,investigator	两半各归一个：装置与变异表改了要有产物，归执行员；kb 里把依据写成 /tmp 路径，归书记员；这一轮新写的提示由主 agent 写，主 agent先替它看
@@ -70,9 +81,11 @@ doc-experiments.sh	experiment-orphans	experiment-runner	实验号在 kb 里有�
 doc-experiments.sh	quoted-result-lines	experiment-runner	正文整行抄的产物行，归写实验页的执行员
 doc-experiments.sh	archive-past-rounds	sweep	上一轮实验记录的归档属于回扫：与「撤回一个数之后全仓找还在引它的地方」同类
 doc-experiments.sh	multipath-registry	experiment-runner	多条路径互证的登记：路径、源码落点与共用项由跑实验的人写
+doc-experiments.sh	cited-paths-exist	kb-scribe,experiment-runner	kb 点名的产物、变异表、实验源码路径找不到：点名的行归写它的人改——kb 正文由书记员写，实验页与产物由执行员写。没有合并之前的旧归属，2026-10-13 新立（还 C43）
 doc-process-records.sh	batch-scope	investigator	这一批的触发文件有没有登记进 .claude/batch-scope：判据是暂存区，而暂存与提交归主 agent，主 agent 跑整轮门禁时先看一眼
 doc-process-records.sh	verdict-names-local-samples	investigator	判决文件由主 agent 写，提交前核它按路径点名了那一轮本地腿的每一份样本
 doc-process-records.sh	crates-adversarial-review	investigator	判决文件由主 agent 写，提交前核点名
+doc-process-records.sh	code-round-snapshot	investigator	开工快照由主 agent 在派腿之前记、判决由主 agent 写；判红时主 agent 补记快照、在判决里写一行开工快照指到它，提交前核
 doc-process-records.sh	implementation-premise	three-way-materials	三方正文是材料员的输入
 doc-process-records.sh	abandoned-rounds	investigator	判决文件与撂下登记都由主 agent 写；三方轮次在跑时本来就没有判决，提交前核
 doc-process-records.sh	knowledge-sync	investigator	同步记录由主 agent 在阶段收尾时写；提交前核
@@ -98,10 +111,17 @@ doc-registries.sh	governance-refs	kb-scribe	治理文档与 kb 里点名的门�
 doc-registries.sh	invariant-count-elsewhere	kb-scribe	不变量条数跨文件，归写 kb 的书记员
 doc-registries.sh	citations	kb-scribe,prior-art	外部引用还核得动；写进 kb 的是书记员，查源码树的是调研员
 doc-registries.sh	invariant-anchors	kb-scribe	新写的不变量要点名字段落点：不变量清单归书记员写
+doc-registries.sh	inline-sums	kb-scribe	kb 正文里的内联算式（整数 = 项 + 项 + …）左右相等：算式写在 kb 正文里，写回 kb 的书记员写、也由它改
 doc-text.sh	prime-marks	investigator	全仓不许用撇号类角标给变体起名：谁写文件都可能写进一撇，收尾跑整轮门禁时一并判
 doc-text.sh	clock-times	investigator	全仓描述里不许写钟点：谁写文件都可能写进时分，收尾跑整轮门禁时一并判
+doc-text.sh	session-names	investigator	全仓不许写会话号：谁写文件都可能写进会话名，收尾跑整轮门禁时一并判
 doc-text.sh	date-once	kb-scribe	记录与 kb 页里日期只在标题上，归写 kb 与记录的书记员
 doc-text.sh	term-renames	sweep	全仓术语改名的残余归回扫员：它本来就是「撤回一个数、改一个格式常量、新立一条判据之后全仓找还在引旧值的地方」那类活
+doc-text.sh	trilingual-files	kb-scribe	登记的三语文件（仓根 README 与 briefs/）英语、中文、日语三份齐全、登记表写对了：缺的那份由写这批文档的书记员补译。没有合并之前的旧归属，2026-10-13 新立
+doc-text.sh	trilingual-structure	kb-scribe	三份结构对不上（编号、链接、标题、表格行、围栏）说明只改了一份：补译或恢复由写这批文档的书记员做。没有合并之前的旧归属，2026-10-13 新立
+doc-text.sh	trilingual-changed-together	kb-scribe	改了三语文件的一份而另两份没同步：同步译文归写这批文档的书记员。没有合并之前的旧归属，2026-10-13 新立
+doc-text.sh	trilingual-glossary	kb-scribe	翻译术语表 .claude/kb/translation-glossary.md 写错或译文没照它用词：术语表是 kb 页，归写 kb 的书记员，译文跟着同一位改。没有合并之前的旧归属，2026-10-13 新立
+doc-text.sh	private-values	investigator	这次改动新加的行里不许出现本机私有配置 multi-host.env 的值与本机主机名：谁写文件都可能抄进去，收尾跑整轮门禁时一并判；红行只列文件、行号与键名，换成「第二台」「本机」这类说法
 harness-model-differential-and-scenarios.sh	one-scenario	investigator	用例一条一个场景：谁改 crates/ 下测试都可能写成一条多场景，收尾跑整轮门禁时一并判
 harness-model-differential-and-scenarios.sh	model-fast-tier	implementation-writer,investigator	模型对拍快档：改 crates/ 的实现员修；主 agent跑重门禁时一起看
 harness-model-differential-and-scenarios.sh	model-reuse-sampling	implementation-writer,investigator	模型对拍的复用取样点：改 crates/ 的实现员修；主 agent跑重门禁时一起看

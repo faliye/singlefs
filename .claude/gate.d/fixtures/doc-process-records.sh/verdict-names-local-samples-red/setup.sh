@@ -14,7 +14,7 @@ mkdir -p .claude/gate.d
 printf '^\\.claude/hooks/\t# 钩子（这份样本不碰）\n' > .claude/gate.d/knowledge-sync-triggers.tsv
 git add -A && git commit -qm base
 printf 'Q1 Row D: yes, no\n' > research/prompts/demo-r1-local-attack-output-s1.md
-printf 'Q1 Row D: threads=LAYER0; yes\n' > research/prompts/demo-r1-local-attack-output-s2.md
+printf 'Q1 Row D: threads=CRASH_POINT_REPLAY; yes\n' > research/prompts/demo-r1-local-attack-output-s2.md
 printf 'Q1 Row D: yes, **no\n' > research/prompts/demo-r1-local-attack-output-void1.md
 printf 'Part 1 Q2: 6649413746\n' > research/prompts/demo-r1-local-attack-part1-output-s1.md
 cat > research/prompts/demo-r1-main-verification.md <<'MD'

@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：trilingual-files
+want=查了登记表 2 条，指到 3 组，每组三份（9 份文件）都在
+want=doc-text.sh：1 格里 1 格绿（trilingual-files），0 格本次未跑（无）

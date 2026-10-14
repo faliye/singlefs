@@ -1,0 +1,11 @@
+exit=77
+want=这次改动没碰产品代码的 crates/*/src（测试代码 4 个不归这一格），这一格无对象可判（基准 HEAD）
+want=不判的测试代码 4 个（harness 档包、checker 档包与池级 checker 三个包的 src
+want=      crates/singlefs-checker-tier/src/bin/e1_demo.rs
+want=      crates/singlefs-checker-tier/src/lib.rs
+want=      crates/singlefs-checker/src/lib.rs
+want=      crates/singlefs-harness/src/lib.rs
+want=样本只跑 .gate-cells 点名的格：crates-adversarial-review
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=crates-adversarial-review：本次未跑
+want=doc-process-records.sh：跑到的 1 格都本次无对象可判，这一道本次未跑

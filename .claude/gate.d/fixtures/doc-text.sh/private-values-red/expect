@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：private-values
+want=这次改动新加的 3 行里出现了本机私有值
+want=records/2026-09-24-样本调度.md:4  键名：PEER_SSH_HOST、QUIESCE_STOP_COMMAND（值不打印）
+want=records/2026-09-24-样本调度.md:5  键名：PEER_REPOSITORY_DIRECTORY（值不打印）
+want=records/2026-09-24-样本调度.md:6  键名：本机 hostname（值不打印）
+want=把命中的词换成「第二台」「本机」这类说法
+want=doc-text.sh：1 格里 1 格红（private-values）

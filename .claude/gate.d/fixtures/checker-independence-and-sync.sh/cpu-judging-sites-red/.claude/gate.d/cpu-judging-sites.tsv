@@ -1,0 +1,6 @@
+# 样本：判器调用点登记表（写法同仓里 .claude/gate.d/cpu-judging-sites.tsv 的表头）
+judging-stage	crates/singlefs-checker-tier/src/crash_judge_*.rs	# 判定段：从判定库读回的判表上判（样本）
+judging-stage	crates/singlefs-checker-tier/src/crash.rs::judge_read_back_range	# 判定段：判从判定库读回的一段状态（样本）
+judging-body	crates/singlefs-checker-tier/src/crash.rs::judge_crash_image	# 判器本体：池级 checker 加记录核对器包一层（样本）
+excluded	crates/singlefs-harness/tests/checker_*.rs	# 池级 checker 自己的单测：手造一张镜像断言判器的结论（样本）
+excluded	crates/singlefs-harness/tests/pool_checker_*.rs	# 池级 checker 自己的单测：手造一张镜像断言判器的结论（样本，一份都对不上）

@@ -1,6 +1,6 @@
 exit=77
 want=预录档（.qemu-prerecorded，没起虚机）
-want=判了 6 档 direct skip-new-pool-file-creation-barrier page-cache file-overwrite second-instance raise-rollback-floor、117 项检查全过
+want=判了 6 档 direct skip-new-pool-file-creation-barrier page-cache file-overwrite second-instance raise-rollback-floor、123 项检查全过
 want=样本里没摆的 0 档：无
 want=这一档不算真跑过 QEMU
 want=── 汇总：checker-tier-qemu-device-streams.sh 跑了 1 格（样本根的 .gate-cells 点名）

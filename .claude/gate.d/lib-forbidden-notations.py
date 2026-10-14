@@ -41,6 +41,7 @@ FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。�
 - 紧挨在前面的是 = [ { , > " ' + - . 之一或「, 」：产物行的「名字=值」、切片、字典与逗号列表、「0->1:10」、引号里的代码字面、
   时区偏移、小数；前面是反引号而小时只有一位的，是反引号里的键（`3:10`）；
 - 紧跟在后面的是 %、「.数字」或「-字母」：百分比、「分:秒.百分之一秒」（time -v 的格式）、带编号的阶段文件名（「20:09-sample-stage.sh」这类）；
+- 紧跟在后面的是 = 或 /、或紧挨在前面的是 @ 或 ;：产物行里「槽:代=ok@槽:代」「rows=槽:代/…;槽:代/…」这类键值对与分隔列表；
 - 同一行里有取值出了钟点范围的冒号对（时大于 23、分大于 59、一边三位或分只有一位）或「文件:行号」（「.md:42」这类）的，
   这一行的冒号对按「门禁号:行号」「决策号:行号」这类编号读。
 ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（产物行的字段值，「taken_jst=<日期>T<钟点>」这类）。
@@ -109,6 +110,8 @@ def bare_clock_is_not_clock(line, match):
         return True
     if after.startswith('%') or re.match(r'\.\d|-[A-Za-z]', after):
         return True
+    if after.startswith(('=', '/')) or before.endswith(('@', ';')):
+        return True
     return numbered_pairs_line(line)
 
 
@@ -129,10 +132,11 @@ FORMS = (
         ),
         'excluded_prefixes': (
             (UPSTREAM_COPY, '上游副本，只能在上游改'),
+            ('research/prompts/m3-defs-b6-r2-opus-model/out/', '三方腿探针跑 doc-text 的原样输出，引了这一格成功句里举的角标例子；冻结证据不改'),
         ),
         'allow_suffixes': (),
         'clean': f'没有角标写法（{MARKS_SHOWN}）',
-        'excluded_label': '上游副本 ' + UPSTREAM_COPY + ' 下 {count} 份（只能在上游改）',
+        'excluded_label': '排除前缀下 {count} 份（上游副本 ' + UPSTREAM_COPY + '，与腿的探针输出 research/prompts/m3-defs-b6-r2-opus-model/out/）',
         'finding': f'行用了角标写法（{MARKS_SHOWN}）',
         'detail_shows_pattern': False,
         'snippet_to_match_end': False,
@@ -170,6 +174,14 @@ FORMS = (
             ('research/prompts/unreadable-at-mount-r1-opus-model/runs/', '冻结证据：腿的运行日志，内存包装打出的 ISO 时间戳是原样输出'),
             ('research/prompts/unreadable-at-mount-r2-opus-model/', '冻结证据：腿的模型目录，diff 头带 diff 工具写的机器时间'),
             ('.claude/gate.d/fixtures/', '门禁样本：造现场的 touch -d、GIT_COMMITTER_DATE 与门禁打出来的期望输出'),
+            ('research/prompts/m3-defs-b6-r2-opus-model/', '冻结证据：腿的模型目录，喂样本的 setup.sh 与它的输出里的 ISO 时间戳是被测输入'),
+            ('research/prompts/m3-defs-b9-r1-opus-model/', '冻结证据：腿的模型目录，喂样本的 setup.sh、样本与输出里的 ISO 时间戳是被测输入'),
+            ('research/prompts/m3-defs-b9-r2-opus-model/', '冻结证据：腿的模型目录，探针脚本里的时间戳是被测输入'),
+            ('research/prompts/m3-defs-b9-r1-opus-output.md', '冻结证据：腿的报告，抄了它模型输出里的时间戳'),
+            ('research/prompts/m3-admission-r1-main-verification.md', '冻结证据：那一轮的判决，记了冻结副本被别的会话通删与改动的钟点'),
+            ('research/prompts/m3-close-noncode-candidates.tsv', '冻结证据：回扫候选表整行抄录记录里的旧文，旧文带钟点'),
+            ('research/prompts/m3-close-noncode-sync.md', '冻结证据：阶段同步记录整行抄录记录里的旧文，旧文带钟点'),
+            ('research/results/e142-mutate-r25-s1-2026-10-13.log', '实验产物：变异驱动的原样输出带时间戳，复跑要逐字相同'),
             (UPSTREAM_COPY, '上游副本，只能在上游改'),
             ('research/prompts/_c510-date-gate-r1-appendix.md', C510_REASON),
             ('research/prompts/_c510-date-gate-r1-attack-output.md', C510_REASON),
@@ -209,6 +221,12 @@ FORMS = (
         ),
         'excluded_prefixes': (
             ('.claude/gate.d/fixtures/', '门禁样本：会话号是被测输入，由 setup.sh 拆开拼出'),
+            ('research/prompts/m3-admission-r1-main-verification.md', '冻结证据：那一轮的判决，点名了改动冻结副本的会话'),
+            ('research/prompts/m3-close-noncode-candidates.tsv', '冻结证据：回扫候选表整行抄录记录里的旧文，旧文带会话号'),
+            ('research/prompts/m3-close-noncode-sync.md', '冻结证据：阶段同步记录整行抄录记录里的旧文，旧文带会话号'),
+            ('research/prompts/m3-close-noncode-judge-f14-f27.md', '冻结证据：那一轮逐行判决抄录记录里的旧文，旧文带会话号'),
+            ('research/prompts/m3-defs-b3-r3-sonnet-output.md', '冻结证据：腿的报告，引了派发提示里的会话号'),
+            ('research/prompts/m3-defs-b3-r3-sonnet-model/', '冻结证据：腿的模型目录，探针脚本里的会话号是被测输入'),
             (UPSTREAM_COPY, '上游副本，只能在上游改'),
         ),
         'allow_suffixes': ('.sh', '.py', '.rs'),

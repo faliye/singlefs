@@ -1,0 +1,8 @@
+[package]
+name = "singlefs-checker-tier"
+version = "0.0.0"
+
+[features]
+verdict-store = []
+gpu = []
+sample-accelerator = []

@@ -11,8 +11,8 @@ printf '# 样本仓\n' > README.md
 mkdir -p .claude/gate.d
 printf '^\\.claude/hooks/\t# 钩子（这份样本不碰）\n' > .claude/gate.d/knowledge-sync-triggers.tsv
 git add -A && git commit -qm base
-printf 'Row D: yes, no, enumerate_layer0_in_state_slices, yes\n' > research/prompts/three-r1-local-attack-output-s1.md
-printf 'Row D: threads=LAYER0; yes; yes\n' > research/prompts/three-r1-local-attack-output-s2.md
+printf 'Row D: yes, no, enumerate_crash_states_in_state_slices, yes\n' > research/prompts/three-r1-local-attack-output-s1.md
+printf 'Row D: threads=CRASH_POINT_REPLAY; yes; yes\n' > research/prompts/three-r1-local-attack-output-s2.md
 cat > research/prompts/three-r1-main-verification.md <<'MD'
 # three 第一轮：主 agent 核实
 

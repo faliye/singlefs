@@ -1,0 +1,12 @@
+exit=0
+want=查了 8 轮：判决文件 0 轮、kb 小节里的判决 0 轮、登记撂下 8 轮
+want=登记表 8 行：形状与同一轮重复都查了，出处按派发闸 ⑥ 同一份判法查了 7 行，1 行在旧行名单里、不要求出处
+want=出处行号对不上而〔〕原话恰好找到一次、照收的 1 行
+want=drift-r1：出处 records/halt.md 写的第 2 行，原话现在在第 5 行
+want=出处〔〕原话命中几处或找不到、照行号提示取那一行照收的 3 行
+want=pinned-r1：出处 records/halt.md 第 7 行：原话命中 2 处，取行号提示落着的那一处
+want=reworded-r1：出处 records/halt.md 第 8 行：原话找不到，行号提示那一行去掉改名表的新旧名与日期之后与原话逐字相同，取那一行
+want=dated-r1：出处 records/halt.md 第 9 行：原话找不到，行号提示那一行去掉改名表的新旧名与日期之后与原话逐字相同，取那一行
+want=样本只跑 .gate-cells 点名的格：abandoned-rounds
+want=── 汇总：doc-process-records.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-process-records.sh：1 格里 1 格绿（abandoned-rounds），0 格本次未跑（无）

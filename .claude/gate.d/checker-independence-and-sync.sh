@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: checker 类：checker 与实现只共享常量模块、记账语义不许同源，harness 档不依赖 checker 档；布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟
+# gate-stage: checker 类：checker 与实现只共享常量模块、记账语义不许同源，harness 档不依赖 checker 档；布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟；判器调用点要么在判定段里、要么带了豁免或 CPU 参照的标记
+# gate-fixture: yes
 # gate-category: checker 类
 # gate-similar: code-source-discipline.sh 它的 format-constants 格也按 lib-format-const.py 读格式常量，但判的是 kb 字段表与常量模块两边的值逐个对得上；这里判格式常量变了 checker 跟没跟，不比两边的值；它的 mutation-tables 格按 lib-owed.py 读欠账表，判实验源码与变异表的纪律
 # gate-similar: doc-registries.sh 它也读格式冻结政策的登记表与 kb 字段表，判的是 kb 各表之间、kb 与产物之间的账；这里判布局清单与 checker 源码；也按 lib-owed.py 读 checks-owed.md，判的是欠账表自己的形状与收口；这里只核滞后登记点名的欠账还开着
 # gate-similar: checker-tier-crates-mutation-replay.sh 它复跑 crates/mutations.tsv 的变异，「运行时记账分支取反，I-3.1 必须红」那一半归它；这里只判两侧有没有共享代码
-# gate-similar: checker-tier-layer0-replay.sh 开跑前调 crash-case-check.py 判 checker 档测试文件声明模块，对象是测试文件；这里判的是包之间的依赖方向
+# gate-similar: checker-tier-crash-point-replay.sh 开跑前调 crash-case-check.py 判 checker 档测试文件声明模块，对象是测试文件；这里判的是包之间的依赖方向
 # gate-similar: harness-model-differential-and-scenarios.sh 同样盯 harness 档，但判的是用例粒度与模型对拍，不读 Cargo.toml
+# gate-similar: code-source-discipline.sh 它的 gpu-exemptions 格（scripts/crash/gpu-exemptions-check.py）读同一种 // gpu-exempt: 标记，判的是标记与豁免表逐项对上；这里的 cpu-judging-sites 格判的是判器调用点有没有落在判定段里或带了标记，对象是调用点不是表行；并进那一道要改 code-source-discipline.sh，那一份这一轮有别的会话在加格（records/2026-10-13-复用键与全仓改名.md 课题 4 批次 4-2 派发），所以落在判 checker 与实现之间账的这一道
 #
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就两格都跑，格名写错退 2）：
+# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就三格都跑，格名写错退 2）：
 # gate-cell: checker-implementation-disjoint checker 与实现只共享常量模块，harness 档不依赖 checker 档
 # gate-cell: layout-checker-sync 布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟
+# gate-cell: cpu-judging-sites checker 档与 harness 档里每一处调判器的地方，要么在判定段里，要么包住它的函数带豁免或 CPU 参照的标记
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、汇总与退出码在共用库 lib/stage-cells.sh。
 #
 # ── checker-implementation-disjoint ──
@@ -87,8 +90,20 @@
 #     reference-sources-empty-accepted     一个 .rs 都没有也照判：reference-without-sources-red 退 0
 #     reference-absent-unreported          包不在时不报本次未跑：checker-implementation-disjoint-red 的「⑤ ⑥ 两条本次未跑」出不来
 #   REJECTION_BLOCKS_BREAK=summaries-only lib/rejection-blocks.py 只打摘要：layout-checker-sync-red 的「format/布局.md:5  标记按文法读不出来」明细出不来
+#   CPU_JUDGING_SITES_CHECK_BREAK=<项>    判法那一份（scripts/crash/cpu-judging-sites-check.py，开关表在它文件头）的弄坏开关，样本上：
+#     unmarked-sites-accepted              没标记的调用点不判红：cpu-judging-sites-red 的「history.rs:1 violations_on 调 check_pool_image」出不来
+#     table-targets-unchecked              登记表的文件与 ::函数名不核：cpu-judging-sites-red 的「pool_checker_*.rs」那一句出不来
 #
-#   bash .claude/gate.d/checker-independence-and-sync.sh [项目根]                          两格都跑
+# ── cpu-judging-sites ──
+# 依据：records/2026-10-13-复用键与全仓改名.md「课题 4」出口 ④（门禁能拦住「没打标记的 CPU 就地判」；豁免表那一格只核标记与表行对上，管不到没打标记的）。
+# 判法只在 scripts/crash/cpu-judging-sites-check.py check（判器有哪几类、扫哪几处、一处调用点怎么算合规、登记表的写法与核法都在它文件头），
+# 登记表 .claude/gate.d/cpu-judging-sites.tsv（判定段 judging-stage、判器本体 judging-body、判器自测 judge-self-test（函数级，函数判的是判器自己的契约：手摆盘、手给根、给判器塞已知坏法，不是「产出再判」）与整份不判的 excluded 几种；excluded 那几行是 harness 档池级 checker 自己的单测）。
+# crates/ 不在退 77。判法自己的自证在 scripts/crash/cpu-judging-sites-check.py --selftest（门禁 code-tooling 的 research-script-selftests 格跑）。
+# 样本（fixtures/checker-independence-and-sync.sh/）：
+#   cpu-judging-sites-green  判定段整份里的一处、带 gpu-exempt 标记的函数里的一处、判器本体里的一处与调它的判定段函数，排除表里那一份的不判：绿
+#   cpu-judging-sites-red    另有 harness 档 src 里一处没标记的池级 checker 调用，登记表多一行一份都对不上的 pool_checker_*.rs：红、逐处列
+#
+#   bash .claude/gate.d/checker-independence-and-sync.sh [项目根]                          三格都跑
 #   bash .claude/gate.d/checker-independence-and-sync.sh --list                            逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/checker-independence-and-sync.sh --check <格名>[,<格名>…] [项目根]   只跑点名的格
 set -uo pipefail
@@ -103,6 +118,8 @@ stage_cell checker-implementation-disjoint cell_checker_implementation_disjoint 
   "照上面各条的出路改：checker 要用的逻辑在 checker 里自己写一份，只有格式常量从 singlefs_format 取；共享模块只发射标量；harness 档不依赖 checker 档（D13（验证路线） 已定项 5、15）；RefFS 只依赖 singlefs-format、不引那四个包，实现与池级 checker 不依赖它（用户 2026-10-02 定 F4）"
 stage_cell layout-checker-sync cell_layout_checker_sync "布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟" \
   "在同一次改动里改这套布局的 checker 判定路径；checker 今天确实判不了的，把常量名登记进 .claude/gate.d/layouts-checker-lag.tsv 并挂一条开着的欠账；布局清单与位号登记照上面那一条的出路改"
+stage_cell cpu-judging-sites cell_cpu_judging_sites "checker 档与 harness 档里每一处调判器的地方，要么在判定段里，要么包住它的函数带豁免或 CPU 参照的标记" \
+  "照上面逐处列的改：真跑实现、只能在 CPU 上判的那一截在函数上一行写 // gpu-exempt: <截名>、豁免表 .claude/gate.d/gpu-exemptions.tsv 登记同名一行（每加一行先问用户）；GPU 对拍的 CPU 参照那一侧写 // cpu-reference-for-gpu-comparison；能走两段的搬进判定段（从库里读回再判）；判定段与判器本体登记在 .claude/gate.d/cpu-judging-sites.tsv；改完单跑 python3 scripts/crash/cpu-judging-sites-check.py check 到它退 0，再只重跑这一格：bash .claude/gate.d/checker-independence-and-sync.sh --check cpu-judging-sites"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -792,6 +809,15 @@ if empty_sources:
     for entry in empty_sources:
         print(f"      {entry}")
 PY
+}
+
+# ── cpu-judging-sites ──
+cell_cpu_judging_sites() {
+  if [[ ! -d crates ]]; then
+    echo "  ! $ROOT 下没有 crates/：判器调用点这一格本次无对象可判"
+    exit 77
+  fi
+  python3 "$REPO_ROOT/scripts/crash/cpu-judging-sites-check.py" check "$ROOT"
 }
 
 stage_cells_run "$ROOT"

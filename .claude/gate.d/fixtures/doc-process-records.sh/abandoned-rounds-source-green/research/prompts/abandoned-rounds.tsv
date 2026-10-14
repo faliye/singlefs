@@ -1,0 +1,9 @@
+# 样本登记表：前四行带合格出处（两种写法；unrec-r1 的出处那一行另写着 m3-close-b1，仓里没有它的任何材料、也不是 -r<数字> 形，不当别的轮名；drift-r1 写的是第 2 行，〔〕原话在第 5 行，行号只当提示、原话恰好找到一次照收），最后一行是库里旧行名单（LEGACY_SOURCELESS_ROUNDS）里的 c196-r1、没有出处，不要求；pinned-r1 的〔〕原话命中两处、行号落在其中一处；reworded-r1 的〔〕写的是改名前的原话（样本改名表 .claude/kb/term-renames.md 登记了旧称样本 → 新称样本），dated-r1 的〔〕带着记录里后来删掉的日期，两行都找不到原话、照行号提示取那一行
+halted-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 2 行〔用户叫停 halted-r1〕
+colon-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md:3〔用户叫停 colon-r1〕
+unrec-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 4 行〔用户叫停 unrec-r1〕
+drift-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 2 行〔用户叫停 drift-r1〕
+c196-r1	2026-09-12	云端腿没交	下一轮重派
+pinned-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 7 行〔用户叫停 pinned-r1〕
+reworded-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 8 行〔用户叫停 reworded-r1：「旧称样本那一轮先停掉，原话照术语改名换了词」〕
+dated-r1	2026-10-13	用户叫停	不写判决；出处 records/halt.md 第 9 行〔用户叫停 dated-r1（2026-10-13，用户说「删日期之后行号那一行还在的样本」）〕

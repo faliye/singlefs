@@ -2,10 +2,11 @@
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 它调的 scripts/hosts/test-environment-check.py 读内核日志、SMART 这类宿主信息，读不到的那一类它自己记「没查成」
 # gate-stage: 跑完测试之后机器还干不干净（残留测试设备、临时目录残留、宿主盘）
+# gate-fixture: yes
 # gate-category: harness 类
 # gate-similar: harness-model-differential-and-scenarios.sh 同属 harness 类，它跑 crates/singlefs-harness 的测试并判模型对拍；这一道不跑测试，判的是测试跑完之后留在机器上的东西
 # gate-similar: code-tooling.sh 它的 research-script-selftests 格只跑 test-environment-check.py 的 --selftest（判别力），不看这台机器此刻的样子；它的 stage-order 格只判这一道的文件名排在跑测试的阶段之后，不读机器；这里在真机上判
-# gate-similar: checker-tier-layer0-replay.sh 它跑崩溃点重放时自己建镜像、自己收拾，判的是重放的结局；机器上残不残留、宿主盘好不好，由这一道在全部跑测试的阶段之后统一判
+# gate-similar: checker-tier-crash-point-replay.sh 它跑崩溃点重放时自己建镜像、自己收拾，判的是重放的结局；机器上残不残留、宿主盘好不好，由这一道在全部跑测试的阶段之后统一判
 # gate-similar: checker-tier-qemu-device-streams.sh 它起 QEMU、判设备流的结局；带 singlefs 的 qemu 进程跑完还在不在，由这一道判
 # gate-similar: gate.sh 上游「跑完没留下临时文件」那一段在全部阶段跑完之后判 gate.sh 发给这一轮的 TMPDIR 里剩下的每一项（名字不限 singlefs-*）；它判绿时这一轮的 TMPDIR 下没有剩东西，这里对那个目录的 singlefs-* 也必然判绿，所以在 gate.sh 里时临时目录残留那一类不再扫它。它看不见的 /tmp 与别处的 singlefs-*、loop / dm / 挂载、qemu 进程与宿主盘仍归这一道
 #
@@ -25,6 +26,16 @@
 # GATE_CROSS_RUN_TMPDIR 设了（gate.sh 设它：开跑前的那个 TMPDIR）就交给 --cross-run-temporary-directory：临时目录残留那一类另扫它，
 # 只判 singlefs-* 残留、判法与 /tmp 相同；不交的话它不是 /tmp 时从来没人扫。
 #
+# 上一趟门禁留下的残留（C474）：上游 gate.sh 不能改，开跑时刻只能由这一格往上找祖先里的 gate.sh 读出来，那个数只活在一次运行里。
+# 这一格每趟（读得到祖先 gate.sh 的启动时刻时）调 `python3 $SCRIPT record-run-start` 把它写进跨趟的文件
+# `${GATE_CROSS_RUN_TMPDIR:-$HOME/.local/share/singlefs/cross-run-cache}/gate-run-times`（current=本趟、previous=上一趟，同目录临时文件改名换上），
+# 然后开跑前先预演一次 `clean --refuse-too-recent --run-times-file <它> [--produced-after <本趟开跑>] --temporary-directory <check 扫的各目录>`：
+# 脚本退 4（还有「太新、这一趟清不掉」的项：名字里没有 pid、没有进程开着、不到 10 分钟没改，且不在 [上一趟开跑, 本趟开跑) 里）就拒绝开跑、退 1，
+# 逐项报还要等多少秒；退 0 就接着跑 check。落在 [上一趟开跑, 本趟开跑) 里的不算太新：那是上一趟留下的，人跑 `clean --run-times-file <它> --yes` 删得掉
+# （两趟之间没有本趟，上一趟开跑之后出现的都算）。预演退 0/4 之外的退出码按红报，不当没事。
+# 没有祖先 gate.sh（单跑）时不记文件，预演照做、用文件里最近一趟当上一趟。祖先 gate.sh 在但这一趟没走到这一格（前面的阶段把门禁停了）时这一趟没记，
+# 下一趟读到的「上一趟」还是更早那一趟，窗口只会更宽（多删，不会少删）——但它删的是没有进程开着的 singlefs-*，同样的护栏。
+#
 # 样本（fixtures/harness-test-environment.sh/，每份的 .gate-cells 点名 machine-clean）：被判目录里没有那份脚本而有
 # `test-environment-check-output.log` 时，只判这份录好的输出：
 #   machine-clean-red    判红 1 类（临时目录残留）、没查成 1 类
@@ -33,6 +44,9 @@
 #                        --gate-run-temporary-directory <TMPDIR>、单跑时不带，对上了报判红 0 类，判绿
 #   machine-clean-cross-run-green  放一份只核参数的替身：GATE_CROSS_RUN_TMPDIR 设了该带 --cross-run-temporary-directory <它>、没设不带，
 #                        对上了报判红 0 类，判绿
+#   machine-clean-too-recent-red  替身的 clean 预演退 4、报一项太新还要等 N 秒：这一格拒绝开跑、退 1、点名那一项和还要等多久，不往下跑 check
+#   machine-clean-too-recent-green  替身核预演参数（--refuse-too-recent、--run-times-file 指到上面那份文件、--temporary-directory 给了）与 record-run-start
+#                        的参数（在 gate.sh 里该调、单跑不调），对上了预演退 0、check 判红 0 类，判绿
 # 脚本与录好的输出都没有：判红，不当跳过。
 # 弄坏开关归共用库：STAGE_CELLS_BREAK=red-swallowed 让 machine-clean-red 退 0。
 # 这一道自己的弄坏开关 HARNESS_TEST_ENVIRONMENT_BREAK=gate-run-scanned：在 gate.sh 里也不交 --gate-run-temporary-directory。
@@ -40,6 +54,11 @@
 #   单跑时这一道本来就不交，那份样本照样判绿，证不了红。
 # 另一个 HARNESS_TEST_ENVIRONMENT_BREAK=cross-run-unscanned：GATE_CROSS_RUN_TMPDIR 设了也不交 --cross-run-temporary-directory。
 #   设好 GATE_CROSS_RUN_TMPDIR 喂样本时 machine-clean-cross-run-green 判红、退 1；没设时这一道本来就不交，那份样本照样判绿。
+# 再一个 HARNESS_TEST_ENVIRONMENT_BREAK=too-recent-allowed：预演退 4 也不拒绝开跑，照往下跑 check。
+#   喂 machine-clean-too-recent-red 时它判绿、退 0，与样本的 exit=1 对不上，那一份判红。
+#
+# 另一个弄坏开关在 scripts/hosts/test-environment-check.py 里（TEST_ENVIRONMENT_CHECK_BREAK=previousrunignored / runtimesnotrotated），
+# 由 code-tooling 的 research-script-selftests 格登记的 `--selftest` 证，不在这一道里。
 #
 #   bash .claude/gate.d/harness-test-environment.sh [项目根]
 #   bash .claude/gate.d/harness-test-environment.sh --list
@@ -95,17 +114,35 @@ gate_started_epoch() {
   return 1
 }
 
+# 预演要扫的目录：与 check 的临时目录残留那一类扫的一致——/tmp、TMPDIR（在 gate.sh 里它是这一轮的临时目录，上游判，不扫）、GATE_CROSS_RUN_TMPDIR
+# 结果放进全局数组 CLEAN_DIRECTORIES（调用方在同一个子 shell 里读，不走命令替换）
+collect_clean_directories() {
+  local in_gate_run="$1" candidate real seen
+  CLEAN_DIRECTORIES=()
+  seen=()
+  for candidate in /tmp "${TMPDIR:-}" "${GATE_CROSS_RUN_TMPDIR:-}"; do
+    [[ -n "$candidate" && -d "$candidate" ]] || continue
+    if [[ "$candidate" == "${TMPDIR:-}" && "$in_gate_run" == 1 ]]; then continue; fi
+    real="$(realpath -m -- "$candidate")"
+    case " ${seen[*]-} " in *" $real "*) continue ;; esac
+    seen+=("$real")
+    CLEAN_DIRECTORIES+=("$candidate")
+  done
+}
+
 # ── machine-clean ──
 cell_machine_clean() {
   local script_rc started summary red_classes unchecked_summary unchecked_classes failed expected_rc
+  local run_times_file="${GATE_CROSS_RUN_TMPDIR:-$HOME/.local/share/singlefs/cross-run-cache}/gate-run-times"
   log="$(mktemp)"
   trap 'rm -f "$log"' EXIT
 
   # 在 gate.sh 里：这一轮的 TMPDIR 交给 --gate-run-temporary-directory（文件头「射程」一段）
-  local gate_run_arguments=()
+  local gate_run_arguments=() in_gate_run=0
   if [[ -n "${GATE_NOT_RUN_FILE:-}" && -n "${TMPDIR:-}" && "${HARNESS_TEST_ENVIRONMENT_BREAK:-}" != gate-run-scanned ]] \
     && [[ "$(realpath -m -- "$(dirname -- "$GATE_NOT_RUN_FILE")")" == "$(realpath -m -- "$TMPDIR")" ]]; then
     gate_run_arguments=(--gate-run-temporary-directory "$TMPDIR")
+    in_gate_run=1
   fi
   # gate.sh 开跑前的 TMPDIR（GATE_CROSS_RUN_TMPDIR，跨轮复用的缓存放那里）：不是 /tmp 时不点名就从来不扫，点名交给 --cross-run-temporary-directory
   # （临时目录残留这一类另扫它，判法照旧；与 /tmp、这一轮的 TMPDIR 是同一处时脚本只扫一次）
@@ -115,7 +152,44 @@ cell_machine_clean() {
   # 脚本的退出码要留着：它在「判红 0 类、没查成 ≥1 类」时退 3，吞掉它就只剩汇总行里的判红数可读
   script_rc=""
   if [[ -f "$SCRIPT" ]]; then
-    if started="$(gate_started_epoch)"; then
+    # 开跑时刻记进跨趟文件、开跑前预演（文件头「上一趟门禁留下的残留」一段）
+    local started_now="" clean_arguments=() dry_log dry_rc max_wait candidate_directory
+    started_now="$(gate_started_epoch)" || started_now=""
+    if [[ -n "$started_now" ]]; then
+      if ! python3 "$SCRIPT" record-run-start --run-times-file "$run_times_file" --run-started "$started_now" >"$log" 2>&1; then
+        cat "$log"
+        echo "  ✗ 没把这一趟门禁的开跑时刻记进 $run_times_file：下一趟认不出「上一趟留下的」"
+        echo "     → 怎么办：确认 $(dirname "$run_times_file") 存在、当前用户写得了；GATE_CROSS_RUN_TMPDIR 指到别处时看那里。"
+        exit 1
+      fi
+      tail -1 "$log"
+    fi
+    collect_clean_directories "$in_gate_run"
+    clean_arguments=(clean --refuse-too-recent --run-times-file "$run_times_file")
+    [[ -n "$started_now" ]] && clean_arguments+=(--produced-after "$started_now")
+    for candidate_directory in ${CLEAN_DIRECTORIES[@]+"${CLEAN_DIRECTORIES[@]}"}; do
+      clean_arguments+=(--temporary-directory "$candidate_directory")
+    done
+    dry_log="$(mktemp)"
+    if python3 "$SCRIPT" "${clean_arguments[@]}" >"$dry_log" 2>&1; then dry_rc=0; else dry_rc=$?; fi
+    if [[ "$dry_rc" == 4 && "${HARNESS_TEST_ENVIRONMENT_BREAK:-}" != too-recent-allowed ]]; then
+      grep '太新项：' "$dry_log"
+      max_wait="$(grep -o '还要等 [0-9]* 秒' "$dry_log" | awk '{ if ($2 + 0 > m) m = $2 + 0 } END { print m + 0 }')"
+      rm -f "$dry_log"
+      echo "  ✗ 有项太新、这一趟清不掉（名字里没有 pid、没有进程开着、不到 10 分钟没改，也不是上一趟开跑之后留下的）：拒绝开跑，最长的还要等 $max_wait 秒"
+      echo "     → 怎么办：等 $max_wait 秒让上面的项满 10 分钟没改再跑（那时它们归 clean 管）；确认没有活在用它们、等不起的话，手工删上面列出的路径；"
+      echo "               clean 本身不碰太新的项，等它们满 10 分钟之后才归 clean 管。"
+      exit 1
+    elif [[ "$dry_rc" != 0 && "$dry_rc" != 4 ]]; then
+      tail -8 "$dry_log"
+      rm -f "$dry_log"
+      echo "  ✗ clean 预演退出码是 $dry_rc（该是 0 或 4）：预演没跑成，分不出有没有太新的项"
+      echo "     → 怎么办：单跑 python3 $SCRIPT ${clean_arguments[*]} 看它在哪一步出的错。"
+      exit 1
+    fi
+    rm -f "$dry_log"
+    if [[ -n "$started_now" ]]; then
+      started="$started_now"
       if python3 "$SCRIPT" check --produced-after "$started" ${gate_run_arguments[@]+"${gate_run_arguments[@]}"} >"$log" 2>&1; then script_rc=0; else script_rc=$?; fi
     else
       if python3 "$SCRIPT" check ${gate_run_arguments[@]+"${gate_run_arguments[@]}"} >"$log" 2>&1; then script_rc=0; else script_rc=$?; fi
@@ -145,6 +219,7 @@ cell_machine_clean() {
     grep -E '✗|→|汇总：' "$log" | head -40
     echo "  ✗ 机器上还有测试残留或宿主盘异常（判红 $red_classes 类，上面是逐类的判定）"
     echo "     → 怎么办：先跑 python3 $SCRIPT clean 看计划，确认没有正在跑的活在用它们之后加 --yes 再跑一次；"
+    echo "               上一趟门禁刚留下、还不满 10 分钟的残留，clean 加 --run-times-file $run_times_file 才删得掉（它读上一趟的开跑时刻）；"
     echo "               宿主盘那几类（只读挂载、剩余空间、ext4 错误计数、内核日志）不是 clean 能修的，要人看。"
     failed=1
   fi

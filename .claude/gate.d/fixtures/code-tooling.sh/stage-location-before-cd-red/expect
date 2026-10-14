@@ -1,0 +1,4 @@
+exit=1
+want=  ✗ 1 处在 cd 到项目根之后还用 dirname "$0" / dirname "${BASH_SOURCE" 找自己的位置（扫了 2 道有 cd 的阶段，另 1 道没有那一行 cd、不判）：
+want=     .claude/gate.d/broken-stage.sh:6（cd 在第 5 行）：source "$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/stage-run-or-skip.sh" || exit 1
+want=     → 怎么办：在 cd 之前取阶段自己的位置存进变量

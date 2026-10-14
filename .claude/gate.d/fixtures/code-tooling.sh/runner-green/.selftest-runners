@@ -1,4 +1,4 @@
 # 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：三条都退 0
-bash scripts/sample-pass-a.sh --selftest
-python3 scripts/sample-pass-c.py --selftest
-bash scripts/sample-pass-d.sh --selftest
+bash scripts/gate/sample-pass-a.sh --selftest
+python3 scripts/gate/sample-pass-c.py --selftest
+bash scripts/gate/sample-pass-d.sh --selftest

@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-changed-together
+want=这次改动碰了 4 组三语文件，其中 3 组没碰全三份
+want=README：碰了 README.md、README.zh.md，没碰 README.ja.md
+want=briefs/2026-09-14：碰了 briefs/2026-09-14.ja.md，没碰 briefs/2026-09-14.md、briefs/2026-09-14.zh.md
+want=briefs/2026-10-12：碰了 briefs/2026-10-12.md、briefs/2026-10-12.zh.md，没碰 briefs/2026-10-12.ja.md
+want=doc-text.sh：1 格里 1 格红（trilingual-changed-together）

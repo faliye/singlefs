@@ -2,8 +2,9 @@
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树）里的三方留痕与同步记录，上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 三方论证与阶段同步有没有留下该留的记录：批次范围、判决点名、正文前提、轮次收尾、同步记录
+# gate-fixture: yes
 # gate-category: 文档类
-# gate-similar: doc-experiments.sh 它的 evidence-in-repo 格也用 gate 取法的改动范围、也读 research/prompts/，但判产物与依据落没落进仓（/tmp 路径、产物新不新），不判三方与同步留下的记录；并进来会让七格之外多一种对象（research/results/ 的产物）
+# gate-similar: doc-experiments.sh 它的 evidence-in-repo 格也用 gate 取法的改动范围、也读 research/prompts/，但判产物与依据落没落进仓（/tmp 路径、产物新不新），不判三方与同步留下的记录；并进来会让八格之外多一种对象（research/results/ 的产物）
 # gate-similar: doc-experiments.sh 它的 archive-past-rounds 格按与 knowledge-sync 格同一个基准删上一轮的实验记录，保留判决与 abandoned-rounds.tsv 供这里读；它判工作区里还留没留旧记录，不判记录写没写、写得全不全
 # gate-similar: doc-experiments.sh 它的 verdict-false-named 格名字里也有 verdict，但判的是实验产物判决行里的 false 字段有没有被实验页点名，对象是 research/results/ 与实验页，不是三方判决
 # gate-similar: code-tooling.sh 它的 change-range-single-source 格判各阶段取改动范围只经 changed-paths.sh 一份取法；这里是那份取法的使用者之一，不判别的阶段
@@ -11,22 +12,23 @@
 #
 # gate-cell: batch-scope 这一批要碰的触发文件有没有登记进范围
 # gate-cell: verdict-names-local-samples 新写的三方判决有没有按路径点名那一轮本地腿的每一份样本（含作废副本）
-# gate-cell: crates-adversarial-review crates 里的实现改动有没有走过三方正反对抗推理
+# gate-cell: crates-adversarial-review crates 里产品代码的实现改动有没有走过三方正反对抗推理
+# gate-cell: code-round-snapshot 按路径点名了产品代码 crates 文件的新判决，有没有点名开工快照、快照有没有罩住点名的每份文件
 # gate-cell: implementation-premise 三方论证材料有没有「实现今天的样子」
 # gate-cell: abandoned-rounds 发过腿的三方轮次，要么有判决，要么登记撂下
 # gate-cell: knowledge-sync 改了规则、agent、hook、门禁、脚本或实现之后，有没有写阶段同步记录
 # gate-cell: agent-def-adversarial-review 改过的 agent 定义与共用约束有没有走过三方审核
 # 格结构经 lib/stage-cells.sh；每格的成功行报它查了多少项。
 #
-#   bash .claude/gate.d/doc-process-records.sh [项目根]                              七格都跑
+#   bash .claude/gate.d/doc-process-records.sh [项目根]                              八格都跑
 #   bash .claude/gate.d/doc-process-records.sh --list                                逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-process-records.sh --check <格名>[,<格名>…] [项目根]     只跑点名的格（例：材料员开工只跑 implementation-premise）
 #
 # 改动范围只经 scripts/gate/changed-paths.sh 取（基准怎么定见它的 gate_diff_base），每种取法这一趟只取一次、各格共用：
-#   gate 取法（含工作区、暂存区与未跟踪）：verdict-names-local-samples 只用其中新增的，crates-adversarial-review、knowledge-sync、agent-def-adversarial-review 用全部；
+#   gate 取法（含工作区、暂存区与未跟踪）：verdict-names-local-samples、code-round-snapshot 只用其中新增的，crates-adversarial-review、knowledge-sync、agent-def-adversarial-review 用全部；
 #   head 取法（基准 HEAD）：batch-scope；
 #   gate_added_lines（同步记录这一轮新增的行）：knowledge-sync。
-# 被判的根不是 git 仓时，用改动范围的五格退 77；implementation-premise 与 abandoned-rounds 只看树，照判。
+# 被判的根不是 git 仓时，用改动范围的六格退 77；implementation-premise 与 abandoned-rounds 只看树，照判。
 # 「新写的判决」各格同一个认法：相对基准新增（git diff --diff-filter=A）、暂存区新增、未跟踪；被改过的旧判决（路径改写、补一句）不算。
 #
 # ── batch-scope ──
@@ -63,16 +65,46 @@
 #       verdict-names-local-samples-green（期望退出 0，实测 1）
 #
 # ── crates-adversarial-review ──
-# 规则：.claude/rules/implementation-workflow.md 的第二步（三方正反对抗推理，.claude/rules/three-way-inference.md）。
-# 这次改动里每个 crates/*/src/*.rs 文件，都要在这一次改动新写的某份 research/prompts/*-main-verification.md 里按路径点名。
-# 没有 crates 改动：退 77。管不到的：点名了判得对不对。
+# 规则：.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」的第 2 步（三方正反对抗推理，.claude/rules/three-way-inference.md）。
+# 这次改动里每个产品代码的 crates/*/src/*.rs 文件，都要在这一次改动新写的某份 research/prompts/*-main-verification.md 里按路径点名。
+# 测试代码不判：TEST_CODE_SOURCES 那三个包（harness 档 crates/singlefs-harness/、checker 档 crates/singlefs-checker-tier/、池级 checker crates/singlefs-checker/）的 src 从对象里去掉，
+#   成功行与无对象那一行逐个报出去掉的；crates/*/tests/ 与 crates/mutations.tsv 不是 crates/*/src/*.rs，本来就不在对象里。
+# 只改了注释的产品代码文件不走三方：判法是规范副本的 scripts/comment-only-change.py（去掉注释与空白之后代码词元与基准逐个相同，
+#   文档注释里会编成 doctest 的代码块、文档注释与 // SAFETY: 注释的增删照代码算；上游 show-me-test 用同一份），摘出去的逐个报出来；判法判不了就红。
+# 没有产品代码的 crates/*/src 改动（或都只改了注释）：退 77。管不到的：点名了判得对不对；产品代码包 src 里的 #[cfg(test)] 模块按路径分不出来，照判。
+# 弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   CRATES_ADVERSARIAL_REVIEW_BREAK=test-code-counted  测试代码那三个包的 src 也算对象、要点名
+#       crates-adversarial-review-test-code-only（期望退出 77，实测 1）
+#   CRATES_ADVERSARIAL_REVIEW_BREAK=exempt-hash-ignored  user_exemption_reason 不核内容哈希，豁免表里有这条路径就算豁免
+#       crates-adversarial-review-exempt-stale-red（期望退出 1，实测 0）
+#   CRATES_ADVERSARIAL_REVIEW_BREAK=comments-count-as-code  不摘只改注释的文件，照产品代码改动要点名
+#       crates-adversarial-review-comment-only（期望退出 77，实测 1）；crates-adversarial-review-comment-and-code-red（输出里找不到「crates 改动里 2 个文件没有三方判决点名」）
+#
+# ── code-round-snapshot ──
+# 规则：.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」。快照形态：research/prompts/<轮>-snapshot/ 目录，
+# 里面 crates-sha256.txt（sha256sum 格式：64 位十六进制哈希、两个空格、仓根相对路径）与 kb-sha256.txt；判决里写一行「开工快照」指到那个目录。
+# 对象：这次改动新写的 research/prompts/*-main-verification.md（取法与 crates-adversarial-review 同一个函数 new_verdict_paths）里，
+#   按路径点名了至少一份产品代码 crates/*/src/*.rs 的判决。点名的认法：正文里匹配 crates/<包>/src/<…>.rs 的字面路径，TEST_CODE_SOURCES 那三个包的 src 不算；
+#   只点 kb 的推论轮、只点测试代码的、通配写法（crates/*/src/*.rs）的判决不判，成功行与无对象那一行逐份报出。早先的判决（不在新增里的）不判。
+# 判据，每份判决三条，缺一样就红，理由点名判决与缺的东西：
+#   ① 正文出现 research/prompts/<轮>-snapshot/，轮名取判决文件名去掉 -main-verification.md；
+#   ② 那个目录在树里（这次新加的或已跟踪的都行），里面有清单 crates-sha256.txt（冻结副本那一套记的 frozen-copy-sha256.txt 也认，任一 *sha256.txt）；
+#   ③ 判决点名的每份产品代码文件，在那几份清单的某一份里有一行（两个空格前是 64 位十六进制哈希、后面是那份文件的仓根相对路径）。
+#      点名的文件树里已经不存在的（这一轮删掉的），没有内容可算哈希，不要求有行，成功行逐个报出。
+# 管不到的：哈希与派腿那一刻的文件内容对不对得上（门禁只看这一次的树，看不到派腿时刻；对得上靠主 agent 写判决前 sha256sum -c，
+#   对不上的倒推，写法在 .claude/rules/implementation-workflow.md 同一小节）；快照是不是派腿之前记的（事后补一份同形的也过）；
+#   快照里列没列判决没点名、但这一轮改了的文件（那一半由 crates-adversarial-review 管点名，这里只管点名的被罩住）；路径出现在「没攻它」那句里也算点名。
+# 没有新写的判决，或新写的判决都没点名产品代码文件：退 77。
+# 弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   CODE_ROUND_SNAPSHOT_BREAK=snapshot-coverage-skipped  不判 ③，清单里有没有判决点名的文件都不看
+#       code-round-snapshot-red（期望退出 1，实测 0）
 #
 # ── implementation-premise ──
 # 规则：.claude/rules/implementation-first.md 第 3 条。判据只看形式：
 #   ① 标题日期在 PREMISE_CUTOFF 及以后的正文（research/prompts/_*-body.md）里必须出现 crates/。
 #      日期取首行里的第一个 YYYY-MM-DD；标题里没有日期的照要查的算。成功行报查了几份，逐个列出因为日期早而没查的。
 #   标题日期在 SIDE_AND_SNAPSHOT_CUTOFF 及以后的正文另判两条：
-#   ② 正文里有一行「本地腿：攻 …」或「本地腿：辩 …」，冒号后面在攻 / 辩之外还写了理由；
+#   ② 退役：本地腿不再派（.claude/rules/three-way-inference.md「各条腿必须互不重复」），正文不再判这一行；
 #   ③ 有背景材料（_<轮>-background.md）的轮要有开工快照目录 <轮>-snapshot/，小节清单（_<轮>-checklist.md）里每个「### 小节清单：`<文件>`」
 #      点名的 .claude/kb/ 文件在快照目录里某一份 sha256 清单里有一行。
 #   正文全都早于 PREMISE_CUTOFF：退 77。
@@ -85,12 +117,23 @@
 #   ② 认判决，两种任一：research/prompts/<轮>-main-verification.md；或 .claude/kb/ 下某个 .md 的同一小节（一个标题到下一个标题之间）
 #      既点名这一轮的材料（research/prompts/<轮>- 或 research/prompts/_<轮>-），又有「**判决」（判决文件出现之前的几轮这样写）。
 #   ③ 认撂下：research/prompts/abandoned-rounds.tsv 一行一轮，四列用制表符分隔：轮名、日期、为什么撂下、去向。
-#   发过腿、没有判决、也没登记 ⇒ 红。登记表写坏（不是四列、有空列、日期不是 YYYY-MM-DD、同一轮登记两行）、
+#   ④ 登记行一行收不收，判法只在 .claude/hooks/lib_abandoned_rounds.py 一份，派发闸 ⑥ 调同一份（不收 ⟺ 红）：四列不空、日期 YYYY-MM-DD、同一轮只一行、
+#      出处「records/<文件>.md 第 N 行〔<原话>〕」（或 records/<文件>.md:N〔<原话>〕；〔〕里照抄出处那一行里的一段原话，原话所在的那一行含这一轮的名字；拿它在那份文件里找：
+#      恰好命中一次的取命中的那一行，行号只当提示：对不上而原话找得到照收、成功行后面逐个报挪到第几行；
+#      命中几处而行号提示正落在其中一处的、原话找不到而行号提示那一行有这一轮的名字、〔〕与那一行去掉 .claude/kb/term-renames.md 登记的新旧名与日期
+#      （再去掉空白与逗号、剩下的空括号「（）」「()」）之后〔〕逐字落在那一行里的（只经过术语改名、删日期），取提示那一行，成功行后面逐个报照提示取的是哪几行；
+#      没带原话、找不到而提示那一行没有这一轮的名字、找不到而提示那一行去掉新旧名与日期之后对不上（〔〕写的是转述、改了别的字）、命中几处而提示不在其中都红；
+#      取到的那一行里有这一轮的名字、除这一轮外没有别的轮名、有一句「」括起来的 6 个字以上的用户原话）。
+#      「别的轮名」= 仓里认得的轮名全集（research/prompts/ 下 _<轮>-body.md、<轮>-snapshot/、<轮>-main-verification.md 的轮名，加登记表第一列的轮名）
+#      ∪ 形如 <名>-r<数字> 的写法（不看仓里有没有它的材料）。
+#      不要求出处的只有库里写死的旧行名单（LEGACY_SOURCELESS_ROUNDS：c196-r1、d16-item1-r2、c364-r3、smalldata-ttime-r1，出处这条规矩立起来之前登记、没有出处可补；只缩不涨，不按日期判）；
+#      这一格与派发闸 ⑥ 用同一张名单，名单外的行一律要出处。
+#   发过腿、没有判决、也没登记 ⇒ 红。登记表写坏（不是四列、有空列、日期不是 YYYY-MM-DD、同一轮登记两行）、出处收不了（没写、指不到、同一行有别的轮名……）、
 #   登记了认不出的轮、登记了已经有判决的轮 ⇒ 也红。没有 research/prompts/、或认不出一个发过腿的轮：退 77。
 # 不判的，成功行逐个列出前缀：腿提示是旧形态的轮（<题>-local.md、<题>-forward-sonnet.md / -reverse-opus.md）与轮名不以 -r<N> 结尾的；
 #   它们都早于判决文件，判决写进 kb、形态不一，按 ② 认会把任意一句提到材料的话读成判决。
 # 归档进版本库的腿文件由 git log 取：不在 git 仓里只看树；git log 失败判红，不退回只看树（那样归档的轮次整批消失）。
-# 管不到的：判决写得对不对、登记的理由真不真；② 的第二种只认同一小节里既点名又有 **判决，写着「**判决**：没判」也算判过；
+# 管不到的：判决写得对不对、登记的理由真不真、出处那句话是不是用户为这一轮说的（靠主 agent 核）；② 的第二种只认同一小节里既点名又有 **判决，写着「**判决**：没判」也算判过；
 #   新轮既不写正文、腿提示又用了五种之外的名字，落进不判的那一列而不红。
 #
 # ── knowledge-sync ──
@@ -135,6 +178,11 @@
 # 管不到的：记录写得对不对（原句是不是那一行、「不改」的理由站不站得住）、回扫搜没搜全、只用过而没改动的东西；
 # 「改了」「补了」只核载体文件在改动范围里，不核那一行真的动了；行号不核是否越界；路径里带制表符、换行或引号的认不出；
 # ⑤ 只核点名的材料在不在、行数对不对得上，内容一个字都判不了。
+# 弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   KNOWLEDGE_SYNC_BREAK=old-rows-rejudged  旧记录里不是这一轮新加的「改了」「补了」行也按这一轮写的判，载体不在改动范围里就报
+#       knowledge-sync-old-record-green（期望退出 0，实测 1）
+#     现有的两份样本在这个开关下照过，不算它的证据：knowledge-sync-red 的旧记录多报一行 old-sync.md:14 也满足它的 want（expect 只列必须出现的句子、没有不许出现的），
+#     knowledge-sync-green 的记录整份是这一轮新写的，没有旧行可错判。
 #
 # ── agent-def-adversarial-review ──
 # 规则：.claude/rules/implementation-workflow.md「改 agent 定义与共用约束，走同一条三步」。改动范围里每个被管文件
@@ -151,24 +199,76 @@
 #   verdict-names-local-samples-green 点名齐；0 字节 s2、别一轮与子目录里的样本、没有本地腿样本的判决、只补了一句的旧判决都不算漏，判绿报对数
 #   crates-adversarial-review-red   一个没人点名、一个只被改过的旧判决点名、一个被中文文件名的新判决点名，判红只列前两个
 #   crates-adversarial-review-green 判绿报对数
-#   implementation-premise-red      没有 crates/ 的正文、标题没日期的正文、没写本地腿一侧、缺开工快照，逐个点名判红
+#   crates-adversarial-review-exempt-green  一个被新判决点名、一个按 .claude/crates-review-exempt 的内容哈希豁免，判绿报豁免的那一个
+#   crates-adversarial-review-exempt-stale-red  豁免表登记的是改前那一版的哈希，不算豁免，判红列出它
+#   crates-adversarial-review-test-code-only  只改了 harness 档、checker 档与池级 checker 三个包的 src、另有 crates/*/tests/ 与 crates/mutations.tsv，没有判决，退 77 逐个报出不判的
+#   crates-adversarial-review-comment-only  两份产品代码只改了注释（行注释、行尾注释、文档注释的文字），没有判决，退 77 逐个报出只改注释的
+#   crates-adversarial-review-comment-and-code-red  一份只改注释、一份改了字符串里的 //、一份改了文档注释里的 doctest，都没有判决，判红只列后两份
+#   code-round-snapshot-red         新判决点名两份产品代码文件、快照清单只列了一份，判红只列缺的那一份
+#   code-round-snapshot-no-snapshot-red  四份新判决各缺一样（没提快照目录、目录不在树里、目录里没有 crates-sha256.txt、清单里点名文件的哈希不是 64 位十六进制），判红逐份点名
+#   code-round-snapshot-green       两份判决的快照罩住点名的文件（一份快照目录这次新加、一份已跟踪；一份点名的文件已删、不要求有行）；只点 kb、只点测试代码、通配写法与基准里就有的旧判决不判，判绿报对数
+#   code-round-snapshot-no-object   新判决只点 kb 与测试代码，退 77 逐份报出不判的
+#   implementation-premise-red      没有 crates/ 的正文、标题没日期的正文、缺开工快照，逐个点名判红
 #   implementation-premise-green    判绿，报查了几份、没查哪一份
 #   abandoned-rounds-red            发了腿没判决没登记的轮、只在 kb 里被提到的轮、写坏与说反话的登记，另有 setup.sh 建的缺旧树对象的 git 仓，判红
-#   abandoned-rounds-green          判决文件、kb 小节判决、登记撂下各一轮与三个旧形态前缀，判绿报对数
+#   abandoned-rounds-green          判决文件、kb 小节判决、登记撂下各一轮与三个旧形态前缀，判绿报对数（登记撂下那一行是库里旧行名单里的 c364-r3、没有出处，不要求）
+#   abandoned-rounds-source-red     没写出处的行（2026-10-13）、出处那一行同时写着别的轮名、出处指到 research/ 下这一轮自己的材料、「」里的原话不到 6 个字、没写出处而日期是 2026-10-11 的行（不在旧行名单里，不按日期免）、
+#                                   出处那一行另写着仓里认得而不以 -r<数字> 结尾的别的轮名 close-b1（research/prompts/_close-b1-body.md）、出处那一行另写着形如 <名>-r<数字> 而仓里没有任何它的材料的别的轮名 ghost-r2，
+#                                   〔〕里的原话改了一个字、在出处文件里找不到而行号提示那一行（第 3 行）没有这一轮名字的 gone-r1，
+#                                   〔〕里的原话在出处文件里命中两次而行号提示（第 9 行）不在其中的 twice-r1，只写行号没带〔〕原话的 plain-r1，
+#                                   〔〕写的是转述、行号提示的第 10 行有这一轮的名字与「」原话而去掉改名与日期之后对不上的 misread-r1，
+#                                   十一行逐行点名判红；另有一行名单里的 d16-item1-r2 没出处，不点名
+#   abandoned-rounds-source-green   四行带合格出处（「第 N 行」与「:N」两种写法，另一行的出处那一行写着 m3-close-b1：仓里没有它的任何材料、也不是 -r<数字> 形，不当别的轮名；
+#                                   drift-r1 写的是第 2 行，〔〕原话在第 5 行：出处那份记录前面插过行，原话恰好找到一次照收，成功行后面报挪到第几行；
+#                                   pinned-r1 的〔〕原话在第 6、7 行各一次、行号提示写第 7 行；reworded-r1 的〔〕是改名前的原话（样本根的 .claude/kb/term-renames.md 登记了这次改名），
+#                                   dated-r1 的〔〕带着第 9 行后来删掉的日期，两行原话都找不到而去掉新旧名与日期之后落在行号提示那一行里；
+#                                   三行照提示取那一行收，成功行后面报照提示取的三行）、
+#                                   一行旧行名单里的 c196-r1 没出处，判绿报对数与出处查了几行
+#   abandoned-rounds-source-date-parentheses-green  两行的〔〕带着登记时写在括号里的日期：bracketed-date-r1 那一行的全角括号连日期被 date-once 的出路（doc-consolidate.py migrate）删了，
+#                                   halfwidth-date-r1 那一行的半角括号连日期是手删的；两行原话都找不到，去掉日期、空白与逗号、剩下的空括号之后落在行号提示那一行里，
+#                                   照提示取那一行收，判绿报对数与照提示取的两行
 #   knowledge-sync-red              没点名的触发文件、只在不带标记的文件里点名的、说改了而载体没动、处置开头不合法、不改没理由、载体没行号、
 #                                   载体不存在、缺「## 搜索」、表头写错，外加「## 原始证据」整节缺、表头错、零行、材料不在、行数不对，判红
 #   knowledge-sync-green            两份记录点名三个触发文件、三种处置各一行、中文载体、原句里的 \|、围栏里的竖线行、0 行的表、
 #                                   对得上的原始证据表（含反引号包着的路径、不以换行结尾的材料），判绿报对数
+#   knowledge-sync-old-record-green 基准里已有的旧记录这一轮只追加了一行「不改：」，旧记录里早先「改了」「补了」两行点名的载体（更早一轮改的）不在这次改动范围里，不判；
+#                                   这一轮新建的触发文件由这一轮新写的记录点名，判绿报对数
 #   agent-def-adversarial-review-red   共用约束没人点名、主 agent 入口只被旧判决点名、删掉的定义没有去向，判红逐个列出
 #   agent-def-adversarial-review-green 四份被新判决点名、一份删除按 deleted 豁免、顺带改的 README 不算，判绿报对数
+# 登记行判法的弄坏开关在 .claude/hooks/lib_abandoned_rounds.py（LIB_ABANDONED_ROUNDS_BREAK，一次设一个；派发闸的自检也带着）。红在这一格的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   columns-unchecked        不核四列不空                     abandoned-rounds-red（输出里找不到「不是四列、或有空列」）
+#   date-unchecked           不核日期是 YYYY-MM-DD            abandoned-rounds-red（输出里找不到「日期不是 YYYY-MM-DD」）
+#   duplicate-unchecked      同一轮两行也不拒                 abandoned-rounds-red（输出里找不到「dup-r1（第 」）
+#   source-optional          出处一概不要求                   abandoned-rounds-source-red（输出里找不到「这些行的出处收不了」）、abandoned-rounds-source-green（输出里找不到「登记表 8 行：…出处按派发闸 ⑥ 同一份判法查了 7 行」）、
+#                                                             abandoned-rounds-source-date-parentheses-green（输出里找不到「登记表 2 行：…出处按派发闸 ⑥ 同一份判法查了 2 行」）
+#   other-round-name-ok      出处那一行有别的轮名也收         abandoned-rounds-source-red（输出里找不到「除这一轮外还有别的轮名 other-r1」）
+#   other-name-by-form       别的轮名的全集退回只认登记表里的名字（仓里的 _<轮>-body.md 等材料不算；-r<数字> 形照认）  abandoned-rounds-source-red（输出里找不到「named-r1：第 7 行的出处…除这一轮外还有别的轮名 close-b1」）
+#   other-form-ignored       别的轮名不认 -r<数字> 形，只认仓里认得的全集（改前的判法）  abandoned-rounds-source-red（输出里找不到「formonly-r1：第 8 行的出处…除这一轮外还有别的轮名 ghost-r2」）
+#   legacy-by-date           免出处退回按日期（早于 2026-10-12 的行不要求）  abandoned-rounds-source-red（输出里找不到「datedold-r1：第 6 行没有出处」）
+#   source-any-path          出处不限 records/                abandoned-rounds-source-red（输出里找不到「ownbody-r1：第 4 行没有出处」）
+#   quote-short-ok           「」里一个字也算原话             abandoned-rounds-source-red（输出里找不到「至少 6 个字」）
+#   source-required-always   旧行名单里的行也要求出处         abandoned-rounds-green、abandoned-rounds-source-green（期望退出 0，实测 1）
+#   line-unread              不找〔〕原话、不取那一行，整份文件里找   abandoned-rounds-source-red（输出里找不到「除这一轮外还有别的轮名 other-r1」「至少 6 个字」）、
+#                                                             abandoned-rounds-source-green（输出里找不到「出处行号对不上而〔〕原话恰好找到一次、照收的 1 行」）、
+#                                                             abandoned-rounds-source-date-parentheses-green（输出里找不到「出处〔〕原话命中几处或找不到、照行号提示取那一行照收的 2 行」）
+#   line-number-read         退回按行号读，〔〕原话不要求也不找   abandoned-rounds-source-green（期望退出 0，实测 1：drift-r1 的第 2 行里没有这一轮的名字）、
+#                                                             abandoned-rounds-source-red（输出里找不到「gone-r1：第 9 行的出处 records/halt.md 里找不到」）、
+#                                                             abandoned-rounds-source-date-parentheses-green（输出里找不到「出处〔〕原话命中几处或找不到、照行号提示取那一行照收的 2 行」）
+#   line-hint-ignored        不看行号提示（命中几处、找不到一律红）  abandoned-rounds-source-green（期望退出 0，实测 1：pinned-r1 命中 2 次、reworded-r1 与 dated-r1 找不到）、
+#                                                             abandoned-rounds-source-red（输出里找不到「行号提示的第 10 行有这一轮的名字，但去掉改名表」：不看提示时 misread-r1 的说明退回「也没有这一轮的名字」）、
+#                                                             abandoned-rounds-source-date-parentheses-green（期望退出 0，实测 1：bracketed-date-r1 与 halfwidth-date-r1 找不到）
+#   hint-line-unmatched      原话找不到时不比〔〕与提示那一行（改前的判法）  abandoned-rounds-source-red（输出里找不到「misread-r1：第 12 行的出处 records/halt.md 里找不到」）
+#   empty-parentheses-kept   比〔〕与提示那一行时剩下的空括号「（）」「()」留着不去（改前的判法）  abandoned-rounds-source-date-parentheses-green（期望退出 0，实测 1：bracketed-date-r1 与 halfwidth-date-r1
+#                                                             去掉日期之后〔〕里剩一对空括号，落不进提示那一行）
+#   source-escapes、name-substring、round-name-unchecked 这三项只在派发闸的自检里有格（这一道的样本没有对应的写法）
 # 共用库的弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   STAGE_CELLS_BREAK=red-swallowed  红格按绿记、整道退 0
-#       abandoned-rounds-red、agent-def-adversarial-review-red、batch-scope-red、crates-adversarial-review-red、implementation-premise-red、
+#       abandoned-rounds-red、abandoned-rounds-source-red、agent-def-adversarial-review-red、batch-scope-red、code-round-snapshot-no-snapshot-red、code-round-snapshot-red、crates-adversarial-review-comment-and-code-red、crates-adversarial-review-exempt-stale-red、crates-adversarial-review-red、implementation-premise-red、
 #       knowledge-sync-red、verdict-names-local-samples-missing-clean-sample、verdict-names-local-samples-red（期望退出 1，实测 0）
-#   STAGE_CELLS_BREAK=marker-ignored  不认样本根的 .gate-cells，每份样本七格全跑
-#       abandoned-rounds-green、abandoned-rounds-red、agent-def-adversarial-review-green、agent-def-adversarial-review-red、batch-scope-green、
-#       batch-scope-red、crates-adversarial-review-green、crates-adversarial-review-red、implementation-premise-green、implementation-premise-red、
-#       knowledge-sync-green、knowledge-sync-red、verdict-names-local-samples-green、verdict-names-local-samples-missing-clean-sample、
+#   STAGE_CELLS_BREAK=marker-ignored  不认样本根的 .gate-cells，每份样本八格全跑
+#       abandoned-rounds-green、abandoned-rounds-red、abandoned-rounds-source-date-parentheses-green、abandoned-rounds-source-green、abandoned-rounds-source-red、agent-def-adversarial-review-green、agent-def-adversarial-review-red、batch-scope-green、
+#       batch-scope-red、code-round-snapshot-green、code-round-snapshot-no-object、code-round-snapshot-no-snapshot-red、code-round-snapshot-red、crates-adversarial-review-comment-and-code-red、crates-adversarial-review-comment-only、crates-adversarial-review-exempt-green、crates-adversarial-review-exempt-stale-red、crates-adversarial-review-green、crates-adversarial-review-red、crates-adversarial-review-test-code-only、implementation-premise-green、implementation-premise-red、
+#       knowledge-sync-green、knowledge-sync-old-record-green、knowledge-sync-red、verdict-names-local-samples-green、verdict-names-local-samples-missing-clean-sample、
 #       verdict-names-local-samples-red（输出里找不到「样本只跑 .gate-cells 点名的格：…」）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
@@ -183,15 +283,19 @@ source "$STAGE_DIR/lib/stage-cells.sh"
 TRIGGER_TABLE=".claude/gate.d/knowledge-sync-triggers.tsv"
 PREMISE_CUTOFF="2026-09-17"
 SIDE_AND_SNAPSHOT_CUTOFF="2026-09-28"
+# crates-adversarial-review 格不判的测试代码：harness 档包、checker 档包与池级 checker 的 src（.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）
+TEST_CODE_SOURCES='^crates/(singlefs-harness|singlefs-checker-tier|singlefs-checker)/src/'
 
 stage_cell batch-scope check_batch_scope "这一批要碰的触发文件有没有登记进范围" \
   "没登记的触发文件先问它挡不挡着本轮课题，挡着的在 .claude/batch-scope 加一行「<从仓库根起的路径>  # 为什么这一批要碰它」，不挡着的挪到下一批；多出来的登记删掉"
 stage_cell verdict-names-local-samples check_verdict_names_local_samples "新写的三方判决有没有按路径点名那一轮本地腿的每一份样本（含作废副本）" \
   "逐份读那一轮本地腿交回的样本（干净的、通读判带损坏的、-output-void<n>.md），在新写的判决里按路径列出：.claude/rules/three-way-inference.md「判决由主 agent 做，不由投票做」"
-stage_cell crates-adversarial-review check_crates_adversarial_review "crates 里的实现改动有没有走过三方正反对抗推理" \
-  "提交之前走一轮三方（.claude/rules/three-way-inference.md），判决写进 research/prompts/<题>-r<n>-main-verification.md，逐个按路径点名改过的 crates 文件；点名写进新的判决，不往旧判决里补"
+stage_cell crates-adversarial-review check_crates_adversarial_review "crates 里产品代码的实现改动有没有走过三方正反对抗推理" \
+  "提交之前走一轮三方（.claude/rules/three-way-inference.md），判决写进 research/prompts/<题>-r<n>-main-verification.md，逐个按路径点名改过的 crates 产品代码文件（测试代码不点名，射程见 .claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）；点名写进新的判决，不往旧判决里补"
+stage_cell code-round-snapshot check_code_round_snapshot "按路径点名了产品代码 crates 文件的新判决，有没有点名开工快照、快照有没有罩住点名的每份文件" \
+  "派腿之前 sha256sum <判决要点名的 crates 文件…> > research/prompts/<轮>-snapshot/crates-sha256.txt（kb 文件另记 kb-sha256.txt），判决里写一行开工快照指到那个目录（.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」）；派腿时刻已过的，主 agent 补记快照并在判决里写明是事后补的"
 stage_cell implementation-premise check_implementation_premise "三方论证材料有没有「实现今天的样子」" \
-  "正文前提表里加一行「实现今天的样子」写读过的 crates/ 路径与事实；写明本地腿派哪一侧与理由；补开工快照 research/prompts/<轮>-snapshot/（.claude/agents/three-way-materials.md 第 5b 步）"
+  "正文前提表里加一行「实现今天的样子」写读过的 crates/ 路径与事实；补开工快照 research/prompts/<轮>-snapshot/（.claude/agents/three-way-materials.md 第 5b 步）"
 stage_cell abandoned-rounds check_abandoned_rounds "发过腿的三方轮次，要么有判决，要么登记撂下" \
   "补判决 research/prompts/<轮>-main-verification.md，或在 research/prompts/abandoned-rounds.tsv 加一行（轮名、日期、为什么撂下、去向，制表符分隔）；登记表写坏的照上面逐行改"
 stage_cell knowledge-sync check_knowledge_sync "改了规则、agent、hook、门禁、脚本或实现之后，有没有写阶段同步记录" \
@@ -221,6 +325,10 @@ cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     �
 inside_git=0
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 && inside_git=1
 LIB_CHANGED_PATHS="$(cd "$STAGE_DIR/../.." && pwd)/scripts/gate/changed-paths.sh"
+# 哪些文件只改了注释：判法只在上游一份（show-me-test 与这道门禁共用），从规范副本调
+COMMENT_ONLY_JUDGE="$(cd "$STAGE_DIR/.." && pwd)/singlefs-ai-sop/scripts/comment-only-change.py"
+# 叫停轮登记行怎么判：判法只在这一份，派发闸 ⑥ 调同一份（取自这一道脚本旁边 ../hooks/，不取项目根：样本根里放不了坏的）
+ABANDONED_ROUNDS_LIBRARY="$(cd "$STAGE_DIR/../hooks" && pwd)/lib_abandoned_rounds.py"
 # shellcheck source=../../scripts/gate/changed-paths.sh
 source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用库 $LIB_CHANGED_PATHS"; echo "     → 怎么办：改动范围的取法只有那一份，恢复它，别在阶段里另抄一份。"; exit 1; }
 
@@ -465,6 +573,25 @@ PY
 }
 
 # ── crates-adversarial-review ───────────────────────────────────────────────
+# user_exemption_reason <豁免表> <路径>：豁免表一行三段（路径、豁免时那一版的 sha256、为什么），打印这一路径、这一份内容那一行的理由，没有就不打印。
+# 按内容哈希认：那份文件再改一个字就对不上。删掉的文件没有内容可算哈希，第二段写 deleted，只在文件确实不在时对得上。
+# 只有用户明说「这次不走三方」时才加一行，理由里写明是哪一次、他说了什么。两格共用：.claude/agent-def-review-exempt 与 .claude/crates-review-exempt。
+user_exemption_reason() {
+  local table="$1" path="$2" now
+  [[ -f "$table" ]] || return 0
+  if [[ -f "$path" ]]; then now="$(sha256sum -- "$path" | cut -d' ' -f1)"; else now="deleted"; fi
+  if [[ "${CRATES_ADVERSARIAL_REVIEW_BREAK:-}" == exempt-hash-ignored ]]; then
+    awk -F'\t' -v path="$path" '$1 !~ /^#/ && NF >= 3 && $1 == path { print $3; exit }' "$table"; return 0
+  fi
+  awk -F'\t' -v path="$path" -v hash="$now" \
+    '$1 !~ /^#/ && NF >= 3 && $1 == path && $2 == hash { print $3; exit }' "$table"
+}
+
+# new_verdict_paths：这次改动新写的判决（一行一个），要先调过 load_added_since_gate。crates-adversarial-review、agent-def-adversarial-review 与 code-round-snapshot 三格共用这一份取法。
+new_verdict_paths() {
+  grep -E '^research/prompts/.*-main-verification\.md$' <<<"$added_since_gate" || true
+}
+
 check_crates_adversarial_review() {
   ((inside_git)) || { not_git_repository; return; }
   load_changed_since_gate || {
@@ -472,12 +599,45 @@ check_crates_adversarial_review() {
     echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到改动范围时这一格什么都没比，不是通过。"
     return 1
   }
-  local sources verdicts source verdict named verdict_count
-  local -a missing=()
+  local sources verdicts source verdict named verdict_count all_sources test_sources test_count why
+  local -a missing=() exempted=()
   local count=0
-  sources="$(grep -E '^crates/[^/]+/src/.*\.rs$' <<<"$changed_since_gate" || true)"
+  local exempt_table=".claude/crates-review-exempt"
+  all_sources="$(grep -E '^crates/[^/]+/src/.*\.rs$' <<<"$changed_since_gate" || true)"
+  # 测试代码（TEST_CODE_SOURCES）改完直接测、不走三方：从对象里去掉，另列出来
+  if [[ "${CRATES_ADVERSARIAL_REVIEW_BREAK:-}" == test-code-counted ]]; then
+    sources="$all_sources"; test_sources=""
+  else
+    sources="$(grep -vE "$TEST_CODE_SOURCES" <<<"$all_sources" || true)"
+    test_sources="$(grep -E "$TEST_CODE_SOURCES" <<<"$all_sources" || true)"
+  fi
+  test_count="$(grep -c . <<<"$test_sources" || true)"
+  # 只改了注释的产品代码不走三方：去掉注释与空白之后代码词元与基准逐个相同（判法文件头写了哪些注释照代码算）
+  local comment_only="" comment_only_count=0
+  local -a source_list=()
+  if [[ -n "$sources" && "${CRATES_ADVERSARIAL_REVIEW_BREAK:-}" != comments-count-as-code ]]; then
+    if [[ ! -f "$COMMENT_ONLY_JUDGE" ]]; then
+      echo "  ✗ 找不到判「只改了注释」的判法 $COMMENT_ONLY_JUDGE"
+      echo "     → 怎么办：照 CLAUDE.md「规范从哪来」那一行同步规范副本（判法在上游 scripts/comment-only-change.py），不在这道门禁里另写一份。"
+      return 1
+    fi
+    mapfile -t source_list <<<"$sources"
+    if ! comment_only="$(python3 "$COMMENT_ONLY_JUDGE" "$ROOT" "$gate_base" "${source_list[@]}")"; then
+      echo "  ✗ 判不出哪些产品代码文件只改了注释（$COMMENT_ONLY_JUDGE 判不了，原话在上面；基准 $gate_base）"
+      echo "     → 怎么办：核基准在不在、改动清单里的路径对不对，修好再跑；判不了的不当只改注释。"
+      return 1
+    fi
+    if [[ -n "$comment_only" ]]; then
+      sources="$(grep -vxF -f <(printf '%s\n' "$comment_only") <<<"$sources" || true)"
+      comment_only_count="$(grep -c . <<<"$comment_only" || true)"
+    fi
+  fi
   if [[ -z "$sources" ]]; then
-    echo "  ! 这次改动没碰 crates/*/src，这一格无对象可判（基准 $gate_base）"
+    local comment_only_note=""
+    ((comment_only_count)) && comment_only_note="，只改注释的产品代码 ${comment_only_count} 个不走三方"
+    echo "  ! 这次改动没碰产品代码的 crates/*/src（测试代码 ${test_count} 个不归这一格${comment_only_note}），这一格无对象可判（基准 $gate_base）"
+    report_comment_only_sources "$comment_only" "$comment_only_count"
+    report_test_code_sources "$test_sources" "$test_count"
     return 77
   fi
   load_added_since_gate || {
@@ -485,7 +645,7 @@ check_crates_adversarial_review() {
     echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到改动范围时这一格什么都没比，不是通过。"
     return 1
   }
-  verdicts="$(grep -E '^research/prompts/.*-main-verification\.md$' <<<"$added_since_gate" || true)"
+  verdicts="$(new_verdict_paths)"
   while IFS= read -r source; do
     [[ -z "$source" ]] && continue
     count=$((count + 1))
@@ -494,18 +654,176 @@ check_crates_adversarial_review() {
       [[ -z "$verdict" || ! -f "$verdict" ]] && continue
       if grep -qF -- "$source" "$verdict"; then named=1; break; fi
     done <<<"$verdicts"
-    ((named)) || missing+=("$source")
+    if ((named)); then continue; fi
+    why="$(user_exemption_reason "$exempt_table" "$source")"
+    if [[ -n "$why" ]]; then exempted+=("$source：$why"); continue; fi
+    missing+=("$source")
   done <<<"$sources"
   if ((${#missing[@]})); then
     echo "  ✗ crates 改动里 ${#missing[@]} 个文件没有三方判决点名（这次改动新写的 research/prompts/*-main-verification.md 里一份都没按路径提到它；被改过的旧判决不算）："   # gate-lint:summary
     printf '      %s\n' "${missing[@]}"   # gate-lint:detail
     echo "     → 怎么办：写代码之后、提交之前走一轮三方（.claude/rules/three-way-inference.md）：材料带上 diff，正推 / 反推 / 找反例三条腿各攻一遍，"
     echo "               主 agent 的判决写进 research/prompts/<题>-r<n>-main-verification.md，逐个按路径点名改过的 crates 文件（打中的写回代码再改一轮）；"
-    echo "               点名写进新的判决，不往旧判决里补。"
+    echo "               点名写进新的判决，不往旧判决里补；用户明说这次不走三方的，按内容哈希登记进 $exempt_table（一行：路径、sha256、他说了什么）。"
+    report_comment_only_sources "$comment_only" "$comment_only_count"
     return 1
   fi
   verdict_count="$(grep -c . <<<"$verdicts" || true)"
-  echo "  ✓ crates 改动 ${count} 个文件都有三方判决点名（新写的判决文件 ${verdict_count} 份，基准 $gate_base）"
+  if ((${#exempted[@]})); then
+    echo "  ✓ crates 改动 ${count} 个文件都有去向（新写的判决文件 ${verdict_count} 份，另有 ${#exempted[@]} 个按 $exempt_table 豁免，基准 $gate_base）"
+    echo "    豁免的 ${#exempted[@]} 个（按内容哈希认，那份文件再改一个字就不再豁免）："
+    printf '      %s\n' "${exempted[@]}"
+  else
+    echo "  ✓ crates 改动 ${count} 个文件都有三方判决点名（新写的判决文件 ${verdict_count} 份，基准 $gate_base）"
+  fi
+  report_comment_only_sources "$comment_only" "$comment_only_count"
+  report_test_code_sources "$test_sources" "$test_count"
+}
+
+# report_comment_only_sources <只改注释的路径（一行一个）> <个数>：逐个报出只改了注释、不走三方的产品代码，0 个不报
+report_comment_only_sources() {
+  local listed="$1" listed_count="$2"
+  ((listed_count)) || return 0
+  echo "    只改了注释、不走三方的产品代码 ${listed_count} 个（判法 $COMMENT_ONLY_JUDGE）："
+  printf '%s\n' "$listed" | sed 's/^/      /'
+}
+
+# report_test_code_sources <去掉的路径（一行一个）> <个数>：逐个报出这一格不判的测试代码，0 个不报
+report_test_code_sources() {
+  local listed="$1" listed_count="$2" path
+  ((listed_count)) || return 0
+  echo "    不判的测试代码 ${listed_count} 个（harness 档包、checker 档包与池级 checker 三个包的 src，改完直接测、不走三方：.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）："
+  while IFS= read -r path; do
+    [[ -n "$path" ]] && printf '      %s\n' "$path"
+  done <<<"$listed"
+  return 0
+}
+
+# ── code-round-snapshot ─────────────────────────────────────────────────────
+# 对象与判据在文件头「code-round-snapshot」那一节。判决的取法是 new_verdict_paths，与 crates-adversarial-review 同一份。
+check_code_round_snapshot() {
+  ((inside_git)) || { not_git_repository; return; }
+  load_added_since_gate || {
+    echo "  ✗ 取不到这次改动新增了哪些路径（基准 $gate_base）"
+    echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到新增的判决文件时这一格什么都没比，不是通过。"
+    return 1
+  }
+  local -a new_verdicts=()
+  mapfile -t new_verdicts < <(new_verdict_paths)
+  if ((${#new_verdicts[@]} == 0)); then
+    echo "  ! 这次改动没有新写的判决 research/prompts/<轮>-main-verification.md，这一格无对象可判（基准 $gate_base）"
+    return 77
+  fi
+  python3 - "$gate_base" "$TEST_CODE_SOURCES" "${CODE_ROUND_SNAPSHOT_BREAK:-}" "${new_verdicts[@]}" <<'PY'
+import glob
+import os
+import re
+import sys
+
+base, test_code_pattern, breakage = sys.argv[1:4]
+verdict_paths = [path for path in sys.argv[4:] if path]
+suffix = "-main-verification.md"
+# 判决正文里按路径点名的产品代码文件：crates/<包>/src/<…>.rs 的字面路径（ASCII 字符，遇到中文标点、反引号、冒号、井号就断）；crates/*/src/*.rs 这种通配写法认不出，不算点名
+named_source = re.compile(r"crates/[A-Za-z0-9_.-]+/src/[A-Za-z0-9_./-]+\.rs(?![A-Za-z0-9_])")
+test_code = re.compile(test_code_pattern)
+hash_line = re.compile(r"([0-9a-f]{64})  (\S.*)")
+
+judged = []          # (判决路径, 点名的产品代码文件)
+not_judged = []      # (判决路径, 为什么不判)
+for verdict_path in verdict_paths:
+    if not os.path.isfile(verdict_path):
+        continue
+    with open(verdict_path, encoding="utf-8", errors="replace") as handle:
+        text = handle.read()
+    named = sorted(set(named_source.findall(text)))
+    # 树里没有那个包目录的路径（定义轮里举例用的 crates/demo/src/… 这类）不是真文件，不算点名
+    real = [path for path in named if os.path.isdir(path.split("/src/", 1)[0])]
+    product = [path for path in real if not test_code.search(path)]
+    if product:
+        judged.append((verdict_path, product, text))
+    elif real:
+        not_judged.append((verdict_path, f"只点名了测试代码 {len(real)} 份"))
+    elif named:
+        not_judged.append((verdict_path, f"点名的 {len(named)} 处路径所在的包不在树里（举例用的路径）"))
+    else:
+        not_judged.append((verdict_path, "没按路径点名 crates/*/src/*.rs"))
+
+if not judged:
+    print(f"  ! 新写的判决 {len(verdict_paths)} 份都没按路径点名产品代码的 crates/*/src/*.rs，这一格无对象可判（基准 {base}）")
+    for verdict_path, why in not_judged:
+        print(f"      {verdict_path}：{why}")
+    sys.exit(77)
+
+problems_by_verdict = []
+covered_total = 0
+absent_notes = []
+for verdict_path, product, text in judged:
+    round_name = os.path.basename(verdict_path)[: -len(suffix)]
+    directory = f"research/prompts/{round_name}-snapshot"
+    # 清单：快照目录下任一 *sha256.txt（按包记的 crates-sha256.txt，或冻结副本那一套的 frozen-copy-sha256.txt），点名的文件在哪一份里有行都算；kb-sha256.txt 记的是 kb 文件，不算 crates 清单
+    manifests = sorted(path for path in glob.glob(f"{directory}/*sha256.txt") if os.path.basename(path) != "kb-sha256.txt") if os.path.isdir(directory) else []
+    problems = []
+    if directory + "/" not in text:
+        problems.append(f"正文没写开工快照目录 {directory}/")
+    if not os.path.isdir(directory):
+        problems.append(f"目录 {directory}/ 不在树里（这次改动新加的、已跟踪的都算在树里）")
+    elif not manifests:
+        problems.append(f"目录里没有 {directory}/crates-sha256.txt（也没有别的 *sha256.txt 清单）")
+    elif breakage != "snapshot-coverage-skipped":
+        well_formed, malformed = set(), {}
+        for manifest in manifests:
+            with open(manifest, encoding="utf-8", errors="replace") as handle:
+                for number, raw in enumerate(handle.read().split("\n"), 1):
+                    line = raw.rstrip("\r")
+                    if not line.strip():
+                        continue
+                    found = hash_line.fullmatch(line)
+                    if found:
+                        well_formed.add(found.group(2))
+                        continue
+                    pieces = line.split(None, 1)
+                    if len(pieces) == 2:
+                        malformed.setdefault(pieces[1].lstrip("*").strip(), (manifest, number))
+        shown = "、".join(manifests)
+        for path in product:
+            if not os.path.exists(path):
+                absent_notes.append(f"{verdict_path} 点名的 {path}")
+                continue
+            if path in well_formed:
+                covered_total += 1
+            elif path in malformed:
+                bad_manifest, bad_number = malformed[path]
+                problems.append(f"{bad_manifest} 第 {bad_number} 行点名了 {path}，但哈希不是 64 位十六进制、或哈希与路径之间不是两个空格")
+            else:
+                problems.append(f"{shown} 没有 {path} 的一行")
+    if problems:
+        problems_by_verdict.append((verdict_path, problems))
+
+if problems_by_verdict:
+    problem_count = sum(len(problems) for _path, problems in problems_by_verdict)
+    print(f"  ✗ 新写的判决里 {len(problems_by_verdict)} 份点名了产品代码 crates 文件，开工快照没立住（共 {problem_count} 处）：")  # gate-lint:summary
+    for verdict_path, problems in problems_by_verdict:
+        print(f"      {verdict_path}：")  # gate-lint:detail
+        for problem in problems:
+            print(f"        {problem}")  # gate-lint:detail
+    print("     → 怎么办：派腿之前 sha256sum <判决点名的 crates 文件…> > research/prompts/<轮>-snapshot/crates-sha256.txt（kb 文件另记 kb-sha256.txt），")
+    print("               判决里写一行「开工快照」指到那个目录；腿已经派过的，现在补记并在判决里写明是事后补的、哈希对应哪一版")
+    print("               （.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」一节）。")
+    sys.exit(1)
+
+named_total = sum(len(product) for _path, product, _text in judged)
+print(f"  ✓ 新写的判决 {len(verdict_paths)} 份：{len(judged)} 份点名了产品代码 crates 文件（共点名 {named_total} 处），"
+      f"开工快照目录与清单（crates-sha256.txt 或 frozen-copy-sha256.txt）都在、点名的文件逐份有哈希行（{covered_total} 处）；{len(not_judged)} 份没点名产品代码文件不判（基准 {base}）")
+if not_judged:
+    print("    不判的：")
+    for verdict_path, why in not_judged:
+        print(f"      {verdict_path}：{why}")
+if absent_notes:
+    print(f"    点名的文件树里已经不存在、不要求快照有行的 {len(absent_notes)} 处：")
+    for note in absent_notes:
+        print(f"      {note}")
+print("    哈希与派腿那一刻的文件内容对不对得上，这一格判不了（靠主 agent 写判决前 sha256sum -c 核）")
+PY
 }
 
 # ── implementation-premise ──────────────────────────────────────────────────
@@ -514,7 +832,7 @@ check_implementation_premise() {
   local body heading date date_label round listed
   local -a bodies=("$prompts_directory"/_*-body.md)
   local checked=0 side_checked=0 failed=0
-  local -a missing=() before_cutoff=() undated=() missing_side=() missing_snapshot=()
+  local -a missing=() before_cutoff=() undated=() missing_snapshot=()
   for body in "${bodies[@]}"; do
     heading="$(head -n 1 "$body")"
     date="$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' <<<"$heading" | head -n 1)"
@@ -532,7 +850,6 @@ check_implementation_premise() {
     grep -qF 'crates/' "$body" || missing+=("$body（$date_label）")
     if [[ -n "$date" && ! "$date" < "$SIDE_AND_SNAPSHOT_CUTOFF" ]]; then
       side_checked=$((side_checked + 1))
-      grep -qE '本地腿[*]*[：:][*]*[[:space:]]*(攻|辩)[^|]{2,}' "$body" || missing_side+=("$body")
       round="$(basename "$body")"; round="${round#_}"; round="${round%-body.md}"
       if [[ -f "$prompts_directory/_$round-background.md" ]]; then
         if [[ ! -d "$prompts_directory/$round-snapshot" ]]; then
@@ -557,17 +874,10 @@ check_implementation_premise() {
     echo "               实现里没有相关代码时，写 grep 命令与零命中（.claude/rules/implementation-first.md 第 2、3 条）。"
     failed=1
   fi
-  if ((${#missing_side[@]})) || ((${#missing_snapshot[@]})); then
-    if ((${#missing_side[@]})); then
-      echo "  ✗ 这些三方论证正文（标题日期 ≥ $SIDE_AND_SNAPSHOT_CUTOFF）没写这一轮本地腿派哪一侧、为什么："   # gate-lint:summary
-      printf '     %s\n' "${missing_side[@]}"   # gate-lint:detail
-      echo "     → 怎么办：正文分工表里加一行「本地腿：攻（理由）」或「本地腿：辩（理由）」——辩方复核轮派本地辩方，缺哪一侧派哪一侧（.claude/main-agent.md「什么时候派哪个 agent」）"
-    fi
-    if ((${#missing_snapshot[@]})); then
-      echo "  ✗ 这些轮次的开工快照缺了（有背景材料就要有 <轮>-snapshot/，清单点名的 kb 文件都要在快照清单里）："   # gate-lint:summary
-      printf '     %s\n' "${missing_snapshot[@]}"   # gate-lint:detail
-      echo "     → 怎么办：照 .claude/agents/three-way-materials.md 第 5b 步补 research/prompts/<轮>-snapshot/kb-sha256.txt（sha256sum 原样输出，路径从仓根起）；腿已经开跑的，快照里写明是补写的与补写的日期"
-    fi
+  if ((${#missing_snapshot[@]})); then
+    echo "  ✗ 这些轮次的开工快照缺了（有背景材料就要有 <轮>-snapshot/，清单点名的 kb 文件都要在快照清单里）："   # gate-lint:summary
+    printf '     %s\n' "${missing_snapshot[@]}"   # gate-lint:detail
+    echo "     → 怎么办：照 .claude/agents/three-way-materials.md 第 5b 步补 research/prompts/<轮>-snapshot/kb-sha256.txt（sha256sum 原样输出，路径从仓根起）；腿已经开跑的，快照里写明是补写的与补写的日期"
     failed=1
   fi
   ((failed)) && return 1
@@ -575,7 +885,7 @@ check_implementation_premise() {
   if ((${#undated[@]})); then
     echo "    标题没有日期、照要查的算的 ${#undated[@]} 份：${undated[*]}"
   fi
-  echo "    标题日期 ≥ $SIDE_AND_SNAPSHOT_CUTOFF、另核了本地腿一侧与开工快照的 $side_checked 份"
+  echo "    标题日期 ≥ $SIDE_AND_SNAPSHOT_CUTOFF、另核了开工快照的 $side_checked 份"
   if ((${#before_cutoff[@]})); then
     echo "    没查 ${#before_cutoff[@]} 份（标题日期早于 $PREMISE_CUTOFF，规范落地之前写的）：${before_cutoff[*]}"
   else
@@ -585,8 +895,8 @@ check_implementation_premise() {
 
 # ── abandoned-rounds ────────────────────────────────────────────────────────
 check_abandoned_rounds() {
-  python3 - <<'PY'
-import os, re, subprocess, sys
+  python3 - "$ABANDONED_ROUNDS_LIBRARY" <<'PY'
+import importlib.util, os, re, subprocess, sys
 
 prompts_dir = "research/prompts"
 registry_path = "research/prompts/abandoned-rounds.tsv"
@@ -693,23 +1003,36 @@ for name in sorted(dispatch_files_by_round):
 registered_line_numbers = {}
 registered_reasons = {}                      # 轮名 → 第三列「为什么撂下」，判「腿一条没派」那一格要读它
 malformed_registry_rows = []
-if os.path.isfile(registry_path):
-    for line_number, line in enumerate(open(registry_path, encoding="utf-8"), 1):
-        line = line.rstrip("\n")
-        if not line.strip() or line.startswith("#"):
-            continue
-        fields = line.split("\t")
-        if len(fields) != 4 or any(not field.strip() for field in fields):
-            malformed_registry_rows.append(f"第 {line_number} 行不是四列、或有空列：{line}")
-            continue
-        if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", fields[1].strip()):
-            malformed_registry_rows.append(f"第 {line_number} 行日期不是 YYYY-MM-DD：{fields[1]}")
-            continue
-        registered_line_numbers.setdefault(fields[0].strip(), []).append(line_number)
-        if len(fields) >= 3:
-            registered_reasons[fields[0].strip()] = fields[2]
+source_problem_rows = []
+# 登记行一行收不收只在 lib_abandoned_rounds.py 一份（形状、同一轮重复、出处三样），派发闸 ⑥ 调同一份：不收就是红
+library_path = sys.argv[1]
+try:
+    sys.dont_write_bytecode = True
+    library_spec = importlib.util.spec_from_file_location("lib_abandoned_rounds", library_path)
+    abandoned_library = importlib.util.module_from_spec(library_spec)
+    library_spec.loader.exec_module(abandoned_library)
+    library_modes = abandoned_library.breaks()
+except Exception as error:   # 文件不在、语法错、弄坏开关写错都算读不到
+    print(f"  ✗ 读不到登记行的共用判法 {library_path}（{error!r}）")
+    print("     → 怎么办：登记行怎么判只有那一份（派发闸 ⑥ 也调它），恢复它，别在这一格另抄一份；LIB_ABANDONED_ROUNDS_BREAK 只写它认的值。")
+    sys.exit(1)
+registry_rows, registry_error = abandoned_library.read_rows(os.getcwd())
+if registry_error is not None:
+    print(f"  ✗ 读不了 {registry_path}（{registry_error}）：登记撂下的轮这一次没判")
+    print("     → 怎么办：恢复这张表（文件、编码、权限），读不到不是「没有登记」。")
+    sys.exit(1)
+registry_judgement = abandoned_library.judge_table(os.getcwd(), registry_rows, library_modes)
+for row in registry_rows:
+    if row.number in registry_judgement.shape:
+        malformed_registry_rows.append(registry_judgement.shape[row.number])
+        continue
+    registered_line_numbers.setdefault(row.name, []).append(row.number)
+    if len(row.fields) >= 3:
+        registered_reasons[row.name] = row.fields[2]
+    if row.number in registry_judgement.sources:
+        source_problem_rows.append(f"{row.name}：{registry_judgement.sources[row.number]}")
 
-duplicated_registrations = [f"{name}（第 {', '.join(map(str, numbers))} 行）" for name, numbers in sorted(registered_line_numbers.items()) if len(numbers) > 1]
+duplicated_registrations = [f"{name}（第 {', '.join(map(str, numbers))} 行）" for name, numbers in registry_judgement.duplicates.items()]
 # 理由里明写没派腿的，不要求认出腿文件：这种轮本来就没有腿文件，正文一被归档就永远认不出，登记表那一行比文件名更权威。
 no_leg_form = re.compile(r"腿一条没派|没有派腿|一条腿都没派")
 registered_unknown_rounds = [name for name in sorted(registered_line_numbers)
@@ -743,6 +1066,15 @@ if duplicated_registrations:
     for entry in duplicated_registrations:
         print(f"     {entry}")  # gate-lint:detail
     print("     → 怎么办：合成一行，理由与去向写在同一行里。")
+if source_problem_rows:
+    failed = True
+    print(f"  ✗ {registry_path} 这些行的出处收不了（派发闸 ⑥ 读同一张表、判同一份，不收就是红；只有库里旧行名单 {'、'.join(abandoned_library.LEGACY_SOURCELESS_ROUNDS)} 里的行不要出处，别的行都要）：")  # gate-lint:summary
+    for entry in source_problem_rows:
+        print(f"     {entry}")  # gate-lint:detail
+    print("     → 怎么办：在那一行里写出处「records/<文件>.md 第 N 行〔<那一行里含这一轮名字的一段原话，逐字照抄>〕」（或 records/<文件>.md:N〔…〕）：〔〕里的原话在 records/ 下那份现存文件里要恰好找到一次"
+          "（行号只当提示；找不到就照现在的原文逐字重抄，不写转述——只经过术语改名、删日期才找不到的，行号写到那一行照收；命中多次就把行号写成含这一轮名字的那一处，或多抄几个字），"
+          "取到的那一行里要有这一轮的名字、除这一轮外没有别的轮名、并有一句「」括起来的用户原话（去掉空白后至少 6 个字）；")
+    print("               这一轮自己的材料（research/prompts/<轮>*）、规则与定义文件、仓外路径、同一行写着别的轮叫停原话的行都不认，另找只写这一轮的那一行。")
 if registered_unknown_rounds:
     failed = True
     print(f"  ✗ 撂下登记表登记了这些轮，{prompts_dir} 里认不出它们发过腿（没有 _<轮>-body.md、<轮>-opus.md、<轮>-sonnet.md、<轮>-local-attack.md、<轮>-local-defense.md）：")  # gate-lint:summary
@@ -761,6 +1093,16 @@ if failed:
 
 checked = len(dispatch_files_by_round)
 print(f"  ✓ 发过腿的三方轮次都有判决或撂下登记（查了 {checked} 轮：判决文件 {len(verdict_file_rounds)} 轮、kb 小节里的判决 {len(kb_verdict_rounds)} 轮、登记撂下 {len(abandoned_rounds)} 轮）")
+sourced_rows = sum(1 for row in registry_rows if abandoned_library.source_required(row, library_modes))
+print(f"    登记表 {len(registry_rows)} 行：形状与同一轮重复都查了，出处按派发闸 ⑥ 同一份判法查了 {sourced_rows} 行，{len(registry_rows) - sourced_rows} 行在旧行名单里、不要求出处")
+moved_rows = [f"{row.name}：出处 {registry_judgement.moved[row.number][0]} 写的第 {registry_judgement.moved[row.number][1]} 行，原话现在在第 {registry_judgement.moved[row.number][2]} 行"
+              for row in registry_rows if row.number in registry_judgement.moved]
+if moved_rows:
+    print(f"    出处行号对不上而〔〕原话恰好找到一次、照收的 {len(moved_rows)} 行（行号只当提示，顺手把行号改成现在的）：{'；'.join(moved_rows)}")
+hinted_rows = [f"{row.name}：出处 {registry_judgement.hinted[row.number][0]} 第 {registry_judgement.hinted[row.number][1]} 行：{registry_judgement.hinted[row.number][2]}"
+               for row in registry_rows if row.number in registry_judgement.hinted]
+if hinted_rows:
+    print(f"    出处〔〕原话命中几处或找不到、照行号提示取那一行照收的 {len(hinted_rows)} 行（取到的那一行是不是用户为这一轮说的，靠主 agent 核）：{'；'.join(hinted_rows)}")
 if legacy_prefixes:
     print(f"    没判 {len(legacy_prefixes)} 个前缀（腿提示是旧形态：<题>-local.md、<题>-forward-sonnet.md 这类，或轮名不以 -r<N> 结尾）：{'、'.join(sorted(legacy_prefixes))}")
 else:
@@ -1023,7 +1365,8 @@ for record_path, text in records:
         if disposition.startswith("改了") or disposition.startswith("补了"):
             disposition_counts[disposition[:2]] += 1
             # 这一轮写的处置行才判：新写的记录整份都是；旧记录只判这一轮新加的那几行（早先的行点名的是更早一轮改的载体）
-            written_this_round = record_path in fresh_records or row_line in added_lines_by_record.get(record_path, set())
+            written_this_round = (os.environ.get("KNOWLEDGE_SYNC_BREAK", "") == "old-rows-rejudged"
+                                  or record_path in fresh_records or row_line in added_lines_by_record.get(record_path, set()))
             if (written_this_round
                     and carrier_path is not None and carrier_path not in changed_set):
                 out_of_range_problems.append(f"{location}：处置写「{disposition[:2]}」，载体 {carrier_path} 不在改动范围里")
@@ -1109,7 +1452,7 @@ check_agent_def_adversarial_review() {
     echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到改动范围时这一格什么都没比，不是通过。"
     return 1
   }
-  local definitions verdicts definition verdict named now why verdict_count
+  local definitions verdicts definition verdict named why verdict_count
   local -a exempted=() missing=()
   local count=0
   definitions="$(grep -E '^\.claude/(agents/[^/]+\.md|agent-common\.md|main-agent\.md)$' <<<"$changed_since_gate" || true)"
@@ -1122,9 +1465,8 @@ check_agent_def_adversarial_review() {
     echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到新增的判决文件时这一格什么都没比，不是通过。"
     return 1
   }
-  verdicts="$(grep -E '^research/prompts/.*-main-verification\.md$' <<<"$added_since_gate" || true)"
-  # 豁免表 .claude/agent-def-review-exempt 一行三段（路径、豁免时那一版的 sha256、为什么）；删掉一份定义时第二段写 deleted。
-  # 按内容哈希认：那份定义再改一个字，哈希就对不上、这一格照常红。只有用户明说「这次不走三方」时才加一行，理由里写明是哪一次、他说了什么。
+  verdicts="$(new_verdict_paths)"
+  # 豁免表的格式与认法在 user_exemption_reason
   local exempt_table=".claude/agent-def-review-exempt"
   while IFS= read -r definition; do
     [[ -z "$definition" ]] && continue
@@ -1135,13 +1477,8 @@ check_agent_def_adversarial_review() {
       if grep -qF -- "$definition" "$verdict"; then named=1; break; fi
     done <<<"$verdicts"
     if ((named)); then continue; fi
-    if [[ -f "$exempt_table" ]]; then
-      # 删掉的定义没有内容可算哈希：豁免行第二段写 deleted，只在文件确实不在时对得上（文件回来了就按哈希认，deleted 那行不再算）
-      if [[ -f "$definition" ]]; then now="$(sha256sum -- "$definition" | cut -d' ' -f1)"; else now="deleted"; fi
-      why="$(awk -F'\t' -v path="$definition" -v hash="$now" \
-        '$1 !~ /^#/ && NF >= 3 && $1 == path && $2 == hash { print $3; exit }' "$exempt_table")"
-      if [[ -n "$why" ]]; then exempted+=("$definition：$why"); continue; fi
-    fi
+    why="$(user_exemption_reason "$exempt_table" "$definition")"
+    if [[ -n "$why" ]]; then exempted+=("$definition：$why"); continue; fi
     missing+=("$definition")
   done <<<"$definitions"
   if ((${#missing[@]})); then

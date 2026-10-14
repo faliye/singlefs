@@ -1,0 +1,4 @@
+exit=0
+want=挂钟断言的登记位都对：扫了 1 份 .rs、3 个 #[test]；登记 1 条（busy_work_finishes_within_a_millisecond），load-safe 1 条
+want=── 汇总：checker-tier-research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=wallclock-asserts-registered：绿

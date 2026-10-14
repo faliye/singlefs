@@ -1,2 +1,2 @@
 # 样本自己的登记表（research-script-selftests 格经 light-selftest-guard.py --registry-root <样本根> 读它）：一行一份
-scripts/sample-light-fake-cargo.sh	light	# 样本：登记成 light，自证只用样本根 sample-tools/ 里的假 cargo
+scripts/gate/sample-light-fake-cargo.sh	light	# 样本：登记成 light，自证只用样本根 sample-tools/ 里的假 cargo

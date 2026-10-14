@@ -1,0 +1,6 @@
+exit=1
+want=scripts/mutation/tables/tiny_bench.tsv：[两条之二_引了没有的名字] 编不过：error[E0425]: cannot find value `missing_right` in this scope
+want=研究侧变异表有 1 条替换文编不过、0 张表没判完（现判 1 张、复用 0 张）
+want=改那一行替换文
+want=── 汇总：checker-tier-research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=checker-tier-research-build-and-replay.sh：1 格里 1 格红（mutation-tables-compile）

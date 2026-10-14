@@ -1,0 +1,4 @@
+exit=1
+want=1 个阶段头部写了 none，却有样本目录
+want=80-none-but-dir.sh：头部写了 none，而 .claude/gate.d/fixtures/80-none-but-dir.sh 在
+want=目录里有样本就是有判别力样本

@@ -4,7 +4,7 @@
 set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 git init -q -b master .
-git add research
+git add research scripts
 git commit -qm '产物'
 # 上游设在基准提交：旧的取法（先认 gate-ok、再认上游的 tip）在这里取得到基准，于是只看 git diff、漏掉未跟踪的那一页
 git branch 上游 && git branch -q --set-upstream-to=上游 master

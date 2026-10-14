@@ -1,0 +1,4 @@
+exit=1
+want=  ✗ 1 行排除表指到 .claude/gate.d/fixtures/ 下不存在的阶段（fixtures 下现有 1 道）：
+want=     .claude/doc-lint-exclude:3  .claude/gate.d/fixtures/gone-sample.sh（没有阶段目录 gone-sample.sh）
+want=→ 怎么办：阶段改了名就把这一行的路径改成现在的名字

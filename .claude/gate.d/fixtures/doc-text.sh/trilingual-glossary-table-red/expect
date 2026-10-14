@@ -1,0 +1,10 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-glossary
+want=翻译术语表与译文有 6 处不对（表自己 6 处；查了 1 组、4 条术语）
+want=.claude/kb/translation-glossary.md:4：表头不对
+want=.claude/kb/translation-glossary.md:7：表每行要四列，这一行有 3 列
+want=.claude/kb/translation-glossary.md:8：English列是空的
+want=.claude/kb/translation-glossary.md:9：中文列「崩溃点」与第 6 行重复
+want=.claude/kb/translation-glossary.md:10：说明列不空就要恰好三段、用 <br> 分隔、每段不空，这一行有 2 段
+want=.claude/kb/translation-glossary.md:11：说明列不空就要恰好三段、用 <br> 分隔、每段不空，这一行有 3 段（空段 1 段）
+want=doc-text.sh：1 格里 1 格红（trilingual-glossary）

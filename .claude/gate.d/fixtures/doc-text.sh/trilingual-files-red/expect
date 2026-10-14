@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-files
+want=三语文件有 4 处不对（登记表 0 处，三份没配齐的 4 组，共 5 组）
+want=README：缺 README.ja.md（ja）
+want=briefs/2026-09-28：缺 briefs/2026-09-28.zh.md（zh）
+want=briefs/2026-10-10：缺 briefs/2026-10-10.md（en）、briefs/2026-10-10.ja.md（ja）
+want=briefs/2026-10-12：缺 briefs/2026-10-12.md（en）
+want=doc-text.sh：1 格里 1 格红（trilingual-files）
+want=→ trilingual-files：缺哪份补哪份

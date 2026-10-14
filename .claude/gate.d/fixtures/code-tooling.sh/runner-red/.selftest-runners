@@ -1,5 +1,5 @@
 # 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：四条，第二条必红
-bash scripts/sample-pass-a.sh --selftest
-bash scripts/sample-fail-b.sh --selftest
-python3 scripts/sample-pass-c.py --selftest
-bash scripts/sample-pass-d.sh --selftest
+bash scripts/gate/sample-pass-a.sh --selftest
+bash scripts/gate/sample-fail-b.sh --selftest
+python3 scripts/gate/sample-pass-c.py --selftest
+bash scripts/gate/sample-pass-d.sh --selftest

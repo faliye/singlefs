@@ -6,7 +6,7 @@ raise-rollback-floor）、115 项检查全过」），GATE55_KEEP_WORK=1（那�
    - 虚机：VM_DISKS=2 VM_DISK_MB=4096、VM_LOG_MB 取默认 4096，scripts/devices/vm-bench.sh 送进 QEMU；
      blklogwrites 一支用补好的 QEMU ~/.local/share/singlefs/qemu
      （qemu-io version 8.2.2 (singlefs blklogwrites patch f4ecee61df60)）。
-   - 虚机二进制 new_pool_file_creation_on_device（musl 静态）与宿主检查 new_pool_file_creation_device_log_check
+   - 虚机二进制 new_pool_file_creation_on_device（静态链接：glibc 目标加 +crt-static）与宿主检查 new_pool_file_creation_device_log_check
      由本阶段自己编，源码是仓 HEAD fcc4d340 加当时的工作区：工作区里有别的会话没提交的 crates/ 改动，
      也有本批 crates/singlefs-checker-tier/src/device_log.rs 的写零折叠改法（块内乱序可折、块间按序）。
    - check-exit：direct、file-overwrite、second-instance、raise-rollback-floor 为 0；
@@ -16,7 +16,7 @@ raise-rollback-floor）、115 项检查全过」），GATE55_KEEP_WORK=1（那�
    原样取第 35–39 行（name=segments 五行）与第 59 行（name=root_record 一行）。
    scripts/experiments/replay.sh 只留 E142 的两行（2026-10-08 起与真仓同形）：@driver_e142 那一行第 4 列换成 e142-trimmed.out，
    @driver_e142_p8g_crates_dump 那一行第 4 列照真仓写 e142-r24-p8g-crates-dump-2026-10-05.out（样本里没有这个文件，也不该被读）；别的列与真仓里那两行相同。
-   本阶段从这两处现取段序列与反向链（back_chain=3937788698）。
+   本阶段从这两处现取段序列与反向链（back_chain=3937788698）；2026-10-12 起段序列只取 path=mkfs 之外那几行，path=mkfs 那一行的对照见下面 2026-10-12 那一段。
 3. .gate-cells（点名 device-streams）与 .qemu-prerecorded（空文件）照旧。
 
 2026-10-08 起 green、red、direct-divergence-red 的 replay.sh 都是上面那两行 E142（之前只有一行）。
@@ -24,7 +24,7 @@ e142-row-missing-red：只有 .gate-cells、.qemu-prerecorded、research/results
      replay.sh 里 @driver_e142 那一行缺了，只剩 @driver_e142_p8g_crates_dump 一行且第 4 列写 e142-trimmed.out（文件在）：
      本阶段红在「第 2 列是 @driver_e142 的 E142 行取到 0 行」；弄坏开关 GATE_QEMU_DEVICE_STREAMS_BREAK=e142-all-rows 下取全部 E142 行，取到那个文件、过了这一处，红在后面「预录档……四件套都没摆全」，expect 的 want 对不上。
 e142-row-duplicate-red：同上摆法，replay.sh 里 @driver_e142 有两行（第二行第 4 列 e142-trimmed-second.out，样本里没有这个文件）：红在「……取到 2 行」。
-green：上面六档原样，本阶段预录档判 6 档、117 项检查全过，退 77（预录档不算真跑过 QEMU，整道跟着退 77，不退 0）。
+green：上面六档原样，本阶段预录档判 6 档、123 项检查全过（2026-10-12 之前是 117 项，见下面那一段），退 77（预录档不算真跑过 QEMU，整道跟着退 77，不退 0）。
      比真跑那一趟多的 2 项是 direct 那一档逐盘读 divergence=none 那一行（2026-10-03 补上，之前 direct 只看退出码与宿主读回）。
 red：与 green 只差一个数：red/raise-rollback-floor/check.txt 第 3 行 name=device_log device=1 改成 device=2。
      raise-rollback-floor 在判定次序的最后，这一份要先走完六档的段序列、冷重开根、新池新建文件计数与反向链、
@@ -35,7 +35,29 @@ direct-divergence-red：与 green 只差一个数：direct-divergence-red/direct
      check-exit 仍是 0。direct 在判定次序的最前，这一份红在「direct 盘 1：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行」；
      弄坏开关 GATE_QEMU_DEVICE_STREAMS_BREAK=direct-divergence-unread 下 direct 不逐盘读，它判绿退 77，expect 里的 want 对不上。
 
+2026-10-12 起 path=mkfs 那一行不再与 E142 产物比，改与布局表八（.claude/kb/layout/01-first-txn.md「八、」）「mkfs 种根」那一行登记的
+段序列、次操作、崩溃状态数、种类串比（那一行的权威是活代码；E142 的装置是独立手写模型，mkfs 少每盘 [0, 根环基址) 那一步清零：
+2026-10-12 真起虚机那一趟六档都是 14+1+1+1+4、25 次操作、16402、zero_fill×10，E142 第二十四次跑的产物是 12+1+1+1+4、23、4114、zero_fill×8）。
+   green、red、direct-divergence-red、e142-row-missing-red 各加一份 .claude/kb/layout/01-first-txn.md：只有「八、」标题与「mkfs 种根」一行的合成副本，
+   登记值写 2026-10-02 那一趟虚机输出的 path=mkfs 行（12+1+1+1+4、23 次操作、4114 个崩溃状态、zero_fill×8），四份逐字节相同；
+   六档的 out.txt、vm-exit、check.txt、check-exit 与 e142-trimmed.out、replay.sh 一个字节没动。
+   e142-row-missing-red 也放这一份，弄坏开关 e142-all-rows 下它才照旧红在「四件套都没摆全」，不提前红在取不出登记值；
+   e142-row-duplicate-red 红在取 E142 行那一步，走不到读登记表，不放。
+   green 的项数从 117 变成 123：每档的段序列从一项拆成两项（path=mkfs 与登记表比、其余几行与 E142 产物比），6 档各多 1 项。
+mkfs-segments-red：只摆 direct 一档（四件套与 green 逐字节相同），.gate-cells、.qemu-prerecorded、e142-trimmed.out、replay.sh 也与 green 相同；
+     登记行的段序列 12+1+1+1+4 改成 14+1+1+1+4（只改这一个数）：虚机输出与 E142 产物都是 12，登记表是 14。
+     本阶段红在「虚机跑 direct 的 mkfs 段序列与登记表不一致」：direct 这一档在这一句之前只判了 vm-exit；
+     弄坏开关 GATE_QEMU_DEVICE_STREAMS_BREAK=mkfs-from-e142 下 mkfs 那一行退回与 E142 产物比，它判绿退 77（判了 1 档 direct、16 项），expect 的 want 对不上。
+segments-step-red（2026-10-13，关 C487）：只摆 direct 一档（目录与 green 逐字节相同，只差 direct/out.txt 第 10 行），.gate-cells、.qemu-prerecorded、e142-trimmed.out、replay.sh、
+     登记表副本也与 green 相同；direct/out.txt 里 path=transaction 那一行的段序列 24+2+1+2 改成 23+2+1+2（只改这一个数，别的字节没动），E142 产物与登记行都不动。
+     本阶段红在「虚机跑 direct 的段序列（path=mkfs 之外那几行）与 E142 产物的 name=segments 行不一致」，并在它上面印出 diff 的两行（「<」产物、「>」虚机输出）：
+     direct 这一档在这一句之前只判了 vm-exit 与 path=mkfs 那一行（与登记值逐字相同，过了）；
+     弄坏开关 GATE_QEMU_DEVICE_STREAMS_BREAK=segments-diff-skipped 下这一步比对跳过，它判绿退 77（判了 1 档 direct、16 项），expect 的 want 对不上。
+     重录时：direct 四件套换成新录的，改新录 out.txt 里 path=transaction 那一行段序列的第一项（别的数也行，只要和 E142 产物不同），再改 expect 里「>」那一行的 want。
+
 重新生成（重型测试，只在提交时或用户要求时跑）：在仓根不带 .qemu-prerecorded 跑一遍本阶段，设 GATE_QEMU_DEVICE_STREAMS_KEEP_WORK=1
 留现场（不复用上一次全绿判定再加 SINGLEFS_GATE_FULL=1），判绿后把它打出的现场目录里六档各自的
 out.txt、vm-exit、check.txt、check-exit 拷进 green/、red/ 与 direct-divergence-red/ 对应的目录，逐份 cmp；e142-trimmed.out 照第 2 条从
 replay.sh 那时登记的 E142 产物重取；red、direct-divergence-red 照上面两段各重改那一个数，再改 green/expect 里的项数与两份红样本 expect 的 want。
+四份 .claude/kb/layout/01-first-txn.md 的登记行照新录的 direct/out.txt 里 path=mkfs 那一行改；mkfs-segments-red 的 direct 四件套换成新录的，
+登记行照新值写、只把段序列第一项改成别的数，再改它 expect 的 want。

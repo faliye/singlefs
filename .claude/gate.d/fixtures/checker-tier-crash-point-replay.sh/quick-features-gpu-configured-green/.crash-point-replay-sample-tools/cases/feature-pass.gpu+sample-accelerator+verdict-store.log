@@ -1,0 +1,33 @@
+   Compiling singlefs-checker-tier v0.0.0 (样本)
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/singlefs_checker_tier-0000000000000010)
+
+running 2 tests
+test tests::one_is_one ... ok
+test verdict_store::tests::store_round_trips ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/accelerator_items.rs (target/release/deps/accelerator_items-0000000000000011)
+
+running 2 tests
+test accelerator_items_accelerated ... ok
+test accelerator_items_plain ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/gpu_pair.rs (target/release/deps/gpu_pair-0000000000000012)
+
+running 1 test
+CRASH_POINT_REPLAY_JUDGE route=gpu cards_used=1 blocks=2 states=8 red_states=0 compile_seconds=0.1 judge_seconds=0.1 states_per_second=80
+test gpu_pair_agrees_with_the_cpu ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/store_only.rs (target/release/deps/store_only-0000000000000014)
+
+running 1 test
+test store_only_quick ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

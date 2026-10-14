@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# checker-tier-crash-point-replay 带特性那一格样本的假 cargo（快档样本档）：-V 打版本；test 不带 --features 打 cases/default-pass.log，
+# 带 --features <特性> 打 cases/feature-pass.<特性，逗号换成 +>.log、退出码照同名 .exit（没有就 0）；没有那一份日志退 101。别的一律退 101。
+# 同名 .signal 在时打完日志给自己发它写的信号（例 TERM：造一趟被信号打断的 cargo）。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+features=""
+previous=""
+for word in "$@"; do
+  if [[ "$previous" == --features ]]; then features="$word"; fi
+  previous="$word"
+done
+log="$here/cases/default-pass.log"
+if [[ -n "$features" ]]; then log="$here/cases/feature-pass.${features//,/+}.log"; fi
+[[ -f "$log" ]] || { echo "样本里没有这组特性的日志：${log##*/}（参数：$*）"; exit 101; }
+cat "$log"
+if [[ -f "${log%.log}.signal" ]]; then kill -s "$(cat "${log%.log}.signal")" "$$"; fi
+exit "$(cat "${log%.log}.exit" 2>/dev/null || echo 0)"

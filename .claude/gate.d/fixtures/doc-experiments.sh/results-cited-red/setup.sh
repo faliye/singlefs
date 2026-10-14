@@ -4,6 +4,6 @@
 set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 git init -q -b master .
-git add .claude/kb/experiments.md research
+git add .claude/kb/experiments.md research scripts
 git commit -qm '索引与产物'
 git branch 上游 && git branch -q --set-upstream-to=上游 master

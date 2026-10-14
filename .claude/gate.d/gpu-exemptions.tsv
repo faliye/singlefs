@@ -12,3 +12,7 @@ second-crash-during-mount	// gpu-exempt: second-crash-during-mount	要录下可�
 comparison-with-the-ideal-model	// gpu-exempt: comparison-with-the-ideal-model	比的是实现跑出来的结局与只住内存的理想模型（crates/singlefs-harness/src/model.rs），两边都是 Rust 代码在跑，不是判一张镜像	2026-10-10	# 与理想模型比
 witness-criterion-w	// gpu-exempt: witness-criterion-w	见证判据 W 判的是可写挂载读阶段的拒绝合不合法，要在崩溃态上真跑那一段 Rust 实现才判得出	2026-10-10	# 见证判据 W
 reference-filesystem	// gpu-exempt: reference-filesystem	比的是恢复读回的内容与 RefFS（crates/singlefs-reference-filesystem）允许的集合，两边都是 Rust 代码在跑，不是判一张镜像	2026-10-10	# 与 RefFS 允许的集合比
+observer-assertions-on-the-recovery-report	// gpu-exempt: observer-assertions-on-the-recovery-report	观察者在录入段对 singlefs-core 恢复交回的报告（落到哪一版、读回的内容）逐状态下断言、记计数，要在崩溃态上真跑 Rust 实现的恢复才拿得到那份报告；它判的不是一张镜像	2026-10-13	# 观察者对恢复报告的断言（用户 2026-10-13 弹窗点头）
+checker-under-test-on-bad-disk-inputs	// gpu-exempt: checker-under-test-on-bad-disk-inputs	坏盘输入要判的是 CPU 那一份池级 checker 自己的代码在坏镜像上不 panic、判得出坏（GPU 判器是照它另写的一份，替不了它）；GPU 判器在同一组坏镜像上的结论另由 tests/bad_disk_input_campaign.rs 的对拍经库逐张比	2026-10-13	# 坏盘输入里被测的池级 checker（用户 2026-10-13 弹窗点头）
+implementation-under-test-on-bad-disk-inputs	// gpu-exempt: implementation-under-test-on-bad-disk-inputs	坏盘输入的恢复读回是在坏镜像上真跑 singlefs-core 的恢复，被测的是实现自己的恢复读路不 panic、不读回没提交过的内容，GPU 上没有它的另一份	2026-10-13	# 坏盘输入里被测的实现恢复读路（用户 2026-10-13 弹窗点头）
+experiment-measures-the-cpu-judge-itself	// gpu-exempt: experiment-measures-the-cpu-judge-itself	实验量的就是 CPU 判器本身（逐件计时、录判器读集、按件注入 panic、两次重判一致性），换到 GPU 就不是被测对象	2026-10-14	# 实验量的是 CPU 判器本身（用户 2026-10-14 弹窗点头「新立豁免截名」）

@@ -1,0 +1,4 @@
+exit=1
+want=  segment-registry：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（segment-registry）
+want=声明的路径集合是 a、b、m、z，表格行已经占用 a、b，排除之后应该剩一条给「整条流」那句提示，实际剩 2 条（m、z）

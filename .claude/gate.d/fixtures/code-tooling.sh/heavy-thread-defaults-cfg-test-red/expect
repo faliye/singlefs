@@ -1,0 +1,3 @@
+exit=1
+want=✗ 1 处自己定并行度默认值的写法没经登记位取
+want=crates/demo/src/device_after_cfg_test.rs:5  读自己的线程变量 SAMPLE_WORKER_THREADS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值

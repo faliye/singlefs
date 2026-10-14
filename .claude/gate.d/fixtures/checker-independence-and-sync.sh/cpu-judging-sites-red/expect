@@ -1,0 +1,5 @@
+exit=1
+want=✗ crates/singlefs-harness/src/history.rs:1 violations_on 调 check_pool_image（池级 checker）没落在判定段里
+want=pool_checker_*.rs」在
+want=✗ 判器调用点有 2 处不合规（逐处列在上面；扫了 4 份 .rs，调用点 6 处）
+want=cpu-judging-sites：红

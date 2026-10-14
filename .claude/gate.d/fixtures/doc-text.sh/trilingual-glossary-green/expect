@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：trilingual-glossary
+want=术语表 3 条写对了；2 组三份里中文术语在 zh 出现 2 次，对应的英文、日文译名都在 en、ja 里
+want=doc-text.sh：1 格里 1 格绿（trilingual-glossary），0 格本次未跑（无）

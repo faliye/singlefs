@@ -1,4 +1,5 @@
-# 样本按段登记
-demo-stream	0	7	0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-demo-stream	2	12	0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef	# 说明
-other-stream	1	3	0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+# 样本按段登记：五列，一项几条流各登各的段
+demo-stream	demo_Stream	0	7	0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+demo-stream	demo_Stream	2	12	0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef	# 说明
+other-stream	other_piped_A	1	3	0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+other-stream	other_piped_B	1	4	0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

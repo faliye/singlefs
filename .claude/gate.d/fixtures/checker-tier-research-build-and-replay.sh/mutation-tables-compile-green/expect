@@ -1,0 +1,9 @@
+exit=0
+want=── 第 1 趟（样本 .mutation-tables-compile-sample/run-twice
+want=scripts/mutation/tables/tiny_bench.tsv：2 条全编得过，现判（无记录）
+want=── 第 2 趟（样本 .mutation-tables-compile-sample/run-twice
+want=scripts/mutation/tables/tiny_bench.tsv：复用（
+want=本次未跑：scripts/mutation/tables/shell_probe.tsv（scripts/experiments/ 下没有同名的 shell_probe.rs
+want=研究侧变异表逐条只编译全编得过：判了 1 张表，现判 0 张、复用 1 张
+want=── 汇总：checker-tier-research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=mutation-tables-compile：绿

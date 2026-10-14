@@ -1,0 +1,5 @@
+exit=1
+want=定时唯一办法闸没挂全工具
+want=matcher 合起来没覆盖：Monitor
+want=把 timer-only-remind-guard.sh 那一条的 matcher 写成
+want=没注册提醒自启动的停止钩子

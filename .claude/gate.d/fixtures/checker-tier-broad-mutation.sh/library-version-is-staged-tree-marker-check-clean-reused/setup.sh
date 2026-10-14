@@ -23,7 +23,7 @@ import os, subprocess, sys
 with open(os.path.join(".broad-sample", "variant"), encoding="utf-8") as handle:
     variant = handle.read().strip()
 if variant != "clean-unmarked":
-    admission = os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), "admission.py")
+    admission = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[1]))), "gate", "admission.py")
     done = subprocess.run([sys.executable, admission, "stage-marker-write", os.getcwd(), "checker-tier-broad-mutation.sh"], capture_output=True, text=True)
     if done.returncode != 0:
         print(f"写标记没成：{done.stdout}{done.stderr}", file=sys.stderr)

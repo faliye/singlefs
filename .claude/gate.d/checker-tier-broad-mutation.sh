@@ -2,11 +2,12 @@
 # admission: always 判的是此刻被判的仓与广谱变异库目录里那一版的结论，库目录不在 git 树里，上一次的结论不替这一次作保
 # run-condition: command python3 git
 # gate-stage: 广谱变异（提交门禁：这一次暂存树那一版里每一条变异都有结论、没有一条没红）
+# gate-fixture: yes
 # gate-category: checker-tier 类
 # gate-similar: checker-tier-crates-mutation-replay.sh 它按 crates/mutations.tsv 手写的几十行逐条改坏 crates/、自己起 cargo、要点名的测试红；这里不起 cargo，读 cargo-mutants 全量清单在广谱变异库目录里那一版的结论，两张表、两个判据、两个复用对象都不同
 # gate-similar: code-source-discipline.sh 它的 mutation-tables 格静态判变异表成形、锚点唯一；这里不读变异表，读驱动 --summary 的判定行与库目录那一版的源码清单
 # gate-similar: checker-tier-formal-verification.sh 接法照抄它（判法在研究脚本里、按 stage-inputs.tsv 复用、environment= 记工具版本、判绿写全绿标记）；它起 Verus 判证明，这里只读结论，并进去会让两件不相干的事共用一个复用判定
-# gate-similar: checker-tier-layer0-replay.sh 它的快档逐条核崩溃枚举用例的全绿标记、不作数的报本次未跑；这里的结论在驱动的库目录里，不是这一版、有没结论的判红不报本次未跑（用户定提交前跑完才能提交）
+# gate-similar: checker-tier-crash-point-replay.sh 它的快档逐条核崩溃枚举用例的全绿标记、不作数的报本次未跑；这里的结论在驱动的库目录里，不是这一版、有没结论的判红不报本次未跑（用户定提交前跑完才能提交）
 #
 # gate-cell: library-version-is-staged-tree 广谱变异库目录此刻那一版的源码与被判的暂存树在导出范围上逐文件相同、导出范围与登记的相同、记下的工具链与全局键与此刻的相同
 # gate-cell: gate-verdict 驱动 --summary 的 BROAD_MUTATION_GATE 判绿：那一版每一条都有结论（现判或沿用）、没有一条没红，判定行、汇总行与退出码互相对得上

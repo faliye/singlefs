@@ -1,0 +1,4 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-glossary
+want=.claude/kb/translation-glossary.md:3：标记下面不是表：表头要紧挨着标记那一行
+want=doc-text.sh：1 格里 1 格红（trilingual-glossary）

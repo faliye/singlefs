@@ -2,6 +2,7 @@
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 scripts/gate/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
 # gate-stage: crates 变异表复跑（每条改坏一处、点名的测试必须红）
+# gate-fixture: yes
 # gate-category: checker-tier 类
 # gate-similar: code-source-discipline.sh 它的实验与变异源码纪律那一格经同一份判法（scripts/mutation/crates-mutation-rows.py static-check）静态判变异表成形与拷贝范围，不改坏、不起 cargo；这里真改坏每一处、真跑点名的测试，是重型，两边共用判法模块、不共用阶段
 # gate-similar: checker-tier-research-build-and-replay.sh 它的复跑那一格也按输入复用、也逐条跑编出来的代码，但跑的是 research 的实验二进制、比的是产物；这里改坏的是 crates 的源码、判的是点名的测试红不红
@@ -35,24 +36,39 @@
 #
 # 并发（派活与进程数的判法在 crates-mutation-rows.py 的 worker_count_for 与 dispatch_order）：每片各一份源码副本与一个编译目录（共用一份会被 cargo 的文件锁重新串行化）；
 #   按 crate 归堆派（增量编译的命中率才稳），活动态领（等分之下拿到几十秒重测试的那一片会独自拖住整道），上一次用时 ≥ GATE_MUTATION_LONG_ROW_SECONDS（默认 300）秒或超时的先派。
-#   工作进程数取 ① 核数的一半、至多 16（设了 GATE_MUTATION_WORKERS 就顶掉 ①）与 ② 这一趟要现跑的条数的小者、至少 1；不按内存收：开跑那一刻看不见别的重活来抢。
+#   工作进程数取 ① 核数的一半、至多 16（设了 GATE_MUTATION_WORKERS 就顶掉 ①）、② 这一趟要现跑的条数、③ 外层内存上限 ÷ 每条变异的上限（向下取整）的小者、至少 1。
+#   ③ 的外层上限读环境变量 RUN_WITH_MEMORY_CAP_OUTER_CAP（run-with-memory-cap.sh 套在外层时给命令设的，例 `run-with-memory-cap.sh 24G bash 本阶段 --quick`）：
+#   套在外层里的里层包装不排队，合起来超过外层上限时只有 slice 的总上限兜着，所以按外层收；没设或写法不认就是没套在外层里，没有 ③、
+#   每条自己经包装排队（开跑那一刻看不见别的重活来抢，不按内存收），stderr 头一行写明「外层内存上限没读到」。外层不够一条的上限时按 1 个开。判法在 worker_count_for。
+#   线程数按工作进程数压：每个 cargo 的编译并行度 CARGO_BUILD_JOBS 取 max(1, 核数 ÷ 工作进程数)（GATE_MUTATION_CARGO_JOBS 顶掉它）。
+#   被测试自己起的线程不压：RUST_TEST_THREADS 与各测试读的线程数变量调用方设了什么就原样透传给 cargo test。
 #   ⚠️ stdout 里的判定与进程数无关：按变异表的行号排序再打，GATE_MUTATION_WORKERS=1 与 =8 逐字相同（并发之后重新证红的那一半）；进度、前移只进 stderr；
 #   复用了多少进 stdout 的「复用：」「覆盖：」两行、抓到那一行末尾的「（现判：<栏>）」或「（按覆盖复用）」与成功句末尾「；这一趟现判 …」，比判定时去掉这几处。
 #
 # 编译目录：GATE_MUTATION_TARGET_DIR 设了用它；不然 GATE_CROSS_RUN_TMPDIR 设了放 $GATE_CROSS_RUN_TMPDIR/singlefs-crates-mutation-target；
 #   都没设放 ${SINGLEFS_CROSS_RUN_CACHE_HOME:-~/.local/share/singlefs/cross-run-cache}/singlefs-crates-mutation-target，不落 /tmp
 #   （只在 crates-mutation-rows.py 的 default_shared_target_directory 一处算，这里不另算）。分片各加 -w<片号>、各自冷编一次（prepare_shard），记覆盖的再加 -coverage。
+#   片号跨调用经锁领（claim_worker_slot，C456）：共用编译目录那一层里每个片号一把锁文件（<共用目录>.slot 是第 1 片，其余 <共用目录>-w<片号>.slot），工作进程启动时从 1 往上
+#   试拿排他 flock（不阻塞），拿到第一个空闲的就是它的片号，锁拿到进程退出；同一台机器上并发的两次调用（普通 gate.sh 与 --staged 的临时 worktree）因此拿到不相交的片号集合，
+#   不再两边的第 2 片都指向同一个 -w2、被 cargo 的目录锁互相排队。缓存目录仍按片号跨轮复用（不按仓路径或会话号分目录：--staged 的临时 worktree 每趟都会冷编）。
 #   放 GATE_CROSS_RUN_TMPDIR 不放 TMPDIR：门禁每轮给阶段的私有 TMPDIR 跑完就删，放进去每轮都要从头编。
 #   编译目录数按这一趟的工作进程数复用：派活之前，片号大于这一趟工作进程数的 -w<片号>（连同 -coverage）回收，stderr 打一行删了几份、共多大；
-#   有进程的工作目录、命令行、CARGO_TARGET_DIR 指到它、或它那一片的在用标记被别的进程拿着的不删，逐份写明谁在用（crates-mutation-rows.py 文件头「编译目录」）。
+#   有进程的工作目录、命令行、CARGO_TARGET_DIR 指到它、或它那一片的在用标记与片号锁被别的进程拿着的不删，逐份写明谁在用（crates-mutation-rows.py 文件头「编译目录」）。
 #   回收与默认位置的自证在 crates-mutation-rows.py --selftest，弄坏开关 GATE_MUTATION_BREAK=extratargetskept、inusetargetremoved、targetdefaulttmp（本道样本不判这一条）。
+#   片号锁的自证同在那里：弄坏开关 GATE_MUTATION_BREAK=local-shard-numbering（两次并发调用领到的片号重叠）那一格必须判错
+#   （直接起自证时同义名 CRATES_MUTATION_ROWS_BREAK）；本道样本不判这一条。
+# 崩溃判定库：变异版上走判定库的 checker 档用例不写真跑的长期库。起 cargo 时 SINGLEFS_CRASH_AMPLIFICATION_HOME 换成 GATE_MUTATION_CRASH_LIBRARY_HOME（设了、非空），
+#   没设取真跑家目录（${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}）底下的 mutation-replay/（跨轮留着），调用方点名的单份库
+#   SINGLEFS_CRASH_AMPLIFICATION_LIBRARY 清掉；只在 crates-mutation-rows.py 的 mutation_crash_library_environment 一处算（它文件头「变异复跑的判定库」），这里照原样
+#   传调用方的环境，双机分片的驱动给第二台设 mutation-kept 下一份。自证在 crates-mutation-rows.py --selftest（弄坏开关 GATE_MUTATION_BREAK=sharedcrashlibrary）与
+#   mutation-shard-run.sh --selftest（MUTATION_SHARD_RUN_BREAK=peer-crash-library-home-unset）；本道样本不判这一条。
 # 临时目录：每条变异与每批基线各一个 TMPDIR，结束时不论退出码（含限时、撞顶被杀）都整个删掉：被杀的测试 Drop 守卫不跑，镜像会堆在里面；
 #   全部判完总目录下还剩哪一条的目录，整道判红。
 #
 # 内存：每条 cargo test 经 scripts/hosts/run-with-memory-cap.sh（systemd 临时 scope，MemoryMax=<上限>、MemorySwapMax=0）跑，撞上限只杀这一条。
 #   上限先到先用：变异表里单起一行「# 每条变异的内存上限：<上限>」、GATE_MUTATION_MEMORY_MAX、默认 4G。
 #   默认 4G 的依据：本机 60 GiB、常驻约 12 GiB、同时可能 3 件重活，每件 16 GiB 里再分给几个工作进程；四个 crate 全部测试目标冷编的匿名内存峰值 0.60 GiB。
-#   点名的测试跑起来要多少没量，按条记在 scripts/hosts/memory-peaks.tsv。这些数只在本机成立，换机器要重算。
+#   点名的测试跑起来要多少没量，按条记在 ~/.local/share/singlefs/memory-peaks.tsv。这些数只在本机成立，换机器要重算。
 #   包装退 250 记「内存撞顶」，254 记「被总上限挤掉」，252 记「排不上没跑」，245 记「显存不够」（起止之间内核报了 NV_ERR_NO_MEMORY，
 #   输出里的 FAILED 是被它弄红的）：都不算抓到也不算没红，单列、整道判红。分栏在 scripts/mutation/crates-mutation-rows.py 的 verdict_of_run
 #   （245 那一栏的自证是它 --selftest 里「包装退 245（显存不够）记显存不够、不算抓到」那一格，弄坏开关 GATE_MUTATION_BREAK=gpumemoryasoutput）。
@@ -69,7 +85,7 @@
 #   编进去的文件改动都落在函数里，就按覆盖复用，不然现跑，现判的按栏报数（行新加或改了、没有覆盖记录、被变异的函数变了、执行过的函数变了、函数外有改动、一律现跑）。
 #   判法版本（这份阶段脚本、共用模块与它 import 的 libtest 解析、判定库共用部分、内存包装、登记行，连同构建环境）变了整张重跑。记录不按时限过期。只读看这一趟会怎么判：python3 scripts/mutation/crates-mutation-rows.py plan <根>。
 #   只有「抓到」与基线 ok 复用；SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1 一律不复用。判绿之后写全绿标记（admission.py stage-marker-write），写不成只报不红。
-# 双机分片：只在本地多机配置写了 ENABLE_ACROSS_MACHINES=1 时开（判法 scripts/crash/layer0-shard-configuration-check.sh：退 0 开、退 3 关、退 1 判不过），不认环境变量开。
+# 双机分片：只在本地多机配置写了 ENABLE_ACROSS_MACHINES=1 时开（判法 scripts/crash/crash-point-replay-shard-configuration-check.sh：退 0 开、退 3 关、退 1 判不过），不认环境变量开。
 #   整道跑、没设 SINGLEFS_GATE_FULL=1 与 GATE_MUTATION_START_OVER=1（这两样下最后那一趟不复用，分出去的白跑）、判法退 0 时，
 #   先调 scripts/mutation/mutation-shard-run.sh 把没有作数记录的行分到两台各判一份（步骤与弄坏开关在它文件头），输出进 stderr；
 #   驱动退几都照常整张判一遍：命中记录的复用、缺的现跑，stdout 与单机逐字相同，全绿标记由本机写。
@@ -104,7 +120,7 @@
 #       本道样本不判错；红在 scripts/mutation/mutation-shard-run.sh --selftest 的一格（「✗ 单机那一趟（配置没开双机、环境变量 GATE_MUTATION_ACROSS_MACHINES=1）判绿…」）
 #   复用、续跑、只改一行只跑那一行、按覆盖复用的每一条判据、久的先派、选行、导入这几样要连跑好几趟，在 scripts/mutation/crates-mutation-rows.py --selftest 里
 #   用假 cargo、假 llvm 工具跑（门禁 code-tooling 替它复跑），弄坏开关 rowkeywithouttoolchain、mutatedfunctionignored、executedfunctionsignored、outsidechangesignored、
-#   coveragenotrecorded、llvmversionunchecked、timingsignored、importunchecked、nobaseline、emptyreplacementrefused、cargoconfignotcopied 下各有一格必须判错。
+#   coveragenotrecorded、llvmversionunchecked、timingsignored、importunchecked、nobaseline、emptyreplacementrefused、cargoconfignotcopied、outermemoryignored 下各有一格必须判错。
 #   拷贝范围含 .cargo/（.cargo/config.toml 的 [env] BINDGEN_EXTRA_CLANG_ARGS，点名的测试要编 gpu 或 verdict-store 特性的行靠它编 librocksdb-sys）也在那里判：
 #   假 cargo 见 --features gpu 而副本里读不到那个变量就照构建脚本报 stdbool.h 找不到、退 101，记「基线不绿」；弄坏开关 GATE_MUTATION_BREAK=cargoconfignotcopied
 #   拷副本时跳过 .cargo/，那一格（「拷贝范围含 .cargo/：点名的测试要编 gpu 特性的那一行基线绿、变异抓到」）必须判错。本道样本不判这一条（样本用真 cargo、不编 librocksdb-sys）。
@@ -252,7 +268,7 @@ if [[ -z "${GATE_MUTATION_ROW_SELECTION:-}" ]]; then
   if [[ "${SINGLEFS_GATE_FULL:-}" == 1 || "${GATE_MUTATION_START_OVER:-}" == 1 ]]; then
     across_machines_skipped="SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1：这一趟不复用判定库记录，分出去判的行本机还要再跑一遍"
   else
-    bash "$STAGE_REPOSITORY/scripts/crash/layer0-shard-configuration-check.sh" "$ROOT" >/dev/null 2>&1 || across_machines_configuration_exit=$?
+    bash "$STAGE_REPOSITORY/scripts/crash/crash-point-replay-shard-configuration-check.sh" "$ROOT" >/dev/null 2>&1 || across_machines_configuration_exit=$?
     if [[ ",${MUTATION_SHARD_RUN_BREAK:-}," == *,environment-opens,* && "${GATE_MUTATION_ACROSS_MACHINES:-}" == 1 ]]; then
       echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=environment-opens：GATE_MUTATION_ACROSS_MACHINES=1 照旧把双机打开，不看配置的开关" >&2
       across_machines_configuration_exit=0
@@ -260,7 +276,7 @@ if [[ -z "${GATE_MUTATION_ROW_SELECTION:-}" ]]; then
     case "$across_machines_configuration_exit" in
       0) ;;
       3) across_machines_skipped="双机：关——本地多机配置没写 ENABLE_ACROSS_MACHINES=1；要开就在配置里写上（模板仓根 multi-host.env.example）" ;;
-      *) across_machines_skipped="本地配置判不过；单跑 bash scripts/crash/layer0-shard-configuration-check.sh 看原因" ;;
+      *) across_machines_skipped="本地配置判不过；单跑 bash scripts/crash/crash-point-replay-shard-configuration-check.sh 看原因" ;;
     esac
   fi
   if [[ -n "$across_machines_skipped" ]]; then

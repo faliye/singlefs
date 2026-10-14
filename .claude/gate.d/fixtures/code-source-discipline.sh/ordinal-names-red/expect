@@ -1,0 +1,13 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：ordinal-names
+want=扫了 3 份 .rs / .sh / .py 与它们所在的 5 个目录，词表 2 个词，排除 2 条
+want=crates/demo/src/main.rs:1 名字 enumerate_
+want=scripts/demo/run.sh:2 变量 stream
+want=2 处名字带序号或位置词
+want=crates/demo/src/renamed.rs 里已经一个带序号或位置词的名字都没有了
+want=指向不存在的路径 crates/demo/src/gone.rs
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=ordinal-names：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（ordinal-names）
+want=→ ordinal-names：
+want=bash .claude/gate.d/code-source-discipline.sh --check ordinal-names

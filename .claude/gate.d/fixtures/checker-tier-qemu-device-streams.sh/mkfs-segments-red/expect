@@ -1,0 +1,6 @@
+exit=1
+want=虚机跑 direct 的 mkfs 段序列与登记表不一致（虚机：E7RESULT name=segments path=mkfs operations=23 segments=12+1+1+1+4 closed_form=4114
+want=布局表八「mkfs 种根」那一行：E7RESULT name=segments path=mkfs operations=23 segments=14+1+1+1+4 closed_form=4114
+want=照那条用例改 .claude/kb/layout/01-first-txn.md「八、」那一行
+want=device-streams：红（退出 1）
+want=checker-tier-qemu-device-streams.sh：1 格里 1 格红（device-streams）

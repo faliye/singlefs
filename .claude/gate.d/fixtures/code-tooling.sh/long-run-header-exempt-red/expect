@@ -1,0 +1,7 @@
+exit=1
+want=.claude/long-run-live-hosts-exempt 有 5 处不对（共 6 行）
+want=第 2 行指向不存在的路径：scripts/gone.sh
+want=第 3 行的 scripts/registered.sh 文件头已经按登记值读法写齐了，不需要豁免
+want=第 4 行的 scripts/half.sh 文件头按现算读法也不齐
+want=第 5 行不是「<相对仓根的路径>  <被豁免脚本的 sha256，64 位小写十六进制>  # 理由」
+want=第 7 行 scripts/grown.sh 是基准那一版里没有的（豁免表涨了）

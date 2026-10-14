@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：decision-refs
+want=决策号引用全部有定义：1 个不同的决策号（扫 2 份 kb 文件、0 份规则）；not-decisions 标记 1 条，豁免 2 处
+want=doc-registries.sh：1 格里 1 格绿（decision-refs），0 格本次未跑（无）

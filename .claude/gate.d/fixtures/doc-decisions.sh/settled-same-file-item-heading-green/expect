@@ -1,0 +1,4 @@
+exit=0
+want=本次定案之后，同文件的未定项与索引页的待议节都被回头看过（新增已定小节的决策 1 份，查了 1 条未定项、1 节待议）
+want=  settled-same-file：绿
+want=doc-decisions.sh：1 格里 1 格绿（settled-same-file）

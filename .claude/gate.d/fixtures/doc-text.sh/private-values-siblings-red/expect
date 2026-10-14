@@ -1,0 +1,11 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：prime-marks clock-times session-names private-values
+want=这次改动里 3 个文件的名字含本机私有值
+want=research/results/〔文件名含私有值〕/research/results/e999.img  键名：PEER_REPOSITORY_DIRECTORY（值不打印）
+want=research/results/〔文件名含私有值〕/research/results/e999.log:1  ISO 时间戳
+want=二进制：research/results/〔文件名含私有值〕/research/results/e999.img
+want=查了 7 份文本文件，没有角标写法
+want=查了 7 份文本文件，没有会话号
+want=prime-marks：绿
+want=session-names：绿
+want=doc-text.sh：4 格里 2 格红（clock-times private-values）

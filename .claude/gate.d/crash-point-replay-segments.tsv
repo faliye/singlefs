@@ -1,12 +1,27 @@
 # 崩溃点重放的按段登记（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J10、M4 第 15 条）：
-# 登记了的段，引擎在重型里按「甲二」展开（展开 6 对超过 6 次写的段不展开）。入口 scripts/crash/crash-point-replay.sh 开跑时往引擎送
-# SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<这份文件的绝对路径>；引擎那一侧怎么读归实现那一路。
-# 一行一段，制表符分隔四列，可再加一列 # 说明；# 开头的行是注释：
-#   <项名>\t<段号>\t<段写数>\t<段写表摘要 sha256 十六进制 64 位>
+# 登记了的段，引擎在重型里只按轻型那两个域的并展开（甲二 ∪ 展开 6：不超过 6 次写的段展开全部真子集，更长的按甲二），全量展开的态数不报。
+# 两个入口开跑前都先核这份文件（核不过退 2、一项都不跑），再往引擎送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<这份文件的绝对路径>：
+#   scripts/crash/crash-point-replay.sh 与 scripts/crash/crash-amplification.sh；分项驱动 scripts/crash/crash-amplification-item.sh 调用方没送时送本树这一份。
+# 引擎对登了段的流报 exhaustive=false registered_segments=<段号>:<写数>[,…] unregistered_segments_beyond_expansion=<段号>:<写数>[,…]
+#   （后一个字段是这条流里没登记、展开上限又盖不住的段，一段都没有写 -）。放量入口对登了段的流只在后一个字段是 - 时不因不穷举判红，
+#   ITEM 行与成功句报段号与写数；后一个字段不是 - 判红、点名流与那几段（出路「按段登记或加深展开」）；驱动行没报这个字段（旧引擎）照不穷举判红
+#   （出路「重编引擎」）。登哪几段由用户点头。
+# 分片枚举（用户 2026-10-13 定）：登记段的甲二 ∪ 展开 6 装不进 u64 时，引擎按固定次序分片枚举，每趟判 2^32 个态、判定进库，下一趟从库里接着判
+#   （键相同与等价的照旧剪）。驱动行在 unregistered_segments_beyond_expansion= 之后报 registered_segment_domains=<段号>:<full|slice>[,…]
+#   （一段都没登写 -）与 registered_segment_progress=<段号>:<已判态数>/<域的总态数>[,…]（只列 slice 段，没有写 -）。态数是 768 位宽整数
+#   （6 个 u128 拼），两个数都照精确的十进制数字串写（可能到 140 位），不写幂的形态。放量入口：登了段的行两个字段缺一个、漏了登记的段、
+#   写法认不得判红（出路「重编引擎」）；slice 段已判 0 态判红（出路「看录入段与判段的日志」）；其余不因分片判红，ITEM 行带这两个字段，
+#   成功句逐段报「全展开」或「分片，已判 <已判>/<总>」。
+# 一行一段，制表符分隔五列，可再加一列 # 说明；# 开头的行是注释：
+#   <项名>\t<流名>\t<段号>\t<段写数>\t<段写表摘要 sha256 十六进制 64 位>
 #   ① 项名：合表 .claude/gate.d/crash-point-replay-items.tsv 里的一项
-#   ② 段号：非负整数（十进制、不带前导 0）
-#   ③ 段写数：大于 0 的整数
-#   ④ 段写表摘要：那一段写表的 sha256，64 位小写十六进制
-#   同一项同一段只一行。
+#   ② 流名：引擎驱动行的 flow=（例如 position_addressed_ExtentLowerSegmentGrowsToTwoLevels），字母起头，只许字母、数字与 _；引擎按这一列取这条流的行
+#   ③ 段号：非负整数（十进制、不带前导 0）
+#   ④ 段写数：大于 0 的整数
+#   ⑤ 段写表摘要：那一段写表的 sha256，64 位小写十六进制（引擎的取法：只给这一段算 crates/singlefs-checker-tier/src/crash_identity.rs 的
+#      step_write_table_with_barriers；写表变了、段号挪位之后对不上，引擎拒跑，拒跑句里写出这条流这一段的实际摘要）
+#   同一（流名，段号）只一行。
 # 核法在 scripts/crash/lib_crash_point_replay_items.py 的 segment_problems（门禁 code-source-discipline 的 crash-point-replay-segments 格、入口开跑前都调它）。
-# 今天一段都没登记。
+# 2026-10-13 登记两段（用户点头「两段都登」）：位置寻址树第三条流 position_addressed_ExtentLowerSegmentGrowsToTwoLevels 第 0 段（322 次单元写，甲二 1 个态，full）与第 1 段（290 次 journal 记录原地写，甲二装不进 u64，slice：每趟 2^32 个态、进库续跑）。
+position-addressed-trees	position_addressed_ExtentLowerSegmentGrowsToTwoLevels	0	322	878ab0793a9f3dfad700d07e9f824fe8c22b4a8c655c9394fa0065b02f07403f	# 2026-10-13 用户定两段都登；摘要取自 ~/.local/share/singlefs/work/tooling-c790-entry/segment-digests/run-1.log 的拒跑句
+position-addressed-trees	position_addressed_ExtentLowerSegmentGrowsToTwoLevels	1	290	dc92b99949659ef0b9aa80f6eaefca615364560ae1600f36f01192fdfa4ab2cf	# 同上，run-2.log

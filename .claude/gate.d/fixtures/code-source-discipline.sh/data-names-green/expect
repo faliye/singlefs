@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：data-names
+want=数据形态的名字合命名纪律：扫了 2 份文件、8 个串（排除表 1 条放行 1 个串）
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=data-names：绿
+want=code-source-discipline.sh：1 格里 1 格绿（data-names），0 格本次未跑（无）

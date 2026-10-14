@@ -1,0 +1,5 @@
+exit=1
+want=  ✗ 2 道阶段的样本里有编号登记位，却不在 .claude/doc-lint-exclude 里（扫了 3 道，3 道有登记位）：
+want=     .claude/gate.d/fixtures/doc-sample.sh/（第一份：.claude/gate.d/fixtures/doc-sample.sh/red/.claude/kb/decisions/05-样本.md:3，编号登记标题）
+want=     .claude/gate.d/fixtures/table-sample.sh/（第一份：.claude/gate.d/fixtures/table-sample.sh/red/.claude/kb/checks-owed.md:3，登记表标记）
+want=→ 怎么办：在 .claude/doc-lint-exclude 加一行 .claude/gate.d/fixtures/<阶段>/  # 理由

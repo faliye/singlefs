@@ -2,12 +2,13 @@
 # admission: always 判的是此刻被判的仓、此刻的 Verus 安装与 cargo 缓存，上一次的结论不替这一次作保
 # run-condition: none 要的 Verus、cargo 与装置由各格的判法自己判，缺了判红；核还没进仓时 Verus 那四格报本次未跑
 # gate-stage: 形式化验证（Verus 证明恢复重放取前缀的核，版本钉住、空真与必红世界；E165 全量的红例钉进快档）
+# gate-fixture: yes
 # gate-category: checker-tier 类
 # gate-similar: checker-tier-lkmm.sh 同是起外部验证器的一道，接法照抄它（判法放脚本、按 stage-inputs.tsv 复用、environment= 记工具版本）；它起 herd7 判 litmus，这里起 Verus 判 crates/ 的证明，并进去会让两件不相干的事共用一个复用判定
 # gate-similar: checker-tier-crates-mutation-replay.sh 它逐条改坏 crates/ 要求点名的测试红；这里的必红世界要求 Verus 报证明错，写不进它的 crates/mutations.tsv
 # gate-similar: code-source-discipline.sh 它的 mutation-tables 格静态判实验二进制的变异表成形、锚点唯一；这里判 E165 红例账与钉住的表、并逐行在今天的实现上重放
 # gate-similar: checker-tier-research-build-and-replay.sh 它的 experiment-replay 格整份复跑入库实验比产物；这里只逐行重放钉住的红例（快档）
-# gate-similar: checker-tier-layer0-replay.sh 它判崩溃点重放与登记的崩溃枚举用例；这里判证明与有界穷举的红例，不起崩溃枚举
+# gate-similar: checker-tier-crash-point-replay.sh 它判崩溃点重放与登记的崩溃枚举用例；这里判证明与有界穷举的红例，不起崩溃枚举
 #
 # 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就六格按下面的次序全跑，格名写错退 2）：
 # gate-cell: verus-toolchain-pinned Verus 安装的 version 与 commit、Cargo.lock 里六个包的版本、本机 cargo 缓存里包源码的出处与内容指纹都与登记相同
@@ -22,7 +23,7 @@
 #   Verus 四格：scripts/gate/verus-proof-check.py <toolchain|proof|vacuity|must-red-worlds> <根>，登记表 .claude/gate.d/verus-pins.tsv。
 #     核没进仓（登记的核不在、crate 不依赖 vstd、src 里没有 verus!）时四格都退 77；核不在而 crate 已经接了 Verus 判红。
 #     读的环境变量：GATE_VERUS_TIMEOUT_SECONDS（限时，默认 600 秒，超时判红：C5（Z3 超时当通过））、GATE_VERUS_MEMORY_MAX（默认 4G）、
-#     GATE_VERUS_JOBS（几处同时验）、SINGLEFS_THREAD_CAP（线程）、SINGLEFS_VERUS_ROOT（Verus 安装目录，盖过登记表）。
+#     GATE_VERUS_JOBS（几处同时验）、SINGLEFS_THREAD_CAP（线程，没设取登记的重活默认并行度 .claude/heavy-thread-default）、SINGLEFS_VERUS_ROOT（Verus 安装目录，盖过登记表）。
 #   排不上只等一次：这一道给各格一份空文件（VERUS_PROOF_CHECK_QUEUE_REFUSED_FILE）。Verus 那几格里任何一处第一次拿到内存包装的 252（排不上），
 #     判法往文件里写一行「哪一处<TAB>出路」，这一格与后面几格还没起的 Verus 都不再排队（已经起了的照常收），pinned-red-examples-replay 格读到它就不编装置、不起重放，
 #     各报「没跑成：内存包装排不上，没再排队」，各格的汇总之后另打一行「这一道没跑成：内存包装排不上」；出路照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段。

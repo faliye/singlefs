@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：private-values
+want=这次改动里 1 个符号链接的链接文字含本机私有值
+want=research/results/peer-e999.out  链接目标  键名：PEER_SSH_HOST、QUIESCE_STOP_COMMAND（值不打印）
+want=别把指到第二台路径、挂载点的链接放进仓里
+want=doc-text.sh：1 格里 1 格红（private-values）

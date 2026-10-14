@@ -1,3 +1,3 @@
 # 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：两条；第一条在样本自己的登记表里登记成 light，却经 PATH 起 cargo build
-bash scripts/sample-light-real-cargo.sh --selftest
-bash scripts/sample-pass-a.sh --selftest
+bash scripts/gate/sample-light-real-cargo.sh --selftest
+bash scripts/gate/sample-pass-a.sh --selftest

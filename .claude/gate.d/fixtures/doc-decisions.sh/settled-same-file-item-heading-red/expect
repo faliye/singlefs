@@ -1,0 +1,4 @@
+exit=1
+want=981-分项定案标题样本.md:21 本次新增了「已定」小节，而这条未定项一个字都没动
+want=  settled-same-file：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（settled-same-file）

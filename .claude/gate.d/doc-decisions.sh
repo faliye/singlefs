@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 决策文档与变更史（十六格：决策与分项的状态、索引与登记表对正文、未定项回看、写频率、变更史条目与形状）
+# gate-stage: 决策文档与变更史（十八格：决策与分项的状态、索引与登记表对正文、未定项回看、写频率、候选代号复用、变更史条目与形状）
+# gate-fixture: yes
 # gate-category: 文档类
 # gate-similar: history-ordinal.sh 它也读变更史的条目标题、也只判这一轮新增的，但判的是「（其 N）」撞号，住在上游副本里由上游门禁管，项目本地改不了它
 # gate-similar: doc-registries.sh 它从欠账表、收口表与总审核出发判表本身的形状与账的去向，判字段与布局登记表（字节表「指向」列点名的分项存不存在、字段投影与加和、认购表求和不超预留），它的 decision-refs 那一格判 kb 全文引用的 D 号有定义、不看分项号与状态；这里的 user-verdict-owed 那一格方向相反，从决策正文里的「待用户复核」出发去欠账表找一笔未还的账，item-ref-status 那一格判引用写的已定 / 未定与正文分项表相符，判的对象都是决策正文、索引页、冻结层归属登记表与变更史
@@ -9,16 +10,16 @@
 #
 # kb 里同一件事只许一种写法：决策与分项的状态在哪一处说都一样，索引页与决策相关的登记表与正文对得上；决策正文改了要在变更史留条目，变更史的形状要对。
 # 格名表（--list 打它；各格的中文名写在格函数上方的「格「…」」那一行）：
-# gate-cell: kb-shape kb 形状：分项只许一种叫法、kb 文件不链回自己、规则路径带 .claude/、决策标题与分项两节、索引页分项计数与正文相符
+# gate-cell: kb-shape kb 形状：分项只许一种叫法、kb 文件不链回自己、规则路径带 .claude/、决策标题与分项两节、索引页分项计数与进度计数与正文相符
 # gate-cell: item-ref-status 每一处「D<n>（简称） 已定项 k / 未定项 k」写的状态与正文分项表相符
 # gate-cell: status-redundancy 状态别说两遍：小节标题不带「—— 已定」、条目不同时写破折号与「状态：」、分项索引行挂在对的节
 # gate-cell: cross-decision-status 紧贴「D<n>（简称）」写「未定」，而那条决策的状态行不是待定
 # gate-cell: settled-item-self-open 已定项区段里说它自己、或同一条决策里另一条已定分项还没定
 # gate-cell: settled-ref-says-open 引用写着「已定项 k」、归属到的那一条也已定，紧跟着却说它没定
 # gate-cell: stale-open-items 未定项点名的决策，状态行在这条未定项最近一次复核之后又变过
-# gate-cell: settled-same-file 这次在一份决策里新增了「已定」小节，同文件开着的未定项与索引页的待议节一个字没动
+# gate-cell: settled-same-file 这次在一份决策里新增了「已定」小节（含「已定项 N：…」分项定案节），同文件开着的未定项与索引页的待议节一个字没动
 # gate-cell: freeze-layer-membership 冻结层归属登记表：每层每个结构都有行、写「退出」的必是派生态、依据指得到已定分项
-# gate-cell: decision-items-sync decisions.md 的分项清单生成块与索引表「状态」列，与生成器的输出逐字相同
+# gate-cell: decision-items-sync decisions.md 的分项清单生成块与索引表「状态」「进度」两列，与生成器的输出逐字相同
 # gate-cell: blocking-verdict 每条未定项都写了「改新池新建文件的字节」与「动不动格式」两把尺的判定
 # gate-cell: user-verdict-owed 决策正文里标着「待用户复核」的，checks-owed.md 里要有一笔未还的账点名那条决策
 # gate-cell: decision-summary-width 决策索引表每一行的「结论」列不超过 decisions.md 写的字数上限
@@ -26,12 +27,13 @@
 # gate-cell: entry-added 决策正文改了，变更史里要有新增条目
 # gate-cell: shape 变更史的形状：日期块住在自己的节、同节同一天只一块、块下是 - 变更项而不是 #### 子条目、不留快查与现状行
 # gate-cell: history-loss 两份变更史与基准相比，基准里每个日期块的数、编号、产物名、引名在改后都找得到（提交前整理不许丢）
+# gate-cell: candidate-codes 同一份决策里，同一个候选代号（甲乙丙丁… 或单个大写字母）不许出现在两个分项的候选表里
 #
 # 用法：
-#   bash .claude/gate.d/doc-decisions.sh [项目根]                                       十六格都跑；项目根不给取本脚本往上两级
+#   bash .claude/gate.d/doc-decisions.sh [项目根]                                       十八格都跑；项目根不给取本脚本往上两级
 #   bash .claude/gate.d/doc-decisions.sh --list                                         逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-decisions.sh --check <格名>[,<格名>…] [项目根]              只跑点名的格，按格名表的次序
-#   bash .claude/gate.d/doc-decisions.sh --write [--check decision-items-sync] [项目根]  重写 decisions.md 的分项清单生成块与索引表「状态」列，写完回读判一遍
+#   bash .claude/gate.d/doc-decisions.sh --write [--check decision-items-sync] [项目根]  重写 decisions.md 的分项清单生成块与索引表「状态」「进度」两列，写完回读判一遍
 # 退出码：0 绿；1 有格红（红格逐格接它登记的出路）；77 跑到的格全本次未跑（逐格报进 $GATE_NOT_RUN_FILE）；
 #   2 参数错：认不出的选项、两个项目根、进不去项目根、格名写错、--write 配了 decision-items-sync 之外的格。
 # --list、--check、样本根的 .gate-cells、每格一个子 shell 与逐格汇总都在共用库 lib/stage-cells.sh（写法在它的文件头）。
@@ -40,32 +42,36 @@
 #   <格名>-red（前十四格各一份，kb-shape-red … write-frequency-red）  那一格判红、汇总有「<格名>：红（退出 1）」；各份犯了什么写在那一格函数上方
 #   decision-documents-green                前十四格的绿样本并在一棵树里（setup.sh 造 git 历史与工作区改动）：十三格绿，write-frequency 没有登记表退 77，整道退 0
 #   write-frequency-green                   write-frequency 的绿样本（不是 git 仓），那一格绿；判绿靠的几句写在那一格函数上方
+#   candidate-codes-red / -green            candidate-codes 的样本（不是 git 仓）：红的那份两个分项的候选表都用丙（一张表格、一张列表）；
+#                                           绿的那份两个分项代号不同，另一处写「已定项 1 的丙」，历史节里复用的代号不扫
 #   decision-documents-some-cells-not-run   不是 git 仓，没有分项引用、D15、「待用户复核」与写频率登记表：七格退 77 逐格报本次未跑，整道退 0
 #   decision-history-red                    决策首行状态翻了、已提交没推出去、变更史没新增条目，新 kb 页里日期与序号粘在一起：entry-added、shape 都红
 #   shape-cells-marker-red                  现场同 decision-history-red，.gate-cells 只点名 shape：汇总只列一格
 #   decision-history-green                  决策正文改了 7 行，D1 节新增一个带一条顶格 `- ` 项的日期块：entry-added、shape 都绿
 #   shape-red                               shape 的 a 到 e 五样都有新增的，基准里另有存量只计数：shape 红
 #   shape-green                             新增的日期块都住对节、同节日期不重复、围栏里的旧形态不算，存量只计数：shape 绿、entry-added 本次未跑
+#   settled-same-file-item-heading-red / -green  settled-same-file 的分项定案标题样本：本次提交在未定项一节之前新增 `#### 已定项 2：丙问题`；
+#                                           红的那份未定项一字未动、索引页待议节补了复核注，红在那条未定项上；绿的那份未定项与待议节都补了复核注，绿
 #   history-loss-red / history-loss-green   基准里一块带一个数：整理时弄丢了判红；整理成一条结论、数都在判绿
 # 弄坏开关（样本自检时设进环境）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/doc-decisions.sh/ 下的目录名，
 # 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库：红格按绿记、整道退 0
-#       blocking-verdict-red、cross-decision-status-red、decision-history-red、decision-items-sync-red、decision-summary-width-red、
+#       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-history-red、decision-items-sync-red、decision-summary-width-red、
 #       freeze-layer-membership-red、history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、
-#       settled-same-file-red、shape-cells-marker-red、shape-red、stale-open-items-red、status-redundancy-red、user-verdict-owed-red、
+#       settled-same-file-item-heading-red、settled-same-file-red、shape-cells-marker-red、shape-red、stale-open-items-red、status-redundancy-red、user-verdict-owed-red、
 #       write-frequency-red（期望退出 1，实测 0）
 #   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的格都跑
-#       blocking-verdict-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
-#       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-red、shape-red、
+#       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
+#       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
 #       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
-#       decision-documents-green、decision-history-green、history-loss-green、shape-green（期望退出 0，实测 1）；
+#       candidate-codes-green、decision-documents-green、decision-history-green、history-loss-green、settled-same-file-item-heading-green、shape-green（期望退出 0，实测 1）；
 #       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
 #       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
 #   STAGE_CELLS_BREAK=check-ignored  归共用库：点名选格不起作用（--check 与样本根的 .gate-cells 共用一段），照跑全部登记的格
-#       blocking-verdict-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
-#       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-red、shape-red、
+#       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
+#       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
 #       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
-#       decision-documents-green、decision-history-green、history-loss-green、shape-green（期望退出 0，实测 1）；
+#       candidate-codes-green、decision-documents-green、decision-history-green、history-loss-green、settled-same-file-item-heading-green、shape-green（期望退出 0，实测 1）；
 #       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
 #       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
 #   DOC_DECISIONS_BREAK=kb-shape  kb-shape 格不跑、按判过了记
@@ -87,12 +93,15 @@
 #       stale-open-items-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=settled-same-file  settled-same-file 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「同文件的未定项与索引页的待议节都被回头看过…」）；decision-documents-some-cells-not-run（输出里找不到「  settled-same-file：本次未跑」）；
-#       settled-same-file-red（期望退出 1，实测 0）
+#       settled-same-file-item-heading-green（输出里找不到「本次定案之后，同文件的未定项与索引页的待议节都被回头看过…」）；
+#       settled-same-file-item-heading-red、settled-same-file-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=settled-item-heading-unrecognised  settled-same-file 退回老的小节标题正则，不认 `#### 已定项 N：…` 与 `#### 已定项 N（…）`
+#       settled-same-file-item-heading-red（期望退出 1，实测 77：本次 diff 没有新增「已定」小节）；settled-same-file-item-heading-green（期望退出 0，实测 77）
 #   DOC_DECISIONS_BREAK=freeze-layer-membership  freeze-layer-membership 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「冻结层归属登记表判过了…」）；decision-documents-some-cells-not-run（输出里找不到「  freeze-layer-membership：本次未跑」）；
 #       freeze-layer-membership-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=decision-items-sync  decision-items-sync 格不跑、按判过了记
-#       decision-documents-green（输出里找不到「决策索引表状态列与正文同步（21 条决策）」）；decision-items-sync-red（期望退出 1，实测 0）
+#       decision-documents-green（输出里找不到「决策索引表状态列与进度列与正文同步（21 条决策）」）；decision-items-sync-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=blocking-verdict  blocking-verdict 格不跑、按判过了记
 #       blocking-verdict-red（期望退出 1，实测 0）；decision-documents-green（输出里找不到「13 条未定项两把尺都判过」）
 #   DOC_DECISIONS_BREAK=user-verdict-owed  user-verdict-owed 格不跑、按判过了记
@@ -134,6 +143,8 @@
 #       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「3 行新写进变更史的旧形态包装…」）
 #   DOC_DECISIONS_BREAK=empty-ignored  shape 不判 e（日期块下没有变更项）
 #       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「1 个新开的 `### 日期` 块下一条 `- ` 变更项都…」）
+#   DOC_DECISIONS_BREAK=candidate-codes-unchecked  candidate-codes 复用的候选代号不判红，汇总照样记绿
+#       candidate-codes-red（期望退出 1，实测 0）
 set -uo pipefail
 # 路径要在 cd 之前算：$0 是相对路径时，cd 进项目根之后就指不到了
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
@@ -155,8 +166,8 @@ bad() { printf '  ✗ %s\n' "$*"; }
 ok()  { printf '  ✓ %s\n' "$*"; }
 howto() { printf '     → %s\n' "$*"; }
 
-stage_cell kb-shape judge_kb_shape "kb 形状：分项只许一种叫法、kb 文件不链回自己、规则路径带 .claude/、决策标题与分项两节、索引页分项计数与正文相符" \
-  "照这一格各段红行下面的出路改（分项叫法、自指链接、规则路径、决策标题与分项两节、索引页状态列）；状态列的计数以正文两节为准"
+stage_cell kb-shape judge_kb_shape "kb 形状：分项只许一种叫法、kb 文件不链回自己、规则路径带 .claude/、决策标题与分项两节、索引页分项计数与进度计数与正文相符" \
+  "照这一格各段红行下面的出路改（分项叫法、自指链接、规则路径、决策标题与分项两节、分项的进度标记、索引页状态列与进度列）；两列的计数以正文两节为准"
 stage_cell item-ref-status judge_item_ref_status "每一处「D<n>（简称） 已定项 k / 未定项 k」写的状态与正文分项表相符" \
   "照红行把引用处写的「已定项 / 未定项」改成与那条决策正文分项表一致；分项改了号的，引用处跟着改号（scripts/kb/relabel-item.py）"
 stage_cell status-redundancy judge_status_redundancy "状态别说两遍：小节标题不带「—— 已定」、条目不同时写破折号与「状态：」、分项索引行挂在对的节" \
@@ -169,12 +180,12 @@ stage_cell settled-ref-says-open judge_settled_ref_says_open "引用写着「已
   "那条分项已经定了：把句子改成它定下来之后的说法（定成了什么、这一处按它重算了没有），别只改标签"
 stage_cell stale-open-items judge_stale_open_items "未定项点名的决策，状态行在这条未定项最近一次复核之后又变过" \
   "逐条复核：已被别处定掉的改写成「已定，权威记录在 XX」，仍然开着的把点名改成不构成依赖的写法"
-stage_cell settled-same-file judge_settled_same_file "这次在一份决策里新增了「已定」小节，同文件开着的未定项与索引页的待议节一个字没动" \
+stage_cell settled-same-file judge_settled_same_file "这次在一份决策里新增了「已定」小节（含「已定项 N：…」分项定案节），同文件开着的未定项与索引页的待议节一个字没动" \
   "被顺带定掉的改写成「已定，权威记录在 XX」或收摊，仍然开着的在条目里补一行「YYYY-MM-DD 复核过，仍然开着，因为 …」；decisions.md 的待议节同样回看"
 stage_cell freeze-layer-membership judge_freeze_layer_membership "冻结层归属登记表：每层每个结构都有行、写「退出」的必是派生态、依据指得到已定分项" \
   "照红行给缺的层与结构补一行（态别按 D21 已定项 10 的判据推，推不出写「判不动」）、写「退出」的行核态别、依据写成指得到的「D<n>（简称） 已定项 k」"
-stage_cell decision-items-sync judge_decision_items_sync "decisions.md 的分项清单生成块与索引表「状态」列，与生成器的输出逐字相同" \
-  "权威记录是各决策正文的「### 已定项」/「### 未定项」两节；改完正文跑 bash .claude/gate.d/doc-decisions.sh --write 重写分项清单与索引表状态列"
+stage_cell decision-items-sync judge_decision_items_sync "decisions.md 的分项清单生成块与索引表「状态」「进度」两列，与生成器的输出逐字相同" \
+  "权威记录是各决策正文的「### 已定项」/「### 未定项」两节；改完正文跑 bash .claude/gate.d/doc-decisions.sh --write 重写分项清单与索引表状态列、进度列"
 stage_cell blocking-verdict judge_blocking_verdict "每条未定项都写了「改新池新建文件的字节」与「动不动格式」两把尺的判定" \
   "在每条缺判定的未定项的登记行或列表条目里补「改新池新建文件的字节：是 / 否 / 无对象（日期，依据：…）」与「动不动格式」那一句"
 stage_cell user-verdict-owed judge_user_verdict_owed "决策正文里标着「待用户复核」的，checks-owed.md 里要有一笔未还的账点名那条决策" \
@@ -189,6 +200,8 @@ stage_cell shape judge_shape "变更史的形状：日期块住在自己的节�
   "日期写在 \`### \`，块下每条改动一个顶格 \`- \` 项，条目搬进自己的 \`## D<n>（\` / \`## E<n>（\` 节，同节同一天并成一个日期块；\`#### \`、「（其N）」、快查两行与现状行删掉（.claude/rules/changelog-format.md）"
 stage_cell history-loss judge_history_loss "两份变更史与基准相比，基准里每个日期块的数、编号、产物名、引名在改后都找得到（提交前整理不许丢）" \
   "红行列出的数或编号逐个补回那一块、改成指针或 git 引用；确认是有意删的过程数才可以不补，那就在同一块里写一行「去向」说明"
+stage_cell candidate-codes judge_candidate_codes "同一份决策里，同一个候选代号（甲乙丙丁… 或单个大写字母）不许出现在两个分项的候选表里" \
+  "红行点名的代号，在后写的那个分项里换一个这份决策里没用过的代号；引用别的分项的候选时写「已定项 7 的丙」带上分项，带了分项前缀的写法不算复用"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 write_mode=0; root_argument=""
@@ -264,6 +277,35 @@ def declared_open_count(title):
 
 CELL = re.compile(r'^已定\s*(\d+)\s*项\s*/\s*未定\s*(\d+)\s*项$')
 NOITEM = re.compile(r'^无分项\s*·\s*整条(已定|半定|待定)$')
+PROGRESS_MARK = re.compile(r'进度：\s*\*{0,2}(已实现|未实现|无对象)')
+
+
+def count_progress(body):
+    """数两节索引表里每条分项的进度标记，返回 (已实现, 未实现, 无对象, 缺标记)。行的取法与 count_items 同口径。"""
+    done = todo = none = missing = 0
+    for head in ("已定项", "未定项"):
+        m = re.search(r'^### %s\s*$(.*?)(?=^#{1,3} |\Z)' % head, body, flags=re.M | re.S)
+        seg = m.group(1) if m else ""
+        cut = re.search(r'^#{4}\s', seg, flags=re.M)
+        top = seg[:cut.start()] if cut else seg
+        rows = re.findall(r'^\|\s*\d+\s*\|[^|]*\|.*$', top, flags=re.M) or re.findall(r'^\d+\.\s.*$', top, flags=re.M)
+        for row in rows:
+            marks = set(PROGRESS_MARK.findall(row))
+            if len(marks) != 1:
+                missing += 1
+            elif "已实现" in marks:
+                done += 1
+            elif "未实现" in marks:
+                todo += 1
+            else:
+                none += 1
+    return done, todo, none, missing
+
+
+def progress_cell_of(done, todo, none, has_items):
+    if not has_items:
+        return "无对象"
+    return f"已实现 {done} 项 / 未实现 {todo} 项" + (f" / 无对象 {none} 项" if none else "")
 
 
 def kind(s):
@@ -312,13 +354,31 @@ def main():
         row = re.search(r'^\| %s（[^|]*） *\| ([^|]+)\|' % num, idx, flags=re.M)
         if not row:
             print(f"  ✗ {num} 在 decisions.md 索引里找不到对应行")
-            print("     → 怎么办：给它补一行 `| D<n>（简称） | 状态 | 结论（简报） | 正文 |`，")
-            print("       状态列跑 bash .claude/gate.d/doc-decisions.sh --write 生成。")
+            print("     → 怎么办：给它补一行 `| D<n>（简称） | 状态 | 结论（简报） | 正文 | 进度 |`，")
+            print("       状态列与进度列跑 bash .claude/gate.d/doc-decisions.sh --write 生成。")
             fail = 1
             continue
         seen += 1
         isx = row.group(1).strip()
         n_settled, n_open = count_items(body.split("\n## 历史版本")[0])
+
+        # 进度列（第 5 列）：本段自己数正文里的进度标记，不经生成器。转义竖线 `\|` 不算分隔。
+        line = re.search(r'^\|\s*%s（[^|]*）.*$' % num, idx, flags=re.M).group(0)
+        cells = [c.strip() for c in re.split(r'(?<!\\)\|', line.strip().strip("|"))]
+        if len(cells) < 5:
+            print(f"  ✗ {num} 索引行只有 {len(cells)} 列，缺「进度」列（第 5 列）")
+            print("     → 怎么办：索引表写成 `| 决策 | 状态 | 结论（简报） | 正文 | 进度 |`，")
+            print("       进度列跑 bash .claude/gate.d/doc-decisions.sh --write 生成。")
+            fail = 1
+        else:
+            done, todo, none, missing = count_progress(body.split("\n## 历史版本")[0])
+            want_cell = progress_cell_of(done, todo, none, n_settled + n_open > 0)
+            if cells[4] != want_cell:
+                print(f"  ✗ {num} 进度列写「{cells[4]}」，而正文两节里数出「{want_cell}」"
+                      + (f"（另有 {missing} 条分项缺进度标记或写了两个）" if missing else ""))
+                print("     → 怎么办：权威记录是各分项索引行末尾的 **进度：已实现 / 未实现 / 无对象。** 标记；")
+                print("       改完正文跑 bash .claude/gate.d/doc-decisions.sh --write")
+                fail = 1
 
         mc, mn = CELL.match(isx), NOITEM.match(isx)
         if not mc and not mn:
@@ -361,7 +421,7 @@ def main():
         print("       以及 decisions/*.md 首行形如 `## D1 简称 —— 已定`。")
         sys.exit(1)
     if not fail:
-        print(f"  ✓ 决策索引表的状态列与正文相符（{seen} 条决策，分项数是本段自己数的）")
+        print(f"  ✓ 决策索引表的状态列与进度列与正文相符（{seen} 条决策，分项数与进度数是本段自己数的）")
     sys.exit(1 if fail else 0)
 
 
@@ -681,6 +741,16 @@ for a, b in zip(starts, starts[1:]):
                 bad(f"{title.split()[1]} {head}里有一条分项的状态标记写着「{marks[0]}」："
                     f"{row[:56]}",
                     "要么把它挪到对应的小节去（编号不变），要么改正状态标记；两节的编号是同一套。")
+            # 进度标记与状态标记并排：已实现 / 未实现 / 无对象 三选一，缺了与写了两个不同的值都红（判法在 decisions.md「进度」一段）。
+            progress_marks = sorted(set(re.findall(r'进度：\s*\*{0,2}(已实现|未实现|无对象)', row)))
+            if not progress_marks:
+                bad(f"{title.split()[1]} {head}里有一条分项没写「进度：已实现 / 未实现 / 无对象」这个规范标记："
+                    f"{row[:56]}",
+                    "在这一行的 **状态：…。** 之后补上 **进度：已实现。**、**进度：未实现。** 或 **进度：无对象。**；判法在 decisions.md「进度」一段。")
+            elif len(progress_marks) > 1:
+                bad(f"{title.split()[1]} {head}里有一条分项写了两个不同的进度标记（{'、'.join(progress_marks)}）："
+                    f"{row[:56]}",
+                    "一行只许一个「进度：」标记，删掉多余的那个。")
     # ③ 已定项一侧的正文不许自陈本项没定；措辞只认「说本项自己没定」那几句，不误伤「别处仍未定」。
     SELF_UNDECIDED = r'不是定案|落成未定项|退回未定|本项未定|本项仍未定|本项还没定|该项未定|仍未定案|尚未定案'
     regions = []
@@ -1154,12 +1224,13 @@ grid_stale_open_items() (
 )
 
 # ════ 格「定了新东西没回看同文件未定项」════
-# 这一轮在一份决策里新增了「已定」小节标题，而同文件还开着的未定项（「### 未定项」与「### 还要回答的」两节）一条都没碰、
+# 这一轮在一份决策里新增了「已定」小节标题（`—— 已定`、`已定（…）`，或分项定案的 `已定项 N：…` / `已定项 N（…）`），而同文件还开着的未定项（「### 未定项」与「### 还要回答的」两节）一条都没碰、
 # 索引页 decisions.md 还悬着的「## 待议」节一个字没动：判红，要一次回头看。
 # 与格「未定项被别处定了」是两把尺：那一格跨文件看历史，这一格同文件看这一轮的 diff。按历史判会在每个有已定小节又有未定项的决策上恒红。
 # 「碰没碰」按条目块判（表格行一行一条，列表项到下一条分项或标题之前，与 OPEN_ITEM_REVIEW_SOURCE 同口径）；待议按那一节判（`## 待议` 到下一个 `## `），索引页别处动过不算。
 # 新增了已定小节的几份里一条未定项都没有、索引页也没有待议节时退 77。
 # 样本：settled-same-file-red 另放一份两行表格的决策（只改了第 2 行，第 1 行要报）与一节没动的待议（同一次只改了索引表那一行）。
+# settled-same-file-item-heading-red / -green 新增的是现行写法 `#### 已定项 N：名字`：红的那份只有未定项没动，绿的那份未定项与待议节都补了复核注。
 grid_settled_same_file() (
   DEC=.claude/kb/decisions
   IDX=.claude/kb/decisions.md
@@ -1182,7 +1253,7 @@ grid_settled_same_file() (
   settled_files=()
   while IFS= read -r f; do
     [[ -n "$f" ]] || continue
-    # 只认新增行里的小节标题：`## D1 简称 —— 已定` / `### 未定项 3 —— 已定` / `### 已定（…）`；未跟踪的文件整份算新增
+    # 只认新增行里的小节标题：`## D1 简称 —— 已定` / `### 未定项 3 —— 已定` / `### 已定（…）` / `#### 已定项 12：名字` / `#### 已定项 12（名字）`；未跟踪的文件整份算新增
     # 不接 `| grep -q`：pipefail 下前段吃 SIGPIPE，命中会被读成没命中
     added_out="$(gate_added_lines "$BASE" "$f")" || {
       echo "  ✗ 取不到 $f 这次新增了哪些行（基准 $BASE）"
@@ -1190,7 +1261,13 @@ grid_settled_same_file() (
       exit 1
     }
     added_text="$(cut -f2- <<<"$added_out")"
-    if grep -qE '^#{2,4} .*—— 已定|^#{2,4} 已定[（(]' <<<"$added_text"; then
+    # 新分项的定案标题写作 `#### 已定项 N：名字`（format-evolution.md「决策正文只写现状」）；老写法 `—— 已定` 与 `已定（` 照认
+    # 开关 settled-item-heading-unrecognised 退回不认「已定项 N」的老正则（样本自检用）
+    settled_heading_pattern='^#{2,4} .*—— 已定|^#{2,4} 已定[（(]|^#{2,4} 已定项[[:space:]]*[0-9]+[[:space:]]*(：|:|（|\()'
+    if [[ "$BREAK_SWITCH" == settled-item-heading-unrecognised ]]; then
+      settled_heading_pattern='^#{2,4} .*—— 已定|^#{2,4} 已定[（(]'
+    fi
+    if grep -qE "$settled_heading_pattern" <<<"$added_text"; then
       settled_files+=("$f")
     fi
   done <<<"$changed_names"
@@ -1562,7 +1639,7 @@ PY
         echo "  ✗ ① 有 ${#hits[@]} 个层或结构在登记表里没有行："   # gate-lint:summary
         printf '      %s\n' "${hits[@]}"   # gate-lint:detail
         echo "    → 怎么办：给每一个补一行（结构 / 落哪一层 / 态别 / 退不退出冻结 / 依据），态别按 D21 已定项 10 的判据推，"
-        echo "      推不出就写「判不动」并在表下「判不动的九行，各卡在哪一句」里写清卡在哪一句；"
+        echo "      推不出就写「判不动」并在表下「判不动的十一行，各卡在哪一句」里写清卡在哪一句；"
         echo "      树的一行结构列要写「树 ID <n>」，单元类的一行要写「码 <n>」，这一格按这两个字样认行。"
         ;;
       退出)
@@ -1575,7 +1652,7 @@ PY
         echo "  ✗ ③ 有 ${#hits[@]} 处依据指不到一条已定分项："   # gate-lint:summary
         printf '      %s\n' "${hits[@]}"   # gate-lint:detail
         echo "    → 怎么办：依据写成「D<n>（简称） 已定项 k」，那条决策要在 .claude/kb/decisions/ 里、索引表里第 k 条要是已定；"
-        echo "      分项还没定就不能拿它当依据——这一行的态别改成「判不动」，依据写「判不动，推导见「判不动的九行，各卡在哪一句」」。"
+        echo "      分项还没定就不能拿它当依据——这一行的态别改成「判不动」，依据写「判不动，推导见「判不动的十一行，各卡在哪一句」」。"
         ;;
     esac
   done
@@ -1597,8 +1674,9 @@ PY
 )
 
 # ════ 格「决策分项清单与正文同步」════
-# decisions.md 的分项清单生成块与索引表「状态」列是各决策正文的投影，与生成器 .claude/scripts/gen-decision-items.py 的输出逐字比。
+# decisions.md 的分项清单生成块与索引表「状态」「进度」两列是各决策正文的投影，与生成器 .claude/scripts/gen-decision-items.py 的输出逐字比。
 # 状态列写分项计数（`已定 6 项 / 未定 0 项`，没有分项写「无分项 · 整条已定」）；三态词的权威在正文首行。
+# 进度列（最后一列）写实现计数（`已实现 3 项 / 未实现 1 项`，有无对象的再带 ` / 无对象 2 项`；没有分项写「无对象」），取自各分项索引行末尾的 **进度：…。** 标记。
 # 计数本身由格「kb 形状」第 7 段（INDEX_VS_BODY_SOURCE）不经生成器另数：只靠这一格时，生成器数错索引页会跟着错而仍逐字相同。
 # --write 时把两块写回被判的仓的 decisions.md（用法在文件头）。
 # 样本：decision-items-sync-red 状态列写错、索引漏登、索引多一行、生成块漂了各一处，判红。
@@ -1651,24 +1729,41 @@ import re, sys
 
 idx_path, mode, cells_path = sys.argv[1:4]
 text = open(idx_path, encoding='utf-8').read()
-want = dict(l.split('\t', 1) for l in
-            open(cells_path, encoding='utf-8').read().splitlines() if l.strip())
+want = {}
+for l in open(cells_path, encoding='utf-8').read().splitlines():
+    if l.strip():
+        num, status_cell, progress_cell = l.split('\t')
+        want[num] = (status_cell, progress_cell)
 
 bad, n, wrote = [], 0, 0
-for num, cell in want.items():
+for num, (cell, progress) in want.items():
     pat = re.compile(r'^(\|\s*%s（[^|]*）\s*\|)([^|]*)\|' % re.escape(num), re.M)
     m = pat.search(text)
     if not m:
         bad.append(f"{num} 有正文，而决策索引表里没有它的行")
         continue
     n += 1
-    if m.group(2).strip() == cell:
+    if m.group(2).strip() != cell:
+        if mode == 'write':
+            text = text[:m.start(2)] + f" {cell} " + text[m.end(2):]
+            wrote += 1
+        else:
+            bad.append(f"{num} 状态列写着「{m.group(2).strip()}」，正文投影是「{cell}」")
+    # 进度列是最后一列：只改行尾那一格，前面几格一个字不碰（结论列里可能有转义竖线）。
+    line_m = re.search(r'^\|\s*%s（[^|]*）.*$' % re.escape(num), text, re.M)
+    cells = [c.strip() for c in re.split(r'(?<!\\)\|', line_m.group(0).strip().strip('|'))]
+    if len(cells) < 5:
+        bad.append(f"{num} 索引行只有 {len(cells)} 列，缺「进度」列（第 5 列，写成 `| 决策 | 状态 | 结论（简报） | 正文 | 进度 |`）")
         continue
+    if cells[4] == progress:
+        continue
+    tail = re.search(r'\|([^|]*)\|\s*$', line_m.group(0))
     if mode == 'write':
-        text = text[:m.start(2)] + f" {cell} " + text[m.end(2):]
+        a, b = line_m.start() + tail.start(1), line_m.start() + tail.end(1)
+        text = text[:a] + f" {progress} " + text[b:]
         wrote += 1
     else:
-        bad.append(f"{num} 状态列写着「{m.group(2).strip()}」，正文投影是「{cell}」")
+        bad.append(f"{num} 进度列写着「{cells[4]}」，正文投影是「{progress}」")
 
 # 反过来查索引表多出的行（正文删了或改名了），上面的循环够不着
 for row in re.findall(r'^\|\s*(D\d+)（', text, re.M):
@@ -1679,14 +1774,14 @@ if mode == 'write':
     open(idx_path, 'w', encoding='utf-8').write(text)
 
 if bad:
-    print(f"  ✗ 决策索引表的状态列与正文不同步（{len(bad)} 处）")   # gate-lint:summary
+    print(f"  ✗ 决策索引表的状态列或进度列与正文不同步（{len(bad)} 处）")   # gate-lint:summary
     for b in bad:
         print("     " + b)                                          # gate-lint:detail
     print("     → 怎么办：权威记录是各决策正文的「### 已定项」/「### 未定项」两节。")
     print("       改完正文跑： bash .claude/gate.d/doc-decisions.sh --write")
     sys.exit(1)
 
-print(f"  ✓ 决策索引表状态列与正文同步（{n} 条决策"
+print(f"  ✓ 决策索引表状态列与进度列与正文同步（{n} 条决策"
       + (f"，写回 {wrote} 行）" if mode == 'write' else "）"))
 PY
   [[ $? -ne 0 ]] && fail=1
@@ -2574,6 +2669,150 @@ print(f'  ✓ 变更史的形状对：查了 {len(files)} 份 kb 文件、{date_
 PY
 }
 
+# ════ 格「候选代号不跨分项复用」════
+# 同一份决策里，同一个候选代号（甲乙丙丁戊己庚辛壬癸，或单个大写拉丁字母）不许出现在两个分项的候选表里：
+# 检索到其中一条时分不出这个代号属于哪一格（C256：D19 已定项 7 的丙是「都不存」，已定项 8 的草案也有丙，指的是别的东西）。
+# 扫 .claude/kb/decisions/*.md「## 历史版本」之前、围栏之外的行，按分项小节切块：`### / #### 已定项 N` 与 `未定项 N` 到下一个同级或更高级标题；
+#   块外的行（分项索引、连锁一节）不扫。
+# 候选表认两种形态：表格某一列整格是单字代号（去掉 ** 与反引号后），且这一列至少有两个不同的代号；
+#   行首列表「- 甲：」「甲）」「（甲）」「- **乙**：」，相距不超过 6 行的一组里至少有两个不同的代号。判不出候选表的块不判。
+# 同一个代号在两个不同分项块的候选表里都出现判红，点名文件、代号与两处行号；同一块里的几张表共用一个代号不算。
+# 带了分项前缀的写法（「已定项 7 的丙」）不是表格整格也不在行首，本来就不算。看不见：「甲（采用）」这类带括注的格、正文里的「候选甲」「臂乙」。
+# 弄坏开关 DOC_DECISIONS_BREAK=candidate-codes-unchecked：复用不判红。
+# 样本：candidate-codes-red 两个分项的候选表都用丙（一张表格、一张列表），判红；candidate-codes-green 两个分项代号不同、另一处写「已定项 7 的丙」，判绿。
+grid_candidate_codes() (
+  [[ -d .claude/kb/decisions ]] || { echo "  ! 找不到 .claude/kb/decisions，这一格跳过"; exit 77; }
+
+  python3 - "$BREAK_SWITCH" <<'PY'
+import glob, re, sys
+
+BREAK = sys.argv[1]
+CHECK_COMMAND = 'bash .claude/gate.d/doc-decisions.sh --check candidate-codes'
+DECISIONS = '.claude/kb/decisions'
+FENCE = re.compile(r'^[ \t]*```')
+HEADING = re.compile(r'^(#{1,6})[ \t]+(.*?)[ \t]*$')
+ITEM_HEADING = re.compile(r'^(已定项|未定项)[ \t]*(\d+)')
+OWN_HISTORY = re.compile(r'^## 历史版本[ \t]*$')
+SEPARATOR_ROW = re.compile(r'^[\s:|\-]+$')
+HEAVENLY = '甲乙丙丁戊己庚辛壬癸'
+CODE_CELL = re.compile(rf'^[{HEAVENLY}A-Z]$')
+LIST_CODE = re.compile(rf'^[ \t]*(?:[-*][ \t]+)?\**[（(]?([{HEAVENLY}A-Z])\**[）)：:]')
+LIST_GAP = 6
+UNESCAPED_PIPE = re.compile(r'(?<!\\)\|')
+
+files = sorted(glob.glob(f'{DECISIONS}/*.md'))
+if not files:
+    print(f'  ! 找不到 {DECISIONS} 下的决策文件，这一格无对象可判')
+    sys.exit(77)
+
+
+def cell_text(raw):
+    return re.sub(r'[*`\s]', '', raw)
+
+
+def blocks_of(path):
+    """[(块名, [(行号, 行)])]：分项小节到下一个同级或更高级标题；历史节之后和围栏里的行不算。"""
+    blocks, current, fenced = [], None, False
+    for number, line in enumerate(open(path, encoding='utf-8').read().splitlines(), 1):
+        if OWN_HISTORY.match(line):
+            break
+        if FENCE.match(line):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        heading = HEADING.match(line)
+        if heading:
+            level = len(heading.group(1))
+            if current is not None and level <= current[0]:
+                blocks.append(current[1:])
+                current = None
+            item = ITEM_HEADING.match(heading.group(2))
+            if item and level in (3, 4) and current is None:
+                current = (level, f'{item.group(1)} {item.group(2)}', [])
+            continue
+        if current is not None:
+            current[2].append((number, line))
+    if current is not None:
+        blocks.append(current[1:])
+    return blocks
+
+
+def table_groups(lines):
+    """候选表：表格某一列整格是单字代号、这一列至少两个不同的代号。[[(代号, 行号)]]，一张表的一列一组。"""
+    found, table = [], []
+    for number, line in lines + [(0, '')]:
+        if line.lstrip().startswith('|'):
+            table.append((number, line))
+            continue
+        if table:
+            columns = {}
+            for row_number, row in table:
+                if SEPARATOR_ROW.match(row.strip()):
+                    continue
+                cells = [cell_text(c) for c in UNESCAPED_PIPE.split(row.strip().strip('|'))]
+                for index, cell in enumerate(cells):
+                    if CODE_CELL.match(cell):
+                        columns.setdefault(index, []).append((cell, row_number))
+            for hits in columns.values():
+                if len({code for code, _ in hits}) >= 2:
+                    found.append(hits)
+            table = []
+    return found
+
+
+def list_groups(lines):
+    """候选列表：行首「- 甲：」「甲）」这类，相距不超过 LIST_GAP 行的一组里至少两个不同的代号。[[(代号, 行号)]]。"""
+    hits = []
+    for number, line in lines:
+        match = LIST_CODE.match(line)
+        if match:
+            hits.append((match.group(1), number))
+    found, group = [], []
+    for hit in hits + [None]:
+        if hit is not None and (not group or hit[1] - group[-1][1] <= LIST_GAP):
+            group.append(hit)
+            continue
+        if len({code for code, _ in group}) >= 2:
+            found.append(group)
+        group = [hit] if hit is not None else []
+    return found
+
+
+scanned, tables, reused, all_codes = 0, 0, [], set()
+for path in files:
+    scanned += 1
+    where = {}
+    for name, lines in blocks_of(path):
+        groups = table_groups(lines) + list_groups(lines)
+        tables += len(groups)
+        first = {}
+        for group in groups:
+            for code, number in group:
+                first.setdefault(code, number)
+        for code, number in first.items():
+            where.setdefault(code, []).append((name, number))
+            all_codes.add(code)
+    for code, places in sorted(where.items()):
+        if len(places) >= 2:
+            reused.append((path, code, places))
+
+if reused and BREAK == 'candidate-codes-unchecked':
+    print(f'  ✓ 弄坏开关 DOC_DECISIONS_BREAK=candidate-codes-unchecked：{len(reused)} 个复用的候选代号没判')
+    sys.exit(0)
+if reused:
+    print(f'  ✗ {len(reused)} 个候选代号在同一份决策的两个分项候选表里复用')  # gate-lint:summary
+    for path, code, places in reused:
+        text = '、'.join(f'{name}（第 {number} 行）' for name, number in places)
+        print(f'     {path} 的候选代号「{code}」同时在 {text}的候选表里，检索到其中一条时分不出它属于哪一格')  # gate-lint:detail
+    sys.exit(1)
+if tables == 0:
+    print(f'  ! 扫了 {scanned} 份决策，一处候选表都没判出来，这一格无对象可判')
+    sys.exit(77)
+print(f'  ✓ 同一份决策里的候选代号没有跨分项复用：扫了 {scanned} 份决策、{tables} 处候选表、{len(all_codes)} 个代号')
+PY
+)
+
 # ════ 登记的格函数：弄坏开关点名这一格就不跑、按判过了记，否则调这一格的判法 ════
 # 前十四格的 stdin 接 /dev/null，与它们原先在后台跑时读到的一样。
 break_skips() {
@@ -2599,6 +2838,7 @@ judge_write_frequency()         { break_skips write-frequency;         grid_writ
 judge_entry_added()             { break_skips entry-added;             cell_entry_added; }
 judge_shape()                   { break_skips shape;                   cell_shape; }
 judge_history_loss()            { break_skips history-loss;            cell_history_loss; }
+judge_candidate_codes()         { grid_candidate_codes </dev/null; }
 
 # ════ --write：在子 shell 里重写 decision-items-sync 的两块投影，写完回读判一遍 ════
 if ((write_mode)); then

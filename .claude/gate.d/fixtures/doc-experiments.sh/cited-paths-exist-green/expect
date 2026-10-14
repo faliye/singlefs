@@ -1,0 +1,6 @@
+exit=0
+want=✓ 2 份 .md 点名的 4 个路径（5 处引用；research/results 下的产物 2、变异表 1、实验源码 1）都找得到：树里 3 个、只在历史里 1 个
+want=       research/results/e9-gone.out
+want=样本只跑 .gate-cells 点名的格：cited-paths-exist
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（cited-paths-exist），0 格本次未跑（无）

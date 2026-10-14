@@ -2,6 +2,7 @@
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 scripts/gate/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
 # gate-stage: 内存序（herd7 + litmus/，本工程自己的阶段）
+# gate-fixture: yes
 # gate-category: checker-tier 类
 # gate-similar: checker-tier-qemu-device-streams.sh 同是 checker-tier 类里要外部工具的那几道之一，但它起 QEMU 判真设备上收到的写；这里起 herd7 判 litmus 的内存序声明，工具、登记的输入与失败方式都不同
 # gate-similar: code-source-discipline.sh 它静态判源码的写法与登记（名字、格式常量、实验源码纪律）；这里的 litmus 也要绑到 crates 的代码锚点，但判的是 herd7 对每条 Never / Sometimes 的判定与声明符不符
@@ -53,7 +54,7 @@ cell_litmus_verdicts() {
 static_only=()
 [[ -f "$ROOT/.lkmm-static-only" ]] && static_only=(--static-only)
 if [[ ${#static_only[@]} -eq 0 ]]; then
-  source "$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
+  source "$STAGE_REPOSITORY/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
   stage_run_or_skip "$STAGE_REPOSITORY/scripts/gate/stage-must-run.sh" "复用上一次整轮全绿的判定" \
     "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径、herd7 的版本怎么进判定见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
   python3 "$ADMISSION_MODULE" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1

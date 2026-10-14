@@ -1,3 +1,3 @@
 research/prompts/gone/  # 样本：指向不存在的路径
 scripts/experiments/target/copy/  # 样本：目录在盘上，但被 .gitignore 忽略，一份被 git 列出的 .rs 都排不到
-research/frozen.rs
+research/prompts/frozen.rs

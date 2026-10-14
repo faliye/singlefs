@@ -1,0 +1,2 @@
+# doc-lint 扫描要绕开的目录。一行一条：<相对目录>  # 为什么
+.claude/gate.d/fixtures/covered-sample.sh/  # 样本造了带登记标题的 E7 实验页，与真表同号不同名，扫它只会报登记冲突

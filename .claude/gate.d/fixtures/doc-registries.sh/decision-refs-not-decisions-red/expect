@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：decision-refs
+want=D1 在 decisions/ 下有定义，.claude/kb/notes.md:15 却用 not-decisions 标记把它摘出去
+want=.claude/kb/notes.md:18 的 not-decisions 标记点名的 D7 在它管的第 19 行里一处都没有
+want=.claude/kb/notes.md:21 的 not-decisions 标记一个编号都没点名
+want=D0 被引用但 decisions/ 下没有它
+want=  decision-refs：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（decision-refs）

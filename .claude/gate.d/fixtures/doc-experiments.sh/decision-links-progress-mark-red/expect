@@ -1,0 +1,5 @@
+exit=1
+want=D1 已定项索引表第 1 行的定案格要一句话、不带日期、不超过 100 字（现在 101 字）
+want=样本只跑 .gate-cells 点名的格：decision-links
+want=doc-experiments.sh：1 格里 1 格红（decision-links）
+want=bash .claude/gate.d/doc-experiments.sh --check decision-links

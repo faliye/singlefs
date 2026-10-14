@@ -1,0 +1,2 @@
+exit=0
+want=  ✓ 扫了 4 道阶段的样本，2 道有登记位、都在排除表里（bare-sample、slash-sample.sh）；另 2 道没有登记位，在不在表里都不判；排除表里指到 fixtures 下的 2 行都指得到阶段

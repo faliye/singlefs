@@ -1,0 +1,14 @@
+exit=1
+want=12 处自己定并行度默认值的写法没经登记位取
+want=scripts/hosts/arith_assignment.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/cap_fallback_via_variable.sh:4  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/colon_equals_fallback.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/declare_integer.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/eval_assignment.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/for_assignment.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/let_assignment.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/plus_equals_assignment.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/printf_v_assignment.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/read_assignment.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/registry_divided_by_variable.sh:5  写死的线程数默认（|| / && 赋值）
+want=scripts/hosts/sourced_override.sh:5  写死的线程数默认（|| / && 赋值）

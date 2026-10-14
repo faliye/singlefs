@@ -1,0 +1,2 @@
+# 带特性那一趟 cargo test 退 101 判红，判的是带特性那一格；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+feature-gated-tests
