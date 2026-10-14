@@ -1,6 +1,6 @@
 # kb 历史怎么组织
 
-**这是 singlefs 的项目本地规则**，不在共享 SOP 里——共享的 `kb-discipline.md` 只要求正文只写现状；这份定的是
+**这是 singlefs 的项目本地规则**，不在共享 SOP 里。这份定的是
 哪几类文件有历史、历史住在哪、`decisions-history.md` 与 `experiments-history.md` 两份变更史怎么组织。共享规则在 `.claude/singlefs-ai-sop/rules/`。
 
 ## 只有决策与实验有历史，别的文件没有
@@ -39,8 +39,8 @@
 
 ## 门禁管哪一半
 
-门禁 doc-decisions（`.claude/gate.d/doc-decisions.sh`）的两格：`entry-added`（决策正文改了，`decisions-history.md` 要有新增的 `- ` 项或日期块）、
+门禁 doc-decisions（`.claude/gate.d/doc-decisions.sh`）的三格：`entry-added`（决策正文改了，`decisions-history.md` 要有新增的 `- ` 项或日期块）、
 `shape`（日期块住在自己的节、同节同一天只一块、两份变更史里不许 `#### `、快查行与现状行、新开的块不许空）。具体判据以那份脚本的文件头为准。
-数与编号有没有丢由 `scripts/kb/history-consolidate.py loss-check` 判，暂存前跑。
+数与编号有没有丢由 `history-loss` 格（两份变更史与基准相比，基准里每个日期块的数、编号、产物名、引名在改后都找得到；调 `scripts/kb/history-consolidate.py loss-check`）判；整理变更史时暂存前自己先跑一遍 `loss-check`。
 
 **它管不了的**：结论写得对不对、一条改动该点名的决策或实验有没有点全、整理时限定词丢没丢——这几样靠人。

@@ -21,7 +21,9 @@ required-inputs: 草稿目录, 报告, 出口, 要改的文件
 - 要改的文件，全列；这一轮别的会话在改的文件（你不碰的）。
 - 出口：做到哪算完。
 - 每条改法要判红的输入样本与弄坏开关名（`<脚本>_BREAK=<项>` 这类）；主 agent 给不出的，写明由你起名。
-- 线程上限、内存上限；报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下。
+- 预计挂钟：一行「预计挂钟：2 小时内」或「预计挂钟：超过 2 小时」；超过的另有「分片：」「续跑：」「多机：」三行，分不了的那几样由一行「分不了：」点名；这三个标签各只写一行，同一标签写第二行拒，闭合了的围栏代码块（照 CommonMark 认）里的行不算。子 agent 跑多机只照「多机：」那一句规范句，提示里别处写的台数、线程取法一概不照；提示里另有一行「多机已判：<理由>」的，照提示里逐台写的参数跑（逐台写了线程的那几台不照「线程上限：」那一个数）。派发闸查，缺了派不出来。
+- 线程上限：一行「线程上限：N」，N 取登记的每台默认重活线程数（`.claude/heavy-thread-default`），这一行只写这一个十进制整数，后面不接任何字（括注也拒）；要加说明另起一行，照普通正文写。子 agent 起重活只照「线程上限：」那一个整数，提示里别处写的线程数一概不照（有「多机已判：」一行时逐台写的除外）。N 不是登记值的另写一行「线程上限已判：<理由>」，这一行也能顶替缺的「线程上限：」行。派发闸查，缺了又没有已判行的派不出来。
+- 内存上限；报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下。
 
 ## 做什么
 
@@ -46,4 +48,4 @@ required-inputs: 草稿目录, 报告, 出口, 要改的文件
 
 ## 没做什么（固定会有的）
 
-- 没跑重型测试（`checker-tier-layer0-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification、checker-tier-research-build-and-replay 本身、`gate.sh`、全量 `cargo test`、`check.sh`）；没走定义三方；没提交。
+- 没跑重型测试（`checker-tier-crash-point-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification、checker-tier-research-build-and-replay 本身、`gate.sh`、全量 `cargo test`、`check.sh`）；没走定义三方；没提交。

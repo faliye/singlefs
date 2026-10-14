@@ -1,0 +1,6 @@
+# 用户逐次豁免三方论证的 crates 产品代码改动（门禁 doc-process-records 的 crates-adversarial-review 格读它）。一行三段，制表符分隔：路径、豁免时那一版的 sha256（删掉的文件写 deleted）、为什么。
+# 按内容哈希认：那份文件再改一个字，哈希就对不上、这一格照常红。只有用户明说「这次不走三方」时才加一行，理由里写明是哪一次、他说了什么。
+crates/singlefs-reference-filesystem/src/lib.rs	0e848cde0150fa58fcac8685f3d8486ed7067f3684549e7a6f126077b811034f	用户 2026-10-12 指示「两个包的源码注释改了 17 处， 豁免」：这一版只给注释里的决策分项引用补上「D<n>（简称）」（RefFS 16 处、重放前缀 1 处，在飞上限那一处改指 D23（journal 的角色与格式） 已定项 18），代码一个字没动
+crates/singlefs-replay-prefix/src/lib.rs	d030a19e53aaedab49a3c8f529b0d01adf6f44280e252b96c3dacf641e2f63f3	用户 2026-10-12 指示「两个包的源码注释改了 17 处， 豁免」：这一版只给注释里的决策分项引用补上「D<n>（简称）」（RefFS 16 处、重放前缀 1 处，在飞上限那一处改指 D23（journal 的角色与格式） 已定项 18），代码一个字没动
+crates/singlefs-core/src/block_device.rs	e0dd446dd88bae032cf561ee5b9bfb6bcbf48ace7c6faf4a698e591329835ff8	用户 2026-10-12 指示「豁免」（崩溃放量全量这一轮，问的是 block_device.rs 与 recovery.rs 两份要三方还是豁免）：这一版只给 BlockDevice 加默认交回 None 的 journal_record_offsets_hint，只读路径的提示；三条新测试钉住提示与全环扫找到同一批槽（crates/singlefs-harness/tests/sparse_block_device_journal_hint_matches_the_full_ring_scan.rs），crates/mutations.tsv 三行证过红
+crates/singlefs-core/src/recovery.rs	006b1970dc81c51d5a4852544c8ca0d6b95b20439539eac288ea63dde2926438	用户 2026-10-12 指示「豁免」（崩溃放量全量这一轮，同一次指示）：这一版只让切片形态的 PoolReader 把 journal 记录槽的提示转交盘答（找到那块盘、调它的 journal_record_offsets_hint），别的不动；同一批测试与变异
