@@ -1,6 +1,6 @@
 # singlefs
 
-[English](README.md) · [中文](README.zh.md) · [日本語](README.ja.md)
+[中文](README.md) · [English](README.en.md) · [日本語](README.ja.md)
 
 ---
 大きなディスクは会社のもの、よい眠りは自分のもの。
@@ -147,7 +147,7 @@ bash .claude/scripts/gate.sh
 | `.claude/singlefs-ai-sop/` | 共有仕様とゲートスクリプトのコピー。git では無視され、「始め方」の手順で取得する |
 | [`research/`](research/) | 三者論証の資料と判決（`prompts/`）、実験で保存した成果物（`results/`）。どちらも丸ごと消して取り直せる |
 | [`records/`](records/) | 構築の過程 |
-| [`briefs/`](briefs/) | 更新ごとのブリーフ。日付ごとに一つで、その版で何ができるか、どこまで検証したか、まだ何を覆っていないかを書く。各ブリーフに英語（既定）、中国語（`.zh.md`）、日本語（`.ja.md`）の三つの版がある |
+| [`briefs/`](briefs/) | 更新ごとのブリーフ。日付ごとに一つで、その版で何ができるか、どこまで検証したか、まだ何を覆っていないかを書く。各ブリーフに中国語（既定）、英語（`.en.md`）、日本語（`.ja.md`）の三つの版がある |
 
 ## ライセンス
 

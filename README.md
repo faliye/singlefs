@@ -1,156 +1,156 @@
 # singlefs
 
-[English](README.md) · [中文](README.zh.md) · [日本語](README.ja.md)
+[中文](README.md) · [English](README.en.md) · [日本語](README.ja.md)
 
 ---
-The big disks belong to the company; the good sleep belongs to you.
+大硬盘是公司的，好睡眠是自己的。
 ---
-**A copy-on-write (COW) file system designed from scratch, written in Rust.**
+**一个从零设计的写时复制（COW）文件系统，Rust 实现。**
 
-## Why build another one
+## 为什么再造一个
 
-I have read the code of many file systems, and I think they are all excellent. But the hard years they grew up in left them too frugal and too tightly coupled, so now that times are rich they cannot enjoy it.
+我查看了很多fs系统的代码，我觉得他们都很优秀。但是过去的艰苦岁月，让它们不够浪费，太过耦合，在如此富裕的日子里竟然无法享福。
 
-So I decided we will enjoy it. singlefs is allowed to be ugly, allowed to waste storage, and allowed to carry many bloated implementation branches side by side.
+所以我决定我们来享福吧。允许singlefs丑陋，允许浪费存储，也允许拥有很多并行臃肿的实现分支。
 
-I hope that many years from now, when someone describes this code, they will not say it is one big pile of crap, but that it is many piles of crap.
+我希望很多年以后，当有人形容singlefs的这些代码时，不要说它是一坨屎，而是说它是很多条屎。
 
-In practice, changing one place may mean changing many branches together. That is fine: we can easily add another, different branch, even if it stinks in its own special way.
+实现上，修改一个地方可能意味着很多分支都需要一起修改。但这没关系——我们可以很轻松地再加上另一条不一样的——即使它臭得别有风味。
 
-Well, I am still verifying all this, but I reckon it should work.
-waaagh!
+嗯，虽然我现在还在验证，但是俺寻思应该可以。
+waaagh！
 
-Several pain points of existing COW file systems are **format-level**: patches cannot fix them, they can only be avoided at design time:
+现有 COW 文件系统的几个痛点是**格式级的**，补丁补不掉，只能在设计时避开：
 
-| Pain point | Root cause | Choice made here |
+| 痛点 | 根因 | 本项目的选择 |
 |---|---|---|
-| Absurd ENOSPC (space is free but writes fail; deleting a file also reports no space) | Two-level allocation plus rigid chunk classes | No data/metadata split; one global allocator |
-| RAID5/6 write hole | Fixed-width stripes need read-modify-write | Variable stripe width, never read-modify-write |
-| Quota accounting that is slow and wrong | Accounting is an after-the-fact traversal that also walks the reverse index | Accounting is a by-product of the transaction, maintained incrementally at commit |
-| The reverse index became a complexity black hole | It grew later; it was not designed | Designed into the format from day one |
-| Nobody dares to run the repair tool | Rebuildability was never a design goal | Self-describing metadata blocks, plus a checker that evolves with the format |
+| ENOSPC 荒谬（有空间却写不进、删文件也报没空间） | 两级分配 + chunk 分类僵化 | 不分 data/metadata，全局统一分配器 |
+| RAID5/6 write hole | 定宽条带需读改写 | 条带宽度可变，永不读改写 |
+| 配额记账又慢又错 | 记账是事后遍历，还要走反向索引 | 记账是事务的副产品，提交时增量维护 |
+| 反向索引成了复杂度黑洞 | 它是后来长出来的，不是设计的 | day-1 设计进格式 |
+| 修复工具没人敢用 | 可重建性不是设计目标 | 元数据块自描述 + checker 与格式同步演进 |
 
-Decisions and their grounds are in [`.claude/kb/decisions.md`](.claude/kb/decisions.md); the pitfall list is in [`.claude/kb/pitfalls.md`](.claude/kb/pitfalls.md).
+决策与依据在 [`.claude/kb/decisions.md`](.claude/kb/decisions.md)，避坑清单在 [`.claude/kb/pitfalls.md`](.claude/kb/pitfalls.md)。
 
-### Performance estimates
+### 性能预估
 
-Every number comes from an experiment that has been run; read each on its own measurement basis and do not convert between them:
+数都来自跑过的实验，各按自己的口径读，不互相换算：
 
-- Usable space after formatting: on a 16 GiB disk, 95.2% is usable on a single disk and 47.6% on a two-disk mirror; the default formatting of six other file systems is in the same range (E152 (per-milestone file performance against six file systems), table in [`scripts/experiments/perf-by-milestone.md`](scripts/experiments/perf-by-milestone.md)).
-- Small files: any data under 32 KiB is padded to one 32 KiB unit (E66 (how small files land after padding)). Small-object packing has been decided by D27 (small-data packing container) but is not implemented yet; once implemented, the worst-case padding waste is 11.1% (E120 (choosing the common ratio of a geometric size-class table)).
-- Metadata overhead: the allocation record tree takes about 0.055% of capacity at 32 KiB placements and 90% fill (E74 (allocation record entry count and compaction cost), arithmetic model).
+- 格式化之后能用多少：16 GiB 盘上单盘可用 95.2%，两盘镜像 47.6%；六家文件系统默认格式化在同一档（E152（按里程碑对比六家文件系统的文件性能），表在 [`scripts/experiments/perf-by-milestone.md`](scripts/experiments/perf-by-milestone.md)）。
+- 小文件：不足 32 KiB 的数据一律补齐成一个 32 KiB 单元（E66（补齐之后小文件怎么落））。小对象打包由 D27（小数据打包容器）定了、还没实现，实现后补齐浪费最坏 11.1%（E120（档表取等比时公比怎么定））。
+- 元数据自己占的：分配记录树在 32 KiB 落点、90% 填充下约占容量的 0.055%（E74（分配记录的条目数与整理开销），算术模型）。
 
-## Current status
+## 当前状态
 
-The current milestone is "deletion and repeated COW" ([`.claude/kb/milestone/03-third-txn.md`](.claude/kb/milestone/03-third-txn.md)); the previous one, "overwrite, release, rollback and reuse", ended on 2026-09-29, and what it left unfinished moved into item five of the current one.
+当前里程碑是「删除与多次 COW」（[`.claude/kb/milestone/03-third-txn.md`](.claude/kb/milestone/03-third-txn.md)）；上一个「覆盖写、释放、回退与复用」2026-09-29 结束，没做完的转进了它的项五。
 
-What it can do: mkfs on two disks; write a file and commit, filling several data units sequentially and reading back by offset; create several files in one publish (no directories); overwrite, release, and reuse a placement once the rollback floor has been raised past it; close and remount as a second writable instance; perform an administrator rollback while mounted; read back after a cold start; delete a file by inode number (publish the deletion intent first, then reclaim its data units in batches).
+能做的：两块盘上 mkfs；写一个文件并提交，顺序写满多个数据单元、按偏移读回；一次发布建多个文件（没有目录）；覆盖写、释放、抬过回退下界之后复用落点；关闭再挂载成第二个可写实例；挂着的时候做管理员回退；冷启动读回；按 inode 号删除文件（先发布删除意图，再分批回收它的数据单元）。
 
-What it cannot do: it cannot be mounted into the system (no FUSE, no kernel module), has no directories or POSIX interface, and has no snapshots, encryption or compression. **Do not store any data in it.** The disk format is still soft and may be torn down and redone at any time before the first external user appears ([`.claude/rules/format-evolution.md`](.claude/rules/format-evolution.md)).
+不能做的：挂不到系统里（没有 FUSE、没有内核模块），没有目录与 POSIX 接口，没有快照、加密、压缩。**别拿它存任何数据。** 磁盘格式仍是软的，第一个外部用户出现之前随时可能推倒重来（[`.claude/rules/format-evolution.md`](.claude/rules/format-evolution.md)）。
 
-How far verification reaches:
+验证到哪：
 
-| Verification | What it judges | Gate |
+| 验证 | 判什么 | 门禁 |
 |---|---|---|
-| Crash-point replay | Cut the write-request stream into segments at each disk's barriers, enumerate every persistence state inside each segment, build an image for each, and run recovery plus the pool-level checker | checker-tier-crash-point-replay; the full run happens only on user request |
-| Crash amplification | The same enumeration scaled to billions of states: streams are first recorded into the verdict library, then read back and judged; the judge runs on GPUs, sharded across two hosts | `scripts/crash/crash-amplification.sh`, run on user request |
-| Pool-level checker | The 92 invariants marked implemented in the invariant list (`crates/singlefs-checker/invariants/`), the same count as the list in the code | Called by the two rows above |
-| Model differential testing | Random operation sequences compared step by step with an ideal model that lives only in memory | harness-model-differential-and-scenarios |
-| QEMU real device | A fixed workload on two virtio disks; the writes and FLUSHes recorded on the device side are compared item by item with the stream the program recorded; no crash injection | checker-tier-qemu-device-streams |
-| Memory ordering | herd7 judges every Never under `litmus/`, each paired with a control that drops the barrier | checker-tier-lkmm |
-| Formal verification | Verus verifies the pure-function core of recovery replay that takes the journal prefix, does root selection and the ring scan (`crates/singlefs-replay-prefix`); this same code is what gets compiled into the product | checker-tier-formal-verification |
-| Mutation | The crates mutation table breaks one place per row and the named test must go red; broad mutation (cargo-mutants) requires a conclusion for every mutant and none left unkilled | checker-tier-crates-mutation-replay, checker-tier-broad-mutation |
+| 崩溃点重放 | 写请求流按每块盘的屏障切段，枚举段内每一种落盘状态，逐个生成镜像、跑恢复加池级 checker | checker-tier-crash-point-replay；全量只在用户要求时跑 |
+| 崩溃放量 | 同一套枚举放到几十亿态：流先录进判定库，再从库读回判，判器在 GPU 上，两台机器分片 | `scripts/crash/crash-amplification.sh`，用户要求时跑 |
+| 池级 checker | 不变量清单（`crates/singlefs-checker/invariants/`）里「已实现」的 92 条，与代码里的清单同数 | 被上两样调用 |
+| 模型对拍 | 随机操作序列与只住内存的理想模型逐步比 | harness-model-differential-and-scenarios |
+| QEMU 真设备 | 两块 virtio 盘上跑固定负载，设备侧录下的写与 FLUSH 和程序录的流逐项比；没有崩溃注入 | checker-tier-qemu-device-streams |
+| 内存序 | herd7 判 `litmus/` 下每条 Never，各配一条去掉屏障的对照 | checker-tier-lkmm |
+| 形式化验证 | Verus 验恢复重放取 journal 前缀、择根、扫环的纯函数核（`crates/singlefs-replay-prefix`），编进产品的就是这一份 | checker-tier-formal-verification |
+| 变异 | crates 变异表逐行改坏一处、点名的测试必须变红；广谱变异（cargo-mutants）每一条都要有结论、没有一条没红 | checker-tier-crates-mutation-replay、checker-tier-broad-mutation |
 
-How much has been judged: the full run of 2026-10-16 to 2026-10-18 covered 14 crash enumeration cases; the 12 whose logs print a state count total 5,149,586,107 crash states (about 5.15 billion), every state with a verdict under the same key and 0 violations; verdicts are stored in the crash verdict library and reused by function unit key, and the judge runs on the GPUs of two hosts. Case 6 was not rerun on the final tree, and the quick tier judgement of case 12 was changed on the last day. The six heavy gates had one pass on 2026-10-15: herd7 and QEMU (6 VM runs, 123 checks) green, formal verification and the mutation table ran their light tier (2 of 172 mutation rows not red), and broad mutation has no conclusions for this version of the code yet; the numbers of every test are summarized in the "Summary of test data" section of the 2026-10-18 brief.
+判了多少：2026-10-16 到 2026-10-18 那一轮全量罩 14 条崩溃枚举用例，日志打了态数的 12 条合计 5,149,586,107 个崩溃状态（约 51.5 亿），每一态都有键相同的判定、违例 0；判定存在崩溃判定库里按函数单元键复用，判器在两台机器的 GPU 上跑。第 6 条没在最终那棵树上重跑，第 12 条的快档判法最后一天改过。2026-10-15 六道重型门禁过了一趟：herd7 与 QEMU（6 次虚机、123 项检查）绿，形式化与变异表跑的是轻型（变异 172 行里 2 行没红），广谱变异对这一版代码还没有结论；各项测试的数汇总在 2026-10-18 那份简报「测试数据汇总」一节。
 
-**An all-green gate is only evidence of crash consistency at the model level**, not "verified". For how far each item reaches, which items are recorded as not run this time, and what is not covered yet, see the latest file in [`briefs/`](briefs/).
+**门禁全绿只构成模型层的崩溃一致性证据**，不是「验过了」。每一样跑到哪、哪几项记本次未跑、还没罩到什么，看 [`briefs/`](briefs/) 最新一份。
 
-## System configuration
+## 系统配置
 
-Mounting starts by reading two 4096-byte slots at offsets 0 and 4096 of each disk. They hold the **system configuration**: a 489-byte structure, one per disk, alternating between the two slots. It is the start of the whole chain (system configuration → root ring → root record → tree table → each index tree → data units), and also the only small piece on disk that cannot be rescued: everything else can be scanned back from self-describing units, but geometry such as where the journal ring is and how large a unit is has no second copy anywhere.
+挂载从每块盘偏移 0 与 4096 两个 4096 字节的槽读起，那里是**系统配置**：一块 489 字节的结构，每盘一份、两槽轮换。它是整条链的起点（系统配置 → 根环 → 根记录 → 树表 → 各棵索引树 → 数据单元），也是盘上唯一救不回来的一小块：别的都能从自描述的单元扫回来，journal 环在哪、单元多大这些几何丢了没有第二处写着。
 
-Its contents fall into four classes: immutable configuration set by the user at mkfs, which needs a new file system to change (389 bytes); mutable configuration whose change only rebuilds indexes without losing data (4 bytes); run configuration that can be reset at every mount (36 bytes); and run quantities the file system maintains itself and the user can never set (60 bytes, changing at every publish, so do not cache them as constants). The field table is in [`.claude/kb/layout/01-first-txn.md`](.claude/kb/layout/01-first-txn.md).
+内容分四类：mkfs 时由用户设、改了要重建文件系统的不可变配置（389 字节）；改了只重建索引、不丢数据的可变配置（4 字节）；每次挂载可以重设的运行配置（36 字节）；文件系统自己维护、用户从来不能设的运行量（60 字节，每次发布都在动，别当常量缓存）。字段表在 [`.claude/kb/layout/01-first-txn.md`](.claude/kb/layout/01-first-txn.md)。
 
-## Contributor governance
+## 贡献者治理（Contributor Governance）
 
-> **Implementation That Favors the AI, Review That Favors the Human.**
+> **Implementation That Favors the AI, Review That Favors the Human（实现上 AI 友好，审核上人类友好）.**
 >
-> **Make every submitted patch review-worthy.**
+> **Make every submitted patch review-worthy（让每一份提交都值得被 review）.**
 >
-> **Contribution throughput may be unbounded; acceptance throughput is evidence-bound.**
+> **Contribution throughput may be unbounded; acceptance throughput is evidence-bound（投稿吞吐可以无限，接收吞吐受证据约束）.**
 
-The gate does not exist to keep anyone out. It exists to raise every submission to the line where it is worth a human's time: the mechanical part goes to scripts, and human attention goes to what only a human can judge.
+门禁存在的目的不是把谁挡在外面，是把每一份提交抬到值得花人的时间去看那条线上：机械的部分交给脚本，人的注意力用在只有人能判的地方。
 
-**The acceptance criterion is automated verification.** This project does not classify submitters by origin; there is only one distinction: submissions that carry evidence, and those that do not. The evidence criterion is the same ruler for everyone; run the gate before sending and you know where you stand.
+**准入判据是自动化验证。** 本项目不按来源区分提交者，只分一类：带着证据的提交，和不带的。证据判据对所有人是同一把尺子，发出去之前跑一遍门禁，就知道自己站在哪。
 
-> Disclosure: the code, documentation and gate scripts of this project are produced by humans and AI together, and will stay that way. This describes how we work; it is not a classification of submitters.
+> 披露：本项目的代码、文档与门禁脚本由人与 AI 协作产出，并会长期保持这种方式。这是对我们自己做法的说明，不构成对提交者的任何分类。
 
-## Contributing
+## 贡献
 
-Three hard requirements:
+三条硬要求：
 
-1. **Any change to `crates/*/src/` must come with tests.** No exceptions, no "the next patch will add them".
-2. **Every new test must first prove that it goes red**: break the code under test, confirm the test fails, then restore it, and write in the commit message how you checked. A test that cannot be shown to go red does not count.
-3. **Unimplemented verification must not pretend to pass.** The gate lists the stages that are not wired in yet; green only means the implemented part passed.
+1. **改了 `crates/*/src/` 就必须带测试。** 没有例外，没有「下个 patch 补上」。
+2. **新增的测试必须先证明它会红**：把被测代码改坏、确认测试失败、再改回来，在 commit message 里写明怎么验的。不能证明会红的测试等于没写。
+3. **未实现的验证不许假装通过。** 门禁显式列出还没接进来的阶段；绿只代表已实现的部分过了。
 
 ```bash
-bash .claude/scripts/gate.sh                                  # full gate round: shared stages plus the project stages in .claude/gate.d/
-cargo test -p singlefs-harness                                # harness tier: unit and integration tests, run any time after a change
-bash scripts/hosts/run-with-memory-cap.sh <cap> bash scripts/crash/crash-point-replay.sh --quick   # light-tier crash-point replay
+bash .claude/scripts/gate.sh                                  # 整轮门禁：共享阶段加 .claude/gate.d/ 的项目阶段
+cargo test -p singlefs-harness                                # harness 档：单元与集成测试，改了代码随时跑
+bash scripts/hosts/run-with-memory-cap.sh <上限> bash scripts/crash/crash-point-replay.sh --quick   # 轻型崩溃点重放
 ```
 
-The checker tier (crash enumeration cases, QEMU, herd7, mutation tables, formal verification, broad mutation) runs by default only at commit time, with `SINGLEFS_HEAVY_TESTS=commit` on the command; the full run of crash-point replay and of crash amplification happens only on user request. What counts as heavy, and how the light tier and heavy tier are split, is in [`.claude/rules/verification.md`](.claude/rules/verification.md).
+checker 档（崩溃枚举用例、QEMU、herd7、变异表、形式化验证、广谱变异）默认只在提交时跑，命令带 `SINGLEFS_HEAVY_TESTS=commit`；崩溃点重放全量与崩溃放量全量只在用户要求时跑。哪些算重型、轻型与重型两档怎么分，见 [`.claude/rules/verification.md`](.claude/rules/verification.md)。
 
-Prerequisites: herd7 needs `opam install herdtools7` and `SINGLEFS_KERNEL_TREE=` pointing at a Linux source tree that has `tools/memory-model`; the QEMU stage needs KVM and a QEMU patched with blklogwrites (build it with `scripts/devices/build-patched-qemu.sh` into a private directory, then write `qemu.env` at the repository root following [`qemu.env.example`](qemu.env.example)); without them it refuses to run rather than falling back to the system QEMU. Prerequisites of the VM harness are in [`.claude/kb/vm-harness.md`](.claude/kb/vm-harness.md).
+前置：herd7 要 `opam install herdtools7`，并用 `SINGLEFS_KERNEL_TREE=` 指一棵带 `tools/memory-model` 的 Linux 源码树；QEMU 那一道要 KVM 与一份打了 blklogwrites 补丁的 QEMU（`scripts/devices/build-patched-qemu.sh` 编好装进私有目录，再照 [`qemu.env.example`](qemu.env.example) 在仓根写 `qemu.env`），缺了就拒跑、不退回系统 QEMU。虚机装置的前置见 [`.claude/kb/vm-harness.md`](.claude/kb/vm-harness.md)。
 
-### Multiple hosts and GPUs (optional)
+### 多机与 GPU（可选）
 
-Write a local `multi-host.env` (git-ignored) from the template [`multi-host.env.example`](multi-host.env.example) at the repository root: two-host sharding, the GPU judge, the order and quota of GPU cards, and the quiesce commands are all there, with each key explained in the template; afterwards run `bash scripts/crash/crash-point-replay-shard-configuration-check.sh` once to check it. Every GPU run quiesces first and does not restore afterwards (`scripts/crash/gpu-quiesce-run.sh`). To move a job whose result is a file onto the second host: `bash scripts/hosts/multi-host-run.sh --peer -- <command>`. Where each script lives is in [`scripts/README.md`](scripts/README.md).
+照仓根模板 [`multi-host.env.example`](multi-host.env.example) 在本机写一份 `multi-host.env`（git 忽略）：两台分片、GPU 判器、显卡的先后与额度、清场命令都在里面，每个键的说明在模板里；写完 `bash scripts/crash/crash-point-replay-shard-configuration-check.sh` 判一次。凡用 GPU 先清场，跑完不复原（`scripts/crash/gpu-quiesce-run.sh`）。把一件结果是文件的活挪到第二台：`bash scripts/hosts/multi-host-run.sh --peer -- <命令>`。各脚本放哪见 [`scripts/README.md`](scripts/README.md)。
 
-The gate scripts and rules are distributed by singlefs-ai-sop, so every participant runs the same set.
+门禁脚本与规则由 singlefs-ai-sop 统一分发，所有参与者跑的是同一套。
 
-## Getting started
+## 开工
 
-The rules and the gate live in a separate repository, singlefs-ai-sop. The same specification has Chinese, English and Japanese repositories ([`singlefs-ai-sop-zh`](https://github.com/faliye/singlefs-ai-sop-zh), [`-en`](https://github.com/faliye/singlefs-ai-sop-en), `-ja`), and `-en` is authoritative externally; this project uses `-zh`. What the project holds is a **copy**, without the upstream `.git` and `CLAUDE.md`:
+规矩与门禁在独立仓 singlefs-ai-sop，同一份规范有中文、英文、日文三个仓（[`singlefs-ai-sop-zh`](https://github.com/faliye/singlefs-ai-sop-zh)、[`-en`](https://github.com/faliye/singlefs-ai-sop-en)、`-ja`），对外以 `-en` 为准；本项目接的是 `-zh`。项目里那一份是**拷贝**，不带上游的 `.git` 与 `CLAUDE.md`：
 
 ```bash
 git clone https://github.com/faliye/singlefs.git
 git clone https://github.com/faliye/singlefs-ai-sop-zh.git
 cd singlefs
 rsync -a --exclude '.git' --exclude CLAUDE.md ../singlefs-ai-sop-zh/ .claude/singlefs-ai-sop/
-diff -rq --exclude=.git --exclude=CLAUDE.md ../singlefs-ai-sop-zh .claude/singlefs-ai-sop   # no output means the copy is complete
-bash .claude/singlefs-ai-sop/install.sh     # refresh the version stamp .singlefs-ai-sop-version
+diff -rq --exclude=.git --exclude=CLAUDE.md ../singlefs-ai-sop-zh .claude/singlefs-ai-sop   # 没有输出才算拷全
+bash .claude/singlefs-ai-sop/install.sh     # 刷版本戳 .singlefs-ai-sop-version
 bash .claude/scripts/gate.sh
 ```
 
-After an upstream release, copy again with the same `rsync` and run `install.sh` again. **Rule changes go to the upstream repository**; do not edit `.claude/singlefs-ai-sop/` in place.
+上游发版之后照同样的 `rsync` 再拷一遍、再跑 `install.sh`。**改规则要改上游仓**，不许在 `.claude/singlefs-ai-sop/` 里就地改。
 
-## Layout
+## 目录
 
-| Path | Contents |
+| 路径 | 内容 |
 |---|---|
-| [`crates/singlefs-format`](crates/singlefs-format) | Format constants; the value of every width comes from a decision item in the kb |
-| [`crates/singlefs-core`](crates/singlefs-core) | mkfs, allocator, transaction layer, writable mount and session, recovery, reads on a mounted pool, the index trees, block device backends |
-| [`crates/singlefs-harness`](crates/singlefs-harness) | Harness tier: unit and integration tests, plus scaffolding such as the recorder, memory pool, ideal model, random history and fault injection |
-| [`crates/singlefs-checker-tier`](crates/singlefs-checker-tier) | Checker tier: crash-state enumeration, verdict library, crash amplification, GPU judge, real-device fixtures; runs by default only at commit time |
-| [`crates/singlefs-checker`](crates/singlefs-checker) | Pool-level checker: the library that judges one image; shares only the format constants with the implementation |
-| [`crates/singlefs-replay-prefix`](crates/singlefs-replay-prefix) | The pure-function core of recovery replay that takes the prefix, does root selection and the ring scan; this is what Verus verifies |
-| [`crates/singlefs-unit-graph`](crates/singlefs-unit-graph) | Function-unit graph: splits Rust and WGSL source into units, fingerprints them with comments stripped, collects the closure from an entry point and computes the reuse key; depends only on std |
-| [`crates/singlefs-reference-filesystem`](crates/singlefs-reference-filesystem) | RefFS: a semantic-level reference file system that walks POSIX operations in memory only |
-| [`crates/mutations.tsv`](crates/mutations.tsv) | The mutation table of the crates |
-| [`scripts/`](scripts/) | Scripts used again and again, in subdirectories by purpose; see its README for what goes where |
-| [`litmus/`](litmus/) | herd7 litmus tests |
-| [`.claude/kb/`](.claude/kb/) | Decisions and their change history, experiments, owed checks, byte layout tables, milestone plans, prior-art research and pitfalls |
-| [`.claude/rules/`](.claude/rules/) | Project-local rules; the shared rules are in `.claude/singlefs-ai-sop/rules/` |
-| [`.claude/gate.d/`](.claude/gate.d/) | Project-local gate stages and the registry files they read |
-| [`.claude/agents/`](.claude/agents/), [`.claude/hooks/`](.claude/hooks/), [`.claude/skills/`](.claude/skills/) | Subagent definitions, Claude Code hooks, skills |
-| `.claude/singlefs-ai-sop/` | Copy of the shared specification and gate scripts, git-ignored, fetched in "Getting started" |
-| [`research/`](research/) | Three-way review material and verdicts (`prompts/`) and retained experiment artifacts (`results/`); both can be deleted wholesale and fetched again |
-| [`records/`](records/) | The construction process |
-| [`briefs/`](briefs/) | A brief per update, one per date: what that version can do, how far it is verified, and what is not covered yet. Each brief has English (default), Chinese (`.zh.md`) and Japanese (`.ja.md`) versions |
+| [`crates/singlefs-format`](crates/singlefs-format) | 格式常量，每个宽度的值来自 kb 的决策分项 |
+| [`crates/singlefs-core`](crates/singlefs-core) | mkfs、分配器、事务层、可写挂载与会话、恢复、挂载态的读、各棵索引树、块设备后端 |
+| [`crates/singlefs-harness`](crates/singlefs-harness) | harness 档：单元与集成测试，加上录制器、内存池、理想模型、随机历史、故障注入这些脚手架 |
+| [`crates/singlefs-checker-tier`](crates/singlefs-checker-tier) | checker 档：崩溃态枚举、判定库、崩溃放量、GPU 判器、真设备装置；默认只在提交时跑 |
+| [`crates/singlefs-checker`](crates/singlefs-checker) | 池级 checker：判一个镜像的判决器库，与实现只共享格式常量 |
+| [`crates/singlefs-replay-prefix`](crates/singlefs-replay-prefix) | 恢复重放取前缀、择根、扫环的纯函数核，Verus 验的就是这一份 |
+| [`crates/singlefs-unit-graph`](crates/singlefs-unit-graph) | 函数单元图：Rust 与 WGSL 源码按条目切成单元、取去注释指纹，从入口收闭包、算复用键；只用 std |
+| [`crates/singlefs-reference-filesystem`](crates/singlefs-reference-filesystem) | RefFS：语义级的参照文件系统，只在内存里按 POSIX 操作走 |
+| [`crates/mutations.tsv`](crates/mutations.tsv) | crates 的变异表 |
+| [`scripts/`](scripts/) | 反复要用的脚本，按用途分子目录，各放什么见它的 README |
+| [`litmus/`](litmus/) | herd7 的 litmus 测试 |
+| [`.claude/kb/`](.claude/kb/) | 决策与变更史、实验、欠账表、字节布局表、里程碑规划、调研与避坑 |
+| [`.claude/rules/`](.claude/rules/) | 项目本地规则；共享规则在 `.claude/singlefs-ai-sop/rules/` |
+| [`.claude/gate.d/`](.claude/gate.d/) | 项目本地的门禁阶段与它们的登记表 |
+| [`.claude/agents/`](.claude/agents/)、[`.claude/hooks/`](.claude/hooks/)、[`.claude/skills/`](.claude/skills/) | subagent 定义、Claude Code 钩子、skill |
+| `.claude/singlefs-ai-sop/` | 共享规范与门禁脚本的拷贝，git 忽略，「开工」那一步取来 |
+| [`research/`](research/) | 三方论证的材料与判决（`prompts/`）、实验留存产物（`results/`），都可以整个删掉重取 |
+| [`records/`](records/) | 建设过程 |
+| [`briefs/`](briefs/) | 每次更新的简报，按日期一份：那一版能做什么、验到哪、还没罩到什么。每份简报有中文（默认）、英文（`.en.md`）、日语（`.ja.md`）三个版本 |
 
-## License
+## 许可
 
-Dual-licensed: [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option.
+双许可：[Apache-2.0](LICENSE-APACHE) 或 [MIT](LICENSE-MIT)，任选其一。
 
-Any contribution submitted to and accepted by this project is, as defined by Apache-2.0, licensed under the dual license above, without any additional terms.
+任何提交并被本项目采纳的贡献，按 Apache-2.0 的定义，都将按上述双许可授权，不附加任何额外条款。
