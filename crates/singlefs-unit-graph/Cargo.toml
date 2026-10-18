@@ -1,0 +1,12 @@
+[package]
+name = "singlefs-unit-graph"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "函数单元图：Rust 与 WGSL 源码按条目切成单元、取去注释指纹，从入口按名字与编译目标收闭包、算复用键；只用 std，不依赖工作区任何 crate（测试基础设施库，归 checker 档依赖的一侧）"
+
+[dependencies]
+
+[[bin]]
+name = "unit-graph"
+path = "src/bin/unit_graph.rs"

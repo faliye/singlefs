@@ -11,7 +11,7 @@ use singlefs_format::LINEAGE_CONTAINER_RECORDS;
 use crate::address::{CheckpointTxg, TreeIdentifier};
 use crate::container_tree::{
     append_record_to_the_open_container, ContainerTreeAfterThisPublish, ContainerTreeNodeEntries,
-    ContainerTreeShape, RecordContainer,
+    ContainerTreeShape, NextContainerNumberPastTheTopOfItsRange, RecordContainer,
 };
 use crate::records::LineageRecord;
 use crate::unit::PACKED_TYPE_LINEAGE;
@@ -96,7 +96,9 @@ pub type LineageTreeAfterThisPublish = ContainerTreeAfterThisPublish<LineageReco
 
 /// 往谱系树的开放容器（最右那一片）追加一条谱系记录（管理员回退那次发布）：装得下就追加进最右那片；装满了（或零根）就开一片新容器，
 /// 容器号 = 树里最大号 + 1（零根时 1），出生代 = 这次发布的 checkpoint_txg，出生树 = `lineage_tree`，打包记录类型 5；根满时长高。
-#[must_use]
+///
+/// # Errors
+/// 要开新容器而最右那片的号（盘上读来的）已是 `u64::MAX` ⇒ [`NextContainerNumberPastTheTopOfItsRange`]（C841）。
 pub fn append_lineage_record_to_the_open_container(
     containers_before_this_publish: &[LineageContainer],
     shape_before_this_publish: &ContainerTreeShape,
@@ -105,7 +107,7 @@ pub fn append_lineage_record_to_the_open_container(
     lineage_tree: TreeIdentifier,
     capacity: LineageContainerCapacity,
     node_entries: ContainerTreeNodeEntries,
-) -> LineageTreeAfterThisPublish {
+) -> Result<LineageTreeAfterThisPublish, NextContainerNumberPastTheTopOfItsRange> {
     append_record_to_the_open_container(
         containers_before_this_publish,
         shape_before_this_publish,
@@ -143,7 +145,8 @@ mod tests {
             LINEAGE_TREE,
             LineageContainerCapacity::FromTheContainerFormat,
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         let identity = PackedIdentity {
             birth_tree: LINEAGE_TREE,
             record_type: PACKED_TYPE_LINEAGE,
@@ -174,7 +177,8 @@ mod tests {
             LINEAGE_TREE,
             LineageContainerCapacity::FromTheContainerFormat,
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(
             second.containers,
             vec![LineageContainer {

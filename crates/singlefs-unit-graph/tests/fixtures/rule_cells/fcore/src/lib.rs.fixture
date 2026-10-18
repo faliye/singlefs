@@ -1,0 +1,100 @@
+pub const WIDTH: usize = 4;
+pub trait Device {
+    fn read(&self) -> u32;
+    fn doubled(&self) -> u32 {
+        self.read() * 2
+    }
+}
+pub fn recover(device: &dyn Device) -> u32 {
+    device.read() + 1
+}
+pub fn recover_generic<Readable: Device>(device: &Readable) -> u32 {
+    device.doubled()
+}
+pub struct Money(pub u32);
+impl std::ops::Add for Money {
+    type Output = Money;
+    fn add(self, other: Money) -> Money {
+        Money(self.0 + other.0)
+    }
+}
+impl Money {
+    pub fn zero() -> Money {
+        Money(0)
+    }
+    pub fn tripled(&self) -> u32 {
+        self.0 * 3
+    }
+}
+pub struct Guard;
+impl Drop for Guard {
+    fn drop(&mut self) {
+        let _ = 1;
+    }
+}
+macro_rules! make_constant_function {
+    ($name:ident) => {
+        pub fn $name() -> u32 {
+            5
+        }
+    };
+}
+make_constant_function!(five);
+#[macro_export]
+macro_rules! enum_listing_every_member {
+    ($(#[$attribute:meta])* $visibility:vis enum $name:ident { $($member:ident),* $(,)? }) => {
+        $(#[$attribute])* $visibility enum $name { $($member),* }
+        impl $name {
+            pub const EVERY_MEMBER: &'static [$name] = &[$($name::$member),*];
+        }
+    };
+}
+pub trait Limit {
+    const LIMIT: u32;
+}
+pub fn limit_of<Limited: Limit>() -> u32 {
+    Limited::LIMIT
+}
+pub fn helper() -> u32 {
+    3
+}
+pub static TABLE: [fn() -> u32; 1] = [helper];
+pub fn unrelated() -> u32 {
+    99
+}
+pub struct Buffer {
+    pub bytes: [u8; WIDTH],
+}
+pub fn aliased_target() -> u32 {
+    12
+}
+pub fn shared_name() -> u32 {
+    21
+}
+#[cfg(feature = "wide")]
+pub const LANES: u32 = 8;
+#[cfg(not(feature = "wide"))]
+pub const LANES: u32 = 4;
+#[cfg(feature = "checked")]
+pub fn checked_lanes() -> u32 {
+    LANES
+}
+#[cfg(not(feature = "checked"))]
+pub fn checked_lanes() -> u32 {
+    LANES + 1
+}
+/// 文档注释：只改这一行不该作废。
+pub fn documented() -> u32 {
+    1
+}
+/// 带文档测试的函数。
+///
+/// ```
+/// assert_eq!(fcore::with_example(), 2);
+/// ```
+pub fn with_example() -> u32 {
+    2
+}
+pub fn table_text() -> &'static str {
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/table.txt"))
+}

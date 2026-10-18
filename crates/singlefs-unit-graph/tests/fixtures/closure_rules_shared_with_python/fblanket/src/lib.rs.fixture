@@ -1,0 +1,11 @@
+pub trait Shout {
+    fn shout(&self) -> u32;
+}
+impl<T: Copy> Shout for T {
+    fn shout(&self) -> u32 {
+        6
+    }
+}
+pub fn yell(value: &u32) -> u32 {
+    value.shout()
+}

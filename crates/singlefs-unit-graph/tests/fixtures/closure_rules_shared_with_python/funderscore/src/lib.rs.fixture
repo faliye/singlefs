@@ -1,0 +1,10 @@
+pub const LIMIT: u32 = 4;
+#[cfg(feature = "gpu")]
+const _: () = assert!(LIMIT == 4);
+pub fn pick(value: u32) -> u32 {
+    let _ = value;
+    match value {
+        0 => 1,
+        _ => LIMIT,
+    }
+}

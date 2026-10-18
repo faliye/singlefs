@@ -493,6 +493,9 @@ pub fn geometry_of(
     {
         return Err(crate::Verdict::RegionCountPastTheRegionDeviceFields);
     }
+    if regions == 0 {
+        return Err(crate::Verdict::RegionCountZero);
+    }
     let slots_per_region = u64::from(slot[362]);
     if !(ROOT_RING_SLOTS_PER_REGION_MINIMUM..=ROOT_RING_SLOTS_PER_REGION_MAXIMUM)
         .contains(&slots_per_region)
@@ -533,6 +536,22 @@ pub fn geometry_of(
     if !unit_area_start_slot.is_multiple_of(CLUSTER_SEGMENT_SLOTS) {
         return Err(crate::Verdict::UnitAreaStartOffTheClusterSegmentBoundary);
     }
+    let prime_step = u64::from(read_u32(slot, 363));
+    let chunk_bytes = u64::from(read_u32(slot, 367));
+    // 最末一个根槽的偏移要装得进 u64：`root_slot_positions` 按 基槽 × 槽字节 + 区域 × 步长 × 区块字节 + 槽 × 槽距 算，
+    // 步长与区块字节是盘上读来的 u32，坏盘上两个都顶满、乘以区域号就溢出
+    let last_root_slot_offset = base_slot.checked_mul(SLOT_BYTES).and_then(|base| {
+        let last_region_start = (regions - 1)
+            .checked_mul(prime_step)?
+            .checked_mul(chunk_bytes)?
+            .checked_add(base)?;
+        (slots_per_region - 1)
+            .checked_mul(u64::from(slot_spacing))?
+            .checked_add(last_region_start)
+    });
+    if last_root_slot_offset.is_none() {
+        return Err(crate::Verdict::RootRingSlotOffsetOverflowsTheOffsetSpace);
+    }
     Ok(PoolGeometry {
         filesystem_identifier: view.filesystem_identifier,
         physical_block_size: view.declared_physical_block_size,
@@ -544,8 +563,8 @@ pub fn geometry_of(
         declared_minimum_input_output_bytes: read_u32(slot, 425),
         regions,
         slots_per_region,
-        prime_step: u64::from(read_u32(slot, 363)),
-        chunk_bytes: u64::from(read_u32(slot, 367)),
+        prime_step,
+        chunk_bytes,
         base_slot,
         region_devices: [
             read_u32(slot, 379),
@@ -602,7 +621,8 @@ fn journal_ring_bytes_lie_in_the_supported_range(
 
 /// 单元区起始槽号是 journal 环末尾的下一个槽：同一槽自述的环起点 + 环长向上取整到 16 KiB 槽（D3（空间分配） 已定项 10 ④
 /// 「第一版 = journal 环末尾的下一个槽」；D23（journal 的角色与格式） 已定项 19 ③「单元区起始槽号随环长走」）。
-/// checker 自己按条款算一份，不引实现的 `journal::slot_after_the_journal_ring`（门禁 94 号）。环长是盘上读来的 8 字节：
+/// checker 自己按条款算一份，不引实现的 `journal::slot_after_the_journal_ring`（门禁 checker-independence-and-sync 的
+/// checker-implementation-disjoint 格判 checker 不引实现）。环长是盘上读来的 8 字节：
 /// 槽数不超过 2⁶⁴ ÷ 16384，加环起点溢出时算不相等。
 fn unit_area_start_slot_is_the_slot_after_the_journal_ring(
     journal_ring_start_slot: u64,
@@ -631,7 +651,8 @@ pub enum SystemConfigurationSlotReading {
         offset_in_bytes: u64,
         refused: RefusedSystemConfigurationValue,
     },
-    /// 不自证：读不到、不足 4096 字节、magic 或整槽校验和不对（I-8.5（tail 槽有效集非空） 的「自证过」= magic 与整槽校验和都对）。
+    /// 不自证：读不到、不足 4096 字节、magic 或整槽校验和不对（I-8.5（tail 槽有效集非空） 的「自证过」= magic 与整槽校验和都对）；
+    /// 节点大小不是格式常量的槽也归这里（用户 2026-10-15 定 C840「当自证不过」，[`crate::Verdict::NodeBytesNotTheFormatConstant`]）。
     NotSelfVerified,
     /// 自证过（magic 与整槽校验和都对），而 incompat 位不认得、或 R / S 越界：这一槽不可择（R、S 的既有处置，不动）。它仍是 I-8.5 数的「自证过的槽」：tail 住在自证过的槽里（D23（journal 的角色与格式） 已定项 3）。
     SelfVerifiedButNotChoosable,
@@ -728,21 +749,26 @@ pub const fn value_refused_by_this_reader(verdict: &crate::Verdict) -> bool {
         | crate::Verdict::UnknownRecordType
         | crate::Verdict::RegionCountPastTheRegionDeviceFields
         | crate::Verdict::RootRingSlotsPerRegionOutsideTheFormatInterval
+        | crate::Verdict::RegionCountZero
+        | crate::Verdict::RootRingSlotOffsetOverflowsTheOffsetSpace
         | crate::Verdict::EncryptionReservedBytesNotZero
         | crate::Verdict::EntryWidthZeroWithEntries
         | crate::Verdict::RecordWidthZeroWithRecords
-        | crate::Verdict::UnmountMarkerBitsOtherThanBitZero => false,
+        | crate::Verdict::UnmountMarkerBitsOtherThanBitZero
+        | crate::Verdict::NodeBytesNotTheFormatConstant => false,
     }
 }
 
 /// 一个系统配置槽被拒的理由是不是「它自己证不了自己」：不足 4096 字节、magic 不对、整槽校验和不对
-/// （[`crate::check_system_configuration_slot`] 头三道，过了这三道之后拒的都是自证过的槽）。穷举写全，理由同 [`value_refused_by_this_reader`]。
+/// （[`crate::check_system_configuration_slot`] 头三道），以及节点大小不是格式常量（用户 2026-10-15 定 C840「当自证不过」，
+/// 那一道排在格式版本与 incompat 位之后，但处置与头三道相同）。别的理由拒的都是自证过的槽。穷举写全，理由同 [`value_refused_by_this_reader`]。
 #[must_use]
 pub const fn verdict_says_the_slot_does_not_verify_itself(verdict: &crate::Verdict) -> bool {
     match verdict {
-        crate::Verdict::TooShort | crate::Verdict::BadMagic | crate::Verdict::ChecksumMismatch => {
-            true
-        }
+        crate::Verdict::TooShort
+        | crate::Verdict::BadMagic
+        | crate::Verdict::ChecksumMismatch
+        | crate::Verdict::NodeBytesNotTheFormatConstant => true,
         crate::Verdict::Valid
         | crate::Verdict::FormatVersionNotRecognized
         | crate::Verdict::EncryptionTypeNotOff
@@ -764,6 +790,8 @@ pub const fn verdict_says_the_slot_does_not_verify_itself(verdict: &crate::Verdi
         | crate::Verdict::UnknownRecordType
         | crate::Verdict::RegionCountPastTheRegionDeviceFields
         | crate::Verdict::RootRingSlotsPerRegionOutsideTheFormatInterval
+        | crate::Verdict::RegionCountZero
+        | crate::Verdict::RootRingSlotOffsetOverflowsTheOffsetSpace
         | crate::Verdict::EncryptionReservedBytesNotZero
         | crate::Verdict::EntryWidthZeroWithEntries
         | crate::Verdict::RecordWidthZeroWithRecords
@@ -1030,7 +1058,8 @@ pub fn root_slot_positions(geometry: &PoolGeometry) -> Vec<(u64, u64, u32, u64)>
     let mut positions = Vec::new();
     for region in 0..geometry.regions {
         // 下标在范围内不是这里判的：`geometry_of` 是盘上那一字节进 `PoolGeometry` 的唯一入口，
-        // 它已经把 R > 3 的槽拒成 `Verdict::RegionCountPastTheRegionDeviceFields`、不交出 `PoolGeometry`。
+        // 它已经把 R > 3 的槽拒成 `Verdict::RegionCountPastTheRegionDeviceFields`、R = 0 拒成 `Verdict::RegionCountZero`、
+        // 下面这几步乘加会溢出的拒成 `Verdict::RootRingSlotOffsetOverflowsTheOffsetSpace`，不交出 `PoolGeometry`。
         let device = geometry.region_devices[usize::try_from(region).expect(
             "区域号：geometry_of 判过 R ≤ REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION",
         )];
@@ -1238,7 +1267,7 @@ pub fn judge_root_slots_aligned_to_the_decision_width(
     }
 }
 
-/// 一个系统配置槽是不是自证过（magic 与整槽校验和都对）：I-8.5（tail 槽有效集非空） 与旁路报告都按这个数。
+/// 一个系统配置槽是不是自证过（magic 与整槽校验和都对，节点大小是格式常量）：I-8.5（tail 槽有效集非空） 与旁路报告都按这个数。
 const fn slot_verifies_itself(reading: &SystemConfigurationSlotReading) -> bool {
     match reading {
         SystemConfigurationSlotReading::Usable(..)

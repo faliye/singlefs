@@ -428,12 +428,10 @@ pub(crate) fn while_another_thread_holds_a_temporary_gpu_configuration<Outcome>(
     tag: &str,
     work: impl FnOnce() -> Outcome,
 ) -> (Outcome, PathBuf) {
-    let directory = std::env::temp_dir().join(format!(
-        "singlefs-temporary-gpu-configuration-{tag}-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&directory);
-    std::fs::create_dir_all(&directory).expect("建得了临时目录");
+    let directory = crate::crash_library::ExclusiveTemporaryDirectory::create(&format!(
+        "temporary-gpu-configuration-{tag}"
+    ))
+    .expect("建得了一次性临时目录");
     let temporary_configuration = directory.join("temporary-multi-host.env");
     std::fs::write(
         &temporary_configuration,
@@ -470,7 +468,7 @@ pub(crate) fn while_another_thread_holds_a_temporary_gpu_configuration<Outcome>(
     let outcome = work();
     work_is_done.send(()).expect("拿着锁的那条线程在等");
     holder.join().expect("拿着锁的那条线程没 panic");
-    let _ = std::fs::remove_dir_all(&directory);
+    drop(directory);
     (outcome, temporary_configuration)
 }
 
@@ -478,14 +476,11 @@ pub(crate) fn while_another_thread_holds_a_temporary_gpu_configuration<Outcome>(
 mod tests {
     use super::*;
 
-    fn temporary_directory(tag: &str) -> PathBuf {
-        let directory = std::env::temp_dir().join(format!(
-            "singlefs-gpu-card-configuration-{tag}-{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&directory);
-        std::fs::create_dir_all(&directory).expect("建得了临时目录");
-        directory
+    fn temporary_directory(tag: &str) -> crate::crash_library::ExclusiveTemporaryDirectory {
+        crate::crash_library::ExclusiveTemporaryDirectory::create(&format!(
+            "gpu-card-configuration-{tag}"
+        ))
+        .expect("建得了一次性临时目录")
     }
 
     /// 显卡先后从多机配置读（判决 J5、J11）：清过场取清场之后那一份，没写它退回不清场那一份；没清场取不清场那一份；
@@ -549,7 +544,7 @@ mod tests {
             Ok(None),
             "没有多机配置、没给环境变量：没配显卡先后"
         );
-        let _ = std::fs::remove_dir_all(&directory);
+        drop(directory);
     }
 
     /// 清过场而多机配置只写了不清场那一份显卡先后：报错、点名两个键，不退回不清场那一份（「配了 GPU 卡用不上退 78、不降级」，
@@ -595,7 +590,7 @@ mod tests {
             Ok(Some(1)),
             "环境变量给了照它（驱动挑好的那一份）"
         );
-        let _ = std::fs::remove_dir_all(&directory);
+        drop(directory);
     }
 
     /// 清场之后两份显卡先后都没写而多机配置开了 GPU（只写 `ENABLE_GPU=1` 的那种）：报错、点名两个键与 GPU 开关，不照本机空闲显存挑卡
@@ -626,7 +621,7 @@ mod tests {
             Ok(None),
             "没清场：没配显卡先后，不报错"
         );
-        let _ = std::fs::remove_dir_all(&directory);
+        drop(directory);
     }
 
     /// 多机配置在哪（判决 J11、M4 第 4 条）：给了 `SINGLEFS_MULTI_HOST_CONFIG` 照它（相对路径按仓根，文件不在报错）；没给按 git common-dir
@@ -676,7 +671,7 @@ mod tests {
             .is_err_and(|error| error.contains("SINGLEFS_MULTI_HOST_CONFIG")),
             "给了而不在报错"
         );
-        let _ = std::fs::remove_dir_all(&directory);
+        drop(directory);
     }
 
     /// E5 报告第三节第 3 条（用例在拿进程级环境锁之前读本机配置，读到的是拿着锁的别的用例换上的临时配置），确定地造出那种交错

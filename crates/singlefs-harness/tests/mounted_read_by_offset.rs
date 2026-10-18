@@ -1162,7 +1162,7 @@ fn mount_state_open_refuses_an_extent_key_whose_offset_segment_is_the_unit_index
 /// 中央映射树长成两层（两片叶上面一个根，D8（核心索引结构） 已定项 11）：打开挂载态把整棵树读进内存
 /// （D19（块指针的结构与宽度预算） 已定项 5「挂载态怎么读映射」），之后提示过期的一次解引用照旧是 2 + 1 = 3 次设备读——
 /// 查映射一次设备读都不发，不随映射树有几层变。这是已定项 5 那句「这个读数是根兼叶时量的，多层落地时由用例重量」的重量：
-/// 根兼叶那一档在上面 `a_location_hint_pointing_at_another_slot_...` 里钉着，这里是两层。
+/// 根兼叶那一档在上面 `location_hint_pointing_at_another_slot_still_reads_through_the_central_mapping_and_counts_one_extra_hop` 里钉着，这里是两层。
 /// 判别力：挂载态只读映射树根、不往下读叶，映射里就只剩内部条目、查不到数据单元的 key ⇒ 这一读报 `CentralMappingMiss`。
 #[test]
 fn stale_hint_under_the_two_level_central_mapping_still_costs_three_device_reads_because_the_whole_tree_is_in_the_mount_state(

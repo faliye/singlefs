@@ -62,7 +62,7 @@ impl OnDeviceRunMode {
         OnDeviceRunMode::RaiseRollbackFloor,
     ];
 
-    /// 命令行上的写法（跑批脚本与门禁 55 号按它送参数）。
+    /// 命令行上的写法（跑批脚本与门禁 checker-tier-qemu-device-streams 按它送参数）。
     #[must_use]
     pub const fn argument(self) -> &'static str {
         match self {

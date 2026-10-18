@@ -577,8 +577,9 @@ impl CrashPointReplayFinding {
 
 /// 崩溃点重放的发现表：判红的状态按签名去重（[`CrashPointReplayFindingSignature`]），每个签名记状态数与最先几个样本；另记至少一遍判红的状态数
 /// （一个状态几遍都红只算一次）。只有按段枚举的那几个入口记这一项（签名要状态所在的段与发布）；直接调
-/// [`evaluate_state_for_versions`] 评手摆的状态时它是空的。并片按状态序号从小到大（[`CrashPointReplayFindings::absorb_following_slice`]），
-/// 与线程数、切法无关。
+/// [`evaluate_state_for_versions`] 评手摆的状态时它是空的。判红的状态逐个经 [`CrashPointReplayFindings::record_red_state`] 记进来
+/// （现判时在评那个状态的那一刻，从判定库读回时按库里存的红例行重建）；发现日志里的号按
+/// [`CrashPointReplayFindings::signatures_in_first_state_order`] 排。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CrashPointReplayFindings {
     pub red_states: u64,
@@ -1299,7 +1300,7 @@ pub(crate) fn judge_crash_state_range_of_the_read_back_flow_with_slices(
     )
 }
 
-/// [`visit_crash_state_range`] 的本体：只给已经从判定库读回的流用（崩溃放量判段、过库之后），分片的段照 `segment_slices`
+/// [`judge_crash_state_range_of_the_read_back_flow_with_slices`] 走状态的那一半（逐个交镜像、不判）：只给已经从判定库读回的流用（崩溃放量判段、过库之后），分片的段照 `segment_slices`
 /// （与段同序，不分片的段是 `None`）只走那一截。
 ///
 /// # Panics
@@ -1432,7 +1433,43 @@ pub fn crash_state_enumeration_tables_with_slices(
     expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
     segment_slices: &[Option<CrashPointReplaySegmentSlice>],
 ) -> CrashStateEnumerationTables {
-    let tearable = TearableInPlaceOverwrites::of(base, writes);
+    crash_state_enumeration_tables_with_slices_choosing_the_torn_images(
+        base,
+        writes,
+        segments,
+        expansion,
+        segment_slices,
+        TornImagesOfTheInPlaceOverwrites::Appended,
+    )
+}
+
+/// 枚举写表末尾接不接原地覆写的撕裂镜像（连同它们的重放）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TornImagesOfTheInPlaceOverwrites {
+    /// 崩溃点重放的口径：每次原地覆写（[`TearableInPlaceOverwrites::of`]）取三态，撕裂镜像与重放接在录制流后面。
+    Appended,
+    /// 每次写只取两态（[`TearableInPlaceOverwrites::none`]），枚举写表就是录制流：给定状态表的持久掩码从不点名撕裂态时用
+    /// （随机历史每步的镜像全是「前缀全落、之后一个都没落」）。接了也是从不落的写，只白占掩码的位与它罩住的落点的写数。
+    LeftOut,
+}
+
+/// 同 [`crash_state_enumeration_tables_with_slices`]，撕裂镜像接不接照 `torn_images`。
+///
+/// # Panics
+/// 同 [`crash_state_enumeration_tables_with_slices`]。
+#[must_use]
+pub fn crash_state_enumeration_tables_with_slices_choosing_the_torn_images(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
+    segment_slices: &[Option<CrashPointReplaySegmentSlice>],
+    torn_images: TornImagesOfTheInPlaceOverwrites,
+) -> CrashStateEnumerationTables {
+    let tearable = match torn_images {
+        TornImagesOfTheInPlaceOverwrites::Appended => TearableInPlaceOverwrites::of(base, writes),
+        TornImagesOfTheInPlaceOverwrites::LeftOut => TearableInPlaceOverwrites::none(writes.len()),
+    };
     let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
     let plan = CrashStatePlan::new(
         writes,

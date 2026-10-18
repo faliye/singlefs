@@ -6,7 +6,8 @@
 //! 根槽写）进计划哈希：只差版本表的一对、只差一条根槽写的一对都不互相复用，前缀够不着的那几样不影响前缀复用（R1、M3）；每条流的第一个点
 //! 之前一条根槽写都没有，够得着的版本按基镜像里的根截，几条只差版本表的流在第一个点照样共享（test-script-align-code-r2 判决 J1）。
 //! 根槽写的 txg 不严格递增时判器输入罩着点之后的整段写表（J1 退成整段写表那一支）。基镜像照 journal 恢复会越过它里面最新的根的流
-//! （基镜像是崩溃状态），排计划时就拒（B0 的前提，用户 2026-10-02 定「窄一」）。要 `verdict-store` 特性。
+//! （基镜像是崩溃状态），排计划时就拒（B0 的前提，用户 2026-10-02 定「窄一」）；恢复落到更早的根或落不到根的照收（主 agent 2026-10-15 放宽）。
+//! 要 `verdict-store` 特性。
 #![cfg(feature = "verdict-store")]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -15,9 +16,7 @@ mod common_crash_points;
 
 use singlefs_checker_tier::crash_amplification::record_the_flow_and_read_it_back;
 use singlefs_checker_tier::crash_library::{
-    amplification_unit_tests_library_directory,
-    amplification_unit_tests_library_directory_emptied_at_the_start, LibraryOpenInThisProcess,
-    LibraryRole,
+    DisposableLibraryDirectory, LibraryOpenInThisProcess, LibraryRole,
 };
 use singlefs_checker_tier::crash_state_enumeration::{
     sample_crash_states_on_the_cpu, CrashPointReplayItem,
@@ -41,9 +40,11 @@ use singlefs_checker_tier::crash_amplification::{
     CrashPlan, CrashPointRecorder, CrashPointSpan, RecordingTally, WeightedShares,
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
-use singlefs_checker_tier::verdict_store::{JudgeVersion, VerdictStore};
-use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+use singlefs_checker_tier::verdict_store::{JudgingUnitsFingerprint, VerdictStore};
+use singlefs_core::address::{CheckpointTxg, DeviceOffsetInBytes, InstanceGeneration};
 use singlefs_core::mount::mount_writable;
+use singlefs_core::recovery::{recover, JournalPolicy};
+use singlefs_core::root_record::ROOT_MAGIC;
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter};
 use singlefs_harness::memory_pool::{
     root_identity_of_write, writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion,
@@ -175,50 +176,48 @@ fn prefix_length(plan: &CrashPlan) -> usize {
         .count()
 }
 
-/// 这条用例的库：家目录下流水线单元测试那一类的长期库里以用例标签命名的那一份（`crash_library::amplification_unit_tests_library_directory`），
-/// 用例结束库还在，下一趟照同一套复用：流、路径与块键按摘要复用，这一趟的判定写在这一趟自己的判法版本下（[`fresh_judge_version`]）。
+/// 这条用例的库：一次性目录里的一份空库（`crash_library::DisposableLibraryDirectory`，用户 2026-10-15 定：流水线单测起跑不清长期库，
+/// 空库起跑的单测在一次性目录里建库、用完删），长期库一行不写；这一趟的判定写在这一趟自己的判法单元指纹下（[`fresh_judging_units_fingerprint`]）。
 struct UnitTestLibrary {
+    // 先关库、后删目录：字段按声明的次序丢
     handle: LibraryOpenInThisProcess,
+    _directory: DisposableLibraryDirectory,
 }
 
 impl UnitTestLibrary {
+    /// 同 [`Self::emptied_at_the_start`]：一次性的库每趟都是空的。
     fn new(tag: &str) -> Self {
-        let directory = amplification_unit_tests_library_directory(Some(tag))
-            .expect("流水线单元测试那一类的库目录");
-        Self::opened(directory)
+        Self::emptied_at_the_start(tag)
     }
 
-    /// 同 [`Self::new`]，起跑先清空用例标签命名的那一份目录（`crash_library::amplification_unit_tests_library_directory_emptied_at_the_start`），
-    /// 库建在它底下的 `library`（库只在不存在的目录上建）：整份库的账（哪些块没判、存了几份结论）从空库数起的用例用；
-    /// 上一趟留下的块与结论会算进整份库的账。
+    /// 一次性目录底下的 `library`（库只在不存在的目录上建）：整份库的账（哪些块没判、存了几份结论）从空库数起。
     fn emptied_at_the_start(tag: &str) -> Self {
-        let directory = amplification_unit_tests_library_directory_emptied_at_the_start(tag)
-            .expect("流水线单元测试那一类的库目录清空重建");
-        Self::opened(directory.join("library"))
-    }
-
-    fn opened(directory: std::path::PathBuf) -> Self {
+        let directory = DisposableLibraryDirectory::new(tag).expect("建得了一次性库目录");
+        let library = directory.library();
         let handle =
-            LibraryOpenInThisProcess::open_or_share(&directory, LibraryRole::ThisHostsLibrary)
+            LibraryOpenInThisProcess::open_or_share(&library, LibraryRole::ThisHostsLibrary)
                 .unwrap_or_else(|refusal| {
-                    panic!("开得了用例的库 {}：{refusal}", directory.display())
+                    panic!("开得了用例的库 {}：{refusal}", library.display())
                 });
-        Self { handle }
+        Self {
+            handle,
+            _directory: directory,
+        }
     }
     fn store(&self) -> MutexGuard<'_, VerdictStore> {
         self.handle.lock()
     }
 }
 
-/// 这一趟自己的判法版本（进程号、纳秒与一个流水号的摘要）：长期库里这一版下一块都没判过，用例钉的「A 全判、B 只判尾巴」那一套账每趟都成立；
-/// 别的趟判过的块都在别的版本下，流、路径与块键照摘要复用。判法版本进不进判定的键由这里的用例判，与它的值是什么无关。
-fn fresh_judge_version() -> JudgeVersion {
+/// 这一趟自己的判法单元指纹（进程号、纳秒与一个流水号的摘要）：长期库里这一版下一块都没判过，用例钉的「A 全判、B 只判尾巴」那一套账每趟都成立；
+/// 别的趟判过的块都在别的版本下，流、路径与块键照摘要复用。判法单元指纹进不进判定的键由这里的用例判，与它的值是什么无关。
+fn fresh_judging_units_fingerprint() -> JudgingUnitsFingerprint {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("时钟在 1970 之后")
         .as_nanos();
-    JudgeVersion(sha256_digest(
+    JudgingUnitsFingerprint(sha256_digest(
         format!(
             "fresh-version process={} nanos={nanos} number={}",
             std::process::id(),
@@ -232,7 +231,7 @@ fn fresh_judge_version() -> JudgeVersion {
 fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail() {
     let flow_a = record_flow("prefix-share-a", &content_of(3, 4100), true);
     let flow_b = record_flow("prefix-share-b", &content_of(11, 4100), false);
-    let version = fresh_judge_version();
+    let version = fresh_judging_units_fingerprint();
     let plan_a = plan_crash_points(&flow_a.flow());
     let plan_b = plan_crash_points(&flow_b.flow());
 
@@ -295,8 +294,8 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     );
     assert_eq!(repository_relative_file(file!()), THIS_FILE);
 
-    // 三、判法改了：计划不看判法，树与每个点的复用键都不动；判法版本只在判定行上分（第四段末尾核）
-    let changed_version = fresh_judge_version();
+    // 三、判法改了：计划不看判法，树与每个点的复用键都不动；判法单元指纹只在判定行上分（第四段末尾核）
+    let changed_version = fresh_judging_units_fingerprint();
     assert_ne!(changed_version, version);
     let plan_b_changed = plan_crash_points(&flow_b.flow());
     assert_eq!(plan_b_changed.points.len(), plan_b.points.len());
@@ -337,14 +336,14 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     assert!(unjudged_blocks(&store, &version)
         .expect("对得了账")
         .is_empty());
-    // 判法版本换了：A 的每一块在新版本下都算没判，旧版本的行留着
+    // 判法单元指纹换了：A 的每一块在新版本下都算没判，旧版本的行留着
     let mut report_changed = CoverageReport::default();
     let recording_changed =
         record_crash_points(&mut store, &plan_a, &changed_version, &mut report_changed)
             .expect("录得进");
     assert_eq!(
         recording_changed.blocks_already_judged, 0,
-        "换了判法版本一块都不复用"
+        "换了判法单元指纹一块都不复用"
     );
     assert_eq!(
         unjudged_blocks(&store, &changed_version)
@@ -444,7 +443,8 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
         "按前缀扫就是列子树：根之下的每个节点各一行"
     );
 
-    // 五、改名只动路径索引：把流 B 的第一个点改名（祖先改名），它自己的身份变（名字在身份里），后代的身份不变、路径变、块照样复用
+    // 五、改名只动路径索引：把流 B 的第一个点改名（祖先改名），它自己的身份变（名字在身份里），后代的身份不变、路径变；
+    // 块键只由内容定（名字、身份都不进块键，D13 已定项 17），改了名的那个点连同后代的块全部照样复用，一块都不重核
     let mut renamed_flow = flow_b.flow();
     renamed_flow.crash_points[0].name = format!("renamed_{}", renamed_flow.crash_points[0].name);
     let plan_renamed = plan_crash_points(&renamed_flow);
@@ -463,20 +463,31 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     let recording_renamed =
         record_crash_points(&mut store, &plan_renamed, &version, &mut report_renamed)
             .expect("录得进");
-    let first_blocks = u64::try_from(plan_renamed.points[0].blocks().len()).expect("块数");
     let all_blocks: u64 = plan_renamed
         .points
         .iter()
         .map(|point| u64::try_from(point.blocks().len()).expect("块数"))
         .sum();
+    let block_keys_of_the_first_point = |plan: &CrashPlan| {
+        plan.points[0]
+            .blocks()
+            .iter()
+            .map(|local| plan.points[0].block_key(local))
+            .collect::<Vec<_>>()
+    };
     assert_eq!(
-        recording_renamed.blocks_recorded, first_blocks,
-        "只有改名的那个点要核"
+        block_keys_of_the_first_point(&plan_renamed),
+        block_keys_of_the_first_point(&plan_b),
+        "改名的那个点身份变了，块键逐块不变：名字与身份都不进块键"
+    );
+    assert_eq!(
+        recording_renamed.blocks_recorded, 0,
+        "块键只由内容定：改名的那个点也一块都不重核"
     );
     assert_eq!(
         recording_renamed.blocks_already_judged,
-        all_blocks - first_blocks,
-        "路径不进块键：后代的判定照样复用 {:?}",
+        all_blocks,
+        "名字、身份、路径都不进块键：每一块的判定照样复用 {:?}",
         report_renamed.lines()
     );
     drop(store);
@@ -499,7 +510,7 @@ fn record_and_check(
     store: &mut VerdictStore,
     recorded: &RecordedFlow,
     plan: &CrashPlan,
-    version: &JudgeVersion,
+    version: &JudgingUnitsFingerprint,
 ) -> CheckingTally {
     record_crash_points(store, plan, version, &mut CoverageReport::default()).expect("录得进");
     // 判法只吃库里读回的那一份：流先写进库再读回。
@@ -516,17 +527,17 @@ fn record_and_check(
     .expect("核得完")
 }
 
-/// 复用与剪枝的对照（C605；上游 `test-script-discipline.md`「判定可复用：按输入存，按前缀剪」的剪枝自检）：
-/// 同一条小流 B 开着复用与前缀共享判一次（库里先有共前缀的流 A、和另一个判法版本下判过的 B），再关掉复用（B 独自进一份空库）、
+/// 复用与剪枝的对照（C605；`.claude/rules/test-script-discipline.md`「判定可复用：按输入存，按前缀剪」的剪枝自检）：
+/// 同一条小流 B 开着复用与前缀共享判一次（库里先有共前缀的流 A、和另一个判法单元指纹下判过的 B），再关掉复用（B 独自进一份空库）、
 /// 关掉前缀共享（不分崩溃点、不进库，整条流的状态逐个现判）各判一次，三份逐态相同。
-/// 库里先放的两样都故意判红：A 的尾巴（版本表写错）与旧判法版本下的 B（版本表写错）。判法版本不进判定的键，B 就拿到旧版本的红——
+/// 库里先放的两样都故意判红：A 的尾巴（版本表写错）与旧判法单元指纹下的 B（版本表写错）。判法单元指纹不进判定的键，B 就拿到旧版本的红——
 /// 开着复用的那一份就与另两份不同。只差版本表、只差一条根槽写的那两种一对一的对照在后面几条用例里。
 /// ignore 的点是按登记整批不判的一类、不算剪枝，这两条流没有 ignore 的点。要 `verdict-store` 特性：快档靠 C604 才编进来。
 #[test]
 fn reused_verdicts_equal_state_by_state_the_verdicts_judged_without_the_library_or_the_prefix_split(
 ) {
-    let version = fresh_judge_version();
-    let older_version = fresh_judge_version();
+    let version = fresh_judging_units_fingerprint();
+    let older_version = fresh_judging_units_fingerprint();
     // 尾巴都由公共模块设点：A 与 B 的尾巴同名、同父镜像，只差写下的内容
     let flow_a = with_the_overwritten_version_miswritten(record_flow(
         "reuse-control-a",
@@ -548,7 +559,7 @@ fn reused_verdicts_equal_state_by_state_the_verdicts_judged_without_the_library_
         &expansion,
     );
 
-    // 开着复用与前缀共享：A（尾巴红）→ 旧判法版本下的 B（尾巴红）→ B
+    // 开着复用与前缀共享：A（尾巴红）→ 旧判法单元指纹下的 B（尾巴红）→ B
     let shared = UnitTestLibrary::new("two-flows-reuse-control-shared");
     let mut shared_store = shared.store();
     let checking_a = record_and_check(&mut shared_store, &flow_a, &plan_a, &version);
@@ -652,7 +663,7 @@ fn reused_verdicts_equal_state_by_state_the_verdicts_judged_without_the_library_
     );
     assert!(
         checking_older.red_states > 0,
-        "旧判法版本下的 B 版本表写错，必须红：库里要有一份不该被新判法版本复用的红判定"
+        "旧判法单元指纹下的 B 版本表写错，必须红：库里要有一份不该被新判法单元指纹复用的红判定"
     );
     assert!(
         without_prefix_split
@@ -717,13 +728,13 @@ fn every_state_judged_fresh(
     Some(judged)
 }
 
-/// 同一份库、同一判法版本：先录、核 `first`，再录、核 `later`；交回 `later` 录入时的计数与它在库里读回的逐态判定。
+/// 同一份库、同一判法单元指纹：先录、核 `first`，再录、核 `later`；交回 `later` 录入时的计数与它在库里读回的逐态判定。
 fn judge_in_one_library_and_read_back_the_later(
     first: &RecordedFlow,
     later: &RecordedFlow,
     tag: &str,
 ) -> (RecordingTally, Vec<Option<Vec<String>>>) {
-    let version = fresh_judge_version();
+    let version = fresh_judging_units_fingerprint();
     let library = UnitTestLibrary::new(&format!("two-flows-{tag}"));
     let mut store = library.store();
     record_and_check(
@@ -772,7 +783,7 @@ fn a_healthy_flow_and_its_twin_with_a_miswritten_version_table(
     (healthy, miswritten)
 }
 
-/// R1：只差版本表的一对，版本表写错的那一条先进库、健康的后进（同一判法版本）：健康的那一条读回的每个状态与它现判的相同——
+/// R1：只差版本表的一对，版本表写错的那一条先进库、健康的后进（同一判法单元指纹）：健康的那一条读回的每个状态与它现判的相同——
 /// 尾巴够得着覆盖写那一版，不复用写错那一条的红；前缀够不着它，判器读到的真相同，照样复用。
 #[test]
 fn a_healthy_flow_judged_after_its_twin_with_a_miswritten_version_table_reads_back_its_own_verdicts(
@@ -810,7 +821,7 @@ fn a_healthy_flow_judged_after_its_twin_with_a_miswritten_version_table_reads_ba
     );
 }
 
-/// R1：只差版本表的一对，健康的那一条先进库、版本表写错的后进（同一判法版本）：写错的那一条读回的每个状态与它现判的相同（该红的红），
+/// R1：只差版本表的一对，健康的那一条先进库、版本表写错的后进（同一判法单元指纹）：写错的那一条读回的每个状态与它现判的相同（该红的红），
 /// 尾巴不复用健康那一条的绿；前缀照样复用。
 #[test]
 fn a_flow_with_a_miswritten_version_table_judged_after_its_healthy_twin_reads_back_its_own_verdicts(
@@ -1161,4 +1172,37 @@ fn a_flow_whose_base_image_is_a_crash_state_with_a_journal_record_past_its_newes
         expansion: &expansion,
         crash_points,
     });
+}
+
+/// B0 的前提放宽（主 agent 2026-10-15，`records/2026-10-13-复用键与全仓改名.md`「crates 红批交回」主 agent 判 ①）：恢复落不到根也收。
+/// 两流用例那条流（mkfs → 取号加暖机 → 新池新建文件 → 覆盖写）的基镜像，每块盘的两份系统配置槽（槽 0 与槽距处的槽 1）都抹成 0：
+/// 恢复择不出系统配置、落不到根（`None`），基镜像里 mkfs 写下的根记录还在（最新的根是 `Some`）。排计划照常排出点来，不 panic。
+/// 判别力（`crates/mutations.tsv`）：前提退回「落到的根必须正是最新的那条根」，这条 panic 在 B0 的前提上、红。
+#[test]
+fn a_flow_whose_base_image_has_both_system_configuration_slots_wiped_is_planned_though_its_recovery_lands_on_no_root(
+) {
+    let mut flow = record_flow("both-slots-wiped", &content_of(5, 4100), true);
+    let slot_bytes = usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES)
+        .expect("一份槽的字节数装得进 usize");
+    let spacing = u64::from(geometry().fixed_structure_slot_spacing);
+    for device in flow.base.devices.values_mut() {
+        for slot_offset in [0, spacing] {
+            device.write(DeviceOffsetInBytes(slot_offset), &vec![0u8; slot_bytes]);
+        }
+    }
+    assert_eq!(
+        recover(&flow.base, JournalPolicy::Consult).effective_root,
+        None,
+        "两份系统配置槽都抹掉：基镜像照 journal 恢复落不到根"
+    );
+    assert!(
+        flow.base
+            .devices
+            .values()
+            .flat_map(|device| device.written_sectors().values())
+            .any(|sector| sector.starts_with(&ROOT_MAGIC)),
+        "基镜像里 mkfs 写下的根记录还在（最新的根是 Some），这一对才是放宽之前会拒的那一种"
+    );
+    let plan = plan_crash_points(&flow.flow());
+    assert!(!plan.points.is_empty(), "落不到根的基镜像照常排出点来");
 }

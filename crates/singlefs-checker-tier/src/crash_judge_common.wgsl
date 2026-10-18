@@ -21,7 +21,9 @@ const NONE: u32 = 0xFFFFFFFFu;
 
 const WRITE_WORDS: u32 = 12u;
 const LOCATION_WORDS: u32 = 12u;
-const VERSION_WORDS: u32 = 9u;
+// 版本表每条的字数 VERSION_WORDS、组合掩码的字数 COMBINATION_WORDS_OF_A_VERSION、组合高位那几字的起点
+// VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE 与持久掩码的字数 PERSISTED_MASK_WORDS 由 crash_judge_gpu.rs 的
+// judge_table_layout_wgsl_constants 从 Rust 常量生成、接在源码最前面
 // 版本表第 8 字（crash_judge_tables::VERSION_WORD_CRC_SHIFTED_PAST_SIXTEEN_ZERO_KIBIBYTES）：单元槽的一版，「前 16 KiB 后面接 16 KiB 全零」那 32 KiB 的
 // CRC-32C 异或 16 KiB 全零的 CRC-32C。它再异或一段 16 KiB 的 CRC-32C，就是「这一版前 16 KiB 接那一段」32 KiB 的 CRC-32C（CRC 对异或线性）
 const VERSION_WORD_CRC_SHIFTED_PAST_SIXTEEN_ZERO_KIBIBYTES: u32 = 8u;
@@ -182,7 +184,7 @@ const MAX_DEVICES: u32 = 8u;
 const MAX_FRAMES: u32 = 12u;
 
 var<private> B: array<u32, TABLE_COUNT>;
-var<private> persisted: array<u32, 64>;
+var<private> persisted: array<u32, PERSISTED_MASK_WORDS>;
 var<private> scratch_base: u32;
 var<private> undecidable: u32;
 var<private> record_count: u32;
@@ -430,27 +432,46 @@ fn location_word(location: u32, k: u32) -> u32 {
 fn version_of_location(location: u32) -> u32 {
     let writes_first = location_word(location, 5u);
     let writes_count = location_word(location, 6u);
-    // 组合掩码 64 位：第 i 次写在低字的第 i 位（i < 32）或高字的第 i − 32 位；版本表里第 0 字是低字、第 7 字是高字
-    var combination = vec2<u32>(0u, 0u);
+    // 组合掩码 COMBINATION_WORDS_OF_A_VERSION 个字：第 i 次写在第 i / 32 字的第 i % 32 位（建表时核过一个落点的写不多于这几字装得下的）
+    var combination: array<u32, COMBINATION_WORDS_OF_A_VERSION>;
+    for (var word = 0u; word < COMBINATION_WORDS_OF_A_VERSION; word = word + 1u) {
+        combination[word] = 0u;
+    }
     for (var i = 0u; i < writes_count; i = i + 1u) {
         if (is_persisted(tab(T_LOCATION_WRITES, writes_first + i))) {
-            if (i < 32u) {
-                combination.x = combination.x | (1u << i);
-            } else {
-                combination.y = combination.y | (1u << (i - 32u));
-            }
+            combination[i >> 5u] = combination[i >> 5u] | (1u << (i & 31u));
         }
     }
+    // 这个落点的版本在第 ⌈写数 ÷ 32⌉ 字往后都是 0，只比前面那几字
+    let combination_words_in_use = (writes_count + 31u) / 32u;
     let versions_first = location_word(location, 7u);
     let versions_count = location_word(location, 8u);
     for (var i = 0u; i < versions_count; i = i + 1u) {
         let version_words = (versions_first + i) * VERSION_WORDS;
-        if (tab(T_VERSIONS, version_words) == combination.x && tab(T_VERSIONS, version_words + 7u) == combination.y) {
+        var is_this_version = true;
+        for (var word = 0u; word < combination_words_in_use; word = word + 1u) {
+            if (tab(T_VERSIONS, version_words + version_word_of_the_combination_word(word)) != combination[word]) {
+                is_this_version = false;
+                break;
+            }
+        }
+        if (is_this_version) {
             return versions_first + i;
         }
     }
     undecidable = UNDECIDABLE_NO_VERSION;
     return NONE;
+}
+// 版本表里组合掩码第 word 字在一条版本的第几字（crash_judge_tables::version_word_of_the_combination_word 同一个布局）：
+// 第 0 字在第 0 字、第 1 字在第 7 字（64 位那时候的两个字，偏移不动），其余接在第 8 字之后
+fn version_word_of_the_combination_word(word: u32) -> u32 {
+    if (word == 0u) {
+        return 0u;
+    }
+    if (word == 1u) {
+        return 7u;
+    }
+    return VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE + word - 2u;
 }
 struct Slice {
     version: u32,
@@ -3663,7 +3684,7 @@ fn begin_state(local: u32) {
     if (ordinal_lo < dispatch.block_start_lo) {
         ordinal_hi = ordinal_hi + 1u;
     }
-    for (var word = 0u; word < 64u; word = word + 1u) {
+    for (var word = 0u; word < PERSISTED_MASK_WORDS; word = word + 1u) {
         persisted[word] = 0u;
     }
     // 给定状态表（crash_judge_tables::JudgeStateSource::GivenPersistedSets）：这张表不空，第 k 个状态就是表里第 k 个持久掩码
@@ -3699,8 +3720,8 @@ fn begin_state(local: u32) {
             set_persisted(tab(T_SEGMENT_WRITES, group_first + k));
         }
     }
-    var torn: array<u32, 64>;
-    for (var word = 0u; word < 64u; word = word + 1u) {
+    var torn: array<u32, PERSISTED_MASK_WORDS>;
+    for (var word = 0u; word < PERSISTED_MASK_WORDS; word = word + 1u) {
         torn[word] = 0u;
     }
     if (segment_of_state < segment_count) {

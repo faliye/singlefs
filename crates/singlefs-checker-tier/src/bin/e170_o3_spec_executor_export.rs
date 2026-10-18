@@ -1626,7 +1626,7 @@ struct ResultLines {
 }
 
 impl ResultLines {
-    fn result(&mut self, body: &str) {
+    fn emit_result_line(&mut self, body: &str) {
         self.emitted += 1;
         println!("E7RESULT {body}");
     }
@@ -1755,7 +1755,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 5] {
     let mut failed_checks = 0usize;
     for check in &export.checks {
         failed_checks += usize::from(!check.holds());
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=s1 stream={label} check={} local={} crates={} holds={}",
             check.name,
             field_text(&check.local),
@@ -1763,7 +1763,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 5] {
             check.holds()
         ));
     }
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=stream stream={label} operations={} writes={} segments={} tearable_writes={} calls={} full_states={} quick_tier_states={} sampled_states={}",
         export.operation_count,
         export.write_count,
@@ -1775,13 +1775,13 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 5] {
         export.observations.len()
     ));
     for (call_index, call) in export.calls.iter().enumerate() {
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=call stream={label} call={call_index} label={} first_operation={} return_point={} status=ok",
             call.label, call.first_operation, call.return_point
         ));
     }
     for scan in &export.torn_scans {
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=torn_scan stream={label} segment={} scanned={} found={} wanted={TORN_STATES_PER_SEGMENT}",
             scan.segment_index, scan.scanned, scan.found
         ));
@@ -1818,7 +1818,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 5] {
             .iter()
             .map(|observation| observation.segment_index)
             .collect();
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=batch stream={label} batch={batch} states={} segments_touched={} states_with_a_torn_write={} pool_checker_and_record_checker_both_pass={both_pass} pool_checker_red_states={} record_checker_red_states={} consulted_oracle_red_states={} ignored_oracle_red_states={} consulted_effective_root_none={} consulted_failed_outcomes={}",
             in_batch.len(),
             segments.len(),
@@ -1851,26 +1851,26 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 5] {
         .iter()
         .filter(|observation| !observation.rejudge_matches)
         .count();
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=s4 stream={label} rebuilt_states={} digest_mismatches={}",
         export.rebuilt_states, export.rebuilt_digest_mismatches
     ));
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=crash_facts_mask stream={label} states={} mismatches={mask_mismatches}",
         export.observations.len()
     ));
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=rejudge stream={label} states={} mismatches={rejudge_mismatches}",
         export.observations.len()
     ));
     for file in &export.files {
         match &file.sha256_without_timing {
-            None => lines.result(&format!(
+            None => lines.emit_result_line(&format!(
                 "name=file stream={label} file={} bytes={} sha256={}",
                 file.name, file.bytes, file.sha256
             )),
             Some(without_timing) => {
-                lines.result(&format!(
+                lines.emit_result_line(&format!(
                     "name=file stream={label} file={} sha256_without_timing={without_timing}",
                     file.name
                 ));
@@ -1922,7 +1922,7 @@ fn main() {
         std::process::exit(2);
     }
     let mut lines = ResultLines { emitted: 0 };
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=config segment=s1 streams={} sector_bytes={LOCAL_SECTOR_BYTES} first_batch_divisor={FIRST_BATCH_DIVISOR} second_batch_divisor={SECOND_BATCH_DIVISOR} third_batch_divisor={THIRD_BATCH_DIVISOR} torn_states_per_segment={TORN_STATES_PER_SEGMENT} torn_scan_ordinals_per_segment={TORN_SCAN_ORDINALS_PER_SEGMENT} judge_threads=1 compared_with_a_previous_export={}",
         STREAM_NAMES.len(),
         command_line.compare_with.is_some()
@@ -1930,7 +1930,7 @@ fn main() {
     let mut failed_checks = 0usize;
     for check in stream_independent_checks() {
         failed_checks += usize::from(!check.holds());
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=s1 stream=both check={} local={} crates={} holds={}",
             check.name,
             field_text(&check.local),
@@ -1955,12 +1955,12 @@ fn main() {
             );
             for (file_name, identical, without_timing) in comparisons {
                 v2_differing_files += usize::from(!identical);
-                lines.result(&format!(
+                lines.emit_result_line(&format!(
                     "name=v2 stream={label} file={file_name} identical={identical}"
                 ));
                 if let Some(identical_without_timing) = without_timing {
                     v2_differing_files_without_timing += usize::from(!identical_without_timing);
-                    lines.result(&format!(
+                    lines.emit_result_line(&format!(
                         "name=v2_without_timing stream={label} file={file_name} identical={identical_without_timing}"
                     ));
                 }
@@ -1969,7 +1969,7 @@ fn main() {
     }
     failed_checks += totals[0];
     let [_, rebuilt_digest_mismatches, mask_mismatches, rejudge_mismatches, not_both_pass] = totals;
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={rebuilt_digest_mismatches} crash_facts_mask_mismatches={mask_mismatches} rejudge_mismatches={rejudge_mismatches} states_where_pool_checker_or_record_checker_is_red={not_both_pass} v2_compared={} v2_differing_files={v2_differing_files} v2_differing_files_without_timing={v2_differing_files_without_timing}",
         command_line.compare_with.is_some()
     ));
@@ -3393,7 +3393,7 @@ fn report_bad_stream(lines: &mut ResultLines, export: &BadStreamExport) -> (usiz
     let mut failed_checks = 0usize;
     for check in &export.checks {
         failed_checks += usize::from(!check.holds());
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=bad_s1 stream={label} check={} local={} crates={} holds={}",
             check.name,
             field_text(&check.local),
@@ -3402,7 +3402,7 @@ fn report_bad_stream(lines: &mut ResultLines, export: &BadStreamExport) -> (usiz
         ));
     }
     for (base, found, candidates) in &export.bases {
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=bad_base stream={label} base={} call={} persisted_writes={} layer0_match={} layer0_candidates={candidates} notes={}",
             base.label,
             base.call.map_or_else(|| "-".to_string(), |call| call.to_string()),
@@ -3437,7 +3437,7 @@ fn report_bad_stream(lines: &mut ResultLines, export: &BadStreamExport) -> (usiz
             .or_insert((0, 0));
         tally.0 += 1;
         tally.1 += usize::from(both_pass);
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=bad_row stream={label} row={row_id} name={} family={} base={} patches={} patched_bytes={} expected={} expected_landing={} base_digest={} patched_digest={} {verdict_text} impl_both_pass={both_pass}",
             row.name,
             row.family.label(),
@@ -3451,12 +3451,12 @@ fn report_bad_stream(lines: &mut ResultLines, export: &BadStreamExport) -> (usiz
         ));
     }
     for (family, (rows, both_pass)) in &both_pass_by_family {
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=bad_family stream={label} family={family} rows={rows} impl_both_pass={both_pass}"
         ));
     }
     for file in &export.files {
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=bad_file stream={label} file={} bytes={} sha256={}",
             file.name, file.bytes, file.sha256
         ));
@@ -3522,7 +3522,7 @@ fn run_bad_states(command_line: &BadStatesCommandLine) -> i32 {
         u64::from_str_radix(&command_line.seed_hex, 16).expect("16 个十六进制字符，命令行判过");
     let mut generator = SplitMix64 { state: seed };
     let mut lines = ResultLines { emitted: 0 };
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=config segment=s3 mode={} seed_hex={} seed_u64={seed} blind_rows_per_stream={BLIND_ROWS_PER_STREAM} patched_writes_kind=system_configuration_slot judge_threads=1",
         command_line.table_version.config_mode_text(),
         command_line.seed_hex
@@ -3544,7 +3544,7 @@ fn run_bad_states(command_line: &BadStatesCommandLine) -> i32 {
         panics += stream_panics;
         rows += export.rows.len();
     }
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=verdict bad_s1_failed_checks={failed_checks} bad_rows={rows} impl_panics={panics}"
     ));
     lines.finish();

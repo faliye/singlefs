@@ -1,0 +1,11 @@
+pub mod store {
+    pub fn open() -> u32 {
+        1
+    }
+}
+pub mod user {
+    use crate::store::{self};
+    pub fn reader() -> u32 {
+        store::open()
+    }
+}

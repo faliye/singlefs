@@ -756,6 +756,27 @@ fn slots_claimed_by_a_unit_header(s: Slice) -> u32 {
     return 0u;
 }
 
+// walk::instance_carriers 的 some_slot_is_unreadable 在根环槽上的那一半（池级 checker 按择到的那一份几何读 R × S 个根槽，
+// image::root_slot_positions 同一个算式）：有一槽 CPU 的读者交 None 就是读不全——那一槽的盘不在池里（卸载掉电之后只剩一块盘，
+// 丢掉的那块住着根环区域），或越过盘尾（memory_pool 的 PoolReader::read）。GPU 判表只在池里的盘、盘内建根槽落点
+// （crash_judge_tables::enumerate_locations），读那几槽交没有版本的切片，与 CPU 读不出同一个结局；这里照 CPU 的条件现判，不看切片
+fn checker_some_root_slot_is_unreadable(g: CheckerSlot) -> bool {
+    for (var region = 0u; region < g.regions; region = region + 1u) {
+        let device = checker_region_device(g, region);
+        if (!device_is_in_the_pool(device)) {
+            return true;
+        }
+        for (var slot = 0u; slot < g.slots_per_region; slot = slot + 1u) {
+            let offset = add64(slot_to_bytes(g.base_slot), u64_of(region * g.prime_step * g.chunk_bytes + slot * g.spacing));
+            let root_slot_bytes = u64_of(g.physical_block_size);
+            if (add64_overflows(offset, root_slot_bytes) || lt64(device_bytes(), add64(offset, root_slot_bytes))) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // 是不是有载体的实例代号高于 threshold（根、每块盘的 journal 记录、每块盘的单元头写序）
 fn some_instance_carrier_exceeds(threshold: u32, g: CheckerSlot) -> bool {
     for (var i = 0u; i < root_count; i = i + 1u) {
@@ -4780,10 +4801,19 @@ fn judge_the_pool_from_its_system_configuration_slots(device_count: u32) -> u32 
             pool_lowest = min(pool_lowest, highest);
         }
     }
-    // image::judge_instance_carriers：GPU 的表里每个落点都读得出（没有 some_slot_is_unreadable 那一支），两句各判一次
+    // walk::judge_instance_carriers：① 读不全（some_slot_is_unreadable）时报射程里一部分没判、不判；② 读不全时只在找到较大者时判（红），
+    // 读得全时照判。读不全只出在根环槽上（checker_some_root_slot_is_unreadable）：journal 记录槽与单元头都在池里的盘上读、在盘内
     if (every_device_has_a_slot) {
-        judge(INVARIANT_I_7_7, !some_instance_carrier_exceeds(pool_highest, g));
-        judge(INVARIANT_I_7_7, !(pool_lowest < pool_highest && some_instance_carrier_exceeds(pool_lowest, g)));
+        let some_root_slot_is_unreadable = checker_some_root_slot_is_unreadable(g);
+        if (some_root_slot_is_unreadable) {
+            mark_part_of_the_range_not_judged(INVARIANT_I_7_7);
+        } else {
+            judge(INVARIANT_I_7_7, !some_instance_carrier_exceeds(pool_highest, g));
+        }
+        let witnessed_by_one_device = pool_lowest < pool_highest && some_instance_carrier_exceeds(pool_lowest, g);
+        if (witnessed_by_one_device || !some_root_slot_is_unreadable) {
+            judge(INVARIANT_I_7_7, !witnessed_by_one_device);
+        }
     }
     // journal 那几条与点名项的位置条目次序，逐盘
     for (var d = 0u; d < device_count; d = d + 1u) {

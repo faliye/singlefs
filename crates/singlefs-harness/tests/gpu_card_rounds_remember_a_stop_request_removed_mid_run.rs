@@ -308,7 +308,7 @@ enum EndOfTheRun {
 }
 
 #[derive(Clone, Debug)]
-struct RunResult {
+struct CardRoundRunOutcome {
     end: EndOfTheRun,
     /// 整趟收尾时 `stopped_early`：显存不够那一支恒真，别的照这一趟的叫停（实现第 5591 行那一句，改到 [`StopRequestRememberedInThisRun`]）。
     stopped_early: bool,
@@ -317,7 +317,7 @@ struct RunResult {
 }
 
 /// 同外层循环：每轮挑没报过的卡、上卡的是装得下的那几张，第 0 张起、一张带一张；收工之后照 `RoundsOfTheCards::after_the_round` 走。
-fn run_once(script: &RunScript, seed: u64) -> RunResult {
+fn run_once(script: &RunScript, seed: u64) -> CardRoundRunOutcome {
     let mut random = SplitMixRandom { state: seed };
     let events = AtomicUsize::new(0);
     let read_the_stop_file_now = || stop_file_is_there(script, events.load(Ordering::SeqCst));
@@ -328,7 +328,7 @@ fn run_once(script: &RunScript, seed: u64) -> RunResult {
     let finish = |end: EndOfTheRun, gpu_memory_was_short: bool| {
         events.fetch_add(1, Ordering::SeqCst);
         let stopped_early = gpu_memory_was_short || stop_request.is_requested();
-        RunResult {
+        CardRoundRunOutcome {
             end,
             stopped_early,
             stop_seen_and_the_file_gone_at_the_end: stop_request.is_requested()

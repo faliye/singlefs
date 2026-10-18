@@ -21,8 +21,7 @@ use singlefs_checker_tier::crash_judge_tables::{
     build_judge_tables, JudgeFlow, JudgeLocationKind, MAXIMUM_LOCATION_SECTORS,
 };
 use singlefs_checker_tier::crash_library::{
-    repository_root_of_this_crate, two_stages, CrashLibraryClass, ItemManifest, ItemName,
-    StageOutcome,
+    two_stages, CrashLibraryClass, ItemManifest, ItemName, RecordingInputsDigest, StageOutcome,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
@@ -39,7 +38,7 @@ const LARGEST_EXPANDED_SEGMENT_WRITES: usize = 6;
 const CPU_REFERENCE_ITEM: &str = "crash_judge_tables_versions/cpu-reference";
 const CPU_REFERENCE_TABLE_IN_THE_MANIFEST: &str = "cpu_reference_given_states_table";
 
-/// 崩溃镜像那一侧（CPU 参照）的输入先入库、再读回：录入段把这张给定状态表按摘要写进对拍那一类的库、按项名登清单；判段凭项名读清单、
+/// 崩溃镜像那一侧（CPU 参照）的输入先入库、再读回：录入段把这张给定状态表按摘要写进库、按录入键（这张表的摘要）登清单；判段照同一张表读清单、
 /// 按摘要读回、核摘要，交回读回的那一份。只录那一趟交 `None`（用例当场返回）。
 fn crash_images_read_back_from_the_pairing_library(
     table: &RecordedGivenStatesTable,
@@ -49,8 +48,8 @@ fn crash_images_read_back_from_the_pairing_library(
     let item = ItemName::new(CPU_REFERENCE_ITEM).expect("写死的项名合规矩");
     two_stages(
         CrashLibraryClass::JudgeTablesPairing,
-        &repository_root_of_this_crate(),
         &item,
+        &RecordingInputsDigest(digest),
         |library| {
             library
                 .lock()

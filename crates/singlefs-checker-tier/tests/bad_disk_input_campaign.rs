@@ -57,7 +57,7 @@ const DETERMINISM_OPERATIONS_PER_HISTORY: usize = 4;
 /// 偏移 0、1、7、10、14、15、19 一步都没有——那几段从 mkfs 起、一次文件都没发出来）。
 const SEED_OFFSET_OF_THE_FIXED_HISTORY: u64 = 4;
 
-/// 坏盘输入这一段历史本身怎么跑：不跑每一步的池级 checker（活盘面上每一步的 checker 由门禁 74 号那五段罩着，
+/// 坏盘输入这一段历史本身怎么跑：不跑每一步的池级 checker（活盘面上每一步的 checker 由门禁 harness-model-differential-and-scenarios 那五段罩着，
 /// 这一段的预算全给坏镜像），两块 4 GiB 的盘。
 const UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES: HistoryExecution = HistoryExecution {
     per_step_checker: PerStepChecker::Skipped,
@@ -1000,27 +1000,24 @@ const SITES_DELETED_BY_THE_THIRD_BATCH: [KnownPanicSite; 3] = [
         registry_name: "记账树里没有 inode 号水位那一行",
         panic_survey_item: "R11",
         file: "crates/singlefs-core/src/transaction.rs",
+        // 撞到它的坏法：「记账树里 inode 号水位那一行被改挂到别的标签上」；挂载之后第一次发布取水位。
         message_fragment: "每次发布都写 inode 号水位那一行",
-        how_it_is_reached:
-            "「记账树里 inode 号水位那一行被改挂到别的标签上」；挂载之后第一次发布取水位",
         expected_hits_in_the_fast_tier: 8,
     },
     KnownPanicSite {
         registry_name: "释放判定里的两盘同槽断言",
         panic_survey_item: "R5",
         file: "crates/singlefs-core/src/transaction.rs",
+        // 撞到它的坏法：「一条指针的两条位置条目槽号不等」；`placements_to_release_via_mapping`。
         message_fragment: "两盘同槽",
-        how_it_is_reached:
-            "「一条指针的两条位置条目槽号不等」；`placements_to_release_via_mapping`",
         expected_hits_in_the_fast_tier: 8,
     },
     KnownPanicSite {
         registry_name: "挂载重建分配器时的两盘同槽断言",
         panic_survey_item: "R5",
         file: "crates/singlefs-core/src/mount.rs",
+        // 撞到它的坏法：「一条指针的两条位置条目槽号不等」；`format_time_allocator` 的 `placement_of`。
         message_fragment: "两盘同槽",
-        how_it_is_reached:
-            "「一条指针的两条位置条目槽号不等」；`format_time_allocator` 的 `placement_of`",
         expected_hits_in_the_fast_tier: 4,
     },
 ];

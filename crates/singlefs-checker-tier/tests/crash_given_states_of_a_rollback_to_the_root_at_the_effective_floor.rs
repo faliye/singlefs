@@ -1,4 +1,4 @@
-//! checker 档模块：crash_point_replay_progress、crash_given_states、crash_library、crash_amplification
+//! checker 档模块：crash_point_replay_progress、crash_given_states、crash_amplification
 //! 回退到 txg = F_生效 的根（D16（发布语义） 已定项 1「回退候选集」：txg ≥ F_生效）那一段历史上，每一步之后的镜像池级 checker 一条都不红。
 //! harness 档同一段历史的那条用例（`crates/singlefs-harness/tests/random_histories.rs` 的
 //! `rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_that_version`）只核实现的结局与理想模型：每一步的池级 checker
@@ -17,7 +17,6 @@ use singlefs_checker_tier::crash_amplification::{
 use singlefs_checker_tier::crash_given_states::{
     GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
 };
-use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_harness::fault_injection::SharedFaultPlan;
 use singlefs_harness::gpu_memory_ledger::gpu_not_run_line;
@@ -28,9 +27,6 @@ use singlefs_harness::history::{
 };
 use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::SharedStream;
-
-/// 这份文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
-const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/crash_given_states_of_a_rollback_to_the_root_at_the_effective_floor.rs";
 
 /// 这条用例的名字（引擎项名与本次未跑那一行用它）。
 const TEST_NAME: &str =
@@ -98,12 +94,9 @@ fn rolling_back_to_the_root_at_the_effective_floor_leaves_the_pool_checker_green
         let _one_test_at_a_time = one_test_changes_the_environment_at_a_time();
         GivenStatesEngine::start_from_environment(
             GivenStatesItem {
-                item_name: TEST_NAME.to_string(),
-                setting_file: THIS_FILE.to_string(),
-                seeds_and_scale: "fixed".to_string(),
+                item_name: format!("{}::fixed", TEST_NAME),
             },
             &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &repository_root_of_this_crate(),
         )
         .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
     };

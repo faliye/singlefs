@@ -681,6 +681,42 @@ fn the_new_pool_file_creation_stream_keeps_its_segments_and_takes_the_third_stat
     );
 }
 
+/// 观察者「撕裂的系统配置槽」（`torn_slots`）：轮换那一段每次槽写在这个状态的盘上既不是旧槽也不是新槽的算撕裂，撕裂的那一槽新旧都读不出、
+/// 在持久集合里记成「原来那次写没持久」；数撕裂的状态与槽。观察者的身份是这个 fn 的闭包键（入口登记在
+/// `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`），另读的输入（轮换的写与每槽新旧两份）按摘要进它的版本。
+fn count_the_torn_system_configuration_slots(
+    rotation_writes: &[usize],
+    old_and_new_of_each_rotation_write: &[(Vec<u8>, Vec<u8>)],
+    writes: &[RetainedWrite],
+    image: &CrashImage<'_>,
+    counts: &mut CrashPointReplayObserverCounts,
+) {
+    let mut torn_in_this_state = 0u64;
+    for (write_index, (old, new)) in rotation_writes
+        .iter()
+        .zip(old_and_new_of_each_rotation_write)
+    {
+        let write = &writes[*write_index];
+        let on_disk = PoolReader::read(image, write.device, write.offset, 4096).expect("槽读得出");
+        if on_disk != *old && on_disk != *new {
+            torn_in_this_state += 1;
+            assert!(
+                SystemConfiguration::parse_slot(&on_disk).is_err(),
+                "撕裂的那一槽新旧都读不出（盘 {}）",
+                write.device.0
+            );
+            assert!(
+                !image.persisted[*write_index],
+                "撕裂那一态在持久集合里是「原来那次写没持久」"
+            );
+        }
+    }
+    if torn_in_this_state > 0 {
+        counts.add("states_with_a_torn_slot", 1);
+        counts.add("torn_slots", torn_in_this_state);
+    }
+}
+
 /// 撕裂那一态真生成镜像、喂给恢复、checker 与记录核对器：新池新建文件流只展开最后一段（A 的根之后两块盘的系统配置槽轮换），
 /// 3² − 1 个状态再加全部持久那一个。每个状态按盘上字节认那两次写怎么落（与这次写的字节相同是落了、与写之前的相同是没落、
 /// 都不同是撕裂）：撕裂的那一槽解不开（新旧都读不出），五个状态里至少一槽撕裂；恢复读出文件、oracle、池级 checker、
@@ -739,31 +775,13 @@ fn the_torn_state_of_a_system_configuration_rotation_is_generated_and_fed_to_the
                    image: &CrashImage<'_>,
                    _consulted_report: &RecoveryReport,
                    counts: &mut CrashPointReplayObserverCounts| {
-        let mut torn_in_this_state = 0u64;
-        for (write_index, (old, new)) in rotation_writes
-            .iter()
-            .zip(&old_and_new_of_each_rotation_write)
-        {
-            let write = &writes[*write_index];
-            let on_disk =
-                PoolReader::read(image, write.device, write.offset, 4096).expect("槽读得出");
-            if on_disk != *old && on_disk != *new {
-                torn_in_this_state += 1;
-                assert!(
-                    SystemConfiguration::parse_slot(&on_disk).is_err(),
-                    "撕裂的那一槽新旧都读不出（盘 {}）",
-                    write.device.0
-                );
-                assert!(
-                    !image.persisted[*write_index],
-                    "撕裂那一态在持久集合里是「原来那次写没持久」"
-                );
-            }
-        }
-        if torn_in_this_state > 0 {
-            counts.add("states_with_a_torn_slot", 1);
-            counts.add("torn_slots", torn_in_this_state);
-        }
+        count_the_torn_system_configuration_slots(
+            &rotation_writes,
+            &old_and_new_of_each_rotation_write,
+            &writes,
+            image,
+            counts,
+        );
     };
     // 观察者另读的输入：轮换那几次写的下标与每一次写的旧、新两份字节（写表本身在流的输入里）
     let observer_extra_inputs_digest = singlefs_harness::sha256::sha256_digest(

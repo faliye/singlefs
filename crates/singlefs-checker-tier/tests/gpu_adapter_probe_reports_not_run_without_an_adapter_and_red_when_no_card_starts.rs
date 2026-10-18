@@ -1,4 +1,4 @@
-//! checker 档模块：gpu_unit_checks
+//! checker 档模块：crash_library、gpu_unit_checks
 //! GPU 对拍用例开跑前的取卡判定（`gpu_unit_checks::gpu_test_start::decide_gpu_test_start`）每一种结局各一条：起好了卡照跑；
 //! Vulkan 里没有 NVIDIA 独显、PCI 上也没有 NVIDIA 显示控制器，报「本次未跑」；Vulkan 枚举出 NVIDIA 独显而一张卡都没起来，判红；
 //! PCI 上有 NVIDIA 显示控制器而 Vulkan 枚举不出（驱动坏了，C620），判红；Vulkan 里没有、PCI 总线看得见而设备表读不出（分不清没卡与驱动坏），判红。
@@ -6,6 +6,7 @@
 //! 判定是纯函数、读 PCI 用假的设备目录，不要显卡；模块挂 `gpu` 特性，跟着快档带特性那一趟跑。
 #![cfg(feature = "gpu")]
 
+use singlefs_checker_tier::crash_library::ExclusiveTemporaryDirectory;
 use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
     count_nvidia_display_controllers, decide_gpu_test_start, not_run_line,
     read_pci_nvidia_display_controllers_under, AdapterDeviceKind, EnumeratedAdapter, GpuTestStart,
@@ -25,16 +26,13 @@ fn nvidia_discrete_gpu() -> EnumeratedAdapter {
     }
 }
 
-/// 一棵假的 sysfs 设备目录：每个设备一个子目录，`vendor` 与 `class` 照写；`None` 的那个文件不建。用完由调用方删。
+/// 一棵假的 sysfs 设备目录：每个设备一个子目录，`vendor` 与 `class` 照写；`None` 的那个文件不建。丢掉时连同整棵删掉。
 fn fake_pci_devices_directory(
     test_name: &str,
     devices: &[(&str, Option<&str>, Option<&str>)],
-) -> std::path::PathBuf {
-    let directory = std::env::temp_dir().join(format!(
-        "singlefs-gpu-test-start-pci-{}-{test_name}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&directory);
+) -> ExclusiveTemporaryDirectory {
+    let directory = ExclusiveTemporaryDirectory::create(&format!("gpu-test-start-pci-{test_name}"))
+        .expect("建得了一次性临时目录");
     for (address, vendor_text, class_text) in devices {
         let device_directory = directory.join(address);
         std::fs::create_dir_all(&device_directory).expect("临时目录建得出");
@@ -199,7 +197,7 @@ fn a_fake_pci_devices_directory_with_two_nvidia_cards_counts_their_two_display_c
         ],
     );
     let counted = read_pci_nvidia_display_controllers_under(&directory);
-    let _ = std::fs::remove_dir_all(&directory);
+    drop(directory);
     assert_eq!(
         counted,
         PciNvidiaDisplayControllers::Counted {
@@ -219,7 +217,7 @@ fn a_pci_device_without_a_class_file_makes_the_listing_unreadable() {
         ],
     );
     let counted = read_pci_nvidia_display_controllers_under(&directory);
-    let _ = std::fs::remove_dir_all(&directory);
+    drop(directory);
     assert!(
         matches!(
             counted,

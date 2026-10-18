@@ -1,4 +1,4 @@
-//! checker 档模块：crash、crash_state_enumeration、crash_point_replay_progress、crash_given_states、crash_library、crash_amplification
+//! checker 档模块：crash、crash_state_enumeration、crash_point_replay_progress、crash_given_states、crash_amplification
 //! 里程碑「新池新建文件」步 7 的验收：拿步 5 的录制流按 D13（验证路线） 已定项 4 枚举全部崩溃状态，每个状态跑三件事——
 //! 步 6 的恢复与 oracle、池级 checker（一元判决）、记录核对器（二元判决）。oracle 那一半的计数与 E142（新池新建文件的干跑）
 //! 第八次跑产物的 `name=layer0` / `name=journal_effect` 行逐字对；再加一组靶向的阳性对照。
@@ -35,7 +35,6 @@ use singlefs_checker_tier::crash_amplification::{
 use singlefs_checker_tier::crash_given_states::{
     GivenStateConclusion, GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
 };
-use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_checker_tier::crash_state_enumeration::{
     enumerate_crash_states_selecting, enumerate_crash_states_with_expansion,
@@ -544,6 +543,21 @@ fn single_version(prepared: &Prepared) -> Vec<PublishedVersion> {
     }]
 }
 
+/// 观察者「分配代读集」（`allocation_generation_read_sets`）：这个状态上逐个现算 I-3.10 那一类，记进观察者计数。观察者的身份是这个 fn 的
+/// 闭包键（入口登记在 `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`）。
+fn count_the_allocation_generation_read_set(
+    prepared: &Prepared,
+    image: &CrashImage<'_>,
+    counts: &mut CrashPointReplayObserverCounts,
+) {
+    AllocationGenerationReadSetCounts::count_into(
+        prepared
+            .transaction_publish
+            .allocation_generation_read_set_in(image.writes, &image.persisted),
+        counts,
+    );
+}
+
 /// 按段枚举（`expansion` 决定每一段怎么展开），每个状态上逐个现算 I-3.10 那一类，记进观察者计数（按块存进库，判段重建）。
 /// 只录那一趟与只判自己那一份的那一趟交回 `None`：整条流的计数等判完全部块的那一趟。
 fn enumerate_counting_allocation_generation_read_sets(
@@ -556,12 +570,7 @@ fn enumerate_counting_allocation_generation_read_sets(
                    image: &CrashImage<'_>,
                    _consulted_report: &RecoveryReport,
                    counts: &mut CrashPointReplayObserverCounts| {
-        AllocationGenerationReadSetCounts::count_into(
-            prepared
-                .transaction_publish
-                .allocation_generation_read_set_in(image.writes, &image.persisted),
-            counts,
-        );
+        count_the_allocation_generation_read_set(prepared, image, counts);
     };
     let item_name = format!("new_pool_file_creation::{item_label}");
     let tally = enumerate_crash_states_with_expansion(
@@ -589,7 +598,7 @@ fn enumerate_counting_allocation_generation_read_sets(
     Some((tally, read_set_counts))
 }
 
-/// 崩溃点重放取样多线程与单线程的对拍（`.claude/singlefs-ai-sop/rules/test-script-discipline.md`「编译与算法都要快」：多线程与单线程的对拍进快档）：
+/// 崩溃点重放取样多线程与单线程的对拍（`.claude/rules/test-script-discipline.md`「编译与算法都要快」：多线程与单线程的对拍进快档）：
 /// 同一条流、同一个序号段（整条流的前 20 个状态，三条线程切成不止一段），单线程那一支与三条线程那一支交回的都是整条流的状态数，
 /// 每个序号各判一次，逐序号的红项与两遍恢复的结局逐字相同。判别力：多线程那一支交回判了几个、或把各段看到的整条流状态数相加
 /// （`crates/mutations.tsv` 那两行）。
@@ -928,12 +937,9 @@ fn pool_checker_conclusion_through_the_given_states_engine(
         let _one_test_at_a_time = one_test_changes_the_environment_at_a_time();
         GivenStatesEngine::start_from_environment(
             GivenStatesItem {
-                item_name: "crash_enumeration_new_pool_file_creation_stream".to_string(),
-                setting_file: THIS_FILE.to_string(),
-                seeds_and_scale: "fixed".to_string(),
+                item_name: "crash_enumeration_new_pool_file_creation_stream::fixed".to_string(),
             },
             &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &repository_root_of_this_crate(),
         )
         .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
     };

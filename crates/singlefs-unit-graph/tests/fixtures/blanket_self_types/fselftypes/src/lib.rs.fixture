@@ -1,0 +1,137 @@
+pub struct Plain;
+pub trait ForTheParameter {
+    fn for_the_parameter(&self) -> u32;
+}
+impl<Element> ForTheParameter for Element {
+    fn for_the_parameter(&self) -> u32 {
+        1
+    }
+}
+fn accepts_for_the_parameter<Thing: ForTheParameter>(_thing: Thing) {}
+pub fn reaches_for_the_parameter() {
+    accepts_for_the_parameter(());
+}
+pub trait ByReference {
+    fn by_reference(&self) -> u32;
+}
+impl<Element> ByReference for &Element {
+    fn by_reference(&self) -> u32 {
+        2
+    }
+}
+fn accepts_by_reference<Thing: ByReference>(_thing: Thing) {}
+pub fn reaches_by_reference() {
+    accepts_by_reference(());
+}
+pub trait ByMutableReference {
+    fn by_mutable_reference(&self) -> u32;
+}
+impl<Element> ByMutableReference for &mut Element {
+    fn by_mutable_reference(&self) -> u32 {
+        3
+    }
+}
+fn accepts_by_mutable_reference<Thing: ByMutableReference>(_thing: Thing) {}
+pub fn reaches_by_mutable_reference() {
+    accepts_by_mutable_reference(());
+}
+pub trait InABox {
+    fn in_a_box(&self) -> u32;
+}
+impl<Element> InABox for Box<Element> {
+    fn in_a_box(&self) -> u32 {
+        4
+    }
+}
+fn accepts_in_a_box<Thing: InABox>(_thing: Thing) {}
+pub fn reaches_in_a_box() {
+    accepts_in_a_box(());
+}
+pub trait InAVector {
+    fn in_a_vector(&self) -> u32;
+}
+impl<Element> InAVector for Vec<Element> {
+    fn in_a_vector(&self) -> u32 {
+        5
+    }
+}
+fn accepts_in_a_vector<Thing: InAVector>(_thing: Thing) {}
+pub fn reaches_in_a_vector() {
+    accepts_in_a_vector(());
+}
+pub trait InATupleLeadingWithTheParameter {
+    fn in_a_tuple_leading_with_the_parameter(&self) -> u32;
+}
+impl<Element> InATupleLeadingWithTheParameter for (Element, u32) {
+    fn in_a_tuple_leading_with_the_parameter(&self) -> u32 {
+        6
+    }
+}
+fn accepts_in_a_tuple_leading_with_the_parameter<Thing: InATupleLeadingWithTheParameter>(_thing: Thing) {}
+pub fn reaches_in_a_tuple_leading_with_the_parameter() {
+    accepts_in_a_tuple_leading_with_the_parameter(());
+}
+pub trait InATupleTrailingWithTheParameter {
+    fn in_a_tuple_trailing_with_the_parameter(&self) -> u32;
+}
+impl<Element> InATupleTrailingWithTheParameter for (u32, Element) {
+    fn in_a_tuple_trailing_with_the_parameter(&self) -> u32 {
+        7
+    }
+}
+fn accepts_in_a_tuple_trailing_with_the_parameter<Thing: InATupleTrailingWithTheParameter>(_thing: Thing) {}
+pub fn reaches_in_a_tuple_trailing_with_the_parameter() {
+    accepts_in_a_tuple_trailing_with_the_parameter(());
+}
+pub trait InASlice {
+    fn in_a_slice(&self) -> u32;
+}
+impl<Element> InASlice for [Element] {
+    fn in_a_slice(&self) -> u32 {
+        8
+    }
+}
+fn accepts_in_a_slice<Thing: InASlice>(_thing: Thing) {}
+pub fn reaches_in_a_slice() {
+    accepts_in_a_slice(());
+}
+pub trait InAnArray {
+    fn in_an_array(&self) -> u32;
+}
+impl<Element, const LENGTH: usize> InAnArray for [Element; LENGTH] {
+    fn in_an_array(&self) -> u32 {
+        9
+    }
+}
+fn accepts_in_an_array<Thing: InAnArray>(_thing: Thing) {}
+pub fn reaches_in_an_array() {
+    accepts_in_an_array(());
+}
+pub trait InAnOptionalBox {
+    fn in_an_optional_box(&self) -> u32;
+}
+impl<Element> InAnOptionalBox for Option<Box<Element>> {
+    fn in_an_optional_box(&self) -> u32 {
+        10
+    }
+}
+fn accepts_in_an_optional_box<Thing: InAnOptionalBox>(_thing: Thing) {}
+pub fn reaches_in_an_optional_box() {
+    accepts_in_an_optional_box(());
+}
+pub trait OnAConcreteType {
+    fn on_a_concrete_type(&self) -> u32;
+}
+impl OnAConcreteType for Plain {
+    fn on_a_concrete_type(&self) -> u32 {
+        11
+    }
+}
+fn accepts_on_a_concrete_type<Thing: OnAConcreteType>(_thing: Thing) {}
+pub fn reaches_on_a_concrete_type() {
+    accepts_on_a_concrete_type(());
+}
+pub fn reaches_on_a_concrete_type_naming_it() -> Plain {
+    accepts_on_a_concrete_type(Plain);
+    Plain
+}

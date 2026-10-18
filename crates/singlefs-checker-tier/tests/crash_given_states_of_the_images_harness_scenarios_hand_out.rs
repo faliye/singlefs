@@ -167,8 +167,8 @@ use common_given_states_of_harness_scenario_images::{
     judge_the_images_a_harness_scenario_hands_out_under_the_container_capacity_knobs,
     judge_the_images_a_harness_scenario_hands_out_when_it_hands_out_none, mismatches_of_the_images,
     start_the_engine, start_the_engine_on_the_library_of_the_test, the_run_counts,
-    ConclusionsOfAnImage, JudgedAfreshRegardlessOfTheExpectations, LibraryOfTheTestAtTheStart,
-    WhenTheScenarioHandsOutNoImage,
+    ConclusionsOfAnImage, JudgedAfreshRegardlessOfTheExpectations, LibraryOfTheTest,
+    LibraryOfTheTestAtTheStart, WhenTheScenarioHandsOutNoImage,
 };
 use common_images_for_the_checker_tier::{
     PoolCheckerExpectation, PoolCheckerImage, PoolCheckerImages,
@@ -186,15 +186,9 @@ use {
     singlefs_checker_tier::crash_amplification::{
         GivenStatesEngine, GivenStatesItem, GivenStatesRun,
     },
-    singlefs_checker_tier::crash_library::{
-        repository_root_of_this_crate, CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
-    },
+    singlefs_checker_tier::crash_library::CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
     singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity,
 };
-
-/// 这份测试文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取；共用模块经 `crate::THIS_FILE` 读它）。
-const THIS_FILE: &str =
-    "crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs";
 
 // ============================== 场景：每份 harness 测试文件一组，与 harness 档的用例同名 ==============================
 
@@ -3586,9 +3580,7 @@ fn words_of_the_paired_images_judged_under(
         .host()
         .expect("调用方给的机器角色是 local 或 peer");
     let cards = if gpu_enabled {
-        common_gpu_cards_of_the_caller::card_priority_value_of_the_caller(
-            &repository_root_of_this_crate(),
-        )
+        common_gpu_cards_of_the_caller::card_priority_value_of_the_caller()
     } else {
         String::new()
     };
@@ -3612,12 +3604,9 @@ fn words_of_the_paired_images_judged_under(
     let environment = CrashAmplificationEnvironment::cleared_then_set(&settings);
     let engine = GivenStatesEngine::start_from_environment_putting_a_fault_on_the_gpu_side(
         GivenStatesItem {
-            item_name: ITEM_NAME.to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale: "gpu-and-cpu-pairing".to_string(),
+            item_name: format!("{}::gpu-and-cpu-pairing", ITEM_NAME),
         },
         &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root_of_this_crate(),
         fault,
     )
     .expect("引擎照这一趟的配置起得来");
@@ -3643,9 +3632,9 @@ fn paired_images_judged_on_the_gpu_and_on_the_cpu(
     fault: singlefs_checker_tier::crash_amplification::FaultPutOnTheGpuSide,
 ) -> PairedRuns {
     let directory_of = |run: &str| {
-        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
-            &format!("harness-scenario-images-gpu-pairing-{tag}-{run}"),
-        )
+        singlefs_checker_tier::crash_library::DisposableLibraryDirectory::new(&format!(
+            "harness-scenario-images-gpu-pairing-{tag}-{run}"
+        ))
         .expect("流水线单元测试那一类里这条用例的目录")
     };
     let images = images_of_the_paired_scenarios();
@@ -3841,6 +3830,10 @@ fn the_abandoned_root_the_pool_checker_names_comes_back_with_the_conclusions_reu
         "given-states-named-abandoned-root-reused",
     );
     let table = table_of_one_image("被抛弃根那一半判红的镜像", &image);
+    // 两趟交同一份库（第二趟读第一趟写下的）：这一份在两趟之间传，不按用例名重算
+    let Some(library_of_the_test) = LibraryOfTheTest::create_or_report_not_run(TEST_NAME) else {
+        return;
+    };
     let mut runs = Vec::new();
     for library_at_the_start in [
         LibraryOfTheTestAtTheStart::EmptiedWhenTheRecordStageRuns,
@@ -3848,7 +3841,7 @@ fn the_abandoned_root_the_pool_checker_names_comes_back_with_the_conclusions_reu
     ] {
         let engine = start_the_engine_on_the_library_of_the_test(
             TEST_NAME,
-            Some(TEST_NAME),
+            Some(&library_of_the_test),
             library_at_the_start,
         );
         let judged = judge_one_image(
@@ -3925,10 +3918,7 @@ fn conclusions_of_a_table_judged_with_the_gpu(
         GpuConfigurationOfTheCaller, CARDS_BY_PRIORITY_KEY, HOST_ROLE_ENVIRONMENT_VARIABLE,
         MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
     };
-    let directory =
-        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
-            tag,
-        )
+    let directory = singlefs_checker_tier::crash_library::DisposableLibraryDirectory::new(tag)
         .expect("流水线单元测试那一类里这条用例的目录");
     let configuration = directory.join("multi-host.env");
     std::fs::write(
@@ -3945,9 +3935,7 @@ fn conclusions_of_a_table_judged_with_the_gpu(
         .host()
         .expect("调用方给的机器角色是 local 或 peer");
     let cards = if gpu_enabled {
-        common_gpu_cards_of_the_caller::card_priority_value_of_the_caller(
-            &repository_root_of_this_crate(),
-        )
+        common_gpu_cards_of_the_caller::card_priority_value_of_the_caller()
     } else {
         String::new()
     };
@@ -3971,12 +3959,12 @@ fn conclusions_of_a_table_judged_with_the_gpu(
     let environment = CrashAmplificationEnvironment::cleared_then_set(&settings);
     let engine = GivenStatesEngine::start_from_environment(
         GivenStatesItem {
-            item_name: ITEM_NAME.to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale: format!("abandoned-root-named-on-the-gpu-and-the-cpu {tag}"),
+            item_name: format!(
+                "{}::abandoned-root-named-on-the-gpu-and-the-cpu {tag}",
+                ITEM_NAME
+            ),
         },
         &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root_of_this_crate(),
     )
     .expect("引擎照这一趟的配置起得来");
     let judged = engine
@@ -4085,7 +4073,10 @@ fn two_tables_of_one_name_and_one_image_under_different_container_capacity_knobs
         expected: PoolCheckerExpectation::only_the_named_invariants(),
         the_gpu_may_refuse_its_tables_because: None,
     };
-    let engine = start_the_engine(TEST_NAME, Some(TEST_NAME));
+    let Some(library_of_the_test) = LibraryOfTheTest::create_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let engine = start_the_engine(TEST_NAME, Some(&library_of_the_test));
     let under_the_product_capacity =
         judge_one_image(&engine, &image, ContainerCapacityKnobs::PRODUCT);
     let under_the_tombstone_knob = judge_one_image(
@@ -4266,4 +4257,44 @@ fn an_accounting_leaf_wider_than_its_field_table_is_judged_alike_on_the_gpu_and_
         gpu_state.words, cpu_state.words,
         "两趟的对拍字相同（违例位、判到位、两遍恢复落到的根）"
     );
+}
+
+/// 用例自己那一份一次性的库落在这个进程独占的目录里（`LibraryOfTheTest`）：同一个用例名建两份，库目录不同，各在自己那一份一次性目录底下
+/// （目录名带进程号：两个进程同跑这个测试二进制各是各的，不按用例名落在临时目录下同一处——那样录入段开头清库会删掉另一个进程正在用的库）；
+/// 丢掉一份只删那一份，另一份里的库还在。判别力（`crates/mutations.tsv`）：库目录退回按名字落在临时目录下同一处，两份撞成一处，这条红。
+#[test]
+fn two_libraries_of_one_test_name_in_one_process_are_different_directories_named_by_the_process() {
+    const TEST_NAME: &str =
+        "two_libraries_of_one_test_name_in_one_process_are_different_directories_named_by_the_process";
+    let Some(one) = LibraryOfTheTest::create_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(another) = LibraryOfTheTest::create_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    assert_ne!(
+        one.library(),
+        another.library(),
+        "同一个用例名的两份库是两个目录"
+    );
+    let process_identifier = std::process::id().to_string();
+    for library in [one.library(), another.library()] {
+        let holder_name = library
+            .parent()
+            .and_then(std::path::Path::file_name)
+            .and_then(std::ffi::OsStr::to_str)
+            .unwrap_or_else(|| panic!("库目录 {} 有一层名字可读的上层目录", library.display()));
+        assert!(
+            holder_name.contains(&process_identifier),
+            "库目录的上层 {holder_name} 带这个进程的进程号 {process_identifier}"
+        );
+    }
+    std::fs::create_dir_all(another.library()).expect("另一份库目录建得出");
+    let holder_of_the_dropped = one.library().parent().expect("库目录有上层").to_path_buf();
+    drop(one);
+    assert!(
+        !holder_of_the_dropped.exists(),
+        "丢掉的那一份连上层一起删掉"
+    );
+    assert!(another.library().exists(), "丢掉一份不碰另一份的库");
 }

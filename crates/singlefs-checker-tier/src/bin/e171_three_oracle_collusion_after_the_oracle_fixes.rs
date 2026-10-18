@@ -3818,7 +3818,7 @@ fn stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(
     if unattributed_panic_states == 0 {
         return None;
     }
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=verdict s1_failed_checks={failed_checks} s13=false q5_not_run=unattributed_panic piece_panic_states={} unattributed_panic_states={unattributed_panic_states}",
         piece_panic_states_text(&piece_panic_states_of(observations))
     ));
@@ -5396,7 +5396,7 @@ struct ResultLines {
 }
 
 impl ResultLines {
-    fn result(&mut self, body: &str) {
+    fn emit_result_line(&mut self, body: &str) {
         self.emitted += 1;
         match &mut self.collected {
             Some(collected) => collected.push(body.to_string()),
@@ -7035,12 +7035,9 @@ fn given_states_engine_of_this_experiment(
     ENGINE.get_or_init(|| {
         singlefs_checker_tier::crash_amplification::GivenStatesEngine::start_from_environment(
             singlefs_checker_tier::crash_amplification::GivenStatesItem {
-                item_name: "e171_three_oracle_collusion_after_the_oracle_fixes".to_string(),
-                setting_file: CRASH_POINT_REPLAY_SAMPLING_ITEM.setting_file.to_string(),
-                seeds_and_scale: "fixed".to_string(),
+                item_name: "e171_three_oracle_collusion_after_the_oracle_fixes::fixed".to_string(),
             },
             &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
         )
         .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
     })
@@ -7149,7 +7146,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> StreamTotals
     let mut totals = StreamTotals::default();
     for check in &export.checks {
         totals.failed_checks += usize::from(!check.holds());
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=s1 stream={label} check={} local={} crates={} holds={}",
             check.name,
             field_text(&check.local),
@@ -7161,7 +7158,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> StreamTotals
         .ending
         .as_ref()
         .map_or_else(|| "pipeline_panicked".to_string(), ending_text);
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=stream stream={label} ending={ending} exported={} not_exported_why={} operations={} writes={} segments={} tearable_writes={} calls={} full_states={} quick_tier_states={} sampled_states={} model_stopped_at_call={} reference_filesystem_segments={} reference_filesystem_stopped={} comparison_judged_calls_before_the_first_panic={}",
         export.not_exported.is_none(),
         export
@@ -7191,7 +7188,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> StreamTotals
     for (call_index, call) in export.calls.iter().enumerate() {
         totals.comparison_red_calls +=
             usize::from(matches!(call.model, ModelVerdictOfCall::Disagrees { .. }));
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=call stream={label} call={call_index} label={} first_operation={} return_point={} status={} o1_comparison={} return_value_sha256={} memory_objects_sha256={}",
             call.label,
             call.first_operation,
@@ -7205,7 +7202,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> StreamTotals
         ));
     }
     for scan in &export.torn_scans {
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=torn_scan stream={label} segment={} scanned={} found={} wanted={TORN_STATES_PER_SEGMENT}",
             scan.segment_index, scan.scanned, scan.found
         ));
@@ -7229,16 +7226,16 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> StreamTotals
         .filter(|observation| !observation.pool_checker_matches_the_judgement)
         .count();
     totals.rebuilt_digest_mismatches = export.rebuilt_digest_mismatches;
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=s4 stream={label} rebuilt_states={} digest_mismatches={}",
         export.rebuilt_states, export.rebuilt_digest_mismatches
     ));
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=crash_facts_mask stream={label} states={} mismatches={}",
         export.observations.len(),
         totals.mask_mismatches
     ));
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=s3 stream={label} states={} o2_direct_differs_from_judge_crash_image={}",
         export.observations.len(),
         totals.s3_mismatches
@@ -7286,7 +7283,7 @@ fn report_batch(
         .iter()
         .map(|observation| observation.segment_index)
         .collect();
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=batch stream={label} batch={batch} states={} segments_touched={} states_with_a_torn_write={} o1_crash_judge_red={} o1_crash_judge_green={} o1_crash_judge_not_applicable={} o1_crash_judge_off={} o1_reference_filesystem_red={} o1_reference_filesystem_green={} o1_reference_filesystem_abstained={} o1_reference_filesystem_off={} recovery_panic_states={} o2_red={o2_red} o2_matches_judgement_false={} judge_crash_image_pool_checker_red={} record_checker_red_states={} consulted_oracle_red_states={} ignored_oracle_red_states={} consulted_effective_root_none={} consulted_failed_outcomes={} piece_panic_states={}",
         in_batch.len(),
         segments.len(),
@@ -7321,7 +7318,7 @@ fn report_batch(
                 kinds
             });
     for (kind, states) in abstention_kinds {
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=reference_filesystem_abstentions stream={label} batch={batch} kind={} states={states}",
             field_text(kind)
         ));
@@ -7361,7 +7358,7 @@ fn report_batch(
         totals.undecidable_branch_states += probe_count_where(&undecidable);
         totals.witness_refusals_without_either_branch += without_either;
         totals.counter_branch_states_that_mounted += counter_branch_mounted;
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=probe_batch stream={label} batch={batch} probed_states={} mounted={} refused={} refused_for_the_witness={} undecidable_branch={} undecidable_branch_judged_legal={} counter_branch={} counter_branch_judged_legal={counter_branch_legal} counter_branch_judged_illegal={} witness_refusals_without_either_branch={without_either} counter_branch_mounted={counter_branch_mounted}",
             probes.len(),
             probe_count_where(&|probe| probe.mount == "mounted"),
@@ -7376,7 +7373,7 @@ fn report_batch(
             .iter()
             .filter(|(_, probe)| counter_branch(probe) || undecidable(probe))
         {
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=probe_state stream={label} batch={batch} ordinal={} segment={} landing_sha256={} undecidable_branch={} counter_branch={} witnessed_counter={} selected_version={} mount={} refusal={} on_the_d23_list={} second_crop={}",
                 observation.ordinal,
                 observation.segment_index,
@@ -7423,12 +7420,12 @@ fn report_stage_times(label: &str, batch: u8, in_batch: &[&StateObservation]) {
 fn report_files_and_timing(lines: &mut ResultLines, label: &str, export: &StreamExport) {
     for file in &export.files {
         match &file.sha256_without_timing {
-            None => lines.result(&format!(
+            None => lines.emit_result_line(&format!(
                 "name=file stream={label} file={} bytes={} sha256={}",
                 file.name, file.bytes, file.sha256
             )),
             Some(without_timing) => {
-                lines.result(&format!(
+                lines.emit_result_line(&format!(
                     "name=file stream={label} file={} sha256_without_timing={without_timing}",
                     file.name
                 ));
@@ -7677,7 +7674,7 @@ fn run_dump(command_line: &CommandLine) -> i32 {
         emitted: 0,
         collected: None,
     };
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=config segment=s1 mode={} streams={} sector_bytes={LOCAL_SECTOR_BYTES} first_batch_divisor={FIRST_BATCH_DIVISOR} second_batch_divisor={SECOND_BATCH_DIVISOR} third_batch_divisor={THIRD_BATCH_DIVISOR} torn_states_per_segment={TORN_STATES_PER_SEGMENT} torn_scan_ordinals_per_segment={TORN_SCAN_ORDINALS_PER_SEGMENT} third_batch_sampled={} positive_control={} disabled_oracle={} writable_mount_probe={}",
         if run_kind == RunKind::Baseline { "baseline" } else { "row" },
         command_line
@@ -7702,7 +7699,7 @@ fn run_dump(command_line: &CommandLine) -> i32 {
         independent.extend(confirmed_loss_form_checks_against_the_crates());
         for check in independent {
             failed_checks += usize::from(!check.holds());
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=s1 stream=independent check={} local={} crates={} holds={}",
                 check.name,
                 field_text(&check.local),
@@ -7739,7 +7736,7 @@ fn run_dump(command_line: &CommandLine) -> i32 {
         add_stream_totals(&mut totals, &stream_totals);
     }
     failed_checks += totals.failed_checks;
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={} crash_facts_mask_mismatches={} s3_o2_judgement_mismatches={} s9_failed_checks={s9_failed} streams_not_exported={streams_not_exported} o1_comparison_red_calls={} o1_crash_judge_red_states={} o1_reference_filesystem_red_states={} o2_red_states={} recovery_panic_states={} probed_states={} counter_branch_states={} counter_branch_states_judged_legal={} undecidable_branch_states={} witness_refusals_without_either_branch={} counter_branch_states_that_mounted={} piece_panic_states={} unattributed_panic_states={}",
         totals.rebuilt_digest_mismatches,
         totals.mask_mismatches,
@@ -8168,13 +8165,13 @@ fn run_confirmed_loss_form(command_line: &ConfirmedLossCommandLine) -> i32 {
     } else {
         "main_before_the_first_barrier_of_call_3"
     };
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=config segment=s1 mode=confirmed-loss-form sampling_point={sampling_point}"
     ));
     let mut failed_checks = 0usize;
     for check in confirmed_loss_form_checks_against_the_crates() {
         failed_checks += usize::from(!check.holds());
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=s1 stream=confirmed_loss_form check={} local={} crates={} holds={}",
             check.name,
             field_text(&check.local),
@@ -8265,10 +8262,10 @@ fn judge_the_confirmed_loss_shapes(
     let sampling_point = shapes.sampling_point;
     if let Some(shape_name) = shape_without_a_root_write(&shapes) {
         // 那一形截出来的写流里没有可判的根槽写：对拍、阳性对照与类核对都不跑，不是 S13；Q5 记「不够判」、不进判定。
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=q5 sampling_point={sampling_point} not_run=no_root_write shape={shape_name}"
         ));
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=verdict s1_failed_checks={failed_checks} s13=false q5_not_run=no_root_write piece_panic_states=- unattributed_panic_states=0"
         ));
         lines.finish();
@@ -8284,7 +8281,7 @@ fn judge_the_confirmed_loss_shapes(
             .iter()
             .filter(|call| **call == Some(CONFIRMED_LOSS_IN_FLIGHT_CALL))
             .count();
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=q5_equivalence_pairing in_flight_writes_kept={in_flight_writes_kept} states={} product_of_the_choices={} class_states={} classes={} mismatching_states={} crash_judge_not_applicable_states={} {} s13={}",
             pairing.states,
             pairing.product_of_the_choices,
@@ -8299,11 +8296,11 @@ fn judge_the_confirmed_loss_shapes(
             equivalence_check_fields(&pairing.classification, &pairing.checks),
             pairing.stops_at_s13()
         ));
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=q5_partition sampling_point=pairing {}",
             partition_fields(&pairing.classification, &pairing.checks)
         ));
-        lines.result(&q5_piece_panics_line("pairing", &pairing.observations));
+        lines.emit_result_line(&q5_piece_panics_line("pairing", &pairing.observations));
         // S1（修订 5 第 5.2 节）：对拍那一行打的实际截的 k 与分法里的 C 写数相等。
         let kept_check = StopCheck::new(
             "equivalence_pairing_in_flight_writes_kept_equal_the_partition",
@@ -8311,7 +8308,7 @@ fn judge_the_confirmed_loss_shapes(
             pairing.classification.in_flight_writes,
         );
         failed_checks += usize::from(!kept_check.holds());
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=s1 stream=confirmed_loss_form check={} local={} crates={} holds={}",
             kept_check.name,
             field_text(&kept_check.local),
@@ -8326,7 +8323,7 @@ fn judge_the_confirmed_loss_shapes(
             return exit_code;
         }
         if pairing.stops_at_s13() {
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=verdict s1_failed_checks={failed_checks} s13=equivalence_pairing q5_not_run=equivalence_pairing_failed piece_panic_states=- unattributed_panic_states=0"
             ));
             lines.finish();
@@ -8337,7 +8334,7 @@ fn judge_the_confirmed_loss_shapes(
             &pairing,
             shapes.piece_panic_injections.piece_panic_control.as_ref(),
         );
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=q5_piece_panic_control states={} pool_checker={} ignored_recovery={} record_checker={} other_pieces={} consulted_recovery={} consulted_recovery_of_the_plain_pairing={} o1_columns_differing_from_the_plain_pairing={} mismatching_states={} s13={} holds={}",
             control.states,
             control.piece_panic_states[JudgingPiece::PoolChecker.position()],
@@ -8351,7 +8348,7 @@ fn judge_the_confirmed_loss_shapes(
             control.stops_at_s13,
             control.holds()
         ));
-        lines.result(&q5_piece_panics_line(
+        lines.emit_result_line(&q5_piece_panics_line(
             "piece_panic_control",
             &control.observations,
         ));
@@ -8364,7 +8361,7 @@ fn judge_the_confirmed_loss_shapes(
         }
         if !control.holds() {
             // 失败 F9（修订 5 第 5.7 节）：甲那条管子接错了，主取样点不跑、不记成「O1 盲」。
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=verdict s1_failed_checks={failed_checks} s13=false q5_not_run=piece_panic_control_failed piece_panic_states=- unattributed_panic_states=0"
             ));
             lines.finish();
@@ -8386,7 +8383,7 @@ fn judge_the_confirmed_loss_shapes(
         .calls
         .get(CONFIRMED_LOSS_IN_FLIGHT_CALL)
         .is_some_and(|call| call.outcome != CallOutcome::InFlightAtTheTruncation);
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=q5_shape sampling_point={sampling_point} removed_barriers={} root_writes_made_plain={} truncation={} operations_kept={} confirmed_root={} confirmed_call_returned_before_the_truncation={} in_flight_call_returned={in_flight_returned}",
         field_text(&format!("{:?}", shape.removed_barriers)),
         field_text(&format!("{:?}", shape.root_writes_made_plain)),
@@ -8407,10 +8404,10 @@ fn judge_the_confirmed_loss_shapes(
     let (export, totals, stops_at_s13) = if command_line.truncate_at_the_return_point {
         // 方向相反的取样点照读法 7 全枚举（修订 2 的五个候选都不改它）；态数超上限不跑。
         if product > CONFIRMED_LOSS_STATE_LIMIT {
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=q5 sampling_point={sampling_point} not_run=too_many_states states={product} limit={CONFIRMED_LOSS_STATE_LIMIT}"
             ));
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=verdict s1_failed_checks={failed_checks} q5_not_run=too_many_states piece_panic_states=- unattributed_panic_states=0"
             ));
             lines.finish();
@@ -8429,7 +8426,7 @@ fn judge_the_confirmed_loss_shapes(
         let s9 = s9_checks_of_a_stream(&export);
         export.checks.extend(s9);
         let totals = report_stream(lines, &export);
-        lines.result(&q5_piece_panics_line("reverse", &export.observations));
+        lines.emit_result_line(&q5_piece_panics_line("reverse", &export.observations));
         if let Some(exit_code) = stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(
             lines,
             failed_checks + totals.failed_checks,
@@ -8461,16 +8458,16 @@ fn judge_the_confirmed_loss_shapes(
             CONFIRMED_LOSS_STATE_LIMIT,
         );
         if classification.stopped_at_the_state_limit {
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=q5_equivalence sampling_point={sampling_point} {} s13={}",
                 equivalence_check_fields(&classification, &EquivalenceCheckCounts::default()),
                 equivalence_stops_at_s13(&classification, &EquivalenceCheckCounts::default())
             ));
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=q5_partition sampling_point={sampling_point} {}",
                 partition_fields(&classification, &EquivalenceCheckCounts::default())
             ));
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=verdict s1_failed_checks={failed_checks} s13=state_limit q5_not_run=too_many_states_after_refinement piece_panic_states=- unattributed_panic_states=0"
             ));
             lines.finish();
@@ -8491,7 +8488,7 @@ fn judge_the_confirmed_loss_shapes(
         let s9 = s9_checks_of_a_stream(&export);
         export.checks.extend(s9);
         let totals = report_stream(lines, &export);
-        lines.result(&q5_piece_panics_line("main", &export.observations));
+        lines.emit_result_line(&q5_piece_panics_line("main", &export.observations));
         if let Some(exit_code) = stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(
             lines,
             failed_checks + totals.failed_checks,
@@ -8503,11 +8500,11 @@ fn judge_the_confirmed_loss_shapes(
             // 第二道（第一道是修订 5 第 5.3 节的 [`shape_without_a_root_write`]）：这一形截出来的写流里没有可判的根槽写
             // （`export_prepared_stream` 记 `no_root_write_to_judge`）：类核对没走到，不是 S13；记 Q5 没跑、不进判定
             // （登记「主 agent 认定：25-3a 装置返工交回」第 6 条）。
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=q5 sampling_point={sampling_point} not_run=no_root_write not_exported_why={}",
                 field_text(why)
             ));
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=verdict s1_failed_checks={} s4_digest_mismatches={} s3_o2_judgement_mismatches={} states=0 s13=false q5_not_run=no_root_write piece_panic_states={} unattributed_panic_states={}",
                 failed_checks + totals.failed_checks,
                 totals.rebuilt_digest_mismatches,
@@ -8525,12 +8522,12 @@ fn judge_the_confirmed_loss_shapes(
                 &export.observations,
                 CONFIRMED_LOSS_IN_FLIGHT_CALL,
             );
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=q5_equivalence sampling_point={sampling_point} {} s13={}",
                 equivalence_check_fields(&classification, &evaluation.checks),
                 equivalence_stops_at_s13(&classification, &evaluation.checks)
             ));
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=q5_partition sampling_point={sampling_point} {}",
                 partition_fields(&classification, &evaluation.checks)
             ));
@@ -8540,7 +8537,7 @@ fn judge_the_confirmed_loss_shapes(
                         lost_the_confirmed_version(class.consulted_root, confirmed)
                     })
                     .map_or_else(|| "none".to_string(), |lost| lost.to_string());
-                lines.result(&format!(
+                lines.emit_result_line(&format!(
                     "name=q5_class sampling_point={sampling_point} keyed_landing={} in_flight_writes={} states={} consulted_root={} lost_the_confirmed_version={lost} crash_judge={} reference_filesystem={}",
                     class.keyed_landing,
                     class.key.in_flight_writes_landed.word(),
@@ -8568,7 +8565,7 @@ fn judge_the_confirmed_loss_shapes(
         }
     };
     failed_checks += totals.failed_checks;
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={} s3_o2_judgement_mismatches={} states={} s13={stops_at_s13} piece_panic_states={} unattributed_panic_states={}",
         totals.rebuilt_digest_mismatches,
         totals.s3_mismatches,
@@ -8655,7 +8652,7 @@ fn report_the_confirmed_loss(
     derived_by: &str,
 ) {
     let Some(confirmed_root) = confirmed_root else {
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=q5 sampling_point={sampling_point} confirmed_root=none{derived_by}"
         ));
         return;
@@ -8696,7 +8693,7 @@ fn report_the_confirmed_loss(
         .filter(|row| row.consulted_root.is_none())
         .map(|row| row.states)
         .sum();
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=q5 sampling_point={sampling_point} states={states} last_segment_writes={last_segment_writes} last_segment_tearable_writes={tearable} product_of_the_choices={product} a10_states_equal_the_product={} lost_the_confirmed_version={} reference_filesystem_red={} model_crash_judge_red={} both_green={} reference_filesystem_abstained={} reference_filesystem_judge_panic={} model_crash_judge_judge_panic={} not_lost_states={} not_lost_o1_red={} states_without_a_root={without_a_root}{derived_by}",
         states == product,
         states_of(&lost, &every_row),
@@ -8723,7 +8720,7 @@ fn report_the_confirmed_loss(
         }
     }
     for (landed, (lost_states, reference_filesystem_red_states, model_red_states)) in by_landed {
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=q5_trajectory sampling_point={sampling_point} writes_landed_in_the_last_segment={landed} lost_states={lost_states} reference_filesystem_red={reference_filesystem_red_states} model_crash_judge_red={model_red_states}"
         ));
     }
@@ -9891,7 +9888,7 @@ fn run_stream_constants(streams: &[StreamName]) -> i32 {
         emitted: 0,
         collected: None,
     };
-    lines.result("name=config segment=s1 mode=stream-constants");
+    lines.emit_result_line("name=config segment=s1 mode=stream-constants");
     let mut failed_checks = 0usize;
     let mut checks = stream_independent_checks();
     checks.extend(stream_independent_checks_of_the_first_rerun());
@@ -9920,7 +9917,7 @@ fn run_stream_constants(streams: &[StreamName]) -> i32 {
             full_states,
             quick_tier_states,
         ));
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=stream_constants stream={} ending={} calls={} writes={} segments={} reference_filesystem_segments={}",
             name.directory_name(),
             ending_text(&stream.ending),
@@ -9932,7 +9929,7 @@ fn run_stream_constants(streams: &[StreamName]) -> i32 {
     }
     for check in checks {
         failed_checks += usize::from(!check.holds());
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=s1 check={} local={} crates={} holds={}",
             check.name,
             field_text(&check.local),
@@ -9940,7 +9937,7 @@ fn run_stream_constants(streams: &[StreamName]) -> i32 {
             check.holds()
         ));
     }
-    lines.result(&format!("name=verdict s1_failed_checks={failed_checks}"));
+    lines.emit_result_line(&format!("name=verdict s1_failed_checks={failed_checks}"));
     lines.finish();
     if failed_checks > 0 {
         3
@@ -9998,14 +9995,9 @@ mod tests {
         };
         let engine = GivenStatesEngine::start_from_environment(
             GivenStatesItem {
-                item_name: "e171_three_oracle_collusion_after_the_oracle_fixes::tests".to_string(),
-                setting_file:
-                    "crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
-                        .to_string(),
-                seeds_and_scale: "fixed".to_string(),
+                item_name: "e171_three_oracle_collusion_after_the_oracle_fixes::tests::fixed".to_string(),
             },
             &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
         )
         .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"));
         let mut judged_images = Vec::with_capacity(images.len());
@@ -10730,7 +10722,7 @@ mod tests {
         }
     }
 
-    fn check_values(checks: &[StopCheck]) -> Vec<(&str, &str, bool)> {
+    fn stop_check_values(checks: &[StopCheck]) -> Vec<(&str, &str, bool)> {
         checks
             .iter()
             .map(|check| (check.local.as_str(), check.crates.as_str(), check.holds()))
@@ -10760,7 +10752,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            check_values(&silent_checks),
+            stop_check_values(&silent_checks),
             vec![("0", "1", false), ("0", "0", true)]
         );
         // 取号出错、记成对拍的红：两样都 0。
@@ -10786,7 +10778,7 @@ mod tests {
             ),
         ];
         assert_eq!(
-            check_values(&s5_checks_of_a_bad_implementation_row(
+            stop_check_values(&s5_checks_of_a_bad_implementation_row(
                 "s",
                 &error_after_the_stop,
                 Some(0),
@@ -10809,7 +10801,7 @@ mod tests {
             recorded_call_for_the_test("publish", errored("Y"), ModelVerdictOfCall::Agrees),
         ];
         assert_eq!(
-            check_values(&s5_checks_of_a_bad_implementation_row(
+            stop_check_values(&s5_checks_of_a_bad_implementation_row(
                 "s",
                 &allowed_refusal,
                 Some(2),
@@ -10831,7 +10823,7 @@ mod tests {
             ),
         ];
         assert_eq!(
-            check_values(&s5_checks_of_a_bad_implementation_row(
+            stop_check_values(&s5_checks_of_a_bad_implementation_row(
                 "s",
                 &stopped_on_an_agreeing_unmount,
                 Some(1),

@@ -43,8 +43,11 @@ use std::rc::Rc;
 /// 一次不注错的再挂里，根环每个槽第几次被读是重建分配器读根环那一遍（从 1 数；见文件头）。
 pub const READ_OF_EACH_ROOT_RING_SLOT_BY_THE_ALLOCATOR_REBUILD: u64 = 6;
 
-/// 这段历史上一次不注错的再挂里根环每个槽被读的次数（攻方量过不注错的再挂整遍读 15 遍；这里由不注错那条用例现量、钉住）。
-pub const READS_OF_EACH_ROOT_RING_SLOT_BY_A_REMOUNT_WITHOUT_FAULTS: u64 = 15;
+/// 这段历史上一次不注错的再挂里根环每个槽读到盘上的次数，由不注错那条用例现量、钉住：读阶段与重建分配器那几遍
+/// （第 [`READ_OF_EACH_ROOT_RING_SLOT_BY_THE_ALLOCATOR_REBUILD`] 次是重建那一遍），之后可写挂载取号之前读一遍、记进预演与真做共用的那一份
+/// （第 7 次），真做取号写之前那几次读照旧读盘、其中读了一遍根环（第 8 次）；写行、暖机、抬 F 与续做再读根环都取共用的那一份、不再读盘
+/// （岔路单 `research/prompts/m3-b44-code-r2-forks.md` 岔路一「读一次两边共用」，用户定）。攻方在那之前量的是 15 遍。
+pub const READS_OF_EACH_ROOT_RING_SLOT_BY_A_REMOUNT_WITHOUT_FAULTS: u64 = 8;
 
 /// 删除批大小 1 个数据单元（只供测试的开关，挂载的开关链装上去，续做照它）。
 pub fn deletion_switches_with_batches_of_one() -> DeletionSwitches {
@@ -480,7 +483,7 @@ pub fn only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_w
     );
 }
 
-/// 不注错的对照：同一份盘面再可写挂载，一次都不拒、不重读，根环每个槽读的次数与改之前相同（攻方量的 15 遍），两块盘都在时池级 checker 不判违例。
+/// 不注错的对照：同一份盘面再可写挂载，一次都不拒、不重读，根环每个槽读到盘上的次数是 [`READS_OF_EACH_ROOT_RING_SLOT_BY_A_REMOUNT_WITHOUT_FAULTS`]，两块盘都在时池级 checker 不判违例。
 pub fn a_remount_without_faults_does_not_reread_the_root_ring_and_reads_each_slot_as_often_as_before(
     images: &mut PoolCheckerImages,
 ) {

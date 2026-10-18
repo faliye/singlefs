@@ -52,12 +52,14 @@ fn record_the_history_leaving_orphans() -> HistoryLeavingOrphans {
             .fixed_geometry(),
     );
     let first_write_after_each_power_loss = run
-        .first_stream_index_after_each_power_loss
+        .earliest_stream_index_after_each_power_loss
         .iter()
-        .map(|first_stream_index_after_the_power_loss| {
+        .map(|earliest_stream_index_after_the_power_loss| {
             stream_indexes
                 .iter()
-                .position(|stream_index| *stream_index >= *first_stream_index_after_the_power_loss)
+                .position(|stream_index| {
+                    *stream_index >= *earliest_stream_index_after_the_power_loss
+                })
                 .expect("掉电之后那次可写挂载与之后的覆盖写都写了东西")
         })
         .collect();

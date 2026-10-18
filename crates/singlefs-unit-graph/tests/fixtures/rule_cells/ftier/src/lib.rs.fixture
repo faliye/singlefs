@@ -1,0 +1,65 @@
+use fcore::{recover, recover_generic, Device, Money};
+use fcore::aliased_target as renamed_target;
+use fharness::{Memory, Small};
+pub fn judge_through_dyn() -> u32 {
+    recover(&Memory)
+}
+pub fn judge_through_generic() -> u32 {
+    recover_generic(&Memory)
+}
+pub fn judge_operator() -> u32 {
+    (Money(1) + Money(2)).0
+}
+pub fn judge_drop() -> u32 {
+    let _guard = fcore::Guard;
+    0
+}
+pub fn judge_macro() -> u32 {
+    fcore::five()
+}
+pub fn judge_associated_constant() -> u32 {
+    fcore::limit_of::<Small>()
+}
+pub fn judge_table() -> u32 {
+    (fcore::TABLE[0])()
+}
+pub fn judge_open(device: &dyn Device) -> u32 {
+    device.read()
+}
+pub fn judge_open_generic<Readable: Device>(device: &Readable) -> u32 {
+    device.read()
+}
+fn read_through_dyn(device: &dyn Device) -> u32 {
+    device.read()
+}
+pub fn judge_named_type_through_dyn() -> u32 {
+    let device: &dyn Device = &fharness::Disk;
+    read_through_dyn(device)
+}
+pub fn judge_array_length() -> usize {
+    std::mem::size_of::<fcore::Buffer>()
+}
+pub fn judge_associated_function() -> u32 {
+    Money::zero().0
+}
+pub fn judge_inherent_method() -> u32 {
+    Money(2).tripled()
+}
+pub fn judge_renamed_import() -> u32 {
+    renamed_target()
+}
+pub fn judge_shared_name() -> u32 {
+    fcore::shared_name()
+}
+pub fn judge_features() -> u32 {
+    fcore::checked_lanes()
+}
+pub fn judge_documented() -> u32 {
+    fcore::documented()
+}
+pub fn judge_with_example() -> u32 {
+    fcore::with_example()
+}
+pub fn judge_table_text() -> usize {
+    fcore::table_text().len()
+}

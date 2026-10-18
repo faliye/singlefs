@@ -10344,7 +10344,7 @@ fn set_the_extent_offset_of_the_first_container_pointer_in_the_container_tree_ro
 const CONTAINER_TREE_ENTRY_CHILD_POINTER_OFFSET: usize = 34;
 const CONTAINER_TREE_ENTRY_CHILD_POINTER_BYTES: usize = 86;
 
-/// E1（判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L4 第一行）：unlink 意图之后，墓碑树码 2 根里指向墓碑容器的
+/// E1〔判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L4 第一行〕：unlink 意图之后，墓碑树码 2 根里指向墓碑容器的
 /// 子指针头部 extent 偏移改 1。走读跟随这条指针时按 I-2.4 判 extent 偏移（`crates/singlefs-checker/invariants/04-校验和.md` I-2.4 那一行），只红 I-2.4
 /// （改之前 `walk_container_tree_root` 只判 MAC / nonce，I-2.4 报成立、一条都不红）。
 #[test]

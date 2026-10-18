@@ -238,6 +238,46 @@ fn the_first_writable_mount_of_an_io_min_8192_pool_has_seven_segments_and_33_cra
     assert_recovery_checker_and_record_checker_clean(&tally);
 }
 
+/// 观察者「槽 1 在 8192 处」（`slot_one_at_8192`）：全池没有可用的槽 0 时，checker 两块盘的槽 1 都在 8192 处可用、与恢复择同一个世代号；
+/// 记没有可用槽 0 的状态数。观察者的身份是这个 fn 的闭包键（入口登记在 `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`）。
+fn observe_slot_one_at_8192(
+    _ordinal: u64,
+    image: &CrashImage<'_>,
+    _report: &RecoveryReport,
+    counts: &mut CrashPointReplayObserverCounts,
+) {
+    let readings = system_configuration_slot_readings(image);
+    let no_usable_slot_zero = readings
+        .iter()
+        .all(|(_, slots)| !matches!(slots[0], SystemConfigurationSlotReading::Usable(..)));
+    if !no_usable_slot_zero {
+        return;
+    }
+    counts.add("states_without_a_usable_slot_zero", 1);
+    let slot_one_spacings: Vec<Option<u64>> = readings
+        .iter()
+        .map(|(_, slots)| match &slots[1] {
+            SystemConfigurationSlotReading::Usable(_, geometry) => Some(geometry.slot_spacing),
+            SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses { .. }
+            | SystemConfigurationSlotReading::NotSelfVerified
+            | SystemConfigurationSlotReading::SelfVerifiedButNotChoosable => None,
+        })
+        .collect();
+    let checker_generation_of_device_zero = chosen_system_configurations(image)
+        .into_iter()
+        .find(|(device, _)| *device == 0)
+        .and_then(|(_, chosen)| chosen.map(|(view, _)| view.slot_generation));
+    let recovery_generation = choose_system_configuration(image)
+        .ok()
+        .map(|chosen| chosen.quantities.slot_generation);
+    assert!(
+            slot_one_spacings == vec![Some(SLOT_SPACING_IN_BYTES); 2]
+                && checker_generation_of_device_zero.is_some()
+                && checker_generation_of_device_zero == recovery_generation,
+            "全池没有可用的槽 0 时，checker 两块盘的槽 1 都在 8192 处可用、与恢复择同一个世代号：槽 1 读到的槽距 {slot_one_spacings:?}、checker 盘 0 择的世代号 {checker_generation_of_device_zero:?}、恢复择的 {recovery_generation:?}"
+        );
+}
+
 /// 全量：33 个崩溃状态逐个跑恢复与 checker，零违例；两块盘的槽 0 都不可用的状态恰好两个（取号那一段、暖机那次轮换那一段各一个
 /// 两盘同撕），每一个上 checker 两块盘的槽 1 都在 8192 处读成可用，checker 与恢复择到的世代号相同。
 #[test]
@@ -246,41 +286,7 @@ fn every_crash_state_of_the_first_writable_mount_of_an_io_min_8192_pool_recovers
 ) {
     let prepared = prepare();
     // 观察者经崩溃判定库那一路按块看：要记的数全经观察者计数；槽 1 读得不对的状态当场 panic（判段把那一句带出来、用例红）
-    let observe = |_ordinal: u64,
-                   image: &CrashImage<'_>,
-                   _report: &RecoveryReport,
-                   counts: &mut CrashPointReplayObserverCounts| {
-        let readings = system_configuration_slot_readings(image);
-        let no_usable_slot_zero = readings
-            .iter()
-            .all(|(_, slots)| !matches!(slots[0], SystemConfigurationSlotReading::Usable(..)));
-        if !no_usable_slot_zero {
-            return;
-        }
-        counts.add("states_without_a_usable_slot_zero", 1);
-        let slot_one_spacings: Vec<Option<u64>> = readings
-            .iter()
-            .map(|(_, slots)| match &slots[1] {
-                SystemConfigurationSlotReading::Usable(_, geometry) => Some(geometry.slot_spacing),
-                SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses { .. }
-                | SystemConfigurationSlotReading::NotSelfVerified
-                | SystemConfigurationSlotReading::SelfVerifiedButNotChoosable => None,
-            })
-            .collect();
-        let checker_generation_of_device_zero = chosen_system_configurations(image)
-            .into_iter()
-            .find(|(device, _)| *device == 0)
-            .and_then(|(_, chosen)| chosen.map(|(view, _)| view.slot_generation));
-        let recovery_generation = choose_system_configuration(image)
-            .ok()
-            .map(|chosen| chosen.quantities.slot_generation);
-        assert!(
-                slot_one_spacings == vec![Some(SLOT_SPACING_IN_BYTES); 2]
-                    && checker_generation_of_device_zero.is_some()
-                    && checker_generation_of_device_zero == recovery_generation,
-                "全池没有可用的槽 0 时，checker 两块盘的槽 1 都在 8192 处可用、与恢复择同一个世代号：槽 1 读到的槽距 {slot_one_spacings:?}、checker 盘 0 择的世代号 {checker_generation_of_device_zero:?}、恢复择的 {recovery_generation:?}"
-            );
-    };
+    let observe = observe_slot_one_at_8192;
     let Some(tally) = enumerate_crash_states_with_expansion(
         CrashPointReplayItem {
             name: "io_min_8192_mount::full",

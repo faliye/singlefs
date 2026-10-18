@@ -1,4 +1,4 @@
-//! checker 档模块：无（只读这个包的源码文本，不调它的任何模块）
+//! checker 档模块：crash_library
 //! C604（代码三方 test-script-align-code-r2 判决 J3「补一条与硬件无关的源码扫描用例」）：GPU 用例取卡一律经
 //! `gpu_unit_checks::gpu_test_start` 那一个入口（`usable_cards_or_report_not_run`、`first_usable_card_or_report_not_run`，
 //! 与进程里共用一池卡的 `gpu_card_pool_or_report_not_run`）：
@@ -19,6 +19,8 @@
 //! 登记了的要真还在绕（第 10x 批代码轮判决 K3-2：名单之外的文件不扫，新写的 GPU 用例绕开卡池没人拦）。
 
 use std::path::{Path, PathBuf};
+
+use singlefs_checker_tier::crash_library::ExclusiveTemporaryDirectory;
 
 /// 这一份自己的文件名：它的常量与样本里写着要找的名字，不扫。
 const THIS_FILE_NAME: &str =
@@ -1110,19 +1112,16 @@ fn a_test_that_starts_a_device_straight_through_wgpu_is_caught() {
     );
 }
 
-/// 一份临时的包目录（临时目录下，带用例名与进程号）：用例收尾时删。
+/// 一份临时的包目录（这一份一次性临时目录，丢掉时连同整棵删掉）。
 struct TemporaryPackage {
-    root: PathBuf,
+    root: ExclusiveTemporaryDirectory,
 }
 
 impl TemporaryPackage {
     /// 建好包根与 `src/`，按 `(相对 src/ 的路径, 内容)` 写进去。
     fn with_sources(test_name: &str, sources: &[(&str, &str)]) -> Self {
-        let root = std::env::temp_dir().join(format!(
-            "singlefs-gpu-entry-scan-{test_name}-{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&root);
+        let root = ExclusiveTemporaryDirectory::create(&format!("gpu-entry-scan-{test_name}"))
+            .expect("建得了一次性临时目录");
         for (relative_path, content) in sources {
             let path = root.join("src").join(relative_path);
             std::fs::create_dir_all(path.parent().expect("src 下的文件有上一层"))
@@ -1130,12 +1129,6 @@ impl TemporaryPackage {
             std::fs::write(&path, content).expect("写得了临时文件");
         }
         Self { root }
-    }
-}
-
-impl Drop for TemporaryPackage {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.root);
     }
 }
 

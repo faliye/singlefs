@@ -18,14 +18,14 @@
 //! [`ABANDONED_ROOT_NAMED_BY_THE_POOL_CHECKER_WORD`]）。
 //! 这几个字号、打包表的表号与段表宽、段的展开方式码、失败点码在内核里的常量由 [`kernel_prelude_wgsl_constants`] 从 Rust 生成、
 //! 接在每个内核源码前面，不在 WGSL 里另写一份。对拍比的是 [`CrossCheckWords`]：GPU 与 CPU 两侧各由一个构造函数换出来。
-//! 判法代码的摘要 [`gpu_judge_digest`] 进判定表的键：内核改一个字，旧行留着当历史，新行另起。
+//! 判定表的键里判器那一半是 GPU 判器那一组判法单元的键（`crate::crash_identity::judging_units_key`，入口登记在
+//! `crate::judging_units_entries`）：拼内核源码的函数、`.wgsl` 里从 `@compute` 入口够得着的函数、派活回读归位那一段都在里面，
+//! 改一个字（注释除外）旧行留着当历史，新行另起。
 //!
 //! 这一份只放判法：内核原文、表怎么打包、派活参数与结论各是哪几个字、草稿区每个状态多大。怎么上卡、一次派活带几个状态、
-//! 几张卡怎么用，在 `crate::crash_judge_dispatch`——那一份不在判法闭包里（用户 2026-09-29 定「派活和判法拆出来最好」），
-//! 改它不换判法版本；这一份不许引它。
+//! 几张卡怎么用，在 `crate::crash_judge_dispatch`（用户 2026-09-29 定「派活和判法拆出来最好」）；这一份不许引它。
 use singlefs_checker::image::IMPLEMENTED_INVARIANTS;
 use singlefs_checker::walk::ContainerCapacityKnobs;
-use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
 use crate::crash::{
     CrashPointReplayOracleViolationKind, CRASH_POINT_REPLAY_RED_PASS_JOURNAL_CONSULTED_ORACLE,
@@ -33,7 +33,9 @@ use crate::crash::{
     CRASH_POINT_REPLAY_RED_PASS_RECORD_CHECKER, RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT,
     RECORD_CHECKER_ROOT_WITHOUT_RECORD,
 };
-use crate::crash_facts::segment_expansion_code_wgsl_constants;
+use crate::crash_facts::{
+    segment_expansion_code_wgsl_constants, MAXIMUM_ENUMERATED_WRITES, PERSISTED_MASK_WORDS,
+};
 use crate::crash_judge_conclusions::{
     recovery_words_of_the_cross_check_words, AbandonedRootNamedByThePoolChecker,
     RecoveryWordsOfState,
@@ -41,8 +43,9 @@ use crate::crash_judge_conclusions::{
 use crate::crash_judge_tables::{
     JudgeTablesWords, CLAIMED_VERSION_LANDED_ON_BY_THE_CONSULTED_RECOVERY,
     CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITHOUT_A_ROOT,
-    CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITH_A_ROOT, CLAIMED_VERSION_WORDS, JUDGE_TABLE_COUNT,
-    SEGMENT_WORDS,
+    CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITH_A_ROOT, CLAIMED_VERSION_WORDS,
+    COMBINATION_WORDS_OF_A_VERSION, JUDGE_TABLE_COUNT, SEGMENT_WORDS, VERSION_WORDS,
+    VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE,
 };
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 
@@ -256,12 +259,16 @@ pub fn verdict_layout_wgsl_constants() -> String {
     )
 }
 
-/// 打包表的表数、表号、段表宽与恢复自称的那一版那一张表的宽与码在内核里的常量（WGSL 源码）：表号就是 [`JudgeTablesWords::every_table_name`]
-/// 里的次序，名字大写、前面加 `T_`。
+/// 打包表的表数、表号、段表宽、版本表的宽与组合掩码的布局、持久掩码的字数与恢复自称的那一版那一张表的宽与码在内核里的常量（WGSL 源码）：
+/// 表号就是 [`JudgeTablesWords::every_table_name`] 里的次序，名字大写、前面加 `T_`。
 #[must_use]
 pub fn judge_table_layout_wgsl_constants() -> String {
     let mut constants = format!(
         "const TABLE_COUNT: u32 = {JUDGE_TABLE_COUNT}u;\nconst SEGMENT_WORDS: u32 = {SEGMENT_WORDS}u;\n\
+         const VERSION_WORDS: u32 = {VERSION_WORDS}u;\n\
+         const COMBINATION_WORDS_OF_A_VERSION: u32 = {COMBINATION_WORDS_OF_A_VERSION}u;\n\
+         const VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE: u32 = {VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE}u;\n\
+         const PERSISTED_MASK_WORDS: u32 = {PERSISTED_MASK_WORDS}u;\n\
          const CLAIMED_VERSION_WORDS: u32 = {CLAIMED_VERSION_WORDS}u;\n\
          const CLAIMED_VERSION_LANDED_ON_BY_THE_CONSULTED_RECOVERY: u32 = {CLAIMED_VERSION_LANDED_ON_BY_THE_CONSULTED_RECOVERY}u;\n\
          const CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITHOUT_A_ROOT: u32 = {CLAIMED_VERSION_NEWEST_ROOT_WRITTEN_WITHOUT_A_ROOT}u;\n\
@@ -491,7 +498,17 @@ pub fn gpu_recovery_words(words: &[u32; VERDICT_WORDS]) -> [u32; 4] {
 /// （4、7、6 字一条 65 536 + 114 688 + 98 304 字，各加桶表 32 768 字；点名超过一条 journal 记录的那个场景 12 582 个号）：
 /// 423 864 + 24 576 + 73 728 + 32 768 + 20 480 + 8192 + 163 840 + 65 536 + 32 768 + 73 728 + 65 536 + 32 768 + 114 688 + 32 768
 /// + 98 304 + 32 768 = 1 296 312（每个状态 5 185 248 字节，原来 1 695 456 字节）。
-pub const SCRATCH_WORDS: usize = 1_296_312;
+///
+/// 再之后扫描内核释放代高于 F 的已释放记录 `C_MAX_RELEASED_ABOVE` 从 2048 抬到与 `C_MAX_ALLOC_RECORDS` 同宽的 4096 条（容器树旋钮下的随机历史
+/// F = 0，第 53、55 步起最新根的已释放记录多于 2048 条，在站点 34 判不了）：挪到末尾（原处 8192 字空着），4 字一条 × 4096 = 16 384 字，
+/// 1 296 312 + 16 384 = 1 312 696（每个状态 5 250 784 字节）。
+///
+/// 再之后扫描内核 I-3.10 的去重表 `C_MAX_EXAMINED`（各版未释放的分配记录按盘、槽、代去重累计，站点 31）从 2048 抬到与 `C_MAX_ALLOC_RECORDS`
+/// 同宽的 4096 条（不回收的流上累计条数跟着最新那一版的分配记录条数长：分配记录 2088 条那条流累计 2086 条，在站点 31 判不了）：挪到末尾
+/// （原处 10 240 字扫描内核不再用），5 字一条 × 4096 = 20 480 字，1 312 696 + 20 480 = 1 333 176（每个状态 5 332 704 字节）；
+/// 它的桶表照旧借 `C_JOURNAL_GROUP_KEYS` 那一段（桶数跟着翻倍到 8192，那一段正好 8192 字），不占草稿区。
+/// 那张表满了之后不再记判不了（站点 31 没有了）：新来的记录不进表、照判，I-3.10 是置位，同一条记录判两遍结论相同；表的大小不变。
+pub const SCRATCH_WORDS: usize = 1_333_176;
 /// 内核的工作组大小（三个内核都是 `@workgroup_size(64)`）：派 n 个状态要 ⌈n ÷ 64⌉ 个工作组。
 pub const WORKGROUP_SIZE: usize = 64;
 /// 内核的四个绑定（`crash_judge_common.wgsl` 开头）：派活参数、打包的表、结论、草稿区。
@@ -499,10 +516,6 @@ pub const DISPATCH_BINDING: u32 = 0;
 pub const TABLES_BINDING: u32 = 1;
 pub const VERDICTS_BINDING: u32 = 2;
 pub const SCRATCH_BINDING: u32 = 3;
-/// 派活那一侧（`crate::crash_judge_dispatch`，不在判法闭包里）修了会改结论的毛病时抬这个数：
-/// 判法版本跟着变，库里旧行留作历史，这一版从头判。只改快慢、不改结论的改动不抬。
-pub const GPU_JUDGE_REVISION: u32 = 1;
-
 /// 一次派活的参数（内核里的 `Dispatch`）：这次派活第一个状态的序号（低、高 32 位）、几个状态、每个状态的草稿区几个字。
 /// 派活里第 k 个调用判序号 `first_ordinal + k` 的状态，草稿区在缓冲的第 `k × SCRATCH_WORDS` 个字起。
 ///
@@ -528,25 +541,6 @@ pub fn verdict_was_written_by_both_kernels(words: &[u32; VERDICT_WORDS]) -> bool
         && words[POOL_CHECKER_REACHED_WORD] != VERDICT_WORD_NOT_WRITTEN
 }
 
-/// 判法代码的摘要：内核前面那一份生成的常量（[`kernel_prelude_wgsl_constants`]）、三棵容器树都没装旋钮的那一份旋钮常量与五份内核源码，
-/// 连同一个版本前缀（v7：结论加了 I-7.4 点名的被抛弃根那四个字）。旋钮值本身不进这个摘要：给定状态表那一栏旋钮值进那张表的块键
-/// （`crate::crash_amplification::GivenStatesEngine` 的块键），同一张表换了旋钮值是另一块，不复用；旋钮常量的写法（[`container_capacity_knob_wgsl_constants`]）
-/// 在这份文件里，改它照样换 GPU 判器的结论版本。
-#[must_use]
-pub fn gpu_judge_digest() -> [u8; DIGEST_BYTES] {
-    let mut message = b"gpu-crash-judge-v7\n".to_vec();
-    message.extend_from_slice(kernel_prelude_wgsl_constants().as_bytes());
-    message.extend_from_slice(
-        container_capacity_knob_wgsl_constants(ContainerCapacityKnobs::PRODUCT).as_bytes(),
-    );
-    message.extend_from_slice(GPU_JUDGE_COMMON_SOURCE.as_bytes());
-    message.extend_from_slice(GPU_JUDGE_RECOVERY_SOURCE.as_bytes());
-    message.extend_from_slice(GPU_JUDGE_CHECKER_COMMON_SOURCE.as_bytes());
-    message.extend_from_slice(GPU_JUDGE_CHECKER_SOURCE.as_bytes());
-    message.extend_from_slice(GPU_JUDGE_CHECKER_SCAN_SOURCE.as_bytes());
-    sha256_digest(&message)
-}
-
 /// 恢复内核的整份源码（生成的常量、共用那一半接上它自己那一半）。
 #[must_use]
 pub fn recovery_kernel_source() -> String {
@@ -556,9 +550,9 @@ pub fn recovery_kernel_source() -> String {
     )
 }
 
-/// 序号 → 持久掩码那一段的探针（对拍用例用，不判状态）：每个状态 [`PERSISTED_MASK_PROBE_WORDS`] 个字，前 64 个是共用那一半 `begin_state`
-/// 拆出的持久掩码（位 i 在第 i / 32 字的第 i % 32 位），最后一个是它判不了的原因（0 是判得了）。
-pub const PERSISTED_MASK_PROBE_WORDS: usize = 65;
+/// 序号 → 持久掩码那一段的探针（对拍用例用，不判状态）：每个状态 [`PERSISTED_MASK_PROBE_WORDS`] 个字，前 [`PERSISTED_MASK_WORDS`] 个是
+/// 共用那一半 `begin_state` 拆出的持久掩码（位 i 在第 i / 32 字的第 i % 32 位），最后一个是它判不了的原因（0 是判得了）。
+pub const PERSISTED_MASK_PROBE_WORDS: usize = PERSISTED_MASK_WORDS + 1;
 
 const PERSISTED_MASK_PROBE_ENTRY_SOURCE: &str = r#"
 @compute @workgroup_size(64)
@@ -569,10 +563,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     begin_state(local);
     let out = local * PERSISTED_MASK_PROBE_WORDS;
-    for (var word = 0u; word < 64u; word = word + 1u) {
+    for (var word = 0u; word < PERSISTED_MASK_WORDS; word = word + 1u) {
         verdicts[out + word] = persisted[word];
     }
-    verdicts[out + 64u] = undecidable;
+    verdicts[out + PERSISTED_MASK_WORDS] = undecidable;
 }
 "#;
 
@@ -589,7 +583,7 @@ pub fn persisted_mask_probe_kernel_source() -> String {
 /// 探针交回的一个状态换成按枚举写表的持久集合（前 `enumerated_write_count` 位）与判不了的原因。
 ///
 /// # Panics
-/// `words` 不是 [`PERSISTED_MASK_PROBE_WORDS`] 个字；`enumerated_write_count` 超过掩码的宽（2048）。
+/// `words` 不是 [`PERSISTED_MASK_PROBE_WORDS`] 个字；`enumerated_write_count` 超过掩码的宽（[`MAXIMUM_ENUMERATED_WRITES`]）。
 #[must_use]
 pub fn persisted_set_of_the_probe_words(
     words: &[u32],
@@ -601,8 +595,8 @@ pub fn persisted_set_of_the_probe_words(
         "一个状态的探针字数"
     );
     assert!(
-        enumerated_write_count <= 64 * 32,
-        "枚举写表装得进 64 个字的掩码"
+        enumerated_write_count <= MAXIMUM_ENUMERATED_WRITES,
+        "枚举写表装得进 {PERSISTED_MASK_WORDS} 个字的掩码"
     );
     (
         (0..enumerated_write_count)
@@ -630,7 +624,7 @@ fn knob_records_in_the_kernel(knob_records_per_container: Option<u64>) -> u32 {
 
 /// 三棵容器树只供测试的容量旋钮在扫描内核里的常量（WGSL 源码，第 56 批 G6）：每片记录数，0 是没装旋钮。旋钮不落盘，从镜像外给
 /// （同 `singlefs_checker::walk::check_pool_image_given_the_container_capacity_knobs`）；接在扫描内核源码的结论字号常量之后。
-/// 三个都为 0 的那一份（[`ContainerCapacityKnobs::PRODUCT`]）进判法摘要。
+/// 三个都为 0 的那一份（[`ContainerCapacityKnobs::PRODUCT`]）是判定入库的那一份。
 #[must_use]
 pub fn container_capacity_knob_wgsl_constants(knobs: ContainerCapacityKnobs) -> String {
     format!(
@@ -671,15 +665,15 @@ pub struct JudgeKernelSources {
 }
 
 impl JudgeKernelSources {
-    /// 判法摘要 [`gpu_judge_digest`] 罩住的那三份。
+    /// 判定入库的那三份（GPU 判器那一组判法单元的入口之一：拼这三份的函数都在那一组的闭包里）。
     #[must_use]
     pub fn of_the_judge() -> Self {
         Self::of_the_judge_given_the_container_capacity_knobs(ContainerCapacityKnobs::PRODUCT)
     }
 
     /// 同 [`Self::of_the_judge`]，三棵容器树的旋钮值编进扫描内核（第 56 批 G6）：判出的池级 checker 违例位要与
-    /// `singlefs_checker::walk::check_pool_image_given_the_container_capacity_knobs` 带同一组旋钮值逐位相同。旋钮值不进判法摘要
-    /// （[`gpu_judge_digest`]）：判定入库的路径里给定状态表的引擎（`crate::crash_amplification::GivenStatesEngine`）照表上那一栏旋钮值编它
+    /// `singlefs_checker::walk::check_pool_image_given_the_container_capacity_knobs` 带同一组旋钮值逐位相同。旋钮值不进判法单元的键
+    /// （旋钮常量的写法在键里，值不在）：判定入库的路径里给定状态表的引擎（`crate::crash_amplification::GivenStatesEngine`）照表上那一栏旋钮值编它
     /// （用户 2026-10-14 弹窗定「给定状态表加旋钮栏」），旋钮值进那张表的块键；对拍用例拿它判旋钮压小写出的镜像。
     #[must_use]
     pub fn of_the_judge_given_the_container_capacity_knobs(knobs: ContainerCapacityKnobs) -> Self {
@@ -1162,5 +1156,147 @@ mod tests {
         let mut both = only_recovery;
         both[super::POOL_CHECKER_REACHED_WORD] = 5;
         assert!(verdict_was_written_by_both_kernels(&both));
+    }
+
+    #[test]
+    fn facts_verifier_kernel_source_parses_and_validates() {
+        parse_and_validate(
+            "第 ② 段核对内核",
+            &crate::crash_verify_gpu::verifier_shader_source(),
+        );
+    }
+
+    /// 解析一份内核源码（先经 [`parse_and_validate`] 核过）。
+    fn parsed_module(name: &str, source: &str) -> wgpu::naga::Module {
+        parse_and_validate(name, source);
+        wgpu::naga::front::wgsl::parse_str(source).expect("上面解析过")
+    }
+
+    /// 内核里名叫 `name` 的模块常量的 u32 值（初值是字面量，或顺着别的常量指到字面量）。
+    fn value_of_the_u32_constant(module: &wgpu::naga::Module, name: &str) -> u32 {
+        use wgpu::naga::{Expression, Literal};
+        let (_, constant) = module
+            .constants
+            .iter()
+            .find(|(_, constant)| constant.name.as_deref() == Some(name))
+            .unwrap_or_else(|| panic!("内核里没有常量 {name}"));
+        let mut initializer = constant.init;
+        // 迭代上界：模块常量的个数（每一步换到另一个常量的初值）
+        for _step in 0..=module.constants.len() {
+            if let Expression::Literal(Literal::U32(value)) = module.global_expressions[initializer]
+            {
+                return value;
+            }
+            let Expression::Constant(other) = module.global_expressions[initializer] else {
+                panic!(
+                    "常量 {name} 的初值既不是 u32 字面量也不是别的常量：{:?}",
+                    module.global_expressions[initializer]
+                );
+            };
+            initializer = module.constants[other].init;
+        }
+        panic!(
+            "常量 {name} 顺着指了 {} 步还没到字面量",
+            module.constants.len() + 1
+        );
+    }
+
+    /// 内核里名叫 `name` 的 `var<private>` 是几个元素的定长数组。
+    fn element_count_of_the_private_array(module: &wgpu::naga::Module, name: &str) -> u32 {
+        use wgpu::naga::{ArraySize, TypeInner};
+        let (_, variable) = module
+            .global_variables
+            .iter()
+            .find(|(_, variable)| variable.name.as_deref() == Some(name))
+            .unwrap_or_else(|| panic!("内核里没有全局变量 {name}"));
+        let TypeInner::Array {
+            size: ArraySize::Constant(element_count),
+            ..
+        } = module.types[variable.ty].inner
+        else {
+            panic!("{name} 不是定长数组：{:?}", module.types[variable.ty].inner);
+        };
+        element_count.get()
+    }
+
+    /// 持久掩码的宽与组合掩码的布局在内核里只由 Rust 常量生成（`code-discipline.md`「魔法数字写成命名常量」：一个数一处定义）：
+    /// 三个判器内核、探针内核与第 ② 段核对内核里 `persisted` 那个数组的元素数就是 [`crate::crash_facts::PERSISTED_MASK_WORDS`]
+    /// （[`crate::crash_facts::MAXIMUM_ENUMERATED_WRITES`] ÷ 32），判器那几个内核里版本表的宽、组合掩码的字数与组合高位那几字的起点
+    /// 就是 `crate::crash_judge_tables` 的同名常量；手写的 WGSL 里不另写这几个常量，也不留 64 个字的掩码。
+    /// 判别力：WGSL 里把 `persisted` 写回 `array<u32, 64>`、或手写一份 `VERSION_WORDS`，这条红（后者 naga 先报重名）。
+    #[test]
+    fn the_mask_and_combination_widths_in_every_kernel_are_generated_from_the_rust_constants() {
+        use crate::crash_facts::PERSISTED_MASK_WORDS;
+        use crate::crash_judge_tables::{
+            COMBINATION_WORDS_OF_A_VERSION, VERSION_WORDS,
+            VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE,
+        };
+        let as_u32 = |value: usize| u32::try_from(value).expect("常量装得进 u32");
+        let judge_kernels = [
+            ("恢复内核", recovery_kernel_source()),
+            ("池级 checker 走读内核", checker_walk_kernel_source()),
+            ("池级 checker 扫描内核", checker_scan_kernel_source()),
+            (
+                "持久掩码探针内核",
+                super::persisted_mask_probe_kernel_source(),
+            ),
+        ];
+        for (name, source) in &judge_kernels {
+            let module = parsed_module(name, source);
+            assert_eq!(
+                element_count_of_the_private_array(&module, "persisted"),
+                as_u32(PERSISTED_MASK_WORDS),
+                "{name} 的持久掩码"
+            );
+            for (constant, value) in [
+                ("PERSISTED_MASK_WORDS", PERSISTED_MASK_WORDS),
+                ("VERSION_WORDS", VERSION_WORDS),
+                (
+                    "COMBINATION_WORDS_OF_A_VERSION",
+                    COMBINATION_WORDS_OF_A_VERSION,
+                ),
+                (
+                    "VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE",
+                    VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE,
+                ),
+            ] {
+                assert_eq!(
+                    value_of_the_u32_constant(&module, constant),
+                    as_u32(value),
+                    "{name} 的 {constant}"
+                );
+            }
+        }
+        let verifier = parsed_module(
+            "第 ② 段核对内核",
+            &crate::crash_verify_gpu::verifier_shader_source(),
+        );
+        for private_array in ["persisted", "torn"] {
+            assert_eq!(
+                element_count_of_the_private_array(&verifier, private_array),
+                as_u32(PERSISTED_MASK_WORDS),
+                "第 ② 段核对内核的 {private_array}"
+            );
+        }
+        for (name, handwritten) in [
+            ("crash_judge_common.wgsl", super::GPU_JUDGE_COMMON_SOURCE),
+            (
+                "第 ② 段核对内核的本体",
+                crate::crash_verify_gpu::GPU_VERIFIER_SHADER_SOURCE,
+            ),
+        ] {
+            for generated in [
+                "const PERSISTED_MASK_WORDS",
+                "const VERSION_WORDS",
+                "const COMBINATION_WORDS_OF_A_VERSION",
+                "const VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE",
+                "array<u32, 64>",
+            ] {
+                assert!(
+                    !handwritten.contains(generated),
+                    "{name} 里手写了 `{generated}`：这个数由 Rust 常量生成"
+                );
+            }
+        }
     }
 }

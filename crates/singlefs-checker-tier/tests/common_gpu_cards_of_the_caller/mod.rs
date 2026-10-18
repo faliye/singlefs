@@ -11,10 +11,13 @@ use singlefs_checker_tier::gpu_card_configuration::GpuConfigurationOfTheCaller;
 ///
 /// # Panics
 /// 调用方的多机配置读不了、显卡先后写坏了，或清场之下开了 GPU 而没写清场之后那一份（调用方自己的配置就跑不了 GPU 用例）。
-pub fn card_priority_value_of_the_caller(repository_root: &std::path::Path) -> String {
+pub fn card_priority_value_of_the_caller() -> String {
     let caller = GpuConfigurationOfTheCaller::of_this_process();
+    // 多机配置是这台机器的，按这个进程的当前目录找（cargo 把测试进程的当前目录设成包目录；仓根不是键的输入，定案 1）
     let caller_configuration = caller
-        .multi_host_configuration_file(repository_root)
+        .multi_host_configuration_file(
+            &std::env::current_dir().expect("取得到这个进程的当前目录（多机配置从这里起找）"),
+        )
         .expect("调用方的多机配置在");
     caller
         .cards_by_priority(caller_configuration.as_deref())

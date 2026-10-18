@@ -156,8 +156,8 @@ const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 155;
 const SYSTEM_CONFIGURATION_SLOT_BYTES: usize = 4096;
 /// 「两条位置条目的槽号不等」那一条坏法把第二条的槽号加上这个数（普查 R5）。
 const SLOT_OFFSET_THAT_BREAKS_TWO_DEVICES_ON_ONE_SLOT: u64 = 1;
-/// 重写数据单元载荷时填的那个字节：与内容生成器写得出的任何一版都不同（`scenario::first_content_byte` 那一族是按长度与种子取的，
-/// 这个值只在坏盘输入里出现），读回它就是「读回了一版从没提交过的内容」。
+/// 重写数据单元载荷时填的那个字节：与内容生成器写得出的任何一版都不同（`scenario::first_file_content` 按下标取、`history::ContentChoice::bytes` 按种子现算，
+/// 整片填这一个值的只有坏盘输入），读回它就是「读回了一版从没提交过的内容」。
 const BYTE_THAT_NO_COMMITTED_VERSION_CONTAINS: u8 = 0xA5;
 
 /// 一个坏法。封闭集合：加一种坏法，每个 `match` 都要补一臂。
@@ -370,7 +370,7 @@ impl TargetedPanicFamily {
     }
 }
 
-/// 今天撞得到的一处 panic：清单里的名字、它是普查里的哪一条、落在哪个文件、消息里认得出它的那一段、欠着谁。
+/// 今天撞得到的一处 panic：清单里的名字、它是普查里的哪一条、落在哪个文件、消息里认得出它的那一段、快档里撞到几次。
 ///
 /// **按「文件 + 消息片段」认，不按行号认**：`crates/singlefs-core/` 这一轮另有会话在改，行号会漂；
 /// 按行号写的清单一漂就悄悄失效，撞到的 panic 会变成「清单外的新发现」，用例红在一个假的发现上。
@@ -386,8 +386,6 @@ pub struct KnownPanicSite {
     pub file: &'static str,
     /// panic 消息里必然出现的那一段。
     pub message_fragment: &'static str,
-    /// 哪一条坏法打到它、为什么它今天还在。
-    pub how_it_is_reached: &'static str,
     /// 快档（[`singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`] 起 12 段、每段 16 步）里这一条撞到几次。
     /// **次数只许往下走，不许涨**：只按「文件 + 消息片段」认的清单会把同一个文件里同形的新 panic
     /// 静默接走（例如 `transaction.rs` 里另起一处「两盘同槽」的断言），次数涨了就红在这里。

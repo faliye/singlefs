@@ -32,7 +32,6 @@ use singlefs_checker_tier::on_device_modes::{
     allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process,
     publish_the_fourth_version, publish_the_second_version, publish_the_third_version,
     raise_the_rollback_floor_to_its_ceiling, FailedPublish, OnDeviceRunMode,
-    PublishesAfterTheNewPoolFileCreation,
 };
 use singlefs_core::address::DeviceIdentity;
 use singlefs_core::allocator::PoolAllocator;
@@ -1373,28 +1372,47 @@ fn new_pool_file_creation_paths(
     clippy::too_many_lines,
     reason = "虚机里只跑这一件事：写、数、重开、读回，结果行按次序打"
 )]
-fn main() {
-    let arguments: Vec<String> = std::env::args().collect();
-    if arguments.len() != 4 {
-        eprintln!(
-            "用法：new_pool_file_creation_on_device <盘 0> <盘 1> <{}>",
-            OnDeviceRunMode::every_argument_for_usage()
-        );
-        std::process::exit(2);
-    }
-    let device_paths = [arguments[1].clone(), arguments[2].clone()];
-    let Some(mode) = OnDeviceRunMode::from_argument(&arguments[3]) else {
-        eprintln!("不认识的模式 {}", arguments[3]);
-        std::process::exit(2)
-    };
-    let policy = match mode {
-        OnDeviceRunMode::Direct
-        | OnDeviceRunMode::SkipNewPoolFileCreationBarrier
-        | OnDeviceRunMode::FileOverwrite
-        | OnDeviceRunMode::SecondInstance
-        | OnDeviceRunMode::RaiseRollbackFloor => PageCachePolicy::BypassWithDirectInputOutput,
-        OnDeviceRunMode::PageCache => PageCachePolicy::GoThroughPageCache,
-    };
+/// 一趟虚机跑从 `main` 解析好的参数：两块盘的路径与模式参数的原文（结果行与分段登记照打原文）。
+struct OnDeviceRunArguments {
+    device_paths: [String; 2],
+    mode_argument: String,
+}
+
+/// 新池新建文件之前要不要在盘 0 上吞掉下一道屏障：`skip-new-pool-file-creation-barrier` 那一档的入口交
+/// [`swallow_the_next_barrier_on`]，别的档交 `None`（吞屏障那个函数只进那一档的闭包）。
+type BarrierFaultBeforeTheNewPoolFileCreation = Option<fn(DeviceIdentity) -> FaultSchedule>;
+
+/// 冷重开之后另打一行的读法：`raise-rollback-floor` 那一档的入口交 [`rollback_floor_read_back_from_the_chosen_root_line`]，别的档交 `None`。
+type LineReadBackAfterTheColdReopen = Option<fn(&dyn PoolReader) -> String>;
+
+/// 新池新建文件那一段跑完、它的账都打完之后这一趟的状态：各档的入口接着跑自己那几次发布，最后都交
+/// [`finish_with_the_cold_reopen`]（冷重开、恢复、分段挂钟）。
+struct OnDeviceRun {
+    mode: OnDeviceRunMode,
+    mode_argument: String,
+    device_paths: [String; 2],
+    policy: PageCachePolicy,
+    emitter: Emitter,
+    clock: SegmentClock,
+    segment_timing_lines: Vec<String>,
+    parameters: MakeFilesystemParameters,
+    stream: SharedStream,
+    plan: SharedFaultPlan,
+    devices: Vec<(DeviceIdentity, CountedDevice<DirectInputOutputBlockDevice>)>,
+    geometry: FixedGeometry,
+    run: NewPoolFileCreationRun,
+    every_window_matches_device: bool,
+}
+
+/// 量两块盘、建池、暖机、新池新建文件，打几何、段序列、设备调用数、每次发布的写与窗口、事务那几行（六档共用的那一段）。
+/// `barrier_fault` 在新池新建文件之前布下（`skip-new-pool-file-creation-barrier` 那一档）；路上失败照失败账打完退出。
+fn start_through_the_new_pool_file_creation(
+    arguments: &OnDeviceRunArguments,
+    mode: OnDeviceRunMode,
+    policy: PageCachePolicy,
+    barrier_fault: BarrierFaultBeforeTheNewPoolFileCreation,
+) -> OnDeviceRun {
+    let device_paths = arguments.device_paths.clone();
     let mut emitter = Emitter { emitted: 0 };
     let probe = |attribute: &str| -> u32 {
         let values: Vec<Option<u32>> = device_paths
@@ -1446,7 +1464,7 @@ fn main() {
     let device_bytes = devices[0].1.size_in_bytes();
     emitter.emit(&format!(
         "name=geometry mode={} physical_block_size={physical_block_size} minimum_io={minimum_input_output_bytes} spacing={} write_cache={} device_bytes={device_bytes}",
-        arguments[3],
+        arguments.mode_argument,
         parameters.geometry.fixed_structure_slot_spacing,
         write_cache.replace(' ', "_")
     ));
@@ -1483,8 +1501,8 @@ fn main() {
                     counts_before_new_pool_file_creation = Some(counts);
                     operation_count_before_new_pool_file_creation = Some(stream.operation_count());
                     segment_timing_lines.push(clock.mark("warm_up"));
-                    if mode == OnDeviceRunMode::SkipNewPoolFileCreationBarrier {
-                        plan.arm(swallow_the_next_barrier_on(devices[0].0));
+                    if let Some(barrier_fault) = barrier_fault {
+                        plan.arm(barrier_fault(devices[0].0));
                     }
                 }
             }
@@ -1589,100 +1607,54 @@ fn main() {
             ),
         );
     emitter.emit(&new_pool_file_creation_line);
-    let mut every_window_matches_device = warm_up_matches && new_pool_file_creation_matches;
+    let every_window_matches_device = warm_up_matches && new_pool_file_creation_matches;
     emitter.emit(&format!(
         "name=transaction key_order_mismatches={} root_txg={} back_chain={}",
         run.output.key_order_mismatches,
         run.output.root.checkpoint_txg.0,
         run.output.record.back_chain
     ));
-
-    // 覆盖写、释放、回退与复用（发布 B）：同一个进程里再覆盖写一次（`publish_the_second_version_and_describe`）。
-    match mode.publishes_after_the_new_pool_file_creation() {
-        PublishesAfterTheNewPoolFileCreation::Nothing => {}
-        PublishesAfterTheNewPoolFileCreation::SecondVersion
-        | PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstance
-        | PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
-            let second = publish_the_second_version_and_describe(
-                &parameters,
-                &mut devices,
-                &plan,
-                &stream,
-                &geometry,
-                &run,
-            )
-            .unwrap_or_else(|failed| exit_after_a_failed_run(&mut emitter, &failed));
-            for line in &second.lines {
-                emitter.emit(line);
-            }
-            every_window_matches_device &= second.window_matches_device;
-            segment_timing_lines.push(clock.mark("file_overwrite"));
-        }
+    OnDeviceRun {
+        mode,
+        mode_argument: arguments.mode_argument.clone(),
+        device_paths,
+        policy,
+        emitter,
+        clock,
+        segment_timing_lines,
+        parameters,
+        stream,
+        plan,
+        devices,
+        geometry,
+        run,
+        every_window_matches_device,
     }
+}
 
-    // `second-instance`：发布 B 之后同一对盘冷重开、可写挂载，再发布 C；`raise-rollback-floor` 接着在同一次挂载里发布 D、抬 F。
-    let reopen_by_path = |closed_devices: Vec<(DeviceIdentity, DirectInputOutputBlockDevice)>| {
-        drop(closed_devices);
-        device_paths
-            .iter()
-            .enumerate()
-            .map(|(index, path)| {
-                (
-                    DeviceIdentity(u32::try_from(index).expect("设备号")),
-                    open(path, policy),
-                )
-            })
-            .collect::<Vec<_>>()
-    };
-    let devices = match mode.publishes_after_the_new_pool_file_creation() {
-        PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstance => {
-            let switched = switch_instance_and_publish_third_version(
-                &parameters,
-                devices,
-                &stream,
-                &geometry,
-                &mut clock,
-                reopen_by_path,
-            )
-            .unwrap_or_else(|failed| exit_after_a_failed_run(&mut emitter, &failed));
-            emit_the_lines_after_the_second_version(
-                &mut emitter,
-                &mut segment_timing_lines,
-                &switched.lines,
-            );
-            every_window_matches_device &= switched.every_window_matches_device;
-            switched.devices
-        }
-        PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
-            let raised = switch_instance_and_publish_third_version(
-                &parameters,
-                devices,
-                &stream,
-                &geometry,
-                &mut clock,
-                reopen_by_path,
-            )
-            .and_then(|switched| {
-                publish_the_fourth_version_and_raise_the_rollback_floor(
-                    &parameters,
-                    switched,
-                    &stream,
-                    &geometry,
-                    &mut clock,
-                )
-            })
-            .unwrap_or_else(|failed| exit_after_a_failed_run(&mut emitter, &failed));
-            emit_the_lines_after_the_second_version(
-                &mut emitter,
-                &mut segment_timing_lines,
-                &raised.lines,
-            );
-            every_window_matches_device &= raised.every_window_matches_device;
-            raised.devices
-        }
-        PublishesAfterTheNewPoolFileCreation::Nothing
-        | PublishesAfterTheNewPoolFileCreation::SecondVersion => devices,
-    };
+/// 各档最后同一个收尾：丢掉写的那一套句柄、按路径冷重开、恢复读回文件（`raise-rollback-floor` 那一档另打一行所选根从盘上读回的 F），
+/// 打分段挂钟、分段登记与包含自检，末行条数；读回的不是这一档最后发布的那一版、哪一段窗口对不上、分段不对就退出码 1。
+fn finish_with_the_cold_reopen(
+    run: OnDeviceRun,
+    line_read_back_after_the_cold_reopen: LineReadBackAfterTheColdReopen,
+) {
+    // 不再用的几样也绑着（`_` 起头的名字），活到收尾结束，与原先都在 `main` 里时一样的次序丢
+    let OnDeviceRun {
+        mode,
+        mode_argument,
+        device_paths,
+        policy,
+        mut emitter,
+        mut clock,
+        mut segment_timing_lines,
+        parameters: _parameters,
+        stream: _stream,
+        plan: _plan,
+        devices,
+        geometry: _geometry,
+        run: _new_pool_file_creation_run,
+        every_window_matches_device,
+    } = run;
     let expected_content = mode.last_published_content();
 
     // 冷重开：丢掉写的那一套句柄，按路径重新打开，恢复只通过块设备读盘。
@@ -1699,15 +1671,9 @@ fn main() {
         .collect();
     let report = recover(&reopened, JournalPolicy::Consult);
     // 抬 F 模式多打一行：所选根从盘上读回的 F（代码轮第二轮判决 Z10：`name=raise_rollback_floor` 那一行的 `requested_floor=`
-    // 是内存里那一版的 F，冷重开择根并不看它，55 号要独立读回盘上的 F 才判得出「F 抬到 3」）。别的模式一行不多。
-    let rollback_floor_read_back_line = match mode.publishes_after_the_new_pool_file_creation() {
-        PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
-            Some(rollback_floor_read_back_from_the_chosen_root_line(&reopened))
-        }
-        PublishesAfterTheNewPoolFileCreation::Nothing
-        | PublishesAfterTheNewPoolFileCreation::SecondVersion
-        | PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstance => None,
-    };
+    // 是内存里那一版的 F，冷重开择根并不看它，55 号要独立读回盘上的 F 才判得出「F 抬到 3」）。别的模式一行不多（入口交 `None`）。
+    let rollback_floor_read_back_line =
+        line_read_back_after_the_cold_reopen.map(|read_back| read_back(&reopened));
     let (outcome, root, content_matches) = match &report.outcome {
         RecoveryOutcome::FileRead { root, content } => (
             "file_read",
@@ -1742,7 +1708,7 @@ fn main() {
         emitter.emit(line);
     }
     let (registration_line, segment_timing_registered) =
-        clock.registration_check(&arguments[3], registered_segments_of(mode));
+        clock.registration_check(&mode_argument, registered_segments_of(mode));
     emitter.emit(&registration_line);
     let (containment_line, segment_timing_contained) = clock.containment_check();
     emitter.emit(&containment_line);
@@ -1757,12 +1723,225 @@ fn main() {
     }
 }
 
+/// 发布 B（`file-overwrite` 与之后两档）：同一个进程里再覆盖写一次（`publish_the_second_version_and_describe`），打它的行、并进窗口账、记一段分段时间。
+fn publish_the_second_version_step(run: &mut OnDeviceRun) {
+    let second = publish_the_second_version_and_describe(
+        &run.parameters,
+        &mut run.devices,
+        &run.plan,
+        &run.stream,
+        &run.geometry,
+        &run.run,
+    )
+    .unwrap_or_else(|failed| exit_after_a_failed_run(&mut run.emitter, &failed));
+    for line in &second.lines {
+        run.emitter.emit(line);
+    }
+    run.every_window_matches_device &= second.window_matches_device;
+    run.segment_timing_lines
+        .push(run.clock.mark("file_overwrite"));
+}
+
+/// 冷重开时按路径重新打开两块盘（`second-instance` 与 `raise-rollback-floor` 两档换实例那一步交给它）。
+fn reopen_by_path(
+    device_paths: [String; 2],
+    policy: PageCachePolicy,
+) -> impl FnOnce(
+    Vec<(DeviceIdentity, DirectInputOutputBlockDevice)>,
+) -> Vec<(DeviceIdentity, DirectInputOutputBlockDevice)> {
+    move |closed_devices: Vec<(DeviceIdentity, DirectInputOutputBlockDevice)>| {
+        drop(closed_devices);
+        device_paths
+            .iter()
+            .enumerate()
+            .map(|(index, path)| {
+                (
+                    DeviceIdentity(u32::try_from(index).expect("设备号")),
+                    open(path, policy),
+                )
+            })
+            .collect::<Vec<_>>()
+    }
+}
+
+/// `second-instance`：发布 B 之后同一对盘冷重开、可写挂载，再发布 C；挂载与发布 C 的行并进来。
+fn switch_instance_and_publish_the_third_version_step(run: &mut OnDeviceRun) {
+    let devices = std::mem::take(&mut run.devices);
+    let switched = switch_instance_and_publish_third_version(
+        &run.parameters,
+        devices,
+        &run.stream,
+        &run.geometry,
+        &mut run.clock,
+        reopen_by_path(run.device_paths.clone(), run.policy),
+    )
+    .unwrap_or_else(|failed| exit_after_a_failed_run(&mut run.emitter, &failed));
+    emit_the_lines_after_the_second_version(
+        &mut run.emitter,
+        &mut run.segment_timing_lines,
+        &switched.lines,
+    );
+    run.every_window_matches_device &= switched.every_window_matches_device;
+    run.devices = switched.devices;
+}
+
+/// `raise-rollback-floor`：`second-instance` 那条路走完，同一次挂载里再发布 D、抬 F；这几段的行并进来。
+fn switch_instance_publish_the_fourth_version_and_raise_the_rollback_floor_step(
+    run: &mut OnDeviceRun,
+) {
+    let devices = std::mem::take(&mut run.devices);
+    let raised = switch_instance_and_publish_third_version(
+        &run.parameters,
+        devices,
+        &run.stream,
+        &run.geometry,
+        &mut run.clock,
+        reopen_by_path(run.device_paths.clone(), run.policy),
+    )
+    .and_then(|switched| {
+        publish_the_fourth_version_and_raise_the_rollback_floor(
+            &run.parameters,
+            switched,
+            &run.stream,
+            &run.geometry,
+            &mut run.clock,
+        )
+    })
+    .unwrap_or_else(|failed| exit_after_a_failed_run(&mut run.emitter, &failed));
+    emit_the_lines_after_the_second_version(
+        &mut run.emitter,
+        &mut run.segment_timing_lines,
+        &raised.lines,
+    );
+    run.every_window_matches_device &= raised.every_window_matches_device;
+    run.devices = raised.devices;
+}
+
+// ============================== 每档一个入口（QEMU 门禁按档从各自的入口算来宾程序的闭包） ==============================
+
+/// `direct`：绕开页缓存，新池新建文件之后冷重开读回第一版。
+fn run_the_direct_mode(arguments: &OnDeviceRunArguments) {
+    let run = start_through_the_new_pool_file_creation(
+        arguments,
+        OnDeviceRunMode::Direct,
+        PageCachePolicy::BypassWithDirectInputOutput,
+        None,
+    );
+    finish_with_the_cold_reopen(run, None);
+}
+
+/// `page-cache`：走页缓存（阳性对照），其余同 `direct`。
+fn run_the_page_cache_mode(arguments: &OnDeviceRunArguments) {
+    let run = start_through_the_new_pool_file_creation(
+        arguments,
+        OnDeviceRunMode::PageCache,
+        PageCachePolicy::GoThroughPageCache,
+        None,
+    );
+    finish_with_the_cold_reopen(run, None);
+}
+
+/// `skip-new-pool-file-creation-barrier`：新池新建文件之前在盘 0 上吞掉下一道屏障，其余同 `direct`。
+fn run_the_skip_new_pool_file_creation_barrier_mode(arguments: &OnDeviceRunArguments) {
+    let run = start_through_the_new_pool_file_creation(
+        arguments,
+        OnDeviceRunMode::SkipNewPoolFileCreationBarrier,
+        PageCachePolicy::BypassWithDirectInputOutput,
+        Some(swallow_the_next_barrier_on),
+    );
+    finish_with_the_cold_reopen(run, None);
+}
+
+/// `file-overwrite`：新池新建文件之后再发布 B，冷重开读回第二版。
+fn run_the_file_overwrite_mode(arguments: &OnDeviceRunArguments) {
+    let mut run = start_through_the_new_pool_file_creation(
+        arguments,
+        OnDeviceRunMode::FileOverwrite,
+        PageCachePolicy::BypassWithDirectInputOutput,
+        None,
+    );
+    publish_the_second_version_step(&mut run);
+    finish_with_the_cold_reopen(run, None);
+}
+
+/// `second-instance`：发布 B 之后换实例、发布 C，冷重开读回第三版。
+fn run_the_second_instance_mode(arguments: &OnDeviceRunArguments) {
+    let mut run = start_through_the_new_pool_file_creation(
+        arguments,
+        OnDeviceRunMode::SecondInstance,
+        PageCachePolicy::BypassWithDirectInputOutput,
+        None,
+    );
+    publish_the_second_version_step(&mut run);
+    switch_instance_and_publish_the_third_version_step(&mut run);
+    finish_with_the_cold_reopen(run, None);
+}
+
+/// `raise-rollback-floor`：`second-instance` 那条路走完，再发布 D、抬 F，冷重开读回第四版、另打一行所选根从盘上读回的 F。
+fn run_the_raise_rollback_floor_mode(arguments: &OnDeviceRunArguments) {
+    let mut run = start_through_the_new_pool_file_creation(
+        arguments,
+        OnDeviceRunMode::RaiseRollbackFloor,
+        PageCachePolicy::BypassWithDirectInputOutput,
+        None,
+    );
+    publish_the_second_version_step(&mut run);
+    switch_instance_publish_the_fourth_version_and_raise_the_rollback_floor_step(&mut run);
+    finish_with_the_cold_reopen(
+        run,
+        Some(rollback_floor_read_back_from_the_chosen_root_line),
+    );
+}
+
+/// 一档的入口 fn 与它的名字（名字是写在这里的那个标识符本身，`stringify!`，不另抄一份）。
+macro_rules! entry_with_its_name {
+    ($entry:ident) => {
+        ($entry as fn(&OnDeviceRunArguments), stringify!($entry))
+    };
+}
+
+/// 模式表 → 那一档的入口（名字照「run_the_<模式参数，- 换成 _>_mode」）：`main` 解析完参数只调它交回的那一个。
+fn entry_of_the_mode(mode: OnDeviceRunMode) -> (fn(&OnDeviceRunArguments), &'static str) {
+    match mode {
+        OnDeviceRunMode::Direct => entry_with_its_name!(run_the_direct_mode),
+        OnDeviceRunMode::PageCache => entry_with_its_name!(run_the_page_cache_mode),
+        OnDeviceRunMode::SkipNewPoolFileCreationBarrier => {
+            entry_with_its_name!(run_the_skip_new_pool_file_creation_barrier_mode)
+        }
+        OnDeviceRunMode::FileOverwrite => entry_with_its_name!(run_the_file_overwrite_mode),
+        OnDeviceRunMode::SecondInstance => entry_with_its_name!(run_the_second_instance_mode),
+        OnDeviceRunMode::RaiseRollbackFloor => {
+            entry_with_its_name!(run_the_raise_rollback_floor_mode)
+        }
+    }
+}
+
+fn main() {
+    let arguments: Vec<String> = std::env::args().collect();
+    if arguments.len() != 4 {
+        eprintln!(
+            "用法：new_pool_file_creation_on_device <盘 0> <盘 1> <{}>",
+            OnDeviceRunMode::every_argument_for_usage()
+        );
+        std::process::exit(2);
+    }
+    let Some(mode) = OnDeviceRunMode::from_argument(&arguments[3]) else {
+        eprintln!("不认识的模式 {}", arguments[3]);
+        std::process::exit(2)
+    };
+    let (entry, _entry_name) = entry_of_the_mode(mode);
+    entry(&OnDeviceRunArguments {
+        device_paths: [arguments[1].clone(), arguments[2].clone()],
+        mode_argument: arguments[3].clone(),
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        describe_publish_writes, pool_writes_between, publish_writes_against_device,
-        registered_segments_of, switch_instance_and_publish_third_version, CountedDevice,
-        DeviceCallCounts, SegmentClock,
+        describe_publish_writes, entry_of_the_mode, pool_writes_between,
+        publish_writes_against_device, registered_segments_of,
+        switch_instance_and_publish_third_version, CountedDevice, DeviceCallCounts, SegmentClock,
     };
     use singlefs_checker_tier::on_device_modes::{
         allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process, fourth_file_content,
@@ -2141,6 +2320,29 @@ mod tests {
     }
 
     /// 每一档登记的段都互不相同、而且都在这一档真会走到的那几段里：
+    /// 每档一个入口 fn（剪枝复查 4-2d ②：QEMU 门禁按档从各自的入口算来宾程序的闭包，不再六档共用 `main` 一把）：模式表里每一档的入口名字是
+    /// 「run_the_<模式参数，- 换成 _>_mode」，六档六个、两两不同（两档合回一个入口，这条红）。
+    #[test]
+    fn every_mode_has_its_own_entry_function_named_after_its_argument() {
+        let mut names = Vec::new();
+        for mode in OnDeviceRunMode::ALL {
+            let (_entry, name) = entry_of_the_mode(mode);
+            assert_eq!(
+                name,
+                format!("run_the_{}_mode", mode.argument().replace('-', "_")),
+                "{mode:?} 的入口名照模式参数起"
+            );
+            names.push(name);
+        }
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(
+            names.len(),
+            OnDeviceRunMode::ALL.len(),
+            "每档一个入口，两两不同"
+        );
+    }
+
     /// `second-instance` 比 `file-overwrite` 多两段（重开可写挂载、发布 C），后者比 `direct` 多一段（发布 B）；
     /// `raise-rollback-floor` 比 `second-instance` 多两段（发布 D、抬 F）。
     #[test]

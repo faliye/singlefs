@@ -23,10 +23,11 @@ use singlefs_harness::gpu_memory_ledger::{
 };
 use singlefs_harness::sha256::DIGEST_BYTES;
 
-/// 卡池的借据丢掉时最多等设备多久（E174 跑前登记 `research/prompts/e174-preregistration.md` 第五节「等待」那一臂：
-/// `PollType::Wait { submission_index: None, timeout: Some(30 秒) }`；E174 两段里这一臂每次都等完了，`wait_always_returns=true`）。
-const WAIT_FOR_THE_DEVICE_BEFORE_RETURNING_A_LEASE: std::time::Duration =
-    std::time::Duration::from_secs(30);
+/// 卡池的借据丢掉时、崩溃放量在这一趟自己起的卡上判完还显存排队的占位之前，最多等设备多久（E174 跑前登记
+/// `research/prompts/e174-preregistration.md` 第五节「等待」那一臂：`PollType::Wait { submission_index: None, timeout: Some(30 秒) }`；
+/// E174 两段里这一臂每次都等完了，`wait_always_returns=true`）。两处等的是同一件事（丢掉的缓冲要等设备收拾才交回驱动），只留这一处定义。
+pub(crate) const LONGEST_WAIT_FOR_THE_DEVICE_BEFORE_RETURNING_A_LEASE_OR_A_PLACE_IN_THE_MEMORY_QUEUE:
+    std::time::Duration = std::time::Duration::from_secs(30);
 
 /// 借据丢掉时那一次等（`polled` 是 `poll(Wait)` 的结局，wgpu panic 了是外层的 `Err`）算没算等完：队列空了或等到了才算；
 /// 超时、wgpu 报错、panic 都算没等成。`Wait` 不交 [`wgpu::PollStatus::Poll`]（那是 `PollType::Poll` 的结局），交了照没等成算。
@@ -44,11 +45,13 @@ fn device_wait_before_returning_a_lease(
 }
 
 /// 卡池的借据丢掉时那一次等：等这张卡的设备上到此刻为止提交的活都做完（`submission_index: None`，E174 跑前登记第五节「等待」那一臂），
-/// 最多等 [`WAIT_FOR_THE_DEVICE_BEFORE_RETURNING_A_LEASE`]（不设上限会让丢借据的那条线程卡在一台出了事的设备上，设 0 等于不等）。
+/// 最多等 [`LONGEST_WAIT_FOR_THE_DEVICE_BEFORE_RETURNING_A_LEASE_OR_A_PLACE_IN_THE_MEMORY_QUEUE`]（不设上限会让丢借据的那条线程卡在一台出了事的设备上，设 0 等于不等）。
 fn poll_type_before_returning_a_lease() -> wgpu::PollType {
     wgpu::PollType::Wait {
         submission_index: None,
-        timeout: Some(WAIT_FOR_THE_DEVICE_BEFORE_RETURNING_A_LEASE),
+        timeout: Some(
+            LONGEST_WAIT_FOR_THE_DEVICE_BEFORE_RETURNING_A_LEASE_OR_A_PLACE_IN_THE_MEMORY_QUEUE,
+        ),
     }
 }
 
@@ -976,7 +979,7 @@ pub fn check_unit_checksums_on_the_cpu(units: &[&[u8]]) -> Vec<UnitChecksumVerdi
 
 /// GPU 对拍用例开跑前取卡，只给测试用（`tests/` 下的 GPU 对拍与库内要卡的计时用例都经它）。
 /// 本机没有 NVIDIA 卡时打一行 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>`、用例当场返回成功（门禁按这一行逐条报「本次未跑」，
-/// 上游 `test-script-discipline.md`「分快慢两档」：要特定硬件的那几条在没有那种硬件的机器上报「本次未跑」）；有卡而用不上判红
+/// `.claude/rules/test-script-discipline.md`「分快慢两档」：要特定硬件的那几条在没有那种硬件的机器上报「本次未跑」）；有卡而用不上判红
 /// （同一篇「用上现有的硬件加速」：有那种硬件而用不上要报错，不悄悄退回）。
 /// 「没卡」看两处：Vulkan 枚举里有没有 NVIDIA 独显，PCI 上有没有 NVIDIA 显示控制器——Vulkan 驱动坏了枚举不出来时，PCI 上照样看得见那张卡
 /// （C620：GPU 对拍认「没卡」只看 Vulkan 枚举，驱动坏了被当成本次未跑）。看不见 PCI 总线（[`gpu_test_start::PCI_BUS_DIRECTORY`] 整个不在）
@@ -986,8 +989,8 @@ pub mod gpu_test_start {
     use super::{usable_gpu_cards, GpuCard, NVIDIA_VENDOR_IDENTIFIER};
     use crate::crash_amplification::RecordedGivenStatesTable;
     use crate::crash_library::{
-        repository_root_of_this_crate, two_stages, CrashLibrary, CrashLibraryClass, ItemManifest,
-        ItemName, StageOutcome,
+        two_stages, CrashLibrary, CrashLibraryClass, ItemManifest, ItemName, RecordingInputsDigest,
+        StageOutcome,
     };
     use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
@@ -1023,8 +1026,8 @@ pub mod gpu_test_start {
             ItemName::new(&item_text).unwrap_or_else(|refusal| panic!("CPU 参照的项名：{refusal}"));
         let outcome = two_stages(
             CrashLibraryClass::JudgeTablesPairing,
-            &repository_root_of_this_crate(),
             &item,
+            &RecordingInputsDigest(digest),
             |library| {
                 library
                     .lock()
@@ -1966,13 +1969,18 @@ pub mod gpu_test_start {
                 Ok(host) => host,
                 Err(reason) => return refused(reason),
             };
-            // 显卡先后写在多机配置里（判决 J5、J11）：仓根取这一份源码编进来的那个包往上两层，多机配置按它的 git common-dir 找主工作树那一份
-            let repository_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .parent()
-                .and_then(std::path::Path::parent)
-                .expect("包目录在 crates/ 下，往上两层是仓根");
+            // 显卡先后写在多机配置里（判决 J5、J11）：多机配置是这台机器的，按这个进程的当前目录的 git common-dir 找主工作树那一份
+            // （cargo 把测试进程的当前目录设成包目录；仓根不是键的输入，定案 1）
+            let current_directory = match std::env::current_dir() {
+                Ok(current_directory) => current_directory,
+                Err(error) => {
+                    return refused(format!(
+                        "取不到这个进程的当前目录（多机配置从这里起找）：{error}"
+                    ))
+                }
+            };
             let configuration_file =
-                match configuration.multi_host_configuration_file(repository_root) {
+                match configuration.multi_host_configuration_file(&current_directory) {
                     Ok(configuration_file) => configuration_file,
                     Err(reason) => return refused(reason),
                 };
@@ -2243,16 +2251,18 @@ mod tests {
         ThereWithDevices(&'devices [(&'devices str, Option<&'devices str>, Option<&'devices str>)]),
     }
 
-    /// 照 `pci_bus` 建一棵假的 sysfs，交回 `(根, 总线目录 <根>/bus/pci)`；用完由调用方删根。
+    /// 照 `pci_bus` 建一棵假的 sysfs，交回 `(根, 总线目录 <根>/bus/pci)`；根丢掉时连同整棵删掉。
     fn fake_sysfs(
         test_name: &str,
         pci_bus: &FakePciBus<'_>,
-    ) -> (std::path::PathBuf, std::path::PathBuf) {
-        let root = std::env::temp_dir().join(format!(
-            "singlefs-gpu-test-start-sysfs-{}-{test_name}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&root);
+    ) -> (
+        crate::crash_library::ExclusiveTemporaryDirectory,
+        std::path::PathBuf,
+    ) {
+        let root = crate::crash_library::ExclusiveTemporaryDirectory::create(&format!(
+            "gpu-test-start-sysfs-{test_name}"
+        ))
+        .expect("建得了一次性临时目录");
         let bus_directory = root.join("bus").join("pci");
         std::fs::create_dir_all(root.join("bus")).expect("临时目录建得出");
         match pci_bus {
@@ -2299,7 +2309,7 @@ mod tests {
     fn a_pci_bus_directory_that_is_not_there_is_read_as_the_bus_not_being_visible() {
         let (root, bus_directory) = fake_sysfs("bus-not-there", &FakePciBus::NotThere);
         let read = read_pci_nvidia_display_controllers_on_the_bus(&bus_directory);
-        let _ = std::fs::remove_dir_all(&root);
+        drop(root);
         assert!(
             matches!(read, PciNvidiaDisplayControllers::PciBusNotVisible { .. }),
             "总线目录整个不在是看不见 PCI 总线，不是设备表读不出：{read:?}"
@@ -2314,7 +2324,7 @@ mod tests {
             &FakePciBus::ThereWithoutItsDevicesDirectory,
         );
         let read = read_pci_nvidia_display_controllers_on_the_bus(&bus_directory);
-        let _ = std::fs::remove_dir_all(&root);
+        drop(root);
         assert!(
             matches!(read, PciNvidiaDisplayControllers::ListingUnreadable { .. }),
             "总线目录在、设备子目录列不出是读不出，不许当成看不见总线：{read:?}"
@@ -2328,7 +2338,7 @@ mod tests {
             &FakePciBus::ThereWithDevices(&[("0000:00:1f.3", None, Some("0x040300\n"))]),
         );
         let read = read_pci_nvidia_display_controllers_on_the_bus(&bus_directory);
-        let _ = std::fs::remove_dir_all(&root);
+        drop(root);
         let start = decide_gpu_test_start(&[], &read, 0);
         assert!(
             matches!(
@@ -2607,6 +2617,7 @@ mod tests {
                 timeout: Some(timeout),
             } => assert_eq!(
                 timeout,
+                // 钉的是 E174 登记的那个值，所以写字面量：拿常量比它自己，常量改成别的秒数也照绿
                 std::time::Duration::from_secs(30),
                 "最多等 E174 登记的 30 秒：不设会让丢借据的线程卡在出了事的设备上，0 等于不等"
             ),

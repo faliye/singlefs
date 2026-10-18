@@ -8,7 +8,8 @@
 //! 落点按设备取（D3（空间分配） 已定项 8 第 1 条「在每一块被选中的设备上各自取」）：每块盘按自己的空闲图各答一个，各盘一致才分配；
 //! 有的盘答不出、或各盘答得不同，在动任何状态之前拒绝（`PlacementRefusal`）——`Placement` 两盘同槽，各盘不同槽第一版不支持。
 //! 记账（D5（快照 / 空间记账机制） 已定项 7 / 已定项 8）：已分配 = 落点之和、容量 = 单元区、runs = 空闲槽的连续段数（逐设备）、
-//! 全空聚簇段数逐设备——全部在分配那一刻增量维护，运行时不扫盘（`.claude/rules/fs-design.md` 第一格）。
+//! 逐段的已用槽数——这几样在分配那一刻增量维护，运行时不扫盘（`.claude/rules/fs-design.md` 第一格）。全空聚簇段数逐设备不是增量维护的：
+//! `DeviceFreeMap::empty_segments` 每次被读都把内存里逐段的已用槽数数一遍（不读盘，代价随段数长）。
 
 use singlefs_format::{
     ALLOCATION_RECORD_BYTES, CLUSTER_SEGMENT_SLOTS, JOURNAL_RING_DEFAULT_BYTES, SLOT_BYTES,
@@ -64,11 +65,6 @@ impl AllocationRecord {
         writer.put_u64(self.generation.0);
         writer.assert_position(20, "分配记录");
         writer.into_bytes()
-    }
-    /// key = (设备 4, 槽号 6)。
-    #[must_use]
-    pub fn key_bytes(&self) -> Vec<u8> {
-        self.to_bytes()[..10].to_vec()
     }
     /// 按字段比：设备身份，再槽号（D8（核心索引结构） 已定项 11）。
     #[must_use]
@@ -1588,7 +1584,7 @@ pub struct PoolAllocator {
         Option<AllocationRecordTreeOfTheVersionWithoutFile>,
     /// 复用窗口，只供测试的开关（`ReuseWindow`）。只住内存：重开之后按产品路径起步（`rebuild_from_records` 走 `new`）。
     reuse_window: ReuseWindow,
-    /// 复用窗口置 0 时在 `release` 里当场回收掉的落点数（逐盘各算一条，与 `reclaim_released_up_to` 的返回值口径不同）：
+    /// 复用窗口置 0 时在 `release` 里当场回收掉的落点数（两盘同槽的一个落点算一条，就是 `reclaim_released_up_to` 交回的条数）：
     /// 开关走没走到，读这个数就看得出（`.claude/rules/fs-design.md` 五条硬要求第 4 条）。
     placements_reclaimed_on_release_by_the_forced_zero_reuse_window: u64,
     /// 这个分配器实例上提交内生块走回落（`CommitGeneratedDeviceAnswer::FallBackToLowestFreeSlot`，D3（空间分配） 已定项 8 ②）的次数，
@@ -3147,7 +3143,7 @@ mod tests {
     }
 
     /// 新落点罩住一条没回收的记录（已释放、还在 defer 窗口里）：位图与记录分叉了，在记录这一层就断言，不等到位图的断言。
-    /// 不用 `should_panic`：门禁 59 号按「test 名 ... FAILED」认红，`should_panic` 那一行多一段「- should panic」认不出。
+    /// 用 `catch_unwind` 接住、再按消息断言：位图那一层的断言同样会 panic，要钉住拦下它的是记录这一层那一条。
     #[test]
     fn placement_over_record_that_was_not_reclaimed_is_asserted_on_the_records() {
         let mut pool = rebuilt_pool(records_on_both_devices(&[

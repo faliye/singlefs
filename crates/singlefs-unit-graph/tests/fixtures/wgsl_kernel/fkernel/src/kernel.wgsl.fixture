@@ -1,0 +1,13 @@
+// 夹具内核：PRELUDE_OFFSET 由 Rust 侧拼在前面。
+const WIDTH: u32 = 4u;
+fn helper(value: u32) -> u32 {
+    return value * 2u + WIDTH + PRELUDE_OFFSET;
+}
+fn unreachable_helper(value: u32) -> u32 {
+    return value + 7u;
+}
+@group(0) @binding(0) var<storage, read_write> words: array<u32>;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+    words[id.x] = helper(id.x);
+}

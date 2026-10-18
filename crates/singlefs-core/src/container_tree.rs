@@ -272,7 +272,7 @@ impl ContainerTreeShape {
     }
 
     /// 这几片容器（叶序）的祖先的并，按 bump 次序（层级升序、同层从左到右，根最末）：这几片被重写时 COW 的就是它们（叶 + 全部祖先）。
-    /// 只有最右那一片时就是 [`Self::rightmost_path`]。没有容器时空。
+    /// 只有最右那一片时就是最右那一条路径（每一层最右那一个节点）。没有容器时空。
     ///
     /// # Panics
     /// 某个下标不小于容器数：调用方只拿这一版里的容器问。
@@ -311,19 +311,6 @@ impl ContainerTreeShape {
             }
         }
         ancestors.into_iter().collect()
-    }
-
-    /// 最右那一条路径上的节点（每一层最右那一个），按 bump 次序（层级 1 先、根最末）：最右那片容器被重写时 COW 的祖先就是它们。
-    #[must_use]
-    pub fn rightmost_path(&self) -> Vec<ContainerTreeNodePosition> {
-        self.children_of_each_node_at_each_level
-            .iter()
-            .enumerate()
-            .map(|(level_index, nodes)| ContainerTreeNodePosition {
-                level: u8::try_from(level_index + 1).expect("层数在构造时判过装得进一字节"),
-                index_in_level: u32::try_from(nodes.len() - 1).expect("同层节点数装得进 u32"),
-            })
-            .collect()
     }
 
     /// 最右端新开一片容器之后的形状（末尾分裂、根满长高，D8（核心索引结构） 已定项 6）：最右那个层级 1 节点装得下（孩子少于
@@ -467,12 +454,23 @@ impl<Record> ContainerTreeAfterThisPublish<Record> {
     }
 }
 
+/// 要开一片新容器时下一个容器号装不下：最右那片的号（盘上读来的 8 字节）已是 `u64::MAX`，加一越过顶（C841，用户 2026-10-15 定
+/// 「写路径报类型化错误」：开新容器那一次发布报这个错、不 panic，读盘不变）。容器号从 1 起逐片加一，健康的树走不到顶，
+/// 坏镜像、外来镜像才有。`tree` 是要开新容器的那棵树（墓碑树、谱系树或退役树），`rightmost_container` 是最右那片的号。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NextContainerNumberPastTheTopOfItsRange {
+    pub tree: TreeIdentifier,
+    pub rightmost_container: u64,
+}
+
 /// 往容器树的开放容器（最右那一片）追加一条记录：[`append_records_to_the_open_container`] 只给一条的那一格。
+///
+/// # Errors
+/// 同 [`append_records_to_the_open_container`]。
 #[allow(
     clippy::too_many_arguments,
     reason = "参数各是一样东西：上一版的容器与形状、这条记录、txg、树、记录类型、一片装几条、一个节点装几条"
 )]
-#[must_use]
 pub fn append_record_to_the_open_container<Record: Clone>(
     containers_before_this_publish: &[RecordContainer<Record>],
     shape_before_this_publish: &ContainerTreeShape,
@@ -482,7 +480,7 @@ pub fn append_record_to_the_open_container<Record: Clone>(
     record_type: u16,
     records_per_container: usize,
     node_entries: ContainerTreeNodeEntries,
-) -> ContainerTreeAfterThisPublish<Record> {
+) -> Result<ContainerTreeAfterThisPublish<Record>, NextContainerNumberPastTheTopOfItsRange> {
     append_records_to_the_open_container(
         containers_before_this_publish,
         shape_before_this_publish,
@@ -500,6 +498,10 @@ pub fn append_record_to_the_open_container<Record: Clone>(
 /// 打包记录类型 = `record_type`，形状照 [`ContainerTreeShape::after_a_container_is_opened_at_the_right_end`] 往上挂（根满长高）。
 /// 这次追加过的每一片进重写清单（叶序升序、各一次）；别的容器一个字节都不动。`records` 为空时整棵照抄（[`ContainerTreeAfterThisPublish::carried`]）。
 ///
+/// # Errors
+/// 要开新容器而最右那片的号已是 `u64::MAX` ⇒ [`NextContainerNumberPastTheTopOfItsRange`]（C841）：在开那一片之前交回，
+/// 只算、不写，调用方照样一个字节都没写。最右那片还装得下时照常追加，不看它的号。
+///
 /// # Panics
 /// `shape_before_this_publish` 里的容器数与 `containers_before_this_publish` 不等：两样出自同一版。`records_per_container` 为 0：
 /// 三棵树的容量开关的构造函数都判过至少 1。
@@ -507,7 +509,6 @@ pub fn append_record_to_the_open_container<Record: Clone>(
     clippy::too_many_arguments,
     reason = "参数各是一样东西：上一版的容器与形状、这几条记录、txg、树、记录类型、一片装几条、一个节点装几条"
 )]
-#[must_use]
 pub fn append_records_to_the_open_container<Record: Clone>(
     containers_before_this_publish: &[RecordContainer<Record>],
     shape_before_this_publish: &ContainerTreeShape,
@@ -517,7 +518,7 @@ pub fn append_records_to_the_open_container<Record: Clone>(
     record_type: u16,
     records_per_container: usize,
     node_entries: ContainerTreeNodeEntries,
-) -> ContainerTreeAfterThisPublish<Record> {
+) -> Result<ContainerTreeAfterThisPublish<Record>, NextContainerNumberPastTheTopOfItsRange> {
     assert_eq!(
         shape_before_this_publish.containers(),
         containers_before_this_publish.len(),
@@ -543,9 +544,19 @@ pub fn append_records_to_the_open_container<Record: Clone>(
                 .push(record.clone());
         } else {
             // 容器号沿叶序严格递增、从 1 起（0 不用），下一个号 = 树里最大号 + 1：最右那片的号就是最大号。
-            let next_container_number = containers
-                .last()
-                .map_or(1, |rightmost| rightmost.identity.container + 1);
+            // 最右那片的号是盘上读来的 8 字节：加一越过顶的交回类型化错误（C841），不 panic。
+            let next_container_number = match containers.last() {
+                None => 1,
+                Some(rightmost) => {
+                    let rightmost_container = rightmost.identity.container;
+                    rightmost_container.checked_add(1).ok_or(
+                        NextContainerNumberPastTheTopOfItsRange {
+                            tree,
+                            rightmost_container,
+                        },
+                    )?
+                }
+            };
             containers.push(RecordContainer {
                 identity: PackedIdentity {
                     birth_tree: tree,
@@ -568,12 +579,12 @@ pub fn append_records_to_the_open_container<Record: Clone>(
             "形状里层级 1 的孩子数之和就是容器数"
         );
     }
-    ContainerTreeAfterThisPublish {
+    Ok(ContainerTreeAfterThisPublish {
         containers,
         rewritten_containers,
         shape,
         shape_before_this_publish: shape_before_this_publish.clone(),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -677,7 +688,8 @@ mod tests {
             1,
             1,
             capped(2),
-        );
+        )
+        .expect("最右那片的号 2，加一装得下");
         assert!(after.grew_a_level_this_publish());
         assert_eq!(after.containers[2].identity.container, 3);
         assert_eq!(
@@ -738,7 +750,8 @@ mod tests {
             3,
             2,
             capped(2),
-        );
+        )
+        .expect("最右那片的号 2，加一装得下");
         assert_eq!(after.containers.len(), 3);
         assert_eq!(after.containers[0], before[0], "装满了的第一片原样");
         assert_eq!(after.containers[1].records, vec![12, 13], "第二片装满");
@@ -765,8 +778,8 @@ mod tests {
         );
         assert_eq!(
             after.shape.ancestors_of_containers(&[2]),
-            after.shape.rightmost_path(),
-            "只看最右那一片时祖先就是最右那一条路径"
+            vec![position(1, 1), position(2, 0)],
+            "只看最右那一片时祖先就是最右那一条路径：右半 (1, 1) 与根 (2, 0)，旧根 (1, 0) 不在其内"
         );
         let carried = append_records_to_the_open_container(
             &after.containers,
@@ -777,11 +790,61 @@ mod tests {
             3,
             2,
             capped(2),
-        );
+        )
+        .expect("一条都不追加，不开新容器");
         assert!(carried.rewritten_containers.is_empty() && carried.rewritten_nodes().is_empty());
         assert_eq!(
             carried.containers, after.containers,
             "一条都不追加时整棵照抄"
+        );
+    }
+
+    /// C841：最右那片的号是 `u64::MAX`（坏镜像上读来的）。它还装得下时照常追加进它；装满了、要开新容器时交回
+    /// `NextContainerNumberPastTheTopOfItsRange`、点名树与最右那片的号，不 panic。改之前这一步加一溢出 panic（工作区开着 overflow-checks）。
+    #[test]
+    fn opening_a_container_after_one_numbered_at_the_top_of_its_range_returns_an_error() {
+        let rightmost_at_the_top = RecordContainer {
+            identity: PackedIdentity {
+                birth_tree: TreeIdentifier(65545),
+                record_type: 1,
+                container: u64::MAX,
+                container_birth: CheckpointTxg(5),
+            },
+            records: vec![10_u64],
+        };
+        let before = vec![rightmost_at_the_top];
+        let shape_before = shape_after_opening(1, 2);
+        let appended_into_the_open_container = append_records_to_the_open_container(
+            &before,
+            &shape_before,
+            &[11_u64],
+            CheckpointTxg(9),
+            TreeIdentifier(65545),
+            1,
+            2,
+            capped(2),
+        )
+        .expect("最右那片还装得下：不开新容器，不看它的号");
+        assert_eq!(
+            appended_into_the_open_container.containers[0].records,
+            vec![10, 11]
+        );
+        assert_eq!(
+            append_records_to_the_open_container(
+                &before,
+                &shape_before,
+                &[11_u64],
+                CheckpointTxg(9),
+                TreeIdentifier(65545),
+                1,
+                1,
+                capped(2),
+            ),
+            Err(NextContainerNumberPastTheTopOfItsRange {
+                tree: TreeIdentifier(65545),
+                rightmost_container: u64::MAX,
+            }),
+            "最右那片装满、要开新容器：号加一越过顶，交回类型化错误"
         );
     }
 

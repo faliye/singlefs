@@ -1,0 +1,11 @@
+pub trait InASlice {
+    fn in_a_slice(&self) -> u32;
+}
+impl<Element> InASlice for [Element] {
+    fn in_a_slice(&self) -> u32 {
+        5
+    }
+}
+pub fn count(items: &[u32]) -> u32 {
+    items.in_a_slice()
+}

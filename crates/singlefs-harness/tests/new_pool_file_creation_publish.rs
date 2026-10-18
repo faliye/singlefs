@@ -340,7 +340,7 @@ fn recorded_paths_match_the_registered_segment_sequences() {
     let transaction_operations = &operations[pool.warm_up_operation_count..];
     let post_mkfs_operations = &operations[pool.mkfs_operation_count..];
     // 产物第 31–35 行逐字（operations= / segments= / closed_form= / kinds=）；mkfs 那一行 2026-09-22 起
-    // 与产物**不同**：清 journal 环与清根环都是这之后加的，E142 干跑的产物还没重跑（重跑之前门禁 55 号红着）。
+    // 与产物**不同**：清 journal 环与清根环都是这之后加的，E142 干跑的产物还没重跑（重跑之前门禁 checker-tier-qemu-device-streams 红着）。
     // 录制器按设备记屏障（代码审阅第 1 条，用户 2026-09-27 定）之后，每道池屏障两块盘各记一步：操作数与种类串里的屏障数
     // 与产物不同（mkfs 21 → 23、暖机 14 → 18、新池新建文件 31 → 33、mkfs 之后整条 47 → 53），段序列与闭式不变；产物要重出。
     // C577（发布返回之前、系统配置轮换之后一道池屏障）之后每次发布末尾多两步屏障：暖机 18 → 20（第一次末尾那一道顶替了第二次开头
@@ -1490,4 +1490,12 @@ fn mutations_are_caught_by_the_check_that_owns_them() {
         index_node_view(&wrong_width),
         Err(Verdict::DeclaredLengthMismatch)
     );
+}
+
+/// 内存池那一份闭式同一条：一段 64 次写装不进 u64，停下并点名用分片计数。
+#[test]
+#[should_panic(expected = "闭式只算写数少于 64 的段")]
+fn the_memory_pool_closed_form_refuses_a_segment_of_sixty_four_writes() {
+    let segments: Vec<Vec<usize>> = vec![(0..64).collect()];
+    let _ = singlefs_harness::memory_pool::closed_form_state_count(&segments);
 }

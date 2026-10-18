@@ -625,7 +625,12 @@ pub fn writes_and_segments_with_stream_indexes_and_entries(
 pub fn closed_form_state_count(segments: &[Vec<usize>]) -> u64 {
     1 + segments
         .iter()
-        .map(|segment| (1u64 << segment.len()) - 1)
+        .map(|segment| {
+            // 一段 64 次以上的写：2^|段| 装不进 u64，闭式算不出来——那种段要按分片数（E161），不在这里回绕
+            1u64.checked_shl(u32::try_from(segment.len()).expect("段写数装得进 u32"))
+                .expect("闭式只算写数少于 64 的段：2^|段| 装不进 u64，长段按分片计数")
+                - 1
+        })
         .sum::<u64>()
 }
 
@@ -660,7 +665,8 @@ impl ImageReader for MemoryPool {
             .collect();
         Some(slots.into_iter().collect())
     }
-    /// journal 环里写过的扇区所在的记录槽（录制流只收真的记录写，环没有整段写 0 的那一次）。环长取这块盘系统配置槽 0 自述的
+    /// journal 环里写过的扇区所在的记录槽（录制流里 mkfs 清环那一次整段清零也记成一步，施加到镜像上是把扇区删掉、不留写过的扇区，
+    /// [`SparseDevice::zero_fill`]；留下的只有真的记录写）。环长取这块盘系统配置槽 0 自述的
     /// （[`MemoryPool::recorded_geometry_of`]）。
     fn candidate_journal_slots(&self, device: u32) -> Option<Vec<u64>> {
         let image = self.devices.get(&DeviceIdentity(device))?;
@@ -758,7 +764,10 @@ impl ImageReader for CrashImage<'_> {
             .collect();
         for (write, is_persisted) in self.writes.iter().zip(&self.persisted) {
             if *is_persisted && write.device.0 == device && write.kind == StepKind::UnitWrite {
-                slots.insert(write.offset.0 / SLOT_BYTES);
+                // 一次单元写盖住的每个槽都是候选（32 KiB 的数据单元跨两个 16 KiB 的槽），与落成池之后按写过的扇区算的那一份相同
+                let first_slot = write.offset.0 / SLOT_BYTES;
+                let end_slot = (write.offset.0 + write.length_in_bytes()).div_ceil(SLOT_BYTES);
+                slots.extend(first_slot..end_slot.max(first_slot + 1));
             }
         }
         Some(slots.into_iter().collect())

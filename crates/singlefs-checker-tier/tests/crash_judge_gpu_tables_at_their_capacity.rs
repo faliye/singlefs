@@ -1,4 +1,4 @@
-//! checker 档模块：crash、crash_state_enumeration、gpu_unit_checks、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
+//! checker 档模块：crash、crash_state_enumeration、crash_injection、crash_given_states、crash_amplification、gpu_unit_checks、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
 //! GPU 判器按条数开的各张表在容量边界上：恰好装满的判得了、多一条的交 CPU，抬上限之前的边界上那几条流抬之后照样判得了。
 //! 分配记录那两张表（恢复内核读一版分配记录树的 `MAX_ALLOCATION_RECORDS`，`crash_judge_common.wgsl`；扫描内核收一条根的分配记录的
 //! `C_MAX_ALLOC_RECORDS`，`crash_judge_checker_common.wgsl`，最新根的已释放记录表 `C_MAX_RELEASED` 与它同宽）：第 59 批 L6 从 1024 抬到 2048
@@ -18,6 +18,20 @@
 //! 未释放的记录），所以已释放多一条那一形走不到；`C_MAX_RELEASED` 直接取 `C_MAX_ALLOC_RECORDS`，站点 29 在每个输入上都走不到：这条推理在扫描内核的
 //! naga 中间表示上逐步落成断言（`site_twenty_nine_of_the_scan_kernel_is_unreachable_because_released_records_are_picked_from_the_allocation_record_table`，
 //! 不用卡），指站点 29「抬过上限报判不了」的变异是等价变异，留档在那一条。三条流上 CPU 判器每个状态照旧判、都不红（流是合法的）。
+//! 扫描内核释放代高于有效回退下界 F 的已释放记录那张表（`C_MAX_RELEASED_ABOVE`，站点 34）从 2048 抬到与 `C_MAX_ALLOC_RECORDS` 同宽：
+//! 这段历史 F = 0，被判那一版的已释放记录全数进这张表；轮四遍再长到 76 个单元的那条流分配记录 2088 条、已释放 2050 条（CPU 一侧现数的），
+//! 每个状态 GPU 都判得了、对拍字与 CPU 逐状态相同，那张表改回 2048 时它红（容器树旋钮压小的随机历史第 53、55 步起已释放的多于 2048 条，就是这一处判不了）。
+//! 同一条流也钉扫描内核 I-3.10 的去重表（`C_MAX_EXAMINED`，站点 31）：候选集里每条根与由记录施加出来的那几版，各版未释放的分配记录按（盘、槽、代）
+//! 去重、整个状态累计一张；不回收的流上累计条数跟着最新那一版的分配记录条数长，这条流各版累计 2086 条（CPU 一侧现数的），那张表还是 2048 条时
+//! 13 个状态都在站点 31 判不了（恢复照判、池级 checker 原因字 0x1f03：条目过多、站点 31）。抬到与 `C_MAX_ALLOC_RECORDS` 同宽之后每个状态判得了；
+//! 2048、2050 那两条流各版累计 2046、2048 条，在旧的界上也装得下。此刻那张表满了之后不再记判不了、新来的记录不进表照判（I-3.10 是置位，
+//! 同一条记录判两遍结论相同），站点 31 没有了，表多大只管少读几次单元头：这一条在扫描内核的 naga 中间表示上落成断言
+//! （`judging_the_allocation_generations_never_leaves_the_state_undecidable_and_judges_on_once_the_examined_table_is_full`，不用卡）。
+//! 合法的流造不出越过那张表的状态（推的，没造出反例）：回收要求释放代不高于回退下界，候选集里的版本都不低于它，各版未释放记录去重累计
+//! 因此不多于最新那一版的分配记录条数（第四轮 B 量到的每一条流都是少 2），而一版多于 4096 条时分配记录那张表先满。
+//! 表满之后照判那一判在卡上过的是一张不合法的镜像（`common_allocation_record_trees_copied_under_other_generations`）：一个 200 个单元的文件
+//! 长好之后再发十次只建一个空 inode 的发布，最新那条根之前的十条老根各把分配记录树整棵照抄、改代、重封，同一批还在用的单元在每条老根里各算一份，
+//! 各版未释放记录去重累计越过那张表、单版不过七百来条；这张镜像作一个状态的给定状态表交 GPU 判器与 CPU 判器各判一遍，GPU 判得了、对拍字相同（给定状态表那一路两边都不判 oracle，两遍 oracle 的位不比）。
 //! journal 记录表 `MAX_RECORDS`（2048 条，两个内核都按它收环里的记录）这几条流 865、866、1780 条（CPU 一侧数的盘 0 上的记录写）。
 //! 同样造法、同样几半的还有实例表行那两张（扫描内核读一条根自己实例表全部行的 `C_R_MAX_ROWS`，`crash_judge_checker_common.wgsl`，与恢复内核读
 //! 同一种表的 `MAX_ROWS` 同宽）：256 → 512（取号之后崩溃 369 次再挂载写 370 行那条流）→ 24576（取号之后崩溃 65 × 369 次再挂载十二次那个场景，
@@ -28,6 +42,10 @@
 //! 主走读 inode → 对象出生代 `C_MAX_INODE_BIRTHS`（1024 → 16384，站点 13）、扫描内核一版的 inode 记录 `D_MAX_INODE_RECORDS`（1024 → 16384，站点 49）
 //! 与 I-9.29 跨版本那张表 `D_MAX_OBJECT_BIRTHS`（2048 → 16384，站点 59）：一次建 2500 个空 inode、再建一个的那条流（各版合起来 2502 个号），
 //! 每个状态 GPU 都判得了、对拍字与 CPU 逐状态相同；三张表各改回原来的条数时它红。
+//! 判表自己的两个上限（枚举写表的宽 `crash_facts::MAXIMUM_ENUMERATED_WRITES`，持久掩码 `array<u32, PERSISTED_MASK_WORDS>`；一个落点的写数
+//! `crash_judge_tables::MAXIMUM_WRITES_PER_LOCATION`，组合掩码 `COMBINATION_WORDS_OF_A_VERSION` 个字）：2048 → 8192、64 → 256
+//! （随机历史越过原分配记录墙那一族全量那一趟建不出判表；用户 2026-10-13 定「能上 GPU 的上 GPU」）。那一族的一段每步镜像建成一张给定状态表，
+//! 枚举写表与盘 0 系统配置槽 0 号的写数都越过抬之前的上限：每个状态 GPU 都判得了、对拍字与 CPU 逐状态相同。
 //! 要本机一张空闲显存够的 NVIDIA 独显：一张独显适配器都没有时打一行 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、返回成功
 //! （`gpu_unit_checks::gpu_test_start`）。卡经这个进程的卡池取，建好表之后按判器要的显存借
 //! （`crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool`），等满了借不到报「本次未跑」。要 `gpu` 特性。
@@ -35,14 +53,22 @@
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
+mod common_allocation_record_trees_copied_under_other_generations;
 
 use common::{
     build_pool, file_content, geometry, parameters,
     sequential_write_in_process_as_instance_one_and_advance_the_pool, BuiltPool,
     FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
 };
+use common_allocation_record_trees_copied_under_other_generations::{
+    copy_the_allocation_record_tree_of_an_old_root_under_another_generation, FreeSlotsForTheCopies,
+};
 use singlefs_checker_tier::crash::{
     crash_point_replay_plan_state_count, CrashPointReplaySegmentExpansion,
+};
+use singlefs_checker_tier::crash_amplification::RecordedGivenStatesTable;
+use singlefs_checker_tier::crash_given_states::{
+    judge_the_given_states_on_the_cpu, GivenStateConclusion,
 };
 use singlefs_checker_tier::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
 use singlefs_checker_tier::crash_state_enumeration::{
@@ -52,16 +78,25 @@ use singlefs_checker_tier::crash_state_enumeration::{
 /// 这份测试文件的仓内路径：崩溃点重放取样过库的设点文件。
 const THIS_FILE: &str =
     "crates/singlefs-checker-tier/tests/crash_judge_gpu_tables_at_their_capacity.rs";
+use singlefs_checker_tier::crash_injection::HistoryAfterTheMakeFilesystem;
+use singlefs_checker_tier::crash_judge_conclusions::cross_check_words_without_the_oracle;
+use singlefs_checker_tier::crash_judge_conclusions::ClaimedVersionOfAGivenState;
 use singlefs_checker_tier::crash_judge_gpu::{
     checker_scan_kernel_source, cross_check_words_of_cpu_judgement,
     cross_check_words_of_gpu_verdict, verdict_bits, CrossCheckWords, POOL_CHECKER_UNDECIDABLE_WORD,
     VERDICT_WORDS,
 };
-use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
+use singlefs_checker_tier::crash_judge_tables::{
+    build_judge_tables, build_judge_tables_for_the_given_persisted_sets,
+    build_judge_tables_for_the_given_persisted_sets_of_the_recorded_writes_broken_at_the_seams_with_their_claimed_versions,
+    JudgeFlow,
+};
 use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
-    gpu_card_pool_or_report_not_run, GpuCardPool,
+    cpu_reference_table_read_back_from_the_pairing_library, gpu_card_pool_or_report_not_run,
+    GpuCardPool,
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::make_filesystem::make_filesystem;
 use singlefs_core::mount::mount_writable;
@@ -70,6 +105,11 @@ use singlefs_core::transaction::{
     acquire_instance, publish_new_inodes, PoolWriter, TransactionOutput,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
+use singlefs_harness::fault_injection::SharedFaultPlan;
+use singlefs_harness::history::{
+    execute_history_handing_out_every_step_image, generate_history_with_weights, GenerationWeights,
+    HistoryDeviceWidth, HistoryExecution, HistorySeed, PerStepChecker,
+};
 use singlefs_harness::memory_pool::{
     writes_and_segments, writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion,
     RetainedWrite, SparseBlockDevice,
@@ -113,12 +153,48 @@ const DATA_UNITS_BEFORE_THE_JUDGED_PUBLISH_JUST_PAST_THE_OLD_CAPACITY: usize =
 const DATA_UNITS_BEFORE_THE_JUDGED_PUBLISH_JUST_PAST_THE_CAPACITY: usize = 167;
 /// 被判那次缩回的单元数。
 const DATA_UNITS_OF_THE_JUDGED_PUBLISH: usize = 1;
+/// 扫描内核释放代高于 F 的已释放记录那张表（`crash_judge_checker_common.wgsl` 的 `C_MAX_RELEASED_ABOVE`）抬之前装几条：
+/// 这段历史 F = 0，被判那一版的已释放记录全数进这张表，要多于它，改回去才红。
+const RELEASED_RECORDS_ABOVE_THE_FLOOR_THE_SCAN_KERNEL_HELD_BEFORE_THE_RAISE: usize = 2048;
+/// 轮四遍之后再长到的单元数：被判那一版的已释放记录多于 [`RELEASED_RECORDS_ABOVE_THE_FLOOR_THE_SCAN_KERNEL_HELD_BEFORE_THE_RAISE`] 条
+/// （CPU 一侧现数的：长到 76 个、再缩回 1 个之后分配记录 2088 条、已释放 2050 条；每多长一个单元两样各多两条，75 个时已释放恰好 2048 条）。
+const DATA_UNITS_BEFORE_THE_JUDGED_PUBLISH_PAST_THE_OLD_RELEASED_ABOVE_THE_FLOOR_CAPACITY: usize =
+    76;
+/// 那一版的分配记录条数（CPU 一侧现数的）。
+const RECORDS_OF_THE_VERSION_PAST_THE_OLD_RELEASED_ABOVE_THE_FLOOR_CAPACITY: usize = 2088;
+/// 扫描内核 I-3.10 的去重表（`crash_judge_checker_common.wgsl` 的 `C_MAX_EXAMINED`；满了之后新来的记录不进表、照判）此刻装几条：与 `C_MAX_ALLOC_RECORDS` 同宽。
+const EXAMINED_RECORDS_THE_SCAN_KERNEL_HOLDS: usize = 4096;
+/// 那张表抬之前装几条：表满就记判不了（站点 31）的那时候，各版未释放记录去重累计多于它的流在表改回去时每个状态判不了。
+const EXAMINED_RECORDS_THE_SCAN_KERNEL_HELD_BEFORE_THE_RAISE: usize = 2048;
+
+/// 一条流各版未释放的分配记录按（盘、槽、代）去重累计的条数，落在 I-3.10 去重表抬之前的界的哪一边。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ExaminedRecordsOfTheFlow {
+    /// 不多于抬之前的 [`EXAMINED_RECORDS_THE_SCAN_KERNEL_HELD_BEFORE_THE_RAISE`] 条：这条流钉的不是那张表。
+    WithinTheOldCapacityOfTheExaminedTable,
+    /// 多于抬之前的那个界、不多于此刻的 [`EXAMINED_RECORDS_THE_SCAN_KERNEL_HOLDS`] 条：这条流钉那张表抬过。
+    PastTheOldCapacityOfTheExaminedTable,
+}
 
 /// 一版的分配记录几条、其中已释放几条。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct AllocationRecordCounts {
     every_record: usize,
     released: usize,
+}
+
+/// 一版未释放的分配记录按（盘、槽、代）记进 `examined`（同扫描内核 I-3.10 去重的键）。
+fn note_the_unreleased_records(
+    output: &TransactionOutput,
+    examined: &mut HashSet<(DeviceIdentity, u64, CheckpointTxg)>,
+) {
+    examined.extend(
+        output
+            .allocation_records
+            .iter()
+            .filter(|record| !record.is_released)
+            .map(|record| (record.device, record.slot.0, record.generation)),
+    );
 }
 
 fn allocation_record_counts_of(output: &TransactionOutput) -> AllocationRecordCounts {
@@ -141,6 +217,8 @@ struct RecordedFlow {
     versions: Vec<PublishedVersion>,
     judged_txg: CheckpointTxg,
     allocation_record_counts_of_each_version: Vec<(CheckpointTxg, AllocationRecordCounts)>,
+    /// 新池新建文件那一版到被判那一版，各版未释放的分配记录按（盘、槽、代）去重累计（扫描内核 I-3.10 的去重表收的就是这一种）。
+    unreleased_records_examined_across_the_versions: HashSet<(DeviceIdentity, u64, CheckpointTxg)>,
 }
 
 impl RecordedFlow {
@@ -176,6 +254,7 @@ fn publish_a_sequential_write(
     data_units: usize,
     versions: &mut Vec<PublishedVersion>,
     counts: &mut Vec<(CheckpointTxg, AllocationRecordCounts)>,
+    examined: &mut HashSet<(DeviceIdentity, u64, CheckpointTxg)>,
 ) {
     let txg = CheckpointTxg(pool.output.root.checkpoint_txg.0 + 1);
     let content = content_of_the_version(data_units, txg);
@@ -191,6 +270,7 @@ fn publish_a_sequential_write(
         txg.0
     );
     counts.push((txg, allocation_record_counts_of(&output)));
+    note_the_unreleased_records(&output, examined);
     versions.push(PublishedVersion {
         instance: InstanceGeneration(1),
         checkpoint_txg: txg,
@@ -215,6 +295,8 @@ fn record_the_flow(
         pool.output.root.checkpoint_txg,
         allocation_record_counts_of(&pool.output),
     )];
+    let mut examined = HashSet::new();
+    note_the_unreleased_records(&pool.output, &mut examined);
     // 迭代上界：2 × grow_and_shrink_rounds + 1 次发布。
     for data_units in std::iter::repeat_n(
         DATA_UNITS_OF_A_GROW_AND_SHRINK_ROUND,
@@ -223,7 +305,13 @@ fn record_the_flow(
     .flatten()
     .chain([data_units_before_the_judged_publish])
     {
-        publish_a_sequential_write(&mut pool, data_units, &mut versions, &mut counts);
+        publish_a_sequential_write(
+            &mut pool,
+            data_units,
+            &mut versions,
+            &mut counts,
+            &mut examined,
+        );
     }
     let operations_before_the_judged_publish = pool.stream.operation_count();
     publish_a_sequential_write(
@@ -231,6 +319,7 @@ fn record_the_flow(
         DATA_UNITS_OF_THE_JUDGED_PUBLISH,
         &mut versions,
         &mut counts,
+        &mut examined,
     );
     let judged_txg = pool.output.root.checkpoint_txg;
     let operations = pool.retained_operations();
@@ -252,6 +341,7 @@ fn record_the_flow(
         versions,
         judged_txg,
         allocation_record_counts_of_each_version: counts,
+        unreleased_records_examined_across_the_versions: examined,
     }
 }
 
@@ -404,8 +494,8 @@ fn assert_every_state_judged_on_the_gpu_like_the_cpu_judge(
 }
 
 /// 被判那一版的分配记录恰好 `judged_records` 条的那条流（[`record_the_flow`] 轮 `grow_and_shrink_rounds` 遍、再长到 `data_units_before_the_judged_publish` 个单元）：
-/// 取卡之前在 CPU 上核条数与已释放的条数（多于 `released_more_than`），再在卡上逐状态判：每个状态 GPU 都判得了，对拍字与 CPU 逐状态相同；
-/// 要有被判那次的根槽写落了、恢复落到那一版的状态（两个内核都读那一版的分配记录）。
+/// 取卡之前在 CPU 上核条数、已释放的条数（多于 `released_more_than`）与各版未释放记录去重累计的条数（落在 `examined_records` 那一边），
+/// 再在卡上逐状态判：每个状态 GPU 都判得了，对拍字与 CPU 逐状态相同；要有被判那次的根槽写落了、恢复落到那一版的状态（两个内核都读那一版的分配记录）。
 fn assert_the_gpu_judge_judges_a_version_of_these_many_allocation_records_like_the_cpu_judge(
     test_name: &str,
     flow_name: &str,
@@ -413,6 +503,7 @@ fn assert_the_gpu_judge_judges_a_version_of_these_many_allocation_records_like_t
     data_units_before_the_judged_publish: usize,
     judged_records: usize,
     released_more_than: usize,
+    examined_records: ExaminedRecordsOfTheFlow,
 ) {
     let flow = record_the_flow(
         flow_name,
@@ -420,6 +511,21 @@ fn assert_the_gpu_judge_judges_a_version_of_these_many_allocation_records_like_t
         data_units_before_the_judged_publish,
     );
     assert_the_allocation_records_of_the_versions(flow_name, &flow, judged_records);
+    let examined = flow.unreleased_records_examined_across_the_versions.len();
+    let examined_records_of_the_flow = match examined {
+        0..=EXAMINED_RECORDS_THE_SCAN_KERNEL_HELD_BEFORE_THE_RAISE => {
+            ExaminedRecordsOfTheFlow::WithinTheOldCapacityOfTheExaminedTable
+        }
+        _ => ExaminedRecordsOfTheFlow::PastTheOldCapacityOfTheExaminedTable,
+    };
+    assert_eq!(
+        examined_records_of_the_flow, examined_records,
+        "流 {flow_name}：各版未释放的分配记录按（盘、槽、代）去重累计 {examined} 条，落在 I-3.10 去重表抬之前的 {EXAMINED_RECORDS_THE_SCAN_KERNEL_HELD_BEFORE_THE_RAISE} 条的哪一边"
+    );
+    assert!(
+        examined <= EXAMINED_RECORDS_THE_SCAN_KERNEL_HOLDS,
+        "流 {flow_name}：各版未释放记录去重累计 {examined} 条，不多于 I-3.10 去重表此刻的 {EXAMINED_RECORDS_THE_SCAN_KERNEL_HOLDS} 条"
+    );
     let judged = flow.allocation_record_counts_of_the_judged_version();
     assert!(
         judged.released > released_more_than && judged.released <= RECORDS_THE_GPU_TABLES_HOLD,
@@ -463,6 +569,7 @@ fn the_gpu_judge_judges_a_version_of_exactly_two_thousand_and_forty_eight_alloca
         DATA_UNITS_BEFORE_THE_JUDGED_PUBLISH_AT_THE_OLD_CAPACITY,
         RECORDS_THE_GPU_TABLES_HELD_BEFORE_THE_RAISE,
         RELEASED_RECORDS_THE_SCAN_KERNEL_HELD_BEFORE_THE_FIRST_RAISE,
+        ExaminedRecordsOfTheFlow::WithinTheOldCapacityOfTheExaminedTable,
     );
 }
 
@@ -479,6 +586,25 @@ fn the_gpu_judge_judges_a_version_of_two_thousand_and_fifty_allocation_records_p
         DATA_UNITS_BEFORE_THE_JUDGED_PUBLISH_JUST_PAST_THE_OLD_CAPACITY,
         RECORDS_JUST_PAST_THE_GPU_TABLES_BEFORE_THE_RAISE,
         RELEASED_RECORDS_THE_SCAN_KERNEL_HELD_BEFORE_THE_FIRST_RAISE,
+        ExaminedRecordsOfTheFlow::WithinTheOldCapacityOfTheExaminedTable,
+    );
+}
+
+/// 被判那一版的分配记录 2088 条、其中已释放 2050 条（这段历史回退下界不抬、F = 0，扫描内核把已释放的全数收进释放代高于 F 的那张表，
+/// 多于那张表抬之前的 2048 条）：每个状态 GPU 都判得了，对拍字与 CPU 逐状态相同。那张表改回 2048 时，那一版的根槽写落了的状态
+/// 扫描内核在站点 34 记判不了，这条红。各版未释放的分配记录去重累计 2086 条，多于 I-3.10 去重表抬之前的 2048 条：那张表满了就记判不了的那时候，
+/// 判满的界退回 2048 时 13 个状态都在站点 31 记判不了；此刻表满之后照判，界退回 2048 只多读几次单元头，这条照绿（不再钉那张表的界）。
+#[test]
+fn the_gpu_judge_judges_a_version_of_more_than_two_thousand_and_forty_eight_records_released_above_the_floor_like_the_cpu_judge(
+) {
+    assert_the_gpu_judge_judges_a_version_of_these_many_allocation_records_like_the_cpu_judge(
+        "the_gpu_judge_judges_a_version_of_more_than_two_thousand_and_forty_eight_records_released_above_the_floor_like_the_cpu_judge",
+        "allocation-records-released-above-the-floor-past-the-old-capacity-of-the-gpu-table",
+        GROW_AND_SHRINK_ROUNDS_BEFORE_THE_OLD_CAPACITY,
+        DATA_UNITS_BEFORE_THE_JUDGED_PUBLISH_PAST_THE_OLD_RELEASED_ABOVE_THE_FLOOR_CAPACITY,
+        RECORDS_OF_THE_VERSION_PAST_THE_OLD_RELEASED_ABOVE_THE_FLOOR_CAPACITY,
+        RELEASED_RECORDS_ABOVE_THE_FLOOR_THE_SCAN_KERNEL_HELD_BEFORE_THE_RAISE,
+        ExaminedRecordsOfTheFlow::PastTheOldCapacityOfTheExaminedTable,
     );
 }
 
@@ -952,6 +1078,7 @@ fn publish_new_inodes_and_note_the_version(
     count: u64,
     versions: &mut Vec<PublishedVersion>,
     counts: &mut Vec<(CheckpointTxg, AllocationRecordCounts)>,
+    examined: &mut HashSet<(DeviceIdentity, u64, CheckpointTxg)>,
 ) {
     let publish_parameters = parameters();
     let previous = pool.output.clone();
@@ -970,6 +1097,7 @@ fn publish_new_inodes_and_note_the_version(
         output.root.checkpoint_txg,
         allocation_record_counts_of(&output),
     ));
+    note_the_unreleased_records(&output, examined);
     versions.push(PublishedVersion {
         instance: InstanceGeneration(1),
         checkpoint_txg: output.root.checkpoint_txg,
@@ -991,11 +1119,14 @@ fn record_the_inode_flow(tag: &str) -> RecordedFlow {
         pool.output.root.checkpoint_txg,
         allocation_record_counts_of(&pool.output),
     )];
+    let mut examined = HashSet::new();
+    note_the_unreleased_records(&pool.output, &mut examined);
     publish_new_inodes_and_note_the_version(
         &mut pool,
         NEW_INODES_PAST_THE_OLD_CAPACITIES,
         &mut versions,
         &mut counts,
+        &mut examined,
     );
     let operations_before_the_judged_publish = pool.stream.operation_count();
     publish_new_inodes_and_note_the_version(
@@ -1003,6 +1134,7 @@ fn record_the_inode_flow(tag: &str) -> RecordedFlow {
         NEW_INODES_OF_THE_JUDGED_PUBLISH,
         &mut versions,
         &mut counts,
+        &mut examined,
     );
     let judged_txg = pool.output.root.checkpoint_txg;
     let operations = pool.retained_operations();
@@ -1024,6 +1156,7 @@ fn record_the_inode_flow(tag: &str) -> RecordedFlow {
         versions,
         judged_txg,
         allocation_record_counts_of_each_version: counts,
+        unreleased_records_examined_across_the_versions: examined,
     }
 }
 
@@ -1052,6 +1185,369 @@ fn the_gpu_judge_judges_versions_of_two_thousand_five_hundred_inodes_past_the_ol
         FLOW_NAME,
         &gpu,
         &cpu_cross_check_words,
+    );
+}
+
+// ───────── I-3.10 的去重表满了之后照判：老根的分配记录树整棵改代的不合法镜像 ─────────
+
+/// 一直留着的那个文件长到几个数据单元：之后每一版的未释放记录里都有这一批（两块盘各一条），合起来四百来条。
+const DATA_UNITS_KEPT_ACROSS_THE_VERSIONS: usize = 200;
+/// 文件长好之后再发几次只建一个空 inode 的发布（文件不变）：连长文件那一次，最新那条根之前有这么多条老根，每条的分配记录树都照抄改代。
+/// 取十条：每条改过的老根多出它自己那 434 条未释放记录，十条之后越过 I-3.10 去重表的 [`EXAMINED_RECORDS_THE_SCAN_KERNEL_HOLDS`] 条
+/// （CPU 一侧量的，同一造法：改代之前各版累计 666 条、改代之后 5006 条，每版至多 668 条分配记录；改代之后池级 checker 判红的是
+/// I-3.1、I-3.5、I-3.10、I-8.10 四条，别的与改代之前逐条相同，两遍恢复都落在最新那条根上）。
+const OLD_ROOTS_WHOSE_ALLOCATION_RECORD_TREES_ARE_COPIED: usize = 10;
+/// 第 k 条老根（从 0 数）那棵树里每条记录的代号加 (k + 1) × 这个数：各条老根改出来的代号互不相同，也不与原来的相同。
+const GENERATION_OFFSET_STEP_OF_THE_COPIED_TREES: u64 = 1000;
+/// 抄出来的节点从单元区起点往后这么多个槽起放：这条流分配过的槽都在它前面（几百个单元），那一段没写过（取槽时逐个核全 0）。
+const SLOTS_BETWEEN_THE_UNIT_AREA_START_AND_THE_COPIES: u64 = 100_000;
+/// 改代之后 CPU 判器判红的那一条：未释放记录的代号与它罩住的单元头里的诞生代号不同。
+const ALLOCATION_GENERATION_MATCHES_THE_UNIT_BIRTH: &str = "I-3.10";
+
+/// GPU 对拍的 CPU 参照：一张镜像作一个状态的给定状态表（写表空、一个空的持久集合）经对拍那一类的库读回
+/// （`gpu_test_start::cpu_reference_table_read_back_from_the_pairing_library`），CPU 判器判读回的那一份。只录那一趟交 `None`。
+// cpu-reference-for-gpu-comparison
+fn cpu_conclusion_of_an_image_read_back_from_the_pairing_library(
+    table_name: &str,
+    image: &MemoryPool,
+) -> Option<GivenStateConclusion> {
+    let read_back =
+        cpu_reference_table_read_back_from_the_pairing_library(&RecordedGivenStatesTable {
+            table_name: table_name.to_string(),
+            base: image.clone(),
+            writes: Vec::new(),
+            segments: Vec::new(),
+            seams: Vec::new(),
+            persisted_sets: vec![Vec::new()],
+        })?;
+    let mut conclusions =
+        read_back.with_the_table(|table| judge_the_given_states_on_the_cpu(table));
+    assert_eq!(
+        conclusions.states.len(),
+        1,
+        "{table_name}：一张镜像一个状态"
+    );
+    Some(conclusions.states.remove(0))
+}
+
+/// 表满之后照判（扫描内核 I-3.10 的去重表 `C_MAX_EXAMINED`）在卡上过一遍：新池新建文件之后把文件长到 [`DATA_UNITS_KEPT_ACROSS_THE_VERSIONS`] 个单元，
+/// 再发 [`OLD_ROOTS_WHOSE_ALLOCATION_RECORD_TREES_ARE_COPIED`] 次只建一个空 inode 的发布；最新那条根之前那几条老根（长文件那一次起）各把分配记录树
+/// 整棵照抄、改代、重封（`common_allocation_record_trees_copied_under_other_generations`）。每一版的分配记录不多于两张表的 4096 条，
+/// 各版未释放记录去重累计多于去重表的 4096 条（不合法：合法的流上累计不多于最新那一版的分配记录条数）。这张镜像作一个状态的给定状态表：
+/// GPU 判器判得了（没有判不了），对拍字与 CPU 判器逐位相同（两遍 oracle 的位不比：给定状态表那一路没有期望版本表，两边都不判 oracle，
+/// GPU 内核照空版本表判出的「读出了文件、这一版却没有」两位不算数），CPU 判器判 I-3.10 红（改过的代与单元头里的诞生代号不同）。
+/// 判别力（`crates/mutations.tsv`）：去重表满了退回记判不了（站点 31、返回），GPU 那一位判不了，这条红；GPU 一侧的对拍字不去掉 oracle 的位，
+/// 多出两遍 oracle 各一位（位 5、位 13），这条红。
+#[test]
+fn the_gpu_judge_judges_on_past_a_full_examined_table_like_the_cpu_judge_on_an_image_whose_old_roots_carry_their_allocation_records_under_other_generations(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_judges_on_past_a_full_examined_table_like_the_cpu_judge_on_an_image_whose_old_roots_carry_their_allocation_records_under_other_generations";
+    const TABLE_NAME: &str =
+        "old-roots-with-their-allocation-record-trees-copied-under-other-generations";
+    let mut pool = build_pool(TABLE_NAME);
+    let mut versions = vec![PublishedVersion {
+        instance: InstanceGeneration(1),
+        checkpoint_txg: pool.output.root.checkpoint_txg,
+        content: file_content(),
+    }];
+    let mut counts = vec![(
+        pool.output.root.checkpoint_txg,
+        allocation_record_counts_of(&pool.output),
+    )];
+    let mut examined = HashSet::new();
+    note_the_unreleased_records(&pool.output, &mut examined);
+    publish_a_sequential_write(
+        &mut pool,
+        DATA_UNITS_KEPT_ACROSS_THE_VERSIONS,
+        &mut versions,
+        &mut counts,
+        &mut examined,
+    );
+    let oldest_copied_txg = pool.output.root.checkpoint_txg;
+    // 迭代上界：OLD_ROOTS_WHOSE_ALLOCATION_RECORD_TREES_ARE_COPIED 次发布
+    for _publish in 0..OLD_ROOTS_WHOSE_ALLOCATION_RECORD_TREES_ARE_COPIED {
+        publish_new_inodes_and_note_the_version(
+            &mut pool,
+            1,
+            &mut versions,
+            &mut counts,
+            &mut examined,
+        );
+    }
+    let newest_txg = pool.output.root.checkpoint_txg;
+    let mut image = pool.memory_pool();
+    let mut free_slots = FreeSlotsForTheCopies::starting_at(
+        singlefs_format::UNIT_AREA_START_SLOT + SLOTS_BETWEEN_THE_UNIT_AREA_START_AND_THE_COPIES,
+    );
+    let mut examined_with_the_copies = examined.clone();
+    let mut old_roots_copied = 0;
+    // 迭代上界：最新那条根之前、长文件那一次起的每一条老根各一次（OLD_ROOTS_WHOSE_ALLOCATION_RECORD_TREES_ARE_COPIED 条）
+    for (position, txg) in (oldest_copied_txg.0..newest_txg.0).enumerate() {
+        let copied = copy_the_allocation_record_tree_of_an_old_root_under_another_generation(
+            &mut image,
+            &parameters(),
+            CheckpointTxg(txg),
+            GENERATION_OFFSET_STEP_OF_THE_COPIED_TREES
+                * (u64::try_from(position).expect("几条老根装得进 u64") + 1),
+            &mut free_slots,
+        );
+        examined_with_the_copies.extend(copied);
+        old_roots_copied += 1;
+    }
+    assert_eq!(
+        old_roots_copied, OLD_ROOTS_WHOSE_ALLOCATION_RECORD_TREES_ARE_COPIED,
+        "最新那条根之前、长文件那一次起的每一条老根都照抄改代了"
+    );
+    let most_records_of_a_version = counts
+        .iter()
+        .map(|(_, counts_of_the_version)| counts_of_the_version.every_record)
+        .max()
+        .expect("至少一版");
+    assert!(
+        most_records_of_a_version <= RECORDS_THE_GPU_TABLES_HOLD,
+        "每一版的分配记录不多于两张表的 {RECORDS_THE_GPU_TABLES_HOLD} 条（每一版：{counts:?}）"
+    );
+    assert!(
+        examined.len() <= EXAMINED_RECORDS_THE_SCAN_KERNEL_HOLDS
+            && examined_with_the_copies.len() > EXAMINED_RECORDS_THE_SCAN_KERNEL_HOLDS,
+        "改代之前各版未释放记录去重累计 {} 条装得进去重表的 {EXAMINED_RECORDS_THE_SCAN_KERNEL_HOLDS} 条，改代之后 {} 条越过它",
+        examined.len(),
+        examined_with_the_copies.len()
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let not_expanded =
+        |_segment_index: usize, _segment: &[usize]| CrashPointReplaySegmentExpansion::NotExpanded;
+    let tables = build_judge_tables_for_the_given_persisted_sets(
+        &JudgeFlow {
+            base: &image,
+            writes: &[],
+            segments: &[],
+            judged_root_index: 0,
+            versions: &[],
+            expansion: &not_expanded,
+        },
+        &[],
+        vec![Vec::new()],
+    )
+    .expect("一张镜像一个状态的给定状态表建得出判表");
+    let Some(gpu) = judge_every_state_on_a_card_leased_from_the_pool(cards, TEST_NAME, &tables)
+    else {
+        return;
+    };
+    let [gpu_words] = gpu.as_slice() else {
+        panic!("一个状态一份结论，交回 {} 份", gpu.len());
+    };
+    let Some(cpu) =
+        cpu_conclusion_of_an_image_read_back_from_the_pairing_library(TABLE_NAME, &image)
+    else {
+        return;
+    };
+    let cpu_violations: Vec<&'static str> = cpu
+        .pool_checker_violations()
+        .into_iter()
+        .map(|(invariant, _detail)| invariant)
+        .collect();
+    assert!(
+        cpu_violations.contains(&ALLOCATION_GENERATION_MATCHES_THE_UNIT_BIRTH),
+        "前提：CPU 判器判 {ALLOCATION_GENERATION_MATCHES_THE_UNIT_BIRTH} 红（改过的代与单元头里的诞生代号不同）：判红的是 {cpu_violations:?}"
+    );
+    assert!(
+        !gpu_could_not_judge(gpu_words),
+        "GPU 判得了这个状态（恢复第 1 字 {:#x}、池级 checker 原因字 {:#x}）：去重表满了之后照判",
+        gpu_words[1],
+        gpu_words[POOL_CHECKER_UNDECIDABLE_WORD]
+    );
+    // 给定状态表那一路两边都不判 oracle（没有期望版本表）：GPU 一侧的对拍字先去掉两遍 oracle 的位再比，与引擎收卡上结论那一处
+    // （`crash_amplification` 里 `GivenStatesOnTheGpu::Judged` 的对拍字）同一个换法；CPU 一侧（`crash_given_states::judge_a_given_state_on_the_cpu`
+    // 经 `crash_judge_conclusions::cross_check_words_of_a_given_state`）那十四位恒为 0
+    assert_eq!(
+        cross_check_words_without_the_oracle(cross_check_words_of_gpu_verdict(gpu_words)),
+        cpu.words,
+        "GPU 与 CPU 的对拍字逐位相同（两遍 oracle 的位不比；CPU 判红的是 {cpu_violations:?}）"
+    );
+}
+
+// ───────── 枚举写表的宽与一个落点的写数：随机历史越过原分配记录墙那一族 ─────────
+
+/// 随机历史越过原分配记录墙那一族的一段（种子、步数、比重、怎么跑与 `crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library.rs`
+/// 全量那一族逐项相同）：全量那一趟它建不出判表（`EnumeratedWritesPastTheMaskWidth`，2026-10-18 调查员量的这一族每段录制写 4436 到 5265 次、
+/// 盘 0 系统配置槽 0 号录制写 88 到 111 次）。
+const SEED_OF_A_HISTORY_TOWARD_THE_ALLOCATION_RECORD_WALL: u64 = 7_463_871_032_432_355_142;
+const OPERATIONS_OF_A_HISTORY_TOWARD_THE_ALLOCATION_RECORD_WALL: usize = 150;
+/// 两个上限抬之前装几次：枚举写表 2048 次（持久掩码 64 个字）、一个落点 64 次写（组合掩码两个字）。
+const ENUMERATED_WRITES_THE_MASK_HELD_BEFORE_THE_RAISE: usize = 2048;
+const WRITES_PER_LOCATION_THE_COMBINATION_HELD_BEFORE_THE_RAISE: usize = 64;
+
+/// GPU 对拍的 CPU 参照：一张给定状态表经对拍那一类的库读回（`gpu_test_start::cpu_reference_table_read_back_from_the_pairing_library`），
+/// CPU 判器逐状态判读回的那一份。只录那一趟交 `None`。
+// cpu-reference-for-gpu-comparison
+fn cpu_conclusions_of_a_table_read_back_from_the_pairing_library(
+    table: &RecordedGivenStatesTable,
+) -> Option<Vec<GivenStateConclusion>> {
+    let read_back = cpu_reference_table_read_back_from_the_pairing_library(table)?;
+    Some(
+        read_back
+            .with_the_table(|read_back_table| judge_the_given_states_on_the_cpu(read_back_table))
+            .states,
+    )
+}
+
+/// 随机历史越过原分配记录墙那一族的一段（[`SEED_OF_A_HISTORY_TOWARD_THE_ALLOCATION_RECORD_WALL`]）每一步的镜像建成一张给定状态表
+/// （基线是 mkfs 之后的池、写表是 mkfs 之后的录制流、不接撕裂镜像，每步镜像一个「前缀全落、之后一个都没落」的持久掩码）：
+/// 枚举写表多于抬之前的 2048 次、盘 0 系统配置槽 0 号多于抬之前的 64 次写，判表建得出；每个状态 GPU 都判得了，对拍字（两遍 oracle 的位不比，
+/// 给定状态表那一路没有期望版本表）与 CPU 判器逐状态相同。这一条在卡上走过 `PERSISTED_MASK_WORDS`（枚举写表上限 ÷ 32）
+/// 个字的持久掩码与多于两个字的组合掩码（`crash_judge_common.wgsl` 的 `version_of_location` 逐字比）。
+/// 判别力（`crates/mutations.tsv`）：版本表只打包组合的前两个字（第 64 次写往后的位丢了），盘 0 系统配置槽 0 号落了多于 64 次写的状态
+/// 内核在版本表里找不到它的组合、记判不了，这条红。
+#[test]
+fn the_gpu_judge_judges_every_step_image_of_a_history_past_the_old_mask_width_and_writes_per_location_like_the_cpu_judge(
+) {
+    const TEST_NAME: &str =
+        "the_gpu_judge_judges_every_step_image_of_a_history_past_the_old_mask_width_and_writes_per_location_like_the_cpu_judge";
+    let execution = HistoryExecution {
+        per_step_checker: PerStepChecker::Skipped,
+        device_width: HistoryDeviceWidth::FourGibibytes,
+        space_admission: SpaceAdmission::JudgedByTheFormula,
+    };
+    let history = generate_history_with_weights(
+        HistorySeed(SEED_OF_A_HISTORY_TOWARD_THE_ALLOCATION_RECORD_WALL),
+        OPERATIONS_OF_A_HISTORY_TOWARD_THE_ALLOCATION_RECORD_WALL,
+        &GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL,
+    );
+    let stream = SharedStream::retaining_contents();
+    let mut operations_recorded_after_each_step: Vec<usize> = Vec::new();
+    let run = execute_history_handing_out_every_step_image(
+        &history,
+        execution,
+        &stream,
+        &SharedFaultPlan::unarmed(execution.device_width.fixed_geometry()),
+        &mut |_| {},
+        &mut |step_image| {
+            operations_recorded_after_each_step.push(step_image.operations_recorded);
+        },
+    );
+    assert!(
+        run.earliest_stream_index_after_each_power_loss.is_empty(),
+        "前提：这一段没掉过电，每步镜像都在一张表里、不带接缝"
+    );
+    let operations = stream.retained_operations();
+    let (writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
+        &operations,
+        &execution.device_width.fixed_geometry(),
+    );
+    let history_after_the_make_filesystem = HistoryAfterTheMakeFilesystem::of(
+        &writes,
+        &segments,
+        &stream_indexes,
+        run.operations_written_by_make_filesystem,
+        execution,
+    );
+    let persisted_sets: Vec<Vec<bool>> = operations_recorded_after_each_step
+        .iter()
+        .map(|operations_recorded| {
+            let persisted_writes = stream_indexes
+                .iter()
+                .filter(|stream_index| **stream_index < *operations_recorded)
+                .count();
+            let persisted_over_the_whole_write_table: Vec<bool> = (0..writes.len())
+                .map(|write_index| write_index < persisted_writes)
+                .collect();
+            history_after_the_make_filesystem
+                .persisted_set_of_the_table(&persisted_over_the_whole_write_table)
+        })
+        .collect();
+    let table_writes = history_after_the_make_filesystem.writes();
+    let not_expanded =
+        |_segment_index: usize, _segment: &[usize]| CrashPointReplaySegmentExpansion::NotExpanded;
+    let claimed_versions =
+        vec![ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery; persisted_sets.len()];
+    let tables =
+        build_judge_tables_for_the_given_persisted_sets_of_the_recorded_writes_broken_at_the_seams_with_their_claimed_versions(
+            &JudgeFlow {
+                base: history_after_the_make_filesystem.base_pool(),
+                writes: table_writes,
+                segments: history_after_the_make_filesystem.segments(),
+                judged_root_index: 0,
+                versions: &[],
+                expansion: &not_expanded,
+            },
+            &[],
+            persisted_sets.clone(),
+            &claimed_versions,
+            &[],
+        )
+        .unwrap_or_else(|refusal| panic!("两个上限抬过之后这张给定状态表建得出判表：{refusal:?}"));
+    let writes_on_the_first_system_configuration_slot = tables
+        .locations
+        .iter()
+        .find(|location| location.device == 0 && location.offset == 0)
+        .expect("盘 0 的系统配置槽 0 号是判表里的一个落点")
+        .writes
+        .len();
+    assert!(
+        usize::try_from(tables.enumerated_write_count).expect("装得进 usize")
+            > ENUMERATED_WRITES_THE_MASK_HELD_BEFORE_THE_RAISE
+            && writes_on_the_first_system_configuration_slot
+                > WRITES_PER_LOCATION_THE_COMBINATION_HELD_BEFORE_THE_RAISE,
+        "前提：枚举写表 {} 次写多于抬之前的 {ENUMERATED_WRITES_THE_MASK_HELD_BEFORE_THE_RAISE}，盘 0 系统配置槽 0 号 \
+         {writes_on_the_first_system_configuration_slot} 次写多于抬之前的 {WRITES_PER_LOCATION_THE_COMBINATION_HELD_BEFORE_THE_RAISE}",
+        tables.enumerated_write_count
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(gpu) = judge_every_state_on_a_card_leased_from_the_pool(cards, TEST_NAME, &tables)
+    else {
+        return;
+    };
+    drop(tables);
+    let Some(cpu) =
+        cpu_conclusions_of_a_table_read_back_from_the_pairing_library(&RecordedGivenStatesTable {
+            table_name: format!(
+                "toward-the-allocation-record-wall/seed={SEED_OF_A_HISTORY_TOWARD_THE_ALLOCATION_RECORD_WALL}"
+            ),
+            base: history_after_the_make_filesystem.base_pool().clone(),
+            writes: table_writes.to_vec(),
+            segments: history_after_the_make_filesystem.segments().to_vec(),
+            seams: Vec::new(),
+            persisted_sets,
+        })
+    else {
+        return;
+    };
+    assert_eq!(gpu.len(), cpu.len(), "两边判的状态数相同");
+    let mismatches: Vec<String> = gpu
+        .iter()
+        .zip(&cpu)
+        .enumerate()
+        .filter_map(|(ordinal, (gpu_words, cpu_conclusion))| {
+            let gpu_cross_check_words =
+                cross_check_words_without_the_oracle(cross_check_words_of_gpu_verdict(gpu_words));
+            (gpu_could_not_judge(gpu_words) || gpu_cross_check_words != cpu_conclusion.words)
+                .then(|| {
+                    format!(
+                        "状态 {ordinal}：GPU 判不了 {}（恢复第 1 字 {:#x}、池级 checker 原因字 {:#x}）；GPU {gpu_cross_check_words:?}；CPU {:?}",
+                        gpu_could_not_judge(gpu_words),
+                        gpu_words[1],
+                        gpu_words[POOL_CHECKER_UNDECIDABLE_WORD],
+                        cpu_conclusion.words
+                    )
+                })
+        })
+        .collect();
+    assert!(
+        mismatches.is_empty(),
+        "{} 个状态 GPU 判不了或与 CPU 不一致（前几个）：\n{}",
+        mismatches.len(),
+        mismatches
+            .iter()
+            .take(8)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
     );
 }
 
@@ -1708,4 +2204,160 @@ fn assert_site_twenty_nine_of_the_scan_kernel_is_unreachable(source: &str) {
 fn site_twenty_nine_of_the_scan_kernel_is_unreachable_because_released_records_are_picked_from_the_allocation_record_table(
 ) {
     assert_site_twenty_nine_of_the_scan_kernel_is_unreachable(&checker_scan_kernel_source());
+}
+
+// ───────── I-3.10 的去重表：表满之后照判，站点 31 没有了 ─────────
+
+/// 扫描内核里判 I-3.10 一棵树的那个函数（`crash_judge_checker_scan.wgsl`）。
+const ALLOCATION_GENERATION_JUDGING_FUNCTION: &str = "judge_allocation_generations_of_the_records";
+/// 扫描内核里 I-3.10 去重表已记的条数（`var<private>`）。
+const EXAMINED_RECORD_COUNTER: &str = "c_examined_count";
+/// I-3.10 去重表的上限（`crash_judge_checker_common.wgsl`）。
+const EXAMINED_RECORD_TABLE_CAPACITY: &str = "C_MAX_EXAMINED";
+/// 判不了的原因字（`crash_judge_common.wgsl` 的 `var<private>`）：写了它，这个状态就判不了。
+const UNDECIDABLE_REASON_WORD: &str = "undecidable";
+/// 置评估位与违例位的那个函数（`crash_judge_checker_common.wgsl`）。
+const JUDGING_FUNCTION: &str = "judge";
+/// I-3.10 在评估位、违例位里的下标常量（`crash_judge_checker_common.wgsl`）。
+const ALLOCATION_GENERATION_INVARIANT_CONSTANT: &str = "INVARIANT_I_3_10";
+
+/// 这一句是不是「去重表还没满才往里记」那一判：`if (<计数> < <上限常量>) { … }`，没有 else。
+fn is_a_guard_recording_only_while_the_examined_table_has_room(
+    module: &Module,
+    function: &Function,
+    statement: &Statement,
+) -> bool {
+    let Statement::If {
+        condition,
+        ref reject,
+        ..
+    } = *statement
+    else {
+        return false;
+    };
+    let Expression::Binary {
+        op: BinaryOperator::Less,
+        left,
+        right,
+    } = function.expressions[condition]
+    else {
+        return false;
+    };
+    is_a_load_of_the_global_variable(module, function, left, EXAMINED_RECORD_COUNTER)
+        && is_the_named_constant(module, function, right, EXAMINED_RECORD_TABLE_CAPACITY)
+        && reject.is_empty()
+}
+
+/// 扫描内核判 I-3.10 一棵树的那个函数满足三样，合起来就是「去重表满了之后新来的记录不进表、照判，这个函数不让状态判不了」：
+/// ① 它自己（连同里面套着的语句块）一处都不写判不了的原因字；② 去重表的计数只在「还没满才往里记」那一判里面加一，那一判恰好一处；
+/// ③ 判 I-3.10 的那一次 `judge` 恰好一处，不在那一判里面（表满了照样走到）。
+/// 只看这个函数自己：它调的读盘那几个函数各自报不报判不了，是读不读得出单元头的事，与去重表满不满无关。
+fn assert_the_allocation_generations_are_judged_on_once_the_examined_table_is_full(source: &str) {
+    let module = wgpu::naga::front::wgsl::parse_str(source)
+        .unwrap_or_else(|error| panic!("扫描内核解析失败：\n{}", error.emit_to_string(source)));
+    let (_, function) = module
+        .functions
+        .iter()
+        .find(|(_, function)| {
+            function.name.as_deref() == Some(ALLOCATION_GENERATION_JUDGING_FUNCTION)
+        })
+        .unwrap_or_else(|| panic!("扫描内核里没有 {ALLOCATION_GENERATION_JUDGING_FUNCTION}"));
+    // ①
+    let undecidable_stores =
+        stores_to_the_global_counter_in(&module, function, &function.body, UNDECIDABLE_REASON_WORD);
+    assert!(
+        undecidable_stores.is_empty(),
+        "{ALLOCATION_GENERATION_JUDGING_FUNCTION} 不该写判不了的原因字（表满了照判、不记站点 31）：写了 {} 处 {undecidable_stores:?}",
+        undecidable_stores.len()
+    );
+    // ②
+    let guards: Vec<&Statement> = statement_lists_nested_in(&function.body)
+        .into_iter()
+        .flat_map(|nested| nested.iter())
+        .filter(|statement| {
+            is_a_guard_recording_only_while_the_examined_table_has_room(
+                &module, function, statement,
+            )
+        })
+        .collect();
+    assert_eq!(
+        guards.len(),
+        1,
+        "{ALLOCATION_GENERATION_JUDGING_FUNCTION} 里「{EXAMINED_RECORD_COUNTER} < {EXAMINED_RECORD_TABLE_CAPACITY} 才往表里记」那一判恰好一处"
+    );
+    let Statement::If {
+        accept: ref recorded_while_there_is_room,
+        ..
+    } = *guards[0]
+    else {
+        unreachable!("上面只挑了 if");
+    };
+    let increments_in_the_whole_function: Vec<CounterStore> =
+        stores_to_the_global_counter_in(&module, function, &function.body, EXAMINED_RECORD_COUNTER)
+            .into_iter()
+            .filter(|store| *store == CounterStore::IncrementedByOne)
+            .collect();
+    let increments_under_the_guard: Vec<CounterStore> = stores_to_the_global_counter_in(
+        &module,
+        function,
+        recorded_while_there_is_room,
+        EXAMINED_RECORD_COUNTER,
+    )
+    .into_iter()
+    .filter(|store| *store == CounterStore::IncrementedByOne)
+    .collect();
+    assert_eq!(
+        (
+            increments_in_the_whole_function.len(),
+            increments_under_the_guard.len()
+        ),
+        (1, 1),
+        "{EXAMINED_RECORD_COUNTER} 只在那一判里面加一，恰好一处"
+    );
+    // ③
+    let (judging_function, _) = module
+        .functions
+        .iter()
+        .find(|(_, candidate)| candidate.name.as_deref() == Some(JUDGING_FUNCTION))
+        .unwrap_or_else(|| panic!("扫描内核里没有 {JUDGING_FUNCTION}"));
+    let judges_the_allocation_generation_invariant =
+        |(callee, arguments): &(Handle<Function>, &[Handle<Expression>])| {
+            *callee == judging_function
+                && arguments.first().is_some_and(|invariant| {
+                    is_the_named_constant(
+                        &module,
+                        function,
+                        *invariant,
+                        ALLOCATION_GENERATION_INVARIANT_CONSTANT,
+                    )
+                })
+        };
+    assert_eq!(
+        calls_in(&function.body)
+            .iter()
+            .filter(|call| judges_the_allocation_generation_invariant(call))
+            .count(),
+        1,
+        "{ALLOCATION_GENERATION_JUDGING_FUNCTION} 里判 {ALLOCATION_GENERATION_INVARIANT_CONSTANT} 的 {JUDGING_FUNCTION} 恰好一处"
+    );
+    assert_eq!(
+        calls_in(recorded_while_there_is_room)
+            .iter()
+            .filter(|call| judges_the_allocation_generation_invariant(call))
+            .count(),
+        0,
+        "判 {ALLOCATION_GENERATION_INVARIANT_CONSTANT} 的那一次不在「表还没满才记」那一判里面：表满了照样判"
+    );
+}
+
+/// I-3.10 的去重表（`C_MAX_EXAMINED`）满了之后不再记判不了：新来的记录不进表、照判（I-3.10 是置位，同一条记录判两遍结论相同；
+/// CPU 判器去重只为不重复判）。合法的流造不出越过那张表的状态（文件头），所以落成扫描内核 naga 中间表示上的断言
+/// （[`assert_the_allocation_generations_are_judged_on_once_the_examined_table_is_full`]），判的是库编进去的那一份扫描内核源码，只用 naga 解析、不用卡。
+/// 判别力（`crates/mutations.tsv`）：表满时退回记站点 31、返回，① 与 ② 红。
+#[test]
+fn judging_the_allocation_generations_never_leaves_the_state_undecidable_and_judges_on_once_the_examined_table_is_full(
+) {
+    assert_the_allocation_generations_are_judged_on_once_the_examined_table_is_full(
+        &checker_scan_kernel_source(),
+    );
 }

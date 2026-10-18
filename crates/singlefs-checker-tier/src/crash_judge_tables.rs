@@ -2,13 +2,14 @@
 //!
 //! 一个崩溃状态的镜像 = 基线 + 这个状态里持久的写按枚举写表次序叠上去（`singlefs_harness::memory_pool::CrashImage::read`）。
 //! 判器读盘只读**结构槽**：系统配置槽、根环槽、journal 记录槽、单元区里的 16 KiB 槽（单元读 16 KiB 或 32 KiB）。
-//! 这里把每个结构槽叫一个**落点**（[`JudgeLocation`]），把它在全部崩溃状态里可能呈现的每一种字节叫一个**版本**（[`JudgeVersion`]）：
+//! 这里把每个结构槽叫一个**落点**（[`JudgeLocation`]），把它在全部崩溃状态里可能呈现的每一种字节叫一个**版本**（[`JudgingUnitsFingerprint`]）：
 //! 版本由「盖住这个落点的那几次写各自持久没持久」决定，几次写里只有崩溃那一段里的几次是自由的，别的段整段持久或整段没持久，
 //! 所以可达的组合很少（每个落点几个到几十个），按段逐个枚举、去重，字节按 `CrashImage::read` 同一条规则叠出来。
 //! CPU 在这里把每个版本的字节、校验和（CRC-32C；整槽宽校验和字段也是 CRC-32C 加 28 个 0）、与每次写逐扇区等不等算一次；
 //! GPU 每个状态只做组合逻辑：由持久掩码算出每个落点的组合、查到版本、按字节解结构、走恢复与 checker 的判法（`crate::crash_judge_gpu`）。
 //!
-//! 表的字节序列化进 KV 时键带 [`JUDGE_TABLES_VERSION`] 与表的摘要：换了表的形态就是新一轮（与事实表同一条规矩）。
+//! 表的字节序列化进 KV 时按录入键存（建表与打包的函数在录入那一组判法单元的入口里，表的形态变了录入那一把键就变），
+//! [`JudgeTables::digest`] 只按内容取（与事实表同一条规矩）。
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
@@ -17,7 +18,7 @@ use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_field_holds};
 use singlefs_core::journal::slot_after_the_journal_ring;
 use singlefs_core::recovery::PoolReader;
 use singlefs_core::root_ring::region_start;
-use singlefs_core::system_configuration::SystemConfiguration;
+use singlefs_core::system_configuration::{SystemConfiguration, SYSTEM_CONFIGURATION_MAGIC};
 use singlefs_format::{
     DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
     JOURNAL_HEADER_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, NODE_BYTES,
@@ -35,9 +36,10 @@ use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 use crate::crash_judge_conclusions::ClaimedVersionOfAGivenState;
 
 use crate::crash::{
-    crash_state_enumeration_tables_with_slices, no_segment_slices,
+    crash_state_enumeration_tables_with_slices_choosing_the_torn_images, no_segment_slices,
     reuse_is_not_proven_illegal_by_the_reclaim_predicate, CrashPointReplaySegmentExpansion,
     CrashPointReplaySegmentSlice, CrashPointReplayVersionTable, CrashStateEnumerationTables,
+    TornImagesOfTheInPlaceOverwrites,
 };
 use crate::crash_facts::{
     check_the_slice_starts_against_the_expansions,
@@ -46,16 +48,16 @@ use crate::crash_facts::{
     MAXIMUM_ENUMERATED_WRITES,
 };
 
-/// 表的形态版本：落点、版本、检查字或发布表的布局变了就抬它（4：版本表最前面两条全零单元、落点第 9–11 字记它之后没写过的槽，
-/// [`ZERO_UNIT_VERSIONS`]；5：期望版本表第 5 字记这一版有没有文件，[`EXPECTED_VERSION_WITHOUT_A_FILE`]；6：版本表每条多一个第 8 字，
-/// [`VERSION_WORD_CRC_SHIFTED_PAST_SIXTEEN_ZERO_KIBIBYTES`]；7：段表每条 [`SEGMENT_WORDS`] 个字、带段的展开方式与甲二那一组单元写，
-/// 多一张点名的持久掩码表（[`JudgeStateSource::GivenPersistedSets`]）；8：段表每条多两个字，分片的段的片起点各位接在段写表里，C790；
-/// 9：给定状态表多一张逐状态恢复自称的那一版的表，[`CLAIMED_VERSION_WORDS`]）。
-pub const JUDGE_TABLES_VERSION: u32 = 9;
-
-/// 一个落点最多被几次写盖住：GPU 内核里组合掩码是两个 u32（版本表里一个版本的第 0 字是低 32 位、第 7 字是高 32 位）。
-/// 错位复用那条历史把系统配置 0 号槽写了 34 次，32 位装不下。
-pub const MAXIMUM_WRITES_PER_LOCATION: usize = 64;
+/// 一个落点最多被几次写盖住：GPU 内核里组合掩码是 [`COMBINATION_WORDS_OF_A_VERSION`] 个 u32（[`CombinationOfTheWritesOnALocation`]，
+/// 版本表里的布局见 [`version_word_of_the_combination_word`]）。随机历史越过原分配记录墙那一族把系统配置 0 号槽录制写了 88 到 111 次
+/// （2026-10-18 调查员量的，全量那一趟建不出判表），64 位装不下；256 留出余量。
+pub const MAXIMUM_WRITES_PER_LOCATION: usize = 256;
+/// 组合掩码按 u64 几个字（[`CombinationOfTheWritesOnALocation`] 的存法）。
+const COMBINATION_U64_WORDS: usize = MAXIMUM_WRITES_PER_LOCATION / 64;
+const _: () = assert!(COMBINATION_U64_WORDS * 64 == MAXIMUM_WRITES_PER_LOCATION);
+/// 组合掩码按 u32 几个字（版本表与 GPU 内核里的字数；内核里的同名常量由 `crate::crash_judge_gpu` 从这里生成）。
+pub const COMBINATION_WORDS_OF_A_VERSION: usize = MAXIMUM_WRITES_PER_LOCATION / 32;
+const _: () = assert!(COMBINATION_WORDS_OF_A_VERSION >= 2);
 /// 一个落点最多枚举几种版本：越过就是这条流的落点太复杂，GPU 判不了（先报错，不悄悄漏版本）。
 pub const MAXIMUM_VERSIONS_PER_LOCATION: usize = 4096;
 /// 一个落点最长 32 KiB：64 个扇区，逐扇区等不等的掩码是一个 u64。
@@ -99,11 +101,83 @@ pub fn step_kind_code(kind: StepKind) -> u32 {
     }
 }
 
+/// 盖住一个落点的那几次写各自持久没持久：第 i 位 = 落点的 `writes[i]` 持久（i < [`MAXIMUM_WRITES_PER_LOCATION`]，建表时核过）。
+/// 按 u64 存、低位字在前；比大小按它当一个无符号整数比（落点的版本表按它升序）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CombinationOfTheWritesOnALocation {
+    words: [u64; COMBINATION_U64_WORDS],
+}
+
+impl CombinationOfTheWritesOnALocation {
+    /// 哪一次写都没持久。
+    pub const NOTHING_PERSISTED: Self = Self {
+        words: [0; COMBINATION_U64_WORDS],
+    };
+
+    /// 落点的第 `position` 次写记成持久。
+    ///
+    /// # Panics
+    /// `position` 不小于 [`MAXIMUM_WRITES_PER_LOCATION`]：建表时已拒多于它的落点（[`JudgeTablesRefusal::TooManyWritesOnOneLocation`]），走到这里是没经那一判。
+    pub fn mark_persisted(&mut self, position: usize) {
+        assert!(
+            position < MAXIMUM_WRITES_PER_LOCATION,
+            "落点的第 {position} 次写：建表时已核过一个落点不多于 {MAXIMUM_WRITES_PER_LOCATION} 次写"
+        );
+        self.words[position / 64] |= 1u64 << (position % 64);
+    }
+
+    /// 落点的第 `position` 次写持久没持久。
+    ///
+    /// # Panics
+    /// 同 [`Self::mark_persisted`]。
+    #[must_use]
+    pub fn is_persisted(&self, position: usize) -> bool {
+        assert!(
+            position < MAXIMUM_WRITES_PER_LOCATION,
+            "落点的第 {position} 次写：建表时已核过一个落点不多于 {MAXIMUM_WRITES_PER_LOCATION} 次写"
+        );
+        self.words[position / 64] & (1u64 << (position % 64)) != 0
+    }
+
+    /// 按 u32 的字，低位字在前（第 k 字是第 32k 到 32k + 31 次写）：打包进版本表、与 GPU 内核比的就是这几个字。
+    #[must_use]
+    pub fn thirty_two_bit_words(&self) -> [u32; COMBINATION_WORDS_OF_A_VERSION] {
+        let mut thirty_two_bit_words = [0u32; COMBINATION_WORDS_OF_A_VERSION];
+        for (word_index, word) in self.words.iter().enumerate() {
+            thirty_two_bit_words[2 * word_index] =
+                u32::try_from(word & 0xFFFF_FFFF).expect("低 32 位");
+            thirty_two_bit_words[2 * word_index + 1] = u32::try_from(word >> 32).expect("高 32 位");
+        }
+        thirty_two_bit_words
+    }
+}
+
+impl Ord for CombinationOfTheWritesOnALocation {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.words.iter().rev().cmp(other.words.iter().rev())
+    }
+}
+
+impl PartialOrd for CombinationOfTheWritesOnALocation {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// 只取前 64 次写那几位：掩码在第 64 位往上全是 0，与整个组合按位与，就是与它最低那个 u64 字按位与（对拍用例看低几位用）。
+impl std::ops::BitAnd<u64> for CombinationOfTheWritesOnALocation {
+    type Output = u64;
+
+    fn bitand(self, mask_of_the_first_sixty_four_writes: u64) -> u64 {
+        self.words[0] & mask_of_the_first_sixty_four_writes
+    }
+}
+
 /// 一个落点在某个持久组合下呈现的字节与 CPU 先算好的几样。
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct JudgeVersion {
+pub struct JudgingUnitsFingerprint {
     /// 第 i 位 = 这个落点的 `writes[i]` 在这个组合里持久。
-    pub combination: u64,
+    pub combination: CombinationOfTheWritesOnALocation,
     /// 这个落点整段的字节（长度 = 落点长度）。
     pub bytes: Vec<u8>,
     /// 按落点种类各有含义的四个检查字（[`version_checks`]）。
@@ -121,7 +195,7 @@ pub struct JudgeLocation {
     pub kind: JudgeLocationKind,
     /// 盖住这个落点的枚举写表下标，升序。
     pub writes: Vec<u32>,
-    pub versions: Vec<JudgeVersion>,
+    pub versions: Vec<JudgingUnitsFingerprint>,
 }
 
 /// 枚举写表里的一次写，判器要的几样。
@@ -337,6 +411,7 @@ pub fn build_judge_tables_against_the_version_table_with_slices(
         &[],
         PublishesSplitFrom::TheEnumeratedWrites,
         segment_slices,
+        TornImagesOfTheInPlaceOverwrites::Appended,
     )
 }
 
@@ -379,6 +454,7 @@ pub fn build_judge_tables_for_the_given_persisted_sets(
         &[],
         PublishesSplitFrom::TheEnumeratedWrites,
         &no_segment_slices(flow.segments.len()),
+        TornImagesOfTheInPlaceOverwrites::Appended,
     )
 }
 
@@ -433,6 +509,53 @@ pub fn build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams_with_
     claimed_versions: &[ClaimedVersionOfAGivenState],
     seams: &[RecordStreamSeam],
 ) -> Result<JudgeTables, JudgeTablesRefusal> {
+    build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams_choosing_the_torn_images(
+        flow,
+        versions_without_a_file,
+        given_persisted_sets,
+        claimed_versions,
+        seams,
+        TornImagesOfTheInPlaceOverwrites::Appended,
+    )
+}
+
+/// 同 [`build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams_with_their_claimed_versions`]，枚举写表不接撕裂镜像与重放
+/// （[`TornImagesOfTheInPlaceOverwrites::LeftOut`]）：枚举写表就是录制流，每个持久掩码按录制流给（与 `flow.writes` 一样长）。
+/// 随机历史每步的镜像从不摆撕裂态，接上的撕裂镜像在每个掩码里都没落，却照样占掩码一位、照样记进它罩住的落点的写数
+/// （系统配置槽每次轮换都是一次可撕的原地覆写，那一槽的写数因此翻倍）；不接它们，判表上的每个状态叠出的镜像不变。
+///
+/// # Errors
+/// 同 [`build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams`]；掩码与录制流不一样长是
+/// [`JudgeTablesRefusal::GivenPersistedSetOfAnotherLength`]。
+///
+/// # Panics
+/// 同 [`build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams_with_their_claimed_versions`]。
+pub fn build_judge_tables_for_the_given_persisted_sets_of_the_recorded_writes_broken_at_the_seams_with_their_claimed_versions(
+    flow: &JudgeFlow<'_>,
+    versions_without_a_file: &[PublishedVersionWithoutAFile],
+    given_persisted_sets: Vec<Vec<bool>>,
+    claimed_versions: &[ClaimedVersionOfAGivenState],
+    seams: &[RecordStreamSeam],
+) -> Result<JudgeTables, JudgeTablesRefusal> {
+    build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams_choosing_the_torn_images(
+        flow,
+        versions_without_a_file,
+        given_persisted_sets,
+        claimed_versions,
+        seams,
+        TornImagesOfTheInPlaceOverwrites::LeftOut,
+    )
+}
+
+/// 带接缝的给定状态表那两个入口共用的本体：撕裂镜像接不接照 `torn_images`。
+fn build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams_choosing_the_torn_images(
+    flow: &JudgeFlow<'_>,
+    versions_without_a_file: &[PublishedVersionWithoutAFile],
+    given_persisted_sets: Vec<Vec<bool>>,
+    claimed_versions: &[ClaimedVersionOfAGivenState],
+    seams: &[RecordStreamSeam],
+    torn_images: TornImagesOfTheInPlaceOverwrites,
+) -> Result<JudgeTables, JudgeTablesRefusal> {
     assert_eq!(
         claimed_versions.len(),
         given_persisted_sets.len(),
@@ -448,12 +571,14 @@ pub fn build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams_with_
         seams,
         PublishesSplitFrom::TheRecordedWritesOnly,
         &no_segment_slices(flow.segments.len()),
+        torn_images,
     )
 }
 
 /// `seams_of_the_given_sets` 只在给定状态表上可以不空（[`build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams`]）；
 /// 按段展开那一路恒给空表（崩溃点重放的流是一条录制流）。`publishes_split_from` 说发布表从哪一张写表分（[`PublishesSplitFrom`]）。
-/// `segment_slices` 与段同序（分片的段，C790）；给定状态表那两路恒不分片。
+/// `segment_slices` 与段同序（分片的段，C790）；给定状态表那两路恒不分片。`torn_images` 说枚举写表接不接撕裂镜像
+/// （按段展开那一路恒接：它的状态里有撕裂态）。
 fn build_judge_tables_from_the_state_source(
     flow: &JudgeFlow<'_>,
     versions_without_a_file: &[PublishedVersionWithoutAFile],
@@ -461,16 +586,19 @@ fn build_judge_tables_from_the_state_source(
     seams_of_the_given_sets: &[RecordStreamSeam],
     publishes_split_from: PublishesSplitFrom,
     segment_slices: &[Option<CrashPointReplaySegmentSlice>],
+    torn_images: TornImagesOfTheInPlaceOverwrites,
 ) -> Result<JudgeTables, JudgeTablesRefusal> {
     let _version_table_without_contradictions =
         CrashPointReplayVersionTable::new(flow.versions, versions_without_a_file);
-    let tables: CrashStateEnumerationTables = crash_state_enumeration_tables_with_slices(
-        flow.base,
-        flow.writes,
-        flow.segments,
-        flow.expansion,
-        segment_slices,
-    );
+    let tables: CrashStateEnumerationTables =
+        crash_state_enumeration_tables_with_slices_choosing_the_torn_images(
+            flow.base,
+            flow.writes,
+            flow.segments,
+            flow.expansion,
+            segment_slices,
+            torn_images,
+        );
     let enumerated = &tables.enumerated_writes;
     if enumerated.len() > MAXIMUM_ENUMERATED_WRITES {
         return Err(JudgeTablesRefusal::EnumeratedWritesPastTheMaskWidth {
@@ -513,11 +641,6 @@ fn build_judge_tables_from_the_state_source(
     let mut locations =
         enumerate_locations(flow.base, enumerated, &devices, device_bytes, &geometry);
     locations.sort_by_key(|location| (location.device, location.offset));
-    let location_index_by_start: BTreeMap<(u32, u64), usize> = locations
-        .iter()
-        .enumerate()
-        .map(|(index, location)| ((location.device, location.offset), index))
-        .collect();
     // 每次写盖住哪几个落点
     for (write_index, write) in enumerated.iter().enumerate() {
         let write_start = write.offset.0;
@@ -583,6 +706,13 @@ fn build_judge_tables_from_the_state_source(
         };
         push_the_versions_of_the_combinations(flow.base, enumerated, location, combinations);
     }
+    locations.retain(|location| location_is_read_by_the_judge(location, &geometry));
+    // 下标按去掉之后的落点表算（写表、GPU 的落点下标都指这一份）
+    let location_index_by_start: BTreeMap<(u32, u64), usize> = locations
+        .iter()
+        .enumerate()
+        .map(|(index, location)| ((location.device, location.offset), index))
+        .collect();
     let writes = judge_writes(
         enumerated,
         flow.writes,
@@ -710,16 +840,37 @@ fn self_verified_system_configuration_slot_at(
     SystemConfiguration::parse_slot(&bytes).ok()
 }
 
-/// 落点几何取基线里哪一份系统配置：照恢复择系统配置的找法（`singlefs_core::recovery::choose_system_configuration`）在每块盘的两个槽里找，
+/// 格式允许的每一档槽距上槽 1 的偏移（槽 i 在 i × 槽距，槽 1 的偏移就是槽距）：不小于 [`FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES`]、
+/// 扇区宽 [`SECTOR_BYTES`] 的整数倍、槽 1 整槽落在根环基址之前，同 core 的 `slot_one_found_by_trying_every_slot_spacing_the_format_allows`
+/// 与 GPU 两个内核逐档读槽 1 的那两个循环（`slot_one_by_trying_every_spacing`、`checker_slot_one_by_reading_every_spacing`）。
+/// (1 MiB − 4096 − 4096) ÷ 512 + 1 = 2033 档。择落点几何（[`system_configuration_the_locations_are_laid_out_by`]）与建系统配置落点
+/// （[`enumerate_locations`]）都按这一份试。
+fn slot_one_offsets_of_every_spacing_the_format_allows() -> impl Iterator<Item = u64> {
+    let largest_spacing = region_start(0).0 - SYSTEM_CONFIGURATION_SLOT_BYTES;
+    (FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES..=largest_spacing)
+        .step_by(usize::try_from(SECTOR_BYTES).expect("512"))
+}
+
+/// 落点几何取基线里哪一份系统配置：恢复择得出就取恢复择的那一份（`singlefs_core::recovery::choose_system_configuration`：每块盘的槽 0、
+/// 槽 1 比世代号，全池没有一个槽 0 可择时逐档读槽 1、取世代号最大的；GPU 两个内核逐档读时也取世代号最大的，`crash_judge_common.wgsl` 的
+/// `slot_one_by_trying_every_spacing`），几何与 GPU 读根槽的落点同源（hand_out 第二位报告「交主 agent 定的」第 2 条：取第一份自证得过的、
+/// 同一块盘上另有一份记别的槽距、世代号更大的槽时两边几何不同）。恢复择不出（整池拒：带读者不收之值、每区槽数越界）时退回下面那一种找法，
 /// 取第一份自证得过的；一份都没有才交 None。CPU 恢复与池级 checker 判得了的镜像（一块盘两槽全废、或每块盘的槽 0 都抹掉而槽 1 在），
 /// GPU 判表照样建得出。次序：先按池里盘的次序读每块盘的槽 0；全池没有一个槽 0 自证得过时槽距无处可读，按池里盘的次序在格式允许的每一档槽距
-/// （不小于 [`FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES`]、扇区宽 [`SECTOR_BYTES`] 的整数倍、槽 1 整槽落在根环基址之前，同 core 的
-/// `slot_one_found_by_trying_every_slot_spacing_the_format_allows`）上各读一槽，只收自己记的槽距正好等于它所在偏移的那一槽。
+/// （[`slot_one_offsets_of_every_spacing_the_format_allows`]）上各读一槽，只收自己记的槽距正好等于它所在偏移的那一槽。
 /// 几何那几样（槽距、根槽宽、每区槽数、区域盘、环长）是池级不可变字段，哪块盘哪一槽交出来都一样；这里只取几何，不判读者收不收那几个池级值
-/// （那一判在 GPU 恢复内核与池级 checker 内核里，与 CPU 同判）。
+/// （那一判在 GPU 恢复内核与池级 checker 内核里，与 CPU 同判）：带读者不收之值的那一份照样取它的几何——读者遇到它整池拒（恢复报
+/// `SystemConfigurationValueRefused`、池级 checker 只交 I-7.13），几何不进结论；跳过它去取更远一档槽距上的槽，那一份记的槽距与写表里
+/// 根槽写的落点对不上，判表反而建不出（`WriteNotAlignedToALocation`）。几何取哪一份都不决定 GPU 读不读得到逐档那几处槽：
+/// 那几处另建落点（[`enumerate_locations`]）。
 fn system_configuration_the_locations_are_laid_out_by(
     base: &MemoryPool,
 ) -> Option<SystemConfiguration> {
+    if let Ok(chosen_by_the_recovery_reader) =
+        singlefs_core::recovery::choose_system_configuration(base)
+    {
+        return Some(chosen_by_the_recovery_reader);
+    }
     let devices = PoolReader::device_identities(base);
     if let Some(slot_zero) = devices
         .iter()
@@ -727,20 +878,16 @@ fn system_configuration_the_locations_are_laid_out_by(
     {
         return Some(slot_zero);
     }
-    let largest_spacing = region_start(0).0 - SYSTEM_CONFIGURATION_SLOT_BYTES;
-    let spacing_step = usize::try_from(SECTOR_BYTES).expect("512");
-    // 迭代上界：盘数 × 档数（(1 MiB − 4096 − 4096) ÷ 512 + 1 = 2033 档）；找到第一份就交回
+    // 迭代上界：盘数 × 档数（2033 档）；找到第一份就交回
     devices.iter().find_map(|device| {
-        (FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES..=largest_spacing)
-            .step_by(spacing_step)
-            .find_map(|candidate_spacing| {
-                self_verified_system_configuration_slot_at(base, *device, candidate_spacing).filter(
-                    |slot_one| {
-                        u64::from(slot_one.immutable.sizes.fixed_structure_slot_spacing)
-                            == candidate_spacing
-                    },
-                )
-            })
+        slot_one_offsets_of_every_spacing_the_format_allows().find_map(|candidate_spacing| {
+            self_verified_system_configuration_slot_at(base, *device, candidate_spacing).filter(
+                |slot_one| {
+                    u64::from(slot_one.immutable.sizes.fixed_structure_slot_spacing)
+                        == candidate_spacing
+                },
+            )
+        })
     })
 }
 
@@ -867,7 +1014,50 @@ fn enumerate_locations(
             push(*device, offset, length, JudgeLocationKind::UnitSlot);
         }
     }
+    // 逐档读到的槽 1：全池没有一个可择的槽 0 时，GPU 两个内核照 CPU 在每一档槽距上各读一槽
+    // （[`slot_one_offsets_of_every_spacing_the_format_allows`]），偏移 0 与几何槽距两处之外没有落点的那几档 `read_at` 交没有版本的切片、
+    // 读成不自证，而 CPU 在那里读到自证得过的槽（逐档读到 8192 处带读者不收之值、12288 处在飞上限加一的槽，CPU 报 I-7.13）。
+    // 每一档上基线或枚举写碰过那 4096 字节的建一个系统配置落点；哪一版都不自证的建完版本再去掉（[`location_is_read_by_the_judge`]）。
+    // 碰过的范围只取根环基址之前的那几段（基线写过的扇区可以上十万个，逐档比的只是系统配置那 1 MiB 里的几个）
+    let root_ring_base = region_start(0).0;
+    for (device, ranges) in &touched_ranges {
+        let ranges_before_the_root_ring: Vec<&Range<u64>> = ranges
+            .iter()
+            .filter(|range| range.start < root_ring_base)
+            .collect();
+        for offset in slot_one_offsets_of_every_spacing_the_format_allows() {
+            if ranges_before_the_root_ring.iter().any(|range| {
+                range.start < offset + SYSTEM_CONFIGURATION_SLOT_BYTES && offset < range.end
+            }) {
+                push(
+                    *device,
+                    offset,
+                    SYSTEM_CONFIGURATION_SLOT_BYTES,
+                    JudgeLocationKind::SystemConfiguration,
+                );
+            }
+        }
+    }
     locations
+}
+
+/// 建完版本之后这个落点留不留在判表里：系统配置落点在偏移 0 与几何槽距上的照留（每块盘两槽，判器按它们读槽 0 与槽 1）；
+/// 逐档建的别的那几处至少一版自证得过（magic 对、整槽校验和过，与 GPU 两个内核判「自证」同一条：恢复内核 `parse_system_configuration`、
+/// 走读内核 `checker_read_system_configuration_slot` 开头那一判）才留，一版都不自证的留不留 GPU 都读成不自证。别的种类照留。
+fn location_is_read_by_the_judge(location: &JudgeLocation, geometry: &BaseGeometry) -> bool {
+    match location.kind {
+        JudgeLocationKind::SystemConfiguration => {
+            location.offset == 0
+                || location.offset == geometry.fixed_structure_slot_spacing
+                || location.versions.iter().any(|version| {
+                    version.bytes.starts_with(&SYSTEM_CONFIGURATION_MAGIC)
+                        && version.checks[SYSTEM_CONFIGURATION_SLOT_CHECKSUM_HOLDS_CHECK] == 1
+                })
+        }
+        JudgeLocationKind::RootSlot
+        | JudgeLocationKind::JournalRecord
+        | JudgeLocationKind::UnitSlot => true,
+    }
 }
 
 /// 枚举写表里录制流之外的那几条（撕裂镜像、重放）各自跟着哪次录制写：撕裂镜像跟着被撕的那次写，重放跟着被撕的那次写与被重放的那次写。
@@ -903,9 +1093,9 @@ fn reachable_combinations_of_the_expanded_segments(
     segment_count: usize,
     expanded_segments: &BTreeSet<usize>,
     location: &JudgeLocation,
-) -> Result<BTreeSet<u64>, JudgeTablesRefusal> {
+) -> Result<BTreeSet<CombinationOfTheWritesOnALocation>, JudgeTablesRefusal> {
     let recorded_write_count = segment_of_write.len();
-    let mut combinations: BTreeSet<u64> = BTreeSet::new();
+    let mut combinations: BTreeSet<CombinationOfTheWritesOnALocation> = BTreeSet::new();
     // 一次写的落地按它在哪一段与这个组合里给它的落地算
     let landing_of = |write_index: usize, cut: usize, free: &BTreeMap<usize, Landing>| -> Landing {
         if let Some(landing) = free.get(&write_index) {
@@ -930,15 +1120,16 @@ fn reachable_combinations_of_the_expanded_segments(
             Some(replayed) => landing_of(replayed, cut, free) == Landing::Persisted,
         }
     };
-    let combination_of = |cut: usize, free: &BTreeMap<usize, Landing>| -> u64 {
-        let mut combination = 0u64;
-        for (position, entry) in location.writes.iter().enumerate() {
-            if persisted_in(usize::try_from(*entry).expect("下标"), cut, free) {
-                combination |= 1u64 << position;
+    let combination_of =
+        |cut: usize, free: &BTreeMap<usize, Landing>| -> CombinationOfTheWritesOnALocation {
+            let mut combination = CombinationOfTheWritesOnALocation::NOTHING_PERSISTED;
+            for (position, entry) in location.writes.iter().enumerate() {
+                if persisted_in(usize::try_from(*entry).expect("下标"), cut, free) {
+                    combination.mark_persisted(position);
+                }
             }
-        }
-        combination
-    };
+            combination
+        };
     let mut cuts: Vec<usize> = expanded_segments.iter().copied().collect();
     cuts.push(segment_count);
     for cut in cuts {
@@ -1009,13 +1200,13 @@ fn reachable_combinations_of_the_expanded_segments(
 fn combinations_of_the_given_persisted_sets(
     location: &JudgeLocation,
     given_persisted_sets: &[Vec<bool>],
-) -> Result<BTreeSet<u64>, JudgeTablesRefusal> {
-    let mut combinations: BTreeSet<u64> = BTreeSet::new();
+) -> Result<BTreeSet<CombinationOfTheWritesOnALocation>, JudgeTablesRefusal> {
+    let mut combinations: BTreeSet<CombinationOfTheWritesOnALocation> = BTreeSet::new();
     for persisted in given_persisted_sets {
-        let mut combination = 0u64;
+        let mut combination = CombinationOfTheWritesOnALocation::NOTHING_PERSISTED;
         for (position, entry) in location.writes.iter().enumerate() {
             if persisted[usize::try_from(*entry).expect("下标")] {
-                combination |= 1u64 << position;
+                combination.mark_persisted(position);
             }
         }
         combinations.insert(combination);
@@ -1034,7 +1225,7 @@ fn push_the_versions_of_the_combinations(
     base: &MemoryPool,
     enumerated: &[RetainedWrite],
     location: &mut JudgeLocation,
-    combinations: BTreeSet<u64>,
+    combinations: BTreeSet<CombinationOfTheWritesOnALocation>,
 ) {
     let base_bytes = PoolReader::read(
         base,
@@ -1048,7 +1239,7 @@ fn push_the_versions_of_the_combinations(
     for combination in combinations {
         let mut bytes = base_bytes.clone();
         for (position, entry) in location.writes.iter().enumerate() {
-            if combination & (1u64 << position) == 0 {
+            if !combination.is_persisted(position) {
                 continue;
             }
             let write = &enumerated[usize::try_from(*entry).expect("下标")];
@@ -1067,7 +1258,7 @@ fn push_the_versions_of_the_combinations(
                 )
             })
             .collect();
-        location.versions.push(JudgeVersion {
+        location.versions.push(JudgingUnitsFingerprint {
             combination,
             bytes,
             checks,
@@ -1124,6 +1315,9 @@ fn sector_equality(
     }
     mask
 }
+
+/// 系统配置落点的检查字里「整槽校验和字段对得上」那一字的下标（[`version_checks`] 系统配置那一臂的头一字；GPU 内核读成切片的 `c0`）。
+const SYSTEM_CONFIGURATION_SLOT_CHECKSUM_HOLDS_CHECK: usize = 0;
 
 /// 每一类落点的检查字。
 ///
@@ -1634,11 +1828,11 @@ impl JudgeTables {
         &self,
         location: &'location JudgeLocation,
         persisted: &[bool],
-    ) -> Option<&'location JudgeVersion> {
-        let mut combination = 0u64;
+    ) -> Option<&'location JudgingUnitsFingerprint> {
+        let mut combination = CombinationOfTheWritesOnALocation::NOTHING_PERSISTED;
         for (position, entry) in location.writes.iter().enumerate() {
             if persisted[usize::try_from(*entry).expect("下标")] {
-                combination |= 1u64 << position;
+                combination.mark_persisted(position);
             }
         }
         location
@@ -1699,12 +1893,10 @@ impl JudgeTables {
             .collect()
     }
 
-    /// 全部表的摘要（连同形态版本）。
+    /// 全部表的摘要：只按内容取（表的形态怎么建、怎么摊由录入那一组判法单元的键管，不靠手写的版本号）。
     #[must_use]
     pub fn digest(&self) -> [u8; DIGEST_BYTES] {
-        let mut message = JUDGE_TABLES_VERSION.to_le_bytes().to_vec();
-        message.extend_from_slice(&self.words().digest_bytes());
-        sha256_digest(&message)
+        sha256_digest(&self.words().digest_bytes())
     }
 
     /// 摊成 GPU 内核读的几张 u32 表（[`JudgeTablesWords`]）。
@@ -1871,20 +2063,16 @@ impl JudgeTables {
                 JudgeLocationKind::UnitSlot,
                 &zero_unit[..usize::try_from(zero_unit_bytes).expect("单元长装得进 usize")],
             );
-            versions.extend([
+            versions.extend(packed_version_words(
+                &CombinationOfTheWritesOnALocation::NOTHING_PERSISTED,
                 0,
-                0,
-                checks[0],
-                checks[1],
-                checks[2],
-                checks[3],
+                checks,
                 NONE,
-                0,
                 crc_shifted_past_sixteen_zero_kibibytes(
                     JudgeLocationKind::UnitSlot,
                     &zero_unit[..usize::try_from(zero_unit_bytes).expect("单元长装得进 usize")],
                 ),
-            ]);
+            ));
         }
         version_bytes.extend(bytes_to_words(&zero_unit));
         let gaps = self.unit_slots_nothing_wrote_after_each_location();
@@ -1906,18 +2094,13 @@ impl JudgeTables {
             ]);
             location_writes.extend(location.writes.iter().copied());
             for version in &location.versions {
-                let (combination_lo, combination_hi) = split(version.combination);
-                versions.extend([
-                    combination_lo,
+                versions.extend(packed_version_words(
+                    &version.combination,
                     index(version_bytes.len()),
-                    version.checks[0],
-                    version.checks[1],
-                    version.checks[2],
-                    version.checks[3],
+                    version.checks,
                     index(equal_masks.len() / 2),
-                    combination_hi,
                     crc_shifted_past_sixteen_zero_kibibytes(location.kind, &version.bytes),
-                ]);
+                ));
                 version_bytes.extend(bytes_to_words(&version.bytes));
                 for mask in &version.sector_equals {
                     let (lo, hi) = split(*mask);
@@ -2072,12 +2255,57 @@ pub struct UnitSlotsNothingWroteAfterALocation {
 pub const WRITE_WORDS: usize = 12;
 /// 落点表每条几个 u32。
 pub const LOCATION_WORDS: usize = 12;
-/// 版本表每条几个 u32：组合低 32 位、字节起点、四个检查字（[`version_checks`]）、逐扇区等不等掩码起点、组合高 32 位、
-/// 第 8 字 [`VERSION_WORD_CRC_SHIFTED_PAST_SIXTEEN_ZERO_KIBIBYTES`]。
-pub const VERSION_WORDS: usize = 9;
+/// 版本表每条几个 u32：组合第 0 字（第 0–31 次写）、字节起点、四个检查字（[`version_checks`]）、逐扇区等不等掩码起点、组合第 1 字
+/// （第 32–63 次写）、第 8 字 [`VERSION_WORD_CRC_SHIFTED_PAST_SIXTEEN_ZERO_KIBIBYTES`]，再接组合其余的字
+/// （[`version_word_of_the_combination_word`]；组合只有 64 位那时候的九个字偏移不动）。内核里的同名常量由 `crate::crash_judge_gpu` 从这里生成。
+pub const VERSION_WORDS: usize =
+    VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE + COMBINATION_WORDS_OF_A_VERSION - 2;
 /// 版本表第 8 字（[`crc_shifted_past_sixteen_zero_kibibytes`]）：GPU 读者 `read_at` 拼读跨过落点末尾的 32 KiB 时拼整段 CRC 用
 /// （`crash_judge_common.wgsl` 同名常量）。
 pub const VERSION_WORD_CRC_SHIFTED_PAST_SIXTEEN_ZERO_KIBIBYTES: usize = 8;
+/// 版本表里组合第 2 字（第 64–95 次写）在一条版本的第几字：接在第 8 字之后，其余各字依次往后。
+pub const VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE: usize =
+    VERSION_WORD_CRC_SHIFTED_PAST_SIXTEEN_ZERO_KIBIBYTES + 1;
+
+/// 组合掩码第 `combination_word` 个 u32（[`CombinationOfTheWritesOnALocation::thirty_two_bit_words`]）在一条版本的第几字：第 0 字在第 0 字、
+/// 第 1 字在第 7 字，其余从 [`VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE`] 起依次放（`crash_judge_common.wgsl` 的同名函数照同一个布局读）。
+///
+/// # Panics
+/// `combination_word` 不小于 [`COMBINATION_WORDS_OF_A_VERSION`]。
+#[must_use]
+pub fn version_word_of_the_combination_word(combination_word: usize) -> usize {
+    assert!(
+        combination_word < COMBINATION_WORDS_OF_A_VERSION,
+        "组合掩码只有 {COMBINATION_WORDS_OF_A_VERSION} 个字"
+    );
+    match combination_word {
+        0 => 0,
+        1 => 7,
+        past_the_sixty_fourth_write => {
+            VERSION_WORD_COMBINATION_PAST_THE_SIXTY_FOURTH_WRITE + past_the_sixty_fourth_write - 2
+        }
+    }
+}
+
+/// 一条版本打包进版本表的 [`VERSION_WORDS`] 个字（布局见 [`VERSION_WORDS`]）。
+fn packed_version_words(
+    combination: &CombinationOfTheWritesOnALocation,
+    byte_start: u32,
+    checks: [u32; 4],
+    equal_masks_start: u32,
+    crc_shifted_past_sixteen_zero_kibibytes_of_the_version: u32,
+) -> [u32; VERSION_WORDS] {
+    let mut words = [0u32; VERSION_WORDS];
+    for (combination_word, word) in combination.thirty_two_bit_words().into_iter().enumerate() {
+        words[version_word_of_the_combination_word(combination_word)] = word;
+    }
+    words[1] = byte_start;
+    words[2..6].copy_from_slice(&checks);
+    words[6] = equal_masks_start;
+    words[VERSION_WORD_CRC_SHIFTED_PAST_SIXTEEN_ZERO_KIBIBYTES] =
+        crc_shifted_past_sixteen_zero_kibibytes_of_the_version;
+    words
+}
 
 /// 单元槽的一版字节的前 16 KiB 后面接 16 KiB 全零，那 32 KiB 的 CRC-32C 异或 16 KiB 全零的 CRC-32C（版本表第 8 字）。CRC-32C 对异或线性：
 /// 它再异或任意一段 16 KiB 的 CRC-32C，就是「这一版前 16 KiB 接那一段」32 KiB 的 CRC-32C（第 32 批攻方 Z2，判决
@@ -2232,32 +2460,40 @@ pub fn bytes_to_words(bytes: &[u8]) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::build_judge_tables_for_the_given_persisted_sets;
+    use super::build_judge_tables_for_the_given_persisted_sets_of_the_recorded_writes_broken_at_the_seams_with_their_claimed_versions;
     use super::{
         build_judge_tables, crc_shifted_past_sixteen_zero_kibibytes, judge_publishes,
-        ClaimedVersionOfAGivenState, JudgeFlow, JudgeLocationKind, JudgePublish, JudgeStateSource,
-        JudgeTables, JudgeTablesRefusal, JudgeTablesWords, NONE, SEGMENT_WORDS,
+        version_word_of_the_combination_word, ClaimedVersionOfAGivenState, JudgeFlow,
+        JudgeLocationKind, JudgePublish, JudgeStateSource, JudgeTables, JudgeTablesRefusal,
+        JudgeTablesWords, LOCATION_WORDS, NONE, SEGMENT_WORDS, VERSION_WORDS,
     };
     use crate::crash::CrashPointReplaySegmentExpansion;
     use crate::crash_facts::{
-        SegmentExpansionFact, SegmentFact,
+        SegmentExpansionFact, SegmentFact, MAXIMUM_ENUMERATED_WRITES,
         SEGMENT_EXPANSION_CODE_IN_PLACE_SUBSETS_WITH_COPY_ON_WRITE_NONE_OR_ALL,
     };
     use singlefs_core::address::{
-        CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+        CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
     };
     use singlefs_core::block_device::PhysicalBlockSizeInBytes;
     use singlefs_core::checksum::crc32_castagnoli;
     use singlefs_core::journal::slot_after_the_journal_ring;
     use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
+    use singlefs_core::recovery::PoolReader;
     use singlefs_core::root_ring::RootRingSlotsPerRegion;
-    use singlefs_core::system_configuration::SystemImmutableSizes;
+    use singlefs_core::system_configuration::{SystemConfiguration, SystemImmutableSizes};
     use singlefs_format::{
-        JOURNAL_RING_DEFAULT_BYTES, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
+        JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT, SLOT_BYTES,
+        SYSTEM_CONFIGURATION_SLOT_BYTES,
     };
     use singlefs_harness::memory_pool::{
         MemoryPool, RecordStreamSeam, RetainedWrite, SparseBlockDevice, WrittenContents,
     };
     use singlefs_harness::segments::StepKind;
+
+    /// journal 环起点字段写成第一版常量 1024 之外的一个槽号：自证得过、读者不收（与 harness 场景
+    /// `system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery.rs` 的同名常量同一个值）。
+    const JOURNAL_RING_START_SLOT_THE_READER_REFUSES: u64 = 1025;
 
     /// 只有掩码计划那几样的判表（没有落点、写、发布）：words() 摊段表与给定状态表那两张看得出布局。
     fn tables_of_one_segment(
@@ -2422,11 +2658,13 @@ mod tests {
         assert_eq!(names.len(), JudgeTablesWords::every_table_name().len());
     }
 
-    /// 枚举写表多于内核持久掩码的宽（2048 次）：建表交「掩码表满了」，不 panic、不往下建。
+    /// 枚举写表多于内核持久掩码的宽（[`MAXIMUM_ENUMERATED_WRITES`] 次）：建表交「掩码表满了」，不 panic、不往下建。
     #[test]
     fn a_flow_with_more_enumerated_writes_than_the_mask_holds_is_refused_naming_the_mask() {
         let base = MemoryPool::with_devices(&[DeviceIdentity(0)], 1 << 26);
-        let writes: Vec<RetainedWrite> = (0..2049u64)
+        let one_past_the_mask =
+            u64::try_from(MAXIMUM_ENUMERATED_WRITES + 1).expect("掩码宽装得进 u64");
+        let writes: Vec<RetainedWrite> = (0..one_past_the_mask)
             .map(|write_index| RetainedWrite {
                 device: DeviceIdentity(0),
                 kind: StepKind::JournalRecord,
@@ -2449,12 +2687,140 @@ mod tests {
             versions: &[],
             expansion: &expansion,
         })
-        .expect_err("2049 次写装不进掩码");
+        .expect_err("比掩码宽多一次写，装不进掩码");
         assert_eq!(
             refusal,
             JudgeTablesRefusal::EnumeratedWritesPastTheMaskWidth {
-                enumerated_writes: 2049
+                enumerated_writes: MAXIMUM_ENUMERATED_WRITES + 1
             }
+        );
+    }
+
+    /// 随机历史越过原分配记录墙那一族最大的一张给定状态表（2026-10-18 调查员量的）：枚举写表 5709 次写（接撕裂镜像时；录制写最多 5265）。
+    const ENUMERATED_WRITES_OF_THE_LARGEST_ALLOCATION_RECORD_WALL_TABLE: usize = 5709;
+    /// 同一族里盘 0 的系统配置槽 0 号最多被录制写了几次。
+    const WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_LARGEST_ALLOCATION_RECORD_WALL_TABLE: usize =
+        111;
+    /// 抬上限之前的两个上限：枚举写表 2048 次、一个落点 64 次写。
+    const ENUMERATED_WRITES_THE_MASK_HELD_BEFORE_THE_RAISE: usize = 2048;
+    const WRITES_PER_LOCATION_THE_COMBINATION_HELD_BEFORE_THE_RAISE: usize = 64;
+
+    /// 两个上限抬到装得下随机历史越过原分配记录墙那一族：mkfs 之后的两块盘上，盘 0 的系统配置槽 0 号写 111 次、journal 环里再写
+    /// 5598 条记录（共 5709 次写，录制流本身，不接撕裂镜像），两个持久掩码（一个都没落、全落）。建得出判表；那一槽 111 次写，
+    /// 全落那一版组合的第 110 位是 1，打包进版本表时落在组合第 3 字（第 96–127 次写）的第 14 位、第 0 字全 1。
+    /// 判别力（`crates/mutations.tsv` 两行）：枚举写表的上限改回 2048，建表交「掩码表满了」，这条红；一个落点的写数上限改回 64，
+    /// 建表交「一个落点写太多」，这条红。
+    #[test]
+    fn a_given_states_table_of_five_thousand_seven_hundred_and_nine_writes_with_one_hundred_and_eleven_on_one_location_is_built(
+    ) {
+        let base = formatted_pool_of_two_devices();
+        let system_configuration_slot_writes = (0
+            ..WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_LARGEST_ALLOCATION_RECORD_WALL_TABLE)
+            .map(|rewrite| RetainedWrite {
+                device: DeviceIdentity(0),
+                kind: StepKind::SystemConfigurationSlot,
+                is_force_unit_access: true,
+                offset: DeviceOffsetInBytes(0),
+                contents: WrittenContents::Bytes(vec![
+                    u8::try_from(rewrite % 251 + 1).expect("小于 256");
+                    usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096")
+                ]),
+            });
+        let journal_ring_start = JOURNAL_RING_START_SLOT * SLOT_BYTES;
+        let journal_record_writes = (0..ENUMERATED_WRITES_OF_THE_LARGEST_ALLOCATION_RECORD_WALL_TABLE
+            - WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_LARGEST_ALLOCATION_RECORD_WALL_TABLE)
+            .map(|record| RetainedWrite {
+                device: DeviceIdentity(0),
+                kind: StepKind::JournalRecord,
+                is_force_unit_access: false,
+                offset: DeviceOffsetInBytes(
+                    journal_ring_start
+                        + u64::try_from(record).expect("记录序号装得进 u64") * JOURNAL_RECORD_BYTES,
+                ),
+                contents: WrittenContents::Bytes(vec![
+                    0x5a;
+                    usize::try_from(JOURNAL_RECORD_BYTES)
+                        .expect("4096")
+                ]),
+            });
+        let writes: Vec<RetainedWrite> = system_configuration_slot_writes
+            .chain(journal_record_writes)
+            .collect();
+        assert!(
+            writes.len() > ENUMERATED_WRITES_THE_MASK_HELD_BEFORE_THE_RAISE
+                && WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_LARGEST_ALLOCATION_RECORD_WALL_TABLE
+                    > WRITES_PER_LOCATION_THE_COMBINATION_HELD_BEFORE_THE_RAISE,
+            "前提：两样都越过抬之前的上限"
+        );
+        let segments = vec![(0..writes.len()).collect::<Vec<usize>>()];
+        let not_expanded = |_segment_index: usize, _segment: &[usize]| {
+            CrashPointReplaySegmentExpansion::NotExpanded
+        };
+        let every_write_persisted = vec![true; writes.len()];
+        let tables =
+            build_judge_tables_for_the_given_persisted_sets_of_the_recorded_writes_broken_at_the_seams_with_their_claimed_versions(
+                &JudgeFlow {
+                    base: &base,
+                    writes: &writes,
+                    segments: &segments,
+                    judged_root_index: 0,
+                    versions: &[],
+                    expansion: &not_expanded,
+                },
+                &[],
+                vec![vec![false; writes.len()], every_write_persisted.clone()],
+                &[ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery; 2],
+                &[],
+            )
+            .unwrap_or_else(|refusal| panic!("两个上限装得下这张表：{refusal:?}"));
+        assert_eq!(
+            usize::try_from(tables.enumerated_write_count).expect("装得进 usize"),
+            ENUMERATED_WRITES_OF_THE_LARGEST_ALLOCATION_RECORD_WALL_TABLE,
+            "枚举写表就是录制流"
+        );
+        let (location_index, first_system_configuration_slot) = tables
+            .locations
+            .iter()
+            .enumerate()
+            .find(|(_, location)| location.device == 0 && location.offset == 0)
+            .expect("盘 0 的系统配置槽 0 号是判表里的一个落点");
+        assert_eq!(
+            first_system_configuration_slot.writes.len(),
+            WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_LARGEST_ALLOCATION_RECORD_WALL_TABLE,
+            "那一槽 111 次写"
+        );
+        let last_write_position =
+            WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_LARGEST_ALLOCATION_RECORD_WALL_TABLE
+                - 1;
+        let every_write_persisted_version = tables
+            .version_of(first_system_configuration_slot, &every_write_persisted)
+            .expect("全落那个掩码在那一槽有一版");
+        assert!(
+            every_write_persisted_version
+                .combination
+                .is_persisted(last_write_position),
+            "全落那一版组合的第 110 位是 1"
+        );
+        let version_index = first_system_configuration_slot
+            .versions
+            .iter()
+            .position(|version| version == every_write_persisted_version)
+            .expect("那一版在那一槽的版本表里");
+        let words = tables.words();
+        let first_version_of_the_slot =
+            usize::try_from(words.locations[location_index * LOCATION_WORDS + 7])
+                .expect("装得进 usize");
+        let packed_version = &words.versions[(first_version_of_the_slot + version_index)
+            * VERSION_WORDS
+            ..(first_version_of_the_slot + version_index + 1) * VERSION_WORDS];
+        assert_eq!(
+            (
+                packed_version[version_word_of_the_combination_word(0)],
+                packed_version[version_word_of_the_combination_word(last_write_position / 32)]
+                    & (1 << (last_write_position % 32))
+            ),
+            (u32::MAX, 1 << (last_write_position % 32)),
+            "版本表里组合第 0 字全 1、第 110 次写落在组合第 3 字的第 14 位：{packed_version:?}"
         );
     }
 
@@ -2721,6 +3087,49 @@ mod tests {
         );
     }
 
+    /// 两块盘的槽 0 都抹成 0、槽距处本池的槽 1 照旧，两倍槽距处另有一份世代号更大、记的槽距就是两倍槽距的槽 1（自证得过、读者收）：
+    /// 恢复逐档读槽 1、取世代号最大的那一份（GPU 两个内核同），落点几何取的就是它（槽距是两倍槽距），与恢复择的逐项相同。
+    /// 判别力（`crates/mutations.tsv`）：落点几何照旧取第一份自证得过的（槽距处那一份），几何与恢复、GPU 不同源，这条红。
+    #[test]
+    fn the_judge_tables_take_their_geometry_from_the_slot_one_the_recovery_reader_chooses_by_its_generation(
+    ) {
+        let mut image = formatted_pool_of_two_devices();
+        let spacing = u64::from(SystemImmutableSizes::slot_spacing_for(512));
+        let farther_spacing = 2 * spacing;
+        let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+        for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+            let mut farther = SystemConfiguration::parse_slot(
+                &PoolReader::read(&image, device, DeviceOffsetInBytes(spacing), slot_bytes)
+                    .expect("槽 1 读得到"),
+            )
+            .expect("mkfs 写下的槽 1 自证得过");
+            farther.immutable.sizes.fixed_structure_slot_spacing =
+                u32::try_from(farther_spacing).expect("两倍槽距装得进 4 字节");
+            farther.quantities.slot_generation += 10;
+            let pool_device = image.devices.get_mut(&device).expect("池里有这块盘");
+            pool_device.write(DeviceOffsetInBytes(farther_spacing), &farther.to_slot());
+            pool_device.write(DeviceOffsetInBytes(0), &vec![0u8; slot_bytes]);
+        }
+        let chosen_by_the_recovery_reader =
+            singlefs_core::recovery::choose_system_configuration(&image)
+                .expect("恢复逐档读槽 1 择得出");
+        assert_eq!(
+            u64::from(
+                chosen_by_the_recovery_reader
+                    .immutable
+                    .sizes
+                    .fixed_structure_slot_spacing
+            ),
+            farther_spacing,
+            "前提：恢复取世代号更大的那一份（两倍槽距那一槽）"
+        );
+        let geometry = super::base_geometry(&image).expect("基线的落点几何取得出");
+        assert_eq!(
+            geometry.fixed_structure_slot_spacing, farther_spacing,
+            "落点几何取恢复择的那一份：槽距是两倍槽距"
+        );
+    }
+
     /// 两块盘各两槽都抹成 0：一份自证得过的系统配置都没有，判表交 `BaseSystemConfigurationUnreadable`、不建表。
     #[test]
     fn the_judge_tables_are_refused_when_no_system_configuration_slot_of_any_device_verifies_itself(
@@ -2774,6 +3183,44 @@ mod tests {
                 .iter()
                 .any(|location| location.kind == JudgeLocationKind::RootSlot),
             "盘 1 上的根环区域 1 照建落点"
+        );
+    }
+
+    /// 两块盘的槽 0 都抹成 0、4096 处本池的槽 1 照旧，8192 处放一份 journal 环起点写成 1025 的槽（自证得过、读者不收；
+    /// harness 场景「8192 处那份槽带不收之值」的造法）：全池没有一个可择的槽 0，GPU 两个内核逐档读槽 1，读得到 8192 处那一份才判得出 I-7.13。
+    /// 判表在偏移 0 与几何槽距 4096 之外，给每块盘的 8192 建一个系统配置落点；4096 与 8192 那两槽之间各档（4608 … 7680、8704 … 11776）
+    /// 碰过而哪一版都不自证，建完版本就去掉。只建偏移 0 与几何槽距两处的取法少了 8192，这条红；碰过的都留着的取法多出那几档，这条也红。
+    #[test]
+    fn a_slot_one_carrying_a_refused_value_found_while_reading_every_spacing_gets_a_system_configuration_location(
+    ) {
+        let mut image = formatted_pool_of_two_devices();
+        let spacing = u64::from(SystemImmutableSizes::slot_spacing_for(512));
+        let refused_offset = 2 * spacing;
+        let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+        for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+            let mut refused = SystemConfiguration::parse_slot(
+                &PoolReader::read(&image, device, DeviceOffsetInBytes(spacing), slot_bytes)
+                    .expect("槽 1 读得到"),
+            )
+            .expect("mkfs 写下的槽 1 自证得过");
+            refused.immutable.journal_ring_start_slot =
+                SlotNumber(JOURNAL_RING_START_SLOT_THE_READER_REFUSES);
+            let pool_device = image.devices.get_mut(&device).expect("池里有这块盘");
+            pool_device.write(DeviceOffsetInBytes(refused_offset), &refused.to_slot());
+            pool_device.write(DeviceOffsetInBytes(0), &vec![0u8; slot_bytes]);
+        }
+        let tables = judge_tables_of_one_image(&image).expect("4096 处的槽 1 自证得过：判表建得出");
+        assert_eq!(
+            system_configuration_locations_of(&tables),
+            vec![
+                (0, 0),
+                (0, spacing),
+                (0, refused_offset),
+                (1, 0),
+                (1, spacing),
+                (1, refused_offset)
+            ],
+            "两块盘各有偏移 0、槽距 {spacing} 与逐档读到的 {refused_offset} 三个系统配置槽的落点，别的几档不留"
         );
     }
 }

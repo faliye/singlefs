@@ -22528,12 +22528,9 @@ fn given_states_engine_of_this_experiment(
 ) -> singlefs_checker_tier::crash_amplification::GivenStatesEngine {
     singlefs_checker_tier::crash_amplification::GivenStatesEngine::start_from_environment(
         singlefs_checker_tier::crash_amplification::GivenStatesItem {
-            item_name: "e158_root_choice_repair".to_string(),
-            setting_file: "crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs".to_string(),
-            seeds_and_scale: seeds_and_scale.to_string(),
+            item_name: format!("e158_root_choice_repair::{}", seeds_and_scale),
         },
         &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
     )
     .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
 }
@@ -22623,12 +22620,14 @@ fn pool_checker_violations_of_the_prefixes_through_the_engine(
     );
     // 每次掉电之后第一个写在写表里的下标：取录制流下标不小于掉电之后第一步的第一个写（写表不算屏障），掉电之后一个写都没录下的取写表长度
     let first_write_after_each_power_loss: Vec<usize> = recorded
-        .first_stream_index_after_each_power_loss
+        .earliest_stream_index_after_each_power_loss
         .iter()
-        .map(|first_stream_index_after_the_power_loss| {
+        .map(|earliest_stream_index_after_the_power_loss| {
             stream_indexes
                 .iter()
-                .position(|stream_index| *stream_index >= *first_stream_index_after_the_power_loss)
+                .position(|stream_index| {
+                    *stream_index >= *earliest_stream_index_after_the_power_loss
+                })
                 .unwrap_or(stream_indexes.len())
         })
         .collect();
@@ -22676,7 +22675,7 @@ fn pool_checker_violations_of_the_prefixes_through_the_engine(
             .collect();
         let table = GivenStatesOfATable {
             table_name: format!("{table_name}/power-losses={power_losses:?}"),
-            base: history_after_the_make_filesystem.base(),
+            base: history_after_the_make_filesystem.base_pool(),
             writes: history_after_the_make_filesystem.writes(),
             segments: history_after_the_make_filesystem.segments(),
             seams: &seams,

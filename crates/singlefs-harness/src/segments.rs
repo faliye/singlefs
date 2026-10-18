@@ -1,5 +1,5 @@
 //! 把录制流切成段（D13（验证路线） 已定项 4：屏障与 FUA 写切段，段内任意整写子集），并按
-//! `layout/01-first-txn.md` 八那张登记表的写法报出段序列与每段的步骤种类多重集（门禁 52 号比对的形态）。
+//! `layout/01-first-txn.md` 八那张登记表的写法报出段序列与每段的步骤种类多重集（门禁 doc-registries 的 segment-registry 格比对的形态）。
 //!
 //! 步骤种类六种（D17（实现分层与第三方管道） 已定项 2；第六种 2026-09-22 加，用户 2026-09-19 定案
 //! 「环清零写录制流登记成一种新步骤、崩溃点重放认它」，`records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行）：
@@ -208,7 +208,10 @@ pub fn closed_form_state_count(segments: &[Vec<StepKind>]) -> u64 {
                 .iter()
                 .filter(|kind| **kind != StepKind::Barrier)
                 .count();
-            (1u64 << writes) - 1
+            // 一段 64 次以上的写：2^|段| 装不进 u64，闭式算不出来——那种段要按分片数（E161），不在这里回绕
+            1u64.checked_shl(u32::try_from(writes).expect("段写数装得进 u32"))
+                .expect("闭式只算写数少于 64 的段：2^|段| 装不进 u64，长段按分片计数")
+                - 1
         })
         .sum::<u64>()
 }
@@ -244,6 +247,14 @@ pub fn segment_kinds_text(segments: &[Vec<StepKind>]) -> String {
 mod tests {
     use super::*;
     use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
+
+    /// 一段 64 次写：2^64 装不进 u64，闭式不回绕、不按溢出的位移 panic，带着一句说清用分片计数的话停下。
+    #[test]
+    #[should_panic(expected = "闭式只算写数少于 64 的段")]
+    fn the_closed_form_refuses_a_segment_of_sixty_four_writes_naming_the_sliced_count() {
+        let segments = vec![vec![StepKind::UnitWrite; 64]];
+        let _ = closed_form_state_count(&segments);
+    }
 
     fn operation(kind: RecordedOperationKind, offset: u64) -> RecordedOperation {
         RecordedOperation {

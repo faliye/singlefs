@@ -1,0 +1,21 @@
+pub trait Sink {
+    fn level(&self) -> u32;
+}
+pub trait Wrap<T: ?Sized> {
+    fn wrap(&self) -> u32;
+}
+pub struct Meter;
+impl Sink for Meter {
+    fn level(&self) -> u32 {
+        1
+    }
+}
+pub struct Holder;
+impl Wrap<dyn Sink> for Holder {
+    fn wrap(&self) -> u32 {
+        2
+    }
+}
+pub fn feed(sink: &dyn Sink) -> u32 {
+    sink.level()
+}

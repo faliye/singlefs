@@ -1,17 +1,15 @@
 //! harness 档场景交出来的镜像经给定状态引擎两段判、再逐张核场景写下的池级 checker 该判成什么（用户 2026-10-14 弹窗定「搬进 checker 档两段」）：
-//! 判法只这一份，checker 档里收 harness 场景镜像的测试文件经 `mod` 引它。引它的测试文件在根上定义 `THIS_FILE`（它自己的仓内路径：
-//! 给定状态表那一路的设点文件，CPU 结论的版本按它出发的闭包取），并经 `#[path]` 引 harness 档的 `common_images_for_the_checker_tier`。
+//! 判法只这一份，checker 档里收 harness 场景镜像的测试文件经 `mod` 引它，并经 `#[path]` 引 harness 档的 `common_images_for_the_checker_tier`。
+//! 块键只由表的内容定（设点文件、项名、场景名都不进键，场景名只进行里报的项名）。
 //!
 //! 每张镜像建成一张给定状态表（基线就是这张镜像、写表为空、一个空的持久集合：池级 checker 判的就是这张镜像本身，记录核对器在空写表上
 //! 没有发布可判；交的是一批崩溃态时基线、写表、切段与持久集合照交的），交崩溃点重放的给定状态引擎（`crash_amplification::GivenStatesEngine`）：
 //! 先写进给定状态表那一类的判定库、判段从库里读回来判，配了 GPU 只由 GPU 判器判、没配只由 CPU 判器判，结论按表存进库、判过的复用。
 //!
 //! 判到位与违例细节库里不存（复用来的结论没有）：场景里有一张镜像要核判成立、没判到、违例细节（连同带场景这一刻算出的一个数的细节判法）
-//! 或与先交的别的镜像比的，这条用例在自己那一份库里判（家目录下 [`FRESH_LIBRARY_SUBDIRECTORY`] 底下以用例命名的一份，录入段起跑先清空），
-//! 结论都是这一趟现判的；违例细节只有 CPU 判器给，GPU 判的结论上那几样只核违例位。别的用例走给定状态表那一类的长期库
+//! 或与先交的别的镜像比的，这条用例在自己那一份一次性的库里判（[`LibraryOfTheTest`]：`${TMPDIR:-/tmp}` 下一份这个进程独占的一次性目录，
+//! 名字带进程号与进程内序号，录入段起跑先清空、用完连同库一起删；长期库不碰），结论都是这一趟现判的；违例细节只有 CPU 判器给，GPU 判的结论上那几样只核违例位。别的用例走那一份长期库
 //! （入口脚本按趟交的 `SINGLEFS_CRASH_AMPLIFICATION_LIBRARY`，没交就是家目录下的）。
-
-use std::path::PathBuf;
 
 use crate::common_images_for_the_checker_tier::{
     ComparisonWithAnEarlierImage, PoolCheckerImage, PoolCheckerImages,
@@ -26,18 +24,64 @@ use singlefs_checker_tier::crash_given_states::{
     GivenStatesJudge, GivenStatesOfATable, GivenStatesOfATableWithItsColumns,
 };
 use singlefs_checker_tier::crash_library::{
-    crash_library_home, repository_root_of_this_crate, RunStage,
-    CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+    ExclusiveTemporaryDirectory, RunStage, CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
 };
+
+/// 写明这份库是一次性的那个变量（`crash_library::refuse_a_library_that_a_reboot_would_erase`）：只在起引擎那一刻设。
+const LIBRARY_IS_TEMPORARY_VARIABLE: &str = "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY";
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_harness::gpu_memory_ledger::gpu_not_run_line;
 
 /// 给定状态引擎里这一项的名字（进块键与库里的清单名；每个场景的种子与规模那一格写场景名）。
 pub const ITEM_NAME: &str = "harness-scenario-images";
 
-/// 要核判到位、违例细节或与别的镜像比的用例各判在自己的一份库里：家目录（`crash_library::crash_library_home`）下这个子目录、再以用例命名。
-const FRESH_LIBRARY_SUBDIRECTORY: &str =
-    "given-states-library-of-harness-scenario-images-judged-afresh";
+/// 要核判到位、违例细节或与别的镜像比的用例各判在自己的一份一次性的库里（[`LibraryOfTheTest`]）：那份一次性目录的标签以这一段起头、再接用例名
+/// （不放进长期库的家目录，用户 2026-10-15 定：流水线单测起跑不清长期库）。
+const FRESH_LIBRARY_LABEL_PREFIX: &str = "harness-scenario-images-judged-afresh";
+
+/// 一条用例自己那一份一次性的库：`${TMPDIR:-/tmp}` 下一份这个进程独占的一次性目录（`ExclusiveTemporaryDirectory`，名字带进程号与进程内序号，
+/// 两个进程同跑一个测试二进制各是各的），库建在它底下（库目录本身由引擎建）；丢掉时连同库一起删，只删这一份。
+/// 同一条用例前后几趟要读同一份库的（[`LibraryOfTheTestAtTheStart::KeptFromTheEarlierRunOfTheTest`]），起引擎时交同一份，不按用例名重算路径。
+pub struct LibraryOfTheTest {
+    directory: ExclusiveTemporaryDirectory,
+}
+
+impl LibraryOfTheTest {
+    /// 建这条用例自己那一份库。录入段与判段分进程跑（`SINGLEFS_CRASH_AMPLIFICATION_STAGE=record` / `judge`）时不建：这一份只在这个进程里，
+    /// 判段那个进程拿不到录入段那个进程的这一份（跨进程怎么交这份库没定），打「本次未跑」那一行、交 `None`。
+    #[must_use]
+    pub fn create_or_report_not_run(test_name: &str) -> Option<Self> {
+        match RunStage::of_this_process() {
+            RunStage::RecordThenJudge => Some(Self {
+                directory: ExclusiveTemporaryDirectory::create(&format!(
+                    "{FRESH_LIBRARY_LABEL_PREFIX}-{test_name}"
+                ))
+                .unwrap_or_else(|reason| {
+                    panic!("{test_name} 自己那一份一次性的库建不了：{reason}")
+                }),
+            }),
+            stage @ (RunStage::RecordOnly | RunStage::JudgeOnly) => {
+                println!(
+                    "{}",
+                    gpu_not_run_line(
+                        test_name,
+                        &format!(
+                            "这条用例在自己那一份一次性的库里判，录入段与判段分进程跑（这一趟只跑 {}）时两段拿不到同一份库：跨进程怎么交这份库没定",
+                            stage.name()
+                        )
+                    )
+                );
+                None
+            }
+        }
+    }
+
+    /// 库目录（第一次起引擎、录入段跑时由引擎建）。
+    #[must_use]
+    pub fn library(&self) -> std::path::PathBuf {
+        self.directory.join("library")
+    }
+}
 
 /// 一张镜像（一批崩溃态）在这一趟的结论（逐状态，与持久集合同序）与它从哪来。
 pub struct ConclusionsOfAnImage {
@@ -325,12 +369,15 @@ pub fn mismatches_of_the_images(
     mismatches
 }
 
-/// 起引擎：照此刻的环境（多机配置、显卡先后、选段、分片）。`fresh_library_of` 给了用例名，库换成这条用例自己的那一份
+/// 起引擎：照此刻的环境（多机配置、显卡先后、选段、分片）。`library_of_the_test` 给了，库换成这条用例自己的那一份
 /// （录入段起跑先清空），引擎起完把库目录那个变量还原；拿着改环境的那把锁起，不读到别的用例设的值。
-pub fn start_the_engine(scenario_name: &str, fresh_library_of: Option<&str>) -> GivenStatesEngine {
+pub fn start_the_engine(
+    scenario_name: &str,
+    library_of_the_test: Option<&LibraryOfTheTest>,
+) -> GivenStatesEngine {
     start_the_engine_on_the_library_of_the_test(
         scenario_name,
-        fresh_library_of,
+        library_of_the_test,
         LibraryOfTheTestAtTheStart::EmptiedWhenTheRecordStageRuns,
     )
 }
@@ -347,43 +394,40 @@ pub enum LibraryOfTheTestAtTheStart {
 /// 同 [`start_the_engine`]，`library_at_the_start` 定用例自己那一份库起步时清不清空。
 pub fn start_the_engine_on_the_library_of_the_test(
     scenario_name: &str,
-    fresh_library_of: Option<&str>,
+    library_of_the_test: Option<&LibraryOfTheTest>,
     library_at_the_start: LibraryOfTheTestAtTheStart,
 ) -> GivenStatesEngine {
     let _one_test_at_a_time = one_test_changes_the_environment_at_a_time();
     let item = GivenStatesItem {
-        item_name: ITEM_NAME.to_string(),
-        setting_file: crate::THIS_FILE.to_string(),
-        seeds_and_scale: format!("scenario={scenario_name}"),
+        item_name: format!("{}::scenario={scenario_name}", ITEM_NAME),
     };
     let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-    let repository_root = repository_root_of_this_crate();
-    let Some(test_name) = fresh_library_of else {
-        return GivenStatesEngine::start_from_environment(item, &toolchain, &repository_root)
+    let Some(library_of_the_test) = library_of_the_test else {
+        return GivenStatesEngine::start_from_environment(item, &toolchain)
             .expect("崩溃点重放的引擎照本机配置起得来（配了 GPU 卡用不上、结论版本与编译时对不上都在这里红，不退回 CPU）");
     };
-    let directory: PathBuf = crash_library_home()
-        .expect("判定库的家目录")
-        .join(FRESH_LIBRARY_SUBDIRECTORY)
-        .join(test_name);
+    // 库目录本身由引擎建（建库时目录已在会拒，verdict_store 的 LibraryDirectoryAlreadyExists）；上一层是这条用例独占的那一份一次性目录
+    let directory = library_of_the_test.library();
     if library_at_the_start == LibraryOfTheTestAtTheStart::EmptiedWhenTheRecordStageRuns
         && RunStage::of_this_process().records()
+        && directory.exists()
     {
-        if directory.exists() {
-            std::fs::remove_dir_all(&directory)
-                .unwrap_or_else(|error| panic!("清不掉 {}：{error}", directory.display()));
-        }
-        // 只建上一层：库目录本身由引擎建（建库时目录已在会拒，verdict_store 的 LibraryDirectoryAlreadyExists）
-        let parent = directory.parent().expect("用例库目录在判定库家目录底下");
-        std::fs::create_dir_all(parent)
-            .unwrap_or_else(|error| panic!("建不了 {}：{error}", parent.display()));
+        std::fs::remove_dir_all(&directory)
+            .unwrap_or_else(|error| panic!("清不掉 {}：{error}", directory.display()));
     }
+    // 一次性的库落在 TMPDIR 下：起引擎那一刻写明它是一次性的（引擎拒开机会清空的地方的长期库），起完连同库目录变量一起还原
     let previous = std::env::var_os(CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE);
+    let previous_temporary_mark = std::env::var_os(LIBRARY_IS_TEMPORARY_VARIABLE);
     std::env::set_var(CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE, &directory);
-    let started = GivenStatesEngine::start_from_environment(item, &toolchain, &repository_root);
+    std::env::set_var(LIBRARY_IS_TEMPORARY_VARIABLE, "1");
+    let started = GivenStatesEngine::start_from_environment(item, &toolchain);
     match previous {
         Some(value) => std::env::set_var(CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE, value),
         None => std::env::remove_var(CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE),
+    }
+    match previous_temporary_mark {
+        Some(value) => std::env::set_var(LIBRARY_IS_TEMPORARY_VARIABLE, value),
+        None => std::env::remove_var(LIBRARY_IS_TEMPORARY_VARIABLE),
     }
     started.expect("崩溃点重放的引擎照本机配置起得来（配了 GPU 卡用不上、结论版本与编译时对不上都在这里红，不退回 CPU）")
 }
@@ -495,7 +539,12 @@ pub fn judge_the_collected_images(
 ) -> Option<(Vec<ConclusionsOfAnImage>, GivenStatesRun, bool)> {
     let judged_afresh = images.iter().any(needs_a_fresh_judgement)
         || judged_afresh_regardless == JudgedAfreshRegardlessOfTheExpectations::Yes;
-    let engine = start_the_engine(scenario_name, judged_afresh.then_some(scenario_name));
+    let library_of_the_test = if judged_afresh {
+        Some(LibraryOfTheTest::create_or_report_not_run(scenario_name)?)
+    } else {
+        None
+    };
+    let engine = start_the_engine(scenario_name, library_of_the_test.as_ref());
     let conclusions: Vec<ConclusionsOfAnImage> = images
         .iter()
         .map(|image| judge_one_image(&engine, image, container_capacity_knobs))

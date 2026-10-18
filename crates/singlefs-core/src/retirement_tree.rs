@@ -16,7 +16,7 @@ use singlefs_format::RETIREMENT_CONTAINER_RECORDS;
 use crate::address::{CheckpointTxg, TreeIdentifier};
 use crate::container_tree::{
     append_records_to_the_open_container, ContainerTreeAfterThisPublish, ContainerTreeNodeEntries,
-    ContainerTreeShape, RecordContainer,
+    ContainerTreeShape, NextContainerNumberPastTheTopOfItsRange, RecordContainer,
 };
 use crate::records::RetirementRecord;
 use crate::unit::{PackedIdentity, PACKED_TYPE_RETIREMENT};
@@ -119,7 +119,9 @@ pub fn retirement_records_of_this_publish(
 /// 往退役树的开放容器（最右那一片）追加这次发布的退役记录（删空摘掉、被左邻吸收的叶容器身份，各一条）：
 /// 装得下就追加进最右那片；装满了（或零根）就开一片新容器，容器号 = 树里最大号 + 1（零根时 1），出生代 = 这次发布的 checkpoint_txg，
 /// 出生树 = `retirement_tree`，打包记录类型 3；根满时长高。一条都没有时整棵照抄（这次不重写退役树）。
-#[must_use]
+///
+/// # Errors
+/// 要开新容器而最右那片的号（盘上读来的）已是 `u64::MAX` ⇒ [`NextContainerNumberPastTheTopOfItsRange`]（C841）。
 pub fn append_retirement_records_to_the_open_container(
     containers_before_this_publish: &[RetirementContainer],
     shape_before_this_publish: &ContainerTreeShape,
@@ -128,7 +130,7 @@ pub fn append_retirement_records_to_the_open_container(
     retirement_tree: TreeIdentifier,
     capacity: RetirementContainerCapacity,
     node_entries: ContainerTreeNodeEntries,
-) -> RetirementTreeAfterThisPublish {
+) -> Result<RetirementTreeAfterThisPublish, NextContainerNumberPastTheTopOfItsRange> {
     append_records_to_the_open_container(
         containers_before_this_publish,
         shape_before_this_publish,
@@ -187,7 +189,8 @@ mod tests {
                 RETIREMENT_TREE,
                 capacity,
                 node_entries,
-            );
+            )
+            .expect("容器号从 1 起逐片加一，远在顶之下");
         }
         after
     }
@@ -205,7 +208,8 @@ mod tests {
             RETIREMENT_TREE,
             RetirementContainerCapacity::FromTheContainerFormat,
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         let identity = PackedIdentity {
             birth_tree: RETIREMENT_TREE,
             record_type: PACKED_TYPE_RETIREMENT,
@@ -230,7 +234,8 @@ mod tests {
             RETIREMENT_TREE,
             RetirementContainerCapacity::FromTheContainerFormat,
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(
             second.containers,
             vec![RetirementContainer {
@@ -259,7 +264,8 @@ mod tests {
             RETIREMENT_TREE,
             RetirementContainerCapacity::FromTheContainerFormat,
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(after.containers, before.containers);
         assert!(!after.is_the_root_rewritten());
         assert!(after.rewritten_nodes().is_empty());
@@ -282,7 +288,8 @@ mod tests {
             RETIREMENT_TREE,
             capped(2),
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(third.containers.len(), 2, "第一片满 2 条 ⇒ 开第二片");
         assert_eq!(third.containers[0], two.containers[0], "满了的那片原样");
         assert_eq!(third.containers[1].identity.container, 2, "最大号 1 + 1");
@@ -299,7 +306,8 @@ mod tests {
             RETIREMENT_TREE,
             capped(2),
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(
             spanning
                 .containers
@@ -331,7 +339,8 @@ mod tests {
             RETIREMENT_TREE,
             capped(1),
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(grown.shape.root_level(), 2, "第 136 片：根满长一层");
         assert!(grown.grew_a_level_this_publish());
         assert!(grown.previous_root_is_carried_down_unchanged());
@@ -354,7 +363,8 @@ mod tests {
             RETIREMENT_TREE,
             RetirementContainerCapacity::FromTheContainerFormat,
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         let second = append_retirement_records_to_the_open_container(
             &first.containers,
             &first.shape,
@@ -363,7 +373,8 @@ mod tests {
             RETIREMENT_TREE,
             RetirementContainerCapacity::FromTheContainerFormat,
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(
             second.containers[0].records,
             vec![retired_leaf(234, 10), retired_leaf(234, 12)]

@@ -1,0 +1,20 @@
+pub fn plain_entry() -> u32 {
+    helper() + 1
+}
+fn helper() -> u32 {
+    2
+}
+pub fn macro_entry() -> u32 {
+    if cfg!(feature = "gpu") { 3 } else { 4 }
+}
+pub fn statement_entry() -> u32 {
+    #[cfg(feature = "gpu")]
+    let value = 8;
+    #[cfg(not(feature = "gpu"))]
+    let value = 9;
+    value
+}
+#[cfg_attr(feature = "gpu", inline)]
+pub fn attribute_only_entry() -> u32 {
+    7
+}

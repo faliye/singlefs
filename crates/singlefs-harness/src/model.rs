@@ -6,7 +6,7 @@
 //! 角色、根环落点、F 的生效值、抬 F 的上限、候选集、内容装不装得下都照条款另写一份，不照抄实现的算法。
 //!
 //! 不建崩溃：第 1 件的历史里没有断电、没有设备错，每一步的写都落完，所以环里最新的那条根就是最后写出的那一条、journal 里没有要施加的记录
-//! （可写挂载写的上一个实例那一行 W 恒 0）。第 3 件（崩溃注入）接上时要加「这个崩溃状态恢复到的版本在不在允许集合里」。
+//! （可写挂载写的上一个实例那一行 W 恒 0）。第 3 件（崩溃注入）判「这个崩溃状态恢复到的版本在不在允许集合里」用 [`crash_recovery_disagreement`]。
 //!
 //! 条款把答案留给实现取上界的地方（容量墙），模型答「允许拒绝的区间」，不照抄实现的上界算法；打回重议那几处（增补 2 收口表第 ①、② 行）
 //! 照代码今天的读法写，每一处标「预想，跟收口表第 X 行」。
@@ -585,6 +585,34 @@ pub struct ModelRingPosition {
     pub slot_in_region: u64,
 }
 
+/// 一个单元在一块盘上的那一份占的槽：从 `first_slot` 起 `span_in_slots` 个槽。公开是为了让对拍拿实现报的那一份
+/// （`RollbackError::IsolatedUnitCopyUnreadableOrMismatched`、`RollbackError::ResurrectedUnitCopyUnreadableOrMismatched`）
+/// 与被吞的写落在哪比（故障注入，`fault_injection::left_by_the_lying_device`）；胶水在 `model_comparison.rs` 里换过来。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ModelUnitCopyLocation {
+    pub device: ModelDeviceIdentity,
+    pub span_in_slots: u32,
+    pub first_slot: u64,
+}
+
+impl ModelUnitCopyLocation {
+    /// 这一份在盘上占的字节区间 [起, 止)。
+    ///
+    /// # Panics
+    /// 槽号乘槽宽越过 u64（盘上读来的槽号不会这么大，越过就是胶水换错了）。
+    #[must_use]
+    pub fn byte_range_on_the_device(self) -> std::ops::Range<u64> {
+        let start = self
+            .first_slot
+            .checked_mul(SLOT_BYTES)
+            .expect("槽号乘槽宽装得进 u64：槽号来自盘上的位置条目");
+        let length = u64::from(self.span_in_slots)
+            .checked_mul(SLOT_BYTES)
+            .expect("一个单元两槽以内");
+        start..start.checked_add(length).expect("单元末端装得进 u64")
+    }
+}
+
 /// S 取 mkfs 那一档：模型只建 mkfs 默认参数的池，从不改 S（改 S 的池由
 /// `crates/singlefs-harness/tests/system_configuration_slots_per_region.rs` 直接在实现上跑）。
 /// 写成「mkfs 写的那个值」而不是「每区槽数 S」，是为了让「模型假定 S 不变」这件事在名字里就看得见。
@@ -898,9 +926,11 @@ pub enum ModelRefusalReason {
     RollbackTargetOnAbandonedTimeline,
     /// 回退目标那一版树表 0 条（D23（journal 的角色与格式） 已定项 14：候选集只收带文件的根）。
     RollbackTargetWithoutFile,
-    /// 要建立新实例的那一版树表 0 条、而它的实例表已经不是 mkfs 那一片（上一次挂载在这一版上写过行）：
-    /// 被换下的那一片记在哪没有条款——树表 0 条 ⇒ 这一版没有分配记录树，那次释放只住内存，重开之后账取不回来，
-    /// 而根环里更旧的候选根还指着它。第一版不支持（设计空白，交主 agent）。
+    /// 要建立新实例的那一版树表 0 条、而它的实例表已经不是 mkfs 那一片（上一次挂载在这一版上写过行）。此前是必拒的一格；
+    /// C512（树表 0 条的一版上被换下的单元记在哪） 2026-09-23 定案之后写行那次发布建起这一版自己的分配记录树、账取得回来，
+    /// 这一格不再拒，模型的答案里一条都不列（`IdealModel::answer_establishing_an_instance` 那一段注释）。留着这个成员只为
+    /// 胶水把实现在手造镜像上的那一拒（`MountError::VersionWithoutFileNotWrittenByMakeFilesystem`）映射过来：实现要是在随机历史里
+    /// 拒在这一格，对拍报「模型说该成、实现拒了」。
     VersionWithoutFileNotWrittenByMakeFilesystem,
     /// 要抬的 F 超过上限（D16（发布语义） 已定项 1「抬 F 的上限」）。
     FloorAboveCeiling,
@@ -1002,8 +1032,6 @@ pub struct ModelAnswer {
     pub operation: ModelOperationKind,
     /// 条款要求拒绝的理由：非空就必须拒，理由是这里的任一条或区间允许的任一条墙。
     pub required_refusals: BTreeSet<ModelRefusalReason>,
-    /// 不是容量墙、也允许拒绝的理由（照代码今天的读法划的「第一版不支持」区，条款没写）。
-    pub permitted_refusals: BTreeSet<ModelRefusalReason>,
     /// 做成时写出的根，按次序。
     pub expected_roots: Vec<ModelRoot>,
     /// 做成时这次挂载取到的实例代号与写的行。
@@ -1206,6 +1234,18 @@ impl ModelDisagreementAspect {
     }
 }
 
+/// 实现拒的时候点名的那一处读不出（D16（发布语义） 已定项 1「根槽这一次读坏」那一行；D23（journal 的角色与格式） 已定项 14「在任何写之前拒」那一格）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelReportedUnreadablePlace {
+    /// 算抬 F 的上限、或挂着时回退判候选集读根环时，这个进程知道住着根的那一槽读坏、重读仍坏。
+    /// 故障注入按它比「被吞的根槽写落在哪个槽」（实八）。
+    RootRingSlotStillBadAfterOneReread(ModelRingPosition),
+    /// 管理员回退逐盘验时回退目标引用的一个单元（复活集里的或隔离的）在一块盘上的那一份读不出或整单元 CRC-32C 对不上
+    /// （执行器在回退被拒那一处经 [`ModelDisagreement::note_the_unit_copy_a_rollback_refused_on`] 记上）。
+    /// 故障注入按它比「被吞的写落在哪」（`research/prompts/code-backlog-b2-code-r1-main-verification.md`「更正」一节 A4）。
+    UnitCopyUnreadableOrMismatched(ModelUnitCopyLocation),
+}
+
 /// 模型与实现对不上：哪一格、模型答了什么、实现做了什么。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModelDisagreement {
@@ -1215,18 +1255,16 @@ pub struct ModelDisagreement {
     /// 对不上的是抬 F 的上限（[`ModelDisagreementAspect::RollbackFloorCeiling`]）时实现报的那个数；别的格都是 None。
     /// 故障注入按它比「模型去掉被吞的根之后重算的上限」（实七，主 agent 2026-09-26 定的按注入点认）。
     pub implementation_reported_ceiling: Option<ModelCheckpointTxg>,
-    /// 对不上的是「模型说该成、实现拒了」或「拒绝的理由」，而实现拒的是「根环槽读坏、重读仍坏」（抬 F 算上限、挂着时回退判候选集都算）
-    /// 时它点名的那个槽；别的格都是 None。
-    /// 故障注入按它比「被吞的根槽写落在哪个槽」（实八，D16（发布语义） 已定项 1「根槽这一次读坏」那一行）。
-    pub implementation_reported_root_ring_slot_still_bad_after_one_reread:
-        Option<ModelRingPosition>,
+    /// 对不上的是「模型说该成、实现拒了」或「拒绝的理由」，而实现拒的是一处读不出、拒之前一个写都没发时它点名的那一处
+    /// （[`ModelReportedUnreadablePlace`] 的两种）；别的格都是 None。故障注入按它比被吞的写落在哪。
+    pub implementation_reported_unreadable_place: Option<ModelReportedUnreadablePlace>,
     /// 对不上的是「写的实例表行」（[`ModelDisagreementAspect::InstanceRows`]）时实现写的那几行；别的格都是 None。
     /// 故障注入按它比「被吞根槽的那几条根由记录重建之后模型重算的行」（实八，D23（journal 的角色与格式） 已定项 14 第 4 条）。
     pub implementation_rows_written: Option<Vec<ModelInstanceRow>>,
 }
 
 impl ModelDisagreement {
-    /// 只带哪一格与两边的话，实现报的上限、读坏的根环槽、写的行都是 None。
+    /// 只带哪一格与两边的话，实现报的上限、读不出的那一处、写的行都是 None。
     #[must_use]
     pub fn new(
         aspect: ModelDisagreementAspect,
@@ -1238,8 +1276,44 @@ impl ModelDisagreement {
             model_answer,
             implementation_answer,
             implementation_reported_ceiling: None,
-            implementation_reported_root_ring_slot_still_bad_after_one_reread: None,
+            implementation_reported_unreadable_place: None,
             implementation_rows_written: None,
+        }
+    }
+
+    /// 管理员回退被拒、实现点名了「回退目标引用的一个单元在一块盘上的那一份读不出或对不上」时，把那一份记上：
+    /// 只在对不上的是「模型说该成、实现拒了」或「拒绝的理由」、拒之前一个写都没发时记（mount.rs 那两个成员的契约：在任何写之前返回；
+    /// 拒之前写了盘的，故障注入不许拿这一份去认）。别的格不动。
+    pub fn note_the_unit_copy_a_rollback_refused_on(
+        &mut self,
+        unit_copy: Option<ModelUnitCopyLocation>,
+        refused_before_any_write: bool,
+    ) {
+        let aspect_is_a_refusal_the_model_did_not_expect = match self.aspect {
+            ModelDisagreementAspect::RefusedWhenModelRequiresSuccess
+            | ModelDisagreementAspect::RefusalReason => true,
+            ModelDisagreementAspect::SessionState
+            | ModelDisagreementAspect::SucceededWhenModelRequiresRefusal
+            | ModelDisagreementAspect::WroteBeforeRefusing
+            | ModelDisagreementAspect::PublishCount
+            | ModelDisagreementAspect::RootIdentity
+            | ModelDisagreementAspect::JournalCounter
+            | ModelDisagreementAspect::RollbackFloor
+            | ModelDisagreementAspect::FilePresence
+            | ModelDisagreementAspect::FileContent
+            | ModelDisagreementAspect::InstanceTableOfTheVersion
+            | ModelDisagreementAspect::AllocationGeneration
+            | ModelDisagreementAspect::InstanceGeneration
+            | ModelDisagreementAspect::InstanceRows
+            | ModelDisagreementAspect::RollbackFloorCeiling
+            | ModelDisagreementAspect::ColdStartReadBack
+            | ModelDisagreementAspect::NotModeled => false,
+        };
+        if aspect_is_a_refusal_the_model_did_not_expect && refused_before_any_write {
+            if let Some(unit_copy) = unit_copy {
+                self.implementation_reported_unreadable_place =
+                    Some(ModelReportedUnreadablePlace::UnitCopyUnreadableOrMismatched(unit_copy));
+            }
         }
     }
 }
@@ -1340,7 +1414,14 @@ pub struct IdealModel {
     highest_published_txg: ModelCheckpointTxg,
     highest_journal_counter: ModelJournalCounter,
     session: Option<ModelSession>,
+    /// mkfs 之后写进根环的根一共几条（每写一条加一，第 0 代根不算）：执行器按每一步前后的差量一步写出几条根。
+    roots_written_since_make_filesystem: u64,
 }
+
+/// 模型根环的槽数 R × S（[`ROOT_RING_REGIONS`] 个区域、每区 mkfs 那一档的 S 个槽）：根按 txg 落进其中一个槽，一步里写出的根多于它，
+/// 先写的就被同一步后写的盖掉。
+pub const MODEL_ROOT_RING_SLOTS: u64 =
+    ROOT_RING_REGIONS * MODEL_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM;
 
 /// 环长 `journal_ring_bytes` 下的单元区起始槽号：journal 环从槽 [`JOURNAL_RING_START_SLOT`] 起，末尾不落在槽边界上时取下一个整槽
 /// （D3（空间分配） 已定项 10 ④「第一版 = journal 环末尾的下一个槽」）。模型自己的一份式子（D13（验证路线） 已定项 5）。
@@ -1394,7 +1475,14 @@ impl IdealModel {
             highest_published_txg: MAKE_FILESYSTEM_TXG,
             highest_journal_counter: ModelJournalCounter(0),
             session: None,
+            roots_written_since_make_filesystem: 0,
         }
+    }
+
+    /// mkfs 之后写进根环的根一共几条（第 0 代根不算）。
+    #[must_use]
+    pub fn roots_written_since_make_filesystem(&self) -> u64 {
+        self.roots_written_since_make_filesystem
     }
 
     /// mkfs 同一个进程里取号、暖机（D16（发布语义） 已定项 8：连推空发布到本实例的根覆盖每块盘；树表 0 条 ⇒ 零单元），会话开着、
@@ -1432,8 +1520,13 @@ impl IdealModel {
 
     /// 模型此刻根环里的每一条根：身份与它下面的文件内容（树表 0 条是 None）。
     /// 崩溃注入（增补 3 第 3 件）每一步之后并一次，攒成「模型提交过的每一版」的目录，再拿它判崩溃状态恢复到的那一版
-    /// （[`crash_recovery_disagreement`]）。并不掉：根环有 R × S = 24 个槽，一步至多写出四条根（可写挂载的写行加暖机至多三次、
-    /// 抬 F 两次空发布），下一步之前必然还在环里。
+    /// （[`crash_recovery_disagreement`]）。根按 txg 落槽、同一步写的根 txg 连号，一步里写出的根不多于根环槽数
+    /// （[`MODEL_ROOT_RING_SLOTS`]，R × S）时，这一步写的每一条到这一步做完都还在环里，每步并一次不漏。
+    /// 一步写几条根没有写死的常数上界，按今天的代码数：可写挂载是写行一次、暖机至多 R 次（循环上限）、为空间推的抬 F
+    /// （每次准入连写行在内至多 `mount::PUBLISHES_PER_ADMISSION_AT_MOST` 次发布，推的可以是几串）；抬 F 一串至多 R 次空发布；
+    /// 会话里一次用户改动先走空删除队列（每批一次发布）、被空间拒就推抬 F，再发这次改动，次数随队列长度。随机历史里量到过一步 9 条
+    /// （一次可写挂载推了两串抬 F）。不靠数出来的上界，执行器每一步之后量这一步写出的根数（[`Self::roots_written_since_make_filesystem`]
+    /// 的差）、断言不多于根环槽数（`history::execute_history_with` 那一族，`HistoryTally::most_roots_written_by_the_model_in_one_step`）。
     #[must_use]
     pub fn committed_versions(&self) -> Vec<(ModelRootKey, Option<Rc<[u8]>>)> {
         self.ring
@@ -1669,14 +1762,6 @@ impl IdealModel {
         POOL_WIDE_ACCOUNTING_ROWS
             + ACCOUNTING_ROWS_PER_DEVICE * device_count
             + previous.inode_number_watermark_steps
-    }
-
-    /// 接在可写会话的现行版本后面、写记账行的下一次发布写几行（[`IdealModel::accounting_rows_of_a_publish_on`]）；没有可写会话时 None。
-    #[must_use]
-    pub fn accounting_rows_of_the_next_publish_in_the_session(&self) -> Option<u64> {
-        self.session
-            .as_ref()
-            .map(|session| self.accounting_rows_of_a_publish_on(&session.current))
     }
 
     /// 可写会话的现行版本（接下来的发布要接在它后面的那一版）；没有可写会话时 None。对拍的用例拿它的记账行数与记账树节点数的上界
@@ -2060,7 +2145,6 @@ impl IdealModel {
         Ok(self.answer_for_publishes(
             ModelOperationKind::PublishFirstFile,
             required_refusals,
-            BTreeSet::new(),
             vec![root],
         ))
     }
@@ -2143,7 +2227,7 @@ impl IdealModel {
             Some(content),
             Rc::clone(&current.instance_table_rows),
         );
-        Ok(self.answer_for_publishes(operation, required_refusals, BTreeSet::new(), vec![root]))
+        Ok(self.answer_for_publishes(operation, required_refusals, vec![root]))
     }
 
     /// 零单元发布（`transaction::publish_without_units`）：接在现行的树表 0 条的一版后面。
@@ -2172,7 +2256,6 @@ impl IdealModel {
         );
         Ok(self.answer_for_publishes(
             ModelOperationKind::PublishWithoutUnits,
-            BTreeSet::new(),
             BTreeSet::new(),
             vec![root],
         ))
@@ -2214,7 +2297,6 @@ impl IdealModel {
         );
         Ok(self.answer_for_publishes(
             ModelOperationKind::PublishUnlinkIntent,
-            BTreeSet::new(),
             BTreeSet::new(),
             vec![root],
         ))
@@ -2260,7 +2342,6 @@ impl IdealModel {
         );
         Ok(self.answer_for_publishes(
             ModelOperationKind::PublishDeletionStep,
-            BTreeSet::new(),
             BTreeSet::new(),
             vec![root],
         ))
@@ -2320,7 +2401,6 @@ impl IdealModel {
         Ok(self.answer_for_publishes(
             ModelOperationKind::PublishNewInode,
             BTreeSet::new(),
-            BTreeSet::new(),
             vec![root],
         ))
     }
@@ -2336,7 +2416,6 @@ impl IdealModel {
             ModelVersionContents::TreesAndNoFile { .. } => Some(self.answer_for_publishes(
                 operation,
                 BTreeSet::from([ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile]),
-                BTreeSet::new(),
                 Vec::new(),
             )),
             ModelVersionContents::WithoutTrees
@@ -2361,13 +2440,11 @@ impl IdealModel {
         &self,
         operation: ModelOperationKind,
         required_refusals: BTreeSet<ModelRefusalReason>,
-        permitted_refusals: BTreeSet<ModelRefusalReason>,
         roots: Vec<ModelRoot>,
     ) -> ModelAnswer {
         ModelAnswer {
             operation,
             required_refusals,
-            permitted_refusals,
             planned_publish_upper_bounds: Self::upper_bounds_of(&roots),
             expected_roots: roots,
             expected_mount: None,
@@ -2421,7 +2498,6 @@ impl IdealModel {
             BTreeSet::from([
                 ModelRefusalReason::NewerPublishWitnessedBySystemConfigurationStillUnreadableAfterOneReread,
             ]),
-            BTreeSet::new(),
             Vec::new(),
         );
         // 可写挂载在读阶段判完、取号之前拒：拒之前一个写都不发（实现的契约：`NewerStateStillUnreadableAfterOneReread` 取号之前交回）。
@@ -2550,7 +2626,6 @@ impl IdealModel {
         let mut answer = self.answer_for_publishes(
             ModelOperationKind::RollbackWhileMounted,
             required_refusals,
-            BTreeSet::new(),
             roots,
         );
         answer.rollback_target = Some(target);
@@ -2655,8 +2730,7 @@ impl IdealModel {
             ));
             warm_up_publishes += 1;
         }
-        let mut answer =
-            self.answer_for_publishes(operation, required_refusals, BTreeSet::new(), roots);
+        let mut answer = self.answer_for_publishes(operation, required_refusals, roots);
         answer.walls_are_judged_before_the_first_write = true;
         answer.expected_mount = Some((instance, rows_to_write));
         answer.session_after_success = ModelSessionAfterSuccess::OpenedAs(instance);
@@ -2696,7 +2770,6 @@ impl IdealModel {
         }
         let ceiling = self.rollback_floor_ceiling();
         let mut required_refusals = BTreeSet::new();
-        let permitted_refusals = BTreeSet::new();
         match ceiling {
             Some(ceiling) if new_floor > ceiling => {
                 required_refusals.insert(ModelRefusalReason::FloorAboveCeiling);
@@ -2714,7 +2787,6 @@ impl IdealModel {
         let mut answer = self.answer_for_publishes(
             ModelOperationKind::RaiseRollbackFloor,
             required_refusals,
-            permitted_refusals,
             roots,
         );
         answer.rollback_floor_ceiling = ceiling;
@@ -2789,12 +2861,8 @@ impl IdealModel {
         } else {
             Vec::new()
         };
-        let mut answer = self.answer_for_publishes(
-            ModelOperationKind::Unmount,
-            BTreeSet::new(),
-            BTreeSet::new(),
-            roots,
-        );
+        let mut answer =
+            self.answer_for_publishes(ModelOperationKind::Unmount, BTreeSet::new(), roots);
         // 实现在任何写之前把这一串整串预演一遍（`mount::unmount` 走的就是抬 F 那一串），哪一次撞墙都在第一次写之前拒、一次都不发。
         answer.walls_are_judged_before_the_first_write = true;
         answer.session_after_success = ModelSessionAfterSuccess::Closed;
@@ -2815,7 +2883,6 @@ impl IdealModel {
         ModelAnswer {
             operation: ModelOperationKind::ColdStartRecover,
             required_refusals: BTreeSet::new(),
-            permitted_refusals: BTreeSet::new(),
             expected_roots: Vec::new(),
             expected_mount: None,
             expected_read_back: Some(read_back),
@@ -2891,7 +2958,6 @@ impl IdealModel {
                     ObservedRefusalReason::Explained(candidate) => {
                         Some(*candidate).filter(|candidate| {
                             answer.required_refusals.contains(candidate)
-                                || answer.permitted_refusals.contains(candidate)
                                 || (candidate.is_capacity_wall_with_an_interval()
                                     && self.capacity_wall_is_permitted(
                                         *candidate,
@@ -2916,10 +2982,12 @@ impl IdealModel {
                         describe_answer(answer),
                         format!("拒了：{member}"),
                     );
-                    disagreement
-                        .implementation_reported_root_ring_slot_still_bad_after_one_reread =
+                    let root_ring_slot_reported_before_any_write =
                         reported_root_ring_slot_still_bad_after_one_reread
                             .filter(|_| refused_before_any_write);
+                    disagreement.implementation_reported_unreadable_place =
+                        root_ring_slot_reported_before_any_write
+                            .map(ModelReportedUnreadablePlace::RootRingSlotStillBadAfterOneReread);
                     return Err(disagreement);
                 };
                 let partial_publishes_allowed = !answer.walls_are_judged_before_the_first_write
@@ -3005,7 +3073,7 @@ impl IdealModel {
                 ),
                 implementation_answer: format!("实现报上限 {}", reported.0),
                 implementation_reported_ceiling: Some(reported),
-                implementation_reported_root_ring_slot_still_bad_after_one_reread: None,
+                implementation_reported_unreadable_place: None,
                 implementation_rows_written: None,
             })
         }
@@ -3384,6 +3452,7 @@ impl IdealModel {
     }
 
     fn write_root(&mut self, root: ModelRoot) {
+        self.roots_written_since_make_filesystem += 1;
         self.highest_published_txg = self.highest_published_txg.max(root.key.checkpoint_txg);
         self.highest_journal_counter = self.highest_journal_counter.max(root.journal_counter);
         self.ring
@@ -3512,13 +3581,8 @@ pub fn crash_recovery_disagreement(
 
 fn describe_answer(answer: &ModelAnswer) -> String {
     if answer.required_refusals.is_empty() {
-        let permitted: Vec<&'static str> = answer
-            .permitted_refusals
-            .iter()
-            .map(|reason| reason.name())
-            .collect();
         format!(
-            "{:?} 该成（写出 {:?}；允许拒的只有容量墙区间与 {permitted:?}）",
+            "{:?} 该成（写出 {:?}；允许拒的只有容量墙区间）",
             answer.operation,
             answer
                 .expected_roots

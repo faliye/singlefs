@@ -41,7 +41,7 @@ pub const FIRST_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
 pub const OVERWRITE_BYTES: usize = 2999;
 
 /// 单元区 384 槽那一档小盘的单元区槽数：六个 64 槽的聚簇段。
-/// 抄自 `crates/singlefs-harness/src/history.rs` 的 `SMALL_DEVICE_UNIT_AREA_SLOTS`（`HistoryDeviceWidth::UnitAreaOf384Slots`）：
+/// 抄自 `crates/singlefs-harness/src/history.rs` 的 `SMALL_DEVICE_UNIT_AREA_SLOTS_BEYOND_THE_RING_WINDOW_ALLOWANCE`（`HistoryDeviceWidth::UnitAreaOf384Slots`）：
 /// 那边是私有常量，引 `HistoryDeviceWidth` 就把随机历史脚手架带进上面那条登记用例的判法闭包，history.rs 又不在这一件能改的范围里，
 /// 所以各留一份。`tests/common_admission/mod.rs` 的 `PoolUnderTest::start_after_the_first_file` 按 384 槽那一档起池时
 /// 核这里三样（参数、盘宽、几何）与 history.rs 那一档逐项相同，两边改了一边就红。

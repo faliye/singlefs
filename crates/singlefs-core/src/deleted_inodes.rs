@@ -58,7 +58,8 @@ pub fn deleted_inodes_root_entries(
         .collect())
 }
 
-/// 从一个 `deleted_inodes` 根的条目读回号（条目宽在这之前由读者核过等于 8）。
+/// 从一个 `deleted_inodes` 根的条目读回号。每条条目宽恰好 8（无 value）：重建上一版读这个根的那一判
+/// （`recovery::rebuild_version_in_the_unit_area_starting_at`）宽不等于 8 就报 `UnitMalformed`、不走到这里；宽于 8 的不截前 8 字节收下。
 #[must_use]
 pub fn inode_numbers_of_the_deleted_inodes_root_entries(entries: &[Vec<u8>]) -> Vec<InodeNumber> {
     entries

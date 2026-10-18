@@ -1,4 +1,4 @@
-//! checker 档模块：crash_point_replay_progress、crash_injection、crash_given_states、crash_library、crash_amplification、gpu_unit_checks
+//! checker 档模块：crash、crash_point_replay_progress、crash_injection、crash_given_states、crash_library、crash_amplification、gpu_unit_checks、crash_judge_tables
 //! 随机历史每一步的镜像与故障注入每个注入点重开的盘，池级 checker 那一遍搬进 checker 档两段跑（用户 2026-10-13 定：harness 档随机历史每步与
 //! 故障注入每个注入点的池级 checker「搬进 checker 档两段跑」，harness 只留与理想模型、RefFS 比对那一截）：
 //! harness 用同一批种子跑随机历史与故障注入（`PerStepChecker::Skipped`，harness 一条不变量都不判），每一步的镜像经每步镜像那个钩子
@@ -7,7 +7,7 @@
 //! （基线是 mkfs 之后的池、写表是 mkfs 之后的录制流、每张镜像一个持久集合，掉电接缝照历史里的掉电断开记录核对器的发布表，
 //! `crash_injection::HistoryAfterTheMakeFilesystem`），交崩溃点重放的给定状态引擎（`crash_amplification::GivenStatesEngine`）：
 //! 每张表先写进给定状态表那一类的判定库（录入段）、判段从库里读回来判，配了 GPU 只由 GPU 判器判、没配只由 CPU 判器判，结论按表存进库、
-//! 判过的复用（键：判法版本、工具链、表的输入摘要，引擎现有的给定状态键）。
+//! 判过的复用（键：判法单元指纹、工具链、表的输入摘要，引擎现有的给定状态键）。
 //!
 //! 判据与 harness 原先每一步就地跑池级 checker 时相同：随机历史每一步之后的镜像上池级 checker 一条都不红（连同记录核对器两条：
 //! 这几个状态都是「掉电接缝之前全落、之后一个都没落」，在崩溃注入摆状态的域里）；故障注入每个注入点上，带着注入跑的那一遍里第一张判红的每步镜像
@@ -26,6 +26,9 @@ use std::io::Write as _;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
+use singlefs_checker_tier::crash::{
+    crash_state_enumeration_tables, CrashPointReplaySegmentExpansion,
+};
 use singlefs_checker_tier::crash_amplification::{
     FaultPutOnTheGpuSide, GivenStatesEngine, GivenStatesItem, GivenStatesRun,
 };
@@ -33,7 +36,13 @@ use singlefs_checker_tier::crash_given_states::{
     GivenStateConclusion, GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
 };
 use singlefs_checker_tier::crash_injection::HistoryAfterTheMakeFilesystem;
-use singlefs_checker_tier::crash_judge_conclusions::CrossCheckWords;
+use singlefs_checker_tier::crash_judge_conclusions::{
+    ClaimedVersionOfAGivenState, CrossCheckWords,
+};
+use singlefs_checker_tier::crash_judge_tables::{
+    build_judge_tables_for_the_given_persisted_sets_of_the_recorded_writes_broken_at_the_seams_with_their_claimed_versions,
+    JudgeFlow,
+};
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 
 #[cfg(feature = "gpu")]
@@ -56,9 +65,6 @@ use singlefs_harness::history::{
 use singlefs_harness::memory_pool::{writes_and_segments_with_stream_indexes, RecordStreamSeam};
 use singlefs_harness::numeric_environment_variable::process_environment_variable;
 use singlefs_harness::SharedStream;
-
-/// 这份测试文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
-const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library.rs";
 
 /// 崩溃点重放合表里这一项的名字（`.claude/gate.d/crash-point-replay-items.tsv`）。
 const CRASH_POINT_REPLAY_ITEM: &str = "random-histories-and-fault-injection-given-states";
@@ -340,12 +346,14 @@ fn judge_prefixes_of_a_recorded_stream(
     );
     // 每次掉电之后第一个写在写表里的下标：取录制流下标不小于掉电之后第一步的第一个写（写表不算屏障），掉电之后一个写都没录下的取写表长度
     let first_write_after_each_power_loss: Vec<usize> = recorded
-        .first_stream_index_after_each_power_loss
+        .earliest_stream_index_after_each_power_loss
         .iter()
-        .map(|first_stream_index_after_the_power_loss| {
+        .map(|earliest_stream_index_after_the_power_loss| {
             stream_indexes
                 .iter()
-                .position(|stream_index| *stream_index >= *first_stream_index_after_the_power_loss)
+                .position(|stream_index| {
+                    *stream_index >= *earliest_stream_index_after_the_power_loss
+                })
                 .unwrap_or(stream_indexes.len())
         })
         .collect();
@@ -393,7 +401,7 @@ fn judge_prefixes_of_a_recorded_stream(
             .collect();
         let table = GivenStatesOfATable {
             table_name: format!("{table_name}/power-losses={power_losses:?}"),
-            base: history_after_the_make_filesystem.base(),
+            base: history_after_the_make_filesystem.base_pool(),
             writes: history_after_the_make_filesystem.writes(),
             segments: history_after_the_make_filesystem.segments(),
             seams: &seams,
@@ -478,7 +486,8 @@ fn judge_the_step_images_of_a_random_history(
     let recorded = RecordedStreamOfAnImage {
         operations: stream.retained_operations(),
         operations_written_by_make_filesystem: run.operations_written_by_make_filesystem,
-        first_stream_index_after_each_power_loss: run.first_stream_index_after_each_power_loss,
+        earliest_stream_index_after_each_power_loss: run
+            .earliest_stream_index_after_each_power_loss,
     };
     let prefixes: Vec<usize> = step_images
         .iter()
@@ -714,16 +723,6 @@ fn judge_the_histories(
     (merged, histories_judged, spawned_worker_threads)
 }
 
-fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../Cargo.lock")
-        .canonicalize()
-        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
-        .parent()
-        .expect("Cargo.lock 所在的目录就是仓根")
-        .to_path_buf()
-}
-
 /// 这一批的种子与规模（进给定状态表的块键）。
 fn seeds_and_scale_of(
     random_histories: &[RandomHistorySampling],
@@ -741,12 +740,9 @@ fn judge_through_the_given_states_engine(
 ) -> (JudgedThroughTheLibrary, usize, usize, GivenStatesRun) {
     let engine = GivenStatesEngine::start_from_environment_putting_a_fault_on_the_gpu_side(
         GivenStatesItem {
-            item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale: seeds_and_scale_of(random_histories, fault_injections),
+            item_name: format!("{}::{}", CRASH_POINT_REPLAY_ITEM, seeds_and_scale_of(random_histories, fault_injections)),
         },
         &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root(),
         fault,
     )
     .expect("崩溃点重放的引擎照本机配置起得来（配了 GPU 卡用不上、结论版本与编译时对不上都在这里红，不退回 CPU）");
@@ -907,6 +903,151 @@ fn the_small_tier_of_random_histories_and_fault_injection_judged_through_the_lib
     );
 }
 
+/// 全量那一条（[`every_step_image_and_every_image_after_a_fault_of_the_harness_samplings_judged_through_the_library_has_no_finding`]）
+/// 里 GPU 建不出判表的 63 张给定状态表中最小的一张，钉回快档（`.claude/rules/test-script-discipline.md`「全量的红，钉回快档」）。
+const SEED_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED: u64 = 7_463_871_032_432_355_120;
+/// 那一段的步数（复用那一族的取样，[`RANDOM_HISTORY_SAMPLINGS_OF_THE_FULL_RUN`]）。
+const OPERATIONS_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED: usize = 30;
+/// 那一段交出的每步镜像数（全量日志里那一张表的状态数）。
+const STEP_IMAGES_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED: usize = 24;
+/// 那一段的录制流写了盘 0 的系统配置槽 0 号几次（调查员探针量的 `slot00_recorded`）。
+const RECORDED_WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_FIRST_DEVICE: usize = 34;
+
+/// 复用那一族种子 [`SEED_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED`]、30 步：全量日志的拒绝原文是
+/// `TooManyWritesOnOneLocation { device: 0, offset: 0, writes: 68 }`——那一槽录制写 34 次，枚举写表照崩溃点重放接撕裂镜像，每次系统配置轮换
+/// 另接一条从不落的撕裂镜像，写数翻倍。随机历史的给定状态表不接撕裂镜像
+/// （`build_judge_tables_for_the_given_persisted_sets_of_the_recorded_writes_broken_at_the_seams_with_their_claimed_versions`）：
+/// 只建表、不判，不要卡；建得出，枚举写表就是录制流，那一槽 34 次写。
+/// 判别力（`crates/mutations.tsv`）：不接改回接（`crash::TornImagesOfTheInPlaceOverwrites::LeftOut` 那一臂取 `TearableInPlaceOverwrites::of`），
+/// 枚举写表比掩码长，建表拒，这条红。
+#[test]
+fn the_smallest_reuse_history_the_full_run_refused_builds_its_given_states_table_without_torn_images(
+) {
+    let execution = without_the_pool_checker(
+        HistoryDeviceWidth::FourGibibytes,
+        SpaceAdmission::JudgedByTheFormula,
+    );
+    let history = generate_history_with_weights(
+        HistorySeed(SEED_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED),
+        OPERATIONS_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED,
+        &GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
+    );
+    let stream = SharedStream::retaining_contents();
+    let mut operations_recorded_after_each_step: Vec<usize> = Vec::new();
+    let run = execute_history_handing_out_every_step_image(
+        &history,
+        execution,
+        &stream,
+        &SharedFaultPlan::unarmed(execution.device_width.fixed_geometry()),
+        &mut |_| {},
+        &mut |step_image| {
+            operations_recorded_after_each_step.push(step_image.operations_recorded);
+        },
+    );
+    assert_eq!(
+        operations_recorded_after_each_step.len(),
+        STEP_IMAGES_OF_THE_SMALLEST_REUSE_HISTORY_THE_FULL_RUN_REFUSED,
+        "前提：这一段交出的每步镜像数与全量日志里那一张表的状态数相同"
+    );
+    assert!(
+        run.earliest_stream_index_after_each_power_loss.is_empty(),
+        "前提：这一段没掉过电，每步镜像都在一张表里、不带接缝"
+    );
+    let operations = stream.retained_operations();
+    let geometry = execution.device_width.fixed_geometry();
+    let (writes, segments, stream_indexes) =
+        writes_and_segments_with_stream_indexes(&operations, &geometry);
+    let history_after_the_make_filesystem = HistoryAfterTheMakeFilesystem::of(
+        &writes,
+        &segments,
+        &stream_indexes,
+        run.operations_written_by_make_filesystem,
+        execution,
+    );
+    let persisted_sets: Vec<Vec<bool>> = operations_recorded_after_each_step
+        .iter()
+        .map(|operations_recorded| {
+            let persisted_writes = stream_indexes
+                .iter()
+                .filter(|stream_index| **stream_index < *operations_recorded)
+                .count();
+            let persisted_over_the_whole_write_table: Vec<bool> = (0..writes.len())
+                .map(|write_index| write_index < persisted_writes)
+                .collect();
+            history_after_the_make_filesystem
+                .persisted_set_of_the_table(&persisted_over_the_whole_write_table)
+        })
+        .collect();
+    let table_writes = history_after_the_make_filesystem.writes();
+    let not_expanded =
+        |_segment_index: usize, _segment: &[usize]| CrashPointReplaySegmentExpansion::NotExpanded;
+    let writes_on_the_first_system_configuration_slot_of_the_first_device =
+        |enumerated: &[singlefs_harness::memory_pool::RetainedWrite]| {
+            enumerated
+                .iter()
+                .filter(|write| {
+                    write.device.0 == 0
+                        && write.offset.0 < singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES
+                })
+                .count()
+        };
+    let enumerated_with_the_torn_images = crash_state_enumeration_tables(
+        history_after_the_make_filesystem.base_pool(),
+        table_writes,
+        history_after_the_make_filesystem.segments(),
+        &not_expanded,
+    )
+    .enumerated_writes;
+    assert_eq!(
+        (
+            writes_on_the_first_system_configuration_slot_of_the_first_device(table_writes),
+            writes_on_the_first_system_configuration_slot_of_the_first_device(
+                &enumerated_with_the_torn_images
+            )
+        ),
+        (
+            RECORDED_WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_FIRST_DEVICE,
+            2 * RECORDED_WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_FIRST_DEVICE
+        ),
+        "前提：那一槽录制写 34 次；接撕裂镜像的枚举写表里 68 次（全量日志拒绝原文里的写数）"
+    );
+    let claimed_versions =
+        vec![ClaimedVersionOfAGivenState::LandedOnByTheConsultedRecovery; persisted_sets.len()];
+    let tables =
+        build_judge_tables_for_the_given_persisted_sets_of_the_recorded_writes_broken_at_the_seams_with_their_claimed_versions(
+            &JudgeFlow {
+                base: history_after_the_make_filesystem.base_pool(),
+                writes: table_writes,
+                segments: history_after_the_make_filesystem.segments(),
+                judged_root_index: 0,
+                versions: &[],
+                expansion: &not_expanded,
+            },
+            &[],
+            persisted_sets,
+            &claimed_versions,
+            &[],
+        )
+        .unwrap_or_else(|refusal| {
+            panic!("不接撕裂镜像，这张给定状态表建得出判表：{refusal:?}")
+        });
+    assert_eq!(
+        usize::try_from(tables.enumerated_write_count).expect("装得进 usize"),
+        table_writes.len(),
+        "枚举写表就是录制流"
+    );
+    let first_system_configuration_slot = tables
+        .locations
+        .iter()
+        .find(|location| location.device == 0 && location.offset == 0)
+        .expect("盘 0 的系统配置槽 0 号是判表里的一个落点");
+    assert_eq!(
+        first_system_configuration_slot.writes.len(),
+        RECORDED_WRITES_ON_THE_FIRST_SYSTEM_CONFIGURATION_SLOT_OF_THE_FIRST_DEVICE,
+        "那一槽只记录制写，不记从不落的撕裂镜像"
+    );
+}
+
 /// 全量：harness 原先每一步就地跑池级 checker 的那几段随机历史取样与故障注入快档（种子、规模逐项同 harness 那几条用例），
 /// 每一张镜像经引擎判。判据同快档那一条，另核随机历史上 I-3.1、I-5.4、I-3.11、I-7.9、I-9.15 都真被判成立过（原先 harness 快档那一格）、
 /// 故障注入里说谎的设备至少一次留下过盘面不一致（原先 harness 故障注入快档那一格：说谎那两种抽到了却什么也没碰着时判别力要重新量）。
@@ -1008,8 +1149,7 @@ fn small_tier_judged_under(
     let host = GpuConfigurationOfTheCaller::of_this_process()
         .host()
         .expect("调用方给的机器角色是 local 或 peer");
-    let cards =
-        common_gpu_cards_of_the_caller::card_priority_value_of_the_caller(&repository_root());
+    let cards = common_gpu_cards_of_the_caller::card_priority_value_of_the_caller();
     let mut settings: Vec<(&str, &std::ffi::OsStr)> = vec![
         (
             MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
@@ -1050,9 +1190,9 @@ fn small_tier_judged_in_a_gpu_run_and_in_a_cpu_run(
     fault: FaultPutOnTheGpuSide,
 ) -> GpuRunAndCpuRun {
     let directory_of = |run: &str| {
-        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
-            &format!("random-histories-and-fault-injection-given-states-{tag}-{run}"),
-        )
+        singlefs_checker_tier::crash_library::DisposableLibraryDirectory::new(&format!(
+            "random-histories-and-fault-injection-given-states-{tag}-{run}"
+        ))
         .expect("流水线单元测试那一类里这条用例的目录")
     };
     let gpu_directory = directory_of("on-the-gpu");

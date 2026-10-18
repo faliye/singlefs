@@ -1,0 +1,4 @@
+pub const KERNEL_SOURCE: &str = include_str!("kernel.wgsl");
+pub fn kernel_text() -> String {
+    format!("const PRELUDE_OFFSET: u32 = 4u;\n{KERNEL_SOURCE}")
+}

@@ -167,6 +167,77 @@ fn record_the_floor_raise_pushed_by_the_session() -> RecordedFloorRaise {
     }
 }
 
+/// 观察者「崩溃之后可写挂载」（`writable_mount_after_the_crash`）：把这个状态持久的写落到基线上、可写挂载一次，挂不上当场 panic；
+/// 挂完的盘交回，池级 checker 在判段判。观察者的身份是这个 fn 的闭包键（入口登记在
+/// `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`）。
+// gpu-exempt: writable-mount
+fn mount_writable_after_the_crash_of_the_floor_raise(
+    writes_of_the_raise: &[RetainedWrite],
+    base: &MemoryPool,
+    parameters: &singlefs_core::make_filesystem::MakeFilesystemParameters,
+    image: &CrashImage<'_>,
+) -> ImageAfterTheObserver {
+    assert!(
+        image.writes.len() > writes_of_the_raise.len(),
+        "那一串先把新 F 写进每块盘的系统配置（原地覆写），撕裂镜像接在录制流那 {} 次写后面：枚举用的写表 {} 次",
+        writes_of_the_raise.len(),
+        image.writes.len()
+    );
+    let mut materialized = base.clone();
+    for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
+        if *is_persisted {
+            write.contents.apply_to(
+                materialized
+                    .devices
+                    .get_mut(&write.device)
+                    .expect("写落在池里的盘上"),
+                write.offset,
+            );
+        }
+    }
+    let stream = SharedStream::retaining_contents_and_reads();
+    let mut devices: Vec<_> = plain_devices_on(&materialized)
+        .into_iter()
+        .map(|(identity, device)| {
+            (
+                identity,
+                RecordingBlockDevice::with_shared_stream(identity, device, stream.clone()),
+            )
+        })
+        .collect();
+    match mount_writable_with_space_admission(
+        parameters,
+        &mut devices,
+        SpaceAdmission::JudgedByTheFormula,
+    ) {
+        Ok(_) => {
+            let disks_after_the_observer = MemoryPool {
+                devices: devices
+                    .iter()
+                    .map(|(identity, device)| (*identity, device.wrapped_device().image.clone()))
+                    .collect(),
+                device_size_in_bytes: materialized.device_size_in_bytes,
+            };
+            let (writes_on_the_crash_image, _segments_of_the_mount) = writes_and_segments(
+                &stream.retained_operations(),
+                &fixed_geometry_of_the_384_slot_small_devices(),
+            );
+            ImageAfterTheObserver {
+                writes_on_the_crash_image,
+                disks_after_the_observer,
+                ranges_read_on_the_crash_image:
+                    singlefs_checker_tier::crash_amplification::ReadRangeOnTheCrashImage::of_the_recorded_read_ranges(
+                        &stream.read_ranges(),
+                    ),
+                invariants_judged:
+                    InvariantsJudgedOnTheImageAfterTheObserver::EveryImplementedInvariant,
+                counter_when_the_pool_checker_is_clean: "mounted_and_checker_clean".to_string(),
+            }
+        }
+        Err(error) => panic!("挂载失败：{error:?}"),
+    }
+}
+
 /// 崩在准入推的那一串空发布中间（攻方「崩在准入推空发布的那一串中间」那一形）：会话里数据单元在段外落不下的那一刻（单元区 384 槽的小盘，
 /// 崩了再挂之后会话覆盖写 61 次、再直接发布到准入拒（写这条用例时是第 62 次，准入的式子改过之后往后挪，用例按实际拒的那一次取、打一行
 /// `FLOOR_RAISE_PUSHED_BY_THE_SESSION admission_refused_at_overwrite=`），见 `admission_raises_the_floor_before_refusing.rs` 的
@@ -204,69 +275,17 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
     // 录入段在 CPU 上挂（挂载真跑实现，豁免表的 writable-mount 那一行；按恢复镜像去重），挂不上当场 panic（记成红项、用例红）；
     // 判段在挂完的盘上判池级 checker（配了 GPU 上卡），判干净时 `mounted_and_checker_clean` 加一。观察者交来的 `image.writes` 是枚举用的写表
     // （录制流里的写在前、原地覆写的撕裂镜像与重放接在后面），`image.persisted` 与它逐条对应。
-    // gpu-exempt: writable-mount
     let observe = |_ordinal: u64,
                    image: &CrashImage<'_>,
                    _report: &RecoveryReport,
                    _counts: &mut CrashPointReplayObserverCounts|
      -> ImageAfterTheObserver {
-        assert!(
-            image.writes.len() > writes_of_the_raise.len(),
-            "那一串先把新 F 写进每块盘的系统配置（原地覆写），撕裂镜像接在录制流那 {} 次写后面：枚举用的写表 {} 次",
-            writes_of_the_raise.len(),
-            image.writes.len()
-        );
-        let mut materialized = base.clone();
-        for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
-            if *is_persisted {
-                write.contents.apply_to(
-                    materialized
-                        .devices
-                        .get_mut(&write.device)
-                        .expect("写落在池里的盘上"),
-                    write.offset,
-                );
-            }
-        }
-        let stream = SharedStream::retaining_contents();
-        let mut devices: Vec<_> = plain_devices_on(&materialized)
-            .into_iter()
-            .map(|(identity, device)| {
-                (
-                    identity,
-                    RecordingBlockDevice::with_shared_stream(identity, device, stream.clone()),
-                )
-            })
-            .collect();
-        match mount_writable_with_space_admission(
+        mount_writable_after_the_crash_of_the_floor_raise(
+            &writes_of_the_raise,
+            &base,
             &pool.parameters,
-            &mut devices,
-            SpaceAdmission::JudgedByTheFormula,
-        ) {
-            Ok(_) => {
-                let disks_after_the_observer = MemoryPool {
-                    devices: devices
-                        .iter()
-                        .map(|(identity, device)| {
-                            (*identity, device.wrapped_device().image.clone())
-                        })
-                        .collect(),
-                    device_size_in_bytes: materialized.device_size_in_bytes,
-                };
-                let (writes_on_the_crash_image, _segments_of_the_mount) = writes_and_segments(
-                    &stream.retained_operations(),
-                    &fixed_geometry_of_the_384_slot_small_devices(),
-                );
-                ImageAfterTheObserver {
-                    writes_on_the_crash_image,
-                    disks_after_the_observer,
-                    invariants_judged:
-                        InvariantsJudgedOnTheImageAfterTheObserver::EveryImplementedInvariant,
-                    counter_when_the_pool_checker_is_clean: "mounted_and_checker_clean".to_string(),
-                }
-            }
-            Err(error) => panic!("挂载失败：{error:?}"),
-        }
+            image,
+        )
     };
     let Some(tally) = enumerate_crash_states_with_every_kind_of_observer(
         CrashPointReplayItem {
@@ -287,7 +306,7 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
                 format!("{:?}", pool.parameters).as_bytes(),
             ),
             observe: &observe,
-            deduplication: ObserverDeduplication::ByTheRecoveredImageBytes,
+            deduplication: ObserverDeduplication::ByTheRecoveryReportAndTheReadSet,
         }],
     )
     .judged() else {

@@ -1,0 +1,17 @@
+use vstd::prelude::*;
+
+verus! {
+pub fn chosen(value: u64) -> (result: u64)
+    ensures
+        if value > 0 { result == value } else { result == 0 },
+{
+    value
+}
+pub open spec fn never_called() -> bool {
+    true
+}
+}
+
+pub fn judge_verus() -> u64 {
+    chosen(3)
+}

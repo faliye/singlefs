@@ -11,20 +11,23 @@ mod scenarios_of_root_ring_turn_in_one_mount;
 use common::{format_pool, parameters, FIXED_WRITE_TIME_SECONDS};
 use common_images_for_the_checker_tier::PoolCheckerImages;
 use scenarios_of_root_ring_turn_in_one_mount::content_of;
-use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
+use singlefs_core::allocator::UnitAreaStart;
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::mount::mount_writable;
 use singlefs_core::transaction::{
     publish_first_file, publish_without_units, FirstFile, PoolVersion, PoolWriter,
     ZeroUnitPublishPlan,
 };
+use singlefs_format::SLOT_BYTES;
 use singlefs_harness::history::{
-    execute_history_with, ContentChoice, ContentLength, FloorTargetChoice, GeneratedHistory,
-    HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation, HistoryRun, HistorySeed,
-    HistoryStartingPoint, PerStepChecker, StepOutcome,
+    execute_history_with, AppliedEffect, ContentChoice, ContentLength, FloorTargetChoice,
+    GeneratedHistory, HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation,
+    HistoryRun, HistorySeed, HistoryStartingPoint, PerStepChecker, StepOutcome, StepPosition,
 };
-use singlefs_harness::SharedStream;
+use singlefs_harness::{RecordedOperation, RecordedOperationKind, SharedStream};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// 场景与它交给池级 checker 的镜像见 `scenarios_of_root_ring_turn_in_one_mount::turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it`；池级 checker 那一遍在 checker 档同名用例（`crates/singlefs-checker-tier/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
@@ -98,7 +101,23 @@ const OVERWRITE_IN_THE_SMALL_POOL: HistoryOperation =
 /// 判着准入时这块小盘上式子在挂载之后第 11 次覆盖写就拒（D28（挂载期承诺量） 已定项 1 的式子扣切换预留与保留池、defer 按读法甲扣两次），
 /// 走不到这里要比的「根环转过之后落点取不到」那一格。
 fn run_on_the_small_pool(operations: Vec<HistoryOperation>) -> HistoryRun {
-    execute_history_with(
+    run_on_the_small_pool_keeping_the_stream(operations).run
+}
+
+/// [`run_on_the_small_pool`] 连同录制流：每一步操作之后流里有几步，按操作的次序（第 0 个是起点之后）。
+struct SmallPoolRunWithItsStream {
+    run: HistoryRun,
+    stream_operations: Vec<RecordedOperation>,
+    stream_length_after_the_starting_point_and_each_operation: Vec<usize>,
+}
+
+fn run_on_the_small_pool_keeping_the_stream(
+    operations: Vec<HistoryOperation>,
+) -> SmallPoolRunWithItsStream {
+    let stream = SharedStream::new();
+    let stream_seen_by_the_observer = stream.clone();
+    let mut stream_length_after_the_starting_point_and_each_operation: Vec<usize> = Vec::new();
+    let run = execute_history_with(
         &GeneratedHistory {
             seed: HistorySeed(0),
             starting_point: HistoryStartingPoint::AfterFirstFile,
@@ -109,9 +128,90 @@ fn run_on_the_small_pool(operations: Vec<HistoryOperation>) -> HistoryRun {
             device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
             space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
         },
-        &SharedStream::new(),
-        &mut |_| {},
+        &stream,
+        &mut |observation| {
+            let expected_position = match observation.position {
+                StepPosition::StartingPoint => 0,
+                StepPosition::Operation(operation_index) => operation_index + 1,
+            };
+            assert_eq!(
+                stream_length_after_the_starting_point_and_each_operation.len(),
+                expected_position,
+                "观察者按次序见到起点与每一步"
+            );
+            stream_length_after_the_starting_point_and_each_operation
+                .push(stream_seen_by_the_observer.operation_count());
+        },
+    );
+    SmallPoolRunWithItsStream {
+        run,
+        stream_operations: stream.operations(),
+        stream_length_after_the_starting_point_and_each_operation,
+    }
+}
+
+/// 小盘单元区的起始槽号：小盘那条 6 MiB journal 环末尾的下一个槽。
+fn unit_area_start_slot_of_the_small_pool() -> u64 {
+    UnitAreaStart::following_the_journal_ring(
+        HistoryDeviceWidth::UnitAreaOf384Slots
+            .parameters()
+            .geometry
+            .journal_ring_bytes,
     )
+    .expect("小盘的 6 MiB 环末尾的下一个槽落在聚簇段边界上")
+    .slot()
+    .0
+}
+
+/// 小盘每块盘的单元区槽数：盘宽减去单元区起点，即环窗口补足（`singlefs_harness::history` 的 `SMALL_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS`）
+/// 加名字里的 384 槽。环窗口补足变了，这个数跟着变，下面推出来的覆盖写次数也跟着变。
+fn unit_area_slots_on_each_device_of_the_small_pool() -> u64 {
+    HistoryDeviceWidth::UnitAreaOf384Slots.device_bytes() / SLOT_BYTES
+        - unit_area_start_slot_of_the_small_pool()
+}
+
+/// 一次覆盖写（[`OVERWRITE_IN_THE_SMALL_POOL`]）每块盘至少新落几槽（数据单元与它改到的树节点、分配记录树叶）：只用来推下面的次数；
+/// 推少了，用例里「这一段新落的槽数多过单元区」那条前提先红，不会悄悄失敏。
+const SLOTS_EACH_OVERWRITE_PLACES_ON_EACH_DEVICE_AT_LEAST: u64 = 10;
+
+/// 同一次挂载里、不夹抬 F 连着覆盖写几次：单元区槽数 ÷ 每次至少新落的槽数再多一次，这一段新落的槽数就多过单元区。
+fn overwrites_past_the_wall_without_reclaim_in_the_mount() -> usize {
+    usize::try_from(
+        unit_area_slots_on_each_device_of_the_small_pool()
+            / SLOTS_EACH_OVERWRITE_PLACES_ON_EACH_DEVICE_AT_LEAST
+            + 1,
+    )
+    .expect("覆盖写次数装得进 usize")
+}
+
+/// 录制流里 `[stream_lengths 相邻两项)` 那几段（一段一步操作）每块盘写进单元区的槽：一段之内去重，段与段之间相加。
+/// 不经挂载内回收，同一次挂载里新落的槽只能取挂载那一刻空着的槽、每槽至多落一次，所以这个和不超过单元区槽数。
+fn unit_area_slots_placed_step_by_step_on_each_device(
+    stream_operations: &[RecordedOperation],
+    stream_lengths: &[usize],
+) -> BTreeMap<DeviceIdentity, u64> {
+    let unit_area_start_slot = unit_area_start_slot_of_the_small_pool();
+    let mut placed_on_each_device: BTreeMap<DeviceIdentity, u64> = BTreeMap::new();
+    for step_range in stream_lengths.windows(2) {
+        let mut slots_written_in_this_step: BTreeSet<(DeviceIdentity, u64)> = BTreeSet::new();
+        for operation in &stream_operations[step_range[0]..step_range[1]] {
+            match operation.kind {
+                RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {}
+                RecordedOperationKind::WriteZeroes | RecordedOperationKind::Barrier => continue,
+            }
+            let first_slot = operation.offset.0 / SLOT_BYTES;
+            if first_slot < unit_area_start_slot || operation.length == 0 {
+                continue;
+            }
+            let last_slot = (operation.offset.0 + operation.length - 1) / SLOT_BYTES;
+            slots_written_in_this_step
+                .extend((first_slot..=last_slot).map(|slot| (operation.device, slot)));
+        }
+        for (device, _) in slots_written_in_this_step {
+            *placed_on_each_device.entry(device).or_insert(0) += 1;
+        }
+    }
+    placed_on_each_device
 }
 
 fn outcome_names(run: &HistoryRun) -> Vec<String> {
@@ -125,9 +225,11 @@ fn outcome_names(run: &HistoryRun) -> Vec<String> {
         .collect()
 }
 
-/// 可写挂载之后同一次挂载里连着覆盖写 37 次，再抬一次 F（目标取现行的 F）。修之前，这块小盘上根环转过之后谓词放行的槽挂载内不回收：
+/// 可写挂载之后同一次挂载里连着覆盖写 37 次，再抬一次 F（目标取现行的 F）。修之前、小盘还没有环窗口补足时，根环转过之后谓词放行的槽挂载内不回收：
 /// 第 37 次覆盖写的数据单元就拿不到落点，接着那次抬 F 的空发布连固定点都拿不到（`PlacementRefused`，每块盘上都没有）——
 /// C517（固定点分配被拒之后同一进程里写不出去） 那一格从这里起（这几个结局在报告里的基线副本上逐步量过）。
+/// 单元区放大了环窗口补足之后，37 次覆盖写离挂载内不回收时的墙还远，抬 F 的回收又把没回收的补上：挂载内回收由
+/// [`overwrites_past_the_wall_without_reclaim_in_the_mount`] 那一段长覆盖写判。
 fn up_to_the_raise_that_was_refused_its_fixed_points_before_the_fix() -> Vec<HistoryOperation> {
     std::iter::once(HistoryOperation::CloseAndMountWritable)
         .chain(std::iter::repeat_n(OVERWRITE_IN_THE_SMALL_POOL, 37))
@@ -139,6 +241,8 @@ fn up_to_the_raise_that_was_refused_its_fixed_points_before_the_fix() -> Vec<His
 
 /// C517 的验收：同一份盘面上，重挂之后发得出去的那次覆盖写，不重挂也发得出去；不重挂的那一路接着再发十次也都发得出去。
 /// 修之前重挂那一路发得出去（重建分配器按谓词回收），不重挂那一路从第 37 次覆盖写起每一步都被同一个拒绝挡住。
+/// 再从挂载起、不夹抬 F 连着覆盖写 [`overwrites_past_the_wall_without_reclaim_in_the_mount`] 次：这一段新落的槽多过单元区，
+/// 挂载内不回收时一定撞墙，每一次都发得出去只能靠挂载内回收。
 #[test]
 fn an_overwrite_that_goes_out_after_a_remount_goes_out_in_the_same_mount_as_well() {
     let prefix = up_to_the_raise_that_was_refused_its_fixed_points_before_the_fix();
@@ -179,4 +283,45 @@ fn an_overwrite_that_goes_out_after_a_remount_goes_out_in_the_same_mount_as_well
         "挂载、37 次覆盖写与那次抬 F 也都做成：挂载内回收跟得上，这块小盘上根本撞不到墙"
     );
     assert_eq!(in_the_same_mount.ending, HistoryEnding::Completed);
+
+    let overwrites_past_the_wall = overwrites_past_the_wall_without_reclaim_in_the_mount();
+    let long_stretch = run_on_the_small_pool_keeping_the_stream(
+        std::iter::once(HistoryOperation::CloseAndMountWritable)
+            .chain(std::iter::repeat_n(
+                OVERWRITE_IN_THE_SMALL_POOL,
+                overwrites_past_the_wall,
+            ))
+            .collect(),
+    );
+    let names_of_the_long_stretch = outcome_names(&long_stretch.run);
+    assert_eq!(
+        names_of_the_long_stretch,
+        vec!["Applied".to_string(); 1 + overwrites_past_the_wall],
+        "挂载之后不夹抬 F 连着覆盖写 {overwrites_past_the_wall} 次，每一次都发得出去：{names_of_the_long_stretch:?}"
+    );
+    assert_eq!(long_stretch.run.ending, HistoryEnding::Completed);
+    for (overwrite_index, outcome) in long_stretch.run.outcomes[1..].iter().enumerate() {
+        assert!(
+            matches!(
+                outcome,
+                StepOutcome::Applied(AppliedEffect::Published {
+                    floor_raises_pushed_by_the_session: 0,
+                    ..
+                })
+            ),
+            "第 {overwrite_index} 次覆盖写发布之前会话没推抬 F（抬 F 的回收会把挂载内回收补上）：{outcome:?}"
+        );
+    }
+    let placed_on_each_device = unit_area_slots_placed_step_by_step_on_each_device(
+        &long_stretch.stream_operations,
+        &long_stretch.stream_length_after_the_starting_point_and_each_operation[1..],
+    );
+    let unit_area_slots = unit_area_slots_on_each_device_of_the_small_pool();
+    assert!(
+        placed_on_each_device.len() == 2
+            && placed_on_each_device
+                .values()
+                .all(|placed| *placed > unit_area_slots),
+        "前提：挂载之后这一段每块盘新落的槽（逐步去重再相加）多过单元区的 {unit_area_slots} 槽，挂载内不回收时走不完：{placed_on_each_device:?}"
+    );
 }

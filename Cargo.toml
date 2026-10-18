@@ -10,6 +10,7 @@ members = [
     "crates/singlefs-checker",
     "crates/singlefs-checker-tier",
     "crates/singlefs-reference-filesystem",
+    "crates/singlefs-unit-graph",
 ]
 exclude = ["scripts/experiments"]
 

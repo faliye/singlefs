@@ -85,11 +85,6 @@ impl SlotNumber {
     }
 }
 
-impl JournalSequenceNumber {
-    /// 计数器只有 6 字节宽；超过它的值在盘上写不下。
-    pub const COUNTER_LIMIT: u64 = 1 << 48;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,6 +114,5 @@ mod tests {
             counter: 1,
         };
         assert!(earlier_instance < later_instance);
-        assert_eq!(JournalSequenceNumber::COUNTER_LIMIT, 281_474_976_710_656);
     }
 }

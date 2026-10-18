@@ -11,7 +11,6 @@
 mod common;
 mod common_crash_points;
 
-use std::path::PathBuf;
 use std::time::Instant;
 
 use common::{build_pool, file_content, geometry};
@@ -25,7 +24,7 @@ use singlefs_checker_tier::crash_amplification::{
     checking_threads, plan_crash_points, reuse_and_scale_fields_of_the_line, run_from_environment,
     CrashFlow, CrashPointRecorder, ExpandUpToWritesPerSegment,
 };
-use singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory;
+use singlefs_checker_tier::crash_library::crash_library_directory;
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::mount::RollbackTarget;
@@ -332,13 +331,6 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         expansion: &expansion,
         crash_points,
     };
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../Cargo.lock")
-        .canonicalize()
-        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
-        .parent()
-        .expect("Cargo.lock 所在的目录就是仓根")
-        .to_path_buf();
     let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
     let plan = plan_crash_points(&flow);
     let state_count = crash_point_replay_plan_state_count(&base, &writes, &segments, &expansion);
@@ -347,12 +339,11 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
     let library_guard = match std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY") {
         Some(_) => None,
         None => {
-            let directory = amplification_unit_tests_library_directory(None)
-                .expect("流水线单元测试那一类的库目录");
+            let directory = crash_library_directory().expect("流水线单元测试那一类的库目录");
             let mut restored = EnvironmentRestoredOnDrop::saved_then_cleared(&[
                 "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
             ]);
-            restored.set(
+            restored.set_variable(
                 "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
                 directory.as_os_str(),
             );
@@ -360,8 +351,7 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         }
     };
     let checking_started = Instant::now();
-    let run =
-        run_from_environment(&flow, ITEM_NAME, &toolchain, &root, limit).expect("按环境跑得完");
+    let run = run_from_environment(&flow, ITEM_NAME, &toolchain, limit).expect("按环境跑得完");
     let checking_seconds = checking_started.elapsed().as_secs_f64();
     if run.placement_only || run.recorded_only {
         // 只排派活计划、只跑录入段的那一趟一块都没判：不断言、不打汇总行
@@ -408,13 +398,13 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         assert!(run.violations.is_empty());
     }
     if run.share.count == 1 {
-        // 库里这一判法版本已经判过的块复用、不重核（续跑）：这一趟核的是它录下来还没判的那些
+        // 库里这一判法单元指纹已经判过的块复用、不重核（续跑）：这一趟核的是它录下来还没判的那些
         assert_eq!(
             run.checking.states_checked, run.recording.states_recorded,
             "这一趟录下来要判的状态都核了"
         );
         let second_run =
-            run_from_environment(&flow, ITEM_NAME, &toolchain, &root, limit).expect("第二趟跑得完");
+            run_from_environment(&flow, ITEM_NAME, &toolchain, limit).expect("第二趟跑得完");
         assert_eq!(
             second_run.recording.blocks_already_judged,
             run.recording.blocks_recorded + run.recording.blocks_already_judged,
@@ -456,7 +446,7 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         println!("CRASH_AMPLIFICATION_POINT {line}");
     }
     println!(
-        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1}{}{verifier_line}{gpu_judge_line}",
+        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judging_units_fingerprint={} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1}{}{verifier_line}{gpu_judge_line}",
         run.mode.name(),
         run.share.index,
         run.share.count,

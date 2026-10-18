@@ -2397,7 +2397,7 @@ impl Tally {
         }
     }
 
-    fn get(&self, counter: Counter) -> u64 {
+    fn count_of(&self, counter: Counter) -> u64 {
         self.counts[counter.index()]
     }
 
@@ -2679,7 +2679,7 @@ fn run_the_state_probe(domain: Domain, size: usize, probe: StateProbe, run_profi
             let rows = STATE_ROWS_EMITTED.load(Ordering::Relaxed);
             assert_eq!(rows, walked, "每个状态恰好一行");
             assert_eq!(
-                tally.get(Counter::States),
+                tally.count_of(Counter::States),
                 walked,
                 "探针走过的状态数等于这个 (域, N) 数出来的状态数"
             );
@@ -5003,7 +5003,7 @@ fn tally_of_a_mirrored_history(
             &mut tally,
         );
         // 探针跳过的状态不判、不进落后类别。
-        if tally.get(Counter::States) > counts_before[Counter::States.index()] {
+        if tally.count_of(Counter::States) > counts_before[Counter::States.index()] {
             tally.add_to_the_lagging_class(
                 lagging_class_of(first_device_mask, second_device_mask),
                 &counts_before,
@@ -6015,7 +6015,7 @@ impl BoundsTier {
 fn assert_the_pinned_absolute_values(domain: Domain, size: usize, tally: &Tally) {
     let size_index = size - domain.smallest_size();
     assert_eq!(
-        tally.get(Counter::States),
+        tally.count_of(Counter::States),
         pinned_state_counts(domain)[size_index],
         "作废条款 V1：{} 域 N = {size} 的状态数与登记第七节不等",
         domain.label()
@@ -6026,8 +6026,8 @@ fn assert_the_pinned_absolute_values(domain: Domain, size: usize, tally: &Tally)
         {
             assert_eq!(
                 (
-                    tally.get(Counter::FarthestAtLeastOne),
-                    tally.get(Counter::FarthestAtLeastTwo)
+                    tally.count_of(Counter::FarthestAtLeastOne),
+                    tally.count_of(Counter::FarthestAtLeastTwo)
                 ),
                 (*farthest_at_least_one, *farthest_at_least_two),
                 "作废条款 V1：L 域 N = {size} 的见证数（j* ≥ 1, j* ≥ 2）与登记第七节不等"
@@ -6037,10 +6037,10 @@ fn assert_the_pinned_absolute_values(domain: Domain, size: usize, tally: &Tally)
     if let Some(pinned) = pinned_monotone_counts(domain).get(size_index) {
         let counted = [
             tally.pair(PairSet::Wide, PairColumn::Pairs),
-            tally.get(Counter::LegalCrashStatesWhenTheRootWriteIsItsOwnSegment),
+            tally.count_of(Counter::LegalCrashStatesWhenTheRootWriteIsItsOwnSegment),
             tally.pair(PairSet::CutOwnLegal, PairColumn::Pairs),
             tally.pair(PairSet::CutOwnSameSegment, PairColumn::Pairs),
-            tally.get(Counter::LegalCrashStatesWhenTheRootWriteSharesTheRecordSegment),
+            tally.count_of(Counter::LegalCrashStatesWhenTheRootWriteSharesTheRecordSegment),
             tally.pair(PairSet::CutWithLegal, PairColumn::Pairs),
             tally.pair(PairSet::CutWithSameSegment, PairColumn::Pairs),
         ];
@@ -6070,8 +6070,8 @@ fn assert_the_pinned_absolute_values(domain: Domain, size: usize, tally: &Tally)
                 class_states(LaggingClass::Crossed),
                 class_states(LaggingClass::FirstDeviceBehind),
                 class_states(LaggingClass::SecondDeviceBehind),
-                tally.get(Counter::FarthestAtLeastOne),
-                tally.get(Counter::FarthestAtLeastTwo),
+                tally.count_of(Counter::FarthestAtLeastOne),
+                tally.count_of(Counter::FarthestAtLeastTwo),
             ],
             [
                 pinned.equal_states,
@@ -6090,7 +6090,7 @@ fn assert_the_pinned_absolute_values(domain: Domain, size: usize, tally: &Tally)
                 .iter()
                 .map(|class| class_states(*class))
                 .sum::<u64>(),
-            tally.get(Counter::States),
+            tally.count_of(Counter::States),
             "作废条款 SV7：{} 域 N = {size} 四类状态数之和不等于状态数（登记 r2 5.5「落后类别」那一行）",
             domain.label()
         );
@@ -6099,9 +6099,9 @@ fn assert_the_pinned_absolute_values(domain: Domain, size: usize, tally: &Tally)
         assert_eq!(
             [
                 tally.pair(PairSet::Wide, PairColumn::Pairs),
-                tally.get(Counter::ChosenRootIsALaterVersion),
-                tally.get(Counter::FarthestAtLeastOne),
-                tally.get(Counter::FarthestAtLeastTwo),
+                tally.count_of(Counter::ChosenRootIsALaterVersion),
+                tally.count_of(Counter::FarthestAtLeastOne),
+                tally.count_of(Counter::FarthestAtLeastTwo),
             ],
             [
                 pinned.wide_pairs,
@@ -6349,9 +6349,9 @@ fn smallest_adversarial_size_where_the_three_readings_part(
             run_profile,
             thread_count,
         );
-        if tally.get(Counter::MutualWholeTableAndGapContinues) > 0
-            && tally.get(Counter::MutualWholeTableAndGapStops) > 0
-            && tally.get(Counter::MutualGapContinuesAndGapStops) > 0
+        if tally.count_of(Counter::MutualWholeTableAndGapContinues) > 0
+            && tally.count_of(Counter::MutualWholeTableAndGapStops) > 0
+            && tally.count_of(Counter::MutualGapContinuesAndGapStops) > 0
         {
             return largest_size;
         }
@@ -6414,8 +6414,8 @@ fn specification_control_readings(
                 other_reading.label(),
                 violation_counter.label()
             ),
-            tally.get(violation_counter),
-            tally.get(mutual_counter),
+            tally.count_of(violation_counter),
+            tally.count_of(mutual_counter),
         ),
         reading_that_must_be_positive(
             criterion,
@@ -6423,7 +6423,7 @@ fn specification_control_readings(
                 "domain=A,max_n={largest_size},counter={}",
                 mutual_counter.label()
             ),
-            tally.get(mutual_counter),
+            tally.count_of(mutual_counter),
         ),
     ]
 }
@@ -6464,7 +6464,7 @@ fn control_readings_of(
             vec![reading_that_must_equal(
                 criterion,
                 legal_where(Counter::Panicked),
-                tally.get(Counter::Panicked),
+                tally.count_of(Counter::Panicked),
                 1,
             )]
         }
@@ -6474,13 +6474,13 @@ fn control_readings_of(
                 reading_that_must_equal(
                     criterion,
                     legal_where(Counter::J1Violations),
-                    tally.get(Counter::J1Violations),
+                    tally.count_of(Counter::J1Violations),
                     FARTHEST_AT_LEAST_ONE_STATES_WITHIN_THE_CONTROL_BOUND,
                 ),
                 reading_that_must_equal(
                     criterion,
                     legal_where(Counter::FarthestAtLeastOne),
-                    tally.get(Counter::FarthestAtLeastOne),
+                    tally.count_of(Counter::FarthestAtLeastOne),
                     FARTHEST_AT_LEAST_ONE_STATES_WITHIN_THE_CONTROL_BOUND,
                 ),
             ]
@@ -6498,12 +6498,12 @@ fn control_readings_of(
                 reading_that_must_be_positive(
                     criterion,
                     legal_where(Counter::J2Violations),
-                    tally.get(Counter::J2Violations),
+                    tally.count_of(Counter::J2Violations),
                 ),
                 reading_that_must_equal(
                     criterion,
                     legal_where(Counter::J1Violations),
-                    tally.get(Counter::J1Violations),
+                    tally.count_of(Counter::J1Violations),
                     0,
                 ),
                 reading_that_must_be_positive(
@@ -6511,7 +6511,7 @@ fn control_readings_of(
                     format!(
                         "domain=U_verify_on,max_n={CONTROL_LARGEST_SIZE_OF_THE_NAMED_UNITS_DOMAIN},counter=J2"
                     ),
-                    named_units_tally.get(Counter::J2Violations),
+                    named_units_tally.count_of(Counter::J2Violations),
                 ),
             ]
         }
@@ -6531,12 +6531,12 @@ fn control_readings_of(
                 reading_that_must_be_positive(
                     criterion,
                     format!("domain=L6,max_n={small_ring_largest_size},counter=J3"),
-                    small_ring_tally.get(Counter::J3Violations),
+                    small_ring_tally.count_of(Counter::J3Violations),
                 ),
                 reading_that_must_equal(
                     criterion,
                     legal_where(Counter::J3Violations),
-                    big_ring_tally.get(Counter::J3Violations),
+                    big_ring_tally.count_of(Counter::J3Violations),
                     0,
                 ),
             ]
@@ -6547,25 +6547,25 @@ fn control_readings_of(
                 reading_that_must_equal(
                     criterion,
                     legal_where(Counter::J4Violations),
-                    tally.get(Counter::J4Violations),
+                    tally.count_of(Counter::J4Violations),
                     FARTHEST_AT_LEAST_ONE_STATES_WITHIN_THE_CONTROL_BOUND,
                 ),
                 reading_that_must_equal(
                     criterion,
                     legal_where(Counter::J1Violations),
-                    tally.get(Counter::J1Violations),
+                    tally.count_of(Counter::J1Violations),
                     0,
                 ),
                 reading_that_must_equal(
                     criterion,
                     legal_where(Counter::J2Violations),
-                    tally.get(Counter::J2Violations),
+                    tally.count_of(Counter::J2Violations),
                     0,
                 ),
                 reading_that_must_equal(
                     criterion,
                     legal_where(Counter::J3Violations),
-                    tally.get(Counter::J3Violations),
+                    tally.count_of(Counter::J3Violations),
                     0,
                 ),
             ]
@@ -6631,8 +6631,8 @@ fn control_readings_of(
             vec![reading_that_must_be_positive(
                 criterion,
                 legal_where(Counter::J6PremiseHoldsViolations),
-                tally.get(Counter::J6PremiseHoldsViolations)
-                    + tally.get(Counter::J6PremiseFailsViolations),
+                tally.count_of(Counter::J6PremiseHoldsViolations)
+                    + tally.count_of(Counter::J6PremiseFailsViolations),
             )]
         }
         Criterion::Ia1LargestTxgFails => {
@@ -6649,7 +6649,7 @@ fn control_readings_of(
             vec![reading_that_must_be_positive(
                 criterion,
                 format!("domain=E2,max_n={largest_size},counter=IA1"),
-                tally.get(Counter::Ia1Violations),
+                tally.count_of(Counter::Ia1Violations),
             )]
         }
         Criterion::Ia2NoVerificationCounted => {
@@ -6665,7 +6665,7 @@ fn control_readings_of(
                 format!(
                     "domain=U_verify_off,max_n={CONTROL_LARGEST_SIZE_OF_THE_NAMED_UNITS_DOMAIN},counter=IA2"
                 ),
-                tally.get(Counter::Ia2Violations),
+                tally.count_of(Counter::Ia2Violations),
             )]
         }
         Criterion::A0Defined => {
@@ -6678,7 +6678,7 @@ fn control_readings_of(
                 format!(
                     "domain=A,max_n={CONTROL_LARGEST_SIZE_OF_THE_ADVERSARIAL_DOMAIN},counter=panicked"
                 ),
-                tally.get(Counter::Panicked),
+                tally.count_of(Counter::Panicked),
                 1,
             )]
         }
@@ -6718,7 +6718,7 @@ fn control_readings_of(
                 format!(
                     "domain=A,max_n={largest_size},implementation=S_never_judges,counter=AS_whole_table"
                 ),
-                tally.get(Counter::AsWholeTableViolations),
+                tally.count_of(Counter::AsWholeTableViolations),
             )]
         }
         Criterion::AStructure => {
@@ -6731,7 +6731,7 @@ fn control_readings_of(
                 format!(
                     "domain=A,max_n={CONTROL_LARGEST_SIZE_OF_THE_ADVERSARIAL_DOMAIN},counter=A_structure"
                 ),
-                tally.get(Counter::StructureViolations),
+                tally.count_of(Counter::StructureViolations),
             )]
         }
         Criterion::ALimit => {
@@ -6744,8 +6744,8 @@ fn control_readings_of(
                 format!(
                     "domain=A,max_n={CONTROL_LARGEST_SIZE_OF_THE_ADVERSARIAL_DOMAIN},counter=A_limit_must_equal_states"
                 ),
-                tally.get(Counter::LimitViolations),
-                tally.get(Counter::States),
+                tally.count_of(Counter::LimitViolations),
+                tally.count_of(Counter::States),
             )]
         }
         Criterion::J6QnFixedPoint => j6qn_control_readings(run_profile, thread_count),
@@ -6876,16 +6876,16 @@ fn assert_the_pinned_i812_state_counts(domain: Domain, size: usize, tally: &Tall
     });
     assert_eq!(
         (
-            tally.get(Counter::TablesSatisfyI812),
-            tally.get(Counter::TablesViolateI812)
+            tally.count_of(Counter::TablesSatisfyI812),
+            tally.count_of(Counter::TablesViolateI812)
         ),
         (pinned_holding, pinned_failing),
         "作废条款 TV4：{} 域 n = {size} 的 I-8.12 成立 / 不成立态数与登记 r3 第七节乙类不等",
         domain.label()
     );
     assert_eq!(
-        tally.get(Counter::TablesSatisfyI812) + tally.get(Counter::TablesViolateI812),
-        tally.get(Counter::States),
+        tally.count_of(Counter::TablesSatisfyI812) + tally.count_of(Counter::TablesViolateI812),
+        tally.count_of(Counter::States),
         "作废条款 TV4：{} 域 n = {size} 的 I-8.12 成立与不成立两类态数之和不等于状态数",
         domain.label()
     );
@@ -6899,7 +6899,7 @@ fn the_split_rows_differ_from_the_unsplit_rows(tally: &Tally) -> Option<String> 
             .iter()
             .filter(|(cell_premise_holds, _)| *cell_premise_holds == premise_holds)
             .map(|(cell_premise_holds, i812_holds)| {
-                tally.get(pick(j6qn_cell_counters(*cell_premise_holds, *i812_holds)))
+                tally.count_of(pick(j6qn_cell_counters(*cell_premise_holds, *i812_holds)))
             })
             .sum::<u64>()
     };
@@ -6909,22 +6909,22 @@ fn the_split_rows_differ_from_the_unsplit_rows(tally: &Tally) -> Option<String> 
         (
             "前提真的违例数",
             sum_of_cells(true, violations_of),
-            tally.get(Counter::J6QnPremiseHoldsViolations),
+            tally.count_of(Counter::J6QnPremiseHoldsViolations),
         ),
         (
             "前提真的 judged",
             sum_of_cells(true, judged_of),
-            tally.get(Counter::J6QnPremiseHoldsJudged),
+            tally.count_of(Counter::J6QnPremiseHoldsJudged),
         ),
         (
             "前提假的违例数",
             sum_of_cells(false, violations_of),
-            tally.get(Counter::J6QnPremiseFailsViolations),
+            tally.count_of(Counter::J6QnPremiseFailsViolations),
         ),
         (
             "前提假的 judged",
             sum_of_cells(false, judged_of),
-            tally.get(Counter::J6QnPremiseFailsJudged),
+            tally.count_of(Counter::J6QnPremiseFailsJudged),
         ),
     ];
     let differing: Vec<String> = split_and_unsplit
@@ -6956,17 +6956,17 @@ fn rows_of_the_i812_split(
             format!(
                 "name=violations {place} criterion={} violations={} judged={} witness={}",
                 violations_counter.label(),
-                tally.get(violations_counter),
-                tally.get(judged_counter),
+                tally.count_of(violations_counter),
+                tally.count_of(judged_counter),
                 witness_field(tally, violations_counter)
             )
         })
         .collect();
     rows.push(format!(
         "name=i812_states {place} i812_holds={} i812_fails={} states={}",
-        tally.get(Counter::TablesSatisfyI812),
-        tally.get(Counter::TablesViolateI812),
-        tally.get(Counter::States)
+        tally.count_of(Counter::TablesSatisfyI812),
+        tally.count_of(Counter::TablesViolateI812),
+        tally.count_of(Counter::States)
     ));
     rows
 }
@@ -6975,7 +6975,10 @@ fn rows_of_the_i812_split(
 fn verdict_row_of_the_i812_split(place: &str, total: &Tally) -> String {
     let cell = |premise_holds: bool, i812_holds: bool| {
         let (judged_counter, violations_counter) = j6qn_cell_counters(premise_holds, i812_holds);
-        (total.get(violations_counter), total.get(judged_counter))
+        (
+            total.count_of(violations_counter),
+            total.count_of(judged_counter),
+        )
     };
     let (holds_holds_violations, holds_holds_judged) = cell(true, true);
     let (holds_fails_violations, holds_fails_judged) = cell(true, false);
@@ -6983,8 +6986,8 @@ fn verdict_row_of_the_i812_split(place: &str, total: &Tally) -> String {
     let (fails_fails_violations, fails_fails_judged) = cell(false, false);
     format!(
         "name=verdict {place} criteria=r3_i812 j6qn_premise_holds_i812_holds_violations={holds_holds_violations} j6qn_premise_holds_i812_holds_judged={holds_holds_judged} j6qn_premise_holds_i812_fails_violations={holds_fails_violations} j6qn_premise_holds_i812_fails_judged={holds_fails_judged} j6qn_premise_fails_i812_holds_violations={fails_holds_violations} j6qn_premise_fails_i812_holds_judged={fails_holds_judged} j6qn_premise_fails_i812_fails_violations={fails_fails_violations} j6qn_premise_fails_i812_fails_judged={fails_fails_judged} i812_holds={} i812_fails={} split_rows_equal_the_unsplit_rows={}",
-        total.get(Counter::TablesSatisfyI812),
-        total.get(Counter::TablesViolateI812),
+        total.count_of(Counter::TablesSatisfyI812),
+        total.count_of(Counter::TablesViolateI812),
         the_split_rows_differ_from_the_unsplit_rows(total).is_none()
     )
 }
@@ -7035,26 +7038,26 @@ fn i812_split_control_readings(
                 readings.push(reading_that_must_equal(
                     criterion,
                     format!("{place},counter={}", violations_counter.label()),
-                    tally.get(violations_counter),
+                    tally.count_of(violations_counter),
                     pinned,
                 ));
                 readings.push(reading_that_must_equal(
                     criterion,
                     format!("{place},counter={}", judged_counter.label()),
-                    tally.get(judged_counter),
+                    tally.count_of(judged_counter),
                     pinned,
                 ));
             }
             readings.push(reading_that_must_equal(
                 criterion,
                 format!("{place},counter={}", Counter::TablesSatisfyI812.label()),
-                tally.get(Counter::TablesSatisfyI812),
+                tally.count_of(Counter::TablesSatisfyI812),
                 pinned_holding,
             ));
             readings.push(reading_that_must_equal(
                 criterion,
                 format!("{place},counter={}", Counter::TablesViolateI812.label()),
-                tally.get(Counter::TablesViolateI812),
+                tally.count_of(Counter::TablesViolateI812),
                 pinned_failing,
             ));
         }
@@ -7093,19 +7096,19 @@ fn table_comparison_control_readings_on_tables(
         reading_that_must_equal(
             criterion,
             place(Counter::TablesDiffer),
-            tally.get(Counter::TablesDiffer),
-            tally.get(Counter::DirectTableHoldsARecord),
+            tally.count_of(Counter::TablesDiffer),
+            tally.count_of(Counter::DirectTableHoldsARecord),
         ),
         reading_that_must_equal(
             criterion,
             place(Counter::DirectTableHoldsARecord),
-            tally.get(Counter::DirectTableHoldsARecord),
+            tally.count_of(Counter::DirectTableHoldsARecord),
             STATES_WITH_A_RECORD_ON_DISK_WITHIN_THE_CONTROL_BOUND_OF_THE_BIG_RING_LEGAL_DOMAIN,
         ),
         reading_that_must_be_positive(
             criterion,
             place(Counter::RowsDiffer),
-            tally.get(Counter::RowsDiffer),
+            tally.count_of(Counter::RowsDiffer),
         ),
     ]
 }
@@ -7136,19 +7139,19 @@ fn table_comparison_control_readings_on_rows(
         reading_that_must_equal(
             criterion,
             place(Counter::RowsDiffer),
-            tally.get(Counter::RowsDiffer),
+            tally.count_of(Counter::RowsDiffer),
             STATES_WITHIN_THE_CONTROL_BOUND_OF_THE_BIG_RING_LEGAL_DOMAIN,
         ),
         reading_that_must_equal(
             criterion,
             place(Counter::States),
-            tally.get(Counter::States),
+            tally.count_of(Counter::States),
             STATES_WITHIN_THE_CONTROL_BOUND_OF_THE_BIG_RING_LEGAL_DOMAIN,
         ),
         reading_that_must_equal(
             criterion,
             place(Counter::TablesDiffer),
-            tally.get(Counter::TablesDiffer),
+            tally.count_of(Counter::TablesDiffer),
             0,
         ),
     ]
@@ -7213,7 +7216,7 @@ fn any_copy_control_readings(run_profile: RunProfile, thread_count: usize) -> Ve
         reading_that_must_equal(
             Criterion::MultiDiskAnyCopyIsOnDisk,
             control_place(domain, largest_size, "ideal_counting_only_the_first_device_copies", Counter::J4Violations),
-            tally.get(Counter::J4Violations),
+            tally.count_of(Counter::J4Violations),
             expected,
         )
     })
@@ -7243,7 +7246,7 @@ fn mirrored_returned_root_control_readings(
                     "off_timeline_root_whenever_applied",
                     counter,
                 ),
-                tally.get(counter),
+                tally.count_of(counter),
                 farthest_at_least_one,
             ));
         }
@@ -7279,7 +7282,7 @@ fn mirrored_farthest_version_control_readings(
                     "always_returns_the_chosen_root",
                     counter,
                 ),
-                tally.get(counter),
+                tally.count_of(counter),
                 expected,
             ));
         }
@@ -7319,7 +7322,7 @@ fn mirrored_monotone_control_readings(
 fn j6qn_control_readings(run_profile: RunProfile, thread_count: usize) -> Vec<ControlReading> {
     let criterion = Criterion::J6QnFixedPoint;
     let sum_of_both_premises = |tally: &Tally, premise_holds: Counter, premise_fails: Counter| {
-        tally.get(premise_holds) + tally.get(premise_fails)
+        tally.count_of(premise_holds) + tally.count_of(premise_fails)
     };
     let mut readings = Vec::new();
     for (control, implementation_label) in [
@@ -7437,7 +7440,7 @@ fn j7a_control_readings(
         readings.push(reading_that_must_equal(
             criterion,
             format!("{place},counter={}", counter.label()),
-            tally.get(counter),
+            tally.count_of(counter),
             if judged_field == field {
                 FARTHEST_AT_LEAST_ONE_STATES_WITHIN_THE_CONTROL_BOUND
             } else {
@@ -7458,7 +7461,7 @@ fn j7a_control_readings(
             "{place},generator=r1,counter={}",
             field.violations_counter().label()
         ),
-        r1_generator_tally.get(field.violations_counter()),
+        r1_generator_tally.count_of(field.violations_counter()),
         0,
     ));
     readings
@@ -7514,7 +7517,7 @@ fn c8_control_readings(
                     counter.label(),
                     marker_parity.label()
                 ),
-                big_ring_tally.get(*counter),
+                big_ring_tally.count_of(*counter),
                 *pinned_value,
             )
         })
@@ -7530,7 +7533,7 @@ fn c8_control_readings(
         readings.push(reading_that_must_equal(
             criterion,
             format!("{place},generator=r1,counter={}", counter.label()),
-            r1_generator_tally.get(*counter),
+            r1_generator_tally.count_of(*counter),
             0,
         ));
     }
@@ -7551,7 +7554,7 @@ fn c8_control_readings(
                         "domain=C,max_n={CONTROL_LARGEST_SIZE_OF_THE_MONOTONE_BIG_RING_DOMAIN},implementation={control_label},counter={},marker_parity=odd",
                         counter.label()
                     ),
-                    monotone_tally.get(*counter),
+                    monotone_tally.count_of(*counter),
                 ));
             }
         }
@@ -7690,7 +7693,7 @@ fn unmount_marker_control_readings(
             profile,
             thread_count,
         )
-        .get(counter)
+        .count_of(counter)
     };
     let r1_generator_reading = reading_that_must_equal(
         criterion,
@@ -7734,7 +7737,7 @@ fn unmount_marker_control_readings(
                         criterion.label(),
                         counter.label()
                     ),
-                    monotone_tally.get(counter),
+                    monotone_tally.count_of(counter),
                 ),
                 r1_generator_reading,
             ]
@@ -7774,7 +7777,7 @@ struct Emitter {
 }
 
 impl Emitter {
-    fn result(&mut self, text: &str) {
+    fn emit_result_line(&mut self, text: &str) {
         println!("E7RESULT {text}");
         self.emitted += 1;
     }
@@ -7858,31 +7861,31 @@ fn emit_the_rows_of_a_domain_size(
         domain.label(),
         domain.ring().ring_slots
     );
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=states {place} states={} panicked={} failed={} applied_ge1={} applied_ge2={} farthest_ge1={} farthest_ge2={} in_flight_limit={} above_water_max={} above_water_over_limit={} above_water_at_limit={} chosen_root_is_a_later_version={} off_timeline_landings={} states_holding_a_record_rejected_by_parse={}",
-        tally.get(Counter::States),
-        tally.get(Counter::Panicked),
-        tally.get(Counter::Failed),
-        tally.get(Counter::AppliedAtLeastOne),
-        tally.get(Counter::AppliedAtLeastTwo),
-        tally.get(Counter::FarthestAtLeastOne),
-        tally.get(Counter::FarthestAtLeastTwo),
+        tally.count_of(Counter::States),
+        tally.count_of(Counter::Panicked),
+        tally.count_of(Counter::Failed),
+        tally.count_of(Counter::AppliedAtLeastOne),
+        tally.count_of(Counter::AppliedAtLeastTwo),
+        tally.count_of(Counter::FarthestAtLeastOne),
+        tally.count_of(Counter::FarthestAtLeastTwo),
         domain.ring().local_in_flight_limit(),
         tally.above_water_maximum,
-        tally.get(Counter::AboveWaterOverLimit),
-        tally.get(Counter::AboveWaterAtLimit),
-        tally.get(Counter::ChosenRootIsALaterVersion),
-        tally.get(Counter::OffTimelineLandings),
-        tally.get(Counter::StatesHoldingARecordRejectedByParse),
+        tally.count_of(Counter::AboveWaterOverLimit),
+        tally.count_of(Counter::AboveWaterAtLimit),
+        tally.count_of(Counter::ChosenRootIsALaterVersion),
+        tally.count_of(Counter::OffTimelineLandings),
+        tally.count_of(Counter::StatesHoldingARecordRejectedByParse),
     ));
     let mut violations_row = |criterion: &str, violations: Counter, judged: u64| {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=violations {place} criterion={criterion} violations={} judged={judged} witness={}",
-            tally.get(violations),
+            tally.count_of(violations),
             witness_field(tally, violations)
         ));
     };
-    let states = tally.get(Counter::States);
+    let states = tally.count_of(Counter::States);
     match domain.family() {
         Family::LegalHistory | Family::MultiDisk => {
             violations_row("J0", Counter::Panicked, states);
@@ -7907,35 +7910,35 @@ fn emit_the_rows_of_a_domain_size(
             violations_row(
                 "A_structure",
                 Counter::StructureViolations,
-                states - tally.get(Counter::Failed) - tally.get(Counter::Panicked),
+                states - tally.count_of(Counter::Failed) - tally.count_of(Counter::Panicked),
             );
             violations_row(
                 "A_limit",
                 Counter::LimitViolations,
-                states - tally.get(Counter::Failed) - tally.get(Counter::Panicked),
+                states - tally.count_of(Counter::Failed) - tally.count_of(Counter::Panicked),
             );
         }
     }
     violations_row(
         "J6_premise_holds",
         Counter::J6PremiseHoldsViolations,
-        tally.get(Counter::J6PremiseHoldsJudged),
+        tally.count_of(Counter::J6PremiseHoldsJudged),
     );
     violations_row(
         "J6_premise_fails",
         Counter::J6PremiseFailsViolations,
-        tally.get(Counter::J6PremiseFailsJudged),
+        tally.count_of(Counter::J6PremiseFailsJudged),
     );
     if run_profile.judges_j6qn() {
         violations_row(
             "J6Qn_premise_holds",
             Counter::J6QnPremiseHoldsViolations,
-            tally.get(Counter::J6QnPremiseHoldsJudged),
+            tally.count_of(Counter::J6QnPremiseHoldsJudged),
         );
         violations_row(
             "J6Qn_premise_fails",
             Counter::J6QnPremiseFailsViolations,
-            tally.get(Counter::J6QnPremiseFailsJudged),
+            tally.count_of(Counter::J6QnPremiseFailsJudged),
         );
     }
     if run_profile.judges_j7() {
@@ -7943,11 +7946,19 @@ fn emit_the_rows_of_a_domain_size(
             violations_row(
                 field.violations_counter().label(),
                 field.violations_counter(),
-                tally.get(Counter::J7Judged),
+                tally.count_of(Counter::J7Judged),
             );
         }
-        violations_row("J7b", Counter::J7bViolations, tally.get(Counter::J7bJudged));
-        violations_row("J7c", Counter::J7cViolations, tally.get(Counter::J7cJudged));
+        violations_row(
+            "J7b",
+            Counter::J7bViolations,
+            tally.count_of(Counter::J7bJudged),
+        );
+        violations_row(
+            "J7c",
+            Counter::J7cViolations,
+            tally.count_of(Counter::J7cJudged),
+        );
     }
     // r5 档（登记 r5 5.3）：J7 五行换成 J8 五行与「无出处」一行；「无出处」只报，它的 judged 是投影不等于所选根的态数。
     if run_profile.judges_j8() {
@@ -7956,32 +7967,48 @@ fn emit_the_rows_of_a_domain_size(
             Counter::J8aAllocationRecordTreeRootViolations,
             Counter::J8aUnmountMarkerViolations,
         ] {
-            violations_row(counter.label(), counter, tally.get(Counter::J8aJudged));
+            violations_row(counter.label(), counter, tally.count_of(Counter::J8aJudged));
         }
-        violations_row("J8b", Counter::J8bViolations, tally.get(Counter::J8Judged));
-        violations_row("J8c", Counter::J8cViolations, tally.get(Counter::J8cJudged));
+        violations_row(
+            "J8b",
+            Counter::J8bViolations,
+            tally.count_of(Counter::J8Judged),
+        );
+        violations_row(
+            "J8c",
+            Counter::J8cViolations,
+            tally.count_of(Counter::J8cJudged),
+        );
         violations_row(
             "J8_without_a_source",
             Counter::J8WithoutASource,
-            tally.get(Counter::J8aJudged) + tally.get(Counter::J8WithoutASource),
+            tally.count_of(Counter::J8aJudged) + tally.count_of(Counter::J8WithoutASource),
         );
     }
-    if tally.get(Counter::Ia1Judged) > 0 {
-        violations_row("IA1", Counter::Ia1Violations, tally.get(Counter::Ia1Judged));
+    if tally.count_of(Counter::Ia1Judged) > 0 {
+        violations_row(
+            "IA1",
+            Counter::Ia1Violations,
+            tally.count_of(Counter::Ia1Judged),
+        );
     }
-    if tally.get(Counter::Ia2Judged) > 0 {
-        violations_row("IA2", Counter::Ia2Violations, tally.get(Counter::Ia2Judged));
+    if tally.count_of(Counter::Ia2Judged) > 0 {
+        violations_row(
+            "IA2",
+            Counter::Ia2Violations,
+            tally.count_of(Counter::Ia2Judged),
+        );
     }
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=fixed_point {place} first_call_failed={} third_call_equals_second={} third_call_differs_or_is_missing={}",
-        tally.get(Counter::J6FirstCallFailed),
-        tally.get(Counter::J6ThirdCallEqualsSecond),
-        tally.get(Counter::J6ThirdCallDiffersOrIsMissing),
+        tally.count_of(Counter::J6FirstCallFailed),
+        tally.count_of(Counter::J6ThirdCallEqualsSecond),
+        tally.count_of(Counter::J6ThirdCallDiffersOrIsMissing),
     ));
     if run_profile.judges_j6qn() {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=first_returned_root_txg {place} first_returned_root_txg_is_the_largest={}",
-            tally.get(Counter::FirstReturnedRootTxgIsTheLargest),
+            tally.count_of(Counter::FirstReturnedRootTxgIsTheLargest),
         ));
     }
     if domain.specification_self_check() == SpecificationSelfCheck::Judged {
@@ -7990,23 +8017,23 @@ fn emit_the_rows_of_a_domain_size(
             Counter::SpecificationGapContinuesMismatch,
             Counter::SpecificationGapStopsMismatch,
         ] {
-            emitter.result(&format!(
+            emitter.emit_result_line(&format!(
                 "name=specification_self_check {place} reading={} mismatches={} witness={}",
                 counter.label(),
-                tally.get(counter),
+                tally.count_of(counter),
                 witness_field(tally, counter)
             ));
         }
     }
     if !pinned_monotone_counts(domain).is_empty() {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=legal_crash_states {place} cut_own={} cut_with={} pair_states_without_an_interval={}",
-            tally.get(Counter::LegalCrashStatesWhenTheRootWriteIsItsOwnSegment),
-            tally.get(Counter::LegalCrashStatesWhenTheRootWriteSharesTheRecordSegment),
-            tally.get(Counter::PairStatesWithoutAnInterval),
+            tally.count_of(Counter::LegalCrashStatesWhenTheRootWriteIsItsOwnSegment),
+            tally.count_of(Counter::LegalCrashStatesWhenTheRootWriteSharesTheRecordSegment),
+            tally.count_of(Counter::PairStatesWithoutAnInterval),
         ));
         for set in PairSet::ALL {
-            emitter.result(&format!(
+            emitter.emit_result_line(&format!(
                 "name=pairs {place} set={} pairs={} today_j5a={} today_j5b={} ideal_j5a={} ideal_j5b={}",
                 set.label(),
                 tally.pair(*set, PairColumn::Pairs),
@@ -8019,15 +8046,15 @@ fn emit_the_rows_of_a_domain_size(
     }
     if !pinned_mirrored_counts(domain).is_empty() {
         for row in lagging_class_rows("lagging_class", &place, tally, run_profile) {
-            emitter.result(&row);
+            emitter.emit_result_line(&row);
         }
     }
     if !pinned_mirrored_monotone_counts(domain).is_empty() {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=pair_states {place} pair_states_without_an_interval={}",
-            tally.get(Counter::PairStatesWithoutAnInterval),
+            tally.count_of(Counter::PairStatesWithoutAnInterval),
         ));
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=pairs {place} set={} pairs={} today_j5a={} today_j5b={} ideal_j5a={} ideal_j5b={}",
             PairSet::Wide.label(),
             tally.pair(PairSet::Wide, PairColumn::Pairs),
@@ -8042,40 +8069,40 @@ fn emit_the_rows_of_a_domain_size(
             ReportedDiskOrder::FirstDeviceBeforeSecond => String::new(),
             ReportedDiskOrder::SecondDeviceBeforeFirst => format!(
                 " tables_differ_in_reported_order={} rows_differ_in_reported_order={} witness_in_reported_order={} rows_witness_in_reported_order={}",
-                tally.get(Counter::TablesDifferInReportedOrder),
-                tally.get(Counter::RowsDifferInReportedOrder),
+                tally.count_of(Counter::TablesDifferInReportedOrder),
+                tally.count_of(Counter::RowsDifferInReportedOrder),
                 witness_field(tally, Counter::TablesDifferInReportedOrder),
                 witness_field(tally, Counter::RowsDifferInReportedOrder),
             ),
         };
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=table_comparison {place} states={} tables_differ={} rows_differ={} direct_table_holds_a_record={} fully_landed_scan_table_size_checked={} witness={} rows_witness={}{reported_order_fields}",
-            tally.get(Counter::States),
-            tally.get(Counter::TablesDiffer),
-            tally.get(Counter::RowsDiffer),
-            tally.get(Counter::DirectTableHoldsARecord),
-            tally.get(Counter::FullyLandedScanTableSizeChecked),
+            tally.count_of(Counter::States),
+            tally.count_of(Counter::TablesDiffer),
+            tally.count_of(Counter::RowsDiffer),
+            tally.count_of(Counter::DirectTableHoldsARecord),
+            tally.count_of(Counter::FullyLandedScanTableSizeChecked),
             witness_field(tally, Counter::TablesDiffer),
             witness_field(tally, Counter::RowsDiffer),
         ));
     }
     for row in rows_of_the_i812_split(run_profile, domain, &place, tally) {
-        emitter.result(&row);
+        emitter.emit_result_line(&row);
     }
     if domain.family() == Family::Adversarial {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=specification {place} expects_failure={}",
-            tally.get(Counter::SpecificationExpectsFailure)
+            tally.count_of(Counter::SpecificationExpectsFailure)
         ));
         for counter in [
             Counter::MutualWholeTableAndGapContinues,
             Counter::MutualWholeTableAndGapStops,
             Counter::MutualGapContinuesAndGapStops,
         ] {
-            emitter.result(&format!(
+            emitter.emit_result_line(&format!(
                 "name=mutual {place} readings={} differing={} witness={}",
                 counter.label(),
-                tally.get(counter),
+                tally.count_of(counter),
                 witness_field(tally, counter)
             ));
         }
@@ -8099,16 +8126,16 @@ fn emit_the_verdict_of_a_domain(
     );
     // 域非空见证（登记 Q12、作废条款 V4）：实现施加过至少一次发布的态数必须大于 0，E2 除外。
     let domain_is_nonempty =
-        total.get(Counter::AppliedAtLeastOne) > 0 || domain == Domain::TxgAtTheLargest;
+        total.count_of(Counter::AppliedAtLeastOne) > 0 || domain == Domain::TxgAtTheLargest;
     if !domain_is_nonempty {
         findings.void_conditions.push(format!(
             "V4 {} 域没有一个态施加过发布，这个域的 0 违例不算数",
             domain.label()
         ));
     }
-    let specification_mismatches = total.get(Counter::SpecificationWholeTableMismatch)
-        + total.get(Counter::SpecificationGapContinuesMismatch)
-        + total.get(Counter::SpecificationGapStopsMismatch);
+    let specification_mismatches = total.count_of(Counter::SpecificationWholeTableMismatch)
+        + total.count_of(Counter::SpecificationGapContinuesMismatch)
+        + total.count_of(Counter::SpecificationGapStopsMismatch);
     if specification_mismatches > 0 {
         findings.void_conditions.push(format!(
             "V3 {} 域里 S 的期望落点不等于 j* 的态数（三种读法合计）{specification_mismatches}",
@@ -8118,43 +8145,43 @@ fn emit_the_verdict_of_a_domain(
     match domain.family() {
         Family::LegalHistory | Family::MultiDisk => {
             // 登记 r2 第七节甲类、SF9：M、M6、MC 里今天的实现第一次调用报错的态数是 0；不符停下，两边都查。
-            if domain.family() == Family::MultiDisk && total.get(Counter::Failed) > 0 {
+            if domain.family() == Family::MultiDisk && total.count_of(Counter::Failed) > 0 {
                 findings.halt_conditions.push(format!(
                     "SF9 {} 域里今天的实现第一次调用报错的态数 {}（登记 r2 第七节甲类锚点是 0）",
                     domain.label(),
-                    total.get(Counter::Failed)
+                    total.count_of(Counter::Failed)
                 ));
             }
             // 甲类锚点（登记第七节）：L、L 小环、U 开着验证、X、E1 里原实现报错的态数是 0；不符走 F11，停下两边都查。
             let failed_states_are_pinned_to_zero =
                 domain.specification_self_check() == SpecificationSelfCheck::Judged;
-            if failed_states_are_pinned_to_zero && total.get(Counter::Failed) > 0 {
+            if failed_states_are_pinned_to_zero && total.count_of(Counter::Failed) > 0 {
                 findings.halt_conditions.push(format!(
                     "F11 {} 域里原实现报错的态数 {}（登记第七节甲类锚点是 0）",
                     domain.label(),
-                    total.get(Counter::Failed)
+                    total.count_of(Counter::Failed)
                 ));
             }
-            emitter.result(&format!(
+            emitter.emit_result_line(&format!(
                 "name=verdict {place} states={} j0_violations={} failed_states={} j1_violations={} j2_violations={} j3_violations={} j4_violations={} j6_premise_holds_violations={} j6_premise_fails_violations={} j6_premise_fails_judged={} ia1_violations={} ia2_violations={} specification_self_check_mismatches={specification_mismatches} applied_ge1={} applied_ge2={} domain_is_nonempty={domain_is_nonempty}",
-                total.get(Counter::States),
-                total.get(Counter::Panicked),
-                total.get(Counter::Failed),
-                total.get(Counter::J1Violations),
-                total.get(Counter::J2Violations),
-                total.get(Counter::J3Violations),
-                total.get(Counter::J4Violations),
-                total.get(Counter::J6PremiseHoldsViolations),
-                total.get(Counter::J6PremiseFailsViolations),
-                total.get(Counter::J6PremiseFailsJudged),
-                total.get(Counter::Ia1Violations),
-                total.get(Counter::Ia2Violations),
-                total.get(Counter::AppliedAtLeastOne),
-                total.get(Counter::AppliedAtLeastTwo),
+                total.count_of(Counter::States),
+                total.count_of(Counter::Panicked),
+                total.count_of(Counter::Failed),
+                total.count_of(Counter::J1Violations),
+                total.count_of(Counter::J2Violations),
+                total.count_of(Counter::J3Violations),
+                total.count_of(Counter::J4Violations),
+                total.count_of(Counter::J6PremiseHoldsViolations),
+                total.count_of(Counter::J6PremiseFailsViolations),
+                total.count_of(Counter::J6PremiseFailsJudged),
+                total.count_of(Counter::Ia1Violations),
+                total.count_of(Counter::Ia2Violations),
+                total.count_of(Counter::AppliedAtLeastOne),
+                total.count_of(Counter::AppliedAtLeastTwo),
             ));
             if !pinned_monotone_counts(domain).is_empty() {
                 for set in PairSet::ALL {
-                    emitter.result(&format!(
+                    emitter.emit_result_line(&format!(
                         "name=verdict {place} set={} pairs={} today_j5a_violations={} today_j5b_violations={} ideal_j5a_violations={} ideal_j5b_violations={}",
                         set.label(),
                         total.pair(*set, PairColumn::Pairs),
@@ -8167,11 +8194,11 @@ fn emit_the_verdict_of_a_domain(
             }
             if !pinned_mirrored_counts(domain).is_empty() {
                 for row in lagging_class_rows("verdict", &place, total, run_profile) {
-                    emitter.result(&row);
+                    emitter.emit_result_line(&row);
                 }
             }
             if !pinned_mirrored_monotone_counts(domain).is_empty() {
-                emitter.result(&format!(
+                emitter.emit_result_line(&format!(
                     "name=verdict {place} set={} pairs={} today_j5a_violations={} today_j5b_violations={} ideal_j5a_violations={} ideal_j5b_violations={}",
                     PairSet::Wide.label(),
                     total.pair(PairSet::Wide, PairColumn::Pairs),
@@ -8183,30 +8210,30 @@ fn emit_the_verdict_of_a_domain(
             }
         }
         Family::Adversarial => {
-            emitter.result(&format!(
+            emitter.emit_result_line(&format!(
                 "name=verdict {place} states={} a0_violations={} failed_states={} as_whole_table_violations={} as_consecutive_gap_continues_violations={} as_consecutive_gap_stops_violations={} readings_differing_whole_table_vs_consecutive_gap_continues={} readings_differing_whole_table_vs_consecutive_gap_stops={} readings_differing_consecutive_gap_continues_vs_consecutive_gap_stops={} a_structure_violations={} a_limit_violations={} j6_premise_holds_violations={} j6_premise_fails_violations={} j6_premise_fails_judged={} applied_ge1={} states_holding_a_record_rejected_by_parse={} domain_is_nonempty={domain_is_nonempty}",
-                total.get(Counter::States),
-                total.get(Counter::Panicked),
-                total.get(Counter::Failed),
-                total.get(Counter::AsWholeTableViolations),
-                total.get(Counter::AsGapContinuesViolations),
-                total.get(Counter::AsGapStopsViolations),
-                total.get(Counter::MutualWholeTableAndGapContinues),
-                total.get(Counter::MutualWholeTableAndGapStops),
-                total.get(Counter::MutualGapContinuesAndGapStops),
-                total.get(Counter::StructureViolations),
-                total.get(Counter::LimitViolations),
-                total.get(Counter::J6PremiseHoldsViolations),
-                total.get(Counter::J6PremiseFailsViolations),
-                total.get(Counter::J6PremiseFailsJudged),
-                total.get(Counter::AppliedAtLeastOne),
-                total.get(Counter::StatesHoldingARecordRejectedByParse),
+                total.count_of(Counter::States),
+                total.count_of(Counter::Panicked),
+                total.count_of(Counter::Failed),
+                total.count_of(Counter::AsWholeTableViolations),
+                total.count_of(Counter::AsGapContinuesViolations),
+                total.count_of(Counter::AsGapStopsViolations),
+                total.count_of(Counter::MutualWholeTableAndGapContinues),
+                total.count_of(Counter::MutualWholeTableAndGapStops),
+                total.count_of(Counter::MutualGapContinuesAndGapStops),
+                total.count_of(Counter::StructureViolations),
+                total.count_of(Counter::LimitViolations),
+                total.count_of(Counter::J6PremiseHoldsViolations),
+                total.count_of(Counter::J6PremiseFailsViolations),
+                total.count_of(Counter::J6PremiseFailsJudged),
+                total.count_of(Counter::AppliedAtLeastOne),
+                total.count_of(Counter::StatesHoldingARecordRejectedByParse),
             ));
         }
     }
     if run_profile.judges_j6qn() {
         let first_returned_root_txg_is_the_largest =
-            total.get(Counter::FirstReturnedRootTxgIsTheLargest);
+            total.count_of(Counter::FirstReturnedRootTxgIsTheLargest);
         // 登记 r2 作废条款 SV4：E1 上 ρ_1 的 txg 是 u64 最大值的态数为 0，J6Qn 在 E1 上的 0 不算「Qn 管住了顶格」。
         if domain == Domain::TxgOneBelowTheLargest && first_returned_root_txg_is_the_largest == 0 {
             findings.void_conditions.push(
@@ -8217,59 +8244,59 @@ fn emit_the_verdict_of_a_domain(
     }
     if run_profile.judges_j7() {
         let first_returned_root_txg_is_the_largest =
-            total.get(Counter::FirstReturnedRootTxgIsTheLargest);
-        emitter.result(&format!(
+            total.count_of(Counter::FirstReturnedRootTxgIsTheLargest);
+        emitter.emit_result_line(&format!(
             "name=verdict {place} criteria=r2 j6qn_premise_holds_violations={} j6qn_premise_holds_judged={} j6qn_premise_fails_violations={} j6qn_premise_fails_judged={} j7_judged={} j7a_instance_table_violations={} j7a_allocation_record_tree_root_violations={} j7a_filesystem_identifier_violations={} j7b_violations={} j7b_judged={} j7c_violations={} j7c_judged={} first_returned_root_txg_is_the_largest={first_returned_root_txg_is_the_largest}",
-            total.get(Counter::J6QnPremiseHoldsViolations),
-            total.get(Counter::J6QnPremiseHoldsJudged),
-            total.get(Counter::J6QnPremiseFailsViolations),
-            total.get(Counter::J6QnPremiseFailsJudged),
-            total.get(Counter::J7Judged),
-            total.get(Counter::J7aInstanceTableViolations),
-            total.get(Counter::J7aAllocationRecordTreeRootViolations),
-            total.get(Counter::J7aFilesystemIdentifierViolations),
-            total.get(Counter::J7bViolations),
-            total.get(Counter::J7bJudged),
-            total.get(Counter::J7cViolations),
-            total.get(Counter::J7cJudged),
+            total.count_of(Counter::J6QnPremiseHoldsViolations),
+            total.count_of(Counter::J6QnPremiseHoldsJudged),
+            total.count_of(Counter::J6QnPremiseFailsViolations),
+            total.count_of(Counter::J6QnPremiseFailsJudged),
+            total.count_of(Counter::J7Judged),
+            total.count_of(Counter::J7aInstanceTableViolations),
+            total.count_of(Counter::J7aAllocationRecordTreeRootViolations),
+            total.count_of(Counter::J7aFilesystemIdentifierViolations),
+            total.count_of(Counter::J7bViolations),
+            total.count_of(Counter::J7bJudged),
+            total.count_of(Counter::J7cViolations),
+            total.count_of(Counter::J7cJudged),
         ));
     }
     if run_profile.judges_j8() {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=verdict {place} criteria=r5 j6qn_premise_holds_violations={} j6qn_premise_holds_judged={} j6qn_premise_fails_violations={} j6qn_premise_fails_judged={} j8_judged={} j8a_judged={} j8a_instance_table_violations={} j8a_allocation_record_tree_root_violations={} j8a_unmount_marker_violations={} j8b_violations={} j8b_judged={} j8c_violations={} j8c_judged={} j8_without_a_source={} first_returned_root_txg_is_the_largest={}",
-            total.get(Counter::J6QnPremiseHoldsViolations),
-            total.get(Counter::J6QnPremiseHoldsJudged),
-            total.get(Counter::J6QnPremiseFailsViolations),
-            total.get(Counter::J6QnPremiseFailsJudged),
-            total.get(Counter::J8Judged),
-            total.get(Counter::J8aJudged),
-            total.get(Counter::J8aInstanceTableViolations),
-            total.get(Counter::J8aAllocationRecordTreeRootViolations),
-            total.get(Counter::J8aUnmountMarkerViolations),
-            total.get(Counter::J8bViolations),
-            total.get(Counter::J8Judged),
-            total.get(Counter::J8cViolations),
-            total.get(Counter::J8cJudged),
-            total.get(Counter::J8WithoutASource),
-            total.get(Counter::FirstReturnedRootTxgIsTheLargest),
+            total.count_of(Counter::J6QnPremiseHoldsViolations),
+            total.count_of(Counter::J6QnPremiseHoldsJudged),
+            total.count_of(Counter::J6QnPremiseFailsViolations),
+            total.count_of(Counter::J6QnPremiseFailsJudged),
+            total.count_of(Counter::J8Judged),
+            total.count_of(Counter::J8aJudged),
+            total.count_of(Counter::J8aInstanceTableViolations),
+            total.count_of(Counter::J8aAllocationRecordTreeRootViolations),
+            total.count_of(Counter::J8aUnmountMarkerViolations),
+            total.count_of(Counter::J8bViolations),
+            total.count_of(Counter::J8Judged),
+            total.count_of(Counter::J8cViolations),
+            total.count_of(Counter::J8cJudged),
+            total.count_of(Counter::J8WithoutASource),
+            total.count_of(Counter::FirstReturnedRootTxgIsTheLargest),
         ));
     }
     if run_profile.splits_j6qn_by_i812() && domain.family() == Family::Adversarial {
-        emitter.result(&verdict_row_of_the_i812_split(&place, total));
+        emitter.emit_result_line(&verdict_row_of_the_i812_split(&place, total));
     }
     if run_profile.compares_the_two_record_tables() {
         let reported_order_fields = match run_profile.reported_disk_order {
             ReportedDiskOrder::FirstDeviceBeforeSecond => String::new(),
             ReportedDiskOrder::SecondDeviceBeforeFirst => format!(
                 " tables_differ_in_reported_order={} rows_differ_in_reported_order={}",
-                total.get(Counter::TablesDifferInReportedOrder),
-                total.get(Counter::RowsDifferInReportedOrder),
+                total.count_of(Counter::TablesDifferInReportedOrder),
+                total.count_of(Counter::RowsDifferInReportedOrder),
             ),
         };
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=verdict {place} criteria=r2_record_tables tables_differ={} rows_differ={}{reported_order_fields}",
-            total.get(Counter::TablesDiffer),
-            total.get(Counter::RowsDiffer),
+            total.count_of(Counter::TablesDiffer),
+            total.count_of(Counter::RowsDiffer),
         ));
     }
 }
@@ -8568,9 +8595,9 @@ fn check_root_plus_disk_on_a_bad_unit_copy() {
     ));
     assert_eq!(
         (
-            tally.get(Counter::J1Violations),
-            tally.get(Counter::J2Violations),
-            tally.get(Counter::FarthestAtLeastOne)
+            tally.count_of(Counter::J1Violations),
+            tally.count_of(Counter::J2Violations),
+            tally.count_of(Counter::FarthestAtLeastOne)
         ),
         (0, 1, 0),
         "记录在、点名单元一份坏：多落一版的假结局过 J1、不过 J2，j* 停在所选根"
@@ -8633,7 +8660,7 @@ fn check_the_fixed_point_control() {
         1,
     );
     assert!(
-        tally.get(Counter::J6PremiseHoldsViolations) > 0,
+        tally.count_of(Counter::J6PremiseHoldsViolations) > 0,
         "第二次调用换成「再多落一版」的假结局，J6 违例数大于 0"
     );
 }
@@ -8666,7 +8693,7 @@ fn check_the_structure_control() {
         1,
     );
     assert!(
-        tally.get(Counter::StructureViolations) > 0,
+        tally.count_of(Counter::StructureViolations) > 0,
         "返回根取自不带末条标志的记录的假结局，A-结构 违例数大于 0"
     );
 }
@@ -9242,13 +9269,13 @@ fn check_the_odd_marker_parity_turns_the_unmount_marker_controls() {
             1,
         );
         assert_eq!(
-            big_ring.get(counter),
+            big_ring.count_of(counter),
             0,
             "反奇偶：L 域 {} 对照是 0",
             counter.label()
         );
         assert!(
-            monotone.get(counter) > 0,
+            monotone.count_of(counter) > 0,
             "反奇偶：C 域 {} 对照大于 0",
             counter.label()
         );
@@ -10543,7 +10570,7 @@ impl RootChoiceTally {
         }
     }
 
-    fn get(&self, counter: RootChoiceCounter) -> u64 {
+    fn count_of(&self, counter: RootChoiceCounter) -> u64 {
         self.counts[counter.index()]
     }
 
@@ -11715,42 +11742,42 @@ fn assert_the_pinned_root_choice_cell(
         cell.user_publishes
     );
     assert_eq!(
-        tally.get(RootChoiceCounter::States),
+        tally.count_of(RootChoiceCounter::States),
         pinned.states,
         "TV4：{place} 状态数"
     );
     assert_eq!(
-        tally.get(RootChoiceCounter::ConfirmedStates),
+        tally.count_of(RootChoiceCounter::ConfirmedStates),
         pinned.confirmed_states,
         "TV4：{place} 有已确认发布的态数"
     );
     assert_eq!(
-        tally.get(RootChoiceCounter::FirstSelfVerifiedRootIsNotTheNewest),
+        tally.count_of(RootChoiceCounter::FirstSelfVerifiedRootIsNotTheNewest),
         pinned.first_self_verified_root_is_not_the_newest,
         "TV4：{place} 读根环次序里第一个自证过的根不是版本最大那条的态数"
     );
     assert_eq!(
-        tally.get(RootChoiceCounter::SameTxgDifferentInstanceRoots),
+        tally.count_of(RootChoiceCounter::SameTxgDifferentInstanceRoots),
         pinned.same_txg_different_instance_roots,
         "TV4：{place} 根环里同 txg 不同实例同在的态数"
     );
     assert_eq!(
-        tally.get(RootChoiceCounter::HigherInstanceLowerTxgRoots),
+        tally.count_of(RootChoiceCounter::HigherInstanceLowerTxgRoots),
         pinned.higher_instance_lower_txg_roots,
         "TV4：{place} 实例代号更高而 txg 更低的一对根同在的态数"
     );
     assert_eq!(
-        tally.get(RootChoiceCounter::TwoOrMoreInstancesInTheRing),
+        tally.count_of(RootChoiceCounter::TwoOrMoreInstancesInTheRing),
         pinned.two_or_more_instances,
         "TV4：{place} 根环里有两个以上实例的根的态数"
     );
     assert_eq!(
-        tally.get(RootChoiceCounter::IdealRecoveryApplied),
+        tally.count_of(RootChoiceCounter::IdealRecoveryApplied),
         pinned.ideal_recovery_applied,
         "TV4：{place} 理想恢复施加过至少一次发布的态数"
     );
     assert_eq!(
-        tally.get(RootChoiceCounter::StatesWithoutASelfVerifiedRoot),
+        tally.count_of(RootChoiceCounter::StatesWithoutASelfVerifiedRoot),
         0,
         "TV4：{place} 根环里没有一条自证过的根的态数（合法历史里第 0 代根至少还有一份）"
     );
@@ -12491,7 +12518,7 @@ fn root_choice_control_readings(
                     readings.push(root_choice_reading_that_must_equal(
                         RootChoiceCriterion::Kj2NotEarlierThanAnySelfVerifiedRoot,
                         format!("{place} local_choice={}", rule.label()),
-                        tally.get(RootChoiceCounter::Kj2Violations),
+                        tally.count_of(RootChoiceCounter::Kj2Violations),
                         pinned_root_choice_adversarial_kj2_violations(rule),
                     ));
                 }
@@ -12510,7 +12537,7 @@ fn root_choice_control_readings(
                 readings.push(root_choice_reading_that_must_equal(
                     RootChoiceCriterion::Kj0Defined,
                     format!("{place} fake_outcome=panics_on_the_designated_state"),
-                    tally.get(RootChoiceCounter::Kj0Violations),
+                    tally.count_of(RootChoiceCounter::Kj0Violations),
                     1,
                 ));
             }
@@ -12535,7 +12562,7 @@ fn root_choice_control_readings(
                 readings.push(root_choice_reading_that_must_equal(
                     criterion,
                     format!("{place} fake_outcome=KF1_chooses_the_oldest_root"),
-                    kf1.get(counter),
+                    kf1.count_of(counter),
                     expected,
                 ));
             }
@@ -12562,7 +12589,7 @@ fn root_choice_control_readings(
                 readings.push(root_choice_reading_that_must_equal(
                     criterion,
                     format!("{place} fake_outcome=KF2_lands_one_version_before_the_last_confirmed"),
-                    kf2.get(counter),
+                    kf2.count_of(counter),
                     pinned.confirmed_states,
                 ));
             }
@@ -12605,9 +12632,9 @@ fn emit_the_rows_of_a_root_choice_cell(
     let place = root_choice_place_of(domain, cell);
     let counter_fields: Vec<String> = ROOT_CHOICE_COUNTERS_OF_THE_STATES_ROW
         .iter()
-        .map(|counter| format!("{}={}", counter.label(), tally.get(*counter)))
+        .map(|counter| format!("{}={}", counter.label(), tally.count_of(*counter)))
         .collect();
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=root_choice_states {place} {} in_flight_limit={} above_newest_root_max={} above_chosen_root_max={} confirmed_publishes_max={} largest_counter={} slot_reading_witness={}",
         counter_fields.join(" "),
         domain.ring().local_in_flight_limit(),
@@ -12619,35 +12646,35 @@ fn emit_the_rows_of_a_root_choice_cell(
     ));
     let mut violations_row =
         |criterion: RootChoiceCriterion, violations: RootChoiceCounter, judged: u64| {
-            emitter.result(&format!(
+            emitter.emit_result_line(&format!(
                 "name=violations {place} criterion={} violations={} judged={judged} witness={}",
                 criterion.label(),
-                tally.get(violations),
+                tally.count_of(violations),
                 tally.witness(violations)
             ));
         };
     violations_row(
         RootChoiceCriterion::Kj0Defined,
         RootChoiceCounter::Kj0Violations,
-        tally.get(RootChoiceCounter::States),
+        tally.count_of(RootChoiceCounter::States),
     );
     if domain.is_a_legal_history() {
         violations_row(
             RootChoiceCriterion::Kj1NotEarlierThanTheLastConfirmedPublish,
             RootChoiceCounter::Kj1Violations,
-            tally.get(RootChoiceCounter::Kj1Judged),
+            tally.count_of(RootChoiceCounter::Kj1Judged),
         );
     }
     violations_row(
         RootChoiceCriterion::Kj2NotEarlierThanAnySelfVerifiedRoot,
         RootChoiceCounter::Kj2Violations,
-        tally.get(RootChoiceCounter::Kj2Judged),
+        tally.count_of(RootChoiceCounter::Kj2Judged),
     );
     if domain.is_a_legal_history() {
         violations_row(
             RootChoiceCriterion::Kj3LandsOnTheIdealRecovery,
             RootChoiceCounter::Kj3Violations,
-            tally.get(RootChoiceCounter::Kj3Judged),
+            tally.count_of(RootChoiceCounter::Kj3Judged),
         );
     }
 }
@@ -12668,10 +12695,10 @@ fn emit_the_verdict_of_a_root_choice_domain(
         .unwrap_or(0);
     // 登记作废条款 TV10：域是空的（合法历史三个域合起来没有一个已确认的态，KJ1 一态都没判；KA 上同 txg 不同实例同在为 0）。
     let domain_is_nonempty = if domain.is_a_legal_history() {
-        total.get(RootChoiceCounter::ConfirmedStates) > 0
+        total.count_of(RootChoiceCounter::ConfirmedStates) > 0
     } else {
-        total.get(RootChoiceCounter::SameTxgDifferentInstanceRoots) > 0
-            && total.get(RootChoiceCounter::HigherInstanceLowerTxgRoots) > 0
+        total.count_of(RootChoiceCounter::SameTxgDifferentInstanceRoots) > 0
+            && total.count_of(RootChoiceCounter::HigherInstanceLowerTxgRoots) > 0
     };
     if !domain_is_nonempty {
         findings.void_conditions.push(format!(
@@ -12680,45 +12707,45 @@ fn emit_the_verdict_of_a_root_choice_domain(
         ));
     }
     // 登记停机条款 TH4：读槽对拍不一致，不当 KJ 的违例记。
-    if total.get(RootChoiceCounter::SlotReadingsDifferingFromTheTruth) > 0 {
+    if total.count_of(RootChoiceCounter::SlotReadingsDifferingFromTheTruth) > 0 {
         findings.halt_conditions.push(format!(
             "TH4 {} 域里 read_root_ring_slot 交回的与生成时的真相不同的槽数 {}（见证 {}）",
             domain.label(),
-            total.get(RootChoiceCounter::SlotReadingsDifferingFromTheTruth),
+            total.count_of(RootChoiceCounter::SlotReadingsDifferingFromTheTruth),
             total.witness(RootChoiceCounter::SlotReadingsDifferingFromTheTruth)
         ));
     }
     // 登记第七节甲类、失败条款 TF9：合法历史三个域里今天的 choose_root 交回空、replay_journal 报错的态数是 0。
     if domain.is_a_legal_history()
-        && total.get(RootChoiceCounter::ChoseNothingStates)
-            + total.get(RootChoiceCounter::ReplayFailedStates)
+        && total.count_of(RootChoiceCounter::ChoseNothingStates)
+            + total.count_of(RootChoiceCounter::ReplayFailedStates)
             > 0
     {
         findings.halt_conditions.push(format!(
             "TF9 {} 域里 choose_root 交回空的态数 {}、replay_journal 报错的态数 {}（登记第七节甲类锚点都是 0）",
             domain.label(),
-            total.get(RootChoiceCounter::ChoseNothingStates),
-            total.get(RootChoiceCounter::ReplayFailedStates)
+            total.count_of(RootChoiceCounter::ChoseNothingStates),
+            total.count_of(RootChoiceCounter::ReplayFailedStates)
         ));
     }
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=verdict domain={} ring_slots={} slots_per_region={} largest_mounts={largest_mounts} largest_user_publishes={largest_user_publishes} criteria=root_choice states={} confirmed_states={} kj0_violations={} panicked={} choose_root_returned_none={} replay_failed={} kj1_violations={} kj1_judged={} kj2_violations={} kj2_judged={} kj3_violations={} kj3_judged={} slot_readings_differing_from_the_truth={} domain_is_nonempty={domain_is_nonempty}",
         domain.label(),
         domain.ring().ring_slots,
         domain.slots_per_region(),
-        total.get(RootChoiceCounter::States),
-        total.get(RootChoiceCounter::ConfirmedStates),
-        total.get(RootChoiceCounter::Kj0Violations),
-        total.get(RootChoiceCounter::PanickedStates),
-        total.get(RootChoiceCounter::ChoseNothingStates),
-        total.get(RootChoiceCounter::ReplayFailedStates),
-        total.get(RootChoiceCounter::Kj1Violations),
-        total.get(RootChoiceCounter::Kj1Judged),
-        total.get(RootChoiceCounter::Kj2Violations),
-        total.get(RootChoiceCounter::Kj2Judged),
-        total.get(RootChoiceCounter::Kj3Violations),
-        total.get(RootChoiceCounter::Kj3Judged),
-        total.get(RootChoiceCounter::SlotReadingsDifferingFromTheTruth),
+        total.count_of(RootChoiceCounter::States),
+        total.count_of(RootChoiceCounter::ConfirmedStates),
+        total.count_of(RootChoiceCounter::Kj0Violations),
+        total.count_of(RootChoiceCounter::PanickedStates),
+        total.count_of(RootChoiceCounter::ChoseNothingStates),
+        total.count_of(RootChoiceCounter::ReplayFailedStates),
+        total.count_of(RootChoiceCounter::Kj1Violations),
+        total.count_of(RootChoiceCounter::Kj1Judged),
+        total.count_of(RootChoiceCounter::Kj2Violations),
+        total.count_of(RootChoiceCounter::Kj2Judged),
+        total.count_of(RootChoiceCounter::Kj3Violations),
+        total.count_of(RootChoiceCounter::Kj3Judged),
+        total.count_of(RootChoiceCounter::SlotReadingsDifferingFromTheTruth),
     ));
 }
 
@@ -12829,7 +12856,7 @@ fn run_the_root_choice_family(arguments: &[String], run_profile: RunProfile) {
             )
         })
         .collect();
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=config experiment=E165 bounds={} family={ROOT_CHOICE_FAMILY_LABEL} only={} max_u={} root_slot_bytes={ROOT_CHOICE_ROOT_SLOT_BYTES} region_devices=0,1,0 slots_per_region_wide={ROOT_CHOICE_SLOTS_PER_REGION_WIDE} slots_per_region_narrow={ROOT_CHOICE_SLOTS_PER_REGION_NARROW}{}",
         selection.bounds.label(),
         selection
@@ -12844,12 +12871,12 @@ fn run_the_root_choice_family(arguments: &[String], run_profile: RunProfile) {
 
     // ① 常量回比断言（不过当场 panic，进程以非 0 退出，一行结果都不算）。
     cross_check_root_choice_local_constants_against_the_implementation();
-    emitter.result(
+    emitter.emit_result_line(
         "name=self_check check=root_choice_local_constants_equal_the_implementation passed=true",
     );
     let self_checks_passed = 1;
     for ring in [RingGeometry::BIG, RingGeometry::SMALL_NINE] {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=in_flight_limit ring_slots={} local={} implementation={}",
             ring.ring_slots,
             ring.local_in_flight_limit(),
@@ -12861,7 +12888,7 @@ fn run_the_root_choice_family(arguments: &[String], run_profile: RunProfile) {
     let controls_started = Instant::now();
     let control_readings = root_choice_control_readings(&selected_cells, thread_count);
     for reading in &control_readings {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=control criterion={} measured={} value={} must_see={} red_as_required={}",
             reading.criterion.label(),
             reading.measured_where.replace(' ', ","),
@@ -12900,12 +12927,12 @@ fn run_the_root_choice_family(arguments: &[String], run_profile: RunProfile) {
                 assert_the_pinned_root_choice_cell(*domain, *cell, &tally);
             } else {
                 assert_eq!(
-                    tally.get(RootChoiceCounter::States),
+                    tally.count_of(RootChoiceCounter::States),
                     PINNED_ROOT_CHOICE_ADVERSARIAL_STATES,
                     "TV4：KA 状态数"
                 );
                 assert_eq!(
-                    tally.get(RootChoiceCounter::StatesWithoutASelfVerifiedRoot),
+                    tally.count_of(RootChoiceCounter::StatesWithoutASelfVerifiedRoot),
                     1,
                     "TV4：KA 里根环全空的态数（登记第七节乙类 KA：没有一条自证过的根的 1 态）"
                 );
@@ -12916,12 +12943,12 @@ fn run_the_root_choice_family(arguments: &[String], run_profile: RunProfile) {
                 domain.label(),
                 cell.mounts,
                 cell.user_publishes,
-                tally.get(RootChoiceCounter::States),
+                tally.count_of(RootChoiceCounter::States),
                 cell_started.elapsed().as_secs_f64()
             );
             domain_total.merge(&tally);
         }
-        total_states += domain_total.get(RootChoiceCounter::States);
+        total_states += domain_total.count_of(RootChoiceCounter::States);
         emit_the_verdict_of_a_root_choice_domain(
             &mut emitter,
             &mut findings,
@@ -12932,18 +12959,18 @@ fn run_the_root_choice_family(arguments: &[String], run_profile: RunProfile) {
     }
 
     for condition in &findings.void_conditions {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=void condition={}",
             condition.replace(' ', "_")
         ));
     }
     for condition in &findings.halt_conditions {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=halt condition={}",
             condition.replace(' ', "_")
         ));
     }
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=verdict scope=run bounds={} family={ROOT_CHOICE_FAMILY_LABEL} states={total_states} self_checks_passed={self_checks_passed} control_readings={} controls_not_red={} void_conditions={} halt_conditions={}{}",
         selection.bounds.label(),
         control_readings.len(),
@@ -16530,7 +16557,7 @@ fn emit_the_rows_of_a_fault_cell(
     tally: &FaultTally,
 ) {
     let place = fault_place_of(domain, cell);
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=root_choice_fault_states {place} histories={} histories_with_an_uncovered_fault={} judged_states={} confirmed_states={} refused_mounts={} reread_mounts={} states_with_a_torn_system_slot={} same_txg_different_instance_roots={} higher_instance_lower_txg_roots={} states_without_a_readable_root={} above_newest_root_max={} in_flight_limit={} ideal_loss_by_limit={} ideal_loss_covered_other={} ideal_loss_uncovered={} promised_states={} confirmed_publishes_max={} largest_counter={} panicked={} choose_root_returned_none_with_a_readable_root={} choose_root_returned_none_without_a_readable_root={} replay_failed={} replay_applied={} kj1_and_kj1t_differing_states={} kj1_and_kj1t_differing_witness={} slot_readings_checked={} slot_readings_differing_from_the_truth={} slot_reading_witness={}",
         tally.histories,
         tally.histories_with_an_uncovered_fault,
@@ -16575,7 +16602,7 @@ fn emit_the_rows_of_a_fault_cell(
             )
         })
         .collect();
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=fake_outcomes {place} local_rules_kj1_kj1t_kj2:{} kf2_kj1_kj1t_kj2_kj3={}/{}/{}/{} kf4_kj1_kj1t={}/{} kf4_states_without_a_root_off_the_confirmed_chain={}",
         local_rule_fields.join(","),
         tally.kf2[0],
@@ -16590,7 +16617,7 @@ fn emit_the_rows_of_a_fault_cell(
     if cell.mounts == 2 {
         for (menu_index, label) in MOUNT_FAULT_MENU_LABELS.iter().enumerate() {
             let count = tally.mount_two[menu_index];
-            emitter.result(&format!(
+            emitter.emit_result_line(&format!(
                 "name=mount_two_fault {place} mount_two_fault={label} histories={} refused={} reread={}",
                 count.histories, count.refused, count.reread
             ));
@@ -16613,7 +16640,7 @@ fn emit_the_split_and_promised_rows(emitter: &mut Emitter, place: &str, tally: &
                 } else {
                     "not_applicable".to_string()
                 };
-                emitter.result(&format!(
+                emitter.emit_result_line(&format!(
                     "name=violations {place} judged_fault={} history={} criterion={} states={} confirmed_states={} cut_by_the_limit_states={} judged={} violations={} cut_by_the_limit_violations={} ideal_clause_violations={ideal_violations} witness={}",
                     judged_fault.label(),
                     if history_is_covered { "inside_the_promise" } else { "outside_the_promise" },
@@ -16630,7 +16657,7 @@ fn emit_the_split_and_promised_rows(emitter: &mut Emitter, place: &str, tally: &
         }
     }
     for (position, criterion_index) in [KJ1_INDEX, KJ1T_INDEX].into_iter().enumerate() {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=promised {place} criterion={} promised_states={} violations={} violations_from_the_split_rows={} witness={}",
             FaultCriterion::ALL[criterion_index].label(),
             tally.promised_states,
@@ -16698,7 +16725,7 @@ fn emit_the_verdict_of_a_fault_domain(
             total.replay_failed_states
         ));
     }
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=verdict domain={} ring_slots={} slots_per_region={} largest_mounts={largest_mounts} largest_user_publishes={largest_user_publishes} bounds={} criteria=root_choice_faults histories={} states={} confirmed_states={} kj0_violations={} panicked={} choose_root_returned_none_with_a_readable_root={} replay_failed={} kj1_violations={} kj1_judged={} kj1t_violations={} kj1t_judged={} kj2_violations={} kj2_judged={} kj3_violations={} kj3_judged={} promised_states={} promised_kj1_violations={} promised_kj1t_violations={} promised_rows_equal_the_split_rows={promised_rows_equal_the_split_rows} kj1_and_kj1t_differing_states={} slot_readings_differing_from_the_truth={} domain_is_nonempty={domain_is_nonempty}",
         domain.label(),
         domain.geometry().ring().ring_slots,
@@ -16867,7 +16894,7 @@ fn emit_the_control_rows(
     readings: &[FaultControlReading],
 ) {
     for reading in readings {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=control criterion={} measured={} value={} must_see={} red_as_required={}",
             reading.criterion.label(),
             reading.measured_where.replace(' ', ","),
@@ -17081,7 +17108,7 @@ fn emit_the_self_proofs(
         ));
     }
     for (item, passed, detail) in &proofs {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=self_proof item={item} passed={passed} detail={detail}"
         ));
         if !passed {
@@ -17091,7 +17118,7 @@ fn emit_the_self_proofs(
         }
     }
     if witnesses.kg_was_run {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=c331_proof domain=KG local_today_kj1t_without_a_judged_fault={} pinned={PINNED_KG_TODAY_KJ1T_WITHOUT_A_JUDGED_FAULT} implementation_kj1t_without_a_judged_fault={} implementation_kj3_without_a_judged_fault={}",
             witnesses.kg_local_today_kj1t_without_a_judged_fault,
             witnesses.kg_implementation_kj1t_without_a_judged_fault,
@@ -17124,12 +17151,12 @@ fn run_the_adversarial_domain_of_the_faults_family(
     let tally =
         root_choice_tally_of_the_adversarial_root_rings(RootChoiceImplementation::TodayThreeSteps);
     assert_eq!(
-        tally.get(RootChoiceCounter::States),
+        tally.count_of(RootChoiceCounter::States),
         PINNED_ROOT_CHOICE_ADVERSARIAL_STATES,
         "TV4：KA 状态数"
     );
     assert_eq!(
-        tally.get(RootChoiceCounter::StatesWithoutASelfVerifiedRoot),
+        tally.count_of(RootChoiceCounter::StatesWithoutASelfVerifiedRoot),
         1,
         "TV4：KA 里根环全空的态数（登记第七节乙类 KA：没有一条自证过的根的 1 态）"
     );
@@ -17138,7 +17165,7 @@ fn run_the_adversarial_domain_of_the_faults_family(
     emit_the_control_rows(emitter, findings, &readings);
     control_readings.extend(readings);
     emit_the_verdict_of_a_root_choice_domain(emitter, findings, geometry, &[cell], &tally);
-    tally.get(RootChoiceCounter::States)
+    tally.count_of(RootChoiceCounter::States)
 }
 
 fn run_the_root_choice_faults_family(arguments: &[String]) {
@@ -17175,7 +17202,7 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
             )
         })
         .collect();
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=config experiment=E165 bounds={} family={FAULT_FAMILY_LABEL} only={} max_u={} root_slot_bytes={ROOT_CHOICE_ROOT_SLOT_BYTES} region_devices=0,1,0 system_slots_per_device={FAULT_SYSTEM_SLOTS_PER_DEVICE} witness_gate={} profile=r4",
         selection.bounds.label(),
         selection
@@ -17189,12 +17216,12 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
     ));
     // ① 常量回比断言（不过当场 panic，进程以非 0 退出，一行结果都不算）。
     cross_check_root_choice_fault_local_constants_against_the_implementation();
-    emitter.result(
+    emitter.emit_result_line(
         "name=self_check check=root_choice_fault_local_constants_equal_the_implementation passed=true",
     );
     let self_checks_passed = 1;
     for ring in [RingGeometry::BIG, RingGeometry::SMALL_NINE] {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=in_flight_limit ring_slots={} local={} implementation={}",
             ring.ring_slots,
             ring.local_in_flight_limit(),
@@ -17249,7 +17276,7 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
             match selection.witness_gate_rule {
                 WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => {}
                 WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
-                    emitter.result(&refusal_row_of_a_fault_cell(*domain, *cell, &tally));
+                    emitter.emit_result_line(&refusal_row_of_a_fault_cell(*domain, *cell, &tally));
                 }
             }
             if *domain == FaultDomain::GateOn && cell.mounts == 2 {
@@ -17331,18 +17358,18 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
         selection.witness_gate_rule,
     );
     for condition in &findings.void_conditions {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=void condition={}",
             condition.replace(' ', "_")
         ));
     }
     for condition in &findings.halt_conditions {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=halt condition={}",
             condition.replace(' ', "_")
         ));
     }
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=verdict scope=run bounds={} family={FAULT_FAMILY_LABEL} states={total_states} self_checks_passed={self_checks_passed} control_readings={} controls_not_red={} void_conditions={} halt_conditions={} profile=r4{}",
         selection.bounds.label(),
         control_readings.len(),
@@ -17723,7 +17750,7 @@ fn main() {
     let run_started = Instant::now();
     let mut emitter = Emitter { emitted: 0 };
     let mut findings = RunFindings::default();
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=config experiment=E165 bounds={} family={} only={} max_n={} chosen_instance={CHOSEN_INSTANCE} first_txg={ORDINARY_FIRST_TXG} big_ring_slots={BIG_RING_SLOTS} big_ring_first_counter={BIG_RING_FIRST_HISTORY_COUNTER} small_ring_slots={SMALL_RING_SIX_SLOTS},{SMALL_RING_NINE_SLOTS}{}",
         selection.bounds.label(),
         selection.family_label,
@@ -17766,14 +17793,14 @@ fn main() {
         .chain(self_checks_of_the_record_table_knobs)
     {
         check();
-        emitter.result(&format!("name=self_check check={check_name} passed=true"));
+        emitter.emit_result_line(&format!("name=self_check check={check_name} passed=true"));
     }
     for ring in [
         RingGeometry::BIG,
         RingGeometry::SMALL_NINE,
         RingGeometry::SMALL_SIX,
     ] {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=in_flight_limit ring_slots={} local={} implementation={}",
             ring.ring_slots,
             ring.local_in_flight_limit(),
@@ -17786,7 +17813,7 @@ fn main() {
     let control_readings =
         positive_control_readings(&selection.families, run_profile, thread_count);
     for reading in &control_readings {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=control criterion={} measured={} value={} must_see={} red_as_required={}",
             reading.criterion.label(),
             reading.measured_where,
@@ -17857,7 +17884,7 @@ fn main() {
             // 登记 r2 第七节甲类、SF9：每条记录在每块盘上都落了的那一态扫盘表的条数断言要真跑到过（一个都没跑到，这条断言是空的）。
             if run_profile.table_source != RecordTableSource::Direct
                 && domain.family() != Family::Adversarial
-                && tally.get(Counter::FullyLandedScanTableSizeChecked) == 0
+                && tally.count_of(Counter::FullyLandedScanTableSizeChecked) == 0
             {
                 findings.halt_conditions.push(format!(
                     "SF9 {} 域 N = {size} 没有一个「每条记录在每块盘上都落了」的态被断言过扫盘表的条数",
@@ -17866,25 +17893,25 @@ fn main() {
             }
             // 登记 r2 作废条款 SV6：两种建表法的表相同、判出来的行却不同（同一张表同一套判据不该有两种结局）。
             if run_profile.compares_the_two_record_tables()
-                && tally.get(Counter::TablesDiffer) == 0
-                && tally.get(Counter::RowsDiffer) > 0
+                && tally.count_of(Counter::TablesDiffer) == 0
+                && tally.count_of(Counter::RowsDiffer) > 0
             {
                 findings.void_conditions.push(format!(
                     "SV6 {} 域 N = {size} 两种建表法的表逐态相同、判出来的行却有 {} 个态不同",
                     domain.label(),
-                    tally.get(Counter::RowsDiffer)
+                    tally.count_of(Counter::RowsDiffer)
                 ));
             }
             emit_the_rows_of_a_domain_size(&mut emitter, *domain, size, &tally, run_profile);
             println!(
                 "E7TIMING name=elapsed scope=domain domain={} n={size} states={} elapsed_seconds={:.3} threads={thread_count}",
                 domain.label(),
-                tally.get(Counter::States),
+                tally.count_of(Counter::States),
                 size_started.elapsed().as_secs_f64()
             );
             domain_total.merge(&tally);
         }
-        total_states += domain_total.get(Counter::States);
+        total_states += domain_total.count_of(Counter::States);
         emit_the_verdict_of_a_domain(
             &mut emitter,
             &mut findings,
@@ -17896,18 +17923,18 @@ fn main() {
     }
 
     for condition in &findings.void_conditions {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=void condition={}",
             condition.replace(' ', "_")
         ));
     }
     for condition in &findings.halt_conditions {
-        emitter.result(&format!(
+        emitter.emit_result_line(&format!(
             "name=halt condition={}",
             condition.replace(' ', "_")
         ));
     }
-    emitter.result(&format!(
+    emitter.emit_result_line(&format!(
         "name=verdict scope=run bounds={} family={} states={total_states} self_checks_passed={} control_readings={} controls_not_red={} void_conditions={} halt_conditions={}{}",
         selection.bounds.label(),
         selection.family_label,
@@ -18181,8 +18208,8 @@ mod tests {
                 );
                 assert_eq!(
                     (
-                        tally.get(Counter::TablesDiffer),
-                        tally.get(Counter::RowsDiffer)
+                        tally.count_of(Counter::TablesDiffer),
+                        tally.count_of(Counter::RowsDiffer)
                     ),
                     (0, 0),
                     "{} 域 N = {size}：两种建表法逐态相同",
@@ -18190,11 +18217,11 @@ mod tests {
                 );
                 if domain.family() != Family::Adversarial {
                     assert!(
-                        tally.get(Counter::FullyLandedScanTableSizeChecked) > 0,
+                        tally.count_of(Counter::FullyLandedScanTableSizeChecked) > 0,
                         "{} 域 N = {size}：全部落盘那一态的扫盘表条数断言要真跑到",
                         domain.label()
                     );
-                    assert!(tally.get(Counter::DirectTableHoldsARecord) > 0);
+                    assert!(tally.count_of(Counter::DirectTableHoldsARecord) > 0);
                 }
             }
         }
@@ -18216,7 +18243,7 @@ mod tests {
             1,
         );
         assert!(
-            tally.get(Counter::TablesDiffer) > 0,
+            tally.count_of(Counter::TablesDiffer) > 0,
             "R 域 N = 2：盘号升序一栏的直接表在残留所在那条记录 0 号盘那份落了的态上要与扫盘表不同"
         );
     }
@@ -18985,7 +19012,13 @@ mod tests {
             version(100, 2) > version(100, 1),
             "txg 相等时实例代号大的版本大"
         );
-        assert_eq!(version(7, 3), version(7, 3));
+        // txg 与实例都相等时两边谁也不比谁小：比较器的实例那一段写成非严格（相等也判小）时这里红，上面两条照绿。
+        let one_version = version(7, 3);
+        let the_same_version = version(7, 3);
+        assert!(
+            !(one_version < the_same_version) && !(the_same_version < one_version),
+            "txg 与实例都相等：谁也不比谁小"
+        );
     }
 
     #[test]
@@ -19130,12 +19163,12 @@ mod tests {
             );
             assert_the_pinned_root_choice_cell(domain, cell, &tally);
             assert_eq!(
-                tally.get(RootChoiceCounter::SlotReadingsDifferingFromTheTruth),
+                tally.count_of(RootChoiceCounter::SlotReadingsDifferingFromTheTruth),
                 0,
                 "读槽对拍与真相一致：{domain:?} {cell:?}"
             );
-            assert_eq!(tally.get(RootChoiceCounter::ChoseNothingStates), 0);
-            assert_eq!(tally.get(RootChoiceCounter::PanickedStates), 0);
+            assert_eq!(tally.count_of(RootChoiceCounter::ChoseNothingStates), 0);
+            assert_eq!(tally.count_of(RootChoiceCounter::PanickedStates), 0);
         }
     }
 
@@ -19152,19 +19185,19 @@ mod tests {
             1,
         );
         assert_eq!(
-            today.get(RootChoiceCounter::States),
+            today.count_of(RootChoiceCounter::States),
             PINNED_ROOT_CHOICE_ADVERSARIAL_STATES
         );
-        assert_eq!(today.get(RootChoiceCounter::ChoseNothingStates), 1);
-        assert_eq!(today.get(RootChoiceCounter::Kj0Violations), 1);
-        assert_eq!(today.get(RootChoiceCounter::Kj2Judged), 124);
-        assert_eq!(today.get(RootChoiceCounter::Kj2Violations), 0);
+        assert_eq!(today.count_of(RootChoiceCounter::ChoseNothingStates), 1);
+        assert_eq!(today.count_of(RootChoiceCounter::Kj0Violations), 1);
+        assert_eq!(today.count_of(RootChoiceCounter::Kj2Judged), 124);
+        assert_eq!(today.count_of(RootChoiceCounter::Kj2Violations), 0);
         assert_eq!(
-            today.get(RootChoiceCounter::SlotReadingsDifferingFromTheTruth),
+            today.count_of(RootChoiceCounter::SlotReadingsDifferingFromTheTruth),
             0
         );
-        assert!(today.get(RootChoiceCounter::SameTxgDifferentInstanceRoots) > 0);
-        assert!(today.get(RootChoiceCounter::HigherInstanceLowerTxgRoots) > 0);
+        assert!(today.count_of(RootChoiceCounter::SameTxgDifferentInstanceRoots) > 0);
+        assert!(today.count_of(RootChoiceCounter::HigherInstanceLowerTxgRoots) > 0);
     }
 
     /// 每条判据在每个被判的格上各有对照读数、都红；读数条数照格数逐条判据数（删掉某条判据的某一行对照，条数对不上）。
@@ -19756,7 +19789,7 @@ mod root_choice_fault_tests {
                     1,
                 );
                 assert!(
-                    tally.get(Counter::States) > 0,
+                    tally.count_of(Counter::States) > 0,
                     "{} 域 n = {size} 生成过",
                     domain.label()
                 );
@@ -19950,14 +19983,14 @@ mod root_choice_fault_tests {
                 Counter::J8WithoutASource,
             ] {
                 assert_eq!(
-                    tally.get(counter),
+                    tally.count_of(counter),
                     0,
                     "L 域 N = {size} 上 {} 是 0：{:?}",
                     counter.label(),
                     tally.witness(counter)
                 );
             }
-            judged_rebuilt_states += tally.get(Counter::J8aJudged);
+            judged_rebuilt_states += tally.count_of(Counter::J8aJudged);
         }
         assert!(
             judged_rebuilt_states > 0,
@@ -19988,9 +20021,9 @@ mod root_choice_fault_tests {
         let untouched = judge(&chosen_root);
         assert_eq!(
             (
-                untouched.get(Counter::J8cJudged),
-                untouched.get(Counter::J8cViolations),
-                untouched.get(Counter::J8bViolations)
+                untouched.count_of(Counter::J8cJudged),
+                untouched.count_of(Counter::J8cViolations),
+                untouched.count_of(Counter::J8bViolations)
             ),
             (1, 0, 0),
             "原样交回所选根：J8c 判到、不违例"
@@ -20001,9 +20034,9 @@ mod root_choice_fault_tests {
         let changed = judge(&changed_instance_table);
         assert_eq!(
             (
-                changed.get(Counter::J8cJudged),
-                changed.get(Counter::J8cViolations),
-                changed.get(Counter::J8aJudged)
+                changed.count_of(Counter::J8cJudged),
+                changed.count_of(Counter::J8cViolations),
+                changed.count_of(Counter::J8aJudged)
             ),
             (1, 1, 0),
             "一条没施加而实例表指针变了：J8c 记一条"
@@ -20013,9 +20046,9 @@ mod root_choice_fault_tests {
         let unsourced = judge(&without_a_source);
         assert_eq!(
             (
-                unsourced.get(Counter::J8WithoutASource),
-                unsourced.get(Counter::J8aJudged),
-                unsourced.get(Counter::J8cJudged)
+                unsourced.count_of(Counter::J8WithoutASource),
+                unsourced.count_of(Counter::J8aJudged),
+                unsourced.count_of(Counter::J8cJudged)
             ),
             (1, 0, 0),
             "投影不在生成器真相里：记无出处，J8a、J8c 都不判"

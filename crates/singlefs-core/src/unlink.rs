@@ -134,30 +134,6 @@ pub fn next_unlink_step(data_units_remaining: u64, batch_size: UnlinkBatchSize) 
     }
 }
 
-/// 从还剩 `data_units_remaining` 个数据单元起走到底的每一步，按先后：最后一步恒是 [`UnlinkStep::FinalBatch`]。
-#[must_use]
-pub fn every_unlink_step_from(
-    data_units_remaining: u64,
-    batch_size: UnlinkBatchSize,
-) -> Vec<UnlinkStep> {
-    let mut steps = Vec::new();
-    let mut remaining = data_units_remaining;
-    // 迭代上界：每一轮剩下的单元数至少少 1（批大小至少 1），⌈剩下 ÷ 批大小⌉ 轮之内走到最后一批。
-    loop {
-        let step = next_unlink_step(remaining, batch_size);
-        steps.push(step);
-        match step {
-            UnlinkStep::Batch {
-                data_units_kept, ..
-            } => {
-                assert!(data_units_kept < remaining, "每一批至少释放一个单元");
-                remaining = data_units_kept;
-            }
-            UnlinkStep::FinalBatch { .. } => return steps,
-        }
-    }
-}
-
 /// 删除的一批（[`UnlinkStep::Batch`]）之后 inode `inode` 那棵 extent 树：下段截到前 `data_units_kept` 个单元——
 /// 罩的单元全在留下那一段里的节点一个字节都不变、照抄；罩着被截掉那一段的，在新下段里只剩每层最右那一个（被截掉那一片下段叶与它的祖先），
 /// 它们重写；整个落在被截掉那一段里的节点不再出现、换下（K-R3-1：删除批只重写被截掉那一片下段叶与它的祖先）。
@@ -275,6 +251,29 @@ mod tests {
     use crate::transaction::FIRST_INODE_NUMBER;
 
     const PAYLOAD_IN_BYTES: u64 = 32634;
+
+    /// 从还剩 `data_units_remaining` 个数据单元起走到底的每一步，按先后：最后一步恒是 [`UnlinkStep::FinalBatch`]。
+    fn every_unlink_step_from(
+        data_units_remaining: u64,
+        batch_size: UnlinkBatchSize,
+    ) -> Vec<UnlinkStep> {
+        let mut steps = Vec::new();
+        let mut remaining = data_units_remaining;
+        // 迭代上界：每一轮剩下的单元数至少少 1（批大小至少 1），⌈剩下 ÷ 批大小⌉ 轮之内走到最后一批。
+        loop {
+            let step = next_unlink_step(remaining, batch_size);
+            steps.push(step);
+            match step {
+                UnlinkStep::Batch {
+                    data_units_kept, ..
+                } => {
+                    assert!(data_units_kept < remaining, "每一批至少释放一个单元");
+                    remaining = data_units_kept;
+                }
+                UnlinkStep::FinalBatch { .. } => return steps,
+            }
+        }
+    }
 
     fn capped(data_units: u64) -> UnlinkBatchSize {
         UnlinkBatchSize::CappedForTests(

@@ -1,0 +1,23 @@
+use fcore::{Device, Limit};
+pub struct Memory;
+impl Device for Memory {
+    fn read(&self) -> u32 {
+        7
+    }
+}
+pub struct Small;
+impl Limit for Small {
+    const LIMIT: u32 = 10;
+}
+pub struct Other;
+impl Device for Other {
+    fn read(&self) -> u32 {
+        8
+    }
+}
+pub struct Disk;
+impl Device for Disk {
+    fn read(&self) -> u32 {
+        9
+    }
+}

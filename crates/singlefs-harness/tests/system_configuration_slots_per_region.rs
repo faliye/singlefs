@@ -38,6 +38,10 @@ const SLOT_SPACING_IN_BYTES: u64 = 4096;
 /// 系统配置字段表（`.claude/kb/layout/01-first-txn.md` 一）里「每区槽数 S」那一字节的偏移：
 /// R 在 361、S 在 362。用例自己写死这个数，不从实现里取——取了的话，实现把 S 写到别处去这两条也跟着走。
 const SLOTS_PER_REGION_OFFSET_IN_THE_SLOT: usize = 362;
+/// 系统配置槽里区域数那一字节（`singlefs_checker::image::geometry_of` 读 `slot[361]`）。
+const REGIONS_OFFSET_IN_THE_SLOT: usize = 361;
+/// 系统配置槽里区域步长（4 字节）起的偏移，紧接着是区块字节（4 字节）：`geometry_of` 读 363、367。
+const PRIME_STEP_OFFSET_IN_THE_SLOT: usize = 363;
 /// 每盘两个系统配置槽的盘内偏移（D22（单元原子性怎么合成） 已定项 16：槽 0 在 0、槽 1 在槽距处）。
 const SYSTEM_CONFIGURATION_SLOT_OFFSETS: [u64; 2] = [0, SLOT_SPACING_IN_BYTES];
 
@@ -132,6 +136,63 @@ fn declare_slots_per_region_on_disk(
                 .expect("改完的槽写得回去");
         }
     }
+}
+
+/// 把两块盘每个系统配置槽里偏移 `offset_in_the_slot` 起的几个字节改成 `bytes`、重封槽校验和（槽自证照样过，几何那一步才拒）。
+fn declare_bytes_in_the_slot_on_disk(
+    devices: &mut [(DeviceIdentity, SparseBlockDevice)],
+    offset_in_the_slot: usize,
+    bytes: &[u8],
+) {
+    for (_, device) in devices.iter_mut() {
+        for offset in SYSTEM_CONFIGURATION_SLOT_OFFSETS {
+            let mut slot = read_slot(device, offset);
+            slot[offset_in_the_slot..offset_in_the_slot + bytes.len()].copy_from_slice(bytes);
+            let digest = wide_checksum_with_field_zeroed(
+                &slot,
+                usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096"),
+                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+            );
+            slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+                .copy_from_slice(&digest);
+            device
+                .write_at(DeviceOffsetInBytes(offset), &slot, WriteDurability::Plain)
+                .expect("改完的槽写得回去");
+        }
+    }
+}
+
+/// 区域数 R（偏移 361 那一字节）是 0：checker 拒这一槽，不交出几何——交出去择根按 R 取模、除，R = 0 除零（外部审阅 2026-10-16 报的）。
+#[test]
+fn the_pool_checker_refuses_a_slot_declaring_zero_regions() {
+    let (_, mut devices, _) = formatted_pool(8, 0);
+    declare_bytes_in_the_slot_on_disk(&mut devices, REGIONS_OFFSET_IN_THE_SLOT, &[0]);
+    let slot = read_slot(&devices[0].1, 0);
+    let view = check_system_configuration_slot(&slot).expect("这一槽自证得过");
+    assert_eq!(
+        geometry_of(&slot, &view).err(),
+        Some(Verdict::RegionCountZero),
+        "自述 0 个区域的槽拒掉，不按它算根环"
+    );
+}
+
+/// 区域步长与区块字节（偏移 363、367 各 4 字节）是盘上读来的数：都顶满时区域 1 起的根槽偏移装不进 u64，checker 拒这一槽，
+/// 不在 `root_slot_positions` 里乘加溢出（外部审阅 2026-10-16 报的）。
+#[test]
+fn the_pool_checker_refuses_a_slot_whose_root_ring_geometry_overflows_the_slot_offsets() {
+    let (_, mut devices, _) = formatted_pool(8, 0);
+    declare_bytes_in_the_slot_on_disk(
+        &mut devices,
+        PRIME_STEP_OFFSET_IN_THE_SLOT,
+        &[u32::MAX.to_le_bytes(), u32::MAX.to_le_bytes()].concat(),
+    );
+    let slot = read_slot(&devices[0].1, 0);
+    let view = check_system_configuration_slot(&slot).expect("这一槽自证得过");
+    assert_eq!(
+        geometry_of(&slot, &view).err(),
+        Some(Verdict::RootRingSlotOffsetOverflowsTheOffsetSpace),
+        "步长 × 区块字节 × 区域号装不进 u64 的槽拒掉"
+    );
 }
 
 /// 两块盘前 16 MiB（系统配置两槽 + 整条根环 + 一段余量）的字节：拒绝挂载那几格拿它比「盘上逐字节不变」。

@@ -250,7 +250,8 @@ fn tree_table_genesis_placement_at(unit_area_start: UnitAreaStart) -> Placement 
     }
 }
 
-/// 实例表 kind 1 链指针记录（88 字节）：kind 1 + flags 0 + 指向下一片的指针 86，第一片「无下一片」指针全 0。
+/// 实例表 kind 1 链指针记录（88 字节）：kind 1 + 有无下一片 1 + 指向下一片的指针 86（D18（块里携带什么信息） 已定项 11）；
+/// mkfs 写出的这一片「无下一片」（那一字节写 0）、指针全 0。
 #[must_use]
 pub fn instance_table_chain_record() -> Vec<u8> {
     let mut writer = ByteWriter::new(usize::try_from(INSTANCE_ROW_BYTES).expect("88"));

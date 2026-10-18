@@ -446,7 +446,7 @@ fn random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_ope
 /// 种子 [0, 48)、每段 30 步（代码三方第一轮判决第二节第 7 条）。2026-09-18 在 release 下量：第 121 行的变异施加之后，这组比重在种子
 /// [0, 6000) × 30 步上 799 个种子判出（13.3%），按 48 个种子一窗切 125 窗、每窗至少 2 个；门禁这一窗 [0, 48) 判出 7 个。
 /// 先判清单外的失败（变异下红在这一条），再核这一路真的跑到了：罩住别的已释放记录的起点、复用时跨度变了、抬 F 回收到落点——
-/// 这几个数不看罩住的那条删没删，变异下照样成立，门禁 59 号看到的红只会是分类判出来的。
+/// 这几个数不看罩住的那条删没删，变异下照样成立，门禁 checker-tier-crates-mutation-replay 看到的红只会是分类判出来的。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms() {
@@ -800,6 +800,35 @@ fn newest_root_on_the_image(image: &MemoryPool) -> ModelRootKey {
         checkpoint_txg: ModelCheckpointTxg(newest.checkpoint_txg),
         instance: ModelInstanceGeneration(u64::from(newest.instance)),
     }
+}
+
+/// 执行器每一步量模型写进根环几条根（`HistoryTally::most_roots_written_by_the_model_in_one_step`，断言不多于根环槽数；
+/// `IdealModel::committed_versions` 那一段注释）：从 mkfs 起可写挂载那一步写行与暖机两条（txg 1、2），第一个文件那一步一条（txg 3），
+/// 起点（只做过 mkfs）一条都不写，最多的那一步是两条。判别力：模型写根不计数时这里是 0；断言的界压到 1 时挂载那一步就停在断言上、历史跑不完。
+#[test]
+fn the_executor_measures_the_roots_the_model_writes_in_each_step_and_the_mount_writes_two() {
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterMakeFilesystem,
+        operations: vec![
+            HistoryOperation::CloseAndMountWritable,
+            HistoryOperation::PublishFirstFile(ContentChoice {
+                length: ContentLength::InsideOneDataUnit { selector: 2999 },
+                fill_seed: 3,
+            }),
+        ],
+    };
+    let run = execute_history_with(
+        &history,
+        HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
+        &SharedStream::new(),
+        &mut |_observation| {},
+    );
+    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
+    assert_eq!(
+        run.tally.most_roots_written_by_the_model_in_one_step, 2,
+        "可写挂载那一步写行与暖机两条根，是三步里最多的"
+    );
 }
 
 /// 分配记录条数按 checker 的解析从镜像上数（`allocation_records_on_the_image_under`，不看分配器）：一条记录记一个单元、每盘一条、
@@ -1209,10 +1238,11 @@ fn rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_th
 /// 第一个文件之后可写挂载一次（写行 txg 4、暖机 txg 5），同一次挂载里连着覆盖写 25 次（txg 6–30）。根环 R × S = 24 槽：txg 24、25、26
 /// 依次盖掉第 0 代根与两条暖机根，txg 26 盖掉之后再没有一条有效根引用 mkfs 的第 0 版树表单元（1 槽，txg 3 释放），它在这一次发布里
 /// 按谓词回收、记账按回收之后的数写——修之前它没回收、记账仍算已分配，checker 在这一步判 I-3.1 红（记账比遍历多 16384 字节）。
-/// 现在每一步之后 checker 都跑、都不红：起点、挂载、25 次覆盖写之后各一次。
+/// 现在这段历史跑完，起点、挂载、25 次覆盖写之后各交出一张镜像（这个二进制不调池级 checker；同一段历史带池级 checker 判、
+/// 挂载内回收那一槽由 `root_ring_turn_in_one_mount.rs` 的 `turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it`
+/// 与 checker 档同名用例判）。
 #[test]
-#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn turning_the_root_ring_with_overwrites_in_one_mount_runs_to_the_end_with_the_checker_green_after_every_step(
+fn turning_the_root_ring_with_overwrites_in_one_mount_runs_to_the_end_handing_out_an_image_after_every_step(
 ) {
     let overwrite = HistoryOperation::PublishOverwrite(ContentChoice {
         length: ContentLength::InsideOneDataUnit { selector: 2999 },
@@ -1229,7 +1259,7 @@ fn turning_the_root_ring_with_overwrites_in_one_mount_runs_to_the_end_with_the_c
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert_eq!(
         run.tally.step_images_handed_out, 27,
-        "起点、挂载、25 次覆盖写之后各跑一次 checker，一次都没红"
+        "起点、挂载、25 次覆盖写之后各交出一张镜像"
     );
 }
 
@@ -1237,10 +1267,12 @@ fn turning_the_root_ring_with_overwrites_in_one_mount_runs_to_the_end_with_the_c
 /// 之后跑完：同样 25 次覆盖写（txg 4–28），一次挂载都不做。txg 26 那次覆盖写（第 22 步）盖掉 txg 2 的暖机根，环里再没有一条有效根
 /// 引用 mkfs 的第 0 版树表单元（1 槽，第一个文件版本在 txg 3 换下），它在这一次发布里按谓词回收、记账按回收之后的数写——
 /// 不装那张表时它不回收、记账仍算已分配，checker 在这一步判 I-3.1 红（记账比遍历多 16384 字节）。
-/// 装了表，每一步之后 checker 都跑、都不红：起点与 25 次覆盖写之后各一次。
+/// 装了表，这段历史跑完、根环转过一圈，起点与 25 次覆盖写之后各交出一张镜像（这个二进制不调池级 checker；mkfs 那条会话里覆盖写
+/// 转过根环、按谓词回收、池级 checker 不红，由 `root_ring_turn_in_the_make_filesystem_session.rs` 的
+/// `overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant` 与 checker 档同名用例判，
+/// 覆盖写到 txg 30）。
 #[test]
-#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_the_end_with_the_checker_green_after_every_step(
+fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_the_end_handing_out_an_image_after_every_step(
 ) {
     let overwrite = HistoryOperation::PublishOverwrite(ContentChoice {
         length: ContentLength::InsideOneDataUnit { selector: 2999 },
@@ -1255,7 +1287,7 @@ fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
     assert_eq!(
         run.tally.step_images_handed_out, 26,
-        "起点与 25 次覆盖写之后各跑一次 checker，一次都没红"
+        "起点与 25 次覆盖写之后各交出一张镜像"
     );
     assert_eq!(
         run.tally.histories_that_turned_the_root_ring, 1,

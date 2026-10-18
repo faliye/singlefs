@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use common::{build_pool, file_content, geometry};
 use singlefs_checker_tier::crash_amplification::{CrashPointSpan, EnvironmentRun, GpuCardsSource};
 use singlefs_checker_tier::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER;
-use singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start;
+use singlefs_checker_tier::crash_library::DisposableLibraryDirectory;
 use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
     gpu_card_pool_or_report_not_run, not_run_line,
 };
@@ -87,30 +87,22 @@ fn record_new_pool_file_creation(tag: &str) -> RecordedFlow {
     }
 }
 
-/// 用例的目录（家目录下流水线单元测试那一类的长期库里以用例标签命名的一份，起跑先清空、跑完留着）：一份开了 GPU 的多机配置（单机）与一份库。
+/// 用例的目录（一次性目录：起跑是空的、用完删，长期库一行不写）：一份开了 GPU 的多机配置（单机）与一份库。
 /// 配置里的显卡先后照抄本机这一趟的
 /// （清场之下要清场之后那一份显卡先后：用例自己写上，`crash_amplification::card_priority_lines_of_the_caller`，抄的是调用方给这个进程的那一份）。
 struct GpuRunDirectory {
     configuration: PathBuf,
     library: PathBuf,
+    _directory: DisposableLibraryDirectory,
 }
 
 impl GpuRunDirectory {
     fn new(tag: &str) -> Self {
-        let directory = amplification_unit_tests_library_directory_emptied_at_the_start(&format!(
-            "booking-{tag}"
-        ))
-        .expect("流水线单元测试那一类里这条用例的目录");
+        let directory = DisposableLibraryDirectory::new(&format!("booking-{tag}"))
+            .expect("流水线单元测试那一类里这条用例的目录");
         let configuration = directory.join("multi-host-with-gpu.env");
-        let repository_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../Cargo.lock")
-            .canonicalize()
-            .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
-            .parent()
-            .expect("Cargo.lock 所在的目录就是仓根")
-            .to_path_buf();
         let cards = singlefs_checker_tier::crash_amplification::card_priority_lines_of_the_caller(
-            &repository_root,
+            &std::env::current_dir().expect("取得到这个进程的当前目录（多机配置从这里起找）"),
         )
         .expect("本机的多机配置读得了");
         std::fs::write(&configuration, format!("ENABLE_GPU=1\n{cards}"))
@@ -119,6 +111,7 @@ impl GpuRunDirectory {
         Self {
             configuration,
             library,
+            _directory: directory,
         }
     }
 }

@@ -1,4 +1,4 @@
-//! checker 档模块：crash、crash_state_enumeration、crash_point_replay_progress、crash_amplification
+//! checker 档模块：crash、crash_state_enumeration、crash_point_replay_progress、crash_library、crash_amplification
 //! 崩溃点重放放量的发现日志（里程碑「覆盖写、释放、回退与复用」收尾批「崩溃点重放发现日志」）：在新池新建文件流上（mkfs → 取号 → 暖机 → A，按甲二展开，
 //! 原地覆写取三态，46 个状态；C577 之前 54 个）把版本表故意写错——暖机第二次发布（实例 1、txg 2）下面说有文件、A（txg 3）的内容说成别的——
 //! 落在 txg 2 的状态报「有文件却报没有」，读出 A 的状态报「读回的内容不对」，两遍恢复（看 journal、不看 journal）各红几段。
@@ -11,7 +11,6 @@
 mod common;
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 use common::{build_pool, file_content, geometry};
 use singlefs_checker::image::InvariantVerdict;
@@ -24,6 +23,9 @@ use singlefs_checker_tier::crash::{
     CrashPointReplayTally, CrashPointReplayVersionTable, TearableInPlaceOverwrites,
 };
 use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
+use singlefs_checker_tier::crash_library::{
+    DisposableLibraryDirectory, CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+};
 use singlefs_checker_tier::crash_point_replay_progress::{
     unescaped_finding_text, CRASH_POINT_REPLAY_FINDINGS_FILE_ENVIRONMENT_VARIABLE,
 };
@@ -91,31 +93,35 @@ fn versions_claiming_a_warm_up_file_and_the_wrong_content() -> Vec<PublishedVers
     ]
 }
 
-/// 每个用例一个自己的目录（先清空）。
-fn fresh_directory(test_name: &str) -> PathBuf {
-    let directory = std::env::temp_dir().join(format!(
-        "singlefs-crash-enumeration-findings-{}-{test_name}",
-        std::process::id()
-    ));
-    if directory.exists() {
-        std::fs::remove_dir_all(&directory).expect("清空上一次留下的目录");
-    }
-    std::fs::create_dir_all(&directory).expect("建目录");
-    directory
+/// 每个用例一个自己的一次性库目录（`DisposableLibraryDirectory`：起跑是空的，丢掉时连同里面的库与发现日志只删这一份）。这几条用例要从空库起跑
+/// （用户 2026-10-15 定：空库起跑的单测只在一次性副本里建库，不碰长期库）：再跑那一条钉头一趟现判、第二趟照库里复用，观察者换版本那一条要
+/// 第二趟的观察者在库里一块都没有；几条用例同一条流、同一个项名，流的录入键只由流定，用一份库就会读到别的用例先录下的流，所以各用各的库。
+fn disposable_library_directory(test_name: &str) -> DisposableLibraryDirectory {
+    DisposableLibraryDirectory::new(&format!("crash-enumeration-findings-{test_name}"))
+        .expect("建得了一次性库目录")
 }
 
-/// 按甲二跑这一条流一遍（版本表故意写错），发现日志写到 `findings_log_path`（判段写一节定稿），挂上 `observers`（没有就空）。
-/// 同一个二进制里改进程环境的用例一条接一条跑（环境守卫里设发现日志那个变量）。只录、或配置开了 GPU 而没编进 gpu 特性（判段不跑）的那一趟交 `None`。
+/// 按甲二跑这一条流一遍（版本表故意写错），发现日志写到 `findings_log_path`（判段写一节定稿），库是 `library` 那一份一次性库，
+/// 挂上 `observers`（没有就空）。同一个二进制里改进程环境的用例一条接一条跑（环境守卫里设发现日志与库目录两个变量）。
+/// 只录、或配置开了 GPU 而没编进 gpu 特性（判段不跑）的那一趟交 `None`。
 fn enumerate_the_quick_tier_writing_the_findings_log(
     stream: &FirstStream,
     findings_log_path: &std::path::Path,
+    library: &DisposableLibraryDirectory,
     observers: &[CrashPointReplayObserver<'_>],
 ) -> Option<CrashPointReplayTally> {
     let versions = versions_claiming_a_warm_up_file_and_the_wrong_content();
-    let environment = CrashAmplificationEnvironment::cleared_then_set(&[(
-        CRASH_POINT_REPLAY_FINDINGS_FILE_ENVIRONMENT_VARIABLE,
-        findings_log_path.as_os_str(),
-    )]);
+    let library_directory = library.library();
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&[
+        (
+            CRASH_POINT_REPLAY_FINDINGS_FILE_ENVIRONMENT_VARIABLE,
+            findings_log_path.as_os_str(),
+        ),
+        (
+            CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+            library_directory.as_os_str(),
+        ),
+    ]);
     let tally = enumerate_crash_states_with_expansion(
         CrashPointReplayItem {
             name: ITEM_NAME,
@@ -135,9 +141,11 @@ fn enumerate_the_quick_tier_writing_the_findings_log(
 }
 
 /// 与判器分开写的逐状态重判，也走两段：这一条流（同一份故意写错的版本表、同样按甲二展开）经 CPU 取样那一路写进崩溃点重放枚举那一类的库、
-/// 判段从库里读回，每个状态的镜像都是读回的那一份，交 [`rejudge_state`] 重判（不在录入段的内存里判，乙报告验收 3 末尾）。只录那一趟交 `None`。
+/// 判段从库里读回，每个状态的镜像都是读回的那一份，交 [`rejudge_state`] 重判（不在录入段的内存里判，乙报告验收 3 末尾）。库是 `library`
+/// 那一份一次性库（环境守卫里设库目录）。只录那一趟交 `None`。
 fn rejudged_findings_of_the_states_read_back_from_the_library(
     stream: &FirstStream,
+    library: &DisposableLibraryDirectory,
 ) -> Option<RejudgedFindings> {
     let versions = versions_claiming_a_warm_up_file_and_the_wrong_content();
     let segment_and_publish = segment_and_publish_by_ordinal(stream);
@@ -147,6 +155,11 @@ fn rejudged_findings_of_the_states_read_back_from_the_library(
     );
     let mut rejudged = RejudgedFindings::default();
     let mut states_rejudged = 0u64;
+    let library_directory = library.library();
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&[(
+        CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+        library_directory.as_os_str(),
+    )]);
     let states_of_the_flow = sample_crash_states_on_the_cpu_against_the_version_table(
         CrashPointReplayItem {
             name: REJUDGED_ITEM_NAME,
@@ -169,7 +182,9 @@ fn rejudged_findings_of_the_states_read_back_from_the_library(
             );
         },
     )
-    .judged()?;
+    .judged();
+    drop(environment);
+    let states_of_the_flow = states_of_the_flow?;
     assert_eq!(states_of_the_flow, QUICK_TIER_STATES);
     assert_eq!(
         states_rejudged, QUICK_TIER_STATES,
@@ -538,14 +553,19 @@ fn begin_line(stream: &str) -> String {
 #[test]
 fn red_states_are_deduplicated_by_signature_and_the_findings_log_section_is_final() {
     let stream = first_stream("findings-dedupe");
-    let directory = fresh_directory("dedupe");
+    let directory = disposable_library_directory("dedupe");
     let findings_log_path = directory.join("findings.tsv");
-    let Some(tally) =
-        enumerate_the_quick_tier_writing_the_findings_log(&stream, &findings_log_path, &[])
-    else {
+    let Some(tally) = enumerate_the_quick_tier_writing_the_findings_log(
+        &stream,
+        &findings_log_path,
+        &directory,
+        &[],
+    ) else {
         return;
     };
-    let Some(rejudged) = rejudged_findings_of_the_states_read_back_from_the_library(&stream) else {
+    let Some(rejudged) =
+        rejudged_findings_of_the_states_read_back_from_the_library(&stream, &directory)
+    else {
         return;
     };
     assert_eq!(tally.states, QUICK_TIER_STATES);
@@ -599,22 +619,28 @@ fn red_states_are_deduplicated_by_signature_and_the_findings_log_section_is_fina
     assert_findings_match_the_rejudged(&tally.findings, &rejudged);
     let log_text = std::fs::read_to_string(&findings_log_path).expect("读发现日志");
     assert_final_section_matches_the_rejudged(&log_text, &rejudged, &begin_line(ITEM_NAME));
-    std::fs::remove_dir_all(&directory).ok();
+    drop(directory);
+}
+
+/// 观察者「每个状态数一次」（`count_each_state_once`）：只给每个状态记一次 `seen`。观察者的身份是这个 fn 的闭包键（入口登记在
+/// `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`）。
+fn count_each_state_once(
+    _ordinal: u64,
+    _image: &CrashImage<'_>,
+    _report: &RecoveryReport,
+    counts: &mut CrashPointReplayObserverCounts,
+) {
+    counts.add("seen", 1);
 }
 
 /// 同一条流再跑一遍：块与观察者的结论全照库里复用，计数逐项相同、发现日志那一节逐字节相同；两趟写进同一个文件是两节，前一节原样留着。
-/// 观察者两段（用户 2026-10-13 定）：录入段逐状态看、计数存进库，判段从库里读回；这个观察者的名字只有这一条用例用（同名的两个观察者在库里
-/// 是同一个，后跑的那条会复用先跑的那条录下的计数）。
+/// 观察者两段（用户 2026-10-13 定）：录入段逐状态看、计数存进库，判段从库里读回。从空库起跑（一次性库）：头一趟现判、现录，第二趟起照库里复用；
+/// 同名的观察者在别的用例里另有一份库，不在用例之间复用。
 #[test]
 fn the_findings_log_is_byte_identical_when_rerun_from_the_library() {
     let stream = first_stream("findings-rerun");
-    let directory = fresh_directory("rerun");
-    let observe = |_ordinal: u64,
-                   _image: &CrashImage<'_>,
-                   _report: &RecoveryReport,
-                   counts: &mut CrashPointReplayObserverCounts| {
-        counts.add("seen", 1);
-    };
+    let directory = disposable_library_directory("rerun");
+    let observe = count_each_state_once;
     let observers = [CrashPointReplayObserver {
         name: "count_each_state_once",
         // 这个观察者不另读流程输入：只给每个状态记一次（另读的输入摘要照一句说明取，不留全零）
@@ -622,15 +648,21 @@ fn the_findings_log_is_byte_identical_when_rerun_from_the_library() {
         observe: &observe,
     }];
     let first_path = directory.join("first.tsv");
-    let Some(first) =
-        enumerate_the_quick_tier_writing_the_findings_log(&stream, &first_path, &observers)
-    else {
+    let Some(first) = enumerate_the_quick_tier_writing_the_findings_log(
+        &stream,
+        &first_path,
+        &directory,
+        &observers,
+    ) else {
         return;
     };
     let second_path = directory.join("second.tsv");
-    let Some(second) =
-        enumerate_the_quick_tier_writing_the_findings_log(&stream, &second_path, &observers)
-    else {
+    let Some(second) = enumerate_the_quick_tier_writing_the_findings_log(
+        &stream,
+        &second_path,
+        &directory,
+        &observers,
+    ) else {
         return;
     };
     assert_eq!(second, first, "第二遍全照库里复用，计数逐项相同");
@@ -648,13 +680,75 @@ fn the_findings_log_is_byte_identical_when_rerun_from_the_library() {
     );
     // 两趟写进同一个文件是两节
     let both_path = directory.join("both.tsv");
-    let _ = enumerate_the_quick_tier_writing_the_findings_log(&stream, &both_path, &observers);
-    let _ = enumerate_the_quick_tier_writing_the_findings_log(&stream, &both_path, &observers);
+    let _ = enumerate_the_quick_tier_writing_the_findings_log(
+        &stream, &both_path, &directory, &observers,
+    );
+    let _ = enumerate_the_quick_tier_writing_the_findings_log(
+        &stream, &both_path, &directory, &observers,
+    );
     let both_text = std::fs::read_to_string(&both_path).expect("读两节的发现日志");
     assert_eq!(
         both_text,
         format!("{first_text}{first_text}"),
         "两节各是一份定稿，前一节原样留着"
     );
-    std::fs::remove_dir_all(&directory).ok();
+    drop(directory);
+}
+
+/// 录制复用时补录观察者：同一条流先挂观察者跑一趟入库，再把同一个观察者换一份另读的输入摘要（观察者的版本、它录入段的块的键都变了；
+/// 流没变，流的录入键只由流定、照样命中）再跑一趟。第二趟命中流的录制、录入那一段整段不跑，录入段在复用之前核这个观察者录入段的块都在库里，
+/// 缺的照录，判段读得回它的计数（每个状态一次），不报「录入段那一块不在库里」。从空库起跑（一次性库）：第二趟的观察者在库里一块都没有。
+/// 判别力（`crates/mutations.tsv`）：录制复用时不核观察者的块（补录那一段退回什么都不做），第二趟判段读不到这个观察者的块、整趟交错 panic，这条红。
+#[test]
+fn an_observer_whose_version_differs_from_the_one_recorded_with_the_flow_is_recorded_on_the_reused_recording_and_read_back_by_the_judge_stage(
+) {
+    let stream = first_stream("findings-observer-of-another-version");
+    let directory = disposable_library_directory("observer-of-another-version");
+    let observe = count_each_state_once;
+    let observers_recorded_with_the_flow = [CrashPointReplayObserver {
+        name: "count_each_state_once",
+        // 只给每个状态记一次，另读的输入摘要照一句说明取：两趟各取一句，观察者的版本因此不同
+        extra_inputs_digest: sha256_digest(b"the observer recorded together with the flow"),
+        observe: &observe,
+    }];
+    let observers_of_another_version = [CrashPointReplayObserver {
+        name: "count_each_state_once",
+        extra_inputs_digest: sha256_digest(b"the same observer under other extra inputs"),
+        observe: &observe,
+    }];
+    let Some(recorded_with_the_flow) = enumerate_the_quick_tier_writing_the_findings_log(
+        &stream,
+        &directory.join("recorded-with-the-flow.tsv"),
+        &directory,
+        &observers_recorded_with_the_flow,
+    ) else {
+        return;
+    };
+    assert_eq!(
+        recorded_with_the_flow.observer_counts.count_named("seen"),
+        QUICK_TIER_STATES,
+        "前提：头一趟录流时一起录了观察者，判段读回每个状态一次"
+    );
+    let Some(on_the_reused_recording) = enumerate_the_quick_tier_writing_the_findings_log(
+        &stream,
+        &directory.join("on-the-reused-recording.tsv"),
+        &directory,
+        &observers_of_another_version,
+    ) else {
+        return;
+    };
+    assert_eq!(
+        on_the_reused_recording.observer_counts.count_named("seen"),
+        QUICK_TIER_STATES,
+        "换了版本的观察者在复用的录制上照录，判段从库里读回它的计数：每个状态一次"
+    );
+    assert_eq!(
+        on_the_reused_recording.observed_states, QUICK_TIER_STATES,
+        "换了版本的观察者看过整条流的每个状态"
+    );
+    assert_eq!(
+        on_the_reused_recording.states, recorded_with_the_flow.states,
+        "两趟是同一条流"
+    );
+    drop(directory);
 }

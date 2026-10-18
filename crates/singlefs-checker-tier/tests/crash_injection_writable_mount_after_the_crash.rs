@@ -1,4 +1,4 @@
-//! checker 档模块：crash_point_replay_progress、crash_injection、crash_given_states、crash_library、crash_amplification
+//! checker 档模块：crash_point_replay_progress、crash_injection、crash_given_states、crash_amplification
 //! 代码审阅第 2 条（崩溃注入层补可写挂载）：崩溃注入在每个崩溃状态上，只读恢复与判定照旧之后，
 //! 在同一份崩溃后镜像上真的起一次可写挂载（取号、写行、暖机）、再发一次布、跑池级 checker；挂载途中再崩一次（二次崩溃），
 //! 取号、写行、暖机、续做各段各摆一个，每个二次崩溃状态上只读恢复、问模型、池级 checker、记录核对器。
@@ -15,7 +15,6 @@ use singlefs_checker_tier::crash_injection::{
     GivenStatesAfterTheFirstCrash, HistoryAfterTheMakeFilesystem,
     StateOfTheTableAfterTheWritableMount, WritableMountPhase,
 };
-use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::recovery::{recover, JournalPolicy};
@@ -31,20 +30,16 @@ use singlefs_harness::memory_pool::{
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::SharedStream;
 
-/// 这份测试文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
-const THIS_FILE: &str =
-    "crates/singlefs-checker-tier/tests/crash_injection_writable_mount_after_the_crash.rs";
-
 /// 给定状态表交崩溃点重放的引擎判：表与结论进家目录下给定状态表那一类的判定库（判过的复用），配了 GPU 且编进了 `gpu` 特性上卡、否则 CPU。
 fn given_states_engine(seeds_and_scale: &str) -> GivenStatesEngine {
     GivenStatesEngine::start_from_environment(
         GivenStatesItem {
-            item_name: "crash-injection-writable-mount-after-the-crash".to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale: seeds_and_scale.to_string(),
+            item_name: format!(
+                "crash-injection-writable-mount-after-the-crash::{}",
+                seeds_and_scale
+            ),
         },
         &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root_of_this_crate(),
     )
     .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
 }
@@ -325,7 +320,7 @@ fn the_record_checker_after_the_writable_mount_finds_a_history_root_overwritten_
     let mount_segments = vec![vec![0]];
     let version_landed_on_after_the_first_crash = recover(
         &CrashImage {
-            base: history_after_the_make_filesystem.base(),
+            base: history_after_the_make_filesystem.base_pool(),
             writes: history_after_the_make_filesystem.writes(),
             persisted: history_after_the_make_filesystem.persisted_set_of_the_table(&persisted),
         },

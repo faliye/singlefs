@@ -34,6 +34,7 @@ use crate::extent_tree::{
     extent_key_bytes, find_upper_leaf_entry, read_lower_segment, ExtentTreeHeaderJudgement,
     ExtentTreeReading, ExtentUpperLeafTarget,
 };
+use crate::inode_tree::INODE_KEY_WIDTH_IN_BYTES;
 use crate::pointer::{
     DataPointer, LocationEntry, NodePointer, PointerHeadFieldOutsideTheFirstVersion,
 };
@@ -58,14 +59,10 @@ use crate::unit::{
 };
 use crate::write_request_split::{data_unit_count_implied_by_the_file_size, DataUnitsOfTheInode};
 
-/// extent 叶记录 key 三段各 8 字节里 inode 那一段的起点（D8（核心索引结构） 已定项 3 的 (locality_id, inode, offset)）。
-const EXTENT_KEY_INODE_SEGMENT_OFFSET_IN_BYTES: usize = 8;
 /// extent 叶记录 key 第三段（offset 段，文件字节偏移，D8（核心索引结构） 已定项 3）的起点。
 const EXTENT_KEY_THIRD_SEGMENT_OFFSET_IN_BYTES: usize = 16;
 /// inode 树根的层级：根是内部节点，每条条目指一片码 3 叶容器（D8（核心索引结构） 已定项 6）。
 const INODE_TREE_ROOT_LEVEL: u8 = 1;
-/// inode 树 key 宽 8（`recovery::key_width_for_kind` 同一份登记）。
-const INODE_KEY_WIDTH_IN_BYTES: usize = 8;
 
 /// 读路径的运行时观测点：并行线二验收第 4 条要的两个数（这次读了几个单元、位置提示过期的多跳次数），
 /// 加上 D17（实现分层与第三方管道） 已定项 5 射程 ① 要的「这次 API 调用发了几个设备级操作」。
@@ -151,17 +148,6 @@ pub struct ExtentLeafRecordInMountState {
 }
 
 impl ExtentLeafRecordInMountState {
-    /// key 第二段：这条记录属于哪个 inode。
-    #[must_use]
-    pub fn inode_number(&self) -> InodeNumber {
-        InodeNumber(u64::from_le_bytes(
-            self.key[EXTENT_KEY_INODE_SEGMENT_OFFSET_IN_BYTES
-                ..EXTENT_KEY_INODE_SEGMENT_OFFSET_IN_BYTES + 8]
-                .try_into()
-                .expect("key 24 字节，第二段落在 [8, 16)"),
-        ))
-    }
-
     /// key 第三段：这条记录指的那个数据单元第一个字节在文件里的偏移（D8（核心索引结构） 已定项 3）。
     #[must_use]
     pub fn file_offset_in_bytes(&self) -> FileOffsetInBytes {
@@ -171,12 +157,6 @@ impl ExtentLeafRecordInMountState {
                 .try_into()
                 .expect("key 24 字节，第三段落在 [16, 24)"),
         ))
-    }
-
-    /// 这条记录指的那个数据单元的指针（位置条目是提示，D19（块指针的结构与宽度预算） 已定项 5）。
-    #[must_use]
-    pub const fn data_unit_pointer(&self) -> DataPointer {
-        self.data_unit_pointer
     }
 }
 
@@ -313,8 +293,17 @@ pub struct ExtentTreeReadsAtOpen {
     pub node_reads: u64,
     /// 这一路的高：上段的高加这个文件下段的高（内联时下段是 0）。
     pub height: u64,
-    /// 叶片数：读到的层级 0 的节点个数（上段那一片叶加下段的叶）。
+    /// 叶片数：读到的层级 0 的节点个数（上段那一片叶加下段的叶）。上段停在内部节点、一片叶都没读到时上段那一份是 0。
     pub leaves: u64,
+}
+
+/// 打开文件时上段那一趟读到了几片叶：上段停下时最后读的那个节点是层级 0（叶）就是 1，停在内部节点（中途没有孩子罩着这个 inode）是 0。
+/// `level_of_the_upper_node_read_last` 是上段停下时最后读的那个节点头里的层级。
+fn upper_leaves_read_at_open(level_of_the_upper_node_read_last: Option<u8>) -> u64 {
+    match level_of_the_upper_node_read_last {
+        Some(0) => 1,
+        Some(_) | None => 0,
+    }
 }
 
 /// 打开挂载态时读中央映射树读了几个节点（每个节点一次，不按位置条目数）与树高（根的层级加一）。
@@ -717,21 +706,30 @@ impl MountedPoolForRead {
             |mapping_key: &[u8]| Ok(self.central_mapping_lookup(mapping_key));
         let mut tree_node_stale_location_hint_hops: usize = 0;
         let mut node_reads: u64 = 0;
+        // 最近读到的那个节点头里的层级：上段那一趟走完时它说的是上段停在哪一层（0 是叶）。解不开的节点交 `None`，
+        // 那一趟随即在 `find_upper_leaf_entry` 里按解不开报错，用不到它。
+        let level_of_the_node_read_last: Cell<Option<u8>> = Cell::new(None);
         let mut read_node = |pointer: &NodePointer| {
             node_reads += 1;
-            read_mapped_tree_node_via_hint_then_central_mapping(
+            let bytes = read_mapped_tree_node_via_hint_then_central_mapping(
                 reader,
                 pointer,
                 MappedTreeNodeClass::IndexNode,
                 &central_mapping_locations_of_key,
                 &mut tree_node_stale_location_hint_hops,
-            )
+            )?;
+            level_of_the_node_read_last
+                .set(parse_index_node(&bytes).ok().map(|header| header.level));
+            Ok(bytes)
         };
         let (entry, upper_nodes_read) =
             find_upper_leaf_entry(&reading, &self.extent_tree_root, inode.0, &mut read_node)
                 .map_err(OpenFileFailure::ExtentTreeWalk)?;
-        // 上段每一层读一个节点（叶那一片在内），所以上段的高就是这一路读的上段节点数。
+        // 上段从根往下每一层读一个节点：走到叶时读的个数就是上段的高；中途某个内部节点没有孩子罩着这个 inode 时
+        // （`find_upper_leaf_entry` 交回 `None`）停在那一层、叶没读到，这里记的是这一路实际读过的层数，少于上段的高。
         let upper_height = upper_nodes_read;
+        // 上段这一趟读到叶没有：停下时最后读的那个节点是层级 0 才算读到一片（上段停在内部节点时不算）。
+        let upper_leaves = upper_leaves_read_at_open(level_of_the_node_read_last.get());
         let data_units_of_the_inode = match entry.map(|found| found.target) {
             None | Some(ExtentUpperLeafTarget::NoDataUnit) => DataUnitsOfTheInode::NoneWritten,
             Some(
@@ -770,7 +768,7 @@ impl MountedPoolForRead {
         let extent_tree_reads_at_open = ExtentTreeReadsAtOpen {
             node_reads,
             height: upper_height + lower_height,
-            leaves: 1 + lower_leaves,
+            leaves: upper_leaves + lower_leaves,
         };
         let payload_capacity = payload_capacity_in_bytes();
         let data_unit_records: Vec<ExtentLeafRecordInMountState> = data_pointers
@@ -870,12 +868,6 @@ impl OpenFileForRead<'_> {
     #[must_use]
     pub const fn tree_node_stale_location_hint_hops_at_open(&self) -> u64 {
         self.tree_node_stale_location_hint_hops_at_open
-    }
-
-    /// 这个文件按位次排好的数据单元记录（第 i 项是文件第 i 个数据单元）。
-    #[must_use]
-    pub fn data_unit_records(&self) -> &[ExtentLeafRecordInMountState] {
-        &self.data_unit_records
     }
 
     /// 这个文件有几个数据单元。
@@ -1230,6 +1222,159 @@ mod tests {
         assert_eq!(
             observation.stale_location_hint_hops_per_million_dereferences(),
             125_000
+        );
+    }
+
+    /// 两块盘同一个槽上是同一个节点的字节，别的位置都读不出：打开文件那一趟只读得到这一个节点。
+    struct TwoDevicesHoldingOneNode {
+        slot: SlotNumber,
+        node_bytes: Vec<u8>,
+    }
+
+    /// 两块盘各 4 GiB（与坏盘输入那一档的盘同宽）。
+    const DEVICE_BYTES_OF_THE_TWO_DEVICES: u64 = 4 << 30;
+
+    impl PoolReader for TwoDevicesHoldingOneNode {
+        fn device_identities(&self) -> Vec<DeviceIdentity> {
+            vec![DeviceIdentity(0), DeviceIdentity(1)]
+        }
+        fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
+            self.device_identities()
+                .contains(&device)
+                .then_some(DEVICE_BYTES_OF_THE_TWO_DEVICES)
+        }
+        fn read(
+            &self,
+            device: DeviceIdentity,
+            offset: crate::address::DeviceOffsetInBytes,
+            length: usize,
+        ) -> Option<Vec<u8>> {
+            (self.device_identities().contains(&device)
+                && offset == self.slot.to_device_offset()
+                && length == self.node_bytes.len())
+            .then(|| self.node_bytes.clone())
+        }
+        fn journal_record_offsets_hint(
+            &self,
+            _device: DeviceIdentity,
+            _ring_start: crate::address::DeviceOffsetInBytes,
+            _ring_bytes: u64,
+        ) -> Option<Vec<crate::address::DeviceOffsetInBytes>> {
+            unreachable!("打开文件那一趟只走 extent 树，不扫 journal 环")
+        }
+    }
+
+    /// `ExtentTreeReadsAtOpen::leaves` 只数真读到的叶：extent 上段的根是层级 1 的内部节点，只有罩着
+    /// inode 0–142 的那一片叶一个孩子；打开 inode 200（活着、size 0、没写过内容）时上段在根那一层就找不到罩着它的孩子、停在根，
+    /// 一片叶都没读——`leaves` 是 0，读了 1 个节点、这一路的高 1。改之前上段那一份恒记 1。
+    #[test]
+    fn opening_a_file_whose_upper_segment_stops_at_an_internal_node_counts_no_leaf() {
+        use crate::address::{CheckpointTxg, InstanceGeneration};
+        use crate::extent_tree::{
+            build_upper_internal_node, ExtentTreeNodeIdentity, ExtentUpperNodePosition,
+        };
+        use crate::pointer::{BirthSequence, PointerHead};
+        use crate::records::NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES;
+        use crate::root_record::UnmountMarker;
+
+        const EXTENT_TREE: TreeIdentifier = TreeIdentifier(65538);
+        const INODE_PAST_THE_FIRST_UPPER_LEAF: u64 = 200;
+        let filesystem_identifier = [7_u8; 16];
+        let instance = InstanceGeneration(1);
+        let birth_txg_of_the_extent_nodes = CheckpointTxg(3);
+        let upper_root_slot = SlotNumber(60_000);
+        let upper_root_birth_sequence = BirthSequence(4);
+        let pointer_head = PointerHead {
+            birth_tree: EXTENT_TREE,
+            birth_txg: birth_txg_of_the_extent_nodes,
+        };
+        let first_upper_leaf = ExtentUpperNodePosition { level: 0, index: 0 };
+        assert!(
+            first_upper_leaf.inode_range().1 < INODE_PAST_THE_FIRST_UPPER_LEAF,
+            "inode 200 不在最左那片上段叶罩的那一段里"
+        );
+        // 那片叶这一趟不读：它的指针只要解得开，位置与校验和随便。
+        let pointer_to_the_leaf_left_unread = NodePointer {
+            head: pointer_head,
+            locations: [DeviceIdentity(0), DeviceIdentity(1)].map(|device| LocationEntry {
+                device,
+                slot: SlotNumber(60_002),
+                unit_checksum: 0,
+            }),
+            instance,
+            birth_sequence: BirthSequence(3),
+        };
+        let upper_root_bytes = build_upper_internal_node(
+            &ExtentTreeNodeIdentity {
+                tree: EXTENT_TREE,
+                birth_txg: birth_txg_of_the_extent_nodes,
+                filesystem_identifier: &filesystem_identifier,
+                instance,
+            },
+            first_upper_leaf.parent(),
+            &[(first_upper_leaf, pointer_to_the_leaf_left_unread)],
+            upper_root_birth_sequence,
+        );
+        let extent_tree_root = NodePointer {
+            head: pointer_head,
+            locations: [DeviceIdentity(0), DeviceIdentity(1)].map(|device| LocationEntry {
+                device,
+                slot: upper_root_slot,
+                unit_checksum: crc32_castagnoli(&upper_root_bytes),
+            }),
+            instance,
+            birth_sequence: upper_root_birth_sequence,
+        };
+        let mounted = MountedPoolForRead {
+            root: RootRecord {
+                filesystem_identifier,
+                unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,
+                instance,
+                checkpoint_txg: CheckpointTxg(5),
+                tree_table: NodePointer::empty_root(),
+                tree_identifier_watermark: singlefs_format::TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+                rollback_floor: CheckpointTxg(0),
+                instance_table: NodePointer::empty_root(),
+                mapping_root: NodePointer::empty_root(),
+                allocation_record_tree_root: NodePointer::empty_root(),
+            },
+            filesystem_identifier_in_unit_headers: unit_filesystem_identifier(
+                &filesystem_identifier,
+            ),
+            extent_tree: EXTENT_TREE,
+            extent_tree_root,
+            inode_records: vec![InodeRecord {
+                inode: INODE_PAST_THE_FIRST_UPPER_LEAF,
+                object_birth: birth_txg_of_the_extent_nodes,
+                nlink: NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
+                size: 0,
+                change_count: 1,
+                write_time_seconds: 1_788_000_000,
+            }],
+            central_mapping_entries: Vec::new(),
+            central_mapping_tree_reads_at_open: CentralMappingTreeReadsAtOpen {
+                node_reads: 1,
+                height: 1,
+            },
+            observation_since_open: Cell::new(ReadPathObservation::default()),
+            tree_node_stale_location_hint_hops_at_open: 0,
+        };
+        let reader = TwoDevicesHoldingOneNode {
+            slot: upper_root_slot,
+            node_bytes: upper_root_bytes,
+        };
+        let file = mounted
+            .open_file(&reader, InodeNumber(INODE_PAST_THE_FIRST_UPPER_LEAF))
+            .expect("上段停在根、没有这个 inode 的条目：一个数据单元都没有，size 0 对得上");
+        assert_eq!(file.data_unit_count(), 0, "没写过内容");
+        assert_eq!(
+            file.extent_tree_reads_at_open(),
+            ExtentTreeReadsAtOpen {
+                node_reads: 1,
+                height: 1,
+                leaves: 0,
+            },
+            "上段停在层级 1 的根：读了它一个节点，一片叶都没读"
         );
     }
 }

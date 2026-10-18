@@ -188,7 +188,7 @@ fn main() {
         }
     };
 
-    // 绝对值断言（门禁 80 号）：4 GiB = 4 × 1024 × 1024 × 1024，独立算出的字面量，不从代码读回来。
+    // 绝对值断言（门禁 code-source-discipline 的 absolute-assertions 格）：4 GiB = 4 × 1024 × 1024 × 1024，独立算出的字面量，不从代码读回来。
     // 两边在编译期就定了，clippy 建议挪进 const 块（否则判「assertions_on_constants」）。
     const {
         assert!(

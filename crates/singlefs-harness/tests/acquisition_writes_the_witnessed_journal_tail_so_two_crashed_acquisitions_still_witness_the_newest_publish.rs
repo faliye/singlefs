@@ -344,7 +344,7 @@ fn the_first_acquisition_after_mkfs_still_writes_tail_zero_so_the_new_pool_file_
 /// 新池新建文件之后每块盘两槽：世代 4（暖机第二次，tail 2）、世代 5（新池新建文件，tail 3）。盘 `damaged_device` 世代 5 那一槽退回轮换之前
 /// （崩在新池新建文件那次轮换写完另一块盘、没写到这一块：这一槽还是世代 3 的内容，这里拿世代 4 那一槽改世代号为 3 重新编码写回，两槽都自证得过），
 /// 池里最大的 tail 3 只在另一块盘上读得出：第二次取号写进每块盘的 tail 都是 3——取整池的最大值，不是各盘自己的，也不是最小的。
-/// 不清零：C331（择根倒挂压过已确认的写） 取甲之后取号那一刻有一槽读不出就拒（见 `an_acquisition_refuses_a_device_that_lost_only_its_newest_slot`）。
+/// 不清零：清零那一槽是撕裂的另一形，取号把它重写成自证过的（`an_acquisition_rewrites_the_torn_newest_slot_of_a_device`），这里要的是两槽都自证得过、只差一次轮换。
 fn a_later_acquisition_writes_the_largest_tail_of_the_pool_while_one_device_lags_one_rotation(
     tag: &str,
     damaged_device: DeviceIdentity,

@@ -94,7 +94,10 @@
 //! 第59批 E14：I-1.8 第一句在一块盘上有几个数据单元的流上（三个数据单元的文件只改最后一个单元一份副本的载荷）、第二句一条 inode 叶两份副本
 //! 只差出生序号（同对象 key、同全序键的两组）的流，隔离豁免（I-3.11 的隔离的记录）豁免与不豁免各一条流，都整份比。
 //! harness 场景交出来的镜像上 GPU 建不出表的两形：基线里只剩盘 1 的槽 1 自证得过（判表照 CPU 择系统配置的找法取落点几何）、
-//! 池里少一块住着根环区域的盘（判表只在池里的盘上建落点）各一条流，取卡之前在 CPU 上核判表建得出，再整份比。
+//! 池里少一块住着根环区域的盘（判表只在池里的盘上建落点）各一条流，取卡之前在 CPU 上核判表建得出，再整份比（少一块盘那一条上
+//! 两边对 I-7.7 都报射程里一部分没判：根环槽读不全）。逐档读槽 1 读到带读者不收之值的槽（I-7.13）两形：槽距处本池的槽 1 照旧、
+//! 再远一档那一份带不收之值，与逐档读到的第一个自证得过的槽 1 带不收之值、更远一档有一份读者收的槽 1，各一条流，取卡之前核判表给逐档读到的那几处
+//! 建了系统配置落点，再整份比。
 #![cfg(all(feature = "verdict-store", feature = "gpu"))]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -136,24 +139,25 @@ use singlefs_checker_tier::crash_amplification::{
     CrashPointSpan, RecordedGivenStatesTable,
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
+use singlefs_checker_tier::crash_identity::{judging_units_key, JudgingUnits, SectorImage};
 use singlefs_checker_tier::crash_judge_dispatch::{
     mebibytes_a_judge_needs, states_per_scratch_lane, GpuCrashJudge, PackedJudgeTables,
     PackedJudgeTablesReadBack,
 };
 use singlefs_checker_tier::crash_judge_gpu::{
-    cross_check_words_of_cpu_judgement, cross_check_words_of_gpu_verdict, gpu_judge_digest,
-    pool_checker_judged_bits, pool_checker_violated_and_judged_bits, pool_checker_violated_bits,
-    verdict_bits, CrossCheckWords, JudgeKernelSources, POOL_CHECKER_JUDGED_FIRST_WORD,
-    POOL_CHECKER_JUDGED_WORDS, POOL_CHECKER_REACHED_WORD, POOL_CHECKER_UNDECIDABLE_WORD,
-    POOL_CHECKER_VIOLATED_BIT_CAPACITY, POOL_CHECKER_VIOLATED_FIRST_WORD,
-    POOL_CHECKER_VIOLATED_WORDS, VERDICT_WORDS,
+    cross_check_words_of_cpu_judgement, cross_check_words_of_gpu_verdict, pool_checker_judged_bits,
+    pool_checker_violated_and_judged_bits, pool_checker_violated_bits, verdict_bits,
+    CrossCheckWords, JudgeKernelSources, POOL_CHECKER_JUDGED_FIRST_WORD, POOL_CHECKER_JUDGED_WORDS,
+    POOL_CHECKER_REACHED_WORD, POOL_CHECKER_UNDECIDABLE_WORD, POOL_CHECKER_VIOLATED_BIT_CAPACITY,
+    POOL_CHECKER_VIOLATED_FIRST_WORD, POOL_CHECKER_VIOLATED_WORDS, VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{
     build_judge_tables, build_judge_tables_against_the_version_table, JudgeFlow, JudgeLocationKind,
     JudgeTables,
 };
 use singlefs_checker_tier::crash_library::{
-    judge_tables_through_the_pairing_library, StageOutcome,
+    judge_tables_through_the_pairing_library, pairing_conclusion_reused_or_judged,
+    toolchain_of_this_process, CrashLibrary, CrashLibraryClass, StageOutcome,
 };
 use singlefs_checker_tier::crash_state_enumeration::{
     sample_crash_states_on_the_cpu,
@@ -166,7 +170,7 @@ use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
     usable_cards_or_report_not_run, GpuCardPool, CARD_QUOTA_ENVIRONMENT_VARIABLE,
 };
 use singlefs_checker_tier::gpu_unit_checks::GpuCard;
-use singlefs_checker_tier::verdict_store::{JudgeVersion, VerdictStore};
+use singlefs_checker_tier::verdict_store::{JudgingUnitsFingerprint, VerdictStore};
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InodeNumber, InstanceGeneration};
 use singlefs_core::container_tree::{
     ContainerTreeCapacities, ContainerTreeNodeEntries, ContainerTreeNodeEntriesCappedForTests,
@@ -189,6 +193,7 @@ use singlefs_harness::heavy_threads::{
     own_variable_or_default_heavy_threads, registered_heavy_threads,
     THREAD_CAP_ENVIRONMENT_VARIABLE,
 };
+use singlefs_harness::hexadecimal::hexadecimal_text;
 use singlefs_harness::memory_pool::{
     writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion,
     PublishedVersionWithoutAFile, RetainedWrite, WrittenContents,
@@ -197,6 +202,7 @@ use singlefs_harness::numeric_environment_variable::{
     number_from_the_variable_value_panicking_when_unreadable, process_environment_variable,
 };
 use singlefs_harness::segments::StepKind;
+use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 use singlefs_harness::SharedStream;
 
 /// 崩溃点重放取样与崩溃点的设点文件：这份用例文件。
@@ -2270,6 +2276,187 @@ struct Comparison {
     checker_mismatches: Vec<String>,
 }
 
+/// [`Comparison`] 写进对拍结论库的字节（小端；集合与表先写条数，串先写字节数）：逐字段按定义的次序。
+impl Comparison {
+    fn to_bytes(&self) -> Vec<u8> {
+        fn put_u64(bytes: &mut Vec<u8>, value: u64) {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        fn put_length(bytes: &mut Vec<u8>, length: usize) {
+            put_u64(bytes, u64::try_from(length).expect("条数装得进 u64"));
+        }
+        fn put_text(bytes: &mut Vec<u8>, text: &str) {
+            put_length(bytes, text.len());
+            bytes.extend_from_slice(text.as_bytes());
+        }
+        let mut bytes = Vec::new();
+        for count in [
+            self.states,
+            self.cpu_red,
+            self.gpu_red,
+            self.cpu_checker_red,
+            self.gpu_checker_red,
+            self.recovery_mismatches,
+            self.cross_check_mismatches,
+        ] {
+            put_u64(&mut bytes, count);
+        }
+        for invariants in [
+            &self.cpu_checker_red_invariants,
+            &self.cpu_checker_held_invariants,
+        ] {
+            put_length(&mut bytes, invariants.len());
+            for invariant in invariants {
+                put_text(&mut bytes, invariant);
+            }
+        }
+        put_length(&mut bytes, self.cpu_checker_bits_of_each_state.len());
+        for bits in &self.cpu_checker_bits_of_each_state {
+            bytes.extend_from_slice(&bits.to_le_bytes());
+        }
+        for texts in [
+            &self.cpu_red_items_of_each_state,
+            &self.mismatches,
+            &self.checker_mismatches,
+        ] {
+            put_length(&mut bytes, texts.len());
+            for text in texts {
+                put_text(&mut bytes, text);
+            }
+        }
+        put_length(&mut bytes, self.gpu_words_of_each_state.len());
+        for words in &self.gpu_words_of_each_state {
+            for word in words {
+                bytes.extend_from_slice(&word.to_le_bytes());
+            }
+        }
+        put_length(
+            &mut bytes,
+            self.cpu_consulted_reported_root_of_each_state.len(),
+        );
+        for root in &self.cpu_consulted_reported_root_of_each_state {
+            match root {
+                Some((instance, checkpoint_txg)) => {
+                    bytes.push(1);
+                    bytes.extend_from_slice(&instance.to_le_bytes());
+                    put_u64(&mut bytes, *checkpoint_txg);
+                }
+                None => bytes.push(0),
+            }
+        }
+        put_length(&mut bytes, self.cpu_recovery_words_of_each_state.len());
+        for words in &self.cpu_recovery_words_of_each_state {
+            for word in words {
+                bytes.extend_from_slice(&word.to_le_bytes());
+            }
+        }
+        bytes
+    }
+
+    /// [`Self::to_bytes`] 的逆；字节不够、不变量名不在清单里、串不是 UTF-8、后面还剩字节都交 `None`。
+    fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        struct Reader<'bytes> {
+            rest: &'bytes [u8],
+        }
+        impl<'bytes> Reader<'bytes> {
+            fn take(&mut self, count: usize) -> Option<&'bytes [u8]> {
+                if self.rest.len() < count {
+                    return None;
+                }
+                let (taken, rest) = self.rest.split_at(count);
+                self.rest = rest;
+                Some(taken)
+            }
+            fn u32(&mut self) -> Option<u32> {
+                Some(u32::from_le_bytes(self.take(4)?.try_into().ok()?))
+            }
+            fn u64(&mut self) -> Option<u64> {
+                Some(u64::from_le_bytes(self.take(8)?.try_into().ok()?))
+            }
+            fn u128(&mut self) -> Option<u128> {
+                Some(u128::from_le_bytes(self.take(16)?.try_into().ok()?))
+            }
+            fn length(&mut self) -> Option<usize> {
+                usize::try_from(self.u64()?).ok()
+            }
+            fn text(&mut self) -> Option<String> {
+                let length = self.length()?;
+                String::from_utf8(self.take(length)?.to_vec()).ok()
+            }
+            fn invariants(&mut self) -> Option<std::collections::BTreeSet<&'static str>> {
+                (0..self.length()?)
+                    .map(|_| {
+                        let name = self.text()?;
+                        IMPLEMENTED_INVARIANTS
+                            .iter()
+                            .find(|invariant| **invariant == name)
+                            .copied()
+                    })
+                    .collect()
+            }
+            fn texts(&mut self) -> Option<Vec<String>> {
+                (0..self.length()?).map(|_| self.text()).collect()
+            }
+        }
+        let mut reader = Reader { rest: bytes };
+        let states = reader.u64()?;
+        let cpu_red = reader.u64()?;
+        let gpu_red = reader.u64()?;
+        let cpu_checker_red = reader.u64()?;
+        let gpu_checker_red = reader.u64()?;
+        let recovery_mismatches = reader.u64()?;
+        let cross_check_mismatches = reader.u64()?;
+        let cpu_checker_red_invariants = reader.invariants()?;
+        let cpu_checker_held_invariants = reader.invariants()?;
+        let cpu_checker_bits_of_each_state = (0..reader.length()?)
+            .map(|_| reader.u128())
+            .collect::<Option<Vec<u128>>>()?;
+        let cpu_red_items_of_each_state = reader.texts()?;
+        let mismatches = reader.texts()?;
+        let checker_mismatches = reader.texts()?;
+        let gpu_words_of_each_state = (0..reader.length()?)
+            .map(|_| {
+                let mut words = [0u32; VERDICT_WORDS];
+                for word in &mut words {
+                    *word = reader.u32()?;
+                }
+                Some(words)
+            })
+            .collect::<Option<Vec<[u32; VERDICT_WORDS]>>>()?;
+        let cpu_consulted_reported_root_of_each_state = (0..reader.length()?)
+            .map(|_| match reader.take(1)?[0] {
+                0 => Some(None),
+                1 => Some(Some((reader.u32()?, reader.u64()?))),
+                _ => None,
+            })
+            .collect::<Option<Vec<Option<(u32, u64)>>>>()?;
+        let cpu_recovery_words_of_each_state = (0..reader.length()?)
+            .map(|_| Some([reader.u32()?, reader.u32()?, reader.u32()?, reader.u32()?]))
+            .collect::<Option<Vec<[u32; 4]>>>()?;
+        if !reader.rest.is_empty() {
+            return None;
+        }
+        Some(Self {
+            states,
+            cpu_red,
+            gpu_red,
+            cpu_checker_red,
+            gpu_checker_red,
+            cpu_checker_red_invariants,
+            cpu_checker_held_invariants,
+            cpu_checker_bits_of_each_state,
+            cpu_red_items_of_each_state,
+            gpu_words_of_each_state,
+            cpu_consulted_reported_root_of_each_state,
+            cpu_recovery_words_of_each_state,
+            recovery_mismatches,
+            cross_check_mismatches,
+            mismatches,
+            checker_mismatches,
+        })
+    }
+}
+
 fn compare_on_every_state(
     cards: &'static GpuCardPool,
     flow: &RecordedFlow,
@@ -2418,6 +2605,11 @@ fn violated_and_held_bits_of(verdicts: &[(&'static str, InvariantVerdict)]) -> (
 /// [`compare_on_every_state_of_these_segments_against_the_version_table`] 的本体：`knobs` 是 [`ContainerCapacityKnobs::PRODUCT`] 时编判法摘要罩住的那三份内核、
 /// CPU 池级 checker 取判器那一份（产品入口）；否则见 [`compare_on_every_state_given_the_container_capacity_knobs`]。
 /// CPU 那一侧（带旋钮值重判池级 checker 的那一处在内）判的是从崩溃点重放枚举那一类的库里读回的流叠出来的镜像。
+/// 对拍结论入库（用户 2026-10-15 定「对拍结论入库」，`crash_library::pairing_conclusion_reused_or_judged`）：键是这一次对拍的输入摘要
+/// （[`pairing_inputs_digest`]）与两边判器那一组判法单元的键（GPU 判器、CPU 判器判崩溃镜像），库里有就复用、一个状态都不再判；没有就两边
+/// 都判、比、整份比较结果（[`Comparison::to_bytes`]）按键存进库。两边哪一边的判法单元拒算：照判、不入库。
+/// 卡池借不到卡、卡上显存不够、只录那一趟（判那一侧报「本次未跑」交 `None` 的几种）不存进库：判的那一步当场以 [`PairingNotRun`]
+/// 收手，这里接住、照旧交 `None`。
 // cpu-reference-for-gpu-comparison
 fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_container_capacity_knobs(
     cards: &'static GpuCardPool,
@@ -2428,7 +2620,6 @@ fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_
     expansion: &(dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion + Sync),
     knobs: ContainerCapacityKnobs,
 ) -> Option<Comparison> {
-    let kernel_sources = JudgeKernelSources::of_the_judge_given_the_container_capacity_knobs(knobs);
     let judge_flow = JudgeFlow {
         base: &flow.base,
         writes: &flow.writes,
@@ -2451,24 +2642,272 @@ fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_
         words.version_bytes.len(),
         tables_started.elapsed()
     );
+    let judging_units = |units: JudgingUnits| {
+        judging_units_key(&units, toolchain_of_this_process()).map_err(|refused| refused.sentence())
+    };
+    // 比法那一组的键拼进输入摘要；它拒算时整份对拍照判、不入库（拒算交进一边）
+    let comparison_units = judging_units(JudgingUnits::PairingComparison {
+        group_name: "gpu_and_cpu_judge_pairing_comparison",
+    });
+    let mut inputs = pairing_inputs_digest(
+        flow,
+        versions_without_a_file,
+        segments,
+        expansion,
+        knobs,
+        &tables,
+    )
+    .to_vec();
+    inputs.extend_from_slice(
+        comparison_units
+            .as_ref()
+            .map_or(&[0u8; DIGEST_BYTES], |units| units.fingerprint()),
+    );
+    let inputs_digest = sha256_digest(&inputs);
+    let library =
+        CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("对拍那一类的库开得了");
+    let paired = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        pairing_conclusion_reused_or_judged(
+            &library,
+            &inputs_digest,
+            &comparison_units.and_then(|_| judging_units(JudgingUnits::GpuJudge)),
+            &judging_units(JudgingUnits::JudgementOfTheCrashImages),
+            || {
+                judge_on_the_cpu_and_the_gpu_and_compare(
+                    cards,
+                    flow,
+                    item_name,
+                    versions_without_a_file,
+                    segments,
+                    expansion,
+                    knobs,
+                    &tables,
+                )
+                .unwrap_or_else(|| std::panic::panic_any(PairingNotRun))
+                .to_bytes()
+            },
+        )
+    }));
+    match paired {
+        Ok(Ok((conclusion, _source))) => {
+            Some(Comparison::from_bytes(&conclusion).expect("库里的对拍结论是这份测试写的，认得回"))
+        }
+        Ok(Err(reason)) => panic!("流 {} 的对拍结论读写库失败：{reason}", flow.name),
+        Err(payload) if payload.is::<PairingNotRun>() => None,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
+}
+
+/// CPU 判器每个状态交回的那几样（红位、池级 checker 违例位、红项、恢复报告、恢复字、判过而成立的位、看 journal 那一遍报的根、对拍字），
+/// 按状态序号排好交给 [`compare_the_judgements_state_by_state`]。
+type JudgedOnCpu = (
+    u32,
+    u128,
+    String,
+    String,
+    [u32; 4],
+    u128,
+    Option<(u32, u64)>,
+    CrossCheckWords,
+);
+
+/// 逐状态比 CPU 与 GPU 的判定（对拍的比法）：红位、池级 checker 违例位与判到位、两遍恢复落到的根与结局、对拍字；不一致的状态逐个打一行、
+/// 前 12 个带说明。这一段的函数单元另成一组判法单元（`gpu_and_cpu_judge_pairing_comparison`），它的键拼进对拍结论的输入摘要：
+/// 比法改了，库里早先的对拍结论不再复用。
+fn compare_the_judgements_state_by_state(
+    flow_name: &str,
+    state_count: u64,
+    cpu: &[JudgedOnCpu],
+    gpu: &[[u32; VERDICT_WORDS]],
+) -> Comparison {
+    let mut comparison = Comparison {
+        states: state_count,
+        cpu_red: 0,
+        gpu_red: 0,
+        cpu_checker_red: 0,
+        gpu_checker_red: 0,
+        cpu_checker_red_invariants: std::collections::BTreeSet::new(),
+        cpu_checker_held_invariants: std::collections::BTreeSet::new(),
+        cpu_checker_bits_of_each_state: Vec::with_capacity(cpu.len()),
+        cpu_red_items_of_each_state: Vec::with_capacity(cpu.len()),
+        gpu_words_of_each_state: gpu.to_vec(),
+        cpu_consulted_reported_root_of_each_state: Vec::with_capacity(cpu.len()),
+        cpu_recovery_words_of_each_state: Vec::with_capacity(cpu.len()),
+        recovery_mismatches: 0,
+        cross_check_mismatches: 0,
+        mismatches: Vec::new(),
+        checker_mismatches: Vec::new(),
+    };
+    for (
+        ordinal,
+        (
+            cpu_bits,
+            cpu_checker_bits,
+            cpu_items,
+            cpu_report,
+            cpu_recovery,
+            cpu_checker_held_bits,
+            cpu_consulted_reported_root,
+            cpu_cross_check_words,
+        ),
+    ) in cpu.iter().enumerate()
+    {
+        comparison
+            .cpu_consulted_reported_root_of_each_state
+            .push(*cpu_consulted_reported_root);
+        comparison
+            .cpu_recovery_words_of_each_state
+            .push(*cpu_recovery);
+        comparison
+            .cpu_checker_held_invariants
+            .extend(invariant_names(*cpu_checker_held_bits));
+        comparison
+            .cpu_checker_bits_of_each_state
+            .push(*cpu_checker_bits);
+        comparison
+            .cpu_red_items_of_each_state
+            .push(cpu_items.clone());
+        let gpu_words: [u32; VERDICT_WORDS] = gpu[ordinal];
+        let gpu_bits = gpu_words[0] & !(1 << verdict_bits::UNDECIDABLE);
+        let undecidable = gpu_words[0] & (1 << verdict_bits::UNDECIDABLE) != 0
+            || gpu_words[POOL_CHECKER_UNDECIDABLE_WORD] != 0;
+        let gpu_checker_bits = pool_checker_violated_bits(&gpu_words);
+        if *cpu_bits != 0 {
+            comparison.cpu_red += 1;
+        }
+        if gpu_bits != 0 {
+            comparison.gpu_red += 1;
+        }
+        if *cpu_checker_bits != 0 {
+            comparison.cpu_checker_red += 1;
+            comparison
+                .cpu_checker_red_invariants
+                .extend(invariant_names(*cpu_checker_bits));
+        }
+        if gpu_checker_bits != 0 {
+            comparison.gpu_checker_red += 1;
+        }
+        // 落到的根与两遍的结局也要相同：只比红位看不出「两遍恢复落到同一条根」这类漏洞（重放没扫环那一次就是这样漏的）
+        let gpu_recovery = gpu_recovery_words(&gpu_words);
+        if gpu_recovery != *cpu_recovery {
+            comparison.recovery_mismatches += 1;
+        }
+        let gpu_cross_check_words = cross_check_words_of_gpu_verdict(&gpu_words);
+        if gpu_cross_check_words != *cpu_cross_check_words {
+            comparison.cross_check_mismatches += 1;
+        }
+        if undecidable
+            || gpu_checker_bits != *cpu_checker_bits
+            || gpu_cross_check_words.pool_checker_judged_bits
+                != cpu_cross_check_words.pool_checker_judged_bits
+        {
+            if comparison.checker_mismatches.len() < 12 {
+                comparison.checker_mismatches.push(format!(
+                    "状态 {ordinal}：CPU checker={:?}；GPU checker={:?} 判不了的原因 {:#x}",
+                    invariant_names(*cpu_checker_bits),
+                    invariant_names(gpu_checker_bits),
+                    gpu_words[POOL_CHECKER_UNDECIDABLE_WORD]
+                ));
+            } else {
+                comparison.checker_mismatches.push(String::new());
+            }
+        }
+        if undecidable
+            || gpu_bits != *cpu_bits
+            || gpu_checker_bits != *cpu_checker_bits
+            || gpu_recovery != *cpu_recovery
+            || gpu_cross_check_words != *cpu_cross_check_words
+        {
+            // 每个不一致的状态打一行、不截（下面的说明只留前 12 个，CPU 那一半带读出的文件内容、GPU 的字排在后面）：GPU 结论字整份
+            // （第 1 字是恢复内核判不了的原因、第 13 字是池级 checker 判不了的原因）、两侧恢复的四个字与对拍字，不带文件内容；只打、不进判定
+            eprintln!(
+            "CRASH_JUDGE_GPU_STATE flow={} state={ordinal} gpu_words={gpu_words:?} gpu_recovery={gpu_recovery:?} cpu_recovery={cpu_recovery:?} cpu_bits={cpu_bits:#x} gpu={gpu_cross_check_words:?} cpu={cpu_cross_check_words:?}",
+            flow_name
+        );
+            if comparison.mismatches.len() < 12 {
+                comparison.mismatches.push(format!(
+                "状态 {ordinal}：CPU {cpu_bits:#x} {cpu_items} {cpu_report} checker={:?} 判到={:?} 对拍字={cpu_cross_check_words:?}；GPU {gpu_words:?} checker={:?} 判到={:?} 对拍字={gpu_cross_check_words:?}",
+                invariant_names(*cpu_checker_bits),
+                invariant_names(cpu_cross_check_words.pool_checker_judged_bits),
+                invariant_names(gpu_checker_bits),
+                invariant_names(gpu_cross_check_words.pool_checker_judged_bits)
+            ));
+            } else {
+                comparison.mismatches.push(String::new());
+            }
+        }
+    }
+    comparison
+}
+
+/// 判那一侧报了「本次未跑」（卡池借不到卡、卡上显存不够、只录那一趟）：对拍结论不存进库，当场收手、由调用方照旧交 `None`。
+struct PairingNotRun;
+
+/// 一次对拍的输入摘要：流（基线镜像按扇区终值、每次写的盘、种类、偏移、FUA 与内容摘要、切段与每段的展开方式、被判的根、版本表与没有文件的那几版）、
+/// 三棵容器树的旋钮值与判表的摘要。只按内容取，流名、项名不进。
+fn pairing_inputs_digest(
+    flow: &RecordedFlow,
+    versions_without_a_file: &[PublishedVersionWithoutAFile],
+    segments: &[Vec<usize>],
+    expansion: &(dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion + Sync),
+    knobs: ContainerCapacityKnobs,
+    tables: &JudgeTables,
+) -> [u8; DIGEST_BYTES] {
+    let mut text = format!(
+        "crash judge gpu and cpu pairing inputs\nbase={}\n",
+        hexadecimal_text(&SectorImage::of_base(&flow.base).digest())
+    );
+    for write in &flow.writes {
+        let contents = match &write.contents {
+            WrittenContents::Bytes(bytes) => hexadecimal_text(&sha256_digest(bytes)),
+            WrittenContents::Zeros { length } => format!("zeros:{length}"),
+        };
+        text.push_str(&format!(
+            "write device={} kind={:?} offset={} force_unit_access={} contents={contents}\n",
+            write.device.0, write.kind, write.offset.0, write.is_force_unit_access
+        ));
+    }
+    for (segment_index, segment) in segments.iter().enumerate() {
+        text.push_str(&format!(
+            "segment {segment:?} expansion={}\n",
+            expansion(segment_index, segment).name()
+        ));
+    }
+    text.push_str(&format!(
+        "judged_root_index={}\nversions={:?}\nversions_without_a_file={versions_without_a_file:?}\nknobs={knobs:?}\ntables={}\n",
+        flow.judged_root_index,
+        flow.versions,
+        hexadecimal_text(&tables.digest())
+    ));
+    sha256_digest(text.as_bytes())
+}
+
+/// 对拍本身：CPU 判器从库里读回的流逐状态判、GPU 判器从库里读回的判表逐状态判，逐状态比。判那一侧报「本次未跑」时交 `None`。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "对拍的输入就是这几样：卡池、流、项名、版本表另带的没有文件的几版、切段、展开、旋钮、判表；收成一个类型只为让签名变短"
+)]
+// cpu-reference-for-gpu-comparison
+fn judge_on_the_cpu_and_the_gpu_and_compare(
+    cards: &'static GpuCardPool,
+    flow: &RecordedFlow,
+    item_name: &str,
+    versions_without_a_file: &[PublishedVersionWithoutAFile],
+    segments: &[Vec<usize>],
+    expansion: &(dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion + Sync),
+    knobs: ContainerCapacityKnobs,
+    tables: &JudgeTables,
+) -> Option<Comparison> {
+    let kernel_sources = JudgeKernelSources::of_the_judge_given_the_container_capacity_knobs(knobs);
+    let state_count = tables.state_count;
     // 判表先入库、再读库（对拍那一类的库，项名是流名），GPU 只拿读回的那一份算；崩溃点重放的 CPU 判器同样先把流入库
     // （崩溃点重放枚举那一类的库，项名也是流名）、再从库里读回判。两样都录完才看只录那一趟要不要当场返回：录入段里两类库都要写到
-    let packed = packed_tables_through_the_library(item_name, &tables);
+    let packed = packed_tables_through_the_library(item_name, tables);
     // CPU 那一侧按线程分段判（`SINGLEFS_CRASH_JUDGE_CPU_THREADS`，没设取每台默认重活线程数），各线程按序号各报各的，合并按序号排
     let cpu_started = Instant::now();
     let threads = cpu_threads_from_the_value_of_the_variable(
         process_environment_variable(CPU_THREADS_ENVIRONMENT_VARIABLE).as_deref(),
         process_environment_variable(THREAD_CAP_ENVIRONMENT_VARIABLE).as_deref(),
-    );
-    type JudgedOnCpu = (
-        u32,
-        u128,
-        String,
-        String,
-        [u32; 4],
-        u128,
-        Option<(u32, u64)>,
-        CrossCheckWords,
     );
     let judged_by_ordinal: std::sync::Mutex<Vec<(u64, JudgedOnCpu)>> = std::sync::Mutex::new(
         Vec::with_capacity(usize::try_from(state_count).expect("装得进")),
@@ -2560,123 +2999,7 @@ fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_
     assert_eq!(gpu.len(), usize::try_from(state_count).expect("装得进"));
     assert_eq!(cpu.len(), gpu.len());
     cpu.truncate(gpu.len());
-    let mut comparison = Comparison {
-        states: state_count,
-        cpu_red: 0,
-        gpu_red: 0,
-        cpu_checker_red: 0,
-        gpu_checker_red: 0,
-        cpu_checker_red_invariants: std::collections::BTreeSet::new(),
-        cpu_checker_held_invariants: std::collections::BTreeSet::new(),
-        cpu_checker_bits_of_each_state: Vec::with_capacity(cpu.len()),
-        cpu_red_items_of_each_state: Vec::with_capacity(cpu.len()),
-        gpu_words_of_each_state: gpu.clone(),
-        cpu_consulted_reported_root_of_each_state: Vec::with_capacity(cpu.len()),
-        cpu_recovery_words_of_each_state: Vec::with_capacity(cpu.len()),
-        recovery_mismatches: 0,
-        cross_check_mismatches: 0,
-        mismatches: Vec::new(),
-        checker_mismatches: Vec::new(),
-    };
-    for (
-        ordinal,
-        (
-            cpu_bits,
-            cpu_checker_bits,
-            cpu_items,
-            cpu_report,
-            cpu_recovery,
-            cpu_checker_held_bits,
-            cpu_consulted_reported_root,
-            cpu_cross_check_words,
-        ),
-    ) in cpu.iter().enumerate()
-    {
-        comparison
-            .cpu_consulted_reported_root_of_each_state
-            .push(*cpu_consulted_reported_root);
-        comparison
-            .cpu_recovery_words_of_each_state
-            .push(*cpu_recovery);
-        comparison
-            .cpu_checker_held_invariants
-            .extend(invariant_names(*cpu_checker_held_bits));
-        comparison
-            .cpu_checker_bits_of_each_state
-            .push(*cpu_checker_bits);
-        comparison
-            .cpu_red_items_of_each_state
-            .push(cpu_items.clone());
-        let gpu_words: [u32; VERDICT_WORDS] = gpu[ordinal];
-        let gpu_bits = gpu_words[0] & !(1 << verdict_bits::UNDECIDABLE);
-        let undecidable = gpu_words[0] & (1 << verdict_bits::UNDECIDABLE) != 0
-            || gpu_words[POOL_CHECKER_UNDECIDABLE_WORD] != 0;
-        let gpu_checker_bits = pool_checker_violated_bits(&gpu_words);
-        if *cpu_bits != 0 {
-            comparison.cpu_red += 1;
-        }
-        if gpu_bits != 0 {
-            comparison.gpu_red += 1;
-        }
-        if *cpu_checker_bits != 0 {
-            comparison.cpu_checker_red += 1;
-            comparison
-                .cpu_checker_red_invariants
-                .extend(invariant_names(*cpu_checker_bits));
-        }
-        if gpu_checker_bits != 0 {
-            comparison.gpu_checker_red += 1;
-        }
-        // 落到的根与两遍的结局也要相同：只比红位看不出「两遍恢复落到同一条根」这类漏洞（重放没扫环那一次就是这样漏的）
-        let gpu_recovery = gpu_recovery_words(&gpu_words);
-        if gpu_recovery != *cpu_recovery {
-            comparison.recovery_mismatches += 1;
-        }
-        let gpu_cross_check_words = cross_check_words_of_gpu_verdict(&gpu_words);
-        if gpu_cross_check_words != *cpu_cross_check_words {
-            comparison.cross_check_mismatches += 1;
-        }
-        if undecidable
-            || gpu_checker_bits != *cpu_checker_bits
-            || gpu_cross_check_words.pool_checker_judged_bits
-                != cpu_cross_check_words.pool_checker_judged_bits
-        {
-            if comparison.checker_mismatches.len() < 12 {
-                comparison.checker_mismatches.push(format!(
-                    "状态 {ordinal}：CPU checker={:?}；GPU checker={:?} 判不了的原因 {:#x}",
-                    invariant_names(*cpu_checker_bits),
-                    invariant_names(gpu_checker_bits),
-                    gpu_words[POOL_CHECKER_UNDECIDABLE_WORD]
-                ));
-            } else {
-                comparison.checker_mismatches.push(String::new());
-            }
-        }
-        if undecidable
-            || gpu_bits != *cpu_bits
-            || gpu_checker_bits != *cpu_checker_bits
-            || gpu_recovery != *cpu_recovery
-            || gpu_cross_check_words != *cpu_cross_check_words
-        {
-            // 每个不一致的状态打一行、不截（下面的说明只留前 12 个，CPU 那一半带读出的文件内容、GPU 的字排在后面）：GPU 结论字整份
-            // （第 1 字是恢复内核判不了的原因、第 13 字是池级 checker 判不了的原因）、两侧恢复的四个字与对拍字，不带文件内容；只打、不进判定
-            eprintln!(
-                "CRASH_JUDGE_GPU_STATE flow={} state={ordinal} gpu_words={gpu_words:?} gpu_recovery={gpu_recovery:?} cpu_recovery={cpu_recovery:?} cpu_bits={cpu_bits:#x} gpu={gpu_cross_check_words:?} cpu={cpu_cross_check_words:?}",
-                flow.name
-            );
-            if comparison.mismatches.len() < 12 {
-                comparison.mismatches.push(format!(
-                    "状态 {ordinal}：CPU {cpu_bits:#x} {cpu_items} {cpu_report} checker={:?} 判到={:?} 对拍字={cpu_cross_check_words:?}；GPU {gpu_words:?} checker={:?} 判到={:?} 对拍字={gpu_cross_check_words:?}",
-                    invariant_names(*cpu_checker_bits),
-                    invariant_names(cpu_cross_check_words.pool_checker_judged_bits),
-                    invariant_names(gpu_checker_bits),
-                    invariant_names(gpu_cross_check_words.pool_checker_judged_bits)
-                ));
-            } else {
-                comparison.mismatches.push(String::new());
-            }
-        }
-    }
+    let comparison = compare_the_judgements_state_by_state(flow.name, state_count, &cpu, &gpu);
     for line in comparison
         .mismatches
         .iter()
@@ -2711,7 +3034,6 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_every_state_of_three_flows() {
     ) else {
         return;
     };
-    assert_ne!(gpu_judge_digest(), [0u8; 32]);
     let limit = expand_up_to();
     let flows = [
         record_new_pool_file_creation("crash-judge-gpu-healthy", "new-pool"),
@@ -3226,13 +3548,13 @@ fn a_flow_whose_judge_tables_cannot_be_built_is_refused_and_not_judged_on_the_cp
         }],
     };
     let plan = plan_crash_points(&flow);
-    let version = JudgeVersion([9u8; 32]);
-    let directory = std::env::temp_dir().join(format!(
-        "singlefs-crash-judge-gpu-refused-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&directory);
-    let mut store = VerdictStore::create_empty(&directory).expect("建得了判定库");
+    let version = JudgingUnitsFingerprint([9u8; 32]);
+    let directory = singlefs_checker_tier::crash_library::ExclusiveTemporaryDirectory::create(
+        "crash-judge-gpu-refused",
+    )
+    .expect("建得了一次性临时目录");
+    // 库只在不存在的目录上建：建在这一份一次性目录底下
+    let mut store = VerdictStore::create_empty(&directory.join("library")).expect("建得了判定库");
     record_crash_points(&mut store, &plan, &version, &mut CoverageReport::default())
         .expect("录得进");
     let before = unjudged_blocks(&store, &version).expect("对得了账").len();
@@ -3260,7 +3582,7 @@ fn a_flow_whose_judge_tables_cannot_be_built_is_refused_and_not_judged_on_the_cp
         "一块判定都没写进库"
     );
     drop(store);
-    let _ = std::fs::remove_dir_all(&directory);
+    drop(directory);
 }
 
 /// 流取固定脚本到回退 D、展开 16，每段一个崩溃点（几十块）；只用一张卡，叫停之前恰好领五块。
@@ -3326,13 +3648,13 @@ fn the_card_stops_taking_blocks_when_asked_and_the_next_run_judges_only_the_rest
     };
     let card = std::sync::Arc::new(lease.card().clone());
     let plan = plan_crash_points(&flow);
-    let version = JudgeVersion([7u8; 32]);
-    let directory = std::env::temp_dir().join(format!(
-        "singlefs-crash-judge-gpu-stop-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&directory);
-    let mut store = VerdictStore::create_empty(&directory).expect("建得了判定库");
+    let version = JudgingUnitsFingerprint([7u8; 32]);
+    let directory = singlefs_checker_tier::crash_library::ExclusiveTemporaryDirectory::create(
+        "crash-judge-gpu-stop",
+    )
+    .expect("建得了一次性临时目录");
+    // 库只在不存在的目录上建：建在这一份一次性目录底下
+    let mut store = VerdictStore::create_empty(&directory.join("library")).expect("建得了判定库");
     record_crash_points(&mut store, &plan, &version, &mut CoverageReport::default())
         .expect("录得进");
     let total = unjudged_blocks(&store, &version).expect("对得了账").len();
@@ -3359,7 +3681,7 @@ fn the_card_stops_taking_blocks_when_asked_and_the_next_run_judges_only_the_rest
         ),
     ) else {
         drop(store);
-        let _ = std::fs::remove_dir_all(&directory);
+        drop(directory);
         return;
     };
     println!(
@@ -3393,7 +3715,7 @@ fn the_card_stops_taking_blocks_when_asked_and_the_next_run_judges_only_the_rest
         ),
     ) else {
         drop(store);
-        let _ = std::fs::remove_dir_all(&directory);
+        drop(directory);
         return;
     };
     assert_eq!(
@@ -3411,7 +3733,7 @@ fn the_card_stops_taking_blocks_when_asked_and_the_next_run_judges_only_the_rest
         .expect("对得了账")
         .is_empty());
     drop(store);
-    let _ = std::fs::remove_dir_all(&directory);
+    drop(directory);
 }
 
 /// 这个进程此刻在卡上占的显存（MiB，`nvidia-smi` 按进程报的；几张卡加起来）。读不到报 0。
@@ -4238,6 +4560,168 @@ fn the_gpu_judge_agrees_with_the_cpu_on_a_pool_that_lost_a_device_holding_a_root
     assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_the_flow(
         "the_gpu_judge_agrees_with_the_cpu_on_a_pool_that_lost_a_device_holding_a_root_ring_region",
         &flow,
+    );
+}
+
+/// journal 环起点字段写成第一版常量 1024 之外的一个槽号：自证得过、读者不收（与 harness 场景
+/// `system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery.rs` 的同名常量同一个值）。
+const JOURNAL_RING_START_SLOT_THE_READER_REFUSES: u64 = 1025;
+
+/// 基线里 `device` 上偏移 `offset` 那一个系统配置槽（自证得过）。
+fn system_configuration_slot_in_the_base(
+    flow: &RecordedFlow,
+    device: DeviceIdentity,
+    offset: u64,
+) -> singlefs_core::system_configuration::SystemConfiguration {
+    let slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    singlefs_core::system_configuration::SystemConfiguration::parse_slot(
+        &singlefs_core::recovery::PoolReader::read(
+            &flow.base,
+            device,
+            singlefs_core::address::DeviceOffsetInBytes(offset),
+            slot_bytes,
+        )
+        .expect("基线里这一槽读得到"),
+    )
+    .expect("基线里这一槽自证得过")
+}
+
+/// 基线里 `device` 上偏移 `offset` 起写 `bytes`。
+fn write_into_the_base(flow: &mut RecordedFlow, device: DeviceIdentity, offset: u64, bytes: &[u8]) {
+    flow.base
+        .devices
+        .get_mut(&device)
+        .expect("基线里有这块盘")
+        .write(singlefs_core::address::DeviceOffsetInBytes(offset), bytes);
+}
+
+/// 两块盘的槽 0 都抹成 0（全池没有一个可择的槽 0：恢复与池级 checker 逐档读槽 1，直到这条流把槽 0 写回）。
+fn wipe_the_slot_zeros_in_the_base(flow: &mut RecordedFlow) {
+    let slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+        write_into_the_base(flow, device, 0, &vec![0u8; slot_bytes]);
+    }
+}
+
+/// 新池新建文件那条流的基线：两块盘的槽 0 都抹掉，槽距处本池的槽 1 照旧，再远一档（两倍槽距）放一份本池槽 1 的拷贝、journal 环起点写成 1025
+/// （自证得过、读者不收，记的槽距仍是本池的，不等于它所在的偏移；harness 场景「8192 处那份槽带不收之值」的造法）。
+fn record_new_pool_with_a_refused_slot_one_farther_than_the_pool_slot_one_in_the_base(
+    tag: &str,
+) -> RecordedFlow {
+    let mut flow = record_new_pool_file_creation(
+        tag,
+        "new-pool-refused-slot-one-farther-than-the-pool-slot-one-in-the-base",
+    );
+    let spacing = u64::from(geometry().fixed_structure_slot_spacing);
+    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+        let mut refused = system_configuration_slot_in_the_base(&flow, device, spacing);
+        refused.immutable.journal_ring_start_slot =
+            singlefs_core::address::SlotNumber(JOURNAL_RING_START_SLOT_THE_READER_REFUSES);
+        write_into_the_base(&mut flow, device, 2 * spacing, &refused.to_slot());
+    }
+    wipe_the_slot_zeros_in_the_base(&mut flow);
+    flow
+}
+
+/// 新池新建文件那条流的基线：两块盘的槽 0 都抹掉；逐档读到的第一个自证得过的槽 1（槽距处、记的槽距就是它所在的偏移）带读者不收之值
+/// （journal 环起点 1025），更远一档（两倍槽距）有一份读者收的槽 1（本池槽 1 的拷贝、记的槽距改成两倍槽距、等于它所在的偏移）。
+fn record_new_pool_whose_first_self_verified_slot_one_carries_a_refused_value_and_a_farther_one_is_accepted(
+    tag: &str,
+) -> RecordedFlow {
+    let mut flow = record_new_pool_file_creation(
+        tag,
+        "new-pool-first-self-verified-slot-one-refused-and-a-farther-one-accepted-in-the-base",
+    );
+    let spacing = u64::from(geometry().fixed_structure_slot_spacing);
+    let farther_spacing = 2 * spacing;
+    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+        let pool_slot_one = system_configuration_slot_in_the_base(&flow, device, spacing);
+        let mut refused = pool_slot_one;
+        refused.immutable.journal_ring_start_slot =
+            singlefs_core::address::SlotNumber(JOURNAL_RING_START_SLOT_THE_READER_REFUSES);
+        let mut farther = pool_slot_one;
+        farther.immutable.sizes.fixed_structure_slot_spacing =
+            u32::try_from(farther_spacing).expect("两倍槽距装得进 4 字节");
+        write_into_the_base(&mut flow, device, spacing, &refused.to_slot());
+        write_into_the_base(&mut flow, device, farther_spacing, &farther.to_slot());
+    }
+    wipe_the_slot_zeros_in_the_base(&mut flow);
+    flow
+}
+
+/// 一条流的判表里系统配置槽那一类落点在哪几处（盘、偏移），升序。
+fn system_configuration_locations_of(tables: &JudgeTables) -> Vec<(u32, u64)> {
+    tables
+        .locations
+        .iter()
+        .filter(|location| location.kind == JudgeLocationKind::SystemConfiguration)
+        .map(|location| (location.device, location.offset))
+        .collect()
+}
+
+/// 两块盘的槽 0 都废、槽距处本池的槽 1 照旧、再远一档有一份带读者不收之值的槽（hand_out 那张「8192 处那份槽带不收之值」的形，搬到新池新建文件这条流上）：
+/// 判表给每块盘的两倍槽距处建系统配置落点（取卡之前判，没有卡的机器上这一半照样判）；这条流把槽 0 写回之前的状态 CPU 逐档读到那一份、判 I-7.13，
+/// GPU 逐档读同一处，每个状态逐位相同。只建偏移 0 与几何槽距两处落点的取法在取卡之前那一判就红（落点表少了两倍槽距那两处），
+/// 上卡时 GPU 读那一处读成不自证、不红 I-7.13。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_a_refused_slot_one_found_farther_than_the_pool_slot_one_while_reading_every_spacing(
+) {
+    let flow = record_new_pool_with_a_refused_slot_one_farther_than_the_pool_slot_one_in_the_base(
+        "crash-judge-gpu-refused-slot-one-farther",
+    );
+    let tables = judge_tables_of_the_flow(&flow);
+    let spacing = u64::from(geometry().fixed_structure_slot_spacing);
+    assert_eq!(
+        system_configuration_locations_of(&tables),
+        vec![
+            (0, 0),
+            (0, spacing),
+            (0, 2 * spacing),
+            (1, 0),
+            (1, spacing),
+            (1, 2 * spacing)
+        ],
+        "流 {}：两块盘各有偏移 0、槽距与逐档读到的那一处三个系统配置槽的落点",
+        flow.name
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_on_a_refused_slot_one_found_farther_than_the_pool_slot_one_while_reading_every_spacing",
+        &flow,
+        "I-7.13",
+    );
+}
+
+/// 两块盘的槽 0 都废、逐档读到的第一个自证得过的槽 1 带读者不收之值、更远一档槽距上有一份读者收的槽 1：落点几何取第一个那一份
+/// （记的槽距就是这条流的槽距，根槽写都对得上落点；不看读者收不收），更远那一份另建落点（取卡之前判）；这条流把槽 0 写回之前的状态
+/// CPU 逐档读到第一个那一份就判 I-7.13，GPU 逐位相同。GPU 走读内核把 journal 环起点不是 1024 的槽读成不自证时，GPU 逐档读到更远那一份、
+/// 照常判，不红 I-7.13，这条红。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_first_self_verified_slot_one_carries_a_refused_value_and_a_farther_one_is_accepted(
+) {
+    let flow = record_new_pool_whose_first_self_verified_slot_one_carries_a_refused_value_and_a_farther_one_is_accepted(
+        "crash-judge-gpu-first-slot-one-refused-farther-accepted",
+    );
+    let tables = judge_tables_of_the_flow(&flow);
+    let spacing = u64::from(geometry().fixed_structure_slot_spacing);
+    assert_eq!(
+        system_configuration_locations_of(&tables),
+        vec![
+            (0, 0),
+            (0, spacing),
+            (0, 2 * spacing),
+            (1, 0),
+            (1, spacing),
+            (1, 2 * spacing)
+        ],
+        "流 {}：几何取槽距处那一份，两块盘各有偏移 0、槽距与更远那一份三个系统配置槽的落点",
+        flow.name
+    );
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_the_first_self_verified_slot_one_carries_a_refused_value_and_a_farther_one_is_accepted",
+        &flow,
+        "I-7.13",
     );
 }
 

@@ -86,6 +86,11 @@ pub fn allocation_record_tree_cell_range(cell: AllocationRecordTreeCell) -> (Vec
     }
 }
 
+/// 分配记录树内部条目 key 的宽：盘 4 字节 + 槽号 6 字节；短于它的 key 读不出孩子，交回 `None` 而不是切片越界。
+const ALLOCATION_RECORD_TREE_KEY_BYTES: usize = 10;
+/// extent 树（上下两段）内部条目 key 的宽：三个 u64。
+const EXTENT_TREE_KEY_BYTES: usize = 24;
+
 /// 父节点（层级 `parent_level`；根时 `parent` 是 `Root`）里一条内部条目的 key 指的孩子：槽号落在孩子那一层的格点上、盘在池里；
 /// 父节点在根之下时孩子与它同盘、落在它那一段里。对不上交回 `None`。
 #[must_use]
@@ -96,6 +101,9 @@ pub fn allocation_record_tree_child_of_entry_key(
     pool_devices: &[u32],
 ) -> Option<AllocationRecordTreeCell> {
     let child_level = parent_level.checked_sub(1)?;
+    if entry_key.len() < ALLOCATION_RECORD_TREE_KEY_BYTES {
+        return None;
+    }
     let device = read_u32(entry_key, 0);
     let slot = read_six_byte_unsigned(entry_key, 4);
     let child_span = allocation_record_tree_span_in_slots(child_level);
@@ -142,7 +150,13 @@ pub fn allocation_record_fits_in_the_leaf(
     };
     let first = index.saturating_mul(ALLOCATION_RECORD_TREE_LEAF_SLOTS);
     let last = first.saturating_add(ALLOCATION_RECORD_TREE_LEAF_SLOTS - 1);
-    device == leaf_device && span_slots > 0 && slot >= first && slot + span_slots - 1 <= last
+    // 槽号与跨槽数都是盘上读来的数：末槽算不出来（加法溢出）就不落在叶里，不 panic
+    device == leaf_device
+        && span_slots > 0
+        && slot >= first
+        && slot
+            .checked_add(span_slots - 1)
+            .is_some_and(|last_slot_of_the_record| last_slot_of_the_record <= last)
 }
 
 /// extent 树上段层级 L 上一个节点罩几个 inode 号。
@@ -209,6 +223,9 @@ pub fn extent_upper_child_of_entry_key(
     entry_key: &[u8],
 ) -> Option<(u8, u64)> {
     let child_level = parent_level.checked_sub(1)?;
+    if entry_key.len() < EXTENT_TREE_KEY_BYTES {
+        return None;
+    }
     let (locality, first_inode, offset) = (
         read_u64(entry_key, 0),
         read_u64(entry_key, 8),
@@ -232,6 +249,9 @@ pub fn extent_lower_child_of_entry_key(
     entry_key: &[u8],
 ) -> Option<(u8, u64)> {
     let child_level = parent_level.checked_sub(1)?;
+    if entry_key.len() < EXTENT_TREE_KEY_BYTES {
+        return None;
+    }
     let (locality, key_inode, offset) = (
         read_u64(entry_key, 0),
         read_u64(entry_key, 8),
@@ -334,5 +354,42 @@ mod tests {
             last_slot_of_the_leaf - 1,
             2
         ));
+    }
+
+    /// 槽号与跨槽数是盘上读来的：槽号顶满 u64 时末槽算不出来，判不落在叶里，不 panic、不回绕成落得进。
+    #[test]
+    fn a_record_whose_last_slot_overflows_does_not_fit_in_any_leaf() {
+        let leaf = AllocationRecordTreeCell::BelowTheRoot {
+            level: 0,
+            device: 0,
+            index: 61,
+        };
+        assert!(!allocation_record_fits_in_the_leaf(leaf, 0, u64::MAX, 2));
+        assert!(!allocation_record_fits_in_the_leaf(
+            leaf,
+            0,
+            u64::MAX - 1,
+            3
+        ));
+    }
+
+    /// key 短于这棵树的 key 宽（坏盘上条目被截）：三个按 key 取孩子的函数交回 `None`，不切片越界。
+    #[test]
+    fn a_key_shorter_than_the_tree_key_width_names_no_child() {
+        assert_eq!(
+            allocation_record_tree_child_of_entry_key(
+                AllocationRecordTreeCell::Root,
+                2,
+                &[0; 9],
+                &[0, 1]
+            ),
+            None
+        );
+        assert_eq!(extent_upper_child_of_entry_key(2, 0, &[0; 23]), None);
+        assert_eq!(extent_lower_child_of_entry_key(7, 2, 0, &[0; 23]), None);
+        assert!(
+            extent_upper_child_of_entry_key(2, 0, &[0; 24]).is_some(),
+            "整 24 字节的全零 key 指得到层级 1 的第 0 个孩子"
+        );
     }
 }

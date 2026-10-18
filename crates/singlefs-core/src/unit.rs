@@ -147,10 +147,23 @@ pub fn index_node_header_bytes(key_width: usize) -> usize {
 }
 
 /// 一个码 2 节点装得下多少条定宽条目：(16384 − 头 − 预留) / 条目宽。写者在装节点之前拿它判「装不下」并报错，不走到断言。
+///
+/// # Panics
+/// 条目宽是 0（没有「装几条」可算），或 key 宽大到含预留位的头宽过一个节点（16384 减头宽会下溢）。调用方交的都是格式常量
+/// （各种树的 key 宽与条目宽），盘上读来的宽不进这里；两种输入都是调用方的 bug。
 #[must_use]
 pub fn index_node_entry_capacity(key_width: usize, entry_width: usize) -> usize {
+    let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+    assert!(
+        entry_width > 0,
+        "条目宽是 0：index_node_entry_capacity 只收格式常量里的条目宽"
+    );
+    assert!(
+        key_width <= node_bytes && index_node_header_bytes(key_width) <= node_bytes,
+        "key 宽 {key_width} 的码 2 节点头宽过一个节点：index_node_entry_capacity 只收格式常量里的 key 宽"
+    );
     let entries_start = index_node_header_bytes(key_width);
-    (usize::try_from(NODE_BYTES).expect("16384") - entries_start) / entry_width
+    (node_bytes - entries_start) / entry_width
 }
 
 #[allow(
@@ -552,7 +565,7 @@ pub fn parse_data_unit(bytes: &[u8]) -> Result<DataUnitHeader, UnitError> {
     };
     let payload_start = header_end + reserved_bytes();
     if payload_start + usize::from(declared_length) > bytes.len() {
-        return Err(UnitError::Structure("声明长度越过单元末尾"));
+        return Err(UnitError::Structure(DECLARED_LENGTH_PAST_THE_UNIT_END));
     }
     Ok(DataUnitHeader {
         identity,
@@ -563,10 +576,22 @@ pub fn parse_data_unit(bytes: &[u8]) -> Result<DataUnitHeader, UnitError> {
     })
 }
 
+/// 码 1 数据单元的声明长度越过单元末尾时 [`parse_data_unit`] 与 [`data_unit_payload`] 报 [`UnitError::Structure`]，带这一句。
+pub const DECLARED_LENGTH_PAST_THE_UNIT_END: &str = "声明长度越过单元末尾";
+
 /// 载荷从 134 起、长声明长度；之后到单元末尾必须全 0（I-2.3），不是就报结构错。
+///
+/// # Errors
+/// 载荷末尾（134 + 声明长度）越过 `bytes` 末尾 ⇒ [`UnitError::Structure`]（[`DECLARED_LENGTH_PAST_THE_UNIT_END`]）：声明长度是盘上读来的，
+/// 两字节最大 65535、比一个单元的载荷容量大，这里自己判、不越界切片——今天的调用方都先经 [`parse_data_unit`] 核过这一格，
+/// 这一判让本函数不靠调用方的那一步也不 panic（坏的是盘上数据，按「能恢复的写进类型」报错，不断言）。
+/// 补齐字节非零 ⇒ [`UnitError::Structure`]。
 pub fn data_unit_payload(bytes: &[u8], declared_length: u16) -> Result<&[u8], UnitError> {
     let payload_start = usize::try_from(DATA_UNIT_HEADER_BYTES).expect("105") + reserved_bytes();
     let payload_end = payload_start + usize::from(declared_length);
+    if payload_end > bytes.len() {
+        return Err(UnitError::Structure(DECLARED_LENGTH_PAST_THE_UNIT_END));
+    }
     if bytes[payload_end..].iter().any(|byte| *byte != 0) {
         return Err(UnitError::Structure("补齐字节非零"));
     }
@@ -577,6 +602,38 @@ pub fn data_unit_payload(bytes: &[u8], declared_length: u16) -> Result<&[u8], Un
 mod tests {
     use super::*;
     use crate::checksum::wide_checksum_field_holds;
+
+    /// 条目宽 0：在开头那一句断言上 panic，不走到除法上除零（外部代码审查第二条）。
+    #[test]
+    #[should_panic(expected = "条目宽是 0")]
+    fn index_node_entry_capacity_of_a_zero_entry_width_panics_on_its_precondition() {
+        let _ = index_node_entry_capacity(8, 0);
+    }
+
+    /// key 宽 8135：含预留位的头宽 86 + 2 × 8135 + 29 = 16385，宽过一个节点；在断言上 panic，不走到 16384 减头宽的下溢上。
+    #[test]
+    #[should_panic(expected = "的码 2 节点头宽过一个节点")]
+    fn index_node_entry_capacity_of_a_key_width_whose_header_overruns_the_node_panics_on_its_precondition(
+    ) {
+        let _ = index_node_entry_capacity(8135, 8);
+    }
+
+    /// key 宽 8134：头宽 86 + 2 × 8134 + 29 = 16383，还装得下一个节点；条目宽 2 时一条都装不下，交 0（写者据此报「装不下」），不 panic。
+    /// 头宽的那一判是「不宽过节点」，不是「留得下一条」。
+    #[test]
+    fn index_node_entry_capacity_of_the_widest_key_whose_header_fits_the_node_is_zero_when_no_entry_fits(
+    ) {
+        assert_eq!(
+            index_node_header_bytes(8134),
+            16383,
+            "头宽 86 + 2 × 8134 + 29"
+        );
+        assert_eq!(
+            index_node_entry_capacity(8134, 2),
+            0,
+            "16384 − 16383 = 1 字节，条目宽 2 一条都装不下"
+        );
+    }
 
     #[test]
     fn empty_tree_table_node_has_key_width_at_51_and_a_sealed_header() {
@@ -760,6 +817,60 @@ mod tests {
         assert_eq!(
             parse_data_unit(&torn),
             Err(UnitError::PayloadChecksumMismatch)
+        );
+    }
+
+    /// 外部审核 ⑥：声明长度越过单元末尾（134 + 40000 > 32768）时 `data_unit_payload` 自己报结构错，不在切片上越界 panic；
+    /// 不经 `parse_data_unit` 直接调它。
+    #[test]
+    fn data_unit_payload_with_a_declared_length_past_the_unit_end_is_a_structure_error() {
+        let unit = build_data_unit(
+            DataUnitIdentity {
+                tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_EXTENT),
+                object: 1,
+                object_birth: CheckpointTxg(3),
+                anchor_offset: 0,
+            },
+            CheckpointTxg(3),
+            &[9u8; 16],
+            WriteOrder {
+                instance: InstanceGeneration(1),
+                transaction: 1,
+            },
+            &[5u8; 100],
+        );
+        assert_eq!(
+            data_unit_payload(&unit, 40_000),
+            Err(UnitError::Structure(DECLARED_LENGTH_PAST_THE_UNIT_END)),
+            "声明长度 40000：载荷末尾越过 32768 字节的单元"
+        );
+    }
+
+    /// 声明长度恰好等于载荷容量（32634，载荷末尾就是单元末尾）：越界那一判不拒，补齐区是空的，交回整段载荷。
+    #[test]
+    fn data_unit_payload_with_a_declared_length_reaching_the_unit_end_exactly_is_the_whole_payload()
+    {
+        let capacity = data_unit_payload_capacity();
+        let unit = build_data_unit(
+            DataUnitIdentity {
+                tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_EXTENT),
+                object: 1,
+                object_birth: CheckpointTxg(3),
+                anchor_offset: 0,
+            },
+            CheckpointTxg(3),
+            &[9u8; 16],
+            WriteOrder {
+                instance: InstanceGeneration(1),
+                transaction: 1,
+            },
+            &vec![6u8; capacity],
+        );
+        assert_eq!(
+            data_unit_payload(&unit, u16::try_from(capacity).expect("32634 装得进两字节"))
+                .map(<[u8]>::len),
+            Ok(capacity),
+            "载荷末尾等于单元末尾"
         );
     }
 }

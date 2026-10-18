@@ -51,7 +51,8 @@ pub fn crc32_castagnoli_bitwise(bytes: &[u8]) -> u32 {
     !remainder
 }
 
-/// 查表的 CRC-32C（反射多项式 0x82F63B78，一次一个字节、一张 256 项的表）：与按位那一份逐字节同值（单测对拍），
+/// 查表的 CRC-32C（反射多项式 0x82F63B78，一次一个字节、一张 256 项的表）：与按位那一份逐字节同值
+/// （单测 `table_crc32c_agrees_with_the_bitwise_crc32c_on_every_prefix_length` 对拍），
 /// 与实现那份 slicing-by-8 仍是两种写法；池级 checker 在崩溃点重放的每个崩溃状态上要算几十个单元，按位算太慢。
 #[must_use]
 pub fn crc32_castagnoli_table(bytes: &[u8]) -> u32 {
@@ -86,7 +87,7 @@ pub(crate) fn checksum_field_holds(bytes: &[u8], cover_end: usize, field_offset:
     }
     let mut covered = bytes[..cover_end].to_vec();
     covered[field_offset..field_offset + field_width].fill(0);
-    let expected = crc32_castagnoli_bitwise(&covered).to_le_bytes();
+    let expected = crc32_castagnoli_table(&covered).to_le_bytes();
     let stored = &bytes[field_offset..field_offset + field_width];
     stored[..4] == expected && stored[4..].iter().all(|byte| *byte == 0)
 }
@@ -125,6 +126,12 @@ pub enum Verdict {
     /// 也不 panic：S = 0 会让环长变 0、实现侧取模除零。挂载侧同一条判定是
     /// `singlefs_core::recovery::RecoveryFailure::RootRingSlotsPerRegionOutOfRange`。
     RootRingSlotsPerRegionOutsideTheFormatInterval,
+    /// 系统配置自述的区域数 R（偏移 361 那一字节）是 0：根环一个槽都没有，择根与 `image::root_slot_positions` 按 R 取模、除，R = 0 除零。
+    /// 与 [`Self::RegionCountPastTheRegionDeviceFields`] 同一条理由：R 是盘上读来的一字节，不夹、不 panic，这一槽不可择。
+    RegionCountZero,
+    /// 系统配置自述的根环几何（基槽、区域步长 × 区块字节、槽距）算出的根槽偏移装不进 u64：几样都是盘上读来的数，
+    /// 坏盘上任意大，`image::root_slot_positions` 的乘加会溢出；这一槽不可择，不往下按它枚举槽。
+    RootRingSlotOffsetOverflowsTheOffsetSpace,
     /// 单元头或系统配置槽偏移 4 那 2 字节格式版本不是这一版 checker 读得了的那一版
     /// （`UNIT_FORMAT_VERSION_THIS_CHECKER_READS`、`SYSTEM_CONFIGURATION_FORMAT_VERSION_THIS_CHECKER_READS`）：
     /// 版本号定的是后面每个字段按哪张表读，不认得就不按今天的表往下解。
@@ -166,6 +173,11 @@ pub enum Verdict {
     /// 与根记录 flags 同一个编码，读者与恢复把这条记录当损坏（`crates/singlefs-core/src/root_record.rs` 的
     /// `of_unmount_marker_field_of_a_new_root_segment` 交 `None`），checker 照同一口径不收它（m3-root-ring-code-r1 判决 RR1）。
     UnmountMarkerBitsOtherThanBitZero,
+    /// 系统配置偏移 301 自述的节点大小（几何段开头那 4 字节，D8（核心索引结构） 已定项 2）不是格式常量 `NODE_BYTES`：
+    /// 这一版只按 16384 读节点。用户 2026-10-15 定（C840）：当这一槽自证不过、不可择，别的槽照旧可择——
+    /// 与整槽校验和不对同一个处置（[`crate::image::verdict_says_the_slot_does_not_verify_itself`] 把它归进去）。
+    /// 实现那一侧同一条判定是 `singlefs_core::system_configuration::SystemConfigurationSlotRefusal::NodeBytesNotTheFormatConstant`。
+    NodeBytesNotTheFormatConstant,
 }
 
 /// 系统配置槽解出来的几个要紧字段。
@@ -201,6 +213,9 @@ const SYSTEM_CONFIGURATION_FSID_OFFSET: usize = 102;
 const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 155;
 const SYSTEM_CONFIGURATION_PHYSICAL_BLOCK_SIZE_OFFSET: usize =
     155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+/// 系统配置里节点大小那 4 字节：整槽校验和 32、MAC 16、nonce 水位 12、KDF 标识 4、加密类型 1、MAC 长度声明 1、主密钥槽 80 之后，
+/// 几何段的第一行（字段表 `layout/01-first-txn.md` 一）。checker 自己走字段表推，不借实现那边的偏移。
+const SYSTEM_CONFIGURATION_NODE_BYTES_OFFSET: usize = 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80;
 const SYSTEM_CONFIGURATION_TAIL_OFFSET: usize = 469;
 /// 系统配置里回退下界 F 那 8 字节：字段表里 journal tail 8、journal 实例代号 4 之后的那一行（D22（单元原子性怎么合成） 已定项 9）。
 /// 按 checker 自己走字段表的读法从 tail 那一行推出来，不借实现那边的偏移。
@@ -244,8 +259,12 @@ pub(crate) fn read_u64(bytes: &[u8], offset: usize) -> u64 {
     u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
 }
 
-/// 判一个系统配置槽（4096 字节）：magic、整槽校验和、格式版本、incompat 位、加密类型。
+/// 判一个系统配置槽（4096 字节）：magic、整槽校验和、格式版本、incompat 位、节点大小、加密类型。
 /// 几何字段的上下界在 [`image::geometry_of`] 判（R、S、槽距、`physical_block_size`、环长）。
+///
+/// # Errors
+/// 每一道不过各报一个 [`Verdict`] 成员；节点大小不是格式常量报 [`Verdict::NodeBytesNotTheFormatConstant`]，
+/// 池级走读把它与整槽校验和不对归成同一类（这一槽自证不过）。
 pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfigurationView, Verdict> {
     let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     if slot.len() < slot_bytes {
@@ -269,6 +288,9 @@ pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfiguratio
         || incompat[0] & INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT == 0
     {
         return Err(Verdict::UnknownIncompatBit);
+    }
+    if u64::from(read_u32(slot, SYSTEM_CONFIGURATION_NODE_BYTES_OFFSET)) != NODE_BYTES {
+        return Err(Verdict::NodeBytesNotTheFormatConstant);
     }
     if slot[SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET] != SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFF
     {
@@ -441,7 +463,7 @@ pub fn check_unit(unit: &[u8]) -> Result<u8, Verdict> {
     if !checksum_field_holds(unit, header_end, UNIT_HEADER_CHECKSUM_OFFSET) {
         return Err(Verdict::ChecksumMismatch);
     }
-    if read_u32(unit, payload_crc_offset) != crc32_castagnoli_bitwise(&unit[header_end..]) {
+    if read_u32(unit, payload_crc_offset) != crc32_castagnoli_table(&unit[header_end..]) {
         return Err(Verdict::ChecksumMismatch);
     }
     // 两道校验和之后才判这两样：版本号在头校验和里、预留位在载荷 CRC 里，校验和过了，它们就是写这个单元的那一方写下的值，
@@ -502,11 +524,12 @@ pub fn index_node_view(unit: &[u8]) -> Result<IndexNodeView, Verdict> {
     offset += 2;
     assert_eq!(offset, 86 + 2 * key_width, "明文头末尾 = 86 + 2k");
     let declared_length = usize::from(read_u16(unit, 8));
-    if declared_length != entry_count * entry_width || entry_width < key_width {
-        return Err(Verdict::DeclaredLengthMismatch);
-    }
+    // 条目宽 0 先判：key 宽不是 0 的树上「条目宽 ≥ key 宽」先红会把它盖成普通的长度不匹配，I-1.10 认的是这一个成员
     if entry_width == 0 && entry_count != 0 {
         return Err(Verdict::EntryWidthZeroWithEntries);
+    }
+    if declared_length != entry_count * entry_width || entry_width < key_width {
+        return Err(Verdict::DeclaredLengthMismatch);
     }
     let entries_start = offset + usize::try_from(NONCE_MAC_ALGORITHM_RESERVED_BYTES).expect("29");
     if entries_start + declared_length > unit.len() {
@@ -772,7 +795,7 @@ pub struct JournalRecordView {
 pub fn back_chain_of_record_header(record: &[u8]) -> u32 {
     let mut header = record[..usize::try_from(JOURNAL_HEADER_BYTES).expect("487")].to_vec();
     header[JOURNAL_HEADER_CHECKSUM_OFFSET..JOURNAL_HEADER_CHECKSUM_OFFSET + 32].fill(0);
-    crc32_castagnoli_bitwise(&header)
+    crc32_castagnoli_table(&header)
 }
 
 /// 判一条 journal 记录：magic、`header_csum` 罩整条 4096（D23（journal 的角色与格式） 已定项 13）、类型、记录长度、fsid、
@@ -811,7 +834,7 @@ pub fn check_journal_record(
         return Err(Verdict::DeclaredLengthMismatch);
     }
     if read_u32(record, JOURNAL_PAYLOAD_CHECKSUM_OFFSET)
-        != crc32_castagnoli_bitwise(&record[header_bytes..payload_end])
+        != crc32_castagnoli_table(&record[header_bytes..payload_end])
     {
         return Err(Verdict::ChecksumMismatch);
     }
@@ -860,17 +883,108 @@ pub fn check_journal_record(
 mod tests {
     use super::*;
 
+    /// 判定宽度从系统配置里读来（checker 不探测设备），交出去的必须标成声明值、不许标成探到的（C388（checker 的判定宽度不自己探测））：
+    /// 两块盘各声明 max(`physical_block_size`, io_min)，取最大的 4096，来源是 `DeclaredOnly`。
     #[test]
-    fn declared_only_width_stays_distinguishable_from_probed() {
-        let declared = DecisionWidth::DeclaredOnly { bytes: 512 };
-        let probed = DecisionWidth::Probed { bytes: 512 };
-        assert_ne!(declared, probed, "同一个数、两种来源，checker 必须分得开");
-        assert_eq!(declared.bytes(), probed.bytes());
+    fn the_decision_width_read_from_the_chosen_system_configurations_is_reported_as_declared_not_probed(
+    ) {
+        let geometry_declaring =
+            |physical_block_size: u32, declared_minimum_input_output_bytes: u32| {
+                image::PoolGeometry {
+                    filesystem_identifier: [0u8; 16],
+                    physical_block_size,
+                    journal_ring_start_slot: 0,
+                    journal_ring_bytes: 0,
+                    declared_in_flight_record_limit: 0,
+                    declared_worst_case_occupancy_bytes: 0,
+                    declared_safety_factor: 0,
+                    declared_minimum_input_output_bytes,
+                    regions: 0,
+                    slots_per_region: 0,
+                    prime_step: 0,
+                    chunk_bytes: 0,
+                    base_slot: 0,
+                    region_devices: [0, 0, 0],
+                    unit_area_start_slot: 0,
+                    slot_spacing: 0,
+                }
+            };
+        let decision_width = image::decision_width_declared_by_the_chosen_system_configurations(&[
+            geometry_declaring(512, 0),
+            geometry_declaring(512, 4096),
+        ]);
+        assert_eq!(
+            decision_width,
+            Some(DecisionWidth::DeclaredOnly { bytes: 4096 }),
+            "两块盘里声明的最大判定宽度 4096，来源是声明值，不是探到的"
+        );
     }
 
     #[test]
     fn bitwise_crc32c_matches_the_published_check_value() {
         assert_eq!(crc32_castagnoli_bitwise(b"123456789"), 0xE306_9283);
+    }
+
+    /// 查表那一份与按位那一份逐字节同值：一段 0..=255 循环的字节流，每一个前缀长度（0 到 1024 字节）上两份算出同一个值。
+    #[test]
+    fn table_crc32c_agrees_with_the_bitwise_crc32c_on_every_prefix_length() {
+        let bytes: Vec<u8> = (0..1024u32)
+            .map(|index| u8::try_from(index % 256).expect("小于 256"))
+            .collect();
+        for prefix_length in 0..=bytes.len() {
+            assert_eq!(
+                crc32_castagnoli_table(&bytes[..prefix_length]),
+                crc32_castagnoli_bitwise(&bytes[..prefix_length]),
+                "前 {prefix_length} 字节：查表与按位两份不同"
+            );
+        }
+    }
+
+    /// 偏移 301 的节点大小（几何段开头那 4 字节）改成 8192、整槽校验和照 checker 自己的算法重封：magic、校验和、格式版本、incompat 位
+    /// 都过，拒它的只能是节点大小那一判（C840）；改回 16384 照收。
+    #[test]
+    fn a_system_configuration_slot_whose_node_size_is_not_the_format_constant_is_refused_by_name() {
+        let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+        let slot_declaring_node_bytes = |node_bytes: u32| {
+            let mut slot = vec![0u8; slot_bytes];
+            slot[..4].copy_from_slice(SYSTEM_CONFIGURATION_MAGIC);
+            slot[FORMAT_VERSION_OFFSET..FORMAT_VERSION_OFFSET + 2].copy_from_slice(
+                &SYSTEM_CONFIGURATION_FORMAT_VERSION_THIS_CHECKER_READS.to_le_bytes(),
+            );
+            slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] =
+                INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT;
+            slot[SYSTEM_CONFIGURATION_NODE_BYTES_OFFSET
+                ..SYSTEM_CONFIGURATION_NODE_BYTES_OFFSET + 4]
+                .copy_from_slice(&node_bytes.to_le_bytes());
+            let checksum = crc32_castagnoli_bitwise(&slot);
+            slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 4]
+                .copy_from_slice(&checksum.to_le_bytes());
+            slot
+        };
+        let foreign_node_size = slot_declaring_node_bytes(8192);
+        assert!(
+            checksum_field_holds(
+                &foreign_node_size,
+                slot_bytes,
+                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET
+            ),
+            "整槽校验和重封过，拒它的只能是节点大小那一判"
+        );
+        assert_eq!(
+            check_system_configuration_slot(&foreign_node_size),
+            Err(Verdict::NodeBytesNotTheFormatConstant),
+            "节点大小 8192：点名节点大小那一格"
+        );
+        assert!(
+            image::verdict_says_the_slot_does_not_verify_itself(
+                &Verdict::NodeBytesNotTheFormatConstant
+            ),
+            "池级走读把它当这一槽自证不过"
+        );
+        assert!(
+            check_system_configuration_slot(&slot_declaring_node_bytes(16384)).is_ok(),
+            "节点大小是格式常量的同一份槽照收"
+        );
     }
 
     #[test]

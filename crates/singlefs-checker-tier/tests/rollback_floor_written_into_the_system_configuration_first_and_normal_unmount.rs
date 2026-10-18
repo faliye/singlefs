@@ -1,4 +1,4 @@
-//! checker 档模块：crash、crash_point_replay_progress、crash_given_states、crash_library、crash_amplification
+//! checker 档模块：crash、crash_point_replay_progress、crash_given_states、crash_amplification
 //! 回退改形态的第二批（SysPre 与 B1）落到 `crates/` 上：
 //! - F 的生效值 = max(根上带的 F, 系统配置里读得出的 F)（D16（发布语义） 已定项 1「生效」）；
 //! - 抬 F 那一串（准入与卸载共用）第一次发布之前先把新 F 写进每块盘的系统配置、过一道屏障，先写那一步任何一块盘失败就一条根都不发、
@@ -26,7 +26,6 @@ use singlefs_checker_tier::crash_amplification::{
 use singlefs_checker_tier::crash_given_states::{
     GivenStateConclusion, GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
 };
-use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
@@ -218,9 +217,6 @@ fn make_the_root_unreadable(pool: &mut BuiltPool, txg: CheckpointTxg) {
         .expect("改坏根槽");
 }
 
-/// 这份文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
-const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs";
-
 /// 一张盘上的池级 checker 走两段（用户 2026-10-13 定「能走两段的都走两段」）：那张盘作一张给定状态表（基线就是那张盘、写表空、一个空持久集合）
 /// 交崩溃点重放的给定状态引擎（`crash_amplification::GivenStatesEngine`），录入段写进给定状态表那一类的判定库，判段从库里读回判
 /// （配了 GPU 走 GPU 判器，没配由 CPU 判器判），判过的复用。只录那一趟、表归别的机器判的那一趟交 `None`（用例当场返回）。
@@ -235,12 +231,10 @@ fn pool_checker_conclusion_through_the_given_states_engine(
         let _one_test_at_a_time = one_test_changes_the_environment_at_a_time();
         GivenStatesEngine::start_from_environment(
             GivenStatesItem {
-                item_name: "rollback_floor_written_into_the_system_configuration_first".to_string(),
-                setting_file: THIS_FILE.to_string(),
-                seeds_and_scale: "fixed".to_string(),
+                item_name: "rollback_floor_written_into_the_system_configuration_first::fixed"
+                    .to_string(),
             },
             &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &repository_root_of_this_crate(),
         )
         .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
     };

@@ -1,0 +1,1 @@
+pub const UNLINKED_COMMON_SOURCE: &str = include_str!("common.wgsl");

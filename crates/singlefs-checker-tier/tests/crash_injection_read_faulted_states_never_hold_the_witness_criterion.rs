@@ -60,9 +60,6 @@ const OPERATIONS_PER_HISTORY: usize = 24;
 #[cfg(feature = "verdict-store")]
 const HISTORIES_OF_THE_SMALL_BATCH: usize = 1;
 
-/// 这份测试文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
-#[cfg(feature = "verdict-store")]
-const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/crash_injection_read_faulted_states_never_hold_the_witness_criterion.rs";
 /// 崩溃点重放合表里这一项的名字（`.claude/gate.d/crash-point-replay-items.tsv`）。
 #[cfg(feature = "verdict-store")]
 const CRASH_POINT_REPLAY_ITEM: &str = "read-faulted-states-never-hold-the-witness-criterion";
@@ -214,24 +211,24 @@ fn judge_the_read_faulted_states(
             operations_after_each_step.push((observation.position, stream.operation_count()));
         });
         assert!(
-            run.first_stream_index_after_each_power_loss.is_empty(),
+            run.earliest_stream_index_after_each_power_loss.is_empty(),
             "这一组比重里没有掉电那一步：给定状态表不带掉电接缝"
         );
         let mut operations_before_the_step = 0usize;
-        let mut first_stream_index_of_the_step = None;
+        let mut earliest_stream_index_of_the_step = None;
         for (position, operations_after_the_step) in &operations_after_each_step {
             if let StepPosition::Operation(step_index) = position {
-                if first_stream_index_of_the_step.is_none()
+                if earliest_stream_index_of_the_step.is_none()
                     && history.operations[*step_index].kind()
                         == HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
                     && operations_before_the_step < *operations_after_the_step
                 {
-                    first_stream_index_of_the_step = Some(operations_before_the_step);
+                    earliest_stream_index_of_the_step = Some(operations_before_the_step);
                 }
             }
             operations_before_the_step = *operations_after_the_step;
         }
-        let Some(first_stream_index_of_the_step) = first_stream_index_of_the_step else {
+        let Some(earliest_stream_index_of_the_step) = earliest_stream_index_of_the_step else {
             continue;
         };
         let operations_after_the_last_step = operations_before_the_step;
@@ -248,7 +245,7 @@ fn judge_the_read_faulted_states(
             run.operations_written_by_make_filesystem,
             execution,
         );
-        let base_after_the_make_filesystem = history_after_the_make_filesystem.base();
+        let base_after_the_make_filesystem = history_after_the_make_filesystem.base_pool();
         let writes_after_the_make_filesystem = history_after_the_make_filesystem.writes();
         let segments_after_the_make_filesystem = history_after_the_make_filesystem.segments();
         let mut first_crash_persisted_sets: Vec<Vec<bool>> = Vec::new();
@@ -263,7 +260,7 @@ fn judge_the_read_faulted_states(
             }
             base.apply_writes(&writes[writes_applied_to_the_base..first_write]);
             writes_applied_to_the_base = first_write;
-            if last_stream_index < first_stream_index_of_the_step {
+            if last_stream_index < earliest_stream_index_of_the_step {
                 continue;
             }
             let first_write_after_the_make_filesystem =
@@ -373,17 +370,6 @@ fn seeds_and_scale_of(histories: usize) -> String {
     )
 }
 
-#[cfg(feature = "verdict-store")]
-fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../Cargo.lock")
-        .canonicalize()
-        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
-        .parent()
-        .expect("Cargo.lock 所在的目录就是仓根")
-        .to_path_buf()
-}
-
 /// 起引擎时拿不拿改环境的锁（同 `crash_injection_campaign.rs` 的 `EngineStart`）：拿着 `CrashAmplificationEnvironment` 的调用方不许再拿
 /// （同一把锁，不可重入），别的调用方要拿。引擎起步不是一下读完环境（先读多机配置与分片，照树算完结论版本才读库目录），读到一半同一个进程里
 /// 别的用例拿着守卫换了多机配置、分片与库目录，这一趟就读成一半调用方的、一半那条用例的：分片照调用方的、库是那条用例起跑清空的那一份，
@@ -412,12 +398,9 @@ fn read_faulted_states_through_the_given_states_engine(
     let start_the_engine = || {
         GivenStatesEngine::start_from_environment_putting_a_fault_on_the_gpu_side(
             GivenStatesItem {
-                item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
-                setting_file: THIS_FILE.to_string(),
-                seeds_and_scale: seeds_and_scale_of(histories),
+                item_name: format!("{}::{}", CRASH_POINT_REPLAY_ITEM, seeds_and_scale_of(histories)),
             },
             &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &repository_root(),
             fault,
         )
         .expect("崩溃点重放的引擎照本机配置起得来（配了 GPU 卡用不上、结论版本与编译时对不上都在这里红，不退回 CPU）")
@@ -568,18 +551,16 @@ fn the_first_read_faulted_history_judged_on_the_gpu(
     fault: FaultPutOnTheGpuSide,
 ) -> (ReadFaultedStatesOfTheBatch, GivenStatesRun) {
     use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
-    let directory =
-        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
-            &format!("read-faulted-given-states-on-the-gpu-{tag}"),
-        )
-        .expect("流水线单元测试那一类里这条用例的目录");
+    let directory = singlefs_checker_tier::crash_library::DisposableLibraryDirectory::new(
+        &format!("read-faulted-given-states-on-the-gpu-{tag}"),
+    )
+    .expect("流水线单元测试那一类里这条用例的目录");
     let library = directory.join("library");
     let configuration = directory.join("multi-host-with-gpu.env");
     std::fs::write(&configuration, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
     // 清场之下要清场之后那一份显卡先后：调用方给这个进程的那一份经环境变量交给引擎（不读此刻的环境；
     // 抄进配置在调用方的显卡先后只写在仓根 multi-host.env、副本里又没有那一份时抄成空串，见 common_gpu_cards_of_the_caller）
-    let cards =
-        common_gpu_cards_of_the_caller::card_priority_value_of_the_caller(&repository_root());
+    let cards = common_gpu_cards_of_the_caller::card_priority_value_of_the_caller();
     // 机器角色同样照抄调用方给这个进程的那一份：守卫连它一起清掉，引擎取卡按此刻的环境认这台机器、卡池按调用方那一份认，
     // 不设回去时第二台上的引擎认成本机、拿本机那几张卡去对第二台的卡池（同 crash_injection_campaign.rs 的 settings_of_an_engine_on_the_gpu）
     use singlefs_checker_tier::gpu_card_configuration::{
@@ -618,11 +599,10 @@ fn the_first_read_faulted_history_judged_on_the_cpu(
 ) -> (ReadFaultedStatesOfTheBatch, GivenStatesRun) {
     use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
     use singlefs_checker_tier::gpu_card_configuration::MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE;
-    let directory =
-        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
-            &format!("read-faulted-given-states-on-the-cpu-{tag}"),
-        )
-        .expect("流水线单元测试那一类里这条用例的目录");
+    let directory = singlefs_checker_tier::crash_library::DisposableLibraryDirectory::new(
+        &format!("read-faulted-given-states-on-the-cpu-{tag}"),
+    )
+    .expect("流水线单元测试那一类里这条用例的目录");
     let library = directory.join("library");
     let configuration = directory.join("multi-host-on-the-cpu.env");
     std::fs::write(&configuration, "ENABLE_GPU=0\n").expect("写得了没开 GPU 的配置");

@@ -1183,6 +1183,47 @@ fn prepare_with_residual_record_seeded(tag: &str) -> Prepared {
     }
 }
 
+/// 观察者「残留记录的链」（`residual_record_chain`）：展开的状态里 B 的记录与根槽都已持久；链够得着残留记录（实例 2 的根一条都没持久）时
+/// 恢复必须落在残留记录那一版、施加它，记一次 `chain_reaches_the_residual_record`。观察者的身份是这个 fn 的闭包键
+/// （入口登记在 `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`），另读的输入按摘要进它的版本。
+fn observe_the_chain_to_the_residual_record(
+    second_publish_root_index: usize,
+    second_publish_record_indexes: &[usize],
+    second_instance_root_indexes: &[usize],
+    crash_image: &CrashImage<'_>,
+    consulted_report: &RecoveryReport,
+    counts: &mut CrashPointReplayObserverCounts,
+) {
+    let persisted = &crash_image.persisted;
+    assert!(
+        persisted[second_publish_root_index]
+            && second_publish_record_indexes
+                .iter()
+                .all(|record_index| persisted[*record_index]),
+        "展开的状态里 B 的记录与根槽都已持久"
+    );
+    // B 的根槽已持久、所选根的实例表（mkfs 那一版）里没有回退行：水位还在 (1, 4)，链从 jsn 4 接到 jsn 5，直到实例 2 的某条根持久。
+    let chain_reaches_the_residual_record = !second_instance_root_indexes
+        .iter()
+        .any(|root_index| persisted[*root_index]);
+    if chain_reaches_the_residual_record {
+        counts.add("chain_reaches_the_residual_record", 1);
+    }
+    let landed_on_the_residual_record = consulted_report.effective_root
+        == Some(RESIDUAL_RECORD_ROOT)
+        && consulted_report.outcome
+            == (RecoveryOutcome::FileRead {
+                root: (InstanceGeneration(1), CheckpointTxg(4)),
+                content: residual_content(),
+            });
+    assert!(
+            chain_reaches_the_residual_record == landed_on_the_residual_record,
+            "该施加残留记录与恢复实际落在 (1, 5) 对不上：谓词 {chain_reaches_the_residual_record}、实际走的根 {:?}、施加 {}",
+            consulted_report.effective_root,
+            consulted_report.journal.prefix_applied
+        );
+}
+
 /// 步 0「预想的细节」第三条的正例（C42（残留记录冒充合法前缀）、E32（上一条时间线的残留）；验收第 2 条的正例那一半）：基镜像里预置一条
 /// jsn 连续、校验和过、点名单元也在、属于所选根实例、所选根的实例表里没有回退行的记录。只展开 B 的根槽之后的小段，每个状态按独立的谓词判它该不该被施加：
 /// 实例 2 的根一条都没持久（所选根还是 B 的 (1, 4)，链从 jsn 4 接得到 jsn 5）⇔ 恢复落在 (1, 5)、读出它那一版的内容。报出跑到的状态数。
@@ -1226,34 +1267,14 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
                    crash_image: &CrashImage<'_>,
                    consulted_report: &RecoveryReport,
                    counts: &mut CrashPointReplayObserverCounts| {
-        let persisted = &crash_image.persisted;
-        assert!(
-            persisted[second_publish_root_index]
-                && second_publish_record_indexes
-                    .iter()
-                    .all(|record_index| persisted[*record_index]),
-            "展开的状态里 B 的记录与根槽都已持久"
+        observe_the_chain_to_the_residual_record(
+            second_publish_root_index,
+            &second_publish_record_indexes,
+            second_instance_root_indexes,
+            crash_image,
+            consulted_report,
+            counts,
         );
-        // B 的根槽已持久、所选根的实例表（mkfs 那一版）里没有回退行：水位还在 (1, 4)，链从 jsn 4 接到 jsn 5，直到实例 2 的某条根持久。
-        let chain_reaches_the_residual_record = !second_instance_root_indexes
-            .iter()
-            .any(|root_index| persisted[*root_index]);
-        if chain_reaches_the_residual_record {
-            counts.add("chain_reaches_the_residual_record", 1);
-        }
-        let landed_on_the_residual_record = consulted_report.effective_root
-            == Some(RESIDUAL_RECORD_ROOT)
-            && consulted_report.outcome
-                == (RecoveryOutcome::FileRead {
-                    root: (InstanceGeneration(1), CheckpointTxg(4)),
-                    content: residual_content(),
-                });
-        assert!(
-                chain_reaches_the_residual_record == landed_on_the_residual_record,
-                "该施加残留记录与恢复实际落在 (1, 5) 对不上：谓词 {chain_reaches_the_residual_record}、实际走的根 {:?}、施加 {}",
-                consulted_report.effective_root,
-                consulted_report.journal.prefix_applied
-            );
     };
     let Some(tally) = enumerate_crash_states_with_expansion(
         CrashPointReplayItem {
@@ -1432,6 +1453,55 @@ fn records_after_tail_naming_a_mismatched_unit(
         .collect()
 }
 
+/// 观察者「陈旧的 tail」（`stale_tail`）：展开的状态里择到的系统配置都带陈旧的 tail；tail 之后点名了被复用的单元的记录逐条记数；
+/// 改坏 tail 之后恢复的终态与 tail 没改坏的同一个状态相同。观察者的身份是这个 fn 的闭包键
+/// （入口登记在 `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`）。
+fn observe_the_stale_tail(
+    prepared: &Prepared,
+    stale_tail_image: &CrashImage<'_>,
+    stale_tail_report: &RecoveryReport,
+    counts: &mut CrashPointReplayObserverCounts,
+) {
+    assert_eq!(
+        choose_system_configuration(stale_tail_image)
+            .expect("系统配置")
+            .quantities
+            .journal_tail,
+        STALE_JOURNAL_TAIL,
+        "展开的状态里择到的系统配置都带陈旧的 tail"
+    );
+    let mismatched =
+        records_after_tail_naming_a_mismatched_unit(stale_tail_image, STALE_JOURNAL_TAIL);
+    if !mismatched.is_empty() {
+        counts.add("states_with_a_reused_named_unit_after_the_stale_tail", 1);
+        for record in &mismatched {
+            counts.add(&format!("record_{record}_names_a_reused_unit"), 1);
+        }
+    }
+    // 枚举用的写表在录制流里的写后面接着撕裂镜像（系统配置槽写的第三态，代码审阅第 4 条）：tail 没改坏的那一份镜像照样接上，
+    // 撕裂的那一槽同样新旧都读不出，持久集合逐条对得上。
+    let true_tail_writes: Vec<RetainedWrite> = prepared
+        .writes
+        .iter()
+        .chain(&stale_tail_image.writes[prepared.writes.len()..])
+        .cloned()
+        .collect();
+    let true_tail_image = CrashImage {
+        base: &prepared.base,
+        writes: &true_tail_writes,
+        persisted: stale_tail_image.persisted.clone(),
+    };
+    let true_tail_report = recover(&true_tail_image, JournalPolicy::Consult);
+    assert!(
+            *stale_tail_report == true_tail_report,
+            "改坏 tail 之后恢复的终态与 tail 没改坏的同一个状态不同：tail 陈旧：{:?} 走 {:?}；tail 没改坏：{:?} 走 {:?}",
+            stale_tail_report.outcome,
+            stale_tail_report.effective_root,
+            true_tail_report.outcome,
+            true_tail_report.effective_root
+        );
+}
+
 /// 步 6 必红「陈旧 tail + 已复用的块」（verification-build.md 崩溃点重放第一版必红用例表；C77（重放起点未定义）；D23（journal 的角色与格式） 已定项 3
 /// 那条 ⚠️ 与已定项 14）：固定脚本到 E 之后再覆盖写两次（txg 19 的数据单元落回 50180，A 那条记录点名的单元被合法复用），录制流里每次系统配置槽写的
 /// tail 都改成 2。txg 19 的 28 个单元写全持久之后的每个崩溃状态：恢复必须完成、终态与 tail 没改坏的同一个状态逐项相等、施加前验证一次都不失败；
@@ -1476,44 +1546,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
                    stale_tail_image: &CrashImage<'_>,
                    stale_tail_report: &RecoveryReport,
                    counts: &mut CrashPointReplayObserverCounts| {
-        assert_eq!(
-            choose_system_configuration(stale_tail_image)
-                .expect("系统配置")
-                .quantities
-                .journal_tail,
-            STALE_JOURNAL_TAIL,
-            "展开的状态里择到的系统配置都带陈旧的 tail"
-        );
-        let mismatched =
-            records_after_tail_naming_a_mismatched_unit(stale_tail_image, STALE_JOURNAL_TAIL);
-        if !mismatched.is_empty() {
-            counts.add("states_with_a_reused_named_unit_after_the_stale_tail", 1);
-            for record in &mismatched {
-                counts.add(&format!("record_{record}_names_a_reused_unit"), 1);
-            }
-        }
-        // 枚举用的写表在录制流里的写后面接着撕裂镜像（系统配置槽写的第三态，代码审阅第 4 条）：tail 没改坏的那一份镜像照样接上，
-        // 撕裂的那一槽同样新旧都读不出，持久集合逐条对得上。
-        let true_tail_writes: Vec<RetainedWrite> = prepared
-            .writes
-            .iter()
-            .chain(&stale_tail_image.writes[prepared.writes.len()..])
-            .cloned()
-            .collect();
-        let true_tail_image = CrashImage {
-            base: &prepared.base,
-            writes: &true_tail_writes,
-            persisted: stale_tail_image.persisted.clone(),
-        };
-        let true_tail_report = recover(&true_tail_image, JournalPolicy::Consult);
-        assert!(
-                *stale_tail_report == true_tail_report,
-                "改坏 tail 之后恢复的终态与 tail 没改坏的同一个状态不同：tail 陈旧：{:?} 走 {:?}；tail 没改坏：{:?} 走 {:?}",
-                stale_tail_report.outcome,
-                stale_tail_report.effective_root,
-                true_tail_report.outcome,
-                true_tail_report.effective_root
-            );
+        observe_the_stale_tail(&prepared, stale_tail_image, stale_tail_report, counts);
     };
     let Some(tally) = enumerate_crash_states_with_expansion(
         CrashPointReplayItem {

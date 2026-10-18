@@ -15,7 +15,7 @@
 use super::common::{parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
 #[cfg(feature = "verdict-store")]
 use singlefs_checker_tier::crash_amplification::CrashPointRecorder;
-use singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory;
+use singlefs_checker_tier::crash_library::crash_library_directory;
 #[cfg(feature = "verdict-store")]
 use singlefs_core::address::CheckpointTxg;
 use singlefs_core::address::{InodeNumber, InstanceGeneration};
@@ -193,7 +193,7 @@ pub enum ObserverOfTheStandardPrefix {
 }
 
 impl ObserverOfTheStandardPrefix {
-    /// 观察者的名字：进它的结论种类（`ConclusionKind::Observer`）、计数与判红那一项。
+    /// 观察者的名字：进它那一组判法单元的组名、计数与判红那一项（不进结论种类：`ConclusionKind::Observer` 不带名字，是哪一个观察者由版本担）。
     pub fn name(self) -> &'static str {
         match self {
             Self::WritableMountAndContinuation => "writable_mount_and_continuation",
@@ -203,7 +203,7 @@ impl ObserverOfTheStandardPrefix {
 
 /// 登记表（第三轮正文 H4）：标准前缀的节点（这份文件里设点的入口名：[`record_the_multi_record_publishes`] 设的取号加暖机、新池新建文件、
 /// B、C 两次顺序写）→ 挂的观察者。单跑一项照表跑它经过的每个节点上登记的全部观察者；共享节点上的观察者对经过它的每一项、每一个状态都跑
-/// （块键相同的块在库里复用）。观察者代码不进计划哈希、不进判器版本，它的版本从这份文件出发算（`crash_identity::ConclusionVersionRequest::Observer`）。
+/// （块键相同的块在库里复用）。观察者代码不进计划哈希、不进判器版本，它的身份是它的入口 fn 的闭包键（`common_crash_point_observers::observe_the_mount_continuation`，登记在 `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`）。
 pub static OBSERVERS_ON_THE_STANDARD_PREFIX: &[(&str, &[ObserverOfTheStandardPrefix])] = &[
     (
         "acquire_instance_and_warm_up",
@@ -381,7 +381,6 @@ pub mod common_gpu_cards_of_the_caller;
 /// 调用方的多机配置读不了、显卡先后写坏了，或清场之下开了 GPU 而没写清场之后那一份（调用方自己的配置就跑不了 GPU 用例）。
 #[cfg(feature = "verdict-store")]
 fn card_priority_of_the_caller_for_a_test_configuration_naming_no_card(
-    repository_root: &std::path::Path,
 ) -> Option<EnvironmentRestoredOnDrop> {
     use singlefs_checker_tier::gpu_card_configuration::{
         configuration_value, GpuQuiesce, CARDS_BY_PRIORITY_KEY,
@@ -405,10 +404,9 @@ fn card_priority_of_the_caller_for_a_test_configuration_naming_no_card(
     if !gpu_is_enabled || the_key_is_written {
         return None;
     }
-    let cards_of_the_caller =
-        common_gpu_cards_of_the_caller::card_priority_value_of_the_caller(repository_root);
+    let cards_of_the_caller = common_gpu_cards_of_the_caller::card_priority_value_of_the_caller();
     let mut restored = EnvironmentRestoredOnDrop::saved_then_cleared(&[CARDS_BY_PRIORITY_KEY]);
-    restored.set(
+    restored.set_variable(
         CARDS_BY_PRIORITY_KEY,
         std::ffi::OsStr::new(&cards_of_the_caller),
     );
@@ -552,23 +550,15 @@ pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         expansion: &expansion,
         crash_points,
     };
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../Cargo.lock")
-        .canonicalize()
-        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
-        .parent()
-        .expect("Cargo.lock 所在的目录就是仓根")
-        .to_path_buf();
     // 调用方没给库就用家目录下流水线单元测试那一类的长期库（不删，下一趟照同一套复用）：变量设上，跑完（或 panic）还原成调用方原来的样子
     let unit_tests_library = match std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY") {
         Some(_) => None,
         None => {
-            let directory = amplification_unit_tests_library_directory(None)
-                .expect("流水线单元测试那一类的库目录");
+            let directory = crash_library_directory().expect("流水线单元测试那一类的库目录");
             let mut restored = EnvironmentRestoredOnDrop::saved_then_cleared(&[
                 "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
             ]);
-            restored.set(
+            restored.set_variable(
                 "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
                 directory.as_os_str(),
             );
@@ -576,14 +566,13 @@ pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         }
     };
     let card_priority_of_the_caller =
-        card_priority_of_the_caller_for_a_test_configuration_naming_no_card(&root);
+        card_priority_of_the_caller_for_a_test_configuration_naming_no_card();
     let started = std::time::Instant::now();
     let run = run_from_environment_with_observers(
         &flow,
         flow_name,
         observers,
         &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &root,
         limit,
     )
     .expect("按环境跑得完");
@@ -613,9 +602,9 @@ pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         return (run, Some(line));
     }
     let judge_line = judge_fields_of_the_summary_line(&run);
-    let judge_version = run.judged_conclusions().version_text();
+    let judging_units_fingerprint = run.judged_conclusions().version_text();
     let line = format!(
-        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judge_version={judge_version} seconds={seconds:.1}{reuse_and_scale}{judge_line}",
+        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judging_units_fingerprint={judging_units_fingerprint} seconds={seconds:.1}{reuse_and_scale}{judge_line}",
         run.mode.name(),
         run.checking.states_checked,
         run.checking.blocks_checked,
@@ -629,7 +618,7 @@ pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         "健康的流 {flow_name} 一个红状态都不该有：{:?}",
         run.checking.red_texts
     );
-    // 这一趟复用的块（库里这一判法版本早先判过的）判红过也要红：只看这一趟判出的红数，红过一次的流再跑一遍就成了绿
+    // 这一趟复用的块（库里这一判法单元指纹早先判过的）判红过也要红：只看这一趟判出的红数，红过一次的流再跑一遍就成了绿
     if run.unjudged_blocks == 0 {
         assert!(
             run.violations.is_empty(),

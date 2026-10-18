@@ -1,0 +1,8 @@
+[package]
+name = "ftier"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fcore = { path = "../fcore" }
+fharness = { path = "../fharness" }

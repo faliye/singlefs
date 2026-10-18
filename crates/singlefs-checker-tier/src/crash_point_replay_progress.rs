@@ -1,6 +1,6 @@
 //! 崩溃枚举用例跑出来的两样文字：发现日志（出错那一份：每趟枚举往 `SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE` 指的文件末尾追加一节，
 //! 红例按签名去重、留样本、收尾一行汇总；标准输出上的 `CRASH_POINT_REPLAY_FINDING` / `CRASH_POINT_REPLAY_FINDINGS` 两种行同一套字段）与跑这一趟的
-//! 工具链身份（`rustc -Vv`、`cargo -V`、target triple，进判法版本与结论版本，`crash_identity`）。
+//! 工具链身份（`rustc -Vv`、`cargo -V`、target triple，进判法单元指纹与结论版本，`crash_identity`）。
 //!
 //! 崩溃枚举用例判过的状态都在判定库里（`crash_library` 那一类的长期库，两段协议：流先入库、判段从库里读回判），进度文件与
 //! 双机账本没有了：分片、导入、续跑都走库（`crash_state_enumeration`）。
@@ -21,7 +21,7 @@ pub const CRASH_POINT_REPLAY_FINDINGS_FILE_ENVIRONMENT_VARIABLE: &str =
     "SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE";
 
 /// 编这个测试二进制、跑这一趟的工具链：`rustc -Vv` 前三行、`cargo -V`、target triple（`rustc -Vv` 的 `host:` 那一行：
-/// 这几条流都不交叉编译，编出来的就是 host）。进判法版本与结论版本（`crash_identity`）：两台的工具链不同，判定就落在不同的版本下，不互相复用。
+/// 这几条流都不交叉编译，编出来的就是 host）。进判法单元指纹与结论版本（`crash_identity`）：两台的工具链不同，判定就落在不同的版本下，不互相复用。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CrashPointReplayToolchainIdentity {
     pub rustc_version_lines: String,
@@ -38,7 +38,9 @@ impl CrashPointReplayToolchainIdentity {
     #[must_use]
     pub fn of_the_cargo_running_this_test() -> Self {
         let cargo = PathBuf::from(std::env::var_os("CARGO").unwrap_or_else(|| {
-            panic!("要经 cargo test 起（环境里要有 CARGO）：判法版本要记编这个测试二进制的工具链")
+            panic!(
+                "要经 cargo test 起（环境里要有 CARGO）：判法单元指纹要记编这个测试二进制的工具链"
+            )
         }));
         let rustc_next_to_cargo = cargo.with_file_name("rustc");
         let rustc = if rustc_next_to_cargo.is_file() {
@@ -322,19 +324,7 @@ fn new_signature_fields(
     fields
 }
 
-fn threshold_fields(
-    number: usize,
-    signature: &CrashPointReplayFindingSignature,
-    states_at_least: u64,
-) -> Vec<(&'static str, String)> {
-    let mut fields = vec![("finding", number.to_string())];
-    fields.extend(finding_signature_fields(signature));
-    fields.push(("states_at_least", states_at_least.to_string()));
-    fields
-}
-
-/// 一节的 begin 行：`crash_point_replay_findings_begin`，字段 `format=1`、`stream=<流名或 unnamed>`、`states=<整条流>`，
-/// 分片跑一片另带 `shard=`、`shard_states=`。
+/// 一节的 begin 行：`crash_point_replay_findings_begin`，字段 `format=1`、`stream=<流名或 unnamed>`、`states=<整条流>`。
 #[must_use]
 pub fn findings_log_begin_line(begin: &CrashPointReplayFindingsLogBegin) -> String {
     let fields = vec![
@@ -351,32 +341,6 @@ pub fn findings_log_begin_line(begin: &CrashPointReplayFindingsLogBegin) -> Stri
     tab_separated_findings_line("crash_point_replay_findings_begin", &fields)
 }
 
-/// 跑的过程中：一个签名第一次出现（发现日志那一行）。
-#[must_use]
-pub fn findings_log_new_signature_line(
-    number: usize,
-    signature: &CrashPointReplayFindingSignature,
-    first_sample: &CrashPointReplayFindingSample,
-) -> String {
-    tab_separated_findings_line(
-        "crash_point_replay_finding_new",
-        &new_signature_fields(number, signature, first_sample),
-    )
-}
-
-/// 跑的过程中：一个签名的状态数跨过一级台阶（发现日志那一行）。
-#[must_use]
-pub fn findings_log_threshold_line(
-    number: usize,
-    signature: &CrashPointReplayFindingSignature,
-    states_at_least: u64,
-) -> String {
-    tab_separated_findings_line(
-        "crash_point_replay_finding_threshold",
-        &threshold_fields(number, signature, states_at_least),
-    )
-}
-
 /// 标准输出：一个签名第一次出现，`CRASH_POINT_REPLAY_FINDING event=new …`（`first_violation=` 一直到行尾）。
 #[must_use]
 pub fn findings_standard_output_new_signature_line(
@@ -386,18 +350,6 @@ pub fn findings_standard_output_new_signature_line(
 ) -> String {
     let mut fields = vec![("event", "new".to_string())];
     fields.extend(new_signature_fields(number, signature, first_sample));
-    space_separated_findings_line("CRASH_POINT_REPLAY_FINDING", &fields)
-}
-
-/// 标准输出：一个签名的状态数跨过一级台阶，`CRASH_POINT_REPLAY_FINDING event=threshold …`。
-#[must_use]
-pub fn findings_standard_output_threshold_line(
-    number: usize,
-    signature: &CrashPointReplayFindingSignature,
-    states_at_least: u64,
-) -> String {
-    let mut fields = vec![("event", "threshold".to_string())];
-    fields.extend(threshold_fields(number, signature, states_at_least));
     space_separated_findings_line("CRASH_POINT_REPLAY_FINDING", &fields)
 }
 

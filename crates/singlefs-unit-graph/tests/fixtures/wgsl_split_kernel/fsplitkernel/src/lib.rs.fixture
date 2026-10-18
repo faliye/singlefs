@@ -1,0 +1,8 @@
+pub const COMMON_SOURCE: &str = include_str!("common.wgsl");
+pub const CHECKER_SOURCE: &str = include_str!("checker.wgsl");
+pub fn kernel_text() -> String {
+    format!("{COMMON_SOURCE}\n{CHECKER_SOURCE}")
+}
+pub fn checker_text_alone() -> String {
+    CHECKER_SOURCE.to_string()
+}

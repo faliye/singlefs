@@ -5,9 +5,11 @@
 //! - `C_MAPPING`（收窄）：C 读一次没施加的发布（记录拼的根，或上面那条较新的根）的账读不出时，只在那次发布读得出的记录不齐（序号缺一条、
 //!   缺末条）时照被抛弃根那一份从中央映射现算账里的落点；仍算不出就在取号之前拒可写（拒因另起一个成员，与 C393 那一拒分开报）。
 //!   记录齐的不走这一支（照被抛弃根那一份不收窄会在 `ur` 那几形上误拒，攻方量到入库 7 条）。较新的根那次发布一条记录都读不出时：
-//!   映射现算得出就并进来；现算不成时，系统配置里取过号的实例代号不比那条根新就照记录不齐那一支办（攻方
-//!   `research/prompts/m3-batch37-43-code-r1-opus-output.md` 第一节 Y2，用户 2026-10-08 定「两形都修」），比它新就不拒（入库 `urJ` 那一形就是这样，
-//!   拒了它就再也做不成可写挂载）。
+//!   映射现算得出就并进来；现算不成时只看那条根自己的树表与中央映射树根两个指针（C834，用户 2026-10-15 定「同一指针两份都更新」，
+//!   `research/prompts/c834-r3-main-verification.md`「四、用户定案」；替换攻方 `research/prompts/m3-batch37-43-code-r1-opus-output.md`
+//!   第一节 Y2 那一判）：有一个指针两条位置条目指着的两个槽都读出比那条根新的实例写的自证单元头
+//!   （`mount.rs` 的 `one_pointer_has_both_copies_overwritten_by_a_later_instance`）就不拒（入库 `urJ` 那一形就是这样，
+//!   拒了它就再也做不成可写挂载），否则照记录不齐那一支办。
 //!
 //! 造法（`tests/common_unwitnessed_publish/mod.rs`，攻方 `research/prompts/m3-batch35-36-code-r1-opus-output.md` 第一、三节那几形）：384 槽小盘、
 //! 第一个文件之后覆盖写 5 次，再录一次发布 R（覆盖写一次、一条记录；或顺序写三个数据单元、三条记录），崩在 R 的根槽落盘之后、系统配置轮换之前；
@@ -249,9 +251,10 @@ fn a_publish_whose_account_and_mapping_read_back_zero_while_its_last_record_is_m
 
 /// 攻方 Y2（`research/prompts/m3-batch37-43-code-r1-opus-output.md` 第一节，`u8M+u9T` 那一格）：R 是一条记录的覆盖写，M1 里 R 那条记录、
 /// R 的中央映射树根与树表读回全零，R 的根槽读得出。R 走读失败、系统配置没见证它，退回 P；R 是较新的可读根，账读不出、那次发布一条记录都读不出、
-/// 映射也现算不成，系统配置里取过号的实例代号就是 R 的（R 之后没有别的挂载取过号）⇒ 照记录不齐那一支办：重读一次仍这样、现行账（P 的）里没有
+/// 映射也现算不成，R 的树表与中央映射树根两个指针指着的槽都读回全零、读不出自证单元头，没有一个指针两份都被比 R 新的实例盖掉（C834 的判法）
+/// ⇒ 照记录不齐那一支办：重读一次仍这样、现行账（P 的）里没有
 /// C694 的 B 那道凭据，在取号之前拒可写，拒因是 `AccountOfAnUnappliedPublishWithIncompleteReadableRecords`、点名 R，R 的单元一份不少。
-/// 判别力：这一支不拒（变异「删除线第45批 Y2 较新可读根记录全读不出、映射现算不成时取过号的实例代号不比它新也不拒」）时 M1 做成、
+/// 判别力：这一支不拒（变异「删除线第45批 Y2（C834 判法）较新可读根记录全读不出、映射现算不成、没有一个指针两份都被更新的实例盖掉也不拒」）时 M1 做成、
 /// 写行那次发布的根落盘之前写掉 R 的单元（攻方量到 14 份），这一条红。
 #[test]
 fn a_newer_readable_root_whose_only_record_mapping_root_and_tree_table_read_back_zero_refuses_the_writable_mount_before_any_write(
@@ -280,7 +283,7 @@ fn a_newer_readable_root_whose_only_record_mapping_root_and_tree_table_read_back
             "覆盖写 R、记录、映射根与树表读回全零、根槽读得出",
         )
         .expect_err(
-            "R 的账与映射都读不出、记录一条都读不出、取过号的实例代号是 R 的：可写挂载在取号之前拒",
+            "R 的账与映射都读不出、记录一条都读不出、两个指针都没有两份被更新的实例盖掉：可写挂载在取号之前拒",
         );
     assert!(
         matches!(

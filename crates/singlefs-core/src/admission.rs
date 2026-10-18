@@ -292,7 +292,7 @@ pub const TOMBSTONE_PREPAY_BYTES_PER_LIVE_OBJECT_ON_ONE_REPLICA: u64 =
     DATA_UNIT_BYTES.div_ceil(TOMBSTONE_CONTAINER_RECORDS);
 
 /// 墓碑预付里全池常驻那一份的固定部分（每份副本、以 16 KiB 槽计）：一个开放墓碑容器（32 KiB 码 3，2 槽）加墓碑树根（1 槽）。
-/// 式子是 (2 + H + 1) × 16384，H 另算（[`committed_reservation_for_tombstones`]）。
+/// 式子是 (2 + H + 1) × 16384，H 另算（[`committed_reservation_for_tombstones_and_retirement_records`]）。
 pub const TOMBSTONE_PREPAY_OPEN_CONTAINER_SLOTS_ON_ONE_REPLICA: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
 pub const TOMBSTONE_PREPAY_ROOT_SLOTS_ON_ONE_REPLICA: u64 = 1;
 
@@ -669,8 +669,10 @@ impl AdmissionReading {
     /// D28（挂载期承诺量） 已定项 2 要的是「已发布统计量 − 在飞已批准」。这几个计数就是每次发布写进记账行的那几个数
     /// （装记账行读的是同一组），发布与发布之间与最近一次发布的记账行逐项相等；在飞已批准第一版恒为零——一次发布在同一个调用里
     /// 准入、分配、落盘，调用与调用之间没有在飞的东西（在飞 overlay 没有实现，C87（准入读的合成值无定义））。
-    /// ⚠️ 两处例外计数先于记账行变：挂载重建时按回收门槛回收、按影子账隔离之后到写行那次发布之前；抬 F 回收的槽扣住到 F 生效之前
+    /// ⚠️ 有记账树的版本上只有两处例外计数先于记账行变：挂载重建时按回收门槛回收、按影子账隔离之后到写行那次发布之前；抬 F 回收的槽扣住到 F 生效之前
     /// （计数上已回到空闲、分配器却不发它们，式子里没有一项装它们）。那两段里准入读哪一个，条款没写。
+    /// 树表 0 条的那一版没有记账树，上面没有记账行可比：那一版上的零单元发布（`mount::publish_empty_after`、`mount::establish_instance`）
+    /// 与写行发布（`transaction::prepare_the_row_publish_on_a_version_without_file`）都在根落盘之后记根、按回收门槛回收，计数变而不写记账行。
     #[must_use]
     pub fn of_allocator(
         allocator: &PoolAllocator,
@@ -898,7 +900,7 @@ pub fn units_of_a_publish_to_land(
 
 /// 「这次的单元落得下」逐设备合取（C545（空间准入罩不住分裂与聚簇段层）：D3（空间分配） 已定项 5「字节总量够」与「聚簇段里有合法空槽」
 /// 之间没有条款连起来，用户 2026-09-27 定准入先拒）：每块盘都要两样都够才放行——
-/// ① 数据单元：段外成对的空槽 ≥ 这次的数据单元个数（数据单元在这次的角色里排最前、先取落点，`transaction::PublishShape::rewritten_roles`）；
+/// ① 数据单元：段外成对的空槽 ≥ 这次的数据单元个数（数据单元在这次的角色里排最前、先取落点，`transaction::PublishPlan::resolve` 排角色那一段：`rewritten_roles` 从写的文件内容的数据单元起）；
 /// ② 提交内生块：没挡的槽减去数据单元取走的那几对 ≥ 这次提交内生块至多要的槽。
 ///
 /// ② 只数槽：两槽的 inode 叶容器要成对、各盘的落点要同槽（开段各盘一致、回落各盘同槽），这两样今天的落点规则里有、这一判不判——

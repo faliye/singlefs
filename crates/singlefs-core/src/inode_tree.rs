@@ -117,10 +117,17 @@ impl InodeLeafContainer {
     }
 }
 
+/// inode 树的 key 宽：inode 号 8 字节（D8（核心索引结构） 已定项 6：叶记录的 key、根条目的分隔 key 都是 inode 号）。
+/// 写侧装根、读侧核根（`crate::recovery` 的 `key_width_for_kind`、`crate::mounted_read`）都引这一个。
+pub const INODE_KEY_WIDTH_IN_BYTES: usize = 8;
+
 /// 一个码 2 根装得下几条 inode 内部条目：扇出 135（D8（核心索引结构） 已定项 6：分隔 key 8 + 身份引用 26 + 子指针 86 = 120）。
 #[must_use]
 pub fn leaf_containers_one_root_node_holds() -> usize {
-    index_node_entry_capacity(8, usize::try_from(INODE_INTERNAL_ENTRY).expect("120"))
+    index_node_entry_capacity(
+        INODE_KEY_WIDTH_IN_BYTES,
+        usize::try_from(INODE_INTERNAL_ENTRY).expect("120"),
+    )
 }
 
 /// 这一版的一片叶容器从哪来。
@@ -171,21 +178,6 @@ impl InodeLeafContainersAfterThisPublish {
             .iter()
             .map(|retired| retired.identity)
             .collect()
-    }
-
-    /// 这一版第 `index` 片照抄的话，它在上一版里的叶序；这次重写的交回 `None`。
-    ///
-    /// # Panics
-    /// `index` 不在这一版里：调用方只拿这一版的叶序问。
-    #[must_use]
-    pub fn previous_index_of_a_carried_container(
-        &self,
-        index: InodeLeafContainerIndexInTree,
-    ) -> Option<InodeLeafContainerIndexInTree> {
-        match self.origins[index.position()] {
-            InodeLeafContainerOrigin::RewrittenThisPublish => None,
-            InodeLeafContainerOrigin::CarriedFrom(previous_index) => Some(previous_index),
-        }
     }
 }
 

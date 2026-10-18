@@ -100,10 +100,10 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
         &operations[pool.mkfs_operation_count..],
         &geometry(),
     );
-    let first_stream_index_of_the_remount =
+    let earliest_stream_index_of_the_remount =
         operations_before_the_remount - pool.mkfs_operation_count;
     let remount_writes: Vec<usize> = (0..writes.len())
-        .filter(|write_index| stream_indexes[*write_index] >= first_stream_index_of_the_remount)
+        .filter(|write_index| stream_indexes[*write_index] >= earliest_stream_index_of_the_remount)
         .collect();
     let first_remount_write = *remount_writes.first().expect("重开之后发过写");
     assert_eq!(
@@ -234,7 +234,7 @@ fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_cras
         "展开的段按崩溃点重放的枚举域数（原地覆写取三态）"
     );
     assert_eq!(tally.states, 1 + (3 * 3 - 1) + 262_143);
-    // 与覆盖写固定脚本流发 C 之前那一截逐段相同（门禁 52 号核的那个数组的前 28 段），末段 2 写是暖机第二次的系统配置槽轮换。
+    // 与覆盖写固定脚本流发 C 之前那一截逐段相同（门禁 doc-registries 的 segment-registry 格核的那个数组的前 28 段），末段 2 写是暖机第二次的系统配置槽轮换。
     // C577 之后每次轮换过了发布末尾那道屏障、自成一段：A、B 的 24 个单元写与暖机两次的 16 个单元写不再并上一次的轮换
     // （改之前 26、26、18、18），段号跟着后移两位。
     assert_eq!(

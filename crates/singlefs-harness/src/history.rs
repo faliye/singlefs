@@ -62,7 +62,7 @@ use crate::memory_pool::{MemoryPool, RecordCheck, SparseBlockDevice};
 use crate::model::{
     IdealModel, ModelAnswer, ModelCheckpointTxg, ModelDeviceIdentity, ModelDisagreement,
     ModelJudgementCounts, ModelPoolGeometry, ModelRefusalReason, ModelRingPosition, ModelRootKey,
-    ObservedEffect, ObservedOutcome, ObservedRefusalReason,
+    ObservedEffect, ObservedOutcome, ObservedRefusalReason, MODEL_ROOT_RING_SLOTS,
 };
 use crate::model_comparison::{
     model_root_key, observed_mount_carrying_to_zero_unit_publishes,
@@ -71,7 +71,7 @@ use crate::model_comparison::{
     refusal_reason_of_publish_error, refusal_reason_of_rollback_error,
     reported_ceiling_of_mount_error, root_ring_slot_still_bad_after_one_reread_of_mount_error,
     root_ring_slot_still_bad_after_one_reread_of_rollback_error,
-    ContentsCarriedToZeroUnitPublishes,
+    unit_copy_unreadable_or_mismatched_of_rollback_error, ContentsCarriedToZeroUnitPublishes,
 };
 use crate::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
 use crate::segments::FixedGeometry;
@@ -1433,8 +1433,8 @@ struct HistoryPool {
     stream: SharedStream,
     /// mkfs 写完时录制流里有几步（崩溃注入的基线从这里起）。
     operations_written_by_make_filesystem: usize,
-    /// 每次掉电之后录制流里第一步的下标，按次序（交回 [`HistoryRun::first_stream_index_after_each_power_loss`]）。
-    first_stream_index_after_each_power_loss: Vec<usize>,
+    /// 每次掉电之后录制流里第一步的下标，按次序（交回 [`HistoryRun::earliest_stream_index_after_each_power_loss`]）。
+    earliest_stream_index_after_each_power_loss: Vec<usize>,
 }
 
 /// 模型对一步的判定：对不上的那一格（没有就是 None）与这一步比了多少格。
@@ -1461,6 +1461,32 @@ fn judge_by_model(
             counts: ModelJudgementCounts::default(),
         },
     }
+}
+
+/// 一步（起点算一步）里模型写进根环几条根：记进 [`HistoryTally::most_roots_written_by_the_model_in_one_step`]，交回这一步之后的累计数
+/// （下一步从它量起）。多于根环槽数（[`MODEL_ROOT_RING_SLOTS`]）时这一步先写的根被同一步后写的盖掉，观察者每步并一次模型根环
+/// （`IdealModel::committed_versions`）就漏了那几版：一步写几条根没有写死的常数上界（那一段注释按今天的代码数了来源），量到的必须在槽数之内。
+///
+/// # Panics
+/// 这一步模型写出的根多于根环槽数。
+fn measure_the_roots_the_model_wrote_in_one_step(
+    tally: &mut HistoryTally,
+    model: &IdealModel,
+    roots_written_by_the_model_before_this_step: u64,
+    position: StepPosition,
+) -> u64 {
+    let roots_written_by_the_model_after_this_step = model.roots_written_since_make_filesystem();
+    let roots_written_in_this_step = roots_written_by_the_model_after_this_step
+        .checked_sub(roots_written_by_the_model_before_this_step)
+        .expect("模型写进根环的累计数只增不减");
+    assert!(
+        roots_written_in_this_step <= MODEL_ROOT_RING_SLOTS,
+        "{position:?} 这一步模型写进根环 {roots_written_in_this_step} 条根，多于根环槽数 {MODEL_ROOT_RING_SLOTS}：先写的被同一步后写的盖掉，每步并一次模型根环会漏版本"
+    );
+    tally.most_roots_written_by_the_model_in_one_step = tally
+        .most_roots_written_by_the_model_in_one_step
+        .max(roots_written_in_this_step);
+    roots_written_by_the_model_after_this_step
 }
 
 /// 入口返回 Err 时交给模型的观测：成员映射成的理由、拒之前做完几次发布、录制流在这一步里有没有多出写或屏障。
@@ -1681,7 +1707,7 @@ impl HistoryPool {
                 model,
                 stream: stream.clone(),
                 operations_written_by_make_filesystem,
-                first_stream_index_after_each_power_loss: Vec::new(),
+                earliest_stream_index_after_each_power_loss: Vec::new(),
             },
             verdict,
         ))
@@ -2205,14 +2231,6 @@ pub struct AllocationStatisticMechanism {
     pub root_slots_dropped_below_floor: u64,
 }
 
-impl AllocationStatisticMechanism {
-    /// 回退下界把环里读得到的根挡在了遍历之外。
-    #[must_use]
-    pub fn the_floor_dropped_readable_roots(&self) -> bool {
-        self.root_slots_dropped_below_floor >= 1
-    }
-}
-
 /// 从 I-3.1 的说明文字里读机理标识；少一项就 None（说明这条违例不是那一段格式写出来的）。
 #[must_use]
 pub fn allocation_statistic_mechanism(detail: &str) -> Option<AllocationStatisticMechanism> {
@@ -2359,6 +2377,9 @@ pub struct HistoryTally {
     pub not_applicable_by_precondition: BTreeMap<&'static str, u64>,
     pub recovery_outcomes: BTreeMap<String, u64>,
     pub most_publishes_in_one_mount: usize,
+    /// 一步（起点算一步）里模型写进根环的根最多几条（[`crate::model::IdealModel::roots_written_since_make_filesystem`] 的差）：
+    /// 执行器每一步断言它不多于根环槽数（[`crate::model::MODEL_ROOT_RING_SLOTS`]），观察者每步并一次模型根环才不漏版本。
+    pub most_roots_written_by_the_model_in_one_step: u64,
     pub most_successful_mounts_in_one_history: usize,
     pub most_mount_attempts_in_one_history: usize,
     pub raises_that_reclaimed: u64,
@@ -2443,6 +2464,9 @@ impl HistoryTally {
         self.most_publishes_in_one_mount = self
             .most_publishes_in_one_mount
             .max(other.most_publishes_in_one_mount);
+        self.most_roots_written_by_the_model_in_one_step = self
+            .most_roots_written_by_the_model_in_one_step
+            .max(other.most_roots_written_by_the_model_in_one_step);
         self.most_successful_mounts_in_one_history = self
             .most_successful_mounts_in_one_history
             .max(other.most_successful_mounts_in_one_history);
@@ -2679,8 +2703,9 @@ impl HistoryTally {
         }
         let _ = writeln!(
             text,
-            "  一次挂载里最多写出 {} 条根；一段历史里最多挂载成功 {} 次、最多试挂载 {} 次",
+            "  一次挂载里最多写出 {} 条根；模型一步里最多写进根环 {} 条根；一段历史里最多挂载成功 {} 次、最多试挂载 {} 次",
             self.most_publishes_in_one_mount,
+            self.most_roots_written_by_the_model_in_one_step,
             self.most_successful_mounts_in_one_history,
             self.most_mount_attempts_in_one_history
         );
@@ -2797,7 +2822,7 @@ pub struct HistoryRun {
     /// 掉电之前那一截与之后可写挂载另起的实例写的流在这里断开。崩溃注入把它交给记录核对器
     /// （`crate::memory_pool::RecordStreamSeam::AfterAPowerLoss`）：那次改动掉电之前落了盘的单元写没有根，
     /// 不归掉电之后的第一次发布。
-    pub first_stream_index_after_each_power_loss: Vec<usize>,
+    pub earliest_stream_index_after_each_power_loss: Vec<usize>,
 }
 
 /// 每一步之后交给观察者的东西：第几步、这一步是什么、结局、此刻的整份镜像、跟到这一步的理想模型。
@@ -2878,12 +2903,24 @@ fn publish_error_member(error: &PublishError) -> String {
         PublishError::NextCheckpointTxgPastTheTopOfItsRange { .. } => {
             "NextCheckpointTxgPastTheTopOfItsRange"
         }
+        PublishError::NextContainerNumberPastTheTopOfItsRange(_) => {
+            "NextContainerNumberPastTheTopOfItsRange"
+        }
         PublishError::WriteToAnInodeBeingDeleted { .. } => "WriteToAnInodeBeingDeleted",
         PublishError::WriteToAnInodeThatIsNotInTheTree { .. } => "WriteToAnInodeThatIsNotInTheTree",
         PublishError::UnlinkOfAnInodeThatIsNotALiveRecord { .. } => {
             "UnlinkOfAnInodeThatIsNotALiveRecord"
         }
         PublishError::DeletedInodesQueueRefused(_) => "DeletedInodesQueueRefused",
+        PublishError::ReadFailedWhileRehearsingTheContinuationBeforeAcquisition(read) => {
+            return format!(
+                "PublishError::ReadFailedWhileRehearsingTheContinuationBeforeAcquisition({})",
+                block_device_error_member(&read.error)
+            )
+        }
+        PublishError::ReadBackFailingSelfVerificationWhileRehearsingTheContinuationBeforeAcquisition(_) => {
+            "ReadBackFailingSelfVerificationWhileRehearsingTheContinuationBeforeAcquisition"
+        }
         PublishError::BlockDevice(cause) => {
             return format!(
                 "PublishError::BlockDevice({})",
@@ -4799,7 +4836,7 @@ fn apply_overwrite_losing_power_before_its_journal_record_then_mount_writable(
         .collect();
     // 这个进程到这里就没了（掉电截在第一个 journal 记录写上；那次改动在那之前就被拒的，进程同样不再往下写），
     // 之后录下的是可写挂载另起的实例写的流。
-    pool.first_stream_index_after_each_power_loss
+    pool.earliest_stream_index_after_each_power_loss
         .push(pool.stream.operation_count());
     pool.model.close_session();
     apply_mount_writable(pool, parameters)
@@ -5025,7 +5062,7 @@ fn apply_rollback_while_mounted(
         Err(error) => {
             let member = rollback_error_member(&error);
             let reason = refusal_reason_of_rollback_error(&error);
-            let verdict = judge_by_model(
+            let mut verdict = judge_by_model(
                 model,
                 answer,
                 &observed_refusal(
@@ -5038,6 +5075,13 @@ fn apply_rollback_while_mounted(
                     root_ring_slot_still_bad_after_one_reread_of_rollback_error(&error),
                 ),
             );
+            // 拒在回退目标引用的一个单元的那一份上：把实现点名的那一份记进对不上的那一格（故障注入拿它与被吞的写落在哪比，A4）。
+            if let Some(disagreement) = verdict.disagreement.as_mut() {
+                disagreement.note_the_unit_copy_a_rollback_refused_on(
+                    unit_copy_unreadable_or_mismatched_of_rollback_error(&error),
+                    stream.operation_count() == stream_length_before,
+                );
+            }
             AppliedStep::judged_by_outcome_and_model(StepOutcome::Refused { member }, verdict)
         }
     }
@@ -5860,6 +5904,13 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
             }
         };
         let pool = pool_slot.insert(started_pool);
+        let mut roots_written_by_the_model_before_this_step =
+            measure_the_roots_the_model_wrote_in_one_step(
+                &mut tally,
+                &pool.model,
+                0,
+                StepPosition::StartingPoint,
+            );
         let mut image = pool.image();
         let mut checked_stream_length = stream.operation_count();
         let starting_point_step_image_index = step_image_index_of_the_next_hand_out(&tally);
@@ -5906,6 +5957,13 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
                 harness_judgement,
                 model_verdict,
             } = apply_operation(pool, operation, step_index);
+            roots_written_by_the_model_before_this_step =
+                measure_the_roots_the_model_wrote_in_one_step(
+                    &mut tally,
+                    &pool.model,
+                    roots_written_by_the_model_before_this_step,
+                    step_position,
+                );
             tally.note_outcome(operation, &outcome);
             if let Some(verdict) = &model_verdict {
                 tally.note_model_verdict(verdict);
@@ -6087,10 +6145,10 @@ pub(crate) fn execute_history_stopping_at_the_given_pool_checker_violations(
                 .map(|(key, content)| (key, content.map(|content| content.to_vec())))
                 .collect()
         }),
-        first_stream_index_after_each_power_loss: pool_slot
+        earliest_stream_index_after_each_power_loss: pool_slot
             .as_ref()
             .map_or_else(Vec::new, |pool| {
-                pool.first_stream_index_after_each_power_loss.clone()
+                pool.earliest_stream_index_after_each_power_loss.clone()
             }),
     }
 }
@@ -6415,7 +6473,7 @@ pub struct NewFindingReport {
     pub sampling: HistorySampling,
 }
 
-/// 新发现收不收缩：收缩一类要把那段历史反复重跑几十次，debug 下每次几秒（门禁 59 号在变异下跑快档时量到过：只收一类也要两分多钟）。
+/// 新发现收不收缩：收缩一类要把那段历史反复重跑几十次，debug 下每次几秒（门禁 checker-tier-crates-mutation-replay 在变异下跑快档时量到过：只收一类也要两分多钟）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FindingShrinking {
     /// 每一类都收缩第一个种子（大档，release 下跑）。
@@ -6952,7 +7010,7 @@ mod tests {
             tally: HistoryTally::default(),
             operations_written_by_make_filesystem: 0,
             committed_versions_at_the_end: Vec::new(),
-            first_stream_index_after_each_power_loss: Vec::new(),
+            earliest_stream_index_after_each_power_loss: Vec::new(),
         };
         let finished = vec![
             (

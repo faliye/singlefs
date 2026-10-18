@@ -2,7 +2,7 @@
 //! I-9.10 墓碑那一个等号）的坏镜像：
 //! 新池新建文件之后把第一个文件顺序写成三个数据单元、按只供测试的批大小 1 发意图与几批（D8（核心索引结构） 已定项 16），
 //! 或建几个空 inode；坏镜像在发布路径写出的一版上找到要改的单元（从最新的根读树表往下找），改一处、重封，
-//! 新的整单元校验和沿引用链补到根槽（`common_pointer_head_corruption::replace_the_unit_and_propagate_its_checksum`）。
+//! 新的整单元校验和沿引用链补到根槽（`common_pointer_head_corruption::change_the_unit_and_propagate_its_checksum_on`）。
 //! 用这一份的测试文件同时声明 `mod common;` 与 `mod common_pointer_head_corruption;`（照 `common_tree_split` 的做法，两份测试文件各 `mod` 一次）。
 #![allow(dead_code, reason = "两份测试文件各自只用到其中一部分")]
 
@@ -14,7 +14,6 @@ use singlefs_checker::image::{
 };
 use singlefs_core::address::{CheckpointTxg, InodeNumber, InstanceGeneration, SlotNumber};
 use singlefs_core::bytes::ByteReader;
-use singlefs_core::checksum::crc32_castagnoli;
 use singlefs_core::mount::{roll_back_by_a_forward_publish, RollbackTarget};
 use singlefs_core::pointer::NodePointer;
 use singlefs_core::records::{
@@ -26,16 +25,16 @@ use singlefs_core::transaction::{
     publish_unlink_steps_until_the_queue_is_empty, PoolWriter, TransactionOutput,
     FIRST_INODE_NUMBER,
 };
-use singlefs_core::unit::{data_unit_payload_capacity, parse_index_node, seal_header_checksum};
+use singlefs_core::unit::{data_unit_payload_capacity, parse_index_node};
 use singlefs_core::unlink::{UnlinkBatchDataUnitsCappedForTests, UnlinkBatchSize};
 use singlefs_harness::memory_pool::MemoryPool;
 
 use crate::common::{
     build_pool, parameters, sequential_write_in_process_as_instance_one_and_advance_the_pool,
-    BuiltPool, FIXED_WRITE_TIME_SECONDS,
+    BuiltPool, PoolImageGeometry, FIXED_WRITE_TIME_SECONDS,
 };
 use crate::common_pointer_head_corruption::{
-    data_unit_bytes, newest_root, node_bytes, replace_the_unit_and_propagate_its_checksum,
+    change_the_unit_and_propagate_its_checksum_on, data_unit_bytes, newest_root, node_bytes,
     the_slot_of, tree_table_entry_of_kind, unit_bytes_at,
 };
 
@@ -348,33 +347,21 @@ pub fn pool_with_inode_two_unlinked_then_rolled_back_before_the_intent_and_the_r
     pool
 }
 
-/// 改过的单元重封：载荷 CRC 与头校验和（码 3 罩 [107, 32768)、住 89，头 [0, 107)；码 2 罩 [86 + 2k, 16384)、住 76 + 2k，头 [0, 86 + 2k)）。
-fn reseal_unit(bytes: &mut [u8]) {
-    let (header_end, payload_checksum_offset) = match bytes[6] {
-        3 => (107, 89),
-        2 => {
-            let key_width = usize::from(bytes[51]);
-            (86 + 2 * key_width, 76 + 2 * key_width)
-        }
-        other_class => panic!("这几份坏镜像只改码 2 与码 3 单元，读到类 {other_class}"),
-    };
-    let payload_checksum = crc32_castagnoli(&bytes[header_end..]);
-    bytes[payload_checksum_offset..payload_checksum_offset + 4]
-        .copy_from_slice(&payload_checksum.to_le_bytes());
-    seal_header_checksum(bytes, header_end);
-}
-
-/// `slot` 那个单元（两盘同槽，`length_in_bytes` 宽）改一处、重封，新的整单元校验和沿引用链补到根槽。
+/// `slot` 那个单元（两盘同槽，`length_in_bytes` 宽）改一处、重封，新的整单元校验和沿引用链补到根槽。镜像是 `common::build_pool` 这一类
+/// 4 GiB 盘、默认 journal 环上的：照这组盘的几何调 `common_pointer_head_corruption::change_the_unit_and_propagate_its_checksum_on`。
 pub fn change_the_unit_and_propagate_its_checksum(
     image: &mut MemoryPool,
     slot: SlotNumber,
     length_in_bytes: usize,
     change: impl FnOnce(&mut Vec<u8>),
 ) {
-    let mut bytes = unit_bytes_at(image, slot, length_in_bytes);
-    change(&mut bytes);
-    reseal_unit(&mut bytes);
-    replace_the_unit_and_propagate_its_checksum(image, slot, &bytes);
+    change_the_unit_and_propagate_its_checksum_on(
+        image,
+        &PoolImageGeometry::of_four_gibibyte_devices_under_the_common_parameters(),
+        slot,
+        length_in_bytes,
+        change,
+    );
 }
 
 fn get_u16(bytes: &[u8], offset: usize) -> u16 {

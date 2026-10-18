@@ -5,9 +5,9 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use singlefs_core::address::{
-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
-use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
+use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator, UnitAreaStart};
 use singlefs_core::block_device::{FileBackedBlockDevice, PhysicalBlockSizeInBytes};
 use singlefs_core::journal::{back_chain_of, record_offset, JournalRecord};
 use singlefs_core::make_filesystem::{
@@ -79,6 +79,40 @@ pub fn file_content() -> Vec<u8> {
     (0..FILE_BYTES)
         .map(|index| u8::try_from(index % 251).expect("小于 256"))
         .collect()
+}
+
+/// 一组盘的几何：mkfs 参数（journal 环长、根槽宽、文件系统身份）与每块盘的字节数。改坏一个单元之后沿引用链补校验和、
+/// 把根抄进 journal 记录时按它找单元区、根槽与 journal 环：盘宽与环长不是 [`parameters`] 那一套的池（窄盘这类），
+/// 照 4 GiB 盘与默认环去找，一个单元、一条记录都找不到。
+pub struct PoolImageGeometry {
+    pub parameters: MakeFilesystemParameters,
+    pub device_bytes: u64,
+}
+
+impl PoolImageGeometry {
+    /// [`build_pool`] 这一类池：[`parameters`]（默认 journal 环、根槽 512 字节）、每块盘 [`IMAGE_BYTES`]。
+    pub fn of_four_gibibyte_devices_under_the_common_parameters() -> Self {
+        PoolImageGeometry {
+            parameters: parameters(),
+            device_bytes: IMAGE_BYTES,
+        }
+    }
+
+    /// 单元区第一个槽：mkfs 照 journal 环末尾的下一个槽划单元区（`UnitAreaStart::following_the_journal_ring`）。
+    ///
+    /// # Panics
+    /// 环末尾的下一个槽不落在聚簇段边界上：mkfs 不收这样的环长，这组盘上起不了池。
+    pub fn unit_area_start_slot(&self) -> SlotNumber {
+        UnitAreaStart::following_the_journal_ring(self.parameters.geometry.journal_ring_bytes)
+            .expect("环末尾的下一个槽落在聚簇段边界上：起池时 mkfs 照它划的单元区")
+            .slot()
+    }
+
+    /// 根槽宽是物理块大小。
+    pub fn root_slot_bytes(&self) -> usize {
+        usize::try_from(self.parameters.geometry.physical_block_size)
+            .expect("根槽宽是物理块大小，装得进 usize")
+    }
 }
 
 pub struct BuiltPool {
@@ -482,10 +516,25 @@ fn journal_record_bytes_in_the_default_ring(
     device: DeviceIdentity,
     counter: u64,
 ) -> Vec<u8> {
+    journal_record_bytes_in_the_ring_of(
+        image,
+        &PoolImageGeometry::of_four_gibibyte_devices_under_the_common_parameters(),
+        device,
+        counter,
+    )
+}
+
+/// `geometry` 那一组盘的 journal 环里计数器 `counter` 那一格在 `device` 上的 4096 字节（没写过的格读出来是全 0）。
+fn journal_record_bytes_in_the_ring_of(
+    image: &MemoryPool,
+    geometry: &PoolImageGeometry,
+    device: DeviceIdentity,
+    counter: u64,
+) -> Vec<u8> {
     PoolReader::read(
         image,
         device,
-        record_offset(counter, JOURNAL_RING_DEFAULT_BYTES),
+        record_offset(counter, geometry.parameters.geometry.journal_ring_bytes),
         usize::try_from(JOURNAL_RECORD_BYTES).expect("4096"),
     )
     .expect("环里那一格读得到")
@@ -505,6 +554,21 @@ fn journal_record_bytes_in_the_default_ring(
 pub fn copy_each_root_into_the_new_root_segment_of_its_journal_records(
     image: &mut MemoryPool,
 ) -> usize {
+    copy_each_root_into_the_new_root_segment_of_its_journal_records_on(
+        image,
+        &PoolImageGeometry::of_four_gibibyte_devices_under_the_common_parameters(),
+    )
+}
+
+/// 同 [`copy_each_root_into_the_new_root_segment_of_its_journal_records`]，journal 环长与文件系统身份取 `geometry` 那一组盘的。
+///
+/// # Panics
+/// 镜像上择不出系统配置。
+pub fn copy_each_root_into_the_new_root_segment_of_its_journal_records_on(
+    image: &mut MemoryPool,
+    geometry: &PoolImageGeometry,
+) -> usize {
+    let journal_ring_bytes = geometry.parameters.geometry.journal_ring_bytes;
     let system_configuration =
         choose_system_configuration(&*image).expect("坏镜像只改了单元与根槽，系统配置择得出");
     let mut root_of_each_instance_and_txg: std::collections::BTreeMap<
@@ -521,15 +585,16 @@ pub fn copy_each_root_into_the_new_root_segment_of_its_journal_records(
             .entry((root.instance, root.checkpoint_txg))
             .or_insert(root);
     }
-    let filesystem_identifier = unit_filesystem_identifier(&parameters().filesystem_identifier);
-    let record_slots_in_the_ring = JOURNAL_RING_DEFAULT_BYTES / JOURNAL_RECORD_BYTES;
+    let filesystem_identifier =
+        unit_filesystem_identifier(&geometry.parameters.filesystem_identifier);
+    let record_slots_in_the_ring = journal_ring_bytes / JOURNAL_RECORD_BYTES;
     let mut records_rewritten = 0;
     for device in [DeviceIdentity(0), DeviceIdentity(1)] {
         // 跨轮携带：计数器小 1 的那一条若被改过，记它的实例与改后的字节（下一条的反向链按它重算）。
         let mut rewritten_previous_record: Option<(InstanceGeneration, Vec<u8>)> = None;
         // 迭代次数的上界是环的槽数；环里第一格解不出的记录就是出口。
         for counter in 1..=record_slots_in_the_ring {
-            let bytes = journal_record_bytes_in_the_default_ring(image, device, counter);
+            let bytes = journal_record_bytes_in_the_ring_of(image, geometry, device, counter);
             let Some(record) = JournalRecord::parse(&bytes, filesystem_identifier) else {
                 break;
             };
@@ -554,10 +619,11 @@ pub fn copy_each_root_into_the_new_root_segment_of_its_journal_records(
                 None
             } else {
                 let rewritten_bytes = rewritten.to_bytes();
-                image.devices.get_mut(&device).expect("有这块盘").write(
-                    record_offset(counter, JOURNAL_RING_DEFAULT_BYTES),
-                    &rewritten_bytes,
-                );
+                image
+                    .devices
+                    .get_mut(&device)
+                    .expect("有这块盘")
+                    .write(record_offset(counter, journal_ring_bytes), &rewritten_bytes);
                 records_rewritten += 1;
                 Some((record.instance, rewritten_bytes))
             };

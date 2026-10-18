@@ -38,7 +38,7 @@ use singlefs_harness::history::{
     ReproductionEnvironmentError, ReproductionVariablePrefix, StartingPointStep, StepPosition,
 };
 use singlefs_harness::memory_pool::MemoryPool;
-use singlefs_harness::model::ModelDisagreementAspect;
+use singlefs_harness::model::{ModelDisagreementAspect, ModelReportedUnreadablePlace};
 use singlefs_harness::numeric_environment_variable::process_environment_variable;
 use singlefs_harness::SharedStream;
 use std::collections::{BTreeMap, BTreeSet};
@@ -469,7 +469,7 @@ fn replay_line_of_a_batch_unlike_the_large_tier_defaults_runs_the_same_campaign_
     the_replay_line_printed_for_a_batch_runs_the_same_campaign_on_the_large_tier_entry(&campaign);
 }
 
-/// 说谎的设备许可留下的盘面不一致里 `["I-3.1"]` 那一组的取样点（`fault_injection::INCONSISTENCIES_A_LYING_DEVICE_MAY_LEAVE`；
+/// 说谎的设备留下的盘面不一致里只判红 `["I-3.1"]` 的那一形的取样点（按注入点认，`fault_injection::left_by_the_lying_device`；
 /// `crates/mutations.tsv` 钉着把被吞的写插回去那一步拿掉的变异）。快档那 24 段里说谎的设备留下的不一致全落在另一组
 /// （`["I-2.1", "I-4.8", "I-7.4"]`），这一组要单独钉。
 ///
@@ -1138,10 +1138,14 @@ fn floor_raise_in_the_same_process_after_a_swallowed_root_slot_write_is_refused_
         disagreement.implementation_answer
     );
     assert_eq!(
-        disagreement.implementation_reported_root_ring_slot_still_bad_after_one_reread,
-        Some(singlefs_harness::model_comparison::model_ring_position(
-            root_slot_of_the_swallowed_publish
-        )),
+        disagreement.implementation_reported_unreadable_place,
+        Some(
+            ModelReportedUnreadablePlace::RootRingSlotStillBadAfterOneReread(
+                singlefs_harness::model_comparison::model_ring_position(
+                    root_slot_of_the_swallowed_publish
+                )
+            )
+        ),
         "实现点名的读坏的槽是 txg 7 那一次被吞的根槽写的槽"
     );
 

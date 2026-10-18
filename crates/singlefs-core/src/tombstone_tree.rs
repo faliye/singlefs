@@ -16,8 +16,8 @@ use singlefs_format::TOMBSTONE_CONTAINER_RECORDS;
 
 use crate::address::{CheckpointTxg, TreeIdentifier};
 use crate::container_tree::{
-    append_record_to_the_open_container, containers_one_container_tree_root_holds,
-    ContainerTreeAfterThisPublish, ContainerTreeNodeEntries, ContainerTreeShape, RecordContainer,
+    append_record_to_the_open_container, ContainerTreeAfterThisPublish, ContainerTreeNodeEntries,
+    ContainerTreeShape, NextContainerNumberPastTheTopOfItsRange, RecordContainer,
 };
 use crate::records::TombstoneRecord;
 use crate::unit::PACKED_TYPE_TOMBSTONE;
@@ -100,12 +100,6 @@ impl TombstoneContainerCapacity {
     }
 }
 
-/// 一个码 2 节点按产品格式装得下几条墓碑树条目：与 inode 树内部节点同一形态（分隔 key 8 + 身份引用 26 + 子指针 86 = 120），扇出 135。
-#[must_use]
-pub fn tombstone_containers_one_root_node_holds() -> usize {
-    containers_one_container_tree_root_holds()
-}
-
 /// 这次发布之后墓碑树的样子：叶容器、这次重写哪几片（叶序）、这次前后的形状（`crate::container_tree`）。
 pub type TombstoneTreeAfterThisPublish = ContainerTreeAfterThisPublish<TombstoneRecord>;
 
@@ -113,7 +107,9 @@ pub type TombstoneTreeAfterThisPublish = ContainerTreeAfterThisPublish<Tombstone
 /// 最右那片还装得下（记录数小于 `capacity`）就追加进去；装满了（或树是空的）就开一片新容器：
 /// 容器号 = 树里最大号 + 1（零根时 1），出生代 = 这次发布的 checkpoint_txg，出生树 = `tombstone_tree`，打包记录类型 1；
 /// 根满时长高（`node_entries` 是一个码 2 节点装满几条）。别的容器一个字节都不动。
-#[must_use]
+///
+/// # Errors
+/// 要开新容器而最右那片的号（盘上读来的）已是 `u64::MAX` ⇒ [`NextContainerNumberPastTheTopOfItsRange`]（C841）。
 pub fn append_tombstone_to_the_open_container(
     containers_before_this_publish: &[TombstoneContainer],
     shape_before_this_publish: &ContainerTreeShape,
@@ -122,7 +118,7 @@ pub fn append_tombstone_to_the_open_container(
     tombstone_tree: TreeIdentifier,
     capacity: TombstoneContainerCapacity,
     node_entries: ContainerTreeNodeEntries,
-) -> TombstoneTreeAfterThisPublish {
+) -> Result<TombstoneTreeAfterThisPublish, NextContainerNumberPastTheTopOfItsRange> {
     append_record_to_the_open_container(
         containers_before_this_publish,
         shape_before_this_publish,
@@ -140,7 +136,8 @@ mod tests {
     use super::*;
     use crate::address::InodeNumber;
     use crate::container_tree::{
-        ContainerTreeNodeEntriesCappedForTests, ContainerTreeNodePosition,
+        containers_one_container_tree_root_holds, ContainerTreeNodeEntriesCappedForTests,
+        ContainerTreeNodePosition,
     };
     use crate::unit::PackedIdentity;
     use singlefs_format::TREE_IDENTIFIER_TOMBSTONE;
@@ -178,7 +175,8 @@ mod tests {
                 TOMBSTONE_TREE,
                 capacity,
                 node_entries,
-            );
+            )
+            .expect("容器号从 1 起逐片加一，远在顶之下");
         }
         after
     }
@@ -194,7 +192,8 @@ mod tests {
             TOMBSTONE_TREE,
             TombstoneContainerCapacity::FromTheContainerFormat,
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(
             after.containers,
             vec![TombstoneContainer {
@@ -224,7 +223,8 @@ mod tests {
             TOMBSTONE_TREE,
             capped(2),
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(after.containers.len(), 1, "压到 2 条一片：第二条还装得下");
         assert_eq!(
             after.containers[0].identity, first.containers[0].identity,
@@ -250,7 +250,8 @@ mod tests {
             TOMBSTONE_TREE,
             capped(2),
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(after.containers.len(), 2, "第一片满 2 条 ⇒ 开第二片");
         assert_eq!(after.containers[0], two.containers[0], "满了的那片原样");
         assert_eq!(after.containers[1].identity.container, 2, "最大号 1 + 1");
@@ -266,7 +267,7 @@ mod tests {
     /// 长高那次旧根留在 (层级 1, 第 0 个) 照抄，新开的容器、右半 (1, 1) 与新根 (2, 0) 重写。
     #[test]
     fn opening_a_container_past_what_one_root_holds_grows_the_tree_one_level() {
-        let capacity_of_the_root = tombstone_containers_one_root_node_holds();
+        let capacity_of_the_root = containers_one_container_tree_root_holds();
         assert_eq!(capacity_of_the_root, 135, "与 inode 树根同一形态：扇出 135");
         let full_root =
             after_appending(135, capped(1), ContainerTreeNodeEntries::FromTheNodeFormat);
@@ -279,7 +280,8 @@ mod tests {
             TOMBSTONE_TREE,
             capped(1),
             ContainerTreeNodeEntries::FromTheNodeFormat,
-        );
+        )
+        .expect("容器号从 1 起逐片加一，远在顶之下");
         assert_eq!(grown.shape.root_level(), 2, "第 136 片：根满长一层");
         assert!(grown.grew_a_level_this_publish());
         let node_entries_of_two = ContainerTreeNodeEntries::CappedForTests(

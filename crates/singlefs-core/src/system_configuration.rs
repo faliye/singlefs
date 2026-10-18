@@ -40,6 +40,9 @@ pub const CHECKSUM_ALGORITHM_CRC32_CASTAGNOLI: u8 = 1;
 /// 自举头：magic 4 + 格式版本 2 + feature bits 96 + fsid 16 + 写入者身份 20 + 校验和算法标识 1 + 本盘设备号 4 + 设备数 4 + 槽世代号 8。
 pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
 const FSID_OFFSET: usize = 4 + 2 + 96;
+/// 几何段开头「节点大小」那 4 字节（字段表 `layout/01-first-txn.md` 一：加密预留 114 字节之后、单元大小之前）。
+/// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`SystemConfiguration::parse_slot`] 按它切。
+const NODE_BYTES_OFFSET: u64 = 301;
 /// 几何段里「每区槽数 S」那一字节（字段表 `layout/01-first-txn.md` 一：R 在 361、S 在 362）。
 /// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`SystemConfiguration::parse_slot`] 按它切，
 /// 一个偏移只有这一处定义。
@@ -253,10 +256,11 @@ impl SystemImmutableConfiguration {
 /// 系统可变配置：4 字节，改它 = 重建索引、不丢数据（D22（单元原子性怎么合成） 已定项 26 第二档）。
 ///
 /// 字段表里归这一档的只有 1 行：几何段的「节点大小 4」。
-/// **没有字段**：节点大小唯一的权威定义是格式常量 `NODE_BYTES`（`singlefs-format`，门禁 27 号按 kb 的
-/// format-const 标记钉住它的值），mkfs 今天不收它当参数——
+/// **没有字段**：节点大小唯一的权威定义是格式常量 `NODE_BYTES`（`singlefs-format`，门禁 code-source-discipline 的
+/// format-constants 格按 kb 的 format-const 标记钉住它的值），mkfs 今天不收它当参数——
 /// `grep -rn 'NODE_BYTES' crates/*/src` 命中的全是读，[`crate::make_filesystem::MakeFilesystemParameters`]
 /// 里没有这一项；改它要走的那条重建索引的路第一版也没有（已定项 26 第二档逐字「第一版没有这条路」）。
+/// 读者照样读回盘上那 4 字节，不等于格式常量就当这一槽自证不过（[`SystemConfigurationSlotRefusal::NodeBytesNotTheFormatConstant`]）。
 /// 真有了 mkfs 参数，值落在这里，格式常量退回去当默认值。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SystemMutableConfiguration;
@@ -471,6 +475,7 @@ impl SystemConfiguration {
             writer.skip(80); // 主密钥槽：内联进槽，加密关时全 0
         });
         slot.write(SlotFieldMutability::MutableConfiguration, |writer| {
+            writer.assert_position(NODE_BYTES_OFFSET, "节点大小");
             writer.put_u32(self.mutable.node_bytes());
         });
         slot.write(SlotFieldMutability::ImmutableConfiguration, |writer| {
@@ -547,11 +552,13 @@ impl SystemConfiguration {
     /// 读者：magic、整槽校验和、incompat 位三关都过才解。magic 或整槽校验和不过是
     /// [`SystemConfigurationSlotRefusal::NotSelfDescribing`]（这一槽不可择）；这两关都过、incompat 位图不认识是
     /// [`SystemConfigurationSlotRefusal::IncompatBitsNotRecognized`]（这一槽同样不可择，但它是一份完整的系统配置，布局不认识）；
+    /// 布局认得、节点大小那 4 字节不等于格式常量 `NODE_BYTES` 是
+    /// [`SystemConfigurationSlotRefusal::NodeBytesNotTheFormatConstant`]（当这一槽自证不过，与整槽校验和不过同一个处置）；
     /// 解开之后按 D22 已定项 1 的字段表判每区槽数 S 的区间，越界是
     /// [`SystemConfigurationSlotRefusal::RootRingSlotsPerRegionOutOfRange`]（整池拒绝挂载）。
     ///
     /// # Errors
-    /// 见三个成员各自的说明。
+    /// 见四个成员各自的说明。
     pub fn parse_slot(bytes: &[u8]) -> Result<Self, SystemConfigurationSlotRefusal> {
         if bytes.len() < slot_bytes() || bytes[..4] != SYSTEM_CONFIGURATION_MAGIC {
             return Err(SystemConfigurationSlotRefusal::NotSelfDescribing);
@@ -563,6 +570,18 @@ impl SystemConfiguration {
             return Err(SystemConfigurationSlotRefusal::IncompatBitsNotRecognized {
                 incompat_bitmap: incompat_bitmap_of(bytes),
             });
+        }
+        let recorded_node_bytes = ByteReader::at(
+            bytes,
+            usize::try_from(NODE_BYTES_OFFSET).expect("字段表里的偏移装得进 usize"),
+        )
+        .get_u32();
+        if u64::from(recorded_node_bytes) != NODE_BYTES {
+            return Err(
+                SystemConfigurationSlotRefusal::NodeBytesNotTheFormatConstant {
+                    recorded_node_bytes,
+                },
+            );
         }
         let root_ring_slots_per_region = RootRingSlotsPerRegion::from_system_configuration_field(
             u64::from(bytes[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")]),
@@ -626,8 +645,8 @@ impl SystemConfiguration {
                 journal_ring_start_slot,
                 root_ring_base_slot,
             },
-            // 节点大小那 4 字节不读回来：它今天只可能是格式常量 `NODE_BYTES`，读回来会多出一个
-            // 「盘上的值与格式常量不符」的状态而没人判它。有了 mkfs 参数那天连着判定一起加。
+            // 节点大小那 4 字节上面判过等于格式常量 `NODE_BYTES`，内存里不另存一份；有了 mkfs 参数那天值落进这一档、
+            // 判定连着换成判它在 mkfs 收的范围里（C840，用户 2026-10-15 定「当自证不过」）。
             mutable: SystemMutableConfiguration,
             // 可调值那 36 字节不读回来：挂载选项通道不存在（C422（挂载选项通道不存在）），
             // 读回来的值没有任何使用者。
@@ -654,6 +673,11 @@ pub enum SystemConfigurationSlotRefusal {
     /// 布局不是这个读者认得的那一版（退役的位 0 那一版旧镜像，或更新的实现写的，D15（格式冻结政策） 已定项 4）。
     /// 与 [`Self::NotSelfDescribing`] 分开报，调用方据此把「布局不认识」与「数据坏了」分开。带着那一槽的 incompat 位图原样。
     IncompatBitsNotRecognized { incompat_bitmap: IncompatBitmap },
+    /// magic、整槽校验和、incompat 位三关都过，而节点大小那 4 字节（偏移 301）不等于格式常量 `NODE_BYTES`
+    /// ⇒ **当这一槽自证不过**：这一槽不可择，换一槽、换一盘还可以试，与 [`Self::NotSelfDescribing`] 同一个处置
+    /// （C840，用户 2026-10-15 弹窗定「当自证不过」）。单列成员是为了报得出拒在节点大小这一格、带着盘上读到的值；
+    /// 节点照格式常量读，不收别的节点大小（D22（单元原子性怎么合成） 已定项 26 第二档：改节点大小的路第一版没有）。
+    NodeBytesNotTheFormatConstant { recorded_node_bytes: u32 },
     /// 自述的每区槽数 S 落在格式承诺的区间之外 ⇒ **整池拒绝挂载**，不换一槽再试：S 是池级字段，
     /// 两盘四槽写的是同一个值，换一槽读到的还是它（D22（单元原子性怎么合成） 已定项 9 的射程：
     /// 字段表里只有本盘设备号是盘级的）。
@@ -910,6 +934,45 @@ mod tests {
                 "读回来的 S 就是盘上那一字节，不是编译期常量"
             );
         }
+    }
+
+    /// 节点大小那 4 字节（偏移 301）改成别的值、整槽校验和重封（magic、校验和、incompat 三关照样过）：读者拒成点名节点大小的成员，
+    /// 带着盘上读到的值；写回格式常量的那一份照收（C840）。
+    #[test]
+    fn self_describing_slot_declaring_a_node_size_other_than_the_format_constant_is_refused_by_name(
+    ) {
+        let node_bytes_field = usize::try_from(NODE_BYTES_OFFSET).expect("301");
+        let mut slot = sample().to_slot();
+        assert_eq!(
+            u32::from_le_bytes(
+                slot[node_bytes_field..node_bytes_field + 4]
+                    .try_into()
+                    .expect("4 字节")
+            ),
+            16384,
+            "写者在偏移 301 写格式常量 NODE_BYTES"
+        );
+        slot[node_bytes_field..node_bytes_field + 4].copy_from_slice(&8192u32.to_le_bytes());
+        let digest = wide_checksum_with_field_zeroed(
+            &slot,
+            slot_bytes(),
+            SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+        );
+        slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+            .copy_from_slice(&digest);
+        assert!(
+            wide_checksum_field_holds(&slot, 4096, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET),
+            "整槽校验和重封过，拒它的只能是节点大小那一判"
+        );
+        assert_eq!(
+            SystemConfiguration::parse_slot(&slot),
+            Err(
+                SystemConfigurationSlotRefusal::NodeBytesNotTheFormatConstant {
+                    recorded_node_bytes: 8192,
+                }
+            ),
+            "节点大小 8192 不是格式常量：拒成点名节点大小的成员"
+        );
     }
 
     #[test]

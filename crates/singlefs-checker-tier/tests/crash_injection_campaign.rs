@@ -57,23 +57,9 @@ use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchai
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 mod common_gpu_cards_of_the_caller;
 
-/// 这份测试文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
-#[cfg(feature = "verdict-store")]
-const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/crash_injection_campaign.rs";
 /// 崩溃点重放合表里这一项的名字（`.claude/gate.d/crash-point-replay-items.tsv`）。
 #[cfg(feature = "verdict-store")]
 const CRASH_POINT_REPLAY_ITEM: &str = "crash-injection-fast-tier";
-
-#[cfg(feature = "verdict-store")]
-fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../Cargo.lock")
-        .canonicalize()
-        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
-        .parent()
-        .expect("Cargo.lock 所在的目录就是仓根")
-        .to_path_buf()
-}
 
 /// 一批崩溃注入的种子与规模（进给定状态表的块键，第三轮正文 H8「键 = 种子 + 规模参数 + 测试文件出发的整份闭包」）：线程数、镜像留不留
 /// 与照哪一组断言判不改哪个状态判成什么，不进。
@@ -119,12 +105,9 @@ fn campaign_through_the_given_states_engine_started(
     let start_the_engine = || {
         GivenStatesEngine::start_from_environment_putting_a_fault_on_the_gpu_side(
             GivenStatesItem {
-                item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
-                setting_file: THIS_FILE.to_string(),
-                seeds_and_scale: seeds_and_scale_of(campaign),
+                item_name: format!("{}::{}", CRASH_POINT_REPLAY_ITEM, seeds_and_scale_of(campaign)),
             },
             &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &repository_root(),
             fault,
         )
         .expect("崩溃点重放的引擎照本机配置起得来（配了 GPU 卡用不上、结论版本与编译时对不上都在这里红，不退回 CPU）")
@@ -185,26 +168,25 @@ fn given_states_engine_under_the_callers_environment_guard(
 ) -> GivenStatesEngine {
     GivenStatesEngine::start_from_environment(
         GivenStatesItem {
-            item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale: seeds_and_scale.to_string(),
+            item_name: format!("{}::{}", CRASH_POINT_REPLAY_ITEM, seeds_and_scale),
         },
         &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root(),
     )
     .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
 }
 
-/// 两台分片与两个引擎的用例用的目录：家目录下流水线单元测试那一类的长期库里以用例标签命名的一份（不放开机会清空的目录，引擎拒那里的库），
-/// 里面一份 CPU 配置与几份库。这几条用例钉的是空库起跑的账，起跑先清空这一份，跑完留着不删。
+/// 两台分片与两个引擎的用例用的目录：一次性目录（`crash_library::DisposableLibraryDirectory`：起跑是空的、用完删，引擎照它的记号收里面的库，
+/// 长期库一行不写），里面一份 CPU 配置与几份库。这几条用例钉的是空库起跑的账。
 fn directory_under_the_library_home_with_a_configuration_on_the_cpu(
     tag: &str,
-) -> (std::path::PathBuf, std::path::PathBuf) {
-    let directory =
-        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
-            &format!("crash-injection-given-states-{tag}"),
-        )
-        .expect("流水线单元测试那一类里这条用例的目录");
+) -> (
+    singlefs_checker_tier::crash_library::DisposableLibraryDirectory,
+    std::path::PathBuf,
+) {
+    let directory = singlefs_checker_tier::crash_library::DisposableLibraryDirectory::new(
+        &format!("crash-injection-given-states-{tag}"),
+    )
+    .expect("流水线单元测试那一类里这条用例的目录");
     let configuration = directory.join("multi-host-on-the-cpu.env");
     std::fs::write(&configuration, "ENABLE_GPU=0\n").expect("写得了配置");
     (directory, configuration)
@@ -733,7 +715,8 @@ fn assert_every_crash_injection_path_was_exercised(report: &CrashInjectionReport
 
 /// 多线程只影响跑得多快：同一批种子，1 个线程与 4 个线程跑出来的报告逐字相同
 /// （`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」的「合并要确定」）。
-/// 计数按片的次序相加、新发现按种子留第一个，所以结论与线程数、调度次序无关；进度行按到达次序打，不带判定，不在比对之内。
+/// 计数按片的次序相加、新发现按种子留第一个，所以结论与线程数、调度次序无关；进度行按到达次序打，不带判定，不在比对之内；
+/// 判红的崩溃镜像每次调用写进自己新建的目录，路径不在比对之内（比的是 `render_the_conclusions`）。
 /// 两遍拿的是同一个种子基（这个测试周期写死的那一个），比的就是同一批历史上的同一批崩溃状态。
 #[test]
 fn one_thread_and_four_threads_render_the_same_report() {
@@ -763,8 +746,8 @@ fn one_thread_and_four_threads_render_the_same_report() {
             return;
         }
     }
-    let on_one_thread = report_on_one_thread.render();
-    let on_four_threads = report_on_four_threads.render();
+    let on_one_thread = report_on_one_thread.render_the_conclusions();
+    let on_four_threads = report_on_four_threads.render_the_conclusions();
     assert_eq!(
         on_one_thread, on_four_threads,
         "线程数不改结论（种子基 {first_seed}）"
@@ -1186,7 +1169,7 @@ fn units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_
         given_states_engine_for("crash_recovery_abandoning_the_newest_root_then_three_overwrites")
             .judge_the_given_states(&GivenStatesOfATable {
                 table_name: "every-write-landed-and-a-kept-unit-withheld".to_string(),
-                base: history_after_the_make_filesystem.base(),
+                base: history_after_the_make_filesystem.base_pool(),
                 writes: history_after_the_make_filesystem.writes(),
                 segments: history_after_the_make_filesystem.segments(),
                 seams: &[],
@@ -2351,7 +2334,7 @@ fn write_a_configuration_with_the_gpu_enabled(configuration: &std::path::Path) {
 /// 调用方给这个进程的显卡先后（清场之下是清场之后那一份；不读此刻的环境），交 [`settings_of_an_engine_on_the_gpu`] 设成环境变量。
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 fn cards_of_the_caller() -> String {
-    common_gpu_cards_of_the_caller::card_priority_value_of_the_caller(&repository_root())
+    common_gpu_cards_of_the_caller::card_priority_value_of_the_caller()
 }
 
 /// 调用方给这个进程的机器角色（`GpuConfigurationOfTheCaller`：进程第一次换环境之前的那一份，卡池照它挑卡；不读此刻的环境）。
@@ -2418,11 +2401,10 @@ fn small_campaign_judged_on_the_gpu(
     fault: FaultPutOnTheGpuSide,
 ) -> (CrashInjectionReport, GivenStatesRun) {
     use singlefs_checker_tier::crash_amplification::CrashAmplificationEnvironment;
-    let directory =
-        singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start(
-            &format!("crash-injection-given-states-on-the-gpu-{tag}"),
-        )
-        .expect("流水线单元测试那一类里这条用例的目录");
+    let directory = singlefs_checker_tier::crash_library::DisposableLibraryDirectory::new(
+        &format!("crash-injection-given-states-on-the-gpu-{tag}"),
+    )
+    .expect("流水线单元测试那一类里这条用例的目录");
     let configuration = directory.join("multi-host-with-gpu.env");
     write_a_configuration_with_the_gpu_enabled(&configuration);
     let library = directory.join("library");
@@ -2471,7 +2453,7 @@ fn small_campaign_judged_on_the_cpu(tag: &str) -> (CrashInjectionReport, GivenSt
 
 /// 验收第 1 条（用户 2026-10-10 定「第一截与第三截都上 GPU」；用户 2026-10-11 定 GPU 与 CPU 的对拍是独立的两趟，一段里 CPU 不既跑数据又对拍）：
 /// 同一小批一趟配了 GPU、第一截与第三截的给定状态表由 GPU 判器判，一趟没开 GPU、由 CPU 判器判，各写各的库；两趟的崩溃注入报告逐样相同
-/// （摆出的状态数、已知红、新发现），两趟都没有判不了的。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
+/// （摆出的状态数、已知红、新发现；判红的镜像只比落没落盘、不比路径，`CrashInjectionReport::has_the_same_conclusions_as`），两趟都没有判不了的。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」。
 #[cfg(all(feature = "verdict-store", feature = "gpu"))]
 #[test]
 fn a_small_campaign_judged_in_a_gpu_run_and_in_a_cpu_run_reports_the_same() {
@@ -2517,9 +2499,11 @@ fn a_small_campaign_judged_in_a_gpu_run_and_in_a_cpu_run_reports_the_same() {
         "GPU 那一趟都判得了"
     );
     assert_eq!(cpu_run.red_items(), Vec::<String>::new());
-    assert_eq!(
-        gpu_report, cpu_report,
-        "GPU 那一趟与 CPU 那一趟的报告逐样相同"
+    assert!(
+        gpu_report.has_the_same_conclusions_as(&cpu_report),
+        "GPU 那一趟与 CPU 那一趟的报告逐样相同（镜像只比落没落盘、不比路径：两趟的镜像目录各是自己新建的那一份）：\nGPU 那一趟：\n{}\nCPU 那一趟：\n{}",
+        gpu_report.render_the_conclusions(),
+        cpu_report.render_the_conclusions()
     );
 }
 
@@ -2540,9 +2524,10 @@ fn a_fault_put_on_the_gpu_side_of_a_small_campaign_makes_the_gpu_run_differ_from
         FaultPutOnTheGpuSide::FirstInvariantViolatedBitFlippedOnTheFirstStateOfEachTable,
     );
     let (cpu_report, _cpu_run) = small_campaign_judged_on_the_cpu("fault");
-    assert_ne!(
-        gpu_report, cpu_report,
-        "GPU 那一侧塞了故障，两趟的报告却相同"
+    assert!(
+        !gpu_report.has_the_same_conclusions_as(&cpu_report),
+        "GPU 那一侧塞了故障，两趟的报告却相同（不比镜像路径：路径不同不算不同）：\n{}",
+        gpu_report.render_the_conclusions()
     );
 }
 
@@ -2564,17 +2549,18 @@ fn small_campaign_judged_on_the_cpu_through_the_engine() -> CrashInjectionCampai
     }
 }
 
-/// 这一趟用的临时目录（建好、里面是空的）与里面那份 `ENABLE_GPU=0` 的多机配置。
+/// 这一趟用的一次性临时目录（新建、独占，丢掉时连同里面的东西删掉）与里面那份 `ENABLE_GPU=0` 的多机配置。
 #[cfg(feature = "verdict-store")]
 fn temporary_directory_with_a_configuration_on_the_cpu(
     tag: &str,
-) -> (std::path::PathBuf, std::path::PathBuf) {
-    let directory = std::env::temp_dir().join(format!(
-        "singlefs-crash-injection-given-states-{tag}-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&directory);
-    std::fs::create_dir_all(&directory).expect("建得了临时目录");
+) -> (
+    singlefs_checker_tier::crash_library::ExclusiveTemporaryDirectory,
+    std::path::PathBuf,
+) {
+    let directory = singlefs_checker_tier::crash_library::ExclusiveTemporaryDirectory::create(
+        &format!("crash-injection-given-states-{tag}"),
+    )
+    .expect("建得了一次性临时目录");
     let configuration = directory.join("multi-host-on-the-cpu.env");
     std::fs::write(&configuration, "ENABLE_GPU=0\n").expect("写得了配置");
     (directory, configuration)
@@ -2631,7 +2617,7 @@ fn a_campaign_whose_stop_file_is_there_takes_no_slice_and_reports_every_history_
         (0, campaign.seed_count),
         "叫停文件不在：两段都领了"
     );
-    let _ = std::fs::remove_dir_all(&directory);
+    drop(directory);
 }
 
 /// 两台分片（给定状态引擎补的第 ① 样，第三轮正文 H5「配了双机就两台分片」，照流水线那一侧的双机做法）：同一批先整份在一台上判一遍；
@@ -2723,8 +2709,8 @@ fn two_shares_judged_apart_and_then_imported_judge_every_table_once_and_render_t
         "导入第 1 份的库之后：一张都不现判、一张都不留，全照库里的"
     );
     assert_eq!(
-        imported_report.render(),
-        whole_report.render(),
+        imported_report.render_the_conclusions(),
+        whole_report.render_the_conclusions(),
         "导入之后那一趟的报告与整份在一台上判的逐字相同"
     );
     // 一份空库：叫停文件在时起一趟，库建好了、一片都不领
@@ -2822,18 +2808,16 @@ fn a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_check
     let planted = vec![true; table_writes.len()];
     let table = GivenStatesOfATable {
         table_name: "first-file-and-two-overwrites/genesis-tree-table-overwritten".to_string(),
-        base: history_after_the_make_filesystem.base(),
+        base: history_after_the_make_filesystem.base_pool(),
         writes: &table_writes,
         segments: &table_segments,
         seams: &[],
         persisted_sets: vec![healthy, planted],
     };
-    let directory = std::env::temp_dir().join(format!(
-        "singlefs-genesis-publish-on-the-gpu-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&directory);
-    std::fs::create_dir_all(&directory).expect("建得了临时目录");
+    let directory = singlefs_checker_tier::crash_library::ExclusiveTemporaryDirectory::create(
+        "genesis-publish-on-the-gpu",
+    )
+    .expect("建得了一次性临时目录");
     let configuration = directory.join("multi-host-with-gpu.env");
     write_a_configuration_with_the_gpu_enabled(&configuration);
     let cards = cards_of_the_caller();
@@ -2842,14 +2826,12 @@ fn a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_check
     );
     let engine = GivenStatesEngine::start_from_environment(
         GivenStatesItem {
-            item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale:
-                "history_of_a_first_file_and_two_overwrites genesis-tree-table-overwritten"
-                    .to_string(),
+            item_name: format!(
+                "{}::history_of_a_first_file_and_two_overwrites genesis-tree-table-overwritten",
+                CRASH_POINT_REPLAY_ITEM
+            ),
         },
         &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root(),
     )
     .expect("配了 GPU 的引擎起得来（卡用不上在这里红，不退回 CPU）");
     let conclusions = engine
@@ -2857,7 +2839,7 @@ fn a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_check
         .expect("配了 GPU 的引擎判得了这张表");
     let engine_run = engine.finish();
     drop(environment);
-    let _ = std::fs::remove_dir_all(&directory);
+    drop(directory);
     assert_eq!(
         engine_run.judged_by,
         JudgedBy::GpuJudge,
@@ -3003,12 +2985,13 @@ fn two_engines_started_at_once_in_one_process_both_judge_with_or_without_a_libra
     let start = || {
         GivenStatesEngine::start_from_environment(
             GivenStatesItem {
-                item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
-                setting_file: THIS_FILE.to_string(),
-                seeds_and_scale: seeds_and_scale_of(&campaign),
+                item_name: format!(
+                    "{}::{}",
+                    CRASH_POINT_REPLAY_ITEM,
+                    seeds_and_scale_of(&campaign)
+                ),
             },
             &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &repository_root(),
         )
     };
     let library_of_both_engines = directory.join("library-of-both-engines");
@@ -3052,8 +3035,8 @@ fn two_engines_started_at_once_in_one_process_both_judge_with_or_without_a_libra
             "{how}：两个都收尾之后库还在"
         );
         assert_eq!(
-            first_report.render(),
-            second_report.render(),
+            first_report.render_the_conclusions(),
+            second_report.render_the_conclusions(),
             "{how}：复用的那一趟报告与现判的相同"
         );
     }
@@ -3292,12 +3275,10 @@ fn the_gpu_record_checker_after_the_writable_mount_agrees_with_the_cpu_on_the_cr
         the_root_of_a_history_publish_overwritten_by_the_mount(&writes),
         the_last_root_withheld_then_the_writable_mount(&history, execution, &writes, &segments),
     ];
-    let directory = std::env::temp_dir().join(format!(
-        "singlefs-record-checker-after-the-mount-on-the-gpu-{}",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_dir_all(&directory);
-    std::fs::create_dir_all(&directory).expect("建得了临时目录");
+    let directory = singlefs_checker_tier::crash_library::ExclusiveTemporaryDirectory::create(
+        "record-checker-after-the-mount-on-the-gpu",
+    )
+    .expect("建得了一次性临时目录");
     let configuration = directory.join("multi-host-with-gpu.env");
     write_a_configuration_with_the_gpu_enabled(&configuration);
     let cards = cards_of_the_caller();
@@ -3306,21 +3287,16 @@ fn the_gpu_record_checker_after_the_writable_mount_agrees_with_the_cpu_on_the_cr
     );
     let engine = GivenStatesEngine::start_from_environment(
         GivenStatesItem {
-            item_name: CRASH_POINT_REPLAY_ITEM.to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale:
-                "history_of_a_first_file_and_two_overwrites record-checker-after-the-writable-mount"
-                    .to_string(),
+            item_name: format!("{}::history_of_a_first_file_and_two_overwrites record-checker-after-the-writable-mount", CRASH_POINT_REPLAY_ITEM),
         },
         &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root(),
     )
     .expect("配了 GPU 的引擎起得来（卡用不上在这里红，不退回 CPU）");
     let mut compared = Vec::new();
     for first_crash in &first_crashes {
         let version_landed_on_after_the_first_crash = recover(
             &CrashImage {
-                base: history_after_the_make_filesystem.base(),
+                base: history_after_the_make_filesystem.base_pool(),
                 writes: history_after_the_make_filesystem.writes(),
                 persisted: history_after_the_make_filesystem
                     .persisted_set_of_the_table(&first_crash.persisted_over_the_whole_history),
@@ -3367,7 +3343,7 @@ fn the_gpu_record_checker_after_the_writable_mount_agrees_with_the_cpu_on_the_cr
     }
     let engine_run = engine.finish();
     drop(environment);
-    let _ = std::fs::remove_dir_all(&directory);
+    drop(directory);
     assert_eq!(
         engine_run.judged_by,
         JudgedBy::GpuJudge,
@@ -3448,7 +3424,7 @@ fn second_stage_table_whose_pool_after_the_mount_lands_below_the_newest_root_wri
     let every_history_write = vec![true; writes.len()];
     let version_landed_on_after_the_first_crash = recover(
         &CrashImage {
-            base: history_after_the_make_filesystem.base(),
+            base: history_after_the_make_filesystem.base_pool(),
             writes: history_after_the_make_filesystem.writes(),
             persisted: history_after_the_make_filesystem
                 .persisted_set_of_the_table(&every_history_write),

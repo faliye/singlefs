@@ -3084,6 +3084,33 @@ fn crates_comparison_observer_extra_inputs_digest(
     singlefs_harness::sha256::sha256_digest(&bytes)
 }
 
+/// S3 那个观察者（名字 `e161_crates_comparison`，登记在 `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`，判法单元按这个入口 fn 收）：
+/// 经崩溃判定库那一路按块看（并行、不按序号先后），要记的数全经计数记：crates 枚举里序号 k 的状态就是 crates 次序里第 k 个，
+/// 对装置计划的第 k 个序号；写表只在第一个取样的状态上比一次（整条流的枚举写表是同一张）。
+fn observe_the_crates_comparison(
+    table: &TornWriteTable,
+    plan: &LocalPlan<'_>,
+    ordinals: &[u64],
+    ordinal: u64,
+    image: &CrashImage<'_>,
+    counts: &mut singlefs_checker_tier::crash::CrashPointReplayObserverCounts,
+) {
+    counts.add("observed_states", 1);
+    let Some(device_ordinal) = usize::try_from(ordinal)
+        .ok()
+        .and_then(|position| ordinals.get(position))
+    else {
+        return;
+    };
+    counts.add("compared_states", 1);
+    if ordinal == 0 && image.writes != table.writes.as_slice() {
+        counts.add("writes_table_differs", 1);
+    }
+    if image.persisted != plan.persisted_of(*device_ordinal) {
+        counts.add("persisted_mismatches", 1);
+    }
+}
+
 /// 在 `ordinals`（装置计划的序号，按次序）那个域上跑一遍 crates 的枚举（只展开 `expansion_of` 给的那几段），逐状态核 S3，交回 crates 的计数。
 /// crates 最后多出的全部持久那一个（域里不含它时）不比。判段这一趟没跑、交不回整份结论时交 `None`（[`CRATES_COMPARISON_NOT_RUN_EXIT_CODE`]）。
 fn compare_with_the_crates(
@@ -3093,27 +3120,14 @@ fn compare_with_the_crates(
     ordinals: &[u64],
     expansion_of: &dyn Fn(usize) -> CrashPointReplaySegmentExpansion,
 ) -> Option<CratesComparison> {
-    // 观察者经崩溃判定库那一路按块看（并行、不按序号先后），要记的数全经计数记：crates 枚举里序号 k 的状态就是 crates 次序里第 k 个，
-    // 对装置计划的第 k 个序号；写表只在第一个取样的状态上比一次（整条流的枚举写表是同一张）
+    // 观察者的代码是具名的 fn（observe_the_crates_comparison）：它那一组判法单元按这个入口 fn 收闭包、登记在
+    // `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`（4-2a 报告第四节第 6 条），这里只把装置的写表、计划与取样域交给它
     let observe =
         |ordinal: u64,
          image: &CrashImage<'_>,
          _report: &RecoveryReport,
          counts: &mut singlefs_checker_tier::crash::CrashPointReplayObserverCounts| {
-            counts.add("observed_states", 1);
-            let Some(device_ordinal) = usize::try_from(ordinal)
-                .ok()
-                .and_then(|position| ordinals.get(position))
-            else {
-                return;
-            };
-            counts.add("compared_states", 1);
-            if ordinal == 0 && image.writes != table.writes.as_slice() {
-                counts.add("writes_table_differs", 1);
-            }
-            if image.persisted != plan.persisted_of(*device_ordinal) {
-                counts.add("persisted_mismatches", 1);
-            }
+            observe_the_crates_comparison(table, plan, ordinals, ordinal, image, counts);
         };
     let crates_tally =
         singlefs_checker_tier::crash_state_enumeration::enumerate_crash_states_with_expansion(

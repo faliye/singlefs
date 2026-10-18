@@ -266,6 +266,33 @@ fn index_node_with_zero_key_width_and_zero_entry_width(entry_count: u16) -> Vec<
     node
 }
 
+/// 码 2 节点：key 宽 `key_width`、条目宽 0、条目数 `entry_count`、声明长度 0。条目数在 82 + 2k、条目宽在 84 + 2k（明文头到 86 + 2k）。
+fn index_node_with_zero_entry_width(key_width: u8, entry_count: u16) -> Vec<u8> {
+    let mut node = vec![0u8; 16384];
+    node[..4].copy_from_slice(b"SFSU");
+    node[FORMAT_VERSION_OFFSET..FORMAT_VERSION_OFFSET + 2].copy_from_slice(&1u16.to_le_bytes());
+    node[6] = 2;
+    node[42..50].copy_from_slice(&12u64.to_le_bytes());
+    node[INDEX_NODE_KEY_WIDTH_OFFSET] = key_width;
+    let entry_count_offset = 82 + 2 * usize::from(key_width);
+    node[entry_count_offset..entry_count_offset + 2].copy_from_slice(&entry_count.to_le_bytes());
+    node[entry_count_offset + 2..entry_count_offset + 4].copy_from_slice(&0u16.to_le_bytes());
+    reseal_unit_by_its_class(&mut node);
+    node
+}
+
+/// key 宽不是 0 的树（inode 树内部节点 key 宽 8）上条目宽 0、条目数 3：拒的是「条目宽 0 而有条目」，不是普通的长度不匹配——
+/// I-1.10 认的是这一个成员，判成长度不匹配就漏判（外部审阅 2026-10-16 报的）。
+#[test]
+fn a_code_two_node_with_an_eight_byte_key_whose_entry_width_is_zero_while_its_entry_count_is_not_is_refused_as_zero_width(
+) {
+    assert_eq!(
+        index_node_view(&index_node_with_zero_entry_width(8, 3)).map(|view| view.entries.len()),
+        Err(Verdict::EntryWidthZeroWithEntries),
+        "key 宽 8、条目宽 0、条目数 3：先判条目宽 0，不让「条目宽 ≥ key 宽」把它盖成长度不匹配"
+    );
+}
+
 #[test]
 fn a_code_two_node_whose_entry_width_is_zero_while_its_entry_count_is_not_is_refused() {
     assert_eq!(

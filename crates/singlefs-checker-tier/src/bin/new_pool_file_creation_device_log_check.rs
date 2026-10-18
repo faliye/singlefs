@@ -493,7 +493,7 @@ mod tests {
     use singlefs_harness::scenario::e142_parameters;
     use singlefs_harness::{fnv1a_64_of_zeros, SharedStream};
 
-    /// 门禁 55 号给虚机的两块 virtio 盘各 4096 MiB（`VM_DISK_MB=4096`）。
+    /// 门禁 checker-tier-qemu-device-streams 给虚机的两块 virtio 盘各 4096 MiB（`VM_DISK_MB=4096`）。
     const VIRTIO_DEVICE_BYTES: u64 = 4096 * 1024 * 1024;
     /// 设备侧日志里一段清零被块层拆成的块长（后端按 4 MiB 拆）。
     const ZERO_FILL_PIECE_BYTES: u64 = 4 * 1024 * 1024;
@@ -727,7 +727,7 @@ mod tests {
     }
 
     /// 模式送错也判红：`second-instance` 的盘拿 `file-overwrite` 去比，程序的事件整段是日志的前缀、红在程序之后
-    /// （今天门禁 55 号对后两档判的正是这个形态）；反过来 `file-overwrite` 的盘拿 `second-instance` 去比，红在可写挂载那一段开头。
+    /// （今天门禁 checker-tier-qemu-device-streams 对后两档判的正是这个形态）；反过来 `file-overwrite` 的盘拿 `second-instance` 去比，红在可写挂载那一段开头。
     /// 程序之后多出一个写、或关机之后多出第二个 FLUSH，都红在程序之后。
     #[test]
     fn device_log_from_another_mode_or_with_anything_after_the_program_is_red_after_the_program() {

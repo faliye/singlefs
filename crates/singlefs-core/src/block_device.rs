@@ -1,9 +1,10 @@
-//! 块设备抽象：读、写、屏障、FUA 写、探测 `physical_block_size`、写零。
+//! 块设备抽象：四个动作（读、写——普通写或 FUA 写、写零、屏障），外加三问（探测 `physical_block_size`、设备字节数、
+//! journal 环里可能有字节的记录槽）。
 //!
 //! 第一版两个后端（D17（实现分层与第三方管道） 已定项 5）：文件后端（测试镜像）与 `O_DIRECT` 后端（虚机里的真块设备）。
 //! 两个后端的持久语义相同：屏障 = `sync_data`（块设备上是一次 FLUSH），FUA 写 = 写完立刻 `sync_data`。
 //!
-//! 「写零」是第六个动作（用户 2026-09-19 定案，`records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行：
+//! 「写零」这个动作是后加的（用户 2026-09-19 定案，`records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行：
 //! 问「块设备抽象加不加写零」答「加」）：一次调用覆盖 `[offset, offset + length)` 一整段，真设备上对应 WRITE ZEROES。
 //! **一次调用就是一个动作**——底下拆成几次 I/O 由后端自己定（[`ZERO_FILL_CHUNK_BYTES`]），上层（录制流、段序列）看到的是一步。
 //!
@@ -111,7 +112,11 @@ impl std::error::Error for BlockDeviceError {}
 /// 比它大只再快 1–2 ms 而暂存区从 4 MiB 长到 64 MiB（`O_DIRECT` 那条路每次调用要一块对齐暂存区）。
 pub const ZERO_FILL_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
 
-/// 六个动作，只有这六个。介质是什么这里看不见。
+/// 七个方法：四个动作（[`BlockDevice::read_at`]、[`BlockDevice::write_at`]——FUA 是它的 [`WriteDurability`] 参数、不是另一个方法——、
+/// [`BlockDevice::write_zeroes_at`]、[`BlockDevice::barrier`]），三个只答问题、不碰介质的（物理块大小、设备字节数、journal 记录槽的提示）。
+/// 另有四个带默认实现、只给记着这次挂载读过什么的那一层（`mounted_session::DeviceReadOnceInThisMount`）改写的：读坏之后当场重读、
+/// 换上自证过的重读、读成而自证不过的记账丢块、这一刻读盘；默认落回 [`BlockDevice::read_at`] 或什么都不做。
+/// 介质是什么这里看不见。
 pub trait BlockDevice {
     fn read_at(
         &self,
@@ -152,6 +157,41 @@ pub trait BlockDevice {
         _ring_bytes: u64,
     ) -> Option<Vec<DeviceOffsetInBytes>> {
         None
+    }
+    /// 读坏（读不出或读出来自证不过）之后当场重读的那一读（条款要它再读一次盘：D19（块指针的结构与宽度预算） 已定项 5、
+    /// D16（发布语义） 已定项 1「根槽这一次读坏」那一行）。默认就是 [`BlockDevice::read_at`]：盘自己不记读过什么。
+    /// 记着这次挂载读过什么的那一层（`mounted_session::DeviceReadOnceInThisMount`）在这里绕过记下的那一份、直接读底下那块盘。
+    fn reread_at_after_a_bad_read(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.read_at(offset, buffer)
+    }
+    /// 当场重读那一读读到、调用方核过自证（根槽自证、单元校验和与位置项相符）的字节：记着这次挂载读过什么的那一层拿它换掉记下的那一份，
+    /// 之后再读这几块取的是它。默认什么都不做：盘自己不记读过什么。`offset` 与 `bytes` 是那一次重读的请求，对齐与越界照 [`BlockDevice::read_at`]。
+    fn keep_the_self_verified_reread(&self, _offset: DeviceOffsetInBytes, _bytes: &[u8]) {}
+    /// 一次读读成了、调用方核出自证不过（系统配置槽的 magic 与整槽校验和、节点大小，单元校验和与位置项不符）：`offset` 起 `length_in_bytes`
+    /// 字节是那一次读的请求，对齐与越界照 [`BlockDevice::read_at`]。默认什么都不做：盘自己不记读过什么。
+    /// 记着这次挂载读过什么的那一层（`mounted_session::DeviceReadOnceInThisMount`）把它记进读坏账、丢掉记下的那几块，下一次读它们穿到盘上
+    /// （岔路单 `research/prompts/m3-b44-code-r3-forks.md` 岔路一「两样都做」那一行，用户定：也记读坏、坏字节不留）。
+    fn note_the_read_failing_self_verification_and_forget_its_bytes(
+        &self,
+        _offset: DeviceOffsetInBytes,
+        _length_in_bytes: u64,
+    ) {
+    }
+    /// 条款要这一刻读盘的那一读：取号写、轮换写与抬 F 先写系统配置那一步算世代号与覆写哪一槽时读本盘两个系统配置槽
+    /// （D22（单元原子性怎么合成） 已定项 16 两槽轮换「覆写旧槽」要的是这一刻盘上哪一槽旧；可写挂载里这一读算进「取号写之前那几次读」，
+    /// 代码轮 `research/prompts/m3-b44-code-r3-main-verification.md` 第二节 L1 ②）。默认就是 [`BlockDevice::read_at`]：盘自己不记读过什么；
+    /// 只进内存的预演那一层（`mounted_session::DeviceKeepingWritesInMemory`）也走默认，写过的块取内存里那一份、没写过的照它底下那一份的路读。
+    /// 记着这次挂载读过什么的那一层（`mounted_session::DeviceReadOnceInThisMount`）在这里不取也不改记下的那一份、直接读底下那块盘。
+    fn read_at_straight_from_the_disk(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.read_at(offset, buffer)
     }
 }
 
@@ -360,8 +400,9 @@ fn zero_fill_chunk_length(length: u64) -> usize {
 /// 两个后端共用的拆块循环：`zeros` 是后端备好的全 0 暂存区（它的长度就是块大小），
 /// 从 `offset` 起按块顺序交给 `write_chunk`，最后一块按剩余长度截短。
 ///
-/// 长度按物理块对齐由调用方先核过（[`check_aligned_and_in_range`]），而块大小 4 MiB 是 512 与 4096 的整数倍，
-/// 所以每一块都还是对齐的。
+/// 长度按物理块对齐由调用方先核过（[`check_aligned_and_in_range`]）；每一块的起点都还对齐，前提是物理块大小整除块大小 4 MiB
+/// （512、4096 都整除）。这个前提这里不判，物理块大小的来处也都不判它：[`PhysicalBlockSizeSource::Declared`] 收调用方给的任何值，
+/// sysfs 读到的值也不核；不整除时第二块起的起点不对齐。
 fn write_zeroes_in_chunks<WriteChunk>(
     offset: DeviceOffsetInBytes,
     length: u64,

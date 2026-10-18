@@ -1092,10 +1092,11 @@ fn judge_allocation_records_disjoint() {
 }
 
 // I-3.10 去重表 C_EXAMINED（每行 5 字：盘、槽 lo/hi、代 lo/hi）的桶：每个桶记一行的下标 + 1，0 是空桶，按 (盘, 槽, 代) 散列、撞了往后挪一个桶。
-// 原来每条记录从头比到表尾，各版的记录多半已判过，条数平方长。桶数取表的两倍，表满（C_MAX_EXAMINED 行）时也至少一半是空桶，往后挪总停得下。
+// 原来每条记录从头比到表尾，各版的记录多半已判过，条数平方长。桶数取表的两倍，表满（C_MAX_EXAMINED 行）时也至少一半是空桶，往后挪总停得下；
+// 表满之后新来的记录不进表、照判（judge_allocation_generations_of_the_records），去重只省重读单元头。
 // 借 C_JOURNAL_GROUP_KEYS 那一段：那是走读内核逐盘 journal 用的；扫描内核里 I-1.8（检查字）与 I-3.9（已释放记录的桶表）在这之前借过、
 // 各自用完，这里开判时从头清
-const C_EXAMINED_BUCKET_COUNT: u32 = 4096u;
+const C_EXAMINED_BUCKET_COUNT: u32 = 2u * C_MAX_EXAMINED;
 
 const C_EXAMINED_BUCKETS: u32 = C_JOURNAL_GROUP_KEYS;
 
@@ -1139,17 +1140,18 @@ fn judge_allocation_generations_of_the_records() {
         if (examined) {
             continue;
         }
-        if (c_examined_count >= C_MAX_EXAMINED) {
-            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (31u << 8u);
-            return;
+        // 表满之后不再往表里记、照判（原来满了记判不了，站点 31）：judge 只置评估位与违例位，同一条记录（同盘、同槽、同代）读的是同一个单元头，
+        // 判两遍结论相同；CPU judge_allocation_generations_against_unit_births 去重只为不重复判，into_report 只看评估过没有、有没有违例。
+        // 表满时桶里至多一半有行，上面找的那一圈照旧停得下
+        if (c_examined_count < C_MAX_EXAMINED) {
+            sws(C_EXAMINED + c_examined_count * 5u, device);
+            sws(C_EXAMINED + c_examined_count * 5u + 1u, slot.x);
+            sws(C_EXAMINED + c_examined_count * 5u + 2u, slot.y);
+            sws(C_EXAMINED + c_examined_count * 5u + 3u, generation.x);
+            sws(C_EXAMINED + c_examined_count * 5u + 4u, generation.y);
+            sws(C_EXAMINED_BUCKETS + bucket, c_examined_count + 1u);
+            c_examined_count = c_examined_count + 1u;
         }
-        sws(C_EXAMINED + c_examined_count * 5u, device);
-        sws(C_EXAMINED + c_examined_count * 5u + 1u, slot.x);
-        sws(C_EXAMINED + c_examined_count * 5u + 2u, slot.y);
-        sws(C_EXAMINED + c_examined_count * 5u + 3u, generation.x);
-        sws(C_EXAMINED + c_examined_count * 5u + 4u, generation.y);
-        sws(C_EXAMINED_BUCKETS + bucket, c_examined_count + 1u);
-        c_examined_count = c_examined_count + 1u;
         // 起点槽上可用的单元头：magic、类 1 / 2 / 3、头校验和过
         let s = read_at(device, slot_to_bytes(slot), 4096u);
         if (s.version == NONE || rd32(s.base, 0u) != MAGIC_SFSU || (s.c2 & 1u) == 0u) {
@@ -1769,10 +1771,11 @@ fn c_deferred_below_the_floor(newest_base: u32) {
                 undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (34u << 8u);
                 return;
             }
-            sws(C_RELEASED_ABOVE + released_above * 4u, sw(a));
-            sws(C_RELEASED_ABOVE + released_above * 4u + 1u, sw(a + 1u));
-            sws(C_RELEASED_ABOVE + released_above * 4u + 2u, sw(a + 2u));
-            sws(C_RELEASED_ABOVE + released_above * 4u + 3u, sw(a + 3u));
+            let released_above_row = C_RELEASED_ABOVE + released_above * C_RELEASED_ABOVE_WORDS;
+            sws(released_above_row, sw(a));
+            sws(released_above_row + 1u, sw(a + 1u));
+            sws(released_above_row + 2u, sw(a + 2u));
+            sws(released_above_row + 3u, sw(a + 3u));
             released_above = released_above + 1u;
         }
     }
@@ -1787,7 +1790,7 @@ fn c_deferred_below_the_floor(newest_base: u32) {
         let slot = vec2<u32>(sw(H_BELOW_FLOOR_SLOTS + i * 3u + 1u), sw(H_BELOW_FLOOR_SLOTS + i * 3u + 2u));
         var in_released = false;
         for (var q = 0u; q < released_above; q = q + 1u) {
-            let record = C_RELEASED_ABOVE + q * 4u;
+            let record = C_RELEASED_ABOVE + q * C_RELEASED_ABOVE_WORDS;
             if (sw(record) != device) {
                 continue;
             }

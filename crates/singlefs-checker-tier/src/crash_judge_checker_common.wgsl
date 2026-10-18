@@ -519,7 +519,7 @@ const C_ALLOC_RECORD_WORDS: u32 = 8u;        // 盘、槽 lo/hi、跨度、代 l
 const C_MAX_ALLOC_RECORDS: u32 = 4096u;
 
 // 走读内核四张桶表借的那一段的起点：扫描内核原来的分配记录表在这里起，挪走之后这一段只剩扫描内核写过才读的那几张表（C_R_SEEN、C_R_PENDING、
-// C_SEEN_NODES、C_EXAMINED）
+// C_SEEN_NODES；I-3.10 的去重表原来也在这一段，抬上限时挪到草稿区末尾）
 const C_SCAN_TABLES_THE_WALK_BUCKETS_BORROW: u32 = 228400u;
 
 const C_R_MAX_SEEN: u32 = 512u;
@@ -536,9 +536,15 @@ const C_MAX_SEEN_NODES: u32 = 256u;
 
 const C_SEEN_NODES: u32 = 251440u;           // 盘、槽 lo/hi、校验和
 
-const C_MAX_EXAMINED: u32 = 2048u;
-
-const C_EXAMINED: u32 = 252464u;             // 盘、槽 lo/hi、代 lo/hi
+// I-3.10 的去重表（扫描内核 judge_allocation_generations_of_the_records；满了之后新来的记录不进表、照判，不再记判不了）：候选集里每条根、由记录施加出来的那几版与
+// 下一次挂载先施加的那一版，各版未释放的分配记录按（盘、槽、代）去重，整个状态累计一张。从 2048 抬到与一条根的分配记录那张表
+// （C_MAX_ALLOC_RECORDS）同宽：不回收的流上分配过的记录一直留在树里（释放了改成已释放），各版未释放记录去重累计的条数跟着最新那一版的
+// 分配记录条数长。CPU 一侧数的：轮四遍再长到 56、57、76 个单元的三条流各版累计 2046、2048、2086 条（被判那一版分配记录 2048、2050、2088 条），
+// 2086 条那一条在旧的界上每个状态判不了；轮八遍再长到 167 个那一条累计 4096 条。原来表满记判不了（站点 31），此刻表满之后不再去重、照判：
+// I-3.10 是置位，同一条记录判两遍结论相同，表多大只管少读几次单元头，不管判不判得了。
+// 表挪到草稿区末尾（⑫ 的 C_EXAMINED）；252464 起原来那 10240 个字扫描内核不再用（走读内核的四张桶表照旧借其中到 W_BUCKETS_END 为止的那一段），
+// 其后各表的偏移不挪。去重桶表借 C_JOURNAL_GROUP_KEYS 那一段，桶数取表的两倍（扫描内核的 C_EXAMINED_BUCKET_COUNT）
+const C_MAX_EXAMINED: u32 = C_MAX_ALLOC_RECORDS;
 
 const C_MAX_SCANNED: u32 = 2048u;
 
@@ -565,9 +571,12 @@ const C_COUNTED_STATES: u32 = 267008u;       // valid_before 下标
 
 const C_PICKED: u32 = 267056u;               // 选过的标记（非空 48 + 判不了 48）
 
-const C_MAX_RELEASED_ABOVE: u32 = 2048u;
-
-const C_RELEASED_ABOVE: u32 = 267152u;       // 盘、槽 lo/hi、跨度
+// 扫描内核 c_deferred_below_the_floor 收最新根树表里分配记录树的已释放、释放代高于有效回退下界 F 的记录（满了记站点 34）：从 2048 抬到
+// 与一条根的分配记录那张表（C_MAX_ALLOC_RECORDS）同宽。容器树旋钮压到一片 1 条、2 条的随机历史 F = 0，最新根的已释放记录全数进这张表：
+// 旋钮 1 第 53 步 2078 条、第 54 步 2100 条，旋钮 2 第 55 步 2060 条、第 56 步 2114 条（CPU 一侧数的），在站点 34 判不了。
+// 合法镜像的树表里分配记录树只有一棵，这几条是从那一棵的记录里挑的，不多于它；树表里多于一棵的坏镜像才走得到站点 34。
+// 表挪到草稿区末尾（⑫ 的 C_RELEASED_ABOVE）；267152 起原来那 8192 个字空着，其后各表的偏移不挪
+const C_MAX_RELEASED_ABOVE: u32 = C_MAX_ALLOC_RECORDS;
 
 const C_MAX_DEFERRED: u32 = 4096u;
 
@@ -1000,8 +1009,8 @@ const_assert R_ALLOCATION == SCRATCH_END_BEFORE_THE_TABLES_GREW;
 
 // ⑫ 抬了上限、挪到末尾的几张表（各自的条数与为什么抬见定义它们上限的那一处），按这个次序首尾相接：
 //    扫描内核一条根的分配记录、最新根的已释放记录与「哪条候选根引用它」、最新根实例表的行与它的散列索引（桶表、同实例下一行）、
-//    扫描内核一条根自己实例表的行、主走读的 inode → 对象出生代与它的桶表、这一版 inode 记录与它的桶表、I-9.29 跨版本那张表与它的桶表。
-//    几张桶表的写法见 ⑬
+//    扫描内核一条根自己实例表的行、主走读的 inode → 对象出生代与它的桶表、这一版 inode 记录与它的桶表、I-9.29 跨版本那张表与它的桶表、
+//    释放代高于 F 的已释放记录、I-3.10 的去重表。几张桶表的写法见 ⑬
 const C_ALLOC_RECORDS: u32 = END_OF_THE_RECOVERY_TABLES_MOVED_PAST_THE_CHECKER_TABLES;
 
 const C_RELEASED: u32 = C_ALLOC_RECORDS + C_ALLOC_RECORD_WORDS * C_MAX_ALLOC_RECORDS;   // 盘、槽 lo/hi、释放代 lo/hi
@@ -1041,10 +1050,17 @@ const D_OBJECT_BIRTH_BUCKET_COUNT: u32 = 2u * D_MAX_OBJECT_BIRTHS;
 
 const D_OBJECT_BIRTH_BUCKETS: u32 = D_OBJECT_BIRTHS + D_OBJECT_BIRTH_WORDS * D_MAX_OBJECT_BIRTHS;
 
-// 每个状态的草稿区到这里为止：crash_judge_gpu.rs 的 SCRATCH_WORDS 与它相等（那一份的单测核）
-const SCRATCH_END: u32 = 1296312u;
+// 一条四个字：盘、槽 lo/hi、跨度
+const C_RELEASED_ABOVE_WORDS: u32 = 4u;
 
-const_assert SCRATCH_END == D_OBJECT_BIRTH_BUCKETS + D_OBJECT_BIRTH_BUCKET_COUNT;
+const C_RELEASED_ABOVE: u32 = D_OBJECT_BIRTH_BUCKETS + D_OBJECT_BIRTH_BUCKET_COUNT;
+
+const C_EXAMINED: u32 = C_RELEASED_ABOVE + C_RELEASED_ABOVE_WORDS * C_MAX_RELEASED_ABOVE;   // 盘、槽 lo/hi、代 lo/hi
+
+// 每个状态的草稿区到这里为止：crash_judge_gpu.rs 的 SCRATCH_WORDS 与它相等（那一份的单测核）
+const SCRATCH_END: u32 = 1333176u;
+
+const_assert SCRATCH_END == C_EXAMINED + 5u * C_MAX_EXAMINED;
 
 // 扫描内核 I-5.4 把一条根的分配记录按行号次序排进 C_ROW_ORDER（那一段 C_MAX_REFERENCES 个字）：装得下
 const_assert C_MAX_ALLOC_RECORDS <= C_JOURNAL_GROUP_KEYS - C_ROW_ORDER;

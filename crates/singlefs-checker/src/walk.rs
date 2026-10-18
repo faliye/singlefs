@@ -4055,12 +4055,18 @@ fn scanned_tree_identifiers(
 ) -> BTreeSet<u64> {
     let mut identifiers = BTreeSet::new();
     for device in reader.devices() {
-        let mut slots = reader.candidate_unit_slots(device).unwrap_or_else(|| {
-            let end = reader.device_bytes(device).unwrap_or(0) / SLOT_BYTES;
-            (geometry.unit_area_start_slot..end).collect()
-        });
-        slots.sort_unstable();
-        slots.dedup();
+        // 读者给的候选排一遍；给不出候选时按区间迭代（本来就有序），不把几千万个槽号先收进 Vec
+        let slots: Box<dyn Iterator<Item = u64>> = match reader.candidate_unit_slots(device) {
+            Some(mut candidates) => {
+                candidates.sort_unstable();
+                candidates.dedup();
+                Box::new(candidates.into_iter())
+            }
+            None => {
+                let end = reader.device_bytes(device).unwrap_or(0) / SLOT_BYTES;
+                Box::new(geometry.unit_area_start_slot..end)
+            }
+        };
         let mut first_slot_not_claimed = 0u64;
         for slot in slots {
             if slot < first_slot_not_claimed {
@@ -4077,7 +4083,8 @@ fn scanned_tree_identifiers(
                 continue;
             }
             let header_end = 86 + 2 * usize::from(bytes[51]);
-            if header_end < bytes.len() && checksum_field_holds(&bytes, header_end, 10) {
+            // 头校验和 `slots_claimed_by_a_unit_header` 刚核过（同一段、同一个字段），这里不再算一遍
+            if header_end < bytes.len() {
                 let birth_txg = read_u64(&bytes, 52 + 2 * usize::from(bytes[51]));
                 if birth_txg <= newest_published_txg
                     && !written_after_its_instance_was_last_applied(
@@ -4149,9 +4156,12 @@ fn instance_carriers(
         .collect();
     let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
     for device in reader.devices() {
-        let journal_slots = reader
-            .candidate_journal_slots(device)
-            .unwrap_or_else(|| (0..geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES).collect());
+        // 读者给不出候选时逐槽扫整环：按区间迭代，不把几十万个槽号先收进一个 Vec
+        let journal_slots: Box<dyn Iterator<Item = u64>> =
+            match reader.candidate_journal_slots(device) {
+                Some(candidates) => Box::new(candidates.into_iter()),
+                None => Box::new(0..geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES),
+            };
         for slot in journal_slots {
             let offset =
                 geometry.journal_ring_start_slot * SLOT_BYTES + slot * JOURNAL_RECORD_BYTES;
@@ -4166,10 +4176,14 @@ fn instance_carriers(
                 ));
             }
         }
-        let unit_slots = reader.candidate_unit_slots(device).unwrap_or_else(|| {
-            let end = reader.device_bytes(device).unwrap_or(0) / SLOT_BYTES;
-            (geometry.unit_area_start_slot..end).collect()
-        });
+        // 读者给不出候选时逐槽扫整个单元区：按区间迭代，1 TiB 的盘有几千万个槽，收进 Vec 要几百 MiB
+        let unit_slots: Box<dyn Iterator<Item = u64>> = match reader.candidate_unit_slots(device) {
+            Some(candidates) => Box::new(candidates.into_iter()),
+            None => {
+                let end = reader.device_bytes(device).unwrap_or(0) / SLOT_BYTES;
+                Box::new(geometry.unit_area_start_slot..end)
+            }
+        };
         for slot in unit_slots {
             let Some(bytes) = reader.read(device, slot * SLOT_BYTES, UNIT_HEADER_SCAN_BYTES) else {
                 some_slot_is_unreadable = true;
@@ -7441,10 +7455,13 @@ fn scanned_content_units(
 ) -> Vec<ScannedContentUnit> {
     let mut units = Vec::new();
     for device in reader.devices() {
-        let slots = reader.candidate_unit_slots(device).unwrap_or_else(|| {
-            let end = reader.device_bytes(device).unwrap_or(0) / SLOT_BYTES;
-            (geometry.unit_area_start_slot..end).collect()
-        });
+        let slots: Box<dyn Iterator<Item = u64>> = match reader.candidate_unit_slots(device) {
+            Some(candidates) => Box::new(candidates.into_iter()),
+            None => {
+                let end = reader.device_bytes(device).unwrap_or(0) / SLOT_BYTES;
+                Box::new(geometry.unit_area_start_slot..end)
+            }
+        };
         for slot in slots {
             let Some(header) = reader.read(device, slot * SLOT_BYTES, UNIT_HEADER_SCAN_BYTES)
             else {
@@ -8057,10 +8074,11 @@ fn judge_commit_markers_per_transaction(
                 continue;
             }
             judged_transactions += 1;
-            if let Some((later_counter, later)) = records
-                .range(last_counter + 1..)
-                .find(|(_, later)| later.instance == *instance)
-            {
+            if let Some((later_counter, later)) = counter_after(*last_counter).and_then(|next| {
+                records
+                    .range(next..)
+                    .find(|(_, later)| later.instance == *instance)
+            }) {
                 first_record_after_an_uncommitted_transaction.get_or_insert_with(|| {
                     format!(
                         "盘 {device} 实例 {instance} 事务号 {transaction} 的记录（计数器 {member_counters:?}）一条提交标记都没有，后面计数器 {later_counter}（环槽 {}）上却还有同实例事务号 {} 的记录——没提交的事务之后这个实例不许再写任何记录",
@@ -8213,15 +8231,16 @@ fn judge_publish_ordinals_and_last_record_flags(
                 .collect();
             match flagged_counters.as_slice() {
                 [] => {
-                    let this_instance_wrote_on = records
-                        .get(&(last_counter + 1))
+                    let next_counter = counter_after(last_counter);
+                    let this_instance_wrote_on = next_counter
+                        .and_then(|next| records.get(&next))
                         .is_some_and(|next| next.instance == *instance);
                     if this_instance_wrote_on {
                         note_violation(
                             "没有末条",
                             format!(
                                 "盘 {device} 实例 {instance} checkpoint_txg {checkpoint_txg} 那次发布的记录（计数器 {member_counters:?}）一条都不带末条标志，而同一实例在计数器 {} 上已经往下写了",
-                                last_counter + 1
+                                next_counter.expect("往下写了就有下一个计数器")
                             ),
                         );
                     }
@@ -8572,6 +8591,11 @@ fn judge_blocks_referenced_by_abandoned_roots(
 /// [180..188) = [130..138)、[188..274) = [170..256)、[274..360) = [342..428)、[360..364) = flags [20..24)
 /// （[`NEW_ROOT_SEGMENT_FIELDS_COMPARED_WITH_THE_ROOT`]）。
 /// 末条标志不唯一的组归 I-8.9（一次发布的记录序号连续且只有末条带标志），不判；同 (实例, txg) 有两条以上不同内容的根不另分，逐条比。
+/// 游标之后那一个计数器：计数器是盘上读来的 u64，到顶（`u64::MAX`）就没有「下一个」——不回绕成 0 去把整环当成「后面的记录」。
+fn counter_after(last_counter: u64) -> Option<u64> {
+    last_counter.checked_add(1)
+}
+
 fn judge_new_root_segment_of_the_last_record_against_the_roots(
     records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
     roots: &[(u64, u64, crate::RootView)],
@@ -13233,6 +13257,13 @@ pub fn check_pool_image_given_the_container_capacity_knobs(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 游标是盘上读来的 u64：到顶就没有「下一个」，不回绕成 0。
+    #[test]
+    fn the_counter_after_the_cursor_is_none_at_the_top_of_u64() {
+        assert_eq!(counter_after(5), Some(6));
+        assert_eq!(counter_after(u64::MAX), None);
+    }
     use singlefs_format::{
         TREE_IDENTIFIER_ACCOUNTING, TREE_IDENTIFIER_ALLOCATION_RECORDS,
         TREE_IDENTIFIER_CENTRAL_MAPPING, TREE_IDENTIFIER_DEADLIST, TREE_IDENTIFIER_DELETED_INODES,
@@ -13728,6 +13759,68 @@ mod tests {
             merging_the_abandoned_roots_too,
             newest,
         })
+    }
+
+    /// GPU 判器的扫描内核判丁-defer 只按 F_生效 挑已释放记录（`crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl` 的
+    /// `c_deferred_below_the_floor`），这里的门槛是 max(F_生效, 环里最旧有效根)（`deferred_slots_reclaim_threshold`）：hand_out 第二位报告
+    /// 「交主 agent 定的」第 1 条疑两边口径不同。丁-defer 并进的槽只来自 F_生效 之下的有效根
+    /// （`root_references_are_merged_into_the_deferred_slots_below_the_floor`），这样的根一有，环里最旧有效根就在 F_生效 之下，门槛就是
+    /// F_生效；一条都没有时并进的是空集、门槛取多少都一样。所以能并进槽的每个盘面上两边同一个门槛，造不出两边判得不同的镜像。
+    /// 这里在（有效 / 被抛弃，txg）的全部组合（至多三条根、txg 与 F_生效 各取 0..6、0..4）上钉住它：有一条根并得进来，门槛就是 F_生效。
+    /// 判别力（`crates/mutations.tsv`）：门槛取「环里最新有效根」（`min` 换成 `max`），环里另有 F_生效 之上的有效根时门槛高于 F_生效，这条红。
+    #[test]
+    fn the_deferral_threshold_is_the_effective_floor_whenever_a_root_below_the_floor_can_merge_its_slots(
+    ) {
+        let standings = [
+            RootStandingInTheNewestRootsTable::Valid,
+            RootStandingInTheNewestRootsTable::Abandoned,
+        ];
+        let choices: Vec<(RootStandingInTheNewestRootsTable, u64)> = standings
+            .iter()
+            .flat_map(|standing| (0..6u64).map(move |checkpoint_txg| (*standing, checkpoint_txg)))
+            .collect();
+        let mut rings_with_a_mergeable_root = 0u64;
+        for effective_rollback_floor in 0..4u64 {
+            // 至多三条根：长度 0、1、2、3 的每一串各一次（逐层从上一层长一条，不重不漏）
+            let mut rings: Vec<Vec<(RootStandingInTheNewestRootsTable, u64)>> = vec![Vec::new()];
+            let mut previous_layer = rings.clone();
+            for _root_count in 0..3 {
+                let next_layer: Vec<Vec<(RootStandingInTheNewestRootsTable, u64)>> = previous_layer
+                    .iter()
+                    .flat_map(|ring| {
+                        choices.iter().map(move |choice| {
+                            let mut extended = ring.clone();
+                            extended.push(*choice);
+                            extended
+                        })
+                    })
+                    .collect();
+                rings.extend(next_layer.iter().cloned());
+                previous_layer = next_layer;
+            }
+            for ring in &rings {
+                let some_root_merges_its_slots = ring.iter().any(|(standing, checkpoint_txg)| {
+                    root_references_are_merged_into_the_deferred_slots_below_the_floor(
+                        *standing,
+                        *checkpoint_txg,
+                        effective_rollback_floor,
+                    )
+                });
+                if !some_root_merges_its_slots {
+                    continue;
+                }
+                rings_with_a_mergeable_root += 1;
+                assert_eq!(
+                    deferred_slots_reclaim_threshold(ring.iter().copied(), effective_rollback_floor),
+                    effective_rollback_floor,
+                    "环 {ring:?}、F_生效 {effective_rollback_floor}：有一条根并得进来，门槛就是 F_生效（GPU 扫描内核按它挑）"
+                );
+            }
+        }
+        assert!(
+            rings_with_a_mergeable_root > 1000,
+            "枚举到的、有根并得进来的盘面太少：{rings_with_a_mergeable_root}"
+        );
     }
 
     /// LR5：「被抛弃根引用的也并」与原式在小世界的每个盘面上并进同一组槽，只在双故障形下可能不同

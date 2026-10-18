@@ -85,13 +85,12 @@ fn c393_tree_table_unreadable_only_on_the_first_read_of_each_copy() {
 #[test]
 fn c393_positive_control_the_hook_is_called_when_the_newest_instance_table_is_unreadable() {
     let (mut pool, _) = pool_after_a_recovery_abandoned_c("c393-hook-positive-control");
-    let mut devices_for_the_page = pool.reopen_recorded();
+    let devices_for_the_page = pool.reopen_recorded();
     let newest = singlefs_core::recovery::choose_root(
         &devices_for_the_page,
         &singlefs_core::recovery::choose_system_configuration(&devices_for_the_page).expect("择"),
     )
     .expect("最新根");
-    let _ = &mut devices_for_the_page;
     pool.devices = Some(devices_for_the_page);
     let page = newest.instance_table;
     let ranges: Vec<UnreadableRange> = page
@@ -258,6 +257,46 @@ fn hide_the_root_slot_of(
     }
 }
 
+/// 一条根那一版账里还分配着的落点罩着的槽里，分配器的分配记录一条都没罩着、也没隔离着的那几个（每个一槽）。
+/// 分配记录没罩着的槽分配位没置着；这样的槽影子账算到这条被抛弃根时不论走哪一支都要隔离，分配器跟着变。
+fn slots_referenced_by_a_root_that_the_allocator_neither_allocates_nor_isolates(
+    allocator: &singlefs_core::allocator::PoolAllocator,
+    account_of_the_root: &[singlefs_core::allocator::AllocationRecord],
+) -> Vec<singlefs_core::allocator::PlacementOnDevice> {
+    let covers =
+        |record: &singlefs_core::allocator::AllocationRecord, device: DeviceIdentity, slot: u64| {
+            record.device == device
+                && (record.slot.0..record.slot.0 + u64::from(record.span_slots)).contains(&slot)
+        };
+    account_of_the_root
+        .iter()
+        .filter(|record| !record.is_released)
+        .flat_map(|record| {
+            (record.slot.0..record.slot.0 + u64::from(record.span_slots))
+                .map(move |slot| (record.device, slot))
+        })
+        .filter(|(device, slot)| {
+            !allocator
+                .records()
+                .iter()
+                .any(|current| covers(current, *device, *slot))
+        })
+        .map(
+            |(device, slot)| singlefs_core::allocator::PlacementOnDevice {
+                device,
+                slot: singlefs_core::address::SlotNumber(slot),
+                span: 1,
+            },
+        )
+        .filter(|placement| {
+            allocator
+                .isolated_slots_covered_by(std::slice::from_ref(placement))
+                .iter()
+                .all(|(_, isolated)| *isolated == 0)
+        })
+        .collect()
+}
+
 fn restore_the_root_slot(pool: &mut BuiltPool, hidden: &HiddenRootSlot) {
     use singlefs_core::block_device::{BlockDevice, WriteDurability};
     let mut devices = pool.reopen_recorded();
@@ -286,6 +325,9 @@ fn restore_the_root_slot(pool: &mut BuiltPool, hidden: &HiddenRootSlot) {
 /// 根环线第 10z 批）：要走到影子账的拒，排在后面的那一条得是根环表里没记着的——再可写挂载那一刻它的根槽读回全零（挂载之后写回），
 /// 根环表把那一槽记成「挂载时读回全零」，抬 F 那一遍读出它、照盘上读它的账（那一槽记的不是有效根，C 那一圈也不借：两样都没记着的照今天读盘，
 /// D16（发布语义） 已定项 1「根槽这一次读坏」那一行，用户 2026-10-08 定）。
+/// 排在前面的那一条同样在挂载那一刻读回全零：根环表记着它时，它引用的槽挂载那一遍已经隔离、没隔离的分配位置着，抬 F 只补分配位没置着的槽，
+/// 一个都补不上，交 `Err` 之前分配器没变；没记着时挂载那一遍没见过它，它引用的槽既没分配也没隔离，抬 F 从盘上读它的账、整段隔离，
+/// 用例在抬 F 之前断言确有这样的槽。
 /// 判别力：影子账交 `Err` 时不换回分配器，前一条补上的隔离留在分配器上，「与抬 F 之前逐项相同」那一项红。
 #[test]
 fn a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_account_and_mapping_is_refused_and_restores_the_allocator(
@@ -321,15 +363,17 @@ fn a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_accou
     } else {
         (&abandoned_c, &abandoned_e)
     };
-    let hidden_root_slot = hide_the_root_slot_of(&mut pool, &later.root);
+    let hidden_root_slot_of_the_earlier = hide_the_root_slot_of(&mut pool, &earlier.root);
+    let hidden_root_slot_of_the_later = hide_the_root_slot_of(&mut pool, &later.root);
     let mut devices_of_the_mount = pool.reopen_recorded();
     let mounted = singlefs_core::mount::mount_writable(&parameters(), &mut devices_of_the_mount)
-        .expect("排在后面那条被抛弃根的根槽读回全零、前面那条读得出：照常可写挂载");
+        .expect("两条被抛弃根的根槽都读回全零：照常可写挂载");
     let instance = mounted.output.instance;
     pool.devices = Some(devices_of_the_mount);
     pool.allocator = mounted.allocator;
     pool.output = mounted.current.into_file_version().expect("带文件");
-    restore_the_root_slot(&mut pool, &hidden_root_slot);
+    restore_the_root_slot(&mut pool, &hidden_root_slot_of_the_earlier);
+    restore_the_root_slot(&mut pool, &hidden_root_slot_of_the_later);
     let root_ring_table = pool
         .allocator
         .root_ring_occupancy()
@@ -340,14 +384,14 @@ fn a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_accou
                 earlier.root.instance,
                 earlier.root.checkpoint_txg
             )
-            .is_some()
+            .is_none()
             && root_ring_table
                 .placements_recorded_for_the_abandoned_root(
                     later.root.instance,
                     later.root.checkpoint_txg
                 )
                 .is_none(),
-        "根环表记着排在前面的那条被抛弃根、没记着排在后面的那一条"
+        "根环表两条被抛弃根都没记着：抬 F 那一遍两条都从盘上读账"
     );
     for overwrite_index in 0..OVERWRITES_BEFORE_THE_RAISE {
         let previous = pool.output.clone();
@@ -361,6 +405,15 @@ fn a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_accou
         .expect("这次挂载里覆盖写");
     }
     zero_the_tree_table_and_the_mapping_root_of(&mut pool, &later.root);
+    let slots_of_the_earlier_neither_allocated_nor_isolated =
+        slots_referenced_by_a_root_that_the_allocator_neither_allocates_nor_isolates(
+            &pool.allocator,
+            &earlier.allocation_records,
+        );
+    assert!(
+        !slots_of_the_earlier_neither_allocated_nor_isolated.is_empty(),
+        "前提：排在前面的那条被抛弃根引用着分配器既没分配、也没隔离的槽，影子账算它时就动分配器，交 Err 之前分配器确实变过"
+    );
     let allocator_before_the_raise = format!("{:?}", pool.allocator);
     let image_before_the_raise = pool.memory_pool();
     let mut devices_of_the_raise = pool.reopen_recorded();

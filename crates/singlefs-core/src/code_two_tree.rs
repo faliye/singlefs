@@ -309,20 +309,6 @@ impl CodeTwoTreePlan {
             .map(|(node, _)| node.position)
             .collect()
     }
-
-    /// 这个位置上的节点从哪来。
-    ///
-    /// # Panics
-    /// 这个位置不在这一版里：调用方从同一份计划里取的位置。
-    #[must_use]
-    pub fn origin_of(&self, position: CodeTwoTreeNodePosition) -> CodeTwoTreeNodeOrigin {
-        let index = self
-            .shape
-            .nodes()
-            .binary_search_by_key(&position, |node| node.position)
-            .expect("位置取自同一份计划");
-        self.origins[index]
-    }
 }
 
 /// 这次之后的树算不出来，在任何落盘动作之前交回。
@@ -1373,11 +1359,20 @@ mod tests {
             key(5),
             "最左分隔 key 压低到新插的 key"
         );
+        let right_leaf_index_in_the_plan = after
+            .shape
+            .nodes()
+            .iter()
+            .position(|node| {
+                node.position
+                    == CodeTwoTreeNodePosition {
+                        level: 0,
+                        index_in_level: 1,
+                    }
+            })
+            .expect("右叶在这一版里");
         assert_eq!(
-            after.origin_of(CodeTwoTreeNodePosition {
-                level: 0,
-                index_in_level: 1
-            }),
+            after.origins[right_leaf_index_in_the_plan],
             CodeTwoTreeNodeOrigin::CarriedFrom(CodeTwoTreeNodePosition {
                 level: 0,
                 index_in_level: 1
@@ -1444,23 +1439,29 @@ mod tests {
 
     #[test]
     fn the_level_byte_bounds_the_height() {
-        assert_eq!(u8::MAX.checked_add(1), None);
         let mut root = PlanningNode::Internal {
             level: u8::MAX,
             children: vec![
                 PlanningChild {
                     separator_key: key(1),
-                    node: PlanningNode::empty_leaf(),
+                    node: PlanningNode::Leaf {
+                        keys: vec![key(1)],
+                        carried_from: None,
+                    },
                 },
                 PlanningChild {
                     separator_key: key(2),
-                    node: PlanningNode::empty_leaf(),
+                    node: PlanningNode::Leaf {
+                        keys: vec![key(2)],
+                        carried_from: None,
+                    },
                 },
             ],
             carried_from: None,
         };
-        // 根的层级是 255、孩子是空叶（只为造出这一格，层级不连贯）：插一把 key 进孩子不分裂，根不切；
-        // 把内部容量压到 1 让根装不下，根分裂要长出第 256 层 ⇒ 拒绝。
+        // 根的层级是 255、孩子是各装一把 key 的叶（只为造出这一格，层级不连贯）：插一把 key 进孩子不分裂，根不切；
+        // 把内部容量压到 1 让根装不下，根分裂要长出第 256 层 ⇒ 拒绝。孩子不是空叶，根的拒绝被放行时切开照常走完、
+        // 交回 `Ok`，红在下面这条断言上，不红在切开那一步取左半最小 key 的 `expect` 上。
         let refused = insert_at_the_root(&mut root, key(3), capacity(4, 1));
         assert_eq!(refused, Err(CodeTwoTreeRefusal::HeightBeyondTheLevelField));
     }

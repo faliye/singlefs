@@ -1,23 +1,23 @@
 //! 崩溃放量节点的身份与复用键（里程碑二「增补 4」第一项；第三轮判决 `research/prompts/m3-prune-gpu-r3-main-verification.md`
 //! 第四节的设计表，用户 2026-09-28 认了身份形态；E164（崩溃放量新设计的小范围功能测试） 第一、二段量过各件）。
 //!
-//! - 身份 = `<设这个崩溃点的文件的仓内路径>::<崩溃点名称>::<哈希串>`（用户 2026-09-28 定）：一个函数里设了几个崩溃点就是几个身份，
-//!   名称绑在设它的函数上；前两段是标签，只给覆盖报告；哈希串是复用键。
-//! - 复用键罩三样属性：这一步带屏障、FUA、盘、偏移、段号的整张写表；这一步之前的镜像（父输出，扇区终值）；判法代码
-//!   （从节点的测试文件出发、顺着 `use` 与路径引用只收用到的模块，外加给这些类型写 `impl` 的同 crate 文件；自己原文被
-//!   `include_str!` 读的文件取原文摘要，其余去注释、去位置取词法摘要），连同 `Cargo.lock` 与工具链。
-//! - 身份只由仓内相对路径与内容算出，不含绝对路径、机器与用户：同一份代码在两台机器、两个目录下算出同一个身份。
-//! - 标签类型不给格式化、不给比较（没有 `Display`、`Debug`、`Clone`、`Hash`、`PartialEq`、`Ord`），不能拿去当键（E164 F12）。
-//! - 三种结论各一把版本（崩溃点重放合并第三轮判决 J8）：GPU 结论（GPU 判器闭包）、CPU 结论（CPU 判器闭包 ∪ 设点文件出发的闭包）、
-//!   观察者结果（观察者代码出发的闭包 + 另读输入的摘要），闭包都在停止表（判器的 ∪ 流水线五份）处停。闭包算法在零依赖的
-//!   `judging_closure.rs`，`build.rs` 照同一套在编译时算代码摘要表写进二进制，跑时从盘上再算，不等由调用方整趟不写库、退 78。
+//! - 键只由内容定（用户 2026-10-15 定：键里不许有路径、名字、种子、行号、手写版本号、整文件或整表指纹、按提交算的东西）：
+//!   块键 = 这一步带屏障、FUA、盘、偏移、段号的写表与它起步的镜像（扇区终值）的摘要，加段展开、判器另读的输入与段内序号
+//!   （`verdict_store::VerdictBlockKey`）；判器那一半只经 [`judging_units_key`] 这一个入口取（[`JudgingUnitsKey`]，判法单元指纹）。
+//! - 身份 `<设这个崩溃点的文件的仓内路径>::<崩溃点名称>::<复用键>` 只作索引：进路径索引表与覆盖报告，不进任何键。
+//!   标签类型不给格式化、不给比较（没有 `Display`、`Debug`、`Clone`、`Hash`、`PartialEq`、`Ord`），不能拿去当键（E164 F12）。
+//! - 判法单元指纹（4-2a）：构建脚本按入口登记表（`crate::judging_units_entries`）经 `singlefs-unit-graph` 逐组从入口 fn 收函数单元闭包、
+//!   算键（单元去注释的指纹、工具链与 cargo 解析后的 profile、`Cargo.lock` 里闭包真引到的外部包），连同组成清单写进 `OUT_DIR`；
+//!   这里只读编进二进制的那一份，跑时不读盘上的树。二进制比盘上的树旧时它的键对不上新树算出来的键，查库不中就现判。
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
 use singlefs_harness::hexadecimal::hexadecimal_text;
 use singlefs_harness::memory_pool::{MemoryPool, RetainedWrite, WrittenContents};
 use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
+use singlefs_unit_graph::entry_groups::{
+    parse_entry_group_table, ReadBackEntryGroup, ReadBackEntryGroupTable, ReadBackEntryGroupVerdict,
+};
 
 use crate::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 
@@ -78,7 +78,7 @@ impl NodeLabel {
     }
 }
 
-/// 复用键：只能从属性算出（[`StepAttributes::reuse_key`]）。这一步的输入没变就是同一个键；判法变不变另按判法版本在判定行上分。
+/// 复用键：只能从属性算出（[`StepAttributes::reuse_key`]）。这一步的输入没变就是同一个键；判法变不变另按判法单元指纹在判定行上分。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ReuseKey([u8; DIGEST_BYTES]);
 
@@ -90,7 +90,7 @@ impl ReuseKey {
 }
 
 /// 一步的两样属性（各是 SHA-256）：这一步写下的字节（带屏障的写表）与它起步的镜像。只有流程进复用键：
-/// 判法是判定行的属性（`verdict_store::JudgeVersion`），不在这里。
+/// 判法是判定行的属性（`verdict_store::JudgingUnitsFingerprint`），不在这里。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StepAttributes {
     pub write_table_with_barriers: [u8; DIGEST_BYTES],
@@ -273,263 +273,10 @@ impl SectorImage {
     }
 }
 
-// ============================== 核对的属性：判法代码摘要（按模块引用取） ==============================
+// ============================== 三种结论（崩溃点重放合并第三轮判决 J8） ==============================
 
-// 闭包算法住在零依赖的 `judging_closure.rs`（只用 std）：`build.rs` 经 `#[path]` 引同一份，在编译时算三种结论的代码摘要。
-// 它用这一层引进来的 `sha256_digest`、`DIGEST_BYTES` 与 `hexadecimal_text` 算摘要。
-#[path = "judging_closure.rs"]
-mod judging_closure;
-
-pub use judging_closure::{
-    conclusion_closure_stop_files, lexical_text, lexical_tokens, ClosureToolchainLines,
-    ClosureTreeReader, ConclusionCode, ConclusionCodeDigestTable,
-    ConclusionCodeDigestTableUnreadable, ConclusionCodeEntry, FileIntroducer, JudgingCode,
-    JudgingCodeError, CONCLUSION_CANDIDATE_DIRECTORY, CONCLUSION_CODE_DIGEST_TABLE_FILE_NAME,
-    CPU_JUDGE_ENTRY_FILE, FILES_THE_JUDGES_MUST_NOT_REACH, GPU_JUDGE_ENTRY_FILE,
-    JUDGE_CLOSURE_STOP_FILES, JUDGE_ENTRY_FILES, PIPELINE_FILES_THE_CONCLUSION_CLOSURES_STOP_AT,
-};
-// ============================== 登记的崩溃枚举用例：随机历史脚手架经谁进判法闭包 ==============================
-
-/// 随机历史脚手架（生成器、执行器、取样与复现入口，连同它带进来的理想模型、对拍、场景、故障注入）。登记的崩溃枚举用例的判法闭包里
-/// 有了它，改随机历史就让那一格整格重判（E164 W5）。
-pub const RANDOM_HISTORY_SCAFFOLDING_FILE: &str = "crates/singlefs-harness/src/history.rs";
-
-/// 一条登记的崩溃枚举用例许经一份库模块引随机历史脚手架（用户 2026-10-02 定「按登记用例白名单」）：只给拿随机历史当输入的用例登记，
-/// 理由写明它的判定为什么本来就随随机历史变。
-pub struct RandomHistoryThroughALibraryModuleAllowed {
-    /// `.claude/gate.d/stage-inputs.tsv` 里 `crash-case:` 行 `test=` 列的测试目标。
-    pub test_target: &'static str,
-    /// 引随机历史脚手架的那份库模块（仓内路径，`crates/<包>/src/` 下）。
-    pub library_module: &'static str,
-    pub reason: &'static str,
-}
-
-/// 登记表：哪条用例许经哪份库模块引随机历史脚手架。没登记的库模块把它带进登记的崩溃枚举用例，判法闭包那一核就拦
-/// （[`random_history_scaffolding_introducers_judged`]）；登记了而那条用例的闭包里没有这一引的是死条目，同一核也拦。
-pub const RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED: &[RandomHistoryThroughALibraryModuleAllowed] = &[
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_injection_campaign",
-        library_module: "crates/singlefs-checker-tier/src/crash_injection.rs",
-        reason: "崩溃注入拿随机历史当输入：战役按种子生成随机历史、执行时注入崩溃、照理想模型判恢复落到的版本，判定本来就随随机历史的生成器与执行器变",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_injection_campaign",
-        library_module: "crates/singlefs-harness/src/model_comparison.rs",
-        reason: "崩溃注入拿随机历史当输入：战役经 crash_injection.rs 用它把崩溃之后读回的结果对到理想模型；它只在自己的单元测试模块里引随机历史脚手架（词法闭包照收），判定随对拍的写法变",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_injection_campaign",
-        library_module: "crates/singlefs-harness/src/reference_filesystem_translation.rs",
-        reason: "崩溃注入拿随机历史当输入：战役经 crash_injection.rs 用 RefFS 翻译层把历史操作、每步结局与崩溃时刻翻成 RefFS 操作再判恢复读出（形式化接入线 12-2），翻译层直接引随机历史脚手架的操作与观察类型，判定随历史怎么生成、怎么执行变",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_injection_campaign",
-        library_module: "crates/singlefs-harness/src/fault_injection.rs",
-        reason: "崩溃注入拿随机历史当输入：RefFS 翻译层把历史操作翻成 RefFS 操作时要认每步的故障结局（形式化接入线 12-2），经它引故障注入的结局类型，故障注入又引随机历史脚手架的执行器；判定随带故障执行历史的写法变",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_injection_read_faulted_states_never_hold_the_witness_criterion",
-        library_module: "crates/singlefs-checker-tier/src/crash_injection.rs",
-        reason: "读故障那一项拿随机历史当输入：按种子生成、带读故障执行随机历史，经 crash_injection.rs 取 mkfs 之后的基线与写表（HistoryAfterTheMakeFilesystem）交给定状态表判，判定本来就随随机历史与它的建表变",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_injection_read_faulted_states_never_hold_the_witness_criterion",
-        library_module: "crates/singlefs-harness/src/model_comparison.rs",
-        reason: "读故障那一项拿随机历史当输入：经 crash_injection.rs 按文件收进闭包（崩溃注入用它对理想模型）；它只在自己的单元测试模块里引随机历史脚手架（词法闭包照收）",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_injection_read_faulted_states_never_hold_the_witness_criterion",
-        library_module: "crates/singlefs-harness/src/reference_filesystem_translation.rs",
-        reason: "读故障那一项拿随机历史当输入：经 crash_injection.rs 按文件收进闭包（崩溃注入用 RefFS 翻译层判恢复读出），翻译层直接引随机历史脚手架的操作与观察类型",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_injection_read_faulted_states_never_hold_the_witness_criterion",
-        library_module: "crates/singlefs-harness/src/fault_injection.rs",
-        reason: "读故障那一项拿随机历史当输入：带读故障执行历史，经 crash_injection.rs 与 RefFS 翻译层收进故障注入的结局类型，故障注入又引随机历史脚手架的执行器",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library",
-        library_module: "crates/singlefs-checker-tier/src/crash_injection.rs",
-        reason: "随机历史与故障注入经库判那一项拿随机历史当输入：按 harness 原先逐步跑 checker 的那几段种子生成并执行随机历史，经 crash_injection.rs 取 mkfs 之后的基线与写表（HistoryAfterTheMakeFilesystem）把每一步的镜像建成给定状态表交引擎判，判定本来就随随机历史与它的建表变",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library",
-        library_module: "crates/singlefs-harness/src/fault_injection.rs",
-        reason: "随机历史与故障注入经库判那一项拿故障注入当输入：经 fault_injection.rs 的注入点钩子拿每个注入点重开的盘与归类函数，故障注入又引随机历史脚手架的执行器，判定随带故障执行历史的写法变",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library",
-        library_module: "crates/singlefs-harness/src/model_comparison.rs",
-        reason: "随机历史与故障注入经库判那一项经 crash_injection.rs 按文件收进闭包（崩溃注入用它对理想模型）；它只在自己的单元测试模块里引随机历史脚手架（词法闭包照收）",
-    },
-    RandomHistoryThroughALibraryModuleAllowed {
-        test_target: "crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library",
-        library_module: "crates/singlefs-harness/src/reference_filesystem_translation.rs",
-        reason: "随机历史与故障注入经库判那一项经 crash_injection.rs 与故障注入收进 RefFS 翻译层，翻译层直接引随机历史脚手架的操作与观察类型，判定随历史怎么生成、怎么执行变",
-    },
-];
-
-/// 随机历史脚手架的一个引入者判下来是什么。
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum RandomHistoryIntroducerVerdict {
-    /// 它就是测试目标的入口。
-    EntryOfTheTestTarget,
-    /// 测试目标自己的文件（`tests/` 下，连同经 `#[path]` 共用的搭建模块）直接引：放行。
-    TestTargetFile,
-    /// 库模块引，这条用例登记过它：放行，理由在登记表里。
-    RegisteredLibraryModule { reason: &'static str },
-    /// 库模块引，这条用例没登记它：拦。
-    UnregisteredLibraryModule,
-    /// `impl` 头点名了闭包里声明的名字把它带进来：拦，登记不了。
-    BroughtInByAnImplHeader,
-}
-
-impl RandomHistoryIntroducerVerdict {
-    #[must_use]
-    pub fn is_let_through(&self) -> bool {
-        match self {
-            Self::EntryOfTheTestTarget
-            | Self::TestTargetFile
-            | Self::RegisteredLibraryModule { .. } => true,
-            Self::UnregisteredLibraryModule | Self::BroughtInByAnImplHeader => false,
-        }
-    }
-}
-
-/// 随机历史脚手架的一个引入者与它的判定。
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct JudgedRandomHistoryIntroducer {
-    pub introducer: FileIntroducer,
-    pub verdict: RandomHistoryIntroducerVerdict,
-}
-
-/// 仓内路径是不是某个包的库模块（`crates/<包>/src/` 下）；不是的是测试目标自己的文件（`crates/<包>/tests/` 下）。
-fn is_a_library_module(file: &str) -> bool {
-    let mut parts = file.split('/');
-    parts.next() == Some("crates") && parts.next().is_some() && parts.next() == Some("src")
-}
-
-/// 逐份判一条登记的崩溃枚举用例里随机历史脚手架的引入者（用户 2026-10-02 定「逐份判」）。闭包从
-/// `crates/singlefs-checker-tier/tests/<test_target>.rs` 出发按模块引用收、到 [`RANDOM_HISTORY_SCAFFOLDING_FILE`] 停：
-/// 停在门外那一份的每一个引入者，都是不经随机历史脚手架自己就进了闭包、又引它的文件。只因随机历史脚手架才进闭包的模块
-/// （它自己带进来的故障注入、对拍）回引它，不算把它带进来。交回每个引入者与判定（按引入者排序）；闭包够不着随机历史脚手架时是空的。
-///
-/// # Errors
-/// 同 [`judging_code_by_module_references_stopping_at`]。
-pub fn random_history_scaffolding_introducers_judged(
-    repository_root: &Path,
-    test_target: &str,
-    toolchain: &CrashPointReplayToolchainIdentity,
-    allowed: &[RandomHistoryThroughALibraryModuleAllowed],
-) -> Result<Vec<JudgedRandomHistoryIntroducer>, JudgingCodeError> {
-    let entry = format!("crates/singlefs-checker-tier/tests/{test_target}.rs");
-    let closure_stopped_at_the_scaffolding = judging_code_by_module_references_stopping_at(
-        repository_root,
-        &[entry.as_str()],
-        &[RANDOM_HISTORY_SCAFFOLDING_FILE],
-        toolchain,
-    )?;
-    let Some(introducers) = closure_stopped_at_the_scaffolding
-        .introducers_of_each_file
-        .get(RANDOM_HISTORY_SCAFFOLDING_FILE)
-    else {
-        return Ok(Vec::new());
-    };
-    let verdict_on_an_introducing_file = |file: &str| {
-        if !is_a_library_module(file) {
-            return RandomHistoryIntroducerVerdict::TestTargetFile;
-        }
-        match allowed
-            .iter()
-            .find(|row| row.test_target == test_target && row.library_module == file)
-        {
-            Some(row) => {
-                RandomHistoryIntroducerVerdict::RegisteredLibraryModule { reason: row.reason }
-            }
-            None => RandomHistoryIntroducerVerdict::UnregisteredLibraryModule,
-        }
-    };
-    Ok(introducers
-        .iter()
-        .map(|introducer| JudgedRandomHistoryIntroducer {
-            introducer: introducer.clone(),
-            verdict: match introducer {
-                FileIntroducer::Entry => RandomHistoryIntroducerVerdict::EntryOfTheTestTarget,
-                FileIntroducer::ReferencedBy { file }
-                | FileIntroducer::ReadAsRawTextBy { file } => verdict_on_an_introducing_file(file),
-                FileIntroducer::ImplHeaderNaming { .. } => {
-                    RandomHistoryIntroducerVerdict::BroughtInByAnImplHeader
-                }
-            },
-        })
-        .collect())
-}
-
-fn closure_toolchain_lines(
-    toolchain: &CrashPointReplayToolchainIdentity,
-) -> ClosureToolchainLines<'_> {
-    ClosureToolchainLines {
-        rustc_version_lines: &toolchain.rustc_version_lines,
-        cargo_version: &toolchain.cargo_version,
-        target_triple: &toolchain.target_triple,
-    }
-}
-
-/// 判器的判法代码：从 [`JUDGE_ENTRY_FILES`] 出发、到 [`JUDGE_CLOSURE_STOP_FILES`] 停的模块引用闭包。
-///
-/// # Errors
-/// 同 [`judging_code_by_module_references_stopping_at`]。
-pub fn judging_code_of_the_judges(
-    repository_root: &Path,
-    toolchain: &CrashPointReplayToolchainIdentity,
-) -> Result<JudgingCode, JudgingCodeError> {
-    let stop_files: Vec<&str> = JUDGE_CLOSURE_STOP_FILES
-        .iter()
-        .map(|(file, _reason)| *file)
-        .collect();
-    judging_code_by_module_references_stopping_at(
-        repository_root,
-        JUDGE_ENTRY_FILES,
-        &stop_files,
-        toolchain,
-    )
-}
-
-/// 同 [`judging_code_by_module_references_stopping_at`]，不设停止文件。
-///
-/// # Errors
-/// 同 [`judging_code_by_module_references_stopping_at`]。
-pub fn judging_code_by_module_references(
-    repository_root: &Path,
-    entry_files: &[&str],
-    toolchain: &CrashPointReplayToolchainIdentity,
-) -> Result<JudgingCode, JudgingCodeError> {
-    judging_code_by_module_references_stopping_at(repository_root, entry_files, &[], toolchain)
-}
-
-/// 判法代码：从 `entry_files`（仓内路径）出发，顺着路径与 `use` 引用收文件；再收同 crate 里 `impl` 头点名了
-/// 已收文件里所声明类型或 trait 的文件，反复到收不到新文件为止；`stop_files` 里的文件被引到就停在门外，不收、不往下收，记进 `stopped_at`。
-/// 自己原文被 `include_str!` / `include_bytes!` 读的文件取原文摘要，其余取词法单元串。摘要另拼 `Cargo.lock`、收到的各 crate 的
-/// `Cargo.toml`（原文）与工具链（算法在 [`ClosureTreeReader::judging_code_stopping_at`]）。
-///
-/// # Errors
-/// 读不了某份文件、工作区的 crate 清单读不出来。
-pub fn judging_code_by_module_references_stopping_at(
-    repository_root: &Path,
-    entry_files: &[&str],
-    stop_files: &[&str],
-    toolchain: &CrashPointReplayToolchainIdentity,
-) -> Result<JudgingCode, JudgingCodeError> {
-    ClosureTreeReader::new(repository_root)?.judging_code_stopping_at(
-        entry_files,
-        stop_files,
-        &closure_toolchain_lines(toolchain),
-    )
-}
-
-// ============================== 三种结论各一把版本（崩溃点重放合并第三轮判决 J8） ==============================
-
-/// 观察者的名字：非空，不超过 `u16::MAX` 字节（判定库的键里用两个字节记它的长度）。
+/// 观察者的名字：非空，不超过 `u16::MAX` 字节。只当索引：拼进它那一组判法单元的组名（`observer_code:<文件>:<名字>`）与行里报的名字，
+/// 不进任何键（结论种类里没有它，4-2a 报告第四节第 5 条：观察者是哪一个由它那一组判法单元的键担，即结论的版本）。
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ObserverName(String);
 
@@ -557,273 +304,371 @@ impl ObserverName {
     }
 }
 
-/// 一块存的三种结论（第三轮判决 J8）：GPU 判器判镜像的结论、CPU 判器判镜像的结论、一个观察者的结果。判定库按（块键，结论种类，版本）
-/// 存与记账，哪一种没有就只排那一种。驱动版本与卡型是块的属性（判定库的块属性表），不进种类、不进版本。
+/// 一块存的两种结论：判镜像的结论、一个观察者的结果。判定库按（块键，结论种类，版本）存与记账，哪一种没有就只排那一种。
+/// 镜像判定不分在哪判的（用户 2026-10-17 定：数据不与硬件、不与 CPU 还是 GPU 绑定，复用与剪枝不看设备）：GPU 判器与 CPU 判器判出的
+/// 存在同一种类、同一版本下，版本是判定的定义（[`JudgingUnits::JudgementOfTheCrashImages`]）的键；在哪判的、GPU 判器是哪一版，
+/// 连同驱动版本与卡型都是块的属性（判定库的块属性表），不进种类、不进版本。
+/// 观察者不带名字：是哪一个观察者由版本担（它那一组判法单元的键按入口 fn 定，同一份文件里两个观察者两把键，4-2a 报告第四节第 5 条）。
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ConclusionKind {
-    GpuJudge,
-    CpuJudge,
-    Observer { observer_name: ObserverName },
+    ImageJudgement,
+    Observer,
 }
 
 impl ConclusionKind {
-    /// 版本消息里的种类那一行：`gpu_judge`、`cpu_judge`、`observer:<名字>`。
+    /// 种类写成文字：`image_judgement`、`observer`。
     #[must_use]
     pub fn version_text(&self) -> String {
         match self {
-            Self::GpuJudge => "gpu_judge".to_string(),
-            Self::CpuJudge => "cpu_judge".to_string(),
-            Self::Observer { observer_name } => format!("observer:{}", observer_name.as_str()),
+            Self::ImageJudgement => "image_judgement".to_string(),
+            Self::Observer => "observer".to_string(),
         }
     }
 }
 
-/// 一种结论的版本（SHA-256）：种类、这种结论的代码摘要（[`ConclusionCodeEntry`] 出发的闭包）、工具链，观察者另加它另读的输入的摘要。
-/// 同一块在几把版本下的结论并存，复用只认同一版本。
+/// 一种结论的版本（SHA-256）：判这种结论的那一组判法单元的键（[`judging_units_key`]），观察者另拼它另读的输入的摘要与判它交回的盘的
+/// 判器那一把。同一块在几把版本下的结论并存，复用只认同一版本。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ConclusionVersion(pub [u8; DIGEST_BYTES]);
 
-/// 要哪一把版本。
-/// - GPU 结论：GPU 判器闭包。
-/// - CPU 结论：CPU 判器闭包 ∪ 设这个点的文件与它 `mod` 进来的测试模块出发的闭包，都在停止表（判器的 ∪ 流水线五份）处停。
-/// - 观察者结果：观察者代码出发的闭包，加观察者另读的流程输入的摘要（第三轮判决 J4；由调用方算好给）。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConclusionVersionRequest<'request> {
+// ============================== 判器那一半键：判法单元指纹（块键、核对键、录入键、对拍键都只经这一个入口取） ==============================
+
+/// 哪一组判法单元：判这一样结论（或录、核、拼这一样）的那几个入口 fn 收出的函数单元闭包。入口登记在 `crate::judging_units_entries`，
+/// 块键、核对键、录入键、对拍键里判器那一半都经 [`judging_units_key`] 这一个入口取，调用方不碰闭包算法、不碰任何手写的版本号。
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum JudgingUnits {
+    /// GPU 判器：内核源码的拼法、上卡与派活、回读归位、结论字的解法（判崩溃镜像与给定状态表是同一个判器）。
     GpuJudge,
-    CpuJudge {
-        setting_file: &'request str,
-    },
-    Observer {
-        observer_name: &'request ObserverName,
-        observer_code_file: &'request str,
-        extra_inputs_digest: [u8; DIGEST_BYTES],
+    /// 崩溃镜像该判出什么的定义：CPU 参照判器的闭包（`crash::judge_crash_image`，连同结论的编码）。镜像判定的版本就是这一把，
+    /// 不论这一块是 CPU 判的还是 GPU 判的（GPU 判器是加速路径，它的准入靠与这一把的对拍）。
+    JudgementOfTheCrashImages,
+    /// 给定状态该判出什么的定义：CPU 参照判器的闭包（`crash_given_states::judge_the_given_states_on_the_cpu`，连同它的计数向量与红项编码）；
+    /// 给定状态表的判定不论在哪判的都存在这一版下。
+    JudgementOfTheGivenStates,
+    /// 第 ② 段核对的 CPU 参照（`crash_facts::verify_states_from_facts` 一族）。
+    CpuFactsVerifier,
+    /// 第 ② 段核对的 GPU 内核（`crash_verify_gpu::GpuFactsVerifier`）。
+    GpuFactsVerifier,
+    /// 录入段：写进库的那几样怎么从流算出、怎么编成字节（事实表抽取、判表建表与打包、录入的流）。
+    Recording,
+    /// 观察者结论拼块：观察者交回的盘怎么建判表、判不了的怎么记、一块怎么拼。
+    ObserverConclusionComposition,
+    /// 一种对拍的比法（对拍测试里逐状态比两边判定的那几个函数，登记表里的组名）：它的键拼进对拍结论的输入摘要，比法改了不复用早先的结论。
+    PairingComparison { group_name: &'static str },
+    /// 一个观察者：（观察者代码文件，观察者名）只用来在登记表里找它的入口 fn，键是那几个入口 fn 的闭包键（同一份文件里两个观察者各自一把）。
+    ObserverCode {
+        observer_code_file: String,
+        observer_name: String,
     },
 }
 
-/// 版本消息的头一行：消息的写法换了就换这一行。
-const CONCLUSION_VERSION_HEADER: &str = "singlefs conclusion version 1";
-
-impl ConclusionVersionRequest<'_> {
+impl JudgingUnits {
+    /// 行与组成清单里的种类名（观察者不带文件与名字）。
     #[must_use]
-    pub fn kind(&self) -> ConclusionKind {
+    pub fn name(&self) -> &'static str {
         match self {
-            Self::GpuJudge => ConclusionKind::GpuJudge,
-            Self::CpuJudge { .. } => ConclusionKind::CpuJudge,
-            Self::Observer { observer_name, .. } => ConclusionKind::Observer {
-                observer_name: (*observer_name).clone(),
-            },
+            Self::GpuJudge => "gpu_judge",
+            Self::JudgementOfTheCrashImages => "judgement_of_the_crash_images",
+            Self::JudgementOfTheGivenStates => "judgement_of_the_given_states",
+            Self::CpuFactsVerifier => "cpu_facts_verifier",
+            Self::GpuFactsVerifier => "gpu_facts_verifier",
+            Self::Recording => "recording",
+            Self::ObserverConclusionComposition => "observer_conclusion_composition",
+            Self::PairingComparison { .. } => "pairing_comparison",
+            Self::ObserverCode { .. } => "observer_code",
         }
     }
 
-    /// 这一把版本的代码摘要按哪个入口算。
+    /// 编进二进制的那份表里这一组的组名（只当索引）：判器、核对、录入、拼块各是 [`Self::name`]，观察者是
+    /// `crate::judging_units_entries::observer_group_name` 拼的那一个。
     #[must_use]
-    pub fn code_entry(&self) -> ConclusionCodeEntry {
+    pub fn group_name(&self) -> String {
         match self {
-            Self::GpuJudge => ConclusionCodeEntry::GpuJudge,
-            Self::CpuJudge { setting_file } => ConclusionCodeEntry::CpuJudgeWithSettingFile {
-                setting_file: (*setting_file).to_string(),
-            },
-            Self::Observer {
-                observer_code_file, ..
-            } => ConclusionCodeEntry::ObserverCode {
-                observer_code_file: (*observer_code_file).to_string(),
-            },
+            Self::ObserverCode {
+                observer_code_file,
+                observer_name,
+            } => {
+                crate::judging_units_entries::observer_group_name(observer_code_file, observer_name)
+            }
+            Self::PairingComparison { group_name } => (*group_name).to_string(),
+            Self::GpuJudge
+            | Self::JudgementOfTheCrashImages
+            | Self::JudgementOfTheGivenStates
+            | Self::CpuFactsVerifier
+            | Self::GpuFactsVerifier
+            | Self::Recording
+            | Self::ObserverConclusionComposition => self.name().to_string(),
         }
     }
-
-    /// 代码摘要拼上种类、工具链（与观察者另读的输入）取 SHA-256。
-    fn version_of_code(
-        &self,
-        code_digest: &[u8; DIGEST_BYTES],
-        toolchain: &CrashPointReplayToolchainIdentity,
-    ) -> ConclusionVersion {
-        let extra_inputs = match self {
-            Self::GpuJudge | Self::CpuJudge { .. } => "-".to_string(),
-            Self::Observer {
-                extra_inputs_digest,
-                ..
-            } => hexadecimal_text(extra_inputs_digest),
-        };
-        let message = format!(
-            "{CONCLUSION_VERSION_HEADER}\nkind={}\ncode={}\nrustc={}\ncargo={}\ntarget={}\nextra_inputs={extra_inputs}\n",
-            self.kind().version_text(),
-            hexadecimal_text(code_digest),
-            toolchain.rustc_version_lines,
-            toolchain.cargo_version,
-            toolchain.target_triple,
-        );
-        ConclusionVersion(sha256_digest(message.as_bytes()))
-    }
 }
 
-/// `build.rs` 在编这个 crate 的那棵树上算的结论代码摘要表（文件名是 [`CONCLUSION_CODE_DIGEST_TABLE_FILE_NAME`]）。
-const COMPILED_CONCLUSION_CODE_DIGEST_TABLE_TEXT: &str =
-    include_str!(concat!(env!("OUT_DIR"), "/conclusion_code_digests.tsv"));
-
-/// 编译时算的结论代码摘要表。
-///
-/// # Panics
-/// 写进二进制的表认不回来：它是 `build.rs` 用 [`ConclusionCodeDigestTable::to_table_text`] 写的，认不回来是两边写法不一致的 bug。
-#[must_use]
-pub fn compiled_conclusion_code_digest_table() -> ConclusionCodeDigestTable {
-    ConclusionCodeDigestTable::from_table_text(COMPILED_CONCLUSION_CODE_DIGEST_TABLE_TEXT)
-        .unwrap_or_else(|unreadable| {
-            panic!("build.rs 写进二进制的结论代码摘要表认不回来（两边写法不一致）：{unreadable:?}")
-        })
+/// 一组判法单元里的一个单元与它的指纹：组成清单的一行，随键落盘，库对不上时照它点名变了的单元。
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct JudgingUnitFingerprint {
+    pub unit: String,
+    pub fingerprint: [u8; DIGEST_BYTES],
 }
 
-/// 从盘上这棵树现算整张结论代码摘要表（与 `build.rs` 同一个算法）。
-///
-/// # Errors
-/// 读不了某份文件、候选目录或工作区的 crate 清单。
-pub fn conclusion_code_digest_table_from_the_tree(
-    repository_root: &Path,
-) -> Result<ConclusionCodeDigestTable, JudgingCodeError> {
-    ConclusionCodeDigestTable::of_the_tree(&mut ClosureTreeReader::new(repository_root)?)
-}
-
-/// 从盘上这棵树现算一把版本。
-///
-/// # Errors
-/// 读不了某份文件、工作区的 crate 清单读不出来。
-pub fn conclusion_version_from_the_tree(
-    repository_root: &Path,
-    request: &ConclusionVersionRequest<'_>,
-    toolchain: &CrashPointReplayToolchainIdentity,
-) -> Result<ConclusionVersion, JudgingCodeError> {
-    let code = ClosureTreeReader::new(repository_root)?
-        .conclusion_code(&request.code_entry().entry_files())?;
-    Ok(request.version_of_code(&code.digest, toolchain))
-}
-
-/// 编译时那张表里的这一把版本；这个入口编译时没算（不在 [`CONCLUSION_CANDIDATE_DIRECTORY`] 下）交回 None。
-#[must_use]
-pub fn conclusion_version_compiled_in(
-    request: &ConclusionVersionRequest<'_>,
-    toolchain: &CrashPointReplayToolchainIdentity,
-) -> Option<ConclusionVersion> {
-    compiled_conclusion_code_digest_table()
-        .digest_of_each_entry
-        .get(&request.code_entry())
-        .map(|code_digest| request.version_of_code(code_digest, toolchain))
-}
-
-/// 编译时与跑时比一把版本的结局。
+/// 判器那一半键：只按内容取值（这一组判法单元的复用键），不带路径、名字、手写版本号。组成清单随键落盘
+/// （判定库的组成清单表），作废时点名变了的单元。
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ConclusionVersionCheck {
-    /// 相同：这一把版本可以写库。
-    SameAsTheBuild { version: ConclusionVersion },
-    /// 不等：二进制不是从盘上这棵树编的（编完又改了代码、拿别的树编的）。调用方整趟不写库、退 78（第二轮判决 L3-1）。
-    DiffersFromTheBuild {
-        compiled_in: ConclusionVersion,
-        from_the_tree: ConclusionVersion,
-    },
-    /// 这个入口编译时没算：比不了，调用方照「不等」处理。
-    NotComputedAtTheBuild {
-        code_entry: ConclusionCodeEntry,
-        from_the_tree: ConclusionVersion,
-    },
+pub struct JudgingUnitsKey {
+    fingerprint: [u8; DIGEST_BYTES],
+    composition: Vec<JudgingUnitFingerprint>,
 }
 
-impl ConclusionVersionCheck {
-    /// 能写库的版本：只有与编译时相同才有；交回 None 时调用方整趟不写库、退 78。
+impl JudgingUnitsKey {
+    /// 从指纹与组成清单建（编进二进制的表读回的、库里读回的组成清单、测试里造的）。
     #[must_use]
-    pub fn version_to_write_under(&self) -> Option<ConclusionVersion> {
-        match self {
-            Self::SameAsTheBuild { version } => Some(*version),
-            Self::DiffersFromTheBuild { .. } | Self::NotComputedAtTheBuild { .. } => None,
+    pub fn of_the_parts(
+        fingerprint: [u8; DIGEST_BYTES],
+        composition: Vec<JudgingUnitFingerprint>,
+    ) -> Self {
+        Self {
+            fingerprint,
+            composition,
         }
+    }
+
+    #[must_use]
+    pub fn fingerprint(&self) -> &[u8; DIGEST_BYTES] {
+        &self.fingerprint
+    }
+
+    #[must_use]
+    pub fn composition(&self) -> &[JudgingUnitFingerprint] {
+        &self.composition
+    }
+
+    /// 组成清单的文字：一个单元一行 `<单元>\t<指纹十六进制>`，按单元排。
+    #[must_use]
+    pub fn composition_text(&self) -> String {
+        let mut sorted = self.composition.clone();
+        sorted.sort();
+        sorted
+            .iter()
+            .map(|unit| format!("{}\t{}\n", unit.unit, hexadecimal_text(&unit.fingerprint)))
+            .collect()
+    }
+
+    /// [`Self::composition_text`] 的逆；有一行认不出交回 `None`。
+    #[must_use]
+    pub fn composition_from_text(text: &str) -> Option<Vec<JudgingUnitFingerprint>> {
+        text.lines()
+            .filter(|line| !line.is_empty())
+            .map(|line| {
+                let (unit, hexadecimal) = line.split_once('\t')?;
+                let bytes: Vec<u8> = (0..hexadecimal.len())
+                    .step_by(2)
+                    .map(|start| {
+                        hexadecimal
+                            .get(start..start + 2)
+                            .and_then(|pair| u8::from_str_radix(pair, 16).ok())
+                    })
+                    .collect::<Option<Vec<u8>>>()?;
+                Some(JudgingUnitFingerprint {
+                    unit: unit.to_string(),
+                    fingerprint: bytes.try_into().ok()?,
+                })
+            })
+            .collect()
     }
 }
 
-/// 一把版本编译时算的与从盘上现算的比。
-///
-/// # Errors
-/// 同 [`conclusion_version_from_the_tree`]。
-pub fn conclusion_version_checked_against_the_build(
-    repository_root: &Path,
-    request: &ConclusionVersionRequest<'_>,
-    toolchain: &CrashPointReplayToolchainIdentity,
-) -> Result<ConclusionVersionCheck, JudgingCodeError> {
-    let from_the_tree = conclusion_version_from_the_tree(repository_root, request, toolchain)?;
-    Ok(match conclusion_version_compiled_in(request, toolchain) {
-        Some(compiled_in) if compiled_in == from_the_tree => {
-            ConclusionVersionCheck::SameAsTheBuild {
-                version: from_the_tree,
+/// 库里存着的那一把与这一趟的组成清单比：两边指纹不同、或只有一边有的单元，按单元排。两边一样是空的。
+#[must_use]
+pub fn units_changed_between(
+    stored: &[JudgingUnitFingerprint],
+    now: &[JudgingUnitFingerprint],
+) -> Vec<String> {
+    let stored_of_each_unit: BTreeMap<&str, &[u8; DIGEST_BYTES]> = stored
+        .iter()
+        .map(|unit| (unit.unit.as_str(), &unit.fingerprint))
+        .collect();
+    let now_of_each_unit: BTreeMap<&str, &[u8; DIGEST_BYTES]> = now
+        .iter()
+        .map(|unit| (unit.unit.as_str(), &unit.fingerprint))
+        .collect();
+    stored_of_each_unit
+        .keys()
+        .chain(now_of_each_unit.keys())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .filter(|unit| stored_of_each_unit.get(**unit) != now_of_each_unit.get(**unit))
+        .map(|unit| (*unit).to_string())
+        .collect()
+}
+
+/// 库对不上时红句里点名变了的单元那一截：以「变了的单元：」起头，接逗号隔开的单元清单；组成清单两边都空、比不出时写明。
+#[must_use]
+pub fn changed_units_sentence(changed_units: &[String]) -> String {
+    if changed_units.is_empty() {
+        "变了的单元：（组成清单比不出：库里那一把或这一趟的组成清单是空表）".to_string()
+    } else {
+        format!("变了的单元：{}", changed_units.join("，"))
+    }
+}
+
+/// 判器那一半键算不出：哪一组、什么形态。调用方照判、不入库，计入拒算（不退回整文件或整表指纹，不跳过）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum JudgingUnitsKeyRefused {
+    /// 编进二进制的表里没有这一组（观察者没登记），或这一组的入口在这一趟开的特性下一个都不编进来（例：没开 `gpu` 时取 GPU 判器那一把）。
+    NotComputedAtTheBuild { units: JudgingUnits, reason: String },
+    /// 编译时这一组的闭包里有认不出的形态（`singlefs-unit-graph` 的拒算行，点名单元与形态）。
+    RefusedAtTheBuild {
+        units: JudgingUnits,
+        refusal_lines: Vec<String>,
+    },
+}
+
+impl JudgingUnitsKeyRefused {
+    /// 拒算的是哪一组。
+    #[must_use]
+    pub fn units(&self) -> &JudgingUnits {
+        match self {
+            Self::NotComputedAtTheBuild { units, .. } | Self::RefusedAtTheBuild { units, .. } => {
+                units
             }
         }
-        Some(compiled_in) => ConclusionVersionCheck::DiffersFromTheBuild {
-            compiled_in,
-            from_the_tree,
-        },
-        None => ConclusionVersionCheck::NotComputedAtTheBuild {
-            code_entry: request.code_entry(),
-            from_the_tree,
-        },
+    }
+
+    /// 拒算的形态名（行里 `form=` 那一截）。
+    #[must_use]
+    pub fn form_name(&self) -> &'static str {
+        match self {
+            Self::NotComputedAtTheBuild { .. } => "not_computed_at_the_build",
+            Self::RefusedAtTheBuild { .. } => "refused_at_the_build",
+        }
+    }
+
+    /// 红句：哪一组、什么形态、为什么；闭包里认不出的点名拒算行。
+    #[must_use]
+    pub fn sentence(&self) -> String {
+        match self {
+            Self::NotComputedAtTheBuild { units, reason } => format!(
+                "判法单元 {} 拒算（{}）：{reason}",
+                units.group_name(),
+                self.form_name()
+            ),
+            Self::RefusedAtTheBuild {
+                units,
+                refusal_lines,
+            } => format!(
+                "判法单元 {} 拒算（{}）：闭包里有认不出的形态：{}",
+                units.group_name(),
+                self.form_name(),
+                refusal_lines.join(" | ").replace('\t', " ")
+            ),
+        }
+    }
+}
+
+/// 构建脚本写进 `OUT_DIR` 的那份判器键表（`singlefs_unit_graph::entry_groups` 的写法，文件名与 `build.rs` 的
+/// `JUDGING_UNITS_KEYS_FILE_NAME` 相同）。
+const COMPILED_JUDGING_UNITS_KEYS_TEXT: &str =
+    include_str!(concat!(env!("OUT_DIR"), "/judging_units_keys.tsv"));
+
+/// 编进二进制的那份判器键表，读回一次。
+///
+/// # Panics
+/// 表认不回来：它是构建脚本用 `entry_group_table_text` 写的，认不回来是两边写法不一致的 bug。
+#[must_use]
+pub fn compiled_judging_units_keys() -> &'static ReadBackEntryGroupTable {
+    static TABLE: std::sync::OnceLock<ReadBackEntryGroupTable> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        parse_entry_group_table(COMPILED_JUDGING_UNITS_KEYS_TEXT).unwrap_or_else(|reason| {
+            panic!("构建脚本写进二进制的判器键表认不回来（两边写法不一致）：{reason}")
+        })
     })
 }
 
-/// 整张表编译时与跑时比：交回两边摘要不同、或只有一边有的入口（按入口排）；空的就是二进制与盘上这棵树相同。
-/// 引擎开跑前调一次，不空就整趟不写库、退 78。
+/// 表里一组的组成清单换成组成清单行：一个单元一行，单元写 `<种类> <限定名> @ <文件>`（不带行号：行挪了不算单元变了），
+/// 同一份文件里种类与限定名都相同的几个单元按出现次序另加 `#<第几个>`。
+fn composition_of_the_compiled_group(group: &ReadBackEntryGroup) -> Vec<JudgingUnitFingerprint> {
+    let mut seen: BTreeMap<String, usize> = BTreeMap::new();
+    group
+        .composition
+        .iter()
+        .map(|unit| {
+            let file = unit
+                .location
+                .rsplit_once(':')
+                .map_or(unit.location.as_str(), |(file, _lines)| file);
+            let base = format!("{} {} @ {file}", unit.kind, unit.qualified_name);
+            let occurrence = seen.entry(base.clone()).or_insert(0);
+            *occurrence += 1;
+            let name = if *occurrence == 1 {
+                base
+            } else {
+                format!("{base} #{occurrence}")
+            };
+            JudgingUnitFingerprint {
+                unit: name,
+                fingerprint: unit.fingerprint,
+            }
+        })
+        .collect()
+}
+
+/// 判器那一半键的唯一入口：块键、核对键、录入键、对拍键都只经它取。读编进二进制的那份表（构建脚本按入口登记表逐组算的）里这一组的键与
+/// 组成清单，跑时不读盘上的树，也不收仓根（定案 1：仓根不是键的输入）：`toolchain` 这一版不用（工具链已在编译时进了键），签名照旧留给
+/// `crash_library`、`crash_state_enumeration` 那几处调用方。
 ///
 /// # Errors
-/// 同 [`conclusion_code_digest_table_from_the_tree`]。
-pub fn conclusion_code_entries_differing_from_the_build(
-    repository_root: &Path,
-) -> Result<Vec<ConclusionCodeEntry>, JudgingCodeError> {
-    let compiled_in = compiled_conclusion_code_digest_table().digest_of_each_entry;
-    let from_the_tree =
-        conclusion_code_digest_table_from_the_tree(repository_root)?.digest_of_each_entry;
-    let every_entry: BTreeSet<&ConclusionCodeEntry> =
-        compiled_in.keys().chain(from_the_tree.keys()).collect();
-    Ok(every_entry
-        .into_iter()
-        .filter(|entry| compiled_in.get(*entry) != from_the_tree.get(*entry))
-        .cloned()
-        .collect())
+/// 拒算（[`JudgingUnitsKeyRefused`]）：表里没有这一组、这一组在这一趟的特性下不编进来、编译时闭包里有认不出的形态。调用方照判、不入库，计入拒算。
+pub fn judging_units_key(
+    units: &JudgingUnits,
+    _toolchain: &CrashPointReplayToolchainIdentity,
+) -> Result<JudgingUnitsKey, JudgingUnitsKeyRefused> {
+    let group_name = units.group_name();
+    let Some(group) = compiled_judging_units_keys()
+        .groups
+        .iter()
+        .find(|group| group.group_name == group_name)
+    else {
+        return Err(JudgingUnitsKeyRefused::NotComputedAtTheBuild {
+            units: units.clone(),
+            reason: format!(
+                "编译时的判器键表里没有组 {group_name}（观察者要在 crate::judging_units_entries 的 OBSERVER_ENTRIES 登记它的入口 fn）"
+            ),
+        });
+    };
+    match &group.verdict {
+        ReadBackEntryGroupVerdict::Keyed { key } => Ok(JudgingUnitsKey::of_the_parts(
+            *key,
+            composition_of_the_compiled_group(group),
+        )),
+        ReadBackEntryGroupVerdict::Refused { refusal_lines } => {
+            Err(JudgingUnitsKeyRefused::RefusedAtTheBuild {
+                units: units.clone(),
+                refusal_lines: refusal_lines.clone(),
+            })
+        }
+        ReadBackEntryGroupVerdict::NotCompiled { reason } => {
+            Err(JudgingUnitsKeyRefused::NotComputedAtTheBuild {
+                units: units.clone(),
+                reason: reason.clone(),
+            })
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
-
-    fn repository_root() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../Cargo.lock")
-            .canonicalize()
-            .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
-            .parent()
-            .expect("Cargo.lock 所在的目录就是仓根")
-            .to_path_buf()
-    }
-
-    #[test]
-    fn lexical_digest_matches_the_e164_anchors() {
-        let digest =
-            |source: &str| hexadecimal_text(&sha256_digest(lexical_text(source).as_bytes()));
-        let anchor = "e7587d8d4f76653ed394fefe683bb459d4976354ee1366bf987fcd16750a418c";
-        assert_eq!(
-            digest("const A: u8 = 1;"),
-            anchor,
-            "E164 跑前登记 7.2 第一行"
-        );
-        assert_eq!(
-            digest("/// doc\nconst A: u8 = 1; // x"),
-            anchor,
-            "注释与文档注释不进摘要"
-        );
-        assert_eq!(
-            digest("const A: u8 = 2;"),
-            "1869717063fbdfadfa523427dd8bd33001d9070e3bab056a405409a4adb11eae",
-            "字面量改了摘要就变"
-        );
-        assert_eq!(
-            digest("// only\n/* a /* nested */ */"),
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            "只有注释的文件是空串"
-        );
-    }
+    use crate::judging_units_entries::{
+        observer_group_name, GPU_FILES_ONLY_THE_GPU_GROUPS_REACH, JUDGING_UNITS_ENTRY_GROUPS,
+        OBSERVER_ENTRIES, PIPELINE_FILES_THE_JUDGES_MUST_NOT_REACH,
+    };
+    use singlefs_unit_graph::build_toolchain::{
+        effective_profile_lines, toolchain_lines_of_the_build, BuildToolchainInputs,
+    };
+    use singlefs_unit_graph::entry_groups::{
+        entry_group_key, EntryGroupRequest, EntryGroupVerdict,
+    };
+    use singlefs_unit_graph::heavy_threads::default_heavy_threads;
+    use singlefs_unit_graph::{load_workspace, parse_lock_file, RuleSwitches, TargetSelector};
+    use std::path::Path;
 
     #[test]
     fn node_label_takes_only_relative_paths_inside_the_repository() {
@@ -860,612 +705,20 @@ mod tests {
         assert_ne!(
             StepAttributes {
                 write_table_with_barriers: [9; 32],
-                ..base
+                parent_output: base.parent_output,
             }
             .reuse_key(),
             key
         );
         assert_ne!(
             StepAttributes {
+                write_table_with_barriers: base.write_table_with_barriers,
                 parent_output: [9; 32],
-                ..base
             }
             .reuse_key(),
             key
         );
         assert_eq!(base.reuse_key(), key, "同样的属性同一个键");
-    }
-
-    fn copy_tree(source: &Path, destination: &Path) {
-        std::fs::create_dir_all(destination).expect("建得了目标目录");
-        for entry in std::fs::read_dir(source).expect("读得了源目录").flatten() {
-            let target = destination.join(entry.file_name());
-            if entry.file_type().expect("读得了类型").is_dir() {
-                if entry.file_name() != "target" {
-                    copy_tree(&entry.path(), &target);
-                }
-            } else {
-                std::fs::copy(entry.path(), &target).expect("拷得了文件");
-            }
-        }
-    }
-
-    /// 判器的判法闭包：两个判器、它们调的恢复（连同恢复调的取前缀核 `singlefs-replay-prefix`）与池级 checker、格式常量、内存池里的状态拼装、五份内核原文都在；流水线（录入、存储、
-    /// 身份、对账）、进度模块、设点的测试文件、实现的写路径、装置二进制都不在。停止表里每一条都指到现存文件、都真的拦到了（没拦到的是死条目）。
-    #[test]
-    fn the_judging_closure_of_the_judges_holds_recovery_the_checker_and_the_kernels_and_stops_before_the_pipeline(
-    ) {
-        let root = repository_root();
-        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-        let code = judging_code_of_the_judges(&root, &toolchain).expect("算得出");
-        println!(
-            "JUDGING_CODE entry=judges files={} raw={} stopped={} digest={}",
-            code.files.len(),
-            code.raw_files.len(),
-            code.stopped_at.len(),
-            hexadecimal_text(&code.digest)
-        );
-        for file in &code.files {
-            println!(
-                "JUDGING_CODE_FILE entry=judges file={file} reason={}",
-                code.reason_of_each_file[file]
-            );
-        }
-        for file in &code.stopped_at {
-            println!("JUDGING_CODE_STOPPED entry=judges file={file}");
-        }
-        let has = |path: &str| code.files.iter().any(|file| file == path);
-        for required in [
-            "crates/singlefs-checker-tier/src/crash.rs",
-            "crates/singlefs-checker-tier/src/crash_judge_gpu.rs",
-            "crates/singlefs-checker-tier/src/crash_judge_conclusions.rs",
-            "crates/singlefs-checker-tier/src/crash_judge_tables.rs",
-            "crates/singlefs-checker-tier/src/crash_facts.rs",
-            "crates/singlefs-checker/src/walk.rs",
-            "crates/singlefs-checker/src/image.rs",
-            "crates/singlefs-core/src/recovery.rs",
-            "crates/singlefs-replay-prefix/src/lib.rs",
-            "crates/singlefs-format/src/lib.rs",
-            "crates/singlefs-harness/src/memory_pool.rs",
-        ] {
-            assert!(has(required), "判器的闭包要含 {required}");
-        }
-        for kernel in [
-            "crash_judge_common.wgsl",
-            "crash_judge_recovery.wgsl",
-            "crash_judge_checker_common.wgsl",
-            "crash_judge_checker.wgsl",
-            "crash_judge_checker_scan.wgsl",
-        ] {
-            let path = format!("crates/singlefs-checker-tier/src/{kernel}");
-            assert!(has(&path), "内核 {path} 要在判器的闭包里");
-            assert!(code.raw_files.contains(&path), "内核 {path} 要按原文进摘要");
-        }
-        for excluded in [
-            "crates/singlefs-checker-tier/src/crash_amplification.rs",
-            "crates/singlefs-checker-tier/src/verdict_store.rs",
-            "crates/singlefs-checker-tier/src/crash_identity.rs",
-            "crates/singlefs-checker-tier/src/crash_point_replay_progress.rs",
-            "crates/singlefs-checker-tier/src/crash_library.rs",
-            "crates/singlefs-checker-tier/src/crash_state_enumeration.rs",
-            "crates/singlefs-checker-tier/src/crash_verify_gpu.rs",
-            "crates/singlefs-checker-tier/src/lib.rs",
-            "crates/singlefs-core/src/lib.rs",
-        ] {
-            assert!(!has(excluded), "{excluded} 不判对错，不该在判器的闭包里");
-        }
-        // 给定状态表的形态与它的 CPU 判法：GPU 判器要的（点名的被抛弃根、恢复自称的那一版）住在判器一侧的 `crash_judge_conclusions`，
-        // GPU 判器引这一份就把它连同它引的 `writable_mount_phases` 拉进判器闭包（批次 4-5 合入之后这三条用例红在这里）。断言消息里
-        // 「经 impl 头把 crash_amplification.rs 拉进闭包」是闭包算法只认条目级 `impl` 块之前的样子：那时流水线参数类型里的
-        // `impl FnOnce(&GivenStatesOfATable)` 被当成 `impl` 头；消息没跟着改，改它会换掉收 `crash_identity.rs` 的那几把结论版本
-        assert!(
-            !has("crates/singlefs-checker-tier/src/crash_given_states.rs"),
-            "crash_given_states.rs 是给定状态表的形态与 CPU 判法，判器不该引它（引它就经 impl 头把 crash_amplification.rs 拉进闭包）"
-        );
-        let outside: Vec<&String> = code
-            .files
-            .iter()
-            .filter(|file| file.contains("/tests/") || file.contains("/src/bin/"))
-            .collect();
-        assert!(
-            outside.is_empty(),
-            "测试文件与装置二进制不判对错，不该在判器的闭包里：{outside:?}"
-        );
-        for (file, reason) in FILES_THE_JUDGES_MUST_NOT_REACH {
-            assert!(
-                root.join(file).is_file(),
-                "不许引的表指到不存在的文件 {file}（{reason}）"
-            );
-            assert!(
-                !has(file) && !code.stopped_at.contains(*file),
-                "判器引到了 {file}：它不该在判法闭包里（{reason}）"
-            );
-        }
-        for (stop_file, reason) in JUDGE_CLOSURE_STOP_FILES {
-            assert!(
-                root.join(stop_file).is_file(),
-                "停止表指到不存在的文件 {stop_file}（{reason}）"
-            );
-            assert!(
-                code.stopped_at.contains(*stop_file),
-                "停止表里的 {stop_file} 没被判器引到：死条目，删掉它"
-            );
-        }
-    }
-
-    /// 设崩溃点的七份文件（`tests/` 下调录制器 `step`、`record_span` 或公共模块 `one_crash_point_over_every_write` 的那几份）。
-    const SETTING_FILES: &[&str] = &[
-        "crates/singlefs-checker-tier/tests/common_crash_points/mod.rs",
-        "crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs",
-        "crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs",
-        "crates/singlefs-checker-tier/tests/crash_enumeration_floor_raise_pushed_by_admission.rs",
-        "crates/singlefs-checker-tier/tests/crash_amplification_two_flows_share_their_prefix.rs",
-        "crates/singlefs-checker-tier/tests/crash_enumeration_position_addressed_trees.rs",
-        "crates/singlefs-checker-tier/tests/crash_enumeration_tree_split_streams.rs",
-    ];
-
-    /// 判定只随判器变：在仓副本里给流水线那几份、身份、核对、crate 根各加一条真语句，今天的判法摘要不动、三种结论的版本也一把都不动；
-    /// 给 CPU 判器、GPU 判器、它的输入表、恢复、取前缀核、池级 checker 走树各加一条，今天的判法摘要变；一份内核原文改一个字节也变。
-    /// 三种结论各一把版本（第三轮判决 J8）：改只在 GPU 判器闭包里的文件只换 GPU 版本；改一份设点文件只换它那把 CPU 版本（GPU 版本、
-    /// 另一份设点文件的 CPU 版本、观察者版本不动）；改观察者代码只换观察者版本；CPU 与 GPU 两边都收的文件（恢复、走树）两把都换。
-    #[test]
-    fn the_judging_digest_ignores_the_pipeline_and_the_progress_module_but_follows_every_judge() {
-        let root = repository_root();
-        let copy = std::env::temp_dir().join(format!(
-            "singlefs-judging-closure-copy-{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&copy);
-        copy_tree(&root.join("crates"), &copy.join("crates"));
-        std::fs::copy(root.join("Cargo.lock"), copy.join("Cargo.lock")).expect("拷得了 Cargo.lock");
-        const OBSERVER_CODE_FILE: &str =
-            "crates/singlefs-checker-tier/tests/observer_code_probe_of_the_judging_contract.rs";
-        std::fs::write(
-            copy.join(OBSERVER_CODE_FILE),
-            "pub fn observed_states_probe(states: u64) -> u64 {\n    states\n}\n",
-        )
-        .expect("副本里写得了观察者代码");
-        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-        let observer_name = ObserverName::new("judging_contract_probe").expect("名字非空、不长");
-        let requests = [
-            ConclusionVersionRequest::GpuJudge,
-            ConclusionVersionRequest::CpuJudge {
-                setting_file: SETTING_FILES[0],
-            },
-            ConclusionVersionRequest::CpuJudge {
-                setting_file: SETTING_FILES[1],
-            },
-            ConclusionVersionRequest::Observer {
-                observer_name: &observer_name,
-                observer_code_file: OBSERVER_CODE_FILE,
-                extra_inputs_digest: [7; DIGEST_BYTES],
-            },
-        ];
-        const REQUEST_NAMES: [&str; 4] = [
-            "gpu",
-            "cpu_common_crash_points",
-            "cpu_multi_record",
-            "observer",
-        ];
-        let digest_and_versions = || {
-            let digest = judging_code_of_the_judges(&copy, &toolchain)
-                .expect("副本算得出")
-                .digest;
-            let versions: Vec<ConclusionVersion> = requests
-                .iter()
-                .map(|request| {
-                    conclusion_version_from_the_tree(&copy, request, &toolchain)
-                        .expect("副本算得出")
-                })
-                .collect();
-            (digest, versions)
-        };
-        let (baseline_digest, baseline_versions) = digest_and_versions();
-        let after_appending = |file: &str, appended: &str| {
-            let path = copy.join(file);
-            let original = std::fs::read(&path).expect("读得了副本里的文件");
-            let mut edited = original.clone();
-            edited.extend_from_slice(appended.as_bytes());
-            std::fs::write(&path, &edited).expect("写得了副本");
-            let digest_and_versions_after = digest_and_versions();
-            std::fs::write(&path, &original).expect("还原得了副本");
-            digest_and_versions_after
-        };
-        // 每份改动之后：今天的判法摘要变不变，四把版本（GPU、公共模块的 CPU、多记录流的 CPU、观察者）各自变不变。
-        let expect_changes = |file: &str,
-                              appended: &str,
-                              judging_digest_changes: bool,
-                              versions_change: [bool; 4]| {
-            let (digest, versions) = after_appending(file, appended);
-            assert_eq!(
-                digest != baseline_digest,
-                judging_digest_changes,
-                "改 {file}：今天的判法摘要{}",
-                if judging_digest_changes {
-                    "要变"
-                } else {
-                    "不该变"
-                }
-            );
-            for (index, version_changes) in versions_change.into_iter().enumerate() {
-                assert_eq!(
-                    versions[index] != baseline_versions[index],
-                    version_changes,
-                    "改 {file}：{} 那把结论版本{}",
-                    REQUEST_NAMES[index],
-                    if version_changes {
-                        "要换"
-                    } else {
-                        "不该换"
-                    }
-                );
-            }
-        };
-        const RUST_PROBE: &str = "\npub const JUDGING_CLOSURE_PROBE: u8 = 1;\n";
-        for unchanged in [
-            "crates/singlefs-checker-tier/src/crash_amplification.rs",
-            "crates/singlefs-checker-tier/src/verdict_store.rs",
-            "crates/singlefs-checker-tier/src/crash_point_replay_progress.rs",
-            "crates/singlefs-checker-tier/src/crash_verify_gpu.rs",
-            "crates/singlefs-checker-tier/src/crash_judge_dispatch.rs",
-            "crates/singlefs-checker-tier/src/gpu_unit_checks.rs",
-            "crates/singlefs-checker-tier/src/lib.rs",
-            "crates/singlefs-core/src/lib.rs",
-        ] {
-            expect_changes(unchanged, RUST_PROBE, false, [false, false, false, false]);
-        }
-        // 身份（这一份）不在停止表里（主 agent 定，实现 V 报告第八节第 5 条）：引它的设点文件的 CPU 版本照换，不引的不换。
-        // 副本上核过谁引它：多记录流、删除流与两流共享前缀那三份设点文件引（`step_write_table_with_barriers`、`SectorImage`、观察者名），
-        // 公共模块不引；判器（GPU、CPU 那一半）与观察者代码都不引；今天的判法摘要从两个判器出发，也不收它。
-        {
-            let identity_file = "crates/singlefs-checker-tier/src/crash_identity.rs";
-            let (digest, versions) = after_appending(identity_file, RUST_PROBE);
-            assert_eq!(
-                digest, baseline_digest,
-                "改 {identity_file}：今天的判法摘要不该变（判器不引身份）"
-            );
-            for (index, version_changes) in [false, false, true, false].into_iter().enumerate() {
-                assert_eq!(
-                    versions[index] != baseline_versions[index],
-                    version_changes,
-                    "改 {identity_file}：{} 那把结论版本{}（身份不在停止表；多记录流的设点文件引它，公共模块、判器与观察者代码不引）",
-                    REQUEST_NAMES[index],
-                    if version_changes { "要换" } else { "不该换" }
-                );
-            }
-        }
-        expect_changes(
-            SETTING_FILES[0],
-            RUST_PROBE,
-            false,
-            [false, true, true, false],
-        );
-        expect_changes(
-            SETTING_FILES[1],
-            RUST_PROBE,
-            false,
-            [false, false, true, false],
-        );
-        for only_in_the_gpu_judge in [
-            "crates/singlefs-checker-tier/src/crash_judge_gpu.rs",
-            "crates/singlefs-checker-tier/src/crash_judge_tables.rs",
-        ] {
-            expect_changes(
-                only_in_the_gpu_judge,
-                RUST_PROBE,
-                true,
-                [true, false, false, false],
-            );
-        }
-        expect_changes(
-            "crates/singlefs-checker-tier/src/crash_judge_checker.wgsl",
-            "\n// probe\n",
-            true,
-            [true, false, false, false],
-        );
-        // 改结论的几处搬进判器一侧（第三轮判决 J8、正文 H8）：红项编码、恢复字与失败点码表、计数向量在 `crash_judge_conclusions.rs`，
-        // 两个判器的闭包都收它（CPU 判器经 `CrashStateJudgement` 的 `impl` 头，GPU 判器 `use` 它），改一个字 GPU 与每份设点文件的 CPU 版本都换；
-        // GPU 结论换红项、GPU 恢复字的换法在 `crash_judge_gpu.rs`（上面只换 GPU 那一把的那一组）。
-        for in_both_judges in [
-            "crates/singlefs-checker-tier/src/crash_judge_conclusions.rs",
-            "crates/singlefs-checker-tier/src/crash.rs",
-            "crates/singlefs-core/src/recovery.rs",
-            "crates/singlefs-replay-prefix/src/lib.rs",
-            "crates/singlefs-checker/src/walk.rs",
-        ] {
-            expect_changes(in_both_judges, RUST_PROBE, true, [true, true, true, false]);
-        }
-        expect_changes(
-            OBSERVER_CODE_FILE,
-            RUST_PROBE,
-            false,
-            [false, false, false, true],
-        );
-        let other_extra_inputs = ConclusionVersionRequest::Observer {
-            observer_name: &observer_name,
-            observer_code_file: OBSERVER_CODE_FILE,
-            extra_inputs_digest: [8; DIGEST_BYTES],
-        };
-        assert_ne!(
-            conclusion_version_from_the_tree(&copy, &other_extra_inputs, &toolchain)
-                .expect("副本算得出"),
-            baseline_versions[3],
-            "观察者另读的输入换了，观察者版本要换"
-        );
-        std::fs::remove_dir_all(&copy).expect("删得掉副本");
-    }
-
-    /// 从七份设点文件出发的结论闭包都停在流水线那几份门外（攻方模型那一行 `crash_amplification.rs=1` 变 0）；只按判器的停止表停时
-    /// 流水线那几份里不在判器停止表的每一份都被某份设点文件引到（停止表每一条都真的拦到了，不是死条目）；GPU 与 CPU 判器的结论闭包
-    /// 停下的只在判器的停止表里（判器自己引不到流水线）。
-    #[test]
-    fn the_conclusion_closures_from_every_setting_file_stop_before_the_pipeline_files() {
-        let root = repository_root();
-        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-        let mut reader = ClosureTreeReader::new(&root).expect("读得了树");
-        let judge_stop_files: Vec<&str> = JUDGE_CLOSURE_STOP_FILES
-            .iter()
-            .map(|(file, _reason)| *file)
-            .collect();
-        let mut reached_without_the_pipeline_stops: BTreeSet<String> = BTreeSet::new();
-        for setting_file in SETTING_FILES.iter().copied() {
-            let code = reader.conclusion_code(&[setting_file]).expect("算得出");
-            println!(
-                "CONCLUSION_CLOSURE entry={setting_file} files={} stopped={:?}",
-                code.files.len(),
-                code.stopped_at
-            );
-            for (pipeline_file, reason) in PIPELINE_FILES_THE_CONCLUSION_CLOSURES_STOP_AT {
-                assert!(
-                    root.join(pipeline_file).is_file(),
-                    "流水线停止表指到不存在的文件 {pipeline_file}（{reason}）"
-                );
-                assert!(
-                    !code.files.contains(*pipeline_file),
-                    "从 {setting_file} 出发的结论闭包收了流水线的 {pipeline_file}（{reason}）"
-                );
-            }
-            let without_the_pipeline_stops = judging_code_by_module_references_stopping_at(
-                &root,
-                &[setting_file],
-                &judge_stop_files,
-                &toolchain,
-            )
-            .expect("算得出");
-            reached_without_the_pipeline_stops.extend(without_the_pipeline_stops.files);
-        }
-        for (pipeline_file, reason) in PIPELINE_FILES_THE_CONCLUSION_CLOSURES_STOP_AT {
-            assert!(
-                judge_stop_files.contains(pipeline_file)
-                    || reached_without_the_pipeline_stops.contains(*pipeline_file),
-                "流水线停止表里的 {pipeline_file} 不停也没有一份设点文件引到它：死条目，删掉它（{reason}）"
-            );
-        }
-        for judge_entry in [GPU_JUDGE_ENTRY_FILE, CPU_JUDGE_ENTRY_FILE] {
-            let code = reader.conclusion_code(&[judge_entry]).expect("算得出");
-            let stopped_outside_the_judge_stops: Vec<&String> = code
-                .stopped_at
-                .iter()
-                .filter(|file| !judge_stop_files.contains(&file.as_str()))
-                .collect();
-            assert!(
-                stopped_outside_the_judge_stops.is_empty(),
-                "{judge_entry} 的结论闭包引到了流水线（停在判器停止表之外的门口）：{stopped_outside_the_judge_stops:?}"
-            );
-        }
-    }
-
-    /// 编译时 `build.rs` 算的结论代码摘要表，与跑时从盘上这棵树现算的逐行相同；GPU 判器与每份设点文件那一把版本比下来都是「相同」、可以写库。
-    #[test]
-    fn the_conclusion_code_digest_table_compiled_in_equals_the_one_computed_from_the_tree() {
-        let root = repository_root();
-        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-        let compiled_in = compiled_conclusion_code_digest_table();
-        let from_the_tree = conclusion_code_digest_table_from_the_tree(&root).expect("算得出");
-        println!(
-            "CONCLUSION_CODE_TABLE rows={} compiled_in_rows={}",
-            from_the_tree.digest_of_each_entry.len(),
-            compiled_in.digest_of_each_entry.len()
-        );
-        assert_eq!(
-            conclusion_code_entries_differing_from_the_build(&root).expect("算得出"),
-            Vec::new(),
-            "编译时与跑时的表有对不上的入口：二进制不是从这棵树编的"
-        );
-        assert_eq!(compiled_in, from_the_tree);
-        assert!(
-            compiled_in
-                .digest_of_each_entry
-                .contains_key(&ConclusionCodeEntry::GpuJudge),
-            "表里有 GPU 判器那一行"
-        );
-        let mut requests = vec![ConclusionVersionRequest::GpuJudge];
-        requests.extend(
-            SETTING_FILES
-                .iter()
-                .copied()
-                .map(|setting_file| ConclusionVersionRequest::CpuJudge { setting_file }),
-        );
-        for request in &requests {
-            let check = conclusion_version_checked_against_the_build(&root, request, &toolchain)
-                .expect("算得出");
-            assert!(
-                matches!(check, ConclusionVersionCheck::SameAsTheBuild { .. }),
-                "{request:?}：编译时与跑时要相同：{check:?}"
-            );
-            assert_eq!(
-                check.version_to_write_under(),
-                conclusion_version_compiled_in(request, &toolchain),
-                "{request:?}：相同时写库用的就是编译时那一把"
-            );
-        }
-    }
-
-    /// 编完之后改了设点文件：这一份的 CPU 版本比下来「不等」、交不出可写库的版本，整张表比下来只点名带它的入口；
-    /// 编译时没算的入口（不在候选目录下）比下来「编译时没算」，同样交不出可写库的版本。
-    #[test]
-    fn a_tree_edited_after_the_build_is_reported_as_differing_and_yields_no_version_to_write_under()
-    {
-        let root = repository_root();
-        let copy = std::env::temp_dir().join(format!(
-            "singlefs-conclusion-version-copy-{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&copy);
-        copy_tree(&root.join("crates"), &copy.join("crates"));
-        std::fs::copy(root.join("Cargo.lock"), copy.join("Cargo.lock")).expect("拷得了 Cargo.lock");
-        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-        let request = ConclusionVersionRequest::CpuJudge {
-            setting_file: SETTING_FILES[1],
-        };
-        let before = conclusion_version_checked_against_the_build(&copy, &request, &toolchain)
-            .expect("副本算得出");
-        let compiled_in = conclusion_version_compiled_in(&request, &toolchain).expect("编译时算过");
-        let edited_path = copy.join(SETTING_FILES[1]);
-        let mut edited = std::fs::read(&edited_path).expect("读得了副本里的设点文件");
-        edited.extend_from_slice(b"\npub const SETTING_FILE_EDITED_AFTER_THE_BUILD: u8 = 1;\n");
-        std::fs::write(&edited_path, &edited).expect("写得了副本");
-        let after = conclusion_version_checked_against_the_build(&copy, &request, &toolchain)
-            .expect("副本算得出");
-        let differing =
-            conclusion_code_entries_differing_from_the_build(&copy).expect("副本算得出");
-        let not_compiled_in = conclusion_version_checked_against_the_build(
-            &copy,
-            &ConclusionVersionRequest::CpuJudge {
-                setting_file: "crates/singlefs-harness/tests/common/mod.rs",
-            },
-            &toolchain,
-        )
-        .expect("副本算得出");
-        std::fs::remove_dir_all(&copy).expect("删得掉副本");
-        assert_eq!(
-            before,
-            ConclusionVersionCheck::SameAsTheBuild {
-                version: compiled_in
-            },
-            "副本没改之前与编译时相同"
-        );
-        assert!(
-            matches!(after, ConclusionVersionCheck::DiffersFromTheBuild { compiled_in: in_the_binary, from_the_tree }
-                if in_the_binary == compiled_in && from_the_tree != compiled_in),
-            "改了设点文件之后要报不等：{after:?}"
-        );
-        assert_eq!(
-            after.version_to_write_under(),
-            None,
-            "不等就交不出可写库的版本"
-        );
-        assert!(
-            differing.contains(&ConclusionCodeEntry::CpuJudgeWithSettingFile {
-                setting_file: SETTING_FILES[1].to_string()
-            }) && !differing.contains(&ConclusionCodeEntry::GpuJudge),
-            "整张表只点名带这份设点文件的入口：{differing:?}"
-        );
-        assert!(
-            matches!(
-                not_compiled_in,
-                ConclusionVersionCheck::NotComputedAtTheBuild { .. }
-            ),
-            "候选目录外的入口编译时没算：{not_compiled_in:?}"
-        );
-        assert_eq!(not_compiled_in.version_to_write_under(), None);
-    }
-
-    /// 摘要表写成文字再读回逐行相同；表头不对、少一列、摘要不是 64 个小写十六进制字符、同一个入口两行，都读不回。
-    #[test]
-    fn the_conclusion_code_digest_table_reads_back_its_own_text_and_refuses_malformed_lines() {
-        let table = ConclusionCodeDigestTable {
-            digest_of_each_entry: BTreeMap::from([
-                (ConclusionCodeEntry::GpuJudge, [1; DIGEST_BYTES]),
-                (
-                    ConclusionCodeEntry::CpuJudgeWithSettingFile {
-                        setting_file: "crates/a/tests/b.rs".to_string(),
-                    },
-                    [2; DIGEST_BYTES],
-                ),
-                (
-                    ConclusionCodeEntry::ObserverCode {
-                        observer_code_file: "crates/a/tests/b.rs".to_string(),
-                    },
-                    [3; DIGEST_BYTES],
-                ),
-            ]),
-        };
-        let text = table.to_table_text();
-        assert_eq!(
-            ConclusionCodeDigestTable::from_table_text(&text),
-            Ok(table),
-            "自己写的读得回"
-        );
-        let header = text.lines().next().expect("有表头");
-        let gpu_line = format!("gpu_judge\t-\t{}", "01".repeat(DIGEST_BYTES));
-        for (malformed, reason) in [
-            (format!("# other header\n{gpu_line}\n"), "表头不对"),
-            (
-                format!("{header}\ngpu_judge\t{}\n", "01".repeat(DIGEST_BYTES)),
-                "不是三列",
-            ),
-            (
-                format!("{header}\ngpu_judge\t-\t{}\n", "0G".repeat(DIGEST_BYTES)),
-                "摘要不是 64 个小写十六进制字符",
-            ),
-            (
-                format!("{header}\nsomething\t-\t{}\n", "01".repeat(DIGEST_BYTES)),
-                "种类认不得",
-            ),
-            (
-                format!("{header}\n{gpu_line}\n{gpu_line}\n"),
-                "同一个入口出现两次",
-            ),
-        ] {
-            assert_eq!(
-                ConclusionCodeDigestTable::from_table_text(&malformed)
-                    .map_err(|unreadable| unreadable.reason),
-                Err(reason),
-                "{malformed:?}"
-            );
-        }
-    }
-
-    /// 同一段代码摘要、同一套工具链：三种结论的版本两两不同；观察者另读的输入换了，观察者版本换；工具链换了，版本换。
-    #[test]
-    fn conclusion_versions_of_different_kinds_never_coincide_and_follow_the_toolchain() {
-        let code_digest = [5; DIGEST_BYTES];
-        let toolchain = CrashPointReplayToolchainIdentity {
-            rustc_version_lines: "rustc 0.0.0-probe".to_string(),
-            cargo_version: "cargo 0.0.0-probe".to_string(),
-            target_triple: "x86_64-probe".to_string(),
-        };
-        let observer_name = ObserverName::new("probe").expect("名字非空");
-        let observer = |extra_inputs_digest| ConclusionVersionRequest::Observer {
-            observer_name: &observer_name,
-            observer_code_file: "crates/a/tests/b.rs",
-            extra_inputs_digest,
-        };
-        let versions = [
-            ConclusionVersionRequest::GpuJudge.version_of_code(&code_digest, &toolchain),
-            ConclusionVersionRequest::CpuJudge {
-                setting_file: "crates/a/tests/b.rs",
-            }
-            .version_of_code(&code_digest, &toolchain),
-            observer([0; DIGEST_BYTES]).version_of_code(&code_digest, &toolchain),
-            observer([1; DIGEST_BYTES]).version_of_code(&code_digest, &toolchain),
-        ];
-        assert_eq!(
-            versions.iter().collect::<BTreeSet<_>>().len(),
-            versions.len(),
-            "三种结论、两份另读输入，四把版本两两不同：{versions:?}"
-        );
-        let other_toolchain = CrashPointReplayToolchainIdentity {
-            rustc_version_lines: "rustc 0.0.0-probe".to_string(),
-            cargo_version: "cargo 0.0.1-probe".to_string(),
-            target_triple: "x86_64-probe".to_string(),
-        };
-        assert_ne!(
-            ConclusionVersionRequest::GpuJudge.version_of_code(&code_digest, &other_toolchain),
-            versions[0],
-            "工具链换了，版本换"
-        );
     }
 
     #[test]
@@ -1487,458 +740,608 @@ mod tests {
         );
     }
 
-    /// 抽出之前（闭包算法还在 `crash_identity.rs` 里的那一版）在这个小仓上算出的文件集与摘要（工具链三行写死）。
-    /// 小仓罩了路径与 `use` 树、`crate::`、外部 crate 路径、`include_str!` 读的原文、`impl` 头点名的类型、测试目标里的 `mod` 与
-    /// `#[path]`、`super::` 落空、注释与文档注释、停止表。
-    const SMALL_REPOSITORY_FILES: &[(&str, &str)] = &[
-        ("Cargo.lock", "# lock\n"),
-        ("crates/singlefs-alpha/Cargo.toml", "[package]\nname = \"singlefs-alpha\"\n"),
-        ("crates/singlefs-alpha/src/lib.rs", "pub mod judge;\npub mod kernel_table;\npub mod pipeline;\n"),
-        (
-            "crates/singlefs-alpha/src/judge.rs",
-            "use crate::kernel_table::KernelTable;\nuse singlefs_beta::format::BLOCK_BYTES;\n\
-             pub struct Judgement { pub bytes: usize }\n\
-             /// 文档注释不进摘要\npub fn judge(table: &KernelTable) -> Judgement {\n    let _ = crate::pipeline::PIPELINE_PROBE; // 行注释不进摘要\n    \
-             Judgement { bytes: BLOCK_BYTES + table.words }\n}\n",
-        ),
-        (
-            "crates/singlefs-alpha/src/kernel_table.rs",
-            "pub struct KernelTable { pub words: usize }\npub const KERNEL: &str = include_str!(\"kernel.wgsl\");\n",
-        ),
-        ("crates/singlefs-alpha/src/kernel.wgsl", "struct Words { a: u32 }\n"),
-        (
-            "crates/singlefs-alpha/src/judgement_display.rs",
-            "impl crate::judge::Judgement { pub fn twice(&self) -> usize { self.bytes * 2 } }\n",
-        ),
-        ("crates/singlefs-alpha/src/pipeline.rs", "pub const PIPELINE_PROBE: u8 = 1;\n"),
-        (
-            "crates/singlefs-alpha/tests/setting_case.rs",
-            "#[path = \"../../singlefs-beta/tests/common/mod.rs\"]\nmod common;\nmod shared_points;\n\
-             use singlefs_alpha::judge::judge;\n#[test]\nfn setting_case() { common::probe(); shared_points::point(); }\n",
-        ),
-        (
-            "crates/singlefs-alpha/tests/shared_points/mod.rs",
-            "use super::common::probe;\npub fn point() { probe(); }\n",
-        ),
-        ("crates/singlefs-beta/Cargo.toml", "[package]\nname = \"singlefs-beta\"\n"),
-        ("crates/singlefs-beta/src/lib.rs", "pub mod format;\n"),
-        ("crates/singlefs-beta/src/format.rs", "pub const BLOCK_BYTES: usize = 4096;\n"),
-        ("crates/singlefs-beta/tests/common/mod.rs", "pub fn probe() {}\n"),
-    ];
+    // ============================== 判法单元：编进二进制的那份判器键表 ==============================
 
-    /// 闭包算法抽成 `judging_closure.rs` 前后，同一棵树上算出的文件集、按原文取的文件、停在门外的文件与摘要逐字相同：
-    /// 钉的值是抽出之前那一版在这个小仓上算的（草稿里把旧算法按行抽出来编成程序跑的，真仓上 145 组逐项比也全同）。
-    #[test]
-    fn the_extracted_closure_algorithm_gives_the_files_and_digests_pinned_before_the_extraction() {
-        let root = std::env::temp_dir().join(format!(
-            "singlefs-extracted-closure-small-repository-{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&root);
-        for (file, contents) in SMALL_REPOSITORY_FILES {
-            let path = root.join(file);
-            std::fs::create_dir_all(path.parent().expect("文件有上层")).expect("建得了目录");
-            std::fs::write(&path, contents).expect("写得了小仓的文件");
+    /// 组名 → 那一组的键（拒算或不编进来的是 `None`）。
+    type KeysOfEachGroup = BTreeMap<String, Option<[u8; DIGEST_BYTES]>>;
+
+    /// 这个测试二进制编进来的特性（构建脚本按 `CARGO_FEATURE_*` 取的同一组）。
+    fn features_of_this_build() -> Vec<String> {
+        let mut features = Vec::new();
+        if cfg!(feature = "default") {
+            features.push("default".to_string());
         }
-        let toolchain = CrashPointReplayToolchainIdentity {
-            rustc_version_lines: "rustc 0.0.0-probe\nbinary: rustc\ncommit-hash: probe".to_string(),
-            cargo_version: "cargo 0.0.0-probe".to_string(),
-            target_triple: "x86_64-probe".to_string(),
-        };
-        let judge = "crates/singlefs-alpha/src/judge.rs";
-        let pipeline = "crates/singlefs-alpha/src/pipeline.rs";
-        let setting_case = "crates/singlefs-alpha/tests/setting_case.rs";
-        let computed = [
-            judging_code_by_module_references_stopping_at(&root, &[judge], &[], &toolchain),
-            judging_code_by_module_references_stopping_at(&root, &[judge], &[pipeline], &toolchain),
-            judging_code_by_module_references_stopping_at(&root, &[setting_case], &[], &toolchain),
-        ];
-        std::fs::remove_dir_all(&root).expect("删得掉小仓");
-        let pinned: [(Vec<&str>, Vec<&str>, &str); 3] = [
-            (
-                vec![
-                    "crates/singlefs-alpha/src/judge.rs",
-                    "crates/singlefs-alpha/src/judgement_display.rs",
-                    "crates/singlefs-alpha/src/kernel.wgsl",
-                    "crates/singlefs-alpha/src/kernel_table.rs",
-                    "crates/singlefs-alpha/src/pipeline.rs",
-                    "crates/singlefs-beta/src/format.rs",
-                ],
-                vec![],
-                "d5f6e7546481a1b24236d89a7ec8367ebe8e0dea72d307ddc381edae14f8236d",
-            ),
-            (
-                vec![
-                    "crates/singlefs-alpha/src/judge.rs",
-                    "crates/singlefs-alpha/src/judgement_display.rs",
-                    "crates/singlefs-alpha/src/kernel.wgsl",
-                    "crates/singlefs-alpha/src/kernel_table.rs",
-                    "crates/singlefs-beta/src/format.rs",
-                ],
-                vec![pipeline],
-                "cbd50ac7da534ea25cce0d105320ae9c2f77a28520e767e0e708ae77815a662e",
-            ),
-            (
-                vec![
-                    "crates/singlefs-alpha/src/judge.rs",
-                    "crates/singlefs-alpha/src/judgement_display.rs",
-                    "crates/singlefs-alpha/src/kernel.wgsl",
-                    "crates/singlefs-alpha/src/kernel_table.rs",
-                    "crates/singlefs-alpha/src/pipeline.rs",
-                    "crates/singlefs-alpha/tests/setting_case.rs",
-                    "crates/singlefs-alpha/tests/shared_points/mod.rs",
-                    "crates/singlefs-beta/src/format.rs",
-                    "crates/singlefs-beta/tests/common/mod.rs",
-                ],
-                vec![],
-                "41e168aac5d580c288eb98c52008761d3060de0156c961da6d162c09ca3f212b",
-            ),
-        ];
-        for (code, (files, stopped_at, digest)) in computed.into_iter().zip(pinned) {
-            let code = code.expect("小仓算得出");
-            assert_eq!(code.files, files, "收的文件与抽出之前相同");
-            assert_eq!(
-                code.raw_files,
-                BTreeSet::from(["crates/singlefs-alpha/src/kernel.wgsl".to_string()]),
-                "按原文取的只有内核那一份"
-            );
-            assert_eq!(
-                code.stopped_at,
-                stopped_at
-                    .iter()
-                    .map(|file| (*file).to_string())
-                    .collect::<BTreeSet<String>>(),
-                "停在门外的与抽出之前相同"
-            );
-            assert_eq!(
-                hexadecimal_text(&code.digest),
-                digest,
-                "摘要与抽出之前逐字相同"
-            );
+        if cfg!(feature = "gpu") {
+            features.push("gpu".to_string());
         }
-    }
-
-    /// 身份要能跨机器、跨目录：同一份代码拷到别的路径，判法代码收的文件与摘要逐字相同。
-    #[test]
-    fn judging_code_is_the_same_in_a_copy_of_the_repository_at_another_path() {
-        let root = repository_root();
-        let copy =
-            std::env::temp_dir().join(format!("singlefs-identity-copy-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&copy);
-        copy_tree(&root.join("crates"), &copy.join("crates"));
-        std::fs::copy(root.join("Cargo.lock"), copy.join("Cargo.lock")).expect("拷得了 Cargo.lock");
-        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-        let entry =
-            "crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs";
-        let original =
-            judging_code_by_module_references(&root, &[entry], &toolchain).expect("主仓算得出");
-        let copied =
-            judging_code_by_module_references(&copy, &[entry], &toolchain).expect("副本算得出");
-        std::fs::remove_dir_all(&copy).expect("删得掉副本");
-        assert_eq!(original.files, copied.files, "收的文件逐个相同");
-        assert_eq!(original.digest, copied.digest, "摘要相同：身份不含绝对路径");
-    }
-
-    /// 崩溃枚举用例登记表在仓里的位置（相对仓根）。
-    const CRASH_CASE_REGISTRY: &str = ".claude/gate.d/stage-inputs.tsv";
-
-    /// 从仓根取崩溃枚举用例登记了哪些测试目标：登记表在就逐行取 `crash-case:` 行 `test=` 列的测试目标；
-    /// 不在（只导出 `crates/` 的树，广谱变异的导出树就是这样）交回 [`CrashCaseRegistration::RegistryAbsent`]，不猜。
-    #[derive(Debug, PartialEq, Eq)]
-    enum CrashCaseRegistration {
-        Registered { targets: Vec<String> },
-        RegistryAbsent { looked_at: PathBuf },
-    }
-
-    /// # Panics
-    /// 登记表在却读不出、或某一行 `crash-case:` 没有 `test=` 列或 `test=` 列里没有测试目标。
-    fn crash_case_registration_under(root: &Path) -> CrashCaseRegistration {
-        let registry = root.join(CRASH_CASE_REGISTRY);
-        if !registry.is_file() {
-            return CrashCaseRegistration::RegistryAbsent {
-                looked_at: registry,
-            };
+        if cfg!(feature = "verdict-store") {
+            features.push("verdict-store".to_string());
         }
-        let registrations = std::fs::read_to_string(&registry).expect("登记表在就读得出");
-        let targets = registrations
-            .lines()
-            .filter(|line| line.starts_with("crash-case:"))
-            .map(|line| {
-                let test_column = line
-                    .split('\t')
-                    .find_map(|column| column.strip_prefix("test="))
-                    .expect("test= 列");
-                test_column.split(':').nth(1).expect("测试目标").to_string()
-            })
-            .collect();
-        CrashCaseRegistration::Registered { targets }
+        features
     }
 
-    /// 仓里登记表在，取到的是登记的那几条。
-    #[test]
-    fn crash_case_registration_reads_the_crash_cases_registered_in_the_repository() {
-        match crash_case_registration_under(&repository_root()) {
-            CrashCaseRegistration::Registered { targets } => assert!(
-                targets
-                    .iter()
-                    .any(|target| target == "crash_enumeration_fixed_script_stream"),
-                "仓里的登记表登记了固定脚本那条流（取到的：{targets:?}）"
-            ),
-            CrashCaseRegistration::RegistryAbsent { looked_at } => {
-                panic!("仓里登记表 {} 在，却认成不在", looked_at.display())
-            }
-        }
-    }
-
-    /// 只有 `crates/` 的树（广谱变异的导出树）里登记表不在，认成「不在」，不认成「登记了 0 条」。
-    #[test]
-    fn crash_case_registration_reports_the_registry_absent_in_a_tree_of_only_crates() {
-        let exported =
-            std::env::temp_dir().join(format!("singlefs-exported-crates-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&exported);
-        std::fs::create_dir_all(exported.join("crates")).expect("建得出导出树");
-        let registration = crash_case_registration_under(&exported);
-        std::fs::remove_dir_all(&exported).expect("删得掉导出树");
-        assert_eq!(
-            registration,
-            CrashCaseRegistration::RegistryAbsent {
-                looked_at: exported.join(CRASH_CASE_REGISTRY)
-            },
-            "只有 crates/ 的树里登记表不在"
-        );
-    }
-
-    /// 每条登记的崩溃枚举用例的判法代码：含恢复与 checker 走树（判它们的正是这两样），不含装置二进制；随机历史脚手架只许由测试目标自己的
-    /// 文件直接引，或经登记表（[`RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED`]）给这条用例登记过的库模块引，逐个引入者判
-    /// （按 crate 闭包取会把整个 harness 收进来，E164 W5 量到崩溃枚举节点 20 个提交全部重跑；按模块引用取就不会）。登记表里每一行
-    /// 都要在它那条用例里真的引到（没引到的是死条目）。
-    /// 登记表不在（只导出 `crates/` 的树）时这一核没有对象：打一行 `CRASH_CASE_REGISTRY_ABSENT` 写明跳过、不判；
-    /// 按 `tests/` 下的文件名认不出登记的那几条（登记的有不以 `crash_enumeration_` 起头的，以它起头的也有没登记的）。
-    #[test]
-    fn every_registered_crash_case_depends_on_recovery_and_the_checker_walk_but_not_on_apparatus_binaries(
-    ) {
-        let root = repository_root();
-        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-        let targets = match crash_case_registration_under(&root) {
-            CrashCaseRegistration::Registered { targets } => targets,
-            CrashCaseRegistration::RegistryAbsent { looked_at } => {
-                println!(
-                    "CRASH_CASE_REGISTRY_ABSENT registry={} 登记表不在（只导出 crates/ 的树），跳过「登记的崩溃枚举用例的判法代码」这一核",
-                    looked_at.display()
-                );
-                return;
-            }
-        };
-        let mut cases = 0usize;
-        let mut blocked_introducers: Vec<(String, JudgedRandomHistoryIntroducer)> = Vec::new();
-        let mut registrations_used: BTreeSet<(String, String)> = BTreeSet::new();
-        for target in &targets {
-            let entry = format!("crates/singlefs-checker-tier/tests/{target}.rs");
-            let code = judging_code_by_module_references(&root, &[entry.as_str()], &toolchain)
-                .expect("算得出");
-            println!(
-                "JUDGING_CODE entry={entry} files={} raw={} digest={}",
-                code.files.len(),
-                code.raw_files.len(),
-                hexadecimal_text(&code.digest)
-            );
-            for file in &code.files {
-                println!(
-                    "JUDGING_CODE_FILE entry={target} file={file} reason={}",
-                    code.reason_of_each_file[file]
-                );
-            }
-            let has = |path: &str| code.files.iter().any(|file| file == path);
-            assert!(
-                has("crates/singlefs-core/src/recovery.rs"),
-                "{target}：判定靠恢复"
-            );
-            assert!(
-                has("crates/singlefs-checker/src/walk.rs"),
-                "{target}：判定靠池级 checker 走树"
-            );
-            assert!(
-                has("crates/singlefs-format/src/lib.rs"),
-                "{target}：格式常量经 use 收进来（E164 V11）"
-            );
-            assert!(
-                !code
-                    .files
-                    .iter()
-                    .any(|file| file.starts_with("crates/singlefs-checker-tier/src/bin/")),
-                "{target}：装置二进制不是节点判定走的代码"
-            );
-            let judged_introducers = random_history_scaffolding_introducers_judged(
-                &root,
-                target,
-                &toolchain,
-                RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED,
-            )
-            .expect("算得出");
-            for judged in judged_introducers {
-                println!(
-                    "RANDOM_HISTORY_INTRODUCER entry={target} introducer={:?} verdict={:?}",
-                    judged.introducer, judged.verdict
-                );
-                if let (
-                    Some(file),
-                    RandomHistoryIntroducerVerdict::RegisteredLibraryModule { .. },
-                ) = (judged.introducer.introducing_file(), &judged.verdict)
-                {
-                    registrations_used.insert((target.clone(), file.to_string()));
-                }
-                if !judged.verdict.is_let_through() {
-                    blocked_introducers.push((target.clone(), judged));
-                }
-            }
-            cases += 1;
-        }
-        assert!(cases >= 8, "登记表里至少 8 条崩溃枚举用例，实际 {cases}");
-        assert!(
-            blocked_introducers.is_empty(),
-            "随机历史脚手架经没登记的库模块或 impl 头进了登记的崩溃枚举用例的判法代码（用例，引入者，判定）：{blocked_introducers:?}。\
-             拿随机历史当输入的用例在 RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED 登记那份库模块并写明理由；别的用例改成不经库模块引它"
-        );
-        for row in RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED {
-            assert!(
-                registrations_used
-                    .contains(&(row.test_target.to_string(), row.library_module.to_string())),
-                "登记表里 {} 经 {} 引随机历史脚手架那一行，在这条用例的判法闭包里没引到（或它不是登记的崩溃枚举用例）：死条目，删掉它（{}）",
-                row.test_target,
-                row.library_module,
-                row.reason
-            );
-        }
-    }
-
-    /// 只有两个包的小仓：入口测试文件先直接引随机历史脚手架，再引一份库模块，那份库模块也引它——闭包里第二份文件经库模块引。
-    /// 交回小仓的根；用完由调用方删。
-    fn repository_where_the_second_file_in_the_closure_references_the_random_history_through_a_library_module(
-        tag: &str,
-    ) -> PathBuf {
-        let root = std::env::temp_dir().join(format!(
-            "singlefs-random-history-introducers-{tag}-{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&root);
-        for (file, contents) in [
-            ("Cargo.lock", ""),
-            (
-                "crates/singlefs-harness/Cargo.toml",
-                "[package]\nname = \"singlefs-harness\"\n",
-            ),
-            ("crates/singlefs-harness/src/lib.rs", "pub mod history;\n"),
-            (
-                RANDOM_HISTORY_SCAFFOLDING_FILE,
-                "pub const RANDOM_HISTORY_PROBE: u8 = 1;\n",
-            ),
-            (
-                "crates/singlefs-checker-tier/Cargo.toml",
-                "[package]\nname = \"singlefs-checker-tier\"\n",
-            ),
-            (
-                "crates/singlefs-checker-tier/src/lib.rs",
-                "pub mod campaign_probe;\n",
-            ),
-            (
-                "crates/singlefs-checker-tier/src/campaign_probe.rs",
-                "use singlefs_harness::history::RANDOM_HISTORY_PROBE;\npub fn probe() -> u8 { RANDOM_HISTORY_PROBE }\n",
-            ),
-            (
-                "crates/singlefs-checker-tier/tests/probe_case.rs",
-                "use singlefs_harness::history::RANDOM_HISTORY_PROBE;\nuse singlefs_checker_tier::campaign_probe::probe;\n\
-                 #[test]\nfn probe_case() { assert_eq!(probe(), RANDOM_HISTORY_PROBE); }\n",
-            ),
-        ] {
-            let path = root.join(file);
-            std::fs::create_dir_all(path.parent().expect("文件有上层")).expect("建得了目录");
-            std::fs::write(&path, contents).expect("写得了小仓的文件");
-        }
-        root
-    }
-
-    const LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY: &str =
-        "crates/singlefs-checker-tier/src/campaign_probe.rs";
-    const ENTRY_OF_THE_SMALL_REPOSITORY: &str = "crates/singlefs-checker-tier/tests/probe_case.rs";
-
-    /// 闭包里第二份文件经库模块引随机历史脚手架，那份库模块只给别的用例登记过：拦；入口自己直接引的那一处照旧放行。
-    /// 入口先引到它，只记第一个引入者就看不见库模块那一引（这条变红）。
-    #[test]
-    fn a_library_module_second_in_the_closure_referencing_the_random_history_unregistered_for_the_case_is_blocked(
-    ) {
-        let root = repository_where_the_second_file_in_the_closure_references_the_random_history_through_a_library_module(
-            "unregistered",
-        );
-        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-        let registered_for_another_case = [RandomHistoryThroughALibraryModuleAllowed {
-            test_target: "another_case",
-            library_module: LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY,
-            reason: "只给别的用例登记",
-        }];
-        let judged = random_history_scaffolding_introducers_judged(
-            &root,
-            "probe_case",
-            &toolchain,
-            &registered_for_another_case,
-        );
-        std::fs::remove_dir_all(&root).expect("删得掉小仓");
-        assert_eq!(
-            judged.expect("小仓算得出"),
-            vec![
-                JudgedRandomHistoryIntroducer {
-                    introducer: FileIntroducer::ReferencedBy {
-                        file: LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY.to_string()
-                    },
-                    verdict: RandomHistoryIntroducerVerdict::UnregisteredLibraryModule,
-                },
-                JudgedRandomHistoryIntroducer {
-                    introducer: FileIntroducer::ReferencedBy {
-                        file: ENTRY_OF_THE_SMALL_REPOSITORY.to_string()
-                    },
-                    verdict: RandomHistoryIntroducerVerdict::TestTargetFile,
-                },
-            ],
-            "两个引入者都要判到：库模块那一引没给这条用例登记，拦；入口自己直接引，放行"
-        );
-    }
-
-    /// 同一个小仓，那份库模块给这条用例登记了：放，判定带着登记的理由。
-    #[test]
-    fn a_library_module_second_in_the_closure_referencing_the_random_history_registered_for_the_case_is_let_through(
-    ) {
-        let root = repository_where_the_second_file_in_the_closure_references_the_random_history_through_a_library_module(
-            "registered",
-        );
-        let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-        let registered_for_this_case = [RandomHistoryThroughALibraryModuleAllowed {
-            test_target: "probe_case",
-            library_module: LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY,
-            reason: "这条用例拿随机历史当输入",
-        }];
-        let judged = random_history_scaffolding_introducers_judged(
-            &root,
-            "probe_case",
-            &toolchain,
-            &registered_for_this_case,
-        );
-        std::fs::remove_dir_all(&root).expect("删得掉小仓");
-        let judged = judged.expect("小仓算得出");
-        assert!(
-            judged
+    /// 编进二进制的工具链行，profile 那几行按 `root` 那棵树的根 `Cargo.toml` 重算（经构建脚本那一份拼法
+    /// `toolchain_lines_of_the_build`）：`rustc -vV`、`cargo -V`、目标与 RUSTFLAGS 取编进去的那几行。
+    fn toolchain_lines_under(root: &Path) -> Vec<String> {
+        let compiled = &compiled_judging_units_keys().toolchain_lines;
+        let value_after = |prefix: &str| -> String {
+            compiled
                 .iter()
-                .all(|introducer| introducer.verdict.is_let_through()),
-            "登记过的库模块与入口自己都放行：{judged:?}"
+                .find_map(|line| line.strip_prefix(prefix))
+                .unwrap_or_else(|| panic!("编进去的工具链行里有「{prefix}」那一行：{compiled:?}"))
+                .to_string()
+        };
+        let rustc_version_text = compiled
+            .iter()
+            .take_while(|line| !line.starts_with("cargo-version: "))
+            .cloned()
+            .collect::<Vec<String>>()
+            .join("\n");
+        let rustflags = value_after("rustflags: ")
+            .split(' ')
+            .filter(|flag| !flag.is_empty())
+            .collect::<Vec<&str>>()
+            .join("\u{1f}");
+        let root_manifest =
+            std::fs::read_to_string(root.join("Cargo.toml")).expect("根 Cargo.toml 读得了");
+        let profile_lines =
+            effective_profile_lines(&root_manifest, &value_after("profile: "), &|name| {
+                std::env::var(name).ok()
+            })
+            .expect("profile 的生效值算得出");
+        toolchain_lines_of_the_build(&BuildToolchainInputs {
+            rustc_version_text: &rustc_version_text,
+            cargo_version_text: &value_after("cargo-version: "),
+            target_triple: &value_after("target: "),
+            encoded_rustflags: &rustflags,
+            profile_lines: &profile_lines,
+        })
+    }
+
+    /// 照入口登记表在 `root` 那棵树上逐组算键（与构建脚本同一套）：组名 → 键（拒算或不编进来的是 `None`）。
+    fn registry_keys_under(root: &Path) -> KeysOfEachGroup {
+        let switches = RuleSwitches::every_rule_intact();
+        let workspace =
+            load_workspace(root, default_heavy_threads(), &switches).expect("工作区装得起来");
+        let toolchain_lines = toolchain_lines_under(root);
+        let packages = parse_lock_file(
+            &std::fs::read_to_string(root.join("Cargo.lock")).expect("Cargo.lock 读得了"),
+        )
+        .expect("Cargo.lock 解析得了");
+        JUDGING_UNITS_ENTRY_GROUPS
+            .iter()
+            .map(|group| {
+                (
+                    group.group_name.to_string(),
+                    group.target,
+                    group.entry_functions,
+                )
+            })
+            .chain(OBSERVER_ENTRIES.iter().map(|observer| {
+                (
+                    observer_group_name(observer.observer_code_file, observer.observer_name),
+                    observer.target,
+                    observer.entry_functions,
+                )
+            }))
+            .map(|(group_name, target, entry_functions)| {
+                let request = EntryGroupRequest {
+                    group_name: group_name.clone(),
+                    target: TargetSelector::parse(target).expect("登记表里的目标写法认得"),
+                    entry_paths: entry_functions
+                        .iter()
+                        .map(|entry| (*entry).to_string())
+                        .collect(),
+                    features: features_of_this_build(),
+                };
+                let computed =
+                    entry_group_key(&workspace, &request, &toolchain_lines, &packages, &switches)
+                        .unwrap_or_else(|error| panic!("组 {group_name} 的入口写错了：{error}"));
+                let key = match computed.verdict {
+                    EntryGroupVerdict::Keyed { key } => Some(key.0),
+                    EntryGroupVerdict::Refused { .. } | EntryGroupVerdict::NotCompiled { .. } => {
+                        None
+                    }
+                };
+                (group_name, key)
+            })
+            .collect()
+    }
+
+    /// 编进二进制的那份表里每一组的键（拒算或不编进来的是 `None`）。
+    fn compiled_keys() -> KeysOfEachGroup {
+        compiled_judging_units_keys()
+            .groups
+            .iter()
+            .map(|group| {
+                let key = match &group.verdict {
+                    ReadBackEntryGroupVerdict::Keyed { key } => Some(*key),
+                    ReadBackEntryGroupVerdict::Refused { .. }
+                    | ReadBackEntryGroupVerdict::NotCompiled { .. } => None,
+                };
+                (group.group_name.clone(), key)
+            })
+            .collect()
+    }
+
+    /// 构建脚本算键时闭包读到、又不在 `crates/` 底下的数据文件（编进去的那份表的 `watched` 行里，`include_str!` 按清单目录往上读的那几份，
+    /// 例：`singlefs_harness::heavy_threads` 读的 `.claude/heavy-thread-default`）：拷树重算时要连它们一起拷，两边才是同一套输入——
+    /// 拷漏了，读它的那一组在拷贝上判 `data-file-unreadable` 拒算，键对不上编进去的那一把。根上的 `Cargo.toml`、`Cargo.lock` 另拷，不在这里。
+    fn data_files_outside_the_crates_the_build_read() -> Vec<&'static str> {
+        compiled_judging_units_keys()
+            .watched_files
+            .iter()
+            .map(String::as_str)
+            .filter(|path| {
+                !path.starts_with("crates/") && *path != "Cargo.toml" && *path != "Cargo.lock"
+            })
+            .collect()
+    }
+
+    /// 编进去的那份表点名的、`crates/` 之外的数据文件里有登记的每台默认重活线程数那一份：观察者结论拼块那一组的闭包经核对线程数读它，
+    /// 拷树重算时漏拷它，那一组在拷贝上拒算（crates 第三轮第 3 条第三小项的病根）。
+    /// 判别力（`crates/mutations.tsv`）：拷树只认 `crates/` 底下的文件，这条红。
+    #[test]
+    fn the_data_files_outside_the_crates_include_the_heavy_thread_registration() {
+        assert!(
+            data_files_outside_the_crates_the_build_read()
+                .contains(&".claude/heavy-thread-default"),
+            "构建时读到的 crates 之外的数据文件：{:?}",
+            data_files_outside_the_crates_the_build_read()
+        );
+    }
+
+    /// 这棵活树（编这个测试二进制的那一份仓）里的 `crates/`、`Cargo.toml`、`Cargo.lock` 与构建时闭包读到的 `crates/` 之外的数据文件
+    /// （[`data_files_outside_the_crates_the_build_read`]）拷进一个新的临时目录（离开作用域时删掉）。
+    /// 用它的测试断言的就是真仓上的判器登记表（登记的入口都编得进、真仓上改一处哪几组键变），照旧拒算（定案 1：断言本身关于真仓的留着）；
+    /// 仓根只在这里现取，别的测试够不到它。
+    struct RepositoryCopy {
+        root: crate::crash_library::ExclusiveTemporaryDirectory,
+    }
+
+    impl RepositoryCopy {
+        fn new(label: &str) -> Self {
+            fn copy_directory(from: &Path, to: &Path) {
+                std::fs::create_dir_all(to).expect("建得了目录");
+                for entry in std::fs::read_dir(from).expect("读得了目录").flatten() {
+                    let destination = to.join(entry.file_name());
+                    if entry.file_type().expect("读得了类型").is_dir() {
+                        if entry.file_name() != "target" {
+                            copy_directory(&entry.path(), &destination);
+                        }
+                    } else {
+                        std::fs::copy(entry.path(), &destination).expect("拷得了文件");
+                    }
+                }
+            }
+            let root = crate::crash_library::ExclusiveTemporaryDirectory::create(&format!(
+                "judging-units-{label}"
+            ))
+            .expect("建得了一次性临时目录");
+            let repository = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .and_then(Path::parent)
+                .expect("本 crate 在仓根的 crates/ 下")
+                .to_path_buf();
+            copy_directory(&repository.join("crates"), &root.join("crates"));
+            for file in ["Cargo.toml", "Cargo.lock"] {
+                std::fs::copy(repository.join(file), root.join(file)).expect("拷得了根文件");
+            }
+            for data_file in data_files_outside_the_crates_the_build_read() {
+                let destination = root.join(data_file);
+                std::fs::create_dir_all(
+                    destination
+                        .parent()
+                        .expect("仓内相对路径拼到临时根底下，总有上一级目录"),
+                )
+                .expect("建得了数据文件的目录");
+                std::fs::copy(repository.join(data_file), &destination).unwrap_or_else(|error| {
+                    panic!("拷得了构建时读到的数据文件 {data_file}：{error}")
+                });
+            }
+            Self { root }
+        }
+
+        /// 一份文件里恰好出现一次的原文换成替换文；不是恰好一次就 panic（锚点腐化不许悄悄放过）。
+        fn replace_exactly_once(&self, relative: &str, original: &str, replacement: &str) {
+            let path = self.root.join(relative);
+            let text = std::fs::read_to_string(&path).expect("读得了");
+            assert_eq!(
+                text.matches(original).count(),
+                1,
+                "{relative} 里「{original}」要恰好一处"
+            );
+            std::fs::write(&path, text.replacen(original, replacement, 1)).expect("写得了");
+        }
+    }
+
+    /// 在临时拷贝上施加一处改动，交改前与改后逐组的键。
+    fn keys_before_and_after(
+        label: &str,
+        relative: &str,
+        original: &str,
+        replacement: &str,
+    ) -> (KeysOfEachGroup, KeysOfEachGroup) {
+        let copy = RepositoryCopy::new(label);
+        let before = registry_keys_under(&copy.root);
+        copy.replace_exactly_once(relative, original, replacement);
+        let after = registry_keys_under(&copy.root);
+        (before, after)
+    }
+
+    /// 这几组在改前改后键都交得出（`Some`），交回键变了的那几组。
+    fn groups_whose_key_changed(
+        before: &KeysOfEachGroup,
+        after: &KeysOfEachGroup,
+    ) -> BTreeSet<String> {
+        before
+            .iter()
+            .filter(|(group, key)| key.is_some() && after.get(*group) != Some(*key))
+            .map(|(group, _key)| group.clone())
+            .collect()
+    }
+
+    /// 构建脚本写进二进制的那份表，与这个测试在盘上这棵树上照同一套算法、同一份工具链行重算的逐组相同（编译之后改了树的不算数）。
+    #[test]
+    fn the_judging_units_keys_compiled_in_are_the_ones_computed_from_the_tree() {
+        let compiled = compiled_keys();
+        let copy = RepositoryCopy::new("compiled-keys");
+        let from_the_tree = registry_keys_under(&copy.root);
+        assert_eq!(
+            compiled, from_the_tree,
+            "编进去的键与盘上这棵树重算的逐组相同"
         );
         assert!(
-            judged.contains(&JudgedRandomHistoryIntroducer {
-                introducer: FileIntroducer::ReferencedBy {
-                    file: LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY.to_string()
-                },
-                verdict: RandomHistoryIntroducerVerdict::RegisteredLibraryModule {
-                    reason: "这条用例拿随机历史当输入"
-                },
+            compiled
+                .get("judgement_of_the_crash_images")
+                .is_some_and(Option::is_some),
+            "CPU 判器那一组算得出键：{compiled:?}"
+        );
+    }
+
+    /// 判器与核对的闭包里没有流水线的单元（停止表退役之后留下的那条设计约束）；CPU 那几组连卡上那一套（派活、起卡）都没有。
+    #[test]
+    fn the_judge_groups_reach_no_pipeline_unit_and_the_cpu_groups_no_card_unit() {
+        let table = compiled_judging_units_keys();
+        let judge_groups = [
+            "gpu_judge",
+            "judgement_of_the_crash_images",
+            "judgement_of_the_given_states",
+            "cpu_facts_verifier",
+            "gpu_facts_verifier",
+        ];
+        let cpu_groups = [
+            "judgement_of_the_crash_images",
+            "judgement_of_the_given_states",
+            "cpu_facts_verifier",
+        ];
+        let mut checked = 0;
+        for group in &table.groups {
+            if !judge_groups.contains(&group.group_name.as_str()) {
+                continue;
+            }
+            checked += 1;
+            let forbidden: Vec<&str> = if cpu_groups.contains(&group.group_name.as_str()) {
+                PIPELINE_FILES_THE_JUDGES_MUST_NOT_REACH
+                    .iter()
+                    .chain(GPU_FILES_ONLY_THE_GPU_GROUPS_REACH)
+                    .copied()
+                    .collect()
+            } else {
+                PIPELINE_FILES_THE_JUDGES_MUST_NOT_REACH.to_vec()
+            };
+            let reached: Vec<String> = group
+                .composition
+                .iter()
+                .filter(|unit| {
+                    forbidden
+                        .iter()
+                        .any(|file| unit.location.starts_with(&format!("{file}:")))
+                })
+                .map(|unit| format!("{} {} {}", unit.kind, unit.qualified_name, unit.location))
+                .collect();
+            assert!(
+                reached.is_empty(),
+                "{} 的闭包里有不许有的单元：{reached:?}",
+                group.group_name
+            );
+        }
+        assert!(checked >= 3, "至少 CPU 那三组在表里：{checked}");
+    }
+
+    /// U3 阳性对照：判器闭包里的一个常量改了（池级 checker 的载荷校验和偏移），CPU 判镜像与判给定状态那两组的键变。
+    #[test]
+    fn a_constant_in_the_judge_closure_changes_the_cpu_judge_keys() {
+        let (before, after) = keys_before_and_after(
+            "constant-in-the-judge",
+            "crates/singlefs-checker/src/lib.rs",
+            "const JOURNAL_PAYLOAD_CHECKSUM_OFFSET: usize = 95;",
+            "const JOURNAL_PAYLOAD_CHECKSUM_OFFSET: usize = 91;",
+        );
+        let changed = groups_whose_key_changed(&before, &after);
+        for group in [
+            "judgement_of_the_crash_images",
+            "judgement_of_the_given_states",
+        ] {
+            assert!(
+                changed.contains(group),
+                "{group} 的键要变：变了的是 {changed:?}"
+            );
+        }
+    }
+
+    /// U3 阴性对照改的那一处：`crash_amplification::run_from_environment` 函数体里那一个表达式（转调带观察者的那一版）。只取调用本身、
+    /// 不带缩进与换行，rustfmt 把它排成一行还是几行之前，换成块表达式都编得过；它在那份文件里要恰好一处，由
+    /// [`the_anchor_of_the_pipeline_function_edit_is_in_the_pipeline_file_exactly_once`] 在编进来的那一份上钉住。
+    const PIPELINE_FUNCTION_EDIT_ANCHOR: &str =
+        "run_from_environment_with_observers(flow, flow_name, &[], toolchain, expand_up_to)";
+
+    /// 锚点没腐化：U3 阴性对照要改的那一个表达式在编进这个测试二进制的那一份 `crash_amplification.rs` 里恰好一处（腐化了阴性对照只会在
+    /// 读活树、拒算照跑的那一条里才红，这一条在编进来的源码上先红、点名锚点）。
+    /// 判别力（`crates/mutations.tsv`）：`run_from_environment` 里那个调用的参数排法一变，这条红。
+    #[test]
+    fn the_anchor_of_the_pipeline_function_edit_is_in_the_pipeline_file_exactly_once() {
+        assert_eq!(
+            include_str!("crash_amplification.rs")
+                .matches(PIPELINE_FUNCTION_EDIT_ANCHOR)
+                .count(),
+            1,
+            "crash_amplification.rs 里「{PIPELINE_FUNCTION_EDIT_ANCHOR}」要恰好一处：U3 阴性对照改的就是它"
+        );
+    }
+
+    /// U3 阴性对照：流水线里一个与判器无关的 fn 改了（`crash_amplification::run_from_environment` 的函数体），判器、核对与录入的键都不变。
+    #[test]
+    fn a_pipeline_function_changes_no_judge_verifier_or_recording_key() {
+        let (before, after) = keys_before_and_after(
+            "pipeline-function",
+            "crates/singlefs-checker-tier/src/crash_amplification.rs",
+            PIPELINE_FUNCTION_EDIT_ANCHOR,
+            &format!(
+                "{{ let _pipeline_probe = flow_name.len(); {PIPELINE_FUNCTION_EDIT_ANCHOR} }}"
+            ),
+        );
+        let changed = groups_whose_key_changed(&before, &after);
+        for group in [
+            "gpu_judge",
+            "judgement_of_the_crash_images",
+            "judgement_of_the_given_states",
+            "cpu_facts_verifier",
+            "gpu_facts_verifier",
+            "recording",
+        ] {
+            assert!(
+                !changed.contains(group),
+                "{group} 的键不该变：变了的是 {changed:?}"
+            );
+        }
+        assert!(
+            before
+                .get("judgement_of_the_crash_images")
+                .is_some_and(Option::is_some),
+            "改前算得出键（不是两边都拒算才相等）"
+        );
+    }
+
+    /// controls 路 S12：派活回读归位（`judge_one_dispatch` 把结论字放回哪个状态那一处）改一处写法，GPU 判器那一组的键变——派活里决定结论
+    /// 归位的函数在 GPU 判器的入口集合里（底稿 L7）。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn the_readback_placement_in_the_dispatch_changes_the_gpu_judge_key() {
+        let (before, after) = keys_before_and_after(
+            "dispatch-readback",
+            "crates/singlefs-checker-tier/src/crash_judge_dispatch.rs",
+            "entries[state * VERDICT_WORDS..(state + 1) * VERDICT_WORDS]",
+            "entries[(state) * VERDICT_WORDS..(state + 1) * VERDICT_WORDS]",
+        );
+        let changed = groups_whose_key_changed(&before, &after);
+        assert!(changed.contains("gpu_judge"), "变了的是 {changed:?}");
+    }
+
+    /// 失败点码表的条目级宏调用改一个码（9 → 99）：GPU 判器那一组的键变（WGSL 外名 `FAILURE_POINT_*` 的着落做成边，宏调用进闭包）。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn a_failure_point_code_changes_the_gpu_judge_key() {
+        let (before, after) = keys_before_and_after(
+            "failure-point-code",
+            "crates/singlefs-checker-tier/src/crash_judge_conclusions.rs",
+            "    GPU_FAILURE_POINT_UNIT_UNREADABLE = 9,\n",
+            "    GPU_FAILURE_POINT_UNIT_UNREADABLE = 99,\n",
+        );
+        let changed = groups_whose_key_changed(&before, &after);
+        assert!(changed.contains("gpu_judge"), "变了的是 {changed:?}");
+    }
+
+    /// controls 路 S16：这一趟用的 profile 的 `overflow-checks` 改了（工具链行里 cargo 解析后的 profile 生效值进键），算得出键的每一组都变。
+    #[test]
+    fn overflow_checks_of_the_profile_in_use_change_every_key() {
+        let profile_of_this_build = compiled_judging_units_keys()
+            .toolchain_lines
+            .iter()
+            .find_map(|line| line.strip_prefix("profile: "))
+            .expect("编进去的工具链行里有 profile 那一行")
+            .to_string();
+        let copy = RepositoryCopy::new("overflow-checks");
+        let before = registry_keys_under(&copy.root);
+        if profile_of_this_build == "release" {
+            copy.replace_exactly_once(
+                "Cargo.toml",
+                "overflow-checks = true",
+                "overflow-checks = false",
+            );
+        } else {
+            let manifest = copy.root.join("Cargo.toml");
+            let mut text = std::fs::read_to_string(&manifest).expect("读得了");
+            text.push_str(&format!(
+                "\n[profile.{profile_of_this_build}]\noverflow-checks = false\n"
+            ));
+            std::fs::write(&manifest, text).expect("写得了");
+        }
+        let after = registry_keys_under(&copy.root);
+        let keyed: BTreeSet<String> = before
+            .iter()
+            .filter(|(_group, key)| key.is_some())
+            .map(|(group, _key)| group.clone())
+            .collect();
+        assert!(!keyed.is_empty(), "改前有算得出键的组");
+        assert_eq!(
+            groups_whose_key_changed(&before, &after),
+            keyed,
+            "每一组都变"
+        );
+    }
+
+    /// 同一份测试文件里的两个观察者各自一把键（身份是各自入口 fn 的闭包键，不是文件）；只改其中一个的函数体，只那一把变。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn two_observers_in_one_file_have_two_keys_and_editing_one_moves_only_its_key() {
+        let file =
+            "crates/singlefs-checker-tier/tests/crash_amplification_planned_import_names_the_gpu_conclusions.rs";
+        let handing_back = observer_group_name(file, "crash_image_handed_back");
+        let rewriting =
+            observer_group_name(file, "system_configuration_slot_rewritten_past_the_limit");
+        let compiled = compiled_keys();
+        let handing_back_key = compiled
+            .get(&handing_back)
+            .copied()
+            .flatten()
+            .expect("交回崩溃镜像那个观察者算得出键");
+        let rewriting_key = compiled
+            .get(&rewriting)
+            .copied()
+            .flatten()
+            .expect("重写系统配置槽那个观察者算得出键");
+        assert_ne!(
+            handing_back_key, rewriting_key,
+            "同一文件里的两个观察者两把键"
+        );
+        let (before, after) = keys_before_and_after(
+            "one-observer-body",
+            file,
+            "writes_on_the_crash_image: Vec::new(),",
+            "writes_on_the_crash_image: Vec::with_capacity(0),",
+        );
+        let changed = groups_whose_key_changed(&before, &after);
+        assert!(
+            changed.contains(&handing_back),
+            "改了它的函数体，它的键变：{changed:?}"
+        );
+        assert!(
+            !changed.contains(&rewriting),
+            "另一个观察者的键不变：{changed:?}"
+        );
+    }
+
+    /// 没登记入口 fn 的观察者取键拒算（照判、不入库），红句点名组与形态。
+    #[test]
+    fn an_observer_without_a_registered_entry_is_refused_as_not_computed_at_the_build() {
+        let refused = judging_units_key(
+            &JudgingUnits::ObserverCode {
+                observer_code_file: "crates/singlefs-checker-tier/tests/nowhere.rs".to_string(),
+                observer_name: "unregistered".to_string(),
+            },
+            &CrashPointReplayToolchainIdentity {
+                rustc_version_lines: String::new(),
+                cargo_version: String::new(),
+                target_triple: String::new(),
+            },
+        )
+        .expect_err("没登记就拒算");
+        assert_eq!(refused.form_name(), "not_computed_at_the_build");
+        assert!(
+            refused.sentence().contains(
+                "observer_code:crates/singlefs-checker-tier/tests/nowhere.rs:unregistered"
+            ),
+            "{}",
+            refused.sentence()
+        );
+    }
+
+    /// 组成清单写成文字再读回逐行相同；两把清单比下来点名指纹不同与只有一边有的单元；红句以「变了的单元：」起头、接清单，
+    /// 两边都空时写明比不出；编译时拒算的那一种红句带拒算行。
+    #[test]
+    fn the_composition_reads_back_and_the_red_sentence_names_the_changed_units() {
+        let unit = |name: &str, byte: u8| JudgingUnitFingerprint {
+            unit: name.to_string(),
+            fingerprint: [byte; DIGEST_BYTES],
+        };
+        let stored = JudgingUnitsKey::of_the_parts(
+            [1; DIGEST_BYTES],
+            vec![unit("recover", 1), unit("check_unit", 2), unit("walk", 3)],
+        );
+        assert_eq!(
+            JudgingUnitsKey::composition_from_text(&stored.composition_text()),
+            Some({
+                let mut sorted = stored.composition().to_vec();
+                sorted.sort();
+                sorted
             }),
-            "库模块那一引判成登记过、带着登记的理由：{judged:?}"
+            "组成清单读得回"
+        );
+        assert_eq!(
+            JudgingUnitsKey::composition_from_text("recover\tzz\n"),
+            None
+        );
+        let now = vec![unit("recover", 1), unit("check_unit", 9), unit("crc32", 4)];
+        let changed = units_changed_between(stored.composition(), &now);
+        assert_eq!(changed, vec!["check_unit", "crc32", "walk"]);
+        let sentence = changed_units_sentence(&changed);
+        assert!(
+            sentence.starts_with("变了的单元：") && sentence.contains("check_unit，crc32，walk"),
+            "{sentence}"
+        );
+        assert!(
+            changed_units_sentence(&units_changed_between(&[], &[])).starts_with("变了的单元："),
+            "组成清单是空表也照打这一截"
+        );
+        let refused = JudgingUnitsKeyRefused::RefusedAtTheBuild {
+            units: JudgingUnits::GpuJudge,
+            refusal_lines: vec![
+                "refused\tcurrent-exe\tcrates/a/src/lib.rs:3\tcurrent_exe".to_string()
+            ],
+        };
+        assert!(
+            refused.sentence().contains("refused_at_the_build")
+                && refused
+                    .sentence()
+                    .contains("current-exe crates/a/src/lib.rs:3"),
+            "{}",
+            refused.sentence()
+        );
+    }
+
+    /// 编进去的组成清单换成组成清单行：单元写种类、限定名与文件，不带行号；同一份文件里种类与限定名都相同的几个按出现次序另加序号。
+    #[test]
+    fn the_compiled_composition_names_units_without_line_numbers_and_tells_repeated_units_apart() {
+        let unit = |qualified_name: &str, location: &str, byte: u8| {
+            singlefs_unit_graph::entry_groups::CompositionUnit {
+                kind: "use".to_string(),
+                qualified_name: qualified_name.to_string(),
+                location: location.to_string(),
+                fingerprint: [byte; DIGEST_BYTES],
+            }
+        };
+        let group = ReadBackEntryGroup {
+            group_name: "gpu_judge".to_string(),
+            verdict: ReadBackEntryGroupVerdict::Keyed {
+                key: [7; DIGEST_BYTES],
+            },
+            entries_not_compiled: Vec::new(),
+            composition: vec![
+                unit("crate_a::module_a", "crates/a/src/lib.rs:3-4", 1),
+                unit("crate_a::module_a", "crates/a/src/lib.rs:9-9", 2),
+            ],
+        };
+        let names: Vec<String> = composition_of_the_compiled_group(&group)
+            .into_iter()
+            .map(|composed| composed.unit)
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "use crate_a::module_a @ crates/a/src/lib.rs",
+                "use crate_a::module_a @ crates/a/src/lib.rs #2",
+            ]
         );
     }
 }

@@ -361,7 +361,7 @@ struct HoleBetweenTheFirstVersionAndAnOverwriteOfALaterInstance {
 }
 
 impl HoleBetweenTheFirstVersionAndAnOverwriteOfALaterInstance {
-    fn build(tag: &str, instances_after_the_first: u32) -> Self {
+    fn build_reference_pair(tag: &str, instances_after_the_first: u32) -> Self {
         let mut pool = build_pool(tag);
         let first = pool.output.clone();
         let mut current = first.clone();
@@ -448,7 +448,7 @@ fn published_txg_of_the_row(table: &[u8], row: usize) -> u64 {
 #[test]
 fn a_hole_whose_row_for_the_previous_instance_names_another_txg_is_not_bridged_and_a_user_visible_unit_born_before_it_is_not_judged(
 ) {
-    let history = HoleBetweenTheFirstVersionAndAnOverwriteOfALaterInstance::build(
+    let history = HoleBetweenTheFirstVersionAndAnOverwriteOfALaterInstance::build_reference_pair(
         "gap-row-row-names-another-txg",
         1,
     );
@@ -486,7 +486,7 @@ fn a_hole_whose_row_for_the_previous_instance_names_another_txg_is_not_bridged_a
 #[test]
 fn a_hole_with_an_instance_between_that_has_no_row_is_not_bridged_and_a_user_visible_unit_born_before_it_is_not_judged(
 ) {
-    let history = HoleBetweenTheFirstVersionAndAnOverwriteOfALaterInstance::build(
+    let history = HoleBetweenTheFirstVersionAndAnOverwriteOfALaterInstance::build_reference_pair(
         "gap-row-instance-between-without-a-row",
         2,
     );
@@ -509,7 +509,7 @@ fn a_hole_with_an_instance_between_that_has_no_row_is_not_bridged_and_a_user_vis
 #[test]
 fn a_hole_whose_instance_between_has_a_row_that_is_not_zero_is_not_bridged_and_a_user_visible_unit_born_before_it_is_not_judged(
 ) {
-    let history = HoleBetweenTheFirstVersionAndAnOverwriteOfALaterInstance::build(
+    let history = HoleBetweenTheFirstVersionAndAnOverwriteOfALaterInstance::build_reference_pair(
         "gap-row-instance-between-not-zero",
         2,
     );

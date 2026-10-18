@@ -32,22 +32,20 @@ use singlefs_core::unit::{
 };
 use singlefs_format::{
     DATA_POINTER_BYTES, DATA_UNIT_BYTES, NODE_BYTES, NODE_POINTER_BYTES, SLOT_BYTES,
-    UNIT_AREA_START_SLOT,
 };
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_harness::scenario::run_new_pool_file_creation;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 use crate::common::{
-    build_pool, copy_each_root_into_the_new_root_segment_of_its_journal_records,
+    build_pool, copy_each_root_into_the_new_root_segment_of_its_journal_records_on,
     memory_pool_of_sparse_devices, parameters,
-    sequential_write_in_process_as_instance_one_and_advance_the_pool, IMAGE_BYTES,
+    sequential_write_in_process_as_instance_one_and_advance_the_pool, PoolImageGeometry,
+    IMAGE_BYTES,
 };
 
 /// 单元头第 6 个字节是单元类（共同前缀：magic 4、格式版本 2 之后）。
 const UNIT_CLASS_OFFSET_IN_THE_UNIT_HEADER: usize = 6;
-/// 根槽宽 = physical_block_size（`common::parameters` 取 512）。
-const ROOT_SLOT_BYTES: usize = 512;
 /// 一片实例表里数据行的上限：370 条记录减去链指针那一条（D18（块里携带什么信息） 已定项 11）。
 const INSTANCE_ROWS_PER_PAGE: u32 = 369;
 
@@ -126,17 +124,22 @@ fn reseal_unit(unit: &mut [u8]) {
     seal_header_checksum(unit, header_end);
 }
 
-/// 单元区里盘 0 上写过的每个单元（起始槽、整单元宽）：按槽号升序逐槽看单元头，按单元类取宽、解得开才算一个单元，32 KiB 的单元跳过它的第二个槽。
-fn units_in_the_unit_area(image: &MemoryPool) -> Vec<(SlotNumber, usize)> {
-    let unit_area_start = DeviceOffsetInBytes(UNIT_AREA_START_SLOT * SLOT_BYTES);
+/// `geometry` 那一组盘的单元区里盘 0 上写过的每个单元（起始槽、整单元宽）：按槽号升序逐槽看单元头，按单元类取宽、解得开才算一个单元，
+/// 32 KiB 的单元跳过它的第二个槽。
+fn units_in_the_unit_area_on(
+    image: &MemoryPool,
+    geometry: &PoolImageGeometry,
+) -> Vec<(SlotNumber, usize)> {
+    let unit_area_start_slot = geometry.unit_area_start_slot();
+    let unit_area_start = unit_area_start_slot.to_device_offset();
     let device = image.devices.get(&DeviceIdentity(0)).expect("池里有盘 0");
     let written_slots: std::collections::BTreeSet<u64> = device
-        .written_sectors_in(unit_area_start, IMAGE_BYTES - unit_area_start.0)
+        .written_sectors_in(unit_area_start, geometry.device_bytes - unit_area_start.0)
         .into_iter()
         .map(|sector| sector * 512 / SLOT_BYTES)
         .collect();
     let mut units = Vec::new();
-    let mut first_slot_not_yet_covered = UNIT_AREA_START_SLOT;
+    let mut first_slot_not_yet_covered = unit_area_start_slot.0;
     // 迭代上界是写过的槽数；跨轮携带的是上一个单元之后的第一个槽（32 KiB 单元的第二个槽不当单元的开头看）。
     for slot in written_slots {
         if slot < first_slot_not_yet_covered {
@@ -212,10 +215,17 @@ fn root_slots(image: &MemoryPool) -> Vec<(DeviceIdentity, DeviceOffsetInBytes)> 
         .collect()
 }
 
-/// `slot` 那个单元（两盘同槽）的整单元校验和由 `old` 换成了 `new`：引用它的每一条位置条目（单元区里的父单元、中央映射条目、根槽）
-/// 换成新的，被换的单元重封、它自己的新校验和再往上补，直到根槽；最后把每条根抄进它那几条 journal 记录的新根段。
-fn propagate_the_new_unit_checksum(image: &mut MemoryPool, slot: SlotNumber, old: u32, new: u32) {
-    let units = units_in_the_unit_area(image);
+/// `geometry` 那一组盘上 `slot` 那个单元（两盘同槽）的整单元校验和由 `old` 换成了 `new`：引用它的每一条位置条目（单元区里的父单元、
+/// 中央映射条目、根槽）换成新的，被换的单元重封、它自己的新校验和再往上补，直到根槽；最后把每条根抄进它那几条 journal 记录的新根段。
+fn propagate_the_new_unit_checksum_on(
+    image: &mut MemoryPool,
+    geometry: &PoolImageGeometry,
+    slot: SlotNumber,
+    old: u32,
+    new: u32,
+) {
+    let units = units_in_the_unit_area_on(image, geometry);
+    let root_slot_bytes = geometry.root_slot_bytes();
     let mut pending = vec![(slot, old, new)];
     // 迭代上界：每换一处，被换的单元的新校验和入队一次；引用链从叶到根是有限的、不成环（单元只被更晚写出的单元引用）。
     while let Some((changed_slot, old_checksum, new_checksum)) = pending.pop() {
@@ -250,7 +260,7 @@ fn propagate_the_new_unit_checksum(image: &mut MemoryPool, slot: SlotNumber, old
         }
         for (device, offset) in root_slots(image) {
             let sparse = image.devices.get_mut(&device).expect("根槽所在的盘在池里");
-            let mut root_slot = sparse.read(offset, ROOT_SLOT_BYTES);
+            let mut root_slot = sparse.read(offset, root_slot_bytes);
             let mut replaced = 0;
             for location_device in [DeviceIdentity(0), DeviceIdentity(1)] {
                 replaced += replace_every_occurrence(
@@ -262,7 +272,7 @@ fn propagate_the_new_unit_checksum(image: &mut MemoryPool, slot: SlotNumber, old
             if replaced > 0 {
                 let digest = wide_checksum_with_field_zeroed(
                     &root_slot,
-                    ROOT_SLOT_BYTES,
+                    root_slot_bytes,
                     ROOT_CHECKSUM_OFFSET,
                 );
                 root_slot[ROOT_CHECKSUM_OFFSET..ROOT_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
@@ -270,12 +280,28 @@ fn propagate_the_new_unit_checksum(image: &mut MemoryPool, slot: SlotNumber, old
             }
         }
     }
-    copy_each_root_into_the_new_root_segment_of_its_journal_records(image);
+    copy_each_root_into_the_new_root_segment_of_its_journal_records_on(image, geometry);
 }
 
 /// `container` 那个单元换成 `after`（同宽）：写回两盘，新的整单元校验和沿引用链补上去。`after` 调用方已重封。
+/// 镜像是 `common::build_pool` 这一类 4 GiB 盘、默认 journal 环上的；别的盘宽与环长用 [`replace_the_unit_and_propagate_its_checksum_on`]。
 pub fn replace_the_unit_and_propagate_its_checksum(
     image: &mut MemoryPool,
+    container: SlotNumber,
+    after: &[u8],
+) {
+    replace_the_unit_and_propagate_its_checksum_on(
+        image,
+        &PoolImageGeometry::of_four_gibibyte_devices_under_the_common_parameters(),
+        container,
+        after,
+    );
+}
+
+/// 同 [`replace_the_unit_and_propagate_its_checksum`]，单元区、根槽宽与 journal 环按 `geometry` 那一组盘找。
+pub fn replace_the_unit_and_propagate_its_checksum_on(
+    image: &mut MemoryPool,
+    geometry: &PoolImageGeometry,
     container: SlotNumber,
     after: &[u8],
 ) {
@@ -283,12 +309,28 @@ pub fn replace_the_unit_and_propagate_its_checksum(
     for device in image.devices.values_mut() {
         device.write(container.to_device_offset(), after);
     }
-    propagate_the_new_unit_checksum(
+    propagate_the_new_unit_checksum_on(
         image,
+        geometry,
         container,
         crc32_castagnoli(&before),
         crc32_castagnoli(after),
     );
+}
+
+/// `geometry` 那一组盘上 `slot` 那个单元（两盘同槽，`length_in_bytes` 宽）交给 `change` 改、重封，新的整单元校验和沿引用链补到根槽，
+/// 再把每条根抄进它那几条 journal 记录的新根段。
+pub fn change_the_unit_and_propagate_its_checksum_on(
+    image: &mut MemoryPool,
+    geometry: &PoolImageGeometry,
+    slot: SlotNumber,
+    length_in_bytes: usize,
+    change: impl FnOnce(&mut Vec<u8>),
+) {
+    let mut after = unit_bytes_at(image, slot, length_in_bytes);
+    change(&mut after);
+    reseal_unit(&mut after);
+    replace_the_unit_and_propagate_its_checksum_on(image, geometry, slot, &after);
 }
 
 /// `container` 那个单元里恰好一处是 `pointer_bytes`（一条指针的盘上原样）：把它头部的 `change` 那一段改掉、重封、写回两盘，

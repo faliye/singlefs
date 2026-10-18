@@ -1863,12 +1863,9 @@ fn given_states_engine_of_this_experiment(
     ENGINE.get_or_init(|| {
         singlefs_checker_tier::crash_amplification::GivenStatesEngine::start_from_environment(
             singlefs_checker_tier::crash_amplification::GivenStatesItem {
-                item_name: "e171_three_oracle_collusion".to_string(),
-                setting_file: CRASH_POINT_REPLAY_SAMPLING_ITEM.setting_file.to_string(),
-                seeds_and_scale: "fixed".to_string(),
+                item_name: "e171_three_oracle_collusion::fixed".to_string(),
             },
             &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
         )
         .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
     })
@@ -2844,7 +2841,7 @@ struct ResultLines {
 }
 
 impl ResultLines {
-    fn result(&mut self, body: &str) {
+    fn emit_result_line(&mut self, body: &str) {
         self.emitted += 1;
         println!("E7RESULT {body}");
     }
@@ -4783,7 +4780,7 @@ fn known_bad_images_on_the_first_stream(
         ),
     ] {
         failed += usize::from(!check.holds());
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=s4 check={} local={} crates={} holds={}",
             check.name,
             field_text(&check.local),
@@ -4823,7 +4820,7 @@ fn known_bad_images_on_the_first_stream(
         ),
     ] {
         failed += usize::from(!check.holds());
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=s4 check={} local={} crates={} holds={}",
             check.name,
             field_text(&check.local),
@@ -4833,7 +4830,7 @@ fn known_bad_images_on_the_first_stream(
     }
     let clean_red =
         pool_checker_red_names_through_the_given_states_engine("known-bad/clean", &clean);
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=known_bad_clean_image invariants_red={}",
         field_text(&list_text(&clean_red))
     ));
@@ -4868,7 +4865,7 @@ fn known_bad_images_on_the_first_stream(
             list_text(&patched_red),
             list_text(&direct_red)
         ));
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=known_bad_entry index={entry_index} target={target} o2={} patched_red={} direct_red={} sets_equal={sets_equal} digest_equals_the_direct_one={digest_equals_the_direct_one} target_is_red={target_is_red} patches={}",
             if patched_red.is_empty() { "green" } else { "red" },
             field_text(&list_text(&patched_red)),
@@ -4884,7 +4881,7 @@ fn known_bad_images_on_the_first_stream(
         ("known-bad-o2.tsv", o2_text.into_bytes()),
     ] {
         let written = write_export_file(output_directory, file_name, &contents);
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=file file={file_name} bytes={} sha256={}",
             written.bytes, written.sha256
         ));
@@ -4954,7 +4951,7 @@ fn e170_bad_rows_on_both_streams(
                 if o2_red.is_empty() { "green" } else { "red" },
                 list_text(&base_red)
             ));
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=e170_bad_row stream={label} row={row_id} o2={} o2_red={} e170_pool_checker={} o2_equals_e170={o2_equals_e170} digests_equal={digests_equal} base_o2_red={}",
                 if o2_red.is_empty() { "green" } else { "red" },
                 field_text(&o2_text_of_the_row),
@@ -4966,7 +4963,7 @@ fn e170_bad_rows_on_both_streams(
     std::fs::create_dir_all(output_directory)
         .unwrap_or_else(|error| panic!("建 {}：{error}", output_directory.display()));
     let written = write_export_file(output_directory, "e170-bad-rows-o2.tsv", o2_text.as_bytes());
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=file file=e170-bad-rows-o2.tsv bytes={} sha256={}",
         written.bytes, written.sha256
     ));
@@ -4980,7 +4977,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
     let mut failed_checks = 0usize;
     for check in &export.checks {
         failed_checks += usize::from(!check.holds());
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=s1 stream={label} check={} local={} crates={} holds={}",
             check.name,
             field_text(&check.local),
@@ -5001,7 +4998,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
         }
         None => "pipeline_panicked".to_string(),
     };
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=stream stream={label} ending={ending_text} exported={} not_exported_why={} operations={} writes={} segments={} tearable_writes={} calls={} full_states={} quick_tier_states={} sampled_states={} model_stopped_at_call={}",
         export.not_exported.is_none(),
         export
@@ -5023,7 +5020,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
     let mut red_calls = 0usize;
     for (call_index, call) in export.calls.iter().enumerate() {
         red_calls += usize::from(matches!(call.model, ModelVerdictOfCall::Disagrees { .. }));
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=call stream={label} call={call_index} label={} first_operation={} return_point={} status={} o1_comparison={}",
             call.label,
             call.first_operation,
@@ -5033,7 +5030,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
         ));
     }
     for scan in &export.torn_scans {
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=torn_scan stream={label} segment={} scanned={} found={} wanted={TORN_STATES_PER_SEGMENT}",
             scan.segment_index, scan.scanned, scan.found
         ));
@@ -5066,7 +5063,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
             .iter()
             .map(|observation| observation.segment_index)
             .collect();
-        lines.result(&format!(
+        lines.emit_result_line(&format!(
             "name=batch stream={label} batch={batch} states={} segments_touched={} states_with_a_torn_write={} o1_crash_judge_red={} o1_crash_judge_green={} o1_crash_judge_not_applicable={} o1_crash_judge_off={} o2_red={o2_red} o2_matches_judgement_false={} judge_crash_image_pool_checker_red={} record_checker_red_states={} consulted_oracle_red_states={} ignored_oracle_red_states={} consulted_effective_root_none={} consulted_failed_outcomes={}",
             in_batch.len(),
             segments.len(),
@@ -5126,26 +5123,26 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
         .iter()
         .filter(|observation| !observation.pool_checker_matches_the_judgement)
         .count();
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=s4 stream={label} rebuilt_states={} digest_mismatches={}",
         export.rebuilt_states, export.rebuilt_digest_mismatches
     ));
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=crash_facts_mask stream={label} states={} mismatches={mask_mismatches}",
         export.observations.len()
     ));
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=s3 stream={label} states={} o2_direct_differs_from_judge_crash_image={s3_mismatches}",
         export.observations.len()
     ));
     for file in &export.files {
         match &file.sha256_without_timing {
-            None => lines.result(&format!(
+            None => lines.emit_result_line(&format!(
                 "name=file stream={label} file={} bytes={} sha256={}",
                 file.name, file.bytes, file.sha256
             )),
             Some(without_timing) => {
-                lines.result(&format!(
+                lines.emit_result_line(&format!(
                     "name=file stream={label} file={} sha256_without_timing={without_timing}",
                     file.name
                 ));
@@ -5358,7 +5355,7 @@ fn parse_command_line(arguments: &[String]) -> Option<ParsedCommand> {
 
 fn run_known_bad_images(command_line: &KnownBadImagesCommandLine) -> i32 {
     let mut lines = ResultLines { emitted: 0 };
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=config segment=s1 mode=known-bad-images e170_bad_rows={}",
         command_line.with_e170_bad_rows
     ));
@@ -5376,7 +5373,7 @@ fn run_known_bad_images(command_line: &KnownBadImagesCommandLine) -> i32 {
     } else {
         0
     };
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=verdict known_bad_entries_failing_s4={known_bad_failed} e170_bad_rows_failing_s3_or_s4={e170_rows_failed}"
     ));
     lines.finish();
@@ -5391,7 +5388,7 @@ fn run_dump(command_line: &CommandLine) -> i32 {
     let run_kind = command_line.run_kind;
     let switches = command_line.switches;
     let mut lines = ResultLines { emitted: 0 };
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=config segment=s1 mode={} streams={} sector_bytes={LOCAL_SECTOR_BYTES} first_batch_divisor={FIRST_BATCH_DIVISOR} second_batch_divisor={SECOND_BATCH_DIVISOR} third_batch_divisor={THIRD_BATCH_DIVISOR} torn_states_per_segment={TORN_STATES_PER_SEGMENT} torn_scan_ordinals_per_segment={TORN_SCAN_ORDINALS_PER_SEGMENT} third_batch_sampled={} positive_control={} disabled_oracle={}",
         if run_kind == RunKind::Baseline { "baseline" } else { "row" },
         STREAM_NAMES.len(),
@@ -5407,7 +5404,7 @@ fn run_dump(command_line: &CommandLine) -> i32 {
     if run_kind == RunKind::Baseline {
         for check in stream_independent_checks() {
             failed_checks += usize::from(!check.holds());
-            lines.result(&format!(
+            lines.emit_result_line(&format!(
                 "name=s1 stream=both check={} local={} crates={} holds={}",
                 check.name,
                 field_text(&check.local),
@@ -5444,7 +5441,7 @@ fn run_dump(command_line: &CommandLine) -> i32 {
     failed_checks += totals[0];
     let [_, rebuilt_digest_mismatches, mask_mismatches, s3_mismatches, red_calls, crash_judge_red, pool_checker_red] =
         totals;
-    lines.result(&format!(
+    lines.emit_result_line(&format!(
         "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={rebuilt_digest_mismatches} crash_facts_mask_mismatches={mask_mismatches} s3_o2_judgement_mismatches={s3_mismatches} streams_not_exported={streams_not_exported} o1_comparison_red_calls={red_calls} o1_crash_judge_red_states={crash_judge_red} o2_red_states={pool_checker_red}"
     ));
     lines.finish();

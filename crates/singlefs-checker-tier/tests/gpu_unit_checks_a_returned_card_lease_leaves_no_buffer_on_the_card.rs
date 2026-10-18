@@ -28,6 +28,9 @@ const SPIN_AT_LEAST: std::time::Duration = std::time::Duration::from_millis(250)
 /// 标定空转内核时头一次试的循环次数（E174 装置同一个数）与最多试几次。
 const FIRST_GUESS_OF_SPIN_ITERATIONS: u32 = 2_000_000;
 const SPIN_CALIBRATION_ATTEMPTS: u32 = 8;
+/// 标定空转内核时等一次提交的上限：这是测试自己等自己那次提交，不是借据归还前等设备空闲的那个量
+/// （`gpu_unit_checks::LONGEST_WAIT_FOR_THE_DEVICE_BEFORE_RETURNING_A_LEASE_OR_A_PLACE_IN_THE_MEMORY_QUEUE`），两个数各自定。
+const SPIN_CALIBRATION_SUBMISSION_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 /// 空转内核绑的那一截（第一张缓冲的头 256 字节）。
 const SPIN_KERNEL_BINDING_BYTES: u64 = 256;
 /// 提交到丢借据之间最多占空转时长的几成，活才算在飞（E174 登记第九节 K9 的 0.8）。
@@ -155,7 +158,7 @@ fn spin_pipeline_running_at_least_the_target(
         device
             .poll(wgpu::PollType::Wait {
                 submission_index: Some(submission),
-                timeout: Some(std::time::Duration::from_secs(30)),
+                timeout: Some(SPIN_CALIBRATION_SUBMISSION_WAIT),
             })
             .expect("标定空转内核时等得到");
         let spun = started.elapsed();

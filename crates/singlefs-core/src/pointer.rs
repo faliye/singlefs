@@ -67,7 +67,9 @@ pub fn slot_shared_by_both_location_entries(
 }
 
 /// 一条盘上指针的两条位置条目不按设备身份严格升序（I-2.5（位置条目按设备身份升序）：相同或逆序一律判损坏）。
-/// **这是一份坏镜像，不是我们的不变量被破坏**：写者（[`NodePointer::write_to`] / [`DataPointer::write_to`]）按升序写、在那里断言，
+/// 例外只有一个：整条全零的码 2 / 码 3 指针（[`NodePointer::empty_root`]，「注册了但还没有根」，两条位置条目都是盘 0）整条豁免，
+/// 读者（[`NodePointer::location_entries_ascend_by_device`]）与写者（[`NodePointer::write_to`]）同一个豁免；数据指针没有全零写法，不豁免。
+/// **这是一份坏镜像，不是我们的不变量被破坏**：写者（[`NodePointer::write_to`] / [`DataPointer::write_to`]）按严格升序写、在那里断言，
 /// 而照抄上一版的发布会把盘上读来的指针原样写回去（树表条目、多层码 2 树的内部条目、根记录）——不在读进来的地方判，
 /// 坏镜像就走到写者的断言上（C476（盘上内容可控时走得到的 panic 有 21 处） 普查「缺口」那张表 `pointer.rs` 那一行，实测坐实）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -321,8 +323,8 @@ impl NodePointer {
         let start = writer.position();
         self.head.write_to(writer);
         assert!(
-            self.locations[0].device <= self.locations[1].device,
-            "位置条目按设备身份升序（I-2.5）：盘上读来、要照抄写回的指针在 recovery::rebuild_version 判过"
+            self.location_entries_ascend_by_device().is_ok(),
+            "位置条目按设备身份严格升序（I-2.5），整条全零的空指针（empty_root）豁免：盘上读来、要照抄写回的指针在 recovery::rebuild_version 判过"
         );
         for location in &self.locations {
             location.write_to(writer);
@@ -396,8 +398,8 @@ impl DataPointer {
         let start = writer.position();
         self.head.write_to(writer);
         assert!(
-            self.locations[0].device <= self.locations[1].device,
-            "位置条目按设备身份升序（I-2.5）：盘上读来、要照抄写回的指针在 recovery::rebuild_version 判过"
+            location_entries_ascend_by_device(&self.locations).is_ok(),
+            "数据指针的位置条目按设备身份严格升序（I-2.5），没有全零豁免：盘上读来、要照抄写回的指针在 recovery::rebuild_version 判过"
         );
         for location in &self.locations {
             location.write_to(writer);
@@ -491,5 +493,66 @@ mod tests {
             pointer
         );
         assert_eq!(NodePointer::empty_root().locations[1].slot, SlotNumber(0));
+    }
+
+    /// 两条位置条目都在盘 1 的一条非空码 2 / 码 3 指针：两条设备身份相同，不是全零的空指针，写出时断言（I-2.5 严格升序）。
+    /// 改之前断言是 `<=`，同盘两条照写不误。
+    #[test]
+    #[should_panic(
+        expected = "位置条目按设备身份严格升序（I-2.5），整条全零的空指针（empty_root）豁免"
+    )]
+    fn a_non_empty_node_pointer_with_both_location_entries_on_one_device_is_refused_by_the_writer()
+    {
+        let on_device_one = LocationEntry {
+            device: DeviceIdentity(1),
+            slot: SlotNumber(50178),
+            unit_checksum: 0xAB,
+        };
+        let pointer = NodePointer {
+            head: PointerHead {
+                birth_tree: TreeIdentifier(3),
+                birth_txg: CheckpointTxg(7),
+            },
+            locations: [on_device_one, on_device_one],
+            instance: InstanceGeneration(1),
+            birth_sequence: BirthSequence(1),
+        };
+        let mut writer = ByteWriter::new(86);
+        pointer.write_to(&mut writer);
+    }
+
+    /// 整条全零的空指针（`empty_root`，mkfs 写进映射树根与分配记录树根的那一形）两条位置条目都是盘 0：照写，写出来 86 字节全 0。
+    #[test]
+    fn the_all_zero_empty_root_is_written_although_both_location_entries_name_device_zero() {
+        let mut writer = ByteWriter::new(86);
+        NodePointer::empty_root().write_to(&mut writer);
+        assert!(
+            writer.into_bytes().iter().all(|byte| *byte == 0),
+            "空指针写出来整条全 0"
+        );
+    }
+
+    /// 两条位置条目都在盘 0 的数据指针：数据指针没有全零豁免，写出时断言。
+    #[test]
+    #[should_panic(expected = "数据指针的位置条目按设备身份严格升序（I-2.5），没有全零豁免")]
+    fn a_data_pointer_with_both_location_entries_on_one_device_is_refused_by_the_writer() {
+        let on_device_zero = LocationEntry {
+            device: DeviceIdentity(0),
+            slot: SlotNumber(50200),
+            unit_checksum: 0xCD,
+        };
+        let pointer = DataPointer {
+            head: PointerHead {
+                birth_tree: TreeIdentifier(3),
+                birth_txg: CheckpointTxg(7),
+            },
+            locations: [on_device_zero, on_device_zero],
+            write_order: WriteOrder {
+                instance: InstanceGeneration(1),
+                transaction: 4,
+            },
+        };
+        let mut writer = ByteWriter::new(88);
+        pointer.write_to(&mut writer);
     }
 }

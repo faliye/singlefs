@@ -1,7 +1,7 @@
 //! 格式常量：新池新建文件要写的每个宽度都在这里。
 //!
 //! 每个常量的值来自 `.claude/kb/layout/01-first-txn.md` 与各决策分项；带 `format-const:` 注的常量
-//! 与 kb 里同名的 `<!-- format-const: NAME = N -->` 标记由门禁 27 号绑住，改值要三处一起动。
+//! 与 kb 里同名的 `<!-- format-const: NAME = N -->` 标记由门禁 code-source-discipline 的 format-constants 格绑住，改值要三处一起动。
 //! 值还是预想（等一次实测或一次定案）的常量，前一行写 `// placeholder: <分项或欠账编号（简称）> —— 为什么还是预想`，
 //! 门禁「格式常量文件里的占位」数它们、并核每个占位都指到一条真实存在的分项或欠账。
 //!
@@ -74,7 +74,7 @@ pub const ACCOUNTING_TREE_INDEX_NODE_HEADER_BYTES: u64 = 159;
 pub const CENTRAL_MAPPING_TREE_INDEX_NODE_HEADER_BYTES: u64 = 169;
 
 /// 位置条目：设备身份 4 + 16 KiB 槽号 6 + 密文校验和 4（D19（块指针的结构与宽度预算） 已定项 4）。format-const: LOC_ENTRY
-pub const LOC_ENTRY: u64 = 14; // naming-lint:external 名字由 kb 的 format-const 登记位定（D19 已定项 4），门禁 27 号按这个名字绑值
+pub const LOC_ENTRY: u64 = 14; // naming-lint:external 名字由 kb 的 format-const 登记位定（D19 已定项 4），门禁 code-source-discipline 的 format-constants 格按这个名字绑值
 
 /// 每条指针带几份位置条目（D2（RAID 条带策略） 已定项 6：每次写至少 w = 2 列）。
 pub const LOCATION_ENTRIES_PER_POINTER: u64 = 2;
@@ -185,9 +185,6 @@ pub const EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES: u64 = 113;
 /// extent 树上段一片叶罩几个 inode 号：(16384 − 163) ÷ 113 的整数部分（一个 inode 号至多一条上段叶条目，叶永远装得下）。
 pub const EXTENT_TREE_UPPER_LEAF_INODES: u64 = 143;
 
-/// 新池新建文件这次发布写出的记账行数（D5（快照 / 空间记账机制） 已定项 8，2026-09-14 用户定案 15 行）。
-pub const NEW_POOL_FILE_CREATION_ACCOUNTING_ROWS: u64 = 15;
-
 /// 树表条目：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76（D8（核心索引结构） 已定项 8；重排与头 ID 2026-09-14 用户定案，加宽到 200 是 2026-09-16 用户定案）。format-const: TREE_TABLE_ENTRY_BYTES
 pub const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 
@@ -262,7 +259,8 @@ pub const SYSTEM_CONFIGURATION_BYTES: u64 = 489;
 /// 系统配置每盘恒 2 个槽、槽 = 世代号 mod 2（D22（单元原子性怎么合成） 已定项 16）。
 pub const SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE: u64 = 2;
 
-/// 固定结构槽距的下限；槽距 = max(4096, mkfs 时探测的 io_min)（D2（RAID 条带策略） 已定项 19）。
+/// 固定结构槽距的下限；槽距 = 4096 向上取整到 mkfs 时探测的 io_min 的整数倍（D2（RAID 条带策略） 已定项 19；io_min 是 2 的幂时
+/// 就是 max(4096, io_min)，io_min = 3072 时是 6144；实现的算式在 `SystemImmutableSizes::slot_spacing_for`）。
 pub const FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES: u64 = 4096;
 
 /// 系统配置槽宽是格式常量 4096（D22（单元原子性怎么合成） 已定项 2，2026-09-14 三方第一轮 + 用户定案；此前是探测到的 physical_block_size）。format-const: SYSTEM_CONFIGURATION_SLOT_BYTES
@@ -323,7 +321,7 @@ pub const TEST_IMAGE_DEFAULT_BYTES: u64 = 4_294_967_296;
 mod tests {
     use super::*;
 
-    /// 字节表零到七的合计与这里的推导式必须一个数不差；写成加法、不写减法（减法在变异下会编译期溢出）。
+    /// 字节表零到七的合计与这里的推导式必须一个数不差：段宽的合计写成加法，扇出与一片装几条要从节点宽、单元宽里扣掉头宽，写成减法。
     #[test]
     fn widths_match_the_new_pool_file_creation_byte_table() {
         assert_eq!(
@@ -503,7 +501,7 @@ mod tests {
         );
     }
 
-    /// 这六个宽写成整数字面量，门禁 27 号才核得了它们与 kb 的登记值（C94（登记的格式常量与后来的定案对不上））；
+    /// 这六个宽写成整数字面量，门禁 code-source-discipline 的 format-constants 格才核得了它们与 kb 的登记值（C94（登记的格式常量与后来的定案对不上））；
     /// 原来定义它们的算式留在这里，要一个数不差。写成加法、不写减法（减法在变异下会编译期溢出）。
     #[test]
     fn pointer_record_and_entry_width_literals_equal_the_field_sums_they_stand_for() {
@@ -550,7 +548,7 @@ mod tests {
     }
 
     /// 这八个量的值原来写成算式；D13（验证路线） 已定项 5「判据是发射物里有没有分支与算术」不许，改成整数字面量
-    /// （门禁 27 号也只认字面量）。原来的算式原样留在这里，与字面量一个数不差。
+    /// （门禁 code-source-discipline 的 format-constants 格也只认字面量）。原来的算式原样留在这里，与字面量一个数不差。
     #[test]
     fn arithmetic_initializer_literals_equal_the_expressions_they_replaced() {
         assert_eq!(
@@ -599,7 +597,7 @@ mod tests {
             + NONCE_MAC_ALGORITHM_RESERVED_BYTES
     }
 
-    /// 每棵树的码 2 节点头宽写成整数字面量（门禁 27 号要核），与字段表三段在那棵树的 key 宽上加起来的一个数不差；
+    /// 每棵树的码 2 节点头宽写成整数字面量（门禁 code-source-discipline 的 format-constants 格要核），与字段表三段在那棵树的 key 宽上加起来的一个数不差；
     /// 哪棵树取哪个 key 宽照 `.claude/kb/layout/01-first-txn.md` 那几行：inode 树根与树表单元都是 8，两者各有各的名字。
     #[test]
     fn tree_index_node_header_literals_equal_the_header_formula_at_each_tree_key_width() {

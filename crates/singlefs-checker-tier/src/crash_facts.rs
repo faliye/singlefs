@@ -10,9 +10,9 @@
 //! 同一组判据算，逐状态相等是 GPU 那一份的判别力自证；第 ③ 段（`crash_amplification::compare_judge_and_verifier`）再把它们
 //! 与 CPU 判器（`crash::judge_crash_image`）的判定逐状态比。
 //!
-//! 事实表进 KV 时键带**产出它的代码摘要**（[`FlowFacts::digest`] 连同 [`FACTS_EXTRACTOR_VERSION`]），核对表的键带核对代码摘要：
-//! 换了代码就是新一轮，旧行留着当历史、不覆盖，每一段各自对账（用户 2026-09-28 定「事实表和核对表按代码摘要分版本存储、
-//! 旧行保留为历史、每段独立对账」）。
+//! 事实表进 KV 时按录入键存（录入那一组判法单元的键连同录入的输入摘要，`crate::crash_library::recording_key_of_the_inputs`；抽取事实的
+//! 函数在录入那一组的入口里），[`FlowFacts::digest`] 只按内容取；核对表的键带核对那一组判法单元的键：换了代码就是新一轮，
+//! 旧行留着当历史、不覆盖，每一段各自对账（用户 2026-09-28 定「事实表和核对表按代码摘要分版本存储、旧行保留为历史、每段独立对账」）。
 use std::collections::BTreeMap;
 use std::ops::Range;
 
@@ -31,10 +31,8 @@ use crate::crash::{
     StateCount1280Bits, STATE_COUNT_BYTES,
 };
 
-/// 事实抽取器的版本：解析规则变了就抬它，事实表的键跟着变（2：段带片起点，C790 分片枚举）。
-pub const FACTS_EXTRACTOR_VERSION: u32 = 2;
-
 /// 事实表字节的布局版本：字节以 [`FACTS_LAYOUT_MAGIC`] 起头，布局变了就换它（版本 1 没有头、段里没有片起点；版本 2 每段带片起点那一格）。
+/// 只给读库里的旧字节认布局用（读到别的头就拒，不按新布局错解），不进任何复用键：[`FlowFacts::digest`] 不收这个头。
 pub const FACTS_LAYOUT_VERSION: u32 = 2;
 
 /// 事实表字节的头：布局版本 [`FACTS_LAYOUT_VERSION`] 的写法。版本 1 的字节以录制流写数起头（小端 u32 两个），撞不上这 8 个字节
@@ -365,8 +363,13 @@ pub struct FlowFacts {
     pub newest_base_root: Option<u32>,
 }
 
-/// GPU 内核的持久掩码是 `array<u32, 64>`：2048 位。
-pub const MAXIMUM_ENUMERATED_WRITES: usize = 2048;
+/// 枚举写表最多几次写：GPU 判器与核对内核的持久掩码各是 [`PERSISTED_MASK_WORDS`] 个 u32 一位一次写。
+/// 随机历史越过原分配记录墙那一族一段录制写 4436 到 5265 次（2026-10-18 调查员量的，全量那一趟建不出判表的 32 张），
+/// 2048 装不下；8192 留出余量。
+pub const MAXIMUM_ENUMERATED_WRITES: usize = 8192;
+/// 持久掩码几个 u32（位 i 在第 i / 32 字的第 i % 32 位）：GPU 两个内核里的 `array<u32, PERSISTED_MASK_WORDS>` 由这里生成，不在 WGSL 里另写一个数。
+pub const PERSISTED_MASK_WORDS: usize = MAXIMUM_ENUMERATED_WRITES / 32;
+const _: () = assert!(PERSISTED_MASK_WORDS * 32 == MAXIMUM_ENUMERATED_WRITES);
 
 /// 从一条流抽事实（第 ① 段）。`expansion` 与枚举时给的同一个。
 ///
@@ -633,12 +636,12 @@ fn base_roots(base: &MemoryPool) -> Vec<RootFact> {
 }
 
 impl FlowFacts {
-    /// 事实表的摘要（连同抽取器版本）：进 KV 键。
+    /// 事实表的摘要：只按内容取（布局头 [`FACTS_LAYOUT_MAGIC`] 之后的字节），进核对键。抽取规则变了由录入那一组判法单元的键管，
+    /// 不靠手写的版本号。
     #[must_use]
     pub fn digest(&self) -> [u8; DIGEST_BYTES] {
-        let mut message = FACTS_EXTRACTOR_VERSION.to_le_bytes().to_vec();
-        message.extend_from_slice(&self.to_bytes());
-        sha256_digest(&message)
+        let bytes = self.to_bytes();
+        sha256_digest(&bytes[FACTS_LAYOUT_MAGIC.len()..])
     }
 
     /// 序号落在哪一段；等于段数就是最后全部持久那一个状态。

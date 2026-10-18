@@ -1,0 +1,5 @@
+// 夹具共用那一半：草稿区的起点只在这一份里定义。
+const SCRATCH_BASE: u32 = 16u;
+fn scratch_word(index: u32) -> u32 {
+    return SCRATCH_BASE + index;
+}

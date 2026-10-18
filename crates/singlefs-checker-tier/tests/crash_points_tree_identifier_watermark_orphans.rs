@@ -1,4 +1,4 @@
-//! checker 档模块：crash_point_replay_progress、crash_given_states、crash_library、crash_amplification
+//! checker 档模块：crash_point_replay_progress、crash_given_states、crash_amplification
 //! I-7.8（根记录树 ID 水位不低于全池最大树 ID） 扫描方向的改法 D（`research/prompts/m2-wave3-code-r1-main-verification.md`
 //! 第三节 Y1、第四节第 1 条，被攻过零轮）：第一个文件版本那次发布崩在录制流的每一个前缀上 → 可写挂载 → 挂载之后六种动作，
 //! 池级 checker 一条违例都没有。流：mkfs → 取号 → 暖机 → 第一个文件版本（从水位 65536 发十三棵树，D8（核心索引结构） 已定项 11：退役树 65548、水位 65549）。
@@ -29,7 +29,6 @@ use singlefs_checker_tier::crash_amplification::{
 use singlefs_checker_tier::crash_given_states::{
     GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
 };
-use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
@@ -255,10 +254,6 @@ fn the_birth_txg_only_reading_would_redden(image: &MemoryPool) -> bool {
     })
 }
 
-/// 这份文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
-const THIS_FILE: &str =
-    "crates/singlefs-checker-tier/tests/crash_points_tree_identifier_watermark_orphans.rs";
-
 /// 一次扫完数出来的格子：每格一个 (前缀, 动作)。
 #[derive(Debug, Default)]
 struct SweepTally {
@@ -285,12 +280,11 @@ fn sweep_every_crash_inside_the_publish(
         let _one_test_at_a_time = one_test_changes_the_environment_at_a_time();
         GivenStatesEngine::start_from_environment(
             GivenStatesItem {
-                item_name: "crash_points_tree_identifier_watermark_orphans".to_string(),
-                setting_file: THIS_FILE.to_string(),
-                seeds_and_scale: format!("stream={stream_label}"),
+                item_name: format!(
+                    "crash_points_tree_identifier_watermark_orphans::stream={stream_label}"
+                ),
             },
             &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &repository_root_of_this_crate(),
         )
         .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
     };

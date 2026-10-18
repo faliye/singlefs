@@ -1,4 +1,4 @@
-//! checker 档模块：crash、crash_state_enumeration、crash_library、gpu_unit_checks、crash_facts、crash_verify_gpu
+//! checker 档模块：crash、crash_state_enumeration、crash_identity、crash_library、gpu_unit_checks、crash_facts、crash_verify_gpu
 //! 崩溃放量三段流的第 ②、③ 段在新池新建文件那条流上：① 抽事实；② GPU 内核与 CPU 参照按同一张事实表判每个状态，逐状态相等、健康流全 0；
 //! ③ 改坏一次单元写的一个字节之后，两份仍逐状态相等，那次写持久的每个状态都红，而且每个红状态在 CPU 判器上也红（核对红 ⇒ 判器红）。
 //! 要本机一张空闲显存够的 NVIDIA 独显：本机没有 NVIDIA 卡时打一行 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、返回成功，
@@ -23,15 +23,22 @@ use common::{build_pool, file_content, geometry};
 use singlefs_checker_tier::crash::{
     crash_point_replay_plan_state_count, CrashPointReplaySegmentExpansion,
 };
+use singlefs_checker_tier::crash_facts::FlowFactsReadBack;
 use singlefs_checker_tier::crash_facts::{
     extract_flow_facts, verdict_bits, verify_states_from_facts, FlowFacts, BASE_IMAGE_SOURCE,
 };
-use singlefs_checker_tier::crash_library::{facts_through_the_pairing_library, StageOutcome};
+use singlefs_checker_tier::crash_identity::{judging_units_key, JudgingUnits};
+use singlefs_checker_tier::crash_library::{
+    facts_through_the_pairing_library, library_reads_are_skipped_in_this_process,
+    pairing_conclusion_reused_or_judged, toolchain_of_this_process, CrashLibrary,
+    CrashLibraryClass, PairingConclusionSource, StageOutcome,
+};
 use singlefs_checker_tier::crash_state_enumeration::{
     sample_crash_states_on_the_cpu, CrashPointReplayItem,
 };
-use singlefs_checker_tier::crash_verify_gpu::{gpu_verifier_digest, GpuFactsVerifier};
+use singlefs_checker_tier::crash_verify_gpu::GpuFactsVerifier;
 use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+use singlefs_checker_tier::gpu_unit_checks::GpuCard;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_harness::memory_pool::{
     writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion, RetainedWrite,
@@ -130,6 +137,69 @@ const LARGEST_EXPANSION_OF_A_FACTS_BYTE_ON_THE_CARD: u64 = 16;
 /// 三条流是同一条流改了几个字节，事实表一样大。
 const FACTS_VERIFIERS_ALIVE_AT_ONCE: u64 = 3;
 
+/// 对拍的比法：CPU 参照与 GPU 内核逐状态相等、GPU 分两块核与一次核完逐位相同（块边界不改结论），交回要存的结论（每个状态的核对位，
+/// 小端四字节一个）。这个函数自成一组判法单元（`gpu_and_cpu_facts_verifier_pairing_comparison`），它的键拼进对拍结论的输入摘要。
+fn verifier_bits_agreeing_on_every_state(
+    cpu: &[u32],
+    gpu: &[u32],
+    gpu_in_two_blocks: &[u32],
+) -> Vec<u8> {
+    assert_eq!(cpu, gpu, "GPU 内核与 CPU 参照逐状态相等");
+    assert_eq!(
+        gpu_in_two_blocks, gpu,
+        "分两块核与一次核完逐位相同（块边界不改结论）"
+    );
+    cpu.iter().flat_map(|bits| bits.to_le_bytes()).collect()
+}
+
+/// 一张事实表上 GPU 核对内核与 CPU 参照逐状态对拍，交回每个状态的核对位。对拍结论入库（用户 2026-10-15 定「对拍结论入库」，
+/// `crash_library::pairing_conclusion_reused_or_judged`）：键是事实表摘要与两边核对那一组判法单元的键（CPU 参照、GPU 核对内核），
+/// 库里有就复用、不再上卡；没有就两边都核（GPU 那一侧另分两块核一遍，块边界不改结论）、逐状态相等才存（不等当场判红、不入库）。
+/// 两边哪一边的判法单元拒算：照核、不入库。交回核对位与这一份对拍结论从哪来。
+fn verifier_bits_paired_through_the_library(
+    card: &GpuCard,
+    facts: &FlowFactsReadBack,
+) -> (Vec<u32>, PairingConclusionSource) {
+    let library =
+        CrashLibrary::open(CrashLibraryClass::FactsPairing).expect("对拍那一类的库开得了");
+    let judging_units = |units: JudgingUnits| {
+        judging_units_key(&units, toolchain_of_this_process()).map_err(|refused| refused.sentence())
+    };
+    // 比法那一组的键拼进输入摘要；它拒算时整份对拍照核、不入库（拒算交进一边）
+    let comparison_units = judging_units(JudgingUnits::PairingComparison {
+        group_name: "gpu_and_cpu_facts_verifier_pairing_comparison",
+    });
+    let mut inputs = facts.digest().to_vec();
+    inputs.extend_from_slice(
+        comparison_units
+            .as_ref()
+            .map_or(&[0u8; 32], |units| units.fingerprint()),
+    );
+    let (conclusion, source) = pairing_conclusion_reused_or_judged(
+        &library,
+        &singlefs_harness::sha256::sha256_digest(&inputs),
+        &comparison_units.and_then(|_| judging_units(JudgingUnits::CpuFactsVerifier)),
+        &judging_units(JudgingUnits::GpuFactsVerifier),
+        || {
+            let cpu = verify_states_from_facts(facts, 0..facts.state_count);
+            let verifier = GpuFactsVerifier::new(card, facts);
+            let gpu = verifier.verify_states(0..facts.state_count);
+            let half = facts.state_count / 2;
+            let mut in_two_blocks = verifier.verify_states(0..half);
+            in_two_blocks.extend(verifier.verify_states(half..facts.state_count));
+            verifier_bits_agreeing_on_every_state(&cpu, &gpu, &in_two_blocks)
+        },
+    )
+    .expect("对拍结论读写库");
+    let bits = conclusion
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|word| u32::from_le_bytes(*word))
+        .collect();
+    (bits, source)
+}
+
 fn facts_of(recorded: &Recorded) -> FlowFacts {
     extract_flow_facts(
         &recorded.base,
@@ -179,11 +249,22 @@ fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_
         Some(&*facts),
         "事实表往返 KV 的字节不丢"
     );
-    let cpu = verify_states_from_facts(&facts, 0..facts.state_count);
-    let verifier = GpuFactsVerifier::new(card, &facts);
-    let gpu = verifier.verify_states(0..facts.state_count);
-    assert_eq!(cpu.len(), gpu.len());
-    assert_eq!(cpu, gpu, "GPU 内核与 CPU 参照逐状态相等（健康流）");
+    // 健康流：GPU 内核与 CPU 参照逐状态相等（对拍结论经库复用）
+    let (cpu, _source) = verifier_bits_paired_through_the_library(card, &facts);
+    assert_eq!(
+        cpu.len(),
+        usize::try_from(facts.state_count).expect("装得进")
+    );
+    // 同一张事实表再对拍一次：键（事实表摘要、两边核对的判法单元键）相同，结论从库里复用、不再上卡（只写不读那一趟照判）
+    let (cpu_again, source_again) = verifier_bits_paired_through_the_library(card, &facts);
+    assert_eq!(cpu_again, cpu, "复用的结论与判的那一份逐状态相同");
+    if !library_reads_are_skipped_in_this_process() {
+        assert_eq!(
+            source_again,
+            PairingConclusionSource::ReusedFromTheLibrary,
+            "第二趟同一键的对拍结论从库里复用"
+        );
+    }
     assert!(
         cpu.iter().all(|bits| *bits == 0),
         "健康的新池新建文件一个状态都不该红：{:?}",
@@ -197,12 +278,6 @@ fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_
         return;
     };
     assert!(healthy_reds.is_empty(), "CPU 判器在健康流上也全绿");
-    // 分两块核，与一次核完逐位相同（块边界不改结论）
-    let half = facts.state_count / 2;
-    let mut in_two_blocks = verifier.verify_states(0..half);
-    in_two_blocks.extend(verifier.verify_states(half..facts.state_count));
-    assert_eq!(in_two_blocks, gpu);
-    assert_ne!(gpu_verifier_digest(), [0u8; 32]);
 
     // 改坏发布的根直接指着的那个单元（树表）载荷里的一个字节：整单元 CRC 与根指针里的对不上；没被任何根引用的半截单元
     // 校验和本来就可能对不上，池级 checker 不判它们，核对也不判（第一版对拍打中的）
@@ -259,14 +334,10 @@ fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_
     else {
         return;
     };
-    let half_cpu = verify_states_from_facts(&half_facts, 0..half_facts.state_count);
+    let (half_cpu, _half_source) = verifier_bits_paired_through_the_library(card, &half_facts);
     assert!(
         half_cpu.iter().all(|bits| *bits == 0),
         "另一份位置条目还对得上，不红"
-    );
-    assert_eq!(
-        GpuFactsVerifier::new(card, &half_facts).verify_states(0..half_facts.state_count),
-        half_cpu
     );
     let broken_facts = facts_of(&broken);
     // 事实表先入库（对拍那一类的库）、再读库，CPU 参照与 GPU 核对器都只拿读回的那一份
@@ -275,10 +346,9 @@ fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_
     else {
         return;
     };
-    let broken_cpu = verify_states_from_facts(&broken_facts, 0..broken_facts.state_count);
-    let broken_verifier = GpuFactsVerifier::new(card, &broken_facts);
-    let broken_gpu = broken_verifier.verify_states(0..broken_facts.state_count);
-    assert_eq!(broken_cpu, broken_gpu, "改坏之后两份仍逐状态相等");
+    // 改坏之后两份仍逐状态相等（对拍里判）
+    let (broken_cpu, _broken_source) =
+        verifier_bits_paired_through_the_library(card, &broken_facts);
     let red_states: Vec<usize> = broken_cpu
         .iter()
         .enumerate()

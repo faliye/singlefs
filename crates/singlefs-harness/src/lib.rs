@@ -1,12 +1,11 @@
 //! harness 档的脚手架库（D13（验证路线） 已定项 15）：录制器（包在块设备外面，把每个写请求与屏障记成一条流）、内存池、理想模型、随机历史、故障注入设备、场景。
 //! 崩溃态枚举引擎与注入战役在 checker 档的 `singlefs-checker-tier`。
 //!
-//! 每条记：设备身份、偏移、长度、内容哈希、种类（普通写 / FUA 写 / 屏障）。读不记——崩溃状态只由写与屏障切段（D13（验证路线） 已定项 4）。
+//! 每条记：设备身份、偏移、长度、内容哈希、种类（普通写 / FUA 写 / 整段清零 / 屏障，[`RecordedOperationKind`]）。读不记——崩溃状态只由写与屏障切段（D13（验证路线） 已定项 4）。
 #![forbid(unsafe_code)]
 
 use std::cell::RefCell;
 use std::fmt::Write as _;
-use std::path::Path;
 use std::rc::Rc;
 
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
@@ -164,12 +163,23 @@ pub struct RecordedEntrySpan {
     pub operations: std::ops::Range<usize>,
 }
 
+/// 录制设备上一次读到的一段，或一次 journal 记录槽提示问到的一段（提示的答案由那一段里哪些扇区写过定，所以也算读了那一段）：
+/// 观察者录入段按它算读集见证（`crash_amplification` 的观察者去重）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RecordedReadRange {
+    pub device: DeviceIdentity,
+    pub offset: DeviceOffsetInBytes,
+    pub length: u64,
+}
+
 #[derive(Default)]
 struct StreamState {
     operations: Vec<RecordedOperation>,
     contents: Vec<Option<Vec<u8>>>,
     retain_contents: bool,
     entry_spans: Vec<RecordedEntrySpan>,
+    /// `Some` 时记每一次读与每一次槽提示问到的段（[`SharedStream::retaining_contents_and_reads`]）。
+    read_ranges: Option<Vec<RecordedReadRange>>,
 }
 
 /// 一个池里几块设备共用的录制流：按发出次序记，谁先发谁在前。
@@ -192,7 +202,32 @@ impl SharedStream {
             contents: Vec::new(),
             retain_contents: true,
             entry_spans: Vec::new(),
+            read_ranges: None,
         })))
+    }
+
+    /// 既留每次写的字节，又记每一次读与每一次槽提示问到的段（[`SharedStream::read_ranges`]）：交回镜像的观察者拿读过的段算读集见证。
+    #[must_use]
+    pub fn retaining_contents_and_reads() -> Self {
+        Self(Rc::new(RefCell::new(StreamState {
+            operations: Vec::new(),
+            contents: Vec::new(),
+            retain_contents: true,
+            entry_spans: Vec::new(),
+            read_ranges: Some(Vec::new()),
+        })))
+    }
+
+    fn push_read_range(&self, range: RecordedReadRange) {
+        if let Some(read_ranges) = self.0.borrow_mut().read_ranges.as_mut() {
+            read_ranges.push(range);
+        }
+    }
+
+    /// 记下来的每一段读（按发出次序；没开记读的流交回空）。
+    #[must_use]
+    pub fn read_ranges(&self) -> Vec<RecordedReadRange> {
+        self.0.borrow().read_ranges.clone().unwrap_or_default()
     }
 
     /// 调 `run`（驱动这条流的一方调一个入口），把它期间录下的操作记成 `entry` 发的一段（[`RecordedEntrySpan`]）。
@@ -317,10 +352,6 @@ impl<Inner: BlockDevice> RecordingBlockDevice<Inner> {
     pub fn render_stream(&self) -> String {
         self.stream.render()
     }
-
-    pub fn write_stream_to(&self, path: &Path) -> std::io::Result<()> {
-        std::fs::write(path, self.render_stream())
-    }
 }
 
 /// 把一批操作渲染成流文本，末行 `count=N`。
@@ -369,6 +400,11 @@ impl<Inner: BlockDevice> BlockDevice for RecordingBlockDevice<Inner> {
         offset: DeviceOffsetInBytes,
         buffer: &mut [u8],
     ) -> Result<(), BlockDeviceError> {
+        self.stream.push_read_range(RecordedReadRange {
+            device: self.device,
+            offset,
+            length: u64::try_from(buffer.len()).expect("读长度装得进 u64"),
+        });
         self.inner.read_at(offset, buffer)
     }
 
@@ -443,12 +479,17 @@ impl<Inner: BlockDevice> BlockDevice for RecordingBlockDevice<Inner> {
         self.inner.size_in_bytes()
     }
 
-    /// 录制不改盘上有什么，提示照里面那块盘答。
+    /// 录制不改盘上有什么，提示照里面那块盘答；答案由问到的那一段里哪些扇区写过定，开了记读的流把整段记成读过。
     fn journal_record_offsets_hint(
         &self,
         ring_start: DeviceOffsetInBytes,
         ring_bytes: u64,
     ) -> Option<Vec<DeviceOffsetInBytes>> {
+        self.stream.push_read_range(RecordedReadRange {
+            device: self.device,
+            offset: ring_start,
+            length: ring_bytes,
+        });
         self.inner
             .journal_record_offsets_hint(ring_start, ring_bytes)
     }
@@ -554,6 +595,51 @@ mod tests {
             .read_at(DeviceOffsetInBytes(1024), &mut read_back)
             .expect("读");
         assert_eq!(read_back, [3u8; 512], "录制器把写透传给了里面的设备");
+    }
+
+    /// 开了记读的流记每一次读与每一次 journal 记录槽提示问到的段（按发出次序）；没开的流一段都不记。
+    #[test]
+    fn a_stream_retaining_reads_records_every_read_and_every_slot_hint_range_in_issue_order() {
+        let stream = SharedStream::retaining_contents_and_reads();
+        let recorder = RecordingBlockDevice::with_shared_stream(
+            DeviceIdentity(3),
+            MemoryDevice {
+                bytes: vec![0; 4096],
+            },
+            stream.clone(),
+        );
+        let mut buffer = [0u8; 512];
+        recorder
+            .read_at(DeviceOffsetInBytes(1024), &mut buffer)
+            .expect("读");
+        let _hint = recorder.journal_record_offsets_hint(DeviceOffsetInBytes(2048), 1024);
+        assert_eq!(
+            stream.read_ranges(),
+            vec![
+                RecordedReadRange {
+                    device: DeviceIdentity(3),
+                    offset: DeviceOffsetInBytes(1024),
+                    length: 512,
+                },
+                RecordedReadRange {
+                    device: DeviceIdentity(3),
+                    offset: DeviceOffsetInBytes(2048),
+                    length: 1024,
+                },
+            ]
+        );
+        let plain = SharedStream::retaining_contents();
+        let plain_recorder = RecordingBlockDevice::with_shared_stream(
+            DeviceIdentity(3),
+            MemoryDevice {
+                bytes: vec![0; 4096],
+            },
+            plain.clone(),
+        );
+        plain_recorder
+            .read_at(DeviceOffsetInBytes(0), &mut buffer)
+            .expect("读");
+        assert!(plain.read_ranges().is_empty(), "没开记读的流一段都不记");
     }
 
     /// 录制器自证：喂一个少发一条写的假流，条数闸必须判红；正常的流判绿。

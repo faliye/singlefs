@@ -34,7 +34,8 @@ use singlefs_checker_tier::crash_state_enumeration::{
     sample_crash_states_on_the_cpu, CrashPointReplayItem,
 };
 
-/// 这份测试文件的仓内路径：崩溃点重放取样过库的设点文件（GPU 对拍那一条的 CPU 一侧用）、σ 那几张给定状态表的设点文件。
+/// 这份测试文件的仓内路径：崩溃点重放取样过库的设点文件（GPU 对拍那一条的 CPU 一侧用；只作索引，不进块键）。
+#[cfg(feature = "gpu")]
 const THIS_FILE: &str =
     "crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs";
 
@@ -519,12 +520,9 @@ fn given_states_engine_of_this_test(
         singlefs_checker_tier::crash_amplification::one_test_changes_the_environment_at_a_time();
     singlefs_checker_tier::crash_amplification::GivenStatesEngine::start_from_environment(
         singlefs_checker_tier::crash_amplification::GivenStatesItem {
-            item_name: format!("record_checker_judges_absence::{test_name}"),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale: "history=fixed".to_string(),
+            item_name: format!("record_checker_judges_absence::{test_name}::history=fixed"),
         },
         &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
     )
     .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
 }
@@ -886,16 +884,9 @@ fn enumerate_every_subset_of_one_segment(
             );
         GivenStatesEngine::start_from_environment(
             GivenStatesItem {
-                item_name: item_name.to_string(),
-                setting_file: THIS_FILE.to_string(),
-                seeds_and_scale: format!(
-                    "history=UOOUOMSU segment_writes={} slices={}",
-                    segment.len(),
-                    slices.len()
-                ),
+                item_name: format!("{}::history=UOOUOMSU segment_writes={} slices={}", item_name, segment.len(), slices.len()),
             },
             &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
         )
         .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
     };

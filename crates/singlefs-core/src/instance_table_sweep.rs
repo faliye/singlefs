@@ -25,12 +25,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use singlefs_format::{
     DATA_UNIT_HEADER_BYTES, INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE,
     INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT, INSTANCE_TABLE_PAGE_RECORDS, PACKED_UNIT_HEADER_BYTES,
-    SLOT_BYTES,
 };
 
-use crate::address::{
-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
-};
+use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
 use crate::allocator::{absolute_slot_count_of_device, PoolAllocator};
 use crate::block_device::{BlockDevice, BlockDeviceError, WriteDurability};
 use crate::checksum::wide_checksum_field_holds;
@@ -849,12 +846,6 @@ pub fn sweep_the_instance_table_while_mounted<Device: BlockDevice>(
         &judgement,
         sweep_publish_placements,
     )
-}
-
-/// 一个落点的设备内偏移（给用例读头用）。
-#[must_use]
-pub fn device_offset_of_the_head(placement: PlacementOfAUnitHead) -> DeviceOffsetInBytes {
-    DeviceOffsetInBytes(placement.slot.0 * SLOT_BYTES)
 }
 
 #[cfg(test)]

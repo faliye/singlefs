@@ -700,13 +700,9 @@ fn given_states_engine_of_this_experiment() -> &'static GivenStatesEngine {
     ENGINE.get_or_init(|| {
         GivenStatesEngine::start_from_environment(
             GivenStatesItem {
-                item_name: "e156_allocation_basis_counts".to_string(),
-                setting_file: "crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs"
-                    .to_string(),
-                seeds_and_scale: "fixed".to_string(),
+                item_name: "e156_allocation_basis_counts::fixed".to_string(),
             },
             &singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &singlefs_checker_tier::crash_library::repository_root_of_this_crate(),
         )
         .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
     })

@@ -52,7 +52,9 @@ use crate::extent_tree::{
     read_extent_tree, ExtentTreeHeaderJudgement, ExtentTreeReadFromDisk, ExtentTreeReading,
     ExtentTreeVersion, ExtentsOfAFileReadFromDisk,
 };
-use crate::inode_tree::{InodeLeafContainer, InodeLeafContainerIndexInTree};
+use crate::inode_tree::{
+    InodeLeafContainer, InodeLeafContainerIndexInTree, INODE_KEY_WIDTH_IN_BYTES,
+};
 use crate::instance_table::{
     InstanceTableChainRecord, InstanceTablePage, InstanceTablePageIndex, InstanceTableRecords,
 };
@@ -123,6 +125,163 @@ pub trait PoolReader {
         ring_start: DeviceOffsetInBytes,
         ring_bytes: u64,
     ) -> Option<Vec<DeviceOffsetInBytes>>;
+    /// 读坏之后当场重读的那一读（[`BlockDevice::reread_at_after_a_bad_read`]）。默认就是 [`PoolReader::read`]。
+    /// 调用方不直接调它：当场重读的那几处经 [`PoolReaderOfOneReadPass::rereading_after_a_bad_read`] 读。
+    fn reread_after_a_bad_read(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        length: usize,
+    ) -> Option<Vec<u8>> {
+        self.read(device, offset, length)
+    }
+    /// 当场重读那一读读到、核过自证的字节交给盘那一层（[`BlockDevice::keep_the_self_verified_reread`]）。默认什么都不做。
+    /// 调用方不直接调它：经 [`PoolReader::note_that_the_bytes_read_self_verify`] 由重读那一遍的读者转过来。
+    fn keep_the_self_verified_reread(
+        &self,
+        _device: DeviceIdentity,
+        _offset: DeviceOffsetInBytes,
+        _bytes: &[u8],
+    ) {
+    }
+    /// 读的一方核过自证（根槽自证、单元校验和与位置项相符）之后报一声：这几字节是从 `device` 的 `offset` 起读到的、自证过。
+    /// 默认什么都不做；当场重读那一遍的读者（[`PoolReaderOfOneReadPass`] 的重读那一种）把它转成
+    /// [`PoolReader::keep_the_self_verified_reread`]：重读读到自证过的就换掉这次挂载记下的那一份。
+    fn note_that_the_bytes_read_self_verify(
+        &self,
+        _device: DeviceIdentity,
+        _offset: DeviceOffsetInBytes,
+        _bytes: &[u8],
+    ) {
+    }
+    /// 读的一方核出读成的字节自证不过（系统配置槽的 magic 与整槽校验和、节点大小，单元校验和与位置项不符）之后报一声：从 `device` 的 `offset` 起
+    /// 读的那 `length_in_bytes` 字节读坏了。默认什么都不做；盘切片那一份交给盘那一层
+    /// （[`BlockDevice::note_the_read_failing_self_verification_and_forget_its_bytes`]：可写挂载这次挂载共用的那一份记进读坏账、丢掉那几块）。
+    /// 与 [`PoolReader::note_that_the_bytes_read_self_verify`] 对称，报的是另一半。根环槽读成而自证不过不报：从没写过的全 0 槽同样自证不过，
+    /// 读的一方分不出那是读坏还是本来就空。
+    fn note_that_the_bytes_read_fail_self_verification(
+        &self,
+        _device: DeviceIdentity,
+        _offset: DeviceOffsetInBytes,
+        _length_in_bytes: usize,
+    ) {
+    }
+}
+
+/// 一遍读是第一次读，还是读坏之后当场重读的那一遍（D19（块指针的结构与宽度预算） 已定项 5、D16（发布语义） 已定项 1「根槽这一次读坏」那一行
+/// 与「重读一次」：只重读一次，重读要再读一次盘）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReadPassOverThePool {
+    FirstRead,
+    /// 读走 [`PoolReader::reread_after_a_bad_read`]：可写挂载里绕过这次挂载记下的那一份、直接读底下那块盘
+    /// （主 agent 判定：抬 F 与续做里「读坏当场重读」那一读不许被预演与真做共用的那一份吃掉）；读到自证过的换掉记下的那一份。
+    RereadAfterABadRead,
+}
+
+/// 一遍读的读者：第一次读照原样读；读坏之后当场重读的那一遍，读走 [`PoolReader::reread_after_a_bad_read`]，
+/// 读的一方核过自证报上来的字节（[`PoolReader::note_that_the_bytes_read_self_verify`]）转成 [`PoolReader::keep_the_self_verified_reread`]。
+pub struct PoolReaderOfOneReadPass<'reader, Reader: PoolReader + ?Sized> {
+    reader: &'reader Reader,
+    pass: ReadPassOverThePool,
+}
+
+impl<'reader, Reader: PoolReader + ?Sized> PoolReaderOfOneReadPass<'reader, Reader> {
+    #[must_use]
+    pub fn reading_for_the_first_time(reader: &'reader Reader) -> Self {
+        PoolReaderOfOneReadPass {
+            reader,
+            pass: ReadPassOverThePool::FirstRead,
+        }
+    }
+
+    #[must_use]
+    pub fn rereading_after_a_bad_read(reader: &'reader Reader) -> Self {
+        PoolReaderOfOneReadPass {
+            reader,
+            pass: ReadPassOverThePool::RereadAfterABadRead,
+        }
+    }
+
+    #[must_use]
+    pub fn in_the_pass(reader: &'reader Reader, pass: ReadPassOverThePool) -> Self {
+        PoolReaderOfOneReadPass { reader, pass }
+    }
+}
+
+impl<Reader: PoolReader + ?Sized> PoolReader for PoolReaderOfOneReadPass<'_, Reader> {
+    fn device_identities(&self) -> Vec<DeviceIdentity> {
+        self.reader.device_identities()
+    }
+    fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
+        self.reader.device_size_in_bytes(device)
+    }
+    fn read(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        length: usize,
+    ) -> Option<Vec<u8>> {
+        match self.pass {
+            ReadPassOverThePool::FirstRead => self.reader.read(device, offset, length),
+            ReadPassOverThePool::RereadAfterABadRead => {
+                self.reader.reread_after_a_bad_read(device, offset, length)
+            }
+        }
+    }
+    fn journal_record_offsets_hint(
+        &self,
+        device: DeviceIdentity,
+        ring_start: DeviceOffsetInBytes,
+        ring_bytes: u64,
+    ) -> Option<Vec<DeviceOffsetInBytes>> {
+        self.reader
+            .journal_record_offsets_hint(device, ring_start, ring_bytes)
+    }
+    fn reread_after_a_bad_read(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        length: usize,
+    ) -> Option<Vec<u8>> {
+        self.reader.reread_after_a_bad_read(device, offset, length)
+    }
+    fn keep_the_self_verified_reread(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        bytes: &[u8],
+    ) {
+        self.reader
+            .keep_the_self_verified_reread(device, offset, bytes);
+    }
+    fn note_that_the_bytes_read_self_verify(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        bytes: &[u8],
+    ) {
+        match self.pass {
+            ReadPassOverThePool::FirstRead => self
+                .reader
+                .note_that_the_bytes_read_self_verify(device, offset, bytes),
+            ReadPassOverThePool::RereadAfterABadRead => self
+                .reader
+                .keep_the_self_verified_reread(device, offset, bytes),
+        }
+    }
+    /// 两遍一样转过去：重读那一读同样是共用的那一段里的一次读，读坏同样记账（重读不记下读到的字节，丢掉的是第一次读记下的那一份）。
+    fn note_that_the_bytes_read_fail_self_verification(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        length_in_bytes: usize,
+    ) {
+        self.reader.note_that_the_bytes_read_fail_self_verification(
+            device,
+            offset,
+            length_in_bytes,
+        );
+    }
 }
 
 impl<Device: BlockDevice> PoolReader for [(DeviceIdentity, Device)] {
@@ -154,6 +313,42 @@ impl<Device: BlockDevice> PoolReader for [(DeviceIdentity, Device)] {
         let (_, block_device) = self.iter().find(|(identity, _)| *identity == device)?;
         block_device.journal_record_offsets_hint(ring_start, ring_bytes)
     }
+    fn reread_after_a_bad_read(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        length: usize,
+    ) -> Option<Vec<u8>> {
+        let (_, block_device) = self.iter().find(|(identity, _)| *identity == device)?;
+        let mut buffer = vec![0u8; length];
+        block_device
+            .reread_at_after_a_bad_read(offset, &mut buffer)
+            .ok()?;
+        Some(buffer)
+    }
+    fn keep_the_self_verified_reread(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        bytes: &[u8],
+    ) {
+        if let Some((_, block_device)) = self.iter().find(|(identity, _)| *identity == device) {
+            block_device.keep_the_self_verified_reread(offset, bytes);
+        }
+    }
+    fn note_that_the_bytes_read_fail_self_verification(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        length_in_bytes: usize,
+    ) {
+        if let Some((_, block_device)) = self.iter().find(|(identity, _)| *identity == device) {
+            block_device.note_the_read_failing_self_verification_and_forget_its_bytes(
+                offset,
+                u64::try_from(length_in_bytes).expect("读长装得进 u64"),
+            );
+        }
+    }
 }
 
 /// 文件后端的池就是一串盘：读法与切片那一份相同。
@@ -179,6 +374,82 @@ impl<Device: BlockDevice> PoolReader for Vec<(DeviceIdentity, Device)> {
         ring_bytes: u64,
     ) -> Option<Vec<DeviceOffsetInBytes>> {
         PoolReader::journal_record_offsets_hint(self.as_slice(), device, ring_start, ring_bytes)
+    }
+    fn reread_after_a_bad_read(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        length: usize,
+    ) -> Option<Vec<u8>> {
+        PoolReader::reread_after_a_bad_read(self.as_slice(), device, offset, length)
+    }
+    fn keep_the_self_verified_reread(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        bytes: &[u8],
+    ) {
+        PoolReader::keep_the_self_verified_reread(self.as_slice(), device, offset, bytes);
+    }
+    fn note_that_the_bytes_read_fail_self_verification(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        length_in_bytes: usize,
+    ) {
+        PoolReader::note_that_the_bytes_read_fail_self_verification(
+            self.as_slice(),
+            device,
+            offset,
+            length_in_bytes,
+        );
+    }
+}
+
+/// 这一刻读盘的读者（[`BlockDevice::read_at_straight_from_the_disk`]）：写系统配置槽算世代号、覆写哪一槽那一读用它
+/// （`transaction::PoolWriter` 的系统配置槽写）。读的一方报上来的自证结论（[`PoolReader::note_that_the_bytes_read_self_verify`]、
+/// [`PoolReader::note_that_the_bytes_read_fail_self_verification`]）不转给盘那一层：读到的字节没进这次挂载记下的那一份。
+pub struct PoolReaderStraightFromTheDisk<'devices, Device: BlockDevice> {
+    devices: &'devices [(DeviceIdentity, Device)],
+}
+
+impl<'devices, Device: BlockDevice> PoolReaderStraightFromTheDisk<'devices, Device> {
+    #[must_use]
+    pub fn over(devices: &'devices [(DeviceIdentity, Device)]) -> Self {
+        PoolReaderStraightFromTheDisk { devices }
+    }
+}
+
+impl<Device: BlockDevice> PoolReader for PoolReaderStraightFromTheDisk<'_, Device> {
+    fn device_identities(&self) -> Vec<DeviceIdentity> {
+        PoolReader::device_identities(self.devices)
+    }
+    fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
+        PoolReader::device_size_in_bytes(self.devices, device)
+    }
+    fn read(
+        &self,
+        device: DeviceIdentity,
+        offset: DeviceOffsetInBytes,
+        length: usize,
+    ) -> Option<Vec<u8>> {
+        let (_, block_device) = self
+            .devices
+            .iter()
+            .find(|(identity, _)| *identity == device)?;
+        let mut buffer = vec![0u8; length];
+        block_device
+            .read_at_straight_from_the_disk(offset, &mut buffer)
+            .ok()?;
+        Some(buffer)
+    }
+    fn journal_record_offsets_hint(
+        &self,
+        device: DeviceIdentity,
+        ring_start: DeviceOffsetInBytes,
+        ring_bytes: u64,
+    ) -> Option<Vec<DeviceOffsetInBytes>> {
+        PoolReader::journal_record_offsets_hint(self.devices, device, ring_start, ring_bytes)
     }
 }
 
@@ -383,6 +654,8 @@ pub(crate) fn span_in_slots_of_a_named_unit(named: &crate::journal::NamedUnit) -
 
 /// 按指针里的位置条目读一个单元：逐条试，整单元 CRC-32C 等于条目里的校验和才算读到。
 /// 挂载态的读（`crate::mounted_read`）打开时走同一条，不另写一份。
+/// 对得上的那一份报给读者（[`PoolReader::note_that_the_bytes_read_self_verify`]），读成而对不上的那一份也报
+/// （[`PoolReader::note_that_the_bytes_read_fail_self_verification`]：可写挂载这次挂载共用的那一份记进读坏账、丢掉那几块）。
 pub(crate) fn read_unit_via_locations<Reader: PoolReader + ?Sized>(
     reader: &Reader,
     locations: &[LocationEntry; 2],
@@ -397,8 +670,18 @@ pub(crate) fn read_unit_via_locations<Reader: PoolReader + ?Sized>(
             continue;
         };
         if crc32_castagnoli(&bytes) == location.unit_checksum {
+            reader.note_that_the_bytes_read_self_verify(
+                location.device,
+                location.slot.to_device_offset(),
+                &bytes,
+            );
             return Ok(bytes);
         }
+        reader.note_that_the_bytes_read_fail_self_verification(
+            location.device,
+            location.slot.to_device_offset(),
+            unit_bytes,
+        );
     }
     Err(RecoveryFailure::UnitUnreadable {
         slot: locations[0].slot,
@@ -630,7 +913,7 @@ impl<'reader> CentralMappingTreeWithBytesReadOnFirstUse<'reader> {
 enum SystemConfigurationSlotReading {
     /// 三关都过、S 在区间里：这一槽可择。
     Mountable(SystemConfiguration),
-    /// 读不到，或 magic / 整槽校验和不过：这一槽不可择，换一槽换一盘还可以试。
+    /// 读不到，或 magic / 整槽校验和不过，或节点大小不是格式常量（当自证不过，C840）：这一槽不可择，换一槽换一盘还可以试。
     NotSelfDescribing,
     /// magic 与整槽校验和都过、incompat 位图不认识：这一槽同样不可择，记下它，池里一份可择的都没有时报布局不认识。
     IncompatBitsNotRecognized(IncompatBitmap),
@@ -955,9 +1238,11 @@ fn mountable_slot_or_refusal(
                 system_configuration,
             ))
         }
-        Err(SystemConfigurationSlotRefusal::NotSelfDescribing) => {
-            Ok(SystemConfigurationSlotReading::NotSelfDescribing)
-        }
+        // 节点大小不是格式常量的槽当自证不过（C840，用户 2026-10-15 定）：与整槽校验和不过同一路，换一槽换一盘还可以试。
+        Err(
+            SystemConfigurationSlotRefusal::NotSelfDescribing
+            | SystemConfigurationSlotRefusal::NodeBytesNotTheFormatConstant { .. },
+        ) => Ok(SystemConfigurationSlotReading::NotSelfDescribing),
         Err(SystemConfigurationSlotRefusal::IncompatBitsNotRecognized { incompat_bitmap }) => Ok(
             SystemConfigurationSlotReading::IncompatBitsNotRecognized(incompat_bitmap),
         ),
@@ -1255,6 +1540,7 @@ pub enum RootRingSlotReading {
 }
 
 /// 读一个根环槽（区域归属表给出它在哪块盘、槽距给出偏移），验自证校验和与 fsid。只读一次，不重试。
+/// 自证过的字节报给读者（[`PoolReader::note_that_the_bytes_read_self_verify`]：当场重读那一遍的读者拿它换掉这次挂载记下的那一份）。
 #[must_use]
 pub fn read_root_ring_slot<Reader: PoolReader + ?Sized>(
     reader: &Reader,
@@ -1270,7 +1556,10 @@ pub fn read_root_ring_slot<Reader: PoolReader + ?Sized>(
         return RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable);
     };
     match RootRecord::parse_slot(&bytes, filesystem_identifier) {
-        Some(root) => RootRingSlotReading::SelfVerified(root),
+        Some(root) => {
+            reader.note_that_the_bytes_read_self_verify(device, offset, &bytes);
+            RootRingSlotReading::SelfVerified(root)
+        }
         None => RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified),
     }
 }
@@ -1426,6 +1715,17 @@ pub fn readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_
             ring_slot,
         )
     };
+    // 重读那一读绕过这次挂载记下的那一份、再读一次盘（[`ReadPassOverThePool::RereadAfterABadRead`]）。
+    let rereading_reader = PoolReaderOfOneReadPass::rereading_after_a_bad_read(reader);
+    let reread_the_slot = |ring_slot| {
+        read_root_ring_slot(
+            &rereading_reader,
+            region_devices,
+            immutable_sizes,
+            filesystem_identifier,
+            ring_slot,
+        )
+    };
     let mut roots = Vec::new();
     // 迭代次数的上界是根环槽数 R × S；跨轮只带已认出的根。提前出口只有「知道住着根的槽重读仍坏」一个。
     for ring_slot in every_root_ring_slot(immutable_sizes) {
@@ -1439,7 +1739,7 @@ pub fn readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_
         if !ring_slots_known_to_hold_a_root.contains(&ring_slot) {
             continue;
         }
-        match read_the_slot(ring_slot) {
+        match reread_the_slot(ring_slot) {
             RootRingSlotReading::SelfVerified(root) => roots.push((ring_slot, root)),
             RootRingSlotReading::Bad(reread) => {
                 return Err(RootRingSlotKnownToHoldARootStillBadAfterOneReread {
@@ -1650,9 +1950,9 @@ pub fn effective_rollback_floor_rereading_the_newest_instance_table_once<
     immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
 ) -> Result<CheckpointTxg, InstanceTableOfTheNewestRootStillUnreadableAfterOneReread> {
-    let read_the_ring = || {
+    let read_the_ring = |pass| {
         Ok::<_, std::convert::Infallible>(readable_roots_with_ring_slots(
-            reader,
+            &PoolReaderOfOneReadPass::in_the_pass(reader, pass),
             region_devices,
             immutable_sizes,
             filesystem_identifier,
@@ -1695,9 +1995,9 @@ pub fn effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instan
     filesystem_identifier: &[u8; 16],
     ring_slots_known_to_hold_a_root: &BTreeSet<RootRingSlot>,
 ) -> Result<CheckpointTxg, EffectiveFloorReadingStillUnreadableAfterOneReread> {
-    let read_the_ring = || {
+    let read_the_ring = |pass| {
         readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once(
-            reader,
+            &PoolReaderOfOneReadPass::in_the_pass(reader, pass),
             region_devices,
             immutable_sizes,
             filesystem_identifier,
@@ -1739,10 +2039,10 @@ pub fn effective_rollback_floor_rereading_unreadable_reads_once<Reader: PoolRead
     immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
 ) -> CheckpointTxg {
-    let read_the_ring = || {
+    let read_the_ring = |pass| {
         Ok::<_, std::convert::Infallible>(
             readable_roots_with_ring_slots_rereading_unreadable_slots_once(
-                reader,
+                &PoolReaderOfOneReadPass::in_the_pass(reader, pass),
                 region_devices,
                 immutable_sizes,
                 filesystem_identifier,
@@ -1788,7 +2088,7 @@ enum EffectiveFloorAfterAtMostOneReread {
 
 /// 读一遍根环（`read_the_ring`：怎么读、读坏的槽怎么办由调用方定）、择最新那条根、沿链读它的实例表；表读不出、解不开或一条根都择不到时
 /// 立即把根环与表一起重读一次（C554 乙的形态，R = 1；D16（发布语义） 已定项 1「重读一次」），读出表就按它算 F 生效值。
-/// 第一次读与重读一次走同一段。
+/// 第一次读与重读一次走同一段；重读那一遍根环与表都按 [`ReadPassOverThePool::RereadAfterABadRead`] 读（`read_the_ring` 收到哪一遍）。
 ///
 /// # Errors
 /// `read_the_ring` 的错原样交回（那一遍之后不再读）。
@@ -1800,13 +2100,21 @@ fn effective_rollback_floor_rereading_the_newest_instance_table_once_over<
     region_devices: &[DeviceIdentity; 3],
     immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
-    read_the_ring: impl Fn() -> Result<Vec<(RootRingSlot, RootRecord)>, RingReadingFailure>,
+    read_the_ring: impl Fn(
+        ReadPassOverThePool,
+    ) -> Result<Vec<(RootRingSlot, RootRecord)>, RingReadingFailure>,
 ) -> Result<EffectiveFloorAfterAtMostOneReread, RingReadingFailure> {
-    let read_the_ring_and_the_newest_roots_table = || {
-        let roots_with_ring_slots = read_the_ring()?;
+    let read_the_ring_and_the_newest_roots_table = |pass: ReadPassOverThePool| {
+        let roots_with_ring_slots = read_the_ring(pass)?;
         let newest = newest_root_among(&roots_with_ring_slots);
         let newest_roots_table = newest
-            .and_then(|newest| instance_table_chain_of_root(reader, &newest).ok())
+            .and_then(|newest| {
+                instance_table_chain_of_root(
+                    &PoolReaderOfOneReadPass::in_the_pass(reader, pass),
+                    &newest,
+                )
+                .ok()
+            })
             .map(|chain| chain.records);
         Ok((roots_with_ring_slots, newest, newest_roots_table))
     };
@@ -1823,19 +2131,23 @@ fn effective_rollback_floor_rereading_the_newest_instance_table_once_over<
             ),
         )
     };
-    if let (roots_with_ring_slots, _, Some(table)) = read_the_ring_and_the_newest_roots_table()? {
+    if let (roots_with_ring_slots, _, Some(table)) =
+        read_the_ring_and_the_newest_roots_table(ReadPassOverThePool::FirstRead)?
+    {
         return Ok(floor_under(&roots_with_ring_slots, &table));
     }
-    Ok(match read_the_ring_and_the_newest_roots_table()? {
-        (roots_with_ring_slots, _, Some(table)) => floor_under(&roots_with_ring_slots, &table),
-        (roots_with_ring_slots_on_the_reread, newest_on_the_reread, None) => {
-            EffectiveFloorAfterAtMostOneReread::NewestRootsTableStillUnreadable {
-                roots_with_ring_slots_on_the_reread,
-                newest_root_on_the_reread: newest_on_the_reread
-                    .map(|root| (root.instance, root.checkpoint_txg)),
+    Ok(
+        match read_the_ring_and_the_newest_roots_table(ReadPassOverThePool::RereadAfterABadRead)? {
+            (roots_with_ring_slots, _, Some(table)) => floor_under(&roots_with_ring_slots, &table),
+            (roots_with_ring_slots_on_the_reread, newest_on_the_reread, None) => {
+                EffectiveFloorAfterAtMostOneReread::NewestRootsTableStillUnreadable {
+                    roots_with_ring_slots_on_the_reread,
+                    newest_root_on_the_reread: newest_on_the_reread
+                        .map(|root| (root.instance, root.checkpoint_txg)),
+                }
             }
-        }
-    })
+        },
+    )
 }
 
 /// 读出来的根里 (checkpoint_txg, 实例代号) 最大的那一条（与 [`choose_root`] 同一个择法）；一条都没有时 `None`。
@@ -2042,7 +2354,8 @@ pub fn every_device_reaches_the_unit_area_start(
 /// # Errors
 /// 树表读不到、解不开，同一种树有两条（[`TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE`]）；
 /// 分配记录树根提示读不出且映射里没有它（`MappingMiss`）、映射落点也读不出（`MappingStillUnreadable`）、
-/// 映射树根读不出或解不开、分配记录树根解不开；条目宽或结构值判红（见 [`allocation_records_of_node`]）。
+/// 映射树根读不出或解不开、分配记录树根解不开；条目宽判红（见 [`read_allocation_record_tree`]）或结构值判红
+/// （见 `allocation_records_fit_the_pool_geometry`）。
 ///
 /// 单元区从 `unit_area_start` 起（择到的系统配置按环长现算的那个，[`unit_area_start_of_the_chosen_system_configuration`]）：
 /// 分配记录落不落在单元区里按它判。
@@ -2541,6 +2854,7 @@ pub fn rebuild_version_in_the_unit_area_starting_at(
     }
     let record =
         record_standing_for_root.ok_or(RebuildVersionFailure::NoRecordStandingForFileVersion)?;
+    location_entries_of_the_record_ascend_by_device(&record)?;
     let record_bytes = record.to_bytes();
     let tree_table_entries = tree_table_entries_each_kind_at_most_once(&tree_table.entries)
         .map_err(RecoveryFailure::from)?;
@@ -2783,7 +3097,7 @@ pub fn rebuild_version_in_the_unit_area_starting_at(
                 || node
                     .entries
                     .iter()
-                    .any(|entry| entry.len() < DELETED_INODES_KEY_WIDTH_IN_BYTES)
+                    .any(|entry| entry.len() != DELETED_INODES_KEY_WIDTH_IN_BYTES)
             {
                 return Err(RecoveryFailure::UnitMalformed {
                     what: "deleted_inodes 根不是层级 0、条目宽 8 的非空节点",
@@ -3449,15 +3763,30 @@ pub fn system_configuration_slots_of_one_device_read_once<Reader: PoolReader + ?
     for offset in [0, slot_spacing_in_bytes] {
         match reader.read(device, DeviceOffsetInBytes(offset), slot_bytes) {
             None => slots_reporting_a_read_error += 1,
-            Some(bytes) => {
-                if let Ok(system_configuration) = SystemConfiguration::parse_slot(&bytes) {
+            Some(bytes) => match SystemConfiguration::parse_slot(&bytes) {
+                Ok(system_configuration) => {
                     if system_configuration.immutable.filesystem_identifier
                         == *filesystem_identifier
                     {
                         self_verified.push(system_configuration);
                     }
                 }
-            }
+                // 读成而自证不过（magic 与整槽校验和、节点大小，C840 当自证不过）：报给读者（可写挂载这次挂载共用的那一份记进读坏账、
+                // 丢掉这一槽，下一次读它穿到盘上）。mkfs 把每块盘两槽都写过，这两样不过的槽不是「本来就空」。
+                Err(
+                    SystemConfigurationSlotRefusal::NotSelfDescribing
+                    | SystemConfigurationSlotRefusal::NodeBytesNotTheFormatConstant { .. },
+                ) => reader.note_that_the_bytes_read_fail_self_verification(
+                    device,
+                    DeviceOffsetInBytes(offset),
+                    slot_bytes,
+                ),
+                // 布局不认识、每区槽数越界：是一份完整的系统配置、不是坏槽（择系统配置那一步已按它们判过整池），不算读坏。
+                Err(
+                    SystemConfigurationSlotRefusal::IncompatBitsNotRecognized { .. }
+                    | SystemConfigurationSlotRefusal::RootRingSlotsPerRegionOutOfRange(_),
+                ) => {}
+            },
         }
     }
     SystemConfigurationSlotsOfOneDevice {
@@ -3832,7 +4161,7 @@ pub(crate) fn root_assembled_from_the_new_root_segment_of_the_record(
 fn key_width_for_kind(kind: u16) -> Option<usize> {
     match kind {
         TREE_KIND_EXTENT => Some(24),
-        TREE_KIND_INODE => Some(8),
+        TREE_KIND_INODE => Some(INODE_KEY_WIDTH_IN_BYTES),
         TREE_KIND_ALLOCATION => Some(10),
         TREE_KIND_ACCOUNTING => Some(22),
         // `deleted_inodes` 的 key 是 inode 号 8 字节（D8（核心索引结构） 已定项 16 第 1 条）；墓碑树与谱系树的根条目照 inode 树内部节点的
@@ -4449,12 +4778,20 @@ pub(crate) fn extents_of_the_first_file(
 /// 每盘不少于 `placements_on_each_device_at_least` 个落点（走读传的是这套几何下新池新建文件之后每盘的落点数，
 /// [`placements_on_each_device_after_the_new_pool_file_creation`]）。同盘同槽两条记录（代不同）在集合里是两个元素、两盘对称就过——第二轮攻方腿打中，
 /// 走读自己不判 key 严格递增，这里逐盘核槽号不重复。
+///
+/// # Panics
+/// `device_identities` 为空：调用方要交一张非空的盘表。产品调用方交的是读者的盘表（`PoolReader::device_identities`），
+/// 零块盘的池走到这里之前在读实例表单元那一步已经报错返回；空盘表在这里没有「每盘一条」可判，不交回 `true` 也不交回 `false`。
 #[must_use]
 pub fn allocation_records_are_one_per_device(
     records: &[AllocationRecord],
     device_identities: &[DeviceIdentity],
     placements_on_each_device_at_least: PlacementsOnEachDevice,
 ) -> bool {
+    assert!(
+        !device_identities.is_empty(),
+        "盘表不许为空：产品调用方交读者的盘表，零块盘的池在读实例表单元那一步已经报错返回"
+    );
     let mut placements_per_device: BTreeMap<DeviceIdentity, BTreeSet<(u64, u16, u64, bool)>> =
         BTreeMap::new();
     let mut slots_per_device: BTreeMap<DeviceIdentity, BTreeSet<u64>> = BTreeMap::new();
@@ -4484,7 +4821,9 @@ pub fn allocation_records_are_one_per_device(
         return false;
     }
     let mut placement_sets = placements_per_device.values();
-    let first_device_placements = placement_sets.next().expect("上面核过每块盘都有记录");
+    let first_device_placements = placement_sets
+        .next()
+        .expect("开头断言过盘表非空，上面又核过盘表里每块盘都有记录：至少有一块盘的落点集合");
     first_device_placements.len() >= placements_on_each_device_at_least.0
         && placement_sets.all(|placements| placements == first_device_placements)
 }
@@ -5100,13 +5439,78 @@ fn root_record_pointers_ascend_by_device(root: &RootRecord) -> Result<(), Recove
     Ok(())
 }
 
+/// 顶着这一版的那条 journal 记录里盘上读来的位置条目按 I-2.5 判，坏的报 [`location_entries_not_ascending`]：
+/// 新根段里的四条指针（树表、映射树根、实例表、分配记录树根；全零的豁免），判法与根记录那四条（[`root_record_pointers_ascend_by_device`]）、
+/// 重建出来的这一版（[`pointers_of_the_rebuilt_version_ascend_by_device`]）同一个（逐条 `NodePointer::location_entries_ascend_by_device`）；
+/// 每个点名项的两条位置条目（I-2.5 射程里的「journal 点名项里的位置条目数组」，点名项不是指针、没有全零豁免，
+/// 与数据指针同一个判法 `pointer::location_entries_ascend_by_device`）。
+/// 重建一拿到这条记录就重新编码它（`JournalRecord::to_bytes`），写者 `NodePointer::write_to` 在那里断言新根段四条升序：
+/// 那一步之前不判，坏镜像就在可写挂载的那条断言上 panic（I-2.5 罩「任一块指针」，新根段这四条也是盘上读来的块指针）。
+/// 点名项的写者 `NamedUnit::write_to` 不断言升序，重新编码不 panic；恢复这一侧别处没有按 I-2.5 判点名项的位置条目
+/// （代码轮 `research/prompts/m3-b44-code-r3-main-verification.md` 第二节 L4 那一句），并在这一判里。
+fn location_entries_of_the_record_ascend_by_device(
+    record: &JournalRecord,
+) -> Result<(), RecoveryFailure> {
+    for pointer in [
+        &record.new_tree_table,
+        &record.new_mapping_root,
+        &record.new_instance_table,
+        &record.new_allocation_record_tree_root,
+    ] {
+        pointer
+            .location_entries_ascend_by_device()
+            .map_err(|_not_ascending| location_entries_not_ascending())?;
+    }
+    for named_unit in &record.named {
+        location_entries_ascend_by_device(&named_unit.locations)
+            .map_err(|_not_ascending| location_entries_not_ascending())?;
+    }
+    Ok(())
+}
+
+/// 一棵容器树（墓碑树、谱系树、退役树）这一版里盘上读来的指针：每片容器的指针与根之下每个码 2 节点的指针（根的指针住树表条目，
+/// 随树表条目判）。下一次重写这棵树的某个节点时，没换的条目连同它们的指针照抄写回。
+fn container_tree_pointers_read_from_disk<'version>(
+    container_pointers: impl Iterator<Item = &'version NodePointer> + 'version,
+    index_nodes: &'version ContainerTreeIndexNodesVersion,
+) -> impl Iterator<Item = &'version NodePointer> + 'version {
+    container_pointers.chain(
+        index_nodes
+            .pointers_below_the_root
+            .iter()
+            .map(|(_, pointer)| pointer),
+    )
+}
+
 /// 重建出来的这一版里每一条盘上读来的指针按 I-2.5 判（C476 普查「缺口」那张表 `pointer.rs` 那一行，实审 A3a 实测坐实走得到）：
-/// 下一次发布照抄没重写的角色时把它们原样写回（树表条目、多层码 2 树与分配记录树的内部条目、inode 树根的条目、extent 树），
-/// 写者 `NodePointer::write_to` / `DataPointer::write_to` 在那里断言升序——不在读进来的地方判，坏镜像就在写者的断言上 panic。
+/// 下一次发布照抄没重写的角色时把它们原样写回（树表条目、多层码 2 树与分配记录树的内部条目、inode 树根的条目、extent 树、
+/// 三棵容器树的内部条目），写者 `NodePointer::write_to` / `DataPointer::write_to` 在那里断言升序——不在读进来的地方判，
+/// 坏镜像就在写者的断言上 panic（三棵容器树那一份：代码轮 `research/prompts/m3-b44-code-r1-main-verification.md` 第二节 K4）。
 fn pointers_of_the_rebuilt_version_ascend_by_device(
     output: &TransactionOutput,
 ) -> Result<(), RecoveryFailure> {
     root_record_pointers_ascend_by_device(&output.root)?;
+    let tombstone_tree_pointers = container_tree_pointers_read_from_disk(
+        output
+            .tombstone_containers
+            .iter()
+            .map(|container| &container.pointer),
+        &output.tombstone_tree_index_nodes,
+    );
+    let lineage_tree_pointers = container_tree_pointers_read_from_disk(
+        output
+            .lineage_containers
+            .iter()
+            .map(|container| &container.pointer),
+        &output.lineage_tree_index_nodes,
+    );
+    let retirement_tree_pointers = container_tree_pointers_read_from_disk(
+        output
+            .retirement_containers
+            .iter()
+            .map(|container| &container.pointer),
+        &output.retirement_tree_index_nodes,
+    );
     let node_pointers = output
         .tree_table_entries
         .iter()
@@ -5139,7 +5543,10 @@ fn pointers_of_the_rebuilt_version_ascend_by_device(
                 .map(|(_, pointer)| pointer),
         )
         .chain(output.accounting_tree.pointers.iter())
-        .chain(output.central_mapping_tree.pointers.iter());
+        .chain(output.central_mapping_tree.pointers.iter())
+        .chain(tombstone_tree_pointers)
+        .chain(lineage_tree_pointers)
+        .chain(retirement_tree_pointers);
     for pointer in node_pointers {
         pointer
             .location_entries_ascend_by_device()
@@ -5932,6 +6339,14 @@ mod allocation_records_per_device_tests {
         );
     }
 
+    /// 记录与盘表都空：盘表非空是这个函数的前提（文档注释的 panic 条件），在开头那一句断言上 panic、消息说的就是这个前提。
+    /// 改之前走到取第一块盘的落点集合那一句 `expect`，消息写的「上面核过每块盘都有记录」在空输入上不成立（外部代码审查第一条）。
+    #[test]
+    #[should_panic(expected = "盘表不许为空")]
+    fn an_empty_device_table_with_no_records_panics_on_the_non_empty_device_table_precondition() {
+        let _ = allocation_records_are_one_per_device(&[], &[], PlacementsOnEachDevice(0));
+    }
+
     #[test]
     fn exactly_the_placements_of_the_default_geometry_are_accepted_and_one_fewer_is_rejected() {
         let placements_on_each_device = placements_on_each_device_of_the_default_geometry();
@@ -6294,6 +6709,7 @@ mod allocation_record_pool_geometry_tests {
 #[cfg(test)]
 mod tree_kind_key_width_tests {
     use super::key_width_for_kind;
+    use crate::inode_tree::INODE_KEY_WIDTH_IN_BYTES;
     use crate::records::{
         TREE_KIND_DELETED_INODES, TREE_KIND_INODE, TREE_KIND_LINEAGE, TREE_KIND_LOGGED_OPERATIONS,
         TREE_KIND_RETIREMENT, TREE_KIND_TOMBSTONE,
@@ -6327,6 +6743,13 @@ mod tree_kind_key_width_tests {
             None,
             "logged_ops 没有字段表"
         );
-        assert_eq!(key_width_for_kind(TREE_KIND_INODE), Some(8));
+        assert_eq!(
+            key_width_for_kind(TREE_KIND_INODE),
+            Some(INODE_KEY_WIDTH_IN_BYTES)
+        );
+        assert_eq!(
+            INODE_KEY_WIDTH_IN_BYTES, 8,
+            "inode 树的 key = inode 号 8 字节（D8 已定项 6）"
+        );
     }
 }

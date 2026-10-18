@@ -10,7 +10,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use singlefs_core::address::{CheckpointTxg, DataUnitIndexInFile, InstanceGeneration, SlotNumber};
 use singlefs_core::allocator::{AllocationRecord, PlacementRefusal};
-use singlefs_core::block_device::BlockDeviceError;
 use singlefs_core::instance_table::{
     InstanceTableChainRecord, InstanceTablePage, InstanceTablePageIndex,
 };
@@ -33,9 +32,10 @@ use singlefs_core::unit::{data_unit_payload, parse_data_unit};
 
 use crate::model::{
     ModelCheckpointTxg, ModelDeviceIdentity, ModelInstanceGeneration, ModelInstanceRow,
-    ModelJournalCounter, ModelRefusalReason, ModelRingPosition, ModelRootKey, ModelUnitRole,
-    ObservedAllocationRecord, ObservedEffect, ObservedFile, ObservedInstanceTable,
-    ObservedReadBack, ObservedRefusalReason, ObservedRoot, ObservedUnitAllocationRecords,
+    ModelJournalCounter, ModelRefusalReason, ModelRingPosition, ModelRootKey,
+    ModelUnitCopyLocation, ModelUnitRole, ObservedAllocationRecord, ObservedEffect, ObservedFile,
+    ObservedInstanceTable, ObservedReadBack, ObservedRefusalReason, ObservedRoot,
+    ObservedUnitAllocationRecords,
 };
 
 #[must_use]
@@ -721,6 +721,8 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         // 模型里没有它们的理由。
         | PublishError::JournalRecordsOfThePublishExceedTheLimit { .. }
         | PublishError::NextCheckpointTxgPastTheTopOfItsRange { .. }
+        // 墓碑树、谱系树或退役树最右那片的容器号已到顶（C841）：容器号从 1 起逐片加一，健康的内存盘上走不到，坏镜像才有。
+        | PublishError::NextContainerNumberPastTheTopOfItsRange(_)
         // 写删除中的 inode、写删完的 inode、unlink 不是活记录的号、deleted_inodes 装不下：执行器只在实现报带文件时调覆盖写与 unlink，
         // 队列不空时那两种改动先走空、再拒成带着走空那几步的 `NoFileVersionToChange`（代码轮 U10、U11），不报这几种；
         // 队列至多 inode 1 一个号，造不出这几格。
@@ -728,7 +730,12 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         | PublishError::WriteToAnInodeThatIsNotInTheTree { .. }
         | PublishError::UnlinkOfAnInodeThatIsNotALiveRecord { .. }
         | PublishError::DeletedInodesQueueRefused(_)
-        | PublishError::BlockDevice(_) => ObservedRefusalReason::Unexplained,
+        | PublishError::BlockDevice(_)
+        // 可写挂载取号之前预演读错、读坏那两拒：健康的内存盘上不出读错、读坏，模型里没有它们的理由。
+        | PublishError::ReadFailedWhileRehearsingTheContinuationBeforeAcquisition(_)
+        | PublishError::ReadBackFailingSelfVerificationWhileRehearsingTheContinuationBeforeAcquisition(_) => {
+            ObservedRefusalReason::Unexplained
+        }
     }
 }
 
@@ -793,6 +800,9 @@ pub fn refusal_reason_of_rollback_error(error: &RollbackError) -> ObservedRefusa
         }
         | RollbackError::UserVisibleUnitWithoutItsRecordInTheCurrentAccount { .. }
         | RollbackError::UserVisibleUnitStillAllocatedUnderAnotherGeneration { .. }
+        // 回退目标引用的单元（复活集里的、隔离的）在一块盘上的那一份读不出或对不上：健康的内存盘上不该出现；故障注入里说谎的设备吞了落在
+        // 那一份上的写才有（`research/prompts/code-backlog-b2-code-r1-main-verification.md`「更正」一节 A4），那一格不在这里映射成理由，
+        // 由故障注入按实现点名的那一份认（`unit_copy_unreadable_or_mismatched_of_rollback_error`，`fault_injection::left_by_the_lying_device`）。
         | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. }
         | RollbackError::IsolatedUnitCopyUnreadableOrMismatched { .. }
         // 判候选集读根环或算 F_生效 重读一次仍读坏（实审 A3b Q7）：读路径上注入故障、或同一个进程里一次根槽写被说谎的设备吞掉
@@ -801,12 +811,6 @@ pub fn refusal_reason_of_rollback_error(error: &RollbackError) -> ObservedRefusa
             ObservedRefusalReason::Unexplained
         }
     }
-}
-
-/// 零单元发布只会报块设备错：内存盘不报错，模型里没有它的理由。
-#[must_use]
-pub fn refusal_reason_of_block_device_error(_error: &BlockDeviceError) -> ObservedRefusalReason {
-    ObservedRefusalReason::Unexplained
 }
 
 /// 挂载、抬 F 的错误成员说的是哪条理由。
@@ -836,7 +840,9 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
         MountError::SpaceAdmissionRefusedBeforeAcquisition { .. } => {
             explained(ModelRefusalReason::UnitAreaWall)
         }
-        // 树表 0 条、而实例表已经不是 mkfs 那一片：零故障走得到（写过行的那一版上再挂载一次），模型照代码今天的读法划进必须拒。
+        // 树表或实例表不是 mkfs 写的那一版、而这一版又没有自己的分配记录树：手造镜像才走得到。映射成模型那一条理由，模型的答案里一条都不列
+        // （C512（树表 0 条的一版上被换下的单元记在哪） 2026-09-23 定案之后这一格不再拒，`IdealModel::answer_establishing_an_instance`），
+        // 实现要是在随机历史里拒在这一格，对拍报「模型说该成、实现拒了」。
         MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. } => {
             explained(ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem)
         }
@@ -988,6 +994,42 @@ pub fn root_ring_slot_still_bad_after_one_reread_of_rollback_error(
         | RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { .. }
         | RollbackError::IsolatedUnitCopyUnreadableOrMismatched { .. }
         | RollbackError::CurrentVersionUnitNotReleasable { .. }
+        | RollbackError::Publish(_) => None,
+    }
+}
+
+/// 管理员回退拒在「回退目标引用的一个单元在一块盘上的那一份读不出或整单元 CRC-32C 对不上」上时实现点名的那一份
+/// （复活集里的 `ResurrectedUnitCopyUnreadableOrMismatched` 与隔离单元的 `IsolatedUnitCopyUnreadableOrMismatched` 同一形，
+/// `research/prompts/code-backlog-b2-code-r1-main-verification.md`「更正」一节 A4）；别的成员 None。
+#[must_use]
+pub fn unit_copy_unreadable_or_mismatched_of_rollback_error(
+    error: &RollbackError,
+) -> Option<ModelUnitCopyLocation> {
+    match error {
+        RollbackError::ResurrectedUnitCopyUnreadableOrMismatched { unit, device, slot }
+        | RollbackError::IsolatedUnitCopyUnreadableOrMismatched { unit, device, slot } => {
+            Some(ModelUnitCopyLocation {
+                device: ModelDeviceIdentity(device.0),
+                span_in_slots: u32::try_from(unit.span_slots())
+                    .expect("一个单元两槽以内，装得进 u32"),
+                first_slot: slot.0,
+            })
+        }
+        RollbackError::PublishFrozenAfterAWriteFailureIsNotResentYet { .. }
+        | RollbackError::Recovery(_)
+        | RollbackError::CallerInputsDisagreeWithTheDisk(_)
+        | RollbackError::NextCheckpointTxgPastTheTopOfItsRange { .. }
+        | RollbackError::CurrentInstanceTableMalformed
+        | RollbackError::TargetNotACandidate { .. }
+        | RollbackError::TargetVersionUnreadable { .. }
+        | RollbackError::CurrentAccountUnreadable { .. }
+        | RollbackError::TargetTreeIdentifiersDifferFromTheCurrentVersionWhoseHandlingIsUndecided {
+            ..
+        }
+        | RollbackError::UserVisibleUnitWithoutItsRecordInTheCurrentAccount { .. }
+        | RollbackError::UserVisibleUnitStillAllocatedUnderAnotherGeneration { .. }
+        | RollbackError::CurrentVersionUnitNotReleasable { .. }
+        | RollbackError::CandidateJudgementStillUnreadableAfterOneReread(_)
         | RollbackError::Publish(_) => None,
     }
 }
@@ -1272,6 +1314,51 @@ mod tests {
                 root_ring_slot_still_bad_after_one_reread_of_rollback_error(error),
                 None,
                 "不是「知道住着根的根环槽重读仍坏」的回退拒绝不点名槽：{error:?}"
+            );
+        }
+    }
+
+    /// 管理员回退拒在「回退目标引用的一个单元在一块盘上的那一份读不出或对不上」上（`research/prompts/code-backlog-b2-code-r1-main-verification.md`
+    /// 「更正」一节 A4）：复活集里的与隔离单元的两个成员照同一个判据交出点名的那一份（哪块盘、从哪个槽起、几个槽）；
+    /// 别的回退拒绝一份都不交，同样点名了盘与槽的「账里没有它的记录」也不交（说的不是那一份读不出）。
+    #[test]
+    fn both_unit_copy_refusals_of_a_rollback_name_the_copy_and_no_other_refusal_does() {
+        let unit = TransactionUnit::Data(DataUnitIndexInFile::FIRST);
+        let named_copy = ModelUnitCopyLocation {
+            device: ModelDeviceIdentity(1),
+            span_in_slots: 2,
+            first_slot: 51_000,
+        };
+        for error in [
+            RollbackError::ResurrectedUnitCopyUnreadableOrMismatched {
+                unit,
+                device: DeviceIdentity(1),
+                slot: SlotNumber(51_000),
+            },
+            RollbackError::IsolatedUnitCopyUnreadableOrMismatched {
+                unit,
+                device: DeviceIdentity(1),
+                slot: SlotNumber(51_000),
+            },
+        ] {
+            assert_eq!(
+                unit_copy_unreadable_or_mismatched_of_rollback_error(&error),
+                Some(named_copy),
+                "数据单元占两槽：{error:?}"
+            );
+        }
+        for error in [
+            RollbackError::CurrentInstanceTableMalformed,
+            RollbackError::UserVisibleUnitWithoutItsRecordInTheCurrentAccount {
+                unit,
+                device: DeviceIdentity(1),
+                slot: SlotNumber(51_000),
+            },
+        ] {
+            assert_eq!(
+                unit_copy_unreadable_or_mismatched_of_rollback_error(&error),
+                None,
+                "不是「那一份读不出或对不上」的回退拒绝不交那一份：{error:?}"
             );
         }
     }

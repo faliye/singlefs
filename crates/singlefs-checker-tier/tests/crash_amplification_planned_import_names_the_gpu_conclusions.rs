@@ -1,4 +1,4 @@
-//! checker 档模块：crash、crash_point_replay_progress、crash_given_states、crash_identity、crash_library、crash_amplification、verdict_store、gpu_unit_checks、crash_verify_gpu、crash_judge_tables
+//! checker 档模块：crash、crash_point_replay_progress、crash_given_states、crash_identity、crash_library、crash_amplification、verdict_store、gpu_unit_checks、crash_judge_tables
 //! 配置开了 GPU 时两台分片之后的按计划导入（第 62 批判决 Q4）：流水线那一路点名的键里有 GPU 判器那一种结论与 GPU 核对代码那一把摘要的核对行，
 //! 给定状态表那一路点名的键里有 GPU 判器那一种结论。没配 GPU 的那几条（`crash_amplification_pipeline_records_checks_and_reuses.rs`）
 //! 库里没有这两样，漏点了照绿；这里两条在卡上真判，漏点哪一样对应的那条就红。
@@ -23,9 +23,8 @@ use singlefs_checker_tier::crash_given_states::{
     GivenStatesConclusionsOfATable, GivenStatesJudge, GivenStatesOfATable,
 };
 use singlefs_checker_tier::crash_identity::ConclusionKind;
-use singlefs_checker_tier::crash_library::amplification_unit_tests_library_directory_emptied_at_the_start;
+use singlefs_checker_tier::crash_library::DisposableLibraryDirectory;
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
-use singlefs_checker_tier::crash_verify_gpu::gpu_verifier_digest;
 use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
     gpu_card_pool_or_report_not_run, not_run_line,
 };
@@ -41,17 +40,13 @@ const THIS_FILE: &str =
 const LARGEST_EXPANDED_SEGMENT_WRITES: usize = 6;
 /// 给定状态表那一条：一项 4 张表，每张两个状态。
 const GIVEN_STATES_TABLES: usize = 4;
+/// 给定状态表按段切块（每个状态归它第一次有写没持久的那一段，全持久的归「全部持久」那一块）：这一项每张表两块，
+/// 持久前缀那一个状态一块、全持久那一个状态一块。
+const BLOCKS_OF_EACH_GIVEN_STATES_TABLE: usize = 2;
+/// 块键只由内容定（表名不进）：4 张表的基线、写表、切段相同，全持久那一块是同一把键、库里只存一块；持久前缀那一块各张不同。
+/// 那一台的库里 GPU 判器那一种的结论块数：4 张各一块持久前缀，加共用的一块全持久。
+const GPU_JUDGE_BLOCKS_OF_THE_GIVEN_STATES_ITEM: usize = GIVEN_STATES_TABLES + 1;
 const GIVEN_STATES_ITEM: &str = "given_states_gpu_import_probe";
-
-fn repository_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../Cargo.lock")
-        .canonicalize()
-        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
-        .parent()
-        .expect("Cargo.lock 所在的目录就是仓根")
-        .to_path_buf()
-}
 
 /// 录好的一条流：崩溃枚举要的五样加两个崩溃点。
 struct RecordedFlow {
@@ -110,23 +105,24 @@ fn record_new_pool_file_creation(tag: &str) -> RecordedFlow {
     }
 }
 
-/// 用例的目录（家目录下流水线单元测试那一类的长期库里以用例标签命名的一份，起跑先清空、跑完留着）：一份开了 GPU 的多机配置
+/// 用例的目录（一次性目录：起跑是空的、用完删，长期库一行不写）：一份开了 GPU 的多机配置
 /// （显卡先后照抄调用方给这个进程的那一份，`card_priority_lines_of_the_caller`；清场之下要清场之后那一份）与两份库（第二台的、本机的）。
 struct GpuImportDirectory {
     configuration: PathBuf,
     other_host_library: PathBuf,
     this_host_library: PathBuf,
+    _directory: DisposableLibraryDirectory,
 }
 
 impl GpuImportDirectory {
     fn new(tag: &str) -> Self {
-        let directory = amplification_unit_tests_library_directory_emptied_at_the_start(&format!(
-            "gpu-import-{tag}"
-        ))
-        .expect("流水线单元测试那一类里这条用例的目录");
+        let directory = DisposableLibraryDirectory::new(&format!("gpu-import-{tag}"))
+            .expect("流水线单元测试那一类里这条用例的目录");
         let configuration = directory.join("multi-host-with-gpu.env");
-        let cards =
-            card_priority_lines_of_the_caller(&repository_root()).expect("本机的多机配置读得了");
+        let cards = card_priority_lines_of_the_caller(
+            &std::env::current_dir().expect("取得到这个进程的当前目录（多机配置从这里起找）"),
+        )
+        .expect("本机的多机配置读得了");
         std::fs::write(&configuration, format!("ENABLE_GPU=1\n{cards}"))
             .expect("写得了开 GPU 的配置");
         let other_host_library = directory.join("other-host-library");
@@ -135,6 +131,7 @@ impl GpuImportDirectory {
             configuration,
             other_host_library,
             this_host_library,
+            _directory: directory,
         }
     }
 }
@@ -186,13 +183,13 @@ fn importing_the_other_share_on_the_gpu_brings_its_gpu_judge_conclusion_and_its_
         ("SINGLEFS_CRASH_AMPLIFICATION_SHARE", OsStr::new("1/2")),
     ]);
     let other_share_run = amplify(&recorded, "gpu-pipeline-import");
-    environment.set(
+    environment.set_variable(
         "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
         directory.this_host_library.as_os_str(),
     );
-    environment.set("SINGLEFS_CRASH_AMPLIFICATION_SHARE", OsStr::new("0/2"));
+    environment.set_variable("SINGLEFS_CRASH_AMPLIFICATION_SHARE", OsStr::new("0/2"));
     let this_share_run = amplify(&recorded, "gpu-pipeline-import");
-    environment.set(
+    environment.set_variable(
         "SINGLEFS_CRASH_AMPLIFICATION_IMPORT",
         directory.other_host_library.as_os_str(),
     );
@@ -247,7 +244,7 @@ fn importing_the_other_share_on_the_gpu_brings_its_gpu_judge_conclusion_and_its_
     assert!(
         other_share_conclusions
             .iter()
-            .any(|(_, kind, _)| *kind == ConclusionKind::GpuJudge),
+            .any(|(_, kind, _)| *kind == ConclusionKind::ImageJudgement),
         "前提：第二台那一份库里有 GPU 判器那一种结论：{other_share_conclusions:?}"
     );
     assert_eq!(
@@ -273,15 +270,24 @@ fn importing_the_other_share_on_the_gpu_brings_its_gpu_judge_conclusion_and_its_
         "导入那一趟第 ③ 段拿 GPU 核对代码的核对行比：第二台那一块的 GPU 核对行导进来了，没有一块缺核对行"
     );
     let this_share_store = open_the_library(&directory.this_host_library);
-    let gpu_verifier = gpu_verifier_digest();
     for (block_key, _, _) in &other_share_conclusions {
+        let verifier_keys = other_share_store
+            .verifier_row_keys_of_block(block_key)
+            .expect("列得出第二台的核对键");
+        assert_eq!(
+            verifier_keys.len(),
+            1,
+            "前提：第二台在卡上核过块 {}（一把核对键：GPU 核对单元与事实表摘要）",
+            block_key.short_text()
+        );
+        let gpu_verifier = verifier_keys[0];
         let verifier_row_of_the_other_share = other_share_store
             .read_verifier_block(block_key, &gpu_verifier)
             .expect("读得了第二台的核对行");
         assert!(
             verifier_row_of_the_other_share.is_some(),
             "前提：第二台在卡上核过块 {}",
-            block_key.stream_or_node_name.as_str()
+            block_key.short_text()
         );
         assert_eq!(
             this_share_store
@@ -289,7 +295,7 @@ fn importing_the_other_share_on_the_gpu_brings_its_gpu_judge_conclusion_and_its_
                 .expect("读得了导入之后的核对行"),
             verifier_row_of_the_other_share,
             "块 {} 的 GPU 核对行：导入之后的本机库与第二台的读回不同",
-            block_key.stream_or_node_name.as_str()
+            block_key.short_text()
         );
     }
     drop((other_share_store, this_share_store));
@@ -297,7 +303,8 @@ fn importing_the_other_share_on_the_gpu_brings_its_gpu_judge_conclusion_and_its_
 }
 
 /// 新池新建文件那条流上的几张给定状态表：第 k 张两个状态，持久了前 k·写数/张数 次写的与全部持久的（一条录制流的前缀都是合法的崩溃状态），
-/// 表名带 k（同 `crash_amplification_pipeline_records_checks_and_reuses.rs` 那一份）。
+/// 表名带 k（同 `crash_amplification_pipeline_records_checks_and_reuses.rs` 那一份）。k 小于张数，持久前缀那一个状态总有写没持久，
+/// 与全持久那一个不在同一块。
 fn given_states_tables_of_the_flow(
     recorded: &RecordedFlow,
     table_count: usize,
@@ -331,12 +338,12 @@ fn judge_every_given_states_table_or_report_not_run(
 ) -> Option<(Vec<GivenStatesConclusionsOfATable>, GivenStatesRun)> {
     let engine = GivenStatesEngine::start_from_environment(
         GivenStatesItem {
-            item_name: GIVEN_STATES_ITEM.to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale: "new_pool_file_creation gpu_import_probe".to_string(),
+            item_name: format!(
+                "{}::new_pool_file_creation gpu_import_probe",
+                GIVEN_STATES_ITEM
+            ),
         },
         &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root(),
     )
     .expect("配了 GPU 的给定状态表引擎起得来");
     let mut conclusions = Vec::with_capacity(tables.len());
@@ -358,11 +365,13 @@ fn judge_every_given_states_table_or_report_not_run(
 }
 
 /// 给定状态表那一路（`GivenStatesEngine::import_the_table_from_the_other_hosts`）：配置开 GPU，权重 0,1 让每张表都归 1/2 那一台；
-/// 那一台在卡上判这一项的 4 张表（每张只存 GPU 判器那一块）、写一份库；本机这一份（0/2，一张表都不归它）带
+/// 那一台在卡上判这一项的 4 张表（只存 GPU 判器那一种）、写一份库；本机这一份（0/2，一张表都不归它）带
 /// `SINGLEFS_CRASH_AMPLIFICATION_IMPORT=<那一台的库>` 判同一批：每张都从那份库点名导入、照库里的复用（复用要 GPU 判器那一种在），
-/// 一张都不现判。账：导入的块数等于那一台库里的结论块数（4 张 × GPU 判器一种 = 4）、复用 4 张、现判 0 张、留给别的机器 0 张。
+/// 一张都不现判。块按段切（L6）、块键只由内容定：每张表两块（持久前缀那一个状态所在那一段一块、全部持久一块），4 张表的全部持久那一块
+/// 是同一把键，那一台的库里 GPU 判器那一种 5 块、别的种类一块都没有。账：按表点名导入，每张表点它自己那两块，写下的加本库已有且相同的
+/// 都数（全部持久那一块第一张写下、后三张已有且相同），导入 8 块；复用 4 张、现判 0 张、留给别的机器 0 张。
 /// 判别力（`crates/mutations.tsv`）：点名时漏掉 GPU 判器那一种，导入之后库里还是没有这张表 GPU 判器的结论，引擎判第一张表就报
-/// 「导入之后库里还是没有」。
+/// 「导入之后库里还是没有」；切块时不看段（每个状态都落进全部持久那一组，一张表退回一块），那一台的库里 4 块、导入 4 块。
 #[test]
 fn given_states_tables_judged_on_the_gpu_by_another_host_are_imported_with_their_gpu_judge_conclusions(
 ) {
@@ -377,9 +386,7 @@ fn given_states_tables_judged_on_the_gpu_by_another_host_are_imported_with_their
     // 给定状态引擎不经公共模块的 run_from_environment 那一路（那一路配置里抄不到显卡先后时自己补）：调用方的显卡先后经环境变量交，
     // 配置里抄到的是空串时（副本里没有仓根 multi-host.env）清场之下照样起得来（common_gpu_cards_of_the_caller 文件头）
     let cards =
-        common_crash_points::common_gpu_cards_of_the_caller::card_priority_value_of_the_caller(
-            &repository_root(),
-        );
+        common_crash_points::common_gpu_cards_of_the_caller::card_priority_value_of_the_caller();
     let mut environment = common_crash_points::CrashAmplificationEnvironment::cleared_then_set(&[
         (
             "SINGLEFS_MULTI_HOST_CONFIG",
@@ -401,12 +408,12 @@ fn given_states_tables_judged_on_the_gpu_by_another_host_are_imported_with_their
     else {
         return;
     };
-    environment.set("SINGLEFS_CRASH_AMPLIFICATION_SHARE", OsStr::new("0/2"));
-    environment.set(
+    environment.set_variable("SINGLEFS_CRASH_AMPLIFICATION_SHARE", OsStr::new("0/2"));
+    environment.set_variable(
         "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
         directory.this_host_library.as_os_str(),
     );
-    environment.set(
+    environment.set_variable(
         "SINGLEFS_CRASH_AMPLIFICATION_IMPORT",
         directory.other_host_library.as_os_str(),
     );
@@ -433,18 +440,18 @@ fn given_states_tables_judged_on_the_gpu_by_another_host_are_imported_with_their
     let other_host_conclusions = other_host_store
         .stored_conclusion_keys()
         .expect("列得出那一台的结论");
+    let gpu_judge_blocks = other_host_conclusions
+        .iter()
+        .filter(|(_, kind, _)| *kind == ConclusionKind::ImageJudgement)
+        .count();
     assert_eq!(
-        other_host_conclusions
-            .iter()
-            .filter(|(_, kind, _)| *kind == ConclusionKind::GpuJudge)
-            .count(),
-        GIVEN_STATES_TABLES,
-        "前提：那一台的库里每张表一块 GPU 判器结论"
+        gpu_judge_blocks, GPU_JUDGE_BLOCKS_OF_THE_GIVEN_STATES_ITEM,
+        "前提：那一台的库里 GPU 判器那一种 {GIVEN_STATES_TABLES} 张表各一块持久前缀、加 {GIVEN_STATES_TABLES} 张共用的一块全部持久（块键只由内容定）"
     );
     assert_eq!(
         other_host_conclusions.len(),
-        GIVEN_STATES_TABLES,
-        "前提：那一台的库里每张表只有 GPU 判器那一块（配了 GPU 只由 GPU 判器判）"
+        gpu_judge_blocks,
+        "前提：那一台的库里只有 GPU 判器那一种（配了 GPU 只由 GPU 判器判）：{other_host_conclusions:?}"
     );
     drop(other_host_store);
     assert_eq!(
@@ -454,8 +461,14 @@ fn given_states_tables_judged_on_the_gpu_by_another_host_are_imported_with_their
             importing_run.tally.tables_judged_here,
             importing_run.tally.tables_left_to_the_other_hosts
         ),
-        (4, 4, 0, 0),
-        "按名导入：导入 4 块（每张表 GPU 判器那一块）、复用 4 张、现判 0 张、留给别的机器 0 张"
+        (
+            u64::try_from(GIVEN_STATES_TABLES * BLOCKS_OF_EACH_GIVEN_STATES_TABLE)
+                .expect("块数装得进 u64"),
+            4,
+            0,
+            0
+        ),
+        "按名导入：每张表点它自己那两块（持久前缀那一块、全部持久那一块），写下的加已有且相同的导入 8 块、复用 4 张、现判 0 张、留给别的机器 0 张"
     );
     assert!(
         importing_run.red_items().is_empty(),
@@ -463,6 +476,87 @@ fn given_states_tables_judged_on_the_gpu_by_another_host_are_imported_with_their
         importing_run.red_items()
     );
     drop(directory);
+}
+
+/// 观察者「交回崩溃镜像本身」（第一条 GPU 观察者用例）：一个写都不发，交回的盘就是崩溃镜像按持久集合落好的那一份，判每一条不变量。
+/// 观察者的身份是这个 fn 的闭包键（入口登记在 `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`）。
+fn hand_back_the_crash_image(
+    _ordinal: u64,
+    image: &singlefs_harness::memory_pool::CrashImage<'_>,
+    _report: &singlefs_core::recovery::RecoveryReport,
+    _counts: &mut singlefs_checker_tier::crash::CrashPointReplayObserverCounts,
+) -> singlefs_checker_tier::crash_amplification::ImageAfterTheObserver {
+    let mut disks_after_the_observer = image.base.clone();
+    for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
+        if *is_persisted {
+            disks_after_the_observer.apply_writes(std::slice::from_ref(write));
+        }
+    }
+    singlefs_checker_tier::crash_amplification::ImageAfterTheObserver {
+        writes_on_the_crash_image: Vec::new(),
+        ranges_read_on_the_crash_image:
+            singlefs_checker_tier::crash_amplification::ReadRangeOnTheCrashImage::whole_pool(
+                &disks_after_the_observer,
+            ),
+        disks_after_the_observer,
+        invariants_judged:
+            singlefs_checker_tier::crash_amplification::InvariantsJudgedOnTheImageAfterTheObserver::EveryImplementedInvariant,
+        counter_when_the_pool_checker_is_clean: "pool_checker_clean_on_the_crash_image".to_string(),
+    }
+}
+
+/// 观察者「把第一块盘的系统配置槽 0 号原样重写过判表一个落点的写数上限」：在崩溃镜像上把那一槽原样重写
+/// `MAXIMUM_WRITES_PER_LOCATION` 加 6 次（字节与崩溃镜像上那一槽相同，盘不变），判每一条不变量。身份同上，入口登记在同一张表。
+fn rewrite_the_first_system_configuration_slot_past_the_judge_table_limit(
+    _ordinal: u64,
+    image: &singlefs_harness::memory_pool::CrashImage<'_>,
+    _report: &singlefs_core::recovery::RecoveryReport,
+    _counts: &mut singlefs_checker_tier::crash::CrashPointReplayObserverCounts,
+) -> singlefs_checker_tier::crash_amplification::ImageAfterTheObserver {
+    use singlefs_checker_tier::crash_amplification::{
+        ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver,
+    };
+    use singlefs_checker_tier::crash_judge_tables::MAXIMUM_WRITES_PER_LOCATION;
+    let rewrites_of_the_slot = MAXIMUM_WRITES_PER_LOCATION + 6;
+    let mut disks_after_the_observer = image.base.clone();
+    for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
+        if *is_persisted {
+            disks_after_the_observer.apply_writes(std::slice::from_ref(write));
+        }
+    }
+    let first_device = *disks_after_the_observer
+        .devices
+        .keys()
+        .next()
+        .expect("池里至少一块盘");
+    let slot_bytes = singlefs_core::recovery::PoolReader::read(
+        &disks_after_the_observer,
+        first_device,
+        singlefs_core::address::DeviceOffsetInBytes(0),
+        4096,
+    )
+    .expect("系统配置槽 0 号在盘内");
+    let writes_on_the_crash_image: Vec<singlefs_harness::memory_pool::RetainedWrite> = (0
+        ..rewrites_of_the_slot)
+        .map(|_rewrite| singlefs_harness::memory_pool::RetainedWrite {
+            device: first_device,
+            kind: singlefs_harness::segments::StepKind::SystemConfigurationSlot,
+            is_force_unit_access: true,
+            offset: singlefs_core::address::DeviceOffsetInBytes(0),
+            contents: singlefs_harness::memory_pool::WrittenContents::Bytes(slot_bytes.clone()),
+        })
+        .collect();
+    disks_after_the_observer.apply_writes(&writes_on_the_crash_image);
+    ImageAfterTheObserver {
+        writes_on_the_crash_image,
+        ranges_read_on_the_crash_image:
+            singlefs_checker_tier::crash_amplification::ReadRangeOnTheCrashImage::whole_pool(
+                &disks_after_the_observer,
+            ),
+        disks_after_the_observer,
+        invariants_judged: InvariantsJudgedOnTheImageAfterTheObserver::EveryImplementedInvariant,
+        counter_when_the_pool_checker_is_clean: "pool_checker_clean_after_the_rewrites".to_string(),
+    }
 }
 
 /// 观察者走两段、池级 checker 上 GPU（用户 2026-10-13 定「观察者改走两段、池级 checker 上 GPU、按恢复结果去重」）：配置开了 GPU，
@@ -473,8 +567,7 @@ fn given_states_tables_judged_on_the_gpu_by_another_host_are_imported_with_their
 #[test]
 fn an_observer_handing_back_its_disks_is_judged_on_the_gpu_and_its_conclusion_names_the_card() {
     use singlefs_checker_tier::crash_amplification::{
-        ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver, NodeOfAnObserver,
-        ObserverCode, ObserverDeduplication, ObserverOnTheNodes,
+        NodeOfAnObserver, ObserverCode, ObserverDeduplication, ObserverOnTheNodes,
     };
     use singlefs_checker_tier::crash_identity::ObserverName;
     use singlefs_checker_tier::verdict_store::JudgingDevice;
@@ -495,26 +588,7 @@ fn an_observer_handing_back_its_disks_is_judged_on_the_gpu_and_its_conclusion_na
             directory.this_host_library.as_os_str(),
         ),
     ]);
-    let observe = |_ordinal: u64,
-                   image: &singlefs_harness::memory_pool::CrashImage<'_>,
-                   _report: &singlefs_core::recovery::RecoveryReport,
-                   _counts: &mut singlefs_checker_tier::crash::CrashPointReplayObserverCounts|
-     -> ImageAfterTheObserver {
-        let mut disks_after_the_observer = image.base.clone();
-        for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
-            if *is_persisted {
-                disks_after_the_observer.apply_writes(std::slice::from_ref(write));
-            }
-        }
-        ImageAfterTheObserver {
-            writes_on_the_crash_image: Vec::new(),
-            disks_after_the_observer,
-            invariants_judged:
-                InvariantsJudgedOnTheImageAfterTheObserver::EveryImplementedInvariant,
-            counter_when_the_pool_checker_is_clean: "pool_checker_clean_on_the_crash_image"
-                .to_string(),
-        }
-    };
+    let observe = hand_back_the_crash_image;
     let observers = [ObserverOnTheNodes {
         observer_name: ObserverName::new("crash_image_handed_back").expect("名字合规矩"),
         observer_code_file: THIS_FILE.to_string(),
@@ -528,7 +602,7 @@ fn an_observer_handing_back_its_disks_is_judged_on_the_gpu_and_its_conclusion_na
         }],
         observe: ObserverCode::HandsBackAnImage {
             observe: &observe,
-            deduplication: ObserverDeduplication::ByTheRecoveredImageBytes,
+            deduplication: ObserverDeduplication::ByTheRecoveryReportAndTheReadSet,
         },
     }];
     let (run, _line) =
@@ -597,7 +671,7 @@ fn an_observer_handing_back_its_disks_is_judged_on_the_gpu_and_its_conclusion_na
         .stored_conclusion_keys()
         .expect("列得出库里的结论")
         .into_iter()
-        .filter(|(_key, kind, _version)| matches!(kind, ConclusionKind::Observer { .. }))
+        .filter(|(_key, kind, _version)| matches!(kind, ConclusionKind::Observer))
         .collect();
     assert!(!observer_conclusions.is_empty(), "库里有观察者那几块的结论");
     for (key, kind, version) in observer_conclusions {
@@ -621,11 +695,9 @@ fn an_observer_handing_back_its_disks_is_judged_on_the_gpu_and_its_conclusion_na
 #[test]
 fn an_observer_rewriting_one_location_past_the_judge_table_limit_is_still_judged_on_the_gpu() {
     use singlefs_checker_tier::crash_amplification::{
-        ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver, NodeOfAnObserver,
-        ObserverCode, ObserverDeduplication, ObserverOnTheNodes,
+        NodeOfAnObserver, ObserverCode, ObserverDeduplication, ObserverOnTheNodes,
     };
     use singlefs_checker_tier::crash_identity::ObserverName;
-    use singlefs_checker_tier::crash_judge_tables::MAXIMUM_WRITES_PER_LOCATION;
     let test_name =
         "an_observer_rewriting_one_location_past_the_judge_table_limit_is_still_judged_on_the_gpu";
     if gpu_card_pool_or_report_not_run(test_name).is_none() {
@@ -643,50 +715,7 @@ fn an_observer_rewriting_one_location_past_the_judge_table_limit_is_still_judged
             directory.this_host_library.as_os_str(),
         ),
     ]);
-    let rewrites_of_the_slot = MAXIMUM_WRITES_PER_LOCATION + 6;
-    let observe = |_ordinal: u64,
-                   image: &singlefs_harness::memory_pool::CrashImage<'_>,
-                   _report: &singlefs_core::recovery::RecoveryReport,
-                   _counts: &mut singlefs_checker_tier::crash::CrashPointReplayObserverCounts|
-     -> ImageAfterTheObserver {
-        let mut disks_after_the_observer = image.base.clone();
-        for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
-            if *is_persisted {
-                disks_after_the_observer.apply_writes(std::slice::from_ref(write));
-            }
-        }
-        let first_device = *disks_after_the_observer
-            .devices
-            .keys()
-            .next()
-            .expect("池里至少一块盘");
-        let slot_bytes = singlefs_core::recovery::PoolReader::read(
-            &disks_after_the_observer,
-            first_device,
-            singlefs_core::address::DeviceOffsetInBytes(0),
-            4096,
-        )
-        .expect("系统配置槽 0 号在盘内");
-        let writes_on_the_crash_image: Vec<singlefs_harness::memory_pool::RetainedWrite> = (0
-            ..rewrites_of_the_slot)
-            .map(|_rewrite| singlefs_harness::memory_pool::RetainedWrite {
-                device: first_device,
-                kind: singlefs_harness::segments::StepKind::SystemConfigurationSlot,
-                is_force_unit_access: true,
-                offset: singlefs_core::address::DeviceOffsetInBytes(0),
-                contents: singlefs_harness::memory_pool::WrittenContents::Bytes(slot_bytes.clone()),
-            })
-            .collect();
-        disks_after_the_observer.apply_writes(&writes_on_the_crash_image);
-        ImageAfterTheObserver {
-            writes_on_the_crash_image,
-            disks_after_the_observer,
-            invariants_judged:
-                InvariantsJudgedOnTheImageAfterTheObserver::EveryImplementedInvariant,
-            counter_when_the_pool_checker_is_clean: "pool_checker_clean_after_the_rewrites"
-                .to_string(),
-        }
-    };
+    let observe = rewrite_the_first_system_configuration_slot_past_the_judge_table_limit;
     let observers = [ObserverOnTheNodes {
         observer_name: ObserverName::new("system_configuration_slot_rewritten_past_the_limit")
             .expect("名字合规矩"),
@@ -701,7 +730,7 @@ fn an_observer_rewriting_one_location_past_the_judge_table_limit_is_still_judged
         }],
         observe: ObserverCode::HandsBackAnImage {
             observe: &observe,
-            deduplication: ObserverDeduplication::ByTheRecoveredImageBytes,
+            deduplication: ObserverDeduplication::ByTheRecoveryReportAndTheReadSet,
         },
     }];
     let (run, _line) =

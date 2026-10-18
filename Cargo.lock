@@ -806,6 +806,7 @@ dependencies = [
  "singlefs-format",
  "singlefs-harness",
  "singlefs-reference-filesystem",
+ "singlefs-unit-graph",
  "wgpu",
 ]
 
@@ -842,6 +843,10 @@ version = "0.1.0"
 dependencies = [
  "vstd",
 ]
+
+[[package]]
+name = "singlefs-unit-graph"
+version = "0.1.0"
 
 [[package]]
 name = "slab"

@@ -1284,19 +1284,33 @@ pub fn ring_slot_of_the_newest_root_on(image: &MemoryPool, device: DeviceIdentit
 pub enum ReadsOfTheSlotFailingAfterTheRebuildPass {
     /// 从重读那一遍起每一次都报读错（第三轮攻方 `research/prompts/m3-batch10-code-r3-opus-output.md` 第 1.3 节那一形：只在「从重读起一直坏」上出现）。
     FromTheRereadOnward,
-    /// 重读那一遍与写行、暖机之后推的抬 F 算上限读它那一次（[`READ_OF_THE_SLOT_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE`]）报读错，
-    /// 别的读得出（抬 F 那一遍瞬时读坏）。
-    OnTheRereadAndTheFirstReadOfTheFloorRaiseOnly,
+    /// 重读那一遍报读错；可写挂载头一次把它读进预演与真做共用的那一份那一次（[`READ_OF_THE_SLOT_INTO_THE_READS_SHARED_IN_THIS_MOUNT`]）
+    /// 读成功、读回乱字节（记下的是坏字节），别的读得出：写行与暖机之后推的抬 F 算上限那一遍取记下的那一份读坏，当场重读穿到盘上读得出
+    /// （[`READ_OF_THE_SLOT_REREAD_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE`]）。
+    OnTheRereadAndBackAsGarbageOnItsFirstReadIntoTheReadsSharedInThisMount,
     /// 只有重读那一遍报读错（对照）。
     OnlyOnTheReread,
+    /// 重建两遍都读得出（这个进程知道那里住着一条根）；只有可写挂载头一次把它读进预演与真做共用的那一份那一次
+    /// （[`READ_OF_THE_SLOT_INTO_THE_READS_SHARED_IN_THIS_MOUNT`]）读成功、读回乱字节（记下的是坏字节）。
+    BackAsGarbageOnlyOnItsFirstReadIntoTheReadsSharedInThisMount,
+    /// 重建那一遍之后一次都不读坏（对照）。
+    NeverAfterTheRebuildPass,
 }
 
-/// `narrow-384-20-2` 上照 [`ReadsOfTheSlotFailingAfterTheRebuildPass`] 再挂时，盘 0 最新那条根住的槽第几次被读是写行与暖机之后推的
-/// 第一次抬 F 算上限读根环那一遍（`mount::roots_of_the_ring_for_the_ceiling`）：现量的（第 10i 批在副本上逐次打出读它的调用栈：
-/// 1–5 读阶段，6、7 重建分配器两遍，8、9 取号判最大实例代号，10–15 先写系统配置那几步算生效 F，16 算上限）。挂载里读根环的次序变了，
-/// 这个数跟着变：瞬时那条用例另断言这一次读落在暖机最后一段写之后的第一遍读根环里、紧接着当场重读、写之前这一槽还被读过
-/// （[`read_opens_the_floor_raise_after_the_last_write_and_is_reread_at_once`]），读序一变那一项就红。
-pub const READ_OF_THE_SLOT_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE: u64 = 16;
+/// `narrow-384-20-2` 上照 [`ReadsOfTheSlotFailingAfterTheRebuildPass`] 再挂时，盘 0 最新那条根住的槽第几次读到盘上是可写挂载头一次把它读进
+/// 预演与真做共用的那一份（`mounted_session::DeviceReadOnceInThisMount`；岔路单 `research/prompts/m3-b44-code-r2-forks.md` 岔路一
+/// 「读一次两边共用」）：1–5 读阶段，6、7 重建分配器两遍，8 是可写挂载这一段里头一次读根环（之后写行、暖机、抬 F 读它都取记下的那一份）。
+pub const READ_OF_THE_SLOT_INTO_THE_READS_SHARED_IN_THIS_MOUNT: u64 =
+    READ_OF_EACH_ROOT_RING_SLOT_BY_THE_REREAD + 1;
+
+/// 同上，那一槽第几次读到盘上是写行与暖机之后推的第一次抬 F 算上限那一遍（`mount::roots_of_the_ring_for_the_ceiling`）读坏之后的当场重读：
+/// 9 是真做取号写之前那一遍（条款要那一刻再读一次盘，照旧读盘）；之后读它都取记下的那一份，抬 F 算上限那一遍读到记下的坏字节、
+/// 当场重读那一读绕过记下的那一份穿到盘上（主 agent 判定：抬 F 与续做里「读坏当场重读」那一读不许被共用的那一份吃掉），是第 10 次。
+/// 重读读到自证过的换掉记下的那一份，之后再算一次上限、重算影子账那几遍取它，不再到盘上。读到盘上的次序变了这个数跟着变：
+/// 瞬时那条用例另断言这一次读前后都紧挨着一段写、这一槽上一次读到盘上在这次挂载第一个写之前
+/// （[`read_is_the_floor_raises_reread_alone_on_the_disk_between_two_writes`]），读序一变那一项就红。
+pub const READ_OF_THE_SLOT_REREAD_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE: u64 =
+    READ_OF_THE_SLOT_INTO_THE_READS_SHARED_IN_THIS_MOUNT + 2;
 
 /// S1 那一形再挂之后看到的那几样（各用例自己断言）。
 #[derive(Debug, PartialEq, Eq)]
@@ -1316,53 +1330,42 @@ pub struct RemountWithARootSelfVerifiedOnlyOnTheRebuildPass {
     pub lone_survivor_reads_what_both_devices_read_before_the_remount: [bool; 2],
     /// 丢盘 0、丢盘 1 之后，挂载之前环里还在、不低于 F 的每条自证根在剩下那块盘上整读与挂载之前相同。
     pub lone_survivor_reads_every_root_still_in_the_ring_as_before_the_remount: [bool; 2],
-    /// 那一槽第 [`READ_OF_THE_SLOT_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE`] 次读落在它之前最后一段写之后的第一遍读根环里、
-    /// 紧接着是同一槽的重读（[`read_opens_the_floor_raise_after_the_last_write_and_is_reread_at_once`]）。
-    pub the_named_read_opens_the_floor_raise_after_the_last_write_and_is_reread_at_once: bool,
+    /// 那一槽第 [`READ_OF_THE_SLOT_REREAD_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE`] 次读到盘上的是抬 F 那一段写之前唯一一次读到盘上的根环槽读，
+    /// 这一槽上一次读到盘上在这次挂载第一个写之前（[`read_is_the_floor_raises_reread_alone_on_the_disk_between_two_writes`]）。
+    pub the_named_read_is_the_floor_raises_reread_alone_on_the_disk_between_two_writes: bool,
+    /// 挂载结束时那一槽一共读到盘上几次。
+    pub reads_of_the_slot_on_the_disk_by_the_end_of_the_remount: u64,
 }
 
-/// 读写次序里（`ring_slot`，第 `read` 次读）那一次读是不是：① 落在它之前最后一段写之后的第一遍读根环里——那一段写之后的根环槽读照
-/// `every_root_ring_slot` 的次序从第一个槽起、一个槽一次地读到它；② 紧接着的一次读是同一槽的重读；③ 重读之后、下一段写之前这一槽还被读过。
-/// 挂载里暖机之后推的抬 F，第一遍读根环是准入算上限那一遍（`mount::roots_of_the_ring_for_the_ceiling`，这一类槽读坏当场重读），
-/// 之后写之前还有再算一次上限、重算影子账那几遍（③）。别的几遍对不上：先写系统配置那几步算生效 F 的那一遍也是上一次发布的写之后第一遍、
-/// 读坏也当场重读，紧接着却是这次发布的写（③ 不成立）；抬 F 那一串里第二次算上限、重算影子账那几遍不是写之后的第一遍（① 不成立）。
-pub fn read_opens_the_floor_raise_after_the_last_write_and_is_reread_at_once(
+/// 读写次序里（`ring_slot`，第 `read` 次读到盘上）那一次读是不是：① 紧挨在一段写之后（那段写之后头一次读到盘上的根环槽读）；
+/// ② 紧挨着它的是下一段写（两段写之间读到盘上的根环槽读只有它这一次）；③ 这一槽上一次读到盘上（第 `read − 1` 次）在这次挂载第一个写之前。
+/// 读一次两边共用之后，这次挂载写之后读根环都取预演与真做共用的那一份、不到盘上，只有读坏之后当场重读那一读穿到盘上
+/// （主 agent 判定：抬 F 与续做里「读坏当场重读」那一读不许被共用的那一份吃掉）。暖机之后推的抬 F 头一遍读根环是准入算上限那一遍：
+/// 它取到记下的坏字节、当场重读（①；③：写行、暖机算生效 F 那几遍读它取的是记下的那一份，没到盘上）；重读读到自证过的换掉记下的那一份，
+/// 之后再算一次上限、重算影子账那几遍取它、不再到盘上（②）。别的位置对不上：真做取号写之前那一遍照旧读盘，前面没有写（① 不成立）；
+/// 重读读到的不换掉记下的那一份时，再算一次上限那一遍又读坏、又重读一次（② 不成立）。
+pub fn read_is_the_floor_raises_reread_alone_on_the_disk_between_two_writes(
     reads_and_writes_in_order: &[Option<(RootRingSlot, u64)>],
-    ring_slots_in_order: &[RootRingSlot],
     ring_slot: RootRingSlot,
     read: u64,
 ) -> bool {
-    let Some(position) = reads_and_writes_in_order
-        .iter()
-        .position(|event| *event == Some((ring_slot, read)))
-    else {
+    let position_of = |read_of_the_slot: u64| {
+        reads_and_writes_in_order
+            .iter()
+            .position(|event| *event == Some((ring_slot, read_of_the_slot)))
+    };
+    let Some(position) = position_of(read) else {
         return false;
     };
-    let reread_at_once =
-        reads_and_writes_in_order.get(position + 1) == Some(&Some((ring_slot, read + 1)));
-    let first_event_after_the_last_write = reads_and_writes_in_order[..position]
-        .iter()
-        .rposition(Option::is_none)
-        .map_or(0, |last_write| last_write + 1);
-    let slots_read_since_the_last_write: Vec<RootRingSlot> = reads_and_writes_in_order
-        [first_event_after_the_last_write..=position]
-        .iter()
-        .filter_map(|event| event.map(|(slot_read, _)| slot_read))
-        .collect();
-    let Some(position_in_the_ring) = ring_slots_in_order
-        .iter()
-        .position(|slot_in_the_ring| *slot_in_the_ring == ring_slot)
-    else {
-        return false;
-    };
-    let read_again_before_the_next_write = reads_and_writes_in_order
-        .iter()
-        .skip(position + 2)
-        .take_while(|event| event.is_some())
-        .any(|event| event.is_some_and(|(slot_read, _)| slot_read == ring_slot));
-    reread_at_once
-        && read_again_before_the_next_write
-        && slots_read_since_the_last_write == ring_slots_in_order[..=position_in_the_ring]
+    let right_after_a_write = position > 0 && reads_and_writes_in_order[position - 1].is_none();
+    let right_before_a_write = reads_and_writes_in_order.get(position + 1) == Some(&None);
+    let first_write = reads_and_writes_in_order.iter().position(Option::is_none);
+    let previous_read_before_the_first_write =
+        match (read.checked_sub(1).and_then(position_of), first_write) {
+            (Some(previous), Some(first_write)) => previous < first_write,
+            (None, _) | (Some(_), None) => false,
+        };
+    right_after_a_write && right_before_a_write && previous_read_before_the_first_write
 }
 
 /// `narrow-384-20-2` 上照一份读坏计划再挂一次交回的：挂载的结局、挂载之后的盘面、钩子每次调的那一刻每个根环槽读过几次、
@@ -1406,7 +1409,7 @@ pub fn remount_of_the_narrow_pool_with_device_one_failing_the_rebuild_pass_and_a
                 ),
             );
         }
-        ReadsOfTheSlotFailingAfterTheRebuildPass::OnTheRereadAndTheFirstReadOfTheFloorRaiseOnly => {
+        ReadsOfTheSlotFailingAfterTheRebuildPass::OnTheRereadAndBackAsGarbageOnItsFirstReadIntoTheReadsSharedInThisMount => {
             faulted_reads.extend(faulted_reads_of(
                 &[slot],
                 READ_OF_EACH_ROOT_RING_SLOT_BY_THE_REREAD,
@@ -1414,8 +1417,8 @@ pub fn remount_of_the_narrow_pool_with_device_one_failing_the_rebuild_pass_and_a
             ));
             faulted_reads.extend(faulted_reads_of(
                 &[slot],
-                READ_OF_THE_SLOT_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE,
-                RootRingSlotReadFault::ReadFails,
+                READ_OF_THE_SLOT_INTO_THE_READS_SHARED_IN_THIS_MOUNT,
+                RootRingSlotReadFault::ReadsBackGarbage,
             ));
         }
         ReadsOfTheSlotFailingAfterTheRebuildPass::OnlyOnTheReread => {
@@ -1425,6 +1428,14 @@ pub fn remount_of_the_narrow_pool_with_device_one_failing_the_rebuild_pass_and_a
                 RootRingSlotReadFault::ReadFails,
             ));
         }
+        ReadsOfTheSlotFailingAfterTheRebuildPass::BackAsGarbageOnlyOnItsFirstReadIntoTheReadsSharedInThisMount => {
+            faulted_reads.extend(faulted_reads_of(
+                &[slot],
+                READ_OF_THE_SLOT_INTO_THE_READS_SHARED_IN_THIS_MOUNT,
+                RootRingSlotReadFault::ReadsBackGarbage,
+            ));
+        }
+        ReadsOfTheSlotFailingAfterTheRebuildPass::NeverAfterTheRebuildPass => {}
     }
     let root_ring_reads = root_ring_reads_failing_also_from_a_read_onward(
         &before.image_to_remount,
@@ -1532,13 +1543,17 @@ pub fn remount_of_the_narrow_pool_with_the_newest_root_on_device_zero_self_verif
             );
             read_differently.is_empty()
         }),
-        the_named_read_opens_the_floor_raise_after_the_last_write_and_is_reread_at_once:
-            read_opens_the_floor_raise_after_the_last_write_and_is_reread_at_once(
+        the_named_read_is_the_floor_raises_reread_alone_on_the_disk_between_two_writes:
+            read_is_the_floor_raises_reread_alone_on_the_disk_between_two_writes(
                 &reads_and_writes_in_order,
-                &every_root_ring_slot(&before.parameters.geometry),
                 slot_of_the_newest_root_on_device_zero,
-                READ_OF_THE_SLOT_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE,
+                READ_OF_THE_SLOT_REREAD_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE,
             ),
+        reads_of_the_slot_on_the_disk_by_the_end_of_the_remount:
+            reads_of_each_slot_by_the_end_of_the_remount
+                .get(&slot_of_the_newest_root_on_device_zero)
+                .copied()
+                .unwrap_or(0),
     }
 }
 
@@ -1578,17 +1593,25 @@ pub fn a_root_self_verified_only_on_the_rebuild_pass_and_unreadable_from_the_rer
     );
 }
 
-/// 场景：同上，那一槽只在重读那一遍与写行、暖机之后推的抬 F 算上限读它那一次报读错，之后读得出（抬 F 那一遍瞬时读坏）。
-/// 预期：照旧——抬 F 那一遍读它读坏就重读一次、重读读出有效根就照读出来的算，与「那一槽只在重读那一遍报读错」的再挂同一份盘面；
-/// checker 不红，丢盘整读不变；点名的那一次读确是暖机最后一段写之后第一遍读根环（准入算上限那一遍）读它、当场重读（正推腿 K3-e：只靠常量时读序一变照样绿）。
+/// 场景：同上，那一槽只在重读那一遍报读错、在可写挂载头一次把它读进预演与真做共用的那一份那一次读回乱字节（读成功、自证不过，记下的是坏字节），
+/// 之后读得出：写行、暖机之后推的抬 F 算上限那一遍取到记下的坏字节（这一遍读坏），当场重读穿到盘上（盘上是好的）。
+/// 预期：抬 F 那一遍读它读坏就重读一次、重读读出有效根就照读出来的算，与「那一槽只在重读那一遍报读错」的再挂同一份盘面；
+/// checker 不红，丢盘整读不变；那一槽第 [`READ_OF_THE_SLOT_REREAD_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE`] 次读到盘上的是抬 F 那一段写之前
+/// 唯一一次读到盘上的根环槽读、它上一次读到盘上在第一个写之前，挂载结束时一共读到盘上这么多次（正推腿 K3-e：只靠常量时读序一变照样绿；
+/// 重读读到自证过的换掉记下的那一份，之后再算一次上限、重算影子账不再读坏、不再到盘上）。
 /// 判别力：抬 F 算上限那一遍读它读坏一次就拒、不重读（`crates/mutations.tsv`「第10i批 S1 抬 F 算上限读它读坏一次就拒、不重读」）时
-/// 挂载在写行、暖机之后报 `FloorRaiseFailedAfterTheMountsPublishes`，第一项红。
+/// 挂载在写行、暖机之后报 `FloorRaiseFailedAfterTheMountsPublishes`，第一项红；重读也取记下的那一份（`crates/mutations.tsv`
+/// 「4-4 修红 W16 读坏当场重读：重读也取共用的那一份」）时那一槽在抬 F 那一段一次都不到盘上，点名的那一项红；读到盘上的次序变了
+/// （「4-4 修红 W16 读序：真做取号写之前多读一遍根环」）时点名的那一次成了取号写之前那一遍，点名的那一项与读到盘上的次数红。
+/// 抬 F 算上限那一遍与重算影子账那一遍（`mount::readable_roots_for_raising_the_floor` 里两遍里只有一遍自证过的槽那一段）都读坏当场重读，
+/// 哪一遍先重读、换掉记下的那一份，从盘上看不出来：只改一处的变异这条用例照绿，「知道住着根的槽」那一类另有
+/// `writable_mount_reread_after_a_bad_read_reaches_the_disk_past_the_reads_shared_with_the_rehearsal.rs` 那条用例。
 pub fn a_root_self_verified_only_on_the_rebuild_pass_read_bad_once_more_after_the_reread_is_taken_as_read_by_the_floor_raise(
     images: &mut PoolCheckerImages,
 ) {
     assert_eq!(
         remount_of_the_narrow_pool_with_the_newest_root_on_device_zero_self_verified_only_on_the_rebuild_pass(images,
-            ReadsOfTheSlotFailingAfterTheRebuildPass::OnTheRereadAndTheFirstReadOfTheFloorRaiseOnly,
+            ReadsOfTheSlotFailingAfterTheRebuildPass::OnTheRereadAndBackAsGarbageOnItsFirstReadIntoTheReadsSharedInThisMount,
         ),
         RemountWithARootSelfVerifiedOnlyOnTheRebuildPass {
             root_ring_of_the_rebuilt_allocator: Ok(RootRingOfTheRebuiltAllocatorRead::OnTheOneReread),
@@ -1598,9 +1621,11 @@ pub fn a_root_self_verified_only_on_the_rebuild_pass_read_bad_once_more_after_th
             same_disk_as_a_remount_failing_the_slot_only_on_the_reread: true,
             lone_survivor_reads_what_both_devices_read_before_the_remount: [true, true],
             lone_survivor_reads_every_root_still_in_the_ring_as_before_the_remount: [true, true],
-            the_named_read_opens_the_floor_raise_after_the_last_write_and_is_reread_at_once: true,
+            the_named_read_is_the_floor_raises_reread_alone_on_the_disk_between_two_writes: true,
+            reads_of_the_slot_on_the_disk_by_the_end_of_the_remount:
+                READ_OF_THE_SLOT_REREAD_BY_THE_FIRST_CEILING_OF_THE_MOUNTS_FLOOR_RAISE,
         },
-        "两遍里只有一遍自证过的根、之后瞬时读坏一次：抬 F 重读读出来就照读出来的算"
+        "两遍里只有一遍自证过的根、之后读进共用的那一份时读坏一次：抬 F 当场重读穿到盘上，读出来就照读出来的算"
     );
 }
 

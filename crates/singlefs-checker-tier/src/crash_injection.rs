@@ -31,7 +31,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::time::Instant;
 
@@ -406,9 +406,49 @@ pub struct CrashPointFinding {
     pub image_files: Option<PathBuf>,
 }
 
+/// 报告与新发现写成文字时，崩溃镜像落在哪的路径写不写进去。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ImagePathsInTheText {
+    /// 写路径（给人看、回头找现场）。
+    Shown,
+    /// 不写路径：镜像目录每次调用各不相同（[`create_the_image_directory_of_a_campaign_call`]），两份报告比对时路径不进比对。
+    LeftOut,
+}
+
 impl CrashPointFinding {
     #[must_use]
     pub fn render(&self) -> String {
+        self.render_given(ImagePathsInTheText::Shown)
+    }
+
+    /// 同 [`CrashPointFinding::render`]，崩溃镜像落了盘只写一句、不写路径（两份报告比对时用这一份）。
+    #[must_use]
+    pub fn render_the_conclusions(&self) -> String {
+        self.render_given(ImagePathsInTheText::LeftOut)
+    }
+
+    /// 两个新发现除了崩溃镜像落在哪的路径之外逐样相同：镜像只比落没落盘（[`CrashInjectionReport::has_the_same_conclusions_as`] 逐个用它）。
+    #[must_use]
+    pub fn has_the_same_conclusions_as(&self, other: &Self) -> bool {
+        let Self {
+            signature,
+            seed,
+            crash_point,
+            stage,
+            observation,
+            read_back,
+            image_files,
+        } = self;
+        *signature == other.signature
+            && *seed == other.seed
+            && *crash_point == other.crash_point
+            && *stage == other.stage
+            && *observation == other.observation
+            && *read_back == other.read_back
+            && image_files.is_some() == other.image_files.is_some()
+    }
+
+    fn render_given(&self, image_paths: ImagePathsInTheText) -> String {
         let mut text = String::new();
         let _ = writeln!(
             text,
@@ -439,8 +479,14 @@ impl CrashPointFinding {
                 disagreement.implementation_answer
             );
         }
-        if let Some(directory) = &self.image_files {
-            let _ = writeln!(text, "  崩溃镜像留在：{}", directory.display());
+        match (&self.image_files, image_paths) {
+            (Some(directory), ImagePathsInTheText::Shown) => {
+                let _ = writeln!(text, "  崩溃镜像留在：{}", directory.display());
+            }
+            (Some(_), ImagePathsInTheText::LeftOut) => {
+                let _ = writeln!(text, "  崩溃镜像落了盘（路径见 render）");
+            }
+            (None, ImagePathsInTheText::Shown | ImagePathsInTheText::LeftOut) => {}
         }
         text
     }
@@ -1126,18 +1172,20 @@ impl StreamMarks {
     }
 }
 
-/// 每次掉电之后第一个写在写表里的下标，按次序：录制流下标（[`singlefs_harness::history::HistoryRun::first_stream_index_after_each_power_loss`]）
+/// 每次掉电之后第一个写在写表里的下标，按次序：录制流下标（[`singlefs_harness::history::HistoryRun::earliest_stream_index_after_each_power_loss`]）
 /// 换成写表下标，取录制流下标不小于它的第一个写（写表不算屏障，`stream_indexes` 与写表逐条对应）；掉电之后一个写都没录下的取写表长度。
 fn first_write_after_each_power_loss_in_the_write_table(
-    first_stream_index_after_each_power_loss: &[usize],
+    earliest_stream_index_after_each_power_loss: &[usize],
     stream_indexes: &[usize],
 ) -> Vec<usize> {
-    first_stream_index_after_each_power_loss
+    earliest_stream_index_after_each_power_loss
         .iter()
-        .map(|first_stream_index_after_the_power_loss| {
+        .map(|earliest_stream_index_after_the_power_loss| {
             stream_indexes
                 .iter()
-                .position(|stream_index| *stream_index >= *first_stream_index_after_the_power_loss)
+                .position(|stream_index| {
+                    *stream_index >= *earliest_stream_index_after_the_power_loss
+                })
                 .unwrap_or(stream_indexes.len())
         })
         .collect()
@@ -1467,7 +1515,7 @@ fn inject_crashes_into_history_with_every_switch(
     let (writes, segments, stream_indexes) =
         writes_and_segments_with_stream_indexes(&operations, &geometry);
     let first_write_after_each_power_loss = first_write_after_each_power_loss_in_the_write_table(
-        &run.first_stream_index_after_each_power_loss,
+        &run.earliest_stream_index_after_each_power_loss,
         &stream_indexes,
     );
     // 崩溃状态摆在最后一个跑完的操作之前，停下那一步不进 RefFS（与 O1 那一路同一个范围）。
@@ -1978,7 +2026,7 @@ impl<'history> HistoryAfterTheMakeFilesystem<'history> {
     }
 
     #[must_use]
-    pub fn base(&self) -> &MemoryPool {
+    pub fn base_pool(&self) -> &MemoryPool {
         &self.base
     }
 
@@ -4953,7 +5001,7 @@ pub struct CrashInjectionReport {
     pub known_red_hits: Vec<KnownRedAtACrashPoint>,
     /// 按种子从小到大排；同一截同一个签名只留第一个种子。
     pub new_findings: Vec<CrashPointFinding>,
-    /// 这一批判红的崩溃镜像留在哪；跑完删掉的那一档是 None。
+    /// 这一批判红的崩溃镜像写在哪（这一次调用自己新建的那一份目录，跑完删掉的那一档也照写）；一个都没落盘时是 None。
     pub image_directory: Option<PathBuf>,
     pub image_retention: FailureImageRetention,
     /// 这一批照哪一组断言判（交「重放这一整批」那一行写出来；跑的时候不读它）。
@@ -4966,8 +5014,59 @@ pub struct CrashInjectionReport {
 impl CrashInjectionReport {
     /// 第一行就是这次用的种子基与规模：种子基是这个测试周期写死的那一个（[`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`]），
     /// 报告与失败信息里不带它就重放不了，下一个周期重抽之后这一批数也就换了（用户 2026-09-20 定案第 7 条）。
+    /// 判红的崩溃镜像落在哪写路径（给人看）；比对两份报告用 [`CrashInjectionReport::render_the_conclusions`]。
     #[must_use]
     pub fn render(&self) -> String {
+        self.render_given(ImagePathsInTheText::Shown)
+    }
+
+    /// 同 [`CrashInjectionReport::render`]，判红的崩溃镜像落在哪不写路径、只写落没落盘与留没留：镜像目录每次调用各不相同
+    /// （[`create_the_image_directory_of_a_campaign_call`]），同一批种子跑两遍（线程数不同、判器不同、导入与整份）比的是这一份。
+    #[must_use]
+    pub fn render_the_conclusions(&self) -> String {
+        self.render_given(ImagePathsInTheText::LeftOut)
+    }
+
+    /// 两份报告除了判红的崩溃镜像落在哪的路径之外逐样相同：这一批的镜像目录与每个新发现的镜像都只比落没落盘、不比路径
+    /// （镜像目录每次调用各不相同，[`create_the_image_directory_of_a_campaign_call`]），别的字段与 `==` 一样逐个比（已知红比全部，不只比文字里那前几个）。
+    /// 同一批种子跑两遍、各自落了镜像（GPU 判器那一趟与 CPU 判器那一趟）比的是这一份；结构体的 `==` 连路径一起比，两趟各落了镜像、路径不同就判不等。
+    #[must_use]
+    pub fn has_the_same_conclusions_as(&self, other: &Self) -> bool {
+        let Self {
+            first_seed,
+            seed_count,
+            operations_per_history,
+            draw,
+            weights,
+            execution,
+            tally,
+            known_red_hits,
+            new_findings,
+            image_directory,
+            image_retention,
+            assertions,
+            histories_left_by_the_stop_request,
+        } = self;
+        *first_seed == other.first_seed
+            && *seed_count == other.seed_count
+            && *operations_per_history == other.operations_per_history
+            && *draw == other.draw
+            && *weights == other.weights
+            && *execution == other.execution
+            && *tally == other.tally
+            && *known_red_hits == other.known_red_hits
+            && new_findings.len() == other.new_findings.len()
+            && new_findings
+                .iter()
+                .zip(&other.new_findings)
+                .all(|(finding, other_finding)| finding.has_the_same_conclusions_as(other_finding))
+            && image_directory.is_some() == other.image_directory.is_some()
+            && *image_retention == other.image_retention
+            && *assertions == other.assertions
+            && *histories_left_by_the_stop_request == other.histories_left_by_the_stop_request
+    }
+
+    fn render_given(&self, image_paths: ImagePathsInTheText) -> String {
         let mut text = String::new();
         let _ = writeln!(
             text,
@@ -4980,19 +5079,47 @@ impl CrashInjectionReport {
             self.weights.name,
             self.execution.name()
         );
-        match (&self.image_directory, self.image_retention) {
-            (Some(directory), FailureImageRetention::KeepTheImageFiles) => {
+        match (&self.image_directory, self.image_retention, image_paths) {
+            (
+                Some(directory),
+                FailureImageRetention::KeepTheImageFiles,
+                ImagePathsInTheText::Shown,
+            ) => {
                 let _ = writeln!(text, "判红的崩溃镜像留在 {}", directory.display());
             }
-            (Some(directory), FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes) => {
+            (
+                Some(directory),
+                FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+                ImagePathsInTheText::Shown,
+            ) => {
                 let _ = writeln!(
                     text,
                     "判红的崩溃镜像曾写在 {}，跑完已删",
                     directory.display()
                 );
             }
-            (None, FailureImageRetention::KeepTheImageFiles)
-            | (None, FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes) => {}
+            (Some(_), FailureImageRetention::KeepTheImageFiles, ImagePathsInTheText::LeftOut) => {
+                let _ = writeln!(
+                    text,
+                    "判红的崩溃镜像留在这一次调用自己的镜像目录里（路径见 render）"
+                );
+            }
+            (
+                Some(_),
+                FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+                ImagePathsInTheText::LeftOut,
+            ) => {
+                let _ = writeln!(
+                    text,
+                    "判红的崩溃镜像曾写在这一次调用自己的镜像目录里，跑完已删"
+                );
+            }
+            (
+                None,
+                FailureImageRetention::KeepTheImageFiles
+                | FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+                ImagePathsInTheText::Shown | ImagePathsInTheText::LeftOut,
+            ) => {}
         }
         if self.histories_left_by_the_stop_request > 0 {
             let _ = writeln!(
@@ -5032,7 +5159,7 @@ impl CrashInjectionReport {
             );
         }
         for finding in &self.new_findings {
-            text.push_str(&finding.render());
+            text.push_str(&finding.render_given(image_paths));
             let _ = writeln!(
                 text,
                 "  复现这一段：{}",
@@ -5253,10 +5380,18 @@ pub fn crash_injection_campaign_from_environment(
         }
     } else {
         CrashPointDraw::EveryProperSubsetOfShortSegments {
-            segment_writes: positive_count_from_the_variable_text(
-                &short_segment_writes_variable,
-                &short_segment_writes,
-            ),
+            segment_writes: {
+                let segment_writes = positive_count_from_the_variable_text(
+                    &short_segment_writes_variable,
+                    &short_segment_writes,
+                );
+                // 整段枚举按 u64 掩码摆子集（`1u64 << 写数`），写数到 64 位移就溢出：上限与抽样那一支的掩码宽同一个数
+                assert!(
+                    segment_writes <= WRITES_A_SUBSET_MASK_HOLDS,
+                    "{short_segment_writes_variable}={short_segment_writes:?} 认不出：短段整段枚举按 u64 掩码摆子集，写数上限最多 {WRITES_A_SUBSET_MASK_HOLDS}"
+                );
+                segment_writes
+            },
             sampled_in_longer_segments: points,
         }
     };
@@ -5359,10 +5494,63 @@ pub struct CrashInjectionCampaign {
     pub assertions: CrashInjectionAssertions,
 }
 
+/// 这个进程里建过几次战役的镜像目录（[`create_the_image_directory_of_a_campaign_call`] 每次取一个号，名字里带它）。
+static IMAGE_DIRECTORIES_CREATED_IN_THIS_PROCESS: AtomicU64 = AtomicU64::new(0);
+
+/// 一次战役调用试几个名字建镜像目录：名字撞上已有的目录（同进程号的旧进程留下的）就换下一个号，试满还建不出就不留现场。
+const MOST_IMAGE_DIRECTORY_NAMES_TRIED: u32 = 64;
+
+/// 给一次战役调用新建一个它独占的空镜像目录（临时目录下，名字带进程号、种子基与这个进程里的调用号；`create_dir` 排他新建，撞上已有的换号）。
+/// 同一个进程里同一个种子基的几条用例并行跑时各写各的、各删各的：只由进程号与种子基定名时，一条用例收尾删掉的是另一条正在写的目录，
+/// 报告里「判红的崩溃镜像曾写在……」那一行也跟着别的用例变。建不出（临时目录写不了、试满 [`MOST_IMAGE_DIRECTORY_NAMES_TRIED`] 个名字）交回
+/// `None`：这一次不留现场（留现场是为了好查，不是判据，同 `write_crash_image_files`）。
+fn create_the_image_directory_of_a_campaign_call(first_seed: u64) -> Option<PathBuf> {
+    // 迭代上界：MOST_IMAGE_DIRECTORY_NAMES_TRIED 次；只有名字撞上已有目录时才试下一个
+    for _name_tried in 0..MOST_IMAGE_DIRECTORY_NAMES_TRIED {
+        let call_number = IMAGE_DIRECTORIES_CREATED_IN_THIS_PROCESS.fetch_add(1, Ordering::Relaxed);
+        let directory = std::env::temp_dir().join(format!(
+            "singlefs-crash-injection-{}-seedbase-{first_seed}-call-{call_number}",
+            std::process::id()
+        ));
+        match std::fs::create_dir(&directory) {
+            Ok(()) => return Some(directory),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(_unwritable) => return None,
+        }
+    }
+    None
+}
+
+/// 一次战役调用跑完收尾它自己那一份镜像目录：里面一个文件都没有（没有判红的崩溃状态落盘）就删掉、交回 `None`；有的照 `retention`
+/// 留着或删掉，交回它的路径（报告里那一行「留在」「曾写在」照它写）。只碰 `directory` 这一份，不碰别的调用的目录。
+fn settle_the_image_directory_of_the_call(
+    directory: &Path,
+    retention: FailureImageRetention,
+) -> Option<PathBuf> {
+    let images_were_written =
+        std::fs::read_dir(directory).is_ok_and(|mut entries| entries.next().is_some());
+    match (images_were_written, retention) {
+        (
+            false,
+            FailureImageRetention::KeepTheImageFiles
+            | FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+        ) => {
+            let _ = std::fs::remove_dir(directory);
+            None
+        }
+        (true, FailureImageRetention::KeepTheImageFiles) => Some(directory.to_path_buf()),
+        (true, FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes) => {
+            let _ = std::fs::remove_dir_all(directory);
+            Some(directory.to_path_buf())
+        }
+    }
+}
+
 /// 跑种子 [`first_seed`, `first_seed` + `seed_count`)，分给 `worker_threads.count()` 个工作线程：种子区间切成首尾相接的片，
 /// 线程按片号从小到大领片，调用线程收到一片就打一行 `CRASH_INJECTION_PROGRESS`（片号、种子区间、已跑完的片数与段数），
 /// 再按片号从小到大并计数。计数按片的次序相加、新发现按种子从小到大留第一个，所以
-/// [`CrashInjectionReport::render`] 与线程数、调度次序无关（进度行是按到达次序打的，只报跑到哪了，不带判定）。
+/// [`CrashInjectionReport::render_the_conclusions`] 与线程数、调度次序无关（进度行是按到达次序打的，只报跑到哪了，不带判定；
+/// 判红的崩溃镜像每次调用写进自己新建的那一份目录，[`create_the_image_directory_of_a_campaign_call`]，路径不进那一份）。
 ///
 /// # Panics
 /// 某个工作线程 panic（历史里的 panic 在执行器里接住，走到这里的是崩溃状态上恢复或 checker 的断言）；有一片领了却没交回；
@@ -5403,17 +5591,16 @@ pub fn run_crash_injection_campaign_judging_the_given_states_with(
     let slices = seed_slices(seed_count, worker_threads.count());
     let spawned_worker_threads = worker_threads.count().min(slices.len().max(1));
     let started = Instant::now();
-    let image_directory = std::env::temp_dir().join(format!(
-        "singlefs-crash-injection-{}-seedbase-{first_seed}",
-        std::process::id()
-    ));
+    let image_directory = create_the_image_directory_of_a_campaign_call(first_seed);
     println!(
         "CRASH_INJECTION_START seeds=[{first_seed},{}) slices={} worker_threads={spawned_worker_threads} configured_worker_threads={} worker_threads_source={} images={}",
         first_seed + seed_count,
         slices.len(),
         worker_threads.count(),
         worker_threads.source_name(),
-        image_directory.display()
+        image_directory
+            .as_deref()
+            .map_or_else(|| "none".to_string(), |directory| directory.display().to_string())
     );
     let next_slice_index = AtomicUsize::new(0);
     let (finished_slices, merged_slice_count) = std::thread::scope(|scope| {
@@ -5422,7 +5609,7 @@ pub fn run_crash_injection_campaign_judging_the_given_states_with(
             let sender = sender.clone();
             let slices = &slices;
             let next_slice_index = &next_slice_index;
-            let image_directory = image_directory.as_path();
+            let image_directory = image_directory.as_deref();
             scope.spawn(move || loop {
                 // 领一片之前问叫停（同流水线那一侧「每领一块之前先问」）：叫停了就不再领，领了的片照样判完交回
                 if given_states_judge.stop_is_requested() {
@@ -5444,7 +5631,7 @@ pub fn run_crash_injection_campaign_judging_the_given_states_with(
                             &history,
                             execution,
                             draw,
-                            Some(image_directory),
+                            image_directory,
                             given_states_judge,
                         )
                     })
@@ -5510,14 +5697,9 @@ pub fn run_crash_injection_campaign_judging_the_given_states_with(
             }
         }
     }
-    let image_directory_left_behind = match image_retention {
-        FailureImageRetention::KeepTheImageFiles => image_directory.exists(),
-        FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes => {
-            let existed = image_directory.exists();
-            let _ = std::fs::remove_dir_all(&image_directory);
-            existed
-        }
-    };
+    let image_directory_of_the_report = image_directory
+        .as_deref()
+        .and_then(|directory| settle_the_image_directory_of_the_call(directory, image_retention));
     CrashInjectionReport {
         first_seed,
         seed_count,
@@ -5528,7 +5710,7 @@ pub fn run_crash_injection_campaign_judging_the_given_states_with(
         tally,
         known_red_hits,
         new_findings,
-        image_directory: image_directory_left_behind.then_some(image_directory),
+        image_directory: image_directory_of_the_report,
         image_retention,
         assertions,
         histories_left_by_the_stop_request,
@@ -5557,6 +5739,161 @@ pub fn seed_slices(seed_count: u64, worker_threads: usize) -> Vec<std::ops::Rang
 mod tests {
     use super::*;
     use singlefs_core::mount::FloorRaiseFailedAfterTheMountsPublishes;
+
+    /// 同一个进程里同一个种子基的两次战役调用并发建镜像目录（两条用例并行跑）：各得一份不同的、新建的空目录；没写镜像的那一次收尾
+    /// 只删自己那一份、报告不点名镜像目录，另一次写下的镜像还在；写了镜像的那一次收尾删掉自己那一份、报告点名它。
+    /// 判别力（`crates/mutations.tsv`）：目录名退回只由进程号与种子基定，第二次调用的名字恒撞上第一次的，建不出自己那一份。
+    #[test]
+    fn two_campaign_calls_with_the_same_seed_base_in_one_process_each_get_and_settle_their_own_image_directory(
+    ) {
+        use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+        let (directory_of_one_call, directory_of_another_call) = std::thread::scope(|scope| {
+            let one_call = scope.spawn(|| {
+                create_the_image_directory_of_a_campaign_call(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE)
+            });
+            let another_call = scope.spawn(|| {
+                create_the_image_directory_of_a_campaign_call(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE)
+            });
+            (
+                one_call.join().expect("建镜像目录的线程不 panic"),
+                another_call.join().expect("建镜像目录的线程不 panic"),
+            )
+        });
+        let one_call = directory_of_one_call.expect("这一次调用建得出自己的镜像目录");
+        let another_call = directory_of_another_call.expect("另一次调用也建得出自己的镜像目录");
+        assert_ne!(
+            one_call, another_call,
+            "同进程、同种子基的两次调用各一份目录"
+        );
+        for directory in [&one_call, &another_call] {
+            assert!(
+                std::fs::read_dir(directory)
+                    .expect("新建的目录读得了")
+                    .next()
+                    .is_none(),
+                "新建的 {} 是空的",
+                directory.display()
+            );
+        }
+        let image_of_one_call = one_call.join("device-0.img");
+        std::fs::write(
+            &image_of_one_call,
+            b"crash image of the call that judged red",
+        )
+        .expect("写得进这一次调用的镜像目录");
+        assert_eq!(
+            settle_the_image_directory_of_the_call(
+                &another_call,
+                FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes
+            ),
+            None,
+            "没写镜像的那一次：报告不点名镜像目录"
+        );
+        assert!(
+            !another_call.exists(),
+            "没写镜像的那一次删了自己那一份空目录"
+        );
+        assert!(
+            image_of_one_call.exists(),
+            "另一次调用收尾不删这一次写下的镜像"
+        );
+        assert_eq!(
+            settle_the_image_directory_of_the_call(
+                &one_call,
+                FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes
+            ),
+            Some(one_call.clone()),
+            "写了镜像的那一次：报告点名它自己那一份目录"
+        );
+        assert!(!one_call.exists(), "写了镜像的那一次跑完删掉自己那一份");
+    }
+
+    /// 一份落了镜像的报告：一个新发现，这一批的镜像目录与那个新发现的镜像都落在 `image_directory` 底下。
+    fn report_whose_images_landed_under(image_directory: &Path) -> CrashInjectionReport {
+        use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+        let crash_point = CrashPoint {
+            segment_index: 1,
+            persisted_within_the_segment: vec![true, false],
+            step: StepPosition::Operation(3),
+            operation_kind: None,
+        };
+        let finding = CrashPointFinding {
+            signature: FailureSignature::CheckerViolations {
+                invariants: vec!["I-3.10"],
+            },
+            seed: HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
+            crash_point,
+            stage: CrashStateStage::CrashImage,
+            observation: FailureObservation {
+                position: StepPosition::Operation(3),
+                operation_kind: None,
+                violations: vec![("I-3.10", "盘 0 槽 40 的分配代 4，诞生代号 5".to_string())],
+                panic: None,
+                newest_ring_root_txg: Some(5),
+                root_ring_slot_count: Some(64),
+                harness_judgement: None,
+                model_disagreement: None,
+                raised_floor_lands_only_on_abandoned_roots: None,
+                record_check: RecordCheck::default(),
+            },
+            read_back: "第 5 版的文件".to_string(),
+            image_files: Some(image_directory.join("seed-crash_image")),
+        };
+        CrashInjectionReport {
+            first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+            seed_count: 2,
+            operations_per_history: 8,
+            draw: CrashPointDraw::Sampled {
+                crash_points_per_history: 2,
+            },
+            weights: GenerationWeights::BROAD,
+            execution: HistoryExecution::HANDING_EVERY_STEP_IMAGE_OUT_ON_FOUR_GIBIBYTE_DEVICES,
+            tally: CrashInjectionTally::default(),
+            known_red_hits: Vec::new(),
+            new_findings: vec![finding],
+            image_directory: Some(image_directory.to_path_buf()),
+            image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+            assertions: CrashInjectionAssertions::NewFindingsOnly,
+            histories_left_by_the_stop_request: 0,
+        }
+    }
+
+    /// 同一批种子跑两遍、两遍都落了镜像（GPU 判器那一趟与 CPU 判器那一趟，镜像目录各是自己新建的那一份）：路径不同而结论相同的两份报告
+    /// 判相同，结构体的 `==` 判不同；结论差一处（新发现读回的不同）的两份判不同，只差有没有落镜像的两份也判不同。
+    /// 判别力（`crates/mutations.tsv`）：退回按结构体比，路径不同的那两份判成不同，这条红。
+    #[test]
+    fn two_reports_whose_images_landed_in_different_directories_have_the_same_conclusions_when_only_the_paths_differ(
+    ) {
+        let gpu_run = report_whose_images_landed_under(Path::new(
+            "/nonexistent/singlefs-crash-injection-gpu-run-call-0",
+        ));
+        let cpu_run = report_whose_images_landed_under(Path::new(
+            "/nonexistent/singlefs-crash-injection-cpu-run-call-1",
+        ));
+        assert_ne!(
+            gpu_run, cpu_run,
+            "前提：两份的镜像路径不同，结构体的 == 连路径一起比、判不同"
+        );
+        assert!(
+            gpu_run.has_the_same_conclusions_as(&cpu_run),
+            "路径不同而结论相同的两份判相同：\n{}\n{}",
+            gpu_run.render_the_conclusions(),
+            cpu_run.render_the_conclusions()
+        );
+        let mut differs_in_what_was_read_back = cpu_run.clone();
+        differs_in_what_was_read_back.new_findings[0].read_back = "第 4 版的文件".to_string();
+        assert!(
+            !gpu_run.has_the_same_conclusions_as(&differs_in_what_was_read_back),
+            "新发现读回的不同，判不同"
+        );
+        let mut no_image_landed = cpu_run.clone();
+        no_image_landed.image_directory = None;
+        no_image_landed.new_findings[0].image_files = None;
+        assert!(
+            !gpu_run.has_the_same_conclusions_as(&no_image_landed),
+            "一边落了镜像、一边没落，判不同"
+        );
+    }
     use singlefs_harness::history::generate_history;
     use singlefs_harness::mount_transparency::WitnessedCounterBranchThatHolds;
 
@@ -5564,22 +5901,19 @@ mod tests {
         crash_points_per_history: 4,
     };
 
-    /// 这份文件的单测起崩溃点重放的引擎判给定状态表：表与结论都进家目录下给定状态表那一类的判定库（判过的复用），配了 GPU 且编进了
-    /// `gpu` 特性上卡、否则 CPU；设点文件是这份文件自己（候选表 `judging_closure::CONCLUSION_CANDIDATE_LIBRARY_FILES`）。
+    /// 这份文件的单测起崩溃点重放的引擎判给定状态表：表与结论都进家目录下那一份判定库（判过的复用），配了 GPU 且编进了
+    /// `gpu` 特性上卡、否则 CPU。`label_of_the_report` 只进项名（行里报的名字），种子与规模不进键（块键只由表的内容定）。
     fn given_states_engine_for(
-        seeds_and_scale: &str,
+        label_of_the_report: &str,
     ) -> crate::crash_amplification::GivenStatesEngine {
         // 起引擎时拿着改环境的锁：同一个进程里别的单测拿着环境守卫改叫停文件、分片与库目录
         let _one_test_at_a_time =
             crate::crash_amplification::one_test_changes_the_environment_at_a_time();
         crate::crash_amplification::GivenStatesEngine::start_from_environment(
             crate::crash_amplification::GivenStatesItem {
-                item_name: "crash_injection_unit_tests".to_string(),
-                setting_file: "crates/singlefs-checker-tier/src/crash_injection.rs".to_string(),
-                seeds_and_scale: seeds_and_scale.to_string(),
+                item_name: format!("crash_injection_unit_tests::{label_of_the_report}"),
             },
             &crate::crash_point_replay_progress::CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-            &crate::crash_library::repository_root_of_this_crate(),
         )
         .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
     }
@@ -7220,6 +7554,16 @@ mod tests {
         );
     }
 
+    /// 短段写数超过 u64 掩码的宽（63）：整段枚举 `1u64 << 写数` 会溢出，解析时就停下，消息带变量名、原值与上限。
+    #[test]
+    #[should_panic(expected = "SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES=\"64\" 认不出")]
+    fn a_crash_injection_short_segment_writes_value_past_the_mask_width_panics_naming_the_limit() {
+        let _campaign = campaign_read_back_with_only_this_variable_set(
+            "SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES",
+            "64",
+        );
+    }
+
     /// 重放行里崩溃点数写错：经数值环境变量共用的那一份解析 panic，消息带变量名与原值。
     #[test]
     #[should_panic(expected = "SINGLEFS_CRASH_INJECTION_POINTS=\"four\" 认不出")]
@@ -7532,7 +7876,7 @@ mod tests {
     /// C670：崩溃窗口末尾那个写之前（含）历史里有一步「崩溃恢复抛弃根」往录制流里发过东西，这个崩溃态才算注入过读故障；
     /// 那一步落在窗口末尾之后的不算。
     #[test]
-    fn a_crash_state_counts_as_read_faulted_from_the_first_stream_step_of_an_abandoning_recovery_on(
+    fn a_crash_state_counts_as_read_faulted_from_the_earliest_stream_step_of_an_abandoning_recovery_on(
     ) {
         let step_kinds = [
             HistoryOperationKind::CloseAndMountWritable,
@@ -7726,20 +8070,20 @@ mod tests {
             });
             // 读故障下发过东西的那几步各自的第一个录制流下标。
             let mut operations_before_the_step = 0usize;
-            let mut first_stream_index_of_each_read_faulted_step: Vec<usize> = Vec::new();
+            let mut earliest_stream_index_of_each_read_faulted_step: Vec<usize> = Vec::new();
             for (position, operations_after_the_step) in &operations_after_each_step {
                 if let StepPosition::Operation(step_index) = position {
                     if history.operations[*step_index].kind()
                         == NEWEST_SYSTEM_CONFIGURATION_SLOT_ZEROS_MOUNT
                         && operations_before_the_step < *operations_after_the_step
                     {
-                        first_stream_index_of_each_read_faulted_step
+                        earliest_stream_index_of_each_read_faulted_step
                             .push(operations_before_the_step);
                     }
                 }
                 operations_before_the_step = *operations_after_the_step;
             }
-            if first_stream_index_of_each_read_faulted_step.is_empty() {
+            if earliest_stream_index_of_each_read_faulted_step.is_empty() {
                 continue;
             }
             let (_writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
@@ -7747,9 +8091,9 @@ mod tests {
                 &execution.device_width.fixed_geometry(),
             );
             let read_faulted_by_the_end_of_the_window = |last_index_of_the_window: usize| {
-                first_stream_index_of_each_read_faulted_step
+                earliest_stream_index_of_each_read_faulted_step
                     .iter()
-                    .any(|first_stream_index| *first_stream_index <= last_index_of_the_window)
+                    .any(|earliest_stream_index| *earliest_stream_index <= last_index_of_the_window)
             };
             let injection = inject_crashes_into_history(
                 &history,
@@ -8255,7 +8599,7 @@ mod tests {
                         "first-file-and-one-overwrite/every-write-persisted/writes={}",
                         table_writes.len()
                     ),
-                    base: history_after_the_make_filesystem.base(),
+                    base: history_after_the_make_filesystem.base_pool(),
                     writes: table_writes,
                     segments: &segments_of_the_table,
                     seams: &[],
@@ -8308,7 +8652,7 @@ mod tests {
             crate::crash::CrashPointReplaySegmentExpansion::NotExpanded
         };
         let enumerated_write_count = crate::crash::crash_state_enumeration_tables(
-            history_after_the_make_filesystem.base(),
+            history_after_the_make_filesystem.base_pool(),
             table_writes,
             history_after_the_make_filesystem.segments(),
             &not_expanded,
@@ -8323,7 +8667,7 @@ mod tests {
         mask.resize(enumerated_write_count, false);
         let tables = build_judge_tables_for_the_given_persisted_sets_broken_at_the_seams(
             &JudgeFlow {
-                base: history_after_the_make_filesystem.base(),
+                base: history_after_the_make_filesystem.base_pool(),
                 writes: table_writes,
                 segments: history_after_the_make_filesystem.segments(),
                 judged_root_index: 0,

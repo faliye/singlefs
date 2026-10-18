@@ -13,7 +13,8 @@
 //!   判决 `research/prompts/m3-batch33r-code-r1-main-verification.md` 第三节第 2 条；这一个观察者与删除流的录法住在公共模块
 //!   `tests/common_crash_point_observers/mod.rs`、删除流的录法住在公共模块 `tests/common_crash_points/mod.rs`，崩溃放量那一路照登记表把它挂在标准前缀的节点上，
 //!   崩溃点重放合并第三轮判决 J4）。挂载是每个状态上的重活，观察者放在工作线程上跑
-//!   （`crash::CrashStateObserving::OnTheWorkerThreads`），一个工作线程、四个工作线程与观察者在调用线程上三种跑法的计数逐项相同（快档对拍）。
+//!   （`crash_state_enumeration::enumerate_crash_states_with_every_kind_of_observer` 交进去的观察者）；同一趟快档跑两遍、第二遍全照判定库复用，
+//!   两份计数逐项相同（`the_unlink_stream_quick_tier_counts_the_same_when_rerun_from_the_library`）。
 //!
 //! **比已有的流多罩了什么**：已有的崩溃点重放流上没有删除类发布；这里意图那次（13 个单元：墓碑容器、`deleted_inodes` 根、inode 叶容器与根……）、
 //! 两批（12、11 个单元）、最后一批（12 个单元：inode 叶容器删空不写，退役树开第一片容器、写根）各自的单元段、记录段、根槽写与之后的系统配置槽轮换第一次被枚举到；
@@ -508,7 +509,7 @@ fn mount_continuation_observer<'prepared>(
         name: "mount_continuation",
         extra_inputs_digest: prepared.mount_continuation_inputs.digest(),
         observe,
-        deduplication: ObserverDeduplication::ByTheRecoveredImageBytes,
+        deduplication: ObserverDeduplication::ByTheRecoveryReportAndTheReadSet,
     }
 }
 

@@ -88,11 +88,14 @@ pub fn lower_span_in_data_units(level: u8) -> u64 {
 }
 
 /// 上段罩得住 inode 号 `largest_inode` 的最低一层（上段根的层级）。
+///
+/// # Panics
+/// `largest_inode` 是 `u64::MAX`：[`upper_span_in_inodes`] 从第 8 层起饱和在 `u64::MAX`，跨度大于号才算罩得住，饱和的跨度罩不住这个号。
 #[must_use]
 pub fn upper_root_level_for(largest_inode: u64) -> u8 {
     (0..=u8::MAX)
         .find(|level| upper_span_in_inodes(*level) > largest_inode)
-        .expect("第 8 层起罩的 inode 号已超过 u64 的上界")
+        .expect("第 8 层起跨度饱和在 u64::MAX，罩得住小于 u64::MAX 的每个 inode 号；走到这里说明调用方传了 u64::MAX")
 }
 
 /// 下段罩得住 `data_units` 个单元（单元号 0 .. data_units − 1）的最低一层（下段根的层级）。
@@ -192,15 +195,6 @@ impl ExtentLowerNodePosition {
             extent_key_bytes(inode, first_offset),
             extent_key_bytes(inode, last_offset),
         )
-    }
-
-    /// 这个位置下面那一层的孩子里，罩着单元号 `data_unit` 的那一个。
-    #[must_use]
-    pub fn child_holding_data_unit(self, data_unit: u64) -> Self {
-        Self {
-            level: self.level - 1,
-            index: data_unit / lower_span_in_data_units(self.level - 1),
-        }
     }
 }
 
@@ -558,20 +552,6 @@ impl ExtentTreeVersion {
     #[must_use]
     pub fn upper_root(&self) -> ExtentUpperNodePosition {
         self.upper_nodes.last().expect("带文件的一版里上段恒有根").0
-    }
-
-    /// 上段的高（上段根的层级 + 1，D8（核心索引结构） 已定项 11 ⑤ 的读法）。
-    #[must_use]
-    pub fn upper_height(&self) -> u64 {
-        u64::from(self.upper_root().level) + 1
-    }
-
-    /// 第一个文件下段的高；内联（没有下段）时 0。
-    #[must_use]
-    pub fn lower_height(&self) -> u64 {
-        self.lower_nodes
-            .last()
-            .map_or(0, |(position, _)| u64::from(position.level) + 1)
     }
 
     #[must_use]
@@ -1203,7 +1183,12 @@ pub fn read_extent_tree(
 
 #[cfg(test)]
 mod tests {
+    use singlefs_format::TREE_IDENTIFIER_EXTENT;
+
     use super::*;
+    use crate::address::DeviceIdentity;
+    use crate::pointer::{LocationEntry, PointerHead};
+    use crate::unit::WriteOrder;
 
     /// 下段：两个单元就要建下段（根兼叶），144 个还是一片叶，145 个长出层级 1（两片叶加一个根）。
     #[test]
@@ -1260,7 +1245,32 @@ mod tests {
             inode: 8,
             target: ExtentUpperLeafTarget::LowerSegmentRoot(NodePointer::empty_root()),
         };
-        for entry in [no_unit, lower] {
+        let inline = ExtentUpperLeafEntry {
+            inode: 9,
+            target: ExtentUpperLeafTarget::InlineDataUnit(DataPointer {
+                head: PointerHead {
+                    birth_tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT),
+                    birth_txg: CheckpointTxg(3),
+                },
+                locations: [
+                    LocationEntry {
+                        device: DeviceIdentity(0),
+                        slot: SlotNumber(50180),
+                        unit_checksum: 1,
+                    },
+                    LocationEntry {
+                        device: DeviceIdentity(1),
+                        slot: SlotNumber(50181),
+                        unit_checksum: 2,
+                    },
+                ],
+                write_order: WriteOrder {
+                    instance: InstanceGeneration(1),
+                    transaction: 4,
+                },
+            }),
+        };
+        for entry in [no_unit, lower, inline] {
             let bytes = entry.to_bytes();
             assert_eq!(bytes.len(), 113);
             assert_eq!(ExtentUpperLeafEntry::parse(&bytes), Ok(entry));

@@ -1,7 +1,8 @@
 //! 挂在标准前缀节点上的观察者（崩溃点重放合并第三轮判决 J4）：观察者的代码、它另读的流程输入怎么录、照登记表
 //! （`common_crash_points::OBSERVERS_ON_THE_STANDARD_PREFIX`，名字住在公共模块）挂上观察者跑一趟崩溃放量的入口。
 //! 这一份单独放：公共模块（标准前缀的设点文件）不引它，标准前缀上的点的 CPU 判器版本不收观察者代码（第三轮正文 H4「观察者代码不进计划哈希、
-//! 不进判器版本」）；观察者的版本从这一份出发算（`crash_identity::ConclusionVersionRequest::Observer` 的 `observer_code_file`）。
+//! 不进判器版本」）；观察者的身份是它的入口 fn（[`observe_the_mount_continuation`]）的闭包键，入口登记在
+//! `singlefs_checker_tier::judging_units_entries::OBSERVER_ENTRIES`。
 //! 可写挂载续做观察者从删除流的崩溃枚举用例搬来，那一份用例照旧调这里的同一个。
 //! 两段（用户 2026-10-13 定「观察者改走两段、池级 checker 上 GPU、按恢复结果去重」）：观察者在录入段的 CPU 上真跑可写挂载与续做，
 //! 交回挂载发的写与挂完的盘；挂完的盘上的池级 checker 不在这里跑，判段从库里读回来判（配了 GPU 上卡）。
@@ -21,7 +22,7 @@ use super::common_crash_points::{
 use super::common_crash_points::{ObserverOfTheStandardPrefix, OBSERVERS_ON_THE_STANDARD_PREFIX};
 use singlefs_checker_tier::crash::CrashPointReplayObserverCounts;
 use singlefs_checker_tier::crash_amplification::{
-    ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver,
+    ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver, ReadRangeOnTheCrashImage,
 };
 use singlefs_checker_tier::writable_mount_phases::materialized_crash_image;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
@@ -86,7 +87,7 @@ impl MountContinuationInputs {
         }
     }
 
-    /// 另读的输入的摘要（进观察者的版本，`ConclusionVersionRequest::Observer` 的 `extra_inputs_digest`）：逐版一行写下、取 SHA-256。
+    /// 另读的输入的摘要（进观察者的版本，`crash_amplification::ObserverOnTheNodes` 的 `extra_inputs_digest`）：逐版一行写下、取 SHA-256。
     pub fn digest(&self) -> [u8; singlefs_harness::sha256::DIGEST_BYTES] {
         let mut text = String::from("mount continuation inputs 1\n");
         for (instance, checkpoint_txg) in &self.versions_with_a_file {
@@ -166,7 +167,8 @@ pub fn observe_the_mount_continuation(
 ) -> ImageAfterTheObserver {
     let materialized = materialized_crash_image(image);
     let mount_parameters = parameters();
-    let stream = SharedStream::retaining_contents();
+    // 记读：挂载读过的每一段（连同 journal 记录槽提示问到的段）交回去，录入段按它算读集见证
+    let stream = SharedStream::retaining_contents_and_reads();
     let mut devices: Vec<_> = materialized
         .devices
         .iter()
@@ -249,6 +251,9 @@ pub fn observe_the_mount_continuation(
     ImageAfterTheObserver {
         writes_on_the_crash_image,
         disks_after_the_observer,
+        ranges_read_on_the_crash_image: ReadRangeOnTheCrashImage::of_the_recorded_read_ranges(
+            &stream.read_ranges(),
+        ),
         invariants_judged: InvariantsJudgedOnTheImageAfterTheObserver::EveryImplementedInvariant,
         counter_when_the_pool_checker_is_clean: POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER
             .to_string(),
@@ -432,7 +437,7 @@ pub fn amplify_a_flow_through_the_standard_prefix(
                 ObserverOfTheStandardPrefix::WritableMountAndContinuation => {
                     ObserverCode::HandsBackAnImage {
                         observe: &observe_the_mount,
-                        deduplication: ObserverDeduplication::ByTheRecoveredImageBytes,
+                        deduplication: ObserverDeduplication::ByTheRecoveryReportAndTheReadSet,
                     }
                 }
             },
@@ -454,9 +459,11 @@ pub fn amplify_a_flow_through_the_standard_prefix(
     if let Some(recording) = &run.observer_recording {
         // 录入段的「现判 N、去重复用 M」：这一趟真挂的恢复镜像张数、镜像已经看过（这一趟早先的状态或库里存着的）因而不再挂的状态数
         println!(
-            "CRASH_POINT_REPLAY_OBSERVERS_RECORDING flow={flow_name} images_observed_fresh={} states_reusing_an_observed_image={} blocks_recorded_here={} states_recorded_here={} blocks_already_recorded={}",
+            "CRASH_POINT_REPLAY_OBSERVERS_RECORDING flow={flow_name} images_observed_fresh={} states_reusing_an_observed_image={} buckets={} witness_misses={} blocks_recorded_here={} states_recorded_here={} blocks_already_recorded={}",
             recording.images_observed_here,
             recording.states_reusing_an_observed_image,
+            recording.buckets,
+            recording.witness_misses,
             recording.blocks_recorded_here,
             recording.states_recorded_here,
             recording.blocks_already_recorded

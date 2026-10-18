@@ -1,4 +1,4 @@
-//! checker 档模块：crash_point_replay_progress、crash_injection、crash_given_states、crash_library、crash_amplification
+//! checker 档模块：crash_point_replay_progress、crash_injection、crash_given_states、crash_amplification
 //! 记录核对器第二条判据在掉电那道接缝处断开（`memory_pool::RecordStreamSeam::AfterAPowerLoss`）。留孤儿那段历史
 //! （`history::history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring`）最后一步开头摆一个崩溃状态
 //! （更早的写全落、最后一步一个都没落，崩溃注入 `inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_erases_heads_of_orphans`
@@ -15,7 +15,6 @@ use singlefs_checker_tier::crash_injection::{
     GivenStatesConclusionsOfATable, GivenStatesJudge, GivenStatesOfATable,
     HistoryAfterTheMakeFilesystem,
 };
-use singlefs_checker_tier::crash_library::repository_root_of_this_crate;
 use singlefs_checker_tier::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
@@ -39,23 +38,14 @@ const UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES: HistoryExecution = HistoryExecution {
     space_admission: SpaceAdmission::JudgedByTheFormula,
 };
 
-/// 这份测试文件的仓内路径：给定状态表那一路的设点文件（CPU 结论的版本按它出发的闭包取）。
-const THIS_FILE: &str =
-    "crates/singlefs-checker-tier/tests/record_checker_breaks_the_history_at_the_power_loss_seam.rs";
-
 /// 给定状态表交崩溃点重放的引擎判：表与结论进家目录下给定状态表那一类的判定库（判过的复用），配了 GPU 且编进了 `gpu` 特性上卡、否则 CPU
 /// （用户 2026-10-13 定「能走两段的都走两段」：表先写进库、读回再判）。
 fn given_states_engine() -> GivenStatesEngine {
     GivenStatesEngine::start_from_environment(
         GivenStatesItem {
-            item_name: "record-checker-at-the-power-loss-seam".to_string(),
-            setting_file: THIS_FILE.to_string(),
-            seeds_and_scale:
-                "history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring"
-                    .to_string(),
+            item_name: "record-checker-at-the-power-loss-seam::history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring".to_string(),
         },
         &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-        &repository_root_of_this_crate(),
     )
     .unwrap_or_else(|refusal| panic!("起不了给定状态表的引擎：{refusal}"))
 }
@@ -106,13 +96,15 @@ fn crash_at_the_start_of_the_last_step() -> CrashAtTheStartOfTheLastStep {
         .position(|stream_index| *stream_index >= operations_before_the_last_step)
         .expect("最后一步（覆盖写）写过东西");
     assert_eq!(
-        run.first_stream_index_after_each_power_loss.len(),
+        run.earliest_stream_index_after_each_power_loss.len(),
         1,
         "这段历史掉了一次电"
     );
     let first_write_after_the_power_loss = stream_indexes
         .iter()
-        .position(|stream_index| *stream_index >= run.first_stream_index_after_each_power_loss[0])
+        .position(|stream_index| {
+            *stream_index >= run.earliest_stream_index_after_each_power_loss[0]
+        })
         .expect("掉电之后那次可写挂载写了东西");
     let last_root_write_before_the_crash = (0..first_write_of_the_last_step)
         .rev()
@@ -186,7 +178,7 @@ fn judged_through_the_given_states_engine(
     let conclusions = given_states_engine()
         .judge_the_given_states(&GivenStatesOfATable {
             table_name: format!("{table_name}/{record_stream:?}"),
-            base: history_after_the_make_filesystem.base(),
+            base: history_after_the_make_filesystem.base_pool(),
             writes: history_after_the_make_filesystem.writes(),
             segments: history_after_the_make_filesystem.segments(),
             seams: &seams,

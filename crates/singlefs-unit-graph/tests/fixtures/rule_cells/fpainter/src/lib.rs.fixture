@@ -1,0 +1,10 @@
+fcore::enum_listing_every_member! {
+    #[derive(Clone, Copy)]
+    pub enum Color {
+        Red,
+        Green,
+    }
+}
+pub fn judge_color() -> usize {
+    Color::EVERY_MEMBER.len()
+}

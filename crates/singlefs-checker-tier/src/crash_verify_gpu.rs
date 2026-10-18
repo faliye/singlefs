@@ -5,13 +5,12 @@
 //!
 //! 事实表按流上卡一次（[`GpuFactsVerifier::new`]），之后每块只送一个头（块起点、块里几个状态）、读回每状态一个 u32；
 //! 不再逐状态建缓冲、提交、等——那一版（`gpu_unit_checks` 逐状态算校验和）比 CPU 慢 18 倍，慢的是派活不是算。
-//! 核对代码的摘要 [`gpu_verifier_digest`] 进核对表的键：着色器改一个字，旧行留着当历史，新行另起。
+//! 核对表的键里核对那一半是 GPU 核对那一组判法单元的键（`crate::crash_identity::judging_units_key`）：着色器改一个字（它是这里一个
+//! 串常量，进那个常量单元的指纹），旧行留着当历史，新行另起。
 //! 段内序号按段的展开方式拆（全量、甲二；判决 `research/prompts/m3-crash-enumeration-merge-r2-main-verification.md` 第二节 L6-2），
 //! 满 64 位（同一判决 L1-7）：与 `crate::crash_facts::persisted_writes_of_state_by_the_segment_expansions` 同一套数字次序。
 //! 分片的段（C790）：段内编号 = 片起点 + 片内序号，片起点拆成的各位随段写表上卡，内核从那几位起加片内序号、逐位进位（只用 u32，不做宽整数除法）。
 use std::ops::Range;
-
-use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
 use crate::crash_facts::{
     check_the_slice_starts_against_the_expansions, segment_expansion_code_wgsl_constants,
@@ -67,8 +66,8 @@ const BIT_NEWEST_ROOT_SELF_CHECKSUM: u32 = 2u;
 const BIT_NEWEST_ROOT_POINTER_TARGET: u32 = 4u;
 const BIT_NO_ROOT_AT_ALL: u32 = 8u;
 
-var<private> persisted: array<u32, 64>;
-var<private> torn: array<u32, 64>;
+var<private> persisted: array<u32, PERSISTED_MASK_WORDS>;
+var<private> torn: array<u32, PERSISTED_MASK_WORDS>;
 // 分片的段片起点的各位加片内序号越过了段的域（或片内序号装不进 32 位）：main 记 BIT_SLICE_PAST_ITS_DOMAIN
 var<private> slice_past_its_domain: bool;
 
@@ -113,7 +112,7 @@ fn decode_the_persisted_set_of_the_state(local: u32) {
     if (ordinal_lo < header.block_start_lo) {
         ordinal_hi = ordinal_hi + 1u;
     }
-    for (var word = 0u; word < 64u; word = word + 1u) {
+    for (var word = 0u; word < PERSISTED_MASK_WORDS; word = word + 1u) {
         persisted[word] = 0u;
         torn[word] = 0u;
     }
@@ -244,7 +243,7 @@ fn decode_the_persisted_set_of_the_state(local: u32) {
     }
 }
 
-// 对拍用的探针入口（`GpuFactsVerifier::persisted_masks_of_states`）：每个状态把拆出的持久掩码 64 个字写进结论缓冲
+// 对拍用的探针入口（`GpuFactsVerifier::persisted_masks_of_states`）：每个状态把拆出的持久掩码 PERSISTED_MASK_WORDS 个字写进结论缓冲
 @compute @workgroup_size(64)
 fn probe_persisted_masks(@builtin(global_invocation_id) id: vec3<u32>) {
     let local = id.x;
@@ -252,8 +251,8 @@ fn probe_persisted_masks(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     decode_the_persisted_set_of_the_state(local);
-    for (var word = 0u; word < 64u; word = word + 1u) {
-        verdicts[local * 64u + word] = persisted[word];
+    for (var word = 0u; word < PERSISTED_MASK_WORDS; word = word + 1u) {
+        verdicts[local * PERSISTED_MASK_WORDS + word] = persisted[word];
     }
 }
 
@@ -348,22 +347,15 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 "#;
 
-/// 核对内核的整份源码：段表宽与段的展开方式码（[`segment_expansion_code_wgsl_constants`]）从 Rust 生成、接在本体前面，不在 WGSL 里另写一份。
+/// 核对内核的整份源码：段表宽、持久掩码的字数（[`PERSISTED_MASK_WORDS`]）与段的展开方式码（[`segment_expansion_code_wgsl_constants`]）
+/// 从 Rust 生成、接在本体前面，不在 WGSL 里另写一份。
 #[must_use]
 pub fn verifier_shader_source() -> String {
     format!(
-        "const SEGMENT_WORDS: u32 = {FACTS_VERIFIER_WORDS_PER_SEGMENT}u;\nconst BIT_SLICE_PAST_ITS_DOMAIN: u32 = {}u;\n{}\n{GPU_VERIFIER_SHADER_SOURCE}",
+        "const SEGMENT_WORDS: u32 = {FACTS_VERIFIER_WORDS_PER_SEGMENT}u;\nconst PERSISTED_MASK_WORDS: u32 = {PERSISTED_MASK_WORDS}u;\nconst BIT_SLICE_PAST_ITS_DOMAIN: u32 = {}u;\n{}\n{GPU_VERIFIER_SHADER_SOURCE}",
         verdict_bits::SLICE_PAST_ITS_DOMAIN,
         segment_expansion_code_wgsl_constants()
     )
-}
-
-/// GPU 核对代码的摘要：进核对表的键。
-#[must_use]
-pub fn gpu_verifier_digest() -> [u8; DIGEST_BYTES] {
-    let mut message = b"gpu-facts-verifier-v4\n".to_vec();
-    message.extend_from_slice(verifier_shader_source().as_bytes());
-    sha256_digest(&message)
 }
 
 fn words_to_bytes(values: &[u32]) -> Vec<u8> {
@@ -828,9 +820,9 @@ impl<'card> GpuFactsVerifier<'card> {
     }
 }
 
-/// 持久掩码几个字：内核里的 `array<u32, 64>`，装得下 [`MAXIMUM_ENUMERATED_WRITES`] 次写。
-pub const PERSISTED_MASK_WORDS: usize = 64;
-const _: () = assert!(PERSISTED_MASK_WORDS * 32 == MAXIMUM_ENUMERATED_WRITES);
+/// 持久掩码几个字（内核里的 `array<u32, PERSISTED_MASK_WORDS>`，装得下 [`MAXIMUM_ENUMERATED_WRITES`] 次写）：定义在 `crate::crash_facts`，
+/// 对拍用例照这条路径引。
+pub use crate::crash_facts::PERSISTED_MASK_WORDS;
 
 /// 探针交回的一个掩码换成按枚举写表的持久集合（前 `enumerated_write_count` 位）。
 ///

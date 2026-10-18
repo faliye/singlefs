@@ -12,6 +12,9 @@ singlefs-format = { path = "../singlefs-format" }
 singlefs-harness = { path = "../singlefs-harness" }
 # RefFS（D13（验证路线） 已定项 3，E171 第 1 次重跑登记修订 2 第 2.3 节）：checker 档的装置只读它、只调它判允许集合，不改它的源码，它的依赖闭包与单测归它自己（harness 档）。
 singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }
+# 判法单元（4-2a）：库读回构建脚本写进 OUT_DIR 的那份判器键表（`singlefs_unit_graph::entry_groups`），测试在临时拷贝上照同一套算法重算键。
+# 只用 std，不依赖工作区任何 crate。
+singlefs-unit-graph = { path = "../singlefs-unit-graph" }
 # 崩溃放量的判定存储（src/verdict_store.rs，里程碑三第十一项；用户 2026-09-28 选 RocksDB）。版本钉成与 scripts/experiments/Cargo.lock 相同，
 # E162（崩溃放量判定块存储选型） K 臂杀进程量的就是这一版，默认特性也照那边不动（K 臂用的 LZ4 压缩在默认特性里）。
 # 只进 checker 档：harness 档、池级 checker、core 都不依赖它（.claude/rules/verification.md「定义与名字」，门禁 94 号）。
@@ -21,6 +24,10 @@ rocksdb = { version = "=0.25.0", optional = true }
 # 崩溃放量的 GPU 核对（src/gpu_unit_checks.rs）：版本与特性钉成 E163（GPU多卡算单元校验和） 装置用的那一份（scripts/experiments/Cargo.toml）。
 wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan", "wgsl", "std"], optional = true }
 pollster = { version = "=1.0.1", optional = true }
+
+# 构建脚本按判法单元的入口登记表（src/judging_units_entries.rs）逐组算判器键与组成清单，写进 OUT_DIR（build.rs 文件头）。
+[build-dependencies]
+singlefs-unit-graph = { path = "../singlefs-unit-graph" }
 
 [features]
 # 判定存储（src/verdict_store.rs）与它的 RocksDB 依赖：崩溃点重放枚举与按序号段判只吃从库里读回的流（src/crash_library.rs），默认就编；

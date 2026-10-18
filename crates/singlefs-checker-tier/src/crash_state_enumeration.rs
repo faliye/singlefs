@@ -3,9 +3,13 @@
 //! （[`CrashPointReplayTally`]）从库里读回的结论重建。判一个状态的判法在 `crate::crash`（CPU）与 `crate::crash_judge_gpu`（GPU），这里只排两段、
 //! 领块、存库、读回。
 //!
-//! 一条崩溃枚举用例的流当一个崩溃点（名字是项名、设点文件是用例文件），加末节点（整张写表全部持久那一个状态，
-//! `crash_amplification::END_OF_FLOW_NODE_NAME`）；块键照崩溃放量的身份与复用键（`crate::crash_identity`），结论版本照三种结论各一把
-//! （`crate::crash_amplification::ConclusionVersionsOfThePlan`）：改了判器只换判器那把、改了用例文件只换它那把 CPU 版本。
+//! 一条崩溃枚举用例的流按步切成前缀树的节点（L6：写下标区间互相交叠的几段并成一步，一步一个崩溃点，点名 `<项名>.<周期>.<步序>` 只作索引），
+//! 加末节点（整张写表全部持久那一个状态，`crash_amplification::END_OF_FLOW_NODE_NAME`）；块键与崩溃放量同一个算法、只由内容定
+//! （段写表、起步镜像、计划哈希），几条流共有的前几步只判一次；判器那一半是判法单元指纹（`crate::crash_identity::judging_units_key`），
+//! 设点文件、项名都不进键。录入段按录入键入库，命中就不再录（`crate::crash_library::two_stages`）。
+//! 跑完打一行 `CRASH_CASE_BLOCKS blocks= reused= fresh= red= refused=`（[`CrashCaseBlocks`]）；`SINGLEFS_CRASH_CASE_BLOCKS_QUERY=1` 只算块键、
+//! 只读地查库、一块不判；`SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1` 库不读、全部块现判、照键写回同一份库；判器那一半拒算的整条用例在一次性的库里
+//! 照判、不入库，块计入 `refused=`。
 //! 两台分片与崩溃放量同一种读法（`SINGLEFS_CRASH_AMPLIFICATION_SHARE`、`…_HOST_WEIGHTS`、`…_IMPORT`）。
 //!
 //! 行：开跑一行 `CRASH_POINT_REPLAY_PARALLEL_START`、跑完一行 `CRASH_POINT_REPLAY_PARALLEL_FINISHED`（门禁 checker-tier-crash-point-replay 的准入模块按它判线程；
@@ -15,7 +19,6 @@
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::ops::Range;
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
@@ -45,33 +48,36 @@ use crate::crash::{
     RECORD_CHECKER_ROOT_WITHOUT_RECORD,
 };
 use crate::crash_amplification::{
-    check_blocks_where_until_with_threads, count_vector_disagreements_of_the_flow,
-    import_the_planned_blocks_of_the_other_hosts, judge_the_observers_of_the_flow,
-    observer_versions_to_write_under, pending_blocks, plan_crash_points,
+    changed_units_line_of_the_stale_verdicts, check_blocks_where_until_with_threads,
+    count_vector_disagreements_of_the_flow, import_the_planned_blocks_of_the_other_hosts,
+    judge_the_observers_of_the_flow, observer_versions_keeping_the_refused_out,
+    observers_whose_recorded_blocks_are_missing, pending_blocks, plan_crash_points,
     record_the_observers_of_the_flow, states_with_the_root_slot_write_persisted,
     stop_is_requested_by_the_environment, unjudged_blocks_of_the_flow, write_the_recorded_blocks,
-    ConclusionVersionsOfThePlan, CpuJudgementsOfSampledBlocks, CrashAmplificationRunMode,
-    CrashFlow, CrashPlan, CrashPointSpan, FlowOfTheLibrary, JudgedBy, NodeOfAnObserver,
-    ObserveACrashState, ObserveACrashStateHandingBackAnImage, ObserverCode, ObserverDeduplication,
-    ObserverOnTheNodes, ObserverVersions, PoolCheckerOfTheImagesAfterTheObservers, RecordedFlow,
-    RecordedFlowReadBack, WeightedShares, END_OF_FLOW_NODE_NAME,
+    ConclusionVersionsOfThePlan, CpuJudgementsOfSampledBlocks, CrashFlow, CrashPlan,
+    CrashPointSpan, FlowOfTheLibrary, JudgedBy, NodeOfAnObserver, ObserveACrashState,
+    ObserveACrashStateHandingBackAnImage, ObserverCode, ObserverDeduplication, ObserverOnTheNodes,
+    ObserverVersions, PoolCheckerOfTheImagesAfterTheObservers, RecordedFlow, RecordedFlowReadBack,
+    WeightedShares, END_OF_FLOW_NODE_NAME,
 };
-use crate::crash_identity::{ConclusionKind, ConclusionVersion, ObserverName};
+use crate::crash_identity::{
+    judging_units_key, ConclusionKind, ConclusionVersion, JudgingUnits, ObserverName,
+};
 use crate::crash_judge_conclusions::{
     red_items_of_the_encoded_verdict, RECOVERY_OUTCOME_CODE_FAILED,
     RECOVERY_OUTCOME_CODE_FILE_READ, RECOVERY_OUTCOME_CODE_NO_FILE,
 };
 use crate::crash_library::{
-    repository_root_of_this_crate, two_stages, CrashLibrary, CrashLibraryClass, ItemManifest,
-    ItemName, StageOutcome,
+    open_the_library_for_reading_only, recording_key_of_the_inputs, toolchain_of_this_process,
+    two_stages, two_stages_under_the_recording_key_topping_up_a_reused_recording, CrashLibrary,
+    CrashLibraryClass, DisposableLibraryDirectory, ItemManifest, ItemName, RecordingInputsDigest,
+    RunStage, StageOutcome,
 };
 use crate::crash_point_replay_progress::{
     findings_log_final_lines, findings_standard_output_new_signature_line,
     findings_standard_output_summary_line, CrashPointReplayFindingsLog,
     CrashPointReplayFindingsLogBegin, CrashPointReplayFindingsLogSection,
-    CrashPointReplayToolchainIdentity,
 };
-use crate::gpu_card_configuration::multi_host_configuration_file;
 use crate::verdict_store::{StoredConclusionBlock, VerdictStore};
 
 /// 崩溃点重放判段的工作线程数从这个环境变量取（十进制正整数）；没设取崩溃放量的 `SINGLEFS_CRASH_AMPLIFICATION_THREADS`，再没设取
@@ -145,19 +151,12 @@ impl CrashPointReplayJudgeRoute {
     }
 }
 
-/// 照本机多机配置选路（[`crash_point_replay_judge_route_of_the_switches`]）。
-fn crash_point_replay_judge_route(
-    repository_root: &Path,
-) -> Result<CrashPointReplayJudgeRoute, String> {
-    let configuration_file: Option<PathBuf> = multi_host_configuration_file(repository_root)?;
-    let mode = match &configuration_file {
-        Some(configuration) => CrashAmplificationRunMode::from_configuration_file(configuration),
-        None => CrashAmplificationRunMode::from_configuration_file_or_environment(
-            &repository_root.join("multi-host.env"),
-        ),
-    };
+/// 照本机多机配置选路（[`crash_point_replay_judge_route_of_the_switches`]）：配置按这个进程从哪起找
+/// （`crate::crash_amplification::multi_host_configuration_of_this_process`，不收仓根）。
+fn crash_point_replay_judge_route() -> Result<CrashPointReplayJudgeRoute, String> {
+    let configuration = crate::crash_amplification::multi_host_configuration_of_this_process()?;
     Ok(crash_point_replay_judge_route_of_the_switches(
-        mode.uses_gpu(),
+        configuration.mode.uses_gpu(),
         cfg!(feature = "gpu"),
     ))
 }
@@ -635,13 +634,13 @@ fn sample_through_the_library(
     ordinals: &Range<u64>,
     judge_the_read_back_flow: impl FnOnce(&FlowOfTheLibrary<'_>, &NoteASampledState<'_>) -> u64,
 ) -> StageOutcome<u64> {
-    let repository_root = repository_root_of_this_crate();
     let item_name = item_name_of(item);
+    let recorded_bytes = flow_to_record.recorded_bytes();
     two_stages(
         CrashLibraryClass::CrashStateEnumeration,
-        &repository_root,
         &item_name,
-        |library| flow_to_record.record_into(library, false),
+        &FlowToRecord::recording_inputs_digest(&recorded_bytes, false),
+        |library| flow_to_record.record_into(library, false, &recorded_bytes),
         |library, manifest| {
             let read_back = RecordedFlowReadBack::read_from_the_library(
                 &library.lock(),
@@ -649,14 +648,24 @@ fn sample_through_the_library(
             )?;
             let flow = read_back.flow();
             let plan = plan_crash_points(&flow);
-            let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-            let conclusion_versions =
-                ConclusionVersionsOfThePlan::of_the_plan(&repository_root, &plan, &toolchain)
-                    .map_err(|not_writable| {
-                        let line = not_writable.not_written_line();
-                        println!("{line}");
-                        line
-                    })?;
+            // CPU 判器那一组拒算：取这个进程的占位、取样的结论照判不入库（4-2a 报告第四节第 7 条后半句）
+            let (conclusion_versions, refusals) =
+                ConclusionVersionsOfThePlan::of_the_plan_keeping_the_refused_out(
+                    &plan,
+                    toolchain_of_this_process(),
+                );
+            for refusal in &refusals {
+                println!(
+                    "CRASH_CASE_BLOCKS_KEY_REFUSED item={} {}（这一组照判、不入库）",
+                    item.name,
+                    refusal.sentence()
+                );
+            }
+            library
+                .lock()
+                .keep_the_rows_of_these_versions_out_of_the_library(
+                    conclusion_versions.versions_kept_out_of_the_library(),
+                );
             let sampled_blocks = CpuJudgementsOfSampledBlocks::for_the_ordinals(
                 &library.lock(),
                 &plan,
@@ -745,13 +754,67 @@ fn flow_of_the_inputs<'flow>(
             .enumerate()
             .map(|(segment_index, segment)| expansion(segment_index, segment))
             .collect(),
-        crash_points: vec![CrashPointSpan {
+        crash_points: crash_points_of_the_steps(item, writes, segments),
+    }
+}
+
+/// 一条崩溃枚举用例的流按步切成前缀树的节点（L6）：写下标区间互相交叠的几段并成一步，每一步一个崩溃点，点的写区间首尾相接罩住整张写表；
+/// 点名 `<项名>.<周期>.<步序>`（周期取这一步最后一次写的，`crash_amplification::period_of_write`）只作索引。块键照崩溃放量的同一个算法
+/// （段写表、起步镜像、计划哈希），几条流共有的前几步就是同几个节点，只判一次。切不成首尾相接的几步（某一段的写落在前一步之前）就
+/// 整条流一个点，与改之前一样。
+fn crash_points_of_the_steps(
+    item: CrashPointReplayItem<'_>,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+) -> Vec<CrashPointSpan> {
+    let whole_flow = || {
+        vec![CrashPointSpan {
             name: item.name.to_string(),
             code_file_in_repository: item.setting_file.to_string(),
             writes: 0..writes.len(),
             ignored: false,
-        }],
+        }]
+    };
+    // 每一步：（最低的写下标，最高的写下标），按段的次序并
+    let mut steps: Vec<(usize, usize)> = Vec::new();
+    for segment in segments {
+        let (Some(lowest), Some(highest)) = (segment.iter().min(), segment.iter().max()) else {
+            continue;
+        };
+        match steps.last_mut() {
+            Some((step_lowest, step_highest)) if *lowest <= *step_highest => {
+                if *lowest < *step_lowest {
+                    return whole_flow();
+                }
+                *step_highest = (*step_highest).max(*highest);
+            }
+            Some(_) | None => steps.push((*lowest, *highest)),
+        }
     }
+    if steps.len() < 2 || !steps.windows(2).all(|pair| pair[0].1 < pair[1].0) {
+        return whole_flow();
+    }
+    let starts: Vec<usize> = std::iter::once(0)
+        .chain(steps.iter().skip(1).map(|(lowest, _highest)| *lowest))
+        .collect();
+    starts
+        .iter()
+        .enumerate()
+        .map(|(step_index, start)| {
+            let end = starts.get(step_index + 1).copied().unwrap_or(writes.len());
+            let (_lowest, highest) = steps[step_index];
+            CrashPointSpan {
+                name: format!(
+                    "{}.{}.{step_index}",
+                    item.name,
+                    crate::crash_amplification::period_of_write(&writes[highest])
+                ),
+                code_file_in_repository: item.setting_file.to_string(),
+                writes: *start..end,
+                ignored: false,
+            }
+        })
+        .collect()
 }
 
 impl FlowToRecord<'_> {
@@ -774,23 +837,35 @@ impl FlowToRecord<'_> {
         use_the_flow(&flow)
     }
 
+    /// 录进库的那一份流的字节（[`RecordedFlow`]）：录入键的输入照它算，录入段照它写。
+    fn recorded_bytes(&self) -> Vec<u8> {
+        self.with_the_flow(|flow| RecordedFlow::of(flow).to_bytes())
+    }
+
+    /// 录入键的输入那一半：录进库的那一份流的字节与判表开不开（配了 GPU 才打包判表）；项名、设点文件不进。
+    fn recording_inputs_digest(recorded_bytes: &[u8], gpu_judges: bool) -> RecordingInputsDigest {
+        let mut message = b"singlefs crash state enumeration recording inputs\n".to_vec();
+        message.extend_from_slice(&sha256_digest(recorded_bytes));
+        message.extend_from_slice(format!("gpu_judges={gpu_judges}\n").as_bytes());
+        RecordingInputsDigest(sha256_digest(&message))
+    }
+
     /// 录入段：排计划、写录入表与路径索引、把流写进库（配了 GPU 再把打包判表写进库），交回清单。
     fn record_into(
         &self,
         library: &CrashLibrary,
         gpu_judges: bool,
+        recorded_bytes: &[u8],
     ) -> Result<ItemManifest, String> {
         self.with_the_flow(|flow| {
             let mut store = library.lock();
             let plan = plan_crash_points(flow);
             write_the_recorded_blocks(&mut store, &plan)
                 .map_err(|error| format!("录入失败：{error:?}"))?;
-            let recorded_bytes = RecordedFlow::of(flow).to_bytes();
-            let flow_digest = sha256_digest(&recorded_bytes);
+            let flow_digest = sha256_digest(recorded_bytes);
             store
-                .store_recorded_flow(&flow_digest, &recorded_bytes)
+                .store_recorded_flow(&flow_digest, recorded_bytes)
                 .map_err(|error| format!("录下的流程写不进库：{error:?}"))?;
-            drop(recorded_bytes);
             let mut digests = vec![(MANIFEST_FLOW.to_string(), flow_digest)];
             if gpu_judges {
                 digests.push((
@@ -845,6 +920,101 @@ fn record_the_judge_tables(
 
 // ============================== 两段 ==============================
 
+/// 崩溃枚举用例只算块键、查库、一块不判的开关（`scripts/gate/admission.py` 文件头「崩溃枚举用例的块判定」）：设成 `1` 时只读地开库
+/// （库目录里一个文件都不动、修改时刻不变），打 [`CRASH_CASE_BLOCKS_LINE_PREFIX`] 那一行，交只录（`StageOutcome::RecordedOnly`），退 0。
+pub const CRASH_CASE_BLOCKS_QUERY_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_CRASH_CASE_BLOCKS_QUERY";
+
+/// 一条崩溃枚举用例跑完打的那一行的头（字段次序照 `scripts/gate/admission.py` 的 `CRASH_CASE_BLOCKS_FIELDS`）。
+pub const CRASH_CASE_BLOCKS_LINE_PREFIX: &str = "CRASH_CASE_BLOCKS";
+
+/// 一条崩溃枚举用例这一趟这台机器那一份的块账（[`CRASH_CASE_BLOCKS_LINE_PREFIX`] 那一行）：`blocks = reused + fresh + refused`。
+/// `reused` 是键相同、库里有判定的块，`fresh` 是这一趟现判的（只查块键那一趟是库里没有键相同判定的），`refused` 是判器那一半键拒算、
+/// 照判不入库的，`red` 是判红的块（复用的与现判的都算）。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CrashCaseBlocks {
+    pub blocks: u64,
+    pub reused: u64,
+    pub fresh: u64,
+    pub red: u64,
+    pub refused: u64,
+}
+
+impl CrashCaseBlocks {
+    /// `CRASH_CASE_BLOCKS blocks=<n> reused=<n> fresh=<n> red=<n> refused=<n>`。
+    #[must_use]
+    pub fn line(&self) -> String {
+        format!(
+            "{CRASH_CASE_BLOCKS_LINE_PREFIX} blocks={} reused={} fresh={} red={} refused={}",
+            self.blocks, self.reused, self.fresh, self.red, self.refused
+        )
+    }
+}
+
+/// 这条用例判器那一半的键：判器与挂着的观察者各一把（[`crate::crash_identity::judging_units_key`]）。哪几把拒算：那几组取这个进程的
+/// 占位、照判不入库（键里带着占位与从它拼出来的版本的行只留在这个进程里，`VerdictStore::keep_the_rows_of_these_versions_out_of_the_library`），
+/// 别的照键入库同一份长期库（4-2a 报告第四节第 7 条后半句；不另建一次性库、不退回整文件或整表指纹）；这条用例的块全部计入 `refused=`。
+struct KeysOfTheItem {
+    /// 挂着的每个观察者那几把版本（拒算的那几组是占位拼的）。
+    observer_versions: Vec<ObserverVersions>,
+    /// 拒算的那几组，一组一句（行里逐个点名）。
+    refusal_sentences: Vec<String>,
+    /// 判器那一组拒算（判器的结论用占位、照判不入库）。
+    judge_is_refused: bool,
+    /// 照判、不入库的那几把版本：开库之后登记进库。
+    versions_kept_out_of_the_library: Vec<[u8; DIGEST_BYTES]>,
+}
+
+impl KeysOfTheItem {
+    /// 有没有哪一组拒算（这条用例的块全部计入 `refused=`）。
+    fn are_refused(&self) -> bool {
+        !self.refusal_sentences.is_empty()
+    }
+}
+
+/// 这条用例这一趟判器那一半的键（判器那一组、挂着的每个观察者那一组）。
+fn keys_of_the_item(
+    route: CrashPointReplayJudgeRoute,
+    observers_on_the_nodes: &[ObserverOnTheNodes<'_>],
+) -> KeysOfTheItem {
+    let toolchain = toolchain_of_this_process();
+    // 镜像判定的版本是判定定义那一把，不论在哪判的；GPU 判的还要 GPU 判器那一组的键当出处，取不出同样照判、不入库
+    let judge_units_needed: &[JudgingUnits] = match route.judged_by() {
+        JudgedBy::GpuJudge => &[
+            JudgingUnits::JudgementOfTheCrashImages,
+            JudgingUnits::GpuJudge,
+        ],
+        JudgedBy::CpuJudge => &[JudgingUnits::JudgementOfTheCrashImages],
+    };
+    let mut keys = KeysOfTheItem {
+        observer_versions: Vec::with_capacity(observers_on_the_nodes.len()),
+        refusal_sentences: Vec::new(),
+        judge_is_refused: false,
+        versions_kept_out_of_the_library: Vec::new(),
+    };
+    for judge_units in judge_units_needed {
+        if let Err(refusal) = judging_units_key(judge_units, toolchain) {
+            keys.refusal_sentences.push(refusal.sentence());
+            keys.judge_is_refused = true;
+            keys.versions_kept_out_of_the_library.push(
+                *crate::crash_amplification::placeholder_judging_units_key_of_the_refused(
+                    judge_units,
+                )
+                .fingerprint(),
+            );
+        }
+    }
+    for observer in observers_on_the_nodes {
+        let (versions, refusals, versions_kept_out) =
+            observer_versions_keeping_the_refused_out(observer, route.judged_by(), toolchain);
+        keys.refusal_sentences
+            .extend(refusals.iter().map(|refusal| refusal.sentence()));
+        keys.versions_kept_out_of_the_library
+            .extend(versions_kept_out);
+        keys.observer_versions.push(versions);
+    }
+    keys
+}
+
 #[allow(
     clippy::too_many_arguments,
     reason = "与 enumerate_crash_states_with_expansion 同一组参数"
@@ -860,9 +1030,10 @@ fn enumerate_crash_states_through_the_library(
     observers: &[CrashPointReplayObserver<'_>],
     observers_handing_back_images: &[CrashPointReplayObserverHandingBackAnImage<'_>],
 ) -> Result<StageOutcome<CrashPointReplayTally>, String> {
-    let repository_root = repository_root_of_this_crate();
-    let route = crash_point_replay_judge_route(&repository_root)?;
-    let item_name = item_name_of(item);
+    let route = crash_point_replay_judge_route()?;
+    let observers_on_the_nodes =
+        observers_on_the_nodes_of_the_item(item, observers, observers_handing_back_images)?;
+    let keys = keys_of_the_item(route, &observers_on_the_nodes);
     let flow_to_record = flow_of_the_inputs(
         item,
         base,
@@ -872,65 +1043,163 @@ fn enumerate_crash_states_through_the_library(
         versions,
         expansion,
     );
-    let observers_on_the_nodes =
-        observers_on_the_nodes_of_the_item(item, observers, observers_handing_back_images)?;
-    let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
-    let observer_versions: Vec<ObserverVersions> = observers_on_the_nodes
-        .iter()
-        .map(|observer| {
-            observer_versions_to_write_under(
-                &repository_root,
-                observer,
-                route.judged_by(),
-                &toolchain,
-            )
-            .map_err(|not_writable| {
-                let line = not_writable.not_written_line();
-                println!("{line}");
-                line
-            })
-        })
-        .collect::<Result<_, _>>()?;
-    two_stages(
-        CrashLibraryClass::CrashStateEnumeration,
-        &repository_root,
+    let (outcome, blocks) = enumerate_the_flow_through_the_library_with_the_keys(
+        item,
+        &flow_to_record,
+        &observers_on_the_nodes,
+        route,
+        keys,
+    )?;
+    if let Some(blocks) = blocks {
+        println!("{}", blocks.line());
+    }
+    Ok(outcome)
+}
+
+/// 只查块键那一趟（[`CRASH_CASE_BLOCKS_QUERY_ENVIRONMENT_VARIABLE`]`=1`）：照调用方这一趟的流排计划、算块键，只读地开库、查每一块有没有
+/// 键相同的判定，一块都不判、一行都不写。判器那一半拒算的块全部计入 `refused=`。
+fn blocks_queried_without_judging(
+    flow_to_record: &FlowToRecord<'_>,
+    route: CrashPointReplayJudgeRoute,
+    keys: &KeysOfTheItem,
+) -> Result<CrashCaseBlocks, String> {
+    flow_to_record.with_the_flow(|flow| {
+        let plan = plan_crash_points(flow);
+        let selected = blocks_of_this_host(&plan)?;
+        let blocks = u64::try_from(selected.len()).expect("块数装得进 u64");
+        if keys.are_refused() {
+            for sentence in &keys.refusal_sentences {
+                println!("CRASH_CASE_BLOCKS_KEY_REFUSED {sentence}");
+            }
+            return Ok(CrashCaseBlocks {
+                blocks,
+                reused: 0,
+                fresh: 0,
+                red: 0,
+                refused: blocks,
+            });
+        }
+        let log_directory = DisposableLibraryDirectory::new("crash-case-blocks-query")?;
+        let Some(store) = open_the_library_for_reading_only(log_directory.directory())? else {
+            return Ok(CrashCaseBlocks {
+                blocks,
+                reused: 0,
+                fresh: blocks,
+                red: 0,
+                refused: 0,
+            });
+        };
+        let conclusion_versions =
+            ConclusionVersionsOfThePlan::of_the_plan(&plan, toolchain_of_this_process())
+                .map_err(|not_writable| not_writable.not_written_line())?;
+        let conclusions = conclusion_versions.stored_under(route.judged_by());
+        let mut counted = CrashCaseBlocks {
+            blocks,
+            reused: 0,
+            fresh: 0,
+            red: 0,
+            refused: 0,
+        };
+        let mut block_sequence = 0u64;
+        for (point_index, point) in plan.points.iter().enumerate() {
+            for local in point.blocks() {
+                let this_block = block_sequence;
+                block_sequence += 1;
+                if !selected.contains(&this_block) {
+                    continue;
+                }
+                let key = point.block_key(&local);
+                if conclusions
+                    .is_stored(&store, point_index, &key)
+                    .map_err(|error| format!("查块失败：{error:?}"))?
+                {
+                    counted.reused += 1;
+                    if !conclusions
+                        .violations_in_block(&store, point_index, &key)
+                        .map_err(|error| format!("读违例失败：{error:?}"))?
+                        .is_empty()
+                    {
+                        counted.red += 1;
+                    }
+                } else {
+                    counted.fresh += 1;
+                }
+            }
+        }
+        Ok(counted)
+    })
+}
+
+/// 两段过库，键由调用方给（单测造拒算用）：只查块键那一趟只查不判；别的都在长期库里录、判（录入键命中就不再录）；判器那一半哪几组拒算，
+/// 那几组照判不入库（开库之后登记它们的占位版本，键里带着它们的行只留在这个进程里），别的照键入库同一份库，块全部计入 `refused=`
+/// （4-2a 报告第四节第 7 条后半句）。交回判段的结局与这一趟的块账（只录那一趟是 `None`）。
+///
+/// # Errors
+/// 开不了库、写不进、读不回；判段的错。
+fn enumerate_the_flow_through_the_library_with_the_keys(
+    item: CrashPointReplayItem<'_>,
+    flow_to_record: &FlowToRecord<'_>,
+    observers_on_the_nodes: &[ObserverOnTheNodes<'_>],
+    route: CrashPointReplayJudgeRoute,
+    keys: KeysOfTheItem,
+) -> Result<(StageOutcome<CrashPointReplayTally>, Option<CrashCaseBlocks>), String> {
+    if std::env::var(CRASH_CASE_BLOCKS_QUERY_ENVIRONMENT_VARIABLE).is_ok_and(|value| value == "1") {
+        let blocks = blocks_queried_without_judging(flow_to_record, route, &keys)?;
+        return Ok((StageOutcome::RecordedOnly, Some(blocks)));
+    }
+    let item_name = item_name_of(item);
+    let recorded_bytes = flow_to_record.recorded_bytes();
+    let gpu_judges = route == CrashPointReplayJudgeRoute::Gpu;
+    let inputs = FlowToRecord::recording_inputs_digest(&recorded_bytes, gpu_judges);
+    for sentence in &keys.refusal_sentences {
+        println!(
+            "CRASH_CASE_BLOCKS_KEY_REFUSED item={} {sentence}（这一组照判、不入库，别的照键入库同一份库）",
+            item.name
+        );
+    }
+    let library = CrashLibrary::open(CrashLibraryClass::CrashStateEnumeration)?;
+    library
+        .lock()
+        .keep_the_rows_of_these_versions_out_of_the_library(
+            keys.versions_kept_out_of_the_library.iter().copied(),
+        );
+    let stage = RunStage::of_this_process();
+    let recording_key_of_this_run = recording_key_of_the_inputs(&inputs);
+    let observer_versions = &keys.observer_versions;
+    let blocks_of_the_run: std::cell::Cell<Option<CrashCaseBlocks>> = std::cell::Cell::new(None);
+    let outcome = two_stages_under_the_recording_key_topping_up_a_reused_recording(
+        &library,
+        stage,
         &item_name,
+        &recording_key_of_this_run,
         |library| {
-            let manifest =
-                flow_to_record.record_into(library, route == CrashPointReplayJudgeRoute::Gpu)?;
+            let manifest = flow_to_record.record_into(library, gpu_judges, &recorded_bytes)?;
             if !observers_on_the_nodes.is_empty() {
                 // 观察者的录入段（用户 2026-10-13 定「观察者改走两段」）：这台机器领的块逐状态看、结果写进库，判段从库里读
                 flow_to_record.with_the_flow(|flow| {
                     let plan = plan_crash_points(flow);
                     let is_mine = blocks_of_this_host(&plan)?;
-                    let started = Instant::now();
-                    let stop_request =
-                        StopRequestRememberedInThisRun::new(&stop_is_requested_by_the_environment);
-                    let recording = record_the_observers_of_the_flow(
-                        &mut library.lock(),
+                    record_these_observers_and_print_the_line(
+                        library,
                         flow,
                         &plan,
-                        &observers_on_the_nodes,
-                        &observer_versions,
                         &|block| is_mine.contains(&block),
-                        &|| stop_request.is_requested(),
-                    )?;
-                    println!(
-                        "CRASH_POINT_REPLAY_OBSERVERS_RECORDED item={} blocks_recorded_here={} states_recorded_here={} blocks_already_recorded={} states_counted_here={} images_observed_fresh={} states_reusing_an_observed_image={} stopped_early={} seconds={:.1}",
-                        item.name,
-                        recording.blocks_recorded_here,
-                        recording.states_recorded_here,
-                        recording.blocks_already_recorded,
-                        recording.states_counted_here,
-                        recording.images_observed_here,
-                        recording.states_reusing_an_observed_image,
-                        recording.stopped_early,
-                        started.elapsed().as_secs_f64()
-                    );
-                    Ok::<(), String>(())
+                        item,
+                        observers_on_the_nodes,
+                        observer_versions,
+                    )
                 })?;
             }
             Ok(manifest)
+        },
+        |library| {
+            record_the_observers_missing_from_a_reused_recording(
+                library,
+                flow_to_record,
+                item,
+                observers_on_the_nodes,
+                observer_versions,
+            )
         },
         |library, manifest| {
             // 配了 GPU 而这份二进制没编进 gpu 特性：判段不判、报本次未跑，交只录（录入段上面照录了），带特性那一趟从库里读回在卡上判
@@ -942,13 +1211,129 @@ fn enumerate_crash_states_through_the_library(
                 library,
                 manifest,
                 item,
-                &observers_on_the_nodes,
-                &observer_versions,
+                observers_on_the_nodes,
+                observer_versions,
                 route,
-                &repository_root,
+                &JudgingUnitsOfTheRun {
+                    are_refused: keys.are_refused(),
+                    judge_is_refused: keys.judge_is_refused,
+                    blocks_of_the_run: &blocks_of_the_run,
+                },
             )
         },
-    )
+    )?;
+    drop(library);
+    Ok((outcome, blocks_of_the_run.get()))
+}
+
+/// 判段这一趟判器那一半键取没取得出，与它把块账交回到哪。
+struct JudgingUnitsOfTheRun<'run> {
+    /// 有一组拒算：那几组照判不入库，块全部计入 `refused=`。
+    are_refused: bool,
+    /// 判器那一组拒算：判器的结论按这个进程的占位存、照判不入库（开库之后已登记）。
+    judge_is_refused: bool,
+    blocks_of_the_run: &'run std::cell::Cell<Option<CrashCaseBlocks>>,
+}
+
+/// 观察者的录入段（用户 2026-10-13 定「观察者改走两段」）：给的这几个观察者在这台机器领的块上逐状态看、结果写进库（库里这一把观察者版本
+/// 录过的块不再录，[`record_the_observers_of_the_flow`]），打 `CRASH_POINT_REPLAY_OBSERVERS_RECORDED` 一行。
+///
+/// # Errors
+/// 库读写失败。
+fn record_these_observers_and_print_the_line(
+    library: &CrashLibrary,
+    flow: &CrashFlow<'_>,
+    plan: &CrashPlan,
+    is_mine: &dyn Fn(u64) -> bool,
+    item: CrashPointReplayItem<'_>,
+    observers: &[ObserverOnTheNodes<'_>],
+    versions: &[ObserverVersions],
+) -> Result<(), String> {
+    let started = Instant::now();
+    let stop_request = StopRequestRememberedInThisRun::new(&stop_is_requested_by_the_environment);
+    let recording = record_the_observers_of_the_flow(
+        &mut library.lock(),
+        flow,
+        plan,
+        observers,
+        versions,
+        is_mine,
+        &|| stop_request.is_requested(),
+    )?;
+    println!(
+        "CRASH_POINT_REPLAY_OBSERVERS_RECORDED item={} observers={} blocks_recorded_here={} states_recorded_here={} blocks_already_recorded={} states_counted_here={} images_observed_fresh={} states_reusing_an_observed_image={} buckets={} witness_misses={} stopped_early={} seconds={:.1}",
+        item.name,
+        observers
+            .iter()
+            .map(|observer| observer.observer_name.as_str())
+            .collect::<Vec<&str>>()
+            .join(","),
+        recording.blocks_recorded_here,
+        recording.states_recorded_here,
+        recording.blocks_already_recorded,
+        recording.states_counted_here,
+        recording.images_observed_here,
+        recording.states_reusing_an_observed_image,
+        recording.buckets,
+        recording.witness_misses,
+        recording.stopped_early,
+        started.elapsed().as_secs_f64()
+    );
+    Ok(())
+}
+
+/// 录制复用时补录观察者：流的录入键只由流定（[`FlowToRecord::recording_inputs_digest`]），挂着的观察者的版本不进键，命中之后录入那一段
+/// 整段不跑；观察者换了版本（代码改了、另读的输入改了、换了一个观察者）而流没变，判段就读不到它录入段的块。这里在录入段里逐个观察者核
+/// 它录入段的块都在库里（[`observers_whose_recorded_blocks_are_missing`]），缺块的那几个照录（只录缺的观察者，流与判表已在库里、键只由内容定，
+/// 不整段重录），打 `CRASH_POINT_REPLAY_OBSERVERS_CHECKED_ON_A_REUSED_RECORDING` 一行点名缺块的观察者。
+///
+/// # Errors
+/// 读写库失败；分片与权重写法错。
+fn record_the_observers_missing_from_a_reused_recording(
+    library: &CrashLibrary,
+    flow_to_record: &FlowToRecord<'_>,
+    item: CrashPointReplayItem<'_>,
+    observers: &[ObserverOnTheNodes<'_>],
+    versions: &[ObserverVersions],
+) -> Result<(), String> {
+    if observers.is_empty() {
+        return Ok(());
+    }
+    flow_to_record.with_the_flow(|flow| {
+        let plan = plan_crash_points(flow);
+        let blocks_this_host_takes = blocks_of_this_host(&plan)?;
+        let is_mine = |block: u64| blocks_this_host_takes.contains(&block);
+        let missing = observers_whose_recorded_blocks_are_missing(
+            &library.lock(),
+            &plan,
+            observers,
+            versions,
+            &is_mine,
+        )?;
+        println!(
+            "CRASH_POINT_REPLAY_OBSERVERS_CHECKED_ON_A_REUSED_RECORDING item={} observers={} observers_missing_blocks={}",
+            item.name,
+            observers.len(),
+            missing
+                .iter()
+                .map(|position| observers[*position].observer_name.as_str())
+                .collect::<Vec<&str>>()
+                .join(",")
+        );
+        // 迭代上界：缺块的观察者个数（不多于观察者个数）
+        for position in missing {
+            record_these_observers_and_print_the_line(
+                library,
+                flow,
+                &plan,
+                &is_mine,
+                item,
+                std::slice::from_ref(&observers[position]),
+                std::slice::from_ref(&versions[position]),
+            )?;
+        }
+        Ok(())
+    })
 }
 
 /// 这台机器领的块（块序号 = 全部点的块按次序编号）：两台分片与崩溃放量同一种读法，按权重平滑轮转。
@@ -1024,6 +1409,10 @@ fn observers_on_the_nodes_of_the_item<'observer>(
     clippy::too_many_lines,
     reason = "读回、选路、版本、分工、导入、判、看、对账、重建计数、打行，是判段的全部步骤，拆开要把十几个量来回传"
 )]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "库、清单、项、观察者与它们的版本、选路、仓根、这一趟判器那一半键的结局，各是各的东西"
+)]
 fn judge_the_recorded_item(
     library: &CrashLibrary,
     manifest: &ItemManifest,
@@ -1031,10 +1420,9 @@ fn judge_the_recorded_item(
     observers_on_the_nodes: &[ObserverOnTheNodes<'_>],
     observer_versions: &[ObserverVersions],
     route: CrashPointReplayJudgeRoute,
-    repository_root: &Path,
+    judging_units_of_the_run: &JudgingUnitsOfTheRun<'_>,
 ) -> Result<StageOutcome<CrashPointReplayTally>, String> {
     let started = Instant::now();
-    let toolchain = CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test();
     let read_back = RecordedFlowReadBack::read_from_the_library(
         &library.lock(),
         &manifest.digest_named(MANIFEST_FLOW)?,
@@ -1042,14 +1430,49 @@ fn judge_the_recorded_item(
     let flow_of_the_library = read_back.flow();
     let flow = &flow_of_the_library;
     let plan = plan_crash_points(flow);
-    let conclusion_versions =
-        ConclusionVersionsOfThePlan::of_the_plan(repository_root, &plan, &toolchain).map_err(
-            |not_writable| {
-                let line = not_writable.not_written_line();
-                println!("{line}");
-                line
-            },
-        )?;
+    // 判器那一组拒算：照开库之前那一次判定（keys_of_the_item）取这个进程的占位、照判不入库，不在这里再取一次键——取得出也不改按真键存
+    // （判定与写读同一份输入）；没拒算就照判法单元指纹存进长期库，组成清单随键登进库
+    let conclusion_versions = if judging_units_of_the_run.judge_is_refused {
+        let (conclusion_versions, _refusals) =
+            ConclusionVersionsOfThePlan::of_the_plan_keeping_the_refused_out(
+                &plan,
+                toolchain_of_this_process(),
+            );
+        let conclusion_versions =
+            conclusion_versions.with_the_judge_refused_by_the_caller(route.judged_by());
+        library
+            .lock()
+            .keep_the_rows_of_these_versions_out_of_the_library(
+                conclusion_versions.versions_kept_out_of_the_library(),
+            );
+        conclusion_versions
+    } else {
+        let conclusion_versions =
+            ConclusionVersionsOfThePlan::of_the_plan(&plan, toolchain_of_this_process()).map_err(
+                |not_writable| {
+                    let line = not_writable.not_written_line();
+                    println!("{line}");
+                    line
+                },
+            )?;
+        let mut store = library.lock();
+        for judging_units in conclusion_versions.judging_units_keys() {
+            store
+                .store_judging_units_composition(judging_units)
+                .map_err(|error| format!("组成清单写不进库：{error:?}"))?;
+        }
+        if let Some(line) = changed_units_line_of_the_stale_verdicts(
+            &store,
+            &plan,
+            &route.judged_by().conclusion_kind(),
+            conclusion_versions.judging_units_of(route.judged_by()),
+        )
+        .map_err(|error| format!("读库里别的判法单元指纹失败：{error:?}"))?
+        {
+            println!("{line} item={}", item.name);
+        }
+        conclusion_versions
+    };
     let observer_conclusion_versions: Vec<ConclusionVersion> = observer_versions
         .iter()
         .map(|versions| versions.conclusion)
@@ -1075,7 +1498,6 @@ fn judge_the_recorded_item(
     let imported_blocks = match std::env::var("SINGLEFS_CRASH_AMPLIFICATION_IMPORT") {
         Ok(list) => import_the_planned_blocks_of_the_other_hosts(
             &mut store,
-            repository_root,
             &plan,
             &is_mine,
             &conclusion_versions,
@@ -1134,7 +1556,6 @@ fn judge_the_recorded_item(
             manifest,
             &is_mine,
             &judged_conclusions,
-            repository_root,
             &stop_is_requested,
         )?,
         CrashPointReplayJudgeRoute::JudgeNotRunWithoutTheGpuFeature => unreachable!(
@@ -1149,7 +1570,7 @@ fn judge_the_recorded_item(
                 .to_string(),
         );
     }
-    let pool_checker = pool_checker_of_the_images_on_the_route(route, repository_root)?;
+    let pool_checker = pool_checker_of_the_images_on_the_route(route)?;
     let observers_judging_started = Instant::now();
     let observing = judge_the_observers_of_the_flow(
         &mut store,
@@ -1183,6 +1604,17 @@ fn judge_the_recorded_item(
             ));
         }
         if share.count > 1 {
+            judging_units_of_the_run
+                .blocks_of_the_run
+                .set(Some(crash_case_blocks_of_the_share(
+                    &store,
+                    &plan,
+                    &judged_conclusions,
+                    &is_mine,
+                    blocks_of_this_share,
+                    blocks_to_judge,
+                    judging_units_of_the_run.are_refused,
+                )?));
             let blocks_left: u64 = u64::try_from(unjudged.len()).expect("块数装得进 u64");
             println!(
                 "CRASH_POINT_REPLAY_PARALLEL_FINISHED states={state_count} slices={blocks_of_this_share} worker_threads={worker_threads} configured_worker_threads={worker_threads} worker_threads_source={worker_threads_source} resumed_slices={blocks_reused} freshly_run_slices={blocks_to_judge} progress_file_after_completion=none elapsed_seconds={:.1} judge={}{share_fields} blocks_left_to_other_hosts={blocks_left}",
@@ -1195,10 +1627,9 @@ fn judge_the_recorded_item(
             });
         }
         return Err(format!(
-            "判段判完库里还有 {} 块没有这一把版本的结论（第一块：点 {}，起 {}）：判器那一路没写库",
+            "判段判完库里还有 {} 块没有这一把版本的结论（第一块：{}）：判器那一路没写库",
             unjudged.len(),
-            unjudged[0].0.stream_or_node_name.as_str(),
-            unjudged[0].0.block_start.0
+            unjudged[0].0.short_text()
         ));
     }
     // 计数向量每一趟都判（J7）
@@ -1216,24 +1647,25 @@ fn judge_the_recorded_item(
         observers_on_the_nodes
             .iter()
             .zip(&observer_conclusion_versions)
-            .map(|(observer, version)| {
-                (
-                    ConclusionKind::Observer {
-                        observer_name: observer.observer_name.clone(),
-                    },
-                    *version,
-                )
-            })
+            .map(|(_observer, version)| (ConclusionKind::Observer, *version))
             .collect();
+    judging_units_of_the_run
+        .blocks_of_the_run
+        .set(Some(crash_case_blocks_of_the_share(
+            &store,
+            &plan,
+            &judged_conclusions,
+            &is_mine,
+            blocks_of_this_share,
+            blocks_to_judge,
+            judging_units_of_the_run.are_refused,
+        )?));
     let tally = crash_point_replay_tally_from_the_library(
         &store,
         flow,
         &plan,
         judged_by.conclusion_kind(),
-        match judged_by {
-            JudgedBy::GpuJudge => &conclusion_versions.gpu_judge_of_each_point,
-            JudgedBy::CpuJudge => &conclusion_versions.cpu_judge_of_each_point,
-        },
+        conclusion_versions.versions_of_each_point_when_judged_by(judged_by),
         &observer_kinds_and_versions,
     )?;
     drop(store);
@@ -1264,19 +1696,66 @@ fn judge_the_recorded_item(
     Ok(StageOutcome::Judged(tally))
 }
 
+/// 这一趟这台机器那一份的块账：块数、复用（判之前库里有键相同判定的）、现判、判红（这一份里结论有违例的块）；判器那一半哪一组拒算时
+/// 这一份的块全部计入拒算（判了，拒算那几组照判不入库，这条用例的块在库里罩不全）。
+///
+/// # Errors
+/// 库读失败。
+fn crash_case_blocks_of_the_share(
+    store: &VerdictStore,
+    plan: &CrashPlan,
+    conclusions: &crate::crash_amplification::ConclusionsStoredUnder<'_>,
+    is_mine: &dyn Fn(u64) -> bool,
+    blocks_of_this_share: u64,
+    blocks_judged_here: u64,
+    judging_units_are_refused: bool,
+) -> Result<CrashCaseBlocks, String> {
+    let mut red = 0u64;
+    let mut block_sequence = 0u64;
+    for (point_index, point) in plan.points.iter().enumerate() {
+        for local in point.blocks() {
+            let this_block = block_sequence;
+            block_sequence += 1;
+            if is_mine(this_block)
+                && !conclusions
+                    .violations_in_block(store, point_index, &point.block_key(&local))
+                    .map_err(|error| format!("读违例失败：{error:?}"))?
+                    .is_empty()
+            {
+                red += 1;
+            }
+        }
+    }
+    let (reused, fresh, refused) = if judging_units_are_refused {
+        (0, 0, blocks_of_this_share)
+    } else {
+        (
+            blocks_of_this_share - blocks_judged_here,
+            blocks_judged_here,
+            0,
+        )
+    };
+    Ok(CrashCaseBlocks {
+        blocks: blocks_of_this_share,
+        reused,
+        fresh,
+        red,
+        refused,
+    })
+}
+
 /// 观察者交回的盘上的池级 checker 照第 ① 段的选路：CPU 那一路由 CPU 判；GPU 那一路取这一趟的卡（同 [`judge_the_pending_blocks_on_the_cards`]）。
 ///
 /// # Errors
 /// 选路走 GPU 而取不到卡。
 fn pool_checker_of_the_images_on_the_route(
     route: CrashPointReplayJudgeRoute,
-    repository_root: &Path,
 ) -> Result<PoolCheckerOfTheImagesAfterTheObservers, String> {
     match route {
         CrashPointReplayJudgeRoute::Cpu { .. } => {
             Ok(PoolCheckerOfTheImagesAfterTheObservers::OnTheCpu)
         }
-        CrashPointReplayJudgeRoute::Gpu => pool_checker_of_the_images_on_the_cards(repository_root),
+        CrashPointReplayJudgeRoute::Gpu => pool_checker_of_the_images_on_the_cards(),
         CrashPointReplayJudgeRoute::JudgeNotRunWithoutTheGpuFeature => unreachable!(
             "判段不跑的那一趟在 enumerate_crash_states_through_the_library 的判段闭包里先交只录，不判观察者交回的盘"
         ),
@@ -1285,15 +1764,15 @@ fn pool_checker_of_the_images_on_the_route(
 
 #[cfg(feature = "gpu")]
 fn pool_checker_of_the_images_on_the_cards(
-    repository_root: &Path,
 ) -> Result<PoolCheckerOfTheImagesAfterTheObservers, String> {
     use crate::crash_amplification::gpu_cards_in_use;
     use crate::gpu_card_configuration::{
         cards_by_priority_from_configuration_or_environment, CardHost,
     };
-    let configuration_file = multi_host_configuration_file(repository_root)?;
-    let cards_by_priority =
-        cards_by_priority_from_configuration_or_environment(configuration_file.as_deref())?;
+    let configuration = crate::crash_amplification::multi_host_configuration_of_this_process()?;
+    let cards_by_priority = cards_by_priority_from_configuration_or_environment(
+        configuration.configuration_file.as_deref(),
+    )?;
     let host = CardHost::of_this_process()?;
     let cards_of_this_run = gpu_cards_in_use(cards_by_priority.as_deref(), host)?;
     Ok(PoolCheckerOfTheImagesAfterTheObservers::OnTheGpu {
@@ -1305,7 +1784,6 @@ fn pool_checker_of_the_images_on_the_cards(
 /// 没编进 `gpu` 特性选路不会走 GPU（[`crash_point_replay_judge_route`]）。
 #[cfg(not(feature = "gpu"))]
 fn pool_checker_of_the_images_on_the_cards(
-    _repository_root: &Path,
 ) -> Result<PoolCheckerOfTheImagesAfterTheObservers, String> {
     Err("这份二进制没编进 gpu 特性，观察者交回的盘上不了卡（选路不该要它）".to_string())
 }
@@ -1314,7 +1792,7 @@ fn pool_checker_of_the_images_on_the_cards(
 #[cfg(feature = "gpu")]
 #[allow(
     clippy::too_many_arguments,
-    reason = "库、流、计划、清单、分工、判法版本、仓根、叫停，各是各的东西"
+    reason = "库、流、计划、清单、分工、判法单元指纹、叫停，各是各的东西"
 )]
 fn judge_the_pending_blocks_on_the_cards(
     store: &mut VerdictStore,
@@ -1323,7 +1801,6 @@ fn judge_the_pending_blocks_on_the_cards(
     manifest: &ItemManifest,
     is_mine: &dyn Fn(u64) -> bool,
     judged_conclusions: &crate::crash_amplification::ConclusionsStoredUnder<'_>,
-    repository_root: &Path,
     stop_is_requested: &(dyn Fn() -> bool + Sync),
 ) -> Result<(), String> {
     use crate::crash_amplification::{
@@ -1335,9 +1812,10 @@ fn judge_the_pending_blocks_on_the_cards(
     };
     let tables =
         packed_judge_tables_read_back(store, &manifest.digest_named(MANIFEST_JUDGE_TABLES)?)?;
-    let configuration_file = multi_host_configuration_file(repository_root)?;
-    let cards_by_priority =
-        cards_by_priority_from_configuration_or_environment(configuration_file.as_deref())?;
+    let configuration = crate::crash_amplification::multi_host_configuration_of_this_process()?;
+    let cards_by_priority = cards_by_priority_from_configuration_or_environment(
+        configuration.configuration_file.as_deref(),
+    )?;
     let host = CardHost::of_this_process()?;
     let cards_of_this_run = gpu_cards_in_use(cards_by_priority.as_deref(), host)?;
     match judge_my_blocks_on_gpu(
@@ -1381,7 +1859,6 @@ fn judge_the_pending_blocks_on_the_cards(
     _manifest: &ItemManifest,
     _is_mine: &dyn Fn(u64) -> bool,
     _judged_conclusions: &crate::crash_amplification::ConclusionsStoredUnder<'_>,
-    _repository_root: &Path,
     _stop_is_requested: &(dyn Fn() -> bool + Sync),
 ) -> Result<(), String> {
     Err("这份二进制没编进 gpu 特性，上不了卡（选路不该要它）".to_string())
@@ -1549,7 +2026,7 @@ fn crash_point_replay_tally_from_the_library(
                 let ordinal =
                     point.ordinals.start + local.start + u64::try_from(offset).expect("块内序号");
                 let vector = store.verdict_vector_of_number(*number).ok_or_else(|| {
-                    format!("判定块里的编号 {} 没在这个库里登记过", number.as_u8())
+                    format!("判定块里的编号 {} 没在这个库里登记过", number.as_u32())
                 })?;
                 let items = red_items_of_the_encoded_verdict(vector);
                 tally.states += 1;
@@ -1779,6 +2256,10 @@ fn report_the_findings(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "gpu")]
+    use crate::crash_amplification::CrashAmplificationEnvironment;
+    #[cfg(feature = "gpu")]
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn red_items_stored_by_either_judge_are_read_back_into_their_passes() {
@@ -1922,6 +2403,505 @@ mod tests {
                 "崩溃放量那个变量 {value:?} 同样要停下"
             );
         }
+    }
+
+    /// 一次写：一个扇区（512 字节）、各写各的 4 KiB 块；根槽写的根身份写在偏移 24（实例 1）与 28（checkpoint_txg）。
+    fn one_write_of(
+        write_index: usize,
+        kind: StepKind,
+        byte: u8,
+        checkpoint_txg: u64,
+    ) -> RetainedWrite {
+        let mut bytes = vec![byte; 512];
+        if kind == StepKind::RootRecordFua {
+            bytes = vec![0; 512];
+            bytes[24..28].copy_from_slice(&1u32.to_le_bytes());
+            bytes[28..36].copy_from_slice(&checkpoint_txg.to_le_bytes());
+        }
+        RetainedWrite {
+            device: singlefs_core::address::DeviceIdentity(1),
+            kind,
+            is_force_unit_access: kind == StepKind::RootRecordFua,
+            offset: singlefs_core::address::DeviceOffsetInBytes(
+                u64::try_from(write_index).expect("写表下标装得进 u64") * 4096,
+            ),
+            contents: singlefs_harness::memory_pool::WrittenContents::Bytes(bytes),
+        }
+    }
+
+    /// 一段一组写（种类、内容字节、根槽写的 txg），交回写表与切段。
+    fn writes_and_segments_of(
+        segments_of_writes: &[&[(StepKind, u8, u64)]],
+    ) -> (Vec<RetainedWrite>, Vec<Vec<usize>>) {
+        let mut writes = Vec::new();
+        let mut segments = Vec::new();
+        for segment_writes in segments_of_writes {
+            let mut segment = Vec::new();
+            for (kind, byte, checkpoint_txg) in *segment_writes {
+                segment.push(writes.len());
+                writes.push(one_write_of(writes.len(), *kind, *byte, *checkpoint_txg));
+            }
+            segments.push(segment);
+        }
+        (writes, segments)
+    }
+
+    fn every_proper_subset(
+        _segment_index: usize,
+        _segment: &[usize],
+    ) -> CrashPointReplaySegmentExpansion {
+        CrashPointReplaySegmentExpansion::EveryProperSubset
+    }
+
+    /// 一条流每个节点（计划里的点，连同末节点）各自的块键。
+    fn block_keys_of_each_node(
+        item: CrashPointReplayItem<'_>,
+        base: &MemoryPool,
+        writes: &[RetainedWrite],
+        segments: &[Vec<usize>],
+    ) -> Vec<Vec<crate::verdict_store::VerdictBlockKey>> {
+        let judged_root_index = writes
+            .iter()
+            .rposition(|write| write.kind == StepKind::RootRecordFua)
+            .unwrap_or(0);
+        flow_of_the_inputs(
+            item,
+            base,
+            writes,
+            segments,
+            judged_root_index,
+            CrashPointReplayVersionTable::with_a_file_only(&[]),
+            &every_proper_subset,
+        )
+        .with_the_flow(|flow| {
+            plan_crash_points(flow)
+                .points
+                .iter()
+                .map(|point| {
+                    point
+                        .blocks()
+                        .into_iter()
+                        .map(|local| point.block_key(&local))
+                        .collect()
+                })
+                .collect()
+        })
+    }
+
+    /// L6：崩溃枚举用例按步切成前缀树的节点，节点键与崩溃放量同一个算法：两条流共前三步（单元写与 journal 记录、根槽写、系统配置槽轮换），
+    /// 前三个节点的块键逐个相同，第四步（单元写的内容不同）起不同。判别力（`crates/mutations.tsv`）：把前缀树退成整条流一个点，这条红。
+    #[test]
+    fn two_flows_sharing_their_first_steps_share_the_keys_of_those_nodes_and_differ_at_the_next() {
+        let shared: [&[(StepKind, u8, u64)]; 3] = [
+            &[
+                (StepKind::UnitWrite, 1, 0),
+                (StepKind::UnitWrite, 1, 0),
+                (StepKind::JournalRecord, 1, 0),
+            ],
+            &[(StepKind::RootRecordFua, 0, 1)],
+            &[
+                (StepKind::SystemConfigurationSlot, 1, 0),
+                (StepKind::SystemConfigurationSlot, 1, 0),
+            ],
+        ];
+        let tail_of = |byte: u8| -> Vec<Vec<(StepKind, u8, u64)>> {
+            vec![
+                vec![
+                    (StepKind::UnitWrite, byte, 0),
+                    (StepKind::JournalRecord, 2, 0),
+                ],
+                vec![(StepKind::RootRecordFua, 0, 2)],
+            ]
+        };
+        let flow_with_the_tail = |byte: u8| {
+            let tail = tail_of(byte);
+            let mut segments_of_writes: Vec<&[(StepKind, u8, u64)]> = shared.to_vec();
+            segments_of_writes.extend(tail.iter().map(Vec::as_slice));
+            writes_and_segments_of(&segments_of_writes)
+        };
+        let base = MemoryPool {
+            devices: std::collections::BTreeMap::new(),
+            device_size_in_bytes: 1 << 30,
+        };
+        let item = CrashPointReplayItem {
+            name: "prefix_probe",
+            setting_file: "crates/singlefs-checker-tier/src/crash_state_enumeration.rs",
+        };
+        let (writes_of_a, segments_of_a) = flow_with_the_tail(2);
+        let (writes_of_b, segments_of_b) = flow_with_the_tail(3);
+        let nodes_of_a = block_keys_of_each_node(item, &base, &writes_of_a, &segments_of_a);
+        let nodes_of_b = block_keys_of_each_node(item, &base, &writes_of_b, &segments_of_b);
+        assert_eq!(nodes_of_a.len(), 6, "五步五个节点加末节点");
+        assert_eq!(nodes_of_b.len(), 6);
+        assert!(
+            nodes_of_a.iter().all(|keys| !keys.is_empty()),
+            "每个节点都有块"
+        );
+        assert_eq!(
+            nodes_of_a[..3],
+            nodes_of_b[..3],
+            "共有的前三步是同三个节点：块键逐个相同"
+        );
+        assert_ne!(nodes_of_a[3], nodes_of_b[3], "第四步内容不同，节点键不同");
+    }
+
+    /// 这几条库单测的判路照这台机器的多机配置取（配 GPU 必用 GPU、做不到报错不降级；门禁 checker-tier-crash-point-replay 的
+    /// `cpu_judging_lines` 判配了 GPU 的判段不许落在 CPU）：配了 GPU 的机器只有编进 gpu 特性的那一趟判得了，所以这几条只编进带特性的那一趟，
+    /// 「没编进特性不跑判段」那一路在这里到不了。
+    #[cfg(feature = "gpu")]
+    fn configured_judge_route() -> CrashPointReplayJudgeRoute {
+        match crash_point_replay_judge_route().expect("多机配置读得出") {
+            route @ (CrashPointReplayJudgeRoute::Gpu | CrashPointReplayJudgeRoute::Cpu { .. }) => {
+                route
+            }
+            CrashPointReplayJudgeRoute::JudgeNotRunWithoutTheGpuFeature => {
+                unreachable!("这几条编进了 gpu 特性，判路不会是「没编进特性不跑判段」")
+            }
+        }
+    }
+
+    /// 两块盘 mkfs 一次的池（io_min 512、槽距 4096，没有文件）：GPU 判表要底座读得出系统配置（`crash_judge_tables::JudgeTablesRefusal::BaseSystemConfigurationUnreadable`），
+    /// 没格式化的空池它建不了表。与 `crash_judge_tables` 单测里的造法同一种，两处各留一份（测试模块之间不互相导入）。
+    #[cfg(feature = "gpu")]
+    fn formatted_pool_of_two_devices_for_the_probe() -> MemoryPool {
+        use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+        use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
+        use singlefs_core::root_ring::RootRingSlotsPerRegion;
+        use singlefs_core::system_configuration::SystemImmutableSizes;
+        use singlefs_harness::memory_pool::SparseBlockDevice;
+        let device_bytes: u64 = 4 << 30;
+        let mut devices: Vec<(singlefs_core::address::DeviceIdentity, SparseBlockDevice)> = [
+            singlefs_core::address::DeviceIdentity(0),
+            singlefs_core::address::DeviceIdentity(1),
+        ]
+        .into_iter()
+        .map(|identity| {
+            (
+                identity,
+                SparseBlockDevice::new(device_bytes, PhysicalBlockSizeInBytes(512)),
+            )
+        })
+        .collect();
+        make_filesystem(
+            &MakeFilesystemParameters {
+                filesystem_identifier: *b"singlefs-probe!!",
+                region_devices: [
+                    singlefs_core::address::DeviceIdentity(0),
+                    singlefs_core::address::DeviceIdentity(1),
+                    singlefs_core::address::DeviceIdentity(0),
+                ],
+                geometry: SystemImmutableSizes {
+                    physical_block_size: 512,
+                    minimum_input_output_bytes: 512,
+                    fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(512),
+                    journal_ring_bytes: singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
+                    root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
+                },
+            },
+            &mut devices,
+        )
+        .expect("两块空盘上 mkfs 做得成");
+        MemoryPool {
+            devices: devices
+                .iter()
+                .map(|(identity, device)| (*identity, device.image.clone()))
+                .collect(),
+            device_size_in_bytes: device_bytes,
+        }
+    }
+
+    /// 探针流的三次写，每次都落在 GPU 判表认的一个落点的起点上（`crash_judge_tables::JudgeTablesRefusal::WriteNotAlignedToALocation` 拒起点不在落点上的写）：
+    /// 两次单元写各在单元区头两个槽的起点（盘 1），一次根槽写在根环区域 0 的 0 号槽（盘 0，长度一个物理块），根身份写在偏移 24（实例 1）与 28（checkpoint_txg 1）。
+    #[cfg(feature = "gpu")]
+    fn probe_writes_on_the_locations_of() -> Vec<RetainedWrite> {
+        use singlefs_core::journal::slot_after_the_journal_ring;
+        use singlefs_harness::memory_pool::WrittenContents;
+        let unit_area_start =
+            slot_after_the_journal_ring(singlefs_format::JOURNAL_RING_DEFAULT_BYTES).0
+                * singlefs_format::SLOT_BYTES;
+        let unit_write = |slot_in_the_unit_area: u64, byte: u8| RetainedWrite {
+            device: singlefs_core::address::DeviceIdentity(1),
+            kind: StepKind::UnitWrite,
+            is_force_unit_access: false,
+            offset: singlefs_core::address::DeviceOffsetInBytes(
+                unit_area_start + slot_in_the_unit_area * singlefs_format::SLOT_BYTES,
+            ),
+            contents: WrittenContents::Bytes(vec![byte; 512]),
+        };
+        let mut root_record = vec![0u8; 512];
+        root_record[24..28].copy_from_slice(&1u32.to_le_bytes());
+        root_record[28..36].copy_from_slice(&1u64.to_le_bytes());
+        vec![
+            unit_write(0, 7),
+            unit_write(1, 8),
+            RetainedWrite {
+                device: singlefs_core::address::DeviceIdentity(0),
+                kind: StepKind::RootRecordFua,
+                is_force_unit_access: true,
+                offset: singlefs_core::root_ring::region_start(0),
+                contents: WrittenContents::Bytes(root_record),
+            },
+        ]
+    }
+
+    /// 一条用例在给定的库上过两段（判路由调用方给，取 [`configured_judge_route`]），交回结局与块账：库由环境里的库目录给，用例在
+    /// [`CrashAmplificationEnvironment`] 里起。
+    /// 流是两段单元写加一段根槽写（[`probe_writes_on_the_locations_of`]），被判的那一次写是那条根槽写（「根槽已持久」只按根槽写两态数，被判的写不是根槽写时判段交错）。
+    #[cfg(feature = "gpu")]
+    fn run_the_unit_writes_case(
+        route: CrashPointReplayJudgeRoute,
+        keys: KeysOfTheItem,
+    ) -> (StageOutcome<CrashPointReplayTally>, Option<CrashCaseBlocks>) {
+        let base = formatted_pool_of_two_devices_for_the_probe();
+        let writes = probe_writes_on_the_locations_of();
+        let segments: Vec<Vec<usize>> = (0..writes.len()).map(|index| vec![index]).collect();
+        let judged_root_index = writes
+            .iter()
+            .rposition(|write| write.kind == StepKind::RootRecordFua)
+            .expect("造的流最后一段是一次根槽写");
+        let item = CrashPointReplayItem {
+            name: "crash_case_blocks_probe",
+            setting_file: "crates/singlefs-checker-tier/src/crash_state_enumeration.rs",
+        };
+        let flow_to_record = flow_of_the_inputs(
+            item,
+            &base,
+            &writes,
+            &segments,
+            judged_root_index,
+            CrashPointReplayVersionTable::with_a_file_only(&[]),
+            &every_proper_subset,
+        );
+        enumerate_the_flow_through_the_library_with_the_keys(
+            item,
+            &flow_to_record,
+            &[],
+            route,
+            keys,
+        )
+        .expect("两段过得了库")
+    }
+
+    #[cfg(feature = "gpu")]
+    fn computed_keys(route: CrashPointReplayJudgeRoute) -> KeysOfTheItem {
+        keys_of_the_item(route, &[])
+    }
+
+    /// 一个目录底下每一份文件的相对路径、修改时刻与字节数，按路径排（连同目录自己的修改时刻）。
+    #[cfg(feature = "gpu")]
+    fn files_with_their_times(directory: &Path) -> Vec<(PathBuf, std::time::SystemTime, u64)> {
+        let mut entries = Vec::new();
+        let mut pending = vec![directory.to_path_buf()];
+        while let Some(path) = pending.pop() {
+            let metadata = std::fs::metadata(&path).expect("读得了属性");
+            entries.push((
+                path.strip_prefix(directory)
+                    .expect("在目录底下")
+                    .to_path_buf(),
+                metadata.modified().expect("读得了修改时刻"),
+                metadata.len(),
+            ));
+            if metadata.is_dir() {
+                for entry in std::fs::read_dir(&path).expect("列得了目录") {
+                    pending.push(entry.expect("读得了目录项").path());
+                }
+            }
+        }
+        entries.sort();
+        entries
+    }
+
+    /// 第二节第 9 条与 `CRASH_CASE_BLOCKS` 接口：头一趟现判、写进库；只查块键那一趟（`SINGLEFS_CRASH_CASE_BLOCKS_QUERY=1`）一块不判、库目录里
+    /// 每份文件的修改时刻与字节数一个不动、块全部复用；只写不读那一趟（`SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1`）全部现判；每一趟
+    /// `blocks = reused + fresh + refused`，那一行五个字段次序照 admission.py。判别力（`crates/mutations.tsv`）：那一行少打一个字段，这条红。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn the_crash_case_blocks_line_counts_the_blocks_and_the_query_leaves_every_library_file_untouched(
+    ) {
+        let disposable =
+            DisposableLibraryDirectory::new("crash-case-blocks").expect("建得了一次性目录");
+        let library = disposable.library();
+        let mut environment = CrashAmplificationEnvironment::cleared_then_set(&[(
+            crate::crash_library::CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+            library.as_os_str(),
+        )]);
+        let route = configured_judge_route();
+        let (judged, fresh_run) = run_the_unit_writes_case(route, computed_keys(route));
+        assert!(judged.judged().is_some(), "头一趟两段先后跑、交判的结果");
+        let fresh_run = fresh_run.expect("判段跑了就有块账");
+        assert!(fresh_run.blocks > 0);
+        assert_eq!(
+            (fresh_run.reused, fresh_run.fresh, fresh_run.refused),
+            (0, fresh_run.blocks, 0),
+            "空库头一趟全部现判"
+        );
+        let before = files_with_their_times(&library);
+        environment.set_variable(
+            CRASH_CASE_BLOCKS_QUERY_ENVIRONMENT_VARIABLE,
+            std::ffi::OsStr::new("1"),
+        );
+        let (queried, query_run) = run_the_unit_writes_case(route, computed_keys(route));
+        assert!(queried.judged().is_none(), "只查块键那一趟一块不判，交只录");
+        let query_run = query_run.expect("只查那一趟也有块账");
+        assert_eq!(
+            files_with_their_times(&library),
+            before,
+            "只查块键那一趟库目录里的文件一个不动"
+        );
+        assert_eq!(
+            (
+                query_run.blocks,
+                query_run.reused,
+                query_run.fresh,
+                query_run.refused
+            ),
+            (fresh_run.blocks, fresh_run.blocks, 0, 0),
+            "键相同的块全部复用"
+        );
+        assert_eq!(query_run.red, fresh_run.red, "查到的红块与判出的一样多");
+        environment.set_variable(
+            CRASH_CASE_BLOCKS_QUERY_ENVIRONMENT_VARIABLE,
+            std::ffi::OsStr::new("0"),
+        );
+        environment.set_variable(
+            crate::crash_library::CRASH_LIBRARY_WRITE_ONLY_ENVIRONMENT_VARIABLE,
+            std::ffi::OsStr::new("1"),
+        );
+        let (_written_only, write_only_run) = run_the_unit_writes_case(route, computed_keys(route));
+        let write_only_run = write_only_run.expect("判段跑了就有块账");
+        assert_eq!(
+            (write_only_run.reused, write_only_run.fresh),
+            (0, write_only_run.blocks),
+            "只写不读那一趟库不读、全部现判"
+        );
+        for run in [fresh_run, query_run, write_only_run] {
+            assert_eq!(run.blocks, run.reused + run.fresh + run.refused);
+            assert_eq!(
+                run.line(),
+                format!(
+                    "CRASH_CASE_BLOCKS blocks={} reused={} fresh={} red={} refused={}",
+                    run.blocks, run.reused, run.fresh, run.red, run.refused
+                )
+            );
+        }
+    }
+
+    /// 第 10 条与 4-2a 报告第四节第 7 条后半句：判器那一组拒算的块照判、不入库、计入 `refused=`：判段照常交判的结果；同一份长期库
+    /// （环境里给的那一份，不另建一次性库）里录入段照录（流与清单都在），CPU 判器的结论一块都没有（照判不入库的占位版本只留在这个进程里）。
+    /// 判别力（`crates/mutations.tsv`）：照判不入库的行照旧写进库，这条红。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn a_case_whose_judging_units_are_refused_is_judged_stored_nowhere_and_counted_as_refused() {
+        let disposable =
+            DisposableLibraryDirectory::new("refused-judging-units").expect("建得了一次性目录");
+        let library = disposable.library();
+        let _environment = CrashAmplificationEnvironment::cleared_then_set(&[(
+            crate::crash_library::CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+            library.as_os_str(),
+        )]);
+        let judge_units = JudgingUnits::JudgementOfTheCrashImages;
+        let (judged, blocks) = run_the_unit_writes_case(
+            configured_judge_route(),
+            KeysOfTheItem {
+                observer_versions: Vec::new(),
+                refusal_sentences: vec![
+                    "判法单元 judgement_of_the_crash_images 拒算（单测造的）".to_string()
+                ],
+                judge_is_refused: true,
+                versions_kept_out_of_the_library: vec![
+                    *crate::crash_amplification::placeholder_judging_units_key_of_the_refused(
+                        &judge_units,
+                    )
+                    .fingerprint(),
+                ],
+            },
+        );
+        let tally = judged.judged().expect("拒算照判：判段交判的结果");
+        assert!(tally.states > 0, "状态都判了");
+        let blocks = blocks.expect("判段跑了就有块账");
+        assert!(blocks.blocks > 0);
+        assert_eq!(
+            (blocks.reused, blocks.fresh, blocks.refused),
+            (0, 0, blocks.blocks),
+            "拒算的块全部计入 refused"
+        );
+        let (store, _opening) =
+            VerdictStore::open_existing(&library).expect("录入段照录进同一份长期库");
+        assert_eq!(
+            store.recorded_run_manifest_count().expect("读得了清单"),
+            1,
+            "录入段照录：这一项的清单在长期库里"
+        );
+        assert_eq!(
+            store
+                .stored_conclusion_keys()
+                .expect("列得出库里的结论")
+                .into_iter()
+                .filter(|(_key, kind, _version)| *kind == ConclusionKind::ImageJudgement)
+                .count(),
+            0,
+            "CPU 判器拒算：它的结论一块都没进长期库"
+        );
+    }
+
+    /// 红批第 5 条与 crates 第三轮第 3 条的另一半：拒算的只是别的组（这里造一个观察者那一组拒算，判器那一组取得出），判器的结论照键入库
+    /// 同一份长期库、一块不少；这条用例有一组拒算，块照旧全部计入 `refused=`。与上一条合起来钉「拒算的组一块不入、别的组照入」。
+    /// 判别力（`crates/mutations.tsv`）：判段把「有一组拒算」当成「判器那一组拒算」，判器的结论也照判不入库，这条红。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn a_case_whose_other_judging_units_are_refused_stores_every_judge_block_in_the_library() {
+        let disposable = DisposableLibraryDirectory::new("refused-observer-judging-units")
+            .expect("建得了一次性目录");
+        let library = disposable.library();
+        let _environment = CrashAmplificationEnvironment::cleared_then_set(&[(
+            crate::crash_library::CRASH_LIBRARY_DIRECTORY_ENVIRONMENT_VARIABLE,
+            library.as_os_str(),
+        )]);
+        let refused_observer_units = JudgingUnits::ObserverCode {
+            observer_code_file: "crates/singlefs-checker-tier/src/crash_state_enumeration.rs"
+                .to_string(),
+            observer_name: "refused_in_the_unit_test".to_string(),
+        };
+        let (judged, blocks) = run_the_unit_writes_case(configured_judge_route(), KeysOfTheItem {
+            observer_versions: Vec::new(),
+            refusal_sentences: vec![
+                "判法单元 observer_code:crates/singlefs-checker-tier/src/crash_state_enumeration.rs:refused_in_the_unit_test 拒算（单测造的）"
+                    .to_string(),
+            ],
+            judge_is_refused: false,
+            versions_kept_out_of_the_library: vec![
+                *crate::crash_amplification::placeholder_judging_units_key_of_the_refused(
+                    &refused_observer_units,
+                )
+                .fingerprint(),
+            ],
+        });
+        assert!(
+            judged.judged().expect("判段交判的结果").states > 0,
+            "状态都判了"
+        );
+        let blocks = blocks.expect("判段跑了就有块账");
+        assert!(blocks.blocks > 0);
+        assert_eq!(
+            (blocks.reused, blocks.fresh, blocks.refused),
+            (0, 0, blocks.blocks),
+            "有一组拒算，这条用例的块全部计入 refused"
+        );
+        let (store, _opening) =
+            VerdictStore::open_existing(&library).expect("录入段照录进同一份长期库");
+        assert_eq!(
+            u64::try_from(
+                store
+                    .stored_conclusion_keys()
+                    .expect("列得出库里的结论")
+                    .into_iter()
+                    .filter(|(_key, kind, _version)| *kind == ConclusionKind::ImageJudgement)
+                    .count()
+            )
+            .expect("块数装得进 u64"),
+            blocks.blocks,
+            "判器那一组没拒算：它的结论每一块都照键进了长期库"
+        );
     }
 
     #[test]
