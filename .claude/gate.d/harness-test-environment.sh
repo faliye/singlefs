@@ -210,7 +210,7 @@ cell_machine_clean() {
   unchecked_classes="${unchecked_classes% 类}"
   if [[ -z "$summary" || -z "$unchecked_summary" ]]; then
     tail -12 "$log"
-    echo "  ✗ 环境检查没报出完整的汇总行（「查了 N 类；✓ … 判红 N 类 … 没查成 N 类」），分不出「查过了没问题」与「压根没查成」"
+    echo "  ✗ 环境检查没报出完整的汇总行（「查了 N 类；… 判红 N 类 … 没查成 N 类」），分不出「查过了没问题」与「压根没查成」"
     echo "     → 怎么办：单跑 python3 $SCRIPT check 看它停在哪；改过它的输出格式就把这一道的取法一起改。"
     exit 1
   fi

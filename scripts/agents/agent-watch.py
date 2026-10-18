@@ -40,6 +40,9 @@ watch 每 15 秒读一次，读到被看子 agent 所在会话的检出就退出
 「被拒」的检出（钩子在执行前已经拒掉：写被拒、越出写范围、重型测试被拒、提交时才跑的检查被拒、不经内存包装被拒……）与判不了的脚本（重型测试闸没判全）一样，
 只写进报告、不叫醒主 agent（.claude/main-agent.md「派出去之后」说的「记录不处置」那一类：拒绝信息与出路在它的工具结果里，主 agent 醒了没有可处置的）；
 叫醒的只有「只记」的、照常在跑的命令。2026-10-10、2026-10-11 被拒的命令让看门狗退出，主 agent 重起了十来次。弄坏开关 AGENT_WATCH_BREAK=refusedwakes。
+范围声明钩子（.claude/hooks/run-scope-guard.sh）放行的每一条也写进检出记录，会话号在 scope_session_id、带 run_scope（命令与切开的四段）：它们不是检出、不叫醒，
+属于被看会话（被看子 agent 与主 agent）的逐条列进报告的「范围声明」一节，一条一行写谁、命令与四段（种类、跑什么、范围、为什么），范围合不合适由主 agent 对着看。
+弄坏开关 AGENT_WATCH_BREAK=scopeunlisted。
 
 会话记录的位置：~/.claude/projects/<项目>/<会话 id>/subagents/agent-<id>.jsonl，同名 .meta.json 里有 agentType 与 description。
 进程这一半只看运行这个脚本的那个 Claude 实例的后代进程（主 agent 与它派出的子 agent 起的命令都在里面），不看别的会话。
@@ -81,7 +84,7 @@ queued_command），与主会话记录里 SendMessage 发给它的成功结果�
 驱动自检（scripts/crash/crash-point-replay-shard-run.sh --selftest）在临时仓里登记 harness 档包的替身用例；树根里那一行读不到的（lib_heavy_tests.py 照重型算）靠下一段放行。
 登记成轻的自证底下不判：一个进程起的脚本（bash / sh、python 后面那个，直接执行的取它自己）照 lib_heavy_tests.py 的 classify_selftest 判
 （同一份登记表 .claude/hooks/selftest-registry.tsv，命令词要解到本仓那一份），是登记成 light、或 heavy-if-set:<变量> 而它环境里那个变量没设的自证，
-它自己照判，它底下整棵不判。`<名>.sh --selftest` 先 exec 进同目录 `<名>-selftest.sh` 本体的（gate-staged.sh、stage-must-run.sh；
+它自己照判，它底下整棵不判。`<名>.sh --selftest` 先 exec 进同目录 `<名>-selftest.sh` 本体的（gate-staged.sh；
 exec 之后参数里没有 --selftest，下面「样本自检底下不判」那条认不出），本体不带参数时按 `<名>.sh --selftest` 那一行判，`<名>.sh` 的正文里还要写着本体的文件名。
 不在它底下、而参数里的路径或当前目录落在它临时目录里的也不报：它的临时目录是它底下进程的参数与当前目录里出现过的、临时根（它环境里的 TMPDIR，没有是 /tmp）
 下一层名字像 mktemp / mkdtemp 起的（tmp.XXXXXXXXXX、tmpXXXXXXXX）那一层，它还在跑时才算。仓副本里路径尾部相同的自证、设了那个变量的、登记成 heavy 的、
@@ -357,6 +360,8 @@ selftest_heavy_tests、selftest_heavy_selftest_tree、selftest_light_tier_tree�
       「✗ 自检：子 agent queuedresume 应当不算交回或被停」）
   AGENT_WATCH_BREAK=resumeturn  AgentTranscript._read() 结束本轮之后来的续做消息不算被叫醒
       selftest_in（「✗ 自检：子 agent resumedafterturnend」、「✗ 自检：子 agent resumedafterturnend 的状态应当是「思考中」」）
+  AGENT_WATCH_BREAK=scopeunlisted  read_detections() 不记范围声明钩子的放行记录，定时回报里没有「范围声明」一节
+      selftest_session_watch_in（「✗ 自检：范围声明：这一会话放行的两条（c1、主 agent）应当列进「范围声明」一节 …」）
   AGENT_WATCH_BREAK=scratchhog  scratch_hog_report() 一条都不报
       selftest_scratch_hogs（「✗ 自检：草稿根里超阈值的编译目录与仓副本：应当只报 …」、「✗ 自检：草稿根那一节的第一行应当是汇总」、「✗ 自检：草稿根那一节应当按最后修改时刻、最久没动的在前」、
       「✗ 自检：有子 agent 交回时看门狗的报告应当列出超阈值的 …」）
@@ -2488,8 +2493,32 @@ def session_id_of(transcript_path):
     return os.path.basename(os.path.dirname(os.path.dirname(transcript_path)))
 
 
-def read_detections(detections_path, start_offset, session_ids, watched_agent_ids=()):
-    """从 start_offset 往后读检出记录，返回 (新的偏移, [属于这些会话、被看的子 agent 或主 agent 的告警], [只进报告的记录])。"""
+SCOPE_SEGMENT_KEYS = ("种类", "跑什么", "范围", "为什么")   # 与 .claude/hooks/lib_run_scope.py 的 SEGMENT_KEYS 同一组
+
+
+def scope_declaration_line(entry):
+    """范围声明钩子（.claude/hooks/run-scope-guard.sh）放行的一条在「范围声明」一节里的一行：谁、命令、四段（照记录里切开的 segments，没切开的写声明原文）。"""
+    scope = entry.get("run_scope") if isinstance(entry.get("run_scope"), dict) else {}
+    segments = scope.get("segments") if isinstance(scope.get("segments"), dict) else {}
+    four = ("；".join(f"{key}={segments.get(key, '')}" for key in SCOPE_SEGMENT_KEYS) if segments
+            else f"声明原文 {scope.get('declaration') or '（没有）'}")
+    who = f"{entry.get('agent_type') or '?'}{' ' + entry['agent_id'] if entry.get('agent_id') else ''}"
+    where = "" if scope.get("where") in (None, "命令文本") else f"（{scope['where']}）"
+    return f"{who}：{(entry.get('command') or '')[:160]}{where}：{four}"
+
+
+def scope_declaration_section(scope_declarations):
+    """定时回报里的「范围声明」一节：放行记录一条一行，只列不叫醒；一条都没有时不出这一节。"""
+    if not scope_declarations:
+        return []
+    return ([f"范围声明（run-scope-guard.sh 放行的 {len(scope_declarations)} 条，只列不叫醒；范围合不合适由主 agent 对着看）："]
+            + [f"  {line}" for line in scope_declarations])
+
+
+def read_detections(detections_path, start_offset, session_ids, watched_agent_ids=(), scope_declarations=None):
+    """从 start_offset 往后读检出记录，返回 (新的偏移, [属于这些会话、被看的子 agent 或主 agent 的告警], [只进报告的记录])。
+    范围声明钩子的放行记录（会话号在 scope_session_id、带 run_scope）不是检出：给了 scope_declarations 就把属于这些会话的逐条记成一行追加进去
+    （scope_declaration_line），不叫醒；弄坏开关 scopeunlisted 下一条都不记。"""
     alerts, notes = [], []
     if not os.path.isfile(detections_path):
         return start_offset, alerts, notes
@@ -2503,6 +2532,11 @@ def read_detections(detections_path, start_offset, session_ids, watched_agent_id
             except ValueError:
                 continue
             if not isinstance(entry, dict):
+                continue
+            if entry.get("run_scope") is not None and entry.get("scope_session_id") is not None:
+                if (scope_declarations is not None and BROKEN_DETECTION != "scopeunlisted" and entry.get("scope_session_id") in session_ids
+                        and not (watched_agent_ids and entry.get("agent_id") and entry.get("agent_id") not in watched_agent_ids)):
+                    scope_declarations.append(scope_declaration_line(entry))
                 continue
             if BROKEN_DETECTION == "detections" or entry.get("session_id") not in session_ids:
                 continue
@@ -2871,6 +2905,7 @@ def run(arguments):
     detections_offset = os.path.getsize(detections_path) if (arguments.mode == "watch" and os.path.isfile(detections_path)) else 0
     report_deadline = watch_started + arguments.max_minutes * 60
     detection_notes = []
+    scope_declarations = []   # 范围声明钩子放行的（这一个看门狗起来之后读到的），定时回报里列成「范围声明」一节
     repeats_path = repeated_reports_path(arguments.session_dir, False)
     def acknowledgements():
         return set(arguments.ack or []) | (read_acks(state_dir) if discover else set())
@@ -2884,9 +2919,10 @@ def run(arguments):
         if arguments.session_dir:
             session_ids.add(os.path.basename(os.path.normpath(arguments.session_dir)))
         detections_offset, detection_alerts, new_notes = read_detections(
-            detections_path, detections_offset, session_ids, set(agent_ids))
+            detections_path, detections_offset, session_ids, set(agent_ids), scope_declarations)
         detection_notes += new_notes
         lines += detection_notes
+        lines += scope_declaration_section(scope_declarations)
         alerts += detection_alerts
         if discover:
             write_acks(state_dir, pruned_acks(acknowledgements(), alerts, set(agent_ids)))
@@ -2924,7 +2960,7 @@ def run(arguments):
         while time.time() < next_full_check:
             time.sleep(min(arguments.detection_poll_seconds, max(next_full_check - time.time(), 0)))
             detections_offset, detection_alerts, new_notes = read_detections(
-                detections_path, detections_offset, session_ids, set(agent_ids))
+                detections_path, detections_offset, session_ids, set(agent_ids), scope_declarations)
             detection_notes += new_notes
             # 常驻内存过线等不到下一次整查：单查到了就同检出一样马上整查一次（整查的报告里带着内存一节），有没确认的告警就退 3
             if detection_alerts or memory_alarm_between_checks(process_root_pid, excluded_pids, arguments):
@@ -2934,7 +2970,8 @@ def run(arguments):
                 alerts, acknowledged = split_acknowledged(alerts + detection_alerts, acknowledgements())
                 if alerts:
                     lines = (terminate_unacknowledged_repeats(repeats_path, alerts, acknowledged, arguments.terminate_after_unacknowledged_reports)
-                             + lines + detection_notes + [f"已确认接着盯（--ack {subject}:{name}）：{explanation}"
+                             + lines + detection_notes + scope_declaration_section(scope_declarations)
+                             + [f"已确认接着盯（--ack {subject}:{name}）：{explanation}"
                                                           for subject, name, explanation, _ in acknowledged])
                     print_report(lines, alerts)
                     print_active_list(*active_lists, discover)
@@ -4112,6 +4149,30 @@ def selftest_session_watch_in(work, session, scratch, thresholds, failures, watc
                     for agent_id in ("b1", "b2"))):
         failures.append("hook 检出：执行前已被 hook 拒了的（b1 写了结局「被拒」、b2 是没写结局的旧记录）应当只记进报告、不叫醒，"
                         f"只记的（b3）照常告警、下一步说命令照常在跑，实际告警 {sorted(next_steps)}、下一步 {next_steps}、记录 {outcome_notes}")
+    # 范围声明钩子的放行记录（scope_session_id、run_scope）：属于这一会话的 c1 与主 agent 那一条列进「范围声明」一节（命令、四段），不叫醒、不进检出记录那几行；
+    # 别的会话的 c2 不列（AGENT_WATCH_BREAK=scopeunlisted 下一条都不列：这一格红）
+    scope_detections = os.path.join(work, "detections-scope.jsonl")
+    with open(scope_detections, "w", encoding="utf-8") as detections_file:
+        for session_id, agent_id, agent_type, command in (
+                ("s1", "c1", "implementation-writer", "bash .claude/gate.d/checker-tier-formal-verification.sh --quick /w"),
+                ("s1", None, "主 agent", "bash .claude/gate.d/doc-text.sh --check prime-marks"),
+                ("s9", "c2", "implementation-writer", "bash scripts/crash/crash-point-replay.sh --quick")):
+            detections_file.write(json.dumps({"hook": "run-scope-guard.sh", "agent_id": agent_id, "agent_type": agent_type, "command": command,
+                                              "scope_session_id": session_id, "outcome": "放行",
+                                              "run_scope": {"where": "命令文本", "kind_of_command": "quick", "what": "样本",
+                                                            "declaration": "种类=quick; 跑什么=样本; 范围=轻型核心部分; 为什么=只改了这一道的判法所以只跑轻型",
+                                                            "segments": {"种类": "quick", "跑什么": f"样本 {agent_id}", "范围": "轻型核心部分",
+                                                                         "为什么": "只改了这一道的判法所以只跑轻型"}}}, ensure_ascii=False) + "\n")
+    scope_lines = []
+    _, scope_alerts, scope_notes = read_detections(scope_detections, 0, {"s1"}, set(), scope_lines)
+    section = scope_declaration_section(scope_lines)
+    checks += 1
+    if not (not scope_alerts and not scope_notes and len(section) == 3 and section[0].startswith("范围声明（run-scope-guard.sh 放行的 2 条")
+            and "implementation-writer c1：bash .claude/gate.d/checker-tier-formal-verification.sh --quick /w：种类=quick；跑什么=样本 c1；范围=轻型核心部分；为什么=只改了这一道的判法所以只跑轻型" in section[1]
+            and section[2].startswith("  主 agent：bash .claude/gate.d/doc-text.sh --check prime-marks：种类=quick")
+            and not any("c2" in line for line in section)):
+        failures.append("范围声明：这一会话放行的两条（c1、主 agent）应当列进「范围声明」一节、每条一行写命令与四段，不叫醒、不进检出记录那几行，别的会话的 c2 不列，"
+                        f"实际告警 {scope_alerts}、记录 {scope_notes}、这一节 {section}")
     # --discover：状态目录放自检自己的；一个会话一个看门狗，--ack 落文件下一次读回，条件消失的确认作废
     state_root = os.path.join(work, "watch-state")
     environment = dict(os.environ, AGENT_WATCH_STATE_ROOT=state_root)
@@ -4403,8 +4464,12 @@ def selftest_in(work):
     wanted_cost = {"model_calls": 3, "first_context_tokens": 100_003, "fresh_input_tokens": 250_206, "cache_read_tokens": 150_002,
                    "output_tokens": 150, "full_cache_rewrites": 1, "full_cache_rewrite_tokens": 150_000,
                    "total_context_tokens": 100_003 + 150_002 + 150_203}
+    # 读到的那几样逐个点名（分派表），不按字段名 getattr：函数单元库看得见读的是哪几个属性
+    got_cost = {"model_calls": costed.model_calls, "first_context_tokens": costed.first_context_tokens, "fresh_input_tokens": costed.fresh_input_tokens,
+                "cache_read_tokens": costed.cache_read_tokens, "output_tokens": costed.output_tokens, "full_cache_rewrites": costed.full_cache_rewrites,
+                "full_cache_rewrite_tokens": costed.full_cache_rewrite_tokens, "total_context_tokens": costed.total_context_tokens}
     for field, wanted in wanted_cost.items():
-        got = getattr(costed, field)
+        got = got_cost[field]
         if BROKEN_DETECTION == "cost" and field == "full_cache_rewrite_tokens":
             got = 0
         if got != wanted:

@@ -1,0 +1,6 @@
+exit=1
+want=说 D2501 未定（隔着名词短语）
+want=.claude/kb/decisions/2502-隔词样本引用方.md:3 说 D2501 未定
+want=.claude/kb/decisions/2502-隔词样本引用方.md:5 说 D2509 未定（隔着名词短语），而 D2509（隔词样本半定方）的状态行是「半定（一项未定）」
+want=  cross-decision-status：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（cross-decision-status）

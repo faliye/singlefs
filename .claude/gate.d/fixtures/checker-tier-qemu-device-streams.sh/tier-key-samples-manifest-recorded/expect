@@ -1,0 +1,10 @@
+exit=77
+want=六档照 runs/<档>/initramfs.manifest 核过清单再记
+want=· 头一趟记下 6 档
+want=── 第二趟（样本 .qemu-key-samples/change.sh 改过之后）
+want=· direct：复用（
+want=· second-instance：复用（
+want=· raise-rollback-floor：复用（
+want=· 按档：现判 0、复用 6
+want=device-streams：本次未跑
+not-green-by-design=device-streams 键样本只判键（.qemu-prerecorded 与 .qemu-key-samples），没起虚机不算真跑过 QEMU，绿的一侧只能记本次未跑

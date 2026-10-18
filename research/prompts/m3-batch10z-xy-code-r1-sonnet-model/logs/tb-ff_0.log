@@ -1,8 +1,0 @@
-
-running 1 test
-test s2_sweep ... S2 label=tb-ff_0 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=HHHH secs=0.41 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=24 iso_max=24 iso_end=24 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
-S2_DONE label=tb-ff_0 arm=implemented histories=1 hits=0 tbl_asks=0
-ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
-

@@ -1,8 +1,0 @@
-M0	rc=2	✗ 派 investigator 的提示写了预计挂钟超过 2 小时，长活声明不齐：
-M1	rc=2	✗ 派 investigator 的提示写了预计挂钟超过 2 小时，长活声明不齐：
-M2	rc=2	✗ 派 investigator 的提示写了预计挂钟超过 2 小时，长活声明不齐：
-M3	rc=2	✗ 派 investigator 的提示写了预计挂钟超过 2 小时，长活声明不齐：
-M4	rc=2	✗ 派 investigator 的提示写了预计挂钟超过 2 小时，长活声明不齐：
-M5	rc=2	✗ 派 investigator 的提示写了预计挂钟超过 2 小时，长活声明不齐：
-M6	rc=2	✗ 派 investigator 的提示写了预计挂钟超过 2 小时，长活声明不齐：
-M7	rc=2	✗ 派 investigator 的提示写了预计挂钟超过 2 小时，长活声明不齐：

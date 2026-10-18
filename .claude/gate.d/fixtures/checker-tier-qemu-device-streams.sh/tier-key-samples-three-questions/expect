@@ -1,0 +1,6 @@
+exit=77
+want=REUSE_SELFTEST script=.claude/gate.d/checker-tier-qemu-device-streams.sh same-inputs=reused unrelated-change=reused unit-change=rejudged-only-affected items=6 affected=1
+want=· qemu:raise-rollback-floor：绿，现判（来宾程序单元 变了
+want=复用哨兵（QEMU 档）：种子
+want=device-streams：本次未跑
+not-green-by-design=device-streams 键样本只判键（.qemu-prerecorded 与 .qemu-key-samples），没起虚机不算真跑过 QEMU，绿的一侧只能记本次未跑

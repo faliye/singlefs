@@ -2086,8 +2086,18 @@ fn run_everything(emitter: &mut Emitter) -> RunTally {
     tally
 }
 
+/// 准入用的仓根：环境变量 SINGLEFS_REPOSITORY_ROOT，没设取当前目录（replay.sh 与实验页的命令都在仓根起）；不取「清单目录/../..」（单元键把它当运行期路径拒算）。
 fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+    let root = std::env::var_os("SINGLEFS_REPOSITORY_ROOT")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_default();
+    if !root.join(".claude/singlefs-ai-sop/scripts/preflight.py").is_file() {
+        eprintln!("  ✗ {} 不是仓根（下面没有 .claude/singlefs-ai-sop/scripts/preflight.py），判不了准入", root.display());
+        eprintln!("  → 怎么办：在仓根起这个装置，或设 SINGLEFS_REPOSITORY_ROOT=<仓根>");
+        std::process::exit(78);
+    }
+    root
 }
 
 fn preflight() {
@@ -2217,7 +2227,7 @@ impl Bitset {
         Bitset { words: vec![0; usize::try_from(bits.div_ceil(64)).expect("位集大小装得进 usize")] }
     }
 
-    fn set(&mut self, index: u64) {
+    fn insert_index(&mut self, index: u64) {
         self.words[(index >> 6) as usize] |= 1u64 << (index & 63);
     }
 
@@ -2486,14 +2496,14 @@ fn walk_interleavings<S: LeafSink>(context: &WalkContext, walk: Walk, masks: &mu
 }
 
 #[derive(Clone, Copy)]
-struct Task {
+struct CoverSearchTask {
     walk: Walk,
     masks: [u32; MAXIMUM_STREAMING_WRITES],
 }
 
 /// 把深搜的前 `steps_deep` 步展开成任务，线程按任务领活；任务按字典序排，结果与线程数无关。
-fn split_tasks(context: &WalkContext, steps_deep: usize) -> Vec<Task> {
-    let mut frontier = vec![Task { walk: Walk::start(), masks: [0; MAXIMUM_STREAMING_WRITES] }];
+fn split_tasks(context: &WalkContext, steps_deep: usize) -> Vec<CoverSearchTask> {
+    let mut frontier = vec![CoverSearchTask { walk: Walk::start(), masks: [0; MAXIMUM_STREAMING_WRITES] }];
     for _ in 0..steps_deep {
         let mut next_frontier = Vec::new();
         for task in &frontier {
@@ -2687,7 +2697,7 @@ fn evaluate_signatures(info: &TableInfo, signatures: &[(u128, u64, u64)], thread
                             let segments = segments_of_signature(key, info.write_count);
                             let (mut states, mut cross, mut invalid_record, mut invalid_all) = (0u32, 0u32, 0u32, 0u32);
                             for_each_crash_state(info, &segments, |code, index| {
-                                union.set(index);
+                                union.insert_index(index);
                                 states += 1;
                                 if info.is_cross(code) {
                                     cross += 1;
@@ -2811,7 +2821,7 @@ fn evaluate_exact_union(info: &TableInfo, direct_masks: &[[u32; MAXIMUM_STREAMIN
                         if position >= direct_masks.len() {
                             break;
                         }
-                        for_each_exact_state(info, &direct_masks[position], &mut |index| union.set(index));
+                        for_each_exact_state(info, &direct_masks[position], &mut |index| union.insert_index(index));
                     }
                     union
                 })
@@ -2942,7 +2952,7 @@ fn search_truth(context: &WalkContext, info: &TableInfo, threads: usize) -> Bits
                         }
                         for index in start..(start + CHUNK).min(info.total_vectors) {
                             if searcher.realizable(info.code_of_index(index)) {
-                                found.set(index);
+                                found.insert_index(index);
                             }
                         }
                     }
@@ -3918,7 +3928,7 @@ fn true_cross_target(table: &[WriteSpec], truth: &[StateCode], exact: &[StateCod
 fn true_cross_misses_by_enumeration(info: &TableInfo, rows: &[SignatureRow], target: &[u64], threads: usize) -> Vec<u32> {
     let mut target_bits = Bitset::new(info.total_vectors);
     for &code in target {
-        target_bits.set(info.index_of_code(code));
+        target_bits.insert_index(info.index_of_code(code));
     }
     const CHUNK: usize = 64;
     let next_start = AtomicUsize::new(0);

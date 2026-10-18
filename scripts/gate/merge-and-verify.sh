@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # admission: always 每一批补丁都要打一次、验一次，上一次的结论不替这一次作保
 # run-condition: command git cargo
-# 一批实现员交回之后的「合入后验证」：打全部补丁、编一次、跑 harness 档全部测试二进制、fmt、clippy 与 build，红的列出来。替掉派一个实现员做这件活。
+# 一批实现员交回之后的「合入后验证」：打全部补丁、编一次、跑补丁改到的包（与依赖它们的包）的 harness 档测试二进制、fmt、clippy 与 build，红的列出来。替掉派一个实现员做这件活。
 #
-#   merge-and-verify.sh [--memory <上限>] [--threads <N>] [--skip-apply] [--copy] <补丁目录> …
+#   merge-and-verify.sh [--memory <上限>] [--threads <N>] [--skip-apply] [--copy] [--all-packages] <补丁目录> …
 #     --threads 缺省取登记的重活默认并行度（.claude/heavy-thread-default，scripts/hosts/heavy-threads.sh），不看忙闲。
+#     --all-packages 测试步照旧跑工作区成员减掉 checker 档包的全部包，不按补丁挑。
 #   merge-and-verify.sh --selftest                     # 用假的 apply-writer-patch 与假 cargo 走一遍；MERGE_AND_VERIFY_BREAK=ignore-red 时必须判红
 #
 # --copy：不往这份脚本所在的仓里打，自己建一份副本在副本里打、编、验，收尾删掉它自己建的副本与编译目录（成功、失败、被 INT / TERM 停都删）：
@@ -25,6 +26,13 @@
 #          减掉 checker 档包 singlefs-checker-tier（那归提交时的主 agent）；check.sh 跑的是 `cargo test --all`，差的只有这一个包。
 #          成员里没有 singlefs-checker-tier（改了名、挪了）、成员写成通配、读不出包名，都判红、不编：排不掉它就宁可不跑。
 #          退 0 而 test result 行里一条测试都没数到，也判红（check.sh「一条测试都没跑」那一条）。
+#          测试只跑改到的包：上面那几个包里只留这一批补丁改到的包与工作区里依赖它们的包（成员 Cargo.toml 的 [dependencies]、[dev-dependencies]、
+#          [build-dependencies] 与 [target.*] 下的这三张表里写了它，一层层往上传）。改到的包按给的补丁目录里 crates.patch 改过的路径算（路径往上找到的
+#          第一份带 [package] 的 Cargo.toml，scripts/gate/lib_rebuilt_packages.py 的 package_of，与重编核对同一份；包里改过的不论是不是 .rs 都算），
+#          --skip-apply 时照样读给的补丁目录。没挑上的包逐个报「本次未跑：补丁没改到」，成功句里逐个列名；一个包都没挑上（补丁只改了 checker 档包、
+#          或没有 crates.patch）时测试这一步不跑、报「测试本次未跑」，不记红也不算测过。照旧全跑的：带 --all-packages；没给补丁目录；
+#          补丁改到工作区根的 Cargo.toml、Cargo.lock 或 .cargo/；补丁改到不落在任何包里的路径（测试运行时可能读它，判不出归哪个包）。
+#          harness 档按测试函数单元键入库复用（只跑键对不上的测试）归 .claude/kb/decisions/13-验证路线.md 已定项 17 的下一步，这里还是按包挑。
 #   fmt    `cargo fmt --all -- --check`；clippy `cargo clippy --offline --all-targets --all-features -- -D warnings` 加编码纪律那张 lint 表；build `cargo build --offline --all-targets`。
 #   lint 表只在 check.sh 一处定义：每次开跑从它的 `CODE_DISCIPLINE_LINTS=(` … `)` 那一段现读（一条一对 `-D clippy::<名>`），不在这里另抄一份；
 #   同时核 check.sh 里 fmt、clippy、build、test 四条 cargo 的写法（CHECK_SH_COMMANDS）还是这里照着对齐的那一种。读不出表、表的形状不对、
@@ -39,6 +47,7 @@
 #   没给补丁目录、或补丁里没有要核的包：报「重编核对本次未判」，不记红也不算核过。
 # 主工作区合入锁（同一张表第 20 行；判法与锁文件在 scripts/gate/lib_workspace_lock.py 的文件头，这里不另写）：不带 --copy 时，打补丁与编之前先拿锁，
 #   持有者是这个进程（$$），被别的合入占着就排队、每过一段时间报一行谁占着，持有者已死的判失效、报出来再接管；退出时（成功、红、被 INT / TERM 停）放掉。
+#   锁按工作树分开：在 git worktree 加出来的树里跑时拿那棵树自己那一把，不排在主工作树的合入后面。
 #   拿着锁时 export SINGLEFS_WORKSPACE_LOCK_HOLDER=$$，它起的 apply-writer-patch.py 认出是在持有者之下、不另拿。拿不成退 1、一个补丁都没打、没编。
 #   带 --copy 时在自己的副本里打与编，不拿这一把。
 # MERGE_AND_VERIFY_TREE（只给自证）：刷源码戳与编译在这棵树里（默认这份脚本所在的仓根）；打补丁照旧是 apply-writer-patch.py 自己的仓根。
@@ -66,7 +75,8 @@
 #       「应当跑 cargo build --offline --all-targets」（实际假 cargo 没收到 build）
 #   MERGE_AND_VERIFY_BREAK=fixed-harness-packages  cargo test 退回写死的四个包 singlefs-format、singlefs-core、singlefs-harness、singlefs-checker
 #       「cargo test 应当挑工作区成员减掉 checker 档包」（实际收到的是写死的四个包，样本树的成员 demo 不在里面）；
-#       「工作区成员里没有 singlefs-checker-tier 时应当退 1、不编」也红（写死的表不读成员，照编）
+#       「工作区成员里没有 singlefs-checker-tier 时应当退 1、不编」也红（写死的表不读成员，照编）；
+#       按补丁挑包的那几格与别的带补丁目录的格也红（写死的四个包都不在样本工作区里，按补丁挑出来一个不剩，测试本次未跑）
 #   MERGE_AND_VERIFY_BREAK=no-checker-tier-guard  工作区成员里找不到 singlefs-checker-tier 也照挑全部成员
 #       「工作区成员里没有 singlefs-checker-tier 时应当退 1、不编」（实际退 0，改了名的 checker 档包被跑进来）
 #   MERGE_AND_VERIFY_BREAK=zero-tests-green  cargo test 退 0 而一条测试都没数到时照报全绿
@@ -84,9 +94,17 @@
 #   MERGE_AND_VERIFY_BREAK=ignore-workspace-lock  不带 --copy 时不拿主工作区合入锁
 #       「两个合入同时起：后起的应当排队、报出前者的进程号、前者编完放锁后才编」（实际两趟的 cargo test 叠在一起）与
 #       「锁文件里的持有者已死：应当报出来、接管、照常验完、放锁后记录清空」（实际没报接管）
+#   MERGE_AND_VERIFY_BREAK=all-packages-always  测试步不按补丁挑包，照旧跑全部（改前的样子）
+#       「补丁改到 alpha 与 beta 两个包：cargo test 只该挑这两个、报 demo 与 delta 本次未跑」（实际收到四个包）；
+#       连带「补丁改到 demo：…」「补丁只改到 checker 档包：…」（照旧全跑）与「补丁改到工作区根的 Cargo.lock：…」（挑法那一句写的是开关，不是 Cargo.lock）
+#   MERGE_AND_VERIFY_BREAK=lock-changes-narrowed  补丁改到工作区根的 Cargo.toml、Cargo.lock 或 .cargo/ 时不照旧全跑（当成没改到包）
+#       「补丁改到工作区根的 Cargo.lock：cargo test 应当照旧挑全部四个包」（实际测试本次未跑）
+#   MERGE_AND_VERIFY_BREAK=dependents-dropped  只挑补丁改到的包，不带上工作区里依赖它们的包
+#       「补丁改到 demo：cargo test 应当挑 demo 与依赖它的 delta」（实际只收到 -p demo）
 #   本库 scripts/gate/lib_rebuilt_packages.py 的 REBUILT_PACKAGES_BREAK=any-compiling-line 也让「编译目录里的产物比源码新……」那一格红（另一个包有 Compiling 行就当 demo 也重编了）；
 #   scripts/gate/lib_workspace_lock.py 的 WORKSPACE_LOCK_BREAK=trust-dead-holder 让「锁文件里的持有者已死……」那一格红（排队等死掉的持有者，到 SINGLEFS_WORKSPACE_LOCK_GIVE_UP_SECONDS 退 1）；
-#   它的 WORKSPACE_LOCK_BREAK=no-wait 让「两个合入同时起……」与「锁文件里的持有者已死……」两格红（活着的持有者也照拿、不排队；死的不报接管）
+#   它的 WORKSPACE_LOCK_BREAK=no-wait 让「两个合入同时起……」与「锁文件里的持有者已死……」两格红（活着的持有者也照拿、不排队；死的不报接管）；
+#   它的 WORKSPACE_LOCK_BREAK=lock-in-common-dir 让「主工作树的锁被占着时在 git worktree 加出来的树里验……」那一格红（锁文件照改前放 git common-dir，排到点退 1）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -226,6 +244,102 @@ PY_MEMBERS
   return 0
 }
 
+# select_test_packages <树>：TEST_PACKAGES 里只留这一批补丁改到的包与工作区里依赖它们的包（文件头「测试只跑改到的包」）；照旧全跑的原样留着。
+# 没挑上的包名进 UNTESTED_PACKAGES，怎么挑的一句进 TEST_SELECTION_NOTE；读不了补丁或成员清单返回 1，原因进 TEST_SELECTION_PROBLEM。
+select_test_packages() {
+  local listing kind name candidates=() position
+  UNTESTED_PACKAGES=(); TEST_SELECTION_NOTE=""; TEST_SELECTION_PROBLEM=""
+  if ((ALL_PACKAGES)); then TEST_SELECTION_NOTE="带了 --all-packages，照旧全跑"; return 0; fi
+  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "all-packages-always" ]]; then TEST_SELECTION_NOTE="弄坏开关 MERGE_AND_VERIFY_BREAK=all-packages-always，照旧全跑"; return 0; fi
+  if ((${#CHECK_PATCH_DIRS[@]} == 0)); then TEST_SELECTION_NOTE="没给补丁目录，算不出改到的包，照旧全跑"; return 0; fi
+  for ((position = 1; position < ${#TEST_PACKAGES[@]}; position += 2)); do candidates+=("${TEST_PACKAGES[position]}"); done
+  if ! listing="$(python3 - "$1" "$REBUILT" "${MERGE_AND_VERIFY_BREAK:-}" "${candidates[*]}" "${CHECK_PATCH_DIRS[@]}" <<'PY_SELECT' 2>&1
+import importlib.util, os, sys, tomllib
+tree, library, broken, candidate_text, *patch_directories = sys.argv[1:]
+candidates = candidate_text.split()
+specification = importlib.util.spec_from_file_location("lib_rebuilt_packages_for_merge_and_verify", library)
+rebuilt = importlib.util.module_from_spec(specification)
+specification.loader.exec_module(rebuilt)
+try:
+    paths = rebuilt.collect_paths(patch_directories, [])
+except OSError as error:
+    print(f"读不了补丁：{error}")
+    sys.exit(1)
+WORKSPACE_WIDE = ("Cargo.toml", "Cargo.lock")
+changed, outside = [], []
+for path in paths:
+    if path in WORKSPACE_WIDE or path == ".cargo" or path.startswith(".cargo/"):
+        if broken == "lock-changes-narrowed":
+            continue
+        print(f"ALL\t补丁改到工作区根的 {path}")
+        sys.exit(0)
+    name = rebuilt.package_of(tree, path)
+    if name is None:
+        outside.append(path)
+    elif name not in changed:
+        changed.append(name)
+if outside:
+    print(f"ALL\t补丁改到不落在任何包里的 {'、'.join(outside[:3])}{' 等 ' + str(len(outside)) + ' 处' if len(outside) > 3 else ''}（测试运行时可能读它，判不出归哪个包）")
+    sys.exit(0)
+def load(path):
+    with open(path, "rb") as handle:
+        return tomllib.load(handle)
+try:
+    members = load(os.path.join(tree, "Cargo.toml")).get("workspace", {}).get("members") or []
+    manifests = {}
+    for member in members:
+        manifest = load(os.path.join(tree, member, "Cargo.toml"))
+        manifests[manifest["package"]["name"]] = manifest
+except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as error:
+    print(f"读不了工作区成员的 Cargo.toml：{error!r}")
+    sys.exit(1)
+def dependency_names(manifest):
+    """一个成员在三张依赖表（连同 [target.*] 下的）里写的包名（改了名的照 package = 认）。"""
+    tables = [manifest.get(key) for key in ("dependencies", "dev-dependencies", "build-dependencies")]
+    for target in (manifest.get("target") or {}).values():
+        if isinstance(target, dict):
+            tables += [target.get(key) for key in ("dependencies", "dev-dependencies", "build-dependencies")]
+    for table in tables:
+        for key, value in (table or {}).items():
+            yield value.get("package", key) if isinstance(value, dict) else key
+depends_on = {name: set(dependency_names(manifest)) & set(manifests) for name, manifest in manifests.items()}
+affected = set(changed)
+dependents = []
+while broken != "dependents-dropped":
+    grown = sorted(name for name, needed in depends_on.items() if name not in affected and needed & affected)
+    if not grown:
+        break
+    affected |= set(grown)
+    dependents += grown
+for name in changed:
+    print(f"CHANGED\t{name}")
+for name in dependents:
+    print(f"DEPENDENT\t{name}")
+for name in candidates:
+    print(f"{'RUN' if name in affected else 'SKIP'}\t{name}")
+PY_SELECT
+  )"; then
+    TEST_SELECTION_PROBLEM="$listing"; return 1
+  fi
+  if grep -q $'^ALL\t' <<< "$listing"; then
+    TEST_SELECTION_NOTE="$(sed -n 's/^ALL\t//p' <<< "$listing" | head -n 1)，照旧全跑"; return 0
+  fi
+  local changed_text="" dependent_text=""
+  TEST_PACKAGES=()
+  while IFS=$'\t' read -r kind name; do
+    case "$kind" in
+      RUN) TEST_PACKAGES+=(-p "$name") ;;
+      SKIP) UNTESTED_PACKAGES+=("$name") ;;
+      CHANGED) changed_text+="$name、" ;;
+      DEPENDENT) dependent_text+="$name、" ;;
+    esac
+  done <<< "$listing"
+  TEST_SELECTION_NOTE="补丁改到的包：${changed_text:-一个都没有}"
+  TEST_SELECTION_NOTE="${TEST_SELECTION_NOTE%、}"
+  [[ -z "$dependent_text" ]] || TEST_SELECTION_NOTE+="；另带上依赖它们的：${dependent_text%、}"
+  return 0
+}
+
 run_capped() {   # $1 日志文件，其余是命令；经内存包装与线程上限（WRAPPER 为 none 时直接跑，自检用）
   local log="$1"; shift
   if [[ "$WRAPPER" == "none" ]]; then "$@" > "$log" 2>&1
@@ -235,7 +349,7 @@ run_capped() {   # $1 日志文件，其余是命令；经内存包装与线程�
 verify() {
   local logs="$1"; shift
   local -a dirs=("$@")
-  local dir rc applied=0 warned=0 failed_tests reds=0 test_count
+  local dir rc applied=0 warned=0 failed_tests reds=0 test_count untested_text
   local -a clippy_lints=() patch_arguments=() compile_logs=()
   mkdir -p "$logs"
   rm -f -- "$logs/test.log" "$logs/build.log"   # 重编核对只认这一趟的编译输出（日志目录可能是调用方给的旧目录）
@@ -280,11 +394,20 @@ verify() {
   fi
   test_packages "$tree" || die "挑不出要测的包：$TEST_PACKAGES_PROBLEM；没编" \
     "工作区成员要逐个写出目录、各有 [package] name，checker 档包 $CHECKER_TIER_PACKAGE 要在成员里（这里靠它的名字把它排掉）；改了名就同步改这份脚本的 CHECKER_TIER_PACKAGE" 1
-  echo "  编译并跑 ${TEST_PACKAGES[*]} 的全部测试二进制（工作区成员减掉 $CHECKER_TIER_PACKAGE；内存上限 $MEMORY、线程上限 $THREADS）…"
-  run_capped "$logs/test.log" cargo test --offline --no-fail-fast "${TEST_PACKAGES[@]}"; rc=$?
-  test_count="$(awk 'match($0, /^test result: [A-Za-z]+\. [0-9]+ passed; [0-9]+ failed/) { split($0, f, " "); passed += f[4]; failed += f[6] } END { print passed + failed + 0 }' "$logs/test.log")"
-  failed_tests="$(sed -n 's/^test \(.*\) \.\.\. FAILED$/\1/p' "$logs/test.log")"
-  if [[ $rc -eq $GPU_MEMORY_HIT_EXIT && "${MERGE_AND_VERIFY_BREAK:-}" != "gpu-memory-as-test-red" ]]; then
+  select_test_packages "$tree" || die "算不出这一批补丁改到哪几个包：$TEST_SELECTION_PROBLEM；没编" \
+    "看补丁目录在不在、crates.patch 与工作区成员的 Cargo.toml 读不读得了；要照旧全跑就加 --all-packages" 1
+  untested_text=""
+  if ((${#UNTESTED_PACKAGES[@]})); then untested_text="$(printf '%s、' "${UNTESTED_PACKAGES[@]}")"; untested_text="；本次未跑：补丁没改到 ${#UNTESTED_PACKAGES[@]} 个包：${untested_text%、}"; fi
+  rc=0; test_count=0; failed_tests=""
+  if ((${#TEST_PACKAGES[@]})); then
+    echo "  编译并跑 ${TEST_PACKAGES[*]} 的全部测试二进制（工作区成员减掉 $CHECKER_TIER_PACKAGE，${TEST_SELECTION_NOTE}${untested_text}；内存上限 $MEMORY、线程上限 $THREADS）…"
+    run_capped "$logs/test.log" cargo test --offline --no-fail-fast "${TEST_PACKAGES[@]}"; rc=$?
+    test_count="$(awk 'match($0, /^test result: [A-Za-z]+\. [0-9]+ passed; [0-9]+ failed/) { split($0, f, " "); passed += f[4]; failed += f[6] } END { print passed + failed + 0 }' "$logs/test.log")"
+    failed_tests="$(sed -n 's/^test \(.*\) \.\.\. FAILED$/\1/p' "$logs/test.log")"
+  fi
+  if ((${#TEST_PACKAGES[@]} == 0)); then
+    echo "  - 测试本次未跑：这一批补丁一个要测的包都没改到（${TEST_SELECTION_NOTE}；checker 档包 $CHECKER_TIER_PACKAGE 归提交时）${untested_text}"
+  elif [[ $rc -eq $GPU_MEMORY_HIT_EXIT && "${MERGE_AND_VERIFY_BREAK:-}" != "gpu-memory-as-test-red" ]]; then
     reds=$((reds+1))
     echo "  ✗ cargo test 那一趟显存不够（内存包装退 $GPU_MEMORY_HIT_EXIT：起止之间内核报了 NV_ERR_NO_MEMORY），这一趟的测试结果不算数（日志 $logs/test.log）"
     echo "  → 怎么办：nvidia-smi 看谁在用卡，等它跑完再重跑这一条 merge-and-verify.sh；不是代码红，别照日志里的 FAILED 改钉值"
@@ -302,7 +425,7 @@ verify() {
     echo "  ✗ cargo test 退 0，却一条测试都没跑（test result 行里 passed 与 failed 加起来是 0；日志 $logs/test.log）"
     echo "  → 怎么办：看那份日志里编了哪些包、有没有 test result 行；一条都没跑的「全绿」与跑过了长得一样（check.sh 同一条）"
   else
-    echo "  ✓ 测试全绿（$(grep -c '^test result: ok' "$logs/test.log") 个测试二进制，共 $test_count 条测试）"
+    echo "  ✓ 测试全绿（$(grep -c '^test result: ok' "$logs/test.log") 个测试二进制，共 $test_count 条测试；跑了 $((${#TEST_PACKAGES[@]} / 2)) 个包${untested_text}）"
   fi
   run_capped "$logs/fmt.log" cargo fmt --all -- --check; rc=$?
   if [[ $rc -ne 0 ]]; then reds=$((reds+1)); echo "  ✗ cargo fmt --check 红（日志 $logs/fmt.log）"; echo "  → 怎么办：cargo fmt --all，再看 diff 只动了格式"; else echo "  ✓ fmt 过"; fi
@@ -319,8 +442,11 @@ verify() {
     echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=skip-rebuild-check：不核改过的包重编了没有"
   elif ((${#patch_arguments[@]} == 0)); then
     echo "  - 重编核对本次未判：没给补丁目录，算不出改过的包"
+  elif [[ ! -f "$logs/test.log" && ! -f "$logs/build.log" ]]; then
+    echo "  - 重编核对本次未判：这一趟测试与 build 都没编（测试本次未跑、build 没跑），没有编译输出可核"
   else
-    compile_logs=(--log "$logs/test.log")
+    compile_logs=()
+    [[ ! -f "$logs/test.log" ]] || compile_logs+=(--log "$logs/test.log")   # 测试本次未跑时没有这一份
     [[ ! -f "$logs/build.log" ]] || compile_logs+=(--log "$logs/build.log")
     python3 "$REBUILT" check --tree "$tree" --target-dir "${CARGO_TARGET_DIR:-$tree/target}" "${compile_logs[@]}" "${patch_arguments[@]}" > "$logs/rebuilt.log" 2>&1; rc=$?
     sed 's/^/  /' "$logs/rebuilt.log"
@@ -339,7 +465,9 @@ selftest() {
   local scratch fake_cargo_dir failures=0 checked=0 out rc expected_lints expected_lint_count check_case
   unset MERGE_AND_VERIFY_KEEP_COPY   # 留现场那一格自己设；调用方设了不能带进别的格
   scratch="$(mktemp -d)"; fake_cargo_dir="$scratch/bin"; mkdir -p "$fake_cargo_dir" "$scratch/patch-a" "$scratch/patch-b"
-  # 主工作区合入锁：每一格的锁文件都是临时目录里这一份（不碰仓里 git common-dir 那一把）；排队时每 0.3 秒报一次、每 0.05 秒看一次；调用方的持有者变量不带进来
+  # patch-a 改的是 demo 里的一份数据文件（不是 .rs：重编核对不核它，测试照挑 demo）
+  printf -- '--- a/crates/demo/src/table.txt\n+++ b/crates/demo/src/table.txt\n@@ -1 +1 @@\n-1\n+2\n' > "$scratch/patch-a/crates.patch"
+  # 主工作区合入锁：每一格的锁文件都是临时目录里这一份（不碰仓里 git 目录那一把；按工作树分开那一格另在临时仓里用默认位置）；排队时每 0.3 秒报一次、每 0.05 秒看一次；调用方的持有者变量不带进来
   # 排队最多等 30 秒：锁永远拿不到（弄坏开关、或哪一格没放锁）时到点退 1、那一格红，不挂住
   export SINGLEFS_WORKSPACE_LOCK_FILE="$scratch/main-workspace.lock" SINGLEFS_WORKSPACE_LOCK_REPORT_SECONDS=0.3 SINGLEFS_WORKSPACE_LOCK_POLL_SECONDS=0.05 SINGLEFS_WORKSPACE_LOCK_GIVE_UP_SECONDS=30
   unset SINGLEFS_WORKSPACE_LOCK_HOLDER
@@ -410,6 +538,45 @@ FAKE
   checked=$((checked+1))
   if ! grep -qxF -- "test --offline --no-fail-fast -p demo" "$scratch/calls-three.txt"; then
     echo "  ✗ 自检：cargo test 应当挑工作区成员减掉 checker 档包（样本里只剩 -p demo），假 cargo 收到的是：$(grep '^test' "$scratch/calls-three.txt")"; failures=1; fi   # gate-lint:detail
+  # 测试只跑改到的包（文件头）：样本工作区五个成员 demo、alpha、beta、delta（依赖 demo）与 checker 档包；补丁改的都是包里的数据文件（重编核对不核）
+  local narrow_tree="$scratch/narrow-tree" narrow_member
+  mkdir -p "$narrow_tree/crates/singlefs-checker-tier"
+  printf '[workspace]\nmembers = ["crates/demo", "crates/alpha", "crates/beta", "crates/delta", "crates/singlefs-checker-tier"]\n' > "$narrow_tree/Cargo.toml"
+  for narrow_member in demo alpha beta delta; do
+    mkdir -p "$narrow_tree/crates/$narrow_member/src" "$narrow_tree/crates/$narrow_member/tests"; printf 'pub fn f() {}\n' > "$narrow_tree/crates/$narrow_member/src/lib.rs"
+    printf '[package]\nname = "%s"\n' "$narrow_member" > "$narrow_tree/crates/$narrow_member/Cargo.toml"
+  done
+  printf '\n[dev-dependencies]\ndemo = { path = "../demo" }\n' >> "$narrow_tree/crates/delta/Cargo.toml"
+  printf '[package]\nname = "singlefs-checker-tier"\n' > "$narrow_tree/crates/singlefs-checker-tier/Cargo.toml"
+  narrow_patch() {   # $1 补丁目录，其余是改到的路径
+    mkdir -p "$1"; local narrow_path; : > "$1/crates.patch"
+    for narrow_path in "${@:2}"; do printf -- '--- a/%s\n+++ b/%s\n@@ -1 +1 @@\n-1\n+2\n' "$narrow_path" "$narrow_path" >> "$1/crates.patch"; done
+  }
+  narrow_patch "$scratch/narrow-two" crates/alpha/src/table.txt crates/beta/tests/data.txt
+  narrow_patch "$scratch/narrow-demo" crates/demo/src/table.txt
+  narrow_patch "$scratch/narrow-lock" Cargo.lock
+  narrow_case() {   # $1 标签，其余是参数
+    FAKE_CARGO_MODE=green FAKE_CARGO_CALLS="$scratch/calls-narrow-$1.txt" PATH="$fake_cargo_dir:$PATH" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" MERGE_AND_VERIFY_WRAPPER=none \
+      MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-narrow-$1" MERGE_AND_VERIFY_TREE="$narrow_tree" env -u CARGO_TARGET_DIR bash "$0" "${@:2}" > "$out" 2>&1; rc=$?
+  }
+  out="$scratch/out-narrow-two.txt"; narrow_case two --skip-apply "$scratch/narrow-two"; checked=$((checked+1))
+  if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p alpha -p beta" "$scratch/calls-narrow-two.txt" \
+     || ! grep -qF '本次未跑：补丁没改到 2 个包：demo、delta' "$out" || ! grep -q '✓ 测试全绿.*跑了 2 个包；本次未跑：补丁没改到 2 个包：demo、delta' "$out"; then
+    echo "  ✗ 自检：补丁改到 alpha 与 beta 两个包：cargo test 只该挑这两个、报 demo 与 delta 本次未跑，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-two.txt" 2>/dev/null)：$(grep -E '✓ 测试|本次未跑|✗' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  out="$scratch/out-narrow-demo.txt"; narrow_case demo --skip-apply "$scratch/narrow-demo"; checked=$((checked+1))
+  if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p demo -p delta" "$scratch/calls-narrow-demo.txt" || ! grep -qF '另带上依赖它们的：delta' "$out"; then
+    echo "  ✗ 自检：补丁改到 demo：cargo test 应当挑 demo 与依赖它的 delta，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-demo.txt" 2>/dev/null)：$(grep -E '编译并跑|✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
+  out="$scratch/out-narrow-lock.txt"; narrow_case lock --skip-apply "$scratch/narrow-lock"; checked=$((checked+1))
+  if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p demo -p alpha -p beta -p delta" "$scratch/calls-narrow-lock.txt" || ! grep -qF '补丁改到工作区根的 Cargo.lock，照旧全跑' "$out"; then
+    echo "  ✗ 自检：补丁改到工作区根的 Cargo.lock：cargo test 应当照旧挑全部四个包，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-lock.txt" 2>/dev/null)：$(grep -E '编译并跑|本次未跑|✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
+  out="$scratch/out-narrow-all.txt"; narrow_case all --skip-apply --all-packages "$scratch/narrow-two"; checked=$((checked+1))
+  if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p demo -p alpha -p beta -p delta" "$scratch/calls-narrow-all.txt" || ! grep -qF '带了 --all-packages，照旧全跑' "$out"; then
+    echo "  ✗ 自检：带 --all-packages：cargo test 应当照旧挑全部四个包，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-all.txt" 2>/dev/null)"; failures=1; fi   # gate-lint:detail
+  narrow_patch "$scratch/narrow-checker" crates/singlefs-checker-tier/src/table.txt
+  mkdir -p "$narrow_tree/crates/singlefs-checker-tier/src"
+  out="$scratch/out-narrow-checker.txt"; narrow_case checker --skip-apply "$scratch/narrow-checker"; checked=$((checked+1))
+  if [[ $rc -ne 0 ]] || grep -q '^test' "$scratch/calls-narrow-checker.txt" 2>/dev/null || ! grep -qF '测试本次未跑：这一批补丁一个要测的包都没改到' "$out"; then
+    echo "  ✗ 自检：补丁只改到 checker 档包：测试这一步应当不跑、报测试本次未跑、退 0，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-checker.txt" 2>/dev/null)：$(grep -E '本次未跑|✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
   # check.sh 读不出 lint 表、或 clippy 那一行变了：退 1，一个补丁都不打、不编
   sed '/^CODE_DISCIPLINE_LINTS=(/,/^)/d' "$CHECK_SH" > "$scratch/check-no-table.sh"
   sed 's/-- -D warnings "\${CODE_DISCIPLINE_LINTS\[@\]}"/-- -D warnings -W clippy::pedantic "${CODE_DISCIPLINE_LINTS[@]}"/' "$CHECK_SH" > "$scratch/check-clippy-changed.sh"
@@ -535,6 +702,23 @@ FAKE
   FAKE_CARGO_MODE=green SINGLEFS_WORKSPACE_LOCK_GIVE_UP_SECONDS=5 run_case lock-dead --skip-apply
   if [[ $rc -ne 0 ]] || ! grep -q '已死.*死掉的会话.*接管' "$out" || grep -q '^pid=' "$SINGLEFS_WORKSPACE_LOCK_FILE"; then
     echo "  ✗ 自检：锁文件里的持有者已死：应当报出来、接管、照常验完、放锁后记录清空，实际退出码 $rc：$(grep -E '锁|✗' "$out" | head -3 | tr '\n' ' ')；锁文件 $(tr '\n' ' ' < "$SINGLEFS_WORKSPACE_LOCK_FILE")"; failures=1; fi   # gate-lint:detail
+  # 每棵工作树各一把（lib_workspace_lock.py 文件头「锁文件」）：临时仓的主工作树的锁被一个活着的假合入占着（它拿到锁之后 exec sleep，进程号不变），
+  # 在它 git worktree 加出来的树里验不排队、照常验完；这一格不设 SINGLEFS_WORKSPACE_LOCK_FILE，锁文件在各自的 git 目录里。放弃时限 3 秒
+  # （弄坏开关 WORKSPACE_LOCK_BREAK=lock-in-common-dir 下排到点退 1、这一格红，不挂住）；用完只停自己起的那一个进程号
+  local wt_main="$scratch/wt-main" wt_linked="$scratch/wt-linked" wt_holder wt_attempt
+  mkdir -p "$wt_main/crates/demo/src"; write_workspace "$wt_main" singlefs-checker-tier; printf 'pub fn f() {}\n' > "$wt_main/crates/demo/src/lib.rs"
+  { git init -q "$wt_main" && git -C "$wt_main" add -A && git -C "$wt_main" -c user.name=s -c user.email=s@s commit -qm base && git -C "$wt_main" worktree add -q "$wt_linked"; } > /dev/null 2>&1
+  env -u SINGLEFS_WORKSPACE_LOCK_FILE bash -c 'python3 "$0" acquire --root "$1" --holder-pid $$ --command "假合入 主工作树" > /dev/null || exit 1; : > "$2"; exec sleep 30' \
+    "$WORKSPACE_LOCK" "$wt_main" "$scratch/wt-held" &
+  wt_holder=$!
+  for wt_attempt in $(seq 1 200); do [[ -e "$scratch/wt-held" ]] && break; kill -0 "$wt_holder" 2>/dev/null || break; sleep 0.05; done
+  out="$scratch/out-lock-per-tree.txt"; checked=$((checked+1))
+  PATH="$rebuilt_bin:$PATH" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" MERGE_AND_VERIFY_WRAPPER=none MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-lock-per-tree" \
+    MERGE_AND_VERIFY_TREE="$wt_linked" SINGLEFS_WORKSPACE_LOCK_GIVE_UP_SECONDS=3 env -u CARGO_TARGET_DIR -u SINGLEFS_WORKSPACE_LOCK_FILE bash "$0" --skip-apply > "$out" 2>&1; rc=$?
+  kill "$wt_holder" 2>/dev/null
+  wait "$wt_holder" 2>/dev/null
+  if [[ ! -e "$scratch/wt-held" || $rc -ne 0 ]] || grep -q '在排队' "$out"; then
+    echo "  ✗ 自检：主工作树的锁被占着时在 git worktree 加出来的树里验：应当不排队、照常验完退 0，实际$([[ -e "$scratch/wt-held" ]] || echo '主工作树的假合入没拿到锁、')退出码 $rc：$(grep -E '锁|排队|✗' "$out" | head -3 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
   rm -rf "${scratch:?}"
   if [[ $failures -ne 0 ]]; then
     echo "    → 怎么办：看 verify() 抓 FAILED 行与退出码、编之前刷源码戳的那几处；MERGE_AND_VERIFY_BREAK 设着的话这里本来就该红"
@@ -546,19 +730,21 @@ FAKE
   echo "    check.sh 读不出 lint 表或 clippy 那一行变了退 1 不编、成员里没有 checker 档包退 1 不编、一条测试都没跑退 1、"
   echo "    --copy 在自己建的副本里打补丁与编、全绿与测试红收尾都删掉副本与编译目录、MERGE_AND_VERIFY_KEEP_COPY=1 留着并打出路径、"
   echo "    补丁改过的包头一次编与再验同一批补丁都有 Compiling 行、编译目录里的产物比源码新时点名没重编的包退 1、"
-  echo "    两个合入同时起后起的排队并报出前者、前者放锁后才编、锁文件里的持有者已死时报出来并接管"
+  echo "    两个合入同时起后起的排队并报出前者、前者放锁后才编、锁文件里的持有者已死时报出来并接管、主工作树的锁被占着时 git worktree 加出来的树里照常验、"
+  echo "    测试只挑补丁改到的包（改两个包只跑两个、没改到的逐个报本次未跑）并带上依赖它们的包、改到 Cargo.lock 与带 --all-packages 照旧全跑、只改到 checker 档包时测试本次未跑"
   return 0
 }
 
 if [[ "${1:-}" == "--selftest" ]]; then selftest; exit $?; fi
-MEMORY="${REPLAY_MEMORY_CAP:-8G}"; THREADS="$(heavy_thread_default)"; skip_apply=0; copy_mode=0; dirs=(); invocation="merge-and-verify.sh $*"
+MEMORY="${REPLAY_MEMORY_CAP:-8G}"; THREADS="$(heavy_thread_default)"; skip_apply=0; copy_mode=0; ALL_PACKAGES=0; dirs=(); invocation="merge-and-verify.sh $*"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --memory) MEMORY="${2:?}"; shift 2 ;;
     --threads) THREADS="${2:?}"; shift 2 ;;
     --skip-apply) skip_apply=1; shift ;;
     --copy) copy_mode=1; shift ;;
-    --*) die "认不出参数 $1" "只认 --memory <上限>、--threads <N>、--skip-apply、--copy" ;;
+    --all-packages) ALL_PACKAGES=1; shift ;;
+    --*) die "认不出参数 $1" "只认 --memory <上限>、--threads <N>、--skip-apply、--copy、--all-packages" ;;
     *) dirs+=("$1"); shift ;;
   esac
 done

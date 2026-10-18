@@ -19,6 +19,8 @@
 
 ### 装置、研究一侧与变异表
 
+研究一侧变异表在各修订上的复跑（`replay.sh` 逐字节比对的三行）：修订 8 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-07-s1-revision-8-tools-research-mutations-2026-10-07.out`（`E7RESULT name=verdict mutations=26 caught=26 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`）、修订 10 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-08-s2-revision-10-tools-research-mutations.out`（`mutations=29 caught=29`）、修订 11 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-08-revision-11-tools-research-mutations.out`（`mutations=15 caught=15`），三份都 `invalid=0 survived=0 timed_out=0`。
+
 | 件 | 位置 | 说明 |
 |---|---|---|
 | 入库装置 | `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs` | 模式 `baseline`、`row`、`known-bad-images`，开关 `--positive-control`、`--disable-oracle`；只读、只驱动、只观测，不改 core、checker、harness、format、replay-prefix；内联单测 31 条（`grep -c '#\[test\]'`） |
@@ -103,7 +105,7 @@ E7RESULT name=verdict a3_columns_with_red_on_the_baseline=0 z1_files_differing=0
 
 | 行（变异） | 那一条红在哪 | 另外两条为什么看不到 |
 |---|---|---|
-| 32（可写挂载不写实例表的行，实例表照抄） | O1（内存模型对拍（HashMap 理想文件系统））-对拍：流二第 4 次调用 `mount_writable` 判 `disagrees:这一版的实例表`（模型要有上一个实例那一行，实现交回空表），模型停在这次调用，之后流二 324 态（批 1）崩溃判官记不适用 | O2（独立解析器 + checker）：这一行 0 态红（批 1 流二 397 态都绿），实现了的不变量里没有一条拿根的实例代号去对实例表的行（由读数推的，没逐条查 invariants.md）；O3（独立规约执行器）：投影里没有实例表，A(c) 是这一行自己写的根，「在」 |
+| 32（可写挂载不写实例表的行，实例表照抄） | O1（内存模型对拍（HashMap 理想文件系统））-对拍：流二第 4 次调用 `mount_writable` 判 `disagrees:这一版的实例表`（模型要有上一个实例那一行，实现交回空表），模型停在这次调用，之后流二 324 态（批 1）崩溃判官记不适用 | O2（独立解析器 + checker）：这一行 0 态红（批 1 流二 397 态都绿），实现了的不变量里没有一条拿根的实例代号去对实例表的行（由读数推的，没逐条查 `crates/singlefs-checker/invariants/`）；O3（独立规约执行器）：投影里没有实例表，A(c) 是这一行自己写的根，「在」 |
 | 45（挂载那一刻就读不出的槽也重读、仍坏就拒） | O1（内存模型对拍（HashMap 理想文件系统））-对拍：流二第 12 次调用 `raise_floor` 交回 `err:RollbackFloorCeilingRootRingSlotStillBadAfterOneReread`，模型说该成 | O2（独立解析器 + checker）、O3（独立规约执行器）：被拒之前的写流与基线逐条相同（流二停在第 440 条 op，0 条 op 不同），取到的镜像都是基线那一批的前缀；被拒的调用不留镜像，单镜像的判官没有对象可判 |
 | 108（码 2 读者补齐字节从最后一个载荷字节算起） | O1（内存模型对拍（HashMap 理想文件系统））-对拍：两条流第 2 次调用 `publish` 判 `disagrees:这一版的文件内容`（胶水解不开实现交回的单元：「补齐字节非零」）；流二第 4 次调用 `mount_writable` 交回 `err:Recovery` | 错在实现的读者一侧，写出的字节与基线相同（流一 0 条 op 不同，流二停在第 92 条 op 之前也 0 条不同）；O2（独立解析器 + checker） 用自己的解析器读裸字节、不调 core 的读者，O3（独立规约执行器） 用 Python 自己的读者，两边看到的镜像与基线逐字节相同。崩溃点重放那份手写版本表的 oracle 与记录核对器红（`layer0_or_record_checker_red=true`，不是三条之一） |
 | 115（取前缀核锚点筛选不看 txg） | O1（内存模型对拍（HashMap 理想文件系统））-崩溃判官：批 1 流一 32 态、流二 52 态「走读失败：没择到根」（实现恢复报 `RootPublishCarriesMoreThanOneLastRecordFlag…`），段为正 8/12、12/16；O1（内存模型对拍（HashMap 理想文件系统））-对拍：流二第 4 次调用 `mount_writable` 交回 `err:Recovery`，模型说该成 | 写出的字节与基线相同（流一 0 条 op 不同）；O2（独立解析器 + checker） 判镜像结构、O3（独立规约执行器） 用它自己的前缀规则从镜像恢复，都不看实现的恢复，看到的镜像与基线逐字节相同。崩溃点重放那份 oracle 与记录核对器红 |
@@ -169,7 +171,7 @@ E7RESULT name=q1_quiet_row reading=q1_gamma row=233 row_name=由记录重建的�
 
 | 行（变异） | 和基线不同在哪 | 条款不许的态（批 1 / 批 2） | O1（内存模型对拍（HashMap 理想文件系统）） / O2（独立解析器 + checker） / O3（独立规约执行器） 看不看得到 | 三分 |
 |---|---|---|---|---|
-| 242（发布的持久顺序把系统配置槽轮换挪到根槽 FUA 写之前） | 两条流第 8 条 op 起：每次取号、暖机、发布末尾的「根槽 FUA → 两块盘的系统配置槽 → 屏障」换成「两块盘的系统配置槽 → 根槽 FUA → 屏障」，写的内容逐条相同、次序变了（流一 9 条、流二 57 条 op 按下标比不同）；基线里根槽 FUA 自成一段，变异把它与系统配置写切进同一段（流一 8 段里 3 段、流二 59 段里 19 段，基线 0 段）；调用结局同 | 同一段里系统配置写已落、根槽 FUA 没落全：流一 21 / 3 态，流二 133 / 19 态；基线 0 | O1（内存模型对拍（HashMap 理想文件系统））-崩溃判官：根槽没落，恢复择到前一版，前一版是模型提交过的、不比已持久的最新根槽旧，判绿；O1（内存模型对拍（HashMap 理想文件系统））-对拍：调用结局同；O2（独立解析器 + checker）：这一行 0 态红（单个镜像里系统配置槽比根早一次发布，没逐条查 invariants.md 有没有管这一样的）；O3（独立规约执行器）：A(c) 由这一行自己写的根构成，恢复落到的版本在里面，「在」 | **真盲区候选**：D16（发布语义） 已定项 7 定案「一次发布的持久顺序恒为 COW 单元 / 节点 → 屏障 → journal 记录 → 屏障 → 根槽（FUA）→ 系统配置槽 → 屏障」「系统配置槽在根槽持久之后再更新」（`.claude/kb/decisions/16-发布语义.md`「已定项 7：发布的持久顺序」）；系统配置先于它见证的根落盘的态，照条款的写序造不出来，三条都放行 |
+| 242（发布的持久顺序把系统配置槽轮换挪到根槽 FUA 写之前） | 两条流第 8 条 op 起：每次取号、暖机、发布末尾的「根槽 FUA → 两块盘的系统配置槽 → 屏障」换成「两块盘的系统配置槽 → 根槽 FUA → 屏障」，写的内容逐条相同、次序变了（流一 9 条、流二 57 条 op 按下标比不同）；基线里根槽 FUA 自成一段，变异把它与系统配置写切进同一段（流一 8 段里 3 段、流二 59 段里 19 段，基线 0 段）；调用结局同 | 同一段里系统配置写已落、根槽 FUA 没落全：流一 21 / 3 态，流二 133 / 19 态；基线 0 | O1（内存模型对拍（HashMap 理想文件系统））-崩溃判官：根槽没落，恢复择到前一版，前一版是模型提交过的、不比已持久的最新根槽旧，判绿；O1（内存模型对拍（HashMap 理想文件系统））-对拍：调用结局同；O2（独立解析器 + checker）：这一行 0 态红（单个镜像里系统配置槽比根早一次发布，没逐条查 `crates/singlefs-checker/invariants/` 有没有管这一样的）；O3（独立规约执行器）：A(c) 由这一行自己写的根构成，恢复落到的版本在里面，「在」 | **真盲区候选**：D16（发布语义） 已定项 7 定案「一次发布的持久顺序恒为 COW 单元 / 节点 → 屏障 → journal 记录 → 屏障 → 根槽（FUA）→ 系统配置槽 → 屏障」「系统配置槽在根槽持久之后再更新」（`.claude/kb/decisions/16-发布语义.md`「已定项 7：发布的持久顺序」）；系统配置先于它见证的根落盘的态，照条款的写序造不出来，三条都放行 |
 | 269（见证值取成槽世代号） | 流一第 0、1 条 op（mkfs 之后第一次取号写的两块盘系统配置槽）偏移 469 一字节 0x00 → 0x01，连同校验和（155–158）；流二另有第 92、93 条 op（可写挂载取号那一写）0x04 → 0x06。偏移 469 是 journal tail（`crates/singlefs-checker/src/lib.rs` 的 `SYSTEM_CONFIGURATION_TAIL_OFFSET`）；调用结局同；看 journal 那一遍恢复逐态同 | 镜像与基线不同的态：流一 31 / 0，流二 78 / 14（全持久态相同：之后的发布把那一槽写成正确的 tail） | O1（内存模型对拍（HashMap 理想文件系统））：`ObservedRoot` 不带系统配置，恢复不先信 tail（D23（journal 的角色与格式） 已定项 3），读回同；O2（独立解析器 + checker）：读了 tail（`crates/singlefs-checker/src/lib.rs` 的 `check_system_configuration_slot`），没有一条不变量判它的值；O3（独立规约执行器）：执行器只在锚点断言里读 tail（`scripts/experiments/e170_second_run_o3_spec_executor/executor_main.py` 的 `anchor_assertions` 里），只核全持久态，判定不用它 | **真盲区候选**：D23（journal 的角色与格式） 已定项 14 写「取号那一写……改写取号那一刻按同一取法读到的见证值 c_见证」（全部自证过的槽 journal_tail 取最大）、「mkfs 写 tail 0，mkfs 之后第一次取号读到 0、写 0：新池新建文件的字节不变」（`.claude/kb/decisions/23-journal的角色与格式.md`「已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换」）；tail 写成 1 的系统配置槽不在条款写得出的镜像里，三条都放行 |
 | 270（发布在系统配置轮换之后不过屏障就返回） | 每次发布末尾那道屏障没了：流一 57 → 53 条 op、流二 595 → 565 条，之后的返回点整体前移；写的内容同；系统配置轮换与下一次调用的第一批写切进同一段 | 一次调用的系统配置写没落全、之后的调用的写已落：流一 7 / 6 态，流二 70 / 59 态；基线 0 | O1（内存模型对拍（HashMap 理想文件系统））-崩溃判官：那次发布的根槽 FUA 已落，恢复择到它，判绿；O1（内存模型对拍（HashMap 理想文件系统））-对拍：调用结局同；O2（独立解析器 + checker）：系统配置落后根一次发布在单个镜像里合法（I-7.12（系统配置 F 不低于同盘根上的 F） 只比 F）；O3（独立规约执行器）：「在」 | **真盲区候选**：D16（发布语义） 已定项 7 定案「根槽（FUA）→ 系统配置槽 → 屏障；fsync 等系统配置轮换持久之后才返回」（第 181 行），射程「屏障口径」写明系统配置轮换之后那一道屏障是「发布返回前加屏障」（第 186 行）；返回之后系统配置还没落、后面的写先落的态照条款造不出来，三条都放行 |
 | 271（deleted_inodes 的树表条目头 ID 写 0） | 两条流第 44、45 条 op（树表单元，两块盘各 16 KiB）偏移 1647、1649 两字节 0x01 → 0x00（头 ID 65537 → 0），连同单元校验和；指向它的节点（第 48、49 条 op）与根槽（第 52 条 op）的指针与校验和随之变；流二之后重写树表的发布都带着（85 条 op 不同）；调用结局同；恢复逐态同 | 择到新版（根 txg 不小于第一处不同之后写出的第一条根）：流一 12 / 0 态，流二 356 / 112 态 | O1（内存模型对拍（HashMap 理想文件系统））：不读树表；O2（独立解析器 + checker）：树表条目只解树 ID、种类、诞生 txg（`crates/singlefs-checker/src/walk.rs` 的 `tree_table_entry_of_the_walk`），头 ID 不判；O3（独立规约执行器）：投影只带树表单元指针，A(c) 是这一行自己写的根，「在」 | **真盲区候选**：D8（核心索引结构） 已定项 8 定案「头 ID 8 字节的取值：……`deleted_inodes` 与墓碑树写 inode 树的树 ID（65537）」（`.claude/kb/decisions/08-核心索引结构.md`「已定项 8：树表条目的字段表」）；择到新版的态里头 ID 是 0，三条都放行 |
@@ -204,7 +206,7 @@ E7RESULT name=q1_quiet_row reading=q1_gamma row=233 row_name=由记录重建的�
 | 172（交进来的盘数等于 w 的下限也拒） | O1（内存模型对拍（HashMap 理想文件系统））-对拍：流二第 4 次调用 `mount_writable` 交回 `err:WritableDeviceCountBelowTheStripeWidthLowerBound`，模型说该成；流二停在第 92 条 op | 被拒之前的写流与基线逐条相同（0 条 op 不同），取到的镜像都是基线那一批的前缀；被拒的调用不留镜像，O2（独立解析器 + checker）、O3（独立规约执行器） 没有对象可判（同第 45 行） |
 | 233（由记录重建的根不照抄所选根的 fsid） | O1（内存模型对拍（HashMap 理想文件系统））-崩溃判官：批 1 流一 3 态、流二 42 态走读失败（I-1.4（块头 fsid 一致） 树根 fsid 不符），段为正 2/12、28/79；批 2 0 态 | 错在实现的恢复，写流与基线逐字节相同；O2（独立解析器 + checker） 判恢复之前的镜像，O3（独立规约执行器） 跑它自己的恢复。批 1 与批 2 红的列不同：批 2 没有施加了记录的态，取样点不敏感（「F4 新出的全放行行」一节） |
 | 237（解系统配置槽时根环起点读错了位置） | O1（内存模型对拍（HashMap 理想文件系统））-崩溃判官：批 1 流一 53 态、流二 73 态（段为正 12/12、16/16），批 2 7、14 态，「没择到根」（`SystemConfigurationValueRefused … RootRingBaseNotTheFirstVersionSlot`）；O1（内存模型对拍（HashMap 理想文件系统））-对拍：流二第 4 次调用 `mount_writable` 交回 `err:Recovery` | 错在实现的读者一侧，写出的字节与基线相同（0 条 op 不同）；O2（独立解析器 + checker）、O3（独立规约执行器） 各用自己的解析器读系统配置，看到的镜像与基线逐字节相同 |
-| 249（一个数据单元的发布也切成两条记录） | O1（内存模型对拍（HashMap 理想文件系统））-对拍：两条流第 2 次调用 `publish` 判 `disagrees:jsn`（模型说那一版的 jsn 3，实现 4），模型停下 | 两条记录合起来仍是一次完整的发布：O2（独立解析器 + checker） 在这一行 0 态红（没逐条查 invariants.md 有没有限一次发布几条记录的）；O3（独立规约执行器） 自己重放记录，落到的版本在 A(c) 里，投影不带 jsn |
+| 249（一个数据单元的发布也切成两条记录） | O1（内存模型对拍（HashMap 理想文件系统））-对拍：两条流第 2 次调用 `publish` 判 `disagrees:jsn`（模型说那一版的 jsn 3，实现 4），模型停下 | 两条记录合起来仍是一次完整的发布：O2（独立解析器 + checker） 在这一行 0 态红（没逐条查 `crates/singlefs-checker/invariants/` 有没有限一次发布几条记录的）；O3（独立规约执行器） 自己重放记录，落到的版本在 A(c) 里，投影不带 jsn |
 | 250（数据单元的净荷字节倒序写） | O1（内存模型对拍（HashMap 理想文件系统））-对拍：两条流第 2 次调用 `publish` 判 `disagrees:这一版的文件内容`（读回 3000 字节、内容倒序） | 单元的校验和按写下去的字节算，结构自洽：D13（验证路线） 已定项 6 表 O2（独立解析器 + checker） 行「验不到」一栏写的「一个块被覆盖成另一份合法内容」；O3（独立规约执行器） 的投影不带文件内容，不拿写入的内容去比 |
 | 281（择根取第一个自证过的槽就不再换） | O1（内存模型对拍（HashMap 理想文件系统））-崩溃判官：批 1 流一 41 态、流二 61 态（段为正 9/12、13/16），批 2 7、14 态，「走到实例 0 第 0 代根」（比盘上已持久的最新根槽旧）；O1（内存模型对拍（HashMap 理想文件系统））-对拍：流二第 4 次调用 `mount_writable` 交回 `err:NewerStateStillUnreadableAfterOneReread` | 错在实现的择根，写流与基线逐字节相同（0 条 op 不同）；O2（独立解析器 + checker） 判镜像结构，O3（独立规约执行器） 用自己的择根规则恢复，看到的镜像与基线相同 |
 | 135（复活 defer 里那一条时 defer 槽数不减） | O2（独立解析器 + checker）：I-3.11（已分配减 defer 等于最新根走读）批 1 流二 225 态，段为正 44/79；批 2 70 态 | O1（内存模型对拍（HashMap 理想文件系统））：`ObservedRoot`（`crates/singlefs-harness/src/model.rs` 里它的定义）没有记账行；O3（独立规约执行器）：投影不进记账树 |
@@ -288,7 +290,7 @@ for f in P B; do echo "== $f"; grep "name=q2_row family=$f " B | grep ' o2=green
 
 P 族 12 张是 5 种补丁（P2、P3、P4、P5、P9）的实例，盲测 B 族 17 张是 3 型（P2、P3、P5）的随机实例；全是结构自洽的伪造根、伪造续接镜像。
 
-### 第一段的基线与对照（整行抄自 s1 产物）
+### 第一段的基线与对照（整行抄自 s1 产物（产物已移出工作区的行写成一行指针））
 
 `research/results/e171-three-oracle-collusion-2026-10-03-s1-baseline-run1.out`（基线第一趟；两趟的 E7RESULT 行逐字节相同，`diff` 无输出）：
 
@@ -344,39 +346,39 @@ E7RESULT name=row row=1 row_name=C318_实现：准入读数的「被抛弃根独
 E7RESULT name=row_touch row=1 write_stream_differs=false call_outcomes_differ=false recovery_report_differs=false ignored_pass_differs=false touched=false
 E7RESULT name=row row=6 row_name=K1：分配记录树按槽号找叶时叶宽算成两倍（记录进了不罩它的叶，按位置寻址的核判出） category=self_crash substituted_from=- line_matches_the_registration=true
 E7RESULT name=row_touch row=6 write_stream_differs=true call_outcomes_differ=true recovery_report_differs=false ignored_pass_differs=false touched=true
-E7RESULT name=q1_denominator rows_run=3 counted_D=0 untouched=2 only_in_the_ignored_pass=0 compile_failed=0 anchor_not_unique=0 not_found=0 self_crash=1 timeout=0 device_stop=0 wrapper_ended=0 enough_to_judge_none_side=false
-E7RESULT name=f6_table_failures rows_not_counted_for_the_table=1 rows_run=3 more_than_half=false
-E7RESULT name=q1_o1_and_o2_both_quiet counted_rows=0 rows=0 row_numbers=none o3=not_run
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 102 行（name=q1_denominator）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 103 行（name=f6_table_failures）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 104 行（name=q1_o1_and_o2_both_quiet）
 E7RESULT name=q1_o1_and_o2_both_quiet_batch_2 rows=0 rows_that_differ_from_batch_1=none
-E7RESULT name=q1_column_red_rows counted_rows=0 O1=0 O1-对拍=0 O1-崩溃判官=0 O2=0
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 106 行（name=q1_column_red_rows）
 E7RESULT name=untouched_but_red rows=0 row_numbers=none
 ```
 
 Q2 的 O2（独立解析器 + checker） 一列（O3（独立规约执行器） 两列、盲测族没跑）：
 
 ```
-E7RESULT name=q2_family family=P rows=26 o2_red=10 o2_quiet=16 o2_quiet_rows=new:2,new:3,new:5,new:7,new:8,new:9,new:10,new:11,new:12,fix:2,fix:3,fix:5,fix:8,fix:9,fix:11,fix:12
-E7RESULT name=q2_family family=N rows=10 o2_red=2 o2_quiet=8 o2_quiet_rows=new:14,new:15,new:16,new:17,fix:14,fix:15,fix:16,fix:17
-E7RESULT name=q2_family family=K rows=41 o2_red=41 o2_quiet=0 o2_quiet_rows=none
-E7RESULT name=q2_blind_family rows=0 expected_when_run=40 status=not_run why=seed_needs_the_frozen_executor_s7
-E7RESULT name=q2_negative_bases bases=8 expected=8 o2_red_bases=0 red_base_list=none
-E7RESULT name=a9_a10_a8 p_rows=26 p_rows_expected=26 n_rows=10 n_rows_expected=10 known_bad_rows=41 known_bad_rows_expected=41 blind_rows=0 q2_table_rows_when_the_blind_family_exists=107
-E7RESULT name=q2_all_quiet status=not_run why=o3_frozen_version_not_available_s7 o2_quiet_rows_total=16
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 191 行（name=q2_family）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 192 行（name=q2_family）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 193 行（name=q2_family）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 194 行（name=q2_blind_family）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 195 行（name=q2_negative_bases）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 196 行（name=a9_a10_a8）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 198 行（name=q2_all_quiet）
 ```
 
 判决行（比对器自己的那一行；O3（独立规约执行器） 一律 `not_run`）：
 
 ```
-E7RESULT name=verdict a3_columns_with_red_on_the_baseline=0 z1_files_differing=0 s2_files_differing=0 s5_numbers_that_differ=0 positive_controls_run=6 positive_controls_not_red=0 disabled_runs_with_differences_outside_the_closed_column=0 rows_untouched_but_red=0 negative_bases_with_o2_red=0 known_bad_rows_with_o2_quiet=0 o3_columns=not_run q1_alpha=not_run q1_beta=not_run q2_all_quiet=not_run q3_alpha=not_run
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out 第 199 行（name=verdict）
 ```
 
 `e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out`（第一刀第 6 行：分配记录树按槽号找叶时叶宽算成两倍，实现在第一次 `publish` 里 panic，装置记「实现自崩」、这条流不导出）：
 
 ```
-E7RESULT name=stream stream=new_pool_file_creation ending=implementation_crashed:call_2_publish:分配记录（盘DeviceIdentity(0)槽SlotNumber(50176)跨2）越过它所在叶的末槽：两槽单元起在偶数槽、叶宽取偶数，盘上读来的记录进来之前判过 exported=false not_exported_why=implementation_crashed_in_a_call:call_2_publish:分配记录（盘_DeviceIdentity(0)_槽_SlotNumber(50176)_跨_2）越过它所在叶的末槽：两槽单元起在偶数槽、叶宽取偶数，盘上读来的记录进来之前判过 operations=22 writes=12 segments=7 tearable_writes=0 calls=3 full_states=0 quick_tier_states=0 sampled_states=0 model_stopped_at_call=2
-E7RESULT name=call stream=new_pool_file_creation call=2 label=publish first_operation=22 return_point=22 status=panic o1_comparison=not_modelled
-E7RESULT name=stream stream=fixed_script_through_e_then_unmount ending=implementation_crashed:call_2_publish:分配记录（盘DeviceIdentity(0)槽SlotNumber(50176)跨2）越过它所在叶的末槽：两槽单元起在偶数槽、叶宽取偶数，盘上读来的记录进来之前判过 exported=false not_exported_why=implementation_crashed_in_a_call:call_2_publish:分配记录（盘_DeviceIdentity(0)_槽_SlotNumber(50176)_跨_2）越过它所在叶的末槽：两槽单元起在偶数槽、叶宽取偶数，盘上读来的记录进来之前判过 operations=22 writes=12 segments=7 tearable_writes=0 calls=3 full_states=0 quick_tier_states=0 sampled_states=0 model_stopped_at_call=2
-E7RESULT name=call stream=fixed_script_through_e_then_unmount call=2 label=publish first_operation=22 return_point=22 status=panic o1_comparison=not_modelled
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out 第 2 行（name=stream）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out 第 5 行（name=call）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out 第 14 行（name=stream）
+产物行见 git show 5d0b7e7c1667:research/results/e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out 第 17 行（name=call）
 ```
 
 `research/results/e171-three-oracle-collusion-2026-10-03-s1-known-bad-images.out`（41 条已知坏镜像在流一全持久态上：补丁叠回与直接改坏判红的不变量集合相等、目标不变量都红、条目名与原文件逐条相同）：
@@ -416,7 +418,7 @@ E7RESULT name=verdict known_bad_entries_failing_s4=0 e170_bad_rows_failing_s3_or
 | Q4 | 基线甲（（ii）0 态）；第 242 行乙（（ii）12 态，第二截全判不合法）；第 269 行乙（（ii）58 态，全判不合法） | `name=q4_trip` 三行（整行抄在「第 1 次重跑第一段·修订 6 那一趟」一节判决行之后的代码块） | 三趟 × 三条流 × 两批 18 格每格都探过（`cells_without_a_probe=0`）。Q4-对账两数 18 格都是 0（`witness_refusals_without_either_branch=0`、`counter_branch_mounted=0`），S11 不触发。（i）判不出那一支另报：基线 1 340 态、第 242 行 2 650 态、第 269 行 1 340 态（两批合计，`undecidable_branch=` 之和），不进候选。（ii）的逐态清单与按段、按建 inode 排开的轨迹在「Q4-（ii）逐态清单与 Q4、Q5 轨迹（修订 6 那一趟）」一节 |
 | Q5 | 甲，告警自证已过（主取样点与反向取样点上 RefFS 红的态数都等于 L，模型崩溃判官 0 态红，两点同判） | `name=q5_judged` 两行（整行抄在「第 1 次重跑第一段·修订 6 那一趟」一节判决行之后的代码块）；告警自证见「作数的条件与 Q5（修订 6 那一趟）」一节末条 | 修订 5 第 5.6 节第 7 条与修订 6 第 6.6 节要的告警自证（U1–U9、U13–U16 与原有的两条内联用例绿，`crates/mutations.tsv` 里 V17–V31、V33–V36 全抓；U10–U12、V32 不进这一条）由主 agent 带 `SINGLEFS_HEAVY_TESTS=user-request` 提前跑过，作数（登记末节「主 agent 认定：第一段（修订 6 树）Q5 告警自证」）。主取样点的 L 是按等价类推出的（`derived_by=equivalence_classes judged_states=144`），等价关系只在 k = 6 的 4 608 态上逐态核过（`mismatching_states=0`），其余态按类核对 ③ 与修订 5 甲推（修订 5 第 5.2 节）。按末段落了几个写排开的轨迹在「Q4-（ii）逐态清单与 Q4、Q5 轨迹（修订 6 那一趟）」一节 |
 
-比对器的判决行（`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-comparator-resume2-r6-r3.out` 的 `name=verdict` 那一行；补了逐态清单与轨迹之后的 `…-s1-comparator-resume2-r6-r3-2026-10-07.out` 的 `name=verdict` 那一行与它逐字节相同，这一节抄的判决行与 Q1、Q3、Q4、Q5、阴性、覆盖各行在两份里都有）：
+比对器的判决行（`e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-comparator-resume2-r6-r3.out` 的 `name=verdict` 那一行；补了逐态清单与轨迹之后的 `…-s1-comparator-resume2-r6-r3-2026-10-07.out` 的 `name=verdict` 那一行与它逐字节相同，这一节抄的判决行与 Q1、Q3、Q4、Q5、阴性、覆盖各行在两份里都有）：
 
 ```
 E7RESULT name=verdict q1=jia q3=jia q4_baseline=jia q4_row_242=yi q4_row_269=yi q5_main=jia q5_reverse=jia q5_same_at_both_sampling_points=true a1_baseline_red=0 a8_failing_controls=0 a11_failing_streams=0 z1_differing_files=0 f7=false a1_empty_mutation_red=0 empty_mutation_touched=false
@@ -455,7 +457,7 @@ E7RESULT name=q5_judged sampling_point=reverse lost=9 reference_filesystem_red=9
 批 1 每行每条流红的列（O1（内存模型对拍（HashMap 理想文件系统））-对拍按调用，其余按态；括号里是轨迹：峰值、为正段数、期末值、单点红的段数）。在仓根跑的命令（只读 `name=q1_row … batch=1` 那 21 行，打出非 0 的列）：
 
 ```
-grep 'name=q1_row .* batch=1 ' research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-comparator-resume2-r6-r3.out | awk '{o=""; for(i=1;i<=NF;i++){split($i,a,"="); f[a[1]]=a[2]} if (f["o1_comparison_red_calls"]!="0") o=o" O1-对拍="f["o1_comparison_red_calls"]; n=split("O1-模型崩溃判官 O1-RefFS O2 O3甲 O3乙",c," "); for(j=1;j<=n;j++){k=c[j]; if (f[k"_red"]!="0") o=o" "k"="f[k"_red"]"(峰"f[k"_peak"]",正段"f[k"_positive_segments"]",末"f[k"_last"]",单点"f[k"_single_points"]")"} print f["row"], substr(f["stream"],1,9) (o==""?" 全不红":o)}'
+grep 'name=q1_row .* batch=1 ' e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-comparator-resume2-r6-r3.out | awk '{o=""; for(i=1;i<=NF;i++){split($i,a,"="); f[a[1]]=a[2]} if (f["o1_comparison_red_calls"]!="0") o=o" O1-对拍="f["o1_comparison_red_calls"]; n=split("O1-模型崩溃判官 O1-RefFS O2 O3甲 O3乙",c," "); for(j=1;j<=n;j++){k=c[j]; if (f[k"_red"]!="0") o=o" "k"="f[k"_red"]"(峰"f[k"_peak"]",正段"f[k"_positive_segments"]",末"f[k"_last"]",单点"f[k"_single_points"]")"} print f["row"], substr(f["stream"],1,9) (o==""?" 全不红":o)}'
 ```
 
 原样输出：
@@ -952,7 +954,7 @@ e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-07-s2-rows-substit
 
 ### 第 1 次重跑·修订 12：流三段长重钉（2026-10-13）
 
-登记 `research/prompts/e171-r1-prereg.md` 修订 12（设计员写）与修订 13（执行员写，只抄读数）；问题单 `research/prompts/e171-r1-s3-segment-lengths-questions.md` 第 1、3 行（第 2 行的状态由主 agent 改）。这一节只属于装置里一个常量 `LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 的两个数；Q1–Q5 的判定、数与修订 6 树的产物一个没动。
+登记 `research/prompts/e171-r1-prereg.md` 修订 12（设计员写）与修订 13（执行员写，只抄读数）；问题单 `e171-r1-s3-segment-lengths-questions.md` 第 1、3 行（第 2 行的状态由主 agent 改）。这一节只属于装置里一个常量 `LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 的两个数；Q1–Q5 的判定、数与修订 6 树的产物一个没动。
 
 1. **为什么重钉**：2026-10-09 退役树判决落地后，今天的 crates 在流三删第一个文件那次多写两个退役单元（`crates/singlefs-core/src/transaction.rs` 里 `retirement_records_of_this_publish` 那一处），装置里 2026-10-05 钉的段长表与今天 crates 现算的在两处对不上。重钉前那一趟的产物（产物甲，`e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-13-s1-stream-constants-revision-12-before-the-repin.out`）第 82 行判决行里 `s1_failed_checks` 是 1（`grep -n 'name=verdict'` 取）。
 
@@ -1185,20 +1187,20 @@ e171-three-oracle-collusion-2026-10-03-s4-rows-timing.out
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D13（验证路线） 已定项 6 | 支撑 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D13（验证路线） 已定项 1 | 备料 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D13（验证路线） 已定项 7 | 备料 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D13（验证路线） 已定项 15 | 备料 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D8（核心索引结构） 已定项 6 | 不影响 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D16（发布语义） 已定项 1 | 不影响 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D16（发布语义） 已定项 7 | 不影响 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D16（发布语义） 已定项 12 | 不影响 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D8（核心索引结构） 已定项 8 | 不影响 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D23（journal 的角色与格式） 已定项 3 | 不影响 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D23（journal 的角色与格式） 已定项 15 | 不影响 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D3（空间分配） 已定项 8 | 不影响 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
-| D3（空间分配） 已定项 10 | 不影响 | 2026-10-13 不受影响：只重钉流三段长表下标 15、43 两个数（登记修订 12），Q1–Q5 的判定、数与修订 6 树的产物不变 |
+| D13（验证路线） 已定项 6 | 支撑 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D13（验证路线） 已定项 1 | 备料 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D13（验证路线） 已定项 7 | 备料 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D13（验证路线） 已定项 15 | 备料 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D8（核心索引结构） 已定项 6 | 不影响 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D16（发布语义） 已定项 1 | 不影响 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D16（发布语义） 已定项 7 | 不影响 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D16（发布语义） 已定项 12 | 不影响 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D8（核心索引结构） 已定项 8 | 不影响 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D23（journal 的角色与格式） 已定项 3 | 不影响 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D23（journal 的角色与格式） 已定项 15 | 不影响 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D3（空间分配） 已定项 8 | 不影响 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
+| D3（空间分配） 已定项 10 | 不影响 | 2026-10-18 不受影响：装置一节补点名研究一侧变异表三次复跑的产物，结论、数不变 |
 
 ## 历史版本
 

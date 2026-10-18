@@ -1,3 +1,0 @@
-exit=1
-want=按驱动的 version_key 算出的版本指纹不是 tree.source 记的
-want=checker-tier-broad-mutation.sh：1 格里 1 格红（library-version-is-staged-tree）

@@ -1,2 +1,0 @@
-      9 OPUS_C694_C_ISOLATED placements=0
-      7 OPUS_C694_C_ISOLATED placements=24

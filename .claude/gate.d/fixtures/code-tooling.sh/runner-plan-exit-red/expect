@@ -1,0 +1,5 @@
+exit=1
+want=! 按条复用算不出（admission.py verdict-plan 没成（
+want=✗ code-tooling.sh 的 research-script-selftests 格按条复用失灵：scripts/gate/admission.py verdict-plan 退 1（✗ 样本档造的失灵：
+want=→ 怎么办：看 scripts/gate/admission.py 文件头子命令「verdict-plan」那一条
+want=✗ research 脚本的自证这一格判红：按条复用失灵（上面「按条复用失灵」那一句点名了哪一条哨兵、或 admission.py 退了几）；表里 3 条照旧全部现判跑完、都过了

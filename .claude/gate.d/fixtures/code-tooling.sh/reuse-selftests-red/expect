@@ -1,0 +1,4 @@
+exit=1
+want=输出里没有 REUSE_SELFTEST script=scripts/gate/no-line.sh
+want=漏登记：scripts/gate/unregistered.sh
+want=指到不存在的路径：scripts/gate/gone.sh

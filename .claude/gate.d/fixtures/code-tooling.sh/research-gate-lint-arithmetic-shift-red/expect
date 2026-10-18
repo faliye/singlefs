@@ -1,0 +1,3 @@
+exit=1
+want=裸 cd：scripts/gate/arithmetic-shift.sh:5
+want=射程里有 1 处 cd 没接 || 也没接 &&

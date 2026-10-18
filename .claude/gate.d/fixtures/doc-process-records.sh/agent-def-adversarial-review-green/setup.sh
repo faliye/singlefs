@@ -26,5 +26,12 @@ printf '# 样本仓（改）\n' > README.md
 cat > research/prompts/demo-r1-main-verification.md <<'MD'
 # demo 第一轮：主 agent 核实
 
-点名：.claude/agents/demo.md、.claude/agents/fresh.md、.claude/agent-common.md、.claude/main-agent.md。三条腿都没打中。
+三条腿都没打中。
+
+## 这一轮被判过的文件
+
+- .claude/agents/demo.md
+- .claude/agents/fresh.md
+- .claude/agent-common.md
+- .claude/main-agent.md
 MD

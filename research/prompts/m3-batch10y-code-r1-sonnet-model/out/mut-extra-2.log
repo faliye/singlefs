@@ -1,3 +1,0 @@
-[8] X9 借草稿区前判有一张带得了：any 改 all => 红（被抓） rc=101 ['test result: FAILED. 37 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.00s', 'gpu_memory_ledger::tests::with_no_card_holding_a_state_now_a_card_holding_one_when_empty_means_not_run_not_red']
-[9] X13 设备起好了不留着 => 红（被抓） rc=101 ['test result: FAILED. 37 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.00s', 'gpu_memory_ledger::tests::a_device_that_failed_to_start_is_started_again_and_a_lost_one_is_replaced']
-[10] X16 本进程占的量读不出当 u64::MAX（悄悄当大） => 绿（没抓） rc=0 ['test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.00s']

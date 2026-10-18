@@ -1,0 +1,3 @@
+checker-tier-crash-point-replay.sh	tests-of:singlefs-checker-tier	command=cargo command=rustc	# 样本：本阶段那一行（入口是 checker 档包的测试函数）
+crash-case:plain-stream	-	test=singlefs-checker-tier:plain_stream:plain_stream_full	# 样本：没带标记，快档照旧查库（查询那一趟打的块那一行全部有判定、无红：块全罩住）
+crash-case:fault-injection-given-states	-	test=singlefs-checker-tier:fault_injection_given_states:fault_injection_given_states_full features=verdict-store red-blocks=judged-by-test	# 样本：故障注入之后的红块由用例自己认下，快档起用例按退出码判

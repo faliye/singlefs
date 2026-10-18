@@ -1,0 +1,5 @@
+exit=0
+want=没有把已定的决策说成未定（扫 2 份 kb 文件，比对 2 条决策的状态行）
+want=被挂账表罩住的 1 处
+want=  cross-decision-status：绿
+want=doc-decisions.sh：1 格里 1 格绿（cross-decision-status）

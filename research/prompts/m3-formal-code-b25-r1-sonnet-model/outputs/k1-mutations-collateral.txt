@@ -1,6 +1,0 @@
-抄自本会话当时的终端输出（同一条命令 tools/mutate_in_scratch.py 配 tools/k1-rows-collateral.tsv，各行约 2 分钟；rerun.sh k1 末尾那个循环能复现）：
-RESULT name=O1 跨叶容器（理想模型自身）：第二片晚一条才分出（一片按 234 条记，第 234 个 inode 的新记录与重写记成 anchor_hits=1 exit=101 outcome=caught failed=1 passed=109
-  FAILED_LINE test model::k1_boundary_probe::model_position_rule_boundaries ... FAILED
-RESULT name=O1 跨叶容器（胶水）：实现交回的每片叶容器都当成最左那片 anchor_hits=1 exit=0 outcome=not_caught failed=0 passed=110
-RESULT name=O1 跨叶容器（理想模型自身）：新记录落在第二片时最左那片也记成这次重写（分配代按第一片记） anchor_hits=1 exit=0 outcome=not_caught failed=0 passed=110
-说明：集合是 --lib（含我追加的 k1_boundary_probe 一条）加 random_histories 与 unlink_in_histories_judged_by_the_model，共 110 条（--no-fail-fast）。第一行唯一红的是我自己追加的边界探针（它断言 233 条落第 1 片），仓里原有的 109 条全绿。

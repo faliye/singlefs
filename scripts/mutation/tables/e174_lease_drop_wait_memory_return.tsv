@@ -26,3 +26,9 @@ M25_窗口读数不大于tau改成小于tau	let satisfies = |sample: &WindowSamp
 M26_子进程作废时那一轮仍算有效	if !done.child_void.is_empty() || self.failure_detail.is_some() {	if self.failure_detail.is_some() {
 M27_清单次序反过来	pending.sort_by_key(|job| job_order_key(job, arm_count));	pending.sort_by_key(|job| std::cmp::Reverse(job_order_key(job, arm_count)));
 M28_作废的借据仍读完整个窗口	if record.is_void() {	if false {
+M29_轮键漏子进程代码键	[child_line, arguments_line, parameters_line, device].concat()	[arguments_line, parameters_line, device].concat()
+M30_轮键漏参数代码键	[child_line, arguments_line, parameters_line, device].concat()	[child_line, parameters_line, device].concat()
+M31_轮键漏轮号	let parameters_text = format!("{:?} round={}", job.cell, job.round);	let parameters_text = format!("{:?}", job.cell);
+M32_轮键漏驱动	[child_line, arguments_line, parameters_line, device].concat()	[child_line, arguments_line, parameters_line].concat()
+M33_轮键带产物路径	let round_key = round_key_of(&library.child_code_key, &library.arguments_code_key, job, &device_line_of(job.cell.card)?);	let round_key = round_key_of(&library.child_code_key, &library.arguments_code_key, job, &format!("{}{}", device_line_of(job.cell.card)?, plan.output_path));
+M34_续跑读回不比键	if let Some(text) = read_back_the_round(&library.round_path(round_key), &round_header(round_key, library)) {	let previous_path = library.round_path(previous_index.get(&job.key_text()).map_or(round_key.as_str(), String::as_str));\n            if let Some(text) = read_back_the_round(&previous_path, std::fs::read_to_string(&previous_path).unwrap_or_default().lines().next().unwrap_or_default()) {

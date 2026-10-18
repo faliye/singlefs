@@ -1,0 +1,678 @@
+diff -ruN a/crates/singlefs-checker/src/walk.rs b/crates/singlefs-checker/src/walk.rs
+--- a/crates/singlefs-checker/src/walk.rs	2026-10-14 +0000
++++ b/crates/singlefs-checker/src/walk.rs	2026-10-14 +0000
+@@ -7036,6 +7036,29 @@
+         else {
+             continue;
+         };
++        // C794 攻方原型：C794_EXEMPT_READING=per_unit 时按单元归组（同一起点槽、同跨度的未释放无引用记录里有一条带位就整组豁免）。
++        if std::env::var("C794_EXEMPT_READING").as_deref() == Ok("per_unit") {
++            let mut groups: BTreeMap<(u64, u64), Vec<(u32, bool)>> = BTreeMap::new();
++            for record in &records {
++                if record.is_released
++                    || referenced_start_slots.contains(&(record.device, record.slot))
++                {
++                    continue;
++                }
++                groups
++                    .entry((record.slot, record.span_slots))
++                    .or_default()
++                    .push((record.device, record.is_quarantined));
++            }
++            for ((_, span_slots), members) in groups {
++                if members.iter().any(|(_, flagged)| *flagged) {
++                    for (device, _) in members {
++                        *exempted.entry(device).or_insert(0) += span_slots;
++                    }
++                }
++            }
++            continue;
++        }
+         for record in records {
+             if record.is_released
+                 || !record.is_quarantined
+@@ -7049,6 +7072,47 @@
+     exempted
+ }
+ 
++/// C794 攻方原型（Q3 的对面读法）：最新根分配记录树里未释放、带隔离位、而 `referenced_start_slots` 里有引用起在它那一槽的记录。
++fn c794_quarantined_records_with_a_reference(
++    reader: &dyn ImageReader,
++    root: &crate::RootView,
++    referenced_start_slots: &BTreeSet<(u32, u64)>,
++    cache: &mut IndexNodeCache,
++) -> Vec<(u32, u64)> {
++    let mut flagged = Vec::new();
++    let tree_table_pointer = parse_node_pointer(&root.record_bytes[36..122]);
++    if tree_table_pointer.all_zero {
++        return flagged;
++    }
++    let Some(tree_table) = read_index_node_without_judging(reader, &tree_table_pointer, cache)
++    else {
++        return flagged;
++    };
++    for entry in &tree_table.entries {
++        if entry.len() < tree_table_entry_bytes() || read_u16(entry, 10) != TREE_KIND_ALLOCATION {
++            continue;
++        }
++        let allocation_root = parse_node_pointer(&entry[14..100]);
++        if allocation_root.all_zero {
++            continue;
++        }
++        let Some((_, records)) =
++            allocation_record_tree_without_judging(reader, &allocation_root, cache)
++        else {
++            continue;
++        };
++        for record in records {
++            if !record.is_released
++                && record.is_quarantined
++                && referenced_start_slots.contains(&(record.device, record.slot))
++            {
++                flagged.push((record.device, record.slot));
++            }
++        }
++    }
++    flagged
++}
++
+ /// 一条根的分配记录树里有几条记录：按 checker 自己的字段表读这条根的树表，找种类 3（分配记录）的条目，数它根节点叶里的条目
+ /// （第一版分配记录树只有一个节点；一条记录记一个单元，D3（空间分配） 已定项 7）。只读不判——给理想模型的对拍数分配记录墙的真条数
+ /// （增补 3 第 2 件代码三方第一轮判决第三节第 1 条：从镜像上现数，不用分配器的状态）。
+@@ -13024,6 +13088,33 @@
+         &start_slots_referenced_by_the_newest_root,
+         &mut index_node_cache,
+     );
++    // C794 攻方原型（Q3 的对面读法）：C794_Q3=newest 时「隔离位置在最新根引用的记录上」判 I-3.11 违例，
++    // C794_Q3=every 时「隔离位置在任一走过的版本引用的记录上」判 I-3.1 违例；详情以 C794-Q3 开头。
++    match std::env::var("C794_Q3").as_deref() {
++        Ok("newest") => {
++            let flagged = c794_quarantined_records_with_a_reference(
++                reader,
++                newest_root_view,
++                &start_slots_referenced_by_the_newest_root,
++                &mut index_node_cache,
++            );
++            judgements.judge("I-3.11", flagged.is_empty(), || {
++                format!("C794-Q3-newest 隔离位置在最新根引用的记录上：{flagged:?}")
++            });
++        }
++        Ok("every") => {
++            let flagged = c794_quarantined_records_with_a_reference(
++                reader,
++                newest_root_view,
++                &start_slots_referenced_by_every_walked_version,
++                &mut index_node_cache,
++            );
++            judgements.judge("I-3.1", flagged.is_empty(), || {
++                format!("C794-Q3-every 隔离位置在走过的版本引用的记录上：{flagged:?}")
++            });
++        }
++        _ => {}
++    }
+     // 最新根的记账是按它自己带的 F 记的（抬 F 的回收在写第一条带新 F 的根之前做，`mount::raise_rollback_floor`）：它带的 F 低于
+     // F 生效值时——先把新 F 写进系统配置之后、带新 F 的根落盘之前（D16（发布语义） 已定项 1「抬 F 那一串」），或带新 F 的根全读不出——
+     // 它的「已分配」还算着 F 生效值之下那些根引用的槽，与按 F 生效值取的候选集并集不可比，I-3.1 这一格报不适用（实二的读法，交主 agent）。
+diff -ruN a/crates/singlefs-checker-tier/src/bin/c794_attack_probe.rs b/crates/singlefs-checker-tier/src/bin/c794_attack_probe.rs
+--- a/crates/singlefs-checker-tier/src/bin/c794_attack_probe.rs	1970-01-01 +0000
++++ b/crates/singlefs-checker-tier/src/bin/c794_attack_probe.rs	2026-10-14 +0000
+@@ -0,0 +1,466 @@
++//! C794 盘上隔离位第一轮攻方腿的原型（只在攻方草稿副本里编、跑；读法开关是副本里打的环境变量补丁，见 `patches/`）。
++//! 盘是内存稀疏盘；流都是这里自己造的；崩溃状态经 `enumerate_crash_states_versions`（每一段都展开）判。
++use std::collections::BTreeMap;
++use std::sync::{Arc, Mutex};
++
++use singlefs_checker::image::InvariantVerdict;
++use singlefs_checker::walk::check_pool_image;
++use singlefs_checker_tier::crash::{
++    crash_state_count_with_torn_in_place_overwrites, CrashPointReplaySegmentExpansion,
++};
++use singlefs_checker_tier::crash_state_enumeration::{
++    enumerate_crash_states_versions, CrashPointReplayItem,
++};
++use singlefs_core::address::{
++    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
++};
++use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
++use singlefs_core::block_device::{
++    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
++};
++use singlefs_core::make_filesystem::{
++    make_filesystem, root_ring_occupancy_after_make_filesystem, MakeFilesystemParameters,
++    INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
++};
++use singlefs_core::mount::{roll_back_by_a_forward_publish, RollbackTarget};
++use singlefs_core::recovery::{recover, JournalPolicy};
++use singlefs_core::root_ring::RootRingSlotsPerRegion;
++use singlefs_core::system_configuration::SystemImmutableSizes;
++use singlefs_core::transaction::{
++    acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
++    TransactionOutput,
++};
++use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
++use singlefs_harness::fault_injection::injected_block_device_error;
++use singlefs_harness::memory_pool::{
++    writes_and_segments, MemoryPool, PublishedVersion, SparseBlockDevice,
++};
++use singlefs_harness::segments::{FixedGeometry, StepKind};
++use singlefs_harness::{RecordingBlockDevice, SharedStream};
++
++const IMAGE_BYTES: u64 = 4 << 30;
++const FILESYSTEM_IDENTIFIER: [u8; 16] = *b"C794-ATTACK-PRB\0";
++const WRITE_TIME_SECONDS: u64 = 1_788_000_000;
++const DATA_SPAN: u64 = 2;
++const STATE_CAP: u64 = 1_000_000;
++
++fn parameters() -> MakeFilesystemParameters {
++    MakeFilesystemParameters {
++        filesystem_identifier: FILESYSTEM_IDENTIFIER,
++        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
++        geometry: SystemImmutableSizes {
++            physical_block_size: 512,
++            minimum_input_output_bytes: 512,
++            fixed_structure_slot_spacing: 4096,
++            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
++        },
++    }
++}
++
++fn geometry() -> FixedGeometry {
++    FixedGeometry {
++        fixed_structure_slot_spacing: 4096,
++        journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++        root_ring_slots_per_region: parameters().geometry.root_ring_slots_per_region,
++    }
++}
++
++fn content_of(length: usize, seed: usize) -> Vec<u8> {
++    (0..length)
++        .map(|index| u8::try_from((index * 13 + seed) % 241).expect("小于 256"))
++        .collect()
++}
++
++/// 读拒绝：某个偏移的读先报错 `remaining` 次（盘上字节不动）。
++type Refusal = Arc<Mutex<Option<(u64, u64)>>>;
++
++struct ProbeDevice {
++    inner: SparseBlockDevice,
++    refusal: Refusal,
++}
++
++impl BlockDevice for ProbeDevice {
++    fn read_at(&self, offset: DeviceOffsetInBytes, buffer: &mut [u8]) -> Result<(), BlockDeviceError> {
++        let mut refusal = self.refusal.lock().expect("锁");
++        if let Some((refused_offset, remaining)) = refusal.as_mut() {
++            if offset.0 == *refused_offset && *remaining > 0 {
++                *remaining -= 1;
++                return Err(injected_block_device_error("读"));
++            }
++        }
++        drop(refusal);
++        self.inner.read_at(offset, buffer)
++    }
++    fn write_at(&mut self, offset: DeviceOffsetInBytes, bytes: &[u8], durability: WriteDurability) -> Result<(), BlockDeviceError> {
++        self.inner.write_at(offset, bytes, durability)
++    }
++    fn write_zeroes_at(&mut self, offset: DeviceOffsetInBytes, length: u64) -> Result<(), BlockDeviceError> {
++        self.inner.write_zeroes_at(offset, length)
++    }
++    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
++        self.inner.barrier()
++    }
++    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
++        self.inner.probe_physical_block_size()
++    }
++    fn size_in_bytes(&self) -> u64 {
++        self.inner.size_in_bytes()
++    }
++    fn journal_record_offsets_hint(&self, ring_start: DeviceOffsetInBytes, ring_bytes: u64) -> Option<Vec<DeviceOffsetInBytes>> {
++        self.inner.journal_record_offsets_hint(ring_start, ring_bytes)
++    }
++}
++
++type Device = RecordingBlockDevice<ProbeDevice>;
++
++struct Pool {
++    devices: Vec<(DeviceIdentity, Device)>,
++    stream: SharedStream,
++    refusals: Vec<Refusal>,
++    allocator: PoolAllocator,
++    output: TransactionOutput,
++    versions: Vec<PublishedVersion>,
++}
++
++impl Pool {
++    fn build() -> Self {
++        let parameters = parameters();
++        let stream = SharedStream::retaining_contents();
++        let mut refusals = Vec::new();
++        let mut devices: Vec<(DeviceIdentity, Device)> = Vec::new();
++        for number in 0..2u32 {
++            let refusal: Refusal = Arc::new(Mutex::new(None));
++            refusals.push(refusal.clone());
++            let inner = SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512));
++            devices.push((
++                DeviceIdentity(number),
++                RecordingBlockDevice::with_shared_stream(DeviceIdentity(number), ProbeDevice { inner, refusal }, stream.clone()),
++            ));
++        }
++        let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
++        let mut allocator = PoolAllocator::new(vec![
++            DeviceFreeMap::new(DeviceIdentity(0), IMAGE_BYTES),
++            DeviceFreeMap::new(DeviceIdentity(1), IMAGE_BYTES),
++        ]);
++        allocator.mark_format_time_units(
++            Placement { slot: INSTANCE_TABLE_SLOT, span: 2 },
++            Placement { slot: TREE_TABLE_GENESIS_SLOT, span: 1 },
++        );
++        allocator.install_root_ring_occupancy(root_ring_occupancy_after_make_filesystem(&parameters, &genesis));
++        let content = content_of(3000, 1);
++        let output = {
++            let mut writer = PoolWriter::new(&parameters, &mut devices);
++            let instance = acquire_instance(&mut writer).expect("取号");
++            let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
++            publish_first_file(
++                &mut writer,
++                &mut allocator,
++                warmed.roots.last().expect("暖机两代根"),
++                FirstFile { content: &content, write_time_seconds: WRITE_TIME_SECONDS },
++                instance,
++                &warmed.last_record_bytes,
++            )
++            .expect("新池新建文件 A")
++        };
++        let versions = vec![PublishedVersion {
++            instance: output.root.instance,
++            checkpoint_txg: output.root.checkpoint_txg,
++            content,
++        }];
++        Pool { devices, stream, refusals, allocator, output, versions }
++    }
++
++    fn overwrite(&mut self, seed: usize) {
++        let parameters = parameters();
++        let content = content_of(2500 + seed * 7, seed);
++        let next = {
++            let mut writer = PoolWriter::new(&parameters, &mut self.devices);
++            publish_overwrite(
++                &mut writer,
++                &mut self.allocator,
++                &self.output,
++                FirstFile { content: &content, write_time_seconds: WRITE_TIME_SECONDS + 60 * seed as u64 },
++                InstanceGeneration(1),
++            )
++            .expect("覆盖写")
++        };
++        self.versions.push(PublishedVersion { instance: next.root.instance, checkpoint_txg: next.root.checkpoint_txg, content });
++        self.output = next;
++    }
++
++    fn roll_back_to(&mut self, txg: u64) -> Result<(), String> {
++        let parameters = parameters();
++        let target_content = self
++            .versions
++            .iter()
++            .find(|version| version.checkpoint_txg == CheckpointTxg(txg))
++            .expect("目标版本在表里")
++            .content
++            .clone();
++        roll_back_by_a_forward_publish(
++            &parameters,
++            &mut self.devices,
++            &mut self.allocator,
++            &mut self.output,
++            RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(txg) },
++        )
++        .map_err(|refusal| format!("{refusal:?}"))?;
++        self.versions.push(PublishedVersion { instance: self.output.root.instance, checkpoint_txg: self.output.root.checkpoint_txg, content: target_content });
++        Ok(())
++    }
++
++    fn refuse_reads_at(&self, slot: SlotNumber, times: u64) {
++        for refusal in &self.refusals {
++            *refusal.lock().expect("锁") = Some((slot.to_device_offset().0, times));
++        }
++    }
++    fn stop_refusing(&self) {
++        for refusal in &self.refusals {
++            *refusal.lock().expect("锁") = None;
++        }
++    }
++
++    fn image(&self) -> MemoryPool {
++        MemoryPool {
++            devices: self.devices.iter().map(|(identity, device)| (*identity, device.wrapped_device().inner.image.clone())).collect(),
++            device_size_in_bytes: IMAGE_BYTES,
++        }
++    }
++
++    fn records_of(&self, slot: SlotNumber) -> String {
++        [DeviceIdentity(0), DeviceIdentity(1)]
++            .into_iter()
++            .map(|device| match self.allocator.record_for(device, slot) {
++                Some(record) => format!("盘{}(已释放={},隔离位={},代={})", device.0, record.is_released, record.is_quarantined, record.generation.0),
++                None => format!("盘{}(无记录)", device.0),
++            })
++            .collect::<Vec<_>>()
++            .join(" ")
++    }
++}
++
++fn verdict_line(image: &MemoryPool) -> String {
++    let verdicts = check_pool_image(image);
++    let violated: Vec<&str> = verdicts.iter().filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_))).map(|(name, _)| *name).collect();
++    let pick = |name: &str| verdicts.iter().find(|(invariant, _)| *invariant == name).map(|(_, verdict)| match verdict {
++        InvariantVerdict::Violated(detail) => format!("违例[{}]", detail.chars().take(160).collect::<String>()),
++        other => format!("{other:?}").chars().take(60).collect::<String>(),
++    }).unwrap_or_default();
++    format!("violated={violated:?} I-1.1={} I-3.1={} I-3.11={}", pick("I-1.1"), pick("I-3.1"), pick("I-3.11"))
++}
++
++fn cold_recovery_line(image: &MemoryPool, expected: &[u8]) -> String {
++    let report = recover(image, JournalPolicy::Consult);
++    match &report.outcome {
++        singlefs_core::recovery::RecoveryOutcome::FileRead { root, content } => format!("cold=FileRead root={root:?} content_matches_expected={}", content == expected),
++        other => format!("cold={other:?}").chars().take(400).collect(),
++    }
++}
++
++/// 瞬时隔离：A 的数据单元两块盘那一份的读各先报错两次，B 隔离它（两份都完好）。交回 A 的数据槽。
++fn transient_quarantine(pool: &mut Pool) -> SlotNumber {
++    let data_slot = pool.output.data_pointers[0].locations[0].slot;
++    pool.refuse_reads_at(data_slot, 2);
++    pool.overwrite(2);
++    pool.stop_refusing();
++    assert_eq!(pool.output.quarantined_after_release_checksum_mismatch.len(), 2, "前提：B 隔离了两份");
++    data_slot
++}
++
++fn scenario_q1() {
++    // 写者缺陷造出已释放 + 隔离位同时置着的记录（C794_WRITE_BOTH_BITS=1 让编码器照写两位）。
++    let mut pool = Pool::build();
++    let data_slot = pool.output.data_pointers[0].locations[0].slot;
++    pool.overwrite(2); // B 照常释放 A 的数据单元
++    println!("Q1 B 之后 A 数据槽 {}: {}", data_slot.0, pool.records_of(data_slot));
++    std::env::set_var("C794_WRITE_BOTH_BITS", "1");
++    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
++        pool.allocator.c794_set_quarantine_flag(device, data_slot, true);
++    }
++    pool.overwrite(3); // C 写出带两位的记录
++    std::env::remove_var("C794_WRITE_BOTH_BITS");
++    println!("Q1 C 之后 A 数据槽 {}: {}", data_slot.0, pool.records_of(data_slot));
++    let image = pool.image();
++    println!("Q1 checker: {}", verdict_line(&image));
++    let expected = pool.versions.last().expect("C").content.clone();
++    println!("Q1 {}", cold_recovery_line(&image, &expected));
++}
++
++fn scenario_q2_image() {
++    // 瞬时隔离 B；C；回退到 A（重新引用隔离单元）；D 覆盖写换下它、写者漏了这一次释放；E 落盘。
++    let keeps_bit = std::env::var("C794_ROLLBACK_KEEPS_BIT").as_deref() == Ok("1");
++    let mut pool = Pool::build();
++    let data_slot = transient_quarantine(&mut pool);
++    pool.overwrite(3);
++    pool.roll_back_to(3).expect("回退到 A");
++    println!("Q2 keeps_bit={keeps_bit} 回退之后 槽 {}: {}", data_slot.0, pool.records_of(data_slot));
++    println!("Q2 回退之后 checker: {}", verdict_line(&pool.image()));
++    let after_rollback = pool.output.clone();
++    assert_eq!(after_rollback.data_pointers[0].locations[0].slot, data_slot, "回退那一版引用隔离单元");
++    pool.overwrite(4); // D：换下 U
++    println!("Q2 D 照常释放之后 槽 {}: {}", data_slot.0, pool.records_of(data_slot));
++    // 写者漏释放：D 那一次该释放 U 却没有——记录停在 D 之前的样子（仍分配、代 3、隔离位照 D 之前）。
++    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
++        pool.allocator.resurrect_released_record(device, Placement { slot: data_slot, span: DATA_SPAN }, CheckpointTxg(3));
++        pool.allocator.c794_set_quarantine_flag(device, data_slot, keeps_bit);
++    }
++    pool.overwrite(5); // E 把漏释放的账写盘
++    println!("Q2 漏释放之后 槽 {}: {}", data_slot.0, pool.records_of(data_slot));
++    println!("Q2 漏释放之后 checker: {}", verdict_line(&pool.image()));
++}
++
++fn scenario_q5_image() {
++    // 写者缺陷：隔离只在盘 1 那条记录上置位，盘 0 那条仍分配不带位（各盘不对称）。
++    let mut pool = Pool::build();
++    let data_slot = transient_quarantine(&mut pool);
++    pool.allocator.c794_set_quarantine_flag(DeviceIdentity(0), data_slot, false);
++    pool.overwrite(3);
++    println!("Q5 读法={:?} 槽 {}: {}", std::env::var("C794_EXEMPT_READING").ok(), data_slot.0, pool.records_of(data_slot));
++    println!("Q5 checker: {}", verdict_line(&pool.image()));
++    // 对照：写者两块盘都置位（实现今天的样子）。
++    let mut symmetric = Pool::build();
++    let symmetric_slot = transient_quarantine(&mut symmetric);
++    symmetric.overwrite(3);
++    println!("Q5 对照（两盘都置位） 槽 {}: {}", symmetric_slot.0, symmetric.records_of(symmetric_slot));
++    println!("Q5 对照 checker: {}", verdict_line(&symmetric.image()));
++}
++
++fn scenario_q4(corrupt: bool) {
++    // 写者漏释放（不带位）：B 该释放 A 的数据单元 U 却没有；C；（可选）盘 1 上 U 那一份坏掉；回退到 A。
++    let mut pool = Pool::build();
++    let data_slot = pool.output.data_pointers[0].locations[0].slot;
++    pool.overwrite(2);
++    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
++        pool.allocator.resurrect_released_record(device, Placement { slot: data_slot, span: DATA_SPAN }, CheckpointTxg(3));
++    }
++    pool.overwrite(3);
++    println!("Q4 corrupt={corrupt} 读法 bit={:?} 回退前 槽 {}: {}", std::env::var("C794_ISOLATED_BY_BIT").ok(), data_slot.0, pool.records_of(data_slot));
++    println!("Q4 回退前 checker: {}", verdict_line(&pool.image()));
++    if corrupt {
++        let (_, device) = pool.devices.iter_mut().find(|(identity, _)| *identity == DeviceIdentity(1)).expect("盘 1");
++        let offset = DeviceOffsetInBytes(data_slot.to_device_offset().0 + 4096);
++        let mut byte = device.wrapped_device().inner.image.read(offset, 512);
++        byte[0] ^= 0xff;
++        device.wrapped_device_mut().inner.image.write(offset, &byte);
++    }
++    match pool.roll_back_to(3) {
++        Ok(()) => {
++            println!("Q4 回退做成 槽 {}: {}", data_slot.0, pool.records_of(data_slot));
++            println!("Q4 回退之后 checker: {}", verdict_line(&pool.image()));
++            let expected = pool.versions.last().expect("回退").content.clone();
++            println!("Q4 回退之后 {}", cold_recovery_line(&pool.image(), &expected));
++        }
++        Err(refusal) => println!("Q4 回退被拒：{}", refusal.chars().take(300).collect::<String>()),
++    }
++}
++
++/// 崩溃枚举：`which` 选一段历史，只展开它要判的那一次发布（基线 = 那次发布之前的整条流）。
++fn crash_flow(which: &str) -> (MemoryPool, Vec<singlefs_harness::memory_pool::RetainedWrite>, Vec<Vec<usize>>, usize, Vec<PublishedVersion>) {
++    let mut pool = Pool::build();
++    let prefix_length;
++    match which {
++        "quarantine-publish" => {
++            prefix_length = pool.stream.retained_operations().len();
++            transient_quarantine(&mut pool);
++        }
++        "rollback-publish" => {
++            transient_quarantine(&mut pool);
++            pool.overwrite(3);
++            prefix_length = pool.stream.retained_operations().len();
++            pool.roll_back_to(3).expect("回退到 A");
++        }
++        "after-rollback-overwrite" => {
++            transient_quarantine(&mut pool);
++            pool.overwrite(3);
++            pool.roll_back_to(3).expect("回退到 A");
++            prefix_length = pool.stream.retained_operations().len();
++            pool.overwrite(4);
++        }
++        other => panic!("认不得的流 {other}"),
++    }
++    let operations = pool.stream.retained_operations();
++    let mut base = MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
++    base.apply(&operations[..prefix_length]);
++    let (writes, segments) = writes_and_segments(&operations[prefix_length..], &geometry());
++    let root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("这次发布有根槽写");
++    (base, writes, segments, root_index, pool.versions)
++}
++
++fn every_proper_subset(_: usize, _: &[usize]) -> CrashPointReplaySegmentExpansion {
++    CrashPointReplaySegmentExpansion::EveryProperSubset
++}
++
++fn count(which: &str) -> u64 {
++    let (base, writes, segments, root_index, _) = crash_flow(which);
++    let states = crash_state_count_with_torn_in_place_overwrites(&base, &writes, &segments, &every_proper_subset);
++    let sizes: Vec<usize> = segments.iter().map(Vec::len).collect();
++    println!("COUNT flow={which} writes={} segments={sizes:?} root_index={root_index} states={states}", writes.len());
++    states
++}
++
++fn enumerate(which: &str, label: &str) {
++    let states = count(which);
++    assert!(states <= STATE_CAP, "这一段 {states} 个状态越过约 10^6，不跑");
++    let (base, writes, segments, root_index, versions) = crash_flow(which);
++    let item_name = format!("c794-attack-{which}-{label}");
++    let tally = enumerate_crash_states_versions(
++        CrashPointReplayItem { name: &item_name, setting_file: "crates/singlefs-checker-tier/src/bin/c794_attack_probe.rs" },
++        &base,
++        &writes,
++        &segments,
++        root_index,
++        &versions,
++    )
++    .judged()
++    .expect("单机两段跑完交回整份结果");
++    let violated: BTreeMap<&str, u64> = tally.checker_violated_states.iter().filter(|(_, count)| **count > 0).map(|(name, count)| (*name, *count)).collect();
++    println!(
++        "ENUM flow={which} label={label} states={} oracle_violations={} failed_states={} file_read={} checker_violated={violated:?}",
++        tally.states, tally.violations, tally.failed_states, tally.file_read_states
++    );
++    for (name, detail) in &tally.checker_first_violation {
++        if violated.contains_key(name) {
++            println!("ENUM_FIRST label={label} {name}: {}", detail.chars().take(300).collect::<String>());
++        }
++    }
++    if let Some(first) = &tally.first_violation {
++        println!("ENUM_FIRST_ORACLE label={label}: {}", first.chars().take(300).collect::<String>());
++    }
++}
++
++/// 估时：只判开头 `how_many` 个状态（同一份枚举、同一个判器），报挂钟。
++fn sample(which: &str, how_many: u64) {
++    let (base, writes, segments, root_index, versions) = crash_flow(which);
++    let started = std::time::Instant::now();
++    let mut judged = 0u64;
++    let item_name = format!("c794-attack-sample-{which}");
++    let _ = singlefs_checker_tier::crash_state_enumeration::sample_crash_states_on_the_cpu(
++        CrashPointReplayItem { name: &item_name, setting_file: "crates/singlefs-checker-tier/src/bin/c794_attack_probe.rs" },
++        &base,
++        &writes,
++        &segments,
++        root_index,
++        &versions,
++        &every_proper_subset,
++        0..how_many,
++        &mut |_, _, _| judged += 1,
++    );
++    println!("SAMPLE flow={which} judged={judged} seconds={:.1}", started.elapsed().as_secs_f64());
++}
++
++fn main() {
++    let arguments: Vec<String> = std::env::args().collect();
++    match arguments.get(1).map(String::as_str) {
++        Some("q1") => scenario_q1(),
++        Some("q2-image") => scenario_q2_image(),
++        Some("q5-image") => scenario_q5_image(),
++        Some("q4") => scenario_q4(arguments.get(2).map(String::as_str) == Some("corrupt")),
++        Some("count") => {
++            count(&arguments[2]);
++        }
++        Some("enumerate") => enumerate(&arguments[2], &arguments[3]),
++        Some("sample") => sample(&arguments[2], arguments[3].parse().expect("个数")),
++        other => panic!("认不得的子命令 {other:?}"),
++    }
++}
+diff -ruN a/crates/singlefs-core/src/allocator.rs b/crates/singlefs-core/src/allocator.rs
+--- a/crates/singlefs-core/src/allocator.rs	2026-10-14 +0000
++++ b/crates/singlefs-core/src/allocator.rs	2026-10-14 +0000
+@@ -59,11 +59,16 @@
+             0,
+             "跨度值不许占到标志位"
+         );
++        // C794 攻方原型（Q1 造写者缺陷）：C794_WRITE_BOTH_BITS=1 时已释放 + 隔离位照写两位。
++        let c794_write_both_bits = std::env::var("C794_WRITE_BOTH_BITS").as_deref() == Ok("1");
+         assert!(
+-            !(self.is_released && self.is_quarantined),
++            c794_write_both_bits || !(self.is_released && self.is_quarantined),
+             "隔离位只在仍分配的记录上：释放把它清掉（PoolAllocator::release_leaving_the_record_allocated_on），读盘时两位都置的记录在分配记录树的读者那里拒掉"
+         );
+         let span_field = match (self.is_released, self.is_quarantined) {
++            (true, true) if c794_write_both_bits => {
++                self.span_slots | ALLOCATION_RECORD_RELEASED_FLAG | ALLOCATION_RECORD_QUARANTINED_FLAG
++            }
+             (true, _) => self.span_slots | ALLOCATION_RECORD_RELEASED_FLAG,
+             (false, true) => self.span_slots | ALLOCATION_RECORD_QUARANTINED_FLAG,
+             (false, false) => self.span_slots,
+@@ -1849,7 +1854,8 @@
+                         span_slots: u16::try_from(placement.span).expect("跨度 2 字节"),
+                         generation,
+                         is_released: false,
+-                        is_quarantined: false,
++                        // C794 攻方原型（Q8 变异）：C794_MUTANT_NEW_RECORD_BIT=1 时新分配的记录带隔离位。
++                        is_quarantined: std::env::var("C794_MUTANT_NEW_RECORD_BIT").as_deref() == Ok("1"),
+                     });
+                 }
+             }
+@@ -1939,6 +1945,16 @@
+         }
+     }
+ 
++    /// C794 攻方原型：直接改一块盘上那条记录的隔离位（造写者缺陷用），别的字段不动。
++    pub fn c794_set_quarantine_flag(&mut self, device: DeviceIdentity, slot: SlotNumber, flag: bool) {
++        let record = self
++            .records
++            .iter_mut()
++            .find(|record| record.device == device && record.slot == slot)
++            .expect("C794 原型：这块盘上有这个槽的记录");
++        record.is_quarantined = flag;
++    }
++
+     /// 管理员回退的复活（D23（journal 的角色与格式） 已定项 14「复活」）：`device` 上起点是这个落点的那条已释放记录改回已分配，
+     /// 分配代写回 `allocation_generation`（回退目标那一版账里的分配代）。按盘改：回退逐盘判哪几块盘上的记录是已释放的。
+     /// 那一槽还在 defer 窗口里的，从 defer 挪回仍分配；已回收、还没被复用（位图上空着、记录照旧写着已释放）的，重新在位图上标占。
+diff -ruN a/crates/singlefs-core/src/mount.rs b/crates/singlefs-core/src/mount.rs
+--- a/crates/singlefs-core/src/mount.rs	2026-10-14 +0000
++++ b/crates/singlefs-core/src/mount.rs	2026-10-14 +0000
+@@ -7819,7 +7819,15 @@
+             .any(|location| slots_of_the_units_of_the_current_version.contains(&location.slot));
+         if is_resurrected_on_some_device {
+             units_to_check_on_every_device.push((*unit, *locations));
+-        } else if !is_referenced_by_the_current_version {
++        } else if !is_referenced_by_the_current_version
++            && (std::env::var("C794_ISOLATED_BY_BIT").as_deref() != Ok("1")
++                || locations.iter().all(|location| {
++                    current_account
++                        .record_for(location.device, location.slot)
++                        .is_some_and(|record| record.is_quarantined)
++                }))
++        {
++            // C794 攻方原型（Q4 的对面读法）：C794_ISOLATED_BY_BIT=1 时只把每块盘上记录都带隔离位的认成隔离单元。
+             isolated_units_to_check_on_every_device.push((*unit, *locations));
+         }
+     }
+@@ -8298,7 +8306,9 @@
+     }
+     // 回退目标引用的隔离单元这次重新被引用：清掉它每块盘上那条记录的隔离位（C794 盘上隔离位；条款没写，取最保守的读法，
+     // `PoolAllocator::clear_quarantine_of_the_records_of`）。改的记录落在这次发布重写的叶里：发布路径按记录比上一版判哪几片叶变了。
+-    for (unit, locations) in &isolated_units_to_check_on_every_device {
++    // C794 攻方原型（Q2 的对面读法）：C794_ROLLBACK_KEEPS_BIT=1 时回退不清隔离位。
++    let c794_rollback_keeps_the_bit = std::env::var("C794_ROLLBACK_KEEPS_BIT").as_deref() == Ok("1");
++    for (unit, locations) in isolated_units_to_check_on_every_device.iter().filter(|_| !c794_rollback_keeps_the_bit) {
+         allocator.clear_quarantine_of_the_records_of(Placement {
+             slot: locations[0].slot,
+             span: unit.span_slots(),
+diff -ruN a/crates/singlefs-core/src/transaction.rs b/crates/singlefs-core/src/transaction.rs
+--- a/crates/singlefs-core/src/transaction.rs	2026-10-14 +0000
++++ b/crates/singlefs-core/src/transaction.rs	2026-10-14 +0000
+@@ -8141,6 +8141,10 @@
+     // 释放之前读盘核校验和核出对不上（读不出也算）的那几份：逻辑上照样释放（映射条目这次不再写它），那一份在它那块盘上的分配记录
+     // 留在已分配、不改成已释放（D19（块指针的结构与宽度预算） 已定项 5，用户 2026-09-24 定案）、置上隔离位（C794 盘上隔离位），
+     // 核得上的那一份照常释放。
++    // C794 攻方原型（Q8 取样计数）：这次发布隔离了几份，打一行。
++    if !quarantine.is_empty() {
++        eprintln!("C794_QUARANTINE_EVENT copies={}", quarantine.len());
++    }
+     for placement in release {
+         let devices_whose_copy_failed_the_checksum: Vec<DeviceIdentity> = quarantine
+             .iter()

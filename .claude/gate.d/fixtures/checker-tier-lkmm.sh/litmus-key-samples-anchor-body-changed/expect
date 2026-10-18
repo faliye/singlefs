@@ -1,0 +1,8 @@
+exit=77
+want=── 第二趟（样本 .lkmm-key-samples/change.sh 改过之后
+want=· binding:publish.litmus：绿，现判（锚点单元 变了：锚点单元：改了 fn publish（crates/demo/src/lib.rs））
+want=· herd7:publish.litmus：绿，复用（
+want=· herd7:publish-nofence.litmus：绿，复用（
+want=· 按条：现判 1、复用 2（现判的原因：锚点单元 变了 1）
+want=litmus-verdicts：本次未跑
+not-green-by-design=litmus-verdicts 样本经假 herd7 跑（.lkmm-fake-herd7），没起过真 herd7，绿的一侧只能记本次未跑

@@ -1,0 +1,5 @@
+Q4 corrupt=true 读法 bit=Some("1") 回退前 槽 50180: 盘0(已释放=false,隔离位=false,代=3) 盘1(已释放=false,隔离位=false,代=3)
+Q4 回退前 checker: violated=["I-3.11"] I-1.1=Holds I-3.1=Holds I-3.11=违例[盘 0：记账的已分配 Some(737280) 减 defer 待释放 Some(442368)，不等于从最新根（txg 5）走读到的 262144（其中隔离豁免 0）]
+Q4 回退做成 槽 50180: 盘0(已释放=false,隔离位=false,代=3) 盘1(已释放=false,隔离位=false,代=3)
+Q4 回退之后 checker: violated=["I-2.1", "I-4.8", "I-7.4"] I-1.1=Holds I-3.1=Holds I-3.11=Holds
+Q4 回退之后 cold=FileRead root=(InstanceGeneration(1), CheckpointTxg(6)) content_matches_expected=true

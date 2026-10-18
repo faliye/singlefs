@@ -10,6 +10,12 @@
 # 「只缩不涨」必须判红，不许当成「基准里还没有这张表、初次登记」放过去。
 set -euo pipefail
 printf 'M_测试名空着\tcrates/demo/src/lib.rs\tpub fn published_generation(\tpub fn published_generation_emptied(\t-p demo --lib\t\n' >> crates/mutations.tsv
+# 第 11 行点名一条哪里都没有的测试；第 12 行 --lib 点名一条只在 tests/reads_outside.rs 里的测试（选的目标里找不到，整个包里找得到）
+printf 'M_点名的测试不存在\tcrates/demo/src/lib.rs\tpub fn published_generation(\tpub fn published_generation_gone(\t-p demo --lib\tno_such_case\n' >> crates/mutations.tsv
+printf 'M_库里点名只在集成测试里的用例\tcrates/demo/src/lib.rs\tpub fn published_generation(\tpub fn published_generation_moved(\t-p demo --lib\treads_a_file_outside_the_copy\n' >> crates/mutations.tsv
+# 第 13、14 行是同一处改法（文件、原文、替换文三样全同），点名两条不同的测试：一处改法只许一行，这一组判红
+printf 'M_同一改法点名库里的用例\tcrates/demo/src/lib.rs\tpub fn published_generation(\tpub fn published_generation_doubled(\t-p demo --lib\tlib_case\n' >> crates/mutations.tsv
+printf 'M_同一改法点名集成测试\tcrates/demo/src/lib.rs\tpub fn published_generation(\tpub fn published_generation_doubled(\t-p demo --test reads_outside\treads_a_file_outside_the_copy\n' >> crates/mutations.tsv
 printf 'fn main() {}\n' > scripts/experiments/e3_latin1.rs
 printf 'M1_\xe9chantillon\tfn main() {}\tfn main() { }\n' > scripts/mutation/tables/e3_latin1.tsv
 git init -q .

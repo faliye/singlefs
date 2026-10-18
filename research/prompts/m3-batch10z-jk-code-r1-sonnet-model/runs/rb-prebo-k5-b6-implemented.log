@@ -1,9 +1,0 @@
-
-running 1 test
-test probe_sweep ... PROBEJK label=rb-prebo-k5-b6 arm=implemented slots=384 k=5 q=None r=b back=6 faults=racct persist=false actions=ossnssnonssonsnsssssononoss secs=7.92 selected=10 c_r=68 revived=2 revived_in_c_r=2 iso_mount=42 iso_after_first_raise=70 iso_max=70 iso_end=0 refused_steps=0 first_refused=- r_left_at=18 hit=false first_red=-
-PROBEJK label=rb-prebo-k5-b6 arm=implemented slots=384 k=5 q=None r=b back=6 faults=racct persist=false actions=ssososnooooonnoooonsnnoo secs=6.42 selected=10 c_r=68 revived=2 revived_in_c_r=2 iso_mount=42 iso_after_first_raise=70 iso_max=70 iso_end=0 refused_steps=0 first_refused=- r_left_at=18 hit=false first_red=-
-PROBEJK_DONE label=rb-prebo-k5-b6 arm=implemented histories=2
-ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.39s
-

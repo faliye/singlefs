@@ -1,8 +1,0 @@
-name=htd_cell tree=b3-r2 scanned=831 by_dir=scripts 455、.claude/gate.d 24、.claude/hooks 16、crates 335、.claude/cargo-command-prefix 1 suspicious=94 table_rows=66 own_variables=72
-name=scan_count tree=b3-r2 扫了 831 份（scripts 455、.claude/gate.d 24、.claude/hooks 16、crates 335、.claude/cargo-command-prefix 1）；排除表数据行 66
-name=htd_cell tree=r1 scanned=832 by_dir=scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-prefix 1 suspicious=94 table_rows=66 own_variables=58
-name=scan_count tree=r1 扫了 832 份（scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-prefix 1）；排除表数据行 66
-name=htd_cell tree=r2 scanned=832 by_dir=scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-prefix 1 suspicious=94 table_rows=66 own_variables=72
-name=scan_count tree=r2 扫了 832 份（scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-prefix 1）；排除表数据行 66
-name=htd_cell tree=r3 scanned=832 by_dir=scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-prefix 1 suspicious=117 table_rows=89 own_variables=74
-name=scan_count tree=r3 扫了 832 份（scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-prefix 1）；排除表数据行 89

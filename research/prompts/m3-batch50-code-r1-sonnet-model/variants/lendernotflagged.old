@@ -1,2 +1,0 @@
-            .expect("右邻借出的条数少于它的记录数：借完至少还剩一条");
-        lender.is_changed_this_publish = true;

@@ -1,7 +1,0 @@
-command args=-p singlefs-harness --test checker_known_bad_images -- two_retirement_containers_written_under_the_knob_one rc=101
-thread 'two_retirement_containers_written_under_the_knob_one_redden_only_the_knob_capacity_invariant_when_judged_with_the_knobs_two_and_three' panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:16728:5:
-failures:
-failures:
-    two_retirement_containers_written_under_the_knob_one_redden_only_the_knob_capacity_invariant_when_judged_with_the_knobs_two_and_three
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 254 filtered out; 
-row 3846 named-test-red=yes

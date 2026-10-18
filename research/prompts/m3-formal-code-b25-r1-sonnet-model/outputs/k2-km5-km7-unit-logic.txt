@@ -1,3 +1,0 @@
-RESULT name=KM5 代表的落地串核对恒过（class_landing 代表那一支） exit=0 stdout_same_as_unmutated=True differing_lines=0
-RESULT name=KM6 S13 不含 class_landing_mismatches exit=252 stdout_same_as_unmutated=False differing_lines=4
-RESULT name=KM7 类核对 ③ 的 journal 位置提示不记读段（只记 read） exit=252 stdout_same_as_unmutated=False differing_lines=4

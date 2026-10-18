@@ -14,7 +14,7 @@ mkdir -p .claude/gate.d
 printf '^\\.claude/hooks/\t# 钩子（这份样本不碰）\n' > .claude/gate.d/knowledge-sync-triggers.tsv
 git add -A && git commit -qm base
 printf 'pub fn publish() -> u32 { 2 }\n' > crates/demo/src/lib.rs
-printf '# demo 第一轮：主 agent 核实\n\n改动：crates/demo/src/lib.rs 的 publish 返回 2。三条腿都没打中。\n' > research/prompts/demo-r1-main-verification.md
+printf '# demo 第一轮：主 agent 核实\n\n改动：crates/demo/src/lib.rs 的 publish 返回 2。三条腿都没打中。\n\n## 这一轮被判过的文件\n\n- crates/demo/src/lib.rs\n' > research/prompts/demo-r1-main-verification.md
 git add research/prompts/demo-r1-main-verification.md
 printf 'pub fn named() -> u32 { 2 }\n' > crates/demo/src/named.rs
-printf '# 中文题 第一轮：主 agent 核实\n\n改动：crates/demo/src/named.rs 的 named 返回 2。三条腿都没打中。\n' > research/prompts/中文题-r1-main-verification.md
+printf '# 中文题 第一轮：主 agent 核实\n\n改动：crates/demo/src/named.rs 的 named 返回 2。三条腿都没打中。\n\n## 这一轮被判过的文件\n\n- crates/demo/src/named.rs\n' > research/prompts/中文题-r1-main-verification.md

@@ -1,0 +1,5 @@
+exit=1
+want=挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 1 处不对
+want=decision-evidence-lag.tsv:3 相对基准那一版新增了一行（.claude/kb/decisions/2522-账样本乙.md 已定项 2）：这张表只缩不涨
+want=  three-way-leg-record：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（three-way-leg-record）

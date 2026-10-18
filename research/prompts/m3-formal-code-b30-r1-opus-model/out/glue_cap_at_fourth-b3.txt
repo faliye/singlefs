@@ -1,4 +1,0 @@
-== b30_opus_glue_leaf_role_is_injective
-test every_inode_leaf_container_index_one_root_holds_maps_to_its_own_model_role ... FAILED
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out;
-rc=101 target=b30_opus_glue_leaf_role_is_injective

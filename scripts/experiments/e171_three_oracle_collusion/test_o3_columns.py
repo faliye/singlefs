@@ -311,10 +311,10 @@ class DriverRebuildTests(unittest.TestCase):
         self.next_mutation: MutationRow | None = None
         replaced = {"run_compile": self.fake_compile, "run_device": lambda *unused: (0, 0),
                     "prepare_row": lambda *unused: row_driver.RowChoice(self.next_mutation, STATUS_LOCATED, "-", True, 0, ())}
+        originals = {"run_compile": row_driver.run_compile, "run_device": row_driver.run_device, "prepare_row": row_driver.prepare_row}  # 换掉之前逐个点名留下原件
         for name, replacement in replaced.items():
-            original = getattr(row_driver, name)
             setattr(row_driver, name, replacement)
-            self.addCleanup(setattr, row_driver, name, original)
+            self.addCleanup(setattr, row_driver, name, originals[name])
 
     def fake_compile(self, lane_tree, lane_target, repo_root, threads, log_path, artifacts_path):
         started_ns = time.time_ns()

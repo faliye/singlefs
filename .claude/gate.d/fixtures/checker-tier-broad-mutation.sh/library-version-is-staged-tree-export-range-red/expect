@@ -1,3 +1,0 @@
-exit=1
-want=导出范围不同：库目录那一版记的是 crates Cargo.toml Cargo.lock litmus，被判仓登记的是 crates Cargo.toml Cargo.lock litmus .cargo
-want=checker-tier-broad-mutation.sh：1 格里 1 格红（library-version-is-staged-tree）

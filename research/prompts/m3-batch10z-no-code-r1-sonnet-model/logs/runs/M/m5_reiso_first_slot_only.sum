@@ -1,6 +1,0 @@
-m5_reiso_first_slot_only s1 histories=60 handed_out>0:0 both>0:0 unblocked_grew:32 rc=0
-m5_reiso_first_slot_only s2 histories=40 handed_out>0:0 both>0:0 unblocked_grew:18 rc=0
-m5_reiso_first_slot_only s3 histories=40 handed_out>0:0 both>0:0 unblocked_grew:40 rc=0
-m5_reiso_first_slot_only s4 histories=40 handed_out>0:0 both>0:0 unblocked_grew:14 rc=0
-m5_reiso_first_slot_only s5 histories=60 handed_out>0:0 both>0:0 unblocked_grew:40 rc=0
-m5_reiso_first_slot_only s6 histories=40 handed_out>0:0 both>0:0 unblocked_grew:40 rc=0

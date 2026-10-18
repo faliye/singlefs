@@ -1,6 +1,0 @@
-ATK scan /home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/scan-proto/inputs/v0-frozen.rs found=0
-ATK scan /home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/scan-proto/inputs/v1-new-layer-plain.rs found=1
-ATK scan   收叫停的是这六层，连同没编进 gpu 特性时那一份 judge_my_blocks_on_gpu（多一层少一层、参数换了名字都要回来看这条用例罩没罩到），读到的是 [("check_blocks_where_until", "stop_is_requested"), ("check_pending_blocks_in_
-ATK scan /home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/scan-proto/inputs/v2-new-layer-behind-a-commented-opening.rs found=0
-ATK scan /home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/scan-proto/inputs/v3-multiline-new-layer-behind-a-commented-opening.rs found=1
-ATK scan   收叫停的是这六层，连同没编进 gpu 特性时那一份 judge_my_blocks_on_gpu（多一层少一层、参数换了名字都要回来看这条用例罩没罩到），读到的是 [("check_blocks_where_until", "stop_is_requested"), ("check_pending_blocks_in_

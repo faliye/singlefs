@@ -1,8 +1,0 @@
-row=77 file=crates/singlefs-core/src/allocator.rs anchor_hits=1 baseline=False
-exit=101
-test user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written ... FAILED
-thread 'user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written' (200803) panicked at crates/singlefs-harness/tests/unequal_devices.rs:431:5:
-  left: Ok(Placement { slot: SlotNumber(50184), span: 2 })
- right: Err(UserDataSlotsDifferAcrossDevicesPerDeviceSlotsUnsupported { slot_per_device: [(DeviceIdentity(0), SlotNumber(50184)), (DeviceIdentity(1), SlotNumber(50182))] })
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.03s
-error: test failed, to rerun pass `-p singlefs-harness --test unequal_devices`

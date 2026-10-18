@@ -1,9 +1,0 @@
-
-running 1 test
-test s2_sweep ... S2 label=r105 arm= slots=384 prefix=oooons mid=n r=d r_txg=12 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=nbsbFFbFobboFoboFs secs=2.87 selected=11 c_r=206 revived=0 revived_in_c_r=0 iso_mount=194 iso_after_first_raise=218 iso_max=234 iso_end=234 refused_steps=4 first_refused=11o:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor{la r_left_at=- hit=false first_red=-
-S2 label=r105 arm= slots=384 prefix=oooons mid=n r=d r_txg=12 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=oobnbnnsnbsoboFsb secs=3.64 selected=11 c_r=206 revived=0 revived_in_c_r=0 iso_mount=194 iso_after_first_raise=234 iso_max=234 iso_end=0 refused_steps=0 first_refused=- r_left_at=14 hit=false first_red=-
-S2_DONE label=r105 arm= histories=2 hits=0
-ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.53s
-

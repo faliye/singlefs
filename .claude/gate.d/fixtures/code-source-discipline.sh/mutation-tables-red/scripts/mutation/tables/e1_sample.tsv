@@ -1,2 +1,4 @@
 M1_样本	foo	bar
 M2_转义写进源码	fn main() {}	fn main() { \&(); }
+M3_同一改法甲	fn main() {}	fn main() { panic!(); }
+M4_同一改法乙	fn main() {}	fn main() { panic!(); }

@@ -1,0 +1,9 @@
+exit=1
+want=点名一节的挂账表 .claude/gate.d/review-section-pending.tsv 有 4 处不合规
+want=第 1 行指向的判决不存在：research/prompts/gone-r1-main-verification.md
+want=第 2 行不是「判决路径<制表符>理由」两段，或理由不到 8 个字：research/prompts/short-r1-main-verification.md
+want=第 3 行的路径不是 research/prompts/ 顶层的 *-main-verification.md：crates/demo/src/lib.rs
+want=第 5 行重复登记了 research/prompts/demo-r1-main-verification.md（第 4 行已经有）
+want=样本只跑 .gate-cells 点名的格：crates-adversarial-review
+want=doc-process-records.sh：1 格里 1 格红（crates-adversarial-review）
+want=→ crates-adversarial-review：提交之前走一轮三方

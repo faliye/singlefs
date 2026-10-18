@@ -1,2 +1,0 @@
-                ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad
-                    .insert(*ring_slot, txgs_it_can_hold.oldest_txg_it_can_have_held());

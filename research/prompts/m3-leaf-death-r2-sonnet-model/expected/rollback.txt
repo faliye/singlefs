@@ -1,4 +1,0 @@
-E7RESULT name=r2_rollback_demo candidate=T_whole_object_tombstone tombstones_filtered_by_lineage=false units_filtered_by_lineage=false resurrected=0 missed=2 missed_inodes=[234, 235]
-E7RESULT name=r2_rollback_demo candidate=T_whole_object_tombstone tombstones_filtered_by_lineage=true units_filtered_by_lineage=true resurrected=0 missed=0 missed_inodes=[]
-E7RESULT name=r2_rollback_demo candidate=two_zero_version_persist tombstones_filtered_by_lineage=none units_filtered_by_lineage=false resurrected=0 missed=2 missed_inodes=[234, 235]
-E7RESULT name=r2_rollback_demo candidate=two_zero_version_persist tombstones_filtered_by_lineage=none units_filtered_by_lineage=true resurrected=0 missed=0 missed_inodes=[]

@@ -1,2 +1,0 @@
-        borrower.contents.records.extend(moved);
-        borrower.is_changed_this_publish = true;

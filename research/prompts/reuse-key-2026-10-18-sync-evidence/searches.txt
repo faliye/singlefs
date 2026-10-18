@@ -1,0 +1,20 @@
+# 10-17、10-18 新改动的旧说法现搜（复用键与全仓改名一批收尾）
+grep -rlF 'red-blocks=' <规则、定义、skill、CLAUDE.md、tooling、verification-build 与相关脚本> → .claude/rules/verification.md .claude/gate.d/checker-tier-crash-point-replay.sh .claude/skills/crash-test/commit-stages.md scripts/gate/admission.py 
+grep -rlF '只查库' <规则、定义、skill、CLAUDE.md、tooling、verification-build 与相关脚本> → .claude/rules/verification.md .claude/skills/crash-test/commit-stages.md 
+grep -rlF 'judged-by-test' <规则、定义、skill、CLAUDE.md、tooling、verification-build 与相关脚本> → .claude/rules/verification.md .claude/skills/crash-test/commit-stages.md .claude/gate.d/checker-tier-crash-point-replay.sh scripts/gate/admission.py 
+grep -rlF '那三个包' <规则、定义、skill、CLAUDE.md、tooling、verification-build 与相关脚本> → 0 处
+grep -rlF 'TEST_CODE_SOURCES' <规则、定义、skill、CLAUDE.md、tooling、verification-build 与相关脚本> → .claude/gate.d/doc-process-records.sh 
+grep -rlF 'GATE_MUTATION_KEY_WORKERS' <规则、定义、skill、CLAUDE.md、tooling、verification-build 与相关脚本> → scripts/hosts/capped.sh 
+grep -rlF 'cpu_judge 这一份' <规则、定义、skill、CLAUDE.md、tooling、verification-build 与相关脚本> → 0 处
+grep -rlF '第三列认七种' <规则、定义、skill、CLAUDE.md、tooling、verification-build 与相关脚本> → 0 处
+grep -rlF '只改了注释的除外' <规则、定义、skill、CLAUDE.md、tooling、verification-build 与相关脚本> → .claude/rules/implementation-workflow.md 
+
+# 归档上一轮实验记录（GATE_BASE=HEAD python3 scripts/kb/archive-past-rounds.py --apply）
+      留下 1549 份还被代码当输入的产物（门禁按名字读它比对、装置 include_str! 编译期读它）：
+  ✓ 删了 9539 份上一轮及更早的实验记录；42 份文件里 791 处引用去掉了路径、只留文件名
+  ! 删完之后这几条排除项指不到东西了，各自那道检查会判红：
+     → 怎么办：把它们从各自的排除表里删掉——排除只缩不涨，指不到的排除会让人以为那批文件已经被绕开了。
+     → 下一步：在仓库根单跑共享「链接指向」那一道 `python3 .claude/singlefs-ai-sop/scripts/link-targets.py` 确认没有指空的链接，再跑一次本脚本 --check 判绿。
+
+# 链接指向
+  ✓ 文档指向都到得了（418 份文档、1347 条相对链接、27 处「第 <数字> 节」指向）

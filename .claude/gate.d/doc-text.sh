@@ -113,6 +113,11 @@
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-unreadable-raises  读文件不包异常（改前的样子：读不了就让格崩，python 回溯把带假仓路径的原路径打出来）：private-values-unreadable-red 里
 #     「1 个文件读不了」「research/results/〔文件名含私有值〕/research/results/e999.out  EACCES」两条 want 找不到；兄弟三格同样崩，「prime-marks：绿」「clock-times：绿」「session-names：绿」与「读不了（EACCES」四条 want 找不到
 #   LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>   关掉判据行：红样本里点名那一行的报不出来
+#   LIB_FORBIDDEN_NOTATIONS_BREAK=iso-compact-timestamp  关掉紧凑时间戳那一条判据行：clock-times-red 里六条「records/iso-compact.md:N  ISO 紧凑时间戳」want 找不到、「54 行」那条 want 也对不上
+#   LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose  紧凑时间戳那一条判据行退回「8 位数字加 T 加 4 到 6 位数字」、不核日期钟点的范围与前后字符：
+#     clock-times-green 判红（records/近似写法.md 里月日时分越界、位数不对、哈希编号那几行被点名）
+#   LIB_FORBIDDEN_NOTATIONS_BREAK=numbered-pairs-whole-line  编号对的上下文规则退回按整行读（改前的样子：同一行里有「文件:行号」或越界冒号对，整行的冒号对都放过）：
+#     clock-times-red 里五条「records/bare-clock-sentences.md:N  不挨日期时区的钟点」want 找不到、「54 行」那条 want 也对不上
 #   LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=<判据行键或形态键>、LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=<形态键>、
 #   LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=<形态键>  关掉上下文规则、不认放行标记、排除前缀失效：那一格的绿样本判红
 #   （键写在 lib-forbidden-notations.py）
@@ -123,8 +128,10 @@
 #   date-once-green     同一基准；加的行只带别的日期、加的小节是另一天，判绿
 #   prime-marks-red     一份带「K9」加一撇的 md、一份带「G5」加两撇的 rs，逐处点名「文件:行」判红
 #   prime-marks-green   只有正常写法（变体起了新名字、ASCII 单引号），外加上游副本里带角标的 md（排除前缀下），判绿
-#   clock-times-red     每条判据行各有一份带那种写法的 md 或 rs，外加写在 md 里与没写理由的放行标记，逐处点名「文件:行」与判据行判红
-#   clock-times-green   只有日期与近似但该放行的写法，.sh、.py、.rs 里带放行标记的各一行，外加钟点排除前缀下的门禁样本、hook 自检与 c510 提示，判绿
+#   clock-times-red     每条判据行各有一份带那种写法的 md 或 rs（ISO 基本格式的紧凑时间戳一份：运行目录名与日志文件名里的、带 Z 或偏移或小数秒的、日期带连字符的、钟点带冒号的；
+#                       光秃钟点同一行里「文件:行号」或越界冒号对写在另一句的一份），外加写在 md 里与没写理由的放行标记，逐处点名「文件:行」与判据行判红
+#   clock-times-green   只有日期与近似但该放行的写法（数字后面跟 T 却不是紧凑时间戳的哈希、编号与越界的数；同一句里带「文件:行号」的编号对），.sh、.py、.rs 里带放行标记的各一行，
+#                       外加钟点排除前缀下的门禁样本、hook 自检与 c510 提示，判绿
 #   session-names-red   标签式、当主语用的、上游三语仓的、长十六进制的会话号各一行，外加 rs 里没写理由的放行标记，逐处点名判红
 #   session-names-green 近似但该放行的写法（crate 名、mktemp 模板与临时目录名、上游仓目录名、带字母后缀的标识符）与 .sh 里带放行标记的一行，
 #                       外加会话号排除前缀下的门禁样本，判绿

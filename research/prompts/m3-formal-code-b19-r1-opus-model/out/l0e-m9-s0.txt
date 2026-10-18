@@ -1,3 +1,0 @@
-name=history ring_mib=1 unit_area_slots=2000 mounts=9 gate_slack=0 txg=26 data_rel_U=4 writes=25 segments=[20, 2, 1, 2] closed_form_states=1048583
-name=layer0 mode=expand_from_segment_1 gate_slack=0 states=13 oracle_violations=0 root_persisted_states=9 failed_states=0 seconds=0.3
-name=i55 gate_slack=0 evaluated=9 red=0 not_applicable=4

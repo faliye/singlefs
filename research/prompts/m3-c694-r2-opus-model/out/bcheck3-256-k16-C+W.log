@@ -1,4 +1,0 @@
-G W=256 k=16 R=ow hide=ur arm=C+W/all/ring/none M1[effective=(1,24) row_txg=26 isolated=24 free=1758] r=(1,25) r_records=1
-G W=256 k=16 R=ow hide=ur arm=C+W/all/ring/none seq=- in_ring=true dmg=0/26 iso=24 free=1758 unmount=Ok(3) in_ring_after_unmount=true chk=[] probe=onR:read-ok bc_alive=true | bc_fail:skips=0 mount=Err(StillUnreadable:AccountOfAnAbandonedRoot) | bc_stale:skips=1 B_MISJUDGE mount=Ok then=[ok,ok,ok] unmount=Ok(3) probe=onR:FAILED(UnitUnreadable) chk=[I-7.4]
-G W=256 k=16 R=ow hide=ur arm=C+W/all/ring/none seq=o in_ring=true dmg=0/26 iso=24 free=1734 unmount=Ok(2) in_ring_after_unmount=true chk=[] probe=onR:read-ok bc_alive=true | bc_fail:skips=0 mount=Err(StillUnreadable:AccountOfAnAbandonedRoot) | bc_stale:skips=1 B_MISJUDGE mount=Ok then=[ok,ok,ok] unmount=Ok(3) probe=onR:FAILED(UnitUnreadable) chk=[I-7.4]
-GTALLY W=256 k=16 R=ow hide=ur arm=C+W/all/ring/none b_misjudge=2 b_skip=2 chk_I-7.4=2 nodes=2 probe_failed=2

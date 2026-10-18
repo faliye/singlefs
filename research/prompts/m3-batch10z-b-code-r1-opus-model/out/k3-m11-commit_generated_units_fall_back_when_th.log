@@ -1,8 +1,0 @@
-test a_raise_whose_second_empty_publish_fails_on_a_write_reports_that_one_publish_of_the_sequence_persisted ... ok
-test a_raise_whose_second_empty_publish_finds_no_slot_is_refused_by_the_rehearsal_before_any_write ... ok
-test fallback_skips_a_slot_isolated_by_the_shadow_ledger ... ok
-test a_raise_whose_third_empty_publish_finds_no_slot_is_refused_by_the_rehearsal_before_any_write ... ok
-test publish_on_pool_without_empty_cluster_segment_falls_back_to_lowest_free_slot_on_every_device ... ok
-test raising_the_floor_when_the_only_empty_segment_is_held_falls_back_to_slots_outside_the_hold ... ok
-test raising_the_floor_with_no_free_slot_outside_the_hold_fails_before_any_write_and_hands_the_allocator_back_exactly_as_before_the_raise ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.18s

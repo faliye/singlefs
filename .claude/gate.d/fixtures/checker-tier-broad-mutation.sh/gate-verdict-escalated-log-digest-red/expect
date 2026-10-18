@@ -1,4 +1,4 @@
 exit=1
 want=升档判的抓到复核不过
-want=escalated 那趟的日志 escalation/1.one-build.100.escalated.log 的 sha256 与登记的不同
-want=gate-verdict：红
+want=escalated 那趟的日志 escalation/1.one-build.100.escalated.log 的 sha256 与登记的不同（登记之后改过）
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

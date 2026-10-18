@@ -1,3 +1,0 @@
-arm=bing k=3 q=s r=n faults=cfgq,qroot,qlast,racct histories=60 hit=9 preroot_red=9 red_root_txg=8=9
-arm=chain k=3 q=s r=n faults=cfgq,qroot,qlast,racct histories=60
-arm=h2 k=3 q=s r=n faults=cfgq,qroot,qlast,racct histories=60 hit=8 preroot_red=8 red_root_txg=8=8

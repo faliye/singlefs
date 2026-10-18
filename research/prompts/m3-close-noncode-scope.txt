@@ -1,5 +1,0 @@
-.claude/kb/checks-owed.md
-.claude/kb/decisions/02-RAID条带策略.md
-.claude/kb/decisions/23-journal的角色与格式.md
-.claude/kb/milestone/03-third-txn.md
-records/2026-10-12-里程碑三非代码收尾.md

@@ -1,2 +1,0 @@
-b24-b1 mode=base cells_built=293 build_failed=18 old_test_green=11 new_test_green_(premise_ok)=5 green_cells_where_zero_mutation_red_and_only_some_red=5 green_cells_where_only_some_red_zero_not_red=6 disagreements_between_premise_and_zero_mutation=0 premise_failure_kinds={"PlacementRefused": 6}
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.34s

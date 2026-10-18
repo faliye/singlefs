@@ -1,6 +1,0 @@
-m4_skip_alloc_check_removed s1 histories=60 handed_out>0:0 both>0:60 unblocked_grew:0 rc=0
-m4_skip_alloc_check_removed s2 histories=40 handed_out>0:0 both>0:40 unblocked_grew:0 rc=0
-m4_skip_alloc_check_removed s3 histories=40 handed_out>0:0 both>0:40 unblocked_grew:0 rc=0
-m4_skip_alloc_check_removed s4 histories=40 handed_out>0:0 both>0:40 unblocked_grew:0 rc=0
-m4_skip_alloc_check_removed s5 histories=60 handed_out>0:0 both>0:28 unblocked_grew:0 rc=0
-m4_skip_alloc_check_removed s6 histories=40 handed_out>0:0 both>0:20 unblocked_grew:0 rc=0

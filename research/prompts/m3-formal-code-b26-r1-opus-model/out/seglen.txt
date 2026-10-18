@@ -1,8 +1,0 @@
-SEGLEN several-leaves unit-area-384 steps=24 seeds=0..40 segments_after_the_starting_point=2916 longest=48 (seed 12) over_32=6
-SEGLEN several-leaves 4gib steps=24 seeds=0..40 segments_after_the_starting_point=3178 longest=626 (seed 14) over_32=85
-SEGLEN broad unit-area-384 steps=24 seeds=0..40 segments_after_the_starting_point=3460 longest=26 (seed 16) over_32=0
-SEGLEN broad 4gib steps=24 seeds=0..40 segments_after_the_starting_point=3460 longest=30 (seed 16) over_32=0
-SEGLEN orphans unit-area-384 steps=24 seeds=0..40 segments_after_the_starting_point=4488 longest=24 (seed 0) over_32=0
-SEGLEN orphans 4gib steps=24 seeds=0..40 segments_after_the_starting_point=4164 longest=28 (seed 0) over_32=0
-SEGLEN rollback unit-area-384 steps=24 seeds=0..40 segments_after_the_starting_point=3183 longest=24 (seed 0) over_32=0
-SEGLEN rollback 4gib steps=24 seeds=0..40 segments_after_the_starting_point=3183 longest=28 (seed 0) over_32=0

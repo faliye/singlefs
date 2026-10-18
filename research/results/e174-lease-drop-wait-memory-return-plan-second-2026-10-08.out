@@ -1,4 +1,0 @@
-E7RESULT name=plan segment=second stage=5 group=shared_device cells=12 first_pass_children=60
-E7RESULT name=plan segment=second stage=15 group=shared_device cells=12 first_pass_children=60
-E7RESULT name=verdict scope=plan segment=second cells_total=24 first_pass_children_total=120 void_conditions=0
-E7RESULT name=done emitted=4

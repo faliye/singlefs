@@ -1,0 +1,115 @@
+== whole
+rc=0
+{'verified': 56, 'errors': 0, 'is-verifying-entire-crate': True}
+== clash replay_core
+rc=0
+note: verifying root module (selected functions)
+
+== per-function
+above_the_chosen_root rc=0 verified=0
+admitted_record_passed_every_check rc=0 verified=0
+a_later_checkpoint_txg_is_chosen_over_a_higher_instance_with_an_earlier_checkpoint_txg rc=1 verified=?
+a_later_record_of_the_same_publish_is_readable rc=0 verified=0
+anchor_of_the_chain rc=0 verified=0
+a_newer_root_after_the_first_self_verified_slot_is_chosen_over_it rc=1 verified=?
+applied_is_the_chain_cut_at_its_last_publish_end rc=0 verified=0
+applied_records_are_whole_publishes_above_the_chosen_root rc=0 verified=0
+a_publish_of_two_records_is_whole rc=0 verified=1
+a_publish_whose_last_record_is_missing_is_not_applied_and_the_root_segment_stays rc=1 verified=?
+a_record_without_the_last_flag_alone_is_not_a_concatenation rc=0 verified=1
+as_ints rc=0 verified=0
+a_two_record_publish_after_the_anchor_is_applied_whole_and_the_new_root_segment_comes_from_its_last_record rc=1 verified=?
+back_chain_reported_broken rc=0 verified=0
+back_chain_reported_holding rc=0 verified=0
+candidates_before rc=0 verified=1
+choose_root_slot rc=0 verified=2
+continues_the_jsn_chain rc=0 verified=0
+corollary_recovery_replays_from_the_newest_self_verified_root rc=0 verified=1
+corollary_the_landed_version_does_not_go_back rc=0 verified=1
+counter_of_the_last_record_the_root_covers rc=0 verified=2
+each_kept_copy_stands_for_one_record_key rc=0 verified=0
+every_counter_has_a_successor rc=0 verified=0
+expected_next_after rc=0 verified=0
+fails_a_check_before_the_named_units rc=0 verified=0
+first_copies_follow_the_first_come_rule rc=0 verified=0
+first_copy_of_each_record_key rc=0 verified=2
+is_above_the_chosen_root rc=0 verified=1
+is_a_later_record_of_the_same_instance rc=0 verified=0
+is_concatenation_of_whole_publishes rc=0 verified=1
+is_last_record_of_its_publish rc=0 verified=0
+is_open_publish rc=0 verified=0
+is_whole_publish rc=0 verified=0
+journal_txg_does_not_decrease_with_the_counter_within_an_instance rc=0 verified=0
+judge_the_candidate rc=0 verified=1
+key_is_below rc=0 verified=0
+landed_checkpoint_txg rc=0 verified=0
+landed_instance rc=0 verified=0
+last_record_flag_counters_of_the_chosen_roots_publish rc=0 verified=1
+lemma_admitting_the_candidate_extends_the_open_publish rc=0 verified=1
+lemma_admitting_the_candidate_keeps_every_link rc=0 verified=1
+lemma_appending_a_whole_publish_keeps_a_concatenation rc=0 verified=1
+lemma_applying_a_record_twice_in_a_row_is_applying_it_once rc=0 verified=1
+lemma_a_publish_end_that_passed_the_fourth_reader_rule_closes_its_txg rc=0 verified=1
+lemma_a_record_above_the_chosen_root_is_a_candidate rc=0 verified=1
+lemma_candidates_above_the_landed_root_are_the_tail rc=0 verified=1
+lemma_candidates_ascend_in_slice_order rc=0 verified=1
+lemma_candidates_before_a_shorter_end_are_a_prefix rc=0 verified=1
+lemma_candidates_lie_below_their_end_and_above_the_chosen_root rc=0 verified=1
+lemma_no_record_above_the_chosen_root_means_no_candidate rc=0 verified=1
+lemma_replay_core_result_is_a_fixed_point rc=0 verified=1
+lemma_replay_core_result_is_the_only_one_the_rules_allow rc=0 verified=1
+lemma_replay_core_result_lands_no_earlier_than_the_chosen_root rc=0 verified=1
+lemma_replay_core_result_replays_an_applied_record_twice_as_once rc=0 verified=1
+lemma_replaying_from_the_landed_root_stays_put rc=0 verified=1
+lemma_slice_order_within_an_instance_follows_the_counter rc=0 verified=1
+lemma_the_applied_head_and_the_open_tail_make_up_the_chain rc=0 verified=1
+lemma_the_flagged_counters_of_the_landed_publish rc=0 verified=1
+lemma_the_landed_record_closes_its_txg rc=0 verified=1
+lemma_the_maximum_over_the_appended_publish rc=0 verified=1
+lemma_the_rules_allow_one_outcome rc=0 verified=1
+lemma_the_same_inputs_admit_no_longer_chain rc=0 verified=1
+lemma_the_same_reader_does_not_both_stop_and_admit_a_candidate rc=0 verified=1
+maximum_transaction_is_the_largest_applied rc=0 verified=0
+maximum_transaction_of rc=0 verified=2
+named_units_reported_unverified rc=0 verified=0
+named_units_reported_verified rc=0 verified=0
+obeys_the_reader_rules_and_the_commit_markers rc=0 verified=0
+of_two_scanned_copies_of_one_record_key_the_first_position_is_kept rc=1 verified=?
+of_two_slots_with_the_same_checkpoint_txg_the_higher_instance_in_the_later_slot_is_chosen rc=1 verified=?
+of_two_slots_with_the_same_choice_key_the_earlier_slot_is_chosen rc=1 verified=?
+outcome_follows_the_prefix_rules rc=0 verified=0
+passes_every_check_before_the_named_units rc=0 verified=0
+previous_in_the_chain rc=0 verified=0
+readable_record_of_the_same_publish_follows rc=0 verified=2
+record rc=1 verified=?
+record_ends_its_publish rc=0 verified=1
+records_above_the_chosen_root_fit_the_in_flight_limit rc=0 verified=0
+records_ascend_by_instance_and_counter rc=0 verified=0
+records_at rc=0 verified=0
+recovery_replays_from_the_newest_self_verified_root rc=0 verified=0
+replay_core rc=0 verified=3
+replay_follows_the_prefix_rules rc=0 verified=0
+replaying_again_from_the_landed_root_stays_put rc=0 verified=0
+replaying_an_applied_record_twice_leaves_the_root_as_once rc=0 verified=0
+replaying_from_the_landed_root_is_a_fixed_point rc=0 verified=0
+replay_lands_no_earlier_than_any_self_verified_root rc=0 verified=0
+replay_lands_no_earlier_than_the_chosen_root rc=0 verified=0
+replay_outcome_is_the_only_one_the_rules_allow rc=0 verified=0
+root_choice_follows_the_newest_rule rc=0 verified=0
+root_choice_key rc=1 verified=?
+root_choice_key_is_not_newer_than rc=0 verified=0
+root_choice_key_of rc=0 verified=0
+root_chosen_among_the_first_slots rc=0 verified=0
+root_source_after_applying_in_order rc=0 verified=1
+root_source_after_applying_the_record rc=0 verified=0
+the_candidate_stops_the_chain rc=0 verified=0
+the_reader_answers_each_position_one_way rc=0 verified=0
+version_is_not_later_than rc=0 verified=0
+functions=99 sum_verified=48
+== cheat
+A=lemma_candidates_lie_below_their_end_and_above_the_chosen_root B=a_record_without_the_last_flag_alone_is_not_a_concatenation
+rc=1
+1201 | |         assume(false);
+error: assume/admit not allowed with --no-cheating
+1201 |         assume(false);
+== done

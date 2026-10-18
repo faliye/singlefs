@@ -1,9 +1,0 @@
-KSTART plain W=384 k=12 m=2 k2=3 | current_txg=27 source=now
-KPASSES plain W=384 k=12 m=2 k2=3 n=now j=0 ring_reads=336 boundaries=[0, 24, 48, 72, 96, 120, 144, 168, 192, 216, 240, 264, 288, 312, 336] ring_newest=["dev0:[27, 26, 24, 23, 21]", "dev1:[25, 22, 19, 16, 13]"]
-KPLAN plain W=384 k=12 m=2 k2=3 n=now j=0 plan=clean faulted_reads=0 ok chosen=27 effective=27 floor_in_row=19 row_txg=28 warm_up=1 floor_raises=0 rereads=ring:OnTheFirstRead/table:OnTheFirstRead overwrites_done=0 pattern= writes2=42 mount_writes=42 closed_form_states=266256 unscreened
-KPLAN plain W=384 k=12 m=2 k2=3 n=now j=0 plan=w:all/-:e faulted_reads=320 ok chosen=25 effective=27 floor_in_row=19 row_txg=28 warm_up=1 floor_raises=0 rereads=ring:OnTheFirstRead/table:OnTheFirstRead overwrites_done=0 pattern= writes2=38 mount_writes=38 closed_form_states=20496 unscreened
-LAYER0_FINDINGS signatures=0 red_states=0 states=20511
-LAYER0_PARALLEL_FINISHED states=20511 slices=239 worker_threads=15 configured_worker_threads=15 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=239 progress_file_after_completion=none
-KENUM plain W=384 k=12 m=2 k2=3 n=now plan=w:all/-:e j=0 segments=0..9/9 closed_form_states=20496 states=20511 observed=20511 violations=0 failed_states=0 checker_violated={} recheck={}
-KTALLY plain W=384 k=12 m=2 k2=3 mounted j=0 count=2
-KDONE plain W=384 k=12 m=2 k2=3

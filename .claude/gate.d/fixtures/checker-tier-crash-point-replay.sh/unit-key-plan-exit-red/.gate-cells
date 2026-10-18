@@ -1,0 +1,2 @@
+# 按条复用失灵：.unit-verdict-sample/plan-failure 写 exit-1，test-plan 退 1；快档照旧全部现判（假 cargo 三条都过），crash-case-replay 格结论判红
+crash-case-replay

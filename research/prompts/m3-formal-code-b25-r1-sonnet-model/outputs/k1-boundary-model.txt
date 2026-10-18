@@ -1,5 +1,0 @@
-PROBE model capacity = 135
-PROBE model at records_before=233*135 panics=true
-PROBE model at records_before=233*135-1 -> Ok(134)
-test model::k1_boundary_probe::model_position_rule_boundaries ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 79 filtered out; finished in 0.00s

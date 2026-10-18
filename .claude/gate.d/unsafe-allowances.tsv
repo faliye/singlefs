@@ -23,3 +23,4 @@ singlefs-checker-tier	forbid	-	-	-	-
 singlefs-harness	forbid	-	-	-	-
 singlefs-replay-prefix	forbid	-	-	-	-
 singlefs-reference-filesystem	forbid	-	-	-	-
+singlefs-unit-graph	forbid	-	-	-	-

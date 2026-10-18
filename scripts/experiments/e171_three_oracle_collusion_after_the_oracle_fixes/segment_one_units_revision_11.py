@@ -107,7 +107,8 @@ class ReuseState:
 
 
 STATE: dict = {"reuse": None}
-ORIGINAL = {name: getattr(units8, name) for name in ("unit_table", "unit_environment", "finish_unit", "run", "plan")}
+ORIGINAL = {"unit_table": units8.unit_table, "unit_environment": units8.unit_environment, "finish_unit": units8.finish_unit,  # 逐个点名留下原件
+            "run": units8.run, "plan": units8.plan}
 
 
 # ── 换进修订 8 单元编排的几处（configure 一次装好；那边的函数按模块全局名取，换了就用这里的）──

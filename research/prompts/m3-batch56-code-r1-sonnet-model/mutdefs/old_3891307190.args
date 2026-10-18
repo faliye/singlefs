@@ -1,1 +1,0 @@
--p singlefs-harness --test checker_known_bad_images -- two_tombstone_containers_with_one_container_number_redden_only_the_capacity_knob_invariant

@@ -1,0 +1,7 @@
+exit=1
+want=── 第二趟（样本 .lkmm-key-samples/change.sh 改过之后
+want=· herd7:publish.litmus：红，现判（期望 变了
+want=litmus/publish.litmus  期望 Sometimes，实际 Never
+want=· herd7:publish-nofence.litmus：绿，复用（
+want=litmus-verdicts：红（退出 1）
+want=checker-tier-lkmm.sh：1 格里 1 格红（litmus-verdicts）

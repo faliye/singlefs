@@ -1,5 +1,0 @@
-start-key  : [(0, 1544)]
-span-key   : [(0, 1544), (0, 1545)]
-per-slot   : [(0, 1544), (0, 1545)]
-start-key (wide first): [(0, 1544), (0, 1545)]
-exempt by start slot  : [] (候选只罩 1544 时 1545 也被一并豁免)

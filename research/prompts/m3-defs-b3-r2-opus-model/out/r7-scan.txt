@@ -1,2 +1,0 @@
-name=r7-scan records_files=95 source_lines=557 round_names=180
-name=r7-scan source_lines_without_halt_words=504 round_names_only_in_lines_without_halt_words=146

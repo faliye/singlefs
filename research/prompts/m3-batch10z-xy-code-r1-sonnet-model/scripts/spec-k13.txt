@@ -1,5 +1,0 @@
-k14 atk_tu_vw k13-a vw_k13_state_changes_with_and_without_moving_instance_and_txg ATK_CELLS=4:16:13
-k14 atk_tu_vw k13-b vw_k13_state_changes_with_and_without_moving_instance_and_txg ATK_CELLS=4:16:20
-k14 atk_tu_vw k13-c vw_k13_state_changes_with_and_without_moving_instance_and_txg ATK_CELLS=8:11:40
-k14 atk_tu_vw k14e-a vw_k14_wrong_device_tables_are_judged_like_the_push_entry_judges_them ATK_CELLS=4:16:13
-k14 atk_tu_vw k14e-b vw_k14_wrong_device_tables_are_judged_like_the_push_entry_judges_them ATK_CELLS=4:16:20

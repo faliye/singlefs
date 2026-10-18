@@ -1,6 +1,0 @@
-any-n                        arm=anylin       n=2 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=18.0/18 iso_first_raise=46.0/46 iso_max=46.0/46 iso_end=0.0/0 c_r=48.0/48 rev_in_c_r=2.0/2 revived=2.0/2
-any-n                        arm=implemented  n=2 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=18.0/18 iso_first_raise=46.0/46 iso_max=46.0/46 iso_end=0.0/0 c_r=48.0/48 rev_in_c_r=2.0/2 revived=2.0/2
-any-o                        arm=anylin       n=2 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=24.0/24 iso_first_raise=52.0/52 iso_max=52.0/52 iso_end=0.0/0 c_r=52.0/52 rev_in_c_r=2.0/2 revived=2.0/2
-any-o                        arm=implemented  n=2 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=24.0/24 iso_first_raise=52.0/52 iso_max=52.0/52 iso_end=0.0/0 c_r=52.0/52 rev_in_c_r=2.0/2 revived=2.0/2
-any-s                        arm=anylin       n=2 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=34.0/34 iso_first_raise=62.0/62 iso_max=62.0/62 iso_end=0.0/0 c_r=70.0/70 rev_in_c_r=2.0/2 revived=2.0/2
-any-s                        arm=implemented  n=2 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=34.0/34 iso_first_raise=62.0/62 iso_max=62.0/62 iso_end=0.0/0 c_r=70.0/70 rev_in_c_r=2.0/2 revived=2.0/2

@@ -6,13 +6,7 @@ crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs  #
 crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
 crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
 crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-crates/singlefs-checker-tier/src/crash_injection.rs  # first 指最早的那个下标，不是第几条流；改成 earliest_… 归下一批实现员
-crates/singlefs-checker-tier/tests/crash_enumeration_acquisition_barrier.rs  # first 指最早的那个下标，不是第几条流；改成 earliest_… 归下一批实现员
 crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs  # FirstStream、first_stream 按先后叫新池新建文件流，改名漏了；改成 NewPoolFileCreationStream、new_pool_file_creation_stream 归下一批实现员
-crates/singlefs-checker-tier/tests/crash_injection_read_faulted_states_never_hold_the_witness_criterion.rs  # first 指最早的那个下标，不是第几条流；改成 earliest_… 归下一批实现员
-crates/singlefs-checker-tier/tests/record_checker_breaks_the_history_at_the_power_loss_seam.rs  # first 指最早的那个下标，不是第几条流；改成 earliest_… 归下一批实现员
-crates/singlefs-harness/src/history.rs  # first 指最早的那个下标，不是第几条流；改成 earliest_… 归下一批实现员
-crates/singlefs-harness/tests/publishes_of_a_history_broken_at_the_power_loss_seam.rs  # first 指最早的那个下标，不是第几条流；改成 earliest_… 归下一批实现员
 scripts/crash/crash-amplification.sh  # 自证里按位置叫登记表头一个分项的变量 first_item（第 919 行）；归下一批工具员改名
 scripts/experiments/e142_new_pool_file_creation_dry_run.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
 scripts/experiments/e153_ledger_shape_and_ring_holes.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名

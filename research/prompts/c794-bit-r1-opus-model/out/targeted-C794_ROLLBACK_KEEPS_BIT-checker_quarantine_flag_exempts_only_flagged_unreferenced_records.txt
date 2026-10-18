@@ -1,0 +1,6 @@
+test dangling_unit_no_root_ever_referenced_violates_both_allocated_statistics ... ok
+test forgotten_release_of_a_once_referenced_unit_violates_both_allocated_statistics ... ok
+test live_unit_recorded_as_released_violates_the_allocated_minus_deferred_invariant ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+test transient_quarantine_of_two_intact_copies_carries_the_quarantine_flag_and_no_invariant_is_violated ... ok
+test transient_quarantine_with_the_quarantine_flag_cleared_violates_both_allocated_statistics ... ok

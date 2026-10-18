@@ -1,1 +1,0 @@
-name=first-file-watermark txg=3 tree_identifier_watermark=65549 tree_table_entries=12 checker_tier_test_expects=(3, 65548)

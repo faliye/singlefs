@@ -14,6 +14,7 @@
 | [experiments/](experiments/) | 每个实验一个文件（`NN-简称.md`），测什么、判据、口径都在这里 |
 | [experiments-history.md](experiments-history.md) | 全部实验的变更史 |
 | [checks-owed.md](checks-owed.md) | 欠的检查：知道要拦什么但还拦不了的，含前置 |
+| [pending-rules.md](pending-rules.md) | 待议的规矩：做不成会红的检查、从共享 SOP 撤下来的条款，原文逐字留存，写明缺什么才能成规则 |
 | [tooling.md](tooling.md) | 工具与环境事实：本地 LLM、Rust 工具链、QEMU harness 的现状与缺口 |
 | [vm-harness.md](vm-harness.md) | 怎么把一个实验送进虚机在**真块设备**上跑：三个前置、卫生检查、虚机里多了哪条校验路径、屏蔽 CPU 特性那一档的已知答案闸、设备侧独立录制（blklogwrites）、附加根与盘镜像预分配、计时与块层计数的口径 |
 | [verification-build.md](verification-build.md) | 三样验证手段（checker、事务层、崩溃点重放）怎么落地：各自消费哪些已定条款、被哪些未定项挡着、能从 research/ 抬走什么、第一版最小范围、当时待用户定案的问题（只剩 T1（常规层 挂钟预算） 一问没定）、崩溃放量的流程与用户定的两档 |

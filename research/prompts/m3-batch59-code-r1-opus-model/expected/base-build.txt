@@ -1,7 +1,0 @@
-base-build PROBE rc=0
-base-build CHECKER_LIB rc=0
-base-build KNOB_HARNESS rc=0
-base-build M3_TARGETS rc=0
-base-build LEGIT_a rc=0
-base-build LEGIT_b rc=0
-base-build LEGIT_unlink rc=0

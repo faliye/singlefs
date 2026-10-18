@@ -1,6 +1,6 @@
 # scripts/agents
 
-派子 agent 与盯着它们、三方论证的材料与引文核对、本地模型网关。从仓根跑：`bash scripts/agents/watch.sh`。
+派子 agent 与盯着它们、三方论证的材料与引文核对、定时提醒（`remind.sh`）。从仓根跑：`bash scripts/agents/watch.sh`。
 
 | 文件 | 做什么 |
 |---|---|

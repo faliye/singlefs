@@ -1,0 +1,9 @@
+exit=77
+want=── 第二趟（样本 .qemu-key-samples/change.sh 改过之后）
+want=· direct：现判（宿主脚本单元 变了：宿主脚本单元：改了 function stage_initramfs_root（scripts/devices/vm-bench.sh））
+want=· file-overwrite：现判（宿主脚本单元 变了
+want=· raise-rollback-floor：现判（宿主脚本单元 变了
+want=· 按档：现判 6、复用 0
+want=键样本（.qemu-key-samples）：只判每一档的键作不作废，不判虚机输出，这一格本次未跑
+want=device-streams：本次未跑
+not-green-by-design=device-streams 键样本只判键（.qemu-prerecorded 与 .qemu-key-samples），没起虚机不算真跑过 QEMU，绿的一侧只能记本次未跑

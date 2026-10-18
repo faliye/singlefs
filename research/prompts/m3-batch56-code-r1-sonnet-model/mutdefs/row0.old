@@ -1,8 +1,0 @@
-    for entry_bytes in &roots.accounting.leaf_entries_in_key_order {
-        accounting_entry_parsed_and_judged_against_the_root(entry_bytes, root)?;
-    }
-    accounting_entry_count_is_three_plus_six_per_device(
-        &roots.accounting.leaf_entries_in_key_order,
-        root.checkpoint_txg,
-        device_count,
-    )?;

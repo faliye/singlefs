@@ -1,0 +1,2 @@
+# 快档按条复用：上一版记进判定库，这一版只现判 S17、N19、F1 中间那一条、H2 四条，样本档快档判绿退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-case-replay

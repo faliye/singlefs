@@ -57,6 +57,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import hashlib
+import importlib.machinery
 import importlib.util
 import math
 import os
@@ -396,24 +397,54 @@ def segment_one_reading_names() -> list[str]:
 
 
 _pinned_modules: dict[str, types.ModuleType] = {}
-PINNED = {"rows_orchestrator_1dcfb8d0": ("rows_orchestrator.py", "1dcfb8d0c08a706077f41fe69d3566d7a99e16f3dcbffc10808a2f0d88d17853"),
-          "rows_orchestrator_segment_two_7d7b458b": ("rows_orchestrator_segment_two.py", "7d7b458b95e0a2b8a650e5e9f45b5405902661ffc296b06643100f63cea98393")}
+# 第一段编排器 rows_orchestrator.py 搬目录（10-11、10-14 两次提交改了里面的路径）之后按现内容重钉：修订 11 这几层认 ORCHESTRATOR_SHA256。
+# 冻结的修订 8、修订 10 与它们钉住的 cross_host_o3_check.py、rows_orchestrator_segment_two.py 里写的是搬之前的 ORCHESTRATOR_SHA256_BEFORE_MOVE，
+# 一个字节不改：修订 11 载入它们时先核它们自己的 sha256（load_repinned），再把正文里那个旧值换成新值编（RepinnedLoader）。
+ORCHESTRATOR_SHA256_BEFORE_MOVE = "1dcfb8d0c08a706077f41fe69d3566d7a99e16f3dcbffc10808a2f0d88d17853"
+ORCHESTRATOR_SHA256 = "9a5a4170ddb89a76aace60baeac549dd24af1b3aaf9687001b80b23fabb87154"
+ORCHESTRATOR_REPIN = ((ORCHESTRATOR_SHA256_BEFORE_MOVE, ORCHESTRATOR_SHA256),)
+# 钉住的编排器：模块名 → 路径、模块名 → sha256 两张表（路径表照字面拼，函数单元库认得出载的是哪几份）；PINNED_REPINS 是载入时正文里要换的钉值
+PINNED_PATHS = {"rows_orchestrator_1dcfb8d0": os.path.join(HERE, "rows_orchestrator.py"),
+                "rows_orchestrator_segment_two_7d7b458b": os.path.join(HERE, "rows_orchestrator_segment_two.py")}
+PINNED_SHA256 = {"rows_orchestrator_1dcfb8d0": ORCHESTRATOR_SHA256,
+                 "rows_orchestrator_segment_two_7d7b458b": "7d7b458b95e0a2b8a650e5e9f45b5405902661ffc296b06643100f63cea98393"}
+PINNED_REPINS = {"rows_orchestrator_segment_two_7d7b458b": ORCHESTRATOR_REPIN}
+
+
+class RepinnedLoader(importlib.machinery.SourceFileLoader):
+    """按路径载入一份冻结的脚本，正文里旧的钉值换成新的再编（文件本身一个字节不改，也不读、不写 .pyc）。"""
+
+    def __init__(self, fullname: str, path: str, replacements: tuple[tuple[str, str], ...]):
+        super().__init__(fullname, path)
+        self.replacements = replacements
+
+    def get_code(self, fullname: str) -> types.CodeType:
+        text = self.get_data(self.path).decode("utf-8")
+        for old, new in self.replacements:
+            if old not in text:
+                raise RuntimeError(f"{self.path} 里没有要换的钉值 {old}")
+            text = text.replace(old, new)
+        return compile(text, self.path, "exec", dont_inherit=True)
+
+
+def load_repinned(path: str, expected: str, module_name: str, replacements: tuple[tuple[str, str], ...] = ()) -> types.ModuleType:
+    """核 path 的 sha256 是 expected（冻结的那一份），再按 replacements 换掉正文里的钉值载入；sha256 不对抛 RuntimeError。"""
+    actual = sha256_file(path)
+    if actual != expected:
+        raise RuntimeError(f"{path} 的 sha256 是 {actual}，不是 {expected}")
+    specification = importlib.util.spec_from_file_location(module_name, path, loader=RepinnedLoader(module_name, path, tuple(replacements)))
+    module = importlib.util.module_from_spec(specification)
+    sys.dont_write_bytecode = True
+    sys.modules[module_name] = module
+    specification.loader.exec_module(module)
+    return module
 
 
 def pinned_module(module_name: str) -> types.ModuleType:
     """按 sha256 钉住的编排器（已经有层载入了就用那一份，不再载第二份）；sha256 不对抛 RuntimeError。"""
     if module_name in sys.modules:
         return sys.modules[module_name]
-    file_name, expected = PINNED[module_name]
-    path = os.path.join(HERE, file_name)
-    if sha256_file(path) != expected:
-        raise RuntimeError(f"{path} 的 sha256 不是 {expected}")
-    specification = importlib.util.spec_from_file_location(module_name, path)
-    module = importlib.util.module_from_spec(specification)
-    sys.dont_write_bytecode = True
-    sys.modules[module_name] = module
-    specification.loader.exec_module(module)
-    return module
+    return load_repinned(PINNED_PATHS[module_name], PINNED_SHA256[module_name], module_name, PINNED_REPINS.get(module_name, ()))
 
 
 def segment_one_row_units(steps: tuple[str, ...], rows_of_step: dict[str, tuple[int, ...]] | None = None) -> list[RowUnit]:

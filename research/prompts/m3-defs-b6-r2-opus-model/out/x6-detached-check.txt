@@ -1,4 +1,0 @@
-r2	h1_note_live	detached-run long-run-check rc=0	  ✓ 长活声明齐了（<WORK>/feeds/x6/scripts/h1_note_live.sh，判了 3 个键）：分片：按行切，一行一片；续跑：同一条
-r2	h3_note_eid	detached-run long-run-check rc=5	  ✗ 长活声明（<WORK>/feeds/x6/scripts/h3_note_eid.sh）：# long-run-hosts: 一行规范句后面的说明「编排照 E171 修订 11 那
-r1	h1_note_live	detached-run long-run-check rc=5	  ✗ 长活声明（<WORK>/feeds/x6/scripts/h1_note_live.sh）：# long-run-hosts: 一行写了按核数、忙闲、负载现算的说法（空
-r1	h3_note_eid	detached-run long-run-check rc=0	  ✓ 长活声明齐了（<WORK>/feeds/x6/scripts/h3_note_eid.sh，判了 3 个键）：分片：按行切，一行一片；续跑：同一条�

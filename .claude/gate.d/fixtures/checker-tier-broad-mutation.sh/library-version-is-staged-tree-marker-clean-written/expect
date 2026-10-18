@@ -1,4 +1,0 @@
-exit=0
-want=就是被判的暂存树：导出范围 crates Cargo.toml Cargo.lock litmus .cargo 里 6 个文件逐个相同，工具链相同
-want=写了这一道的全绿标记：
-want=singlefs-stage-green.checker-tier-broad-mutation.sh.

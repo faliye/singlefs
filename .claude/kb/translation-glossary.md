@@ -81,7 +81,7 @@
 | 记录核对器 | record checker | レコード照合器 | |
 | 判器 | judge | 判定器 | |
 | 判定库 | verdict library | 判定ライブラリ | |
-| 判法版本 | judging-method version | 判定法バージョン | |
+| 判法单元指纹 | judging-unit fingerprint | 判定法ユニット指紋 | |
 | 观察者 | observer | オブザーバー | |
 | 必红流 | must-red stream | 必赤ストリーム | 改坏一个字段、必须红在指定不变量上的流<br>a stream with one field corrupted that must go red on a named invariant<br>一つのフィールドを壊し、指定の不変条件で赤にならなければならないストリーム |
 | 对拍 | differential | 突き合わせ | 两条互不共享代码的路子算同一件事再逐项比<br>two code paths that share no code compute the same thing and are compared item by item<br>コードを共有しない二つの経路で同じものを計算し、項目ごとに比べる |
@@ -121,3 +121,13 @@
 | 按里程碑对比六家文件系统的文件性能 | per-milestone file performance against six file systems | マイルストーン別の六ファイルシステムとのファイル性能比較 | E152（按里程碑对比六家文件系统的文件性能） 的简称<br>short name of that experiment<br>その実験の略称 |
 | 恢复重放有界穷举与变异杀伤界 | bounded exhaustive recovery replay and mutation kill bound | リカバリ再生の有界全数探索とミューテーション殺傷限界 | E165（恢复重放有界穷举与变异杀伤界） 的简称<br>short name of that experiment<br>その実験の略称 |
 | 吞写之后可写挂载被拒而模型说该成 | writable mount refused after a swallowed write while the model says it should succeed | 書き込み消失後に書き込み可能マウントが拒否されモデルは成功すべきとする | C600（吞写之后可写挂载被拒而模型说该成） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 单元键 | unit key | ユニットキー | 判定按它复用：函数单元指纹、工具链、依赖版本<br>the key a verdict is reused by: function-unit fingerprints, toolchain, dependency versions<br>判定の再利用の鍵: 関数ユニットの指紋、ツールチェーン、依存の版 |
+| 函数单元 | function unit | 関数ユニット | |
+| 块键 | block key | ブロックキー | |
+| 录入段 | recording stage | 記録段 | |
+| 判段 | judging stage | 判定段 | |
+| 读集见证 | read-set witness | 読み出し集合の証人 | |
+| 恢复报告分桶 | recovery-report bucketing | リカバリ報告のバケット分け | |
+| 判表 | judge tables | 判定表 | |
+| 显存账 | GPU memory ledger | GPU メモリ台帳 | |
+| 预期红 | expected red | 想定内の赤 | |

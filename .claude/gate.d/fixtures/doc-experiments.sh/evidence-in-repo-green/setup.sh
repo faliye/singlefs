@@ -4,7 +4,7 @@
 # 这一轮新写的提示里「草稿放 /tmp/…」也不算；一份改过但不是新写的提示里写着「依据：/tmp/…」，
 # 它登记在原样保存的证据里，本阶段不判——扫到的 /tmp 处数与没判的份数把这一条钉住；
 # E905 只改了 // 注释里的路径（path-moves.md 要求的改写），产物再旧也不判，成功行列出它。
-# E909 登记了准入，产物比源码旧而产物头的输入指纹与今天的输入相同，按指纹判绿，成功行列出它。
+# E909 登记了准入，产物头没记实验键、产物比源码新，按修改时刻判绿，成功行把它列进「按修改时刻判」（产物头记的实验键对得上的那一路由 admission.py --selftest 判）。
 # 修改日子一律按东京的零点写（TZ=Asia/Tokyo touch -d <日期>），格里也按东京的日期报，与跑门禁那台机器的时区无关。
 # 样本根的 .gate-cells 只点名 evidence-in-repo；原先同一道里别的九格也跑这份样本，为它们补的东西（留着不碍事）在下面各处的注释里写明（一条样本决策、每个实验号一页正文、产物不进版本库）；
 # 补的实验页与决策是 .md，这一格扫的 .md 因此从 3 份变 9 份。
@@ -43,13 +43,15 @@ experiment_page_906() {
     "$2" "$1" > .claude/kb/experiments/906-on-request.md
 }
 experiment_page_906 '2026-09-01 不受影响：样本页只作对照' ''
-# E909：登记了准入，产物比源码旧、产物头的输入指纹与今天的输入相同 ⇒ 按指纹判绿（按修改时刻会判红）
+# E909：登记了准入，产物头没记实验键 ⇒ 按修改时刻判（产物比源码新，判绿）
 mkdir -p .claude/gate.d
-e909_source=scripts/experiments/e909_fingerprint_matches.rs
+e909_source=scripts/experiments/e909_registered_without_key.rs
 printf 'E909\t%s\t# 样本：登记了准入\n' "$e909_source" > .claude/gate.d/stage-inputs.tsv
 printf 'fn main() { println!("e909"); }\n' > "$e909_source"
+# 变更史里一行早先写下的「依据：报告 /tmp/…」：基准就有、这一轮没动，是历史条目，不判（开关 history-lines-judged 打开时判红）
+printf '## E900（样本实验）\n\n### 2026-09-01\n\n- 新立。\n  - **依据**：执行员报告 `/tmp/claude-1000/e900-run/report.md`。\n' > .claude/kb/experiments-history.md
 git add -A && git commit -qm base
-# 产物在基准提交之后才落盘、不进版本库（这一格只看产物的修改日子与指纹，不看跟没跟踪）：
+# 产物在基准提交之后才落盘、不进版本库（这一格只看产物的修改日子与产物头记的实验键，不看跟没跟踪）：
 # 同一道里的 archive-past-rounds 格把跟踪着又没改过的产物当上一轮的，这样它在这份样本里判绿
 printf 'E7RESULT name=e903 rows=1\n' > research/results/e903-fresh-product-2026-09-06.out
 printf 'E7RESULT name=e905 rows=1\n' > research/results/e905-comment-only-2026-09-01.out
@@ -65,7 +67,7 @@ experiment_page 7 装置目录的号 '装置目录 scripts/experiments 用的是
 experiment_page 903 产物比装置新 '产物 `research/results/e903-fresh-product-2026-09-06.out`，复跑经 `scripts/experiments/replay.sh`。'
 experiment_page 904 没碰的旧装置 '产物 `research/results/e904-untouched-2026-09-01.out`，复跑经 `scripts/experiments/replay.sh`。'
 experiment_page 905 只改了注释的装置 '产物 `research/results/e905-comment-only-2026-09-01.out`，复跑经 `scripts/experiments/replay.sh`。'
-experiment_page 909 按指纹判的装置 '产物 `research/results/e909-fingerprint-matches-2026-09-01.out`，复跑经 `scripts/experiments/replay.sh`。'
+experiment_page 909 产物头没记实验键的装置 '产物 `research/results/e909-registered-without-key-2026-09-06.out`，复跑经 `scripts/experiments/replay.sh`。'
 printf 'fn main() { println!("e903 改过了"); }\n' > scripts/experiments/e903_fresh_product.rs
 printf '// 字段表见 layout/01-first.md\nfn main() { println!("e905"); }\n' > scripts/experiments/e905_comment_only.rs
 printf '# oldround-r1 云端攻方\n\n报告原件的依据：/tmp/claude-1000/oldround-r1-opus/report.md\n\n（这一行是这一轮加的注，冻结材料的路径不改）\n' > research/prompts/oldround-r1-opus.md
@@ -82,12 +84,8 @@ experiment_page_906 '2026-09-05 不受影响：装置改过、结论不变' $'�
 TZ=Asia/Tokyo touch -d 2026-09-01 research/results/e906-on-request-2026-09-01.out
 TZ=Asia/Tokyo touch -d 2026-09-05 scripts/experiments/e906_on_request.rs
 TZ=Asia/Tokyo touch -d 2026-09-06 research/results/e903-fresh-product-2026-09-06.out
-# E909 的指纹不经准入模块，照它文件头写的算法用 sha256sum 另算一遍：逐文件「sha256  路径」、登记行、工具链，整张再算一次
+# E909 的产物头上没有 E7INPUT 那一行（没记实验键）：只能按修改时刻判，产物比源码新
 printf 'fn main() { println!("e909 改过了"); }\n' > "$e909_source"
-registration_hash="$(printf 'E909\t%s\n' "$e909_source" | sha256sum | cut -d' ' -f1)"
-toolchain_versions="$(cargo -V && rustc -V)"
-toolchain_hash="$(printf '%s\n' "$toolchain_versions" | sha256sum | cut -d' ' -f1)"
-e909_fingerprint="$( { sha256sum -- "$e909_source"; printf '%s  %s\n' "$registration_hash" "<登记行：E909>" "$toolchain_hash" "<工具链：${toolchain_versions//$'\n'/；}>"; } | sha256sum | cut -d' ' -f1)"
-printf 'E7INPUT name=input_fingerprint key=E909 sha256=%s files=1\nE7RESULT name=e909 rows=1\n' "$e909_fingerprint" > research/results/e909-fingerprint-matches-2026-09-01.out
-TZ=Asia/Tokyo touch -d 2026-09-01 research/results/e909-fingerprint-matches-2026-09-01.out
+printf 'E7RESULT name=e909 rows=1\n' > research/results/e909-registered-without-key-2026-09-06.out
+TZ=Asia/Tokyo touch -d 2026-09-06 research/results/e909-registered-without-key-2026-09-06.out
 TZ=Asia/Tokyo touch -d 2026-09-05 "$e909_source"

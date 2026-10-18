@@ -1,8 +1,0 @@
-            if right_pair_fits {
-                self.absorb_the_right_neighbour(current_position);
-            } else if left_pair_fits {
-                self.absorb_the_right_neighbour(current_position - 1);
-                current_position -= 1;
-            } else {
-                return absorbed_at_least_once;
-            }

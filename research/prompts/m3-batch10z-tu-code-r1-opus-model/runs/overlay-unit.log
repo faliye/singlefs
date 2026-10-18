@@ -1,9 +1,0 @@
-
-running 2 tests
-ATK k5 compared=100225 differ=0
-test mounted_session::atk_overlay_tests::atk_overlay_check_is_the_file_backend_check ... ok
-ATK overlay compared=360000
-test mounted_session::atk_overlay_tests::atk_overlay_reads_back_like_a_plain_device_and_never_writes_through ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 216 filtered out; finished in 22.17s
-

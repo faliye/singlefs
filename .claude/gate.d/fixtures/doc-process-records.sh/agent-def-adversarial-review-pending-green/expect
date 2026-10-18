@@ -1,0 +1,5 @@
+exit=0
+want=✓ 改过的定义与共用约束 1 份都有去向（新写的判决文件 1 份，另有 0 份按 .claude/agent-def-review-exempt 豁免，基准 HEAD）
+want=    按挂账表 .claude/gate.d/review-section-pending.tsv 认整份正文里提到的新写判决
+want=      research/prompts/demo-r1-main-verification.md：这一节上线之前写的判决没有那一节
+want=doc-process-records.sh：1 格里 1 格绿（agent-def-adversarial-review），0 格本次未跑（无）

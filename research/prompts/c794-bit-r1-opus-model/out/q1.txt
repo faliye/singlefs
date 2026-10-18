@@ -1,0 +1,4 @@
+Q1 B 之后 A 数据槽 50180: 盘0(已释放=true,隔离位=false,代=4) 盘1(已释放=true,隔离位=false,代=4)
+Q1 C 之后 A 数据槽 50180: 盘0(已释放=true,隔离位=true,代=4) 盘1(已释放=true,隔离位=true,代=4)
+Q1 checker: violated=[] I-1.1=Holds I-3.1=Holds I-3.11=Holds
+Q1 cold=Failed { root: Some((InstanceGeneration(1), CheckpointTxg(5))), failure: InvariantViolated { invariant: "I-1.1", detail: "分配记录的已释放位与隔离位同时置着：条款没定这一组合，第一版不认" } }

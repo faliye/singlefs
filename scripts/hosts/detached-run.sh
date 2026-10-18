@@ -55,7 +55,7 @@
 #   逐字（可带句末句号），后面不许接任何说明，说明另起一行写普通注释，别的写法一律拒，不再用现算词表；规范句只写在那一处，这里不抄。文件头写的读法与脚本真做的事是否一致，钩子看不到，由写文件头的人保证。
 #   只有 .claude/long-run-live-hosts-exempt 登记、登记的 sha256 又对得上这份脚本现在文件的脚本（真按此刻空闲现算的 E171 六份入口）这一行按现算读：点名 --emit-hosts 与 host-resources.py，不写死；
 #   登记的 sha256 对不上（脚本改过）判红；那张表只缩不涨，读法的细节见 .claude/hooks/lib_long_run.py 文件头），
-#   分不了的写 # long-run-unshardable: 点名缺的那几段与为什么（至少 8 个字）。判据 .claude/singlefs-ai-sop/rules/test-script-discipline.md
+#   分不了的写 # long-run-unshardable: 点名缺的那几段与为什么（至少 8 个字）。判据 .claude/rules/test-script-discipline.md
 #   「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」；认被起的脚本、读声明与判法都在 .claude/hooks/lib_long_run.py（写法以它的文件头为准）。
 #   声明不齐、多机一行写死额度、判不出被起的是哪份脚本（bash -c '…' 一长串、直接起 cargo 或编出来的二进制）、判法起不来，都拒、退 5，
 #   什么都不起、旧登记不动（判在拿锁之前）；出路：把命令写进一份脚本、文件头补声明、改成 -- bash <那份脚本> 起。齐了在 stderr 打一行「长活声明齐了」。

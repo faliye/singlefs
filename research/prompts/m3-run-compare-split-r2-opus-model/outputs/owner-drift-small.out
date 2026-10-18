@@ -1,7 +1,0 @@
-SELFTEST weights=3,1 first8=[0, 0, 1, 0, 0, 0, 1, 0] weights=1,1 first6=[0, 1, 0, 1, 0, 1] ok=True
-OWNER_DRIFT kind=pipeline before=136700,45275 after=136701,45275 blocks=39917 moved=2178 moved_fraction=0.0546
-OWNER_DRIFT kind=given_states before=136700,45275 after=136701,45275 blocks=20000 moved=7629 moved_fraction=0.3815
-OWNER_DRIFT kind=pipeline before=136700,45275 after=273400,90550 blocks=39917 moved=0 moved_fraction=0.0000
-OWNER_DRIFT kind=given_states before=136700,45275 after=273400,90550 blocks=20000 moved=0 moved_fraction=0.0000
-OWNER_DRIFT kind=pipeline before=136701,45275 after=273400,90550 blocks=39917 moved=2178 moved_fraction=0.0546
-OWNER_DRIFT kind=given_states before=136701,45275 after=273400,90550 blocks=20000 moved=7629 moved_fraction=0.3815

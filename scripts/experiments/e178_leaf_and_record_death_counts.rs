@@ -9,13 +9,19 @@
 //!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-one     第一段：X4（坏镜像全表、只跑写路径）
 //!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-two     第二段：X2 与 X3 的漏活（每次扫描都读）
 //!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-three   第三段：X3 的崩溃那一半（F12 全部崩溃支）
-//!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-four [--shard i/k] [--no-reuse]
-//!                                                                                  第四段：登记修订 2 的两条新底座臂（B-stub、B-tsz）
+//!   python3 scripts/experiments/device-code-key.py run . --binary e178-leaf-and-record-death-counts --entry e7_index_bench::segment_four_item_lines \
+//!       --when-refused=--no-reuse -- segment-four [--shard i/k] [--no-reuse]
+//!                                                                                  第四段：登记修订 2 的两条新底座臂（B-stub、B-tsz），读写项库
+//!   cargo run --release --bin e178-leaf-and-record-death-counts -- segment-four --no-reuse [--shard i/k]
+//!                                                                                  第四段每项现判、不读不写项库（复跑表那一行）
 //! 线程数取环境变量 E178_THREADS（没设取 SINGLEFS_THREAD_CAP，都没设取登记的重活默认并行度 .claude/heavy-thread-default），产物按工作项的次序输出，与线程数无关。
-//! 第四段的分片、续跑与多机（登记修订 2 之十三）：997 个工作项，每项算完把产物行原子写进项目录（环境变量
-//! E178_SEGMENT_FOUR_ITEMS，默认 ~/.local/share/singlefs/work/e178-segment-four/items）下的 `<项名>.out`，第一行是键（项名、装置源
-//! sha256、几何参数）；同一条命令重起，键相同的项读回不重算。`--shard i/k` 只算序号 mod k = i 的项、只落项文件、不拼产物；
-//! 不带 `--shard` 时补算缺的项，997 项齐了按项的次序拼出产物打到 stdout。`--no-reuse` 不读项目录（项文件照写）。
+//! 第四段的分片、续跑与多机（登记修订 2 之十三、修订 4 之五）：997 个工作项，每项一把项键 = sha256（入口 `segment_four_item_lines` 的代码键
+//! 与这一项 `{item:?}` 的全部字段值）；代码键由取键脚本 `scripts/experiments/device-code-key.py` 算（单元闭包、工具链行、闭包点到的依赖行），
+//! 经 `--code-key-file` 交进来。项库在环境变量 E178_SEGMENT_FOUR_LIBRARY（默认 ~/.local/share/singlefs/experiments/e178/segment-four）：
+//! 每项算完原子写进 `items/<项键>.out`（键行、parameters、meta、产物行、done 行），组成清单存 `codes/<代码键>.txt`，不分片的那一趟拼完重写
+//! `index.tsv`（项名 → 项键，只当索引）。同一条命令重起，项键相同的项读回不重算；项名、序号、标签都不进键。`--shard i/k` 只算序号 mod k = i 的项、
+//! 只落项文件、不拼产物；不带 `--shard` 时补算缺的项，997 项齐了按项的次序拼出产物打到 stdout。`--no-reuse` 不读项库（给了代码键时项文件照写）。
+//! 旧项目录（变量 E178_SEGMENT_FOUR_ITEMS）弃用：设了它就报错退 2。
 //! 产物是 `E7RESULT` 行，收尾 `E7RESULT name=done emitted=N`（N 把 config 行与 done 行都算进去）。
 //!
 //! 登记没写死、装置取了一个读法的几格（报告与实验页逐条列，交主 agent 认）：
@@ -59,10 +65,15 @@ const INODE_RECORD_BYTES: u64 = 140;
 /// 墓碑记录 40 字节（D18 已定项 24 第 2 条）。
 const TOMBSTONE_RECORD_BYTES: u64 = 40;
 /// 退役记录 = 出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8 + 死亡 txg 8（登记第一节读法 9；宽度是本实验自定，条款没定）。
-const RETIREMENT_RECORD_BYTES: u64 = 8 + 2 + 8 + 8 + 8;
-const INODE_LEAF_RECORDS: u64 = (PACKED_CONTAINER_BYTES - PACKED_RECORDS_OFFSET) / INODE_RECORD_BYTES;
-const TOMBSTONE_CONTAINER_RECORDS: u64 = (PACKED_CONTAINER_BYTES - PACKED_RECORDS_OFFSET) / TOMBSTONE_RECORD_BYTES;
-const RETIREMENT_CONTAINER_RECORDS: u64 = (PACKED_CONTAINER_BYTES - PACKED_RECORDS_OFFSET) / RETIREMENT_RECORD_BYTES;
+const RETIREMENT_RECORD_BYTES: u64 = 34;
+const INODE_LEAF_RECORDS: u64 = 233;
+const TOMBSTONE_CONTAINER_RECORDS: u64 = 815;
+const RETIREMENT_CONTAINER_RECORDS: u64 = 959;
+// 整数字面量给门禁 format-constants 读；推导式在编译期核，两处对不上编不过
+const _: () = assert!(RETIREMENT_RECORD_BYTES == 8 + 2 + 8 + 8 + 8);
+const _: () = assert!(INODE_LEAF_RECORDS == (PACKED_CONTAINER_BYTES - PACKED_RECORDS_OFFSET) / INODE_RECORD_BYTES);
+const _: () = assert!(TOMBSTONE_CONTAINER_RECORDS == (PACKED_CONTAINER_BYTES - PACKED_RECORDS_OFFSET) / TOMBSTONE_RECORD_BYTES);
+const _: () = assert!(RETIREMENT_CONTAINER_RECORDS == (PACKED_CONTAINER_BYTES - PACKED_RECORDS_OFFSET) / RETIREMENT_RECORD_BYTES);
 /// 码 2 根：节点 16 KiB，头 = 86 + 2 × key 宽 8 + 预留 29，条目 120（D8 已定项 6「扇出 135」）。
 const NODE_BYTES: u64 = 16_384;
 const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 86;
@@ -5702,11 +5713,11 @@ fn stub_lineage_positive_control() -> (bool, String) {
         Reader { base: BaseArm::ZeroRecordStubs, shrink: ShrinkArm::RecordSize, effect: UnlinkEffectArm::AtIntent, window: ReadableWindow::Forever },
         Reader { base: BaseArm::ZeroRecordStubsIgnoringLineage, shrink: ShrinkArm::RecordSize, effect: UnlinkEffectArm::AtIntent, window: ReadableWindow::Forever },
     ];
-    let main = simulation.read_readers(&readers, &Overlay::default(), simulation.publish_sequence, SelectionPath::GroupIndex);
+    let group_index_readings = simulation.read_readers(&readers, &Overlay::default(), simulation.publish_sequence, SelectionPath::GroupIndex);
     let reference = simulation.read_readers(&readers, &Overlay::default(), simulation.publish_sequence, SelectionPath::FullScan);
-    let paths_agree = main == reference;
-    let stub = main[0];
-    let lineage_off = main[1];
+    let paths_agree = group_index_readings == reference;
+    let stub = group_index_readings[0];
+    let lineage_off = group_index_readings[1];
     let holds = rolled_back
         && paths_agree
         && (stub.container_missed, stub.inode_missed) == (0, 0)
@@ -6126,7 +6137,7 @@ fn segment_four_item_lines(item: SegmentFourItem) -> Vec<String> {
     }
 }
 
-/// SHA-256（FIPS 180-4）：续跑的键里装置源文件的指纹（修订 2 之十三）。单测钉空串与 "abc" 的标准值。
+/// SHA-256（FIPS 180-4）：第四段续跑的项键由它算（登记修订 4 之五）。单测钉空串与 "abc" 的标准值。
 fn sha256_hex(message: &[u8]) -> String {
     const ROUND_CONSTANTS: [u32; 64] = [
         0x428a_2f98, 0x7137_4491, 0xb5c0_fbcf, 0xe9b5_dba5, 0x3956_c25b, 0x59f1_11f1, 0x923f_82a4, 0xab1c_5ed5, 0xd807_aa98, 0x1283_5b01,
@@ -6187,85 +6198,292 @@ fn sha256_hex(message: &[u8]) -> String {
     state.iter().map(|word| format!("{word:08x}")).collect()
 }
 
-/// 装置自己的源码（编进二进制），续跑的键用它的 sha256：源码一改，旧项一律重算。
-const DEVICE_SOURCE: &str = include_str!("e178_leaf_and_record_death_counts.rs");
-
-/// 第四段跑法的选项：分片 (i, k)、读不读项目录、项目录在哪。
+/// 第四段跑法的选项（登记修订 4 之五）：分片 (i, k)、读不读项库、项库（`None` 是没给代码键：只认 `--no-reuse`，不读不写库）、
+/// 这一趟写进库的项文件逐行记到哪个文件（`--written-list`：取键脚本在装置退出之后再取一次键，两次不等时照它删）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct SegmentFourOptions {
     shard: Option<(usize, usize)>,
     reuse: bool,
-    items_directory: std::path::PathBuf,
+    library: Option<SegmentFourLibrary>,
+    written_list: Option<std::path::PathBuf>,
 }
 
-/// 项文件名：序号加几何，只留字母、数字与连字符。
+/// 项库（默认 `~/.local/share/singlefs/experiments/e178/segment-four/`）与这一趟的代码键：取键脚本 `scripts/experiments/device-code-key.py`
+/// 打的组成清单里 `code_key` 那一行；清单原文照存进 `codes/<代码键>.txt`（只给「变了的单元」那一句用），取键那天与机器只进项文件的 meta 行。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SegmentFourLibrary {
+    directory: std::path::PathBuf,
+    code_key: String,
+    composition: String,
+    judged: String,
+    host: String,
+}
+
+impl SegmentFourLibrary {
+    fn item_path(&self, item_key: &str) -> std::path::PathBuf {
+        self.directory.join("items").join(format!("{item_key}.out"))
+    }
+
+    fn composition_path(&self, code_key: &str) -> std::path::PathBuf {
+        self.directory.join("codes").join(format!("{code_key}.txt"))
+    }
+
+    fn index_path(&self) -> std::path::PathBuf {
+        self.directory.join("index.tsv")
+    }
+}
+
+/// 取键脚本打的组成清单的第一行（`device-code-key.py` 的 FORM_LINE）。
+const COMPOSITION_FORM_LINE: &str = "form\tdevice-code-key-v1";
+/// 第四段的项都从这个入口进（登记修订 4 之一「读法写死」）：组成清单里那一行 code_key 的入口要以它收尾。
+const SEGMENT_FOUR_ENTRY_SUFFIX: &str = "::segment_four_item_lines";
+
+/// 读组成清单：第一行是 form，恰好一行 code_key（入口是 `segment_four_item_lines`，键是十六进制），judged 与 host 两行可缺（缺写 `-`）。
+fn segment_four_library_from_composition(directory: std::path::PathBuf, composition: &str) -> Result<SegmentFourLibrary, String> {
+    if composition.lines().next() != Some(COMPOSITION_FORM_LINE) {
+        return Err("--code-key-file 不是 device-code-key.py 打的组成清单（第一行不是 form\tdevice-code-key-v1）".to_string());
+    }
+    let field = |name: &str| {
+        composition.lines().find_map(|line| line.strip_prefix(name).and_then(|rest| rest.strip_prefix('\t'))).unwrap_or("-").to_string()
+    };
+    let code_keys: Vec<(&str, &str)> = composition.lines().filter_map(|line| line.strip_prefix("code_key\t")).filter_map(|rest| rest.split_once('\t')).collect();
+    let [(entry, code_key)] = code_keys.as_slice() else {
+        return Err(format!("组成清单里要恰好一行 code_key，读到 {} 行", code_keys.len()));
+    };
+    if !entry.ends_with(SEGMENT_FOUR_ENTRY_SUFFIX) {
+        return Err(format!("组成清单的入口是 {entry}：第四段的项从 segment_four_item_lines 进（登记修订 4 之一）"));
+    }
+    if code_key.is_empty() || !code_key.chars().all(|character| character.is_ascii_hexdigit()) {
+        return Err(format!("组成清单里的代码键不是十六进制：{code_key}"));
+    }
+    Ok(SegmentFourLibrary { directory, code_key: (*code_key).to_string(), composition: composition.to_string(), judged: field("judged"), host: field("host") })
+}
+
+/// 项名：序号加几何，只留字母、数字与连字符。只给 `index.tsv` 当索引（数键对不上的项、给人看），不进键、读回不经它。
 fn segment_four_item_name(position: usize, item: SegmentFourItem) -> String {
     let geometry: String = item.label().chars().map(|character| if character.is_ascii_alphanumeric() || character == '-' { character } else { '_' }).collect();
     format!("{position:04}-{geometry}")
 }
 
-/// 项文件的第一行：项名、装置源 sha256、几何参数（修订 2 之十三）。
-fn segment_four_item_key(name: &str, item: SegmentFourItem, device_source_sha256: &str) -> String {
-    format!("key item={name} device_source_sha256={device_source_sha256} geometry={}", item.label())
+/// 项键（登记修订 4 之五）：sha256（`code\t<代码键>\nparameters\t<{item:?}>\n`）。参数取 `derive(Debug)` 打的全部字段值，不用 `label()` 拼的串；
+/// 序号、项名、`label()`、库路径、线程数、分片、日期都不进。
+fn segment_four_item_key(code_key: &str, item: SegmentFourItem) -> String {
+    let code_line = format!("code\t{code_key}\n");
+    let parameters_line = format!("parameters\t{item:?}\n");
+    sha256_hex([code_line, parameters_line].concat().as_bytes())
 }
 
-/// 读回一个项文件：第一行键相同、末行 `done` 报的行数对得上才算数，不然交回 None（重算）。
-fn read_back_the_item(path: &std::path::Path, key: &str) -> Option<Vec<String>> {
+/// 项文件的第一行：项键与代码键（读回时两个都要等）。
+fn segment_four_item_header(item_key: &str, code_key: &str) -> String {
+    format!("key item_key={item_key} code_key={code_key}")
+}
+
+/// 读回一个项文件：第一行是给的键行，第二、三行是 parameters 与 meta（跳过、不比），末行 `done` 报的行数对得上才算数；不然交回 None（现判）。
+fn read_back_the_item(path: &std::path::Path, header: &str) -> Option<Vec<String>> {
     let contents = std::fs::read_to_string(path).ok()?;
     let mut lines: Vec<String> = contents.lines().map(str::to_string).collect();
-    if lines.first().map(String::as_str) != Some(key) {
+    if lines.first().map(String::as_str) != Some(header) {
         return None;
     }
     let done = lines.pop()?;
-    let item_lines: Vec<String> = lines.into_iter().skip(1).collect();
+    if lines.len() < 3 || !lines[1].starts_with("parameters ") || !lines[2].starts_with("meta ") {
+        return None;
+    }
+    let item_lines: Vec<String> = lines.into_iter().skip(3).collect();
     (done == format!("done lines={}", item_lines.len())).then_some(item_lines)
 }
 
-/// 一项算完原子落盘：同目录临时文件写完、fsync、改名，再 fsync 目录。
-fn write_the_item_atomically(directory: &std::path::Path, name: &str, key: &str, item_lines: &[String]) -> std::io::Result<()> {
+/// 项文件的全文（登记修订 4 之五）：键行、parameters、meta（判定日期、跑法、机器；只当记录）、产物行、`done lines=<行数>`。
+fn segment_four_item_file_text(header: &str, item: SegmentFourItem, meta: &str, item_lines: &[String]) -> String {
+    let mut text = format!("{header}\nparameters {item:?}\n{meta}\n");
+    for line in item_lines {
+        text.push_str(line);
+        text.push('\n');
+    }
+    text.push_str(&format!("done lines={}\n", item_lines.len()));
+    text
+}
+
+/// 临时文件名的序号：同一个进程里几个线程同时写库，各用各的临时文件。
+static TEMPORARY_FILE_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
+
+/// 原子落盘：同目录临时文件写完、fsync、改名，再 fsync 目录（目录不在先建）。
+fn write_text_atomically(final_path: &std::path::Path, text: &str) -> std::io::Result<()> {
     use std::io::Write;
-    let final_path = directory.join(format!("{name}.out"));
-    let temporary_path = directory.join(format!(".{name}.tmp-{}", std::process::id()));
+    let directory = final_path.parent().expect("库里的文件都在某个目录下");
+    std::fs::create_dir_all(directory)?;
+    let file_name = final_path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+    let sequence = TEMPORARY_FILE_SEQUENCE.fetch_add(1, Ordering::SeqCst);
+    let temporary_path = directory.join(format!(".{file_name}.tmp-{}-{sequence}", std::process::id()));
     {
         let mut file = std::fs::File::create(&temporary_path)?;
-        writeln!(file, "{key}")?;
-        for line in item_lines {
-            writeln!(file, "{line}")?;
-        }
-        writeln!(file, "done lines={}", item_lines.len())?;
+        file.write_all(text.as_bytes())?;
         file.sync_all()?;
     }
-    std::fs::rename(&temporary_path, &final_path)?;
+    std::fs::rename(&temporary_path, final_path)?;
     std::fs::File::open(directory)?.sync_all()
 }
 
-/// 算（或读回）给定的项：分片之外的项不碰，交回 (每项的行，没轮到的是 None；现判数；复用数)。
-fn compute_or_reuse_the_items(items: &[SegmentFourItem], threads: usize, options: &SegmentFourOptions) -> (Vec<Option<Vec<String>>>, u64, u64) {
-    let device_source_sha256 = sha256_hex(DEVICE_SOURCE.as_bytes());
-    std::fs::create_dir_all(&options.items_directory).expect("项目录建得出来（E178_SEGMENT_FOUR_ITEMS）");
+/// 项库的 `index.tsv`：`<项名>\t<项键>`，上一趟拼完时写的；不在、读不出交空表。只给人看与数键对不上的项，读回不经它。
+fn read_the_index(library: &SegmentFourLibrary) -> BTreeMap<String, String> {
+    std::fs::read_to_string(library.index_path())
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|line| line.split_once('\t'))
+        .map(|(name, item_key)| (name.to_string(), item_key.to_string()))
+        .collect()
+}
+
+/// 键对不上的项：这一趟的项名在上一趟的 `index.tsv` 里有、记的项键与这一趟的不等（新进清单的项不算）。
+fn count_mismatched_keys(previous_index: &BTreeMap<String, String>, current: &[(String, String)]) -> u64 {
+    length_as_u64(current.iter().filter(|(name, item_key)| previous_index.get(name).is_some_and(|previous_key| previous_key != item_key)).count())
+}
+
+/// 项文件第一行里记的代码键；文件不在、第一行认不出交 None。
+fn code_key_recorded_in(path: &std::path::Path) -> Option<String> {
+    let contents = std::fs::read_to_string(path).ok()?;
+    let header = contents.lines().next()?;
+    header.split(' ').find_map(|field| field.strip_prefix("code_key=")).map(str::to_string)
+}
+
+/// 「变了的单元」那一句最多点名几个单元，多出的报个数。
+const CHANGED_UNITS_NAMED_AT_MOST: usize = 20;
+
+/// 两份组成清单比：单元行按（入口，种类，限定名，文件）对，改了、新进、出去的各列限定名（合起来至多 20 个，多出的报个数）；
+/// 单元都没变的，报工具链行与依赖行各变了几行。
+fn changed_units_between(previous: &str, current: &str) -> String {
+    type UnitIdentity = (String, String, String, String);
+    let units_of = |text: &str| -> BTreeMap<UnitIdentity, String> {
+        text.lines()
+            .filter_map(|line| {
+                let columns: Vec<&str> = line.split('\t').collect();
+                let [kind_column, entry, kind, qualified, location, fingerprint] = columns.as_slice() else { return None };
+                if *kind_column != "unit" {
+                    return None;
+                }
+                let file = location.rsplit_once(':').map_or(*location, |(file, _span)| file);
+                Some((((*entry).to_string(), (*kind).to_string(), (*qualified).to_string(), file.to_string()), (*fingerprint).to_string()))
+            })
+            .collect()
+    };
+    let lines_with = |text: &str, prefix: &str| -> BTreeSet<String> { text.lines().filter(|line| line.starts_with(prefix)).map(str::to_string).collect() };
+    let (before, after) = (units_of(previous), units_of(current));
+    let changed: Vec<&str> = before.iter().filter(|(identity, fingerprint)| after.get(*identity).is_some_and(|now| now != *fingerprint)).map(|(identity, _)| identity.2.as_str()).collect();
+    let entered: Vec<&str> = after.keys().filter(|identity| !before.contains_key(*identity)).map(|identity| identity.2.as_str()).collect();
+    let left: Vec<&str> = before.keys().filter(|identity| !after.contains_key(*identity)).map(|identity| identity.2.as_str()).collect();
+    if changed.is_empty() && entered.is_empty() && left.is_empty() {
+        let differing = |prefix: &str| lines_with(previous, prefix).symmetric_difference(&lines_with(current, prefix)).count();
+        return format!("单元都没变：工具链行变了 {} 行、依赖行变了 {} 行", differing("toolchain\t"), differing("dependency\t"));
+    }
+    let mut named = 0;
+    let mut parts = Vec::new();
+    for (label, names) in [("改了", &changed), ("新进", &entered), ("出去", &left)] {
+        if names.is_empty() {
+            continue;
+        }
+        let room = CHANGED_UNITS_NAMED_AT_MOST.saturating_sub(named);
+        let shown: Vec<&str> = names.iter().take(room).copied().collect();
+        named += shown.len();
+        let more = if names.len() > shown.len() { format!("（另 {} 个）", names.len() - shown.len()) } else { String::new() };
+        parts.push(format!("{label} {}{more}", shown.join("、")));
+    }
+    format!("变了的单元：{}", parts.join("；"))
+}
+
+/// 键对不上时那一句（登记修订 4 之五「成功句」）：找上一趟那几项记的代码键，与这一趟的不同就比两份组成清单。
+fn changed_units_sentence(library: &SegmentFourLibrary, previous_index: &BTreeMap<String, String>, current: &[(String, String)]) -> String {
+    let mut previous_code_keys = BTreeSet::new();
+    let mut unreadable = 0_u64;
+    for (name, item_key) in current {
+        let Some(previous_key) = previous_index.get(name).filter(|previous_key| *previous_key != item_key) else { continue };
+        match code_key_recorded_in(&library.item_path(previous_key)) {
+            Some(code_key) => {
+                previous_code_keys.insert(code_key);
+            }
+            None => unreadable += 1,
+        }
+    }
+    let Some(previous_code_key) = previous_code_keys.iter().find(|code_key| **code_key != library.code_key) else {
+        return if unreadable > 0 {
+            format!("上一趟的项文件不在库里（{unreadable} 项），说不出变了哪些单元")
+        } else {
+            "代码键没变：键对不上的那几项是项的参数变了".to_string()
+        };
+    };
+    match std::fs::read_to_string(library.composition_path(previous_code_key)) {
+        Ok(previous) => changed_units_between(&previous, &library.composition),
+        Err(_) => format!("上一趟的组成清单 codes/{previous_code_key}.txt 不在库里，说不出变了哪些单元"),
+    }
+}
+
+/// 写进 meta 行的跑法：full、no-reuse、shard-<i>/<k>，不复用的分片接 `,no-reuse`。
+fn segment_four_how(options: &SegmentFourOptions) -> String {
+    match (options.shard, options.reuse) {
+        (None, true) => "full".to_string(),
+        (None, false) => "no-reuse".to_string(),
+        (Some((index, count)), true) => format!("shard-{index}/{count}"),
+        (Some((index, count)), false) => format!("shard-{index}/{count},no-reuse"),
+    }
+}
+
+/// 一趟第四段算下来的项：每项的行（分片之外的是 None）、现判数、复用数、键对不上的项数与那一句（没有键对不上的是 None）。
+struct SegmentFourItemsOutcome {
+    item_lines: Vec<Option<Vec<String>>>,
+    computed: u64,
+    reused: u64,
+    mismatched: u64,
+    changed_units: Option<String>,
+}
+
+/// 算（或按项键读回）给定的项：分片之外的项不碰。有项库时：组成清单存进 `codes/`；复用时按项键找 `items/<项键>.out`，读不回的现判、
+/// 原子写回、把文件路径记进 `--written-list`；不分片的那一趟拼完重写 `index.tsv`。没有项库（没给代码键）时每项现判、一个文件都不写。
+fn compute_or_reuse_the_items(items: &[SegmentFourItem], threads: usize, options: &SegmentFourOptions) -> SegmentFourItemsOutcome {
+    use std::io::Write;
+    let previous_index = options.library.as_ref().map(read_the_index).unwrap_or_default();
+    if let Some(library) = &options.library {
+        write_text_atomically(&library.composition_path(&library.code_key), &library.composition).expect("组成清单写得进项库的 codes/");
+    }
+    let written_list = options.written_list.as_ref().map(|path| {
+        Mutex::new(std::fs::OpenOptions::new().create(true).append(true).open(path).expect("--written-list 给的文件打得开"))
+    });
+    let meta = options.library.as_ref().map(|library| format!("meta judged={} how={} host={}", library.judged, segment_four_how(options), library.host));
     let positions: Vec<usize> = (0..items.len()).collect();
     let outcomes = run_in_parallel(&positions, threads, |position| {
         if let Some((shard_index, shard_count)) = options.shard {
             if position % shard_count != shard_index {
-                return (None, false);
+                return (None, false, None);
             }
         }
         let item = items[position];
+        let (Some(library), Some(meta)) = (&options.library, &meta) else {
+            return (Some(segment_four_item_lines(item)), false, None);
+        };
         let name = segment_four_item_name(position, item);
-        let key = segment_four_item_key(&name, item, &device_source_sha256);
-        let path = options.items_directory.join(format!("{name}.out"));
+        let item_key = segment_four_item_key(&library.code_key, item);
+        let path = library.item_path(&item_key);
         if options.reuse {
-            if let Some(item_lines) = read_back_the_item(&path, &key) {
-                return (Some(item_lines), true);
+            if let Some(item_lines) = read_back_the_item(&path, &segment_four_item_header(&item_key, &library.code_key)) {
+                return (Some(item_lines), true, Some((name, item_key)));
             }
         }
         let item_lines = segment_four_item_lines(item);
-        write_the_item_atomically(&options.items_directory, &name, &key, &item_lines).expect("项文件写得进项目录");
-        (Some(item_lines), false)
+        let text = segment_four_item_file_text(&segment_four_item_header(&item_key, &library.code_key), item, meta, &item_lines);
+        write_text_atomically(&path, &text).expect("项文件写得进项库的 items/");
+        if let Some(list) = &written_list {
+            writeln!(list.lock().expect("记写过的项文件的锁没有中毒"), "{}", path.display()).expect("--written-list 写得进去");
+        }
+        (Some(item_lines), false, Some((name, item_key)))
     });
-    let computed = length_as_u64(outcomes.iter().filter(|(item_lines, reused)| item_lines.is_some() && !reused).count());
-    let reused = length_as_u64(outcomes.iter().filter(|(_, reused)| *reused).count());
-    (outcomes.into_iter().map(|(item_lines, _)| item_lines).collect(), computed, reused)
+    let computed = length_as_u64(outcomes.iter().filter(|(item_lines, reused, _)| item_lines.is_some() && !reused).count());
+    let reused = length_as_u64(outcomes.iter().filter(|(_, reused, _)| *reused).count());
+    let current: Vec<(String, String)> = outcomes.iter().filter_map(|(_, _, named_key)| named_key.clone()).collect();
+    let mismatched = count_mismatched_keys(&previous_index, &current);
+    let changed_units = options.library.as_ref().filter(|_| mismatched > 0).map(|library| changed_units_sentence(library, &previous_index, &current));
+    if let (Some(library), None) = (&options.library, options.shard) {
+        let index: String = current.iter().map(|(name, item_key)| format!("{name}\t{item_key}\n")).collect();
+        write_text_atomically(&library.index_path(), &index).expect("index.tsv 写得进项库");
+    }
+    SegmentFourItemsOutcome { item_lines: outcomes.into_iter().map(|(item_lines, _, _)| item_lines).collect(), computed, reused, mismatched, changed_units }
 }
 
 /// 产物行的字段：按空格切开的 `键=值`（值里没有空格；`name=` 后面那一段也在里面）。
@@ -6812,22 +7030,68 @@ fn segment_four_summary_lines(items: &[SegmentFourItem], item_lines: &[Vec<Strin
     lines
 }
 
-/// 第四段入口：补算没落盘的项；带 `--shard` 只落项文件、打一行进度；不带时 997 项齐了拼产物。现判、复用数打到 stderr（产物与续跑无关）。
+/// 第四段入口：补算没落盘的项；带 `--shard` 只落项文件、打一行进度；不带时 997 项齐了拼产物。成功句打到 stderr（产物与续跑无关）：
+/// 有项库时「现判、复用、键对不上」三个数（登记修订 4 之五），键对不上 > 0 时下一行写变了的单元；没项库时写没入库。
 fn run_segment_four(threads: usize, options: &SegmentFourOptions) -> Vec<String> {
     let items = segment_four_items();
-    let (item_lines, computed, reused) = compute_or_reuse_the_items(&items, threads, options);
-    eprintln!("segment-four: 现判 {computed}、复用 {reused}（共 {} 项，分片 {:?}，项目录 {}）", items.len(), options.shard, options.items_directory.display());
-    if options.shard.is_some() {
-        return vec![format!("name=shard_progress computed={computed} reused={reused} items={}", items.len())];
+    let outcome = compute_or_reuse_the_items(&items, threads, options);
+    let shard_text = options.shard.map_or_else(|| "不分片".to_string(), |(index, count)| format!("{index}/{count}"));
+    match &options.library {
+        Some(library) => {
+            eprintln!(
+                "segment-four: 现判 {}、复用 {}、键对不上 {} 项（共 {} 项，分片 {shard_text}，库 {}）",
+                outcome.computed,
+                outcome.reused,
+                outcome.mismatched,
+                items.len(),
+                library.directory.display()
+            );
+            if let Some(sentence) = &outcome.changed_units {
+                eprintln!("segment-four: {sentence}");
+            }
+        }
+        None => eprintln!(
+            "segment-four: 现判 {}、复用 {}、没入库（没给代码键：--no-reuse 不读不写库；共 {} 项，分片 {shard_text}）",
+            outcome.computed,
+            outcome.reused,
+            items.len()
+        ),
     }
-    let complete: Vec<Vec<String>> = item_lines.into_iter().map(|lines| lines.expect("不分片时每一项都算过或读回")).collect();
+    if options.shard.is_some() {
+        return vec![format!("name=shard_progress computed={} reused={} items={}", outcome.computed, outcome.reused, items.len())];
+    }
+    let complete: Vec<Vec<String>> = outcome.item_lines.into_iter().map(|lines| lines.expect("不分片时每一项都算过或读回")).collect();
     assemble_segment_four(&items, &complete)
 }
 
-/// `segment-four` 的参数：`--shard i/k`、`--no-reuse`；项目录取 E178_SEGMENT_FOUR_ITEMS，默认在 work 目录下。
-fn segment_four_options_from(arguments: &[String]) -> Result<SegmentFourOptions, String> {
+/// 第四段参数解析要读的环境（单测换成假的，不动进程的环境变量）：项库目录（`E178_SEGMENT_FOUR_LIBRARY`）、
+/// 旧项目录的变量（`E178_SEGMENT_FOUR_ITEMS`）设没设、HOME。
+struct SegmentFourEnvironment {
+    library_directory: Option<std::ffi::OsString>,
+    old_items_variable_is_set: bool,
+    home: std::ffi::OsString,
+}
+
+impl SegmentFourEnvironment {
+    fn of_this_process() -> SegmentFourEnvironment {
+        SegmentFourEnvironment {
+            library_directory: std::env::var_os("E178_SEGMENT_FOUR_LIBRARY"),
+            old_items_variable_is_set: std::env::var_os("E178_SEGMENT_FOUR_ITEMS").is_some(),
+            home: std::env::var_os("HOME").unwrap_or_default(),
+        }
+    }
+}
+
+/// `segment-four` 的参数（登记修订 4 之六第 5 条）：`--shard i/k`、`--no-reuse`、`--code-key-file <组成清单>`、`--written-list <文件>`。
+/// 不给 `--code-key-file` 只认 `--no-reuse`（每项现判、不读不写库，产物照打）；设了旧变量 `E178_SEGMENT_FOUR_ITEMS` 报错（旧项目录弃用）。
+fn segment_four_options_from(arguments: &[String], environment: &SegmentFourEnvironment) -> Result<SegmentFourOptions, String> {
+    if environment.old_items_variable_is_set {
+        return Err("E178_SEGMENT_FOUR_ITEMS 是旧项目录的变量：旧项目录弃用（登记修订 4 之五），项库改取 E178_SEGMENT_FOUR_LIBRARY".to_string());
+    }
     let mut shard = None;
     let mut reuse = true;
+    let mut code_key_file: Option<std::path::PathBuf> = None;
+    let mut written_list: Option<std::path::PathBuf> = None;
     let mut remaining = arguments.iter();
     while let Some(argument) = remaining.next() {
         match argument.as_str() {
@@ -6842,17 +7106,35 @@ fn segment_four_options_from(arguments: &[String]) -> Result<SegmentFourOptions,
                 }
                 shard = Some((index, count));
             }
+            "--code-key-file" => code_key_file = Some(std::path::PathBuf::from(remaining.next().ok_or("--code-key-file 后面缺文件")?)),
+            "--written-list" => written_list = Some(std::path::PathBuf::from(remaining.next().ok_or("--written-list 后面缺文件")?)),
             other => return Err(format!("认不得的参数：{other}")),
         }
     }
-    let items_directory = std::env::var_os("E178_SEGMENT_FOUR_ITEMS").map_or_else(
-        || std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".local/share/singlefs/work/e178-segment-four/items"),
+    let directory = environment.library_directory.as_ref().map_or_else(
+        || std::path::PathBuf::from(&environment.home).join(".local/share/singlefs/experiments/e178/segment-four"),
         std::path::PathBuf::from,
     );
-    Ok(SegmentFourOptions { shard, reuse, items_directory })
+    let library = match &code_key_file {
+        Some(path) => {
+            let composition = std::fs::read_to_string(path).map_err(|error| format!("读不了 --code-key-file {}：{error}", path.display()))?;
+            Some(segment_four_library_from_composition(directory, &composition)?)
+        }
+        None => None,
+    };
+    if library.is_none() && reuse {
+        return Err("没给 --code-key-file 时只认 --no-reuse（每项现判、不读不写库）；要读写项库，经 scripts/experiments/device-code-key.py run 起".to_string());
+    }
+    if library.is_none() && written_list.is_some() {
+        return Err("--written-list 要与 --code-key-file 一起给".to_string());
+    }
+    Ok(SegmentFourOptions { shard, reuse, library, written_list })
 }
 
-include!("heavy_threads_default/threads.rs");
+// 写成 `#[path] mod` 而不是条目级 `include!`：`unit-graph` 把条目级 `include!` 记成拒算，入口闭包的键就算不出（登记修订 4 之六第 2 条）。
+#[path = "heavy_threads_default/threads.rs"]
+mod heavy_threads_default;
+use heavy_threads_default::default_heavy_threads;
 
 /// 线程数：`E178_THREADS`，没设取 `SINGLEFS_THREAD_CAP`，都没设取登记的重活默认并行度（`.claude/heavy-thread-default`）。
 fn threads_from_the_environment() -> usize {
@@ -6868,12 +7150,13 @@ fn main() {
     let arguments: Vec<String> = std::env::args().collect();
     let mode = arguments.get(1).cloned().unwrap_or_default();
     let threads = threads_from_the_environment();
-    let usage = "用法：e178-leaf-and-record-death-counts segment-one | segment-two | segment-three | segment-four [--shard i/k] [--no-reuse]";
+    let usage = "用法：e178-leaf-and-record-death-counts segment-one | segment-two | segment-three \
+                 | segment-four [--shard i/k] [--no-reuse] [--code-key-file <组成清单> --written-list <文件>]（读写项库经 scripts/experiments/device-code-key.py run 起）";
     let emitted_lines = match mode.as_str() {
         "segment-one" => run_segment_one(threads),
         "segment-two" => run_segment_two(threads),
         "segment-three" => run_segment_three(threads),
-        "segment-four" => match segment_four_options_from(&arguments[2..]) {
+        "segment-four" => match segment_four_options_from(&arguments[2..], &SegmentFourEnvironment::of_this_process()) {
             Ok(options) => run_segment_four(threads, &options),
             Err(problem) => {
                 eprintln!("{problem}\n{usage}");
@@ -6896,7 +7179,7 @@ fn main() {
 mod tests {
     use super::*;
 
-    fn cell(borrow_arm: BorrowArm, leaf_capacity: u64, merge_threshold: u64) -> WritePathCell {
+    fn write_path_cell(borrow_arm: BorrowArm, leaf_capacity: u64, merge_threshold: u64) -> WritePathCell {
         WritePathCell { borrow_arm, leaf_capacity, merge_threshold }
     }
 
@@ -7002,8 +7285,8 @@ mod tests {
     #[test]
     fn without_merges_both_borrow_arms_write_the_same_stream() {
         let history = History::BuildAndDeleteEmptyInodes { inode_count: 300, order: DeletionOrder::Random(1) };
-        let raise_separator = run_write_path(history, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0));
-        let renew_identity = run_write_path(history, cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 0));
+        let raise_separator = run_write_path(history, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0));
+        let renew_identity = run_write_path(history, write_path_cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 0));
         let pair = pair_statistics(&raise_separator, &renew_identity);
         assert!(pair.streams_identical && pair.user_changes_identical && pair.publish_counts_identical);
         assert_eq!(pair.borrow_publishes, 0);
@@ -7013,7 +7296,7 @@ mod tests {
     #[test]
     fn at_zero_threshold_every_emptied_leaf_writes_one_retirement_record() {
         let history = History::BuildAndDeleteEmptyInodes { inode_count: 300, order: DeletionOrder::Ascending };
-        let run = run_write_path(history, cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 0));
+        let run = run_write_path(history, write_path_cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 0));
         assert_eq!(run.written.retirement_records, 17 + 1);
         assert_eq!(run.drops, 17 + 1);
         assert_eq!(run.assertions.violations_of("A8_retirements_equal_identity_disappearances"), 0);
@@ -7022,15 +7305,15 @@ mod tests {
     /// A1：H51 逐段重放的发布数与被拒步数（F1 式子 607；F8 式子；F3 五段与 E177 产物那两段相同）（第九节 M14 在这里红）。
     #[test]
     fn the_replayed_histories_match_the_registered_publish_counts() {
-        let first = run_write_path(History::BuildAndDeleteEmptyInodes { inode_count: 300, order: DeletionOrder::EvenThenOdd }, cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0));
+        let first = run_write_path(History::BuildAndDeleteEmptyInodes { inode_count: 300, order: DeletionOrder::EvenThenOdd }, write_path_cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0));
         assert_eq!(first.publishes, 606 + 1);
         let large = run_write_path(
             History::LargeFileRewriteAndDelete { data_units: 300, rewrites: 5, overwrite_before_unlink: false, batch: 144 },
-            cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0),
+            write_path_cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0),
         );
         assert_eq!(large.publishes, 12 + 1);
         for (seed, publishes, refused) in E177_MIXED_RANDOM_PUBLISHES_AND_REFUSALS {
-            let mixed = run_write_path(History::MixedRandom { seed }, cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 8));
+            let mixed = run_write_path(History::MixedRandom { seed }, write_path_cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 8));
             assert_eq!((mixed.publishes, mixed.refused_steps), (publishes, refused), "seed {seed}");
             assert_eq!(mixed.assertions.violations_of("A1_history_publishes"), 0);
         }
@@ -7043,7 +7326,7 @@ mod tests {
         let history = History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Ascending, batch: 144 };
         for threshold in [4, 8] {
             for borrow_arm in BORROW_ARMS {
-                let run = run_write_path(history, cell(borrow_arm, TEST_LEAF_CAPACITY, threshold));
+                let run = run_write_path(history, write_path_cell(borrow_arm, TEST_LEAF_CAPACITY, threshold));
                 assert!(self_check_holds(borrow_arm, threshold, run.self_check), "{borrow_arm:?} θ {threshold}: {:?}", run.self_check);
                 assert!(path_was_covered(&run), "{borrow_arm:?} θ {threshold}: borrows {} shortened {} unlinked {}", run.borrows, run.moved_then_shortened, run.moved_then_unlinked);
                 assert!(run.absorbs > 0);
@@ -7059,8 +7342,8 @@ mod tests {
     #[test]
     fn every_borrow_costs_renewed_identity_one_container_and_one_root() {
         let history = History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Random(2), batch: 1 };
-        let raise_separator = run_write_path(history, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8));
-        let renew_identity = run_write_path(history, cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 8));
+        let raise_separator = run_write_path(history, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8));
+        let renew_identity = run_write_path(history, write_path_cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 8));
         let pair = pair_statistics(&raise_separator, &renew_identity);
         assert!(pair.borrow_publishes > 0);
         assert_eq!((pair.extra_code_three_per_borrow.smallest, pair.extra_code_three_per_borrow.largest), (Some(1), Some(1)));
@@ -7107,7 +7390,7 @@ mod tests {
     #[test]
     fn after_an_overwrite_shrinks_a_file_only_the_object_gate_resurrects_its_tail() {
         let history = History::LargeFileRewriteAndDelete { data_units: 3, rewrites: 0, overwrite_before_unlink: true, batch: 144 };
-        let (simulation, _) = simulate(history, cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0), true);
+        let (simulation, _) = simulate(history, write_path_cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0), true);
         let overwrite_scan = simulation
             .publish_records
             .iter()
@@ -7126,7 +7409,7 @@ mod tests {
     #[test]
     fn the_intent_effect_misses_the_record_and_every_remaining_unit_in_the_window() {
         let history = History::LargeFileRewriteAndDelete { data_units: 300, rewrites: 0, overwrite_before_unlink: false, batch: 144 };
-        let (simulation, _) = simulate(history, cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0), true);
+        let (simulation, _) = simulate(history, write_path_cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0), true);
         let intent_effect = position_of(BaseArm::RetirementOnLineage, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever);
         let deferred_read = position_of(BaseArm::RetirementOnLineage, ShrinkArm::RecordSize, UnlinkEffectArm::AtLastBatchRead, ReadableWindow::Forever);
         let in_window: Vec<&ScanRecord> = simulation.scans.iter().filter(|scan| scan.inside_an_unlink).collect();
@@ -7140,7 +7423,7 @@ mod tests {
     #[test]
     fn the_deferred_read_effect_keeps_the_record_while_it_is_still_in_the_tree() {
         let history = History::BuildAndDeleteEmptyInodes { inode_count: 300, order: DeletionOrder::Ascending };
-        let (simulation, _) = simulate(history, cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0), true);
+        let (simulation, _) = simulate(history, write_path_cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0), true);
         let deferred_read = position_of(BaseArm::RetirementOnLineage, ShrinkArm::RecordSize, UnlinkEffectArm::AtLastBatchRead, ReadableWindow::Forever);
         let intent_effect = position_of(BaseArm::RetirementOnLineage, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever);
         let trajectories = trajectories_of(&simulation.scans, every_reader().len());
@@ -7153,7 +7436,7 @@ mod tests {
     /// txg 已重发、被抛弃那一批的叶容器落在父链上，只有已发布谓词挡它；E-L-w × Z 的 extent m 是 0。
     #[test]
     fn the_published_predicate_hides_the_batch_the_crash_abandoned() {
-        let (prefix, object) = build_crash_prefix(CrashPrefix::FirstFileOnly, cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0)).expect("P-1 前缀");
+        let (prefix, object) = build_crash_prefix(CrashPrefix::FirstFileOnly, write_path_cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0)).expect("P-1 前缀");
         let mut simulation = prefix;
         simulation.batch_data_units = 1;
         simulation.apply(UserChange::WriteFile { object, data_units: 145 });
@@ -7174,7 +7457,7 @@ mod tests {
     /// 第九节 M13：同号多条时取写序最大的那个容器里的那条。植入一片写序最大、装 (1, b, size 0) 的叶容器，Z 判 inode 1 的单元死（extent m = 1）。
     #[test]
     fn duplicate_records_are_taken_from_the_container_with_the_newest_write_order() {
-        let simulation = Simulation::start(cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0), PRODUCT_UNLINK_BATCH_DATA_UNITS, false);
+        let simulation = Simulation::start(write_path_cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0), PRODUCT_UNLINK_BATCH_DATA_UNITS, false);
         let record = simulation.version.record_of(FIRST_FILE_INODE).expect("新池新建文件");
         let planted = InodeRecord { inode: FIRST_FILE_INODE, object_birth: record.object_birth, nlink: 1, size_bytes: 0, change_counter: 0 };
         let overlay = Overlay::planting(vec![Simulation::planted_leaf(planted, simulation.newest_write_order(), simulation.publish_sequence)]);
@@ -7193,7 +7476,7 @@ mod tests {
     /// 回退之后第一次追加退役记录就是重跑缺口里第一次身份消失，左移重写又给后面几片换了诞生 txg（修订 1）。
     #[test]
     fn after_a_rollback_retirements_and_tombstones_from_the_gap_do_not_apply() {
-        let (simulation, outcome) = simulate(History::RollBackOverAGap { event: GapEvent::Absorb }, cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 8), true);
+        let (simulation, outcome) = simulate(History::RollBackOverAGap { event: GapEvent::Absorb }, write_path_cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 8), true);
         let outcome = outcome.expect("F11 交回回退的结局");
         assert!(outcome.event_found);
         assert!(outcome.retirement_records_after_the_rollback > 0);
@@ -7218,9 +7501,9 @@ mod tests {
     #[test]
     fn the_group_index_reads_the_same_as_a_full_scan() {
         for (history, write_path) in [
-            (History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Random(3), batch: 1 }, cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 4)),
-            (History::RollBackOverAGap { event: GapEvent::Drop }, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0)),
-            (History::MixedRandom { seed: 3 }, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8)),
+            (History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Random(3), batch: 1 }, write_path_cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 4)),
+            (History::RollBackOverAGap { event: GapEvent::Drop }, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0)),
+            (History::MixedRandom { seed: 3 }, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8)),
         ] {
             let (simulation, _) = simulate(history, write_path, false);
             assert!(simulation.group_index_equals_the_full_scan(simulation.publish_sequence), "{}", history.label());
@@ -7232,7 +7515,7 @@ mod tests {
     fn positive_controls_on_a_many_objects_history_agree_on_both_paths() {
         let item = SegmentTwoItem {
             history: History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Ascending, batch: 144 },
-            cell: cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 4),
+            cell: write_path_cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 4),
         };
         let result = run_segment_two_item(item);
         assert!(result.two_runs_identical && result.last_scan_paths_agree);
@@ -7251,7 +7534,7 @@ mod tests {
     /// 第三段：P-1、u = 3、b = 1 上三个崩溃点；两路对得上，PC-O 两项与 PC-M 的期望成立；E-I 下崩溃点 extent m = 这一版剩下的单元数。
     #[test]
     fn crash_branches_count_what_the_rebuilt_view_misses() {
-        let (prefix, object) = build_crash_prefix(CrashPrefix::FirstFileOnly, cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0)).expect("P-1 前缀");
+        let (prefix, object) = build_crash_prefix(CrashPrefix::FirstFileOnly, write_path_cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0)).expect("P-1 前缀");
         let outcomes = run_crash_branches(&prefix, object, 3, 1);
         assert_eq!(outcomes.len(), 3);
         let intent_effect = position_of(BaseArm::RetirementOnLineage, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever);
@@ -7310,7 +7593,7 @@ mod tests {
     #[test]
     fn stub_write_path_on_emptied_inodes_matches_the_closed_forms() {
         let history = History::BuildAndDeleteEmptyInodes { inode_count: 300, order: DeletionOrder::Ascending };
-        let (simulation, _) = stub_path_simulation(history, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0), false);
+        let (simulation, _) = stub_path_simulation(history, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0), false);
         let stubs_written: u64 = simulation.publish_records.iter().map(|record| record.stubs_written).sum();
         assert_eq!((stubs_written, simulation.version.stub_count()), (17 + 1, 17 + 1));
         let last = simulation.publish_records.last().expect("有发布");
@@ -7323,7 +7606,7 @@ mod tests {
         assert_eq!(first_stub_publish_and_versions_with_a_stub(900, INODE_LEAF_RECORDS), (950 + 1, 868 + 1));
         assert_eq!(simulation.total_written().retirement_records, 0);
         let wide = History::BuildAndDeleteEmptyInodes { inode_count: 900, order: DeletionOrder::EvenThenOdd };
-        let (wide_simulation, _) = stub_path_simulation(wide, cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0), false);
+        let (wide_simulation, _) = stub_path_simulation(wide, write_path_cell(BorrowArm::RaiseSeparator, INODE_LEAF_RECORDS, 0), false);
         assert_eq!((wide_simulation.version.stub_count(), length_as_u64(wide_simulation.version.leaves.len())), (2 + 1, 3 + 1));
     }
 
@@ -7331,10 +7614,10 @@ mod tests {
     #[test]
     fn stub_write_path_keeps_every_live_leaf_of_the_original_write_path() {
         for (history, write_path) in [
-            (History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Ascending, batch: 144 }, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8)),
-            (History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Random(2), batch: 1 }, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 4)),
-            (History::MixedRandom { seed: 3 }, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8)),
-            (History::RollBackOverAGap { event: GapEvent::Absorb }, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8)),
+            (History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Ascending, batch: 144 }, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8)),
+            (History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Random(2), batch: 1 }, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 4)),
+            (History::MixedRandom { seed: 3 }, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8)),
+            (History::RollBackOverAGap { event: GapEvent::Absorb }, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8)),
         ] {
             let original = original_path_simulation(history, write_path, false);
             let (stub, _) = stub_path_simulation(history, write_path, false);
@@ -7357,7 +7640,7 @@ mod tests {
     #[test]
     fn stub_readers_select_the_stub_and_read_no_dead_container() {
         let history = History::BuildAndDeleteEmptyInodes { inode_count: 300, order: DeletionOrder::Ascending };
-        let (simulation, _) = stub_path_simulation(history, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0), true);
+        let (simulation, _) = stub_path_simulation(history, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0), true);
         let readers = segment_four_stub_path_readers();
         let reader = position_in(&readers, reader_with(BaseArm::ZeroRecordStubs, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever));
         let last = simulation.scans.last().expect("有扫描").counts[reader];
@@ -7369,7 +7652,7 @@ mod tests {
     #[test]
     fn tombstones_only_reads_every_dead_container_and_drops_its_deleted_records() {
         let history = History::BuildAndDeleteEmptyInodes { inode_count: 300, order: DeletionOrder::Ascending };
-        let simulation = original_path_simulation(history, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0), true);
+        let simulation = original_path_simulation(history, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0), true);
         let readers = segment_four_original_path_readers();
         let tombstones_only = position_in(&readers, reader_with(BaseArm::TombstonesOnly, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever));
         let without_retirement = position_in(&readers, reader_with(BaseArm::WithoutRetirement, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever));
@@ -7389,7 +7672,7 @@ mod tests {
     /// （吸收时不落桩，被吸收那片的最后一版就被读回）。
     #[test]
     fn an_absorbed_leaf_leaves_a_stub_that_hides_its_last_version() {
-        let (simulation, outcome) = stub_path_simulation(History::RollBackOverAGap { event: GapEvent::Absorb }, cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8), true);
+        let (simulation, outcome) = stub_path_simulation(History::RollBackOverAGap { event: GapEvent::Absorb }, write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 8), true);
         let outcome = outcome.expect("F11 交回回退的结局");
         let gap_start = simulation.gap_start.clone().expect("吸收缺口出现了");
         let readers = segment_four_stub_path_readers();
@@ -7409,7 +7692,7 @@ mod tests {
     /// 而 P-C 下那次扫描 B-tsz × Z × E-I 的 extent r 是 0（供出规则取写序最小的副本就变成那个增量）。
     #[test]
     fn reversed_provenance_resurrects_the_tail_of_a_moved_then_shortened_object() {
-        let write_path = cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 4);
+        let write_path = write_path_cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, 4);
         let readers = segment_four_original_path_readers();
         let tombstones_only = position_in(&readers, reader_with(BaseArm::TombstonesOnly, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever));
         let hand_of = |control: &PositiveControlOutcome| -> i64 { control.detail.trim_start_matches("hand_extent_r_z=").parse().expect("手算值是数") };
@@ -7438,7 +7721,7 @@ mod tests {
     fn a_segment_four_item_holds_its_pairing_controls_and_anchors() {
         let lines = segment_four_history_item_lines(
             History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Ascending, batch: 144 },
-            cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 4),
+            write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 4),
         );
         let stub_simulation = lines.iter().find(|line| line.starts_with("name=simulation segment=four") && line.contains("path=stub")).expect("有 B-stub 写路径那一行");
         assert!(stub_simulation.contains("pairing_holds=true") && stub_simulation.contains("stub_read_mismatch_scans=0"), "{stub_simulation}");
@@ -7455,31 +7738,6 @@ mod tests {
         assert!(lines.iter().any(|line| line.starts_with("name=difference") && line.contains("base=B-stub")));
     }
 
-    /// 续跑（修订 2 之十三）：小输入上关掉复用跑一遍、再开着复用跑一遍，拼出的产物逐行相同，第二遍全是复用。
-    #[test]
-    fn resuming_from_the_item_files_assembles_the_same_product() {
-        let items = vec![
-            SegmentFourItem::HistoryCell {
-                history: History::LargeFileRewriteAndDelete { data_units: 3, rewrites: 0, overwrite_before_unlink: true, batch: 1 },
-                cell: cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0),
-            },
-            SegmentFourItem::DirectRollbackConstruction,
-        ];
-        let directory = std::env::temp_dir().join(format!("e178-segment-four-resume-test-{}", std::process::id()));
-        let fresh_options = SegmentFourOptions { shard: None, reuse: false, items_directory: directory.clone() };
-        let (fresh_lines, fresh_computed, fresh_reused) = compute_or_reuse_the_items(&items, 2, &fresh_options);
-        let reuse_options = SegmentFourOptions { shard: None, reuse: true, items_directory: directory.clone() };
-        let (reused_lines, reused_computed, reused_reused) = compute_or_reuse_the_items(&items, 1, &reuse_options);
-        let shard_options = SegmentFourOptions { shard: Some((1, 2)), reuse: true, items_directory: directory.clone() };
-        let (shard_lines, _, _) = compute_or_reuse_the_items(&items, 1, &shard_options);
-        std::fs::remove_dir_all(&directory).expect("删得掉测试自己建的项目录");
-        assert_eq!((fresh_computed, fresh_reused, reused_computed, reused_reused), (2, 0, 0, 2));
-        assert!(shard_lines[0].is_none() && shard_lines[1].is_some());
-        let fresh: Vec<Vec<String>> = fresh_lines.into_iter().map(|lines| lines.expect("每项都算了")).collect();
-        let reused: Vec<Vec<String>> = reused_lines.into_iter().map(|lines| lines.expect("每项都读回了")).collect();
-        assert_eq!(assemble_segment_four(&items, &fresh), assemble_segment_four(&items, &reused));
-    }
-
     /// 第二段 PC-B1 在三段 F11 上不成立（产物里那三行 `holds=false`）的成因：消失过的身份里期末没被 B-off-ret × Z × E-I × ∞ 读回的，
     /// 盘上每一版的诞生 txg 都不在期末那一版的父链上（在缺口里生、又在缺口里消失）；登记 PC-B1 的期望数的是消失过的身份，没扣这一类。
     /// (消失过的身份数, 期末容器 r) 照第二段产物那三行钉：(4, 3)、(6, 4)、(5, 4)。
@@ -7487,7 +7745,7 @@ mod tests {
     fn identities_born_and_retired_inside_the_abandoned_gap_are_what_pc_b1_overcounts() {
         let without_retirement_forever = position_of(BaseArm::WithoutRetirement, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever);
         for (event, threshold, expected) in [(GapEvent::Borrow, 4, (4, 3)), (GapEvent::Borrow, 8, (6, 4)), (GapEvent::MovedObjectShortened, 8, (5, 4))] {
-            let (simulation, _) = simulate(History::RollBackOverAGap { event }, cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, threshold), false);
+            let (simulation, _) = simulate(History::RollBackOverAGap { event }, write_path_cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, threshold), false);
             let final_identities: HashSet<ContainerIdentity> = simulation.version.leaves.iter().map(|leaf| leaf.identity).collect();
             let disappeared: BTreeSet<ContainerIdentity> = simulation
                 .publish_records
@@ -7513,18 +7771,190 @@ mod tests {
         }
     }
 
+    /// 第四段续跑单测用的小项：F8 大文件改写删，数据单元数不同就是不同的项（一项算得快）。
+    fn small_rewrite_item(data_units: u64) -> SegmentFourItem {
+        SegmentFourItem::HistoryCell {
+            history: History::LargeFileRewriteAndDelete { data_units, rewrites: 0, overwrite_before_unlink: true, batch: 1 },
+            cell: write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 0),
+        }
+    }
+
+    /// 单测自己的项库：临时目录下按测试名与进程号分开，组成清单照 device-code-key.py 打的那几行写（一行 code_key）。
+    fn test_library(test_name: &str, code_key: &str) -> SegmentFourLibrary {
+        let directory = std::env::temp_dir().join(format!("e178-segment-four-{test_name}-{}", std::process::id()));
+        let composition = format!(
+            "{COMPOSITION_FORM_LINE}\njudged\t2026-10-15\nhost\t本机\ncode_key\te7_index_bench::segment_four_item_lines\t{code_key}\n\
+             unit\te7_index_bench::segment_four_item_lines\tfn\te7_index_bench::<bin>::segment_four_item_lines\tscripts/experiments/e178.rs:1-2\t{code_key}\n"
+        );
+        segment_four_library_from_composition(directory, &composition).expect("单测写的组成清单读得出")
+    }
+
+    fn library_options(library: &SegmentFourLibrary, reuse: bool) -> SegmentFourOptions {
+        SegmentFourOptions { shard: None, reuse, library: Some(library.clone()), written_list: None }
+    }
+
+    fn item_files_in(library: &SegmentFourLibrary) -> usize {
+        std::fs::read_dir(library.directory.join("items")).map_or(0, |entries| entries.filter_map(Result::ok).filter(|entry| entry.file_name().to_string_lossy().ends_with(".out")).count())
+    }
+
+    /// 登记修订 4 之六单测表「项键随代码键变」（M27 抓）：同一项、两个代码键 → 项键不等；项键的绝对值另由 python 的 hashlib 算出钉住。
+    #[test]
+    fn item_key_changes_with_the_code_key() {
+        let item = SegmentFourItem::DirectRollbackConstruction;
+        assert_eq!(segment_four_item_key("A", item), "15b1a55c608c669c7e110a594d8fb4165ad050c30b8f84c510d749d2da62269e");
+        assert_eq!(segment_four_item_key("B", item), "70c33db17155490d2820d10bcdd2af7f335a311f3c74255fdb9009ac18698c0f");
+        assert_ne!(segment_four_item_key("A", item), segment_four_item_key("B", item));
+    }
+
+    /// 「项键随每个参数字段变」（M23 抓）：只差 θ、只差容量、只差借臂、只差删序、只差批的项 → 项键两两不等（同一个代码键）。
+    #[test]
+    fn item_key_changes_with_every_parameter_field() {
+        let item = |borrow_arm, leaf_capacity, merge_threshold, order, batch| SegmentFourItem::HistoryCell {
+            history: History::ManyObjectsWithData { inode_count: 300, order, batch },
+            cell: write_path_cell(borrow_arm, leaf_capacity, merge_threshold),
+        };
+        let items = [
+            item(BorrowArm::RaiseSeparator, 16, 4, DeletionOrder::Ascending, 144),
+            item(BorrowArm::RaiseSeparator, 16, 8, DeletionOrder::Ascending, 144),
+            item(BorrowArm::RaiseSeparator, 32, 4, DeletionOrder::Ascending, 144),
+            item(BorrowArm::RenewIdentity, 16, 4, DeletionOrder::Ascending, 144),
+            item(BorrowArm::RaiseSeparator, 16, 4, DeletionOrder::EvenThenOdd, 144),
+            item(BorrowArm::RaiseSeparator, 16, 4, DeletionOrder::Ascending, 1),
+        ];
+        let keys: BTreeSet<String> = items.iter().map(|item| segment_four_item_key("A", *item)).collect();
+        assert_eq!(keys.len(), items.len(), "六项只差一个参数字段，项键要两两不等");
+    }
+
+    /// 「项键不看序号与名字」（M24 抓）：清单前插一项再跑，原有各项全部复用，只现判插进来的那一项。
+    #[test]
+    fn inserting_an_item_in_front_reuses_every_item_already_judged() {
+        let library = test_library("insert-in-front", "a1");
+        let first = compute_or_reuse_the_items(&[small_rewrite_item(3), small_rewrite_item(4)], 2, &library_options(&library, true));
+        let second = compute_or_reuse_the_items(&[small_rewrite_item(5), small_rewrite_item(3), small_rewrite_item(4)], 2, &library_options(&library, true));
+        std::fs::remove_dir_all(&library.directory).expect("删得掉测试自己建的项库");
+        assert_eq!((first.computed, first.reused), (2, 0));
+        assert_eq!((second.computed, second.reused), (1, 2), "前插一项之后，原有两项的项键不变、读回");
+    }
+
+    /// 「别的代码键写的项不读回」（M25 抓）：代码键 A 下写库、B 下再跑 → 全部现判，A 写的项文件留着（库里两份并存）。
+    #[test]
+    fn items_written_under_another_code_key_are_not_read_back() {
+        let library_a = test_library("other-code-key", "a1");
+        let library_b = test_library("other-code-key", "b2");
+        let items = [small_rewrite_item(3), small_rewrite_item(4)];
+        compute_or_reuse_the_items(&items, 2, &library_options(&library_a, true));
+        let second = compute_or_reuse_the_items(&items, 2, &library_options(&library_b, true));
+        let files = item_files_in(&library_b);
+        std::fs::remove_dir_all(&library_b.directory).expect("删得掉测试自己建的项库");
+        assert_eq!((second.computed, second.reused), (2, 0), "B 下不读 A 写的项");
+        assert_eq!(files, 4, "A 写的两份留着，B 又写了两份");
+    }
+
+    /// 「键对不上的项数」（M26 抓）：代码键 A 跑完、B 再跑 → 成功句报键对不上 = 项数，那一句点名变了的单元。
+    #[test]
+    fn a_second_code_key_reports_every_item_as_mismatched() {
+        let library_a = test_library("mismatched", "a1");
+        let library_b = test_library("mismatched", "b2");
+        let items = [small_rewrite_item(3), small_rewrite_item(4)];
+        let first = compute_or_reuse_the_items(&items, 2, &library_options(&library_a, true));
+        let second = compute_or_reuse_the_items(&items, 2, &library_options(&library_b, true));
+        std::fs::remove_dir_all(&library_b.directory).expect("删得掉测试自己建的项库");
+        assert_eq!(first.mismatched, 0, "空库上第一趟没有上一趟可比");
+        assert_eq!(second.mismatched, 2);
+        let sentence = second.changed_units.expect("键对不上时有那一句");
+        assert!(sentence.contains("改了 e7_index_bench::<bin>::segment_four_item_lines"), "{sentence}");
+    }
+
+    /// 续跑（修订 2 之十三、修订 4 之六单测表「续跑拼出同一份产物」）：小输入上关掉复用跑一遍、再开着复用跑一遍，拼出的产物逐行相同，
+    /// 第二遍全是复用；关掉复用那一遍照样按项键写回；分片只碰自己那几项。
+    #[test]
+    fn resuming_from_the_item_files_assembles_the_same_product() {
+        let items = vec![small_rewrite_item(3), SegmentFourItem::DirectRollbackConstruction];
+        let library = test_library("resume", "c3");
+        let fresh = compute_or_reuse_the_items(&items, 2, &library_options(&library, false));
+        let files_after_fresh = item_files_in(&library);
+        let reused = compute_or_reuse_the_items(&items, 1, &library_options(&library, true));
+        let shard_options = SegmentFourOptions { shard: Some((1, 2)), reuse: true, library: Some(library.clone()), written_list: None };
+        let shard = compute_or_reuse_the_items(&items, 1, &shard_options);
+        std::fs::remove_dir_all(&library.directory).expect("删得掉测试自己建的项库");
+        assert_eq!((fresh.computed, fresh.reused, reused.computed, reused.reused), (2, 0, 0, 2));
+        assert_eq!(files_after_fresh, 2, "--no-reuse 不读库，现判的照样按项键写回");
+        assert!(shard.item_lines[0].is_none() && shard.item_lines[1].is_some());
+        let fresh_lines: Vec<Vec<String>> = fresh.item_lines.into_iter().map(|lines| lines.expect("每项都算了")).collect();
+        let reused_lines: Vec<Vec<String>> = reused.item_lines.into_iter().map(|lines| lines.expect("每项都读回了")).collect();
+        assert_eq!(assemble_segment_four(&items, &fresh_lines), assemble_segment_four(&items, &reused_lines));
+    }
+
+    fn test_environment(library_directory: &std::path::Path, old_items_variable_is_set: bool) -> SegmentFourEnvironment {
+        SegmentFourEnvironment {
+            library_directory: Some(library_directory.as_os_str().to_os_string()),
+            old_items_variable_is_set,
+            home: std::ffi::OsString::from("/nonexistent-home"),
+        }
+    }
+
+    fn parse_with(arguments: &[&str], environment: &SegmentFourEnvironment) -> Result<SegmentFourOptions, String> {
+        segment_four_options_from(&arguments.iter().map(|argument| (*argument).to_string()).collect::<Vec<String>>(), environment)
+    }
+
+    /// 「不给代码键只认 --no-reuse、不写库」：不给 --code-key-file 带 --no-reuse → 每项现判、库目录没建；不带 --no-reuse → 参数解析报错，出路点名取键脚本。
+    #[test]
+    fn without_a_code_key_only_no_reuse_is_accepted_and_nothing_is_written() {
+        let directory = std::env::temp_dir().join(format!("e178-segment-four-no-code-key-{}", std::process::id()));
+        let environment = test_environment(&directory, false);
+        let options = parse_with(&["--no-reuse"], &environment).expect("不给代码键带 --no-reuse 要认");
+        assert!(options.library.is_none());
+        let outcome = compute_or_reuse_the_items(&[small_rewrite_item(3)], 1, &options);
+        assert_eq!((outcome.computed, outcome.reused, outcome.mismatched), (1, 0, 0));
+        assert!(!directory.exists(), "没给代码键时一个文件都不写、库目录也不建");
+        let refused = parse_with(&[], &environment).expect_err("不给代码键又不带 --no-reuse 要报错");
+        assert!(refused.contains("device-code-key.py run"), "{refused}");
+        assert!(parse_with(&["--no-reuse", "--written-list", "/nonexistent"], &environment).is_err(), "--written-list 要与代码键一起给");
+    }
+
+    /// 「旧变量退 2」：设了 E178_SEGMENT_FOUR_ITEMS → 参数解析报错（main 照它退 2），说旧项目录弃用。
+    #[test]
+    fn the_old_items_directory_variable_is_refused() {
+        let directory = std::env::temp_dir().join(format!("e178-segment-four-old-variable-{}", std::process::id()));
+        let refused = parse_with(&["--no-reuse"], &test_environment(&directory, true)).expect_err("旧变量设了要报错");
+        assert!(refused.contains("旧项目录弃用"), "{refused}");
+    }
+
     #[test]
     fn segment_four_arguments_take_a_shard_and_refuse_a_wrong_one() {
-        let parse = |arguments: &[&str]| segment_four_options_from(&arguments.iter().map(|argument| (*argument).to_string()).collect::<Vec<String>>());
-        assert_eq!(parse(&["--shard", "1/3", "--no-reuse"]).map(|options| (options.shard, options.reuse)), Ok((Some((1, 3)), false)));
-        assert!(parse(&["--shard", "3/3"]).is_err());
-        assert!(parse(&["--shard"]).is_err());
-        assert!(parse(&["--bogus"]).is_err());
+        let environment = test_environment(&std::env::temp_dir().join("e178-segment-four-arguments-unused"), false);
+        assert_eq!(parse_with(&["--shard", "1/3", "--no-reuse"], &environment).map(|options| (options.shard, options.reuse)), Ok((Some((1, 3)), false)));
+        assert!(parse_with(&["--shard", "3/3", "--no-reuse"], &environment).is_err());
+        assert!(parse_with(&["--shard"], &environment).is_err());
+        assert!(parse_with(&["--bogus"], &environment).is_err());
+    }
+
+    /// 组成清单读法：第一行不是 form、code_key 不是恰好一行、入口不是 segment_four_item_lines，都报错；judged 与 host 读进 meta 用。
+    #[test]
+    fn the_composition_needs_the_form_line_and_exactly_one_entry_key() {
+        let directory = std::env::temp_dir().join("e178-segment-four-composition-unused");
+        let library = test_library("composition", "segment_four_code_key");
+        assert_eq!((library.code_key.as_str(), library.judged.as_str(), library.host.as_str()), ("segment_four_code_key", "2026-10-15", "本机"));
+        let entry_line = "code_key\te7_index_bench::segment_four_item_lines\tsegment_four_code_key\n";
+        assert!(segment_four_library_from_composition(directory.clone(), entry_line).is_err(), "缺 form 行");
+        assert!(segment_four_library_from_composition(directory.clone(), &format!("{COMPOSITION_FORM_LINE}\n")).is_err(), "缺 code_key 行");
+        assert!(segment_four_library_from_composition(directory.clone(), &format!("{COMPOSITION_FORM_LINE}\n{entry_line}{entry_line}")).is_err(), "两行 code_key");
+        assert!(segment_four_library_from_composition(directory, &format!("{COMPOSITION_FORM_LINE}\ncode_key\te7_index_bench::main\tsegment_four_code_key\n")).is_err(), "入口不对");
     }
 }
 
+/// 准入用的仓根：环境变量 SINGLEFS_REPOSITORY_ROOT，没设取当前目录（replay.sh 与实验页的命令都在仓根起）；不取「清单目录/../..」（单元键把它当运行期路径拒算）。
 fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+    let root = std::env::var_os("SINGLEFS_REPOSITORY_ROOT")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_default();
+    if !root.join(".claude/singlefs-ai-sop/scripts/preflight.py").is_file() {
+        eprintln!("  ✗ {} 不是仓根（下面没有 .claude/singlefs-ai-sop/scripts/preflight.py），判不了准入", root.display());
+        eprintln!("  → 怎么办：在仓根起这个装置，或设 SINGLEFS_REPOSITORY_ROOT=<仓根>");
+        std::process::exit(78);
+    }
+    root
 }
 
 fn preflight() {

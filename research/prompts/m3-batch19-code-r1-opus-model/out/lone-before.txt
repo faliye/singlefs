@@ -1,6 +1,0 @@
-run-with-memory-cap: 上限 3G 超过实测峰值 134M 的 2 倍，照理由放行：同一个原型二进制按 MODE 跑不同的活，峰值表只记了最小的那一种；整编峰值比增量编大
-run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿与别的会话各跑各的
-LONEBEFORE S=176 K=0 U=1 txg=3 ["lost0=只读挂载:Open", "lost1=ok"]
-LONEBEFORE S=176 K=1 U=1 txg=4 ["lost0=ok", "lost1=ok"]
-LONEBEFORE S=176 K=3 U=1 txg=6 ["lost0=ok", "lost1=ok"]
-LONEBEFORE S=176 K=0 U=36 txg=5 ["lost0=ok", "lost1=ok"]

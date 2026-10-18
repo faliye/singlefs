@@ -1,0 +1,7 @@
+cbfa42f9fdbbb52598648bdd91a550799a20153a4fcc6ed9b12a16dd0434b118  .claude/kb/decisions/16-发布语义.md
+75a828bb0d04371c4987d1bdafc9ae02ea789f4eb0960c794d2ca9b7a7311c10  .claude/kb/decisions/18-块里携带什么信息.md
+2739b6c3d426a5ed0a8e5168a22ffcce51fc545bf32d8bd4f7c3be3c8286f23e  .claude/kb/decisions/27-小数据打包容器.md
+925cda7a17240e6530704db2f31a4859e598636af6fca37d728cbb381e8316db  .claude/kb/checks-owed.md
+90ad7f1269ac50f1de5a559bdeabbf9756febfe8a57aa70a8ff248337c0b7c48  .claude/kb/experiments/139-按盘回退下界的收严形态.md
+ea42056ceae75a8d454816de1dfaf23d74333b8488eb976807f1b81f63be0961  crates/singlefs-checker/invariants/01-块自描述.md
+51db71aaca864f06319e15f72093c65ad433a0e36bf8a59244210ef407082930  .claude/kb/decisions/28-挂载期承诺量.md

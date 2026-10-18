@@ -1,7 +1,0 @@
-command args=-p singlefs-harness --test checker_known_bad_images -- retirement_containers_numbered_zero_and_one rc=101
-thread 'retirement_containers_numbered_zero_and_one_redden_only_the_knob_capacity_invariant' panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:16728:5:
-failures:
-failures:
-    retirement_containers_numbered_zero_and_one_redden_only_the_knob_capacity_invariant
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 254 filtered out; 
-row 3844 named-test-red=yes

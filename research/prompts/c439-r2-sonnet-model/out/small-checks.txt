@@ -1,0 +1,7 @@
+== 一、preflight 摘 --force
+after-strip: n=2 args=[/some/root extra] force_given=1
+inner would run: gate.sh --staged /some/root extra
+== 二、worktree 与主仓共用 refs/sop
+worktree_sees_equal_main=yes
+== 三、git rev-parse --local-env-vars 里的索引变量
+found_at_position=10:GIT_INDEX_FILE

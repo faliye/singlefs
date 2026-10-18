@@ -1,8 +1,0 @@
-ROW 1 RED(caught) rc=101 150s kind=append 第10z批第六块 显存账 G2 乙 重起好了就当旧设备已经不在（设备丢了那一刻活着的借据还在）
-   test k3_1_random_ops_never_let_the_ledger_give_more_than_is_physically_lendable ... FAILED
-   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 2.43s
-   error: test failed, to rerun pass `-p singlefs-harness --test sonnet_g2_model`
-ROW 5 RED(caught) rc=101 9s kind=probe P5 第二次丢设备时（Remain 状态）不重新记账
-   test k3_1_random_ops_never_let_the_ledger_give_more_than_is_physically_lendable ... FAILED
-   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 2.33s
-   error: test failed, to rerun pass `-p singlefs-harness --test sonnet_g2_model`

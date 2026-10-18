@@ -13,7 +13,6 @@ M12_admission_not_charged	if self.arm.is_tightened() { plain.min(self.df_arm()) 
 M13_states_cap_counts_all_roots	self.fourth_newest_nonempty_valid_txg().min(self.newest_valid_txg_on_every_surviving_disk())	self.fourth_newest_valid_txg().min(self.newest_valid_txg_on_every_surviving_disk())
 M14_skip_then_raise_fails_region_two_instead	if Simulation::region_of_txg(simulation.next_txg) == 1 {	if Simulation::region_of_txg(simulation.next_txg) == 2 {
 M15_no_margin_per_failure	const PUBLICATIONS_PER_TOLERATED_FAILURE: u64 = 2;	const PUBLICATIONS_PER_TOLERATED_FAILURE: u64 = 0;
-M16_lag_counts_empty_publication_frees	BlockState::Freed { freed_at, .. } => *freed_at > bound && !self.empty_txgs.contains(freed_at),	BlockState::Freed { freed_at, .. } => *freed_at > bound,
 MW1_window_boundary_inclusive	txg + window_length > anchor	txg + window_length >= anchor
 MW2_reclaim_window_anchored_at_maximum_published	txg_is_inside_window(*txg, self.newest_durable_txg, window_length)	txg_is_inside_window(*txg, self.maximum_published_txg, window_length)
 MW3_candidate_set_ignores_window	Some(_) => txg_is_inside_window(txg, self.newest_durable_txg, self.ring_depth),	Some(_) => true,

@@ -1,4 +1,4 @@
 exit=1
 want=升档判的抓到复核不过
 want=升档那趟的 3600 没比原来的 3600 大
-want=gate-verdict：红
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

@@ -1,6 +1,0 @@
-fb-chain                     arm=implemented  n=12 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=52.0/52 iso_first_raise=74.5/80 iso_max=80.0/80 iso_end=0.0/0 c_r=70.0/70 rev_in_c_r=0.0/0 revived=0.0/0
-fb-chain                     arm=none         n=12 mount_err=0 hit=2 preroot=2 refused=0 iso_mount=52.0/52 iso_first_raise=74.5/80 iso_max=80.0/80 iso_end=0.0/0 c_r=44.0/44 rev_in_c_r=0.0/0 revived=0.0/0
-fb-chain-persist             arm=implemented  n=12 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=52.0/52 iso_first_raise=74.5/80 iso_max=80.0/80 iso_end=0.0/0 c_r=70.0/70 rev_in_c_r=0.0/0 revived=0.0/0
-fb-chain-persist             arm=none         n=12 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=52.0/52 iso_first_raise=74.5/80 iso_max=80.0/80 iso_end=0.0/0 c_r=44.0/44 rev_in_c_r=0.0/0 revived=0.0/0
-fb-rb                        arm=implemented  n=24 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=42.0/42 iso_first_raise=64.5/70 iso_max=70.0/70 iso_end=0.0/0 c_r=64.0/64 rev_in_c_r=2.0/2 revived=2.0/2
-fb-rb                        arm=none         n=24 mount_err=0 hit=22 preroot=22 refused=0 iso_mount=18.0/18 iso_first_raise=40.5/46 iso_max=46.0/46 iso_end=0.0/0 c_r=44.0/44 rev_in_c_r=0.0/0 revived=2.0/2

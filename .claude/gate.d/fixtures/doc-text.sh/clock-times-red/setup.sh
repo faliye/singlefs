@@ -7,6 +7,8 @@
 # 光秃的时区词一份 md，ISO 与机器时间戳（T 形态、Z 结尾、diff 头与 stat 的带秒带偏移）一份 md；
 # 英文十二小时制（时后面跟 am / pm：贴着写、隔空格、大写、带点、带「:分」，第一行是外部限额通知的原样、后面跟时区词）一份 md；
 # 放行标记写在 md 里（不认）、写在 rs 里却没写理由（不认），各一行照判钟点。
+# ISO 基本格式的紧凑时间戳（日期连写、字母 T、钟点连写，运行目录名与日志文件名里的也判；带 Z、偏移、小数秒、日期带连字符的、钟点带冒号的）一份 md；
+# 同一行里「文件:行号」或越界冒号对在另一句、真钟点在这一句（编号对只罩住自己那一句）一份 md。
 # 这份源码本身不出现那几个撇号字符、字面钟点与时区词：冒号由变量拼进去，时区词由 "" 断开拼进变量，
 # 数字与「点」「时」「am / pm」、日期与时段词之间也用 "" 断开——否则门禁 doc-text.sh 扫样本现场时会先把这份 setup.sh 判红，多红几行。
 set -e
@@ -35,3 +37,20 @@ printf -- "--- a/x.rs\t2026-09-24 16${colon}27${colon}05.398761624 +0000\nModify
 printf '%s\n' "通知写 resets Oct 4 4""pm ${utc}）" "11 ""AM 截止" "交回于 3""p.m." "10${colon}30 ""am 起跑" > records/twelve-hour.md
 printf '%s\n' "用户 23${colon}10 定  # clock-times:allow 写在 md 里不认" > records/allow-in-md.md
 printf '%s\n' "// 跑于 23${colon}10  // clock-times:allow" "fn main() {}" > crates/demo/src/no_reason.rs
+# ISO 基本格式的紧凑时间戳（日期连写、字母 T、钟点连写；运行目录名与日志文件名里的、带 Z、带偏移、带小数秒、日期带连字符的、钟点带冒号的）一份 md：
+# 日期、T、钟点分开放进变量，运行时才拼，源码里不出现字面。
+stamp_day=20261008
+stamp_other_day=20261013
+stamp_t=T
+printf '%s\n' "产物目录 ~/.local/share/singlefs/crash-amplification/runs/crash-point-replay-${stamp_day}${stamp_t}063920Z-3703484/fast-tier.log" \
+  "编译输出：/work/compile-then-swap/build-${stamp_other_day}${stamp_t}061531Z-134080.log" \
+  "日志目录 run_${stamp_day}${stamp_t}0639 下" \
+  "取回于 ${stamp_day}${stamp_t}06${colon}39 那一趟" \
+  "实验跑于 2026-10-08${stamp_t}0639Z" \
+  "拍照 ${stamp_day}${stamp_t}063920+0900 与 ${stamp_day}${stamp_t}063920.123Z" > records/iso-compact.md
+# 同一行里「文件:行号」或越界冒号对写在另一句（句号、叹号、问号隔开），真钟点写在这一句：按句读，编号对只罩住自己那一句。
+printf '%s\n' "改 \`crates/a.rs:1232\` 的参数。材料 10${colon}44–11${colon}00 建，没有判决" \
+  "补丁 09${colon}39 打进工作区。clippy 红在 \`walk.rs:6299\`" \
+  "表里 31${colon}68 是编号！用户 23${colon}10 定" \
+  "日志 \`a.rs:7\`？用户 06${colon}32 整仓暂存" \
+  "补丁放进目录后打上（10-02 12${colon}06）。它报红在 \`x.rs:181/182\`" > records/bare-clock-sentences.md

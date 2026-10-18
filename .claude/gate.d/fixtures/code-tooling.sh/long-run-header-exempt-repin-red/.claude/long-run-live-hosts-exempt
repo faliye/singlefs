@@ -1,2 +1,2 @@
 # 样本：基准那一版登记的是改正文之前的 sha256；工作区改了 live.sh 的正文（slots=7 改成 slots=8），把表里的 sha256 换成了新文件的（重钉），路径与行数都没变
-scripts/live.sh  bed5bfa5f9dadabc3e464ce65097d544dc50fde74196939fc233117c55c1d1fc  # 样本：文件头按现算写、不能改；正文改了、sha256 重钉了
+scripts/live.sh  6af8b4a7a331e9d094c37428a08d0363e3224fc79c541efb80e878536315a9cb  # 样本：文件头按现算写、不能改；正文改了、sha256 重钉了

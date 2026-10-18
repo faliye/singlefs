@@ -12,10 +12,15 @@
 #                                                                        找得到当前会话（CLAUDE_CODE_SESSION_ID）就同时查交回之后后台还在跑
 #   bash scripts/agents/watch.sh --report                              当前会话的全部子 agent 现在是什么样，报一次就退
 #   bash scripts/agents/watch.sh … --ack <agent 号>:<告警名>            看过、判定只是慢的那一条告警，这一次看门狗里不再为它叫醒（可给多次；进程告警——含「重型测试没带前缀」——写 --ack 进程:<pid>）；
+#                                                                        也可逗号连写：--ack 进程:<pid>,进程:<pid>,<agent 号>:<告警名>，拆成一条一个 --ack 交给 agent-watch.py。
+#                                                                        逗号后面接的是「进程:」或「<agent 号>:」才算下一条；接的不是的，那个逗号算进前一条的告警名；
+#                                                                        头一条就不是这两种形态的整个拒（拒绝说明给出路）
 #                                                                        「进程卡住」类告警连报到 watch.conf 的 terminate-after-unacknowledged-reports 次既没处置也没 --ack 的，
 #                                                                        看门狗终止那个进程并报出来（不带 agent 号与带 --processes 两种起法才记连报，判法在 agent-watch.py 文件头「调度方不响应就终止」）
 #   bash scripts/agents/watch.sh --dry-run …                           只打印要跑的命令，不跑
 #   bash scripts/agents/watch.sh --selftest
+# 弄坏开关（只给证红用；自证不逐个打开，打开后跑 --selftest 核红在点名那一格）：
+#   WATCH_BREAK=ackcommajoined  --ack 的逗号连写不拆，整串原样当一条交过去（改前的样子：连写的几个进程照报）   自检⑨红
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -108,12 +113,20 @@ selftest() {
     echo "  ✗ 自检⑧：不给 agent 号、又找不到会话时没被拒绝"; fail=1   # gate-lint:detail
   fi
   checked=$((checked + 1))
+  # ⑨ --ack 逗号连写拆成一条一个 --ack（进程与 agent 号的告警混写也拆）；告警名里的逗号（后面接的不是「进程:」或 agent 号）留在那一条里；头一条形态不对的整个拒
+  out="$(WATCH_CONF="$scratch/ok.conf" bash "$0" --dry-run --processes --ack 进程:3162530,进程:3170253,a0000000000000001:上下文过大,带逗号 2>&1)"
+  [[ "$out" == *"--ack 进程:3162530 --ack 进程:3170253 --ack a0000000000000001:上下文过大,带逗号"* && "$out" != *"--ack 进程:3162530,"* ]] \
+    || { echo "  ✗ 自检⑨：--ack 逗号连写没拆成一条一个 --ack（或把告警名里的逗号也拆了）：$out"; fail=1; }   # gate-lint:detail
+  if WATCH_CONF="$scratch/ok.conf" bash "$0" --dry-run --processes --ack 上下文过大,进程:3162530 >/dev/null 2>&1; then
+    echo "  ✗ 自检⑨：逗号连写头一条形态不对没被拒绝"; fail=1   # gate-lint:detail
+  fi
+  checked=$((checked + 1))
   rm -rf "${scratch:?}"
   if ((fail)); then
     echo "  → 怎么办：按上面那一条改 scripts/agents/watch.sh 里对应的那段"
     exit 1
   fi
-  echo "  ✓ watch.sh 自检通过：配置转选项、拼错的 key 拒绝、不像 agent 号的参数拒绝、--processes 只盯进程（找得到当前会话就带上会话目录）、--ack 原样转过去且形态不对就拒绝、重型测试与书记员汇总两类告警的 --ack 照旧转过去、不给 agent 号找得到会话就走 --discover 找不到就拒绝（判了 $checked 条）"
+  echo "  ✓ watch.sh 自检通过：配置转选项、拼错的 key 拒绝、不像 agent 号的参数拒绝、--processes 只盯进程（找得到当前会话就带上会话目录）、--ack 原样转过去且形态不对就拒绝、重型测试与书记员汇总两类告警的 --ack 照旧转过去、不给 agent 号找得到会话就走 --discover 找不到就拒绝、--ack 逗号连写拆成一条一个（判了 $checked 条）"
   exit 0
 }
 
@@ -131,8 +144,22 @@ while (($#)); do
     --report) mode="report" ;;
     --ack)
       (($#)) || die "--ack 后面没给要确认的告警" "写成 --ack <agent 号>:<告警名>，进程告警写 --ack 进程:<pid>"
-      [[ "$1" =~ ^(a[0-9a-f]{8,}|进程):.+$ ]] || die "「$1」不是 --ack 认的形态" "写成 <agent 号>:<告警名>（告警名照看门狗报出来的那个，例如 上下文过大），或 进程:<pid>"
-      acks+=(--ack "$1")
+      [[ "$1" =~ ^(a[0-9a-f]{8,}|进程):.+$ ]] || die "「$1」不是 --ack 认的形态" "写成 <agent 号>:<告警名>（告警名照看门狗报出来的那个，例如 上下文过大），或 进程:<pid>；几条可逗号连写，头一条也要是这两种形态"
+      if [[ "${WATCH_BREAK:-}" == ackcommajoined ]]; then
+        acks+=(--ack "$1")   # 弄坏开关：逗号连写不拆（改前的样子）
+      else
+        # 逗号连写（文件头 --ack 那一行）：逗号后面接「进程:」或「<agent 号>:」的才是下一条，别的逗号留在前一条的告警名里
+        ack_entries=()
+        IFS=',' read -r -a ack_pieces <<<"$1"
+        for ack_piece in "${ack_pieces[@]}"; do
+          if [[ "$ack_piece" =~ ^(a[0-9a-f]{8,}|进程):.+$ || ${#ack_entries[@]} -eq 0 ]]; then
+            ack_entries+=("$ack_piece")
+          else
+            ack_entries[${#ack_entries[@]} - 1]+=",$ack_piece"
+          fi
+        done
+        for ack_entry in "${ack_entries[@]}"; do acks+=(--ack "$ack_entry"); done
+      fi
       shift
       ;;
     -*) die "不认识的选项：$argument" "只有 --processes、--report、--ack、--dry-run、--selftest；阈值写进 $conf，不在命令行上给" ;;

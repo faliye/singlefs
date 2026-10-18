@@ -1,9 +1,0 @@
-
-running 1 test
-test probe_sweep ... PROBEJK label=swt-nb-qacct+rlin arm=tri slots=384 k=3 q=Some('n') r=b back=4 faults=cfgq,qacct,rlin,racct persist=false actions=nsnosnssonosonsonnssnsossn secs=0.02 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1532)})
-PROBEJK label=swt-nb-qacct+rlin arm=tri slots=384 k=3 q=Some('n') r=b back=4 faults=cfgq,qacct,rlin,racct persist=false actions=nonosnsoooonnoonossnnssnn secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1532)})
-PROBEJK_DONE label=swt-nb-qacct+rlin arm=tri histories=2
-ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
-

@@ -1,6 +1,0 @@
-PROBE core capacity = 135
-PROBE core refusal at k=31455 (records_before) -> MoreLeafContainersThanOneRootNodeHolds { containers: 136, capacity: 135 }
-PROBE core checked=31455 containers=135
-PROBE core remove last: rewritten=[InodeLeafContainerIndexInTree(134)] dropped=0
-test core_one_at_a_time_lands_in_floor_k_over_233_and_refuses_at_136_containers ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s

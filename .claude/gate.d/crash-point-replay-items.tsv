@@ -1,5 +1,5 @@
 # 崩溃点重放的合表（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J2：一张表、一个入口；一项一条流，
-# .claude/gate.d/stage-inputs.tsv 的 13 条 crash-case: 与 scripts/crash/crash-amplification.sh 的 8 项按流去重之后合表）。入口 scripts/crash/crash-point-replay.sh 照这张表跑。
+# .claude/gate.d/stage-inputs.tsv 的 14 条 crash-case: 与 scripts/crash/crash-amplification.sh 的 8 项按流去重之后合表）。入口 scripts/crash/crash-point-replay.sh 照这张表跑。
 # 一行一项，制表符分隔四列，再加一列 # 说明：
 #   ① 项名：小写字母、数字、-；不用 layer0、amplification 这两个退役的词（判决第三节 J1）
 #   ② 重型里崩溃点重放那一套的部分：stage-inputs.tsv 里 crash-case: 的键，几条空格隔开（同一条流的几条用例并在一项里）；没有写 -

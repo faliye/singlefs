@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# harness-model-differential-and-scenarios 按格复用样本的假 rustc：-V 打版本，-vV 另打 host（单元键要工具链那几行），别的退 0
+case "${1:-}" in
+  -V) echo "rustc 0.0.0-model-differential-sample" ;;
+  -vV) printf '%s\n' "rustc 0.0.0-model-differential-sample" "host: x86_64-unknown-linux-gnu" "release: 0.0.0" ;;
+esac
+exit 0

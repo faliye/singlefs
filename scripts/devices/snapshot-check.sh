@@ -8,12 +8,15 @@
 #
 # 为什么：.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」要主 agent 写判决前拿快照 sha256sum -c 一遍，对不上的倒推；
 # 2026-09-20 起主 agent 为这类核对敲了几百次 grep / sha256sum，每次都在 50 万上下文里。这一条命令把它做完，判决里抄它的输出。
-# 输出每行一个文件：一致 / 工作区改了（HEAD 与快照一致，是别的会话未提交的改动）/ 提交改了（HEAD 也不是快照那一版）/ 文件不在。
+# 输出每行一个文件：一致 / 工作区改了（HEAD 与快照一致，是别的会话未提交的改动）/ 提交改了（HEAD 也不是快照那一版）/
+# HEAD 里没有这份文件（`git cat-file -e HEAD:<路径>` 不过：快照时是未跟踪或没提交的，按工作区那一份核）/ 文件不在（工作区里没有）。
 # 退出码：0 全部一致；1 有对不上的；2 用法错、快照目录不在。
 # 弄坏开关 SNAPSHOT_CHECK_BREAK=<项>（只给证红用；打开时自证退 1）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
 # （自证的三例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
 #   SNAPSHOT_CHECK_BREAK=ignore-mismatch  check_snapshot 不比 sha256，对不上的也判「一致」
 #       「三种对不上应当各判各的、退 1」（实际退 1，工作区改了的 one.md 与提交改了的 two.md 都报成「一致」，只有文件不在的 three.md 判对）
+#   SNAPSHOT_CHECK_BREAK=skip-head-presence  check_snapshot 不先核文件在不在 HEAD，不在的拿空输出的哈希去比（改前的样子）
+#       「未跟踪的文件应当判「HEAD 里没有这份文件」」（实际退 1，four.md 被报成「提交改了」）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -38,8 +41,13 @@ check_snapshot() {   # $1 仓根 $2 轮名；stdout 逐行结论，返回 0 全�
         if [[ "$actual" == "$digest" || "${SNAPSHOT_CHECK_BREAK:-}" == "ignore-mismatch" ]]; then
           verdict="一致"
         else
-          head_digest="$(git -C "$root" show "HEAD:$path" 2>/dev/null | sha256sum | cut -c1-64)"
-          if [[ "$head_digest" == "$digest" ]]; then verdict="工作区改了（HEAD 与快照一致：别的会话未提交的改动，腿引的行按 HEAD 那一版核）"
+          if [[ "${SNAPSHOT_CHECK_BREAK:-}" != "skip-head-presence" ]] && ! git -C "$root" cat-file -e "HEAD:$path" 2>/dev/null; then
+            head_digest=""   # HEAD 里没有这份文件：下面不拿空输出的哈希去比
+          else
+            head_digest="$(git -C "$root" show "HEAD:$path" 2>/dev/null | sha256sum | cut -c1-64)"
+          fi
+          if [[ -z "$head_digest" ]]; then verdict="HEAD 里没有这份文件：快照时是未跟踪或没提交的，按工作区那一份核"
+          elif [[ "$head_digest" == "$digest" ]]; then verdict="工作区改了（HEAD 与快照一致：别的会话未提交的改动，腿引的行按 HEAD 那一版核）"
           else verdict="提交改了（HEAD 也不是快照那一版：快照之后有提交动过它，倒推要看 git log -- $path）"; fi
         fi
       fi
@@ -50,7 +58,7 @@ check_snapshot() {   # $1 仓根 $2 轮名；stdout 逐行结论，返回 0 全�
   [[ $checked -gt 0 ]] || die "快照目录里一行 sha256 都没读到：$dir" "快照清单每行是「<sha256>  <路径>」（sha256sum 的原样输出）" 2
   if [[ $mismatched -eq 0 ]]; then echo "  ✓ 快照 $round：$checked 个文件都与开工时一致"; return 0; fi
   echo "  ✗ 快照 $round：$checked 个文件里 $mismatched 个对不上（逐个列在上面）"
-  echo "  → 怎么办：工作区改了的按 HEAD 那一版核腿引的行；提交改了的倒推出快照时的原样再核；判决开头写明哪个文件、被改了几处、腿引的行落没落在那几处"
+  echo "  → 怎么办：工作区改了的、HEAD 里没有的按工作区那一份核腿引的行（前者按 HEAD 那一版）；提交改了的倒推出快照时的原样再核；判决开头写明哪个文件、被改了几处、腿引的行落没落在那几处"
   return 1
 }
 
@@ -74,9 +82,17 @@ selftest() {
     echo "  ✗ 自检：三种对不上应当各判各的、退 1，实际 $rc：$out"; failures=1; fi   # gate-lint:detail
   out="$(check_snapshot "$work" nothere 2>&1)"; rc=$?; checked=$((checked+1))
   if [[ $rc -ne 2 ]]; then echo "  ✗ 自检：快照目录不在应当退 2，实际 $rc"; failures=1; fi   # gate-lint:detail
+  # 快照时是未跟踪的文件，之后又改了内容：HEAD 里没有它，判「HEAD 里没有这份文件」，不判「提交改了」
+  mkdir -p "$work/research/prompts/r2-snapshot"
+  printf "d\n" > "$work/.claude/kb/four.md"
+  (cd "$work" && sha256sum .claude/kb/four.md > research/prompts/r2-snapshot/kb-sha256.txt)
+  printf "d2\n" > "$work/.claude/kb/four.md"
+  out="$(check_snapshot "$work" r2)"; rc=$?; checked=$((checked+1))
+  if [[ $rc -ne 1 ]] || ! grep -q "HEAD 里没有这份文件.*four.md" <<<"$out" || grep -q "提交改了（" <<<"$out"; then
+    echo "  ✗ 自检：未跟踪的文件应当判「HEAD 里没有这份文件」、不判「提交改了」、退 1，实际 $rc：$out"; failures=1; fi   # gate-lint:detail
   rm -rf "${work:?}"
-  if [[ $failures -ne 0 ]]; then echo "    → 怎么办：看 check_snapshot() 三种判定；SNAPSHOT_CHECK_BREAK=ignore-mismatch 设着的话这里本来就该红"; return 1; fi
-  echo "  ✓ 自检通过（查了 $checked 种）：全一致退 0；工作区改了、提交改了、文件不在各判各的并退 1；快照目录不在退 2"
+  if [[ $failures -ne 0 ]]; then echo "    → 怎么办：看 check_snapshot() 三种判定；SNAPSHOT_CHECK_BREAK=ignore-mismatch / skip-head-presence 设着的话这里本来就该红"; return 1; fi
+  echo "  ✓ 自检通过（查了 $checked 种）：全一致退 0；工作区改了、提交改了、文件不在各判各的并退 1；快照时未跟踪的文件判「HEAD 里没有这份文件」；快照目录不在退 2"
   return 0
 }
 

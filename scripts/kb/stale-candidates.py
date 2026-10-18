@@ -521,6 +521,7 @@ def benchmark(repository_root):
 
 
 def selftest():
+    global MAXIMUM_CANDIDATE_LINES_PER_FACT, WIDE_TERM_SPOT_CHECK_LINES  # 下面临时把这两个门槛调成 0、判完换回
     with tempfile.TemporaryDirectory() as directory:
         def git(*arguments):
             subprocess.run(['git', '-C', directory, *arguments], check=True, capture_output=True)
@@ -585,19 +586,19 @@ def selftest():
             write(name, content)
             if quietly(check_facts, directory, 'HEAD~1', 'HEAD', os.path.join(directory, name)) != 6:
                 failures.append(f'{what}的事实表没被判红')
-        saved_limit = globals()['MAXIMUM_CANDIDATE_LINES_PER_FACT']
-        globals()['MAXIMUM_CANDIDATE_LINES_PER_FACT'] = 0
+        saved_limit = MAXIMUM_CANDIDATE_LINES_PER_FACT
+        MAXIMUM_CANDIDATE_LINES_PER_FACT = 0
         if quietly(check_facts, directory, 'HEAD~1', 'HEAD', os.path.join(directory, 'facts-good.tsv')) != 6:
             failures.append('命中行数超上限的事实表没被判红')
-        globals()['MAXIMUM_CANDIDATE_LINES_PER_FACT'] = saved_limit
-        saved_wide = globals()['WIDE_TERM_SPOT_CHECK_LINES']
-        globals()['WIDE_TERM_SPOT_CHECK_LINES'] = 0
+        MAXIMUM_CANDIDATE_LINES_PER_FACT = saved_limit
+        saved_wide = WIDE_TERM_SPOT_CHECK_LINES
+        WIDE_TERM_SPOT_CHECK_LINES = 0
         if quietly(check_facts, directory, 'HEAD~1', 'HEAD', os.path.join(directory, 'facts-good.tsv')) != 6:
             failures.append('命中超过抽查门槛、出处列没写「宽词已抽查」的事实表没被判红')
         write('facts-wide-checked.tsv', header + 'F1\t层 0 只有新池新建文件\t层 0 两条流\t层 0\tH1；宽词已抽查：抽 10 行、相干 9 行\n')
         if quietly(check_facts, directory, 'HEAD~1', 'HEAD', os.path.join(directory, 'facts-wide-checked.tsv')) != 0:
             failures.append('写了「宽词已抽查」的宽检索词被判红')
-        globals()['WIDE_TERM_SPOT_CHECK_LINES'] = saved_wide
+        WIDE_TERM_SPOT_CHECK_LINES = saved_wide
         write('facts-build.tsv', header + good_row + 'F2\t只改措辞\t只改措辞\t层 0\tH1\n'
               'F3\t层 0 只有新池新建文件\t层 0 两条流\t一次挂载\tH1\n')
         candidates = build_candidates(directory, 'HEAD', read_fact_table(os.path.join(directory, 'facts-build.tsv')))

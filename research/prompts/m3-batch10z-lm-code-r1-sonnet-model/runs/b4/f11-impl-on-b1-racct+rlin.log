@@ -1,9 +1,0 @@
-
-running 1 test
-test s2_sweep ... S2 label=f11 arm= slots=384 prefix=oooo mid=n r=b1 r_txg=9 r_old_txg=7 r_old_in_ring=true faults=racct,rlin persist=false actions=noonoonnonnnnnnnoonnnnnonononnononoooonn secs=8.66 selected=8 c_r=142 revived=0 revived_in_c_r=0 iso_mount=134 iso_after_first_raise=162 iso_max=162 iso_end=0 refused_steps=0 first_refused=- r_left_at=19 hit=false first_red=-
-S2 label=f11 arm= slots=384 prefix=oooo mid=n r=b1 r_txg=9 r_old_txg=7 r_old_in_ring=true faults=racct,rlin persist=false actions=nonoooonoononnooooonooooooonnnn secs=6.37 selected=8 c_r=142 revived=0 revived_in_c_r=0 iso_mount=134 iso_after_first_raise=162 iso_max=162 iso_end=0 refused_steps=0 first_refused=- r_left_at=18 hit=false first_red=-
-S2_DONE label=f11 arm= histories=2 hits=0
-ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.06s
-

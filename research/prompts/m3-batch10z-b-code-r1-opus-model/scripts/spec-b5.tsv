@@ -1,6 +1,0 @@
-x1b-today-s1	opus10zb_probe_abandoned_slot-bd8790121b7e5f03	OPUS10ZB_ARM=today OPUS_STARTS=1 OPUS_FAULTS=slot OPUS_MODES=unmount,write+unmount
-x1b-today-s2	opus10zb_probe_abandoned_slot-bd8790121b7e5f03	OPUS10ZB_ARM=today OPUS_STARTS=2 OPUS_FAULTS=slot OPUS_MODES=unmount,write+unmount
-x1b-today-s3	opus10zb_probe_abandoned_slot-bd8790121b7e5f03	OPUS10ZB_ARM=today OPUS_STARTS=3 OPUS_FAULTS=slot OPUS_MODES=unmount,write+unmount
-x1b-slot-s1	opus10zb_probe_abandoned_slot-bd8790121b7e5f03	OPUS10ZB_ARM=slot OPUS_STARTS=1 OPUS_FAULTS=slot OPUS_MODES=unmount,write+unmount
-x1b-slot-s2	opus10zb_probe_abandoned_slot-bd8790121b7e5f03	OPUS10ZB_ARM=slot OPUS_STARTS=2 OPUS_FAULTS=slot OPUS_MODES=unmount,write+unmount
-x1b-slot-s3	opus10zb_probe_abandoned_slot-bd8790121b7e5f03	OPUS10ZB_ARM=slot OPUS_STARTS=3 OPUS_FAULTS=slot OPUS_MODES=unmount,write+unmount

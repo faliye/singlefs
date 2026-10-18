@@ -1,0 +1,29 @@
+
+running 1 test
+test an_unlink_intent_that_opens_a_tombstone_container_after_one_numbered_at_the_top_of_its_range_is_refused_before_any_write ... FAILED
+
+failures:
+
+---- an_unlink_intent_that_opens_a_tombstone_container_after_one_numbered_at_the_top_of_its_range_is_refused_before_any_write stdout ----
+
+thread 'an_unlink_intent_that_opens_a_tombstone_container_after_one_numbered_at_the_top_of_its_range_is_refused_before_any_write' (2713955) panicked at crates/singlefs-core/src/container_tree.rs:552:26:
+attempt to add with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    an_unlink_intent_that_opens_a_tombstone_container_after_one_numbered_at_the_top_of_its_range_is_refused_before_any_write
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.82s
+
+
+--- stderr ---
+   Compiling singlefs-format v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s4/tree/crates/singlefs-format)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s4/tree/crates/singlefs-reference-filesystem)
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s4/tree/crates/singlefs-replay-prefix)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s4/tree/crates/singlefs-checker)
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s4/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s4/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 28.57s
+     Running tests/opening_a_container_past_the_largest_number_returns_an_error.rs (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/target/debug/deps/opening_a_container_past_the_largest_number_returns_an_error-fa9d9f39e9b90615)
+error: test failed, to rerun pass `-p singlefs-harness --test opening_a_container_past_the_largest_number_returns_an_error`

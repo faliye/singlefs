@@ -1,0 +1,915 @@
+=== example=bing-race-unstage cand=bing hist=h9_aba cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g rm -q --cached -- .claude/kb/b.md
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=no verdict=green
+      （交错）g add -- .claude/kb/b.md
+      staged-green -> tree 6c47db026a86
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=647445591f2b track_in_window=no verdict=green
+      staged-green -> tree 6c47db026a86
+result cand=bing hist=h9_aba cont=S judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=bing-race-stash cand=bing hist=h9_stash cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g stash push -q
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=no verdict=green
+      （交错）g stash pop -q --index
+      staged-green -> tree 6c47db026a86
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=647445591f2b track_in_window=no verdict=green
+      staged-green -> tree 6c47db026a86
+result cand=bing hist=h9_stash cont=S judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=bing-race-commit-undo cand=bing hist=h9_commit_undo cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g commit -q -m tmp
+      （交错）g reset -q --soft HEAD~1
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=no verdict=green
+      staged-green -> tree 6c47db026a86
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=647445591f2b track_in_window=no verdict=green
+      staged-green -> tree 6c47db026a86
+result cand=bing hist=h9_commit_undo cont=S judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=bing-override cand=bing hist=h15_override cont=kS
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=37a3c1aea820 track_in_window=no verdict=green
+      staged-green -> tree e95a7ee653a2
+    --- 前缀与故障完 ---
+    commit af4cda5
+    run=3 path=S who=A head=af4cda5 base=cf6d7b7a0f1b track_in_window=no verdict=green
+      staged-green -> tree e95a7ee653a2
+result cand=bing hist=h15_override cont=kS judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=geng2-race-unstage cand=geng2 hist=h9_aba cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g rm -q --cached -- .claude/kb/b.md
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+      （交错）g add -- .claude/kb/b.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h9_aba cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=geng2-race-stash cand=geng2 hist=h9_stash cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g stash push -q
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+      （交错）g stash pop -q --index
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h9_stash cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=geng2-race-commit-undo cand=geng2 hist=h9_commit_undo cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g commit -q -m tmp
+      （交错）g reset -q --soft HEAD~1
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h9_commit_undo cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=geng2-override cand=geng2 hist=h15_override cont=kS
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=37a3c1aea820 track_in_window=no verdict=green
+      庚二：GATE_BASE 是人给的，staged-green 不前移
+    --- 前缀与故障完 ---
+    commit af4cda5
+    run=3 path=S who=A head=af4cda5 base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h15_override cont=kS judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_tree_fixed-race-unstage cand=ding_tree_fixed hist=h9_aba cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g rm -q --cached -- .claude/kb/b.md
+    run=2 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+      （交错）g add -- .claude/kb/b.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_tree_fixed hist=h9_aba cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_tree_fixed-race-stash cand=ding_tree_fixed hist=h9_stash cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g stash push -q
+    run=2 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+      （交错）g stash pop -q --index
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_tree_fixed hist=h9_stash cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_tree_fixed-race-commit-undo cand=ding_tree_fixed hist=h9_commit_undo cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g commit -q -m tmp
+      （交错）g reset -q --soft HEAD~1
+    run=2 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_tree_fixed hist=h9_commit_undo cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_tree_fixed-override cand=ding_tree_fixed hist=h15_override cont=kS
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=37a3c1aea820 track_in_window=no verdict=green
+      庚二：GATE_BASE 是人给的，staged-green 不前移
+    --- 前缀与故障完 ---
+    commit af4cda5
+    run=3 path=S who=A head=af4cda5 base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_tree_fixed hist=h15_override cont=kS judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_lazy_fixed-race-unstage cand=ding_lazy_fixed hist=h9_aba cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g rm -q --cached -- .claude/kb/b.md
+    run=2 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+      （交错）g add -- .claude/kb/b.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_lazy_fixed hist=h9_aba cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_lazy_fixed-race-stash cand=ding_lazy_fixed hist=h9_stash cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g stash push -q
+    run=2 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+      （交错）g stash pop -q --index
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_lazy_fixed hist=h9_stash cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_lazy_fixed-race-commit-undo cand=ding_lazy_fixed hist=h9_commit_undo cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g commit -q -m tmp
+      （交错）g reset -q --soft HEAD~1
+    run=2 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_lazy_fixed hist=h9_commit_undo cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_lazy_fixed-override cand=ding_lazy_fixed hist=h15_override cont=kS
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=37a3c1aea820 track_in_window=no verdict=green
+      庚二：GATE_BASE 是人给的，staged-green 不前移
+    --- 前缀与故障完 ---
+    commit af4cda5
+    run=3 path=S who=A head=af4cda5 base=1ad82d9d8e13 track_in_window=yes verdict=red
+result cand=ding_lazy_fixed hist=h15_override cont=kS judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=geng-race-unstage cand=geng hist=h9_aba cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g rm -q --cached -- .claude/kb/b.md
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+      （交错）g add -- .claude/kb/b.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng hist=h9_aba cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=geng-override cand=geng hist=h15_override cont=kS
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=37a3c1aea820 track_in_window=no verdict=green
+      staged-green -> tree e95a7ee653a2
+    --- 前缀与故障完 ---
+    commit af4cda5
+    run=3 path=S who=A head=af4cda5 base=cf6d7b7a0f1b track_in_window=no verdict=green
+      staged-green -> tree e95a7ee653a2
+result cand=geng hist=h15_override cont=kS judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=bing_guard-race-unstage cand=bing_guard hist=h9_aba cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g rm -q --cached -- .claude/kb/b.md
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=no verdict=green
+      （交错）g add -- .claude/kb/b.md
+      staged-green -> tree 6c47db026a86
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=647445591f2b track_in_window=no verdict=green
+      staged-green -> tree 6c47db026a86
+result cand=bing_guard hist=h9_aba cont=S judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=bing_guard-override cand=bing_guard hist=h15_override cont=kS
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=37a3c1aea820 track_in_window=no verdict=green
+      庚二：GATE_BASE 是人给的，staged-green 不前移
+    --- 前缀与故障完 ---
+    commit af4cda5
+    run=3 path=S who=A head=af4cda5 base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=bing_guard hist=h15_override cont=kS judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_tree-race-unstage cand=ding_tree hist=h9_aba cont=kS
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g rm -q --cached -- .claude/kb/b.md
+    run=2 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=no verdict=green
+      （交错）g add -- .claude/kb/b.md
+      staged-green -> tree 6c47db026a86
+    --- 前缀与故障完 ---
+    commit 091d0b6
+    run=3 path=S who=A head=091d0b6 base=091d0b6579f1 track_in_window=no verdict=green
+      staged-green -> tree 6c47db026a86
+result cand=ding_tree hist=h9_aba cont=kS judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=ding_tree-override cand=ding_tree hist=h15_override cont=kS
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=37a3c1aea820 track_in_window=no verdict=green
+      staged-green -> tree e95a7ee653a2
+    --- 前缀与故障完 ---
+    commit af4cda5
+    run=3 path=S who=A head=af4cda5 base=af4cda5e24ad track_in_window=no verdict=green
+      staged-green -> tree e95a7ee653a2
+result cand=ding_tree hist=h15_override cont=kS judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=yi_gate_mb-stamp-S cand=yi_gate_mb hist=h6_stamp_S cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    restore .claude/kb/page.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=37a3c1a base=37a3c1aea820 track_in_window=no verdict=green
+      staged-green -> tree 625c968fa8fe
+result cand=yi_gate_mb hist=h6_stamp_S cont=S judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=yi_gate_mb-stamp-N cand=yi_gate_mb hist=h6_stamp_N cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=N who=A head=37a3c1a base=1ad82d9d8e13 track_in_window=no verdict=green
+    restore .claude/kb/page.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=37a3c1a base=37a3c1aea820 track_in_window=no verdict=green
+      staged-green -> tree 625c968fa8fe
+result cand=yi_gate_mb hist=h6_stamp_N cont=S judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=yi_gate_mb-stamp-revert cand=yi_gate_mb hist=h6_stamp_revert cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit ea44c1e
+    revert -> 73f334c
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=73f334c base=37a3c1aea820 track_in_window=no verdict=green
+      staged-green -> tree 625c968fa8fe
+result cand=yi_gate_mb hist=h6_stamp_revert cont=S judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=yi_clean-stamp-S cand=yi_clean hist=h6_stamp_S cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    restore .claude/kb/page.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=37a3c1a base=1ad82d9d8e13 track_in_window=yes verdict=red
+result cand=yi_clean hist=h6_stamp_S cont=S judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=yi_clean-stamp-N cand=yi_clean hist=h6_stamp_N cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=N who=A head=37a3c1a base=1ad82d9d8e13 track_in_window=no verdict=green
+    restore .claude/kb/page.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=37a3c1a base=1ad82d9d8e13 track_in_window=yes verdict=red
+result cand=yi_clean hist=h6_stamp_N cont=S judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=yi_clean-stamp-revert cand=yi_clean hist=h6_stamp_revert cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit ea44c1e
+    revert -> 73f334c
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=73f334c base=1ad82d9d8e13 track_in_window=yes verdict=red
+result cand=yi_clean hist=h6_stamp_revert cont=S judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=geng2-stamp-S cand=geng2 hist=h6_stamp_S cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=cdd45ba2384a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    restore .claude/kb/page.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=37a3c1a base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h6_stamp_S cont=S judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=geng2-stamp-N cand=geng2 hist=h6_stamp_N cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=N who=A head=37a3c1a base=cdd45ba2384a track_in_window=no verdict=green
+    restore .claude/kb/page.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=37a3c1a base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h6_stamp_N cont=S judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=geng2-stamp-revert cand=geng2 hist=h6_stamp_revert cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=cdd45ba2384a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit ea44c1e
+    revert -> 73f334c
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=73f334c base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h6_stamp_revert cont=S judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_tree_fixed-stamp-S cand=ding_tree_fixed hist=h6_stamp_S cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=bf379ed0fa00 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    restore .claude/kb/page.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=37a3c1a base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_tree_fixed hist=h6_stamp_S cont=S judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_tree_fixed-stamp-N cand=ding_tree_fixed hist=h6_stamp_N cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=N who=A head=37a3c1a base=bf379ed0fa00 track_in_window=no verdict=green
+    restore .claude/kb/page.md
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=37a3c1a base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_tree_fixed hist=h6_stamp_N cont=S judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=ding_tree_fixed-stamp-revert cand=ding_tree_fixed hist=h6_stamp_revert cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=S who=A head=37a3c1a base=bf379ed0fa00 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit ea44c1e
+    revert -> 73f334c
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=73f334c base=ea44c1ea9429 track_in_window=yes verdict=red
+result cand=ding_tree_fixed hist=h6_stamp_revert cont=S judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=yi_clean-race-unstage cand=yi_clean hist=h9_aba cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+      （交错）g rm -q --cached -- .claude/kb/b.md
+    run=2 path=S who=A head=bf379ed base=1ad82d9d8e13 track_in_window=no verdict=green
+      （交错）g add -- .claude/kb/b.md
+      staged-green -> tree 6c47db026a86
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=yi_clean hist=h9_aba cont=S judged_ever=yes runs=3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=wu_set-duplicate cand=wu_set hist=h11_dup cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    run=2 path=S who=A head=bf379ed base=FULL track_in_window=no verdict=green
+      staged-green -> tree 6923008c80af
+    commit c346fcd
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=c346fcd base=FULL track_in_window=no verdict=green
+      staged-green -> tree 6923008c80af
+result cand=wu_set hist=h11_dup cont=S judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=wu_set-grow cand=wu_set hist=h12_exempt_grow cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit a6d165a
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=a6d165a base=FULL track_in_window=no verdict=green
+      staged-green -> tree 5834bac128a0
+result cand=wu_set hist=h12_exempt_grow cont=S judged_ever=no runs=none prefix_runs=1 after_prefix=none after_count=0 total_runs=2
+=== example=wu_set-move cand=wu_set hist=h17_wu_move cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    存量豁免行在同一页里从末尾搬到页首
+    commit 55962c6
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=55962c6 base=FULL track_in_window=no verdict=green
+      staged-green -> tree e3bbbab312f8
+result cand=wu_set hist=h17_wu_move cont=S judged_ever=no runs=none prefix_runs=1 after_prefix=none after_count=0 total_runs=2
+=== example=wu_set-copy-other cand=wu_set hist=h18_wu_copy_other_page cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit cce4ac0
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=cce4ac0 base=FULL track_in_window=yes verdict=red
+result cand=wu_set hist=h18_wu_copy_other_page cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=wu_count-duplicate cand=wu_count hist=h11_dup cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    run=2 path=S who=A head=bf379ed base=FULL track_in_window=yes verdict=red
+    commit c346fcd
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=c346fcd base=FULL track_in_window=yes verdict=red
+result cand=wu_count hist=h11_dup cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=wu_count-grow cand=wu_count hist=h12_exempt_grow cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit a6d165a
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=a6d165a base=FULL track_in_window=no verdict=green
+      staged-green -> tree 5834bac128a0
+result cand=wu_count hist=h12_exempt_grow cont=S judged_ever=no runs=none prefix_runs=1 after_prefix=none after_count=0 total_runs=2
+=== example=wu_count-move cand=wu_count hist=h17_wu_move cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    存量豁免行在同一页里从末尾搬到页首
+    commit 55962c6
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=55962c6 base=FULL track_in_window=no verdict=green
+      staged-green -> tree e3bbbab312f8
+result cand=wu_count hist=h17_wu_move cont=S judged_ever=no runs=none prefix_runs=1 after_prefix=none after_count=0 total_runs=2
+=== example=wu_count-copy-other cand=wu_count hist=h18_wu_copy_other_page cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit cce4ac0
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=cce4ac0 base=FULL track_in_window=yes verdict=red
+result cand=wu_count hist=h18_wu_copy_other_page cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=wu_fixed-duplicate cand=wu_fixed hist=h11_dup cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    run=2 path=S who=A head=bf379ed base=FULL track_in_window=no verdict=green
+      staged-green -> tree 6923008c80af
+    commit c346fcd
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=c346fcd base=FULL track_in_window=no verdict=green
+      staged-green -> tree 6923008c80af
+result cand=wu_fixed hist=h11_dup cont=S judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=3
+=== example=wu_fixed-grow cand=wu_fixed hist=h12_exempt_grow cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit a6d165a
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=a6d165a base=FULL track_in_window=yes verdict=red
+result cand=wu_fixed hist=h12_exempt_grow cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=wu_fixed-move cand=wu_fixed hist=h17_wu_move cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    存量豁免行在同一页里从末尾搬到页首
+    commit 55962c6
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=55962c6 base=FULL track_in_window=no verdict=green
+      staged-green -> tree e3bbbab312f8
+result cand=wu_fixed hist=h17_wu_move cont=S judged_ever=no runs=none prefix_runs=1 after_prefix=none after_count=0 total_runs=2
+=== example=wu_fixed-copy-other cand=wu_fixed hist=h18_wu_copy_other_page cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit cce4ac0
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=cce4ac0 base=FULL track_in_window=yes verdict=red
+result cand=wu_fixed hist=h18_wu_copy_other_page cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=wu_cf-duplicate cand=wu_cf hist=h11_dup cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    run=2 path=S who=A head=bf379ed base=FULL track_in_window=yes verdict=red
+    commit c346fcd
+    --- 前缀与故障完 ---
+    run=3 path=S who=A head=c346fcd base=FULL track_in_window=yes verdict=red
+result cand=wu_cf hist=h11_dup cont=S judged_ever=yes runs=2,3 prefix_runs=2 after_prefix=3 after_count=1 total_runs=3
+=== example=wu_cf-grow cand=wu_cf hist=h12_exempt_grow cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit a6d165a
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=a6d165a base=FULL track_in_window=yes verdict=red
+result cand=wu_cf hist=h12_exempt_grow cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=wu_cf-move cand=wu_cf hist=h17_wu_move cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    存量豁免行在同一页里从末尾搬到页首
+    commit 55962c6
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=55962c6 base=FULL track_in_window=no verdict=green
+      staged-green -> tree e3bbbab312f8
+result cand=wu_cf hist=h17_wu_move cont=S judged_ever=no runs=none prefix_runs=1 after_prefix=none after_count=0 total_runs=2
+=== example=wu_cf-copy-other cand=wu_cf hist=h18_wu_copy_other_page cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit cce4ac0
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=cce4ac0 base=FULL track_in_window=yes verdict=red
+result cand=wu_cf hist=h18_wu_copy_other_page cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=geng2-move cand=geng2 hist=h17_wu_move cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    存量豁免行在同一页里从末尾搬到页首
+    commit 55962c6
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=55962c6 base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h17_wu_move cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=today-move cand=today hist=h17_wu_move cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=b14e019685ba track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    存量豁免行在同一页里从末尾搬到页首
+    commit 55962c6
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=55962c6 base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=today hist=h17_wu_move cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=geng2_s-n-only-bypass cand=geng2_s hist=h2_noverify cont=N
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    --- 前缀与故障完 ---
+    run=2 path=N who=A head=37a3c1a base=HEAD track_in_window=no verdict=green
+result cand=geng2_s hist=h2_noverify cont=N judged_ever=no runs=none prefix_runs=1 after_prefix=none after_count=0 total_runs=2
+=== example=geng2-n-only-bypass cand=geng2 hist=h2_noverify cont=N
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    --- 前缀与故障完 ---
+    run=2 path=N who=A head=37a3c1a base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h2_noverify cont=N judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=geng2_s-n-only-c439 cand=geng2_s hist=h1_c439 cont=NN
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=N who=A head=37a3c1a base=HEAD track_in_window=no verdict=green
+    --- 前缀与故障完 ---
+    run=3 path=N who=A head=37a3c1a base=HEAD track_in_window=no verdict=green
+    run=4 path=N who=A head=37a3c1a base=HEAD track_in_window=no verdict=green
+result cand=geng2_s hist=h1_c439 cont=NN judged_ever=no runs=none prefix_runs=2 after_prefix=none after_count=0 total_runs=4
+=== example=geng2-n-only-c439 cand=geng2 hist=h1_c439 cont=NN
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    commit 37a3c1a
+    run=2 path=N who=A head=37a3c1a base=cdd45ba2384a track_in_window=yes verdict=red
+    --- 前缀与故障完 ---
+    run=3 path=N who=A head=37a3c1a base=cdd45ba2384a track_in_window=yes verdict=red
+    run=4 path=N who=A head=37a3c1a base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h1_c439 cont=NN judged_ever=yes runs=2,3,4 prefix_runs=2 after_prefix=3,4 after_count=2 total_runs=4
+=== example=control-today cand=today hist=h0_control cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=b14e019685ba track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=bf379ed base=1ad82d9d8e13 track_in_window=yes verdict=red
+result cand=today hist=h0_control cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=control-bing cand=bing hist=h0_control cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=bing hist=h0_control cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=control-geng2 cand=geng2 hist=h0_control cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2 hist=h0_control cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=control-ding_tree_fixed cand=ding_tree_fixed hist=h0_control cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_tree_fixed hist=h0_control cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=control-ding_lazy_fixed cand=ding_lazy_fixed hist=h0_control cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=bf379ed base=bf379ed0fa00 track_in_window=yes verdict=red
+result cand=ding_lazy_fixed hist=h0_control cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=control-yi_clean cand=yi_clean hist=h0_control cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=1ad82d9d8e13 track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=bf379ed base=1ad82d9d8e13 track_in_window=yes verdict=red
+result cand=yi_clean hist=h0_control cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=control-wu_cf cand=wu_cf hist=h0_control cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=bf379ed base=FULL track_in_window=yes verdict=red
+result cand=wu_cf hist=h0_control cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=control-wu_set cand=wu_set hist=h0_control cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=FULL track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=bf379ed base=FULL track_in_window=yes verdict=red
+result cand=wu_set hist=h0_control cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+=== example=control-geng2_s cand=geng2_s hist=h0_control cont=S
+    open A at 1ad82d9
+    open B at 1ad82d9
+    run=1 path=S who=A head=1ad82d9 base=5c3364eb1b1a track_in_window=no verdict=green
+      staged-green -> tree af16447ab07a
+    commit bf379ed
+    --- 起点完 ---
+    --- 前缀与故障完 ---
+    run=2 path=S who=A head=bf379ed base=cdd45ba2384a track_in_window=yes verdict=red
+result cand=geng2_s hist=h0_control cont=S judged_ever=yes runs=2 prefix_runs=1 after_prefix=2 after_count=1 total_runs=2
+name=k6 count=66
+name=k6row id=bing-race-unstage cand=bing hist=h9_aba cont=S judged_ever=no
+name=k6row id=bing-race-stash cand=bing hist=h9_stash cont=S judged_ever=no
+name=k6row id=bing-race-commit-undo cand=bing hist=h9_commit_undo cont=S judged_ever=no
+name=k6row id=bing-override cand=bing hist=h15_override cont=kS judged_ever=no
+name=k6row id=geng2-race-unstage cand=geng2 hist=h9_aba cont=S judged_ever=yes
+name=k6row id=geng2-race-stash cand=geng2 hist=h9_stash cont=S judged_ever=yes
+name=k6row id=geng2-race-commit-undo cand=geng2 hist=h9_commit_undo cont=S judged_ever=yes
+name=k6row id=geng2-override cand=geng2 hist=h15_override cont=kS judged_ever=yes
+name=k6row id=ding_tree_fixed-race-unstage cand=ding_tree_fixed hist=h9_aba cont=S judged_ever=yes
+name=k6row id=ding_tree_fixed-race-stash cand=ding_tree_fixed hist=h9_stash cont=S judged_ever=yes
+name=k6row id=ding_tree_fixed-race-commit-undo cand=ding_tree_fixed hist=h9_commit_undo cont=S judged_ever=yes
+name=k6row id=ding_tree_fixed-override cand=ding_tree_fixed hist=h15_override cont=kS judged_ever=yes
+name=k6row id=ding_lazy_fixed-race-unstage cand=ding_lazy_fixed hist=h9_aba cont=S judged_ever=yes
+name=k6row id=ding_lazy_fixed-race-stash cand=ding_lazy_fixed hist=h9_stash cont=S judged_ever=yes
+name=k6row id=ding_lazy_fixed-race-commit-undo cand=ding_lazy_fixed hist=h9_commit_undo cont=S judged_ever=yes
+name=k6row id=ding_lazy_fixed-override cand=ding_lazy_fixed hist=h15_override cont=kS judged_ever=yes
+name=k6row id=geng-race-unstage cand=geng hist=h9_aba cont=S judged_ever=yes
+name=k6row id=geng-override cand=geng hist=h15_override cont=kS judged_ever=no
+name=k6row id=bing_guard-race-unstage cand=bing_guard hist=h9_aba cont=S judged_ever=no
+name=k6row id=bing_guard-override cand=bing_guard hist=h15_override cont=kS judged_ever=yes
+name=k6row id=ding_tree-race-unstage cand=ding_tree hist=h9_aba cont=kS judged_ever=no
+name=k6row id=ding_tree-override cand=ding_tree hist=h15_override cont=kS judged_ever=no
+name=k6row id=yi_gate_mb-stamp-S cand=yi_gate_mb hist=h6_stamp_S cont=S judged_ever=no
+name=k6row id=yi_gate_mb-stamp-N cand=yi_gate_mb hist=h6_stamp_N cont=S judged_ever=no
+name=k6row id=yi_gate_mb-stamp-revert cand=yi_gate_mb hist=h6_stamp_revert cont=S judged_ever=no
+name=k6row id=yi_clean-stamp-S cand=yi_clean hist=h6_stamp_S cont=S judged_ever=yes
+name=k6row id=yi_clean-stamp-N cand=yi_clean hist=h6_stamp_N cont=S judged_ever=yes
+name=k6row id=yi_clean-stamp-revert cand=yi_clean hist=h6_stamp_revert cont=S judged_ever=yes
+name=k6row id=geng2-stamp-S cand=geng2 hist=h6_stamp_S cont=S judged_ever=yes
+name=k6row id=geng2-stamp-N cand=geng2 hist=h6_stamp_N cont=S judged_ever=yes
+name=k6row id=geng2-stamp-revert cand=geng2 hist=h6_stamp_revert cont=S judged_ever=yes
+name=k6row id=ding_tree_fixed-stamp-S cand=ding_tree_fixed hist=h6_stamp_S cont=S judged_ever=yes
+name=k6row id=ding_tree_fixed-stamp-N cand=ding_tree_fixed hist=h6_stamp_N cont=S judged_ever=yes
+name=k6row id=ding_tree_fixed-stamp-revert cand=ding_tree_fixed hist=h6_stamp_revert cont=S judged_ever=yes
+name=k6row id=yi_clean-race-unstage cand=yi_clean hist=h9_aba cont=S judged_ever=yes
+name=k6row id=wu_set-duplicate cand=wu_set hist=h11_dup cont=S judged_ever=no
+name=k6row id=wu_set-grow cand=wu_set hist=h12_exempt_grow cont=S judged_ever=no
+name=k6row id=wu_set-move cand=wu_set hist=h17_wu_move cont=S judged_ever=no
+name=k6row id=wu_set-copy-other cand=wu_set hist=h18_wu_copy_other_page cont=S judged_ever=yes
+name=k6row id=wu_count-duplicate cand=wu_count hist=h11_dup cont=S judged_ever=yes
+name=k6row id=wu_count-grow cand=wu_count hist=h12_exempt_grow cont=S judged_ever=no
+name=k6row id=wu_count-move cand=wu_count hist=h17_wu_move cont=S judged_ever=no
+name=k6row id=wu_count-copy-other cand=wu_count hist=h18_wu_copy_other_page cont=S judged_ever=yes
+name=k6row id=wu_fixed-duplicate cand=wu_fixed hist=h11_dup cont=S judged_ever=no
+name=k6row id=wu_fixed-grow cand=wu_fixed hist=h12_exempt_grow cont=S judged_ever=yes
+name=k6row id=wu_fixed-move cand=wu_fixed hist=h17_wu_move cont=S judged_ever=no
+name=k6row id=wu_fixed-copy-other cand=wu_fixed hist=h18_wu_copy_other_page cont=S judged_ever=yes
+name=k6row id=wu_cf-duplicate cand=wu_cf hist=h11_dup cont=S judged_ever=yes
+name=k6row id=wu_cf-grow cand=wu_cf hist=h12_exempt_grow cont=S judged_ever=yes
+name=k6row id=wu_cf-move cand=wu_cf hist=h17_wu_move cont=S judged_ever=no
+name=k6row id=wu_cf-copy-other cand=wu_cf hist=h18_wu_copy_other_page cont=S judged_ever=yes
+name=k6row id=geng2-move cand=geng2 hist=h17_wu_move cont=S judged_ever=yes
+name=k6row id=today-move cand=today hist=h17_wu_move cont=S judged_ever=yes
+name=k6row id=geng2_s-n-only-bypass cand=geng2_s hist=h2_noverify cont=N judged_ever=no
+name=k6row id=geng2-n-only-bypass cand=geng2 hist=h2_noverify cont=N judged_ever=yes
+name=k6row id=geng2_s-n-only-c439 cand=geng2_s hist=h1_c439 cont=NN judged_ever=no
+name=k6row id=geng2-n-only-c439 cand=geng2 hist=h1_c439 cont=NN judged_ever=yes
+name=k6row id=control-today cand=today hist=h0_control cont=S judged_ever=yes
+name=k6row id=control-bing cand=bing hist=h0_control cont=S judged_ever=yes
+name=k6row id=control-geng2 cand=geng2 hist=h0_control cont=S judged_ever=yes
+name=k6row id=control-ding_tree_fixed cand=ding_tree_fixed hist=h0_control cont=S judged_ever=yes
+name=k6row id=control-ding_lazy_fixed cand=ding_lazy_fixed hist=h0_control cont=S judged_ever=yes
+name=k6row id=control-yi_clean cand=yi_clean hist=h0_control cont=S judged_ever=yes
+name=k6row id=control-wu_cf cand=wu_cf hist=h0_control cont=S judged_ever=yes
+name=k6row id=control-wu_set cand=wu_set hist=h0_control cont=S judged_ever=yes
+name=k6row id=control-geng2_s cand=geng2_s hist=h0_control cont=S judged_ever=yes

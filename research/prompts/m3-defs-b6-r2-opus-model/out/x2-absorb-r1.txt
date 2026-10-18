@@ -1,1 +1,0 @@
-  ✓ 每台默认重活线程数只经登记位取：登记值 31；扫了 832 份（scripts 455、.claude/gate.d 24、.claude/hooks 17、crates 335、.claude/cargo-command-prefix 1），可疑写法

@@ -1,2 +1,0 @@
-q1 s2 SINGLEFS_PROBE_ARM=diff S2_ACTIONS=oo,oFoFo S2_SLOTS=1536 S2_PREFIXES=oooooooooooooooooooooooooooooooooooooooo S2_MID= S2_RS=b6;b12;b20;b30 S2_FAULTS=racct;racct,rlin;rall S2_LABEL=q1
-q2 s2 SINGLEFS_PROBE_ARM=diff S2_ACTIONS=oo,oFoFo S2_SLOTS=384 S2_PREFIXES=oooooooooooooooooooooooooooooooooooooooo S2_MID= S2_RS=b6;b12;b20;b30 S2_FAULTS=racct;racct,rlin;rall S2_LABEL=q2

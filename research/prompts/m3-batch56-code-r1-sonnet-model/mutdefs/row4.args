@@ -1,1 +1,0 @@
--p singlefs-harness --test checker_known_bad_images -- containers_numbered_two_and_three

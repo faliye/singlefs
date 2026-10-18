@@ -100,7 +100,7 @@ fn preflight() -> Option<String> {
         return None;
     }
     let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source = format!("{manifest_directory}/src/bin/e162_verdict_store_network.rs");
+    let source = format!("{manifest_directory}/e162_verdict_store_network.rs");
     let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
     let mut command = Command::new("python3");
     command.arg(&script).arg("check").arg(&source);
@@ -1991,7 +1991,7 @@ struct InterruptionRecord {
 }
 
 #[derive(Debug, Clone, Default)]
-struct CellRun {
+struct NetworkCellRun {
     sender_summary: String,
     sender_windows: String,
     sender_reconnections: Vec<String>,
@@ -2004,7 +2004,7 @@ struct CellRun {
     setup_problem: String,
 }
 
-impl CellRun {
+impl NetworkCellRun {
     fn sender_blocks_per_second(&self) -> f64 {
         let acknowledged = number_field(&self.sender_summary, "acknowledged") as f64;
         let elapsed_seconds = number_field(&self.sender_summary, "elapsed_microseconds") as f64 / 1_000_000.0;
@@ -2116,8 +2116,8 @@ fn decode_verification_line(line: &str) -> VerificationReport {
 
 /// 一格回环：起库进程（直写线程 + 收块线程）、转发进程、送块进程；按送块进程报的确认数中断转发进程；
 /// 送块进程退出之后停转发、关库进程的标准输入让它收尾；再在核对子进程里逐块核两路。
-fn run_loopback_cell(candidate: Candidate, cell: &LoopbackCell, scratch: &Path) -> CellRun {
-    let mut run = CellRun::default();
+fn run_loopback_cell(candidate: Candidate, cell: &LoopbackCell, scratch: &Path) -> NetworkCellRun {
+    let mut run = NetworkCellRun::default();
     let library = scratch.join(format!("library-{}-{}", candidate.label(), cell.label));
     if library.exists() {
         fs::remove_dir_all(&library).expect("删得了上一次的库");
@@ -2218,7 +2218,7 @@ fn run_loopback_cell(candidate: Candidate, cell: &LoopbackCell, scratch: &Path) 
 
 /// 一格的一次跑（计时格 V15 干扰就重跑，最多重跑三次）。
 struct CellAttempt {
-    run: CellRun,
+    run: NetworkCellRun,
     attempt: usize,
     is_interfered: bool,
 }
@@ -2287,7 +2287,7 @@ fn parse_window_offsets(windows_line: &str) -> Vec<u64> {
         .unwrap_or_default()
 }
 
-fn emit_cell_lines(output: &mut ProductLines, candidate: Candidate, cell: &LoopbackCell, attempt: usize, run: &CellRun) {
+fn emit_cell_lines(output: &mut ProductLines, candidate: Candidate, cell: &LoopbackCell, attempt: usize, run: &NetworkCellRun) {
     let arm = candidate.label();
     let label = cell.label;
     output.line(format!("name=sender arm={arm} cell={label} attempt={attempt} exit_code={} {}", run.sender_exit_code, prefixed_fields(&run.sender_summary, true)));
@@ -2473,7 +2473,7 @@ fn run_loopback_question(output: &mut ProductLines, arguments: &[String]) -> i32
 
 /// V14：S3-C 的中断走没走到半帧与重发两条路。原读法是半帧、重发都 > 0；加修订里收严的一条：库进程至少收过两条连接
 /// （至少一次重连真把帧送进了库；连上正在退出的转发进程的那一次到不了库）。
-fn disconnect_paths_reached(run: &CellRun) -> bool {
+fn disconnect_paths_reached(run: &NetworkCellRun) -> bool {
     number_field(&run.library_network, "half_frames_dropped") > 0
         && number_field(&run.sender_summary, "resent_frames") > 0
         && number_field(&run.library_network, "connections") >= 2
@@ -2692,10 +2692,10 @@ mod tests {
 
     #[test]
     fn disconnect_paths_need_a_half_frame_a_resend_and_a_second_library_connection() {
-        let run_with = |half_frames: u64, resent: u64, connections: u64| CellRun {
+        let run_with = |half_frames: u64, resent: u64, connections: u64| NetworkCellRun {
             sender_summary: format!("S ending=complete resent_frames={resent}"),
             library_network: format!("N receive_mode=registered connections={connections} half_frames_dropped={half_frames}"),
-            ..CellRun::default()
+            ..NetworkCellRun::default()
         };
         assert!(disconnect_paths_reached(&run_with(3, 64, 51)));
         assert!(!disconnect_paths_reached(&run_with(0, 64, 51)), "没丢过半帧");
@@ -2906,7 +2906,7 @@ mod tests {
         LoopbackCell { label, direct_blocks, network_blocks, states_per_block, window_frames: PRIMARY_WINDOW_FRAMES, receive_mode, interruption_count, is_timed: false }
     }
 
-    fn assert_clean_run(run: &CellRun, cell: &LoopbackCell, arm: Candidate) {
+    fn assert_clean_run(run: &NetworkCellRun, cell: &LoopbackCell, arm: Candidate) {
         let context = format!("臂 {} 格 {}：{} | {} | {}", arm.label(), cell.label, run.sender_summary, run.library_network, run.setup_problem);
         assert_eq!(run.setup_problem, "", "{context}");
         assert_eq!(field_value(&run.sender_summary, "ending"), Some("complete"), "{context}");

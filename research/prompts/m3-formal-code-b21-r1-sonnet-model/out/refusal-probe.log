@@ -1,7 +1,0 @@
-run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同会话两条推论腿各跑各的副本
-PROBE2 chosen_slot_journal_tail=3 selected=Some((InstanceGeneration(1), CheckpointTxg(3))) last_record_counter_of_selected=Some(3) max_counter_in_ring=Some(3)
-test b21_probe_torn_both_slots_witness ... ok
-test a_refusal_on_a_crash_image_without_read_faults_where_a_device_has_both_system_configuration_slots_torn_is_legal ... ok
-test a_witness_refusal_on_a_crash_image_without_read_faults_where_only_a_rotation_landed_is_illegal ... ok
-test the_same_witness_refusal_in_a_crash_state_with_read_faults_injected_is_legal ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s

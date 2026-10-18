@@ -10,7 +10,9 @@
 调它的：scripts/gate/apply-writer-patch.py（打进主工作区时，按路径载入本库调 acquire / release）、
 scripts/gate/merge-and-verify.sh（不带 --copy 时，命令行 acquire / release，持有者是它自己的进程号）。
 
-锁文件：SINGLEFS_WORKSPACE_LOCK_FILE 设了用它（自证用、或要另指一处时），没设是 <树的 git common-dir>/singlefs-main-workspace.lock。
+锁文件：SINGLEFS_WORKSPACE_LOCK_FILE 设了用它（自证用、或要另指一处时），没设是 <树自己的 git 目录>/singlefs-main-workspace.lock
+  （git rev-parse --git-dir：主工作树是 .git，git worktree 加出来的树是 .git/worktrees/<名>）：每棵工作树各一把，往 worktree 里合入不排在主工作树的合入后面，
+  反过来也一样。主工作树的锁文件位置与改前相同（主工作树的 git 目录就是 git common-dir）。
   文件不删，里面记持有者一行一项：pid=、start=（/proc/<pid>/stat 第 22 段，防进程号被复用）、session=（CLAUDE_CODE_SESSION_ID）、
   command=、since=（拿到时的 epoch 秒）；空着就是没人拿。读写记录都在这份文件的 flock 里做，flock 只拿一瞬、不跨命令持有。
 判法：
@@ -42,6 +44,10 @@ scripts/gate/merge-and-verify.sh（不带 --copy 时，命令行 acquire / relea
       本库「两个进程同时要锁：后到的排队、报出前者、前者放了才拿到」「HOLDER 变量指着的持有者不是祖先：照排队……」
       「持有者已死的锁文件：报出来、接管」（不看死活就不报接管）；
       连带 merge-and-verify.sh「两个合入同时起……」「锁文件里的持有者已死……」与 apply-writer-patch.py「主工作区合入锁被别的合入占着时……」「主工作区合入锁的持有者已死时……」
+  lock-in-common-dir 锁文件照改前放 git common-dir（所有工作树共用一把）
+      本库「主工作树的锁被占着：git worktree 加出来的树照拿它自己那一把」；连带 apply-writer-patch.py「主工作树的锁被占着时往 git worktree 加出来的树打补丁……」、
+      merge-and-verify.sh「主工作树的锁被占着时在 git worktree 加出来的树里验……」与 .claude/hooks/lib_workspace_cargo_lock.py
+      「锁文件在默认位置，主工作树的锁被占着，git worktree 加出来的树里起：放行」「git worktree 加出来的树自己的锁被占着：拒」
 """
 import fcntl
 import os
@@ -83,12 +89,14 @@ def lock_path(root):
     override = os.environ.get(LOCK_FILE_VARIABLE, "")
     if override:
         return override
-    completed = subprocess.run(["git", "-C", root, "rev-parse", "--git-common-dir"], capture_output=True, text=True)
+    # 每棵工作树各一把（文件头「锁文件」）：取这棵树自己的 git 目录；弄坏开关 lock-in-common-dir 下照改前取 git common-dir
+    which = "--git-common-dir" if broken("lock-in-common-dir") else "--git-dir"
+    completed = subprocess.run(["git", "-C", root, "rev-parse", which], capture_output=True, text=True)
     if completed.returncode != 0 or not completed.stdout.strip():
-        raise LockError(f"{root} 不在 git 仓里，找不到放主工作区合入锁的 git common-dir（{completed.stderr.strip()[:200]}）",
+        raise LockError(f"{root} 不在 git 仓里，找不到放主工作区合入锁的 git 目录（{completed.stderr.strip()[:200]}）",
                         f"在仓里跑；要另指一处锁文件设 {LOCK_FILE_VARIABLE}")
-    common = completed.stdout.strip()
-    return os.path.join(common if os.path.isabs(common) else os.path.join(root, common), LOCK_NAME)
+    git_directory = completed.stdout.strip()
+    return os.path.join(git_directory if os.path.isabs(git_directory) else os.path.join(root, git_directory), LOCK_NAME)
 
 
 def process_start(pid):
@@ -156,7 +164,7 @@ def open_locked(path):
     try:
         descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o644)
     except OSError as error:
-        raise LockError(f"建不了主工作区合入锁文件 {path}：{error}", "看 git common-dir 在不在、可不可写；锁拿不到就别往主工作区合入")
+        raise LockError(f"建不了主工作区合入锁文件 {path}：{error}", "看那棵树的 git 目录（git rev-parse --git-dir）在不在、可不可写；锁拿不到就别往这棵树合入")
     fcntl.flock(descriptor, fcntl.LOCK_EX)
     return descriptor
 
@@ -393,6 +401,32 @@ def selftest():
             missing_code, missing_text = "超时", f"{error.stdout or ''}"
         cell("持有者进程号不在：退 1、不拿", missing_code == EXIT_FAILED and "不在" in missing_text and record_in(missing_lock) is None,
              f"退 {missing_code}：{missing_text.strip()!r}")
+        # 每棵工作树各一把（文件头「锁文件」）：临时仓的主工作树的锁被一个活着的进程（自证起的 sleep）占着，
+        # git worktree 加出来的树要锁不排队、当场拿到；两把锁文件一把在主工作树的 .git、一把在 .git/worktrees/<名>
+        os.environ.pop(LOCK_FILE_VARIABLE, None)
+        trees = os.path.join(work, "trees")
+        main_tree, linked_tree = os.path.join(trees, "main"), os.path.join(trees, "linked")
+        git_environment = {name: value for name, value in os.environ.items() if not name.startswith("GIT_")}
+        for command in (["git", "init", "-q", main_tree], ["git", "-C", main_tree, "-c", "user.name=s", "-c", "user.email=s@s", "commit", "-q", "--allow-empty", "-m", "base"],
+                        ["git", "-C", main_tree, "worktree", "add", "-q", linked_tree]):
+            subprocess.run(command, check=True, capture_output=True, env=git_environment)
+        main_holder = subprocess.Popen(["sleep", "30"])
+        try:
+            main_lock = lock_path(main_tree)
+            with open(main_lock, "w") as handle:
+                handle.write(f"pid={main_holder.pid}\nstart={process_start(main_holder.pid)}\nsession=主工作树的合入\ncommand=假合入 main\nsince={time.time()}\n")
+            said = []
+            held, problem = selftest_acquire(linked_tree, os.getpid(), "worktree 里的合入", said, 1)
+            linked_lock = lock_path(linked_tree)
+            if held is not None:
+                release(held)
+        finally:
+            main_holder.kill()
+            main_holder.wait()
+        cell("主工作树的锁被占着：git worktree 加出来的树照拿它自己那一把",
+             held is not None and not any("在排队" in line for line in said) and os.path.realpath(main_lock) == os.path.realpath(os.path.join(main_tree, ".git", LOCK_NAME))
+             and os.path.realpath(linked_lock) == os.path.realpath(os.path.join(main_tree, ".git", "worktrees", "linked", LOCK_NAME)),
+             f"{problem or '拿到了'}；报的 {said}；主工作树的锁 {main_lock}，worktree 的锁 {linked_lock}")
     finally:
         for name, value in saved.items():
             os.environ.pop(name, None)
@@ -406,7 +440,8 @@ def selftest():
         print(f"  → 看 acquire / release 的判法（文件头「判法」①–④）；{BREAK_VARIABLE} 设着的话这里本来就该红")
         return EXIT_FAILED
     print(f"  ✓ lib_workspace_lock 自检通过（查了 {checked} 格）：两个假的合入同时起后到的排队、报出前者、前者放了才进，持有者已死的锁文件报出来并接管，"
-          f"放锁后记录清空，持有者之下的子进程重入不另拿，HOLDER 变量指着的不是祖先时照排队到点退 3，持有者进程号不在退 1")
+          f"放锁后记录清空，持有者之下的子进程重入不另拿，HOLDER 变量指着的不是祖先时照排队到点退 3，持有者进程号不在退 1，"
+          f"主工作树的锁被占着时 git worktree 加出来的树照拿它自己那一把")
     return 0
 
 

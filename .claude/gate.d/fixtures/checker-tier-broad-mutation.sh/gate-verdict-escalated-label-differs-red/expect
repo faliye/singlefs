@@ -1,0 +1,4 @@
+exit=1
+want=升档判的抓到复核不过
+want=--summary 说第 1 条（键 e5ca1a7e00000000）是升档判的 caught-by-memory，登记表里没有这把键、这个标签复核得过的那一行
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

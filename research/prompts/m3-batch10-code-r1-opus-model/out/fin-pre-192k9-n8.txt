@@ -1,3 +1,0 @@
-FXFINAL narrow U=192 k=9 u=3 b=1 cont=WalkedToEmpty n=8 j=0 plan=w:-/-:z red=[]
-FXFINAL narrow U=192 k=9 u=3 b=1 cont=WalkedToEmpty n=8 j=0 plan=w:all/but1:z red=["I-7.9"] [I-7.9] 实例 3 txg 24 那条根把回退下界 F 从 21 抬到 22，高于它之前的根算出的抬 F 上限 21：每块盘上最新的有效根 {0: 23, 1: 22}，非空有效根 [21]，空不空判不了的有效根 []，最旧有效根 txg 21
-FXFINAL narrow U=192 k=9 u=3 b=1 cont=WalkedToEmpty n=8 j=0 plan=w:-/only1:z red=[]

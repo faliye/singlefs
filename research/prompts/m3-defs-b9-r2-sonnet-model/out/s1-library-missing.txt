@@ -1,8 +1,0 @@
-fenced-example	PATH=normal	退出=0	（没有拒绝项）	载不进那句 stderr=0 行
-fenced-example	PATH=shim	退出=2	会拒 1 处（线程上限）	载不进那句 stderr=1 行
-tilde-example	PATH=normal	退出=0	（没有拒绝项）	载不进那句 stderr=0 行
-tilde-example	PATH=shim	退出=2	会拒 1 处（线程上限）	载不进那句 stderr=1 行
-plain	PATH=normal	退出=0	（没有拒绝项）	载不进那句 stderr=0 行
-plain	PATH=shim	退出=0	（没有拒绝项）	载不进那句 stderr=1 行
-垫片 python3 的 sys.flags.no_site = 1
-ModuleNotFoundError: No module named 'markdown_it'

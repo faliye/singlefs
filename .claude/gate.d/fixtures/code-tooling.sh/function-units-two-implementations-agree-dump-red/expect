@@ -1,0 +1,5 @@
+exit=1
+want=只有 Rust 那一份切出：mod_head	fsample::<module attributes>	crates/fsample/src/lib.rs:1-1
+want=  ✗ dump 有 2 处单元两份不同（Rust 9 行、python 7 行）
+want=只在 Rust 闭包里：mod_head	fsample::nested
+want=function-units-two-implementations-agree：红（退出 1）

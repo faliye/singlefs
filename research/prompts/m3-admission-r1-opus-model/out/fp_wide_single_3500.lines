@@ -1,2 +1,0 @@
-FP round=0 kind=user size=3500 txg=4 built_on=3 ckpt_cost=52 data_slots=7000 ordinary_other_slots=30 fixed_point_slots=48 excess=-4 mapping_tree_height=2
-FP summary geometry=[16384, 16384] ring=67108864 user_publishes=1 user_exceed=0 max_user_excess=-4 raise_exceed=0 max_raise_excess=-9223372036854775808

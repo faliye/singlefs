@@ -1,0 +1,7 @@
+PASS h1a_original / 丙只改带暂存：Lbad_A 进过窗口=yes
+PASS h1a_original / 丙两条路：Lbad_A 进过窗口=yes
+PASS h1a_original / 今天：Lbad_A 进过窗口=no
+PASS h1b_bypass / 丙只改带暂存：Lbad_A 进过窗口=yes
+PASS h1b_bypass / 丙两条路：Lbad_A 进过窗口=yes
+PASS h1b_bypass / 今天：Lbad_A 进过窗口=no
+h5 自证查了 6 项，红 0 项

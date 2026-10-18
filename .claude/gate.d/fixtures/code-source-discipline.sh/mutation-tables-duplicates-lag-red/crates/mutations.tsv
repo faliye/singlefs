@@ -1,0 +1,7 @@
+# 变异名	文件	原文	替换文	cargo test 参数	必须红的测试名
+M_分配代取发布代	crates/demo/src/lib.rs	    transaction_generation\n}	    transaction_generation - 1\n}	-p demo --lib	lib_case
+M_分配代取发布代另起的名字	crates/demo/src/lib.rs	    transaction_generation\n}	    transaction_generation - 1\n}	-p demo --lib -- tests::lib_case	lib_case
+M_改函数名	crates/demo/src/lib.rs	pub fn published_generation(	pub fn published_generation_renamed(	-p demo --lib	lib_case
+M_改函数名点名库里的用例	crates/demo/src/lib.rs	pub fn published_generation(	pub fn published_generation_renamed(	-p demo --lib -- tests::lib_case	lib_case
+M_改函数名再写一行	crates/demo/src/lib.rs	pub fn published_generation(	pub fn published_generation_renamed(	-p demo --lib -- lib_case	lib_case
+M_库里的断言改掉	crates/demo/src/lib.rs	assert_eq!(super::published_generation(1), 1);	assert_eq!(super::published_generation(1), 2);	-p demo --lib	lib_case

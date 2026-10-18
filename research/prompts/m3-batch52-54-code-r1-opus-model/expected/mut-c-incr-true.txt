@@ -1,4 +1,0 @@
-command=1 args=--release -p singlefs-harness --test checker_known_bad_images filter= rc=0
-test result: ok. 230 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-command=2 args=--release -p singlefs-harness --test container_trees_grow_a_level_when_the_root_is_full filter= rc=0
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

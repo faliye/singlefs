@@ -1,5 +1,0 @@
-command args=-p singlefs-harness --test core_review_tree_table_duplicates_and_slot_one_search --test corrupt_on_disk_content_is_refused_instead_of_panicking rc=0
-binary core_review_tree_table_duplicates_and_slot_one_search
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-binary corrupt_on_disk_content_is_refused_instead_of_panicking
-test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

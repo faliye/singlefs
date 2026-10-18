@@ -24,6 +24,10 @@
 #      进程号、退出码、输出（标准输出与标准错误合成一份）各写第二台 runs/<标签>.pid / .exit / .log，每 MULTI_HOST_RUN_POLL_SECONDS（默认 5）秒
 #      经 ssh 看一次（peer_host_wait_detached）；跑完输出拷回、经 peer_host_redact 打到标准输出。
 #      带到第二台的环境：RUN_WITH_MEMORY_CAP_RESERVE 设了就带；本机别的环境变量不带（真的第二台经 ssh 也拿不到），要设写成 -- env 变量=值 <命令>。
+#      第二台共用编译目录：MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY=<相对树根的编译目录>（例 ../crash-amplification-target：几棵树、几趟共用树外同一个编译目录）设了时，
+#      那条命令最前面接 peer-host-lib.sh 的 peer_host_shared_target_guard：在 <编译目录>.lock 上持锁 → scripts/hosts/source-stamp.py refresh（④ 拷树是 rsync -a，
+#      源文件带着本机的旧 mtime，cargo 按 mtime 判新鲜；内容或 mtime 与戳里不一样的 touch 到此刻，cargo 才重编它们）→ 设 CARGO_TARGET_DIR 跑命令，cargo 打出 Running 就放锁；
+#      守卫自己没做成退 255、命令不跑。只认 --peer（本机模式不拷树，设了打一句、不起作用）；写绝对路径是用法错（第二台的目录与本机不同）；读完就 unset，不带给命令。
 #   ⑥ --fetch 点名的路径（文件或目录，相对树根，不许绝对路径与 ..）取回本机取回目录；不带 --peer 时从本机仓根拷过去，两种一样放。
 #      取回目录：${MULTI_HOST_RUN_FETCH_DIRECTORY:-<工作根>/multi-host-run/<标签>}，路径在里面照原样；已有东西就拒（退 2）。
 #      工作根只在 .claude/hooks/lib_work_root.py 里定义（SINGLEFS_WORK_ROOT，默认 ~/.local/share/singlefs/work，开机不清）；
@@ -53,6 +57,7 @@
 #       Ⓐ 默认本机跑经 run-with-memory-cap.sh（cgroup 在 singlefs-memory-cap- 的 scope 里）（「命令记下的 cgroup：0::/user.slice/…」）
 #   MULTI_HOST_RUN_BREAK=peer-exit-dropped  第二台那条命令退几都退 0
 #       Ⓑ --peer 退出码原样带回：第二台那条命令退 7 ⇒ 驱动退 7（「退 0」）
+#       Ⓜ 样本：不设 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY，旧 mtime 新内容的树进共用编译目录 ⇒ 假 cargo 认它已编（Fresh）、测试红（退 101）（「样本不成立（假 cargo 没被旧 mtime 骗到），别的 Ⓜ 格判不了：第一趟退 0，第二趟退 0，…」）
 #   MULTI_HOST_RUN_BREAK=peer-without-memory-cap  第二台那条命令不经副本里的 run-with-memory-cap.sh 跑
 #       Ⓑ --peer 经副本里的 run-with-memory-cap.sh 跑（cgroup 在 singlefs-memory-cap- 的 scope 里）（「命令记下的 cgroup：0::/user.slice/…」）
 #   MULTI_HOST_RUN_BREAK=no-peer-cap-limit  --memory-cap 比配置的 PEER_MEMORY_CAP 大也照跑
@@ -338,6 +343,12 @@ multi_host_peer_main() { # 带 --peer：步骤 ①–⑦ 见文件头
     echo "  ! 弄坏开关 MULTI_HOST_RUN_BREAK=peer-without-memory-cap：第二台那条命令不经 run-with-memory-cap.sh 跑" >&2
     command_text="$(printf '%q ' "$@")"
   fi
+  # 第二台共用编译目录（文件头 ⑤）：命令最前面接守卫——持锁、刷源码戳、设 CARGO_TARGET_DIR，cargo 打出 Running 再放锁（peer-host-lib.sh 的 peer_host_shared_target_guard）
+  if [[ -n "$shared_target_directory" ]]; then
+    peer_host_shared_target_prefix_for "$shared_target_directory"
+    command_text="${reserve_text}$(printf '%q ' "${peer_host_shared_target_prefix[@]}")${command_text#"$reserve_text"}"
+    echo "  · ⑤ 第二台共用编译目录 $shared_target_directory：起命令之前在 $shared_target_directory.lock 上持锁、刷源码戳（scripts/hosts/source-stamp.py refresh），cargo 打出 Running 再放锁" >&2
+  fi
   peer_command_started=1   # 先置上：起的那一刻收到信号，也按第二台上记下的进程号去停
   peer_host_start_detached "$peer_run_directory" "$peer_pid_file" "$peer_exit_file" "$peer_output_file" "$command_text" >/dev/null \
     || multi_host_fail "第二台那条命令起不来" "看 ssh 连不连得上、第二台那棵树在不在"
@@ -397,6 +408,17 @@ multi_host_main() {
       multi_host_usage_error "--send 的落点读到「$send_relative」：要写树里的相对路径，不许绝对路径与 .."
     fi
   done
+  # 第二台共用编译目录（文件头 ⑤）：读完就 unset、不带给命令；只认 --peer，写绝对路径是用法错
+  shared_target_directory="${MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY:-}"
+  unset MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY
+  if [[ -n "$shared_target_directory" ]]; then
+    if (( ! peer_mode )); then
+      echo "  · MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY=$shared_target_directory 不起作用：本机模式不拷树，命令在仓根照它自己的编译目录编" >&2
+      shared_target_directory=""
+    elif [[ "$shared_target_directory" == /* ]]; then
+      multi_host_usage_error "MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY 读到「$shared_target_directory」：要写相对树根的路径（第二台的目录与本机不同，例 ../crash-amplification-target）"
+    fi
+  fi
   # 取回目录（文件头 ⑥）：没设 MULTI_HOST_RUN_FETCH_DIRECTORY 就落在工作根下
   fetch_directory=""
   if [[ -n "${MULTI_HOST_RUN_FETCH_DIRECTORY:-}" ]]; then
@@ -455,6 +477,13 @@ multi_host_main() {
 #      $TMPDIR 下没有；再设 MULTI_HOST_RUN_FETCH_DIRECTORY 跑一趟 ⇒ 取回到它点名的目录，工作根下没有那一趟（小仓里另拷了 .claude/hooks/lib_work_root.py）
 #   Ⓚ 本机跑 bash -c 'exit 3'，内存包装的 journalctl 换成假的（RUN_WITH_MEMORY_CAP_JOURNALCTL，打一行 NVRM … NV_ERR_NO_MEMORY）⇒ 包装退 245，
 #      驱动原样退 245、标准错误里报「显存不够」与「不算结果」
+#   Ⓜ 第二台共用编译目录（文件头 ⑤ MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY）：第二台的 PATH 前面放假 cargo（scripts/hosts/source-stamp.py --write-selftest-cargo 写的那一份，
+#      照 cargo 那样按 mtime 判本地包新不新鲜、test 核产物与此刻的源码是不是同一份，不是就 FAILED、退 101；-V 转给真 cargo，工具链照比）。树里 crates/demo/src/walk.rs 先编一趟，
+#      再换成新内容、mtime 仍是 2020 年（比编译目录里的 dep-info 旧，rsync -a 照原样带过去）编第二趟，两趟的命令都是 env CARGO_TARGET_DIR=../shared-target cargo test：
+#      样本——不设变量 ⇒ 第二趟假 cargo 认 walk.rs 已编（Fresh）、测试红（退 101），这一格红说明样本不成立；设了变量 ⇒ 第二趟 walk.rs 重编（Compiling）、测试过（退 0）
+#      持锁——前一趟的命令占着锁等放行文件，后一趟走到等锁那一行之后再等 1 秒，它的命令还没跑；放行之后两趟都退 0
+#      Running 放锁——前一趟的命令往标准错误打 cargo 的「     Running …」再等放行文件，后一趟 30 秒里跑完自己的命令；之后放行前一趟，两趟都退 0
+#      绝对路径——变量写成绝对路径 ⇒ 用法错（退 2），命令没跑
 # 自证在临时目录里放标记文件、export MULTI_HOST_RUN_SELFTEST_MARK 指向它：场景里起的驱动认得出是自证起的，调用方设的弄坏开关才生效
 
 multi_host_selftest() {
@@ -724,12 +753,121 @@ if test -e target; then echo yes > $(printf '%q' "$scene/target-copied"); fi; if
     "$([[ "$(exit_of gpu-memory run)" == 245 ]] && grep -q '退 245：显存不够' "$scene/run.err" && grep -q '不算结果' "$scene/run.err"; echo $?)" \
     "退 $(exit_of gpu-memory run)，stderr 尾部：$(tail_of gpu-memory run)"
 
+  # Ⓜ 第二台共用编译目录（上面「逐格」那一段的 Ⓜ）：第二台的 PATH 前面放假 cargo，-V 转给真 cargo（工具链照比）
+  local real_cargo shared_old_seconds=1577836800 driver_exit="" holder_driver waiter_driver rounds waiter_ran_early waiter_ran_while_holding holder_exit waiter_exit
+  real_cargo="$(command -v cargo)"
+  prepare_shared_scene() { # <场景名>：prepare_scene 之后在小仓里放 crates/demo（walk.rs 是旧内容），源文件的 mtime 都是 2020 年；第二台的 PATH 前面放假 cargo
+    local scene="$work/$1"
+    prepare_scene "$1"
+    mkdir -p "$scene/repo/crates/demo/src"
+    printf '[workspace]\n' > "$scene/repo/Cargo.toml"
+    printf 'pub mod walk;\n' > "$scene/repo/crates/demo/src/lib.rs"
+    printf 'pub fn walk() -> u32 { 1 }\n' > "$scene/repo/crates/demo/src/walk.rs"
+    touch -d "@$shared_old_seconds" "$scene/repo/Cargo.toml" "$scene/repo/crates/demo/src/lib.rs" "$scene/repo/crates/demo/src/walk.rs"
+    env -u SOURCE_STAMP_BREAK python3 "$template/scripts/hosts/source-stamp.py" --write-selftest-cargo "$scene/peer-bin/fake-cargo"
+    printf '%s\n' '#!/usr/bin/env bash' '# 自证用的 cargo：-V / --version 转给真 cargo（两台工具链照比），别的交 source-stamp.py 写的假 cargo（按 mtime 判新鲜）' \
+      "case \"\${1:-}\" in -V|--version) exec $(printf '%q' "$real_cargo") \"\$@\" ;; esac" 'exec python3 "$(dirname "$0")/fake-cargo" "$@"' > "$scene/peer-bin/cargo"
+    chmod +x "$scene/peer-bin/cargo"
+  }
+  shared_build() { # <场景名> <这一趟的名字> <guarded|unguarded>：起一趟 --peer，命令照崩溃放量双机驱动那样 env CARGO_TARGET_DIR=../shared-target cargo test；guarded 才设变量
+    if [[ "$3" == guarded ]]; then
+      MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY=../shared-target run_in "$1" "$2" --peer --memory-cap 256M --label "$1-$2" -- env CARGO_TARGET_DIR=../shared-target cargo test
+    else
+      run_in "$1" "$2" --peer --memory-cap 256M --label "$1-$2" -- env CARGO_TARGET_DIR=../shared-target cargo test
+    fi
+  }
+  shared_stale_scenario() { # <场景名> <guarded|unguarded>：编一趟；walk.rs 换成新内容、mtime 仍是 2020 年（比编译目录里的 dep-info 旧）；再编一趟
+    prepare_shared_scene "$1"
+    shared_build "$1" first "$2"
+    printf 'pub fn walk() -> u32 { 22 }\n' > "$work/$1/repo/crates/demo/src/walk.rs"
+    touch -d "@$(( shared_old_seconds + 100 ))" "$work/$1/repo/crates/demo/src/walk.rs"
+    shared_build "$1" second "$2"
+  }
+  shared_outcome() { # <场景名>：两趟的退出码与第二趟的要紧几行，判错时打
+    echo "第一趟退 $(exit_of "$1" first)，第二趟退 $(exit_of "$1" second)，第二趟输出：$(grep -E 'SOURCE_STAMP|Compiling|Fresh|test result' "$work/$1/second.out" 2>/dev/null | tr '\n' '|')；stderr 尾部：$(tail_of "$1" second)"
+  }
+  shared_stale_scenario shared-unguarded unguarded
+  expect "Ⓜ 样本：不设 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY，旧 mtime 新内容的树进共用编译目录 ⇒ 假 cargo 认它已编（Fresh）、测试红（退 101）" \
+    "$([[ "$(exit_of shared-unguarded first)" == 0 && "$(exit_of shared-unguarded second)" == 101 ]] && grep -q 'Fresh crates/demo/src/walk.rs' "$work/shared-unguarded/second.out"; echo $?)" \
+    "样本不成立（假 cargo 没被旧 mtime 骗到），别的 Ⓜ 格判不了：$(shared_outcome shared-unguarded)"
+  shared_stale_scenario shared-guarded guarded
+  expect "Ⓜ 设了 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY ⇒ 第二台编之前刷源码戳：旧 mtime 新内容的那个文件重编（Compiling）、测试过（退 0）" \
+    "$([[ "$(exit_of shared-guarded first)" == 0 && "$(exit_of shared-guarded second)" == 0 ]] && grep -q 'Compiling crates/demo/src/walk.rs' "$work/shared-guarded/second.out" \
+       && grep -q '^SOURCE_STAMP touched=1 ' "$work/shared-guarded/second.out"; echo $?)" \
+    "$(shared_outcome shared-guarded)"
+
+  wait_driver() { # <进程号> <秒>：等这一格自己起的驱动退出，至多等这么久，还在就只给它发 KILL；退出码放 driver_exit
+    local driver_rounds
+    for (( driver_rounds = 0; driver_rounds < $2 * 10; driver_rounds++ )); do peer_host_process_is_alive "$1" || break; sleep 0.1; done
+    if peer_host_process_is_alive "$1"; then kill -KILL "$1"; fi
+    if wait "$1"; then driver_exit=0; else driver_exit=$?; fi
+  }
+  start_shared_driver() { # <场景名> <标签> <命令文本>：设了变量的 --peer 一趟放后台起，输出写 <标签>.out / .err，进程号放 shared_driver
+    scene_command_for "$1"
+    MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY=../shared-target "${scene_command[@]}" --peer --memory-cap 256M --label "$2" -- bash -c "$3" \
+      > "$work/$1/$2.out" 2> "$work/$1/$2.err" < /dev/null &
+    shared_driver=$!
+  }
+  wait_for_file() { # <文件> <秒> [<进程号>]：等文件出现，至多等这么久；给了进程号，它退了就不再等
+    local file_rounds
+    for (( file_rounds = 0; file_rounds < $2 * 10; file_rounds++ )); do
+      [[ -e "$1" ]] && return 0
+      if [[ -n "${3:-}" ]] && ! peer_host_process_is_alive "$3"; then break; fi
+      sleep 0.1
+    done
+    [[ -e "$1" ]]
+  }
+  local shared_driver=""
+  # 持锁：前一趟（holder）的命令占着锁等放行文件；后一趟（waiter）走到等锁那一行之后再等 1 秒，它的命令还没跑；放行之后两趟都退 0
+  prepare_scene shared-lock
+  scene="$work/shared-lock"
+  start_shared_driver shared-lock holder "touch $(printf '%q' "$scene/holder-running"); for ((r = 0; r < 600; r++)); do [[ -e $(printf '%q' "$scene/holder-release") ]] && break; sleep 0.1; done"
+  holder_driver="$shared_driver"
+  wait_for_file "$scene/holder-running" 60 "$holder_driver"
+  start_shared_driver shared-lock waiter "touch $(printf '%q' "$scene/waiter-ran")"
+  waiter_driver="$shared_driver"
+  for (( rounds = 0; rounds < 600; rounds++ )); do
+    grep -q '等共用编译目录' "$scene/peer-home/runs/waiter.log" 2>/dev/null && break
+    peer_host_process_is_alive "$waiter_driver" || break
+    sleep 0.1
+  done
+  sleep 1
+  waiter_ran_early=0; [[ -e "$scene/waiter-ran" ]] && waiter_ran_early=1
+  : > "$scene/holder-release"
+  wait_driver "$holder_driver" 120; holder_exit="$driver_exit"
+  wait_driver "$waiter_driver" 120; waiter_exit="$driver_exit"
+  expect "Ⓜ 同一共用编译目录两趟同时起：后一趟等前一趟放锁才刷源码戳、跑命令" \
+    "$([[ -e "$scene/holder-running" && "$waiter_ran_early" == 0 && -e "$scene/waiter-ran" && "$holder_exit" == 0 && "$waiter_exit" == 0 ]]; echo $?)" \
+    "$([[ "$waiter_ran_early" == 1 ]] && echo "前一趟放锁之前后一趟的命令已经跑了；")前一趟$([[ -e "$scene/holder-running" ]] && echo 起了 || echo 没起来)、退 $holder_exit，后一趟退 $waiter_exit；后一趟 stderr 尾部：$(tail -n 3 "$scene/waiter.err" 2>/dev/null | tr '\n' '|')"
+  # Running 放锁：前一趟的命令往标准错误打 cargo 的「     Running …」再等放行文件；后一趟 30 秒里跑完自己的命令；之后放行前一趟，两趟都退 0
+  prepare_scene shared-running
+  scene="$work/shared-running"
+  start_shared_driver shared-running holder "echo '     Running tests/demo.rs (target/release/deps/demo-0000000000000000)' >&2; touch $(printf '%q' "$scene/holder-running"); for ((r = 0; r < 900; r++)); do [[ -e $(printf '%q' "$scene/holder-release") ]] && break; sleep 0.1; done"
+  holder_driver="$shared_driver"
+  wait_for_file "$scene/holder-running" 60 "$holder_driver"
+  start_shared_driver shared-running waiter "touch $(printf '%q' "$scene/waiter-ran")"
+  waiter_driver="$shared_driver"
+  waiter_ran_while_holding=0; wait_for_file "$scene/waiter-ran" 30 && waiter_ran_while_holding=1
+  : > "$scene/holder-release"
+  wait_driver "$holder_driver" 120; holder_exit="$driver_exit"
+  wait_driver "$waiter_driver" 120; waiter_exit="$driver_exit"
+  expect "Ⓜ 前一趟的命令打出 cargo 的 Running 行就放锁：后一趟不等它跑完" \
+    "$([[ -e "$scene/holder-running" && "$waiter_ran_while_holding" == 1 && "$holder_exit" == 0 && "$waiter_exit" == 0 ]]; echo $?)" \
+    "$([[ "$waiter_ran_while_holding" == 0 ]] && echo "前一趟还在跑，后一趟 30 秒里没跑上；")前一趟$([[ -e "$scene/holder-running" ]] && echo 起了 || echo 没起来)、退 $holder_exit，后一趟退 $waiter_exit；前一趟的输出：$(grep -E 'Running|锁' "$scene/holder.out" 2>/dev/null | tr '\n' '|')"
+  # 绝对路径：用法错，命令没跑
+  prepare_scene shared-absolute
+  scene="$work/shared-absolute"
+  MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY="$scene/absolute-shared-target" run_in shared-absolute run --peer --memory-cap 256M -- bash -c "touch $(printf '%q' "$scene/ran")"
+  expect "Ⓜ MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY 写绝对路径 ⇒ 用法错（退 2），命令没跑" \
+    "$([[ "$(exit_of shared-absolute run)" == 2 && ! -e "$scene/ran" ]] && grep -q 'MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY 读到' "$scene/run.err"; echo $?)" \
+    "退 $(exit_of shared-absolute run)，命令$([[ -e "$scene/ran" ]] && echo 跑了 || echo 没跑)；stderr 尾部：$(tail_of shared-absolute run)"
+
   if (( failures > 0 )); then
     echo "  ✗ multi-host-run.sh 自证有 $failures 格判错（共 $checked 格）"
     echo "     → 怎么办：设了 MULTI_HOST_RUN_BREAK 或 MULTI_HOST_CONFIGURATION_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看 scripts/hosts/multi-host-run.sh 与 peer-host-lib.sh"
     return 1
   fi
-  echo "  ✓ multi-host-run.sh 自证 $checked 格都对（默认本机跑不读配置、--peer 跑成且退出码带回、上限不超过 PEER_MEMORY_CAP、工具链不同就拒、取回逐字相同、跑完删第二台的目录、收到 TERM 先停第二台、输出不露主机与目录、双机没开就拒、弄坏开关设在自证之外就拒、取回目录默认在工作根下而设了变量照变量、包装认出显存不够时原样退 245 并报显存不够）"
+  echo "  ✓ multi-host-run.sh 自证 $checked 格都对（默认本机跑不读配置、--peer 跑成且退出码带回、上限不超过 PEER_MEMORY_CAP、工具链不同就拒、取回逐字相同、跑完删第二台的目录、收到 TERM 先停第二台、输出不露主机与目录、双机没开就拒、弄坏开关设在自证之外就拒、取回目录默认在工作根下而设了变量照变量、包装认出显存不够时原样退 245 并报显存不够、第二台共用编译目录先持锁刷源码戳再编（旧 mtime 新内容的照样重编）、cargo 打出 Running 就放锁、那个变量写绝对路径就拒）"
 }
 
 if [[ "${1:-}" == --selftest ]]; then

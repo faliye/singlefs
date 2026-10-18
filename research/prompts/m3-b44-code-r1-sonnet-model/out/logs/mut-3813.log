@@ -1,0 +1,26 @@
+
+running 1 test
+test unit::tests::index_node_entry_capacity_of_a_zero_entry_width_panics_on_its_precondition - should panic ... FAILED
+
+failures:
+
+---- unit::tests::index_node_entry_capacity_of_a_zero_entry_width_panics_on_its_precondition stdout ----
+
+thread 'unit::tests::index_node_entry_capacity_of_a_zero_entry_width_panics_on_its_precondition' (2658211) panicked at crates/singlefs-core/src/unit.rs:166:5:
+attempt to divide by zero
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+note: panic did not contain expected string
+      panic message: "attempt to divide by zero"
+ expected substring: "条目宽是 0"
+
+failures:
+    unit::tests::index_node_entry_capacity_of_a_zero_entry_width_panics_on_its_precondition
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 268 filtered out; finished in 0.00s
+
+
+--- stderr ---
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s1/tree/crates/singlefs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.53s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/target/debug/deps/singlefs_core-5c6a767bd9164a51)
+error: test failed, to rerun pass `-p singlefs-core --lib`

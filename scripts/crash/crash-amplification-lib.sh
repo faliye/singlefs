@@ -39,7 +39,7 @@
 #   inherited-classes-kept、classes-sent-again、configuration-from-tree-root。
 #   配置那几处的开关 cards-read-from-cards-file 由 scripts/crash/crash-amplification-item.sh --selftest 证红（表与该红的格在那份文件头）。
 #
-# 弄坏开关轮（崩溃放量入口与双机驱动的 --selftest 末尾共用；.claude/singlefs-ai-sop/rules/test-script-discipline.md「测试脚本自己也要被测试证明有效」：
+# 弄坏开关轮（崩溃放量入口与双机驱动的 --selftest 末尾共用；.claude/rules/test-script-discipline.md「测试脚本自己也要被测试证明有效」：
 # 复跑的一方逐个打开开关、看它红在点名的那一项）：
 #   crash_amplification_read_switch_table <脚本文件> <变量名…>
 #       读那份文件头的开关表（第一行代码之前的注释块），一个开关打一行「<变量>=<开关名> <TAB> <点名的格，空格隔开>」，照表里的次序。表的写法（B 写法，
@@ -103,21 +103,22 @@
 #   本机那一趟起 cargo 前照样用 env -u 清掉调用方环境里漏进来的同名变量。弄坏开关 classes-sent-again：开了 GPU 照改前往本机那一趟送三类。
 #   不走 GPU 的那几截计算登记在仓内豁免表 .claude/gate.d/gpu-exemptions.tsv（每行用户点头），门禁 code-source-discipline 的 gpu-exemptions 格核它与代码标记逐项对上。
 #   本机那一趟另交 SINGLEFS_MULTI_HOST_CONFIG=<这一份的绝对路径>：用例不设它时按自己的树根找 multi-host.env，在 worktree 里会找不到主工作树那一份（第二台不交，它的树副本不带配置）。
-# 判定库（分项驱动与双机驱动共用；崩溃放量入口与崩溃点重放入口经它们用）：没给 --library 时用 <家目录>/<CRASH_AMPLIFICATION_LIBRARY_SUBDIRECTORY>，
-#   家目录是 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}，子目录今天是 library-by-conclusion-kind；
-#   crash_amplification_default_library <家目录> 打这个路径。按结论种类存之前的旧库（<家目录>/library）引擎开库就拒，所以换成这个新子目录；
-#   旧目录不删、不读。弄坏开关 library-in-the-old-directory：照改前打 <家目录>/library，由 scripts/crash/crash-amplification-item.sh --selftest 证红（表与该红的格在那份文件头）。
+# 判定库（分项驱动与双机驱动共用；崩溃放量入口与崩溃点重放入口经它们用）：没给 --library 时用 <家目录>/<CRASH_LIBRARY_DIRECTORY_NAME>，
+#   家目录是 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}，目录名是 crash-state-verdicts（一份库，几类测试同一份，
+#   目录名不带类名、不带存法名；与 crates/singlefs-checker-tier/src/crash_library.rs 的 CRASH_LIBRARY_DIRECTORY_NAME 逐字相同）；
+#   crash_amplification_default_library <家目录> 打这个路径。块键带名字的旧库（<家目录>/library、library-by-conclusion-kind 这几份）引擎开库就拒、不迁移；
+#   旧目录这里不读、不删（由主 agent 删）。弄坏开关 library-in-the-old-directory：照改前打 <家目录>/library，由 scripts/crash/crash-amplification-item.sh --selftest 证红（表与该红的格在那份文件头）。
 
 source "$(dirname "${BASH_SOURCE[0]}")/../hosts/heavy-threads.sh"
 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS="-I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/lib/gcc/x86_64-linux-gnu/14/include"  # librocksdb-sys 的 bindgen 找 stdbool.h；哪个版本的目录在就用哪个，不在的 -I 无害
-CRASH_AMPLIFICATION_LIBRARY_SUBDIRECTORY="library-by-conclusion-kind"  # 默认判定库在家目录下的子目录（文件头「判定库」）：按结论种类存的库；旧的 library 引擎开库就拒
+CRASH_LIBRARY_DIRECTORY_NAME="crash-state-verdicts"  # 那一份判定库在家目录下的目录名（文件头「判定库」）：一份库、目录名固定一处；块键带名字的旧库引擎开库就拒
 # 给定状态表的判器借不到显存时引擎打的那一行的行首（crates/singlefs-checker-tier/src/crash_amplification.rs 的 GIVEN_STATES_RUN_CONDITION_NOT_MET_LINE_PREFIX）：
 # 运行条件不满足，调用方退 78；crash_amplification_failure_kind 的 device 那一组与崩溃点重放入口 scripts/crash/crash-point-replay.sh 的快档都照这一份认
 CRASH_AMPLIFICATION_GIVEN_STATES_RUN_CONDITION_LINE_PREFIX="CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET"
 
 crash_amplification_default_library() { # <家目录>：打没给 --library 时的判定库路径（文件头「判定库」）
   if crash_amplification_item_break_is library-in-the-old-directory; then printf '%s/library\n' "$1"; return 0; fi
-  printf '%s/%s\n' "$1" "$CRASH_AMPLIFICATION_LIBRARY_SUBDIRECTORY"
+  printf '%s/%s\n' "$1" "$CRASH_LIBRARY_DIRECTORY_NAME"
 }
 
 crash_amplification_configuration_value() { # <配置文件> <键>：打那个键的值（去掉两头成对的一层引号）；文件不在、键没写打空串
@@ -363,9 +364,14 @@ crash_amplification_run_on_this_host() { # <share> <库目录> <日志> [<附加
 # CRASH_LIBRARY_RECORDED（crates/singlefs-checker-tier/src/crash_library.rs 的 record_the_item）；弄坏开关 library-marker-not-accepted 照改前只认前一种，
 # 由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红。
 # 之后的每一趟照 SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge 起（调用方 export）。退了非 0 交回照日志分类之后该退的码；退 0 而一行都没打交回 1。
-crash_amplification_record_on_this_host() { # <库目录> <日志>
-  local library="$1" log="$2" record_exit exit_code recorded_line_pattern
-  crash_amplification_run_on_this_host 0/1 "$library" "$log" SINGLEFS_CRASH_AMPLIFICATION_STAGE=record; record_exit=$?
+# 份：不给是 0/1（整份）。引擎录入段带 SHARE=k/n 时，清单、流程、事实表与判表（配了 GPU）照旧整条录（录入键不含份，crates/singlefs-checker-tier/src/crash_state_enumeration.rs
+#   的 recording_inputs_digest），只有观察者的块按份筛（record_the_observers_of_the_flow 的 is_mine，与判段同一个 blocks_of_this_host：份加
+#   SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS、按块序号平滑轮转）。所以两台观察者录入各录各的那一份时，本机录入段给 0/2，附加环境里带上判段也要带的权重（双机驱动
+#   crash-amplification-two-hosts.sh 的分着录），录入段与判段的分法才是同一个；判段读到录入段没录的观察者块会报「先跑录入段」。
+crash_amplification_record_on_this_host() { # <库目录> <日志> [<份> [<附加环境 键=值>…]]
+  local library="$1" log="$2" share="${3:-0/1}" record_exit exit_code recorded_line_pattern
+  shift $(( $# < 3 ? $# : 3 ))
+  crash_amplification_run_on_this_host "$share" "$library" "$log" SINGLEFS_CRASH_AMPLIFICATION_STAGE=record "$@"; record_exit=$?
   if [[ "$record_exit" != 0 ]]; then
     exit_code="$(crash_amplification_exit_code_of_a_failed_run "$record_exit" "$log")"
     echo "  ✗ 录入段（SINGLEFS_CRASH_AMPLIFICATION_STAGE=record）退 $record_exit；日志 $log" >&2

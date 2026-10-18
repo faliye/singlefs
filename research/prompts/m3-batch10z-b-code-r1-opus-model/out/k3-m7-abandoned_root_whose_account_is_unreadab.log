@@ -1,3 +1,0 @@
-test an_abandoned_root_whose_account_slots_only_read_back_zero_still_refuses_the_unmount_before_any_write ... ok
-test an_abandoned_root_whose_account_slots_were_taken_by_later_units_no_longer_refuses_unmount_floor_raise_or_remount ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s

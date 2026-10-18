@@ -4,3 +4,4 @@ M_点名慢档用例带了开关	crates/demo/src/lib.rs	pub fn published_generat
 M_库里筛选词对得上	crates/demo/src/lib.rs	assert_eq!(super::published_generation(1), 1);	assert_eq!(super::published_generation(1), 2);	-p demo --lib -- tests::lib_case	lib_case
 M_改litmus文件	litmus/sample.litmus	exists (x=1)	exists (x=0)	-p demo --test reads_litmus	reads_the_litmus_directory
 M_删掉litmus里的写	litmus/sample.litmus	 WRITE_ONCE(*x, 1);		-p demo --test reads_litmus	reads_the_litmus_directory
+M_宏展开出来的测试	crates/demo/tests/generated.rs	generated_case!(generated_by_a_macro_case);		-p demo --test generated	generated_by_a_macro_case

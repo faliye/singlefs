@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# admission: always 每次调都在这一刻的树上跑全量或点名的分项；哪些块要重判由库里的块键与判法版本定，不在这里
+# admission: always 每次调都在这一刻的树上跑全量或点名的分项；哪些块要重判由库里的块键与判法单元指纹定，不在这里
 # run-condition: command bash cargo python3
 # run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
 # 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/hosts/detached-run.sh start --wall-clock over-2h 与 long-run-check、scripts/hosts/host-dispatch.py 文件头 ⓪ 都读这几行）：
 # long-run-shards: 按登记表 ITEMS 的分项逐项跑；多机配置开着双机时，每一项由 crash-amplification-two-hosts.sh 把它的状态块按两台量到的速度分成两份（SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/2、1/2），第二台那一份取回、导入本机库并成一份
-# long-run-resume: 一份库装全部分项（${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library-by-conclusion-kind，在 /tmp 之外）；重起同一条命令就是续跑：同一判法版本下判过的块全部复用、只判没判过的，第二台判到一半被停也先导入再退
+# long-run-resume: 一份库装全部分项（${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/crash-state-verdicts，在 /tmp 之外）；重起同一条命令就是续跑：同一把判法单元指纹下判过的块全部复用、只判没判过的，第二台判到一半被停也先导入再退
 # long-run-unshardable: 多机：台数只认多机配置的双机开关（至多本机与 PEER_SSH_HOST 两台，不读 crash-point-replay-shard-configuration-check.sh --emit-hosts 的清单）；跑的那一步线程取 --threads 或本机核数减一、内存上限取 --memory-cap 与 --peer-memory-cap（本机默认 38G），只有本机只编那一步与第二台那两趟的线程按 host-resources.py --json 现算
 # 崩溃放量全量（用户 2026-09-29 定：其他的崩溃放量放在一个脚本里做、作为分项；以后全量就是一起跑，分项用参数跑；不指定参数就作为全量跑）：
 #
@@ -12,7 +12,7 @@
 #   crash-amplification.sh --item <分项> [--item <分项>]…    只跑点名的分项，给几次取并集（分项名照 --list-items 列的）；展开深度同全量，成功句不说全量
 #   crash-amplification.sh --expand-up-to <N> [--item …]    缩过规模的一趟：每项按展开 N 跑（N 与 FULL_EXPAND_UP_TO 相同就是没缩）；成功句写「缩过规模：展开 N」、不说全量，并点名哪几项不穷举
 #   crash-amplification.sh --list-items                     逐行列出可点名的分项：分项名、测试目标、用例函数、档位（TAB 隔开）；不清场、不跑
-#   crash-amplification.sh --selftest                       用假的分项驱动与假的清场命令走一遍第 1–46 格（列项、点名、拒绝、清场、各种判红、本次未跑、复用数、派出收回、
+#   crash-amplification.sh --selftest                       用假的分项驱动与假的清场命令走一遍第 1–48 格（复用三问与上次红的清单是第 47、48 格；列项、点名、拒绝、清场、各种判红、本次未跑、复用数、派出收回、
 #                                                           只供自证的变量、有红又有项退 78、按登记整批不判的数、驱动行的 red= 与全量的零态、复用数每项只取一次、两台分份的 flow= 行留的块、
 #                                                           分项驱动退 77 与它报的本次未跑、几条流里有的没借到、不带参数的全量里一项不穷举红在那一项、
 #                                                           只因登记的段不穷举不红而报段号与写数、没登段的流照旧红、往驱动送按段登记文件、登记文件写坏拒跑、
@@ -28,9 +28,9 @@
 # crash_amplification::run_from_environment 的用例（用例函数经分项驱动的 --test-filter 点名，cargo test 的 --exact）。档位今天只有「全量」：
 # 每一项都是穷举、要 checker 档的重活，只在全量里跑，不在快档（--list-items 写成「全量（不在快档）」）。
 # 崩溃注入（crash_injection_campaign）不在表里：它是随机历史上的抽样、没有固定的点序列与树，是轻测，归普通 cargo test。
-# 一份库装全部分项（默认 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library-by-conclusion-kind，在 /tmp 之外；
-# 子目录名与「按结论种类存之前的旧库 <家目录>/library 引擎开库就拒、不删不读」见 scripts/crash/crash-amplification-lib.sh 文件头「判定库」）：
-# 几条流共前缀，同一份库里前缀节点只判一次；重跑同一条命令就是续跑——同一判法版本下判过的块全部复用，判法版本变了旧行留作历史、这一版从头判。
+# 一份库装全部分项（默认 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/crash-state-verdicts，在 /tmp 之外；
+# 目录名与「块键带名字的旧库引擎开库就拒、这里不删不读」见 scripts/crash/crash-amplification-lib.sh 文件头「判定库」）：
+# 几条流共前缀，同一份库里前缀节点只判一次；重跑同一条命令就是续跑——同一把判法单元指纹下判过的块全部复用，判法改了旧行留作历史、这一把从头判。
 # 每项交 scripts/crash/crash-amplification-item.sh 跑：配置几台就跑几台、配置开了 GPU 就由 GPU 判，做不到那一项报错
 # （用户 2026-09-29 定：「配置中一台机器就要跑一台，配置中两台机器就要跑两台，配置中有gpu就一定要让GPU工作 如果不行就明确报错拒绝，不接受默认降级」）。
 # 运行条件：配置上判得了的（多机配置开了 GPU 却一份卡都没写、点名的卡与双机开关对不上）由文件头 run-condition: check 在开跑之前判（同分项驱动，判法在
@@ -133,8 +133,8 @@
 #     整趟有红先判：别的项或这一项红就退 1，没有红才退 78；退 78 的那一项都在 ✗ 里点名。
 #   green：别的。
 # 复用数怎么取：登记表里每一项都走 run_from_environment 的判定库，都有判定复用这一层，没有哪一项写「不复用」。一项的复用数只取一次
-#   （.claude/singlefs-ai-sop/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」：成功句报「现判 N、复用 M」）：
-#   这一项开跑时库里这一判法版本已判、这一趟因此没判的态数。现判是各行 states_checked_here 之和（每一趟判的块不相交，照加）。
+#   （.claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」：成功句报「现判 N、复用 M」）：
+#   这一项开跑时库里这一判法单元指纹下已判、这一趟因此没判的态数。现判是各行 states_checked_here 之和（每一趟判的块不相交，照加）。
 #   驱动行的 states_reused= 是那一趟（一次 run_from_environment）录入时库里已判的，叫停、导入、只排计划的那一趟都照实报
 #   （crates/singlefs-checker-tier/src/crash_amplification.rs 的 reuse_and_scale_fields_of_the_line 的文档），同一项里几趟的行相加会重复计，所以按流、按行的种类取：
 #   - 按流分组：行里有 flow=<名> 的按名分，没有的（fixed-script 两项的汇总行）归一组。一组只取一次：
@@ -146,7 +146,7 @@
 #   一行的复用数依次这样取：
 #   ① 行里有 states_reused=<n> 就取它；
 #   ② 本机一台跑完的整趟（share=<i>/1、带 states=、没有 stopped_early=true、imported_blocks 为 0 或没有）取 states − states_checked_here：
-#      fixed-script 两项的用例打这一行之前断言过「录的 + 库里这一判法版本已判的 = states」与（一台时）「这一趟核的 = 录的」，差就是这一趟复用的状态数
+#      fixed-script 两项的用例打这一行之前断言过「录的 + 库里这一判法单元指纹下已判的 = states」与（一台时）「这一趟核的 = 录的」，差就是这一趟复用的状态数
 #      （crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_rollback.rs、…_through_unmount.rs 打汇总行之前那几条 assert_eq）；
 #   ③ 别的行取不出：flow= 那种行（tests/common_crash_points/mod.rs 的 amplify_prepared_flow）不带 states=；两台跑的三行（share=0/2、1/2 与带
 #      imported_blocks 的导入那一趟）里 states − states_checked_here 混着对方那一份、导入的块与复用的块，分不开；被叫停的行还有没判的块。
@@ -154,7 +154,7 @@
 #   要取的行里有一行取不出，这一项记 reused=unknown、计进 TOTAL 行的 reuse_unknown，不记 failed、不改退出码；TOTAL 行的 reused_known 只加取得出的项。
 #   成功句：都取得出写「复用 M 态」；全都取不出写「复用数取不出（J 项：<分项…>，驱动行没报 states_reused=）」；一部分取不出写
 #   「复用 M 态（只算取得出的 K 项；另有 J 项取不出：<分项…>，驱动行没报 states_reused=）」。有取不出的项时不写「复用 0 态」，也不写「不复用」。
-# 按登记整批不判（.claude/singlefs-ai-sop/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」：这一类不算剪枝，成功句报跳过了多少、哪几类）：
+# 按登记整批不判（.claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」：这一类不算剪枝，成功句报跳过了多少、哪几类）：
 #   驱动行的约定是每行带 ignored_points=<测试代码里预设 ignore 的点数> states_skipped_by_ignore=<这些点的段因此没展开的态数>。这两个数是那条流的测试代码预设的，
 #   不随一趟变：同一条流的本机份、第二台份、导入、叫停再续的各行报的是同一份，所以和复用数一样按流分组、每组只取一次（不是各行之和）：
 #   - 按流分组：行里有 flow=<名> 的按名分，没有的归一组（同「复用数怎么取」）；
@@ -177,7 +177,7 @@
 #       建不了放每项输出的目录、某一项的驱动退 78（这一趟没有红时）
 #   preflight 自己判不了条件（声明写坏）时退 1，见 .claude/singlefs-ai-sop/rules/preflight-discipline.md「不满足时」。没有别的退出码。
 # 弄坏开关 CRASH_AMPLIFICATION_BREAK=<项>（几个用逗号连；只在自证起的子进程里认）。逐项写开关名、弄坏哪一处、打开后 --selftest 哪几格该红
-#   （格号是 run_selftest 里的第 1–46 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
+#   （格号是 run_selftest 里的第 1–48 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
 # 写法（B 写法，样板是 scripts/mutation/mutate.sh 文件头「弄坏开关」一段）：一行「#   CRASH_AMPLIFICATION_BREAK=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头
 #   写点名的格「第 N 格」（、隔开；括号里是那一格失败行的句首，开关轮不读，括号外的每一段都算一格）。--selftest 末尾那一轮（开关轮）从这张表现读
 #   （crash-amplification-lib.sh 的 crash_amplification_read_switch_table，与双机驱动同一份读法）：表里 CRASH_AMPLIFICATION_BREAK 的开关与代码里认的开关要相等
@@ -186,7 +186,7 @@
 #   CRASH_AMPLIFICATION_BREAK=swallow-exit  分项驱动退非 0 也记 0
 #       第 8 格（「驱动退非 0 没记成红」）、第 20 格（「驱动退 78 却没停下退 78」）、第 22 格（「有红又有一项退 78 时没退 1」）、
 #       第 23 格（「驱动退 78 而行里报了红，这一项没记红」）、第 30 格（「跑完调了复原命令、或有项红时没退 1」）、
-#       第 31 格（「分项驱动退 77 没记进本次未跑」）
+#       第 31 格（「分项驱动退 77 没记进本次未跑」）、第 48 格（「上次红的清单不对」：红的那一项没记成红）
 #   CRASH_AMPLIFICATION_BREAK=skip-filter  调驱动时不带 --test-filter
 #       第 4 格（「全量没把每个分项各调一次驱动」）
 #   CRASH_AMPLIFICATION_BREAK=accept-unknown-item  不认得的分项名照跑
@@ -200,7 +200,7 @@
 #       第 6 格（「没有照「开跑前清一次、每项带 --quiesced、跑完不复原」走」）、第 30 格（「跑完调了复原命令、或有项红时没退 1」）
 #   CRASH_AMPLIFICATION_BREAK=reuse-as-zero  取得出的复用数也记 0
 #       第 10 格（「复用数取错」）、第 28 格（「复用数没有每项只取一次」）、第 29 格（「两台分份的 flow= 行留的块没照「同一组有导入行才不算」判」）、
-#       第 45 格（「全部复用的一趟判了红、或 ITEM 行没照实写现判 3 复用 7」：ITEM 行复用写成 0）
+#       第 45 格（「全部复用的一趟判了红、或 ITEM 行没照实写现判 3 复用 7」：ITEM 行复用写成 0）、第 47 格（「复用三问没过」：键相同的一趟 ITEM 行写复用 0，折成现判）
 #   CRASH_AMPLIFICATION_BREAK=accept-unknown-reuse  取不出复用数的项记成 reused=0、不计进 reuse_unknown、成功句不点名
 #       第 11 格（「取不出复用数的项没照实报出」）、第 12 格（「两台跑的行被拿来推复用数」）
 #   CRASH_AMPLIFICATION_BREAK=reuse-across-shares  两台分份行、导入行、叫停的行也拿 states 减 states_checked_here 当复用数
@@ -764,7 +764,7 @@ run_selftest() {
   printf '%s\n' "$SELFTEST_MARK_CONTENT" > "$work/mark"
   export CRASH_AMPLIFICATION_SELFTEST_MARK="$work/mark"
   # 子进程的运行条件、每项输出都落在这里：多机配置指到不在的文件（两个开关都关），退役的私有显卡配置变量清掉，本次未跑不写进门禁的汇总
-  export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home"
+  export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home" SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs"
   unset SINGLEFS_GPU_CARDS_CONFIG CRASH_AMPLIFICATION_SELFTEST_RED_ITEM CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT CRASH_AMPLIFICATION_ITEM_SWITCHES CRASH_AMPLIFICATION_ITEM_CARDS GATE_NOT_RUN_FILE
   unset SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT
   # 按段登记的仓根（文件头「按段登记」）：合表照抄仓里那一份，按段登记文件只写一行核得过的（第 37 格临时换成写坏的一份、跑完换回）
@@ -799,6 +799,16 @@ case "$shape" in
     echo "CRASH_AMPLIFICATION mode=two_hosts_cpu share=0/2 cards=0 states=10 states_checked_here=4 blocks_checked_here=1 imported_blocks=0 unjudged_blocks=3 red=0 expand_up_to=$expand exhaustive=true"
     echo "CRASH_AMPLIFICATION mode=two_hosts_cpu share=1/2 cards=0 states=10 states_checked_here=6 blocks_checked_here=1 imported_blocks=0 unjudged_blocks=2 red=0 expand_up_to=$expand exhaustive=true"
     echo "CRASH_AMPLIFICATION mode=two_hosts_cpu share=0/2 cards=0 states=10 states_checked_here=0 blocks_checked_here=0 imported_blocks=3 unjudged_blocks=0 red=0 expand_up_to=$expand exhaustive=true" ;;
+  library) # 复用三问那一格（第 47 格）：照 $SINGLEFS_CRASH_AMPLIFICATION_HOME/stub-library 按这一项测试目标的单元文件（$STUB_UNITS/<测试目标>）内容摘要记判过没有：
+    #   判过的这一趟现判 0 态、复用 10 态，没判过的现判 10 态并记下（真驱动的库在引擎里按块键记，这里只演「按键存、键相同复用」）
+    unit_key="$(sha256sum "${STUB_UNITS:?}/$target" | cut -c1-64)"
+    record="$SINGLEFS_CRASH_AMPLIFICATION_HOME/stub-library/$target.$unit_key"
+    if [[ -f "$record" ]]; then
+      echo "CRASH_AMPLIFICATION mode=single_host_cpu share=0/1 cards=0 states=10 states_checked_here=0 blocks_checked_here=0 imported_blocks=0 unjudged_blocks=0 red=0 expand_up_to=$expand exhaustive=true"
+    else
+      mkdir -p "$SINGLEFS_CRASH_AMPLIFICATION_HOME/stub-library" && : >"$record"
+      echo "CRASH_AMPLIFICATION mode=single_host_cpu share=0/1 cards=0 states=10 states_checked_here=10 blocks_checked_here=2 imported_blocks=0 unjudged_blocks=0 red=0 expand_up_to=$expand exhaustive=true"
+    fi ;;
   silent) ;; # cargo 筛出 0 条：退 0、一行都不打
   placement-not-run) # 排派活计划那一趟借不到显存、一项都没跑到：照真驱动打 DECISION 与 CRASH_AMPLIFICATION_NOT_RUN 行、退 77，不打 CRASH_AMPLIFICATION 行
     echo "CRASH_AMPLIFICATION_DECISION where=not-run reason=no-card-of-the-pool-had-room-in-time across_machines=0 quiesced=1"
@@ -1492,6 +1502,41 @@ STUB
     selftest_cell_failed "分项驱动报判段没跑（CRASH_AMPLIFICATION_NOT_RUN step=judge）的那一项没记本次未跑：判了红、没逐项报、原因没写判段没跑与那一行的 reason=、成功句没点名，或只点名这一项时没退 77（两项那一趟退 $exit_code、只点名这一项退 $only_not_run_exit）：$output" \
       "看主循环里 item_judge_not_run_lines：驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行，这一项记 not-run，原因写几条流判段没跑"
   fi
+  # 第 47 格：复用三问（scripts/gate/lib_reuse_checks.py 文件头「一」）：假驱动 library 形态照 $STUB_UNITS/<测试目标> 的内容摘要按键记判过没有，
+  #   点名三项各跑四趟：头一趟、同一份输入、加一份哪个测试目标都不读的单元文件（闭包外）、改 fixed-script-through-rollback 那个测试目标的单元文件（闭包内）；
+  #   每一趟从 ITEM 行取这一项复用还是现判（states=0 而 reused 是正整数是复用），照三问判、打规范输出。入口自己不判复用（判定在引擎里）：
+  #   这一格核的是它每一趟把同一份库交给驱动、不因闭包外的改动清库，并照实把驱动报的现判与复用写进 ITEM 行
+  cells=$((cells + 1))
+  local three_units="$work/stub-units" three_name three_items=(fixed-script-through-rollback multi-record-publish tree-split-streams) three_arguments=()
+  mkdir -p "$three_units"
+  for entry_row in "${ITEMS[@]}"; do printf 'unit of %s\n' "$(item_fields "$entry_row" 2)" >"$three_units/$(item_fields "$entry_row" 2)"; done
+  for three_name in "${three_items[@]}"; do three_arguments+=(--item "$three_name"); done
+  three_round() { # <名>：跑一趟，ITEM 行折成「分项<TAB>复用|现判」写进 $work/three-<名>.tsv
+    STUB_SHAPE=library STUB_UNITS="$three_units" entry "${three_arguments[@]}" >"$work/three-$1.out" 2>/dev/null
+    awk '/^CRASH_AMPLIFICATION_ITEM / { item = ""; states = ""; reused = ""
+           for (i = 2; i <= NF; i++) { split($i, pair, "="); if (pair[1] == "item") item = pair[2]; if (pair[1] == "states") states = pair[2]; if (pair[1] == "reused") reused = pair[2] }
+           print item "\t" ((states == "0" && reused ~ /^[1-9][0-9]*$/) ? "复用" : "现判") }' "$work/three-$1.out" >"$work/three-$1.tsv"
+  }
+  three_round first; three_round second
+  printf '哪个测试目标都不读\n' >"$three_units/not-read-by-any-target"; three_round unrelated
+  printf 'unit of crash_amplification_fixed_script_through_rollback，改过\n' >"$three_units/crash_amplification_fixed_script_through_rollback"; three_round unit
+  if ! python3 "$repository_root/scripts/gate/lib_reuse_checks.py" three-questions --script scripts/crash/crash-amplification.sh --first "$work/three-first.tsv" \
+         --second "$work/three-second.tsv" --unrelated "$work/three-unrelated.tsv" --unit-change "$work/three-unit.tsv" --affected fixed-script-through-rollback >"$work/three.log" 2>&1; then
+    selftest_cell_failed "复用三问没过：$(tr '\n' ' ' <"$work/three.log")" "照规范输出那一行 red 的那一问查：ITEM 行的 states=、reused= 取法（文件头「复用数怎么取」），与每一趟交给驱动的库家目录"
+  fi
+  grep '^REUSE_SELFTEST ' "$work/three.log"
+  # 第 48 格：上次红的清单（scripts/gate/lib_reuse_checks.py 文件头「三」）：点名 multi-record-publish 红一趟，清单是它；再点名 fixed-script-through-unmount 绿一趟，清单照留它；
+  #   再点名 multi-record-publish 绿一趟，清单成空文件（这两项都没登段，按段登记那几个开关碰不到它们）
+  cells=$((cells + 1))
+  local last_run_file="$work/last-runs/scripts__crash__crash-amplification.sh.tsv" last_red last_kept last_cleared
+  rm -f -- "$last_run_file"   # 前面几格留下的清单不算：这一格从空起
+  CRASH_AMPLIFICATION_SELFTEST_RED_ITEM=1 entry --item multi-record-publish >/dev/null 2>&1; last_red="$(cat "$last_run_file" 2>/dev/null)"
+  entry --item fixed-script-through-unmount >/dev/null 2>&1; last_kept="$(cat "$last_run_file" 2>/dev/null)"
+  entry --item multi-record-publish >/dev/null 2>&1; last_cleared="$(cat "$last_run_file" 2>/dev/null)"
+  if [[ "$last_red" != multi-record-publish || "$last_kept" != multi-record-publish || -n "$last_cleared" || ! -f "$last_run_file" ]]; then
+    selftest_cell_failed "上次红的清单不对：红一趟之后「$last_red」、点名别的项绿一趟之后「$last_kept」、那一项绿了之后「$last_cleared」" \
+      "看主循环收尾写 last-run 那一段：红的分项一行一个，点名了分项的只换跑到的那几项（scripts/gate/lib_reuse_checks.py last-run --ran）"
+  fi
   if (( failures > 0 )); then
     echo "  ✗ --selftest：$cells 格里 $failures 格判错" >&2
     echo "     → 怎么办：照上面每一格给的出路改，再跑 $0 --selftest" >&2
@@ -1636,7 +1681,7 @@ fi
 
 started_at=$(date +%s)
 items_dispatched=0; items_run=0; items_failed=0; items_not_run=0; items_reuse_unknown=0
-reuse_unknown_items=""; not_run_items=""; not_run_entries=(); failed_entries=(); failed_names=()
+reuse_unknown_items=""; not_run_items=""; not_run_entries=(); failed_entries=(); failed_names=(); last_run_ran=()
 total_states=0; total_reused=0; total_red=0; stopped_by_condition=""
 total_ignored_points=0; total_states_skipped_by_ignore=0; items_ignore_unknown=0; ignore_unknown_items=""; ignored_items=""; ignore_conflict_seen=0
 items_with_lines=0; items_not_exhaustive=0; not_exhaustive_items=""; not_exhaustive_failed_names=(); engine_field_missing_failed_names=()
@@ -1812,7 +1857,7 @@ for row in "${rows_to_run[@]}"; do
     beyond_segment_count=$((beyond_segment_count + ${item_beyond_text%%$'\t'*}))
     beyond_entries="${beyond_entries:+${beyond_entries}，}${item_beyond_text#*$'\t'}"
   fi
-  items_run=$((items_run + 1))
+  items_run=$((items_run + 1)); last_run_ran+=("$name")
   if (( item_lines > 0 )); then
     items_with_lines=$((items_with_lines + 1))
     if [[ "$item_exhaustive" != true ]]; then items_not_exhaustive=$((items_not_exhaustive + 1)); not_exhaustive_items="${not_exhaustive_items:+${not_exhaustive_items}、}${name}"; fi
@@ -1844,6 +1889,17 @@ for row in "${rows_to_run[@]}"; do
   esac
   [[ -n "$stopped_by_condition" ]] && break
 done
+# 上次红的清单（scripts/gate/lib_reuse_checks.py 文件头「三」，.claude/hooks/run-scope-guard.sh 的拒绝说明读它）：红的分项一行一个；点名了分项的只换跑到的那几项
+last_run_red_file="$(mktemp)" && last_run_ran_file="$(mktemp)" && {
+  printf '%s\n' ${failed_names[@]+"${failed_names[@]}"} >"$last_run_red_file"
+  printf '%s\n' ${last_run_ran[@]+"${last_run_ran[@]}"} >"$last_run_ran_file"
+  if (( ${#selected[@]} > 0 )); then
+    python3 "$repository_root/scripts/gate/lib_reuse_checks.py" last-run scripts/crash/crash-amplification.sh "$last_run_red_file" --ran "$last_run_ran_file" >/dev/null
+  else
+    python3 "$repository_root/scripts/gate/lib_reuse_checks.py" last-run scripts/crash/crash-amplification.sh "$last_run_red_file" >/dev/null
+  fi || echo "  ! 上次红的清单没写成（scripts/gate/lib_reuse_checks.py last-run），这一趟的判定不受影响" >&2
+  rm -f -- "$last_run_red_file" "$last_run_ran_file"
+}
 echo "CRASH_AMPLIFICATION_TOTAL dispatched=$items_dispatched items=$items_run failed=$items_failed not_run=$items_not_run reuse_unknown=$items_reuse_unknown states=$total_states reused_known=$total_reused red=$total_red expand_up_to=$requested_expand_up_to scope=$scope seconds=$(( $(date +%s) - started_at )) ignored_points=$total_ignored_points states_skipped_by_ignore=$total_states_skipped_by_ignore ignore_unknown=$items_ignore_unknown"
 run_verdict=0
 if (( items_run != items_dispatched )) && ! crash_amplification_break_is skip-collection-count; then

@@ -1,0 +1,13 @@
+E7RESULT name=config experiment=E178 tree=scripts/experiments-copy binary=e178-leaf-and-record-death-counts columns=entry threads=31
+E7RESULT name=baseline entry=af452fb09ebbd03b entry_dependencies=0 entry_units=338
+E7RESULT name=sample class=invalidating sample=deletion-order-callee-changed entry_changed=true entry_expected=changed restored_same=true holds=true why=闭包里的函数体变
+E7RESULT name=sample class=invalidating sample=closure-constant-changed entry_changed=true entry_expected=changed restored_same=true holds=true why=被引用的常量单元变
+E7RESULT name=sample class=invalidating sample=thresholds-generator-changed entry_changed=false entry_expected=unchanged restored_same=true holds=true why=造清单的函数在闭包外、代码键不换；只_θ_=_⌊容量_÷_4⌋_的项作废由项键的参数行担，单元测试_item_key_changes_with_every_parameter_field_判
+E7RESULT name=sample class=invalidating-moved-to-not-invalidating sample=lock-aes-gcm-bumped entry_changed=false entry_expected=unchanged restored_same=true holds=true why=修订_5：依赖行收窄到闭包点到的包，入口闭包不点_aes_gcm
+E7RESULT name=sample class=invalidating sample=toolchain-release-line-changed entry_changed=true entry_expected=changed restored_same=true holds=true why=rustc_-vV_的_release_行变（PATH_前面放一个改_release_行的_rustc）
+E7RESULT name=sample class=not-invalidating sample=comment-in-entry entry_changed=false entry_expected=unchanged restored_same=true holds=true why=注释不进指纹
+E7RESULT name=sample class=not-invalidating sample=unrelated-function-added entry_changed=false entry_expected=unchanged restored_same=true holds=true why=不在闭包里
+E7RESULT name=sample class=not-invalidating sample=segment-one-function-changed entry_changed=false entry_expected=unchanged restored_same=true holds=true why=main_改名之后不在闭包里
+E7RESULT name=sample class=not-invalidating sample=item-renamed-or-inserted-in-front judged_by=unit_test test=inserting_an_item_in_front_reuses_every_item_already_judged
+E7RESULT name=verdict experiment=E178 key_samples=8 key_samples_holding=8 f_k1_missed=0 f_k2_extra=0 unit_test_samples=1
+E7RESULT name=done emitted=13

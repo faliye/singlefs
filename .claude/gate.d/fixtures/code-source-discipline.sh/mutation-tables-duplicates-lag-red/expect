@@ -1,0 +1,10 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=重复行滞后表 .claude/gate.d/mutation-duplicates-lag.tsv 有 4 处不对
+want=.claude/gate.d/mutation-duplicates-lag.tsv:3 相对基准那一版多出一组（scripts/mutation/tables/e1_sample.tsv：M1_样本；M2_同一改法另起的名字）：这张表只缩不涨
+want=.claude/gate.d/mutation-duplicates-lag.tsv:4 的这几个名字在 crates/mutations.tsv 里找不到：M_没有这一行
+want=.claude/gate.d/mutation-duplicates-lag.tsv:5 的名字此刻不是同一组重复行（三样不全同）：M_库里的断言改掉；M_分配代取发布代
+want=.claude/gate.d/mutation-duplicates-lag.tsv:6 那一组里还有没登记的名字：M_改函数名再写一行
+want=crates/mutations.tsv 里有 1 组行的「文件、原文、替换文」三样逐字全同
+want=crates/mutations.tsv 第 4、5、6 行（4 M_改函数名；5 M_改函数名点名库里的用例；6 M_改函数名再写一行），改的是 crates/demo/src/lib.rs
+want=mutation-tables：红（退出 1）

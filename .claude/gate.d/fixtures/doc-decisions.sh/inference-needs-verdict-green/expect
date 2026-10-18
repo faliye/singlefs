@@ -1,0 +1,4 @@
+exit=0
+want=自陈是推论的依据条目都指到了存在的判决：扫 1 份决策、5 条依据条目，带推论记号的 2 条（指到判决 1 条，挂账 1 条；用户定案的「没走三方」1 条不算）
+want=  inference-needs-verdict：绿
+want=doc-decisions.sh：1 格里 1 格绿（inference-needs-verdict）

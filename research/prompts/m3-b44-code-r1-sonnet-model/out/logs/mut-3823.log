@@ -1,0 +1,44 @@
+
+running 8 tests
+test newer_root_whose_mapping_root_slots_hold_units_of_a_later_instance_is_passed_with_its_tree_table_slots_reading_back_zero ... FAILED
+test newer_root_whose_pointer_slots_all_hold_units_of_the_mount_that_could_not_see_it_is_passed_in_both_device_orders ... FAILED
+test newer_root_whose_tree_table_slots_hold_units_of_a_later_instance_is_passed_with_its_mapping_root_slots_reading_back_zero ... FAILED
+test newer_root_after_an_acquisition_that_landed_on_both_devices_and_wrote_nothing_else_refuses_the_writable_mount_in_both_device_orders ... ok
+test newer_root_whose_tree_table_has_one_copy_overwritten_and_the_rest_reading_back_zero_refuses_the_writable_mount_in_both_device_orders ... ok
+test newer_root_after_an_acquisition_that_landed_on_one_device_only_refuses_the_writable_mount_in_both_device_orders ... ok
+test newer_root_whose_tree_table_and_mapping_root_each_have_one_copy_overwritten_and_the_other_reading_back_zero_refuses_the_writable_mount_in_both_device_orders ... ok
+test newer_root_whose_units_a_later_mount_kept_while_taking_its_record_slot_refuses_the_writable_mount_in_both_device_orders ... ok
+
+failures:
+
+---- newer_root_whose_mapping_root_slots_hold_units_of_a_later_instance_is_passed_with_its_tree_table_slots_reading_back_zero stdout ----
+
+thread 'newer_root_whose_mapping_root_slots_hold_units_of_a_later_instance_is_passed_with_its_tree_table_slots_reading_back_zero' (2699901) panicked at crates/singlefs-harness/tests/newer_unreadable_root_passes_only_when_both_copies_of_one_pointer_are_newer.rs:189:13:
+urJ 那一形、树表两槽读回全零（盘序 AsRecorded）：R 有一个指针两份都已是更新实例的单元，放过、可写挂载做成：NewerStateStillUnreadableAfterOneReread(AccountOfAnUnappliedPublishWithIncompleteReadableRecords { unapplied_publish: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(9) } })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- newer_root_whose_pointer_slots_all_hold_units_of_the_mount_that_could_not_see_it_is_passed_in_both_device_orders stdout ----
+
+thread 'newer_root_whose_pointer_slots_all_hold_units_of_the_mount_that_could_not_see_it_is_passed_in_both_device_orders' (2699902) panicked at crates/singlefs-harness/tests/newer_unreadable_root_passes_only_when_both_copies_of_one_pointer_are_newer.rs:189:13:
+urJ 那一形、没有读故障（盘序 AsRecorded）：R 有一个指针两份都已是更新实例的单元，放过、可写挂载做成：NewerStateStillUnreadableAfterOneReread(AccountOfAnUnappliedPublishWithIncompleteReadableRecords { unapplied_publish: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(9) } })
+
+---- newer_root_whose_tree_table_slots_hold_units_of_a_later_instance_is_passed_with_its_mapping_root_slots_reading_back_zero stdout ----
+
+thread 'newer_root_whose_tree_table_slots_hold_units_of_a_later_instance_is_passed_with_its_mapping_root_slots_reading_back_zero' (2699905) panicked at crates/singlefs-harness/tests/newer_unreadable_root_passes_only_when_both_copies_of_one_pointer_are_newer.rs:189:13:
+urJ 那一形、映射根两槽读回全零（盘序 AsRecorded）：R 有一个指针两份都已是更新实例的单元，放过、可写挂载做成：NewerStateStillUnreadableAfterOneReread(AccountOfAnUnappliedPublishWithIncompleteReadableRecords { unapplied_publish: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(9) } })
+
+
+failures:
+    newer_root_whose_mapping_root_slots_hold_units_of_a_later_instance_is_passed_with_its_tree_table_slots_reading_back_zero
+    newer_root_whose_pointer_slots_all_hold_units_of_the_mount_that_could_not_see_it_is_passed_in_both_device_orders
+    newer_root_whose_tree_table_slots_hold_units_of_a_later_instance_is_passed_with_its_mapping_root_slots_reading_back_zero
+
+test result: FAILED. 5 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+--- stderr ---
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s3/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s3/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 36.53s
+     Running tests/newer_unreadable_root_passes_only_when_both_copies_of_one_pointer_are_newer.rs (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/target/debug/deps/newer_unreadable_root_passes_only_when_both_copies_of_one_pointer_are_newer-682bcaf0b03a5b6e)
+error: test failed, to rerun pass `-p singlefs-harness --test newer_unreadable_root_passes_only_when_both_copies_of_one_pointer_are_newer`

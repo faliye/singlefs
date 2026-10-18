@@ -1,2 +1,0 @@
-            .iter()
-            .chain(ring_slots_with_a_root_self_verified_on_only_one_of_the_two_rebuild_passes)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 本该判红，一份样本同时放四种坏法：装置改了而产物比它旧；变异表改了而这个实验号一份产物都没有；
 # kb 里把还清依据写成 /tmp 下的报告；这一轮新写的提示里把实现员报告引成 /tmp 下的文件；
-# 另有一个装置注释与代码一起改（E907），不许按只改注释放过；E910 登记了准入，产物比源码新而指纹对不上，按指纹判红。
+# 另有一个装置注释与代码一起改（E907），不许按只改注释放过；E910 登记了准入，产物比源码新而产物头记的实验键对不上今天的，按实验键判红。
 # 修改日子一律按东京的零点写（TZ=Asia/Tokyo touch -d <日期>），格里也按东京的日期报，与跑门禁那台机器的时区无关。
 # 样本根的 .gate-cells 只点名 evidence-in-repo，同一道里别的九格不跑这份样本；want 只认 evidence-in-repo 格自己的行。
 set -e
@@ -23,9 +23,11 @@ printf '# E911 样本\n\n装置 2026-09-02 改过，之后没有正式跑。\n\n
 printf 'fn main() { println!("e908"); }\n' > scripts/experiments/e908_on_request_no_note.rs
 printf 'E7RESULT name=e908 rows=1\n' > research/results/e908-on-request-no-note-2026-09-01.out
 printf '# E908 样本\n\n装置改过。\n\n## 历史版本\n' > .claude/kb/experiments/908-on-request-no-note.md
-# E910：登记了准入，产物比源码新、产物头的输入指纹却对不上今天的输入 ⇒ 按指纹判红（按修改时刻会判绿）
+# E910：登记了准入，产物比源码新、产物头记的实验键却对不上今天的 ⇒ 按实验键判红（按修改时刻会判绿）。
+# 实验键是登记的入口（装置的 main）的单元键，要一份 research 工作区的 Cargo.toml 认得出这个 bin（只放它一个 [[bin]]）
 mkdir -p .claude/gate.d
-printf 'E910\tscripts/experiments/e910_fingerprint_stale.rs\t# 样本：登记了准入\n' > .claude/gate.d/stage-inputs.tsv
+printf 'E910\tscripts/experiments/e910_fingerprint_stale.rs::main\t# 样本：登记了准入\n' > .claude/gate.d/stage-inputs.tsv
+printf '[package]\nname = "e910-sample"\nversion = "0.0.0"\nedition = "2021"\n\n[[bin]]\nname = "e910"\npath = "e910_fingerprint_stale.rs"\n' > scripts/experiments/Cargo.toml
 printf 'fn main() { println!("e910"); }\n' > scripts/experiments/e910_fingerprint_stale.rs
 git add -A && git commit -qm base
 printf 'fn main() { println!("e901 改过了"); }\n' > scripts/experiments/e901_stale_product.rs

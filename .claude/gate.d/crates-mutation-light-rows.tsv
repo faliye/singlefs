@@ -7,6 +7,16 @@
 #   那一行被删、改名、改了测试目标或改坏对象挪出了核心代码，换成同一个测试目标在核心行里剩下行号最小的那一条。
 #   核法与缺行时该补哪一行：python3 scripts/mutation/crates-mutation-light-rows.py check（门禁 code-source-discipline 的 mutation-light-rows 格调它）。
 # 2026-10-10 照挑法生成：变异表 3774 条成形的行里 1396 条改坏对象在 crates/singlefs-core/src/ 下，涉及 171 个测试目标，171 行。
+# 逐行上限（判法在 scripts/mutation/crates-mutation-rows.py 文件头「逐行上限」）：一行「# 逐行上限：<变异名><TAB><内存上限，systemd 写法，或 -><TAB><限时秒，或 -><TAB># 依据>」，
+#   那一行（连同它所在的那一批基线）拿它自己的上限与限时，写 - 的那一样与没写的行照变异表表头、GATE_MUTATION_MEMORY_MAX / GATE_MUTATION_TIMEOUT、默认 4G / 1800 秒。
+#   # 开头：这张表的核法（crates-mutation-light-rows.py）与门禁取名字的那一段都不读它；上限与限时不进行键。依据写「推的」或量过的峰值与日期。
+# 逐行上限：步 6：恢复从系统配置 tail 起逐条验证记录的点名单元、失配即中止（E78 的自我中止形态）	-	3600	# 推的、没量过：2026-10-15 轻型（负载约 90）里这一批基线 1800 秒没跑完，那时限时含重编译（调试档单编约 18 分半）；限时改成不含重编译之后再给到 3600
+# 逐行上限：步 3 验收：取号之后没有屏障（取号的系统配置槽写与写行那次发布的单元写并成一段）	8G	-	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G
+# 逐行上限：实二十：崩溃点重放 L8：恢复把不带末条标志的记录也当末条（半次发布施加上去）	8G	-	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G
+# 逐行上限：树分裂 崩溃点重放：冷走读核映射条目数时记账树按一个节点算（多层记账树的镜像走读失败）	8G	-	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G
+# 逐行上限：实二五 D19 已定项 5（同一处）：读得出而对不上不重读；故障注入快档判出（一次坏读隔离一对好槽，I-3.11 红）	-	3600	# 推的、没量过：2026-10-15 轻型（负载约 90）里这一批基线 1800 秒没跑完，那时限时含重编译（调试档单编约 18 分半）；限时改成不含重编译之后再给到 3600
+# 逐行上限：实五 崩在准入推的那一串空发布中间：抬 F 那一串不先写系统配置（带新 F 的根落盘而系统配置里还是旧 F，I-7.12 判红）	8G	-	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G
+# 逐行上限：第57批 H1 写侧早关一片（攻方 w-close-one-early：旋钮 K ≥ 2 装 K − 1 条就开新片）	8G	-	# 推的、没量过：2026-10-15 轻型（外层 24G）里这一批基线撞了 4G；峰值表里同类崩溃枚举用例 6 个测试线程量到约 4.5 GiB，给 8G
 逐盘核退回只核总数	-p singlefs-core --lib
 释放时清位图（立即复用）	-p singlefs-harness --test overwrite_in_one_instance
 步 3：暖机只推一次	-p singlefs-harness --test writable_mount_takes_a_second_instance
@@ -114,7 +124,7 @@ C581 树表条目的根指针不判 extent 偏移	-p singlefs-harness --test poi
 三·2 unlink 意图：记录的 nlink 不写成 0	-p singlefs-harness --test unlink_single_file_publishes
 三·2 删空：第三个成员的判定把 deleted_inodes 根指针读反	-p singlefs-harness --test unlink_mount_continuation_and_the_emptied_version
 三·2 第 6 条：标签 6 的 n_live 恒取 0（记账行与发布路径的读数不按这一版 inode 树现算）	-p singlefs-harness --test admission_ring_window_and_tombstone_prepay_on_the_publish_path
-三·2 第 7 条 ④：标签 6 的 n_live 恒取 0（每一版标签 6 与镜像现算的对不上）	-p singlefs-harness --test unlink_idempotence_criteria_and_rollback_to_the_emptied_version
+三·2 第 7 条 ④：n_live 把 nlink = 0 的记录也算活对象	-p singlefs-harness --test unlink_idempotence_criteria_and_rollback_to_the_emptied_version
 三·2 第 5 条：ckpt_cost 不算谱系那一项	-p singlefs-harness --test rollback_lineage_record_and_its_checkpoint_cost_term
 三·2 第 7 条：长高那次把留在原位置的旧根当作被这次换下（释放还在用的节点）	-p singlefs-harness --test container_trees_grow_a_level_when_the_root_is_full
 K3-⑨ 两道防线至少留一道：恢复交给前缀核的点名验证开关恒为不验（记录已持久而它点名的单元两份都没落时照样施加、走读失败）	-p singlefs-harness --test named_unit_verification_stands_in_for_the_barrier_before_the_record
@@ -167,3 +177,18 @@ I-2.4 根记录的树表指针只判 extent 偏移（树表指针算法类型 1 
 切片读口子不传盘的 journal 提示（可写挂载退回全环扫描要红）	-p singlefs-harness --test sparse_block_device_journal_hint_matches_the_full_ring_scan
 空闲不随分配减（I-5.2 要红）	-p singlefs-checker-tier --test crash_given_states_of_the_images_harness_scenarios_hand_out
 实二五 D19 已定项 5（同一处）：读得出而对不上不重读；故障注入快档判出（一次坏读隔离一对好槽，I-3.11 红）	-p singlefs-checker-tier --test crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library
+C572 批 C572：回退目标引用的隔离单元不逐盘验（去掉「隔离单元也进逐盘验」这一步）	-p singlefs-harness --test rollback_by_a_forward_publish_verifies_every_copy_of_an_isolated_unit_the_target_references
+C840 读者：系统配置节点大小不是格式常量照收（择系统配置择到那一槽）	-p singlefs-harness --test system_configuration_slot_with_a_foreign_node_size_is_not_chosen
+C834 同一指针只要一份更新就放过（M1 只盖了树表一份）	-p singlefs-harness --test newer_unreadable_root_passes_only_when_both_copies_of_one_pointer_are_newer
+五·6：系统配置见证读取改回甲（一槽读不出或自证不过就判不出），起点段吞掉一次 mkfs 系统配置槽写之后可写挂载被拒	-p singlefs-harness --test a_swallowed_system_configuration_slot_write_at_the_starting_point_still_lets_the_writable_mount_through
+C841 开新容器取最右那片的号加一不判溢出（墓碑树最右容器号 u64 最大值的坏镜像上 unlink 意图 panic、不交类型化错误）	-p singlefs-harness --test opening_a_container_past_the_largest_number_returns_an_error
+K4 重建时 I-2.5 那一判漏掉墓碑树的容器指针与根之下节点指针（两条位置条目同盘的坏镜像挂载照收、下一次重写那棵树时在写者断言上 panic）	-p singlefs-harness --test container_tree_pointer_with_both_location_entries_on_one_device_is_refused_by_the_writable_mount
+4-4 修红 W13 外部审核 ②：deleted_inodes 根条目宽只拒小于 8（宽 16 的照收、截前 8 字节）	-p singlefs-harness --test writable_mount_refuses_a_deleted_inodes_root_whose_entries_are_wider_than_eight_bytes
+4-4 修红 W13 J1：重建不按 I-2.5 判所选那一版那条 journal 记录的新根段指针（重新编码时在写者断言上 panic）	-p singlefs-harness --test journal_record_whose_new_root_segment_pointer_does_not_ascend_is_refused_by_the_writable_mount
+4-4 修红 W13 岔路一读一次两边共用：取号之前预演没走完而读过错照旧吞成放行（真做取号、写行、续做落盘之后才交 C841）	-p singlefs-harness --test writable_mount_rehearsal_and_the_real_run_read_each_block_once
+4-4 修红 W14 C834 比 fsid：较新可读根指针槽里别的池的单元头也算被更新单元盖掉（四个槽都摆别的池的单元头、可写挂载照放过）	-p singlefs-harness --test newer_unreadable_root_counts_only_units_of_this_pool_as_overwriting_its_pointer_slots
+4-4 修红 W16 读坏当场重读：重读也取共用的那一份（预演与真做重读读到的都是记下的坏字节，释放之前读盘核把那个单元两份都隔离）	-p singlefs-harness --test writable_mount_reread_after_a_bad_read_reaches_the_disk_past_the_reads_shared_with_the_rehearsal
+4-4 修红 W16 读序：真做取号写之前多读一遍根环（瞬时那条用例点名的第 10 次读成了取号写之前那一遍，抬 F 的重读是第 11 次）	-p singlefs-harness --test rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root
+4-4 修红 W17 取号写与轮换写算世代号的那一读走共用的那一份（见证值读之后、取号写之前盘 0 两槽不再读到盘上）	-p singlefs-harness --test writable_mount_acquisition_write_reads_the_system_configuration_slots_from_the_disk
+4-4 修红 W17 读坏：读坏不进账（每一趟都读坏的那份树表照旧留给续做，真做取号、写行落盘之后抬 F 才读不出）	-p singlefs-harness --test writable_mount_rehearsal_drops_bytes_failing_self_verification_from_the_shared_reads
+4-4 修红 W17 L4：重建不按 I-2.5 判所选那一版那条 journal 记录的点名项（点名项两条位置条目逆序的记录照收、可写挂载往下写）	-p singlefs-harness --test journal_record_whose_named_unit_locations_do_not_ascend_is_refused_by_the_writable_mount

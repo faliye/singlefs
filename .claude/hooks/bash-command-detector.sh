@@ -110,11 +110,12 @@
 #   以 `/` 结尾的，写的是 目录/源的文件名，源里的通配按这一刻的文件展开）、`dd of=`（带不带 `conv=notrunc` 都算）与 `truncate` 的文件（2026-09-25 并进来：
 #   与 ⑦ 认的是同一段 `overwrite_steps` / `follow_simple_command`，不重复判定）。2026-09-25 E158 第九段执行员用 `cp` 把 s8 同名的三份未跟踪产物整份覆盖，
 #   旧字节找不回（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 24 行）；write-guard.sh 只拦 Write / Edit 工具，拦不到 shell。
+#   进没进 git 的判法：整条命令里确定的目标路径收齐，一次 `git ls-files` 查完（tracked_verdicts）；算不出的样式（通配、变量）另按对得上的文件一次查。
 #   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。
 #   放行：`>>`、`&>>`、`tee -a` 追加；目标不存在（新文件名）；目标已进 git（`git add` 过就算，git 兜得住）；目标不在仓库根的 `research/results/` 下；
 #   `2>&1`、`>&2`、`>&-` 这类 fd 复制与关闭；`cp` / `mv` 带 `-n`、`--no-clobber`、`--update=none`、`-b`、`--backup` 的（已有的目标不被整份盖掉）；`install -d`；
 #   同一条命令里排在写之前 `git add` 过、或被 `mv` 挪走的那个文件（拒绝信息给的两条出路写进同一条命令也认）。
-#   目标按命令里的 cd / pushd 跟着算；cd 算不出来（`cd "$变量"`、`cd -`、`popd`）或没有 cd 时按仓库根（这个 hook 所在的仓，`.claude/hooks/` 往上两级）解析。
+#   目标按命令里的 cd / pushd 跟着算；cd 算不出来（`cd "$变量"` 而变量没在这段命令里赋值、`cd -`、`popd`；`$HOME` 照钩子自己的环境展开，共用模块的 changed_directory）或没有 cd 时按仓库根（这个 hook 所在的仓，`.claude/hooks/` 往上两级）解析。
 #   这条命令里前面独立赋过值的变量（`out=…`、`export out=…`）在目标里的 `$out`、`${out}` 先代入。
 #   目标这一刻算不出来（没赋过值的变量、命令替换、通配、花括号展开）的不拦：算不出的段换成 `*` 去对 research/results/ 下已有的文件，
 #   对得上没进 git 的就记一条检出（对不上的一定是新文件名，不记）；git 自己出错、判不了进没进 git 的也只记检出。
@@ -135,7 +136,7 @@
 #   systemctl 停、杀、重启、改属性（stop、kill、restart 一族、freeze、set-property、disable / mask --now）ssh、sshd、session-*.scope、user@*.service、
 #   user.slice、user-*.slice、私有配置里登记的本地模型服务单元、systemd-logind、dbus，或单元带通配、是命令替换；systemctl isolate、poweroff、reboot 一类与 --user exit；
 #   loginctl terminate-* / kill-*；reboot、poweroff、halt、shutdown（shutdown -c 不算）；
-#   目标是写死的进程号时现读进程表：是这条命令所在会话自己的祖先（Claude 会话、VSCode 扩展宿主往上）、pid 1、名叫 sshd / systemd / dbus / logind / claude 的、
+#   目标是写死的进程号时现读进程表（整条命令里第一次判到 kill 或 proc.py stop 的写死的进程号才读 /proc、读一次；不带这种目标的命令，带数字的 git log -1、sleep 2 也不读）：是这条命令所在会话自己的祖先（Claude 会话、VSCode 扩展宿主往上）、pid 1、名叫 sshd / systemd / dbus / logind / claude 的、
 #   命令行里带 .vscode-server 或私有配置里登记的本地模型服务标记的，或它的祖先里有另一个 Claude 会话（别的会话起的）——都拒；读不到那个进程的不拦（kill 自己会报错）。
 #   本地模型服务的单元名与进程标记是本机的私有信息，不写进仓：从仓外的私有配置读，文件是 BASH_COMMAND_DETECTOR_PRIVATE_CONFIG，
 #   不设就是 ${XDG_CONFIG_HOME:-~/.config}/singlefs/bash-command-detector.env；一行一个 KEY=值，值按空白或逗号切成几个：
@@ -178,7 +179,7 @@
 #   出路是 scripts/hosts/work-directory-ownership.sh：claim 写归属文件，sweep 只删归属是本会话、没有进程开着的，删前逐项连大小写日志。
 #   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。放行：工作根下一个具体目录（`rm -rf <工作根>/<目录>`）与它里面的通配（`<工作根>/<目录>/copy-*`）、
 #   同名前缀的兄弟目录、别处的 rm -r、不带 -r 的 rm、当数据写的（引号里、写进文件的 heredoc 正文、注释）。
-#   路径里 ~、$HOME、$SINGLEFS_WORK_ROOT 与这条命令里 export 过、命令前写过的变量代入，相对路径跟着 cd 算（没有 cd 按 hook 输入的 cwd，再没有按仓库根）；
+#   路径里 ~、$HOME、$SINGLEFS_WORK_ROOT 与这条命令里 export 过、命令前写过的变量代入，相对路径跟着 cd 算（cd 的目录里同一段命令前面赋过的变量与 $HOME 先展开，共用模块的 expand_known_variables；没有 cd 按 hook 输入的 cwd，再没有按仓库根）；
 #   通配照 bash 的默认认（不开 dotglob：`~/*` 不碰 `~/.local`）。每一层（bash -c、喂给 shell 的 heredoc、命令替换）都判，前缀与 capped.sh 剥开。
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、没赋过值的变量（`rm -rf "$d"/*`）、单独一行赋值的变量（`w=…; rm -rf "$w"/*`）、
 #   find -delete 与 find -exec rm、xargs rm、python 的 shutil.rmtree、旧根下 <项目>/ 那一层的通配（`/tmp/claude-<uid>/<项目>/*`）。
@@ -331,8 +332,12 @@
 #                                        #   BASH_COMMAND_DETECTOR_BREAK=detection-outcome-dropped  检出记录不写结局（outcome：只记）
 #                                        #       「stdin:只记的检出记录写了结局「只记」」（共 1 格）
 #                                        #   BASH_COMMAND_DETECTOR_BREAK=allow-work-root-removal  ⑪ rm -r 作用在工作根本身、它的上级或工作根下第一层通配上也放行
-#                                        #       「通删工作根:工作根下通配（~ 写法）」「通删工作根:工作根下通配（$HOME 写法、引号里外）」「通删工作根:工作根本身」「通删工作根:工作根本身带结尾的 /」「通删工作根:旧根下通配」「通删工作根:rm -fr」「通删工作根:rm -r -f 分开写」「通删工作根:rm --recursive --force」「通删工作根:rm -r 不带 -f」「通删工作根:工作根下第一层部分通配」「通删工作根:工作根下第一层通配再往下」「通删工作根:cd 进工作根之后 rm -rf *」「通删工作根:bash -c 里」「通删工作根:nice、sudo 前缀」「通删工作根:工作根的上级」「通删工作根:$SINGLEFS_WORK_ROOT 写法」「通删工作根:/tmp/* 盖住旧根」「通删工作根:前面 export 过的变量代入」「通删工作根:选项写在操作数后面」「通删工作根:喂给 bash 的 heredoc 里」「stdin:rm -rf 工作根下通配拒绝（退出码 2）」「stdin:通删工作根的拒绝写了出路（work-directory-ownership.sh 的 sweep 与 claim）」（共 22 格）
+#                                        #       「通删工作根:工作根下通配（~ 写法）」「通删工作根:工作根下通配（$HOME 写法、引号里外）」「通删工作根:工作根本身」「通删工作根:工作根本身带结尾的 /」「通删工作根:旧根下通配」「通删工作根:rm -fr」「通删工作根:rm -r -f 分开写」「通删工作根:rm --recursive --force」「通删工作根:rm -r 不带 -f」「通删工作根:工作根下第一层部分通配」「通删工作根:工作根下第一层通配再往下」「通删工作根:cd 进工作根之后 rm -rf *」「通删工作根:bash -c 里」「通删工作根:nice、sudo 前缀」「通删工作根:工作根的上级」「通删工作根:$SINGLEFS_WORK_ROOT 写法」「通删工作根:/tmp/* 盖住旧根」「通删工作根:前面 export 过的变量代入」「通删工作根:选项写在操作数后面」「通删工作根:喂给 bash 的 heredoc 里」「通删工作根:D=… 之后 cd $D 进工作根再 rm -rf *」「通删工作根:cd $HOME/… 进工作根再 rm -r 第一层部分通配」「stdin:rm -rf 工作根下通配拒绝（退出码 2）」「stdin:通删工作根的拒绝写了出路（work-directory-ownership.sh 的 sweep 与 claim）」（共 24 格）
 #                                        #   （这两格在别的开关下也红：disable-check 下两格都红；allow-detaching、allow-foreground-wait-loop、allow-process-signals 下「一次列全」那一格红）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=always-read-process-table  ⑥ 命令里有数字就先整扫 /proc 读进程表（改前的做法；现在只在判到 kill / proc.py stop 的写死的进程号时才读）
+#                                        #       「终止进程:没有终止词的带数字命令不读进程表（git log -1、sleep 2、--threads 8）」（共 1 格）
+#                                        #   BASH_COMMAND_DETECTOR_BREAK=per-path-git-query  ⑤ 确定的目标一份起一次 git ls-files（改前的做法；现在收齐一次查完）
+#                                        #       「覆盖产物:一条命令里两份未跟踪的目标同时判，git ls-files 只起一次」「覆盖产物:已跟踪的、未跟踪的、不存在的目标混在一起，git ls-files 只起一次」（共 2 格）
 #                                        #   LIB_SHELL_WORDS_BREAK=detached-run-force-kept  共用模块 lib_shell_words.py 的 detached_run_arguments_after_preflight() 原样交回参数：-- 之后、选项值位置上的 --force 不摘，`-- --force <放出追踪的命令>` 放过去
 #                                        #       「放出追踪:detached-run.sh start 的 -- 之后先写 --force、里面 setsid -f 照拒」（共 1 格）
 #                                        # 工作根的两个弄坏开关在同目录 lib_work_root.py（不经 BASH_COMMAND_DETECTOR_BREAK）：
@@ -510,7 +515,7 @@ KNOWN_DETECTOR_BREAK_ITEMS = ("disable-check", "disable-self-background", "keep-
                               "allow-background-task-output-wait", "allow-repository-in-place-edit", "allow-compile-first-bypass", "allow-results-overwrite",
                               "allow-process-signals", "ignore-private-config", "allow-script-in-place-write", "keep-selftest-scratch",
                               "refuse-every-wait-loop", "stop-at-first-refusal", "detection-outcome-dropped",
-                              "allow-work-root-removal")
+                              "allow-work-root-removal", "always-read-process-table", "per-path-git-query")
 
 def detector_break_is_set(item):
     return item in os.environ.get(DETECTOR_BREAK_VARIABLE, "").split(",")
@@ -1332,28 +1337,52 @@ def is_preserved(path, preserved):
     """path 是同一条命令里前面 git add 过、或 mv 挪走了的那个文件（或在那样一个目录里面）。"""
     return any(os.path.normpath(path) == kept or is_inside(path, kept) for kept in preserved)
 
+GIT_LS_FILES_RUNS = [0]   # 起了几次 git ls-files，自证数它
+
+def run_git_ls_files(repository_root, arguments):
+    GIT_LS_FILES_RUNS[0] += 1
+    return subprocess.run(["git", "-C", repository_root, "ls-files", *arguments], capture_output=True, text=True, timeout=20)
+
 def git_tracks(repository_root, path):
-    """`git ls-files --error-unmatch`：进过 git 交 True，没进交 False，git 自己出错（不是仓、路径在仓外、超时）交 None。"""
+    """`git ls-files --error-unmatch`：进过 git 交 True，没进交 False，git 自己出错（不是仓、路径在仓外、超时）交 None。
+    一份一份查，只给弄坏开关 per-path-git-query 退回旧做法用；正常走 tracked_verdicts 一次查完。"""
     try:
-        completed = subprocess.run(["git", "-C", repository_root, "ls-files", "--error-unmatch", "--", path],
-                                   capture_output=True, text=True, timeout=20)
+        completed = run_git_ls_files(repository_root, ["--error-unmatch", "--", path])
     except (OSError, subprocess.TimeoutExpired):
         return None
     return {0: True, 1: False}.get(completed.returncode)
 
-def untracked_among(repository_root, paths):
-    """几份已有的文件里没进 git 的，一次 git ls-files 查完；git 自己出错交 None。"""
-    if not paths:
-        return []
+def tracked_names(repository_root, paths):
+    """一次 git ls-files 查这几份文件，交回进了 git 的那些（规范化的绝对路径集合）；git 自己出错交 None。"""
     try:
-        completed = subprocess.run(["git", "-C", repository_root, "ls-files", "-z", "--full-name", "--", *paths],
-                                   capture_output=True, text=True, timeout=20)
+        completed = run_git_ls_files(repository_root, ["-z", "--full-name", "--", *paths])
     except (OSError, subprocess.TimeoutExpired):
         return None
     if completed.returncode != 0:
         return None
     top = os.path.realpath(repository_root)
-    tracked = {os.path.normpath(os.path.join(top, name)) for name in completed.stdout.split("\0") if name}
+    return {os.path.normpath(os.path.join(top, name)) for name in completed.stdout.split("\0") if name}
+
+def tracked_verdicts(repository_root, paths):
+    """几份已有的文件各自进没进 git，一次 git ls-files 查完 → {路径: True（进了）/ False（没进）/ None（git 自己出错）}。
+    符号链接按链接本身判（只解析它所在的目录），与 git ls-files --error-unmatch 同义。"""
+    paths = list(dict.fromkeys(paths))
+    if not paths:
+        return {}
+    if detector_break_is_set("per-path-git-query"):   # 弄坏开关：一份一份查（改前的做法）
+        return {path: git_tracks(repository_root, path) for path in paths}
+    tracked = tracked_names(repository_root, paths)
+    if tracked is None:
+        return dict.fromkeys(paths)
+    return {path: os.path.normpath(os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path))) in tracked for path in paths}
+
+def untracked_among(repository_root, paths):
+    """几份已有的文件里没进 git 的，一次 git ls-files 查完；git 自己出错交 None。"""
+    if not paths:
+        return []
+    tracked = tracked_names(repository_root, paths)
+    if tracked is None:
+        return None
     return [path for path in paths if os.path.normpath(os.path.realpath(path)) not in tracked]
 
 def results_overwrite_verdict(command, repository_root):
@@ -1361,6 +1390,7 @@ def results_overwrite_verdict(command, repository_root):
     （`写法 相对仓库根的路径`）；目标这一刻算不出、样式对得上已有的未跟踪文件的，与 git 判不了的，交进要记检出的。"""
     results_directory = os.path.join(repository_root, *RESULTS_DIRECTORY_WORDS)
     preserved, refused, noted = [], [], []
+    candidates = []   # 按出现的次序：("exact", 写法, 目标) 或 ("pattern", 写法, 原词, 前面没被 git add / mv 留住的对得上的文件)；留住与否在步骤出现那一刻判
     for step in overwrite_steps(command, repository_root):
         base = step.directory if step.directory is not None else repository_root
         if isinstance(step, PreservingStep):
@@ -1372,21 +1402,28 @@ def results_overwrite_verdict(command, repository_root):
         for word in destination_words(step, base):
             exact, matches = resolve_destination(word, base, repository_root)
             if exact is not None:
-                if not is_inside(exact, results_directory) or not os.path.isfile(exact) or is_preserved(exact, preserved):
-                    continue
-                tracked = git_tracks(repository_root, exact)
-                relative = os.path.relpath(exact, repository_root)
-                if tracked is False:
-                    refused.append(f"{step.form} {relative}")
-                elif tracked is None:
-                    noted.append(f"判不了 {relative} 进没进 git（git ls-files 出错），{step.form} 覆盖它这一步没拦")
+                if is_inside(exact, results_directory) and os.path.isfile(exact) and not is_preserved(exact, preserved):
+                    candidates.append(("exact", step.form, exact))
                 continue
-            untracked = untracked_among(repository_root, [match for match in matches if not is_preserved(match, preserved)])
+            candidates.append(("pattern", step.form, word, [match for match in matches if not is_preserved(match, preserved)]))
+    verdicts = tracked_verdicts(repository_root, [item[2] for item in candidates if item[0] == "exact"])   # 确定的目标一次查完
+    for item in candidates:
+        if item[0] == "exact":
+            _, form, exact = item
+            tracked = verdicts[exact]
+            relative = os.path.relpath(exact, repository_root)
+            if tracked is False:
+                refused.append(f"{form} {relative}")
+            elif tracked is None:
+                noted.append(f"判不了 {relative} 进没进 git（git ls-files 出错），{form} 覆盖它这一步没拦")
+        else:
+            _, form, word, remaining = item
+            untracked = untracked_among(repository_root, remaining)
             if untracked is None:
-                noted.append(f"判不了 {step.form} {word} 对得上的文件进没进 git（git ls-files 出错），没拦")
+                noted.append(f"判不了 {form} {word} 对得上的文件进没进 git（git ls-files 出错），没拦")
             elif untracked:
                 shown = "、".join(os.path.relpath(path, repository_root) for path in untracked[:3])
-                noted.append(f"{step.form} {word} 的目标这一刻算不出来（变量、命令替换或通配），没拦；"
+                noted.append(f"{form} {word} 的目标这一刻算不出来（变量、命令替换或通配），没拦；"
                              f"它对得上 research/results/ 下 {len(untracked)} 份已有的未跟踪文件：{shown}{' 等' if len(untracked) > 3 else ''}")
     return list(dict.fromkeys(refused)), list(dict.fromkeys(noted))
 
@@ -1716,6 +1753,19 @@ def ancestors_in(table, process_id):
         current = table[current]["parent"]
     return found
 
+class ProcessTableOnDemand:
+    """进程表与发这条命令的会话自己的祖先：第一次有人要才读（判 kill / proc.py stop 的写死的进程号打到谁时才要），读过的不再读。
+    process_target_findings 认它：有它就按需取，是字典就照旧用字典与 own_ancestors。"""
+    def __init__(self, reader, own_process_id=None):
+        self.reader, self.own_process_id, self.loaded = reader, own_process_id, None
+
+    def load(self):
+        """→ (进程表, 这个会话自己的祖先)。"""
+        if self.loaded is None:
+            table = self.reader()
+            self.loaded = (table, ancestors_in(table, self.own_process_id or os.getpid()))
+        return self.loaded
+
 def protected_process_reason(process_id, table, own_ancestors):
     """写死的进程号打到的是 SSH、VSCode、Claude 会话、本地模型服务、系统服务，或别的 Claude 会话起的进程，就交回原因。不在表里的不拦（kill 自己会报错）。"""
     information = table.get(process_id)
@@ -1747,7 +1797,8 @@ def process_target_findings(words, targets, in_loop, what, process_table, own_an
             kind = "cgroup" if PROCESS_LIST_READING.search(target) or any(picker in target for picker in PROCESS_PICKERS) else "other"
             findings.append(TerminationFinding(tuple(words), f"{what}：{problem}", kind))
         elif process_table is not None and LITERAL_PROCESS_ID.match(target):
-            reason = protected_process_reason(int(target), process_table, own_ancestors)
+            table, ancestors = process_table.load() if isinstance(process_table, ProcessTableOnDemand) else (process_table, own_ancestors)
+            reason = protected_process_reason(int(target), table, ancestors)
             if reason:
                 findings.append(TerminationFinding(tuple(words), f"{what}：{reason}", "other"))
     if in_loop:
@@ -1923,14 +1974,16 @@ def termination_findings(text, process_table=None, own_ancestors=(), whole_comma
     return findings
 
 def process_signal_refusal(command, process_table_reader=read_process_table, own_process_id=None):
-    """命令里有打得到别人的终止写法就交回每一处的原因；否则交 []。写死的进程号才读进程表。前台、run_in_background 一样拒。"""
+    """命令里有打得到别人的终止写法就交回每一处的原因；否则交 []。进程表只在判到 kill / proc.py stop 的写死的进程号时才读（ProcessTableOnDemand，读一次）。
+    前台、run_in_background 一样拒。弄坏开关 always-read-process-table：命令里有数字就先整扫 /proc（改前的做法）。"""
     if (detector_break_is_set("disable-check")
             or detector_break_is_set("allow-process-signals")):
         return []
-    table = process_table_reader() if re.search(r"(?<![\w$-])\d+\b", command) else None
-    own_ancestors = ancestors_in(table, own_process_id or os.getpid()) if table is not None else []
+    process_table = ProcessTableOnDemand(process_table_reader, own_process_id)
+    if detector_break_is_set("always-read-process-table") and re.search(r"(?<![\w$-])\d+\b", command):
+        process_table.load()
     return list(dict.fromkeys(f"{finding.problem}（{' '.join(finding.words)[:120]}）" if finding.words else finding.problem
-                              for finding in termination_findings(command, table, own_ancestors)))
+                              for finding in termination_findings(command, process_table, ())))
 
 # 扫脚本（门禁 code-tooling 的 research-gate-lint 格调 --scan-scripts）：同一份判定，按文件里的行号报；own-scope 标注与待改清单
 OWN_SCOPE_ANNOTATION = re.compile(r"(?<!`)#\s*process-safety:own-scope\b[ \t]*(.*)$")   # 反引号里的是说明里举的例子，不算
@@ -2582,6 +2635,23 @@ def selftest_in(hook_dir, work):
     ]
     for label, command, want in process_signal_cases:
         results.append((f"终止进程:{label}", want, 1 if process_signal_refusal(command, fake_reader, 1001) else 0))
+    # 进程表按需读：只有判到 kill / proc.py stop 的写死的进程号才读，读一次；BASH_COMMAND_DETECTOR_BREAK=always-read-process-table（命令里有数字就先读）下
+    # 「没有终止词的带数字命令不读进程表」一格红
+    table_reads = []
+    def counting_reader():
+        table_reads.append(1)
+        return fake_table
+    def reads_for(*commands):
+        del table_reads[:]
+        for one_command in commands:
+            process_signal_refusal(one_command, counting_reader, 1001)
+        return len(table_reads)
+    results.append(("终止进程:没有终止词的带数字命令不读进程表（git log -1、sleep 2、--threads 8）", 0,
+                    reads_for("git log -1", "sleep 2", "cargo test -p singlefs-core --threads 8")))
+    results.append(("终止进程:kill 写死的进程号读一次进程表", 1, reads_for("kill 4000")))
+    results.append(("终止进程:proc.py stop 写死的进程号读一次进程表", 1, reads_for("python3 .claude/singlefs-ai-sop/scripts/proc.py stop 4000")))
+    results.append(("终止进程:一条命令里几处写死的进程号共读一次进程表", 1, reads_for("kill 4000; kill 1100")))
+    results.append(("终止进程:kill 的目标不是写死的进程号不读进程表", 0, reads_for('kill "$pid"')))
     # 私有配置不在、没有那两个键：本地模型服务那一项不判、不报错，别的照判
     with open(os.path.join(work, "private-keyless.env"), "w", encoding="utf-8") as handle:
         handle.write("# 自证用的私有配置，没有那两个键\nOTHER_KEY=selftest-model-server selftest_model_server\n")
@@ -2699,6 +2769,7 @@ def selftest_in(hook_dir, work):
         ("前面赋过值的变量代入", 'out=research/results/untracked.out; python3 x.py > "$out"', 1),
         ("export 过的变量代入", 'export OUT=research/results/untracked.out; python3 x.py > "${OUT}"', 1),
         ("cd 到变量路径算不出来、按仓库根解析", 'cd "$scratch" && python3 x.py > research/results/untracked.out', 1),
+        ("cd $HOME/… 算得出来、按那个目录解析（仓外，放行）", 'cd "$HOME/no-such-directory-for-detector-selftest" && python3 x.py > research/results/untracked.out', 0),
         ("进程替换里的 tee", "make > >(tee research/results/untracked.out)", 1),
         ("整个循环重定向", "for arm in a b; do python3 x.py $arm; done > research/results/untracked.out", 1),
         ("sudo 包着的 tee", "echo x | sudo tee research/results/untracked.out", 1),
@@ -2738,6 +2809,17 @@ def selftest_in(hook_dir, work):
     ]
     for label, command, want in results_overwrite_cases:
         results.append((f"覆盖产物:{label}", want, 1 if git_ready and results_overwrite_refusal(command, repository)[0] else 0))
+    # 一条命令里几个确定的目标同时判：各自点名，且 git ls-files 只起一次（BASH_COMMAND_DETECTOR_BREAK=per-path-git-query 一份一份查，后两格的次数红）
+    def refused_and_runs(command):
+        GIT_LS_FILES_RUNS[0] = 0
+        refused_here = results_overwrite_refusal(command, repository)[0] if git_ready else []
+        return refused_here, GIT_LS_FILES_RUNS[0]
+    two_refused, two_runs = refused_and_runs("make | tee research/results/untracked.out research/results/sub/deep.out")
+    mixed_refused, mixed_runs = refused_and_runs("make | tee research/results/tracked.out research/results/untracked.out research/results/sub/deep.out research/results/fresh.out")
+    results.append(("覆盖产物:一条命令里两份未跟踪的目标各自点名", ["tee research/results/untracked.out", "tee research/results/sub/deep.out"], two_refused))
+    results.append(("覆盖产物:一条命令里两份未跟踪的目标同时判，git ls-files 只起一次", 1, two_runs))
+    results.append(("覆盖产物:已跟踪的、未跟踪的、不存在的目标混在一起同时判，只点名未跟踪的", ["tee research/results/untracked.out", "tee research/results/sub/deep.out"], mixed_refused))
+    results.append(("覆盖产物:已跟踪的、未跟踪的、不存在的目标混在一起，git ls-files 只起一次", 1, mixed_runs))
     # 只记检出、不拦：(说明, 命令, 仓库根, 该不该记)
     results_noted_cases = [
         ("算不出的变量对得上一份未跟踪的产物", "for arm in a b; do python3 x.py > research/results/untracked$arm.out; done", repository, 1),
@@ -2920,6 +3002,10 @@ def selftest_in(hook_dir, work):
         ("工作根下第一层部分通配", f"rm -rf {removal_root}/owed-*", 1),
         ("工作根下第一层通配再往下", f"rm -rf {removal_root}/*/target", 1),
         ("cd 进工作根之后 rm -rf *", f"cd {removal_tilde} && rm -rf *", 1),
+        # cd 的目录写在变量里：同一段命令里前面赋过的变量与 $HOME 展开之后再判（共用模块 lib_shell_words.py 的 expand_known_variables）
+        ("D=… 之后 cd $D 进工作根再 rm -rf *", f"D={removal_root}; cd $D && rm -rf *", 1),
+        ("cd $HOME/… 进工作根再 rm -r 第一层部分通配", f"cd {removal_dollar} && rm -r owed-*", 1),
+        ("cd 进写在变量里的工作根下具体目录再 rm -rf * 放行", f"D={removal_root}/owed-x; cd $D && rm -rf *", 0),
         ("bash -c 里", f"bash -c 'rm -rf {removal_root}/*'", 1),
         ("nice、sudo 前缀", f"nice -n 19 sudo rm -rf {removal_root}/*", 1),
         ("工作根的上级", f"rm -rf {os.path.dirname(removal_root)}", 1),
@@ -3139,10 +3225,10 @@ def selftest_in(hook_dir, work):
     if failures:
         print("    → 看 findings_for()、record()、watchdog_rejection()、wait_loop_refusal() / unbounded_wait_loops()、detaching_refusal() / detaching_forms()、"
               "unwaited_ampersand_refusal() / unwaited_background_jobs() / jobs_with_endings()、"
-              "results_overwrite_refusal() / results_overwrite_verdict() / overwrite_steps() / follow_simple_command() / destination_words() 与共用的 lib_shell_words.py；"
+              "results_overwrite_refusal() / results_overwrite_verdict() / tracked_verdicts() / overwrite_steps() / follow_simple_command() / destination_words() 与共用的 lib_shell_words.py；"
               "「覆盖产物:临时 git 仓建得起来」红的是本机的 git 起不来，先看 git init 能不能跑；"
               "BASH_COMMAND_DETECTOR_BREAK 设着的话（项与红的格见文件头）这里本来就该红；"
-              "「终止进程:」「扫脚本:」红的看 process_signal_refusal() / termination_findings() / call_findings() / scan_scripts()；"
+              "「终止进程:」「扫脚本:」红的看 process_signal_refusal() / ProcessTableOnDemand / termination_findings() / call_findings() / scan_scripts()；"
               "「就地改脚本:」红的看 script_in_place_refusal() / script_in_place_verdict() / python_in_place_writes() / is_existing_script()；"
               "「先编后换:」红的看 compile_first_refusal() / compile_first_verdict() / overwrite_steps(every_write=True)，BASH_COMMAND_DETECTOR_BREAK=allow-compile-first-bypass 设着的话本来就该红；"
               "detached-run.sh 那几格红的看 detached_run_refusal() / detached_run_calls() / detached_run_copy_destinations() / detached_run_inner_words() "
@@ -3180,7 +3266,8 @@ def selftest_in(hook_dir, work):
                "先编后换：experiment-runner 在 Bash 里写主工作区 crates/ 下的 .rs（cp、cat >、>>、tee -a、mv 进目录、cd 之后 cp 到 .、sed -i、perl -pi、rsync、rm、mv 挪走、"
                "bash -c、变量里的目录、算不出而对得上已有装置的、python shutil.copy / open 'a' / os.replace）拒绝并点名 compile-then-swap.py，"
                "经那条脚本换进来、拷进草稿目录、改草稿目录、追加 crates/mutations.tsv、只读、当数据写的与 implementation-writer、主 agent 放行；"
-               "通删工作根：rm -r 作用在工作根本身、它的上级或工作根下第一层带通配上的（~、$HOME、$SINGLEFS_WORK_ROOT、export 的变量、cd 之后的 *、bash -c、喂给 bash 的 heredoc、前缀、-fr / -r -f / --recursive / 选项写在后面、旧根 /tmp/claude-<uid>/*、/tmp/*）拒绝并点名 work-directory-ownership.sh 的 sweep 与 claim，工作根下具体目录与它里面的通配、同名前缀的兄弟目录、别处、不带 -r、当数据写的与算不出的变量放行")
+               "通删工作根：rm -r 作用在工作根本身、它的上级或工作根下第一层带通配上的（~、$HOME、$SINGLEFS_WORK_ROOT、export 的变量、cd 之后的 *、bash -c、喂给 bash 的 heredoc、前缀、-fr / -r -f / --recursive / 选项写在后面、旧根 /tmp/claude-<uid>/*、/tmp/*）拒绝并点名 work-directory-ownership.sh 的 sweep 与 claim，工作根下具体目录与它里面的通配、同名前缀的兄弟目录、别处、不带 -r、当数据写的与算不出的变量放行；"
+               "进程表只在判到 kill / proc.py stop 的写死的进程号时读、一次（没有终止词的带数字命令不读），一条命令里几个确定的产物目标一次 git ls-files 查完")
     print(f"  ✓ 自检通过（查了 {len(results)} 种）：{summary}")
     return 0
 

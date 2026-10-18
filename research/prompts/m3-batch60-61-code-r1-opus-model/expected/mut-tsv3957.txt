@@ -1,9 +1,0 @@
-command args=-p singlefs-harness --test corrupt_on_disk_content_is_refused_instead_of_panicking -- allocation_records_whose_generation_is_after_the_root rc=101
-binary corrupt_on_disk_content_is_refused_instead_of_panicking
-  failed allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_width_by_the_recovery
-    thread 'allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_width_by_the_recovery' panicked:
-    assertion `left == right` failed: 只读恢复在 txg 4 那条根上报分配记录的代晚于根，不报记账条目窄于字段表
-      left: Failed { root: Some((InstanceGeneration(1), CheckpointTxg(4))), failure: EntryNarrowerThanItsFieldTable { what: "记账条目", entry_bytes: 22, field_table_bytes: 34 } }
-     right: Failed { root: Some((InstanceGeneration(1), CheckpointTxg(4))), failure: InvariantViolated { invariant: "E142 走读同款", detail: "分配记录跨度为 0，或分配代 / 释放代晚于根" } }
-  failure-name allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_width_by_the_recovery
-test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 35 filtered out

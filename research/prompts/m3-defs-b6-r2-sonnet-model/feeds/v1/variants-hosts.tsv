@@ -1,8 +1,0 @@
-M0	多机：台数取多机配置（scripts/crash/layer0-shard-configuration-check.sh --emit-hosts），每台线程取登记的每台默认重活线程数（.claude/heavy-thread-default），不现算
-M1	多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default，不看忙闲
-M2	多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default，第二台在跑别的会话也照这个数
-M3	多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default，两台核数不同也一样
-M4	多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default（31）
-M5	多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default，机器忙也不降
-M6	多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default 的一半
-M7	多机：台数取多机配置（--emit-hosts），每台线程取登记值 .claude/heavy-thread-default，第二台按此刻余量少给

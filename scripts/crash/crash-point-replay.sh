@@ -1,22 +1,28 @@
 #!/usr/bin/env bash
-# admission: always 每次调都在这一刻的树上跑点名的档；哪些判定复用由背后两套驱动各自的全绿标记与判定库定，不在这里
+# admission: always 每次调都在这一刻的树上跑点名的档；哪些判定复用由背后两套驱动各自的判定库按块定，不在这里
 # run-condition: command bash cargo python3
 # run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
 # 长活声明（判法 .claude/hooks/lib_long_run.py：scripts/hosts/detached-run.sh start --wall-clock over-2h 与 long-run-check 读这几行）：
 # long-run-shards: 按合表 .claude/gate.d/crash-point-replay-items.tsv 的项逐项跑；每项的崩溃点重放部分交门禁 checker-tier-crash-point-replay --full（登记了 shard=across-machines 的用例按多机配置两台各判一份再导入），放量部分交 scripts/crash/crash-amplification.sh（双机开着时每一项的状态块按两台量到的速度分两份）
-# long-run-resume: 重起同一条命令就是续跑：崩溃点重放部分照全绿标记复用、判过的块照崩溃枚举用例那一类的判定库复用（<库的家目录>/crash-state-enumeration-library），放量部分照判定库（${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library-by-conclusion-kind）同一判法版本下判过的块复用
+# long-run-resume: 重起同一条命令就是续跑：崩溃点重放部分与放量部分判过的块都照同一份判定库（${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/crash-state-verdicts）按块键复用（键只由内容与判法单元指纹定）
 # long-run-unshardable: 多机：这一份不自己分台，台数与额度全由背后两套驱动照多机配置的双机开关取（至多本机与 PEER_SSH_HOST 两台，不读 crash-point-replay-shard-configuration-check.sh --emit-hosts 的清单、不调 host-resources.py 现算），快档那一段只在本机跑——经给定状态引擎的测试目标除外：配了双机时交双机驱动 crash-amplification-two-hosts.sh 两台各判一份（文件头「双机」）
 # 崩溃点重放的入口（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J2「一张表、一个入口、一道门禁」与 J9「两档」；
 # 用户 2026-10-10 定的两档见 .claude/rules/verification.md「两档：轻型与重型」）。登记表是合表 .claude/gate.d/crash-point-replay-items.tsv（写法在它的表头，
 # 一项一条流），读法与核法在 scripts/crash/lib_crash_point_replay_items.py。这一批背后照调今天的两套驱动：崩溃点重放那一套（门禁 checker-tier-crash-point-replay
-# 的 --full：逐条照全绿标记复用）与放量分项驱动（scripts/crash/crash-amplification.sh）；引擎合并之后由引擎那一路换成一套。
+# 的 --full：逐条用例照块判定库复用）与放量分项驱动（scripts/crash/crash-amplification.sh）；引擎合并之后由引擎那一路换成一套。
 #
-#   crash-point-replay.sh                       重型·剪枝：全部项，崩溃点重放部分照全绿标记复用、放量部分照判定库复用，加上快档那一段与两档都跑的那几类
+#   crash-point-replay.sh                       重型·剪枝：全部项，崩溃点重放部分照块判定库复用、放量部分照判定库复用，加上快档那一段与两档都跑的那几类
 #   crash-point-replay.sh --item <项> […]       重型·逐条：只跑点名的项（给几次取并集），快档那一段只跑这几项的测试目标，两档都跑的那几类不跑
-#   crash-point-replay.sh --full [--item …]     重型·全量（清空复用）：同上，崩溃点重放部分先删这几条用例这批输入的全绿标记、带 --start-over 丢掉进度文件，
-#                                               放量部分换一份新的空判定库（留在 <放量的家目录>/crash-point-replay-full/<时戳>-<进程号>/library，跑完不删）
+#   crash-point-replay.sh --full [--item …]     重型·全量（只写不读）：同上，崩溃点重放部分带 --start-over、放量部分带 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1
+#                                               （两部分都是库不读、全部块现判、照键写回同一份库；不另建库）
 #   crash-point-replay.sh --quick [--item …]    轻型：核心部分，每次都跑全部项（见「两个域的写法」）；点名的项已在核心部分里，--item 只核项名
 #   crash-point-replay.sh --list-items          逐行打「项名<TAB>轻型：…；重型：…」，只读合表，不编、不跑
+#   crash-point-replay.sh --list-items --with-keys
+#                                               同上，末尾再打几行「键<TAB>…」：崩溃判定库里录下的块有几块键对不上（只在别的判法单元指纹下判过、
+#                                               一种判器的结论都没有）、几块键相同，与两种判器这一份的判法单元指纹。起只读读库程序
+#                                               （cargo run … --bin crash_library_reader -- keys：只读开库、不写），它的输出写法在
+#                                               crates/singlefs-checker-tier/src/bin/crash_library_reader.rs 文件头「输出」那一段，自证 list-items-with-keys 格
+#                                               把那一段原样喂进来钉读法；读库程序退非 0 或输出认不出照实报、退 1
 #   crash-point-replay.sh --selftest            假 cargo、假的两套驱动、假的准入模块走一遍各格，末尾一轮从下面「弄坏开关」那张表现读开关、逐个打开
 #   引擎配了 GPU 只由 GPU 判、没配只由 CPU 判，同一批状态一趟只判一次；GPU 判与 CPU 判的对拍是另立的测试，不在这里跑（用户 2026-10-11 定）。
 #   不带 --quick 的跑法是重型，只由带 SINGLEFS_HEAVY_TESTS 前缀的主 agent 跑（.claude/hooks/heavy-test-guard.sh 判）；轻型经
@@ -25,12 +31,12 @@
 # 两个域的写法（.claude/rules/verification.md「两档：轻型与重型」点名这里）：
 #   「甲二」 = 每项第四列的测试目标不带 --ignored 跑到的那些用例（checker 档快档：按甲二展开的小域，crash::CrashPointReplaySegmentExpansion）；
 #   「展开 6」 = 每项第三列的放量分项交 crash-amplification.sh --expand-up-to LIGHT_EXPAND_UP_TO（第一行代码之后那个赋值，今天 6），不带 --library：
-#              用放量入口的默认长期库（<放量的家目录>/library-by-conclusion-kind，与重型的放量部分同一份；.claude/rules/verification.md「checker 档自己分快档与全量」
+#              用放量入口的默认长期库（<放量的家目录>/crash-state-verdicts，与重型的放量部分同一份；.claude/rules/verification.md「checker 档自己分快档与全量」
 #              崩溃放量那一行），键相同、判过的块照库复用，被打断之后重跑同一条命令就是续跑（test-script-discipline.md「判定可复用：按输入存，按前缀剪」）；
 #              ITEM 行与成功句照放量入口的 CRASH_AMPLIFICATION_ITEM 行报现判几态、复用几态。
 #              按段登记里甲二装不进 u64 的段（驱动行 registered_segment_domains=<段号>:slice）引擎分片枚举、每趟判 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES 个态
 #              （没设取 2^32）：起放量入口那一趟，调用方没设这个变量就设成 LIGHT_REGISTERED_SEGMENT_SLICE_STATES（LIGHT_EXPAND_UP_TO 下一行那个赋值，今天 65536，引擎的一块），
-#              设了照用（空串也照原样交，引擎拒）；长期库里有续点，所以轻型对这种段每趟从库里这一判法版本的续点起判一块（65536 个态；库里还没有续点的从段内序号 0 起），
+#              设了照用（空串也照原样交，引擎拒）；长期库里有续点，所以轻型对这种段每趟从库里这一判法单元指纹的续点起判一块（65536 个态；库里还没有续点的从段内序号 0 起），
 #              与重型的放量部分接着同一个续点往下判。不带 --quick 的跑法不设，从调用方环境继承。
 #              快档那一段不分档（每种跑法里都是冒烟那一段）：每一趟 cargo test（连同开了双机时交双机驱动的那几趟）调用方没设同样设成 LIGHT_REGISTERED_SEGMENT_SLICE_STATES、
 #              设了照用；快档的测试目标里不带 --ignored 的放量用例（例如 crash_enumeration_position_addressed_trees 的 crash_amplification_of_every_position_addressed_tree_stream_is_clean）
@@ -47,7 +53,7 @@
 #   崩溃点重放部分的全量与快档同一条流、同一个测试目标（合表第四列取自同一项的重型部分，lib_crash_point_replay_items.py 核）。
 # 两档都跑的那几类（BOTH_TIERS_GROUPS，一行「类名<TAB>测试目标，空格隔开；没有写 -」）：没有测试目标的一类报本次未跑、写明为什么。
 #
-# GPU（.claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」）：多机配置（crash-amplification-lib.sh 文件头「配置」：
+# GPU（.claude/rules/test-script-discipline.md「用上现有的硬件加速」）：多机配置（crash-amplification-lib.sh 文件头「配置」：
 #   ${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，按 git common-dir 找）写了 ENABLE_GPU=1 时快档那一段带 --features verdict-store,gpu 编，
 #   每一趟 cargo test 经 scripts/crash/gpu-quiesce-run.sh 清场再起（跑完不复原），环境里交清场之后那一份显卡先后
 #   （多机配置的 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED，没写取 GPU_CARDS_BY_PRIORITY）；走 GPU 的计算类不送（引擎开了 GPU 就三类全走 GPU、不读
@@ -69,7 +75,7 @@
 #   多机配置写了 ENABLE_ACROSS_MACHINES=1 时先经 scripts/crash/crash-point-replay-shard-configuration-check.sh 判（双机开没开、键齐不齐、第二台连不连得上）：
 #     退 0（双机开）：每个这样的测试目标一趟 scripts/crash/crash-amplification-two-hosts.sh <测试目标> --library <新建的空库> --label <标签> --given-states（本机与第二台都两段先后跑，驱动不另起录入段），照它的三步跑——
 #       本机 SHARE=0/2、第二台 SHARE=1/2 经 multi-host-run.sh 跑完取回库、本机带 SINGLEFS_CRASH_AMPLIFICATION_IMPORT=<取回的库> 再跑一趟；
-#       库用给定状态那一类的长期库 <放量的家目录>/given-states-library（FAST_TIER_GIVEN_STATES_LIBRARY_SUBDIRECTORY；单机那一趟用例照默认落的也是它，
+#       库用那一份长期库 <放量的家目录>/crash-state-verdicts（CRASH_LIBRARY_DIRECTORY_NAME；单机那一趟用例照默认落的也是它，
 #       crates/singlefs-checker-tier/src/crash_library.rs 的 CrashLibraryClass::GivenStates），跨趟留着、键相同的表照库复用，被打断之后重跑同一条命令就是续跑；
 #       跑完只删取回的那一份与送第二台的快照（<放量的家目录>/runs/<标签>/fetched、library-for-peer），双机驱动的日志留在 <放量的家目录>/runs/<标签>/。
 #       开了 GPU 整条经 gpu-quiesce-run.sh 清场再起、带 --quiesced。
@@ -93,7 +99,7 @@
 #     fast_tier_tests=<快档跑到的用例数> fast_tier_red=<红的用例数> fast_tier_reused=<快档复用的块数，见「快档的复用数怎么取」；一个测试目标都取不出写 unknown>
 #     fast_tier_reuse_unknown=<取不出复用数的测试目标个数>
 #     pipeline_states=<放量现判的态数> pipeline_red=<红> pipeline_reused=<复用的态数，放量入口取不出写 unknown>
-#     enumeration_cases=<崩溃点重放部分的用例数> enumeration_red=<红的用例数> enumeration_reused=<照全绿标记复用的用例数> seconds=<这一项各段的挂钟之和>
+#     enumeration_cases=<崩溃点重放部分的用例数> enumeration_red=<红的用例数> enumeration_reused=<全部块都复用的用例数> seconds=<这一项各段的挂钟之和>
 #     （这一项没有那一段的写 -）；末行 CRASH_POINT_REPLAY_TOTAL tier=… dispatched=<派出几项> collected=<收回几项> green= red= not_run=
 #     fast_tier_tests= fast_tier_reused_known=<取得出的那几个测试目标复用的块数之和> fast_tier_reuse_unknown=<几个测试目标取不出>
 #     pipeline_states= pipeline_reused_known= pipeline_reuse_unknown=<几项取不出> enumeration_cases= enumeration_reused= seconds=。
@@ -123,9 +129,10 @@
 #   CRASH_POINT_REPLAY_BREAK=accept-unknown-item  认不得的项名悄悄丢掉、照跑
 #       unknown-item（「项名写错应当退 2、列出可点名的项、什么都不起」）
 #   CRASH_POINT_REPLAY_BREAK=list-items-builds  --list-items 先起一趟 cargo build 再列
-#       list-items（「--list-items 应当退 0、逐项列出、不起 cargo 与驱动」）
+#       list-items（「--list-items 应当退 0、逐项列出、不起 cargo 与驱动」）、list-items-with-keys（「--list-items --with-keys 应当只读判定库、不起 cargo 与驱动」）
 #   CRASH_POINT_REPLAY_BREAK=quick-throwaway-library  轻型的放量部分带一份这一趟新建、跑完删掉的空判定库（改前的样子：不复用、打断之后没有续点）
-#       quick-runs-the-light-domains（「轻型应当照甲二与展开 6 跑全部项」）、quick-reuses-the-long-term-library（「轻型那一趟第二次跑应当复用第一次判过的块」）
+#       quick-runs-the-light-domains（「轻型应当照甲二与展开 6 跑全部项」）、quick-reuses-the-long-term-library（「轻型那一趟第二次跑应当复用第一次判过的块」）、
+#       reuse-three-questions（「复用三问没过」：每一趟一份空库，第二趟照样全现判）
 #   CRASH_POINT_REPLAY_BREAK=fast-tier-reuse-not-counted  快档每个测试目标的复用数写死 none（改前的样子）
 #       fast-tier-reuse-counted（「快档日志里有复用计数行时 ITEM 行应当报同一个数……」）
 #   CRASH_POINT_REPLAY_BREAK=fast-tier-two-hosts-throwaway-library  双机开着时经给定状态引擎的测试目标交一份这一趟新建、跑完删掉的空库（改前的样子）
@@ -148,12 +155,12 @@
 #       fast-tier-not-run（「快档跑到 0 条或没卡没跑的，应当记本次未跑」）、all-not-run（「派出的项全是本次未跑，应当退 77」）
 #   CRASH_POINT_REPLAY_BREAK=skip-collection-count  放量部分收不回的分项不记红、派出收回不核
 #       collection-count（「放量那一项收不回，应当红、派出收回对不上」）
-#   CRASH_POINT_REPLAY_BREAK=full-keeps-reuse  全量不删全绿标记、不带 --start-over、不换新的空判定库
-#       full-heavy（「全量应当清空复用」）、library-left-to-the-engine（--full 那一支没交库）
+#   CRASH_POINT_REPLAY_BREAK=full-keeps-reuse  全量不带 --start-over、放量部分不设只写不读（SINGLEFS_CRASH_LIBRARY_WRITE_ONLY）
+#       full-heavy（「全量应当只写不读」）、full-writes-back-into-the-one-library（--full 那一支没设只写不读）
 #   CRASH_POINT_REPLAY_BREAK=enumeration-exit-ignored  崩溃点重放那一道的退出码不看，一律记绿
 #       enumeration-red（「崩溃点重放那一道红了，那一项应当红」）
 #   CRASH_POINT_REPLAY_BREAK=pipeline-red-ignored  放量那一项的 red= 与 verdict=red 不看
-#       pipeline-red（「放量那一项红了，那一项应当红」）
+#       pipeline-red（「放量那一项红了，那一项应当红」）、last-run-list（「上次红的清单不对」：放量红的那一项没记成红）
 #   CRASH_POINT_REPLAY_BREAK=honor-test-variables-outside-selftest  平常跑时也认只供自证的变量，不拒
 #       test-variables-outside-selftest（「平常跑时带了只供自证的变量应当退 2」）
 #   CRASH_POINT_REPLAY_BREAK=fast-tier-classes-sent  开了 GPU 时快档那几趟照改前送三类 GPU_COMPUTATION_CLASSES
@@ -179,8 +186,9 @@
 #       outer-memory-cap-forwarded（「套在内存包装里，放量入口应当带外层的上限」）、fast-tier-two-hosts（双机驱动那一趟没带 --memory-cap 3G）
 #   CRASH_POINT_REPLAY_BREAK=threads-not-defaulted  快档的 cargo 不经 capped.sh default 起，吃 cargo 自己的缺省（改前的样子）
 #       fast-tier-threads-default（「快档每一趟 cargo 都应当带登记的重活默认并行度」）
-#   CRASH_POINT_REPLAY_BREAK=library-directory-precreated  轻型与 --full 两支先把判定库目录本身建出来，再交给放量入口（改前的样子）
-#       library-left-to-the-engine（「交给放量入口的判定库目录应当还不在……」）
+#   CRASH_POINT_REPLAY_BREAK=full-in-a-library-of-its-own  --full 那一支照改前给放量部分另建一份空判定库（<放量的家目录>/crash-point-replay-full/…，跑完没人读）
+#       full-heavy（「全量应当只写不读…」：另建库那一支不带 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1）、
+#       full-writes-back-into-the-one-library（「--full 那一支应当照键写回同一份库、不另建库」）
 #   CRASH_POINT_REPLAY_BREAK=quick-slice-states-not-set  轻型起放量入口时调用方没设也不设 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES（改前的样子：分片的段照 2^32 判）
 #       quick-slice-states-sent（「轻型起放量入口时调用方没设……应当设成 65536」）
 #   CRASH_POINT_REPLAY_BREAK=quick-slice-states-override-caller  轻型起放量入口时调用方设了也改成 65536
@@ -193,7 +201,8 @@
 #       fast-tier-slice-states-sent（「调用方设了……快档每一趟应当照原值收到」）
 # 只供自证（自证起的子进程里才认；平常跑时有一个非空就退 2 拒跑，--list-items 与 --selftest 本身不拒）：CRASH_POINT_REPLAY_BREAK=<项>（上面那张表）；
 #   CRASH_POINT_REPLAY_ROOT=<造出来的小仓>：合表、stage-inputs.tsv、门禁 checker-tier-crash-point-replay、crash-amplification.sh 与准入模块 admission.py 都从它取
-#   （那三份是自证写的假的：只记一行参数、照环境变量打结果）。
+#   （那三份是自证写的假的：只记一行参数、照环境变量打结果）；
+#   CRASH_POINT_REPLAY_KEYS_READER_OUTPUT=<文件>：--list-items --with-keys 不起读库程序，拿这份文件的内容当它的输出（list-items-with-keys 格用）。
 #   「自证起的子进程」的标记：CRASH_POINT_REPLAY_SELFTEST_MARK=<文件>，那份文件在、内容是 SELFTEST_MARK_CONTENT 那一行；只有 run_selftest 设它。
 #   这三个变量读完就从环境里清掉，不传给背后的驱动。自证里的 cargo 是 PATH 最前面的假 cargo（起之前核 PATH 上解到的就是它，不是就不起）；
 #   清场走真的 scripts/crash/gpu-quiesce-run.sh，多机配置指到临时目录里只写了假清场命令的一份，状态与日志目录都在临时目录里。
@@ -207,7 +216,7 @@ preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT
 
 LIGHT_EXPAND_UP_TO=6
 LIGHT_REGISTERED_SEGMENT_SLICE_STATES=65536
-FAST_TIER_GIVEN_STATES_LIBRARY_SUBDIRECTORY="given-states-library"   # 给定状态那一类长期库在放量家目录下的子目录（文件头「双机」；crash_library.rs 的 CrashLibraryClass::GivenStates）
+CRASH_LIBRARY_DIRECTORY_NAME="crash-state-verdicts"   # 那一份长期判定库在放量家目录下的目录名（几类测试同一份；crates/singlefs-checker-tier/src/crash_library.rs 的 CRASH_LIBRARY_DIRECTORY_NAME，逐字相同）
 SELFTEST_MARK_CONTENT="crash-point-replay.sh --selftest 起的子进程"
 BOTH_TIERS_GROUPS=(
   $'gpu-and-cpu-agree-on-small-inputs\tcrash_judge_gpu_agrees_with_the_cpu_judge_on_every_state crash_facts_gpu_verifier_agrees_with_the_cpu_reference gpu_unit_checks_agree_with_the_cpu_and_catch_a_flipped_byte gpu_judge_root_choice_tie_takes_the_earlier_root_like_the_cpu_checker gpu_judge_tree_identifier_watermark_of_the_newest_root_like_the_cpu_checker gpu_recovery_root_choice_refuses_root_record_pointer_head_fields_like_the_core'
@@ -229,24 +238,27 @@ if [[ -n "${CRASH_POINT_REPLAY_SELFTEST_MARK:-}" && -f "${CRASH_POINT_REPLAY_SEL
 fi
 replay_break="${CRASH_POINT_REPLAY_BREAK:-}"
 replay_root_override="${CRASH_POINT_REPLAY_ROOT:-}"
+replay_keys_reader_output="${CRASH_POINT_REPLAY_KEYS_READER_OUTPUT:-}"
 replay_test_variables=()
 [[ -n "$replay_break" ]] && replay_test_variables+=(CRASH_POINT_REPLAY_BREAK)
 [[ -n "$replay_root_override" ]] && replay_test_variables+=(CRASH_POINT_REPLAY_ROOT)
-unset CRASH_POINT_REPLAY_BREAK CRASH_POINT_REPLAY_ROOT CRASH_POINT_REPLAY_SELFTEST_MARK
+[[ -n "$replay_keys_reader_output" ]] && replay_test_variables+=(CRASH_POINT_REPLAY_KEYS_READER_OUTPUT)
+unset CRASH_POINT_REPLAY_BREAK CRASH_POINT_REPLAY_ROOT CRASH_POINT_REPLAY_SELFTEST_MARK CRASH_POINT_REPLAY_KEYS_READER_OUTPUT
 replay_break_is() { [[ ",$replay_break," == *",$1,"* ]]; }
 
 usage() {
-  echo "  ✗ 用法不对：$1。用法：$0 [--quick | --full] [--item <项>]… | --list-items | --selftest" >&2
+  echo "  ✗ 用法不对：$1。用法：$0 [--quick | --full] [--item <项>]… | --list-items [--with-keys] | --selftest" >&2
   echo "  → 怎么办：不带参数是重型·剪枝；--quick 是轻型；项名照 --list-items 列的写；--quick 与 --full 不一起给" >&2
   exit 2
 }
 
-tier=""; quick=0; full=0; list_items=0; selftest=0; named_items=()
+tier=""; quick=0; full=0; list_items=0; with_keys=0; selftest=0; named_items=()
 while (($#)); do
   case "$1" in
     --quick) quick=1; shift ;;
     --full) full=1; shift ;;
     --list-items) list_items=1; shift ;;
+    --with-keys) with_keys=1; shift ;;
     --selftest) selftest=1; shift ;;
     --item)
       if (($# < 2)) || [[ -z "$2" || "$2" == -* ]]; then usage "--item 后面缺项名"; fi
@@ -393,8 +405,8 @@ run_fast_tier_target_on_two_hosts() { # <测试目标> <记给哪几项>
     return 0
   fi
   label="crash-point-replay-$run_stamp-$target"
-  # 给定状态那一类的长期库（文件头「双机」）：跨趟留着、键相同的表复用；库目录本身留给引擎建（见 <库>/CURRENT 不在就建空库）
-  library="$pipeline_home/$FAST_TIER_GIVEN_STATES_LIBRARY_SUBDIRECTORY"; library_parent="$pipeline_home"
+  # 那一份长期库（文件头「双机」）：跨趟留着、键相同的表复用；库目录本身留给引擎建（见 <库>/CURRENT 不在就建空库）
+  library="$pipeline_home/$CRASH_LIBRARY_DIRECTORY_NAME"; library_parent="$pipeline_home"
   if replay_break_is fast-tier-two-hosts-throwaway-library; then   # 弄坏开关：改前每趟一份新建、跑完删掉的空库
     library_root="$pipeline_home/crash-point-replay-fast-tier/$run_stamp"; library="$library_root/$target/library"; library_parent="$library_root/$target"
   fi
@@ -560,22 +572,12 @@ run_fast_tier() { # <计划文件>：快档那一段（fast-tier 的件），一
   done
 }
 
-run_enumeration_part() { # <项> <crash-case: 键…>：交门禁 checker-tier-crash-point-replay --full --item（全量先删全绿标记、带 --start-over）
-  local item="$1" key arguments=(--full) log exit_code state reason reused manifest summary fingerprint marker started red_cases=0
+run_enumeration_part() { # <项> <crash-case: 键…>：交门禁 checker-tier-crash-point-replay --full --item（全量带 --start-over：只写不读、全部块现判、写回同一份库）
+  local item="$1" key arguments=(--full) log exit_code state reason reused started red_cases=0
   shift
   started=$SECONDS
   if [[ "$tier" == full ]] && ! replay_break_is full-keeps-reuse; then
     arguments+=(--start-over)
-    for key in "$@"; do
-      manifest="$run_directory/manifest.${key#crash-case:}"
-      if summary="$(python3 "$repository_root/scripts/gate/admission.py" crash-case-manifest "$repository_root" "$key" "$manifest" --judging-digest --toolchain --build-environment)" \
-         && read -r fingerprint _ <<<"$summary" && [[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]] \
-         && marker="$(python3 "$repository_root/scripts/gate/admission.py" crash-case-marker-path "$repository_root" "$key" "$fingerprint")"; then
-        if [[ -n "$marker" && -e "$marker" ]]; then rm -f -- "${marker:?}"; echo "  · 全量（清空复用）：删掉 $key 这批输入的全绿标记 $marker"; fi
-      else
-        echo "  ! 全量（清空复用）：算不出 $key 这批输入的指纹或标记路径（admission.py crash-case-manifest / crash-case-marker-path 没成），这一条的全绿标记没删，门禁照它复用" >&2
-      fi
-    done
   fi
   for key in "$@"; do arguments+=(--item "$key"); done
   log="$run_directory/enumeration.$item.log"
@@ -596,7 +598,7 @@ run_enumeration_part() { # <项> <crash-case: 键…>：交门禁 checker-tier-c
 
 # 判定库只建上层目录，库目录本身留给引擎新建（文件头「两个域的写法」：目录已经在，引擎拒 LibraryDirectoryAlreadyExists）
 make_library_parent() { # <库目录>
-  if replay_break_is library-directory-precreated; then mkdir -p -- "$1"; else mkdir -p -- "$(dirname -- "$1")"; fi
+  mkdir -p -- "$(dirname -- "$1")"
 }
 
 run_pipeline_part() { # <计划文件>：放量部分（pipeline-* 的件）一趟交 crash-amplification.sh
@@ -624,15 +626,17 @@ run_pipeline_part() { # <计划文件>：放量部分（pipeline-* 的件）一�
     fi
   else
     replay_break_is heavy-slice-states-set && pipeline_environment+=("SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES=$LIGHT_REGISTERED_SEGMENT_SLICE_STATES")
-    # 重型：全部项都点了就不带 --item（放量入口照全量判，scope=full）；全量换一份新的空判定库
+    # 重型：全部项都点了就不带 --item（放量入口照全量判，scope=full）；全量只写不读：库不读、全部块现判、照键写回同一份库（不另建库）
     if [[ "$tier" == named ]] || (( ! all_named )); then
       for word in "${requested[@]}"; do arguments+=(--item "$word"); done
     fi
-    if [[ "$tier" == full ]] && ! replay_break_is full-keeps-reuse; then
+    if [[ "$tier" == full ]] && replay_break_is full-in-a-library-of-its-own; then   # 弄坏开关：改前另建一份跑完没人读的空库
       library="$pipeline_home/crash-point-replay-full/$run_stamp/library"
       make_library_parent "$library" || { echo "  ✗ 建不了全量那一份空判定库的上层目录 $(dirname -- "$library")" >&2; echo "  → 怎么办：看 $pipeline_home 可不可写、盘满没满" >&2; exit 78; }
       arguments+=(--library "$library")
-      echo "  · 全量（清空复用）：放量部分用一份新的空判定库 $library（跑完不删）"
+    elif [[ "$tier" == full ]] && ! replay_break_is full-keeps-reuse; then
+      pipeline_environment+=("SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1")
+      echo "  · 全量（只写不读）：放量部分带 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1，库不读、全部块现判、照键写回同一份库"
     fi
   fi
   # 套在内存包装里：外层的上限给放量入口（文件头「内存包装」）
@@ -743,6 +747,9 @@ for item in order:
           f"enumeration_cases={enumeration_cases} enumeration_red={enumeration_red} enumeration_reused={enumeration_reused} seconds={seconds}")
 dispatched, collected = len(order), len(verdicts)
 red = [item for item, (verdict, _) in verdicts.items() if verdict == "red"]
+# 上次红的清单（scripts/gate/lib_reuse_checks.py 文件头「三」）由外面的 shell 写，红的项交给它
+with open(exit_file + ".red-items", "w", encoding="utf-8") as handle:
+    handle.write("".join(item + "\n" for item in red))
 not_run = [item for item, (verdict, _) in verdicts.items() if verdict == "not-run"]
 green = [item for item, (verdict, _) in verdicts.items() if verdict == "green"]
 print(f"CRASH_POINT_REPLAY_TOTAL tier={tier} dispatched={dispatched} collected={collected} green={len(green)} red={len(red)} not_run={len(not_run)} "
@@ -799,7 +806,7 @@ run_selftest() {
   work="$(mktemp -d "${TMPDIR:-/tmp}/crash-point-replay-selftest.XXXXXX")"
   trap 'rm -rf -- "${work:?}"' EXIT
   root="$work/root"; calls="$work/calls"
-  mkdir -p "$root/.claude/gate.d" "$root/scripts" "$root/scripts/crash" "$root/scripts/gate" "$root/crates/singlefs-checker-tier/tests" "$work/bin" "$work/home" "$work/markers"
+  mkdir -p "$root/.claude/gate.d" "$root/scripts" "$root/scripts/crash" "$root/scripts/gate" "$root/crates/singlefs-checker-tier/tests" "$work/bin" "$work/home"
   printf '%s\n' "$SELFTEST_MARK_CONTENT" >"$work/mark"
   # 造出来的小仓：三项（两段都有、只有崩溃点重放、只有放量），合表核法照真的那一份判
   printf '%s\n' "# 自证的合表" $'alpha\tcrash-case:alpha\talpha-amp\talpha\t# 两段都有' $'beta\tcrash-case:beta\t-\tbeta\t# 只有崩溃点重放' \
@@ -822,6 +829,7 @@ ITEMS=(
 printf 'pipeline-entry %s\n' "$*" >>"${STUB_CALLS:?}"
 printf 'pipeline-env segments=[%s]\n' "${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY-unset}" >>"$STUB_CALLS"
 printf 'pipeline-env slice-states=[%s]\n' "${SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES-unset}" >>"$STUB_CALLS"
+printf 'pipeline-env write-only=[%s]\n' "${SINGLEFS_CRASH_LIBRARY_WRITE_ONLY-unset}" >>"$STUB_CALLS"
 if [[ -n "${STUB_AMP_ENGINE_LIBRARY:-}" ]]; then   # 照引擎建库：<库>/CURRENT 在就开；不在而目录已经在就拒（LibraryDirectoryAlreadyExists）、一项都不打；都不在就建出来
   library=""; previous=""
   for argument in "$@"; do [[ "$previous" == --library ]] && library="$argument"; previous="$argument"; done
@@ -835,8 +843,8 @@ if [[ -n "${STUB_AMP_ENGINE_LIBRARY:-}" ]]; then   # 照引擎建库：<库>/CUR
     echo "pipeline-library created $library" >>"$STUB_CALLS"
   fi
 fi
-if [[ -n "${STUB_AMP_PERSISTENT:-}" ]]; then   # 照引擎按键复用：库是 --library 给的，没给是 <家目录>/library-by-conclusion-kind；判过的分项在库里留一份文件，再判就报复用、现判 0 态
-  persistent_library="${SINGLEFS_CRASH_AMPLIFICATION_HOME:?}/library-by-conclusion-kind"; previous=""
+if [[ -n "${STUB_AMP_PERSISTENT:-}" ]]; then   # 照引擎按键复用：库是 --library 给的，没给是 <家目录>/crash-state-verdicts；判过的分项在库里留一份文件，再判就报复用、现判 0 态
+  persistent_library="${SINGLEFS_CRASH_AMPLIFICATION_HOME:?}/crash-state-verdicts"; previous=""
   for argument in "$@"; do [[ "$previous" == --library ]] && persistent_library="$argument"; previous="$argument"; done
   echo "pipeline-persistent-library $persistent_library" >>"$STUB_CALLS"
 fi
@@ -851,7 +859,9 @@ for item in "${items[@]}"; do
   [[ " ${STUB_AMP_NOT_RUN:-} " == *" $item "* ]] && verdict=not-run
   states=10; reused=4
   if [[ -n "${STUB_AMP_PERSISTENT:-}" ]]; then
-    if [[ -e "$persistent_library/$item.judged" ]]; then states=0; reused=10; else states=10; reused=0; mkdir -p -- "$persistent_library" && : >"$persistent_library/$item.judged"; fi
+    unit_key=""   # STUB_AMP_UNITS 设了：键另带这一项的单元文件（<STUB_AMP_UNITS>/<分项>）的内容摘要（复用三问那一格用）
+    [[ -n "${STUB_AMP_UNITS:-}" ]] && unit_key=".$(sha256sum "$STUB_AMP_UNITS/$item" | cut -c1-64)"
+    if [[ -e "$persistent_library/$item$unit_key.judged" ]]; then states=0; reused=10; else states=10; reused=0; mkdir -p -- "$persistent_library" && : >"$persistent_library/$item$unit_key.judged"; fi
   fi
   echo "CRASH_AMPLIFICATION_ITEM item=$item exit=$item_exit states=$states reused=$reused red=$red lines=1 expand_up_to=6 exhaustive=true verdict=$verdict seconds=0 ignored_points=0 states_skipped_by_ignore=0"
 done
@@ -863,19 +873,15 @@ STUB
 printf 'enumeration-gate %s\n' "$*" >>"${STUB_CALLS:?}"
 previous=""
 for argument in "$@"; do
-  [[ "$previous" == --item && -n "${STUB_CRASH_POINT_REPLAY_REUSED:-}" ]] && echo "  · $argument 复用：这批输入那一格全绿标记作数（自证）"
+  [[ "$previous" == --item && -n "${STUB_CRASH_POINT_REPLAY_REUSED:-}" ]] && echo "  · $argument 复用：全部块都有键相同的判定（自证）"
   previous="$argument"
 done
 exit "${STUB_CRASH_POINT_REPLAY_EXIT:-0}"
 STUB
   cat >"$root/scripts/gate/admission.py" <<'STUB'
-# 假的准入模块（自证用）：记一行参数；crash-case-manifest 打一份假指纹，crash-case-marker-path 打 STUB_MARKERS 下以键为名的标记
+# 假的准入模块（自证用）：记一行参数；这一份不该再调它（用例一级没有全绿标记可删），调了就在 full-heavy 那一格判红
 import os, sys
 open(os.environ["STUB_CALLS"], "a").write("admission " + " ".join(sys.argv[1:]) + "\n")
-if sys.argv[1] == "crash-case-manifest":
-    print("a" * 64, 1, 0)
-elif sys.argv[1] == "crash-case-marker-path":
-    print(os.path.join(os.environ["STUB_MARKERS"], sys.argv[3]))
 STUB
   cat >"$work/bin/cargo" <<'STUB'
 #!/usr/bin/env bash
@@ -978,7 +984,7 @@ STUB
     : >"$calls"
     cells=$((cells + 1))
     env -u RUN_WITH_MEMORY_CAP_OUTER_UNIT -u RUN_WITH_MEMORY_CAP_OUTER_CAP -u SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE -u SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES \
-      PATH="$work/bin:$PATH" STUB_CALLS="$calls" STUB_MARKERS="$work/markers" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home" \
+      PATH="$work/bin:$PATH" STUB_CALLS="$calls" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home" SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" \
       SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-off.env" CRASH_POINT_REPLAY_SELFTEST_MARK="$work/mark" CRASH_POINT_REPLAY_ROOT="$root" \
       CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_RUN="$work/two-hosts-local.sh" CRASH_AMPLIFICATION_TWO_HOSTS_PEER_RUN="$work/two-hosts-peer.sh" CRASH_AMPLIFICATION_PEER_THREADS=2 \
       CRASH_POINT_REPLAY_BREAK="$replay_break" ${settings[@]+"${settings[@]}"} bash "$replay_script" "$@" >"$work/out" 2>&1
@@ -995,6 +1001,17 @@ STUB
   entry -- --list-items
   if [[ "$exit_code" != 0 || "$(grep -cE $'^(alpha|beta|gamma)\t轻型：' "$work/out")" != 3 ]] || [[ -s "$calls" ]]; then
     cell_failed list-items "--list-items 应当退 0、逐项列出、不起 cargo 与驱动" "看 --list-items 那一段：只读合表、打表就退"
+  fi
+  # list-items-with-keys：读库程序的输出取它文件头「输出」那一段原样喂进来（写法与读法钉在同一段字上）⇒ 退 0、三项照列，
+  # 报录下的块 6、键对不上的块 4（只在别的判法单元指纹下判过 3、一种判器的结论都没有 1）、键相同的 2，与镜像判器（image_judgement）那一把指纹；不起 cargo
+  local keys_reader_source="$replay_script_directory/../../crates/singlefs-checker-tier/src/bin/crash_library_reader.rs"
+  sed -n '/^\/\/! keys-format-begin$/,/^\/\/! keys-format-end$/p' "$keys_reader_source" | sed '1d;$d' | sed 's|^//! ||' >"$work/keys-reader-output"
+  entry CRASH_POINT_REPLAY_KEYS_READER_OUTPUT="$work/keys-reader-output" -- --list-items --with-keys
+  if [[ "$exit_code" != 0 || "$(grep -cE $'^(alpha|beta|gamma)\t轻型：' "$work/out")" != 3 ]] || [[ -s "$calls" ]] \
+     || ! out_has $'键\t崩溃判定库 /library/crash-state-verdicts：录下的块 6，键对不上的块 4（只在别的判法单元指纹下判过 3、一种判器的结论都没有 1），键相同的 2' \
+     || ! out_has $'键\timage_judgement 这一份的判法单元指纹 0505050505050505'; then
+    cell_failed list-items-with-keys "--list-items --with-keys 应当照读库程序文件头「输出」那一段的写法报键对不上的块数、不起 cargo" \
+      "看 report_the_keys_of_the_library 与 crates/singlefs-checker-tier/src/bin/crash_library_reader.rs 文件头「输出」那一段"
   fi
   # unknown-item / missing-item-value / quick-and-full：用法错退 2、什么都不起
   entry -- --item no-such-item
@@ -1057,20 +1074,18 @@ STUB
      || calls_have '^enumeration-gate ' || ! calls_have '^pipeline-entry --item gamma-amp$' || item_line 'both-tiers:pruning-self-proof' >/dev/null; then
     cell_failed named-heavy "--item 应当只跑点名的项（逐条）" "看定档那一段 named 与 run_pipeline_part 的 --item"
   fi
-  # full-heavy：--full ⇒ 先删每条用例的全绿标记、崩溃点重放带 --start-over、放量带一份新的空库（留着）
-  : >"$work/markers/crash-case:alpha"; : >"$work/markers/crash-case:beta"
+  # full-heavy：--full ⇒ 崩溃点重放带 --start-over（只写不读）、放量带 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1（只写不读）；准入模块一次都不调（用例一级没有全绿标记可删）
   entry -- --full
-  if [[ "$exit_code" != 0 ]] || [[ -e "$work/markers/crash-case:alpha" || -e "$work/markers/crash-case:beta" ]] \
-     || ! calls_have "^enumeration-gate --full --start-over --item crash-case:alpha $root\$" \
-     || ! calls_have "^pipeline-entry --library $work/home/crash-point-replay-full/[^ ]+/library\$" || ! calls_have '^admission crash-case-manifest '; then
-    cell_failed full-heavy "全量应当清空复用（删全绿标记、--start-over、新的空判定库）" "看 run_enumeration_part 与 run_pipeline_part 里 tier=full 那两段"
+  if [[ "$exit_code" != 0 ]] || ! calls_have "^enumeration-gate --full --start-over --item crash-case:alpha $root\$" \
+     || ! calls_have '^pipeline-env write-only=\[1\]$' || calls_have '^admission '; then
+    cell_failed full-heavy "全量应当只写不读（崩溃点重放 --start-over、放量带 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1，不调准入模块）" "看 run_enumeration_part 与 run_pipeline_part 里 tier=full 那两段"
   fi
-  # library-left-to-the-engine：假的放量入口照引擎建库（库目录已经在而没有 CURRENT 就拒、退 1）⇒ --full 那一支交下去的库目录还不在、由入口建出来
-  #   （轻型那一支不交 --library，照放量入口的默认长期库，那一半在 quick-reuses-the-long-term-library 一格）
+  # full-writes-back-into-the-one-library：假的放量入口照引擎建库 ⇒ --full 那一支不交 --library、不另建库（不建 crash-point-replay-full/），放量那一趟只写不读
   entry STUB_AMP_ENGINE_LIBRARY=1 -- --full
-  if [[ "$exit_code" != 0 ]] || ! calls_have "^pipeline-library created $work/home/crash-point-replay-full/[^ ]+/library\$" || calls_have '^pipeline-library refused '; then
-    cell_failed library-left-to-the-engine "--full 那一支交给放量入口的判定库目录应当还不在（只建上层，库目录本身留给引擎新建：已经在的目录引擎拒 LibraryDirectoryAlreadyExists）" \
-      "看 make_library_parent 与 run_pipeline_part 里 tier=full 那一段"
+  if [[ "$exit_code" != 0 ]] || calls_have '^pipeline-entry .*--library' || calls_have '^pipeline-library created ' \
+     || [[ -e "$work/home/crash-point-replay-full" ]] || ! calls_have '^pipeline-env write-only=\[1\]$'; then
+    cell_failed full-writes-back-into-the-one-library "--full 那一支应当照键写回同一份库、不另建库（不交 --library、不建 crash-point-replay-full/、放量带 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1）" \
+      "看 run_pipeline_part 里 tier=full 那一段"
   fi
   # enumeration-red：崩溃点重放那一道退 1 ⇒ alpha、beta 红，退 1
   entry STUB_CRASH_POINT_REPLAY_EXIT=1 -- --item alpha --item beta
@@ -1088,9 +1103,9 @@ STUB
   if [[ "$exit_code" != 1 ]] || ! item_has gamma 'verdict=red' || ! out_has "收不回"; then
     cell_failed collection-count "放量那一项收不回，应当红、派出收回对不上" "看 run_pipeline_part 里 line 为空那一支"
   fi
-  # quick-reuses-the-long-term-library：假的放量入口照键复用（判过的分项在库里留一份）⇒ 轻型接连两趟：都不交 --library、用 <家目录>/library-by-conclusion-kind，
+  # quick-reuses-the-long-term-library：假的放量入口照键复用（判过的分项在库里留一份）⇒ 轻型接连两趟：都不交 --library、用 <家目录>/crash-state-verdicts，
   #   头一趟现判 20 态复用 0 态，第二趟现判 0 态复用 20 态（第二次跑复用了第一次判过的块），成功句照实报，库跑完留着、不建 crash-point-replay-quick/
-  local reuse_first_ok=0 reuse_first_total reuse_library="$work/home/library-by-conclusion-kind"
+  local reuse_first_ok=0 reuse_first_total reuse_library="$work/home/crash-state-verdicts"
   rm -rf -- "${reuse_library:?}"
   entry STUB_AMP_PERSISTENT=1 -- --quick
   reuse_first_total="$(grep -E '^CRASH_POINT_REPLAY_TOTAL ' "$work/out")"
@@ -1104,6 +1119,40 @@ STUB
       "看 run_pipeline_part 里 pipeline-expand 那一支（不交 --library）与文件头「展开 6」"
   fi
   rm -rf -- "${reuse_library:?}"
+  # reuse-three-questions（scripts/gate/lib_reuse_checks.py 文件头「一」）：假的放量入口照键复用、键另带每个分项的单元文件（STUB_AMP_UNITS）⇒ 轻型接连四趟：
+  #   头一趟、同一份输入、加一份哪个分项都不读的单元文件（闭包外）、改 alpha-amp 的单元文件（闭包内）；从 ITEM 行取有放量那一段的项（alpha、gamma）复用还是现判
+  #   （pipeline_states=0 而 pipeline_reused 是正整数是复用），照三问判、打规范输出。这一份入口不判复用（判定在引擎里）：核的是每一趟把同一份长期库交下去、
+  #   不因闭包外的改动换库，并照实把放量入口报的现判与复用写进 ITEM 行；quick-reuses-the-long-term-library 那一格是这里的 ①
+  local three_units="$work/amp-units" three_exits=() three_round_name
+  mkdir -p -- "$three_units"; printf 'alpha-amp 的单元\n' >"$three_units/alpha-amp"; printf 'gamma-amp 的单元\n' >"$three_units/gamma-amp"
+  three_round() { # <名>
+    entry STUB_AMP_PERSISTENT=1 STUB_AMP_UNITS="$three_units" -- --quick
+    three_exits+=("$exit_code")
+    awk '/^CRASH_POINT_REPLAY_ITEM / { item = ""; states = ""; reused = ""
+           for (i = 2; i <= NF; i++) { split($i, pair, "="); if (pair[1] == "item") item = pair[2]; if (pair[1] == "pipeline_states") states = pair[2]; if (pair[1] == "pipeline_reused") reused = pair[2] }
+           if (states != "-") print item "\t" ((states == "0" && reused ~ /^[1-9][0-9]*$/) ? "复用" : "现判") }' "$work/out" >"$work/three-$1.tsv"
+  }
+  three_round first; three_round second
+  printf '哪个分项都不读\n' >"$three_units/not-read-by-any-item"; three_round unrelated
+  printf 'alpha-amp 的单元，改过\n' >"$three_units/alpha-amp"; three_round unit
+  if ! python3 "$replay_script_directory/../gate/lib_reuse_checks.py" three-questions --script scripts/crash/crash-point-replay.sh --first "$work/three-first.tsv" \
+         --second "$work/three-second.tsv" --unrelated "$work/three-unrelated.tsv" --unit-change "$work/three-unit.tsv" --affected alpha >"$work/three.log" 2>&1 \
+     || [[ "${three_exits[*]}" != "0 0 0 0" ]]; then
+    cell_failed reuse-three-questions "复用三问没过（四趟退 ${three_exits[*]}）：$(tr '\n' ' ' <"$work/three.log")" \
+      "照规范输出那一行 red 的那一问查：run_pipeline_part 交给放量入口的库（不交 --library、用长期库）与 ITEM 行的 pipeline_states=、pipeline_reused= 取法"
+  fi
+  grep '^REUSE_SELFTEST ' "$work/three.log"
+  rm -rf -- "${reuse_library:?}"
+  # last-run-list（scripts/gate/lib_reuse_checks.py 文件头「三」）：轻型一趟 gamma 那一项放量红，上次红的清单是 gamma；再一趟全绿，清单成空文件
+  local last_run_file="$work/last-runs/scripts__crash__crash-point-replay.sh.tsv" last_red
+  rm -f -- "$last_run_file"
+  entry STUB_AMP_RED=gamma-amp -- --quick
+  last_red="$(cat "$last_run_file" 2>/dev/null)"
+  entry -- --quick
+  if [[ "$last_red" != gamma || ! -f "$last_run_file" || -s "$last_run_file" ]]; then
+    cell_failed last-run-list "上次红的清单不对：gamma 红的那一趟之后是「$last_red」，全绿那一趟之后$([[ -f "$last_run_file" ]] && echo "是「$(cat "$last_run_file")」" || echo 没有这份文件)" \
+      "看收尾写 last-run 那一段：summarize 交出的红的项一行一个（exit.red-items），轻型整份写"
+  fi
   # fast-tier-reuse-counted：快档 alpha 那个测试目标的日志里有复用计数行（resumed_slices=3）⇒ alpha 那一行 fast_tier_reused=3；beta 没有那一行 ⇒ unknown、计进取不出的、成功句点名
   entry STUB_REUSE_TARGETS=alpha -- --quick
   if [[ "$exit_code" != 0 ]] || ! item_has alpha 'fast_tier_reused=3 fast_tier_reuse_unknown=0 ' || ! item_has beta 'fast_tier_reused=unknown fast_tier_reuse_unknown=1 ' \
@@ -1114,7 +1163,7 @@ STUB
   fi
   # test-variables-outside-selftest：不带自证标记、带了 CRASH_POINT_REPLAY_ROOT ⇒ 退 2、什么都不起
   : >"$calls"; cells=$((cells + 1))
-  env PATH="$work/bin:$PATH" STUB_CALLS="$calls" STUB_MARKERS="$work/markers" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home" \
+  env PATH="$work/bin:$PATH" STUB_CALLS="$calls" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home" \
     SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-off.env" CRASH_POINT_REPLAY_ROOT="$root" \
     CRASH_POINT_REPLAY_BREAK="$replay_break" bash "$replay_script" --quick >"$work/out" 2>&1
   exit_code=$?
@@ -1192,9 +1241,9 @@ STUB
      || ! calls_have '^two-hosts-local share=0/2 import=unset ' || ! calls_have '^two-hosts-peer share=1/2 fetch=crash-amplification-library$' \
      || ! [[ "$last_two_hosts_call" =~ $import_wanted ]] || calls_have ' --test beta -- --nocapture ' || ! calls_have ' --test alpha -- --nocapture ' \
      || ! item_has beta 'exit=0 verdict=green fast_tier_tests=2 ' || ! out_has 'crash-amplification-two-hosts.sh beta --library ' || ! out_has ' --memory-cap 3G' \
-     || [[ -e "$work/home/crash-point-replay-fast-tier" ]] || ! calls_have "^two-hosts-local share=0/2 import=unset fetched=no library=$work/home/$FAST_TIER_GIVEN_STATES_LIBRARY_SUBDIRECTORY " \
-     || [[ ! -e "$work/home/$FAST_TIER_GIVEN_STATES_LIBRARY_SUBDIRECTORY/CURRENT" ]] || compgen -G "$work/home/runs/crash-point-replay-*-beta/fetched" >/dev/null; then
-    cell_failed fast-tier-two-hosts "开了双机，经给定状态引擎的测试目标应当照双机驱动的三步跑（本机 0/2、第二台 1/2 取回库、本机带 IMPORT 指到取回的库再跑，照导入那一趟判），别的测试目标照旧本机一趟，外层的上限给双机驱动，库用给定状态那一类的长期库 $work/home/$FAST_TIER_GIVEN_STATES_LIBRARY_SUBDIRECTORY、跑完留着、取回的那一份删掉（最后一笔双机调用：${last_two_hosts_call:-没有}）" \
+     || [[ -e "$work/home/crash-point-replay-fast-tier" ]] || ! calls_have "^two-hosts-local share=0/2 import=unset fetched=no library=$work/home/$CRASH_LIBRARY_DIRECTORY_NAME " \
+     || [[ ! -e "$work/home/$CRASH_LIBRARY_DIRECTORY_NAME/CURRENT" ]] || compgen -G "$work/home/runs/crash-point-replay-*-beta/fetched" >/dev/null; then
+    cell_failed fast-tier-two-hosts "开了双机，经给定状态引擎的测试目标应当照双机驱动的三步跑（本机 0/2、第二台 1/2 取回库、本机带 IMPORT 指到取回的库再跑，照导入那一趟判），别的测试目标照旧本机一趟，外层的上限给双机驱动，库用那一份长期库 $work/home/$CRASH_LIBRARY_DIRECTORY_NAME、跑完留着、取回的那一份删掉（最后一笔双机调用：${last_two_hosts_call:-没有}）" \
       "看 run_fast_tier 里 given_states_targets 那一支、decide_fast_tier_two_hosts 与 run_fast_tier_target_on_two_hosts"
   fi
   # fast-tier-two-hosts-off：双机关着（没写 ENABLE_ACROSS_MACHINES=1）⇒ beta 照旧本机一趟，不起双机驱动
@@ -1283,7 +1332,7 @@ STUB
   echo "  ✓ --selftest $cells 格都对：列项不起编译、项名写错与缺项名与 --quick --full 退 2、轻型照甲二与展开 6 跑全部项（放量不交 --library、照默认长期库，接连两趟第二趟复用头一趟判过的块）、--quick --item 照跑核心部分、"
   echo "    开了 GPU 快档带 gpu 特性经清场包装起并交清场之后的显卡先后（不送走 GPU 的计算类）、"
   echo "    每一趟带按段登记文件的绝对路径而它核不过退 2 不起、快档红退 1、跑到 0 条与没卡记本次未跑、全是本次未跑退 77、重型剪枝每项交崩溃点重放 --full --item 与放量全量、"
-  echo "    逐条只跑点名的项、全量删全绿标记带 --start-over 换新库（库目录留给放量入口建）、快档的复用数照复用计数行报（没有那一行报取不出、成功句点名）、双机时给定状态引擎的测试目标用给定状态那一类的长期库、崩溃点重放红与放量红各红在那一项、放量收不回判红、平常跑带只供自证的变量退 2、轻型每一件在重型里都有（真合表与小仓），
+  echo "    逐条只跑点名的项、全量崩溃点重放带 --start-over 只写不读、放量换新库（库目录留给放量入口建）、快档的复用数照复用计数行报（没有那一行报取不出、成功句点名）、双机时给定状态引擎的测试目标用给定状态那一类的长期库、崩溃点重放红与放量红各红在那一项、放量收不回判红、平常跑带只供自证的变量退 2、轻型每一件在重型里都有（真合表与小仓），
     快档日志里有给定状态表借不到显存那一行记本次未跑退 78、套在内存包装里把外层的上限给放量入口与双机驱动、
     轻型起放量入口时调用方没设就把分片的段一趟判的态数设成 $LIGHT_REGISTERED_SEGMENT_SLICE_STATES（设了照用、不带 --quick 不设）、快档那一段不分档同样设（设了照用，连同交双机驱动的本机与第二台那几趟）、开了双机时经给定状态引擎的测试目标照双机驱动三步跑
     （本机 0/2、第二台 1/2 取回库、本机带 IMPORT 指到取回的库再跑，双机驱动是真的、两趟是假的）而双机关着照旧本机一趟、第二台连不上与判法判不过记本次未跑退 78，"
@@ -1292,9 +1341,54 @@ STUB
 }
 
 if (( selftest )); then
-  (( quick || full || list_items || ${#named_items[@]} )) && usage "--selftest 不与别的参数一起给"
+  (( quick || full || list_items || with_keys || ${#named_items[@]} )) && usage "--selftest 不与别的参数一起给"
   run_selftest
 fi
+(( with_keys && ! list_items )) && usage "--with-keys 只跟 --list-items 一起给"
+
+# --list-items --with-keys：崩溃判定库里键对不上的块（只读读库程序 crash_library_reader keys；它的输出写法在
+# crates/singlefs-checker-tier/src/bin/crash_library_reader.rs 文件头「输出」那一段）。读库程序退非 0、输出认不出照实报，交回 1。
+report_the_keys_of_the_library() {
+  local output reader_exit tag first second third fourth fifth seen=0
+  if (( replay_in_selftest_child )) && [[ -n "$replay_keys_reader_output" ]]; then
+    output="$(cat -- "$replay_keys_reader_output")"; reader_exit=$?
+  else
+    output="$(cd "$repository_root" && cargo run --release --quiet --offline -p singlefs-checker-tier --bin crash_library_reader -- keys 2>&1)"; reader_exit=$?
+  fi
+  if (( reader_exit != 0 )); then
+    printf '%s\n' "$output" | tail -n 5 >&2
+    echo "  ✗ 读库程序 crash_library_reader keys 退 $reader_exit：键对不上的块数报不出" >&2
+    echo "  → 怎么办：照上面那几行修（库是这一套之前的布局就换一个新目录建库）；单跑 cargo run --release -p singlefs-checker-tier --bin crash_library_reader -- keys" >&2
+    return 1
+  fi
+  while IFS=$'\t' read -r tag first second third fourth fifth; do
+    case "$tag" in
+      CRASH_LIBRARY_KEYS)
+        seen=1
+        if [[ "$second" == missing ]]; then
+          printf '键\t崩溃判定库 %s 不在：一块都没判过\n' "${first#library=}"
+          continue
+        fi
+        if [[ "$first" != library=* || "$second" != recorded_blocks=* || "$third" != judged_under_the_current_key=* \
+              || "$fourth" != judged_only_under_another_key=* || "$fifth" != never_judged=* ]]; then
+          echo "  ✗ 读库程序那一行认不出：$tag $first $second $third $fourth $fifth（写法与 crash_library_reader.rs 文件头「输出」那一段对不上）" >&2
+          echo "  → 怎么办：让 report_the_keys_of_the_library 与 crates/singlefs-checker-tier/src/bin/crash_library_reader.rs 文件头「输出」那一段的写法对上，再跑 --list-items --with-keys" >&2
+          return 1
+        fi
+        printf '键\t崩溃判定库 %s：录下的块 %s，键对不上的块 %s（只在别的判法单元指纹下判过 %s、一种判器的结论都没有 %s），键相同的 %s\n' \
+          "${first#library=}" "${second#recorded_blocks=}" "$(( ${fourth#judged_only_under_another_key=} + ${fifth#never_judged=} ))" \
+          "${fourth#judged_only_under_another_key=}" "${fifth#never_judged=}" "${third#judged_under_the_current_key=}" ;;
+      CRASH_LIBRARY_KEYS_JUDGE)
+        printf '键\t%s 这一份的判法单元指纹 %s\n' "$first" "${second#current_key=}" ;;
+      *) ;;
+    esac
+  done <<<"$output"
+  if (( ! seen )); then
+    echo "  ✗ 读库程序的输出里没有 CRASH_LIBRARY_KEYS 那一行（写法与 crash_library_reader.rs 文件头「输出」那一段对不上）" >&2
+    echo "  → 怎么办：看读库程序的输出是不是编不过或换了写法，照 crates/singlefs-checker-tier/src/bin/crash_library_reader.rs 文件头「输出」那一段对上，再跑 --list-items --with-keys" >&2
+    return 1
+  fi
+}
 
 load_items
 if (( list_items )); then
@@ -1307,6 +1401,9 @@ if (( list_items )); then
     [[ -n "${item_pipeline_items[$name]}" ]] && heavy_text+="${heavy_text:+ ∪ }放量 ${item_pipeline_items[$name]}"
     printf '%s\t轻型：%s；重型：快档 %s ∪ %s\n' "$name" "$light_text" "${item_light_targets[$name]}" "$heavy_text"
   done
+  if (( with_keys )); then
+    report_the_keys_of_the_library || exit 1
+  fi
   exit 0
 fi
 
@@ -1401,4 +1498,14 @@ if [[ "$tier" != quick ]]; then
 fi
 run_pipeline_part "$plan_file"
 summarize "$plan_file" "$tier_title"
+# 上次红的清单（scripts/gate/lib_reuse_checks.py 文件头「三」，.claude/hooks/run-scope-guard.sh 的拒绝说明读它）：红的项一行一个；
+# 重型点名了项的（--item，不带 --quick）只换这几项，轻型与不点名的重型照这一趟整份写
+if [[ -f "$run_directory/exit.red-items" ]]; then
+  if [[ "$tier" != quick ]] && (( ${#named_items[@]} > 0 )); then
+    printf '%s\n' "${named_items[@]}" >"$run_directory/last-run.ran"
+    python3 "$replay_script_directory/../gate/lib_reuse_checks.py" last-run scripts/crash/crash-point-replay.sh "$run_directory/exit.red-items" --ran "$run_directory/last-run.ran" >/dev/null
+  else
+    python3 "$replay_script_directory/../gate/lib_reuse_checks.py" last-run scripts/crash/crash-point-replay.sh "$run_directory/exit.red-items" >/dev/null
+  fi || echo "  ! 上次红的清单没写成（scripts/gate/lib_reuse_checks.py last-run），这一趟的判定不受影响" >&2
+fi
 exit "$(cat "$run_directory/exit" 2>/dev/null || echo 1)"

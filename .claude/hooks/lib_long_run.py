@@ -1,5 +1,5 @@
 """长活声明的判法：预计挂钟超过 2 小时的活，要说清分片单元、续跑入口、机器与额度取自多机配置与现查三样；分不了的写一行缺哪一段。
-判据：.claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」与「判定可复用：按输入存，按前缀剪」。
+判据：.claude/rules/test-script-discipline.md「用上现有的硬件加速」与「判定可复用：按输入存，按前缀剪」。
 三处用这一份：scripts/hosts/detached-run.sh 的 start（--wall-clock over-2h）与 long-run-check 判被起脚本的文件头；
 .claude/hooks/runner-dispatch-guard.sh 判派 experiment-designer 与带重活的几种类型（线程上限那张类型表）的提示；scripts/hosts/host-dispatch.py 判派法占几台（started_script、script_header_declaration、judge_script_header）。
 
@@ -394,7 +394,7 @@ def script_main(directory, words):
     if problems:
         for problem in problems:
             print(f"  ✗ 长活声明（{script}）：{problem}", file=sys.stderr)  # gate-lint:detail
-        print(f"     → 怎么办：在 {script} 文件头的注释块里补齐（判据 .claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」）："
+        print(f"     → 怎么办：在 {script} 文件头的注释块里补齐（判据 .claude/rules/test-script-discipline.md「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」）："
               "# long-run-shards: 分片单元；# long-run-resume: 同一条命令重起只补没做完的；"
               f"# long-run-hosts: {CANONICAL_HOSTS_SENTENCE}（逐字这一句，可带句末句号，后面不接任何说明；要说明另起一行写普通注释）；"
               "分不了的写 # long-run-unshardable: <点名缺的分片 / 续跑 / 多机与为什么，至少 8 个字>"

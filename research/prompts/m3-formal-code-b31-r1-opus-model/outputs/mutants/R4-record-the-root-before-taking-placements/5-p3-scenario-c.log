@@ -1,6 +1,0 @@
-name=scenario_c steps=60 last_txg=63 violated_states=38 by_invariant={"I-2.1": 38, "I-3.10": 37, "I-4.8": 38, "I-7.4": 38} smallest_closed_form_state_count_of_one_publish=16777223
-first_violation=txg 26（第 23 次覆盖写，切在第 28 步）I-2.1：树表单元 在盘 0 槽 50178 的那一份与位置条目里的校验和对不上
-test scenario_c_unit_writes_persisted_before_the_first_barrier_of_each_overwrite ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 8.85s
-

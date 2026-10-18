@@ -1,4 +1,4 @@
 exit=1
 want=升档判的抓到复核不过
-want=first 那趟的日志 logs/1.first.log 不在 versions/<那一版>/escalation/ 下
-want=gate-verdict：红
+want=first 那趟的日志 logs/1.first.log 不在库目录的 escalation/ 下：没有驱动写的证据（手写的行）
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

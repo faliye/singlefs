@@ -1,6 +1,0 @@
-0.1 sha256 OK 份数	18
-0.2 static-check	CHECKED	3147	304	9
-0.7 guard_model	cases 9918 disagree-with-truth {'old': 1133, 'new': 0};first old disagreement: (4294967295, 16384, 0, 0, None);first new disagreement: None;misaligned rejected by both;
-0.8 cmp_mut 头三行	old 3121 new 3152;names added 51 removed 20;changed rows 30;
-0.8 cmp_mut CARGO/TEST DIFF 行	2
-0.8 cmp_mut 追加的 S 行（名字含「第33批」）	19

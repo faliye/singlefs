@@ -1,2 +1,2 @@
-checker-tier-crash-point-replay.sh	crates/ Cargo.toml	command=cargo command=rustc	# 样本：本阶段那一行
-crash-case:registered-stream	crates/ Cargo.toml	test=singlefs-checker-tier:full_streams:registered_stream_full	# 样本：登记了的那一条；同文件的 forgot_to_register_full 故意不登记
+checker-tier-crash-point-replay.sh	tests-of:singlefs-checker-tier	command=cargo command=rustc	# 样本：本阶段那一行（入口是 checker 档包的测试函数）
+crash-case:registered-stream	-	test=singlefs-checker-tier:full_streams:registered_stream_full	# 样本：登记了的那一条；同文件的 forgot_to_register_full 故意不登记

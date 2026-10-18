@@ -1,0 +1,3 @@
+exit=0
+want=· scripts/gate/with-line.sh：reuse-three-questions 过
+want=复用三问过 1 份；本次未跑 1 份：scripts/gate/no-library.sh（本次未跑：没有判定库，待立）；不算 1 份

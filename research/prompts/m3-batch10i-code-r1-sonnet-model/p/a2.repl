@@ -1,8 +1,0 @@
-                RootRingOccupant::AbandonedRoot {
-                    referenced_placements,
-                } => referenced_placements.as_slice(),
-                RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
-                    root: RootReadOnOneRebuildPass::AbandonedRoot { .. },
-                    ..
-                }
-                | RootRingOccupant::ValidRoot { .. }

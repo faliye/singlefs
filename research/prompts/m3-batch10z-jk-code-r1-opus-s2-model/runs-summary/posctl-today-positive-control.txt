@@ -1,3 +1,0 @@
-label=posctl arm=today slots=384 mid=- r=b1 r_old_in_ring=true faults=racct histories=8 hit=8 refused_histories=0 revived_in_c_r_sum=0/16 iso_mount_max=18 iso_max_max=46
-label=posctl arm=today slots=384 mid=- r=b5 r_old_in_ring=true faults=racct histories=4 hit=4 refused_histories=0 revived_in_c_r_sum=0/8 iso_mount_max=18 iso_max_max=46
-SKIPPED S2 label=posctl arm=today prefix=oooo mid= r=b5 record=skipped:动作b5做不成

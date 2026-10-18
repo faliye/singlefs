@@ -1,4 +1,0 @@
-name=plan scenario=absorb leaves_before=[(1, 233), (234, 1)] leaves_after=[(1, 233)] retirement_records=1 writes=52 segments=8 largest_segment=22 closed_form_state_count=5242893 torn_state_count=5242903
-name=plan scenario=borrow leaves_before=[(1, 233), (234, 117), (467, 233), (700, 60)] leaves_after=[(1, 233), (234, 174), (467, 175), (700, 60)] retirement_records=0 writes=54 segments=8 largest_segment=22 closed_form_state_count=8388621 torn_state_count=8388631
-name=plan scenario=lender-absorb leaves_before=[(1, 233), (234, 117), (467, 233), (700, 1)] leaves_after=[(1, 233), (234, 174), (467, 176)] retirement_records=1 writes=58 segments=8 largest_segment=26 closed_form_state_count=71303181 torn_state_count=71303191
-name=plan scenario=reunlink-after-rollback leaves_before=[(1, 233), (234, 1)] leaves_after=[(1, 233)] retirement_records=2 writes=52 segments=8 largest_segment=22 closed_form_state_count=5242893 torn_state_count=5242903

@@ -1,1 +1,0 @@
-B2 activation family: rows 60 rows_with_fakes 0 rows_with_unrecoverable 0 total_fakes 0 total_unrec 0

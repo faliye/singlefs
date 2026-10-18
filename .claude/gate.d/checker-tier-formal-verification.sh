@@ -4,7 +4,7 @@
 # gate-stage: 形式化验证（Verus 证明恢复重放取前缀的核，版本钉住、空真与必红世界；E165 全量的红例钉进快档）
 # gate-fixture: yes
 # gate-category: checker-tier 类
-# gate-similar: checker-tier-lkmm.sh 同是起外部验证器的一道，接法照抄它（判法放脚本、按 stage-inputs.tsv 复用、environment= 记工具版本）；它起 herd7 判 litmus，这里起 Verus 判 crates/ 的证明，并进去会让两件不相干的事共用一个复用判定
+# gate-similar: checker-tier-lkmm.sh 同是起外部验证器的一道，接法相同（判法放脚本、每条判定按单元键进判定库 scripts/crash/lib_verdict_library.py）；它起 herd7 判 litmus，这里起 Verus 判 crates/ 的证明，并进去会让两件不相干的事共用一份判定库的种类与出路
 # gate-similar: checker-tier-crates-mutation-replay.sh 它逐条改坏 crates/ 要求点名的测试红；这里的必红世界要求 Verus 报证明错，写不进它的 crates/mutations.tsv
 # gate-similar: code-source-discipline.sh 它的 mutation-tables 格静态判实验二进制的变异表成形、锚点唯一；这里判 E165 红例账与钉住的表、并逐行在今天的实现上重放
 # gate-similar: checker-tier-research-build-and-replay.sh 它的 experiment-replay 格整份复跑入库实验比产物；这里只逐行重放钉住的红例（快档）
@@ -12,7 +12,7 @@
 #
 # 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就六格按下面的次序全跑，格名写错退 2）：
 # gate-cell: verus-toolchain-pinned Verus 安装的 version 与 commit、Cargo.lock 里六个包的版本、本机 cargo 缓存里包源码的出处与内容指纹都与登记相同
-# gate-cell: verus-proof Verus 带 --no-cheating 验整个 crate，限时内出结局、errors 0、verified 等于登记的数，核里没有作弊标记
+# gate-cell: verus-proof Verus 带 --no-cheating 逐项验核里 verus! 有证明义务的单元（proof fn、exec fn、带 decreases 的 spec fn、derive(Clone) 的 clone），每项限时内出结局、errors 0、verified 至少 1，各项 verified 之和等于登记的数，核里没有作弊标记
 # gate-cell: verus-vacuity 核里每一处 requires 的函数体头插 assert(false) 都验不过（前置条件可满足，不空真）
 # gate-cell: verus-must-red-worlds 必红世界表每行改坏核之后 Verus 都报错、证明错条数等于第五段的 proof_errors=，原文恰好命中一次
 # gate-cell: pinned-red-examples-complete 登记的全部 E165 红例账每一行都钉在 e165-pinned-red-examples.tsv 里，钉着的那一行第 9 到 21 段与红例账原行逐字节相同、第 22 段是那份账的档
@@ -33,39 +33,31 @@
 #     --replay 编装置的内存上限读 GATE_E165_PINNED_MEMORY_MAX（默认 2G，由那份脚本读）。
 #     装置 e165_replay_bounded_enumeration 还不认 --pinned-cases 时，replay 格判完「变异还在」那一半就退 77。
 #
-# 复用按格算（用户 2026-10-08 定，records/2026-09-16-subagent拆分提案.md 第六十三节）：.claude/gate.d/stage-inputs.tsv 里每格一行，键 checker-tier-formal-verification.sh:<格名>，
-#   判法在 scripts/gate/admission.py 的 gate-reuse（经 scripts/gate/stage-must-run.sh）；阶段脚本自己进每格的比对，整张登记表不进，这一格自己的登记行进。
-#   Verus 四格的输入只有 crates/singlefs-replay-prefix/（含必红世界表 verus-must-red-worlds.tsv）、.claude/gate.d/verus-pins.tsv、scripts/gate/verus-proof-check.py、内存包装、capped.sh、
-#     lib/stage-cells.sh 与 --tool-versions 环境（verus-toolchain-pinned 另读仓根 Cargo.lock）；不含别的 crate，core 改动不重跑它们。
-#   红例两格的输入是 singlefs-checker-tier 编 e165_replay_bounded_enumeration 的 cargo 依赖闭包（登记行第三列 closure=，admission.py 的 cargo_closure_input_paths 现算：
-#     path 依赖的传递闭包，减去 cargo 编这个 bin 读不到的 tests/、别的 bin 的源码与 crate 根下 cargo 不读的文件，例 verus-must-red-worlds.tsv），不手列 crate；加两张变异表、红例账与同一趟 kill-bounds 产物（只取 e165 的）、钉表、判法脚本及其 import；
-#     complete 格另读作废红例账登记表 .claude/gate.d/e165-void-red-example-ledgers.tsv（登记的账 --check 跳过，写法在表头）
-#     与被取代红例账登记表 .claude/gate.d/e165-superseded-red-example-ledgers.tsv（被同档后一趟取代的完整账 --check 跳过；取代它的账照常要钉全、要同档、
-#     要逐行覆盖被取代账的（域, N, 枚举序号, ①），写法在表头）。
-#   真仓与 --staged 下整道跑（不给 --check、--item）时每格各问一次：输入没变、上次判绿作数（全绿标记或上次整轮全绿那棵暂存树）就复用，汇总写「复用」，只跑变了的格，
-#     六格都复用整道退 77；单跑一格、--check、--item、--list、--list-items 与样本不问复用、不写标记。跑绿的格各写自己的全绿标记与 Verus 版本记录；有一格本次未跑或红，这一趟一份也不写。
-# 按条复用（格里再分条；判法与键写在两份判法脚本文件头「逐项点名与按条复用」，存放与键的算法在判定库 scripts/crash/lib_verdict_library.py）：
-#   要跑的格里，proof、空真每处、必红世界每行、红例钉表每行各按自己的键记判定；键相同、上次判绿就复用，不起 Verus、不编装置；verus-toolchain-pinned 与
-#     pinned-red-examples-complete 每趟现判、不复用。键分输入指纹与判法版本两列（判定库文件头「键分两列」）：
-#     Verus 那几项共用的输入罩 crates/singlefs-replay-prefix/ 整个目录（跳过 verus-pins.tsv 的 must-red-worlds 行点名的
-#     必红世界表：Verus 不读它，表里每行只进它自己那一项的键，改一行只现判那一行，表头与注释不进任何一项的键）、verus-pins.tsv、工具链（--tool-versions 那一行）与限时；
-#     红例每行的输入罩这一行、装置的整个 cargo 依赖闭包（admission.py 的 cargo_closure_input_paths）与工具链、⑥ 引的变异行。
-#     判法版本是那份判法脚本与判定库两份内容的摘要。共用的输入有一样变了、或判法版本变了，整格每一项都现判。
-#   判定库：真仓与 --staged 下在被判那棵树的 git common-dir 的 singlefs-formal-verdicts/（GATE_FORMAL_VERDICT_LIBRARY 盖过它）；一项判完当场原子落盘，
-#     被打断之后同一条命令重跑只补没判的。整道跑且没设 SINGLEFS_GATE_FULL=1 才读；--check、--item 与 SINGLEFS_GATE_FULL=1 照样记、不读（--no-reuse）。
-#   每项一行「· <项>：绿|红，现判（<原因>）|复用」，每格一行「· 按条：现判 N、复用 M（现判的原因：…）」，整道末了一行「── 按条（…）：现判 N、复用 M」。
+# 复用：每条（证明按函数、空真每处 requires、必红世界每行、钉表每行）一条判定，键是这一条涉及的 Verus 函数单元（被验 fn、它 requires / ensures 用到的
+#   spec fn 与 proof fn）去注释后的指纹、Verus 与 vstd 版本；钉表行的键是那一行档与参数重放真走到的装置函数单元闭包、状态输入、期望逐态行、变异原文与替换文；
+#   限时不进键；空真项身份是所属函数单元指纹加函数内第几处，不带路径与行号。格不复用，不问 stage-must-run.sh，不写全绿标记：一格判绿就是它的每一条判定都判绿
+#   （现判的或复用的），verus-toolchain-pinned 与 pinned-red-examples-complete 每趟现判（只读几份文件，几秒）。
+#   每条判定的键、判法单元指纹（判结局的那几个函数的单元闭包键，判定库与 lib_function_units.py 不进）写在两份判法脚本文件头「逐项点名与按条复用」，
+#   存放、组成清单与作废时报出变了的单元写在判定库 scripts/crash/lib_verdict_library.py 文件头。
+#   判定库：真仓与 --staged 下在被判那棵树的 git common-dir 的 singlefs-formal-unit-verdicts/（GATE_FORMAL_VERDICT_LIBRARY 盖过它；2026-10-15 前的
+#     singlefs-formal-verdicts/ 整个弃用、不读）；一项判完当场原子落盘，被打断之后同一条命令重跑只补没判的。
+#     整道、--check、--item、--quick 都读（键相同就复用）；SINGLEFS_GATE_FULL=1 只写不读（--no-reuse），现判的照键写回同一份库。
+#   每项一行「· <项>：绿|红，现判（<原因>：<变了的单元>）|复用」，每格一行「· 按条：现判 N、复用 M（现判的原因：…）」，整道末了一行「── 按条（…）：现判 N、复用 M」。
 # 逐项点名（.claude/rules/verification.md「门禁的结构」里重型门禁的 --list-items / --item）：
-#   --list-items 逐行打「项<TAB>格[<TAB>说明]」：toolchain、proof、complete 各一项，空真每处 requires 一项 vacuity:<核>:<requires 行号>，
-#     必红世界每行一项 must-red:<变异名>，红例钉表每行一项 pinned:<钉表行号>；只读登记表、核与两张表，不编、不起 Verus 与装置。
-#   --item <项>（可给多次，取并集）只跑点了项的那几格，空真、必红世界、红例重放三格只判点名的项；项名写错、缺项名退 2 并列出可点名的项；与 --check、--list-items 不一起用（退 2）。
+#   --list-items 逐行打「项<TAB>格[<TAB>说明]」：toolchain、proof（整格）、complete 各一项，证明每个有证明义务的单元一项 proof:<fn 名或 <类型>::clone>，空真每处 requires 一项
+#     vacuity:<所属 fn>#<函数内第几处>，必红世界每行一项 must-red:<变异名>，红例钉表每行一项 pinned:<钉表行号>；只读登记表、核与两张表，不编、不起 Verus 与装置。
+#     判定库目录（下面「判定库」一段，真仓与 --staged 下 git common-dir 里那一份）在列项之前定：列项时交给 verus-proof-check.py list-items --verdict-library，
+#     它逐项照现在的键比库（只读库、不写库、不起 Verus），每格一行「<格>：键对不上 N 条、无记录 M 条、键相同 K 条、拒算 R 条」与末了「键对不上共 N 条」
+#     原样接在项的后面、走 stderr（stdout 照旧只有项的那几行）；样本根不定判定库，末了说一句「列项没比键」。--item 照列出的项找格，不比键。
+#   --item <项>（可给多次，取并集）只跑点了项的那几格，证明、空真、必红世界、红例重放四格只判点名的项（proof 一项是整格）；项名写错、缺项名退 2 并列出可点名的项；
+#     与 --check、--list-items 不一起用（退 2）。
 #   --quick（轻型，.claude/rules/verification.md「两档：轻型与重型」）：核心部分是 QUICK_CORE_ITEMS 那三项（toolchain、proof、complete：工具链、证明、钉全），
-#     再连同 --item 点名的项（可变部分，取并集）照 --item 那一路跑：只记判定库、不读（--no-reuse），不问按格复用、不写全绿标记，轻型没有剪枝。
+#     再连同 --item 点名的项（可变部分，取并集）照 --item 那一路跑：与重型同一份判定库、同一套单元键，键相同就复用。
 #     与 --check、--list-items 不一起用（退 2）。样本根放 .formal-sample/quick 当成给了 --quick（样本没法带参数）。
-#   自证：scripts/gate/admission.py --selftest 的 run_formal_cell_reuse_cells（临时仓里跑这份脚本，两份判法脚本换成往跟踪文件记一行的假驱动，不起 Verus、不起 cargo）。弄坏开关 ADMISSION_BREAK=<项>：
-#     closure-only-replay-prefix        红例两格的闭包退回只算 crates/singlefs-replay-prefix/，core 改了红例两格不重跑      自证「① 只改一个 core 文件」那一条红
-#     proof-key-without-replay-prefix   自证造临时仓的登记表时，verus-proof 那格的键拿掉 crates/singlefs-replay-prefix/      自证「② 只改 replay-prefix」那一条红
 # 样本（fixtures/checker-tier-formal-verification.sh/<格名>-<情形>/，各放 .gate-cells 点名一格；共享门禁的 stage-selftest.sh 跑）。名字读不出判法的几份：
 #   verus-toolchain-pinned-*：假的 Verus 安装与假的 cargo 缓存放在样本的 .formal-sample/ 下
+#   verus-must-red-worlds-list-items：只列项（没给判定库，末了一句「列项没比键」）；-list-items-key-counts：另放 .formal-sample/list-items-library，
+#     列项照空的判定库比键，每格「无记录」几条、末了「键对不上共 0 条」（读 Verus 的安装算工具链那一样，不起 Verus）
 #   verus-proof-timeout-red：rlimit 设成无穷、样本限时 20 秒；verus-proof-killed-red：替身 Verus 起来就 kill -9 自己，判红，✗ 写「Verus 被信号停了」；
 #   pinned-red-examples-replay-killed-red：桩装置打一行就 kill -9 自己，判红，✗ 写「装置被信号停了」；这两份另核汇总出路里「被信号停了」那一句（不改证明或实现）
 #   verus-proof-kernel-absent（核没进仓）、pinned-red-examples-replay-device-absent（没有桩、装置源码不认 --pinned-cases）：退 77
@@ -86,6 +78,7 @@
 #   .formal-sample/verus-timeout-seconds  Verus 那几格的限时改成文件里的秒数
 #   .formal-sample/e165-stub.sh           replay 格改用这个桩当装置（经 bash 起，不经内存包装）
 #   .formal-sample/list-items             当成给了 --list-items（样本没法带参数）
+#   .formal-sample/list-items-library     列项时判定库放这一趟的空临时目录（列完删掉）：Verus 那几格逐项比它，样本 verus-must-red-worlds-list-items-key-counts 看「无记录」与「键对不上共 0 条」
 #   .formal-sample/items                  每一行当成一个 --item（命令行给了 --item 就不看它）
 #   .formal-sample/quick                  当成给了 --quick（样本 quick-green、quick-red：核没进仓，toolchain 与 proof 两项本次未跑，complete 照钉表判绿 / 判红）
 #   .formal-sample/run-twice              判定库放这一趟的临时目录、读，整道接连跑两趟：第二趟按条全复用（按条复用的样本）
@@ -94,9 +87,10 @@
 #   逐项点名与按条复用：判法那一半的开关在两份脚本文件头「逐项点名与按条复用」；这一道自己接的那一半 FORMAL_VERIFICATION_BREAK=<项>[,<项>…]，
 #   自证是 scripts/gate/admission.py --selftest 的 run_formal_item_cells（临时仓里跑这份脚本、两份判法换成记参数的假驱动）：
 #     items-unchecked       --item 写错的项名悄悄丢掉、不退 2        自证「--item 写错退 2」那一条红；样本 pinned-red-examples-replay-item-unknown 判错
-#     reuse-on-named-run    --check、--item、SINGLEFS_GATE_FULL=1 照样读判定库（不转 --no-reuse）   自证「--item 只记不读」「SINGLEFS_GATE_FULL=1 只记不读」两条红
+#     reuse-on-full-run     SINGLEFS_GATE_FULL=1 照样读判定库（不转 --no-reuse）   自证「SINGLEFS_GATE_FULL=1 只记不读」那一条红
 #     library-in-tmpdir     判定库放 $TMPDIR（门禁每轮新给、跑完删）而不是 git common-dir   自证「判定库在 git common-dir」那一条红
 #     quick-core-unselected  --quick 不把核心部分那三项放进点名，照整道跑                    样本 quick-green 判错（输出里找不到「--quick：核心部分」）
+#     list-items-without-library  --list-items 不把判定库交给 verus-proof-check.py list-items（键对不上几条不报）   样本 verus-must-red-worlds-list-items-key-counts 判错
 #   红例两格整行抄（一行 21 段）的三项，开关一行、下一行起写打开之后判错的样本：
 #   E165_PIN_RED_EXAMPLES_BREAK=whole-row-unchecked  complete 格不比 ⑨ 起的整行，只认 ①、⑦ 与 ⑤ / ⑥
 #       pinned-red-examples-complete-whole-row-red（判绿）
@@ -125,7 +119,7 @@
 #   bash .claude/gate.d/checker-tier-formal-verification.sh --quick [--item <项>…] [项目根]      轻型：核心部分三项，再加点名的项
 #   bash .claude/gate.d/checker-tier-formal-verification.sh --tool-versions   打 Verus 的版本与安装文件的 sha256、安装目录顶层的整体摘要，VERUS_Z3_PATH、VERUS_ROOT、
 #     VERUS_USE_RUSTUP 三个变量的取值，以及 Verus 起 rust_verify 用的那条 rustup 工具链：RUSTUP_HOME 与它解析到的路径、工具链 lib/ 与 lib/rustlib/*/lib/ 下全部文件的
-#     整体摘要、rustup 程序的 sha256（stage-inputs.tsv 的 environment= 用；工具链里换了一个文件，这一行与阶段指纹都变、旧的全绿标记不再作数；
+#     整体摘要、rustup 程序的 sha256（Verus 每条判定的键里「工具链」那一样就是这一行的摘要：工具链里换了一个文件，Verus 的每一条都现判；
 #     逐样的写法在 scripts/gate/verus-proof-check.py 文件头 tool-versions 一段；不起 Verus，不算重型；本机多哈希约 500 MB，页缓存热时多约 0.25 秒）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
@@ -133,11 +127,10 @@ preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT
 STAGE_REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
 VERUS_CHECK="$STAGE_REPOSITORY/scripts/gate/verus-proof-check.py"
 PIN_CHECK="$STAGE_REPOSITORY/scripts/experiments/e165-pin-red-examples.py"
-ADMISSION_MODULE="$STAGE_REPOSITORY/scripts/gate/admission.py"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
 stage_cell verus-toolchain-pinned cell_verus_toolchain_pinned "Verus 安装的 version 与 commit、Cargo.lock 里六个包的版本、本机 cargo 缓存里包源码的出处与内容指纹都与登记相同" \
   "装登记的 Verus 发布或用 SINGLEFS_VERUS_ROOT 指到它；缓存不对就删掉那个包目录再 cargo fetch --locked；要换版本先照 .claude/gate.d/verus-pins.tsv 的注释复核同源再改登记"
-stage_cell verus-proof cell_verus_proof "Verus 带 --no-cheating 验整个 crate，限时内出结局、errors 0、verified 等于登记的数，核里没有作弊标记" \
+stage_cell verus-proof cell_verus_proof "Verus 带 --no-cheating 逐项验核里 verus! 有证明义务的单元（proof fn、exec fn、带 decreases 的 spec fn、derive(Clone) 的 clone），每项限时内出结局、errors 0、verified 至少 1，各项 verified 之和等于登记的数，核里没有作弊标记" \
   "照 Verus 报错的位置修证明或实现；verified 数变了而确是加减了证明，就改 .claude/gate.d/verus-pins.tsv 的 crate 行并写明加减了哪几个；超时先查哪条查询慢，不许靠放宽限时了事；✗ 行写「没跑成：内存包装」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，不改证明或实现；✗ 行写「被信号停了」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，这一次的输出不算判定，不改证明或实现"
 stage_cell verus-vacuity cell_verus_vacuity "核里每一处 requires 的函数体头插 assert(false) 都验不过（前置条件可满足，不空真）" \
   "验得过的那一处前置条件不可满足：改前置条件让它可满足；插入点认错了就按 scripts/gate/verus-proof-check.py 的 requires_insertion_points 改写法；✗ 行写「没跑成：内存包装」的照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办，不改前置条件"
@@ -194,7 +187,7 @@ if ((sample_mode)) && ((${#requested_items[@]} == 0)) && [[ -f .formal-sample/it
   done < .formal-sample/items
 fi
 if ((sample_mode)) && [[ -f .formal-sample/quick ]]; then quick_requested=1; fi
-# --quick（文件头「逐项点名」一段的 --quick）：核心部分三项并进点名，照 --item 那一路跑（只记不读判定库、不问按格复用、不写全绿标记）
+# --quick（文件头「逐项点名」一段的 --quick）：核心部分三项并进点名，照 --item 那一路跑（与重型同一份判定库，键相同就复用）
 if ((quick_requested)); then
   if ((list_items_requested)) || ((STAGE_CELLS_CHECK_GIVEN)); then
     echo "  ✗ --quick 不与 --list-items、--check 一起用：--quick 已经定了跑哪几项"
@@ -204,26 +197,62 @@ if ((quick_requested)); then
   quick_named_count=${#requested_items[@]}
   if [[ ",${FORMAL_VERIFICATION_BREAK:-}," != *,quick-core-unselected,* ]]; then
     requested_items=("${QUICK_CORE_ITEMS[@]}" ${requested_items[@]+"${requested_items[@]}"})
-    echo "  · --quick：核心部分 ${QUICK_CORE_ITEMS[*]} 三项$( ((quick_named_count)) && echo "，另加点名的 $quick_named_count 项" )；轻型没有剪枝：判定库只记不读"
+    echo "  · --quick：核心部分 ${QUICK_CORE_ITEMS[*]} 三项$( ((quick_named_count)) && echo "，另加点名的 $quick_named_count 项" )；与重型同一份判定库，键相同就复用"
   fi
 fi
 
-# 可点名的项（--list-items 打它、--item 照它核）：两份判法各列自己那几格的，「项<TAB>格[<TAB>说明]」；只读登记表、核、必红世界表与钉表，不编、不起 Verus 与装置
+# 判定库（scripts/crash/lib_verdict_library.py）：真仓与 --staged 下放被判那棵树的 git common-dir 里（跨轮留着，几棵 worktree 共用），
+#   GATE_FORMAL_VERDICT_LIBRARY 盖过它；没设 SINGLEFS_GATE_FULL=1 就读（键相同就复用），设了只记不读（--no-reuse）。
+#   样本不读不写，只有放了 .formal-sample/run-twice 的那份：判定库放这一趟的临时目录、读，整道接连跑两趟（第二趟应当全复用）。
+#   --list-items 也认这一份目录（列项时 Verus 那几格逐项照现在的键比它，报键对不上几条），所以在列项之前定；列项不建临时的那一份。
+verdict_library=""
+verdict_rounds=1
+verdict_library_is_temporary=0
+if ((sample_mode == 0)); then
+  if [[ -n "${GATE_FORMAL_VERDICT_LIBRARY:-}" ]]; then
+    verdict_library="$GATE_FORMAL_VERDICT_LIBRARY"
+  elif common_directory="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" && [[ -n "$common_directory" ]]; then
+    verdict_library="$common_directory/singlefs-formal-unit-verdicts"
+    [[ ",${FORMAL_VERIFICATION_BREAK:-}," == *,library-in-tmpdir,* ]] && verdict_library="${TMPDIR:-/tmp}/singlefs-formal-unit-verdicts"
+  elif ((list_items_requested)); then
+    echo "  ! 取不到 $ROOT 的 git common-dir，判定库没处放：列项不报键对不上几条" >&2
+  else
+    echo "  ! 取不到 $ROOT 的 git common-dir，判定库没处放：这一趟每一项都现判、不记"
+  fi
+elif { [[ -f .formal-sample/run-twice ]] && ((list_items_requested == 0)); } || { [[ -f .formal-sample/list-items-library ]] && ((list_items_requested)); }; then
+  verdict_library="$(mktemp -d)" || { echo "  ✗ 建不了临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
+  verdict_library_is_temporary=1
+  ((list_items_requested)) || verdict_rounds=2
+  # 下面点名写错退 2、列完项退 0 这类提前退出的路上也删掉它（末了照旧删一次；格在子 shell 里跑，不继承这个陷阱）
+  trap 'rm -rf "${verdict_library:?}"' EXIT
+fi
+
+# 可点名的项（--list-items 打它、--item 照它核）：两份判法各列自己那几格的，「项<TAB>格[<TAB>说明]」；只读登记表、核、必红世界表与钉表，不编、不起 Verus 与装置。
+#   带参数 with-library（--list-items 那一路）且判定库目录定了：Verus 那份另带 --verdict-library <判定库>，它往 stderr 报的每格「键对不上 N 条…」
+#   与末了「键对不上共 N 条」收进 formal_items_report_file，列完项之后原样接在后面（stderr，项的那几行 stdout 照旧只有「项<TAB>格[<TAB>说明]」）
 formal_items_file=""
+formal_items_report_file=""
 list_formal_items() {
   formal_items_file="$(mktemp)" || { echo "  ✗ 建不了临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
+  formal_items_report_file="$(mktemp)" || { echo "  ✗ 建不了临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; rm -f "${formal_items_file:?}"; exit 1; }
   local listing_exit
-  if python3 "$VERUS_CHECK" list-items "$ROOT" > "$formal_items_file"; then listing_exit=0; else listing_exit=$?; fi
+  local library_arguments=()
+  if [[ "${1:-}" == with-library && -n "$verdict_library" && ",${FORMAL_VERIFICATION_BREAK:-}," != *,list-items-without-library,* ]]; then
+    library_arguments=(--verdict-library "$verdict_library")
+  fi
+  if python3 "$VERUS_CHECK" list-items "$ROOT" ${library_arguments[@]+"${library_arguments[@]}"} > "$formal_items_file" 2> "$formal_items_report_file"; then listing_exit=0; else listing_exit=$?; fi
   if ((listing_exit != 0)); then
+    cat "$formal_items_report_file" >&2
     echo "  ✗ 列不出 Verus 那几格的项：scripts/gate/verus-proof-check.py list-items 退 $listing_exit"
-    echo "     → 怎么办：照它上面打的 ✗ 修登记表 .claude/gate.d/verus-pins.tsv 或必红世界表；列项只读文件，不起 Verus。"
-    rm -f "${formal_items_file:?}"; exit 1
+    echo "     → 怎么办：照它上面打的红行修登记表 .claude/gate.d/verus-pins.tsv 或必红世界表；列项只读文件，不起 Verus。"
+    rm -f "${formal_items_file:?}" "${formal_items_report_file:?}"; exit 1
   fi
   if python3 "$PIN_CHECK" --list-items --root "$ROOT" >> "$formal_items_file"; then listing_exit=0; else listing_exit=$?; fi
   if ((listing_exit != 0)); then
+    cat "$formal_items_report_file" >&2
     echo "  ✗ 列不出红例两格的项：scripts/experiments/e165-pin-red-examples.py --list-items 退 $listing_exit"
-    echo "     → 怎么办：照它上面打的 ✗ 修钉表 .claude/gate.d/e165-pinned-red-examples.tsv；列项只读文件，不编装置。"
-    rm -f "${formal_items_file:?}"; exit 1
+    echo "     → 怎么办：照它上面打的红行修钉表 .claude/gate.d/e165-pinned-red-examples.tsv；列项只读文件，不编装置。"
+    rm -f "${formal_items_file:?}" "${formal_items_report_file:?}"; exit 1
   fi
 }
 if ((list_items_requested)); then
@@ -232,9 +261,15 @@ if ((list_items_requested)); then
     echo "     → 怎么办：先单独跑 --list-items 看项名，再用 --item <项> 点名跑。"
     exit 2
   fi
-  list_formal_items
+  list_formal_items with-library
   cat "$formal_items_file"
-  rm -f "${formal_items_file:?}"
+  # 键对不上的条数（Verus 那份给了判定库时才有）接在项后面、走 stderr；没给判定库时这份是空的，另说一句没比
+  if [[ -s "$formal_items_report_file" ]]; then
+    cat "$formal_items_report_file" >&2
+  elif [[ -z "$verdict_library" ]]; then
+    echo "  · 判定库没定（样本根，或取不到 git common-dir）：列项没比键" >&2
+  fi
+  rm -f "${formal_items_file:?}" "${formal_items_report_file:?}"
   exit 0
 fi
 # --item：点名的项各属哪一格照列出的表找；格只跑点了项的那几格（次序照登记），vacuity、must-red、pinned 那几格只判点名的项（转给判法的 --item）
@@ -259,7 +294,7 @@ if ((${#requested_items[@]})); then
     fi
     cells_wanted[${cell_of_item[$wanted_item]}]=1
     case "${cell_of_item[$wanted_item]}" in
-      verus-vacuity|verus-must-red-worlds|pinned-red-examples-replay)
+      verus-proof|verus-vacuity|verus-must-red-worlds|pinned-red-examples-replay)
         item_options_of_cell[${cell_of_item[$wanted_item]}]+="$wanted_item"$'\n' ;;
     esac
   done
@@ -267,10 +302,10 @@ if ((${#requested_items[@]})); then
     echo "  ✗ 没有这些项：${unknown_items[*]}"
     echo "     → 怎么办：项名照下面这张表写（第一列是项、第二列是格），给几次 --item 取并集："
     cut -f1,2 "$formal_items_file" | sed 's/^/       /'   # gate-lint:detail
-    rm -f "${formal_items_file:?}"
+    rm -f "${formal_items_file:?}" "${formal_items_report_file:?}"
     exit 2
   fi
-  rm -f "${formal_items_file:?}"
+  rm -f "${formal_items_file:?}" "${formal_items_report_file:?}"
   STAGE_CELLS_SELECTED=()
   for cell_name in "${STAGE_CELLS_NAMES[@]}"; do
     [[ -n "${cells_wanted[$cell_name]+set}" ]] && STAGE_CELLS_SELECTED+=("$cell_name")
@@ -295,35 +330,15 @@ if ((sample_mode)); then
   [[ -f .formal-sample/verus-timeout-seconds ]] && verus_options+=(--timeout "$(tr -dc '0-9' < .formal-sample/verus-timeout-seconds)")
   [[ -f .formal-sample/e165-stub.sh ]] && replay_options+=(--binary "$ROOT/.formal-sample/e165-stub.sh" --memory-cap none)
 fi
-# 判定库（scripts/crash/lib_verdict_library.py）：真仓与 --staged 下放被判那棵树的 git common-dir 里（跨轮留着，几棵 worktree 共用），
-#   GATE_FORMAL_VERDICT_LIBRARY 盖过它；整道跑（不给 --check、--item）且没设 SINGLEFS_GATE_FULL=1 时读（键相同就复用），别的只记不读（--no-reuse）。
-#   样本不读不写，只有放了 .formal-sample/run-twice 的那份：判定库放这一趟的临时目录、读，整道接连跑两趟（第二趟应当全复用）。
-verdict_library=""
-verdict_rounds=1
-verdict_library_is_temporary=0
-if ((sample_mode == 0)); then
-  if [[ -n "${GATE_FORMAL_VERDICT_LIBRARY:-}" ]]; then
-    verdict_library="$GATE_FORMAL_VERDICT_LIBRARY"
-  elif common_directory="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" && [[ -n "$common_directory" ]]; then
-    verdict_library="$common_directory/singlefs-formal-verdicts"
-    [[ ",${FORMAL_VERIFICATION_BREAK:-}," == *,library-in-tmpdir,* ]] && verdict_library="${TMPDIR:-/tmp}/singlefs-formal-verdicts"
-  else
-    echo "  ! 取不到 $ROOT 的 git common-dir，判定库没处放：这一趟每一项都现判、不记"
-  fi
-elif [[ -f .formal-sample/run-twice ]]; then
-  verdict_library="$(mktemp -d)" || { echo "  ✗ 建不了临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
-  verdict_library_is_temporary=1
-  verdict_rounds=2
-fi
 if [[ -n "$verdict_library" ]]; then
   library_options=(--verdict-library "$verdict_library")
-  if { ((STAGE_CELLS_CHECK_GIVEN)) || [[ "${SINGLEFS_GATE_FULL:-}" == 1 ]]; } && [[ ",${FORMAL_VERIFICATION_BREAK:-}," != *,reuse-on-named-run,* ]]; then library_options+=(--no-reuse); fi
+  if [[ "${SINGLEFS_GATE_FULL:-}" == 1 && ",${FORMAL_VERIFICATION_BREAK:-}," != *,reuse-on-full-run,* ]]; then library_options+=(--no-reuse); fi
   verus_options+=("${library_options[@]}")
   replay_options+=("${library_options[@]}")
 fi
 
 cell_verus_toolchain_pinned() { python3 "$VERUS_CHECK" toolchain "$ROOT" ${toolchain_options[@]+"${toolchain_options[@]}"}; }
-cell_verus_proof() { python3 "$VERUS_CHECK" proof "$ROOT" ${verus_options[@]+"${verus_options[@]}"}; }
+cell_verus_proof() { item_arguments_of verus-proof; python3 "$VERUS_CHECK" proof "$ROOT" ${verus_options[@]+"${verus_options[@]}"} ${item_arguments[@]+"${item_arguments[@]}"}; }
 cell_verus_vacuity() { item_arguments_of verus-vacuity; python3 "$VERUS_CHECK" vacuity "$ROOT" ${verus_options[@]+"${verus_options[@]}"} ${item_arguments[@]+"${item_arguments[@]}"}; }
 cell_verus_must_red_worlds() { item_arguments_of verus-must-red-worlds; python3 "$VERUS_CHECK" must-red-worlds "$ROOT" ${verus_options[@]+"${verus_options[@]}"} ${item_arguments[@]+"${item_arguments[@]}"}; }
 cell_pinned_red_examples_complete() { python3 "$PIN_CHECK" --check --root "$ROOT"; }
@@ -340,37 +355,9 @@ cell_pinned_red_examples_replay() {
   python3 "$PIN_CHECK" --replay --root "$ROOT" ${replay_options[@]+"${replay_options[@]}"} ${item_arguments[@]+"${item_arguments[@]}"}
 }
 
-# 按格复用（复用的判法同 checker-tier-lkmm.sh，粒度是格）：真仓与 --staged 下整道跑时（不是样本、没给 --check、--item），每格各问一次 scripts/gate/stage-must-run.sh，
-# 键是 <本阶段文件名>:<格名>（.claude/gate.d/stage-inputs.tsv 里每格一行）：那一格登记的输入（Verus 四格另加 environment= 的 --tool-versions 那一行）没变、上次判绿作数
-# （全绿标记，或上次整轮全绿那棵暂存树）就复用，只跑输入变了的格；六格都复用就整道退 77。判定的退出码只认 1 为可跳过、0 为要跑，别的非 0 判红（同 scripts/gate/stage-run-or-skip.sh）。
-# 要跑的格里再按条复用（文件头「按条复用」）。
-reused_cells=()
-if ((sample_mode == 0 && STAGE_CELLS_CHECK_GIVEN == 0)); then
-  must_run_cells=()
-  reuse_lines=()
-  for cell_name in "${STAGE_CELLS_SELECTED[@]}"; do
-    cell_reason="$(bash "$STAGE_REPOSITORY/scripts/gate/stage-must-run.sh" "$ROOT" "$(basename "$0"):$cell_name")"; cell_reuse_exit=$?
-    case "$cell_reuse_exit" in
-      0) must_run_cells+=("$cell_name"); reuse_lines+=("  $cell_name：重跑（$cell_reason）") ;;
-      1) reused_cells+=("$cell_name"); reuse_lines+=("  $cell_name：复用（$cell_reason）") ;;
-      *) echo "  ✗ 判不出格 $cell_name 要不要跑：scripts/gate/stage-must-run.sh 退 $cell_reuse_exit（它只许退 0 要跑、1 可跳过），这一道按红记"
-         echo "     → 怎么办：单独执行 bash scripts/gate/stage-must-run.sh $ROOT $(basename "$0"):$cell_name 看它停在哪；文件不在或起不来就先修它，修好之前这一道一直红，不退 77。"
-         exit 1 ;;
-    esac
-  done
-  echo "── 按格复用判定：${#STAGE_CELLS_SELECTED[@]} 格里 ${#reused_cells[@]} 格复用、${#must_run_cells[@]} 格重跑（每格的输入登记在 .claude/gate.d/stage-inputs.tsv，键 $(basename "$0"):<格名>）"
-  printf '%s\n' "${reuse_lines[@]}"
-  if ((${#must_run_cells[@]} == 0)); then
-    [[ -n "${GATE_NOT_RUN_FILE:-}" ]] && printf '%s 每一格都复用上一次判绿的判定（各格的输入与 Verus 版本都没变），本次未跑\n' "$(basename "$0")" >> "$GATE_NOT_RUN_FILE"
-    echo "  ! 本阶段跳过（每一格都复用上一次判绿的判定）"
-    echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；每格读哪几条路径、Verus 的版本怎么进判定见 .claude/gate.d/stage-inputs.tsv。"
-    exit 77
-  fi
-  STAGE_CELLS_SELECTED=("${must_run_cells[@]}")
-  STAGE_CELLS_SELECTION_SOURCE="按格复用：${#reused_cells[@]} 格复用，只跑输入变了的 ${#must_run_cells[@]} 格"
-fi
+# 格不复用（文件头「复用」一段）：每一格照跑，格里每一条按自己的单元键查判定库。
 
-# 本次未跑的格先收进自己的文件：有一格本次未跑就不记环境、不写全绿标记（没判全的一趟不算上次成功），再原样转给 $GATE_NOT_RUN_FILE
+# 本次未跑的格先收进自己的文件，再原样转给 $GATE_NOT_RUN_FILE
 not_run_record="$(mktemp)" || { echo "  ✗ 建不了临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
 # 一道里只排一次：Verus 那几格第一次拿到内存包装的 252 就往这份文件写一行（verus-proof-check.py 的 QueueRefusal），之后的格读到就不再排队
 queue_refused_record="$(mktemp)" || { echo "  ✗ 建不了临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; rm -f "${not_run_record:?}"; exit 1; }
@@ -399,20 +386,5 @@ if [[ -s "$queue_refused_record" ]]; then
   echo "     → 怎么办：${refused_howto:-照 scripts/hosts/run-with-memory-cap.sh 文件头「退出码」一段办}；空出来之后整道重跑，不改证明、核、必红世界表或实现"
 fi
 rm -f "${queue_refused_record:?}"
-if ((${#reused_cells[@]})); then
-  echo "── 汇总（按格复用）：${#reused_cells[@]} 格复用上一次判绿的判定，本次没跑"
-  for cell_name in "${reused_cells[@]}"; do echo "  $cell_name：复用"; done
-fi
-if ((stage_exit == 0 && sample_mode == 0 && STAGE_CELLS_CHECK_GIVEN == 0)) && [[ ! -s "$not_run_record" ]]; then
-  # 跑了的每一格各记一份 Verus 版本（登记了 environment= 的那四格）与全绿标记，键是 <阶段>:<格名>；复用的格不动（它们的标记还在）。写不成只报不红：后果只是下一趟这一格多跑
-  for cell_name in "${STAGE_CELLS_SELECTED[@]}"; do
-    if ! python3 "$ADMISSION_MODULE" gate-record-environment "$ROOT" "$(basename "$0"):$cell_name"; then
-      echo "  ! 没记下格 $cell_name 这一次的 Verus 版本（admission.py gate-record-environment 没成）：下一趟整轮这一格照跑，不会复用"
-    fi
-    if ! python3 "$ADMISSION_MODULE" stage-marker-write "$ROOT" "$(basename "$0"):$cell_name" >/dev/null; then
-      echo "  ! 没写成格 $cell_name 的全绿标记（admission.py stage-marker-write 没成）：下一趟这一格照跑，不会复用"
-    fi
-  done
-fi
 rm -f "${not_run_record:?}"
 exit "$stage_exit"

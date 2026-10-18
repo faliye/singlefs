@@ -1,0 +1,9 @@
+exit=0
+want=· 样本：上一版（.unit-verdict-sample/prior）的 3 条自证照判绿记进这一版样本的判定库
+want=· 按条复用：表里 3 条自证，现判 1、复用 2、拒算 0
+want=复用「bash scripts/gate/sample-pass-a.sh --selftest」：键相同的判定（
+want=复用「bash scripts/gate/sample-pass-d.sh --selftest」：键相同的判定（
+want=现判「python3 scripts/gate/sample-pass-c.py --selftest」：键对不上（
+want=· 判绿记库：RECORD recorded=1
+want=research 脚本的自证都通过（这一格跑了 1 条，表取自 样本根的 .selftest-runners
+want=表里 3 条：现判 1、复用 2、拒算 0、本次未跑 0

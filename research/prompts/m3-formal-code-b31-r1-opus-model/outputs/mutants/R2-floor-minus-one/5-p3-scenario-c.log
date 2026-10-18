@@ -1,6 +1,0 @@
-name=scenario_c steps=60 last_txg=63 violated_states=37 by_invariant={"I-3.1": 37} smallest_closed_form_state_count_of_one_publish=16777223
-first_violation=txg 27（第 24 次覆盖写，切在第 28 步）I-3.1：盘 0：记账的已分配 Some(6078464)，遍历全部有效根得到 6062080（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 26、环里自证过的根槽 24 个、最老的自证过的根 txg 3、遍历的候选根槽 24 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个
-test scenario_c_unit_writes_persisted_before_the_first_barrier_of_each_overwrite ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 8.06s
-

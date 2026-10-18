@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
-import importlib.util
 import json
 import os
 import subprocess
@@ -54,23 +53,14 @@ LEDGER_STEM = "reuse-ledger-rows"
 MARKERS_NAME = "segment-one-rows"
 
 
-def load_pinned(path: str, expected: str, module_name: str) -> types.ModuleType:
-    actual = reuse.sha256_file(path)
-    if actual != expected:
-        raise RuntimeError(f"{path} 的 sha256 是 {actual}，不是 {expected}")
-    specification = importlib.util.spec_from_file_location(module_name, path)
-    module = importlib.util.module_from_spec(specification)
-    sys.dont_write_bytecode = True
-    sys.modules[specification.name] = module
-    specification.loader.exec_module(module)
-    return module
-
-
 try:
-    rows8 = load_pinned(ROWS_R8_PATH, ROWS_R8_SHA256, "rows_orchestrator_revision_8_25d77b2b")
+    # 修订 8 一个字节不改（先核它的 sha256），载入时把它钉的第一段编排器 sha256 换成搬目录后重钉的那个（reuse_library 的 ORCHESTRATOR_REPIN）
+    rows8 = reuse.load_repinned(ROWS_R8_PATH, ROWS_R8_SHA256, "rows_orchestrator_revision_8_25d77b2b", reuse.ORCHESTRATOR_REPIN)
 except RuntimeError as wrong_file:
     print(f"✗ {wrong_file}（这一层调的是钉住的那一份的函数；改过就先核这一层，再改钉的 sha256）", file=sys.stderr)
     sys.exit(EXIT_WRONG_PINNED_FILE)
+# cross_host_o3_check.py 在调用时核编排器的 sha256（模块常量）：同样换成重钉的那个，文件不改
+rows8.cross_host.ORCHESTRATOR_SHA256 = reuse.ORCHESTRATOR_SHA256
 one = rows8.one
 
 
@@ -258,8 +248,8 @@ def install(reuse_config: dict, repo: str, dumps: str) -> None:
     h30 = reuse_config.get("H30") or {}
     STATE["reuse"] = RowsReuse(reuse.Library(h30.get("library_root") or reuse.DEFAULT_LIBRARY_ROOT), bool(h30.get("lookup", True)),
                                os.path.join(repo, dumps, "reuse-markers", MARKERS_NAME), {}, [])
-    for name in ("phase_rows_and_checks", "finish_shard", "phase_timeout_reruns", "run"):
-        ORIGINAL[name] = getattr(one, name)
+    ORIGINAL.update({"phase_rows_and_checks": one.phase_rows_and_checks, "finish_shard": one.finish_shard,  # 换掉之前逐个点名留下原件
+                     "phase_timeout_reruns": one.phase_timeout_reruns, "run": one.run})
     one.phase_rows_and_checks = phase_rows_with_reuse
     one.finish_shard = finish_shard_with_reuse
     one.phase_timeout_reruns = phase_timeout_reruns_with_reuse

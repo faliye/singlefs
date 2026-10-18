@@ -394,6 +394,20 @@ fn hexadecimal(bytes: &[u8]) -> String {
 /// 子进程角色的第一个参数；带着它起的是装置自己起的子进程，不再判准入。
 const CHILD_ROLE_ARGUMENTS: [&str; 3] = ["writer", "verify", "read"];
 
+/// 准入与多机配置用的仓根：环境变量 SINGLEFS_REPOSITORY_ROOT，没设取当前目录（replay.sh 与实验页的命令都在仓根起）；不取「清单目录/../..」（单元键把它当运行期路径拒算）。
+fn repository_root() -> PathBuf {
+    let root = std::env::var_os("SINGLEFS_REPOSITORY_ROOT")
+        .map(PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_default();
+    if !root.join(".claude/singlefs-ai-sop/scripts/preflight.py").is_file() {
+        eprintln!("  ✗ {} 不是仓根（下面没有 .claude/singlefs-ai-sop/scripts/preflight.py），判不了准入", root.display());
+        eprintln!("  → 怎么办：在仓根起这个装置，或设 SINGLEFS_REPOSITORY_ROOT=<仓根>");
+        std::process::exit(78);
+    }
+    root
+}
+
 fn preflight() -> Option<String> {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     if arguments
@@ -402,9 +416,9 @@ fn preflight() -> Option<String> {
     {
         return None;
     }
-    let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source = format!("{manifest_directory}/src/bin/e162_crash_verdict_block_store.rs");
-    let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
+    let root = repository_root();
+    let source = root.join("scripts/experiments/e162_crash_verdict_block_store.rs");
+    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
     let mut command = Command::new("python3");
     command.arg(&script).arg("check").arg(&source);
     if arguments.iter().any(|argument| argument == "--force") {
@@ -2895,10 +2909,12 @@ fn run_segment_one_crash_question(output: &mut ProductLines, remaining: &[String
 
 // ============================== 第一段：S2 与几何敏感性 ==============================
 
-/// P_B：`ssh -o BatchMode=yes <PEER_SSH_HOST> nproc`，主机名取仓根 `multi-host.env`（与 layer0-shard-run.sh 的 run_on_peer 函数同一个取法）。
+/// P_B：`ssh -o BatchMode=yes <PEER_SSH_HOST> nproc`，主机名取多机配置（与 scripts/hosts/multi-host-run.sh 同一个取法：`SINGLEFS_MULTI_HOST_CONFIG`，没设取仓根 `multi-host.env`）。
 fn peer_logical_processors() -> (String, String) {
-    let repository_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let configuration = fs::read_to_string(repository_root.join("multi-host.env")).unwrap_or_default();
+    let configuration_path = std::env::var_os("SINGLEFS_MULTI_HOST_CONFIG")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| repository_root().join("multi-host.env"));
+    let configuration = fs::read_to_string(configuration_path).unwrap_or_default();
     let host = configuration
         .lines()
         .find_map(|line| line.trim().strip_prefix("PEER_SSH_HOST="))

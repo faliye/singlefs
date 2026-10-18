@@ -1,0 +1,97 @@
+   Compiling singlefs-format v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-pn/tree/crates/singlefs-format)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-pn/tree/crates/singlefs-reference-filesystem)
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-pn/tree/crates/singlefs-replay-prefix)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-pn/tree/crates/singlefs-checker)
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-pn/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-pn/tree/crates/singlefs-harness)
+warning: unused import: `first_tombstone_container_slot_of_the_newest_root`
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:14:49
+   |
+14 |     change_the_unit_and_propagate_its_checksum, first_tombstone_container_slot_of_the_newest_root,
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `data_unit_bytes` and `tree_table_entry_of_kind`
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:19:5
+   |
+19 |     data_unit_bytes, node_bytes, tree_table_entry_of_kind, writable_devices_of,
+   |     ^^^^^^^^^^^^^^^              ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `NextContainerNumberPastTheTopOfItsRange`
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:23:56
+   |
+23 |     ContainerTreeCapacities, ContainerTreeNodeEntries, NextContainerNumberPastTheTopOfItsRange,
+   |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `PublishError`
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:32:82
+   |
+32 | use singlefs_core::transaction::{publish_unlink_intent, PoolVersion, PoolWriter, PublishError};
+   |                                                                                  ^^^^^^^^^^^^
+
+warning: constant `PACKED_UNIT_CONTAINER_NUMBER_OFFSET` is never used
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:35:7
+   |
+35 | const PACKED_UNIT_CONTAINER_NUMBER_OFFSET: usize = 53;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `CONTAINER_TREE_ROOT_SMALLEST_KEY_OFFSET` is never used
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:37:7
+   |
+37 | const CONTAINER_TREE_ROOT_SMALLEST_KEY_OFFSET: usize = 52;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `CONTAINER_TREE_ROOT_LARGEST_KEY_OFFSET` is never used
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:38:7
+   |
+38 | const CONTAINER_TREE_ROOT_LARGEST_KEY_OFFSET: usize = 60;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `CONTAINER_TREE_ENTRY_SEPARATOR_KEY_OFFSET` is never used
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:42:7
+   |
+42 | const CONTAINER_TREE_ENTRY_SEPARATOR_KEY_OFFSET: usize = 0;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `CONTAINER_TREE_ENTRY_IDENTITY_CONTAINER_NUMBER_OFFSET` is never used
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:43:7
+   |
+43 | const CONTAINER_TREE_ENTRY_IDENTITY_CONTAINER_NUMBER_OFFSET: usize = 18;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `CONTAINER_NUMBER_OF_THE_FIRST_TOMBSTONE_CONTAINER` is never used
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:45:7
+   |
+45 | const CONTAINER_NUMBER_OF_THE_FIRST_TOMBSTONE_CONTAINER: u64 = 1;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `u64_at` is never used
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:47:4
+   |
+47 | fn u64_at(bytes: &[u8], offset: usize) -> u64 {
+   |    ^^^^^^
+
+warning: function `set_u64_at` is never used
+  --> crates/singlefs-harness/tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs:51:4
+   |
+51 | fn set_u64_at(bytes: &mut [u8], offset: usize, value: u64) {
+   |    ^^^^^^^^^^
+
+warning: `singlefs-harness` (test "probe_equal_device_pointer_in_a_copied_container_tree_entry") generated 12 warnings (run `cargo fix --test "probe_equal_device_pointer_in_a_copied_container_tree_entry" -p singlefs-harness` to apply 4 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 58.38s
+     Running tests/probe_equal_device_pointer_in_a_copied_container_tree_entry.rs (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/target/debug/deps/probe_equal_device_pointer_in_a_copied_container_tree_entry-209fc5033f8cff65)
+
+running 1 test
+probe mount=ok
+
+thread 'probe_equal_device_pointer_in_a_copied_container_tree_entry' (444620) panicked at crates/singlefs-core/src/pointer.rs:325:9:
+位置条目按设备身份严格升序（I-2.5），整条全零的空指针（empty_root）豁免：盘上读来、要照抄写回的指针在 recovery::rebuild_version 判过
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+probe publish=panic 位置条目按设备身份严格升序（I-2.5），整条全零的空指针（empty_root）豁免：盘上读来、要照抄写回的指针在 recovery::rebuild_version 判过
+test probe_equal_device_pointer_in_a_copied_container_tree_entry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 57.05s
+

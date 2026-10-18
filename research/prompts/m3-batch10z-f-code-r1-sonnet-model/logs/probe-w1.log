@@ -1,8 +1,0 @@
-ROW 1 RED(caught) rc=101 4s kind=probe P2 return_a_lease 不从设备丢了那一刻活着的集合里去掉
-   test gpu_memory_ledger::tests::a_lost_device_left_on_the_card_is_not_taken_for_the_driver_share_of_its_replacement ... FAILED
-   test result: FAILED. 93 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.29s
-   error: test failed, to rerun pass `-p singlefs-harness --lib`
-ROW 5 RED(caught) rc=101 3s kind=probe P9 is_requested 去掉见过就答叫停的快路（但仍记下）
-   test gpu_memory_ledger::tests::a_stop_request_seen_once_stays_requested_after_the_request_is_gone ... FAILED
-   test result: FAILED. 93 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.26s
-   error: test failed, to rerun pass `-p singlefs-harness --lib`

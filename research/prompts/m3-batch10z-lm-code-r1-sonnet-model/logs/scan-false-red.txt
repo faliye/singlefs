@@ -1,8 +1,0 @@
-B2 重命名局部变量 started -> kept_device（行为不变）：
-RED: 要有一处 |started:&GpuCard|started.device_condition().is_lost(),（丢没丢照设备的情况），数到 0
-B1 闭包参数后多一个空格（空白不影响，扫描去空白，应当仍绿）：
-GREEN
-B3 .as_deref() 换成 .as_ref().map(|device| &**device)（行为不变）：
-RED: 要有一处 |started:&GpuCard|{started.device_on_the_books.as_deref().expect(（账上的那一台是这台设备自己的），数到 0
-b2:     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s
-b3:     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s

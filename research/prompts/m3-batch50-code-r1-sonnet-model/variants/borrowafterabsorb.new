@@ -1,2 +1,0 @@
-        {
-            tree.borrow_from_the_right_neighbour_if_below_the_floor(holding_position);

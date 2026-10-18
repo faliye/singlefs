@@ -63,16 +63,22 @@ for name, (got, want) in values.items(): print(f'name=crc_anchor id={name} got=0
 }
 step inputs inputs > "$P-inputs.out"
 
-run_executor() {  # <版本目录> <导出目录> <批> <产物>
-  (cd "$1" && python3 executor_main.py --dumps "$2" --batches "$3" --workers "$WORKERS" --output "$4")
+run_executor() {  # <版本：v1|v2> <导出目录> <批> <产物>；版本按名字取 V1 / V2，执行器在那一版的目录里起
+  local version_directory
+  case "$1" in
+    v1) version_directory="$V1" ;;
+    v2) version_directory="$V2" ;;
+    *) echo "  ✗ run_executor：认不出的版本 $1" >&2; echo "  → 怎么办：写 v1 或 v2" >&2; return 2 ;;
+  esac
+  (cd "$version_directory" && python3 executor_main.py --dumps "$2" --batches "$3" --workers "$WORKERS" --output "$4")
 }
-step v1-i1 run_executor "$V1" "$I1" 1,2 "$P-v1-i1.out"
-step v1-i2 run_executor "$V1" "$I2" 1,2 "$P-v1-i2.out"
-for row in 242 269 270; do step "v1-row-$row" run_executor "$V1" "$ROWS/row-$row/dump" 1,2 "$P-v1-row-$row.out"; done
-step v2-i1 run_executor "$V2" "$I1" 1,2,3 "$P-v2-i1.out"
-step v2-i2 run_executor "$V2" "$I2" 1,2,3 "$P-v2-i2.out"
-for row in 242 269 270; do step "v2-row-$row" run_executor "$V2" "$ROWS/row-$row/dump" 1,2 "$P-v2-row-$row.out"; done
-step v2-e171-s4-baseline run_executor "$V2" "$BASELINE" 1,2,3 "$P-v2-e171-s4-baseline.out"
+step v1-i1 run_executor v1 "$I1" 1,2 "$P-v1-i1.out"
+step v1-i2 run_executor v1 "$I2" 1,2 "$P-v1-i2.out"
+for row in 242 269 270; do step "v1-row-$row" run_executor v1 "$ROWS/row-$row/dump" 1,2 "$P-v1-row-$row.out"; done
+step v2-i1 run_executor v2 "$I1" 1,2,3 "$P-v2-i1.out"
+step v2-i2 run_executor v2 "$I2" 1,2,3 "$P-v2-i2.out"
+for row in 242 269 270; do step "v2-row-$row" run_executor v2 "$ROWS/row-$row/dump" 1,2 "$P-v2-row-$row.out"; done
+step v2-e171-s4-baseline run_executor v2 "$BASELINE" 1,2,3 "$P-v2-e171-s4-baseline.out"
 
 judge_images() {  # <v 名> <版本目录> <冻结参照> <输入名> <导出目录> [已知坏镜像目录]
   local known=(); [ $# -ge 6 ] && known=(--known-bad-dir "$6")

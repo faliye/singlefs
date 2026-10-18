@@ -1,4 +1,0 @@
-rc=0
-OPUS_K2_PRODUCT_RETIREMENT retirements=960 retirement_counts=[959, 1] I-9.36=Holds violations=[]
-OPUS_K2_PRODUCT_LINEAGE rollbacks=1360 lineage_counts=[1359, 1] I-9.36=Holds violations=[]
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out

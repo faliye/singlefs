@@ -1,7 +1,0 @@
-ROW 3329 rc=101 named_test_red=True ['test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s']: 第10z批第五块 GPU 取卡 K1-4 交回那一刻设备没丢的活照设备丢了那一支认
-ROW 3333 rc=101 named_test_red=True ['test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s']: 第10z批第五块 崩溃放量 K3 卡线程那一圈不问叫停（正推 M18）
-ROW 3335 rc=101 named_test_red=True ['test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s']: 第10z批第五块 崩溃放量 K1-5 判完一块不记块号（叫停之后认不出交回的块有判完的块在等）
-ROW 3340 rc=101 named_test_red=True ['test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s']: 第10z批第五块 崩溃放量 K3 报过 Out of Memory 的卡下一轮照用（正推 K3 补充 2 第 1 条：第 2937 行的过滤）
-ROW 3341 rc=101 named_test_red=True ['test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s']: 第10z批第五块 崩溃放量 K3 下一轮重判全部块（正推 K3 补充 2 第 1 条：第 3105 行）
-ROW 3347 rc=101 named_test_red=True ['test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s']: 第10z批第五块 崩溃放量 K3 写库那一头走了卡也接着领（正推 M31）
-ROW 3348 rc=101 named_test_red=True ['test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s']: 第10z批第五块 崩溃放量 K3 判不了的那一块也交回队里（攻方 a-refused-block-is-given-back）

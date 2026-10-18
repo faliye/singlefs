@@ -363,7 +363,7 @@ fn relative_error(model_ratio: f64, predicted_ratio: f64, denominator: f64) -> f
     (predicted_ratio - model_ratio) / denominator
 }
 
-struct CellResult {
+struct PeakCellResult {
     streams: u64,
     batch: u64,
     intent_average: f64,
@@ -379,13 +379,13 @@ struct CellResult {
     windows: usize,
 }
 
-fn compute_cell(geometry: &Geometry, stream_count: u64, batch: u64, format: RecordFormat) -> CellResult {
+fn compute_peak_cell(geometry: &Geometry, stream_count: u64, batch: u64, format: RecordFormat) -> PeakCellResult {
     let samples = simulate_cell(geometry, stream_count, batch, format);
     let (intent_average, intent_minimum, intent_maximum) = cost_statistics(&samples.intent_fsync_costs);
     let (write_ahead_log_leaf_average, write_ahead_log_leaf_minimum, write_ahead_log_leaf_maximum) = cost_statistics(&samples.write_ahead_log_leaf_fsync_costs);
     let ratio = intent_average / write_ahead_log_leaf_average;
     let predicted = predicted_ratio(batch, stream_count, geometry.node_levels());
-    CellResult {
+    PeakCellResult {
         streams: stream_count,
         batch,
         intent_average,
@@ -402,7 +402,7 @@ fn compute_cell(geometry: &Geometry, stream_count: u64, batch: u64, format: Reco
     }
 }
 
-fn emit_cell_line(emitter: &mut Emitter, output: &mut String, mode: &str, geometry_name: &str, cell: &CellResult) {
+fn emit_cell_line(emitter: &mut Emitter, output: &mut String, mode: &str, geometry_name: &str, cell: &PeakCellResult) {
     output.push_str(&emitter.emit_raw(&format!(
         "name=cell mode={mode} geometry={geometry_name} streams={} batch={} intent_avg={:.4} intent_min={} intent_max={} \
          write_ahead_log_leaf_avg={:.4} write_ahead_log_leaf_min={} write_ahead_log_leaf_max={} ratio={:.6} predicted_ratio={:.6} \
@@ -489,7 +489,7 @@ struct RowSummary {
 }
 
 /// 峰值集合（比值不低于最大值 × (1 − 容差) 的那些批）连同 B_lo / B_hi。
-fn peak_set(cells: &[CellResult]) -> (f64, u64, u64) {
+fn peak_set(cells: &[PeakCellResult]) -> (f64, u64, u64) {
     let maximum_ratio = cells.iter().map(|cell| cell.ratio).fold(f64::MIN, f64::max);
     let threshold = maximum_ratio * (1.0 - PEAK_SET_TOLERANCE);
     let in_peak_set: Vec<u64> = cells.iter().filter(|cell| cell.ratio >= threshold).map(|cell| cell.batch).collect();
@@ -498,8 +498,8 @@ fn peak_set(cells: &[CellResult]) -> (f64, u64, u64) {
     (maximum_ratio, batch_low, batch_high)
 }
 
-fn classify_row(streams: u64, cells: &[CellResult]) -> RowSummary {
-    let mut sorted_cells: Vec<&CellResult> = cells.iter().collect();
+fn classify_row(streams: u64, cells: &[PeakCellResult]) -> RowSummary {
+    let mut sorted_cells: Vec<&PeakCellResult> = cells.iter().collect();
     sorted_cells.sort_by_key(|cell| cell.batch);
     let (peak_ratio, peak_batch_low, peak_batch_high) = peak_set(cells);
     let batch_axis_maximum = sorted_cells.last().expect("这一行没有任何格").batch;
@@ -650,14 +650,14 @@ fn emit_row_summary(emitter: &mut Emitter, output: &mut String, geometry_name: &
 struct GeometryGrid {
     #[allow(dead_code, reason = "字段保留几何点身份，供未来扩展读取；本轮只用 rows")]
     geometry: Geometry,
-    rows: Vec<(u64, Vec<CellResult>)>, // (streams, 这一行的全部格，按 batch 未必有序)
+    rows: Vec<(u64, Vec<PeakCellResult>)>, // (streams, 这一行的全部格，按 batch 未必有序)
 }
 
 fn compute_geometry_grid(geometry: Geometry, format: RecordFormat) -> GeometryGrid {
     let rows = stream_axis()
         .into_iter()
         .map(|streams| {
-            let cells = batch_axis_for(streams).into_iter().map(|batch| compute_cell(&geometry, streams, batch, format)).collect();
+            let cells = batch_axis_for(streams).into_iter().map(|batch| compute_peak_cell(&geometry, streams, batch, format)).collect();
             (streams, cells)
         })
         .collect();
@@ -721,12 +721,12 @@ fn emit_two_dimensional_maximum_summary(emitter: &mut Emitter, output: &mut Stri
 
 /// 两种相对误差分母（跑前登记第一节「相对误差」与 M11）：模型比值本身，或预测比值。
 /// PC2 核哪一种复现得出 9.6% / 20.5%，两种都报，判据在读产物的那一步选。
-const ERROR_DENOMINATOR_SELECTORS: [(&str, fn(&CellResult) -> f64); 2] =
-    [("model", |cell: &CellResult| cell.error_model_denominator), ("predicted", |cell: &CellResult| cell.error_predicted_denominator)];
+const ERROR_DENOMINATOR_SELECTORS: [(&str, fn(&PeakCellResult) -> f64); 2] =
+    [("model", |cell: &PeakCellResult| cell.error_model_denominator), ("predicted", |cell: &PeakCellResult| cell.error_predicted_denominator)];
 
 /// Q3/Q4：原 56 格子集（`streams=已定`）与全网格（Q4），两种误差分母各报一遍。
 fn emit_relative_error_summary(emitter: &mut Emitter, output: &mut String, geometry_name: &str, grid: &GeometryGrid) {
-    let original_56: Vec<&CellResult> = grid
+    let original_56: Vec<&PeakCellResult> = grid
         .rows
         .iter()
         .filter(|(streams, _)| ORIGINAL_56_STREAMS.contains(streams))
@@ -746,7 +746,7 @@ fn emit_relative_error_summary(emitter: &mut Emitter, output: &mut String, geome
         output.push('\n');
     }
 
-    let all_cells: Vec<&CellResult> = grid.rows.iter().flat_map(|(_, cells)| cells.iter()).collect();
+    let all_cells: Vec<&PeakCellResult> = grid.rows.iter().flat_map(|(_, cells)| cells.iter()).collect();
     for (label, selector) in ERROR_DENOMINATOR_SELECTORS {
         let positive_count = all_cells.iter().filter(|cell| selector(cell) > 0.0).count();
         output.push_str(&emitter.emit_raw(&format!(
@@ -822,7 +822,7 @@ fn run_pc3_mode() {
     emit_geometry_configuration(&mut emitter, &mut output, &ORIGINAL_DEVICE_GEOMETRY);
     for &streams in &ORIGINAL_56_STREAMS {
         for &batch in &ORIGINAL_56_BATCHES {
-            let cell = compute_cell(&ORIGINAL_DEVICE_GEOMETRY, streams, batch, RecordFormat::LegacyOriginal);
+            let cell = compute_peak_cell(&ORIGINAL_DEVICE_GEOMETRY, streams, batch, RecordFormat::LegacyOriginal);
             emit_cell_line(&mut emitter, &mut output, "pc3", ORIGINAL_DEVICE_GEOMETRY.name, &cell);
         }
     }
@@ -994,7 +994,7 @@ mod tests {
     fn s2b1_and_s2b2_match_the_independent_anchor_script() {
         // S=2、B=1：甲 = 祖先层数 + 3，乙 = 2（跑前登记第七节 7.2）。
         for (geometry, node_levels) in [(TWO_FIFTY_SIX_MEBIBYTE_FILE_GEOMETRY, 2u32), (FOUR_GIBIBYTE_FILE_GEOMETRY, 3), (ONE_TEBIBYTE_FILE_GEOMETRY, 4), (FULL_ROOT_LEVEL_FOUR_GEOMETRY, 4), (SIXTEEN_TEBIBYTE_FILE_GEOMETRY, 5)] {
-            let cell = compute_cell(&geometry, 2, 1, RecordFormat::Today);
+            let cell = compute_peak_cell(&geometry, 2, 1, RecordFormat::Today);
             assert_eq!(cell.intent_average, node_levels as f64 + 3.0, "{} S2B1 甲", geometry.name);
             assert_eq!(cell.write_ahead_log_leaf_average, 2.0, "{} S2B1 乙", geometry.name);
         }
@@ -1002,7 +1002,7 @@ mod tests {
         for (geometry, expected_intent_average, expected_ratio) in
             [(TWO_FIFTY_SIX_MEBIBYTE_FILE_GEOMETRY, 7.00, 2.333), (FOUR_GIBIBYTE_FILE_GEOMETRY, 9.00, 3.000), (ONE_TEBIBYTE_FILE_GEOMETRY, 11.00, 3.667), (FULL_ROOT_LEVEL_FOUR_GEOMETRY, 11.00, 3.667), (SIXTEEN_TEBIBYTE_FILE_GEOMETRY, 12.00, 4.000)]
         {
-            let cell = compute_cell(&geometry, 2, 2, RecordFormat::Today);
+            let cell = compute_peak_cell(&geometry, 2, 2, RecordFormat::Today);
             assert!((cell.intent_average - expected_intent_average).abs() < 1e-9, "{} S2B2 甲", geometry.name);
             assert_eq!(cell.write_ahead_log_leaf_average, 3.0, "{} S2B2 乙", geometry.name);
             assert!((cell.ratio - expected_ratio).abs() < 1e-3, "{} S2B2 比值", geometry.name);
@@ -1073,7 +1073,7 @@ mod tests {
     fn positive_control_four_batch_one_difference_equals_node_levels_plus_one() {
         for geometry in FIRST_SEGMENT_GEOMETRIES {
             for &streams in &STREAM_AXIS_BASE {
-                let cell = compute_cell(&geometry, streams, 1, RecordFormat::Today);
+                let cell = compute_peak_cell(&geometry, streams, 1, RecordFormat::Today);
                 assert_eq!(
                     cell.intent_average - cell.write_ahead_log_leaf_average,
                     geometry.node_levels() as f64 + 1.0,
@@ -1089,7 +1089,7 @@ mod tests {
         for geometry in FIRST_SEGMENT_GEOMETRIES {
             for &streams in &[2u64, 16, 128] {
                 for &batch in &[1u64, 2, 5, 10, 20, 50, 64, 65, 67] {
-                    let cell = compute_cell(&geometry, streams, batch, RecordFormat::Today);
+                    let cell = compute_peak_cell(&geometry, streams, batch, RecordFormat::Today);
                     assert!(cell.ratio > 1.0, "{} streams={streams} batch={batch} ratio={}", geometry.name, cell.ratio);
                 }
             }
@@ -1120,8 +1120,8 @@ mod tests {
 
     // ── 分类逻辑：判别力自证（跑前登记第八节「判别力自证」） ──────────────────
 
-    fn synthetic_cell(streams: u64, batch: u64, ratio: f64) -> CellResult {
-        CellResult {
+    fn synthetic_cell(streams: u64, batch: u64, ratio: f64) -> PeakCellResult {
+        PeakCellResult {
             streams,
             batch,
             intent_average: ratio * 2.0,
@@ -1239,7 +1239,7 @@ mod tests {
             .chain(RECORD_WIDTH_KNOB_POINTS)
         {
             for &streams in &[2u64, 16, 128] {
-                let cell = compute_cell(&geometry, streams, 1, format);
+                let cell = compute_peak_cell(&geometry, streams, 1, format);
                 assert_eq!(
                     cell.intent_average - cell.write_ahead_log_leaf_average,
                     geometry.node_levels() as f64 + 1.0,

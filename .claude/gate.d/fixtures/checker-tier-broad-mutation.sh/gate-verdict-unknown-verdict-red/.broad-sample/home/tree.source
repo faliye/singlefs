@@ -1,1 +1,0 @@
-{"commit": "0123456789abcdef0123456789abcdef01234567", "revision": "HEAD", "fingerprint": "970a8024312172609756f0d39cad72963419979f0553a2b19fa78969ee819ee8", "source_fingerprint": "34b17d47def01575b28c89a99595ff1ecb4d0206eed3e5add42ea4a1292f7481", "files": 6, "export_paths": ["crates", "Cargo.toml", "Cargo.lock", "litmus", ".cargo"]}

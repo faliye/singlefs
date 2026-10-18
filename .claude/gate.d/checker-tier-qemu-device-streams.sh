@@ -15,19 +15,53 @@
 # 盘那一条是 QEMU 的 blklogwrites 过滤节点在来宾之外按 dm-log-writes 格式记下的每个写（带数据）与每个 FLUSH。
 # 不声明 gate-covers：「最终判据」要真实负载 + 崩溃注入 + checker 全绿，这一道没有崩溃注入（欠在 C6（块层语义假设写错））。
 #
-# 用法：bash .claude/gate.d/checker-tier-qemu-device-streams.sh [选项] [项目根]；不带选项时六个模式并行各起一台虚机。
+# 用法：bash .claude/gate.d/checker-tier-qemu-device-streams.sh [选项] [项目根]；不带选项时六个模式里键对不上的那几档并行各起一台虚机。
 #   --list                  逐行打格名与判什么
 #   --check device-streams  只跑这一格；格名写错退 2
 #   --list-items            逐行打六个模式与各自判什么，不编译、不起虚机
-#   --item <模式>           只跑点名的模式（给几次取并集；写错退 2、列出可点的模式）：不问整道的复用判定与改动范围，不写全绿标记
+#   --item <模式>           只跑点名的模式（给几次取并集；写错退 2、列出可点的模式）：每档照键查判定库，判出的照键写库
 #   认不出的选项退 2。
 # 读的环境变量：VM_LOG_MB（每块盘的设备侧日志 MiB，默认 4096）；GATE_QEMU_DEVICE_STREAMS_KEEP_WORK=1（判绿也留现场，重录样本时拷四件套用）；
-#   SINGLEFS_GATE_FULL=1 由 stage-must-run.sh 与 change-touches-crates.sh 读（不复用、不按改动范围跳过）。
+#   SINGLEFS_GATE_FULL=1 不读判定库、全部现跑、照键写回；GATE_QEMU_VERDICT_LIBRARY 盖过判定库的位置。
+#
+# 复用：每档一条判定，键是宿主与来宾两侧真走到的函数单元、QEMU 版本、内核镜像与 initramfs 的内容摘要、工具链；键对得上的档复用，对不上的现跑；
+#   `--item <模式>` 只跑点名的档，判出的照键写库；`SINGLEFS_GATE_FULL=1` 不读库、全部现跑、照键写回。没有整道标记；
+#   stage-inputs.tsv 本阶段那一行只登记三个前提与入口，不进任何键。键的组成（逐样进 scripts/crash/lib_verdict_library.py 的组成表，单元键照 scripts/gate/lib_function_units.py 的切法）：
+#     宿主脚本单元      scripts/devices/vm-bench.sh 脚本体起的 shell 单元闭包（run_one 与它调的函数，/init 的 here-doc 在 stage_initramfs_root 这个单元里），
+#                       连同它点名的外部程序：busybox（sha256 与 --help 第一行）、qemu-system-x86_64（补好的那一份的 sha256 与 --version 第一行）
+#     来宾程序单元      按档一把：new_pool_file_creation_on_device 的 main 与这一档的入口 run_the_<档，- 换成 _>_mode 起的 Rust 单元闭包，
+#                       去掉只有别的档才走到的单元（别的档入口闭包里有、这一档入口闭包里没有的；guest_keys_by_mode），main 自己的参数解析与分派进每一档；
+#                       工具链行（cargo -V、rustc -V、--release --target x86_64-unknown-linux-gnu +crt-static）与 Cargo.lock 里 singlefs-checker-tier 传递引到的外部包。
+#                       改一档才走到的函数只作废那一档；管不到的：main 自己点到、又只被别的档入口点到的单元，这一档的键不收（闭包按入口收，切不开 main 里走哪条路）
+#     宿主检查程序单元  new_pool_file_creation_device_log_check 的 main 起的 Rust 单元闭包（同上，dev 档）
+#     判法单元指纹      本阶段 judge_mode_outputs 与 judge_mode_device_log 的单元闭包（按档查表的 cold_root_of、required_lines_of、forbidden_lines_of、
+#                       host_rerun_windows_of、mode_parameters_of 不进，它们这一档的取值进「这一档的判据」与「档位参数」，改一档的表只作废那一档）
+#     内核镜像          vm-bench.sh 选中的那份镜像的字节 sha256（不按路径）
+#     QEMU              补好的 qemu-system-x86_64 与 qemu-io 的 sha256、--version 第一行、补丁 scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch 的内容
+#     initramfs 清单    vm-bench.sh --initramfs-manifest 这一档的根的清单（只取它标准输出里 entry<TAB> 开头的条目：路径、种类、权限、内容 sha256；
+#                       /bench 那一行的内容换成占位，被测二进制由来宾程序单元管），不取 cpio.gz 的哈希（cpio 头里有 mtime）；
+#                       跑完核 run_one 打包之前打的那一份与它相同（record_tiers_after_run），不同不记、打头几行差异
+#     E142 对照行       E142 产物里这一道真读的那几行（path=mkfs 之外的 name=segments 行、name=root_record 的 back_chain）与布局表八登记的 mkfs 那一行
+#     这一档的判据      几张按档查表的函数在这一档交的取值
+#     档位参数          /bench 收到的参数串（档名就是它）、mode_parameters_of 交的盘参数、VM_LOG_MB 与调用方环境里会改虚机行为的几个 VM_ 变量
+#   判定库在被判那棵树的 git common-dir 的 singlefs-qemu-verdicts/（种类 qemu-tier，一档一项 qemu:<模式>），跨轮留着；判绿的档当趟记，红了整趟不记。
+#   每档一行「· <模式>：绿，复用（…）」，现判的原因（变了的单元）写在成功句「按档：现判 N、复用 M（现判的原因：…）」里。
 #
 # 样本 fixtures/checker-tier-qemu-device-streams.sh/{red,direct-divergence-red,e142-row-missing-red,e142-row-duplicate-red,mkfs-segments-red,segments-step-red,green}（stage-selftest.sh 跑，各放 .gate-cells 点名 device-streams）：
 # 样本根放 .qemu-prerecorded，按 <模式>/out.txt、vm-exit、check.txt、check-exit 摆某一轮真跑的原样输出，本阶段不起虚机、不编译，
 # 用同一段判定代码判（只供测试的开关：.claude/rules/fs-design.md 五条硬要求第 2 条）。预录档全过这一格退 77：退 0 与真起过虚机的一档在汇总里分不出。
 # 走到段序列那一步的样本另放 .claude/kb/layout/01-first-txn.md：只有「八、」标题与登记表「mkfs 种根」一行的合成副本，登记值写那一趟录样本时的值。
+# 键样本 fixtures/checker-tier-qemu-device-streams.sh/tier-key-samples-*（.qemu-prerecorded 之外另放 .qemu-key-samples/：environment.tsv 写内核镜像的路径、
+#   busybox、qemu-system-x86_64 的 sha256 与版本行、工具链行，initramfs-manifest.tsv 是一份清单，mode-parameters.tsv 是每档的盘参数，change.sh 是第二趟之前施加的改动；
+#   setup.sh 现造一棵小树：vm-bench.sh、来宾与宿主检查两个 bin、E142 产物与布局表八）：只判键、不判输出。判定库放这一趟的临时目录，
+#   头一趟六档照绿记下，跑 change.sh，第二趟逐档 lookup，打「· <模式>：复用（…）| 现判（<原因>：<变了的单元>）」与「· 按档：现判 N、复用 M」，退 77。几份：
+#   init-heredoc（改 run_one 里 /init 的 here-doc，六档都作废）、one-tier-parameters（只改 raise-rollback-floor 一档的盘参数，只那一档作废）、
+#   kernel-byte（内核镜像换一个字节，六档都作废）、e142-unread-line（E142 产物里加一行这一道不读的，一档都不作废）、
+#   guest-function（改来宾程序里只有 raise-rollback-floor 的入口走到的那个函数，只那一档作废）、
+#   guest-dispatch（改来宾程序 main 的参数解析，六档都作废：main 自己的单元进每一档）。
+#   另两份不摆 initramfs-manifest.tsv，摆真跑那一条路读的原样（listings/<档>.txt 是 vm-bench.sh --initramfs-manifest 的标准输出，runs/<档>/initramfs.manifest
+#   是 run_one 打包之前打的清单），头一趟照真跑那一条路核过清单再记（record_tiers_after_run），change.sh 什么都不改：
+#   manifest-recorded（六档清单相同，头一趟记下 6 档，第二趟「现判 0、复用 6」）、manifest-differs（second-instance 跑的时候 /init 变了，那一档不记，第二趟「现判 1、复用 5」）。
 #
 # 段序列分两处比：path=mkfs 那一行与布局表八（.claude/kb/layout/01-first-txn.md「八、」）「mkfs 种根」那一行登记的段序列、次操作、崩溃状态数、种类串比，
 #   登记值经 scripts/crash/check-segment-registry.py --print-mkfs-segments-line 现取（同一份解析器，这里不抄第二份）；那一行的权威是活代码
@@ -46,9 +80,24 @@
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=segments-diff-skipped 让虚机输出与 E142 产物的 name=segments 行（path=mkfs 之外那几行）逐字比对那一步跳过：
 #   segments-step-red（只摆 direct 一档，direct/out.txt 里 path=transaction 那一行的段序列 24+2+1+2 改成 23+2+1+2，E142 产物与登记行都不动）判绿退 77，
 #   红不在「段序列（path=mkfs 之外那几行）与 E142 产物的 name=segments 行不一致」，expect 里的 want 对不上。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=tier-key-is-the-whole-stage 让每档的键退回整道一把（这一档的判据、档位参数、initramfs 清单换成六档合起来的一份）：
+#   tier-key-samples-one-tier-parameters（只改 raise-rollback-floor 一档的盘参数）里 file-overwrite 那一档也报现判，expect 里「· file-overwrite：复用」找不到。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=guest-key-from-main 让来宾程序单元退回六档共用 main 起的一把：tier-key-samples-guest-function（只改 raise-rollback-floor 的入口
+#   走到的函数）里 direct 那一档也报现判，expect 里「· direct：复用」「· 按档：现判 1、复用 5」找不到。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=guest-key-without-main 让来宾程序单元只从这一档的入口起算、不收 main：tier-key-samples-guest-dispatch（只改 main 的参数解析）
+#   六档都报复用，expect 里「· direct：现判」「· 按档：现判 6、复用 0」找不到。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=manifest-with-listing-lines 让开跑前的清单退回改前的取法（vm-bench.sh 标准输出里抬头那几行留在清单里）：
+#   tier-key-samples-manifest-recorded 头一趟六档都报「清单不同……没记」，第二趟「现判 6、复用 0」，expect 里「· 头一趟记下 6 档」找不到。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=manifest-check-skipped 让跑完不核清单、照记：tier-key-samples-manifest-differs 六档都记下、second-instance 也复用，
+#   expect 里「· second-instance：现判（无记录）」「· 按档：现判 1、复用 5」找不到。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=reuse-lookup-skipped 让每一档一律不读库：tier-key-samples-three-questions 判红（复用三问 ① 与复用哨兵都红），expect 里的 exit=77 对不上。
+# 复用三问与复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「一」「二」）：真跑每一趟六档的组成表写好之后、查库之前抽哨兵（候选按键文件查，与 lookup 分开），
+#   抽中强制现判的那一档不读库、照现跑；哨兵被现判、强制现判那一档判红，这一格红。SINGLEFS_GATE_FULL=1 不抽。
+#   键样本 tier-key-samples-three-questions（.qemu-key-samples/ 另放 unrelated.sh 与 affected）：头一趟六档照绿记下，同一份输入、unrelated.sh（E142 产物末尾加一行这一道不读的）
+#   之后、change.sh（改只有 raise-rollback-floor 走到的 publish_the_fourth_version）之后各查一趟（开着哨兵，现判的照绿记），照三问判、打规范输出，退 77；
+#   登记表 .claude/gate.d/verdict-library-scripts.tsv 里这一道的自证命令经 scripts/gate/lib_reuse_checks.py sample 起这一份样本。
 #
-# 准入：读的路径与三个前提（QEMU、/dev/kvm、内核镜像）都登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行，复用判定与改动范围都从它取，
-# 那一行不在判红；判法在 scripts/gate/admission.py。
+# 准入：三个前提（QEMU、/dev/kvm、内核镜像）登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行第三列，判法在 scripts/gate/admission.py gate-preconditions，没齐判红。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -204,121 +253,24 @@ host_rerun_windows_of() {
     *)                    printf '' ;;
   esac
 }
-
-# ── 格 device-streams（在自己的子 shell 里跑，fail 与 exit 只结束这一格）──
-cell_device_streams() {
-prerecorded=0
-[[ -f "$ROOT/.qemu-prerecorded" ]] && prerecorded=1
-
-if ((prerecorded == 0)); then
- if ((${#named_modes[@]})); then
-  echo "  · 只跑点名的 ${#MODES[@]} 档（${MODES[*]}）：不问整道的复用判定与改动范围，跑完不写全绿标记"
- else
-  # 先问能不能复用上一次整轮全绿的判定，再问这次改动碰没碰它判的东西（前缀含本阶段脚本自己）；两样都退 77（本次未跑），不退 0。
-  # 判法在 scripts/gate/stage-must-run.sh 与 change-touches-crates.sh 的文件头。范围判定只摘得掉零行代码的改动，细的那一半欠在 C8（门禁范围判不出来）。
-  source "$STAGE_REPOSITORY/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
-  stage_run_or_skip "$STAGE_REPOSITORY/scripts/gate/stage-must-run.sh" "复用上一次整轮全绿的判定" \
-    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
-  # 改动范围的前缀：登记表本阶段那一行的路径（admission.py paths，不另抄一份），加本阶段脚本自己
-  qemu_registered_input_paths=()
-  if registered_paths_text="$(python3 "$ADMISSION_MODULE" paths "$ROOT" "$(basename "$0")" 2>/dev/null)"; then
-    mapfile -t qemu_registered_input_paths <<< "$registered_paths_text"
+# 每一档交给 vm-bench.sh 的盘与镜像参数（档的内容进键，档名不进）。键样本（.qemu-key-samples/mode-parameters.tsv）换成样本里那一张表。
+mode_parameters_of() {
+  if [[ -n "${QEMU_MODE_PARAMETERS_TABLE:-}" ]]; then
+    awk -F'\t' -v mode="$1" '$1 == mode { print $2 }' "$QEMU_MODE_PARAMETERS_TABLE"
+    return 0
   fi
-  if [[ ${#qemu_registered_input_paths[@]} -eq 0 || -z "${qemu_registered_input_paths[0]}" ]]; then
-    fail "$ROOT/.claude/gate.d/stage-inputs.tsv 里没有 $(basename "$0") 这一行（或读不到这份表）：判不出这一道读哪些路径" \
-         "在 .claude/gate.d/stage-inputs.tsv 里给本阶段登记它读的路径（制表符分隔，照别的行写）。"
-  fi
-  stage_run_or_skip "$STAGE_REPOSITORY/scripts/gate/change-touches-crates.sh" "这次改动没碰它判的东西" \
-    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${qemu_registered_input_paths[*]} 加本阶段脚本，判据见 scripts/gate/change-touches-crates.sh。" \
-    -- "$ROOT" "${qemu_registered_input_paths[@]}" ".claude/gate.d/$(basename "$0")"
- fi
-  [[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
+  case "$1" in
+    *) printf 'VM_DISKS=2 VM_DISK_MB=4096' ;;
+  esac
+}
 
-  # 三个前置（QEMU、/dev/kvm、内核镜像）登记在 stage-inputs.tsv 本阶段那一行第三列，没齐判红
-  python3 "$ADMISSION_MODULE" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1
-
-  # 虚机二进制要静态链接（initramfs 里没有动态库）：glibc 目标加 +crt-static 编成 static-pie。不编 musl 目标：checker 档默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器
-  # 两条 cargo build 不吃 cargo 自己的缺省（核数）：经 capped.sh default 起，编译并行度取登记的重活默认并行度（.claude/heavy-thread-default，SINGLEFS_THREAD_CAP 设了取它）
-  if ! bash "$STAGE_REPOSITORY/scripts/hosts/capped.sh" default cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device >/dev/null 2>&1; then
-    fail "虚机二进制（glibc 静态 PIE）编不过" "单跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device 看报错。"
-  fi
-  if ! bash "$STAGE_REPOSITORY/scripts/hosts/capped.sh" default cargo build -p singlefs-checker-tier --bin new_pool_file_creation_device_log_check >/dev/null 2>&1; then
-    fail "宿主一侧的设备日志检查编不过" "单跑 cargo build -p singlefs-checker-tier --bin new_pool_file_creation_device_log_check 看报错。"
-  fi
-fi
-
-# 复跑表里 E142 有不止一行（第 2 列 @driver_e142 与 @driver_e142_p8g_crates_dump 等）：只取第 2 列恰是 @driver_e142 的那一行的第 4 列，不取全部 E142 行。
-e142_row_filter='$1=="E142" && $2=="@driver_e142"'
-[[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == e142-all-rows ]] && e142_row_filter='$1=="E142"'
-e142_product_names="$(awk -F'|' "$e142_row_filter"'{print $4}' scripts/experiments/replay.sh)"
-e142_product_row_count="$(grep -c . <<<"$e142_product_names")"
-if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != e142-all-rows && "$e142_product_row_count" != 1 ]]; then
-  fail "scripts/experiments/replay.sh 里第 2 列是 @driver_e142 的 E142 行取到 $e142_product_row_count 行（要恰好 1 行；0 行是这一行被删或改了名，多于 1 行是被重复登记）" \
-       "看 scripts/experiments/replay.sh 里 E142|@driver_e142| 开头的行：留一行，第 4 列写这一道对照的 E142 产物文件名；驱动改了名，这里的 @driver_e142 跟着改。"
-fi
-PRODUCT="research/results/$e142_product_names"
-[[ -f "$PRODUCT" ]] || fail "从 replay.sh 的 @driver_e142 那一行解析不出产物文件（得到 $PRODUCT）" "看 scripts/experiments/replay.sh 里 E142|@driver_e142| 那一行的第 4 列，对应的文件在不在 research/results/ 下。"
-# 反向链从产物里现取，不写死：写死的数在格式常量一改就过期，红起来像是写路错了。
-EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$PRODUCT" | head -1)"
-[[ -n "$EXPECTED_BACK_CHAIN" ]] || fail "产物里取不出 name=root_record 的 back_chain（$PRODUCT）" "看 $PRODUCT 有没有 name=root_record 那一行、它的 back_chain 字段还在不在。"
-# path=mkfs 那一行的对照是布局表八「mkfs 种根」那一行登记的值（文件头「段序列分两处比」）：解析器按本阶段自己的位置取，--root 指被判的仓，
-# 样本把 cwd 换成样本根时，读的是样本里那份合成的布局表、跑的仍是仓里的解析器。开虚机之前取，登记表写坏了不白等虚机。
-SEGMENT_REGISTRY_SCRIPT="$STAGE_REPOSITORY/scripts/crash/check-segment-registry.py"
-if ! registered_mkfs_segments_output="$(python3 "$SEGMENT_REGISTRY_SCRIPT" --root "$ROOT" --print-mkfs-segments-line)"; then
-  printf '%s\n' "$registered_mkfs_segments_output" | sed 's/^/        /'
-  fail "取不出 .claude/kb/layout/01-first-txn.md「八、」登记表「mkfs 种根」那一行的登记值（段序列、次操作、崩溃状态数、种类串）" \
-       "照上面 scripts/crash/check-segment-registry.py 的报错改那一行；它不在就从 git 找回来（门禁 doc-registries 的 segment-registry 格用的是同一份）。"
-fi
-EXPECTED_MKFS_SEGMENTS_LINE="$registered_mkfs_segments_output"
-EXPECTED_MKFS_SEGMENTS_SOURCE="布局表八「mkfs 种根」那一行"
-if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == mkfs-from-e142 ]]; then
-  EXPECTED_MKFS_SEGMENTS_LINE="$(grep -ao 'E7RESULT name=segments path=mkfs .*' "$PRODUCT" | tr -d '\r')"
-  EXPECTED_MKFS_SEGMENTS_SOURCE="E142 产物 $PRODUCT 的 path=mkfs 行"
-fi
-
-if ((prerecorded)); then
-  # 预录档：不起虚机、不编译，只判样本目录里摆好的那几个模式。被判的模式现算，不写死——
-  # 写死一份清单，样本里少摆一个模式就会整档静默不判（`show-me-test.md`「跳过清单要与被扫集合出自同一份数据、现算」）。
-  work="$ROOT"
-  present=()
-  missing=()
-  for mode in "${MODES[@]}"; do
-    if [[ -f "$work/$mode/out.txt" && -f "$work/$mode/vm-exit" && -f "$work/$mode/check.txt" && -f "$work/$mode/check-exit" ]]; then
-      present+=("$mode")
-    else
-      missing+=("$mode")
-    fi
-  done
-  ((${#present[@]})) || fail "预录档：$work 下一个模式的四件套（out.txt / vm-exit / check.txt / check-exit）都没摆全" "按 <模式>/out.txt、vm-exit、check.txt、check-exit 放某一轮真跑留下来的原样输出；模式名取 ${MODES[*]} 里的。"
-  MODES=("${present[@]}")
-else
-  work="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-checker-tier-qemu-device-streams.XXXXXX")"
-  # 设备侧日志（blklogwrites）连数据记下每块盘收到的每个写，要装得下 mkfs 写零的 768 MiB 与之后的写：默认取一块数据盘的大小（4096 MiB）；
-  # vm-bench.sh 自己的 256 MiB 装不下，direct 那几档会在 mkfs 里撞 I/O error。镜像是稀疏文件，只占真写进去的那些。
-  # 数据盘或写路再变大，先看判红现场里 log<d>.img 的 du -m。
-  QEMU_DEVICE_LOG_MEGABYTES="${VM_LOG_MB:-4096}"
-  [[ "$QEMU_DEVICE_LOG_MEGABYTES" =~ ^[1-9][0-9]*$ ]] || fail "VM_LOG_MB 写成了「$QEMU_DEVICE_LOG_MEGABYTES」，vm-bench.sh 要的是正整数（MiB）" "写成正整数，例 VM_LOG_MB=4096；不设就用一块数据盘的大小 4096。"
-  # 判绿才清理：判红时出路点名的 check.txt、out.txt 都在 $work 底下，留着现场、印出路径，删不删由看的人定。
-  trap 'stage_exit_code=$?; if ((stage_exit_code == 0)) && [[ "${GATE_QEMU_DEVICE_STREAMS_KEEP_WORK:-0}" != 1 ]]; then rm -rf "${work:?}"; elif ((stage_exit_code == 0)); then echo "     ! GATE_QEMU_DEVICE_STREAMS_KEEP_WORK=1，判绿的现场留着：$work（看完自己删）"; else echo "     ! 判红，现场没清：$work（出路里点名的文件都在这底下，看完自己删）"; fi' EXIT
-  missing=()
-  BIN="target/x86_64-unknown-linux-gnu/release/new_pool_file_creation_on_device"
-  CHECK="target/debug/new_pool_file_creation_device_log_check"
-  pids=()
-  for mode in "${MODES[@]}"; do
-    mkdir -p "$work/$mode"
-    ( VM_DISKS=2 VM_DISK_MB=4096 VM_LOG_MB="$QEMU_DEVICE_LOG_MEGABYTES" VM_BLKLOGWRITES_DIR="$work/$mode" bash scripts/devices/vm-bench.sh "$BIN" "$mode" >"$work/$mode/out.txt" 2>&1
-      echo "$?" >"$work/$mode/vm-exit" ) &
-    pids+=("$!")
-  done
-  for pid in "${pids[@]}"; do wait "$pid"; done   # 逐个 wait 取退出码：每台虚机把退出码写进 $work/<模式>/vm-exit，紧接着按 MODES 的顺序逐个读
-fi
-
-checks=0
-for mode in "${MODES[@]}"; do
-  out="$work/$mode/out.txt"
+# 每一档的判法：虚机输出与宿主检查的逐项判据（判法单元指纹取这两个函数的单元闭包，几张按档查表的函数不进、它们这一档的取值另进「这一档的判据」）。
+# 这两个函数在这一格的子 shell 里调：fail 与 exit 只结束这一格；checks 累加判了几项。
+judge_mode_outputs() { # judge_mode_outputs <档>
+  local mode="$1" out="$work/$1/out.txt" vm_mkfs_segments_lines segments_diff cold_root pattern device_calls_lines line barriers fua flushes
   if [[ "$(cat "$work/$mode/vm-exit")" != 0 ]]; then
     tail -15 "$out" | sed 's/^/        /'
-    fail "虚机跑 $mode 没过（vm-bench.sh 的退出码或条数闸）" "单跑：VM_DISKS=2 VM_DISK_MB=4096 VM_LOG_MB=$QEMU_DEVICE_LOG_MEGABYTES VM_BLKLOGWRITES_DIR=<目录> bash scripts/devices/vm-bench.sh <musl 二进制> $mode"
+    fail "虚机跑 $mode 没过（vm-bench.sh 的退出码或条数闸）" "单跑：$(mode_parameters_of "$mode") VM_LOG_MB=$QEMU_DEVICE_LOG_MEGABYTES VM_BLKLOGWRITES_DIR=<目录> bash scripts/devices/vm-bench.sh <静态二进制> $mode"
   fi
   checks=$((checks + 1))
   # path=mkfs 那一行：恰好一行，与登记值逐字相同（段序列、次操作、崩溃状态数、种类串四样都在这一行里）
@@ -368,17 +320,8 @@ for mode in "${MODES[@]}"; do
   done < <(grep -ao 'E7RESULT name=device_calls .*' "$out" | tr -d '\r')
   ((device_calls_lines > 0)) \
     || fail "虚机跑 $mode 的输出里一行 name=device_calls 都没有：来宾块层的 FLUSH 数没法与屏障 + FUA 写对账" "看 $mode 的 out.txt：虚机二进制没打这一行、或者行名改了；读不到不等于对得上。"
-  if ((prerecorded == 0)); then
-    geometry="$(grep -ao 'E7RESULT name=geometry .*' "$out" | tr -d '\r' | head -1)"
-    bytes="$(sed -n 's/.*device_bytes=\([0-9]*\).*/\1/p' <<<"$geometry")"
-    physical="$(sed -n 's/.*physical_block_size=\([0-9]*\).*/\1/p' <<<"$geometry")"
-    minimum="$(sed -n 's/.*minimum_io=\([0-9]*\).*/\1/p' <<<"$geometry")"
-    disks=()
-    [[ "$mode" == direct ]] && disks=("$work/$mode/disk0.img" "$work/$mode/disk1.img")
-    "$CHECK" "$mode" "$work/$mode/log0.img" "$work/$mode/log1.img" "$bytes" "$physical" "$minimum" "${disks[@]}" >"$work/$mode/check.txt" 2>&1
-    echo "$?" >"$work/$mode/check-exit"
-  fi
-done
+  return 0
+}
 
 verdict() { cat "$work/$1/check-exit"; }
 # 宿主检查退出 0 的档，两块盘各要有一行 divergence_window=none divergence=none 的 name=device_log：退出码与结果行两处都判，
@@ -392,9 +335,8 @@ require_each_device_without_divergence() {
     checks=$((checks + 1))
   done
 }
-judged_device_logs=0
-matched_device_log_modes=(); control_modes=()
-for mode in "${MODES[@]}"; do
+judge_mode_device_log() { # judge_mode_device_log <档>：设备侧日志的判据，对得上的档记进 matched_device_log_modes，两个对照记进 control_modes
+  local mode="$1" host_rerun_windows
   case "$mode" in
     direct)
       [[ "$(verdict direct)" == 0 ]] || { sed 's/^/        /' "$work/direct/check.txt"
@@ -435,8 +377,460 @@ for mode in "${MODES[@]}"; do
       checks=$((checks + 1))
       matched_device_log_modes+=("$mode")
       ;;
-    *) fail "模式 $mode 没有登记设备侧日志的判据" "在这个 case 里给它补一支；不补就等于这一档的设备侧比对一个字都不判。" ;;
+    *) fail "模式 $mode 没有登记设备侧日志的判据" "在 judge_mode_device_log 的 case 里给它补一支；不补就等于这一档的设备侧比对一个字都不判。" ;;
   esac
+  return 0
+}
+
+# ── 每一档一条判定的键（文件头「复用」一段）──
+# 按档查表的几个函数：它们在这一档的取值进「这一档的判据」，单元本身不进判法单元指纹（改一档的表只作废那一档）
+TIER_TABLE_FUNCTIONS=(cold_root_of required_lines_of forbidden_lines_of host_rerun_windows_of mode_parameters_of)
+VERDICT_LIBRARY_MODULE="$STAGE_REPOSITORY/scripts/crash/lib_verdict_library.py"
+STAGE_RELATIVE=".claude/gate.d/$(basename "$0")"
+digest_text() { printf '%s' "$1" | sha256sum | cut -d' ' -f1; }
+digest_file() { if [[ -f "$1" ]]; then sha256sum "$1" | cut -d' ' -f1; else digest_text "没有 $(basename "$1")"; fi; }
+# 这一档的判据：几张按档查表的函数在这一档交的取值
+tier_table_text() { # tier_table_text <档>
+  printf 'cold_root\t%s\n' "$(cold_root_of "$1")"
+  printf 'host_rerun_windows\t%s\n' "$(host_rerun_windows_of "$1")"
+  required_lines_of "$1" | sed 's/^/required\t/'
+  forbidden_lines_of "$1" | sed 's/^/forbidden\t/'
+}
+# 档位参数：参数串（/bench 收到的 args）、盘与镜像参数、调用方环境里会改虚机行为的几个 VM_ 变量（没设写「未设」）
+tier_parameters_text() { # tier_parameters_text <档>
+  local variable
+  printf 'args\t%s\nparameters\t%s\nVM_LOG_MB\t%s\n' "$1" "$(mode_parameters_of "$1")" "$QEMU_DEVICE_LOG_MEGABYTES"
+  for variable in VM_MEM VM_CPUS VM_TIMEOUT VM_IOPS VM_CPU VM_EXTRA_ROOT VM_DISK_PREALLOCATE; do
+    printf '%s\t%s\n' "$variable" "${!variable-未设}"
+  done
+}
+# E142 产物里这一道真读的那几行：path=mkfs 之外的 name=segments 行、name=root_record 的 back_chain，与布局表八登记的 mkfs 那一行
+e142_reading_text() {
+  grep -ao 'E7RESULT name=segments .*' "$PRODUCT" | tr -d '\r' | grep -v '^E7RESULT name=segments path=mkfs '
+  printf 'back_chain\t%s\nmkfs\t%s\n' "$EXPECTED_BACK_CHAIN" "$EXPECTED_MKFS_SEGMENTS_LINE"
+}
+# 单元键（lib_verdict_library.py unit-key）写进文件；拒算（退 4）照写，lookup 读到拒算行就不复用
+unit_key_into() { # unit_key_into <输出文件> <unit-key 的参数…>
+  local output="$1"; shift
+  python3 "$VERDICT_LIBRARY_MODULE" unit-key "$@" > "$output"
+  local status=$?
+  ((status == 0 || status == 4)) || fail "算不出单元键（lib_verdict_library.py unit-key $* 退 $status）" "先让 python3 scripts/crash/lib_verdict_library.py unit-key 在这棵树上跑通（单元切法在 scripts/gate/lib_function_units.py）。"
+  return 0
+}
+# 来宾程序单元按档算（文件头「复用」一段）：每档一份 $keys_directory/guest-<档>.txt。先一次算出六档入口各自的闭包，
+# 把「别的档入口闭包里有、这一档入口闭包里没有」的单元写进 guest-excluded-<档>.txt；再逐档从 main 与这一档的入口起算、去掉那几样
+GUEST_PROGRAM=crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
+guest_keys_by_mode() {
+  local mode excluded entries exclusions
+  if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != guest-key-from-main ]]; then
+    python3 - "$VERDICT_LIBRARY_MODULE" "$ROOT" "$GUEST_PROGRAM" "$keys_directory" "${ALL_MODES[@]}" <<'PY' \
+      || fail "算不出来宾程序各档入口的闭包（$GUEST_PROGRAM 的 run_the_<档>_mode）" "看上面 python 的报错：入口改了名就照「run_the_<档，- 换成 _>_mode」改回，或改这里的入口名；单元切法在 scripts/gate/lib_function_units.py。"
+import os, sys
+sys.dont_write_bytecode = True
+module_path, root, guest_program, keys_directory = sys.argv[1:5]
+modes = sys.argv[5:]
+sys.path.insert(0, os.path.dirname(module_path))
+from lib_verdict_library import FunctionUnitIndex
+index = FunctionUnitIndex(root)
+members = {}
+for mode in modes:
+    closure = index.closure(f"{guest_program}::run_the_{mode.replace('-', '_')}_mode")
+    # 与 FunctionUnitIndex.key 的 excluded_units 同一种写法：<文件>::<限定名>
+    members[mode] = {f"{unit.file}::{unit.name}" for unit in closure.order}
+for mode in modes:
+    only_elsewhere = set().union(*(members[other] for other in modes if other != mode)) - members[mode]
+    with open(os.path.join(keys_directory, f"guest-excluded-{mode}.txt"), "w", encoding="utf-8") as handle:
+        handle.write("".join(f"{name}\n" for name in sorted(only_elsewhere)))
+PY
+  fi
+  for mode in "${ALL_MODES[@]}"; do
+    entries=("$GUEST_PROGRAM::main"); exclusions=()
+    if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != guest-key-from-main ]]; then
+      entries+=("$GUEST_PROGRAM::run_the_${mode//-/_}_mode")
+      [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == guest-key-without-main ]] && entries=("${entries[@]:1}")
+      while IFS= read -r excluded; do exclusions+=(--exclude-unit "$excluded"); done < "$keys_directory/guest-excluded-$mode.txt"
+    fi
+    unit_key_into "$keys_directory/guest-$mode.txt" "$ROOT" "${entries[@]}" ${exclusions[@]+"${exclusions[@]}"} \
+      "${TOOLCHAIN_OPTIONS[@]}" --toolchain "build: --release --target x86_64-unknown-linux-gnu rustflags=-C target-feature=+crt-static" --dependency-of singlefs-checker-tier
+  done
+}
+# 共用的几样单元键与外部输入（宿主脚本、来宾与宿主检查两个程序、判法、内核、QEMU、E142），写进 $keys_directory；每一档的组成表另由 write_tier_table 写
+compute_shared_keys() {
+  local exclusions=() function_name
+  for function_name in "${TIER_TABLE_FUNCTIONS[@]}"; do exclusions+=(--exclude-unit "$STAGE_RELATIVE::$function_name"); done
+  unit_key_into "$keys_directory/host.txt" "$ROOT" scripts/devices/vm-bench.sh --external "busybox=$BUSYBOX_IDENTITY" --external "qemu-system-x86_64=$QEMU_SYSTEM_IDENTITY"
+  guest_keys_by_mode
+  unit_key_into "$keys_directory/check.txt" "$ROOT" crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs::main \
+    "${TOOLCHAIN_OPTIONS[@]}" --toolchain "build: dev profile" --dependency-of singlefs-checker-tier
+  unit_key_into "$keys_directory/judging.txt" "$STAGE_REPOSITORY" "$STAGE_RELATIVE::judge_mode_outputs" "$STAGE_RELATIVE::judge_mode_device_log" \
+    --exclude-file scripts/crash/lib_verdict_library.py --exclude-file scripts/gate/lib_function_units.py "${exclusions[@]}" --programs-keyed-elsewhere
+  E142_DIGEST="$(digest_text "$(e142_reading_text)")"
+}
+# 一档的组成表（lib_verdict_library.py lookup / record 读的）。弄坏开关 tier-key-is-the-whole-stage 下按档的那几样换成六档合起来的一份（整道一把键）
+write_tier_table() { # write_tier_table <档>
+  local mode="$1" table_text parameters_text manifest_digest every
+  if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == tier-key-is-the-whole-stage ]]; then
+    table_text=""; parameters_text=""; manifest_digest=""
+    for every in "${ALL_MODES[@]}"; do
+      table_text+="$(tier_table_text "$every")"$'\n'; parameters_text+="$(tier_parameters_text "$every")"$'\n'
+      manifest_digest+="$(digest_file "$keys_directory/manifest-$every.txt")"
+    done
+  else
+    table_text="$(tier_table_text "$mode")"; parameters_text="$(tier_parameters_text "$mode")"; manifest_digest="$(digest_file "$keys_directory/manifest-$mode.txt")"
+  fi
+  { printf '宿主脚本单元\t@%s\n' "$keys_directory/host.txt"
+    printf '来宾程序单元\t@%s\n' "$keys_directory/guest-$mode.txt"
+    printf '宿主检查程序单元\t@%s\n' "$keys_directory/check.txt"
+    printf '判法单元指纹\t@%s\n' "$keys_directory/judging.txt"
+    printf '内核镜像\t%s\n' "$KERNEL_DIGEST"
+    printf 'QEMU\t%s\n' "$QEMU_DIGEST"
+    printf 'initramfs 清单\t%s\n' "$(digest_text "$manifest_digest")"
+    printf 'E142 对照行\t%s\n' "$E142_DIGEST"
+    printf '这一档的判据\t%s\n' "$(digest_text "$table_text")"
+    printf '档位参数\t%s\n' "$(digest_text "$parameters_text")"; } > "$keys_directory/$mode.tsv"
+}
+lookup_tier() { # lookup_tier <档>：交 0 复用、1 现判；原因写进 $tier_reason
+  local options=() answer=""
+  [[ "${SINGLEFS_GATE_FULL:-}" == 1 ]] && options=(--no-reuse)
+  if answer="$(python3 "$VERDICT_LIBRARY_MODULE" lookup "$verdict_library" qemu-tier "qemu:$1" "$keys_directory/$1.tsv" ${options[@]+"${options[@]}"})"; then
+    tier_reason="$(printf '%s' "$answer" | cut -f2)"; return 0
+  fi
+  tier_reason="$(printf '%s' "$answer" | cut -f2)"
+  local detail; detail="$(printf '%s' "$answer" | cut -f3)"
+  [[ -n "$detail" ]] && tier_reason="$tier_reason：$detail"
+  return 1
+}
+# ── 复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「二」）：六档的组成表都写好之后、查库之前抽 ──
+REUSE_CHECKS_MODULE="$STAGE_REPOSITORY/scripts/gate/lib_reuse_checks.py"
+QEMU_SCRIPT_KEY=".claude/gate.d/checker-tier-qemu-device-streams.sh"
+plan_tier_sentinel() { # plan_tier_sentinel <状态文件> <档…>：候选是这把键在库里有判绿记录的档（verdict-library-candidate 按键文件查，与 lookup 分开）
+  local state="$1" mode
+  shift
+  : > "$state.candidates"
+  if [[ "${SINGLEFS_GATE_FULL:-}" == 1 ]]; then
+    python3 "$REUSE_CHECKS_MODULE" sentinel-plan "$state" --script "$QEMU_SCRIPT_KEY" --label "QEMU 档" --off "SINGLEFS_GATE_FULL=1（不读判定库）" \
+      || fail "复用哨兵没抽成（$REUSE_CHECKS_MODULE sentinel-plan）" "照它的报错修 scripts/gate/lib_reuse_checks.py；抽不成这一趟判不了复用"
+    return 0
+  fi
+  for mode in "$@"; do
+    if python3 "$REUSE_CHECKS_MODULE" verdict-library-candidate "$verdict_library" qemu-tier "$keys_directory/$mode.tsv"; then
+      printf 'qemu:%s\t绿\n' "$mode" >> "$state.candidates"
+    fi
+  done
+  python3 "$REUSE_CHECKS_MODULE" sentinel-plan "$state" --script "$QEMU_SCRIPT_KEY" --label "QEMU 档" --candidates "$state.candidates" \
+    || fail "复用哨兵没抽成（$REUSE_CHECKS_MODULE sentinel-plan）" "照它的报错修 scripts/gate/lib_reuse_checks.py；抽不成这一趟判不了复用"
+}
+# lookup_tier_with_sentinel <状态文件> <档>：交 0 复用、1 现判；抽中强制现判的那一档不读库（tier_forced=1）。弄坏开关 reuse-lookup-skipped 下一律不读库
+lookup_tier_with_sentinel() {
+  tier_forced=0
+  if python3 "$REUSE_CHECKS_MODULE" sentinel-forced "$1" "qemu:$2" 2>/dev/null; then
+    tier_forced=1; tier_reason="复用哨兵抽中：键相同，这一趟不读库"; return 1
+  fi
+  if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == reuse-lookup-skipped ]]; then
+    tier_reason="无记录（弄坏开关 reuse-lookup-skipped：没读库）"; return 1
+  fi
+  lookup_tier "$2"
+}
+observe_tier() { # observe_tier <状态文件> <档> <结局> <判定>
+  python3 "$REUSE_CHECKS_MODULE" sentinel-observe "$1" "qemu:$2" "$3" "$4" || echo "  ! 复用哨兵没记下 qemu:$2 的结局（这一档这一趟不当哨兵判）"
+}
+record_tier() { # record_tier <档> <一句判定> <跑法>
+  python3 "$VERDICT_LIBRARY_MODULE" record "$verdict_library" qemu-tier "qemu:$1" "$keys_directory/$1.tsv" --summary "$2" --run "$3" >/dev/null \
+    || echo "  ! qemu:$1 判绿了，没记进判定库 $verdict_library：下一趟这一档照跑"
+}
+# 清单的条目，/bench 那一行的内容换成占位：被测二进制由「来宾程序单元」管。run_one 拷出来的清单（VM_INITRAMFS_MANIFEST）只有条目，直接用它；
+manifest_without_bench() { awk -F'\t' 'BEGIN { OFS = "\t" } $1 == "bench" { $4 = "<被测二进制，见来宾程序单元>" } { print }' "$1"; }
+# vm-bench.sh --initramfs-manifest 的标准输出前面还有它的抬头与「✓ 内核 …」这几行和 kernel、qemu 两行，只取 entry<TAB> 开头的条目。
+# 弄坏开关 manifest-with-listing-lines：退回改前的取法（只去掉 entry 前缀与 kernel、qemu 两行，抬头那几行留在清单里，跑完核清单永远不同、一档都不记）
+manifest_entries_of_listing() {
+  if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == manifest-with-listing-lines ]]; then
+    sed 's/^entry\t//' "$1" | grep -v -e '^kernel	' -e '^qemu	' | manifest_without_bench -
+  else
+    sed -n 's/^entry\t//p' "$1" | manifest_without_bench -
+  fi
+}
+# 跑完每档核一遍清单再记（文件头「复用」一段 initramfs 清单那一行）：<目录>/<档>/initramfs.manifest 是 run_one 打包之前打的那一份，
+# 与开跑前算键用的 $keys_directory/manifest-<档>.txt 相同才记；不同的打头几行差异、不记。键样本里 <目录> 是样本摆好的那几份。
+# 弄坏开关 manifest-check-skipped：不核清单，照记（键样本 tier-key-samples-manifest-differs 里清单不同的那一档也被复用）
+record_tiers_after_run() { # record_tiers_after_run <目录> <一句判定> <QEMU 的版本行> <档…>
+  local runs="$1" summary="$2" version="$3" mode manifest_difference
+  shift 3
+  recorded_count=0
+  for mode in "$@"; do
+    if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == manifest-check-skipped ]] \
+       || { [[ -f "$runs/$mode/initramfs.manifest" ]] \
+            && manifest_difference="$(diff <(manifest_without_bench "$runs/$mode/initramfs.manifest") "$keys_directory/manifest-$mode.txt")"; }; then
+      record_tier "$mode" "$summary" "$(mode_parameters_of "$mode") VM_LOG_MB=$QEMU_DEVICE_LOG_MEGABYTES vm-bench.sh <来宾程序> $mode（$version）"
+      recorded_count=$((recorded_count + 1))
+    else
+      echo "  ! $mode：run_one 打包之前的清单与开跑前算键用的那一份不同（或没打出来），这一档的判定没记：下一趟照跑"
+      if [[ -f "$runs/$mode/initramfs.manifest" ]]; then
+        printf '%s\n' "$manifest_difference" | head -n 6 | sed 's/^/        /'   # 「<」是 run_one 那一份，「>」是开跑前算键用的那一份
+      fi
+    fi
+  done
+}
+
+# ── 键样本（.qemu-key-samples/，文件头「样本」一段）：只判键、不判输出 ──
+run_key_samples() {
+  local samples="$ROOT/.qemu-key-samples" mode reused=0 judged=0 name value rest
+  verdict_library="$keys_directory/library"
+  QEMU_MODE_PARAMETERS_TABLE="$samples/mode-parameters.tsv"
+  TOOLCHAIN_OPTIONS=()
+  sample_environment() {
+    BUSYBOX_IDENTITY=""; QEMU_SYSTEM_IDENTITY=""; QEMU_DIGEST=""; KERNEL_DIGEST=""; TOOLCHAIN_OPTIONS=()
+    while IFS=$'\t' read -r name value rest; do
+      case "$name" in
+        kernel) KERNEL_DIGEST="$(digest_file "$ROOT/$value")" ;;
+        busybox) BUSYBOX_IDENTITY="$value=$rest" ;;
+        qemu-system-x86_64) QEMU_SYSTEM_IDENTITY="$value=$rest"; QEMU_DIGEST="$(digest_text "$value $rest")" ;;
+        toolchain) TOOLCHAIN_OPTIONS+=(--toolchain "$value") ;;
+      esac
+    done < "$samples/environment.tsv"
+    for mode in "${ALL_MODES[@]}"; do
+      if [[ -d "$samples/listings" ]]; then   # 样本摆了 vm-bench.sh --initramfs-manifest 的原样输出：照真跑那一条路取条目
+        manifest_entries_of_listing "$samples/listings/$mode.txt" > "$keys_directory/manifest-$mode.txt"
+      else
+        { cat "$samples/initramfs-manifest.tsv"; printf 'args\tf\t644\t%s\n' "$(digest_text "$mode")"; } > "$keys_directory/manifest-$mode.txt"
+      fi
+    done
+    compute_shared_keys
+    for mode in "${ALL_MODES[@]}"; do write_tier_table "$mode"; done
+  }
+  if [[ -d "$samples/runs" ]]; then
+    # 样本摆了 run_one 打包之前打的清单（runs/<档>/initramfs.manifest）：头一趟照真跑那一条路核过清单再记，清单不同的那一档不记
+    echo "── 头一趟（键样本 .qemu-key-samples：判定库 $verdict_library，六档照 runs/<档>/initramfs.manifest 核过清单再记，不判输出）"
+    sample_environment
+    record_tiers_after_run "$samples/runs" "键样本头一趟核过清单再记" "键样本" "${ALL_MODES[@]}"
+    echo "  · 头一趟记下 $recorded_count 档"
+  else
+    echo "── 头一趟（键样本 .qemu-key-samples：判定库 $verdict_library，六档照绿记下，不判输出）"
+    sample_environment
+    for mode in "${ALL_MODES[@]}"; do record_tier "$mode" "键样本头一趟照绿记" "键样本"; done
+  fi
+  [[ -f "$samples/unrelated.sh" ]] && run_key_samples_three_questions
+  echo "── 第二趟（样本 .qemu-key-samples/change.sh 改过之后）"
+  (cd "$ROOT" && bash .qemu-key-samples/change.sh) || fail "样本的 .qemu-key-samples/change.sh 没跑成" "照它的报错改样本；它只许改样本根里的文件。"
+  EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$PRODUCT" | head -1)"
+  sample_environment
+  for mode in "${ALL_MODES[@]}"; do
+    if lookup_tier "$mode"; then
+      reused=$((reused + 1)); echo "  · $mode：复用（$tier_reason）"   # gate-lint:detail
+    else
+      judged=$((judged + 1)); echo "  · $mode：现判（$tier_reason）"   # gate-lint:detail
+    fi
+  done
+  echo "  · 按档：现判 $judged、复用 $reused"
+  echo "  ! 键样本（.qemu-key-samples）：只判每一档的键作不作废，不判虚机输出，这一格本次未跑"
+  echo "     → 这一档不算真跑过 QEMU：真跑要在仓顶层不带 .qemu-prerecorded 跑一遍本阶段。"
+  exit 77
+}
+
+# 复用三问（键样本另放 .qemu-key-samples/unrelated.sh 与 affected 的那一份，scripts/gate/lib_reuse_checks.py 文件头「一」）：头一趟六档照绿记下之后，
+# 同一份输入、跑 unrelated.sh（闭包外的改动）之后、跑 change.sh（闭包内改一个单元）之后各查一趟（每趟开着复用哨兵，现判的照绿记），
+# affected 一行一档；打规范输出「REUSE_SELFTEST script=.claude/gate.d/checker-tier-qemu-device-streams.sh …」，三问与哨兵都过退 77（不判虚机输出），有一样不过判红
+run_key_samples_three_questions() {
+  local samples="$ROOT/.qemu-key-samples" mode sentinel_red=0 affected
+  for mode in "${ALL_MODES[@]}"; do printf 'qemu:%s\t现判\n' "$mode"; done > "$keys_directory/three-first.tsv"
+  key_sample_round() { # key_sample_round <名>（变量不叫 name：sample_environment 里 read 的是 name）
+    local round_name="$1" state
+    echo "── 键样本 $round_name 那一趟（复用三问）"
+    sample_environment
+    plan_tier_sentinel "$keys_directory/sentinel-$round_name.json" "${ALL_MODES[@]}"
+    : > "$keys_directory/three-$round_name.tsv"
+    for mode in "${ALL_MODES[@]}"; do
+      if lookup_tier_with_sentinel "$keys_directory/sentinel-$round_name.json" "$mode"; then state=复用; elif ((tier_forced)); then state=强制现判; else state=现判; fi
+      echo "  · qemu:$mode：绿，$state（$tier_reason）"   # gate-lint:detail
+      printf 'qemu:%s\t%s\n' "$mode" "$state" >> "$keys_directory/three-$round_name.tsv"
+      observe_tier "$keys_directory/sentinel-$round_name.json" "$mode" "$state" 绿
+      [[ "$state" == 复用 ]] || record_tier "$mode" "键样本：这一趟现判照绿记" "键样本"   # 键样本不起虚机：现判的照绿记，下一趟比得出复用
+    done
+    python3 "$REUSE_CHECKS_MODULE" sentinel-finish "$keys_directory/sentinel-$round_name.json" || sentinel_red=1
+  }
+  key_sample_round second
+  (cd "$ROOT" && bash .qemu-key-samples/unrelated.sh) || fail "样本的 .qemu-key-samples/unrelated.sh 没跑成" "照它的报错改样本；它只许改样本根里的文件。"
+  key_sample_round unrelated
+  (cd "$ROOT" && bash .qemu-key-samples/change.sh) || fail "样本的 .qemu-key-samples/change.sh 没跑成" "照它的报错改样本；它只许改样本根里的文件。"
+  key_sample_round unit
+  affected="$(sed -n 's/^\([a-z-]\{1,\}\)$/qemu:\1/p' "$samples/affected" | paste -sd,)"
+  if ! python3 "$REUSE_CHECKS_MODULE" three-questions --script "$QEMU_SCRIPT_KEY" --first "$keys_directory/three-first.tsv" --second "$keys_directory/three-second.tsv" \
+         --unrelated "$keys_directory/three-unrelated.tsv" --unit-change "$keys_directory/three-unit.tsv" --affected "$affected"; then
+    fail "键样本的复用三问没过（红在哪一问写在上面 REUSE_SELFTEST 那一行与它上面几行）" "照 scripts/gate/lib_reuse_checks.py 文件头「一」看是哪一问：① 查库那一段，② 键里多进了闭包外的输入，③ 按档的闭包收多或收少了"
+  fi
+  ((sentinel_red == 0)) || fail "键样本的复用哨兵判红（上面 ✗ 那几行）" "照上面的出路查 lookup_tier_with_sentinel 与 lookup_tier"
+  echo "  ! 键样本（.qemu-key-samples，复用三问）：只判每一档的键作不作废，不判虚机输出，这一格本次未跑"
+  echo "     → 这一档不算真跑过 QEMU：真跑要在仓顶层不带 .qemu-prerecorded 跑一遍本阶段。"
+  exit 77
+}
+
+# ── 格 device-streams（在自己的子 shell 里跑，fail 与 exit 只结束这一格）──
+cell_device_streams() {
+prerecorded=0
+[[ -f "$ROOT/.qemu-prerecorded" ]] && prerecorded=1
+key_samples=0
+if ((prerecorded)) && [[ -f "$ROOT/.qemu-key-samples/change.sh" && "$(pwd -P)" != "$(cd "$STAGE_REPOSITORY" && pwd -P)" && -z "${GATE_STAGED_FROM:-}" ]]; then key_samples=1; fi
+ALL_MODES=(direct skip-new-pool-file-creation-barrier page-cache file-overwrite second-instance raise-rollback-floor)
+work=""
+keys_directory="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-qemu-keys.XXXXXX")" || fail "建不了临时目录" "看 \$TMPDIR 满没满、有没有写权限，修好再跑。"
+# 判绿才清理现场：判红时出路点名的 check.txt、out.txt 都在 $work 底下，留着现场、印出路径，删不删由看的人定；键的临时目录哪条路退都删
+cleanup_device_streams() {
+  local stage_exit_code=$?
+  rm -rf "${keys_directory:?}"
+  [[ -n "$work" && "$work" != "$ROOT" ]] || return 0
+  if ((stage_exit_code == 0)) && [[ "${GATE_QEMU_DEVICE_STREAMS_KEEP_WORK:-0}" != 1 ]]; then rm -rf "${work:?}"
+  elif ((stage_exit_code == 0)); then echo "     ! GATE_QEMU_DEVICE_STREAMS_KEEP_WORK=1，判绿的现场留着：$work（看完自己删）"
+  else echo "     ! 判红，现场没清：$work（出路里点名的文件都在这底下，看完自己删）"; fi
+}
+trap cleanup_device_streams EXIT
+QEMU_DEVICE_LOG_MEGABYTES="${VM_LOG_MB:-4096}"
+[[ "$QEMU_DEVICE_LOG_MEGABYTES" =~ ^[1-9][0-9]*$ ]] || fail "VM_LOG_MB 写成了「$QEMU_DEVICE_LOG_MEGABYTES」，vm-bench.sh 要的是正整数（MiB）" "写成正整数，例 VM_LOG_MB=4096；不设就用一块数据盘的大小 4096。"
+
+if ((prerecorded == 0)); then
+  ((${#named_modes[@]})) && echo "  · 只跑点名的 ${#MODES[@]} 档（${MODES[*]}）：每档照键查判定库，判出的照键写库"
+  [[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
+  # 三个前置（QEMU、/dev/kvm、内核镜像）登记在 stage-inputs.tsv 本阶段那一行第三列，没齐判红
+  python3 "$ADMISSION_MODULE" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1
+fi
+
+# 复跑表里 E142 有不止一行（第 2 列 @driver_e142 与 @driver_e142_p8g_crates_dump 等）：只取第 2 列恰是 @driver_e142 的那一行的第 4 列，不取全部 E142 行。
+e142_row_filter='$1=="E142" && $2=="@driver_e142"'
+[[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == e142-all-rows ]] && e142_row_filter='$1=="E142"'
+e142_product_names="$(awk -F'|' "$e142_row_filter"'{print $4}' scripts/experiments/replay.sh)"
+e142_product_row_count="$(grep -c . <<<"$e142_product_names")"
+if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != e142-all-rows && "$e142_product_row_count" != 1 ]]; then
+  fail "scripts/experiments/replay.sh 里第 2 列是 @driver_e142 的 E142 行取到 $e142_product_row_count 行（要恰好 1 行；0 行是这一行被删或改了名，多于 1 行是被重复登记）" \
+       "看 scripts/experiments/replay.sh 里 E142|@driver_e142| 开头的行：留一行，第 4 列写这一道对照的 E142 产物文件名；驱动改了名，这里的 @driver_e142 跟着改。"
+fi
+PRODUCT="research/results/$e142_product_names"
+[[ -f "$PRODUCT" ]] || fail "从 replay.sh 的 @driver_e142 那一行解析不出产物文件（得到 $PRODUCT）" "看 scripts/experiments/replay.sh 里 E142|@driver_e142| 那一行的第 4 列，对应的文件在不在 research/results/ 下。"
+# 反向链从产物里现取，不写死：写死的数在格式常量一改就过期，红起来像是写路错了。
+EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$PRODUCT" | head -1)"
+[[ -n "$EXPECTED_BACK_CHAIN" ]] || fail "产物里取不出 name=root_record 的 back_chain（$PRODUCT）" "看 $PRODUCT 有没有 name=root_record 那一行、它的 back_chain 字段还在不在。"
+# path=mkfs 那一行的对照是布局表八「mkfs 种根」那一行登记的值（文件头「段序列分两处比」）：解析器按本阶段自己的位置取，--root 指被判的仓，
+# 样本把 cwd 换成样本根时，读的是样本里那份合成的布局表、跑的仍是仓里的解析器。开虚机之前取，登记表写坏了不白等虚机。
+SEGMENT_REGISTRY_SCRIPT="$STAGE_REPOSITORY/scripts/crash/check-segment-registry.py"
+if ! registered_mkfs_segments_output="$(python3 "$SEGMENT_REGISTRY_SCRIPT" --root "$ROOT" --print-mkfs-segments-line)"; then
+  printf '%s\n' "$registered_mkfs_segments_output" | sed 's/^/        /'
+  fail "取不出 .claude/kb/layout/01-first-txn.md「八、」登记表「mkfs 种根」那一行的登记值（段序列、次操作、崩溃状态数、种类串）" \
+       "照上面 scripts/crash/check-segment-registry.py 的报错改那一行；它不在就从 git 找回来（门禁 doc-registries 的 segment-registry 格用的是同一份）。"
+fi
+EXPECTED_MKFS_SEGMENTS_LINE="$registered_mkfs_segments_output"
+EXPECTED_MKFS_SEGMENTS_SOURCE="布局表八「mkfs 种根」那一行"
+if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == mkfs-from-e142 ]]; then
+  EXPECTED_MKFS_SEGMENTS_LINE="$(grep -ao 'E7RESULT name=segments path=mkfs .*' "$PRODUCT" | tr -d '\r')"
+  EXPECTED_MKFS_SEGMENTS_SOURCE="E142 产物 $PRODUCT 的 path=mkfs 行"
+fi
+((key_samples)) && run_key_samples
+
+reused_modes=(); judged_reasons=()
+if ((prerecorded)); then
+  # 预录档：不起虚机、不编译，只判样本目录里摆好的那几个模式。被判的模式现算，不写死——
+  # 写死一份清单，样本里少摆一个模式就会整档静默不判（`show-me-test.md`「跳过清单要与被扫集合出自同一份数据、现算」）。
+  work="$ROOT"
+  present=()
+  missing=()
+  for mode in "${MODES[@]}"; do
+    if [[ -f "$work/$mode/out.txt" && -f "$work/$mode/vm-exit" && -f "$work/$mode/check.txt" && -f "$work/$mode/check-exit" ]]; then
+      present+=("$mode")
+    else
+      missing+=("$mode")
+    fi
+  done
+  ((${#present[@]})) || fail "预录档：$work 下一个模式的四件套（out.txt / vm-exit / check.txt / check-exit）都没摆全" "按 <模式>/out.txt、vm-exit、check.txt、check-exit 放某一轮真跑留下来的原样输出；模式名取 ${MODES[*]} 里的。"
+  MODES=("${present[@]}")
+else
+  # 判定库：被判那棵树的 git common-dir 里的 singlefs-qemu-verdicts/（跨轮留着；GATE_QEMU_VERDICT_LIBRARY 盖过它）；SINGLEFS_GATE_FULL=1 只写不读
+  verdict_library="${GATE_QEMU_VERDICT_LIBRARY:-}"
+  if [[ -z "$verdict_library" ]]; then
+    common_directory="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
+      || fail "取不到 $ROOT 的 git common-dir，判定库没处放" "在 git 工作树里跑本阶段，或设 GATE_QEMU_VERDICT_LIBRARY=<固定目录>（不放 /tmp）。"
+    verdict_library="$common_directory/singlefs-qemu-verdicts"
+  fi
+  # 每一档的键：开跑之前算（文件头「复用」一段）。清单、内核与 QEMU 照 vm-bench.sh --initramfs-manifest 交的，与 run_one 同一段代码
+  BUSYBOX_PATH="$(command -v busybox)" || fail "找不到 busybox" "装 busybox-static（apt install busybox-static）再跑。"
+  BUSYBOX_IDENTITY="$(sha256sum "$BUSYBOX_PATH" | cut -d' ' -f1)=$(busybox --help 2>&1 | head -1)"
+  TOOLCHAIN_OPTIONS=(--toolchain "$(cargo -V 2>&1)" --toolchain "$(rustc -V 2>&1)")
+  : > "$keys_directory/bench-placeholder"
+  for mode in "${MODES[@]}"; do
+    env $(mode_parameters_of "$mode") VM_LOG_MB="$QEMU_DEVICE_LOG_MEGABYTES" VM_BLKLOGWRITES_DIR="$keys_directory/blk" \
+      bash scripts/devices/vm-bench.sh --initramfs-manifest "$keys_directory/bench-placeholder" "$mode" > "$keys_directory/manifest-raw-$mode.txt" 2>"$keys_directory/manifest-$mode.err" \
+      || { sed 's/^/        /' "$keys_directory/manifest-$mode.err"; fail "vm-bench.sh --initramfs-manifest 交不出 $mode 这一档的清单" "照上面的报错修（多半是 busybox、内核镜像或补好的 QEMU 缺了）；它不起虚机。"; }
+    manifest_entries_of_listing "$keys_directory/manifest-raw-$mode.txt" > "$keys_directory/manifest-$mode.txt"
+  done
+  kernel_path="$(sed -n 's/^kernel\t//p' "$keys_directory/manifest-raw-${MODES[0]}.txt")"
+  qemu_path="$(sed -n 's/^qemu\t//p' "$keys_directory/manifest-raw-${MODES[0]}.txt")"
+  [[ -r "$kernel_path" && -x "$qemu_path" ]] || fail "vm-bench.sh 交的内核镜像（$kernel_path）或 QEMU（$qemu_path）读不了" "照 vm-bench.sh 的出路配好内核镜像（SINGLEFS_KERNEL）与补好的 QEMU（qemu.env）再跑。"
+  KERNEL_DIGEST="$(sha256sum "$kernel_path" | cut -d' ' -f1)"
+  qemu_version="$("$qemu_path" --version 2>&1 | head -1)"
+  QEMU_SYSTEM_IDENTITY="$(sha256sum "$qemu_path" | cut -d' ' -f1)=$qemu_version"
+  QEMU_DIGEST="$(digest_text "$QEMU_SYSTEM_IDENTITY $(digest_file "$(dirname "$qemu_path")/qemu-io") $(digest_file "$ROOT/scripts/devices/qemu/blklogwrites-linearize-over-iov-max.patch")")"
+  compute_shared_keys
+  modes_to_run=()
+  echo "  · 每档一条判定（判定库 $verdict_library）："
+  forced_modes=()
+  for mode in "${MODES[@]}"; do write_tier_table "$mode"; done
+  plan_tier_sentinel "$keys_directory/sentinel.json" "${MODES[@]}"
+  for mode in "${MODES[@]}"; do
+    if lookup_tier_with_sentinel "$keys_directory/sentinel.json" "$mode"; then
+      reused_modes+=("$mode"); echo "  · $mode：绿，复用（$tier_reason）"   # gate-lint:detail
+      observe_tier "$keys_directory/sentinel.json" "$mode" 复用 绿
+    else
+      modes_to_run+=("$mode"); judged_reasons+=("$mode：$tier_reason")
+      ((tier_forced)) && forced_modes+=("$mode")
+    fi
+  done
+  if ((${#modes_to_run[@]} == 0)); then
+    python3 "$REUSE_CHECKS_MODULE" sentinel-finish "$keys_directory/sentinel.json" || fail "复用哨兵判红（上面 ✗ 那几行）" "照上面的出路查 lookup_tier_with_sentinel 与 lookup_tier"
+    echo "  ✓ QEMU 真设备：${#MODES[@]} 档（${MODES[*]}）每档的键都对得上上一次判绿的判定，全部复用，没编、没起虚机；按档：现判 0、复用 ${#reused_modes[@]}"
+    echo "     ! 这一道没罩到：崩溃注入：${#MODES[@]} 档都没有"
+    exit 0
+  fi
+  MODES=("${modes_to_run[@]}")
+  # 虚机二进制要静态链接（initramfs 里没有动态库）：glibc 目标加 +crt-static 编成 static-pie。不编 musl 目标：checker 档默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器
+  # 两条 cargo build 不吃 cargo 自己的缺省（核数）：经 capped.sh default 起，编译并行度取登记的重活默认并行度（.claude/heavy-thread-default，SINGLEFS_THREAD_CAP 设了取它）
+  if ! bash "$STAGE_REPOSITORY/scripts/hosts/capped.sh" default cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device >/dev/null 2>&1; then
+    fail "虚机二进制（glibc 静态 PIE）编不过" "单跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\"]' -p singlefs-checker-tier --bin new_pool_file_creation_on_device 看报错。"
+  fi
+  if ! bash "$STAGE_REPOSITORY/scripts/hosts/capped.sh" default cargo build -p singlefs-checker-tier --bin new_pool_file_creation_device_log_check >/dev/null 2>&1; then
+    fail "宿主一侧的设备日志检查编不过" "单跑 cargo build -p singlefs-checker-tier --bin new_pool_file_creation_device_log_check 看报错。"
+  fi
+  work="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-checker-tier-qemu-device-streams.XXXXXX")"
+  # 设备侧日志（blklogwrites）连数据记下每块盘收到的每个写，要装得下 mkfs 写零的 768 MiB 与之后的写：默认取一块数据盘的大小（4096 MiB）；
+  # vm-bench.sh 自己的 256 MiB 装不下，direct 那几档会在 mkfs 里撞 I/O error。镜像是稀疏文件，只占真写进去的那些。
+  # 数据盘或写路再变大，先看判红现场里 log<d>.img 的 du -m。
+  missing=()
+  BIN="target/x86_64-unknown-linux-gnu/release/new_pool_file_creation_on_device"
+  CHECK="target/debug/new_pool_file_creation_device_log_check"
+  pids=()
+  for mode in "${MODES[@]}"; do
+    mkdir -p "$work/$mode"
+    ( env $(mode_parameters_of "$mode") VM_LOG_MB="$QEMU_DEVICE_LOG_MEGABYTES" VM_BLKLOGWRITES_DIR="$work/$mode" VM_INITRAMFS_MANIFEST="$work/$mode/initramfs.manifest" \
+        bash scripts/devices/vm-bench.sh "$BIN" "$mode" >"$work/$mode/out.txt" 2>&1
+      echo "$?" >"$work/$mode/vm-exit" ) &
+    pids+=("$!")
+  done
+  for pid in "${pids[@]}"; do wait "$pid"; done   # 逐个 wait 取退出码：每台虚机把退出码写进 $work/<模式>/vm-exit，紧接着按 MODES 的顺序逐个读
+fi
+
+checks=0
+for mode in "${MODES[@]}"; do
+  judge_mode_outputs "$mode"
+  if ((prerecorded == 0)); then
+    geometry="$(grep -ao 'E7RESULT name=geometry .*' "$work/$mode/out.txt" | tr -d '\r' | head -1)"
+    bytes="$(sed -n 's/.*device_bytes=\([0-9]*\).*/\1/p' <<<"$geometry")"
+    physical="$(sed -n 's/.*physical_block_size=\([0-9]*\).*/\1/p' <<<"$geometry")"
+    minimum="$(sed -n 's/.*minimum_io=\([0-9]*\).*/\1/p' <<<"$geometry")"
+    disks=()
+    [[ "$mode" == direct ]] && disks=("$work/$mode/disk0.img" "$work/$mode/disk1.img")
+    "$CHECK" "$mode" "$work/$mode/log0.img" "$work/$mode/log1.img" "$bytes" "$physical" "$minimum" "${disks[@]}" >"$work/$mode/check.txt" 2>&1
+    echo "$?" >"$work/$mode/check-exit"
+  fi
+done
+
+judged_device_logs=0
+matched_device_log_modes=(); control_modes=()
+for mode in "${MODES[@]}"; do
+  judge_mode_device_log "$mode"
   judged_device_logs=$((judged_device_logs + 1))
 done
 
@@ -447,14 +841,14 @@ if ((prerecorded)); then
   echo "     → 这一档不算真跑过 QEMU：真跑要在仓顶层不带 .qemu-prerecorded 跑一遍本阶段。"
   exit 77
 fi
-echo "  ✓ QEMU 真设备：${#MODES[@]} 次虚机跑（${MODES[*]}）、$checks 项检查全过；${matched_device_log_modes[*]} 设备侧逐项对得上（宿主照模式重跑到这一档最后那次发布），${#control_modes[@]} 个对照（${control_modes[*]}）都红在该红的地方"
+# 每档判绿各记一条判定（键是开跑前算的那一份）；run_one 打包之前打的清单与开跑前算键用的那一份核一遍，对不上不记（键罩的不是真跑的那一份）
+record_tiers_after_run "$work" "$checks 项检查全过（这一趟 ${#MODES[@]} 档）" "$qemu_version" "${MODES[@]}"
+for mode in "${MODES[@]}"; do
+  if [[ " ${forced_modes[*]} " == *" $mode "* ]]; then observe_tier "$keys_directory/sentinel.json" "$mode" 强制现判 绿; else observe_tier "$keys_directory/sentinel.json" "$mode" 现判 绿; fi
+done
+python3 "$REUSE_CHECKS_MODULE" sentinel-finish "$keys_directory/sentinel.json" || fail "复用哨兵判红（上面 ✗ 那几行）" "照上面的出路查 lookup_tier_with_sentinel 与 lookup_tier"
+echo "  ✓ QEMU 真设备：${#MODES[@]} 次虚机跑（${MODES[*]}）、$checks 项检查全过；${matched_device_log_modes[*]} 设备侧逐项对得上（宿主照模式重跑到这一档最后那次发布），${#control_modes[@]} 个对照（${control_modes[*]}）都红在该红的地方；按档：现判 ${#MODES[@]}、复用 ${#reused_modes[@]}（现判的原因：$(IFS='；'; printf '%s' "${judged_reasons[*]}")），记下 $recorded_count 档"
 echo "     ! 这一道没罩到：$uncovered"
-# 全绿标记（git common-dir）供整轮门禁与下一趟复用；写不成只报不红（方向是多跑）。只跑了点名的几档（--item）不写：标记说的是整道。
-if ((${#named_modes[@]})); then
-  echo "     ! 只跑了点名的 ${#MODES[@]} 档，不是整道结论：没写全绿标记"
-elif ! python3 "$ADMISSION_MODULE" stage-marker-write "$ROOT" "$(basename "$0")" >/dev/null; then
-  echo "  ! 没写成这一道的全绿标记（admission.py stage-marker-write 没成）：下一趟这一道照跑，不会复用"
-fi
 }
 
 stage_cells_run "$ROOT"

@@ -1,5 +1,0 @@
-PROBE_UNIT A states=288 class_states_equal_product=true classes=144 refinements=0 checks_all_zero=true mismatching_states=0 stops_at_s13=false
-PROBE_UNIT B not_applicable_states=216 (unit test expects 216) mismatching_states=0 stops_at_s13=false
-PROBE_UNIT D main_sum=1207959552 local_states=1207959552
-PROBE_UNIT D2 forbidden_kind=1 refinements=1 mismatching_states=0 stops_at_s13=true
-PROBE_UNIT C moved_positions=[5] (expects [5]) refinements=1 differing_when_that_write_lands=36 mismatching_states=0 stops_at_s13=false

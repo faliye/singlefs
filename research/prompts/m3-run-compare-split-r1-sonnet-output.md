@@ -237,7 +237,7 @@ scripts/crash/crash-amplification.sh:222：FULL_EXPAND_UP_TO=30
 ### 7.6 RocksDB 的压缩与写放大
 
 - 压缩：`options.set_compression_type(rocksdb::DBCompressionType::Lz4)`（`copy/crates/singlefs-checker-tier/src/verdict_store.rs:811`）。每批同步写、WAL 开着（`:819`）。
-- 压缩比我**没有可用的样本**：旧布局库没有 `0C`（上一小节）。一个旁证（不是样本）：10/08 那趟取回的对端库 169 270 644 字节，对应对端判的 409 862 144 态，即 0.41 字节/态；本机送出的 187 508 594 字节对应本机判的 903 610 463 态，0.21 字节/态（哪份库对哪份态数是我从 share-0、share-1 日志推的）（`~/.local/share/singlefs/crash-amplification/runs/crash-amplification-20261008T063920Z-2361592-two-hosts/` 下 `fetched`、`library-for-peer` 的 `du -sb`，日志 `share-1.log`）[算]。这些是每态 1 字节的判定向量编号加键、WAL，说明**同值成片的块压得很狠**，但 `10` 是 106–160 字节、同值成片程度取决于一块里不同落点的个数，不能外推 [推]。
+- 压缩比我**没有可用的样本**：旧布局库没有 `0C`（上一小节）。一个旁证（不是样本）：10/08 那趟取回的对端库 169 270 644 字节，对应对端判的 409 862 144 态，即 0.41 字节/态；本机送出的 187 508 594 字节对应本机判的 903 610 463 态，0.21 字节/态（哪份库对哪份态数是我从 share-0、share-1 日志推的）（`~/.local/share/singlefs/crash-amplification/runs/crash-amplification-2026-10-08-2361592-two-hosts/` 下 `fetched`、`library-for-peer` 的 `du -sb`，日志 `share-1.log`）[算]。这些是每态 1 字节的判定向量编号加键、WAL，说明**同值成片的块压得很狠**，但 `10` 是 106–160 字节、同值成片程度取决于一块里不同落点的个数，不能外推 [推]。
 - 写放大：没量过。E162（崩溃放量判定块存储选型）只量了持续写入速率与占用比，对应产物已归档，不在今天的树上。一般经验（WAL 一遍、刷盘一遍、各层合并若干遍）**未在本项目验证**，不进结论。量法写在第 13 节 M3。
 
 ### 7.7 三档各要多少、能落下的形态、各丢什么
@@ -268,7 +268,7 @@ scripts/crash/crash-amplification.sh:222：FULL_EXPAND_UP_TO=30
 
 ### 8.2 观察者那一块（P5）是另一笔账，与拆不拆无关
 
-`seconds_observing=9.2`、`states_observed_here=140`、`blocks_observed_here=16`（`~/.local/share/singlefs/crash-amplification/runs/crash-point-replay-20261010T074317Z-3703484/fast-tier.crash_enumeration_multi_record_publish_stream.log` 第 182、184 行；另一条流 9.5 秒、140 态）：这是展开 6 的小域，墙钟 9.2 秒除以 140 态 = **每态约 66 ms**，含存库、起线程的固定开销，线程数没记，不是吞吐量测量，只说明量级 [算]。观察者在多记录流上挂的三个节点覆盖 1.359×10⁹ 态（第 7.5 节）；按 66 ms × 1.359×10⁹ ÷ 62 线程 = 约 17 天 [算，纯外推，可能高估也可能低估]。**这一块和「跑数据 / 对比数据」拆不拆无关，是 J4 观察者「共享前缀的每个状态都做」自带的 CPU 账**，只是拆开后挂载的写还要额外录库。需要先量（8.3），再谈要不要对用户摊开。
+`seconds_observing=9.2`、`states_observed_here=140`、`blocks_observed_here=16`（`~/.local/share/singlefs/crash-amplification/runs/crash-point-replay-2026-10-10-3703484/fast-tier.crash_enumeration_multi_record_publish_stream.log` 第 182、184 行；另一条流 9.5 秒、140 态）：这是展开 6 的小域，墙钟 9.2 秒除以 140 态 = **每态约 66 ms**，含存库、起线程的固定开销，线程数没记，不是吞吐量测量，只说明量级 [算]。观察者在多记录流上挂的三个节点覆盖 1.359×10⁹ 态（第 7.5 节）；按 66 ms × 1.359×10⁹ ÷ 62 线程 = 约 17 天 [算，纯外推，可能高估也可能低估]。**这一块和「跑数据 / 对比数据」拆不拆无关，是 J4 观察者「共享前缀的每个状态都做」自带的 CPU 账**，只是拆开后挂载的写还要额外录库。需要先量（8.3），再谈要不要对用户摊开。
 
 ### 8.3 量法：哪条命令、在哪棵树上、量到哪算够
 
@@ -306,7 +306,7 @@ scripts/crash/crash-amplification.sh:222：FULL_EXPAND_UP_TO=30
 
 ### 9.3 P5 判表形态上限：用量 [推]
 
-- **每落点 64 次写**（`copy/crates/singlefs-checker-tier/src/crash_judge_tables.rs:51`）。系统配置槽是被写次数最多的落点：多记录流从取号到 C 的系统配置槽写，点名里是 `acquire_instance_and_warm_up.system_configuration_slot.1`/`.2`/`.3`、`publish_first_file.system_configuration_slot.1`、`sequential_write.system_configuration_slot.1`…（07:43 那趟日志的 `CRASH_AMPLIFICATION_BLOCK` 行），两盘各两个槽轮换，每个落点个位数；一次挂载再加取号写行、暖机两次、续做每步一次，约 8–10。合计十几次。最坏的是 σ 流，系统配置 0 号槽写了 34 次（`briefs/2026-09-28.md:85`）加挂载十来次，约 44 < 64。**不会顶到**。
+- **每落点 64 次写**（`copy/crates/singlefs-checker-tier/src/crash_judge_tables.rs:51`）。系统配置槽是被写次数最多的落点：多记录流从取号到 C 的系统配置槽写，点名里是 `acquire_instance_and_warm_up.system_configuration_slot.1`/`.2`/`.3`、`publish_first_file.system_configuration_slot.1`、`sequential_write.system_configuration_slot.1`…（那一趟日志的 `CRASH_AMPLIFICATION_BLOCK` 行），两盘各两个槽轮换，每个落点个位数；一次挂载再加取号写行、暖机两次、续做每步一次，约 8–10。合计十几次。最坏的是 σ 流，系统配置 0 号槽写了 34 次（`briefs/2026-09-28.md:85`）加挂载十来次，约 44 < 64。**不会顶到**。
 - **持久掩码 2048 位**（`copy/crates/singlefs-checker-tier/src/crash_facts.rs:287`），超了判表建不出（`EnumeratedWritesPastTheMaskWidth`，`copy/crates/singlefs-checker-tier/src/crash_judge_tables.rs:242`、`:389`）。多记录流写表约 150 次、加撕裂镜像与重放，再加一个挂载组的 10–120 次写，≈ 300–500，远低于上限。**随机历史是另一回事**：一次发布约 24–30 次写（多记录流 A、B、C 三段 24、28、30 写，`…multi_record_publish_stream.rs:20`），2048 ÷ 30 ≈ 68 次发布。快档 24 步历史（`copy/crates/singlefs-checker-tier/tests/crash_injection_campaign.rs:180`）≈ 24 × 30 + 挂载与之后一次发布 ≈ 900，够；**历史长过约 60 步的大档，开 GPU 时判表建不出**，而 P9 要求建不出就判红、不退回 CPU。这是 3.3 没写的 GPU 路对随机历史规模的硬上限（内核容量，不是挂钟）。
 - **挂载写的分组数**：挂载写由（落到的版本，实例代号与 txg 这几个标量，journal 前缀长度）决定，组数不超过这几个量的乘积，估几十 [推]；没量过。量法：在观察者里对每个态的挂载写表取 SHA-256，数一个展开 16 的域里有几个不同值；接近状态数就说明退化成一态一表，要改形态。
 
@@ -370,7 +370,7 @@ record_checker_judges_absence_by_the_persisted_set.rs:1
 
 ## 11. Q8 两档：轻型 ⊂ 重型还成不成立，轻型的库放哪
 
-- **成立，且不用改合表**。`.claude/rules/verification.md:50` 写的是「轻型是重型的子集：轻型里有的每一项，重型里都有」，入口自证 `light-within-heavy` 是拿真合表与小仓两份计划逐件核（`scripts/crash/crash-point-replay.sh` 文件头「轻型是重型的子集」一段）。比的是（项，测试目标，展开域）这一层，拆成两段后每一项仍是同一个入口、同一组测试目标，只是每个入口内部先跑数据后比；轻型在小域（「甲二」∪ 展开 6）、重型在整域，包含关系不变 [读、推]。观察者也一样：展开 6 域里 140 态（07:43 那趟日志），30 深全展开 1.359×10⁹ 态，前者在后者里。
+- **成立，且不用改合表**。`.claude/rules/verification.md:50` 写的是「轻型是重型的子集：轻型里有的每一项，重型里都有」，入口自证 `light-within-heavy` 是拿真合表与小仓两份计划逐件核（`scripts/crash/crash-point-replay.sh` 文件头「轻型是重型的子集」一段）。比的是（项，测试目标，展开域）这一层，拆成两段后每一项仍是同一个入口、同一组测试目标，只是每个入口内部先跑数据后比；轻型在小域（「甲二」∪ 展开 6）、重型在整域，包含关系不变 [读、推]。观察者也一样：展开 6 域里 140 态（那一趟日志），30 深全展开 1.359×10⁹ 态，前者在后者里。
 - **会破的是构建，不是包含关系**。快档命令是 `cargo test --release -p singlefs-checker-tier --lib --tests`（`.claude/rules/verification.md:34`），不带 `verdict-store`；RocksDB 是可选依赖、平常不编，因为「librocksdb-sys 在每个编译目录里现编一遍 C++」（`copy/crates/singlefs-checker-tier/Cargo.toml:18`、`:20`、`:26`–`:27`）。拆成先跑完全部数据、再从库读以后，每一个要判的测试（17 份调旧引擎的、13 处调 `inject_crashes_into_history`）都得读库，**快档整条要带这个特性**；`copy/crates/singlefs-checker-tier/src/crash_given_states.rs:119`：「`verdict-store` 特性的二进制只有它」，指不经库的就地判那一支（前半句在 `:118`）。连带：crates 变异整表每个拷贝目录都要现编 C++。两条路，交主 agent 或用户定 [推]：
   - 路 A：快档整条带特性，成本是每个编译目录多编一遍 C++（我没量，只知道 Cargo.toml 注释的说法，以及 `records/2026-09-30-里程碑三开工第一轮.md:986` 记的「编译两次撞 235 秒限时」）。
   - 路 B：对比段读一个 trait（库），实现两个——RocksDB 和内存 `BTreeMap`；内存那个只给不链 RocksDB 的小用例，**同样严格先写全部、后读**，对比段闭包里不引 RocksDB。代价：用户原话说的是「放入rockdb中」（`records/2026-09-30-里程碑三开工第一轮.md:997`），内存实现要用户点头。

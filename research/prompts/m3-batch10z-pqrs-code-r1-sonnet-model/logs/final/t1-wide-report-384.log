@@ -1,9 +1,0 @@
-
-running 1 test
-test s2_sweep ... DIAG label=t1 prefix=20 r=b6 faults=racct,rlin actions=WWWW step=0W NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk
-S2 label=t1 arm=implemented slots=384 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=WWWW secs=0.53 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=440 ab_mount=0 iso_after_first_raise=- iso_max=440 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=0W:NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk r_left_at=0 hit=false first_red=-
-S2_DONE label=t1 arm=implemented histories=1 hits=0
-ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
-

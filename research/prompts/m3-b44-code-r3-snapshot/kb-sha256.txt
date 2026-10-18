@@ -1,0 +1,6 @@
+95e8dbb2ccc55ee8d3f3e0ae49b695eda8fd78a3e5df9fcf84afd4851a96fd45  .claude/kb/term-renames.md
+a7d3c07761095e4745c9004ccf044b3a8be5e413126e67c1ccb8ed0e5f66f6bd  crates/singlefs-checker/invariants/04-校验和.md
+a8b3756958d7ef463c121238ba6610ea86c6579d37d0f8938afdc97c2302764d  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+cda3dc77738b34554368552c9279e0e3c71eb5bafa8f41e5019494c7a382dba8  .claude/kb/decisions/16-发布语义.md
+d2fd003ed9d7dbbecdb8a0d5701f2354653da4a9211410083f4ec6979e426617  .claude/kb/experiments/02-key布局对递归遍历的影响.md
+925cda7a17240e6530704db2f31a4859e598636af6fca37d728cbb381e8316db  .claude/kb/checks-owed.md

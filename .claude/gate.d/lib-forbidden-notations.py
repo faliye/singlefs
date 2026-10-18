@@ -24,6 +24,10 @@ FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。�
 - 时:分 这一族：日期后面跟钟点（「日期 时区词 时:分」、diff 头与 stat 那种「日期 时:分:秒.毫秒 +0000」）、时区词后面跟钟点、
   钟点后面跟时区词、带 x 通配的「时:分x」、不带日期的 Z 钟点，与不挨日期时区的钟点（时:分、时:分:秒、带毫秒、区间、「月-日 时:分」）。
 - ISO 时间戳：日期与钟点之间是 T 的（带不带日期、带不带时区偏移或 Z 都算），date 的原样输出也在内。
+- ISO 基本格式的紧凑时间戳：日期（8 位连写，或带连字符的）、字母 T、钟点（4 到 6 位连写，可带小数秒）、可带 Z 或偏移，中间没有冒号；
+  日期是 8 位连写的，钟点也可以是带冒号的「时:分」。日期与钟点各位都要合法（年 20 开头、月 01 到 12、日 01 到 31、时 00 到 23、分 00 到 59），
+  前后不挨 ASCII 字母数字（下划线、连字符、斜杠、点不算，运行目录名与日志文件名里的写法照判）；没有放行写法，字段值、路径名都判。
+  日期或钟点越界的、年不是 20 开头的、钟点位数不对的、小写 t 的数字加 T 写法（哈希、编号）不算。不带日期的「T 加钟点」不判（与编号分不开）。
 - 时区词：ZONE_WORDS 里那两个缩写，大写、前后不挨 ASCII 字母数字与下划线（标识符里的不算）。
 - 中文的「N 点 / N 时」：挨在日期或时区词后面的（中间可有空格、「次日」；「时」后面跟间、代、刻、序、延、钟、效、长、候、机、区、态的
   是时间、时区这一类别的词，不算）；不挨日期、时区的，只认后面跟「前后 / 左右 / 许 / 半 / 钟」的「N 点」与后面跟「许」的「N 时」
@@ -42,15 +46,18 @@ FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。�
   时区偏移、小数；前面是反引号而小时只有一位的，是反引号里的键（`3:10`）；
 - 紧跟在后面的是 %、「.数字」或「-字母」：百分比、「分:秒.百分之一秒」（time -v 的格式）、带编号的阶段文件名（「20:09-sample-stage.sh」这类）；
 - 紧跟在后面的是 = 或 /、或紧挨在前面的是 @ 或 ;：产物行里「槽:代=ok@槽:代」「rows=槽:代/…;槽:代/…」这类键值对与分隔列表；
-- 同一行里有取值出了钟点范围的冒号对（时大于 23、分大于 59、一边三位或分只有一位）或「文件:行号」（「.md:42」这类）的，
-  这一行的冒号对按「门禁号:行号」「决策号:行号」这类编号读。
+- 同一句里（句的边界是 。！？，没有这几个就是整行；「；」不算）有取值出了钟点范围的冒号对（时大于 23、分大于 59、一边三位或分只有一位）或「文件:行号」（「.md:42」这类）的，
+  这一句里的冒号对按「门禁号:行号」「决策号:行号」这类编号读；别的句子里的冒号对不受它牵连。
 ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（产物行的字段值，「taken_jst=<日期>T<钟点>」这类）。
 排除的是把钟点当被测输入或期望输出用的文件（hook 自检的假日志、门禁样本、以时区为被测算法的 c510 那一轮）与上游副本。
-管不到的：同一行既有编号对又有真钟点的，真钟点跟着一起放过；引号、反引号里两位小时以外的代码字面按上面那几条放过。
+管不到的：同一句既有编号对又有真钟点的，真钟点跟着一起放过；引号、反引号里两位小时以外的代码字面按上面那几条放过。
 
 弄坏开关（环境变量，逗号分隔，可以写几个键；每次现读，同一个进程里切换也认）：
 - LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>：那几条判据行（写形态键的，那一形态的全部判据行）不判。
   打开时 doc-text.sh 那一形态的红样本（prime-marks-red、clock-times-red、session-names-red）、write-guard.sh --selftest 里点名那一行的格必须判红，证判据真在管那一行。
+  同一个变量另认两项会让编号对与紧凑时间戳判法退回旧样子的：numbered-pairs-whole-line（编号对按整行读，不按句读）与 compact-timestamp-loose（紧凑时间戳退回「8 位数字加 T 加 4 到 6 位数字」）；
+  前者打开时 doc-text.sh 的 clock-times-red 里 records/bare-clock-sentences.md 那五行必须报不出来（want 找不到、行数对不上），后者打开时 clock-times-green 里 records/近似写法.md 的数字加 T 近似写法必须判红。
+  紧凑时间戳那一条判据行的键是 iso-compact-timestamp，写进上面的 <判据行键> 关掉它时 clock-times-red 里 records/iso-compact.md 那六行必须报不出来。
   同一个变量另认一项 first-hit-only：all_hits 只交最靠前的那一处（退回只报第一处的旧样子）；
   打开时 write-guard.sh --selftest 的「钟点:两处都报（行号与总数）」「会话号:两处都报（行号与总数）」两格必须判红。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=<判据行键或形态键>：那几条判据行的上下文规则不生效，命中一律算违例。
@@ -83,6 +90,16 @@ HOUR_VALUE = r'(?:[01]?\d|2[0-3])'
 MINUTE_VALUE = r'[0-5]\d'
 BARE_CLOCK = rf'(?<![{ASCII_WORD}:]){HOUR_VALUE}:{MINUTE_VALUE}(?::{MINUTE_VALUE}(?:\.\d+)?)?(?![{ASCII_WORD}:])'
 ISO_TIMESTAMP = rf'(?:{DATE}|(?<![{ASCII_WORD}\-]))T(?:[01]\d|2[0-3]):{MINUTE_VALUE}'
+# ISO 基本格式的紧凑时间戳，两种写法：带连字符的日期加连写的钟点；8 位连写的日期加连写的钟点（4 到 6 位，可带小数秒）或带冒号的「时:分」。
+# 之后可带 Z 或偏移。日期与钟点的各个位都要在合法范围里（年 20 开头、月 01 到 12、日 01 到 31、时 00 到 23、分 00 到 59），前后不挨 ASCII 字母数字
+# （下划线、连字符、斜杠、点不算：运行目录名与日志文件名里的写法照判）；8 位数字后面跟 T 与 4 到 6 位数字、但日期或钟点越界的编号不算。
+# 带连字符的日期加带冒号的钟点不在这一条里（ISO_TIMESTAMP 判，它认「=」后面的字段值放行）。
+DATE_COMPACT = r'20\d\d(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])'
+TIME_COMPACT = r'(?:[01]\d|2[0-3])[0-5]\d\d{0,2}(?:[.,]\d+)?'
+ISO_COMPACT_TIMESTAMP = (rf'(?<![A-Za-z0-9])(?:{DATE}T{TIME_COMPACT}|{DATE_COMPACT}T(?:{TIME_COMPACT}|(?:[01]\d|2[0-3]):{MINUTE_VALUE}))'
+                         rf'(?:Z|[+\-](?:[01]\d|2[0-3]):?[0-5]\d)?(?![A-Za-z0-9])')
+# 弄坏用：不核日期与钟点的范围、前后不管，8 位数字加 T 加 4 到 6 位数字都算（LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose）
+COMPACT_TIMESTAMP_LOOSE_PATTERN = re.compile(r'\d{8}T\d{4,6}')
 ZONE_WORD = rf'(?<![{ASCII_WORD}]){ZONE}(?![{ASCII_WORD}])'
 TWELVE_HOUR = rf'(?<![{ASCII_WORD}:.])\d{{1,2}}(?::{MINUTE_VALUE})? ?[AaPp]\.?[Mm]\.?(?![{ASCII_WORD}])'
 # 会话号：本仓与上游三语仓的目录名，后面跟 - 与 2 到 6 位小写十六进制；后面紧跟 . - } / 的是 mktemp 模板、路径里的临时目录名，不算
@@ -94,11 +111,25 @@ COLON_PAIR = re.compile(rf'(?<![{ASCII_WORD}:.])(\d{{1,3}}):(\d{{1,3}})(?![{ASCI
 FILE_LINE_REFERENCE = re.compile(r'\.[A-Za-z]\w*:\d')
 
 
-def numbered_pairs_line(line):
-    """这一行的冒号对按编号读：有取值出了钟点范围的冒号对，或有「文件:行号」。"""
-    if FILE_LINE_REFERENCE.search(line):
+# 编号对按「句」读：句子的边界是 。！？（没有这几个就是整行；「；」不算，表格单元格与清单里常用它隔开并列的编号对）；这一句里有「文件:行号」或取值出了钟点范围的冒号对，这一句里的冒号对按编号读，
+# 别的句子里的不受它牵连（日志文件名、行号引用与真钟点常写在同一行的不同句里）
+SENTENCE_BREAKS = '。！？'
+
+
+def numbered_pairs_in(text):
+    """这段文字里的冒号对按编号读：有取值出了钟点范围的冒号对，或有「文件:行号」。"""
+    if FILE_LINE_REFERENCE.search(text):
         return True
-    return any(int(hour) > 23 or int(minute) > 59 or len(hour) > 2 or len(minute) != 2 for hour, minute in COLON_PAIR.findall(line))
+    return any(int(hour) > 23 or int(minute) > 59 or len(hour) > 2 or len(minute) != 2 for hour, minute in COLON_PAIR.findall(text))
+
+
+def sentence_around(line, match):
+    """这一行里命中所在的那一句（弄坏开关 LIB_FORBIDDEN_NOTATIONS_BREAK=numbered-pairs-whole-line 时是整行）。"""
+    if 'numbered-pairs-whole-line' in environment_keys('LIB_FORBIDDEN_NOTATIONS_BREAK'):
+        return line
+    start = max(line.rfind(mark, 0, match.start()) for mark in SENTENCE_BREAKS) + 1
+    ends = [position for position in (line.find(mark, match.end()) for mark in SENTENCE_BREAKS) if position >= 0]
+    return line[start:min(ends) if ends else len(line)]
 
 
 def bare_clock_is_not_clock(line, match):
@@ -112,7 +143,7 @@ def bare_clock_is_not_clock(line, match):
         return True
     if after.startswith(('=', '/')) or before.endswith(('@', ';')):
         return True
-    return numbered_pairs_line(line)
+    return numbered_pairs_in(sentence_around(line, match))
 
 
 def field_value(line, match):
@@ -161,6 +192,7 @@ FORMS = (
             ('twelve-hour', '十二小时制钟点', re.compile(TWELVE_HOUR), None),
             ('bare-clock', '不挨日期时区的钟点', re.compile(BARE_CLOCK), bare_clock_is_not_clock),
             ('iso-timestamp', 'ISO 时间戳', re.compile(ISO_TIMESTAMP), field_value),
+            ('iso-compact-timestamp', 'ISO 紧凑时间戳', re.compile(ISO_COMPACT_TIMESTAMP), None),
             ('zone-word', '时区词', re.compile(ZONE_WORD), None),
         ),
         'excluded_prefixes': (
@@ -181,6 +213,7 @@ FORMS = (
             ('research/prompts/m3-admission-r1-main-verification.md', '冻结证据：那一轮的判决，记了冻结副本被别的会话通删与改动的钟点'),
             ('research/prompts/m3-close-noncode-candidates.tsv', '冻结证据：回扫候选表整行抄录记录里的旧文，旧文带钟点'),
             ('research/prompts/m3-close-noncode-sync.md', '冻结证据：阶段同步记录整行抄录记录里的旧文，旧文带钟点'),
+            ('research/prompts/agentdef-r2-main-verification.md', '冻结证据：那一轮的判决，里面「决策号:行号」写法的冒号对（决策 06 的第 42 行）不是钟点，同一句里没有「文件:行号」可认'),
             ('research/results/e142-mutate-r25-s1-2026-10-13.log', '实验产物：变异驱动的原样输出带时间戳，复跑要逐字相同'),
             (UPSTREAM_COPY, '上游副本，只能在上游改'),
             ('research/prompts/_c510-date-gate-r1-appendix.md', C510_REASON),
@@ -206,7 +239,8 @@ FORMS = (
             '时间只写到日期，把钟点连同挨着它的时区词、「前后」一起删掉（例：「用户 <日期> <时区词> <时:分> 定」写成「用户 <日期> 定」）；',
             '「N 点 / N 时」与时段词同样删（例：「<日期> <时区词> <N> 点前后要开」「交回于 <日期> <上午 / 下午>」「<时段词> <N> 点」'
             '都写成「<日期> 要开」「交回于 <日期>」这样只到日期）；',
-            '光秃的时区词（lib-forbidden-notations.py 的 ZONE_WORDS）也删；ISO 时间戳、diff 头与 stat 的机器时间、date 的原样输出不贴进仓，只写日期；',
+            '光秃的时区词（lib-forbidden-notations.py 的 ZONE_WORDS）也删；ISO 时间戳（含运行目录名、日志文件名里连写的紧凑写法，路径里的也判：目录名里的时间戳段删掉，只写日期或「<运行目录>」）、'
+            'diff 头与 stat 的机器时间、date 的原样输出不贴进仓，只写日期；',
             '命中的冒号对其实不是钟点（产物字段、切片、编号对），改那份库里「不挨日期时区的钟点」的上下文规则，并在 doc-text.sh 的 clock-times-green 样本补一行；',
             '.sh、.py、.rs 里代码真要用这些字面（TZ 环境变量、解析外部文本的正则、造时间戳的自检输入），在那一行写'
             '「# clock-times:allow <理由>」（Rust 写「//」），理由不许省；',
@@ -274,7 +308,9 @@ def judged_patterns(form_key):
     if form_key in skipped:
         return None
     context_off = environment_keys('LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT')
-    return [(index, key, name, pattern, None if key in context_off or form_key in context_off else not_violation)
+    loose = 'compact-timestamp-loose' in skipped
+    return [(index, key, name, COMPACT_TIMESTAMP_LOOSE_PATTERN if loose and key == 'iso-compact-timestamp' else pattern,
+             None if key in context_off or form_key in context_off else not_violation)
             for index, (key, name, pattern, not_violation) in enumerate(FORMS_BY_KEY[form_key]['patterns']) if key not in skipped]
 
 

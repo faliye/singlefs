@@ -1,6 +1,0 @@
-name=mutation_anchor mutation=XC8_照抄核对只比目标名不比条目文本 file=run_known_bad_recopy_check.py hits=1
-name=mutation_verdict_line mutation=XC8_照抄核对只比目标名不比条目文本 name=known_bad_recopy_verdict counts_equal=True recopy_differences=0 item_differences=1 names_resolved_equal=True i4_target_names_equal=True
-name=mutation_run mutation=XC8_照抄核对只比目标名不比条目文本 input=pc3-device.rs exit=3 unmutated_exit=3 recopy_differences_unmutated=1 recopy_differences_mutated=0 result=caught
-name=mutation_anchor mutation=XC9_归一不去收尾逗号 file=run_known_bad_recopy_check.py hits=1
-name=mutation_verdict_line mutation=XC9_归一不去收尾逗号 name=known_bad_recopy_verdict counts_equal=True recopy_differences=0 item_differences=2 names_resolved_equal=True i4_target_names_equal=True
-name=mutation_run mutation=XC9_归一不去收尾逗号 input=e171_three_oracle_collusion.rs exit=3 unmutated_exit=0 recopy_differences_unmutated=0 recopy_differences_mutated=0 result=caught

@@ -323,7 +323,7 @@ ckdoc D10 refs-docs "FAST17：老化的 BetrFS 胜过别家未老化" betrfs-fas
 
 # ── 自证 ───────────────────────────────────────────────────────────────
 # 合成两棵假树跑整条链路，不碰本机那两棵真树（真树在别人机器上多半不在，
-# 自证要能在任何机器上跑）。断言表由 VERIFY_CITATIONS_ASSERTIONS 顶替，
+# 自证要能在任何机器上跑）。断言表由 VERIFY_CITATIONS_ASSERTIONS 点名本文件里的一张合成表顶替，
 # 那是只供自证使用的开关（.claude/rules/fs-design.md「每条分支必须能被测试强制进入」）。
 st_checked=0; st_failed=0
 st_case() { # st_case <这一格叫什么> <要的结局：绿 或 红> <实际退出码> <整份输出> <输出里要有的话>
@@ -336,7 +336,39 @@ st_case() { # st_case <这一格叫什么> <要的结局：绿 或 红> <实际�
   printf '%s\n' "$out" | sed 's/^/      /'  # gate-lint:detail
   st_failed=$((st_failed + 1))
 }
-st_run() { # st_run <合成树目录> <断言表文件> [额外的环境赋值…] —— 打印整份输出，退出码转手
+# selftest_assertions <表名>：自证用的合成断言表，VERIFY_CITATIONS_ASSERTIONS=<表名> 时跑这里的那一张、顶替内置那一份
+# （表写在本文件里、按名字分派，不 source 外面的文件：函数单元库认得出这几张表是哪几行代码）
+selftest_assertions() {
+  case "$1" in
+    green)
+      ck  D1  refs-linux  "合成：固定点树上的一条"   fs/bcachefs/alloc_background.h 'BUCKET_GC_GEN_MAX'
+      ckn D1  refs-linux  "合成：固定点树上的计数"   1 "grep -c 'BUCKET_GC_GEN_MAX' '%ROOT%/fs/bcachefs/alloc_background.h'"
+      ck  D4  refs-zfs    "合成：另一棵固定点树"     include/sys/spa.h 'SPA_BLKPTRSHIFT'
+      ck  D23 host-kernel "合成：本机内核树上的一条" fs/xfs/xfs_log_format.h 'XLOG_MAX_ICLOGS' ;;
+    unmarked)
+      ck  D1  refs-linux  "合成：固定点树上的一条"   fs/bcachefs/alloc_background.h 'BUCKET_GC_GEN_MAX'
+      ck  D23 "合成：依赖本机内核树却忘了标树来源"   fs/xfs/xfs_log_format.h 'XLOG_MAX_ICLOGS' ;;
+    unknown-tree)
+      ck  D23 没登记过的树名 "合成：标了一棵没登记的树" fs/xfs/xfs_log_format.h 'XLOG_MAX_ICLOGS' ;;
+    missing-file)
+      ck  D23 host-kernel "合成：源码不在" fs/xfs/根本没有这个文件.h 'XLOG_MAX_ICLOGS' ;;
+    missing-pattern)
+      ck  D23 host-kernel "合成：模式不命中" fs/xfs/xfs_log_format.h 'XLOG_这个串不在文件里' ;;
+    cross-tree)
+      ckn D1  refs-linux  "合成：标的是一棵，命令读了另一棵" 1 "grep -c 'BUCKET_GC_GEN_MAX' '%ROOT%/fs/bcachefs/alloc_background.h' '$KERN/fs/xfs/xfs_log_format.h'" ;;
+    no-root)
+      ckn D1  refs-linux  "合成：命令里忘了写 %ROOT%" 1 "printf '1\n'" ;;
+    half-extraction)
+      ckdoc D9 refs-docs "合成：抽取到一半失败的文献" half.pdf '合成的半截原文' ;;
+    whole-extraction)
+      ckdoc D9 refs-docs "合成：抽得出的文献" whole.pdf '合成的整篇原文' ;;
+    *)
+      echo "  ✗ VERIFY_CITATIONS_ASSERTIONS=$1：本文件里没有这一张自证断言表"
+      echo "  → 怎么办：这个变量只给 --selftest 用，写 selftest_assertions 里的表名之一；平常跑不设它"
+      exit 2 ;;
+  esac
+}
+st_run() { # st_run <合成树目录> <断言表名> [额外的环境赋值…] —— 打印整份输出，退出码转手
   local work="$1" assertions="$2"; shift 2
   env GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$assertions" "$@" bash "$SELF" 2>&1
 }
@@ -350,57 +382,33 @@ selftest() {
   printf '#define SPA_BLKPTRSHIFT\t7\n'     >"$work/refs/zfs/include/sys/spa.h"
   printf '#define XLOG_MAX_ICLOGS\t8\n'     >"$work/kern/fs/xfs/xfs_log_format.h"
 
-  cat >"$work/green.sh" <<'GREEN_EOF'
-ck  D1  refs-linux  "合成：固定点树上的一条"   fs/bcachefs/alloc_background.h 'BUCKET_GC_GEN_MAX'
-ckn D1  refs-linux  "合成：固定点树上的计数"   1 "grep -c 'BUCKET_GC_GEN_MAX' '%ROOT%/fs/bcachefs/alloc_background.h'"
-ck  D4  refs-zfs    "合成：另一棵固定点树"     include/sys/spa.h 'SPA_BLKPTRSHIFT'
-ck  D23 host-kernel "合成：本机内核树上的一条" fs/xfs/xfs_log_format.h 'XLOG_MAX_ICLOGS'
-GREEN_EOF
-  cat >"$work/unmarked.sh" <<'UNMARKED_EOF'
-ck  D1  refs-linux  "合成：固定点树上的一条"   fs/bcachefs/alloc_background.h 'BUCKET_GC_GEN_MAX'
-ck  D23 "合成：依赖本机内核树却忘了标树来源"   fs/xfs/xfs_log_format.h 'XLOG_MAX_ICLOGS'
-UNMARKED_EOF
-  cat >"$work/unknown-tree.sh" <<'UNKNOWN_EOF'
-ck  D23 没登记过的树名 "合成：标了一棵没登记的树" fs/xfs/xfs_log_format.h 'XLOG_MAX_ICLOGS'
-UNKNOWN_EOF
-  cat >"$work/missing-file.sh" <<'MISSING_EOF'
-ck  D23 host-kernel "合成：源码不在" fs/xfs/根本没有这个文件.h 'XLOG_MAX_ICLOGS'
-MISSING_EOF
-  cat >"$work/missing-pattern.sh" <<'PATTERN_EOF'
-ck  D23 host-kernel "合成：模式不命中" fs/xfs/xfs_log_format.h 'XLOG_这个串不在文件里'
-PATTERN_EOF
-  cat >"$work/cross-tree.sh" <<CROSS_EOF
-ckn D1  refs-linux  "合成：标的是一棵，命令读了另一棵" 1 "grep -c 'BUCKET_GC_GEN_MAX' '%ROOT%/fs/bcachefs/alloc_background.h' '$work/kern/fs/xfs/xfs_log_format.h'"
-CROSS_EOF
-  cat >"$work/no-root.sh" <<'NOROOT_EOF'
-ckn D1  refs-linux  "合成：命令里忘了写 %ROOT%" 1 "printf '1\n'"
-NOROOT_EOF
+
 
   # ① ~ ③ 基线：全命中判绿，而且分组报数逐棵树对得上（数是现算的，一条断言都不许漏进漏出）
-  out="$(st_run "$work" "$work/green.sh")"; rc=$?
+  out="$(st_run "$work" green)"; rc=$?
   st_case "基线：固定点树那一组的数"   绿 "$rc" "$out" 'refs-linux（固定点） 2 条：命中 2，未命中 0'
   st_case "基线：非固定点树那一组的数" 绿 "$rc" "$out" 'host-kernel（非固定点） 1 条：命中 1，未命中 0'
   st_case "基线：一条断言都没有的树也要列出来" 绿 "$rc" "$out" 'refs-docs（固定点） 0 条：命中 0，未命中 0'
   # ④ ⑤ ⑥ C44 逐字要的那一格：依赖非固定点树的引用没标树来源 ⇒ 判红。
   # 三格分开钉：那一行自己判红（两种缺法各一格），以及末尾那道 C44 汇总闸自己。
   # 合成一格是不够的——缺标注的那条同时也被当成一条未命中，光看退出码分不出是哪道闸红的。
-  out="$(st_run "$work" "$work/unmarked.sh")"; rc=$?
+  out="$(st_run "$work" unmarked)"; rc=$?
   st_case "旧写法少一格，那一行判红" 红 "$rc" "$out" '多半是没标树来源'
   st_case "C44 汇总闸自己判红"       红 "$rc" "$out" '没标树来源（checks-owed.md C44 要它必须标）'
-  out="$(st_run "$work" "$work/unknown-tree.sh")"; rc=$?
+  out="$(st_run "$work" unknown-tree)"; rc=$?
   st_case "标了一棵没登记的树，那一行判红" 红 "$rc" "$out" '没标树来源，或标了一棵没登记的树'
   # ⑦ 分组报数与被扫集合对不上 ⇒ 判红（开关只漏记一格，钉的是一个 1 的差）
-  out="$(st_run "$work" "$work/green.sh" VERIFY_CITATIONS_BREAK_TALLY=1)"; rc=$?
+  out="$(st_run "$work" green VERIFY_CITATIONS_BREAK_TALLY=1)"; rc=$?
   st_case "分组报数算错判红" 红 "$rc" "$out" '分组报数与被扫集合对不上'
   # ⑧ ⑨ 原有的两条判据一条都没放松
-  out="$(st_run "$work" "$work/missing-file.sh")"; rc=$?
+  out="$(st_run "$work" missing-file)"; rc=$?
   st_case "文件不在仍判红" 红 "$rc" "$out" '源码不在'
-  out="$(st_run "$work" "$work/missing-pattern.sh")"; rc=$?
+  out="$(st_run "$work" missing-pattern)"; rc=$?
   st_case "模式不命中仍判红" 红 "$rc" "$out" '模式没命中'
   # ⑩ ⑪ 标注与命令实际读的树不许分叉：读了别的树判红，一棵都没读也判红
-  out="$(st_run "$work" "$work/cross-tree.sh")"; rc=$?
+  out="$(st_run "$work" cross-tree)"; rc=$?
   st_case "命令读了别的树判红" 红 "$rc" "$out" '命令里却读了 host-kernel'
-  out="$(st_run "$work" "$work/no-root.sh")"; rc=$?
+  out="$(st_run "$work" no-root)"; rc=$?
   st_case "命令一棵树都没读判红" 红 "$rc" "$out" '命令没读标着的那棵树'
   # ⑫ ⑬ ⑭ 抽取到一半失败：这一次判红，下一次也不许拿留下的半截文本当原文匹配，缓存目录里不许留半截文件。
   # 抽取器换成一个假的：先吐出半截（要找的那句正好在里面），再退 1。抽取器按本脚本所在的目录找，
@@ -414,12 +422,9 @@ sys.stdout.flush()
 sys.exit(1)
 HALF_EXTRACTOR_EOF
   printf '%%PDF-1.4 synthetic\n' >"$work/refs/docs/half.pdf"
-  cat >"$work/half-extraction.sh" <<'HALF_EOF'
-ckdoc D9 refs-docs "合成：抽取到一半失败的文献" half.pdf '合成的半截原文'
-HALF_EOF
-  out="$(env TMPDIR="$work/tmp" GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$work/half-extraction.sh" bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
+  out="$(env TMPDIR="$work/tmp" GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=half-extraction bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
   st_case "抽取到一半失败判红" 红 "$rc" "$out" '抽取失败'
-  out="$(env TMPDIR="$work/tmp" GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$work/half-extraction.sh" bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
+  out="$(env TMPDIR="$work/tmp" GATE_CROSS_RUN_TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=half-extraction bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
   st_case "抽取失败之后再跑，不拿半截文本当原文" 红 "$rc" "$out" '抽取失败'
   leftovers="$(find "$work/tmp" -name 'half.txt*' -type f | wc -l)"
   st_case "抽取失败不在缓存目录里留半截文件" 绿 "$(( leftovers == 0 ? 0 : 1 ))" "缓存目录里留下的半截文件：$leftovers 个" '半截文件：0 个'
@@ -432,10 +437,7 @@ import sys
 sys.stdout.write('the whole text: 合成的整篇原文\n')
 WHOLE_EXTRACTOR_EOF
   printf '%%PDF-1.4 synthetic\n' >"$work/refs/docs/whole.pdf"
-  cat >"$work/whole-extraction.sh" <<'WHOLE_EOF'
-ckdoc D9 refs-docs "合成：抽得出的文献" whole.pdf '合成的整篇原文'
-WHOLE_EOF
-  out="$(env TMPDIR="$work/private-tmp" GATE_CROSS_RUN_TMPDIR="$work/cross-run-tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$work/whole-extraction.sh" bash "$work/bin-whole/verify-citations.sh" 2>&1)"; rc=$?
+  out="$(env TMPDIR="$work/private-tmp" GATE_CROSS_RUN_TMPDIR="$work/cross-run-tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS=whole-extraction bash "$work/bin-whole/verify-citations.sh" 2>&1)"; rc=$?
   private_leftovers="$(find "$work/private-tmp" -mindepth 1 | wc -l)"
   cross_run_cached="$(find "$work/cross-run-tmp" -name 'whole.txt' -type f | wc -l)"
   st_case "文本缓存落在 GATE_CROSS_RUN_TMPDIR、TMPDIR 里不留" 绿 "$(( rc == 0 && private_leftovers == 0 && cross_run_cached == 1 ? 0 : 1 ))" \
@@ -459,9 +461,8 @@ for tree_name in "${TREE_ORDER[@]}"; do
 done
 echo
 if [[ -n "${VERIFY_CITATIONS_ASSERTIONS:-}" ]]; then
-  # 只供自证使用：拿一份合成的断言表顶替内置那一份
-  # shellcheck source=/dev/null
-  source "$VERIFY_CITATIONS_ASSERTIONS"
+  # 只供自证使用：拿本文件里的一张合成断言表（selftest_assertions）顶替内置那一份
+  selftest_assertions "$VERIFY_CITATIONS_ASSERTIONS"
 else
   builtin_assertions
 fi

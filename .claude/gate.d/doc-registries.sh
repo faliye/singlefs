@@ -50,6 +50,8 @@
 #                               第四张表没点名单元类，报「!」不判
 #   field-refs-reservation-owner-green  只跑 field-refs：三处各指对（指针头表第 4 项、journal 记录头表与根记录表第 1 项），报「核了 3 行预留字段的指向」
 #   field-registry-green        字段与布局组九格的绿样本并在一棵树里，九格各报成功行、整道退 0
+#   admission-terms-fullwidth-d-green   只跑 admission-terms：式子那一行写成全角括号的 `可用（d） = …`，抓式子的那一步半角全角都认，判绿
+#   tree-table-reserve-wide-number-green  只跑 tree-table-reserve：出处指四位的欠账号 C1000 与三位的决策号 D105，编号位数不设上限，判绿
 #   checks-owed-red             同一份欠账表喂欠账与收口五格，五格都红、各报自己点名的行，整道退 1；总审核第五节第 9 行按 I-7.4 点名不变量类文件
 #                               （样本自己的 .claude/kb-directories 登记 crates/sample/invariants/），引文只在 I-8 那一类的文件里，audit-contradictions 点名两份路径判红
 #   checks-owed-green           四格判绿、closeout-row27-preconditions 退 77，整道退 0 并报那一格本次未跑；总审核第五节第 6、7 行按 I- 号指到登记目录里的类文件，
@@ -84,6 +86,8 @@
 #       field-registry-green（输出里找不到「互相挂钩…」）；first-txn-hooks-red（期望退出 1，实测 0）
 #   DOC_REGISTRIES_BREAK=admission-terms  admission-terms 格不跑、按判过了记
 #       admission-terms-red（期望退出 1，实测 0）；field-registry-green（输出里找不到「准入不等式 3 项逐项有归属」）
+#   DOC_REGISTRIES_BREAK=formula-fullwidth-d-unmatched  admission-terms 格抓式子那一行只认半角 (d)
+#       admission-terms-fullwidth-d-green（期望退出 0，实测 1）
 #   DOC_REGISTRIES_BREAK=segment-registry  segment-registry 格不跑、按判过了记
 #       field-registry-green（输出里找不到「比对了 2 处登记…」）；segment-registry-red（期望退出 1，实测 0）
 #   DOC_REGISTRIES_BREAK=format-const-placeholders  format-const-placeholders 格不跑、按判过了记
@@ -92,6 +96,8 @@
 #       field-registry-green（输出里找不到「登记表 1 行、行到步 1 处、「写出的字节」点名 3 处、…」）；second-txn-hooks-red（期望退出 1，实测 0）
 #   DOC_REGISTRIES_BREAK=tree-table-reserve  tree-table-reserve 格不跑、按判过了记
 #       field-registry-green（输出里找不到「3 条认购」）；tree-table-reserve-red（期望退出 1，实测 0）
+#   DOC_REGISTRIES_BREAK=owed-number-width-fixed  tree-table-reserve 格抓出处里的编号时位数写死（C 最多三位、D 最多两位）
+#       tree-table-reserve-wide-number-green（期望退出 0，实测 1）
 #   DOC_REGISTRIES_BREAK=table-shape  table-shape 格不跑、按判过了记
 #       checks-owed-green（输出里找不到「检查了 16 行」）；checks-owed-red（输出里找不到「C4：6 格」）
 #   DOC_REGISTRIES_BREAK=closeout-collects-open  closeout-collects-open 格不跑、按判过了记
@@ -1038,7 +1044,7 @@ PY
 
 # ── 格 admission-terms：准入不等式的每一项都有人维护（统计量，或写明的例外）
 # 判据在 D5（快照 / 空间记账机制） 已定项 4：式子里出现的每一项都是被维护的统计量，做不到就写明例外是谁。
-#   1. 式子的权威正文前面有一行 `<!-- gate:admission-formula -->`，全仓只许一处；取它下面第一个代码块里 `可用 =` 那一行，
+#   1. 式子的权威正文前面有一行 `<!-- gate:admission-formula -->`，全仓只许一处；取它下面第一个代码块里 `可用 =`、`可用(d) =` 或 `可用（d） =`（半角、全角括号都认）那一行，
 #      按 `−` 拆成项（去掉 `Σ设备(` 与括号）。
 #   2. 对照表前面有一行 `<!-- gate:admission-terms -->`，全仓只许一处；取它下面第一张表的两列。
 #   3. 两边的项逐一相等：式子多一项或对照表多一项，都判红。
@@ -1049,12 +1055,13 @@ PY
 #   两个锚不是各恰好一处（含一处都没有）判红、不退 77：锚没了就是式子与对照表脱了钩。decisions/ 不在，退 77。
 # 射程：只判每一项有归属、归属指得到，不判归属对不对（该不该是统计量、例外的理由成不成立，靠人）；
 #   不判统计量表里多出来的项（判定不止准入一处，机器列不全）。
-# 样本：admission-terms-red 的式子多了「挂载期承诺量」而对照表没有、副本在权威那一行后面多写一项；field-registry-green 三项各有归属、副本逐字一致。
+# 样本：admission-terms-red 的式子多了「挂载期承诺量」而对照表没有、副本在权威那一行后面多写一项；field-registry-green 三项各有归属、副本逐字一致；
+#   admission-terms-fullwidth-d-green 的式子写成 `可用（d） = …`（全角括号），判绿。
 cell_admission_terms() {
   [[ -d .claude/kb/decisions ]] || { echo "  ! 找不到 .claude/kb/decisions/，这一格无对象可判"; exit 77; }
 
-  python3 - <<'PY'
-import glob, re, sys
+  BREAK_SWITCH="$BREAK_SWITCH" python3 - <<'PY'
+import glob, os, re, sys
 
 files = sorted(glob.glob('.claude/kb/decisions/*.md'))
 texts = {path: open(path, encoding='utf-8').read() for path in files}
@@ -1081,13 +1088,15 @@ if len(formula_hits) != 1 or len(terms_hits) != 1:
 formula_path, formula_line, formula_lines = formula_hits[0]
 formula_text = None
 inside_block = False
+# 弄坏开关 DOC_REGISTRIES_BREAK=formula-fullwidth-d-unmatched：抓式子那一行只认半角 (d)（改前的写法）
+formula_line_pattern = r'^可用(\(d\))?\s*=' if os.environ.get('BREAK_SWITCH') == 'formula-fullwidth-d-unmatched' else r'^可用(\(d\)|（d）)?\s*='
 for line in formula_lines[formula_line + 1:]:
     if line.startswith('```'):
         if inside_block:
             break
         inside_block = True
         continue
-    if inside_block and re.match(r'^可用(\(d\))?\s*=', line.strip()):
+    if inside_block and re.match(formula_line_pattern, line.strip()):
         formula_text = line.strip()
         break
 if formula_text is None:
@@ -1432,14 +1441,15 @@ PY
 #   |---|---|---|---|
 #   | … | 头条目 | 8 | C271（…） |
 # 判据三条：① 宽度列全是正整数；② 合计不超过标记里的 total；③ 每行「出处」要带一个编号
-#（C<n> 在 .claude/kb/checks-owed.md 有登记行，D<n> 在 .claude/kb/decisions/<n>-*.md 存在）。
+#（C<n> 在 .claude/kb/checks-owed.md 有登记行，D<n> 在 .claude/kb/decisions/<n>-*.md 存在；编号的位数不设上限，后面紧跟全角括号里的简称）。
 # 带标记的表不是恰好一张（含一张都没有）判红；认购行不足四格（少了宽度或出处）判红，不静默丢掉；标记下面一条认购都没有，退 77。
 # 内嵌 python 的退出码要取，而且必须报出 CHECKED 那一行：它崩了（例如读不到 checks-owed.md）时不许走绿。
-# 样本：tree-table-reserve-red 里认购合计 88 超过预留 76、一行只有三格；field-registry-green 三条认购合计 32、余 44。
+# 样本：tree-table-reserve-red 里认购合计 88 超过预留 76、一行只有三格；field-registry-green 三条认购合计 32、余 44；
+#   tree-table-reserve-wide-number-green 的出处指到四位的欠账号 C1000 与三位的决策号 D105（样本里都有登记行或正文），判绿。
 cell_tree_table_reserve() {
   local report python_rc
-  report="$(python3 - <<'PY'
-import glob, re, sys
+  report="$(BREAK_SWITCH="$BREAK_SWITCH" python3 - <<'PY'
+import glob, os, re, sys
 
 marker = re.compile(r"<!--\s*gate:tree-table-reserve\s+total=(\d+)\s*-->")
 files = sorted(glob.glob(".claude/kb/decisions/*.md"))
@@ -1479,7 +1489,9 @@ for cells in rows:
         print("BAD", f"「{name}」的宽度列不是正整数：{width_text}", sep="\t")
         continue
     subtotal += int(width_text)
-    numbers = re.findall(r"(C\d{1,3}|D\d{1,2})（", source)
+    # 弄坏开关 DOC_REGISTRIES_BREAK=owed-number-width-fixed：编号位数写死（C 三位、D 两位，改前的写法）
+    number_pattern = r"(C\d{1,3}|D\d{1,2})（" if os.environ.get("BREAK_SWITCH") == "owed-number-width-fixed" else r"(C\d+|D\d+)（"
+    numbers = re.findall(number_pattern, source)
     if not numbers:
         print("BAD", f"「{name}」的出处里没有带简称的编号", sep="\t")
         continue
@@ -2134,9 +2146,9 @@ cell_closeout_row27_preconditions() {
   local -a bad
   # 四段：笔名、文件、原文（逐字）、今天的命中次数。同一笔可以有几条探针。
   PROBES="$(cat <<'TSV'
-豁免集与隔离集按记录起点做 key	crates/singlefs-core/src/mount.rs	let key = (device.0, slot.0);	1
-扣住位在空发布循环之后无条件放开	crates/singlefs-core/src/mount.rs	    allocator.release_reclaim_holds();	1
-alloc-basis 第三轮 ①：挂载内回收	crates/singlefs-core/src/mount.rs	reclaim_released_up_to(	2
+豁免集与隔离集按记录起点做 key	crates/singlefs-core/src/mount.rs	(slot.0..end_slot).map(move |covered_slot| (device.0, covered_slot))	1
+扣住位在空发布循环之后无条件放开	crates/singlefs-core/src/mount.rs	    allocator.release_reclaim_holds();	2
+alloc-basis 第三轮 ①：挂载内回收	crates/singlefs-core/src/mount.rs	reclaim_released_up_to(	3
 C333（删行那次发布被重放）：行回收	crates/singlefs-core/src/instance_table.rs	rows.retain(	0
 C333（删行那次发布被重放）：行回收	crates/singlefs-core/src/instance_table.rs	rows.remove(	0
 TSV
@@ -2975,7 +2987,7 @@ PY
 # 字段与布局组九格的 stdin 接到 /dev/null，与它们并进来之前在后台起时一致。
 break_skips() {
   if [[ "$BREAK_SWITCH" == "$1" ]]; then
-    echo "  ✓ 弄坏开关 DOC_REGISTRIES_BREAK=$1：这一格没判"
+    echo "  ! 弄坏开关 DOC_REGISTRIES_BREAK=$1：这一格没判"
     exit 0
   fi
 }

@@ -26,7 +26,8 @@
 # 五、描述里的钟点、时区词与时间戳（Write、Edit、MultiEdit）：目标在仓里、不在 lib-forbidden-notations.py 里钟点那一形态（clock-times）的排除前缀下，
 #    写进去的内容命中那一形态的判据行之一就拒绝；仓外（草稿目录、报告目录）不判。主 agent 与所有子 agent 一样判。
 #    判据与门禁 doc-text 同一份：../gate.d/lib-forbidden-notations.py，不在这里另抄；读不到就拒绝。Bash 里的写（cp、重定向）归 doc-text 在收尾时判。
-#    形态有几族：时:分（日期后、时区词旁、x 通配、Z 后缀、不挨日期时区的时:分与区间）、ISO 时间戳、光秃的时区词，
+#    形态有几族：时:分（日期后、时区词旁、x 通配、Z 后缀、不挨日期时区的时:分与区间）、ISO 时间戳、ISO 基本格式的紧凑时间戳（日期连写或带连字符、T、连写的钟点，
+#    运行目录名与日志文件名里的写法、路径里的也判；与门禁 doc-text 的 clock-times 格同一条判据行 iso-compact-timestamp，这里没有另抄）、光秃的时区词，
 #    与中文的「N 点 / N 时」和时段词（挨着日期或时区词的、时段词后面跟钟点的、不挨日期时区却带「前后 / 左右 / 许 / 半 / 钟」的）；
 #    长得像钟点的冒号对靠库里的上下文规则放过，.sh、.py、.rs 里带「clock-times:allow <理由>」的那一行放过（目标路径交给库判后缀）；
 #    逐个形态的判据与放行写在那份库的文档串里。
@@ -75,10 +76,21 @@
 #                              #     「stdin:实现员写工作根下的报告」「stdin:七次拒绝都落进检出记录」（多出一次拒绝）
 #                              #   SINGLEFS_WORK_ROOT_BREAK=legacy-root-unknown（不认旧根）：「范围:过渡期旧根下的报告目录」
 #                              #   WRITE_GUARD_BREAK=scope-root-unanchored（展开时根后面不带 /）：「范围:工作根同名前缀的兄弟目录」
-#                              # 第六道：写进 .claude/hooks/、.claude/gate.d/、.claude/scripts/、scripts/ 下的 .sh 先过 bash -n、.py 先过 ast 解析，
+#                              # 紧凑时间戳（五里的 ISO 基本格式写法）有三个开关，打开时点名的几格红（格名都以「紧凑时间戳:」起头，另有「stdin:」两格）：
+#                              #   WRITE_GUARD_BREAK=compact-timestamp-skipped（本钩子把命中的「ISO 紧凑时间戳」形态丢掉不报）：拒绝的几例（Write、Edit、MultiEdit、路径里、带冒号的时分、
+#                              #     带连字符的日期、带小数秒与偏移）与「stdin:Write 写进紧凑时间戳拒绝（退出码 2）」「stdin:紧凑时间戳的拒绝点名形态与那一处」
+#                              #   LIB_FORBIDDEN_NOTATIONS_BREAK=iso-compact-timestamp（库里那一条判据行不判）：同上那几格
+#                              #   LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose（库里退回「8 位数字加 T 加 4 到 6 位数字」）：「8 位数字后跟 T 但不是时间戳」的放行五例
+#                              #     （月份越界、钟点越界、年不是 20 开头、全是 9、前面挨着字母；钟点只有三位与小写 t 两例在这个开关下仍放行），
+#                              #     以及「紧凑时间戳:8 位日期、T、带冒号的时分」「紧凑时间戳:带连字符的日期加连写钟点」两例（退回的写法认不出这两种）、
+#                              #     「紧凑时间戳:Write / Edit / MultiEdit 写进仓里拒绝并点名形态与那一处」三格与「stdin:紧凑时间戳的拒绝点名形态与那一处」（退回的写法报出来的串少了末尾的 Z）
+#                              # 第六道：写进 .claude/hooks/、.claude/gate.d/、.claude/scripts/、scripts/ 下的 .sh 先过 bash -n（写临时文件、起 bash）、.py 先过 ast 解析（本进程里 ast.parse，不写临时文件、不起子进程），
 #                              # 语法错的拒（带语法错误的钩子一上线，每一次 Bash 调用都收到它的报错）；
+#                              # WRITE_GUARD_BREAK=python-syntax-subprocess（.py 也退回另起 python3 判）时「语法:写坏的 .py 在本进程里判，不起 python 子进程」一格红；
+#                              # 撇号、钟点、会话号三道读的共用判据库在进程里只装一次（load_notations_library，装过的直接取）：
+#                              # WRITE_GUARD_BREAK=library-reloaded-each-time（每回重装）时「库:一次写入判撇号、钟点、会话号三道，共用判据库只装一次」一格红；
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键>（钟点的 date-zone-hour、date-zone-period、period-hour、hour-suffix、twelve-hour、
-#                              # bare-clock、iso-timestamp、zone-word，键写在 ../gate.d/lib-forbidden-notations.py）关掉一条判据行时，点名那一行的用例必须判红；
+#                              # bare-clock、iso-timestamp、iso-compact-timestamp、zone-word，键写在 ../gate.d/lib-forbidden-notations.py）关掉一条判据行时，点名那一行的用例必须判红；
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=clock-times 时靠上下文放行的用例、LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=clock-times 时
 #                              # 带放行标记的用例必须判红；
 #                              # 第九道（写者锁）：WRITE_GUARD_DISABLE_WRITER_LOCK=1 时「写者锁:提示对不上的子 agent 不能认领」「写者锁:同一份提示但派发早于这把锁的旧进程不能认领」
@@ -108,6 +120,7 @@
 #                              #   no-walk-up（只看目标所在那一层目录）：「写者锁:第二个写者写子目录也被拒」
 #                              #   foreign-holder-unnamed（回执对不上的拒绝不去记录里找持锁者）：「写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id」
 #                              #     「stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路」
+#                              #   replace-temp-kept（接手换锁失败不删自己建的临时文件）：「写者锁:换锁时锁内容写不进 JSON，抛异常且不留临时文件」「写者锁:换锁时锁的位置被目录占着，抛异常且不留临时文件」
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -270,11 +283,25 @@ def decide_compile_first(hook_input, project_root):
 def notations_library_path(hook_dir):
     return os.path.join(os.path.dirname(hook_dir), "gate.d", "lib-forbidden-notations.py")
 
-def load_prime_marks(library_path):
-    """撇号类字符集，与门禁 doc-text 同一份；读不到或读出来是空的就抛异常，由调用方按拒绝处理。"""
+NOTATIONS_LIBRARIES = {}      # 库路径 → 装好的模块：一个进程里同一份库只装一次（一次写入判撇号、钟点、会话号三道，都从这里取）
+NOTATIONS_LIBRARY_LOADS = [0]  # 真装了几次，自证数它
+
+def load_notations_library(library_path):
+    """门禁 doc-text 与本钩子共用的判据库 lib-forbidden-notations.py：装过的直接交回，没装过的装一次并记下；读不到、语法错抛异常（失败不记，下一回再试）。
+    弄坏开关 WRITE_GUARD_BREAK=library-reloaded-each-time 每回重装。"""
+    library = NOTATIONS_LIBRARIES.get(library_path)
+    if library is not None and os.environ.get("WRITE_GUARD_BREAK") != "library-reloaded-each-time":
+        return library
     spec = importlib.util.spec_from_file_location("lib_forbidden_notations", library_path)
     library = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(library)
+    NOTATIONS_LIBRARY_LOADS[0] += 1
+    NOTATIONS_LIBRARIES[library_path] = library
+    return library
+
+def load_prime_marks(library_path):
+    """撇号类字符集，与门禁 doc-text 同一份；读不到或读出来是空的就抛异常，由调用方按拒绝处理。"""
+    library = load_notations_library(library_path)
     prime_marks = library.PRIME_MARKS
     if not isinstance(prime_marks, str) or not prime_marks:
         raise ValueError(f"PRIME_MARKS 是 {prime_marks!r}，不是非空字符串")
@@ -381,9 +408,7 @@ def library_hits_in_written_texts(hook_input, project_root, library_path, form_k
     if not places or not absolute or os.path.commonpath([absolute, root]) != root:
         return None, None, []
     try:
-        spec = importlib.util.spec_from_file_location("lib_forbidden_notations", library_path)
-        library = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(library)
+        library = load_notations_library(library_path)
         relative = os.path.relpath(absolute, root)
         if library.is_excluded(form_key, relative):
             return None, None, []
@@ -401,6 +426,8 @@ def listed_hits(found, with_shape):
         shown.append(f"  （另有 {len(found) - LISTED_HITS_LIMIT} 处没列，改完上面这些再写一次会列出来）")
     return "\n".join(shown) + "\n"
 
+COMPACT_TIMESTAMP_SHAPE = "ISO 紧凑时间戳"   # 库里 iso-compact-timestamp 那一条判据行的名字；只给弄坏开关 compact-timestamp-skipped 认形态用，判法在库里
+
 def decide_clock_times(hook_input, project_root, library_path):
     """五、写进仓里的内容带描述性的钟点。"""
     if os.environ.get("WRITE_GUARD_DISABLE_CLOCK_TIMES") == "1":
@@ -408,11 +435,13 @@ def decide_clock_times(hook_input, project_root, library_path):
     unreadable, relative, found = library_hits_in_written_texts(hook_input, project_root, library_path, "clock-times", "钟点")
     if unreadable:
         return 2, unreadable
+    if os.environ.get("WRITE_GUARD_BREAK") == "compact-timestamp-skipped":   # 弄坏开关：把紧凑时间戳那一形态的命中丢掉
+        found = [hit for hit in found if hit[1] != COMPACT_TIMESTAMP_SHAPE]
     if not found:
         return 0, None
     return 2, (f"✗ 写进 {relative} 的内容在描述里写了钟点，共 {len(found)} 处：\n" + listed_hits(found, True) +
                "→ 怎么办：时间只写到日期，把钟点（时:分、「N 点 / N 时」、上午下午这类时段词）连同挨着它的时区词、「前后」一起删掉；"
-               "光秃的时区词、ISO 时间戳与 date 的原样输出也删，只写日期。\n"
+               "光秃的时区词、ISO 时间戳（含运行目录名、日志文件名里连写的紧凑写法，路径里的也判：目录名里的时间戳段删掉）与 date 的原样输出也删，只写日期。\n"
                "→ .sh、.py、.rs 里代码真要用这些字面（TZ 环境变量、解析外部文本的正则、造时间戳的自检输入），在那一行写「# clock-times:allow <理由>」（Rust 写「//」）；"
                "命中的其实不是钟点（产物字段、切片、编号对），改 .claude/gate.d/lib-forbidden-notations.py 的上下文规则\n"
                "→ 钟点确实是被测输入的整份文件（hook 自检、门禁样本），登记进 .claude/gate.d/lib-forbidden-notations.py 里钟点那一形态的 excluded_prefixes 并写明理由")
@@ -432,7 +461,32 @@ def decide_session_names(hook_input, project_root, library_path):
                "→ .sh、.py、.rs 里代码真要用这些字面（解析 ListAgents 输出的正则、造会话号的自检输入），在那一行写「# session-names:allow <理由>」（Rust 写「//」）")
 
 SYNTAX_CHECKED_DIRECTORIES = (".claude/hooks", ".claude/gate.d", ".claude/scripts", "scripts")
-PYTHON_SYNTAX_CHECK = "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1])"
+PYTHON_SYNTAX_CHECK = "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1])"   # 只给弄坏开关 python-syntax-subprocess 用
+
+def python_syntax_error(content, relative):
+    """.py 的内容在本进程里 ast 解析（不写临时文件、不起子进程）：过得去交 None，过不去交错误说明（文件名写相对仓根的路径）。"""
+    import ast, traceback
+    try:
+        ast.parse(content, filename=relative)
+    except (SyntaxError, ValueError, RecursionError) as error:
+        return "".join(traceback.format_exception_only(type(error), error)).strip()[-600:]
+    return None
+
+def syntax_error_by_checker(checker, content, suffix, relative):
+    """内容写进临时文件、起 checker（bash -n）判：过得去交 None，过不去交错误说明；起不了、超时按放行交 None。"""
+    handle = tempfile.NamedTemporaryFile("w", suffix=suffix, delete=False, encoding="utf-8")
+    try:
+        handle.write(content)
+        handle.close()
+        result = subprocess.run(checker + [handle.name], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    finally:
+        handle.close()
+        os.unlink(handle.name)
+    if result.returncode == 0:
+        return None
+    return (result.stderr or result.stdout).strip().replace(handle.name, relative)[-600:]
 
 def edited_content(hook_input, target):
     """Write 给的整份内容，或 Edit / MultiEdit 施加到现文件之后的内容；施加不了（文件不在、旧串找不到）返回 None，那一步 Edit 自己会拒。"""
@@ -468,24 +522,17 @@ def decide_shell_syntax(hook_input, project_root):
     if target.endswith(".sh"):
         checker, checker_name = ["bash", "-n"], "bash -n"
     elif target.endswith(".py"):
-        checker, checker_name = [sys.executable, "-c", PYTHON_SYNTAX_CHECK], "python3 的 ast 解析"
+        checker, checker_name = None, "python3 的 ast 解析"
     else:
         return 0, None
     content = edited_content(hook_input, target)
     if content is None:
         return 0, None
-    handle = tempfile.NamedTemporaryFile("w", suffix=os.path.splitext(target)[1], delete=False, encoding="utf-8")
-    handle.write(content)
-    handle.close()
-    try:
-        result = subprocess.run(checker + [handle.name], capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.TimeoutExpired):
+    if checker is None and os.environ.get("WRITE_GUARD_BREAK") == "python-syntax-subprocess":   # 弄坏开关：.py 也退回另起 python3 的旧做法
+        checker = [sys.executable, "-c", PYTHON_SYNTAX_CHECK]
+    detail = python_syntax_error(content, relative) if checker is None else syntax_error_by_checker(checker, content, os.path.splitext(target)[1], relative)
+    if detail is None:
         return 0, None
-    finally:
-        os.unlink(handle.name)
-    if result.returncode == 0:
-        return 0, None
-    detail = (result.stderr or result.stdout).strip().replace(handle.name, relative)[-600:]
     return 2, (f"✗ 写进 {relative} 的内容过不了 {checker_name}：\n  {detail}\n"
                f"→ 怎么办：先在草稿目录里改到 `{checker_name}` 过，再写进来；钩子、门禁与脚本带着语法错误上线，之后每一次调用都会收到它的报错。")
 
@@ -679,6 +726,31 @@ def selftest(hook_dir):
             prime_case("角标:读不到共用字符集就拒绝", "Write", None, {"content": "普通内容\n"}, 2,
                        library_path=os.path.join(work, "no-such-lib-forbidden-notations.py")),
         ]
+        # 六、语法（续）：.py 在本进程里 ast 解析、不起子进程，.sh 起一个 bash -n；WRITE_GUARD_BREAK=python-syntax-subprocess 下「.py 在本进程里判」一格红
+        real_run, started = subprocess.run, []
+        def counting_run(command, *run_arguments, **run_keywords):
+            started.append(command)
+            return real_run(command, *run_arguments, **run_keywords)
+        def checker_starts_of(path, content):
+            del started[:]
+            decided = decide({"tool_name": "Write", "tool_input": {"file_path": path, "content": content}}, work, table, library)
+            return [command for command in started if command[0] in ("bash", sys.executable)], decided[1] or ""
+        subprocess.run = counting_run
+        try:
+            python_starts, python_message = checker_starts_of(f"{work}/.claude/gate.d/z.py", "def (:\n")
+            shell_starts, _ = checker_starts_of(f"{work}/.claude/hooks/x.sh", "if [ ; then\n  echo\n")
+        finally:
+            subprocess.run = real_run
+        cases += [
+            ("语法:写坏的 .py 在本进程里判，不起 python 子进程", 0, len(python_starts)),
+            ("语法:写坏的 .py 的拒绝说明点名文件与 SyntaxError", True, ".claude/gate.d/z.py" in python_message and "SyntaxError" in python_message and "python3 的 ast 解析" in python_message),
+            ("语法:写坏的 .sh 仍起一个 bash -n", ["bash"], [command[0] for command in shell_starts]),
+        ]
+        # 共用判据库一次写入只装一次：撇号、钟点、会话号三道都读它；WRITE_GUARD_BREAK=library-reloaded-each-time 下这一格红（装三回）
+        NOTATIONS_LIBRARIES.clear()
+        NOTATIONS_LIBRARY_LOADS[0] = 0
+        decide({"tool_name": "Write", "tool_input": {"file_path": f"{work}/records/library-once.md", "content": "普通内容\n"}}, work, table, library, library)
+        cases.append(("库:一次写入判撇号、钟点、会话号三道，共用判据库只装一次", 1, NOTATIONS_LIBRARY_LOADS[0]))
         # 八、old_string 以空白收尾：判的是拒绝那一道的名字；WRITE_GUARD_BREAK=trailing-blank-ignored 时拒绝的几例就红。
         # 不是 .md / .mdx 的目标，钩子收到的 new_string 已去过行尾空白，例子里照那样写
         trailing_finding = "old_string 以空白收尾"
@@ -829,6 +901,35 @@ def selftest(hook_dir):
                              target="crates/a.rs"),
         ]
         cases += context_cases + allow_cases
+        # 五、ISO 基本格式的紧凑时间戳（运行目录名、日志文件名里连写的那种）：样本串用 glued 把日期与「T 加钟点」拆开拼，这份源码里不出现字面写法；
+        # 拒绝的几例判的是拒绝信息点名的形态；WRITE_GUARD_BREAK=compact-timestamp-skipped 或 LIB_FORBIDDEN_NOTATIONS_BREAK=iso-compact-timestamp 时它们红，
+        # 放行的「8 位数字后跟 T 但不是时间戳」几例在 LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose 时红
+        compact_shape = "ISO 紧凑时间戳"
+        compact_sample = glued("运行目录 20261014", "T153000Z")
+        compact_cases = [
+            clock_shape_case("紧凑时间戳:8 位日期、T、6 位钟点、Z", compact_sample, compact_shape),
+            clock_shape_case("紧凑时间戳:8 位日期、T、4 位钟点", glued("日志 20261014", "T1530"), compact_shape),
+            clock_shape_case("紧凑时间戳:8 位日期、T、带冒号的时分", glued("跑于 20261014", "T15", colon, "30"), compact_shape),
+            clock_shape_case("紧凑时间戳:带连字符的日期加连写钟点", glued("run 2026-10-14", "T153000"), compact_shape),
+            clock_shape_case("紧凑时间戳:带小数秒与偏移", glued("20261014", "T153000.5+0900"), compact_shape),
+            clock_shape_case("紧凑时间戳:路径里的运行目录名也判", glued("见 logs/run-20261014", "T153000Z/out.log"), compact_shape),
+        ]
+        compact_lookalike_cases = [
+            clock_shape_case("紧凑时间戳:月份越界放行", glued("编号 20261314", "T1530"), None),
+            clock_shape_case("紧凑时间戳:钟点越界放行", glued("编号 20261014", "T2560"), None),
+            clock_shape_case("紧凑时间戳:年不是 20 开头放行", glued("编号 12345678", "T0000"), None),
+            clock_shape_case("紧凑时间戳:钟点只有三位放行", glued("编号 20261014", "T123"), None),
+            clock_shape_case("紧凑时间戳:8 位数字全是 9 放行", glued("编号 99999999", "T123456"), None),
+            clock_shape_case("紧凑时间戳:前面挨着字母放行", glued("哈希 ab20261014", "T1530"), None),
+            clock_shape_case("紧凑时间戳:小写 t 放行", glued("哈希 20261014", "t1530"), None),
+        ]
+        compact_pass_cases = [
+            clock_shape_case("紧凑时间戳:只写日期放行", "运行目录 20261014", None),
+            clock_shape_case("紧凑时间戳:.py 里带理由的放行标记放行", glued('stamp = "20261014', 'T153000Z"  # clock-times:allow 造紧凑时间戳的自检输入'), None,
+                             target=".claude/hooks/parse.py"),
+            clock_case("紧凑时间戳:仓外草稿目录放行", f"{new_root}/x/progress.md", {"content": compact_sample + "\n"}, None),
+        ]
+        cases += compact_cases + compact_lookalike_cases + compact_pass_cases
         # 钟点、会话号逐处全报（行号与总数；LIB_FORBIDDEN_NOTATIONS_BREAK=first-hit-only 下前两格红）；Edit 的行号折算成文件里的行号；
         # 九道判完再报：覆盖、越界与钟点三道一次列全（WRITE_GUARD_BREAK=stop-at-first 下末格红）
         def refusal_of(tool_name, target, tool_input, agent=None):
@@ -843,6 +944,14 @@ def selftest(hook_dir):
         cases.append(("会话号:两处都报（行号与总数）", True, all(fragment in two_sessions for fragment in ("共 2 处", "  第 1 行：", "  第 2 行："))))
         edit_lines, _ = refusal_of("Edit", "tracked.md", {"old_string": "a", "new_string": f"x\n用户 23{colon}10 定"})
         cases.append(("钟点:Edit 的行号折算成文件里的行号", True, "  第 2 行（" in edit_lines))
+        # 紧凑时间戳：Write、Edit、MultiEdit 三个工具各写一次，拒绝点名形态与命中的那一串（开关见上面紧凑时间戳那一段）
+        compact_stamp = compact_sample[len("运行目录 "):]
+        for tool_name, tool_input in (("Write", {"content": compact_sample + "\n"}),
+                                      ("Edit", {"old_string": "a", "new_string": compact_sample}),
+                                      ("MultiEdit", {"edits": [{"old_string": "a", "new_string": "b"}, {"old_string": "c", "new_string": compact_sample}]})):
+            compact_message, compact_finding = refusal_of(tool_name, "records/x.md", tool_input)
+            cases.append((f"紧凑时间戳:{tool_name} 写进仓里拒绝并点名形态与那一处", True,
+                          compact_finding == "描述里写了钟点" and f"（{compact_shape}）：「{compact_stamp}」" in compact_message))
         _, three_labels = refusal_of("Write", "untracked.md", {"content": f"用户 23{colon}10 定\n"}, agent="kb-scribe")
         cases.append(("九道判完再报:覆盖、越界与钟点一次列全", "整份覆盖未跟踪文件、越出写范围、描述里写了钟点", three_labels))
         # 走真实入口：把脚本当子进程、从标准输入喂 JSON，防「判定函数对、入口读不到输入」；拒绝要落进检出记录
@@ -883,6 +992,10 @@ def selftest(hook_dir):
                       run_entry({"tool_name": "Edit", "tool_input": {"file_path": f"{work}/records/x.md", "old_string": "python3 - ", "new_string": "python3 - "}}).returncode))
         recorded = sum(1 for _ in open(detections, encoding="utf-8")) if os.path.exists(detections) else 0
         cases.append(("stdin:七次拒绝都落进检出记录", 7, recorded))
+        compact_entry = run_entry({"tool_name": "Write", "tool_input": {"file_path": f"{work}/records/compact.md", "content": compact_sample + "\n"}})
+        cases.append(("stdin:Write 写进紧凑时间戳拒绝（退出码 2）", 2, compact_entry.returncode))
+        cases.append(("stdin:紧凑时间戳的拒绝点名形态与那一处", True,
+                      all(fragment in compact_entry.stderr for fragment in (f"（{compact_shape}）：「{compact_stamp}」", "→ 怎么办", "紧凑写法"))))
         # ── 九、草稿目录写者锁：SINGLEFS_WORK_ROOT 指到自检自己的工作根，锁与主会话记录都在里面 ──
         # 开关见文件头 --selftest 一段；下面「写者锁:」「stdin:第二个写者」「stdin:持锁者」开头的格各自点名在开关下红
         lock_root = tempfile.mkdtemp(dir=base)
@@ -960,6 +1073,27 @@ def selftest(hook_dir):
                     ("写者锁:草稿根之外不判", 0, decide({"tool_name": "Write", "agent_id": rival_id, "agent_type": "implementation-writer", "transcript_path": lock_transcript,
                                                    "tool_input": {"file_path": f"{work}/crates/b.rs", "content": "x"}}, work, table, library)[0]),
                 ]
+                # 接手换锁（派发闸用 replace_lock）失败不留临时文件：锁内容写不进 JSON（json.dump 写到一半抛 TypeError）、锁的位置是个非空目录（os.replace 抛 OSError）
+                # 两种失败各一格，另有一格成功的对照；LIB_WRITER_LOCK_BREAK=replace-temp-kept 下前两格红
+                def replace_lock_outcome(name, obstacle):
+                    scratch = os.path.join(lock_root, name)
+                    os.makedirs(scratch)
+                    if obstacle == "directory-in-the-way":
+                        os.makedirs(os.path.join(scratch, writer_lock.LOCK_NAME, "keep"))
+                    new = writer_lock.new_lock("self-test", prompt_one, "implementation-writer", lock_transcript)
+                    if obstacle == "unserializable":
+                        new["unserializable"] = object()
+                    try:
+                        writer_lock.replace_lock(scratch, new)
+                        raised = False
+                    except (TypeError, OSError):
+                        raised = True
+                    return raised, sorted(item for item in os.listdir(scratch) if item.endswith(".tmp"))
+                cases += [
+                    ("写者锁:换锁时锁内容写不进 JSON，抛异常且不留临时文件", (True, []), replace_lock_outcome("w10", "unserializable")),
+                    ("写者锁:换锁时锁的位置被目录占着，抛异常且不留临时文件", (True, []), replace_lock_outcome("w11", "directory-in-the-way")),
+                    ("写者锁:换锁成功不抛异常也不留临时文件", (False, []), replace_lock_outcome("w12", "none")),
+                ]
                 lock_environment = dict(environment, SINGLEFS_WORK_ROOT=lock_root)
                 def run_lock_entry(agent_id, relative):
                     return subprocess.run(["bash", script], input=json.dumps(lock_hook_input(agent_id, relative)), capture_output=True, text=True, env=lock_environment)
@@ -988,14 +1122,15 @@ def selftest(hook_dir):
     if failures:
         print("    → 看 decide_overwrite() / decide_compile_first() / decide_trailing_blank() / decide_shell_syntax() / decide_scope() / decide_prime_marks() / decide_clock_times() / decide_session_names() / decide_writer_lock() 与入口；"
               "WRITE_GUARD_DISABLE_WRITER_LOCK / LIB_WRITER_LOCK_BREAK / WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SYNTAX / WRITE_GUARD_DISABLE_SCOPE / WRITE_GUARD_DISABLE_CLOCK_TIMES / WRITE_GUARD_DISABLE_SESSION_NAMES、"
-              "WRITE_GUARD_BREAK=trailing-blank-ignored / scope-root-unanchored 或 SINGLEFS_WORK_ROOT_BREAK 设着的话这里本来就该红")
+              "WRITE_GUARD_BREAK=trailing-blank-ignored / scope-root-unanchored / python-syntax-subprocess / library-reloaded-each-time 或 SINGLEFS_WORK_ROOT_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {len(cases)} 种情形）：钩子、门禁、项目脚本、研究脚本目录下写进语法错误的 .sh（Write 与 Edit）与 .py 拒绝、语法对的与别处的放行；"
           "未跟踪的已有文件整份覆盖拒绝，已跟踪 / 不存在 / 仓外 / Edit 放行；主 agent 与内置 agent 放行、范围内放行、"
           "工作根与过渡期旧根下的报告目录放行、工作根同名前缀的兄弟目录拒绝，范围外（Edit、Write、MultiEdit）与 .. 绕路与未登记的项目 agent 拒绝；experiment-runner 写主工作区 crates/ 下的 .rs（改、新建、.. 绕路）按先编后换拒绝并点名 compile-then-swap.py，"
           "implementation-writer 与主 agent 写同一处、执行员写草稿目录与 crates/mutations.tsv 放行；Write 内容、Edit 与 MultiEdit 的 new_string 里有撇号类角标（五个字符各一例，主 agent 与子 agent 一样）拒绝，"
           "只在 old_string 里有、ASCII 单引号放行，共用字符集读不到拒绝；写进仓里的内容带钟点（日期后、时区词旁、x 通配、日期或时区词后的「N 点 / N 时」与时段词、时段词后的钟点、光秃的「N 点前后」、"
-          "不挨日期时区的时分与区间、ISO 与 diff 头 stat 的机器时间、光秃的时区词、英文十二小时制，md 里与没写理由的放行标记不认，主 agent 与子 agent 一样）拒绝并点名形态，"
+          "不挨日期时区的时分与区间、ISO 与 diff 头 stat 的机器时间、ISO 紧凑时间戳（日期连写或带连字符加连写的钟点，含路径里的运行目录名，Write、Edit、MultiEdit 各一例）、光秃的时区词、英文十二小时制，"
+          f"md 里与没写理由的放行标记不认，主 agent 与子 agent 一样）拒绝并点名形态，8 位数字后跟 T 但不是时间戳的 {len(compact_lookalike_cases)} 例（月份与钟点越界、年不是 20 开头、钟点只有三位、前面挨着字母、小写 t）与只写日期、仓外、.py 里带理由的放行标记放行，"
           f"只写日期、序号与个数后的「点」、不挨日期时区的时段词、标识符里的时区词、以 am / pm 起头的英文词、{len(context_cases)} 类长得像钟点的冒号对、"
           f".sh / .py / .rs 里带理由的放行标记 {len(allow_cases)} 例、仓外、排除的样本、hook 自检与 c510 提示、只在 old_string 里有放行，判据读不到拒绝；写进仓里的会话号（标签式、当主语、上游三语仓、长十六进制）拒绝，crate 名、上游仓目录名、临时目录名与 .sh 里带理由的放行标记放行；"
           "目标不是 .md / .mdx 时 Edit 与 MultiEdit 的 old_string 以空格或制表符收尾（.sh、.txt、.markdown，仓里仓外、主 agent 与子 agent 一样）拒绝并给出收窄框选与 replace-once.py 两条出路，"
@@ -1003,7 +1138,8 @@ def selftest(hook_dir):
           "钟点与会话号逐处列出（行号与总数，Edit 折算成文件里的行号），几道都不成立的一次列全；拒绝都记进检出记录；"
           "草稿目录写者锁：提示对不上与派发早于锁的旧进程不能认领，持锁者写与续写（含子目录）放行，第二个写者（含子目录）拒绝并点名持锁者与出路，回执对不上的拒绝点名记录里找到的持锁者（找不到写锁登记的提示 sha256 前几位），"
           "嵌套的子目录另派给别人持锁时，父目录锁的持有者写那个子目录、子目录锁的持有者写父目录与不持有任何一层的第三者都按最近一层的锁拦，回执还没落进记录的先到先得，"
-          "主 agent、没有锁的目录、坏锁文件、草稿根自己下面与草稿根之外不判")
+          "主 agent、没有锁的目录、坏锁文件、草稿根自己下面与草稿根之外不判；接手换锁时锁内容写不进 JSON、锁的位置被目录占着都不留临时文件；"
+          ".py 的语法在本进程里判、不起子进程，共用判据库一次写入只装一次")
     return 0
 
 hook_dir = sys.argv[1]

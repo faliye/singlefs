@@ -1,3 +1,0 @@
-test a_system_configuration_slot_one_landing_on_root_ring_region_zero_is_refused_before_any_write ... ok
-test root_ring_regions_longer_than_the_region_step_are_refused_and_regions_that_just_touch_are_not ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s

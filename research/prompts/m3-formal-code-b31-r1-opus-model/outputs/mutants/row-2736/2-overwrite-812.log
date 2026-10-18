@@ -1,6 +1,0 @@
-thread 'allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records' (3375334) panicked at crates/singlefs-core/src/allocator.rs:1919:49:
-分配器没装根环表却记了一条根：写根的分配器都由建它的一方装上根环表（挂载在 mount::rebuilt_allocator 装，mkfs 同一个进程里用 make_filesystem::allocator_after_make_filesystem，或 install_root_ring_occupancy(make_filesystem::root_ring_occupancy_after_make_filesystem(..))）；没装就一次不回收，转过根环之后 I-3.1 红（C551）
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
---
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.02s
-

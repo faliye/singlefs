@@ -1,1 +1,0 @@
--p singlefs-harness --test checker_known_bad_images -- a_retirement_container_holding_more_records_than_the_knob_reddens_only_the_knob_capacity_invariant

@@ -1,0 +1,4 @@
+exit=1
+want=驱动 --summary 的判定行、汇总行、计数、明细与退出码对不上（驱动的提交门禁判法失灵）
+want=REFUSED 0 行、UNLISTED 0 行，判定行 without_conclusion=0、missed=0、refused=1、unlisted_units=0
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

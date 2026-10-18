@@ -1,0 +1,7 @@
+4e52695f4a029e521226f8e6caf0ba5422f6262027afb1d4fee6aa9aa322aac3  scripts/gate/admission.py
+3a0337636ea86c57fc9fc5de2c3f37b96de93ab303a0d51c169434d822b1ca21  scripts/gate/lib_source_digest.py
+a0cc35315bd60ae32f1d041eb0f958b0af489f8bc32e459132d9c33460fc2fe5  .claude/scripts/preflight.sh
+64c1bf28184f22047c0a41eed321d83afd085a1d2abc9176c256db18598335a4  .claude/scripts/project_preflight.py
+73cc2da504b071cb49a18ae596ccba035514a061bffb213e7db02cb0afd39985  .claude/singlefs-ai-sop/scripts/comment-only-change.py
+6af572c36b57df4474c2e5369e1a8c3189f2736e057fcbb94aba211ca8d24528  .claude/singlefs-ai-sop/scripts/preflight.py
+d0d41b0dc20427f230b4d5f571c9a0abe68435a34cb4ec6ef202030ea0034958  .claude/singlefs-ai-sop/scripts/preflight.sh

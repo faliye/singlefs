@@ -1,0 +1,40 @@
+# 带判定库的脚本与没有判定库的测试入口：一行一份（门禁 code-tooling 的 reuse-selftests 格逐行核，判法在 scripts/gate/lib_reuse_checks.py 文件头「四」）。
+# 列（制表符隔开）：路径<TAB>自证命令<TAB>判定库放哪<TAB>复用三问格名[<TAB># 说明]
+#   判定库放哪：有判定库的写库在哪；没有判定库的测试入口写「无判定库：<欠账 C 号或「待立」>」（报本次未跑，不算绿）；
+#   射程里扫到、只是提到别人的复用的写「不算：<为什么>」。射程里声称复用的不许写成「无判定库」。
+#   复用三问格名全仓统一：reuse-three-questions（自证末尾打一行 REUSE_SELFTEST script=<脚本> same-inputs=… unrelated-change=… unit-change=…）。
+#   自证命令里的那一份脚本在 .claude/hooks/selftest-registry.tsv 的登记定现跑还是读上一次输出；门禁那几行指到入口脚本的自证，或经 lib_reuse_checks.py sample 起一份样本。
+# 现扫的射程（注释行写了「判定库」或「复用」的脚本都要在这张表里）：
+# scan: .claude/gate.d/*.sh scripts/crash/*.sh scripts/mutation/*.sh scripts/mutation/*.py scripts/experiments/replay.sh scripts/experiments/device-code-key.py scripts/gate/verus-proof-check.py .claude/scripts/lkmm.sh
+scripts/gate/verus-proof-check.py	python3 scripts/gate/verus-proof-check.py --selftest	<git common-dir>/singlefs-formal-unit-verdicts/（门禁 checker-tier-formal-verification 交 --verdict-library；GATE_FORMAL_VERDICT_LIBRARY 盖过）	reuse-three-questions	# 三格（证明、空真、必红世界）的项一起算；复用哨兵每格一份
+.claude/gate.d/checker-tier-formal-verification.sh	python3 scripts/gate/verus-proof-check.py --selftest	<git common-dir>/singlefs-formal-unit-verdicts/（判法在 scripts/gate/verus-proof-check.py）	reuse-three-questions	# 门禁只接判法、给库的位置
+scripts/mutation/crates-mutation-rows.py	python3 scripts/mutation/crates-mutation-rows.py --selftest	<git common-dir>/singlefs-crates-mutation-library/（GATE_MUTATION_RECORDS_HOME 盖过）	reuse-three-questions	# 一行变异一条判定；复用哨兵在 run_stage
+.claude/gate.d/checker-tier-crates-mutation-replay.sh	python3 scripts/mutation/crates-mutation-rows.py --selftest	<git common-dir>/singlefs-crates-mutation-library/（判法在 scripts/mutation/crates-mutation-rows.py）	reuse-three-questions	# 门禁经 import 调 run_stage
+scripts/mutation/broad-mutation.py	python3 scripts/mutation/broad-mutation.py --selftest	${SINGLEFS_BROAD_MUTATION_HOME:-~/.local/share/singlefs/broad-mutation-units}/verdicts.tsv	reuse-three-questions	# 一条变异一条判定；复用哨兵在 run_items
+.claude/gate.d/checker-tier-broad-mutation.sh	python3 scripts/mutation/broad-mutation.py --selftest	${SINGLEFS_BROAD_MUTATION_HOME:-~/.local/share/singlefs/broad-mutation-units}/verdicts.tsv（判法在 scripts/mutation/broad-mutation.py；门禁只读库）	reuse-three-questions	# 门禁不现判，只核库里此刻每条都有键相同的结论
+.claude/scripts/lkmm.sh	bash scripts/gate/lkmm-selftest.sh --selftest	<git common-dir>/singlefs-lkmm-verdicts/（门禁 checker-tier-lkmm 交 --verdict-library）	reuse-three-questions	# lkmm.sh 带 --selftest 会被重型测试闸按 herd7 拦，自证另放在 scripts/gate/lkmm-selftest.sh
+.claude/gate.d/checker-tier-lkmm.sh	bash scripts/gate/lkmm-selftest.sh --selftest	<git common-dir>/singlefs-lkmm-verdicts/（判法在 .claude/scripts/lkmm.sh）	reuse-three-questions	# 同上
+.claude/gate.d/checker-tier-qemu-device-streams.sh	python3 scripts/gate/lib_reuse_checks.py sample checker-tier-qemu-device-streams.sh tier-key-samples-three-questions	<git common-dir>/singlefs-qemu-verdicts/（GATE_QEMU_VERDICT_LIBRARY 盖过）	reuse-three-questions	# 判法在这一道门禁里；三问在键样本 tier-key-samples-three-questions
+scripts/experiments/replay.sh	bash scripts/experiments/replay.sh --selftest	<git common-dir>/singlefs-unit-verdicts/replay-row/	reuse-three-questions	# 复跑表一行一条判定
+.claude/gate.d/checker-tier-research-build-and-replay.sh	bash scripts/experiments/replay.sh --selftest	<git common-dir>/singlefs-unit-verdicts/（experiment-replay 格的判法在 scripts/experiments/replay.sh）	reuse-three-questions	# 这一行的命令罩 experiment-replay 格；research-unit-tests 格经 admission.py test-plan（三问在 admission.py 的自证，见 checker-tier-crash-point-replay.sh 那一行），mutation-tables-compile 格经 mutate.sh（三问在 scripts/mutation/mutate.sh 那一行）
+scripts/crash/crash-point-replay.sh	bash scripts/crash/crash-point-replay.sh --selftest	${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/crash-state-verdicts（判定在引擎里，crates/singlefs-checker-tier 的判定存储）	reuse-three-questions	# 自证这一层核入口把同一份长期库交下去、照实报现判与复用；复用哨兵要接在引擎里，没接
+scripts/crash/crash-amplification.sh	bash scripts/crash/crash-amplification.sh --selftest	${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/crash-state-verdicts（判定在引擎里）	reuse-three-questions	# 同上
+scripts/experiments/device-code-key.py	python3 scripts/experiments/device-code-key.py --selftest	装置各自的库（E174、E178）按这一份交的代码键存	reuse-three-questions	# 自证照装置的存法在内存里按代码键记；复用哨兵要接在装置里，没接
+.claude/gate.d/checker-tier-crash-point-replay.sh	python3 scripts/gate/admission.py --selftest	<git common-dir>/singlefs-unit-verdicts/checker-tier-crash-point-replay.sh:<格名>/（scripts/gate/admission.py verdict-plan）	reuse-three-questions	# 判法是 admission.py 的 verdict-plan / test-plan / verdict-record；复用三问与复用哨兵在它的自证（run_reuse_three_question_cells）
+.claude/gate.d/code-tooling.sh	python3 scripts/gate/admission.py --selftest	<git common-dir>/singlefs-unit-verdicts/code-tooling.sh:research-script-selftests/（scripts/gate/admission.py verdict-plan）	reuse-three-questions	# 同上：research-script-selftests 格经 verdict-plan 按条复用
+.claude/gate.d/harness-model-differential-and-scenarios.sh	python3 scripts/gate/admission.py --selftest	<git common-dir>/singlefs-unit-verdicts/harness-model-differential-and-scenarios.sh:<格名>/（scripts/gate/admission.py verdict-plan）	reuse-three-questions	# 同上：每格一条判定，经 verdict-plan
+scripts/mutation/mutate.sh	bash scripts/mutation/mutate.sh --selftest	<git common-dir>/singlefs-mutate-library/（MUTATE_LIBRARY_DIRECTORY 盖过）	reuse-three-questions	# 一条变异一条判定；复用三问与复用哨兵在自证的 reuse-three-questions、reuse-sentinel 两例
+.claude/gate.d/checker-independence-and-sync.sh	-	不算：注释里的「复用键与全仓改名」是一份记录的名字	-
+.claude/gate.d/code-source-discipline.sh	-	不算：注释里的「复用键与全仓改名」是一份记录的名字	-
+.claude/gate.d/doc-decisions.sh	-	不算：「候选代号复用」判的是决策文本的写法，没有判定库	-
+.claude/gate.d/doc-registries.sh	-	不算：「覆盖写、释放、回退与复用」是一个里程碑的名字	-
+scripts/crash/crash-amplification-lib.sh	-	不算：被两个崩溃放量驱动 source 的共用库，定库的位置与开库；判定与复用在引擎里，复用三问在 scripts/crash/crash-amplification.sh 的自证里	-
+scripts/crash/crash-amplification-item.sh	-	不算：分项驱动，只把库交给 cargo test 起的引擎、转打录入与判段的行；判定与复用在引擎里	-
+scripts/crash/crash-amplification-two-hosts.sh	-	不算：双机驱动，库交给本机与第二台、送快照、取回导入；判定与复用在引擎里	-
+scripts/crash/crash-point-replay-shard-run.sh	-	不算：崩溃点重放的双机驱动，库交给两台、取回导入；判定与复用在引擎里	-
+scripts/mutation/mutation-shard-run.sh	-	不算：变异的双机分片，分行照 crates-mutation-rows.py row-plan 的复用判据、导入照它的 import 核键；判定与库在 crates-mutation-rows.py	-
+scripts/mutation/lib_mutation_units.py	-	不算：被 import 的共用库（单元键与按条判定库的存放）；复用三问在用它的 crates-mutation-rows.py 与 mutate.sh 的自证里	-
+scripts/mutation/mutation-prune.py	-	不算：广谱变异的沿用判据库（被 broad-mutation.py 载入）；复用三问在 broad-mutation.py 的自证里	-
+scripts/gate/merge-and-verify.sh	-	无判定库：待立（harness 档每趟整包重跑，没有按条判定库）	-
+.claude/gate.d/fixtures	-	无判定库：待立（门禁样本档 stage-selftest 每趟全喂，没有按条判定库）	-
+scripts/gate/light-selftest-guard.py	-	无判定库：待立（单独起一份脚本的 --selftest 不经判定库；经门禁 code-tooling 的 research-script-selftests 格起时按条复用，那一行在上面）	-

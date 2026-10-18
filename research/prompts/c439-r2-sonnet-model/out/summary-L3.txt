@@ -1,0 +1,116 @@
+# 表一：守规矩续作里一次都没判到的条数/守规矩续作条数
+name=cover hist=h0_control bing=0/135 bing_guard=0/135 ding_lazy_fixed=0/135 ding_tree=0/135 ding_tree_fixed=0/135 geng=0/135 geng2=0/135 geng2_nc=0/135 geng2_s=0/135 today=0/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=0/135 yi_gate_mb=0/135
+name=cover hist=h11_dup bing=0/135 bing_guard=0/135 ding_lazy_fixed=0/135 ding_tree=0/135 ding_tree_fixed=0/135 geng=0/135 geng2=0/135 geng2_nc=0/135 geng2_s=0/135 today=0/135 wu_cf=0/135 wu_count=0/135 wu_fixed=135/135 wu_set=135/135 yi_clean=0/135 yi_gate_mb=0/135
+name=cover hist=h12_exempt_grow bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=0/135 wu_count=135/135 wu_fixed=0/135 wu_set=135/135 yi_clean=21/135 yi_gate_mb=21/135
+name=cover hist=h13_shared_open bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=21/135 yi_gate_mb=21/135
+name=cover hist=h14_rejudge_cost bing=0/135 bing_guard=0/135 ding_lazy_fixed=0/135 ding_tree=0/135 ding_tree_fixed=0/135 geng=0/135 geng2=0/135 geng2_nc=0/135 geng2_s=0/135 today=0/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=0/135 yi_gate_mb=0/135
+name=cover hist=h15_override bing=183/183 bing_guard=33/183 ding_lazy_fixed=33/183 ding_tree=53/183 ding_tree_fixed=33/183 geng=183/183 geng2=33/183 geng2_nc=33/183 geng2_s=92/183 today=116/183 wu_cf=0/183 wu_count=0/183 wu_fixed=0/183 wu_set=0/183 yi_clean=33/183 yi_gate_mb=33/183
+name=cover hist=h16_unstaged_other bing=0/135 bing_guard=0/135 ding_lazy_fixed=0/135 ding_tree=0/135 ding_tree_fixed=0/135 geng=0/135 geng2=0/135 geng2_nc=0/135 geng2_s=0/135 today=0/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=0/135 yi_gate_mb=0/135
+name=cover hist=h17_wu_move bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=135/135 wu_count=135/135 wu_fixed=135/135 wu_set=135/135 yi_clean=21/135 yi_gate_mb=21/135
+name=cover hist=h18_wu_copy_other_page bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=21/135 yi_gate_mb=21/135
+name=cover hist=h19_index_moves bing=0/135 bing_guard=0/135 ding_lazy_fixed=0/135 ding_tree=0/135 ding_tree_fixed=0/135 geng=0/135 geng2=0/135 geng2_nc=0/135 geng2_s=0/135 today=0/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=0/135 yi_gate_mb=0/135
+name=cover hist=h1_c439 bing=0/183 bing_guard=0/183 ding_lazy_fixed=0/183 ding_tree=0/183 ding_tree_fixed=0/183 geng=0/183 geng2=0/183 geng2_nc=0/183 geng2_s=92/183 today=104/183 wu_cf=0/183 wu_count=0/183 wu_fixed=0/183 wu_set=0/183 yi_clean=0/183 yi_gate_mb=0/183
+name=cover hist=h2_noverify bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=21/135 yi_gate_mb=21/135
+name=cover hist=h2u_unpushed bing=69/207 bing_guard=39/207 ding_lazy_fixed=39/207 ding_tree=39/207 ding_tree_fixed=39/207 geng=69/207 geng2=39/207 geng2_nc=39/207 geng2_s=51/207 today=51/207 wu_cf=0/207 wu_count=0/207 wu_fixed=0/207 wu_set=0/207 yi_clean=39/207 yi_gate_mb=39/207
+name=cover hist=h3_split bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=21/135 yi_gate_mb=21/135
+name=cover hist=h4_other bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=21/135 yi_gate_mb=21/135
+name=cover hist=h5_pushed bing=69/207 bing_guard=39/207 ding_lazy_fixed=39/207 ding_tree=39/207 ding_tree_fixed=39/207 geng=69/207 geng2=39/207 geng2_nc=39/207 geng2_s=106/207 today=108/207 wu_cf=0/207 wu_count=0/207 wu_fixed=0/207 wu_set=0/207 yi_clean=39/207 yi_gate_mb=39/207
+name=cover hist=h6_stamp_N bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=21/135 yi_gate_mb=135/135
+name=cover hist=h6_stamp_S bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=21/135 yi_gate_mb=135/135
+name=cover hist=h6_stamp_revert bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=21/135 yi_gate_mb=135/135
+name=cover hist=h8_amend bing=45/135 bing_guard=21/135 ding_lazy_fixed=21/135 ding_tree=21/135 ding_tree_fixed=21/135 geng=45/135 geng2=21/135 geng2_nc=21/135 geng2_s=64/135 today=66/135 wu_cf=0/135 wu_count=0/135 wu_fixed=0/135 wu_set=0/135 yi_clean=21/135 yi_gate_mb=21/135
+name=cover hist=h9_aba bing=116/183 bing_guard=116/183 ding_lazy_fixed=0/183 ding_tree=30/183 ding_tree_fixed=0/183 geng=0/183 geng2=0/183 geng2_nc=0/183 geng2_s=0/183 today=28/183 wu_cf=0/183 wu_count=0/183 wu_fixed=0/183 wu_set=0/183 yi_clean=12/183 yi_gate_mb=12/183
+name=cover hist=h9_commit_undo bing=116/183 bing_guard=116/183 ding_lazy_fixed=0/183 ding_tree=30/183 ding_tree_fixed=0/183 geng=0/183 geng2=0/183 geng2_nc=0/183 geng2_s=0/183 today=28/183 wu_cf=0/183 wu_count=0/183 wu_fixed=0/183 wu_set=0/183 yi_clean=12/183 yi_gate_mb=12/183
+name=cover hist=h9_stash bing=116/183 bing_guard=116/183 ding_lazy_fixed=0/183 ding_tree=30/183 ding_tree_fixed=0/183 geng=0/183 geng2=0/183 geng2_nc=0/183 geng2_s=0/183 today=28/183 wu_cf=0/183 wu_count=0/183 wu_fixed=0/183 wu_set=0/183 yi_clean=12/183 yi_gate_mb=12/183
+# 表二：被追踪的行在前缀之后进窗口的 总次数/单条续作最大次数/至少进过一次的续作条数
+name=cost hist=h0_control bing=255/3/135 bing_guard=255/3/135 ding_lazy_fixed=255/3/135 ding_tree=255/3/135 ding_tree_fixed=255/3/135 geng=255/3/135 geng2=255/3/135 geng2_nc=255/3/135 geng2_s=249/3/135 today=249/3/135 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=255/3/135 yi_gate_mb=255/3/135
+name=cost hist=h11_dup bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=0/0/0 wu_set=0/0/0 yi_clean=174/3/114 yi_gate_mb=174/3/114
+name=cost hist=h12_exempt_grow bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=0/0/0 wu_fixed=261/3/135 wu_set=0/0/0 yi_clean=174/3/114 yi_gate_mb=174/3/114
+name=cost hist=h13_shared_open bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=174/3/114 yi_gate_mb=174/3/114
+name=cost hist=h14_rejudge_cost bing=0/0/0 bing_guard=0/0/0 ding_lazy_fixed=0/0/0 ding_tree=0/0/0 ding_tree_fixed=0/0/0 geng=0/0/0 geng2=0/0/0 geng2_nc=0/0/0 geng2_s=0/0/0 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=114/1/114 yi_gate_mb=114/1/114
+name=cost hist=h15_override bing=0/0/0 bing_guard=218/3/150 ding_lazy_fixed=218/3/150 ding_tree=190/3/130 ding_tree_fixed=218/3/150 geng=0/0/0 geng2=218/3/150 geng2_nc=218/3/150 geng2_s=109/3/91 today=81/3/67 wu_cf=327/3/183 wu_count=327/3/183 wu_fixed=327/3/183 wu_set=327/3/183 yi_clean=218/3/150 yi_gate_mb=218/3/150
+name=cost hist=h16_unstaged_other bing=195/3/135 bing_guard=223/3/135 ding_lazy_fixed=253/3/135 ding_tree=251/3/135 ding_tree_fixed=253/3/135 geng=195/3/135 geng2=223/3/135 geng2_nc=223/3/135 geng2_s=233/3/135 today=249/3/135 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=255/3/135 yi_gate_mb=255/3/135
+name=cost hist=h17_wu_move bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=0/0/0 wu_count=0/0/0 wu_fixed=0/0/0 wu_set=0/0/0 yi_clean=174/3/114 yi_gate_mb=174/3/114
+name=cost hist=h18_wu_copy_other_page bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=174/3/114 yi_gate_mb=174/3/114
+name=cost hist=h19_index_moves bing=195/3/135 bing_guard=223/3/135 ding_lazy_fixed=253/3/135 ding_tree=251/3/135 ding_tree_fixed=253/3/135 geng=195/3/135 geng2=223/3/135 geng2_nc=81/3/67 geng2_s=233/3/135 today=249/3/135 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=255/3/135 yi_gate_mb=255/3/135
+name=cost hist=h1_c439 bing=182/3/122 bing_guard=218/3/150 ding_lazy_fixed=218/3/150 ding_tree=218/3/150 ding_tree_fixed=218/3/150 geng=182/3/122 geng2=218/3/150 geng2_nc=218/3/150 geng2_s=109/3/91 today=95/3/79 wu_cf=327/3/183 wu_count=327/3/183 wu_fixed=327/3/183 wu_set=327/3/183 yi_clean=218/3/150 yi_gate_mb=218/3/150
+name=cost hist=h2_noverify bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=174/3/114 yi_gate_mb=174/3/114
+name=cost hist=h2u_unpushed bing=202/3/138 bing_guard=240/3/168 ding_lazy_fixed=240/3/168 ding_tree=240/3/168 ding_tree_fixed=240/3/168 geng=202/3/138 geng2=240/3/168 geng2_nc=240/3/168 geng2_s=223/3/156 today=223/3/156 wu_cf=360/3/207 wu_count=360/3/207 wu_fixed=360/3/207 wu_set=360/3/207 yi_clean=240/3/168 yi_gate_mb=240/3/168
+name=cost hist=h3_split bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=174/3/114 yi_gate_mb=174/3/114
+name=cost hist=h4_other bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=174/3/114 yi_gate_mb=174/3/114
+name=cost hist=h5_pushed bing=202/3/138 bing_guard=240/3/168 ding_lazy_fixed=240/3/168 ding_tree=240/3/168 ding_tree_fixed=240/3/168 geng=202/3/138 geng2=240/3/168 geng2_nc=240/3/168 geng2_s=120/3/101 today=117/3/99 wu_cf=360/3/207 wu_count=360/3/207 wu_fixed=360/3/207 wu_set=360/3/207 yi_clean=240/3/168 yi_gate_mb=240/3/168
+name=cost hist=h6_stamp_N bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=174/3/114 yi_gate_mb=0/0/0
+name=cost hist=h6_stamp_S bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=174/3/114 yi_gate_mb=0/0/0
+name=cost hist=h6_stamp_revert bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=174/3/114 yi_gate_mb=0/0/0
+name=cost hist=h8_amend bing=142/3/90 bing_guard=174/3/114 ding_lazy_fixed=174/3/114 ding_tree=174/3/114 ding_tree_fixed=174/3/114 geng=142/3/90 geng2=174/3/114 geng2_nc=174/3/114 geng2_s=87/3/71 today=84/3/69 wu_cf=261/3/135 wu_count=261/3/135 wu_fixed=261/3/135 wu_set=261/3/135 yi_clean=174/3/114 yi_gate_mb=174/3/114
+name=cost hist=h9_aba bing=81/3/67 bing_guard=81/3/67 ding_lazy_fixed=299/3/171 ding_tree=271/3/153 ding_tree_fixed=299/3/171 geng=295/3/167 geng2=299/3/171 geng2_nc=299/3/171 geng2_s=271/3/155 today=271/3/155 wu_cf=327/3/183 wu_count=327/3/183 wu_fixed=327/3/183 wu_set=327/3/183 yi_clean=299/3/171 yi_gate_mb=299/3/171
+name=cost hist=h9_commit_undo bing=81/3/67 bing_guard=81/3/67 ding_lazy_fixed=299/3/171 ding_tree=271/3/153 ding_tree_fixed=299/3/171 geng=295/3/167 geng2=299/3/171 geng2_nc=299/3/171 geng2_s=271/3/155 today=271/3/155 wu_cf=327/3/183 wu_count=327/3/183 wu_fixed=327/3/183 wu_set=327/3/183 yi_clean=299/3/171 yi_gate_mb=299/3/171
+name=cost hist=h9_stash bing=81/3/67 bing_guard=81/3/67 ding_lazy_fixed=299/3/171 ding_tree=271/3/153 ding_tree_fixed=299/3/171 geng=295/3/167 geng2=299/3/171 geng2_nc=299/3/171 geng2_s=271/3/155 today=271/3/155 wu_cf=327/3/183 wu_count=327/3/183 wu_fixed=327/3/183 wu_set=327/3/183 yi_clean=299/3/171 yi_gate_mb=299/3/171
+# 与 geng2 覆盖逐段相同（22 段里相同的段数）
+name=same_as_geng2 cand=bing same=6/23
+name=same_as_geng2 cand=bing_guard same=20/23
+name=same_as_geng2 cand=ding_lazy_fixed same=23/23
+name=same_as_geng2 cand=ding_tree same=19/23
+name=same_as_geng2 cand=ding_tree_fixed same=23/23
+name=same_as_geng2 cand=geng same=9/23
+name=same_as_geng2 cand=geng2 same=23/23
+name=same_as_geng2 cand=geng2_nc same=23/23
+name=same_as_geng2 cand=geng2_s same=8/23
+name=same_as_geng2 cand=today same=5/23
+name=same_as_geng2 cand=wu_cf same=9/23
+name=same_as_geng2 cand=wu_count same=9/23
+name=same_as_geng2 cand=wu_fixed same=8/23
+name=same_as_geng2 cand=wu_set same=8/23
+name=same_as_geng2 cand=yi_clean same=20/23
+name=same_as_geng2 cand=yi_gate_mb same=17/23
+# 合计：14 段「错行绕过门禁提交 / 交错 / 人给 GATE_BASE」历史上守规矩续作一次都没判到的条数 / 守规矩续作条数
+name=total14 cand=bing never=984/2274 of_which_no_N_or_S=294
+name=total14 cand=bing_guard never=606/2274 of_which_no_N_or_S=294
+name=total14 cand=ding_lazy_fixed never=258/2274 of_which_no_N_or_S=258
+name=total14 cand=ding_tree never=368/2274 of_which_no_N_or_S=294
+name=total14 cand=ding_tree_fixed never=258/2274 of_which_no_N_or_S=258
+name=total14 cand=geng never=636/2274 of_which_no_N_or_S=258
+name=total14 cand=geng2 never=258/2274 of_which_no_N_or_S=258
+name=total14 cand=geng2_nc never=258/2274 of_which_no_N_or_S=258
+name=total14 cand=geng2_s never=789/2274 of_which_no_N_or_S=291
+name=total14 cand=today never=925/2274 of_which_no_N_or_S=327
+name=total14 cand=wu_cf never=0/2274 of_which_no_N_or_S=0
+name=total14 cand=wu_count never=0/2274 of_which_no_N_or_S=0
+name=total14 cand=wu_fixed never=0/2274 of_which_no_N_or_S=0
+name=total14 cand=wu_set never=0/2274 of_which_no_N_or_S=0
+name=total14 cand=yi_clean never=294/2274 of_which_no_N_or_S=294
+name=total14 cand=yi_gate_mb never=636/2274 of_which_no_N_or_S=294
+# 合计：戊一族的 4 段历史（重复抄存量豁免行 / 绕过提交同时涨表 / 同页搬家 / 抄到另一页）
+name=total_wu cand=bing h11_dup=0/135 h12_exempt_grow=45/135 h17_wu_move=45/135 h18_wu_copy_other_page=45/135
+name=total_wu cand=bing_guard h11_dup=0/135 h12_exempt_grow=21/135 h17_wu_move=21/135 h18_wu_copy_other_page=21/135
+name=total_wu cand=ding_lazy_fixed h11_dup=0/135 h12_exempt_grow=21/135 h17_wu_move=21/135 h18_wu_copy_other_page=21/135
+name=total_wu cand=ding_tree h11_dup=0/135 h12_exempt_grow=21/135 h17_wu_move=21/135 h18_wu_copy_other_page=21/135
+name=total_wu cand=ding_tree_fixed h11_dup=0/135 h12_exempt_grow=21/135 h17_wu_move=21/135 h18_wu_copy_other_page=21/135
+name=total_wu cand=geng h11_dup=0/135 h12_exempt_grow=45/135 h17_wu_move=45/135 h18_wu_copy_other_page=45/135
+name=total_wu cand=geng2 h11_dup=0/135 h12_exempt_grow=21/135 h17_wu_move=21/135 h18_wu_copy_other_page=21/135
+name=total_wu cand=geng2_nc h11_dup=0/135 h12_exempt_grow=21/135 h17_wu_move=21/135 h18_wu_copy_other_page=21/135
+name=total_wu cand=geng2_s h11_dup=0/135 h12_exempt_grow=64/135 h17_wu_move=64/135 h18_wu_copy_other_page=64/135
+name=total_wu cand=today h11_dup=0/135 h12_exempt_grow=66/135 h17_wu_move=66/135 h18_wu_copy_other_page=66/135
+name=total_wu cand=wu_cf h11_dup=0/135 h12_exempt_grow=0/135 h17_wu_move=135/135 h18_wu_copy_other_page=0/135
+name=total_wu cand=wu_count h11_dup=0/135 h12_exempt_grow=135/135 h17_wu_move=135/135 h18_wu_copy_other_page=0/135
+name=total_wu cand=wu_fixed h11_dup=135/135 h12_exempt_grow=0/135 h17_wu_move=135/135 h18_wu_copy_other_page=0/135
+name=total_wu cand=wu_set h11_dup=135/135 h12_exempt_grow=135/135 h17_wu_move=135/135 h18_wu_copy_other_page=0/135
+name=total_wu cand=yi_clean h11_dup=0/135 h12_exempt_grow=21/135 h17_wu_move=21/135 h18_wu_copy_other_page=21/135
+name=total_wu cand=yi_gate_mb h11_dup=0/135 h12_exempt_grow=21/135 h17_wu_move=21/135 h18_wu_copy_other_page=21/135
+# 全部历史：守规矩续作里「带 N 或 S 而一次都没判到」的条数 / 守规矩续作条数（G-only 的续作不算：那是人每一趟都带 GATE_BASE 自己收窄窗口）
+name=never_with_NS cand=bing never=786/3489
+name=never_with_NS cand=bing_guard never=312/3489
+name=never_with_NS cand=ding_lazy_fixed never=0/3489
+name=never_with_NS cand=ding_tree never=74/3489
+name=never_with_NS cand=ding_tree_fixed never=0/3489
+name=never_with_NS cand=geng never=474/3489
+name=never_with_NS cand=geng2 never=0/3489
+name=never_with_NS cand=geng2_nc never=0/3489
+name=never_with_NS cand=geng2_s never=670/3489
+name=never_with_NS cand=today never=778/3489
+name=never_with_NS cand=wu_cf never=114/3489
+name=never_with_NS cand=wu_count never=228/3489
+name=never_with_NS cand=wu_fixed never=228/3489
+name=never_with_NS cand=wu_set never=342/3489
+name=never_with_NS cand=yi_clean never=0/3489
+name=never_with_NS cand=yi_gate_mb never=342/3489

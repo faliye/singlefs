@@ -53,20 +53,27 @@
 # 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   STAGE_CELLS_BREAK=red-swallowed  共用库吞红：红格按绿记、整道退 0
 #       absolute-assertions-red、clause-enums-red、crash-point-replay-segments-red、data-names-red、feature-bits-red、format-constants-exclusion-red、format-constants-red、gpu-exemptions-red、mutation-light-rows-red、
-#       mutation-tables-red、ordinal-names-red、reading-discipline-red、test-file-names-red、crate-sources-reachable-red、
+#       mutation-tables-duplicates-lag-red、mutation-tables-red、ordinal-names-red、reading-discipline-red、test-file-names-red、crate-sources-reachable-red、
 #       unsafe-allowances-no-safety-red、unsafe-allowances-other-crate-red、unsafe-allowances-reason-empty-red、unsafe-allowances-root-blank-red、
 #       unsafe-allowances-safety-vague-red、unsafe-allowances-source-missing-red、unsafe-allowances-two-allows-red、unsafe-allowances-wrong-function-red、
 #       vague-names-red（期望退出 1，实测 0）
 #   STAGE_CELLS_BREAK=marker-ignored  共用库不认 .gate-cells：每份样本十五格都跑
 #       absolute-assertions-green、clause-enums-green、crash-point-replay-segments-green、data-names-green、feature-bits-green、format-constants-green、gpu-exemptions-green、mutation-light-rows-green、
-#       mutation-tables-green、ordinal-names-green、reading-discipline-green、
+#       mutation-tables-duplicates-lag-green、mutation-tables-green、ordinal-names-green、reading-discipline-green、
 #       test-file-names-green、crate-sources-reachable-green、unsafe-allowances-deny-one-green、unsafe-allowances-green、vague-names-green（期望退出 0，实测 1）；absolute-assertions-red、
-#       clause-enums-red、crash-point-replay-segments-red、data-names-red、feature-bits-red、format-constants-exclusion-red、format-constants-red、gpu-exemptions-red、mutation-light-rows-red、mutation-tables-red、
+#       clause-enums-red、crash-point-replay-segments-red、data-names-red、feature-bits-red、format-constants-exclusion-red、format-constants-red、gpu-exemptions-red、mutation-light-rows-red、
+#       mutation-tables-duplicates-lag-red、mutation-tables-red、
 #       ordinal-names-red、reading-discipline-red、test-file-names-red、crate-sources-reachable-red、
 #       unsafe-allowances-no-safety-red、unsafe-allowances-other-crate-red、unsafe-allowances-reason-empty-red、unsafe-allowances-root-blank-red、
 #       unsafe-allowances-safety-vague-red、unsafe-allowances-source-missing-red、unsafe-allowances-two-allows-red、unsafe-allowances-wrong-function-red、
 #       vague-names-red（输出里找不到「样本只跑 .gate-cells 点名的格：…」）
 #   GATE_VAGUE_NAMES_BREAK=trait-methods-judged  vague-names 把 trait 块里的方法也判
+#       vague-names-green（期望退出 0，实测 1）
+#   GATE_READING_DISCIPLINE_BREAK=reading-writes-unseen  reading-discipline 不认字段简写初始化与经方法调用结果写字段，把这两种写过的读数也当恒为 0
+#       reading-discipline-green（期望退出 0，实测 1）
+#   GATE_READING_DISCIPLINE_BREAK=asserted-fields-judged  reading-discipline 把进了断言被拿来核的字段（钉值）也当恒为 0 的读数
+#       reading-discipline-green（期望退出 0，实测 1）
+#   GATE_VAGUE_NAMES_BREAK=string-continuation-judged  vague-names 把以 \n\ 续行的字符串字面量里的源码也判
 #       vague-names-green（期望退出 0，实测 1）
 #   GATE_VAGUE_NAMES_BREAK=exclusions-ignored  vague-names 不认排除表
 #       vague-names-red（输出里找不到「crates/demo/src/renamed.rs 里已经…」）
@@ -162,7 +169,21 @@
 #       data-names-green（期望退出 0，实测 1）
 #   DATA_NAME_LINT_BREAK=call-arguments-judged  data-names 函数调用的字符串实参（左括号前是标识符）也当元组首列
 #       data-names-green（期望退出 0，实测 1）
-# mutation-tables、absolute-assertions 没有弄坏开关，reading-discipline 只有共用库那一项，判别力靠各自的样本。
+#   GATE_MUTATION_TABLES_BREAK=named-test-unsearched  mutation-tables 不判点名的测试在不在选的目标里
+#       mutation-tables-red（输出里找不到「M_点名的测试不存在」那一条）
+#   GATE_MUTATION_TABLES_BREAK=named-test-target-ignored  mutation-tables 点名的测试在整个包里找、不看选的目标
+#       mutation-tables-red（输出里找不到「M_库里点名只在集成测试里的用例」那一条）
+#   GATE_MUTATION_TABLES_BREAK=named-test-definitions-only  mutation-tables 点名的测试只认 fn <名> 的定义（宏展开出来的认不出）
+#       mutation-tables-green（期望退出 0，实测 1）
+#   GATE_MUTATION_TABLES_BREAK=duplicate-key-with-test  mutation-tables 把点名的测试也算进 crates/mutations.tsv 重复行的键（改前的判法）
+#       mutation-tables-red（输出里找不到「crates/mutations.tsv 第 13、14 行」）
+#   GATE_MUTATION_TABLES_BREAK=research-duplicates-unchecked  mutation-tables 不判研究变异表里除变异名外各列全同的行
+#       mutation-tables-red（输出里找不到「scripts/mutation/tables/e1_sample.tsv 第 3、4 行」）
+#   GATE_MUTATION_TABLES_BREAK=duplicates-lag-ignored  mutation-tables 不读重复行滞后表 .claude/gate.d/mutation-duplicates-lag.tsv：登记的组照红
+#       mutation-tables-duplicates-lag-green（期望退出 0，实测 1）
+#   GATE_MUTATION_TABLES_BREAK=duplicates-lag-growth-unchecked  mutation-tables 不拿滞后表和基准那一版比：表涨了不红
+#       mutation-tables-duplicates-lag-red（输出里找不到「相对基准那一版多出一组」）
+# absolute-assertions 没有弄坏开关，mutation-tables 别的几样与 reading-discipline（只有共用库那一项）判别力靠各自的样本。
 #
 #   bash .claude/gate.d/code-source-discipline.sh [项目根]                                十五格都跑
 #   bash .claude/gate.d/code-source-discipline.sh --list                                  逐行打格名与判什么，不跑格
@@ -236,7 +257,7 @@ ROOT="$(pwd)"
 # ── vague-names ──
 # 判据：`git ls-files` 列出的 crates/**/*.rs 与 scripts/experiments/**/*.rs 里，每一处 `fn <名>` 与 `struct|enum|type|trait <名>`：
 # 函数名按 `_` 切词、类型名按大写字母切词，切出来的每一个词（小写）都在 .claude/naming-vague-words 里，判违规，逐处列「文件:行 名字」。
-# 不判的：`impl <trait> for <类型>` 块里的方法（名字是 trait 定的）、`main`、宏展开出来的名字（认不出）。
+# 不判的：`impl <trait> for <类型>` 块里的方法与关联类型（名字是 trait 定的）、`main`、以 `\n\` 续行的字符串字面量里的源码（测试夹具）、宏展开出来的名字（认不出）。
 # 还没改完名的文件逐个登记在 .claude/naming-vague-exclude（一行 <路径>  # 理由），那份文件里的违规不判；排除项指向不存在的文件、
 # 或那份文件里已经一处违规都没有了，判红（排除只缩不涨）。一份 .rs 都没扫到：这一格本次无对象可判。
 # 管不到的：名字里夹了一个非空泛词、而那个词本身也什么都没说（run_the_cell_again）——词表只认整名全空泛，这一类靠 review。
@@ -291,7 +312,8 @@ def violations_in(path):
             trait_impl_depths.append(depth)
         match = DECLARATION.match(code)
         inside_trait_impl = bool(trait_impl_depths) and depth > trait_impl_depths[-1]
-        if match and not (match.group(1) == "fn" and inside_trait_impl) and match.group(2) != "main":
+        inside_string_literal = line.rstrip("\n").endswith("\\n\\") and BROKEN != "string-continuation-judged"
+        if match and not (match.group(1) in ("fn", "type") and inside_trait_impl) and match.group(2) != "main" and not inside_string_literal:
             parts = words_of(match.group(1), match.group(2))
             if parts and all(part in vague for part in parts):
                 found.append(f"{path}:{number} {match.group(1)} {match.group(2)}")
@@ -488,7 +510,7 @@ for name, (kbf, want, stale) in sorted(marks.items()):
 
 if exclusion_problems:
     for problem in exclusion_problems:
-        print(f'  ✗ {problem}')
+        print(f'  ✗ {problem}')   # gate-lint:detail
     print(f'  ✗ 排除表 {EXCLUDE_FILE} 有 {len(exclusion_problems)} 行不起作用或没写理由')
     print('     → 指向不存在的与排不到文件的那几行删掉（排除只缩不涨）；留着的每一行在 # 后面写明为什么不判（原样保存的证据、改了就不是原样）。')
 if bad:
@@ -1051,30 +1073,52 @@ PY
 # ── 格 mutation-tables：每个实验二进制都要有变异表
 #
 # research 那侧：scripts/experiments/ 下每个 *.rs 在 scripts/mutation/tables/ 下有同名 .tsv，至少一条成形的变异
-# （三段制表符分隔）、没有坏行；每条原文（\n 还原成换行）在源码里恰好命中一次（mutate.sh 命中 0 次或多次就退 3，后面一条都不跑）；
+# （三段制表符分隔）、没有坏行；每条原文（\n 还原成换行）在源码里恰好命中一次（mutate.sh 把命中 0 次或多次的那一条记「⚓ 锚点失效」、别的照跑，整轮退 3）；
 # 原文与替换文里只许 \n 这一种反斜杠转义。没有同名二进制的表（shell 探针的）不判锚点，成功行逐个列名。
+# 重复行：每张表（有没有同名二进制都判）里除第一列变异名外各列逐字全同的几行判红，逐组列表名、行号与变异名（一处改法写了几行，条数看着多、真改法没多）；
+#   弄坏开关 GATE_MUTATION_TABLES_BREAK=research-duplicates-unchecked 不判这一样：red 样本 e1_sample.tsv 第 3、4 行那一组找不到。
 # 为什么：kb 里每一句「N 条变异全部被抓」都靠这些表复现。
 #
 # crates/mutations.tsv（门禁 checker-tier-crates-mutation-replay 的表，六段）：那一道要跑几个钟头，改 crates/ 的实现员不跑它，
 # 它派活之前判的几样在这里先静态判。判法只有一份，在 scripts/mutation/crates-mutation-rows.py 的 row_problems，这里经 static-check 调：
 #   成形：六段；替换文可以空（删掉原文），其余五段不许空；
-#   锚点：原文的 \n 还原成换行后，在「文件」那一段指的源码里恰好命中一次，文件不在、读不了也算；
+#   锚点：原文的 \n 还原成换行后，在「文件」那一段指的源码里恰好命中一次，文件不在、读不了也算（那一道把这样的行记「锚点失效」、别的行照判）；
 #   测试名：必须红的测试名是一个用例名（不带正则符号与空白）；
 #   转义：原文与替换文里只许 \n 这一种反斜杠转义（别的按字面写进源码，那条变异编不过、等于没跑）；
 #   拷贝范围 ①：某一行改的文件不在 .claude/gate.d/stage-inputs.tsv 里那一道登记的路径之内（它只把这些路径拷进每片的源码副本）；
 #   拷贝范围 ②：crates/ 下 .rs 里以 "../ 起头、按所在 crate 的根解析之后逃出 crates/、又不在拷贝范围里的字符串字面量
 #     （#[path = …] 与注释里的不算）：运行时读它的测试在副本里没改坏就红，那一道记「基线不绿」。
 #     管不到：路径拼在变量里、环境变量给的、format! 拼出来的、运行期再 join("..") 的；指到仓根本身的（"../../"）按不在范围里判。
-# 另判三样那一道不判的：两行重复；点名的测试标了 #[ignore] 而参数里没有 --include-ignored；
-# `--` 之后的筛选词一个都筛不到点名的测试（libtest 比的是完整测试名：模块路径由点名的函数在哪个文件、套在哪几层内联 mod 里算出）。
+# 另判四样那一道不判的：重复行——「文件、原文、替换文」三样逐字全同的几行判红（点名的测试、cargo 参数不同也算：一处改法留一行），
+#   逐组列行号与变异名，组里 cargo 参数也全同的另注一句；变异名相同的两行另判（按名字分格的报告把两条并成一格）。
+#   弄坏开关 GATE_MUTATION_TABLES_BREAK=duplicate-key-with-test 照改前的判法把点名的测试也算进重复的键：red 样本第 13、14 行那一组（点名的测试不同）找不到；
+# 滞后表：两侧的重复行里还不能删的组（有装置或名单按名字引着、臂表与键表按臂或键登记）登记在 .claude/gate.d/mutation-duplicates-lag.tsv（写法在它的表头），
+#   登记的组不判红，成功句前逐组列名、成功句报「重复行滞后 N 组」。判红的：一行不是四列或有空格子；表那一列不是 crates/mutations.tsv、也不是 scripts/mutation/tables/<表名>.tsv，
+#   或那张表不在；名字在那张表第一列里找不到；名字此刻不是同一组（三样不全同 / 除变异名外各列不全同）；那一组里还有没登记的名字；名字在表里不唯一、对上不止一组；
+#   两行罩同一组；只缩不涨——此刻的一行在基准那一版（scripts/gate/changed-paths.sh 的 gate_diff_base gate）同一张表里找不到名字是它超集的一行。
+#   基准里还没有这张表时不比、成功句写明；git 取不到基准那一版判红。名字改了也算涨（按名字认组）。
+#   弄坏开关 GATE_MUTATION_TABLES_BREAK=duplicates-lag-ignored 不读滞后表：mutation-tables-duplicates-lag-green 登记的两组照红，mutation-tables-duplicates-lag-red 里滞后表那四处不对也不报，两份样本都判错；
+#   duplicates-lag-growth-unchecked 不和基准比：mutation-tables-duplicates-lag-red 里比基准多登记的那一组不红，mutation-tables-duplicates-lag-green 成功句里「没涨」那半句也不打，两份样本都判错。
+#   样本 mutation-tables-duplicates-lag-green：crates 表与 e1_sample.tsv 各一组重复、滞后表两行罩住、基准那一版与此刻相同；
+#   mutation-tables-duplicates-lag-red：基准那一版只登记 crates 那一组，此刻多登记 e1_sample.tsv 那一组（涨了），另有一行名字找不到、一行名字不是同一组、一行漏登记组里一个名字。
+# 点名的测试标了 #[ignore] 而参数里没有 --include-ignored；
+# `--` 之后的筛选词一个都筛不到点名的测试（libtest 比的是完整测试名：模块路径由点名的函数在哪个文件、套在哪几层内联 mod 里算出）；
+# 点名的测试在 cargo 参数选的目标里找不到（--lib：src/ 除 src/bin/ 与 src/main.rs；--bin <名>：src/bin/<名>.rs 与 src/bin/<名>/；
+#   --test <名>：tests/<名>.rs、tests/<名>/ 与它 mod 进来的 tests/ 下文件；都没写或 --tests、--all-targets 这一类：src/ 与 tests/ 全部），
+#   按 scripts/gate/lib_function_units.py 的 rust_lex 切词，名字是其中一个标识符就算找得到（宏展开出来的测试名在调用处是标识符，认得出；
+#   只在注释、字符串里出现的不算）。测试改了名、删了，那一道照这一行跑时点名的测试不在输出里，变异永远报没红。
+#   弄坏开关 GATE_MUTATION_TABLES_BREAK=named-test-unsearched 不判这一样：red 样本「点名的测试不存在」那几条找不到；
+#   named-test-target-ignored 不看选的目标、整个包里找：red 样本里 --lib 点名只在 tests/ 里的 slow_heavy_case 那一条找不到；
+#   named-test-definitions-only 只认 `fn <名>` 的定义：green 样本里宏展开出来的 generated_by_a_macro_case 那一行判红、整格退 1。
 #
 # 这一格不跑测试、不判抓不抓得到（逐条施加替换文只编译，归 checker-tier-research-build-and-replay 的 mutation-tables-compile 格），只保证装置在、形状对。
 # research 那侧「表今天还会不会红」靠改实验代码时手跑 scripts/mutation/mutate.sh，门禁不判：C40（变异表没存）。
 #
-# 样本：red 里 research 那侧有一份没有同名表的实验二进制（e2_naked）、一条锚点命中 0 次、一条替换文带 \& 的、一张不是 UTF-8 的表（setup.sh 现造）；
+# 样本：red 里 research 那侧有一份没有同名表的实验二进制（e2_naked）、一条锚点命中 0 次、一条替换文带 \& 的、一张不是 UTF-8 的表（setup.sh 现造）、
+# 除变异名外各列全同的两行（e1_sample.tsv 第 3、4 行）；
 # crates/mutations.tsv 那侧有锚点腐化、转义写进源码、文件列是目录、点名慢档用例没带开关、两种筛选词对不上、文件在拷贝范围外、
-# 测试名带符号、测试名空着（setup.sh 现写）各一行，另有一份逃出 crates/ 的相对路径字面量；
-# green 是同形的一套都对得上的（含替换文空着的删行变异、读 litmus/ 的测试），每个实验二进制各有一张锚点唯一的表。
+# 测试名带符号、测试名空着、点名的测试不存在、--lib 点名只在 tests/ 里的测试、同一处改法点名两条不同测试的两行（后五样 setup.sh 现写）各一行，另有一份逃出 crates/ 的相对路径字面量；
+# green 是同形的一套都对得上的（含替换文空着的删行变异、读 litmus/ 的测试、点名宏展开出来的测试），每个实验二进制各有一张锚点唯一的表。
 cell_mutation_tables() {
 BIN_DIR=scripts/experiments
 MUT_DIR=scripts/mutation/tables
@@ -1096,14 +1140,37 @@ done
 anchor_report="$(BIN_DIR="$BIN_DIR" MUT_DIR="$MUT_DIR" python3 - <<'PY'
 import os, glob, re
 bin_dir = os.environ["BIN_DIR"]; mut_dir = os.environ["MUT_DIR"]
-bad = []; stray = []; unreadable = []; checked = 0
+bad = []; stray = []; unreadable = []; duplicates = []; checked = 0; tables_read = 0
+check_duplicates = "research-duplicates-unchecked" not in os.environ.get("GATE_MUTATION_TABLES_BREAK", "")
 def stray_escapes(segment_name, segment):
     """mutate.sh 与 checker-tier-crates-mutation-replay 只把 \\n 还原成换行，别的反斜杠按字面写进源码（C427）。"""
     return [(segment_name, match.group(0)) for match in re.finditer(r"\\(.)", segment) if match.group(1) != "n"]
+def duplicate_groups(stem, table_lines):
+    """一张表里除第一列变异名外各列逐字全同的几行：每组一项 (表名, 「第 a、b 行（名；名）」, 组内各行的变异名用 \\x1f 连起来)。注释行与空行不算。"""
+    groups = {}
+    for lineno, line in enumerate(table_lines, 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        groups.setdefault(tuple(parts[1:]), []).append((lineno, parts[0]))
+    return [(stem, "第 " + "、".join(str(lineno) for lineno, _name in rows) + " 行（" + "；".join(name for _lineno, name in rows) + "）",
+             "\x1f".join(name for _lineno, name in rows))
+            for rows in groups.values() if len(rows) > 1]
 for tsv in sorted(glob.glob(os.path.join(mut_dir, "*.tsv"))):
     stem = os.path.basename(tsv)[:-4]
     src_path = os.path.join(bin_dir, stem + ".rs")
-    # 没有同名二进制的表（shell 探针的变异表）不在这一格的射程：它们的被测对象不是 .rs；成功行逐个列名
+    # 重复行每张表都判（有没有同名二进制都算）；读不了的表在下面锚点那一段判红，没有同名二进制的读不了也判红
+    try:
+        table_lines = open(tsv, encoding="utf-8").read().split("\n")
+    except (OSError, UnicodeDecodeError) as error:
+        table_lines = None
+        if not os.path.exists(src_path):
+            unreadable.append((stem, f"{type(error).__name__}: {error}"))
+    if table_lines is not None:
+        tables_read += 1
+        if check_duplicates:
+            duplicates += duplicate_groups(stem, table_lines)
+    # 没有同名二进制的表（shell 探针的变异表）不在锚点的射程：它们的被测对象不是 .rs；成功行逐个列名
     if not os.path.exists(src_path):
         print("NO_BINARY", tsv, sep="\t")
         continue
@@ -1130,6 +1197,9 @@ for tsv in sorted(glob.glob(os.path.join(mut_dir, "*.tsv"))):
             for found in stray_escapes(segment_name, segment):
                 stray.append((stem, name, lineno) + found)
 print("CHECKED", checked)
+print("TABLES_READ", tables_read)
+for d in duplicates:
+    print("DUP", *d, sep="\t")
 for b in bad:
     print("BAD", *b, sep="\t")
 for s in stray:
@@ -1206,17 +1276,73 @@ def test_attributes_of_package(package):
                         table.setdefault(found.group(2), []).append((found.group(1), "::".join(prefix + modules + [found.group(2)])))
         attributes_by_package[package] = table
     return attributes_by_package[package]
+# 点名的测试在选的目标里找不找得到：切词用 lib_function_units.py 的 rust_lex（与单元切法同一份词法，不另写一份去注释、去字符串）
+named_test_break = os.environ.get("GATE_MUTATION_TABLES_BREAK", "")
+function_units_specification = importlib.util.spec_from_file_location(
+    "lib_function_units", os.path.join(os.path.dirname(os.environ["MUTATION_ROWS_MODULE"]), "..", "gate", "lib_function_units.py"))
+function_units = importlib.util.module_from_spec(function_units_specification)
+function_units_specification.loader.exec_module(function_units)
+words_by_path = {}
+def words_of(path):
+    """一份 .rs 里的标识符集合与紧跟在 fn 后面的标识符集合（注释、字符串、字符字面量里的不算）；读不了的两样都空。"""
+    if path not in words_by_path:
+        try:
+            kinds, texts = function_units.rust_lex(open(path, encoding="utf-8").read())[:2]
+        except (OSError, UnicodeDecodeError):
+            kinds, texts = [], []
+        identifiers = {text for kind, text in zip(kinds, texts) if kind == function_units.IDENT}
+        defined = {texts[index + 1] for index in range(len(texts) - 1)
+                   if kinds[index] == function_units.IDENT and texts[index] == "fn" and kinds[index + 1] == function_units.IDENT}
+        modules = [texts[index + 1] for index in range(len(texts) - 2)
+                   if texts[index] == "mod" and kinds[index + 1] == function_units.IDENT and texts[index + 2] == ";"]
+        words_by_path[path] = (identifiers, defined, modules)
+    return words_by_path[path]
+def rust_files_under(directory):
+    found = []
+    for root, _directories, files in os.walk(directory):
+        found += [os.path.join(root, name) for name in files if name.endswith(".rs")]
+    return sorted(found)
+def selected_target_files(package, arguments):
+    """cargo test 参数在 `--` 之前选的编译目标的源文件与一句说明。--lib、--bin、--test 认；都没写或别的选法按 src/ 与 tests/ 全部。"""
+    base = os.path.join("crates", package)
+    before_separator = arguments[:arguments.index("--")] if "--" in arguments else arguments
+    selections = []
+    for position, word in enumerate(before_separator):
+        if word == "--lib":
+            selections.append(("lib", None))
+        elif word in ("--bin", "--test") and position + 1 < len(before_separator):
+            selections.append((word[2:], before_separator[position + 1]))
+        elif word.startswith(("--bin=", "--test=")):
+            selections.append(tuple(word[2:].split("=", 1)))
+        elif word in ("--tests", "--bins", "--all-targets", "--examples", "--benches"):
+            selections.append(("all", None))
+    if not selections or ("all", None) in selections or "named-test-target-ignored" in named_test_break:
+        return rust_files_under(os.path.join(base, "src")) + rust_files_under(os.path.join(base, "tests")), f"crates/{package} 的 src/ 与 tests/"
+    files, shown = [], []
+    for kind, value in selections:
+        if kind == "lib":
+            files += [path for path in rust_files_under(os.path.join(base, "src"))
+                      if not path.startswith(os.path.join(base, "src", "bin") + os.sep) and path != os.path.join(base, "src", "main.rs")]
+            shown.append("--lib")
+        elif kind == "bin":
+            files += [os.path.join(base, "src", "bin", value + ".rs")] + rust_files_under(os.path.join(base, "src", "bin", value))
+            shown.append(f"--bin {value}")
+        else:
+            root_file = os.path.join(base, "tests", value + ".rs")
+            files += [root_file] + rust_files_under(os.path.join(base, "tests", value))
+            for module in words_of(root_file)[2]:
+                files += [os.path.join(base, "tests", module + ".rs")] + rust_files_under(os.path.join(base, "tests", module))
+            shown.append(f"--test {value}")
+    return [path for path in dict.fromkeys(files) if os.path.isfile(path)], f"crates/{package} 的 {'、'.join(shown)}"
 rows, _malformed, _memory, _timeout = mutation_rows.read_table("crates/mutations.tsv")
+# 弄坏开关 duplicate-key-with-test：照改前的判法把点名的测试也算进重复的键（同一处改法点名两条不同测试的几行就放过去了）
+duplicate_key_with_test = "duplicate-key-with-test" in os.environ.get("GATE_MUTATION_TABLES_BREAK", "")
 for row in rows:
     line_number, fields = row.line_number, row.fields
     name, path = row.name, row.path
-    # 两行的（文件, 原文, 替换文, 点名的测试）逐字相同：表里少了一条真改法，而条数看着没少。
-    # 只按改法认会误拒：同一个改法让两条不同的测试变红是合法的。
-    change = (path, fields[2], fields[3], fields[5])
-    if change in first_line_of_change:
-        print("CRATES_DUP", line_number, name, f"（文件, 原文, 替换文, 点名的测试）与第 {first_line_of_change[change]} 行逐字相同", sep="\t")
-    else:
-        first_line_of_change[change] = line_number
+    # 几行的（文件, 原文, 替换文）逐字相同：同一处改法写了几行，表里的条数看着多、真改法没多；一处改法留一行
+    change = (path, fields[2], fields[3]) + ((fields[5],) if duplicate_key_with_test else ())
+    first_line_of_change.setdefault(change, []).append((line_number, name, fields[4]))
     # 变异名相同 ⇒ 按名字分格的报告把两条并成一格，其中一条的结论看不见。
     if name in first_line_of_name:
         print("CRATES_DUP", line_number, name, f"变异名与第 {first_line_of_name[name]} 行相同", sep="\t")
@@ -1235,10 +1361,23 @@ for row in rows:
     candidates = [full_name for _attributes, full_name in test_attributes_of_package(package).get(test_name, [])] if package and test_name else []
     if candidates and filters and not any((full_name == word) if exact else (word in full_name) for word in filters for full_name in candidates):
         print("CRATES_FILTER", line_number, name, f"筛选词 {' '.join(filters)}{'（--exact）' if exact else ''} 筛不到点名的 {' 或 '.join(candidates)}", sep="\t")
+    # 点名的测试在选的目标里找不到（改了名、删了）：那一道照这一行跑，点名的测试不在输出里，变异永远报没红
+    if package and test_name and "named-test-unsearched" not in named_test_break:
+        target_files, target_shown = selected_target_files(package, arguments)
+        look_in = 1 if "named-test-definitions-only" in named_test_break else 0
+        if not any(test_name in words_of(path)[look_in] for path in target_files):
+            print("CRATES_MISSING", line_number, name, f"点名的测试 {test_name} 在 {target_shown}（{len(target_files)} 份 .rs）里找不到", sep="\t")
     if package and test_name and not ({"--include-ignored", "--ignored"} & set(arguments)):
         found_tests = test_attributes_of_package(package).get(test_name, [])
         if found_tests and all("#[ignore" in attributes for attributes, _full_name in found_tests):
             print("CRATES_IGNORED", line_number, name, f"点名的 {test_name} 标了 #[ignore]，cargo test 参数「{fields[4]}」里没有 --include-ignored", sep="\t")
+# 重复的改法逐组一行：「第 a、b 行（a 名；b 名）」，组里 cargo 参数也全同的另注一句
+for (path, *_rest), group in first_line_of_change.items():
+    if len(group) > 1:
+        same_arguments = "；这几行的 cargo test 参数也全同" if len({arguments for _line, _name, arguments in group}) == 1 else ""
+        print("CRATES_DUP_CHANGE", "第 " + "、".join(str(line) for line, _name, _arguments in group) + " 行（"
+              + "；".join(f"{line} {name}" for line, name, _arguments in group) + f"），改的是 {path}{same_arguments}",
+              "\x1f".join(name for _line, name, _arguments in group), sep="\t")
 print("CRATES_CHECKED", len(rows))
 PY
 )"
@@ -1263,27 +1402,162 @@ mapfile -t scope_literals < <(grep $'^LITERAL\t' <<<"$scope_report")
 mapfile -t scope_errors < <(sed -n 's/^ERROR\t//p' <<<"$scope_report")
 IFS=$'\t' read -r scope_row_count scope_source_count scope_literal_count <<<"$scope_checked"
 crates_checked="$(sed -n 's/^CRATES_CHECKED //p' <<<"$crates_report")"
-mapfile -t crates_dup < <(grep '^CRATES_DUP' <<<"$crates_report")
+mapfile -t crates_dup < <(grep $'^CRATES_DUP\t' <<<"$crates_report")
+mapfile -t crates_duplicate_groups < <(grep $'^CRATES_DUP_CHANGE\t' <<<"$crates_report")
 mapfile -t crates_ignored < <(grep '^CRATES_IGNORED' <<<"$crates_report")
 mapfile -t crates_filter < <(grep '^CRATES_FILTER' <<<"$crates_report")
+mapfile -t crates_missing_tests < <(grep '^CRATES_MISSING' <<<"$crates_report")
 anchor_checked="$(sed -n 's/^CHECKED //p' <<<"$anchor_report")"
+tables_read="$(sed -n 's/^TABLES_READ //p' <<<"$anchor_report")"
+mapfile -t research_duplicate_groups < <(grep $'^DUP\t' <<<"$anchor_report")
 mapfile -t anchor_bad < <(grep '^BAD' <<<"$anchor_report")
 mapfile -t stray_rows < <(grep '^STRAY' <<<"$anchor_report")
 mapfile -t anchor_unreadable < <(grep '^UNREADABLE' <<<"$anchor_report")
 mapfile -t tables_without_binary < <(sed -n 's/^NO_BINARY\t//p' <<<"$anchor_report")
+# ── 重复行的滞后表：登记的组不判红，表只缩不涨（判法写在这一格的文件头注释「滞后表」那几行）──
+DUPLICATES_LAG=.claude/gate.d/mutation-duplicates-lag.tsv
+lag_base=""
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  LIB_CHANGED_PATHS="$STAGE_REPOSITORY/scripts/gate/changed-paths.sh"
+  # shellcheck source=../../scripts/gate/changed-paths.sh
+  source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"; echo "     → 怎么办：它随仓走（scripts/gate/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
+  lag_base="$(gate_diff_base gate)"
+fi
+duplicates_lag_judge="$(cat <<'PY'
+import os, subprocess, sys
+lag_path, mutation_directory, base = sys.argv[1], sys.argv[2], sys.argv[3]
+broken = os.environ.get("GATE_MUTATION_TABLES_BREAK", "")
+CRATES_TABLE = "crates/mutations.tsv"
+groups = []   # (表, 原样输出的那一行去掉名字那一段, 组内名字的列表)
+for line in sys.stdin.read().split("\n"):
+    fields = line.split("\t")
+    if fields[0] == "CRATES_DUP_CHANGE" and len(fields) == 3:
+        groups.append((CRATES_TABLE, "\t".join(fields[:2]), fields[2].split("\x1f")))
+    elif fields[0] == "DUP" and len(fields) == 4:
+        groups.append((f"{mutation_directory}/{fields[1]}.tsv", "\t".join(fields[:3]), fields[3].split("\x1f")))
+def names_of_table(path):
+    """那张表第一列的全部名字（注释行与空行不算）；读不了返回 None。"""
+    try:
+        text = open(path, encoding="utf-8").read()
+    except (OSError, UnicodeDecodeError):
+        return None
+    return {line.split("\t")[0] for line in text.split("\n") if line.strip() and not line.startswith("#")}
+def parse_rows(text, label):
+    """滞后表的行：[(行号, 表, 名字列表)]，形状不对的进 problems。"""
+    rows, problems = [], []
+    for line_number, line in enumerate(text.split("\n"), 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != 4 or not all(field.strip() for field in fields):
+            problems.append(f"{label}:{line_number} 不是四列、或有空格子（表、组内名字、为什么滞后、归哪一次处理）")
+            continue
+        rows.append((line_number, fields[0].strip(), fields[1].split("|")))
+    return rows, problems
+problems = []
+rows = []
+malformed_count = 0
+if "duplicates-lag-ignored" not in broken and os.path.exists(lag_path):
+    try:
+        rows, problems = parse_rows(open(lag_path, encoding="utf-8").read(), lag_path)
+        malformed_count = len(problems)
+    except (OSError, UnicodeDecodeError) as error:
+        problems.append(f"{lag_path} 读不了（{type(error).__name__}: {error}）")
+covered = {}   # 组的下标 → 罩住它的那一行的行号
+lag_lines = []
+table_names = {}
+for line_number, table, names in rows:
+    where = f"{lag_path}:{line_number}"
+    if table != CRATES_TABLE and not (table.startswith(mutation_directory + "/") and table.endswith(".tsv")):
+        problems.append(f"{where} 的表「{table}」不是 {CRATES_TABLE}，也不是 {mutation_directory}/<表名>.tsv")
+        continue
+    if table not in table_names:
+        table_names[table] = names_of_table(table)
+    if table_names[table] is None:
+        problems.append(f"{where} 指的表 {table} 不在或读不了")
+        continue
+    if len(set(names)) != len(names):
+        problems.append(f"{where} 里同一个名字写了不止一次")
+        continue
+    missing = [name for name in names if name not in table_names[table]]
+    if missing:
+        problems.append(f"{where} 的这几个名字在 {table} 里找不到：" + "；".join(missing))
+        continue
+    exact = [index for index, (group_table, _shown, group_names) in enumerate(groups) if group_table == table and set(group_names) == set(names)]
+    if len(exact) > 1:
+        problems.append(f"{where} 的名字在 {table} 里对上 {len(exact)} 组（名字在表里不唯一），一行只罩一组")
+        continue
+    if not exact:
+        holding = [group_names for group_table, _shown, group_names in groups if group_table == table and set(names) <= set(group_names)]
+        if holding:
+            problems.append(f"{where} 那一组里还有没登记的名字：" + "；".join(sorted(set(holding[0]) - set(names))))
+        else:
+            problems.append(f"{where} 的名字此刻不是同一组重复行（" + ("三样不全同" if table == CRATES_TABLE else "除变异名外各列不全同") + "）：" + "；".join(names))
+        continue
+    if exact[0] in covered:
+        problems.append(f"{where} 与第 {covered[exact[0]]} 行罩的是同一组")
+        continue
+    covered[exact[0]] = line_number
+    lag_lines.append(f"{table}\t" + "；".join(names))
+# 只缩不涨：此刻的每一行，基准那一版同一张表里要有一行的名字是它的超集；基准里还没有这张表不比，git 取不到基准那一版判红
+baseline_note = "不在 git 仓里，没和基准比"
+if base and rows and "duplicates-lag-growth-unchecked" not in broken:
+    listed = subprocess.run(["git", "-c", "core.quotepath=false", "ls-tree", "--name-only", base, "--", lag_path], capture_output=True, text=True)
+    if listed.returncode != 0:
+        problems.append(f"取不到基准 {base} 里的 {lag_path}（git ls-tree 退 {listed.returncode}：{listed.stderr.strip()[:200]}），只缩不涨没比")
+    elif not listed.stdout.strip():
+        baseline_note = f"基准 {base[:12]} 里还没有这张表，没比只缩不涨"
+    else:
+        shown = subprocess.run(["git", "show", f"{base}:{lag_path}"], capture_output=True, text=True)
+        if shown.returncode != 0:
+            problems.append(f"读不出基准 {base} 里的 {lag_path}（git show 退 {shown.returncode}：{shown.stderr.strip()[:200]}），只缩不涨没比")
+        else:
+            baseline_rows, _baseline_problems = parse_rows(shown.stdout, f"基准里的 {lag_path}")
+            grown = [(line_number, table, names) for line_number, table, names in rows
+                     if not any(base_table == table and set(names) <= set(base_names) for _n, base_table, base_names in baseline_rows)]
+            for line_number, table, names in grown:
+                problems.append(f"{lag_path}:{line_number} 相对基准那一版多出一组（{table}：" + "；".join(names) + "）：这张表只缩不涨")
+            baseline_note = f"与基准 {base[:12]} 那一版按组比，" + (f"多出 {len(grown)} 组" if grown else "没涨")
+elif base and "duplicates-lag-growth-unchecked" in broken:
+    baseline_note = "没和基准比"
+elif base:
+    baseline_note = "表里没有行，不用和基准比"
+for index, (_table, shown, _names) in enumerate(groups):
+    if index not in covered:
+        print(shown)
+for line in lag_lines:
+    print("LAG", line, sep="\t")
+for problem in problems:
+    print("LAG_PROBLEM", problem, sep="\t")
+print("LAG_BASELINE", baseline_note, sep="\t")
+print("LAG_ROWS", len(rows) + malformed_count, sep="\t")
+PY
+)"
+lag_report="$( { printf '%s\n' ${crates_duplicate_groups[@]+"${crates_duplicate_groups[@]}"} ${research_duplicate_groups[@]+"${research_duplicate_groups[@]}"}; } \
+  | python3 -c "$duplicates_lag_judge" "$DUPLICATES_LAG" "$MUT_DIR" "$lag_base")"
+lag_exit_code=$?
+mapfile -t crates_dup_changes < <(sed -n 's/^CRATES_DUP_CHANGE\t//p' <<<"$lag_report")
+mapfile -t research_duplicates < <(grep $'^DUP\t' <<<"$lag_report")
+mapfile -t lag_groups < <(sed -n 's/^LAG\t//p' <<<"$lag_report")
+mapfile -t lag_problems < <(sed -n 's/^LAG_PROBLEM\t//p' <<<"$lag_report")
+lag_baseline="$(sed -n 's/^LAG_BASELINE\t//p' <<<"$lag_report")"
+lag_rows="$(sed -n 's/^LAG_ROWS\t//p' <<<"$lag_report")"
 # 两段 python 自己崩了（退出码非 0、或没报出 CHECKED 那一行）：它们没判完，不许读成「没有 BAD 行」
 script_failures=()
 if [[ "${anchor_exit_code:-1}" -ne 0 || -z "$anchor_checked" ]]; then
   script_failures+=("research 变异表的锚点检查没跑完（python 退出码 ${anchor_exit_code:-?}，CHECKED 行「${anchor_checked}」）")
 fi
 if [[ -f crates/mutations.tsv ]] && [[ "${crates_exit_code:-1}" -ne 0 || -z "$crates_checked" ]]; then
-  script_failures+=("crates/mutations.tsv 的重复、#[ignore]、筛选词检查没跑完（python 退出码 ${crates_exit_code:-?}，CRATES_CHECKED 行「${crates_checked}」）")
+  script_failures+=("crates/mutations.tsv 的重复、#[ignore]、筛选词、点名的测试在不在目标里这几样检查没跑完（python 退出码 ${crates_exit_code:-?}，CRATES_CHECKED 行「${crates_checked}」）")
+fi
+if [[ "${lag_exit_code:-1}" -ne 0 || -z "$lag_rows" ]]; then
+  script_failures+=("重复行滞后表 $DUPLICATES_LAG 的判法没跑完（python 退出码 ${lag_exit_code:-?}，LAG_ROWS 行「${lag_rows}」），重复行哪几组算滞后没判")
 fi
 if [[ "$scope_exit_code" -ne 0 && "$scope_exit_code" -ne 1 ]] || [[ -z "$scope_checked" ]]; then
   script_failures+=("门禁 checker-tier-crates-mutation-replay 派活之前那几样与拷贝范围的检查没跑完（scripts/mutation/crates-mutation-rows.py static-check 退出码 ${scope_exit_code}，CHECKED 行「${scope_checked}」；${scope_errors[*]:-没报原因}）")
 fi
 
-if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} + ${#crates_dup[@]} + ${#crates_ignored[@]} + ${#crates_filter[@]} + ${#stray_rows[@]} + ${#crates_stray[@]} + ${#crates_malformed[@]} + ${#crates_names[@]} + ${#anchor_unreadable[@]} + ${#script_failures[@]} + ${#scope_rows[@]} + ${#scope_literals[@]})); then
+if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} + ${#crates_dup[@]} + ${#crates_dup_changes[@]} + ${#research_duplicates[@]} + ${#lag_problems[@]} + ${#crates_ignored[@]} + ${#crates_filter[@]} + ${#crates_missing_tests[@]} + ${#stray_rows[@]} + ${#crates_stray[@]} + ${#crates_malformed[@]} + ${#crates_names[@]} + ${#anchor_unreadable[@]} + ${#script_failures[@]} + ${#scope_rows[@]} + ${#scope_literals[@]})); then
   if ((${#script_failures[@]})); then
     echo "  ✗ 锚点或拷贝范围检查的 python 没跑完，这一段等于没判："
     printf '      %s\n' "${script_failures[@]}"
@@ -1306,7 +1580,7 @@ if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} +
     echo "    → 每行写成「变异名<TAB>原文<TAB>替换文」三段，坏行补齐或删掉，至少留一条成形的。"
   fi
   if ((${#anchor_bad[@]})); then
-    echo "  ✗ 这些变异条目的「原文」在源码里不是恰好命中一次（mutate.sh 会退出码 3，后面的条目一条都不跑）："
+    echo "  ✗ 这些变异条目的「原文」在源码里不是恰好命中一次（mutate.sh 把这几条记「⚓ 锚点失效」、不跑，别的照跑，整轮退 3）："
     while IFS=$'\t' read -r _ stem name lineno hits; do
       printf '      %s:%s %s：原文在 %s 里命中 %s 次\n' "$MUT_DIR/$stem.tsv" "$lineno" "$name" "$BIN_DIR/$stem.rs" "$hits"   # gate-lint:detail
     done < <(printf '%s\n' "${anchor_bad[@]}")
@@ -1333,13 +1607,30 @@ if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} +
     echo "    → 怎么办：去掉那个反斜杠，改完单跑那一行证明点名的测试红（2026-09-20 第 180 行踩过：替换文写 \\&report.outcome，"
     echo "      写进源码是字面反斜杠、编不过，checker-tier-crates-mutation-replay 把它报成「点名的测试没跑到」，出路指向「先造一条会红的用例」，方向是反的）。"
   fi
+  if ((${#crates_dup_changes[@]})); then
+    echo "  ✗ crates/mutations.tsv 里有 ${#crates_dup_changes[@]} 组行的「文件、原文、替换文」三样逐字全同（同一处改法写了不止一行）："
+    printf '      crates/mutations.tsv %s\n' "${crates_dup_changes[@]}"   # gate-lint:detail
+    echo "    → 怎么办：一处改法留一行，多的删；删的那一行要是 .claude/gate.d/crates-mutation-light-rows.tsv 点名的，登记表里换成留下的那一行。"
+  fi
   if ((${#crates_dup[@]})); then
-    echo "  ✗ crates/mutations.tsv 这些行与前面某一行重复（表里的条数没少，真改法少了一条）："
+    echo "  ✗ crates/mutations.tsv 这些行的变异名与前面某一行相同（按名字分格的报告会把两条并成一格，其中一条的结论看不见）："
     while IFS=$'\t' read -r _ lineno name why; do
       printf '      crates/mutations.tsv:%s %s：%s\n' "$lineno" "$name" "$why"   # gate-lint:detail
     done < <(printf '%s\n' "${crates_dup[@]}")
-    echo "    → 怎么办：这一行本来要守的那一格今天没有守卫。把它换成真正打在那一格上的改法（改完单跑它、证明点名的测试红），"
-    echo "      或者确认它多余就整行删掉。⚠️ 同一个改法让**两条不同的测试**变红是合法的，这道检查按「改法 + 点名的测试」四项认，不会拦那一种。"
+    echo "    → 怎么办：给后面那一行起一个说它改了什么的新名字（名字写它是什么、做什么，不加序号）。"
+  fi
+  if ((${#research_duplicates[@]})); then
+    echo "  ✗ 这些变异表里有 ${#research_duplicates[@]} 组行除变异名外各列逐字全同（同一处改法写了不止一行）："
+    while IFS=$'\t' read -r _ stem where; do
+      printf '      %s %s\n' "$MUT_DIR/$stem.tsv" "$where"   # gate-lint:detail
+    done < <(printf '%s\n' "${research_duplicates[@]}")
+    echo "    → 怎么办：一处改法留一行，多的删。"
+  fi
+  if ((${#lag_problems[@]})); then
+    echo "  ✗ 重复行滞后表 $DUPLICATES_LAG 有 ${#lag_problems[@]} 处不对（指到不存在的名字、名字此刻不是同一组、或相对基准那一版涨了）："
+    printf '      %s\n' "${lag_problems[@]}"   # gate-lint:detail
+    echo "    → 怎么办：名字照那张表第一列逐字写、一行写全一组的名字（用 | 隔）；那一组已经不重复了（删了多的、或改了写法）就删掉这一行；"
+    echo "      这张表只缩不涨，新出的重复行不往里加，照上面重复行那一条一处改法留一行。"
   fi
   if ((${#crates_filter[@]})); then
     echo "  ✗ crates/mutations.tsv 这些行 cargo test 参数里的筛选词筛不到点名的测试（checker-tier-crates-mutation-replay 跑它时那条测试不跑，变异永远报没红）："
@@ -1347,6 +1638,14 @@ if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} +
       printf '      crates/mutations.tsv:%s %s：%s\n' "$lineno" "$name" "$why"   # gate-lint:detail
     done < <(printf '%s\n' "${crates_filter[@]}")
     echo "    → 怎么办：把 \`--\` 后面的筛选词改成点名测试名的一段（测试改过名、拆过的多半是这个），或者删掉筛选词跑整个测试目标。"
+  fi
+  if ((${#crates_missing_tests[@]})); then
+    echo "  ✗ crates/mutations.tsv 这些行点名的测试在 cargo test 参数选的目标里找不到（checker-tier-crates-mutation-replay 跑它时输出里没有这条测试，变异永远报没红）："
+    while IFS=$'\t' read -r _ lineno name why; do
+      printf '      crates/mutations.tsv:%s %s：%s\n' "$lineno" "$name" "$why"   # gate-lint:detail
+    done < <(printf '%s\n' "${crates_missing_tests[@]}")
+    echo "    → 怎么办：测试改了名就把最后一列改成新名字；测试挪了目标就改 cargo 参数里的 --lib / --test <名>；测试删了就换一条今天还在、改坏这一处会红的测试，"
+    echo "      改完单跑那一行证明点名的测试红（scripts/mutation/prove-red.sh）。"
   fi
   if ((${#crates_ignored[@]})); then
     echo "  ✗ crates/mutations.tsv 这些行点名的测试标了 #[ignore]，cargo test 参数里却没有 --include-ignored（checker-tier-crates-mutation-replay 跑它时那条测试被跳过，变异永远报没红）："
@@ -1370,7 +1669,7 @@ if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} +
     echo "    → 怎么办：那一列写成用例名本身（或带模块路径 tests::<名字>），去掉 \$、^ 这类符号；checker-tier-crates-mutation-replay 已经按「在输出里只许对上一个用例」判，不用再靠 \$ 锚定。"
   fi
   if ((${#crates_bad[@]})); then
-    echo "  ✗ crates/mutations.tsv 这些行的「原文」在源码里不是恰好命中一次（门禁 checker-tier-crates-mutation-replay 预扫会整张表退出，一条都不跑）："
+    echo "  ✗ crates/mutations.tsv 这些行的「原文」在源码里不是恰好命中一次（门禁 checker-tier-crates-mutation-replay 把这几行记「锚点失效」、不跑，别的行照判，整道判红）："
     while IFS=$'\t' read -r _ lineno name why; do
       printf '      crates/mutations.tsv:%s %s：%s\n' "$lineno" "$name" "$why"   # gate-lint:detail
     done < <(printf '%s\n' "${crates_bad[@]}")
@@ -1401,7 +1700,13 @@ crates_summary+="；门禁 checker-tier-crates-mutation-replay 的拷贝范围�
 if ((${#tables_without_binary[@]})); then
   crates_summary+="；没有同名实验二进制、锚点不在这一格射程的表 ${#tables_without_binary[@]} 张：$(printf '%s ' "${tables_without_binary[@]}")"
 fi
-echo "  ✓ $n 个实验二进制都有成形的变异表，${anchor_checked} 条变异的原文各命中源码一次${crates_summary}（这一格不跑变异，只验装置在、锚点对得上、两段里没有 \n 以外的反斜杠转义、crates 那张表里没有两行重复、点名标了 #[ignore] 的测试都带 --include-ignored、筛选词筛得到点名的测试——重复按「文件 + 原文 + 替换文 + 点名的测试」四项认，变异名另判）"
+if ((${#lag_groups[@]})); then
+  echo "  · 重复行滞后 ${#lag_groups[@]} 组（$DUPLICATES_LAG 登记、这一格不判红；逐组：表、组内各行的变异名）："
+  printf '      %s\n' "${lag_groups[@]//$'\t'/ }"
+fi
+lag_summary="；重复行滞后 ${#lag_groups[@]} 组（$DUPLICATES_LAG 登记 ${lag_rows} 行，${lag_baseline}）"
+[[ -f "$DUPLICATES_LAG" ]] || lag_summary="；重复行滞后 0 组（没有 $DUPLICATES_LAG）"
+echo "  ✓ $n 个实验二进制都有成形的变异表，${anchor_checked} 条变异的原文各命中源码一次，${tables_read} 张研究变异表里没有两行除变异名外各列全同${lag_summary}${crates_summary}（这一格不跑变异，只验装置在、锚点对得上、两段里没有 \n 以外的反斜杠转义、crates 那张表里没有两行改法相同、点名标了 #[ignore] 的测试都带 --include-ignored、筛选词筛得到点名的测试、点名的测试在选的目标里找得到——crates 那张表的重复按「文件 + 原文 + 替换文」三项认，变异名另判）"
 }
 
 # ── 格 absolute-assertions：每个实验二进制都要有钉绝对值的断言
@@ -1649,6 +1954,15 @@ for path, text in sources.items():
         compound = re.search(prefix + r"\s*(?:[-+*/|&^%]=|<<=|>>=)", text)
         assigned = [match.group(1).strip() for match in re.finditer(prefix + r"\s*=(?!=)\s*([^;,}\n]+)", text)]
         borrowed = re.search(r"&\s*mut\s+(?:\w+\s*\.\s*)*" + name + r"\b", text)
+        # 经方法调用的结果写字段（`history_mut(…).名 = 值`）与结构体字面量里的字段简写（一行只有 `名,`，值是同名的局部变量）也算写过
+        if "reading-writes-unseen" not in os.environ.get("GATE_READING_DISCIPLINE_BREAK", ""):
+            assigned += [match.group(1).strip() for match in re.finditer(r"\)\s*\.\s*" + name + r"\s*=(?!=)\s*([^;,}\n]+)", text)]
+            if re.search(r"^\s*" + name + r"\s*,\s*$", text, re.M):
+                continue
+        # 进了断言被拿来核的字段（钉值表的期望一侧，`assert_eq!(现算, 钉的.名)`）是钉值，不是没人算的读数
+        if "asserted-fields-judged" not in os.environ.get("GATE_READING_DISCIPLINE_BREAK", "") and \
+                re.search(r"assert(?:_eq|_ne)?!\s*\([^;]*?\.\s*" + name + r"\b", text):
+            continue
         if compound or borrowed or any(not LITERAL_ZERO.match(value) for value in assigned):
             continue
         initialised = [match.group(1).strip() for match in re.finditer(r"(?<![\w.])" + name + r"\s*:\s*([^,}\n]+)", text)]

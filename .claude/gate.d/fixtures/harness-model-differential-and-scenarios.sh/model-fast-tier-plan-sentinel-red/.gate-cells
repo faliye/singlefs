@@ -1,0 +1,2 @@
+# 按条复用失灵：.unit-verdict-sample/plan-failure 写 sentinel-reuse-failed，verdict-plan 的复用哨兵报复用失灵、退 1；快档那一格照旧现判跑完，结论判红
+model-fast-tier

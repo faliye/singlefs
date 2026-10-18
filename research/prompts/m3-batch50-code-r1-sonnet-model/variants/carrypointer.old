@@ -1,2 +1,0 @@
-            let carried = previous_containers
-                .get(previous_index.position())

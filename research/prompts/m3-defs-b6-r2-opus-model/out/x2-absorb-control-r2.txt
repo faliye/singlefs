@@ -1,2 +1,0 @@
-  ✗ 1 处自己定并行度默认值的写法没经登记位取（每台默认重活线程数登记在 .claude/heavy-thread-default）：
-     crates/singlefs-harness/tests/new_device_control.rs:2  读自己的线程变量 SINGLEFS_RANDOM_HISTORY_SAMPLING_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_T

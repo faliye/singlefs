@@ -1,1 +1,0 @@
-    let bytes = BytesOnOneDevice::of_slots(slots_of_the_demand * u64::try_from(devices.len()).unwrap());

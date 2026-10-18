@@ -1,7 +1,0 @@
-chosen 43 N(max published) 56 3S 12 N-chosen 13 floor_active 0 floor_carried 43 in_window(N) False lost [True, False] disk1_valid_txgs [34, 37, 40, 43]
-chosen 43 N(max published) 57 3S 12 N-chosen 14 floor_active 0 floor_carried 43 in_window(N) False lost [True, False] disk1_valid_txgs [34, 37, 40, 43]
-chosen 85 N(max published) 98 3S 12 N-chosen 13 floor_active 0 floor_carried 85 in_window(N) False lost [True, False] disk1_valid_txgs [76, 79, 82, 85]
-chosen 85 N(max published) 99 3S 12 N-chosen 14 floor_active 0 floor_carried 85 in_window(N) False lost [True, False] disk1_valid_txgs [76, 79, 82, 85]
-chosen 190 N(max published) 203 3S 12 N-chosen 13 floor_active 0 floor_carried 190 in_window(N) False lost [True, False] disk1_valid_txgs [181, 184, 187, 190]
-chosen 190 N(max published) 204 3S 12 N-chosen 14 floor_active 0 floor_carried 190 in_window(N) False lost [True, False] disk1_valid_txgs [181, 184, 187, 190]
-unrecoverable events seen 96

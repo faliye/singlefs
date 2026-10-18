@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# 门禁 checker-tier-crates-mutation-replay（crates 变异表复跑）的双机分片驱动：本机没有作数记录的行按用时表分成两堆，本机与第二台各跑一趟 checker-tier-crates-mutation-replay、只判自己那一堆
-# （GATE_MUTATION_ROW_SELECTION），第二台的判定库记录拷回本机，经 scripts/mutation/crates-mutation-rows.py import 逐条核过再导入。判定不在这里：
-# 驱动退出之后 checker-tier-crates-mutation-replay 在本机整张判一遍（命中判定库记录的复用、缺的现跑），判定与单机逐字相同（复用的报数不同），全绿标记照旧由本机写。
+# 门禁 checker-tier-crates-mutation-replay（crates 变异表复跑）的双机分片驱动：本机库里没有键相同判定的行按用时表分成两堆，本机与第二台各跑一趟 checker-tier-crates-mutation-replay、
+# 只判自己那一堆（GATE_MUTATION_ROW_SELECTION）；第二台判出的记录连同覆盖记录当场拷回，经 scripts/mutation/crates-mutation-rows.py import 按行键与判法单元指纹逐条核过，
+# 并进本机那一份判定库，第二台这一趟的库随这一趟的树一起删（第二台不留长期库）。判定不在这里：
+# 驱动退出之后 checker-tier-crates-mutation-replay 在本机整张判一遍（行键对得上的复用、对不上的现判），判定与单机逐字相同（复用的报数不同）。
 #
 #   mutation-shard-run.sh <树根>       门禁 checker-tier-crates-mutation-replay（.claude/gate.d/checker-tier-crates-mutation-replay.sh）在本地多机配置写了 ENABLE_ACROSS_MACHINES=1
 #                                      （判法 crash-point-replay-shard-configuration-check.sh 退 0）时调（只由 checker-tier-crates-mutation-replay 调，输出进 checker-tier-crates-mutation-replay 的 stderr）；不认环境变量开。
@@ -14,35 +15,41 @@
 # ① 配置照 scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-assignments（只调，与崩溃点重放分片同一份）；判不过退 1，原因不在这里打；
 #    判法退 3（配置没写 ENABLE_ACROSS_MACHINES=1）报一行「双机：关」、退 0，什么都不分（checker-tier-crates-mutation-replay 在本机整张判）。
 # ② 两台工具链相同：rustc -Vv 前三行与 host 行、cargo -V。
-# ③ 分行：crates-mutation-rows.py row-plan 列出每一行有没有作数的抓到记录与上一次现跑的用时；没有作数记录的行按用时从长到短，
-#    每条放进合计用时少的那一堆（相等放本机），没记过用时的按表里记过的中位数算（一条都没记过都按 1 秒）；本机那一堆与第二台那一堆各写一份选行文件。
-#    没有作数记录的行少于 2 行不分，退 0。SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1 时拒（checker-tier-crates-mutation-replay 最后那一趟不复用，分出去的白跑）。
+#    第二台的 llvm 工具（记覆盖要的 llvm-profdata、llvm-cov，--version 的 LLVM 版本要以第二台 rustc -vV 的「LLVM version」起头；目录取 MUTATION_SHARD_PEER_LLVM_TOOLS，
+#    没设取 GATE_MUTATION_LLVM_TOOLS，都没设取第二台 rustc --print sysroot 下 lib/rustlib/<host>/bin）分行之前先查：查不过报一行「第二台缺 llvm-tools」、
+#    不分给它、退 0（没判的行交给 checker-tier-crates-mutation-replay 在本机判），第二台这一趟的目录不建。
+# ③ 分行（mutation_shard_split_plan）：crates-mutation-rows.py row-plan 列出每一行的行键、这一趟会不会复用、上一次现跑的用时与锚点失效没有；要现判的行
+#    （拒算的不算：第二台判出来也没有键可导，留给最后那一趟在本机判；第五列是 anchor-broken 的锚点失效行不算：这一趟不跑，最后那一趟在本机记锚点失效）
+#    按用时从长到短，每条放进合计用时少的那一堆（相等放本机），没记过用时的按表里记过的中位数算（一条都没记过都按 1 秒）；本机那一堆与第二台那一堆各写一份选行文件。
+#    要现判的行少于 2 行不分，退 0。SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1 时拒（checker-tier-crates-mutation-replay 最后那一趟不读库，分出去的白跑）。
 # ④ 树拷到第二台 <PEER_REPOSITORY_DIRECTORY>/mutation-runs/<这一趟>/（新建目录，rsync 不带 --delete，排除 target、.git、规范副本与本地配置 multi-host.env），
 #    规范副本另拷（树里有拷树里的，没有拷驱动所在仓的，再没有拷那份仓的主仓的），拷完回读；在那里 git init；
-#    两台各算 crates-mutation-rows.py judge-version（判法版本：阶段脚本、共用模块与它 import 的 libtest 解析和判定库共用部分、mutation-prune.py、内存包装、登记行，连同构建环境），不同就拒；
-#    源码两台是同一棵树拷的，哪一行能复用由 ⑦ 的 import 照复用判据逐条核，这里不比源码。
+#    两台各算 crates-mutation-rows.py judging-units（判法单元指纹）与 toolchain（工具链行：rustc -vV、cargo -V、构建环境解析后的值），哪一样不同就拒
+#    （行键里有这两样，不同的话第二台判出的记录一条都导不进来）；源码两台是同一棵树拷的，每一行的键由 ⑦ 的 import 照本机此刻的源码逐条核，这里不比源码。
 # ⑤ 清场照配置做；跑完、跑红、收到信号都不复原（EXIT 上只报一句「清了场、没复原」，要复原由用户手动跑私有复原脚本）；清场的命令与输出都不打。
 # ⑥ 两台同时跑：本机 GATE_MUTATION_ROW_SELECTION=<本机那一堆> bash <checker-tier-crates-mutation-replay> <树根>；第二台同一条只判它那一堆，脱离 ssh 会话起（setsid nohup），
 #    进程号、退出码、输出各写第二台一个文件，驱动每 MUTATION_SHARD_RUN_POLL_SECONDS（默认 5）秒经 ssh 看一次；连续 60 次连不上、
 #    进程没了又没留退出码、60 次都没起来，就不等了。第二台那一份整份经那棵树副本里的 run-with-memory-cap.sh 起
 #    （上限 MUTATION_SHARD_PEER_MEMORY_CAP，默认 4G，键固定为「mutation-shard-run.sh 第二台那一份」：罩的是 checker-tier-crates-mutation-replay 自己在每条变异之外的进程；
 #    不用配置的 PEER_MEMORY_CAP：那是崩溃点重放一片测试二进制的上限，拿它罩整份 checker-tier-crates-mutation-replay，它在第二台的账上就一直占着这么多、每条变异排在它后面），
-#    每条变异在里面照 checker-tier-crates-mutation-replay 各自经包装，上限与限时与本机同一套（行键里有它们）。
-#    第二台跨趟保留的放 <PEER_REPOSITORY_DIRECTORY>/mutation-kept/：判定库记录与用时表（GATE_MUTATION_RECORDS_HOME=records）、
-#    编译目录（GATE_MUTATION_TARGET_DIR=target）、峰值表（RUN_WITH_MEMORY_CAP_PEAKS=memory-peaks.tsv）、变异复跑的崩溃判定库家目录
-#    （GATE_MUTATION_CRASH_LIBRARY_HOME=crash-library-home：变异版上走判定库的用例写这一份，不写进第二台真跑的长期库，crates-mutation-rows.py 文件头「变异复跑的判定库」），
-#    都不在这一趟会删的树里。本机那一份不另设：共用模块照本机真跑家目录底下的 mutation-replay/。
+#    每条变异在里面照 checker-tier-crates-mutation-replay 各自经包装，上限与限时与本机同一套（它们不进行键，只记在超时、撞顶那两档的记录里）。
+#    第二台那一份的判定库不设 GATE_MUTATION_RECORDS_HOME：照默认放在这一趟的树的 git common-dir 里，每趟新建、⑦ 拷回、⑧ 随树删（第二台不留长期库）。
+#    第二台跨趟保留的只有缓存，放 <PEER_REPOSITORY_DIRECTORY>/mutation-kept/：编译目录（GATE_MUTATION_TARGET_DIR=target）、峰值表（RUN_WITH_MEMORY_CAP_PEAKS=memory-peaks.tsv）、
+#    变异复跑的崩溃判定库家目录（GATE_MUTATION_CRASH_LIBRARY_HOME=crash-library-home：变异版上走判定库的用例写这一份，不写进第二台真跑的长期库，
+#    crates-mutation-rows.py 文件头「变异复跑的判定库」），都不在这一趟会删的树里。本机那一份不另设：共用模块照本机真跑家目录底下的 mutation-replay/。
+#    跨趟复用的编译目录不接 peer-host-lib.sh 的 peer_host_shared_target_guard（不按 rsync -a 带来的旧 mtime 刷源码戳）：cargo 不在这棵树里起，起在每个工作进程自己的副本里，
+#    副本由 crates-mutation-rows.py 的 prepare_shard 用 shutil.copy 拷、修改时刻取拷的那一刻（它的 --selftest 第十二格拿旧 mtime 的源文件证这一条），
+#    几趟同时用同一个编译目录由 claim_worker_slot 的片号锁分开（-w<片号>，弄坏开关 GATE_MUTATION_BREAK=local-shard-numbering）。
 #    带到第二台的环境：SINGLEFS_HEAVY_TESTS 原样；GATE_MUTATION_MEMORY_MAX、GATE_MUTATION_TIMEOUT、GATE_MUTATION_LONG_ROW_SECONDS、
-#    GATE_MUTATION_BREAK、RUN_WITH_MEMORY_CAP_RESERVE、GATE_MUTATION_LLVM_TOOLS 设了就带（后者是 llvm 工具的目录，第二台要在同一个路径上有同一份）；
-#    本机别的环境变量不带（真的第二台经 ssh 也拿不到）。
-# ⑦ 第二台 mutation-kept/records 下这一格判法版本的记录目录拷回本机（连同覆盖记录、快照与源码副本三个子目录），只留名字是本机变异表此刻某一行的记录
-#    （变异表改过之后留下的旧行的记录不导），交 crates-mutation-rows.py import 逐条核文件名、判法版本、行键，再照本机此刻的源码过一遍复用判据
-#    （抓到的要判成复用、基线 ok 的快照要与本机此刻相同；跨机不比主机名），不符的由它列出。第二台那一份中途挂了、ssh 断了，已有的记录照样拷回导入，
-#    没判的行留给 checker-tier-crates-mutation-replay 最后那一趟。
-# ⑧ 删第二台这一趟的树与进程号、退出码、输出、选行文件（mutation-kept 下的留着）；④ 之后在哪一步失败退出，这一步都挂在 EXIT 上照做。
+#    GATE_MUTATION_BREAK、RUN_WITH_MEMORY_CAP_RESERVE、GATE_MUTATION_LLVM_TOOLS 设了就带（后者是 llvm 工具的目录，第二台要在同一个路径上有同一份；
+#    设了 MUTATION_SHARD_PEER_LLVM_TOOLS 就给第二台换成它）；本机别的环境变量不带（真的第二台经 ssh 也拿不到）。
+# ⑦ 第二台这一趟的判定库（那棵树的 git common-dir 底下，crates-mutation-rows.py library-directory 报的那一个；records/、baselines/、coverage/、compositions/、units/）
+#    整个拷回本机，交 crates-mutation-rows.py import 逐条核文件名、判法单元指纹与行键（键是本机变异表此刻某一行照本机此刻的源码算得出的；跨机不比主机名），
+#    符的并进本机那一份库，不符的由它列出。第二台那一份中途挂了、ssh 断了，已有的记录照样拷回导入，没判的行留给 checker-tier-crates-mutation-replay 最后那一趟。
+# ⑧ 删第二台这一趟的树（连同它这一趟的判定库）与进程号、退出码、输出、选行文件（mutation-kept 下的缓存留着）；④ 之后在哪一步失败退出，这一步都挂在 EXIT 上照做。
 # 收到 TERM / INT / HUP（退 143 / 130 / 129）：先停两份——本机那一份从它的进程号起，第二台那一份从它在第二台上记下的进程号起（核它的工作目录是这一趟的树），
 #   都连同全部后代逐个按进程号冻住、从最底层起 TERM、放开，至多等 30 秒，还在的 KILL，回读一个不剩——再照 EXIT 上那一套删第二台这一趟的树，做完才退。
-#   前台那几步（rsync、算判法版本）里收到的，等那一步跑完再收尾；KILL 接不住，那时第二台上这一趟的树留着，手动删。
+#   前台那几步（rsync、算判法单元指纹与工具链行）里收到的，等那一步跑完再收尾；KILL 接不住，那时第二台上这一趟的树留着，手动删。
 # 两份的输出存进 <树根的 git common-dir>/singlefs-mutation-shard-logs/<这一趟>/（local.log、peer.log，只留最新 3 趟）。
 # 驱动打的每一行、存下的输出都不写配置里的主机、目录与清场命令：第二台上的错误输出与 peer.log 经 scripts/hosts/peer-host-lib.sh 的 peer_host_redact 换成「第二台」。
 # 第二台共用的那几段（跑命令、拷文件、脱离会话起与轮询、按进程号停、清场）在 scripts/hosts/peer-host-lib.sh。
@@ -53,14 +60,14 @@
 #   文件在、内容是 MUTATION_SHARD_SELFTEST_MARK_CONTENT 那一行才认开关；别处设了它，驱动拒、退 2，checker-tier-crates-mutation-replay 判红，什么都没判。
 #   逐项写开关名、弄坏哪一处、打开后自证哪几格红
 # （项名是自证 expect 的格名，一行一项；失败行是「✗ <格名>：<细节>」，括号里抄细节的句首，随跑变的路径、进程号、指纹写成 …）：
-#   MUTATION_SHARD_RUN_BREAK=import-skipped  拷回的记录不经 import、直接放进本机记录目录
+#   MUTATION_SHARD_RUN_BREAK=import-skipped  拷回的库不经 import、直接放进本机那一份库
 #       ① 两台各判一份：起的变异不相交、合起来是全部 6 行、两边都不空（「本机「」里有一行判了两次：拒掉的那一条没拒，最后那一趟在本机补跑）
 #       ① 最后那一趟全部复用（复用抓到 6 条、现跑变异至多 0 条）（「stderr 里的判定库记录行：  … 判定库记录：复用抓到 5 条」）
 #       ② import 拒了行键对不上的那一条、逐条列出（「stderr 里导入那几行：」后面是空的）
 #   MUTATION_SHARD_RUN_BREAK=no-final-pass  checker-tier-crates-mutation-replay 调完驱动不再整张判一遍（checker-tier-crates-mutation-replay 读这一项）
 #       ① checker-tier-crates-mutation-replay 接驱动那一趟判绿，判定与单机那一趟逐字相同（「退 1；diff：」）
 #       ① 最后那一趟全部复用（复用抓到 6 条、现跑变异至多 0 条）（「stderr 里的判定库记录行：」后面是空的）
-#       ① 第二台判的行连同覆盖记录导入（「指到覆盖记录的 」后面不是 6）
+#       ① 第二台判的行连同覆盖记录导入（「覆盖那一行：」后面是空的）
 #       ③ 第二台那一份判完 1 条就停：第二台那一份退 1，checker-tier-crates-mutation-replay 最后那一趟复用 4 条、补跑缺的 2 行，判定仍与单机逐字相同（「退 0；判定库记录行：」）
 #       ④ 驱动拒了之后 checker-tier-crates-mutation-replay 在本机整张判，判定与单机逐字相同（「退 1」）
 #   MUTATION_SHARD_RUN_BREAK=environment-opens  checker-tier-crates-mutation-replay 见 GATE_MUTATION_ACROSS_MACHINES=1 照旧把双机打开、不看配置的开关（checker-tier-crates-mutation-replay 读这一项）
@@ -68,15 +75,16 @@
 #   MUTATION_SHARD_RUN_BREAK=switch-off-ignored  判法退 3（双机：关）当成判不过、退 1
 #       ⑧ 驱动直接起、配置没写 ENABLE_ACROSS_MACHINES=1：报一行双机：关、退 0、第二台这一趟的目录没建（「退 1；输出：  ✗ 双机分片的本地配置判不过」）
 #   MUTATION_SHARD_RUN_BREAK=peer-without-memory-cap  第二台那一份不经 run-with-memory-cap.sh 起
-#       ① 第二台那一份经 run-with-memory-cap.sh 起：跨趟保留的峰值表里有它的键（「跨趟保留的峰值表 4 行，没有键「mutation-shard-run.sh 第二台那一份」那一行」）
+#       ① 第二台那一份经 run-with-memory-cap.sh 起：跨趟保留的峰值表里有它的键（「跨趟保留的峰值表 8 行，没有键「mutation-shard-run.sh 第二台那一份」那一行」）
 #   MUTATION_SHARD_RUN_BREAK=no-peer-cleanup-on-failure  ④ 之后失败退出（含收到信号）时不删第二台这一趟的树
-#       ④ 两台判法版本不同：驱动拒、两份都没起、第二台这一趟的树删了（「stderr：  ✗ 双机分片：两台算出的判法版本不同」）
+#       ④ 两台的构建环境不同：驱动拒、两份都没起、第二台这一趟的树删了（「stderr：  ✗ 双机分片：两台的工具链行（含构建环境）不同」）
 #       ⑥ 两份都在跑时收到 TERM：退 143，两份卡住的假 cargo 都不在了，没复原，第二台这一趟的树删了（「退 143；卡住的假 cargo 2 个（…），还活着的「」；第二台留着 1 个目录」）
-#   MUTATION_SHARD_RUN_BREAK=peer-kept-in-run-tree  第二台的记录、编译目录与峰值表放进这一趟的树里
-#       ① 第二台这一趟的树删了，跨趟保留的记录与峰值表在 mutation-kept 下留着（「mutation-runs 底下留着 0 个目录；mutation-kept 底下：」）
-#       ① 第二台那一份经 run-with-memory-cap.sh 起：跨趟保留的峰值表里有它的键（「跨趟保留的峰值表  行，没有键「mutation-shard-run.sh 第二台那一份」那一行」）
-#       ① 第二台每条变异的峰值记在跨趟保留的峰值表里（「峰值表里没有 cargo test --offline 的行」）
-#       ② import 拒了行键对不上的那一条、逐条列出（「stderr 里导入那几行：  … 导入：收了 6 条、拒了 0 条」）
+#   MUTATION_SHARD_RUN_BREAK=peer-library-kept  第二台那一份的判定库放进跨趟保留的 mutation-kept/records（改前的样子：第二台留一份长期库），拷回的是这一趟的树里那一份（空的）
+#       ① 两台各判一份（「本机「」里是全部 6 行」：第二台判的一条都没导进来，最后那一趟在本机补跑）
+#       ① 最后那一趟全部复用（复用抓到 6 条、现跑变异至多 0 条）（「stderr 里的判定库记录行：  … 判定库记录：复用抓到 3 条」）
+#       ① 第二台这一趟的树（连同它这一趟的判定库）删了，mutation-kept 下留着编译目录与峰值表、没有判定库（「mutation-kept 底下：」里有 records）
+#       ① 第二台判的行连同覆盖记录导入……最后那一趟一份覆盖都没补记（「覆盖那一行：  … 覆盖：这一趟记了 3 份」）
+#       ③ 第二台那一份判完 1 条就停……最后那一趟复用 4 条、补跑缺的 2 行（「判定库记录行：  … 复用抓到 3 条」）
 #   MUTATION_SHARD_RUN_BREAK=peer-crash-library-home-unset  不给第二台那一份设 GATE_MUTATION_CRASH_LIBRARY_HOME（改前的样子：变异版的结论照第二台真跑家目录底下的 mutation-replay/ 写，不跨趟留在 mutation-kept 下）
 #       ① 第二台那一份起 cargo 用 mutation-kept 下变异复跑自己的崩溃判定库家目录（「第二台那一份的输出里崩溃判定库家目录那一行：」）
 #   MUTATION_SHARD_RUN_BREAK=break-honored-anywhere  弄坏开关在 --selftest 之外也认（驱动与 checker-tier-crates-mutation-replay 都读这一项）
@@ -84,15 +92,21 @@
 #       ⑩ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外：checker-tier-crates-mutation-replay 判红（退 1）、说设在 --selftest 之外（「退 0；输出：」）
 #   MUTATION_SHARD_RUN_BREAK=gpu-memory-unexplained  第二台那一份退 245 时不报显存不够，只报「第二台那一份 exit 245」
 #       ⑪ 第二台那一份退 245 ⇒ 报显存不够、不算结果；退 252 ⇒ 报内存包装自己的结局；退 3 ⇒ 不报（「退 245 报的「第二台那一份 exit 245」；…」）
-#   MUTATION_SHARD_RUN_BREAK=store-not-fetched  拷回时不带第二台的覆盖记录、快照与源码副本（coverage/、snapshots/、blobs/）
-#       ① 第二台判的行连同覆盖记录导入（「指到覆盖记录的 」后面不是 6）
+#   MUTATION_SHARD_RUN_BREAK=store-not-fetched  拷回时不带第二台的覆盖记录（coverage/）
+#       ① 第二台判的行连同覆盖记录导入（「抓到的记录 6 条、覆盖记录 3 份」）
+#   MUTATION_SHARD_RUN_BREAK=peer-llvm-tools-unchecked  分行之前不查第二台的 llvm 工具（改前的样子）
+#       ⑬ 第二台缺 llvm-tools：分片前先查，报一行第二台缺 llvm-tools、退 0、不分给它，第二台这一趟的目录没建（「退 1；输出：」）
+#   MUTATION_SHARD_RUN_BREAK=anchor-broken-dispatched  ③ 分行不看 row-plan 的第五列：锚点失效、而行键算得出的那一行照样分出去
+#       ⑭ ③ 分行：锚点失效的行（第五列 anchor-broken，有键没键都算）不进两堆、单报几行（「本机「」第二台「」；汇总「」」里第 4 行进了一堆）
 #   MUTATION_SHARD_RUN_BREAK=selftest-tmpdir-outside  自证不把 TMPDIR 换成自己临时目录下的 tmp/，场景照调用方的 TMPDIR（没设是 /tmp）建临时目录
 #       ⑫ 跑完外面的临时目录里没多出 singlefs-mutation-replay-*（要连同 GATE_MUTATION_BREAK=shardrootkeptonsignal 一起开：
 #          那样被 TERM 停的那一份不删它，「外面多出来的」后面不空；只开 crates-mutation-rows.py 那一个时「自证自己的 tmp/ 里剩下的」后面不空）
 #   共用库的 PEER_HOST_LIB_BREAK=no-redact  peer_host_redact 原样转出、不换私有的字
 #       ① 输出里没有配置的主机、第二台的目录与清场命令（「…/singlefs-mutation-shard-logs/…/peer.log 里有」）
 # 只供测试的开关：SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1（照崩溃点重放分片）；MUTATION_SHARD_RUN_PEER_STOP_AFTER_ROWS=<k>
-#   给第二台那一份设 GATE_MUTATION_STOP_AFTER_ROWS=k 与 GATE_MUTATION_WORKERS=1（造「第二台那一份中途停了」：一个工作进程，判完 k 条就不再领活）。
+#   给第二台那一份设 GATE_MUTATION_STOP_AFTER_ROWS=k 与 GATE_MUTATION_WORKERS=1（造「第二台那一份中途停了」：一个工作进程，判完 k 条就不再领活）；
+#   MUTATION_SHARD_RUN_SELFTEST_PLANT=<文件>（只在 --selftest 起的进程里认，同弄坏开关的标记）⑦ 拷回之后把这份文件照原名放进拷回来的 records/（造「另一台交来一条键对不上的记录」）。
+# 配置的开关：MUTATION_SHARD_PEER_LLVM_TOOLS=<第二台上的目录> 第二台的 llvm 工具不在 GATE_MUTATION_LLVM_TOOLS 那个路径上时设它（② 查它、⑥ 给第二台那一份换成它）。
 #
 # admission: always 每次调都分这一刻这棵树上没有作数记录的行；复用判定在判定库记录里，不在这里
 # run-condition: command python3 rsync ssh git cargo rustc
@@ -127,6 +141,54 @@ mutation_shard_peer_problem() { # <第二台那一份的结局，「exit <码>�
     "exit 25"[0-4]) echo "第二台那一份${1#exit }：内存包装自己的结局（run-with-memory-cap.sh 文件头「退出码」），那一份的输出不算结果" ;;
     *) echo "第二台那一份 $1" ;;
   esac
+}
+
+mutation_shard_llvm_check_command() { # 打在第二台跑的那一段：llvm-profdata、llvm-cov 在、llvm-cov 的 LLVM 版本以第二台 rustc 的起头（文件头 ②）；查得过退 0 打一句版本，查不过退 3 打为什么
+  printf 'directory=%q\n' "${MUTATION_SHARD_PEER_LLVM_TOOLS:-${GATE_MUTATION_LLVM_TOOLS:-}}"
+  cat <<'LLVM_CHECK'
+if [[ -z "$directory" ]]; then directory="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/^host: //p')/bin"; fi
+for tool in llvm-profdata llvm-cov; do [[ -x "$directory/$tool" ]] || { echo "$tool 不在或不能执行"; exit 3; }; done
+wanted="$(rustc -vV | sed -n 's/^LLVM version: //p')"
+[[ -n "$wanted" ]] || { echo "第二台 rustc -vV 读不出 LLVM 版本"; exit 3; }
+found="$("$directory/llvm-cov" --version | sed -n 's/.*LLVM version \([^ ]*\).*/\1/p' | head -n 1)"
+case "$found" in
+  "$wanted"|"$wanted"-*) echo "llvm-cov 的 LLVM $found，rustc 的 $wanted" ;;
+  *) echo "llvm-cov 的 LLVM 版本「${found:-读不出}」与第二台 rustc 的「${wanted:-读不出}」对不上"; exit 3 ;;
+esac
+LLVM_CHECK
+}
+
+mutation_shard_split_plan() { # <row-plan 的输出> <本机选行文件> <第二台选行文件> <键文件>：③ 分两堆、写选行文件与键文件，stdout 打一行汇总
+  # 汇总：<表里的行数> <要现判的> <记过用时的> <没记过的按几秒> <本机行数> <本机秒数> <第二台行数> <第二台秒数> <拒算的> <锚点失效的>
+  # 要现判 = 不复用、有键、第五列不是 anchor-broken（锚点失效的行这一趟不跑，crates-mutation-rows.py 文件头「锚点失效」）
+  local anchor_dispatched=""
+  mutation_shard_break_is anchor-broken-dispatched && anchor_dispatched=1
+  MUTATION_SHARD_ANCHOR_DISPATCHED="$anchor_dispatched" python3 - "$@" <<'PY_SPLIT'
+import os, statistics, sys
+plan_path, local_path, peer_path, keys_path = sys.argv[1:]
+anchor_dispatched = os.environ.get("MUTATION_SHARD_ANCHOR_DISPATCHED") == "1"   # 弄坏开关 anchor-broken-dispatched：不看第五列
+with open(plan_path, encoding="utf-8") as handle:
+    rows = [line.rstrip("\n").split("\t") for line in handle if line.strip()]
+with open(keys_path, "w", encoding="utf-8") as handle:
+    handle.write("".join(row[1] + "\n" for row in rows))
+def anchor_broken(row):
+    return not anchor_dispatched and len(row) > 4 and row[4] == "anchor-broken"
+known = [float(row[3]) for row in rows if row[3] != "-"]
+default = statistics.median(known) if known else 1.0
+pending = sorted(((float(row[3]) if row[3] != "-" else default, int(row[0])) for row in rows if row[2] == "0" and row[1] != "-" and not anchor_broken(row)),
+                 key=lambda item: (-item[0], item[1]))
+heaps = [[0.0, []], [0.0, []]]
+for seconds, line_number in pending:
+    lighter = heaps[0] if heaps[0][0] <= heaps[1][0] else heaps[1]
+    lighter[0] += seconds
+    lighter[1].append(line_number)
+for path, (_total, lines) in zip((local_path, peer_path), heaps):
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write("".join(f"{line_number}\n" for line_number in sorted(lines)))
+broken = sum(1 for row in rows if anchor_broken(row))
+refused = sum(1 for row in rows if row[1] == "-" and not anchor_broken(row))
+print(len(rows), len(pending), len(known), f"{default:.1f}", len(heaps[0][1]), f"{heaps[0][0]:.0f}", len(heaps[1][1]), f"{heaps[1][0]:.0f}", refused, broken)
+PY_SPLIT
 }
 
 mutation_shard_fail() { # <原因> <出路>
@@ -245,41 +307,32 @@ mutation_shard_main() {
   # ② 工具链
   peer_host_compare_toolchains || exit 1
   echo "  · ② 两台的工具链相同（${peer_host_toolchain_text}）"
+  # ② 第二台的 llvm 工具（记覆盖要用）：分行之前先查，查不过不分给它（文件头 ②）
+  local peer_llvm_report
+  if mutation_shard_break_is peer-llvm-tools-unchecked; then
+    echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=peer-llvm-tools-unchecked：不查第二台的 llvm 工具"
+  elif peer_llvm_report="$(peer_host_run / "$(mutation_shard_llvm_check_command)" 2>&1)"; then
+    echo "  · ② 第二台的 llvm 工具在（${peer_llvm_report##*$'\n'}）"
+  else
+    echo "  · 双机：第二台缺 llvm-tools（${peer_llvm_report##*$'\n'}）：不分给它，没判的行交给 checker-tier-crates-mutation-replay 在本机判；要分就在第二台装 rustup component add llvm-tools（与它的 rustc 同一份 LLVM），或设 MUTATION_SHARD_PEER_LLVM_TOOLS=<第二台上的目录>"
+    exit 0
+  fi
 
   # ③ 分行
   local plan_file="$mutation_shard_scratch/plan.tsv" split_summary
   python3 "$rows_module" row-plan "$tree_root" > "$plan_file" \
     || mutation_shard_fail "本机列不出每一行的记录与用时（crates-mutation-rows.py row-plan 退非 0：$(tail -2 "$plan_file" | tr '\n' ' ')）" "单跑 python3 scripts/mutation/crates-mutation-rows.py row-plan <树根> 看它报什么"
-  split_summary="$(python3 - "$plan_file" "$mutation_shard_scratch/local.selection" "$mutation_shard_scratch/peer.selection" "$mutation_shard_scratch/keys" <<'PY_SPLIT'
-import statistics, sys
-plan_path, local_path, peer_path, keys_path = sys.argv[1:]
-with open(plan_path, encoding="utf-8") as handle:
-    rows = [line.rstrip("\n").split("\t") for line in handle if line.strip()]
-with open(keys_path, "w", encoding="utf-8") as handle:
-    handle.write("".join(row[1] + "\n" for row in rows))
-known = [float(row[3]) for row in rows if row[3] != "-"]
-default = statistics.median(known) if known else 1.0
-pending = sorted(((float(row[3]) if row[3] != "-" else default, int(row[0])) for row in rows if row[2] == "0"), key=lambda item: (-item[0], item[1]))
-heaps = [[0.0, []], [0.0, []]]
-for seconds, line_number in pending:
-    lighter = heaps[0] if heaps[0][0] <= heaps[1][0] else heaps[1]
-    lighter[0] += seconds
-    lighter[1].append(line_number)
-for path, (_total, lines) in zip((local_path, peer_path), heaps):
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write("".join(f"{line_number}\n" for line_number in sorted(lines)))
-print(len(rows), len(pending), len(known), f"{default:.1f}", len(heaps[0][1]), f"{heaps[0][0]:.0f}", len(heaps[1][1]), f"{heaps[1][0]:.0f}")
-PY_SPLIT
-)" || mutation_shard_fail "分行那一段 python 没跑成" "看上面 python 的报错"
-  local table_rows pending_rows timed_rows default_seconds local_rows local_seconds peer_rows peer_seconds
-  read -r table_rows pending_rows timed_rows default_seconds local_rows local_seconds peer_rows peer_seconds <<< "$split_summary"
+  split_summary="$(mutation_shard_split_plan "$plan_file" "$mutation_shard_scratch/local.selection" "$mutation_shard_scratch/peer.selection" "$mutation_shard_scratch/keys")" \
+    || mutation_shard_fail "分行那一段 python 没跑成" "看上面 python 的报错"
+  local table_rows pending_rows timed_rows default_seconds local_rows local_seconds peer_rows peer_seconds refused_rows anchor_broken_rows
+  read -r table_rows pending_rows timed_rows default_seconds local_rows local_seconds peer_rows peer_seconds refused_rows anchor_broken_rows <<< "$split_summary"
   if (( pending_rows < 2 )); then
-    echo "  · ③ 变异表 $table_rows 行里没有作数记录的只有 $pending_rows 行：不分，交给 checker-tier-crates-mutation-replay 在本机判"
+    echo "  · ③ 变异表 $table_rows 行里要现判的只有 $pending_rows 行（拒算的 $refused_rows 行、锚点失效的 $anchor_broken_rows 行不分）：不分，交给 checker-tier-crates-mutation-replay 在本机判"
     exit 0
   fi
-  echo "  · ③ 变异表 $table_rows 行里没有作数记录的 $pending_rows 行按用时两堆均分（记过用时的 $timed_rows 行，没记过的按中位数 $default_seconds 秒算）：本机 $local_rows 行约 $local_seconds 秒，第二台 $peer_rows 行约 $peer_seconds 秒"
+  echo "  · ③ 变异表 $table_rows 行里要现判的 $pending_rows 行按用时两堆均分（记过用时的 $timed_rows 行，没记过的按中位数 $default_seconds 秒算；拒算的 $refused_rows 行、锚点失效的 $anchor_broken_rows 行不分，留给最后那一趟）：本机 $local_rows 行约 $local_seconds 秒，第二台 $peer_rows 行约 $peer_seconds 秒"
 
-  # ④ 树拷到第二台、两台各算判法版本
+  # ④ 树拷到第二台、两台各算判法单元指纹与工具链行
   local peer_runs="$PEER_REPOSITORY_DIRECTORY/mutation-runs" peer_kept sop_source local_base peer_base
   peer_run_directory="$peer_runs/$run_label"
   peer_pid_file="$peer_runs/$run_label.pid"
@@ -287,10 +340,6 @@ PY_SPLIT
   peer_output_file="$peer_runs/$run_label.log"
   peer_selection_file="$peer_runs/$run_label.selection"
   peer_kept="$PEER_REPOSITORY_DIRECTORY/mutation-kept"
-  if mutation_shard_break_is peer-kept-in-run-tree; then
-    peer_kept="$peer_run_directory/.mutation-kept"
-    echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=peer-kept-in-run-tree：第二台的记录、编译目录与峰值表放进这一趟的树里"
-  fi
   sop_source="$(peer_host_sop_source "$tree_root" "$stage_repository")" \
     || mutation_shard_fail "树里、驱动所在的仓与它的主仓里都没有规范副本 .claude/singlefs-ai-sop/（要有 scripts/preflight.py）：第二台那棵树的 checker-tier-crates-mutation-replay 一步都判不了" "在主仓里装好它（bash .claude/singlefs-ai-sop/install.sh）"
   peer_host_run / "mkdir -p $(printf '%q' "$peer_run_directory") $(printf '%q' "$peer_kept")" \
@@ -305,16 +354,25 @@ PY_SPLIT
   peer_host_copy "$mutation_shard_scratch/peer.selection" "$(peer_host_path "$peer_selection_file")" \
     || mutation_shard_fail "第二台那一堆的选行文件拷不过去" "看第二台盘满没满"
   echo "  · ④ 树拷到第二台这一趟的目录、在那里 git init（规范副本另拷）"
-  local_base="$(python3 "$rows_module" judge-version "$tree_root")" \
-    || mutation_shard_fail "本机算不出判法版本：$local_base" "单跑 python3 scripts/mutation/crates-mutation-rows.py judge-version <树根> 看它报什么"
-  peer_base="$(peer_host_run "$peer_run_directory" "python3 scripts/mutation/crates-mutation-rows.py judge-version .")" \
-    || mutation_shard_fail "第二台算不出判法版本" "在第二台那棵树里单跑同一条 judge-version 看它报什么"
+  local_base="$(python3 "$rows_module" judging-units "$tree_root")" \
+    || mutation_shard_fail "本机算不出判法单元指纹：$local_base" "单跑 python3 scripts/mutation/crates-mutation-rows.py judging-units <树根> 看它报什么"
+  peer_base="$(peer_host_run "$peer_run_directory" "python3 scripts/mutation/crates-mutation-rows.py judging-units .")" \
+    || mutation_shard_fail "第二台算不出判法单元指纹" "在第二台那棵树里单跑同一条 judging-units 看它报什么"
   local_base="${local_base%% *}"
   peer_base="${peer_base%% *}"
   [[ "$local_base" == "$peer_base" ]] \
-    || mutation_shard_fail "两台算出的判法版本不同（本机 ${local_base:0:16}…，第二台 ${peer_base:0:16}…）：构建环境（~/.cargo/config*、目录层级里的 .cargo/config*、RUSTFLAGS 这一类）或树不一样" \
-      "对一对两台的 cargo 配置与环境变量，改成一样再跑"
-  echo "  · ④ 两台的判法版本相同：${local_base:0:16}…"
+    || mutation_shard_fail "两台算出的判法单元指纹不同（本机 ${local_base:0:16}…，第二台 ${peer_base:0:16}…）：两棵树里判「抓没抓到」的那几个函数不一样" \
+      "让第二台那棵树与本机被判的树同一份（树是这一趟现拷的，多半是本机被判的树与驱动所在的仓不同）"
+  local local_toolchain peer_toolchain
+  local_toolchain="$(python3 "$rows_module" toolchain "$tree_root")" \
+    || mutation_shard_fail "本机算不出工具链行：$local_toolchain" "单跑 python3 scripts/mutation/crates-mutation-rows.py toolchain <树根> 看它报什么"
+  peer_toolchain="$(peer_host_run "$peer_run_directory" "python3 scripts/mutation/crates-mutation-rows.py toolchain .")" \
+    || mutation_shard_fail "第二台算不出工具链行" "在第二台那棵树里单跑同一条 toolchain 看它报什么"
+  if [[ "$local_toolchain" != "$peer_toolchain" ]]; then
+    mutation_shard_fail "两台的工具链行（含构建环境）不同：$(diff <(printf '%s\n' "$local_toolchain") <(printf '%s\n' "$peer_toolchain") | grep '^[<>]' | head -3 | tr '\n' ' ')；行键里有它，第二台判出的记录一条都导不进来" \
+      "对一对两台的 cargo 配置（~/.cargo/config*、目录层级里的 .cargo/config*）与 RUSTFLAGS 这一类环境变量，改成一样再跑"
+  fi
+  echo "  · ④ 两台的判法单元指纹（${local_base:0:16}…）与工具链行都相同"
 
   # ⑤ 清场
   peer_host_quiesce || exit 1
@@ -336,10 +394,16 @@ PY_SPLIT
   for carried_variable in GATE_MUTATION_MEMORY_MAX GATE_MUTATION_TIMEOUT GATE_MUTATION_LONG_ROW_SECONDS GATE_MUTATION_BREAK RUN_WITH_MEMORY_CAP_RESERVE GATE_MUTATION_LLVM_TOOLS; do
     if [[ -n "${!carried_variable:-}" ]]; then peer_command+=" $carried_variable=$(printf '%q' "${!carried_variable}")"; fi
   done
+  if [[ -n "${MUTATION_SHARD_PEER_LLVM_TOOLS:-}" ]]; then peer_command+=" GATE_MUTATION_LLVM_TOOLS=$(printf '%q' "$MUTATION_SHARD_PEER_LLVM_TOOLS")"; fi
   if [[ -n "${MUTATION_SHARD_RUN_PEER_STOP_AFTER_ROWS:-}" ]]; then
     peer_command+=" GATE_MUTATION_WORKERS=1 GATE_MUTATION_STOP_AFTER_ROWS=$(printf '%q' "$MUTATION_SHARD_RUN_PEER_STOP_AFTER_ROWS")"
   fi
-  peer_command+=" GATE_MUTATION_ROW_SELECTION=$(printf '%q' "$peer_selection_file") GATE_MUTATION_RECORDS_HOME=$(printf '%q' "$peer_kept/records")"
+  # 第二台那一份的判定库照默认放在这一趟的树的 git common-dir 里，⑦ 拷回、⑧ 随树删（文件头 ⑥）
+  peer_command+=" GATE_MUTATION_ROW_SELECTION=$(printf '%q' "$peer_selection_file")"
+  if mutation_shard_break_is peer-library-kept; then
+    echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=peer-library-kept：第二台那一份的判定库放进跨趟保留的 mutation-kept/records（改前的样子）"
+    peer_command+=" GATE_MUTATION_RECORDS_HOME=$(printf '%q' "$peer_kept/records")"
+  fi
   peer_command+=" GATE_MUTATION_TARGET_DIR=$(printf '%q' "$peer_kept/target") RUN_WITH_MEMORY_CAP_PEAKS=$(printf '%q' "$peer_kept/memory-peaks.tsv")"
   # 变异复跑的崩溃判定库家目录（文件头 ⑥）：第二台那一份写 mutation-kept 下自己的一份，不写第二台真跑的长期库
   mutation_shard_break_is peer-crash-library-home-unset || peer_command+=" GATE_MUTATION_CRASH_LIBRARY_HOME=$(printf '%q' "$peer_kept/crash-library-home")"
@@ -379,40 +443,41 @@ PY_SPLIT
     if [[ -f "$peer_log" ]]; then echo "    第二台那一份的尾部（全文 $peer_log）："; tail -6 "$peer_log" | sed 's/^/      /'; fi
   fi
 
-  # ⑦ 第二台的记录拷回、核过再导入
-  local peer_records="$peer_kept/records/singlefs-mutation-rows/$local_base" fetched="$mutation_shard_scratch/fetched" importable="$mutation_shard_scratch/importable"
-  local fetched_count=0 importable_count=0 stale_count=0 record_file record_name import_exit=0 local_records
-  mkdir -p -- "$fetched" "$importable"
-  if ! peer_host_copy "$(peer_host_path "$peer_records")/" "$fetched/" 2>/dev/null; then
-    echo "  ! 第二台这一格判法版本的记录目录拷不回来（那一份一条都没判完，或 ssh 断了）"
+  # ⑦ 第二台这一趟的判定库拷回、核过再并进本机那一份（文件头 ⑦）；第二台那一份照默认把库放在这一趟的树的 git common-dir 里
+  local peer_library fetched="$mutation_shard_scratch/fetched" record_count=0 baseline_count=0 coverage_count=0 import_exit=0 local_library store_directory
+  mkdir -p -- "$fetched"
+  if ! peer_library="$(peer_host_run "$peer_run_directory" "python3 scripts/mutation/crates-mutation-rows.py library-directory ." 2>/dev/null)" || [[ -z "$peer_library" ]]; then
+    peer_library="$peer_run_directory/.git/singlefs-crates-mutation-library"
   fi
-  # 覆盖记录、快照与源码副本整个带上：import 照复用判据核的时候要读它们，收下的记录引的那几份由它拷进本机
-  local store_directory
-  for store_directory in coverage snapshots blobs; do
-    if mutation_shard_break_is store-not-fetched; then
-      echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=store-not-fetched：第二台的 $store_directory/ 不带过来"
-      continue
+  if ! peer_host_copy "$(peer_host_path "$peer_library")/" "$fetched/" 2>/dev/null; then
+    echo "  ! 第二台这一趟的判定库拷不回来（那一份一条都没判完，或 ssh 断了）"
+  fi
+  # 覆盖记录一并带上（基线复用按它判）；弄坏开关 store-not-fetched 下不带
+  if mutation_shard_break_is store-not-fetched && [[ -d "$fetched/coverage" ]]; then
+    echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=store-not-fetched：第二台的 coverage/ 不带过来"
+    rm -rf -- "${fetched:?}/coverage"
+  fi
+  # 只供自证：往拷回来的 records/ 里放一条名字是本机某一行的键、内容的行键是别的的记录，看 import 拒它（标记文件在、内容对得上才认）
+  if [[ -n "${MUTATION_SHARD_RUN_SELFTEST_PLANT:-}" ]] && mutation_shard_inside_selftest && [[ -f "$MUTATION_SHARD_RUN_SELFTEST_PLANT" ]]; then
+    mkdir -p -- "$fetched/records" && cp -- "$MUTATION_SHARD_RUN_SELFTEST_PLANT" "$fetched/records/$(basename "$MUTATION_SHARD_RUN_SELFTEST_PLANT")"
+  fi
+  for store_directory in records baselines coverage; do
+    if [[ -d "$fetched/$store_directory" ]]; then
+      case "$store_directory" in
+        records) record_count="$(find "$fetched/records" -maxdepth 1 -type f | wc -l)" ;;
+        baselines) baseline_count="$(find "$fetched/baselines" -maxdepth 1 -type f | wc -l)" ;;
+        coverage) coverage_count="$(find "$fetched/coverage" -maxdepth 1 -type f | wc -l)" ;;
+      esac
     fi
-    if [[ -d "$fetched/$store_directory" ]]; then cp -r -- "$fetched/$store_directory" "$importable/"; fi
   done
-  for record_file in "$fetched"/*; do
-    [[ -f "$record_file" ]] || continue
-    fetched_count=$((fetched_count + 1))
-    record_name="${record_file##*/}"
-    if [[ "$record_name" =~ ^(mutation|baseline)\.([0-9a-f]{64})$ ]] && grep -qxF "${BASH_REMATCH[2]}" "$mutation_shard_scratch/keys"; then
-      cp -- "$record_file" "$importable/" && importable_count=$((importable_count + 1))
-    else
-      stale_count=$((stale_count + 1))
-    fi
-  done
-  echo "  · ⑦ 拷回第二台的记录 $fetched_count 条：本机变异表此刻的行 $importable_count 条，别的 $stale_count 条（变异表改过之后留下的旧行，不导）"
+  echo "  · ⑦ 拷回第二台这一趟的判定库：记录 $record_count 条、基线 $baseline_count 条、覆盖 $coverage_count 份"
   if mutation_shard_break_is import-skipped; then
-    echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=import-skipped：拷回的记录不经 import，直接放进本机记录目录"
-    if local_records="$(python3 "$rows_module" records-directory "$tree_root")" && mkdir -p -- "$local_records"; then
-      cp -r -- "$importable"/. "$local_records/" 2>/dev/null
+    echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=import-skipped：拷回的库不经 import，直接放进本机那一份库"
+    if local_library="$(python3 "$rows_module" library-directory "$tree_root")" && mkdir -p -- "$local_library"; then
+      cp -r -- "$fetched"/. "$local_library/" 2>/dev/null
     fi
-  elif (( importable_count > 0 )); then
-    if python3 "$rows_module" import "$tree_root" "$importable"; then import_exit=0; else import_exit=$?; fi
+  elif (( record_count + baseline_count + coverage_count > 0 )); then
+    if python3 "$rows_module" import "$tree_root" "$fetched"; then import_exit=0; else import_exit=$?; fi
     (( import_exit == 0 )) || problems+=("import 退 $import_exit（拒掉的逐条列在上面，那几行 checker-tier-crates-mutation-replay 最后那一趟照跑）")
   fi
 
@@ -431,14 +496,18 @@ PY_SPLIT
 # 每条变异照真的走 run-with-memory-cap.sh（上限 256M，排队与账都是真的）。逐格：
 #   单机那一趟：配置没写 ENABLE_ACROSS_MACHINES=1、环境里 GATE_MUTATION_ACROSS_MACHINES=1（原来的开法）：checker-tier-crates-mutation-replay 判绿、报「双机：关」、不调驱动（它的 stdout 是下面比对的基准）
 #   ① 主流程（checker-tier-crates-mutation-replay 接驱动）：退 0；判定与单机那一趟逐字相同；两台起的变异不相交、合起来是全部、都不空；
-#      最后一趟全部复用；本机那一份（选行模式的 checker-tier-crates-mutation-replay）没再调驱动；清了场、跑完没复原；第二台这一趟的树删了、跨趟保留的记录与峰值表留着；
+#      最后一趟全部复用；本机那一份（选行模式的 checker-tier-crates-mutation-replay）没再调驱动；清了场、跑完没复原；
+#      第二台这一趟的树连同它这一趟的判定库删了，mutation-kept 下只留编译目录与峰值表（第二台不留长期库）；第二台判的记录连同覆盖记录并进本机那一份库；
 #      第二台那一份经内存包装起（跨趟保留的峰值表里有它的键）、每条变异的峰值也记在那里；输出里没有配置的主机、第二台的目录与清场命令
-#   ② import 拒行键对不上的：第二台跨趟保留的记录目录里预先放一条名字是本机那一堆某行、内容行键是别的的记录：驱动列出它，本机记录目录里那一行不是它
+#   ② import 拒行键对不上的：拷回来的 records/ 里另放一条名字是本机那一堆第一行的键、内容行键是别的的记录（只供自证的 MUTATION_SHARD_RUN_SELFTEST_PLANT）：
+#      驱动列出它，本机库里那一行不是它
+#   ⑬ 第二台缺 llvm-tools（MUTATION_SHARD_PEER_LLVM_TOOLS 指一个空目录）：驱动直接起，分行之前先查，报一行「第二台缺 llvm-tools」、退 0、不分给它，第二台这一趟的目录没建
 #   ③ 第二台那一份判完 1 条就停（MUTATION_SHARD_RUN_PEER_STOP_AFTER_ROWS=1）：驱动退 1；拷回的记录照导；checker-tier-crates-mutation-replay 最后那一趟补跑缺的行，判定仍与单机逐字相同
-#   ④ 两台判法版本不同（第二台目录的上一层放 .cargo/config.toml）：驱动拒、两份都没起、第二台这一趟的树删了；checker-tier-crates-mutation-replay 在本机整张判，判定与单机逐字相同
+#   ④ 两台的构建环境不同（第二台目录的上一层放 .cargo/config.toml，两台的工具链行就不同）：驱动拒、两份都没起、第二台这一趟的树删了；checker-tier-crates-mutation-replay 在本机整张判，判定与单机逐字相同
 #   ⑤ 第二台的 rustc -Vv 不同：驱动拒，第二台这一趟的目录没建
 #   ⑥ 两份都在跑的时候给驱动（只给它自己，kill "$!"）发 TERM：退 143，两份卡住的假 cargo 进程都不在了，没复原，第二台这一趟的树删了
 #   ⑦ 选行模式下调驱动：退 2 拒
+#   ⑭ ③ 分行（mutation_shard_split_plan）喂一份写好的 row-plan 输出：锚点失效的两行（一行没键、一行有键）与拒算、复用的不进两堆，汇总单报锚点失效 2 行
 #   ⑧ 驱动直接起、配置没写 ENABLE_ACROSS_MACHINES=1（判法退 3）：报一行「双机：关」、退 0，第二台这一趟的目录没建
 #   ⑫ 场景都跑在 TMPDIR=<自证的临时目录>/tmp 下（command-safety.md「测试镜像一律放临时目录」）：跑完外面的临时目录里没多出 singlefs-mutation-replay-*，
 #      自证自己的 tmp/ 下也一个不剩（⑥ 被 TERM 停的那一份照样删了它的；删不删由 crates-mutation-rows.py 的 run_pool 管）
@@ -452,6 +521,10 @@ mutation_shard_selftest() {
   # 自证起的驱动与 checker-tier-crates-mutation-replay 认弄坏开关的标记：场景里起的都带着它
   printf '%s\n' "$MUTATION_SHARD_SELFTEST_MARK_CONTENT" > "$work/selftest-mark"
   export MUTATION_SHARD_RUN_SELFTEST_MARK="$work/selftest-mark"
+  # 复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「二」）：场景里 checker-tier-crates-mutation-replay 每一趟都抽；这里比的是复用与现跑的条数，
+  #   键相同的全当哨兵、不抽强制现判（哨兵数比行数多），哨兵与强制现判本身在 crates-mutation-rows.py 的自证 reuse-sentinel 那一格判
+  export SINGLEFS_REUSE_SENTINEL_COUNT=1000
+  unset SINGLEFS_REUSE_SENTINEL_SEED
   trap 'echo "  · 自证的临时目录（$(du -sh "$mutation_shard_selftest_work" 2>/dev/null | cut -f1)）删掉"; rm -rf -- "${mutation_shard_selftest_work:?}"' EXIT
   # 场景起的 checker-tier-crates-mutation-replay 与它的工作进程都照 TMPDIR 建临时目录：换成自证自己目录下的 tmp/，跑完随自证的临时目录一起删；
   # 开跑前先记下外面那个临时目录里已有的 singlefs-mutation-replay-*，⑫ 比的是自证跑完多出来的
@@ -476,6 +549,7 @@ mutation_shard_selftest() {
   mkdir -p "$template/.claude/gate.d" "$template/crates/tiny/src" "$template/research"
   rsync -a --exclude __pycache__ "$repository_root/.claude/scripts/" "$template/.claude/scripts/"
   cp -- "$repository_root/.claude/gate.d/checker-tier-crates-mutation-replay.sh" "$repository_root/.claude/gate.d/stage-inputs.tsv" "$template/.claude/gate.d/"
+  cp -- "$repository_root/.claude/heavy-thread-default" "$template/.claude/"   # 算闭包开几个子进程照每台默认重活线程数的登记（scripts/hosts/heavy_threads.py）
   rsync -a --exclude __pycache__ "$repository_root/.claude/gate.d/lib/" "$template/.claude/gate.d/lib/"   # checker-tier-crates-mutation-replay source 的格共用库
   rsync -a --exclude __pycache__ --exclude /experiments/target/ "$repository_root/scripts/" "$template/scripts/"   # 装置的编译目录几十 G，自证用不到
   ln -s "$repository_root/.claude/singlefs-ai-sop" "$template/.claude/singlefs-ai-sop"
@@ -483,7 +557,7 @@ mutation_shard_selftest() {
   printf '[workspace]\nmembers = ["crates/tiny"]\n' > "$template/Cargo.toml"
   printf '[package]\nname = "tiny"\nversion = "0.1.0"\n' > "$template/crates/tiny/Cargo.toml"
   cat > "$template/crates/tiny/src/lib.rs" <<'SAMPLE_SOURCE'
-// 双机分片驱动自证的样本 crate（假 cargo 按下面几行判）
+// 双机分片驱动自证的样本 crate（假 cargo 按下面几行判；下面的 #[test] 函数只给行键认点名的测试是哪一个单元）
 // TEST adds NEEDS left + right
 // TEST doubles NEEDS value * 2
 // TEST negates NEEDS 0 - value
@@ -496,6 +570,22 @@ pub fn negate(value: i32) -> i32 { 0 - value }
 pub fn halve(value: u32) -> u32 { value / 2 }
 pub fn triple(value: u32) -> u32 { value * 3 }
 pub fn square(value: u32) -> u32 { value * value }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn adds() { assert_eq!(super::add(2, 3), 5); }
+    #[test]
+    fn doubles() { assert_eq!(super::double(3), 6); }
+    #[test]
+    fn negates() { assert_eq!(super::negate(3), -3); }
+    #[test]
+    fn halves() { assert_eq!(super::halve(6), 3); }
+    #[test]
+    fn triples() { assert_eq!(super::triple(2), 6); }
+    #[test]
+    fn squares() { assert_eq!(super::square(3), 9); }
+}
 SAMPLE_SOURCE
   {
     printf '# 每条变异的内存上限：256M\n# 每条变异的超时秒数：120\n# 变异名\t文件\t原文\t替换文\tcargo test 参数\t必须红的测试名\n'
@@ -627,7 +717,7 @@ FAKE_LLVM
     echo "$exit_code" > "$scene/exit"
   }
   verdict_view() { # <stdout 文件>：去掉随记录变的几处（「复用：」「覆盖：」两行、抓到那一行末尾的栏、成功句末尾「；这一趟现判 …」），剩下的是判定
-    sed -E 's/（现判：[^）]*）$|（按覆盖复用）$//; s/；这一趟现判 .*$//' "$1" | grep -v -e '^  复用：' -e '^  覆盖：'
+    sed -E 's/（现判：[^）]*）$|（复用）$|（拒算）$//; s/；这一趟现判 .*$//' "$1" | grep -v -e '^  复用：' -e '^  覆盖：'
   }
   mutated_filters() { # <假 cargo 的记录>：变异那几次（lib.rs 不是原样的）的过滤词，一行一个、排好
     [[ -f "$1" ]] || return 0
@@ -644,19 +734,18 @@ FAKE_LLVM
     "$([[ "$(cat "$work/single/exit")" == 0 ]] && grep -q '双机分片：没分（双机：关' "$work/single/stderr" && ! grep -q '双机分片：驱动退' "$work/single/stderr"; echo $?)" \
     "退 $(cat "$work/single/exit")；stderr 尾部：$(tail -3 "$work/single/stderr" | tr '\n' ' ')"
 
-  # ① 主流程，连同 ② import 拒行键对不上的
+  # ① 主流程，连同 ② import 拒行键对不上的：拷回来的 records/ 里另放一条名字是本机那一堆第一行的键、内容的行键是别的的记录（只供自证的 MUTATION_SHARD_RUN_SELFTEST_PLANT）
   prepare_scene main
-  local plan_line bogus_key base
+  local plan_line bogus_key base planted_key planted_file="$work/main/plant"
   plan_line="$(scene_environment main python3 "$work/main/repo/scripts/mutation/crates-mutation-rows.py" row-plan "$work/main/repo" | head -1)"
-  base="$(scene_environment main env GATE_MUTATION_MEMORY_CAP_RUNNER="$work/main/repo/scripts/hosts/run-with-memory-cap.sh" \
-    python3 "$work/main/repo/scripts/mutation/crates-mutation-rows.py" judge-version "$work/main/repo" | cut -d' ' -f1)"
+  base="$(scene_environment main python3 "$work/main/repo/scripts/mutation/crates-mutation-rows.py" judging-units "$work/main/repo" | cut -d' ' -f1)"
   bogus_key="$(printf 'bogus' | sha256sum | cut -c1-64)"
-  local planted_directory="$work/main/peer-home/mutation-kept/records/singlefs-mutation-rows/$base" planted_key
   planted_key="$(cut -f2 <<< "$plan_line")"
-  mkdir -p "$planted_directory"
-  printf '# 自证预先放的记录：名字是本机那一堆第一行，内容的行键是别的\nkind=mutation\nrow_key=%s\njudge_version=%s\nverdict=caught\nfinished_utc=%s\n' \
-    "$bogus_key" "$base" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$planted_directory/mutation.$planted_key"
-  run_stage_in main
+  mkdir -p "$planted_file"
+  planted_file="$planted_file/$planted_key"
+  printf '# 自证另放的记录：名字是本机那一堆第一行的键，内容的行键是别的\nkind=mutation\nrow_key=%s\njudging=%s\nverdict=caught\njudged_date=%s\n' \
+    "$bogus_key" "$base" "$(date -u +%Y-%m-%d)" > "$planted_file"
+  run_stage_in main MUTATION_SHARD_RUN_SELFTEST_PLANT="$planted_file"
   local main_stderr="$work/main/stderr" local_filters peer_filters all_filters
   local_filters="$(mutated_filters "$work/main/local-bin/invocations.log" | tr '\n' ' ')"
   peer_filters="$(mutated_filters "$work/main/peer-bin/invocations.log" | tr '\n' ' ')"
@@ -678,10 +767,9 @@ FAKE_LLVM
   expect "① 照配置清了场、跑完没复原（清场标记还在，报了「清了场、没复原」）" \
     "$(grep -q '照配置清了场' "$main_stderr" && grep -q '清了场、没复原' "$main_stderr" && [[ -e "$work/main/quiesce-marker-selftest" ]]; echo $?)" \
     "stderr：$(grep -E '清了场|复原' "$main_stderr" | tr '\n' ' ')"
-  expect "① 第二台这一趟的树删了，跨趟保留的记录与峰值表在 mutation-kept 下留着" \
-    "$([[ "$(peer_run_trees_left main)" == 0 && -s "$work/main/peer-home/mutation-kept/memory-peaks.tsv" ]] \
-       && ls "$planted_directory"/mutation.* >/dev/null 2>&1 && [[ "$(ls "$planted_directory" | wc -l)" -ge 3 ]]; echo $?)" \
-    "mutation-runs 底下留着 $(peer_run_trees_left main) 个目录；mutation-kept 底下：$(ls -R "$work/main/peer-home/mutation-kept" 2>/dev/null | head -8 | tr '\n' ' ')"
+  expect "① 第二台这一趟的树（连同它这一趟的判定库）删了，mutation-kept 下留着编译目录与峰值表、没有判定库（第二台不留长期库）" \
+    "$([[ "$(peer_run_trees_left main)" == 0 && -s "$work/main/peer-home/mutation-kept/memory-peaks.tsv" && ! -e "$work/main/peer-home/mutation-kept/records" ]]; echo $?)" \
+    "mutation-runs 底下留着 $(peer_run_trees_left main) 个目录；mutation-kept 底下：$(ls "$work/main/peer-home/mutation-kept" 2>/dev/null | tr '\n' ' ')"
   expect "① 第二台那一份经 run-with-memory-cap.sh 起：跨趟保留的峰值表里有它的键" \
     "$(grep -qF "$MUTATION_SHARD_PEER_WRAPPER_KEY" "$work/main/peer-home/mutation-kept/memory-peaks.tsv" 2>/dev/null; echo $?)" \
     "跨趟保留的峰值表 $(grep -vc '^#' "$work/main/peer-home/mutation-kept/memory-peaks.tsv" 2>/dev/null || true) 行，没有键「$MUTATION_SHARD_PEER_WRAPPER_KEY」那一行"
@@ -694,30 +782,20 @@ FAKE_LLVM
   expect "① 第二台那一份起 cargo 用 mutation-kept 下变异复跑自己的崩溃判定库家目录" \
     "$(grep -qF '起 cargo 时的崩溃判定库家目录：GATE_MUTATION_CRASH_LIBRARY_HOME 设的那一份' "$(dirname "$main_logs")/peer.log" 2>/dev/null; echo $?)" \
     "第二台那一份的输出里崩溃判定库家目录那一行：$(grep -h '崩溃判定库家目录' "$(dirname "$main_logs")/peer.log" 2>/dev/null | head -1)"
-  local local_records_directory
-  local_records_directory="$(scene_environment main env GATE_MUTATION_MEMORY_CAP_RUNNER="$work/main/repo/scripts/hosts/run-with-memory-cap.sh" \
-    python3 "$work/main/repo/scripts/mutation/crates-mutation-rows.py" records-directory "$work/main/repo")"
+  local local_library
+  local_library="$(scene_environment main python3 "$work/main/repo/scripts/mutation/crates-mutation-rows.py" library-directory "$work/main/repo")"
   expect "② import 拒了行键对不上的那一条、逐条列出" \
-    "$(grep -q "拒了 1 条另一台的判定库记录" "$main_stderr" && grep -q "mutation.$planted_key：文件名与记录里的类别、行键对不上" "$main_stderr"; echo $?)" \
+    "$(grep -q "拒了 1 条另一台的判定库记录" "$main_stderr" && grep -q "records/$planted_key：文件名与记录里的键对不上" "$main_stderr"; echo $?)" \
     "stderr 里导入那几行：$(grep -A2 '导入：' "$main_stderr" | head -3 | tr '\n' ' ')"
-  local covered_records=0 uncovered_records="" record_file
-  for record_file in "$local_records_directory"/mutation.*; do
-    [[ -f "$record_file" ]] || continue
-    grep -qx 'verdict=caught' "$record_file" || continue
-    local coverage_identity
-    coverage_identity="$(sed -n 's/^coverage=//p' "$record_file")"
-    if [[ -n "$coverage_identity" && -f "$local_records_directory/coverage/$coverage_identity.json.gz" ]]; then
-      covered_records=$((covered_records + 1))
-    else
-      uncovered_records+=" ${record_file##*/}"
-    fi
-  done
-  expect "① 第二台判的行连同覆盖记录导入：本机 6 条抓到的记录都指到一份在的覆盖记录，最后那一趟一组覆盖都没补记" \
-    "$([[ "$covered_records" == 6 && -z "$uncovered_records" ]] && grep -q '判定库记录：.*补记覆盖 0 组' "$main_stderr"; echo $?)" \
-    "指到覆盖记录的 $covered_records 条，没指到的「$uncovered_records」；判定库记录行：$(grep '判定库记录：' "$main_stderr" | tail -1 | cut -c1-120)"
-  expect "② 本机记录目录里那一行的记录不是拒掉的那一条" \
-    "$(! grep -q "row_key=$bogus_key" "$local_records_directory/mutation.$planted_key" 2>/dev/null; echo $?)" \
-    "$local_records_directory/mutation.$planted_key 里是那条预先放的"
+  local caught_records coverage_records
+  caught_records="$(grep -lx 'verdict=caught' "$local_library"/records/* 2>/dev/null | wc -l)"
+  coverage_records="$(find "$local_library/coverage" -maxdepth 1 -name '*.json.gz' 2>/dev/null | wc -l)"
+  expect "① 第二台判的行连同覆盖记录导入：本机库里 6 条抓到的记录、6 份覆盖记录（6 条点名测试各一份），最后那一趟一份覆盖都没补记" \
+    "$([[ "$caught_records" == 6 && "$coverage_records" == 6 ]] && grep -q '覆盖：这一趟记了 0 份' "$main_stderr"; echo $?)" \
+    "抓到的记录 $caught_records 条、覆盖记录 $coverage_records 份；覆盖那一行：$(grep '覆盖：这一趟' "$main_stderr" | tail -1 | cut -c1-120)"
+  expect "② 本机库里那一行的记录不是拒掉的那一条" \
+    "$(! grep -q "row_key=$bogus_key" "$local_library/records/$planted_key" 2>/dev/null; echo $?)" \
+    "$local_library/records/$planted_key 里是那条另放的"
 
   # ③ 第二台那一份判完 1 条就停
   prepare_scene stopped
@@ -727,13 +805,13 @@ FAKE_LLVM
        && grep -q '复用抓到 4 条.*现跑变异至多 2 条' "$work/stopped/stderr"; echo $?)" \
     "退 $(cat "$work/stopped/exit")；判定库记录行：$(grep '判定库记录：' "$work/stopped/stderr" | tail -1)；第二台：$(grep '第二台那一份：' "$work/stopped/stderr" | tail -1)"
 
-  # ④ 判法版本不同
+  # ④ 构建环境不同（第二台目录的上一层放 .cargo/config.toml）：两台的工具链行不同
   prepare_scene diverged
   mkdir -p "$work/diverged/peer-home/.cargo"
   printf '[build]\nrustflags = ["-Cdebug-assertions"]\n' > "$work/diverged/peer-home/.cargo/config.toml"
   run_stage_in diverged
-  expect "④ 两台判法版本不同：驱动拒、两份都没起、第二台这一趟的树删了" \
-    "$(grep -q '两台算出的判法版本不同' "$work/diverged/stderr" && [[ ! -s "$work/diverged/peer-bin/invocations.log" && "$(peer_run_trees_left diverged)" == 0 ]]; echo $?)" \
+  expect "④ 两台的构建环境不同：驱动拒、两份都没起、第二台这一趟的树删了" \
+    "$(grep -q '两台的工具链行（含构建环境）不同' "$work/diverged/stderr" && [[ ! -s "$work/diverged/peer-bin/invocations.log" && "$(peer_run_trees_left diverged)" == 0 ]]; echo $?)" \
     "stderr：$(grep -E '✗|删' "$work/diverged/stderr" | head -3 | tr '\n' ' ')；第二台留着 $(peer_run_trees_left diverged) 个目录"
   expect "④ 驱动拒了之后 checker-tier-crates-mutation-replay 在本机整张判，判定与单机逐字相同" \
     "$([[ "$(cat "$work/diverged/exit")" == 0 ]] && cmp -s <(verdict_view "$work/single/stdout") <(verdict_view "$work/diverged/stdout"); echo $?)" \
@@ -825,6 +903,34 @@ FAKE_LLVM
     "$([[ "$gpu_problem" == *'显存不够'* && "$gpu_problem" == *'不算结果'* && "$slice_problem" == *'内存包装自己的结局'* && -z "$done_problem" ]]; echo $?)" \
     "退 245 报的「$gpu_problem」；退 252 报的「$slice_problem」；退 3 报的「$done_problem」"
 
+  # ⑭ ③ 分行：喂一份 row-plan 的输出——两行要现判、第 3 行锚点失效没键、第 4 行锚点失效而键算得出（数据文件那一类）、第 5 行拒算、第 6 行复用：
+  #    两堆合起来只有第 1、2 行，汇总报拒算 1 行、锚点失效 2 行（弄坏开关 anchor-broken-dispatched 下第 4 行进了一堆）
+  mkdir -p "$work/split"
+  printf '1\t%s\t0\t5.000\t-\n2\t%s\t0\t4.000\t-\n3\t-\t0\t-\tanchor-broken\n4\t%s\t0\t3.000\tanchor-broken\n5\t-\t0\t-\t-\n6\t%s\t1\t2.000\t-\n' \
+    "$(printf 'row-one' | sha256sum | cut -c1-64)" "$(printf 'row-two' | sha256sum | cut -c1-64)" "$(printf 'row-four' | sha256sum | cut -c1-64)" \
+    "$(printf 'row-six' | sha256sum | cut -c1-64)" > "$work/split/plan.tsv"
+  local split_line split_local split_peer
+  split_line="$(mutation_shard_split_plan "$work/split/plan.tsv" "$work/split/local.selection" "$work/split/peer.selection" "$work/split/keys")"
+  split_local="$(tr '\n' ' ' < "$work/split/local.selection" 2>/dev/null)"
+  split_peer="$(tr '\n' ' ' < "$work/split/peer.selection" 2>/dev/null)"
+  expect "⑭ ③ 分行：锚点失效的行（第五列 anchor-broken，有键没键都算）不进两堆、单报几行" \
+    "$([[ "$(sort -n "$work/split/local.selection" "$work/split/peer.selection" | tr '\n' ' ')" == "1 2 " && "$split_line" == "6 2 4 3.5 1 5 1 4 1 2" ]]; echo $?)" \
+    "本机「$split_local」第二台「$split_peer」；汇总「$split_line」"
+
+  # ⑬ 第二台缺 llvm-tools（MUTATION_SHARD_PEER_LLVM_TOOLS 指一个空目录）：驱动直接起，分行之前先查，报一行、退 0、不分给它，第二台这一趟的目录没建
+  prepare_scene nollvm
+  mkdir -p "$work/nollvm/empty-llvm"
+  local nollvm_exit
+  if scene_environment nollvm env MUTATION_SHARD_PEER_LLVM_TOOLS="$work/nollvm/empty-llvm" bash "$work/nollvm/repo/scripts/mutation/mutation-shard-run.sh" "$work/nollvm/repo" \
+       > "$work/nollvm/driver.out" 2>&1; then
+    nollvm_exit=0
+  else
+    nollvm_exit=$?
+  fi
+  expect "⑬ 第二台缺 llvm-tools：分片前先查，报一行第二台缺 llvm-tools、退 0、不分给它，第二台这一趟的目录没建" \
+    "$([[ "$nollvm_exit" == 0 && "$(grep -c '第二台缺 llvm-tools' "$work/nollvm/driver.out")" == 1 && ! -d "$work/nollvm/peer-home/mutation-runs" && ! -s "$work/nollvm/peer-bin/invocations.log" ]]; echo $?)" \
+    "退 $nollvm_exit；输出：$(tail -3 "$work/nollvm/driver.out" | tr '\n' ' ')"
+
   # ⑫ 跑完不留：外面的临时目录里没多出 singlefs-mutation-replay-*，自证自己的 tmp/ 下也一个不剩
   local outside_after outside_new inside_left
   outside_after="$(compgen -G "$outside_temporary/singlefs-mutation-replay-*" | sort || true)"
@@ -844,7 +950,7 @@ FAKE_LLVM
     echo "     → 怎么办：设了 MUTATION_SHARD_RUN_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看驱动与 scripts/hosts/peer-host-lib.sh"
     return 1
   fi
-  echo "  ✓ mutation-shard-run.sh 自证 $checked 格都对（两台各判一份、拷回核过再导入（连同覆盖记录）、最后一趟全部复用且判定与单机逐字相同、第二台中途停了补跑、行键对不上被拒、判法版本与工具链不同就拒、收到 TERM 先停两份、场景跑完不留 singlefs-mutation-replay-*、配置没开双机就报双机：关不分、环境变量开不了双机、弄坏开关设在自证之外驱动与门禁都拒、第二台那一份退 245 报显存不够）"
+  echo "  ✓ mutation-shard-run.sh 自证 $checked 格都对（两台各判一份、第二台判出的记录连同覆盖记录当场拷回核过再并进本机那一份库、第二台不留长期库、最后一趟全部复用且判定与单机逐字相同、第二台中途停了补跑、行键对不上被拒、判法单元指纹与工具链（含构建环境）不同就拒、第二台缺 llvm-tools 不分片、收到 TERM 先停两份、场景跑完不留 singlefs-mutation-replay-*、配置没开双机就报双机：关不分、环境变量开不了双机、弄坏开关设在自证之外驱动与门禁都拒、第二台那一份退 245 报显存不够、锚点失效的行不分给第二台）"
 }
 
 if [[ "${1:-}" == --selftest ]]; then

@@ -1,0 +1,24 @@
+
+running 1 test
+test mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::a_candidate_roots_two_slot_placement_exempts_its_second_slot_from_an_abandoned_roots_placement ... FAILED
+
+failures:
+
+---- mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::a_candidate_roots_two_slot_placement_exempts_its_second_slot_from_an_abandoned_roots_placement stdout ----
+
+thread 'mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::a_candidate_roots_two_slot_placement_exempts_its_second_slot_from_an_abandoned_roots_placement' (2706251) panicked at crates/singlefs-core/src/mount.rs:10241:9:
+起点 + 1 被候选根（mkfs 那一版）的实例表 (起点, 跨 2) 罩着：不隔离
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::a_candidate_roots_two_slot_placement_exempts_its_second_slot_from_an_abandoned_roots_placement
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 268 filtered out; finished in 0.01s
+
+
+--- stderr ---
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s3/tree/crates/singlefs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.80s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/target/debug/deps/singlefs_core-5c6a767bd9164a51)
+error: test failed, to rerun pass `-p singlefs-core --lib`

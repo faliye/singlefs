@@ -1,3 +1,0 @@
-ATK scan /home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/scan-proto/inputs/v4-trailing-comment-with-fn-in-a-signature.rs found=1
-ATK scan   收叫停的是这六层，连同没编进 gpu 特性时那一份 judge_my_blocks_on_gpu（多一层少一层、参数换了名字都要回来看这条用例罩没罩到），读到的是 [("外面定", "stop_is_requested"), ("check_pending_blocks_in_pieces", "stop_is_req
-ATK scan /home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/scan-proto/inputs/v5-attribute-line-before-a-layer.rs found=0

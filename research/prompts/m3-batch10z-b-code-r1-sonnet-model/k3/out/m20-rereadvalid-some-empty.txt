@@ -1,8 +1,0 @@
-ok ['m20-rereadvalid-some-empty']
-## lib rc=0 :: test result: ok. 200 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s 
-## newfile rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.47s 
-## credential rc=0 :: test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s 
-## slotbad rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.32s 
-## onepass rc=0 :: test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 60.34s 
-ok ['m20-rereadvalid-some-empty', 'restore']
-done

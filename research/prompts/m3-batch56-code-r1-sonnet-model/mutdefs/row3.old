@@ -1,1 +1,0 @@
-        .fold(tree_identifier_watermark_of_the_current_version, u64::max)

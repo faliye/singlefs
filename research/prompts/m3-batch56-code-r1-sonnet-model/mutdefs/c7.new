@@ -1,2 +1,0 @@
-        let lineage_or_retirement_container_holds_a_record =
-            record_count > 0 || knob_records_per_container.is_none();

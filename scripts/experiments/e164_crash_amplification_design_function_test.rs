@@ -37,6 +37,7 @@ const F12_STRICT_DESIGN: &str = include_str!("e164_crash_amplification_design_fu
 const F12_WRITINGS: &str = include_str!("e164_crash_amplification_design_function_test/f12_writings.rs");
 
 /// 仓根：`E164_REPOSITORY_ROOT` 设了就用它（mutate.sh 只拷 research/，副本里没有 .git 与 crates/），否则取装置往上两层。
+/// `repository`、`variants` 两个子命令与单测 frozen_file_name_scan_covers_every_commit 读的就是真仓，单元键照旧把这里当运行期路径拒算（不改成取环境变量或当前目录）。
 pub fn repository_root() -> PathBuf {
     if let Ok(root) = std::env::var("E164_REPOSITORY_ROOT") {
         return PathBuf::from(root);
@@ -1564,7 +1565,7 @@ mod json {
             }
         }
 
-        pub fn items(&self) -> &[JsonValue] {
+        pub fn array_items(&self) -> &[JsonValue] {
             match self {
                 JsonValue::Array(items) => items,
                 JsonValue::Null | JsonValue::Boolean(_) | JsonValue::Number(_) | JsonValue::Text(_) | JsonValue::Object(_) => &[],
@@ -2951,13 +2952,13 @@ mod repository_scans {
             return Err(String::from_utf8_lossy(&output.stderr).lines().take(3).collect::<Vec<&str>>().join(" / "));
         }
         let metadata = parse_json(&String::from_utf8_lossy(&output.stdout));
-        let members: BTreeSet<String> = metadata.field("workspace_members").items().iter().filter_map(|member| member.text().map(str::to_string)).collect();
+        let members: BTreeSet<String> = metadata.field("workspace_members").array_items().iter().filter_map(|member| member.text().map(str::to_string)).collect();
         let mut packages = BTreeMap::new();
-        for package in metadata.field("packages").items() {
+        for package in metadata.field("packages").array_items() {
             let identifier = package.field("id").text().expect("包有 id").to_string();
             let manifest_path = PathBuf::from(package.field("manifest_path").text().expect("包有 manifest_path"));
-            let has_build_script = package.field("targets").items().iter().any(|target| {
-                target.field("kind").items().iter().any(|kind| kind.text() == Some("custom-build"))
+            let has_build_script = package.field("targets").array_items().iter().any(|target| {
+                target.field("kind").array_items().iter().any(|kind| kind.text() == Some("custom-build"))
             });
             packages.insert(
                 identifier.clone(),
@@ -2970,16 +2971,16 @@ mod repository_scans {
             );
         }
         let mut dependencies = BTreeMap::new();
-        for node in metadata.field("resolve").field("nodes").items() {
+        for node in metadata.field("resolve").field("nodes").array_items() {
             let identifier = node.field("id").text().expect("节点有 id").to_string();
             let edges = node
                 .field("deps")
-                .items()
+                .array_items()
                 .iter()
                 .map(|edge| {
                     let kinds = edge
                         .field("dep_kinds")
-                        .items()
+                        .array_items()
                         .iter()
                         .map(|kind| match kind.field("kind") {
                             JsonValue::Text(text) if text == "dev" => DependencyKind::Development,

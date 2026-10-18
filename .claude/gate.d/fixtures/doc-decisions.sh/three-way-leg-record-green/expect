@@ -1,0 +1,4 @@
+exit=0
+want=依据里写了「三方」的条目都有腿况记录：扫 1 份决策、6 条依据条目，写了「三方」的 4 条（指到存在的材料 1 条，写明腿况缺失 2 条，挂账 1 条）
+want=  three-way-leg-record：绿
+want=doc-decisions.sh：1 格里 1 格绿（three-way-leg-record）

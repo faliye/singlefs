@@ -1,5 +1,0 @@
-mod card_pool {
-    #[allow(non_upper_case_globals)] pub const std: u8 = 0;
-    pub fn f() -> bool { std::panic::catch_unwind(|| 1).is_ok() }
-}
-fn main() { println!("{}", card_pool::f()); }

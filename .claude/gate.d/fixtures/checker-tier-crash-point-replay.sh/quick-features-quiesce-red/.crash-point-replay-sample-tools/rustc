@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
-# checker-tier-crash-point-replay 判别力样本的假 rustc：-V、-Vv 打版本，别的退 0
-[[ "${1:-}" == -V || "${1:-}" == -Vv ]] && echo "rustc 0.0.0-crash-point-replay-sample"
+# checker-tier-crash-point-replay 判别力样本的假 rustc：-V、-Vv 打版本；-vV 另打 host（快档按条复用的单元键要工具链那几行），别的退 0
+case "${1:-}" in
+  -V|-Vv) echo "rustc 0.0.0-crash-point-replay-sample" ;;
+  -vV) printf '%s\n' "rustc 0.0.0-crash-point-replay-sample" "host: x86_64-unknown-linux-gnu" "release: 0.0.0" ;;
+esac
 exit 0

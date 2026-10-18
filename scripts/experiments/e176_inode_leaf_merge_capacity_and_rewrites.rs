@@ -458,7 +458,7 @@ impl StreamingSha256 {
         Self { hash_words: SHA256_INITIAL_HASH, pending_block: [0; 64], pending_bytes: 0, total_bytes: 0 }
     }
 
-    pub fn update(&mut self, bytes: &[u8]) {
+    pub fn absorb_bytes(&mut self, bytes: &[u8]) {
         self.total_bytes += u64::try_from(bytes.len()).expect("一次喂的字节数装得进 u64");
         for byte in bytes {
             self.pending_block[self.pending_bytes] = *byte;
@@ -514,11 +514,11 @@ impl StreamingSha256 {
     pub fn hexadecimal_digest(&self) -> String {
         let mut finishing = self.clone();
         let bit_length = self.total_bytes * 8;
-        finishing.update(&[0x80]);
+        finishing.absorb_bytes(&[0x80]);
         while finishing.pending_bytes != 56 {
-            finishing.update(&[0]);
+            finishing.absorb_bytes(&[0]);
         }
-        finishing.update(&bit_length.to_be_bytes());
+        finishing.absorb_bytes(&bit_length.to_be_bytes());
         assert_eq!(finishing.pending_bytes, 0, "补齐之后正好一整块");
         finishing.hash_words.iter().fold(String::new(), |mut text, word| {
             write!(text, "{word:08x}").expect("写进 String 不会失败");
@@ -997,7 +997,7 @@ fn apply_operation(run: &mut ArmRun, operation: Operation, sequence_name: &str, 
             (StepOutcome::Unlinked(operation, content, position), rewrites.content_rewritten_positions)
         }
     };
-    run.hasher.update(&operation.fingerprint_bytes());
+    run.hasher.absorb_bytes(&operation.fingerprint_bytes());
     run.trajectory.operations_accepted += 1;
     let third_sentence_false_pairs = check_structure_after_publish(&run.tree, &touched_positions).unwrap_or_else(|violation| {
         panic!("F4 丙类断言红：序列 {sequence_name} 臂 {} 第 {} 个操作 {operation:?}：{violation}", run.variant.name, step + 1)
@@ -2138,7 +2138,7 @@ mod tests {
 
     fn one_shot_digest(bytes: &[u8]) -> String {
         let mut hasher = StreamingSha256::new();
-        hasher.update(bytes);
+        hasher.absorb_bytes(bytes);
         hasher.hexadecimal_digest()
     }
 
@@ -2150,7 +2150,7 @@ mod tests {
         assert_eq!(one_shot_digest(two_blocks), "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
         let mut in_pieces = StreamingSha256::new();
         for piece in two_blocks.chunks(9) {
-            in_pieces.update(piece);
+            in_pieces.absorb_bytes(piece);
         }
         assert_eq!(in_pieces.hexadecimal_digest(), one_shot_digest(two_blocks), "分块喂与一次喂同一个摘要");
     }
@@ -2453,8 +2453,18 @@ mod tests {
     }
 }
 
+/// 准入用的仓根：环境变量 SINGLEFS_REPOSITORY_ROOT，没设取当前目录（replay.sh 与实验页的命令都在仓根起）；不取「清单目录/../..」（单元键把它当运行期路径拒算）。
 fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+    let root = std::env::var_os("SINGLEFS_REPOSITORY_ROOT")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_default();
+    if !root.join(".claude/singlefs-ai-sop/scripts/preflight.py").is_file() {
+        eprintln!("  ✗ {} 不是仓根（下面没有 .claude/singlefs-ai-sop/scripts/preflight.py），判不了准入", root.display());
+        eprintln!("  → 怎么办：在仓根起这个装置，或设 SINGLEFS_REPOSITORY_ROOT=<仓根>");
+        std::process::exit(78);
+    }
+    root
 }
 
 fn preflight() {

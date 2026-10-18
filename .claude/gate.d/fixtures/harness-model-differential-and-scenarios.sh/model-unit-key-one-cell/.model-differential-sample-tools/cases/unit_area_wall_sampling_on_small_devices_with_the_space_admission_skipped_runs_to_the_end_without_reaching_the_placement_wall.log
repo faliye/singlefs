@@ -1,0 +1,6 @@
+running 1 test
+── 随机历史：小盘上逼近单元区墙的取样点 ──
+  模型对拍 4749 步：该拒而拒 1、区间里拒 0、该成而成 4748（样本）
+test unit_area_wall_sampling_on_small_devices_with_the_space_admission_skipped_runs_to_the_end_without_reaching_the_placement_wall ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.00s

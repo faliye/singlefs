@@ -1,9 +1,0 @@
-
-running 1 test
-test m3_crates_vs_e176_model ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 17.47s
-
-   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-core)
-    Finished `release` profile [optimized + debuginfo] target(s) in 15.47s
-     Running tests/probe_m3_oracle.rs (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/target-rel/release/deps/probe_m3_oracle-dd10dd66e96297b8)

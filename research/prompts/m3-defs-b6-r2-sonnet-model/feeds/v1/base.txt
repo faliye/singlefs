@@ -1,6 +1,0 @@
-开工先读 `.claude/agent-common.md`。
-重型测试：不跑
-预计挂钟：2 小时内
-草稿目录：/home/fy5090/.local/share/singlefs/work/m3-defs-b6-r2-sonnet/fake-scratch/
-报告：/home/fy5090/.local/share/singlefs/work/m3-defs-b6-r2-sonnet/fake-scratch/report.md
-活：把 records 里一张表的行数数一遍，交回数。

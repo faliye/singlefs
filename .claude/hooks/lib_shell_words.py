@@ -19,6 +19,9 @@ python 的选项照解释器的语义切（python_invocation）：短选项可�
 （弄坏开关 LIB_SHELL_WORDS_BREAK=python-options-by-dash 退回「以 - 开头的词都当选项跳过、第一个不以 - 开头的词当脚本」，哪几份自证的哪几项红见「弄坏开关」一段），
 数组赋值 `名字=(…)`（元素是值，不当命令）、`command -v` / `-V`（查名字，后面那个词不当命令），
 以及 cd / pushd 换目录、export / unset 改变量对后面命令的影响。喂给非 shell 命令的 heredoc 正文每一层都先剥掉。
+cd / pushd / env -C 的目录里写成变量的，同一段命令文本里前面赋过的（单独成一条的 `名字=值`、export、local / declare 这类）与 `$HOME`、`~` 先展开再判
+（expand_known_variables；记下的值交在 CommandAtPosition.variables，调用方拿它展开别的参数）；展开不了的（没在这段文本里赋值、for / select / read / unset 改写过、
+`$(…)`、`${名字:-默认}` 这类写法）照旧认不出：cd 之后的目录是 None，env -C 照外面的当前目录。
 剥掉的 heredoc 正文与输出重定向挂回它所在的那条命令（CommandAtPosition 的 standard_input_heredocs、output_redirections）：
 要认「同一条命令里先由 heredoc 写出文件、再执行它」的 hook 从这两格读，不自己再切一遍。重定向前的 fd 号切词时丢掉了，`2> 文件` 与 `> 文件` 分不开。
 剥掉包装之后命令词是一个脚本时，记下它是怎么起的（launcher：bash / sh 这类后面跟的、source / . 读进来的、python3 后面跟的）；
@@ -31,8 +34,10 @@ detached-run.sh 的参数先照它的 preflight 摘掉每一个 `--force`（连 
 判不到的：变量里拼出来的命令、eval、`<<<` 喂给 shell 的字符串、进程替换的输出再交给 shell 执行（`bash <(…)`、`source <(…)`，括号里的命令照判，它打印出来的不判）、Makefile 与 xargs 起的命令；
 喂给 shell 的 heredoc 正文里引号没配对时，其后的切词会错；heredoc 挂的命令从上一行续行过来时认不出它喂给谁（当数据剥掉）；heredoc 挂在命令替换或进程替换里面的命令上（`$(bash <<EOF`、`<(bash <<EOF`）认不出它喂给 shell（当数据剥掉）；圆括号子 shell 里的 cd 与 export 当成对后面的命令也生效；
 命令替换与进程替换里的命令按替换所在那条命令开始时的目录与 export 判（替换里的 cd 不影响外面）。
+变量展开判不到的：值从上一条 Bash、source 进来的文件、eval 来的（目录照旧认不出）；单引号里的 `$名字` 照样展开（引号在切词时已去掉，分不出）；
+bash -c 的那段代码按外层记下的全部变量展开（没 export 的变量里层真跑时看不到，这里照样展开，判得偏严）；圆括号子 shell 里赋的值当成对后面的命令也生效。
 弄坏开关（LIB_SHELL_WORDS_BREAK，几个用逗号连；只给自证判红用）。这一份没有自己的 --selftest，由导入它的几份的自证判红：
-lib_heavy_tests.py、heavy-test-guard.sh、bash-command-detector.sh、scripts/hosts/detached-run.sh 各自的 --selftest。
+lib_heavy_tests.py、heavy-test-guard.sh、bash-command-detector.sh、scripts/hosts/detached-run.sh 各自的 --selftest（目录变量那两个开关另有 lib_workspace_cargo_lock.py 的 --selftest）。
 逐项写开关名、弄坏哪一处、打开后哪几份自证的哪几项红（项名是那份自证的用例标签，括号里是失败行在标签之后的开头；
 失败行 lib_heavy_tests.py 以「✗ lib_heavy_tests 自检：」起头，heavy-test-guard.sh、bash-command-detector.sh 以「✗ 自检：」起头，
 detached-run.sh 以「✗ 自证格不对：」起头、标签之后不另写期望值；heavy-test-guard.sh 的自证还原样转出 lib_heavy_tests.py 自证的失败行）：
@@ -94,11 +99,13 @@ detached-run.sh 以「✗ 自证格不对：」起头、标签之后不另写期
         env 换目录：-C 换进 checker 档包目录裸跑、-C 贴着目录写、--chdir=目录、--chdir 目录（分两个词）、bash -c 里的 env -C（「应当是 checker-tier-cargo，实际 full-cargo」）
         env 换目录：绝对路径、当前目录在别处、经内存包装（「应当是 checker-tier-cargo，实际 None」）
         env 换目录：换进 harness 档目录裸跑放行、换进不依赖 checker 档包的探针裸跑放行、两个 -C 取最后一个（「应当是 None，实际 full-cargo」）
-      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那十项）：
+        另有「变量目录裸跑：」那一批的「export D 之后经内存包装 env -C $D/checker 档包目录」一格（「应当是 checker-tier-cargo，实际 None」）
+      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那十一项）：
         实现员经内存包装 env -C 换进探针再 cargo test -p 探针自己的包名、env -C 换进 checker 档包目录裸跑、env --chdir=目录换进 checker 档包目录、env --chdir 目录（分两个词）、
         主 agent 不带前缀 env -C 换进链接 checker 档包的探针 cargo run（「应当是 2，实际 0」）
         实现员经内存包装 env -C 换进不依赖 checker 档包的探针裸跑 cargo test：放行（「应当是 0，实际 2」）
         实现员经内存包装 env -iC 合写换进 checker 档包目录 cargo test：照拒、实现员经内存包装 env -S 拆串里先换目录再 cargo test：照拒（「应当是 2，实际 0」）
+        实现员 export D 之后经内存包装 env -C $D/checker 档包目录裸跑：照拒（「应当是 2，实际 0」）
         lib_heavy_tests.py 的自检（「应当是 0，实际 1」）
       bash-command-detector.sh、detached-run.sh 的 --selftest 不红
   LIB_SHELL_WORDS_BREAK=env-option-clusters-unparsed  skip_prefixes() 里 env 的选项退回只认整词 -u / --unset / -C / --chdir：合写的 -iC、-0iu、缩写的 --chd、单独的 - 与 -S / --split-string
@@ -117,6 +124,33 @@ detached-run.sh 以「✗ 自证格不对：」起头、标签之后不另写期
         实现员经内存包装 env -S 拆串里是 checker 档包的 cargo test：照拒、env -S 拆串里先换目录再 cargo test：照拒（「应当是 2，实际 0」）
         lib_heavy_tests.py 的自检（「应当是 0，实际 1」）
       bash-command-detector.sh、detached-run.sh 的 --selftest 不红（同上，未实跑）
+  LIB_SHELL_WORDS_BREAK=directory-variables-unexpanded  expand_known_variables() 遇到 `$` 一律交 None：cd / pushd / env -C 的目录与轻型写法的参数写在变量里的照旧认不出（改前的判法）
+      lib_heavy_tests.py --selftest：
+        变量目录裸跑：D=… 之后 cd $D/checker 档包目录、经内存包装、export D 之后经内存包装 env -C $D/checker 档包目录、cd $HOME/… 指到 checker 档包目录、
+        嵌套变量 D=$B/…、外层赋的变量在 bash -c 里的 cd（「应当是 checker-tier-cargo，实际 None」）
+        变量目录裸跑：cd ${D} 工作区根、经内存包装全量、declare D=… 之后 cd $D 全量（「应当是 full-cargo，实际 None」）
+        轻型：根参数写成前面赋过值的变量、根参数写成 $HOME/…（「应当是 None，实际 verus-stage」「应当是 None，实际 crates-mutation-stage」）
+      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那九项）：
+        实现员 D=… 之后 cd $D/checker 档包目录、经内存包装裸跑 cargo test：照拒、实现员 cd ${D} 工作区根、经 timeout、nice、capped.sh、内存包装四层全量：照拒、
+        实现员 export D 之后经内存包装 env -C $D/checker 档包目录裸跑：照拒、实现员 cd $HOME/… 指到 checker 档包目录、经内存包装裸跑：照拒、
+        主 agent 不带前缀 D=… 之后 cd $D 全量：照拒（「应当是 2，实际 0」）
+        调查员 cd 到变量目录、经内存包装起形式化那一道 --quick 根写成同一个变量：放行（「应当是 0，实际 2」）
+        cd 进写在变量里的主工作区再起：拒（转出 lib_workspace_cargo_lock.py 那一格，「应当拒，实际 放行」）
+        lib_heavy_tests.py 的自检、lib_workspace_cargo_lock.py 的自检（「应当是 0，实际 1」）
+      lib_workspace_cargo_lock.py --selftest：
+        cd 进写在变量里的主工作区再起：拒（「应当拒，实际 放行」）
+      bash-command-detector.sh --selftest：
+        通删工作根:D=… 之后 cd $D 进工作根再 rm -rf *、通删工作根:cd $HOME/… 进工作根再 rm -r 第一层部分通配（「应当是 1，实际 0」；后一格只在工作根在家目录下时写成 $HOME）
+        覆盖产物:cd $HOME/… 算得出来、按那个目录解析（仓外，放行）（「应当是 0，实际 1」）
+      detached-run.sh、host-resources-reminder.sh、timer-only-remind-guard.sh、scripts/agents/agent-watch.py、scripts/gate/light-selftest-guard.py 的 --selftest 不红
+  LIB_SHELL_WORDS_BREAK=variable-rebinding-unseen  for / select / read / unset 改写过的变量照旧用之前记下的值（rebind_variables() 与 unset 那一处不记成算不出）
+      lib_heavy_tests.py --selftest：
+        变量目录裸跑：for 改写过的变量照旧认不出（放行）、read 读进来的变量照旧认不出（放行）、unset 之后照旧认不出（放行）（「应当是 None，实际 checker-tier-cargo」）
+      heavy-test-guard.sh --selftest（另转出 lib_heavy_tests.py 那三项）：
+        实现员 for 改写过的变量照旧认不出、经内存包装裸跑：放行（「应当是 0，实际 2」）
+        lib_heavy_tests.py 的自检（「应当是 0，实际 1」）
+      bash-command-detector.sh、lib_workspace_cargo_lock.py、detached-run.sh、host-resources-reminder.sh、timer-only-remind-guard.sh、agent-watch.py、
+      light-selftest-guard.py 的 --selftest 不红
 """
 import os
 import re
@@ -193,13 +227,14 @@ class PythonInvocation(NamedTuple):
 
 class CommandAtPosition(NamedTuple):
     words: list[str]              # words[0] 是命令词（照写的样子，没取 basename），其后是参数
-    directory: str | None         # 跑这条命令时的当前目录；cd 到变量路径之后认不出，是 None
+    directory: str | None         # 跑这条命令时的当前目录；cd 到展开不了的变量路径之后认不出，是 None（能展开的见 expand_known_variables）
     environment: dict[str, str]   # 这条命令看得到的、这段命令文本里设过的变量：前面 export 的、命令前与 env 里写的、外层传进来的
     launcher: str | None = None   # words[0] 是经什么起的脚本："shell"（bash / sh 这类后面跟的）、"source"（source / .）、
                                   # "python"（python3 后面跟的程序）；直接执行的命令（含 capped.sh N 后面那条）是 None
     output_redirections: tuple = ()      # 这一条简单命令上的输出重定向：((运算符, 目标词), …)，运算符是 OUTPUT_REDIRECTS 之一；fd 号不在里面
     standard_input_heredocs: tuple = ()  # 喂给这一条的、被当数据剥掉的 heredoc：(HeredocBody, …)，按出现次序（最后一个才是它读到的标准输入）
     memory_capped: bool = False          # 经 run-with-memory-cap.sh 跑：它自己的包装里有，或外层（bash -c 的那段代码、起它所在脚本的那一条）有
+    variables: dict | None = None        # 跑这条命令时这段命令文本里记下的变量（名字 → 已展开的值，None 是算不出）：调用方拿它给 expand_known_variables 展开参数
 
 
 class ShellScan(NamedTuple):
@@ -458,12 +493,15 @@ def env_chdir_ignored():
     return "env-chdir-ignored" in os.environ.get("LIB_SHELL_WORDS_BREAK", "").split(",")
 
 
-def env_directory(directory, target):
-    """env -C 的目标解开成绝对路径：相对路径按命令开始时的当前目录。目标带变量、命令替换或当前目录认不出时交 directory 原样（照旧按外面的当前目录判，
-    不像 cd 那样交 None：交 None 会让这一条命令的目录类判定全部放过，比改前还松；罩不住的：env -C 的目录写在变量里）。"""
+def env_directory(directory, target, variables=None):
+    """env -C 的目标解开成绝对路径：相对路径按命令开始时的当前目录。目标里的变量照 expand_known_variables 展开（variables 是这段命令文本里前面赋过的）；
+    展开不了（没赋过的变量、命令替换）或当前目录认不出时交 directory 原样（照旧按外面的当前目录判，
+    不像 cd 那样交 None：交 None 会让这一条命令的目录类判定全部放过，比改前还松；罩不住的：env -C 的目录写在展开不了的变量里）。"""
     expanded = os.path.expanduser(target)
     if "$" in expanded or "`" in expanded:
-        return directory
+        expanded = expand_known_variables(expanded, variables or {})
+        if expanded is None:
+            return directory
     return resolve_path(directory, expanded) or directory
 
 
@@ -793,22 +831,91 @@ def detached_run_start_command(arguments):
     return None
 
 
-def changed_directory(directory, arguments):
-    """cd / pushd 之后的当前目录；目标是 `-` 或变量、命令替换时认不出，交 None。"""
+# 目录词里认的变量引用：`$名字`、`${名字}`；别的写法（`${名字:-默认}`、`$1`、`$$`、`$(…)`）不认，留着的 `$` 算展开不了
+VARIABLE_REFERENCE = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
+# 改写变量、改成什么这里算不出的命令：for / select 的循环变量、read 读进来的（unset 在 commands_at_command_position 里另记）
+REBINDING_COMMANDS = {"for", "select", "read"}
+# 声明命令：参数里的 `名字=值` 照赋值记
+DECLARATION_COMMANDS = {"local", "declare", "typeset", "readonly"}
+
+
+def directory_variables_unexpanded():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=directory-variables-unexpanded：cd / pushd / env -C 的目录带 `$` 一律展开不了（改前的判法，只给自检证红用）。"""
+    return "directory-variables-unexpanded" in os.environ.get("LIB_SHELL_WORDS_BREAK", "").split(",")
+
+
+def variable_rebinding_unseen():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=variable-rebinding-unseen：for / select / read / unset 改写过的变量照旧用之前记下的值（只给自检证红用）。"""
+    return "variable-rebinding-unseen" in os.environ.get("LIB_SHELL_WORDS_BREAK", "").split(",")
+
+
+def expand_known_variables(word, variables):
+    """词里的 `$名字`、`${名字}` 换成值：先查 variables（这段命令文本里前面赋过的，值已经展开；值是 None 的是改写过、算不出的），
+    查不到的只认 HOME（取钩子进程自己的环境：钩子与它判的命令是同一个用户起的）。有一处展开不了（没赋过的变量、算不出的值、别的写法、命令替换、反引号）交 None。
+    弄坏开关 LIB_SHELL_WORDS_BREAK=directory-variables-unexpanded 下带 `$` 的一律交 None。"""
+    if "`" in word:
+        return None
+    if "$" not in word:
+        return word
+    if directory_variables_unexpanded():
+        return None
+    unexpanded = []
+    def replace(match):
+        name = match.group(1) or match.group(2)
+        value = variables[name] if name in variables else (os.environ.get("HOME") if name == "HOME" else None)
+        if value is None:
+            unexpanded.append(name)
+            return match.group(0)
+        return value
+    expanded = VARIABLE_REFERENCE.sub(replace, word)
+    return None if unexpanded or "$" in expanded else expanded
+
+
+def assigned_value(value, variables):
+    """`名字=值` 赋进去的是什么：开头的 `~` 展开，变量照 expand_known_variables 展开；展开不了交 None（记成算不出）。"""
+    return expand_known_variables(os.path.expanduser(value), variables)
+
+
+def rebind_variables(name, arguments, variables):
+    """会改写变量的命令记进 variables：local / declare 这类声明里的 `名字=值` 照赋值记；for / select 的循环变量、read 读进来的几个名字记成 None（算不出）。
+    弄坏开关 LIB_SHELL_WORDS_BREAK=variable-rebinding-unseen 下只记声明里的赋值。"""
+    if name in DECLARATION_COMMANDS:
+        for argument in arguments:
+            assignment = ASSIGNMENT.match(argument)
+            if assignment:
+                variables[assignment.group(1)] = assigned_value(assignment.group(2), variables)
+        return
+    if variable_rebinding_unseen():
+        return
+    names = arguments[:1] if name in ("for", "select") else [argument for argument in arguments if not argument.startswith("-")]
+    for argument in names:
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", argument):
+            variables[argument] = None
+
+
+def changed_directory(directory, arguments, variables=None):
+    """cd / pushd 之后的当前目录。目标里的变量照 expand_known_variables 展开（variables 是这段命令文本里前面赋过的；不给时只认 HOME）；
+    目标是 `-`、展开不了的变量或命令替换时认不出，交 None。"""
     targets = [argument for argument in arguments if not argument.startswith("-") or argument == "-"]
     if not targets:
         return os.path.expanduser("~")
     target = os.path.expanduser(targets[0])
-    if target == "-" or "$" in target or "`" in target:
+    if target == "-":
+        return None
+    target = expand_known_variables(target, variables or {})
+    if target is None:
         return None
     return resolve_path(directory, target)
 
 
-def commands_at_command_position(text, directory=None, environment=None, depth=0, stripped_heredocs=None, memory_capped=False):
+def commands_at_command_position(text, directory=None, environment=None, depth=0, stripped_heredocs=None, memory_capped=False, variables=None):
     """整段命令文本里命令位置上的每一条命令（前缀与包装剥掉、cd 与 export 跟着走），连同各层的放后台与输出重定向写法。
     stripped_heredocs 是递归时往里传的、各层剥掉的 heredoc 正文（记号里的下标指向它），调用方不用给。
     memory_capped：这段文本整个跑在 run-with-memory-cap.sh 里（它是经它起的脚本的正文）；每条命令的 memory_capped 从它起算。
-    喂给 shell 的 heredoc 正文当同一段文本里的后续命令切，挂 heredoc 的那条命令上的包装不算在正文的命令上。"""
+    喂给 shell 的 heredoc 正文当同一段文本里的后续命令切，挂 heredoc 的那条命令上的包装不算在正文的命令上。
+    variables：cd / pushd / env -C 的目录里展开变量用的值（名字 → 已展开的值，None 是算不出），递归时往里传，调用方不用给；不给时从 environment 起算。
+    单独成一条的 `名字=值`、export、local / declare 这类记进去，for / select / read / unset 改写过的记成算不出（rebind_variables）；
+    命令前的 `名字=值 命令` 不记（只给那一条命令，它的参数也不按它展开）。"""
     if stripped_heredocs is None:
         stripped_heredocs = []
     tokens = shell_tokens(strip_data_heredocs(text, stripped_bodies=stripped_heredocs))
@@ -816,18 +923,31 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
     commands, prefix_names = [], set()
     has_lone_ampersand = (True, "&") in tokens
     exported = dict(environment or {})
+    if variables is None:
+        variables = {}
+        for name, value in exported.items():
+            variables[name] = assigned_value(value, variables)
+    else:
+        variables = dict(variables)
     for words, command_substitutions, command_redirections in zip(simple, substitutions, redirections):
         for substitution in command_substitutions:
             if depth < MAXIMUM_NESTING:
-                inner = commands_at_command_position(substitution, directory, exported, depth + 1, stripped_heredocs, memory_capped)
+                inner = commands_at_command_position(substitution, directory, exported, depth + 1, stripped_heredocs, memory_capped, variables)
                 commands += inner.commands
                 prefix_names |= inner.prefix_names
                 has_lone_ampersand = has_lone_ampersand or inner.has_lone_ampersand
                 output_targets += inner.output_targets
         if not words:
             continue
+        standalone = skip_prefixes(words)
+        if standalone.command_position is None and not standalone.prefix_names:
+            for word in words:
+                assignment = ASSIGNMENT.match(word)
+                if assignment:
+                    variables[assignment.group(1)] = assigned_value(assignment.group(2), variables)
         heredoc_indices = [HEREDOC_BODY_MARKER.match(target) for operator, target in command_redirections if operator in ("<<", "<<-")]
         attached = {
+            "variables": dict(variables),
             "output_redirections": tuple((operator, target) for operator, target in command_redirections if operator in OUTPUT_REDIRECTS),
             "standard_input_heredocs": tuple(stripped_heredocs[int(found.group(1))] for found in heredoc_indices
                                              if found and int(found.group(1)) < len(stripped_heredocs)),
@@ -842,7 +962,7 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
             prefix_names |= skipped.prefix_names
             command_environment.update(skipped.assignments)
             if skipped.chdir is not None:
-                command_directory = env_directory(command_directory, skipped.chdir)
+                command_directory = env_directory(command_directory, skipped.chdir, variables)
             if skipped.command_position is None:
                 break
             remaining = remaining[skipped.command_position:]
@@ -852,21 +972,26 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                     assignment = ASSIGNMENT.match(argument)
                     if assignment:
                         exported[assignment.group(1)] = assignment.group(2)
+                        variables[assignment.group(1)] = assigned_value(assignment.group(2), variables)
                 break
             if name == "unset":
                 for argument in arguments:
                     if not argument.startswith("-"):
                         exported.pop(argument, None)
+                        if not variable_rebinding_unseen():
+                            variables[argument] = None
                 break
             if name in ("cd", "pushd"):
-                directory = changed_directory(directory, arguments)
+                directory = changed_directory(directory, arguments, variables)
                 break
+            if name in REBINDING_COMMANDS or name in DECLARATION_COMMANDS:
+                rebind_variables(name, arguments, variables)
             if name in SHELL_NAMES:
                 invocation = shell_invocation(arguments)
                 if invocation.code_string is not None:
                     if depth < MAXIMUM_NESTING:
                         inner = commands_at_command_position(invocation.code_string, command_directory, command_environment, depth + 1, stripped_heredocs,
-                                                             command_memory_capped)
+                                                             command_memory_capped, variables)
                         commands += inner.commands
                         prefix_names |= inner.prefix_names
                         has_lone_ampersand = has_lone_ampersand or inner.has_lone_ampersand

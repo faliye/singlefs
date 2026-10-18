@@ -1,0 +1,7 @@
+exit=1
+want=依据里写了「三方」而没有腿况记录：3 条
+want=已定项 1：点名的 ghost-forward-output.md 在 research/ 的树里与 git 历史里都找不到
+want=已定项 2：写了「三方」，既没有指到 research/prompts 或 research/results 下存在的判决、材料或腿输出，也没写腿况缺失
+want=已定项 3：写了腿况缺失，却同时写了阴性结论「都没找到」：没有腿况就分不出腿没打中与腿没跑
+want=  three-way-leg-record：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（three-way-leg-record）

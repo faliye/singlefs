@@ -1,0 +1,14 @@
+exit=0
+want=样本档：
+want=「随机历史快档」复用：键相同的判定（
+want=「随机历史：偏向抬 F 之后回退的取样点」复用：键相同的判定（
+want=「随机历史：越过原分配记录墙的取样点」复用：键相同的判定（
+want=「随机历史：小盘上逼近单元区墙的取样点」复用：键相同的判定（
+want=「随机历史：小盘上逼近单元区墙的取样点（空间准入判着）」复用：键相同的判定（
+want=· 单元键：要现判（键对不上（上一次
+want=变了 1 处：变了 fn crates/singlefs-harness/tests/random_histories.rs::reuse_steps）
+want=MODEL_DIFFERENTIAL_SAMPLE cargo-arguments: test --release -p singlefs-harness --test random_histories -- --include-ignored --exact reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms --nocapture
+want=随机历史：偏向抬 F 之后复用的取样点：模型对拍 1183 步
+want=· 判绿记库：RECORD recorded=1 changed=0 refused=0
+want=· 单元键：现判 1、复用 0、拒算 0、本次未跑 0
+want=6 格里 6 格绿

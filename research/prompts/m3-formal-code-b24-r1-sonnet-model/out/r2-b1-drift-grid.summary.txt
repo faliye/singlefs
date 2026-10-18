@@ -1,2 +1,0 @@
-b24-b1 mode=drift cells_built=5867 build_failed=1093 old_test_green=244 new_test_green_(premise_ok)=117 green_cells_where_zero_mutation_red_and_only_some_red=117 green_cells_where_only_some_red_zero_not_red=127 disagreements_between_premise_and_zero_mutation=0 premise_failure_kinds={"PlacementRefused": 127}
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 153.07s

@@ -1,8 +1,0 @@
-E7RESULT name=rollback_demo retirement_tree_at_rollback=carried_from_current select_by_lineage=false retirement_record_carries_death_txg=false resurrected=0 missed=2 missed_inodes=[234, 235]
-E7RESULT name=rollback_demo retirement_tree_at_rollback=carried_from_current select_by_lineage=false retirement_record_carries_death_txg=true resurrected=0 missed=2 missed_inodes=[234, 235]
-E7RESULT name=rollback_demo retirement_tree_at_rollback=carried_from_current select_by_lineage=true retirement_record_carries_death_txg=false resurrected=0 missed=2 missed_inodes=[234, 235]
-E7RESULT name=rollback_demo retirement_tree_at_rollback=carried_from_current select_by_lineage=true retirement_record_carries_death_txg=true resurrected=0 missed=0 missed_inodes=[]
-E7RESULT name=rollback_demo retirement_tree_at_rollback=taken_from_r_old select_by_lineage=false retirement_record_carries_death_txg=false resurrected=0 missed=2 missed_inodes=[234, 235]
-E7RESULT name=rollback_demo retirement_tree_at_rollback=taken_from_r_old select_by_lineage=false retirement_record_carries_death_txg=true resurrected=0 missed=2 missed_inodes=[234, 235]
-E7RESULT name=rollback_demo retirement_tree_at_rollback=taken_from_r_old select_by_lineage=true retirement_record_carries_death_txg=false resurrected=0 missed=0 missed_inodes=[]
-E7RESULT name=rollback_demo retirement_tree_at_rollback=taken_from_r_old select_by_lineage=true retirement_record_carries_death_txg=true resurrected=0 missed=0 missed_inodes=[]

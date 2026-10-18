@@ -1,4 +1,0 @@
-ok ['m23-prebatch-raise-reads-disk']
-## lr3full rc=0 :: test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.00s 
-ok ['m23-prebatch-raise-reads-disk', 'restore']
-done

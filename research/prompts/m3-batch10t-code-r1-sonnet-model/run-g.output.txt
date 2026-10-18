@@ -1,3 +1,0 @@
-PROBE_G free=1000 capacity=[0] registered=Ok(()) registered_flag=Ok(true) booking_of_1=Err(NeedLargerThanEveryCard(NeedLargerThanEveryCard { need_mebibytes: 1, largest_capacity_mebibytes: 0 }))
-PROBE_G free=0 capacity=[0] registered=Ok(()) registered_flag=Ok(true) booking_of_1=Err(NeedLargerThanEveryCard(NeedLargerThanEveryCard { need_mebibytes: 1, largest_capacity_mebibytes: 0 }))
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 8.07s

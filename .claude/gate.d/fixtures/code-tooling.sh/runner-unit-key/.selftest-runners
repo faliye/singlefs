@@ -1,0 +1,4 @@
+# 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：三条都退 0；上一版只有 c 那一份不同（setup.sh 造），这一版只现判 c
+bash scripts/gate/sample-pass-a.sh --selftest
+python3 scripts/gate/sample-pass-c.py --selftest
+bash scripts/gate/sample-pass-d.sh --selftest

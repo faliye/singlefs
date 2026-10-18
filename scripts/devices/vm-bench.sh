@@ -2,7 +2,14 @@
 # 在 QEMU/KVM 虚机里跑一个静态二进制，并给它一块真实的块设备（/dev/vda）。
 #
 #   vm-bench.sh <静态二进制> [参数...]    跑它，退出码传回宿主
-#   vm-bench.sh --selftest                验证本 harness 能分辨成功与失败
+#   vm-bench.sh --initramfs-manifest <静态二进制> [参数...]
+#                                         不起虚机：照 run_one 同一段代码（stage_initramfs_root）把 initramfs 的根拼进临时目录，打它的清单，打完删掉；
+#                                         另打要用的内核镜像与 QEMU（kernel<TAB><路径>、qemu<TAB><可执行文件的路径>），清单每行前面接 entry<TAB>。
+#                                         门禁 checker-tier-qemu-device-streams 开跑前拿它算每一档的判定键（清单进键，不取 cpio.gz 的哈希：cpio 头里有 mtime）
+#   vm-bench.sh --selftest                验证本 harness 能分辨成功与失败，清单不随 mtime 变、随参数变
+#
+# initramfs 的清单（initramfs_manifest）：根里每个条目一行「<相对路径><TAB><种类 f|l|d><TAB><权限><TAB><内容 sha256，链接写目标，目录写 ->」，按路径的字节序排；
+#   不带 mtime、属主与 inode。run_one 打包之前打一份进工作目录，设了 VM_INITRAMFS_MANIFEST 的另拷一份到那个路径（门禁拿它核开跑前算键用的那一份）。
 #
 # 虚机装置归项目：共享门禁不带虚机装置（.claude/singlefs-ai-sop/rules/show-me-test.md「最终判据是 QEMU/KVM 压测」）。
 # 挂几块盘、塞什么二进制、结果怎么抓，都跟被测对象绑在一起；索引 benchmark 要量的就是块设备行为，没有盘就没有被测对象。
@@ -14,6 +21,8 @@
 # （自证的例没有标签，项名直接写那条「✗」失败行的句首，括号里写那一行接着报的）：
 #   VM_BENCH_BREAK=keepselftestscratch  --selftest 建好桩程序目录之后不挂 EXIT 的 trap（读不到退出标记、die 退出时桩程序目录与日志指针不删）
 #       「读不到退出标记那条路（die）没走到或临时目录没删」（按代码推的、没跑过：「：子进程退出码 …，TMPDIR 里留下「singlefs-vmself.……」」，留下的是没删的桩程序目录）
+#   VM_BENCH_BREAK=manifest-with-mtime  initramfs 的清单每行另带文件的 mtime（换成按 cpio 包取摘要那种口径）
+#       「清单随 mtime 变了」（按代码推的、没跑过：同一份桩程序、中间 touch 一下，两份清单不同）
 set -uo pipefail
 
 VM_MEM="${VM_MEM:-2048}"
@@ -44,13 +53,11 @@ find_kernel() {
 # 它只能继承已经存在的变量，且它对变量的赋值传不回来——所以走文件，不走变量。
 VM_WORKLIST="${VM_WORKLIST:-}"
 
-# 跑一次。stdout 回显退出码；控制台日志路径留在 VM_LOG。
-run_one() {
+# initramfs 的根：busybox 与它的全部链接名、被测二进制当 /bench、VM_EXTRA_ROOT 的内容、args 与 devs 两个小文件、/init。
+# run_one 与 --initramfs-manifest 共用这一段（门禁按清单算键，跑的就是同一份根）。
+stage_initramfs_root() { # stage_initramfs_root <根目录> <静态二进制> [参数...]
+  local ird="$1"; shift
   local bin="$1"; shift
-  local kernel="$1"; shift
-  local work ird pidf logf disk
-  work="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmbench.XXXXXX")"
-  ird="$work/irfs"; pidf="$work/qemu.pid"; logf="$work/console.log"; disk="$work/disk.img"
   mkdir -p "$ird"/{bin,proc,sys,dev}
   cp "$(command -v busybox)" "$ird/bin/busybox"
   ( cd "$ird/bin" && ./busybox --list | while read -r a; do ln -sf busybox "$a"; done ) 2>/dev/null || true
@@ -59,21 +66,12 @@ run_one() {
   # （E152（按里程碑对比六家文件系统的文件性能） 要的 fio、各家用户态、依赖库、解压过的模块）。
   [[ -n "${VM_EXTRA_ROOT:-}" ]] && cp -a "$VM_EXTRA_ROOT"/. "$ird"/
   printf '%s\n' "$*" > "$ird/args"
-  # N 块盘：disk.img / disk1.img …；来宾侧设备名按 virtio 顺序 vda vdb vdc …
+  # N 块盘：来宾侧设备名按 virtio 顺序 vda vdb vdc …（盘镜像由 run_one 建）
   local d devs=""
   for ((d=0; d<VM_DISKS; d++)); do
-    # VM_DISK_PREALLOCATE=1：fallocate 预分配，宿主 ext4 不在来宾写的时候边写边分配（E152 的顺序写要它）。
-    # 预分配失败就不跑这一次，不许悄悄退回稀疏文件——那会换掉被测条件而没人知道。
-    if [[ "${VM_DISK_PREALLOCATE:-0}" == 1 ]]; then
-      fallocate -l "${VM_DISK_MB}M" "$work/disk$d.img" \
-        || { echo "fallocate $work/disk$d.img 失败" >&2; printf '%s\n' "$work" >> "$VM_WORKLIST"; return 1; }
-    else
-      truncate -s "${VM_DISK_MB}M" "$work/disk$d.img"
-    fi
     devs="$devs /dev/vd$(printf "\\$(printf '%03o' $((97+d)))")"
   done
   printf '%s\n' "${devs# }" > "$ird/devs"
-  disk="$work/disk0.img"
 
   cat > "$ird/init" <<'INIT'
 #!/bin/sh
@@ -90,6 +88,44 @@ echo "SINGLEFS_EXIT=$rc"
 /bin/busybox poweroff -f
 INIT
   chmod +x "$ird/init"
+}
+
+# initramfs 根的清单：一行一个条目「<相对路径> 种类 权限 内容 sha256 / 链接目标」（制表符分隔），按路径的字节序排；不带 mtime。
+initramfs_manifest() { # initramfs_manifest <根目录>
+  ( cd "$1" && find . -mindepth 1 -printf '%P\t%y\t%m\t%l\t%T@\n' | LC_ALL=C sort | while IFS=$'\t' read -r path kind mode link modified; do
+      [[ "${VM_BENCH_BREAK:-}" == manifest-with-mtime ]] || modified=""
+      case "$kind" in
+        f) printf '%s\tf\t%s\t%s%s\n' "$path" "$mode" "$(sha256sum "$path" | cut -d' ' -f1)" "${modified:+$'\t'$modified}" ;;
+        l) printf '%s\tl\t-\t%s%s\n' "$path" "$link" "${modified:+$'\t'$modified}" ;;
+        *) printf '%s\t%s\t%s\t-%s\n' "$path" "$kind" "$mode" "${modified:+$'\t'$modified}" ;;
+      esac
+    done )
+}
+
+# 跑一次。stdout 回显退出码；控制台日志路径留在 VM_LOG。
+run_one() {
+  local bin="$1"; shift
+  local kernel="$1"; shift
+  local work ird pidf logf disk
+  work="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmbench.XXXXXX")"
+  ird="$work/irfs"; pidf="$work/qemu.pid"; logf="$work/console.log"; disk="$work/disk.img"
+  stage_initramfs_root "$ird" "$bin" "$@"
+  # 打包之前打清单（门禁按它算键；设了 VM_INITRAMFS_MANIFEST 的另拷一份过去，门禁核它与开跑前算键用的那一份相同）
+  initramfs_manifest "$ird" > "$work/initramfs.manifest"
+  [[ -n "${VM_INITRAMFS_MANIFEST:-}" ]] && cp "$work/initramfs.manifest" "$VM_INITRAMFS_MANIFEST"
+  # N 块盘：disk.img / disk1.img …
+  local d
+  for ((d=0; d<VM_DISKS; d++)); do
+    # VM_DISK_PREALLOCATE=1：fallocate 预分配，宿主 ext4 不在来宾写的时候边写边分配（E152 的顺序写要它）。
+    # 预分配失败就不跑这一次，不许悄悄退回稀疏文件——那会换掉被测条件而没人知道。
+    if [[ "${VM_DISK_PREALLOCATE:-0}" == 1 ]]; then
+      fallocate -l "${VM_DISK_MB}M" "$work/disk$d.img" \
+        || { echo "fallocate $work/disk$d.img 失败" >&2; printf '%s\n' "$work" >> "$VM_WORKLIST"; return 1; }
+    else
+      truncate -s "${VM_DISK_MB}M" "$work/disk$d.img"
+    fi
+  done
+  disk="$work/disk0.img"
   ( cd "$ird" && find . | cpio -o -H newc --quiet | gzip -1 > "$work/initramfs.cpio.gz" )
 
   # 寻道主导模型：VM_IOPS 非空时给盘加一个「每次 I/O 固定代价、与大小无关」的上限。
@@ -189,7 +225,7 @@ cleanup_work() {
 trap cleanup_work EXIT
 
 say ""; say "══ 虚机 benchmark harness ══"
-command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 缺失" "装 qemu-system-x86（apt install qemu-system-x86），装完重跑。"
+command -v qemu-system-x86_64 >/dev/null || die "缺 qemu-system-x86_64" "装 qemu-system-x86（apt install qemu-system-x86），装完重跑。"
 [[ -r /dev/kvm && -w /dev/kvm ]] || die "/dev/kvm 不可读写 —— 不降级到软件模拟" "把当前用户加进 kvm 组（sudo usermod -aG kvm \$USER，重新登录生效），确认 /dev/kvm 存在；不接受回退到软件模拟。"
 command -v busybox >/dev/null || die "busybox 缺失（apt install busybox-static）" "装完 busybox-static 重跑这个脚本。"
 command -v cpio >/dev/null || die "cpio 缺失" "装 cpio（apt install cpio），装完重跑。"
@@ -239,6 +275,19 @@ if [[ -z "${VM_IOPS:-}" && -n "${VM_BLKLOGWRITES_DIR:-}" ]]; then
   ok "blklogwrites 一支用补好的 QEMU：$QEMU_SYSTEM_BINARY（开跑前 qemu-blklogwrites-check.sh 核过）"
 fi
 
+if [[ "${1:-}" == "--initramfs-manifest" ]]; then
+  shift
+  [[ $# -ge 1 && -f "$1" ]] || die "--initramfs-manifest 要一个二进制（文件要在）" "写成 vm-bench.sh --initramfs-manifest <静态二进制> [参数...]；门禁拿一份占位文件代被测二进制（/bench 那一行它自己换掉）"
+  manifest_root="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmmanifest.XXXXXX")"
+  trap 'rm -rf "${manifest_root:?}"; cleanup_work' EXIT
+  manifest_binary="$1"; shift
+  stage_initramfs_root "$manifest_root/irfs" "$manifest_binary" "$@"
+  printf 'kernel\t%s\n' "$KERNEL"
+  printf 'qemu\t%s\n' "$(command -v "$QEMU_SYSTEM_BINARY")"
+  initramfs_manifest "$manifest_root/irfs" | sed 's/^/entry\t/'
+  exit 0
+fi
+
 if [[ "${1:-}" == "--selftest" ]]; then
   say ""
   say "  自检：跑一个必然成功的、一个必然失败的、一个查得到 /dev/vda 的。"
@@ -252,6 +301,23 @@ if [[ "${1:-}" == "--selftest" ]]; then
   printf '#!/bin/sh\nexit 7\n'  > "$tmp/bad";  chmod +x "$tmp/bad"
   printf '#!/bin/sh\n[ -b "$1" ] || exit 9\nsz=$(/bin/busybox blockdev --getsize64 "$1" 2>/dev/null)\necho "VMBENCH_DISK_BYTES=$sz"\n[ "$sz" -gt 0 ] || exit 10\nexit 0\n' > "$tmp/disk"; chmod +x "$tmp/disk"
   fail=0
+  # 清单不随 mtime 变、随参数变（门禁按清单算每一档的键：cpio 包的字节随 mtime 变，清单不该）；不起虚机
+  manifest_probe="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmself-manifest.XXXXXX")"
+  stage_initramfs_root "$manifest_probe/first" "$tmp/ok" direct
+  sleep 1
+  stage_initramfs_root "$manifest_probe/second" "$tmp/ok" direct
+  touch "$manifest_probe/second/init" "$manifest_probe/second/args"
+  stage_initramfs_root "$manifest_probe/third" "$tmp/ok" file-overwrite
+  first_manifest="$(initramfs_manifest "$manifest_probe/first")"; second_manifest="$(initramfs_manifest "$manifest_probe/second")"
+  third_manifest="$(initramfs_manifest "$manifest_probe/third")"
+  rm -rf "${manifest_probe:?}"
+  if [[ "$first_manifest" == "$second_manifest" && "$first_manifest" != "$third_manifest" && "$first_manifest" == *$'\ninit\tf\t'* ]]; then
+    ok "initramfs 清单：同一份根隔一秒、touch 过两份文件不变，参数换一档就变，/init 在里面"
+  else
+    printf '  ✗ 清单随 mtime 变了，或换了参数不变、没有 /init（%s 行 / %s 行 / %s 行）\n' "$(grep -c . <<<"$first_manifest")" "$(grep -c . <<<"$second_manifest")" "$(grep -c . <<<"$third_manifest")"
+    printf '     → 怎么办：看 initramfs_manifest 是不是带了 mtime（VM_BENCH_BREAK=manifest-with-mtime 设着的话这里本来就该红），stage_initramfs_root 是不是把参数写进了 args。\n'
+    fail=1
+  fi
   # 读不到退出标记那条路：拉起自己的子进程，建好桩程序目录就照那条路 die，不起虚机；TMPDIR 指进探查目录，子进程退出之后那里必须是空的
   [[ "${VM_BENCH_SELFTEST_ROLE:-}" == die ]] && die "自证角色 die：照「读不到退出标记」那条路退出" "这是自证拉起的子进程故意走的那条路，看的是它退出之后临时目录删没删，不是 harness 坏了"
   probe="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmself-probe.XXXXXX")"

@@ -1,0 +1,11 @@
+exit=3
+want=样本档（快档）：
+want=crash-case:plain-stream：全部块都有键相同的判定、没有红（块 2：复用 2、没有判定 0、红 0、拒算 0）
+want=crash-case:fault-injection-given-states：登记了 red-blocks=judged-by-test，照全量起用例、按 cargo test 的退出码判（
+want=-u SINGLEFS_CRASH_LIBRARY_WRITE_ONLY -u SINGLEFS_CRASH_CASE_BLOCKS_QUERY SINGLEFS_CRASH_POINT_REPLAY_THREADS=
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release -p singlefs-checker-tier --features verdict-store --test fault_injection_given_states -- --include-ignored --exact fault_injection_given_states_full --nocapture
+want=crash-case:fault-injection-given-states：实跑绿（块 4：复用 1、现判 3、红 2、拒算 0）
+want=✓ 登记 2 条崩溃枚举用例：实跑 1 条（登记了 red-blocks=judged-by-test，按退出码判，都绿）；查库 1 条：块全罩住 1 条、有红 0 条、本次未跑 0 条
+want=逐格：crash-case-replay：绿；feature-gated-tests：无对象可判
+want=样本档（.crash-point-replay-sample-tools/quick-tier，假 cargo）：快档流程判绿，退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走快档流程，判绿也退 3 不退 0（这一趟没跑过真的 checker 档，不许记成通过）

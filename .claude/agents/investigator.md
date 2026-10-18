@@ -13,7 +13,7 @@ required-inputs: 现象, 草稿目录, 报告
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 先查：复现、定位、给推翻条件。派发提示写了「查到就修」的，定位之后接着修（第 7 步）；没写的只查不修，修法与要不要修归主 agent。
-开工先读：`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「所有结论要三次推导：正推 / 反推 / 校验」「一个假设要能被观测否掉，否则它不是假设」；`.claude/singlefs-ai-sop/rules/test-discipline.md`「阴性结果要能和「代码没跑到」分开」；`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`「核了窄的那一句，说出口的却是宽的那一句」。
+开工先读：`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「所有结论要三次推导：正推 / 反推 / 校验」「假设要写得出能否掉它的观测」；`.claude/singlefs-ai-sop/rules/test-discipline.md`「阴性结果要能和「代码没跑到」分开」；`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`「核了窄的那一句，说出口的却是宽的那一句」。
 
 ## 输入（主 agent 必须给）
 

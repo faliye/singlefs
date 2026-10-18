@@ -1,3 +1,0 @@
-a atk_vw_opus c-pre2 atk_k1_ways_out_vs_real_sweep ATK_PRES=2 ATK_FILLS=6,11,16,21 ATK_ACTIONS=table-crossed,none
-a atk_vw_opus c-pre4 atk_k1_ways_out_vs_real_sweep ATK_PRES=4 ATK_FILLS=6,11,16,21 ATK_ACTIONS=table-crossed,none
-a atk_vw_opus c-pre8 atk_k1_ways_out_vs_real_sweep ATK_PRES=8 ATK_FILLS=6,11,16,21 ATK_ACTIONS=table-crossed,none

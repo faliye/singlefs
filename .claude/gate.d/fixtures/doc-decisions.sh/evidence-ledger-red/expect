@@ -1,0 +1,14 @@
+exit=1
+want=挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 4 处不对
+want=挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 5 处不对
+want=挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 3 处不对
+want=decision-evidence-lag.tsv:4 对象里逐字的一段不足 8 个字
+want=decision-evidence-lag.tsv:5 要五列
+want=decision-evidence-lag.tsv:6 格名「unknown-cell」不是这张表管的三格
+want=decision-evidence-lag.tsv:2 登记的「.claude/kb/decisions/2520-账样本甲.md 已定项 1」里含「这一步是推论，三方论证的判决」的对象此刻在格「inference-needs-verdict」不红
+want=decision-evidence-lag.tsv:3 登记的「.claude/kb/decisions/2599-不存在.md 已定项 1」
+want=decision-evidence-lag.tsv:7 登记的「.claude/kb/decisions/2520-账样本甲.md -」
+want=  cross-decision-status：红（退出 1）
+want=  inference-needs-verdict：红（退出 1）
+want=  three-way-leg-record：红（退出 1）
+want=doc-decisions.sh：3 格里 3 格红（cross-decision-status inference-needs-verdict three-way-leg-record）

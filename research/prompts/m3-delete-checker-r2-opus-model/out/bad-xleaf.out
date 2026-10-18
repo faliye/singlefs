@@ -1,6 +1,0 @@
-run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：三方攻方腿原型复跑，与同机别的活互不依赖
-XLEAF count=240 root_level=1 root_entries=2 checker=[]
-XLEAF leaves=2
-XLEAF case=「第一片叶的最后一条改成最后一片叶的第一条的号」 number=234 checker_red=["I-9.4: 左容器 1 的最大 key 234 不小于右容器号 234", "I-9.12: 第 1 条的分隔 key 234 不大于上一个孩子的最大 key 234"]
-XLEAF case=「最后一片叶的第一条改成第一片叶最后一条的号」 number=233 checker_red=["I-9.4: inode 233 小于它所在容器的号 234", "I-9.12: 第 1 条的分隔 key 234 大于这个孩子的最小 key 233"]
-ELAPSED 0.6s

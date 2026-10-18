@@ -1,5 +1,0 @@
-test a_refusal_on_a_crash_image_without_read_faults_where_a_device_has_both_system_configuration_slots_torn_is_legal ... ok
-test a_witness_refusal_on_a_crash_image_without_read_faults_where_only_a_rotation_landed_is_illegal ... ok
-test opus_both_slots_of_device_zero_torn_on_the_disk_where_only_a_rotation_landed ... c670-other-disk comparison=Some(AgainstTheSelectedVersionsLastRecord { selected_version_last_record_counter: 3 }) selected=Some((InstanceGeneration(1), CheckpointTxg(3))) verdict=Illegal { reason: NewerPublishWitnessedBySystemConfiguration, conditions_not_met: [WitnessCriterionTrueOnACrashImageWithoutReadFaults(WitnessedCounterAboveTheLastRecordOfTheSelectedVersion)] }
-test the_same_witness_refusal_in_a_crash_state_with_read_faults_injected_is_legal ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

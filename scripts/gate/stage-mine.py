@@ -24,7 +24,8 @@ dry-run 报「留在工作区 1 块」，留下的正是那一行的旧版。
 自己的一行与别人的十几行挤在同一块里，--match 与 --foreign 同时命中，按块只能拒绝。带 --by-row：这样的块若是「纯行式」就不拒绝，按整行挑——
 纯行式的判据：块里（底里的行与工作区的行）每一行都是表格行（整行以 `|` 起头、以 `|` 收尾，缩进不计）或登记行（`E<数字>|` 起头），没有空行、没有正文行。
 挑法：工作区里命中 --match 的新增行进暂存区，别的新增行和别人的删除行留在工作区，暂存区因此是「HEAD + 我的新增行」；
-我的行插在它在工作区里的前一行（那一行在块里原样存在时）后面，前面没有可对的行就插在块首。
+我的行插在它在工作区里的前一行（那一行在块里原样存在时）后面，前面没有可对的行就插在块首；
+前一行在块里重复出现时按位置对应：它在工作区块里是第几次出现，就取底的块里同样第几次出现的那一处（`matching_index()`），不取第一处。
 删除行里命中 --match 的、以及按上面「挪了位置的行」的判法是我的某个新增行旧版的（命中 --foreign 的除外），跟着一起删，不留新旧两份。
 新增行里本身同时命中 --match 与 --foreign 的，仍然拒绝。不是纯行式的块照旧拒绝，拒绝句点名出路。没带 --by-row 时行为不变。
 
@@ -41,12 +42,15 @@ dry-run 报「留在工作区 1 块」，留下的正是那一行的旧版。
 关掉按块切与挪动配对，确认 selftest 判红。另造一张表（我的一行夹在别人五行中间、整表重排、别人的行改了标签）：
 没带 --by-row 必须拒绝，带了必须只暂存我那一行、暂存区 = HEAD + 我那一行，块里夹正文行时带了也拒绝；
 再造一份带别人新增行的内容喂给 --write-index，必须退 3、索引不动，只带我的新增行的必须写进去。
+另造一个块（两张表各有一条分隔行 `|---|`，我的一行加在第二张表的分隔行后面），必须落在第二处。
 
 弄坏开关 STAGE_MINE_BREAK=<项>（只给 --selftest 证红用，打开后 --selftest 退 1；项名、弄坏哪一处、红在哪个用例）：
   STAGE_MINE_BREAK=by-row-takes-block   --by-row 退回整块进：同时命中 --match 与 --foreign 的纯行式块整块进暂存区，别人的行跟着进来
       红在「整表重排按整行挑」（selftest: 整表重排应当只暂存我那一行……）
   STAGE_MINE_BREAK=write-index-unchecked   write_index() 写之前不核 --foreign
       红在「--write-index 带别人新增行」（selftest: --write-index 带别人新增行应当退 3……）
+  STAGE_MINE_BREAK=first-occurrence-anchor   choose_rows() 找锚点退回取底的块里第一处命中（改前的写法）
+      红在「块里有重复行」（selftest: 重复行：| MINE | 应当落在第二张表的 |---| 之后……）
 STAGE_MINE_NO_SPLIT=1、STAGE_MINE_NO_MOVE_PAIRING=1 是更早的两个关闭开关，行为见上，selftest 写法不同（判红即退 0）。
 """
 import difflib
@@ -133,6 +137,22 @@ def hits_any(line, patterns):
     return any(pattern.search(line) for pattern in patterns)
 
 
+def matching_index(old_lines, new_lines, position):
+    """工作区块里第 position 行，在底的块里对应的行号：这一行内容在工作区块里是第几次出现，就取底的块里同样第几次出现的那一处；
+    底里出现次数不够就返回 None。块里有重复行（两张表各有一条分隔行）时，按位置对应才不会锚到第一处。"""
+    line = new_lines[position]
+    if BROKEN == 'first-occurrence-anchor':
+        return old_lines.index(line) if line in old_lines else None
+    occurrence = new_lines[:position + 1].count(line)
+    seen = 0
+    for index, old_line in enumerate(old_lines):
+        if old_line == line:
+            seen += 1
+            if seen == occurrence:
+                return index
+    return None
+
+
 def choose_rows(path, old_lines, new_lines, match_patterns, foreign_patterns):
     """纯行式的块按整行挑。返回（这一块进暂存区后的行, 进暂存区的新增行, 删掉的旧行, 留在工作区的新增行）；
     没有一行是我的就返回 None；拒绝时抛 SystemExit。"""
@@ -165,8 +185,9 @@ def choose_rows(path, old_lines, new_lines, match_patterns, foreign_patterns):
         for earlier in range(position - 1, -1, -1):
             if new_lines[earlier] in mine_rows:
                 continue
-            if new_lines[earlier] in old_lines and old_lines.index(new_lines[earlier]) not in dropped:
-                anchor = old_lines.index(new_lines[earlier])
+            matched = matching_index(old_lines, new_lines, earlier)
+            if matched is not None and matched not in dropped:
+                anchor = matched
                 break
         insert_after.setdefault(anchor, []).append(line)
     result = list(insert_after.get(-1, []))
@@ -403,11 +424,11 @@ def selftest():
             print('selftest: 挪了位置的那一行留下了旧版，暂存区里有两份 —— 正是本脚本要防的形态'); return 1
         if run(['--match', '不存在的标记', 'history.md'], repo) != 3:
             print('selftest: --match 一处都没命中时没有拒绝'); return 1
-        problem = selftest_by_row() or selftest_write_index()
+        problem = selftest_by_row() or selftest_write_index() or selftest_duplicate_anchor()
         if problem:
             print(f'selftest: {problem}'); return 1
         print('selftest: 通过（紧挨着的两块、两行表格、两行登记各切开，只暂存了我的；挪了位置的那一行只留新版；没命中时拒绝；'
-              '整表重排时 --by-row 只暂存我那一行、没带 --by-row 或块里夹正文行时拒绝；--write-index 带别人新增行时退 3、不带时写进索引）')
+              '整表重排时 --by-row 只暂存我那一行、没带 --by-row 或块里夹正文行时拒绝；块里有重复行时我的行按位置对应锚到第二处；--write-index 带别人新增行时退 3、不带时写进索引）')
         return 0
 
 
@@ -447,6 +468,19 @@ def selftest_by_row():
                 return '整表重排：工作区被改动了'
         if run(arguments + ['--by-row', 'note.md'], repo) != 4 or git(['show', ':note.md'], cwd=repo).decode('utf-8') != note_base:
             return '整表重排块里夹正文行，带 --by-row 也应当拒绝（退 4）、暂存区不动'
+    return None
+
+
+def selftest_duplicate_anchor():
+    """块里有重复行（两张表各有一条分隔行）：我的一行加在第二张表的分隔行后面，必须插在那一处，不能锚到第一张表的。"""
+    base_lines = ['| a |\n', '|---|\n', '| x |\n', '| b |\n', '|---|\n', '| y |\n']
+    work_lines = base_lines[:5] + ['| MINE |\n'] + base_lines[5:]
+    picked = choose_rows('sample.md', base_lines, work_lines, [re.compile('MINE')], [])
+    if picked is None:
+        return '重复行：我的新增行 | MINE | 没有被挑出来'
+    if picked[0] != work_lines:
+        return ('重复行：| MINE | 应当落在第二张表的 |---| 之后、| y | 之前（暂存内容 = 工作区这一块），实际 '
+                + ''.join(picked[0]).replace(chr(10), ' ⏎ '))
     return None
 
 

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# harness-model-differential-and-scenarios 按格复用样本的假 cargo：-V 打版本；test 先打一行 MODEL_DIFFERENTIAL_SAMPLE cargo-arguments: <收到的全部参数>，
+# 再照 --exact 后面那个用例名打 cases/<用例名>.log；没有那一份退 101。别的一律退 101。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-model-differential-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+echo "MODEL_DIFFERENTIAL_SAMPLE cargo-arguments: $*"
+name="" previous=""
+for word in "$@"; do
+  [[ "$previous" == --exact ]] && name="$word"
+  previous="$word"
+done
+[[ -n "$name" && -f "$here/cases/$name.log" ]] || { echo "样本里没有这条用例的输出：${name:-（没给 --exact）}"; exit 101; }
+cat "$here/cases/$name.log"

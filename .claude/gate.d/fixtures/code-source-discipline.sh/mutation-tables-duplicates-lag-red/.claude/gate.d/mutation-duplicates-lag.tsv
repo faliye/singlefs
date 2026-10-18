@@ -1,0 +1,6 @@
+# 样本：此刻的滞后表；setup.sh 拿掉 e1_sample.tsv 那一行之后的样子当基准提交，这一行就是比基准多出的一组。
+crates/mutations.tsv	M_分配代取发布代|M_分配代取发布代另起的名字	样本：有名单按名字引着另起的那一个	样本：下一次修订
+scripts/mutation/tables/e1_sample.tsv	M1_样本|M2_同一改法另起的名字	样本：比基准多登记的一组	样本：下一次修订
+crates/mutations.tsv	M_没有这一行|M_库里的断言改掉	样本：名字在表里找不到	样本：下一次修订
+crates/mutations.tsv	M_库里的断言改掉|M_分配代取发布代	样本：两个名字不是同一处改法	样本：下一次修订
+crates/mutations.tsv	M_改函数名|M_改函数名点名库里的用例	样本：组里还有一个名字没登记	样本：下一次修订

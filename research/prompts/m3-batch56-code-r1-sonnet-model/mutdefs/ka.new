@@ -1,6 +1,0 @@
-            if left_pair_fits {
-                self.absorb_the_right_neighbour(current_position - 1);
-                current_position -= 1;
-            } else if right_pair_fits {
-                self.absorb_the_right_neighbour(current_position);
-            } else if false {

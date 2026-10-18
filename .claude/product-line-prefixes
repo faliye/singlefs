@@ -1,0 +1,3 @@
+# 产物行前缀登记表：实验页里指向已归档产物的指针（产物行见 git show <提交>:<路径> 第 N 行）指到的那一行要以这里某个前缀起头
+# （.claude/singlefs-ai-sop/rules/evidence-discipline.md「引产物就整行抄」）。一行一个前缀，# 后写它是哪一类产物的行；判它的检查还没接（C837 欠的那一半）。
+E7RESULT  # 实验装置（scripts/experiments/ 下的 e<号>_* 二进制）打的结果行，name=<名> 是那一行的量名

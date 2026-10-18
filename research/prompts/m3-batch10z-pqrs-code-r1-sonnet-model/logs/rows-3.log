@@ -1,3 +1,0 @@
-行2397 第10z批第十七块 K2 访问器恒交 0（分配位与隔离位同时置着的槽一个都不数）: rc=101 红 1 条 unts_each_overlapping_slot_both_as_allocated_and_as_isolated | test result: FAILED. 215 passed; 1 failed; 0 ignored; 0 measured; 0 fi (5s)
-行2398 第10z批第十七块 K2 卸载那一格当场放开那一截回收之后不补隔离（改回只回收）: rc=101 红 1 条 reclaims_while_the_root_slot_of_the_rollback_reads_back_zero | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 35 fil (19s)
-行2710 第10z批第十九块 K2 卸载那一格扣到生效那一截回收之后不补隔离（改回只回收）: rc=101 红 1 条 he_floor_takes_effect_while_the_account_of_r_reads_back_zero | test result: FAILED. 34 passed; 1 failed; 1 ignored; 0 measured; 0 fil (24s)

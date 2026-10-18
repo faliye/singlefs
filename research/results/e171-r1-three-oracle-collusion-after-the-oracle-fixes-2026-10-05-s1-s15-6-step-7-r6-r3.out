@@ -1,4 +1,0 @@
-E7RESULT name=config segment=s1 product=s15_six inputs=scripts/experiments/target/e171-r1-dumps/revision-6-2026-10-05-r3/baseline-run1/first_file_unlinked_then_inodes_across_one_leaf_scripts/experiments/target/e171-r1-dumps/newtree-2026-10-05/baseline-run1/first_file_unlinked_then_inodes_across_one_leaf
-E7RESULT name=s15_6 first_differing_calls_row=77 first_differing_ops_line=767 first_differing_payload_op=767 first_difference_op=767 txg_26_call_new=25 first_write_new=753 txg_26_call_old=25 first_write_old=753 calls_new=240 calls_old=240 ops_new=7418 ops_old=7438 triggered=false
-E7RESULT name=verdict s15_six_problems=0 triggered=false
-E7RESULT name=done emitted=4

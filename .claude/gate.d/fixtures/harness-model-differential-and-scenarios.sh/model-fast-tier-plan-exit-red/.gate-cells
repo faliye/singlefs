@@ -1,0 +1,2 @@
+# 按条复用失灵：.unit-verdict-sample/plan-failure 写 exit-1，verdict-plan 退 1；快档那一格照旧现判跑完（假 cargo 打那一段、判过），结论判红
+model-fast-tier

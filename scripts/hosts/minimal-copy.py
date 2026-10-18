@@ -5,7 +5,7 @@
 
 为什么：手敲 cp -a 建 GPU 证红的小副本时把 research/ 一起拷了，一下 31G（.claude/kb/milestone/03-third-txn.md「待优化」第 17 行，第 60 批卡上证红）。
 修改时刻：rsync -a 把源树里的旧修改时刻原样带过去，cargo 判副本里内容已换的文件「已编过」、静默跑旧二进制（同一张表第 1 行，
-.claude/singlefs-ai-sop/rules/test-script-discipline.md「编译与算法都要快」）；这里 rsync -a --no-times --checksum：按内容比，
+.claude/rules/test-script-discipline.md「编译与算法都要快」）；这里 rsync -a --no-times --checksum：按内容比，
 内容变了的才拷、拷过去的修改时刻是此刻，没变的不动。
 
 用法：

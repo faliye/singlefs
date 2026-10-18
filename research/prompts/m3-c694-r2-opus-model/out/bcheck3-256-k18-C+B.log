@@ -1,4 +1,0 @@
-G W=256 k=18 R=ow hide=ur arm=C+B/all/ring/none M1[effective=(1,26) row_txg=28 isolated=24 free=1722] r=(1,27) r_records=1
-G W=256 k=18 R=ow hide=ur arm=C+B/all/ring/none seq=- in_ring=true dmg=0/26 iso=24 free=1722 unmount=Ok(2) in_ring_after_unmount=true chk=[] probe=onR:read-ok bc_alive=true | bc_fail:skips=0 mount=Err(StillUnreadable:AccountOfAnAbandonedRoot) | bc_stale:skips=0 mount=Err(StillUnreadable:AccountOfAnAbandonedRoot)
-G W=256 k=18 R=ow hide=ur arm=C+B/all/ring/none seq=o in_ring=true dmg=0/26 iso=24 free=1754 unmount=Ok(2) in_ring_after_unmount=true chk=[] probe=onR:read-ok bc_alive=true | bc_fail:skips=0 mount=Err(StillUnreadable:AccountOfAnAbandonedRoot) | bc_stale:skips=0 mount=Err(StillUnreadable:AccountOfAnAbandonedRoot)
-GTALLY W=256 k=18 R=ow hide=ur arm=C+B/all/ring/none nodes=2

@@ -85,6 +85,7 @@ import zoneinfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RESEARCH_RELATIVE = "scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes"
+CHECK_PRODUCT = os.path.join(HERE, "check_product.py")  # 判法脚本：--check 只认这一份（各跑法脚本给的都是研究目录里的它），起它时照字面路径起
 DRIVER_NAME = "row_driver.py"
 GIB = 1 << 30
 LANE_THREADS_MINIMUM = 5
@@ -490,9 +491,14 @@ def timing_blocks(shard: Shard) -> dict[int, list[str]]:
     return blocks
 
 
+def shard_freeze(shard: ParsedShard, which: str) -> dict[str, str]:
+    """which 是 freeze_before / freeze_after：按名字取那一组冻结行（逐个点名，不 getattr）。"""
+    return {"freeze_before": shard.freeze_before, "freeze_after": shard.freeze_after}[which]
+
+
 def merged_freeze(parsed: list[ParsedShard], which: str, before: bool) -> str:
-    total = sum(int(getattr(shard, which).get("differences", "-1")) for shard in parsed)
-    details = sorted({detail for shard in parsed for detail in getattr(shard, which).get("detail", "none").split(",") if detail and detail != "none"})
+    total = sum(int(shard_freeze(shard, which).get("differences", "-1")) for shard in parsed)
+    details = sorted({detail for shard in parsed for detail in shard_freeze(shard, which).get("detail", "none").split(",") if detail and detail != "none"})
     return f"freeze_check before={'true' if before else 'false'} differences={total} detail={','.join(details) or 'none'}"
 
 
@@ -1134,7 +1140,7 @@ def next_attempt_directory(context: Context) -> str:
 
 
 def check_rows(context: Context, product: str) -> None:
-    completed = subprocess.run(["python3", "-B", context.check, "rows", product], cwd=context.repo, capture_output=True, text=True)
+    completed = subprocess.run(["python3", "-B", CHECK_PRODUCT, "rows", product], cwd=context.repo, capture_output=True, text=True)
     say(context, f"  check_product.py rows {os.path.relpath(product, context.repo)}：{completed.stdout.strip()}")
     if completed.returncode != 0:
         raise Stopped(f"判法不过：check_product.py rows {os.path.relpath(product, context.repo)}")
@@ -1330,6 +1336,8 @@ def main(argument_list: list[str]) -> int:
     arguments = parser.parse_args(argument_list)
     if not arguments.resume_tag:
         parser.error("--resume-tag 要给（新的一趟的行输出根与产物名接它，不与上一趟撞名）")
+    if os.path.realpath(arguments.check) != os.path.realpath(CHECK_PRODUCT):
+        parser.error(f"--check 只认这一份旁边的 check_product.py（{CHECK_PRODUCT}），给的是 {arguments.check}")
     context = context_from_arguments(arguments)
     try:
         return run(context, arguments.mode == "plan")

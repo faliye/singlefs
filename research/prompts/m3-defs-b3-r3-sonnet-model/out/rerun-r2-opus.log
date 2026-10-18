@@ -1,8 +1,0 @@
-name=compare file=r1-r2 same
-name=compare file=r5-r2 same
-name=compare file=r7-r2 same
-name=compare file=r7-scan same
-name=compare file=r2-regex same
-name=compare file=r1-r1 same
-name=compare file=r5-r1 same
-name=compare file=r7-r1 same

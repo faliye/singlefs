@@ -1,4 +1,4 @@
 exit=0
 want=样本 replay.sh 收到：E1（
-want=· 复跑：现判 1 行、复用 2 行、已归档只跑不比 1 行
+want=· 复跑：现判 1 行、复用 2 行、拒算 0 行、本次未跑 1 行（已归档只跑不比 1 行、负载高没判 0 行
 want=experiment-replay：绿

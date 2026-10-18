@@ -2935,7 +2935,7 @@ fn preflight() -> Option<String> {
         return None;
     }
     let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source = format!("{manifest_directory}/src/bin/e162_verdict_store_power_cut.rs");
+    let source = format!("{manifest_directory}/e162_verdict_store_power_cut.rs");
     let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
     let mut command = Command::new("python3");
     command.arg(&script).arg("check").arg(&source);

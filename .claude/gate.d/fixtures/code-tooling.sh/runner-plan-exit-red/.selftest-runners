@@ -1,0 +1,4 @@
+# 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：三条都退 0；.unit-verdict-sample/plan-failure 写 exit-1，verdict-plan 退 1，这一格照旧全部现判跑完、判红
+bash scripts/gate/sample-pass-a.sh --selftest
+python3 scripts/gate/sample-pass-c.py --selftest
+bash scripts/gate/sample-pass-d.sh --selftest

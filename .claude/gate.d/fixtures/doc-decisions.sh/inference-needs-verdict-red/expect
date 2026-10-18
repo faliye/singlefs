@@ -1,0 +1,6 @@
+exit=1
+want=自陈是推论的依据条目没有指到存在的判决：2 条
+want=已定项 1：记号「是推论」，同一条里没有指到任何 *-main-verification.md
+want=已定项 2：记号「是推的」，点名的判决 ghost-r1-main-verification.md 在树里与 git 历史里都找不到
+want=  inference-needs-verdict：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（inference-needs-verdict）

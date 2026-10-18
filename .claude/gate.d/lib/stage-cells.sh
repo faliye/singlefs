@@ -9,7 +9,7 @@
 # gate-similar: doc-decisions.sh 它是第一道改用这份库的阶段，只留格的判法
 #
 # 门禁阶段共用的格结构：登记格、解析 --list / --check、样本只跑点名的格、每格一个子 shell、逐格汇总。
-# 规则：.claude/rules/verification.md「门禁的结构」。scripts/gate/stage-run-or-skip.sh 判的是整道要不要跑，不管格。
+# 规则：.claude/rules/verification.md「门禁的结构」。这份库只管格，不判整道要不要跑。
 #
 # 阶段里的写法（preflight 那一行之后）：
 #   source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
@@ -37,6 +37,10 @@
 #   有一格红（退出码既不是 0 也不是 77）⇒ 整道退 1，红格逐格接它登记的出路，末了给只重跑红格的 --check 命令；
 #   跑到的格全退 77 ⇒ 整道退 77，不记通过；否则退 0。
 #   退 77 的格逐格往 $GATE_NOT_RUN_FILE 报一行（这个变量不在时不写）。
+#   上次红的清单：汇总之后把红的格名写进 ~/.local/share/singlefs/last-runs/.claude__gate.d__<阶段文件名>.tsv（一行一格，全绿写空文件；
+#   写法、原子写与 SINGLEFS_LAST_RUNS_DIRECTORY 照 scripts/gate/lib_reuse_checks.py 文件头「三」；.claude/hooks/run-scope-guard.sh 的拒绝说明读它）。
+#   给了 --check 或样本根 .gate-cells 点名的，只换这一趟跑到的格、别的格上一次的照留；被判的根是样本（与 .gate-cells 同一条判据）时不写，
+#   除非显式设了 SINGLEFS_LAST_RUNS_DIRECTORY（自证用）。写不成只 warn 一句，不改这一道的判定。
 #
 # 直接执行只跑自证（gate.sh 只取门禁目录顶层的 *.sh，不把它当阶段跑；code-tooling 的 runner 表跑它的 --selftest）：
 #   bash .claude/gate.d/lib/stage-cells.sh [项目根] [--force] [--selftest]
@@ -53,6 +57,7 @@
 #   shared-shell        格不进子 shell，一格 exit 就带走整道        red、odd-exit、mixed 等判错
 #   not-run-unreported  退 77 的格不往 $GATE_NOT_RUN_FILE 报        all-not-run、mixed 判错
 #   generic-howto       红格不接它自己的出路，只给一句通用的        red 判错
+#   last-run-unwritten  不写上次红的清单                            last-run-whole、last-run-partial 判错
 
 declare -ga STAGE_CELLS_NAMES=()
 declare -gA STAGE_CELLS_FUNCTION=() STAGE_CELLS_TITLE=() STAGE_CELLS_HOWTO=()
@@ -62,6 +67,7 @@ STAGE_CELLS_SELECTION_SOURCE="全部登记的格"
 STAGE_CELLS_STAGE_FILE="${BASH_SOURCE[1]:-$0}"
 STAGE_CELLS_STAGE_NAME="${STAGE_CELLS_STAGE_FILE##*/}"
 STAGE_CELLS_STAGE_REPOSITORY=""
+STAGE_CELLS_REUSE_CHECKS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." 2>/dev/null && pwd -P)/scripts/gate/lib_reuse_checks.py"
 if [[ "$STAGE_CELLS_STAGE_FILE" == */* ]]; then
   STAGE_CELLS_STAGE_REPOSITORY="$(cd "${STAGE_CELLS_STAGE_FILE%/*}/../.." 2>/dev/null && pwd -P)"
 else
@@ -200,6 +206,25 @@ stage_cells_apply_sample_marker() {
   printf '  · 样本只跑 .gate-cells 点名的格：%s（%s 是样本，不是这道阶段所在的仓）\n' "${STAGE_CELLS_SELECTED[*]}" "$root"
 }
 
+# stage_cells_write_last_run <红的格…>：写上次红的清单（文件头「上次红的清单」）。当前目录是被判的根。
+stage_cells_write_last_run() {
+  local root_physical ran_file="" name
+  [[ "${STAGE_CELLS_BREAK:-}" == last-run-unwritten ]] && return 0
+  root_physical="$(pwd -P)"
+  if [[ -z "${SINGLEFS_LAST_RUNS_DIRECTORY:-}" && "$root_physical" != "$STAGE_CELLS_STAGE_REPOSITORY" && -z "${GATE_STAGED_FROM:-}" ]]; then
+    return 0
+  fi
+  if [[ "$STAGE_CELLS_SELECTION_SOURCE" != "全部登记的格" ]]; then
+    ran_file="$(mktemp)" || { printf '  ! %s：建不了临时文件，上次红的清单没写\n' "$STAGE_CELLS_STAGE_NAME"; return 0; }
+    for name in "${STAGE_CELLS_SELECTED[@]}"; do printf '%s\n' "$name"; done > "$ran_file"
+  fi
+  if ! printf '%s\n' "$@" | python3 "$STAGE_CELLS_REUSE_CHECKS" last-run ".claude/gate.d/$STAGE_CELLS_STAGE_NAME" - ${ran_file:+--ran "$ran_file"} >/dev/null 2>&1; then
+    printf '  ! %s：上次红的清单没写成（%s last-run），这一道的判定不受影响\n' "$STAGE_CELLS_STAGE_NAME" "$STAGE_CELLS_REUSE_CHECKS"
+  fi
+  [[ -n "$ran_file" ]] && rm -f "$ran_file"
+  return 0
+}
+
 stage_cells_run() {
   local root="${1:-.}" scratch name function_name cell_exit index=0 collected=0
   local green=() red=() not_run=()
@@ -253,6 +278,8 @@ stage_cells_run() {
     done
   fi
 
+  stage_cells_write_last_run ${red[@]+"${red[@]}"}
+
   if ((collected != ${#STAGE_CELLS_SELECTED[@]})); then
     printf '  ✗ %s：派出去 %s 格，只收回 %s 份退出码\n' "$STAGE_CELLS_STAGE_NAME" "${#STAGE_CELLS_SELECTED[@]}" "$collected"
     printf '     → 怎么办：临时目录在跑的过程中被删了或写不进去；看 $TMPDIR 再重跑，收不全的一轮不算判过。\n'
@@ -283,20 +310,20 @@ stage_cells_run() {
 }
 
 # ── 自证 ──
-# stage_cells_selftest <要判的库> [nested]：造一道三格（alpha、beta、gamma）的合成阶段 source 那一份库，逐条判
+# stage_cells_selftest <树根> [nested]：造一道三格（alpha、beta、gamma）的合成阶段 source 那棵树里的这一份库
+# （<树根>/.claude/gate.d/lib/stage-cells.sh），逐条判
 stage_cells_selftest() {
-  local library_under_test="$1" nested="${2:-}" scratch stage_file sample_root own_root
+  local stage_cells_tree="$1" nested="${2:-}" library_under_test scratch stage_file sample_root own_root
+  library_under_test="$stage_cells_tree/.claude/gate.d/lib/stage-cells.sh"
   local cases=0 wrong=0 label
   scratch="$(mktemp -d)" || { printf '  ✗ 自证建不了临时目录\n'; printf '     → 怎么办：看 $TMPDIR 满没满、有没有写权限，修好再跑。\n'; return 1; }
   own_root="$scratch/stage-repository"
   sample_root="$scratch/sample-root"
   stage_file="$own_root/.claude/gate.d/50-sample-cells.sh"
   mkdir -p "$own_root/.claude/gate.d" "$sample_root"
-  {
-    printf '#!/usr/bin/env bash\nset -uo pipefail\n'
-    printf 'source %q\n' "$library_under_test"
-    # shellcheck disable=SC2016
-    printf '%s\n' \
+  # 合成阶段整份由这一条 printf 写出（函数单元库认「单元自己 printf 出来再起的脚本」，代码就是这几行）
+  # shellcheck disable=SC2016
+  printf '%s\n' '#!/usr/bin/env bash' 'set -uo pipefail' "source $(printf '%q' "$library_under_test")" \
       'cell_alpha() { printf "alpha\n" >> "$SAMPLE_TRACE"; echo "  alpha 格判完"; exit "${OUTCOME_ALPHA:-0}"; }' \
       'cell_beta()  { printf "beta\n"  >> "$SAMPLE_TRACE"; echo "  beta 格判完";  exit "${OUTCOME_BETA:-0}"; }' \
       'cell_gamma() { printf "gamma\n" >> "$SAMPLE_TRACE"; echo "  gamma 格判完"; exit "${OUTCOME_GAMMA:-0}"; }' \
@@ -307,8 +334,7 @@ stage_cells_selftest() {
       'printf "%s\n" "$@" > "$SAMPLE_REST"' \
       'ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"' \
       'cd "$ROOT" || exit 2' \
-      'stage_cells_run "$ROOT"'
-  } > "$stage_file"
+      'stage_cells_run "$ROOT"' > "$stage_file"
 
   # sample_case <标签> <想要的退出码> <想要的 trace（空格隔开，- 表示一格都没跑）> <环境…> -- <参数…>
   # 输出落在 $scratch/out，其余检查由调用方接着判
@@ -378,10 +404,21 @@ stage_cells_selftest() {
     output_has "beta：本次未跑"
     if ! grep -q '的 beta 格本次无对象可判' "$scratch/not-run" || [[ "$(wc -l < "$scratch/not-run")" != 1 ]]; then case_wrong "\$GATE_NOT_RUN_FILE 里该只有 beta 那一行"; fi
   fi
+  # 上次红的清单：整轮照这一趟的红写、全绿写空；--check 只换跑到的格
+  local last_run_file="$scratch/last-runs/.claude__gate.d__50-sample-cells.sh.tsv"
+  if sample_case last-run-whole 1 "alpha beta gamma" OUTCOME_ALPHA=1 OUTCOME_GAMMA=2 SINGLEFS_LAST_RUNS_DIRECTORY="$scratch/last-runs" -- "$sample_root"; then
+    if [[ "$(cat "$last_run_file" 2>/dev/null)" != "$(printf 'alpha\ngamma')" ]]; then case_wrong "上次红的清单该是 alpha、gamma 两行，实为「$(cat "$last_run_file" 2>/dev/null)」"; fi
+  fi
+  if sample_case last-run-partial 0 "alpha" SINGLEFS_LAST_RUNS_DIRECTORY="$scratch/last-runs" -- --check alpha "$sample_root"; then
+    if [[ "$(cat "$last_run_file" 2>/dev/null)" != gamma ]]; then case_wrong "--check alpha 绿之后上次红的清单该只剩 gamma，实为「$(cat "$last_run_file" 2>/dev/null)」"; fi
+  fi
+  if sample_case last-run-green 0 "alpha beta gamma" SINGLEFS_LAST_RUNS_DIRECTORY="$scratch/last-runs" -- "$sample_root"; then
+    if [[ ! -f "$last_run_file" || -s "$last_run_file" ]]; then case_wrong "全绿之后上次红的清单该是空文件"; fi
+  fi
 
   local breaks_proven=0 breaks_missed=() break_name
   if ((wrong == 0)) && [[ -z "$nested" && -z "${STAGE_CELLS_BREAK:-}" ]]; then
-    for break_name in list-empty check-ignored unknown-accepted marker-everywhere marker-ignored red-swallowed not-run-as-pass shared-shell not-run-unreported generic-howto; do
+    for break_name in list-empty check-ignored unknown-accepted marker-everywhere marker-ignored red-swallowed not-run-as-pass shared-shell not-run-unreported generic-howto last-run-unwritten; do
       if STAGE_CELLS_BREAK="$break_name" bash "$library_under_test" --selftest-nested >/dev/null 2>&1; then
         breaks_missed+=("$break_name")
       else
@@ -425,9 +462,9 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     esac
   done
   ROOT="${root_argument:-}"
-  library_under_test="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/${BASH_SOURCE[0]##*/}"
+  stage_cells_tree="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
   if [[ -n "$ROOT" && -f "$ROOT/.claude/gate.d/lib/stage-cells.sh" ]]; then
-    library_under_test="$(cd "$ROOT/.claude/gate.d/lib" && pwd -P)/stage-cells.sh"
+    stage_cells_tree="$(cd "$ROOT" && pwd -P)"
   fi
-  if stage_cells_selftest "$library_under_test" "$nested_run"; then exit 0; else exit 1; fi
+  if stage_cells_selftest "$stage_cells_tree" "$nested_run"; then exit 0; else exit 1; fi
 fi

@@ -1,6 +1,0 @@
-f1-today-k3-ow-a	opus10zb_probe_form1-4839bcb7bf4ed8fd	OPUS10ZB_ARM=today OPUS_KS=3 OPUS_KINDS=ow OPUS_MODES=unmount,w3+unmount,w3+rollback+unmount
-f1-today-k5-ow-a	opus10zb_probe_form1-4839bcb7bf4ed8fd	OPUS10ZB_ARM=today OPUS_KS=5 OPUS_KINDS=ow OPUS_MODES=unmount,w3+unmount,w3+rollback+unmount
-f1-today-k8-ow-a	opus10zb_probe_form1-4839bcb7bf4ed8fd	OPUS10ZB_ARM=today OPUS_KS=8 OPUS_KINDS=ow OPUS_MODES=unmount,w3+unmount,w3+rollback+unmount
-f1-cring-k3-ow-a	opus10zb_probe_form1-4839bcb7bf4ed8fd	OPUS10ZB_ARM=cring OPUS_KS=3 OPUS_KINDS=ow OPUS_MODES=unmount,w3+unmount,w3+rollback+unmount
-f1-cring-k5-ow-a	opus10zb_probe_form1-4839bcb7bf4ed8fd	OPUS10ZB_ARM=cring OPUS_KS=5 OPUS_KINDS=ow OPUS_MODES=unmount,w3+unmount,w3+rollback+unmount
-f1-cring-k8-ow-a	opus10zb_probe_form1-4839bcb7bf4ed8fd	OPUS10ZB_ARM=cring OPUS_KS=8 OPUS_KINDS=ow OPUS_MODES=unmount,w3+unmount,w3+rollback+unmount

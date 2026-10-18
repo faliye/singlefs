@@ -1,0 +1,2 @@
+# 按条复用失灵：.unit-verdict-sample/plan-failure 写 sentinel-reuse-failed，test-plan 的复用哨兵报复用失灵、退 1；快档照旧全部现判，crash-case-replay 格结论判红
+crash-case-replay

@@ -19,5 +19,5 @@ git add -A && git commit -qm base
 printf 'pub fn publish() -> u32 { 2 }\n' > crates/demo/src/lib.rs
 printf 'pub fn recover() -> u32 { 2 }\n' > crates/demo/src/other.rs
 printf 'pub fn named() -> u32 { 2 }\n' > crates/demo/src/named.rs
-printf '# 中文题 第一轮：主 agent 核实\n\n改动：crates/demo/src/named.rs 的 named 返回 2。三条腿都没打中。\n' > research/prompts/中文题-r1-main-verification.md
+printf '# 中文题 第一轮：主 agent 核实\n\n改动：crates/demo/src/named.rs 的 named 返回 2。三条腿都没打中。\n\n## 这一轮被判过的文件\n\n- crates/demo/src/named.rs\n' > research/prompts/中文题-r1-main-verification.md
 printf '\n路径改写：旧路径换成新路径。\n' >> research/prompts/old-r1-main-verification.md

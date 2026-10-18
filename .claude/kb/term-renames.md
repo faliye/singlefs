@@ -22,7 +22,7 @@
 ## 层 0 → 崩溃点重放（2026-10-12 起）
 
 用户 2026-10-11 指出「层 0」改名成「崩溃点重放」只换了一部分，定全仓照这套换：「层 0 崩溃点重放」叠用的去掉「层 0」；「层 0 全量 / 快档」写「崩溃点重放全量 / 快档」；「层 0 用例」写「崩溃枚举用例」；英文标识符（`layer0_*`、门禁名 `checker-tier-layer0-replay`）当时没动，2026-10-13 那一批改了，登在文末「第一条流 / 第二条流、两段流水线、三层表的档 → 按内容起的名字（2026-10-13 起）」一节。
-不换的三类按 `.claude/term-rename-exempt` 登记：D13（验证路线） 已定项 9 分层表里与层 1、层 2 并列的「层 0」档（正则不打「层 0 冒烟」，别的写法按行登记）；实验装置、留存产物、变异名与门禁样本（整份）；代码里的字符串与原样引的旧文。
+不换的两类按 `.claude/term-rename-exempt` 登记：实验装置、留存产物、变异名与门禁样本（整份）；代码里的字符串与原样引的旧文（原有的第三类，D13（验证路线） 已定项 9 分层表里与层 1、层 2 并列的「层 0」档，随分层表三档改成冒烟层、常规层、大负载层已没有对象）。
 
 ## 第一条流 / 第二条流、两段流水线、三层表的档 → 按内容起的名字（2026-10-13 起）
 
@@ -51,7 +51,7 @@ D13（验证路线） 已定项 9 三层表的三档：层 0 冒烟 → 冒烟�
 | sb_ | system_configuration_ | 词边界 | 缩写前缀（`sb_mac`） |
 | _sb | _system_configuration | 词边界 | 缩写后缀（`tail_sb`） |
 | sb | system_configuration | 词边界 | 裸缩写。`sb` 本是为 superblock 设的，概念没了缩写也去掉，同日从 SOP 的缩写表里删行 |
-| harness 耗时用例 | harness 慢档用例 | 整串 | harness 档里 debug 下单条跑到 60 秒及以上、标 `#[ignore]` 的用例；用户 2026-10-01 定 harness 档分「快档 / 慢档」，与上游 test-script-discipline.md「分快慢两档」同名 |
+| harness 耗时用例 | harness 慢档用例 | 整串 | harness 档里 debug 下单条跑到 60 秒及以上、标 `#[ignore]` 的用例；用户 2026-10-01 定 harness 档分「快档 / 慢档」，与.claude/rules/test-script-discipline.md「分快慢两档」同名 |
 | 耗时用例 | 慢档用例 | 整串 | 「harness 耗时用例」不带「harness」前缀的短称 |
 | 轻用例 | 快档用例 | 整串 | harness 档里不标 `#[ignore]`、每次改完就跑的用例；与「慢档用例」同日改名 |
 | harness 重档 | harness 慢档用例 | 整串 | harness 档里单线程跑满 60 秒的用例；「重档」与「重型测试」只差一个字、指的却是两件事，改名分开 |
@@ -78,8 +78,9 @@ D13（验证路线） 已定项 9 三层表的三档：层 0 冒烟 → 冒烟�
 | second_txn | overwrite_release_rollback_reuse | 整串 | 缩写形态的蛇形 |
 | third_txn | crash_verification_rebuild | 整串 | 缩写形态的蛇形 |
 | 按条记录 | 判定库记录 | 整串 | crates 变异表那一份判定库里的记录 |
-| 判法指纹 | 判法版本 | 整串 | crates 变异表判定库目录的那个摘要 |
-| 底座指纹 | 判法版本 | 整串 | 「判法指纹」更早的叫法 |
+| 判法指纹 | 判法单元指纹 | 整串 | crates 变异表判定库目录的那个摘要（中间一度叫判法版本） |
+| 底座指纹 | 判法单元指纹 | 整串 | 「判法指纹」更早的叫法（中间一度叫判法版本） |
+| 判法版本 | 判法单元指纹 | 整串 | 2026-10-15 起没有管整库的判法版本：判一块状态、判「抓没抓到」、判一条证明的那几个函数单元各自的指纹进每条判定的单元键 |
 | judging-fingerprint | judge-version | 整串 | `crates-mutation-rows.py` 的子命令 |
 | judging_fingerprint | judge_version | 整串 | 函数名与记录字段 |
 | lib_item_verdicts | lib_verdict_library | 整串 | 文件改名（属路径搬迁，`.claude/rules/path-moves.md`「怎么做」），按术语一并查旧名 |
@@ -103,7 +104,7 @@ D13（验证路线） 已定项 9 三层表的三档：层 0 冒烟 → 冒烟�
 | src/layer0_library.rs | src/crash_library.rs | 整串 | `Cargo.toml` 注释里引的判定库源文件 |
 | `layer0_enumeration(?![A-Za-z0-9_])(?<![A-Za-z0-9_]layer0_enumeration)` | crash_state_enumeration | 正则 | 模块名、`.rs` 文件名、判定库类名与清单种类（`CrashLibraryClass::name`、`MANIFEST_KIND`） |
 | `layer0_progress(?![A-Za-z0-9_])(?<![A-Za-z0-9_]layer0_progress)` | crash_point_replay_progress | 正则 | 模块名与 `.rs` 文件名 |
-| `layer0-enumeration-library(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-enumeration-library)` | crash-state-enumeration-library | 正则 | 判定库里崩溃枚举用例那一类的子目录名 |
+| `layer0-enumeration-library(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-enumeration-library)` | crash-state-verdicts | 正则 | 判定库里崩溃枚举用例那一类的子目录名；几类测试合成一份库之后，那一份的目录名是 `crash-state-verdicts`（`crates/singlefs-checker-tier/src/crash_library.rs` 的 `CRASH_LIBRARY_DIRECTORY_NAME`） |
 | `layer0-replay(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-replay)` | crash-case-replay | 正则 | 崩溃点重放门禁的格名（门禁名那一行在前，先换掉长的） |
 | `LAYER0_CELL_NAME(?![A-Za-z0-9_])(?<![A-Za-z0-9_]LAYER0_CELL_NAME)` | CRASH_CASE_REPLAY_CELL_NAME | 正则 | 阶段里的格名常量 |
 | `LAYER0_CELL_TITLE(?![A-Za-z0-9_])(?<![A-Za-z0-9_]LAYER0_CELL_TITLE)` | CRASH_CASE_REPLAY_CELL_TITLE | 正则 | 阶段里的格标题常量 |

@@ -1,4 +1,0 @@
-S1-gatePayloadSwapped@core	绿		3s
-S4-sessionMovedCurrentInstanceFromTheReport@core	绿		2s
-S7-keptOverwriteAsSequentialWrite@core	红(别的)	ests::each_kind_of_change_kept_by_the_refusal_reads_back_as_the_change_handed_in	2s
-S10-asRemainderDropsTheChange@core	绿		2s

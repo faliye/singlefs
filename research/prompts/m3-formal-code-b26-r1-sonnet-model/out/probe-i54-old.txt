@@ -1,7 +1,0 @@
-PROBE_I54 root_50249 clean=Holds
-PROBE_I54 root_50249 zeroed=NotApplicable("候选集里没有一条根的分配记录树走得到叶：第 0 代树表是空的，或树表 / 分配记录树读不出、位置对不上")
-PROBE_I54 root_50249 zeroed_violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
-PROBE_I54 leaf_50245 clean=Holds
-PROBE_I54 leaf_50245 zeroed=NotApplicable("候选集里没有一条根的分配记录树走得到叶：第 0 代树表是空的，或树表 / 分配记录树读不出、位置对不上")
-PROBE_I54 leaf_50245 zeroed_violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 83 filtered out; finished in 0.47s

@@ -1,0 +1,5 @@
+exit=1
+want=litmus/publish.litmus  crates/demo/src/lib.rs 里限定名 publish 命中 2 个单元（第 1 行、第 4 行），锚点要恰好命中一个
+want=同一个限定名在这份文件里有几处
+want=代码绑定检查未过：1 项
+want=checker-tier-lkmm.sh：1 格里 1 格红（litmus-verdicts）

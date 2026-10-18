@@ -1,2 +1,0 @@
-lengthUnaligned@core	crates/singlefs-core/src/block_device.rs	    if !offset.0.is_multiple_of(block) || !length.is_multiple_of(block) {	    if !offset.0.is_multiple_of(block) {	-p singlefs-core --lib	
-rangeEndLt@core	crates/singlefs-core/src/block_device.rs	        Some(end) if end <= device_size => Ok(()),	        Some(end) if end < device_size => Ok(()),	-p singlefs-core --lib	

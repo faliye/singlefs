@@ -1,0 +1,5 @@
+exit=1
+want=广谱变异提交门禁判红：此刻源码上 3 条里 1 条沿用不了也没现判、0 条没红、1 个单元没记清单
+want=NO_CONCLUSION 2 none crates/singlefs-core/src/lib.rs:8:5: replace three -> u32 with 0 no-record；变了：改了 helper（crates/singlefs-core/src/lib.rs）
+want=UNLISTED crates/singlefs-core/src/lib.rs:4 fn helper
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

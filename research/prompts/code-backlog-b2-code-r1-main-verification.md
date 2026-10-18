@@ -52,7 +52,7 @@ A1、A2 改的是 `mount.rs` 的 `#[cfg(test)]` 模块与 harness 用例，`moun
 - 正推：`~/.local/share/singlefs/work/code-backlog-b2-code-r1-main-rerun/sonnet.log` 末行「name=rerun_compare differing=0」（日志里「test result: FAILED. 4 passed; 2 failed」是探针在弄坏的副本上按设计红）。
 - 攻方：同目录 `opus.log` 末行「name=rerun_compare tally_same=yes lines_same=yes」，计数行见第一节。
 
-## 更正（2026-10-14，判决写完之后）
+## 更正（2026-10-15，判决写完之后）
 
 K4 那一格「随机历史走不到新拒因」不成立。主 agent 照 C600（吞写之后可写挂载被拒而模型说该成） 登记的那组参数在主工作区重跑故障注入大档（`SINGLEFS_FAULT_INJECTION_FIRST_SEED=7463871032432355113 SINGLEFS_FAULT_INJECTION_SEEDS=512 SINGLEFS_FAULT_INJECTION_OPERATIONS=30 SINGLEFS_FAULT_INJECTION_FAULTS=6`，`cargo test --release -p singlefs-harness --test fault_injection_fast_tier -- --ignored --exact fault_injection_large_tier_from_the_environment`，经 16G 内存包装），整条红在「以「已知红」收尾 {}、新发现 5」，5 次都是同一个签名：「种子 7463871032432355312 write_is_swallowed：整池第 146 次write，落在第 10 步（PublishOverwrite）：ModelDisagreement { aspect: "模型说该成、实现拒了" }」「模型 RollbackWhileMounted 该成（写出 [(19, 2)]；允许拒的只有容量墙区间与 []）；实现 拒了：RollbackError::IsolatedUnitCopyUnreadableOrMismatched」。正推腿那一句是推的（没跑随机历史与故障注入），攻方的取样里没有故障注入大档。
 

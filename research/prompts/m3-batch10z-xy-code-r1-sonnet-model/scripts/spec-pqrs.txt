@@ -1,1 +1,0 @@
-a atk_pqrs_vw p-k1w atk_k1_ways_out_sweep ATK_PUSH_ATTEMPTS=3 ATK_PRES=2,4,8 ATK_FILLS=6,11,16,21

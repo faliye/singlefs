@@ -1,6 +1,0 @@
-C794RESULT mirror=transient_inside_floor_raise accounting_slot=50298 publishes=3 quarantined_copies_in_the_publishes=2
-C794RESULT mirror=transient_inside_floor_raise stage=after_floor_raise candidate=keep_current red=["I-3.11"] I-3.1=holds I-3.11=violated I-5.2=holds
-C794DETAIL mirror=transient_inside_floor_raise stage=after_floor_raise I-3.11 盘 0：记账的已分配 Some(1343488) 减 defer 待释放 Some(1064960)，不等于从最新根（txg 10）走读到的 262144（其中隔离豁免 0）
-C794RESULT mirror=transient_inside_floor_raise stage=after_floor_raise candidate=exempt_every_unreferenced_record red=[] I-3.1=holds I-3.11=holds I-5.2=holds
-C794RESULT mirror=transient_inside_floor_raise stage=after_floor_raise candidate=on_disk_quarantine_mark red=[] I-3.1=holds I-3.11=holds I-5.2=holds
-C794RESULT mirror=transient_inside_floor_raise stage=after_floor_raise candidate=once_referenced_evidence red=[] I-3.1=holds I-3.11=holds I-5.2=holds

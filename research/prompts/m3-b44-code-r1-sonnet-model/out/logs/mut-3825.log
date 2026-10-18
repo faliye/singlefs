@@ -1,0 +1,24 @@
+
+running 1 test
+test mount::rollback_does_not_verify_units_the_current_version_shares_with_the_target_tests::rolling_back_to_a_version_sharing_a_unit_with_a_bad_copy_with_the_current_version_goes_through ... FAILED
+
+failures:
+
+---- mount::rollback_does_not_verify_units_the_current_version_shares_with_the_target_tests::rolling_back_to_a_version_sharing_a_unit_with_a_bad_copy_with_the_current_version_goes_through stdout ----
+
+thread 'mount::rollback_does_not_verify_units_the_current_version_shares_with_the_target_tests::rolling_back_to_a_version_sharing_a_unit_with_a_bad_copy_with_the_current_version_goes_through' (2704459) panicked at crates/singlefs-core/src/mount.rs:10551:9:
+现行那一版与目标共用的单元不进逐盘验，盘 1 那一份坏着回退照做：Some(IsolatedUnitCopyUnreadableOrMismatched { unit: Data(DataUnitIndexInFile(0)), device: DeviceIdentity(1), slot: SlotNumber(50180) })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mount::rollback_does_not_verify_units_the_current_version_shares_with_the_target_tests::rolling_back_to_a_version_sharing_a_unit_with_a_bad_copy_with_the_current_version_goes_through
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 268 filtered out; finished in 0.49s
+
+
+--- stderr ---
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s3/tree/crates/singlefs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.68s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/target/debug/deps/singlefs_core-5c6a767bd9164a51)
+error: test failed, to rerun pass `-p singlefs-core --lib`

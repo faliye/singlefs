@@ -1,0 +1,2 @@
+# 样本标记：门禁 checker-tier-broad-mutation 在被判的根里见到它才进样本模式（阶段文件头「样本」）；现场照下一行的情形造（.claude/gate.d/lib/broad-mutation-samples.py）
+scenario=escalated:old-key

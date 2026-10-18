@@ -1,0 +1,38 @@
+=== arm=control
+step=introduce
+step=commit_L_without_gate
+step=stage_unrelated
+  gate: judged_tree=d53374989ed3 base_tree=77c278f39bc6
+    window_base=14fcc01b1843c1ddaa8096c93b3a137333d27813 added_E7RESULT_lines=1
+      ✗ 这次改动新增或改写的 kb 正文与历史节里有 1 行整行抄的产物行，在 scripts/experiments/replay.sh 登记着的 1 份产物里一份都找不到：
+         .claude/kb/experiments/900-x.md:5  E7RESULT name=beta value=2
+         → 怎么办：打开这个实验复跑命令登记的那份产物，把对应的行原样抄回来，别手改数；
+                   正文里照这几行写的结论句一起回对。产物确实没留存，就删掉这几行并写明「原始输出未留存」。
+    cell_rc=1
+  staged-green 不动（格 rc=1）
+step=commit
+step=stage_unrelated
+  gate: judged_tree=46679b4b3bc1 base_tree=77c278f39bc6
+    window_base=14fcc01b1843c1ddaa8096c93b3a137333d27813 added_E7RESULT_lines=1
+      ✗ 这次改动新增或改写的 kb 正文与历史节里有 1 行整行抄的产物行，在 scripts/experiments/replay.sh 登记着的 1 份产物里一份都找不到：
+         .claude/kb/experiments/900-x.md:5  E7RESULT name=beta value=2
+         → 怎么办：打开这个实验复跑命令登记的那份产物，把对应的行原样抄回来，别手改数；
+                   正文里照这几行写的结论句一起回对。产物确实没留存，就删掉这几行并写明「原始输出未留存」。
+    cell_rc=1
+  staged-green 不动（格 rc=1）
+=== arm=break_switch_left_in_environment
+step=introduce
+step=commit_L_without_gate
+step=stage_unrelated
+  gate: judged_tree=d53374989ed3 base_tree=77c278f39bc6
+    window_base=HEAD added_E7RESULT_lines=0
+      ! 这次改动新增或改写的 kb 正文与历史节里没有整行抄的 E7RESULT 行，这一格无对象可判
+    cell_rc=77
+  staged-green -> d53374989ed3（格 rc=77，整轮按退 0 记）
+step=commit
+step=stage_unrelated
+  gate: judged_tree=46679b4b3bc1 base_tree=d53374989ed3
+    window_base=c43981681a970352eea52626e12b8eae3c2e4b15 added_E7RESULT_lines=0
+      ! 这次改动新增或改写的 kb 正文与历史节里没有整行抄的 E7RESULT 行，这一格无对象可判
+    cell_rc=77
+  staged-green -> 46679b4b3bc1（格 rc=77，整轮按退 0 记）

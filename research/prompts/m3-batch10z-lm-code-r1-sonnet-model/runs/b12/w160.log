@@ -1,9 +1,0 @@
-
-running 1 test
-test s2_sweep ... S2 label=w160 arm= slots=6144 prefix=oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo mid= r=b4 r_txg=164 r_old_txg=159 r_old_in_ring=true faults=racct persist=false actions=oo secs=0.66 selected=163 c_r=68 revived=2 revived_in_c_r=2 iso_mount=42 iso_after_first_raise=- iso_max=42 iso_end=42 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
-S2 label=w160 arm= slots=6144 prefix=oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo mid= r=b4 r_txg=164 r_old_txg=159 r_old_in_ring=true faults=racct,rlin persist=false actions=oo secs=0.63 selected=163 c_r=892 revived=2 revived_in_c_r=2 iso_mount=968 iso_after_first_raise=- iso_max=968 iso_end=968 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
-S2_DONE label=w160 arm= histories=2 hits=0
-ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.61s
-

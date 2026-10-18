@@ -1,0 +1,5 @@
+# 样本：一份有判定库（light 假自证打三问都过的规范输出）、一份无判定库、一份只提到别人的复用
+# scan: scripts/gate/*.sh
+scripts/gate/with-line.sh	bash scripts/gate/with-line.sh --selftest	样本里的假库	reuse-three-questions
+scripts/gate/no-library.sh	-	无判定库：待立	-
+scripts/gate/mentions.sh	-	不算：只提到别人的复用	-

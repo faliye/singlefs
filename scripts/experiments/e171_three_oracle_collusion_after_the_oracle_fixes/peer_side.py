@@ -40,9 +40,27 @@ def sha256_of_file(path: str) -> str:
     return digest.hexdigest()
 
 
-def research_module(expected: dict, name: str):
-    sys.path.insert(0, os.path.join(os.getcwd(), expected["research_directory"]))
-    return __import__(name)
+RESEARCH_RELATIVE = "scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes"
+
+
+def research_directory_on_path(expected: dict) -> None:
+    """那边树里的研究目录放进 sys.path 第一位；expected.json 的 research_directory 要正是 RESEARCH_RELATIVE（编排器发来的就是它），
+    路径照字面拼，函数单元库认得出装的是哪几份。"""
+    if expected["research_directory"] != RESEARCH_RELATIVE:
+        raise SystemExit(f"expected.json 的 research_directory 是 {expected['research_directory']}，不是 {RESEARCH_RELATIVE}")
+    sys.path.insert(0, os.path.join(os.getcwd(), RESEARCH_RELATIVE))
+
+
+def research_row_driver(expected: dict):
+    research_directory_on_path(expected)
+    import row_driver
+    return row_driver
+
+
+def research_frozen_o3(expected: dict):
+    research_directory_on_path(expected)
+    import frozen_o3
+    return frozen_o3
 
 
 def file_problems(expected: dict) -> list[str]:
@@ -60,7 +78,7 @@ def snapshot_problem(expected: dict) -> str | None:
     path, digest, count = expected["snapshot"]
     if not os.path.isdir(path):
         return f"missing:{path}"
-    found_digest, found_count = research_module(expected, "row_driver").snapshot_digest(path)
+    found_digest, found_count = research_row_driver(expected).snapshot_digest(path)
     if (found_digest, str(found_count)) != (digest, str(count)):
         return f"digest:{found_digest}/{found_count}"
     return None
@@ -83,7 +101,7 @@ def preflight(arguments: argparse.Namespace, expected: dict) -> int:
     checks.append(("driver_and_baseline_files", not problems, ",".join(problems) or f"files={len(expected['files']) + 1}"))
     problem = snapshot_problem(expected)
     checks.append(("snapshot", problem is None, problem or "digest_matches"))
-    differences = research_module(expected, "frozen_o3").freeze_differences(os.getcwd())
+    differences = research_frozen_o3(expected).freeze_differences(os.getcwd())
     checks.append(("o3_freeze", not differences, ",".join(differences) or "differences=0"))
     free = shutil.disk_usage(".").free
     need = arguments.slots * int(expected["disk_bytes_per_slot"])

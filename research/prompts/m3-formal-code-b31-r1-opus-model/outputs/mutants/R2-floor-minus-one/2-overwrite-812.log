@@ -1,6 +1,0 @@
-thread 'allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records' (3382787) panicked at crates/singlefs-harness/tests/overwrite_in_one_instance.rs:752:13:
-assertion `left == right` failed: 第 23 次覆盖写（644 条分配记录，回收门槛 txg 3）盘 0：「已分配」要等于这一版不是已回收的分配记录的跨度之和
-  left: 6078464
---
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.24s
-

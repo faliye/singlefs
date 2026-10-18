@@ -1,6 +1,0 @@
-行2357 第10z批第二十块 C 记着落点而一槽都没隔离也报被宽护卡住（正推 noIsoCheck）: rc=101 红 1 条 _of_which_is_isolated_is_not_reported_as_the_wide_protection | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (23s)
-行2358 第10z批第二十块 C 记着落点而一槽都没隔离时推环入口照推: rc=101 红 1 条 ots_hold_placements_none_of_which_is_isolated_writes_nothing | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (23s)
-行2359 第10z批第二十块 记着空串的槽也算 C 那一圈记着落点的槽（正推 emptyHeld）: rc=101 红 1 条 ding_no_placement_is_not_the_ring_slot_the_push_writes_up_to | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (23s)
-行2360 第10z批第二十块 推环交回写掉的那几槽恒空（正推 slotsWrittenEmpty）: rc=101 红 1 条 ding_no_placement_is_not_the_ring_slot_the_push_writes_up_to | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (26s)
-行2361 第10z批第二十块 攻方 M12 R 那一槽取最先轮到的那一槽（两槽 C）: rc=101 红 1 条 ding_placements_writes_up_to_the_later_one_and_releases_both | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (23s)
-行2362 第10z批第二十块 停因是一次准入的发布数做满也报被宽护卡住（正推 budgetAsStuck）: rc=101 红 1 条 d_isolated_placements_is_not_reported_as_the_wide_protection | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (23s)

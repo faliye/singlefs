@@ -334,6 +334,8 @@ def feed_only(hook, root, feeds=None):
         if feeds is None:
             raise BadInput(f"{hook_relative} 没有内置喂法\n→ 怎么办：--feeds 给一份喂法（放行几条、该拒几条，写法见文件头）")
     validate_feeds(feeds)
+    # 起的是 <root>/.claude/hooks/ 这一层里点名的那一份（上面核过）：路径照「钩子目录 + 文件名」拼，函数单元库把这一层的钩子都算进闭包
+    hook_file = os.path.join(root, HOOKS_DIRECTORY, os.path.basename(hook_path))
     lines, wrong = [], 0
     with tempfile.TemporaryDirectory(prefix="hook-swap-feed-only-") as scratch:
         environment = feed_environment(root, os.path.join(scratch, "detections.jsonl"))
@@ -341,7 +343,7 @@ def feed_only(hook, root, feeds=None):
             hook_input = hook_input_of(feed, root)
             command = hook_input.get("tool_input", {}).get("command", "") if isinstance(hook_input, dict) else ""
             try:
-                done = subprocess.run(["bash", hook_path], input=json.dumps(hook_input, ensure_ascii=False), capture_output=True, text=True,
+                done = subprocess.run(["bash", hook_file], input=json.dumps(hook_input, ensure_ascii=False), capture_output=True, text=True,
                                       env=environment, cwd=root, timeout=FEED_TIMEOUT_SECONDS)
                 code, stderr = done.returncode, done.stderr
             except subprocess.TimeoutExpired:
@@ -357,8 +359,9 @@ def feed_only(hook, root, feeds=None):
 
 
 def feed_problems(hook_path, root, feeds, log_path, detections_path, only_neutral=False):
-    """逐条喂 hook_path；交 (问题列表, 喂了几条)。"""
+    """逐条喂 hook_path（<root>/.claude/hooks/ 这一层里的一份）；交 (问题列表, 喂了几条)。"""
     environment = feed_environment(root, detections_path)
+    hook_file = os.path.join(root, HOOKS_DIRECTORY, os.path.basename(hook_path))  # 照「钩子目录 + 文件名」拼，函数单元库把这一层的钩子都算进闭包
     problems, fed = [], 0
     with open(log_path, "a", encoding="utf-8") as log:
         for feed in feeds:
@@ -367,7 +370,7 @@ def feed_problems(hook_path, root, feeds, log_path, detections_path, only_neutra
             fed += 1
             hook_input = hook_input_of(feed, root)
             try:
-                done = subprocess.run(["bash", hook_path], input=json.dumps(hook_input, ensure_ascii=False), capture_output=True, text=True,
+                done = subprocess.run(["bash", hook_file], input=json.dumps(hook_input, ensure_ascii=False), capture_output=True, text=True,
                                       env=environment, cwd=root, timeout=FEED_TIMEOUT_SECONDS)
             except subprocess.TimeoutExpired:
                 problems.append(f"喂「{feed['label']}」：{FEED_TIMEOUT_SECONDS} 秒没判完")

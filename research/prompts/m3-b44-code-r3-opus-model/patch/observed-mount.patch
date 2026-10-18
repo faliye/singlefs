@@ -1,0 +1,49 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -5338,7 +5338,10 @@
+         deletion_switches_the_continuation_reads.container_tree_capacities(),
+         publishes_planned.instance_to_acquire,
+     ) {
+-        Ok(()) => return Ok(()),
++        Ok(()) => {
++            eprintln!("PROBE_REHEARSAL ending=first-pass-walked");
++            return Ok(());
++        }
+         Err(refusal) if refusal_is_short_of_space(&refusal) => {
+             walk_the_continuation_after_acquisition_on_devices_keeping_writes_in_memory(
+                 pool.parameters,
+@@ -5351,6 +5354,20 @@
+         }
+         Err(refusal) => ContinuationRehearsedBeforeAcquisition::StepRefused(refusal),
+     };
++    eprintln!(
++        "PROBE_REHEARSAL ending={} reads_failed_in_the_two_passes={}",
++        match &ending {
++            ContinuationRehearsedBeforeAcquisition::WalkedToItsEnd => "walked-to-its-end".to_owned(),
++            ContinuationRehearsedBeforeAcquisition::StepRefused(refusal) => format!(
++                "step-refused:{}",
++                format!("{refusal:?}").split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("")
++            ),
++            ContinuationRehearsedBeforeAcquisition::StoppedBeforeTheEndOfTheContinuation => {
++                "stopped-before-the-end".to_owned()
++            }
++        },
++        reads_failed_on_the_disk.borrow().len()
++    );
+     let refusal = match ending {
+         ContinuationRehearsedBeforeAcquisition::WalkedToItsEnd => return Ok(()),
+         ContinuationRehearsedBeforeAcquisition::StepRefused(refusal)
+@@ -5363,6 +5380,13 @@
+             let first_read_failed_on_the_disk =
+                 reads_failed_on_the_disk.borrow_mut().drain(..).next();
+             // 这两趟读盘没出过读错：照旧留给续做（岔路单那一行只定了 C841）。
++            if std::env::var_os("PROBE_WITHOUT_THE_READ_ERROR_REFUSAL").is_some() {
++                eprintln!(
++                    "PROBE_REHEARSAL refusal-skipped would_refuse={}",
++                    first_read_failed_on_the_disk.is_some()
++                );
++                return Ok(());
++            }
+             let Some(read_failed_on_the_disk) = first_read_failed_on_the_disk else {
+                 return Ok(());
+             };

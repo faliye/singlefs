@@ -1,2 +1,0 @@
-rehearseSkipsChange: rc=101 红 8 条 a_sixty_unit_write_after_a_rollback_stuck_behind_the_wide_protection_l a_write_refused_even_without_the_wide_protection_lists_only_unmounting a_sixty_unit_write_after_an_inode_creation_stuck_behind_the_wide_prote | ['test result: FAILED. 46 passed; 8 failed; 1 ignored; 0 measured; 0 filtered out; finished in 7.19s'] (35s)
-frozenCheckDropped: rc=101 红 1 条 pushing_the_root_ring_again_after_a_block_device_error_halfway_is_refu | ['test result: FAILED. 53 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 7.55s'] (31s)

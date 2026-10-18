@@ -1,0 +1,14 @@
+E7RESULT name=config experiment=E174 tree=scripts/experiments-copy binary=e174-lease-drop-wait-memory-return columns=card,model,arguments threads=31
+E7RESULT name=baseline arguments=380a0b007a302d6b card=3257e4a64340ba92 card_dependencies=61 card_units=160 model=f7e1a79acd77f3fb model_dependencies=0 model_units=151
+E7RESULT name=sample class=invalidating sample=lease-step-statements-swapped arguments_changed=false arguments_expected=not_judged card_changed=true card_expected=changed model_changed=true model_expected=not_judged restored_same=true holds=true why=闭包里的函数体变
+E7RESULT name=sample class=invalidating sample=window-constant-changed arguments_changed=false arguments_expected=not_judged card_changed=true card_expected=changed model_changed=true model_expected=not_judged restored_same=true holds=true why=被引用的常量单元变
+E7RESULT name=sample class=invalidating sample=lease-size-512-changed arguments_changed=false arguments_expected=unchanged card_changed=false card_expected=unchanged model_changed=false model_expected=not_judged restored_same=true holds=true why=造清单的常量在两个入口闭包外、代码键不换；只_S_=_512_MiB_的格作废由轮键的参数行担，单元测试_round_key_changes_with_every_cell_field_and_the_round_number_判
+E7RESULT name=sample class=invalidating sample=lock-wgpu-bumped arguments_changed=false arguments_expected=not_judged card_changed=true card_expected=changed model_changed=false model_expected=unchanged restored_same=true holds=true why=依赖行变；修订_3：模型卡入口不点_wgpu、不换
+E7RESULT name=sample class=not-invalidating sample=comment-in-lease-step arguments_changed=false arguments_expected=not_judged card_changed=false card_expected=unchanged model_changed=false model_expected=not_judged restored_same=true holds=true why=注释不进指纹
+E7RESULT name=sample class=not-invalidating sample=judge-function-changed arguments_changed=false arguments_expected=not_judged card_changed=false card_expected=unchanged model_changed=false model_expected=not_judged restored_same=true holds=true why=judge_product_不在子进程闭包里
+E7RESULT name=sample class=not-invalidating sample=unrelated-function-added arguments_changed=false arguments_expected=not_judged card_changed=false card_expected=unchanged model_changed=false model_expected=not_judged restored_same=true holds=true why=不在闭包里
+E7RESULT name=sample class=not-invalidating sample=simulated-host-changed arguments_changed=false arguments_expected=not_judged card_changed=false card_expected=unchanged model_changed=true model_expected=changed restored_same=true holds=true why=真卡入口的闭包里没有_SimulatedCardHost；模型卡的轮作废
+E7RESULT name=sample class=invalidating sample=driver-version-changed judged_by=unit_test test=round_key_changes_with_the_driver_and_card_line
+E7RESULT name=sample class=not-invalidating sample=output-path-changed judged_by=unit_test test=another_output_path_reuses_every_round
+E7RESULT name=verdict experiment=E174 key_samples=8 key_samples_holding=8 f_k1_missed=0 f_k2_extra=0 unit_test_samples=2
+E7RESULT name=done emitted=14

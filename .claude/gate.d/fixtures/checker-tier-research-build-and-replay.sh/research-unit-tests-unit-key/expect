@@ -1,0 +1,8 @@
+exit=0
+want=· 样本：上一版（.unit-verdict-sample/prior）tiny 的 2 条测试函数照判绿记进这一版的判定库
+want=· 单测按条复用：3 条编得进的测试函数，现判 1、复用 2、拒算 0
+want=现判 tiny/src/lib.rs::tests::adds_zero_to_itself（库里没有这一条）
+want=· 判绿记库（tiny）：RECORD recorded=1
+want=research 构建与单测全绿：1 个测试批次、共 1 个单测（单测按条：现判 1、复用 2、拒算 0、本次未跑 0）
+want=── 汇总：checker-tier-research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=research-unit-tests：绿

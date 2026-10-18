@@ -1,6 +1,0 @@
-E7RESULT name=cross_host_columns row=0 row_line_dropped=copy_ns,compile_ns,device_ns,o3_ns device=E7RESULT_lines dump=oracle-verdicts.tsv,call-outcomes.tsv,writable-mount-probe.tsv,ops.tsv,states.tsv o3_dropped=name=config,name=state_time,*_ns
-E7RESULT name=cross_host_part part=row_line identical=true dropped=copy_ns,compile_ns,device_ns,o3_ns
-E7RESULT name=cross_host_part part=device_results identical=true lines=606/606
-E7RESULT name=cross_host_part part=dump_files identical=true compared=12 differing=none
-E7RESULT name=cross_host_part part=o3 identical=false lines=7645/7645 dropped=name=config,name=state_time,*_ns
-E7RESULT name=verdict cross_host_identical=false row=0 host_of_step_12_row_0=1 host_of_cross_host_row_0=2 parts=4 differing_parts=o3

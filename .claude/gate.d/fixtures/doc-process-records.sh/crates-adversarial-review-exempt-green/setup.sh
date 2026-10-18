@@ -11,6 +11,6 @@ printf '^\\.claude/hooks/\t# 钩子（这份样本不碰）\n' > .claude/gate.d/
 git add -A && git commit -qm base
 printf 'pub fn publish() -> u32 { 2 }\n' > crates/demo/src/lib.rs
 printf '// 依据：D3（样本） 已定项 3\npub fn comment() -> u32 { 2 }\n' > crates/demo/src/comment.rs
-printf '# demo 第一轮：主 agent 核实\n\n改动：crates/demo/src/lib.rs。三条腿都没打中。\n' > research/prompts/demo-r1-main-verification.md
+printf '# demo 第一轮：主 agent 核实\n\n改动：crates/demo/src/lib.rs。三条腿都没打中。\n\n## 这一轮被判过的文件\n\n- crates/demo/src/lib.rs\n' > research/prompts/demo-r1-main-verification.md
 printf 'crates/demo/src/comment.rs\t%s\t用户说这次不走三方\n' \
   "$(sha256sum crates/demo/src/comment.rs | cut -d' ' -f1)" > .claude/crates-review-exempt

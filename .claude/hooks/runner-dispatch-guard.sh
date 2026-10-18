@@ -30,7 +30,8 @@
 #      （时刻、提示的 sha256、文件）；每次判之前先删掉已结束的：主会话记录里那次派发（toolUseResult 的 prompt 同 sha256）的 agent
 #      交回了（`<agent-message from="<id>">` 后跟 `[Subagent hand-back]`）、任务通知是 failed / killed / stopped、或被 TaskStop 停了；
 #      派发之后 10 分钟主会话记录里还没有它的，按没派出去删。
-#   ⑥ 快照冲突：派 kb-scribe、implementation-writer 时要改的文件在还没判完的三方轮开工快照里，拒（判法见 snapshot_conflict_verdict 上面那段）。
+#   ⑥ 快照冲突：派 kb-scribe、implementation-writer 时要改的文件在还没判完的三方轮开工快照里，拒（哪几轮开着、快照清单怎么读、放行行与拒绝说明在同目录的
+#      lib_snapshot_conflicts.py，与 scripts/gate/apply-writer-patch.py 打补丁之前那一查共用；要改的文件怎么从提示里找见 snapshot_conflict_verdict）。
 #      用户叫停、不写判决的轮，在 research/prompts/abandoned-rounds.tsv 登记一行收掉（门禁 doc-process-records 的 abandoned-rounds 格读的是同一张表，只有这一处登记；
 #      <轮>-halted.md 这一支已撤，写了也不认）。一行收不收的判法只在同目录的 lib_abandoned_rounds.py 一份，门禁那一格调同一份（不收就是红）：
 #      第一列是轮名，四列不空，第二列日期是 YYYY-MM-DD，同一轮只一行；整行里要有出处「records/<文件>.md 第 N 行〔<原话>〕」（或 records/<文件>.md:N〔<原话>〕），
@@ -54,12 +55,12 @@
 #   ⑧ 书记员：提示里点名的工作根或过渡期旧根下的规格文件逐份交给 scripts/kb/kb-spec-check.py，红了拒；一份认得出的规格都没有也拒
 #      （规格写在提示正文里的，把提示正文当规格判）；放行行「规格检查已判：<理由>」。
 #   ⑨ 设计员写重跑登记（提示里有 research/prompts/e<号>-r<n>-prereg.md）：`scripts/gate/admission.py experiment <根> E<号>` 退 77
-#      （输入自上次产物以来没变）就拒；没登记的实验（退 2）放行；放行行「准入已判：<理由>」。
+#      （这一实验的单元键与上次产物头记的相同）就拒；没登记的实验（退 2）放行；放行行「准入已判：<理由>」。
 #   ⑩ 变异分诊员：提示里要有 `scripts/mutation/tables/…tsv` 或 `crates/mutations.tsv`——不接没有表的广谱活动。
 #   ⑪ 执行员：提示里写着「只修锚点」或「只补落产物」的放行这一条；否则要有「这一段回答的岔路：<非空>」；登记对应的实验已经有实验页的算续做，
 #      还要有「上一段岔路表里还差：<非空>」，写「无 / 没有」的拒（一行都不差就该交岔路表，不续派）。
 #   ⑭ 任务带长活的类型（LONG_RUN_AGENTS：experiment-designer，加 ⑮ 那张类型表）的预计挂钟与长活声明（判法在同目录 lib_long_run.py，判据
-#      .claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」）：
+#      .claude/rules/test-script-discipline.md「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」）：
 #      要有一行「预计挂钟：2 小时内」或「预计挂钟：超过 2 小时」（后面可接逗号与推的依据），没有或认不出就拒；
 #      超过的，同一份提示里要有「分片：」「续跑：」「多机：」三行：多机一行只认骨架那一句规范写法（lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE，逐字：台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，
 #      每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量），这一行逐字等于它（可带句末句号），后面不许接任何说明（「；……」「，……」都拒），说明另起一行照普通正文写，
@@ -116,7 +117,7 @@
 #       写范围:执行员去更新问题单（应当返回 2，实际 0）；写范围:实现员写进 invariants.md（应当返回 2，实际 0）；变异分诊:没给表（应当返回 2，实际 0）；
 #       实现员:第二件撞了在跑的那件（应当返回 2，实际 0）；实现员:没写要动的文件（应当返回 2，实际 0）；并发:已有 5 个在跑再派（应当返回 2，实际 0）；
 #       并发:派 sonnet 一样算（应当返回 2，实际 0）；并发:没有定义的类型一样算（应当返回 2，实际 0）；窗口:还没到 resets 时刻不派同一族（应当返回 2，实际 0）；规格:点名的规格旧串不在（应当返回 2，实际 0）；
-#       规格:一份认得出的规格都没有（应当返回 2，实际 0）；准入:输入没变不写重跑登记（应当返回 2，实际 0）；快照:书记员撞开着的轮（清单写 ./.claude/）（应当返回 2，实际 0）；
+#       规格:一份认得出的规格都没有（应当返回 2，实际 0）；准入:单元键没变不写重跑登记（应当返回 2，实际 0）；快照:书记员撞开着的轮（清单写 ./.claude/）（应当返回 2，实际 0）；
 #       快照:实现员撞开着的轮（清单写 tree/crates/）（应当返回 2，实际 0）；快照:提示写项目根起的绝对路径、中文文件名（应当返回 2，实际 0）；
 #       快照:清单写 defs/.claude/ 也归一（应当返回 2，实际 0）；快照:规格文件里点名的照拒（路径后面紧跟中文）（应当返回 2，实际 0）；快照:放行行写的是别的轮，照拒（应当返回 2，实际 0）；
 #       快照:放行行没写理由，照拒（应当返回 2，实际 0）；快照:放行行没写理由、下一行不算它的理由，照拒（应当返回 2，实际 0）；快照:放行行理由是占位，照拒（应当返回 2，实际 0）；
@@ -152,7 +153,7 @@
 #       stdin:快照撞了拒绝（退出码 2）（应当返回 2，实际 0）；stdin:快照拒绝的 stderr 写了轮名、文件与出路（应当返回 1，实际 0）；
 #       stdin:快照清单读不了时 stderr 写了是哪一份（应当返回 1，实际 0）
 #   RUNNER_DISPATCH_GUARD_BREAK=admission-ignored  designer_admission_verdict 不判重跑登记的准入：admission.py 退 77 也放行（⑨）
-#       准入:输入没变不写重跑登记（应当返回 2，实际 0）
+#       准入:单元键没变不写重跑登记（应当返回 2，实际 0）
 #   RUNNER_DISPATCH_GUARD_BREAK=general-purpose-allowed  内置通用类型没写「通用已判」放行行也放行（⑫）
 #       通用:general-purpose 没写放行行的拒（应当返回 2，实际 0）；通用:claude 类型同样拒（应当返回 2，实际 0）
 #   RUNNER_DISPATCH_GUARD_BREAK=general-purpose-free  没有定义文件的类型没写「开工先读 `.claude/agent-common.md`」也放行（②）
@@ -500,6 +501,11 @@ try:   # 叫停轮登记表一行怎么判（与门禁 doc-process-records 的 a
     abandoned_library_error = None
 except Exception as error:  # 文件不在、语法错都算读不到
     abandoned_library, abandoned_library_error = None, error
+try:   # 三方轮开工快照的冲突判法（与 scripts/gate/apply-writer-patch.py 共用）：同目录的 lib_snapshot_conflicts.py（读不到时 ⑥ 不判，stderr 写一句）
+    sys.path.insert(0, sys.argv[1]); import lib_snapshot_conflicts as snapshot_library
+    snapshot_library_error = None
+except Exception as error:  # 文件不在、语法错都算读不到
+    snapshot_library, snapshot_library_error = None, error
 SCRIPT_HOOK_DIR = sys.argv[1]   # 这个钩子自己所在的 .claude/hooks：登记的线程数、写者锁的库都按它找，不按派发提示里的仓根找
 
 NONE_WORDS = {"", "无", "没有", "无。", "-", "—", "空", "none"}
@@ -870,17 +876,12 @@ def designer_admission_verdict(prompt, project_root, hook_dir):
         print(f"! 派发闸跑不了 admission.py，准入这一条没判：{error}", file=sys.stderr)
         return None
     if result.returncode == 77:
-        return (f"✗ E{int(match.group(1))} 的输入自上次产物以来没变（scripts/gate/admission.py experiment 退 77），不写它的重跑登记。\n"
+        return (f"✗ E{int(match.group(1))} 的单元键与上次产物头记的相同（scripts/gate/admission.py experiment 退 77），不写它的重跑登记。\n"
                 "→ 怎么办：沿用上次产物与结论；要为别的原因重跑（换臂、换判据），在提示里写一行「准入已判：<哪一样变了>」。")
     return None
 
 SNAPSHOT_GUARDED_AGENTS = {"kb-scribe", "implementation-writer"}
-SNAPSHOT_DIRECTORY_SUFFIX = "-snapshot"
-SNAPSHOT_LIST_NAME_MARK = "sha256"
-# 快照清单的一行：64 位十六进制哈希、空白、路径（sha256sum 二进制模式在路径前加 *）
-SNAPSHOT_LIST_LINE = re.compile(r"^\s*[0-9a-fA-F]{64}\s+\*?(\S.*?)\s*$")
-# 清单里的路径从第一段 .claude/ 或 crates/ 起取（./.claude/…、tree/crates/…、defs/.claude/… 都归一成仓库根相对路径）
-REPOSITORY_PATH_START = re.compile(r"(?:^|/)((?:\.claude|crates)/)")
+# 快照清单怎么读、哪几轮开着、放行行认不认、拒绝说明怎么写：同目录的 lib_snapshot_conflicts.py（与 scripts/gate/apply-writer-patch.py 共用，判法写在它的文件头）
 # 一条路径在文字里「出现」：前后不连着路径字符（后面的 . 只在它后面还跟着路径字符时才算连着，句末的点不算）
 PATH_LEFT_EDGE = r"(?<![A-Za-z0-9_\-./~])"
 PATH_RIGHT_EDGE = r"(?![A-Za-z0-9_\-/]|\.[A-Za-z0-9_])"
@@ -888,109 +889,16 @@ DOT_SLASH_BEFORE_REPOSITORY_PATH = re.compile(PATH_LEFT_EDGE + r"\./(?=\.claude/
 # 提示里点名的规格文件：工作根或过渡期旧根下的路径（写法见 lib_work_root.py 的 mention_prefix_pattern），到空白、引号、括号或中文标点为止
 SCRATCH_FILE_MENTION = re.compile(SCRATCH_MENTION_PREFIX + r"[^\s`'\"，。；：、（）()「」『』“”‘’《》<>\[\]{}|,;*]+")
 SPECIFICATION_READ_LIMIT_BYTES = 4 * 1024 * 1024
-# 放行口：一行以「快照冲突已判：<轮名> <理由>」开头（行首可以有列表记号与粗体星号）；只在这一行里找，不跨到下一行
-SNAPSHOT_CONFLICT_RULED_LINE = re.compile(r"^[ \t>*_\-]*快照冲突已判[* \t]*[：:][* \t]*([^\s，,：:；;。]+)[ \t，,：:；;。]+(.*?)[ \t]*$", re.M)
-SNAPSHOT_CONFLICT_RULED_ANYWHERE = re.compile(r"快照冲突已判[*\s]*[：:][*\s]*([^\s，,：:；;。]*)")
-SNAPSHOT_CONFLICTS_SHOWN_LIMIT = 20
 
 def break_switch_is(name):
     """自检用的弄坏开关：RUNNER_DISPATCH_GUARD_BREAK 等于 name 时，那一处判法故意走错，自检必须判红。"""
     return os.environ.get("RUNNER_DISPATCH_GUARD_BREAK") == name
 
-ABANDONED_ROUNDS_TABLE = abandoned_library.TABLE_PATH if abandoned_library is not None else os.path.join("research", "prompts", "abandoned-rounds.tsv")   # 门禁 doc-process-records 的 abandoned-rounds 格读的同一张表：叫停的轮只在这一处登记；这张表一行怎么判只在 lib_abandoned_rounds.py 一处
-SNAPSHOT_HALTED_SUFFIX = "-halted.md"                                                 # 已撤的一支：文件还在时只在拒绝说明里提醒改道，不认
 ABANDONED_LEGACY_BREAK_MODES = ("source-any-path", "source-escapes", "line-unread", "name-substring", "round-name-unchecked", "quote-short-ok")   # 出处判法的这六项，派发闸里也认 RUNNER_DISPATCH_GUARD_BREAK=snapshot-abandoned-<项>
 
 def abandoned_break_modes():
     """lib_abandoned_rounds.py 的弄坏开关（LIB_ABANDONED_ROUNDS_BREAK）加上派发闸自己的 snapshot-abandoned-<项>；LIB_ABANDONED_ROUNDS_BREAK 的值认不出时抛 ValueError。"""
     return abandoned_library.breaks() | {mode for mode in ABANDONED_LEGACY_BREAK_MODES if break_switch_is("snapshot-abandoned-" + mode)}
-
-def open_three_way_rounds(project_root, notes=None):
-    """还没判完的三方轮：[(轮名, 快照目录)]。research/prompts/<轮>-snapshot/ 在、_<轮>-body.md 在、<轮>-main-verification.md 不在；
-    research/prompts/abandoned-rounds.tsv 登记了这一轮、而且这一轮的登记行过得了 lib_abandoned_rounds.py 的判法（四列不空、日期是 YYYY-MM-DD、同一轮只一行、
-    出处收得了；门禁 abandoned-rounds 格判同一份，不收就是红）的轮是用户叫停收掉的，不算；登记了而过不了的照旧算开着，原因记进 notes。
-    <轮>-halted.md 这一支已撤：文件还在的，开着的轮在 notes 里提醒改道登记表。"""
-    prompts_directory = os.path.join(project_root, "research", "prompts")
-    if not os.path.isdir(prompts_directory):
-        return []
-    candidates = []
-    for entry_name in sorted(os.listdir(prompts_directory)):
-        snapshot_directory = os.path.join(prompts_directory, entry_name)
-        if not entry_name.endswith(SNAPSHOT_DIRECTORY_SUFFIX) or not os.path.isdir(snapshot_directory):
-            continue
-        round_name = entry_name[:-len(SNAPSHOT_DIRECTORY_SUFFIX)]
-        has_body = os.path.isfile(os.path.join(prompts_directory, f"_{round_name}-body.md"))
-        has_verdict = os.path.exists(os.path.join(prompts_directory, f"{round_name}-main-verification.md"))
-        if round_name and (has_body or break_switch_is("snapshot-body-optional")) and (not has_verdict or break_switch_is("snapshot-closed-round-open")):
-            candidates.append((round_name, snapshot_directory))
-    judgement = None
-    if candidates and not break_switch_is("snapshot-abandoned-ignored"):
-        if abandoned_library is None:
-            if notes is not None:
-                notes.append(f"! 派发闸读不到同目录的 lib_abandoned_rounds.py（{abandoned_library_error!r}）：叫停的轮这一次都没收")
-        else:
-            rows, read_error = abandoned_library.read_rows(project_root)
-            if read_error is not None:
-                if notes is not None:
-                    notes.append(f"! 派发闸读不了 {ABANDONED_ROUNDS_TABLE}（{read_error}）：叫停的轮这一次都没收")
-            else:
-                try:
-                    judgement = abandoned_library.judge_table(project_root, rows, abandoned_break_modes(), only_names={name for name, _ in candidates})
-                except ValueError as error:
-                    if notes is not None:
-                        notes.append(f"! {error}：叫停的轮这一次都没收")
-    rounds = []
-    for round_name, snapshot_directory in candidates:
-        if judgement is not None and any(row.name == round_name for row in judgement.rows):
-            problem = None if break_switch_is("snapshot-abandoned-unchecked") else abandoned_library.round_problem(judgement, round_name)
-            if problem is None:
-                continue
-            if notes is not None:
-                notes.append(f"! {ABANDONED_ROUNDS_TABLE} 登记了 {round_name}，但收不了这一轮：{problem}")
-        if notes is not None and os.path.isfile(os.path.join(prompts_directory, f"{round_name}{SNAPSHOT_HALTED_SUFFIX}")):
-            notes.append(f"! research/prompts/{round_name}{SNAPSHOT_HALTED_SUFFIX} 在，但派发闸不再认这一支：叫停的轮改在 {ABANDONED_ROUNDS_TABLE} 登记一行")
-        rounds.append((round_name, snapshot_directory))
-    return rounds
-
-def repository_path_of_snapshot_line(line):
-    """快照清单的一行归一成的仓库根相对路径；不是「<哈希>  <路径>」的形状、或路径里没有 .claude/ 与 crates/ 起头的一段，返回 None。"""
-    if break_switch_is("snapshot-loose-lines"):
-        fields = line.split()
-        return fields[-1] if fields else None
-    match = SNAPSHOT_LIST_LINE.match(line)
-    if match is None:
-        return None
-    listed_path = match.group(1)
-    if break_switch_is("snapshot-no-normalize"):
-        return listed_path
-    start = REPOSITORY_PATH_START.search(listed_path)
-    if start is None:
-        return None
-    normalized = os.path.normpath(listed_path[start.start(1):])
-    return None if normalized.startswith("..") else normalized
-
-def snapshot_listed_paths(snapshot_directory, notes):
-    """快照目录里文件名含 sha256 的每份清单读出来的路径：{仓库根相对路径: 清单文件}。认不出的行跳过；读不了的清单记进 notes、跳过。"""
-    listed = {}
-    for list_name in sorted(os.listdir(snapshot_directory)):
-        if SNAPSHOT_LIST_NAME_MARK not in list_name:
-            continue
-        list_path = os.path.join(snapshot_directory, list_name)
-        try:
-            with open(list_path, encoding="utf-8", errors="replace") as list_file:
-                lines = list_file.read().splitlines()
-        except OSError as error:
-            if break_switch_is("snapshot-unreadable-aborts"):
-                raise
-            if break_switch_is("snapshot-unreadable-denies"):
-                listed[f"<读不了的清单 {list_name}>"] = list_path
-            notes.append(f"! 派发闸（快照那一条）读不了快照清单 {list_path}：{error}；这一份跳过，没当成撞快照")
-            continue
-        for line in lines:
-            repository_path = repository_path_of_snapshot_line(line)
-            if repository_path is not None:
-                listed.setdefault(repository_path, list_path)
-    return listed
 
 def specification_texts(prompt, notes):
     """提示里点名的工作根或过渡期旧根下的规格文件：[(路径, 内容)]。不在的、是目录的跳过；在而读不了的记进 notes、跳过。"""
@@ -1025,37 +933,29 @@ def mentioned_repository_paths(text, candidate_paths, project_root):
         return {path for path in candidate_paths if path in text}
     return {path for path in candidate_paths if re.search(PATH_LEFT_EDGE + re.escape(path) + PATH_RIGHT_EDGE, text)}
 
-def ruled_snapshot_conflicts(prompt):
-    """派发提示里写了「快照冲突已判：<轮名> <理由>」的轮名（理由非空、不是 <理由> 这种占位）。"""
-    if break_switch_is("snapshot-valve-ignored"):
-        return set()
-    if break_switch_is("snapshot-valve-loose"):
-        return {"*"} if SNAPSHOT_CONFLICT_RULED_ANYWHERE.search(prompt) else set()
-    ruled = set()
-    for match in SNAPSHOT_CONFLICT_RULED_LINE.finditer(prompt):
-        reason = match.group(2).strip()
-        if reason not in NONE_WORDS and not (reason.startswith("<") and reason.endswith(">")):
-            ruled.add(match.group(1))
-    return ruled
 
 def snapshot_conflict_verdict(subagent_type, prompt, project_root):
-    """第三条。返回 (0, 给 stderr 的提醒或 None) 放行；(2, 说明) 拒绝。这一条自己出错一律放行，错误写进说明。"""
+    """第三条。返回 (0, 给 stderr 的提醒或 None) 放行；(2, 说明) 拒绝。这一条自己出错一律放行，错误写进说明。
+    哪几轮开着、快照清单怎么读、放行行认不认、拒绝说明怎么写都在同目录的 lib_snapshot_conflicts.py（与 scripts/gate/apply-writer-patch.py 共用）；
+    这里只找「要改的文件」：派发提示与它点名的规格文件里出现的、快照清单列着的路径。"""
     if break_switch_is("disable-snapshot"):
         return 0, None
     if subagent_type not in SNAPSHOT_GUARDED_AGENTS and not break_switch_is("snapshot-any-agent"):
         return 0, None
+    if snapshot_library is None:
+        return 0, f"! 派发闸读不到共用模块 lib_snapshot_conflicts.py（同目录，{snapshot_library_error!r}）：快照那一条这一次放行、不判"
     notes = []
     try:
-        rounds = open_three_way_rounds(project_root, notes)
+        rounds = snapshot_library.open_three_way_rounds(project_root, notes, break_switch_is, abandoned_break_modes)
         if not rounds:
             return 0, ("\n".join(notes) or None)
         sources = [("派发提示", prompt)]
         if not break_switch_is("snapshot-spec-unread"):
             sources += [(f"规格 {path}", text) for path, text in specification_texts(prompt, notes)]
-        ruled = ruled_snapshot_conflicts(prompt)
+        ruled = snapshot_library.ruled_snapshot_conflicts(prompt, break_switch_is, NONE_WORDS)
         conflicts = []  # [(轮名, 快照目录, [(路径, 出现在哪, 清单文件)])]
         for round_name, snapshot_directory in rounds:
-            listed = snapshot_listed_paths(snapshot_directory, notes)
+            listed = snapshot_library.snapshot_listed_paths(snapshot_directory, notes, break_switch_is)
             hits = {}
             for source_name, text in sources:
                 for path in sorted(mentioned_repository_paths(text, listed, project_root)):
@@ -1071,26 +971,7 @@ def snapshot_conflict_verdict(subagent_type, prompt, project_root):
         return 0, "\n".join(notes)
     if not conflicts:
         return 0, ("\n".join(notes) or None)
-    listing = []
-    for round_name, snapshot_directory, hits in conflicts:
-        listing.append(f"  三方轮 {round_name}（开工快照 {os.path.relpath(snapshot_directory, project_root)}/，"
-                       f"research/prompts/{round_name}-main-verification.md 还不在）：")
-        for path, source_name, list_path in hits[:SNAPSHOT_CONFLICTS_SHOWN_LIMIT]:
-            listing.append(f"    {path}（出现在{source_name}；快照清单 {os.path.basename(list_path)}）")
-        if len(hits) > SNAPSHOT_CONFLICTS_SHOWN_LIMIT:
-            listing.append(f"    （另有 {len(hits) - SNAPSHOT_CONFLICTS_SHOWN_LIMIT} 个）")
-    round_names = "、".join(round_name for round_name, _, _ in conflicts)
-    valve_lines = "；".join(f"「快照冲突已判：{round_name} <理由>」" for round_name, _, _ in conflicts)
-    return 2, (f"✗ 派 {subagent_type} 要改的文件落在还没判完的三方轮 {round_names} 的开工快照里：\n" + "\n".join(listing) + "\n"
-               "→ 规矩：.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」：腿跑着的时候主 agent 不改这些文件，要改的等判决时一起改。\n"
-               f"→ 怎么办：等 {round_names} 的判决写完再派，或把这几处改动并进判决；判过这次派发不碰那一轮的证据（例如只读不改），"
-               f"在派发提示里单起一行写{valve_lines}（理由不许空）；用户已叫停、不会写判决的轮，在 research/prompts/abandoned-rounds.tsv 加一行收掉它"
-               "（轮名、日期 YYYY-MM-DD、为什么撂下、去向，制表符分隔，同一轮只一行；门禁 doc-process-records 的 abandoned-rounds 格读同一张表、判同一份，这里不收那一格就红），"
-               "行里写出处「records/<文件>.md 第 N 行〔<那一行里含这一轮名字的一段原话，逐字照抄>〕」：〔〕里的原话在 records/ 下那份现存文件里恰好找到一次（行号只当提示），"
-               "命中几处时取行号提示落着的那一处，找不到时只在行号提示那一行有这一轮的名字、去掉改名表（.claude/kb/term-renames.md）的新旧名与日期之后〔〕逐字落在那一行里才取那一行（〔〕不写转述）；"
-               "取到的那一行里要有这一轮的名字、除这一轮外没有别的轮名、并有「」括起来的用户原话（去掉空白后至少 6 个字），"
-               "不认这一轮自己的材料、规则与定义文件、仓外路径（含 ..）、同一行写着别的轮叫停原话的行，之后这一轮的快照不再挡任何派发。"
-               + ("\n" + "\n".join(notes) if notes else ""))
+    return 2, snapshot_library.refusal_text(project_root, f"派 {subagent_type} 要改的文件", conflicts, notes, "再派", "在派发提示里单起一行写")
 
 THREAD_LIMIT_LINE = re.compile(LINE_START + r"线程上限[* \t]*[：:][* \t]*(.*?)[ \t]*$", re.M)
 CODE_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,})[^`]*$")   # 只有弄坏开关 code-block-line-rule 下还在用：改前逐行认的开头围栏行（至多缩进 3 个空格，三个及以上反引号，语言名里不许有反引号）
@@ -1397,7 +1278,7 @@ def acquire_writer_locks(hook_input, prompt, subagent_type, actions):
 LONG_RUN_AGENTS = {"experiment-designer"} | THREAD_LIMIT_REQUIRED_AGENTS   # 设计员，加上 ⑮ 那张任务带重活的类型表（用户 2026-10-12 定的判定射程）
 LONG_RUN_AGENTS_BEFORE_WIDENING = {"experiment-designer", "experiment-runner"}   # 只有弄坏开关 long-run-types-narrowed 下还在用
 LONG_RUN_RULE = ("→ 规矩：预计挂钟超过 2 小时的活默认分片、断点续跑、按多机配置自适应；多机配置里每台线程取登记值 .claude/heavy-thread-default，不现算"
-                 "（.claude/singlefs-ai-sop/rules/test-script-discipline.md「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」）。\n")
+                 "（.claude/rules/test-script-discipline.md「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」）。\n")
 def long_run_lines():
     """拒绝说明里「怎么办」的三行写法；多机一行的规范句取 lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE（规范句只写在那一处），读不到库时只指过去。"""
     sentence = long_run.CANONICAL_HOSTS_SENTENCE if long_run is not None else "<规范句见 .claude/hooks/lib_long_run.py 的 CANONICAL_HOSTS_SENTENCE>"
@@ -1990,12 +1871,12 @@ def selftest(hook_dir):
             case("规格:一份认得出的规格都没有", "kb-scribe", "照判决写回 C120。", 2, footer=no_valve),
             case("规格:写了放行行", "kb-scribe", "照判决写回 C120。\n规格检查已判：用户口述的定案，没有规格文件\n", 0, footer=no_valve),
         ]
-        # 设计员的重跑登记：准入判输入没变（假的 admission.py 退 77）就拒
+        # 设计员的重跑登记：准入判单元键没变（假的 admission.py 退 77）就拒
         for name, code in (("admission-unchanged.py", 77), ("admission-changed.py", 0)):
             write_sample(work, name, f"import sys\nsys.exit({code})\n")
         os.environ["RUNNER_DISPATCH_GUARD_ADMISSION_SCRIPT"] = os.path.join(work, "admission-unchanged.py")
         cases += [
-            case("准入:输入没变不写重跑登记", "experiment-designer", "写重跑登记 research/prompts/e142-r19-prereg.md。", 2),
+            case("准入:单元键没变不写重跑登记", "experiment-designer", "写重跑登记 research/prompts/e142-r19-prereg.md。", 2),
             case("准入:写了放行行", "experiment-designer", "写重跑登记 research/prompts/e142-r19-prereg.md。\n准入已判：换了一条臂\n", 0),
             case("准入:不是重跑登记不判", "experiment-designer", "写跑前登记 research/prompts/e170-preregistration.md。", 0),
         ]
@@ -2578,7 +2459,7 @@ def selftest(hook_dir):
           "工作根（~ 写法与绝对路径）与过渡期旧根下的报告按写范围表里展开的 $SINGLEFS_WORK_ROOT 判，规格文件在工作根（含 ~ 写法）与旧根下都读；"
           "写回员给判决不给规格的放行；"
           "实现员没写要动的 crates 文件、超上限、与在跑的实现员撞文件的拒，交回之后不再撞；opus 在跑满上限的拒、sonnet 与用户放行行放行，"
-          "限额窗口没到的同一族拒、换一族或时刻已过放行；书记员规格检查红或一份规格都认不出的拒；设计员重跑登记准入判输入没变的拒；"
+          "限额窗口没到的同一族拒、换一族或时刻已过放行；书记员规格检查红或一份规格都认不出的拒；设计员重跑登记准入判单元键没变的拒；"
           "变异分诊员没给表的拒；执行员没点名岔路、续做没写还差或还差写无的拒，只修锚点与只补落产物放行；"
           "派书记员或实现员时要改的文件在没判完的三方快照里就拒，已判完的轮、没正文的快照、写了放行行的、派别的 agent 的、认不出的清单行、不在的规格与读不了的清单放行；"
           "派设计员与带重活的类型（线程上限那张类型表）没写预计挂钟或写得认不出的拒，超过 2 小时而分片、续跑、多机三行不齐（没写、半截、多机写死额度、多机一行不是规范句（现算、折算、换了词的取法、规范句后接任何说明都算）、分不了没点名或太短、多机已判没写理由或写两行）的拒，齐了、点名了、规范句加多机已判与逐台参数一行、2 小时内的放行；"

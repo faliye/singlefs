@@ -88,13 +88,19 @@
         被打断或包装没跑成之后同一条命令重跑，判过的块复用、只补没判的。
       --verdict-library <目录> 给了就按条记判定（判定库 scripts/crash/lib_verdict_library.py）：每一行的键相同就复用，一行都不用现判时不编装置、不起重放；
         --no-reuse 只记不读。不给 --verdict-library 不读不写。complete（--check）每趟现判、不复用。
-      键分两列（判定库文件头「键分两列」）：
-        判法版本：这份脚本与 lib_verdict_library.py 两份内容的摘要（judge_version）；变了整格每一行都现判，原因写「判法版本 变了」。
-        输入指纹（逐样摘要按名字排好再取 sha256）——共用的一样：装置（e165_replay_bounded_enumeration 的 cargo 依赖闭包，scripts/gate/admission.py 的 cargo_closure_input_paths 现算，
-          crate 根下 cargo 不读的文件不在里面，例 crates/singlefs-replay-prefix/verus-must-red-worlds.tsv；
-          input_manifest 逐文件取内容，加仓根 Cargo.toml、Cargo.lock 与 cargo -V、rustc -V；给了 --binary 的另加那份可执行文件的内容，这时闭包算不出就记一句原因；
-          不给 --binary 而闭包算不出判红）；变了整格每一行都现判。
-        输入指纹里每一行另加：这一行（22 段原样）、档（㉒，单列一样，变了原因写「档 变了」）、引的变异行（⑥ 点名的每一条变异在 crates/mutations.tsv 或 scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv 里那一行原样）。
+      键分两列（判定库文件头「键」一段）：
+        判法单元指纹：这份脚本里 replay 的单元闭包键（判结局的那几个函数：读表、判变异还在、分块、拼起装置的命令、认包装与信号的结局、比 ⑦；
+          判定库与 lib_function_units.py 不进；只改注释不变），变了整格每一行都现判，原因写「判法单元指纹 变了」。
+          编装置与起装置的那一下（run_reporting_progress：起 cargo 或 --binary 给的程序）不在这个闭包里：replay 经 options["spawn"] 调它（main 给），
+          起的是什么程序由下面「装置」那几样进键，不靠判法单元指纹罩；所以判法单元指纹算得出、不拒算。
+        输入（逐样的单元键或摘要按名字排好再取 sha256）——每一行都带的装置那几样：装置单元闭包（装置的 Rust bin 入口
+          crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs 的 main 起的函数单元闭包键，scripts/gate/lib_function_units.py 的切法：
+          装置源码改一个它调到的函数键变，只改注释、改没被调的函数不变；工具链行是 cargo -V、rustc -V 与编装置的那一条构建配置，
+          依赖行是 Cargo.lock 里 singlefs-checker-tier 传递引到的外部包）；给了 --binary 的另加「装置替身」：那份程序的内容摘要（样本与自证的桩就是这样，
+          换一份桩键变），这时装置单元闭包算不出就记一句原因；不给 --binary 而闭包算不出判红；闭包里有拒算的那几行不复用、每趟现判。
+          变了整格每一行都现判，现判的原因点名变了的单元。
+        每一行另加：状态输入（①②③④）、期望逐态行（⑦）、档（㉒，单列一样，变了原因写「档 变了」）、变异原文与替换文（⑥ 点名的每一条变异在它的表里那一行的第 3、4 段）。
+          出处 ⑤（红例账路径与行号）、变异名、⑧ 与抄来的账行 ⑨–㉑ 不进：重放只读 ②③④⑦ 与档，账改名、变异改名、账里别的段不改这一行的判定。
       只记绿。每行一行「· pinned:<行号>：绿|红，现判（<原因>）|复用（<记下的日期与一句判定>）」，末了「· 按条：现判 N、复用 M（现判的原因：…）」；
         环境里有 FORMAL_ITEM_TALLY_FILE 的（门禁给的）另往那份文件追加一行「格<TAB>现判数<TAB>复用数<TAB>原因分栏」。
   e165-pin-red-examples.py --selftest
@@ -163,20 +169,29 @@
 --replay 的逐项点名与按条复用：
   item-filter-ignored    --item 不起作用、照重放全部（写错的项名也不退 2）
       自证 item-select-one、item-unknown 判错；reuse-row-own-key 跟着判错
-  reuse-key-without-closure  键里不带装置的 cargo 依赖闭包（装置依赖的 crate 改了照旧复用）
-      自证 reuse-closure-changed 判错
-  （闭包减掉 crate 根下 cargo 不读的文件归 scripts/gate/admission.py：它的 ADMISSION_BREAK=closure-keeps-crate-root-files 下
-      自证 reuse-crate-root-file-unchanged 判错：依赖 crate 根下放一份、改一行 verus-must-red-worlds.tsv，三行全现判）
-  reuse-key-without-row  键里不带这一行自己（同一个 ⑥、同一个 ⑦ 的两行共用一个键，只判过一行就拿它的判定当另一行的）
+  reuse-key-without-closure  键里不带装置单元闭包（装置调到的函数改了照旧复用）
+      自证 reuse-closure-changed、reuse-device-source-function-changed 判错
+  reuse-key-without-row  键里不带这一行的状态输入与期望逐态行（同一个输入、只差 ⑦ 的两行共用一个键，只判过一行就拿它的判定当另一行的）
       自证 reuse-row-own-key 判错
-  reuse-key-without-judge-version  判法版本一律交空串（这份脚本或判定库改了照旧复用）
-      自证 reuse-judge-version-changed 判错
+  reuse-key-without-judging-units  判法单元指纹一律交空串（判结局的函数改了照旧复用）
+      自证 reuse-judging-units-changed 判错
+  stand-in-unkeyed       给了 --binary 时「装置替身」（那份程序的内容摘要）不进键（换一份桩照旧复用）
+      自证 reuse-device-changed、reuse-device-stand-in-swapped 判错（prune-after-change 跟着判错）
+  judging-units-raw-text  判法单元指纹取这份脚本整份原文的摘要（只改 replay 里一行注释也变）
+      自证 judging-units-comment-only 判错
+  spawn-inside-judging-closure  起装置那一下（run_reporting_progress）算进判法入口：起 --binary 给的程序那一段回到闭包里，库折不出那条命令，判法单元指纹拒算、每趟现判
+      自证 judging-units-no-refusal、judging-units-comment-only 判错，按条复用那几格（reuse-first-run-records 起）跟着判错
+  row-key-with-ledger-path  每一行的键另带 ⑤（红例账的路径与行号，旧判法）
+      自证 reuse-ledger-path-renamed 判错（账路径改名，三行全现判）
+  row-key-with-mutation-name  变异原文与替换文那一样另带 ⑥ 的表与变异名
+      自证 reuse-mutation-renamed 判错（变异表那一行与 ⑥ 一起改名，三行全现判）
   list-items-pipe-unhandled  --list-items 不照 SIGPIPE 惯例退（接 | head 时打 BrokenPipeError 的回溯、退 1）
       自证 list-items-closed-pipe 判错
   reuse-key-without-mutation-row  键里不带 ⑥ 引的变异行（变异表里那一行改了照旧复用）
-      自证 reuse-mutation-row-changed 判错
+      自证 reuse-mutation-row-changed 判错；reuse-row-own-key 跟着判错（两行同一个输入、同一个期望，只差 ⑥）
   reuse-ignores-key      这一行判绿过就复用，不比键
-      自证 prune-after-change 判错（剪枝自证：桩改了之后开着复用与关掉复用逐行判定不同）；reuse-mutation-row-changed、reuse-device-changed、reuse-closure-changed 跟着判错
+      自证 prune-after-change 判错（剪枝自证：桩改了之后开着复用与关掉复用逐行判定不同）；reuse-mutation-row-changed、reuse-device-changed、reuse-closure-changed、
+      reuse-judging-units-changed 跟着判错
   reuse-records-red      红的也记成绿
       自证 reuse-red-not-recorded 判错
   reuse-records-whole-cell-only  一块判完不当场落盘，整格判完、一行红都没有才一起记（被打断或有一行红，判过的全不留）
@@ -199,10 +214,12 @@
   threads-default-cpu-count  --threads 的缺省取核数（改前的样子），不取登记的重活默认并行度
       自证 threads-default-registered 判错
 """
+import concurrent.futures
 import glob
 import hashlib
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -216,8 +233,8 @@ from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename  
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "crash"))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "hosts"))
 from heavy_threads import default_heavy_threads  # noqa: E402
-from lib_verdict_library import Tally, VerdictLibrary, digest_file, digest_text  # noqa: E402
-import importlib.util  # noqa: E402
+from lib_verdict_library import (NOT_JUDGING_FILES, FunctionUnitIndex, Tally, UnitKey, VerdictLibrary, digest_file, digest_text,  # noqa: E402
+                                 judging_unit_key, locked_dependency_lines, rust_toolchain_lines)
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -276,7 +293,6 @@ BREAK = {item for item in os.environ.get("E165_PIN_RED_EXAMPLES_BREAK", "").spli
 DEFAULT_BLOCK_ROWS = 32
 # 门禁给的一份文件：--replay 判完往里追加一行「格<TAB>现判数<TAB>复用数<TAB>原因分栏」（lib_verdict_library.Tally.append_to），门禁整道相加
 ITEM_TALLY_FILE_VARIABLE = "FORMAL_ITEM_TALLY_FILE"
-_ADMISSION_MODULE = []
 MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "run-with-memory-cap.sh")
 # 内存包装自己的结局（run-with-memory-cap.sh 文件头「退出码」一段）：经它起时装置这一次没跑成，输出不算判定
 WRAPPER_OWN_EXITS = {245: "显存不够（起止之间内核报了 NV_ERR_NO_MEMORY）", 250: "撞了这一条自己的内存上限", 251: "包装用法错或起不了 scope", 252: "内存不够排不上",
@@ -1128,16 +1144,6 @@ class UsageError(Exception):
         self.message, self.available = message, available
 
 
-def admission_module():
-    """scripts/gate/admission.py（装置的 cargo 依赖闭包 cargo_closure_input_paths、逐文件清单 input_manifest、工具链 toolchain_line），第一次用到时才读进来。"""
-    if not _ADMISSION_MODULE:
-        specification = importlib.util.spec_from_file_location("admission_for_e165_pin_red_examples", os.path.join(SCRIPT_DIRECTORY, "..", "gate", "admission.py"))
-        module = importlib.util.module_from_spec(specification)
-        specification.loader.exec_module(module)
-        _ADMISSION_MODULE.append(module)
-    return _ADMISSION_MODULE[0]
-
-
 def pinned_item(row):
     return f"pinned:{row['number']}"
 
@@ -1155,62 +1161,96 @@ def list_items(root, table):
     return EXIT_GREEN
 
 
-# 自证造「判法版本变了」用：里面放一个值时 judge_version 交它（只有自证放，门禁与命令行从不放）
-JUDGE_VERSION_FOR_SELFTEST = []
+# 自证造「判法单元指纹变了」用：里面放一个值时 judging_units 交它（只有自证放，门禁与命令行从不放）
+JUDGING_UNITS_FOR_SELFTEST = []
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
+# 判法单元：重放这一格判结局的函数（连同它调到的；判定库与 lib_function_units.py 两份不进）
+JUDGING_ENTRY = "replay"
+# 装置的构建配置（--replay 不给 --binary 时编装置的那一条），进装置单元闭包那一样的工具链行
+DEVICE_BUILD_LINE = f"build: cargo build --release --locked -p singlefs-checker-tier --bin {DEVICE_BINARY}"
 
 
-def judge_version():
-    """判法版本：这份脚本与它 import 的判定库，两份内容的摘要（判定库的另一列，不进输入指纹）。弄坏开关 reuse-key-without-judge-version 下一律交空串。"""
-    if "reuse-key-without-judge-version" in BREAK:
+_JUDGING_UNITS = []
+
+
+def judging_units():
+    """判法单元指纹：这份脚本里 replay（JUDGING_ENTRY）的单元闭包键，判定库的另一列，不进输入指纹；一个进程里算一次。
+    弄坏开关 reuse-key-without-judging-units 下一律交空串。"""
+    if "reuse-key-without-judging-units" in BREAK:
         return ""
-    if JUDGE_VERSION_FOR_SELFTEST:
-        return JUDGE_VERSION_FOR_SELFTEST[0]
-    return digest_text(digest_file(os.path.realpath(__file__)) + digest_file(os.path.join(SCRIPT_DIRECTORY, "..", "crash", "lib_verdict_library.py")))
+    if JUDGING_UNITS_FOR_SELFTEST:
+        return JUDGING_UNITS_FOR_SELFTEST[0]
+    if not _JUDGING_UNITS:
+        _JUDGING_UNITS.append(judging_unit_key_of(REPOSITORY_ROOT, os.path.relpath(os.path.realpath(__file__), REPOSITORY_ROOT)))
+    return _JUDGING_UNITS[0]
 
 
-def device_inputs_digest(root, binary):
-    """装置那一样：e165_replay_bounded_enumeration 的 cargo 依赖闭包（admission.py 的 cargo_closure_input_paths 现算）逐文件内容、仓根 Cargo.toml 与 Cargo.lock、
-    工具链（cargo -V 与 rustc -V）；给了 --binary 的另加那份可执行文件的内容（样本与自证的桩），这时闭包算不出就记一句算不出的原因。
-    不给 --binary 而闭包算不出：抛 Red（键罩不全就不许复用）。弄坏开关 reuse-key-without-closure 下闭包不进。"""
-    admission = admission_module()
-    parts = [digest_file(binary)] if binary else []
-    if "reuse-key-without-closure" not in BREAK:
-        try:
-            paths = admission.cargo_closure_input_paths(root, "singlefs-checker-tier", DEVICE_BINARY) + ["Cargo.toml", "Cargo.lock"]
-            _manifest, fingerprint, _count = admission.input_manifest(root, paths, [admission.toolchain_line(root)])
-            parts.append(fingerprint)
-        except (admission.RegistrationError, admission.InputManifestError) as error:
-            if not binary:
-                raise Red(f"算不出装置 {DEVICE_BINARY} 的 cargo 依赖闭包（{error}），按条判定的键罩不全",
-                          "先让 python3 scripts/gate/admission.py paths <根> checker-tier-formal-verification.sh:pinned-red-examples-replay 列得出路径；不给判定库（去掉 --verdict-library）照旧整格现判")
-            parts.append(digest_text(f"算不出闭包：{error}"))
-    return digest_text("\n".join(parts))
+def judging_unit_key_of(root, relative):
+    """根 root 里 relative 那份脚本的判法单元指纹（UnitKey）：JUDGING_ENTRY 的单元闭包键，判定库与 lib_function_units.py 不进；算不出交一条拒算。
+    弄坏开关：judging-units-raw-text 下取那份脚本整份原文的摘要（改注释也变）；spawn-inside-judging-closure 下另把起装置那一下（run_reporting_progress）
+    算进判法入口（起 --binary 给的程序那一段回到闭包里，库折不出那条命令、判法单元指纹拒算）。"""
+    if "judging-units-raw-text" in BREAK:
+        return UnitKey(digest_file(os.path.join(root, relative)), (), ())
+    entries = [f"{relative}::{JUDGING_ENTRY}"] + ([f"{relative}::run_reporting_progress"] if "spawn-inside-judging-closure" in BREAK else [])
+    try:
+        return judging_unit_key(root, entries)
+    except ValueError as error:
+        return UnitKey(None, (), (f"refused\tjudging-units\t{os.path.basename(relative)}:1\t{error}",))
 
 
-def mutation_rows_text(root, variant):
-    """⑥ 点名的每一条变异（<表>#<名>，几个用 + 连）在它的表里那一行原样（第 1 列等于名字的数据行，几行都取）；表不在、行不在各记一句。"""
+def device_components(root, binary):
+    """装置那几样：装置 e165_replay_bounded_enumeration 的 main 起的单元闭包键（UnitKey，lib_function_units.py 的切法；工具链行是 cargo -V、rustc -V
+    与编装置那一条的构建配置，依赖行是 Cargo.lock 里 singlefs-checker-tier 传递引到的外部包），钉表每一行都带它；给了 --binary 的另加「装置替身」：那份程序的内容摘要
+    （样本与自证的桩），这时闭包算不出就记一句算不出的原因。不给 --binary 而闭包算不出：抛 Red（键罩不全就不许复用）。闭包里有拒算的照交（那几行判定不复用、每趟现判）。
+    装置的身份只在这里进键：起装置那一下不在判法单元指纹（replay 的闭包）里（文件头「键」一段）。
+    弄坏开关：reuse-key-without-closure 下单元闭包那一样不进；stand-in-unkeyed 下装置替身那一样不进。"""
+    components = [("装置替身", digest_file(binary))] if binary and "stand-in-unkeyed" not in BREAK else []
+    if "reuse-key-without-closure" in BREAK:
+        return components
+    try:
+        units = FunctionUnitIndex(root).key([f"{DEVICE_SOURCE}::main"], toolchain=rust_toolchain_lines(root) + [DEVICE_BUILD_LINE],
+                                            dependencies=locked_dependency_lines(root, "singlefs-checker-tier"))
+    except ValueError as error:
+        if not binary:
+            raise Red(f"算不出装置 {DEVICE_BINARY} 的 main 起的单元闭包（{error}），按条判定的键罩不全",
+                      f"先让 python3 scripts/gate/lib_function_units.py closure <根> {DEVICE_SOURCE}::main 在这棵树上跑通；不给判定库（去掉 --verdict-library）照旧整格现判")
+        return components + [("装置单元闭包", digest_text(f"算不出闭包：{error}"))]
+    return components + [("装置单元闭包", units)]
+
+
+def mutation_text(root, variant):
+    """⑥ 点名的每一条变异（<表>#<名>，几个用 + 连）在它的表里那几行的原文与替换文（第 3、4 段；第 1 列等于名字的数据行，几行都取）；
+    变异名与表的路径不进（只用来找那一行；弄坏开关 row-key-with-mutation-name 下进）。表不在、行不在各记一句。"""
     pieces = []
     for part in variant.split("+"):
         relative, _hash, name = part.partition("#")
         path = os.path.join(root, relative)
+        head = f"{part}\t" if "row-key-with-mutation-name" in BREAK else ""
         if not os.path.isfile(path):
-            pieces.append(f"{part}\t表不在")
+            pieces.append(f"{head}表不在")
             continue
-        lines = [raw for raw in open(path, encoding="utf-8").read().split("\n") if raw.strip() and not raw.startswith("#") and raw.split("\t")[0] == name]
-        pieces.append(f"{part}\t" + ("\n".join(lines) if lines else "行不在"))
+        lines = ["\t".join(raw.split("\t")[2:4]) for raw in open(path, encoding="utf-8").read().split("\n")
+                 if raw.strip() and not raw.startswith("#") and raw.split("\t")[0] == name]
+        pieces.append(head + ("\n".join(lines) if lines else "行不在"))
     return "\n".join(pieces)
 
 
 def row_components(root, row, shared):
+    """钉表一行的键：装置那几样（shared），加这一行的状态输入（①②③④：指纹、域、N、枚举序号）、期望逐态行（⑦）、档（㉒）、⑥ 引的变异的原文与替换文。
+    出处 ⑤（红例账路径与行号）、变异名、⑧ 与抄来的账行 ⑨–㉑ 不进：重放只读 ②③④⑦ 与档，改账路径、换变异名、账里别的段不改它的判定。
+    弄坏开关：row-key-with-ledger-path 下 ⑤ 进；reuse-key-without-row 下状态输入与期望逐态行不进；reuse-key-without-profile 下档不进；
+    reuse-key-without-mutation-row 下变异的原文与替换文不进。"""
     components = list(shared)
-    # 档进键：「这一行」带 ㉒，另单列一样「档」（开关 reuse-key-without-profile 下两处都不带）
-    row_text = "\t".join(row["fields"][:DEVICE_COLUMNS] if "reuse-key-without-profile" in BREAK else row["fields"])
+    fields = row["fields"]
     if "reuse-key-without-row" not in BREAK:
-        components.append(("这一行", digest_text(row_text)))
+        components.append(("状态输入", digest_text("\t".join(fields[0:4]))))
+        components.append(("期望逐态行", digest_text(fields[6])))
+    if "row-key-with-ledger-path" in BREAK:
+        components.append(("出处", digest_text(fields[4])))
     if "reuse-key-without-profile" not in BREAK:
-        components.append(("档", digest_text(row_profile(row["fields"]) or "")))
+        components.append(("档", digest_text(row_profile(fields) or "")))
     if "reuse-key-without-mutation-row" not in BREAK:
-        components.append(("引的变异行", digest_text(mutation_rows_text(root, row["fields"][5]))))
+        components.append(("变异原文与替换文", digest_text(mutation_text(root, fields[5]))))
     return components
 
 
@@ -1255,7 +1295,9 @@ def run_device_block(root, table_text, block, binary, options, work, profile):
                    "bash", os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "capped.sh"), str(options["threads"]), *command]
     environment = dict(os.environ, RUN_WITH_MEMORY_CAP_PARALLEL_REASON="门禁里逐行重放钉住的红例，与同一趟别的格各用各的上限",
                        RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="门禁的上限按钉住的表最大时给，表只涨不缩")
-    completed = run_reporting_progress(command, root, environment, f"装置 {DEVICE_FLAG} 逐行重放钉住的 {len(block)} 行（档 {profile}，第 {block[0]['number']} 行起这一块）", len(block))
+    # 起装置那一下经 options["spawn"]（main 给的 run_reporting_progress）：起的是 --binary 给的程序或编出来的装置，它的身份由装置那几样进键
+    # （device_components：装置单元闭包、装置替身），不在判法单元指纹（replay 的闭包）里
+    completed = options["spawn"](command, root, environment, f"装置 {DEVICE_FLAG} 逐行重放钉住的 {len(block)} 行（档 {profile}，第 {block[0]['number']} 行起这一块）", len(block))
     if wrapped and completed.returncode in WRAPPER_OWN_EXITS and "wrapper-exit-as-replay-red" not in BREAK:
         tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-4:] if line.strip())
         raise Red(f"没跑成：内存包装 scripts/hosts/run-with-memory-cap.sh 退 {completed.returncode}（{WRAPPER_OWN_EXITS[completed.returncode]}，上限 {options['memory_cap']}），"
@@ -1303,9 +1345,9 @@ def replay(root, table, options):
             print(f"     不在了：{item}")  # gate-lint:detail
         raise Red(f"{len(rows)} 行里 {len(missing_variants)} 处点名的「改回去就红」的变异不在它的表里了",
                   "变异行被删或改了名：找回那一行（改法被悄悄撤回时它要先响），确是改名就照新名改这张表（要写明为什么）")
-    store, tally = VerdictLibrary(options.get("verdict_library"), "pinned-red-examples-replay", judge_version(), reuse=options.get("reuse", True)), Tally()
+    store, tally = VerdictLibrary(options.get("verdict_library"), "pinned-row", judging_units(), reuse=options.get("reuse", True)), Tally()
     binary = options["binary"]
-    shared = [("装置", device_inputs_digest(root, binary))] if store.directory else []
+    shared = device_components(root, binary) if store.directory else []
     pending = []
     for row in rows:
         components = row_components(root, row, shared) if shared else []
@@ -1314,7 +1356,8 @@ def replay(root, table, options):
         if reused:
             report_item(pinned_item(row), "绿", f"复用（{reason}）")
         else:
-            pending.append((row, components, reason))
+            detail = store.detail(pinned_item(row))
+            pending.append((row, components, reason + (f"：{detail}" if detail else "")))
     named = f"（--item 点名的 {len(rows)} 行）" if wanted else ""
     if not pending:
         print(f"  · 按条：{tally.text()}")  # gate-lint:detail
@@ -1327,7 +1370,7 @@ def replay(root, table, options):
             raise NotRun(f"{len(rows)} 行点名的变异都还在；装置 {DEVICE_SOURCE} 还不认 {DEVICE_FLAG}（第 4 批 3-6 才加），逐行重放这一半本次未跑")
         environment = dict(os.environ, CARGO_TARGET_DIR=options["target"])
         command = ["nice", "-n", "19", "cargo", "build", "--release", "--locked", "-p", "singlefs-checker-tier", "--bin", DEVICE_BINARY]
-        completed = run_reporting_progress(command, root, environment, f"编装置 {DEVICE_BINARY}")
+        completed = options["spawn"](command, root, environment, f"编装置 {DEVICE_BINARY}")
         if completed.returncode != 0:
             raise Red(f"编装置没成（{' '.join(command[3:])} 退 {completed.returncode}）：{' | '.join(completed.stderr.strip().split(chr(10))[-4:])}",
                       "先让它在平时的工具链上编得过；缓存缺包 cargo fetch --locked")
@@ -1365,7 +1408,8 @@ def replay(root, table, options):
                     if "reuse-records-whole-cell-only" in BREAK:
                         held.append((pinned_item(row), components))
                     else:
-                        failed_record = store.record(pinned_item(row), components, "装置逐行打的结果与 ⑦ 逐字节相同")
+                        failed_record = store.record(pinned_item(row), components, "装置逐行打的结果与 ⑦ 逐字节相同",
+                                                     run=f"{DEVICE_BINARY} {DEVICE_FLAG} <块表> {profile}（这一块 {len(block)} 行）")
                         if failed_record:
                             print(f"  ! {failed_record}：下一趟这一行照判")
     print(f"  · 按条：{tally.text()}")  # gate-lint:detail
@@ -1379,7 +1423,7 @@ def replay(root, table, options):
                   f"{'（' + stderr_tails[-1] + '）' if stderr_tails else ''}",
                   "今天的实现在钉住的输入上与原实现不同：是改动引入的回归就修实现；装置报指纹漂了就先查装置的枚举次序与状态编码变没变")
     for item, components in held:
-        store.record(item, components, "装置逐行打的结果与 ⑦ 逐字节相同")
+        store.record(item, components, "装置逐行打的结果与 ⑦ 逐字节相同", run=f"{DEVICE_BINARY} {DEVICE_FLAG} <块表>（整格判完一起记：弄坏开关 reuse-records-whole-cell-only）")
     print(f"  ✓ 钉住的 {len(rows)} 行{named}：点名的变异都还在它们的表里；装置 {DEVICE_FLAG} 逐行打的结果都与 ⑦ 逐字节相同"
           f"（按档 {len(groups)} 组：{'、'.join(f'{profile} {len(entries)} 行' for profile, entries in groups.items())}；{len(blocks)} 块、每块至多 {block_rows} 行，每块带它那一组的档）；按条{tally.text()}")
     return EXIT_GREEN
@@ -1400,7 +1444,9 @@ def main(arguments):
     options = {"root": DEFAULT_ROOT, "table": None, "kill_bounds": [], "binary": None, "threads": default_threads(),
                "memory_cap": os.environ.get("GATE_E165_PINNED_MEMORY_MAX") or "2G",
                "target": os.path.join(os.environ.get("GATE_CROSS_RUN_TMPDIR") or os.environ.get("TMPDIR") or "/tmp", "singlefs-e165-pinned-target"),
-               "items": [], "verdict_library": None, "reuse": True, "block_rows": DEFAULT_BLOCK_ROWS}
+               "items": [], "verdict_library": None, "reuse": True, "block_rows": DEFAULT_BLOCK_ROWS,
+               # 编装置与起装置的那一下：不在 replay 里点名，判法单元指纹（replay 的闭包）因此不收起命令行给的程序那一段（文件头「键」一段）
+               "spawn": run_reporting_progress}
     mode, ledgers, position = "append", [], 0
     valued = {"--root": "root", "--table": "table", "--binary": "binary", "--memory-cap": "memory_cap", "--threads": "threads", "--target": "target",
               "--verdict-library": "verdict_library", "--block-rows": "block_rows"}
@@ -1493,6 +1539,10 @@ def main(arguments):
 
 
 # ── 自证 ──
+
+# 自证的开关轮几趟同时起（每趟各用各的临时目录、桩装置不起 cargo）
+SELFTEST_BREAK_WORKERS = 8
+
 
 def selftest():
     global current_digest, MEMORY_CAP_RUNNER, PROGRESS_CLOCK, PROGRESS_POLL_SECONDS, PROGRESS_SINK
@@ -2037,18 +2087,18 @@ def selftest():
                    and all(how == "复用" for _verdict, how in verdicts.values()), f"退 {got}、装置起了 {open(stub_trace).read().count(chr(10))} 次：{output.strip()[-300:]}")
         got, output, _verdicts = run_items([*with_store, "--no-reuse"])
         judge_cell("reuse-off", got == 0 and "现判 3、复用 0（现判的原因：关了复用 3）" in output, f"退 {got}：{output.strip()[-300:]}")
-        # 判法版本是另一列：输入一样都没变、只换判法版本，整格全现判、原因点名判法版本；再照真判法版本跑一趟记回去，后面几格比的是真判法版本
-        JUDGE_VERSION_FOR_SELFTEST.append("自证造的另一版判法")
+        # 判法单元指纹是另一列：输入一样都没变、只换判法单元指纹，整格全现判、原因点名它；再照真的跑一趟记回去，后面几格比的是真判法单元指纹
+        JUDGING_UNITS_FOR_SELFTEST.append("自证造的另一份判法单元")
         try:
             got, output, _verdicts = run_items(with_store)
         finally:
-            JUDGE_VERSION_FOR_SELFTEST.clear()
-        judge_cell("reuse-judge-version-changed", got == 0 and "现判 3、复用 0（现判的原因：判法版本 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+            JUDGING_UNITS_FOR_SELFTEST.clear()
+        judge_cell("reuse-judging-units-changed", got == 0 and "现判 3、复用 0（现判的原因：判法单元指纹 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
         run_items(with_store)
         write(CRATES_TABLE, crates_table.replace("红的一条\tcrates/x.rs\ta\t", "红的一条\tcrates/x.rs\ta2\t"))
         got, output, _verdicts = run_items(with_store)
         write(CRATES_TABLE, crates_table)
-        judge_cell("reuse-mutation-row-changed", got == 0 and "现判 1、复用 2（现判的原因：引的变异行 变了 1）" in output, f"退 {got}：{output.strip()[-300:]}")
+        judge_cell("reuse-mutation-row-changed", got == 0 and "现判 1、复用 2（现判的原因：变异原文与替换文 变了 1）" in output, f"退 {got}：{output.strip()[-300:]}")
         got, output, _verdicts = run_items(with_store)
         judge_cell("reuse-mutation-row-restored", got == 0 and "现判 0、复用 3" in output, f"变异行改回去之后期望全复用（键回到头一趟那一份），实测退 {got}：{output.strip()[-300:]}")
         stub_text = open(stub, encoding="utf-8").read()
@@ -2060,11 +2110,39 @@ def selftest():
             os.replace(stub + ".new", stub)
         replace_stub(stub_text + "# 桩改了一行注释\n")
         got, output, _verdicts = run_items(with_store)
-        judge_cell("reuse-device-changed", got == 0 and "现判 3、复用 0（现判的原因：装置 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        judge_cell("reuse-device-changed", got == 0 and "现判 3、复用 0（现判的原因：装置替身 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
         replace_stub(stub_text)
-        # 每一行的键里有这一行自己：表里另有一行与第一行同一个 ⑥、同一个 ⑦，只 ⑩ 不同；只判过第一行，那一行不能拿它的判定
+        run_items(with_store)
+        # --binary 换成另一份桩（另一个路径、内容多一行注释）：装置替身那一样变了，三行全现判；换回原来那份再记一趟，后面几格照原来的键比
+        other_stub = os.path.join(work, "stub-device-other.sh")
+        with open(other_stub, "w", encoding="utf-8") as handle:
+            handle.write(stub_text + "# 另一份桩\n")
+        os.chmod(other_stub, 0o755)
+        got, output, _verdicts = run_items(["--replay", "--binary", other_stub, "--memory-cap", "none", "--verdict-library", store_directory])
+        judge_cell("reuse-device-stand-in-swapped", got == 0 and "现判 3、复用 0（现判的原因：装置替身 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        run_items(with_store)
+        # 账路径改名（T13 的账路径那一半）：每行 ⑤ 换一个账文件名，内容不变，三行全复用（开关 row-key-with-ledger-path 下判错）
+        renamed_text = "\n".join(raw if not raw.strip() or raw.startswith("#") else
+                                  "\t".join(field.replace("-red-examples.tsv:", "-red-examples-renamed.tsv:") if index == 4 else field
+                                            for index, field in enumerate(raw.split("\t"))) for raw in pinned_text.split("\n"))
+        write(TABLE, renamed_text)
+        got, output, _verdicts = run_items(with_store)
+        write(TABLE, pinned_text)
+        judge_cell("reuse-ledger-path-renamed", renamed_text != pinned_text and got == 0 and "现判 0、复用 3" in output,
+                   f"期望账路径改名三行全复用，实测退 {got}：{output.strip()[-300:]}")
+        # 变异改名：变异表那一行与 ⑥ 一起改名，原文与替换文不变，照复用（开关 row-key-with-mutation-name 下判错）
+        renamed_mutation = crates_table.replace("红的一条\tcrates/x.rs\t", "红的那一条\tcrates/x.rs\t")
+        write(CRATES_TABLE, renamed_mutation)
+        write(TABLE, pinned_text.replace("#红的一条", "#红的那一条"))
+        got, output, _verdicts = run_items(with_store)
+        write(CRATES_TABLE, crates_table)
+        write(TABLE, pinned_text)
+        judge_cell("reuse-mutation-renamed", renamed_mutation != crates_table and got == 0 and "现判 0、复用 3" in output,
+                   f"期望变异改名照复用，实测退 {got}：{output.strip()[-300:]}")
+        # 每一行的键里有这一行自己：表里另有一行与第一行同一个输入、同一个 ⑥，只是期望逐态行 ⑦（与抄来的 ⑳）多一个计数名；只判过第一行，那一行不能拿它的判定
         twin_fields = list(pinned_rows[0]["fields"])
-        twin_fields[9] = twin_fields[9] + "+5"
+        twin_fields[6] = twin_fields[6].replace("counters=states", "counters=states,twin", 1)
+        twin_fields[19] = twin_fields[6]
         write(TABLE, pinned_text.rstrip("\n") + "\n" + "\t".join(twin_fields) + "\n")
         twin_item = f"pinned:{len(pinned_text.rstrip(chr(10)).split(chr(10))) + 1}"
         own_store = os.path.join(work, "verdict-library-own")
@@ -2105,7 +2183,7 @@ def selftest():
                 handle.write(open(os.path.join(root, relative), encoding="utf-8").read())
         closure_files = {"Cargo.toml": '[workspace]\nmembers = ["crates/singlefs-checker-tier", "crates/dep"]\n', "Cargo.lock": "# 锁\n",
                          "crates/singlefs-checker-tier/Cargo.toml": '[package]\nname = "singlefs-checker-tier"\nversion = "0.0.0"\n\n[dependencies]\ndep = { path = "../dep" }\n',
-                         f"crates/singlefs-checker-tier/src/bin/{DEVICE_BINARY}.rs": f"// 认 {DEVICE_FLAG}\nfn main() {{}}\n",
+                         f"crates/singlefs-checker-tier/src/bin/{DEVICE_BINARY}.rs": f"// 认 {DEVICE_FLAG}\nfn main() {{\n    dep::one();\n    helper();\n}}\nfn helper() -> u32 {{\n    2\n}}\n",
                          "crates/dep/Cargo.toml": '[package]\nname = "dep"\nversion = "0.0.0"\n', "crates/dep/src/lib.rs": "pub fn one() -> u32 { 1 }\n"}
         for relative, content in closure_files.items():
             os.makedirs(os.path.dirname(os.path.join(closure_root, relative)) or closure_root, exist_ok=True)
@@ -2114,17 +2192,21 @@ def selftest():
         subprocess.run(["git", "init", "-q", closure_root], capture_output=True)
         closure_store = os.path.join(work, "verdict-library-closure")
         run_items([*replay_arguments, "--verdict-library", closure_store], at=closure_root)
-        with open(os.path.join(closure_root, "crates/dep/src/lib.rs"), "a", encoding="utf-8") as handle:
-            handle.write("// 依赖改了一行\n")
+        with open(os.path.join(closure_root, "crates/dep/src/lib.rs"), "w", encoding="utf-8") as handle:
+            handle.write("pub fn one() -> u32 { 1 + 0 }\n")
         got, output, _verdicts = run_items([*replay_arguments, "--verdict-library", closure_store], at=closure_root)
-        judge_cell("reuse-closure-changed", got == 0 and "现判 3、复用 0（现判的原因：装置 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        judge_cell("reuse-closure-changed", got == 0 and "现判 3、复用 0（现判的原因：装置单元闭包 变了 3）" in output and "改了 fn one" in output,
+                   f"期望装置调到的函数改了三行全现判、点名 fn one，实测退 {got}：{output.strip()[-300:]}")
+        with open(os.path.join(closure_root, "crates/dep/src/lib.rs"), "a", encoding="utf-8") as handle:
+            handle.write("pub fn nobody_calls_it() -> u32 { 2 }\n")
+        got, output, _verdicts = run_items([*replay_arguments, "--verdict-library", closure_store], at=closure_root)
+        judge_cell("reuse-closure-unrelated-function", got == 0 and "现判 0、复用 3" in output, f"依赖里加一个没人调的函数期望全复用，实测退 {got}：{output.strip()[-300:]}")
         os.makedirs(os.path.join(closure_root, "crates/singlefs-checker-tier/tests"))
         with open(os.path.join(closure_root, "crates/singlefs-checker-tier/tests/not_read_by_the_bin.rs"), "w", encoding="utf-8") as handle:
             handle.write("// cargo 编装置读不到 tests/\n")
         got, output, _verdicts = run_items([*replay_arguments, "--verdict-library", closure_store], at=closure_root)
         judge_cell("reuse-closure-unchanged", got == 0 and "现判 0、复用 3" in output, f"退 {got}：{output.strip()[-300:]}")
         # crate 根下 cargo 不读的文件（Verus 必红世界表 verus-must-red-worlds.tsv 这一类）不进装置那一样：新放一份、再改一行，三行都复用
-        # （admission.py 的 ADMISSION_BREAK=closure-keeps-crate-root-files 下这一格判错：三行全现判，原因「装置 变了」）
         root_file_outputs = []
         for content in ("名\t第一行\n", "名\t第一行 \n"):
             with open(os.path.join(closure_root, "crates/dep/verus-must-red-worlds.tsv"), "w", encoding="utf-8") as handle:
@@ -2132,6 +2214,48 @@ def selftest():
             root_file_outputs.append(run_items([*replay_arguments, "--verdict-library", closure_store], at=closure_root))
         judge_cell("reuse-crate-root-file-unchanged", all(got == 0 and "现判 0、复用 3" in output for got, output, _verdicts in root_file_outputs),
                    "；".join(f"退 {got}：{output.strip()[-200:]}" for got, output, _verdicts in root_file_outputs))
+        # 装置源码（bin 入口那份文件）里 main 调到的一个 fn 改了：装置单元闭包变了，三行全现判、点名那个 fn
+        device_path = os.path.join(closure_root, f"crates/singlefs-checker-tier/src/bin/{DEVICE_BINARY}.rs")
+        with open(device_path, encoding="utf-8") as handle:
+            device_text = handle.read()
+        with open(device_path, "w", encoding="utf-8") as handle:
+            handle.write(device_text.replace("fn helper() -> u32 {\n    2\n}", "fn helper() -> u32 {\n    3\n}", 1))
+        got, output, _verdicts = run_items([*replay_arguments, "--verdict-library", closure_store], at=closure_root)
+        judge_cell("reuse-device-source-function-changed", got == 0 and "现判 3、复用 0（现判的原因：装置单元闭包 变了 3）" in output and "改了 fn helper" in output,
+                   f"期望装置源码里 main 调到的 fn 改了三行全现判、点名 fn helper，实测退 {got}：{output.strip()[-300:]}")
+
+        # ── 判法单元指纹（replay 的闭包）：算得出、不拒算；replay 里只改与起装置无关的注释不变，改它的代码变 ──
+        script_relative = os.path.relpath(os.path.realpath(__file__), REPOSITORY_ROOT)
+        base_key = judging_unit_key_of(REPOSITORY_ROOT, script_relative)
+        judge_cell("judging-units-no-refusal", base_key.key is not None and not base_key.refusals,
+                   f"replay 的判法单元指纹要算得出、不拒算，实测拒算 {list(base_key.refusals)[:3]}")
+        copy_root = os.path.join(work, "judging-copy")
+        member_files = {line.split("\t")[2].rsplit(":", 1)[0] for line in base_key.units} | set(NOT_JUDGING_FILES) | {script_relative}
+        for relative in sorted(member_files):
+            os.makedirs(os.path.dirname(os.path.join(copy_root, relative)), exist_ok=True)
+            shutil.copyfile(os.path.join(REPOSITORY_ROOT, relative), os.path.join(copy_root, relative))
+        copied_script = os.path.join(copy_root, script_relative)
+        with open(copied_script, encoding="utf-8") as handle:
+            script_text = handle.read()
+        # 只在 replay 那一段里改（这份自证自己也写着同样的字，按整份文件找会找错地方）
+        replay_start = script_text.index("\ndef replay(")
+        replay_end = script_text.index("\ndef ", replay_start + 1)
+        replay_text = script_text[replay_start:replay_end]
+        comment = "    # 按档分组（㉒ 相同的一组，组的次序照第一次出现），每组再按块起装置、每块带这一组的档参数\n"
+        message = 'raise Red("钉住的表本身不对："'
+        if replay_text.count(comment) != 1 or replay_text.count(message) != 1:
+            judge_cell("judging-units-comment-only", False, f"replay 里那一行注释命中 {replay_text.count(comment)} 次、那一句命中 {replay_text.count(message)} 次（要各恰好一次）")
+        else:
+            commented_text = replay_text.replace(comment, comment.rstrip("\n") + "（只改了注释的措辞）\n", 1)
+            with open(copied_script, "w", encoding="utf-8") as handle:
+                handle.write(script_text[:replay_start] + commented_text + script_text[replay_end:])
+            commented = judging_unit_key_of(copy_root, script_relative)
+            changed_text = replay_text.replace(message, 'raise Red("钉住的表本身就不对："', 1)
+            with open(copied_script, "w", encoding="utf-8") as handle:
+                handle.write(script_text[:replay_start] + changed_text + script_text[replay_end:])
+            changed = judging_unit_key_of(copy_root, script_relative)
+            judge_cell("judging-units-comment-only", base_key.key is not None and commented.key == base_key.key and changed.key not in (None, base_key.key),
+                       f"原样 {base_key.key}、只改 replay 里一行注释 {commented.key}（拒算 {list(commented.refusals)[:2]}）、改 replay 里一句话 {changed.key}")
 
         # ── 钉表认档（文件头「档」一段）──
         # r2 档的账：同样三个输入、同样三个变异，原实现逐态行多判一条（counters 后面多 ,j6qn），state= 不变（① 相同）；产物 device_arguments=--profile+r2+--bounds+segment2
@@ -2239,7 +2363,7 @@ def selftest():
 
     breaks_missed, breaks_proven = [], 0
     if not wrong and not BREAK:
-        for item in ("pin-twice", "titles-unchecked", "no-recheck-before-write", "check-ignores-missing", "fingerprint-unchecked", "variant-unchecked", "replay-ignores-output",
+        items = ("pin-twice", "titles-unchecked", "no-recheck-before-write", "check-ignores-missing", "fingerprint-unchecked", "variant-unchecked", "replay-ignores-output",
                      "wrapper-exit-as-replay-red", "killed-as-regression", "names-from-today-table", "kill-bounds-optional", "title-missing-ignored",
                      "title-not-compared", "variant-sets-unchecked", "ledger-digest-unchecked",
                      "whole-row-unchecked", "old-rows-accepted", "copied-columns-unchecked", "dedupe-by-input-variant", "backfill-unverified",
@@ -2247,11 +2371,20 @@ def selftest():
                      "item-filter-ignored", "reuse-key-without-closure", "reuse-key-without-row", "reuse-key-without-mutation-row", "reuse-ignores-key",
                      "reuse-records-red", "reuse-records-whole-cell-only", "void-ledgers-ignored", "void-rows-unchecked", "void-complete-accepted",
                      "profile-read-as-r1", "same-profile-conflict-ignored", "check-ignores-profile", "replay-without-profile", "profile-column-unchecked",
-                     "profile-arguments-unchecked", "reuse-key-without-profile", "reuse-key-without-judge-version", "list-items-pipe-unhandled", "superseded-replacement-pin-unchecked", "superseded-coverage-unchecked",
-                     "superseded-profile-unchecked", "superseded-rows-unchecked", "threads-default-cpu-count"):
-            completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
-                                       env=dict(os.environ, E165_PIN_RED_EXAMPLES_BREAK=item))
-            if completed.returncode == 0:
+                     "profile-arguments-unchecked", "reuse-key-without-profile", "reuse-key-without-judging-units", "row-key-with-ledger-path", "row-key-with-mutation-name", "list-items-pipe-unhandled", "superseded-replacement-pin-unchecked", "superseded-coverage-unchecked",
+                     "superseded-profile-unchecked", "superseded-rows-unchecked", "threads-default-cpu-count", "stand-in-unkeyed", "judging-units-raw-text",
+                     "spawn-inside-judging-closure")
+        # 各开关的那一趟互不依赖、各用各的临时目录：几趟同时起（至多 SELFTEST_BREAK_WORKERS 趟），按开关的次序收退出码、数份数
+        def run_break(item):
+            return item, subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
+                                        env=dict(os.environ, E165_PIN_RED_EXAMPLES_BREAK=item)).returncode
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(SELFTEST_BREAK_WORKERS, int(default_heavy_threads(os.environ))))) as pool:
+            outcomes = list(pool.map(run_break, items))
+        if len(outcomes) != len(items):
+            breaks_missed.append(f"开关轮收回 {len(outcomes)} 趟、派出 {len(items)} 趟")
+        for item, returncode in outcomes:
+            if returncode == 0:
                 breaks_missed.append(item)
             else:
                 breaks_proven += 1

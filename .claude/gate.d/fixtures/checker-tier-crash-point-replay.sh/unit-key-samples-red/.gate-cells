@@ -1,0 +1,2 @@
+# 快档按条复用：同一份上一版与改动，假 cargo 让 S17 那一条（test_t）判 FAILED：判红，红句点名它与它变了的单元，复用的几条照样不跑；判的是 crash-case-replay 格；阶段不用共用库、自己不读这份，只给 code-tooling 的 fixture-claims 格数红绿
+crash-case-replay

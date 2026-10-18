@@ -1,3 +1,0 @@
-test retirement_tree::tests::the_first_retirement_record_opens_container_one_and_the_next_publish_appends_to_the_open_container ... FAILED
-test retirement_tree::tests::the_same_identity_retired_twice_keeps_both_records ... FAILED
-test result: FAILED. 238 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s

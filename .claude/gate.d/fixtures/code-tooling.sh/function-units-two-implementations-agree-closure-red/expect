@@ -1,0 +1,4 @@
+exit=1
+want=crates/fsample/src/lib.rs::entry 只在 Rust 闭包里：const	fsample::WIDTH	crates/fsample/src/lib.rs:8-8
+want=  ✗ crates/fsample/src/lib.rs::entry：闭包两份不同（Rust 6 个、python 4 个；只在 Rust 里 2 个、只在 python 里 0 个）
+want=function-units-two-implementations-agree：红（退出 1）

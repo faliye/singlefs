@@ -1,3 +1,0 @@
-LAYER0_SLICE item=multi-record-layer0-domain states=1358954634 states_per_slice=20737 blocks=20737 slices_per_block=3.16 blocks_with_states_on_both_hosts=20736
-LAYER0_SLICE item=delete-30 states=1448083638 states_per_slice=22097 blocks=22097 slices_per_block=2.97 blocks_with_states_on_both_hosts=22096
-LAYER0_SLICE item=fixed-unmount-28 states=1610875015 states_per_slice=24581 blocks=24581 slices_per_block=2.67 blocks_with_states_on_both_hosts=24580

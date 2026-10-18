@@ -1,3 +1,0 @@
-                    root: RootReadOnOneRebuildPass::ValidRoot { checkpoint_txg },
-                    ..
-                } => Some(CheckpointTxg(checkpoint_txg.0 + 1_000_000)),

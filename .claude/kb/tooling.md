@@ -162,7 +162,7 @@ cargo mutants --list --package singlefs-core | wc -l
 
 ## `scripts/mutation/mutate.sh` 的结局分类
 
-- 结局：`✅ [抓到]`（红了）/ `❌ [没红]`（测试盲区）/ `⏭ 变异导致编译失败（无效变异，不计入盲区也不算命中）`；另有 `⏱ [超时]`、`🧱 [撞内存]`、包装排不上、被内存总上限挤掉与显存不够几类，各自单列（全部结局见 `scripts/mutation/mutate.sh` 文件头与 `--selftest`）。
+- 结局：`✅ [抓到]`（红了）/ `❌ [没红]`（测试盲区）/ `⏭ 变异导致编译失败（无效变异，不计入盲区也不算命中）`；另有 `⏱ [超时]`、`🧱 [撞内存]`、包装排不上、被内存总上限挤掉、显存不够与锚点失效（`⚓ [锚点腐化]`，原文命中不是恰好一次的那一条不跑、不入判定库，别的条照跑，整轮退 3）几类，各自单列（全部结局见 `scripts/mutation/mutate.sh` 文件头与 `--selftest`）。
 - 改了判定工具，拿已知答案的整套语料回归一遍，不只跑新加的那几条。
 
 ## 几个会话共用一个仓时怎么暂存与提交
@@ -195,9 +195,9 @@ cargo mutants --list --package singlefs-core | wc -l
 | doc-decisions 的 item-ref-status 格（引用归属） | 行内裸的「已定项 k」归属给同一行最近的 `D<n>（简称）` | 新立分项之后跑 doc-decisions 的 item-ref-status 格，把翻掉的裸引用补上决策名；决策正文里引别的决策的分项，同一行里要重复写自己的决策名 |
 | doc-lint | `F` 加数字这类审核编号被当成没有登记位的编号；简称后面加逗号注判「名字不符」 | 写「发现 1」「提议 2」；括注另起一对括号，写成「编号（简称）（条款已写）」，不塞进简称的括号里 |
 | doc-registries 的 table-shape 格（欠账表形状） | 新的六列欠账行接在文件末尾，而那里是「已还清」那张 4 列表；欠着那张里一格开头写「已还（…）」或「销账」；欠着那张中间夹一个空行 | 接在第一张表最后一行后面：第一个五竖线的 `\|---\|` 之前、最后一行以 `\| C` 开头且竖线 ≥ 7 的行；还清了就按四列挪进已还清表，只还一部分的开头写「已还一半」「决策已定、检查仍欠」「前置已还」；表中间不留空行 |
-| doc-registries 的 segment-registry 格（段序列登记表） | `--selftest` 要「mkfs 种根」那一行的段序列串在整份 `layout/01-first-txn.md` 里只出现一次，历史版本里写同一串就红；只有一段的路径（取号 `2`）正则不认 | 历史里用「4 + 1 + 1 + 1 + 4」带空格的写法；把 `check-segment-registry.py` 的正则改成 `*` |
-| 门禁 doc-decisions 的变更史两格（entry-added、shape） | 「（其N）」、快查两行与节顶现状行 | 写法与判法在 `.claude/rules/changelog-format.md`；整理前后的丢失度由 `scripts/kb/history-consolidate.py loss-check` 判 |
-| code-source-discipline 的 format-constants 格（格式常量） | kb 标记改值后，`research/**/*.rs` 里每一份同名 `const` 都要跟；`stale=` 列的旧值串不许再出现在 kb 正文 | 别把仍在别处合法出现的串（`base = 95`）加进 `stale=` |
+| doc-registries 的 segment-registry 格（段序列登记表） | `--selftest` 要「mkfs 种根」那一行的段序列串在整份 `layout/01-first-txn.md` 里只出现一次，同一串在别处再写一遍就红 | 别处引用写成「4 + 1 + 1 + 1 + 4」带空格的写法 |
+| 门禁 doc-decisions 的变更史三格（entry-added、shape、history-loss） | 「（其N）」、快查两行与节顶现状行 | 写法与判法在 `.claude/rules/changelog-format.md`；数与编号有没有丢由 history-loss 格判，整理变更史时暂存前自己先跑 `scripts/kb/history-consolidate.py loss-check` |
+| code-source-discipline 的 format-constants 格（格式常量） | kb 标记改值后，`scripts/experiments/**/*.rs` 与 `crates/**/*.rs` 里每一份同名 `const` 都要跟（`research/` 下只剩冻结证据，扫它但由 `.claude/format-constants-exclude` 逐份放行）；`stale=` 列的旧值串不许再出现在 kb 正文 | 别把仍在别处合法出现的串（`base = 95`）加进 `stale=` |
 | clippy `shadow_unrelated` | 同一个测试函数里第二次 `let reader = …` / `let segments = …` 判红，rustfmt 重排之后用正则替换还会漏改后半段 | 每个读者 / 段 / 报告起不同的名字（`extent_reader`、`warm_up_segments`、`control_report`） |
 | naming-lint | 「字母 + 数字」当单字母：`read_u48` 判红，测试名以 `a_` 开头判红；它扫全仓的 .rs，连 `research/prompts` 里云端腿写的模型源码也扫 | 写 `read_six_byte_unsigned`；`research/prompts` 在 `.claude/naming-lint-exclude`（证据目录，不回收），腿的模型写到别的目录照查 |
 | checker-tier-crash-point-replay（崩溃点重放全量） | 用例标 `#[ignore]`、住 `crates/singlefs-checker-tier/tests/`（D13（验证路线） 已定项 15），`cargo test -p singlefs-checker-tier` 报几条 ignored 是正常的；harness 档 `cargo test -p singlefs-harness` 跑不到它们 | 门禁的 `--full` 在 release 下逐条照复用判定跑（快档不跑全量）；全量在跑时换 `CARGO_TARGET_DIR` 就能同时编别的测试 |

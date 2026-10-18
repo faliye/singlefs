@@ -819,6 +819,7 @@ def run_selftest():
 def selftest_cells(work, outside, broken):
     """十四格；交 (格数, [(格号, 判错的一句)], [(格号, 本次未跑的一句)])。真家伙只起 cargo / rustc 的版本查询与立刻报错退出的 cargo build（清单不在）。
     第 9 到 12 格要 strace 与一份真 cargo 的路径，没有就记本次未跑（弄坏开关 exec-trace-skipped 下照跑、照判错）。"""
+    global process_environment, process_arguments, process_executable  # 第 8、14 格拿替身换掉读 /proc 的这几个函数、判完换回
     failures, not_run = [], []
     quiet_settings = Settings([os.path.join(work, "toolchain")], [], os.path.join(work, "main-worktree", "multi-host.env"), os.path.join(work, "private"),
                               exempt_roots=[work])
@@ -920,15 +921,15 @@ def selftest_cells(work, outside, broken):
 
     # 第 8 格：真清场那一判读到空的环境——参数也读不到了（两次读之间它退出了）不报；参数还在（环境本来就是空的）照报。拿替身换掉两个读 /proc 的函数演
     arguments = ["bash", wrapper, "--", "true"]
-    saved = (globals()["process_environment"], globals()["process_arguments"])
+    saved = (process_environment, process_arguments)
     try:
-        globals()["process_environment"] = lambda _pid: {}
-        globals()["process_arguments"] = lambda _pid: None
+        process_environment = lambda _pid: {}
+        process_arguments = lambda _pid: None
         exited = [kind for kind, _text in judge_process(1, arguments, quiet_settings, broken) if kind == "真清场"]
-        globals()["process_arguments"] = lambda _pid: list(arguments)
+        process_arguments = lambda _pid: list(arguments)
         empty = [kind for kind, _text in judge_process(1, arguments, quiet_settings, broken) if kind == "真清场"]
     finally:
-        globals()["process_environment"], globals()["process_arguments"] = saved
+        process_environment, process_arguments = saved
     if exited or not empty:
         failures.append((8, f"退出途中读到的空环境应当不报、本来就空的环境照报（实际 {len(exited)} 处、{len(empty)} 处）"))
 
@@ -938,15 +939,15 @@ def selftest_cells(work, outside, broken):
     toolchain_cargo = os.path.join(work, "toolchain", "cargo")
     shim_cases = [(["/usr/bin/env", "bash", shim_path, "-V"], 0), (["bash", shim_path, "-vV"], 0), (["/usr/bin/env", "-i", "bash", shim_path, "--version"], 0),
                   (["/usr/bin/env", "bash", shim_path, "build"], 1), (["bash", shim_path, "test"], 1), ([toolchain_cargo, "-V"], 0), ([toolchain_cargo, "build"], 1)]
-    saved = (globals()["process_executable"], globals()["process_arguments"])
+    saved = (process_executable, process_arguments)
     judged = []
     try:
-        globals()["process_executable"] = lambda _pid: toolchain_cargo
+        process_executable = lambda _pid: toolchain_cargo
         for case_arguments, _expected in shim_cases:
-            globals()["process_arguments"] = lambda _pid, held=case_arguments: list(held)
+            process_arguments = lambda _pid, held=case_arguments: list(held)
             judged.append(len([kind for kind, _text in judge_process(1, case_arguments, quiet_settings, broken) if kind == "真工具链"]))
     finally:
-        globals()["process_executable"], globals()["process_arguments"] = saved
+        process_executable, process_arguments = saved
     wrong_shim_cases = [f"{shlex.join(case_arguments)} 报了 {reported} 处（该 {expected}）"
                         for (case_arguments, expected), reported in zip(shim_cases, judged) if reported != expected]
     if wrong_shim_cases:

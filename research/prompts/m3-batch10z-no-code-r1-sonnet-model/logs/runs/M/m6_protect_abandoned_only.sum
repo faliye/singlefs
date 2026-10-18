@@ -1,6 +1,0 @@
-m6_protect_abandoned_only s1 histories=60 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
-m6_protect_abandoned_only s2 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
-m6_protect_abandoned_only s3 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
-m6_protect_abandoned_only s4 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
-m6_protect_abandoned_only s5 histories=60 handed_out>0:36 both>0:0 unblocked_grew:40 rc=0
-m6_protect_abandoned_only s6 histories=40 handed_out>0:40 both>0:0 unblocked_grew:40 rc=0

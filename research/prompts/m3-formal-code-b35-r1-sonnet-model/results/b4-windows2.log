@@ -1,7 +1,0 @@
-窗口 6..=58: exit=101 红（抓到） | thread 'model::tests::a_rollback_takes_exactly_the_inode_leaf_containers_right_of_the_leftmost_of_its_target_f | assertion `left == right` failed: 现行 1 片、目标 30 片：回退写出的那一版最左那片之外的叶容器要恰好是目标那一版的 left: {InodeLeafRightOfTheLeftmost(ModelInodeLeafContainerRightOfTheLeftmost { position_from_the_leftmost: 1 }): ModelChec
-窗口 5..=98: exit=101 红（抓到） | thread 'model::tests::a_rollback_takes_exactly_the_inode_leaf_containers_right_of_the_leftmost_of_its_target_f | assertion `left == right` failed: 现行 1 片、目标 30 片：回退写出的那一版最左那片之外的叶容器要恰好是目标那一版的 left: {InodeLeafRightOfTheLeftmost(ModelInodeLeafContainerRightOfTheLeftmost { position_from_the_leftmost: 1 }): ModelChec
-窗口 100..=133: exit=101 红（抓到） | thread 'model::tests::a_rollback_takes_exactly_the_inode_leaf_containers_right_of_the_leftmost_of_its_target_f | assertion `left == right` failed: 现行 1 片、目标 120 片：回退写出的那一版最左那片之外的叶容器要恰好是目标那一版的 left: {InodeLeafRightOfTheLeftmost(ModelInodeLeafContainerRightOfTheLeftmost { position_from_the_leftmost: 1 }): ModelChe
-窗口 5..=28: exit=0 绿（存活） |  | 
-窗口 30..=98: exit=0 绿（存活） |  | 
-窗口 100..=118: exit=0 绿（存活） |  | 
-窗口 120..=133: exit=0 绿（存活） |  | 

@@ -1,5 +1,0 @@
-file=crates/singlefs-core/src/admission.rs anchor_hits=1
-exit=101
-test admission::tests::demand_counts_every_rewritten_role_and_only_a_publish_with_an_ordinary_allocation_is_judged ... FAILED
-test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 227 filtered out; finished in 0.00s
-error: test failed, to rerun pass `-p singlefs-core --lib`

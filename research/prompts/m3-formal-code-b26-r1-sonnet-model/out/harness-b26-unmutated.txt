@@ -1,8 +1,0 @@
-     Running tests/allocator_fallback_count_on_small_devices_after_repeated_mounts_and_the_first_file.rs 
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.61s
-     Running tests/checker_known_bad_images.rs 
-test result: ok. 84 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 59.19s
-     Running tests/mount_transparency_judged_field_by_field_after_a_writable_mount.rs 
-test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.49s
-     Running tests/new_pool_file_creation_publish.rs 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s

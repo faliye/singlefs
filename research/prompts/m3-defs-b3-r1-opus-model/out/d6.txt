@@ -1,7 +1,0 @@
-name=d6 case=no-halted rc=2
-name=d6 case=legit-user-quote rc=0
-name=d6 case=self-cite rc=0
-name=d6 case=cite-own-body rc=0
-name=d6 case=cite-the-rule-itself rc=0
-name=d6 case=cite-outside-repo rc=0
-name=d6 case=abandoned-tsv-row-only rc=2

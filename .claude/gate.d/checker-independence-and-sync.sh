@@ -89,6 +89,7 @@
 #     reference-moved-unchecked            包目录不在而包名还在时按本次未跑报：reference-moved-red 退 0
 #     reference-sources-empty-accepted     一个 .rs 都没有也照判：reference-without-sources-red 退 0
 #     reference-absent-unreported          包不在时不报本次未跑：checker-implementation-disjoint-red 的「⑤ ⑥ 两条本次未跑」出不来
+#     relative-root-unresolved             cd 进根之后不把根换成绝对路径：cpu-judging-sites-relative-root-green 里判法脚本在新的工作目录下读不到登记表，退 1，「判器调用点都合规…」出不来
 #   REJECTION_BLOCKS_BREAK=summaries-only lib/rejection-blocks.py 只打摘要：layout-checker-sync-red 的「format/布局.md:5  标记按文法读不出来」明细出不来
 #   CPU_JUDGING_SITES_CHECK_BREAK=<项>    判法那一份（scripts/crash/cpu-judging-sites-check.py，开关表在它文件头）的弄坏开关，样本上：
 #     unmarked-sites-accepted              没标记的调用点不判红：cpu-judging-sites-red 的「history.rs:1 violations_on 调 check_pool_image」出不来
@@ -102,6 +103,10 @@
 # 样本（fixtures/checker-independence-and-sync.sh/）：
 #   cpu-judging-sites-green  判定段整份里的一处、带 gpu-exempt 标记的函数里的一处、判器本体里的一处与调它的判定段函数，排除表里那一份的不判：绿
 #   cpu-judging-sites-red    另有 harness 档 src 里一处没标记的池级 checker 调用，登记表多一行一份都对不上的 pool_checker_*.rs：红、逐处列
+#   cpu-judging-sites-relative-root-green  同 cpu-judging-sites-green，另在样本根放 .relative-root-sample：阶段先 cd 到样本的上一级、再以相对路径给根，判得与绝对路径相同：绿
+#
+# 项目根：可以给相对路径。阶段 cd 进根之后把根换成 pwd -P 的绝对路径，各格和它们起的子进程都用这一个绝对路径（cpu-judging-sites 格把它交给 python 判法，
+# 相对路径会在新的工作目录下再解析一次）。样本档只能给绝对路径，样本根里放着 .relative-root-sample 的（阶段所在的仓之外）由阶段自己走一遍"上一级 + 相对名"的调法。
 #
 #   bash .claude/gate.d/checker-independence-and-sync.sh [项目根]                          三格都跑
 #   bash .claude/gate.d/checker-independence-and-sync.sh --list                            逐行打格名与判什么，不跑格
@@ -133,7 +138,15 @@ while (($#)); do
   esac
 done
 ROOT="${root_argument:-$REPO_ROOT}"
+# 样本根里放了 .relative-root-sample 的（阶段所在的仓之外），先 cd 到样本的上一级、再以相对路径给根：样本档只能给绝对路径，这一段让它走到相对路径给根的解析
+if [[ -f "$ROOT/.relative-root-sample" && "$ROOT" != "$REPO_ROOT" ]]; then
+  relative_root_parent="$(dirname "$ROOT")"
+  relative_root_name="$(basename "$ROOT")"
+  cd "$relative_root_parent" 2>/dev/null && ROOT="$relative_root_name"
+fi
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
+# 之后各格和起的子进程都在这个目录里解析路径：把根换成 cd 之后的绝对路径，相对路径给根时不会在新目录下再解析一次
+if [[ "${CHECKER_INDEPENDENCE_BREAK:-}" != relative-root-unresolved ]]; then ROOT="$(pwd -P)"; fi
 
 # ── checker-implementation-disjoint ──
 cell_checker_implementation_disjoint() {

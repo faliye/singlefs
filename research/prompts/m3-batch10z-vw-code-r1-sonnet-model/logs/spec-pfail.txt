@@ -1,4 +1,0 @@
-pf0 S2_LABEL=k0 S2_SLOTS=384 S2_PREFIXES='oooooooooooooooooooo' S2_RS='b6' S2_FAULTS='racct,rlin' S2_MID='' S2_ACTIONS='oPPKoooKoo'  P_FAIL_AT=0
-pf20 S2_LABEL=k20 S2_SLOTS=384 S2_PREFIXES='oooooooooooooooooooo' S2_RS='b6' S2_FAULTS='racct,rlin' S2_MID='' S2_ACTIONS='oPPKoooKoo'  P_FAIL_AT=20
-pf60 S2_LABEL=k60 S2_SLOTS=384 S2_PREFIXES='oooooooooooooooooooo' S2_RS='b6' S2_FAULTS='racct,rlin' S2_MID='' S2_ACTIONS='oPPKoooKoo'  P_FAIL_AT=60
-pf90 S2_LABEL=k90 S2_SLOTS=384 S2_PREFIXES='oooooooooooooooooooo' S2_RS='b6' S2_FAULTS='racct,rlin' S2_MID='' S2_ACTIONS='oPPKoooKoo'  P_FAIL_AT=90

@@ -1,6 +1,0 @@
-rc=0
-OPUS_K3_DIGEST seed=1 ops=80 rollbacks_ok=11 rollbacks_refused=0 final_txg=134 final_watermark=276 digest=e1c4753ea9a4d00d7da013ce3dbbd4d50a4d1375a74b9653af5b16591f887e1e
-OPUS_K3_DIGEST seed=2 ops=80 rollbacks_ok=13 rollbacks_refused=0 final_txg=131 final_watermark=281 digest=8288edc0c09285e85be54bd7a0d82f8145fbbc173a584b1badf9f2876c366e7d
-OPUS_K3_DIGEST seed=3 ops=80 rollbacks_ok=10 rollbacks_refused=0 final_txg=131 final_watermark=285 digest=9ca6c87e28fa567bb6714c34df900938c4003692f6b5067782994de7f97c7715
-OPUS_K3_DIGEST seed=4 ops=80 rollbacks_ok=18 rollbacks_refused=0 final_txg=124 final_watermark=281 digest=3a762c82f9de60001aad00843b9f5e1d57b8e2f8106dcd9496e5a2dbc3f5dec0
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out

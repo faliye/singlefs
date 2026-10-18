@@ -1,4 +1,0 @@
-ROW 2 RED(caught) rc=101 109s kind=append 第10z批第六块 显存账 G2 乙 丢了的设备还可能占着卡时照读数分（旧设备那一份当成新设备的驱动那一份）
-   test k3_1_random_ops_never_let_the_ledger_give_more_than_is_physically_lendable ... FAILED
-   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 2.58s
-   error: test failed, to rerun pass `-p singlefs-harness --test sonnet_g2_model`

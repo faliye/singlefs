@@ -1,8 +1,0 @@
-        let reclaim_floor = if checkpoint_txg.0 == 51 {
-            checkpoint_txg
-        } else {
-            crate::mount::reclaim_floor(
-                occupancy.effective_floor,
-                occupancy.oldest_valid_root_in_the_ring(),
-            )
-        };

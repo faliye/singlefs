@@ -1,6 +1,0 @@
-ok ['m24-lr3-raise-no-restore']
-## lr3full rc=101 :: test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.21s 
-   FAILED: test a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_account_and_mapping_is_refused_and_restores_the_allocator ... FAILED
-   BUILD: error: test failed, to rerun pass `-p singlefs-harness --test an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping`
-ok ['m24-lr3-raise-no-restore', 'restore']
-done

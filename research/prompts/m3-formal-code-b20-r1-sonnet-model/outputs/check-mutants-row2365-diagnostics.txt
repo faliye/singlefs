@@ -1,4 +1,0 @@
-warning: unused variable: `second_crash_image_materialized`
-    --> crates/singlefs-checker-tier/src/crash_injection.rs:2998:13
-warning: `singlefs-checker-tier` (lib test) generated 1 warning (run `cargo fix --lib -p singlefs-checker-tier --tests` to apply 1 suggestion)
-warning: `singlefs-checker-tier` (lib) generated 1 warning (1 duplicate)

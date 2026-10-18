@@ -1,2 +1,0 @@
-S2 name=cascade leaf_cap=6 retirement_container_cap=3 keep=1 unlinked=7 sizes_before=[1,1,1,1,1,1,1,1,1,1] retirement_records_before=0 sizes_after=[6,1,1,1] retirement_records_in_the_last_batch_publish=6 retirement_containers_written_in_that_publish=2 absorbs=5 drops=1
-S2 name=cascade leaf_cap=6 retirement_container_cap=3 keep=2 unlinked=2 sizes_before=[2,2,2,2,2,2,2,2,2,2] retirement_records_before=0 sizes_after=[5,2,2,2,2,2,2,2] retirement_records_in_the_last_batch_publish=2 retirement_containers_written_in_that_publish=1 absorbs=2 drops=0

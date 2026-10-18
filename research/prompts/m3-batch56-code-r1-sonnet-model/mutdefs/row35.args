@@ -1,1 +1,0 @@
--p singlefs-core --lib -- inode_tree::tests

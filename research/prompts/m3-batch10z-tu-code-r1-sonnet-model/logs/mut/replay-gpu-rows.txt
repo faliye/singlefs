@@ -1,8 +1,0 @@
-行3554 块 GPU 取卡 K5 卡池扫源码把 != 拆成 ! 与 =（条目层的不等号又被认成调宏，正推 K5_const_ne）: 红 1 条 ['the_card_pool_scan_reads_an_item_level_not_equal_as_a_comparison_and_s'] 绿 5
-行3555 elf（改成别的名字、{self, …} 又判红，正推 K5_use_as、K5_pub_use_self_group）: 红 2 条 ['the_card_pool_scan_accepts_renames_nested_groups_and_self_that_bring_i', 'the_card_pool_scan_finds_std_wgpu_or_a_pinned_function_brought_in_unde'] 绿 4
-行3556 取卡 K5 卡池扫源码 use 里改回至多一层花括号（两层花括号又判红，正推 K5_nested_use_braces）: 红 1 条 ['the_card_pool_scan_accepts_renames_nested_groups_and_self_that_bring_i'] 绿 5
-行3557  K5 卡池扫源码改回见 extern 就拒（extern "C" 块又判红，正推 K5_extern_c_block）: 红 1 条 ['the_card_pool_scan_accepts_an_extern_block_and_still_finds_extern_crat'] 绿 5
-行3558 0z批第二十一块 GPU 取卡 K5 卡池扫源码 use 改名时取原名、不取改成的名字（use … as std 漏过）: 红 1 条 ['the_card_pool_scan_finds_std_wgpu_or_a_pinned_function_brought_in_unde'] 绿 5
-行3559 块 GPU 取卡 K5 卡池扫源码花括号里的 self 取名成 self（use …::wgpu::{self} 漏过）: 红 1 条 ['the_card_pool_scan_finds_std_wgpu_or_a_pinned_function_brought_in_unde'] 绿 5
-行3560 二十一块 GPU 取卡 K5 卡池扫源码不再拒通配（故意拒的那一类放过，正推 K5_use_wildcard_enum）: 红 1 条 ['the_card_pool_scan_refuses_globs_item_level_macros_and_inner_modules_e'] 绿 5
-行3572 取卡 K5 卡池扫源码 use 里改回至多一层花括号（两层花括号又判红，正推 K5_nested_use_braces）: 红 1 条 ['the_card_pool_scan_accepts_renames_nested_groups_and_self_that_bring_i'] 绿 5

@@ -38,6 +38,7 @@ Bash 里的写这里看不见（write-guard.sh 只挂 Write / Edit / MultiEdit�
   stale-launch-accepted    认领前只比提示 sha256，不比回执时刻（同一份提示重派之后，旧进程照样认作持锁者）
   no-walk-up               只看目标所在的那一层目录有没有锁，不往上走（子目录里的写漏过去）
   foreign-holder-unnamed   回执对不上的拒绝不去记录里找持锁者的 agent_id（改前的说明：只写「派发提示对得上这把锁的那一个子 agent」）
+  replace-temp-kept        接手换锁写临时文件之后、换上之前抛异常，不删自己建的临时文件（草稿目录里留下 .tmp）
 """
 import hashlib
 import json
@@ -53,7 +54,8 @@ sys.dont_write_bytecode = True
 LOCK_NAME = ".writer-lock"
 CLAIM_PREFIX = ".writer-claim-"
 BREAK_VARIABLE = "LIB_WRITER_LOCK_BREAK"
-KNOWN_BREAK_MODES = ("claim-not-exclusive", "holder-ignored", "launch-ignored", "stale-launch-accepted", "no-walk-up", "foreign-holder-unnamed")
+KNOWN_BREAK_MODES = ("claim-not-exclusive", "holder-ignored", "launch-ignored", "stale-launch-accepted", "no-walk-up", "foreign-holder-unnamed",
+                     "replace-temp-kept")
 EXPECTED_HOLDER_LIMIT = 3
 PROMPT_DIGEST_SHOWN = 12
 LAUNCH_SLACK_SECONDS = 2
@@ -131,11 +133,20 @@ def create_lock(scratch, lock):
 
 
 def replace_lock(scratch, lock):
-    """接手：同目录临时文件写完整再 os.replace 换上锁；旧认领文件顺手删（nonce 换了本来也不算数）。"""
+    """接手：同目录临时文件写完整再 os.replace 换上锁；写或换失败时删掉自己建的临时文件再把异常抛出去；旧认领文件顺手删（nonce 换了本来也不算数）。"""
     temporary = f"{lock_path(scratch)}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
-    with open(temporary, "x", encoding="utf-8") as handle:
-        json.dump(lock, handle, ensure_ascii=False)
-    os.replace(temporary, lock_path(scratch))
+    handle = open(temporary, "x", encoding="utf-8")   # 建不成（同名已在）就不是自己的文件，不删
+    try:
+        with handle:
+            json.dump(lock, handle, ensure_ascii=False)
+        os.replace(temporary, lock_path(scratch))
+    except BaseException:
+        if break_mode() != "replace-temp-kept":
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+        raise
     keep = CLAIM_PREFIX + lock["nonce"]
     for name in os.listdir(scratch):
         if name.startswith(CLAIM_PREFIX) and name != keep:

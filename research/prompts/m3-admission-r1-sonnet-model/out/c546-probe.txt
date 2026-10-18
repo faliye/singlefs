@@ -1,4 +1,0 @@
-name=c546-probe success before(free,unblocked)=(211881, 211881) after(free,unblocked)=(211880, 211880) reclaimed=13
-name=c546-probe write_failed_after_one_persisted d0_free_slots=211888 d0_unblocked_slots=211873 d0_free_minus_unblocked=15 d0_isolated=0 frozen_publish_present=true
-test probe_c546_holds_left_in_the_process_after_a_write_failure_in_the_middle_of_the_sequence ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.25s

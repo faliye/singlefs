@@ -1,3 +1,0 @@
-name=d3 case=register-current-hash exempted=yes file_has_other_session_code_change=1
-name=d3 case=register-own-change-only-hash exempted=no
-name=d3 case=staged-tree-with-current-hash-registered exempted=no

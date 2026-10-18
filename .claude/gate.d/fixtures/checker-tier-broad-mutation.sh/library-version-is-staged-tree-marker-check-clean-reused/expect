@@ -1,3 +1,0 @@
-exit=0
-want=singlefs-stage-green.checker-tier-broad-mutation.sh.
-want=登记的输入路径上工作区等于暂存区，这一批输入有作数的全绿标记

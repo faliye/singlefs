@@ -1,0 +1,6 @@
+running 1 test
+── 随机历史快档 ──
+  模型对拍 1912 步：该拒而拒 1、区间里拒 0、该成而成 1911（样本）
+test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.00s

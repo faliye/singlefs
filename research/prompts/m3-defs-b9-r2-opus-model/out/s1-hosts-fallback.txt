@@ -1,3 +1,0 @@
-H1-list-fence-closed-at-column-0	r2=0	r1=2	  ✓ 派发闸照这份提示放行（experiment-runner，查了 19 行提示）；派的那一刻另判：⑦ 并发与限额窗
-H2-details-fold-with-blank-line	r2=0	r1=2	  ✓ 派发闸照这份提示放行（experiment-runner，查了 23 行提示）；派的那一刻另判：⑦ 并发与限额窗
-F1-closed-fence-example	r2=0	r1=0	r2-venv=2	派发闸载不进 markdown-it-py（ModuleNotFoundError("No module named 'markdown_it'")）	✗ 派 experiment-runner 的提示写了「线程上限：31（本机）」（整数后面接了括注：括注一概不认，说明写	  ✓ 派发闸照这份提示放行（experiment-runner，查了 15 行提示）；派的那一刻另判：⑦ 并发与限额窗

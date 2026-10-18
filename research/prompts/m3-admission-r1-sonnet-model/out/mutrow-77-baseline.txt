@@ -1,4 +1,0 @@
-row=77 file=crates/singlefs-core/src/allocator.rs anchor_hits=1 baseline=True
-exit=0
-test user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s

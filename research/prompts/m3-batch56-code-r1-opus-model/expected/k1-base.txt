@@ -1,2 +1,0 @@
-command args=-p singlefs-harness --test corrupt_on_disk_content_is_refused_instead_of_panicking rc=0
-test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 

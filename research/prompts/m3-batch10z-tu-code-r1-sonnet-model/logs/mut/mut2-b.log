@@ -1,6 +1,0 @@
-slotsWrittenEmpty: rc=101 红 3 条 a_ring_slot_recording_no_placement_is_not_the_ring_slot_the_push_write pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up the_slots_the_way_out_by_the_push_releases_with_two_ring_slots_holding | ['test result: FAILED. 51 passed; 3 failed; 1 ignored; 0 measured; 0 filtered out; finished in 6.86s'] (30s)
-textCountZero: 旧串命中 2 次，跳过 (0s)
-textRegionSlot: 旧串命中 2 次，跳过 (0s)
-skipDevCheck: 旧串命中 0 次，跳过 (0s)
-emptyHeld: rc=101 红 1 条 a_ring_slot_recording_no_placement_is_not_the_ring_slot_the_push_write | ['test result: FAILED. 53 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 6.92s'] (30s)
-notRecordedAsNotAllocated: rc=0 红 0 条  | ['test result: ok. 54 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 7.06s'] (30s)

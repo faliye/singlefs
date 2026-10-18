@@ -1,1 +1,0 @@
-p1 s2 SINGLEFS_PROBE_ARM=diff S2_ACTIONS=oo S2_SLOTS=384 S2_PREFIXES=oooo S2_MID= S2_RS=b1 S2_FAULTS=racct,rlin1;racct,rlin2;racct,rlin;racct S2_LABEL=p1

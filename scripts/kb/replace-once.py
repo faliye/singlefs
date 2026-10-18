@@ -15,19 +15,32 @@
 正在按偏移边跑边读这份文件的进程（bash 跑脚本）读的仍是旧 inode 的旧内容，不会从改后文件的同一偏移接着读到别的东西。
 
 退出码：0 写成功；2 参数或文件问题；3 旧串命中 0 次；4 旧串命中多于一次；5 写完回读与预期不符；
-6 没换上（有多个硬链接、建不了临时文件、写或改名失败），原文件没动、临时文件已删。
+6 没换上（有多个硬链接、建不了临时文件、写或改名失败），原文件没动、临时文件已删；
+7 目标是仓里的 .md，新串带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法），一个字节没写。
 命中 0 次时附上文件里最像旧串的那一段（行号、相似度）与第一处不同（旧串在那里是什么、文件里是什么），算法在 nearest_hint()。
+
+写 .md 之前判新串（退出码 7）：目标是仓里的 .md 时，旧串恰好命中一次之后、写之前，用 write-guard.sh 与门禁 doc-text 同一份判据
+（.claude/gate.d/lib-forbidden-notations.py 的钟点形态，lib_notation_check.py 调它）判新串；带钟点、时区词、时间戳的拒绝，逐处列出行号与形态与出路。
+判新串不判旧串；别的后缀、仓外、排除前缀下的文件不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 clock-times 格兜底。
 
 弄坏开关（只给 --selftest 证红用）：
   REPLACE_ONCE_BREAK=no-nearest  nearest_hint() 什么都不给（改前的说法）
       命中 0 次附最像的一行（「✗ --selftest 没通过：」下面「命中 0 次时本该附上最像的一行」那一条）
+  REPLACE_ONCE_BREAK=no-clock-guard  replace_once() 不判新串里的钟点（改前的写法）
+      写 .md 之前判新串（「✗ --selftest 没通过：」下面写 .md 的几条：新串带紧凑时间戳、带日期钟点时区词、带光秃时区词、入口退出码 7 与不写文件）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>  共用库的弄坏开关（写法在 lib-forbidden-notations.py 文件头），自证同样走它：
+      clock-times（整个钟点形态不判）时写 .md 的拒绝几条全红；iso-compact-timestamp 时只有新串带紧凑时间戳的那几条红；
+      compact-timestamp-loose 时「8 位数字后跟 T 但不是时间戳」的放行那一条红
 """
+import contextlib
 import difflib
+import io
 import os
 import sys
 import tempfile
 
 from lib_atomic_replace import ReplaceRefused, problems_with_replacement_by_rename, replace_file_contents_by_rename
+from lib_notation_check import clock_refusal, copy_library_into
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -86,8 +99,8 @@ def nearest_hint(content, old_text):
     return hint
 
 
-def replace_once(path, old_text, new_text):
-    """返回 (退出码, 说明)。只有退出码 0 时文件被改过。"""
+def replace_once(path, old_text, new_text, notation_root=None):
+    """返回 (退出码, 说明)。只有退出码 0 时文件被改过。notation_root 只给自证传（判新串时把哪个目录当仓根）。"""
     if old_text == '':
         return 2, '旧串是空串，拒绝：空串在每个位置都命中\n     → 把旧串换成文件里真实存在、唯一定位那处的一段文字'
     if not os.path.isfile(path):
@@ -101,6 +114,10 @@ def replace_once(path, old_text, new_text):
                    '     → 先用 grep 找到那一行，把旧串按文件里的原样（含空格与标点）抄进来')
     if occurrences > 1:
         return 4, f'旧串在 {path} 里命中 {occurrences} 次，一个字节没写\n     → 把旧串往前后多带几个字，直到只命中一次'
+    if os.environ.get('REPLACE_ONCE_BREAK') != 'no-clock-guard':   # 弄坏开关 no-clock-guard：不判新串里的钟点
+        refusal = clock_refusal(path, new_text, content[:content.index(old_text)].count('\n') + 1, notation_root)
+        if refusal:
+            return 7, '\n'.join(refusal)
     replaced = content.replace(old_text, new_text, 1)
     try:
         notes = replace_file_contents_by_rename(path, replaced)
@@ -116,6 +133,81 @@ def replace_once(path, old_text, new_text):
 def selftest():
     with tempfile.TemporaryDirectory(prefix='replace-once-selftest-') as workspace:
         return selftest_in(workspace)
+
+
+def problems_with_clock_guard(workspace):
+    """写 .md 之前判新串：钟点、时区词、时间戳。样本串在这里拆开拼，这份源码里不出现字面写法（门禁 doc-text 也扫它）。
+    仓根用自证的临时目录顶替（notation_root）：假仓里抄一份真的共用库（copy_library_into）；另造一个没有库的假仓核「读不到判据」那一支。"""
+    problems = []
+    glue = ''.join
+    colon = ':'
+    zone = glue(('J', 'ST'))
+    stamp = glue(('20261014', 'T153000Z'))
+    root = os.path.join(workspace, 'repo')
+    os.makedirs(os.path.join(root, 'records'))
+    copy_library_into(root)
+    notes = os.path.join(root, 'records', 'notes.md')
+    original = '第一行 甲\n第二行 乙\n'
+
+    def reset(path=notes):
+        with open(path, 'w', encoding='utf-8') as handle:
+            handle.write(original)
+
+    def content_of(path=notes):
+        with open(path, encoding='utf-8') as handle:
+            return handle.read()
+
+    reset()
+    refused = [
+        ('新串带紧凑时间戳', glue(('运行目录 ', stamp)), '（ISO 紧凑时间戳）：「' + stamp + '」'),
+        ('新串带日期、时区词、时分', glue(('用户 2026-10-14 ', zone, ' 15', colon, '30 定')), '（日期后面跟钟点）'),
+        ('新串带光秃的时区词', glue(('本机时钟是 ', zone)), '（时区词）：「' + zone + '」'),
+    ]
+    for label, new_text, wanted in refused:
+        code, message = replace_once(notes, '第二行 乙', new_text, notation_root=root)
+        if code != 7 or wanted not in message or '第 2 行' not in message or '→ 怎么办' not in message or '读不到钟点判据' in message:
+            problems.append(f'写 .md：{label}本该退出码 7、点名形态「{wanted}」与第 2 行与出路，实际 {code}：{message!r}'
+                            '（REPLACE_ONCE_BREAK=no-clock-guard 或 LIB_FORBIDDEN_NOTATIONS_BREAK 关掉那一形态的话这一条本来就该红）')
+        if content_of() != original or os.listdir(os.path.dirname(notes)) != ['notes.md']:
+            problems.append(f'写 .md：{label}被拒绝之后文件或目录变了（一个字节都不该写、不该留临时文件）')
+    code, message = replace_once(notes, '第二行 乙', glue(('编号 99999999', 'T1234')), notation_root=root)
+    if code != 0 or content_of() != '第一行 甲\n编号 99999999' + 'T1234\n':
+        problems.append(f'写 .md：8 位数字后跟 T 但不是时间戳的新串本该放行（退出码 0），实际 {code}：{message!r}'
+                        '（LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose 设着的话这一条本来就该红）')
+    reset()
+    code, message = replace_once(notes, '第二行 乙', '第二行 用户 2026-10-14 定', notation_root=root)
+    if code != 0 or content_of() != '第一行 甲\n第二行 用户 2026-10-14 定\n':
+        problems.append(f'写 .md：只写日期的新串本该放行（退出码 0），实际 {code}：{message!r}')
+    # 旧串里带钟点、新串干净（把钟点删掉的改动）放行：判的是新串
+    dirty = os.path.join(root, 'records', 'dirty.md')
+    with open(dirty, 'w', encoding='utf-8') as handle:
+        handle.write(glue(('用户 2026-10-14 ', zone, ' 15', colon, '30 定\n')))
+    code, message = replace_once(dirty, glue(('2026-10-14 ', zone, ' 15', colon, '30 定')), '2026-10-14 定', notation_root=root)
+    if code != 0 or content_of(dirty) != '用户 2026-10-14 定\n':
+        problems.append(f'写 .md：旧串带钟点、新串只写日期（删掉钟点的改动）本该放行，实际 {code}：{message!r}')
+    # 范围：别的后缀与仓外不判（带紧凑时间戳的新串照写）
+    for label, path in (('.txt 目标', os.path.join(root, 'records', 'notes.txt')), ('仓外的 .md', os.path.join(workspace, 'outside.md'))):
+        reset(path)
+        code, message = replace_once(path, '第二行 乙', glue(('运行目录 ', stamp)), notation_root=root)
+        if code != 0:
+            problems.append(f'写 .md：{label}不归这一道判，本该放行（退出码 0），实际 {code}：{message!r}')
+    # 读不到共用库按拒绝处理，不静默放行：假仓里没有库，新串干净也拒，理由是读不到判据（不是钟点）
+    bare = os.path.join(workspace, 'repo-without-library')
+    os.makedirs(os.path.join(bare, 'records'))
+    bare_notes = os.path.join(bare, 'records', 'notes.md')
+    reset(bare_notes)
+    code, message = replace_once(bare_notes, '第二行 乙', '第二行 丙', notation_root=bare)
+    if code != 7 or not message.startswith('读不到钟点判据 ') or 'lib-forbidden-notations.py' not in message \
+            or 'FileNotFoundError' not in message or '→ 怎么办' not in message or content_of(bare_notes) != original:
+        problems.append(f'写 .md：假仓里没有共用库，本该退出码 7、说「读不到钟点判据」点名库文件与 FileNotFoundError 与出路且不写文件，实际 {code}：{message!r}')
+    # 入口：退出码与输出
+    reset()
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured):
+        code = main([notes, '第二行 乙', glue(('运行目录 ', stamp))], notation_root=root)
+    if code != 7 or not captured.getvalue().startswith('  ✗ 新串在描述里写了钟点、时区词或时间戳，共 1 处') or content_of() != original:
+        problems.append(f'写 .md：入口本该退出码 7、打 ✗ 开头的说明且不写文件，实际 {code}：{captured.getvalue()!r}')
+    return problems
 
 
 def selftest_in(workspace):
@@ -145,6 +237,7 @@ def selftest_in(workspace):
     code, _ = replace_once(sample, '', '戊')
     if code != 2:
         problems.append(f'空旧串本该退出码 2，实际 {code}')
+    problems.extend(problems_with_clock_guard(workspace))
     # 写回的方式：inode 要换、在读的进程读旧内容、权限位与符号链接保住、硬链接拒绝、失败不留临时文件（判据在 lib_atomic_replace.py）
     running_script = '#!/usr/bin/env bash\n' + 'echo 前面这几行正在被 bash 边跑边读\n' * 20 + 'run_step 甲\nexit $?\n'
     problems.extend(problems_with_replacement_by_rename(
@@ -160,19 +253,21 @@ def selftest_in(workspace):
         print('     → 怎么办：看 replace_once 里对应分支的退出码与是否写文件；方括号开头的几条看 lib_atomic_replace.py 里同名那一格')
         return 1
     print('  ✓ --selftest 通过：命中 0 次拒绝（3）并附上最像的一行与第一处不同、2 次拒绝（4）、空串拒绝（2），都一个字节没写；命中 1 次写成功并回读确认；'
+          '写仓里的 .md 之前判新串：带紧凑时间戳、带日期时区词时分、带光秃时区词的拒绝（7）并点名形态、行号与出路且不写文件，'
+          '8 位数字后跟 T 但不是时间戳、只写日期、旧串带钟点而新串干净、.txt 目标与仓外的 .md 放行，假仓里没有共用库时读不到判据按拒绝办（退出码 7，理由不是钟点），入口退出码 7；'
           '换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、'
           '经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件')
     return 0
 
 
-def main(arguments):
+def main(arguments, notation_root=None):
     if arguments == ['--selftest']:
         return selftest()
     if len(arguments) != 3:
         print(__doc__)
         return 2
     path, old_text, new_text = arguments
-    code, message = replace_once(path, old_text, new_text)
+    code, message = replace_once(path, old_text, new_text, notation_root=notation_root)
     print(('  ✓ ' if code == 0 else '  ✗ ') + message)
     # → 怎么办：message 本身已经带着下一步（见 replace_once 各分支的返回值），这里不重复打印
     return code

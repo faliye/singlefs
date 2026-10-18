@@ -1,2 +1,0 @@
-OPUS_LM_STRESS threads=8 rounds=2000 bookings=16000 restarts=826 restart_refused=0 early_marks_seen=560 wrongly_lost=0 lost_and_still_in_use_with_kept_after_one_more_pass=false
-OPUS_LM_STRESS threads=14 rounds=5000 bookings=70000 restarts=3564 restart_refused=0 early_marks_seen=2897 wrongly_lost=0 lost_and_still_in_use_with_kept_after_one_more_pass=false

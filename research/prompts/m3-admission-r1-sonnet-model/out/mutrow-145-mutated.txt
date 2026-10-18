@@ -1,6 +1,0 @@
-row=145 file=crates/singlefs-core/src/allocator.rs anchor_hits=1 baseline=False
-exit=101
-test with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write ... FAILED
-thread 'with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write' (207580) panicked at crates/singlefs-harness/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_c
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 2.88s
-error: test failed, to rerun pass `-p singlefs-harness --test admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments`

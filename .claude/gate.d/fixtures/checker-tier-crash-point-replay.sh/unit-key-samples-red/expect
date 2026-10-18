@@ -1,0 +1,7 @@
+exit=1
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-checker-tier --lib --tests -- --nocapture --exact --skip f1_first --skip f1_last --skip h3_test --skip test_v
+want=test test_t ... FAILED
+want=红的 crates/singlefs-checker-tier/tests/setting.rs::test_t：键对不上（上一次
+want=变了 1 处：变了 fn crates/singlefs-checker-tier/tests/setting.rs::observe
+want=✗ checker 档快档判红（上面是 cargo test 的尾部、全部红的用例与测试目标，「红的」那几行是各自变了的单元；键相同而复用的那几条这一趟没跑）
+want=✗ 快档有 1 格判红：crash-case-replay

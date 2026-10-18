@@ -1,0 +1,49 @@
+[2] kb-scribe 照第 3 步 doc-decisions --write，不带声明
+      ✗ 范围声明不合，这条命令没跑（run-scope-guard.sh）：
+        1. .claude/gate.d/doc-decisions.sh --write
+           跑的是：门禁 doc-decisions.sh 的全部格（不带 --check / --item）；范围：整轮
+           ✗ 子 agent 不跑整轮：这一条是门禁 doc-decisions.sh 的全部格（不带 --check / --item）。交回主 agent——在交回报告「要主 agent 跑的命令」一节写明这条命令、四段声明与为什么要整轮；自己只跑点名的格、项或测试目标
+[2] kb-scribe doc-decisions --write，带 whole 声明
+      ✗ 范围声明不合，这条命令没跑（run-scope-guard.sh）：
+        1. .claude/gate.d/doc-decisions.sh --write
+           跑的是：门禁 doc-decisions.sh 的全部格（不带 --check / --item）；范围：整轮
+           ✗ 子 agent 不跑整轮：这一条是门禁 doc-decisions.sh 的全部格（不带 --check / --item）。交回主 agent——在交回报告「要主 agent 跑的命令」一节写明这条命令、四段声明与为什么要整轮；自己只跑点名的格、项或测试目标
+[0] kb-scribe doc-decisions --write --check decision-items-sync，带 items 声明
+[2] 主 agent doc-decisions --write，不带声明
+      ✗ 范围声明不合，这条命令没跑（run-scope-guard.sh）：
+        1. .claude/gate.d/doc-decisions.sh --write
+           跑的是：门禁 doc-decisions.sh 的全部格（不带 --check / --item）；范围：整轮
+           ✗ 没带范围声明
+[2] experiment-runner 照 1b 在 scripts/experiments 下 cargo test，不带声明
+      ✗ 范围声明不合，这条命令没跑（run-scope-guard.sh）：
+        1. cargo test --release
+           跑的是：cargo test 不挑目标（整工作区，或当前目录那个包的全部测试目标）；范围：整轮
+           ✗ 子 agent 不跑整轮：这一条是cargo test 不挑目标（整工作区，或当前目录那个包的全部测试目标）。交回主 agent——在交回报告「要主 agent 跑的命令」一节写明这条命令、四段声明与为什么要整轮；自己只跑点名的格、项或测试目标
+[0] experiment-runner scripts/experiments 下 cargo test --bin，带 target 声明
+[0] experiment-runner 第 3 步 mutate.sh，不带声明
+[2] implementation-writer 跑动到的测试二进制，不带声明
+      ✗ 范围声明不合，这条命令没跑（run-scope-guard.sh）：
+        1. cargo test -p singlefs-harness --test model_differential
+           跑的是：cargo test -p singlefs-harness 的测试目标 --test model_differential；范围：1 个测试目标
+           ✗ 没带范围声明
+[2] investigator 原样复现整包 cargo test，带 whole 声明
+      ✗ 范围声明不合，这条命令没跑（run-scope-guard.sh）：
+        1. cargo test -p singlefs-core
+           跑的是：cargo test 整包 singlefs-core（不挑目标，全部测试二进制）；范围：整包
+           ✗ 子 agent 不跑整轮：这一条是cargo test 整包 singlefs-core（不挑目标，全部测试二进制）。交回主 agent——在交回报告「要主 agent 跑的命令」一节写明这条命令、四段声明与为什么要整轮；自己只跑点名的格、项或测试目标
+[2] three-way-attack 照写范围 cargo test -p --test，不带声明
+      ✗ 范围声明不合，这条命令没跑（run-scope-guard.sh）：
+        1. cargo test -p singlefs-harness --test my_prototype
+           跑的是：cargo test -p singlefs-harness 的测试目标 --test my_prototype；范围：1 个测试目标
+           ✗ 没带范围声明
+[2] implementation-writer 第 4 步一条命令，开头 export 一份 target 声明
+      ✗ 范围声明不合，这条命令没跑（run-scope-guard.sh）：
+        1. .claude/gate.d/checker-tier-formal-verification.sh --quick .
+           跑的是：门禁 checker-tier-formal-verification.sh 的轻型（--quick）；范围：轻型核心部分
+           ✗ 声明的是点名的测试目标（target），命令跑的是轻型（quick）：门禁 checker-tier-formal-verification.sh 的轻型（--quick）
+[0] implementation-writer 第 4 步一条命令，每段各带自己的声明
+[2] 主 agent 照 main-agent 第 94 行起 --full，不带声明
+      ✗ 范围声明不合，这条命令没跑（run-scope-guard.sh）：
+        1. .claude/gate.d/checker-tier-crash-point-replay.sh --full .
+           跑的是：门禁 checker-tier-crash-point-replay.sh 的全部格（不带 --check / --item）；范围：整轮
+           ✗ 没带范围声明

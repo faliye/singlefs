@@ -40,6 +40,9 @@
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-added-lines-skipped quoted-result-lines 退回历史节整节不判：quoted-result-lines-history-added-red 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-lookup-skipped      cited-paths-exist 不查历史，树里没有的一律算缺：cited-paths-exist-green 判错
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=existence-unchecked         cited-paths-exist 把每个点名的路径都当成在：cited-paths-exist-red 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=history-lines-judged        evidence-in-repo 把两份变更史里与基准版逐字相同的历史行也判：evidence-in-repo-green 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=unretained-note-ignored     cited-paths-exist 不认 kb 里某一行写明的「原件未留存 / 原始输出未留存」（那一行点名的路径别处再点名也不判）：cited-paths-exist-green 判错；
+#                                                                   results-cited 第三道同样不认它（实验页里同一行写着产物名与未留存的那个名字也算指空）
 #
 #   bash .claude/gate.d/doc-experiments.sh [项目根]                              十格按格名表的次序全跑
 #   bash .claude/gate.d/doc-experiments.sh --list                                逐行打格名与判什么，不跑格
@@ -382,6 +385,11 @@ cell_results_cited() {
     if [[ -n "$(git -c core.quotepath=false log --all --diff-filter=D --format=%h --name-only -- "*$name" 2>/dev/null | head -1)" ]]; then
       continue
     fi
+    # 实验页里有一行同时写着这个产物名与「原始输出未留存 / 原件未留存」：如实交代过没留下，不算指空
+    naming_lines="$(grep -rhF -- "$name" .claude/kb/experiments.md .claude/kb/experiments/ 2>/dev/null || true)"
+    if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" != unretained-note-ignored ]] && grep -qE "原始输出未留存|原件未留存" <<<"$naming_lines"; then
+      continue
+    fi
     echo "     $owner 点名 $name —— 树里没有，git 历史里也没有"   # gate-lint:detail
     missing=$((missing+1))
   done < <(grep '^NAMED' "$NAMED" | sort -u)
@@ -419,8 +427,9 @@ cell_results_cited() {
 #
 # 判据一「实验跑了没留存」：改动范围里还在盘上的 scripts/experiments/e<号>_*.rs 或 scripts/mutation/tables/e<号>_*.tsv，
 #   research/results/ 下（含子目录）要有一份这个实验号的产物（文件名 e<号> 后面跟非数字或到头），且 mtime 不早于源码。
-#   登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）先按产物头的输入指纹判（admission.py 的 stored_product_status）：
-#   对得上就绿、对不上就红，mtime 不作数；一份带指纹的产物都没有才按 mtime 判。mtime 会被 git checkout / stash pop 刷新，指纹不会。
+#   登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）先按产物头记的实验键判（admission.py 的 stored_product_row_key_status：
+#   实验键 = 复跑表那一行的行键去掉期望产物，算法在 admission.py 文件头「复跑表每一行的行键」）：对得上就绿、对不上就红，mtime 不作数；
+#   一份带实验键的产物都没有（或今天的实验键拒算）才按 mtime 判。mtime 会被 git checkout / stash pop 刷新，实验键不会。
 #   只改了 // 注释的装置源码不判、成功行列名：按 path-moves.md 改注释里的路径碰不到产物。
 #   按要求才跑的实验（scripts/experiments/on-request-experiments.tsv 登记的）不要求新产物：装置比产物新时，实验页这一轮新加的行里要写
 #   「没有正式跑」或「未正式跑」；页里早先那句说的是上一次改装置，不算。
@@ -429,7 +438,7 @@ cell_results_cited() {
 #   两半射程不同：kb 正文只写现状，旧文件照样该改；research/prompts/ 是原样保存的证据（evidence-discipline.md），只判还没冻的新写那一批。
 #
 # 链接 worktree 里（git-dir 落在 .git/worktrees/ 下；gate-staged.sh 与 --staged 的临时 worktree 就是）mtime 是检出时写的：
-# 判据一里只能比 mtime 的那几份（产物在、指纹没判出对不上）不判，逐份列成本次未跑并报进 $GATE_NOT_RUN_FILE；别的照判，
+# 判据一里只能比 mtime 的那几份（产物在、实验键没判出对不上）不判，逐份列成本次未跑并报进 $GATE_NOT_RUN_FILE；别的照判，
 # 所以提交路径上判据二照样判得到。全是要比 mtime 的、判据二又没有 .md 时退 77。
 #
 # 管不到：产物对不对得上源码（归 checker-tier-research-build-and-replay.sh 的逐字节复跑，它不看变异表的重跑日志）；
@@ -437,9 +446,11 @@ cell_results_cited() {
 #   已提交的 prompts 文件后来加进的 /tmp 依据。
 #
 # 样本：evidence-in-repo-red 放一个产物比源码旧的装置、一个一份产物都没有的变异表、kb 里一处「依据：/tmp/…」、
-# 一份新写的 prompts 里「报告 `/tmp/…`」、一个登记了准入而产物头指纹对不上的装置（E910，按 mtime 会判绿），必须判红；
+# 一份新写的 prompts 里「报告 `/tmp/…`」、一个登记了准入而产物头记的实验键对不上今天的装置（E910，按 mtime 会判绿；样本里放了一份只有它一个 [[bin]] 的
+# scripts/experiments/Cargo.toml，实验键算得出），必须判红；
 # evidence-in-repo-green 放产物比源码新的装置、不在改动范围里的旧装置、kb 里三种说做法的 /tmp 写法、改过但不是新写的 prompts 里的「依据：/tmp/…」、
-# 登记了准入而产物比源码旧、指纹与今天的输入相同的装置（E909，按 mtime 会判红；指纹由 setup.sh 另算），必须判绿并报对数。
+# 登记了准入而产物头没记实验键、产物比源码新的装置（E909，按 mtime 判绿），必须判绿并报对数。产物头记的实验键与今天的相同就判绿（mtime 不作数）
+# 那一路样本算不出（实验键要准入模块现算，setup.sh 不认得它在哪），由 python3 scripts/gate/admission.py --selftest 的「给 doc-experiments 的四种状态」那几格判。
 # 链接 worktree 的一对（setup.sh 在样本根里建主仓 .origin-repository/，把它的一个链接 worktree 搬到样本根）：
 # evidence-in-repo-worktree-red 放 kb 与新写的 prompts 里各一处 /tmp 依据、一个产物比源码旧的装置（E920），必须判红、点名两处、把 E920 列成本次未跑；
 # evidence-in-repo-worktree-green 放一个产物比源码旧的装置（E921）与只说做法的 /tmp 写法，必须判绿、把 E921 列成本次未跑。
@@ -484,13 +495,13 @@ from zoneinfo import ZoneInfo
 base = sys.argv[1]
 # argv[6] 为 1：在链接 worktree 里，修改时刻是检出时写的
 timestamps_from_checkout = sys.argv[6] == "1"
-# 输入指纹的算法只有 scripts/gate/admission.py 一份（门禁与实验共用），不在这里另算。
+# 实验键的算法只有 scripts/gate/admission.py 一份（门禁与实验共用），不在这里另算。
 sys.path.insert(0, sys.argv[4])
 try:
     import admission
 except Exception as error:
     print(f"  ✗ 读不到准入模块 {sys.argv[4]}/admission.py：{error}")
-    print("     → 怎么办：恢复 scripts/gate/admission.py（判「产物跟不跟得上输入」的指纹只有那一份算法），再跑这一格。")
+    print("     → 怎么办：恢复 scripts/gate/admission.py（判「产物跟不跟得上输入」的实验键只有那一份算法），再跑这一格。")
     sys.exit(1)
 
 def read_list(path):
@@ -591,9 +602,9 @@ for path, number, kind in changed_sources:
     source_modified_at = os.path.getmtime(path)
     newest = newest_product_by_number.get(number)
     try:
-        fingerprint_status, fingerprint_detail = admission.stored_product_status(".", f"E{number}")
+        fingerprint_status, fingerprint_detail = admission.stored_product_row_key_status(".", f"E{number}")
     except (admission.InputManifestError, admission.RegistrationError) as error:
-        fingerprint_errors.append(f"{path}（{kind}）：E{number} 登记了准入，却算不出输入指纹：{error}")
+        fingerprint_errors.append(f"{path}（{kind}）：E{number} 登记了准入，却算不出实验键：{error}")
         continue
     if fingerprint_status == "matched":
         fingerprint_matched.append(f"E{number}（{path}；{fingerprint_detail}）")
@@ -602,7 +613,7 @@ for path, number, kind in changed_sources:
         fingerprint_absent.append(f"E{number}")
     fingerprint_stale = fingerprint_status == "stale"
     if timestamps_from_checkout and not fingerprint_stale and newest is not None:
-        # 产物在、指纹没判出对不上，剩下只能比修改时刻，而修改时刻是检出时写的：这一份本次未跑
+        # 产物在、实验键没判出对不上，剩下只能比修改时刻，而修改时刻是检出时写的：这一份本次未跑
         timestamp_unjudged.append(f"{path}（{kind}，E{number}）")
         continue
     if number in on_request_numbers and (fingerprint_stale or newest is None or newest[1] < source_modified_at):
@@ -613,7 +624,7 @@ for path, number, kind in changed_sources:
                                            "（只认这一轮新加进实验页的那一句）")
         continue
     if fingerprint_stale:
-        unstored_runs.append(f"{path}（{kind}，改于 {moment(source_modified_at)}）：E{number} 的输入与产物头的指纹对不上，{fingerprint_detail}")
+        unstored_runs.append(f"{path}（{kind}，改于 {moment(source_modified_at)}）：E{number} 今天的实验键与产物头记的对不上，{fingerprint_detail}")
         continue
     if newest is None:
         unstored_runs.append(f"{path}（{kind}，改于 {moment(source_modified_at)}）：{results_dir} 下一份 E{number} 的产物都没有")
@@ -646,15 +657,26 @@ if os.path.isdir(prompts_dir):
             else:
                 skipped_prompt_files += 1
 
+# 两份变更史里与基准版逐字相同的行是早先写下的历史条目（丢失核对要它们原样留着），按「这次改动」判，不判它们
+HISTORY_CARRIERS = {os.path.join(kb_dir, "decisions-history.md"), os.path.join(kb_dir, "experiments-history.md")}
 outside_citations = []
 tmp_mentions = 0
+history_lines_kept = 0
 for path in sorted(set(scanned_files)):
     try:
         lines = open(path, encoding="utf-8", errors="replace").read().split("\n")
     except OSError:
         continue
+    lines_at_base = set()
+    if path in HISTORY_CARRIERS and base and os.environ.get("EXPERIMENT_PAGES_AND_PRODUCTS_BREAK", "") != "history-lines-judged":
+        shown = subprocess.run(["git", "-c", "core.quotepath=false", "show", f"{base}:{os.path.relpath(path)}"], capture_output=True, text=True)
+        if shown.returncode == 0:
+            lines_at_base = set(shown.stdout.split("\n"))
     for line_number, line in enumerate(lines, 1):
         tmp_mentions += len(tmp_form.findall(line))
+        if line in lines_at_base and citation_form.search(line):
+            history_lines_kept += 1
+            continue
         for match in citation_form.finditer(line):
             excerpt = line[max(0, match.start() - 24):match.end()].strip()
             outside_citations.append(f"{path}:{line_number}：…{excerpt}")
@@ -676,11 +698,11 @@ if unstored_runs:
     print(f"     → 怎么办：跑一次把产物存进 {results_dir}/，并在 scripts/experiments/replay.sh 把这个实验的登记行指到它。")
     print("               这一跑已经跑过、产物还在 /tmp 的草稿目录里，就现在拷进来（会话一重启那个目录就没了）；")
     print("               只改了 // 注释的装置这一格不判；改了字符串里的路径，照 .claude/rules/path-moves.md 第 4 条连同留存产物一起改，复跑仍逐字相同。")
-    print("               登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）按产物头的输入指纹判：指纹对不上就是产物跟不上今天的输入，")
-    print("               重跑一次（装置入口放行并把新指纹打在产物头），修改时刻新旧不作数。")
+    print("               登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）按产物头记的实验键判：实验键对不上就是产物跟不上今天的输入，")
+    print("               重跑一次（装置入口放行并把新的实验键打在产物头），修改时刻新旧不作数。")
 if fingerprint_errors:
     failed = True
-    print("  ✗ 这些实验登记了准入，却算不出输入指纹，判不了产物跟不跟得上：")  # gate-lint:summary
+    print("  ✗ 这些实验登记了准入，却算不出实验键，判不了产物跟不跟得上：")  # gate-lint:summary
     for entry in fingerprint_errors:
         print(f"     {entry}")  # gate-lint:detail
     print("     → 怎么办：单跑 python3 scripts/gate/admission.py experiment . E<号> 看它报什么；多半是 .claude/gate.d/stage-inputs.tsv 那一行的路径写错，")
@@ -721,9 +743,9 @@ if comment_only_sources:
 if on_request_not_run:
     print(f"    没要求重跑 {len(on_request_not_run)} 份按要求才跑的实验（装置比产物新，实验页写明了没有正式跑）：{'、'.join(on_request_not_run)}")
 if fingerprint_matched:
-    print(f"    按指纹判 {len(fingerprint_matched)} 份（登记了准入，产物头的输入指纹与今天的输入相同，修改时刻不作数）：{'、'.join(fingerprint_matched)}")
+    print(f"    按实验键判 {len(fingerprint_matched)} 份（登记了准入，产物头记的实验键与今天的相同，修改时刻不作数）：{'、'.join(fingerprint_matched)}")
 if fingerprint_absent:
-    print(f"    按修改时刻判 {len(fingerprint_absent)} 份登记了准入、research/results/ 里却还没有一份带指纹产物的：{'、'.join(fingerprint_absent)}")
+    print(f"    按修改时刻判 {len(fingerprint_absent)} 份登记了准入、research/results/ 里却还没有一份带实验键产物的（或今天的实验键拒算）：{'、'.join(fingerprint_absent)}")
 PY
 }
 
@@ -1826,7 +1848,7 @@ cell_archive_past_rounds() {
 #   ① 登记表的形状：`### 路径与结论登记` 之下恰好一张表，表头逐字
 #      `| # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |`，每行五格；表头下面要有分隔行，
 #      数据行按「不是分隔行」认，不按位置跳过前两行（少了分隔行时第一条数据行照判）；
-#   ② 源码落点指得到：写成 `路径:行号` 的，那个文件要在仓里现存；只活在正文里的写「无实现：理由」，理由不许空；
+#   ② 源码落点指得到：写成 `路径:行号` 或 `路径:行号 函数名` 的，那个文件要在仓里现存；只活在正文里的写「无实现：理由」，理由不许空；
 #   ③ 共用项那一格不许空，也不许只写「无」（去掉括号、标点与「共用项」这类字眼之后只剩「无」「没有」「N/A」「none」这一类的都算）；
 #   ④ 还没写登记节的实验页登记在 `.claude/gate.d/multipath-registry-lag.tsv`，这张表每一行：
 #      两列（页面路径、普查判定的依据）用制表符分隔、都不许空；路径形如
@@ -1912,10 +1934,10 @@ for path in sorted(glob.glob(os.path.join(experiments, '*.md'))):
             continue
         checked_rows += 1
         number, name, _how, where, shared = cells
-        for hit in re.findall(r'`([^`]+?):(\d+)`', where):
+        for hit in re.findall(r'`([^`:]+?):(\d+)(?:\s[^`]*)?`', where):
             if not os.path.exists(hit[0]):
                 problems.append(f"{path}：第 {number} 行「{name}」的源码落点指不到文件：{hit[0]}")
-        if not re.search(r'`[^`]+?:\d+`', where) and not where.startswith('无实现：'):
+        if not re.search(r'`[^`:]+?:\d+(?:\s[^`]*)?`', where) and not where.startswith('无实现：'):
             problems.append(f"{path}：第 {number} 行「{name}」的源码落点既不是 路径:行号，也不是「无实现：理由」：{where[:40]}")
         if where.startswith('无实现：') and not where[len('无实现：'):].strip():
             problems.append(f"{path}：第 {number} 行「{name}」写了「无实现：」而理由是空的")
@@ -2054,11 +2076,23 @@ if not pages:
 
 places = {}      # 路径 -> [(页, 行号)]
 kind_of = {}
+# 哪一行写明了原件没留存（出路里给的那种写法），那一行点名的路径就是如实交代过的：kb 里别处再点名它，也不算指空
+unretained_declared = set()
+if break_switch != 'unretained-note-ignored':
+    for page in pages:
+        with open(page, encoding='utf-8', errors='replace') as handle:
+            for line in handle:
+                if '原件未留存' in line or '原始输出未留存' in line:
+                    unretained_declared.update(found.group(1) for found in cited_path.finditer(line))
+unretained_noted = 0
 for page in pages:
     with open(page, encoding='utf-8', errors='replace') as handle:
         for number, line in enumerate(handle, 1):
             for found in cited_path.finditer(line):
                 path = found.group(1)
+                if path in unretained_declared:
+                    unretained_noted += 1
+                    continue
                 places.setdefault(path, []).append((page, number))
                 kind_of[path] = next(i for i in range(len(KINDS)) if found.group(f'k{i}'))
 
@@ -2111,6 +2145,8 @@ if only_history:
     print("     只在历史里的（树里没有，git log --all --diff-filter=A 找得到它加入过）：")
     for path in only_history:
         print(f"       {path}")
+if unretained_noted:
+    print(f"     写明了原件未留存的 {len(unretained_declared)} 个路径，点名 {unretained_noted} 处不判")
 PY
 }
 

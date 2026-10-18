@@ -1,4 +1,4 @@
 exit=1
 want=驱动 --summary 的判定行、汇总行、计数、明细与退出码对不上（驱动的提交门禁判法失灵）
-want=这一版清单 0 条：没有可判的变异，不是通过
+want=此刻清单 0 条：没有可判的变异，不是通过
 want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

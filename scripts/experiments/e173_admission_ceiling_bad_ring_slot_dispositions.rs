@@ -284,7 +284,7 @@ impl HistoryFamily {
         events
     }
 
-    fn build(self, geometry: RingGeometry, metadata_blocks: i64) -> PoolAfterHistory {
+    fn build_pool_after_history(self, geometry: RingGeometry, metadata_blocks: i64) -> PoolAfterHistory {
         PoolAfterHistory::from_events(geometry, metadata_blocks, &self.events(geometry))
     }
 }
@@ -1906,7 +1906,7 @@ fn merged_is_all_enospc_against(merged: &MountRun, not_merged: &MountRun) -> boo
 
 fn run_a_group(group: &GroupSettings) -> GroupResult {
     let geometry = group.pool.geometry;
-    let history = group.family.build(geometry, group.pool.metadata_blocks);
+    let history = group.family.build_pool_after_history(geometry, group.pool.metadata_blocks);
     let positions = positions_of(group.family, geometry);
     let newest_txg = history.highest_txg_used;
     let arm_of = |zero: AllZeroSlotDisposition| Arm { stuck_ceiling: group.stuck_ceiling, all_zero_slot: zero };
@@ -2829,7 +2829,7 @@ fn label_of_the_arm(arm: Arm) -> String {
 /// B5：H1，S = 4，c = 5，P保留 = 45，近满 k = 0，不注读故障，第一次请求（八条臂都等于这几个数，逐步打印轨迹）。
 fn emit_the_first_request_anchor(emitter: &mut Emitter, tally: &mut RunTally) {
     let geometry = geometry_of_the_control_pools();
-    let history = HistoryFamily::CrashedAfterOverwrites.build(geometry, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
+    let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
     let settings = control_pool_settings(ReserveReading::ClauseReadingTenPlusSevenEmptyPublishes, PoolFullness::NearlyFullWithNoSpareOverwrite);
     for arm in every_arm_pair() {
         let mut session = start_a_session(&history, None, settings, arm, Controls::none(), true);
@@ -2878,7 +2878,7 @@ fn emit_the_roomy_pool_anchor(emitter: &mut Emitter, tally: &mut RunTally) {
     let mut cells_with_a_rejection = 0usize;
     for pool in pool_settings_list().into_iter().filter(|pool| pool.fullness == PoolFullness::Roomy) {
         for family in FAMILIES_WITH_A_FAULT_TO_INJECT {
-            let history = family.build(pool.geometry, pool.metadata_blocks);
+            let history = family.build_pool_after_history(pool.geometry, pool.metadata_blocks);
             for arm in every_arm_pair() {
                 let run = run_a_mount(&history, None, pool, arm, Controls::none(), false);
                 cells_checked += 1;
@@ -2907,7 +2907,7 @@ fn pc4_history_and_fault_for_the_empty_pushing_arms(floor_before_the_mount: u64,
 
 fn emit_the_positive_controls(emitter: &mut Emitter, tally: &mut RunTally) {
     let geometry = geometry_of_the_control_pools();
-    let history = HistoryFamily::CrashedAfterOverwrites.build(geometry, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
+    let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
     let requests = i64::try_from(requests_per_mount(geometry)).expect("请求数");
     for arm in every_arm_pair() {
         let label = label_of_the_arm(arm);
@@ -3188,8 +3188,18 @@ fn render_the_pair_key(key: &CellKey) -> String {
     )
 }
 
+/// 准入用的仓根：环境变量 SINGLEFS_REPOSITORY_ROOT，没设取当前目录（replay.sh 与实验页的命令都在仓根起）；不取「清单目录/../..」（单元键把它当运行期路径拒算）。
 fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+    let root = std::env::var_os("SINGLEFS_REPOSITORY_ROOT")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_default();
+    if !root.join(".claude/singlefs-ai-sop/scripts/preflight.py").is_file() {
+        eprintln!("  ✗ {} 不是仓根（下面没有 .claude/singlefs-ai-sop/scripts/preflight.py），判不了准入", root.display());
+        eprintln!("  → 怎么办：在仓根起这个装置，或设 SINGLEFS_REPOSITORY_ROOT=<仓根>");
+        std::process::exit(78);
+    }
+    root
 }
 
 fn preflight() {
@@ -3306,7 +3316,7 @@ mod pinned_readings {
     #[test]
     fn first_request_of_the_b5_cell_follows_the_independent_arithmetic_on_every_arm() {
         let geometry = geometry_of_the_control_pools();
-        let history = HistoryFamily::CrashedAfterOverwrites.build(geometry, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
+        let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
         let settings = pool_of_the_control_cells(ReserveReading::ClauseReadingTenPlusSevenEmptyPublishes, PoolFullness::NearlyFullWithNoSpareOverwrite);
         for arm in every_arm_pair() {
             let mut session = start_a_session(&history, None, settings, arm, Controls::none(), false);
@@ -3343,7 +3353,7 @@ mod pinned_readings {
     #[test]
     fn positive_controls_read_their_planted_effect_on_every_arm() {
         let geometry = geometry_of_the_control_pools();
-        let history = HistoryFamily::CrashedAfterOverwrites.build(geometry, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
+        let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
         let requests = i64::try_from(requests_per_mount(geometry)).expect("请求数");
         for arm in every_arm_pair() {
             let no_spare = pool_of_the_control_cells(ReserveReading::ClauseReadingTenPlusSevenEmptyPublishes, PoolFullness::NearlyFullWithNoSpareOverwrite);
@@ -3397,7 +3407,7 @@ mod pinned_readings {
     #[test]
     fn a_bad_slot_that_can_hold_exactly_the_floor_still_caps_the_ceiling() {
         let geometry = geometry_of_the_control_pools();
-        let history = HistoryFamily::UnmountedAfterOverwrites.build(geometry, 5);
+        let history = HistoryFamily::UnmountedAfterOverwrites.build_pool_after_history(geometry, 5);
         let fault = fault_below_the_newest_root(&history, 2, ReadFaultKind::DeviceError, FaultPersistence::UntilTheProcessWritesTheSlot);
         let settings = pool_of_the_control_cells(ReserveReading::ClauseReadingTenPlusSevenEmptyPublishes, PoolFullness::NearlyFullWithNoSpareOverwrite);
         let session = start_a_session(&history, Some(fault), settings, arm_of(StuckCeilingDisposition::AsToday, AllZeroSlotDisposition::NotMerged), Controls::none(), false);
@@ -3411,7 +3421,7 @@ mod pinned_readings {
     #[test]
     fn the_admission_budget_of_eight_decides_how_far_the_floor_moves_in_the_second_request() {
         let geometry = geometry_of_the_control_pools();
-        let history = HistoryFamily::FloorRaisedAfterOverwrites.build(geometry, 5);
+        let history = HistoryFamily::FloorRaisedAfterOverwrites.build_pool_after_history(geometry, 5);
         let fault = fault_below_the_newest_root(&history, 3, ReadFaultKind::DeviceError, FaultPersistence::UntilTheProcessWritesTheSlot);
         let settings = pool_of_the_control_cells(ReserveReading::ClauseReadingTenPlusSevenEmptyPublishes, PoolFullness::NearlyFullWithNoSpareOverwrite);
         let run = run_a_mount(&history, Some(fault), settings, arm_of(StuckCeilingDisposition::PushEmptyWithinBudget, AllZeroSlotDisposition::NotMerged), Controls::none(), false);
@@ -3438,7 +3448,7 @@ mod pinned_readings {
     #[test]
     fn a_slot_this_process_wrote_that_still_reads_bad_stops_every_floor_raise_with_its_own_error() {
         let geometry = geometry_of_the_control_pools();
-        let history = HistoryFamily::CrashedAfterOverwrites.build(geometry, 5);
+        let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, 5);
         let fault = fault_below_the_newest_root(&history, 10, ReadFaultKind::DeviceError, FaultPersistence::EvenAfterTheProcessWritesTheSlot);
         let settings = pool_of_the_control_cells(ReserveReading::ClauseReadingTenPlusSevenEmptyPublishes, PoolFullness::NearlyFullWithNoSpareOverwrite);
         let run = run_a_mount(&history, Some(fault), settings, arm_of(StuckCeilingDisposition::AsToday, AllZeroSlotDisposition::NotMerged), Controls::none(), false);
@@ -3454,7 +3464,7 @@ mod pinned_readings {
     #[test]
     fn rereading_a_pinned_slot_after_a_transient_fault_lifts_the_reclaim_floor() {
         let geometry = geometry_of_the_control_pools();
-        let history = HistoryFamily::CrashedAfterOverwrites.build(geometry, 5);
+        let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, 5);
         let fault = fault_below_the_newest_root(&history, 5, ReadFaultKind::DeviceError, FaultPersistence::DuringTheMountOnly);
         let settings = pool_of_the_control_cells(ReserveReading::ClauseReadingTenPlusSevenEmptyPublishes, PoolFullness::NearlyFullWithTwoSpareOverwrites);
         let mut session = start_a_session(&history, Some(fault), settings, arm_of(StuckCeilingDisposition::AsToday, AllZeroSlotDisposition::NotMerged), Controls::none(), false);

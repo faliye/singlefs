@@ -1,5 +1,0 @@
-ok ['m18-raise-filter-removed']
-## newfile rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.40s 
-## lr3 rc=0 :: test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 10.51s 
-ok ['m18-raise-filter-removed', 'restore']
-done

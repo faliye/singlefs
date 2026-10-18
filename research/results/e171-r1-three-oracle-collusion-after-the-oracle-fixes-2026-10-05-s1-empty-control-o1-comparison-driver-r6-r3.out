@@ -1,6 +1,0 @@
-name=row_time_limit seconds=1800 baseline_seconds=75.274 source=e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-s2-device-baseline-streams-1-2-r6-r3-timing.out rerun_of_timed_out_rows=false
-freeze_check before=true differences=0 detail=none
-snapshot_digest=7726cdd6c439f0bc9e39799755a53ebcfb3f57fe96b06daf13c1317ae81be5f4 files=284 snapshot_ns=199186228 rows=1
-row row_number=0 row_name=空变异（C318_实现：准入读数的「被抛弃根独占量」不取影子账隔离的槽、恒_0（影子账隔离的单元又不进不等式）） lane=0 packages_checked_rebuilt=crates/singlefs-core substituted_from=- line_matches_the_registration=true mutated_row_name=空变异（C318_实现：准入读数的「被抛弃根独占量」不取影子账隔离的槽、恒_0（影子账隔离的单元又不进不等式）） failed_attempts=0 mutation_line_sha256=15642eb5e39ff5965ab4b2389df8768873a3021356410e73cb1d80a48cff8745 copy_ns=179608804 compile_ns=26738919531 compile_kind=cold status=ok device_exit=0 device_ns=42111165213 o3_status=ran o3_exit=0 o3_ns=459965879 o3_streams=new_pool_file_creation,fixed_script_through_e_then_unmount
-table lanes=1 threads_per_lane=10 rows=1 table_wall_ns=69492491892 sum_of_row_ns=69489659427
-freeze_check before=false differences=0 detail=none

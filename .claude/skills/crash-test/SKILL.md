@@ -18,7 +18,7 @@ description: 跑 singlefs 的验证套件——LKMM 内存序、QEMU/KVM 真设�
 
 | 手段 | 验什么 | 阶段 | 覆盖声明的键（照 `.claude/gate-not-implemented.tsv` 抄） |
 |---|---|---|---|
-| 崩溃点重放 | 每个崩溃点截断、恢复、跑池级 checker 与记录核对器 | `.claude/gate.d/checker-tier-crash-point-replay.sh`：快档两趟（`cargo test --release -p singlefs-checker-tier --lib --tests`，再带 `tests/` 里 `cfg` 点到的特性另跑一趟）加逐条核崩溃枚举用例的全绿标记（不作数的报「本次未跑」，不判红）；全量 `--full` 在 HEAD + 暂存区的 worktree 里逐条按输入复用 | `崩溃点重放` |
+| 崩溃点重放 | 每个崩溃点截断、恢复、跑池级 checker 与记录核对器 | `.claude/gate.d/checker-tier-crash-point-replay.sh`：快档两趟（`cargo test --release -p singlefs-checker-tier --lib --tests`，再带 `tests/` 里 `cfg` 点到的特性另跑一趟）加逐条核崩溃枚举用例的崩溃状态块（每块在崩溃判定库里有单元键相同、不红的判定才算罩住，没罩住的报「本次未跑」）；全量 `--full` 在 HEAD + 暂存区的 worktree 里每块按单元键复用 | `崩溃点重放` |
 | 模型对拍 | 随机历史每一步与只住内存的理想模型比 | `.claude/gate.d/harness-model-differential-and-scenarios.sh`（harness 类，整轮门禁里跑） | `模型对拍` |
 | QEMU 真设备 | 两块 virtio 盘上跑固定负载，设备侧录制与程序录制流逐项比 | `.claude/gate.d/checker-tier-qemu-device-streams.sh`（重型） | 不声明覆盖 |
 | LKMM 内存序 | `litmus/` 下每条 Never 有对照组、绑到代码，herd7 判定与声明相符 | `.claude/gate.d/checker-tier-lkmm.sh`，逻辑在 `.claude/scripts/lkmm.sh`（重型；缺 herd7 直接红） | 不声明覆盖 |
@@ -35,7 +35,7 @@ description: 跑 singlefs 的验证套件——LKMM 内存序、QEMU/KVM 真设�
 
 ## 判读纪律
 
-- **「没复现问题」不等于「没问题」。** 想说崩溃一致性成立，得先说清这一轮枚举了多少个崩溃点，是不是全部；快档只跑小流，全量那几条有没有作数的全绿标记看门禁 checker-tier-crash-point-replay 的输出。
+- **「没复现问题」不等于「没问题」。** 想说崩溃一致性成立，得先说清这一轮枚举了多少个崩溃点，是不是全部；快档只跑小流，全量那几条的崩溃状态块罩住没有看门禁 checker-tier-crash-point-replay 的输出。
 - **checker 不报错，也可能是那条检查压根没实现。** 先看 `crates/singlefs-checker/invariants/` 的状态列。
 - **判定结果读不到，这一轮就作废**，绝不能当成通过。装置读不到结束标记也一样。
 - 谁在什么时候跑、带什么前缀，照 `.claude/rules/implementation-workflow.md`「checker 档只在提交时跑，harness 随时跑」与 `.claude/main-agent.md`「暂存之后、提交之前跑门禁」那一行；子 agent 不跑重型，轻型只跑形式化那一条，崩溃与变异两条轻型的命令写进报告交主 agent（`.claude/rules/verification.md`「两档：轻型与重型」）；主 agent 照 `.claude/skills/crash-test/commit-stages.md`（六道重阶段）与 `.claude/skills/gate/staged-gate.md`（整轮门禁 `scripts/gate/gate-staged.sh`）跑。

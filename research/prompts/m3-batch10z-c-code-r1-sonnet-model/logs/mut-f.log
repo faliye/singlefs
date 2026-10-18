@@ -1,7 +1,0 @@
-M29 块队：any_left 取反: 红：a_block_given_back_by_a_card_out_of_memory_goes_to_the_next_card_that_takes_one (6s)
-M30 卡线程那一圈：判不了（Refused）也当没事接着领: 照绿（存活） (5s)
-M31 卡线程那一圈：写库那头走了也接着领: 照绿（存活） (4s)
-M32 几轮：还有块没写时才算判完（<= 1）: 红：a_block_a_card_gives_back_is_judged_once_and_every_block_is_stored_at_any_speed_of_two_cards (6s)
-M33 按块序写库：写一块算两块: 红：a_block_a_card_gives_back_is_judged_once_and_every_block_is_stored_at_any_speed_of_two_cards,judged_blocks_are_stored_in_block_order_and_none_after_a_storing_error,with_one_card_only_a_block_it_gives_back_leaves_the_run_not_run,with_every_state_on_the_first_card_the_blocks_it_leaves_are_judged_on_the_second_card (6s)
-M34 报到：报多了不 panic（checked_sub 换成 saturating）: 照绿（存活） (7s)
-M35 卡线程那一圈：交回的块还给队里之后仍把这张卡的 OOM 当没事（返回 NothingLeftOrStopped）: 红：with_every_state_on_the_first_card_the_blocks_it_leaves_are_judged_on_the_second_card,with_one_card_only_a_block_it_gives_back_leaves_the_run_not_run,a_block_a_card_gives_back_is_judged_once_and_every_block_is_stored_at_any_speed_of_two_cards (8s)

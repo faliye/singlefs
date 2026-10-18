@@ -1,5 +1,5 @@
 exit=0
-want=· --quick：核心部分 toolchain proof complete 三项；轻型没有剪枝：判定库只记不读
+want=· --quick：核心部分 toolchain proof complete 三项；与重型同一份判定库，键相同就复用
 want=── 汇总：checker-tier-formal-verification.sh 跑了 3 格（--item 点名 3 项）
 want=verus-proof：本次未跑
 want=1 份红例账 3 行都钉在

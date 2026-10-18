@@ -1,5 +1,0 @@
---- 完整的钩子
-  ✓ 派发闸照这份提示放行（implementation-writer，查了 8 行提示）；派的那一刻另判：⑦ 并发与限额窗口（派的那一刻按主会话记录判）、⑤ 与本会话在跑的实现员撞文件（派的那一刻按登记判）、⑯ 草稿目录写者锁（派的那一刻按锁文件与主会话记录判）
---- 去掉库的钩子
-✗ 派 implementation-writer 要改的文件落在还没判完的三方轮 ot-r1 的开工快照里：
-! 派发闸读不到同目录的 lib_abandoned_rounds.py（ModuleNotFoundError("No module named 'lib_abandoned_rounds'")）：叫停的轮这一次都没收

@@ -1,3 +1,0 @@
-                .chain(lineage_and_retirement_capacity_invariants)
-            {
-                judgements.part_of_the_range_not_judged(invariant, gap.reason());

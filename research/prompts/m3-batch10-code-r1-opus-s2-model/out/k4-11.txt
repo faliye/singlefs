@@ -1,3 +1,0 @@
-K4TALLY histories=40
-K4TALLY seam_at_segment_start=120
-K4TALLY seams=120

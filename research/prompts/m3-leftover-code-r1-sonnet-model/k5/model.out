@@ -1,6 +1,0 @@
-crates/singlefs-checker-tier/src/direct.rs: referenced=["crates/singlefs-harness/src/history.rs", "crates/singlefs-harness/src/history.rs"]
-crates/singlefs-checker-tier/src/via_alias.rs: referenced=["crates/singlefs-harness/src/lib.rs"]
-crates/singlefs-checker-tier/src/via_extern.rs: referenced=[]
-crates/singlefs-checker-tier/src/via_glob.rs: referenced=["crates/singlefs-harness/src/lib.rs", "crates/singlefs-harness/src/lib.rs"]
-crates/singlefs-checker-tier/src/via_mod_alias.rs: referenced=["crates/singlefs-harness/src/lib.rs", "crates/singlefs-harness/src/lib.rs"]
-crates/singlefs-checker-tier/src/via_full_path_expr.rs: referenced=["crates/singlefs-harness/src/history.rs"]

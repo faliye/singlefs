@@ -453,8 +453,10 @@ def main(argument_list: list[str]) -> int:
         analyses = row_analyses(arguments.rows_root, [arguments.selected_rows], arguments.baseline_dir, [])
         print("q3_core_rows=" + ",".join(map(str, q3_core_rows(analyses, arguments.selected_rows))))
         return 0
-    for required in ("output", "mutations_table", "baseline_dir", "baseline_device_output"):
-        if getattr(arguments, required) is None:
+    given = {"output": arguments.output, "mutations_table": arguments.mutations_table, "baseline_dir": arguments.baseline_dir,
+             "baseline_device_output": arguments.baseline_device_output}  # 逐个点名读，不按选项名 getattr
+    for required, value in given.items():
+        if value is None:
             parser.error(f"--{required.replace('_', '-')} 必给")
     lines = ResultLines(arguments.output)
     started = time.monotonic_ns()

@@ -1,0 +1,4 @@
+Q5 读法=None 槽 50180: 盘0(已释放=false,隔离位=false,代=3) 盘1(已释放=false,隔离位=true,代=3)
+Q5 checker: violated=["I-3.11"] I-1.1=Holds I-3.1=Holds I-3.11=违例[盘 0：记账的已分配 Some(737280) 减 defer 待释放 Some(442368)，不等于从最新根（txg 5）走读到的 262144（其中隔离豁免 0）]
+Q5 对照（两盘都置位） 槽 50180: 盘0(已释放=false,隔离位=true,代=3) 盘1(已释放=false,隔离位=true,代=3)
+Q5 对照 checker: violated=[] I-1.1=Holds I-3.1=Holds I-3.11=Holds

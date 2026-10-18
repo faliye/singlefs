@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# checker-tier-crash-point-replay 按条复用样本的假 cargo（快档样本档）：-V 打版本；test 照 cases/tests.tsv（<源文件><制表符><libtest 名><制表符><ok|FAILED|ignored>）
+# 逐个测试二进制打 libtest 的输出，-- 之后的 --skip <名>（带 --exact 时整名相同才跳）跳过的那几条不打、不计数；有 FAILED 的二进制汇总行写 FAILED、整趟退 101。
+# 每次起都先打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: <收到的全部参数>，expect 靠它核阶段交了哪几条 --skip。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+skips=() exact=0 after=0 previous=""
+for word in "$@"; do
+  if ((after)); then
+    [[ "$word" == --exact ]] && exact=1
+    [[ "$previous" == --skip ]] && skips+=("$word")
+  fi
+  [[ "$word" == -- ]] && after=1
+  previous="$word"
+done
+skipped() {
+  local skip
+  for skip in ${skips[@]+"${skips[@]}"}; do
+    if ((exact)); then [[ "$1" == "$skip" ]] && return 0; else [[ "$1" == *"$skip"* ]] && return 0; fi
+  done
+  return 1
+}
+echo "    Finished \`release\` profile [optimized] target(s) in 0.01s"
+status=0 number=0
+while IFS= read -r source; do
+  number=$((number + 1))
+  if [[ "$source" == src/lib.rs ]]; then echo "     Running unittests src/lib.rs (target/release/deps/singlefs_checker_tier-000000000000000$number)"
+  else echo "     Running $source (target/release/deps/$(basename "$source" .rs)-000000000000000$number)"; fi
+  passed=0 failed=0 ignored=0 filtered=0 lines=()
+  while IFS=$'\t' read -r row_source name outcome; do
+    [[ "$row_source" == "$source" ]] || continue
+    [[ "$name" == - ]] && continue
+    if skipped "$name"; then filtered=$((filtered + 1)); continue; fi
+    lines+=("test $name ... $outcome")
+    case "$outcome" in ok) passed=$((passed + 1)) ;; FAILED) failed=$((failed + 1)) ;; ignored) ignored=$((ignored + 1)) ;; esac
+  done < "$here/cases/tests.tsv"
+  echo
+  echo "running ${#lines[@]} tests"
+  printf '%s\n' ${lines[@]+"${lines[@]}"}
+  echo
+  if ((failed)); then
+    echo "failures:"; echo
+    echo "test result: FAILED. $passed passed; $failed failed; $ignored ignored; 0 measured; $filtered filtered out; finished in 0.00s"
+    echo "error: test failed, to rerun pass \`--test $(basename "$source" .rs)\`"
+    status=101
+  else
+    echo "test result: ok. $passed passed; 0 failed; $ignored ignored; 0 measured; $filtered filtered out; finished in 0.00s"
+  fi
+  echo
+done < <(cut -f1 "$here/cases/tests.tsv" | awk '!seen[$0]++')
+exit "$status"

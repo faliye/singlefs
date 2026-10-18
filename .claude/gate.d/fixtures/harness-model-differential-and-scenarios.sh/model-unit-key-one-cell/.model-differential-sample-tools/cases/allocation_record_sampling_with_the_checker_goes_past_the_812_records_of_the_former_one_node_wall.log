@@ -1,0 +1,6 @@
+running 1 test
+── 随机历史：越过原分配记录墙的取样点 ──
+  模型对拍 4001 步：该拒而拒 1、区间里拒 0、该成而成 4000（样本）
+test allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_former_one_node_wall ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.00s

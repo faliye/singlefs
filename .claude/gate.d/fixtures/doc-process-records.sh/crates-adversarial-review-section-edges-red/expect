@@ -1,0 +1,8 @@
+exit=1
+want=crates 改动里 4 个文件没有三方判决点名
+want=      crates/demo/src/fenced.rs（bad-r1-main-verification.md 只在正文别处提到了它
+want=      crates/demo/src/level3.rs（bad-r1-main-verification.md 只在正文别处提到了它
+want=      crates/demo/src/nosection.rs（bad-r1-main-verification.md 只在正文别处提到了它
+want=      crates/demo/src/suffixed.rs（bad-r1-main-verification.md 只在正文别处提到了它
+want=样本只跑 .gate-cells 点名的格：crates-adversarial-review
+want=doc-process-records.sh：1 格里 1 格红（crates-adversarial-review）

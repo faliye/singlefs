@@ -3,6 +3,7 @@
 # 正常写法——变体起了新名字、ASCII 单引号；只写日期；
 # 与「N 点」、时段词近似却不是钟点的写法（序号、个数、光秃时段词、用户原话引文里的「东京时间」、标识符里的时区词、
 # 数字后面跟着以 am / pm 起头的英文词与版本号），都该放行；
+# 数字后面跟 T 却不是 ISO 紧凑时间戳的写法（哈希与编号、年月日时分越界、钟点位数不对、小写 t、没有 T）：LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose 时这里判红；
 # 长得像钟点的冒号对（产物行的 名字=值、Python 切片、字典与逗号列表、时区偏移、引号与反引号里的代码字面、百分比、time -v 的格式说明、
 # 「门禁号:行号」表格、门禁文件名、同一行带「文件:行号」的编号对）一行一类，靠上下文规则放行：
 # LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=clock-times 时这里判红；
@@ -18,6 +19,15 @@ printf '%s\n' '## 候选' '' "取 K13（K9 的收严版），不取 K9。引号 
 printf '# 记录\n\n用户 2026-09-26 弹窗定甲二。\n' > records/记录.md
 printf '%s\n' '第 3 点前后两句' '3 点意见' '1000 个崩溃点' '全量由用户要求或夜间跑' '用户 2026-09-28 定' '同一天下午续跑' '用户原话「东京时间7点前」' \
   "\`${jst}_OFFSET\`、\`started_${utc}\` 这类标识符" "2 AMD 显卡、3 amps、5 ppm、pm2 进程、30 rpm、v1.2am" > records/近似写法.md
+# 数字后面跟 T、却不是 ISO 紧凑时间戳的写法：哈希与编号、年不是 20 开头、月日时分越界、钟点位数不对、小写 t、没有 T、T 后面不是数字；
+# 日期、T、钟点分开放进变量，运行时才拼，源码里不出现字面。
+stamp_day=20261001
+stamp_t=T
+printf '%s\n' "git 哈希 9fceb02d3e1a、e171-r6、m3-batch59 这类编号" \
+  "年不是 20 开头 98765432${stamp_t}1234" "月越界 20261301${stamp_t}1200" "日越界 20261032${stamp_t}1200" \
+  "时越界 ${stamp_day}${stamp_t}2500" "分越界 ${stamp_day}${stamp_t}1261" "钟点只有 3 位 ${stamp_day}${stamp_t}123" \
+  "钟点多到 7 位 ${stamp_day}${stamp_t}1234567" "小写 t ${stamp_day}t1234" "没有 T ${stamp_day}1234" \
+  "T 后面不是数字 ${stamp_day}${stamp_t}ab12" >> records/近似写法.md
 {
   printf '%s\n' 'remount_chosen=2:12 device_chosen=1:16 values=1:16.000,3:12.000,5:14.000'
   printf '%s\n' 'adjacent_differences=0->1:10,1->2:8 steps_by_changed_leaf_count=1:108,2:36'
@@ -32,6 +42,8 @@ printf '%s\n' '第 3 点前后两句' '3 点意见' '1000 个崩溃点' '全量�
   printf '%s\n' '| kb 目录不在 | —— | 21:39、24:27、27:39 |'
   printf '%s\n' '门禁 20:09-sample-stage.sh 那一行'
   printf '%s\n' '触发的那一处（decisions/06-快照实现模型.md:42），06:42 正是没抽到的那一行'
+  printf '%s\n' '同一句里引了 `decisions/06-x.md:42`，决策号:行号 06:42 与 07:15 照旧按编号读'
+  printf '%s\n' '见 `decisions/06-x.md:42`；决策号:行号 06:42 写在分号后面，分号不断句，照旧按编号读'
   printf '%s\n' '撞键 `3:10`：冷重开是 `2:11`'
   printf '%s\n' 'candidates=[ 1:15=ok@1:24 3:26=ok@3:26] rows=1:12/3/4;2:13/5/6'
   printf '%s\n' 'taken_jst=2026-09-27T01:20:12+09:00 started_jst=2026-09-15T03:12'

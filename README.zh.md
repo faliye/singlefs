@@ -61,6 +61,8 @@ waaagh！
 | 形式化验证 | Verus 验恢复重放取 journal 前缀、择根、扫环的纯函数核（`crates/singlefs-replay-prefix`），编进产品的就是这一份 | checker-tier-formal-verification |
 | 变异 | crates 变异表逐行改坏一处、点名的测试必须变红；广谱变异（cargo-mutants）每一条都要有结论、没有一条没红 | checker-tier-crates-mutation-replay、checker-tier-broad-mutation |
 
+判了多少：2026-10-16 到 2026-10-18 那一轮全量罩 14 条崩溃枚举用例，日志打了态数的 12 条合计 5,149,586,107 个崩溃状态（约 51.5 亿），每一态都有键相同的判定、违例 0；判定存在崩溃判定库里按函数单元键复用，判器在两台机器的 GPU 上跑。第 6 条没在最终那棵树上重跑，第 12 条的快档判法最后一天改过。2026-10-15 六道重型门禁过了一趟：herd7 与 QEMU（6 次虚机、123 项检查）绿，形式化与变异表跑的是轻型（变异 172 行里 2 行没红），广谱变异对这一版代码还没有结论；各项测试的数汇总在 2026-10-18 那份简报「测试数据汇总」一节。
+
 **门禁全绿只构成模型层的崩溃一致性证据**，不是「验过了」。每一样跑到哪、哪几项记本次未跑、还没罩到什么，看 [`briefs/`](briefs/) 最新一份。
 
 ## 系统配置
@@ -133,6 +135,7 @@ bash .claude/scripts/gate.sh
 | [`crates/singlefs-checker-tier`](crates/singlefs-checker-tier) | checker 档：崩溃态枚举、判定库、崩溃放量、GPU 判器、真设备装置；默认只在提交时跑 |
 | [`crates/singlefs-checker`](crates/singlefs-checker) | 池级 checker：判一个镜像的判决器库，与实现只共享格式常量 |
 | [`crates/singlefs-replay-prefix`](crates/singlefs-replay-prefix) | 恢复重放取前缀、择根、扫环的纯函数核，Verus 验的就是这一份 |
+| [`crates/singlefs-unit-graph`](crates/singlefs-unit-graph) | 函数单元图：Rust 与 WGSL 源码按条目切成单元、取去注释指纹，从入口收闭包、算复用键；只用 std |
 | [`crates/singlefs-reference-filesystem`](crates/singlefs-reference-filesystem) | RefFS：语义级的参照文件系统，只在内存里按 POSIX 操作走 |
 | [`crates/mutations.tsv`](crates/mutations.tsv) | crates 的变异表 |
 | [`scripts/`](scripts/) | 反复要用的脚本，按用途分子目录，各放什么见它的 README |

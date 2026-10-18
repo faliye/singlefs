@@ -1,0 +1,2 @@
+18b9cb3a3767f1d65cd6ebf822e18bf5b12379f0b34ce624ff2c9c1bf036ec46  .claude/kb/term-renames.md
+7c59a9b68bc3a5403ad4b3df1b3015ffd29b046c2bc92064e94a652b8db22171  .claude/kb/checks-owed.md

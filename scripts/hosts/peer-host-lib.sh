@@ -10,7 +10,8 @@
 # 全局变量（peer_host_load_configuration 设）：PEER_SSH_HOST PEER_REPOSITORY_DIRECTORY PEER_CARGO_BIN_DIRECTORY PEER_MEMORY_CAP
 #   QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND、peer_host_is_this_machine；
 #   peer_host_quiesced（peer_host_quiesce 清过场置 1，peer_host_quiesce_left 报过之后置 0）；peer_host_toolchain_text（peer_host_compare_toolchains 设）；
-#   peer_host_detached_outcome（peer_host_wait_detached 设：exit <码>、vanished、unreachable、never-started）。
+#   peer_host_detached_outcome（peer_host_wait_detached 设：exit <码>、vanished、unreachable、never-started）；
+#   peer_host_shared_target_prefix（peer_host_shared_target_prefix_for 设：第二台共用编译目录的守卫，接在第二台那条命令最前面）。
 # 只供测试的开关 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1（照崩溃点重放分片）：「第二台」是本机上的另一个目录，命令在本机跑，
 #   环境照 ssh 那样只给最少几样（HOME、USER、LOGNAME、LANG、XDG_RUNTIME_DIR、DBUS_SESSION_BUS_ADDRESS、CARGO_HOME、RUSTUP_HOME 与 PATH），本机别的环境变量不漏过去。
 # 弄坏开关 PEER_HOST_LIB_BREAK=<项>（只给证红用，逗号分隔可给几个；打开时调用方的自证退 1）。这一份没有自证，红在两份 source 它的脚本的 --selftest 里：
@@ -25,6 +26,13 @@
 #   PEER_HOST_LIB_BREAK=restore-after-run  peer_host_quiesce_left 照改前跑配置的 QUIESCE_START_COMMAND 复原
 #       mutation-shard-run.sh 的「① 照配置清了场、跑完没复原」（「stderr：…」）与「⑥ 两份都在跑时收到 TERM」（「退 143；…」）
 #       multi-host-run.sh 的自证不红（它不清场）
+#   下面三个弄坏的是第二台共用编译目录的守卫（peer_host_shared_target_guard，见那个函数的注释）；mutation-shard-run.sh 不用这个守卫，它的自证不红：
+#   PEER_HOST_LIB_BREAK=shared-target-not-refreshed  守卫照改前不刷源码戳（不跑 source-stamp.py refresh），只持锁
+#       multi-host-run.sh 的「Ⓜ 设了 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY ⇒ 第二台编之前刷源码戳：旧 mtime 新内容的那个文件重编（Compiling）、测试过（退 0）」（「第一趟退 0，第二趟退 101，第二趟输出：… Fresh crates/demo/src/walk.rs|…」）
+#   PEER_HOST_LIB_BREAK=shared-target-not-locked  守卫不持锁，只刷源码戳
+#       multi-host-run.sh 的「Ⓜ 同一共用编译目录两趟同时起：后一趟等前一趟放锁才刷源码戳、跑命令」（「前一趟放锁之前后一趟的命令已经跑了」）
+#   PEER_HOST_LIB_BREAK=shared-target-lock-held-to-exit  守卫持锁到命令退出，cargo 打出 Running 也不放
+#       multi-host-run.sh 的「Ⓜ 前一趟的命令打出 cargo 的 Running 行就放锁：后一趟不等它跑完」（「前一趟还在跑，后一趟 30 秒里没跑上」）
 
 peer_host_is_this_machine=0
 peer_host_quiesced=0
@@ -185,6 +193,80 @@ peer_host_stop_process_tree() { # <进程号>：这个进程连同全部后代�
   for pid in "${pids[@]}"; do peer_host_process_is_alive "$pid" && survivors+=("$pid"); done
   if (( ${#survivors[@]} > 0 )); then echo "进程 $1 那一棵里 ${survivors[*]} 发了 TERM、KILL 还在"; return 1; fi
   echo "进程 $1 连同 $(( ${#pids[@]} - 1 )) 个后代都停了"
+}
+
+# 第二台共用编译目录的守卫：调用方（multi-host-run.sh，MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY 设了时）把它接在第二台那条命令最前面，几棵树、几趟共用树外同一个编译目录时用。
+#   为什么：每一趟的树经 rsync -a 新拷，源文件带着本机的旧 mtime；cargo 按 mtime 判本地包新不新鲜，内容换了而 mtime 不比编译目录里上一次编的新，就照用别的树编的旧产物
+#   （.claude/rules/test-script-discipline.md「编译与算法都要快」：拷副本带了旧修改时刻的，把内容变了的文件改到此刻）。
+peer_host_shared_target_guard() { # <编译目录，相对树根> <refresh|no-refresh> <until-running|until-exit|unlocked> <命令…>：在第二台那棵树的树根跑（经 declare -f 带过去，
+  # 只用 bash、flock、python3 与树里的 scripts/hosts/source-stamp.py，不引别的函数）。在 <编译目录>.lock 上持排他锁（flock）→ source-stamp.py refresh（内容或 mtime 与戳里
+  # 不一样的源文件 touch 到此刻）→ 设 CARGO_TARGET_DIR、跑命令；命令的标准输出与标准错误并成一条管道转出，看到 cargo 打的「     Running <测试目标>」（编完、判完新鲜、开跑测试）
+  # 就放锁，没打这一行就到命令退出才放；锁的 fd 不交给命令。守卫自己没做成（没有 flock、建不了目录或锁文件、拿不到锁、刷不成戳）打原因与出路，命令不跑，退 255。
+  # 第二、三个参数只给弄坏开关用（peer_host_shared_target_prefix_for 照 PEER_HOST_LIB_BREAK 折出来），平常是 refresh until-running。退出码是命令的。
+  local target="${1%/}" refresh="$2" lock_mode="$3" lock_fd="" stamp_output="" stamp_line="" guard_line=""
+  local running_pattern='^[[:space:]]+Running [^`]'
+  shift 3
+  if ! command -v flock >/dev/null 2>&1; then
+    echo "  ✗ 第二台上没有 flock：共用编译目录 $target 持不了锁，命令没跑" >&2
+    echo "     → 怎么办：在第二台装 util-linux（带 flock）；或调用方不设 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY，让这一趟用树里自己的编译目录" >&2
+    return 255
+  fi
+  if ! mkdir -p -- "$target" 2>/dev/null || ! : >>"$target.lock" 2>/dev/null; then
+    echo "  ✗ 第二台建不了共用编译目录 $target 或它的锁文件 $target.lock，命令没跑" >&2
+    echo "     → 怎么办：看第二台那棵树的上一层可不可写、盘满没满" >&2
+    return 255
+  fi
+  exec {lock_fd}>>"$target.lock"
+  echo "  · 第二台：等共用编译目录 $target 的锁（刷源码戳、编、到 cargo 打出 Running 开跑这一段，同一个编译目录同一时刻只许一趟）"
+  if [[ "$lock_mode" != unlocked ]] && ! flock -x "$lock_fd"; then
+    echo "  ✗ 第二台拿不到共用编译目录的锁 $target.lock，命令没跑" >&2
+    echo "     → 怎么办：看第二台上那个文件可不可读写，再重跑同一条命令" >&2
+    return 255
+  fi
+  echo "  · 第二台：拿到共用编译目录 $target 的锁"
+  if [[ "$refresh" == refresh ]]; then
+    if ! stamp_output="$(python3 scripts/hosts/source-stamp.py refresh . --target-dir "$target" 2>&1)"; then
+      printf '%s\n' "$stamp_output" >&2
+      echo "  ✗ 第二台刷源码戳没做成（scripts/hosts/source-stamp.py refresh . --target-dir $target），命令没跑：不刷就可能拿编译目录里别的树编的旧产物跑" >&2
+      echo "     → 怎么办：照上面 source-stamp.py 打的原因修（树与编译目录在不在、可不可写），再重跑同一条命令" >&2
+      return 255
+    fi
+    # touch 过的文件逐个列的那几行不转出（头一次用、或每一趟新拷的树上一趟 touch 过的，都是成百上千行），只转汇总行 SOURCE_STAMP touched=…
+    while IFS= read -r stamp_line; do [[ "$stamp_line" == "  · touch "* ]] || printf '%s\n' "$stamp_line"; done <<<"$stamp_output"
+  fi
+  export CARGO_TARGET_DIR="$target"
+  "$@" {lock_fd}>&- 2>&1 | {
+    while IFS= read -r guard_line; do
+      printf '%s\n' "$guard_line"
+      if [[ "$guard_line" =~ $running_pattern ]]; then
+        if [[ "$lock_mode" == until-running ]]; then
+          flock -u "$lock_fd"
+          echo "  · 第二台：cargo 开跑，放开共用编译目录 $target 的锁"
+        fi
+        exec cat
+      fi
+    done
+    [[ -z "$guard_line" ]] || printf '%s' "$guard_line"
+  }
+  return "${PIPESTATUS[0]}"
+}
+
+peer_host_shared_target_prefix_for() { # <编译目录，相对树根>：第二台那条命令最前面要接的守卫写进数组 peer_host_shared_target_prefix
+  # （bash -c <peer_host_shared_target_guard 的定义> peer-shared-target-guard <编译目录> refresh until-running）；文件头那三个弄坏开关在这里折成守卫的第二、三个参数
+  local refresh=refresh lock_mode=until-running
+  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,shared-target-not-refreshed,* ]]; then
+    refresh=no-refresh
+    echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=shared-target-not-refreshed：第二台共用编译目录不刷源码戳" >&2
+  fi
+  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,shared-target-not-locked,* ]]; then
+    lock_mode=unlocked
+    echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=shared-target-not-locked：第二台共用编译目录不持锁" >&2
+  fi
+  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,shared-target-lock-held-to-exit,* ]]; then
+    lock_mode=until-exit
+    echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=shared-target-lock-held-to-exit：第二台共用编译目录的锁持到命令退出" >&2
+  fi
+  peer_host_shared_target_prefix=(bash -c "$(declare -f peer_host_shared_target_guard)"$'\n''peer_host_shared_target_guard "$@"' peer-shared-target-guard "$1" "$refresh" "$lock_mode")
 }
 
 peer_host_start_detached() { # <目录> <进程号文件> <退出码文件> <输出文件> <命令文本>：在第二台的这个目录里脱离 ssh 会话起（setsid nohup），

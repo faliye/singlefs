@@ -1,0 +1,8 @@
+exit=0
+want=toolchain	verus-toolchain-pinned
+want=proof:clamp_to_limit	verus-proof	exec fn
+want=pinned:22	pinned-red-examples-replay
+want=  · verus-proof：键对不上 0 条、无记录 2 条、键相同 0 条、拒算 0 条
+want=  · verus-vacuity：键对不上 0 条、无记录 2 条、键相同 0 条、拒算 0 条
+want=  · verus-must-red-worlds：键对不上 0 条、无记录 1 条、键相同 0 条、拒算 0 条
+want=  · 键对不上共 0 条（3 格比了 5 项

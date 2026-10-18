@@ -1,7 +1,0 @@
-ok ['m8-onepass-valid-some-empty']
-## lib rc=0 :: test result: ok. 200 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s 
-## newfile rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.49s 
-## slotbad rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.37s 
-## onepass rc=0 :: test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 64.18s 
-ok ['m8-onepass-valid-some-empty', 'restore']
-done

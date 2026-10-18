@@ -1,8 +1,0 @@
-name=k1-main tests_passed=9 tests_failed=0 b3_calls=11 b3_new_only_nonempty=4 b3_old_only_nonempty=2 b3_with_abandoned=8 b3_strong=3 b3_named=3 b3_ring_bad=2 k2_rollbacks=0 k2_isolated_nonempty=0
-name=k2-k3 tests_passed=2 tests_failed=0 b3_calls=0 b3_new_only_nonempty=0 b3_old_only_nonempty=0 b3_with_abandoned=0 b3_strong=0 b3_named=0 b3_ring_bad=0 k2_rollbacks=10 k2_isolated_nonempty=6
-name=main-harness-46 tests_passed=335 tests_failed=0 b3_calls=838 b3_new_only_nonempty=0 b3_old_only_nonempty=0 b3_with_abandoned=119 b3_strong=9 b3_named=269 b3_ring_bad=4 k2_rollbacks=45 k2_isolated_nonempty=2
-name=main-random-fast-and-ignored tests_passed=75 tests_failed=0 b3_calls=2968 b3_new_only_nonempty=0 b3_old_only_nonempty=0 b3_with_abandoned=5 b3_strong=0 b3_named=9 b3_ring_bad=0 k2_rollbacks=776 k2_isolated_nonempty=0
-name=main-large-rollback-unit-area-384 tests_passed=1 tests_failed=0 b3_calls=22199 b3_new_only_nonempty=0 b3_old_only_nonempty=0 b3_with_abandoned=0 b3_strong=0 b3_named=0 b3_ring_bad=0 k2_rollbacks=19911 k2_isolated_nonempty=0
-name=main-large-reuse-unit-area-240 tests_passed=1 tests_failed=0 b3_calls=35968 b3_new_only_nonempty=0 b3_old_only_nonempty=0 b3_with_abandoned=0 b3_strong=0 b3_named=0 b3_ring_bad=0 k2_rollbacks=2938 k2_isolated_nonempty=0
-name=swap-core-lib tests_passed=255 tests_failed=2 b3_calls=11 b3_new_only_nonempty=4 b3_old_only_nonempty=4 b3_with_abandoned=8 b3_strong=3 b3_named=3 b3_ring_bad=2 k2_rollbacks=0 k2_isolated_nonempty=0
-name=swap-harness-46-with-ignored tests_passed=389 tests_failed=0 b3_calls=0 b3_new_only_nonempty=0 b3_old_only_nonempty=0 b3_with_abandoned=0 b3_strong=0 b3_named=0 b3_ring_bad=0 k2_rollbacks=0 k2_isolated_nonempty=0

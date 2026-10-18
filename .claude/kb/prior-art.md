@@ -166,7 +166,7 @@ key 在 bset 内是**打包**的：每个 bset 有个格式描述符记录哪些
 > not by walking the btrees."
 
 而 `check_allocations` **靠全量遍历重建记账**，用来分辨「计数器过期」和「key 真的还在」。
-这与 `invariants.md` 的 I-3.1（已分配统计对得上） 是同一个设计：**运行时增量维护，checker 用遍历来验它**。
+这与 `crates/singlefs-checker/invariants/05-空间记账.md` 的 I-3.1（已分配统计对得上） 是同一个设计：**运行时增量维护，checker 用遍历来验它**。
 
 ### 5.5 纠删码：write hole 的第二个已知解法
 

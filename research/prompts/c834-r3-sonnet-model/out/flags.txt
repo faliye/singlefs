@@ -1,0 +1,21 @@
+name=r3_flags pair prefix=clean/y2 mapping_newer_index_node=false pointer_fixed=false rows=32790
+name=r3_flags pair prefix=root_units_and_record/none mapping_newer_index_node=true pointer_fixed=true rows=8
+name=r3_flags pair prefix=tree_table_and_record/tree_and_mapping mapping_newer_index_node=false pointer_fixed=false rows=8
+name=r3_flags pair prefix=tree_table_and_record/y2 mapping_newer_index_node=false pointer_fixed=false rows=32800
+name=r3_flags pair_total rows=65606 differ=0
+name=r3_flags pointer_vs_reference prefix=clean/y2 order=forward judge=pass mine=0 reference=0 same
+name=r3_flags pointer_vs_reference prefix=clean/y2 order=forward judge=refuse mine=16395 reference=16395 same
+name=r3_flags pointer_vs_reference prefix=clean/y2 order=reversed judge=pass mine=0 reference=0 same
+name=r3_flags pointer_vs_reference prefix=clean/y2 order=reversed judge=refuse mine=16395 reference=16395 same
+name=r3_flags pointer_vs_reference prefix=root_units_and_record/none order=forward judge=pass mine=4 reference=4 same
+name=r3_flags pointer_vs_reference prefix=root_units_and_record/none order=forward judge=refuse mine=0 reference=0 same
+name=r3_flags pointer_vs_reference prefix=root_units_and_record/none order=reversed judge=pass mine=4 reference=4 same
+name=r3_flags pointer_vs_reference prefix=root_units_and_record/none order=reversed judge=refuse mine=0 reference=0 same
+name=r3_flags pointer_vs_reference prefix=tree_table_and_record/tree_and_mapping order=forward judge=pass mine=0 reference=0 same
+name=r3_flags pointer_vs_reference prefix=tree_table_and_record/tree_and_mapping order=forward judge=refuse mine=4 reference=4 same
+name=r3_flags pointer_vs_reference prefix=tree_table_and_record/tree_and_mapping order=reversed judge=pass mine=0 reference=0 same
+name=r3_flags pointer_vs_reference prefix=tree_table_and_record/tree_and_mapping order=reversed judge=refuse mine=4 reference=4 same
+name=r3_flags pointer_vs_reference prefix=tree_table_and_record/y2 order=forward judge=pass mine=0 reference=0 same
+name=r3_flags pointer_vs_reference prefix=tree_table_and_record/y2 order=forward judge=refuse mine=16400 reference=16400 same
+name=r3_flags pointer_vs_reference prefix=tree_table_and_record/y2 order=reversed judge=pass mine=0 reference=0 same
+name=r3_flags pointer_vs_reference prefix=tree_table_and_record/y2 order=reversed judge=refuse mine=16400 reference=16400 same

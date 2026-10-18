@@ -1,0 +1,4 @@
+exit=1
+want=! 单测按条复用算不出（admission.py test-plan tiny 没成（
+want=✗ checker-tier-research-build-and-replay.sh 的 research-unit-tests 格按条复用失灵：scripts/gate/admission.py test-plan 退 1（✗ 样本档造的失灵：
+want=✗ research-unit-tests 这一格判红：单测按条复用失灵（上面「按条复用失灵」那一句点名了哪一条哨兵、或 admission.py 退了几）；这一趟照旧全部现判跑完、1 个测试批次共 1 个单测都过了

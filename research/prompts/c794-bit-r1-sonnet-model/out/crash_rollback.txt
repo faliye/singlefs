@@ -1,0 +1,7 @@
+PROBE-CRASH window=rollback-publish ops=[117,148) states=949 bit_record_referenced_by_union=939(first cut Some(117)) by_newest_root=0(first cut None) per_unit_vs_per_record_verdict_differs=0(first cut None)
+PROBE-CRASH window=rollback-publish checker_violated_histogram={"[]": 949}
+PROBE-CRASH window=rollback-publish recover_histogram={"FileRead": 949}
+PROBE-CRASH window=rollback-publish-NO-CLEAR ops=[117,148) states=949 bit_record_referenced_by_union=949(first cut Some(117)) by_newest_root=10(first cut Some(144)) per_unit_vs_per_record_verdict_differs=0(first cut None)
+PROBE-CRASH window=rollback-publish-NO-CLEAR checker_violated_histogram={"[]": 949}
+PROBE-CRASH window=rollback-publish-NO-CLEAR recover_histogram={"FileRead": 949}
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out;

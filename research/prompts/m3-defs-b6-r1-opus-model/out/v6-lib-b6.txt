@@ -1,4 +1,0 @@
-old-topic-r1	不收：第 7 行没有出处：要写 records/<文件>.md 第 N 行（research/、.claude/ 下的文件、这一轮自己的材料、仓外路径都不认）
-rc=1
-old-topic-r1	收
-rc=0

@@ -5,7 +5,7 @@
 #
 #   crash-amplification-two-hosts.sh <测试目标> [--test-filter <用例函数名>] [--library <本机库目录>] [--expand-up-to <N>] [--threads <N>] [--memory-cap <本机上限>] [--peer-memory-cap <第二台上限>] [--label <标签>]
 #                                    [--host-weights <本机>,<第二台>] [--local-states-per-second <本机量到的速度>] [--quiesce] [--quiesced] [--given-states]
-#   --given-states：测试目标经给定状态引擎判（`crash_amplification::GivenStatesEngine`：每张表在引擎里先写进库、再从库里读回来判），不另起录入段；
+#   --given-states：测试目标经给定状态引擎判（`crash_amplification::GivenStatesEngine`：每张表在引擎里先写进库、再从库里读回来判），不另起录入段（也不分着录）；
 #                   第二台那一趟也不设选段（不给它 SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge），第二台的引擎同样先录再判：送过去的库快照照在本机这一趟之前，
 #                   第二台只判就读不到这一趟要判的清单（报「先跑录入段」）；它录的表进它自己的库，取回后由步骤 ④ 导入
 #   crash-amplification-two-hosts.sh --selftest      拿假的本机那一趟、假的第二台（换掉 multi-host-run.sh）与假的清场走一遍分份、快照、取回、导入、对账、
@@ -15,13 +15,21 @@
 # 测试目标是 crates/singlefs-checker-tier/tests/ 下一条走 crash_amplification::run_from_environment 的用例（例 crash_amplification_fixed_script_through_rollback），
 # 或经给定状态引擎判的随机历史用例（崩溃点重放入口 scripts/crash/crash-point-replay.sh 的快档开了双机时照这三步起它们：引擎读同样的 SHARE、LIBRARY、IMPORT）。
 # 步骤：① 本机 SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/2、库写到 --library（单独起时先跑的录入段与之后本机每一趟判段——先判着、分份、导入——都用这一份；
-#          没给用 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/library-by-conclusion-kind，
-#          crash-amplification-lib.sh 文件头「判定库」：按结论种类存之前的旧库 <家目录>/library 引擎开库就拒，不删、不读；
+#          单独起（选段没设成 judge、不带 --given-states）时录入段分着录：清单、流程、事实表与判表（配了 GPU）照旧整条录（几十秒，录入键不含份），观察者的录入段逐状态在 CPU 上
+#          恢复、观察（挂了观察者的用例要几个小时），只录这一台领的块，领哪几块与判段同一个分法（份加 SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS、按块序号），
+#          所以本机录入段带 SHARE=0/2 与判段也带的权重（--host-weights 给了就带），本机那一份在后台子 shell 里先录入段（record.log）、录成了再判 0/2，与第二台同时开跑；
+#          没给用 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-~/.local/share/singlefs/crash-amplification}/crash-state-verdicts，
+#          crash-amplification-lib.sh 文件头「判定库」：一份库、几类测试同一份；块键带名字的旧库引擎开库就拒，这里不删、不读；
 #          在 /tmp 之外：重启不清、重跑同一条命令就是续跑；用例里的 run_from_environment 拒绝落在 /tmp、/var/tmp、/dev/shm、/run 下的库），后台跑（先 6 路并行只编、再按线程数跑）；
-#       ② 第二台 SHARE=1/2、库写到那棵树副本树根下的 crash-amplification-library/（相对路径由测试按仓根解析），经 scripts/hosts/multi-host-run.sh --peer --fetch 跑并取回
+#       ② 第二台 SHARE=1/2、库写到那棵树副本树根下的 crash-amplification-library/（引擎只收绝对路径：命令最前面的 bash -c 用第二台的 $PWD 拼成 <树根>/crash-amplification-library，
+#          见 peer_library_path_script），经 scripts/hosts/multi-host-run.sh --peer --fetch 跑并取回
 #          （树怎么拷、内存上限、工具链比对、脱离 ssh 会话、私有字换成「第二台」都归它）；树副本不带 multi-host.env，
 #          两个开关 ENABLE_ACROSS_MACHINES / ENABLE_GPU 随命令的环境送过去（测试在配置不在时读同名环境变量）；
-#          不带 --given-states 时第二台只跑判段（SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge：录入段已在本机跑完、清单在送过去的快照里）；
+#          分着录时（单独起、不带 --given-states，权重录入时就有：给了 --host-weights，或什么都没给等分）第二台不设选段，引擎先录它领的那一份观察者块再判，
+#          清单从送过去的库快照里读（快照照在本机开录之前；库里没有就自己整条录），录的块和判的块都写进它树里的 crash-amplification-library/，随 --fetch 取回，
+#          本机那一趟判段读的是本机库里本机录的，第二台判段读的是它库里它录的，各写各的库；取回的库里第二台录的观察者块不并进本机库，并进去的是它判的结论（步骤 ④）；
+#          只给 --local-states-per-second（权重要等第二台量完速度才有）时录入段还没有权重，仍由本机整份录（SHARE=0/1），第二台只判（SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge：
+#          清单与观察者块在送过去的快照里）；分项驱动 crash-amplification-item.sh 交过来时选段已经是 judge，录入段在它那一步整份录完，同样第二台只判；
 #          带 --given-states 时不设选段，第二台的引擎先录再判，录的表写进它树里的 crash-amplification-library/，随 --fetch 取回；
 #       ③ 等本机那一份；④ 本机再跑一趟 SHARE=0/2 带 SINGLEFS_CRASH_AMPLIFICATION_IMPORT=<取回的库>：导入第二台的块、对账、读违例——
 #          用例在导入之后断言对账为空、违例为空，它退 0 这一趟才算全绿。② 失败（第二台被停、掉线、被杀）而库取回了一部分，也先导入再退：
@@ -41,15 +49,24 @@
 #   变量值在第二台上是那一份的绝对路径）：第二台排计划、分份那两趟都送；本机那几趟从调用方环境继承。
 #   SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES（按段登记里分片的段一趟判几个态）：本机环境里设了（空串也算，照原样交、引擎拒）就把 <变量>=<原值> 放进
 #   第二台排计划、分份那两趟的环境，没设不送（第二台照引擎的默认 2^32 判）；本机那几趟从调用方环境继承。
+#   SINGLEFS_CRASH_LIBRARY_WRITE_ONLY（只写不读：库不读、全部块现判、照键写回；崩溃点重放入口 --full 设）：本机环境里设了就照原值放进第二台那两趟的环境，
+#   没设不送（第二台照读库复用）；本机那几趟从调用方环境继承。
 # 线程（crash-amplification-lib.sh 文件头「线程数的缺省」）：第二台排计划、分份那两趟起 capped.sh 的线程数与那两趟判的线程数（SINGLEFS_CRASH_AMPLIFICATION_THREADS）
 #   取同一个数：CRASH_AMPLIFICATION_PEER_THREADS 给了就用它（正整数），没给取登记的重活默认并行度（.claude/heavy-thread-default，SINGLEFS_THREAD_CAP 设了取它；
 #   用户 2026-10-12 定：默认每台 31、机器忙时也固定、不看忙闲）；--threads 只管本机跑的那一步（没给同样取登记值），不带给第二台。
 #   本机只编那一步同样取登记值（CRASH_AMPLIFICATION_BUILD_THREADS 给了照它）。显式给的不是正整数退 78，那一趟与本机先判着、本机那一份都还没起。
+# 第二台的编译目录：第二台排计划、分份那两趟共用树副本上一层的 crash-amplification-target（peer_environment 里的 CARGO_TARGET_DIR；每趟的树副本是新拷的，不共用就每趟从头编依赖）。
+#   树副本经 multi-host-run.sh 的 rsync -a 拷过去、源文件带着本机的旧 mtime，而 cargo 按 mtime 判本地包新不新鲜：内容换了（别的树、别的会话在那个目录里编过）而 mtime
+#   不比上一次编的新，就悄悄照用旧产物。所以两趟都把同一个目录交 multi-host-run.sh 的 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY（它的文件头 ⑤）：第二台起 cargo 之前
+#   在 <编译目录>.lock 上持锁、scripts/hosts/source-stamp.py refresh 把内容或 mtime 与戳里不一样的源文件 touch 到此刻，cargo 打出 Running 再放锁。
+#   代价：每趟新拷的树上一趟 touch 过的文件 mtime 又回到本机的旧值，refresh 照样再 touch，第二台每趟都重编本地包（依赖照旧复用）。
 # ENABLE_ACROSS_MACHINES 不是 1 由 multi-host-run.sh 拒（退 255），这里不偷偷退回单机。
 # 输出：三趟各自的 CRASH_AMPLIFICATION 行原样打出（第二台那一趟经 multi-host-run.sh 已换掉私有的字；先判着那一趟行尾加 warm_up=true、导入那一趟行尾加 import_run=true，见下）；日志放 <库目录的上层>/runs/<标签>/（--selftest 的全在一个 mktemp 目录里，退出时删掉）。
 #   判段没跑的那一种（配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性：引擎每一趟判段都打一行 CRASH_AMPLIFICATION_NOT_RUN step=judge … flow=<流> reason=…、录入段照录、退 0）
 #   那几行只从导入那一趟转打一次，崩溃放量入口据它把这一项记本次未跑；退出码照导入那一趟。
 # 退出码：④ 那一趟 cargo test 的退出码；① 或 ② 失败退它们的退出码（先失败的那一个），一步都没跑退 2；250–254 是内存包装自己的结局；
+#         分着录时 ① 里本机的录入段红了：退 crash-amplification-lib.sh 的 crash_amplification_record_on_this_host 照 record.log 分类之后交回的码（78、248、245 或原样），
+#            本机判段不起，第二台那一趟照常跑完取回，再带停下文件导入它判过的块（不重新录观察者）；
 #         78 运行条件不满足（出路：修好设备，或改配置）：说是清过场却没在多机配置里写清场之后那一份显卡先后、
 #            --quiesce 时多机配置判不过或清场没过、
 #            第二台那一趟 multi-host-run.sh 自己没跑成（它退 255：配置、工具链、拷树、连不上、等不到结局）、第二台的库没取回、
@@ -89,6 +106,11 @@
 #                                                       假的先判着那一趟等「停下文件在」或「这份文件在」，后者先到就是没被叫停、当场退 101，不等满 10 秒。
 #                                                       --selftest 给每一格设成格目录下的一份；停下文件在它之前建，所以两份都在时照叫停了算。
 #   换不掉的：真的那一趟由 crash-amplification-lib.sh 起 cargo、multi-host-run.sh 拷树连第二台，自证不碰它们。
+# 上次红的清单（scripts/gate/lib_reuse_checks.py 文件头「三」「测试目标」，.claude/hooks/run-scope-guard.sh 的拒绝说明读它）：
+#   ~/.local/share/singlefs/last-runs/scripts__crash__crash-amplification-two-hosts.sh.tsv（SINGLEFS_LAST_RUNS_DIRECTORY 盖过），红的测试名一行一个：
+#   「<测试目标>」，带 --test-filter 的「<测试目标>::<用例函数>」；退 0 是绿、退 2 / 77 / 130 / 143 照留，别的退出码是红；整个目标跑的那一趟换掉这个目标的全部项，
+#   点名用例的那一趟只换那一项。--selftest 之后每一种退法都经 EXIT 钩子 two_hosts_on_exit 写；测试目标的源文件不在、又没显式设 SINGLEFS_LAST_RUNS_DIRECTORY 的
+#   （别的自证拿假目标起真驱动）不写。自证那一格 last-run-list；自证里各格的里层都写进自证自己的临时目录。
 # 弄坏开关 CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=<项>（几个用逗号连；只给 --selftest 证红用，自证起的每一趟里层都带着调用方设的值）。
 # 逐项写开关名、弄坏哪一处、打开后自证哪几格红（格名是 run_selftest 里 run_cell 的第一个参数，或不起里层的 switch-wheel-judges；判错的那一格打「✗ 自证 <格名>：」）。
 # 写法：一行「#   <变量>=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头写点名的格（、隔开；括号里是说明，开关轮不读，括号外的每一段都算一格）。
@@ -96,7 +118,7 @@
 # （与崩溃放量入口共用）：表里的双机开关与代码里 two_hosts_break_is 认的要相等、表里的共用库开关要是共用库里认的，每个逐个打开、要退 1、红的格与点名的逐格相等；
 # 共用库认而表里没列的开关也逐个打开，要退 0、一格不红。并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS（没给取 SINGLEFS_THREAD_CAP，再没给按 nproc）。
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=same-share-on-both-hosts  第二台那一趟也领 0/2（两台判同一半）
-#       peer-engine-variables-absent-when-unset、peer-segments-registry-sent、peer-slice-states-sent（导入之后对账不为空、退 101）、
+#       peer-engine-variables-absent-when-unset、peer-segments-registry-sent、peer-slice-states-sent、peer-write-only-sent（导入之后对账不为空、退 101）、
 #       both-hosts-green、library-snapshot-sent、calibrated-weights（调用记录里没有第二台领 1/2 的那一趟）、
 #       reconciliation-not-empty（没人判的是 3 块、不是漏判的那 1 块）、quiesce-not-restored（导入之后对账不为空、退 101）、
 #       gpu-on-classes-not-sent、gpu-cards-from-multi-host-configuration、gpu-off-classes-not-sent（导入之后对账不为空、退 101，调用记录里也没有第二台领 1/2 的那一趟）、
@@ -104,33 +126,49 @@
 #       peer-checking-threads-default、peer-checking-threads-given、peer-checking-threads-cap、records-when-not-judging、given-states-without-record（导入之后对账不为空、退 101）、
 #       named-test-runs-even-if-ignored、records-library-marker、records-into-the-given-library、records-into-the-default-library-when-not-given、
 #       crash-case-shaped-records-and-imports、judge-not-run-forwarded-once（导入之后对账不为空、退 101）
+#       peer-build-guarded、peer-library-absolute（导入之后对账不为空、退 101）
+#       observers-recorded-by-share、observers-recorded-by-share-with-weights、split-record-fails、split-term-imports-the-fetched-library（第二台也领 0/2：1 3 5 没人领，导入之后对账不为空，不是退 0；被停那一格里第二台库里的观察者块是 0 2 4，不是 1 3 5）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=skip-import               取回之后不跑导入那一趟、当它退 0
-#       peer-segments-registry-sent、peer-slice-states-sent（调用记录里没有带 IMPORT 的本机 0/2 那一趟）、
+#       peer-segments-registry-sent、peer-slice-states-sent、peer-write-only-sent（调用记录里没有带 IMPORT 的本机 0/2 那一趟）、
 #       both-hosts-green（最后一趟不是带 IMPORT 的本机 0/2）、reconciliation-not-empty（退 0，不退 101）、
 #       gpu-on-classes-not-sent、gpu-cards-from-multi-host-configuration、gpu-off-classes-not-sent（调用记录里没有带 IMPORT 的本机 0/2 那一趟）、
 #       records-into-the-given-library、records-into-the-default-library-when-not-given（.library 里本机只有两笔，少了导入那一趟）、
-#       crash-case-shaped-records-and-imports（调用记录里没有带 IMPORT 的本机 0/2 那一趟）、judge-not-run-forwarded-once（导入那一趟没跑，转打 0 行）
+#       crash-case-shaped-records-and-imports（调用记录里没有带 IMPORT 的本机 0/2 那一趟）、judge-not-run-forwarded-once（导入那一趟没跑，转打 0 行）、
+#       observers-recorded-by-share、observers-recorded-by-share-with-weights（最后一趟不是带 IMPORT 的本机 0/2）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=term-skips-import         分份途中收到 TERM 照改前不导入第二台取回的库就退（文件头「被停」）
-#       term-imports-the-fetched-library（调用记录里没有带 IMPORT 的本机 0/2 那一趟，第二台判过的块没进本机库）
+#       term-imports-the-fetched-library、split-term-imports-the-fetched-library（调用记录里没有带 IMPORT 的本机 0/2 那一趟，第二台判过的块没进本机库）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=record-skipped-when-not-judging  单独起（选段没设成 judge）也不先在本机跑录入段
 #       records-when-not-judging、records-library-marker、records-into-the-given-library、records-into-the-default-library-when-not-given、
-#       crash-case-shaped-records-and-imports（.stage 或 .library 里第一笔不是本机录入段那一趟）
+#       crash-case-shaped-records-and-imports（.stage 或 .library 里第一笔不是本机录入段那一趟）、
+#       observers-recorded-by-share、observers-recorded-by-share-with-weights、observers-recorded-whole-when-weights-wait-for-speed、split-record-fails、split-term-imports-the-fetched-library（.record-share 里没有本机录入段那一笔）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=record-for-given-states  带了 --given-states 也先起录入段
 #       given-states-without-record（.stage 里有一笔 record）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-judges-only-for-given-states  带了 --given-states 也照改前给第二台设 SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge（第二台只判、不录）
 #       given-states-without-record（.stage 里第二台那一笔是 stage=judge）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=record-whole-on-this-host  不分着录：照改前本机用 0/1 把整份录完（观察者整份只有本机录）、第二台选段设成 judge 只判
+#       records-when-not-judging、records-library-marker、records-into-the-given-library、records-into-the-default-library-when-not-given、crash-case-shaped-records-and-imports、
+#       observers-recorded-by-share、observers-recorded-by-share-with-weights、split-record-fails、split-term-imports-the-fetched-library
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-judges-only-after-split-record  分着录时第二台也照改前设 SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge（只判，它那一份观察者没人录）
+#       records-when-not-judging、records-library-marker、records-into-the-given-library、records-into-the-default-library-when-not-given、crash-case-shaped-records-and-imports、
+#       observers-recorded-by-share、observers-recorded-by-share-with-weights、split-record-fails、split-term-imports-the-fetched-library
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=record-weights-dropped  分着录时本机录入段不带 --host-weights 给的权重（录的是等分的那一份，判段按权重领，读不到录入块）
+#       observers-recorded-by-share-with-weights
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=split-record-failure-ignored  分着录时本机录入段红了也接着判
+#       split-record-fails
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=record-into-the-default-library  给了 --library 时录入段照改前写进默认库，--library 只管之后那几趟判段（改前的样子：判段在给的库里找不到录入段写下的清单）
-#       records-into-the-given-library（.library 里录入段那一笔、转打的 CRASH_LIBRARY_RECORDED 行的 library= 是默认库，不是给的那一个）
+#       records-into-the-given-library（.library 里录入段那一笔、转打的 CRASH_LIBRARY_RECORDED 行的 library= 是默认库，不是给的那一个）、
+#       observers-recorded-by-share、observers-recorded-by-share-with-weights、observers-recorded-whole-when-weights-wait-for-speed（录入段写进默认库，本机判段在给的库里读不到观察者录入块，退 101）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=no-library-snapshot       本机库已有块也不照快照送给第二台
 #       library-snapshot-sent（第二台那一趟没带 --send、库里那一块没复用）、library-snapshot-fails（不照快照也就拷不坏，退 0，不退 2）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=ignore-snapshot-failure   快照拷不成也照跑
 #       library-snapshot-fails（不退 2）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=local-failure-ignored     本机那一份退非 0 也往下走（导入、退 0）
-#       local-share-fails（退 0，不退 101）、local-share-card-unusable（退 0，不退 78）、local-share-given-states-run-condition（退 0，不退 78）、local-share-gpu-memory（退 0，不退 245）
+#       local-share-fails（退 0，不退 101）、local-share-card-unusable（退 0，不退 78）、local-share-given-states-run-condition（退 0，不退 78）、local-share-gpu-memory（退 0，不退 245）、
+#       split-record-fails（本机录入段红了也退 0，不退 101）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=gpu-memory-unexplained    本机或第二台那一份退 245（内存包装认出的显存不够）时打通用出路、不说显存不够
 #       local-share-gpu-memory、peer-share-gpu-memory
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=local-failure-skips-salvage  本机那一份红了就不导入第二台取回的库
-#       local-share-fails（最后一趟不是带 IMPORT 的本机 0/2）
+#       local-share-fails、split-record-fails（最后一趟不是带 IMPORT 的本机 0/2）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-unreachable-as-run-failure  multi-host-run.sh 退 255 不映射成 78，照日志分类
 #       peer-unreachable（退 255）、peer-placement-unreachable（退 249）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-failure-ignored      第二台那一份退非 0 也往下走（导入、退 0）
@@ -142,17 +180,18 @@
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=import-failure-ignored    导入那一趟退非 0（对账不为空）也报绿
 #       reconciliation-not-empty（退 0，不退 101）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=drop-host-weights         算出两台的分工也不带给两趟分份
-#       calibrated-weights（分份那两趟的调用记录里 weights=none）
+#       calibrated-weights（分份那两趟的调用记录里 weights=none）、observers-recorded-by-share-with-weights（第二台那一趟没拿到权重，调用记录里 weights=none）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=no-warm-up-mark           先判着的那一趟转打时不加 warm_up=true
 #       calibrated-weights（没有带 warm_up=true 的 CRASH_AMPLIFICATION 行）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=no-import-mark            导入那一趟转打时不加 import_run=true
 #       both-hosts-green、local-share-fails、peer-share-card-unusable（导入那一行行尾没有 import_run=true）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=never-stop-warm-run       第二台量完速度不建停下文件
-#       peer-engine-variables-absent-when-unset、peer-segments-registry-sent、peer-slice-states-sent（同下退 101，调用记录里没有分份那一趟）、
-#       calibrated-weights、peer-placement-unreachable、peer-placement-card-unusable、peer-placement-algorithm、peer-placement-unrecognized、
+#       peer-engine-variables-absent-when-unset、peer-segments-registry-sent、peer-slice-states-sent、peer-write-only-sent（同下退 101，调用记录里没有分份那一趟）、
+#       calibrated-weights、observers-recorded-whole-when-weights-wait-for-speed、peer-placement-unreachable、peer-placement-card-unusable、peer-placement-algorithm、peer-placement-unrecognized、
 #       peer-placement-not-run、peer-placement-foreign-not-run-line、gpu-on-classes-not-sent、gpu-cards-from-multi-host-configuration、gpu-off-classes-not-sent（假的先判着那一趟看到叫停那一步走过了、停下文件却不在，退 101；各格退 101）、
 #       peer-threads-default、peer-threads-given、peer-threads-cap（同上退 101，分份那一趟没起、调用记录里只有排计划那一笔线程数）、
 #       peer-checking-threads-default、peer-checking-threads-given、peer-checking-threads-cap（同上退 101，第二台只记下排计划那一笔）
+#       peer-build-guarded（同上退 101，.shared-target 里只有排计划那一笔）、peer-library-absolute（同上退 101）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=warm-failure-ignored      本机先判着的那一趟退非 0 也往下走
 #       warm-run-card-unusable（退 0，不退 78）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-placement-failure-ignored  第二台没量出速度也往下走（分工写成「本机速度,」）
@@ -183,6 +222,8 @@
 #       peer-segments-registry-sent（第二台那两趟的 registry= 不是第二台树里那份快照的路径、或文件内容对不上）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=slice-states-not-sent-to-peer  本机环境里设了 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES 也不送给第二台（改前的样子：第二台照 2^32 判）
 #       peer-slice-states-sent（第二台那两趟的 slice_states= 是 [unset]，不是本机设的 131072）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=write-only-not-sent-to-peer  本机环境里设了 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY 也不送给第二台（改前的样子：第二台照读库复用）
+#       peer-write-only-sent（第二台那两趟的 write_only= 是 [unset]，不是本机设的 1）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-threads-fixed        第二台那两趟照改前写死 capped.sh 8，不取登记值、也不认 CRASH_AMPLIFICATION_PEER_THREADS
 #       peer-threads-default、peer-threads-given、peer-threads-cap（第二台那两趟的线程数是 8）、peer-threads-given-invalid（退 0，不退 78）、
 #       peer-checking-threads-default、peer-checking-threads-given、peer-checking-threads-cap（第二台那两趟判的线程数也是 8）
@@ -194,6 +235,12 @@
 #       switch-wheel-judges（造出来的输出上删一格、多一格、格名写错、没列的开关红了都判成对上）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=judge-not-run-dropped     导入那一趟打的 CRASH_AMPLIFICATION_NOT_RUN step=judge 行不转打（入口认不出这一项判段没跑）
 #       judge-not-run-forwarded-once
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-shared-target-unguarded  第二台那两趟照改前不交 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY（共用编译目录不持锁、不刷源码戳，旧 mtime 新内容的树照用别的树编的旧产物）
+#       peer-build-guarded（第二台那两趟的 shared_target= 是 [unset]）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=last-run-unwritten        跑完不写上次红的清单（改前的样子）
+#       last-run-list（清单一直不在，红的那两趟之后对不上）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=peer-library-relative     第二台那两趟照改前在命令的 env 里交相对路径 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=crash-amplification-library（引擎拒相对路径，第二台那一份当场红）
+#       peer-library-absolute、records-into-the-given-library、records-into-the-default-library-when-not-given（.library 里第二台那几笔是相对路径 crash-amplification-library）
 # 共用库 crash-amplification-lib.sh 的开关 CRASH_AMPLIFICATION_ITEM_BREAK（开关表在 crash-amplification-item.sh 文件头）打开时这里也红（共用库认而这里没列的，开关轮要它一格不红）：
 #   CRASH_AMPLIFICATION_ITEM_BREAK=device-unusable-as-run-failure
 #       local-share-card-unusable、peer-share-card-unusable、warm-run-card-unusable（退 101，不退 78）、peer-placement-card-unusable（退 249，不退 78）
@@ -289,7 +336,50 @@ fi
 echo "${STUB_HOST:?} stage=${SINGLEFS_CRASH_AMPLIFICATION_STAGE-unset}" >>"${STUB_CALLS:?}.stage"
 # 这一趟收到的库目录（SINGLEFS_CRASH_AMPLIFICATION_LIBRARY，原样）另记进 <调用记录>.library，录入段那一趟也记（records-into-the-given-library 那两格读）
 echo "$STUB_HOST stage=${SINGLEFS_CRASH_AMPLIFICATION_STAGE-unset} library=$library" >>"$STUB_CALLS.library"
+# STUB_OBSERVERS=1：模拟挂了观察者的用例——每一块有一份观察者录入块，录进库里的 observer-records（一行一块的序号）；
+#   谁领哪一块：没权重按份 i/n 取余，带权重 w0,w1 时序号对 w0+w1 取余小于 w0 归 0、否则归 1（录入段与判段同一个算法，真引擎里是平滑加权轮转）；
+#   录入段（STAGE=record）与先录再判（STAGE 没设、没有停下文件）把自己领的块录进自己的库；判段读自己领的、还没判的块时库里没有录入块就 panic、退 101（真引擎报「先跑录入段」）。
+#   录入段那一趟另把「<台> share=… weights=…」记进 <调用记录>.record-share（observers-recorded-by-share 那几格读）
+share_index="${share%/*}" share_count="${share#*/}" weights_text="${SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS:-none}"
+owner_of_block() { # <块序号>：打领它的那一台的序号
+  local block="$1" first_weight second_weight
+  if [[ "${STUB_OBSERVERS:-}" == 1 && "$weights_text" != none ]]; then
+    IFS=, read -r first_weight second_weight <<<"$weights_text"
+    if (( block % (first_weight + second_weight) < first_weight )); then echo 0; else echo 1; fi
+  else
+    echo $(( block % share_count ))
+  fi
+}
+record_my_observers() {
+  [[ "${STUB_OBSERVERS:-}" == 1 ]] || return 0
+  { mkdir -p -- "$library" && touch -- "$library/CURRENT" "$library/blocks" "$library/observer-records"; } 2>/dev/null || { echo "假的用例建不了库 $library"; exit 3; }
+  local block
+  for (( block = 0; block < 6; block++ )); do
+    [[ "$(owner_of_block "$block")" == "$share_index" ]] || continue
+    grep -qx "$block" "$library/observer-records" || echo "$block" >>"$library/observer-records"
+  done
+}
+fail_if_told() { # STUB_FAILURE=plain|device：照点名失败，退 101；gpu-memory：演经内存包装跑的那一趟测试红了、包装认出显存不够，退 245
+  case "${STUB_FAILURE:-}" in
+    gpu-memory)
+      echo "test result: FAILED"
+      echo "run-with-memory-cap: 显存不够（假的用例）"
+      exit 245
+      ;;
+    device) echo "GPU_CARD_NOT_USABLE index=0：配置点名了这张卡，这台机器却用不了它（假的用例）" ;;
+    given-states) echo "CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET table=stub-table reason=配了 GPU，给定状态表的判器借不到显存（假的用例）" ;;
+    plain) ;;
+    *) return 0 ;;
+  esac
+  echo "thread 'the_case' panicked at crates/singlefs-checker-tier/src/crash_amplification.rs:1:1:"
+  echo "假的用例照 STUB_FAILURE=$STUB_FAILURE 失败"
+  echo "test result: FAILED"
+  exit 101
+}
 if [[ "${SINGLEFS_CRASH_AMPLIFICATION_STAGE-}" == record ]]; then
+  echo "$STUB_HOST share=$share weights=$weights_text" >>"$STUB_CALLS.record-share"
+  fail_if_told
+  record_my_observers
   # STUB_RECORD_MARKER=library：照崩溃枚举用例经判定库两段跑的样子只打 CRASH_LIBRARY_RECORDED（crash_library.rs 的 record_the_item），不打崩溃放量那一行
   if [[ "${STUB_RECORD_MARKER:-amplification}" == library ]] || (( crash_case_shape )); then
     echo "CRASH_LIBRARY_RECORDED class=crash_state_enumeration item=stub::full manifest=0000000000000000 library=$library"
@@ -312,27 +402,10 @@ echo "${STUB_HOST:?} share=$share import=$import_mark placement=$placement stop=
 # 这一趟判的线程数（SINGLEFS_CRASH_AMPLIFICATION_THREADS）另记进 <调用记录>.checking-threads（线程数的缺省那几格读）
 echo "$STUB_HOST placement=$placement checking_threads=${SINGLEFS_CRASH_AMPLIFICATION_THREADS-unset}" >>"$STUB_CALLS.checking-threads"
 # 往引擎送的变量（SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY）在这一趟环境里的值另记进 <调用记录>.engine-environment；registry_sum 是那份文件的 cksum（没设写 unset，指到的文件不在写 missing）；
-# 同一行末尾 slice_states=[…] 是 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES 在这一趟环境里的值（没设写 unset）
+# 同一行的 write_only=[…] 与末尾 slice_states=[…] 是 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY、SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES 在这一趟环境里的值（没设写 unset）
 registry="${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY-unset}" registry_sum=unset
 if [[ "$registry" != unset ]]; then registry_sum=missing; [[ -f "$registry" ]] && registry_sum="$(cksum <"$registry" | cut -d' ' -f1)"; fi
-echo "$STUB_HOST placement=$placement registry=[$registry] registry_sum=[$registry_sum] slice_states=[${SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES-unset}]" >>"$STUB_CALLS.engine-environment"
-fail_if_told() { # STUB_FAILURE=plain|device：照点名失败，退 101；gpu-memory：演经内存包装跑的那一趟测试红了、包装认出显存不够，退 245
-  case "${STUB_FAILURE:-}" in
-    gpu-memory)
-      echo "test result: FAILED"
-      echo "run-with-memory-cap: 显存不够（假的用例）"
-      exit 245
-      ;;
-    device) echo "GPU_CARD_NOT_USABLE index=0：配置点名了这张卡，这台机器却用不了它（假的用例）" ;;
-    given-states) echo "CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET table=stub-table reason=配了 GPU，给定状态表的判器借不到显存（假的用例）" ;;
-    plain) ;;
-    *) return 0 ;;
-  esac
-  echo "thread 'the_case' panicked at crates/singlefs-checker-tier/src/crash_amplification.rs:1:1:"
-  echo "假的用例照 STUB_FAILURE=$STUB_FAILURE 失败"
-  echo "test result: FAILED"
-  exit 101
-}
+echo "$STUB_HOST placement=$placement registry=[$registry] registry_sum=[$registry_sum] write_only=[${SINGLEFS_CRASH_LIBRARY_WRITE_ONLY-unset}] slice_states=[${SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES-unset}]" >>"$STUB_CALLS.engine-environment"
 if [[ "$placement" == 1 ]]; then
   case "${STUB_PLACEMENT:-ok}" in
     device) echo "GPU_CARD_NOT_USABLE index=2：配置点名了这张卡，这台机器却用不了它（假的用例）"; echo "test result: FAILED"; exit 101 ;;
@@ -377,11 +450,20 @@ index="${share%/*}" count="${share#*/}" judged=0 reused=0
 # 带 IMPORT、停下文件已经在（被停之后先导入的那一趟）：一块都不领，只导入
 stopped_before_judging=0
 [[ -n "$import" && -n "$stop_file" && -e "$stop_file" ]] && stopped_before_judging=1
+# 先录再判（选段没设）：没有停下文件在时，先把自己领的观察者块录进自己的库（停下文件在就停在块边上，一块也不录）
+if [[ -z "${SINGLEFS_CRASH_AMPLIFICATION_STAGE:-}" ]] && (( ! stopped_before_judging )); then record_my_observers; fi
 for (( block = 0; block < total; block++ )); do
   (( stopped_before_judging )) && break
-  (( block % count == index )) || continue
+  [[ "$(owner_of_block "$block")" == "$index" ]] || continue
   [[ "$block" == "${STUB_DROP_BLOCK:-}" ]] && continue
-  if grep -qx "$block" "$library/blocks"; then reused=$((reused + 1)); else echo "$block" >>"$library/blocks"; judged=$((judged + 1)); fi
+  if grep -qx "$block" "$library/blocks"; then reused=$((reused + 1)); else
+    if [[ "${STUB_OBSERVERS:-}" == 1 ]] && ! grep -qx "$block" "$library/observer-records" 2>/dev/null; then
+      echo "thread 'the_case' panicked: 观察者在块 $block 的录入段那一块不在库里 $library：先跑录入段（假的用例）"
+      echo "test result: FAILED"
+      exit 101
+    fi
+    echo "$block" >>"$library/blocks"; judged=$((judged + 1))
+  fi
 done
 fail_if_told
 if [[ -z "$import" ]]; then
@@ -412,7 +494,7 @@ STUB
   cat >"$work/local-run.sh" <<'STUB'
 #!/usr/bin/env bash
 # 假的本机那一趟（自证用）：调法同 crash_amplification_run_on_this_host（<share> <库目录> <日志> [<附加环境 键=值>…]），跑假的用例、写日志。
-# 照点名失败：带停下文件的那一趟看 STUB_WARM_FAILURE，带 IMPORT 的导入那一趟不失败，别的（分份那一趟）看 STUB_LOCAL_FAILURE
+# 照点名失败：带停下文件的那一趟看 STUB_WARM_FAILURE，带 IMPORT 的导入那一趟不失败，录入段那一趟看 STUB_LOCAL_RECORD_FAILURE，别的（分份那一趟）看 STUB_LOCAL_FAILURE
 share="$1" library="$2" log="$3"
 shift 3
 # 带 IMPORT 的先认（被停之后先导入的那一趟 IMPORT 与停下文件都带）；分份那一趟（两样都不带）跑完建 <调用记录>.local-share-done
@@ -420,7 +502,7 @@ share_run=0
 case " $* " in
   *" SINGLEFS_CRASH_AMPLIFICATION_IMPORT="*) failure="" ;;
   *" SINGLEFS_CRASH_AMPLIFICATION_STOP_FILE="*) failure="${STUB_WARM_FAILURE:-}" ;;
-  *" SINGLEFS_CRASH_AMPLIFICATION_STAGE=record "*) failure="${STUB_LOCAL_FAILURE:-}" ;;
+  *" SINGLEFS_CRASH_AMPLIFICATION_STAGE=record "*) failure="${STUB_LOCAL_RECORD_FAILURE:-}" ;;
   *) failure="${STUB_LOCAL_FAILURE:-}"; share_run=1 ;;
 esac
 # 这一趟的 cargo test 参数（驱动交的 CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_TEST_ARGUMENTS）交给假的用例：照崩溃点重放用例的样子造的那种据此判标了 ignore 的跑不跑
@@ -437,9 +519,9 @@ STUB
 # STUB_PEER_EXIT=255（分份那一趟）/ STUB_PEER_PLACEMENT=unreachable（排计划那一趟）：连不上，什么都不跑、不取回，退 255；
 # STUB_PEER_FAILURE=plain|device：分份那一趟判完照点名失败；STUB_PEER_DROP_BLOCK=<序号>：漏判那一块；STUB_PEER_NO_FETCH=1：跑完不取回；
 # STUB_PEER_PLACEMENT=device|algorithm|unrecognized：排计划那一趟照点名失败；STUB_PEER_RATE：排计划那一趟报的速度（默认 50）。
-# 真的第二台那一趟是新起的 ssh 会话、不继承本机的环境：假的照此清掉 GPU_COMPUTATION_CLASSES 与往引擎送的变量，第二台只看得见命令里送过去的那一份。
-# 命令最前面可以是 bash -c <脚本> <名> <变量> <树内相对路径>（双机驱动的 peer_tree_path_script）：假的在假树根里真跑那段脚本（拼 $PWD、文件不在退 2）取变量值，
-# 脚本退非 0 就当那一趟命令退那个码、什么都不跑
+# 真的第二台那一趟是新起的 ssh 会话、不继承本机的环境：假的照此清掉 GPU_COMPUTATION_CLASSES、选段 SINGLEFS_CRASH_AMPLIFICATION_STAGE 与往引擎送的变量，第二台只看得见命令里送过去的那一份。
+# 命令最前面可以是一段或几段 bash -c <脚本> <名> <变量> <树内相对路径>（双机驱动的 peer_library_path_script、peer_tree_path_script）：假的在假树根里逐段真跑那段脚本
+# （拼 $PWD；按段登记文件不在退 2）取变量值，脚本退非 0 就当那一趟命令退 2、什么都不跑
 fetch_name="" send_sources=() send_names=()
 while (($# > 0)); do
   case "$1" in
@@ -452,17 +534,20 @@ while (($# > 0)); do
     *) echo "假的 multi-host-run.sh：认不得参数 $1"; exit 2 ;;
   esac
 done
-tree_path_variable="" tree_path_value=""
-if [[ "${1:-}" == bash && "${2:-}" == -c ]]; then
-  tree_path_variable="$5"
-  tree_path_script="$3" tree_path_name="$4" tree_path_relative="$6"
+tree_path_scripts=() tree_path_names=() tree_path_variables=() tree_path_relatives=() tree_path_value=""
+while [[ "${1:-}" == bash && "${2:-}" == -c ]]; do
+  tree_path_scripts+=("$3"); tree_path_names+=("$4"); tree_path_variables+=("$5"); tree_path_relatives+=("$6")
   shift 6
-fi
+done
 [[ "${1:-}" == env ]] && shift
 assignments=()
 while (($# > 0)) && [[ "$1" == *=* ]]; do assignments+=("$1"); shift; done
 placement=0
 case " ${assignments[*]} " in *" SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1 "*) placement=1 ;; esac
+# 第二台共用编译目录的守卫：调用方环境里的 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY 与命令里 CARGO_TARGET_DIR 的值记进 <调用记录>.shared-target（peer-build-guarded 那一格读）
+cargo_target=unset
+for assignment in "${assignments[@]}"; do [[ "$assignment" == CARGO_TARGET_DIR=* ]] && cargo_target="${assignment#CARGO_TARGET_DIR=}"; done
+echo "placement=$placement shared_target=[${MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY-unset}] cargo_target=[$cargo_target]" >>"${STUB_CALLS:?}.shared-target"
 # 送过去的命令是 bash scripts/hosts/capped.sh <线程数> cargo …：线程数记进 <调用记录>.threads（线程数的缺省那几格读）
 [[ "${1:-}" == bash && "${2:-}" == */capped.sh ]] && echo "placement=$placement threads=${3:-}" >>"${STUB_CALLS:?}.threads"
 # 点名了用例的那一趟（-- 之后带 --exact）：--include-ignored 带没带记进 <调用记录>.test-arguments（点名的用例标 ignore 时不带就一条都不跑）
@@ -480,11 +565,11 @@ for index in "${!send_sources[@]}"; do
   cp -a -- "${send_sources[index]}" "$tree/${send_names[index]}" || exit 3
   [[ "${send_names[index]}" == crash-amplification-library ]] && sent=yes
 done
-if [[ -n "$tree_path_variable" ]]; then
-  tree_path_value="$(cd "$tree" && bash -c "$tree_path_script" "$tree_path_name" "$tree_path_variable" "$tree_path_relative" printenv "$tree_path_variable")" || exit 2
-  assignments+=("$tree_path_variable=$tree_path_value")
-fi
-( cd "$tree" && env -u GPU_COMPUTATION_CLASSES -u SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY -u SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES "${assignments[@]}" STUB_HOST=peer STUB_SENT="$sent" STUB_FAILURE="${STUB_PEER_FAILURE:-}" STUB_DROP_BLOCK="${STUB_PEER_DROP_BLOCK:-}" \
+for index in "${!tree_path_variables[@]}"; do
+  tree_path_value="$(cd "$tree" && bash -c "${tree_path_scripts[index]}" "${tree_path_names[index]}" "${tree_path_variables[index]}" "${tree_path_relatives[index]}" printenv "${tree_path_variables[index]}")" || exit 2
+  assignments+=("${tree_path_variables[index]}=$tree_path_value")
+done
+( cd "$tree" && env -u GPU_COMPUTATION_CLASSES -u SINGLEFS_CRASH_AMPLIFICATION_STAGE -u SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY -u SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES -u SINGLEFS_CRASH_LIBRARY_WRITE_ONLY "${assignments[@]}" STUB_HOST=peer STUB_SENT="$sent" STUB_FAILURE="${STUB_PEER_FAILURE:-}" STUB_DROP_BLOCK="${STUB_PEER_DROP_BLOCK:-}" \
     STUB_PLACEMENT="${STUB_PEER_PLACEMENT:-ok}" STUB_RATE="${STUB_PEER_RATE:-50}" STUB_TEST_ARGUMENTS="$*" bash "${STUB_CASE:?}" )
 case_exit=$?
 # STUB_PEER_WAIT_FOR_TERM=1（分份那一趟）：演第二台那条命令还在跑——判完自己那一份之后建 <调用记录>.peer-running、等驱动转来的 TERM（至多 10 秒）；
@@ -518,6 +603,7 @@ STUB
   printf '%s\n' 'GPU_CARDS_BY_PRIORITY="local:1:3G peer:1:3G"' 'GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED="local:1:3G peer:1:3G"' "GPU_COMPUTATION_CLASSES='crash_judge_gpu'" >"$work/retired-gpu-cards.env"
   # 里层读的多机配置指到不在的文件（两个开关都关、一份卡都没写），库与日志都在临时目录下，本机、第二台与清场都换成上面那几份假的
   export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" SINGLEFS_GPU_CARDS_CONFIG="$work/retired-gpu-cards.env" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home"
+  export SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs"   # 上次红的清单：各格的里层都写这里，不写共用的那一份（last-run-list 那一格另给自己的目录）
   export CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_RUN="$work/local-run.sh" CRASH_AMPLIFICATION_TWO_HOSTS_PEER_RUN="$work/multi-host-run.sh" \
     CRASH_AMPLIFICATION_TWO_HOSTS_PEER_HOST_LIB="$work/peer-host-lib.sh" STUB_CASE="$work/case.sh"
 
@@ -536,13 +622,13 @@ STUB
     done
     shift
     mkdir -p "$cell_directory"
-    : >"$cell_directory/calls"; : >"$cell_directory/calls.stage"; : >"$cell_directory/calls.library"
+    : >"$cell_directory/calls"; : >"$cell_directory/calls.stage"; : >"$cell_directory/calls.library"; : >"$cell_directory/calls.record-share"
     cells=$((cells + 1))
     cell_command=(env -u SINGLEFS_CRASH_AMPLIFICATION_IMPORT -u SINGLEFS_CRASH_AMPLIFICATION_STOP_FILE -u SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY -u SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS -u GPU_COMPUTATION_CLASSES -u GPU_CARDS_BY_PRIORITY
-      -u SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY -u SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES
+      -u SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY -u SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES -u SINGLEFS_CRASH_LIBRARY_WRITE_ONLY
       -u CRASH_AMPLIFICATION_PEER_THREADS -u CRASH_AMPLIFICATION_BUILD_THREADS -u SINGLEFS_THREAD_CAP
       STUB_LOCAL_FAILURE= STUB_WARM_FAILURE= STUB_PEER_EXIT= STUB_PEER_FAILURE= STUB_PEER_DROP_BLOCK= STUB_PEER_NO_FETCH= STUB_PEER_PLACEMENT= STUB_PEER_RATE= STUB_QUIESCE= STUB_RECORD_MARKER=
-      STUB_CASE_SHAPE= STUB_PEER_WAIT_FOR_TERM= STUB_JUDGE_NOT_RUN=
+      STUB_CASE_SHAPE= STUB_PEER_WAIT_FOR_TERM= STUB_JUDGE_NOT_RUN= STUB_OBSERVERS= STUB_LOCAL_RECORD_FAILURE=
       STUB_CALLS="$cell_directory/calls" STUB_PEER_TREE="$cell_directory/peer-tree" CRASH_AMPLIFICATION_TWO_HOSTS_STOP_DECIDED="$cell_directory/stop-decided"
       SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge "${environment[@]+"${environment[@]}"}"
       bash "$two_hosts_script" "$@" "${library_arguments[@]+"${library_arguments[@]}"}" --label "$name")
@@ -584,13 +670,15 @@ STUB
     cell_failed both-hosts-green "本机领 0/2、第二台领 1/2、取回之后本机带 IMPORT 导入、对账为空，应当退 0；转打的行里只有导入那一行带 import_run=true" \
       "看主路径：第二台那一趟的 SINGLEFS_CRASH_AMPLIFICATION_SHARE 是 1/2，取回之后导入那一趟带 SINGLEFS_CRASH_AMPLIFICATION_IMPORT=<取回的库>，转打经 print_the_import_lines"
   fi
-  # 单独起这个驱动（选段没设成 judge）：先在本机跑录入段（.stage 第一笔是 local stage=record），之后本机与第二台的每一趟都是 stage=judge，第二台那几趟也是
+  # 单独起这个驱动（选段没设成 judge）：分着录（文件头「步骤」①②）——本机先跑录入段（.stage 里本机第一笔是 local stage=record），之后本机每一趟都是 stage=judge；
+  #   第二台自己先录再判（选段不设，假的记 unset），一趟 stage=judge 都没有。本机与第二台的 .stage 各自按台看（两台同时开跑，笔与笔之间的先后不定）
+  stage_lines_of() { grep "^$2 " "$work/$1/calls.stage"; }   # <格名> <local|peer>
   run_cell records-when-not-judging SINGLEFS_CRASH_AMPLIFICATION_STAGE= -- some-target
-  if [[ "$cell_exit" != 0 ]] || [[ "$(head -n 1 "$work/records-when-not-judging/calls.stage")" != "local stage=record" ]] \
-     || [[ "$(tail -n +2 "$work/records-when-not-judging/calls.stage" | grep -cv ' stage=judge$')" != 0 ]] \
-     || ! grep -q '^peer stage=judge$' "$work/records-when-not-judging/calls.stage"; then
-    cell_failed records-when-not-judging "单独起（选段没设成 judge）应当先在本机跑录入段、之后本机与第二台每一趟都只跑判段、退 0（退 $cell_exit；.stage「$(tr '\n' ';' <"$work/records-when-not-judging/calls.stage")」）" \
-      "看 mkdir -p 建日志目录之后选段那一段与 peer_environment 里的 SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge"
+  if [[ "$cell_exit" != 0 ]] || [[ "$(stage_lines_of records-when-not-judging local | head -n 1)" != "local stage=record" ]] \
+     || [[ "$(stage_lines_of records-when-not-judging local | tail -n +2 | grep -cv ' stage=judge$')" != 0 ]] \
+     || [[ "$(stage_lines_of records-when-not-judging peer | sort -u | tr '\n' ';')" != "peer stage=unset;" ]]; then
+    cell_failed records-when-not-judging "单独起（选段没设成 judge）应当先在本机跑录入段、之后本机每一趟只跑判段，第二台自己先录再判（选段不设）、一趟 stage=judge 都没有，退 0（退 $cell_exit；.stage「$(tr '\n' ';' <"$work/records-when-not-judging/calls.stage")」）" \
+      "看 mkdir -p 建日志目录之后「分着录」record_split 那一段与 peer_environment 后面选段那一段：分着录时第二台不设 SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge"
   fi
   # 判段没跑（文件头「输出」：没编进 gpu 特性的二进制遇到 ENABLE_GPU=1，每一趟判段都打 CRASH_AMPLIFICATION_NOT_RUN step=judge 行）：
   #   那一行只从导入那一趟转打一次（本机分份那一趟也打了，不转），退 0
@@ -601,22 +689,22 @@ STUB
   fi
   # 崩溃枚举用例经判定库两段跑的（崩溃点重放双机那几条）录入段只打 CRASH_LIBRARY_RECORDED、没有崩溃放量那一行：照样算录入成了，之后本机与第二台跑判段、退 0，那一行转打出来
   run_cell records-library-marker STUB_RECORD_MARKER=library SINGLEFS_CRASH_AMPLIFICATION_STAGE= -- some-target
-  if [[ "$cell_exit" != 0 ]] || [[ "$(head -n 1 "$work/records-library-marker/calls.stage")" != "local stage=record" ]] \
-     || ! grep -q '^peer stage=judge$' "$work/records-library-marker/calls.stage" \
+  if [[ "$cell_exit" != 0 ]] || [[ "$(stage_lines_of records-library-marker local | head -n 1)" != "local stage=record" ]] \
+     || ! grep -q '^peer stage=unset$' "$work/records-library-marker/calls.stage" \
      || ! grep -q '^CRASH_LIBRARY_RECORDED class=crash_state_enumeration ' "$work/records-library-marker/output"; then
-    cell_failed records-library-marker "录入段只打 CRASH_LIBRARY_RECORDED 行（崩溃枚举用例经判定库两段跑的样子）应当照样算录入成了：之后本机与第二台跑判段、退 0、那一行转打出来（退 $cell_exit；.stage「$(tr '\n' ';' <"$work/records-library-marker/calls.stage")」）" \
+    cell_failed records-library-marker "录入段只打 CRASH_LIBRARY_RECORDED 行（崩溃枚举用例经判定库两段跑的样子）应当照样算录入成了：之后本机跑判段、第二台先录再判、退 0、那一行转打出来（退 $cell_exit；.stage「$(tr '\n' ';' <"$work/records-library-marker/calls.stage")」）" \
       "看共用库 crash_amplification_record_on_this_host 认录入行的那一句：CRASH_AMPLIFICATION_RECORDED 与 CRASH_LIBRARY_RECORDED 两种都算"
   fi
-  # 录入段与判段用的库（.library）：<格名> <本机每一趟该收到的库目录>。退 0；第一笔是本机录入段那一趟；本机的每一笔（录入段、分份、导入，至少 3 笔）都是那个库目录；
-  #   第二台的每一笔（至少 1 笔）照旧是它树里的 crash-amplification-library
+  # 录入段与判段用的库（.library）：<格名> <本机每一趟该收到的库目录>。退 0；本机第一笔是本机录入段那一趟；本机的每一笔（录入段、分份、导入，至少 3 笔）都是那个库目录；
+  #   第二台的每一笔（至少 1 笔，先录再判、选段不设）照旧是它树里的 crash-amplification-library，交的是绝对路径 <假树根>/crash-amplification-library
   libraries_are() {
     local record="$work/$1/calls.library" local_calls peer_calls
     local_calls="$(grep -c '^local ' "$record")"; peer_calls="$(grep -c '^peer ' "$record")"
-    [[ "$cell_exit" == 0 ]] && [[ "$(head -n 1 "$record")" == "local stage=record library=$2" ]] && (( local_calls >= 3 && peer_calls >= 1 )) \
+    [[ "$cell_exit" == 0 ]] && [[ "$(grep '^local ' "$record" | head -n 1)" == "local stage=record library=$2" ]] && (( local_calls >= 3 && peer_calls >= 1 )) \
       && [[ "$(grep -cxF -e "local stage=record library=$2" -e "local stage=judge library=$2" "$record")" == "$local_calls" ]] \
-      && [[ "$(grep -cxF 'peer stage=judge library=crash-amplification-library' "$record")" == "$peer_calls" ]]
+      && [[ "$(grep -cxF "peer stage=unset library=$work/$1/peer-tree/crash-amplification-library" "$record")" == "$peer_calls" ]]
   }
-  # 给了 --library（崩溃点重放双机那几条由 crash-point-replay-shard-run.sh 给 <家目录>/crash-state-enumeration-library 的样子）：单独起时先跑的录入段写进给的那个库，
+  # 给了 --library（崩溃点重放双机那几条由 crash-point-replay-shard-run.sh 给 <家目录>/crash-state-verdicts 的样子）：单独起时先跑的录入段写进给的那个库，
   #   之后本机每一趟判段也读它，转打的 CRASH_LIBRARY_RECORDED 行的 library= 是它
   run_cell records-into-the-given-library STUB_RECORD_MARKER=library SINGLEFS_CRASH_AMPLIFICATION_STAGE= -- some-target
   if ! libraries_are records-into-the-given-library "$work/records-into-the-given-library/library" \
@@ -624,10 +712,10 @@ STUB
     cell_failed records-into-the-given-library "给了 --library，录入段与之后本机每一趟判段（分份、导入）都应当用给的那个库目录、第二台照旧用它树里的 crash-amplification-library、退 0（.library「$(tr '\n' ';' <"$work/records-into-the-given-library/calls.library")」）" \
       "看主路径 local_library 那几行：--library 的覆盖要在 crash_amplification_record_on_this_host 之前，录入段与 run_local_share 收同一个 \$local_library"
   fi
-  # 没给 --library：录入段与本机每一趟判段都用默认库 <家目录>/library-by-conclusion-kind（家目录是自证设的 SINGLEFS_CRASH_AMPLIFICATION_HOME）
+  # 没给 --library：录入段与本机每一趟判段都用默认库 <家目录>/crash-state-verdicts（家目录是自证设的 SINGLEFS_CRASH_AMPLIFICATION_HOME）
   run_cell records-into-the-default-library-when-not-given --without-library STUB_RECORD_MARKER=library SINGLEFS_CRASH_AMPLIFICATION_STAGE= -- some-target
-  libraries_are records-into-the-default-library-when-not-given "$work/home/library-by-conclusion-kind" \
-    || cell_failed records-into-the-default-library-when-not-given "没给 --library，录入段与之后本机每一趟判段都应当用默认库 $work/home/library-by-conclusion-kind、第二台照旧用它树里的 crash-amplification-library、退 0（.library「$(tr '\n' ';' <"$work/records-into-the-default-library-when-not-given/calls.library")」）" \
+  libraries_are records-into-the-default-library-when-not-given "$work/home/crash-state-verdicts" \
+    || cell_failed records-into-the-default-library-when-not-given "没给 --library，录入段与之后本机每一趟判段都应当用默认库 $work/home/crash-state-verdicts、第二台照旧用它树里的 crash-amplification-library、退 0（.library「$(tr '\n' ';' <"$work/records-into-the-default-library-when-not-given/calls.library")」）" \
       "看主路径 local_library 那一行与 crash-amplification-lib.sh 的 crash_amplification_default_library"
   # 带 --given-states（经给定状态引擎判的测试目标）：本机不起录入段，.stage 里一笔 record 都没有；第二台至少一笔、每一笔都不是 stage=judge
   #   （引擎自己先录再判，不设选段，假的记 unset；第二台只判就读不到本机这一趟才录的清单）
@@ -702,14 +790,65 @@ STUB
   # 照崩溃点重放双机那几条用例的样子（假的用例 STUB_CASE_SHAPE=crash-case：标 ignore、录入段只打 CRASH_LIBRARY_RECORDED）、单独起、点名用例：本机录入段要真跑
   #   （驱动给本机那一趟的 cargo test 参数带 --include-ignored）、CRASH_LIBRARY_RECORDED 那一行要算录入成了，之后两台判段、导入、对账为空、退 0，本机库里 6 块齐
   run_cell crash-case-shaped-records-and-imports STUB_CASE_SHAPE=crash-case SINGLEFS_CRASH_AMPLIFICATION_STAGE= -- some-target --test-filter the_full_case
-  if [[ "$cell_exit" != 0 ]] || [[ "$(head -n 1 "$work/crash-case-shaped-records-and-imports/calls.stage")" != "local stage=record" ]] \
-     || calls_have crash-case-shaped-records-and-imports ' ignored-not-run$' \
+  if [[ "$cell_exit" != 0 ]] || [[ "$(stage_lines_of crash-case-shaped-records-and-imports local | head -n 1)" != "local stage=record" ]] \
+     || calls_have crash-case-shaped-records-and-imports ' ignored-not-run$' || grep -q '^peer stage=judge$' "$work/crash-case-shaped-records-and-imports/calls.stage" \
      || ! grep -q '^CRASH_LIBRARY_RECORDED class=crash_state_enumeration ' "$work/crash-case-shaped-records-and-imports/output" \
      || output_has crash-case-shaped-records-and-imports '^CRASH_AMPLIFICATION_RECORDED ' \
      || ! calls_have crash-case-shaped-records-and-imports '^peer share=1/2 import=no ' || ! last_call_is crash-case-shaped-records-and-imports '^local share=0/2 import=yes ' \
      || [[ "$(LC_ALL=C sort -u "$work/crash-case-shaped-records-and-imports/library/blocks" 2>/dev/null | wc -l)" != 6 ]]; then
-    cell_failed crash-case-shaped-records-and-imports "照崩溃点重放用例的样子造的用例（标 ignore、录入段只打 CRASH_LIBRARY_RECORDED）给了 --test-filter：本机录入段应当真跑（不记 ignored-not-run）、那一行算录入成了，之后第二台领 1/2、本机带 IMPORT 导入、本机库 6 块齐、退 0（.stage「$(tr '\n' ';' <"$work/crash-case-shaped-records-and-imports/calls.stage")」）" \
+    cell_failed crash-case-shaped-records-and-imports "照崩溃点重放用例的样子造的用例（标 ignore、录入段只打 CRASH_LIBRARY_RECORDED）给了 --test-filter：本机录入段应当真跑（不记 ignored-not-run）、那一行算录入成了，之后第二台（先录再判、选段不设）领 1/2、本机带 IMPORT 导入、本机库 6 块齐、退 0（.stage「$(tr '\n' ';' <"$work/crash-case-shaped-records-and-imports/calls.stage")」）" \
       "看共用库 crash_amplification_prepare 拼的 cargo test 参数（test_filter 非空要带 --include-ignored）与 crash_amplification_record_on_this_host 认的录入行（CRASH_LIBRARY_RECORDED 也算）"
+  fi
+
+  # ── 观察者录入段按份分给两台（文件头「步骤」①②；假的用例 STUB_OBSERVERS=1：每一块有一份观察者录入块，谁领哪一块录哪一块，判段读自己领的块时库里没有录入块就红）
+  #   本机录入段只录本机那一份（SHARE=0/2，.record-share 里本机一笔、带判段也带的权重）、第二台自己先录它那一份再判（选段不设）；两台各写各的库
+  #   （本机库的 observer-records 只有本机那几块，第二台树里的只有第二台那几块）；两台判段都读到自己库里录的，对账为空、退 0
+  observer_blocks_of() { sort -n "$1" 2>/dev/null | tr '\n' ' '; }   # <库目录下 observer-records 的路径>：一行一块的序号，排好序、空格隔开
+  run_cell observers-recorded-by-share STUB_OBSERVERS=1 SINGLEFS_CRASH_AMPLIFICATION_STAGE= -- some-target
+  if [[ "$cell_exit" != 0 ]] || [[ "$(tr '\n' ';' <"$work/observers-recorded-by-share/calls.record-share")" != "local share=0/2 weights=none;" ]] \
+     || [[ "$(stage_lines_of observers-recorded-by-share local | head -n 1)" != "local stage=record" ]] \
+     || [[ "$(stage_lines_of observers-recorded-by-share peer | sort -u | tr '\n' ';')" != "peer stage=unset;" ]] \
+     || [[ "$(observer_blocks_of "$work/observers-recorded-by-share/library/observer-records")" != "0 2 4 " ]] \
+     || [[ "$(observer_blocks_of "$work/observers-recorded-by-share/peer-tree/crash-amplification-library/observer-records")" != "1 3 5 " ]] \
+     || ! output_has observers-recorded-by-share 'unjudged_blocks=0 red=0'; then
+    cell_failed observers-recorded-by-share "不带 --given-states 单独起：本机录入段只录本机那一份（.record-share 只有 local share=0/2 一笔）、第二台自己先录它那一份再判（选段不设）、两台各写各的库（本机 0 2 4、第二台 1 3 5）、两台判段读到的都是自己库里录的、对账为空、退 0（退 $cell_exit；.record-share「$(tr '\n' ';' <"$work/observers-recorded-by-share/calls.record-share")」；本机库「$(observer_blocks_of "$work/observers-recorded-by-share/library/observer-records")」；第二台库「$(observer_blocks_of "$work/observers-recorded-by-share/peer-tree/crash-amplification-library/observer-records")」）" \
+      "看 mkdir -p 建日志目录之后「分着录」record_split 那一段、run_local_record_then_share（录入段收 0/2）与 peer_environment 后面选段那一段（分着录时第二台不设 judge）"
+  fi
+  # 给了 --host-weights：权重在录入时就定，本机录入段也带它（录入段与判段同一个分法），本机只录权重分给它的那几块；第二台那一份同理
+  run_cell observers-recorded-by-share-with-weights STUB_OBSERVERS=1 SINGLEFS_CRASH_AMPLIFICATION_STAGE= -- some-target --host-weights 3,1
+  if [[ "$cell_exit" != 0 ]] || [[ "$(tr '\n' ';' <"$work/observers-recorded-by-share-with-weights/calls.record-share")" != "local share=0/2 weights=3,1;" ]] \
+     || [[ "$(observer_blocks_of "$work/observers-recorded-by-share-with-weights/library/observer-records")" != "0 1 2 4 5 " ]] \
+     || [[ "$(observer_blocks_of "$work/observers-recorded-by-share-with-weights/peer-tree/crash-amplification-library/observer-records")" != "3 " ]] \
+     || ! output_has observers-recorded-by-share-with-weights 'unjudged_blocks=0 red=0'; then
+    cell_failed observers-recorded-by-share-with-weights "给了 --host-weights 3,1：本机录入段应当带着同一份权重（.record-share 是 local share=0/2 weights=3,1）、只录权重分给本机的那几块（0 1 2 4 5）、第二台只录它那一块（3）、两台判段都读到自己库里录的、退 0（退 $cell_exit；.record-share「$(tr '\n' ';' <"$work/observers-recorded-by-share-with-weights/calls.record-share")」；本机库「$(observer_blocks_of "$work/observers-recorded-by-share-with-weights/library/observer-records")」）" \
+      "看 run_local_record_then_share：录入段的附加环境带 weights_environment（record_extra），与判段同一份"
+  fi
+  # 给了 --local-states-per-second（权重要等第二台量完速度才有）：录入段还没有权重，照旧本机整份录（SHARE=0/1）、第二台只判（读送过去的快照）；
+  #   假的用例不模拟排计划的速度之外的东西，这一格只看录入段那一趟的份与第二台的选段
+  run_cell observers-recorded-whole-when-weights-wait-for-speed STUB_OBSERVERS=1 SINGLEFS_CRASH_AMPLIFICATION_STAGE= -- some-target --local-states-per-second 150
+  if [[ "$cell_exit" != 0 ]] || [[ "$(tr '\n' ';' <"$work/observers-recorded-whole-when-weights-wait-for-speed/calls.record-share")" != "local share=0/1 weights=none;" ]] \
+     || [[ "$(stage_lines_of observers-recorded-whole-when-weights-wait-for-speed peer | sort -u | tr '\n' ';')" != "peer stage=judge;" ]]; then
+    cell_failed observers-recorded-whole-when-weights-wait-for-speed "只给了 --local-states-per-second（权重要等第二台量完速度）：录入段应当本机整份录（.record-share 是 local share=0/1）、第二台只判（stage=judge）、退 0（退 $cell_exit；.record-share「$(tr '\n' ';' <"$work/observers-recorded-whole-when-weights-wait-for-speed/calls.record-share")」；.stage「$(tr '\n' ';' <"$work/observers-recorded-whole-when-weights-wait-for-speed/calls.stage")」）" \
+      "看「分着录」record_split 的条件：local_states_per_second 非空而 host_weights 空时不分着录"
+  fi
+  # 本机录入段红了：判段不起（没有 share=0/2 的判段那一趟），第二台那一趟照常跑完取回，带停下文件导入它判过的块（不设选段、不重新录观察者），退本机录入段的退出码（101）
+  run_cell split-record-fails STUB_OBSERVERS=1 STUB_LOCAL_RECORD_FAILURE=plain SINGLEFS_CRASH_AMPLIFICATION_STAGE= -- some-target
+  if [[ "$cell_exit" != 101 ]] || calls_have split-record-fails '^local share=0/2 import=no ' || ! calls_have split-record-fails '^peer share=1/2 import=no ' \
+     || ! last_call_is split-record-fails '^local share=0/2 import=yes placement=0 stop=yes ' || [[ "$(stage_lines_of split-record-fails local | tail -n 1)" != "local stage=unset" ]] \
+     || [[ -s "$work/split-record-fails/library/observer-records" ]] || ! output_has split-record-fails '观察者录入段退 101' \
+     || [[ "$(observer_blocks_of "$work/split-record-fails/peer-tree/crash-amplification-library/observer-records")" != "1 3 5 " ]]; then
+    cell_failed split-record-fails "分着录时本机录入段红了（退 101）：判段不起、第二台那一趟照常跑完（先录它那一份观察者 1 3 5 再判）、带停下文件导入它取回的库（不设选段、不重新录观察者）、退 101、点名是录入段（退 $cell_exit；调用记录「$(tr '\n' ';' <"$work/split-record-fails/calls")」）" \
+      "看 run_local_record_then_share 录入段红了留 local-record-failed 标记、退它的退出码；主流程「导入那一趟的选段」那一段与本机那一份退非 0 那一段"
+  fi
+  # 分份途中被停（分着录）：同 term-imports-the-fetched-library，只是选段不设（本机录入段跑完、判段跑完才收到 TERM）：带 IMPORT 的那一趟本机不设选段、带着停下文件
+  run_cell split-term-imports-the-fetched-library --term-when "$work/split-term-imports-the-fetched-library/calls.peer-running" \
+    --term-when "$work/split-term-imports-the-fetched-library/calls.local-share-done" STUB_OBSERVERS=1 STUB_PEER_WAIT_FOR_TERM=1 SINGLEFS_CRASH_AMPLIFICATION_STAGE= -- some-target
+  if [[ "$cell_exit" != 143 ]] || ! calls_have split-term-imports-the-fetched-library '^peer term$' \
+     || ! last_call_is split-term-imports-the-fetched-library '^local share=0/2 import=yes placement=0 stop=yes ' \
+     || [[ "$(stage_lines_of split-term-imports-the-fetched-library local | tail -n 1)" != "local stage=unset" ]] \
+     || [[ "$(observer_blocks_of "$work/split-term-imports-the-fetched-library/peer-tree/crash-amplification-library/observer-records")" != "1 3 5 " ]]; then
+    cell_failed split-term-imports-the-fetched-library "分着录时分份途中给驱动发 TERM：应当把 TERM 转给第二台那一趟、等它取回库，再不设选段、带停下文件跑一趟本机 0/2 带 IMPORT、退 143（退 $cell_exit；调用记录「$(tr '\n' ';' <"$work/split-term-imports-the-fetched-library/calls")」）" \
+      "看主流程「导入那一趟的选段」：分着录时收到 TERM 就 unset 选段，被停的导入那一趟带停下文件"
   fi
 
   # ── 先判着、量第二台的速度、按速度分
@@ -844,6 +983,18 @@ STUB
     cell_failed peer-slice-states-sent "本机环境里设了 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES=131072：第二台排计划、分份那两趟的环境里都要有它、值照原样，本机那几趟照旧继承，退 0；本机没设：第二台那两趟都不该有（实记设了的「$(tr '\n' ';' <"$work/peer-slice-states-sent/calls.engine-environment")」、没设的第二台「$(peer_engine_lines peer-engine-variables-absent-when-unset | tr '\n' ';')」）" \
       "看 peer_environment 后面 SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES 那一段：本机设了（空串也算）就照原值加进 peer_environment，peer_threads_now 再拷进两趟用的 peer_run_environment"
   fi
+  # peer-write-only-sent：本机设了 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1（崩溃点重放入口 --full）⇒ 第二台排计划、分份两趟的环境里都是 1，本机那几趟照旧继承；
+  #   本机没设 ⇒ 第二台两趟都没有：读 peer-engine-variables-absent-when-unset 那一趟的记录
+  run_cell peer-write-only-sent SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1 -- some-target --local-states-per-second 150
+  write_only_local_lines="$(grep -c '^local ' "$work/peer-write-only-sent/calls.engine-environment" 2>/dev/null)"
+  if [[ "$cell_exit" != 0 ]] || ! five_calls_seen peer-write-only-sent || ! peer_engine_lines_are peer-write-only-sent ' write_only=[1] ' \
+     || ! grep -q '^peer placement=1 .* write_only=\[1\] ' "$work/peer-write-only-sent/calls.engine-environment" \
+     || ! grep -q '^peer placement=0 .* write_only=\[1\] ' "$work/peer-write-only-sent/calls.engine-environment" \
+     || (( ${write_only_local_lines:-0} == 0 )) || [[ "$(grep -c '^local .* write_only=\[1\] ' "$work/peer-write-only-sent/calls.engine-environment")" != "$write_only_local_lines" ]] \
+     || ! peer_engine_lines_are peer-engine-variables-absent-when-unset ' write_only=[unset] '; then
+    cell_failed peer-write-only-sent "本机环境里设了 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=1：第二台排计划、分份那两趟的环境里都要有它、值照原样，本机那几趟照旧继承，退 0；本机没设：第二台那两趟都不该有（实记设了的「$(tr '\n' ';' <"$work/peer-write-only-sent/calls.engine-environment")」、没设的第二台「$(peer_engine_lines peer-engine-variables-absent-when-unset | tr '\n' ';')」）" \
+      "看 peer_environment 后面 SINGLEFS_CRASH_LIBRARY_WRITE_ONLY 那一段：本机设了就照原值加进 peer_environment，peer_threads_now 再拷进两趟用的 peer_run_environment"
+  fi
 
   # ── 线程数的缺省（crash-amplification-lib.sh 文件头「线程数的缺省」）：没给就取登记的重活默认并行度（.claude/heavy-thread-default），SINGLEFS_THREAD_CAP 设了取它
   # 第二台那两趟（排计划、分份）：送过去的 capped.sh 线程数由假的 multi-host-run.sh 记进 <调用记录>.threads
@@ -942,6 +1093,24 @@ STUB
       "看 crash_amplification_run_on_this_host：crash_amplification_threads_now 交回非 0 时 return 78，在起 capped.sh 之前"
   fi
   # 点名了用例（--test-filter）：第二台排计划、分份那两趟的 cargo test 都要带 --include-ignored（崩溃点重放的全量用例标 ignore，不带就一条都不跑、退 0、录入段空着）
+  # 第二台共用编译目录的守卫（文件头「第二台的编译目录」）：排计划、分份那两趟都交 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY，值与命令里 CARGO_TARGET_DIR 是同一个目录
+  #   （假的 multi-host-run.sh 记进 <调用记录>.shared-target）
+  local shared_target_lines shared_target_pattern='^placement=0 shared_target=\[([^]]+)\] cargo_target=\[([^]]+)\];placement=1 shared_target=\[([^]]+)\] cargo_target=\[([^]]+)\];$'
+  run_cell peer-build-guarded -- some-target --local-states-per-second 150
+  shared_target_lines="$(LC_ALL=C sort "$work/peer-build-guarded/calls.shared-target" 2>/dev/null | tr '\n' ';')"
+  if [[ "$cell_exit" != 0 ]] || ! [[ "$shared_target_lines" =~ $shared_target_pattern ]] || [[ "${BASH_REMATCH[1]}" == unset ]] \
+     || [[ "${BASH_REMATCH[2]}" != "${BASH_REMATCH[1]}" || "${BASH_REMATCH[3]}" != "${BASH_REMATCH[1]}" || "${BASH_REMATCH[4]}" != "${BASH_REMATCH[1]}" ]]; then
+    cell_failed peer-build-guarded "第二台排计划、分份那两趟都应当交 MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY、值与命令里的 CARGO_TARGET_DIR 相同，退 0（实记「$shared_target_lines」）" \
+      "看「给了本机的速度」那一段之前的 peer_shared_target_environment：从 peer_environment 的 CARGO_TARGET_DIR 取，两处起 multi-host-run.sh 都带上它"
+  fi
+  # 第二台那两趟的库目录（文件头步骤②）：引擎只收绝对路径，排计划、分份那两趟交的都是第二台树根拼出的 <假树根>/crash-amplification-library
+  local peer_library_lines peer_library_expected="peer stage=judge library=$work/peer-library-absolute/peer-tree/crash-amplification-library"
+  run_cell peer-library-absolute -- some-target --local-states-per-second 150
+  peer_library_lines="$(grep '^peer ' "$work/peer-library-absolute/calls.library" 2>/dev/null | tr '\n' ';')"
+  if [[ "$cell_exit" != 0 || "$peer_library_lines" != "$peer_library_expected;$peer_library_expected;" ]]; then
+    cell_failed peer-library-absolute "第二台排计划、分份那两趟都应当交绝对路径的库目录 <第二台树根>/crash-amplification-library、退 0（退 $cell_exit；.library 里第二台那几笔「$peer_library_lines」）" \
+      "看 peer_library_prefix：两处起 multi-host-run.sh 的命令最前面都带 bash -c \"\$peer_library_path_script\"，env 里不再交相对路径 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY"
+  fi
   run_cell named-test-runs-even-if-ignored -- some-target --test-filter the_full_case
   if [[ "$cell_exit" != 0 ]] || ! grep -q '^peer placement=0 include_ignored=yes$' "$work/named-test-runs-even-if-ignored/calls.test-arguments" 2>/dev/null \
      || grep -q 'include_ignored=no' "$work/named-test-runs-even-if-ignored/calls.test-arguments"; then
@@ -958,6 +1127,42 @@ STUB
     cell_failed this-host-named-test-runs-even-if-ignored "共用库 crash_amplification_prepare 给了 test_filter 时拼出的 cargo test 参数应当以「-- --nocapture --include-ignored --exact the_full_case」收尾、交回 0" \
       "看 crash-amplification-lib.sh 的 crash_amplification_prepare：test_filter 非空时加 --include-ignored --exact <用例>"
   fi
+
+  # ── 上次红的清单（文件头「上次红的清单」；scripts/gate/lib_reuse_checks.py 文件头「三」「测试目标」）：四趟写进这一格自己的目录——
+  #   beta-target 整个红、点名 one_case 绿、点名 one_case 红、整个绿；每一趟之后清单要等于照这一趟的退出码推出来的那一份
+  #   （退 0 绿、退 2 / 77 / 130 / 143 照留、别的红；整个目标那一趟换掉这个目标的全部项，点名的只换那一项）。
+  #   没开弄坏开关时另要四趟的退出码依次是 101、0、101、0（红的那两趟真红了，推出来的清单才不是空的）
+  local last_run_directory="$work/last-runs-cell" last_run_expected="" last_run_actual="" last_run_problems="" last_run_exits=""
+  local last_run_step last_run_name last_run_target last_run_filter last_run_setting last_run_key
+  for last_run_step in "last-run-list-whole-red:beta-target::STUB_LOCAL_FAILURE=plain" "last-run-list-filter-green:beta-target:one_case:" \
+                       "last-run-list-filter-red:beta-target:one_case:STUB_LOCAL_FAILURE=plain" "last-run-list:beta-target::"; do
+    IFS=: read -r last_run_name last_run_target last_run_filter last_run_setting <<<"$last_run_step"
+    run_cell "$last_run_name" SINGLEFS_LAST_RUNS_DIRECTORY="$last_run_directory" ${last_run_setting:+"$last_run_setting"} -- \
+      "$last_run_target" ${last_run_filter:+--test-filter "$last_run_filter"}
+    last_run_exits+="$cell_exit "
+    last_run_key="$last_run_target${last_run_filter:+::$last_run_filter}"
+    case "$cell_exit" in
+      2|77|130|143) ;;
+      *)
+        if [[ -n "$last_run_filter" ]]; then
+          last_run_expected="$(grep -vxF -- "$last_run_key" <<<"$last_run_expected" || true)"
+        else
+          last_run_expected="$(grep -vxF -- "$last_run_target" <<<"$last_run_expected" | grep -vF -- "$last_run_target::" || true)"
+        fi
+        (( cell_exit != 0 )) && last_run_expected+=$'\n'"$last_run_key"
+        ;;
+    esac
+    last_run_expected="$(sed '/^$/d' <<<"$last_run_expected" | LC_ALL=C sort -u)"
+    last_run_actual="$(sed '/^$/d' "$last_run_directory/scripts__crash__crash-amplification-two-hosts.sh.tsv" 2>/dev/null | LC_ALL=C sort -u)"
+    [[ "$last_run_actual" == "$last_run_expected" ]] \
+      || last_run_problems+="$last_run_name 退 $cell_exit 之后清单是「$(tr '\n' ' ' <<<"$last_run_actual")」，应为「$(tr '\n' ' ' <<<"$last_run_expected")」；"
+  done
+  if [[ -z "${CRASH_AMPLIFICATION_TWO_HOSTS_BREAK:-}${CRASH_AMPLIFICATION_ITEM_BREAK:-}" && "$last_run_exits" != "101 0 101 0 " ]]; then
+    last_run_problems+="四趟退 $last_run_exits，应为 101 0 101 0；"
+  fi
+  [[ -z "$last_run_problems" ]] \
+    || cell_failed last-run-list "上次红的清单：$last_run_problems" \
+      "看主流程开头装的 EXIT 钩子 two_hosts_on_exit（经 scripts/gate/lib_reuse_checks.py last-run-target：红的测试目标一行一个，点名用例的只换那一项）"
 
   # ── 开关轮的判法（crash-amplification-lib.sh 的 crash_amplification_switch_wheel_verdict）：不起里层，拿一份造出来的输出（红在 cell-a、cell-b 两格）
   #   比几种点名：照实点名的、没列而一格不红的要判对上；删一格、多一格、格名写错、退出码不对、表里没写格、没列而红了的要判对不上
@@ -1042,6 +1247,7 @@ STUB
   echo "    第二台卡用不了先导入再退 78、库没取回退 78、对账不为空原样退、先判着按速度分、先判着那一趟卡用不了退 78、判段没跑的那一行只从导入那一趟转打一次、第二台量不出速度按日志退 78 / 78 / 248 / 249、第二台排计划借不到显存记本次未跑退 77（别的用例名的那一行照退 249）、"
   echo "    参数写错与用法错退 2、清过场没写那一份显卡配置退 78、清场判不过或没过退 78、清过场退出时不复原、"
   echo "    开不开 GPU 两台每一趟都不送 GPU_COMPUTATION_CLASSES（漏进来的也清掉）、显卡先后读多机配置（不读退役的私有显卡配置）、"
+  echo "    观察者录入按份分给两台（单独起、权重录入时就有：本机录入段只录本机那一份且带判段也带的权重、第二台先录它那一份再判、两台各写各的库、判段都读到自己库里录的；录入段红了判段不起、带停下文件导入第二台取回的；权重要等速度时仍由本机整份录）、"
   echo "    本机设了的按段登记文件（快照）与分片的段一趟判几个态（原值）都送进第二台排计划、分份那两趟、没设不送、"
   echo "    第二台那两趟与本机只编那一步的线程数取登记的重活默认并行度（显式给的优先、SINGLEFS_THREAD_CAP 设了取它、显式给的不是正整数退 78 不起；第二台那两趟判的线程数也取同一个数，不沿用本机的）"
   echo "    开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读：双机 $(grep -c . <<<"$in_table_two") 个、共用库 $(( listed_count - $(grep -c . <<<"$in_table_two") )) 个；共用库另有 $unlisted_count 个表里没列、要它一格不红）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的格"
@@ -1085,11 +1291,22 @@ fi
 # 第二台那一份的上限：没给 --peer-memory-cap 就取本机那一份同一条命令的上限（两台同一套口径；配置的 PEER_MEMORY_CAP 由 multi-host-run.sh 当最大值判）
 if [[ -z "$peer_memory_cap" ]] && ! two_hosts_break_is peer-cap-from-configuration; then peer_memory_cap="$memory_cap"; fi
 if [[ "$selftest" == 1 ]]; then run_selftest; fi
+# 退出时（每一种退法）：写上次红的清单（文件头「上次红的清单」），再做 --quiesce 那一段登记的收尾（two_hosts_exit_extra：报一句清了场、没复原）
+two_hosts_exit_extra=""
+two_hosts_on_exit() { # <这一趟的退出码>
+  if ! two_hosts_break_is last-run-unwritten && [[ -n "$test_target" ]]; then   # 弄坏开关 last-run-unwritten：跑完不写（改前的样子）
+    python3 "$repository_root/scripts/gate/lib_reuse_checks.py" last-run-target scripts/crash/crash-amplification-two-hosts.sh "$test_target" "$1" \
+      ${test_filter:+--test-filter "$test_filter"} --target-file "$repository_root/crates/singlefs-checker-tier/tests/$test_target.rs" >/dev/null 2>&1 \
+      || echo "  ! 上次红的清单没写成（scripts/gate/lib_reuse_checks.py last-run-target），这一趟的判定不受影响" >&2
+  fi
+  [[ -z "$two_hosts_exit_extra" ]] || eval "$two_hosts_exit_extra"
+}
+trap 'two_hosts_on_exit "$?"' EXIT
 library_is_temporary=0
 crash_amplification_prepare || two_hosts_break_is prepare-failure-ignored || exit 78
 
 # 库与日志的落点：/tmp 开机会清空（tmpfiles 的 D /tmp），2026-09-29 到 E 全域的库与树就丢在那里、续不上；正式跑一律放家目录下的固定位置，
-# 重跑同一条命令就是续跑（同一判法版本下判过的块全部复用）。
+# 重跑同一条命令就是续跑（同一判法单元指纹下判过的块全部复用）。
 crash_amplification_home="${SINGLEFS_CRASH_AMPLIFICATION_HOME:-$HOME/.local/share/singlefs/crash-amplification}"
 run_directory="$crash_amplification_home/runs/$label"
 local_library="$(crash_amplification_default_library "$crash_amplification_home")"
@@ -1101,9 +1318,22 @@ record_library="$local_library"
 two_hosts_break_is record-into-the-default-library && record_library="$(crash_amplification_default_library "$crash_amplification_home")"
 mkdir -p "$run_directory" || { echo "  ✗ 建不了 $run_directory" >&2; echo "  → 怎么办：看 ${crash_amplification_home} 可不可写" >&2; exit 2; }
 # 两段（用户 2026-10-11 定）：分项驱动已经在本机跑过录入段、把选段设成 judge 才交过来；单独起这个驱动时它自己先在本机跑录入段。
-# 之后本机先判、两台分份、导入每一趟（连同第二台那几趟）都只跑判段，第二台从送过去的库快照里读录入段写下的那几样。
+# 之后本机先判、两台分份、导入每一趟（连同第二台那几趟）都只跑判段，第二台从送过去的库快照里读录入段写下的那几样；
+# 单独起且权重录入时就有的，录入段不在这里先整份跑完，改成下面「分着录」：本机录自己那一份观察者、第二台自己录它那一份。
 # 带 --given-states 的例外：引擎每张表先写进库再读回来判，驱动不起录入段，两台的引擎各自先录再判（本机那几趟不设选段；第二台见下面 peer_environment 后面选段那一段）
+record_wanted=0
 if [[ "${SINGLEFS_CRASH_AMPLIFICATION_STAGE:-}" != judge ]] && { (( ! given_states )) || two_hosts_break_is record-for-given-states; } && ! two_hosts_break_is record-skipped-when-not-judging; then
+  record_wanted=1
+fi
+# 分着录（文件头「步骤」①②）：观察者的录入段逐状态在 CPU 上恢复、观察，挂了观察者的用例整段要几个小时；引擎录入段带 SHARE=k/n 时清单、流程、事实表照旧整条录（几十秒），
+# 只有观察者的块按份筛，筛法与判段同一个（份加权重、按块序号），所以两台能各录各的那一份：本机录 0/2 那一份，第二台自己先录 1/2 那一份再判（不设选段），两台同时开跑，各写各的库。
+# 权重要在录入时就定：给了 --host-weights 或什么都没给（等分）可以；只给了 --local-states-per-second（权重要等第二台量完速度才有，量速度的那一趟要本机先判着整份）
+# 录入时还没有权重，仍由本机整份录、第二台只判（旧做法）。带 --given-states 的引擎自己先录再判，不走这里。
+record_split=0
+if (( record_wanted && ! given_states )) && [[ -z "$local_states_per_second" || -n "$host_weights" ]] && ! two_hosts_break_is record-whole-on-this-host; then
+  record_split=1
+fi
+if (( record_wanted && ! record_split )); then
   crash_amplification_record_on_this_host "$record_library" "$run_directory/record.log" || exit $?
   export SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge
 fi
@@ -1141,19 +1371,28 @@ if [[ "$quiesce" == 1 ]]; then
     exit 78
   fi
   if two_hosts_break_is restore-after-run; then
-    trap 'peer_host_quiesce_left; bash -c "${QUIESCE_START_COMMAND:-}" >/dev/null 2>&1' EXIT
+    two_hosts_exit_extra='peer_host_quiesce_left; bash -c "${QUIESCE_START_COMMAND:-}" >/dev/null 2>&1'
   else
-    trap 'peer_host_quiesce_left' EXIT
+    two_hosts_exit_extra='peer_host_quiesce_left'
   fi
 fi
 
 # 第二台那一趟的环境：两个开关、它是第二台、显卡配置里的优先级（树副本不带配置）；三个内核一个一个编（驱动编大内核吃内存，一起编在第二台上撞过内存上限）；
 # 编译目录共用树副本上一层的 crash-amplification-target：每一趟的树副本是新拷的，不共用就每趟从头编 rocksdb 等依赖（约 3 分钟）
 peer_environment=("${common_environment[@]}" ENABLE_ACROSS_MACHINES=1 "ENABLE_GPU=$gpu_switch" SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE=peer SINGLEFS_GPU_KERNELS_ONE_AT_A_TIME=1 CARGO_TARGET_DIR=../crash-amplification-target)
-# 选段：不带 --given-states 时录入段已在本机跑完、清单在送过去的库快照里，第二台只判；带 --given-states 时驱动不起录入段（上面「两段」那一段），这一趟要判的清单只有引擎
-# 判之前自己录——送过去的快照照在本机这一趟之前，第二台只判就找不到（报「先跑录入段」），所以不设，第二台的引擎先录再判。
-# 弄坏开关 peer-judges-only-for-given-states 下带 --given-states 也照改前设 judge
-if (( ! given_states )) || two_hosts_break_is peer-judges-only-for-given-states; then
+# 选段：录入段已在本机整份跑完（旧做法：分项驱动交过来的、权重要等速度的、record-whole-on-this-host）、清单与观察者块在送过去的库快照里，第二台只判；
+# 分着录（record_split）时第二台自己的观察者那一份只有它自己录，快照里没有（快照照在本机开录之前），只判就读不到（报「先跑录入段」），所以不设选段，第二台的引擎先录它那一份再判；
+# 带 --given-states 时驱动不起录入段（上面「两段」那一段），这一趟要判的清单只有引擎判之前自己录，同样不设，第二台的引擎先录再判。
+# 弄坏开关 peer-judges-only-for-given-states 下带 --given-states 也照改前设 judge；peer-judges-only-after-split-record 下分着录时也设 judge
+peer_judges_only=0
+if (( given_states )); then
+  two_hosts_break_is peer-judges-only-for-given-states && peer_judges_only=1
+elif (( record_split )); then
+  two_hosts_break_is peer-judges-only-after-split-record && peer_judges_only=1
+else
+  peer_judges_only=1
+fi
+if (( peer_judges_only )); then
   peer_environment+=(SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge)
 fi
 [[ -n "$gpu_cards_by_priority" ]] && peer_environment+=("GPU_CARDS_BY_PRIORITY=$gpu_cards_by_priority")
@@ -1165,6 +1404,10 @@ fi
 # 两趟用的 peer_run_environment 由 peer_threads_now 从这里拷。弄坏开关 slice-states-not-sent-to-peer 下不送
 if [[ -n "${SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES+set}" ]] && ! two_hosts_break_is slice-states-not-sent-to-peer; then
   peer_environment+=("SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES=$SINGLEFS_CRASH_REGISTERED_SEGMENT_SLICE_STATES")
+fi
+# 只写不读（文件头「往引擎送的变量」）：本机设了就照原值放进第二台两趟的环境，没设不送。弄坏开关 write-only-not-sent-to-peer 下不送
+if [[ -n "${SINGLEFS_CRASH_LIBRARY_WRITE_ONLY+set}" ]] && ! two_hosts_break_is write-only-not-sent-to-peer; then
+  peer_environment+=("SINGLEFS_CRASH_LIBRARY_WRITE_ONLY=$SINGLEFS_CRASH_LIBRARY_WRITE_ONLY")
 fi
 
 # 往引擎送的变量（crash-point-replay.sh 文件头「往引擎送的变量」）：本机那几趟从调用方环境继承（env 不清它们）；第二台那一趟是新起的 ssh 会话，
@@ -1185,6 +1428,15 @@ if [[ -n "${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY:-}" ]] && ! two_hosts_
   fi
   peer_registry_send=(--send "$segments_registry_for_peer" crash-amplification-segments-registry)
   peer_tree_path_prefix=(bash -c "$peer_tree_path_script" peer-tree-path SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY "crash-amplification-segments-registry/$segments_registry_file_name")
+fi
+# 第二台那两趟的库目录（文件头步骤②）：引擎只收绝对路径（crash_library.rs 的 crash_library_directory 拒相对路径），第二台树副本的绝对路径同样只有第二台自己的 shell 知道，
+#   由命令最前面的 bash -c（peer_library_path_script）用第二台的 $PWD 拼成 <树根>/crash-amplification-library（库快照没送过去时目录还不在，引擎自己建）。
+#   弄坏开关 peer-library-relative 下照改前在 env 里交相对路径
+peer_library_path_script='export "$1=$PWD/$2"; shift 2; exec "$@"'
+peer_library_prefix=(bash -c "$peer_library_path_script" peer-tree-library SINGLEFS_CRASH_AMPLIFICATION_LIBRARY crash-amplification-library)
+peer_library_environment=()
+if two_hosts_break_is peer-library-relative; then
+  peer_library_prefix=(); peer_library_environment=(SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=crash-amplification-library)
 fi
 
 # 第二台那一趟的线程数（文件头「线程」）：起 capped.sh 的放进 peer_threads；算不出退 78（这时这一趟还什么都没起）。
@@ -1210,6 +1462,17 @@ peer_threads_now() {
   peer_run_environment+=("SINGLEFS_CRASH_AMPLIFICATION_THREADS=$peer_threads")
 }
 
+# 第二台共用编译目录的守卫（文件头「第二台的编译目录」）：目录取 peer_environment 里的 CARGO_TARGET_DIR（同一个值，不另写一份），起 multi-host-run.sh 的两处都带
+#   MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY=<它>。弄坏开关 peer-shared-target-unguarded 下照改前不带
+peer_target_directory=""
+for peer_environment_entry in "${peer_environment[@]}"; do
+  [[ "$peer_environment_entry" == CARGO_TARGET_DIR=* ]] && peer_target_directory="${peer_environment_entry#CARGO_TARGET_DIR=}"
+done
+peer_shared_target_environment=()
+if [[ -n "$peer_target_directory" ]] && ! two_hosts_break_is peer-shared-target-unguarded; then
+  peer_shared_target_environment=("MULTI_HOST_RUN_SHARED_TARGET_DIRECTORY=$peer_target_directory")
+fi
+
 # 给了本机的速度：第二台先排一趟派活计划、量它的速度，两台按速度分（四舍五入到整数，至少 1）
 if [[ -z "$host_weights" && -n "$local_states_per_second" ]]; then
   peer_threads_now
@@ -1227,8 +1490,9 @@ if [[ -z "$host_weights" && -n "$local_states_per_second" ]]; then
   warm_job=$!
   placement_arguments=(--peer --label "$label-placement" "${peer_registry_send[@]+"${peer_registry_send[@]}"}" "${placement_library_send[@]+"${placement_library_send[@]}"}")
   [[ -n "$peer_memory_cap" ]] && placement_arguments+=(--memory-cap "$peer_memory_cap")
-  bash "$multi_host_runner" "${placement_arguments[@]}" -- \
-    "${peer_tree_path_prefix[@]+"${peer_tree_path_prefix[@]}"}" env "${peer_run_environment[@]}" SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1 SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/1 SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=crash-amplification-library \
+  env "${peer_shared_target_environment[@]+"${peer_shared_target_environment[@]}"}" bash "$multi_host_runner" "${placement_arguments[@]}" -- \
+    "${peer_library_prefix[@]+"${peer_library_prefix[@]}"}" "${peer_tree_path_prefix[@]+"${peer_tree_path_prefix[@]}"}" \
+    env "${peer_run_environment[@]}" SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1 SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/1 "${peer_library_environment[@]+"${peer_library_environment[@]}"}" \
     bash scripts/hosts/capped.sh "$peer_threads" cargo "${cargo_test_arguments[@]}" >"$run_directory/peer-placement.log" 2>&1
   peer_placement_exit=$?
   two_hosts_break_is never-stop-warm-run || : > "$warm_stop_file"
@@ -1328,11 +1592,30 @@ wait_for_own_run() { # <进程号>：等这一趟真退出，退出码放 run_ex
   done
 }
 two_hosts_term_received=0; two_hosts_wait_interrupted=0; local_pid=""; peer_pid=""
+# 本机那一份的整条（后台子 shell 里跑）：分着录时先录本机那一份观察者（SHARE=0/2、带判段也带的权重，日志 record.log），录成了再判 0/2；没分着录就只判 0/2。
+#   录入段没成：留一份标记 local-record-failed（主流程据此知道退出码已经是照日志分类之后的、没有判段日志），退它的退出码，不判。
+#   弄坏开关 record-weights-dropped 下录入段不带权重（录的是等分的那一份，判段按权重领别的块，读不到）；split-record-failure-ignored 下录入段红了也接着判
+local_record_failed_marker="$run_directory/local-record-failed"
+rm -f -- "$local_record_failed_marker"
+run_local_record_then_share() {
+  local record_exit record_extra=()
+  if (( record_split )); then
+    two_hosts_break_is record-weights-dropped || record_extra=("${weights_environment[@]+"${weights_environment[@]}"}")
+    crash_amplification_record_on_this_host "$record_library" "$run_directory/record.log" 0/2 "${record_extra[@]+"${record_extra[@]}"}"; record_exit=$?
+    if (( record_exit != 0 )) && ! two_hosts_break_is split-record-failure-ignored; then
+      : > "$local_record_failed_marker"
+      return "$record_exit"
+    fi
+    export SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge
+  fi
+  run_local_share 0/2 "$local_library" "$run_directory/share-0.log"
+}
 trap 'two_hosts_term_received=1; two_hosts_wait_interrupted=1; forward_term_to_own_run "$local_pid"; forward_term_to_own_run "$peer_pid"' TERM
-run_local_share 0/2 "$local_library" "$run_directory/share-0.log" &
+run_local_record_then_share &
 local_pid=$!
-MULTI_HOST_RUN_FETCH_DIRECTORY="$fetch_directory" bash "$multi_host_runner" "${peer_arguments[@]}" -- \
-  "${peer_tree_path_prefix[@]+"${peer_tree_path_prefix[@]}"}" env "${peer_run_environment[@]}" "${weights_environment[@]+"${weights_environment[@]}"}" "SINGLEFS_CRASH_AMPLIFICATION_SHARE=$peer_share" SINGLEFS_CRASH_AMPLIFICATION_LIBRARY=crash-amplification-library \
+MULTI_HOST_RUN_FETCH_DIRECTORY="$fetch_directory" env "${peer_shared_target_environment[@]+"${peer_shared_target_environment[@]}"}" bash "$multi_host_runner" "${peer_arguments[@]}" -- \
+  "${peer_library_prefix[@]+"${peer_library_prefix[@]}"}" "${peer_tree_path_prefix[@]+"${peer_tree_path_prefix[@]}"}" \
+  env "${peer_run_environment[@]}" "${weights_environment[@]+"${weights_environment[@]}"}" "SINGLEFS_CRASH_AMPLIFICATION_SHARE=$peer_share" "${peer_library_environment[@]+"${peer_library_environment[@]}"}" \
   bash scripts/hosts/capped.sh "$peer_threads" cargo "${cargo_test_arguments[@]}" >"$run_directory/share-1.log" 2>&1 &
 peer_pid=$!
 # 第二台那一趟起之前就收到了 TERM（trap 跑时 peer_pid 还空着）：补发给它
@@ -1340,6 +1623,18 @@ if (( two_hosts_term_received )); then forward_term_to_own_run "$peer_pid"; fi
 wait_for_own_run "$peer_pid"; peer_exit="$run_exit"; peer_pid=""
 wait_for_own_run "$local_pid"; local_exit="$run_exit"; local_pid=""
 grep -hE '^CRASH_AMPLIFICATION(_GPU_CARD|_GPU_TOTAL)? ' "$run_directory/share-0.log" "$run_directory/share-1.log" 2>/dev/null
+# 导入那一趟的选段（分着录时）：本机那一份的录入段成了就只判（跟旧做法一样，判段只从库里读）；录入段没成，或被停了（录入段可能停在半路），导入那一趟不设选段，
+#   由引擎先核清单与观察者块再导入——这两种导入都带停下文件（下面），录入段在块边上立刻停下，不会重新录几个小时
+local_record_failed=0
+[[ -e "$local_record_failed_marker" ]] && local_record_failed=1
+if (( record_split )); then
+  if (( local_record_failed || two_hosts_term_received )); then unset SINGLEFS_CRASH_AMPLIFICATION_STAGE; else export SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge; fi
+fi
+stop_the_import_environment=()
+if (( local_record_failed )); then
+  : > "$run_directory/stop-before-the-import-judges"
+  stop_the_import_environment=("SINGLEFS_CRASH_AMPLIFICATION_STOP_FILE=$run_directory/stop-before-the-import-judges")
+fi
 if (( two_hosts_term_received )); then
   trap 'two_hosts_term_received=1' TERM   # 导入那一趟起着时再来的 TERM 只记一笔，不打断导入
   echo "  ✗ 分份途中收到 TERM：本机那一份退 $local_exit、第二台那一份退 $peer_exit；日志 $run_directory/" >&2
@@ -1357,14 +1652,23 @@ if (( two_hosts_term_received )); then
 fi
 trap - TERM
 if [[ "$local_exit" != 0 ]] && ! two_hosts_break_is local-failure-ignored; then
-  echo "  ✗ 本机那一份退 $local_exit；日志 $run_directory/share-0.log" >&2
+  if (( local_record_failed )); then
+    echo "  ✗ 本机那一份的观察者录入段退 $local_exit（分着录，SHARE=0/2；退出码已经照 record.log 分类）；日志 $run_directory/record.log，判段没起" >&2
+    echo "  → 怎么办：看 $run_directory/record.log 里录入段红在哪一步，修好后照原样重跑同一条命令（判过的块照键续跑）" >&2
+  else
+    echo "  ✗ 本机那一份退 $local_exit；日志 $run_directory/share-0.log" >&2
+    echo "  → 怎么办：看 $run_directory/share-0.log 末尾的红行，修好后照原样重跑同一条命令（判过的块照键续跑）" >&2
+  fi
   if [[ -f "$fetched_library/CURRENT" ]] && ! two_hosts_break_is local-failure-skips-salvage; then
     # 第二台那一份判过的块已经取回来了：先导进本机库再退，不因为本机这边红了就把第二台判的丢掉；下一次同一条命令接着跑
-    run_local_share 0/2 "$local_library" "$run_directory/import.log" "$fetched_library"; salvage_exit=$?
+    #   （本机录入段红了的：带停下文件导入，只导入第二台判过的块，不重新录观察者）
+    run_local_share 0/2 "$local_library" "$run_directory/import.log" "$fetched_library" "${stop_the_import_environment[@]+"${stop_the_import_environment[@]}"}"; salvage_exit=$?
     print_the_import_lines
     echo "  · 第二台取回的库已导入本机库（导入那一趟退 $salvage_exit）" >&2
   fi
-  local_exit_code="$(crash_amplification_exit_code_of_a_failed_run "$local_exit" "$run_directory/share-0.log")"
+  if (( local_record_failed )); then local_exit_code="$local_exit"; else
+    local_exit_code="$(crash_amplification_exit_code_of_a_failed_run "$local_exit" "$run_directory/share-0.log")"
+  fi
   if two_hosts_exit_code_is_explained "$local_exit_code"; then crash_amplification_explain_exit_code "$local_exit_code"; else
     echo "  → 怎么办：看日志里 test result、panicked 与 run-with-memory-cap 那几行（250–254 是内存包装自己的结局）" >&2
   fi

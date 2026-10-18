@@ -1,2 +1,0 @@
-行数 3023 列数不是 6 的行 5
-锚点不是恰好命中一次的行: [(1352, '源文件不存在', 'litmus/publish-returns-after-the-rotation-barrier.litmus'), (2919, 0, '第26批 inode 树读不出孩子时 I-9.2 不判（类型段不认得的条目只记 I-2.1 与走读失')]

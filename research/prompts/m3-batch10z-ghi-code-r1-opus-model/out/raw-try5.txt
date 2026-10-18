@@ -1,4 +1,0 @@
-arm=chain k=3 q=s r=n p=(1, 6) qk=(1, 7) rk=(1, 8) faults=cfgq,qroot,qlast,racct actions=ooooooooooooooooooos
-crash=[c19=skipped(268435475)]
-arm=bing k=3 q=s r=n p=(1, 6) qk=(1, 7) rk=(1, 8) faults=cfgq,qroot,qlast,racct actions=ooooooooooooooooooos
-crash=[c19=skipped(268435475)]

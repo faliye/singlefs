@@ -24,12 +24,13 @@
 # 重型测试，按类（只认命令位置；「cargo test」在下面各类里一样指 cargo t、cargo nextest run、cargo miri test、cargo llvm-cov、cargo hack test、
 # cargo mutants 与 --config / CARGO_ALIAS_ 定的别名；libtest 参数里 --list 当选项出现的只列用例、一条都不跑，哪一类都不算，
 # 跟在 --skip、--logfile 这类带值的选项后面的 --list 是那个选项的值，照算）：
-#   checker 档    cargo test 的范围里有 checker 档包 singlefs-checker-tier（-p 点名它，认通配、@版本、pkgid URL；不挑包而范围含它；
+#   checker 档    cargo test 的范围里有 checker 档包 singlefs-checker-tier（-p 点名它，认通配、@版本、pkgid URL，点名的不看当前目录认不认得出：cd 到变量路径之后的也算，lib_heavy_tests.py 的 package_flag_names_checker；不挑包而范围含它；
 #                 在它目录里裸跑；别名展开成这样的），不管挑哪个目标；直接执行它的测试二进制（tests/ 下的目标、src/bin/ 下的装置、库本身）；
 #                 链接它的包（探针包、原型包：Cargo.toml 的依赖表里写它、或经 path 依赖间接依赖它）：cargo test、cargo run、cargo bench 的范围（--manifest-path 指到它、
 #                 -p / --package 点名它（先在当前目录与 --manifest-path 指的那一份自己的包名里找、再找工作区成员：独立的探针包靠前一处）、目录里裸跑）里有这样的包同算，
 #                 经 bash -c、内存包装包几层都一样，`env -C 目录`、`env -Cdir`、`env --chdir=目录`、`env --chdir 目录`、合写的 `env -iC 目录` 换的目录照 cd 判（那一条命令的当前目录换成它，
-#                 不往后带；目录写在变量里的罩不住，照外面的当前目录判；lib_shell_words.py 的 env_directory），`env -S '串'` / `env --split-string=串` 的串拆成词再判
+#                 不往后带；目录写在变量里的，同一段命令里前面赋过的与 $HOME 先展开（lib_shell_words.py 的 expand_known_variables），展开不了的照外面的当前目录判，
+#                 -p 点名 checker 档包的不看目录照算；lib_shell_words.py 的 env_directory），`env -S '串'` / `env --split-string=串` 的串拆成词再判
 #                 （lib_shell_words.py 的 env_option、env_split_string）；只编不跑、test -- --list 不算（lib_heavy_tests.py 文件头、depends_on_checker_package；
 #                 直接执行探针包编出来的二进制看不出链接了什么，罩不住）；
 #                 .claude/gate.d/checker-tier-crash-point-replay.sh、scripts/crash/crash-point-replay-shard-run.sh（按树根里键那一行登记的包判，登记的不是 checker 档包、
@@ -47,10 +48,10 @@
 #   E152 装置     e152-file-system-benchmark（直接起、或 cargo run 它）、scripts/devices/e152-run.sh
 #   广谱变异      scripts/mutation/broad-mutation.py（python 脚本不读正文，按名字与位置、解到的真实路径、文件开头的签名行认：`python3 -W / -X <值> 脚本`、
 #                 `python3 -m broad-mutation`、指到它的符号链接、带签名行的改名拷贝、`python3 -c` 的代码里点它的都认）。凡要起 cargo 或改库目录的都算：
-#                 整趟、--shard / --from / --package、--item 点名（点几条、带不带 --skip-stage-two 都算）、--stage-two-only、--sync-tree（换全局的版本指针）、
+#                 不带选条参数的剪枝跑、--full（只写不读、全部现判）、--refresh-list（换树、清单记进库）、--shard / --from / --package、--item 点名（点几条、带不带 --skip-stage-two 都算）、--stage-two-only、
 #                 --import-results；只有带 --list-items / --summary / --check-ignored / --help（-h）的不算（仓内那一份单独一个 --selftest 照自证登记表判）。
 #                 提交门禁那一道 .claude/gate.d/checker-tier-broad-mutation.sh 同算这一类（带 --list、--tool-versions 的不算，--check 只点名 gate-verdict 一格的不算）。子 agent 一律不跑；主 agent 带前缀能跑（提交时先起驱动
-#                 --sync-tree、--changed-since HEAD，再跑那一道），不算的那几样谁都能跑。
+#                 不带选条参数剪枝跑，再跑那一道），不算的那几样谁都能跑。
 #                 罩不住的写法在 lib_heavy_tests.py 文件头「广谱变异的逐条驱动」那一段
 #   Verus         .claude/gate.d/checker-tier-formal-verification.sh（逐格起 Verus、空真与必红世界逐处起、编装置重放钉住的红例）。子 agent 一律不跑：
 #                 主 agent 提交时带前缀单独跑，整轮 gate.sh 里也有它；直接起的 verus 与 cargo verus 不算（写证明的实现员要用，判法在 lib_heavy_tests.py）。
@@ -81,7 +82,7 @@
 #   gate.sh 在里面起的这些不经这道闸（闸只看 Bash 工具的命令，看不见 gate.sh 的子进程）；看门狗 agent-watch.py 在进程这一层不报这一类
 #   （Stop 钩子 gate-reuse-check.sh 每次收工也起 gate-overlap.py，那是钩子起的，不是哪个 agent 跑的）。
 #   判定在 lib_heavy_tests.py 的 classify（COMMIT_CHECK_KINDS）；弄坏开关 HEAVY_TEST_GUARD_BREAK=ignore-commit-checks 时这一类一律放行，自检必须判红。
-# 自证（上游 test-script-discipline.md「测试脚本自己也要被测试证明有效」：自证用假的驱动、不起编译与重活，拦重型测试的闸不拦自证）：
+# 自证（.claude/rules/test-script-discipline.md「测试脚本自己也要被测试证明有效」：自证用假的驱动、不起编译与重活，拦重型测试的闸不拦自证）：
 #   scripts/、.claude/hooks/ 下脚本的 `--selftest` 与 .claude/gate.d/lib/ 下共用库的直接执行，按登记表 .claude/hooks/selftest-registry.tsv 判
 #   （键认本仓那一份文件：命令词解析后的真实路径要正是它，worktree、工作根外面的仓副本里路径尾部相同的拷贝、路径写在变量里的照旧按提交时才跑的检查拒；
 #   工作根（~/.local/share/singlefs/work）底下仓副本里的那一份放行，条件四条：主仓登记表里登记成 light，副本根的 .claude/hooks/selftest-registry.tsv 里这一行与主仓逐字相同，
@@ -158,7 +159,8 @@
 #   循环里 `b=$(ls -t $D/$t-* | …)` 再经内存包装与 capped.sh 起 `$b`）；读进去的脚本正文只用它自己的定义。
 # 看不见的（照常放行、不记检出）：变量里拼出来的命令与脚本路径（命令词没展开而定义里点不到 checker 档测试目标名的）、通配与花括号写出来的脚本里的正文、eval、`<<<` 喂给 shell 的字符串；
 #   喂给 python 这类非 shell 解释器的程序（`python3 x.py` 里用 subprocess 起的命令；heredoc 正文先剥掉）；
-#   make（Makefile 里起的命令）与 xargs 起的命令；cd 到变量路径之后的裸 cargo test（认不出在不在工作区根）与相对路径的脚本；
+#   make（Makefile 里起的命令）与 xargs 起的命令；cd 到展开不了的变量路径之后（变量不在这段命令文本里赋值，或被 for / read / unset 改写过；前面赋过的与 $HOME 照展开）不带 -p 的 cargo test（认不出在不在工作区根、在哪个包里；
+#   -p 点名 checker 档包的照判）、--manifest-path 写在变量里指到工作区根或探针包的与相对路径的脚本；
 #   命令词不带斜杠、从 PATH 里找到的脚本（直接执行的 `x.sh`）；同一条命令里用 WrittenScript 认不出的写法先写出再执行的脚本——
 #   执行时文件还不在的按「不存在」放行并记检出，已经在的读到的是旧内容；source 进来的文件里 export 的变量对外层后面命令的影响；
 #   .cargo/config.toml 与 `--config <文件>` 里定的别名与 runner；拷走改名、又不点名登记的用例函数的测试二进制（看门狗在进程这一层同样认不出）。
@@ -194,7 +196,7 @@
 #                                   #       「实现员经 run-with-memory-cap.sh 跑 --workspace」「实现员在 bash -c 里跑 --all」「实现员在仓根裸跑 cargo test」「实现员 cd 进 harness 档裸跑、不经内存包装（拒的是包装，不是重型）」「实现员 -p harness 档不挑目标、不经内存包装（拒的是包装）」「实现员 -p checker 档 --test 通配」
 #                                   #       「实现员前缀一串再跑 --workspace」「实现员在 research 工作区根裸跑」「实现员在 research 唯一的成员里裸跑」「实现员带前缀也拒」「实现员 mutate.sh 跑 crates 整表」「实现员起 qemu-system」「实现员 vm-bench.sh --selftest」「实现员跑 herd7」「实现员跑 lkmm.sh」「实现员跑 Verus 那一道门禁」
 #                                   #       「主 agent 不带前缀跑 Verus 那一道」「实现员带前缀跑 Verus 那一道照拒」「实现员直接起判法脚本跑必红世界」「主 agent 不带前缀直接起判法脚本跑必红世界」「调查员经内存包装起红例重放」「主 agent不带前缀跑广谱变异的提交门禁：照拒」
-#                                   #       「主 agent不带前缀起广谱变异驱动：照拒」「实现员带前缀跑广谱变异的提交门禁：照拒」「实现员跑 gate-staged.sh」「实现员喂给 bash 的 heredoc 里跑 --all」「实现员直接执行 checker 档的测试二进制」「书记员跑 research 构建与复跑那一道」「通用 agent 跑 checker-tier-crash-point-replay」
+#                                   #       「主 agent不带前缀起广谱变异驱动：照拒」「实现员起广谱变异驱动 --refresh-list：照拒」「实现员带前缀跑广谱变异的提交门禁：照拒」「实现员跑 gate-staged.sh」「实现员喂给 bash 的 heredoc 里跑 --all」「实现员直接执行 checker 档的测试二进制」「书记员跑 research 构建与复跑那一道」「通用 agent 跑 checker-tier-crash-point-replay」
 #                                   #       「主 agent跑 checker-tier-crash-point-replay 不带前缀」「主 agent不带前缀跑 gate.sh --staged」
 #                                   #       「主 agent 裸跑 gate.sh --staged」「主 agent 带 =whatever」「主 agent 第二条命令没带前缀」「主 agent 裸跑 E152 的 run 脚本」「主 agent 裸 cargo run E152」「实现员跑登记的checker 档的用例（带 --include-ignored）」
 #                                   #       「实现员跑 checker 档集成测试的快用例（不带 --ignored 也拒：按包判）」「主 agent不带前缀跑checker 档的用例」「主 agent 不带前缀直接执行checker 档的用例的测试二进制」「实现员 /usr/bin/time -v 包一层跑 --all」「实现员 systemd-run --scope 自设内存上限跑checker 档的用例」
@@ -246,7 +248,7 @@
 #                                   #       「stdin:登记表外的 --selftest 被拒时 stderr 点名登记表与登记的写法」「stdin:stage-selftest.sh 喂有起重活样本的阶段目录拒绝（退出码 2）」
 #                                   #       「stdin:被拒时 stderr 点名起重活的那一道、写单跑一道样本的写法」「stdin:stage-selftest.sh --item 点名里夹起重活的拒绝（退出码 2）」「stdin:被拒时 stderr 点名起重活的那一道、写 --item 的写法」「stdin:实现员起含被拒命令的脚本拒绝（退出码 2）」「stdin:脚本里的拒绝 stderr 写出脚本路径与行号」
 #                                   #       「stdin:实现员不经内存包装跑测试目标拒绝（退出码 2）」「stdin:不经内存包装的拒绝 stderr 写了出路」「stdin:脚本文件不存在时 stderr 点名它、记一条检出」「stdin:heredoc 写出的含 --all 的脚本拒绝（退出码 2）」「stdin:heredoc 写出的脚本的拒绝 stderr 写出它的路径与行号」
-#                                   #       「stdin:admission.py 判的那一刻抛异常时，点名标了 #[ignore] 的登记目标、不带 --ignored 的 cargo test 照拒（退出码 2）」（共 275 格）；
+#                                   #       「stdin:admission.py 判的那一刻抛异常时，点名标了 #[ignore] 的登记目标、不带 --ignored 的 cargo test 照拒（退出码 2）」「stdin:主 agent 没带前缀跑整道门禁被拒时照抄的那条带四段范围声明（为什么是占位），照它再判放行」（共 276 格）；
 #                                   #       两档里的轻型那一批另有九格：「实现员不经内存包装起崩溃点重放 --quick：拒的是包装」「实现员起崩溃点重放入口不带参数（剪枝）：照拒」
 #                                   #       「实现员起崩溃点重放 --item 不带 --quick（逐条）：照拒」「实现员带前缀起崩溃点重放 --full（全量）：照拒」「实现员经 gpu-quiesce-run.sh 起崩溃点重放不带参数：照拒」
 #                                   #       「主 agent 不带前缀起崩溃点重放入口：照拒」「实现员起形式化那一道 --item（逐条）：照拒」「实现员起 crates 变异那一道 --quick 又带 --full：照拒」
@@ -286,17 +288,20 @@
 #                                   #   HEAVY_TEST_GUARD_BREAK=drop-registry-hint  decide() 拒没登记的自证时不写怎么登记（拿掉 SELFTEST_REGISTRY_POLICY 那一句）
 #                                   #       「stdin:登记表外的 --selftest 被拒时 stderr 点名登记表与登记的写法」（共 1 格）
 #                                   #   HEAVY_TEST_GUARD_BREAK=main-full-policy  主 agent 没带前缀被拒时照旧整段贴规矩、不给加好前缀的那条命令
-#                                   #       「stdin:主 agent 没带前缀被拒时最前面是能照抄的带前缀命令（照抄的那条再判放行）」「stdin:主 agent 被拒时规矩只留一行出处（不整段贴）」（共 2 格）
+#                                   #       「stdin:主 agent 没带前缀被拒时最前面是能照抄的带前缀命令（照抄的那条再判放行）」「stdin:主 agent 被拒时规矩只留一行出处（不整段贴）」「stdin:主 agent 没带前缀跑整道门禁被拒时照抄的那条带四段范围声明（为什么是占位），照它再判放行」（共 3 格）
 #                                   #   HEAVY_TEST_GUARD_BREAK=detection-outcome-dropped  检出记录不写结局（outcome：被拒 / 只记）
 #                                   #       「stdin:被拒的检出记录写了结局「被拒」」「stdin:放行时的检出记录写了结局「只记」」（共 2 格）
-#                                   #   （这四格在别的开关下也红：disable-check 下四格都红；ignore-commit-checks 下 main-full-policy 那两格红）
+#                                   #   HEAVY_TEST_GUARD_BREAK=copy-without-run-scope  主 agent 没带前缀被拒时照抄的那条不带四段范围声明（SINGLEFS_RUN_SCOPE，写法在 run-scope-guard.sh 文件头）
+#                                   #       「stdin:主 agent 没带前缀跑整道门禁被拒时照抄的那条带四段范围声明（为什么是占位），照它再判放行」（共 1 格）
+#                                   #   （这几格在别的开关下也红：disable-check 下 main-full-policy、detection-outcome-dropped、copy-without-run-scope 点名的格都红；ignore-commit-checks 下 main-full-policy 头两格红）
 #                                   #   SINGLEFS_WORK_ROOT_BREAK=new-root-unknown（同目录 lib_work_root.py：工作根退回旧根）  检出记录的默认位置跟着退回旧根
 #                                   #       「检出记录默认放在工作根下（lib_work_root.py）」
-#                                   #   WORKSPACE_CARGO_LOCK_BREAK=ignore-lock（同目录 lib_workspace_cargo_lock.py：不认锁，被别的进程占着也放行；另四项 ignore-reentry、any-tree、refuse-free、not-build-too 写在那份文件头）
+#                                   #   WORKSPACE_CARGO_LOCK_BREAK=ignore-lock（同目录 lib_workspace_cargo_lock.py：不认锁，被别的进程占着也放行；另四项 ignore-reentry、main-tree-only、refuse-free、not-build-too 写在那份文件头）
 #                                   #       「workspace-lock：主 agent 在主工作区起 cargo、锁被别的进程占着：拒（退出码 2）」「workspace-lock：子 agent 经内存包装在主工作区起 cargo、锁被别的进程占着：拒（退出码 2）」
 #                                   #       「workspace-lock：拒绝说明写出谁占着与下一步」三格，另有「lib_workspace_cargo_lock.py 的自检」一格（应当是 0，实际 1）
 #                                   #   WORKSPACE_CARGO_LOCK_BREAK=ignore-reentry  不认 HOLDER 变量：「workspace-lock：持锁者之下（命令前写 HOLDER，指着祖先）：放行（退出码 0）」红
-#                                   #   WORKSPACE_CARGO_LOCK_BREAK=any-tree / refuse-free / not-build-too：红的只有「lib_workspace_cargo_lock.py 的自检」一格（里面哪几格红见那份文件头）
+#                                   #   WORKSPACE_CARGO_LOCK_BREAK=main-tree-only / refuse-free / not-build-too 与 scripts/gate/lib_workspace_lock.py 的 WORKSPACE_LOCK_BREAK=lock-in-common-dir：
+#                                   #       红的只有「lib_workspace_cargo_lock.py 的自检」一格（里面哪几格红见那份文件头）
 #                                   # 切词那一份（lib_shell_words.py）的弄坏开关下同样必须判红，照上面 HEAVY_TEST_GUARD_BREAK 那几个的写法逐个写（自检另原样转出
 #                                   # lib_heavy_tests.py 自检的失败行，那几格写在 lib_heavy_tests.py 的文件头末尾；这里写的是 heavy-test-guard.sh 自己的格）：
 #                                   #   LIB_SHELL_WORDS_BREAK=arguments-as-executed  `python3 -` 后面的词、`bash -n` 的目标当被执行的脚本
@@ -367,7 +372,7 @@ UNREGISTERED_SELFTEST_KIND = "commit-check-selftest-unregistered"
 GUARD_BREAK_VARIABLE = "HEAVY_TEST_GUARD_BREAK"
 KNOWN_GUARD_BREAK_ITEMS = ("disable-check", "ignore-written-scripts", "ignore-memory-cap", "ignore-commit-checks",
                            "ignore-heredoc-detached-run", "read-light-selftest-body", "drop-registry-hint", "main-full-policy",
-                           "detection-outcome-dropped")
+                           "detection-outcome-dropped", "copy-without-run-scope")
 def guard_break_is_set(item):
     return item in os.environ.get(GUARD_BREAK_VARIABLE, "").split(",")
 
@@ -721,6 +726,8 @@ def heavy_uses(text, directory, environment=None, frames_above=(), script=None, 
         occurrence = occurrences.get(key, 0)
         occurrences[key] = occurrence + 1
         record_files_written(command, state)
+        # 轻型写法（带 --quick）里写成变量的参数，用这段命令文本里前面赋过的值展开再判（lib_heavy_tests.py 的 light_tier_words_expanded）
+        command = command._replace(words=heavy_tests.light_tier_words_expanded(command.words, command.variables))
         # /usr/bin/time、flock、systemd-run 这一类包在外面照样起那条命令的：剥掉它，里面那条按一段命令文本接着判（包装、脚本、内存包装照认）；
         # detached-run.sh start 同样剥（同一条命令里前面写出的拷贝按写出的内容认，其余按名字、符号链接、签名行认）
         launched = written_detached_run(command, state)
@@ -863,16 +870,50 @@ def prefixed_command(command, directory):
             return candidate, form
     return None, None
 
+def run_scope_declaration(candidate, directory):
+    """照抄的那条要带的四段范围声明（写法照 .claude/hooks/run-scope-guard.sh 文件头；为什么一段是占位，照抄的人要填）：
+    命令文本里直接起的要声明的验证命令恰好一条、还没带声明时交声明原文；不是验证命令、几条、在驱动脚本里、已带声明的交 None。
+    判法取同目录的 lib_run_scope.py（读不到、判的时候抛异常都交 None）；弄坏开关 copy-without-run-scope 下一律交 None。"""
+    if guard_break_is_set("copy-without-run-scope"):
+        return None
+    try:
+        run_scope_spec = importlib.util.spec_from_file_location("lib_run_scope", os.path.join(sys.argv[1], "lib_run_scope.py"))
+        run_scope = importlib.util.module_from_spec(run_scope_spec)
+        run_scope_spec.loader.exec_module(run_scope)
+        run_scope.load_judging_libraries(sys.argv[1])
+        runs = run_scope.scope_runs_in_text(candidate, directory)
+    except Exception:
+        return None
+    if len(runs) != 1 or runs[0].frames or runs[0].declaration is not None:
+        return None
+    shape = runs[0].shape
+    if any(mark in text for text in (shape.what, shape.range_hint) for mark in ("'", ";")):
+        return None
+    return (f"{run_scope.DECLARATION_VARIABLE}='种类={shape.kind}; 跑什么={shape.what}; 范围={shape.range_hint}; "
+            "为什么=<为什么这么跑、这个范围为什么合适>'")
+
 def main_agent_copy_lines(command, directory):
-    """主 agent 被拒时放在最前面的几行：能照抄的那条命令（太长的只写前缀加在哪），或照抄不了的原因。"""
+    """主 agent 被拒时放在最前面的几行：能照抄的那条命令（太长的只写前缀加在哪），或照抄不了的原因。
+    照抄的那条是要声明范围的验证命令时带上四段范围声明（run_scope_declaration），带上之后照同一张表再判过、还放行才带。"""
     candidate, form = prefixed_command(command, directory)
     if candidate is None:
         return ["→ 照抄不了：命令最前面加前缀也到不了被拒的那一步（写在 env -i 之后、另起的登录 shell 里这类），"
                 f"把 {OCCASION_VARIABLE}=commit 写在起那一步的那条命令前面再跑；用户要求时写 =user-request。"]
+    declaration = run_scope_declaration(candidate, directory)
+    if declaration is not None:
+        bare = LEADING_OCCASION.sub("", command, count=1)
+        declared = f"{declaration} {candidate}" if form == "prefix" else f"export {OCCASION_VARIABLE}=commit; {declaration} {bare}"
+        if main_agent_still_refused(declared, directory):
+            declaration = None
+        else:
+            candidate = declared
     if len(candidate) > COPY_COMMAND_LIMIT:
         written = f"`{OCCASION_VARIABLE}=commit `" if form == "prefix" else f"`export {OCCASION_VARIABLE}=commit; `"
+        if declaration is not None:
+            written += f"，在被拒的那条验证命令最前面加 `{declaration} `（为什么一段换成这一次的理由）"
         return [f"→ 照抄：这条命令 {len(candidate)} 字，不整条贴；在它最前面加 {written}（加上之后照同一张表再判过，放行）；用户要求时把 commit 换成 user-request。"]
-    return ["→ 照抄（提交流程里跑；用户要求时把 commit 换成 user-request，提交之外要跑先弹窗问用户）：", candidate]
+    reason_hint = "；范围声明的为什么一段换成这一次的理由" if declaration is not None else ""
+    return [f"→ 照抄（提交流程里跑；用户要求时把 commit 换成 user-request，提交之外要跑先弹窗问用户{reason_hint}）：", candidate]
 
 def refusal_reason(kind, occasion, agent_type):
     """放行返回 None；拒绝返回一句原因。子 agent 一样都不跑，主 agent 要带前缀。"""
@@ -994,7 +1035,7 @@ def build_sample_scripts(work):
     write("bigtool", "#!/usr/bin/env python3\n" + "# 填充\n" * (MAXIMUM_SCRIPT_BYTES // 8 + 1) + "cargo test --all\n")
     write("elsewhere/mutate.sh", "#!/usr/bin/env bash\ncargo test --all\n")
     write("scripts/gate/gate-staged.sh", "#!/usr/bin/env bash\nbash .claude/scripts/gate.sh --staged\n")
-    # 查名字与数组赋值：照 .claude/scripts/fetch-deps.sh 第 44 行、scripts/gate/change-touches-crates.sh 第 61 行原样
+    # 查名字与数组赋值：照 .claude/scripts/fetch-deps.sh 第 44 行、scripts/gate/change-touches-crates.sh（2026-10-15 删掉）第 61 行原样
     write("command-lookup.sh", "#!/usr/bin/env bash\n  if command -v herd7 >/dev/null 2>&1; then ok \"herd7 已在\"; return 0; fi\n")
     write("array-assignment.sh", "#!/usr/bin/env bash\n  ((${#prefixes[@]})) || prefixes=(\"crates/\")\nchains=(./s.sh ./outer.sh)\n")
     # 命令替换的两种写法，照 .claude/singlefs-ai-sop/scripts/doc-lint.sh 第 43 行、第 70 行原样：切碎之后的片段不许当成脚本路径去读
@@ -1102,6 +1143,52 @@ def selftest(hook_dir):
              "bash scripts/hosts/run-with-memory-cap.sh 8G bash -c 'cd probes/plain && cargo test -p plain-probe'", 0),
             ("实现员经内存包装起 cargo bench 指到不链接 checker 档包的探针：放行", writer,
              "bash scripts/hosts/run-with-memory-cap.sh 8G cargo bench --manifest-path probes/plain/Cargo.toml", 0),
+            # 目录写在变量里、经几层包装起 -p 点名 checker 档包（lib_heavy_tests.py 的 package_flag_names_checker；LIB_HEAVY_TESTS_BREAK=package-flag-needs-directory 下照拒的六格红，
+            # manifest-path-variable-unjudged 下「--manifest-path 写在变量里」一格红：应当是 2，实际 0）
+            ("实现员 cd 到变量目录、经内存包装起 cargo test -p checker 档 --lib：照拒", writer,
+             f"D={work}; cd $D && bash scripts/hosts/run-with-memory-cap.sh 12G cargo test --offline -p singlefs-checker-tier --lib", 2),
+            ("实现员 cd 到变量目录、经 timeout、nice、capped.sh、内存包装四层起：照拒", writer,
+             f"D={work}; cd $D && timeout 235 nice -n 19 bash scripts/hosts/capped.sh 31 bash scripts/hosts/run-with-memory-cap.sh 12G "
+             "cargo test --offline -p singlefs-checker-tier --lib", 2),
+            ("实现员 cd 到变量目录、经内存包装与 bash -c 起：照拒", writer,
+             f"D={work}; cd $D && bash scripts/hosts/run-with-memory-cap.sh 12G bash -c 'cargo test -p singlefs-checker-tier'", 2),
+            ("实现员 cd 到变量目录、经 /usr/bin/time、flock 与内存包装起：照拒", writer,
+             f"D={work}; cd $D && /usr/bin/time -v flock /tmp/heavy-test-guard-selftest.lock bash scripts/hosts/run-with-memory-cap.sh 12G cargo test -p singlefs-checker-tier", 2),
+            ("实现员经内存包装 env -C 变量目录起 cargo test -p checker 档：照拒", writer,
+             f"D={work}; cd /tmp && bash scripts/hosts/run-with-memory-cap.sh 12G env -C $D cargo test -p singlefs-checker-tier", 2),
+            ("主 agent 不带前缀 cd 到变量目录起 cargo test -p checker 档：照拒", None, f"D={work}; cd $D && cargo test -p singlefs-checker-tier", 2),
+            ("主 agent 带前缀 cd 到变量目录起 cargo test -p checker 档：放行", None,
+             f"D={work}; cd $D && " + commit + "bash scripts/hosts/run-with-memory-cap.sh 12G cargo test -p singlefs-checker-tier", 0),
+            ("实现员经内存包装 cargo test --manifest-path 写在变量里指到 checker 档包：照拒", writer,
+             f"D={work}; bash scripts/hosts/run-with-memory-cap.sh 12G cargo test --manifest-path $D/crates/singlefs-checker-tier/Cargo.toml --lib", 2),
+            # --manifest-path 写成 ~/… 的照 shell 展开再找清单（lib_heavy_tests.py 的 manifest_path_expanded；LIB_HEAVY_TESTS_BREAK=manifest-path-home-unexpanded 下这一格红：应当是 2，实际 0）
+            ("实现员经内存包装 cargo test --manifest-path ~/… 指到链接 checker 档包的探针：照拒", writer,
+             f"bash scripts/hosts/run-with-memory-cap.sh 12G cargo test --manifest-path ~/{os.path.relpath(work, os.path.expanduser('~'))}/probes/linked/Cargo.toml", 2),
+            ("实现员 cd 到变量目录、经内存包装起 harness 档 -p：放行", writer,
+             f"D={work}; cd $D && bash scripts/hosts/run-with-memory-cap.sh 12G cargo test -p singlefs-harness --lib", 0),
+            # 目录写在变量里、不带 -p 的裸 cargo test（lib_shell_words.py 的 expand_known_variables；LIB_SHELL_WORDS_BREAK=directory-variables-unexpanded 下照拒的五格红：
+            # 应当是 2，实际 0；variable-rebinding-unseen 下「for 改写过的」一格红：应当是 0，实际 2）
+            ("实现员 D=… 之后 cd $D/checker 档包目录、经内存包装裸跑 cargo test：照拒", writer,
+             f"D={work}; cd $D/crates/singlefs-checker-tier && bash scripts/hosts/run-with-memory-cap.sh 12G cargo test --lib", 2),
+            ("实现员 cd ${D} 工作区根、经 timeout、nice、capped.sh、内存包装四层全量：照拒", writer,
+             f"D={work}; cd ${{D}} && timeout 235 nice -n 19 bash scripts/hosts/capped.sh 31 bash scripts/hosts/run-with-memory-cap.sh 12G cargo test", 2),
+            ("实现员 export D 之后经内存包装 env -C $D/checker 档包目录裸跑：照拒", writer,
+             f"export D={work}; cd /tmp && bash scripts/hosts/run-with-memory-cap.sh 12G env -C $D/crates/singlefs-checker-tier cargo test", 2),
+            ("实现员 cd $HOME/… 指到 checker 档包目录、经内存包装裸跑：照拒", writer,
+             f"cd $HOME/{os.path.relpath(os.path.join(work, 'crates', 'singlefs-checker-tier'), os.path.expanduser('~'))} && "
+             "bash scripts/hosts/run-with-memory-cap.sh 12G cargo test", 2),
+            ("主 agent 不带前缀 D=… 之后 cd $D 全量：照拒", None, f"D={work}; cd /tmp && cd $D && cargo test", 2),
+            ("实现员 D=… 之后 cd $D/harness 档目录经内存包装裸跑：放行", writer,
+             f"D={work}; cd $D/crates/singlefs-harness && bash scripts/hosts/run-with-memory-cap.sh 12G cargo test --lib", 0),
+            ("实现员 D=… 之后 cd $D 再 cargo build 与 cargo clippy：放行", writer, f"D={work}; cd $D && cargo build --workspace && cargo clippy --workspace --all-targets", 0),
+            ("实现员 for 改写过的变量照旧认不出、经内存包装裸跑：放行", writer,
+             f"D={work}/crates/singlefs-checker-tier; cd /tmp && for D in /nonexistent; do cd $D && bash scripts/hosts/run-with-memory-cap.sh 12G cargo test; done", 0),
+            # 轻型的根参数写成同一段命令里前面赋过值的变量（lib_heavy_tests.py 的 light_tier_words_expanded；LIB_HEAVY_TESTS_BREAK=light-tier-variables-unexpanded 下
+            # 放行那一格红：应当是 0，实际 2）
+            ("调查员 cd 到变量目录、经内存包装起形式化那一道 --quick 根写成同一个变量：放行", "investigator",
+             f"D={work}; cd $D && bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick $D", 0),
+            ("调查员经内存包装起形式化那一道 --quick 根写成没赋过值的变量：照拒", "investigator",
+             "bash scripts/hosts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-formal-verification.sh --quick $SINGLEFS_SELFTEST_UNSET_ROOT", 2),
             ("主 agent带前缀经包装跑 checker 档包快档", None, commit + "nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier", 0),
             ("主 agent 不带前缀跑 checker 档包", None, "bash scripts/hosts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier", 2),
             ("主 agent 带 =user-request 跑 checker 档包", None, request + "bash scripts/hosts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-checker-tier", 0),
@@ -1164,13 +1251,14 @@ def selftest(hook_dir):
             ("实现员直接起判法脚本核版本一致（只读安装与缓存）", writer, "python3 scripts/gate/verus-proof-check.py toolchain .", 0),
             ("实现员只打 Verus 那一道的工具版本", writer, "bash .claude/gate.d/checker-tier-formal-verification.sh --tool-versions", 0),
             ("主 agent 不带前缀只打 Verus 那一道的工具版本", None, "bash .claude/gate.d/checker-tier-formal-verification.sh --tool-versions", 0),
-            ("主 agent带 =commit 把广谱变异库目录换到暂存树那一版：放行", None,
-             commit + "nice -n 19 python3 scripts/mutation/broad-mutation.py --sync-tree --commit 0123456789abcdef0123456789abcdef01234567", 0),
-            ("主 agent带 =commit 起广谱变异驱动只现判改到的：放行", None,
-             commit + "nice -n 19 python3 scripts/mutation/broad-mutation.py --changed-since HEAD --threads 8 --memory-cap 16G", 0),
+            ("主 agent带 =commit 起广谱变异驱动剪枝跑：放行", None,
+             commit + "nice -n 19 python3 scripts/mutation/broad-mutation.py --threads 8 --memory-cap 16G", 0),
+            ("主 agent带 =commit 起广谱变异驱动 --full 只写不读：放行", None,
+             commit + "nice -n 19 python3 scripts/mutation/broad-mutation.py --full --threads 8 --memory-cap 16G", 0),
             ("主 agent带 =commit 跑广谱变异的提交门禁：放行", None, commit + "nice -n 19 bash .claude/gate.d/checker-tier-broad-mutation.sh", 0),
             ("主 agent不带前缀跑广谱变异的提交门禁：照拒", None, "bash .claude/gate.d/checker-tier-broad-mutation.sh", 2),
-            ("主 agent不带前缀起广谱变异驱动：照拒", None, "python3 scripts/mutation/broad-mutation.py --changed-since HEAD", 2),
+            ("主 agent不带前缀起广谱变异驱动：照拒", None, "python3 scripts/mutation/broad-mutation.py", 2),
+            ("实现员起广谱变异驱动 --refresh-list：照拒", writer, "python3 scripts/mutation/broad-mutation.py --refresh-list", 2),
             ("实现员带前缀跑广谱变异的提交门禁：照拒", writer, commit + "bash .claude/gate.d/checker-tier-broad-mutation.sh", 2),
             ("实现员只打广谱变异提交门禁的格名表：放行", writer, "bash .claude/gate.d/checker-tier-broad-mutation.sh --list", 0),
             ("实现员只跑广谱变异提交门禁的判定那一格：放行", writer, "bash .claude/gate.d/checker-tier-broad-mutation.sh --check gate-verdict", 0),
@@ -1315,6 +1403,9 @@ def selftest(hook_dir):
              f"cd {work}/gd-heavy && bash {repo}/.claude/singlefs-ai-sop/scripts/stage-selftest.sh \"$PWD/.claude/gate.d\" --item doc-text.sh", 0),
             ("实现员 stage-selftest.sh --item 点名里夹一道起重活的（crates 变异表）：照拒", writer,
              f"bash {repo}/.claude/singlefs-ai-sop/scripts/stage-selftest.sh {work}/gd-heavy/.claude/gate.d --item doc-text.sh --item checker-tier-crates-mutation-replay.sh", 2),
+            # stage-selftest.sh 认不带 .sh 的阶段名：点名不写 .sh 的同样要判，不当成「没这一道」放过去
+            ("实现员 stage-selftest.sh --item 点名起重活的那一道、不写 .sh：照拒", writer,
+             f"bash {repo}/.claude/singlefs-ai-sop/scripts/stage-selftest.sh {work}/gd-heavy/.claude/gate.d --item doc-text --item checker-tier-crates-mutation-replay", 2),
             ("工具实现员 stage-selftest.sh --item 点名不存在的阶段（它自己退 2、不喂样本）：放行", "tooling-writer",
              f"bash {repo}/.claude/singlefs-ai-sop/scripts/stage-selftest.sh {work}/gd-heavy/.claude/gate.d --item no-such-stage.sh", 0),
             ("实现员 stage-selftest.sh --list-items：放行", writer, f"bash {repo}/.claude/singlefs-ai-sop/scripts/stage-selftest.sh {work}/gd-heavy/.claude/gate.d --list-items", 0),
@@ -1800,6 +1891,19 @@ def selftest(hook_dir):
                         "implementation-workflow.md「checker 档只在提交时跑，harness 随时跑」" in main_refused.stderr
                         and "→ 交回前不跑它们" not in main_refused.stderr and len(main_lines) <= 4))
         results.append(("stdin:被拒的检出记录写了结局「被拒」", "被拒", main_outcome))
+        # 走真实入口：照抄的那条是门禁这类验证命令时带四段范围声明（.claude/hooks/run-scope-guard.sh 的写法，为什么一段是占位），照它再喂一遍放行
+        # （HEAVY_TEST_GUARD_BREAK=copy-without-run-scope、main-full-policy、disable-check 下红）
+        stage_command = "bash .claude/gate.d/checker-tier-lkmm.sh"
+        stage_refused = subprocess.run(["bash", script], capture_output=True, text=True, env=environment,
+                                       input=json.dumps({"tool_name": "Bash", "cwd": work, "tool_input": {"command": stage_command}}))
+        stage_lines = stage_refused.stderr.splitlines()
+        stage_copied = stage_lines[1] if len(stage_lines) > 1 and stage_lines[0].startswith("→ 照抄") else ""
+        stage_copied_judged = subprocess.run(["bash", script], capture_output=True, text=True, env=environment,
+                                             input=json.dumps({"tool_name": "Bash", "cwd": work, "tool_input": {"command": stage_copied}}))
+        stage_declared = ("SINGLEFS_RUN_SCOPE='种类=whole; 跑什么=门禁 checker-tier-lkmm.sh 的全部格（不带 --check / --item）; 范围=整轮; "
+                          "为什么=<为什么这么跑、这个范围为什么合适>' SINGLEFS_HEAVY_TESTS=commit " + stage_command)
+        results.append(("stdin:主 agent 没带前缀跑整道门禁被拒时照抄的那条带四段范围声明（为什么是占位），照它再判放行",
+                        (2, stage_declared, 0), (stage_refused.returncode, stage_copied, stage_copied_judged.returncode)))
         # 两份表里提交时才跑的检查是同一组 kind（共用模块读不到时这里的 COMMIT_CHECK_KINDS 照样要认得这一类）
         results.append(("这里的 COMMIT_CHECK_KINDS 与 lib_heavy_tests.COMMIT_CHECK_KINDS 相同", True,
                         COMMIT_CHECK_KINDS == set(heavy_tests.COMMIT_CHECK_KINDS)))
@@ -1993,7 +2097,7 @@ def selftest(hook_dir):
           "命令词带通配的照 bash 展开、按展开出来的那几份判，带 POSIX 字符类、等价类、整理符号的交给 bash 自己展开、判不出的命令词照拒；"
           "命令词与参数里的花括号、参数里的通配照 bash 展开再判；崩溃放量的三份入口按名字算重型、只列分项与登记成轻的自证放行，"
           "子 agent 一律拒，主 agent 带前缀能跑（直接起与经 detached-run.sh start 起一样判）；"
-          "主 agent 没带前缀被拒时最前面给加好前缀、照同一张表再判放行的那条命令，规矩只留出处一行；检出记录写结局（被拒 / 只记）")
+          "主 agent 没带前缀被拒时最前面给加好前缀、照同一张表再判放行的那条命令（要声明范围的验证命令另带四段范围声明），规矩只留出处一行；检出记录写结局（被拒 / 只记）")
     return 0
 
 def main():

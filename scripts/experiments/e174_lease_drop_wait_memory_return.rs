@@ -8,10 +8,19 @@
 //! 有两份实现：`WgpuCardHost`（真卡）与 `SimulatedCardHost`（模型，单测与 `checks` 子命令用，不起卡）。
 //! 登记第九节的变异都改在对着 trait 的那一份代码上，所以不起卡也能由单测抓到。
 //!
-//! 子命令：`run`（父进程：按清单起子进程、续跑；`--segment first|second --output 产物 [--skip-light] [--limit-jobs N] [--simulated]`）、
+//! 子命令：`run`（父进程：按清单起子进程、续跑；`--segment first|second --output 产物 [--skip-light] [--limit-jobs N] [--simulated]`
+//! `--code-key-file <组成清单> [--written-list <文件>] | --without-library`；一律经 `scripts/experiments/device-code-key.py run` 起，
+//! 例 `python3 scripts/experiments/device-code-key.py run . --binary e174-lease-drop-wait-memory-return --feature e174-gpu
+//! --entry e7_index_bench::run_child_on_the_card --entry e7_index_bench::ChildJob::child_arguments --when-refused=--without-library -- run …`，
+//! `--simulated` 的那一趟入口换成 `e7_index_bench::run_child_on_the_model`；子进程照 device-code-key.py 放进环境变量
+//! `DEVICE_CODE_KEY_DEVICE_BINARY` 的装置路径起，没有这个变量 `run` 退 3、一个子进程都不起）、
 //! `child`（一个装置进程，由 `run` 起）、`judge`（读产物判，确定性：`--input 产物 [--input …] [--scope 名]`）、
 //! `checks`（不起卡的自检，确定性）、`plan`（清单各阶段的格数与子进程数，确定性）、`simulate`（在模型卡上跑某一格几轮，试 `judge` 用）。
 //! `run --simulated` 让每个子进程都跑在模型卡上，整条父子流水线（续跑、补轮、原文压缩、F1 停机）不起卡也走得通。
+//! 续跑（登记修订 2 之五）：做完的一轮原子写进轮库（环境变量 E174_ROUND_LIBRARY，默认 ~/.local/share/singlefs/experiments/e174/rounds）的
+//! `<轮键>.out`，轮键 = sha256（子进程入口与 `ChildJob::child_arguments` 两把代码键、`{cell:?}` 与轮号、驱动与卡那一行）；同一条命令重起，
+//! 轮键对得上的轮读回不再起；这一段的轮都齐了（或 F1 停机）由库拼出产物原子写到 `--output`（已在而内容相同报「已经齐了」，不同退 2、一个字节不动）。
+//! 产物路径、`--skip-light`、`--limit-jobs`、清单位置、日期、机器都不进轮键；`codes/` 存组成清单，`index.tsv` 只当索引。
 
 // admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
 // run-condition: command python3
@@ -2598,15 +2607,35 @@ fn run_simulated_child(job: &ChildJob, raw_output_path: Option<&str>) -> Result<
     write_child_result(job, &outcome, (work_microseconds, true), extra, &raw_log, raw_output_path)
 }
 
-/// `child` 子命令：一个装置进程。参数是 `ChildJob::child_arguments` 那几个，再加 `--raw-output 文件`，可选 `--simulated`。
+/// `child` 子命令：一个装置进程，只按 `--simulated` 分派（登记修订 2 之一「读法写死」）：真卡的轮从 `run_child_on_the_card` 进，
+/// `run --simulated` 的轮从 `run_child_on_the_model` 进；两个入口的单元闭包各是那一种轮的子进程代码键。
 fn run_child(arguments: &[String]) -> Result<(), String> {
+    if arguments.iter().any(|argument| argument == "--simulated") {
+        run_child_on_the_model(arguments)
+    } else {
+        run_child_on_the_card(arguments)
+    }
+}
+
+/// 真卡上的子进程入口：解析参数，再 `run_wgpu_child`。
+fn run_child_on_the_card(arguments: &[String]) -> Result<(), String> {
+    let (job, raw_output_path) = parse_child_arguments(arguments)?;
+    run_wgpu_child(&job, raw_output_path.as_deref())
+}
+
+/// 模型卡上的子进程入口：解析参数，再 `run_simulated_child`。
+fn run_child_on_the_model(arguments: &[String]) -> Result<(), String> {
+    let (job, raw_output_path) = parse_child_arguments(arguments)?;
+    run_simulated_child(&job, raw_output_path.as_deref())
+}
+
+/// 子进程的参数：`ChildJob::child_arguments` 那几个，再加 `--raw-output 文件`；`--simulated` 跳过（`run_child` 已经按它分派了）。
+fn parse_child_arguments(arguments: &[String]) -> Result<(ChildJob, Option<String>), String> {
     let mut job_arguments: Vec<String> = Vec::new();
     let mut raw_output_path: Option<String> = None;
-    let mut simulated = false;
     let mut index = 0;
     while index < arguments.len() {
         if arguments[index] == "--simulated" {
-            simulated = true;
             index += 1;
             continue;
         }
@@ -2619,12 +2648,7 @@ fn run_child(arguments: &[String]) -> Result<(), String> {
         }
         index += 2;
     }
-    let job = ChildJob::from_child_arguments(&job_arguments)?;
-    if simulated {
-        run_simulated_child(&job, raw_output_path.as_deref())
-    } else {
-        run_wgpu_child(&job, raw_output_path.as_deref())
-    }
+    Ok((ChildJob::from_child_arguments(&job_arguments)?, raw_output_path))
 }
 
 fn raw_log_text(job: &ChildJob, raw_log: &RawLog) -> String {
@@ -2813,6 +2837,465 @@ fn pending_jobs(cells: &[CellKey], product: &ProductRounds, arm_count: usize) ->
     pending
 }
 
+// ============================== 续跑的轮库（登记修订 2 之五：键 = 两个入口的代码键 + 格与轮号 + 驱动与卡） ==============================
+
+/// SHA-256（FIPS 180-4）：续跑的轮键由它算（登记修订 2 之五）。独立手写，不与别的装置共用；单测钉空串与 "abc" 的标准值。
+fn sha256_hex(message: &[u8]) -> String {
+    const ROUND_CONSTANTS: [u32; 64] = [
+        0x428a_2f98, 0x7137_4491, 0xb5c0_fbcf, 0xe9b5_dba5, 0x3956_c25b, 0x59f1_11f1, 0x923f_82a4, 0xab1c_5ed5, 0xd807_aa98, 0x1283_5b01,
+        0x2431_85be, 0x550c_7dc3, 0x72be_5d74, 0x80de_b1fe, 0x9bdc_06a7, 0xc19b_f174, 0xe49b_69c1, 0xefbe_4786, 0x0fc1_9dc6, 0x240c_a1cc,
+        0x2de9_2c6f, 0x4a74_84aa, 0x5cb0_a9dc, 0x76f9_88da, 0x983e_5152, 0xa831_c66d, 0xb003_27c8, 0xbf59_7fc7, 0xc6e0_0bf3, 0xd5a7_9147,
+        0x06ca_6351, 0x1429_2967, 0x27b7_0a85, 0x2e1b_2138, 0x4d2c_6dfc, 0x5338_0d13, 0x650a_7354, 0x766a_0abb, 0x81c2_c92e, 0x9272_2c85,
+        0xa2bf_e8a1, 0xa81a_664b, 0xc24b_8b70, 0xc76c_51a3, 0xd192_e819, 0xd699_0624, 0xf40e_3585, 0x106a_a070, 0x19a4_c116, 0x1e37_6c08,
+        0x2748_774c, 0x34b0_bcb5, 0x391c_0cb3, 0x4ed8_aa4a, 0x5b9c_ca4f, 0x682e_6ff3, 0x748f_82ee, 0x78a5_636f, 0x84c8_7814, 0x8cc7_0208,
+        0x90be_fffa, 0xa450_6ceb, 0xbef9_a3f7, 0xc671_78f2,
+    ];
+    let mut state: [u32; 8] = [0x6a09_e667, 0xbb67_ae85, 0x3c6e_f372, 0xa54f_f53a, 0x510e_527f, 0x9b05_688c, 0x1f83_d9ab, 0x5be0_cd19];
+    let message_bits = u64::try_from(message.len()).expect("消息长度装得进 u64") * 8;
+    let mut padded = message.to_vec();
+    padded.push(0x80);
+    while padded.len() % 64 != 56 {
+        padded.push(0);
+    }
+    padded.extend_from_slice(&message_bits.to_be_bytes());
+    for block in padded.chunks_exact(64) {
+        let mut schedule = [0_u32; 64];
+        for (word_position, word) in block.chunks_exact(4).enumerate() {
+            schedule[word_position] = u32::from_be_bytes([word[0], word[1], word[2], word[3]]);
+        }
+        for word_position in 16..64 {
+            let earlier = schedule[word_position - 15];
+            let recent = schedule[word_position - 2];
+            let small_sigma_zero = earlier.rotate_right(7) ^ earlier.rotate_right(18) ^ (earlier >> 3);
+            let small_sigma_one = recent.rotate_right(17) ^ recent.rotate_right(19) ^ (recent >> 10);
+            schedule[word_position] = schedule[word_position - 16]
+                .wrapping_add(small_sigma_zero)
+                .wrapping_add(schedule[word_position - 7])
+                .wrapping_add(small_sigma_one);
+        }
+        let mut working = state;
+        for (round_constant, scheduled_word) in ROUND_CONSTANTS.iter().zip(schedule) {
+            let big_sigma_one = working[4].rotate_right(6) ^ working[4].rotate_right(11) ^ working[4].rotate_right(25);
+            let choice = (working[4] & working[5]) ^ (!working[4] & working[6]);
+            let first_sum =
+                working[7].wrapping_add(big_sigma_one).wrapping_add(choice).wrapping_add(*round_constant).wrapping_add(scheduled_word);
+            let big_sigma_zero = working[0].rotate_right(2) ^ working[0].rotate_right(13) ^ working[0].rotate_right(22);
+            let majority = (working[0] & working[1]) ^ (working[0] & working[2]) ^ (working[1] & working[2]);
+            let second_sum = big_sigma_zero.wrapping_add(majority);
+            working = [
+                first_sum.wrapping_add(second_sum),
+                working[0],
+                working[1],
+                working[2],
+                working[3].wrapping_add(first_sum),
+                working[4],
+                working[5],
+                working[6],
+            ];
+        }
+        for (word, added) in state.iter_mut().zip(working) {
+            *word = word.wrapping_add(added);
+        }
+    }
+    state.iter().map(|word| format!("{word:08x}")).collect()
+}
+
+/// 取键脚本 `scripts/experiments/device-code-key.py` 打的组成清单的第一行。
+const COMPOSITION_FORM_LINE: &str = "form\tdevice-code-key-v1";
+/// 两个入口（登记修订 2 之一「读法写死」）：子进程那一侧按卡分两种，父进程告诉子进程哪一格的那一段一种。
+const CARD_CHILD_ENTRY_SUFFIX: &str = "::run_child_on_the_card";
+const MODEL_CHILD_ENTRY_SUFFIX: &str = "::run_child_on_the_model";
+const ARGUMENTS_ENTRY_SUFFIX: &str = "::ChildJob::child_arguments";
+
+/// 轮库（默认 `~/.local/share/singlefs/experiments/e174/rounds/`）与这一趟的两把代码键；组成清单原文照存进 `codes/`（只给「变了的单元」那一句用），
+/// 取键那天与机器只进轮文件的 meta 行。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RoundLibrary {
+    directory: std::path::PathBuf,
+    child_code_key: String,
+    arguments_code_key: String,
+    composition: String,
+    judged: String,
+    host: String,
+}
+
+impl RoundLibrary {
+    fn round_path(&self, round_key: &str) -> std::path::PathBuf {
+        self.directory.join(format!("{round_key}.out"))
+    }
+
+    fn composition_path(&self, code_key: &str) -> std::path::PathBuf {
+        self.directory.join("codes").join(format!("{code_key}.txt"))
+    }
+
+    fn index_path(&self) -> std::path::PathBuf {
+        self.directory.join("index.tsv")
+    }
+}
+
+/// 读组成清单：第一行是 form，恰好两行 code_key：子进程入口（真卡轮是 `run_child_on_the_card`，`--simulated` 的轮是 `run_child_on_the_model`）与
+/// `ChildJob::child_arguments`；judged、host 两行可缺（缺写 `-`）。
+fn round_library_from_composition(directory: std::path::PathBuf, composition: &str, simulated: bool) -> Result<RoundLibrary, String> {
+    if composition.lines().next() != Some(COMPOSITION_FORM_LINE) {
+        return Err("--code-key-file 不是 device-code-key.py 打的组成清单（第一行不是 form\tdevice-code-key-v1）".to_string());
+    }
+    let field = |name: &str| {
+        composition.lines().find_map(|line| line.strip_prefix(name).and_then(|rest| rest.strip_prefix('\t'))).unwrap_or("-").to_string()
+    };
+    let code_keys: Vec<(&str, &str)> = composition.lines().filter_map(|line| line.strip_prefix("code_key\t")).filter_map(|rest| rest.split_once('\t')).collect();
+    let child_suffix = if simulated { MODEL_CHILD_ENTRY_SUFFIX } else { CARD_CHILD_ENTRY_SUFFIX };
+    let key_of = |suffix: &str| -> Result<String, String> {
+        let found: Vec<&str> = code_keys.iter().filter(|(entry, _)| entry.ends_with(suffix)).map(|(_, code_key)| *code_key).collect();
+        let [code_key] = found.as_slice() else {
+            return Err(format!("组成清单里以 {suffix} 收尾的 code_key 要恰好一行，读到 {} 行（{}）", found.len(), if simulated { "--simulated" } else { "真卡" }));
+        };
+        if code_key.is_empty() || !code_key.chars().all(|character| character.is_ascii_hexdigit()) {
+            return Err(format!("组成清单里的代码键不是十六进制：{code_key}"));
+        }
+        Ok((*code_key).to_string())
+    };
+    if code_keys.len() != 2 {
+        return Err(format!("组成清单里要恰好两行 code_key（子进程入口与 ChildJob::child_arguments），读到 {} 行", code_keys.len()));
+    }
+    Ok(RoundLibrary {
+        directory,
+        child_code_key: key_of(child_suffix)?,
+        arguments_code_key: key_of(ARGUMENTS_ENTRY_SUFFIX)?,
+        composition: composition.to_string(),
+        judged: field("judged"),
+        host: field("host"),
+    })
+}
+
+/// 轮键（登记修订 2 之五）：sha256（`child\t<子进程代码键>\narguments\t<参数代码键>\nparameters\t<{cell:?}> round=<轮号>\ndevice\t<驱动与卡那一行>\n`）。
+/// 格取 `derive(Debug)` 打的全部字段值，不用 `fields_text` 拼的串；产物路径、`--skip-light`、`--limit-jobs`、清单位置、乱序值、日期、机器都不进。
+fn round_key_of(child_code_key: &str, arguments_code_key: &str, job: &ChildJob, device_line: &str) -> String {
+    let child_line = format!("child\t{child_code_key}\n");
+    let arguments_line = format!("arguments\t{arguments_code_key}\n");
+    let parameters_text = format!("{:?} round={}", job.cell, job.round);
+    let parameters_line = format!("parameters\t{parameters_text}\n");
+    let device = format!("device\t{device_line}\n");
+    sha256_hex([child_line, arguments_line, parameters_line, device].concat().as_bytes())
+}
+
+/// 轮文件的第一行：轮键与两把代码键（读回时三个都要等）。
+fn round_header(round_key: &str, library: &RoundLibrary) -> String {
+    format!("key round_key={round_key} child_key={} arguments_key={}", library.child_code_key, library.arguments_code_key)
+}
+
+/// 读回一个轮文件：第一行是给的键行，第二、三行是 parameters 与 meta（跳过、不比），末行 `done` 报的行数对得上才算数；交回这一轮原样的结果行（每行带换行）。
+fn read_back_the_round(path: &std::path::Path, header: &str) -> Option<String> {
+    let contents = std::fs::read_to_string(path).ok()?;
+    let mut lines: Vec<&str> = contents.lines().collect();
+    if lines.first().copied() != Some(header) {
+        return None;
+    }
+    let done = lines.pop()?;
+    if lines.len() < 3 || !lines[1].starts_with("parameters ") || !lines[2].starts_with("meta ") {
+        return None;
+    }
+    let result_lines = &lines[3..];
+    (done == format!("done lines={}", result_lines.len())).then(|| result_lines.iter().map(|line| format!("{line}\n")).collect())
+}
+
+/// 轮文件的全文（登记修订 2 之五）：键行、parameters（`key_text`）、meta（判定日期、跑法、机器；只当记录）、这一轮原样的结果行、`done lines=<行数>`。
+fn round_file_text(header: &str, job: &ChildJob, meta: &str, result_text: &str) -> String {
+    let result_lines: Vec<&str> = result_text.lines().collect();
+    let mut text = format!("{header}\nparameters {}\n{meta}\n", job.key_text());
+    for line in &result_lines {
+        text.push_str(line);
+        text.push('\n');
+    }
+    text.push_str(&format!("done lines={}\n", result_lines.len()));
+    text
+}
+
+/// 临时文件名的序号：同一个进程里写几份文件时各用各的临时文件。
+static TEMPORARY_FILE_SEQUENCE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// 原子落盘：同目录临时文件写完、fsync、改名，再 fsync 目录（目录不在先建）。
+fn write_text_atomically(final_path: &std::path::Path, text: &str) -> Result<(), String> {
+    use std::io::Write;
+    let failed = |error: std::io::Error| format!("写不了 {}：{error}", final_path.display());
+    let directory = final_path.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(std::path::Path::new("."));
+    std::fs::create_dir_all(directory).map_err(failed)?;
+    let file_name = final_path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+    let sequence = TEMPORARY_FILE_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let temporary_path = directory.join(format!(".{file_name}.tmp-{}-{sequence}", std::process::id()));
+    {
+        let mut file = std::fs::File::create(&temporary_path).map_err(failed)?;
+        file.write_all(text.as_bytes()).map_err(failed)?;
+        file.sync_all().map_err(failed)?;
+    }
+    std::fs::rename(&temporary_path, final_path).map_err(failed)?;
+    std::fs::File::open(directory).and_then(|handle| handle.sync_all()).map_err(failed)
+}
+
+/// 轮库的 `index.tsv`：`<key_text>\t<轮键>`；不在、读不出交空表。只给人看与数键对不上的轮，读回不经它。
+fn read_the_round_index(library: &RoundLibrary) -> BTreeMap<String, String> {
+    std::fs::read_to_string(library.index_path())
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|line| line.split_once('\t'))
+        .map(|(key_text, round_key)| (key_text.to_string(), round_key.to_string()))
+        .collect()
+}
+
+/// 键对不上的轮：这一段的（格，轮号）在上一趟的 `index.tsv` 里有、记的轮键与这一趟的不等。
+fn count_mismatched_rounds(previous_index: &BTreeMap<String, String>, round_keys: &BTreeMap<ChildJob, String>) -> u64 {
+    let mismatched = round_keys.iter().filter(|(job, round_key)| previous_index.get(&job.key_text()).is_some_and(|previous| previous != *round_key)).count();
+    u64::try_from(mismatched).expect("轮数装得进 u64")
+}
+
+/// 轮文件第一行里记的两把代码键；文件不在、第一行认不出交 None。
+fn code_keys_recorded_in(path: &std::path::Path) -> Option<(String, String)> {
+    let contents = std::fs::read_to_string(path).ok()?;
+    let header = contents.lines().next()?;
+    let field = |name: &str| header.split(' ').find_map(|word| word.strip_prefix(name)).map(str::to_string);
+    Some((field("child_key=")?, field("arguments_key=")?))
+}
+
+/// 「变了的单元」那一句最多点名几个单元，多出的报个数。
+const CHANGED_UNITS_NAMED_AT_MOST: usize = 20;
+
+/// 两份组成清单比：单元行按（入口，种类，限定名，文件）对，改了、新进、出去的各列限定名（合起来至多 20 个，多出的报个数）；
+/// 单元都没变的，报工具链行与依赖行各变了几行。
+fn changed_units_between(previous: &str, current: &str) -> String {
+    type UnitIdentity = (String, String, String, String);
+    let units_of = |text: &str| -> BTreeMap<UnitIdentity, String> {
+        text.lines()
+            .filter_map(|line| {
+                let columns: Vec<&str> = line.split('\t').collect();
+                let [kind_column, entry, kind, qualified, location, fingerprint] = columns.as_slice() else { return None };
+                if *kind_column != "unit" {
+                    return None;
+                }
+                let file = location.rsplit_once(':').map_or(*location, |(file, _span)| file);
+                Some((((*entry).to_string(), (*kind).to_string(), (*qualified).to_string(), file.to_string()), (*fingerprint).to_string()))
+            })
+            .collect()
+    };
+    let lines_with = |text: &str, prefix: &str| -> std::collections::BTreeSet<String> { text.lines().filter(|line| line.starts_with(prefix)).map(str::to_string).collect() };
+    let (before, after) = (units_of(previous), units_of(current));
+    let changed: Vec<&str> = before.iter().filter(|(identity, fingerprint)| after.get(*identity).is_some_and(|now| now != *fingerprint)).map(|(identity, _)| identity.2.as_str()).collect();
+    let entered: Vec<&str> = after.keys().filter(|identity| !before.contains_key(*identity)).map(|identity| identity.2.as_str()).collect();
+    let left: Vec<&str> = before.keys().filter(|identity| !after.contains_key(*identity)).map(|identity| identity.2.as_str()).collect();
+    if changed.is_empty() && entered.is_empty() && left.is_empty() {
+        let differing = |prefix: &str| lines_with(previous, prefix).symmetric_difference(&lines_with(current, prefix)).count();
+        return format!("单元都没变：工具链行变了 {} 行、依赖行变了 {} 行", differing("toolchain\t"), differing("dependency\t"));
+    }
+    let mut named = 0;
+    let mut parts = Vec::new();
+    for (label, names) in [("改了", &changed), ("新进", &entered), ("出去", &left)] {
+        if names.is_empty() {
+            continue;
+        }
+        let room = CHANGED_UNITS_NAMED_AT_MOST.saturating_sub(named);
+        let shown: Vec<&str> = names.iter().take(room).copied().collect();
+        named += shown.len();
+        let more = if names.len() > shown.len() { format!("（另 {} 个）", names.len() - shown.len()) } else { String::new() };
+        parts.push(format!("{label} {}{more}", shown.join("、")));
+    }
+    format!("变了的单元：{}", parts.join("；"))
+}
+
+/// 键对不上时那一句（登记修订 2 之五「成功句」）：找上一趟那几轮记的两把代码键，有一把与这一趟的不同就比那一份组成清单。
+fn changed_units_sentence(library: &RoundLibrary, previous_index: &BTreeMap<String, String>, round_keys: &BTreeMap<ChildJob, String>) -> String {
+    let mut previous_pairs = std::collections::BTreeSet::new();
+    let mut unreadable = 0_u64;
+    for (job, round_key) in round_keys {
+        let Some(previous_key) = previous_index.get(&job.key_text()).filter(|previous_key| *previous_key != round_key) else { continue };
+        match code_keys_recorded_in(&library.round_path(previous_key)) {
+            Some(pair) => {
+                previous_pairs.insert(pair);
+            }
+            None => unreadable += 1,
+        }
+    }
+    let differing_code_key = previous_pairs.iter().find_map(|(child_key, arguments_key)| {
+        if *child_key != library.child_code_key {
+            Some(child_key.clone())
+        } else if *arguments_key != library.arguments_code_key {
+            Some(arguments_key.clone())
+        } else {
+            None
+        }
+    });
+    let Some(previous_code_key) = differing_code_key else {
+        return if unreadable > 0 {
+            format!("上一趟的轮文件不在库里（{unreadable} 轮），说不出变了哪些单元")
+        } else {
+            "两把代码键都没变：键对不上的那几轮是格、轮号或驱动与卡那一行变了".to_string()
+        };
+    };
+    match std::fs::read_to_string(library.composition_path(&previous_code_key)) {
+        Ok(previous) => changed_units_between(&previous, &library.composition),
+        Err(_) => format!("上一趟的组成清单 codes/{previous_code_key}.txt 不在库里，说不出变了哪些单元"),
+    }
+}
+
+/// 父进程这一趟的跑法（`run` 的参数里与轮库、子进程无关的那几样）。
+struct RoundPlan<'plan> {
+    segment: Segment,
+    cells: &'plan [CellKey],
+    arm_count: usize,
+    output_path: &'plan str,
+    skip_light: bool,
+    simulated: bool,
+    limit_jobs: Option<usize>,
+}
+
+/// 一趟 `run` 怎么收的尾。
+#[derive(Debug, PartialEq, Eq)]
+enum RoundsEnding {
+    /// 跑满 `--limit-jobs` 个子进程停下：没写产物，库里已经有这几轮。
+    StoppedAtTheLimit(usize),
+    /// 由库拼出产物写到了 `--output`；F1 停机的那一趟 `stopped_by` 是 `f1_hold_control`。
+    Assembled { stopped_by: &'static str },
+    /// `--output` 已在，内容与拼出的相同。
+    AlreadyComplete,
+    /// `--output` 已在，内容与拼出的不同：一个字节不动。
+    OutputDiffers,
+}
+
+/// 一趟 `run` 的结局与成功句那几个数。
+struct RoundsOutcome {
+    ending: RoundsEnding,
+    computed: u64,
+    reused: u64,
+    mismatched: u64,
+    changed_units: Option<String>,
+}
+
+/// 写进 meta 行的跑法：段，带了的选项接在后面。
+fn round_how(plan: &RoundPlan<'_>) -> String {
+    let mut how = format!("run-{}", plan.segment.label());
+    if plan.skip_light {
+        how.push_str(",skip-light");
+    }
+    if plan.simulated {
+        how.push_str(",simulated");
+    }
+    if let Some(limit) = plan.limit_jobs {
+        how.push_str(&format!(",limit-jobs-{limit}"));
+    }
+    how
+}
+
+/// 一轮的结果文本并进产物：`parse_product` 那一份读法，原文按（格，轮号）记下，拼产物时照原样写回。
+fn add_round(product: &mut ProductRounds, texts: &mut BTreeMap<ChildJob, String>, job: ChildJob, text: String) -> Result<(), String> {
+    product.extend(parse_product(&text)?);
+    texts.insert(job, text);
+    Ok(())
+}
+
+/// 父进程的续跑（登记修订 2 之五）：这一段每一格、轮号 1 到 5 + 3 逐个按轮键找库里的文件，读得回的拼成 `ProductRounds` 交给 `pending_jobs`
+/// （补轮规则不动）；要起的轮由 `run_child` 起，每做完一轮原子写进库、路径记进 `--written-list`；都齐了（或 F1 停机）由库里这一段的轮拼出产物。
+/// 没有轮库（取键脚本报键算不出，`--without-library`）时每一轮都现起、不读不写库。`device_line_of` 交一张卡的驱动与卡那一行（模型卡写 simulated）。
+fn run_rounds(
+    plan: &RoundPlan<'_>,
+    library: Option<&RoundLibrary>,
+    written_list: Option<&std::path::Path>,
+    device_line_of: &dyn Fn(Card) -> Result<String, String>,
+    run_child: &mut dyn FnMut(&ChildJob) -> Result<String, String>,
+) -> Result<RoundsOutcome, String> {
+    use std::io::Write;
+    let rounds_at_most = ROUNDS_REQUIRED_PER_CELL + MAXIMUM_REFILL_ROUNDS_PER_CELL;
+    let candidate_jobs: Vec<ChildJob> = plan.cells.iter().flat_map(|cell| (1..=rounds_at_most).map(move |round| ChildJob { cell: *cell, round })).collect();
+    let mut round_keys: BTreeMap<ChildJob, String> = BTreeMap::new();
+    if let Some(library) = library {
+        for job in &candidate_jobs {
+            let round_key = round_key_of(&library.child_code_key, &library.arguments_code_key, job, &device_line_of(job.cell.card)?);
+            round_keys.insert(*job, round_key);
+        }
+        for code_key in [&library.child_code_key, &library.arguments_code_key] {
+            write_text_atomically(&library.composition_path(code_key), &library.composition)?;
+        }
+    }
+    let previous_index = library.map(read_the_round_index).unwrap_or_default();
+    let mut product: ProductRounds = BTreeMap::new();
+    let mut texts: BTreeMap<ChildJob, String> = BTreeMap::new();
+    let mut reused = 0_u64;
+    if let Some(library) = library {
+        for (job, round_key) in &round_keys {
+            if let Some(text) = read_back_the_round(&library.round_path(round_key), &round_header(round_key, library)) {
+                add_round(&mut product, &mut texts, *job, text)?;
+                reused += 1;
+            }
+        }
+    }
+    let mismatched = count_mismatched_rounds(&previous_index, &round_keys);
+    let changed_units = library.filter(|_| mismatched > 0).map(|library| changed_units_sentence(library, &previous_index, &round_keys));
+    let write_index = |texts: &BTreeMap<ChildJob, String>| -> Result<(), String> {
+        let Some(library) = library else { return Ok(()) };
+        let mut index = previous_index.clone();
+        for job in texts.keys() {
+            index.insert(job.key_text(), round_keys.get(job).cloned().unwrap_or_default());
+        }
+        write_text_atomically(&library.index_path(), &index.iter().map(|(key_text, round_key)| format!("{key_text}\t{round_key}\n")).collect::<String>())
+    };
+    let meta = library.map(|library| format!("meta judged={} how={} host={}", library.judged, round_how(plan), library.host));
+    let mut written = match written_list {
+        Some(path) => Some(std::fs::OpenOptions::new().create(true).append(true).open(path).map_err(|error| format!("打不开 --written-list {}：{error}", path.display()))?),
+        None => None,
+    };
+    let (mut computed, mut jobs_run, mut stopped_by) = (0_u64, 0_usize, "none");
+    'passes: loop {
+        let pending = pending_jobs(plan.cells, &product, plan.arm_count);
+        if pending.is_empty() {
+            break;
+        }
+        for job in pending {
+            if plan.limit_jobs.is_some_and(|limit| jobs_run >= limit) {
+                write_index(&texts)?;
+                return Ok(RoundsOutcome { ending: RoundsEnding::StoppedAtTheLimit(jobs_run), computed, reused, mismatched, changed_units });
+            }
+            let child_text = run_child(&job)?;
+            jobs_run += 1;
+            computed += 1;
+            if let (Some(library), Some(meta)) = (library, &meta) {
+                let round_key = round_keys.get(&job).ok_or_else(|| format!("{} 的轮号超出 1 到 {rounds_at_most}", job.key_text()))?;
+                let path = library.round_path(round_key);
+                write_text_atomically(&path, &round_file_text(&round_header(round_key, library), &job, meta, &child_text))?;
+                if let Some(file) = written.as_mut() {
+                    writeln!(file, "{}", path.display()).map_err(|error| format!("写不进 --written-list：{error}"))?;
+                }
+            }
+            let hold_control_failed = child_output_shows_hold_control_failure(&job, &child_text);
+            add_round(&mut product, &mut texts, job, child_text)?;
+            if hold_control_failed {
+                stopped_by = "f1_hold_control";
+                break 'passes;
+            }
+        }
+    }
+    write_index(&texts)?;
+    let mut text = format!(
+        "E7RESULT name=config segment={} seed={SHUFFLE_SEED} driver_version={EXPECTED_DRIVER_VERSION} skip_light={} cells={} \
+         rounds_required={ROUNDS_REQUIRED_PER_CELL} refills_at_most={MAXIMUM_REFILL_ROUNDS_PER_CELL} simulated={}\n",
+        plan.segment.label(),
+        plan.skip_light,
+        plan.cells.len(),
+        plan.simulated
+    );
+    let mut ordered: Vec<&ChildJob> = texts.keys().collect();
+    ordered.sort_by_key(|job| (job_order_key(job, plan.arm_count), job.round));
+    for job in ordered {
+        text.push_str(&texts[job]);
+    }
+    let verdict = run_verdict_line(plan.segment, plan.cells, &product, stopped_by);
+    let emitted = text.lines().filter(|line| line.starts_with("E7RESULT ")).count() + 2;
+    text.push_str(&format!("{verdict}\nE7RESULT name=done emitted={emitted}\n"));
+    let ending = if std::path::Path::new(plan.output_path).exists() {
+        let (existing, _existing_rounds) = load_product(plan.output_path)?;
+        if existing == text { RoundsEnding::AlreadyComplete } else { RoundsEnding::OutputDiffers }
+    } else {
+        write_text_atomically(std::path::Path::new(plan.output_path), &text)?;
+        RoundsEnding::Assembled { stopped_by }
+    };
+    Ok(RoundsOutcome { ending, computed, reused, mismatched, changed_units })
+}
+
 // ============================== 父进程：按清单起子进程，续跑 ==============================
 
 struct ParentOptions {
@@ -2821,8 +3304,14 @@ struct ParentOptions {
     skip_light: bool,
     /// 子进程都跑在模型卡上，不起卡、不读 `nvidia-smi`：只用来试父子流水线。
     simulated: bool,
-    /// 最多起这么多个子进程就停（不写 verdict 与 done）：冒烟用，续跑照常。
+    /// 最多起这么多个子进程就停（不写产物）：冒烟用，库里已经做完的轮下一趟照读回。
     limit_jobs: Option<usize>,
+    /// 取键脚本打的组成清单（登记修订 2 之六第 5 条）：两个入口的代码键从这里读。
+    code_key_file: Option<String>,
+    /// 这一趟写进库的轮文件逐行记到哪：取键脚本在父进程退出之后再取一次键，两次不等时照它删。
+    written_list: Option<String>,
+    /// 取键脚本报键算不出时带上：每一轮现起、不读不写库（登记修订 2 之十二 V-K1）。
+    without_library: bool,
 }
 
 fn parse_parent_options(arguments: &[String]) -> Result<ParentOptions, String> {
@@ -2831,6 +3320,9 @@ fn parse_parent_options(arguments: &[String]) -> Result<ParentOptions, String> {
     let mut skip_light = false;
     let mut simulated = false;
     let mut limit_jobs: Option<usize> = None;
+    let mut code_key_file: Option<String> = None;
+    let mut written_list: Option<String> = None;
+    let mut without_library = false;
     let mut index = 0;
     while index < arguments.len() {
         match arguments[index].as_str() {
@@ -2847,6 +3339,10 @@ fn parse_parent_options(arguments: &[String]) -> Result<ParentOptions, String> {
                 simulated = true;
                 index += 1;
             }
+            "--without-library" => {
+                without_library = true;
+                index += 1;
+            }
             "--segment" => {
                 let label = arguments.get(index + 1).ok_or("--segment 后面没有值")?;
                 segment = Some(Segment::from_label(label).ok_or_else(|| format!("--segment 认不出：{label}"))?);
@@ -2854,6 +3350,14 @@ fn parse_parent_options(arguments: &[String]) -> Result<ParentOptions, String> {
             }
             "--output" => {
                 output_path = Some(arguments.get(index + 1).ok_or("--output 后面没有值")?.clone());
+                index += 2;
+            }
+            "--code-key-file" => {
+                code_key_file = Some(arguments.get(index + 1).ok_or("--code-key-file 后面没有值")?.clone());
+                index += 2;
+            }
+            "--written-list" => {
+                written_list = Some(arguments.get(index + 1).ok_or("--written-list 后面没有值")?.clone());
                 index += 2;
             }
             other => return Err(format!("认不出的参数 {other}")),
@@ -2865,7 +3369,33 @@ fn parse_parent_options(arguments: &[String]) -> Result<ParentOptions, String> {
         skip_light,
         simulated,
         limit_jobs,
+        code_key_file,
+        written_list,
+        without_library,
     })
+}
+
+/// 轮库的目录：环境变量 `E174_ROUND_LIBRARY`，没设取 `~/.local/share/singlefs/experiments/e174/rounds`。
+fn round_library_directory() -> std::path::PathBuf {
+    std::env::var_os("E174_ROUND_LIBRARY").map_or_else(
+        || std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".local/share/singlefs/experiments/e174/rounds"),
+        std::path::PathBuf::from,
+    )
+}
+
+/// 驱动与卡那一行（登记修订 2 之五「驱动与卡」）：`nvidia-smi --query-gpu=pci.bus_id,name,memory.total,driver_version --format=csv,noheader`
+/// 里总线号（去掉域）对得上的那一行，原样去掉首尾空白。
+fn device_lines_by_card(report: &str) -> BTreeMap<Card, String> {
+    let mut lines = BTreeMap::new();
+    for line in report.lines() {
+        let Some(bus) = line.split(',').next() else { continue };
+        for card in Card::EVERY_CARD {
+            if bus_without_domain(bus.trim()) == card.bus_without_domain() {
+                lines.insert(card, line.trim().to_string());
+            }
+        }
+    }
+    lines
 }
 
 /// 登记第七节 B7、第十一节停机：驱动版本不是 595.84，停下，不作废也不当结果。
@@ -2876,16 +3406,6 @@ fn check_driver_version() -> Result<(), String> {
         return Err(format!("驱动版本不是 {EXPECTED_DRIVER_VERSION}：{versions:?}（登记第十一节停机）"));
     }
     Ok(())
-}
-
-fn append_to_file(path: &str, text: &str) -> Result<(), String> {
-    use std::io::Write;
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .map_err(|error| format!("打不开 {path}：{error}"))?;
-    file.write_all(text.as_bytes()).map_err(|error| format!("写不了 {path}：{error}"))
 }
 
 fn raw_archive_path(output_path: &str) -> String {
@@ -2907,10 +3427,27 @@ fn append_gzip_member(raw_file: &str, archive_path: &str) -> Result<(), String> 
     if status.success() { Ok(()) } else { Err(format!("gzip 退 {:?}", status.code())) }
 }
 
+/// 子进程照哪一份装置起：`scripts/experiments/device-code-key.py run` 起装置时把它编好、起的那一份的路径放进这个环境变量。
+/// 不读自己的路径（`std::env::current_exe`）：单元键认不出读自己路径的起法，整个 main 闭包拒算。
+const DEVICE_BINARY_VARIABLE: &str = "DEVICE_CODE_KEY_DEVICE_BINARY";
+
+/// `run` 起子进程用的装置路径（`DEVICE_BINARY_VARIABLE`）；没设或是空的交错，`run` 一个子进程都不起。
+fn child_executable_path() -> Result<std::path::PathBuf, String> {
+    match std::env::var_os(DEVICE_BINARY_VARIABLE) {
+        Some(path) if !path.is_empty() => Ok(std::path::PathBuf::from(path)),
+        _ => Err(format!("没有 {DEVICE_BINARY_VARIABLE}：run 要经 scripts/experiments/device-code-key.py run 起，子进程照它交的装置路径起")),
+    }
+}
+
 /// 起一个子进程，等它退出后整份读（不在转发输出的循环里打时间戳），交回要追加进产物的文本。
-fn run_one_child(job: &ChildJob, raw_archive: &str, scratch_directory: &std::path::Path, simulated: bool) -> Result<String, String> {
+fn run_one_child(
+    job: &ChildJob,
+    executable: &std::path::Path,
+    raw_archive: &str,
+    scratch_directory: &std::path::Path,
+    simulated: bool,
+) -> Result<String, String> {
     let raw_file = scratch_directory.join(format!("e174-raw-{}.txt", std::process::id()));
-    let executable = std::env::current_exe().map_err(|error| format!("找不到自己的路径：{error}"))?;
     let mut command = std::process::Command::new(executable);
     command.args(job.child_arguments()).arg("--raw-output").arg(&raw_file);
     if simulated {
@@ -2974,62 +3511,93 @@ fn child_output_shows_hold_control_failure(job: &ChildJob, child_text: &str) -> 
 
 fn run_parent(arguments: &[String]) -> Result<i32, String> {
     let options = parse_parent_options(arguments)?;
+    let child_executable = child_executable_path()?;
+    let library = match (&options.code_key_file, options.without_library) {
+        (Some(_), true) => {
+            eprintln!("e174：--code-key-file 与 --without-library 只给一个");
+            return Ok(2);
+        }
+        (None, false) => {
+            eprintln!("e174：run 要 --code-key-file（两个入口的代码键）：经 scripts/experiments/device-code-key.py run 起；取键脚本报键算不出时它改带 --without-library");
+            return Ok(2);
+        }
+        (None, true) => None,
+        (Some(path), false) => {
+            let composition = std::fs::read_to_string(path).map_err(|error| format!("读不了 --code-key-file {path}：{error}"))?;
+            Some(round_library_from_composition(round_library_directory(), &composition, options.simulated)?)
+        }
+    };
+    if library.is_none() && options.written_list.is_some() {
+        eprintln!("e174：--written-list 要与 --code-key-file 一起给");
+        return Ok(2);
+    }
     if !options.simulated {
         check_driver_version()?;
     }
-    let cells = cells_of_segment(options.segment, options.skip_light);
-    let arm_count = match options.segment {
-        Segment::First => 2,
-        Segment::Second => 3,
+    let device_lines = if options.simulated {
+        None
+    } else {
+        Some(device_lines_by_card(&run_nvidia_smi(&["--query-gpu=pci.bus_id,name,memory.total,driver_version", "--format=csv,noheader"])?))
     };
-    let (initial_text, initial_product) = load_product(&options.output_path)?;
-    let already_has_done_line = initial_text.lines().any(|line| line.starts_with("E7RESULT name=done "));
-    if already_has_done_line && pending_jobs(&cells, &initial_product, arm_count).is_empty() {
-        println!("{} 已经有 name=done 行，这一组格也没有要补的轮，不再追加", options.output_path);
-        return Ok(0);
-    }
-    if initial_text.is_empty() || already_has_done_line {
-        append_to_file(
-            &options.output_path,
-            &format!(
-                "E7RESULT name=config segment={} seed={SHUFFLE_SEED} driver_version={EXPECTED_DRIVER_VERSION} skip_light={} cells={} \
-                 rounds_required={ROUNDS_REQUIRED_PER_CELL} refills_at_most={MAXIMUM_REFILL_ROUNDS_PER_CELL} simulated={}\n",
-                options.segment.label(),
-                options.skip_light,
-                cells.len(),
-                options.simulated
-            ),
-        )?;
-    }
+    let device_line_of = |card: Card| -> Result<String, String> {
+        match &device_lines {
+            None => Ok("simulated".to_string()),
+            Some(lines) => lines.get(&card).cloned().ok_or_else(|| format!("nvidia-smi 里没有总线 {} 那张卡（驱动与卡那一行进轮键）", card.bus_without_domain())),
+        }
+    };
+    let cells = cells_of_segment(options.segment, options.skip_light);
+    let plan = RoundPlan {
+        segment: options.segment,
+        cells: &cells,
+        arm_count: match options.segment {
+            Segment::First => 2,
+            Segment::Second => 3,
+        },
+        output_path: &options.output_path,
+        skip_light: options.skip_light,
+        simulated: options.simulated,
+        limit_jobs: options.limit_jobs,
+    };
     let scratch_directory = std::env::temp_dir();
     let raw_archive = raw_archive_path(&options.output_path);
-    let mut stopped_by = "none";
-    let mut jobs_run: usize = 0;
-    'passes: loop {
-        let (_, product) = load_product(&options.output_path)?;
-        let pending = pending_jobs(&cells, &product, arm_count);
-        if pending.is_empty() {
-            break;
-        }
-        for job in pending {
-            if options.limit_jobs.is_some_and(|limit| jobs_run >= limit) {
-                println!("跑满 --limit-jobs {jobs_run} 个子进程，停在这里：没写 verdict 与 done，同一条命令去掉 --limit-jobs 就接着往下跑");
-                return Ok(0);
-            }
-            let child_text = run_one_child(&job, &raw_archive, &scratch_directory, options.simulated)?;
-            jobs_run += 1;
-            append_to_file(&options.output_path, &child_text)?;
-            if child_output_shows_hold_control_failure(&job, &child_text) {
-                stopped_by = "f1_hold_control";
-                break 'passes;
+    let mut run_child = |job: &ChildJob| run_one_child(job, &child_executable, &raw_archive, &scratch_directory, options.simulated);
+    let written_list = options.written_list.as_deref().map(std::path::Path::new);
+    let outcome = run_rounds(&plan, library.as_ref(), written_list, &device_line_of, &mut run_child)?;
+    match &library {
+        Some(library) => {
+            eprintln!(
+                "run: 现判 {} 轮、复用 {} 轮、键对不上 {} 轮（段 {}，库 {}）",
+                outcome.computed,
+                outcome.reused,
+                outcome.mismatched,
+                options.segment.label(),
+                library.directory.display()
+            );
+            if let Some(sentence) = &outcome.changed_units {
+                eprintln!("run: {sentence}");
             }
         }
+        None => eprintln!(
+            "run: 现判 {} 轮、复用 0 轮、没入库（--without-library：取键脚本报键算不出，每轮现起、不读不写库；段 {}）",
+            outcome.computed,
+            options.segment.label()
+        ),
     }
-    let (text, product) = load_product(&options.output_path)?;
-    let verdict = run_verdict_line(options.segment, &cells, &product, stopped_by);
-    let emitted = text.lines().filter(|line| line.starts_with("E7RESULT ")).count() + 2;
-    append_to_file(&options.output_path, &format!("{verdict}\nE7RESULT name=done emitted={emitted}\n"))?;
-    Ok(if stopped_by == "none" { 0 } else { 4 })
+    Ok(match outcome.ending {
+        RoundsEnding::StoppedAtTheLimit(jobs_run) => {
+            println!("跑满 --limit-jobs {jobs_run} 个子进程，停在这里：没写产物，同一条命令去掉 --limit-jobs 就接着往下跑（做完的轮在库里）");
+            0
+        }
+        RoundsEnding::Assembled { stopped_by } => i32::from(stopped_by != "none") * 4,
+        RoundsEnding::AlreadyComplete => {
+            println!("{} 已经齐了：与库里这一段拼出的产物逐字节相同，不再写", options.output_path);
+            0
+        }
+        RoundsEnding::OutputDiffers => {
+            eprintln!("e174：{} 已在、内容与库里这一段拼出的不同，一个字节没动；另给 --output", options.output_path);
+            2
+        }
+    })
 }
 
 // ============================== 不起卡的自检：模型卡上跑整套步骤 ==============================
@@ -3627,16 +4195,188 @@ mod tests {
         device_lease.device_spread_mebibytes = 9;
         assert_eq!(device_lease.tau_device_mebibytes(), 9 + 2);
     }
-}
 
-fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+    // ---------------------------------------------------------------------------------------------
+    // 续跑的轮库（登记修订 2 之六单测表；不起卡：子进程换成进程内的模型卡 simulate_job）
+    // ---------------------------------------------------------------------------------------------
+
+    fn resume_cell(arm: Arm) -> CellKey {
+        CellKey { group: Group::MainGrid, card: Card::Rtx5090, size_mebibytes: 64, liveness: Liveness::InFlightMedium, method: Method::OneBuild, arm }
+    }
+
+    /// 单测自己的轮库：临时目录下按测试名与进程号分开，组成清单照 device-code-key.py 打的写（两行 code_key，`--simulated` 的入口）。
+    fn test_round_library(test_name: &str, child_code_key: &str, arguments_code_key: &str) -> RoundLibrary {
+        let directory = std::env::temp_dir().join(format!("e174-rounds-{test_name}-{}", std::process::id()));
+        let composition = format!(
+            "{COMPOSITION_FORM_LINE}\njudged\t2026-10-15\nhost\t本机\ncode_key\te7_index_bench::run_child_on_the_model\t{child_code_key}\n\
+             code_key\te7_index_bench::ChildJob::child_arguments\t{arguments_code_key}\n\
+             unit\te7_index_bench::run_child_on_the_model\tfn\te7_index_bench::<bin>::run_simulated_child\tscripts/experiments/e174.rs:1-2\t{child_code_key}\n"
+        );
+        round_library_from_composition(directory, &composition, true).expect("单测写的组成清单读得出")
+    }
+
+    /// 在模型卡上跑一趟 `run`（进程内，不起子进程）：两格（等最新、轮询两条臂），第一段的两臂次序。
+    fn run_on_the_model(library: Option<&RoundLibrary>, output_path: &std::path::Path, limit_jobs: Option<usize>) -> RoundsOutcome {
+        let cells = [resume_cell(Arm::WaitLatest), resume_cell(Arm::Poll)];
+        let output = output_path.to_string_lossy().into_owned();
+        let plan = RoundPlan { segment: Segment::First, cells: &cells, arm_count: 2, output_path: &output, skip_light: false, simulated: true, limit_jobs };
+        let mut run_child = |job: &ChildJob| -> Result<String, String> { Ok(simulate_job(job).1) };
+        let device_line_of = |_card: Card| -> Result<String, String> { Ok("simulated".to_string()) };
+        run_rounds(&plan, library, None, &device_line_of, &mut run_child).expect("模型卡上的一趟 run 跑得完")
+    }
+
+    fn round_files_in(library: &RoundLibrary) -> usize {
+        std::fs::read_dir(&library.directory).map_or(0, |entries| entries.filter_map(Result::ok).filter(|entry| entry.file_name().to_string_lossy().ends_with(".out")).count())
+    }
+
+    #[test]
+    fn sha256_matches_the_standard_test_vectors() {
+        assert_eq!(sha256_hex(b""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    }
+
+    /// 「轮键随子进程代码键变」（M29 抓）：同一格同一轮、两个子进程代码键 → 轮键不等；轮键的绝对值另由 python 的 hashlib 算出钉住。
+    #[test]
+    fn round_key_changes_with_the_child_code_key() {
+        let job = ChildJob { cell: resume_cell(Arm::WaitLatest), round: 1 };
+        assert_eq!(round_key_of("A", "B", &job, "simulated"), "bbbb35f09d1e63698a0f6a591e11904367a09983dcc57f52feeb104d4ae47dfa");
+        assert_ne!(round_key_of("A", "B", &job, "simulated"), round_key_of("C", "B", &job, "simulated"));
+    }
+
+    /// 「轮键随参数代码键变」（M30 抓）：同一格同一轮、两个参数代码键 → 轮键不等。
+    #[test]
+    fn round_key_changes_with_the_arguments_code_key() {
+        let job = ChildJob { cell: resume_cell(Arm::WaitLatest), round: 1 };
+        assert_ne!(round_key_of("A", "B", &job, "simulated"), round_key_of("A", "C", &job, "simulated"));
+    }
+
+    /// 「轮键随格的每个字段与轮号变」（M31 抓）：只差组、卡、S、活、借法、臂、轮号的两轮 → 轮键两两不等。
+    #[test]
+    fn round_key_changes_with_every_cell_field_and_the_round_number() {
+        let cell = |group, card, size_mebibytes, liveness, method, arm| CellKey { group, card, size_mebibytes, liveness, method, arm };
+        let (main, card, live, build, wait) = (Group::MainGrid, Card::Rtx5090, Liveness::InFlightMedium, Method::OneBuild, Arm::WaitLatest);
+        let jobs = [
+            ChildJob { cell: cell(main, card, 64, live, build, wait), round: 1 },
+            ChildJob { cell: cell(Group::PassByPassGrid, card, 64, live, build, wait), round: 1 },
+            ChildJob { cell: cell(main, Card::Rtx5060Ti, 64, live, build, wait), round: 1 },
+            ChildJob { cell: cell(main, card, 512, live, build, wait), round: 1 },
+            ChildJob { cell: cell(main, card, 64, Liveness::Done, build, wait), round: 1 },
+            ChildJob { cell: cell(main, card, 64, live, Method::PassByPass, wait), round: 1 },
+            ChildJob { cell: cell(main, card, 64, live, build, Arm::Poll), round: 1 },
+            ChildJob { cell: cell(main, card, 64, live, build, wait), round: 2 },
+        ];
+        let keys: std::collections::BTreeSet<String> = jobs.iter().map(|job| round_key_of("A", "B", job, "simulated")).collect();
+        assert_eq!(keys.len(), jobs.len(), "八轮只差一个字段或轮号，轮键要两两不等");
+    }
+
+    /// 「轮键随驱动与卡那一行变」（M32 抓）：驱动版本串改一位 → 轮键不等。
+    #[test]
+    fn round_key_changes_with_the_driver_and_card_line() {
+        let job = ChildJob { cell: resume_cell(Arm::WaitLatest), round: 1 };
+        let line = "00000000:01:00.0, NVIDIA GeForce RTX 5090, 32607 MiB, 595.84";
+        assert_ne!(round_key_of("A", "B", &job, line), round_key_of("A", "B", &job, &line.replace("595.84", "595.85")));
+    }
+
+    /// 「轮键不看产物路径」（M33 抓）：模型卡上同一段先 `--output A` 跑完、再 `--output B` 起 → 第二趟现判 0、复用全部，B 与 A 内容相同。
+    #[test]
+    fn another_output_path_reuses_every_round() {
+        let library = test_round_library("other-output", "a1", "b1");
+        let (first_output, second_output) = (library.directory.join("first.out"), library.directory.join("second.out"));
+        let first = run_on_the_model(Some(&library), &first_output, None);
+        let second = run_on_the_model(Some(&library), &second_output, None);
+        let (first_text, second_text) = (std::fs::read_to_string(&first_output), std::fs::read_to_string(&second_output));
+        std::fs::remove_dir_all(&library.directory).expect("删得掉测试自己建的轮库");
+        assert!(first.computed > 0 && first.reused == 0, "空库上第一趟全部现起：{} / {}", first.computed, first.reused);
+        assert_eq!((second.computed, second.reused), (0, first.computed), "换一个 --output，轮键不变、全部读回");
+        assert_eq!(first_text.expect("A 写出来了"), second_text.expect("B 写出来了"));
+    }
+
+    /// 「别的键写的轮不读回」（M34 抓）：子进程代码键 A 下跑完、B 下再起 → 全部现起，A 的文件留着；成功句键对不上 = 轮数，那一句点名变了的单元。
+    #[test]
+    fn rounds_written_under_another_child_code_key_are_not_read_back() {
+        let library_a = test_round_library("other-child-key", "a1", "b1");
+        let library_b = test_round_library("other-child-key", "a2", "b1");
+        let first = run_on_the_model(Some(&library_a), &library_a.directory.join("first.out"), None);
+        let second = run_on_the_model(Some(&library_b), &library_b.directory.join("second.out"), None);
+        let files = round_files_in(&library_b);
+        std::fs::remove_dir_all(&library_b.directory).expect("删得掉测试自己建的轮库");
+        assert_eq!((second.computed, second.reused), (first.computed, 0), "B 下不读 A 写的轮");
+        assert_eq!(second.mismatched, first.computed, "键对不上 = 上一趟的轮数");
+        assert_eq!(files, 2 + 2 * usize::try_from(first.computed).expect("轮数装得进 usize"), "两份产物加两趟各写的轮文件");
+        let sentence = second.changed_units.expect("键对不上时有那一句");
+        assert!(sentence.contains("改了 e7_index_bench::<bin>::run_simulated_child"), "{sentence}");
+    }
+
+    /// 「中途停下再起只补没做完的」（续跑本身）：`--limit-jobs 2` 停下、再不带它起 → 第二趟只起其余的轮、复用 2，拼出的产物与一次跑完的逐字节相同。
+    #[test]
+    fn stopping_at_the_limit_and_starting_again_only_runs_the_remaining_rounds() {
+        let stopped_library = test_round_library("limit-stopped", "a1", "b1");
+        let whole_library = test_round_library("limit-whole", "a1", "b1");
+        let stopped_output = stopped_library.directory.join("product.out");
+        let stopped = run_on_the_model(Some(&stopped_library), &stopped_output, Some(2));
+        let output_after_stop = stopped_output.exists();
+        let resumed = run_on_the_model(Some(&stopped_library), &stopped_output, None);
+        let whole_output = whole_library.directory.join("product.out");
+        let whole = run_on_the_model(Some(&whole_library), &whole_output, None);
+        let (resumed_text, whole_text) = (std::fs::read(&stopped_output), std::fs::read(&whole_output));
+        std::fs::remove_dir_all(&stopped_library.directory).expect("删得掉测试自己建的轮库");
+        std::fs::remove_dir_all(&whole_library.directory).expect("删得掉测试自己建的轮库");
+        assert_eq!(stopped.ending, RoundsEnding::StoppedAtTheLimit(2));
+        assert!(!output_after_stop, "停在 --limit-jobs 时不写产物");
+        assert_eq!((resumed.computed, resumed.reused), (whole.computed - 2, 2));
+        assert_eq!(resumed_text.expect("续跑写出了产物"), whole_text.expect("一次跑完写出了产物"));
+    }
+
+    /// 「--output 已在而内容不同」：退 2 那一支（结局 OutputDiffers），原文件一个字节不动；内容相同的那一支报已经齐了。
+    #[test]
+    fn an_existing_output_with_other_content_is_left_alone() {
+        let library = test_round_library("existing-output", "a1", "b1");
+        std::fs::create_dir_all(&library.directory).expect("建得出测试的轮库目录");
+        let output = library.directory.join("product.out");
+        std::fs::write(&output, "E7RESULT name=config segment=first\n").expect("写得进测试的旧产物");
+        let differs = run_on_the_model(Some(&library), &output, None);
+        let after = std::fs::read_to_string(&output);
+        let complete_output = library.directory.join("complete.out");
+        run_on_the_model(Some(&library), &complete_output, None);
+        let complete = run_on_the_model(Some(&library), &complete_output, None);
+        std::fs::remove_dir_all(&library.directory).expect("删得掉测试自己建的轮库");
+        assert_eq!(differs.ending, RoundsEnding::OutputDiffers);
+        assert_eq!(after.expect("旧产物还在"), "E7RESULT name=config segment=first\n", "一个字节不动");
+        assert_eq!(complete.ending, RoundsEnding::AlreadyComplete);
+    }
+
+    /// 没有轮库（取键脚本报键算不出，`--without-library`）：每一轮都现起，一个轮文件都不写；组成清单要两行 code_key、入口与卡对得上。
+    #[test]
+    fn without_a_library_every_round_runs_and_the_composition_needs_both_entries() {
+        let directory = std::env::temp_dir().join(format!("e174-rounds-without-library-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).expect("建得出测试目录");
+        let outcome = run_on_the_model(None, &directory.join("product.out"), None);
+        let entries = std::fs::read_dir(&directory).map(Iterator::count).unwrap_or(0);
+        std::fs::remove_dir_all(&directory).expect("删得掉测试目录");
+        assert!(outcome.computed > 0 && outcome.reused == 0 && outcome.mismatched == 0);
+        assert_eq!(entries, 1, "只写了产物");
+        let card_entry = "code_key\te7_index_bench::run_child_on_the_card\ta1\ncode_key\te7_index_bench::ChildJob::child_arguments\tb1\n";
+        let unused = std::env::temp_dir().join("e174-rounds-composition-unused");
+        assert!(round_library_from_composition(unused.clone(), &format!("{COMPOSITION_FORM_LINE}\n{card_entry}"), false).is_ok());
+        assert!(round_library_from_composition(unused.clone(), &format!("{COMPOSITION_FORM_LINE}\n{card_entry}"), true).is_err(), "--simulated 要模型卡的入口");
+        assert!(round_library_from_composition(unused.clone(), card_entry, false).is_err(), "缺 form 行");
+        assert!(round_library_from_composition(unused, &format!("{COMPOSITION_FORM_LINE}\ncode_key\te7_index_bench::run_child_on_the_card\ta1\n"), false).is_err(), "缺参数入口");
+    }
+
+    #[test]
+    fn the_device_line_is_the_query_row_of_that_bus() {
+        let report = "00000000:01:00.0, NVIDIA GeForce RTX 5090, 32607 MiB, 595.84\n00000000:10:00.0, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 595.84\n";
+        let lines = device_lines_by_card(report);
+        assert_eq!(lines.get(&Card::Rtx5090).map(String::as_str), Some("00000000:01:00.0, NVIDIA GeForce RTX 5090, 32607 MiB, 595.84"));
+        assert_eq!(lines.get(&Card::Rtx5060Ti).map(String::as_str), Some("00000000:10:00.0, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 595.84"));
+    }
 }
 
 fn preflight() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let root = repository_root();
-    let source = root.join("scripts/experiments/e174_lease_drop_wait_memory_return.rs");
+    // 源文件从编进来的清单目录直接点名（单元键认得这种写法，把这份文件算进键）；仓根是它往上三层，不经「清单目录/../..」这种出了包目录的路径
+    let source = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("e174_lease_drop_wait_memory_return.rs");
+    let root = source.ancestors().nth(3).expect("源文件在 <仓根>/scripts/experiments/ 下").to_path_buf();
     let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
     let mut command = std::process::Command::new("python3");
     command.arg(&script).arg("check").arg(&source);

@@ -1,6 +1,0 @@
-m9_clear_before_reclaim_all_c s1 histories=60 handed_out>0:32 both>0:8 unblocked_grew:32 rc=0
-m9_clear_before_reclaim_all_c s2 histories=40 handed_out>0:14 both>0:4 unblocked_grew:18 rc=0
-m9_clear_before_reclaim_all_c s3 histories=40 handed_out>0:36 both>0:12 unblocked_grew:40 rc=0
-m9_clear_before_reclaim_all_c s4 histories=40 handed_out>0:12 both>0:0 unblocked_grew:14 rc=0
-m9_clear_before_reclaim_all_c s5 histories=60 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
-m9_clear_before_reclaim_all_c s6 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0

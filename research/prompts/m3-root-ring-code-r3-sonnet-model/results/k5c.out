@@ -1,5 +1,0 @@
-(4096-487)//56 = 64  487+64*56 = 4071  487+65*56 = 4127 (>4096)
-(16384-163)//112 = 144
-scratch bytes per state = 1160256  2147483644//that = 1850  12GiB//that = 11105
-segments 78 size-2 segments 42  = 19 record segments + 23 system-configuration pairs -> 42
-system configuration writes: acquire x2, raise-F x1, unmount x1, rotation after each of 19 publishes -> 46

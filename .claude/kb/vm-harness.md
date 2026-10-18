@@ -7,9 +7,9 @@
 ## 一句话
 
 ```bash
-cd research
+cd scripts/experiments
 cargo build --release --target x86_64-unknown-linux-musl --bin <实验二进制名>
-bash scripts/devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/<名> /dev/vda <参数...>
+bash ../devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/<名> /dev/vda <参数...>
 ```
 
 ## 挂几块盘

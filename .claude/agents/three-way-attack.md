@@ -32,7 +32,7 @@ required-inputs: 禁读清单, 草稿目录, 背景材料, 攻击面
 3b. 造历史、跑模型时这样取样：
    - 盘用内存稀疏盘（`crates/singlefs-harness/src/memory_pool.rs` 的 `SparseBlockDevice`），不在磁盘上建镜像文件；每个起点状态只建一次池（mkfs 与起点历史只跑一次），之后每段历史从内存里那一份拷（`SparseDevice`、`MemoryPool` 都能 `clone`）。
    - 正式跑之前先跑一小段，按它估全量的挂钟；估出来超过 40 分钟，先缩历史、候选与几何的取样，报告里写明缩了什么、缩前缩后各多少、估时怎么算的。
-   - 崩溃状态不在缩的范围里（共用约束「不做」一节「崩溃点测试准确率和正确率优先，其次再衡量时间成本」那一条），照崩溃点重放的枚举域取：调同一份文件里每一段都展开的 `enumerate_crash_states` / `enumerate_crash_states_versions`（录制写流，屏障与 FUA 切段，段内写的整写子集逐个枚举，不是只截前缀），每个崩溃状态恢复之后都跑 checker。缩只缩历史条数与长度、候选与几何的取样；留下的每段历史，它的崩溃状态一个不落。
+   - 崩溃状态不在缩的范围里（共用约束「不做」一节「崩溃点测试准确率和正确率优先，其次再衡量时间成本」那一条），照崩溃点重放的枚举域取：调 `crates/singlefs-checker-tier/src/crash_state_enumeration.rs` 里每一段都展开的 `enumerate_crash_states` / `enumerate_crash_states_versions`（录制写流，屏障与 FUA 切段，段内写的整写子集逐个枚举，不是只截前缀），每个崩溃状态恢复之后都跑 checker。缩只缩历史条数与长度、候选与几何的取样；留下的每段历史，它的崩溃状态一个不落。
    - 在自己的原型里这样调枚举函数跑小流不算重型：原型里的流只许在原型里自己造，不从崩溃枚举用例（`crates/singlefs-checker-tier/tests/crash_enumeration_*.rs` 这一类）里拷（拷文件、拷代码段、`include!`、`mod` 引进来都算拷）；测试目标不放进 checker 档包 `singlefs-checker-tier`（`heavy-test-guard.sh` 按包判，跑到这个包的测试就拒）；每次跑之前用 `crates/singlefs-checker-tier/src/crash.rs` 的 `crash_state_count_with_torn_in_place_overwrites`（写表里没有原地覆写时它等于 `closed_form_state_count`） 算出这一次全量的状态数，不超过约 10⁶ 个（几段历史合起来超过的，分几次跑）；这一条腿与接手它的腿全部原型跑的全量合起来不超过约 10⁷ 个状态（接手的腿从交接摘要里取前面的腿已跑的量）。一段历史自己就超过约 10⁶ 的，那段不跑；再跑就要越过约 10⁷ 的，剩下的不跑；两样都写进报告交主 agent。
    - 随机跑批分小批：每批的段数按先跑一小段估出的时长定，不给批设限时（包装的 `RUN_WITH_MEMORY_CAP_TIME_LIMIT`、外面套 `timeout` 都不用）；每批的段数与估时写进报告。
 3c. 内存与进程：
@@ -45,7 +45,7 @@ required-inputs: 禁读清单, 草稿目录, 背景材料, 攻击面
 5. 自己提的改法写明「只在我的模型上量过、被攻过零轮」。写「几个改法各修哪一格」的表时，每一格标「量过」（贴副本上的原样输出）或「推的」（按代码推、没实现没跑）。
 6. 引文同正推腿：写进报告之前在被引文件里 `grep -nF` 一次，命中 0 次不许写成引文，行号取命中的那一行。
 7. 没打中的写试过哪些形状、取样范围多大。
-8. 写模型的，报告开头给复跑命令与每个文件的 sha256。模型目录里的 `tools/rerun.sh` 从 `scripts/agents/three-way-rerun-template.sh` 拷，只改 `rerun_steps` 那一段；仓根与冻结副本用 `--repo`、`--frozen` 传，不从脚本自身的路径推。
+8. 写模型的，报告开头给复跑命令与每个文件的 sha256。模型目录里的 `<模型目录>/tools/rerun.sh` 从 `scripts/agents/three-way-rerun-template.sh` 拷，只改 `rerun_steps` 那一段；仓根与冻结副本用 `--repo`、`--frozen` 传，不从脚本自身的路径推。
 9. 交回前跑 `python3 scripts/agents/cite-check.py <报告>`，贴末行；对不上的改行号或引文到绿再交回（交回闸对三方腿跑同一个脚本，对不上就拒交回）。
 
 ## 写范围

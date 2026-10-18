@@ -1,3 +1,0 @@
-scenarios 48 with a valid root outside the window after the mount 48
-hole slot holds x-3S in 48 of 48
-[(4, 46, 34, 34, 49), (4, 47, 35, 35, 49), (4, 48, 36, 36, 50), (4, 86, 74, 74, 88)]

@@ -15,10 +15,11 @@
 set -u
 UNIT=${1:?要单元名}
 cd "$REPO" || exit 2
+# 编排给的 RESEARCH 是这一份所在的研究目录（相对 REPO 的 RESEARCH_RELATIVE，自证里是它的绝对路径）；缺省写成那个字面路径
+RESEARCH="${RESEARCH:-scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes}"
 TIMING=$RESEARCH/device_timing.py
 CHECK=$RESEARCH/check_product.py
 JUDGE=$RESEARCH/frozen_tree_lines_revision_8.py
-S2_COMPARE=/home/fy5090/.local/share/singlefs/work/e171-r1-segment1-rev6/s2_compare.py
 E170_SEED=85441ae491419411
 PRINT_ONLY=${PRINT_ONLY:-0}
 EXPECTED_EXIT=0
@@ -174,13 +175,11 @@ unit_step_1() {
 
 # ───── 第 2 步：E170 导出装置 dump（修订 8 树编的），与第 1 步逐文件比（S2） ─────
 unit_step_2() {
-  note_directory "$DUMPS/s2-e170-export$TAG"
-  device_step s2-e170-export-dump "$CAP_SMALL" "$E170_BIN" dump --output-directory "$DUMPS/s2-e170-export$TAG"
-  [ $? -eq 0 ] || stop "E170 导出装置退出码不是 0（3 是 S6：跑不起来，交主 agent）"
-  refuse_existing "$(own s2)"
-  must python3 -B "$S2_COMPARE" "$DUMPS/s2-e170-export$TAG" "$DUMPS/$S2_BASELINE" "$(own s2)"
-  note_product "$(own s2)"
-  must python3 -B "$CHECK" verdict "$(own s2)" s2_differing_files=0 s2_compared_files=18
+  # 逐文件比的那一份 s2_compare.py 写在仓外的草稿目录里，本机与 git 里都已经没有（登记 research/prompts/e171-r1-prereg.md 修订 11 的登记修订）：
+  # 这一步不起导出装置、不退回别的比法，显式报错退 2
+  say "✗ 单元 $UNIT：s2 比对脚本 s2_compare.py 未入库，这一步不能跑"
+  say "  → 怎么办：把逐文件比的脚本写进研究目录、登记进跑前登记，再把这一步改回现跑；在那之前第 2 步的 S2 读数记缺，交主 agent"
+  exit 2
 }
 
 # ───── 第 2b 步（修订 8 新加）：第 2 步导出的拷贝上现导 E170 第 2 次重跑坏状态，种子 85441ae491419411（E170 第 2 次重跑登记 Z3 那一句） ─────

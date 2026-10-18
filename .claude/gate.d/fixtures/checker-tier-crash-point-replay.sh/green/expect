@@ -5,6 +5,6 @@ want=没有签名
 want=这条用例没走读 SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE 的枚举入口
 want=crash-case:clean-stream 判绿
 want=crash-case:no-enumeration 判绿
-want=这一趟跑了判绿 2 条
+want=✓ 用例：现判 2、复用 0、拒算 0、本次未跑 0
 want=退 3 不退 0
 not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

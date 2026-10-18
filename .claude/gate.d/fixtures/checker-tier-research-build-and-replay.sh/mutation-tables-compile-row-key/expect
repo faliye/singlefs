@@ -1,0 +1,8 @@
+exit=0
+want=── 第 1 趟（样本 .mutation-tables-compile-sample/run-twice
+want=scripts/mutation/tables/tiny_bench.tsv：2 条全编得过（现判 2 条、复用 0 条、拒算 0 条）
+want=── 第 2 趟之前把 .mutation-tables-compile-sample/second-round/ 下的文件盖到样本根上（改了表里一条）
+want=── 第 2 趟（样本 .mutation-tables-compile-sample/run-twice
+want=scripts/mutation/tables/tiny_bench.tsv：2 条全编得过（现判 1 条、复用 1 条、拒算 0 条）
+want=研究侧变异表逐条只编译全编得过：判了 1 张表（整张复用、一条都没编的 0 张），按条：现判 1、复用 1、拒算 0、本次未跑 1 张表
+want=mutation-tables-compile：绿

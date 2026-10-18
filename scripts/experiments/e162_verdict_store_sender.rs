@@ -905,7 +905,7 @@ fn preflight() {
         return;
     }
     let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source = format!("{manifest_directory}/src/bin/e162_verdict_store_sender.rs");
+    let source = format!("{manifest_directory}/e162_verdict_store_sender.rs");
     let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
     let mut command = std::process::Command::new("python3");
     command.arg(&script).arg("check").arg(&source);

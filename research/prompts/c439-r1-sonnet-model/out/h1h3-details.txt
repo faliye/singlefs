@@ -1,0 +1,504 @@
+── h1a_original / 今天
+  步1 N 今天 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步3 N 今天 基准=HEAD=c1-绕过 窗口={Lok_1 green 整轮绿让gate-ok前移}
+  步4 S 今天 基准=c1-绕过 窗口={Lok_1,Lok_2 green 提交前带暂存}
+  步5 N 今天 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1a_original / 甲
+  步1 N 甲 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步3 N 甲 基准=HEAD=c1-绕过 窗口={Lok_1 green 整轮绿让gate-ok前移}
+  步4 S 甲 基准=HEAD=c2-绕过 窗口={Lok_2 green 提交前带暂存}
+  步5 N 甲 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1a_original / 乙
+  步1 N 乙 基准=c0 窗口={ green 初始整轮}
+  步2 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步3 N 乙 基准=c0 窗口={Lbad_A,Lok_1 red 整轮绿让gate-ok前移}
+  步4 S 乙 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步5 N 乙 基准=c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1a_original / 丙只改带暂存
+  步1 N 丙只改带暂存 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步3 N 丙只改带暂存 基准=HEAD=c1-绕过 窗口={Lok_1 green 整轮绿让gate-ok前移}
+  步4 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步5 N 丙只改带暂存 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1a_original / 丙两条路
+  步1 N 丙两条路 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步3 N 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1 red 整轮绿让gate-ok前移}
+  步4 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步5 N 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1a_original / 丁
+  步1 N 丁 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步3 N 丁 基准=c0 窗口={Lbad_A,Lok_1 red 整轮绿让gate-ok前移}
+  步4 S 丁 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步5 N 丁 基准=c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1a_original / 戊
+  步1 N 戊 基准=空树 窗口={ok_0 green 初始整轮}
+  步2 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步3 N 戊 基准=空树 窗口={Lbad_A,Lok_1,ok_0 red 整轮绿让gate-ok前移}
+  步4 S 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_2,ok_0 red 提交前带暂存}
+  步5 N 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_2,Lok_3,ok_0 red 之后不带暂存}
+── h1a_original / 庚
+  步1 N 庚 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步3 N 庚 基准=c0 窗口={Lbad_A,Lok_1 red 整轮绿让gate-ok前移}
+  步4 S 庚 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步5 N 庚 基准=c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1a_immediate / 今天
+  步1 N 今天 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步3 N 今天 基准=HEAD=c1-绕过 窗口={Lok_1 green 整轮绿让gate-ok前移}
+  步4 S 今天 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 紧接着带暂存}
+── h1a_immediate / 甲
+  步1 N 甲 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步3 N 甲 基准=HEAD=c1-绕过 窗口={Lok_1 green 整轮绿让gate-ok前移}
+  步4 S 甲 基准=HEAD=c1-绕过 窗口={Lok_1,Lok_2 green 紧接着带暂存}
+── h1a_immediate / 乙
+  步1 N 乙 基准=c0 窗口={ green 初始整轮}
+  步2 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步3 N 乙 基准=c0 窗口={Lbad_A,Lok_1 red 整轮绿让gate-ok前移}
+  步4 S 乙 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 紧接着带暂存}
+── h1a_immediate / 丙只改带暂存
+  步1 N 丙只改带暂存 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步3 N 丙只改带暂存 基准=HEAD=c1-绕过 窗口={Lok_1 green 整轮绿让gate-ok前移}
+  步4 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2 red 紧接着带暂存}
+── h1a_immediate / 丙两条路
+  步1 N 丙两条路 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步3 N 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1 red 整轮绿让gate-ok前移}
+  步4 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2 red 紧接着带暂存}
+── h1a_immediate / 丁
+  步1 N 丁 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步3 N 丁 基准=c0 窗口={Lbad_A,Lok_1 red 整轮绿让gate-ok前移}
+  步4 S 丁 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 紧接着带暂存}
+── h1a_immediate / 戊
+  步1 N 戊 基准=空树 窗口={ok_0 green 初始整轮}
+  步2 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步3 N 戊 基准=空树 窗口={Lbad_A,Lok_1,ok_0 red 整轮绿让gate-ok前移}
+  步4 S 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_2,ok_0 red 紧接着带暂存}
+── h1a_immediate / 庚
+  步1 N 庚 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步3 N 庚 基准=c0 窗口={Lbad_A,Lok_1 red 整轮绿让gate-ok前移}
+  步4 S 庚 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 紧接着带暂存}
+── h1a_nomove / 今天
+  步1 N 今天 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步3 S 今天 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步4 N 今天 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1a_nomove / 甲
+  步1 N 甲 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步3 S 甲 基准=HEAD=c2-绕过 窗口={Lok_2 green 提交前带暂存}
+  步4 N 甲 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1a_nomove / 乙
+  步1 N 乙 基准=c0 窗口={ green 初始整轮}
+  步2 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步3 S 乙 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步4 N 乙 基准=c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1a_nomove / 丙只改带暂存
+  步1 N 丙只改带暂存 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步3 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步4 N 丙只改带暂存 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1a_nomove / 丙两条路
+  步1 N 丙两条路 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步3 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步4 N 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1a_nomove / 丁
+  步1 N 丁 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步3 S 丁 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步4 N 丁 基准=c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1a_nomove / 戊
+  步1 N 戊 基准=空树 窗口={ok_0 green 初始整轮}
+  步2 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步3 S 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_2,ok_0 red 提交前带暂存}
+  步4 N 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_2,Lok_3,ok_0 red 之后不带暂存}
+── h1a_nomove / 庚
+  步1 N 庚 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步3 S 庚 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步4 N 庚 基准=c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1b_bypass / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 S 今天 基准=c1-绕过 窗口={Lok_1,Lok_2 green 提交前带暂存}
+  步3 N 今天 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1b_bypass / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 S 甲 基准=HEAD=c2-绕过 窗口={Lok_2 green 提交前带暂存}
+  步3 N 甲 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1b_bypass / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 S 乙 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步3 N 乙 基准=c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1b_bypass / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步3 N 丙只改带暂存 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1b_bypass / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步3 N 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1b_bypass / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丁 基准=c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+  步3 N 丁 基准=c0 窗口={Lbad_A,Lok_1,Lok_2,Lok_3 red 之后不带暂存}
+── h1b_bypass / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 S 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_2,ok_0 red 提交前带暂存}
+  步3 N 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_2,Lok_3,ok_0 red 之后不带暂存}
+── h1b_bypass / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 S 庚 基准=c1-绕过 窗口={Lok_1,Lok_2 green 提交前带暂存}
+  步3 N 庚 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1b_bypass_one / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 S 今天 基准=c0 窗口={Lbad_A,Lok_2 red 提交前带暂存}
+  步3 N 今天 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1b_bypass_one / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 S 甲 基准=HEAD=c1-绕过 窗口={Lok_2 green 提交前带暂存}
+  步3 N 甲 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1b_bypass_one / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 S 乙 基准=c0 窗口={Lbad_A,Lok_2 red 提交前带暂存}
+  步3 N 乙 基准=c0 窗口={Lbad_A,Lok_2,Lok_3 red 之后不带暂存}
+── h1b_bypass_one / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_2 red 提交前带暂存}
+  步3 N 丙只改带暂存 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1b_bypass_one / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_2 red 提交前带暂存}
+  步3 N 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_2,Lok_3 red 之后不带暂存}
+── h1b_bypass_one / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丁 基准=c0 窗口={Lbad_A,Lok_2 red 提交前带暂存}
+  步3 N 丁 基准=c0 窗口={Lbad_A,Lok_2,Lok_3 red 之后不带暂存}
+── h1b_bypass_one / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 S 戊 基准=空树 窗口={Lbad_A,Lok_2,ok_0 red 提交前带暂存}
+  步3 N 戊 基准=空树 窗口={Lbad_A,Lok_2,Lok_3,ok_0 red 之后不带暂存}
+── h1b_bypass_one / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 S 庚 基准=c0 窗口={Lbad_A,Lok_2 red 提交前带暂存}
+  步3 N 庚 基准=HEAD=c3 窗口={Lok_3 green 之后不带暂存}
+── h1c_split / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 S 今天 基准=c0 窗口={Lok_p1 green 第一份带暂存}
+  步3 S 今天 基准=c3-第三份没跑 窗口={Lok_n,Lok_p4 green 下一批提交前带暂存}
+── h1c_split / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 S 甲 基准=HEAD=c0 窗口={Lok_p1 green 第一份带暂存}
+  步3 S 甲 基准=HEAD=c4-第四份没跑 窗口={Lok_n green 下一批提交前带暂存}
+── h1c_split / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 S 乙 基准=c0 窗口={Lok_p1 green 第一份带暂存}
+  步3 S 乙 基准=c0 窗口={Lbad_A,Lok_n,Lok_p1,Lok_p3,Lok_p4 red 下一批提交前带暂存}
+── h1c_split / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙只改带暂存 基准=绿树@c0 窗口={Lok_p1 green 第一份带暂存}
+  步3 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_n,Lok_p3,Lok_p4 red 下一批提交前带暂存}
+── h1c_split / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙两条路 基准=绿树@c0 窗口={Lok_p1 green 第一份带暂存}
+  步3 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_n,Lok_p3,Lok_p4 red 下一批提交前带暂存}
+── h1c_split / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丁 基准=c0 窗口={Lok_p1 green 第一份带暂存}
+  步3 S 丁 基准=c0 窗口={Lbad_A,Lok_n,Lok_p1,Lok_p3,Lok_p4 red 下一批提交前带暂存}
+── h1c_split / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 S 戊 基准=空树 窗口={Lok_p1,ok_0 green 第一份带暂存}
+  步3 S 戊 基准=空树 窗口={Lbad_A,Lok_n,Lok_p1,Lok_p3,Lok_p4,ok_0 red 下一批提交前带暂存}
+── h1c_split / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 S 庚 基准=c0 窗口={Lok_p1 green 第一份带暂存}
+  步3 S 庚 基准=c3-第三份没跑 窗口={Lok_n,Lok_p4 green 下一批提交前带暂存}
+── h1c_allstaged / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 S 今天 基准=c0 窗口={Lok_A,Lok_p1,Lok_p3 green 全部暂存后一趟}
+  步3 S 今天 基准=c1 窗口={Lok_A,Lok_n green 下一批提交前带暂存}
+── h1c_allstaged / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 S 甲 基准=HEAD=c0 窗口={Lok_A,Lok_p1,Lok_p3 green 全部暂存后一趟}
+  步3 S 甲 基准=HEAD=c2 窗口={Lok_n green 下一批提交前带暂存}
+── h1c_allstaged / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 S 乙 基准=c0 窗口={Lok_A,Lok_p1,Lok_p3 green 全部暂存后一趟}
+  步3 S 乙 基准=c0 窗口={Lok_A,Lok_n,Lok_p1,Lok_p3 green 下一批提交前带暂存}
+── h1c_allstaged / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙只改带暂存 基准=绿树@c0 窗口={Lok_A,Lok_p1,Lok_p3 green 全部暂存后一趟}
+  步3 S 丙只改带暂存 基准=绿树@c0 窗口={Lok_n green 下一批提交前带暂存}
+── h1c_allstaged / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙两条路 基准=绿树@c0 窗口={Lok_A,Lok_p1,Lok_p3 green 全部暂存后一趟}
+  步3 S 丙两条路 基准=绿树@c0 窗口={Lok_n green 下一批提交前带暂存}
+── h1c_allstaged / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丁 基准=c0 窗口={Lok_A,Lok_p1,Lok_p3 green 全部暂存后一趟}
+  步3 S 丁 基准=c2 窗口={Lok_n green 下一批提交前带暂存}
+── h1c_allstaged / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 S 戊 基准=空树 窗口={Lok_A,Lok_p1,Lok_p3,ok_0 green 全部暂存后一趟}
+  步3 S 戊 基准=空树 窗口={Lok_A,Lok_n,Lok_p1,Lok_p3,ok_0 green 下一批提交前带暂存}
+── h1c_allstaged / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 S 庚 基准=c0 窗口={Lok_A,Lok_p1,Lok_p3 green 全部暂存后一趟}
+  步3 S 庚 基准=c1 窗口={Lok_A,Lok_n green 下一批提交前带暂存}
+── h1d_interleave / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 S 今天 基准=c0 窗口={Lok_A1 green A带暂存}
+  步3 S 今天 基准=cB-绕过 窗口={Lok_A2,Lok_A3 green A下一批带暂存}
+── h1d_interleave / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 S 甲 基准=HEAD=c0 窗口={Lok_A1 green A带暂存}
+  步3 S 甲 基准=HEAD=cA2-没重跑 窗口={Lok_A3 green A下一批带暂存}
+── h1d_interleave / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 S 乙 基准=c0 窗口={Lok_A1 green A带暂存}
+  步3 S 乙 基准=c0 窗口={Lbad_A,Lok_A1,Lok_A2,Lok_A3 red A下一批带暂存}
+── h1d_interleave / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙只改带暂存 基准=绿树@c0 窗口={Lok_A1 green A带暂存}
+  步3 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_A2,Lok_A3 red A下一批带暂存}
+── h1d_interleave / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙两条路 基准=绿树@c0 窗口={Lok_A1 green A带暂存}
+  步3 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_A2,Lok_A3 red A下一批带暂存}
+── h1d_interleave / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丁 基准=c0 窗口={Lok_A1 green A带暂存}
+  步3 S 丁 基准=c0 窗口={Lbad_A,Lok_A1,Lok_A2,Lok_A3 red A下一批带暂存}
+── h1d_interleave / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 S 戊 基准=空树 窗口={Lok_A1,ok_0 green A带暂存}
+  步3 S 戊 基准=空树 窗口={Lbad_A,Lok_A1,Lok_A2,Lok_A3,ok_0 red A下一批带暂存}
+── h1d_interleave / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 S 庚 基准=c0 窗口={Lok_A1 green A带暂存}
+  步3 S 庚 基准=cB-绕过 窗口={Lok_A2,Lok_A3 green A下一批带暂存}
+── h1e_pushed_one / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 N 今天 基准=c1-绕过 窗口={Lok_n green 推完不带暂存}
+  步3 S 今天 基准=c0 窗口={Lbad_A,Lok_n red 推完带暂存}
+── h1e_pushed_one / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 N 甲 基准=HEAD=c1-绕过 窗口={Lok_n green 推完不带暂存}
+  步3 S 甲 基准=HEAD=c1-绕过 窗口={Lok_n green 推完带暂存}
+── h1e_pushed_one / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 N 乙 基准=c0 窗口={Lbad_A,Lok_n red 推完不带暂存}
+  步3 S 乙 基准=c0 窗口={Lbad_A,Lok_n red 推完带暂存}
+── h1e_pushed_one / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 N 丙只改带暂存 基准=c1-绕过 窗口={Lok_n green 推完不带暂存}
+  步3 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_n red 推完带暂存}
+── h1e_pushed_one / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 N 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_n red 推完不带暂存}
+  步3 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_n red 推完带暂存}
+── h1e_pushed_one / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 N 丁 基准=c0 窗口={Lbad_A,Lok_n red 推完不带暂存}
+  步3 S 丁 基准=c0 窗口={Lbad_A,Lok_n red 推完带暂存}
+── h1e_pushed_one / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 N 戊 基准=空树 窗口={Lbad_A,Lok_n,ok_0 red 推完不带暂存}
+  步3 S 戊 基准=空树 窗口={Lbad_A,Lok_n,ok_0 red 推完带暂存}
+── h1e_pushed_one / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 N 庚 基准=c1-绕过 窗口={Lok_n green 推完不带暂存}
+  步3 S 庚 基准=c0 窗口={Lbad_A,Lok_n red 推完带暂存}
+── h1e_pushed_two / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 N 今天 基准=c2-绕过 窗口={Lok_n green 推完不带暂存}
+  步3 S 今天 基准=c1-绕过 窗口={Lok_1,Lok_n green 推完带暂存}
+── h1e_pushed_two / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 N 甲 基准=HEAD=c2-绕过 窗口={Lok_n green 推完不带暂存}
+  步3 S 甲 基准=HEAD=c2-绕过 窗口={Lok_n green 推完带暂存}
+── h1e_pushed_two / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 N 乙 基准=c0 窗口={Lbad_A,Lok_1,Lok_n red 推完不带暂存}
+  步3 S 乙 基准=c0 窗口={Lbad_A,Lok_1,Lok_n red 推完带暂存}
+── h1e_pushed_two / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 N 丙只改带暂存 基准=c2-绕过 窗口={Lok_n green 推完不带暂存}
+  步3 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_n red 推完带暂存}
+── h1e_pushed_two / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 N 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_n red 推完不带暂存}
+  步3 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_n red 推完带暂存}
+── h1e_pushed_two / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 N 丁 基准=c0 窗口={Lbad_A,Lok_1,Lok_n red 推完不带暂存}
+  步3 S 丁 基准=c0 窗口={Lbad_A,Lok_1,Lok_n red 推完带暂存}
+── h1e_pushed_two / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 N 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_n,ok_0 red 推完不带暂存}
+  步3 S 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_n,ok_0 red 推完带暂存}
+── h1e_pushed_two / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 N 庚 基准=c2-绕过 窗口={Lok_n green 推完不带暂存}
+  步3 S 庚 基准=c1-绕过 窗口={Lok_1,Lok_n green 推完带暂存}
+── h1f_n_only / 今天
+  步1 N 今天 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步3 N 今天 基准=HEAD=c2-绕过 窗口={Lok_n green 只跑不带暂存}
+── h1f_n_only / 甲
+  步1 N 甲 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步3 N 甲 基准=HEAD=c2-绕过 窗口={Lok_n green 只跑不带暂存}
+── h1f_n_only / 乙
+  步1 N 乙 基准=c0 窗口={ green 初始整轮}
+  步2 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步3 N 乙 基准=c0 窗口={Lbad_A,Lok_1,Lok_n red 只跑不带暂存}
+── h1f_n_only / 丙只改带暂存
+  步1 N 丙只改带暂存 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步3 N 丙只改带暂存 基准=HEAD=c2-绕过 窗口={Lok_n green 只跑不带暂存}
+── h1f_n_only / 丙两条路
+  步1 N 丙两条路 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步3 N 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_n red 只跑不带暂存}
+── h1f_n_only / 丁
+  步1 N 丁 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步3 N 丁 基准=c0 窗口={Lbad_A,Lok_1,Lok_n red 只跑不带暂存}
+── h1f_n_only / 戊
+  步1 N 戊 基准=空树 窗口={ok_0 green 初始整轮}
+  步2 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步3 N 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_n,ok_0 red 只跑不带暂存}
+── h1f_n_only / 庚
+  步1 N 庚 基准=HEAD=c0 窗口={ green 初始整轮}
+  步2 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步3 N 庚 基准=c0 窗口={Lbad_A,Lok_1,Lok_n red 只跑不带暂存}
+── m1_roundmove / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 S 今天 基准=c1-A绕过 窗口={Lok_A2,Lok_B1 green A带暂存}
+── m1_roundmove / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 S 甲 基准=HEAD=c2-B 窗口={Lok_A2 green A带暂存}
+── m1_roundmove / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 S 乙 基准=c1-A绕过 窗口={Lok_A2,Lok_B1 green A带暂存}
+── m1_roundmove / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_A2,Lok_B1 red A带暂存}
+── m1_roundmove / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_A2,Lok_B1 red A带暂存}
+── m1_roundmove / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丁 基准=c0 窗口={Lbad_A,Lok_A2,Lok_B1 red A带暂存}
+── m1_roundmove / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 S 戊 基准=空树 窗口={Lbad_A,Lok_A2,Lok_B1,ok_0 red A带暂存}
+── m1_roundmove / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 S 庚 基准=c1-A绕过 窗口={Lok_A2,Lok_B1 green A带暂存}
+── m2_lastwriter / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 S 今天 基准=c0 窗口={Lok_a1 green A带暂存含a1}
+  步3 S 今天 基准=c0 窗口={Lok_b1 green B带暂存不含a1}
+  步4 S 今天 基准=c0 窗口={Lok_a1,Lok_b1 green A重新暂存a1}
+── m2_lastwriter / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 S 甲 基准=HEAD=c0 窗口={Lok_a1 green A带暂存含a1}
+  步3 S 甲 基准=HEAD=c0 窗口={Lok_b1 green B带暂存不含a1}
+  步4 S 甲 基准=HEAD=c0 窗口={Lok_a1,Lok_b1 green A重新暂存a1}
+── m2_lastwriter / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 S 乙 基准=c0 窗口={Lok_a1 green A带暂存含a1}
+  步3 S 乙 基准=c0 窗口={Lok_b1 green B带暂存不含a1}
+  步4 S 乙 基准=c0 窗口={Lok_a1,Lok_b1 green A重新暂存a1}
+── m2_lastwriter / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙只改带暂存 基准=绿树@c0 窗口={Lok_a1 green A带暂存含a1}
+  步3 S 丙只改带暂存 基准=绿树@c0 窗口={Lok_b1 green B带暂存不含a1}
+  步4 S 丙只改带暂存 基准=绿树@c0 窗口={Lok_a1 green A重新暂存a1}
+── m2_lastwriter / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙两条路 基准=绿树@c0 窗口={Lok_a1 green A带暂存含a1}
+  步3 S 丙两条路 基准=绿树@c0 窗口={Lok_b1 green B带暂存不含a1}
+  步4 S 丙两条路 基准=绿树@c0 窗口={Lok_a1 green A重新暂存a1}
+── m2_lastwriter / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丁 基准=c0 窗口={Lok_a1 green A带暂存含a1}
+  步3 S 丁 基准=c0 窗口={Lok_b1 green B带暂存不含a1}
+  步4 S 丁 基准=c0 窗口={Lok_a1,Lok_b1 green A重新暂存a1}
+── m2_lastwriter / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 S 戊 基准=空树 窗口={Lok_a1,ok_0 green A带暂存含a1}
+  步3 S 戊 基准=空树 窗口={Lok_b1,ok_0 green B带暂存不含a1}
+  步4 S 戊 基准=空树 窗口={Lok_a1,Lok_b1,ok_0 green A重新暂存a1}
+── m2_lastwriter / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 S 庚 基准=c0 窗口={Lok_a1 green A带暂存含a1}
+  步3 S 庚 基准=c0 窗口={Lok_b1 green B带暂存不含a1}
+  步4 S 庚 基准=c0 窗口={Lok_a1,Lok_b1 green A重新暂存a1}
+── m3_toctou / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 S 今天 基准=c0 窗口={Lok_a1 green A带暂存}
+  步3 S 今天 基准=cA-带走了B的错行 窗口={Lok_a2,Lok_a3 green 下一批带暂存}
+── m3_toctou / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 S 甲 基准=HEAD=c0 窗口={Lok_a1 green A带暂存}
+  步3 S 甲 基准=HEAD=cA2-没跑 窗口={Lok_a3 green 下一批带暂存}
+── m3_toctou / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 S 乙 基准=c0 窗口={Lok_a1 green A带暂存}
+  步3 S 乙 基准=c0 窗口={Lbad_A,Lok_a1,Lok_a2,Lok_a3 red 下一批带暂存}
+── m3_toctou / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙只改带暂存 基准=绿树@c0 窗口={Lok_a1 green A带暂存}
+  步3 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_a2,Lok_a3 red 下一批带暂存}
+── m3_toctou / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙两条路 基准=绿树@c0 窗口={Lok_a1 green A带暂存}
+  步3 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_a2,Lok_a3 red 下一批带暂存}
+── m3_toctou / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丁 基准=c0 窗口={Lok_a1 green A带暂存}
+  步3 S 丁 基准=c0 窗口={Lbad_A,Lok_a1,Lok_a2,Lok_a3 red 下一批带暂存}
+── m3_toctou / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 S 戊 基准=空树 窗口={Lok_a1,ok_0 green A带暂存}
+  步3 S 戊 基准=空树 窗口={Lbad_A,Lok_a1,Lok_a2,Lok_a3,ok_0 red 下一批带暂存}
+── m3_toctou / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 S 庚 基准=c0 窗口={Lok_a1 green A带暂存}
+  步3 S 庚 基准=cA-带走了B的错行 窗口={Lok_a2,Lok_a3 green 下一批带暂存}
+── m5_rewrite / 今天
+  步1 S 今天 基准=c0 窗口={ green 初始带暂存}
+  步2 S 今天 基准=c1-绕过 窗口={Lok_1,Lok_2 green 提交前带暂存}
+── m5_rewrite / 甲
+  步1 S 甲 基准=HEAD=c0 窗口={ green 初始带暂存}
+  步2 S 甲 基准=HEAD=c2-绕过 窗口={Lok_2 green 提交前带暂存}
+── m5_rewrite / 乙
+  步1 S 乙 基准=c0 窗口={ green 初始带暂存}
+  步2 S 乙 基准=c1-绕过 窗口={Lok_1,Lok_2 green 提交前带暂存}
+── m5_rewrite / 丙只改带暂存
+  步1 S 丙只改带暂存 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙只改带暂存 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+── m5_rewrite / 丙两条路
+  步1 S 丙两条路 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丙两条路 基准=绿树@c0 窗口={Lbad_A,Lok_1,Lok_2 red 提交前带暂存}
+── m5_rewrite / 丁
+  步1 S 丁 基准=c0 窗口={ green 初始带暂存}
+  步2 S 丁 基准=c1-绕过 窗口={Lok_1,Lok_2 green 提交前带暂存}
+── m5_rewrite / 戊
+  步1 S 戊 基准=空树 窗口={ok_0 green 初始带暂存}
+  步2 S 戊 基准=空树 窗口={Lbad_A,Lok_1,Lok_2,ok_0 red 提交前带暂存}
+── m5_rewrite / 庚
+  步1 S 庚 基准=c0 窗口={ green 初始带暂存}
+  步2 S 庚 基准=c1-绕过 窗口={Lok_1,Lok_2 green 提交前带暂存}

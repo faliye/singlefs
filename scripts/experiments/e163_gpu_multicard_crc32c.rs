@@ -1,4 +1,4 @@
-//! E163（GPU 多卡算单元校验和）：单机多卡、双机多卡能不能把一批 32768 字节单元的
+//! E163（GPU多卡算单元校验和）：单机多卡、双机多卡能不能把一批 32768 字节单元的
 //! CRC-32C 切开算、合并后与 CPU 参照逐个相同；比对本身会不会红。
 //!
 // admission: always 每一次跑都是新的适配器枚举、新的显存分配与新的计时，上一次的结论不替这一次作保
@@ -795,7 +795,7 @@ fn preflight() {
         return;
     }
     let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source = format!("{manifest_directory}/src/bin/e163_gpu_multicard_crc32c.rs");
+    let source = format!("{manifest_directory}/e163_gpu_multicard_crc32c.rs");
     let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
     let mut command = std::process::Command::new("python3");
     command.arg(&script).arg("check").arg(&source);

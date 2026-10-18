@@ -1,9 +1,0 @@
-run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同会话两条推论腿各跑各的副本
-K3 calls=44928 model_vs_code_mismatches=0
-K3 general: pairs=67392 counterexamples(T(V2) true, T(V1) false) listed=6 first=["shape=0 mask=0010 c=1 V1=P1 V2=P2", "shape=0 mask=0010 c=1 V1=P1 V2=P3", "shape=0 mask=0100 c=1 V1=P2 V2=P3", "shape=0 mask=0100 c=2 V1=P2 V2=P3", "shape=0 mask=0101 c=2 V1=P2 V2=P3", "shape=0 mask=0110 c=1 V1=P1 V2=P3"]
-K3 general: pairs with T(V2) false and T(V1) true = 17928
-K3 domain R0 (earlier publishes' records all readable, c arbitrary): pairs=42240 counterexamples=408 examples_outside_R=["shape=1 mask=00010 c=1 V1=P0 V2=P1", "shape=1 mask=00010 c=1 V1=P0 V2=P2", "shape=1 mask=00010 c=1 V1=P0 V2=P3", "shape=1 mask=00110 c=1 V1=P0 V2=P2", "shape=1 mask=00110 c=1 V1=P0 V2=P3", "shape=1 mask=01010 c=1 V1=P0 V2=P1", "shape=1 mask=01010 c=1 V1=P0 V2=P3", "shape=1 mask=01110 c=1 V1=P0 V2=P3"]
-K3 domain R: pairs with T(V2) true and T(V1) true = 9072; pairs with T(V2) false and T(V1) true = 6912
-K3 domain R: pairs=23328 counterexamples listed=0 first=[]
-test k3_monotone ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.64s

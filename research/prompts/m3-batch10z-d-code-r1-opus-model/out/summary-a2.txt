@@ -1,8 +1,0 @@
-arm=diskfirst k=3 rkind=n fault=acct histories=1813 mount_refused=0 step_refused=133 hit=0 borrowed=22:1813 selected=(1,6):1813
-arm=diskfirst k=5 rkind=n fault=acct histories=1813 mount_refused=0 step_refused=133 hit=0 borrowed=22:1813 selected=(1,8):1813
-arm=h2 k=3 rkind=n fault=acct histories=1813 mount_refused=0 step_refused=133 hit=17 borrowed=22:1813 red_at_some_step:20 selected=(1,6):1813
-arm=h2 k=5 rkind=n fault=acct histories=1813 mount_refused=0 step_refused=133 hit=1 borrowed=22:1813 red_at_some_step:1 selected=(1,8):1813
-arm=today k=3 rkind=n fault=acct histories=1813 mount_refused=0 step_refused=133 hit=0 borrowed=22:1813 selected=(1,6):1813
-arm=today k=5 rkind=n fault=acct histories=1813 mount_refused=0 step_refused=133 hit=0 borrowed=22:1813 selected=(1,8):1813
-HITS h2 3 n acct Wnss Woos Woso Woss Wsbs Wsns Wsoo Wsos Wss Wssb Wssn Wsso Wsss bWss nWss oWss sWss
-HITS h2 5 n acct Wsss

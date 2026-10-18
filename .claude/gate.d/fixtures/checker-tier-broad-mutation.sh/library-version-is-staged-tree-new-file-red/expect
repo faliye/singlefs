@@ -1,4 +1,0 @@
-exit=1
-want=不是被判的这棵暂存树
-want=源码与库目录那一版不同（1 个文件）：暂存树有、那一版没有 crates/sample/src/extra.rs
-want=checker-tier-broad-mutation.sh：1 格里 1 格红（library-version-is-staged-tree）

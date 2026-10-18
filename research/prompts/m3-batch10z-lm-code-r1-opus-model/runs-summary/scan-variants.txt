@@ -1,8 +1,0 @@
-SCAN_GREEN crash variants/crash-0-original.rs
-SCAN_RED crash variants/crash-1-row-never-stop.rs
-SCAN_GREEN crash variants/crash-2-fool-never-stop-naming-it.rs
-SCAN_GREEN crash variants/crash-3-fool-never-ask-naming-it.rs
-SCAN_GREEN gpu variants/gpu-0-original.rs
-SCAN_RED gpu variants/gpu-1-row-never-lost.rs
-SCAN_GREEN gpu variants/gpu-2-fool-never-call-the-ledger.rs
-SCAN_GREEN gpu variants/gpu-3-fool-poll-always-idle.rs

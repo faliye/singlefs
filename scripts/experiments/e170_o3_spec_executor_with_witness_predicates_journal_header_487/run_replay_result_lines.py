@@ -28,6 +28,22 @@ import unittest
 TEST_MODULE_NAME = "test_executor_on_synthetic_pool"
 FILES_OUTSIDE_THE_TESTED_SET = ("comparator", "mutation_driver", "witness_reference", "run_")  # 同 executor_main.FILES_OUTSIDE_THE_FREEZE
 TIMING_FIELD_KEY_SUFFIX = "_ns"
+# E170 各版执行器的目录（--executor-directory 只认这几份之一）：显式列出来，函数单元库照这张表把几版的模块都收进闭包
+EXPERIMENTS_DIRECTORY = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EXECUTOR_DIRECTORIES = (os.path.join(EXPERIMENTS_DIRECTORY, "e170_o3_spec_executor"),
+                        os.path.join(EXPERIMENTS_DIRECTORY, "e170_o3_spec_executor_with_witness_predicates"),
+                        os.path.join(EXPERIMENTS_DIRECTORY, "e170_o3_spec_executor_with_witness_predicates_journal_header_487"),
+                        os.path.join(EXPERIMENTS_DIRECTORY, "e170_second_run_o3_spec_executor"),
+                        os.path.join(EXPERIMENTS_DIRECTORY, "e170_second_run_o3_spec_executor_journal_header_487"))
+
+
+def registered_executor_directory(executor_directory: str) -> str:
+    """--executor-directory 给的那一份 → EXECUTOR_DIRECTORIES 里同一个目录；不是其中之一就退出、说清给哪几份。"""
+    for directory in EXECUTOR_DIRECTORIES:
+        if os.path.realpath(directory) == os.path.realpath(executor_directory):
+            return directory
+    raise SystemExit(f"  ✗ --executor-directory {executor_directory} 不是 E170 登记的执行器目录之一\n"
+                     "  → 怎么办：给 EXECUTOR_DIRECTORIES 里的一份（scripts/experiments/ 底下那五个 e170_* 执行器目录）")
 PROCESS_IDENTIFIER_FIELD_KEY = "worker"
 DONE_LINE_PATTERN = re.compile(r"^name=done emitted=(\d+)$")
 
@@ -72,14 +88,20 @@ def tested_files(directory: str) -> list[str]:
 
 
 def unit_test_lines(executor_directory: str, arm: str, scratch: str) -> list[str]:
-    directory = os.path.abspath(executor_directory)
+    chosen = registered_executor_directory(executor_directory)
+    directory = os.path.abspath(chosen)
     own_directory = os.path.dirname(os.path.abspath(__file__))
     os.makedirs(scratch, exist_ok=True)
     os.environ["E170_TEST_SCRATCH"] = os.path.abspath(scratch)  # 单测模块载入时读它（SCRATCH_ROOT）
     sys.dont_write_bytecode = True
     os.chdir(directory)
     # 本文件所在目录（v2-487）不许排在被测目录前面：判 v1-487 时要载入 v1-487 自己的模块
-    sys.path[:] = [directory] + [entry for entry in sys.path if os.path.abspath(entry or os.curdir) not in (own_directory, directory)]
+    for entry in list(sys.path):
+        if os.path.abspath(entry or os.curdir) in (own_directory, directory):
+            sys.path.remove(entry)
+    for candidate in EXECUTOR_DIRECTORIES:  # 插的是表里那一项本身：插进 sys.path 的目录就是表里写着的那几个之一
+        if candidate == chosen:
+            sys.path.insert(0, candidate)
     test_module = importlib.import_module(TEST_MODULE_NAME)
     loaded_from = os.path.dirname(os.path.abspath(test_module.__file__))
     if loaded_from != directory:

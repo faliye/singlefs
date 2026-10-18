@@ -1,4 +1,0 @@
-warning: unused variable: `read_faults_in_the_first_crash_state`
-    --> crates/singlefs-checker-tier/src/crash_injection.rs:2899:9
-warning: `singlefs-checker-tier` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-checker-tier` to apply 1 suggestion)
-warning: `singlefs-checker-tier` (lib test) generated 1 warning (1 duplicate)

@@ -1,6 +1,0 @@
-m2_newmethod_noiso s1 histories=60 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
-m2_newmethod_noiso s2 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
-m2_newmethod_noiso s3 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
-m2_newmethod_noiso s4 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
-m2_newmethod_noiso s5 histories=60 handed_out>0:36 both>0:0 unblocked_grew:40 rc=0
-m2_newmethod_noiso s6 histories=40 handed_out>0:40 both>0:0 unblocked_grew:40 rc=0

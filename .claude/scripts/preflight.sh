@@ -2,15 +2,16 @@
 # 项目自己的脚本 source 这一份，不直接 source 规范副本里的 preflight.sh（.claude/singlefs-ai-sop/rules/preflight-discipline.md 的开头先判）。
 # 规范副本 .claude/singlefs-ai-sop/ 被 .gitignore 挡着，git worktree 里没有它：提交时在「HEAD + 暂存区」的临时树里跑 checker-tier-crash-point-replay --full
 # 就是这样。直接 source 副本会落空，preflight 成了找不到的命令，紧跟着的 set -- 把参数整个清掉，脚本不带参数照跑，一声不响。
-# 这一份随仓走，每棵树里都在：先用这棵树里的副本，没有就用主仓（git 的公共目录所在的那一份仓）里的，
+# 这一份随仓走，每棵树里都在：先用这棵树里的副本（相对这一份的字面路径 .claude/scripts/../singlefs-ai-sop/scripts/preflight.sh，
+# gate.sh --staged 的临时树与只拷了 .claude/ 的小树里副本跟着拷），没有就用主仓（git 的公共目录所在的那一份仓）里的，
 # 两处都没有就定义一个当场判红的 preflight，不让脚本静默往下走。只定义函数、不改 shell 选项，变量用完就清掉。
+# 两处路径都写成函数单元库（scripts/gate/lib_function_units.py）折得出的样子：${BASH_SOURCE[0]%/*} 拼字面路径，主仓那一处拼 git rev-parse --git-common-dir。
 project_preflight_shim_directory="${BASH_SOURCE[0]%/*}"
 if [[ "$project_preflight_shim_directory" == "${BASH_SOURCE[0]}" ]]; then project_preflight_shim_directory=.; fi
-project_preflight_tree_root="$(cd "$project_preflight_shim_directory/../.." && pwd -P)"
-project_preflight_library="$project_preflight_tree_root/.claude/singlefs-ai-sop/scripts/preflight.sh"
+project_preflight_library="$project_preflight_shim_directory/../singlefs-ai-sop/scripts/preflight.sh"
 if [[ ! -f "$project_preflight_library" ]]; then
-  project_preflight_common_directory="$(git -C "$project_preflight_tree_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-  if [[ -n "$project_preflight_common_directory" ]]; then
+  if project_preflight_common_directory="$(git -C "$project_preflight_shim_directory" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
+    && [[ -n "$project_preflight_common_directory" ]]; then
     project_preflight_library="${project_preflight_common_directory%/*}/.claude/singlefs-ai-sop/scripts/preflight.sh"
   fi
 fi
@@ -25,4 +26,4 @@ else
     exit 1
   }
 fi
-unset project_preflight_shim_directory project_preflight_tree_root project_preflight_library project_preflight_common_directory
+unset project_preflight_shim_directory project_preflight_library project_preflight_common_directory

@@ -1,4 +1,4 @@
 exit=1
 want=.claude/long-run-live-hosts-exempt 有 2 处不对（共 3 行）
-want=第 3 行的 scripts/stale.sh 现在的 sha256 是 51cb3276095a38da07be90a9b22850e8aceaeb16394fe7fdef2ec47177181351，表里登记的是 c0edb89935e6075b2173acb75ca8922f4e3083592f91295ad83a9bb8883544a1（脚本改过了，豁免只给登记的那一版文件）
+want=第 3 行的 scripts/stale.sh 现在的 sha256 是 cc01b0aebf09d4d479e31c115463c36333a06aab68d527952e92da9b0cecbadc，表里登记的是 9bf21947f00b8271923fe8a4dc41a3a23a62907dff070e8f9e56424f64443613（脚本改过了，豁免只给登记的那一版文件）
 want=第 4 行不是「<相对仓根的路径>  <被豁免脚本的 sha256，64 位小写十六进制>  # 理由」

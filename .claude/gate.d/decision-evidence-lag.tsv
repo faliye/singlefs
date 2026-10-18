@@ -1,0 +1,53 @@
+# 决策依据块的存量挂账表：门禁 doc-decisions 的格「推论要有判决」（inference-needs-verdict）、「三方要有腿况」（three-way-leg-record）与
+# 「说未定其实已定」（cross-decision-status）此刻就判红、当场补不上的存量，一行一处。登记一行等于承认「这一处还欠着」，并挂在一条有人排期的账上：
+# inference-needs-verdict 对应 .claude/kb/checks-owed.md 的 C402，three-way-leg-record 对应 C403，cross-decision-status 的新判法对应 C61。
+# 写法（制表符分隔，五列）：<格名><TAB><文件路径，相对仓根><TAB><位置><TAB><那一处里逐字的一段，至少 8 个字><TAB># <为什么挂账，至少 4 个字>
+#   位置：inference-needs-verdict 与 three-way-leg-record 写分项（「已定项 25」「未定项 6」），cross-decision-status 没有分项，写 -。
+#   inference-needs-verdict 与 three-way-leg-record 的「一处」是依据块里的一个条目（顶格列表项 / 编号项 / 表格行，或空行之后的一段，折行并入）；cross-decision-status 的「一处」是 kb 正文里的一行。
+#   一行必须恰好罩住这一格此刻判红的一处：文件、位置、片段任何一样对不上（对象已经改好、文件不在、片段在同一分项里不唯一）判红，删掉那一行。
+#   格名不是上面三个、列数不是五、片段不足 8 个字、理由不足 4 个字，同样判红。
+# 只缩不涨：相对基准那一版（changed-paths.sh 的 gate_diff_base gate）新增的行判红；基准那一版没有这张表、或不在 git 仓里时不比。
+#   新判红的条目补判决 / 指针 / 现状，不往表里加行；只收此刻就红的，不预留。
+# 退役：存量清完这张表就该一行都不剩，到那时连同三格里读它的那一段一起删。空行与 # 开头的行不算。
+inference-needs-verdict	.claude/kb/decisions/22-单元原子性怎么合成.md	已定项 8	整段写 0：不写的话，在一块装过上一份 singlefs 的盘上重 mk	# C402 存量：自陈「（推的，没量）」，同一条没有指到判决文件
+inference-needs-verdict	.claude/kb/decisions/22-单元原子性怎么合成.md	已定项 25	证据等级：数是观测；「所以那条旧依据要改写」是推论，只走了本地腿，两条云	# C402 存量：证据等级一句自陈「所以那条旧依据要改写」是推论、只走了本地腿，两条云端腿欠着，没有判决文件
+inference-needs-verdict	.claude/kb/decisions/23-journal的角色与格式.md	已定项 14	主 agent 2026-09-26 定：回退那次发布之前逐盘验复活集里	# C402 存量：自陈「无实验，推的，被攻过零轮」，同一条没有指到判决文件
+three-way-leg-record	.claude/kb/decisions/02-RAID条带策略.md	已定项 19	三方论证（系统配置槽宽那一轮）第一轮反推腿在 `io_min` = 30	# C403 存量：点名的材料文件名在 research/prompts、research/results 的树里与 git 历史里都取不到，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/04-校验和位置.md	已定项 7	四处已定条款，不是「两端相夹」那个推理（那个推理被三方论证的本地腿打穿，	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/05-快照-空间记账机制.md	已定项 4	三方论证：第 8 / 9 项撤回时两条腿各自独立普查、零命中；用户定案，	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/05-快照-空间记账机制.md	已定项 18	三方论证：第二道销毁闸是 D6（快照实现模型） 已定项 2 三轮对抗第二	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/06-快照实现模型.md	已定项 8	2026-08-26 三方论证：九条判据由那一轮定出，经过在变更史。	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/06-快照实现模型.md	已定项 9	无实验：六条各自的反例是已定条款与已有豁免（三处遍历豁免、I-3.5（引	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/08-核心索引结构.md	已定项 6	用户定案 2026-09-12（C297（inode 内部条目里出生树两	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/08-核心索引结构.md	已定项 6	用户定案 2026-09-16（C143（inode 号水位在崩溃恢复落	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/08-核心索引结构.md	已定项 7	三条已定条款的字面冲突（三方论证，主 agent 逐条现查）：D5（快照	# C403 存量：写了三方，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/08-核心索引结构.md	已定项 16	无实验：数都在三方腿的副本原型上量（三份删除判决），入库装置「删除借保留	# C403 存量：写了三方，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/09-加密.md	已定项 2	三方论证一致（经过在变更史）。	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/13-验证路线.md	已定项 2	用户定案，记在变更史；将来并行提交那条前置约束来自 C113（扫描重建时	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/13-验证路线.md	已定项 4	三方对抗与判决：[verification-build.md](../v	# C403 存量：写了三方，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/13-验证路线.md	已定项 4	用户定案（按 E77（发布的持久顺序） 与三方对抗定；FUA 写算段边界	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/15-格式冻结政策.md	已定项 1	无实验：定的是门禁判定规则的对象与默认值，没有可量的量。撑它的是两条事实	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/15-格式冻结政策.md	已定项 3	三方论证：反推腿按跑前写死的失败条款判「spec 只投影标量」那条臂出局	# C403 存量：写了三方，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/16-发布语义.md	已定项 4	三方论证之后的用户定案收窄问法（问的是「那第二份实现必须独立实现什么、允	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/17-实现分层与第三方管道.md	已定项 2	主 agent 定案（2026-09-13，按两轮三方论证），用户定向的	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/17-实现分层与第三方管道.md	已定项 6	三方论证（2026-08-27，三条腿一致）：反推腿查内核 6.17 树	# C403 存量：写了三方，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/17-实现分层与第三方管道.md	已定项 7	`.claude/rules/fs-design.md`「能不能把『用错	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/18-块里携带什么信息.md	已定项 3	「块头明文可读不构成认证」：三方论证的反推腿指出，主 agent 逐字核	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/18-块里携带什么信息.md	已定项 4	三方论证落下的六条开线举证与判红条件、用户定案，都在变更史。	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/18-块里携带什么信息.md	已定项 5	三方论证：两条腿独立确认候选 ①（靠父指针）在「索引丢了才要重建」这个前	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/18-块里携带什么信息.md	已定项 13	两轮三方论证：经过在 [records/2026-09-07-D18项3	# C403 存量：经过写在 records/ 下的过程记录，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/18-块里携带什么信息.md	已定项 14	一轮三方论证：经过在 [records/2026-09-07-D18项1	# C403 存量：经过写在 records/ 下的过程记录，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/18-块里携带什么信息.md	已定项 24	墓碑树、谱系树的其余数：三方腿的模型与副本原型上量的（墓碑判决、m3-d	# C403 存量：写了三方，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/19-块指针的结构与宽度预算.md	已定项 1	三方论证（2026-08-28）：正推腿与反推腿结论相反，分辨它们的事实	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/19-块指针的结构与宽度预算.md	已定项 6	E133（映射 key 各候选的格式代价）：两轮三方论证里出现过的每一种	# C403 存量：写了三方，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/20-承重面单元的原子性与自包含.md	已定项 5	三方论证：正推腿把「原子宽度」拆成设备声明的宽度与判定宽度并给出七个机制	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/21-权威态与派生态的分界.md	已定项 4	三方论证（2026-08-31，三条腿）：正推腿给出「条件带」的条件，反	# C403 存量：写了三方，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/21-权威态与派生态的分界.md	已定项 7	三方论证（2026-09-09）的反推腿量出配额范围内翻一个字节全仓无一	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/21-权威态与派生态的分界.md	已定项 17	三方论证（2026-09-09，反推腿现查、主 agent 逐条核过）：	# C403 存量：写了三方，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/22-单元原子性怎么合成.md	已定项 11	三方：未定项 6 第一轮三条腿一致判「进 checker 作交叉校验」臂	# C403 存量：写了三方，没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/22-单元原子性怎么合成.md	已定项 12	无实验：这是一条按发布顺序与回退语义推出的结构论证，没有可量的量；三方：	# C403 存量：点名的材料文件名在 research/prompts、research/results 的树里与 git 历史里都取不到，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/23-journal的角色与格式.md	已定项 8	用户定案：加反向链「字节代价小，而它同时买到两样」；宽度「如果 32 位	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/23-journal的角色与格式.md	已定项 10	用户定案，原话在变更史；三方 2026-08-30 反推腿读实验源码时指	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/23-journal的角色与格式.md	已定项 20	无实验：方向由 2026-08-28 三方论证按幂等、重放要不要分配器、	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+three-way-leg-record	.claude/kb/decisions/25-目标负载优先级.md	已定项 3	三方判决：云端反推腿打中这一点并推翻了 D25（目标负载优先级） 初稿的	# C403 存量：条目提到变更史（经过、腿况或用户原话在那里），没有指到 research/prompts 或 research/results 下的判决或腿输出，也没写腿况缺失
+cross-decision-status	.claude/kb/experiments/43-扩展点字节上限.md	-	⚠️ **那个 128 不算证据**：D21（权威态与派生态的分界） 正	# C61 存量：引了 D21 旧正文「未定案」当自陈的依据，引文旁边没有现状（D21 此刻已定；本件不改 kb 正文）

@@ -1,1 +1,0 @@
-            tree.absorb_until_no_pair_fits(holding_position - 1);

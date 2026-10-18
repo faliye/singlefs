@@ -1,0 +1,4 @@
+# 样本：一份 light 假自证不打规范输出、一份注释写了判定库却没登记、一份指到不存在的路径
+# scan: scripts/gate/*.sh
+scripts/gate/no-line.sh	bash scripts/gate/no-line.sh --selftest	样本里的假库	reuse-three-questions
+scripts/gate/gone.sh	bash scripts/gate/gone.sh --selftest	样本里的假库	reuse-three-questions

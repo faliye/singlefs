@@ -1,2 +1,0 @@
-FRAC newest-system-configuration-slot-zeros unit-area-384 steps=24 seeds=0..80 histories_with_a_faulted_step_that_sent_writes=42 segments=7916 segments_marked_injected=2292
-FRAC newest-system-configuration-slot-zeros unit-area-256 steps=24 seeds=0..80 histories_with_a_faulted_step_that_sent_writes=42 segments=8672 segments_marked_injected=2536

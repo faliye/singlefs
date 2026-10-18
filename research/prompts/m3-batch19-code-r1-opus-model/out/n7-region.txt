@@ -1,8 +1,0 @@
-MISMATCH c3,r0 p=1 n=1
-MISMATCH c3,r0 p=1 n=2
-MISMATCH c3,r0 p=1 n=3
-MISMATCH c3,r0 p=2 n=1
-MISMATCH c3,r0 p=2 n=2
-MISMATCH c3,r0 p=3 n=1
-REGION 预测对上 159 对不上 6；I-9.6 不红的点 90，其中压回的号不是发过的最大号 42
-REGION 例 ['c3 p=2 n=3 树内最大号=4 最大墓碑号=0', 'c3 p=3 n=2 树内最大号=4 最大墓碑号=0', 'c3 p=3 n=3 树内最大号=4 最大墓碑号=0', 'c3,u4 p=2 n=3 树内最大号=3 最大墓碑号=4', 'c3,u4 p=3 n=2 树内最大号=3 最大墓碑号=4', 'c3,u4 p=3 n=3 树内最大号=3 最大墓碑号=4']

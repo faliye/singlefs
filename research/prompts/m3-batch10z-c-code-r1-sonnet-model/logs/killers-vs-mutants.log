@@ -1,7 +1,0 @@
-M01 读数不压（take_in_a_reading 的调用去掉）: 红：k_pressing_lets_a_later_lease_count_once_the_card_took_the_returned_one_back (6s)
-M05 设备丢了重起：驱动那一份仍记成 DeviceStarted: 红：k_a_refused_restart_asked_again_does_not_take_another_driver_share_off_the_room (4s)
-M10 重起判：恰差 1 MiB 放不下也放行: 红：k_the_restart_is_refused_when_one_mebibyte_short_and_allowed_when_exactly_enough (3s)
-M13 借了一笔在 DeviceLostNotStartedAgain 时把驱动那一份记回登记了、没起: 红：k_a_lease_booked_after_a_refused_restart_keeps_the_restart_judged (6s)
-M18 卡线程那一圈：不问叫停: 红：k_the_card_loop_stops_on_request_on_refusal_and_when_the_store_is_gone (2s)
-M30 卡线程那一圈：判不了（Refused）也当没事接着领: 红：k_the_card_loop_stops_on_request_on_refusal_and_when_the_store_is_gone (1s)
-M31 卡线程那一圈：写库那头走了也接着领: 红：k_the_card_loop_stops_on_request_on_refusal_and_when_the_store_is_gone (1s)

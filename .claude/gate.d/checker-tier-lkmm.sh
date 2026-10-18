@@ -4,22 +4,35 @@
 # gate-stage: 内存序（herd7 + litmus/，本工程自己的阶段）
 # gate-fixture: yes
 # gate-category: checker-tier 类
-# gate-similar: checker-tier-qemu-device-streams.sh 同是 checker-tier 类里要外部工具的那几道之一，但它起 QEMU 判真设备上收到的写；这里起 herd7 判 litmus 的内存序声明，工具、登记的输入与失败方式都不同
+# gate-similar: checker-tier-qemu-device-streams.sh 同是 checker-tier 类里要外部工具的那几道之一，但它起 QEMU 判真设备上收到的写；这里起 herd7 判 litmus 的内存序声明，工具、判定的键与失败方式都不同
 # gate-similar: code-source-discipline.sh 它静态判源码的写法与登记（名字、格式常量、实验源码纪律）；这里的 litmus 也要绑到 crates 的代码锚点，但判的是 herd7 对每条 Never / Sometimes 的判定与声明符不符
 #
 # gate-cell: litmus-verdicts litmus/ 下每条 Never 有对照组、绑到代码，herd7 判定与声明相符
 # 判法全在 .claude/scripts/lkmm.sh，这里只接进门禁、给出路；参数、每格子 shell、汇总与退出码经 lib/stage-cells.sh。
 # 上游不再跑 LKMM，litmus/ 的这几样只有这一道在判。
 #
-# 样本 fixtures/checker-tier-lkmm.sh/{red,green}（stage-selftest.sh 跑，各放 .gate-cells 点名 litmus-verdicts）：
-# 样本根放 .lkmm-static-only 时只跑不需要 herd7 的静态层（只供测试的开关：.claude/rules/fs-design.md 五条硬要求第 2 条），
-# 全过这一格退 77，绿样本的 expect 写 exit=77；这一档不问复用、不判前提、不记环境。
+# 复用：每份 litmus 两条判定（herd7:<文件名> 与 binding:<文件名>），键写在 .claude/scripts/lkmm.sh 文件头「判定库」一段：
+#   ① herd7 那一条的键是 litmus 去注释后的内容、singlefs-expect 的值、herd7 版本与可执行文件的 sha256、内核树 tools/memory-model 的 .cfg / .cat / .bell / .def 内容摘要
+#      与内核树的版本；锚点指到的代码不进（herd7 不读代码）。键对得上的复用、不起 herd7，对不上的现判。
+#   ② 绑定那一条的键另含锚点指到的函数单元指纹（scripts/gate/lib_function_units.py 的切法，锚点写「文件 :: 单元限定名」、恰好命中一个单元）。
+#   判定库在被判那棵树的 git common-dir 的 singlefs-lkmm-verdicts/（GATE_LKMM_VERDICT_LIBRARY 盖过它），跨轮留着；SINGLEFS_GATE_FULL=1 只写不读，现判的照键写回同一份库。
+#   没有整道标记，不问 stage-must-run.sh。前提（stage-inputs.tsv 本阶段那一行第三列 probe=：找得到 herd7）没齐判红，不退 77。
 #
-# 准入（登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行，判法在 scripts/gate/admission.py）：
-#   ① 复用（scripts/gate/stage-must-run.sh）：登记的路径在 refs/sop/staged-green 与这一次的暂存树之间没变，
-#      且 herd7 版本（第三列 environment=）与上次判绿时记下的相同，才退 77。版本不在 git 树里，判绿后经 gate-record-environment 记进 git common-dir。
-#   ② 前提（第三列 probe=：找得到 herd7）没齐判红，不退 77。
-#   内核树里的 tools/memory-model 不进复用判定（不在 git 树里、可能要联网取）；它换了要重判，设 SINGLEFS_GATE_FULL=1 再跑。
+# 样本 fixtures/checker-tier-lkmm.sh/<名>/（stage-selftest.sh 跑，各放 .gate-cells 点名 litmus-verdicts；只供测试的开关：.claude/rules/fs-design.md 五条硬要求第 2 条）：
+#   样本根放 .lkmm-static-only：不起真 herd7。没有 .lkmm-fake-herd7/ 的只跑不需要 herd7 的静态层，全过这一格退 77，绿样本的 expect 写 exit=77；
+#   另有 .lkmm-fake-herd7/（一份打固定版本串、按 litmus 里 fake-observation 那一行交判定的假 herd7，与只有 tools/memory-model 几份模型文件的假内核树）的，
+#     herd7 那一层经假 herd7 跑，全过同样退 77（没起过真 herd7）；
+#   再有 .lkmm-key-samples/change.sh 的：判定库放这一趟的临时目录，接连跑两趟，头一趟现判、记下，跑完 change.sh 改样本，第二趟按键复用或现判，
+#     expect 认第二趟每条的「· <项>：绿|红，现判（…）|复用（…）」那一行。几份 litmus-key-samples-*：
+#     comment-only（只改 litmus 的普通注释，herd7 那一条复用）、expectation-changed-red（改 singlefs-expect，herd7 那一条现判、与假 herd7 的判定不符判红）、
+#     anchor-body-changed（改锚点那个 fn 的函数体，herd7 那一条复用、绑定那一条现判、点名变了的单元）；
+#   anchor-impl-method-green（锚点写 <impl 类型>::<方法>，静态层判绿）、anchor-duplicate-red（同一限定名在那份文件里两处，判红）。
+# 弄坏开关 GATE_LKMM_BREAK=<项>（lkmm.sh 读，只给样本证红用）：
+#   litmus-key-drops-every-comment  herd7 那一条的键把注释整个去掉、连 singlefs-expect 的值也不留（S27：改了期望照样复用）
+#     样本 litmus-key-samples-expectation-changed-red 判绿退 77，expect 里的 exit=1 与「现判（期望 变了」找不到。
+#   reuse-lookup-skipped            一律不读库（键相同照样现判）：lkmm.sh 的复用自证 scripts/gate/lkmm-selftest.sh 的 reuse-three-questions 那一格判错
+# 复用三问与复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「一」「二」）：哨兵在 lkmm.sh 里每一趟真跑都抽（绑定、herd7 各一份），被现判、强制现判判定不同这一格红；
+#   复用三问那一格在 scripts/gate/lkmm-selftest.sh（登记表 .claude/gate.d/verdict-library-scripts.tsv 那一行）。上次红的清单由 lib/stage-cells.sh 按格写。
 #
 #   bash .claude/gate.d/checker-tier-lkmm.sh [项目根]
 #   bash .claude/gate.d/checker-tier-lkmm.sh --list                       逐行打格名与判什么，不起 herd7
@@ -46,21 +59,73 @@ while (($#)); do
 done
 ROOT="${root_argument:-$STAGE_REPOSITORY}"
 cd "$ROOT" 2>/dev/null || exit 2
+ROOT="$(pwd)"
 
 # ── 格 litmus-verdicts ──
 cell_litmus_verdicts() {
 [[ -f "$LKMM" ]] || { echo "  ✗ 找不到 $LKMM"; echo "     → 怎么办：它随仓走（.claude/scripts/lkmm.sh），被删了就从 git 找回来。"; exit 1; }
 [[ -d "$ROOT/litmus" ]] || { echo "  ! $ROOT 下没有 litmus/，本阶段跳过"; exit 77; }
-static_only=()
-[[ -f "$ROOT/.lkmm-static-only" ]] && static_only=(--static-only)
-if [[ ${#static_only[@]} -eq 0 ]]; then
-  source "$STAGE_REPOSITORY/scripts/gate/stage-run-or-skip.sh" || { echo "  ✗ source 不进 scripts/gate/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
-  stage_run_or_skip "$STAGE_REPOSITORY/scripts/gate/stage-must-run.sh" "复用上一次整轮全绿的判定" \
-    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径、herd7 的版本怎么进判定见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
+# 样本根（不是这道阶段所在的仓、也没设 GATE_STAGED_FROM）才认 .lkmm-static-only 与它旁边的假 herd7（文件头「样本」一段）
+sample_root=0
+[[ -f "$ROOT/.lkmm-static-only" ]] && sample_root=1
+static_only=(); fake_tools=0; rounds=1; library_options=(); temporary_library=""; fake_tools_directory=""
+# 样本建的两个临时目录（这一趟的判定库、假 herd7 的替身）：这一格的子 shell 退出时删（哪条路退都删）
+cleanup_lkmm_temporaries() {
+  [[ -n "$temporary_library" ]] && rm -rf "${temporary_library:?}"
+  [[ -n "$fake_tools_directory" ]] && rm -rf "${fake_tools_directory:?}"
+  return 0
+}
+trap cleanup_lkmm_temporaries EXIT
+if ((sample_root)); then
+  if [[ -f "$ROOT/.lkmm-fake-herd7/herd7" && "$(pwd -P)" != "$(cd "$STAGE_REPOSITORY" && pwd -P)" && -z "${GATE_STAGED_FROM:-}" ]]; then
+    fake_tools=1
+    # 样本里的文件不带执行位：PATH 上放一个经 bash 起它的替身（临时目录，跑完删）
+    fake_tools_directory="$(mktemp -d)" || { echo "  ✗ 建不了临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
+    printf '#!/usr/bin/env bash\nexec bash %q "$@"\n' "$ROOT/.lkmm-fake-herd7/herd7" > "$fake_tools_directory/herd7"
+    chmod +x "$fake_tools_directory/herd7"
+    export PATH="$fake_tools_directory:$PATH" SINGLEFS_KERNEL_TREE="$ROOT/.lkmm-fake-herd7/linux" SINGLEFS_NO_FETCH=1
+    if [[ -f "$ROOT/.lkmm-key-samples/change.sh" ]]; then
+      temporary_library="$(mktemp -d)" || { echo "  ✗ 建不了临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
+      library_options=(--verdict-library "$temporary_library")
+      rounds=2
+    fi
+  else
+    static_only=(--static-only)
+  fi
+else
   python3 "$ADMISSION_MODULE" gate-preconditions "$STAGE_REPOSITORY" "$(basename "$0")" || exit 1
+  # 判定库：被判那棵树的 git common-dir 里（跨轮留着，几棵 worktree 共用），GATE_LKMM_VERDICT_LIBRARY 盖过它；SINGLEFS_GATE_FULL=1 只写不读
+  verdict_library="${GATE_LKMM_VERDICT_LIBRARY:-}"
+  if [[ -z "$verdict_library" ]] && common_directory="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" && [[ -n "$common_directory" ]]; then
+    verdict_library="$common_directory/singlefs-lkmm-verdicts"
+  fi
+  if [[ -n "$verdict_library" ]]; then
+    library_options=(--verdict-library "$verdict_library")
+    [[ "${SINGLEFS_GATE_FULL:-}" == 1 ]] && library_options+=(--no-reuse)
+  else
+    echo "  ! 取不到 $ROOT 的 git common-dir，判定库没处放：这一趟每一条都现判、不记"
+  fi
 fi
-bash "$LKMM" "$ROOT" "${static_only[@]}"
-rc=$?
+rc=0
+for ((round = 1; round <= rounds; round++)); do
+  if ((round == 2)); then
+    echo "── 第二趟（样本 .lkmm-key-samples/change.sh 改过之后；判定库 $temporary_library 里是头一趟记下的）"
+    if ! (cd "$ROOT" && bash .lkmm-key-samples/change.sh); then
+      echo "  ✗ 样本的 .lkmm-key-samples/change.sh 没跑成"
+      echo "     → 怎么办：照它的报错改样本；它只许改样本根里的 litmus 与代码。"
+      exit 1
+    fi
+  elif ((rounds == 2)); then
+    echo "── 头一趟（样本 .lkmm-key-samples：判定库 $temporary_library，现判之后记下）"
+  fi
+  bash "$LKMM" "$ROOT" ${static_only[@]+"${static_only[@]}"} ${library_options[@]+"${library_options[@]}"}
+  rc=$?
+  if ((round < rounds && rc != 0)); then
+    echo "  ✗ 样本头一趟就没过（lkmm.sh 退 $rc），第二趟比不出复用"
+    echo "     → 怎么办：先让样本不带 change.sh 的那一份判绿，再放 .lkmm-key-samples/change.sh。"
+    exit 1
+  fi
+done
 if [[ ${#static_only[@]} -gt 0 ]]; then
   # lkmm.sh 静态档全过退 3：herd7 那一层没判，记本次未跑（77）；共用库把 0、77 之外的码都算红。别的码原样交出（1 是红）
   if [[ "$rc" == 3 ]]; then
@@ -75,16 +140,12 @@ if [[ "$rc" -ne 0 ]]; then
   echo "               再决定是 litmus 没跟上代码、还是代码把屏障漏了；缺 herd7 就跑 bash .claude/scripts/fetch-deps.sh --check。"
   exit 1
 fi
-# 记下 herd7 版本供 ① 复用，只在 gate-staged.sh 起的那一趟记；记不下只报不红：下一趟判「要跑」，方向是多跑
-if ! python3 "$ADMISSION_MODULE" gate-record-environment "$ROOT" "$(basename "$0")"; then
-  echo "  ! 没记下这一次的 herd7 版本（admission.py gate-record-environment 没成）：下一趟整轮这一道照跑，不会复用"
-fi
 litmus_file_count="$(find "$ROOT/litmus" -maxdepth 1 -name '*.litmus' -type f | wc -l)"
-echo "  ✓ 内存序：litmus/ 下 $litmus_file_count 份 litmus 里每条 Never 有对照组、绑到代码，herd7 判定与声明相符（逐条的判定在上面 lkmm.sh 的输出里）"
-# 全绿标记（git common-dir）供整轮门禁与下一趟复用；写不成只报不红。
-if ! python3 "$ADMISSION_MODULE" stage-marker-write "$ROOT" "$(basename "$0")" >/dev/null; then
-  echo "  ! 没写成这一道的全绿标记（admission.py stage-marker-write 没成）：下一趟这一道照跑，不会复用"
+if ((fake_tools)); then
+  echo "  ! 假 herd7（样本 .lkmm-fake-herd7）：$litmus_file_count 份 litmus 全过，没起过真 herd7，这一格本次未跑"
+  exit 77
 fi
+echo "  ✓ 内存序：litmus/ 下 $litmus_file_count 份 litmus 里每条 Never 有对照组、绑到代码，herd7 判定与声明相符（逐条的判定与复用在上面 lkmm.sh 的输出里）"
 }
 
 stage_cells_run "$ROOT"

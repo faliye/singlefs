@@ -2284,17 +2284,17 @@ fn rounds_line(spec: &CellSpec, outcome: &RoundsOutcome) -> String {
     line
 }
 
-struct CellResult {
+struct PartitionCellResult {
     spec: CellSpec,
     aggregate: Aggregate,
     rounds: RoundsOutcome,
 }
 
-fn run_cell(spec: CellSpec) -> CellResult {
+fn run_partition_cell(spec: CellSpec) -> PartitionCellResult {
     let model = Model::new(spec);
     let enumeration = enumerate_schedules(&model, should_memoize(&spec));
     let rounds = simulate_rounds(&model);
-    CellResult { spec, aggregate: enumeration.aggregate, rounds }
+    PartitionCellResult { spec, aggregate: enumeration.aggregate, rounds }
 }
 
 fn arm_cell_specs(device_count: usize) -> Vec<CellSpec> {
@@ -2486,14 +2486,14 @@ fn judgement_of(question: Question, arm: Arm) -> Judgement {
 }
 
 fn cells_of<'results>(
-    results: &'results [CellResult],
+    results: &'results [PartitionCellResult],
     arm: Arm,
     stage: ParallelStage,
-) -> Vec<&'results CellResult> {
+) -> Vec<&'results PartitionCellResult> {
     results.iter().filter(|result| result.spec.arm == arm && result.spec.stage == stage).collect()
 }
 
-fn duplicates_of_question(result: &CellResult, question: Question) -> u128 {
+fn duplicates_of_question(result: &PartitionCellResult, question: Question) -> u128 {
     question
         .resources()
         .iter()
@@ -2501,7 +2501,7 @@ fn duplicates_of_question(result: &CellResult, question: Question) -> u128 {
         .sum()
 }
 
-fn emit_question_verdicts(emitter: &mut Emitter, default_cells: &[CellResult]) {
+fn emit_question_verdicts(emitter: &mut Emitter, default_cells: &[PartitionCellResult]) {
     for question in DUPLICATE_QUESTIONS {
         for arm in ALL_ARMS {
             for stage in ALL_STAGES {
@@ -2599,9 +2599,9 @@ fn emit_question_verdicts(emitter: &mut Emitter, default_cells: &[CellResult]) {
 }
 
 fn find_cell<'results>(
-    results: &'results [CellResult],
+    results: &'results [PartitionCellResult],
     spec: &CellSpec,
-) -> Option<&'results CellResult> {
+) -> Option<&'results PartitionCellResult> {
     results.iter().find(|result| {
         result.spec.arm == spec.arm
             && result.spec.variant == spec.variant
@@ -2613,8 +2613,8 @@ fn find_cell<'results>(
 }
 
 /// 登记第十节失败条款 1–9 逐条按产物里的格算一次（`triggered` = 条款的前件满足）。
-fn emit_failure_clauses(emitter: &mut Emitter, default_cells: &[CellResult]) {
-    let nonzero_duplicates = |result: &CellResult| result.aggregate.duplicate_total.iter().any(|total| *total > 0);
+fn emit_failure_clauses(emitter: &mut Emitter, default_cells: &[PartitionCellResult]) {
+    let nonzero_duplicates = |result: &PartitionCellResult| result.aggregate.duplicate_total.iter().any(|total| *total > 0);
     let whole_lock_default_duplicates = default_cells
         .iter()
         .filter(|result| result.spec.arm == Arm::WholeLock)
@@ -2726,7 +2726,7 @@ fn emit_failure_clauses(emitter: &mut Emitter, default_cells: &[CellResult]) {
 }
 
 /// 第八节「几何敏感性」：D = 2（默认）与 D = 1（第一个反向取样点）上每格的判定逐格对一遍。
-fn emit_geometry_sensitivity(emitter: &mut Emitter, default_cells: &[CellResult], sample_cells: &[CellResult]) {
+fn emit_geometry_sensitivity(emitter: &mut Emitter, default_cells: &[PartitionCellResult], sample_cells: &[PartitionCellResult]) {
     let mut unstable_groups: Vec<(String, u128, u128)> = Vec::new();
     for arm in ALL_ARMS {
         for stage in ALL_STAGES {
@@ -2850,15 +2850,15 @@ fn emit_segment_one(emitter: &mut Emitter) {
     }
     for device_count in [DEFAULT_DEVICE_COUNT, SAMPLE_DEVICE_COUNT] {
         for spec in control_cell_specs(device_count) {
-            let result = run_cell(spec);
+            let result = run_partition_cell(spec);
             emit(emitter, &cell_line("control_cell", &result.spec, &result.aggregate));
         }
     }
-    let mut default_cells: Vec<CellResult> = Vec::new();
-    let mut sample_cells: Vec<CellResult> = Vec::new();
+    let mut default_cells: Vec<PartitionCellResult> = Vec::new();
+    let mut sample_cells: Vec<PartitionCellResult> = Vec::new();
     for device_count in [DEFAULT_DEVICE_COUNT, SAMPLE_DEVICE_COUNT] {
         for spec in arm_cell_specs(device_count) {
-            let result = run_cell(spec);
+            let result = run_partition_cell(spec);
             emit(emitter, &cell_line("cell", &result.spec, &result.aggregate));
             emit(emitter, &trajectory_line(&result.spec, &result.aggregate));
             if reports_rounds(&result.spec) {
@@ -2932,7 +2932,7 @@ mod tests {
             .collect()
     }
 
-    fn cell(
+    fn partition_cell(
         arm: Arm,
         variant: ArmVariant,
         stage: ParallelStage,
@@ -3028,7 +3028,7 @@ mod tests {
             for shape_kind in [ShapeKind::SameShape, ShapeKind::Disjoint] {
                 for initial_has_file in [true, false] {
                     for transaction_count in [2usize, 3] {
-                        let aggregate = cell(
+                        let aggregate = partition_cell(
                             Arm::WholeLock,
                             ArmVariant::Normal,
                             stage,
@@ -3060,7 +3060,7 @@ mod tests {
                     for initial_has_file in [true, false] {
                         for transaction_count in [2usize, 3] {
                             for device_count in [SAMPLE_DEVICE_COUNT, DEFAULT_DEVICE_COUNT] {
-                                let aggregate = cell(
+                                let aggregate = partition_cell(
                                     arm,
                                     ArmVariant::Normal,
                                     stage,
@@ -3086,7 +3086,7 @@ mod tests {
     #[test]
     fn region_partition_with_one_region_per_transaction_never_falls_back_or_deadlocks() {
         for stage in ALL_STAGES {
-            let aggregate = cell(
+            let aggregate = partition_cell(
                 Arm::RegionPartition,
                 ArmVariant::Normal,
                 stage,
@@ -3106,7 +3106,7 @@ mod tests {
     #[test]
     fn literal_lock_leaves_transaction_numbers_and_tree_identifiers_outside_the_lock() {
         // 锁内四样（U、G、I、journal 计数器、txg）没有重复；锁外两样（X、T）有（失败 7 的前件）。
-        let aggregate = cell(
+        let aggregate = partition_cell(
             Arm::LiteralLock,
             ArmVariant::Normal,
             ParallelStage::ManyPublishesInFlight,
@@ -3134,7 +3134,7 @@ mod tests {
     #[test]
     fn read_set_optimistic_checks_the_user_pair_and_takes_the_transaction_number_at_the_commit_point() {
         // Q1乙、不相交：事务 0 只建 inode、其余只写用户数据单元。
-        let three = cell(
+        let three = partition_cell(
             Arm::OptimisticReadSet,
             ArmVariant::Normal,
             ParallelStage::OnePublishCarriesManyTransactions,
@@ -3145,7 +3145,7 @@ mod tests {
         );
         assert_eq!(three.duplicate_total, [0; RESOURCE_COUNT], "校验里有「用户数据对仍空」，事务 1 与 2 争同一个对时后提交那个重算");
         assert!(three.retries_total > 0);
-        let two = cell(
+        let two = partition_cell(
             Arm::OptimisticReadSet,
             ArmVariant::Normal,
             ParallelStage::OnePublishCarriesManyTransactions,
@@ -3164,7 +3164,7 @@ mod tests {
         for stage in [ParallelStage::PrepareParallelCommitSerial, ParallelStage::ManyPublishesInFlight] {
             for shape_kind in [ShapeKind::SameShape, ShapeKind::Disjoint] {
                 for transaction_count in [2usize, 3] {
-                    let whole = cell(
+                    let whole = partition_cell(
                         Arm::OptimisticWholeVersion,
                         ArmVariant::Normal,
                         stage,
@@ -3173,7 +3173,7 @@ mod tests {
                         transaction_count,
                         DEFAULT_DEVICE_COUNT,
                     );
-                    let read_set = cell(
+                    let read_set = partition_cell(
                         Arm::OptimisticReadSet,
                         ArmVariant::Normal,
                         stage,
@@ -3262,7 +3262,7 @@ mod tests {
             (Arm::LiteralLock, ArmVariant::Normal, ParallelStage::PrepareParallelCommitSerial, 3),
             (Arm::DevicePartition, ArmVariant::PositiveControl, ParallelStage::PrepareParallelCommitSerial, 2),
         ] {
-            let aggregate = cell(arm, variant, stage, ShapeKind::SameShape, false, transaction_count, DEFAULT_DEVICE_COUNT);
+            let aggregate = partition_cell(arm, variant, stage, ShapeKind::SameShape, false, transaction_count, DEFAULT_DEVICE_COUNT);
             assert_eq!(aggregate.duplicate_peak, aggregate.duplicate_max_single_schedule, "{}", arm.label(variant));
             for resource in 0..RESOURCE_COUNT {
                 assert!(
@@ -3278,7 +3278,7 @@ mod tests {
     fn inode_margin_goes_negative_only_when_the_shared_watermark_falls_behind_a_held_number() {
         // 整份写回：事务 1、0 先后按水位 2 拿号并写回水位 3，事务 2 拿 3 写回水位 4，最后事务 1 用旧拷贝把水位写回 3：
         // 已提交的最大号 3，余量 = 3 − 3 − 1 = −1，共享水位退到了已发出的号之下（I-9.6 的反面）。
-        let lost_update = cell(
+        let lost_update = partition_cell(
             Arm::WholeLock,
             ArmVariant::PositiveControl,
             ParallelStage::ManyPublishesInFlight,
@@ -3289,7 +3289,7 @@ mod tests {
         );
         assert_eq!(lost_update.inode_margin_minimum, -1);
         assert!(lost_update.inode_margin_negative_steps > 0);
-        let correct = cell(
+        let correct = partition_cell(
             Arm::WholeLock,
             ArmVariant::Normal,
             ParallelStage::ManyPublishesInFlight,

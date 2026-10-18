@@ -18,7 +18,7 @@
 # SINGLEFS_CRASH_POINT_REPLAY_THREADS、SINGLEFS_CRASH_INJECTION_THREADS、SINGLEFS_FAULT_INJECTION_WORKER_THREADS、
 # SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS、SINGLEFS_RANDOM_HISTORY_THREADS，checker 档各处只读的 E161_THREADS（E161 装置）、
 # SINGLEFS_CRASH_JUDGE_CPU_THREADS（GPU 对拍与记录核对器两份测试的 CPU 判器一侧）、SINGLEFS_CRASH_AMPLIFICATION_THREADS（崩溃放量的核对线程）、
-# E165_THREADS（E165 装置）、E168_THREADS（E168 装置），以及通用的 SINGLEFS_THREAD_CAP
+# E165_THREADS（E165 装置）、E168_THREADS（E168 装置）、GATE_MUTATION_KEY_WORKERS（crates 变异表门禁算行键的子进程数），以及通用的 SINGLEFS_THREAD_CAP
 # （实验装置自己的线程变量没登记在这里的，照派发提示另设，或让装置读 SINGLEFS_THREAD_CAP；门禁 code-tooling 的 heavy-thread-defaults 格判：
 # 装置读自己的线程变量，这里不设、文件里也没回退到 SINGLEFS_THREAD_CAP 或登记值的，红）。
 # 弄坏开关 CAPPED_BREAK=default-from-nproc（只给自证证红）：default 照改前的写法取本机核数、不读登记、不认 SINGLEFS_THREAD_CAP，
@@ -48,6 +48,7 @@ variable_names=(
     SINGLEFS_CRASH_AMPLIFICATION_THREADS
     E165_THREADS
     E168_THREADS
+    GATE_MUTATION_KEY_WORKERS
     SINGLEFS_THREAD_CAP
 )
 # checker 档各处只读的线程变量（文件头「设的变量」）：自证逐个核它们在清单里
@@ -147,13 +148,13 @@ run_default_selftest() {
         echo "  → 怎么办：看 \$TMPDIR 满没满、有没有写权限"
         return
     fi
-    # default_tree <目录名> <登记内容，MISSING 是不建>：建一棵样本树，打 capped.sh 拷贝的路径
+    # default_tree <目录名> <登记内容，MISSING 是不建>：建一棵样本树，打树根（capped.sh 的拷贝在 <树根>/scripts/hosts/capped.sh）
     default_tree() {
         mkdir -p "$scratch/$1/scripts/hosts" "$scratch/$1/.claude/scripts"
         cp "$here/capped.sh" "$here/heavy-threads.sh" "$scratch/$1/scripts/hosts/"
         printf '%s\n' 'preflight() { shift; PREFLIGHT_ARGUMENTS=("$@"); }' > "$scratch/$1/.claude/scripts/preflight.sh"
         if [[ "$2" != MISSING ]]; then printf '%s\n' "$2" > "$scratch/$1/.claude/heavy-thread-default"; fi
-        printf '%s\n' "$scratch/$1/scripts/hosts/capped.sh"
+        printf '%s\n' "$scratch/$1"
     }
     default_failed() {
         failures=$((failures + 1))
@@ -163,23 +164,23 @@ run_default_selftest() {
     tree="$(default_tree registered '7  # 样本理由')"
     checked=$((checked + 1))
     for name in "${variable_names[@]}"; do
-        output="$(env -u SINGLEFS_THREAD_CAP bash "$tree" default printenv "$name" 2>&1 || true)"
+        output="$(env -u SINGLEFS_THREAD_CAP bash "$tree/scripts/hosts/capped.sh" default printenv "$name" 2>&1 || true)"
         if [[ "$output" != 7 ]]; then default_failed "登记 7 ⇒ default 把 $name 设成 7，实际「$output」"; break; fi
     done
     checked=$((checked + 1))
     want_lines="$(for name in "${variable_names[@]}"; do echo "$name=7"; done)"
-    got_lines="$(env -u SINGLEFS_THREAD_CAP bash "$tree" --print default 2>&1 || true)"
+    got_lines="$(env -u SINGLEFS_THREAD_CAP bash "$tree/scripts/hosts/capped.sh" --print default 2>&1 || true)"
     [[ "$got_lines" == "$want_lines" ]] || default_failed "登记 7 ⇒ --print default 逐行打 <变量>=7，实际「$(head -n 1 <<<"$got_lines")」…"
     checked=$((checked + 1))
-    output="$(env SINGLEFS_THREAD_CAP=5 bash "$tree" default printenv CARGO_BUILD_JOBS 2>&1 || true)"
+    output="$(env SINGLEFS_THREAD_CAP=5 bash "$tree/scripts/hosts/capped.sh" default printenv CARGO_BUILD_JOBS 2>&1 || true)"
     [[ "$output" == 5 ]] || default_failed "SINGLEFS_THREAD_CAP=5、登记 7 ⇒ default 设成 5，实际「$output」"
     checked=$((checked + 1))
-    if env SINGLEFS_THREAD_CAP=0 bash "$tree" default touch "$scratch/ran-cap-zero" 2>"$scratch/cap-zero.stderr"; then status=0; else status=$?; fi
+    if env SINGLEFS_THREAD_CAP=0 bash "$tree/scripts/hosts/capped.sh" default touch "$scratch/ran-cap-zero" 2>"$scratch/cap-zero.stderr"; then status=0; else status=$?; fi
     [[ "$status" == 2 && ! -e "$scratch/ran-cap-zero" ]] || default_failed "SINGLEFS_THREAD_CAP=0 ⇒ default 拒、退 2、不起命令，实际退 $status"
     for case_name in missing broken; do
         checked=$((checked + 1))
         if [[ "$case_name" == missing ]]; then tree="$(default_tree missing MISSING)"; else tree="$(default_tree broken 'abc  # 样本理由')"; fi
-        if env -u SINGLEFS_THREAD_CAP bash "$tree" default touch "$scratch/ran-$case_name" 2>"$scratch/$case_name.stderr"; then status=0; else status=$?; fi
+        if env -u SINGLEFS_THREAD_CAP bash "$tree/scripts/hosts/capped.sh" default touch "$scratch/ran-$case_name" 2>"$scratch/$case_name.stderr"; then status=0; else status=$?; fi
         if [[ "$status" != 2 || -e "$scratch/ran-$case_name" ]] || ! grep -q '✗' "$scratch/$case_name.stderr"; then
             default_failed "登记$([[ "$case_name" == missing ]] && echo 文件不在 || echo 写坏) ⇒ default 拒（退 2、stderr 有拒绝标记、不起命令），实际退 $status"
         fi

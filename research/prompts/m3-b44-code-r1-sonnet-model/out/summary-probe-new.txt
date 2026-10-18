@@ -1,0 +1,2 @@
+probe-new: probe mount=ok
+probe-new: probe publish=panic 位置条目按设备身份严格升序（I-2.5），整条全零的空指针（empty_root）豁免：盘上读来、要照抄写回的指针在 recovery::rebuild_version 判过

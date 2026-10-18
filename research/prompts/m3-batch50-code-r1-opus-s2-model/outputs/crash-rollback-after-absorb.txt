@@ -1,2 +1,0 @@
-name=plan scenario=rollback-after-absorb leaves_before=[(1, 233)] leaves_after=[(1, 233), (234, 1)] retirement_records=1 writes=21 segments=4 largest_segment=16 closed_form_state_count=65543 torn_state_count=65548
-name=crash scenario=rollback-after-absorb states=65548 violations=0 first_violation=None checker_red=0 checker_first={} failed_states=0 no_file_states=0 evaluated=["I-3.13:65548", "I-9.30:65548", "I-9.31:65548", "I-9.32:65548", "I-9.33:65548", "I-9.34:65548", "I-9.35:65548"]

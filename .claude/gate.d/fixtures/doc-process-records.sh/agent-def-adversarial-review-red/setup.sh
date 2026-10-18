@@ -22,4 +22,4 @@ printf '# demo\n\n1. 跑完贴原样输出与退出码。\n' > .claude/agents/de
 printf '# 共用约束\n\n- 只写写范围与草稿目录。\n' > .claude/agent-common.md
 printf '# 主 agent\n\n职责与交回怎么读写在这里。\n' > .claude/main-agent.md
 printf '\n路径改写：旧路径换成新路径。\n' >> research/prompts/old-r1-main-verification.md
-printf '# demo 第一轮：主 agent 核实\n\n改动：.claude/agents/demo.md 第 1 步多贴退出码。三条腿都没打中。\n' > research/prompts/demo-r1-main-verification.md
+printf '# demo 第一轮：主 agent 核实\n\n改动：.claude/agents/demo.md 第 1 步多贴退出码。三条腿都没打中。\n\n## 这一轮被判过的文件\n\n- .claude/agents/demo.md\n' > research/prompts/demo-r1-main-verification.md

@@ -33,7 +33,7 @@ required-inputs: 禁读清单, 草稿目录, 背景材料, 判决
 
 ## 写范围
 
-- 报告文件、模型目录、草稿目录。除此之外不写。冻结副本（主 agent 建的开工快照、`~/.local/share/singlefs/work/<轮>-frozen/` 这类）只读：要改、要编译先拷进自己的草稿目录。模型目录里的 `tools/rerun.sh` 从 `scripts/agents/three-way-rerun-template.sh` 拷，只改 `rerun_steps` 那一段；仓根与冻结副本用 `--repo`、`--frozen` 传，不从脚本自身的路径推。
+- 报告文件、模型目录、草稿目录。除此之外不写。冻结副本（主 agent 建的开工快照、`~/.local/share/singlefs/work/<轮>-frozen/` 这类）只读：要改、要编译先拷进自己的草稿目录。模型目录里的 `<模型目录>/tools/rerun.sh` 从 `scripts/agents/three-way-rerun-template.sh` 拷，只改 `rerun_steps` 那一段；仓根与冻结副本用 `--repo`、`--frozen` 传，不从脚本自身的路径推。
 
 ## 产出
 

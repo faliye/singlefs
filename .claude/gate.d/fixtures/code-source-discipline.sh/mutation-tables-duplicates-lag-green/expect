@@ -1,0 +1,9 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=· 重复行滞后 2 组（.claude/gate.d/mutation-duplicates-lag.tsv 登记、这一格不判红
+want=crates/mutations.tsv M_分配代取发布代；M_分配代取发布代另起的名字
+want=scripts/mutation/tables/e1_sample.tsv M1_样本；M2_同一改法另起的名字
+want=✓ 1 个实验二进制都有成形的变异表，2 条变异的原文各命中源码一次
+want=1 张研究变异表里没有两行除变异名外各列全同；重复行滞后 2 组（.claude/gate.d/mutation-duplicates-lag.tsv 登记 2 行，与基准 HEAD 那一版按组比，没涨）
+want=crates/mutations.tsv 2 条的原文各命中源码一次
+want=mutation-tables：绿

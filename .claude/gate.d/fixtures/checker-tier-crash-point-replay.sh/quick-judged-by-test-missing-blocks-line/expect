@@ -1,0 +1,7 @@
+exit=1
+want=crash-case:plain-stream：全部块都有键相同的判定、没有红（块 2：复用 2、没有判定 0、红 0、拒算 0）
+want=✗ crash-case:fault-injection-given-states：实跑退 0，块那一行不对（crash-case-blocks --ran 退 4：日志里以「CRASH_CASE_BLOCKS 」开头的行读到 0 行（每条流一行，至少一行））
+want=→ 怎么办：看它的日志
+want=✗ 1 条登记了 red-blocks=judged-by-test 的崩溃枚举用例快档实跑红：crash-case:fault-injection-given-states
+want=逐格：crash-case-replay：红；feature-gated-tests：无对象可判
+want=✗ 快档有 1 格判红：crash-case-replay（各自的出路在上面）

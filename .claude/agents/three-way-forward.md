@@ -34,7 +34,7 @@ required-inputs: 禁读清单, 草稿目录, 背景材料, 报告
 
 ## 写范围
 
-- 报告文件、模型目录、草稿目录。除此之外不写。模型目录里的 `tools/rerun.sh` 从 `scripts/agents/three-way-rerun-template.sh` 拷，只改 `rerun_steps` 那一段；仓根与冻结副本用 `--repo`、`--frozen` 传，不从脚本自身的路径推。
+- 报告文件、模型目录、草稿目录。除此之外不写。模型目录里的 `<模型目录>/tools/rerun.sh` 从 `scripts/agents/three-way-rerun-template.sh` 拷，只改 `rerun_steps` 那一段；仓根与冻结副本用 `--repo`、`--frozen` 传，不从脚本自身的路径推。
 
 ## 产出
 

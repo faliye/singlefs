@@ -1,2 +1,0 @@
-name=model_rerun leg=r1-sonnet same=11 DIFF=1
-name=model_rerun leg=r1-opus same=20 DIFF=1

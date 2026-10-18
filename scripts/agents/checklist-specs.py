@@ -20,13 +20,17 @@ quote-kb.py 报「标题『###』命中 9 次」。这里用参数列表直接�
 - 清单里标「抄」、理由不以「随」开头的行才取；
 - 标题行取 `文件@标题`；引言段行（「……正文：第 a-b 行」）取 `文件:a-b`；
 - 文件顶上的一、二级标题若紧跟着的引言段也标「抄」，两者合成一个 `文件:1-b`，免得 `@标题` 把整个文件抄进来；
+  引言段那一行的小节列必须写「第 a-b 行」，没写就判红（退出码 1，点名那一行，给改法）；
 - `--extra` 追加清单表达不了的按行补抄（例如欠账表里的某一行）。
-自证会红：`--selftest` 造一份带空格标题的清单，确认生成的取法里标题是一整条；再造一份父节标「不抄」、子节标「抄 / 随」的清单，确认判红。
+自证会红：`--selftest` 造一份带空格标题的清单，确认生成的取法里标题是一整条；再造一份父节标「不抄」、子节标「抄 / 随」的清单，确认判红；
+再造一份引言段标「抄」而小节列没有「第 a-b 行」的清单，确认退出码非 0、输出「✗」点名那一行并带「→」出路、不抛回溯。
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项的名字，括号里是那条「✗ 自检：」的开头）：
   CHECKLIST_SPECS_SPLIT_ON_SPACE=1  specs_from_checklist() 走回按空格拆取法的旧毛病
       带空格的标题（「✗ 自检：取法 」…「≠ 期望」）
   CHECKLIST_SPECS_BREAK=trust-follow  specs_from_checklist() 不判父节没被取到的「随」行
       父节没取到的「随」行（「✗ 自检：父节标「不抄」、子节标「抄 / 随」的清单应当判红，实际退出码 0」）
+  CHECKLIST_SPECS_BREAK=preamble-without-range  specs_from_checklist() 不判引言段标了抄却没有「第 a-b 行」（改前的样子：取区间时抛 AttributeError）
+      引言段缺区间（「✗ 自检：引言段标「抄」却没写「第 a-b 行」的清单应当」…）
   CHECKLIST_SPECS_BREAK=raw-arguments  main() 不先判 --help、不认的选项、选项缺值与读不了的文件（改前的样子）
       命令行那一格（「✗ 自检：命令行 ['--help'] 应当退 0」）
 """
@@ -71,6 +75,9 @@ def specs_from_checklist(checklist_path, extra_specs=()):
             level = len(re.match(r'#*', title).group(0))
             if level <= 2 and following and following[0] == path and not following[1].startswith('#') and following[2] == '抄':
                 line_range = re.search(r'第 (\d+)-(\d+) 行', following[1])
+                if line_range is None and os.environ.get('CHECKLIST_SPECS_BREAK') != 'preamble-without-range':
+                    sys.exit(f'✗ 清单里「{following[1]}」是「{title}」下面的引言段，标了抄，却没有「第 a-b 行」\n'
+                             '  → 改清单那一行，小节那一列写成「……正文：第 a-b 行」')
                 specs.append(f'{path}:1-{line_range.group(2)}')
                 merged_preamble.add(index + 1)
                 continue
@@ -147,6 +154,18 @@ def selftest():
             print(f'  ✗ 自检：父节标「不抄」、子节标「抄 / 随」的清单应当判红，实际退出码 {child.returncode}：{child.stderr[-200:]}')
             print('    → 看 uncarried_follow_rows()；CHECKLIST_SPECS_BREAK=trust-follow 设着的话这里本来就该红')
             return 1
+        # 引言段标了抄、小节列却没有「第 a-b 行」：退出码非 0，「✗」点名那一行并带「→」出路，不抛 traceback
+        no_range = os.path.join(directory, 'no-range.md')
+        open(no_range, 'w', encoding='utf-8').write(
+            f'### 小节清单：`{kb}`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n'
+            '| ## 样本 —— 已定 | 抄 | 顶 |\n| （样本 标题之下的开篇正文，没写区间） | 抄 | 开篇 |\n')
+        child = subprocess.run([sys.executable, os.path.abspath(__file__), no_range], capture_output=True, text=True)
+        said = child.stdout + child.stderr
+        if child.returncode == 0 or '✗' not in said or '→' not in said or '没写区间' not in said or 'Traceback' in said:
+            print(f'  ✗ 自检：引言段标「抄」却没写「第 a-b 行」的清单应当退非 0、输出「✗」点名那一行并带「→」出路、不抛 traceback，'
+                  f'实际退 {child.returncode}：{said[-300:]}')
+            print('    → 看 specs_from_checklist() 取引言段区间那一支；CHECKLIST_SPECS_BREAK=preamble-without-range 设着的话这里本来就该红')
+            return 1
         # 命令行：--help / -h 打文件头的用法退 0；不认的选项退 2；清单或正文读不了报文件名与出路、不抛 traceback
         cli_cases = [(['--help'], 0, '用法：'), (['-h'], 0, '用法：'), (['--bogus'], 2, '不认的选项：--bogus'),
                      ([checklist, '--bogus'], 2, '不认的选项：--bogus'),
@@ -161,7 +180,7 @@ def selftest():
                       f'实际退 {child.returncode}：{said[-300:]}')
                 print('    → 看 main() 开头那几道判；CHECKLIST_SPECS_BREAK=raw-arguments 设着的话这里本来就该红')
                 return 1
-    print(f'  ✓ 自检通过：顶部标题与引言合成一个行区间，带空格的标题是一整条取法，父节没取到的「随」行判红（查了 3 条）；'
+    print(f'  ✓ 自检通过：顶部标题与引言合成一个行区间，带空格的标题是一整条取法，父节没取到的「随」行判红、引言段没写区间判红（查了 4 条）；'
           f'命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的清单与正文退 2 带出路')
     return 0
 

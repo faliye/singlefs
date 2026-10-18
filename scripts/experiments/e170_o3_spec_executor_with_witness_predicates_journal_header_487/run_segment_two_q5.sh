@@ -100,20 +100,26 @@ grep -E '^name=freeze(_seed)? ' "$S1B" | grep -v ' arm=' > "$SCRATCH/v2-487-free
 NEW_GAPS="$(comm -13 <(cut -f1 "$V2/spec-gaps.tsv" | sort) <(cut -f1 "$V487/spec-gaps.tsv" | sort) | paste -sd, -)"  # 格式补丁新记的欠一句
 echo "name=new_gaps identifiers=${NEW_GAPS:-none}" >> "$STATUS"
 
-run_executor() {  # <版本目录> <导出目录> <批> <产物>
-  (cd "$1" && python3 executor_main.py --dumps "$2" --batches "$3" --workers "$WORKERS" --output "$4")
+run_executor() {  # <版本：v487|v2> <导出目录> <批> <产物>；版本按名字取 V487 / V2，执行器在那一版的目录里起
+  local version_directory
+  case "$1" in
+    v487) version_directory="$V487" ;;
+    v2) version_directory="$V2" ;;
+    *) echo "  ✗ run_executor：认不出的版本 $1" >&2; echo "  → 怎么办：写 v487 或 v2" >&2; return 2 ;;
+  esac
+  (cd "$version_directory" && python3 executor_main.py --dumps "$2" --batches "$3" --workers "$WORKERS" --output "$4")
 }
 judge_images() {  # <执行器目录> <冻结参照> <输入名> <导出目录> <产物> [已知坏镜像目录]
   local known=(); [ $# -ge 6 ] && known=(--known-bad-dir "$6")
   (cd "$V2" && python3 comparator_bad_image_judge.py --executor-directory "$1" --input-label "$3" --dumps "$4" "${known[@]}" \
      --freeze-reference "$2" --output "$5")
 }
-step v2-487-z1 run_executor "$V487" "$Z1" 1,2,3 "$P-v2-487-z1.out"
-step v2-487-z5 run_executor "$V487" "$Z5" 1,2,3 "$P-v2-487-z5.out"
+step v2-487-z1 run_executor v487 "$Z1" 1,2,3 "$P-v2-487-z1.out"
+step v2-487-z5 run_executor v487 "$Z5" 1,2,3 "$P-v2-487-z5.out"
 step v2-487-z3-images judge_images "$V487" "$SCRATCH/v2-487-freeze-reference.out" Z3 "$Z3" "$P-v2-487-z3-images.out"
 step v2-487-z4-images judge_images "$V487" "$SCRATCH/v2-487-freeze-reference.out" Z4 "$Z4" "$P-v2-487-z4-images.out" "$ZKB"
-step pc-v2-z1 run_executor "$V2" "$Z1" 1,2 "$P-pc-v2-z1.out"
-step pc-v2-z5 run_executor "$V2" "$Z5" 1,2 "$P-pc-v2-z5.out"
+step pc-v2-z1 run_executor v2 "$Z1" 1,2 "$P-pc-v2-z1.out"
+step pc-v2-z5 run_executor v2 "$Z5" 1,2 "$P-pc-v2-z5.out"
 step pc-v2-z3-images judge_images "$V2" "$V2_FREEZE" Z3 "$Z3" "$P-pc-v2-z3-images.out"
 step pc-v2-z4-images judge_images "$V2" "$V2_FREEZE" Z4 "$Z4" "$P-pc-v2-z4-images.out" "$ZKB"
 step record-paths bash -c "cd '$V487' && python3 run_q5_record_path_counts.py --executor-directory '$V487' --states Z1:'$Z1':1,2,3 \
@@ -121,11 +127,12 @@ step record-paths bash -c "cd '$V487' && python3 run_q5_record_path_counts.py --
 step format-constants bash -c "cd '$V487' && python3 comparator_q5_format_constants.py --executor-directory '$V487' --tree '$TREE' \
   --working-tree '$ROOT' --output '$P-format-constants.out'"
 
-recopy_check() {  # <照抄后的装置> <核对脚本>：读法 18、19 的照抄核对；照抄前的装置取 git 里那一次提交（12.12 第 2 条）
-  (cd "$ROOT" && python3 "$2" "$SCRATCH/e171-before-$BEFORE_COMMIT.rs" "$1" "$TEST_FILE" "${IKB#"$ROOT"/}/known-bad-o2.tsv" "$IMAGE_RS")
+recopy_check() {  # <照抄后的装置> [变异过的核对脚本]：读法 18、19 的照抄核对；核对脚本缺省是 V487 里的 run_known_bad_recopy_check.py，
+  # 变异那一步给它在草稿里改出来的那一份；照抄前的装置取 git 里那一次提交（12.12 第 2 条）
+  (cd "$ROOT" && python3 "${2:-$V487/run_known_bad_recopy_check.py}" "$SCRATCH/e171-before-$BEFORE_COMMIT.rs" "$1" "$TEST_FILE" "${IKB#"$ROOT"/}/known-bad-o2.tsv" "$IMAGE_RS")
 }
 git -C "$ROOT" show "$BEFORE_COMMIT:$DEVICE" > "$SCRATCH/e171-before-$BEFORE_COMMIT.rs"
-step known-bad-recopy recopy_check "$DEVICE" "$V487/run_known_bad_recopy_check.py" > "$PB.out"
+step known-bad-recopy recopy_check "$DEVICE" > "$PB.out"
 pc3_copy() {  # Q5-pc3（12.14）：照抄后的装置复制一份，序号 5 那一条目标名之后第一个数加 1，目标名不动（重导准备第三趟草稿 make_pc3_copy.py 的同一取法）
   python3 - "$ROOT/$DEVICE" "$SCRATCH/pc3-device.rs" <<'PY'
 import re, sys
@@ -145,7 +152,7 @@ with open(destination, "x", encoding="utf-8") as handle:
     handle.write("\n".join(lines))
 PY
 }
-pc3_run() { pc3_copy && recopy_check "$SCRATCH/pc3-device.rs" "$V487/run_known_bad_recopy_check.py"; }
+pc3_run() { pc3_copy && recopy_check "$SCRATCH/pc3-device.rs"; }
 step known-bad-recopy-pc3 pc3_run > "$PB-pc3.out"  # 期望退 3（复制件上照抄前后不同恰 1），不算失败的步
 recopy_mutations() {  # XC8、XC9（12.14）：变异表里 XC 两行逐条在草稿副本上替换（原文在核对脚本里恰好命中 1 次），XC8 跑 pc3 复制件、XC9 跑真的照抄后装置
   # 抓到 = 退出码或判决行与同一输入上没变异那一趟（$PB-pc3.out / $PB.out 的末行）不同；12.14 点名的那一格（照抄前后不同）另报前后两个数

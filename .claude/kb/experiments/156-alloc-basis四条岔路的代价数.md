@@ -1,4 +1,4 @@
-## E156 alloc-basis 四条岔路的代价数 —— 部分已跑（2026-09-26 第 4 次重跑：前提 1 成立（当天的代码上「记录已持久、根槽没持久」的崩溃之后可写挂载仍造得出洞）、前提 2 不成立（两个 F 口径在抬 F 那一串上合成一个）⇒ 岔路单第 3 行失效、不量；前提 3 只有岔路 2 那一族按旧式子定义、Hh 历史碰不到新准入式子；岔路单第 1 行在 38 条排得下的历史 × 「实」「每」两个回收时点上量完、按登记的够判条件够判：12 个取样点上 Q1c-前 都越过 2 槽（h_缺 = 1 时已 10 槽）、Q1d 都随 h_缺 增长，F1 触发；岔路单第 1 行用户 2026-09-27 定留到里程碑三、要考虑重排算法；入库装置，确定性，17 单测 / 装置的 22 条变异全抓；岔路单第 2、7 行用户已定不量；2026-10-05 第 5 次重跑：core 断言之后 W7 那一格的阳性对照换成 PC-钉门槛、6 个取样点两列全看到；第 4 次读数在新 `crates/` 上规范化之后 294 行不同（F1 仍触发，Q1d 在「实」列 4 个取样点不再随 h_缺 增长，K10 在 34 个观测点不符），归属跑证明不是 31-1 带来的，哪一份承重交主 agent 定；2026-10-05 第 6 次重跑：回收门槛照用户 2026-10-05 定乙读（挂载时读回全零的根环槽钉在它可能住过的最旧 txg）之后，38 格 K10、F24 都是 0，副本里去掉 core 的全零钉住时两项都红在推出来的 34 个观测点上；「实」列与第 5 次逐字段相同，「每」列随之与「实」列相同，Q1d 在「每」列 4 个取样点由随 h_缺 增长变成不单调，F1 仍触发、Q1c-前 判定不变；PC-钉门槛 六格两列与第 5 次逐字节相同；单测 19 条与变异 M45–M47 没跑，归提交时）
+## E156 alloc-basis 四条岔路的代价数 —— 部分已跑（2026-09-26 第 4 次重跑：前提 1 成立（当天的代码上「记录已持久、根槽没持久」的崩溃之后可写挂载仍造得出洞）、前提 2 不成立（两个 F 口径在抬 F 那一串上合成一个）⇒ 岔路单第 3 行失效、不量；前提 3 只有岔路 2 那一族按旧式子定义、Hh 历史碰不到新准入式子；岔路单第 1 行在 38 条排得下的历史 × 「实」「每」两个回收时点上量完、按登记的够判条件够判：12 个取样点上 Q1c-前 都越过 2 槽（h_缺 = 1 时已 10 槽）、Q1d 都随 h_缺 增长，F1 触发；岔路单第 1 行用户 2026-09-27 定留到里程碑三、要考虑重排算法；入库装置，确定性，第 4 次重跑时 17 单测 / 装置的 22 条变异全抓；岔路单第 2、7 行用户已定不量；2026-10-05 第 5 次重跑：core 断言之后 W7 那一格的阳性对照换成 PC-钉门槛、6 个取样点两列全看到；第 4 次读数在新 `crates/` 上规范化之后 294 行不同（F1 仍触发，Q1d 在「实」列 4 个取样点不再随 h_缺 增长，K10 在 34 个观测点不符），归属跑证明不是 31-1 带来的，哪一份承重主 agent 已认定第 5 次产物（`e156-r5-prereg.md` 末尾「主 agent 认定：第 5 次交回与 S11 两边查」第 2 条；第 4 次产物当那棵树的记录留着，不再承重）；2026-10-05 第 6 次重跑：回收门槛照用户 2026-10-05 定乙读（挂载时读回全零的根环槽钉在它可能住过的最旧 txg）之后，38 格 K10、F24 都是 0，副本里去掉 core 的全零钉住时两项都红在推出来的 34 个观测点上；「实」列与第 5 次逐字段相同，「每」列随之与「实」列相同，Q1d 在「每」列 4 个取样点由随 h_缺 增长变成不单调，F1 仍触发、Q1c-前 判定不变；PC-钉门槛 六格两列与第 5 次逐字节相同；单测 19 条与变异 M45–M47 没跑，归提交时）
 
 <!-- doc-lint:not-numbers K1 K8 S1 S2 S3 S4 S5 S9 V1 V2 V3 V6 V7 V8 V10 V11 V13 F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F16 Q1 Q2 Q3 Q7 R1 R2 R3 R4 R5 R6 R7 R8 G7 G8 G12 G26 G27 G28 H0 HF K9 U5 U7 U8 U11 U13 F23 F24 M32 M34 A10 A14 F26 F27 F28 F29 F30 K10 K15 L1 L3 M35 M44 S11 S13 S14 U14 U19 V18 W7 W14 P7 Q1r5a Q1r5b Q2d R1a R1b R1c R1d R2a R2b R2c K16 L6 M45 M46 M47 U20 F31 F32 F33 F34 F35 V19 V20 S15 S16 S17 S18 M36 M42 -->
 本文里 K1、锚1/锚2/锚3（对应登记「七」第二类锚点表逐行的本地简写，不写成编号形状——kb 别的登记表已经用同一形状登记过别的含义，这里避开撞号）、K8、K9、S1–S5、S9、V1–V8、V10、V11、V13、F1–F14、F16、R1–R8、Q1a–Q1f、Q2a/Q2b/Q2c、Q3a–Q3e、Q7a–Q7f、U5、U7、U8、G7、G27、G12、甲-T1、F-扣、H0、HR、HK、HK-F0、HF、Hh(k)、HX、HY、β0/β1/β2/βK-w/r/f/l2/β_syn/β_F0、Bd(k)、Bk1/Bk2/Bk3
@@ -19,7 +19,7 @@
 
 ### 第 6 次重跑（2026-10-05）：回收门槛照定乙读之后 38 格 K10、F24 都是 0，去掉 core 的全零钉住正好红在推出来的 34 点
 
-重跑登记 `research/prompts/e156-r6-prereg.md`（差分形态，以第 5 次登记为底，含末尾「主 agent 认定：第 6 次登记交回」六条），问题单 `research/prompts/e156-r6-questions.md` 三行：第 1 行（装置的回收门槛照定乙读之后，今天的 `crates/` 上 38 格的 K10 与 F24 还有没有不符的点，另在副本里去掉 core 的全零钉住证这一判分得出）、第 2 行（岔路单第 1 行的读数在新门槛下各是什么、与第 5 次产物比哪几格变了，只报不重下判决）、第 3 行（PC-钉门槛 六格两列还都判「不符」、都含 6S − 1 吗）。起因是第 5 次的 K10 34 点不符：core 照用户定乙，把挂载那一刻读回全零的根环槽钉在它可能住过的最旧 txg（`crates/singlefs-core/src/allocator.rs` 的 `RootRingOccupant::AllZeroAtMount`），装置与锚点模型照的是旧读法。
+重跑登记 `e156-r6-prereg.md`（差分形态，以第 5 次登记为底，含末尾「主 agent 认定：第 6 次登记交回」六条），问题单 `e156-r6-questions.md` 三行：第 1 行（装置的回收门槛照定乙读之后，今天的 `crates/` 上 38 格的 K10 与 F24 还有没有不符的点，另在副本里去掉 core 的全零钉住证这一判分得出）、第 2 行（岔路单第 1 行的读数在新门槛下各是什么、与第 5 次产物比哪几格变了，只报不重下判决）、第 3 行（PC-钉门槛 六格两列还都判「不符」、都含 6S − 1 吗）。起因是第 5 次的 K10 34 点不符：core 照用户定乙，把挂载那一刻读回全零的根环槽钉在它可能住过的最旧 txg（`crates/singlefs-core/src/allocator.rs` 的 `RootRingOccupant::AllZeroAtMount`），装置与锚点模型照的是旧读法。
 
 **起跑前提与开跑前的核**（登记 S15、S2、S3）：
 
@@ -34,7 +34,7 @@
 
 **装置怎么改的**（登记第五节 5.3）：`crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 5819 行 → 6205 行，19 条单测（`grep -c '#\[test\]'`，第 5 次 18）。挂载点在交给 `mount_writable` 之前读切段镜像的 3S 个槽，分自证过、读回全零、读坏三类（`read_root_ring_slot_content`）；挂载交回之后按新实例第一个 txg 给每个全零槽取「落到它、小于第一个 txg 的最小 txg」，整张换进 `HhRunState` 的钉住表，打一行 `name=all_zero_pins_at_mount`。`read_hh_state` 在算门槛之前对钉住表里每一槽读这一刻那一槽的根：根的 txg ≥ 第一个 txg 算这个进程写掉了、< 第一个 txg 算重读读出（另计 `released_by_reread_only`），都不是的照旧钉着、并入门槛；`reclaim_threshold_read_from_the_ring_image` 的函数体与 `let every_publish_floor = ring_threshold;` 一个字没动。锚点模型照登记命令四的补丁改同一处。每格在 `name=q1_cell_checks` 之后打 `name=all_zero_pin_cell`，第二段 `name=failure_clauses` 之后打 `name=all_zero_pin_summary`；已有的行一行都没改格式。新单测 U20 与变异 M45–M47（`crates/mutations.tsv` 里带「M45（第 6 次重跑登记第九节）」「M46（…）」「M47（…）」的三行）。只对这一份文件跑了 `rustfmt --edition 2021`，`rustfmt --check` 无输出（第 4999 行起的 `use` 块随之改好）。`compile-then-swap.py` 在仓副本里 `cargo build` 与 `cargo test --no-run` 都编过才换进主工作区（换上之后 sha256 `3129ec95e2f129ef0a49f1be15a998aae5c4abb508615a8663cdece91d1ef279`）。
 
-**产物**：主产物 `research/results/e156-alloc-basis-counts-2026-10-05-r2.out`（4063 行，sha256 `1c8812b19456165b10b6cd01f3e00fb2ddd1e3673f700cedac151f5da778176b`，完成标记 `E7RESULT name=done emitted=4063`），用仓根 `target/release/` 的二进制（sha256 `1227561466a0008a1b1a7004bafe73d1d71cff7b1af1a51eaab19c40416f2a48`）跑，同一个二进制再跑一遍逐字节相同；`replay.sh` 的驱动用 debug 二进制，debug 一遍约 13 分钟，执行员前台跑不完，只跑了前 225 秒，那 1803 行与 release 产物的前 1803 行逐字节相同，整份 debug 复跑交 `replay.sh` 的 exact 比对。判别力对照 `research/results/e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out`（4063 行，sha256 `eaf6b8b63d3b1d899377559a5f09fb32f6774cd14031f41567898c62873679ff`），副本里对 core 的改动 `research/results/e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.patch`（`mount.rs` 一行，挂载时一个全零槽都不装进根环表，与调查报告 x1 补丁的块体逐行相同、只差行号），同一份装置源码在副本里另编 release。
+**产物**：主产物 `research/results/e156-alloc-basis-counts-2026-10-05-r2.out`（4063 行，sha256 `1c8812b19456165b10b6cd01f3e00fb2ddd1e3673f700cedac151f5da778176b`，完成标记 `E7RESULT name=done emitted=4063`），用仓根 `target/release/` 的二进制（sha256 `1227561466a0008a1b1a7004bafe73d1d71cff7b1af1a51eaab19c40416f2a48`）跑，同一个二进制再跑一遍逐字节相同；`replay.sh` 的驱动用 debug 二进制，debug 一遍约 13 分钟，执行员前台跑不完，只跑了前 225 秒，那 1803 行与 release 产物的前 1803 行逐字节相同，整份 debug 复跑交 `replay.sh` 的 exact 比对。判别力对照 `e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out`（4063 行，sha256 `eaf6b8b63d3b1d899377559a5f09fb32f6774cd14031f41567898c62873679ff`），副本里对 core 的改动 `e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.patch`（`mount.rs` 一行，挂载时一个全零槽都不装进根环表，与调查报告 x1 补丁的块体逐行相同、只差行号），同一份装置源码在副本里另编 release。
 
 **第 1 行：照定乙读门槛之后 38 格 K10、F24 都是 0**（登记 R1a、R1b）。主产物 `:4050`、`:4048`、`:4049`：
 
@@ -45,14 +45,14 @@ E7RESULT name=all_zero_pin_summary cells=38 cells_with_pins=16 pins_installed=64
 
 逐格：`grep ' name=q1_cell_checks ' research/results/e156-alloc-basis-counts-2026-10-05-r2.out | grep -o 'k10_violation_points=[0-9]*' | sort | uniq -c` → `38 k10_violation_points=0`；同一命令换 `real_every_differ_points` → `38 real_every_differ_points=0`；`failure_clauses` 行（`:4048`）的 `f24_real_every_differ_points=0`。38 格是 S ∈ {4, 8, 16} × ρ ∈ {1, 1/4} 的 k = 0 六格、洞位置为前与为后各 16 格。按登记第八节 8.2 的写法：K10、F24 在这 38 个取样点上一致为 0，只在这 38 个取样点上。
 
-**判别力（登记 R1c，PC-全零钉）**：同一份装置配去掉全零钉住的 core，判别力对照 `:4050` 的 `s11_k10_violation_points=34`、`:4048` 的 `f24_real_every_differ_points=34`（整行在「判决行点名」）。不为 0 的观测点集合用 `research/results/e156-alloc-basis-counts-2026-10-05-r6-point-sets.py`（只读两份产物与锚点脚本的两份输出）与登记 L6 × 两个 ρ 比，输出 `research/results/e156-alloc-basis-counts-2026-10-05-r6-point-sets.txt` 里 `L6_points_x_rho=` 与 `pc:` 开头的两行：
+**判别力（登记 R1c，PC-全零钉）**：同一份装置配去掉全零钉住的 core，判别力对照 `:4050` 的 `s11_k10_violation_points=34`、`:4048` 的 `f24_real_every_differ_points=34`（整行在「判决行点名」）。不为 0 的观测点集合用 `e156-alloc-basis-counts-2026-10-05-r6-point-sets.py`（只读两份产物与锚点脚本的两份输出）与登记 L6 × 两个 ρ 比，输出 `e156-alloc-basis-counts-2026-10-05-r6-point-sets.txt` 里 `L6_points_x_rho=` 与 `pc:` 开头的两行：
 
 ```
 L6_points_x_rho=34
 pc: k10_points=34 f24_points=34 k10_eq_L6=True f24_eq_L6=True k10_minus_L6=[] L6_minus_k10=[] f24_minus_L6=[] L6_minus_f24=[]
 ```
 
-即 K10、F24 都红在前洞格 txg h + 3S − 1 那一个观测点上（S = 4 的 16、21，S = 8 的 28、33、39、45，S = 16 的 52、57、63、69，按 k 取前 k 个），后洞格与 k = 0 的格一点不红；作废 V19 与停机 S16 都没触发。两个输入文件是登记命令四 `--dump --pins` 与命令五的原样输出：`research/results/e156-alloc-basis-counts-2026-10-05-r6-anchor-pins.txt`（`8a222fe4…`）、`research/results/e156-alloc-basis-counts-2026-10-05-r6-anchor-lowered.txt`（`9d5cf9ce…`）。
+即 K10、F24 都红在前洞格 txg h + 3S − 1 那一个观测点上（S = 4 的 16、21，S = 8 的 28、33、39、45，S = 16 的 52、57、63、69，按 k 取前 k 个），后洞格与 k = 0 的格一点不红；作废 V19 与停机 S16 都没触发。两个输入文件是登记命令四 `--dump --pins` 与命令五的原样输出：`e156-alloc-basis-counts-2026-10-05-r6-anchor-pins.txt`（`8a222fe4…`）、`e156-alloc-basis-counts-2026-10-05-r6-anchor-lowered.txt`（`9d5cf9ce…`）。
 
 **钉住簿记（登记 R1d）**：同一份输出第 4–7 行：
 
@@ -65,7 +65,7 @@ R1d_4: cells_with_bad_slots=[]
 
 68 次挂载（含第一段那两段历史）每次钉的 txg 集合与锚点脚本那一格挂载做完那一行的 `pinned` 相同，后洞格与 k = 0 一槽不钉；每格 `threshold_lowered_points` 等于 L6 那一格的点数；`released_by_reread_only` 全是 0、`bad_slots_at_mount` 与 `bad_slots_still_pinned` 全是 0，停机 S17、S18 不触发。锚点逐行相同（登记第七节 7.2 的最后一条断言）：主产物 `name=anchor_dump` 1092 行去掉前缀之后与命令四 `--dump` 的 `DUMP` 行 `cmp` 无输出（作废 V20 不触发）。
 
-**第 2 行：岔路单第 1 行的读数与第 5 次比**（登记 R2a–R2c，只报、不重下岔路单第 1 行的判决）。比较脚本 `research/results/e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.py`，输出 `research/results/e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.txt`（146 行）第 1 行：
+**第 2 行：岔路单第 1 行的读数与第 5 次比**（登记 R2a–R2c，只报、不重下岔路单第 1 行的判决）。比较脚本 `e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.py`，输出 `e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.txt`（146 行）第 1 行：
 
 ```
 pairs=102 unequal_pairs=42 only_old=0 only_new=0 differing_fields_real=0 differing_fields_every=122 differing_fields_unsplit=3 judgement_flips=8 other_judgement_changes=12
@@ -86,14 +86,14 @@ pairs=102 unequal_pairs=42 only_old=0 only_new=0 differing_fields_real=0 differi
 **判决行点名**（`grep -n 'name=verdict' <产物>`）：主产物 14 条（`:1217`、`:4050`–`:4062`），没有取值为 `false` 或 `not_run` 的字段，违例、不匹配、失败类的整数计数都是 0；`premise_two_answer=not_holds`、`fork_three=void_not_measured` 与第 5 次相同（前提 2 不成立、岔路单第 3 行失效）。判别力对照 14 条（行号同），不为 0 的两项：`s11_k10_violation_points=34`（登记 R1c 要的那一项）与 `s11_a15_real_below_points=16`（`:4050`；16 个前洞格各 1 点，「实」列 Q1a 低于锚点模型照定乙读算的树表下界，推的：core 不钉时在 txg h + 3S − 1 提前回收了一个树表单元；登记没写这一项的预期，对照不是被测状态）。完整行：
 
 ```
-E7RESULT name=verdict stage=second cells_run=38 cells_not_fitting=4 truncated_cells=0 v1_over_withheld_controls_void=0 v2_a10_every_mismatch_cells=0 v2_a12_every_nonzero_points=0 v2_a14_mismatch_points=0 v2_a15_every_below_points=0 v2_pc_pinned_floor_seen=true v2_pc_c2_seen=true v6_a11_mismatch_points=0 v6_devices_unequal_points=0 v6_pc_hole_not_seen_cells=0 v16_judge_cases_wrong=0 v17_a13_every_nonzero_points=0 s1_failures=0 s1h_root_ring_missing_points=0 s11_a10_real_mismatch_cells=0 s11_a12_real_nonzero_points=0 s11_a15_real_below_points=16 s11_k10_violation_points=34 s12_g_adm_nonzero=0 k8_mismatches=0 referenced_but_free_points=0 abandoned_or_unknown_root_points=0 anchor_rows_missing=0
+产物行见 git show 18b30adbfe94:e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out 第 4050 行（name=verdict）
 ```
 
 **它答不了的（第 6 次）**：① 内联单测 19 条（含新 U20）与 `crates/mutations.tsv` 里点着这个装置的 26 行变异（含 M45–M47）都没跑（checker 档，归提交时），只核了 26 行原文在新源码里各命中 1 次、M45–M47 三条同时施加在副本里 `cargo test --no-run` 编得过；② 这一族只造第一圈里的前洞，那一槽在 [0, 第一个 txg) 里只住得下一个 txg，「钉在最旧 txg」与「钉在能住的最大 txg」同值，分不出 core 钉的是哪一个；③ 「重读读出根才解开」那条路在这一族上一次没出现（`released_by_reread_only` 全 0），装置只计数、不证它；④ 读坏的槽、准入抬 F 的上限这一族不造；⑤ PC-全零钉 证 core 少钉全零槽时装置看得见，不证装置旁路自己读没读对定乙（那一半由锚点逐行相同与 U20 盯）；⑥ 主产物用 release 二进制跑，debug 那一份只比了前 1803 行；⑦ 「实」列与第 5 次相同，第 5 次之后 `crates/` 别的改动碰没碰这一族之外的量没查；⑧ 两个对照（PC-钉门槛、PC-全零钉）各自分得出它们要抓的那一类，合起来分不出三样：core 钉的是最旧 txg 还是最大 txg、重读解开、读坏的槽（第 32–33 批代码轮判决 `research/prompts/m3-formal-code-b33-r1-main-verification.md` 第二节 P5「两个对照分不分得出」一行，站住）；⑨ 变异 M36（`crates/mutations.tsv` 里带「M36（第 4 次重跑登记第九节）」的那一行：门槛改成「最新有效根 − 环里根数 + 1」、漏看洞槽里的旧根）在前洞格上可能少一块判别力（同一格表里「M36、M42」一行，攻方推的，没量）；M36 与 M42 无互相掩护（读码）。
 
 ### 第 5 次重跑（2026-10-05）：W7 那一格的对照换成 PC-钉门槛，第 4 次读数在新 `crates/` 上 294 行不同
 
-重跑登记 `research/prompts/e156-r5-prereg.md`（差分形态，其余各节同第 4 次登记 `e156-r4-prereg.md`），问题单 `research/prompts/e156-r5-questions.md` 两行：第 1 行（core 在分配器没装根环表而记了一条根时断言之后，装置里 W7 那一格的阳性对照 PC-分配器 造不出来，换成什么）、第 2 行（第 4 次已够判的读数在新 `crates/` 上还相不相同）。起因是用户定的 C551（`build_pool` 的分配器没有根环表）：`crates/singlefs-core/src/allocator.rs` 的 `record_root_written_by_this_process` 在没装根环表时 `expect`，消息以「分配器没装根环表却记了一条根」开头。
+重跑登记 `e156-r5-prereg.md`（差分形态，其余各节同第 4 次登记 `e156-r4-prereg.md`），问题单 `e156-r5-questions.md` 两行：第 1 行（core 在分配器没装根环表而记了一条根时断言之后，装置里 W7 那一格的阳性对照 PC-分配器 造不出来，换成什么）、第 2 行（第 4 次已够判的读数在新 `crates/` 上还相不相同）。起因是用户定的 C551（`build_pool` 的分配器没有根环表）：`crates/singlefs-core/src/allocator.rs` 的 `record_root_written_by_this_process` 在没装根环表时 `expect`，消息以「分配器没装根环表却记了一条根」开头。
 
 **起跑前提与开跑前的核**（登记第 5 次的停机 S13、S2、S3）：
 
@@ -108,7 +108,7 @@ E7RESULT name=verdict stage=second cells_run=38 cells_not_fitting=4 truncated_ce
 
 **装置怎么改的**（登记 5.5 的 e1–e4）：`crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 5783 行 → 5819 行。删 `HhAllocatorSource::WithoutRootRingPositiveControl`、`allocator_without_the_root_ring` 与 `main` 里 PC-分配器 那一块；`HhAllocatorSource` 与成员 `ProductPathWithRootRing` 名字不改（`name=q1_cell` 行打 `allocator={:?}`）；加 PC-钉门槛（格表之后、PC-多扣 之前，对格表里 `hole_count == 1` 且位置为后的 6 格用同一个 `judge_hole_history_outcome`，期望取同一 S 的 `anchor_model::tree_table_reclaim_lags`，6S − 1 现算为 `2 * E156_ROOT_RING_REGIONS * slots_per_region - 1`）；`name=verdict stage=second` 里 `v2_pc_allocator_seen` 换名 `v2_pc_pinned_floor_seen`；新单测 U19。`grep -n 'PoolAllocator::new(' crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` → `5041:        let mut allocator = PoolAllocator::new(`（`new_pool_file_creation_state` 里，第 5071 行 `install_root_ring_occupancy` 紧跟着装根环表）。单测数 `grep -c '#\[test\]' 同一文件` → `18`（第 4 次 17）。`compile-then-swap.py` 在草稿副本里 `cargo build` 与 `cargo test --no-run` 都编过才换进主工作区。
 
-**第 1 行：新对照 PC-钉门槛**。产物 `research/results/e156-alloc-basis-counts-2026-10-05.out`（3955 行，sha256 `a3d29fe0e31a570aca19db52a6fda9f7600017f43dbcfa856996d9126085931c`；同一个二进制再跑一遍与它逐字节相同，`cmp` 无输出）：
+**第 1 行：新对照 PC-钉门槛**。产物 `e156-alloc-basis-counts-2026-10-05.out`（3955 行，sha256 `a3d29fe0e31a570aca19db52a6fda9f7600017f43dbcfa856996d9126085931c`；同一个二进制再跑一遍与它逐字节相同，`cmp` 无输出）：
 
 ```
 E7RESULT name=pc_pinned_floor s=4 rho=1 k=1 position=back expected=[12] lags_real=[12,13,14,15,16,17,18,19,20,21,22,23,24] lags_every=[12,13,14,15,16,17,18,19,20,21,22,23,24] judge_real_mismatch=1 judge_every_mismatch=1 bound=23 contains_bound_real=true contains_bound_every=true seen_real=true seen_every=true
@@ -120,13 +120,13 @@ E7RESULT name=pc_pinned_floor s=16 rho=1/4 k=1 position=back expected=[48] lags_
 E7RESULT name=pc_pinned_floor_summary cells=6 seen_real_cells=6 seen_every_cells=6
 ```
 
-六格两列逐个报：Q1r5a（判定判「不符」）实、每两列都是 1；Q1r5b（滞后集合含 6S − 1）实、每两列都是 true；`v2_pc_pinned_floor_seen=true`（`research/results/e156-alloc-basis-counts-2026-10-05.out` 里 `name=verdict stage=second cells_run=` 那一行）。登记的够判条件满足（作废 V2 没触发、F28、F29 没触发）：新对照在 6 个取样点上证出了「A10 分得出真实分配器把回收推迟一圈」。它只证推迟，不证全程不回收（那一形由变异 M35 改写后的行盯，提交时跑），也不证 W7 那一格的核认得出没装根环表的分配器（那一件由 core 的单测接管）。滞后集合是 3S 到 6S 的整段（S = 4 时 12 到 24），不是只有 6S − 1 一个值；6S − 1 与 6S 是登记命令四算出的释放代 6、5 的滞后（`lag_bound_r5.py` 的输出 `release_first_free_lag=[(5, 28, 24), (6, 28, 23)]`），整段里别的值产物没按释放代拆开，没核（命令 `grep -c '^E7RESULT name=pc_pinned_floor ' research/results/e156-alloc-basis-counts-2026-10-05.out` → `6`，汇总行 `grep -c '^E7RESULT name=pc_pinned_floor_summary '` → `1`）。
+六格两列逐个报：Q1r5a（判定判「不符」）实、每两列都是 1；Q1r5b（滞后集合含 6S − 1）实、每两列都是 true；`v2_pc_pinned_floor_seen=true`（`e156-alloc-basis-counts-2026-10-05.out` 里 `name=verdict stage=second cells_run=` 那一行）。登记的够判条件满足（作废 V2 没触发、F28、F29 没触发）：新对照在 6 个取样点上证出了「A10 分得出真实分配器把回收推迟一圈」。它只证推迟，不证全程不回收（那一形由变异 M35 改写后的行盯，提交时跑），也不证 W7 那一格的核认得出没装根环表的分配器（那一件由 core 的单测接管）。滞后集合是 3S 到 6S 的整段（S = 4 时 12 到 24），不是只有 6S − 1 一个值；6S − 1 与 6S 是登记命令四算出的释放代 6、5 的滞后（`lag_bound_r5.py` 的输出 `release_first_free_lag=[(5, 28, 24), (6, 28, 23)]`），整段里别的值产物没按释放代拆开，没核（命令 `grep -c '^E7RESULT name=pc_pinned_floor ' e156-alloc-basis-counts-2026-10-05.out` → `6`，汇总行 `grep -c '^E7RESULT name=pc_pinned_floor_summary '` → `1`）。
 
 **第 2 行：第 4 次读数在新 `crates/` 上逐字段重比**（登记 Q2a、Q2b）。规范化：第 4 次产物 `e156-alloc-basis-counts-2026-09-26-r2.out`（4007 行）去掉带 `family=PC-allocator` 项的行、第一项是 `name=pc_allocator` 的行、`name=verdict stage=second` 行里的 `v2_pc_allocator_seen=` 一项；新产物去掉 `name=pc_pinned_floor`、`name=pc_pinned_floor_summary` 行与同一 verdict 行里的 `v2_pc_pinned_floor_seen=` 一项；「第一项」按行首 `E7RESULT ` 之后的第一个空白分隔项算。比对脚本与全部输出都在仓里：
 
 ```
-python3 research/results/e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.py e156-alloc-basis-counts-2026-09-26-r2.out research/results/e156-alloc-basis-counts-2026-10-05.out > research/results/e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt
-head -3 research/results/e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt
+python3 e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.py e156-alloc-basis-counts-2026-09-26-r2.out e156-alloc-basis-counts-2026-10-05.out > e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt
+head -3 e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt
 old_dropped_rows={'family=PC-allocator': 58, 'name=pc_allocator': 1} old_dropped_items=1
 new_dropped_rows={'name=pc_pinned_floor': 6, 'name=pc_pinned_floor_summary': 1} new_dropped_items=1
 lines_old=3948 lines_new=3948 equal=3654 unequal=294
@@ -141,30 +141,30 @@ Q2b 按登记的两类分（判决行名单取登记第六节）：
 | 判决行 | 60 | 160 | `q1c`（24）、`q1_cell_checks`（16）、`q1d`（6）、`q1c_front_threshold_moved`（6）、`verdict`（5）、`u13a_rollback_to_oldest_candidate`（1）、`geometry_sensitivity`（1）、`failure_clauses`（1） |
 | 计数行 | 234 | 522 | `q1_observation`（82）、`hole_recovery`（69）、`q1_trajectory`（48）、`q1_cell`（18）、`q1_trajectory_extra`（16）、`done`（1） |
 
-不同的行落在哪几格：`name=q1_cell` 的 Hh 行里洞位置为前的 16 格全部不同（k = 1、2、4 各 6、6、4 格），位置为后的只有 k = 2、k = 4 各 1 格，k = 0 的 6 格一格不同；`hole_recovery` 69 行只有一个键不同（`steps_after_root_slot_write` 在 `system_configuration_slot,system_configuration_slot` 之后多了 `,barrier,barrier`）；其余键见 `research/results/e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt`（979 行，每个不同的行逐键列旧值、新值）。判决层面的几处：
+不同的行落在哪几格：`name=q1_cell` 的 Hh 行里洞位置为前的 16 格全部不同（k = 1、2、4 各 6、6、4 格），位置为后的只有 k = 2、k = 4 各 1 格，k = 0 的 6 格一格不同；`hole_recovery` 69 行只有一个键不同（`steps_after_root_slot_write` 在 `system_configuration_slot,system_configuration_slot` 之后多了 `,barrier,barrier`）；其余键见 `e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt`（979 行，每个不同的行逐键列旧值、新值）。判决层面的几处：
 
 | 字段 | 第 4 次 | 新产物 |
 |---|---|---|
 | `failure_clauses` 的 `f24_real_every_differ_points` | 0 | 34 |
 | `verdict stage=second` 的 `s11_k10_violation_points` | 0 | 34 |
-| `geometry_sensitivity quantity=q1d_growth` 的 `result` | `consistent_on_12_sampling_points` | `unstable`（`research/results/e156-alloc-basis-counts-2026-10-05.out` 里 `name=geometry_sensitivity quantity=q1d_growth` 那一行，12 个取样点里「实」列的 s=4 ρ=1、s=4 ρ=1/4、s=8 ρ=1/4、s=16 ρ=1/4 四点 `not_monotonic`，其余 8 点 `grows_with_holes`） |
+| `geometry_sensitivity quantity=q1d_growth` 的 `result` | `consistent_on_12_sampling_points` | `unstable`（`e156-alloc-basis-counts-2026-10-05.out` 里 `name=geometry_sensitivity quantity=q1d_growth` 那一行，12 个取样点里「实」列的 s=4 ρ=1、s=4 ρ=1/4、s=8 ρ=1/4、s=16 ρ=1/4 四点 `not_monotonic`，其余 8 点 `grows_with_holes`） |
 | `verdict stage=second_group` 的 `q1d_growth` | 12 组全是 `grows_with_holes` | 4 组 `not_monotonic`（与 `geometry_sensitivity quantity=q1d_growth` 那一格的四点相同），8 组不变 |
-| `q1c_front_threshold_moved`（S = 4、ρ = 1、实 那一组，新产物 `research/results/e156-alloc-basis-counts-2026-10-05.out`、第 4 次 `research/results/e156-alloc-basis-counts-2026-09-26-r2.out` 各自的 `name=q1c_front_threshold_moved s=4 rho=1 timing=real` 那一行；「实」列 6 组都不同） | `threshold_between=10` `threshold_at_largest=18` | `threshold_between=18` `threshold_at_largest=20` |
+| `q1c_front_threshold_moved`（S = 4、ρ = 1、实 那一组，新产物 `e156-alloc-basis-counts-2026-10-05.out`、第 4 次 `research/results/e156-alloc-basis-counts-2026-09-26-r2.out` 各自的 `name=q1c_front_threshold_moved s=4 rho=1 timing=real` 那一行；「实」列 6 组都不同） | `threshold_between=10` `threshold_at_largest=18` | `threshold_between=18` `threshold_at_largest=20` |
 | `u13a_rollback_to_oldest_candidate` 的 `item1_slots` | 374 | 377 |
 
-没变的判决：`f1_front_above_two_groups` 仍是 12 组全在（`research/results/e156-alloc-basis-counts-2026-10-05.out` 里 `name=failure_clauses` 那一行），即 F1 在新 `crates/` 上照样触发；`name=verdict stage=first` 行（`:1214`）、`v2_a10_every_mismatch_cells`、`v2_a12_every_nonzero_points`、`v2_a14_mismatch_points`、`v2_a15_every_below_points`、`s1h_root_ring_missing_points` 都与第 4 次相同（`:3942`）。`name=verdict stage=second` 整行（`:3942`）：
+没变的判决：`f1_front_above_two_groups` 仍是 12 组全在（`e156-alloc-basis-counts-2026-10-05.out` 里 `name=failure_clauses` 那一行），即 F1 在新 `crates/` 上照样触发；`name=verdict stage=first` 行（`:1214`）、`v2_a10_every_mismatch_cells`、`v2_a12_every_nonzero_points`、`v2_a14_mismatch_points`、`v2_a15_every_below_points`、`s1h_root_ring_missing_points` 都与第 4 次相同（`:3942`）。`name=verdict stage=second` 整行（`:3942`）：
 
 ```
-E7RESULT name=verdict stage=second cells_run=38 cells_not_fitting=4 truncated_cells=0 v1_over_withheld_controls_void=0 v2_a10_every_mismatch_cells=0 v2_a12_every_nonzero_points=0 v2_a14_mismatch_points=0 v2_a15_every_below_points=0 v2_pc_pinned_floor_seen=true v2_pc_c2_seen=true v6_a11_mismatch_points=0 v6_devices_unequal_points=0 v6_pc_hole_not_seen_cells=0 v16_judge_cases_wrong=0 v17_a13_every_nonzero_points=0 s1_failures=0 s1h_root_ring_missing_points=0 s11_a10_real_mismatch_cells=0 s11_a12_real_nonzero_points=0 s11_a15_real_below_points=0 s11_k10_violation_points=34 s12_g_adm_nonzero=0 k8_mismatches=0 referenced_but_free_points=0 abandoned_or_unknown_root_points=0 anchor_rows_missing=0
+产物行见 git show 18b30adbfe94:e156-alloc-basis-counts-2026-10-05.out 第 3942 行（name=verdict）
 ```
 
-**Q2c 归属**：在仓副本里只把 31-1 对 `allocator.rs` 的断言块反着打回去（`record_root_written_by_this_process` 回到 `let Some(occupancy) = self.root_ring.as_mut() else { return; };`），用同一份装置、副本自己的编译目录跑一次，产物 `research/results/e156-alloc-basis-counts-2026-10-05-attribution-without-31-1.out`（3955 行），`cmp` 与 `research/results/e156-alloc-basis-counts-2026-10-05.out` 逐字节相同（两份 sha256 都是 `a3d29fe0…`）。不同不是 31-1 带来的，来自第 4 次产物之后别的批改过的 `crates/`（登记 W14）；登记第四节 P7 的预估（Q2a 相同）错了，F30 的触发条件（Q2c 判出不同来自 31-1）没满足。哪一批带来的没查（登记没立这个量）。
+**Q2c 归属**：在仓副本里只把 31-1 对 `allocator.rs` 的断言块反着打回去（`record_root_written_by_this_process` 回到 `let Some(occupancy) = self.root_ring.as_mut() else { return; };`），用同一份装置、副本自己的编译目录跑一次，产物 `e156-alloc-basis-counts-2026-10-05-attribution-without-31-1.out`（3955 行），`cmp` 与 `e156-alloc-basis-counts-2026-10-05.out` 逐字节相同（两份 sha256 都是 `a3d29fe0…`）。不同不是 31-1 带来的，来自第 4 次产物之后别的批改过的 `crates/`（登记 W14）；登记第四节 P7 的预估（Q2a 相同）错了，F30 的触发条件（Q2c 判出不同来自 31-1）没满足。哪一批带来的没查（登记没立这个量）。
 
 按登记，Q2a「不同」触发 S14 与 F26，K10 在「实」上 34 点不符触发 S11，三条都是交主 agent 的停机，不当结果、不改判据。读码推的一个线索（没跑过、没验）：`crates/singlefs-core/src/allocator.rs` 在第 5 次重跑时把挂载时读回全零的槽记成 `RootRingOccupant::AllZeroAtMount` 并把回收门槛钉在它可能住过的最旧 txg（`allocator.rs` 里 `TxgsARingSlotBadAtMountCanHold` 的文档注释，用户定乙），而装置 `read_hh_state` 里没有 `AllZero` 的处理（`grep -n 'AllZero' crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 无输出）；洞位置为前的格，崩溃那一次的根槽按推算是环第一圈里还没写过的槽（推的，没读产物核），与不同的格大体重合。这一条要对着 `crates/` 与装置两边查，不是这一份产物的结论。
 
-**判决行点名**（`grep -n 'name=verdict' research/results/e156-alloc-basis-counts-2026-10-05.out`）：14 条，行号 `1214`、`3942`–`3954`。没有取值为 `false` 或 `not_run` 的字段；整数计数里不为 0 的，名字表示违例的只有一个：`s11_k10_violation_points=34`（`:3942`，K10 在「实」列 34 个观测点不符，34 点全在洞位置为前的 16 格里；第 4 次是 0，不在登记预期内，触发停机 S11、S14）。`cells_run=38`、`cells_not_fitting=4` 是格数，不是违例。判决行之外同一类字段：`name=failure_clauses`（`:3941`）的 `f24_real_every_differ_points=34`（第 4 次 0）与 `f2_no_observable_difference=false`（取值 false 表示有可观测的差，F2 没触发，与第 4 次相同）。
+**判决行点名**（`grep -n 'name=verdict' e156-alloc-basis-counts-2026-10-05.out`）：14 条，行号 `1214`、`3942`–`3954`。没有取值为 `false` 或 `not_run` 的字段；整数计数里不为 0 的，名字表示违例的只有一个：`s11_k10_violation_points=34`（`:3942`，K10 在「实」列 34 个观测点不符，34 点全在洞位置为前的 16 格里；第 4 次是 0，不在登记预期内，触发停机 S11、S14）。`cells_run=38`、`cells_not_fitting=4` 是格数，不是违例。判决行之外同一类字段：`name=failure_clauses`（`:3941`）的 `f24_real_every_differ_points=34`（第 4 次 0）与 `f2_no_observable_difference=false`（取值 false 表示有可观测的差，F2 没触发，与第 4 次相同）。
 
-**第 5 次重跑与页内第 4 次各节的关系**：「这一段做了什么」到「它答不了的」各节写的是 2026-09-26 第 4 次重跑，引的读数出自 `e156-alloc-basis-counts-2026-09-26-r2.out`，没有随新产物改写。新产物在 Q2a 的规范化之后有 294 行不同，F1 仍触发而 Q1d 随 h_缺 增长的那一句在「实」列 4 个取样点上不再成立（Q2b 判决层面那一组字段）；哪一份承重主 agent 已在认定为第 5 次产物（`research/prompts/e156-r5-prereg.md` 末尾「主 agent 认定：第 5 次交回与 S11 两边查」第 2 条）；第 6 次重跑照定乙读门槛之后，`f24_real_every_differ_points`、`s11_k10_violation_points` 在第 6 次产物上又是 0（见「第 6 次重跑」一节），但这几节里「Q1d 都随 h_缺 增长」在第 5、6 次产物的「实」列 4 个取样点上仍不成立，不能原样再引。
+**第 5 次重跑与页内第 4 次各节的关系**：「这一段做了什么」到「它答不了的」各节写的是 2026-09-26 第 4 次重跑，引的读数出自 `e156-alloc-basis-counts-2026-09-26-r2.out`，没有随新产物改写。新产物在 Q2a 的规范化之后有 294 行不同，F1 仍触发而 Q1d 随 h_缺 增长的那一句在「实」列 4 个取样点上不再成立（Q2b 判决层面那一组字段）；哪一份承重主 agent 已在认定为第 5 次产物（`e156-r5-prereg.md` 末尾「主 agent 认定：第 5 次交回与 S11 两边查」第 2 条）；第 6 次重跑照定乙读门槛之后，`f24_real_every_differ_points`、`s11_k10_violation_points` 在第 6 次产物上又是 0（见「第 6 次重跑」一节），但这几节里「Q1d 都随 h_缺 增长」在第 5、6 次产物的「实」列 4 个取样点上仍不成立，不能原样再引。
 
 **它答不了的（第 5 次）**：① 内联单测与变异没跑（执行员不跑 checker 档）：新单测 U19 与整份装置的 18 条单测、M35 改写与 M44 的实际红绿都没有读数，只验了变异两行的原文在源码里各命中 1 次、替换文在副本里编得过；② PC-钉门槛 证推迟一圈，不证全程不回收；③ W7 那一格认得出没装根环表的分配器这一件，装置里不再有对照，靠 core 的单测 `recording_a_root_on_an_allocator_without_a_root_ring_occupancy_panics_instead_of_never_reclaiming` 与变异「C551（`build_pool` 的分配器没有根环表）：分配器没装根环表记根时静默返回（不断言）」；④ 294 行不同来自哪一批 `crates/` 的改动没查；⑤ `s11_k10_violation_points=34` 是装置读错了还是实现的门槛与条款不同，没两边查完（只有 Q2c 之后那一条读码的线索）。
 
@@ -174,7 +174,7 @@ E7RESULT name=verdict stage=second cells_run=38 cells_not_fitting=4 truncated_ce
 SINGLEFS_HEAVY_TESTS=commit bash scripts/hosts/run-with-memory-cap.sh 8G bash scripts/hosts/capped.sh 10 cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts
 ```
 
-看 `test result:` 行是不是 `19 passed`（第 6 次，含新 U20；第 5 次交回时是 `18 passed`（Q2d）），U19 的名字是 `hh_back_hole_at_four_slots_per_region_delays_the_tree_table_reclaim_to_six_ring_slots_minus_one_and_the_a10_judgement_sees_it`；变异：旧 M35（替换文 `allocator_without_the_root_ring` 在装置里已不存在，编不过）已换成改写后的 M35、追加了 M44，都已打进 `crates/mutations.tsv`（`grep -n 'e156_allocation_basis_counts' crates/mutations.tsv` 现查；两行的原样内容在 `research/results/e156-alloc-basis-counts-2026-10-05-mutations-replacements.tsv` 与 `research/results/e156-alloc-basis-counts-2026-10-05-mutations-append.tsv`），由门禁 checker-tier-crates-mutation-replay 跑，三个数分开报。
+看 `test result:` 行是不是 `19 passed`（第 6 次，含新 U20；第 5 次交回时是 `18 passed`（Q2d）），U19 的名字是 `hh_back_hole_at_four_slots_per_region_delays_the_tree_table_reclaim_to_six_ring_slots_minus_one_and_the_a10_judgement_sees_it`；变异：旧 M35（替换文 `allocator_without_the_root_ring` 在装置里已不存在，编不过）已换成改写后的 M35、追加了 M44，都已打进 `crates/mutations.tsv`（`grep -n 'e156_allocation_basis_counts' crates/mutations.tsv` 现查；两行的原样内容在 `e156-alloc-basis-counts-2026-10-05-mutations-replacements.tsv` 与 `e156-alloc-basis-counts-2026-10-05-mutations-append.tsv`），由门禁 checker-tier-crates-mutation-replay 跑，三个数分开报。
 
 ### 这一段做了什么
 
@@ -186,12 +186,12 @@ SINGLEFS_HEAVY_TESTS=commit bash scripts/hosts/run-with-memory-cap.sh 8G bash sc
 4. **第二段**：S ∈ {4, 8, 16} × ρ ∈ {1, 1/4} × (k, 位置) ∈ {(0, —), (1, 前), (2, 前), (4, 前), (1, 后), (2, 后), (4, 后)} 共 42 格，S = 4 的 (4, 前)、(4, 后) 两格几何排不下（锚点模型 `fits=false`），跑 38 格；每格两个回收时点，共 76 组读数。阳性对照 PC-多扣（每个 (S, ρ) 的 k = 0 与 (2, 后)）、PC-洞、PC-分配器（S = 4、ρ = 1、k = 0，换回不装根环表的分配器）、PC-判定器（10 条合成用例）都跑了。Q1e（附带）只在 S = 8、ρ = 1 的格上算（登记写死），别的格标「够判后未跑」。
 5. **单测与变异**：`cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts` → `test result: ok. 17 passed`。`crates/mutations.tsv` 里点着这个装置的 22 行：这一次新加 9 行（M35–M43）、改锚 3 行（M32–M34，测试名跟着改），其余 10 行没动；22 行在草稿目录的仓副本里逐条施加、跑点名的测试，22 行全红（抓到 22 / 无效 0 / 没红 0），门禁 code-source-discipline 的 mutation-tables 格（锚点唯一命中）通过。门禁 checker-tier-crates-mutation-replay 整表复跑没跑（归提交前的整轮）。其中另有 9 行测试名末尾带 `$`，门禁 checker-tier-crates-mutation-replay 按字面找 `test … FAILED` 找不到它们，没改，交主 agent（登记第十二节修订 2 第 10 条）。
 
-### 结果整行抄自产物
+### 结果整行抄自产物（产物已移出工作区的行写成一行指针）
 
 产物 `e156-alloc-basis-counts-2026-09-26.out`（4007 行，2026-10-05 现查 sha256 `cbbb5f38033ce0c93baa837044abe261e07471cb7ff1af150457f4ad6546e136`；2026-09-26 跑完时页内记的是 `1eaf5ea6…`，之后提交 `bc57af7a`（按内容起名）改了这份产物里的 160 行，`git show bc57af7a^:e156-alloc-basis-counts-2026-09-26.out | sha256sum` 得 `1eaf5ea6…`，现值与旧值不同）；装置把区域数 R 改成本地常量之后又跑一份 `e156-alloc-basis-counts-2026-09-26-r2.out`，与前一份逐字节相同（`sha256sum` 现值同为 `cbbb5f38…`），第 5 次重跑之前 `replay.sh` 登记的是 r2 那一份。完成标记：
 
 ```
-E7RESULT name=done emitted=4007
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 4007 行（name=done）
 ```
 
 **前提 1（问题单第一节）：成立。** 两段最小复现（S = 4、ρ = 1）上崩溃那次的 txg 在环里没有根，新实例第一个 txg = 洞 + 1；「前」洞的槽从没写过，「后」洞的槽里仍是 txg 4 的根：
@@ -199,7 +199,7 @@ E7RESULT name=done emitted=4007
 ```
 E7RESULT name=pq1 position=front hole_txg=5 prefix_applied=1 first_txg_of_new_instance=6 ring_has_root_at_hole_txg=false hole_slot_content=never_written a16_applicable=true
 E7RESULT name=pq1 position=back hole_txg=16 prefix_applied=1 first_txg_of_new_instance=17 ring_has_root_at_hole_txg=false hole_slot_content=root_txg_4 a16_applicable=true
-E7RESULT name=hole_recovery family=Hh s=4 rho=1 k=1 position=back hole_txg=16 crashed_publish=overwrite prefix_applied=1 first_txg_of_new_instance=17 last_txg_of_mount=19 publishes_in_mount=3 planned_last_txg_of_mount=19 ring_has_root_at_hole_txg=false hole_slot_content=root_txg_4 cut_point=BeforeTheRootSlotWrite cut_matches_root_and_system_configuration_restored_image=true sectors_differing_from_root_slot_only_restored_image=d0@0,d1@0 steps_after_root_slot_write=system_configuration_slot,system_configuration_slot root_slot_writes_in_crashed_publish=1 mount_admission=admitted_before_acquisition mount_floor_raise_sequences=0
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 1143 行（name=hole_recovery）
 E7RESULT name=pc_c2 ring_has_root_at_hole_txg=true mount_return_h_que=0 a14_mismatches=9 seen=true
 ```
 
@@ -219,7 +219,7 @@ E7RESULT name=pq2 raised=true floor_before=0 new_floor=8 effective_floor_before_
 
 ```
 E7RESULT name=u11_forward_rollback txg_before=8 txg_of_rollback_publish=9 instance_before=2 instance_after=2 instance_table_rows_before=1 instance_table_rows_after=1 remount_instance=3 isolated_after_plain_remount=[(0, 0), (1, 0)] abandoned_roots_after_plain_remount=0 forward_rollback_structure_holds=true
-E7RESULT name=u13a_rollback_to_oldest_candidate overwrites=72 target_txg=52 txg_before=75 txg_after=76 instance_before=1 instance_after=1 instance_table_rows_before=0 instance_table_rows_after=0 item1_slots=374 item5_slots=356 i311=holds structure_holds=true
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 1211 行（name=u13a_rollback_to_oldest_candidate）
 E7RESULT name=q7c1_not_subtracting_defer basis=beta_syn k=1 real_check_is_red=true without_subtracting_defer_is_red=false flips_red_to_green=true
 E7RESULT name=q7c2_threshold_at_least basis=beta_syn k=-1 not_applicable=true reason=deferred_is_zero_cannot_subtract_one
 ```
@@ -233,25 +233,25 @@ E7RESULT name=verdict stage=first premise_one_reproduced=true premise_two_the_tw
 **岔路单第 1 行（第二段）**。判决行（作废、停机类的计数全是 0）与 12 个取样点 (S, ρ, 回收时点) 的判定：
 
 ```
-E7RESULT name=verdict stage=second cells_run=38 cells_not_fitting=4 truncated_cells=0 v1_over_withheld_controls_void=0 v2_a10_every_mismatch_cells=0 v2_a12_every_nonzero_points=0 v2_a14_mismatch_points=0 v2_a15_every_below_points=0 v2_pc_allocator_seen=true v2_pc_c2_seen=true v6_a11_mismatch_points=0 v6_devices_unequal_points=0 v6_pc_hole_not_seen_cells=0 v16_judge_cases_wrong=0 v17_a13_every_nonzero_points=0 s1_failures=0 s1h_root_ring_missing_points=0 s11_a10_real_mismatch_cells=0 s11_a12_real_nonzero_points=0 s11_a15_real_below_points=0 s11_k10_violation_points=0 s12_g_adm_nonzero=0 k8_mismatches=0 referenced_but_free_points=0 abandoned_or_unknown_root_points=0 anchor_rows_missing=0
-E7RESULT name=verdict stage=second_group s=4 rho=1 timing=real q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
-E7RESULT name=verdict stage=second_group s=4 rho=1 timing=every_publish q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
-E7RESULT name=verdict stage=second_group s=4 rho=1/4 timing=real q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
-E7RESULT name=verdict stage=second_group s=4 rho=1/4 timing=every_publish q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 3994 行（name=verdict）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 3995 行（name=verdict）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 3996 行（name=verdict）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 3997 行（name=verdict）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 3998 行（name=verdict）
 E7RESULT name=verdict stage=second_group s=8 rho=1 timing=real q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
 E7RESULT name=verdict stage=second_group s=8 rho=1 timing=every_publish q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
-E7RESULT name=verdict stage=second_group s=8 rho=1/4 timing=real q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
-E7RESULT name=verdict stage=second_group s=8 rho=1/4 timing=every_publish q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 4001 行（name=verdict）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 4002 行（name=verdict）
 E7RESULT name=verdict stage=second_group s=16 rho=1 timing=real q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
 E7RESULT name=verdict stage=second_group s=16 rho=1 timing=every_publish q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
-E7RESULT name=verdict stage=second_group s=16 rho=1/4 timing=real q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
-E7RESULT name=verdict stage=second_group s=16 rho=1/4 timing=every_publish q1c=above q1c_on_holes=above q1c_front=above q1c_back=above q1d_growth=grows_with_holes
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 4005 行（name=verdict）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 4006 行（name=verdict）
 ```
 
 - **Q1c-前（第 1 行的判据）**：12 个取样点全部判「越过 2 槽」，也全部越过 1 槽；最小的越过点都是 h_缺 = 1（第一次「前」洞挂载交回的那一刻，txg 7）。「前」洞的 Δ 峰值在 12 个取样点上逐点相同：h_缺 = 1、2、3、4 时 10、18、26、34 槽（S = 4 只排得下 k ≤ 2，到 18）。S = 8、ρ = 1、「实」那一行：
 
 ```
-E7RESULT name=q1c s=8 rho=1 timing=real quantity=q1c_front samples=73 judgement_two_slots=above judgement_one_slot=above smallest_h_que_above_two=1 smallest_h_que_above_one=1 first_crossing_two=key1:k1:positionfront:workload_publishes1:txg7 by_h_que=1:peak10:sum314:count38:positive38,2:peak18:sum420:count24:positive24,3:peak26:sum208:count8:positive8,4:peak34:sum102:count3:positive3
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 3935 行（name=q1c）
 ```
 
 - **Q1c-后（照报，不算判据）**：12 个取样点全部越过 2 槽，登记第四节预推的「后洞必然多扣得多」没被推翻（失败条款 F23 没触发）；「后」洞把门槛钉在环里那条旧根上，Δ 随 h_缺 每步涨一次发布换下的量（ρ = 1 时约 14–16 槽、ρ = 1/4 时约 8–10 槽），到最后一个 h_缺 取样点 S = 4 / 8 / 16 分别是 174 / 366 / 716 槽（ρ = 1）、118 / 238 / 478 槽（ρ = 1/4）。
@@ -288,7 +288,7 @@ s=16 rho=1/4 timing=every_publish quantity=q1c_back judgement_two_slots=above sm
 - **Q1d（随洞怎么长、在什么规模上越过一个单元的槽数）**：12 个取样点都判「随 h_缺 增长」（相邻差全部 > 0），第一次越过 2 槽 / 1 槽都在 h_缺 = 1、「前」洞 k = 1、第 1 次工作负载发布之后的挂载交回、txg 7。第二读法（不进判定）：按注入的洞数 k 分组时 Δ 峰值**不随 k 增长**（S = 8、ρ = 1：k = 1 / 2 / 4 时 366 / 360 / 344 槽），峰值由「后」洞把门槛钉住的那一段撑着，不由洞的个数撑着。S = 8、ρ = 1、「实」那一行：
 
 ```
-E7RESULT name=q1d s=8 rho=1 timing=real growth_by_h_que=grows_with_holes adjacent_differences=0->1:10,1->2:8,2->3:8,3->4:26,4->5:14,5->6:14,6->7:14,7->8:16,8->9:16,9->10:16,10->11:16,11->12:16,12->13:16,13->14:16,14->15:16,15->16:16,16->17:16,17->18:16,18->19:20,19->20:12,20->21:16,21->22:16,22->23:16,23->24:16 first_crossing_two=key1:k1:positionfront:workload_publishes1:txg7 first_crossing_one=key1:k1:positionfront:workload_publishes1:txg7 by_h_dong=0:peak0:sum0:count172:positive0,1:peak366:sum8604:count77:positive77,2:peak360:sum6326:count48:positive48,3:peak340:sum2742:count17:positive17,4:peak344:sum1086:count6:positive6 by_injected_k=0:peak0:sum0:count70:positive0,1:peak366:sum4506:count76:positive42,2:peak360:sum6172:count81:positive47,4:peak344:sum8080:count93:positive59
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 3937 行（name=q1d）
 ```
 
 - **几何敏感性**：Q1c、Q1c-洞、Q1c-前、Q1c-后、Q1d 在 12 个取样点上都一致（只在这 12 个取样点上）；「实」与「每」逐观测点相同（`f24_real_every_differ_points=0`）：
@@ -300,7 +300,7 @@ E7RESULT name=geometry_sensitivity quantity=q1c_front result=consistent_on_12_sa
 - **失败条款**：F1（甲-T1 在「前」洞上多扣得多，出路不能只是一句射程，交主 agent）在 12 个取样点上全部触发；F2、F22、F23、F24 都没触发：
 
 ```
-E7RESULT name=failure_clauses f1_front_above_two_groups=s=4_rho=1_timing=real,s=4_rho=1_timing=every_publish,s=4_rho=1/4_timing=real,s=4_rho=1/4_timing=every_publish,s=8_rho=1_timing=real,s=8_rho=1_timing=every_publish,s=8_rho=1/4_timing=real,s=8_rho=1/4_timing=every_publish,s=16_rho=1_timing=real,s=16_rho=1_timing=every_publish,s=16_rho=1/4_timing=real,s=16_rho=1/4_timing=every_publish f2_no_observable_difference=false f22_front_and_back_differ_groups=none f23_back_at_most_two_groups=none f24_real_every_differ_points=0 q1c_front_one_slot=s=4_rho=1_timing=real:above,s=4_rho=1_timing=every_publish:above,s=4_rho=1/4_timing=real:above,s=4_rho=1/4_timing=every_publish:above,s=8_rho=1_timing=real:above,s=8_rho=1_timing=every_publish:above,s=8_rho=1/4_timing=real:above,s=8_rho=1/4_timing=every_publish:above,s=16_rho=1_timing=real:above,s=16_rho=1_timing=every_publish:above,s=16_rho=1/4_timing=real:above,s=16_rho=1/4_timing=every_publish:above q1c_not_on_holes=s=4_rho=1_timing=real:at_most,s=4_rho=1_timing=every_publish:at_most,s=4_rho=1/4_timing=real:at_most,s=4_rho=1/4_timing=every_publish:at_most,s=8_rho=1_timing=real:at_most,s=8_rho=1_timing=every_publish:at_most,s=8_rho=1/4_timing=real:at_most,s=8_rho=1/4_timing=every_publish:at_most,s=16_rho=1_timing=real:at_most,s=16_rho=1_timing=every_publish:at_most,s=16_rho=1/4_timing=real:at_most,s=16_rho=1/4_timing=every_publish:at_most
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 3993 行（name=failure_clauses）
 ```
 
 - **钉绝对值的锚点**：锚点模型每个 S 的 A10 滞后恰为 3S、排得下的格上 r2 两条闭式与按环现数逐点相同、k = 0 的 Q1a 与全部格的 Q1b 恒 0；装置在 38 格的每个观测点上门槛、h_缺、h_洞 与它逐点相同，Q1a 不低于它的树表下界（判决行 `v2_*`、`v6_*`、`s11_*` 全 0）。阳性对照 PC-分配器：不装根环表时树表单元在这一次挂载里一个都发不出：
@@ -309,7 +309,7 @@ E7RESULT name=failure_clauses f1_front_above_two_groups=s=4_rho=1_timing=real,s=
 E7RESULT name=anchor_model s=4 k0_end=48 a10_lags=[12] a11_closed_form_mismatches_on_fitting_cells=0 a12_k0_max_q1a=0 a13_max_q1b=0 fits=1front:true,2front:true,4front:false,1back:true,2back:true,4back:false
 E7RESULT name=anchor_model s=8 k0_end=72 a10_lags=[24] a11_closed_form_mismatches_on_fitting_cells=0 a12_k0_max_q1a=0 a13_max_q1b=0 fits=1front:true,2front:true,4front:true,1back:true,2back:true,4back:true
 E7RESULT name=anchor_model s=16 k0_end=120 a10_lags=[48] a11_closed_form_mismatches_on_fitting_cells=0 a12_k0_max_q1a=0 a13_max_q1b=0 fits=1front:true,2front:true,4front:true,1back:true,2back:true,4back:true
-E7RESULT name=pc_allocator a10_lags_real=[] expected=[12] root_ring_installed_points=0 seen=true
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-26.out 第 3859 行（name=pc_allocator）
 ```
 
 锚点模型的 Rust 移植与 Python 脚本逐行比（Python 输出在草稿目录，不入库；比的是 1092 行 `DUMP`）：
@@ -387,12 +387,12 @@ cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D28（挂载期承诺量） 已定项 1 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
-| D16（发布语义） 已定项 1 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
-| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
-| D3（空间分配） 已定项 7 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
-| D5（快照 / 空间记账机制） 已定项 4 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
-| D8（核心索引结构） 已定项 14 | 备料 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D28（挂载期承诺量） 已定项 1 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
+| D16（发布语义） 已定项 1 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
+| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
+| D3（空间分配） 已定项 7 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
+| D5（快照 / 空间记账机制） 已定项 4 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
+| D8（核心索引结构） 已定项 14 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
 
 ## 历史版本
 
@@ -445,16 +445,16 @@ cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts
 「三个常量（与另外六处）改成什么」（第七节 7.2 闭式与命令二独立算出，逐条已在装置上核对成立）：
 
 ```text
-E7RESULT name=k1_after_new_pool_file_creation txg=3 allocated_slots=17 free_slots=211951 deferred_slots=1 registered_item1_slots=17 registered_item5_slots=1 matches_registered=true
-E7RESULT name=anchor_a_d8 local_leaf_slots=812 local_internal_fanout=169 local_leaf_slots_matches_format_crate=true local_internal_fanout_matches_format_crate=true my_root_level=2
-E7RESULT name=anchor_a_d8_root_level my_root_level=2 real_root_level=2 matches=true
-E7RESULT name=s1f_record_count txg=3 count=28
-E7RESULT name=s1ef_summary steps=144 mismatches=0 steps_by_changed_leaf_count=1:108,2:36
-E7RESULT name=r5_empty_publish_closed_form label=HK released_d0=8 expected_released_d0=8 record_delta=16 expected_record_delta=16 fixed_point_slots_one_leaf=8
-E7RESULT name=s1c_remount instance=4 isolated=[(0,54),(1,54)] abandoned_roots_unreadable=0
-E7RESULT name=q7d1_by_kind kind=O min=14 max=16 count=288
-E7RESULT name=r7_hy_cap chosen_cap=0
-E7RESULT name=r7_hy_condition pool=hy open_segment_free_slots=0 fixed_point_slots=8 threshold=8 holds=false
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 7 行（name=k1_after_new_pool_file_creation）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 3 行（name=anchor_a_d8）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 6 行（name=anchor_a_d8_root_level）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 9 行（name=s1f_record_count）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 332 行（name=s1ef_summary）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 486 行（name=r5_empty_publish_closed_form）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 522 行（name=s1c_remount）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 524 行（name=q7d1_by_kind）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 630 行（name=r7_hy_cap）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 632 行（name=r7_hy_condition）
 ```
 
 K1 第 1 项 13→17、β0 走读引用 12→16（`k1_after_new_pool_file_creation` 与 `referenced_slots` 逐字匹配）、S1(c) 隔离槽数 34→54、新池新建文件之后记录条数 20→28：全部按第七节 7.2 的闭式与独立命令算出的值核对成立（`s1ef_summary mismatches=0`：H0 全部 144 步逐次released/记录增量都等于闭式，`steps_by_changed_leaf_count=1:108,2:36` 两个方向——只落 1 片叶与跨 ≥ 2 片叶——都出现过，第八节 8.2 满足）。空发布释放槽数 4→8（`r5_empty_publish_closed_form`）、Q7d-1 覆盖写那一组从字面 `min=10 max=10` 改成逐次现量（`min=14 max=16`）。A-D8：本地叶宽/扇出与 `singlefs_format` 回比一致，本地算出的根层级与实装 `AllocationRecordTreeGeometry` 一致（都是 2），F21 未触发。HY 的覆盖写次数改成搜「e ≥ max(8, f)」：搜了 3、2、1、0 四档都不满足（这一格的开放段在小池 P5 几何上，抬 F 那一刻要么还没建立（cap=0，重开之后 `open_segment` 归零、下一次分配前才重新打开）要么已经消耗殆尽（cap≥1 时小池本身在 1 次覆盖写之后就 `SpaceAdmissionRefused`），装置报 `holds=false`——写进「它答不了的」，这一格没有按登记原意演示出「推空时还留着空间」，交主 agent 判要不要放宽小池几何。
@@ -480,9 +480,9 @@ K1 第 1 项 13→17、β0 走读引用 12→16（`k1_after_new_pool_file_creati
 R2 全部段产物收尾行（`grep -n 'name=integrity \|name=done\|name=integrity_r2_segments' e156-alloc-basis-counts-2026-09-24-stage4.out`）：
 
 ```text
-E7RESULT name=integrity families=3 legal_state_rows=168 hk_forced_to_zero_rows=9 basis_count=9
-E7RESULT name=integrity_r2_segments hf_cells=1 hh_cells=6 hh_holes_sampled=s8h0,s8h1,s8h2,s4h0,s4h1,s4h2 matched_cells=4 matched_sampled=s8m1,s8m2,s4m1,s4m2
-E7RESULT name=done emitted=776
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 323 行（name=integrity）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 1075 行（name=integrity_r2_segments）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 776 行（name=done）
 ```
 
 分类计数（`grep -o 'name=[a-z0-9_]*' e156-alloc-basis-counts-2026-09-24-stage4.out | sort | uniq -c`）：392 条 `q1_delta_record`（S=8/S=4 各 holes=0/1/2，续派第一段新加的逐槽列举）、177 条 `legal_state`（beta0 1、H0 49、HR 100、HK 18、HK-F0 9）、30 条 `s1d_step`、27 条 `q7a`、10 条 `q1_hh`（S=8/S=4 各 holes=0/1/2）、10 条 `q1_delta_debug`、各 9 条 `q7c1_not_subtracting_defer`/`q7c2_threshold_at_least`/`pc_check_bk1`/`pc_check_bk2`/`pc_check_bk3_is_bd_plus_one`/`basis_snapshot`、4 条 `q1_step_matched_diff`（续派第二段）、4 条 `q1d_adjacent_diff`、2 条 `x8a_prefix`/`x8a_held_measure`/`q3e_x8a`/`q3e_g7_remount`（HX、HY 各一条），其余各 1 条或 2 条（`q7a_summary`/`q7b` 等首段量、`q3a_d_rel_g7` 等岔路 3 单格量、`q3d_d_acct_d_alloc`、`anchor_k8`、`k9_precondition`、`q1_geometry_sensitivity_s`）；总计 66 种量名、776 行。
@@ -499,17 +499,17 @@ E7RESULT name=done emitted=776
 **（2026-09-25 第 3 次重跑续派，`e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out`，逐行照抄）**：「可达合法状态第 5 项从来不是 0」这条结论今天被推翻。补一个可达基底 `beta_hr_rollback_row`（HR 家族管理员回退写行那一步，`family=HR kind=rollback_row txg=76`）之后：
 
 ```
-E7RESULT name=basis_snapshot label=beta_hr_rollback_row item1=18 item5=0 referenced=18 reachable=true
-E7RESULT name=q7a basis=beta_hr_rollback_row defer_delta=1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
-E7RESULT name=q7a basis=beta_hr_rollback_row defer_delta=-1 not_applicable=true reason=deferred_underflow
-E7RESULT name=q7a basis=beta_hr_rollback_row defer_delta=8 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
-E7RESULT name=q7c1_not_subtracting_defer basis=beta_hr_rollback_row k=1 real_check_is_red=true without_subtracting_defer_is_red=false flips_red_to_green=true
-E7RESULT name=q7c2_threshold_at_least basis=beta_hr_rollback_row k=-1 not_applicable=true reason=deferred_is_zero_cannot_subtract_one
-E7RESULT name=pc_check_bk1 basis=beta_hr_rollback_row check_is_red=true i31_red=false i52_red=false
-E7RESULT name=pc_check_bk2 basis=beta_hr_rollback_row check_is_red=false i31_red=false i52_red=false
-E7RESULT name=pc_check_bk3_is_bd_plus_one basis=beta_hr_rollback_row check_is_red=true i31_red=false i52_red=false
-E7RESULT name=q7a_summary all_red_count=20 q7c1_flip_seen=true q7c2_flip_seen=true
-E7RESULT name=integrity families=3 legal_state_rows=310 hk_forced_to_zero_rows=9 basis_count=10
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 591 行（name=basis_snapshot）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 592 行（name=q7a）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 593 行（name=q7a）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 594 行（name=q7a）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 595 行（name=q7c1_not_subtracting_defer）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 596 行（name=q7c2_threshold_at_least）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 597 行（name=pc_check_bk1）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 598 行（name=pc_check_bk2）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 599 行（name=pc_check_bk3_is_bd_plus_one）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 618 行（name=q7a_summary）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out 第 621 行（name=integrity）
 ```
 
 `q7c1_not_subtracting_defer` 那一行 `flips_red_to_green=true`——**判别力自证①第一次在一个可达基底上转色**（此前只有不可达的 β_syn 转过色）；`q7c2_threshold_at_least` 与 β_syn/β_F0 同理 `not_applicable`（`deferred==0` 时 Bd(−1) 会把它减成负数，不是两种读法的分歧）。`basis_count` 从 9 变 10、`all_red_count` 从 18 变 20（这个基底 delta=1/8 各命中一次 Q7a 合取，delta=-1 因 `deferred_underflow` 跳过）；`legal_state_rows` 仍是 310（这个基底是对已有 `legal_state` 行的再利用，没有新增走过的历史步）。独立单测 `hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test` 不调用 `main()`，另用同样的公开入口重放同一段真实历史，独立核对到同一个 `item5=0` 与 `flips_red_to_green=true`；核查 agent 的独立探针（`/tmp/claude-1000/e156-fork7-check/probe.out`，第三条互不共享代码的路径）在这个状态上读到 `item1=18 item5=0`、checker 46 条不变量零违例，三条路径一致。**够不够判交主 agent**：这只证明了「存在至少一个可达基底能转色」，没有证明「这是唯一一个」或「这是某个结构性条件的必然结果」。
@@ -522,12 +522,12 @@ E7RESULT name=integrity families=3 legal_state_rows=310 hk_forced_to_zero_rows=9
 **岔路 3（R2 第二段，2026-09-24，一个几何格：S = 8、ρ = 1，`run_hf_single_cell`）**：
 
 ```text
-E7RESULT name=v13_hf_prefix_identical holds=true
-E7RESULT name=q3a_d_rel_g7 release_generation=13 dispensable_txg=16 d_rel_non_empty=0 d_rel_all=2 pump_publishes=3
-E7RESULT name=q3b_d_rel_f_kou release_generation=13 dispensable_txg=16 d_rel_non_empty=0 d_rel_all=2 pump_publishes=3
-E7RESULT name=q3c_diff max_diff=0 threshold=3 verdict=difference_not_large
-E7RESULT name=k9_newest_batch_d_rel_non_empty g7=0 f_kou=0 expected=3 note=see_p21e_prediction
-E7RESULT name=q3e_x8a status=not_done reason=hx_hy_small_pool_geometry_not_built_this_round
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 614 行（name=v13_hf_prefix_identical）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 615 行（name=q3a_d_rel_g7）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 616 行（name=q3b_d_rel_f_kou）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 617 行（name=q3c_diff）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 618 行（name=k9_newest_batch_d_rel_non_empty）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage3.out 第 330 行（name=q3e_x8a）
 ```
 
 - **V13 holds=true**：抬 F 之前，探上限 / F-扣 / G7 三条分支各自从同一份快照重建，逐字节相同——两条口径的历史前缀确实一样，Q3a/Q3b/Q3c 不因为「起点就不同」而失去可比性。
@@ -539,11 +539,11 @@ E7RESULT name=q3e_x8a status=not_done reason=hx_hy_small_pool_geometry_not_built
 **R2 续派第一段（2026-09-24，同日，s4 执行员，产物 `…-stage3.out`）新增**：
 
 ```text
-E7RESULT name=anchor_k8 configured=4 local=4 holds=true
-E7RESULT name=q1_hh s=4 holes=0 txg=17 allocated=132 deferred=120 referenced=12 q1a_t1_over_withheld=120 q1b_g12_over_withheld=100 delta=20 h_missing=0
-E7RESULT name=q1_hh s=4 holes=1 txg=23 allocated=176 deferred=164 referenced=12 q1a_t1_over_withheld=164 q1b_g12_over_withheld=94 delta=70 h_missing=8
-E7RESULT name=q1_hh s=4 holes=2 txg=29 allocated=220 deferred=208 referenced=12 q1a_t1_over_withheld=208 q1b_g12_over_withheld=98 delta=110 h_missing=8
-E7RESULT name=q1_geometry_sensitivity_s crossing_2_by_s=s8=true,s4=true stable=true
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 641 行（name=anchor_k8）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage3.out 第 523 行（name=q1_hh）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage3.out 第 581 行（name=q1_hh）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage3.out 第 671 行（name=q1_hh）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 698 行（name=q1_geometry_sensitivity_s）
 ```
 
 S = 4（方向与 mkfs 默认 8 相反）上 Δ 同样单调不减（20 → 70 → 110），「越过 2 槽」这条判定与 S = 8 一致（`stable=true`）——S = 4 的 `h_missing` 在 holes=1/2 都停在 8（不像 S = 8 那样 8 → 14），`delta` 在 holes=2 也是 110 不是 120：环更浅时洞的计数方式与多扣的绝对量确实随几何变，但方向性判定没有变。
@@ -551,20 +551,20 @@ S = 4（方向与 mkfs 默认 8 相反）上 Δ 同样单调不减（20 → 70 �
 **R2 续派第二段（2026-09-24，同日，主 agent 续派，产物 `…-stage4.out`）新增**：
 
 ```text
-E7RESULT name=q1_step_matched_diff s=8 k=1 txg=35 delta_k=70 delta_0_matched=20 diff=50 h_missing_k=8 h_missing_0_matched=0
-E7RESULT name=q1_step_matched_diff s=8 k=2 txg=41 delta_k=120 delta_0_matched=20 diff=100 h_missing_k=14 h_missing_0_matched=0
-E7RESULT name=q1_step_matched_diff s=4 k=1 txg=23 delta_k=70 delta_0_matched=20 diff=50 h_missing_k=8 h_missing_0_matched=0
-E7RESULT name=q1_step_matched_diff s=4 k=2 txg=29 delta_k=110 delta_0_matched=20 diff=90 h_missing_k=8 h_missing_0_matched=0
-E7RESULT name=x8a_prefix pool=hx overwrite_count=10 stop_reason=PlacementRefused { unit: InodeRoot, refusal: NoFreeSlotOnAnyDevice } allocated=123 free=5 deferred=111
-E7RESULT name=x8a_held_measure pool=hx ceiling=12 reclaimed_and_held_records=66 reclaimed_and_held_span=81 allocated_after_hold=42 free_after_hold=86 deferred_after_hold=30 lowest_empty_segment_after_hold=none
-E7RESULT name=q3e_f_kou pool=hx first_push_result=failed_placement_refused:PlacementRefused { unit: AccountingTree, refusal: NoFreeSlotOnAnyDevice } release_reclaim_holds_reached=false
-E7RESULT name=q3e_g7 pool=hx first_push_result=failed_placement_refused:PlacementRefused { unit: AccountingTree, refusal: NoFreeSlotOnAnyDevice } release_reclaim_holds_reached=not_applicable_g7_never_holds
-E7RESULT name=q3e_x8a pool=hx status=done f_kou_stuck=true g7_stuck=true both_stuck_at_same_step=true note=see_x8a_held_measure_and_f_kou_g7_lines
-E7RESULT name=x8a_prefix pool=hy overwrite_count=3 stop_reason=stopped_at_cap_3_by_request allocated=53 free=75 deferred=41
-E7RESULT name=q3e_f_kou pool=hy first_push_result=succeeded release_reclaim_holds_reached=true
-E7RESULT name=q3e_g7 pool=hy first_push_result=succeeded release_reclaim_holds_reached=not_applicable_g7_never_holds
-E7RESULT name=q3e_x8a pool=hy status=done f_kou_stuck=false g7_stuck=false both_stuck_at_same_step=true note=see_x8a_held_measure_and_f_kou_g7_lines
-E7RESULT name=q3d_d_acct_d_alloc d_acct_f_kou=0 d_alloc_f_kou=2 d_acct_g7=2 d_alloc_g7=2 method=derived_from_documented_call_order_not_per_push_measured
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 771 行（name=q1_step_matched_diff）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 772 行（name=q1_step_matched_diff）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 773 行（name=q1_step_matched_diff）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 774 行（name=q1_step_matched_diff）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 331 行（name=x8a_prefix）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 332 行（name=x8a_held_measure）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 333 行（name=q3e_f_kou）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 336 行（name=q3e_g7）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 339 行（name=q3e_x8a）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 340 行（name=x8a_prefix）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 634 行（name=q3e_f_kou）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 637 行（name=q3e_g7）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage4.out 第 348 行（name=q3e_x8a）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-25-r3.out 第 619 行（name=q3d_d_acct_d_alloc）
 ```
 
 - **步数对齐对照（岔路 1 够判条件里「随洞的个数怎么长」这句现在有了干净的对照）**：`Δ(0, 步数对齐到 holes=k)` 在全部四组（S=8/S=4 × k=1/2）里**都还是 20**，与 `holes=0`（未对齐）完全一样——同样的总发布步数、只是不造洞，Δ 不涨。`Δ(k) − Δ(0, 步数对齐)` = 50（k=1，两个 S）、100/90（k=2，S=8/S=4）：**这才是洞本身贡献的多扣，之前的 20→70→120 曲线，增长部分不是步数带来的**。
@@ -575,13 +575,13 @@ E7RESULT name=q3d_d_acct_d_alloc d_acct_f_kou=0 d_alloc_f_kou=2 d_acct_g7=2 d_al
 **岔路 1（R2 第三段，2026-09-24，一个几何格：S = 8、ρ = 1，位置固定「后」，`run_hh_cell`）**：
 
 ```text
-E7RESULT name=q1_hh holes=0 txg=29 allocated=252 deferred=240 referenced=12 q1a_t1_over_withheld=240 q1b_g12_over_withheld=220 delta=20 h_missing=0
-E7RESULT name=q1_hh holes=1 txg=35 allocated=296 deferred=284 referenced=12 q1a_t1_over_withheld=284 q1b_g12_over_withheld=214 delta=70 h_missing=8
-E7RESULT name=q1_hh holes=2 txg=41 allocated=340 deferred=328 referenced=12 q1a_t1_over_withheld=328 q1b_g12_over_withheld=208 delta=120 h_missing=14
-E7RESULT name=q1d_adjacent_diff holes_from=0 holes_to=1 q1a_from=240 q1a_to=284 q1b_from=220 q1b_to=214 delta_from=20 delta_to=70 diff=50 h_missing_from=0 h_missing_to=8
-E7RESULT name=q1d_adjacent_diff holes_from=1 holes_to=2 q1a_from=284 q1a_to=328 q1b_from=214 q1b_to=208 delta_from=70 delta_to=120 diff=50 h_missing_from=8 h_missing_to=14
-E7RESULT name=q1d_first_crossing threshold_2_slots=holes=0 txg=29 delta=20 threshold_1_slot=holes=0 txg=29 delta=20
-E7RESULT name=q1d_monotonic holds=true
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage2.out 第 330 行（name=q1_hh）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage2.out 第 331 行（name=q1_hh）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage2.out 第 332 行（name=q1_hh）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage2.out 第 333 行（name=q1d_adjacent_diff）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage2.out 第 334 行（name=q1d_adjacent_diff）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage2.out 第 335 行（name=q1d_first_crossing）
+产物行见 git show 5d0b7e7c1667:research/results/e156-alloc-basis-counts-2026-09-24-stage2.out 第 336 行（name=q1d_monotonic）
 ```
 
 - **Q1a / Q1b / Δ 随洞数怎么长**：三个取样点（k = 0、1、2）上 Δ 分别是 20、70、120，**单调增、每加一个洞恰好 +50**（`q1d_monotonic holds=true`）；h_缺 同步单调增（0 → 8 → 14）。**第 9 行「够判条件」逐字满足**：至少两个洞数不同的取样点各有 Δ，且报得出越过 2 槽 / 1 槽两个门槛的规模——**在这三个取样点上，Δ 从 h = 0 起就已经越过两个门槛**（`q1d_first_crossing` 两栏都指向 `holes=0 txg=29 delta=20`）。

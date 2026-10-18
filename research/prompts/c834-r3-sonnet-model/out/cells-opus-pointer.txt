@@ -1,0 +1,6 @@
+root_units_and_record/none state_count=20516 complete=True | not_reached:mounted_r_units_kept:red=- 20512 ; pass:mounted_r_units_kept:red=- 4
+root_units_and_record/record_only state_count=20516 complete=True | not_reached:mounted_r_units_kept:red=- 13608 ; not_reached:refused:PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion 4100 ; pass:mounted_overwrote_r_units:red=I-2.1+I-4.8+I-7.2+I-7.4 2796 ; pass:mounted_r_units_kept:red=- 12
+root_units_and_record/y2 state_count=20516 complete=True | not_reached:mounted_r_units_kept:red=- 16 ; not_reached:refused:PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion 4100 ; refuse:refused:AccountOfAnUnappliedPublishWithIncompleteReadableRecords 16400
+three_mount_tail/y2 state_count=8227 complete=True | not_reached:refused:AccountOfAnAbandonedRoot 8223 ; refuse:refused:AccountOfAnUnappliedPublishWithIncompleteReadableRecords 4
+three_mount_tail/y2_m0_record state_count=8227 complete=True | not_reached:refused:AccountOfAnAbandonedRoot 8223 ; refuse:refused:AccountOfAnUnappliedPublishWithIncompleteReadableRecords 4
+tree_table_and_record/tree_and_mapping state_count=20516 complete=True | not_reached:mounted_r_units_kept:red=- 16396 ; not_reached:refused:AccountOfAnAbandonedRoot 4116 ; refuse:refused:AccountOfAnUnappliedPublishWithIncompleteReadableRecords 4

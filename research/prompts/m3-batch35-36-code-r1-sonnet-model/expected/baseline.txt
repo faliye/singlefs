@@ -1,8 +1,0 @@
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 189 filtered out; 
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 203 filtered out; 

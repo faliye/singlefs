@@ -1,9 +1,0 @@
-
-running 1 test
-ATK k2two o=1 pre=10 c_at_mount=(2, 52) c_before_push=(2, 52) pre_refused=0 push=pushed(12) writes=204 iso_before=52 iso_after=0 c_after=(0, 0) abandoned_after=0 leave_order=["Q@root11", "R@root12"] violating_prefixes=0 first=None after5(refused=0,violated=0)
-ATK k2two o=3 pre=10 c_at_mount=(2, 52) c_before_push=(2, 52) pre_refused=0 push=pushed(12) writes=204 iso_before=52 iso_after=0 c_after=(0, 0) abandoned_after=0 leave_order=["Q@root11", "R@root12"] violating_prefixes=0 first=None after5(refused=0,violated=0)
-ATK k2two o=8 pre=10 c_at_mount=(2, 52) c_before_push=(2, 80) pre_refused=0 push=pushed(9) writes=161 iso_before=80 iso_after=0 c_after=(0, 0) abandoned_after=0 leave_order=["Q@root8", "R@root9"] violating_prefixes=0 first=None after5(refused=0,violated=0)
-test atk_k2_two_c_slots_push ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 53.52s
-

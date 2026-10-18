@@ -1,7 +1,0 @@
-applied h1set-includes-badatmount
-## core rc=0
-test result: ok. 202 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
-## raise rc=0
-test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.23s
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
-restored h1set-includes-badatmount

@@ -1,5 +1,0 @@
-PROBE coldstart_after_split successes_matched: 243, roots_compared: 243, allocation_records_compared: 4874, instance_tables_compared: 5
-PROBE remount_after_split successes_matched: 242, roots_compared: 243, allocation_records_compared: 4874, instance_tables_compared: 5
-PROBE remount_before_split successes_matched: 240, roots_compared: 242, allocation_records_compared: 4846, instance_tables_compared: 6
-PROBE two_remounts_boundary successes_matched: 240, roots_compared: 243, allocation_records_compared: 4870, instance_tables_compared: 8
-PROBE unlink_after_split successes_matched: 238, roots_compared: 238, allocation_records_compared: 4764, instance_tables_compared: 0

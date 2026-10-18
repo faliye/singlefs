@@ -61,6 +61,8 @@ waaagh!
 | 形式検証 | Verus が、リカバリ再生で journal のプレフィックスを取り、ルート選択とリングスキャンを行う純関数の核（`crates/singlefs-replay-prefix`）を検証する。製品にコンパイルされるのもこのコードそのものである | checker-tier-formal-verification |
 | ミューテーション | crates のミューテーション表は一行ごとに一か所を壊し、指名したテストが赤にならなければならない。広域ミューテーション（cargo-mutants）はすべての変異に結論があり、生き残りが一つもないことを求める | checker-tier-crates-mutation-replay、checker-tier-broad-mutation |
 
+どれだけ判定したか: 2026-10-16 から 2026-10-18 のフル実行はクラッシュ列挙ケース 14 件を覆い、ログに状態数のある 12 件の合計は 5,149,586,107 のクラッシュ状態（約 51.5 億）で、すべての状態に同じキーの判定があり違反 0。判定はクラッシュ判定ライブラリに保存され関数ユニットキーで再利用され、判定器は二台の GPU で走る。ケース 6 は最終のツリーで走らせ直しておらず、ケース 12 のクイック層の判定法は最終日に変えた。六本の重いゲートは 2026-10-15 に一回走った: herd7 と QEMU（仮想マシン 6 回、検査 123 項目）は緑、形式検証とミューテーション表はライト層（ミューテーション 172 行のうち 2 行が赤にならない）、広域ミューテーションにはこの版のコードに対する結論がまだない。各テストの数は 2026-10-18 のブリーフの「テストデータのまとめ」の節にまとめた。
+
 **ゲートが全部緑でも、それはモデル層でのクラッシュ整合性の根拠にすぎず**、「検証済み」ではない。各項目がどこまで走ったか、どれが今回未実行と記録されたか、まだ何を覆っていないかは、[`briefs/`](briefs/) の最新のブリーフを見ること。
 
 ## システム構成
@@ -133,6 +135,7 @@ bash .claude/scripts/gate.sh
 | [`crates/singlefs-checker-tier`](crates/singlefs-checker-tier) | checker 層: クラッシュ状態の列挙、判定ライブラリ、クラッシュ増幅、GPU 判定器、実デバイスのテストハーネス。既定ではコミット時にだけ走る |
 | [`crates/singlefs-checker`](crates/singlefs-checker) | プールレベル checker: 一つのイメージを判定するライブラリ。実装と共有するのはフォーマット定数だけ |
 | [`crates/singlefs-replay-prefix`](crates/singlefs-replay-prefix) | リカバリ再生でプレフィックスを取り、ルート選択とリングスキャンを行う純関数の核。Verus が検証するのはこれ |
+| [`crates/singlefs-unit-graph`](crates/singlefs-unit-graph) | 関数ユニットグラフ: Rust と WGSL のソースを項目ごとにユニットに切り、コメントを除いた指紋を取り、入口から閉包を集めて再利用キーを計算する。std だけに依存 |
 | [`crates/singlefs-reference-filesystem`](crates/singlefs-reference-filesystem) | RefFS: 意味レベルの参照ファイルシステム。メモリ上だけで POSIX 操作に従って動く |
 | [`crates/mutations.tsv`](crates/mutations.tsv) | crates のミューテーション表 |
 | [`scripts/`](scripts/) | 繰り返し使うスクリプト。用途別のサブディレクトリに分かれ、何をどこに置くかはその README にある |

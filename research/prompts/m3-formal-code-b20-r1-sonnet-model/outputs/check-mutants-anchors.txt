@@ -1,6 +1,0 @@
-tsv:2362 命中 1 次  crates/singlefs-checker-tier/src/crash_injection.rs  C670（20-1 F1）接线：第二截调用点把所选那一版交成 None（不合法改由 U6「判据复算为假」给出，计数照样 
-tsv:2363 命中 1 次  crates/singlefs-checker-tier/src/crash_injection.rs  C670（20-1 F2）接线：第三截调用点把读故障的认定恒交 Injected（不沿用第一次崩溃那个态的认定）
-tsv:2364 命中 1 次  crates/singlefs-checker-tier/src/crash_injection.rs  C670（20-1 F2）接线：第三截调用点再挂的盘交成第一次崩溃的镜像（不是二次崩溃镜像）
-tsv:2365 命中 1 次  crates/singlefs-checker-tier/src/crash_injection.rs  C670（20-1 F2）接线：第三截调用点再挂的盘交成没叠二次崩溃那一段的基线 second_base
-tsv:2366 命中 1 次  crates/singlefs-checker-tier/src/crash_injection.rs  C670（20-1 F5）读故障认定的崩溃窗口末尾交成写表下标（不是录制流下标）
-tsv:2367 命中 1 次  crates/singlefs-checker-tier/src/crash_injection.rs  崩溃注入第二截的发布臂（20-1）：带文件的一版一律覆盖写（unlink 之后再建过 inode 的一版上被拒成写一个不

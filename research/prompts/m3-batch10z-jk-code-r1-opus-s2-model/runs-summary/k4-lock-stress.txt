@@ -1,3 +1,0 @@
-S2LOCK threads=10 rounds=5000 drop_ms=0 starts=8335 drops_seen=75001 started_now_blocked_max_ms=0
-S2LOCK threads=10 rounds=400 drop_ms=2 starts=668 drops_seen=6000 started_now_blocked_max_ms=2
-S2LOCK threads=10 rounds=800 drop_ms=3 starts=1334 drops_seen=11999 started_now_blocked_max_ms=0

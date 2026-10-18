@@ -25,7 +25,12 @@
 写前复核排在临时文件写完之后、改名换上之前。正在按偏移边跑边读这份文件的进程读的仍是旧 inode 的旧内容。
 
 退出码：0 插好了（或干跑）；1 用法不对或自检没过；2 --absent 已有命中；3 锚点不是恰好命中一次；
-4 读到写之间文件被改过；5 没换上（有多个硬链接、建不了临时文件、写或改名失败）。2–5 都是原文件没动、临时文件已删。
+4 读到写之间文件被改过；5 没换上（有多个硬链接、建不了临时文件、写或改名失败）；
+6 目标是仓里的 .md，新行带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法）。2–6 都是原文件没动、没留临时文件。
+
+写 .md 之前判新行（退出码 6）：目标是仓里的 .md 时，锚点定位成功之后、写之前（干跑也判），用 write-guard.sh 与门禁 doc-text 同一份判据
+（.claude/gate.d/lib-forbidden-notations.py 的钟点形态，lib_notation_check.py 调它）判 --line 给的新行；带钟点、时区词、时间戳的拒绝，逐处列出行号与形态与出路。
+别的后缀、仓外、排除前缀下的文件不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 clock-times 格兜底。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（括号里是那条「✗ 自检失败：」的开头）：
   INSERT_ROW_BREAK=vague-anchor-hint  anchor_hints() 走回改前的说法（「把正则写得更具体些」，不点元字符、不列行号）
@@ -33,6 +38,11 @@
       「✗ 自检失败：锚点带括号命中 0 次」那一格同样判这一支，只在前一格过了时才走到）
   INSERT_ROW_BREAK=literal-as-regex  insert() 把 --<…>-literal 照旧按正则认
       按字面插（「✗ 自检失败：--after-literal 带括号的锚点没插成」）
+  INSERT_ROW_BREAK=no-clock-guard  insert() 不判新行里的钟点（改前的写法）
+      写 .md 之前判新行（「✗ 自检失败：写 .md：…」那几条：新行带紧凑时间戳、带日期钟点时区词、带光秃时区词、干跑也拒、入口退出码 6 与不写文件）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>  共用库的弄坏开关（写法在 lib-forbidden-notations.py 文件头），自证同样走它：
+      clock-times（整个钟点形态不判）时写 .md 的拒绝几条全红；iso-compact-timestamp 时只有新行带紧凑时间戳的那几条红；
+      compact-timestamp-loose 时「8 位数字后跟 T 但不是时间戳」的放行那一条红
 """
 import argparse
 import contextlib
@@ -45,6 +55,7 @@ import sys
 
 from lib_atomic_replace import ReplaceRefused, leftover_temporary_files, problems_with_replacement_by_rename, \
     replace_file_contents_by_rename
+from lib_notation_check import clock_refusal, copy_library_into
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -103,7 +114,7 @@ def anchor_hints(lines, anchor, where, literal, matched):
     return hints
 
 
-def insert(path, anchor, where, line, absent, dry_run, literal=False):
+def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_root=None):
     if BROKEN == "literal-as-regex":   # 弄坏开关：--<where>-literal 照旧按正则认
         literal = False
     before = digest(path)
@@ -128,6 +139,12 @@ def insert(path, anchor, where, line, absent, dry_run, literal=False):
             print(line)
         return 3
     at = matched[0] + (1 if where == "after" else 0)
+    if BROKEN != "no-clock-guard":   # 弄坏开关 no-clock-guard：不判新行里的钟点
+        refusal = clock_refusal(path, line, at + 1, notation_root)
+        if refusal:
+            print("  ✗ " + "\n".join(refusal))
+            print("  → 怎么办：新行里的钟点、时区词与时间戳删掉，只写日期，再插")
+            return 6
     lines.insert(at, line)
     if dry_run:
         print("  （干跑）会插在 %s:%d，锚点是第 %d 行" % (path, at + 1, matched[0] + 1))
@@ -153,6 +170,83 @@ def insert(path, anchor, where, line, absent, dry_run, literal=False):
     for note in notes:
         print("  ! " + note)
     return 0
+
+
+def problems_with_clock_guard(work):
+    """写 .md 之前判新行：钟点、时区词、时间戳。样本串在这里拆开拼，这份源码里不出现字面写法（门禁 doc-text 也扫它）。
+    仓根用自证的临时目录顶替（notation_root）：假仓里抄一份真的共用库（copy_library_into）；另造一个没有库的假仓核「读不到判据」那一支。"""
+    problems = []
+    glue = "".join
+    colon = ":"
+    zone = glue(("J", "ST"))
+    stamp = glue(("20261014", "T153000Z"))
+    root = os.path.join(work, "repo")
+    os.makedirs(os.path.join(root, "records"))
+    copy_library_into(root)
+    notes = os.path.join(root, "records", "notes.md")
+    original = "| A | 一 |\n| B | 二 |\n"
+
+    def reset(path=notes):
+        open(path, "w", encoding="utf-8").write(original)
+
+    def run(row, path=notes, dry_run=False):
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            code = insert(path, r"^\| A \|", "after", row, None, dry_run, notation_root=root)
+        return code, captured.getvalue()
+
+    reset()
+    refused = [
+        ("新行带紧凑时间戳", glue(("| C | 运行目录 ", stamp, " |")), "（ISO 紧凑时间戳）：「" + stamp + "」"),
+        ("新行带日期、时区词、时分", glue(("| C | 用户 2026-10-14 ", zone, " 15", colon, "30 定 |")), "（日期后面跟钟点）"),
+        ("新行带光秃的时区词", glue(("| C | 本机时钟是 ", zone, " |")), "（时区词）：「" + zone + "」"),
+    ]
+    for label, row, wanted in refused:
+        for dry_run in (False, True):
+            code, said = run(row, dry_run=dry_run)
+            if code != 6 or wanted not in said or "第 2 行" not in said or "→ 怎么办" not in said or "读不到钟点判据" in said:
+                problems.append("写 .md：%s%s本该退出码 6、点名形态「%s」与第 2 行与出路，实际 %d：%r"
+                                "（INSERT_ROW_BREAK=no-clock-guard 或 LIB_FORBIDDEN_NOTATIONS_BREAK 关掉那一形态的话这一条本来就该红）"
+                                % (label, "（干跑）" if dry_run else "", wanted, code, said))
+            if open(notes, encoding="utf-8").read() != original or os.listdir(os.path.dirname(notes)) != ["notes.md"]:
+                problems.append("写 .md：%s被拒绝之后文件或目录变了（一个字节都不该写、不该留临时文件）" % label)
+    code, said = run(glue(("| C | 编号 99999999", "T1234 |")))
+    if code != 0 or open(notes, encoding="utf-8").read() != "| A | 一 |\n| C | 编号 99999999" + "T1234 |\n| B | 二 |\n":
+        problems.append("写 .md：8 位数字后跟 T 但不是时间戳的新行本该放行（退出码 0），实际 %d：%r"
+                        "（LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose 设着的话这一条本来就该红）" % (code, said))
+    reset()
+    code, said = run("| C | 用户 2026-10-14 定 |")
+    if code != 0 or open(notes, encoding="utf-8").read() != "| A | 一 |\n| C | 用户 2026-10-14 定 |\n| B | 二 |\n":
+        problems.append("写 .md：只写日期的新行本该放行（退出码 0），实际 %d：%r" % (code, said))
+    # 范围：别的后缀与仓外不判（带紧凑时间戳的新行照插）
+    for label, path in ((".txt 目标", os.path.join(root, "records", "notes.txt")), ("仓外的 .md", os.path.join(work, "outside.md"))):
+        reset(path)
+        code, said = run(glue(("| C | 运行目录 ", stamp, " |")), path=path)
+        if code != 0:
+            problems.append("写 .md：%s不归这一道判，本该放行（退出码 0），实际 %d：%r" % (label, code, said))
+    # 读不到共用库按拒绝处理，不静默放行：假仓里没有库，新行干净也拒，理由是读不到判据（不是钟点）
+    bare = os.path.join(work, "repo-without-library")
+    os.makedirs(os.path.join(bare, "records"))
+    bare_notes = os.path.join(bare, "records", "notes.md")
+    reset(bare_notes)
+    for dry_run in (False, True):
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            code = insert(bare_notes, r"^\| A \|", "after", "| C | 三 |", None, dry_run, notation_root=bare)
+        said = captured.getvalue()
+        if code != 6 or "读不到钟点判据" not in said or "lib-forbidden-notations.py" not in said \
+                or "FileNotFoundError" not in said or "→ 怎么办" not in said or open(bare_notes, encoding="utf-8").read() != original:
+            problems.append("写 .md：假仓里没有共用库%s，本该退出码 6、说「读不到钟点判据」点名库文件与 FileNotFoundError 与出路且不写文件，实际 %d：%r"
+                            % ("（干跑）" if dry_run else "", code, said))
+    # 入口：退出码与输出
+    reset()
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured):
+        code = main([notes, "--after", r"^\| A \|", "--line", glue(("| C | 运行目录 ", stamp, " |"))], notation_root=root)
+    if code != 6 or not captured.getvalue().startswith("  ✗ 新串在描述里写了钟点、时区词或时间戳，共 1 处") \
+            or open(notes, encoding="utf-8").read() != original:
+        problems.append("写 .md：入口本该退出码 6、打 ✗ 开头的说明且不写文件，实际 %d：%r" % (code, captured.getvalue()))
+    return problems
 
 
 def selftest():
@@ -206,6 +300,14 @@ def selftest():
             print("  ✗ 自检失败：--after-literal 带括号的锚点没插成（--before-literal 同一支），退 %d：\n%s" % (code, body))
             print("     → 查 insert() 里 literal 那一支是不是按字面（in）比；INSERT_ROW_BREAK=literal-as-regex 设着的话这里本来就该红。")
             return 1
+        clock_problems = problems_with_clock_guard(work)
+        if clock_problems:
+            print("  ✗ 自检失败：写 .md 之前判新行没判对")
+            for problem in clock_problems:
+                print("     " + problem)  # gate-lint:detail
+            print("     → 查 insert() 里调 clock_refusal 的那一段与 lib_notation_check.py；"
+                  "INSERT_ROW_BREAK=no-clock-guard 或 LIB_FORBIDDEN_NOTATIONS_BREAK 设着的话这里本来就该红。")
+            return 1
         # 写前复核：让 digest 在读之后返回不同的值，模拟别的会话在这中间写过
         global digest
         original = digest
@@ -247,12 +349,14 @@ def selftest():
         return 1
     print("  ✓ 自检：正常插入判绿、重复插入被 --absent 挡、锚点不唯一拒绝并列出每一处的行号、"
           "锚点带括号命中 0 次时点出元字符并给 --before-literal 与转义好的写法、--before-literal 按字面插成、读到写之间被改过拒绝且不写也不留临时文件；"
+          "写仓里的 .md 之前判新行：带紧凑时间戳、带日期时区词时分、带光秃时区词的拒绝（6，干跑也拒）并点名形态、行号与出路且不写文件，"
+          "8 位数字后跟 T 但不是时间戳、只写日期、.txt 目标与仓外的 .md 放行，假仓里没有共用库时读不到判据按拒绝办（退出码 6，理由不是钟点），入口退出码 6；"
           "换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、"
           "经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件")
     return 0
 
 
-def main(argv):
+def main(argv, notation_root=None):
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument("file", nargs="?")
     parser.add_argument("--after")
@@ -278,7 +382,7 @@ def main(argv):
         print("     → 怎么办：检查路径（相对路径相对当前工作目录），文件是不是已经被别的进程删掉或改名")
         return 1
     where, literal, anchor = anchors[0]
-    return insert(arguments.file, anchor, where, arguments.line, arguments.absent, arguments.dry_run, literal=literal)
+    return insert(arguments.file, anchor, where, arguments.line, arguments.absent, arguments.dry_run, literal=literal, notation_root=notation_root)
 
 
 if __name__ == "__main__":

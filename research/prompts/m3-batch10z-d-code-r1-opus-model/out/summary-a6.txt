@@ -1,2 +1,0 @@
-arm=cplusmountaccount k=3 rkind=n fault=acct histories=2113 mount_refused=0 step_refused=133 hit=0 borrowed=44:2113 selected=(1,6):2113
-arm=cplusmountaccount k=5 rkind=n fault=acct histories=300 mount_refused=0 step_refused=0 hit=0 borrowed=44:300 selected=(1,8):300

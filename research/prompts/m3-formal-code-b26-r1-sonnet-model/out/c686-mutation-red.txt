@@ -1,4 +1,0 @@
-thread 'allocation_record_tree_nodes_carry_birth_sequences_zero_to_four_as_the_bump_order_table_lists' (119230) panicked at crates/singlefs-harness/tests/new_pool_file_creation_publish.rs:1299:13:
-assertion `left == right` failed: t5 分配记录树叶，设备 0：叶里的记录全是表里写的那块盘的
-  left: [DeviceIdentity(1)]
- right: [DeviceIdentity(0)]

@@ -1,0 +1,23 @@
+
+running 3 tests
+first-write-fault outcome=C841-before-acquisition
+corrupted fault-free outcome=C841-before-acquisition total_reads=1070 reads_before_the_first_write=18446744073709551615 fault_free_changed_disk=false
+corrupted n=1 C841-before-acquisition disk-unchanged before-first-write fired=1
+corrupted n=2 C841-before-acquisition disk-unchanged before-first-write fired=1
+first-write-fault outcome=Acquisition
+unchanged fault-free outcome=Ok total_reads=3104 reads_before_the_first_write=1159 fault_free_changed_disk=true
+corrupted n=3 C841-before-acquisition disk-unchanged before-first-write fired=1
+corrupted scanned n=1..=3 step=1 in 2.107312718s
+corrupted summary 3 × C841-before-acquisition disk-unchanged before-first-write fired=1
+test scan_read_faults_on_the_image_with_the_retirement_container_at_the_top_of_its_range ... ok
+unchanged n=1 Ok disk-as-fault-free before-first-write fired=1
+unchanged n=2 Ok disk-as-fault-free before-first-write fired=1
+unchanged n=3 Ok disk-as-fault-free before-first-write fired=1
+unchanged scanned n=1..=3 step=1 in 10.234551747s
+unchanged summary 3 × Ok disk-as-fault-free before-first-write fired=1
+test scan_read_faults_on_the_image_not_changed ... ok
+continuation steps=16 bytes_per_step=[442880, 442880, 442880, 442880, 442880, 377344, 377344, 377344, 377344, 377344, 377344, 442880, 442880, 442880, 410112, 377344] sum=6594560 floor_raise_publishes=[213504, 213504] device_written_bytes={DeviceIdentity(0): 3766784, DeviceIdentity(1): 3763712} total_reads=3104
+test bytes_written_by_the_mount_after_acquisition ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.95s
+

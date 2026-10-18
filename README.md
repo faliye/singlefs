@@ -61,6 +61,8 @@ How far verification reaches:
 | Formal verification | Verus verifies the pure-function core of recovery replay that takes the journal prefix, does root selection and the ring scan (`crates/singlefs-replay-prefix`); this same code is what gets compiled into the product | checker-tier-formal-verification |
 | Mutation | The crates mutation table breaks one place per row and the named test must go red; broad mutation (cargo-mutants) requires a conclusion for every mutant and none left unkilled | checker-tier-crates-mutation-replay, checker-tier-broad-mutation |
 
+How much has been judged: the full run of 2026-10-16 to 2026-10-18 covered 14 crash enumeration cases; the 12 whose logs print a state count total 5,149,586,107 crash states (about 5.15 billion), every state with a verdict under the same key and 0 violations; verdicts are stored in the crash verdict library and reused by function unit key, and the judge runs on the GPUs of two hosts. Case 6 was not rerun on the final tree, and the quick tier judgement of case 12 was changed on the last day. The six heavy gates had one pass on 2026-10-15: herd7 and QEMU (6 VM runs, 123 checks) green, formal verification and the mutation table ran their light tier (2 of 172 mutation rows not red), and broad mutation has no conclusions for this version of the code yet; the numbers of every test are summarized in the "Summary of test data" section of the 2026-10-18 brief.
+
 **An all-green gate is only evidence of crash consistency at the model level**, not "verified". For how far each item reaches, which items are recorded as not run this time, and what is not covered yet, see the latest file in [`briefs/`](briefs/).
 
 ## System configuration
@@ -133,6 +135,7 @@ After an upstream release, copy again with the same `rsync` and run `install.sh`
 | [`crates/singlefs-checker-tier`](crates/singlefs-checker-tier) | Checker tier: crash-state enumeration, verdict library, crash amplification, GPU judge, real-device fixtures; runs by default only at commit time |
 | [`crates/singlefs-checker`](crates/singlefs-checker) | Pool-level checker: the library that judges one image; shares only the format constants with the implementation |
 | [`crates/singlefs-replay-prefix`](crates/singlefs-replay-prefix) | The pure-function core of recovery replay that takes the prefix, does root selection and the ring scan; this is what Verus verifies |
+| [`crates/singlefs-unit-graph`](crates/singlefs-unit-graph) | Function-unit graph: splits Rust and WGSL source into units, fingerprints them with comments stripped, collects the closure from an entry point and computes the reuse key; depends only on std |
 | [`crates/singlefs-reference-filesystem`](crates/singlefs-reference-filesystem) | RefFS: a semantic-level reference file system that walks POSIX operations in memory only |
 | [`crates/mutations.tsv`](crates/mutations.tsv) | The mutation table of the crates |
 | [`scripts/`](scripts/) | Scripts used again and again, in subdirectories by purpose; see its README for what goes where |

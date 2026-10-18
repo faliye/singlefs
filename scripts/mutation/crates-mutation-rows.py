@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# admission: always 判的是此刻被判的仓、它的 crates/mutations.tsv 与 git common-dir 里的判定库记录，上一次的结论不替这一次作保
-# run-condition: none 算判法版本与行键要的 git、cargo、rustc 由 admission.py 的 git_common_directory 与本模块的 toolchain_text 起、起不来报错退 2；llvm-profdata、llvm-cov 由 run_stage 现找、找不到判红；--selftest 用自己造的假 cargo、假 llvm 工具与假内存包装，不编译
-"""门禁 checker-tier-crates-mutation-replay（crates 变异表复跑）的判法与判定库记录，连同门禁 code-source-discipline 静态判的那几样：一份判法只在这里，两道阶段都调它。
+# admission: always 判的是此刻被判的仓、它的 crates/mutations.tsv 与 git common-dir 里那一份判定库，上一次的结论不替这一次作保
+# run-condition: none 算判法单元、行键要的 git、cargo、rustc 由 admission.py 的 git_common_directory 与 lib_mutation_units.py 的 toolchain_lines 起、起不来报错退 2；llvm-profdata、llvm-cov 由 run_stage 现找、找不到判红；--selftest 用自己造的假 cargo、假 llvm 工具与假内存包装，不编译
+"""门禁 checker-tier-crates-mutation-replay（crates 变异表复跑）的判法与判定库，连同门禁 code-source-discipline 静态判的那几样：一份判法只在这里，两道阶段都调它。
 
 变异表一行成形 = 六段制表符分隔（变异名、文件、原文、替换文、cargo test 参数、必须红的测试名）；替换文可以空（删掉原文：改坏时原文换成空串），
 其余五段一段都不许空（malformed_reason，read_table 照它读；checker-tier-crates-mutation-replay、static-check、import 同一份）。
@@ -24,22 +24,25 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
                                         门禁 code-source-discipline 调它；--table 不给就读 <根>/crates/mutations.tsv（不在当空表）；
                                         参数不对（缺 <根>、--table 缺值、<根> 不是目录）与 --table 指的文件不在都打 ERROR 行（原因）、
                                         下一行「→ 怎么办」，退 2
-  judge-version <根>              这棵树此刻的判法版本（见「判定库」）：打「<sha256> <项数>」；算不出退 2
-  records-directory <根>                这棵树此刻那一格判定库记录目录的路径（双机分片的驱动拷记录用）；算不出退 2
+  judging-units <根> [--units]          判法单元指纹（见「判法单元」）：打「<sha256> <单元数>」，带 --units 再逐个打单元（种类、文件:起-止、限定名、指纹）；算不出（拒算）退 2
+  toolchain <根>                        行键里的工具链行（rustc -vV、cargo -V、构建环境解析后的值）；双机分片的驱动拿两台的比。算不出退 2
+  library-directory <根>                这棵树此刻那一份判定库的路径（双机分片的驱动从第二台拷回来比对用）；算不出退 2
   row-plan <根>                         双机分片的驱动（scripts/mutation/mutation-shard-run.sh）分行用：每一条成形的变异打一行
-                                          <行号> <行键> <这一趟会不会复用，1 或 0> <上一次现跑的秒数，没记过写 ->
-                                        （制表符分隔；「会不会复用」与 run_stage 同一份判法 reuse_decision，SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1 时一律 0）；
-                                        退 0；读不了表、上限写错、算不出判法版本退 2
-  plan <根>                             只读：不编、不跑、不写，按现有记录逐行打「<行号>\\t<变异名>\\t复用|现跑\\t<栏>\\t<细节>」（栏见「复用判据」），
-                                        末行「合计 <N> 行：按覆盖复用 <M> 行、现跑 <K> 行（<各栏的数>）」。退 0；读不了表、上限写错、算不出判法版本退 2
-  import <根> <别处的记录目录>          把另一台写的判定库记录导进本机：逐条核文件名与内容对得上、判法版本等于本机此刻算的、行键是本机变异表里某一行
-                                        （连同本机这一趟的每条内存上限、限时与工具链）算得出的，再照本机此刻的源码过一遍复用判据（reuse_decision，
-                                        覆盖记录、快照与源码副本取别处那一份）：抓到的要判成复用、基线 ok 的要快照与本机此刻相同；符的连同它引的
-                                        覆盖记录、快照与源码副本写进本机那一格记录目录（同目录临时文件写完改名），不符的拒、逐条列出栏与细节。
-                                        跨机不比主机名，记录里也不写。退 0 全收；退 1 有拒的；退 2 用法错或算不出判法版本
-  --list-items <根>                     逐行打可点名的变异：「<变异名>\\t第 <行号> 行，改 <文件>」，不编、不跑（与门禁 --list-items 同一份）
+                                          <行号> <行键，拒算写 -> <这一趟会不会复用，1 或 0> <上一次现跑的秒数，没记过写 -> <anchor-broken 或 ->
+                                        （制表符分隔；「会不会复用」与 run_stage 同一份判法 row_decision，SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1 时一律 0；
+                                        锚点失效的行（见「锚点失效」）不算键，打「<行号> - 0 - anchor-broken」）；
+                                        退 0；读不了表、上限写错、算不出判法单元或工具链退 2
+  plan <根>                             只读：不编、不跑、不写，逐行打「<行号>\\t<变异名>\\t复用|现判|拒算|锚点失效\\t<栏>\\t<细节>」（栏见「复用判据」，细节里列变了哪几个单元），
+                                        末行「合计 <N> 行：复用 <M> 行、现判 <K> 行（<各栏的数>）、拒算 <R> 行、锚点失效 <A> 行」。退 0；读不了表、上限写错、算不出判法单元退 2
+  import <根> <另一台的库目录>          把另一台这一趟判出来的记录并进本机那一份库：records/ 与 baselines/ 逐条核文件名等于记录里的键、判法单元指纹等于本机此刻的、
+                                        键是本机变异表里某一行照本机此刻的源码、判法单元、工具链与依赖算得出的（行键里有被改坏的单元、点名测试的闭包，
+                                        源码不同的那几行自然对不上）；coverage/ 只收本机某条点名测试此刻的覆盖号；compositions/ 与 units/ 照收（只当索引）。
+                                        符的写进本机那一份库，不符的拒、逐条列出。跨机不比主机名，记录里也不写。退 0 全收；退 1 有拒的；退 2 用法错或算不出判法单元
+  --list-items <根>                     逐行打可点名的变异：「<变异名>\\t第 <行号> 行，改 <文件>」，锚点失效的那一行末尾接「；锚点失效：<为什么>」，不编、不跑（与门禁 --list-items 同一份）；
+                                        末行合计这一趟键对不上（要现判）、对得上（复用）、拒算、锚点失效的各几条，锚点失效的逐行点名（行号与变异名）；
+                                        再一行报牵连面（见「牵连面」）
   --item <行号或变异名> [--item …] <根>  只判点名的几行：交给门禁 checker-tier-crates-mutation-replay.sh --item（同一份选行模式，点名单跑与整张跑时那一行判定相同，
-                                        判定库记录照写、照复用）；点名的不在表里退 2。是重型（.claude/hooks/lib_heavy_tests.py 按名字认）
+                                        判定库照写、照复用）；点名的不在表里退 2。是重型（.claude/hooks/lib_heavy_tests.py 按名字认）
   llvm-tools <根>                       打找到的 llvm-profdata、llvm-cov 与它们的 LLVM 版本；找不到或与 rustc 的 LLVM 版本对不上退 1、给出路
   --selftest                            自证（假 cargo、假 llvm 工具、假内存包装，在临时仓里跑 run_stage；格数由成功行现算）
 
@@ -48,63 +51,78 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   ② 管不到的：路径拼在变量里、环境变量给的、format! 拼出来的、不以 "../ 起头而运行期再 join("..") 的；#[path = …] 不算（编译期带进来的源文件，
   副本里编得过就在）；指到仓根本身（"../../" 这一类）按不在范围里算（之后拼上的是哪一份判不出）。
 
-判定库（checker-tier-crates-mutation-replay 每条判完立刻写，下一趟按「复用判据」逐行判复用还是现跑）：
-  Python 一侧判定库的共用部分在 scripts/crash/lib_verdict_library.py（原子写 write_atomically、按键读 read_text、现判与复用分开报 Tally），这里调它；
-    这一份每条另挂覆盖记录、快照与源码副本，存放布局与复用判据在这里，不在共用部分。
-  键分两列（判定库文件头「键分两列」）：判法版本定这一格目录，行键（这一行的输入指纹里不随源码变的那一段）定一条记录；
-    这一行改坏的源码与它执行过的函数不进行键，由快照与覆盖记录按「复用判据」比。
-  放在被判那棵树的 git common-dir 下 singlefs-mutation-rows/<判法版本>/：一条一个文件 mutation.<行键>（变异的判定）、baseline.<行键>（基线），
-    子目录 coverage/<覆盖号>.json.gz（覆盖记录）、snapshots/<快照号>.json.gz（快照）、blobs/<sha256>（源码副本，zlib 压过）。
-  判法版本 = 登记行 + 阶段脚本 + 本模块 + scripts/mutation/mutation-prune.py（切词与切 fn 项）+ scripts/gate/lib_libtest_result_lines.py（libtest 结果行）
-    + scripts/crash/lib_verdict_library.py（判定库共用部分）+ 这一趟用的内存包装，连同构建环境（admission.py 的 build_environment_lines：照理是输入，
-    对每一行都一样，变了整张重判，所以放进这一列），不含被测源码；阶段脚本、本模块、mutation-prune.py、lib_libtest_result_lines.py、lib_verdict_library.py 与内存包装按内容进（名字里不带绝对路径，主工作区与临时 worktree、两台机器上算出同一个数）。这几样变了换一格目录，旧记录一条都不用。
-  行键 = sha256（这一行六段原样用制表符接起来 + 这一趟的每条内存上限 + 每条限时 + 工具链：cargo -V 与 rustc -V 原样，toolchain_text）。
-  快照 = 拷贝范围里 scripts/ 之外每个文件（跳过 target 与 crates/mutations.tsv，照 prepare_shard 拷的那样走）的「路径 → sha256」；快照号是它的 sha256。
-    每个工作进程按自己那份源码副本算一份，记录里写的是那一份（开跑之后主工作区又改了，记录照实写跑的是哪一份）。
-  覆盖记录（cargo 参数 + 点名用例一份，被同一组合的各行共用；覆盖号 = sha256（组合键 + 快照号），组合键 = sha256（`--` 之前的参数、`--` 之后的开关、
-    点名用例的全名、工具链））：有一行判成抓到、这一组合在那份快照上还没有覆盖记录时，在没改坏的副本上记一份（judge_coverage）：
+锚点失效（anchor_problem，row_problems 的 ANCHOR 与 run_stage、plan、row-plan、--list-items 同一份判法）：原文在被判仓里「文件」那一段指的源码里不是恰好命中一次，
+  或文件不在、读不了。按行判，不让整张表退出：那一行记它自己的判定「锚点失效」（不起 cargo、不算键、不写判定库、不复用，整道判红），别的行照判、照入库；
+  「计数：」那一行有「锚点失效 N 行」一栏，判红的那一段逐行点名（行号、变异名、为什么）；选行（--item、--quick、双机分片的驱动）同样按行。
+  派活之前另几样（不成形、测试名、拷贝范围、转义）照旧有一行就整道判红、一个工作进程都不起，那时锚点失效的行连同它们一起列出。
+  row-plan 给锚点失效的行写「-」键与 anchor-broken，双机分片的驱动不把它们分给第二台。
+
+牵连面（impact_summary，只报数、不判红）：每一行的键依赖的单元 = 点名测试的单元闭包（KeyContext 为这一行算好的那一份，不另算）连同被改坏的单元；
+  一个单元进了几行的这一份，改它一次就作废几行的判定。成功句之后与 --list-items 末了各打一行
+  「牵连最大的函数单元：<文件>::<限定名> 进了 N 行的闭包（前 5：<单元> N、…）；一次改动最坏牵连 N 行」，单元按（种类、文件、限定名）认，
+  N 相同按单元名排；拒算与锚点失效的行没有闭包，不算进，那一行末尾写明算了几行、没算几行。
+
+
+复用：每行一条判定，行键是被改坏的函数单元指纹、原文、替换文、点名测试的单元闭包键、判「抓没抓到」的判法单元指纹、工具链、解析出的依赖版本，
+  不带变异名、路径、测试名、内存上限、限时；没有管整库的版本号、没有版本目录；一份库，第二台判出的经 import 逐行核键并进本机那一份。
+  没有整道全绿标记，不问 stage-must-run.sh。单元的切法、指纹与闭包在 scripts/gate/lib_function_units.py，这里经 scripts/mutation/lib_mutation_units.py 调
+  （mutate.sh 的按条库也用那一份，文件头写了单元、工具链行、依赖版本行与库的存放）。
+
+判法单元（judging_units，JUDGING_ENTRIES）：判「抓没抓到」的那几个函数——结局分类 verdict_of_run（连同它调到的 libtest 结果行解析，
+  scripts/gate/lib_libtest_result_lines.py 一份）、基线分类 baseline_problem、覆盖复用判据 baseline_reuse_problem、切 fn 规则
+  （lib_mutation_units.py 的 UnitKeys.mutated_units、resolve_test、executed_units，连同它们调到的 lib_function_units.py）——从它们收 python 闭包合起来，
+  指纹 = 闭包里单元（种类，去注释指纹）的多重集。只改注释、文档串、别的函数（阶段脚本的调度、内存包装、判定库的存放、派活与报数）指纹不变；
+  改了闭包里任何一个函数，整张表的行键都变。闭包里有拒算（getattr 变量名、折不出的 import 路径这一类）就算不出，这一道判红、一条都不跑。
+
+行键（KeyContext.components，文件头「复用」那一句的逐样）：
+  被改坏的单元   原文所在那份 .rs 里与原文重叠的最里层单元（fn 项；函数外的项按项单元：const、static、struct、impl 头、宏……）的（种类，指纹）；
+                 原文不落在任何单元上拒算；不是 .rs 的（litmus/ 这类测试读的数据文件）取整份字节的 sha256
+  原文与替换文   原样（\\n \\t \\\\ 转义）
+  点名测试       cargo 参数选中的目标里那条 #[test] fn 单元的闭包键（入口 = 那条测试函数，lib_function_units.py 的 rust_closure_of，
+                 带上 cargo 参数里的特性）；认不出是哪一个单元、或闭包拒算，这一行拒算
+  开关与特性     cargo 参数里不是名字的开关（--release、--include-ignored 这一类）与特性
+  工具链         lib_mutation_units.py 的 toolchain_lines（rustc -vV、cargo -V、构建环境解析后的值）
+  依赖版本       点名测试的闭包与被改坏的单元真点名的外部 crate 在 Cargo.lock 里落到的包与传递依赖（lib_mutation_units.py 的 dependency_lines）
+  拒算的行每趟照跑、不复用、不写记录，成功句另报「拒算 R 条」，stderr 逐行写为什么。
+
+判定库（checker-tier-crates-mutation-replay 每条判完立刻写，下一趟按「复用判据」逐行判复用还是现判；存放在 lib_mutation_units.py 的 Library）：
+  放在被判那棵树的 git common-dir（GATE_MUTATION_RECORDS_HOME 设了放它底下）的 singlefs-crates-mutation-library/，固定一处：
+    records/<行键>        一条变异的判定（判定、要打的那一行、判定日期、跑法、点名测试的闭包号、被改坏的单元号、工具链与依赖的号）；
+                          只有超时、内存撞顶那两档另记这一趟的上限与限时（这两档本来不复用）
+    baselines/<基线键>    一条点名测试在没改坏的副本上的基线（基线键 = 判法单元、测试 fn 单元指纹、开关与特性、工具链、依赖）
+    coverage/<覆盖号>     覆盖记录（覆盖号 = 测试 fn 单元指纹、开关与特性、工具链）：那条测试执行过的单元及各自的指纹，不带用例全名与快照号
+    compositions/、units/  组成清单（判法单元、每份点名测试的闭包、工具链行、依赖版本行）与单元表：作废时照它报变了哪几个单元
+    index/<变异名与文件>  这一行上一次的键与几样组成的号：只用来说清现判的原因，不当复用的依据
+    timings/<六段>        上一次现跑的用时与超没超时（派活次序用；import 不导：另一台的快慢不代表本机）
+  每趟读到、写到的都摸成此刻；收尾删掉 30 天里没被任何一趟引用的（lib_mutation_units.py 的 UNREFERENCED_DAYS_KEPT），不按个数、不按版本删。
+  旧的 singlefs-mutation-rows/<整库版本号>/ 与 singlefs-mutation-row-timings/ 不再读也不再写（不迁移、不补签）。记录里不写主机名。
+  GATE_MUTATION_RECORDS_HOME=<目录> 设了，判定库放在它底下、不放 git common-dir；run_stage、library-directory、import、row-plan、plan、--list-items 都认它。
+
+复用判据（row_decision，按次序）：
+  一律现判        SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1：只写不读（不读库、现判的照键写回同一份库）
+  拒算            这一行算不出键（见「行键」）：照跑，不复用
+  复用            库里有这把行键的记录，判的是抓到
+  上次没判成抓到  有这把键的记录，判的是别的档（没红、无效、超时、内存撞顶……只有抓到的复用）
+  键对不上的那一行照索引里它上一次的那一份逐样比，栏报头一样变了的：判法单元变了、被改坏的单元变了、点名测试的闭包变了、原文或替换文变了、
+  工具链或依赖变了（索引里没有这一行的报「行新加」），细节里列变了的单元（改了 / 新进 / 出了 <文件>::<限定名>）。
+  前提：用例对同一份源码执行的函数集合是确定的（随机源、线程、时序只改函数里走哪条分支）；SINGLEFS_GATE_FULL=1 整张重判。
+  基线 ok 那一条（要现判的行先看它的基线能不能复用，baseline_reuse_problem）：库里有这把基线键的 ok 记录，而且覆盖记录里那条测试执行过的单元
+  （执行过的 fn 单元，连同它闭包里不是 fn 的单元：常量、类型、静态项、宏、数据文件）此刻逐个是那个指纹，或者点名测试的闭包键与记录里的相同；
+  不按整树快照比（同一个文件里加一个没人调的函数、改别的测试，基线照样复用）。
+
+覆盖记录（一条现判成抓到的行，它点名的测试此刻还没有一份执行过的单元都没变的覆盖记录时，在没改坏的副本上记一份，judge_coverage）：
     ① cargo test --no-run --message-format=json-render-diagnostics 带 -C instrument-coverage（环境里有 RUSTFLAGS / CARGO_ENCODED_RUSTFLAGS 就接在后面，
        没有就经 --config build.rustflags，与配置文件里的合并），编译目录是这个工作进程的编译目录加 -coverage；
        LLVM_PROFILE_FILE=<这一格的 TMPDIR>/build-profiles/build-%p-%m.profraw：cargo 没带 --target 时 RUSTFLAGS 也罩构建脚本与过程宏，它们在各自依赖包的源码目录
-       （~/.cargo/registry/src/ 下）里起，不设这个变量就在那里写 default_*.profraw；所以走「设变量」而不是「插桩只罩工作区成员」（后者要 --target <宿主>，
-       换了产物目录布局，dep-info 与可执行文件路径都跟着变）；
+       （~/.cargo/registry/src/ 下）里起，不设这个变量就在那里写 default_*.profraw；
     ② cargo test -- <开关> --exact <用例全名>，LLVM_PROFILE_FILE=<这一格的 TMPDIR>/cov-%p-%m.profraw；点名用例要恰好一行 ok；
     ③ llvm-profdata merge -sparse，llvm-cov export -format=text -skip-expansions，对象是 ① 编出来的本仓每个可执行文件（测试与 bin）；
-    ④ 记：编进去的文件（① 里本仓每个编译单元的 cargo dep-info，proc-macro 与构建脚本的单元另记成编译期）、涉及的包目录、
-       执行过的函数（计数 > 0 的函数按它第一段代码区域落进哪个最外层 fn 项，照 scripts/mutation/mutation-prune.py 的 covered_containers：
-       「文件 + 限定名」，落在 fn 项之外记 <函数外>、文件切不开记 <整个文件>），编进去的每个 .rs 存一份源码副本。
-    ①–③ 经内存包装、上限与限时同变异；有一步不成这一组合不记（下一趟照「没有覆盖记录」现跑），成功句另报「覆盖没记成 N 组」，不判红。
-    记成之后把这一趟判成抓到、所判快照与它相同的同组各行改指到它（复用来的保留原来的 finished_utc）。
+    ④ 记：计数 > 0 的函数按它第一段代码区域的行落进的最里层单元（lib_mutation_units.py 的 executed_units），连同点名测试闭包里不是 fn 的单元，
+       各自的（种类、文件、限定名、指纹）；有函数落不进任何单元的，这一份记成不全、不拿来复用。
+    ①–③ 经内存包装、上限与限时同变异；有一步不成这一条测试不记（下一趟它的基线只按闭包复用），成功句另报「覆盖没记成 N 份」，不判红。
   llvm 工具：GATE_MUTATION_LLVM_TOOLS=<目录> 设了用它（双机分片的驱动设了就带到第二台），不设取 rustc --print sysroot 下 lib/rustlib/<host>/bin
     （rustup 组件 llvm-tools）；两样都要在、--version 的 LLVM 版本要以 rustc -vV 的「LLVM version」起头，不然这一道判红、一条都不跑，不退回不记覆盖。
-  只有「抓到」与基线 ok 的记录复用，别的档每趟重跑；记录不按时限过期（SINGLEFS_REUSE_HOURS 这一道不认）；
-  SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1 一律不复用（照旧写新记录、记覆盖）。
-  基线 ok 的记录只在它的快照与此刻的快照相同时复用。
-  每趟收尾删掉没有行引的覆盖记录、没有记录引的快照、没有覆盖记录引的源码副本（collect_garbage）。
-  singlefs-mutation-rows/ 底下只留最新的 3 个判法版本目录（按修改时刻，这一趟的那个算最新），更早的开跑时删；别处一概不删。记录里不写主机名。
-
-复用判据（reuse_decision，纯函数；按次序判，头一条不成立的就是这一行现跑的栏）：
-  一律现跑   SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1
-  行新加或改了   这一格目录里没有这个行键的 mutation 记录（六段、上限、限时、工具链任一样变了行键就变）；目录里一条新格式记录都没有时记「没有覆盖记录」
-  没有覆盖记录   上次不是抓到（只有抓到记覆盖），或抓到而没有覆盖记录、覆盖记录或它的快照读不到
-  （上次判抓到、所判快照与此刻相同：一字未动，复用，不看覆盖）
-  被变异的函数变了   被变异那份文件里原文不是恰好一处；或那份文件是编进测试二进制的 .rs，包住原文的最外层 fn 项（mutation-prune.py 的 FileIndex 切的，
-                    含属性、文档注释、签名与函数体，比词法单元序列，注释与空白不算）此刻没了、变了，或原文此刻不落在它里面；原文不在任何 fn 项里的，
-                    那份文件函数外的部分要不变；不是编进去的 .rs（litmus/ 这类）按整份 sha256 比
-  执行过的函数变了   那条用例执行过的每个「文件 + 限定名」，此刻的词法单元序列要与覆盖记录那份快照里的相同（<函数外> 比函数外部分，<整个文件> 比整份）
-  函数外有改动   覆盖记录那份快照与此刻之间每个变了的文件（新加、删掉、改了）按 path_effect 分：
-                    编进去的 .rs、两边都在：函数外的词法单元要不变、切得开，不许新加函数（#[test] 函数与 fn 里嵌套的 fn 除外），
-                      变了的函数不许改属性、不许是 const fn、函数体里不许有 impl 块（outside_problem）；
-                    编进去的其余文件（include_str! 读的、proc-macro 与构建脚本单元的、删掉了的）一律算函数外；
-                    涉及的包目录里没编进去的：.rs 只有落在 cargo 自动发现的目标位置（build.rs、src/main.rs、src/lib.rs、src/bin/、tests/、examples/、benches/）
-                      而新加或删掉的算，别的 .rs 不算；非 .rs（Cargo.toml、测试读的数据文件）一律算；
-                    没涉及的包目录里的不算；不在任何包目录里的（根 Cargo.toml、Cargo.lock、.cargo/、litmus/）一律算
-  都成立就「按覆盖复用」。前提：用例对同一份源码执行的函数集合是确定的（随机源、线程、时序只改函数里走哪条分支）；不守这条的用例照常复用：
-    判定本来就是单跑一趟的结论，同组有一行现跑时记的新覆盖顶掉旧的，SINGLEFS_GATE_FULL=1 整张重判。
-  GATE_MUTATION_RECORDS_HOME=<目录> 设了，判定库记录与用时表放在它底下、不放 git common-dir（双机分片的驱动给第二台设：那棵树每趟新拷、跑完删，
-    记录与用时表要跨趟留着）；run_stage、records-directory、import、row-plan、plan 都认它。
-  用时表：同一个 git common-dir 下 singlefs-mutation-row-timings/<这一行六段原样的 sha256>，跨判法版本沿用，记上一次现跑的用时与超没超时；
-    import 不导用时（另一台的快慢不代表本机）。
+  用时表：库里 timings/<这一行六段原样的 sha256>，记上一次现跑的用时与超没超时。
   用时从包装起跑到返回分两段记：排队（调包装到命令在 scope 里起来）与跑（起来到返回）。命令起来的那一刻由包在命令外面的一层 bash 记进
     这一趟源码副本总目录底下的一个文件（不在那一条的 TMPDIR 里，不进「删前留有几个文件」）；包装的峰值表仍按原命令记键（RUN_WITH_MEMORY_CAP_KEY）。
   包装排队时每 60 秒往 stderr 报一行（scripts/hosts/run-with-memory-cap.sh 的 WAITING_REPORT_EVERY_SECONDS）；这里收包装的 stderr 判结局，
@@ -119,28 +137,35 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
 基线（派变异之前，按批在没改坏的副本上跑一遍点名的测试）：
   批的键 = 这一行 cargo 参数里 `--` 之前那一段 + `--` 之后以 `--` 起头的开关；过滤词取这一批要跑基线的各行 `--` 之后非开关词的并集，
   有一行没有过滤词就整批不带过滤词。要单独带值的开关（`--skip 名字`、`--test-threads 4`）写成 `--test-threads=4`：分开写时那个值会被当成过滤词。
-  同样经内存包装、同样的上限与限时。每一行的点名测试在基线输出里要恰好对上一个用例、结果都是 ok，否则这一行记「基线不绿」：
+  同样经内存包装、同样的上限与限时（一批取这一批里各行逐行上限的大者）；限时只罩跑测试那一趟：先在同一个上限里不限时跑一趟
+  cargo test <-- 之前那一段> --no-run（编译），编不成就把那一趟当这一批的结果，编成了再限时跑（run_under_wrapper 的 compile_first；变异那一条同样）。
+  每一行的点名测试在基线输出里要恰好对上一个用例、结果都是 ok，否则这一行记「基线不绿」：
   不算抓到、不算没红、它的变异不跑，整道判红。已有作数的抓到记录或基线 ok 记录的行不再跑基线。
 
 本次未跑（2026-10-01 加）：点名的测试在本机没跑到被改坏的那一处时，打一行 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 后返回成功（GPU 对拍用例在没卡的机器上）。
   变异那一趟的 libtest 参数里补 --show-output（with_shown_output，插在第一个 `--` 之后）：成功用例的输出 libtest 默认不交出来；
   不用 --nocapture：单线程跑时它把用例的输出插进「test <名字> ... 」与结果之间，结果行就认不出。基线那一批不补。
   点名的测试结果是 ok、输出里有一行 test= 对上点名的测试（只比 :: 分开的末一段）的，这一条记「本次未跑」（not_run_reason）：不算抓到、不算没红，逐条打出来；
-  整道不因它判红，成功句写明抓到几条、本次未跑几条，全绿标记不写；一条抓到的都没有、只有本次未跑的退 77（选行模式照旧退 3 / 1）。
+  整道不因它判红，成功句写明抓到几条、本次未跑几条；一条抓到的都没有、只有本次未跑的退 77（选行模式照旧退 3 / 1）。
   GATE_MUTATION_NOT_RUN_RECORD=<文件> 设了，每条本次未跑往里追加一行（阶段把它转给 gate.sh 的 GATE_NOT_RUN_FILE）；写不进去整道判红。
   只有「抓到」复用，本次未跑的下一趟照跑。
 
+
 弄坏开关（GATE_MUTATION_BREAK，只给证红用，逗号分隔可给几个；CRATES_MUTATION_ROWS_BREAK 是同义名，直接起本模块自证时用，两个变量都认）：
   nobaseline           跳过基线：点名的测试在没改坏的副本上本来就红的行照样记抓到（checker-tier-crates-mutation-replay 红样本、本模块自证都必须判错）
-  timingsignored       派活不看用时表（自证「上一次跑得久的先派」那一格必须判错）
-  importunchecked      import 不核文件名、判法版本、行键与复用判据，照单全收（自证「导入一条行键对不上的记录：拒」「导入改了执行过的函数的记录：拒」两格必须判错）
-  rowkeywithouttoolchain  行键不带工具链（复用判据「行新加或改了」那一半：工具链换了照样复用）
-                       （自证「工具链变了：每一行都按行新加或改了现跑」那一格必须判错）
-  mutatedfunctionignored  复用判据不看被变异的函数（自证「改了被变异、没被执行的函数：只现跑那一行」那一格必须判错；
-                       「改了被执行、没被变异的函数」「导入改了执行过的函数的记录」两格同样判错：那里两行 adds 也只靠这一条现跑）
-  executedfunctionsignored  复用判据不看执行过的函数（自证「改了被执行、没被变异的函数：只现跑执行过它的那几行」「导入改了执行过的函数的记录」两格必须判错）
-  outsidechangesignored  复用判据不看函数外的改动（自证「改了函数外的类型定义：编进它的用例点名的行全部现跑」「新加一个用到的源文件：全部现跑」两格必须判错）
-  coveragenotrecorded  抓到之后不记覆盖（自证「头一趟每组记一份覆盖、同组的行共用一份」那一格必须判错；靠覆盖复用的格跟着判错，共 13 格）
+  timingsignored       派活不看用时表（自证「上一次超时的、跑得久的先派」那一格必须判错）
+  importunchecked      import 不核文件名、判法单元指纹与键，照单全收（自证「导入一条键对不上的记录：拒、列出来」「导入一条判法单元指纹对不上的记录：拒」两格必须判错）
+  rowkeywithouttoolchain  行键不带工具链（自证「工具链变了：每一行都现判」那一格必须判错）
+  row-key-with-limits  行键带上每条的内存上限与限时（改前的行键）（自证「每条限时 1800 → 3600（N33）：一行都不现判」那一格必须判错）
+  mutated-unit-ignored  行键不带被改坏的单元指纹（自证「改了被改坏、点名测试够不着的函数：只现判那一行」那一格必须判错）
+  test-closure-ignored  行键不带点名测试的闭包键（自证「改了点名测试调到、不是被改坏的函数：点名它的那一行现判」
+                       「改了被改坏函数用的常量（V5 那一类）：原文在那个函数里的两行现判」「改了点名测试够得着、没执行到的函数：那一行现判」三格必须判错）
+  baseline-by-tree-snapshot  基线 ok 只按整树快照复用（改前的判法）（自证「加一个没人调的函数、同时改一行的替换文：只那一行现判、它的基线复用」
+                       「改了点名测试够得着、没执行到的函数：那一行现判，基线按覆盖复用」两格必须判错）
+  judge-units-whole-file  判法单元指纹取闭包碰到的那几份文件的整份原文（改前的取法）（自证「只改判法脚本的注释：判法单元指纹不变」那一格必须判错）
+  coveragenotrecorded  抓到之后不记覆盖（自证「头一趟每条点名测试记一份覆盖、同一条测试的几行共用一份」
+                       「改了点名测试够得着、没执行到的函数：那一行现判，基线按覆盖复用」两格必须判错；另有记覆盖次数的四格跟着判错：
+                       「头一趟起 1 批基线 + 4 条变异，另记 4 份覆盖」「下一趟只跑剩下的 2 条」「插桩编译那一步写出的剖析文件」「会话里平常跑……4 个工作进程」）
   llvmversionunchecked 不核 llvm 工具与 rustc 的 LLVM 版本（自证「llvm 工具的 LLVM 版本与 rustc 对不上：判红、一条都不跑」那一格必须判错）
   buildprofilesunset   插桩编译那一步不设 LLVM_PROFILE_FILE（改前的样子：构建脚本与过程宏的剖析文件落进它们起的目录）
                        （本模块自证「插桩编译那一步写出的剖析文件只落在这一格的临时目录」那一格必须判错）
@@ -167,6 +192,28 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
                        （本模块自证「同一个共用编译目录上并发的两次调用各起 2 个工作进程：领到的片号集合不相交、四把片号锁都被占」那一格必须判错）
   sharedcrashlibrary   起 cargo 时不换崩溃判定库的家目录、不清调用方点名的单份库（改前的样子：变异版的结论写进真跑的长期库）
                        （本模块自证「变异复跑起的 cargo 写自己的崩溃判定库」「设了 GATE_MUTATION_CRASH_LIBRARY_HOME」两格必须判错）
+  anchor-stops-table   锚点失效的一行让整张表退出、一个工作进程都不起（改前的样子）
+                       （本模块自证「锚点失效按行判：那一行记锚点失效、别的行照跑照入库」那一格必须判错）
+  anchor-rows-planned  plan、row-plan、--list-items 不先剔掉锚点失效的行，照常算键（改前的样子：文件不是 .rs 的那一行算得出键、会被分给第二台）
+                       （本模块自证「row-plan、plan、--list-items 把锚点失效的行单列」那一格必须判错）
+  impact-row-dropped   牵连面少算一行（算进的头一行不数）
+                       （本模块自证「牵连面：样本 crate 上牵连最大的单元与行数」那一格必须判错）
+  reuse-lookup-skipped 复用判据一律不复用（键相同、判过抓到照样现判）
+                       （本模块自证 reuse-three-questions 那一格必须判错；reuse-sentinel 那一格要的就是这一趟复用哨兵判红「复用失灵」）
+  共用库 scripts/gate/lib_reuse_checks.py 的开关 REUSE_CHECKS_BREAK=rejudged-sentinel-passes（哨兵被现判不红）：本模块自证 reuse-sentinel 那一格必须判错
+  rowlimitsignored     不读轻型变异登记表里的「# 逐行上限：」（改前的样子：每行照整张表的那一个上限与限时）
+                       （本模块自证「逐行上限：一行另给的上限与限时只给它…」那一格必须判错）
+  timelimitincludescompile  基线与变异不先编、限时含重编译，插桩编译也限时（改前的样子）
+                       （本模块自证「逐行上限：…先编那一趟不限时…」与日常一条那两格（包装起的次数少了先编那几次）必须判错）
+复用三问与复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「一」「二」）：
+  自证 reuse-three-questions 一格：一份小仓（SELFTEST_UNIT_ROWS 五行）头一趟、同一份输入第二趟、同一个文件里加一个没人调的函数（闭包外）、
+    改被改坏的函数 check_root 的别一行（闭包内：原文在它里面的 root-457、root-double 两行现判）各跑一趟，打规范输出
+    「REUSE_SELFTEST script=scripts/mutation/crates-mutation-rows.py …」。已有同义的格在这一格里点名、不另留：「输入不变的第二趟：5 行都复用」是 ①，
+    「同一个文件里加一个没人调的函数（N45）」与弄坏开关 baseline-by-tree-snapshot 守的「加一个没人调的函数、同时改一行的替换文」是 ②，
+    「被改坏函数的别一行变了（S34）」是 ③。
+  每一趟 run_stage 开跑前从库里抽哨兵：候选是此刻行键在 records/ 里有「抓到」记录的行（直接读记录，与 row_decision 分开）；抽中强制现判的那一行
+    栏写「复用哨兵强制现判」、照现判跑。哨兵被现判、强制现判那一行不是抓到，整道判红。种子与条数取环境里的 SINGLEFS_REUSE_SENTINEL_SEED、
+    SINGLEFS_REUSE_SENTINEL_COUNT；SINGLEFS_GATE_FULL=1、GATE_MUTATION_START_OVER=1 不抽。自证别的格设 SINGLEFS_REUSE_SENTINEL_COUNT=1000（键相同的全当哨兵、不抽强制现判）。
 编译目录（default_shared_target_directory，阶段脚本不另算）：GATE_MUTATION_TARGET_DIR 设了用它；不然 GATE_CROSS_RUN_TMPDIR 设了（gate.sh 设成它开跑前的 TMPDIR）
   放它底下的 singlefs-crates-mutation-target；都没设放 ${SINGLEFS_CROSS_RUN_CACHE_HOME:-~/.local/share/singlefs/cross-run-cache}/singlefs-crates-mutation-target，
   不退回 $TMPDIR 或 /tmp（command-safety.md「有意跨轮复用的缓存」：放 GATE_CROSS_RUN_TMPDIR 下或项目定的位置）。第 1 片用它，其余片加 -w<片号>，记覆盖的再加 -coverage。
@@ -179,12 +226,19 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   同一台机器上并发的两次调用因此拿到不相交的片号集合，不再两边的第 2 片都指向同一个 -w2 而被 cargo 的「Blocking waiting for file lock on build directory」互相排队；
   编译目录仍按片号跨轮复用（不按仓路径或会话号分目录：--staged 的临时 worktree 每趟都会冷编）。片号锁文件建不了、或前 4096 片都被占：报一行，退回本调用内的本地序号。
   回收（reclaim_extra_target_directories）同样核片号锁：别的调用的工作进程刚领到的那一片，被占着的不删。
+逐行上限（read_row_limits、limits_for_lines）：核心部分的行各自要的内存与限时写在 .claude/gate.d/crates-mutation-light-rows.tsv 里，单起一行
+  「# 逐行上限：<变异名><TAB><内存上限，systemd 写法，或 -><TAB><限时秒，或 ->[<TAB># 依据]」（# 开头：那张表的核法 crates-mutation-light-rows.py 与门禁取名字的 awk 都不读它）。
+  点名的变异名照 crates/mutations.tsv 第一列认，同名的几行都拿它；没写的行、写 - 的那一样照整张表的那一个数（表头「# 每条变异的内存上限：」、GATE_MUTATION_MEMORY_MAX、默认 4G；
+  限时同形）。写法不对、点名的不是成形的一行，整道判红、一行都不判。一批基线（几行共用一份 cargo 参数）取这一批里最大的上限与最长的限时，一组覆盖取它那一行的；
+  工作进程数的外层内存那一项按这一趟要现跑的行里最大的上限算。取法定成逐行写（不按 host-resources.py 的峰值表现取）：峰值表里撞过顶的键记的是那一次的上限，
+  照它取只是把撞顶的数原样交回；逐行写的数要写依据（「推的」或量过的峰值与日期）。上限与限时都不进行键（row-key-with-limits 那一格的口径），改了不作废记录
+  （自证「逐行上限不进行键：改那一行的上限与限时之后一行都不现判」）。
 工作进程数（worker_count_for）：三项取最小、至少 1：核数的一半（至多 16，GATE_MUTATION_WORKERS 顶掉它）、这一趟要现跑的条数、外层内存上限 ÷ 每条变异的上限（向下取整）。
   外层内存上限读 RUN_WITH_MEMORY_CAP_OUTER_CAP（scripts/hosts/run-with-memory-cap.sh 套在外层时给命令设的，写法 正整数加 K / M / G / T，1024 进制）：
   套在外层包装里的里层包装不排队（那份文件头「套在包装里」），几条里层同时跑、合起来超过外层上限时只有 slice 的总上限兜着，所以按外层收；
   没设或写法不认就是没套在外层里：没有这一项（每条自己经包装排队、放不下的在它那里等），stderr 头一行写明「外层内存上限没读到」及原因，不悄悄少一项。
   外层上限不足一条的上限时按 1 个开（头一行写「那一项不足 1」）：里层的上限比外层大，包装会按用法错退 251，那是调用方该改上限的事，不在这里改每条的上限。
-  每条变异的上限本身不动（量到峰值之后再定；它进行键，一变全表判定记录作废）。
+  每条变异的上限本身不动（量到峰值之后再定）；上限与限时都不进行键，改了不作废记录（只记在超时、内存撞顶那两档的记录里）。
 测试线程数：不压。起 cargo test 时 RUST_TEST_THREADS 与仓里各测试读的线程数变量（SINGLEFS_THREAD_CAP 等）调用方设了什么就原样透传；只有 CARGO_BUILD_JOBS（编译并行度）按核数 ÷ 工作进程数收。
 变异复跑的判定库（mutation_crash_library_environment）：走判定库的 checker 档用例在变异版上判出的结论不写进真跑的长期库。起 cargo 的环境里
   SINGLEFS_CRASH_AMPLIFICATION_HOME 换成 GATE_MUTATION_CRASH_LIBRARY_HOME（设了、非空）；没设取真跑的家目录（调用方的 SINGLEFS_CRASH_AMPLIFICATION_HOME，
@@ -202,7 +256,6 @@ libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）与汇总
     本模块自证「调用方设了的并行理由原样传给每次包装、不覆盖」
 只供测试的开关：GATE_MUTATION_STOP_AFTER_ROWS=<k> 现跑的变异判完 k 条就不再派活、等在跑的收完，整道判红退出（造「跑到一半被杀」）。
 """
-import calendar
 import collections
 import concurrent.futures
 import contextlib
@@ -223,36 +276,50 @@ import sys
 import tempfile
 import threading
 import time
-import types
-import zlib
 
 sys.dont_write_bytecode = True
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 STAGE_REPOSITORY = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(STAGE_REPOSITORY, ".claude", "scripts"))
 from project_preflight import preflight  # noqa: E402
+sys.path.insert(0, os.path.join(SCRIPT_DIRECTORY, "..", "hosts"))
+from heavy_threads import HeavyThreadDefaultError, default_heavy_threads  # noqa: E402
 
-LIBTEST_RESULT_LINES_PATH = os.path.join(SCRIPT_DIRECTORY, "..", "gate", "lib_libtest_result_lines.py")   # libtest 结果行的解析（全仓一份），进判法版本
+LIBTEST_RESULT_LINES_PATH = os.path.join(SCRIPT_DIRECTORY, "..", "gate", "lib_libtest_result_lines.py")   # libtest 结果行的解析（全仓一份），进判法单元
 _LIBTEST_RESULT_LINES_SPECIFICATION = importlib.util.spec_from_file_location("lib_libtest_result_lines_for_crates_mutation_rows", LIBTEST_RESULT_LINES_PATH)
 libtest_result_lines = importlib.util.module_from_spec(_LIBTEST_RESULT_LINES_SPECIFICATION)
 _LIBTEST_RESULT_LINES_SPECIFICATION.loader.exec_module(libtest_result_lines)
-VERDICT_LIBRARY_PATH = os.path.join(SCRIPT_DIRECTORY, "..", "crash", "lib_verdict_library.py")   # 判定库共用部分（原子写、按键读、现判与复用分开报），进判法版本
-_VERDICT_LIBRARY_SPECIFICATION = importlib.util.spec_from_file_location("lib_verdict_library_for_crates_mutation_rows", VERDICT_LIBRARY_PATH)
-verdict_library = importlib.util.module_from_spec(_VERDICT_LIBRARY_SPECIFICATION)
-_VERDICT_LIBRARY_SPECIFICATION.loader.exec_module(verdict_library)
-write_atomically = verdict_library.write_atomically   # 同目录排他建临时文件、写完 fsync、改名换上；data 是 str 或 bytes
+MUTATION_UNITS_PATH = os.path.join(SCRIPT_DIRECTORY, "lib_mutation_units.py")   # 函数单元键与按条判定库（与 mutate.sh 共用），切 fn 规则进判法单元
+_MUTATION_UNITS_SPECIFICATION = importlib.util.spec_from_file_location("lib_mutation_units_for_crates_mutation_rows", MUTATION_UNITS_PATH)
+mutation_units = importlib.util.module_from_spec(_MUTATION_UNITS_SPECIFICATION)
+sys.modules[_MUTATION_UNITS_SPECIFICATION.name] = mutation_units   # 按名字登记：算闭包的子进程靠这个名字找回要跑的函数
+_MUTATION_UNITS_SPECIFICATION.loader.exec_module(mutation_units)
+write_atomically = mutation_units.write_atomically   # 同目录排他建临时文件、写完 fsync、改名换上；data 是 str 或 bytes
+REUSE_CHECKS_PATH = os.path.join(SCRIPT_DIRECTORY, "..", "gate", "lib_reuse_checks.py")   # 复用三问与复用哨兵（全仓一份），不进判法单元
+_REUSE_CHECKS_SPECIFICATION = importlib.util.spec_from_file_location("lib_reuse_checks_for_crates_mutation_rows", REUSE_CHECKS_PATH)
+reuse_checks = importlib.util.module_from_spec(_REUSE_CHECKS_SPECIFICATION)
+_REUSE_CHECKS_SPECIFICATION.loader.exec_module(reuse_checks)
+SCRIPT_KEY = "scripts/mutation/crates-mutation-rows.py"   # 规范输出与复用哨兵认的脚本名
 
-STAGE = "checker-tier-crates-mutation-replay.sh"   # 登记表的键、阶段脚本进判法版本，都按这个文件名
+STAGE = "checker-tier-crates-mutation-replay.sh"   # 登记表的键（拷贝范围）、阶段脚本的文件名
 STAGE_SCRIPT = os.path.join(STAGE_REPOSITORY, ".claude", "gate.d", STAGE)
 MODULE_PATH = os.path.realpath(__file__)
 DEFAULT_MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "run-with-memory-cap.sh")
 TABLE = "crates/mutations.tsv"
-RECORDS_DIRECTORY_NAME = "singlefs-mutation-rows"
-TIMINGS_DIRECTORY_NAME = "singlefs-mutation-row-timings"
-COVERAGE_DIRECTORY_NAME = "coverage"
-SNAPSHOT_DIRECTORY_NAME = "snapshots"
-BLOB_DIRECTORY_NAME = "blobs"
-SNAPSHOT_LEFT_OUT_PREFIX = "scripts/"   # 拷贝范围里 scripts/ 下的（内存包装、本模块与它读的几份库）按内容进判法版本，不进快照
+# 判定库（文件头「判定库」）：被判那棵树的 git common-dir（或 GATE_MUTATION_RECORDS_HOME）底下这一个目录，固定一处、不按版本号分目录
+LIBRARY_DIRECTORY_NAME = "singlefs-crates-mutation-library"
+ROW_KEY_FORM = "singlefs-crates-mutation-row-v1"
+BASELINE_KEY_FORM = "singlefs-crates-mutation-baseline-v1"
+COVERAGE_KEY_FORM = "singlefs-crates-mutation-coverage-v1"
+# 判法单元（文件头「判法单元」）：判「抓没抓到」的那几个函数，从它们收 python 闭包；阶段脚本的调度、内存包装、判定库的存放不在里面
+JUDGING_ENTRIES = (
+    "scripts/mutation/crates-mutation-rows.py::verdict_of_run",            # 结局分类，连同 libtest 结果行的解析（results_by_test → lib_libtest_result_lines.py）
+    "scripts/mutation/crates-mutation-rows.py::baseline_problem",          # 基线那一批的结局分类
+    "scripts/mutation/crates-mutation-rows.py::baseline_reuse_problem",    # 覆盖复用判据：基线 ok 那一条复用不复用
+    "scripts/mutation/lib_mutation_units.py::UnitKeys.mutated_units",      # 切 fn 规则：一条变异落在哪几个单元上
+    "scripts/mutation/lib_mutation_units.py::UnitKeys.resolve_test",       # 点名的测试是哪一个单元
+    "scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units",     # 覆盖落进哪几个单元
+)
 LLVM_TOOLS = ("llvm-profdata", "llvm-cov")
 LLVM_TOOLS_VARIABLE = "GATE_MUTATION_LLVM_TOOLS"
 COVERAGE_TARGET_SUFFIX = "-coverage"
@@ -274,18 +341,15 @@ WORKER_SLOT_LOCK_SUFFIX = ".slot"
 WORKER_SLOT_SEARCH_LIMIT = 4096
 COVERAGE_FLAG = "-Cinstrument-coverage"
 BUILD_PROFILES_DIRECTORY_NAME = "build-profiles"   # 插桩编译那一步（构建脚本、过程宏）写出的剖析文件的去处，在那一格的 TMPDIR 下，随 TMPDIR 一起删
-# cargo 自动发现的目标位置（相对包目录）：这里新加或删掉一个 .rs 就可能多编、少编一个目标
-AUTO_TARGET_FORMS = [re.compile(form) for form in (r"build\.rs", r"src/(main|lib)\.rs", r"src/bin/[^/]+\.rs", r"src/bin/[^/]+/main\.rs",
-                                                    r"tests/[^/]+\.rs", r"tests/[^/]+/main\.rs", r"examples/.*", r"benches/.*")]
-# 复用判据的栏（reuse_decision 交的栏名，次序就是报数的次序）
-REUSE_COLUMNS = (("start-over", "一律现跑"), ("row-changed", "行新加或改了"), ("no-coverage", "没有覆盖记录"),
-                 ("mutated-function", "被变异的函数变了"), ("executed-function", "执行过的函数变了"), ("outside", "函数外有改动"))
-COLUMN_TITLES = dict(REUSE_COLUMNS)
-BASE_DIRECTORIES_KEPT = 3
-FINGERPRINT_FORM = re.compile(r"[0-9a-f]{64}")
-RECORD_KINDS = ("mutation", "baseline")
+# 现判的栏（row_decision 交的栏名，次序就是报数的次序；拒算另报，不在栏里）
+REUSE_COLUMNS = (("start-over", "一律现判"), ("row-new", "行新加"), ("judging", "判法单元变了"), ("mutated", "被改坏的单元变了"),
+                 ("test", "点名测试的闭包变了"), ("text", "原文或替换文变了"), ("environment", "工具链或依赖变了"),
+                 ("not-caught", "上次没判成抓到"), ("unexplained", "键对不上"))
+COLUMN_TITLES = dict(REUSE_COLUMNS, refused="拒算", sentinel="复用哨兵强制现判")
+REASONS_SHOWN = 20   # stderr 逐行列现判与拒算原因的行数上限（只管列多少，全部的看 plan）
+KEY_WORKER_MEMORY = "512M"   # 算闭包的一个子进程按这么多内存算（套在外层内存包装里时按它收子进程数，key_workers；本仓整张表 24 个子进程合计峰值 4.67 GB）
 REUSABLE_VERDICT = {"mutation": "caught", "baseline": "ok"}
-RECORD_HEADER = ("# 门禁 checker-tier-crates-mutation-replay 的判定库记录（scripts/mutation/crates-mutation-rows.py 写，一条一个文件）：只有「抓到」与基线 ok 的、"
+RECORD_HEADER = ("# 门禁 checker-tier-crates-mutation-replay 的判定库记录（scripts/mutation/crates-mutation-rows.py 写，一条一个文件，按键寻址）：只有「抓到」与基线 ok 的、"
                  "照复用判据判过的复用（scripts/mutation/crates-mutation-rows.py 文件头「复用判据」）。不进工作树，别手改。\n")
 # 拷目录时跳过的名字（各 crate 自己的编译目录）。拷贝范围由它与登记的路径一起定：prepare_shard 照它们拷，is_copied_into_each_shard 照它们判。
 IGNORED_WHEN_COPYING_INTO_EACH_SHARD = ["target"]
@@ -305,6 +369,9 @@ SIZE_TEXT = re.compile(r"^([1-9][0-9]*)([KMGT])$")             # systemd 的写�
 SIZE_UNIT_BYTES = {"K": 1024, "M": 1024 ** 2, "G": 1024 ** 3, "T": 1024 ** 4}
 DEFAULT_TIMEOUT_SECONDS_PER_MUTATION = "1800"  # 依据见 checker-tier-crates-mutation-replay 文件头
 TIMEOUT_DIRECTIVE = re.compile(r"^#\s*每条变异的超时秒数[：:]\s*(\S+)\s*$")
+# 逐行的上限与限时（文件头「逐行上限」）：轻型变异登记表里单起一行「# 逐行上限：<变异名><TAB><内存上限或 -><TAB><限时秒或 ->[<TAB># 依据]」
+LIGHT_ROWS_TABLE = os.path.join(".claude", "gate.d", "crates-mutation-light-rows.tsv")
+ROW_LIMIT_DIRECTIVE = re.compile(r"^#\s*逐行上限[：:]\s*(?P<name>[^\t]+?)\t(?P<memory>[^\t]+)\t(?P<timeout>[^\t]+?)\s*(?:\t#.*)?$")
 DEFAULT_LONG_ROW_SECONDS = "300"               # 上一次用时不短于它（或超时）的行先派：GATE_MUTATION_LONG_ROW_SECONDS
 TIMEOUT_KILL_GRACE_SECONDS = 30                # 到点发 TERM 之后再等这么久，还不退就发 KILL（交给包装的 RUN_WITH_MEMORY_CAP_KILL_GRACE）
 PER_MUTATION_TEMPORARY_DIRECTORY_NAME = "per-mutation-tmp"
@@ -330,9 +397,10 @@ STAGE_VARIABLES = ("GATE_MUTATION_WORKERS", "GATE_MUTATION_CARGO_JOBS", "GATE_MU
                    "GATE_MUTATION_ROW_SELECTION", "GATE_MUTATION_START_OVER", "GATE_MUTATION_LONG_ROW_SECONDS",
                    "GATE_MUTATION_STOP_AFTER_ROWS", "GATE_MUTATION_TARGET_DIR", "GATE_MUTATION_MEMORY_CAP_RUNNER",
                    "GATE_MUTATION_RECORDS_HOME", "GATE_MUTATION_NOT_RUN_RECORD", "GATE_MUTATION_LLVM_TOOLS", "GATE_MUTATION_CRASH_LIBRARY_HOME", "SINGLEFS_GATE_FULL",
-                   "SINGLEFS_REUSE_HOURS", OUTER_MEMORY_CAP_VARIABLE)
+                   "SINGLEFS_REUSE_HOURS", "GATE_MUTATION_KEY_WORKERS", OUTER_MEMORY_CAP_VARIABLE)
 
 Row = collections.namedtuple("Row", "line_number name path old new arguments expected fields")
+
 FIELD_NAMES = ("变异名", "文件", "原文", "替换文", "cargo test 参数", "必须红的测试名")
 REPLACEMENT_FIELD = FIELD_NAMES.index("替换文")   # 六段里只有它可以空：替换文空着就是把原文删掉
 # 派活之前（checker-tier-crates-mutation-replay）与静态（code-source-discipline 经 static-check）判的那几样，打印与输出都照这个次序
@@ -341,7 +409,7 @@ _ADMISSION_MODULE = []
 
 
 def admission_module():
-    """scripts/gate/admission.py（判法版本里的构建环境与清单算法、git common-dir、登记表都用它的），第一次用到时才读进来。"""
+    """scripts/gate/admission.py（git common-dir、登记表里本阶段那一行的拷贝范围、前提都用它的），第一次用到时才读进来。"""
     if not _ADMISSION_MODULE:
         specification = importlib.util.spec_from_file_location("admission_for_crates_mutation_rows", os.path.join(SCRIPT_DIRECTORY, "..", "gate", "admission.py"))
         module = importlib.util.module_from_spec(specification)
@@ -356,6 +424,7 @@ BREAK_VARIABLES = ("GATE_MUTATION_BREAK", "CRATES_MUTATION_ROWS_BREAK")
 
 def break_is(environment, switch_name):
     return any(switch_name in environment.get(variable, "").split(",") for variable in BREAK_VARIABLES)
+
 
 
 def say(text):
@@ -444,6 +513,57 @@ def limits_of(memory_max_from_table, timeout_from_table, environment):
     return memory_max, timeout_seconds, problems
 
 
+def read_row_limits(root, rows, environment):
+    """轻型变异登记表里的「# 逐行上限：」那几行（文件头「逐行上限」）→ ({变异表行号: (内存上限或 None, 限时秒或 None)}, [(卡在哪, 下一步)])。
+    点名同一个变异名的几行都拿它；表不在交空的。弄坏开关 rowlimitsignored：不读（每行照整张表的那一个数）。"""
+    limits, problems = {}, []
+    if break_is(environment, "rowlimitsignored"):
+        return limits, problems
+    try:
+        with open(os.path.join(root, LIGHT_ROWS_TABLE), encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except FileNotFoundError:
+        return limits, problems
+    except (OSError, UnicodeDecodeError) as error:
+        return limits, [(f"读不了 {LIGHT_ROWS_TABLE}（{type(error).__name__}：{error}），逐行上限判不了", "让那张表是 UTF-8 文本、读得了再跑")]
+    lines_of_name = collections.defaultdict(list)
+    for row in rows:
+        lines_of_name[row.name].append(row.line_number)
+    for number, line in enumerate(lines, 1):
+        if not re.match(r"^#\s*逐行上限[：:]", line):
+            continue
+        found = ROW_LIMIT_DIRECTIVE.match(line)
+        where = f"{LIGHT_ROWS_TABLE}:{number}"
+        if not found:
+            problems.append((f"{where} 的「# 逐行上限：」不是「<变异名><TAB><内存上限或 -><TAB><限时秒或 ->」三段", "照 crates-mutation-rows.py 文件头「逐行上限」的写法改这一行"))
+            continue
+        name, memory, timeout = found.group("name"), found.group("memory").strip(), found.group("timeout").strip()
+        if memory != "-" and not SIZE_TEXT.match(memory):
+            problems.append((f"{where} 的内存上限写成了「{memory}」，不是 systemd 的写法", "写成正整数加 K / M / G / T（例 10G），不另给就写 -"))
+            continue
+        if timeout != "-" and not re.fullmatch(r"[1-9][0-9]*", timeout):
+            problems.append((f"{where} 的限时写成了「{timeout}」，不是正整数秒", "写成正整数秒（例 3600），不另给就写 -"))
+            continue
+        if name not in lines_of_name:
+            problems.append((f"{where} 点名的「{name}」不是 {TABLE} 里成形的一行的变异名", "名字照变异表第一列原样抄；那一行删了或改了名，就删掉或改这一行"))
+            continue
+        for line_number in lines_of_name[name]:
+            limits[line_number] = (memory if memory != "-" else None, int(timeout) if timeout != "-" else None)
+    return limits, problems
+
+
+def limits_for_lines(context, line_numbers):
+    """一批行（一行变异、一批基线、一组覆盖；给变异表行号）的 (内存上限, 限时秒)：逐行上限写了的取它，没写的取整张表的那一个数；几行取大的。"""
+    memory_max, timeout_seconds = context["memory_max"], context["timeout_seconds"]
+    for line_number in line_numbers:
+        row_memory, row_timeout = context.get("row_limits", {}).get(line_number, (None, None))
+        if row_memory and (bytes_of_size(row_memory) or 0) > (bytes_of_size(memory_max) or 0):
+            memory_max = row_memory
+        if row_timeout and row_timeout > timeout_seconds:
+            timeout_seconds = row_timeout
+    return memory_max, timeout_seconds
+
+
 # ── 拷贝范围（checker-tier-crates-mutation-replay 拷进每片的、code-source-discipline 静态判的，同一份判法）──────────────────────
 
 def copied_paths(stage_repository=STAGE_REPOSITORY):
@@ -477,6 +597,33 @@ def stray_escapes(segment):
     return [match.group(0) for match in re.finditer(r"\\(.)", segment) if match.group(1) != "n"]
 
 
+def anchor_problem(root, row):
+    """这一行锚点失效的原因（文件头「锚点失效」）：原文在被判仓里「文件」那一段指的源码里不是恰好命中一次，或文件不在、读不了；对得上回 None。"""
+    try:
+        with open(os.path.join(root, row.path), encoding="utf-8") as handle:
+            count = handle.read().count(row.old)
+    except FileNotFoundError:
+        return f"文件 {row.path} 不存在"
+    except (OSError, UnicodeDecodeError) as error:
+        return f"文件 {row.path} 读不了（{type(error).__name__}）"
+    return None if count == 1 else f"原文在 {row.path} 里命中 {count} 次，要恰好 1 次"
+
+
+def anchor_broken_rows(root, rows):
+    """{行号: 为什么}：锚点失效的那几行（run_stage、plan_context 先把它们剔出去、单记一档）。"""
+    broken = {}
+    for row in rows:
+        why = anchor_problem(root, row)
+        if why is not None:
+            broken[row.line_number] = why
+    return broken
+
+
+def anchor_broken_text(row, why):
+    """锚点失效那一行的判定（run_stage 的「锚点失效」那一档与 --list-items 末行的逐行点名同一句）。"""
+    return f"{TABLE}:{row.line_number} {row.name}：锚点失效——{why}（这一行没跑、不入库、不复用）"
+
+
 def row_problems(root, rows, malformed, copied):
     """派活之前一个工作进程都不起就能判的那几样，checker-tier-crates-mutation-replay（prechecks）与门禁 code-source-discipline（static-check）都调这一份。回 {类别: [明细]}，类别照 ROW_PROBLEM_KINDS：
       MALFORMED (行号, 变异名, 为什么)   不成形（read_table 判的：六段，只有替换文可以空）
@@ -487,16 +634,9 @@ def row_problems(root, rows, malformed, copied):
     problems = {kind: [] for kind in ROW_PROBLEM_KINDS}
     problems["MALFORMED"] = list(malformed)
     for row in rows:
-        try:
-            with open(os.path.join(root, row.path), encoding="utf-8") as handle:
-                count = handle.read().count(row.old)
-        except FileNotFoundError:
-            problems["ANCHOR"].append((row.line_number, row.name, f"文件 {row.path} 不存在"))
-        except (OSError, UnicodeDecodeError) as error:
-            problems["ANCHOR"].append((row.line_number, row.name, f"文件 {row.path} 读不了（{type(error).__name__}）"))
-        else:
-            if count != 1:
-                problems["ANCHOR"].append((row.line_number, row.name, f"原文在 {row.path} 里命中 {count} 次，要恰好 1 次"))
+        why = anchor_problem(root, row)
+        if why is not None:
+            problems["ANCHOR"].append((row.line_number, row.name, why))
         if not TEST_NAME_FORM.fullmatch(row.expected):
             problems["NAME"].append((row.line_number, row.name, row.expected))
         for segment_name, segment in (("原文", row.fields[2]), ("替换文", row.fields[3])):
@@ -591,97 +731,56 @@ def escaping_literals(root, copied):
     return found, scanned
 
 
-# ── 判法版本、行键、判定库记录、快照与用时表 ────────────────────────────────────
+# ── 判法单元、行键、判定库 ──────────────────────────────────────────────────────
 
 def read_bytes(path):
     with open(path, "rb") as handle:
         return handle.read()
 
 
-def judge_version(root, environment, memory_cap_runner):
-    """(判法版本, 项数)：见文件头「判定库」。登记表没有 checker-tier-crates-mutation-replay 那一行抛 RegistrationError，读不了、构建环境算不出抛 InputManifestError。"""
-    admission = admission_module()
-    stage_rows = admission.rows_of_key(admission.read_registration_rows(STAGE_REPOSITORY), STAGE)
-    if not stage_rows:
-        raise admission.RegistrationError(f"{admission.REGISTRATION_TABLE} 里没有 {STAGE} 这一行")
-    registration_text = "".join(row.fingerprint_text() for row in stage_rows).encode("utf-8", "surrogateescape")
+class JudgingUnitsRefused(Exception):
+    """判法单元的闭包里有拒算：算不出判法单元指纹，一条记录都对不上（文件头「判法单元」）。"""
+
+
+_JUDGING_CACHE = {}
+# 判法所在那一份仓：平常是本模块所在的仓；自证开头换成判法的一份冻住的临时拷贝（别的会话这时候改了 lib_function_units.py，自证里几十趟 run_stage 的判法单元照样一致）
+JUDGING_ROOT = [STAGE_REPOSITORY]
+
+
+def judging_units(environment, repository=None):
+    """(判法单元指纹, 单元清单)：文件头「判法单元」那几个入口函数的闭包合起来，键只随闭包里单元的（种类，去注释指纹）变。
+    repository 是判法所在那一份仓（不给取 JUDGING_ROOT；自证拿临时拷贝改了判法再算）。弄坏开关 judge-units-whole-file：指纹换成闭包碰到的那几份文件的整份原文。
+    同一个进程里闭包碰到的那几份文件都没动过（修改时刻与大小）就沿用上一次算的（自证一趟起几十次 run_stage）。"""
+    repository = repository or JUDGING_ROOT[0]
+    whole_file = break_is(environment, "judge-units-whole-file")
+    cached = _JUDGING_CACHE.get((repository, whole_file))
+    if cached is not None:
+        key, references, stats = cached
+        if all(_file_stat(os.path.join(repository, path)) == stat for path, stat in stats.items()):
+            return key, references
+    key, references, refusals = mutation_units.judging_units(repository, JUDGING_ENTRIES, whole_file=whole_file)
+    if key is None:
+        raise JudgingUnitsRefused("；".join(refusals[:3]) + (f" 等 {len(refusals)} 处" if len(refusals) > 3 else ""))
+    _JUDGING_CACHE[(repository, whole_file)] = (key, references, {path: _file_stat(os.path.join(repository, path)) for path in {reference.file for reference in references}})
+    return key, references
+
+
+def _file_stat(path):
     try:
-        named_lines = [(f"<登记行：{STAGE}>", registration_text),
-                       (f"<阶段脚本：.claude/gate.d/{STAGE}>", read_bytes(STAGE_SCRIPT)),
-                       ("<共用模块：scripts/mutation/crates-mutation-rows.py>", read_bytes(MODULE_PATH)),
-                       ("<切词与切 fn 项：scripts/mutation/mutation-prune.py>", read_bytes(os.path.join(SCRIPT_DIRECTORY, "mutation-prune.py"))),
-                       ("<libtest 结果行：scripts/gate/lib_libtest_result_lines.py>", read_bytes(LIBTEST_RESULT_LINES_PATH)),
-                       ("<判定库共用部分：scripts/crash/lib_verdict_library.py>", read_bytes(VERDICT_LIBRARY_PATH)),
-                       ("<内存包装：这一趟每条经它跑的那一份>", read_bytes(memory_cap_runner))] + admission.build_environment_lines(root, environment)
-    except OSError as error:
-        raise admission.InputManifestError(f"读不了判法版本的一项：{error}") from error
-    _manifest, fingerprint, _file_count = admission.manifest_of_files(root, [], named_lines)
-    return fingerprint, len(named_lines)
-
-
-def toolchain_text(root, environment):
-    """行键里的工具链：cargo -V 与 rustc -V 原样接起来（与 admission.py 的 toolchain_line 同一个口径，只是起在 environment 里）；起不来抛 InputManifestError。
-    弄坏开关 rowkeywithouttoolchain 交空串。"""
-    if break_is(environment, "rowkeywithouttoolchain"):
-        return ""
-    admission = admission_module()
-    outputs = []
-    for command in (["cargo", "-V"], ["rustc", "-V"]):
-        try:
-            completed = subprocess.run(command, cwd=root, capture_output=True, env=environment, stdin=subprocess.DEVNULL)
-        except OSError as error:
-            raise admission.InputManifestError(f"{' '.join(command)} 起不来：{error}") from error
-        if completed.returncode != 0:
-            raise admission.InputManifestError(f"{' '.join(command)} 退 {completed.returncode}")
-        outputs.append(completed.stdout)
-    return b"".join(outputs).rstrip(b"\n").decode("utf-8", "surrogateescape")
-
-
-def row_key(row, memory_max, timeout_seconds, toolchain):
-    text = "\t".join(row.fields) + f"\nmemory_max={memory_max}\ntimeout_seconds={timeout_seconds}\ntoolchain={toolchain}\n"
-    return hashlib.sha256(text.encode("utf-8", "surrogateescape")).hexdigest()
+        status = os.stat(path)
+    except OSError:
+        return None
+    return status.st_mtime_ns, status.st_size
 
 
 def row_content_hash(row):
+    """六段原样的 sha256：只给用时表与索引当名字，不进任何键。"""
     return hashlib.sha256("\t".join(row.fields).encode("utf-8", "surrogateescape")).hexdigest()
 
 
-def combo_key(row, test_full_name, toolchain):
-    """覆盖记录按这个分：`--` 之前的参数、`--` 之后的开关、点名用例的全名、工具链。"""
-    before, switches = batch_key(row.arguments)
-    text = "\t".join([" ".join(before), " ".join(switches), test_full_name, toolchain])
-    return hashlib.sha256(text.encode("utf-8", "surrogateescape")).hexdigest()
-
-
-def coverage_id(combo, snapshot):
-    return hashlib.sha256(f"{combo}\n{snapshot}\n".encode()).hexdigest()
-
-
-def encode_value(value):
-    return str(value).replace("\\", "\\\\").replace("\n", "\\n")
-
-
-def decode_value(value):
-    return re.sub(r"\\(.)", lambda escape: "\n" if escape.group(1) == "n" else escape.group(1), value)
-
-
-def record_text(fields):
-    return RECORD_HEADER + "".join(f"{key}={encode_value(value)}\n" for key, value in fields.items())
-
-
-def read_record(path):
-    """判定库记录或用时表的一格：{键: 值}；不在、读不了交 None（按键读经判定库共用部分的 read_text）。"""
-    text = verdict_library.read_text(path)
-    if text is None:
-        return None
-    lines = text.split("\n")
-    fields = {}
-    for line in lines:
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        fields[key] = decode_value(value)
-    return fields
+def row_identity(row):
+    """索引（index/）里这一行的名字：变异名与文件。只用来说清现判的原因，不进键。"""
+    return hashlib.sha256(f"{row.name}\t{row.path}".encode("utf-8", "surrogateescape")).hexdigest()
 
 
 def utc_now_text():
@@ -689,7 +788,7 @@ def utc_now_text():
 
 
 def reuse_refusal(environment):
-    """一律不复用的理由（照写新记录）；复用时交 None。"""
+    """一律不读库的理由（全量开关：只写不读，照键写回同一份库）；读库时交 None。"""
     for variable in ("SINGLEFS_GATE_FULL", "GATE_MUTATION_START_OVER"):
         if environment.get(variable, "") == "1":
             return f"{variable}=1"
@@ -697,7 +796,7 @@ def reuse_refusal(environment):
 
 
 def records_home(root, environment):
-    """判定库记录与用时表放在哪个目录底下：GATE_MUTATION_RECORDS_HOME 设了就是它，不设是被判那棵树的 git common-dir；取不到抛 InputManifestError。"""
+    """判定库放在哪个目录底下：GATE_MUTATION_RECORDS_HOME 设了就是它，不设是被判那棵树的 git common-dir；取不到抛 InputManifestError。"""
     configured = environment.get("GATE_MUTATION_RECORDS_HOME", "").strip()
     if configured:
         return configured
@@ -708,30 +807,19 @@ def records_home(root, environment):
     return common_directory
 
 
-def prune_base_directories(records_root, current):
-    """只留最新的 BASE_DIRECTORIES_KEPT 个判法版本目录（这一趟的先 touch 成最新），更早的删掉；只删 records_root 底下名字是 64 位十六进制的目录。
-    返回删了的目录名。"""
-    current_directory = os.path.join(records_root, current)
-    os.makedirs(current_directory, exist_ok=True)
-    os.utime(current_directory)
-    others = [entry for entry in os.scandir(records_root)
-              if entry.is_dir(follow_symlinks=False) and FINGERPRINT_FORM.fullmatch(entry.name) and entry.name != current]
-    others.sort(key=lambda entry: (-entry.stat(follow_symlinks=False).st_mtime, entry.name))
-    removed = []
-    for entry in others[BASE_DIRECTORIES_KEPT - 1:]:
-        shutil.rmtree(os.path.join(records_root, entry.name), ignore_errors=True)
-        removed.append(entry.name)
-    return removed
+def library_directory(root, environment):
+    return os.path.join(records_home(root, environment), LIBRARY_DIRECTORY_NAME)
 
 
-# ── 快照、覆盖记录与源码副本的存放 ────────────────────────────────────────────
+def open_library(root, environment):
+    return mutation_units.Library(library_directory(root, environment), RECORD_HEADER)
+
 
 def snapshot_of(base, copied):
-    """base 底下拷贝范围里（scripts/ 之外，跳过 target 与 crates/mutations.tsv）每个文件的 {路径: sha256}；照 prepare_shard 拷的那样走（跟符号链接）。"""
+    """base 底下拷贝范围里（跳过 target 与 crates/mutations.tsv）每个文件的 {路径: sha256}：只给弄坏开关 baseline-by-tree-snapshot 用（基线按整树快照比，改前的判法），
+    基线记录里照记一份当属性，不当复用的依据。"""
     files = {}
     for item in copied:
-        if item.startswith(SNAPSHOT_LEFT_OUT_PREFIX):
-            continue
         path = os.path.join(base, item)
         if os.path.isfile(path):
             if item != TABLE:
@@ -752,373 +840,195 @@ def snapshot_identity(files):
     return hashlib.sha256("".join(f"{files[path]}  {path}\n" for path in sorted(files)).encode("utf-8", "surrogateescape")).hexdigest()
 
 
-class Store:
-    """一格判法版本目录：判定库记录、覆盖记录、快照与源码副本。读过的覆盖记录与快照留在内存里。"""
-
-    def __init__(self, directory):
-        self.directory = directory
-        self.coverage_directory = os.path.join(directory, COVERAGE_DIRECTORY_NAME)
-        self.snapshot_directory = os.path.join(directory, SNAPSHOT_DIRECTORY_NAME)
-        self.blob_directory = os.path.join(directory, BLOB_DIRECTORY_NAME)
-        self._coverage, self._snapshots = {}, {}
-
-    def ensure(self):
-        for directory in (self.directory, self.coverage_directory, self.snapshot_directory, self.blob_directory):
-            os.makedirs(directory, exist_ok=True)
-
-    def has_new_format_records(self):
-        """目录里有没有一条带快照的 mutation 记录（没有：头一趟、判法版本刚换、只有旧格式记录）。"""
-        try:
-            names = os.listdir(self.directory)
-        except OSError:
-            return False
-        return any(name.startswith("mutation.") and (read_record(os.path.join(self.directory, name)) or {}).get("snapshot") for name in names)
-
-    @staticmethod
-    def read_json(path):
-        try:
-            with gzip.open(path, "rt", encoding="utf-8", errors="surrogateescape") as handle:
-                return json.load(handle)
-        except (OSError, ValueError, EOFError):
-            return None
-
-    @staticmethod
-    def write_json(path, value):
-        write_atomically(path, gzip.compress(json.dumps(value, sort_keys=True, ensure_ascii=False).encode("utf-8", "surrogateescape"), mtime=0))
-
-    def snapshot(self, identity):
-        if identity not in self._snapshots:
-            value = self.read_json(os.path.join(self.snapshot_directory, f"{identity}.json.gz"))
-            self._snapshots[identity] = value.get("files") if isinstance(value, dict) else None
-        return self._snapshots[identity]
-
-    def put_snapshot(self, identity, files):
-        path = os.path.join(self.snapshot_directory, f"{identity}.json.gz")
-        if not os.path.exists(path):
-            self.write_json(path, {"files": files})
-        self._snapshots[identity] = files
-
-    def coverage(self, identity):
-        if identity not in self._coverage:
-            value = self.read_json(os.path.join(self.coverage_directory, f"{identity}.json.gz")) if identity else None
-            self._coverage[identity] = value if isinstance(value, dict) else None
-        return self._coverage[identity]
-
-    def put_coverage(self, identity, value):
-        self.write_json(os.path.join(self.coverage_directory, f"{identity}.json.gz"), value)
-        self._coverage[identity] = value
-
-    def blob(self, digest):
-        try:
-            return zlib.decompress(read_bytes(os.path.join(self.blob_directory, digest)))
-        except (OSError, zlib.error):
-            return None
-
-    def put_blob(self, digest, data):
-        path = os.path.join(self.blob_directory, digest)
-        if not os.path.exists(path):
-            write_atomically(path, zlib.compress(data, 6))
+Components = collections.namedtuple("Components", "row_key refusal mutated test_unit test_full_name test_closure switches toolchain dependency "
+                                                  "baseline_key coverage_id judging")
 
 
-def collect_garbage(store):
-    """删掉没有行引的覆盖记录、没有记录引的快照、没有覆盖记录引的源码副本；回 (删的覆盖记录数, 快照数, 源码副本数)。"""
-    records = []
-    for name in os.listdir(store.directory):
-        if name.split(".", 1)[0] in RECORD_KINDS:
-            record = read_record(os.path.join(store.directory, name))
-            if record is not None:
-                records.append(record)
-    wanted_coverage = {record.get("coverage") for record in records if record.get("coverage")}
-    removed = [0, 0, 0]
-    for name in os.listdir(store.coverage_directory):
-        if name.endswith(".json.gz") and name[:-len(".json.gz")] not in wanted_coverage:
-            with contextlib.suppress(OSError):
-                os.unlink(os.path.join(store.coverage_directory, name))
-                removed[0] += 1
-    wanted_snapshots = {record.get("snapshot") for record in records if record.get("snapshot")}
-    wanted_blobs = set()
-    for identity in wanted_coverage:
-        coverage = store.coverage(identity)
-        if coverage is None:
-            continue
-        wanted_snapshots.add(coverage.get("snapshot"))
-        files = store.snapshot(coverage.get("snapshot")) or {}
-        wanted_blobs |= {files[path] for path in coverage.get("compiled", {}) if path in files and path.endswith(".rs")}
-    for name in os.listdir(store.snapshot_directory):
-        if name.endswith(".json.gz") and name[:-len(".json.gz")] not in wanted_snapshots:
-            with contextlib.suppress(OSError):
-                os.unlink(os.path.join(store.snapshot_directory, name))
-                removed[1] += 1
-    for name in os.listdir(store.blob_directory):
-        if FINGERPRINT_FORM.fullmatch(name) and name not in wanted_blobs:
-            with contextlib.suppress(OSError):
-                os.unlink(os.path.join(store.blob_directory, name))
-                removed[2] += 1
-    return tuple(removed)
+def lines_key(label, lines):
+    return mutation_units.key_of_lines([(label, lines)])
 
 
-# ── 复用判据（reuse_decision 与它用的几个纯函数） ──────────────────────────────
-
-_PRUNE_LIBRARY = []
-
-
-def prune_library():
-    """scripts/mutation/mutation-prune.py（切词、切 fn 项、读覆盖），第一次用到时才读进来；它的弄坏开关不在这里认。"""
-    if not _PRUNE_LIBRARY:
-        specification = importlib.util.spec_from_file_location("mutation_prune_for_crates_mutation_rows", os.path.join(SCRIPT_DIRECTORY, "mutation-prune.py"))
-        module = importlib.util.module_from_spec(specification)
-        specification.loader.exec_module(module)
-        _PRUNE_LIBRARY.append(module)
-    return _PRUNE_LIBRARY[0]
+def key_workers(environment):
+    """算闭包开几个子进程：GATE_MUTATION_KEY_WORKERS 给了（正整数）照它；不然取每台默认重活线程数（scripts/hosts/heavy_threads.py），
+    套在外层内存包装里时（RUN_WITH_MEMORY_CAP_OUTER_CAP）再按外层上限 ÷ KEY_WORKER_MEMORY 收、至少 1。登记文件读不了抛 HeavyThreadDefaultError。"""
+    requested = environment.get("GATE_MUTATION_KEY_WORKERS", "").strip()
+    if re.fullmatch(r"[1-9][0-9]*", requested):
+        return int(requested)
+    count = int(default_heavy_threads(environment))
+    outer = bytes_of_size(environment.get(OUTER_MEMORY_CAP_VARIABLE, "").strip() or "-")
+    if outer is not None:
+        count = min(count, max(1, outer // bytes_of_size(KEY_WORKER_MEMORY)))
+    return count
 
 
-Decision = collections.namedtuple("Decision", "reuse column detail how")   # how：same-snapshot / coverage / None
+class KeyContext:
+    """一棵树这一趟算键要的几样（文件头「行键」）：判法单元指纹、工具链行、单元键（UnitKeys）、依赖版本行按用到的包缓存。"""
+
+    def __init__(self, root, environment, memory_max, timeout_seconds, judging_repository=None):
+        self.root, self.environment = root, environment
+        self.memory_max, self.timeout_seconds = memory_max, timeout_seconds
+        self.judging, self.judging_references = judging_units(environment, judging_repository)
+        self.toolchain_lines = [] if break_is(environment, "rowkeywithouttoolchain") else mutation_units.toolchain_lines(root, environment)
+        self.toolchain = lines_key("toolchain", self.toolchain_lines)
+        self.keys = mutation_units.UnitKeys(root)
+        self._dependencies = {}
+        self.closures = {}
+
+    def prepare(self, rows):
+        """先把这一趟每一行点名测试的闭包算好（并行，进程数见 key_workers）；components 之后照缓存取。回算了几个闭包。"""
+        requests = []
+        for row in rows:
+            _mutated, refusal = self.keys.mutated_units(row.path, row.old)
+            test, test_refusal = (None, refusal) if refusal is not None else self.keys.resolve_test(row.arguments, row.expected)
+            if test_refusal is None:
+                requests.append((test.unit, test.target, mutation_units.parse_cargo_arguments(row.arguments)))
+        return self.keys.precompute_closures(requests, key_workers(self.environment))
+
+    def dependency(self, lines):
+        """(依赖版本行的键, 那几行)：行是点名测试的闭包与被改坏的单元点名的外部 crate 收到的（lib_mutation_units.py 文件头「依赖版本行」），按行缓存。"""
+        lines = tuple(sorted(lines))
+        if lines not in self._dependencies:
+            self._dependencies[lines] = (lines_key("dependency", list(lines)), list(lines))
+        return self._dependencies[lines]
+
+    def components(self, row):
+        """这一行的 Components：键算得出交齐全的一份，算不出（拒算）row_key 是 None、refusal 写为什么。"""
+        mutated, refusal = self.keys.mutated_units(row.path, row.old)
+        if refusal is not None:
+            return Components(None, f"被改坏的单元：{refusal}", None, None, None, None, None, self.toolchain, None, None, None, self.judging)
+        test, refusal = self.keys.resolve_test(row.arguments, row.expected)
+        if refusal is not None:
+            return Components(None, refusal, mutated, None, None, None, None, self.toolchain, None, None, None, self.judging)
+        arguments = mutation_units.parse_cargo_arguments(row.arguments)
+        closure = self.keys.closure(test.unit, test.target, arguments)
+        if closure.key is None:
+            return Components(None, f"点名测试 {test.full_name} 的闭包拒算（{closure.refusals[0]}）", mutated, test.unit, test.full_name,
+                              None, None, self.toolchain, None, None, None, self.judging)
+        self.closures[closure.key] = closure
+        mutated_dependencies, dependency_refusals = self.keys.reference_dependencies(mutated)
+        if dependency_refusals:
+            return Components(None, f"被改坏的单元的依赖版本行拒算（{dependency_refusals[0]}）", mutated, test.unit, test.full_name,
+                              None, None, self.toolchain, None, None, None, self.judging)
+        dependency, _lines = self.dependency(set(closure.dependencies) | set(mutated_dependencies))
+        mutated_lines = [] if break_is(self.environment, "mutated-unit-ignored") else [f"{reference.kind}\t{reference.fingerprint}" for reference in mutated]
+        test_key = "" if break_is(self.environment, "test-closure-ignored") else closure.key
+        groups = [("form", [ROW_KEY_FORM]), ("judging", [self.judging]), ("mutated", mutated_lines),
+                  ("original", [mutation_units.escape_field(row.old)]), ("replacement", [mutation_units.escape_field(row.new)]),
+                  ("test", [test_key]), ("switches", arguments.switches), ("features", sorted(self.keys.features_of(arguments, test.target))),
+                  ("toolchain", [self.toolchain]), ("dependency", [dependency])]
+        if break_is(self.environment, "row-key-with-limits"):
+            groups.append(("limits", [f"{self.memory_max}\t{self.timeout_seconds}"]))
+        row_key = mutation_units.key_of_lines(groups)
+        baseline_key = mutation_units.key_of_lines([("form", [BASELINE_KEY_FORM]), ("judging", [self.judging]), ("test-unit", [test.unit.fingerprint]),
+                                                    ("switches", arguments.switches), ("features", sorted(self.keys.features_of(arguments, test.target))),
+                                                    ("toolchain", [self.toolchain]), ("dependency", [dependency])])
+        coverage_id = mutation_units.key_of_lines([("form", [COVERAGE_KEY_FORM]), ("test-unit", [test.unit.fingerprint]),
+                                                   ("switches", arguments.switches), ("features", sorted(self.keys.features_of(arguments, test.target))),
+                                                   ("toolchain", [self.toolchain])])
+        return Components(row_key, None, mutated, test.unit, test.full_name, closure.key, arguments.switches, self.toolchain, dependency,
+                          baseline_key, coverage_id, self.judging)
+
+    def persist(self, library, components_by_line):
+        """组成清单进库（判法单元、每一份点名测试的闭包、工具链行、依赖版本行），新见到的单元并进 units/。只在 run_stage 里调（plan 只读）。"""
+        library.put_composition(self.judging, self.judging_references)
+        library.put_composition(self.toolchain, lines=self.toolchain_lines)
+        for key, lines in self._dependencies.values():
+            library.put_composition(key, lines=lines)
+        for components in components_by_line.values():
+            if components.test_closure in self.closures:
+                library.put_composition(components.test_closure, self.closures[components.test_closure].members)
+        library.flush_units()
 
 
-class Comparison:
-    """一份旧快照与此刻之间的比较，按快照号缓存：哪些文件变了、各文件旧新两份的切法、函数外的判定。"""
-
-    def __init__(self, store, old_files, current_files, read_current):
-        self.store, self.old, self.current, self.read_current = store, old_files, current_files, read_current
-        self.changed = sorted(path for path in set(old_files) | set(current_files) if old_files.get(path) != current_files.get(path))
-        self._indexes, self._outside = {}, {}
-
-    def index(self, path, side):
-        """旧（"old"，从源码副本读）或新（"new"，从此刻的树读）那一份的 FileIndex；读不到交 None。"""
-        digest = (self.old if side == "old" else self.current).get(path)
-        if digest is None:
-            return None
-        if digest not in self._indexes:
-            data = self.store.blob(digest) if side == "old" else self.read_current(path)
-            self._indexes[digest] = None if data is None else prune_library().FileIndex(path, data.decode("utf-8", "replace"))
-        return self._indexes[digest]
-
-    def text(self, path, side):
-        index = self.index(path, side)
-        return None if index is None else index.text
-
-    def outside_problem(self, path):
-        if path not in self._outside:
-            self._outside[path] = outside_problem(self.index(path, "old"), self.index(path, "new"))
-        return self._outside[path]
+def index_entry(components, row):
+    """索引里这一行的那一份（只用来说清现判的原因）：键与几样组成的号。"""
+    return collections.OrderedDict(
+        row_key=components.row_key or "", judging=components.judging or "", toolchain=components.toolchain or "", dependency=components.dependency or "",
+        test_closure=components.test_closure or "", text=hashlib.sha256(f"{row.old}\0{row.new}".encode("utf-8", "surrogateescape")).hexdigest(),
+        mutated=",".join(mutation_units.unit_id(reference) for reference in components.mutated or []), recorded_date=mutation_units.today_text())
 
 
-def attribute_texts(index, function):
-    """fn 项前面那几个 #[…] 属性的词法单元（文档注释不算）。"""
-    texts, position = [], function.first
-    while position < function.last:
-        token = index.tokens[position]
-        if token[0] == "doc":
-            position += 1
-        elif token[1] == "#" and index.text_of(position + 1) == "[" and position + 1 in index.pairs:
-            close = index.pairs[position + 1]
-            texts.append(" ".join(item[1] for item in index.tokens[position:close + 1]))
-            position = close + 1
-        else:
-            break
-    return texts
+Decision = collections.namedtuple("Decision", "reuse column detail")
 
 
-def is_test_function(index, function):
-    """属性里有一个最末一段是 test 的（#[test]、#[tokio::test]）。"""
-    for text in attribute_texts(index, function):
-        words = text[:-1].replace("#", " ").replace("[", " ").split()
-        if words and words[-1] == "test":
-            return True
-    return False
+def explain_fresh(library, components, row, previous, context):
+    """键对不上的一行：(栏, 细节)。照索引里这一行上一次的那一份逐样比（判法单元 → 被改坏的单元 → 点名测试的闭包 → 原文与替换文 → 工具链 → 依赖），
+    变了的那几个单元列进细节（文件头「判定库」作废时报变了哪几个单元）。"""
+    if previous is None:
+        return "row-new", "判定库里没有这一行的记录（新加的行，或改了变异名、文件）"
+    if previous.get("row_key") == components.row_key:
+        return "not-caught", "上一趟算过这把键而没留下判定（被打断、记录没写成，或判出的不是抓到）"
+    if previous.get("judging") != components.judging:
+        changes = mutation_units.changed_units(library, previous.get("judging"), context.judging_references)
+        return "judging", f"判法单元指纹 {previous.get('judging', '')[:12]}… → {components.judging[:12]}…：{mutation_units.summarize_changes(changes)}"
+    current_ids = ",".join(mutation_units.unit_id(reference) for reference in components.mutated)
+    if previous.get("mutated") != current_ids:
+        names = "、".join(f"{reference.file}::{reference.name}" for reference in components.mutated)
+        return "mutated", f"被改坏的单元 {names} 变了"
+    if previous.get("test_closure") != components.test_closure:
+        closure = context.closures.get(components.test_closure)
+        changes = mutation_units.changed_units(library, previous.get("test_closure"), closure.members if closure else [])
+        return "test", f"点名测试 {components.test_full_name} 的闭包：{mutation_units.summarize_changes(changes)}"
+    if previous.get("text") != hashlib.sha256(f"{row.old}\0{row.new}".encode("utf-8", "surrogateescape")).hexdigest():
+        return "text", "这一行的原文或替换文改了"
+    if previous.get("toolchain") != components.toolchain:
+        return "environment", f"工具链行：{mutation_units.summarize_changes(mutation_units.changed_lines(library, previous.get('toolchain'), context.toolchain_lines))}"
+    if previous.get("dependency") != components.dependency:
+        return "environment", "依赖版本行变了"
+    return "unexplained", "键对不上而几样组成的号都与上一次相同（cargo 参数里的开关或特性改了）"
 
 
-def has_item_impl(index, function):
-    """函数体里有项位置上的 impl（前一个词法单元是 { } ; ] 之一）：函数体里的 impl 块对整个 crate 生效，覆盖看不见。"""
-    if function.body_first is None:
-        return False
-    for position in range(function.body_first + 1, function.last):
-        token = index.tokens[position]
-        if token[0] == "ident" and token[1] == "impl" and index.tokens[position - 1][1] in ("{", "}", ";", "]"):
-            return True
-    return False
-
-
-def outside_problem(old_index, new_index):
-    """编进测试二进制的一份 .rs 两份之间：改动有落在函数之外的交那一句，都在函数之内交 None（复用判据「函数外有改动」那一条）。"""
-    if old_index is None or new_index is None:
-        return "读不到旧的源码副本或此刻那一份"
-    if not old_index.ok or not new_index.ok:
-        return "括号配不上、切不开函数"
-    if old_index.outside_fingerprint != new_index.outside_fingerprint:
-        return "函数外的词法单元变了（类型、常量、static、宏、impl 头、use、mod 这类）"
-    old_functions = {function.qualified: function for function in old_index.functions}
-    new_qualified = {function.qualified for function in new_index.functions}
-    for function in new_index.functions:
-        if function.qualified in old_functions or is_test_function(new_index, function):
-            continue
-        parent = function.qualified.rsplit("::", 1)[0] if "::" in function.qualified else None
-        if parent is not None and parent in new_qualified:
-            continue   # fn 里嵌套的 fn：只有外层调得到
-        return f"新加了函数 {function.qualified}"
-    for function in new_index.functions:
-        old = old_functions.get(function.qualified)
-        if old is None or old.fingerprint == function.fingerprint:
-            continue
-        if attribute_texts(old_index, old) != attribute_texts(new_index, function):
-            return f"函数 {function.qualified} 的属性变了"
-        if old.is_const or function.is_const:
-            return f"const fn {function.qualified} 变了（常量上下文里在编译期求值，覆盖看不见）"
-        if has_item_impl(old_index, old) or has_item_impl(new_index, function):
-            return f"函数 {function.qualified} 的函数体里有 impl 块（对整个 crate 生效）"
-    return None
-
-
-def path_effect(path, coverage, old_files, current_files, package_directories):
-    """一个变了的文件对这一组合算什么：「compiled-rs」（编进去的 .rs、两边都在，要逐函数比）、「outside」（算函数外有改动）、None（不相干）。"""
-    compiled = coverage.get("compiled", {})
-    if path in compiled:
-        if compiled[path] == "runtime" and path.endswith(".rs") and path in old_files and path in current_files:
-            return "compiled-rs"
-        return "outside"
-    involved = coverage.get("packages", [])
-    owner = max((directory for directory in package_directories if path.startswith(directory + "/")), key=len, default=None)
-    if owner is None:
-        return "outside"
-    if owner not in involved:
-        return None
-    if not path.endswith(".rs"):
-        return "outside"
-    if (path in old_files) != (path in current_files):
-        below = path[len(owner) + 1:]
-        if any(form.fullmatch(below) for form in AUTO_TARGET_FORMS):
-            return "outside"
-    return None
-
-
-def package_directories_of(files):
-    """快照里每个不在仓根的 Cargo.toml 所在的目录。"""
-    return sorted(os.path.dirname(path) for path in files if path.endswith("/Cargo.toml"))
-
-
-def mutated_function_problem(row, comparison, coverage, environment):
-    """复用判据「被变异的函数变了」：成立（没变）交 None，不成立交那一句。"""
-    data = comparison.read_current(row.path) if row.path in comparison.current else None
-    if data is None:
-        return f"被变异的文件 {row.path} 此刻不在"
-    current_text = data.decode("utf-8", "replace")
-    if current_text.count(row.old) != 1:
-        return f"原文在 {row.path} 里命中 {current_text.count(row.old)} 次，要恰好 1 次"
-    if break_is(environment, "mutatedfunctionignored"):
-        return None
-    if comparison.old.get(row.path) == comparison.current.get(row.path):
-        return None
-    if coverage.get("compiled", {}).get(row.path) != "runtime" or not row.path.endswith(".rs") or row.path not in comparison.old:
-        return f"被变异的文件 {row.path} 变了（不是编进测试二进制的 .rs，按整份 sha256 比）"
-    old_index, new_index = comparison.index(row.path, "old"), comparison.index(row.path, "new")
-    if old_index is None or new_index is None or not old_index.ok or not new_index.ok:
-        return f"{row.path} 切不开函数，按整份比：变了"
-    old_start = old_index.text.find(row.old)
-    if old_start < 0:
-        return f"原文不在覆盖记录那一份 {row.path} 里"
-    old_container = old_index.container_at(old_start, old_start + len(row.old))
-    new_start = new_index.text.find(row.old)
-    new_container = new_index.container_at(new_start, new_start + len(row.old))
-    if old_container is None:
-        if new_container is not None or old_index.outside_fingerprint != new_index.outside_fingerprint:
-            return f"原文在 {row.path} 的函数外，那一部分变了"
-        return None
-    if new_container is None or new_container.qualified != old_container.qualified:
-        return f"原文此刻不在 {old_container.qualified} 里"
-    if new_container.fingerprint != old_container.fingerprint:
-        return f"{row.path} 的 {old_container.qualified} 变了"
-    return None
-
-
-def executed_function_problem(coverage, comparison, environment):
-    """复用判据「执行过的函数变了」：成立交 None，不成立交那一句。"""
-    if break_is(environment, "executedfunctionsignored"):
-        return None
-    library = prune_library()
-    changed = set(comparison.changed)
-    for path, container in coverage.get("executed", []):
-        if path not in changed:
-            continue
-        old_index, new_index = comparison.index(path, "old"), comparison.index(path, "new")
-        if old_index is None or new_index is None:
-            return f"执行过的 {path} 没了或读不到"
-        if container == library.WHOLE_FILE or not old_index.ok or not new_index.ok:
-            return f"执行过的 {path} 切不开函数，按整份比：变了"
-        if container == library.OUTSIDE:
-            if old_index.outside_fingerprint != new_index.outside_fingerprint:
-                return f"执行过的 {path} 函数外那部分变了"
-            continue
-        old = next((function for function in old_index.functions if function.qualified == container), None)
-        new = next((function for function in new_index.functions if function.qualified == container), None)
-        if old is None or new is None or old.fingerprint != new.fingerprint:
-            return f"执行过的 {path} 的 {container} {'没了' if new is None else '变了'}"
-    return None
-
-
-def outside_change_problem(coverage, comparison, package_directories, environment):
-    """复用判据「函数外有改动」：成立交 None，不成立交那一句。"""
-    if break_is(environment, "outsidechangesignored"):
-        return None
-    for path in comparison.changed:
-        effect = path_effect(path, coverage, comparison.old, comparison.current, package_directories)
-        if effect == "outside":
-            state = "新加" if path not in comparison.old else "删掉" if path not in comparison.current else "改了"
-            return f"{state} {path}（{'编进测试二进制的' if path in coverage.get('compiled', {}) else '不是函数里能装下的'}改动）"
-        if effect == "compiled-rs":
-            problem = comparison.outside_problem(path)
-            if problem is not None:
-                return f"{path}：{problem}"
-    return None
-
-
-def reuse_decision(row, key, record, store, current, comparisons, environment, refusal, store_has_records):
-    """这一行这一趟复用还是现跑（文件头「复用判据」）。current 是此刻的 {"id", "files", "packages", "read"}；comparisons 按快照号缓存 Comparison。"""
+def row_decision(library, components, row, refusal, context, previous=None, record=None):
+    """这一行这一趟复用还是现判（文件头「复用判据」）：(Decision, 记录)。拒算的 column 是 refused。"""
+    if components.row_key is None:
+        return Decision(False, "refused", components.refusal), None
     if refusal:
-        return Decision(False, "start-over", refusal, None)
-    if record is None or record.get("kind") != "mutation" or record.get("row_key") != key:
-        if not store_has_records:
-            return Decision(False, "no-coverage", "这一格记录目录里还没有一条新格式记录（头一趟、判法版本刚换，或只有旧格式记录）", None)
-        return Decision(False, "row-changed", "没有这个行键的记录（六段、内存上限、限时或工具链变了，或是新加的行）", None)
-    if record.get("verdict") != REUSABLE_VERDICT["mutation"]:
-        return Decision(False, "no-coverage", f"上次判的是 {record.get('verdict') or '（没写）'}，只有抓到的记覆盖", None)
-    if record.get("snapshot") and record.get("snapshot") == current["id"]:
-        return Decision(True, None, "源码与上次一字未动", "same-snapshot")
-    coverage = store.coverage(record.get("coverage", ""))
-    old_files = store.snapshot(coverage.get("snapshot", "")) if coverage else None
-    if coverage is None or old_files is None or record.get("snapshot") != coverage.get("snapshot"):
-        return Decision(False, "no-coverage", "抓到了，但没有它那份快照上的覆盖记录（旧格式记录、覆盖没记成或被删了）", None)
-    comparison = comparisons.get(coverage["snapshot"])
-    if comparison is None:
-        comparison = comparisons[coverage["snapshot"]] = Comparison(store, old_files, current["files"], current["read"])
-    problem = mutated_function_problem(row, comparison, coverage, environment)
-    if problem is not None:
-        return Decision(False, "mutated-function", problem, None)
-    problem = executed_function_problem(coverage, comparison, environment)
-    if problem is not None:
-        return Decision(False, "executed-function", problem, None)
-    problem = outside_change_problem(coverage, comparison, current["packages"], environment)
-    if problem is not None:
-        return Decision(False, "outside", problem, None)
-    return Decision(True, None, f"覆盖记录那份快照之后改了 {len(comparison.changed)} 个文件，复用判据都成立", "coverage")
+        return Decision(False, "start-over", refusal), None
+    if record is None:
+        record = library.read("records", components.row_key)
+    if record is not None and record.get("row_key") == components.row_key:
+        if record.get("verdict") == REUSABLE_VERDICT["mutation"]:
+            return Decision(True, None, f"键相同（{record.get('judged_date', '日期没记')} {record.get('how', '')} 判的抓到）"), record
+        return Decision(False, "not-caught", f"上次判的是 {record.get('verdict') or '（没写）'}，只有抓到的复用"), record
+    column, detail = explain_fresh(library, components, row, previous, context)
+    return Decision(False, column, detail), None
 
 
-def current_state(root, copied):
-    """此刻这棵树的快照：{"id", "files", "packages", "read"}（read(路径) 交此刻的字节，读不到交 None）。"""
-    files = snapshot_of(root, copied)
+def executed_set_is_current(keys, coverage):
+    """覆盖记录里那一份执行过的单元（执行过的 fn 单元，连同点名测试闭包里不是 fn 的单元：常量、类型、静态项、宏、数据文件）此刻逐个还是那个指纹。"""
+    if not isinstance(coverage, dict) or not coverage.get("complete"):
+        return False
+    references = [mutation_units.UnitReference(*item) for item in coverage.get("executed", [])]
+    if not references:
+        return False
+    current = keys.current_fingerprints(references)
+    return all(reference.fingerprint in current.get((reference.kind, reference.file, reference.name), set()) for reference in references)
 
-    def read(path):
-        try:
-            return read_bytes(os.path.join(root, path))
-        except OSError:
-            return None
-    return {"id": snapshot_identity(files), "files": files, "packages": package_directories_of(files), "read": read}
+
+def baseline_reuse_problem(record, components, keys, coverage, snapshot, environment):
+    """覆盖复用判据（基线 ok 那一条复用不复用）：成立交 None，不成立交那一句。判据（按次序，头一条成立就复用）：
+      覆盖记录里点名测试执行过的单元此刻逐个没变（executed_set_is_current）；或者点名测试的闭包键与记录里的相同。
+    不按整树快照比：同一个文件里加一个没人调的函数、改别的测试，基线照样复用。弄坏开关 baseline-by-tree-snapshot：只按整树快照比（改前的判法）。"""
+    if record is None or record.get("verdict") != REUSABLE_VERDICT["baseline"]:
+        return "没有基线 ok 的记录"
+    if break_is(environment, "baseline-by-tree-snapshot"):
+        return None if record.get("tree_snapshot") == snapshot else "源码树快照与上次基线那一份不同（弄坏开关 baseline-by-tree-snapshot）"
+    if executed_set_is_current(keys, coverage):
+        return None
+    if record.get("test_closure") and record.get("test_closure") == components.test_closure:
+        return None
+    return "点名测试执行过的单元与它的闭包都与上次基线那一份不同"
 
 
 def read_timing(timings_directory, content_hash):
     """(上一次跑的秒数, 上一次超没超时)；没有记过交 None。"""
-    record = read_record(os.path.join(timings_directory, content_hash))
-    if record is None:
+    path = os.path.join(timings_directory, content_hash)
+    try:
+        with open(path, encoding="utf-8", errors="surrogateescape") as handle:
+            record = mutation_units.parse_record(handle.read())
+    except OSError:
         return None
+    mutation_units.Library.touch(path)
     try:
         return float(record.get("seconds_running", "")), record.get("timed_out") == "1"
     except ValueError:
@@ -1296,7 +1206,7 @@ def verdict_of_run(row, returncode, output, memory_max, timeout_seconds, environ
 
 
 def caught_text(row, how=""):
-    """抓到那一行；how 是「（现判：<栏>）」或「（按覆盖复用）」，判定本身在它前面（比对两趟的判定时把它去掉，selftest_verdict_view）。"""
+    """抓到那一行；how 是「（现判：<栏>）」「（复用）」或「（拒算）」，判定本身在它前面（比对两趟的判定时把它去掉，selftest_verdict_view）。"""
     return f"  ✓ {row.name}：{row.expected} 红了{how}"
 
 
@@ -1332,6 +1242,7 @@ def own_workers_stopped_on_stop(pool, shard_root):
         raise
 
 
+
 def init_worker(sequence_counter, shard_root, context):
     """工作进程启动时跑一次：领一个稳定的片号、建自己的源码副本与编译目录。片号从共用编译目录那一层的锁文件领（claim_worker_slot，跨调用不重），
     活是动态领的（checker-tier-crates-mutation-replay 文件头）。sequence_counter 只在拿不到锁文件、或弄坏开关 local-shard-numbering 下当本地序号用。"""
@@ -1347,14 +1258,11 @@ def init_worker(sequence_counter, shard_root, context):
     environment["CARGO_TARGET_DIR"] = target_directory
     # 在用的标记（WORKER_TARGET_LOCK_NAME）：进程退出内核就放，别的一趟回收时拿不到排他锁就不删这份
     WORKER_STATE["target_lock"] = hold_worker_target_lock(target_directory)
-    # 这份副本自己的快照：记录里写的是这一份（开跑之后主工作区又改了，记录照实写跑的是哪一份）
-    snapshot_files = snapshot_of(work, context["copied"])
-    snapshot = snapshot_identity(snapshot_files)
-    store = Store(context["records_directory"])
-    store.put_snapshot(snapshot, snapshot_files)
+    # 这份副本的整树快照：只当基线记录的一样属性记下（弄坏开关 baseline-by-tree-snapshot 按它比），不当复用的依据
+    snapshot = snapshot_identity(snapshot_of(work, context["copied"]))
     WORKER_STATE.update(work=work, environment=environment, context=context, shard_root=shard_root, worker_sequence=worker_sequence,
                         per_mutation_temporary_root=os.path.join(shard_root, PER_MUTATION_TEMPORARY_DIRECTORY_NAME),
-                        snapshot=snapshot, snapshot_files=snapshot_files, store=store, file_indexes={})
+                        snapshot=snapshot, library=mutation_units.Library(context["library_directory"], RECORD_HEADER), unit_keys=None)
     # 源码副本建在父进程的 shard_root 底下、由父进程收尾时整个删；编译目录留着跨轮复用。
     # 不在这里挂 atexit：进程池的工作进程走 os._exit 退出，atexit 在这里一次都不跑。
 
@@ -1642,15 +1550,34 @@ def run_forwarding_queue_lines(command, label, sink=None, **popen_keywords):
     return subprocess.CompletedProcess(command, process.returncode, stdout, "".join(stderr_lines))
 
 
-def run_under_wrapper(command, temporary_directory, stamp_name, extra_environment=None):
+def run_under_wrapper(command, temporary_directory, stamp_name, extra_environment=None, limits=None, compile_first=False):
     """经内存包装跑一条命令（cargo test --offline … 这一类）：(subprocess 的结果, 用时)。限时交给包装（从起跑算、不算排队），TMPDIR 是这一次自己的；
-    extra_environment 只加在这一次的环境里（覆盖那一格的编译目录、插桩开关与 LLVM_PROFILE_FILE）。"""
+    extra_environment 只加在这一次的环境里（覆盖那一格的编译目录、插桩开关与 LLVM_PROFILE_FILE）。limits 是这一次的 (内存上限, 限时秒；None 是不限时)，
+    不给取整张表的那一个数（文件头「逐行上限」）。compile_first（文件头「基线」一段的限时）：先在同一个上限里不限时跑一趟 cargo test <-- 之前那一段> --no-run，
+    编不成（编不过、撞了上限……）就把那一趟当这一次的结果交回；编成了再限时跑原命令。用时两趟相加。弄坏开关 timelimitincludescompile：不先编（改前的样子，限时含重编译）。"""
+    context = WORKER_STATE["context"]
+    memory_max, timeout_seconds = limits or (context["memory_max"], context["timeout_seconds"])
+    if compile_first and not break_is(context["environment"], "timelimitincludescompile") and "test" in command:
+        before = command[:command.index("--")] if "--" in command else list(command)
+        build, build_seconds = run_one_under_wrapper(before + ["--no-run"], temporary_directory, stamp_name + "-build", extra_environment, memory_max, None)
+        if build.returncode != 0:
+            return build, build_seconds
+        run, run_seconds = run_one_under_wrapper(command, temporary_directory, stamp_name, extra_environment, memory_max, timeout_seconds)
+        return run, {name: f"{float(build_seconds[name]) + float(run_seconds[name]):.3f}" for name in run_seconds}
+    return run_one_under_wrapper(command, temporary_directory, stamp_name, extra_environment, memory_max, timeout_seconds)
+
+
+def run_one_under_wrapper(command, temporary_directory, stamp_name, extra_environment, memory_max, timeout_seconds):
+    """run_under_wrapper 的一趟：timeout_seconds 是 None 时不设 RUN_WITH_MEMORY_CAP_TIME_LIMIT（不限时，只有内存上限）。"""
     state, context = WORKER_STATE, WORKER_STATE["context"]
     stamp_path = os.path.join(state["shard_root"], START_STAMP_DIRECTORY_NAME, stamp_name)
     environment = dict(state["environment"], TMPDIR=temporary_directory,
-                       RUN_WITH_MEMORY_CAP_TIME_LIMIT=str(context["timeout_seconds"]),
                        RUN_WITH_MEMORY_CAP_KILL_GRACE=str(TIMEOUT_KILL_GRACE_SECONDS),
                        RUN_WITH_MEMORY_CAP_KEY=" ".join(command))
+    if timeout_seconds is not None:
+        environment["RUN_WITH_MEMORY_CAP_TIME_LIMIT"] = str(timeout_seconds)
+    else:
+        environment.pop("RUN_WITH_MEMORY_CAP_TIME_LIMIT", None)
     environment.update(extra_environment or {})
     # 会话里的「日常一条」：每次包装带这个工作进程自己的并行理由，调用方设了的原样传、不覆盖；只设在这一次包装的环境里（文件头「并行理由」一段）
     if not state["environment"].get("RUN_WITH_MEMORY_CAP_PARALLEL_REASON") or break_is(context["environment"], "overridecallerreason"):
@@ -1659,10 +1586,11 @@ def run_under_wrapper(command, temporary_directory, stamp_name, extra_environmen
                 f"同一次 checker-tier-crates-mutation-replay（本模块进程 {context['stage_process']}）的第 {state['worker_sequence']} 个工作进程，"
                 f"各用各的源码副本与编译目录（这一轮共 {context['worker_count']} 个）")
     called = time.time()
-    kind, _dash, line_number = stamp_name.partition("-")
+    building = stamp_name.endswith("-build") and not stamp_name.startswith("coverage-")
+    kind, _dash, line_number = stamp_name[:-len("-build")].partition("-") if building else stamp_name.partition("-")
     label = {"baseline": f"基线（批首行是变异表第 {line_number} 行）", "coverage": f"覆盖（组首行是变异表第 {line_number.split('-')[0]} 行）"}.get(
-        kind, f"变异表第 {line_number} 行")
-    run = run_forwarding_queue_lines(["bash", context["memory_cap_runner"], context["memory_max"], "bash", "-c", START_STAMP_SCRIPT, "started-at", stamp_path]
+        kind, f"变异表第 {line_number} 行") + ("（先编，不限时）" if building else "")
+    run = run_forwarding_queue_lines(["bash", context["memory_cap_runner"], memory_max, "bash", "-c", START_STAMP_SCRIPT, "started-at", stamp_path]
                                      + command, label, cwd=state["work"], env=environment)
     returned = time.time()
     started = None
@@ -1677,14 +1605,21 @@ def run_under_wrapper(command, temporary_directory, stamp_name, extra_environmen
                  "seconds_running": f"{max(0.0, running):.3f}"}
 
 
+
 def write_record_quietly(kind, key, fields):
     """写一条判定库记录；写不进去交那一句（交回父进程报在 stderr，下一趟这一条照跑），写成交 None。"""
-    path = os.path.join(WORKER_STATE["context"]["records_directory"], f"{kind}.{key}")
     try:
-        write_atomically(path, record_text(fields))
+        WORKER_STATE["library"].write(kind, key, fields)
     except OSError as error:
-        return f"{path}：{error}"
+        return f"{WORKER_STATE['library'].path(kind, key)}：{error}"
     return None
+
+
+def how_text(context, kind, limits=None):
+    """记录里的跑法：哪一道、什么起法、这一条的上限与限时（只是一样属性，不进键；limits 不给取整张表的那一个数）。"""
+    memory_max, timeout_seconds = limits or (context["memory_max"], context["timeout_seconds"])
+    return (f"{STAGE} {kind}（经 run-with-memory-cap.sh 每条 {memory_max}、限时 {timeout_seconds} 秒、先编不限时；"
+            f"第 {WORKER_STATE['worker_sequence']} 片，共 {context['worker_count']} 片）")
 
 
 def judge_batch(batch):
@@ -1694,75 +1629,85 @@ def judge_batch(batch):
     arguments = baseline_arguments(key, batch_rows)
     temporary_directory = tempfile.mkdtemp(prefix=f"baseline-{batch_rows[0].line_number}-", dir=WORKER_STATE["per_mutation_temporary_root"])
     try:
-        run, seconds = run_under_wrapper(["cargo", "test", "--offline"] + arguments, temporary_directory, f"baseline-{batch_rows[0].line_number}")
+        limits = limits_for_lines(context, [row.line_number for row in batch_rows])
+        run, seconds = run_under_wrapper(["cargo", "test", "--offline"] + arguments, temporary_directory, f"baseline-{batch_rows[0].line_number}",
+                                         limits=limits, compile_first=True)
     finally:
         measure_and_remove_temporary_directory(temporary_directory, context)
     output = run.stdout + run.stderr
     judged, record_problems = [], []
     for row in batch_rows:
-        problem = baseline_problem(row, run.returncode, output, context["memory_max"], context["timeout_seconds"])
+        problem = baseline_problem(row, run.returncode, output, *limits)
         excerpt = None
         if problem is not None:
             results = results_by_test(row.expected, output)
             excerpt = failure_excerpt(output, next(iter(results))) if len(results) == 1 else None
         judged.append((row.line_number, problem, excerpt or output_tail(output)))
-        failed_to_write = write_record_quietly("baseline", context["row_keys"][row.line_number], dict(
-            kind="baseline", judge_version=context["judging"], row_key=context["row_keys"][row.line_number],
-            row_content_hash=row_content_hash(row), table_line=row.line_number, name=row.name, file=row.path,
-            memory_max=context["memory_max"], timeout_seconds=context["timeout_seconds"], snapshot=WORKER_STATE["snapshot"],
-            test_full_name=single_full_name(row.expected, output) or "",
-            verdict="ok" if problem is None else "not-ok", problem=problem or "", batch_arguments=" ".join(arguments),
-            batch_exit_code=run.returncode, finished_utc=utc_now_text(), **seconds))
-        if failed_to_write:
-            record_problems.append(failed_to_write)
+        components = context["row_records"].get(row.line_number) or {}
+        if components.get("baseline_key"):
+            failed_to_write = write_record_quietly("baselines", components["baseline_key"], dict(
+                kind="baseline", baseline_key=components["baseline_key"], judging=context["judging"], test_closure=components.get("test_closure", ""),
+                coverage_id=components.get("coverage_id", ""), tree_snapshot=WORKER_STATE["snapshot"], test_full_name=single_full_name(row.expected, output) or "",
+                verdict="ok" if problem is None else "not-ok", problem=problem or "", batch_arguments=" ".join(arguments),
+                batch_exit_code=run.returncode, judged_date=mutation_units.today_text(), how=how_text(context, "基线", limits), **seconds))
+            if failed_to_write:
+                record_problems.append(failed_to_write)
     return judged, record_problems
 
 
 def judge_row(row):
     """进程池里的一格活：一条变异。建它自己的 TMPDIR、改坏那一处、跑点名的测试、还原、删掉那个 TMPDIR，判完立刻写判定库记录与用时表。
-    回 (((行号, 档, 那一条要打印的话, 删 TMPDIR 的结果), {snapshot, test_full_name}), 写不进去的记录)。"""
+    回 (((行号, 档, 那一条要打印的话, 删 TMPDIR 的结果), {test_full_name}), 写不进去的记录)。"""
     context = WORKER_STATE["context"]
     full = os.path.join(WORKER_STATE["work"], row.path)
     with open(full, encoding="utf-8") as handle:
         pristine = handle.read()
     assert pristine.count(row.old) == 1, (row.path, row.name)
     temporary_directory = tempfile.mkdtemp(prefix=f"line-{row.line_number}-", dir=WORKER_STATE["per_mutation_temporary_root"])
+    limits = limits_for_lines(context, [row.line_number])
     with open(full, "w", encoding="utf-8") as handle:
         handle.write(pristine.replace(row.old, row.new))
     try:
-        run, seconds = run_under_wrapper(["cargo", "test", "--offline"] + with_shown_output(row.arguments.split()), temporary_directory, f"line-{row.line_number}")
+        run, seconds = run_under_wrapper(["cargo", "test", "--offline"] + with_shown_output(row.arguments.split()), temporary_directory, f"line-{row.line_number}",
+                                         limits=limits, compile_first=True)
     finally:
         with open(full, "w", encoding="utf-8") as handle:
             handle.write(pristine)
         # 不论退出码是几都删（含限时、撞顶被杀）：被杀的测试 Drop 守卫不跑，它建的镜像只有这里删得掉
         removal = measure_and_remove_temporary_directory(temporary_directory, context)
     output = run.stdout + run.stderr
-    verdict, text = verdict_of_run(row, run.returncode, output, context["memory_max"], context["timeout_seconds"], context["environment"])
+    verdict, text = verdict_of_run(row, run.returncode, output, *limits, context["environment"])
     if verdict in VERDICTS_KILLED_BY_WRAPPER:
         file_count, allocated_bytes, _apparent_bytes, is_still_there = removal
         first_line, line_break, rest = text.partition("\n")
         text = (first_line + f"；它的临时目录{'没删掉' if is_still_there else '已整个删掉'}（删前留有 {file_count} 个文件、占盘 {allocated_bytes} 字节）"
                 + line_break + rest)
-    key = context["row_keys"][row.line_number]
+    components = context["row_records"].get(row.line_number) or {}
     full_name = single_full_name(row.expected, output) or ""
     record_problems = []
-    failed_to_write = write_record_quietly("mutation", key, dict(
-        kind="mutation", judge_version=context["judging"], row_key=key, row_content_hash=row_content_hash(row),
-        table_line=row.line_number, name=row.name, file=row.path, memory_max=context["memory_max"], timeout_seconds=context["timeout_seconds"],
-        verdict=verdict, text=text, removal_files=removal[0], removal_allocated_bytes=removal[1], removal_apparent_bytes=removal[2],
-        removal_left=int(removal[3]), exit_code=run.returncode, finished_utc=utc_now_text(), snapshot=WORKER_STATE["snapshot"],
-        test_full_name=full_name, combo_key=combo_key(row, full_name, context["toolchain"]) if full_name else "", coverage="", **seconds))
-    if failed_to_write:
-        record_problems.append(failed_to_write)
+    if components.get("row_key"):
+        fields = collections.OrderedDict(
+            kind="mutation", row_key=components["row_key"], judging=context["judging"], verdict=verdict, text=text,
+            removal_files=removal[0], removal_allocated_bytes=removal[1], removal_apparent_bytes=removal[2], removal_left=int(removal[3]),
+            exit_code=run.returncode, judged_date=mutation_units.today_text(), how=how_text(context, "现判", limits), test_full_name=full_name,
+            test_closure=components.get("test_closure", ""), mutated=components.get("mutated", ""), toolchain=components.get("toolchain", ""),
+            dependency=components.get("dependency", ""))
+        if verdict in ("timeout", "memory"):
+            # 上限与限时只记在这两档的记录里（这两档本来不复用）；别的档的键与记录里都没有它们
+            fields.update(memory_max=limits[0], timeout_seconds=limits[1])
+        fields.update(seconds)
+        failed_to_write = write_record_quietly("records", components["row_key"], fields)
+        if failed_to_write:
+            record_problems.append(failed_to_write)
     if verdict not in VERDICTS_THAT_DID_NOT_RUN and verdict not in ("squeezed", "gpumemory"):
         timing_path = os.path.join(context["timings_directory"], row_content_hash(row))
         try:
-            write_atomically(timing_path, record_text(dict(row_content_hash=row_content_hash(row), seconds_running=seconds["seconds_running"],
-                                                           seconds_queued=seconds["seconds_queued"], timed_out=int(verdict == "timeout"),
-                                                           finished_utc=utc_now_text())))
+            write_atomically(timing_path, mutation_units.record_text(RECORD_HEADER, dict(
+                row_content_hash=row_content_hash(row), seconds_running=seconds["seconds_running"], seconds_queued=seconds["seconds_queued"],
+                timed_out=int(verdict == "timeout"), judged_date=mutation_units.today_text())))
         except OSError as error:
             record_problems.append(f"{timing_path}：{error}")
-    return ((row.line_number, verdict, text, removal), dict(snapshot=WORKER_STATE["snapshot"], test_full_name=full_name)), record_problems
+    return ((row.line_number, verdict, text, removal), dict(test_full_name=full_name)), record_problems
 
 
 # ── 覆盖（judge_coverage 与它用的几个函数） ────────────────────────────────────
@@ -1779,95 +1724,34 @@ def coverage_build_settings(environment):
     return {}, ["--config", f'build.rustflags=["{COVERAGE_FLAG}"]']
 
 
-def dep_info_paths(filenames):
-    """一个编译单元的产物（compiler-artifact 的 filenames）旁边 rustc 写的 dep-info：libx-<哈希>.rlib → x-<哈希>.d，可执行文件 x-<哈希> → x-<哈希>.d。"""
-    found = []
-    for name in filenames:
-        directory, base = os.path.split(name)
-        stem, extension = os.path.splitext(base)
-        if extension in (".rlib", ".rmeta", ".so", ".a", ".dylib", ".dll"):
-            stem = stem[3:] if stem.startswith("lib") else stem
-        elif extension not in ("", ".exe"):
-            continue
-        candidate = os.path.join(directory, stem + ".d")
-        if os.path.isfile(candidate) and candidate not in found:
-            found.append(candidate)
-    return found
-
-
-def parse_dep_info(path):
-    """rustc 的 dep-info（Makefile 写法）第一条规则列的文件；`\\ ` 是路径里的空格。"""
-    with open(path, encoding="utf-8", errors="surrogateescape") as handle:
-        for line in handle:
-            if not line.strip() or line.startswith("#"):
-                continue
-            _target, separator, rest = line.partition(": ")
-            if not separator:
-                continue
-            return [part.replace("\\ ", " ") for part in re.split(r"(?<!\\) ", rest.strip()) if part]
-    return []
-
-
 def relative_inside(path, work):
-    """dep-info 与 cargo 消息里的路径 → 相对源码副本根的路径；落在副本之外（注册表、OUT_DIR）交 None。"""
+    """cargo 消息里的路径 → 相对源码副本根的路径；落在副本之外（注册表、OUT_DIR）交 None。"""
     full = os.path.normpath(path if os.path.isabs(path) else os.path.join(work, path))
     root = os.path.normpath(work)
     return os.path.relpath(full, root) if full.startswith(root + os.sep) else None
 
 
-class CompiledFileIndexes:
-    """给 mutation-prune.py 的 covered_containers 用的 files：只认编进去的运行期 .rs，按需切、在这个工作进程里缓存（副本不变）。"""
-
-    def __init__(self, work, compiled, cache):
-        self.work, self.compiled, self.cache = work, compiled, cache
-
-    def __contains__(self, path):
-        return self.compiled.get(path) == "runtime" and path.endswith(".rs")
-
-    def __getitem__(self, path):
-        if path not in self.cache:
-            with open(os.path.join(self.work, path), encoding="utf-8", errors="replace") as handle:
-                self.cache[path] = prune_library().FileIndex(path, handle.read())
-        return self.cache[path]
-
-
-def coverage_from_build(messages, work, snapshot_files):
-    """--no-run 那一次的 compiler-artifact 消息 → (编进去的文件 {路径: runtime / compile-time}, 涉及的包目录, 本仓的可执行文件)。"""
-    compiled, packages, executables = {}, set(), []
+def executables_of_build(messages, work):
+    """--no-run 那一次的 compiler-artifact 消息 → 本仓编出来的可执行文件（测试与 bin，构建脚本不算）。"""
+    executables = []
     for message in messages:
-        if message.get("reason") != "compiler-artifact":
+        if message.get("reason") != "compiler-artifact" or relative_inside(os.path.dirname(message.get("manifest_path", "")), work) is None:
             continue
-        package = relative_inside(os.path.dirname(message.get("manifest_path", "")), work)
-        if package is None:
-            continue
-        packages.add(package)
-        kinds = message.get("target", {}).get("kind", [])
-        compile_time = any(kind in ("proc-macro", "custom-build") for kind in kinds)
-        for dep_info in dep_info_paths(message.get("filenames", [])):
-            for path in parse_dep_info(dep_info):
-                relative = relative_inside(path, work)
-                if relative is None or relative not in snapshot_files:
-                    continue
-                if compile_time:
-                    compiled.setdefault(relative, "compile-time")
-                else:
-                    compiled[relative] = "runtime"
         executable = message.get("executable")
-        if executable and "custom-build" not in kinds and executable not in executables:
+        if executable and "custom-build" not in message.get("target", {}).get("kind", []) and executable not in executables:
             executables.append(executable)
-    return compiled, sorted(packages), executables
+    return executables
 
 
 def judge_coverage(job):
-    """进程池里的一格活：一组「cargo 参数 + 点名用例」在没改坏的副本上记一份覆盖（文件头「判定库」覆盖记录 ①–④）。
-    回 ({combo, coverage（覆盖号或 None）, snapshot, problem（没记成的那一句或 None）, line}, 写不进去的记录)。"""
+    """进程池里的一格活：一条点名测试在没改坏的副本上记一份覆盖（文件头「判定库」覆盖记录 ①–④）。
+    回 ({coverage（覆盖号或 None）, problem（没记成的那一句或 None）, line}, 写不进去的记录)。"""
     state, context = WORKER_STATE, WORKER_STATE["context"]
-    result = dict(combo=job["combo"], coverage=None, snapshot=state["snapshot"], problem=None, line=job["line"])
+    result = dict(coverage=None, problem=None, line=job["line"], identity=job["coverage_id"])
     if break_is(context["environment"], "coveragenotrecorded"):
         return result, []
-    identity = coverage_id(job["combo"], state["snapshot"])
-    if state["store"].coverage(identity) is not None:
-        result.update(coverage=identity, existing=True)
+    if state["library"].read_json("coverage", job["coverage_id"]) is not None and not job.get("stale"):
+        result.update(coverage=job["coverage_id"], existing=True)
         return result, []
     overrides, configuration = coverage_build_settings(state["environment"])
     overrides["CARGO_TARGET_DIR"] = state["environment"]["CARGO_TARGET_DIR"] + COVERAGE_TARGET_SUFFIX
@@ -1875,9 +1759,9 @@ def judge_coverage(job):
     profiles = os.path.join(temporary_directory, "profiles")
     os.mkdir(profiles)
     try:
-        result["problem"] = record_coverage(job, identity, overrides, configuration, temporary_directory, profiles)
+        result["problem"] = record_coverage(job, overrides, configuration, temporary_directory, profiles)
         if result["problem"] is None:
-            result["coverage"] = identity
+            result["coverage"] = job["coverage_id"]
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         result["problem"] = f"记覆盖时出错（{type(error).__name__}：{error}）"
     finally:
@@ -1885,7 +1769,7 @@ def judge_coverage(job):
     return result, []
 
 
-def record_coverage(job, identity, overrides, configuration, temporary_directory, profiles):
+def record_coverage(job, overrides, configuration, temporary_directory, profiles):
     """judge_coverage 的 ①–④：记成交 None，哪一步不成交那一句。"""
     state, context = WORKER_STATE, WORKER_STATE["context"]
     stamp = f"coverage-{job['line']}"
@@ -1895,9 +1779,12 @@ def record_coverage(job, identity, overrides, configuration, temporary_directory
     os.mkdir(build_profiles)
     build_overrides = overrides if break_is(context["environment"], "buildprofilesunset") else dict(
         overrides, LLVM_PROFILE_FILE=os.path.join(build_profiles, "build-%p-%m.profraw"))
+    limits = limits_for_lines(context, [job["line"]])
+    # 插桩编译不限时、只有内存上限（文件头「基线」一段：限时只罩跑测试那一趟、不含重编译）；弄坏开关 timelimitincludescompile 下照改前限时
+    build_limits = limits if break_is(context["environment"], "timelimitincludescompile") else (limits[0], None)
     build, _seconds = run_under_wrapper(["cargo", *configuration, "test", "--offline", *job["before"], "--no-run", "--message-format=json-render-diagnostics"],
-                                        temporary_directory, stamp + "-build", build_overrides)
-    outcome = wrapper_outcome(build.returncode, context["memory_max"], context["timeout_seconds"])
+                                        temporary_directory, stamp + "-build", build_overrides, limits=build_limits)
+    outcome = wrapper_outcome(build.returncode, *limits)
     if outcome is not None or build.returncode != 0:
         return f"插桩编译没成（{outcome[1] if outcome else f'退出码 {build.returncode}'}）：{output_tail(build.stderr, 3)}"
     messages = []
@@ -1905,13 +1792,13 @@ def record_coverage(job, identity, overrides, configuration, temporary_directory
         if line.startswith("{"):
             with contextlib.suppress(ValueError):
                 messages.append(json.loads(line))
-    compiled, packages, executables = coverage_from_build(messages, state["work"], state["snapshot_files"])
+    executables = executables_of_build(messages, state["work"])
     if not executables:
         return "插桩编译没交出一个本仓的可执行文件"
     run, _seconds = run_under_wrapper(["cargo", *configuration, "test", "--offline", *job["before"], "--", *job["switches"], "--exact", job["test"]],
-                                      temporary_directory, stamp + "-run", dict(overrides, LLVM_PROFILE_FILE=os.path.join(profiles, "cov-%p-%m.profraw")))
+                                      temporary_directory, stamp + "-run", dict(overrides, LLVM_PROFILE_FILE=os.path.join(profiles, "cov-%p-%m.profraw")), limits=limits)
     output = run.stdout + run.stderr
-    outcome = wrapper_outcome(run.returncode, context["memory_max"], context["timeout_seconds"])
+    outcome = wrapper_outcome(run.returncode, *limits)
     results = results_by_test(job["test"], output)
     if outcome is not None or run.returncode != 0 or len(results) != 1 or any(result != "ok" for result in next(iter(results.values()))):
         return (f"插桩跑 {job['test']} 没恰好一个 ok（{outcome[1] if outcome else f'退出码 {run.returncode}'}；"
@@ -1930,18 +1817,21 @@ def record_coverage(job, identity, overrides, configuration, temporary_directory
     if exporting.returncode != 0:
         return f"llvm-cov export 退 {exporting.returncode}：{output_tail(exporting.stderr, 3)}"
     export = json.loads(exporting.stdout)
-    tree = types.SimpleNamespace(root=state["work"], files=CompiledFileIndexes(state["work"], compiled, state["file_indexes"]))
-    executed = sorted([path, container] for path, container in prune_library().covered_containers(export, tree))
-    for path, kind in compiled.items():
-        if kind == "runtime" and path.endswith(".rs"):
-            data = read_bytes(os.path.join(state["work"], path))
-            digest = hashlib.sha256(data).hexdigest()
-            if digest != state["snapshot_files"].get(path):
-                return f"副本里的 {path} 与这一份快照对不上（记覆盖时被改了）"
-            state["store"].put_blob(digest, data)
-    state["store"].put_coverage(identity, dict(
-        combo=job["combo"], snapshot=state["snapshot"], arguments=" ".join(job["before"]), switches=" ".join(job["switches"]), test=job["test"],
-        compiled=compiled, packages=packages, executed=executed, executables=len(executables), created_utc=utc_now_text()))
+    # ④ 执行过的单元：计数 > 0 的函数落进的 fn 单元，连同点名测试闭包里不是 fn 的单元（常量、类型、静态项、宏、数据文件），都在这份副本上切
+    if state["unit_keys"] is None:
+        state["unit_keys"] = mutation_units.UnitKeys(state["work"])
+    keys = state["unit_keys"]
+    test, refusal = keys.resolve_test(job["arguments"], job["expected"])
+    if refusal is not None:
+        return f"副本里认不出点名的测试（{refusal}）"
+    closure = keys.closure(test.unit, test.target, job["arguments"])
+    executed, unplaced = keys.executed_units(export, state["work"])
+    members = {(reference.kind, reference.file, reference.name, reference.fingerprint): reference
+               for reference in executed + [member for member in closure.members if member.kind != "fn"]}
+    state["library"].write_json("coverage", job["coverage_id"], dict(
+        test=list(mutation_units.reference_of(test.unit)), executed=sorted(list(reference) for reference in members.values()),
+        executed_functions=len(executed), unplaced_functions=unplaced, complete=unplaced == 0 and bool(executed),
+        executables=len(executables), judged_date=mutation_units.today_text(), how=how_text(context, "覆盖", limits)))
     return None
 
 
@@ -2107,7 +1997,9 @@ def print_rejection(headline, details, howto_lines):
 
 
 def prechecks(root, rows, malformed, environment):
-    """派活之前先判、一个工作进程都不起的那几样（row_problems，与门禁 code-source-discipline 经 static-check 判的是同一份）。回 (拷贝范围, 判红了没有)。"""
+    """派活之前先判、一个工作进程都不起的那几样（row_problems，与门禁 code-source-discipline 经 static-check 判的是同一份）。回 (拷贝范围, 整道判红了没有, {行号: 锚点失效的原因})。
+    锚点失效按行判（文件头「锚点失效」）：只有它的时候不判整道，交回那几行由 run_stage 单记一档；别的几样有一样就整道判红，锚点失效的行一起列出。
+    弄坏开关 anchor-stops-table：锚点失效也让整道判红（改前的样子）。"""
     admission = admission_module()
     try:
         copied = copied_paths()
@@ -2118,17 +2010,21 @@ def prechecks(root, rows, malformed, environment):
     if not copied:
         print_rejection(f"读不到 .claude/gate.d/stage-inputs.tsv 里 {STAGE} 那一行登记的路径（{reason}）：判不出每片的源码副本该拷哪些", [],
                         [f"单独执行 python3 scripts/gate/admission.py paths \"{STAGE_REPOSITORY}\" {STAGE} 看它报什么；那一行不在就照别的行给本阶段登记它读的路径。"])
-        return None, True
-    # 锚点只在真仓上核：文件落在拷贝范围之外时，工作进程在自己那份副本里打不开它，所以拷贝范围也在派活之前判。有一样红就一个工作进程都不起。
+        return None, True, {}
+    # 锚点只在真仓上核：文件落在拷贝范围之外时，工作进程在自己那份副本里打不开它，所以拷贝范围也在派活之前判。
+    # 锚点失效之外的几样有一样红就一个工作进程都不起；只有锚点失效的，那几行单记一档、别的行照跑。
     problems = row_problems(root, rows, malformed, copied)
+    whole_table = [kind for kind in ROW_PROBLEM_KINDS if problems[kind] and (kind != "ANCHOR" or break_is(environment, "anchor-stops-table"))]
+    if not whole_table:
+        return copied, False, {line_number: why for line_number, _name, why in problems["ANCHOR"]}
     not_started = "这一轮一个工作进程都没起；门禁 code-source-discipline 静态判同样几样（不跑变异），改完先跑它。"
     if problems["MALFORMED"]:
         print_rejection(f"{TABLE} 有几行不成形（六段制表符分隔：{'、'.join(FIELD_NAMES)}；替换文可以空，那是删掉原文，其余五段不许空）：",
                         [f"{TABLE}:{line_number} {name}：{why}" for line_number, name, why in problems["MALFORMED"]],
                         ["补上空着的那一段，制表符删补到恰好六段；原文 / 替换文里的换行写成 \\n。要删掉原文就让替换文空着（两个制表符挨着）。", not_started])
     if problems["ANCHOR"]:
-        print_rejection("变异表的锚点腐化：", [f"{TABLE}:{line_number} {name}：{why}" for line_number, name, why in problems["ANCHOR"]],
-                        ["改代码时把变异表里的原文一起改到今天的写法（锚点腐化的那条变异等于没跑过，mutation-sampling.md 第七类）。", not_started])
+        print_rejection("变异表有几行锚点失效：", [f"{TABLE}:{line_number} {name}：{why}" for line_number, name, why in problems["ANCHOR"]],
+                        ["改代码时把变异表里的原文一起改到今天的写法、让它恰好命中一次（锚点失效的那一行等于没跑过，.claude/rules/mutation-sampling.md 第七类）。", not_started])
     if problems["NAME"]:
         print_rejection("变异表有几行的「必须红的测试名」不是一个用例名（带了正则符号或空白），按字面在测试输出里永远找不到：",
                         [f"{TABLE}:{line_number} {name}：「{expected}」" for line_number, name, expected in problems["NAME"]],
@@ -2143,13 +2039,83 @@ def prechecks(root, rows, malformed, environment):
         print_rejection("变异表有几行的原文或替换文里有 \\n 以外的反斜杠转义（这里只把 \\n 还原成换行，别的反斜杠按字面写进源码，那条变异编不过、等于没跑）：",
                         [f"{TABLE}:{line_number} {name}：{segment}里的 {escape}" for line_number, name, segment, escape in problems["STRAY"]],
                         ["去掉那个反斜杠（例 \\&report.outcome 写成 &report.outcome），改完单跑那一行证明点名的测试红。", not_started])
-    if any(problems.values()):
-        return None, True
-    return copied, False
+    return None, True, {}
 
 
-def run_stage(root, environment=None):
-    """门禁 checker-tier-crates-mutation-replay 的整道：判定打 stdout（按表的行号排序，与进程数、复用了多少都无关），进度与复用几条打 stderr。回退出码。"""
+
+def light_components(components):
+    """交给工作进程的那一份（进程池按 pickle 传）：只有键与几样组成的号，不带单元对象。"""
+    return dict(row_key=components.row_key or "", baseline_key=components.baseline_key or "", coverage_id=components.coverage_id or "",
+                test_closure=components.test_closure or "", toolchain=components.toolchain or "", dependency=components.dependency or "",
+                mutated=",".join(mutation_units.unit_id(reference) for reference in components.mutated or []))
+
+
+def baseline_check(library, components, key_context, snapshot, environment, refusal):
+    """(基线 ok 复用得上没有, 不复用的那一句)。全量开关下不读库；拒算的行（没有基线键）照跑。"""
+    if refusal:
+        return False, refusal
+    if not components.baseline_key:
+        return False, components.refusal or "没有基线键"
+    record = library.read("baselines", components.baseline_key)
+    coverage = library.read_json("coverage", components.coverage_id) if components.coverage_id else None
+    problem = baseline_reuse_problem(record, components, key_context.keys, coverage, snapshot, environment)
+    return problem is None, problem
+
+
+def plan_rows(root, rows, environment, memory_max, timeout_seconds, judging_repository=None):
+    """(KeyContext, {行号: Components}, 判定库)：run_stage、plan、row-plan、--list-items、import 共用这一份算法；只读（不写库）。"""
+    key_context = KeyContext(root, environment, memory_max, timeout_seconds, judging_repository)
+    key_context.prepare(rows)
+    components = {row.line_number: key_context.components(row) for row in rows}
+    return key_context, components, open_library(root, environment)
+
+
+def decide_rows(library, rows, components, key_context, environment):
+    """每一行 (Decision, 记录)：与 run_stage 同一份 row_decision。"""
+    refusal = reuse_refusal(environment)
+    decided = {}
+    for row in rows:
+        comp = components[row.line_number]
+        previous = library.read("index", row_identity(row)) if comp.row_key and not refusal else None
+        decided[row.line_number] = row_decision(library, comp, row, refusal, key_context, previous)
+    return decided
+
+
+def impact_unit_name(reference):
+    """牵连面那一行里一个单元的名字：<文件>::<限定名>；数据文件的限定名就是路径，只写路径。"""
+    return reference.file if reference.name == reference.file else f"{reference.file}::{reference.name}"
+
+
+def impact_summary(rows, components, key_context, environment, anchor_broken_count=0):
+    """牵连面那一行（文件头「牵连面」）：每一行的键依赖的单元（KeyContext 为它算好的点名测试闭包，连同被改坏的单元）按（种类、文件、限定名）计数，
+    报进的行数最多的那个单元、前 5 个与一次改动最坏牵连几行。只报数，不判红。弄坏开关 impact-row-dropped：算进的头一行不数。"""
+    counts, names, counted = collections.Counter(), {}, 0
+    for row in rows:
+        comp = components.get(row.line_number)
+        closure = key_context.closures.get(comp.test_closure) if comp is not None and comp.test_closure else None
+        if closure is None:
+            continue
+        counted += 1
+        if counted == 1 and break_is(environment, "impact-row-dropped"):
+            continue
+        units = {}
+        for reference in list(closure.members) + list(comp.mutated or []):
+            units[(reference.kind, reference.file, reference.name)] = impact_unit_name(reference)
+        for identity, name in units.items():
+            counts[identity] += 1
+            names[identity] = name
+    tail = f"（算了 {counted} 行的闭包；拒算与锚点失效的 {len(rows) - counted + anchor_broken_count} 行没有闭包、没算进）"
+    if not counts:
+        return f"牵连最大的函数单元：没有（一行的闭包都没算出来）；一次改动最坏牵连 0 行{tail}"
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], names[item[0]], item[0]))
+    top_identity, top_count = ranked[0]
+    top_five = "、".join(f"{names[identity]} {count}" for identity, count in ranked[:5])
+    return f"牵连最大的函数单元：{names[top_identity]} 进了 {top_count} 行的闭包（前 5：{top_five}）；一次改动最坏牵连 {top_count} 行{tail}"
+
+
+def run_stage(root, environment=None, judging_repository=None):
+    """门禁 checker-tier-crates-mutation-replay 的整道：判定打 stdout（按表的行号排序，与进程数、复用了多少都无关），进度与复用几条打 stderr。回退出码。
+    judging_repository 只给自证用：拿判法的临时拷贝改了判法，看每一行都现判。"""
     environment = dict(os.environ if environment is None else environment)
     admission = admission_module()
     table_path = os.path.join(root, TABLE)
@@ -2166,10 +2132,15 @@ def run_stage(root, environment=None):
         print_rejection(f"{TABLE} 里一条成形的变异都没有", [], ["至少一条：三方打中之后的每一处改法，留一条「改回去它就红」的变异。"])
         return 1
     memory_max, timeout_seconds, limit_problems = limits_of(memory_max_from_table, timeout_from_table, environment)
+    # 逐行上限（文件头「逐行上限」）：照整张成形的表认名字，选行之前读
+    row_limits, row_limit_problems = read_row_limits(root, rows, environment)
+    limit_problems += row_limit_problems
     for headline, howto_line in limit_problems:
         print_rejection(headline, [], [howto_line])
     if limit_problems:
         return 1
+    if row_limits:
+        note(f"  … 逐行上限（{LIGHT_ROWS_TABLE} 的「# 逐行上限：」）：{len(row_limits)} 行另给了上限或限时，别的行照每条 {memory_max}、限时 {timeout_seconds} 秒")
     numeric_settings = {}
     for variable, default in (("GATE_MUTATION_LONG_ROW_SECONDS", DEFAULT_LONG_ROW_SECONDS), ("GATE_MUTATION_STOP_AFTER_ROWS", "")):
         text = environment.get(variable, "").strip() or default
@@ -2185,72 +2156,81 @@ def run_stage(root, environment=None):
                             [f"一行写一个 {TABLE} 里成形的变异所在的行号（# 起头的行与空行不看）；行号照被判的那一份表现数。"])
             return 1
         rows = [row for row in rows if row.line_number in selected]
-    copied, refused = prechecks(root, rows, malformed, environment)
+    copied, refused, anchor_broken = prechecks(root, rows, malformed, environment)
     if refused:
         return 1
+    # 锚点失效的行（文件头「锚点失效」）单记一档：不算键、不派活、不写库，别的行照跑
+    anchor_judgements = [(row.line_number, "anchor", anchor_broken_text(row, anchor_broken[row.line_number]), None)
+                         for row in rows if row.line_number in anchor_broken]
+    rows = [row for row in rows if row.line_number not in anchor_broken]
     memory_cap_runner = environment.get("GATE_MUTATION_MEMORY_CAP_RUNNER", "").strip() or DEFAULT_MEMORY_CAP_RUNNER
     try:
-        judging, _judging_items = judge_version(root, environment, memory_cap_runner)
-        toolchain = toolchain_text(root, environment)
-        common_directory = records_home(root, environment)
-    except (admission.RegistrationError, admission.InputManifestError, OSError) as error:
-        print_rejection(f"算不出判法版本或工具链（{error}），判定库记录没处对：一条都没跑", [],
-                        ["被判的要是 git 工作树、cargo -V 与 rustc -V 跑得通、.claude/gate.d/stage-inputs.tsv 里有本阶段那一行；",
-                         f"单跑 python3 scripts/mutation/crates-mutation-rows.py judge-version {root} 看它报什么。"])
+        key_context, components, library = plan_rows(root, rows, environment, memory_max, timeout_seconds, judging_repository)
+    except (JudgingUnitsRefused, mutation_units.MutationUnitsError, admission.InputManifestError, HeavyThreadDefaultError, OSError) as error:
+        print_rejection(f"算不出判法单元指纹、工具链、依赖版本或判定库的位置（{error}），判定库没处对：一条都没跑", [],
+                        ["被判的要是 git 工作树（或设 GATE_MUTATION_RECORDS_HOME）、rustc -vV 与 cargo -V 跑得通、Cargo.lock 读得懂；",
+                         f"单跑 python3 scripts/mutation/crates-mutation-rows.py judging-units {root} 与 plan {root} 看它报什么。"])
         return 1
-    records_root = os.path.join(common_directory, RECORDS_DIRECTORY_NAME)
-    records_directory = os.path.join(records_root, judging)
-    timings_directory = os.path.join(common_directory, TIMINGS_DIRECTORY_NAME)
+    timings_directory = os.path.join(library.directory, "timings")
     os.makedirs(timings_directory, exist_ok=True)
-    pruned = prune_base_directories(records_root, judging)
-    store = Store(records_directory)
-    store.ensure()
-    current = current_state(root, copied)
-    store.put_snapshot(current["id"], current["files"])
     refusal = reuse_refusal(environment)
     skip_baseline = break_is(environment, "nobaseline")
-    row_keys = {row.line_number: row_key(row, memory_max, timeout_seconds, toolchain) for row in rows}
-    store_has_records = store.has_new_format_records()
-    records, decisions, comparisons = {}, {}, {}
+    snapshot = snapshot_identity(snapshot_of(root, copied)) if break_is(environment, "baseline-by-tree-snapshot") else None
+    decided = decide_rows(library, rows, components, key_context, environment)
+    decisions = {line_number: decision for line_number, (decision, _record) in decided.items()}
+    sentinel = plan_reuse_sentinel(library, rows, components, refusal, environment)
     reused, baseline_ok_lines, reused_baseline_count = {}, set(), 0
     for row in rows:
-        key = row_keys[row.line_number]
-        record = read_record(os.path.join(records_directory, f"mutation.{key}"))
-        records[row.line_number] = record
-        decision = reuse_decision(row, key, record, store, current, comparisons, environment, refusal, store_has_records)
+        decision, record = decided[row.line_number]
+        if decision.reuse and break_is(environment, "reuse-lookup-skipped"):
+            decision = decisions[row.line_number] = Decision(False, "unexplained", "弄坏开关 reuse-lookup-skipped：没读库")
+        if decision.reuse and sentinel.forced(sentinel_item(row)):
+            decision = decisions[row.line_number] = Decision(False, "sentinel", "复用哨兵抽中：键相同，这一趟不读库")
         if decision.reuse:
             try:
                 removal = (int(record.get("removal_files", "")), int(record.get("removal_allocated_bytes", "")),
                            int(record.get("removal_apparent_bytes", "")), record.get("removal_left") == "1")
             except ValueError:
-                decision = Decision(False, "no-coverage", "记录里删临时目录的那几个数读不出", None)
-        decisions[row.line_number] = decision
+                decision = decisions[row.line_number] = Decision(False, "unexplained", "记录里删临时目录的那几个数读不出")
         if decision.reuse:
-            reused[row.line_number] = (row.line_number, "caught", caught_text(row, "（按覆盖复用）"), removal)
+            reused[row.line_number] = (row.line_number, "caught", caught_text(row, "（复用）"), removal)
             baseline_ok_lines.add(row.line_number)
-        elif not refusal:
-            baseline = read_record(os.path.join(records_directory, f"baseline.{key}"))
-            if (baseline is not None and baseline.get("kind") == "baseline" and baseline.get("row_key") == key
-                    and baseline.get("verdict") == REUSABLE_VERDICT["baseline"] and baseline.get("snapshot") == current["id"]):
-                baseline_ok_lines.add(row.line_number)
-                reused_baseline_count += 1
+            continue
+        ok, _problem = baseline_check(library, components[row.line_number], key_context, snapshot, environment, refusal)
+        if ok:
+            baseline_ok_lines.add(row.line_number)
+            reused_baseline_count += 1
+    refused_lines = {row.line_number for row in rows if components[row.line_number].row_key is None}
     candidates = [row for row in rows if row.line_number not in reused]
     if skip_baseline:
         baseline_ok_lines |= {row.line_number for row in candidates}
     needs_baseline = [row for row in candidates if row.line_number not in baseline_ok_lines]
     batches = list(baseline_batches(needs_baseline).items())
     ordered_candidates, moved_count = dispatch_order(candidates, timings_directory, numeric_settings["GATE_MUTATION_LONG_ROW_SECONDS"], environment)
-    planner = CoveragePlanner(rows, row_keys, records, decisions, toolchain, current["id"], store)
-    initial_coverage_jobs = planner.initial_jobs()
+    planner = CoveragePlanner(components, library, key_context.keys)
+    # 组成清单先进库（判法单元、点名测试的闭包、工具链行、依赖版本行）：这一趟中途停了，下一趟照样报得出变了哪几个单元
+    key_context.persist(library, components)
     # stderr 头一行：复用几条、现跑几条、前移几条（逐栏的数在 stdout 的「复用：」那一行）
     note(f"  … 判定库记录：复用抓到 {len(reused)} 条、复用基线 ok {reused_baseline_count} 行；现跑基线 {len(batches)} 批 {len(needs_baseline)} 行、"
-         f"现跑变异至多 {len(candidates)} 条、补记覆盖 {len(initial_coverage_jobs)} 组；前移 {moved_count} 条（上一次用时 ≥ {numeric_settings['GATE_MUTATION_LONG_ROW_SECONDS']} 秒"
-         f"或上一次超时的先派，按用时从长到短）；判法版本 {judging[:16]}…，记录在 {records_directory}"
-         + (f"；不复用：{refusal}" if refusal else "") + (f"；删了更早的判法版本目录 {len(pruned)} 个" if pruned else "")
+         f"现跑变异至多 {len(candidates)} 条（其中拒算 {len(refused_lines)} 条）、锚点失效不跑 {len(anchor_judgements)} 行、补记覆盖 0 份；前移 {moved_count} 条（上一次用时 ≥ {numeric_settings['GATE_MUTATION_LONG_ROW_SECONDS']} 秒"
+         f"或上一次超时的先派，按用时从长到短）；判法单元 {key_context.judging[:16]}…（{len(key_context.judging_references)} 个单元），库在 {library.directory}"
+         + (f"；不读库：{refusal}（只写不读，现判的照键写回同一份库）" if refusal else "")
          + ("；基线没跑：GATE_MUTATION_BREAK=nobaseline（只给证红用）" if skip_baseline else ""))
+    for line in sentinel.plan_lines:
+        note(line)
+    # 现判与拒算的原因逐行进 stderr（作废时报出变了哪几个单元，文件头「复用判据」）；多了只列前 REASONS_SHOWN 行，全部的看 plan
+    fresh_reasons = [row for row in rows if row.line_number not in reused and row.line_number not in refused_lines]
+    for row in fresh_reasons[:REASONS_SHOWN]:
+        decision = decisions[row.line_number]
+        note(f"  · 现判：{TABLE}:{row.line_number} {row.name}：{COLUMN_TITLES[decision.column]}——{decision.detail}")
+    refused_rows = [row for row in rows if row.line_number in refused_lines]
+    for row in refused_rows[:REASONS_SHOWN]:
+        note(f"  · 拒算（照跑、不复用）：{TABLE}:{row.line_number} {row.name}：{components[row.line_number].refusal}")
+    if len(fresh_reasons) > REASONS_SHOWN or len(refused_rows) > REASONS_SHOWN:
+        note(f"  · 现判 {len(fresh_reasons)} 行、拒算 {len(refused_rows)} 行，各只列了前 {REASONS_SHOWN} 行；逐行的栏与变了的单元：python3 scripts/mutation/crates-mutation-rows.py plan {root}")
     outcome = dict(mutation=[], mutation_info={}, baseline={}, coverage=[], submitted=0, received=0, stopped=False, left_behind=[], record_problems=[])
     worker_count, cargo_jobs = 0, "-"
-    if candidates or initial_coverage_jobs:
+    if candidates:
         memory_cap_check = subprocess.run(["bash", memory_cap_runner, "--check", memory_max], capture_output=True, text=True, errors="replace",
                                           env=environment)
         if memory_cap_check.returncode != 0:
@@ -2261,10 +2241,13 @@ def run_stage(root, environment=None):
         tools, tools_text, tools_problem = llvm_tools(root, environment)
         if tools_problem is not None:
             print_rejection(f"记覆盖要的 llvm 工具不对（{tools_problem[0]}），一条变异都没跑：", [],
-                            [tools_problem[1], "不退回不记覆盖去跑：没有覆盖记录，下一趟这几行全都要现跑。"])
+                            [tools_problem[1], "不退回不记覆盖去跑：没有覆盖记录，基线就只能按点名测试的闭包复用。"])
             return 1
         note(f"  … 记覆盖用的 llvm 工具：{tools_text}")
-        worker_count, worker_count_head_line = worker_count_for(len(candidates) + len(initial_coverage_jobs), environment, memory_max)
+        # 工作进程数的 ③（外层上限 ÷ 每条上限）按这一趟要现跑的行里最大的那一个上限算（逐行上限给了更大的，几条同时撞也装得下）
+        largest_memory = limits_for_lines(dict(memory_max=memory_max, timeout_seconds=timeout_seconds, row_limits=row_limits),
+                                          [row.line_number for row in candidates])[0]
+        worker_count, worker_count_head_line = worker_count_for(len(candidates), environment, largest_memory)
         note(worker_count_head_line)
         # 每个 cargo 的编译并行度：进程数 × 它 ≈ 核数，免得 N 个 cargo 各自按核数开 rustc、互相抢
         cargo_jobs = environment.get("GATE_MUTATION_CARGO_JOBS", "").strip() or str(max(1, (os.cpu_count() or 4) // worker_count))
@@ -2284,11 +2267,11 @@ def run_stage(root, environment=None):
         # 编译目录数按这一趟的工作进程数复用：片号更大的旧 -w<片号>（连同 -coverage）开跑时回收，有人在用的留着（reclaim_extra_target_directories）
         for line in target_reclaim_lines(shared_target, worker_count, reclaim_extra_target_directories(shared_target, worker_count, environment)):
             note(line)
-        context = dict(root=root, copied=copied, environment=environment, memory_max=memory_max, timeout_seconds=timeout_seconds,
-                       memory_cap_runner=memory_cap_runner, judging=judging, toolchain=toolchain, llvm_tools=tools,
-                       records_directory=records_directory, timings_directory=timings_directory,
-                       row_keys=row_keys, shared_target_directory=shared_target,
-                       worker_count=worker_count, stage_process=os.getpid())
+        context = dict(root=root, copied=copied, environment=environment, memory_max=memory_max, timeout_seconds=timeout_seconds, row_limits=row_limits,
+                       memory_cap_runner=memory_cap_runner, judging=key_context.judging, llvm_tools=tools,
+                       library_directory=library.directory, timings_directory=timings_directory,
+                       row_records={row.line_number: light_components(components[row.line_number]) for row in rows},
+                       shared_target_directory=shared_target, worker_count=worker_count, stage_process=os.getpid())
         try:
             outcome = run_pool(context, worker_count, batches, ordered_candidates, baseline_ok_lines, numeric_settings["GATE_MUTATION_STOP_AFTER_ROWS"], planner)
         except concurrent.futures.process.BrokenProcessPool:
@@ -2310,20 +2293,24 @@ def run_stage(root, environment=None):
                         f"现跑的变异判完 {len(outcome['mutation'])} 条就没再派活，这一轮没跑全", [],
                         ["这个开关只给自证造「跑到一半被杀」用，门禁里别设它；判完的那几条已经写了判定库记录，去掉它再跑一趟只跑剩下的。"])
         return 1
-    attached = planner.attach(outcome, records_directory)
-    garbage = collect_garbage(store)
+    # 索引：这一趟复用的与现判出结果的每一行，记下它此刻的键与几样组成的号（下一趟键对不上时照它报变了哪几个单元）
+    judged_lines = {judgement[0] for judgement in outcome["mutation"]} | set(reused)
+    for row in rows:
+        if row.line_number in judged_lines and components[row.line_number].row_key:
+            with contextlib.suppress(OSError):
+                library.write("index", row_identity(row), index_entry(components[row.line_number], row))
+    garbage = library.collect_garbage()
     rows_by_line = {row.line_number: row for row in rows}
     fresh = []
     for line_number, verdict, text, removal in outcome["mutation"]:
         if verdict == "caught":
-            text = caught_text(rows_by_line[line_number], f"（现判：{COLUMN_TITLES[decisions[line_number].column]}）")
+            how = "（拒算）" if line_number in refused_lines else f"（现判：{COLUMN_TITLES[decisions[line_number].column]}）"
+            text = caught_text(rows_by_line[line_number], how)
         fresh.append((line_number, verdict, text, removal))
-    judgements = list(reused.values()) + fresh
-    baseline_problems = {}
+    judgements = list(reused.values()) + fresh + anchor_judgements
     for row in candidates:
         problem, tail = outcome["baseline"].get(row.line_number, (None, ""))
         if problem is not None:
-            baseline_problems[row.line_number] = problem
             judgements.append((row.line_number, "baseline",
                                f"{TABLE}:{row.line_number} {row.name}：基线不绿——点名的测试 {row.expected} 在没改坏的副本上{problem}\n{tail}", None))
     judged_lines = {judgement[0] for judgement in judgements}
@@ -2332,96 +2319,75 @@ def run_stage(root, environment=None):
         print_rejection(f"有 {len(missing)} 行一个判定都没有（没有作数的记录、基线也没判出它来）", [f"{TABLE}:{row.line_number} {row.name}" for row in missing],
                         ["这是判定库记录与派活自己的完整性闸红了，不是变异的问题；GATE_MUTATION_START_OVER=1 整道重跑一遍，还缺就去查 run_stage 与 run_pool 那一段。"])
         return 1
-    tally = verdict_library.Tally()
-    for row in rows:
-        tally.count(decisions[row.line_number].reuse, decisions[row.line_number].column)
+    fresh_columns = collections.Counter(decisions[row.line_number].column for row in rows if row.line_number not in reused and row.line_number not in refused_lines)
     coverage_failures = [result for result in outcome["coverage"] if result["problem"] is not None]
     for result in coverage_failures:
-        note(f"  ! 覆盖没记成（组首行 {TABLE}:{result['line']}；下一趟这一组的行照「没有覆盖记录」现跑）：{result['problem']}")
+        note(f"  ! 覆盖没记成（组首行 {TABLE}:{result['line']}；下一趟这一条测试的基线只按它的闭包复用）：{result['problem']}")
     coverage_recorded = sum(1 for result in outcome["coverage"] if result["coverage"] and not result.get("existing"))
     coverage_existing = sum(1 for result in outcome["coverage"] if result.get("existing"))
-    note(f"  … 覆盖：这一趟记了 {coverage_recorded} 组、那份快照上已有沿用 {coverage_existing} 组、没记成 {len(coverage_failures)} 组，"
-         f"{attached} 行改指到这一趟的覆盖记录；收尾删了没人引的覆盖记录 {garbage[0]} 份、快照 {garbage[1]} 份、源码副本 {garbage[2]} 份")
-    return report(rows, judgements, outcome, memory_max, timeout_seconds, selection_path, skip_baseline, dict(
-        root=root, worker_count=worker_count, cargo_jobs=cargo_jobs, reused=tally.reused, reused_baseline=reused_baseline_count,
-        reused_same_snapshot=sum(1 for line_number in reused if decisions[line_number].how == "same-snapshot"),
-        fresh_columns=tally.reasons, fresh_rows=tally.judged, coverage_recorded=coverage_recorded, coverage_existing=coverage_existing,
-        coverage_failed=len(coverage_failures),
-        fresh_mutations=len(outcome["mutation"]), fresh_batches=len(batches), records_directory=records_directory,
-        not_run_record=environment.get("GATE_MUTATION_NOT_RUN_RECORD", "").strip()))
+    note(f"  … 覆盖：这一趟记了 {coverage_recorded} 份、已有沿用 {coverage_existing} 份、没记成 {len(coverage_failures)} 份；"
+         f"收尾删了 {mutation_units.UNREFERENCED_DAYS_KEPT} 天里没被任何一趟引用的 {sum(garbage.values())} 份（{'、'.join(f'{kind} {count}' for kind, count in sorted(garbage.items())) or '一份都没有'}）")
+    for line_number in reused:
+        sentinel.observe(sentinel_item(rows_by_line[line_number]), reuse_checks.REUSED, "抓到")
+    for line_number, verdict, _text, _removal in outcome["mutation"]:
+        item = sentinel_item(rows_by_line[line_number])
+        sentinel.observe(item, reuse_checks.FORCED if sentinel.forced(item) else reuse_checks.JUDGED, "抓到" if verdict == "caught" else verdict)
+    sentinel_problems = sentinel.finish(printer=note)
+    exit_code = report(rows, judgements, outcome, memory_max, timeout_seconds, selection_path, skip_baseline, dict(
+        worker_count=worker_count, cargo_jobs=cargo_jobs, reused=len(reused), reused_baseline=reused_baseline_count,
+        fresh_columns=fresh_columns, fresh_rows=len(candidates) - len(refused_lines), refused_rows=len(refused_lines),
+        coverage_recorded=coverage_recorded, coverage_existing=coverage_existing, coverage_failed=len(coverage_failures),
+        fresh_mutations=len(outcome["mutation"]), fresh_batches=len(batches), records_directory=library.directory,
+        not_run_record=environment.get("GATE_MUTATION_NOT_RUN_RECORD", "").strip(),
+        impact=impact_summary(rows, components, key_context, environment, len(anchor_judgements))))
+    for message, howto in sentinel_problems:
+        print_rejection(message, [], [howto])
+    return 1 if sentinel_problems else exit_code
+
+
+def sentinel_item(row):
+    """复用哨兵里一行的名字：行号与变异名（变异名可能重名）。"""
+    return f"{row.line_number} {row.name}"
+
+
+def plan_reuse_sentinel(library, rows, components, refusal, environment):
+    """复用哨兵（文件头「复用三问与复用哨兵」）：候选是此刻行键在 records/ 里有「抓到」记录的行，直接读记录（不经 row_decision）；不读库的一趟不抽。"""
+    sentinel = reuse_checks.ReuseSentinel(SCRIPT_KEY, "crates 变异表", environment=environment)
+    candidates = {}
+    for row in rows if not refusal else []:
+        key = components[row.line_number].row_key
+        record = library.read("records", key) if key else None
+        if record is not None and record.get("row_key") == key and record.get("verdict") == REUSABLE_VERDICT["mutation"]:
+            candidates[sentinel_item(row)] = "抓到"
+    # 抽中的几条先攒着，等 stderr 头一行（「… 判定库记录：」）打完再打（别的定义与自证照头一行读复用几条）
+    sentinel.plan_lines = []
+    sentinel.plan(candidates, reuse=not refusal, off_reason=f"不读库（{refusal}）" if refusal else "", printer=sentinel.plan_lines.append)
+    return sentinel
 
 
 class CoveragePlanner:
-    """这一趟要记哪几组覆盖（文件头「判定库」覆盖记录）：判成抓到的一行，它那一组这一趟还没派过就派一格；
-    一字未动复用来的、还没有它那份快照上的覆盖的，开跑时就派。跑完把这一趟判成抓到、所判快照与覆盖那一份相同的同组各行改指到它（attach）。"""
+    """这一趟要记哪几份覆盖（文件头「判定库」覆盖记录）：一行现判成抓到、它点名的测试此刻还没有一份执行过的单元都没变的覆盖记录，就派一格（同一份覆盖号只派一次）。"""
 
-    def __init__(self, rows, row_keys, records, decisions, toolchain, current_snapshot, store):
-        self.rows, self.row_keys, self.records, self.decisions = rows, row_keys, records, decisions
-        self.toolchain, self.current_snapshot, self.store = toolchain, current_snapshot, store
+    def __init__(self, components, library, keys):
+        self.components, self.library, self.keys = components, library, keys
         self.scheduled = set()
-        self.initial = []
-        for row in rows:
-            decision, record = decisions[row.line_number], records[row.line_number]
-            if not (decision.reuse and decision.how == "same-snapshot"):
-                continue
-            coverage = store.coverage(record.get("coverage", ""))
-            if coverage is not None and coverage.get("snapshot") == current_snapshot:
-                continue
-            job = self.job(row, record.get("test_full_name", ""))
-            if job is not None:
-                self.initial.append(job)
-
-    def job(self, row, test_full_name):
-        if not test_full_name:
-            return None
-        combo = combo_key(row, test_full_name, self.toolchain)
-        if combo in self.scheduled:
-            return None
-        self.scheduled.add(combo)
-        before, switches = batch_key(row.arguments)
-        return dict(combo=combo, before=list(before), switches=list(switches), test=test_full_name, line=row.line_number)
 
     def initial_jobs(self):
-        return list(self.initial)
+        return []
 
     def job_after(self, row, judgement, info):
-        return self.job(row, info.get("test_full_name", "")) if judgement[1] == "caught" else None
-
-    def attach(self, outcome, records_directory):
-        """回改指了几行。"""
-        results = {result["combo"]: result for result in outcome["coverage"] if result["coverage"]}
-        fresh_info = outcome.get("mutation_info", {})
-        fresh_verdicts = {judgement[0]: judgement[1] for judgement in outcome["mutation"]}
-        attached = 0
-        for row in self.rows:
-            line_number = row.line_number
-            if line_number in fresh_verdicts:
-                if fresh_verdicts[line_number] != "caught":
-                    continue
-                full_name, validated = fresh_info[line_number]["test_full_name"], fresh_info[line_number]["snapshot"]
-            elif self.decisions[line_number].reuse:
-                full_name, validated = self.records[line_number].get("test_full_name", ""), self.current_snapshot
-            else:
-                continue
-            if not full_name:
-                continue
-            combo = combo_key(row, full_name, self.toolchain)
-            result = results.get(combo)
-            if result is None or result["snapshot"] != validated:
-                continue
-            path = os.path.join(records_directory, f"mutation.{self.row_keys[line_number]}")
-            record = read_record(path)
-            if record is None or record.get("verdict") != REUSABLE_VERDICT["mutation"]:
-                continue
-            if record.get("coverage") == result["coverage"] and record.get("snapshot") == validated:
-                continue
-            record.update(coverage=result["coverage"], snapshot=validated, combo_key=combo)
-            if line_number not in fresh_verdicts:
-                record["rebased_utc"] = utc_now_text()
-            with contextlib.suppress(OSError):
-                write_atomically(path, record_text(record))
-                attached += 1
-        return attached
+        if judgement[1] != "caught":
+            return None
+        components = self.components.get(row.line_number)
+        if components is None or not components.coverage_id or components.coverage_id in self.scheduled or not components.test_full_name:
+            return None
+        coverage = self.library.read_json("coverage", components.coverage_id)
+        if executed_set_is_current(self.keys, coverage):
+            return None
+        self.scheduled.add(components.coverage_id)
+        before, switches = batch_key(row.arguments)
+        return dict(coverage_id=components.coverage_id, before=list(before), switches=list(switches), test=components.test_full_name,
+                    arguments=row.arguments, expected=row.expected, line=row.line_number, stale=coverage is not None)
 
 
 def llvm_tools(root, environment):
@@ -2458,6 +2424,7 @@ def llvm_tools(root, environment):
     return directory, f"{directory}（{'、'.join(versions)}；rustc 的 LLVM {wanted}）", None
 
 
+
 def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_path, skip_baseline, counts):
     """按变异表的行号排序打印判定、计数、基线与临时目录，判红的逐栏列出；回退出码。"""
     judgements.sort(key=lambda judgement: judgement[0])
@@ -2469,11 +2436,13 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
     refused, unavailable, baseline_bad = by_verdict["refused"], by_verdict["unavailable"], by_verdict["baseline"]
     not_run = by_verdict["notrun"]
     gpu_memory = by_verdict["gpumemory"]
+    anchor_broken = by_verdict["anchor"]   # 锚点失效（文件头「锚点失效」）：rows 里没有这几行，「共」那个数把它们加回来
     for text in caught:
         say(text)
     # 各栏各数各的；「计数：」这一行的格式别的定义与规则照栏读（mutation-triage），基线另起一行报
     say(f"  计数：抓到 {len(caught)} 条、没红 {len(failures)} 条、无效 {len(invalid)} 条、内存撞顶 {len(memory_hits)} 条、超时 {len(timeouts)} 条、"
-        f"被总上限挤掉 {len(squeezed)} 条、排不上没跑 {len(refused)} 条、scope 起不来没跑 {len(unavailable)} 条（共 {len(rows)} 条）")
+        f"被总上限挤掉 {len(squeezed)} 条、排不上没跑 {len(refused)} 条、scope 起不来没跑 {len(unavailable)} 条、锚点失效 {len(anchor_broken)} 行"
+        f"（共 {len(rows) + len(anchor_broken)} 条）")
     if gpu_memory:   # 「计数：」那一行的格式不动（别的定义照栏读），显存不够另起一行报
         say(f"  显存不够：{len(gpu_memory)} 条（内存包装退 {GPU_MEMORY_HIT_EXIT}：不算抓到、不算没红，结果不算数）")
     if skip_baseline:
@@ -2482,10 +2451,11 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
         say(f"  基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 {len(rows) - len(baseline_bad)} 行，基线不绿 {len(baseline_bad)} 行"
             f"（按 cargo 参数分 {len(baseline_batches(rows))} 批；共 {len(rows)} 行）")
     # 复用与覆盖各另起一行（「计数：」那一行的格式不动）；判定本身与进程数无关，这两行随记录变（比对两趟的判定时去掉，selftest_verdict_view）
+    counts["not_run_rows"] = len(not_run)
     reuse_text = reuse_summary_text(counts)
     say(f"  复用：{reuse_text}")
-    say(f"  覆盖：这一趟记了 {counts['coverage_recorded']} 组（cargo 参数 + 点名用例），那份快照上已有、沿用 {counts['coverage_existing']} 组，没记成 {counts['coverage_failed']} 组"
-        + ("（逐组的原因在 stderr；那几组的行下一趟照「没有覆盖记录」现跑）" if counts["coverage_failed"] else ""))
+    say(f"  覆盖：这一趟记了 {counts['coverage_recorded']} 份（点名测试执行过的单元，基线按它复用），已有、沿用 {counts['coverage_existing']} 份，没记成 {counts['coverage_failed']} 份"
+        + ("（逐份的原因在 stderr；那几条测试的基线下一趟只按闭包复用）" if counts["coverage_failed"] else ""))
     # 本次未跑的逐条列出来（文件头「本次未跑」）：不算抓到、不算没红；「计数：」那一行的格式不动，另起一行报
     not_run_record_problem = None
     if not_run:
@@ -2502,6 +2472,9 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
         f"其中被包装停掉或杀掉的 {len(killed_removals)} 条（超时、内存撞顶、被总上限挤掉）留下 {sum(removal[0] for removal in killed_removals)} 个文件、"
         f"占盘 {sum(removal[1] for removal in killed_removals)} 字节")
     sections = [
+        (anchor_broken, f"有几行锚点失效（锚点失效 {len(anchor_broken)} 行；原文在「文件」那一段指的源码里不是恰好命中一次，或文件不在、读不了：这几行没跑、不入库、不复用，别的行照判）：",
+         ["把那一行的原文改到今天源码里逐字存在、只出现一次的那一段（原文里的换行写成 \\n），文件挪了就改「文件」那一段；",
+          "改完单跑那几行：bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --item <行号或变异名>（.claude/rules/mutation-sampling.md 第七类）。"]),
         (baseline_bad, f"有几行基线不绿（基线不绿 {len(baseline_bad)} 行；点名的测试在没改坏的副本上就不是恰好一个 ok，改坏之后红了也证明不了什么，这几行的变异没跑）：",
          ["先看点名的测试读的文件在不在拷贝范围里（.claude/gate.d/stage-inputs.tsv 本阶段那一行；bash .claude/gate.d/code-source-discipline.sh 静态判这一样），",
           "不在就登记进那一行；再在真仓上单跑它（照那一行的 cargo test 参数），真仓上也红就是测试本来就坏，先修测试；对上多个用例的把点名写全到模块路径。"]),
@@ -2542,11 +2515,11 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
         print_rejection(f"本次未跑的 {len(not_run)} 条没写进 GATE_MUTATION_NOT_RUN_RECORD 那份记录（{not_run_record_problem}），门禁汇总就看不见它们", [],
                         ["看那份文件所在的目录满没满、有没有写权限；记不下本次未跑的这一趟按红记，免得被当成全判过。"])
     red = bool(invalid or failures or memory_hits or timeouts or squeezed or gpu_memory or refused or unavailable or baseline_bad or left_behind
-               or not_run_record_problem)
+               or not_run_record_problem or anchor_broken)
     note(f"  … 这一轮 {counts['worker_count']} 个工作进程，每个 cargo 编译并行度 {counts['cargo_jobs']}，每条变异内存上限 {memory_max}、限时 {timeout_seconds} 秒；"
          f"复用抓到 {counts['reused']} 条、复用基线 ok {counts['reused_baseline']} 行，现跑变异 {counts['fresh_mutations']} 条、现跑基线 {counts['fresh_batches']} 批")
     if selection_path:
-        # 只判了一部分：不写全绿标记；都抓到也退 3（门禁汇总记失败，不会被当成通过），有红退 1
+        # 只判了一部分：都抓到也退 3（门禁汇总记失败，不会被当成通过），有红退 1
         say(f"  … 只判了选中的 {len(rows)} 行，不是整道结论（GATE_MUTATION_ROW_SELECTION={selection_path}；"
             f"{'有红，见上面' if red else (f'选中的里抓到 {len(caught)} 条、本次未跑 {len(not_run)} 条' if not_run else '选中的都红在点名的测试上')}；"
             f"判定库记录写进了 {counts['records_directory']}）；这一趟{reuse_text}")
@@ -2554,30 +2527,30 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
     if red:
         return 1
     if not_run:
-        # 有本次未跑的：不说全抓到、不写全绿标记（没判全的一趟不算上次成功）；一条抓到的都没有就退 77（无对象判到）
+        # 有本次未跑的：不说全抓到；一条抓到的都没有就退 77（无对象判到）
         if not caught:
-            say(f"  · crates 变异表复跑：{len(rows)} 条全是本次未跑（见上），一条都没判到被改坏的那一处：这一道记本次未跑，不是通过；全绿标记没写")
+            say(f"  · crates 变异表复跑：{len(rows)} 条全是本次未跑（见上），一条都没判到被改坏的那一处：这一道记本次未跑，不是通过；这一趟{reuse_text}")
             return 77
-        say(f"  ✓ crates 变异表复跑：{len(rows)} 条里抓到 {len(caught)} 条、本次未跑 {len(not_run)} 条（本次未跑的逐条见上，不算抓到；这一趟不是整张表都红在点名的测试上，"
-            f"全绿标记没写）；没红、无效、内存撞顶、超时、被总上限挤掉、排不上 0 条，每条一个自己的 TMPDIR、结束时都删掉了；这一趟{reuse_text}")
+        say(f"  ✓ crates 变异表复跑：{len(rows)} 条里抓到 {len(caught)} 条、本次未跑 {len(not_run)} 条（本次未跑的逐条见上，不算抓到；这一趟不是整张表都红在点名的测试上）"
+            f"；没红、无效、内存撞顶、超时、被总上限挤掉、排不上 0 条，锚点失效 0 行，每条一个自己的 TMPDIR、结束时都删掉了；这一趟{reuse_text}")
+        say(f"  {counts['impact']}")
         return 0
     # ⚠️ 进程数不写进 stdout：写进去就让「GATE_MUTATION_WORKERS=1 与 =16 的 stdout 逐字相同」当场为假；复用几条接在成功句末尾「；这一趟现判」之后
-    say(f"  ✓ crates 变异表复跑：{len(rows)} 条变异各自红在点名的测试上（原文都恰好命中一次；点名的测试在没改坏的副本上都恰好一个 ok；"
+    say(f"  ✓ crates 变异表复跑：{len(rows)} 条变异各自红在点名的测试上（原文都恰好命中一次、锚点失效 0 行；点名的测试在没改坏的副本上都恰好一个 ok；"
         f"每条在内存上限 {memory_max} 里跑、内存撞顶 0 条，每条经 run-with-memory-cap.sh 排队、被总上限挤掉与排不上 0 条，每条限时 {timeout_seconds} 秒、超时 0 条，"
         f"每条一个自己的 TMPDIR、结束时都删掉了；工作进程动态领活——谁先跑完谁再领下一条，不按条数预先切片；输出按表的行号排序、判定与进程数无关）"
         f"；这一趟{reuse_text}")
-    write_stage_marker_with_counts(counts["root"], dict(reused_caught_rows=counts["reused"], reused_caught_rows_same_snapshot=counts["reused_same_snapshot"],
-                                                        reused_baseline_ok_rows=counts["reused_baseline"],
-                                                        freshly_run_mutation_rows=counts["fresh_mutations"], freshly_run_baseline_batches=counts["fresh_batches"],
-                                                        row_records=counts["records_directory"]))
+    # 牵连面（文件头「牵连面」）：成功句之后另起一行，只报数
+    say(f"  {counts['impact']}")
     return 0
 
 
 def reuse_summary_text(counts):
-    """「现判 N 条（各栏的数）、按覆盖复用 M 条（其中一字未动 K 条）」：成功句末尾与「复用：」那一行用同一句。"""
+    """「现判 N 条、复用 M 条、拒算 R 条、本次未跑 K 条（现判的按栏：…）」：成功句末尾与「复用：」那一行用同一句。
+    拒算的行照跑、不复用，不算进现判；本次未跑是判出来的一档（点名的测试打了 NOT_RUN_NO_GPU_ADAPTER），算在现判或拒算里。"""
     columns = "、".join(f"{title} {counts['fresh_columns'].get(name, 0)}" for name, title in REUSE_COLUMNS)
-    return (f"现判 {counts['fresh_rows']} 条（{columns}）、按覆盖复用 {counts['reused']} 条"
-            f"（其中源码与上次一字未动 {counts['reused_same_snapshot']} 条）")
+    return (f"现判 {counts['fresh_rows']} 条、复用 {counts['reused']} 条、拒算 {counts['refused_rows']} 条、本次未跑 {counts.get('not_run_rows', 0)} 条"
+            f"（现判的按栏：{columns}）")
 
 
 def write_not_run_record(path, texts):
@@ -2591,18 +2564,6 @@ def write_not_run_record(path, texts):
         return f"{path}：{error}"
     return None
 
-
-def write_stage_marker_with_counts(root, counts):
-    """判绿之后写这一道这批输入的全绿标记（admission.py 的 write_stage_marker），再把复用几条、现跑几条接在末尾（同目录临时文件写完改名）。写不成只报不红。"""
-    admission = admission_module()
-    try:
-        fingerprint, file_count, _paths = admission.stage_fingerprint(root, STAGE)
-        marker_path = admission.write_stage_marker(root, STAGE, fingerprint, file_count)
-        with open(marker_path, encoding="utf-8", errors="surrogateescape") as handle:
-            text = handle.read()
-        write_atomically(marker_path, text + "".join(f"{key}={value}\n" for key, value in counts.items()))
-    except (admission.RegistrationError, admission.InputManifestError, OSError) as error:
-        say(f"  ! 没写成这一道的全绿标记（{error}）：下一趟这一道照跑，不会复用")
 
 
 # ── 命令行 ────────────────────────────────────────────────────────────────────
@@ -2667,27 +2628,59 @@ def command_static_check(arguments):
     return 1 if any(problems.values()) or outside_literals else 0
 
 
-def command_judge_version(arguments, want_directory=False):
+
+def command_judging_units(arguments):
+    """judging-units <根> [--units]：打「<判法单元指纹> <单元数>」；带 --units 再逐个打单元行（种类、文件:起-止、限定名、指纹）。"""
+    if not arguments or len(arguments) > 2 or (len(arguments) == 2 and arguments[1] != "--units"):
+        print("  ✗ 用法：crates-mutation-rows.py judging-units <根> [--units]")
+        print("     → 怎么办：<根> 是被判那棵树的仓根；判法单元按本模块所在那一份仓算（文件头「判法单元」）")
+        return 2
+    try:
+        key, references = judging_units(dict(os.environ))
+    except (JudgingUnitsRefused, mutation_units.MutationUnitsError, OSError) as error:
+        print(f"  ✗ 算不出判法单元指纹：{error}")
+        print("     → 怎么办：判法单元的闭包里有拒算（getattr 变量名、折不出的 import 路径这一类）就改成字面写法；拒算的形态见 scripts/gate/lib_function_units.py 文件头「拒算」")
+        return 2
+    print(f"{key} {len(references)}")
+    if len(arguments) == 2:
+        for reference in references:
+            print(f"unit\t{reference.kind}\t{reference.file}:{reference.lines}\t{reference.name}\t{reference.fingerprint}")
+    return 0
+
+
+def command_library_directory(arguments):
     if len(arguments) != 1:
-        print(f"  ✗ 用法：crates-mutation-rows.py {'records-directory' if want_directory else 'judge-version'} <根>")
+        print("  ✗ 用法：crates-mutation-rows.py library-directory <根>")
         print("     → 怎么办：<根> 是被判那棵树的仓根（git 工作树）")
         return 2
     admission = admission_module()
-    environment = dict(os.environ)
     try:
-        fingerprint, item_count = judge_version(arguments[0], environment, environment.get("GATE_MUTATION_MEMORY_CAP_RUNNER", "").strip()
-                                                      or DEFAULT_MEMORY_CAP_RUNNER)
-        common_directory = records_home(arguments[0], environment)
-    except (admission.RegistrationError, admission.InputManifestError, OSError) as error:
-        print(f"  ✗ 算不出判法版本：{error}")
-        print("     → 怎么办：被判的要是 git 工作树、.claude/gate.d/stage-inputs.tsv 里有 checker-tier-crates-mutation-replay 那一行、构建环境读得到")
+        print(library_directory(arguments[0], dict(os.environ)))
+    except (admission.InputManifestError, OSError) as error:
+        print(f"  ✗ 取不到判定库的位置：{error}")
+        print("     → 怎么办：被判的要是 git 工作树，或者设 GATE_MUTATION_RECORDS_HOME")
         return 2
-    print(os.path.join(common_directory, RECORDS_DIRECTORY_NAME, fingerprint) if want_directory else f"{fingerprint} {item_count}")
+    return 0
+
+
+def command_toolchain(arguments):
+    """toolchain <根>：打行键里的工具链行（rustc -vV、cargo -V、构建环境解析后的值），双机分片的驱动拿两台的比。"""
+    if len(arguments) != 1:
+        print("  ✗ 用法：crates-mutation-rows.py toolchain <根>")
+        print("     → 怎么办：<根> 是被判那棵树的仓根（rustc、cargo 在那里起，从它往上找 .cargo/config.toml）")
+        return 2
+    try:
+        lines = mutation_units.toolchain_lines(arguments[0], dict(os.environ))
+    except mutation_units.MutationUnitsError as error:
+        print(f"  ✗ 算不出工具链行：{error}")
+        print("     → 怎么办：装好 Rust 工具链（rustc -vV、cargo -V 要跑得通），根 Cargo.toml 要读得懂")
+        return 2
+    print("\n".join(lines))
     return 0
 
 
 def plan_context(root, environment):
-    """plan、row-plan、import 共用：读表、算上限、拷贝范围、判法版本、工具链、记录目录与此刻的快照；一个字节都不写。
+    """plan、row-plan、import、--list-items 共用：读表、算上限、算每一行的键与判定（与 run_stage 同一份 plan_rows、decide_rows）；不写库。
     交 dict；不成就打两行（✗ 与 →）交 None。"""
     admission = admission_module()
     try:
@@ -2701,36 +2694,23 @@ def plan_context(root, environment):
         print(f"  ✗ {limit_problems[0][0]}")
         print(f"     → 怎么办：{limit_problems[0][1]}")
         return None
+    # 锚点失效的行（文件头「锚点失效」）先剔出去、单列：不算键（run_stage 不跑它们，row-plan 不让双机分片的驱动把它们分给第二台）
+    anchor_broken = {} if break_is(environment, "anchor-rows-planned") else anchor_broken_rows(root, rows)
+    anchor_rows = [(row, anchor_broken[row.line_number]) for row in rows if row.line_number in anchor_broken]
+    rows = [row for row in rows if row.line_number not in anchor_broken]
     try:
-        copied = copied_paths()
-        judging, _items = judge_version(root, environment, environment.get("GATE_MUTATION_MEMORY_CAP_RUNNER", "").strip() or DEFAULT_MEMORY_CAP_RUNNER)
-        toolchain = toolchain_text(root, environment)
-        home = records_home(root, environment)
-    except (admission.RegistrationError, admission.InputManifestError, OSError) as error:
-        print(f"  ✗ 算不出判法版本或工具链：{error}")
-        print("     → 怎么办：被判的要是 git 工作树、cargo -V 与 rustc -V 跑得通、.claude/gate.d/stage-inputs.tsv 里有 checker-tier-crates-mutation-replay 那一行")
+        key_context, components, library = plan_rows(root, rows, environment, memory_max, timeout_seconds)
+    except (JudgingUnitsRefused, mutation_units.MutationUnitsError, admission.InputManifestError, HeavyThreadDefaultError, OSError) as error:
+        print(f"  ✗ 算不出判法单元指纹、工具链、依赖版本或判定库的位置：{error}")
+        print("     → 怎么办：被判的要是 git 工作树（或设 GATE_MUTATION_RECORDS_HOME）、rustc -vV 与 cargo -V 跑得通、Cargo.lock 读得懂")
         return None
-    records_directory = os.path.join(home, RECORDS_DIRECTORY_NAME, judging)
-    store = Store(records_directory)
-    return dict(rows=rows, row_keys={row.line_number: row_key(row, memory_max, timeout_seconds, toolchain) for row in rows},
-                memory_max=memory_max, timeout_seconds=timeout_seconds, judging=judging, toolchain=toolchain, home=home,
-                records_directory=records_directory, store=store, current=current_state(root, copied),
-                store_has_records=store.has_new_format_records(), timings_directory=os.path.join(home, TIMINGS_DIRECTORY_NAME))
-
-
-def planned_decisions(context, environment):
-    """每一行 (row, Decision)：与 run_stage 同一份 reuse_decision，只读。"""
-    refusal, comparisons, decided = reuse_refusal(environment), {}, []
-    for row in context["rows"]:
-        key = context["row_keys"][row.line_number]
-        record = read_record(os.path.join(context["records_directory"], f"mutation.{key}"))
-        decided.append((row, reuse_decision(row, key, record, context["store"], context["current"], comparisons, environment, refusal,
-                                            context["store_has_records"])))
-    return decided
+    return dict(rows=rows, components=components, key_context=key_context, library=library, memory_max=memory_max, timeout_seconds=timeout_seconds,
+                decided=decide_rows(library, rows, components, key_context, environment), timings_directory=os.path.join(library.directory, "timings"),
+                anchor_rows=anchor_rows)
 
 
 def command_row_plan(arguments):
-    """每一条成形的变异一行：行号、行键、这一趟会不会复用、上一次现跑的秒数（见文件头 row-plan）。"""
+    """每一条成形的变异一行：行号、行键（拒算写 -）、这一趟会不会复用、上一次现跑的秒数（见文件头 row-plan）。"""
     if len(arguments) != 1:
         print("  ✗ 用法：crates-mutation-rows.py row-plan <根>")
         print("     → 怎么办：<根> 是被判那棵树的仓根（git 工作树）")
@@ -2739,14 +2719,21 @@ def command_row_plan(arguments):
     context = plan_context(arguments[0], environment)
     if context is None:
         return 2
-    for row, decision in planned_decisions(context, environment):
+    lines = []
+    for row in context["rows"]:
+        decision, _record = context["decided"][row.line_number]
         timing = read_timing(context["timings_directory"], row_content_hash(row))
-        print(f"{row.line_number}\t{context['row_keys'][row.line_number]}\t{1 if decision.reuse else 0}\t{'-' if timing is None else f'{timing[0]:.3f}'}")
+        key = context["components"][row.line_number].row_key or "-"
+        lines.append((row.line_number, f"{row.line_number}\t{key}\t{1 if decision.reuse else 0}\t{'-' if timing is None else f'{timing[0]:.3f}'}\t-"))
+    # 锚点失效的行：没有键、不复用，第五列 anchor-broken（双机分片的驱动不把它们分给第二台）
+    lines += [(row.line_number, f"{row.line_number}\t-\t0\t-\tanchor-broken") for row, _why in context["anchor_rows"]]
+    for _line_number, text in sorted(lines):
+        print(text)
     return 0
 
 
 def command_plan(arguments):
-    """只读：每一行会复用还是现跑、栏与细节，末行总数（文件头 plan）。"""
+    """只读：每一行会复用、现判还是拒算，栏与细节（变了哪几个单元），末行总数（文件头 plan）。"""
     if len(arguments) != 1:
         print("  ✗ 用法：crates-mutation-rows.py plan <根>")
         print("     → 怎么办：<根> 是被判那棵树的仓根（git 工作树）；只读，不编、不跑、不写")
@@ -2755,107 +2742,108 @@ def command_plan(arguments):
     context = plan_context(arguments[0], environment)
     if context is None:
         return 2
-    columns, reused, same_snapshot = collections.Counter(), 0, 0
-    for row, decision in planned_decisions(context, environment):
+    columns, reused, refused = collections.Counter(), 0, 0
+    lines = []
+    for row in context["rows"]:
+        decision, _record = context["decided"][row.line_number]
         if decision.reuse:
             reused += 1
-            same_snapshot += decision.how == "same-snapshot"
-            print(f"{row.line_number}\t{row.name}\t复用\t按覆盖复用\t{decision.detail}")
+            lines.append((row.line_number, f"{row.line_number}\t{row.name}\t复用\t键相同\t{decision.detail}"))
+        elif decision.column == "refused":
+            refused += 1
+            lines.append((row.line_number, f"{row.line_number}\t{row.name}\t拒算\t拒算\t{decision.detail}"))
         else:
             columns[decision.column] += 1
-            print(f"{row.line_number}\t{row.name}\t现跑\t{COLUMN_TITLES[decision.column]}\t{decision.detail}")
-    fresh = sum(columns.values())
-    print(f"合计 {len(context['rows'])} 行：按覆盖复用 {reused} 行（其中源码与上次一字未动 {same_snapshot} 行）、现跑 {fresh} 行（"
-          + "、".join(f"{title} {columns.get(name, 0)}" for name, title in REUSE_COLUMNS) + "）")
+            lines.append((row.line_number, f"{row.line_number}\t{row.name}\t现判\t{COLUMN_TITLES[decision.column]}\t{decision.detail}"))
+    # 锚点失效的行（文件头「锚点失效」）：不算键、这一趟不跑
+    lines += [(row.line_number, f"{row.line_number}\t{row.name}\t锚点失效\t锚点失效\t{why}") for row, why in context["anchor_rows"]]
+    for _line_number, text in sorted(lines):
+        print(text)
+    print(f"合计 {len(context['rows']) + len(context['anchor_rows'])} 行：复用 {reused} 行、现判 {sum(columns.values())} 行（"
+          + "、".join(f"{title} {columns.get(name, 0)}" for name, title in REUSE_COLUMNS) + f"）、拒算 {refused} 行、锚点失效 {len(context['anchor_rows'])} 行")
     return 0
 
 
-def copy_record_dependencies(record, source, target):
-    """导入的一条记录引的覆盖记录、快照与源码副本，从 source 拷进 target（已有的不动）。"""
-    snapshots = {record.get("snapshot")} - {None, ""}
-    coverage = source.coverage(record.get("coverage", "")) if record.get("coverage") else None
-    if coverage is not None:
-        target.put_coverage(record["coverage"], coverage)
-        snapshots.add(coverage.get("snapshot"))
-    for identity in snapshots:
-        files = source.snapshot(identity)
-        if files is not None:
-            target.put_snapshot(identity, files)
-    if coverage is not None:
-        files = source.snapshot(coverage.get("snapshot")) or {}
-        for path, kind in coverage.get("compiled", {}).items():
-            if kind == "runtime" and path.endswith(".rs") and path in files:
-                data = source.blob(files[path])
-                if data is not None:
-                    target.put_blob(files[path], data)
-
-
 def command_import(arguments):
+    """import <根> <另一台的库目录>：把另一台这一趟判出来的记录并进本机那一份库（文件头 import）。"""
     if len(arguments) != 2:
-        print("  ✗ 用法：crates-mutation-rows.py import <根> <别处的记录目录>")
-        print("     → 怎么办：<别处的记录目录> 是另一台 singlefs-mutation-rows/<判法版本>/ 拷过来的那一份（连同 coverage/、snapshots/、blobs/）")
+        print("  ✗ 用法：crates-mutation-rows.py import <根> <另一台的库目录>")
+        print(f"     → 怎么办：<另一台的库目录> 是另一台那一趟 {LIBRARY_DIRECTORY_NAME}/ 拷过来的那一份（records/、baselines/、coverage/、compositions/、units/）")
         return 2
     root, source_directory = arguments
     environment = dict(os.environ)
+    if not os.path.isdir(source_directory):
+        print(f"  ✗ {source_directory} 不是目录")
+        print(f"     → 怎么办：给另一台那一趟 {LIBRARY_DIRECTORY_NAME}/ 拷过来的那一份目录")
+        return 2
     context = plan_context(root, environment)
     if context is None:
         return 2
-    if not os.path.isdir(source_directory):
-        print(f"  ✗ {source_directory} 不是目录")
-        print("     → 怎么办：给另一台 singlefs-mutation-rows/<判法版本>/ 拷过来的那一份目录")
-        return 2
-    rows_by_key = {context["row_keys"][row.line_number]: row for row in context["rows"]}
-    source, target = Store(source_directory), context["store"]
-    target.ensure()
+    judging = context["key_context"].judging
+    wanted = {"records": {components.row_key for components in context["components"].values() if components.row_key},
+              "baselines": {components.baseline_key for components in context["components"].values() if components.baseline_key},
+              "coverage": {components.coverage_id for components in context["components"].values() if components.coverage_id}}
+    source, target = mutation_units.Library(source_directory, RECORD_HEADER), context["library"]
     unchecked = break_is(environment, "importunchecked")
-    accepted, rejected, comparisons = [], [], {}
-    for name in sorted(os.listdir(source_directory)):
-        path = os.path.join(source_directory, name)
-        if os.path.isdir(path) and name in (COVERAGE_DIRECTORY_NAME, SNAPSHOT_DIRECTORY_NAME, BLOB_DIRECTORY_NAME):
-            continue
-        record = read_record(path) if os.path.isfile(path) else None
-        if record is None:
-            rejected.append((name, "不是一份读得出的记录文件"))
-            continue
-        problems = []
-        kind, key = record.get("kind", ""), record.get("row_key", "")
-        if kind not in RECORD_KINDS:
-            problems.append(f"类别「{kind}」认不出（只认 {'、'.join(RECORD_KINDS)}）")
-        if name != f"{kind}.{key}":
-            problems.append("文件名与记录里的类别、行键对不上")
-        if record.get("judge_version") != context["judging"]:
-            problems.append(f"判法版本 {record.get('judge_version', '')[:16]}… 不是本机此刻的 {context['judging'][:16]}…")
-        if key not in rows_by_key:
-            problems.append(f"行键不是本机 {TABLE} 里任何一行（连同本机这一趟的每条上限 {context['memory_max']}、限时 {context['timeout_seconds']} 秒与工具链）算得出的")
-        if not problems:
-            if kind == "mutation" and record.get("verdict") == REUSABLE_VERDICT["mutation"]:
-                decision = reuse_decision(rows_by_key[key], key, record, source, context["current"], comparisons, environment, None, True)
-                if not decision.reuse:
-                    problems.append(f"照本机此刻的源码判成现跑（{COLUMN_TITLES[decision.column]}：{decision.detail}）")
-            elif kind == "baseline" and record.get("verdict") == REUSABLE_VERDICT["baseline"] and record.get("snapshot") != context["current"]["id"]:
-                problems.append("基线 ok 那一份快照不是本机此刻的")
-        if unchecked:
+    accepted, rejected = [], []
+    for kind, key_field in (("records", "row_key"), ("baselines", "baseline_key")):
+        directory = os.path.join(source_directory, kind)
+        for name in sorted(os.listdir(directory)) if os.path.isdir(directory) else []:
+            record = source.read(kind, name)
             problems = []
-        if problems:
-            rejected.append((name, "；".join(problems)))
+            if record is None:
+                problems.append("不是一份读得出的记录文件")
+            else:
+                if record.get(key_field) != name:
+                    problems.append("文件名与记录里的键对不上")
+                if record.get("judging") != judging:
+                    problems.append(f"判法单元指纹 {record.get('judging', '')[:16]}… 不是本机此刻的 {judging[:16]}…")
+                if name not in wanted[kind]:
+                    problems.append(f"键不是本机 {TABLE} 里任何一行照本机此刻的源码、判法单元、工具链与依赖算得出的")
+            if unchecked:
+                problems = []
+            if problems:
+                rejected.append((f"{kind}/{name}", "；".join(problems)))
+                continue
+            target.write(kind, name, record)
+            accepted.append(f"{kind}/{name}")
+    coverage_directory = os.path.join(source_directory, "coverage")
+    for name in sorted(os.listdir(coverage_directory)) if os.path.isdir(coverage_directory) else []:
+        identity = name[:-len(".json.gz")] if name.endswith(".json.gz") else None
+        value = source.read_json("coverage", identity) if identity else None
+        if value is None or (identity not in wanted["coverage"] and not unchecked):
+            rejected.append((f"coverage/{name}", "不是本机任何一条点名测试此刻的覆盖号，或读不出"))
             continue
-        copy_record_dependencies(record, source, target)
-        with open(path, encoding="utf-8", errors="surrogateescape") as handle:
-            write_atomically(os.path.join(context["records_directory"], name), handle.read())
-        accepted.append(name)
-    print(f"  … 导入：收了 {len(accepted)} 条、拒了 {len(rejected)} 条（写进 {context['records_directory']}）")
+        target.write_json("coverage", identity, value)
+        accepted.append(f"coverage/{name}")
+    for kind in ("compositions", "units"):
+        directory = os.path.join(source_directory, kind)
+        for name in sorted(os.listdir(directory)) if os.path.isdir(directory) else []:
+            if not name.endswith(".json.gz"):
+                continue
+            value = source.read_json(kind, name[:-len(".json.gz")])
+            if value is None:
+                continue
+            if kind == "units":
+                existing = target.read_json("units", name[:-len(".json.gz")]) or {}
+                existing.update(value)
+                value = existing
+            elif os.path.exists(target.path(kind, name)):
+                continue
+            target.write_json(kind, name[:-len(".json.gz")], value)
+    print(f"  … 导入：收了 {len(accepted)} 条、拒了 {len(rejected)} 条（写进 {target.directory}）")
     if rejected:
-        print(f"  ✗ 拒了 {len(rejected)} 条另一台的判定库记录（文件名、判法版本、行键或复用判据与本机此刻对不上，照收会让本机复用别的输入下的结论）：")
+        print(f"  ✗ 拒了 {len(rejected)} 条另一台的判定库记录（文件名、判法单元指纹或键与本机此刻对不上，照收会让本机复用别的输入下的结论）：")
         for name, reason in rejected:
             print(f"      {name}：{reason}")
-        print("     → 怎么办：两台的判法版本（阶段脚本、本模块、内存包装、构建环境）、变异表、上限、限时与工具链要同一套；源码不同的照复用判据判，")
-        print("       判成现跑的那几行本机 checker-tier-crates-mutation-replay 照跑，不会少判。")
+        print("     → 怎么办：两台的判法单元、变异表、工具链（含构建环境）与依赖要同一套；源码不同的那几行键自然对不上，")
+        print("       本机 checker-tier-crates-mutation-replay 照跑，不会少判。")
         return 1
     return 0
 
 
 def command_list_items(arguments):
-    """可点名的变异，一行一条（门禁 --list-items 调的就是这一份）。"""
+    """可点名的变异，一行一条（门禁 --list-items 调的就是这一份），每行末尾一段写这一行的键对不对得上；末行合计键对不上的条数。"""
     if len(arguments) != 1:
         print("  ✗ 用法：crates-mutation-rows.py --list-items <根>")
         print("     → 怎么办：<根> 是被判那棵树的仓根")
@@ -2871,11 +2859,34 @@ def command_list_items(arguments):
         print(f"  ✗ 读不了 {path}（{error}）：列不出可点名的变异")
         print("     → 怎么办：在项目根跑，或把项目根作为参数传进来。")
         return 1
-    for number, line in enumerate(lines, 1):
-        if line.startswith("#") or not line.strip():
-            continue
-        fields = line.split("\t")
-        print(f"{fields[0]}\t第 {number} 行，改 {fields[1] if len(fields) > 1 else ''}")
+    items = [(number, line.split("\t")) for number, line in enumerate(lines, 1) if not line.startswith("#") and line.strip()]
+    # 锚点失效的那几行（文件头「锚点失效」）在逐行那一段末尾接一句；判法与 run_stage 同一份（anchor_problem），成形的行才判
+    environment = dict(os.environ)
+    try:
+        table_rows = read_table(path, environment)[0]
+    except (OSError, UnicodeDecodeError):
+        table_rows = []
+    anchor_broken = {} if break_is(environment, "anchor-rows-planned") else anchor_broken_rows(arguments[0], table_rows)
+    for number, fields in items:
+        anchor_note = f"；锚点失效：{anchor_broken[number]}" if number in anchor_broken else ""
+        print(f"{fields[0]}\t第 {number} 行，改 {fields[1] if len(fields) > 1 else ''}{anchor_note}", flush=True)
+    status_output = io.StringIO()
+    with contextlib.redirect_stdout(status_output):
+        context = plan_context(arguments[0], environment)
+    if context is None:
+        print("  · 键对不对得上没算出来：" + " ".join(line.strip() for line in status_output.getvalue().splitlines()))
+        return 0
+    counter = collections.Counter()
+    for row in context["rows"]:
+        decision, _record = context["decided"][row.line_number]
+        state = "复用" if decision.reuse else "拒算" if decision.column == "refused" else "键对不上"
+        counter[state] += 1
+    anchor_named = "、".join(f"第 {row.line_number} 行 {row.name}" for row, _why in context["anchor_rows"])
+    print(f"  · 键对不上 {counter['键对不上']} 条（这一趟要现判）、键对得上 {counter['复用']} 条（复用）、拒算 {counter['拒算']} 条（照跑）、"
+          f"锚点失效 {len(context['anchor_rows'])} 行{'（不跑、整道判红：' + anchor_named + '）' if anchor_named else ''}；"
+          f"逐行的栏与变了哪几个单元：python3 scripts/mutation/crates-mutation-rows.py plan {arguments[0]}")
+    # 牵连面（文件头「牵连面」）：末了另起一行，只报数
+    print(f"  · {impact_summary(context['rows'], context['components'], context['key_context'], environment, len(context['anchor_rows']))}")
     return 0
 
 
@@ -3005,13 +3016,17 @@ if "--no-run" in before:
             handle.write(f"{executable}: {' '.join(sources)}\n\n")
         print(json.dumps({"reason": "compiler-artifact", "manifest_path": os.path.join(crate, "Cargo.toml"), "target": {"kind": ["lib"], "name": package},
                           "profile": {"test": True}, "filenames": [executable], "executable": executable, "fresh": False}))
-    stray = os.path.abspath((os.environ.get("LLVM_PROFILE_FILE") or "default_%m_%p.profraw").replace("%p", str(os.getpid())).replace("%m", "0"))
-    os.makedirs(os.path.dirname(stray), exist_ok=True)
-    with open(stray, "w", encoding="utf-8") as handle:
-        handle.write("{}")
-    if os.environ.get("FAKE_CARGO_PROFILE_LOG"):
-        with open(os.environ["FAKE_CARGO_PROFILE_LOG"], "a", encoding="utf-8") as log:
-            log.write(os.getcwd() + "\t" + stray + "\n")
+    # 剖析文件只在插桩编译时写（参数或 RUSTFLAGS / CARGO_ENCODED_RUSTFLAGS 里带 -Cinstrument-coverage）：基线与变异先编的那一趟不插桩，不写
+    instrumented = any("instrument-coverage" in word for word in sys.argv[1:]) or any(
+        "instrument-coverage" in os.environ.get(name, "") for name in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS"))
+    if instrumented:
+        stray = os.path.abspath((os.environ.get("LLVM_PROFILE_FILE") or "default_%m_%p.profraw").replace("%p", str(os.getpid())).replace("%m", "0"))
+        os.makedirs(os.path.dirname(stray), exist_ok=True)
+        with open(stray, "w", encoding="utf-8") as handle:
+            handle.write("{}")
+        if os.environ.get("FAKE_CARGO_PROFILE_LOG"):
+            with open(os.environ["FAKE_CARGO_PROFILE_LOG"], "a", encoding="utf-8") as log:
+                log.write(os.getcwd() + "\t" + stray + "\n")
     sys.exit(0)
 after = arguments[arguments.index("--") + 1:] if "--" in arguments else []
 filters = [word for word in after if not word.startswith("-")]
@@ -3109,8 +3124,9 @@ done
 exit 9
 '''
 FAKE_MEMORY_CAP_RUNNER = '''#!/usr/bin/env bash
-# 自证用的假内存包装：--check 退 0；其余去掉上限那一个参数、原样执行命令
+# 自证用的假内存包装：--check 退 0；其余去掉上限那一个参数、原样执行命令；FAKE_MEMORY_CAP_LOG 设了，先记一行「<上限><TAB><限时或「不限时」><TAB><命令>」（逐行上限那一格读）
 if [[ "${1:-}" == "--check" ]]; then exit 0; fi
+if [[ -n "${FAKE_MEMORY_CAP_LOG:-}" ]]; then printf '%s\t%s\t%s\n' "$1" "${RUN_WITH_MEMORY_CAP_TIME_LIMIT:-不限时}" "${*:2}" >>"$FAKE_MEMORY_CAP_LOG"; fi
 shift
 exec "$@"
 '''
@@ -3144,6 +3160,25 @@ sleep 0.3
 if [[ -n "$entry" ]]; then rm -f -- "$entry"; fi
 exit "$status"
 '''
+
+SELFTEST_TESTS = '''
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn adds() { assert_eq!(super::add(2, 3), 5); }
+    #[test]
+    fn doubles() { assert_eq!(super::double(3), 6); }
+    #[test]
+    fn negates() { assert_eq!(super::negate(3), -3); }
+    #[test]
+    fn halves() { assert_eq!(super::halve(6), 3); }
+    #[test]
+    fn reads_answer() {}
+    #[test]
+    fn gpu_parity() {}
+}
+'''
+# 样本 crate：假 cargo 照「// TEST <名字> NEEDS <原文>」判红不红；下面的 #[test] 函数只给单元键认点名的测试是哪一个单元（文件头「行键」），跑不跑、红不红都照假 cargo
 SELFTEST_SOURCE = '''// 本模块自证的样本 crate（假 cargo 按下面几行判）
 // TEST adds NEEDS left + right
 // TEST doubles NEEDS value * 2
@@ -3153,7 +3188,7 @@ pub fn add(left: u32, right: u32) -> u32 { left + right }
 pub fn double(value: u32) -> u32 { value * 2 }
 pub fn negate(value: i32) -> i32 { 0 - value }
 pub fn halve(value: u32) -> u32 { value / 2 }
-'''
+''' + SELFTEST_TESTS
 SELFTEST_TABLE_ROWS = [
     "add-becomes-sub\tcrates/tiny/src/lib.rs\t{ left + right }\t{ left * right }\t-p tiny --lib -- adds\tadds",
     "double-becomes-triple\tcrates/tiny/src/lib.rs\t{ value * 2 }\t{ value * 3 }\t-p tiny --lib -- doubles\tdoubles",
@@ -3178,23 +3213,71 @@ SELFTEST_STATIC_PROBLEM_ROWS = [
     ("ROW", "outside-copy\tdocs/outside.rs\tpub fn outside() {}\tpub fn outside() { }\t-p tiny --lib -- adds\tadds"),
     ("STRAY", "stray-escape\tcrates/tiny/src/lib.rs\t{ value * 2 }\t{ \\&value * 2 }\t-p tiny --lib -- doubles\tdoubles"),
 ]
-# 覆盖那几格的样本 crate：helps 只执行 add（RUNS），点名它的那条变异改的是没执行的 helper；unused 谁都不执行；Pair 是函数外的类型定义
-SELFTEST_COVERAGE_SOURCE = '''// 覆盖那几格的样本 crate（假 cargo 按下面几行判）
+# 插桩编译那一格的样本 crate：helps 只执行 add（RUNS），两行同点 adds（同一条测试共用一份覆盖），一共 3 条测试记 3 份覆盖
+SELFTEST_COVERAGE_SOURCE = '''// 覆盖那一格的样本 crate（假 cargo 按下面几行判）
 // TEST adds NEEDS left + right
 // TEST doubles NEEDS value * 2
-// TEST helps NEEDS value + 7 RUNS add
-pub struct Pair { pub left: u32 }
+// TEST helps NEEDS value + 7 RUNS helps,add
 pub fn add(left: u32, right: u32) -> u32 { left + right }
 pub fn double(value: u32) -> u32 { value * 2 }
 pub fn helper(value: u32) -> u32 { value + 7 }
-pub fn unused(value: u32) -> u32 { value + 1 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn adds() { assert_eq!(super::add(2, 3), 5); }
+    #[test]
+    fn doubles() { assert_eq!(super::double(3), 6); }
+    #[test]
+    fn helps() { assert_eq!(super::add(2, 3), 5); }
+}
 '''
-# 两行同点 adds（同一组「cargo 参数 + 点名用例」，共用一份覆盖）
 SELFTEST_COVERAGE_ROWS = [
     "add-becomes-mul\tcrates/tiny/src/lib.rs\t{ left + right }\t{ left * right }\t-p tiny --lib -- adds\tadds",
     "add-becomes-sub\tcrates/tiny/src/lib.rs\t{ left + right }\t{ left - right }\t-p tiny --lib -- adds\tadds",
     "double-becomes-triple\tcrates/tiny/src/lib.rs\t{ value * 2 }\t{ value * 3 }\t-p tiny --lib -- doubles\tdoubles",
     "helper-becomes-eight\tcrates/tiny/src/lib.rs\t{ value + 7 }\t{ value + 8 }\t-p tiny --lib -- helps\thelps",
+]
+# 单元键那几格（第二轮复查 controls 路第 5 节 crates 变异那一行的 S34、S30、N33、N34、N45，加上被改坏的单元、点名测试的闭包、常量、覆盖复用基线几格）的样本 crate：
+#   check_root 里有两条变异（root-457、root-double），点名 checks_root；sum 的变异点名 sums（它还调 pad）；helper 的变异点名 helps（它只调 add，够不着 helper）；
+#   taken 的变异点名 branches（它静态上还调 untaken，执行的只有 taken）；OFFSET 是 check_root 用的常量（V5 那一类）
+SELFTEST_UNIT_SOURCE = '''// 单元键那几格的样本 crate（假 cargo 按下面几行判）
+// TEST checks_root NEEDS slot + 457
+// TEST checks_root NEEDS base * 2
+// TEST sums NEEDS left + right
+// TEST helps NEEDS value + 7 RUNS helps,add
+// TEST branches NEEDS value + 9 RUNS branches,taken
+pub const OFFSET: u32 = 95;
+pub fn check_root(slot: u32) -> u32 {
+    let base = slot + 457;
+    let floor = base.max(OFFSET);
+    floor * 0 + base * 2
+}
+pub fn pad(value: u32) -> u32 { value + 0 }
+pub fn sum(left: u32, right: u32) -> u32 { left + right }
+pub fn add(first: u32, second: u32) -> u32 { first + second }
+pub fn helper(value: u32) -> u32 { value + 7 }
+pub fn taken(value: u32) -> u32 { value + 9 }
+pub fn untaken(value: u32) -> u32 { value + 10 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn checks_root() { assert_eq!(super::check_root(1), 916); }
+    #[test]
+    fn sums() { assert_eq!(super::sum(super::pad(2), 3), 5); }
+    #[test]
+    fn helps() { assert_eq!(super::add(2, 3), 5); }
+    #[test]
+    fn branches() { let value = super::taken(1); if value == 0 { super::untaken(value); } }
+}
+'''
+SELFTEST_UNIT_ROWS = [
+    "root-457\tcrates/tiny/src/lib.rs\t= slot + 457;\t= slot + 458;\t-p tiny --lib -- checks_root\tchecks_root",
+    "root-double\tcrates/tiny/src/lib.rs\t0 + base * 2\t0 + base * 3\t-p tiny --lib -- checks_root\tchecks_root",
+    "sum-sub\tcrates/tiny/src/lib.rs\t{ left + right }\t{ left - right }\t-p tiny --lib -- sums\tsums",
+    "helper-eight\tcrates/tiny/src/lib.rs\t{ value + 7 }\t{ value + 8 }\t-p tiny --lib -- helps\thelps",
+    "taken-eleven\tcrates/tiny/src/lib.rs\t{ value + 9 }\t{ value + 11 }\t-p tiny --lib -- branches\tbranches",
 ]
 
 
@@ -3230,22 +3313,25 @@ class Selftest:
         selftest_write(self.runner, FAKE_MEMORY_CAP_RUNNER, executable=True)
         self.log = os.path.join(work, "cargo.log")
         # BINDGEN_EXTRA_CLANG_ARGS 也不带进来：调用方 export 了它，副本里没有 .cargo/ 照样编得过，「拷贝范围含 .cargo/」那一格就红不出来；
-        # RUSTFLAGS 一类也不带：假 cargo 不看它，带进来只会让判法版本随调用方变
+        # RUSTFLAGS 一类也不带：假 cargo 不看它，带进来只会让工具链行随调用方变
         self.base_environment = {key: value for key, value in os.environ.items()
-                                 if key not in STAGE_VARIABLES
+                                 if key not in STAGE_VARIABLES and key not in mutation_units.BUILD_VARIABLES and not key.startswith("CARGO_PROFILE_")
                                  and key not in ("BINDGEN_EXTRA_CLANG_ARGS", "FAKE_CARGO_VERSION", "FAKE_LLVM_VERSION")}
         self.base_environment.update(PATH=self.bin_directory + os.pathsep + os.environ.get("PATH", ""), FAKE_CARGO_LOG=self.log,
                                      GATE_MUTATION_MEMORY_CAP_RUNNER=self.runner, GATE_MUTATION_TARGET_DIR=os.path.join(work, "target"),
                                      GATE_MUTATION_WORKERS="1", GATE_MUTATION_LLVM_TOOLS=self.llvm_directory)
+        # 复用哨兵：别的格比的是现判与复用的条数，键相同的全当哨兵、不抽强制现判；reuse-three-questions 与 reuse-sentinel 两格自己设
+        self.base_environment[reuse_checks.SENTINEL_COUNT_VARIABLE] = "1000"
+        self.base_environment.pop(reuse_checks.SENTINEL_SEED_VARIABLE, None)
 
-    def run(self, root, **changes):
+    def run(self, root, judging_repository=None, **changes):
         """在 root 上跑一趟 run_stage：(退出码, stdout, stderr, 这一趟假 cargo 起的每一行)。"""
         with contextlib.suppress(FileNotFoundError):
             os.unlink(self.log)
         environment = dict(self.base_environment, **changes)
         stdout, stderr = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = run_stage(root, environment)
+            exit_code = run_stage(root, environment, judging_repository)
         invocations = []
         if os.path.exists(self.log):
             with open(self.log, encoding="utf-8") as handle:
@@ -3258,27 +3344,32 @@ class Selftest:
             self.failures.append(f"{label}{('：' + detail) if detail else ''}")
 
 
+def compile_invocation(line):
+    """基线与变异先编的那一趟（文件头「限时」：cargo test <-- 之前那一段> --no-run，不带 --message-format；记覆盖的插桩编译带）。"""
+    return "--no-run" in line and "--message-format" not in line
+
+
 def plain_invocations(invocations):
-    """假 cargo 的记录里基线与变异那几次（记覆盖的 --no-run 与 --exact 两次不算）。"""
+    """假 cargo 的记录里基线与变异那几次（记覆盖的 --no-run 与 --exact 两次、先编的那一趟不算）。"""
     return [line for line in invocations if "--no-run" not in line and "--exact" not in line]
 
 
 def coverage_invocations(invocations):
-    return [line for line in invocations if "--no-run" in line or "--exact" in line]
+    return [line for line in invocations if ("--no-run" in line or "--exact" in line) and not compile_invocation(line)]
 
 
 def mutation_invocations(invocations, pristine_hash):
-    """假 cargo 的记录里改坏了源码的那几次（lib.rs 的哈希不是没改坏的那一份）。"""
-    return [line for line in invocations if not line.endswith("\t" + pristine_hash)]
+    """假 cargo 的记录里改坏了源码的那几次（lib.rs 的哈希不是没改坏的那一份；先编的那一趟不算）。"""
+    return [line for line in invocations if not line.endswith("\t" + pristine_hash) and not compile_invocation(line)]
 
 
 def selftest_verdict_view(stdout):
-    """stdout 去掉随记录变的那几处（「复用：」「覆盖：」两行、抓到那一行末尾的「（现判：…）」「（按覆盖复用）」、成功句末尾「；这一趟现判 …」），剩下的是判定本身。"""
+    """stdout 去掉随记录变的那几处（「复用：」「覆盖：」两行、抓到那一行末尾的「（现判：…）」「（复用）」「（拒算）」、成功句末尾「；这一趟现判 …」），剩下的是判定本身。"""
     lines = []
     for line in stdout.splitlines():
         if line.startswith("  复用：") or line.startswith("  覆盖："):
             continue
-        line = re.sub(r"（现判：[^）]*）$|（按覆盖复用）$", "", line)
+        line = re.sub(r"（现判：[^）]*）$|（复用）$|（拒算）$", "", line)
         lines.append(re.sub(r"；这一趟现判 .*$", "", line))
     return "\n".join(lines)
 
@@ -3296,11 +3387,15 @@ def replace_in_file(path, old, new):
 
 
 def per_row_how(stdout):
-    """stdout 里抓到那几行：{变异名: 「现判：<栏>」或「按覆盖复用」}。"""
+    """stdout 里抓到那几行：{变异名: 「现判：<栏>」「复用」或「拒算」}。"""
     found = {}
-    for match in re.finditer(r"^  ✓ (\S+)：\S+ 红了（(现判：[^）]*|按覆盖复用)）$", stdout, re.M):
+    for match in re.finditer(r"^  ✓ (\S+)：\S+ 红了（(现判：[^）]*|复用|拒算)）$", stdout, re.M):
         found[match.group(1)] = match.group(2)
     return found
+
+
+def library_of(repository):
+    return os.path.join(repository, ".git", LIBRARY_DIRECTORY_NAME)
 
 
 def selftest_queue_line_cells(selftest, work):
@@ -3341,6 +3436,46 @@ def selftest_worker_count_cells(selftest, work):
     outer = selftest.run(repository, GATE_MUTATION_WORKERS="16", GATE_MUTATION_MEMORY_MAX="4G", GATE_MUTATION_START_OVER="1", **{OUTER_MEMORY_CAP_VARIABLE: "8G"})
     selftest.check("外层内存上限交给 run_stage：开的工作进程数跟着收（8G ÷ 4G 开 2 个，不是给的 16 个也不是条数 4）",
                    outer[0] == 0 and "这一轮开 2 个工作进程" in outer[2] and "卡在「外层内存上限」这一项" in outer[2], f"退 {outer[0]}；{outer[2][:600]}")
+
+
+def selftest_row_limit_cell(selftest, work):
+    """逐行上限与限时不含重编译（文件头「逐行上限」与「基线」一段的限时）：轻型变异登记表里给 double-becomes-triple（变异表第 3 行）写 9G、2400 秒，
+    假内存包装把每一次收到的上限、限时（没设记「不限时」）与命令记进 FAKE_MEMORY_CAP_LOG：那一行的先编与变异两趟都是 9G，先编不限时、变异限时 2400；
+    别的三行照整张表的 4G、1800；它们共用的那一批基线取大的 9G、2400（先编那一趟不限时）。弄坏开关 rowlimitsignored（那一行照 4G、1800）、
+    timelimitincludescompile（不先编，限时含重编译）下这一格判错。"""
+    repository = os.path.join(work, "row-limits")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    selftest_write(os.path.join(repository, LIGHT_ROWS_TABLE), "# 自证用的轻型变异登记表（只放逐行上限那一行）\n"
+                   "# 逐行上限：double-becomes-triple\t9G\t2400\t# 自证：比整张表的 4G、1800 秒大\n")
+    cap_log = os.path.join(work, "row-limits-caps.log")
+    exit_code, stdout, stderr, _invocations = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_MEMORY_MAX="4G",
+                                                           GATE_MUTATION_TIMEOUT="1800", FAKE_MEMORY_CAP_LOG=cap_log)
+    calls = []
+    with contextlib.suppress(OSError):
+        with open(cap_log, encoding="utf-8") as handle:
+            calls = [line.split("\t", 2) for line in handle.read().splitlines()]
+
+    def seen(stamp):
+        """这一个起头名（line-3、baseline-2 这一类）的 先编 / 跑 两趟各收到的 (上限, 限时)。"""
+        found = {}
+        for cap, limit, command in calls:
+            match = re.search(r"/" + START_STAMP_DIRECTORY_NAME + r"/(\S+)", command)
+            if match and match.group(1) in (stamp, stamp + "-build"):
+                found["build" if match.group(1).endswith("-build") else "run"] = (cap, limit)
+        return found
+
+    wanted = {"line-3": {"build": ("9G", "不限时"), "run": ("9G", "2400")}, "line-2": {"build": ("4G", "不限时"), "run": ("4G", "1800")},
+              "line-5": {"build": ("4G", "不限时"), "run": ("4G", "1800")}, "baseline-2": {"build": ("9G", "不限时"), "run": ("9G", "2400")}}
+    got = {stamp: seen(stamp) for stamp in wanted}
+    selftest.check("逐行上限：一行另给的上限与限时只给它与它所在的那一批基线，别的行照整张表的数；先编那一趟不限时、只有内存上限，再限时跑点名的测试",
+                   exit_code == 0 and got == wanted and "逐行上限（" in stderr,
+                   f"退 {exit_code}；收到的 {got}，应为 {wanted}；{stderr[-300:]}")
+    # 逐行上限也不进行键（row-key-with-limits 那一格的口径）：把那一行改成 10G、3000 秒再跑一趟，一行都不现判
+    selftest_write(os.path.join(repository, LIGHT_ROWS_TABLE), "# 自证用的轻型变异登记表（只放逐行上限那一行）\n"
+                   "# 逐行上限：double-becomes-triple\t10G\t3000\t# 自证：改了上限与限时\n")
+    again = selftest.run(repository, GATE_MUTATION_MEMORY_MAX="4G", GATE_MUTATION_TIMEOUT="1800")
+    selftest.check("逐行上限不进行键：改那一行的上限与限时之后一行都不现判", again[0] == 0 and "复用：现判 0 条" in again[1],
+                   f"退 {again[0]}：{again[1][-400:]}")
 
 
 def selftest_gpu_memory_cell(selftest, work):
@@ -3468,14 +3603,14 @@ def selftest_daily_cells(selftest, work):
             mismatched.append(f"理由「{reason}」、编译目录 {target_directory}")
     judged = [line for line in seen if not line[1].endswith(COVERAGE_TARGET_SUFFIX)]
     selftest.check("会话里平常跑（假包装照日常一条演）、4 个工作进程：各条照样判对，每次包装带自己那个工作进程的并行理由",
-                   plain[0] == 0 and "计数：抓到 4 条、没红 0 条" in plain[1] and "排不上没跑 0 条" in plain[1] and len(judged) == 5
-                   and len(seen) == 5 + 2 * 4 and not mismatched,
-                   f"退 {plain[0]}；包装起了 {len(seen)} 次（要 1 批基线 + 4 条变异 + 4 组覆盖各 2 次）；理由不对的 {mismatched}；{plain[1]}")
+                   plain[0] == 0 and "计数：抓到 4 条、没红 0 条" in plain[1] and "排不上没跑 0 条" in plain[1] and len(judged) == 2 * 5
+                   and len(seen) == 2 * 5 + 2 * 4 and not mismatched,
+                   f"退 {plain[0]}；包装起了 {len(seen)} 次（要 1 批基线 + 4 条变异各 2 次：先编、再限时跑，4 组覆盖各 2 次）；理由不对的 {mismatched}；{plain[1]}")
     caller_reason = "调用方给的并行理由（自证）"
     passed_through = selftest.run(repository, **dict(daily, RUN_WITH_MEMORY_CAP_PARALLEL_REASON=caller_reason))
     seen = wrapper_lines() if os.path.exists(wrapper_log) else []
     selftest.check("调用方设了的并行理由原样传给每次包装、不覆盖",
-                   passed_through[0] == 0 and len(seen) == 5 and all(reason == caller_reason for reason, _target in seen),
+                   passed_through[0] == 0 and len(seen) == 2 * 5 and all(reason == caller_reason for reason, _target in seen),
                    f"退 {passed_through[0]}；包装看到的理由 {sorted({reason for reason, _target in seen})}")
 
 
@@ -3669,20 +3804,30 @@ def selftest_crash_library_home_cells(selftest, work):
                    f"退 {exit_code}；假 cargo 起了 {len(records)} 次，收到的家目录 {homes}（要 [{configured}]）、单份库 {libraries}；{stderr[-400:]}")
 
 
+
 def run_selftest():
     work = tempfile.mkdtemp(prefix="crates-mutation-rows-selftest-")
     saved_environment = dict(os.environ)
     try:
         selftest = Selftest(work)
-        # import、plan 与 records-directory 读本进程的环境：与 run_stage 那一份对齐
+        # 判法冻成一份临时拷贝：别的会话这时候改了判法闭包里的哪一份（lib_function_units.py 这一类），自证里几十趟的判法单元照样一致
+        frozen, frozen_made = judging_copy(work, "judging-frozen")
+        selftest.check("判法单元的闭包算得出、冻成一份临时拷贝", frozen_made, "judging-units 算不出；单跑 python3 scripts/mutation/crates-mutation-rows.py judging-units . 看拒算")
+        if frozen_made:
+            JUDGING_ROOT[0] = frozen
+        # import、plan 与 library-directory 读本进程的环境：与 run_stage 那一份对齐
         os.environ.clear()
         os.environ.update(selftest.base_environment)
         run_selftest_cells(selftest, work)
-        selftest_coverage_cells(selftest, work)
+        selftest_unit_key_cells(selftest, work)
+        selftest_reuse_cells(selftest, work)
+        selftest_parallel_key_cell(selftest, work)
+        selftest_judging_unit_cells(selftest, work)
         selftest_build_profile_cell(selftest, work)
         selftest_queue_line_cells(selftest, work)
         selftest_daily_cells(selftest, work)
         selftest_gpu_memory_cell(selftest, work)
+        selftest_row_limit_cell(selftest, work)
         selftest_worker_count_cells(selftest, work)
         selftest_libtest_result_cell(selftest, work)
         selftest_cargo_configuration_cell(selftest, work)
@@ -3690,7 +3835,9 @@ def run_selftest():
         selftest_worker_slot_cells(selftest, work)
         selftest_signal_and_pipe_cells(selftest, work)
         selftest_crash_library_home_cells(selftest, work)
+        selftest_anchor_and_impact_cells(selftest, work)
     finally:
+        JUDGING_ROOT[0] = STAGE_REPOSITORY
         os.environ.clear()
         os.environ.update(saved_environment)
         shutil.rmtree(work, ignore_errors=True)
@@ -3698,21 +3845,26 @@ def run_selftest():
         print(f"  ✗ crates-mutation-rows.py 自证有 {len(selftest.failures)} 格判错（共 {selftest.cells} 格）：")
         for failure in selftest.failures:
             print(f"      {failure}")
-        print("     → 怎么办：设了 GATE_MUTATION_BREAK 的，这就是要的结果（那个开关把对应的判法弄坏了）；没设的，照上面那几格去看 run_stage、reuse_decision、")
-        print("       judge_coverage、dispatch_order、command_import、command_plan、escaping_literals、read_table 与 row_problems 里对应的那一段；并行理由那两格看 run_under_wrapper。")
+        print("     → 怎么办：设了 GATE_MUTATION_BREAK 的，这就是要的结果（那个开关把对应的判法弄坏了）；没设的，照上面那几格去看 run_stage、row_decision、")
+        print("       KeyContext.components、baseline_reuse_problem、judge_coverage、dispatch_order、command_import、command_plan、escaping_literals、read_table 与 row_problems；")
+        print("       单元切分与闭包看 scripts/mutation/lib_mutation_units.py 与 scripts/gate/lib_function_units.py；并行理由那两格看 run_under_wrapper。")
         return 1
     print(f"  ✓ crates-mutation-rows.py 自证 {selftest.cells} 格都对（复用、改一行只重跑那一行、跑到一半续跑、基线不绿、"
-          "久的先派、选行只判一部分退 3、导入核行键、判法版本与复用判据、只留 3 个判法版本目录、记录里没有主机名、拷贝范围两样、"
+          "久的先派、选行只判一部分退 3、导入核键与判法单元指纹、多久没被引用才删、记录里没有主机名、拷贝范围两样、"
           "替换文空着的删行变异照常判、派活之前那几样 checker-tier-crates-mutation-replay 与 static-check 同一份判法、"
           "点名的测试打了 NOT_RUN 记本次未跑且变异那一趟补了 --show-output、只有本次未跑的退 77、should panic 的用例红了判抓到、"
+          "单元键：被改坏函数的别一行变只现判原文在它里面的行（S34）、判法单元变了整张现判（S30）、限时变了与改名一行都不现判（N33、N34）、"
+          "同文件加没人调的函数一行都不现判（N45）、改点名测试调到的函数与被改坏函数用的常量现判点名它的行、基线按执行过的单元复用而不按整树快照、"
+          "只改判法注释判法单元指纹不变而改 libtest 解析一处就变、拒算的照跑、"
           "会话里平常跑时每次包装带自己那个工作进程的并行理由且调用方设了的不覆盖、"
           "工作进程数不超过外层内存上限 ÷ 每条变异的上限而外层上限读不到时头一行写明、"
           "拷贝范围含 .cargo/（点名的测试要编 gpu 特性的那一行在副本里读得到 [env]）、被 TERM 停时删掉 $TMPDIR 下的 singlefs-mutation-replay-*、"
           "片号大于这一趟工作进程数的 -w<片号> 开跑时回收而有进程在用的不删、两个变量都没设时编译目录不落 /tmp、"
           "同一个共用编译目录上并发的两次调用领到的片号集合不相交（片号锁）而片号锁被占着的 -w<片号> 回收时留着、"
           "--list-items 接 | head 时安静退、变异复跑起的 cargo 写自己的崩溃判定库（真跑家目录底下的 mutation-replay/，或 GATE_MUTATION_CRASH_LIBRARY_HOME）而点名的单份库清掉、"
-          "按覆盖复用：每组记一份覆盖、改没执行的函数全复用、改被变异的函数与执行过的函数只现跑那几行、函数外改动与新加目标全现跑、"
-          "别的包改了不相干、工具链变了全现跑、不按时限过期、llvm 工具不对判红、plan 只读且逐栏报数）")
+          "工具链变了全现判、不按时限过期、llvm 工具不对判红、plan 只读且逐栏报数、"
+          "锚点失效按行判（那一行记锚点失效、不入库、整道判红，别的行照跑照入库）而 row-plan、plan、--list-items 把锚点失效的行单列（数据文件那一行也不算键）、"
+          "牵连面在样本 crate 上报对牵连最大的单元与行数）")
     return 0
 
 
@@ -3723,60 +3875,60 @@ def run_selftest_cells(selftest, work):
     # 一：头一趟全跑；第二趟输入不变，假 cargo 一次都不起、判定逐字相同
     first = selftest.run(repository)
     selftest.check("头一趟判绿", first[0] == 0, first[1] + first[2])
-    selftest.check("头一趟起 1 批基线 + 4 条变异，另记 4 组覆盖（各一次插桩编译、一次插桩跑）",
+    selftest.check("头一趟起 1 批基线 + 4 条变异，另记 4 份覆盖（各一次插桩编译、一次插桩跑）",
                    len(plain_invocations(first[3])) == 5 and len(coverage_invocations(first[3])) == 8, "\n".join(first[3]))
     second = selftest.run(repository)
     selftest.check("第二趟输入不变：cargo 一次都不起", second[0] == 0 and second[3] == [], "\n".join(second[3]))
     selftest.check("第二趟判定与头一趟逐字相同（只差复用的报数）", selftest_verdict_view(second[1]) == selftest_verdict_view(first[1])
-                   and "按覆盖复用 4 条（其中源码与上次一字未动 4 条）" in second[1], second[1])
+                   and "现判 0 条、复用 4 条、拒算 0 条、本次未跑 0 条" in second[1], second[1])
     selftest.check("第二趟 stderr 头一行报复用 4 条", "复用抓到 4 条" in (second[2].splitlines() or [""])[0], second[2])
     # 二：进程数不同、一律不复用，判定仍逐字相同
     parallel = selftest.run(repository, GATE_MUTATION_WORKERS="4", GATE_MUTATION_START_OVER="1")
     selftest.check("GATE_MUTATION_WORKERS=4 与 =1 的判定逐字相同", selftest_verdict_view(parallel[1]) == selftest_verdict_view(first[1]), parallel[1])
-    selftest.check("GATE_MUTATION_START_OVER=1 一律不复用（报「一律现跑」那一栏）", len(plain_invocations(parallel[3])) == 5
-                   and "不复用：GATE_MUTATION_START_OVER=1" in parallel[2] and "一律现跑 4" in parallel[1], parallel[1] + parallel[2])
+    selftest.check("GATE_MUTATION_START_OVER=1 只写不读（报「一律现判」那一栏）", len(plain_invocations(parallel[3])) == 5
+                   and "不读库：GATE_MUTATION_START_OVER=1" in parallel[2] and "一律现判 4" in parallel[1], parallel[1] + parallel[2])
     full = selftest.run(repository, SINGLEFS_GATE_FULL="1")
-    selftest.check("SINGLEFS_GATE_FULL=1 一律不复用", len(plain_invocations(full[3])) == 5, "\n".join(full[3]))
+    selftest.check("SINGLEFS_GATE_FULL=1 只写不读", len(plain_invocations(full[3])) == 5, "\n".join(full[3]))
     unlimited = selftest.run(repository, SINGLEFS_REUSE_HOURS="0")
     selftest.check("SINGLEFS_REUSE_HOURS=0 照样复用（记录不按时限过期）", unlimited[0] == 0 and unlimited[3] == [], "\n".join(unlimited[3]))
-    # 三：只改一行的替换文，只那一行重跑（它自己的基线 + 它的变异），栏是「行新加或改了」
+    # 三：只改一行的替换文：只那一行现判（栏是原文或替换文变了），它点名测试的基线复用（基线键与点名测试都没变），只起那一条变异
     table_path = os.path.join(repository, TABLE)
     replace_in_file(table_path, "{ value * 3 }", "{ value * 4 }")
     one_row = selftest.run(repository)
     changed = mutation_invocations(plain_invocations(one_row[3]), pristine)
-    selftest.check("只改一行的替换文：只那一行重跑，栏是行新加或改了", one_row[0] == 0 and len(plain_invocations(one_row[3])) == 2 and len(changed) == 1
-                   and "doubles" in changed[0] and per_row_how(one_row[1]).get("double-becomes-triple") == "现判：行新加或改了",
+    selftest.check("只改一行的替换文：只那一行现判，栏是原文或替换文变了，它的基线复用", one_row[0] == 0 and len(plain_invocations(one_row[3])) == 1 and len(changed) == 1
+                   and "doubles" in changed[0] and per_row_how(one_row[1]).get("double-becomes-triple") == "现判：原文或替换文变了",
                    one_row[1] + "\n".join(one_row[3]))
-    # 四：改一行注释（锚点照旧命中）：词法单元不变，全部按覆盖复用
+    # 四：改一行注释（锚点照旧命中）：单元指纹不变，全部复用
     replace_in_file(os.path.join(repository, "crates", "tiny", "src", "lib.rs"), "pub fn add(", "// 改了一行注释\npub fn add(")
     pristine = source_hash(repository)
     comment_changed = selftest.run(repository)
-    selftest.check("改一行注释：词法单元不变，全部按覆盖复用、cargo 一次都不起", comment_changed[0] == 0 and comment_changed[3] == []
-                   and "按覆盖复用 4 条（其中源码与上次一字未动 0 条）" in comment_changed[1], comment_changed[1] + "\n".join(comment_changed[3]))
-    # 五：跑到一半停掉（只供测试的开关），下一趟只跑剩下的；基线已判过 ok 的不再跑。先清掉这一格的记录，从零起
-    shutil.rmtree(run_command_capturing(command_judge_version, [repository], want_directory=True)[1].strip(), ignore_errors=True)
+    selftest.check("改一行注释：单元指纹不变，全部复用、cargo 一次都不起", comment_changed[0] == 0 and comment_changed[3] == []
+                   and "现判 0 条、复用 4 条" in comment_changed[1], comment_changed[1] + "\n".join(comment_changed[3]))
+    # 五：跑到一半停掉（只供测试的开关），下一趟只跑剩下的；基线已判过 ok 的不再跑。先清掉这一棵仓的库，从零起
+    shutil.rmtree(library_of(repository), ignore_errors=True)
     halfway = selftest.run(repository, GATE_MUTATION_START_OVER="1", GATE_MUTATION_STOP_AFTER_ROWS="2")
     selftest.check("跑完 2 条就退：判红、说明是只供测试的开关", halfway[0] == 1 and "GATE_MUTATION_STOP_AFTER_ROWS=2" in halfway[1]
                    and len(mutation_invocations(halfway[3], pristine)) == 2, halfway[1] + "\n".join(halfway[3]))
     resumed = selftest.run(repository)
-    selftest.check("下一趟只跑剩下的 2 条、基线不再跑，判完的 2 条一字未动复用、补记它们的覆盖",
+    selftest.check("下一趟只跑剩下的 2 条、基线不再跑，判完的 2 条复用；给这一趟现判的 2 条测试补记覆盖",
                    resumed[0] == 0 and len(plain_invocations(resumed[3])) == 2 and len(mutation_invocations(resumed[3], pristine)) == 2
-                   and len(coverage_invocations(resumed[3])) == 8, "\n".join(resumed[3]))
+                   and len(coverage_invocations(resumed[3])) == 4, "\n".join(resumed[3]))
     # 六：上一次跑得久（或超时）的先派，按用时从长到短；stderr 头一行报前移几条
-    timings_directory = os.path.join(repository, ".git", TIMINGS_DIRECTORY_NAME)
+    timings_directory = os.path.join(library_of(repository), "timings")
     table_rows, _malformed, _memory, _timeout = read_table(table_path)
     long_rows = {"negates": ("400", "0"), "halves": ("1800", "1")}
     for row in table_rows:
         if row.expected in long_rows:
             seconds, timed_out = long_rows[row.expected]
             write_atomically(os.path.join(timings_directory, row_content_hash(row)),
-                             record_text(dict(seconds_running=seconds, timed_out=timed_out, finished_utc=utc_now_text())))
+                             mutation_units.record_text(RECORD_HEADER, dict(seconds_running=seconds, timed_out=timed_out)))
     ordered = selftest.run(repository, GATE_MUTATION_START_OVER="1")
     order = [line.split("\t")[0].split()[-1] for line in mutation_invocations(ordered[3], pristine)]
     ordered_head_line = (ordered[2].splitlines() or [""])[0]
     selftest.check("上一次超时的、跑得久的先派（按用时从长到短）", order[:2] == ["halves", "negates"] and "前移 2 条" in ordered_head_line,
                    f"派活次序 {order}；{ordered_head_line}")
-    # 七：选行只判一部分：都抓到退 3、末行写明不是整道结论；不写全绿标记
+    # 七：选行只判一部分：都抓到退 3、末行写明不是整道结论
     selection_file = os.path.join(work, "selection.txt")
     selftest_write(selection_file, "".join(f"{row.line_number}\n" for row in table_rows[:2]))
     selected = selftest.run(repository, GATE_MUTATION_ROW_SELECTION=selection_file, GATE_MUTATION_START_OVER="1")
@@ -3784,52 +3936,58 @@ def run_selftest_cells(selftest, work):
                    and "只判了选中的 2 行，不是整道结论" in selected[1].splitlines()[-1] and len(mutation_invocations(selected[3], pristine)) == 2,
                    selected[1])
     reused_selected = selftest.run(repository, GATE_MUTATION_ROW_SELECTION=selection_file)
-    selftest.check("选 2 行、不设 START_OVER：照判定库记录复用，与整张跑时那两行的判定相同", reused_selected[0] == EXIT_SELECTION_ONLY
-                   and reused_selected[3] == [] and "按覆盖复用 2 条" in reused_selected[1], reused_selected[1])
+    selftest.check("选 2 行、不设 START_OVER：照判定库复用，与整张跑时那两行的判定相同", reused_selected[0] == EXIT_SELECTION_ONLY
+                   and reused_selected[3] == [] and "复用 2 条" in reused_selected[1], reused_selected[1])
     selftest_write(os.path.join(work, "bad-selection.txt"), "99999\n")
     bad_selection = selftest.run(repository, GATE_MUTATION_ROW_SELECTION=os.path.join(work, "bad-selection.txt"))
     selftest.check("选行文件里的行号不是一条变异：判红、一格都没跑", bad_selection[0] == 1 and bad_selection[3] == [], bad_selection[1])
-    # 八：导入另一台的记录：同一份内容的另一棵仓先全收，之后一格都不跑、判定与本机现跑逐字相同；行键或判法版本对不上的拒
-    reference = selftest.run(repository)
+    # 八：导入另一台的库：同一份内容的另一棵仓先全收，之后一格都不跑、判定与本机现跑逐字相同；键或判法单元指纹对不上的拒
+    # 另一台那一趟的库照双机分片的样子是这一趟新建的（第二台不留长期库）：在 GATE_MUTATION_RECORDS_HOME 指的一个空目录里只写不读地判一遍
+    peer_home = os.path.join(work, "peer-home")
+    reference = selftest.run(repository, GATE_MUTATION_RECORDS_HOME=peer_home, GATE_MUTATION_START_OVER="1")
     other = os.path.join(work, "other")
     build_selftest_repository(other, [line for line in open(table_path, encoding="utf-8").read().splitlines()[1:]])
     shutil.copyfile(os.path.join(repository, "crates", "tiny", "src", "lib.rs"), os.path.join(other, "crates", "tiny", "src", "lib.rs"))
-    source_records = run_command_capturing(command_judge_version, [repository], want_directory=True)[1].strip()
-    imported = run_command_capturing(command_import, [other, source_records])
+    source_library = library_of(repository)
+    imported = run_command_capturing(command_import, [other, os.path.join(peer_home, LIBRARY_DIRECTORY_NAME)])
     after_import = selftest.run(other)
-    selftest.check("导入同一判法版本、同一份源码的记录：全收", imported[0] == 0, imported[1])
+    selftest.check("导入同一判法单元、同一份源码的库：全收", imported[0] == 0 and "拒了 0 条" in imported[1], imported[1])
     selftest.check("导入之后另一棵仓一格都不跑、判定与本机逐字相同", after_import[3] == [] and selftest_verdict_view(after_import[1]) == selftest_verdict_view(reference[1]),
                    after_import[1] + after_import[2])
     forged_directory = os.path.join(work, "forged")
-    os.makedirs(forged_directory)
-    genuine_name = sorted(name for name in os.listdir(source_records) if name.startswith("mutation."))[0]
-    genuine = read_record(os.path.join(source_records, genuine_name))
+    genuine_name = sorted(os.listdir(os.path.join(source_library, "records")))[0]
+    genuine = mutation_units.parse_record(open(os.path.join(source_library, "records", genuine_name), encoding="utf-8").read())
     forged_key = hashlib.sha256(b"no such row").hexdigest()
-    selftest_write(os.path.join(forged_directory, f"mutation.{forged_key}"), record_text(dict(genuine, row_key=forged_key)))
-    foreign_judging = dict(genuine, judge_version=hashlib.sha256(b"another judging").hexdigest())
-    selftest_write(os.path.join(forged_directory, genuine_name), record_text(foreign_judging))
+    selftest_write(os.path.join(forged_directory, "records", forged_key), mutation_units.record_text(RECORD_HEADER, dict(genuine, row_key=forged_key)))
+    foreign_judging = dict(genuine, judging=hashlib.sha256(b"another judging").hexdigest())
+    selftest_write(os.path.join(forged_directory, "records", genuine_name), mutation_units.record_text(RECORD_HEADER, foreign_judging))
     forged = run_command_capturing(command_import, [other, forged_directory])
-    selftest.check("导入一条行键对不上的记录：拒、列出来", forged[0] == 1 and f"mutation.{forged_key}" in forged[1] and "行键不是本机" in forged[1], forged[1])
-    selftest.check("导入一条判法版本对不上的记录：拒", "判法版本" in forged[1] and "拒了 2 条" in forged[1], forged[1])
-    # 九：只留最新的 3 个判法版本目录，别的名字不动
-    records_root = os.path.dirname(source_records)
-    for index in range(4):
-        stale = os.path.join(records_root, hashlib.sha256(f"stale {index}".encode()).hexdigest())
-        os.makedirs(stale)
-        os.utime(stale, (1000 + index, 1000 + index))
-    keep_me = os.path.join(records_root, "not-a-fingerprint")
-    os.makedirs(keep_me)
-    selftest.run(repository)
-    remaining = sorted(name for name in os.listdir(records_root) if FINGERPRINT_FORM.fullmatch(name))
-    selftest.check("只留最新的 3 个判法版本目录（这一趟的在里面），别的名字不动", len(remaining) == 3 and os.path.basename(source_records) in remaining
-                   and os.path.isdir(keep_me), f"{remaining}")
-    # 十：记录里不写主机名（判定库记录与解开的覆盖记录、快照）
+    selftest.check("导入一条键对不上的记录：拒、列出来", forged[0] == 1 and f"records/{forged_key}" in forged[1] and "键不是本机" in forged[1], forged[1])
+    selftest.check("导入一条判法单元指纹对不上的记录：拒", "判法单元指纹" in forged[1] and "拒了 2 条" in forged[1], forged[1])
+    # 九：多久没被任何一趟引用就删：40 天前摸过、这一趟没读到的记录删了；40 天前摸过、这一趟读到的（复用了）摸成此刻、留着；不按个数删
+    records_directory = os.path.join(source_library, "records")
+    stale = os.path.join(records_directory, hashlib.sha256(b"stale record").hexdigest())
+    selftest_write(stale, RECORD_HEADER + "kind=mutation\n")
+    long_ago = time.time() - 40 * 86400
+    os.utime(stale, (long_ago, long_ago))
+    current_keys = {line.split("\t")[1] for line in run_command_capturing(command_row_plan, [repository])[1].splitlines() if "\t" in line}
+    kept_name = sorted(name for name in os.listdir(records_directory) if name in current_keys)[0]
+    os.utime(os.path.join(records_directory, kept_name), (long_ago, long_ago))
+    collected = selftest.run(repository)
+    selftest.check("40 天里没被任何一趟引用的记录收尾删掉，这一趟复用的那一条摸成此刻、留着（不按个数、不按版本删）",
+                   collected[0] == 0 and not os.path.exists(stale) and os.path.exists(os.path.join(records_directory, kept_name))
+                   and os.stat(os.path.join(records_directory, kept_name)).st_mtime > long_ago + 86400, collected[2][-600:])
+    # 十：记录里不写主机名（判定库记录与解开的覆盖记录、组成清单）
     host_name = os.uname().nodename
-    record_texts = [open(os.path.join(source_records, name), encoding="utf-8").read() for name in os.listdir(source_records)
-                    if os.path.isfile(os.path.join(source_records, name))]
-    for directory_name in (COVERAGE_DIRECTORY_NAME, SNAPSHOT_DIRECTORY_NAME):
-        directory = os.path.join(source_records, directory_name)
-        record_texts += [json.dumps(Store.read_json(os.path.join(directory, name)), ensure_ascii=False) for name in os.listdir(directory)]
+    record_texts = []
+    for directory, _names, files in os.walk(source_library):
+        for name in files:
+            path = os.path.join(directory, name)
+            if name.endswith(".json.gz"):
+                with gzip.open(path, "rt", encoding="utf-8", errors="replace") as handle:
+                    record_texts.append(handle.read())
+            else:
+                record_texts.append(open(path, encoding="utf-8", errors="replace").read())
     selftest.check("记录里不写主机名", len(host_name) >= 3 and record_texts and not any(host_name in text for text in record_texts), host_name)
     # 十一：基线不绿（点名的测试读一个副本里没有的文件）：不算抓到、整道判红；弄坏开关 nobaseline 下误判成抓到
     outside = os.path.join(work, "outside")
@@ -3899,10 +4057,11 @@ def run_selftest_cells(selftest, work):
     not_run = selftest.run(not_run_root, GATE_MUTATION_NOT_RUN_RECORD=not_run_record)
     recorded_lines = open(not_run_record, encoding="utf-8").read().splitlines() if os.path.exists(not_run_record) else []
     success_lines = [line for line in not_run[1].splitlines() if line.startswith("  ✓ crates 变异表复跑")]
-    selftest.check("点名的测试打了 NOT_RUN：记本次未跑、逐条列出、计数里抓到 4 条没红 0 条、整道不判红、成功句不说全抓到、记录里一行",
+    selftest.check("点名的测试打了 NOT_RUN：记本次未跑、逐条列出、计数里抓到 4 条没红 0 条、整道不判红、成功句不说全抓到、成功句报本次未跑 1 条、记录里一行",
                    not_run[0] == 0 and "本次未跑：1 条" in not_run[1]
                    and f"{TABLE}:6 card-path-changed：本次未跑——点名的测试 gpu_parity 打了 NOT_RUN_NO_GPU_ADAPTER（样本：本机没有 GPU 适配器）" in not_run[1]
                    and "计数：抓到 4 条、没红 0 条" in not_run[1] and len(success_lines) == 1 and "抓到 4 条、本次未跑 1 条" in success_lines[0]
+                   and "本次未跑 1 条（现判的按栏" in success_lines[0]
                    and "各自红在点名的测试上" not in not_run[1] and len(recorded_lines) == 1 and "card-path-changed" in recorded_lines[0],
                    not_run[1] + "\n".join(recorded_lines))
     shown_runs = [line for line in mutation_invocations(not_run[3], not_run_pristine) if "-- --show-output gpu_parity\t" in line]
@@ -3917,8 +4076,233 @@ def run_selftest_cells(selftest, work):
                    and "这一道记本次未跑，不是通过" in only_not_run[1], only_not_run[1])
 
 
+def selftest_unit_key_cells(selftest, work):
+    """单元键几格（第二轮复查 controls 路第 5 节 crates 变异那一行：S34、S30、N33、N34、N45；另加被改坏的单元、点名测试的闭包、V5 那一类常量、
+    覆盖复用基线、拒算、plan、工具链、llvm 工具几格）：每格施加一处改动，看哪几行现判、栏对不对；弄坏开关各让点名的那一格判错。"""
+    repository = os.path.join(work, "units")
+    build_selftest_repository(repository, SELFTEST_UNIT_ROWS, source=SELFTEST_UNIT_SOURCE)
+    source = os.path.join(repository, "crates", "tiny", "src", "lib.rs")
+    table_path = os.path.join(repository, TABLE)
+    names = [row.split("\t")[0] for row in SELFTEST_UNIT_ROWS]
+
+    def fresh_and_reused(run):
+        how = per_row_how(run[1])
+        return sorted(name for name in how if how[name].startswith("现判")), sorted(name for name in how if how[name] == "复用"), how
+
+    first = selftest.run(repository)
+    coverage_directory = os.path.join(library_of(repository), "coverage")
+    coverage_files = sorted(os.listdir(coverage_directory)) if os.path.isdir(coverage_directory) else []
+    selftest.check("头一趟每条点名测试记一份覆盖、同一条测试的几行共用一份（5 行 4 条测试：两行点名 checks_root）",
+                   first[0] == 0 and len(coverage_files) == 4 and len(coverage_invocations(first[3])) == 8 and "行新加 5" in first[1]
+                   and "覆盖：这一趟记了 4 份" in first[1], f"覆盖记录 {coverage_files}；{first[1]}")
+    second = selftest.run(repository)
+    selftest.check("输入不变的第二趟：5 行都复用、cargo 一次都不起", second[0] == 0 and second[3] == [] and fresh_and_reused(second)[1] == sorted(names), second[1])
+    # plan：只读、逐行打、末行报总数
+    library_before = sorted(os.path.relpath(os.path.join(directory, name), library_of(repository))
+                            for directory, _names, files in os.walk(library_of(repository)) for name in files)
+    plan = run_command_capturing(command_plan, [repository])
+    library_after = sorted(os.path.relpath(os.path.join(directory, name), library_of(repository))
+                           for directory, _names, files in os.walk(library_of(repository)) for name in files)
+    selftest.check("plan：只读（库里一个文件都没多）、逐行打复用还是现判、末行报总数",
+                   plan[0] == 0 and library_after == library_before and plan[1].count("\t复用\t键相同\t") == 5
+                   and plan[1].splitlines()[-1].startswith("合计 5 行：复用 5 行、现判 0 行"), plan[1])
+    listed = run_command_capturing(command_list_items, [repository])
+    selftest.check("--list-items：逐行列可点名的变异，末行报键对不上 0 条、对得上 5 条、拒算 0 条",
+                   listed[0] == 0 and listed[1].count("\t第 ") == 5 and "键对不上 0 条（这一趟要现判）、键对得上 5 条（复用）、拒算 0 条" in listed[1], listed[1])
+    # S34：被改坏的函数 check_root 的别一行变了：原文落在它里面的两行（root-457、root-double）现判，栏是被改坏的单元变了；别的三行复用
+    replace_in_file(source, "base.max(OFFSET)", "base.max(OFFSET + 0)")
+    s34 = selftest.run(repository)
+    fresh, reused, how = fresh_and_reused(s34)
+    selftest.check("被改坏函数的别一行变了（S34）：原文在它里面的两行现判、栏是被改坏的单元变了，别的三行复用",
+                   s34[0] == 0 and fresh == ["root-457", "root-double"] and how.get("root-457") == "现判：被改坏的单元变了"
+                   and reused == ["helper-eight", "sum-sub", "taken-eleven"]
+                   and "root-457：被改坏的单元变了——被改坏的单元 crates/tiny/src/lib.rs::check_root 变了" in s34[2], f"{how}；{s34[1]}{s34[2][-600:]}")
+    # N45：同一个文件里加一个没人调的函数：一行都不现判
+    replace_in_file(source, "pub fn pad(", "pub fn unused_helper() -> u32 { 70 }\npub fn pad(")
+    n45 = selftest.run(repository)
+    selftest.check("同一个文件里加一个没人调的函数（N45）：一行都不现判、cargo 一次都不起", n45[0] == 0 and n45[3] == [] and fresh_and_reused(n45)[0] == [],
+                   n45[1] + "\n".join(n45[3]))
+    # N33：每条的限时 1800 → 3600：一行都不现判（限时不进行键）；弄坏开关 row-key-with-limits 下每一行都现判、这一格判错
+    n33 = selftest.run(repository, GATE_MUTATION_TIMEOUT="3600")
+    selftest.check("每条限时 1800 → 3600（N33）：一行都不现判", n33[0] == 0 and n33[3] == [] and fresh_and_reused(n33)[0] == [], n33[1] + "\n".join(n33[3]))
+    # N34：给一条变异改名：一行都不现判（变异名不进行键）
+    replace_in_file(table_path, "sum-sub\t", "sum-becomes-sub\t")
+    n34 = selftest.run(repository)
+    selftest.check("给一条变异改名（N34）：一行都不现判、改了名的那一行复用", n34[0] == 0 and n34[3] == [] and per_row_how(n34[1]).get("sum-becomes-sub") == "复用",
+                   n34[1])
+    # 改了点名测试调到、不是被改坏的那个函数（sums 调的 pad）：点名它的那一行现判，栏是点名测试的闭包变了；弄坏开关 test-closure-ignored 下复用、这一格判错
+    replace_in_file(source, "{ value + 0 }", "{ value + 0 + 0 }")
+    padded = selftest.run(repository)
+    fresh, reused, how = fresh_and_reused(padded)
+    selftest.check("改了点名测试调到、不是被改坏的函数：点名它的那一行现判（点名测试的闭包变了），别的复用",
+                   padded[0] == 0 and fresh == ["sum-becomes-sub"] and how.get("sum-becomes-sub") == "现判：点名测试的闭包变了" and len(reused) == 4, f"{how}；{padded[1]}")
+    # 改了被改坏、点名测试够不着的函数（helps 只调 add，helper 是被改坏的那个）：只现判那一行，栏是被改坏的单元变了；弄坏开关 mutated-unit-ignored 下复用、这一格判错
+    replace_in_file(source, "pub fn helper(value: u32) -> u32 { value + 7 }", "pub fn helper(value: u32) -> u32 { let _seven = 7; { value + 7 } }")
+    helper = selftest.run(repository)
+    fresh, reused, how = fresh_and_reused(helper)
+    selftest.check("改了被改坏、点名测试够不着的函数：只现判那一行（被改坏的单元变了）",
+                   helper[0] == 0 and fresh == ["helper-eight"] and how.get("helper-eight") == "现判：被改坏的单元变了" and len(reused) == 4, f"{how}；{helper[1]}")
+    # V5 那一类：改了被改坏函数用的常量 OFFSET（check_root 自己的指纹不变）：原文在 check_root 里的两行现判，栏是点名测试的闭包变了
+    replace_in_file(source, "OFFSET: u32 = 95", "OFFSET: u32 = 91")
+    constant = selftest.run(repository)
+    fresh, reused, how = fresh_and_reused(constant)
+    selftest.check("改了被改坏函数用的常量（V5 那一类）：原文在那个函数里的两行现判，别的复用，现判的原因点名那个常量",
+                   constant[0] == 0 and fresh == ["root-457", "root-double"] and how.get("root-457") == "现判：点名测试的闭包变了" and len(reused) == 3
+                   and "改了 crates/tiny/src/lib.rs::OFFSET（const）" in constant[2], f"{how}；{constant[1]}{constant[2][-600:]}")
+    # 覆盖复用基线：改了 branches 静态够得着、没执行到的 untaken：那一行现判（闭包变了），它的基线按覆盖复用、不跑基线；
+    # 弄坏开关 coveragenotrecorded 下没有覆盖记录、基线只按闭包比、要跑一批基线，这一格判错
+    replace_in_file(source, "{ value + 10 }", "{ value + 12 }")
+    untaken = selftest.run(repository)
+    fresh, _reused, how = fresh_and_reused(untaken)
+    selftest.check("改了点名测试够得着、没执行到的函数：那一行现判，基线按覆盖复用（只起那一条变异、不跑基线）",
+                   untaken[0] == 0 and fresh == ["taken-eleven"] and len(plain_invocations(untaken[3])) == 1 and "复用基线 ok 1 行" in untaken[2],
+                   f"{how}；{untaken[2][:400]}" + "\n".join(untaken[3]))
+    # 基线不按整树快照：加一个没人调的函数、同时改一行的替换文：只那一行现判、它的基线复用；弄坏开关 baseline-by-tree-snapshot 下基线现跑、这一格判错
+    replace_in_file(source, "pub fn pad(", "pub fn unused_too() -> u32 { 71 }\npub fn pad(")
+    replace_in_file(table_path, "{ left - right }", "{ left * right }")
+    snapshot = selftest.run(repository)
+    fresh, _reused, how = fresh_and_reused(snapshot)
+    selftest.check("加一个没人调的函数、同时改一行的替换文：只那一行现判、它的基线复用（不按整树快照）",
+                   snapshot[0] == 0 and fresh == ["sum-becomes-sub"] and how.get("sum-becomes-sub") == "现判：原文或替换文变了" and len(plain_invocations(snapshot[3])) == 1,
+                   f"{how}；" + "\n".join(snapshot[3]))
+    # 工具链变了：每一行都现判；弄坏开关 rowkeywithouttoolchain 下复用、这一格判错
+    toolchain = selftest.run(repository, FAKE_CARGO_VERSION="cargo 0.0.1 (crates-mutation-rows selftest：换了工具链)")
+    selftest.check("工具链变了：每一行都现判", toolchain[0] == 0 and set(per_row_how(toolchain[1]).values()) == {"现判：工具链或依赖变了"}, toolchain[1])
+    # 拒算：点名的测试是宏展开出来的、认不出单元：那一行每趟照跑、不复用，成功句报拒算 1 条，stderr 写为什么
+    refused_root = os.path.join(work, "refused")
+    build_selftest_repository(refused_root, SELFTEST_TABLE_ROWS[:1] + ["unknown-test\tcrates/tiny/src/lib.rs\tu32) -> u32 { value * 2 }\tu32) -> u32 { value * 5 }\t-p tiny --lib -- doubled\tdoubled"],
+                              "// TEST doubled NEEDS { value * 2 }\n")
+    refused_first = selftest.run(refused_root)
+    refused_second = selftest.run(refused_root)
+    selftest.check("点名的测试认不出单元：那一行拒算、每趟照跑，成功句报拒算 1 条，stderr 写为什么",
+                   refused_first[0] == 0 and refused_second[0] == 0 and per_row_how(refused_second[1]).get("unknown-test") == "拒算"
+                   and len(mutation_invocations(plain_invocations(refused_second[3]), source_hash(refused_root))) == 1
+                   and "现判 0 条、复用 1 条、拒算 1 条" in refused_second[1] and "拒算（照跑、不复用）" in refused_second[2],
+                   refused_second[1] + refused_second[2][-400:])
+    mismatched = selftest.run(repository, FAKE_LLVM_VERSION="0.0.0", GATE_MUTATION_START_OVER="1")
+    selftest.check("llvm 工具的 LLVM 版本与 rustc 对不上：判红、一条都不跑", mismatched[0] == 1 and mismatched[3] == []
+                   and "记覆盖要的 llvm 工具不对" in mismatched[1], mismatched[1] + mismatched[2])
+    empty_tools = os.path.join(work, "no-llvm-tools")
+    os.makedirs(empty_tools)
+    missing = selftest.run(repository, GATE_MUTATION_LLVM_TOOLS=empty_tools, GATE_MUTATION_START_OVER="1")
+    selftest.check("llvm 工具不在：判红、一条都不跑、出路写 rustup component add llvm-tools", missing[0] == 1 and missing[3] == []
+                   and "rustup component add llvm-tools" in missing[1], missing[1])
+    # S30：判结局的函数变了（判法的临时拷贝里改 verdict_of_run 的一处）：每一行都现判，栏是判法单元变了、原因里点名 verdict_of_run（放在最后：这一趟写的索引是拷贝那一份判法的）
+    copy, edited = judging_copy(work, "judging-s30")
+    replace_in_file(os.path.join(copy, "scripts", "mutation", "crates-mutation-rows.py"), "    tail = output_tail(output)\n", "    tail = output_tail(output[:])\n")
+    s30 = selftest.run(repository, judging_repository=copy)
+    fresh, _reused, how = fresh_and_reused(s30)
+    selftest.check("判结局的函数变了（S30）：每一行都现判，栏是判法单元变了、原因里点名 verdict_of_run",
+                   s30[0] == 0 and edited and len(fresh) == 5 and set(how.values()) == {"现判：判法单元变了"}
+                   and "改了 scripts/mutation/crates-mutation-rows.py::verdict_of_run" in s30[2], f"{how}；{s30[1][-800:]}{s30[2][-800:]}")
+
+
+def selftest_reuse_cells(selftest, work):
+    """复用三问（reuse-three-questions）与复用哨兵（reuse-sentinel）两格，写法在文件头「复用三问与复用哨兵」。"""
+    repository = os.path.join(work, "three-questions")
+    build_selftest_repository(repository, SELFTEST_UNIT_ROWS, source=SELFTEST_UNIT_SOURCE)
+    source = os.path.join(repository, "crates", "tiny", "src", "lib.rs")
+    sentinel_environment = {reuse_checks.SENTINEL_COUNT_VARIABLE: "1", reuse_checks.SENTINEL_SEED_VARIABLE: "5"}
+    forced_how = "现判：" + COLUMN_TITLES["sentinel"]
+
+    def states(run):
+        found = {}
+        for name, how in per_row_how(run[1]).items():
+            found[name] = (reuse_checks.FORCED if how == forced_how else reuse_checks.JUDGED if how.startswith("现判")
+                           else reuse_checks.REUSED if how == "复用" else how)
+        return found
+
+    runs = [selftest.run(repository, **sentinel_environment)]
+    runs.append(selftest.run(repository, **sentinel_environment))
+    replace_in_file(source, "pub fn pad(", "pub fn unused_in_three_questions() -> u32 { 72 }\npub fn pad(")
+    runs.append(selftest.run(repository, **sentinel_environment))
+    replace_in_file(source, "base.max(OFFSET)", "base.max(OFFSET + 0)")
+    runs.append(selftest.run(repository, **sentinel_environment))
+    passed, problems = reuse_checks.report_three_questions(SCRIPT_KEY, *[states(run) for run in runs], ["root-457", "root-double"])
+    selftest.check(reuse_checks.CELL_NAME, passed and all(run[0] == 0 for run in runs),
+                   f"四趟退 {[run[0] for run in runs]}；{'；'.join(problems)}；{runs[-1][2][-600:]}")
+    green = selftest.run(repository, **sentinel_environment)
+    skipped = selftest.run(repository, GATE_MUTATION_BREAK="reuse-lookup-skipped", **sentinel_environment)
+    forced = [name for name, how in per_row_how(green[1]).items() if how == forced_how]
+    selftest.check(reuse_checks.SENTINEL_CELL_NAME, green[0] == 0 and "复用哨兵（crates 变异表）：种子 5" in green[2] and len(forced) == 1
+                   and skipped[0] == 1 and "复用失灵：" in skipped[1],
+                   f"照常那一趟退 {green[0]}、强制现判 {forced}：{green[2][-400:]}；不读库那一趟退 {skipped[0]}：{skipped[1][-400:]}")
+
+
+def selftest_parallel_key_cell(selftest, work):
+    """算闭包的子进程数不同（就地算与 fork 4 个子进程），每一行的键逐字相同（并行之后重新证它与串行一致）；行数要够 PARALLEL_MINIMUM 才真起子进程。"""
+    count = mutation_units.PARALLEL_MINIMUM + 2
+    functions = "".join(f"pub fn step_{index}(value: u32) -> u32 {{ value + {index + 100} }}\n" for index in range(count))
+    tests = "".join(f"    #[test]\n    fn steps_{index}() {{ assert_eq!(super::step_{index}(1), {index + 101}); }}\n" for index in range(count))
+    source = "// 并行算闭包那一格的样本 crate\n" + functions + "\n#[cfg(test)]\nmod tests {\n" + tests + "}\n"
+    rows = [f"step-{index}\tcrates/tiny/src/lib.rs\t{{ value + {index + 100} }}\t{{ value + {index + 200} }}\t-p tiny --lib -- steps_{index}\tsteps_{index}"
+            for index in range(count)]
+    repository = os.path.join(work, "parallel-keys")
+    build_selftest_repository(repository, rows, source=source)
+    saved = os.environ.get("GATE_MUTATION_KEY_WORKERS")
+    outputs = {}
+    try:
+        for workers in ("1", "4"):
+            os.environ["GATE_MUTATION_KEY_WORKERS"] = workers
+            outputs[workers] = run_command_capturing(command_row_plan, [repository])
+    finally:
+        if saved is None:
+            os.environ.pop("GATE_MUTATION_KEY_WORKERS", None)
+        else:
+            os.environ["GATE_MUTATION_KEY_WORKERS"] = saved
+    keys = [line.split("\t")[1] for line in outputs["4"][1].splitlines() if "\t" in line]
+    selftest.check(f"算闭包的子进程数不同（就地算与 4 个子进程）：{count} 行的键逐字相同、没有一行拒算",
+                   outputs["1"][0] == 0 and outputs["4"] == outputs["1"] and len(keys) == count and "-" not in keys,
+                   f"1 个：{outputs['1'][1][:400]}；4 个：{outputs['4'][1][:400]}")
+
+
+def judging_copy(work, name):
+    """判法的一份临时拷贝（判法单元闭包碰到的那几份文件，照原路径放），给判法单元那几格改着看指纹变不变：(拷贝的根, 拷没拷成)。"""
+    copy, source = os.path.join(work, name), JUDGING_ROOT[0]
+    try:
+        _key, references = judging_units({}, source)
+    except (JudgingUnitsRefused, OSError):
+        return copy, False
+    for path in sorted({reference.file for reference in references} | {".claude/scripts/project_preflight.py"}):
+        if os.path.isfile(os.path.join(source, path)):
+            os.makedirs(os.path.dirname(os.path.join(copy, path)), exist_ok=True)
+            shutil.copyfile(os.path.join(source, path), os.path.join(copy, path))
+    return copy, True
+
+
+def selftest_judging_unit_cells(selftest, work):
+    """判法单元指纹（文件头「判法单元」）：判法的拷贝上算出的与本仓的相同；只改判法脚本的注释不变（弄坏开关 judge-units-whole-file 下变、这一格判错）；
+    改 libtest 结果行解析的一处就变；改判法单元闭包外的函数（派活的 run_pool）不变。"""
+    environment = dict(selftest.base_environment)
+    copy, copied = judging_copy(work, "judging-cells")
+    try:
+        real_key, real_references = judging_units(environment)
+        copied_key, _references = judging_units(environment, copy)
+    except (JudgingUnitsRefused, OSError) as error:
+        selftest.check("判法单元算得出（闭包里没有拒算）", False, str(error))
+        return
+    selftest.check("判法单元算得出、在判法的临时拷贝上算出同一个指纹（键里不带路径）", copied and copied_key == real_key and len(real_references) > 10,
+                   f"本仓 {real_key[:16]}…、拷贝 {copied_key[:16]}…，{len(real_references)} 个单元")
+    module = os.path.join(copy, "scripts", "mutation", "crates-mutation-rows.py")
+    replace_in_file(module, "    tail = output_tail(output)\n", "    # 判法单元自证加的一行注释\n    tail = output_tail(output)\n")
+    commented_key, _references = judging_units(environment, copy)
+    selftest.check("只改判法脚本的注释：判法单元指纹不变", commented_key == real_key, f"{real_key[:16]}… → {commented_key[:16]}…")
+    replace_in_file(module, "def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, stop_after, coverage_planner):\n",
+                    "def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, stop_after, coverage_planner, _unused=None):\n")
+    scheduling_key, _references = judging_units(environment, copy)
+    selftest.check("改判法单元闭包外的函数（派活的 run_pool）：判法单元指纹不变", scheduling_key == commented_key or break_is(environment, "judge-units-whole-file"),
+                   f"{commented_key[:16]}… → {scheduling_key[:16]}…")
+    replace_in_file(os.path.join(copy, "scripts", "gate", "lib_libtest_result_lines.py"),
+                    "        if parsed.full_name == expected or parsed.full_name.endswith(\"::\" + expected):\n",
+                    "        if expected == parsed.full_name or parsed.full_name.endswith(\"::\" + expected):\n")
+    parsing_key, _references = judging_units(environment, copy)
+    selftest.check("改 libtest 结果行解析函数的一处：判法单元指纹变", parsing_key != scheduling_key, f"{scheduling_key[:16]}… → {parsing_key[:16]}…")
+    shown = run_command_capturing(command_judging_units, [copy])
+    selftest.check("judging-units 子命令打「<指纹> <单元数>」", shown[0] == 0 and re.fullmatch(r"[0-9a-f]{64} \d+\n", shown[1]) is not None, shown[1])
+
+
 def build_coverage_repository(directory):
-    """覆盖那几格的样本仓：crates/tiny 用 SELFTEST_COVERAGE_SOURCE，另有一个 -p tiny 编不进去的包 crates/other。"""
+    """插桩编译那一格的样本仓：crates/tiny 用 SELFTEST_COVERAGE_SOURCE，另有一个 -p tiny 编不进去的包 crates/other。"""
     build_selftest_repository(directory, SELFTEST_COVERAGE_ROWS, source=SELFTEST_COVERAGE_SOURCE)
     selftest_write(os.path.join(directory, "crates", "other", "Cargo.toml"), '[package]\nname = "other"\nversion = "0.1.0"\n')
     selftest_write(os.path.join(directory, "crates", "other", "src", "lib.rs"), "pub fn other() -> u32 { 1 }\n")
@@ -3947,75 +4331,66 @@ def selftest_build_profile_cell(selftest, work):
                    f"退 {run[0]}；插桩编译 {len(builds)} 次；假 cargo 写了 {len(written)} 份：{written}；落对的 {len(outside)} 份")
 
 
-def selftest_coverage_cells(selftest, work):
-    """按覆盖复用的几格（文件头「复用判据」）：每一条判据一个改法，看哪几行现跑、栏对不对；弄坏开关各让一格判错。"""
-    repository = os.path.join(work, "coverage")
-    build_coverage_repository(repository)
-    source = os.path.join(repository, "crates", "tiny", "src", "lib.rs")
-    first = selftest.run(repository)
-    records_directory = run_command_capturing(command_judge_version, [repository], want_directory=True)[1].strip()
-    coverage_files = sorted(os.listdir(os.path.join(records_directory, COVERAGE_DIRECTORY_NAME))) if os.path.isdir(records_directory) else []
-    pointed = {read_record(os.path.join(records_directory, name)).get("coverage") for name in os.listdir(records_directory) if name.startswith("mutation.")}
-    selftest.check("头一趟每组记一份覆盖、同组的行共用一份（4 行 3 组：两行同点 adds）",
-                   first[0] == 0 and len(coverage_files) == 3 and len(coverage_invocations(first[3])) == 6 and len(pointed - {""}) == 3 and "" not in pointed
-                   and "没有覆盖记录 4" in first[1] and "覆盖：这一趟记了 3 组" in first[1],
-                   f"覆盖记录 {coverage_files}；记录指到 {pointed}；{first[1]}")
-    plan_before = sorted(os.listdir(records_directory))
-    replace_in_file(source, "{ value + 1 }", "{ value + 2 }")
-    plan = run_command_capturing(command_plan, [repository])
-    selftest.check("plan：只读（记录目录一个文件都没多）、逐行打复用还是现跑、末行报总数",
-                   plan[0] == 0 and sorted(os.listdir(records_directory)) == plan_before and plan[1].count("\t复用\t按覆盖复用\t") == 4
-                   and plan[1].splitlines()[-1].startswith("合计 4 行：按覆盖复用 4 行（其中源码与上次一字未动 0 行）、现跑 0 行"), plan[1])
-    unexecuted = selftest.run(repository)
-    selftest.check("改了没被任何用例执行的函数：全部按覆盖复用、cargo 一次都不起", unexecuted[0] == 0 and unexecuted[3] == []
-                   and set(per_row_how(unexecuted[1]).values()) == {"按覆盖复用"}, unexecuted[1] + "\n".join(unexecuted[3]))
-    replace_in_file(source, "pub fn helper(value: u32) -> u32 { value + 7 }", "pub fn helper(value: u32) -> u32 { let _seven = 7; { value + 7 } }")
-    mutated = selftest.run(repository)
-    how = per_row_how(mutated[1])
-    selftest.check("改了被变异、没被执行的函数：只现跑那一行（被变异的函数变了）",
-                   mutated[0] == 0 and how.get("helper-becomes-eight") == "现判：被变异的函数变了"
-                   and all(how.get(name) == "按覆盖复用" for name in ("add-becomes-mul", "add-becomes-sub", "double-becomes-triple"))
-                   and len(plain_invocations(mutated[3])) == 2, f"{how}；{mutated[1]}" + "\n".join(mutated[3]))
-    replace_in_file(source, "pub fn add(left: u32, right: u32) -> u32 { left + right }", "pub fn add(left: u32, right: u32) -> u32 { let _sum = 0; { left + right } }")
-    executed = selftest.run(repository)
-    how = per_row_how(executed[1])
-    selftest.check("改了被执行、没被变异的函数：只现跑执行过它的那几行（helps 执行过的函数变了，两行 adds 被变异的函数变了）",
-                   executed[0] == 0 and how.get("helper-becomes-eight") == "现判：执行过的函数变了"
-                   and how.get("add-becomes-mul") == how.get("add-becomes-sub") == "现判：被变异的函数变了" and how.get("double-becomes-triple") == "按覆盖复用",
-                   f"{how}；{executed[1]}")
-    replace_in_file(os.path.join(repository, "crates", "other", "src", "lib.rs"), "{ 1 }", "{ 2 }")
-    unrelated = selftest.run(repository)
-    selftest.check("改了 -p tiny 编不进去的另一个包：全部按覆盖复用", unrelated[0] == 0 and unrelated[3] == []
-                   and set(per_row_how(unrelated[1]).values()) == {"按覆盖复用"}, unrelated[1])
-    replace_in_file(source, "pub struct Pair { pub left: u32 }", "pub struct Pair { pub left: u64 }")
-    outside = selftest.run(repository)
-    selftest.check("改了函数外的类型定义：编进它的用例点名的行全部现跑（函数外有改动）", outside[0] == 0
-                   and set(per_row_how(outside[1]).values()) == {"现判：函数外有改动"} and "函数外有改动 4" in outside[1], outside[1])
-    selftest_write(os.path.join(repository, "crates", "tiny", "tests", "extra.rs"), "#[test]\nfn extra() {}\n")
-    new_target = selftest.run(repository)
-    selftest.check("新加一个用到的源文件（tests/ 下 cargo 自动发现的测试目标）：全部现跑（函数外有改动）", new_target[0] == 0
-                   and set(per_row_how(new_target[1]).values()) == {"现判：函数外有改动"}, new_target[1])
-    toolchain = selftest.run(repository, FAKE_CARGO_VERSION="cargo 0.0.1 (crates-mutation-rows selftest：换了工具链)")
-    selftest.check("工具链变了：每一行都按行新加或改了现跑", toolchain[0] == 0
-                   and set(per_row_how(toolchain[1]).values()) == {"现判：行新加或改了"}, toolchain[1])
-    mismatched = selftest.run(repository, FAKE_LLVM_VERSION="0.0.0", GATE_MUTATION_START_OVER="1")
-    selftest.check("llvm 工具的 LLVM 版本与 rustc 对不上：判红、一条都不跑", mismatched[0] == 1 and mismatched[3] == []
-                   and "记覆盖要的 llvm 工具不对" in mismatched[1], mismatched[1] + mismatched[2])
-    empty_tools = os.path.join(work, "no-llvm-tools")
-    os.makedirs(empty_tools)
-    missing = selftest.run(repository, GATE_MUTATION_LLVM_TOOLS=empty_tools, GATE_MUTATION_START_OVER="1")
-    selftest.check("llvm 工具不在：判红、一条都不跑、出路写 rustup component add llvm-tools", missing[0] == 1 and missing[3] == []
-                   and "rustup component add llvm-tools" in missing[1], missing[1])
-    # 导入照复用判据核：另一棵仓与这一棵只差被执行的 add，helps 与两行 adds 判成现跑、拒；double 那一行收
-    source_records = records_directory
-    other = os.path.join(work, "coverage-other")
-    shutil.copytree(repository, other, ignore=shutil.ignore_patterns(".git"))
-    subprocess.run(["git", "init", "-q", other], check=True)
-    replace_in_file(os.path.join(other, "crates", "tiny", "src", "lib.rs"), "{ let _sum = 0; { left + right } }", "{ let _sum = 1; { left + right } }")
-    imported = run_command_capturing(command_import, [other, source_records])
-    selftest.check("导入改了执行过的函数的记录：拒（照本机此刻的源码判成现跑），没改到的那一行收",
-                   imported[0] == 1 and imported[1].count("照本机此刻的源码判成现跑") == 3 and "收了" in imported[1]
-                   and "执行过的函数变了" in imported[1] and "被变异的函数变了" in imported[1], imported[1])
+SELFTEST_ANCHOR_MISSING_ROW = "anchor-missing\tcrates/tiny/src/lib.rs\t{ left / right }\t{ left }\t-p tiny --lib -- adds\tadds"
+# 改的是数据文件（不是 .rs）而原文命中 0 次的一行：单元键不核锚点（数据文件按整份字节算），不先剔掉就算得出键、会被双机分片的驱动分给第二台
+SELFTEST_DATA_FILE_ANCHOR_ROW = "data-file-anchor-missing\tfixture-data/answer.txt\t43\t44\t-p tiny --lib -- adds\tadds"
+# 牵连面那一格：单元键样本 crate 的 5 行再加一行改 OFFSET（check_root 用的常量），点名 checks_root：checks_root 的闭包进了三行
+SELFTEST_IMPACT_ROW = "offset-plus-one\tcrates/tiny/src/lib.rs\tpub const OFFSET: u32 = 95;\tpub const OFFSET: u32 = 96;\t-p tiny --lib -- checks_root\tchecks_root"
+SELFTEST_IMPACT_TEST = "// TEST checks_root NEEDS OFFSET: u32 = 95 RUNS checks_root,check_root\n"
+# 照闭包手数：6 行的闭包都有 mod tests 那个单元；checks_root 的闭包（tests::checks_root、check_root、OFFSET）进了三行；
+# 计数 1 的按名字排、add 最前（helps 的闭包里有它，helper 是那一行被改坏的单元）
+SELFTEST_IMPACT_EXPECTED = ("牵连最大的函数单元：crates/tiny/src/lib.rs::tests 进了 6 行的闭包（前 5：crates/tiny/src/lib.rs::tests 6、crates/tiny/src/lib.rs::OFFSET 3、"
+                            "crates/tiny/src/lib.rs::check_root 3、crates/tiny/src/lib.rs::tests::checks_root 3、crates/tiny/src/lib.rs::add 1）；一次改动最坏牵连 6 行"
+                            "（算了 6 行的闭包；拒算与锚点失效的 0 行没有闭包、没算进）")
+
+
+def selftest_anchor_and_impact_cells(selftest, work):
+    """锚点失效按行判（文件头「锚点失效」）与牵连面（文件头「牵连面」）。"""
+    # 锚点失效按行判：第 6 行原文命中 0 次，记锚点失效、整道判红；别的 4 行照跑、照入库；第二趟那 4 行复用、锚点失效那一行照旧红、不入库
+    anchor_root = os.path.join(work, "anchor-per-row")
+    build_selftest_repository(anchor_root, SELFTEST_TABLE_ROWS + [SELFTEST_ANCHOR_MISSING_ROW])
+    anchor_pristine = source_hash(anchor_root)
+    anchored = selftest.run(anchor_root)
+    records_directory = os.path.join(library_of(anchor_root), "records")
+    records_after_first = sorted(os.listdir(records_directory)) if os.path.isdir(records_directory) else []
+    anchored_again = selftest.run(anchor_root)
+    anchor_line = f"{TABLE}:6 anchor-missing：锚点失效——原文在 crates/tiny/src/lib.rs 里命中 0 次，要恰好 1 次（这一行没跑、不入库、不复用）"
+    selftest.check("锚点失效按行判：那一行记锚点失效、别的行照跑照入库（计数报锚点失效 1 行、整道判红；第二趟那 4 行复用、锚点失效那一行照旧红）",
+                   anchored[0] == 1 and len(mutation_invocations(plain_invocations(anchored[3]), anchor_pristine)) == 4
+                   and "计数：抓到 4 条、没红 0 条" in anchored[1] and "scope 起不来没跑 0 条、锚点失效 1 行（共 5 条）" in anchored[1]
+                   and anchor_line in anchored[1] and "有几行锚点失效（锚点失效 1 行" in anchored[1] and len(records_after_first) == 4
+                   and anchored_again[0] == 1 and anchored_again[3] == [] and "复用 4 条" in anchored_again[1] and anchor_line in anchored_again[1],
+                   anchored[1] + anchored[2][-800:] + "\n".join(anchored[3]) + f"\n记录 {len(records_after_first)} 条\n" + anchored_again[1])
+    # row-plan、plan、--list-items 把锚点失效的行单列：第 6 行（.rs）与第 7 行（数据文件，单元键不核锚点）都写「-」键与 anchor-broken，不算进现判
+    listed_root = os.path.join(work, "anchor-listed")
+    build_selftest_repository(listed_root, SELFTEST_TABLE_ROWS + [SELFTEST_ANCHOR_MISSING_ROW, SELFTEST_DATA_FILE_ANCHOR_ROW])
+    row_plan = run_command_capturing(command_row_plan, [listed_root])
+    plan_lines = {line.split("\t")[0]: line.split("\t") for line in row_plan[1].splitlines() if "\t" in line}
+    plan = run_command_capturing(command_plan, [listed_root])
+    listed = run_command_capturing(command_list_items, [listed_root])
+    selftest.check("row-plan、plan、--list-items 把锚点失效的行单列（数据文件那一行也不算键）",
+                   row_plan[0] == 0 and plan_lines.get("6") == ["6", "-", "0", "-", "anchor-broken"] and plan_lines.get("7") == ["7", "-", "0", "-", "anchor-broken"]
+                   and all(plan_lines.get(str(number), ["", "-"])[1] != "-" and plan_lines[str(number)][4] == "-" for number in range(2, 6))
+                   and plan[0] == 0 and "6\tanchor-missing\t锚点失效\t锚点失效\t原文在 crates/tiny/src/lib.rs 里命中 0 次" in plan[1]
+                   and plan[1].splitlines()[-1].startswith("合计 6 行：") and plan[1].splitlines()[-1].endswith("拒算 0 行、锚点失效 2 行")
+                   and listed[0] == 0 and listed[1].count("；锚点失效：") == 2
+                   and "锚点失效 2 行（不跑、整道判红：第 6 行 anchor-missing、第 7 行 data-file-anchor-missing）" in listed[1],
+                   row_plan[1] + plan[1] + listed[1])
+    # 牵连面：单元键样本 crate 上 6 行，checks_root 点名三行（root-457、root-double、offset-plus-one），它的闭包（tests::checks_root、check_root、OFFSET）各进 3 行；
+    # 弄坏开关 impact-row-dropped 少算头一行（root-457），数就对不上
+    impact_root = os.path.join(work, "impact")
+    build_selftest_repository(impact_root, SELFTEST_UNIT_ROWS + [SELFTEST_IMPACT_ROW], SELFTEST_IMPACT_TEST, source=SELFTEST_UNIT_SOURCE)
+    impact_listed = run_command_capturing(command_list_items, [impact_root])
+    impact_lines = [line for line in impact_listed[1].splitlines() if "牵连最大的函数单元：" in line]
+    impact_run = selftest.run(impact_root)
+    run_impact_lines = [line for line in impact_run[1].splitlines() if "牵连最大的函数单元：" in line]
+    selftest.check("牵连面：样本 crate 上牵连最大的单元与行数（--list-items 末了与成功句之后各一行，数一样）",
+                   len(impact_lines) == 1 and impact_lines[0] == "  · " + SELFTEST_IMPACT_EXPECTED
+                   and impact_run[0] == 0 and len(run_impact_lines) == 1 and run_impact_lines[0] == "  " + SELFTEST_IMPACT_EXPECTED
+                   and impact_run[1].splitlines()[-1] == run_impact_lines[0] and impact_run[1].splitlines()[-2].startswith("  ✓ crates 变异表复跑：6 条"),
+                   impact_listed[1] + impact_run[1])
+
+
 def run_command_capturing(command, arguments, **keywords):
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout):
@@ -4028,11 +4403,11 @@ def main(arguments):
         return run_selftest()
     if arguments[:1] == ["--item"]:
         return command_item(arguments)
-    commands = {"static-check": command_static_check, "judge-version": command_judge_version,
-                "records-directory": lambda rest: command_judge_version(rest, want_directory=True), "import": command_import,
-                "row-plan": command_row_plan, "plan": command_plan, "llvm-tools": command_llvm_tools, "--list-items": command_list_items}
+    commands = {"static-check": command_static_check, "judging-units": command_judging_units, "toolchain": command_toolchain,
+                "library-directory": command_library_directory, "import": command_import, "row-plan": command_row_plan, "plan": command_plan,
+                "llvm-tools": command_llvm_tools, "--list-items": command_list_items}
     if not arguments or arguments[0] not in commands:
-        print("  ✗ 用法：crates-mutation-rows.py {static-check|judge-version|records-directory|import|row-plan|plan|llvm-tools|--list-items|--item} … 或 --selftest",
+        print("  ✗ 用法：crates-mutation-rows.py {static-check|judging-units|toolchain|library-directory|import|row-plan|plan|llvm-tools|--list-items|--item} … 或 --selftest",
               file=sys.stderr)
         print("     → 怎么办：各子命令的参数见文件头；整张表的复跑只经门禁 checker-tier-crates-mutation-replay.sh（bash .claude/gate.d/checker-tier-crates-mutation-replay.sh）", file=sys.stderr)
         return 2

@@ -1,7 +1,0 @@
-        .chain(
-            ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad
-                .iter()
-                .map(|(ring_slot, oldest_txg_it_can_have_held)| {
-                    (*ring_slot, *oldest_txg_it_can_have_held)
-                }),
-        )

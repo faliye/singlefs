@@ -1,0 +1,24 @@
+
+running 1 test
+test pointer::tests::the_all_zero_empty_root_is_written_although_both_location_entries_name_device_zero ... FAILED
+
+failures:
+
+---- pointer::tests::the_all_zero_empty_root_is_written_although_both_location_entries_name_device_zero stdout ----
+
+thread 'pointer::tests::the_all_zero_empty_root_is_written_although_both_location_entries_name_device_zero' (2667565) panicked at crates/singlefs-core/src/pointer.rs:325:9:
+位置条目按设备身份严格升序（I-2.5），整条全零的空指针（empty_root）豁免：盘上读来、要照抄写回的指针在 recovery::rebuild_version 判过
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    pointer::tests::the_all_zero_empty_root_is_written_although_both_location_entries_name_device_zero
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 268 filtered out; finished in 0.00s
+
+
+--- stderr ---
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s2/tree/crates/singlefs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.51s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/target/debug/deps/singlefs_core-5c6a767bd9164a51)
+error: test failed, to rerun pass `-p singlefs-core --lib`

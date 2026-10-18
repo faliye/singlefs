@@ -1,5 +1,6 @@
 // 实验装置没给线程数时的缺省（用户 2026-10-12 定：所有的默认都跑 31 线程，可以输入参数调整，不输入就是登记的默认）。
-// 每个用到它的装置在文件里 `include!("heavy_threads_default/threads.rs");`，再把登记文件的原文传进来：
+// 每个用到它的装置在文件里 `include!("heavy_threads_default/threads.rs");`（E178 写成 `#[path = "heavy_threads_default/threads.rs"] mod heavy_threads_default;`
+// 再 `use` 它：单元闭包的键不收条目级 `include!`），再把登记文件的原文传进来：
 // `default_heavy_threads(include_str!("../../.claude/heavy-thread-default"))`（include_str 的路径从调用它的那个文件算，所以由装置自己写）。
 // 规矩与 scripts/hosts/heavy_threads.py、scripts/hosts/heavy-threads.sh 相同：SINGLEFS_THREAD_CAP 是正整数取它（scripts/hosts/capped.sh 设），
 // 否则取登记文件第一条非注释行的头一个词。
@@ -16,7 +17,8 @@ fn first_registered_threads(registry_text: &str) -> Option<usize> {
 }
 
 /// 没给线程数时用几个线程：`SINGLEFS_THREAD_CAP` 是正整数取它，否则登记文件的头一条数。登记文件读不出数就停（不悄悄退回 1）。
-fn default_heavy_threads(registry_text: &str) -> usize {
+/// `pub(crate)`：E178 装置把这份文件当 `#[path] mod` 引进来再 `use` 它；照旧 `include!` 它的装置里，bin 根上的 `pub(crate)` 与私有同义。
+pub(crate) fn default_heavy_threads(registry_text: &str) -> usize {
     std::env::var("SINGLEFS_THREAD_CAP")
         .ok()
         .and_then(|text| text.parse::<usize>().ok())

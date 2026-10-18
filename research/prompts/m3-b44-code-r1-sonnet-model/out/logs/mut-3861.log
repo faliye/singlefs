@@ -1,0 +1,37 @@
+
+running 3 tests
+test container_tree::tests::opening_a_container_after_one_numbered_at_the_top_of_its_range_returns_an_error ... ok
+test recovery::tree_kind_key_width_tests::deleted_inodes_tombstone_and_lineage_trees_have_eight_byte_keys_and_logged_operations_none ... FAILED
+test mounted_read::tests::opening_a_file_whose_upper_segment_stops_at_an_internal_node_counts_no_leaf ... ok
+
+failures:
+
+---- recovery::tree_kind_key_width_tests::deleted_inodes_tombstone_and_lineage_trees_have_eight_byte_keys_and_logged_operations_none stdout ----
+
+thread 'recovery::tree_kind_key_width_tests::deleted_inodes_tombstone_and_lineage_trees_have_eight_byte_keys_and_logged_operations_none' (2728363) panicked at crates/singlefs-core/src/recovery.rs:6354:9:
+assertion `left == right` failed
+  left: Some(16)
+ right: Some(8)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    recovery::tree_kind_key_width_tests::deleted_inodes_tombstone_and_lineage_trees_have_eight_byte_keys_and_logged_operations_none
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 266 filtered out; finished in 0.00s
+
+
+--- stderr ---
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s4/tree/crates/singlefs-core)
+warning: unused import: `INODE_KEY_WIDTH_IN_BYTES`
+  --> crates/singlefs-core/src/recovery.rs:56:56
+   |
+56 |     InodeLeafContainer, InodeLeafContainerIndexInTree, INODE_KEY_WIDTH_IN_BYTES,
+   |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-core` (lib test) generated 1 warning (run `cargo fix --lib -p singlefs-core --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.22s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/target/debug/deps/singlefs_core-5c6a767bd9164a51)
+error: test failed, to rerun pass `-p singlefs-core --lib`

@@ -50,10 +50,13 @@ const PACKED_RECORDS_OFFSET: u64 = 136;
 const INODE_RECORD_BYTES: u64 = 140;
 const TOMBSTONE_RECORD_BYTES: u64 = 40;
 /// 一片 inode 叶容器装 233 条（`crates/singlefs-format/src/lib.rs:110`）。
-const INODE_LEAF_RECORDS: u64 = (PACKED_CONTAINER_BYTES - PACKED_RECORDS_OFFSET) / INODE_RECORD_BYTES;
+const INODE_LEAF_RECORDS: u64 = 233;
 /// 一片墓碑容器装 815 条（`crates/singlefs-format/src/lib.rs:116`；登记 K1）。
-const TOMBSTONE_CONTAINER_RECORDS: u64 =
-    (PACKED_CONTAINER_BYTES - PACKED_RECORDS_OFFSET) / TOMBSTONE_RECORD_BYTES;
+const TOMBSTONE_CONTAINER_RECORDS: u64 = 815;
+
+// 整数字面量给门禁 format-constants 读；推导式在编译期核，两处对不上编不过
+const _: () = assert!(INODE_LEAF_RECORDS == (PACKED_CONTAINER_BYTES - PACKED_RECORDS_OFFSET) / INODE_RECORD_BYTES);
+const _: () = assert!(TOMBSTONE_CONTAINER_RECORDS == (PACKED_CONTAINER_BYTES - PACKED_RECORDS_OFFSET) / TOMBSTONE_RECORD_BYTES);
 /// 码 2 节点 16 KiB；头 = 86 + 2 × key 宽 + 预留 29（`crates/singlefs-core/src/unit.rs:129-152`）。
 const NODE_BYTES: u64 = 16_384;
 const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 86;
@@ -941,9 +944,10 @@ fn root_ring_slot_of(txg: u64) -> (u64, u64) {
 struct RootRingTable {
     latest_recorded_txg: u64,
     occupants: BTreeMap<(u64, u64), RootRingOccupant>,
-    /// F_生效：整段历史不抬 F，新池是 0（W7）。
-    effective_floor: u64,
 }
+
+/// F_生效：整段历史不抬 F，新池是 0（W7）；是模型的前提，不是读数。
+const EFFECTIVE_FLOOR_OF_THE_WHOLE_HISTORY: u64 = 0;
 
 impl RootRingTable {
     /// mkfs 那个进程：三个区的槽 0 各一条 txg 0（M3）。
@@ -953,7 +957,6 @@ impl RootRingTable {
             occupants: (0..ROOT_RING_REGIONS)
                 .map(|region| ((region, 0), RootRingOccupant::ValidRoot(0)))
                 .collect(),
-            effective_floor: 0,
         }
     }
 
@@ -972,7 +975,6 @@ impl RootRingTable {
         Self {
             latest_recorded_txg,
             occupants,
-            effective_floor: 0,
         }
     }
 
@@ -982,8 +984,8 @@ impl RootRingTable {
             .values()
             .map(|occupant| occupant.txg())
             .min()
-            .unwrap_or(self.effective_floor);
-        self.effective_floor.max(oldest)
+            .unwrap_or(EFFECTIVE_FLOOR_OF_THE_WHOLE_HISTORY);
+        EFFECTIVE_FLOOR_OF_THE_WHOLE_HISTORY.max(oldest)
     }
 
     /// 记一条这个进程写的根，交回此刻的回收门槛 max(F_生效, 环里最旧)。
@@ -6160,8 +6162,18 @@ mod tests {
     }
 }
 
+/// 准入用的仓根：环境变量 SINGLEFS_REPOSITORY_ROOT，没设取当前目录（replay.sh 与实验页的命令都在仓根起）；不取「清单目录/../..」（单元键把它当运行期路径拒算）。
 fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+    let root = std::env::var_os("SINGLEFS_REPOSITORY_ROOT")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_default();
+    if !root.join(".claude/singlefs-ai-sop/scripts/preflight.py").is_file() {
+        eprintln!("  ✗ {} 不是仓根（下面没有 .claude/singlefs-ai-sop/scripts/preflight.py），判不了准入", root.display());
+        eprintln!("  → 怎么办：在仓根起这个装置，或设 SINGLEFS_REPOSITORY_ROOT=<仓根>");
+        std::process::exit(78);
+    }
+    root
 }
 
 fn preflight() {

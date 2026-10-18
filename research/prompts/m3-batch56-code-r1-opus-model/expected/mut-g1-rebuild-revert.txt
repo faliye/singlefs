@@ -1,5 +1,0 @@
-command args=-p singlefs-harness --test corrupt_on_disk_content_is_refused_instead_of_panicking rc=101
-failures:
-failures:
-    an_accounting_step_row_whose_generation_is_after_the_root_is_refused_for_its_generation_by_the_writable_mount
-test result: FAILED. 34 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 

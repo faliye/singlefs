@@ -1,0 +1,10 @@
+src/lib.rs	-	none
+tests/setting.rs	test_t	ok
+tests/setting.rs	test_u	ok
+tests/setting.rs	test_v	ok
+tests/states.rs	f1_first	ok
+tests/states.rs	f1_middle	ok
+tests/states.rs	f1_last	ok
+tests/history.rs	h2_test	ok
+tests/history.rs	h3_test	ok
+tests/plain_stream.rs	plain_stream_full	ignored

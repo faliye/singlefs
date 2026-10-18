@@ -1,6 +1,0 @@
-command args=-p opus-probe-b56 --test k2_knob_bad_images rc=0
-OPUS_K2K trees tombstone=[(1, 1), (2, 1), (3, 1)] lineage=[(1, 1), (2, 1)] retirement=[(1, 1), (2, 1)] leaves=[233, 2]
-OPUS_K2K judged_with=knob1 I-9.22=Holds I-9.37=Holds violations=[]
-OPUS_K2K judged_with=knob2 I-9.22=Holds I-9.37=Holds violations=[]
-OPUS_K2K judged_with=knob3 I-9.22=Holds I-9.37=Holds violations=[]
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 

@@ -1,6 +1,0 @@
-command=1 args=--release -p singlefs-core --lib filter=inode_tree:: rc=101
-test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 223 filtered out
-test inode_tree::tests::deleting_from_the_left_of_a_pair_borrows_until_the_pair_fits_in_one_and_then_absorbs ... FAILED
-command=2 args=--release -p singlefs-harness --test inode_leaf_merge_and_borrow_against_an_independent_reference filter= rc=101
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-test every_publish_of_a_random_history_leaves_the_leaf_shape_and_the_retired_leaves_of_the_independent_reference ... FAILED

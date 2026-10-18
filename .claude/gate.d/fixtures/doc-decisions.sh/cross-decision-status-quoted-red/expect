@@ -1,0 +1,5 @@
+exit=1
+want=.claude/kb/decisions/2504-引文样本引用方.md:3 说 D2503 未定（隔着名词短语，在「」引文里而旁边（同一句或下一句）没有现状）
+want=.claude/kb/decisions/2504-引文样本引用方.md:5 说 D2503 未定（紧贴，在「」引文里而旁边（同一句或下一句）没有现状）
+want=  cross-decision-status：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（cross-decision-status）

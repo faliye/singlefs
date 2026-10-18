@@ -4,7 +4,7 @@
 """拿副本编的脚本核「改过的每个包这一趟都重编了」：改过的包从补丁或变异行算出来，编译输出里那个包要有 `Compiling <包名> v…` 行，没有就判红。
 
 为什么：几份仓副本共用一个编译目录、或拷副本时留着旧修改时刻，cargo 按 mtime 判本地包不用重编，测试静默跑在旧产物上
-（.claude/kb/milestone/03-third-txn.md「待优化：流程、门禁与装置上踩过的坑」第 1 行；.claude/singlefs-ai-sop/rules/test-script-discipline.md「编译与算法都要快」）。
+（.claude/kb/milestone/03-third-txn.md「待优化：流程、门禁与装置上踩过的坑」第 1 行；.claude/rules/test-script-discipline.md「编译与算法都要快」）。
 
 调它的：scripts/gate/merge-and-verify.sh（编完之后核补丁改过的包，命令行 check；编之前把补丁改过的文件刷到此刻，命令行 touch）、
 scripts/mutation/prove-red.sh（每条变异施加后那一趟编译核被改的那个包，按路径载入本库调 package_of / compiled_packages）。

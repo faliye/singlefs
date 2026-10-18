@@ -1,0 +1,7 @@
+# 样本挂账表（写坏与罩不住的几种）
+inference-needs-verdict	.claude/kb/decisions/2520-账样本甲.md	已定项 1	这一步是推论，三方论证的判决	# 样本：对象已经不红，账过期
+inference-needs-verdict	.claude/kb/decisions/2599-不存在.md	已定项 1	指向不存在的文件的一行	# 样本：文件不在
+three-way-leg-record	.claude/kb/decisions/2520-账样本甲.md	已定项 1	短片段	# 样本：片段太短
+three-way-leg-record	.claude/kb/decisions/2520-账样本甲.md	已定项 1	只有四列的一行
+unknown-cell	.claude/kb/decisions/2520-账样本甲.md	已定项 1	格名不认得的一行样本	# 样本
+cross-decision-status	.claude/kb/decisions/2520-账样本甲.md	-	一句早就改好的话不在文件里	# 样本：对象已经不红

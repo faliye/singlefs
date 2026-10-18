@@ -1,2 +1,0 @@
-P-text	r2=0	r1=0
-P-valve	r2=0	r1=0

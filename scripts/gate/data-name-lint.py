@@ -43,6 +43,7 @@ naming-lint 只查我们声明的名字；实验装置的字段表标签 ("syste
   numbered-ignored          e<数字> 这类整类登记不认          numbered-green
   exclusions-ignored        排除表不认                        exclusion-green
   stale-exclusions-passed   排除表里已经没有违规的行、指向不存在的路径、没写理由的行不判  exclusion-stale-red
+  external-marker-ignored   .rs 里那一行的 `// naming-lint:external <理由>` 不认          external-marker-green
 """
 import os
 import re
@@ -71,7 +72,8 @@ EXTRA_ABBREVIATIONS = {
     "mac": "message_authentication_code（几个意思，必须写全）",
 }
 BREAKS = ("string-literals-skipped", "arrow-right-skipped", "key-names-skipped", "call-arguments-judged", "comments-scanned", "kb-tables-skipped",
-          "single-letters-passed", "registered-ignored", "numbered-ignored", "exclusions-ignored", "stale-exclusions-passed")
+          "single-letters-passed", "registered-ignored", "numbered-ignored", "exclusions-ignored", "stale-exclusions-passed",
+          "external-marker-ignored")
 broken = set(item for item in os.environ.get("DATA_NAME_LINT_BREAK", "").split(",") if item in BREAKS)
 
 
@@ -302,6 +304,13 @@ def is_scanned_rust(relative):
     return re.fullmatch(r"crates/[^/]+/src/.+\.rs", relative) is not None
 
 
+def external_reason(line):
+    """那一行写了 `naming-lint:external <理由>`（与上游 naming-lint.sh 同一个行内豁免）时交回理由，没写或理由空交回空串。"""
+    if "external-marker-ignored" in broken or "naming-lint:external" not in line:
+        return ""
+    return line.split("naming-lint:external", 1)[1].replace("*/", "").strip(" \t:：")
+
+
 def collect(root):
     """扫出全部候选：返回 (文件清单, 候选 [(路径, 行号, 形态, 串)])。"""
     files, candidates = [], []
@@ -315,7 +324,9 @@ def collect(root):
             continue
         files.append(relative)
         finder = rust_candidates if relative.endswith(".rs") else kb_candidates
-        candidates.extend((relative, line, kind, string) for line, kind, string in finder(text))
+        lines = text.split("\n")
+        candidates.extend((relative, line, kind, string) for line, kind, string in finder(text)
+                          if not (relative.endswith(".rs") and external_reason(lines[line - 1])))
     return files, candidates
 
 
@@ -439,6 +450,8 @@ def run_selftest():
     case("exclusion-stale-red", {**excluded, EXCLUDE_FILE: stale}, 1, "scripts/experiments/e1_demo.rs:renamed_long 已经一个违规都没有了")
     case("exclusion-missing-path-red", {**excluded, EXCLUDE_FILE: "scripts/experiments/gone.rs:cnt  # 样本：文件不存在\n"}, 1, "指向不存在的路径 scripts/experiments/gone.rs")
     case("exclusion-no-reason-red", {**excluded, EXCLUDE_FILE: "scripts/experiments/e1_demo.rs:system_configuration_mac\n"}, 1, "没写理由")
+    case("external-marker-green", {"crates/demo/src/lib.rs": 'fn kind() -> &\x27static str {\n    match 0 {\n        _ => "lib", // naming-lint:external cargo 定的目标种类名\n    }\n}\n'}, 0, "合命名纪律")
+    case("external-marker-no-reason-red", {"crates/demo/src/lib.rs": 'fn kind() -> &\x27static str {\n    match 0 {\n        _ => "lib", // naming-lint:external\n    }\n}\n'}, 1, "「lib」是缩写")
     case("nothing-to-judge", {"README.md": "no sources\n"}, 77, "本次无对象可判")
     table = upstream_table() or {}
     overlap = sorted(word for word in EXTRA_ABBREVIATIONS if word in table)
@@ -451,7 +464,7 @@ def run_selftest():
         print(f"  ✗ --selftest：{len(cells)} 格里 {len(failed)} 格不对")
         print("     → 怎么办：照上面点名的格查判法；弄坏开关打开时红在点名的格是对的")
         return 1
-    print(f"  ✓ --selftest：{len(cells)} 格都对（元组首列、=> 右侧、键= 的键名、kb 表格、单字母、登记过的放行、整类编号、注释与调用实参不判、排除表只缩不涨）")
+    print(f"  ✓ --selftest：{len(cells)} 格都对（元组首列、=> 右侧、键= 的键名、kb 表格、单字母、登记过的放行、整类编号、注释与调用实参不判、排除表只缩不涨、外部定名的行内豁免）")
     return 0
 
 
@@ -467,6 +480,7 @@ WHEEL = {
     "numbered-ignored": ("numbered-green",),
     "exclusions-ignored": ("exclusion-green",),
     "stale-exclusions-passed": ("exclusion-stale-red",),
+    "external-marker-ignored": ("external-marker-green",),
 }
 
 

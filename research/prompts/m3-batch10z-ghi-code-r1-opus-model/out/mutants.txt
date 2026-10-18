@@ -1,5 +1,0 @@
-MUTANT M1-release-keeps-kept-leases test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
-MUTANT M2-release-keeps-device-in-use test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
-MUTANT M3-device-never-released test result: FAILED. 99 passed; 5 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
-MUTANT M5-never-resume-unwind test result: FAILED. 103 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.21s
-MUTANT M6-poll-exit-returns-every-card test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s

@@ -1,5 +1,0 @@
-command args=-p singlefs-core --lib tree_identifier_watermark_of_the_rollback_tests rc=101
-failures:
-failures:
-    mount::tree_identifier_watermark_of_the_rollback_tests::an_abandoned_ring_root_whose_tree_identifier_watermark_is_above_the_current_version_sets_the_watermark
-test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 246 filtered out; 

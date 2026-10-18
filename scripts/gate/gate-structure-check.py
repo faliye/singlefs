@@ -93,8 +93,10 @@ def make_shims(scratch):
     return shim_directory
 
 
-def start_stage(stage_path, root, arguments, shim_directory, trace):
-    """起一次阶段：返回 (退出码或 None（超时）, stdout, stderr, 被调了的替身)。"""
+def start_stage(root, name, arguments, shim_directory, trace):
+    """起一次 <root>/.claude/gate.d/<name> 那道阶段：返回 (退出码或 None（超时）, stdout, stderr, 被调了的替身)。
+    路径照「阶段目录 + 文件名」拼：函数单元库把这一层的阶段都算进闭包（判的就是它们）。"""
+    stage_path = os.path.join(root, ".claude", "gate.d", name)
     environment = {key: value for key, value in os.environ.items() if key not in CLEARED_ENVIRONMENT}
     environment["PATH"] = shim_directory + os.pathsep + environment.get("PATH", "")
     environment["GATE_STRUCTURE_CHECK_SHIM_TRACE"] = trace
@@ -136,7 +138,7 @@ def judge_stage(root, name, shim_directory, trace):
             problems.append(f"{name}:{number}：格名 {cell} 在格名表里写了两次")
         seen.add(cell)
 
-    exit_code, stdout, stderr, called = start_stage(stage_path, root, ["--list", "--force"], shim_directory, trace)
+    exit_code, stdout, stderr, called = start_stage(root, name, ["--list", "--force"], shim_directory, trace)
     if called:
         problems.append(f"{name}：--list 起了重活：{'、'.join(called)}")
     if exit_code is None:
@@ -152,7 +154,7 @@ def judge_stage(root, name, shim_directory, trace):
             expected_text = "；".join(f"{cell} {title}" for cell, title in expected)
             problems.append(f"{name}：--list 打出的格与格名表不一致：--list 是「{listed_text}」，格名表是「{expected_text}」")
 
-    exit_code, stdout, stderr, called = start_stage(stage_path, root, ["--check", UNKNOWN_CELL, "--force"], shim_directory, trace)
+    exit_code, stdout, stderr, called = start_stage(root, name, ["--check", UNKNOWN_CELL, "--force"], shim_directory, trace)
     if called:
         problems.append(f"{name}：--check 写错的格名起了重活：{'、'.join(called)}")
     if exit_code is None:

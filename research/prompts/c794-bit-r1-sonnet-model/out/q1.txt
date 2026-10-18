@@ -1,0 +1,13 @@
+PROBE-Q1 control changed_records=13
+PROBE-Q1 control-record-outside-its-leaf checker_violated=["I-1.1", "I-8.10", "I-5.5"] I-1.1=Some("Violated(\"分配记录树（树 65538）层级 0 盘 0 第 61 格的节点：key 宽 / key 区间与条目不符（Err(KeysNotStrictlyAscending)）\")") I-3.1=Some("Holds") I-3.9=Some("Holds") I-3.11=Some("Holds")
+PROBE-Q1 control-record-outside-its-leaf recover_outcome=Failed(AllocationRecordOutsideThePoolGeometry { what: "分配记录不在它所在叶按位置罩的那一段里，或末槽越过叶的末槽" })
+PROBE-Q1 baseline-unmodified checker_violated=[] I-1.1=Some("Holds") I-3.1=Some("Holds") I-3.9=Some("Holds") I-3.11=Some("Holds")
+PROBE-Q1 baseline-unmodified recover_outcome=FileRead(3000 bytes)
+PROBE-Q1 changed_records=2
+PROBE-Q1 both-bits-on-all-released-records checker_violated=["I-8.10"] I-1.1=Some("Holds") I-3.1=Some("Holds") I-3.9=Some("Holds") I-3.11=Some("Holds")
+PROBE-Q1 both-bits-on-all-released-records recover_outcome=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录的已释放位与隔离位同时置着：条款没定这一组合，第一版不认" })
+PROBE-Q1 writable_mount_refusal=Recovery(InvariantViolated { invariant: "I-1.1", detail: "分配记录的已释放位与隔离位同时置着：条款没定这一组合，第一版不认" })
+PROBE-Q1 one-device changed_records=1
+PROBE-Q1 both-bits-on-device-0-released-records-only checker_violated=["I-8.10"] I-1.1=Some("Holds") I-3.1=Some("Holds") I-3.9=Some("Holds") I-3.11=Some("Holds")
+PROBE-Q1 both-bits-on-device-0-released-records-only recover_outcome=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录的已释放位与隔离位同时置着：条款没定这一组合，第一版不认" })
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out;

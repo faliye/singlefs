@@ -1,0 +1,41 @@
+
+running 8 tests
+test mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::a_current_account_record_at_the_same_start_slot_leaves_the_second_slot_of_an_abandoned_roots_wider_placement_isolated ... ok
+test mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::a_current_account_record_at_the_same_start_slot_leaves_the_second_slot_recorded_for_an_abandoned_root_whose_ring_slot_read_bad_isolated ... ok
+test mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::a_current_account_record_at_the_same_start_slot_leaves_the_second_slot_of_a_placement_named_by_unapplied_records_isolated ... ok
+test mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::two_abandoned_roots_sharing_a_start_slot_isolate_both_slots_of_the_wider_placement_in_either_read_order ... ok
+test mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::a_candidate_roots_two_slot_placement_exempts_its_second_slot_from_an_abandoned_roots_placement ... ok
+test mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::slot_the_pass_for_abandoned_roots_whose_ring_slot_read_bad_exempted_is_still_isolated_for_the_unapplied_journal_records ... FAILED
+test mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::slot_an_abandoned_roots_pass_exempted_for_a_candidate_is_still_isolated_for_the_unapplied_journal_records ... FAILED
+test mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::a_current_account_record_exempts_every_slot_it_covers_from_the_placements_of_an_abandoned_root_read_from_its_account ... ok
+
+failures:
+
+---- mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::slot_the_pass_for_abandoned_roots_whose_ring_slot_read_bad_exempted_is_still_isolated_for_the_unapplied_journal_records stdout ----
+
+thread 'mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::slot_the_pass_for_abandoned_roots_whose_ring_slot_read_bad_exempted_is_still_isolated_for_the_unapplied_journal_records' (2702326) panicked at crates/singlefs-core/src/mount.rs:10301:9:
+assertion `left == right` failed: s 只被候选根豁免给根槽读坏的被抛弃根那一圈，没施加的记录那一圈照隔离：隔离着、发不出去
+  left: (false, true)
+ right: (true, false)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::slot_an_abandoned_roots_pass_exempted_for_a_candidate_is_still_isolated_for_the_unapplied_journal_records stdout ----
+
+thread 'mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::slot_an_abandoned_roots_pass_exempted_for_a_candidate_is_still_isolated_for_the_unapplied_journal_records' (2702324) panicked at crates/singlefs-core/src/mount.rs:10273:9:
+assertion `left == right` failed: s 只被候选根豁免给被抛弃根那一圈，没施加的记录那一圈照隔离：隔离着、发不出去
+  left: (false, true)
+ right: (true, false)
+
+
+failures:
+    mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::slot_an_abandoned_roots_pass_exempted_for_a_candidate_is_still_isolated_for_the_unapplied_journal_records
+    mount::shadow_ledger_exempts_and_isolates_slot_by_slot_tests::slot_the_pass_for_abandoned_roots_whose_ring_slot_read_bad_exempted_is_still_isolated_for_the_unapplied_journal_records
+
+test result: FAILED. 6 passed; 2 failed; 0 ignored; 0 measured; 261 filtered out; finished in 0.01s
+
+
+--- stderr ---
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/rerun-s3/tree/crates/singlefs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.88s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-b44-code-r1-sonnet/target/debug/deps/singlefs_core-5c6a767bd9164a51)
+error: test failed, to rerun pass `-p singlefs-core --lib`

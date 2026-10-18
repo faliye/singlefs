@@ -18,7 +18,9 @@ import shutil
 import sys
 import time
 
-sys.path.insert(0, os.environ["FAKE_RESEARCH_DIRECTORY"])
+# FAKE_RESEARCH_DIRECTORY 是编排器自证给的真驱动目录（就是这一份所在的研究目录，自证把这一份拷进假世界里起）；
+# 缺省取这一份所在的目录
+sys.path.insert(0, os.environ.get("FAKE_RESEARCH_DIRECTORY") or os.path.dirname(os.path.abspath(__file__)))
 import device_timing  # noqa: E402
 import row_driver  # noqa: E402
 

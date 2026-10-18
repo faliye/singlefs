@@ -4,7 +4,7 @@ C publish
  * 样本：写者先写数据、再立标志；读者先读标志、再读数据。
  *
  * singlefs-expect: Never
- * singlefs-models: crates/demo/src/lib.rs::publish 写者
+ * singlefs-models: crates/demo/src/lib.rs :: publish 写者
  *)
 
 {}

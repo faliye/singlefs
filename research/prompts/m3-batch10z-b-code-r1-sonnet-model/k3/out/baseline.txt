@@ -1,8 +1,0 @@
-## lib rc=0 :: test result: ok. 200 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s 
-## newfile rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.39s 
-## lr3 rc=0 :: test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 75.43s 
-## credential rc=0 :: test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s 
-## slotbad rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.18s 
-## reuse rc=0 :: test result: ok. 3 passed; 0 failed; 13 ignored; 0 measured; 0 filtered out; finished in 7.99s 
-## onepass rc=0 :: test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 61.99s 
-done

@@ -60,6 +60,22 @@ WRITE_ORDER = [
 NEW_ROOT_SEGMENT_FIELDS = [name for name, _, _ in WRITE_ORDER if name.startswith("new_root_")]
 FUNCTION_START = "pub fn to_bytes(&self) -> Vec<u8> {"
 FUNCTION_HEADER_END = 'writer.assert_position(JOURNAL_HEADER_BYTES, "记录头");'
+# E170 各版执行器的目录（--executor-directory 只认这几份之一）：显式列出来，函数单元库照这张表把几版的模块都收进闭包
+EXPERIMENTS_DIRECTORY = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EXECUTOR_DIRECTORIES = (os.path.join(EXPERIMENTS_DIRECTORY, "e170_o3_spec_executor"),
+                        os.path.join(EXPERIMENTS_DIRECTORY, "e170_o3_spec_executor_with_witness_predicates"),
+                        os.path.join(EXPERIMENTS_DIRECTORY, "e170_o3_spec_executor_with_witness_predicates_journal_header_487"),
+                        os.path.join(EXPERIMENTS_DIRECTORY, "e170_second_run_o3_spec_executor"),
+                        os.path.join(EXPERIMENTS_DIRECTORY, "e170_second_run_o3_spec_executor_journal_header_487"))
+
+
+def registered_executor_directory(executor_directory: str) -> str:
+    """--executor-directory 给的那一份 → EXECUTOR_DIRECTORIES 里同一个目录；不是其中之一就退出、说清给哪几份。"""
+    for directory in EXECUTOR_DIRECTORIES:
+        if os.path.realpath(directory) == os.path.realpath(executor_directory):
+            return directory
+    raise SystemExit(f"  ✗ --executor-directory {executor_directory} 不是 E170 登记的执行器目录之一\n"
+                     "  → 怎么办：给 EXECUTOR_DIRECTORIES 里的一份（scripts/experiments/ 底下那五个 e170_* 执行器目录）")
 
 
 def sha256_of(path: str) -> str:
@@ -127,7 +143,10 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--working-tree", required=True, help="仓根（kb 与工作区的 crates/）")
     parser.add_argument("--output", required=True)
     arguments = parser.parse_args(argument_list)
-    sys.path.insert(0, os.path.abspath(arguments.executor_directory))
+    chosen = registered_executor_directory(arguments.executor_directory)
+    for directory in EXECUTOR_DIRECTORIES:  # 插的是表里那一项本身：插进 sys.path 的目录就是表里写着的那几个之一
+        if directory == chosen:
+            sys.path.insert(0, directory)
     import on_disk_layout as layout
     output = open(arguments.output, "x", encoding="utf-8")
     emitted = 0

@@ -2379,7 +2379,7 @@ impl CellRequest {
 }
 
 #[derive(Clone, Debug)]
-struct CellResult {
+struct AppendCellResult {
     executions: u64,
     states: u64,
     incomplete_pair_states: u64,
@@ -2402,7 +2402,7 @@ fn cell_is_applicable(append_arm: AppendArm, history: &History) -> bool {
     !(append_arm == AppendArm::JiaWhole && history.family() == HistoryFamily::H2)
 }
 
-fn evaluate_cell(request: &CellRequest) -> Option<CellResult> {
+fn evaluate_cell(request: &CellRequest) -> Option<AppendCellResult> {
     if !cell_is_applicable(request.append_arm, &request.history) {
         return None;
     }
@@ -2431,7 +2431,7 @@ fn evaluate_cell(request: &CellRequest) -> Option<CellResult> {
 }
 
 /// 一格多飞：按给定的枚举法得到崩溃状态，连同算出的格结果一起交回（路径对拍要比两种枚举法的状态集合）。
-fn multi_flight_cell_result(request: &CellRequest, layout: &CellLayout, enumeration: MultiFlightEnumeration) -> (EnumeratedCrashStates, CellResult) {
+fn multi_flight_cell_result(request: &CellRequest, layout: &CellLayout, enumeration: MultiFlightEnumeration) -> (EnumeratedCrashStates, AppendCellResult) {
     assert!(request.history.family().is_legal(), "第二段 H2 够判后未跑");
     let enumerated = enumerate_multi_flight(request, layout, enumeration);
     let result = cell_result_from_states(layout, &enumerated, request.recovery_control, Some(enumeration));
@@ -2439,9 +2439,9 @@ fn multi_flight_cell_result(request: &CellRequest, layout: &CellLayout, enumerat
 }
 
 /// 一格的全部崩溃状态逐个过四条 Q3 臂，数登记第六节的各量。
-fn cell_result_from_states(layout: &CellLayout, enumerated: &EnumeratedCrashStates, recovery_control: RecoveryControl, multi_flight_enumeration: Option<MultiFlightEnumeration>) -> CellResult {
+fn cell_result_from_states(layout: &CellLayout, enumerated: &EnumeratedCrashStates, recovery_control: RecoveryControl, multi_flight_enumeration: Option<MultiFlightEnumeration>) -> AppendCellResult {
     let states = &enumerated.states;
-    let mut result = CellResult {
+    let mut result = AppendCellResult {
         executions: enumerated.executions,
         states: u64::try_from(states.len()).expect("状态数有限"),
         incomplete_pair_states: 0,
@@ -2638,7 +2638,7 @@ fn h1(record_counts: &[u32], voided: u32) -> History {
     History { record_counts: record_counts.to_vec(), voided: Some((voided, VoidTiming::NarrowBeforeAnyWrite)) }
 }
 
-fn grid_cell(condition: PublishCondition, append_arm: AppendArm, history: History, reading: AppendedReading) -> CellResult {
+fn grid_cell(condition: PublishCondition, append_arm: AppendArm, history: History, reading: AppendedReading) -> AppendCellResult {
     evaluate_cell(&CellRequest::main_grid(condition, append_arm, history, reading)).expect("这一格适用")
 }
 
@@ -2747,7 +2747,7 @@ fn emit_anchors(emitter: &mut Emitter) -> u64 {
     mismatches
 }
 
-fn emit_cell(emitter: &mut Emitter, key_text: &str, result: &CellResult) {
+fn emit_cell(emitter: &mut Emitter, key_text: &str, result: &AppendCellResult) {
     emit(
         emitter,
         &format!(
@@ -2793,7 +2793,7 @@ fn emit_cell(emitter: &mut Emitter, key_text: &str, result: &CellResult) {
     }
 }
 
-fn emit_controls(emitter: &mut Emitter, grid: &BTreeMap<GridKey, CellResult>) -> u64 {
+fn emit_controls(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>) -> u64 {
     let mut controls_not_positive = 0u64;
     let mut report = |emitter: &mut Emitter, body: String, value: u64| {
         if value == 0 {
@@ -2877,7 +2877,7 @@ fn emit_controls(emitter: &mut Emitter, grid: &BTreeMap<GridKey, CellResult>) ->
 }
 
 /// 合法历史（H0 ∪ H1）上某个量的合计与为正的格数。
-fn legal_sum(grid: &BTreeMap<GridKey, CellResult>, condition: PublishCondition, arm: AppendArm, reading: AppendedReading, quantity: &dyn Fn(&CellResult) -> u64) -> (u64, u64, u64) {
+fn legal_sum(grid: &BTreeMap<GridKey, AppendCellResult>, condition: PublishCondition, arm: AppendArm, reading: AppendedReading, quantity: &dyn Fn(&AppendCellResult) -> u64) -> (u64, u64, u64) {
     let mut cells = 0u64;
     let mut positive_cells = 0u64;
     let mut total = 0u64;
@@ -2892,7 +2892,7 @@ fn legal_sum(grid: &BTreeMap<GridKey, CellResult>, condition: PublishCondition, 
     (cells, positive_cells, total)
 }
 
-fn emit_verdicts(emitter: &mut Emitter, grid: &BTreeMap<GridKey, CellResult>, conditions: &[PublishCondition]) {
+fn emit_verdicts(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>, conditions: &[PublishCondition]) {
     for condition in conditions.iter().copied() {
         for arm in AppendArm::ALL {
             for reading in AppendedReading::ALL {
@@ -2953,19 +2953,19 @@ fn emit_verdicts(emitter: &mut Emitter, grid: &BTreeMap<GridKey, CellResult>, co
     }
 }
 
-fn emit_assertions(emitter: &mut Emitter, grid: &BTreeMap<GridKey, CellResult>, conditions: &[PublishCondition], includes_real_baseline: bool) {
+fn emit_assertions(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>, conditions: &[PublishCondition], includes_real_baseline: bool) {
     // A1 真实基线：串落 × 甲整段 × 丙0，H0 与 H1（只在串落那一段的格里有）。
     let real_baseline_readings: &[AppendedReading] = if includes_real_baseline { &AppendedReading::ALL } else { &[] };
     for reading in real_baseline_readings.iter().copied() {
         let bing0 = RecoveryArm::Bing0Today.position();
-        let quantities: [(&str, &dyn Fn(&CellResult) -> u64); 7] = [
-            ("n2a", &|result: &CellResult| result.incomplete_pair_states),
-            ("n2b", &|result: &CellResult| result.pattern_p_states),
-            ("v_fsync", &|result: &CellResult| result.recovery[bing0].v_fsync),
-            ("v_dep", &|result: &CellResult| result.recovery[bing0].v_dependency),
-            ("v_dangling", &|result: &CellResult| result.recovery[bing0].v_dangling()),
-            ("partial_publish", &|result: &CellResult| result.recovery[bing0].partial_publish),
-            ("n_atom", &|result: &CellResult| result.recovery[bing0].n_atom),
+        let quantities: [(&str, &dyn Fn(&AppendCellResult) -> u64); 7] = [
+            ("n2a", &|result: &AppendCellResult| result.incomplete_pair_states),
+            ("n2b", &|result: &AppendCellResult| result.pattern_p_states),
+            ("v_fsync", &|result: &AppendCellResult| result.recovery[bing0].v_fsync),
+            ("v_dep", &|result: &AppendCellResult| result.recovery[bing0].v_dependency),
+            ("v_dangling", &|result: &AppendCellResult| result.recovery[bing0].v_dangling()),
+            ("partial_publish", &|result: &AppendCellResult| result.recovery[bing0].partial_publish),
+            ("n_atom", &|result: &AppendCellResult| result.recovery[bing0].n_atom),
         ];
         let mut fields = Vec::new();
         let mut nonzero_quantities = 0u64;
@@ -3066,7 +3066,7 @@ fn emit_assertions(emitter: &mut Emitter, grid: &BTreeMap<GridKey, CellResult>, 
 }
 
 /// 登记 8.2：在合法格里只取某一 (k, r) 的 H0 与 H1 各格判一次。
-fn point_judgement(grid: &BTreeMap<GridKey, CellResult>, condition: PublishCondition, arm: AppendArm, reading: AppendedReading, record_counts: &[u32], quantity: &dyn Fn(&CellResult) -> u64) -> u64 {
+fn point_judgement(grid: &BTreeMap<GridKey, AppendCellResult>, condition: PublishCondition, arm: AppendArm, reading: AppendedReading, record_counts: &[u32], quantity: &dyn Fn(&AppendCellResult) -> u64) -> u64 {
     grid.iter()
         .filter(|((cell_condition, cell_arm, history, cell_reading), _)| {
             *cell_condition == condition && *cell_arm == arm && *cell_reading == reading && history.family().is_legal() && history.record_counts == record_counts
@@ -3076,24 +3076,24 @@ fn point_judgement(grid: &BTreeMap<GridKey, CellResult>, condition: PublishCondi
 }
 
 /// 第八节几何敏感性判的各量（第六节 Q2-1、Q2-2、Q3-1 至 Q3-4）。
-fn geometry_quantities() -> Vec<(String, Box<dyn Fn(&CellResult) -> u64>)> {
-    let mut quantities: Vec<(String, Box<dyn Fn(&CellResult) -> u64>)> = vec![
-        ("Q2-1".to_string(), Box::new(|result: &CellResult| result.incomplete_pair_states)),
-        ("Q2-2".to_string(), Box::new(|result: &CellResult| result.pattern_p_states)),
+fn geometry_quantities() -> Vec<(String, Box<dyn Fn(&AppendCellResult) -> u64>)> {
+    let mut quantities: Vec<(String, Box<dyn Fn(&AppendCellResult) -> u64>)> = vec![
+        ("Q2-1".to_string(), Box::new(|result: &AppendCellResult| result.incomplete_pair_states)),
+        ("Q2-2".to_string(), Box::new(|result: &AppendCellResult| result.pattern_p_states)),
     ];
     for recovery_arm in RecoveryArm::ALL {
         let position = recovery_arm.position();
-        quantities.push((format!("Q3-1 q3={}", recovery_arm.label()), Box::new(move |result: &CellResult| result.recovery[position].v_fsync)));
-        quantities.push((format!("Q3-2 q3={}", recovery_arm.label()), Box::new(move |result: &CellResult| result.recovery[position].v_dependency)));
-        quantities.push((format!("Q3-3 q3={}", recovery_arm.label()), Box::new(move |result: &CellResult| result.recovery[position].v_dangling())));
+        quantities.push((format!("Q3-1 q3={}", recovery_arm.label()), Box::new(move |result: &AppendCellResult| result.recovery[position].v_fsync)));
+        quantities.push((format!("Q3-2 q3={}", recovery_arm.label()), Box::new(move |result: &AppendCellResult| result.recovery[position].v_dependency)));
+        quantities.push((format!("Q3-3 q3={}", recovery_arm.label()), Box::new(move |result: &AppendCellResult| result.recovery[position].v_dangling())));
     }
     let bing2 = RecoveryArm::Bing2DropAKeepB.position();
-    quantities.push(("Q3-4 q3=bing2_drop_a_keep_b".to_string(), Box::new(move |result: &CellResult| result.recovery[bing2].partial_publish)));
+    quantities.push(("Q3-4 q3=bing2_drop_a_keep_b".to_string(), Box::new(move |result: &AppendCellResult| result.recovery[bing2].partial_publish)));
     quantities
 }
 
 /// 登记 8.2：G1、G2 在给定的条件里判；`includes_g4` 时另报 G4（多飞·根序对多飞·根乱，两个子形态互为方向相反的点）。
-fn emit_geometry(emitter: &mut Emitter, grid: &BTreeMap<GridKey, CellResult>, conditions: &[PublishCondition], includes_g4: bool) {
+fn emit_geometry(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>, conditions: &[PublishCondition], includes_g4: bool) {
     let checks: [(&str, &[u32], Vec<(&str, &[u32])>); 2] = [
         ("G1", &[2, 2], vec![("r1,1", &[1, 1][..]), ("r1,1,1", &[1, 1, 1][..])]),
         ("G2", &[2, 1], vec![("r1,2", &[1, 2][..])]),
@@ -3159,11 +3159,11 @@ fn emit_geometry(emitter: &mut Emitter, grid: &BTreeMap<GridKey, CellResult>, co
     emit(emitter, &format!("name=geometry_summary lines={lines} unstable_lines={unstable}"));
 }
 
-fn emit_h2_summaries(emitter: &mut Emitter, grid: &BTreeMap<GridKey, CellResult>) {
+fn emit_h2_summaries(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>) {
     for condition in PublishCondition::SEGMENT_ONE {
         for arm in AppendArm::ALL {
             for reading in AppendedReading::ALL {
-                let cells: Vec<&CellResult> = grid
+                let cells: Vec<&AppendCellResult> = grid
                     .iter()
                     .filter(|((cell_condition, cell_arm, history, cell_reading), _)| *cell_condition == condition && *cell_arm == arm && *cell_reading == reading && history.family() == HistoryFamily::H2)
                     .map(|(_, result)| result)
@@ -4454,7 +4454,7 @@ fn run_segment_one() {
         std::process::exit(3);
     }
     emit_anchors(&mut emitter);
-    let mut grid: BTreeMap<GridKey, CellResult> = BTreeMap::new();
+    let mut grid: BTreeMap<GridKey, AppendCellResult> = BTreeMap::new();
     for condition in PublishCondition::SEGMENT_ONE {
         for arm in AppendArm::ALL {
             for history in &histories {
@@ -4480,7 +4480,7 @@ fn run_segment_one() {
 }
 
 /// 第二段的 B5 锚点：16 格的执行数与去重状态数逐个比；返回不符的条数。
-fn emit_segment_two_anchors(emitter: &mut Emitter, grid: &BTreeMap<GridKey, CellResult>) -> u64 {
+fn emit_segment_two_anchors(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>) -> u64 {
     let mut checked = 0u64;
     let mut mismatches = 0u64;
     for (counts, condition, arm, executions, states) in ANCHOR_B5 {
@@ -4517,7 +4517,7 @@ struct PathCheckTally {
 }
 
 impl PathCheckTally {
-    fn compare(&mut self, key_text: &str, request: &CellRequest, layout: &CellLayout, direct: &EnumeratedCrashStates, direct_result: &CellResult) {
+    fn compare(&mut self, key_text: &str, request: &CellRequest, layout: &CellLayout, direct: &EnumeratedCrashStates, direct_result: &AppendCellResult) {
         let (searched, searched_result) = multi_flight_cell_result(request, layout, MultiFlightEnumeration::ByConfiguration);
         let state_sets_differ = direct.states != searched.states;
         let executions_differ = direct_result.executions != searched_result.executions;
@@ -4565,7 +4565,7 @@ fn run_segment_two() {
             count_of(HistoryFamily::H1)
         ),
     );
-    let mut grid: BTreeMap<GridKey, CellResult> = BTreeMap::new();
+    let mut grid: BTreeMap<GridKey, AppendCellResult> = BTreeMap::new();
     let mut path_check = PathCheckTally::default();
     for condition in PublishCondition::SEGMENT_TWO {
         for arm in AppendArm::ALL {
@@ -4595,7 +4595,7 @@ fn run_segment_two() {
         }
     }
     // 停机条款 T3：k = 3 的配置数。
-    let three_transaction_cells: Vec<&CellResult> = grid.iter().filter(|((_, _, history, _), _)| history.transaction_count() == 3).map(|(_, result)| result).collect();
+    let three_transaction_cells: Vec<&AppendCellResult> = grid.iter().filter(|((_, _, history, _), _)| history.transaction_count() == 3).map(|(_, result)| result).collect();
     let largest_configurations = three_transaction_cells.iter().filter_map(|result| result.configurations).max().unwrap_or(0);
     let exceeded_cells = three_transaction_cells.iter().filter(|result| result.configuration_limit_exceeded).count();
     emit(
@@ -4963,7 +4963,7 @@ mod tests {
     const ROOTS_ORDERED: PublishCondition = PublishCondition::MultiFlightRootsOrdered;
     const ROOTS_UNORDERED: PublishCondition = PublishCondition::MultiFlightRootsUnordered;
 
-    fn multi_flight(condition: PublishCondition, arm: AppendArm, history: History, reading: AppendedReading, enumeration: MultiFlightEnumeration) -> (EnumeratedCrashStates, CellResult) {
+    fn multi_flight(condition: PublishCondition, arm: AppendArm, history: History, reading: AppendedReading, enumeration: MultiFlightEnumeration) -> (EnumeratedCrashStates, AppendCellResult) {
         let request = CellRequest::main_grid(condition, arm, history.clone(), reading);
         let layout = plan_cell(condition, arm, &history, AppendDiscipline::Kept);
         multi_flight_cell_result(&request, &layout, enumeration)
@@ -5166,8 +5166,18 @@ mod tests {
     }
 }
 
+/// 准入用的仓根：环境变量 SINGLEFS_REPOSITORY_ROOT，没设取当前目录（replay.sh 与实验页的命令都在仓根起）；不取「清单目录/../..」（单元键把它当运行期路径拒算）。
 fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+    let root = std::env::var_os("SINGLEFS_REPOSITORY_ROOT")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_default();
+    if !root.join(".claude/singlefs-ai-sop/scripts/preflight.py").is_file() {
+        eprintln!("  ✗ {} 不是仓根（下面没有 .claude/singlefs-ai-sop/scripts/preflight.py），判不了准入", root.display());
+        eprintln!("  → 怎么办：在仓根起这个装置，或设 SINGLEFS_REPOSITORY_ROOT=<仓根>");
+        std::process::exit(78);
+    }
+    root
 }
 
 fn preflight() {

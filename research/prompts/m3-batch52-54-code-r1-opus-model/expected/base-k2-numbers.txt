@@ -1,6 +1,0 @@
-rc=0
-OPUS_K2_NUMBERS trees tombstone=[(1, 1), (2, 1)] lineage=[(1, 1), (2, 1)] retirement=[(1, 1), (2, 1)] levels(t,l,r)=(1,1,1) leaves=[1]
-OPUS_K2_NUMBERS knob_entry_violations=[]
-OPUS_K2_NUMBERS knob_entry I-9.37=Holds I-9.22=Holds
-OPUS_K2_NUMBERS product_entry_violated=["I-9.21", "I-9.36"]
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out

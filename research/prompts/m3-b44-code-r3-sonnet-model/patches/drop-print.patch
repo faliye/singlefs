@@ -1,0 +1,22 @@
+--- a/crates/singlefs-core/src/mounted_session.rs	2026-10-17 +0000
++++ b/crates/singlefs-core/src/mounted_session.rs	2026-10-17 +0000
+@@ -817,6 +817,19 @@
+     }
+ }
+ 
++impl<Device> Drop for DeviceReadOnceInThisMount<'_, '_, Device> {
++    fn drop(&mut self) {
++        let recorded = self.blocks_read_or_written_in_this_mount.borrow();
++        let bytes: usize = recorded.values().map(Vec::len).sum();
++        eprintln!(
++            "RECORDED_AT_DROP device={} blocks={} bytes={}",
++            self.identity.0,
++            recorded.len(),
++            bytes
++        );
++    }
++}
++
+ impl<Device: BlockDevice> BlockDevice for DeviceReadOnceInThisMount<'_, '_, Device> {
+     fn read_at(
+         &self,

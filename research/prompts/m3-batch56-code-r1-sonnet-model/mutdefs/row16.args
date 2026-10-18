@@ -1,1 +1,0 @@
--p singlefs-harness --test checker_known_bad_images -- an_unreadable_retirement_container_leaves_the_knob_capacity_invariant_not_judged

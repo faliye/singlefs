@@ -1,0 +1,235 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -3718,6 +3718,18 @@
+                 let record = parse_allocation_record(entry);
+                 self.judgements.judge(
+                     "I-1.1",
++                    !(std::env::var_os("PROBE_CHECKER_RED_ON_BOTH_BITS").is_some()
++                        && record.is_released
++                        && record.is_quarantined),
++                    || {
++                        format!(
++                            "{what}：盘 {} 槽 {} 的记录已释放位与隔离位同时置着（PROBE 正推腿：与 core 读者同一处的拒）",
++                            record.device, record.slot
++                        )
++                    },
++                );
++                self.judgements.judge(
++                    "I-1.1",
+                     allocation_record_fits_in_the_leaf(
+                         cell,
+                         record.device,
+@@ -7008,12 +7020,25 @@
+ /// 读的是 `root` 那棵分配记录树（树表里种类 3 那一条指着的根，按位置整棵走下去，`allocation_record_tree_without_judging`）：
+ /// 未释放、带隔离位、`referenced_start_slots` 里没有哪个引用起在它那一槽的记录，逐盘交回豁免的槽数；
+ /// 树表或分配记录树读不出、位置对不上时那一棵一格都不豁免（照旧判）。
++/// PROBE: 线程本地：[union, newest] = 隔离位置着、未释放、却有根引用的记录条数（最近一次 check_pool_image 里那两处调用各存一份）。
++thread_local! {
++    pub static PROBE_BIT_RECORDS_REFERENCED: [std::cell::Cell<u64>; 2] = const { [std::cell::Cell::new(0), std::cell::Cell::new(0)] };
++    pub static PROBE_CALL_COUNTER: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
++    pub static PROBE_EXEMPT_BY_UNIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
++}
++
+ fn quarantined_slots_exempted_per_device(
+     reader: &dyn ImageReader,
+     root: &crate::RootView,
+     referenced_start_slots: &BTreeSet<(u32, u64)>,
+     cache: &mut IndexNodeCache,
+ ) -> BTreeMap<u32, u64> {
++    let probe_index = PROBE_CALL_COUNTER.with(|c| {
++        let n = c.get();
++        c.set(n + 1);
++        (n % 2) as usize
++    });
++    PROBE_BIT_RECORDS_REFERENCED.with(|a| a[probe_index].set(0));
+     let mut exempted: BTreeMap<u32, u64> = BTreeMap::new();
+     let tree_table_pointer = parse_node_pointer(&root.record_bytes[36..122]);
+     if tree_table_pointer.all_zero {
+@@ -7036,9 +7061,26 @@
+         else {
+             continue;
+         };
++        let units_with_a_bit: BTreeSet<(u64, u64)> = records
++            .iter()
++            .filter(|record| !record.is_released && record.is_quarantined)
++            .map(|record| (record.slot, record.span_slots))
++            .collect();
++        let by_unit = PROBE_EXEMPT_BY_UNIT.with(|c| c.get());
+         for record in records {
++            if !record.is_released
++                && record.is_quarantined
++                && referenced_start_slots.contains(&(record.device, record.slot))
++            {
++                PROBE_BIT_RECORDS_REFERENCED.with(|a| a[probe_index].set(a[probe_index].get() + 1));
++            }
++            let flagged = if by_unit {
++                units_with_a_bit.contains(&(record.slot, record.span_slots))
++            } else {
++                record.is_quarantined
++            };
+             if record.is_released
+-                || !record.is_quarantined
++                || !flagged
+                 || referenced_start_slots.contains(&(record.device, record.slot))
+             {
+                 continue;
+@@ -7046,6 +7088,10 @@
+             *exempted.entry(record.device).or_insert(0) += record.span_slots;
+         }
+     }
++    let probe_count = PROBE_BIT_RECORDS_REFERENCED.with(|a| a[probe_index].get());
++    if probe_count > 0 {
++        eprintln!("PROBE-Q3 call={} bit_records_referenced={probe_count}", if probe_index == 0 { "union" } else { "newest" });
++    }
+     exempted
+ }
+ 
+--- a/crates/singlefs-core/src/allocator.rs
++++ b/crates/singlefs-core/src/allocator.rs
+@@ -59,11 +59,13 @@
+             0,
+             "跨度值不许占到标志位"
+         );
++        let probe_allow_both = std::env::var_os("PROBE_ALLOW_BOTH").is_some();
+         assert!(
+-            !(self.is_released && self.is_quarantined),
++            probe_allow_both || !(self.is_released && self.is_quarantined),
+             "隔离位只在仍分配的记录上：释放把它清掉（PoolAllocator::release_leaving_the_record_allocated_on），读盘时两位都置的记录在分配记录树的读者那里拒掉"
+         );
+         let span_field = match (self.is_released, self.is_quarantined) {
++            (true, true) => self.span_slots | ALLOCATION_RECORD_RELEASED_FLAG | ALLOCATION_RECORD_QUARANTINED_FLAG,
+             (true, _) => self.span_slots | ALLOCATION_RECORD_RELEASED_FLAG,
+             (false, true) => self.span_slots | ALLOCATION_RECORD_QUARANTINED_FLAG,
+             (false, false) => self.span_slots,
+@@ -1939,6 +1941,16 @@
+         }
+     }
+ 
++    /// PROBE: 探针用，直接覆盖一条记录（按 设备+槽 找）。
++    pub fn probe_replace_record(&mut self, record: AllocationRecord) {
++        let found = self
++            .records
++            .iter_mut()
++            .find(|existing| existing.device == record.device && existing.slot == record.slot)
++            .expect("探针：记录在");
++        *found = record;
++    }
++
+     /// 管理员回退的复活（D23（journal 的角色与格式） 已定项 14「复活」）：`device` 上起点是这个落点的那条已释放记录改回已分配，
+     /// 分配代写回 `allocation_generation`（回退目标那一版账里的分配代）。按盘改：回退逐盘判哪几块盘上的记录是已释放的。
+     /// 那一槽还在 defer 窗口里的，从 defer 挪回仍分配；已回收、还没被复用（位图上空着、记录照旧写着已释放）的，重新在位图上标占。
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -7817,9 +7817,26 @@
+         let is_referenced_by_the_current_version = locations
+             .iter()
+             .any(|location| slots_of_the_units_of_the_current_version.contains(&location.slot));
++        let bit_on_some_device = locations.iter().any(|location| {
++            current_account
++                .record_for(location.device, location.slot)
++                .is_some_and(|record| record.is_quarantined)
++        });
++        let bit_on_every_device = locations.iter().all(|location| {
++            current_account
++                .record_for(location.device, location.slot)
++                .is_some_and(|record| record.is_quarantined)
++        });
++        let is_isolated = match std::env::var("PROBE_Q4").as_deref() {
++            Ok("bit_any") => bit_on_some_device,
++            Ok("bit_all") => bit_on_every_device,
++            Ok("bit_any_and_unreferenced") => bit_on_some_device && !is_referenced_by_the_current_version,
++            Ok("inference_without_guard") => true,
++            _ => !is_referenced_by_the_current_version,
++        };
+         if is_resurrected_on_some_device {
+             units_to_check_on_every_device.push((*unit, *locations));
+-        } else if !is_referenced_by_the_current_version {
++        } else if is_isolated {
+             isolated_units_to_check_on_every_device.push((*unit, *locations));
+         }
+     }
+@@ -8298,7 +8315,11 @@
+     }
+     // 回退目标引用的隔离单元这次重新被引用：清掉它每块盘上那条记录的隔离位（C794 盘上隔离位；条款没写，取最保守的读法，
+     // `PoolAllocator::clear_quarantine_of_the_records_of`）。改的记录落在这次发布重写的叶里：发布路径按记录比上一版判哪几片叶变了。
++    eprintln!("PROBE-Q8 rollback isolated_units={}", isolated_units_to_check_on_every_device.len());
+     for (unit, locations) in &isolated_units_to_check_on_every_device {
++        if std::env::var_os("PROBE_NO_CLEAR").is_some() {
++            continue;
++        }
+         allocator.clear_quarantine_of_the_records_of(Placement {
+             slot: locations[0].slot,
+             span: unit.span_slots(),
+--- a/crates/singlefs-harness/src/model.rs
++++ b/crates/singlefs-harness/src/model.rs
+@@ -1094,6 +1094,7 @@
+     pub device: ModelDeviceIdentity,
+     pub generation: ModelCheckpointTxg,
+     pub is_released: bool,
++    pub is_quarantined: bool,
+ }
+ 
+ /// 实现冷启动读回了什么。
+@@ -3367,7 +3368,7 @@
+                 && devices_seen == devices_expected
+                 && records
+                     .iter()
+-                    .all(|record| !record.is_released && record.generation == *written_at);
++                    .all(|record| !record.is_released && !record.is_quarantined && record.generation == *written_at);
+             counts.allocation_records_compared += u64::try_from(records.len()).expect("条数");
+             if !well_formed {
+                 return Err(ModelDisagreement::new(
+@@ -3848,6 +3849,7 @@
+                     device,
+                     generation: ModelCheckpointTxg(generation),
+                     is_released: false,
++                    is_quarantined: false,
+                 })
+                 .collect::<Vec<_>>()
+         };
+@@ -3899,6 +3901,7 @@
+                     device,
+                     generation,
+                     is_released: false,
++                    is_quarantined: false,
+                 })
+                 .collect::<Vec<_>>()
+         };
+@@ -3932,6 +3935,27 @@
+         (model, row_publish)
+     }
+ 
++    /// PROBE（正推腿 Q8）：活单元的记录带着隔离位，模型判「单元的分配代」对不上；不带则对得上。
++    #[test]
++    fn probe_q8_a_live_unit_record_carrying_the_quarantine_bit_is_a_disagreement() {
++        let (model, row_publish) = row_publish_of_a_mount_after_the_first_file();
++        let mut observed = observed_exactly_as_the_model_wrote(&row_publish);
++        let mut counts = ModelJudgementCounts::default();
++        assert_eq!(
++            model.judge_allocation_generations(&row_publish, &observed, &mut counts),
++            Ok(()),
++            "不带位：对得上"
++        );
++        if let ObservedUnitAllocationRecords::EveryRoleOfTheVersion(roles) = &mut observed.unit_allocation_records {
++            let (_, records) = roles.iter_mut().find(|(role, _)| *role == ModelUnitRole::Data).expect("数据角色");
++            records[0].is_quarantined = true;
++        }
++        let disagreement = model
++            .judge_allocation_generations(&row_publish, &observed, &mut counts)
++            .expect_err("活单元带位");
++        println!("PROBE-Q8 model verdict on a stale bit: {:?}", disagreement.aspect);
++    }
++
+     /// 分配代对拍两个方向都比（代码审阅第 12 条）：模型这一版有、实现没交回的角色也报——此前只遍历实现交回的角色，
+     /// 写行那一版九个角色只交两个也判对得上。
+     #[test]
+--- a/crates/singlefs-harness/src/model_comparison.rs
++++ b/crates/singlefs-harness/src/model_comparison.rs
+@@ -351,6 +351,7 @@
+         device: ModelDeviceIdentity(record.device.0),
+         generation: model_txg(record.generation),
+         is_released: record.is_released,
++        is_quarantined: record.is_quarantined,
+     }
+ }
+ 

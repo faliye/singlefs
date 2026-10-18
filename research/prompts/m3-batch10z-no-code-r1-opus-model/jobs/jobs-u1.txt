@@ -1,2 +1,0 @@
-today|S3_PERSIST=1 S3_SLOTS=384 S3_PREFIXES=oooooooooo;oooooooooooooooooooo S3_RS=b6;b3;b1 S3_FAULTS=rroot,rlin;rroot,racct,rlin;racct,rlin S3_ACTIONS=u;ou;oou;Fu;Fou;ooooou S3_PREROOT=1
-today|OPUS_NO_ARM=unmount_plain S3_PERSIST=1 S3_SLOTS=384 S3_PREFIXES=oooooooooo;oooooooooooooooooooo S3_RS=b6;b3;b1 S3_FAULTS=rroot,rlin;rroot,racct,rlin;racct,rlin S3_ACTIONS=u;ou;oou;Fu;Fou;ooooou S3_PREROOT=1

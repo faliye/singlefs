@@ -10,9 +10,11 @@ holder_alive / is_self_or_ancestor / describe（判法不在这里另写一份�
 判法（workspace_cargo_lock_refusal）：
   ① 命令位置上有 cargo：包装（bash -c、nice、timeout、env、capped.sh N、run-with-memory-cap.sh、/usr/bin/time 这一类启动器、gpu-quiesce-run.sh）
      剥掉之后的命令词是 cargo，子命令不是只查版本与清单的那几个（NON_BUILDING_SUBCOMMANDS）。目录取 cd / -C / --manifest-path 之后的。
-  ② 那个目录在主工作区里：所在 git 仓的工作树根，它的 .git 就是 git common-dir（主工作树）。仓副本（不在 git 仓里、或是自己的仓）、
-     git worktree 加出来的树都不是；目录认不出（cd 到变量路径）的也不判。
-  ③ 锁文件（SINGLEFS_WORKSPACE_LOCK_FILE 或 <common-dir>/singlefs-main-workspace.lock）里有持有者、而且它活着：拒。记录空着、持有者已死的放行。
+  ② 那个目录在一棵 git 工作树里：取所在工作树的根。主工作树与 git worktree 加出来的树都算，各认各自那一把锁（合入锁按工作树分开，
+     scripts/gate/lib_workspace_lock.py 文件头「锁文件」）；不在 git 仓里的仓副本不判；
+     目录认不出（cd 到展开不了的变量路径；同一段命令里前面赋过的变量与 $HOME 展开之后照判，lib_shell_words.py 的 expand_known_variables）的也不判。
+  ③ 锁文件（SINGLEFS_WORKSPACE_LOCK_FILE，或 <那棵工作树自己的 git 目录>/singlefs-main-workspace.lock，位置由 lib_workspace_lock.py 的 lock_path 定）
+     里有持有者、而且它活着：拒。记录空着、持有者已死的放行。
   ④ 持有者之下的放行：SINGLEFS_WORKSPACE_LOCK_HOLDER（命令前写的，或钩子自己的环境里的）指着记录里的持有者、它是这个钩子进程自己或祖先
      （lib_workspace_lock.py 的重入判法）。
   读不了锁（建不了锁文件、读不到 lib_workspace_lock.py）不拒，交回一句 notice，由调用方记检出、照常执行。
@@ -27,13 +29,15 @@ holder_alive / is_self_or_ancestor / describe（判法不在这里另写一份�
 弄坏开关 WORKSPACE_CARGO_LOCK_BREAK=<项>（几个用逗号连；只给自证判红用，不认识的项抛 ValueError）。项名、弄坏哪一处、打开后自证红在哪几格
 （格名是 selftest 里 cell 的说明）：
   ignore-lock      不认锁，被占着也放行
-      「锁被别的进程占着：拒」「拒绝说明给出谁占着与下一步」「cd 进主工作区再起：拒」「经内存包装起：拒」「bash -c 里起：拒」「cargo -C 指到主工作区：拒」
-      「cargo --manifest-path 指到主工作区：拒」「HOLDER 变量指着的不是祖先：拒」「持锁者自己没写 HOLDER：拒（重入要写明）」「锁文件在默认位置（common-dir 下）：拒」；
+      「锁被别的进程占着：拒」「拒绝说明给出谁占着与下一步」「cd 进主工作区再起：拒」「cd 进写在变量里的主工作区再起：拒」「经内存包装起：拒」「bash -c 里起：拒」「cargo -C 指到主工作区：拒」
+      「cargo --manifest-path 指到主工作区：拒」「HOLDER 变量指着的不是祖先：拒」「持锁者自己没写 HOLDER：拒（重入要写明）」「锁文件在默认位置（主工作树的 git 目录下）：拒」「git worktree 加出来的树自己的锁被占着：拒」；
       heavy-test-guard.sh 自检「workspace-lock：主工作区里起 cargo、锁被别的进程占着：拒（退出码 2）」及它的两格说明（主 agent 与子 agent 各一）
   ignore-reentry   不认 HOLDER 变量，持锁者之下也拒
       「持锁者自己起 cargo（命令前写 HOLDER）：放行」「持锁者自己起 cargo（钩子环境里的 HOLDER）：放行」
-  any-tree         不判是不是主工作树，git worktree 加出来的树里的 cargo 也按主工作区认（不在 git 仓里的目录本来就没有锁可认，这个开关管不到）
-      「git worktree 加出来的树：放行」「锁文件在默认位置，git worktree 加出来的树里起：放行」
+  main-tree-only   照改前只认主工作树（.git 就是 git common-dir），git worktree 加出来的树里的 cargo 不认它自己那一把锁
+      「git worktree 加出来的树自己的锁被占着：拒」
+另有 scripts/gate/lib_workspace_lock.py 的 WORKSPACE_LOCK_BREAK=lock-in-common-dir（锁文件照改前放 git common-dir、所有工作树共用一把）：
+      「锁文件在默认位置，主工作树的锁被占着，git worktree 加出来的树里起：放行」「git worktree 加出来的树自己的锁被占着：拒」
   refuse-free      持有者已死的记录也当锁住（记录空着的本来就没有持有者，这个开关管不到）
       「持有者已死：放行」
   not-build-too    只查版本、清单的子命令也拒
@@ -46,7 +50,7 @@ import tempfile
 import time
 
 BREAK_VARIABLE = "WORKSPACE_CARGO_LOCK_BREAK"
-BREAK_ITEMS = ("ignore-lock", "ignore-reentry", "any-tree", "refuse-free", "not-build-too")
+BREAK_ITEMS = ("ignore-lock", "ignore-reentry", "main-tree-only", "refuse-free", "not-build-too")
 HOLDER_VARIABLE = "SINGLEFS_WORKSPACE_LOCK_HOLDER"
 LOCK_FILE_VARIABLE = "SINGLEFS_WORKSPACE_LOCK_FILE"
 # 不编、不动 target 的子命令：只查版本、清单与帮助
@@ -91,8 +95,9 @@ def cargo_runs_in(command, directory, shell_words, heavy_tests):
     return runs
 
 
-def main_workspace_root(directory):
-    """directory 所在的 git 工作树根，仅当它是主工作树（.git 就是 git common-dir）；仓副本、git worktree 加出来的树、不在仓里的交 None。"""
+def work_tree_root(directory):
+    """directory 所在的 git 工作树根：主工作树与 git worktree 加出来的树都交（各认各自的那一把锁）；不在仓里的交 None。
+    弄坏开关 main-tree-only 下照改前只交主工作树（.git 就是 git common-dir）。"""
     if not directory or not os.path.isdir(directory):
         return None
     environment = {name: value for name, value in os.environ.items() if not name.startswith("GIT_")}
@@ -103,7 +108,7 @@ def main_workspace_root(directory):
         return None
     top = os.path.realpath(lines[0])
     common = lines[1] if os.path.isabs(lines[1]) else os.path.join(directory, lines[1])
-    if switch_is_set("any-tree") or os.path.realpath(common) == os.path.realpath(os.path.join(top, ".git")):
+    if not switch_is_set("main-tree-only") or os.path.realpath(common) == os.path.realpath(os.path.join(top, ".git")):
         return top
     return None
 
@@ -136,7 +141,7 @@ def workspace_cargo_lock_refusal(command, directory, shell_words, heavy_tests, l
     runs = cargo_runs_in(command, directory, shell_words, heavy_tests)
     if not runs:
         return None, []
-    in_main_workspace = [(subcommand, main_workspace_root(where), command_holder) for subcommand, where, command_holder in runs]
+    in_main_workspace = [(subcommand, work_tree_root(where), command_holder) for subcommand, where, command_holder in runs]
     in_main_workspace = [entry for entry in in_main_workspace if entry[1] is not None]
     if not in_main_workspace:
         return None, []
@@ -224,6 +229,7 @@ def selftest():
         cell("锁被别的进程占着：拒", "cargo build", main, True, extra=names_holder)
         cell("拒绝说明给出谁占着与下一步", "cargo test --lib", main, True, extra=names_next_step)
         cell("cd 进主工作区再起：拒", f"cd {main} && cargo check", work, True)
+        cell("cd 进写在变量里的主工作区再起：拒", f"D={main}; cd $D && cargo check", work, True)
         cell("经内存包装起：拒", "bash scripts/hosts/run-with-memory-cap.sh 4G cargo test -p x --lib", main, True)
         cell("bash -c 里起：拒", "bash -c 'cargo fmt --all'", main, True)
         cell("cargo -C 指到主工作区：拒", f"cargo -C {main} build", work, True)
@@ -251,7 +257,6 @@ def selftest():
         # 副本与别的树：锁文件仍指着被占着的那份，这些地方起的 cargo 不认这把锁
         os.environ[LOCK_FILE_VARIABLE] = held_lock
         cell("仓副本（不在 git 仓里）：放行", "cargo build", plain_copy, False)
-        cell("git worktree 加出来的树：放行", "cargo build", linked, False)
         cell("目录认不出（cd 到变量路径之后）：放行", "cd $SOMEWHERE && cargo build", None, False)
         # 不是起 cargo
         cell("cargo --version 与 cargo locate-project 不拒", "cargo --version; cargo locate-project", main, False)
@@ -263,8 +268,18 @@ def selftest():
         start = lock.process_start(holder.pid)
         with open(default_lock, "w", encoding="utf-8") as handle:
             handle.write(f"pid={holder.pid}\nstart={start}\nsession=别的会话\ncommand=假合入 merge-and-verify\nsince={time.time()}\n")
-        cell("锁文件在默认位置（common-dir 下）：拒", "cargo build", main, True, extra=names_holder)
-        cell("锁文件在默认位置，git worktree 加出来的树里起：放行", "cargo build", linked, False)
+        cell("锁文件在默认位置（主工作树的 git 目录下）：拒", "cargo build", main, True, extra=names_holder)
+        cell("锁文件在默认位置，主工作树的锁被占着，git worktree 加出来的树里起：放行", "cargo build", linked, False)
+        # git worktree 加出来的树自己那一把（<主工作树>/.git/worktrees/<名>/ 下）被占着、主工作树那一把空着：那棵树里起 cargo 拒
+        with open(default_lock, "w", encoding="utf-8") as handle:
+            handle.write("")
+        # 位置照 git 自己报的 worktree 的 git 目录取，不经 lock_path（弄坏开关 lock-in-common-dir 下 lock_path 指回主工作树那一把，这一格要红）
+        linked_git_directory = subprocess.run(["git", "-C", linked, "rev-parse", "--absolute-git-dir"], check=True, capture_output=True, text=True,
+                                              env=environment).stdout.strip()
+        linked_lock = os.path.join(linked_git_directory, "singlefs-main-workspace.lock")
+        with open(linked_lock, "w", encoding="utf-8") as handle:
+            handle.write(f"pid={holder.pid}\nstart={start}\nsession=别的会话\ncommand=假合入 merge-and-verify\nsince={time.time()}\n")
+        cell("git worktree 加出来的树自己的锁被占着：拒", "cargo build", linked, True, extra=names_holder)
     finally:
         if holder is not None:
             holder.kill()
@@ -278,10 +293,11 @@ def selftest():
     for failure in failures:
         print(f"  ✗ 自检：{failure}")  # gate-lint:detail
     if failures:
-        print(f"  → 看 workspace_cargo_lock_refusal / cargo_runs_in / main_workspace_root；{BREAK_VARIABLE} 设着的话这里本来就该红（项与红的格见文件头）")
+        print(f"  → 看 workspace_cargo_lock_refusal / cargo_runs_in / work_tree_root；{BREAK_VARIABLE} 设着的话这里本来就该红（项与红的格见文件头）")
         return 1
     print(f"  ✓ lib_workspace_cargo_lock 自检通过（查了 {checked} 格）：主工作区里起 cargo 锁被别的活进程占着拒绝并写出谁占着与下一步（cd、-C、--manifest-path、内存包装、bash -c 都认），"
-          "持锁者自己（HOLDER 变量）放行，锁空着、持有者已死、仓副本与 git worktree 的树、只查版本的子命令放行，默认位置的锁文件认得")
+          "持锁者自己（HOLDER 变量）放行，锁空着、持有者已死、不在 git 仓里的仓副本、只查版本的子命令放行，默认位置的锁文件认得，"
+          "git worktree 加出来的树只认它自己那一把（主工作树的被占着放行、它自己的被占着拒）")
     return 0
 
 

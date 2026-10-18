@@ -1,3 +1,0 @@
-SLOTCHECK at_mkfs t_time_old=5 t_time_new=5000 differing_byte_positions=6 only_433_437_and_155_159=True stored_crc_ok_by_python=True old_sha_matches_old_pin_in_log=a065c124 new_sha=e5cc28ab sha_of_old_slot_patched_by_python=e5cc28ab equals_new=True equals_pin=True
-SLOTCHECK after_the_new_pool_file_creation t_time_old=5 t_time_new=5000 differing_byte_positions=6 only_433_437_and_155_159=True stored_crc_ok_by_python=True old_sha_matches_old_pin_in_log=c67464f9 new_sha=144c1785 sha_of_old_slot_patched_by_python=144c1785 equals_new=True equals_pin=True
-SLOTCHECK_RESULT OK

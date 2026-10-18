@@ -1,0 +1,1 @@
+name=r3_compare tail same rows_mine=56 rows_ref=56

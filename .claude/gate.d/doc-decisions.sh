@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 决策文档与变更史（十八格：决策与分项的状态、索引与登记表对正文、未定项回看、写频率、候选代号复用、变更史条目与形状）
+# gate-stage: 决策文档与变更史（二十格：决策与分项的状态、索引与登记表对正文、未定项回看、写频率、候选代号复用、依据块里的推论判决与三方腿况、变更史条目与形状）
 # gate-fixture: yes
 # gate-category: 文档类
 # gate-similar: history-ordinal.sh 它也读变更史的条目标题、也只判这一轮新增的，但判的是「（其 N）」撞号，住在上游副本里由上游门禁管，项目本地改不了它
 # gate-similar: doc-registries.sh 它从欠账表、收口表与总审核出发判表本身的形状与账的去向，判字段与布局登记表（字节表「指向」列点名的分项存不存在、字段投影与加和、认购表求和不超预留），它的 decision-refs 那一格判 kb 全文引用的 D 号有定义、不看分项号与状态；这里的 user-verdict-owed 那一格方向相反，从决策正文里的「待用户复核」出发去欠账表找一笔未还的账，item-ref-status 那一格判引用写的已定 / 未定与正文分项表相符，判的对象都是决策正文、索引页、冻结层归属登记表与变更史
+# gate-similar: doc-process-records.sh 它从三方轮的判决、材料与快照出发，判一批工作留没留过程记录（判决点名、轮次收尾）；这里 inference-needs-verdict 与 three-way-leg-record 两格方向相反，从决策分项依据块里的「是推论」「三方」字样出发去找 research/ 下存在的判决或腿输出，对象是决策正文不是过程记录
 # gate-similar: code-source-discipline.sh 它的 clause-enums 格也读 .claude/gate.d/ 下一张登记表、去决策分项里找逐字的串，但比对的另一边是代码里的枚举；这里格「同一结构的写频率只有一个量级」两边都在决策正文里（句子写的频率与登记的量级），不碰代码
 #
 # kb 里同一件事只许一种写法：决策与分项的状态在哪一处说都一样，索引页与决策相关的登记表与正文对得上；决策正文改了要在变更史留条目，变更史的形状要对。
@@ -13,7 +14,7 @@
 # gate-cell: kb-shape kb 形状：分项只许一种叫法、kb 文件不链回自己、规则路径带 .claude/、决策标题与分项两节、索引页分项计数与进度计数与正文相符
 # gate-cell: item-ref-status 每一处「D<n>（简称） 已定项 k / 未定项 k」写的状态与正文分项表相符
 # gate-cell: status-redundancy 状态别说两遍：小节标题不带「—— 已定」、条目不同时写破折号与「状态：」、分项索引行挂在对的节
-# gate-cell: cross-decision-status 紧贴「D<n>（简称）」写「未定」，而那条决策的状态行不是待定
+# gate-cell: cross-decision-status 「D<n>（简称）」之后写「未定」（紧贴、隔着名词短语、「」引文里旁边没有现状），而那条决策的状态行不是待定
 # gate-cell: settled-item-self-open 已定项区段里说它自己、或同一条决策里另一条已定分项还没定
 # gate-cell: settled-ref-says-open 引用写着「已定项 k」、归属到的那一条也已定，紧跟着却说它没定
 # gate-cell: stale-open-items 未定项点名的决策，状态行在这条未定项最近一次复核之后又变过
@@ -28,9 +29,11 @@
 # gate-cell: shape 变更史的形状：日期块住在自己的节、同节同一天只一块、块下是 - 变更项而不是 #### 子条目、不留快查与现状行
 # gate-cell: history-loss 两份变更史与基准相比，基准里每个日期块的数、编号、产物名、引名在改后都找得到（提交前整理不许丢）
 # gate-cell: candidate-codes 同一份决策里，同一个候选代号（甲乙丙丁… 或单个大写字母）不许出现在两个分项的候选表里
+# gate-cell: inference-needs-verdict 决策分项依据块里自陈是推论的条目（是推论、是推的、只走了本地腿、没走三方），要指到一份存在的 research/prompts/*-main-verification.md
+# gate-cell: three-way-leg-record 决策分项依据块里写了「三方」的条目，要指到 research/ 下存在的判决或腿输出，或写明腿况缺失且不写阴性结论
 #
 # 用法：
-#   bash .claude/gate.d/doc-decisions.sh [项目根]                                       十八格都跑；项目根不给取本脚本往上两级
+#   bash .claude/gate.d/doc-decisions.sh [项目根]                                       二十格都跑；项目根不给取本脚本往上两级
 #   bash .claude/gate.d/doc-decisions.sh --list                                         逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-decisions.sh --check <格名>[,<格名>…] [项目根]              只跑点名的格，按格名表的次序
 #   bash .claude/gate.d/doc-decisions.sh --write [--check decision-items-sync] [项目根]  重写 decisions.md 的分项清单生成块与索引表「状态」「进度」两列，写完回读判一遍
@@ -53,24 +56,40 @@
 #   settled-same-file-item-heading-red / -green  settled-same-file 的分项定案标题样本：本次提交在未定项一节之前新增 `#### 已定项 2：丙问题`；
 #                                           红的那份未定项一字未动、索引页待议节补了复核注，红在那条未定项上；绿的那份未定项与待议节都补了复核注，绿
 #   history-loss-red / history-loss-green   基准里一块带一个数：整理时弄丢了判红；整理成一条结论、数都在判绿
+#   cross-decision-status-noun-phrase-red   D2502 写「D2501 的条带宽度可变粒度仍然未定」而 D2501 已定（隔着名词短语）；半定的 D2509 同样判红：cross-decision-status 红
+#   cross-decision-status-quoted-red        「」引文里的陈旧写法（隔名词短语的与紧贴的各一处），引文旁边没有现状：红
+#   cross-decision-status-relaxed-green     引文带现状（同一句、下一句、引用块之后的下一段）、「未定 0 项」「余下三项未定」、说成未定、当时未定、夹了 E12 的、待定的决策说未定：绿
+#   cross-decision-status-ledger-green      隔名词短语的一句被挂账表罩住：绿
+#   inference-needs-verdict-red / -green    红：自陈是推论而没有判决、判决文件不存在各一条，另一条带存在的判决不判；
+#                                           绿：带判决、「不是推的」、用户定案的「没走三方」、被挂账表罩住、记号在「」引文里
+#   three-way-leg-record-red / -green       红：点名的材料不存在、没有指针也没写腿况、腿况缺失却写了阴性结论各一条；
+#                                           绿：指到存在的材料、腿况缺失、否定的「没有走三方论证」、「」里引的阴性原话、「第三方」、被挂账表罩住
+#   evidence-ledger-red                     挂账表写坏（列数、格名、片段太短）与罩不住（对象不红、文件不在），三格都红
+#   evidence-ledger-grew-red                setup.sh 造 git 仓：挂账表相对基准提交多了一行：three-way-leg-record 红
+#   evidence-pointer-history-green          setup.sh 造 git 仓：判决与材料先提交、后整批删掉（归档出了树，git 历史里取得回来）：inference-needs-verdict、three-way-leg-record 绿
 # 弄坏开关（样本自检时设进环境）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/doc-decisions.sh/ 下的目录名，
 # 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库：红格按绿记、整道退 0
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-history-red、decision-items-sync-red、decision-summary-width-red、
 #       freeze-layer-membership-red、history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、
 #       settled-same-file-item-heading-red、settled-same-file-red、shape-cells-marker-red、shape-red、stale-open-items-red、status-redundancy-red、user-verdict-owed-red、
+#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red、
 #       write-frequency-red（期望退出 1，实测 0）
 #   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的格都跑
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
 #       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
-#       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red、
+#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       evidence-ledger-red（输出里找不到「doc-decisions.sh：3 格里 3 格红…」）；
 #       candidate-codes-green、decision-documents-green、decision-history-green、history-loss-green、settled-same-file-item-heading-green、shape-green（期望退出 0，实测 1）；
 #       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
 #       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
 #   STAGE_CELLS_BREAK=check-ignored  归共用库：点名选格不起作用（--check 与样本根的 .gate-cells 共用一段），照跑全部登记的格
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
 #       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
-#       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red、
+#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       evidence-ledger-red（输出里找不到「doc-decisions.sh：3 格里 3 格红…」）；
 #       candidate-codes-green、decision-documents-green、decision-history-green、history-loss-green、settled-same-file-item-heading-green、shape-green（期望退出 0，实测 1）；
 #       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
 #       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
@@ -82,7 +101,11 @@
 #   DOC_DECISIONS_BREAK=status-redundancy  status-redundancy 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「状态只说一遍，且分项都在对的节里…」）；status-redundancy-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=cross-decision-status  cross-decision-status 格不跑、按判过了记
-#       cross-decision-status-red（期望退出 1，实测 0）；decision-documents-green（输出里找不到「没有把已定的决策说成未定…」）
+#       cross-decision-status-red、cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red（期望退出 1，实测 0）；
+#       decision-documents-green（输出里找不到「没有把已定的决策说成未定…」）；
+#       cross-decision-status-relaxed-green（输出里找不到「没有把已定的决策说成未定（扫 3 份 kb 文件，比对 3 条决策的状态行）」）；
+#       cross-decision-status-ledger-green（输出里找不到「没有把已定的决策说成未定（扫 2 份 kb 文件，比对 2 条决策的状态行）」）；
+#       evidence-ledger-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 4 处不对」）
 #   DOC_DECISIONS_BREAK=settled-item-self-open  settled-item-self-open 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「已定项的正文没有把已经定了的东西说成未定…」）；settled-item-self-open-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=settled-ref-says-open  settled-ref-says-open 格不跑、按判过了记
@@ -145,6 +168,49 @@
 #       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「1 个新开的 `### 日期` 块下一条 `- ` 变更项都…」）
 #   DOC_DECISIONS_BREAK=candidate-codes-unchecked  candidate-codes 复用的候选代号不判红，汇总照样记绿
 #       candidate-codes-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=inference-needs-verdict  inference-needs-verdict 格不跑、按判过了记
+#       inference-needs-verdict-red（期望退出 1，实测 0）；inference-needs-verdict-green（输出里找不到「自陈是推论的依据条目都指到了存在的判决：扫 1 份决策、5 条依据条目，带推论记号的 2 条…」）；
+#       evidence-ledger-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 5 处不对」）；
+#       evidence-pointer-history-green（输出里找不到「自陈是推论的依据条目都指到了存在的判决：扫 1 份决策、2 条依据条目，带推论记号的 1 条…」）
+#   DOC_DECISIONS_BREAK=three-way-leg-record  three-way-leg-record 格不跑、按判过了记
+#       three-way-leg-record-red、evidence-ledger-grew-red（期望退出 1，实测 0）；three-way-leg-record-green（输出里找不到「依据里写了「三方」的条目都有腿况记录：扫 1 份决策、6 条依据条目，写了「三方」的 4 条…」）；
+#       evidence-ledger-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 3 处不对」）；
+#       evidence-pointer-history-green（输出里找不到「依据里写了「三方」的条目都有腿况记录：扫 1 份决策、2 条依据条目，写了「三方」的 1 条…」）
+#   DOC_DECISIONS_BREAK=cross-decision-status-tight-only  cross-decision-status 只认紧贴的写法（改前的判法）
+#       cross-decision-status-noun-phrase-red（期望退出 1，实测 0）；cross-decision-status-ledger-green（期望退出 0，实测 1：挂账行罩的那一句不红了）；
+#       cross-decision-status-quoted-red（输出里找不到「.claude/kb/decisions/2504-引文样本引用方.md:3 说 D2503 未定（隔着名词短语，在「」引文里…」）；
+#       cross-decision-status-relaxed-green（输出里找不到「隔着名词短语的写法滤掉的：计数写法 3 处；…」）
+#   DOC_DECISIONS_BREAK=cross-decision-status-quote-skipped  「」引文里的写法一概放过（改前的判法）
+#       cross-decision-status-quoted-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=cross-decision-status-quote-current-ignored  「」引文旁边有没有现状都判红
+#       cross-decision-status-relaxed-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=cross-decision-status-count-form-judged  「已定 3 项 / 未定 0 项」「余下三项未定」这类计数写法也判
+#       cross-decision-status-relaxed-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=cross-decision-status-history-phrases-judged  「说成未定」「（当时未定）」也判
+#       cross-decision-status-relaxed-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=cross-decision-status-other-number-ignored  决策号与「未定」之间夹了别的编号也判
+#       cross-decision-status-relaxed-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=evidence-pointer-unchecked  点名了判决 / 材料就算指到，不查存在（inference-needs-verdict、three-way-leg-record 共用）
+#       inference-needs-verdict-red（输出里找不到「自陈是推论的依据条目没有指到存在的判决：2 条」）；three-way-leg-record-red（输出里找不到「依据里写了「三方」而没有腿况记录：3 条」）
+#   DOC_DECISIONS_BREAK=evidence-history-ignored  判决 / 材料只认树里的，不读 git 历史（两格共用）
+#       evidence-pointer-history-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=evidence-ledger-unjudged  挂账表的行不核罩没罩住、写得对不对（三格共用）
+#       evidence-ledger-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=evidence-ledger-growth-unjudged  挂账表相对基准涨了不判（三格共用）
+#       evidence-ledger-grew-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=evidence-ledger-ignored  挂账表当空表读（三格共用）
+#       cross-decision-status-ledger-green、inference-needs-verdict-green、three-way-leg-record-green（期望退出 0，实测 1）；evidence-ledger-red（期望退出 1，实测 0）；
+#       evidence-ledger-grew-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 1 处不对」）
+#   DOC_DECISIONS_BREAK=inference-user-verdict-judged  用户定案的「没走三方」也算自陈的推论
+#       inference-needs-verdict-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=inference-negation-ignored  「不是推的」也算推论记号
+#       inference-needs-verdict-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=three-way-leg-negative-allowed  腿况缺失的条目写了阴性结论也放过
+#       three-way-leg-record-red（输出里找不到「依据里写了「三方」而没有腿况记录：3 条」）
+#   DOC_DECISIONS_BREAK=three-way-leg-quotes-judged  「」引文里的阴性写法也算这一条写了阴性结论
+#       three-way-leg-record-green（期望退出 0，实测 1）
+#   DOC_DECISIONS_BREAK=three-way-leg-negated-judged  「没有走三方论证」也算在说跑过三方
+#       three-way-leg-record-green（期望退出 0，实测 1）
 set -uo pipefail
 # 路径要在 cd 之前算：$0 是相对路径时，cd 进项目根之后就指不到了
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
@@ -172,8 +238,8 @@ stage_cell item-ref-status judge_item_ref_status "每一处「D<n>（简称） �
   "照红行把引用处写的「已定项 / 未定项」改成与那条决策正文分项表一致；分项改了号的，引用处跟着改号（scripts/kb/relabel-item.py）"
 stage_cell status-redundancy judge_status_redundancy "状态别说两遍：小节标题不带「—— 已定」、条目不同时写破折号与「状态：」、分项索引行挂在对的节" \
   "状态只在一处说：删掉小节标题里的「—— 已定」与条目里多出的那一种写法，挂错节的分项挪到它状态对应的那一节"
-stage_cell cross-decision-status judge_cross_decision_status "紧贴「D<n>（简称）」写「未定」，而那条决策的状态行不是待定" \
-  "读那条决策现在定了什么，把这句改写成它的现状"
+stage_cell cross-decision-status judge_cross_decision_status "「D<n>（简称）」之后写「未定」（紧贴、隔着名词短语、「」引文里旁边没有现状），而那条决策的状态行不是待定" \
+  "读那条决策现在定了什么，把这句改写成它的现状；在「」里要原样留着的旧写法，在引文之后的同一句或下一句写一句现状；改好的存量要把罩它的挂账行删掉（.claude/gate.d/decision-evidence-lag.tsv，改 gate.d 归工具实现员）"
 stage_cell settled-item-self-open judge_settled_item_self_open "已定项区段里说它自己、或同一条决策里另一条已定分项还没定" \
   "这是定案之后没清理的推导过程：把这句改写成定案后的现状；真没定就把分项挪回未定项"
 stage_cell settled-ref-says-open judge_settled_ref_says_open "引用写着「已定项 k」、归属到的那一条也已定，紧跟着却说它没定" \
@@ -202,6 +268,10 @@ stage_cell history-loss judge_history_loss "两份变更史与基准相比，基
   "红行列出的数或编号逐个补回那一块、改成指针或 git 引用；确认是有意删的过程数才可以不补，那就在同一块里写一行「去向」说明"
 stage_cell candidate-codes judge_candidate_codes "同一份决策里，同一个候选代号（甲乙丙丁… 或单个大写字母）不许出现在两个分项的候选表里" \
   "红行点名的代号，在后写的那个分项里换一个这份决策里没用过的代号；引用别的分项的候选时写「已定项 7 的丙」带上分项，带了分项前缀的写法不算复用"
+stage_cell inference-needs-verdict judge_inference_needs_verdict "决策分项依据块里自陈是推论的条目（是推论、是推的、只走了本地腿、没走三方），要指到一份存在的 research/prompts/*-main-verification.md" \
+  "在红行点名的那一条里写上判决文件（在树里，或在 git 历史里取得回来）；推论还没走三方的先走一轮三方，别先登挂账表 .claude/gate.d/decision-evidence-lag.tsv；改好的存量要把罩它的那一行挂账行删掉（改 gate.d 归工具实现员）"
+stage_cell three-way-leg-record judge_three_way_leg_record "决策分项依据块里写了「三方」的条目，要指到 research/ 下存在的判决或腿输出，或写明腿况缺失且不写阴性结论" \
+  "在红行点名的那一条里点名那一轮的判决或腿输出；取不回来的写明腿况缺失（没有腿况记录），并去掉「都没找到」「构造不出」这类阴性写法；改好的存量要把罩它的那一行挂账行删掉（.claude/gate.d/decision-evidence-lag.tsv，改 gate.d 归工具实现员）"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 write_mode=0; root_argument=""
@@ -905,18 +975,42 @@ PY
 )
 
 # ════ 格「说未定其实已定」════
-# kb 正文里紧贴「D<n>（简称）」写的「未定」，与那条决策状态行比：状态不是「待定」（含「待定（…）」）判红。
+# kb 正文里「D<n>（简称）」后面写的「未定」，与那条决策状态行比：状态不是「待定」（含「待定（…）」）判红。
 # 与格「未定项被别处定了」不是一条：那一格只扫未定项小节、按时间比；这一格扫全部正文、按文本比，写在已定项论证、不变量清单、实验正文里的它才抓得到。
-# 只认紧贴的写法并跳过「」引文：放宽到隔 40 字时假红远多于真红。代价是隔着名词短语的（「D2 的条带宽度可变粒度仍然未定」）漏掉，靠人看。
-# 样本：cross-decision-status-red 里「D180 未定」而 D180 已定判红；decision-documents-green 里被引的那条标着待定（含「待定（两项未定）」）判绿。
+# 三种写法都判（C61）：
+#   紧贴：「D<n>（简称） 未定」「D<n> 取值仍然未定」，旧判法，一字没动。
+#   隔着名词短语：决策号之后、同一句（到「。；！？」或行尾）里出现「未定」，中间不夹别的编号（D<n>、已定项 / 未定项 k、C<n>、E<n>、I-x.y）：
+#     「D2（RAID 条带策略） 的条带宽度可变粒度仍然未定」。
+#   引文：落在「」里的陈旧写法（紧贴的也算）不再一概放过，要求引文关闭之后的同一句或下一句有一句现状或过时标注（词表见 current_re：已定、现已、改写、没了……，
+#     不含引文里的字），没有判红；「」跨行、跨段（引用块）照段内累计，引文是段末时下一句取下一个非空行。
+# 射程（隔名词短语这一支）：只加「同一句内、中间不夹别的编号」一条而不加别的滤，在真仓 kb 全部正文上命中 71 处，真缺陷 1 处、其余 70 处不是缺陷：
+#   计数与标题 59 处（「已定 8 项 / 未定 0 项」「半定（一项未定）」「其中未定 0」）、说成未定或当时未定 4 处、实验变更史 3 处、表格竖线 1 处、不是谓语 1 处（「相对次序未定义」）、
+#   「」引文旁边已带现状的 2 处；真缺陷是 experiments/43 一处引 D21 旧正文「未定案」而旁边没有现状（登进挂账表）。下面的滤照这 70 处定：
+#   不判的写法——计数（「已定 8 项 / 未定 0 项」「一项未定」「未定 0」）；表格竖线、「——」破折号、斜杠、「其中」之后（结构而不是陈述）；
+#   「说成 / 写成 / 记成 / 当成 / 判成 / 读成 / 标成 / 称成」之后（在描述一处旧的错写）；「当时 / 曾 / 原来 / 此前 / 早先 / 旧」之后（历史陈述）；
+#   「未定项 / 未定分项 / 未定义 / 未定的 / 未定过」不是谓语：只认「未定」（可带「案」）之后紧跟标点、空白、括号、引号、星号、省略号、「但 / 仍」或句末的写法；
+#   实验变更史（experiments-history.md，整份写的是当时的状态，与格「引用写已定紧跟说没定」同一份名单）里新加的两种写法（隔名词短语、引文）不判，紧贴的照旧判。
+#   代价：D<n> 半定时，「D2 的某分项未定」可能是实话（那个分项真的开着），这一支照旧判红，出路是写成「D<n>（简称） 未定项 k」；
+#   中间夹了别的编号的、「若 / 如果」假设句里的陈旧写法判不出，靠人看。
+# 存量：此刻真仓上判红的一处登在 .claude/gate.d/decision-evidence-lag.tsv（格名 cross-decision-status），写法与只缩不涨的规矩在那张表的文件头。
+# 样本：cross-decision-status-red 里「D180 未定」而 D180 已定判红；cross-decision-status-noun-phrase-red 里隔着名词短语的判红；
+#   cross-decision-status-quoted-red 里没有现状的引文判红；cross-decision-status-relaxed-green 里带现状的引文、计数、说成未定、当时未定、夹别的编号的判绿；
+#   decision-documents-green 里被引的那条标着待定（含「待定（两项未定）」）判绿。
+# 弄坏开关 DOC_DECISIONS_BREAK=cross-decision-status-tight-only（只认紧贴）/ -quote-skipped（引文一概放过）/ -quote-current-ignored（引文一概判红）/
+#   -count-form-judged（计数也判）/ -history-phrases-judged（说成未定、当时未定也判）/ -other-number-ignored（中间夹了别的编号也判）。
 grid_cross_decision_status() (
   KB="$PWD/.claude/kb"
   [[ -d "$KB/decisions" ]] || { echo "  ! 没有 $KB/decisions，这一格无对象可判"; exit 77; }
 
-  python3 - "$KB" <<'PY'
-import re, sys, pathlib
+  load_diff_base
 
+  DECISION_EVIDENCE_SOURCE="$DECISION_EVIDENCE_SOURCE" python3 - "$KB" "$BREAK_SWITCH" "$diff_base" <<'PY'
+import os, re, sys, pathlib, types
+
+lib = types.ModuleType("decision_evidence")
+exec(compile(os.environ["DECISION_EVIDENCE_SOURCE"], "DECISION_EVIDENCE_SOURCE", "exec"), lib.__dict__)
 kb = pathlib.Path(sys.argv[1])
+diff_base = sys.argv[3]
 
 # 1) 每条决策的状态取正文标题行 `## D<n> 简称 —— 状态`：破折号前的空格可选（D14 没有）；解析不了的标题判红，不当成跳过
 status, name, unparsed = {}, {}, []
@@ -936,12 +1030,71 @@ if unparsed:
 if not status:
     print("  ! 没有决策正文，这一格无对象可判"); sys.exit(77)
 
-# 2) 紧贴：D<n>（简称） 之后只许空白、逗号、括号、「取值」「状态」与「仍 / 仍然 / 尚 / 都 / 均」，然后是「未定」（不是「未定项」）
+# 2) 三种写法。紧贴：D<n>（简称） 之后只许空白、逗号、括号、「取值」「状态」与「仍 / 仍然 / 尚 / 都 / 均」，然后是「未定」（不是「未定项」）
 ref_re = re.compile(r'D\d+(?:（[^）]*）)?')
 tight_re = re.compile(r'^[\s，,、（(]*(?:取值|状态)?[\s：:]*(?:仍然|仍|尚|都|均)?未定(?!项)')
+# 隔着名词短语：同一句里决策号之后的「未定」。「未定」要是谓语（可带「案」，后面紧跟标点、空白、括号、引号、星号、省略号、「但 / 仍」或句末）
+open_re = re.compile(r'未定案?(?=$|[\s，。；：、）)」』*—…（(`_\\但仍])')
+number_class = '0-9一二三四五六七八九十两'
+count_before_re = re.compile(rf'[{number_class}]\s*[项条个]$')            # 「一项未定」「三条未定」
+count_after_re = re.compile(rf'\s*[{number_class}]')                       # 「未定 0 项」「未定 3」
+other_number_re = re.compile(r'D\d+|(?:已定|未定)项\s*\d+|(?<![A-Za-z0-9])(?:[CE]\d+|I-\d+(?:\.\d+)?)')
+structure_re = re.compile(r'\||——|/|其中')
+described_re = re.compile(r'(?:说|写|记|当|算|判|读|标|称)成\s*$')
+past_re = re.compile(r'当时|曾|原来|此前|早先|旧')
+# 引文旁边的现状：引文关闭之后的同一句或下一句有这些词之一（不含引文里的字）
+current_re = re.compile(r'已定|已经定|现已|现在|现状|如今|后来|改写|改成|已改|作废|过时|陈旧|没了|不再成立|已不成立|当时|曾')
+sentence_end = '。；！？'
+break_switch = sys.argv[2]
+tight_only = break_switch == "cross-decision-status-tight-only"
+quote_skipped = break_switch == "cross-decision-status-quote-skipped"
+quote_current_ignored = break_switch == "cross-decision-status-quote-current-ignored"
+count_form_judged = break_switch == "cross-decision-status-count-form-judged"
+history_phrases_judged = break_switch == "cross-decision-status-history-phrases-judged"
+other_number_ignored = break_switch == "cross-decision-status-other-number-ignored"
+
+
+def relaxed_hit(sentence, tallies):
+    """隔着名词短语的写法：返回命中的「未定」在 sentence 里的位置，没有返回 None；被滤掉的写法记进 tallies。"""
+    for open_match in open_re.finditer(sentence):
+        between, after = sentence[:open_match.start()], sentence[open_match.end():]
+        if not count_form_judged and (count_before_re.search(between.rstrip()) or count_after_re.match(after)):
+            tallies["计数写法"] += 1
+            continue
+        if not other_number_ignored and other_number_re.search(between):
+            tallies["中间夹了别的编号"] += 1
+            return None
+        if structure_re.search(between):
+            tallies["表格竖线、破折号、斜杠、「其中」之后"] += 1
+            return None
+        if not history_phrases_judged and (described_re.search(between) or past_re.search(between)):
+            tallies["说成未定或当时未定"] += 1
+            return None
+        return open_match
+    return None
+
+
+def current_beside(paragraph_lines, start_line, start_column, depth_here):
+    """引文旁边有没有现状：从命中的位置往后取，引文还开着就先跳到它的右引号，再取同一句剩下的和下一句（句子按「。；！？」和换行切）。"""
+    text = paragraph_lines[start_line][start_column:]
+    following = start_line + 1
+    while following < len(paragraph_lines) and len(text) < 2000:
+        text += "\n" + paragraph_lines[following]
+        following += 1
+    if depth_here > 0:
+        close = text.find("」")
+        if close < 0:
+            return False
+        text = text[close + 1:]
+    text = re.sub(r"「[^」]*」", "", text)
+    segments = [s for s in re.split(rf"[{sentence_end}\n]", text) if s.strip()]
+    return any(current_re.search(s) for s in segments[:2])
+
 
 bad, in_hist = [], False
-scanned_files, history_files, history_section_lines, quoted_references = 0, [], 0, 0
+scanned_files, history_files, history_section_lines = 0, [], 0
+tallies = {"计数写法": 0, "中间夹了别的编号": 0, "表格竖线、破折号、斜杠、「其中」之后": 0, "说成未定或当时未定": 0}
+tight_hits = relaxed_hits = quoted_with_current = as_of_then_skipped = 0
 for f in sorted(kb.rglob("*.md")):
     rel = f.relative_to(kb.parent.parent)
     # 决策变更史整份是历史，写的是当时的状态
@@ -950,7 +1103,15 @@ for f in sorted(kb.rglob("*.md")):
         continue
     scanned_files += 1
     in_hist = False
-    for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+    file_lines = f.read_text(encoding="utf-8").splitlines()
+    depth = 0           # 「」的嵌套深度，空行归零（引用块跨行的引文照段内累计）
+    paragraph_start = 0
+    for i, line in enumerate(file_lines, 1):
+        if not line.strip():
+            depth, paragraph_start = 0, i
+            continue
+        depth_start = depth
+        depth = max(0, depth + line.count('「') - line.count('」'))
         # 只认整行的「## 历史版本」：前缀匹配会让「### 历史版本对照」把后半份文件整段跳过
         if re.match(r'^##\s*历史版本\s*$', line):
             in_hist = True          # 文末历史节按定义写的是旧状态，不判
@@ -961,30 +1122,70 @@ for f in sorted(kb.rglob("*.md")):
             d = re.match(r'D\d+', m.group(0)).group(0)
             if d not in status:
                 continue
-            tm = tight_re.match(line[m.end():])
-            if not tm:
-                continue
-            # 「」引文里的是被当作历史陈述引用的原话，不判
-            head = line[:m.end()]
-            if head.count('「') > head.count('」'):
-                quoted_references += 1
-                continue
             # 标题可以写成「待定（两项未定）」：逐字比「待定」会把合法的「D<n> 未定」判红
             if re.match(r'\*{0,2}待定', status[d]):
                 continue
-            bad.append((str(rel), i, d, status[d], line.strip()[:110]))
+            rest = line[m.end():]
+            kind, stale_column = None, None
+            tm = tight_re.match(rest)
+            if tm:
+                kind, stale_column = "紧贴", m.end() + tm.end()
+            elif not tight_only:
+                cut = min([rest.find(c) for c in sentence_end if c in rest] or [len(rest)])
+                hit = relaxed_hit(rest[:cut], tallies)
+                if hit:
+                    kind, stale_column = "隔着名词短语", m.end() + hit.end()
+            if kind is None:
+                continue
+            quoted = max(0, depth_start + line[:stale_column].count('「') - line[:stale_column].count('」')) > 0
+            # 实验变更史整份写的是当时的状态（与格「引用写已定紧跟说没定」同一份名单）：旧判法（紧贴、不在引文里）照判，新加的两种写法不判
+            if f.name == "experiments-history.md" and (quoted or kind != "紧贴"):
+                as_of_then_skipped += 1
+                continue
+            if quoted:
+                # 「」引文里的是被当作历史陈述引用的原话：旁边（同一句或下一句）有一句现状才放过
+                if quote_skipped or (not quote_current_ignored and current_beside(file_lines[paragraph_start:], i - 1 - paragraph_start, stale_column, 1)):
+                    quoted_with_current += 1
+                    continue
+                kind += "，在「」引文里而旁边（同一句或下一句）没有现状"
+            elif kind == "紧贴":
+                tight_hits += 1
+            else:
+                relaxed_hits += 1
+            bad.append((str(rel), i, d, status[d], kind, line.strip()))
             break
 
-if bad:
-    for rel, ln, d, st, text in bad:
-        print(f"  ✗ {rel}:{ln} 说 {d} 未定，而 {d}（{name[d]}）的状态行是「{st}」")
-        print(f"     原文：{text}")
-    print("     → 怎么办：读那条决策现在定了什么，把这句改写成它的现状；")
-    print("               若指的是它下面某个还开着的分项，写成「D<n>（简称） 未定项 k」。")
+# 3) 存量挂账（.claude/gate.d/decision-evidence-lag.tsv 里格名是 cross-decision-status 的行）：一行恰好罩住此刻判红的一处，罩不住判红，表相对基准涨了判红
+rows, ledger_problems, ledger_present = lib.read_ledger()
+if break_switch == 'evidence-ledger-ignored':
+    rows, ledger_problems = [], []
+red_entries = [(rel, "-", ln, text, (rel, ln, d, st, kind, text)) for rel, ln, d, st, kind, text in bad]
+still_red, ledgered, stale = lib.apply_ledger("cross-decision-status", red_entries, rows)
+bad = [entry[4] for entry in still_red]
+grown = [] if break_switch == "evidence-ledger-growth-unjudged" else lib.ledger_growth("cross-decision-status", rows, lib.base_ledger_text(diff_base))
+table_problems = [] if break_switch == "evidence-ledger-unjudged" else ledger_problems + stale
+table_problems += [f"{lib.LEDGER}:{row[0]} 相对基准那一版新增了一行（{row[2]} {row[3]}）：这张表只缩不涨" for row in grown]
+filtered_note = ("隔着名词短语的写法滤掉的：" + "；".join(f"{key} {count} 处" for key, count in tallies.items())
+                 + f"；「」引文里旁边带现状放过的 {quoted_with_current} 处；实验变更史里新判法不判的 {as_of_then_skipped} 处；被挂账表罩住的 {ledgered} 处")
+
+if bad or table_problems:
+    for rel, ln, d, st, kind, text in bad:
+        print(f"  ✗ {rel}:{ln} 说 {d} 未定（{kind}），而 {d}（{name[d]}）的状态行是「{st}」")  # gate-lint:detail
+        print(f"     原文：{text[:110]}")
+    if bad:
+        print("     → 怎么办：读那条决策现在定了什么，把这句改写成它的现状；")
+        print("               若指的是它下面某个还开着的分项，写成「D<n>（简称） 未定项 k」；")
+        print("               在「」里的旧写法要原样留着，就在引文之后的同一句或下一句写一句现状（「现已定……」「已改写成……」）。")
+    if table_problems:
+        print(f"  ✗ 挂账表 {lib.LEDGER} 有 {len(table_problems)} 处不对")  # gate-lint:summary
+        for problem in table_problems:
+            print(f"     {problem}")  # gate-lint:detail
+        print("     → 怎么办：这张表只收此刻判红、当场补不上的存量：罩不住的行删掉（对象改好了就是它该退场），格式写坏的照表头改；新判红的句子改写成现状，别往表里加行。")
+    print(f"     {filtered_note}")
     sys.exit(1)
 print(f"  ✓ 没有把已定的决策说成未定（扫 {scanned_files} 份 kb 文件，比对 {len(status)} 条决策的状态行）")
-print(f"     没查的：决策变更史 {len(history_files)} 份（整份是历史）；各文件「## 历史版本」一节里 {history_section_lines} 行；"
-      f"「」引文里紧贴决策号的 {quoted_references} 处（被引用的原话）")
+print(f"     没查的：决策变更史 {len(history_files)} 份（整份是历史）；各文件「## 历史版本」一节里 {history_section_lines} 行")
+print(f"     {filtered_note}")
 for history_file in history_files:
     print(f"       变更史：{history_file}")
 PY
@@ -2813,6 +3014,416 @@ print(f'  ✓ 同一份决策里的候选代号没有跨分项复用：扫了 {s
 PY
 )
 
+# ════════════════ 依据块与挂账表：推论要有判决、三方要有腿况 ════════════════
+
+# 格「推论要有判决」「三方要有腿况」与格「说未定其实已定」共用：读决策分项「**依据**：」块的条目、解析三方判决 / 腿输出的指针、读挂账表。
+# 只有这三格用（脚本里读成模块），所以不另立库文件；挂账表的写法在 .claude/gate.d/decision-evidence-lag.tsv 文件头。
+IFS= read -r -d '' DECISION_EVIDENCE_SOURCE <<'PY' || true
+"""决策分项「**依据**：」块的读法、三方判决 / 腿输出指针的解析、挂账表的读法。"""
+import fnmatch, os, re, subprocess
+
+DECISIONS = '.claude/kb/decisions'
+LEDGER = '.claude/gate.d/decision-evidence-lag.tsv'
+FENCE = re.compile(r'^[ \t]*```')
+HEADING = re.compile(r'^(#{1,6})[ \t]+(.*?)[ \t]*$')
+ITEM_HEADING = re.compile(r'^(已定项|未定项)[ \t]*(\d+)')
+OWN_HISTORY = re.compile(r'^##[ \t]*历史版本[ \t]*$')
+BLOCK_START = re.compile(r'^\*\*依据\*\*[：:](.*)$')
+BLOCK_END = re.compile(r'^\*\*(?:欠|射程|定案|题面|问题)\*\*[：:]')
+ENTRY_START = re.compile(r'^(?:[-*+][ \t]+|\d+[.)][ \t]+|\|)')
+BULLET = re.compile(r'^(?:[-*+]|\d+[.)])[ \t]+')
+QUOTED = re.compile(r'「[^」]*」')
+CELLS = ('inference-needs-verdict', 'three-way-leg-record', 'cross-decision-status')
+SNIPPET_MINIMUM = 8
+REASON_MINIMUM = 4
+
+
+def read_entries(decisions=DECISIONS):
+    """每份决策正文里每个分项的「依据」块拆成条目：(文件路径, 分项, 起始行号, 条目全文)，另返回读了几份决策。
+    条目 = 一个顶格列表项 / 编号项 / 表格行，或块里空行之后的一段；折行与缩进的子项并进上一条。
+    「## 历史版本」起、围栏里的行不读；分项取最近一个 `### / #### 已定项 N / 未定项 N` 标题。"""
+    entries, files = [], 0
+    for name in sorted(os.listdir(decisions)):
+        if not name.endswith('.md'):
+            continue
+        files += 1
+        path = f'{decisions}/{name}'
+        item, inside, in_fence, previous_blank, current = None, False, False, False, None
+        with open(path, encoding='utf-8') as handle:
+            lines = handle.read().splitlines()
+        for number, line in enumerate(lines, 1):
+            if OWN_HISTORY.match(line):
+                break
+            if FENCE.match(line):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
+            heading = HEADING.match(line)
+            closing = heading or BLOCK_END.match(line)
+            if closing and current is not None:
+                entries.append((path, current[0], current[1], ' '.join(current[2]).strip()))
+                current = None
+            if heading:
+                inside, previous_blank = False, False
+                title = ITEM_HEADING.match(heading.group(2))
+                item = f'{title.group(1)} {title.group(2)}' if title and len(heading.group(1)) >= 3 else None
+                continue
+            if BLOCK_END.match(line):
+                inside = False
+                continue
+            start = BLOCK_START.match(line)
+            if start and item is not None:
+                if current is not None:
+                    entries.append((path, current[0], current[1], ' '.join(current[2]).strip()))
+                    current = None
+                inside, previous_blank = True, False
+                if start.group(1).strip():
+                    current = (item, number, [start.group(1).strip()])
+                continue
+            if not inside:
+                continue
+            if not line.strip():
+                previous_blank = True
+                continue
+            begins = bool(ENTRY_START.match(line)) or previous_blank
+            previous_blank = False
+            if begins:
+                if current is not None:
+                    entries.append((path, current[0], current[1], ' '.join(current[2]).strip()))
+                current = (item, number, [BULLET.sub('', line).strip()])
+            elif current is not None:
+                current[2].append(line.strip())
+            else:
+                current = (item, number, [line.strip()])
+        if current is not None:
+            entries.append((path, current[0], current[1], ' '.join(current[2]).strip()))
+    return entries, files
+
+
+def strip_quotes(text):
+    """去掉「」引起来的原话（被引的不是这一条自己在断言）。"""
+    return QUOTED.sub('', text)
+
+
+def artifact_names(history=True):
+    """research/prompts 与 research/results 下此刻在树里的每一级名字，加上 git 历史里出现过的路径的每一级名字（归档出了树、取得回来的那些）。
+    返回 (名字集合, 在树里的个数, 只在历史里的个数, 历史是否读得出)。"""
+    here, back, history_ok = set(), set(), False
+    for top in ('research/prompts', 'research/results'):
+        if os.path.isdir(top):
+            for _directory, directories, files in os.walk(top):
+                here.update(directories)
+                here.update(files)
+    if history:
+        try:
+            done = subprocess.run(['git', '-c', 'core.quotepath=false', 'log', '--all', '--name-only', '--format=', '--', 'research/prompts', 'research/results'],
+                                  capture_output=True, text=True)
+        except OSError:
+            done = subprocess.CompletedProcess([], 127, '', '')
+        if done.returncode == 0:
+            history_ok = True
+            for path in done.stdout.splitlines():
+                parts = path.strip().split('/')
+                if len(parts) > 2 and parts[0] == 'research':
+                    back.update(parts[2:])
+    return here | back, len(here), len(back - here), history_ok
+
+
+EXPLICIT = re.compile(r'research/(?:prompts|results)/([^\s`，。；、）)」\]]+)')
+BARE_FILE = re.compile(r'(?<![/\w.\-*{])([A-Za-z0-9_][\w.\-*{},]*\.(?:md|out|tsv))(?![\w])')
+BARE_DIRECTORY = re.compile(r'`([A-Za-z0-9_][\w.\-*{},]*)/`')
+
+
+def expand_braces(token):
+    found = re.search(r'\{([^{}]*)\}', token)
+    if not found:
+        return [token]
+    expanded = []
+    for choice in found.group(1).split(','):
+        expanded += expand_braces(token[:found.start()] + choice + token[found.end():])
+    return expanded
+
+
+def exists(name, names):
+    for alternative in expand_braces(name):
+        if '*' in alternative:
+            if any(fnmatch.fnmatch(candidate, alternative) for candidate in names):
+                return True
+        elif alternative in names:
+            return True
+    return False
+
+
+def pointer_verdict(text, names):
+    """条目里点名的研究材料：(存在的, 写成 research/prompts|results/… 而不存在的)。
+    research/ 开头的每一处都得存在；裸文件名与目录名只要有一个存在就算指到了，不存在的裸名字不判（可能是 kb 页）。"""
+    explicit = []
+    for found in EXPLICIT.finditer(text):
+        rest = found.group(1).rstrip('/.')
+        if rest:
+            explicit.append(rest.split('/')[-1])
+    bare = [m.group(1) for m in BARE_FILE.finditer(text)] + [m.group(1) for m in BARE_DIRECTORY.finditer(text)]
+    return [n for n in explicit + bare if exists(n, names)], [n for n in explicit if not exists(n, names)]
+
+
+def read_ledger(path=LEDGER):
+    """(行, 问题, 表在不在)：行 = (行号, 格名, 文件路径, 位置, 片段, 理由)。"""
+    rows, problems = [], []
+    if not os.path.isfile(path):
+        return rows, problems, False
+    with open(path, encoding='utf-8') as handle:
+        for number, raw in enumerate(handle, 1):
+            line = raw.rstrip('\n')
+            if not line.strip() or line.startswith('#'):
+                continue
+            cells = line.split('\t')
+            if len(cells) != 5 or not cells[4].startswith('#'):
+                problems.append(f'{path}:{number} 要五列（格名、文件路径、位置、对象里逐字的一段、「# 理由」），实际 {len(cells)} 列：{line[:60]}')
+                continue
+            cell, target, place, snippet, reason = cells
+            if cell not in CELLS:
+                problems.append(f'{path}:{number} 格名「{cell}」不是这张表管的三格（{"、".join(CELLS)}）')
+            elif len(snippet.strip()) < SNIPPET_MINIMUM:
+                problems.append(f'{path}:{number} 对象里逐字的一段不足 {SNIPPET_MINIMUM} 个字：{snippet}')
+            elif len(reason.lstrip('#').strip()) < REASON_MINIMUM:
+                problems.append(f'{path}:{number} 理由不足 {REASON_MINIMUM} 个字')
+            else:
+                rows.append((number, cell, target, place, snippet, reason))
+    return rows, problems, True
+
+
+def apply_ledger(cell, red, rows, ledger_path=LEDGER):
+    """red = [(文件路径, 位置, 行号, 全文, 说明)]。返回 (仍红的, 被挂账罩住的条数, 表的问题)。
+    每一行必须恰好罩住这一格此刻判红的一个对象：罩不住（文件不在、位置改了、片段改了、对象已经不红）判红，删掉那一行。"""
+    problems, used = [], set()
+    for number, row_cell, target, place, snippet, _reason in rows:
+        if row_cell != cell:
+            continue
+        hits = [index for index, entry in enumerate(red) if entry[0] == target and entry[1] == place and snippet in entry[3]]
+        if not hits:
+            problems.append(f'{ledger_path}:{number} 登记的「{target} {place}」里含「{snippet[:30]}」的对象此刻在格「{cell}」不红'
+                            f'（文件、位置或片段对不上，或已经改好）')
+        elif len(hits) > 1:
+            problems.append(f'{ledger_path}:{number} 「{target} {place}」里有 {len(hits)} 处都含「{snippet[:30]}」，这一行罩的对象不唯一，片段写长一点')
+        else:
+            used.add(hits[0])
+    return [entry for index, entry in enumerate(red) if index not in used], len(used), problems
+
+
+def base_ledger_text(diff_base, ledger_path=LEDGER):
+    """基准那一版的挂账表正文；基准取不到、那一版没有这张表返回 None（不比）。路径写成 ./ 开头：按当前目录算，样本根在别的仓里时不会读到那个仓的表。"""
+    if not diff_base:
+        return None
+    try:
+        done = subprocess.run(['git', 'show', f'{diff_base}:./{ledger_path}'], capture_output=True, text=True)
+    except OSError:
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+def ledger_growth(cell, rows, base_text):
+    """基准那一版的表里没有的 (格名, 路径, 位置, 片段) = 涨了的行（只缩不涨）。"""
+    if base_text is None:
+        return []
+    base = set()
+    for raw in base_text.splitlines():
+        cells = raw.split('\t')
+        if raw.strip() and not raw.startswith('#') and len(cells) == 5:
+            base.add(tuple(cells[:4]))
+    return [row for row in rows if row[1] == cell and tuple(row[1:5]) not in base]
+PY
+
+# ════ 格「推论要有判决」════
+# 决策分项「**依据**：」块里自陈是推论的条目，要指到一份存在的 research/prompts/*-main-verification.md（主 agent 的判决）：
+# 文件此刻在树里，或照 .claude/rules/directory-layout.md 归档出了树、在 git 历史里取得回来（git log --all 里出现过这条路径）。指不到判红（C402）。
+# 条目 = 依据块里的一个顶格列表项 / 编号项 / 表格行，或空行之后的一段（折行并入）；「判决指针」要和推论记号在同一条目里。
+# 记号表（先在真仓 grep 过：这些写法 .claude/kb/decisions/ 下的依据块里都出现过，引文「…」里的不算）：
+#   「是推论」、「是推的」「，推的」「（推的」（前面是「不」的不算：「不是推的」），
+#   「只走了本地腿」「云端腿欠着」「腿欠着」，
+#   「没走三方」「没有走三方」「未走三方」「未三方论证」——这一组是用户定案的写法（「用户定案，没有走三方论证，可推翻」），
+#     同一条目里有「用户」就不算：定案人是用户，不是一条没走三方的推论；推论记号那三组不给这个豁免。
+#   看不见：词表外的写法（「推出」「推导」「无实验」本身不算：那是在说没量，不是在说没走三方）、记号写在依据块之外的。
+# 真仓上量过：依据块里 1080 条条目，带记号的 13 条（指到判决 10 条；另有 21 条是用户定案的「没走三方」，不算）；红 3 条（D22 已定项 8 与 25、D23 已定项 14），登在挂账表。
+# 存量挂账：.claude/gate.d/decision-evidence-lag.tsv 里本格的行，文件头写了写法；一行必须恰好罩住此刻判红的一条，罩不住判红，表里新增的行（相对基准那一版）判红。
+# 弄坏开关 DOC_DECISIONS_BREAK=evidence-pointer-unchecked（点名了判决就算指到，不查存在）/ evidence-history-ignored（只认树里的，不读 git 历史）/
+#   evidence-ledger-unjudged（挂账表的行不核罩没罩住、写得对不对）/ evidence-ledger-growth-unjudged（表涨了不判）/
+#   inference-user-verdict-judged（用户定案的「没走三方」也算推论）/ inference-negation-ignored（「不是推的」也算记号）。
+# 样本：inference-needs-verdict-red（无判决、判决文件不存在各一条，另有一条带存在的判决不判）、inference-needs-verdict-green（带判决、「不是推的」、用户定案、被挂账罩住）、
+#   evidence-ledger-red（挂账表写坏与罩不住）、evidence-ledger-grew-red（表相对基准涨了）、evidence-pointer-history-green（判决文件只在 git 历史里）。
+grid_inference_needs_verdict() (
+  [[ -d .claude/kb/decisions ]] || { echo "  ! 找不到 .claude/kb/decisions，这一格无对象可判"; exit 77; }
+  load_diff_base
+
+  DECISION_EVIDENCE_SOURCE="$DECISION_EVIDENCE_SOURCE" python3 - "$BREAK_SWITCH" "$diff_base" <<'PY'
+import os, re, sys, types
+
+lib = types.ModuleType('decision_evidence')
+exec(compile(os.environ['DECISION_EVIDENCE_SOURCE'], 'DECISION_EVIDENCE_SOURCE', 'exec'), lib.__dict__)
+BREAK, DIFF_BASE = sys.argv[1], sys.argv[2]
+CELL = 'inference-needs-verdict'
+VERDICT = re.compile(r'([\w.\-]+-main-verification\.md)')
+negation_guard = '' if BREAK == 'inference-negation-ignored' else '(?<!不)'
+# (记号名, 正则, 同一条目里有「用户」就不算)
+MARKERS = [
+    ('是推论', re.compile(negation_guard + '是推论'), False),
+    ('是推的', re.compile(negation_guard + '(?:是|，|（)推的'), False),
+    ('只走了本地腿', re.compile('只走了本地腿|云端腿欠着|腿欠着'), False),
+    ('没走三方', re.compile('(?:没有?走|未走)三方|未三方论证'), BREAK != 'inference-user-verdict-judged'),
+]
+
+if BREAK == 'evidence-pointer-unchecked':
+    lib.exists = lambda name, names: True
+names, in_tree, only_history, history_ok = lib.artifact_names(history=BREAK != 'evidence-history-ignored')
+entries, files = lib.read_entries()
+if not entries:
+    print(f'  ! 扫了 {files} 份决策，一条「**依据**：」块里的条目都没读到，这一格无对象可判')
+    sys.exit(77)
+
+red, marked, pointed, user_exempt = [], 0, 0, 0
+for path, item, number, text in entries:
+    plain = lib.strip_quotes(text)
+    hit = None
+    for label, pattern, exempt_with_user in MARKERS:
+        if pattern.search(plain):
+            if exempt_with_user and '用户' in plain:
+                user_exempt += 1
+                continue
+            hit = label
+            break
+    if not hit:
+        continue
+    marked += 1
+    verdicts = VERDICT.findall(text)
+    found = [v for v in verdicts if lib.exists(v, names)]
+    if found:
+        pointed += 1
+        continue
+    why = f'记号「{hit}」，' + (f'点名的判决 {"、".join(verdicts)} 在树里与 git 历史里都找不到' if verdicts else '同一条里没有指到任何 *-main-verification.md')
+    red.append((path, item, number, text, why))
+
+rows, ledger_problems, ledger_present = lib.read_ledger()
+if BREAK == 'evidence-ledger-ignored':
+    rows, ledger_problems = [], []
+red, ledgered, stale = lib.apply_ledger(CELL, red, rows)
+grown = [] if BREAK == 'evidence-ledger-growth-unjudged' else lib.ledger_growth(CELL, rows, lib.base_ledger_text(DIFF_BASE))
+table_problems = [] if BREAK == 'evidence-ledger-unjudged' else ledger_problems + stale
+table_problems += [f'{lib.LEDGER}:{row[0]} 相对基准那一版新增了一行（{row[2]} {row[3]}）：这张表只缩不涨' for row in grown]
+
+if red or table_problems:
+    if red:
+        print(f'  ✗ 自陈是推论的依据条目没有指到存在的判决：{len(red)} 条')  # gate-lint:summary
+        for path, item, number, text, why in red:
+            print(f'     {path}:{number} {item}：{why}')  # gate-lint:detail
+            print(f'       原文：{text[:110]}')
+        print('     → 怎么办：在这一条里写上判决文件（`research/prompts/<轮>-main-verification.md`，在树里或 git 历史里取得回来）；')
+        print('               推论还没走三方的，先走一轮三方（.claude/rules/three-way-inference.md），或把这一句改成观测，不要先登挂账表。')
+    if table_problems:
+        print(f'  ✗ 挂账表 {lib.LEDGER} 有 {len(table_problems)} 处不对')  # gate-lint:summary
+        for problem in table_problems:
+            print(f'     {problem}')  # gate-lint:detail
+        print('     → 怎么办：这张表只收此刻判红、当场补不上判决的存量，一行一条：罩不住的行删掉（对象改好了就是它该退场），格式写坏的照表头改；')
+        print('               新判红的条目补判决，别往表里加行。')
+    sys.exit(1)
+print(f'  ✓ 自陈是推论的依据条目都指到了存在的判决：扫 {files} 份决策、{len(entries)} 条依据条目，'
+      f'带推论记号的 {marked} 条（指到判决 {pointed} 条，挂账 {ledgered} 条；用户定案的「没走三方」{user_exempt} 条不算）')
+print(f'     判决文件：树里 {in_tree} 个名字，只在 git 历史里取得回来的 {only_history} 个' + ('' if history_ok else '（git 历史读不出，只认树里的）'))
+PY
+)
+
+# ════ 格「三方要有腿况」════
+# 决策分项「**依据**：」块里每一条写了「三方」的条目（C403），要二选一：
+#   ① 指到研究材料：条目里点名了 research/prompts 或 research/results 下存在的判决、材料或腿输出（在树里，或在 git 历史里取得回来）；
+#      写成 research/prompts/… 或 research/results/… 的每一处都得存在，裸文件名与目录名（`_d9q6-background.md`、`d2-item1-local.out`）有一个存在就算；
+#   ② 同一条目里写明腿况缺失（「没有腿况记录」「腿况缺失」「材料没有留存」「查不到对应的提示」「仓里只留了」……），而且这一条不许写成阴性结论
+#      （「都没找到」「构造不出」「没打中」「找不到反例」「没发现」「查不到任何」「零命中」「没有反例」「未发现」……）：
+#      没有腿况就分不出「腿跑了没打中」与「腿根本没跑」（.claude/rules/three-way-inference.md「一条腿只抽一次样不算一次观测」）。
+# 「三方」不含「第三方」；「没走三方论证」「未三方论证」这类否定的不是在说跑过三方，不算；「…」里引的话不进阴性结论的判断（被引来降级的原话）。
+# 看不见：指针存在但不是这一轮的、「腿况在变更史」这类指到 kb 别处的说法（要指到 research/ 下才算指到）、把阴性结论整句包进「」绕过去的。
+# 真仓上量过：依据块里 1080 条条目，写了「三方」的 164 条（指到存在的材料 114 条、写明腿况缺失 12 条）；红 38 条登在挂账表。欠账表 C403 点名的 D22 已定项 18、19、23、24
+#   现在都写明了「没有腿况记录」（18 那一条把「都没找到」放在「」里当被降级的原话），按这一格的判法不红；红的是别的分项。
+# 存量挂账：同格「推论要有判决」（.claude/gate.d/decision-evidence-lag.tsv，行里的格名是 three-way-leg-record）。
+# 弄坏开关 DOC_DECISIONS_BREAK=evidence-pointer-unchecked / evidence-history-ignored / evidence-ledger-unjudged / evidence-ledger-growth-unjudged（同上）、
+#   three-way-leg-negative-allowed（腿况缺失的条目写了阴性结论也放过）/ three-way-leg-quotes-judged（「」引文里的阴性写法也算）/ three-way-leg-negated-judged（「没走三方」也算在说三方）。
+# 样本：three-way-leg-record-red（判决文件不存在、没有指针也没写腿况、腿况缺失却写了阴性结论各一条）、three-way-leg-record-green（指到存在的材料、腿况缺失、否定写法、
+#   引文里的阴性写法、被挂账罩住）；evidence-ledger-red / evidence-ledger-grew-red / evidence-pointer-history-green 同上一格。
+grid_three_way_leg_record() (
+  [[ -d .claude/kb/decisions ]] || { echo "  ! 找不到 .claude/kb/decisions，这一格无对象可判"; exit 77; }
+  load_diff_base
+
+  DECISION_EVIDENCE_SOURCE="$DECISION_EVIDENCE_SOURCE" python3 - "$BREAK_SWITCH" "$diff_base" <<'PY'
+import os, re, sys, types
+
+lib = types.ModuleType('decision_evidence')
+exec(compile(os.environ['DECISION_EVIDENCE_SOURCE'], 'DECISION_EVIDENCE_SOURCE', 'exec'), lib.__dict__)
+BREAK, DIFF_BASE = sys.argv[1], sys.argv[2]
+CELL = 'three-way-leg-record'
+CLAIM = re.compile(r'(?<!第)三方')
+NEGATED = re.compile(r'(?:没有?走|未走|没开|不走|未经|没经过)三方|未三方')
+MISSING = re.compile(r'没有腿况记录|腿况缺失|腿况没有留存|腿况未记录|未记录腿况|材料没有留存|查不到对应的提示|仓里只留了')
+NEGATIVE = re.compile(r'都没找到|构造不出|没打中|找不到反例|没发现|查不到任何|零命中|没有反例|无反例|未发现|没有找到')
+
+if BREAK == 'evidence-pointer-unchecked':
+    lib.exists = lambda name, names: True
+names, in_tree, only_history, history_ok = lib.artifact_names(history=BREAK != 'evidence-history-ignored')
+entries, files = lib.read_entries()
+if not entries:
+    print(f'  ! 扫了 {files} 份决策，一条「**依据**：」块里的条目都没读到，这一格无对象可判')
+    sys.exit(77)
+
+red, claims, pointed, missing_stated = [], 0, 0, 0
+for path, item, number, text in entries:
+    claim_text = text if BREAK == 'three-way-leg-negated-judged' else NEGATED.sub('', text)
+    if not CLAIM.search(claim_text):
+        continue
+    claims += 1
+    found, absent = lib.pointer_verdict(text, names)
+    if found and not absent:
+        pointed += 1
+        continue
+    judged = text if BREAK == 'three-way-leg-quotes-judged' else lib.strip_quotes(text)
+    stated = MISSING.search(judged)
+    negative = None if BREAK == 'three-way-leg-negative-allowed' else NEGATIVE.search(judged)
+    if stated and not negative and not absent:
+        missing_stated += 1
+        continue
+    if absent:
+        why = f'点名的 {"、".join(absent)} 在 research/ 的树里与 git 历史里都找不到'
+    elif stated:
+        why = f'写了腿况缺失，却同时写了阴性结论「{negative.group(0)}」：没有腿况就分不出腿没打中与腿没跑'
+    else:
+        why = '写了「三方」，既没有指到 research/prompts 或 research/results 下存在的判决、材料或腿输出，也没写腿况缺失'
+    red.append((path, item, number, text, why))
+
+rows, ledger_problems, ledger_present = lib.read_ledger()
+if BREAK == 'evidence-ledger-ignored':
+    rows, ledger_problems = [], []
+red, ledgered, stale = lib.apply_ledger(CELL, red, rows)
+grown = [] if BREAK == 'evidence-ledger-growth-unjudged' else lib.ledger_growth(CELL, rows, lib.base_ledger_text(DIFF_BASE))
+table_problems = [] if BREAK == 'evidence-ledger-unjudged' else ledger_problems + stale
+table_problems += [f'{lib.LEDGER}:{row[0]} 相对基准那一版新增了一行（{row[2]} {row[3]}）：这张表只缩不涨' for row in grown]
+
+if red or table_problems:
+    if red:
+        print(f'  ✗ 依据里写了「三方」而没有腿况记录：{len(red)} 条')  # gate-lint:summary
+        for path, item, number, text, why in red:
+            print(f'     {path}:{number} {item}：{why}')  # gate-lint:detail
+            print(f'       原文：{text[:110]}')
+        print('     → 怎么办：在这一条里点名那一轮的判决或腿输出（research/prompts/<轮>-main-verification.md、<轮>-*-output.md，在树里或 git 历史里取得回来）；')
+        print('               取不回来的，写明「没有腿况记录」之类的腿况缺失，并去掉「都没找到」「构造不出」这类阴性写法；要拿那一轮支撑新结论，先补跑一轮。')
+    if table_problems:
+        print(f'  ✗ 挂账表 {lib.LEDGER} 有 {len(table_problems)} 处不对')  # gate-lint:summary
+        for problem in table_problems:
+            print(f'     {problem}')  # gate-lint:detail
+        print('     → 怎么办：这张表只收此刻判红、当场补不上指针的存量，一行一条：罩不住的行删掉（对象改好了就是它该退场），格式写坏的照表头改；')
+        print('               新判红的条目补指针或腿况，别往表里加行。')
+    sys.exit(1)
+print(f'  ✓ 依据里写了「三方」的条目都有腿况记录：扫 {files} 份决策、{len(entries)} 条依据条目，写了「三方」的 {claims} 条'
+      f'（指到存在的材料 {pointed} 条，写明腿况缺失 {missing_stated} 条，挂账 {ledgered} 条）')
+print(f'     材料文件：树里 {in_tree} 个名字，只在 git 历史里取得回来的 {only_history} 个' + ('' if history_ok else '（git 历史读不出，只认树里的）'))
+PY
+)
+
 # ════ 登记的格函数：弄坏开关点名这一格就不跑、按判过了记，否则调这一格的判法 ════
 # 前十四格的 stdin 接 /dev/null，与它们原先在后台跑时读到的一样。
 break_skips() {
@@ -2839,6 +3450,8 @@ judge_entry_added()             { break_skips entry-added;             cell_entr
 judge_shape()                   { break_skips shape;                   cell_shape; }
 judge_history_loss()            { break_skips history-loss;            cell_history_loss; }
 judge_candidate_codes()         { grid_candidate_codes </dev/null; }
+judge_inference_needs_verdict() { break_skips inference-needs-verdict; grid_inference_needs_verdict </dev/null; }
+judge_three_way_leg_record()    { break_skips three-way-leg-record;    grid_three_way_leg_record </dev/null; }
 
 # ════ --write：在子 shell 里重写 decision-items-sync 的两块投影，写完回读判一遍 ════
 if ((write_mode)); then

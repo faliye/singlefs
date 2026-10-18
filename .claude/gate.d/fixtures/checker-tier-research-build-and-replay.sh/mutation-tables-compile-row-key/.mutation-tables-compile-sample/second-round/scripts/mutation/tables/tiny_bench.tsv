@@ -1,0 +1,2 @@
+两条之一_加改成减	    left + right	    left.wrapping_sub(right)
+两条之二_加改成乘	    left + right	    right * left

@@ -1,7 +1,0 @@
-command args=-p singlefs-harness --test fsync_drop_and_devices_without_the_selected_version -- mount_writable_with_a_stale_device_one_refuses_or_keeps_two_copies rc=101
-binary fsync_drop_and_devices_without_the_selected_version
-  failed mount_writable_with_a_stale_device_one_refuses_or_keeps_two_copies
-    thread 'mount_writable_with_a_stale_device_one_refuses_or_keeps_two_copies' panicked:
-    盘 1 停在旧状态：可写挂载做成了，而这一版有单元只剩一份 ["Data(DataUnitIndexInFile(0))@50184", "ExtentRoot@50265", "InodeLeafContainer(InodeLeafContainerIndexInTree(0))@50266", "InodeRoot@50268"]，写两次之后池级 checker 判红 ["I-2.1", "I-4.8", "I-7.4"]——盘 1 被当成冗余的一半接着写，它缺的那几份没人补
-  failure-name mount_writable_with_a_stale_device_one_refuses_or_keeps_two_copies
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out

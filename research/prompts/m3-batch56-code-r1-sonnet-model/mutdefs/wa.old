@@ -1,1 +1,0 @@
-                .map_or(1, |rightmost| rightmost.identity.container + 1);

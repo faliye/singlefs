@@ -1,0 +1,7 @@
+exit=0
+want=自陈是推论的依据条目都指到了存在的判决：扫 1 份决策、2 条依据条目，带推论记号的 1 条（指到判决 1 条，挂账 0 条；用户定案的「没走三方」0 条不算）
+want=判决文件：树里 0 个名字，只在 git 历史里取得回来的 3 个
+want=依据里写了「三方」的条目都有腿况记录：扫 1 份决策、2 条依据条目，写了「三方」的 1 条（指到存在的材料 1 条，写明腿况缺失 0 条，挂账 0 条）
+want=  inference-needs-verdict：绿
+want=  three-way-leg-record：绿
+want=doc-decisions.sh：2 格里 2 格绿（inference-needs-verdict three-way-leg-record）

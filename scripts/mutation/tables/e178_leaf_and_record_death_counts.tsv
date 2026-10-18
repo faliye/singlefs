@@ -20,3 +20,8 @@ M19_B-tsz不施行整对象墓碑	if whole_object_tombstone_is_on_the_chain || i
 M20_撞I-9.13的计数写成记录数小于等于1	.any(|record_count| record_count == 0)	.any(|record_count| record_count <= 1)
 M21_叶片总数不数桩	leaves_in_the_leaf_order: length_as_u64(self.version.leaves.len()),	leaves_in_the_leaf_order: length_as_u64(self.version.leaves.len()) - self.version.stub_count(),
 M22_桩算进合并的邻片	fn is_a_merge_neighbour(leaf: &WorkingLeaf) -> bool {\n    !leaf.records.is_empty()\n}	fn is_a_merge_neighbour(leaf: &WorkingLeaf) -> bool {\n    let _ = leaf;\n    true\n}
+M23_项键漏参数	[code_line, parameters_line].concat()	[code_line].concat()
+M24_项键带序号	let item_key = segment_four_item_key(&library.code_key, item);	let item_key = segment_four_item_key(&format!("{}{position}", library.code_key), item);
+M25_按项名找项文件	if let Some(item_lines) = read_back_the_item(&path, &segment_four_item_header(&item_key, &library.code_key)) {	let previous_path = library.item_path(previous_index.get(&name).map_or(item_key.as_str(), String::as_str));\n            if let Some(item_lines) = read_back_the_item(&previous_path, std::fs::read_to_string(&previous_path).unwrap_or_default().lines().next().unwrap_or_default()) {
+M26_键对不上恒报零	let mismatched = count_mismatched_keys(&previous_index, &current);	let mismatched = 0;
+M27_项键漏代码键	[code_line, parameters_line].concat()	[parameters_line].concat()

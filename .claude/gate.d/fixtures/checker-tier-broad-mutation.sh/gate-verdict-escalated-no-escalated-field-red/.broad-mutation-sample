@@ -1,1 +1,2 @@
-# 样本标记：门禁 checker-tier-broad-mutation 读样本里 .broad-sample/ 造的库目录、录好的 --summary 输出与 rustc -Vv
+# 样本标记：门禁 checker-tier-broad-mutation 在被判的根里见到它才进样本模式（阶段文件头「样本」）；现场照下一行的情形造（.claude/gate.d/lib/broad-mutation-samples.py）
+scenario=escalated:no-escalated-field

@@ -1,2 +1,0 @@
-f40_0 S2_LABEL=f40_0 S2_SLOTS=384 S2_PREFIXES='oooooooooooo;oooooooooooooooooooo;oooooooooooooooooooooooooooooooooooooooo' S2_RS='o;b6;n' S2_FAULTS='racct,rlin' S2_MID='' S2_ACTIONS='HHHH,HHWH,NHHH' H_STEP=40
-f40_1 S2_LABEL=f40_1 S2_SLOTS=384 S2_PREFIXES='oooooooooooo;oooooooooooooooooooo;oooooooooooooooooooooooooooooooooooooooo' S2_RS='o;b6;n' S2_FAULTS='racct' S2_MID='' S2_ACTIONS='HHHH,HHWH,NHHH' H_STEP=40

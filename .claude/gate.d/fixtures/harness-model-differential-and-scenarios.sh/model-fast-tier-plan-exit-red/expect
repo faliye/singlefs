@@ -1,0 +1,6 @@
+exit=1
+want=· 单元键：要现判（算不出（
+want=✗ harness-model-differential-and-scenarios.sh 的 model-fast-tier 格按条复用失灵：scripts/gate/admission.py verdict-plan 退 1（✗ 样本档造的失灵：
+want=MODEL_DIFFERENTIAL_SAMPLE cargo-arguments: test --release -p singlefs-harness --test random_histories -- --include-ignored --exact random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation --nocapture
+want=✓ 模型对拍这一段判过、实现与模型没有对不上的（查了 1 段
+want=✗ 「随机历史快档」这一格判红：按条复用失灵（上面「按条复用失灵」那一句点名了哪一条哨兵、或 admission.py 退了几）；这一趟照旧现判跑完、那一段判过了

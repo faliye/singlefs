@@ -30,9 +30,10 @@
 #   changed="$(gate_changed_paths "$base" untracked)"
 #
 # 住在 scripts/ 而不是 .claude/gate.d/：共享门禁（gate.sh）把 gate.d 下每个 *.sh 都当阶段跑，
-# 阶段调用的共用 shell 脚本照 stage-must-run.sh、change-touches-crates.sh 的惯例放这里；自证由门禁 code-tooling 跑。
+# 阶段调用的共用 shell 脚本放这里；自证由门禁 code-tooling 跑。
 # `--selftest` 在临时 git 仓里自证：三种来源（工作区改、暂存新增、未跟踪）各放一个中文路径，逐字核两个函数的输出。
-# 弄坏开关 LIB_CHANGED_PATHS_BREAK=<项>（只给证红用，一次给一个；打开时自证退 1）。
+# 弄坏开关 LIB_CHANGED_PATHS_BREAK=<项>（只给证红用，一次给一个；打开时自证退 1）。只在 --selftest 那一支里认：门禁阶段 source 这一份时，
+# 环境里留着这个变量也不认（source 时把内部的 _lib_changed_paths_break 清空，只有自证那一支照 LIB_CHANGED_PATHS_BREAK 设它；C839）。
 # 逐项写开关名、弄坏哪一处、打开后自证哪几项红：项名是自证里 check 的标签，一行一项；失败行列在「✗ 共用库 scripts/gate/changed-paths.sh 的自证没过」
 # 下面，句首就是标签，整行是「<标签>：期望「…」，实测「…」」，括号里抄那一行的实测（制表符写成 <制表符>）：
 #   LIB_CHANGED_PATHS_BREAK=quotepath  gate_changed_paths 与 gate_added_lines 的 git 调用漏掉 -c core.quotepath=false
@@ -64,6 +65,9 @@
 #   bash scripts/gate/changed-paths.sh --selftest      # 自证
 #   LIB_CHANGED_PATHS_BREAK=quotepath bash scripts/gate/changed-paths.sh --selftest   # 必须判红
 
+# 弄坏开关的内部读法：source 时清空，平常跑的门禁不认环境里的 LIB_CHANGED_PATHS_BREAK（C839）；只有下面 --selftest 那一支照它设
+_lib_changed_paths_break=""
+
 gate_diff_base() {
   local mode="$1" merge_base
   # HEAD 还没出生（刚 git init、orphan 分支）：基准取空树，与上游 lib.sh 对空仓的处置同一种；交出 HEAD 会让 git diff 失败、调用方报取不到
@@ -73,11 +77,11 @@ gate_diff_base() {
       echo "HEAD"
       ;;
     gate)
-      if [[ "${LIB_CHANGED_PATHS_BREAK:-}" != fallback && -n "${GATE_BASE:-}" ]] \
+      if [[ "${_lib_changed_paths_break:-}" != fallback && -n "${GATE_BASE:-}" ]] \
          && git rev-parse --verify -q "${GATE_BASE}^{commit}" >/dev/null 2>&1; then
         echo "$GATE_BASE"
       elif git rev-parse --verify -q '@{upstream}' >/dev/null 2>&1 \
-           && { merge_base="$(git merge-base HEAD '@{upstream}' 2>/dev/null)" || [[ "${LIB_CHANGED_PATHS_BREAK:-}" == empty-merge-base ]]; }; then
+           && { merge_base="$(git merge-base HEAD '@{upstream}' 2>/dev/null)" || [[ "${_lib_changed_paths_break:-}" == empty-merge-base ]]; }; then
         echo "$merge_base"
       else
         echo "HEAD"
@@ -93,7 +97,7 @@ gate_diff_base() {
 gate_changed_paths() {
   local base="$1" untracked_mode="$2" diff_filter="${3:-}"
   local quote_option=(-c core.quotepath=false) filter_option=()
-  [[ "${LIB_CHANGED_PATHS_BREAK:-}" == quotepath ]] && quote_option=()
+  [[ "${_lib_changed_paths_break:-}" == quotepath ]] && quote_option=()
   [[ -n "$diff_filter" ]] && filter_option=("--diff-filter=$diff_filter")
   case "$untracked_mode" in
     untracked|tracked-only) ;;
@@ -103,7 +107,7 @@ gate_changed_paths() {
       ;;
   esac
   local include_untracked=0
-  if [[ "$untracked_mode" == untracked && "${LIB_CHANGED_PATHS_BREAK:-}" != untracked ]] \
+  if [[ "$untracked_mode" == untracked && "${_lib_changed_paths_break:-}" != untracked ]] \
      && [[ -z "$diff_filter" || "$diff_filter" == *A* ]]; then
     include_untracked=1
   fi
@@ -111,7 +115,7 @@ gate_changed_paths() {
   # 基准写错、第一条 git diff 失败，集合就静默少了一截。
   local listed
   listed="$(
-    git "${quote_option[@]}" diff --name-only "${filter_option[@]}" "$base" -- || [[ "${LIB_CHANGED_PATHS_BREAK:-}" == swallow ]] || exit 1
+    git "${quote_option[@]}" diff --name-only "${filter_option[@]}" "$base" -- || [[ "${_lib_changed_paths_break:-}" == swallow ]] || exit 1
     git "${quote_option[@]}" diff --name-only --cached "${filter_option[@]}" -- || exit 1
     if ((include_untracked)); then git "${quote_option[@]}" ls-files --others --exclude-standard -- || exit 1; fi
   )" || return 1
@@ -121,14 +125,14 @@ gate_changed_paths() {
 gate_added_lines() {
   local base="$1"; shift
   local quote_option=(-c core.quotepath=false) diff_output untracked_list untracked_path parsed
-  [[ "${LIB_CHANGED_PATHS_BREAK:-}" == quotepath ]] && quote_option=()
+  [[ "${_lib_changed_paths_break:-}" == quotepath ]] && quote_option=()
   # --no-renames 写死：同一次搬家，暂存前（未跟踪的新名）与暂存后（一次改名）判得要一样；
   # 前缀写死：diff.noprefix 之类的配置会让 +++ 行不带 b/，路径就解析错了。
   diff_output="$(git "${quote_option[@]}" diff --no-renames --unified=0 --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$base" -- "$@")" || return 1
   untracked_list="$(git "${quote_option[@]}" ls-files -z --others --exclude-standard -- "$@" | tr '\0' '\n')" || return 1
   # 「+++ 」只在文件头里认（diff --git 与第一个 @@ 之间）：正文里以「++ 」开头的一行新增，在 diff 里也长成「+++ 」。
   # git 给带空格的路径在文件头末尾补一个制表符，剥掉；路径被 git 加了引号（带制表符、引号、反斜杠），这里还原不了，退非 0。
-  parsed="$(awk -v header_anywhere="$([[ "${LIB_CHANGED_PATHS_BREAK:-}" == header-anywhere ]] && echo 1)" '
+  parsed="$(awk -v header_anywhere="$([[ "${_lib_changed_paths_break:-}" == header-anywhere ]] && echo 1)" '
     /^diff --git / { header = 1; path = ""; next }
     (header || header_anywhere) && /^\+\+\+ / {
       path = substr($0, 5); sub(/\t$/, "", path)
@@ -139,12 +143,12 @@ gate_added_lines() {
     !header && /^\+/ && path != "" { print path "\t" substr($0, 2) }
     END { if (quoted) exit 3 }' <<<"$diff_output")" || return 1
   [[ -z "$parsed" ]] || printf '%s\n' "$parsed"
-  [[ "${LIB_CHANGED_PATHS_BREAK:-}" == untracked-lines ]] && return 0
+  [[ "${_lib_changed_paths_break:-}" == untracked-lines ]] && return 0
   while IFS= read -r untracked_path; do
     [[ -n "$untracked_path" && -f "$untracked_path" ]] || continue
     [[ "$untracked_path" != *$'\t'* ]] || return 1
     # 二进制（或空）文件不读：一个 NUL 会让下游的 grep 把整段新增行当二进制吞掉（vim 的交换文件就是这种）
-    if [[ "${LIB_CHANGED_PATHS_BREAK:-}" != binary ]]; then grep -Iq . "$untracked_path" || continue; fi
+    if [[ "${_lib_changed_paths_break:-}" != binary ]]; then grep -Iq . "$untracked_path" || continue; fi
     UNTRACKED_PATH="$untracked_path" awk '{ print ENVIRON["UNTRACKED_PATH"] "\t" $0 }' "$untracked_path"
   done <<<"$untracked_list"
 }
@@ -153,6 +157,8 @@ gate_added_lines() {
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   set -uo pipefail
   [[ "${1:-}" == "--selftest" ]] || { echo "  ✗ 用法：bash scripts/gate/changed-paths.sh --selftest（平时由门禁阶段 source 它）"; echo "     → 怎么办：自证就带 --selftest；要取改动路径，在阶段里 source 它再调 gate_diff_base / gate_changed_paths。"; exit 2; }
+  _lib_changed_paths_break="${LIB_CHANGED_PATHS_BREAK:-}"
+  library_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
   selftest_directory="$(mktemp -d)"
   trap 'rm -rf "${selftest_directory:?}"' EXIT
   selftest_output="$(
@@ -212,6 +218,9 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     rm -rf 未出生
     check "head 取法是 HEAD" "HEAD" "$(gate_diff_base head)"
     check "GATE_BASE 是个提交就用它" "$first_commit" "$(GATE_BASE="$first_commit" gate_diff_base gate)"
+    # C839：门禁阶段 source 这一份时环境里留着弄坏开关也不认（这一格在任何开关下都该绿）
+    check "source 这一份时环境里的 LIB_CHANGED_PATHS_BREAK=fallback 不认" "$first_commit" \
+          "$(LIB_CHANGED_PATHS_BREAK=fallback GATE_BASE="$first_commit" bash -c 'source "$1" && gate_diff_base gate' sourced "$library_path")"
     check "GATE_BASE 不是提交就回退到上游的 merge-base" "$second_commit" "$(GATE_BASE=没有这个提交 gate_diff_base gate)"
     # 上游是一条没有共同祖先的分支：merge-base 取不到，要回退到 HEAD，不许拿空串当基准（空基准让 git diff 报错、改动范围静默变空）。
     orphan_commit="$(git commit-tree "$(git mktree </dev/null)" -m 孤儿)" && git branch 孤儿 "$orphan_commit" \
@@ -222,14 +231,14 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   )"
   check_count="$(grep -c '^PASS \|^FAIL ' <<<"$selftest_output")"
   failures="$(grep '^FAIL ' <<<"$selftest_output")"
-  if [[ -n "$failures" || "$check_count" -ne 15 ]]; then
-    echo "  ✗ 共用库 scripts/gate/changed-paths.sh 的自证没过（查了 $check_count 项，应当 15 项）："   # gate-lint:summary
+  if [[ -n "$failures" || "$check_count" -ne 16 ]]; then
+    echo "  ✗ 共用库 scripts/gate/changed-paths.sh 的自证没过（查了 $check_count 项，应当 16 项）："   # gate-lint:summary
     printf '%s\n' "$failures" | sed 's/^FAIL /      /'   # gate-lint:detail
     printf '%s\n' "$selftest_output" | grep -v '^PASS \|^FAIL ' | sed 's/^/      /'   # gate-lint:detail
     echo "     → 怎么办：看 gate_changed_paths / gate_added_lines 的 git 调用有没有带 -c core.quotepath=false、未跟踪文件那一支有没有加 ls-files --others，"
     echo "               gate_diff_base 的回退次序是不是 GATE_BASE → @{upstream} 的 merge-base → HEAD；门禁 doc-process-records、doc-experiments 与 doc-registries 的 invariant-anchors 那一格都靠它取改动范围。"
     exit 1
   fi
-  echo "  ✓ 共用库 scripts/gate/changed-paths.sh 自证通过（$check_count 项：三种来源的中文路径逐字不转义、未跟踪可开关、diff-filter=A、新增行含未跟踪整份且只看给的路径、带空格路径与「++ 」开头的行、不读二进制、路径带制表符退非 0、基准解析不到退非 0、HEAD 没出生取空树、基准回退四档）"
+  echo "  ✓ 共用库 scripts/gate/changed-paths.sh 自证通过（$check_count 项：三种来源的中文路径逐字不转义、未跟踪可开关、diff-filter=A、新增行含未跟踪整份且只看给的路径、带空格路径与「++ 」开头的行、不读二进制、路径带制表符退非 0、基准解析不到退非 0、HEAD 没出生取空树、基准回退四档、source 时不认环境里的弄坏开关）"
   exit 0
 fi

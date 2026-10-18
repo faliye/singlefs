@@ -1,0 +1,4 @@
+exit=1
+want=广谱变异提交门禁判红：此刻源码上 4 条里 0 条沿用不了也没现判、0 条没红、1 个单元没记清单
+want=UNLISTED crates/singlefs-core/src/lib.rs:10 fn nine
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

@@ -31,7 +31,6 @@
 from __future__ import annotations
 
 import dataclasses
-import importlib.util
 import json
 import os
 import subprocess
@@ -54,20 +53,13 @@ LEDGER_STEM = "reuse-ledger-rows"
 MARKERS_NAME = "segment-two-rows"
 
 
-def load_pinned(path: str, expected: str, module_name: str) -> types.ModuleType:
-    actual = reuse.sha256_file(path)
-    if actual != expected:
-        raise RuntimeError(f"{path} 的 sha256 是 {actual}，不是 {expected}")
-    specification = importlib.util.spec_from_file_location(module_name, path)
-    module = importlib.util.module_from_spec(specification)
-    sys.dont_write_bytecode = True
-    sys.modules[specification.name] = module
-    specification.loader.exec_module(module)
-    return module
-
-
+SEGMENT_TWO_R10_LOADS_SEGMENT_TWO = 'load_pinned(SEGMENT_TWO_ORCHESTRATOR_PATH, SEGMENT_TWO_ORCHESTRATOR_SHA256, "rows_orchestrator_segment_two_7d7b458b")'
 try:
-    layer10 = load_pinned(SEGMENT_TWO_R10_PATH, SEGMENT_TWO_R10_SHA256, "rows_orchestrator_segment_two_revision_10_627e48c6")
+    # rows_orchestrator_segment_two.py 与修订 10 一个字节不改（先核各自的 sha256）：第二段编排器先按搬目录后重钉的第一段编排器 sha256 载入
+    # （reuse_library 的 ORCHESTRATOR_REPIN），修订 10 载入时它那一处载第二段编排器的调用换成已经载好的这一份
+    reuse.pinned_module("rows_orchestrator_segment_two_7d7b458b")
+    layer10 = reuse.load_repinned(SEGMENT_TWO_R10_PATH, SEGMENT_TWO_R10_SHA256, "rows_orchestrator_segment_two_revision_10_627e48c6",
+                                  ((SEGMENT_TWO_R10_LOADS_SEGMENT_TWO, 'sys.modules["rows_orchestrator_segment_two_7d7b458b"]'),))
 except RuntimeError as wrong_file:
     print(f"✗ {wrong_file}（这一层调的是钉住的那一份的函数；改过就先核这一层，再改钉的 sha256）", file=sys.stderr)
     sys.exit(EXIT_WRONG_PINNED_FILE)
@@ -279,8 +271,8 @@ def install(reuse_config: dict, repo: str, segment_two) -> None:
     h30 = reuse_config.get("H30") or {}
     STATE["reuse"] = SegmentTwoReuse(reuse.Library(h30.get("library_root") or reuse.DEFAULT_LIBRARY_ROOT), bool(h30.get("lookup", True)),
                                      os.path.join(repo, segment_two.dumps, "reuse-markers", MARKERS_NAME), segment_two.suffix, {}, [])
-    for name in ("phase_rows", "finish_shard_two", "phase_cross_host", "phase_timeout_reruns", "run_two"):
-        ORIGINAL[name] = getattr(two, name)
+    ORIGINAL.update({"phase_rows": two.phase_rows, "finish_shard_two": two.finish_shard_two, "phase_cross_host": two.phase_cross_host,  # 换掉之前逐个点名留下原件
+                     "phase_timeout_reruns": two.phase_timeout_reruns, "run_two": two.run_two})
     two.phase_rows = phase_rows_with_reuse
     two.finish_shard_two = finish_shard_with_reuse
     two.phase_cross_host = phase_cross_host_with_reuse

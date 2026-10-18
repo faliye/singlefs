@@ -8881,7 +8881,7 @@ mod tests {
     }
 
     /// 取样点 G10a / G10b（⑧ 开的主几何）与 G12a / G12b（⑧ 关）：吞掉新池新建文件「记录 → 根槽」之间一块盘那一步屏障。
-    /// 绝对值取登记 7.4 C6–C9、D6（G10）与 7.2 B6–B9、7.1 A6（G12）。
+    /// 绝对值取登记 7.4 C6–C9、D6〔G10〕与 7.2 B6–B9、7.1 A6〔G12〕。
     #[test]
     fn swallowed_barrier_points_match_the_registered_anchors() {
         type Anchor = (&'static str, u32, &'static str, usize, &'static str, u64, u64, &'static str, &'static str);

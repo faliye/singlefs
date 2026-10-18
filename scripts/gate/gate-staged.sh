@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 # admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
 # run-condition: command git
-# 跑 `gate.sh --staged`，整轮全绿才把 `refs/sop/staged-green` 前移到这一次被判的那棵暂存树。
+# 跑 `gate.sh --staged`，整轮全绿、调用方又没给 GATE_BASE 才把 `refs/sop/staged-green` 前移到这一次被判的那棵暂存树。
+# ref 留着只作记录（「上次整轮全绿的树」，别处要拿它当改动基准的照读）：任何复用判定都不读它，复用只看每条判定的单元键（scripts/gate/admission.py 文件头）。
+# 交给 gate.sh 的两样：被判的暂存树另经 GATE_STAGED_TREE 交给上游（上游在 worktree 里 read-tree 这一棵，不自己重算）；
+# 编译目录 CARGO_TARGET_DIR 固定（调用方给了 SINGLEFS_GATE_TARGET_DIR 就照它，没给是 ~/.local/share/singlefs/gate-staged-target）：
+# worktree 路径上游已固定，编译产物跨趟命中；两趟同时跑由 cargo 的目录锁串行。
 #
 #   gate-staged.sh [项目根] [传给 gate.sh 的别的参数…]
-#   gate-staged.sh --selftest   自证：转给 scripts/gate/gate-staged-selftest.sh（临时仓 + 假 gate.sh，全绿 / 有红 / 跑的过程中暂存区变了，格数由它的成功行现算）
+#   gate-staged.sh --selftest   自证：转给 scripts/gate/gate-staged-selftest.sh（临时仓 + 假 gate.sh，全绿 / 有红 / 跑的过程中暂存区变了 / 给了 GATE_BASE，格数由它的成功行现算）
 #
 # 为什么前移放在外壳里：共享 `gate.sh` 在上游（`.claude/singlefs-ai-sop/scripts/`），本仓的
 # `.claude/scripts/gate.sh` 只是 `exec` 转发，中间没有钩子。前移那一句只能由**起门禁的人**来做。
 #
-# 三条规矩（`scripts/gate/stage-must-run.sh` 的文件头写了为什么）：
-#   ① 只认暂存树：`git write-tree` 算出来的那一棵，别的会话未暂存的改动进不来。
-#   ② 只有整轮**全绿**才前移；有红不动——红的那一趟什么也没证明。
+# 三条规矩：
+#   ① 只认暂存树：`git write-tree` 算出来的那一棵，别的会话未暂存的改动进不来（几个会话共写一个仓时，工作区不代表任何人打算提交的东西）。
+#   ② 只有整轮**全绿**才前移；有红不动——红的那一趟什么也没证明。调用方给了 GATE_BASE 也不动——那一趟只判了起点之后的改动。
 #   ③ 不带 `--staged` 跑不许前移，所以这个外壳只做 `--staged` 这一条路。
 # ref 是覆盖语义，永远只有一条，不累积、不落盘第二份状态。
 set -uo pipefail
@@ -30,21 +34,28 @@ echo "  这一趟被判的暂存树：${staged_tree:0:12}（HEAD + 暂存区；�
 
 SINGLEFS_STAGED_TREE="$staged_tree"
 export SINGLEFS_STAGED_TREE
+GATE_STAGED_TREE="$staged_tree"
+export GATE_STAGED_TREE
+CARGO_TARGET_DIR="${SINGLEFS_GATE_TARGET_DIR:-$HOME/.local/share/singlefs/gate-staged-target}"
+export CARGO_TARGET_DIR
+echo "  编译目录：$CARGO_TARGET_DIR（跨趟复用编译产物；换目录设 SINGLEFS_GATE_TARGET_DIR）"
 bash "$ROOT/.claude/scripts/gate.sh" --staged "$@"
 gate_rc=$?
 
-if [[ $gate_rc -eq 0 ]]; then
+if [[ $gate_rc -eq 0 && -n "${GATE_BASE:-}" ]]; then
+  echo "  ! 调用方给了 GATE_BASE（${GATE_BASE}）：这一趟只判了那个起点之后的改动，refs/sop/staged-green 不前移"
+  echo "     → 怎么办：要前移就不设 GATE_BASE 再跑一趟。"
+elif [[ $gate_rc -eq 0 ]]; then
   # 前移之前再算一次：跑的这段时间里别人可能往暂存区放了东西，那时被判的那棵树已经不是现在这棵
   now_tree="$(git write-tree)"
   if [[ "$now_tree" != "$staged_tree" ]]; then
     echo "  ! 跑的过程中暂存区变了（${staged_tree:0:12} → ${now_tree:0:12}）：refs/sop/staged-green 不前移"
     echo "     → 怎么办：绿的是开跑时那一棵，现在这一棵没人验过。等暂存区停下来再跑一趟，或者直接提交开跑时那一批。"
   else
-    # ref 指向「包着那棵暂存树的提交」，不是裸树：admission.py 的 gate_reuse 按 <ref>^{commit} 取它，取不到一律判要跑；
-    # 仍然只有一条 ref、不落盘第二份状态。
+    # ref 指向「包着那棵暂存树的提交」，不是裸树（拿它当改动基准的按 <ref>^{commit} 取）；仍然只有一条 ref、不落盘第二份状态。
     green_commit="$(git commit-tree "$staged_tree" -m "gate --staged 整轮全绿：这棵暂存树上每一道都绿过")"
     git update-ref refs/sop/staged-green "$green_commit"
-    echo "  ✓ 整轮全绿，refs/sop/staged-green 前移到 ${green_commit:0:12}（包着暂存树 ${staged_tree:0:12}）：下一趟里输入没变的阶段可以复用这次的判定"
+    echo "  ✓ 整轮全绿，refs/sop/staged-green 前移到 ${green_commit:0:12}（包着暂存树 ${staged_tree:0:12}）：只作「上次整轮全绿的树」的记录，复用判定不读它"
   fi
 else
   echo "  ! 整轮没全绿，refs/sop/staged-green 不动：红的这一趟什么也没证明"

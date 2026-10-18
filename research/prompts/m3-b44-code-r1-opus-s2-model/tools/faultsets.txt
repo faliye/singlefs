@@ -1,0 +1,1 @@
+none,rec,tt1+mr1+rec,tt1+mr0+mr1+rec,tt0+tt1+mr1+rec,mr0+mr1+rec,tt0+tt1+rec

@@ -4,7 +4,7 @@
 
 | 子目录 | 放什么 |
 |---|---|
-| `agents/` | 派发、盯子 agent、三方材料与引文核对、本地模型网关 |
+| `agents/` | 派发、盯子 agent、三方材料与引文核对、定时提醒 |
 | `crash/` | 崩溃点重放、崩溃放量、崩溃点重放双机分片、GPU 清场 |
 | `devices/` | 虚机、QEMU、真块设备上的装置与探针 |
 | `experiments/` | 实验装置的 crate（`Cargo.toml` 在这一层）与复跑入口 `replay.sh` |

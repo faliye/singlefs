@@ -1,9 +1,0 @@
-== 基线
-PERTXG first_violation=None
-test per_txg_checker_over_the_history_of_the_c551_test ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.26s
-== 变异 d
-PERTXG first_violation=Some((4, ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]))
-test per_txg_checker_over_the_history_of_the_c551_test ... FAILED
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.26s
-error: test failed, to rerun pass `-p singlefs-harness --test zz_per_txg_checker`

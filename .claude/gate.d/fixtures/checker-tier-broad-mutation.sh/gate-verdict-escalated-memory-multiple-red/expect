@@ -1,4 +1,4 @@
 exit=1
 want=升档判的抓到复核不过
-want=升档那趟的 36864M 不到基线 21474836480 的 2 倍
-want=gate-verdict：红
+want=升档那趟的 36864M 不到基线 21474836480 的 2 倍（倍数门槛是驱动里的常量）
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

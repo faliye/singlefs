@@ -5,7 +5,7 @@
 **并行agent治理与上游sop治理**
 agent治理与上游sop治理，是另外一个重要的任务。因此遇到问题优先从流程、规范和门禁等方面着手解决问题，目的不是改一行代码，而是避免再发。
 
-当前里程碑：**「删除与多次 COW」**（`.claude/kb/milestone/03-third-txn.md`，作业点、验收与次序在那份文件；调度在 `records/2026-09-30-里程碑三开工第一轮.md`）。上一个里程碑**「覆盖写、释放、回退与复用」**（`.claude/kb/milestone/02-second-txn.md`）已结束，没做完的转进里程碑三项五（五·7 到五·11）；它的崩溃放量已接进 `crates/singlefs-checker-tier`，判器整套上了 GPU，入口 `scripts/crash/crash-amplification.sh --list-items` 列分项。再上一个里程碑「新池新建文件」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下七个 crate（格式常量、核心、池级 checker、harness 档、checker 档、恢复重放取前缀的核 `singlefs-replay-prefix`、参照文件系统 RefFS；两档怎么分见 `.claude/rules/verification.md`）。
+当前里程碑：**「删除与多次 COW」**（`.claude/kb/milestone/03-third-txn.md`，作业点、验收与次序在那份文件；调度在 `records/2026-09-30-里程碑三开工第一轮.md`）。上一个里程碑**「覆盖写、释放、回退与复用」**（`.claude/kb/milestone/02-second-txn.md`）已结束，没做完的转进里程碑三项五（五·7 到五·11）；它的崩溃放量已接进 `crates/singlefs-checker-tier`，判器整套上了 GPU，入口 `scripts/crash/crash-amplification.sh --list-items` 列分项。再上一个里程碑「新池新建文件」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下八个 crate（格式常量、核心、池级 checker、harness 档、checker 档、恢复重放取前缀、择根、扫环三截的核 `singlefs-replay-prefix`、参照文件系统 RefFS、函数单元图 `singlefs-unit-graph`；两档怎么分见 `.claude/rules/verification.md`）。
 
 ## 任务从哪进
 
@@ -30,7 +30,6 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 @.claude/singlefs-ai-sop/rules/rules-discipline.md
 @.claude/singlefs-ai-sop/rules/kb-discipline.md
 @.claude/singlefs-ai-sop/rules/test-discipline.md
-@.claude/singlefs-ai-sop/rules/test-script-discipline.md
 @.claude/singlefs-ai-sop/rules/evidence-discipline.md
 @.claude/singlefs-ai-sop/rules/verify-before-claiming.md
 @.claude/singlefs-ai-sop/rules/command-safety.md
@@ -57,6 +56,7 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 @.claude/rules/mutation-sampling.md
 @.claude/rules/implementation-workflow.md
 @.claude/rules/verification.md
+@.claude/rules/test-script-discipline.md
 @.claude/rules/implementation-first.md
 @.claude/rules/path-moves.md
 @.claude/rules/directory-layout.md
@@ -86,6 +86,7 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |
 | `.claude/kb/checks-owed.md` | 欠的检查：知道要拦什么但还拦不了的，含前置 |
+| `.claude/kb/pending-rules.md` | 待议的规矩：做不成会红的检查、因而撤出规则的条款，每条带原文、原来在哪、为什么撤、要变成规则还缺什么；不约束执行，要立成规则先补那道检查 |
 | `.claude/kb/layout/` | 每个里程碑写出哪些字节，一个里程碑一个文件，与 `milestone/` 同号（`NN-简称.md`）：`01-first-txn.md` 每段每字段指向一条决策分项、给宽度与取值，指不到的就是格式级空白，第八节是根槽写路径的段序列登记表；之后的里程碑只登记新写出的形态，宽度与落点仍以 `01` 为准 |
 | `.claude/kb/vm-harness.md` | 怎么把实验送进虚机在真块设备上跑 |
 | `.claude/kb/verification-build.md` | 三样验证手段（checker、事务层、崩溃点重放）怎么落地、被谁挡着 |
@@ -109,4 +110,4 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 
 - 先定决策，再写代码——未定项还开着就写下去的实现多半要返工。
 - 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」（`.claude/rules/fs-design.md`「从事务开始，不从功能开始」）。
-- 门禁全绿**只构成新池新建文件在模型层的崩溃一致性证据**；里程碑「覆盖写、释放、回退与复用」步 0 那条固定脚本（覆盖写、释放、重开写行、暖机、回退、抬 F、复用各一次）的崩溃点重放结果不作数，重写与重跑归崩溃点重放规模那一轮与实六（`records/2026-09-24-里程碑二收尾调度.md` 第三节「实三交回」那一行）；崩溃点重放（门禁 checker-tier-crash-point-replay）的负载是两条流：新池新建文件，以及固定脚本到 E；checker 判 92 条不变量（数它的命令：`grep -ch '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | awk '{s+=$1} END{print s}'`，与代码清单 `IMPLEMENTED_INVARIANTS` 同数；哪几条按回退候选集判、候选集的下界怎么取，见 `crates/singlefs-checker/invariants/README.md`「## 状态」那一段与各条的状态列）。
+- 门禁全绿**只构成模型层的崩溃一致性证据**（新池新建文件与固定脚本到正常卸载两条流 2026-10-11 的全量都 0 红，记在 `records/2026-10-11-崩溃放量两段与脚本审计.md`；真设备那一侧只有门禁 checker-tier-qemu-device-streams 的六个模式）；崩溃点重放（门禁 checker-tier-crash-point-replay）的负载是 `.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例（`grep -c '^crash-case:'` 数，含那两条流）加崩溃放量的 8 项；checker 判 92 条不变量（数它的命令：`grep -ch '^| I-.*已实现' crates/singlefs-checker/invariants/0*.md | awk '{s+=$1} END{print s}'`，与代码清单 `IMPLEMENTED_INVARIANTS` 同数；哪几条按回退候选集判、候选集的下界怎么取，见 `crates/singlefs-checker/invariants/README.md`「## 状态」那一段与各条的状态列）。

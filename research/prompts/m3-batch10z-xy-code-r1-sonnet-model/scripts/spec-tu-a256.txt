@@ -1,1 +1,0 @@
-k14 atk_tu_vw t-k1-area256 atk_k1_rehearsal_vs_real_sweep ATK_AREA=256 ATK_EXTRA=8

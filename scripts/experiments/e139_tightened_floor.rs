@@ -158,8 +158,8 @@ impl WholeRingArm {
 const WHOLE_RING_ARMS: [WholeRingArm; 2] = [WholeRingArm::ReadingP, WholeRingArm::ReadingQ];
 const WHOLE_RING_SHORT_ARMS: [WholeRingArm; 2] = [WholeRingArm::ReadingPShort, WholeRingArm::ReadingQShort];
 
-/// 第 1 次重跑的七条臂（`research/prompts/e139-r1-prereg.md` 第五节）：回收门槛改成一圈窗口（txg + 3S > N，
-/// `crates/singlefs-core/src/root_ring.rs` 的 `txg_is_inside_the_one_revolution_window`）之后的臂 G2S，与它的读法臂、旧门槛对照、阳性对照。
+/// 第 1 次重跑的七条臂（`research/prompts/e139-r1-prereg.md` 第五节）：回收门槛改成一圈窗口（txg + 3S > N；
+/// 核心层后来退回整个环，那个判法函数已删，见 C842（一圈窗口判法成了死代码））之后的臂 G2S，与它的读法臂、旧门槛对照、阳性对照。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum WindowArm {
     /// G2SW：被测；抬 F 的上限取读法 P，滞后量取读法 a。

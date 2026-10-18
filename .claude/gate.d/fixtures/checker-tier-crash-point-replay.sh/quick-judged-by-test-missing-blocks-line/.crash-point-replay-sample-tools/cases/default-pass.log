@@ -1,0 +1,25 @@
+   Compiling singlefs-checker-tier v0.0.0 (样本)
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/singlefs_checker_tier-0000000000000000)
+
+running 1 test
+test tests::one_is_one ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/fault_injection_given_states.rs (target/release/deps/fault_injection_given_states-0000000000000001)
+
+running 2 tests
+test fault_injection_given_states_full ... ignored
+test fault_injection_given_states_quick ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/plain_stream.rs (target/release/deps/plain_stream-0000000000000002)
+
+running 2 tests
+CRASH_CASE_BLOCKS blocks=2 reused=2 fresh=0 red=0 refused=0
+test plain_stream_full ... ignored
+test plain_stream_quick ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s

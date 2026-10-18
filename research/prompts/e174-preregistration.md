@@ -365,6 +365,211 @@ grep -c '"Used GPU Memory"' crates/singlefs-harness/src/gpu_memory_ledger.rs
 
 第一段不含在飞·轻在 2 小时内；连在飞·轻一起约 2 小时 5 分，所以交回的命令把两个阶段分成两条（先 `--skip-light`，再不带，续跑接着写同一份产物）。
 
+### 修订 2（实验设计员，2026-10-15，父进程续跑键改成函数单元键；只触及续跑）
+
+**时点与范围**：主 agent 派发（批次 `records/2026-10-13-复用键与全仓改名.md#2026-10-15-批4`，4-2e 那一件）。两段已跑完；这一条只改父进程 `run` 的续跑：一轮的键怎么算、已完成的轮存哪、续跑读什么、成功句报什么、重跑之后怎么核产物。第一至十一节与修订 1 的臂、格、档、判据、门槛、锚点、变异、失败条款、作废条款与结论一字不动；第五节「跑的次序、续跑、分段」里「续跑」那一段（键 = 组、卡、S、活、借法、臂、轮，存在产物里）由本修订代替，次序、补轮规则（每格补到 5 轮有效、一格最多补 3 次）照旧。旧产物不当续跑的库、不迁移（不往旧产物里补键）。设计员写这一条时没读 E174 的产物，读到的已有数照列在修订 2 之四。
+
+用户定案（原话，2026-10-15，派发提示转述）：「剪枝就是单元的 做不到就重做」「做完 对账 不用问我 怎么改 不符合要求的统统改掉 从零开始跑也再所不惜」。
+
+**装置写在哪（写死，同原登记）**：`scripts/experiments/e174_lease_drop_wait_memory_return.rs`，走 `scripts/experiments/`（独立手写，不与 `crates/` 共用代码），不是入库装置。取键脚本与 E178 修订 4 共用 `scripts/experiments/device-code-key.py`；键的单元那一半由 `crates/singlefs-unit-graph` 的 `unit-graph` 算，装置不链它、不读 `crates/` 的常量。
+
+#### 修订 2 之一：问题与问题单
+
+主 agent 给的问题（逐字，派发提示「关的是哪几条」第 2、3 条）：
+
+> 2. E174 父进程按产物续跑（L31）：现状键只有格标签与轮号，装置代码与工具链都不进。修订成与第 1 条同形的键；产物目录名只作索引。验收同第 1 条。
+> 3. 两份修订都写清 experiment-runner 要做的装置改动落点（上面那几行）、要补的单元测试与变异行（键随单元变、注释不变）、以及重跑时的产物核对（老产物按新键算一次，内容相同则记「仅键换」）。
+
+第 1 条（「同形」指的那一条）的原文抄在 `research/prompts/e178-preregistration.md` 修订 4 之一。
+
+**问题单**（同 E178 修订 4 之一的四行，判的对象换成一轮）：
+
+| 判断 | 翻面观测 | 够判条件 | 状态 |
+|---|---|---|---|
+| K-作废：新键在「必须作废」样本上每一个都换 | 修订 2 之六的作废样本里有一个键不换 | 每个样本在装置副本上打一次键 | 开着 |
+| K-不作废：新键在「必须不作废」样本上每一个都不换 | 不作废样本里有一个键换了 | 同上 | 开着 |
+| K-仅键换：换键之后判定与产物内容不变 | 复跑表四行有一行不等；或模型卡第二段在空库上重跑出的产物与入库的那一份按行排序后不等 | 四行复跑与一次模型卡重跑 | 开着 |
+| K-续跑：同一条命令重起只补没做完的轮 | 中途停下再起，第二趟又起了已完成的轮；或拼出的产物与一次跑完的逐字节不等 | 模型卡上跑一次「`--limit-jobs` 停下、再起」 | 开着 |
+
+**读法写死**：
+
+- 一条判定 = 一轮：一个子进程交回的 `lease` 行与 `child_done` 行，或父进程替它写的 `child_failed` 行（作废、失败的轮照旧算「出现过」，补轮规则照旧吃它）。
+- 「这一轮真跑到的 fn」：子进程真卡那一支。执行员把 `run_child`（`:2602`）拆成 `run_child_on_the_card`（解析参数，再 `run_wgpu_child`）与 `run_child_on_the_model`（解析参数，再 `run_simulated_child`），`run_child` 只按 `--simulated` 分派；真卡轮的入口是前者，`run --simulated` 的轮是后者。另一个入口是父进程把格告诉子进程的那一段 `ChildJob::child_arguments`（`:318`）：它变了，子进程量的就是另一格。
+- 「参数值」= `format!("{cell:?}")`（`CellKey` 带 `derive(Debug)`，`:237`）加轮号；不用 `fields_text` 拼的串。
+- 驱动与卡进键：这个实验量的就是驱动在丢缓冲之后多久报还，驱动版本与卡是被测对象的一部分（与对账底稿第二节第 3 条「判定不依赖驱动、卡型，不进键」的前提不同：那一条管的是崩溃判器），这一样待主 agent 认。
+- 不进键的（只作索引或跑法）：产物路径与目录名、`--skip-light`、`--limit-jobs`、轮在清单里的位置、乱序值、日期、机器。
+
+#### 修订 2 之二：被测条款（`quote-kb.py` 整段抄，回读逐字节一致）
+
+被测条款另有对账底稿 L31 那一行与 gaps 路报告表一 N2 那一行，仓外、不是 kb，不抄；用到的要求落进修订 2 之五（同 E178 修订 4 之二那一句：键对不上的条数、库里记判定日期与跑法、变了的单元清单）。
+
+**出处 `.claude/singlefs-ai-sop/rules/test-script-discipline.md:60-73`（整段抄，未转述）**
+
+```markdown
+## 判定可复用：按输入存，按前缀剪
+
+- 每一份判定按它依赖的全部输入算键存下：被测代码、判法代码、参数、工具链。键相同的直接复用，不重算。
+- 复用只看键，不设时限：输入没变的判定放多久都照样复用，不因为过了多久而重跑。
+- 判定库不是这一趟的输出：输出照 `show-me-test.md`「门禁不许假装通过」每趟新写，复用来的判定在输出里与现判的分开报；判定库放哪照 `command-safety.md`「测试镜像一律放临时目录」里跨轮缓存那一句。
+- 状态空间按共享前缀组织：几条流、几个项共有的前缀只判一次，后面的接着它判。
+- 剪掉的只能是两种：键相同、已经判过的；与已判状态等价的。等价关系写成用例钉住。
+- 按登记整批不判的一类不算剪枝：登记表一行一类、写明为什么不判，成功那句报跳过了多少，照 `show-me-test.md`「门禁不许假装通过」列出没判的是哪几类。
+- 剪枝要自证：在小规模输入上关掉剪枝与复用跑一遍，判定与开着时逐项相同。剪枝自证进快档。
+- 一块判完才落盘，写入是原子的；被打断后重跑同一条命令就是续跑，只补没判的。
+- 成功那句报「现判 <个数>、复用 <个数>」。
+- 全量（`--full`）不读判定库，现判出的判定照样按键写回判定库。
+- 整个脚本的输入没变就不重跑，写成 `admission: inputs-changed`（`preflight-discipline.md`）；判定一级的复用在脚本里做，两层都要。
+
+```
+
+#### 修订 2 之三：实现今天的样子（这一次现查的行号）
+
+- 装置续跑那几处：`scripts/experiments/e174_lease_drop_wait_memory_return.rs:312`（`struct ChildJob`：格 + 轮号）、`:365`（`key_text`）、`:1495`（`type ProductRounds = BTreeMap<ChildJob, RoundData>`）、`:1503`（`parse_product`，`judge` 也用它）、`:2602`（`run_child`）、`:2547`（`run_wgpu_child`）、`:2592`（`run_simulated_child`）、`:2792`（`pending_jobs`：产物里已有的（格，轮）不再起）、`:2911`（`run_one_child`，`:2913` 的 `current_exe` 只在父进程这一侧）、`:2940`（`load_product`）、`:2975`（`run_parent`）、`:2987`（有 `name=done` 行又没要补的就整趟不跑）、`:2995`（config 行）、`:3021`（子进程的输出追加进产物）；文件头 `:11`–`:14`；`grep -nE 'sha256|digest|DEVICE_SOURCE|include_str|rustc|toolchain'` 在这份文件里无输出（gaps 路量的，键里没有代码与工具链）。
+- 设计员在草稿副本上用 `unit-graph closure` 量的（修订 2 之八）：`run_wgpu_child` 闭包 148 个单元、`run_simulated_child` 139、`run_child` 191、`ChildJob::child_arguments` 19，拒算都是 0；`run_wgpu_child` 的闭包里没有 `SimulatedCardHost` 的单元、没有 `judge_product`、`run_parent`、`pending_jobs`；`run_child` 两种卡的单元都有。
+- `unit-graph` 的用法、根的取法、拒算与键的组成见 E178 修订 4 之三（同一个程序）；E174 这个 bin 挂特性 `e174-gpu`，取键时加 `--cfg 'feature="e174-gpu"'`。
+- 复跑表 `scripts/experiments/replay.sh:946`–`:949` 四行（`checks`、模型卡第二段产物的 `judge`、两段真卡产物的 `judge`），都是确定性读法，不起卡。
+
+#### 修订 2 之四：跑之前已经存在的数
+
+- 读到的：`.claude/kb/experiments-history.md` 第 5318–5328 行（E174 一节，带两段产物的判决行与格数、子进程数）、实验页「历史版本」节（第 391–399 行）、本登记修订 1 引的 `…checks-2026-10-08.out` 第 12 行；入库产物的提交 18b30adb（`git log --diff-filter=A` 现查）。
+- 对判据的影响：没有。本修订只判键换不换、续跑补不补、换键前后判定与产物内容等不等；产物里是什么数不进任何一条。
+
+#### 修订 2 之五：键的组成、库与读回（代替第五节「续跑」那一段）
+
+**键的组成**（一轮一把键）：
+
+| 组成 | 取法 | 进键 |
+|---|---|---|
+| 子进程的单元 | `unit-graph key <仓根>/scripts e7_index_bench::run_child_on_the_card --target bin:e174-lease-drop-wait-memory-return --cfg 'feature="e174-gpu"' --threads <N>`；`run --simulated` 的轮入口换成 `e7_index_bench::run_child_on_the_model` | 进 |
+| 父进程告诉子进程哪一格的那一段 | 同上，入口 `e7_index_bench::ChildJob::child_arguments` | 进 |
+| 工具链行 | 同 E178 修订 4 之五（`rustc -vV`、`cargo -V`、构建环境、`[profile.release]` 摊开），另加 `features e174-gpu` | 进 |
+| 依赖版本行 | `locked_dependency_lines(<仓根>/scripts/experiments, "e7-index-bench")`（含 wgpu、pollster） | 进 |
+| 参数 | `format!("{cell:?}")` 加 `round=<轮号>` | 进 |
+| 驱动与卡 | 父进程开跑时 `nvidia-smi --query-gpu=pci.bus_id,name,memory.total,driver_version --format=csv,noheader` 里这一格那张卡的那一行；`--simulated` 写 `simulated` | 进 |
+| 产物路径与目录名、`--skip-light`、`--limit-jobs`、清单位置、乱序值、日期、机器 | — | 不进 |
+
+- 两个入口各一把代码键（取键脚本一次打两行 `code_key <入口> <hex>`，入口名只当索引）。轮键 = sha256（`child\t<子进程代码键>\narguments\t<参数代码键>\nparameters\t<{cell:?}> round=<轮号>\ndevice\t<驱动与卡那一行>\n`）。
+- 拒算或 `unit-graph` 起不来：同 E178 修订 4 之五（「做不到就重做」：这一趟每一轮都现起子进程、不读不写库；找不到程序退 78）。
+
+**库**：`~/.local/share/singlefs/experiments/e174/rounds/`（环境变量 `E174_ROUND_LIBRARY` 可改）。
+
+- `<轮键>.out`：第一行 `key round_key=<轮键> child_key=<…> arguments_key=<…>`，第二行 `parameters <key_text>`，第三行 `meta judged=<YYYY-MM-DD> how=<run 的段与选项> host=本机`（不进键、读回不比），之后是这一轮原样的结果行（子进程的 stdout 或父进程写的 `child_failed`），末行 `done lines=<行数>`；一轮做完原子落盘（同目录临时文件、fsync、改名、fsync 目录）。
+- `codes/<代码键>.txt`：组成清单；`index.tsv`：`<key_text>\t<轮键>`，只给人看与数键对不上的轮。
+- 续跑：父进程不再从产物读已完成的轮；对这一段的每一格、轮号 1 到 5 + 3 逐个按轮键找库里的文件，读得回的拼成 `ProductRounds` 交给 `pending_jobs`（补轮规则不动）。别的键写的轮不读（照「没出现」补）。
+- 产物：这一段该起的轮都有了（或 F1 停机）之后，由库拼出：config 行（字段不变）、各轮的结果行按 `job_order_key` 再按轮号排、verdict 行、done 行；原子写到 `--output`。`--output` 已在：内容与拼出的相同就打一句「已经齐了」退 0，不同退 2 并说「另给 --output」（不覆盖、不往旧产物里追加）。原文压缩包照旧逐轮追加。
+- 产物格式（行的写法、字段）不变，`judge` 与复跑表四行不用改；键只在库里与成功句里。
+
+**成功句**（stderr）：`run: 现判 <N> 轮、复用 <M> 轮、键对不上 <K> 轮（段 …，库 …）`；K > 0 时下一行写变了的单元清单（同 E178 修订 4 之五）。编译与取键的先后照 E178 修订 4 之五那一段（`device-code-key.py run`），两次不等就删掉这一趟写进库的轮、退 1。
+
+#### 修订 2 之六：执行员要做的改动（落点；行号是这一次现查的）
+
+装置 `scripts/experiments/e174_lease_drop_wait_memory_return.rs`：
+
+1. `:2602` `run_child` 拆成 `run_child_on_the_card` 与 `run_child_on_the_model`（各自解析参数），`run_child` 只按 `--simulated` 分派；行为不变。
+2. `:2975`–`:3035` `run_parent`：开跑时读 `--code-key-file`（`device-code-key.py` 打的组成清单，两个入口各一行代码键）与驱动、卡那几行；`:2987` 的「有 done 行就不跑」改成「库里这一段每格都齐了就只拼产物」；`:3021` 的「子进程输出追加进产物」改成「这一轮原子写进库」；循环完由库拼产物、照修订 2 之五处理 `--output` 已在的情形；成功句照修订 2 之五。`:2995` config 行字段不变。
+3. `:1495`、`:1503`：`parse_product` 不动（`judge` 照用）；另加由库按轮键读回、拼成 `ProductRounds` 的那一步，`:2792` `pending_jobs` 吃它，逻辑不动。
+4. `:2911` `run_one_child` 交回的文本照旧，`child_failed` 行照旧由它写；`:2940` `load_product` 只留给 `judge` 与「`--output` 已在」那一比。
+5. 参数：加 `--code-key-file <组成清单>`、`--written-list <文件>`；库取 `E174_ROUND_LIBRARY`，默认 `~/.local/share/singlefs/experiments/e174/rounds`。不给 `--code-key-file`：退 2，出路写「经 `device-code-key.py run` 起」（这个装置没有登记成只算不存的复跑行，`run` 一律经取键脚本起）。
+6. 文件头 `:11`–`:14` 改写续跑的说法；`scripts/experiments/replay.sh:946`–`:949` 四行不改，执行员改完装置后照跑一遍（修订 2 之七 Q-K-仅键换）。
+
+取键脚本 `scripts/experiments/device-code-key.py` 照 E178 修订 4 之六；E174 用它时给两个 `--entry`（`run_child_on_the_card` 或 `run_child_on_the_model`，与 `ChildJob::child_arguments`）与 `--feature e174-gpu`。
+
+**单元测试**（装置内；`checks` 子命令里的自检可以同时调它们，不起卡）：
+
+| 测试 | 断言 | 被哪条变异抓 |
+|---|---|---|
+| 轮键随子进程代码键变 | 同一格同一轮、两个子进程代码键 → 轮键不等 | M29 |
+| 轮键随参数代码键变 | 同上，换参数代码键 | M30 |
+| 轮键随格的每个字段与轮号变 | 只差组、卡、S、活、借法、臂、轮号的两轮 → 轮键两两不等 | M31 |
+| 轮键随驱动与卡那一行变 | 驱动版本串改一位 → 轮键不等 | M32 |
+| 轮键不看产物路径 | 模型卡上同一段先 `--output A` 跑完、再 `--output B` 起 → 第二趟现判 0、复用全部，B 与 A 内容相同 | M33 |
+| 别的键写的轮不读回 | 子进程代码键 A 下跑完、B 下再起 → 全部现起，A 的文件留着；成功句键对不上 = 轮数 | M34 |
+| 中途停下再起只补没做完的 | 模型卡 `--limit-jobs 2` 停下、再不带它起 → 第二趟只起其余的轮，拼出的产物与一次跑完的逐字相同 | （续跑本身） |
+| `--output` 已在而内容不同 | 退 2，原文件一个字节不动 | — |
+
+**变异**（追加进 `scripts/mutation/tables/e174_lease_drop_wait_memory_return.tsv`，接在现有 28 条之后，锚点唯一命中）：
+
+| 变异 | 改哪 | 在哪个取样点上改变输出 |
+|---|---|---|
+| M29_轮键漏子进程代码键 | 轮键不拼子进程代码键 | 同一轮、两个子进程代码键 |
+| M30_轮键漏参数代码键 | 轮键不拼参数代码键 | 同一轮、两个参数代码键 |
+| M31_轮键漏轮号 | 参数行只拼格、不拼轮号 | 同一格轮号 1 与 2 |
+| M32_轮键漏驱动 | 不拼驱动与卡那一行 | 驱动版本串改一位 |
+| M33_轮键带产物路径 | 把 `--output` 的路径拼进轮键 | 换一个 `--output` 再起 |
+| M34_续跑读回不比键 | 按（格，轮）找文件、不比轮键（回到旧形态） | 代码键 A 下跑完、B 下再起 |
+
+**真树样本**（不进快档，执行员跑一次、产物进 `research/results/e174-lease-drop-wait-memory-return-resume-key-samples-<日期>.out`；做法同 E178 修订 4 之六那一段）：
+
+| 类 | 样本 | 为什么 | 作废面 | 设计员在副本上量的（拿 `run_wgpu_child` 当入口；修订 2 之八） |
+|---|---|---|---|---|
+| 作废 | 子进程调到的借据步骤 `release_everything_and_wait`（`:973`）两句调换 | 闭包里的函数体变 | 全部真卡轮 | 6910e10c… → b405985a… |
+| 作废 | 闭包里的常量 `SHORT_WINDOW_MICROSECONDS`（`:33`）加 1 | 被引用的常量单元变 | 全部真卡轮 | → ea61fde5… |
+| 作废 | 格的参数值：`LEASE_SIZES_MEBIBYTES`（`:31`）里 512 改 513 | 这几格的 S 变 | 只 S = 512 MiB 的那几格（参数行变）；别的格复用 | 它不在子进程闭包里（量的：`run_wgpu_child` 闭包里 0 处）；轮键由单元测试判 |
+| 作废 | `Cargo.lock` 里 wgpu 抬一版 | 依赖版本行变 | 全部 | → 7cb685ed… |
+| 作废 | 驱动版本变 | 被测对象变 | 那张卡的全部轮 | 由单元测试判 |
+| 不作废 | 借据步骤函数里加一行注释 | 注释不进指纹 | 无 | 6910e10c…（不变） |
+| 不作废 | 只改 `judge_product`（`:2027`） | 不在子进程闭包里 | 无 | 不变 |
+| 不作废 | 文件末加一个没人调的函数 | 不在闭包里 | 无 | 不变 |
+| 不作废 | 改模型卡 `SimulatedCardHost`（`:1305`） | 真卡入口的闭包里没有它 | 真卡轮无（模型卡的轮作废） | 真卡入口不变 |
+| 不作废 | 换 `--output` 路径或目录名 | 产物名不进键 | 无 | 由单元测试判 |
+
+#### 修订 2 之七：报哪些量与各自的判据（只判续跑，不判臂）
+
+| 量 | 怎么算 | 门槛与判定 | 问题单哪一行、取什么值翻面 |
+|---|---|---|---|
+| Q-K-作废 | 真树样本表「作废」类每个样本一行：基线与改后的代码键（参数、驱动那两个比受影响轮的轮键）等不等 | 每行各判：换了 = 过；不换 = F-K1 | K-作废；任一行不换就翻 |
+| Q-K-不作废 | 「不作废」类每个样本一行 | 每行各判：不换 = 过；换了 = F-K2 | K-不作废；任一行换了就翻 |
+| Q-K-仅键换-复跑表 | 改完装置后跑 `replay.sh` 的 E174 四行（`:946`–`:949`） | 四行各判：与入库输出逐字节相同 = 过；不同 = 停机 H-K2 | K-仅键换；任一行不同就翻 |
+| Q-K-仅键换-模型卡 | 空库上照 `research/results/e174-lease-drop-wait-memory-return-simulated-second-2026-10-08.out` 的 config 行（段、`skip_light`、`simulated`）重跑 `run --simulated`，拼出的产物与那一份按行排序后比 | 相同 = 实验页记「仅键换」；不同 = 停机 H-K2 | K-仅键换；不同就翻 |
+| Q-K-续跑 | 模型卡上 `--limit-jobs 2` 停下、再起；第二趟的成功句与拼出的产物 | 第二趟现判 = 总轮数 − 2、复用 = 2、产物与一次跑完的逐字节相同，三样各判 | K-续跑；任一样不符就翻（F-K4） |
+| Q-K-单元那一半（附带，够判后不跑） | 产出两段真卡产物那一版的装置（提交 18b30adb 时的源文件）拿 `run_wgpu_child` 与 `ChildJob::child_arguments` 当入口，与改完的装置在同一份工具链行、依赖行下比代码键 | 等 → 实验页记「真卡两段的轮按新键也只换键」；不等 → 列变了的单元交主 agent，不作废 | K-仅键换；只补说明 |
+
+真卡两段不重跑：两段已够判，真卡读数含计时与显存读数、两次跑不同，换键核不靠重跑真卡；旧产物的轮在新键下没有记录，若主 agent 要真卡再跑，按新键从空库起。门槛不能从臂的定义推出：这里没有臂，样本的期望由 `unit-graph` 现算的闭包决定。
+
+#### 修订 2 之八：钉绝对值的断言
+
+- 出自被测条款本身的：成功句报「现判 <轮数>、复用 <轮数>」；两数之和等于这一趟该有的轮数（`plan` 子命令报的那一段子进程数加已起的补轮）。不符按 V-K3 作废那一趟、修装置重跑，不走「条款可能错」。
+- 独立算出、用命令核过的（草稿副本，命令在第十三节修订 2 那一段；探针的工具链行、依赖行是占位串，hex 只在探针里有意义）：`run_wgpu_child` 闭包 148 个单元、拒算 0，里头 `SimulatedCardHost` 0 处、`judge_product` 0 处；`ChildJob::child_arguments` 闭包 19 个单元；执行员拆出来的 `run_child_on_the_card` 闭包 = `run_wgpu_child` 的闭包再加 `ChildJob::from_child_arguments` 一系（只多不少，且没有 `SimulatedCardHost` 的单元），不是就列出差异交回（V-K4）；十个样本里量了的七个的换 / 不换照样本表最后一列；`unit-graph` 与 `scripts/gate/lib_function_units.py` 两条路子在其中三个样本（加基线）上的换 / 不换逐格相同。
+
+#### 修订 2 之九：轨迹与几何敏感性
+
+- 轨迹：不适用（理由同 E178 修订 4 之九：键换不换与现判、复用数都是一次确定性跑的端点）。
+- 几何敏感性：两个方向相反的取样点在样本表里：改子进程闭包里的常量（`SHORT_WINDOW_MICROSECONDS`：代码键换、全部真卡轮作废）与改父进程造清单用的常量（`LEASE_SIZES_MEBIBYTES`：代码键不换、只那几格作废）；另有入口形态与 E178 不同的一点：泛型 `Host: CardHost` 下真卡入口不收模型卡的实现（`SimulatedCardHost` 样本）。判别力自证：打开 M31（漏轮号），同一格五轮会共用一把键，「中途停下再起」那一条由绿转红。
+
+#### 修订 2 之十：变异
+
+见修订 2 之六的变异表；原第九节与修订 1 的 28 条照原样留着，改完装置后整表重跑，抓到 / 无效 / 没红三栏分开报。
+
+#### 修订 2 之十一：失败条款
+
+- **F-K1 键漏判**：触发：作废样本那一行 `changed=false`。新键不得入用；改好重跑样本。
+- **F-K2 键多判**：触发：不作废样本那一行 `changed=true`。同上。
+- **F-K3 换键改了判定或产物内容**：触发：Q-K-仅键换 两行任一不等。走停机 H-K2。
+- **F-K4 续跑不补或补错**：触发：「中途停下再起」那一趟第二趟起了已完成的轮、复用数不是 2，或拼出的产物与一次跑完的不同。续跑作废，修装置重跑。
+
+#### 修订 2 之十二：作废条款与停机条款
+
+- **V-K1 拆完仍拒算**：触发：`unit-graph key` 对两个入口任一退 3。不改键的组成去绕；照「做不到就重做」，`run` 一律每轮现起、不读不写库，交回主 agent，写明拒算形态与位置。
+- **V-K2 样本没施加上**：触发：样本原文在副本里命中不是 1 次。那一趟样本作废，修样本表重跑。
+- **V-K3 成功句不合条款**：触发：现判 + 复用 ≠ 这一趟该有的轮数。那一趟作废，修装置重跑。
+- **V-K4 入口闭包对不上**：触发：修订 2 之八那条闭包关系不成立。不作废，列出差异；只因拆函数时动到闭包里的函数的，写进修订 3 再往下，别的原因交回。
+- **H-K1 两条路子不一致（停机）**：触发：`unit-graph` 与 `lib_function_units.py` 在同一样本上一个换、一个不换。两边都查，交回。
+- **H-K2 换键之后判定或产物内容不同（停机）**：触发：F-K3。先看 `diff`，查拆函数、库的读回与拼产物；不当结果，不覆盖入库产物，新产物另存带日期的文件名，交回。
+- **够判停机**：问题单四行都够判就停；附带那一行没跑的标「够判后未跑」。
+
+#### 修订 2 之十三：实现量、分段与预计挂钟
+
+- **执行的第一段：改键、样本与核产物**（补问题单四行）：修订 2 之六的改动、单元测试、变异、真树样本、复跑表四行、模型卡空库重跑与「中途停下再起」。实现量推的：装置改动约 250 行（库的读写、拼产物、拆函数），取键脚本与 E178 共用。挂钟推的：编译与单测约 10 分钟，变异表 34 条约 40–70 分钟，模型卡第二段一趟 1 分钟以内（模型卡读一份记 50 毫秒是模型时钟，不真等），样本与复跑表几分钟；2 小时内，分片、多机两样这一次不要求（照第五节「预计挂钟」末段那一句的判法）。补完四行都够判，没有第二段。
+- E178 修订 4 执行的第一段先做（取键脚本在那里写成）；这一条接着它做，不并行改同一份取键脚本。
+
+### 修订 3（执行员，2026-10-15，装置改完、单元测试与变异跑完，真树样本、复跑表四行与模型卡空库重跑一次没跑之前；只触及续跑键）
+
+- **依赖行收窄**：修订 2 之五「键的组成」一表「依赖版本行」那一格不再取 `locked_dependency_lines(<仓根>/scripts/experiments, "e7-index-bench")`（整个包的传递依赖），改取每个入口闭包里的 Rust 单元点到的外部包与它们的传递依赖，取法与 `research/prompts/e178-preregistration.md` 修订 5 第一条相同（`scripts/experiments/device-code-key.py` 文件头「键的组成」依赖行那一条）。这一条不是收严：它少作废了入口闭包没点到的依赖变动。依据是派发提示（`~/.local/share/singlefs/work/runner-e178-e174-resume-keys/prompt.md`）「主 agent 对设计员交的几点的定」第 ② 条，原句：「② 依赖行不取整个包的传递依赖，收窄到闭包真引到的外部包及其传递依赖（`unit-graph key --lock-line` 只喂闭包引到的那几行，怎么从闭包成员取「引到哪些外部包」照设计 3.1）」。
+- **驱动与卡进键**：修订 2 之一「读法写死」里「驱动与卡进键……这一样待主 agent 认」由主 agent 认了，依据是同一份派发提示同一段第 ① 条，原句：「① E174 的键带驱动版本与卡型，收（这个实验测的就是驱动行为；对账底稿第二节第 3 条「驱动不进键」只管崩溃判器）」。键的组成照修订 2 之五，一字不改。
+- **单元测试与变异读数**（时点在真树样本与复跑之前）：改完的装置在草稿副本上 `cargo test --release --features e174-gpu --bin e174-lease-drop-wait-memory-return` 30 条绿（原 19 条加新 11 条）；`mutate.sh` 整表 34 条（原 28 条加 M29–M34）抓到 34、无效 0、没红 0，收尾「已还原，基线仍全绿」。`device-code-key.py key` 打的组成清单：入口 `run_child_on_the_card` 闭包 160 个单元、dependency 行 61（wgpu、pollster 与它们的传递依赖）；`run_child_on_the_model` 151 个单元、dependency 行 0；`ChildJob::child_arguments` 19 个单元、dependency 行 0；三者拒算都是 0（草稿 `logs/e174-key-run_child_on_the_card.out`、`logs/e174-key-run_child_on_the_model.out`）。修订 2 之八的闭包关系量了：`run_child_on_the_card` 的闭包是 `run_wgpu_child` 的 148 个单元加 12 个（`ChildJob::from_child_arguments`、`CellKey::from_fields`、五个 `from_label`、`EVERY_CARD`、`EVERY_LIVENESS`、`parse_child_arguments`、入口自己、一条 use），没有 `SimulatedCardHost` 的单元，V-K4 没触发。
+- **牵到的那一行样本**：修订 2 之六真树样本表「作废」类「`Cargo.lock` 里 wgpu 抬一版」的作废面「全部」，收窄之后读成「真卡的轮全部」：真卡入口闭包点到 wgpu，代码键换；模型卡入口（`run_child_on_the_model`）与参数入口不点 wgpu，代码键不换。真树样本照跑这一行，产物里另报模型卡入口那一列（期望不换），判据不改。
+- 别的照修订 2，一字不动。
+
 ## 十三、读过的文件与跑过的命令
 
 ### 读过的文件（行号区间；grep 命中行也列）
@@ -426,3 +631,42 @@ crates/singlefs-harness/src/gpu_memory_ledger.rs
 ```
 
 `nvidia-smi -q -d MEMORY,PIDS` 那一次 grep 出的行：5090 `Total 32607 MiB`、`Reserved 497 MiB`、`Used 2 MiB`、`Free 32110 MiB`、`Processes : None`；5060 Ti `Total 16311 MiB`、`Reserved 462 MiB`、`Used 2 MiB`、`Free 15849 MiB`、`Processes : None`（BAR1 与 Conf Compute 两节的行另有，不用）。另有只读命令（`grep -n`、`sed -n`、`wc -l`、`ls`）读上面列的文件，不一一列。
+
+### 修订 2（实验设计员，2026-10-15）读过的文件与跑过的命令
+
+与 `research/prompts/e178-preregistration.md` 第 13.4 节是同一次（两份修订同一个设计员同一轮写），文件清单与命令照那一节；这里补 E174 专有的。
+
+- 装置 `scripts/experiments/e174_lease_drop_wait_memory_return.rs` 1–60、236–260、295–370、1284–1310、1485–1560、2547–2650、2780–2830、2900–3036；grep 命中第 31、33、318、339、973、1305、2027、2334、2405、2670、2872、2913、2987、2995、3004、3021 行；`scripts/mutation/tables/e174_lease_drop_wait_memory_return.tsv` 行数与末 3 行的变异名；`research/results/` 只 `ls` 了 E174 的文件名、`git log` 取了两段产物的提交（18b30adb）。
+
+命令（`$D`、`$UG` 同 E178 第 13.4 节）：
+
+```
+for entry in run_child run_wgpu_child run_simulated_child; do nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G $UG closure $D/probe/tree/scripts e7_index_bench::$entry --target bin:e174-lease-drop-wait-memory-return --cfg 'feature="e174-gpu"' --threads 1 > $D/probe/e174-$entry.out 2> $D/probe/e174-$entry.err; done
+nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G $UG closure $D/probe/tree/scripts e7_index_bench::ChildJob::child_arguments --target bin:e174-lease-drop-wait-memory-return --cfg 'feature="e174-gpu"' --threads 1
+nice -n 19 bash scripts/hosts/run-with-memory-cap.sh 8G python3 -I $D/probe/tools/e174_probe.py $D/probe $UG
+```
+
+四个入口的 stderr 末行（原样）：
+
+```
+unit-graph：入口 e7_index_bench::run_child：闭包 191 个单元（Rust 191、WGSL 0、数据 0），拒算 0 处，1 线程，0.14 秒
+unit-graph：入口 e7_index_bench::run_wgpu_child：闭包 148 个单元（Rust 148、WGSL 0、数据 0），拒算 0 处，1 线程，0.13 秒
+unit-graph：入口 e7_index_bench::run_simulated_child：闭包 139 个单元（Rust 139、WGSL 0、数据 0），拒算 0 处，1 线程，0.13 秒
+unit-graph：入口 e7_index_bench::ChildJob::child_arguments：闭包 19 个单元（Rust 19、WGSL 0、数据 0），拒算 0 处，1 线程，0.13 秒
+```
+
+`e174_probe.py` 原样输出（去掉每行里入口名那一段）：
+
+```
+sample=baseline entry=run_wgpu_child exit=0 out=key	6910e10c7211dd645b64 闭包 148 个单元（Rust 148、WGSL 0、数据 0），拒算 0 处，1 线程，0.11 秒
+sample=comment-only-in-the-lease-steps entry=run_wgpu_child exit=0 out=key	6910e10c7211dd645b64 闭包 148 个单元（Rust 148、WGSL 0、数据 0），拒算 0 处，1 线程，0.12 秒
+sample=judge-function-changed entry=run_wgpu_child exit=0 out=key	6910e10c7211dd645b64 闭包 148 个单元（Rust 148、WGSL 0、数据 0），拒算 0 处，1 线程，0.11 秒
+sample=unrelated-function-added entry=run_wgpu_child exit=0 out=key	6910e10c7211dd645b64 闭包 148 个单元（Rust 148、WGSL 0、数据 0），拒算 0 处，1 线程，0.11 秒
+sample=simulated-host-changed entry=run_wgpu_child exit=0 out=key	6910e10c7211dd645b64 闭包 148 个单元（Rust 148、WGSL 0、数据 0），拒算 0 处，1 线程，0.12 秒
+sample=lease-step-changed entry=run_wgpu_child exit=0 out=key	b405985af9b56bea7d27 闭包 148 个单元（Rust 148、WGSL 0、数据 0），拒算 0 处，1 线程，0.11 秒
+sample=window-constant-changed entry=run_wgpu_child exit=0 out=key	ea61fde5f13cae7d9bc9 闭包 148 个单元（Rust 148、WGSL 0、数据 0），拒算 0 处，1 线程，0.12 秒
+sample=baseline entry=ChildJob::child_arguments exit=0 out=key	a1dc0a254a0c715e41af 闭包 19 个单元（Rust 19、WGSL 0、数据 0），拒算 0 处，1 线程，0.11 秒
+sample=lock-bumped entry=run_wgpu_child exit=0 out=key	7cb685ed6d40d0b90d6a 闭包 148 个单元（Rust 148、WGSL 0、数据 0），拒算 0 处，1 线程，0.12 秒
+```
+
+两条路子的对拍（E174 那四行）在 E178 第 13.4 节 `crosscheck.py` 的输出里。闭包里有没有 `SimulatedCardHost`、`WgpuCardHost`、`judge_product` 一类单元，是对上面四份 `closure` 输出 `grep -c` 数的：`run_wgpu_child` 0 / 13 / 0，`run_simulated_child` 21 / 0 / 0，`run_child` 21 / 13 / 0。

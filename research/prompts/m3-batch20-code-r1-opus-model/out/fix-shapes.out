@@ -1,8 +1,0 @@
-BAD_VIOLATION case=「S1-base 已登记的 I-4.7 坏镜像（对照）」 I-4.7：根（实例 1、txg 4）：inode 1 处于删除中（inode 树里没有它的记录），extent 树里还有 1 个数据单元，号也不在 deleted_inodes 里
-BAD case=「S1-base 已登记的 I-4.7 坏镜像（对照）」 expect=only_red=["I-4.7"] as_expected=true violated=["I-4.7"] watched=I-9.6=H,I-9.5=H,I-3.4=H,I-4.7=V,I-4.6=N,I-4.4=N details=["I-4.7=V:根（实例 1、txg 4）：inode 1 处于删除中（inode 树里没有它的记录），extent 树里还有 1 个数"]
-SHAPE_NOTE spare_entry_index=4 spare_kind=6 spare_tree=65541 inode_tree=65537
-SHAPE case=「S1 extent 树反方向不配：真 extent 树头 ID→0，一条空根备用条目改成种类 1、头 ID→inode 树」 literal=I-4.7（真 extent 树里 1 号还有 1 个单元、inode 树里没有 1 号记录、队列空） checker_I-4.7=G detail=走读到的某一版树表里有一棵 extent 树，偏移 116 的头 ID 配不上同一张表里恰好一条 inode 树：那一版的数据单元数判不了 violated=["I-9.16", "I-9.27"] watched=I-9.6=H,I-9.5=H,I-3.4=H,I-4.7=G,I-4.6=G,I-4.4=N
-SHAPE case=「S2 deleted_inodes 那一侧同一手法（意图之后）：真 deleted_inodes 头 ID→0，备用条目改种类 9、头 ID→inode 树」 checker=I-9.6=H,I-9.5=V,I-3.4=H,I-4.7=V,I-4.6=G,I-4.4=N violated=["I-9.16", "I-9.27", "I-9.5", "I-4.7"] I-9.5_detail=根（实例 1、txg 5）：inode 树（树 65537）里 inode 1 的记录 nlink = 0，号不在同一版的 deleted_inodes 里
-SHAPE case=「S3 第二棵 inode 树（备用条目改种类 2、空根）」 checker=I-9.6=H,I-9.5=G,I-3.4=H,I-4.7=G,I-4.6=G,I-4.4=N violated=["I-9.16"] I-9.5_detail=走读到的某一版树表里有一棵 inode 树，同一张表里偏移 116 的头 ID 指着它的 deleted_inodes 条目不是恰好一条：那一版这棵树的队列与记
-SHAPE case=「S4a 叶里 [1 nlink 0, 1 nlink 1]、队列空」 literal=I-9.5②（有一条 nlink 0 的 1 号记录、号不在队列） checker_I-9.5=G violated=[] cpu_recovery_consulted=F ignored=F
-SHAPE case=「S4b 叶里 [1 nlink 1, 1 nlink 0]、队列空」 literal=I-9.5②（有一条 nlink 0 的 1 号记录、号不在队列） checker_I-9.5=G violated=[] cpu_recovery_consulted=Z ignored=Z

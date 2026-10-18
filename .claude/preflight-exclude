@@ -155,6 +155,7 @@ scripts/experiments/e9_keylayout.rs  # 还没改完：实验要写 inputs-change
 crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（checker 档包改完直接跑，不开代码轮）
 crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（checker 档包改完直接跑，不开代码轮）
 crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（checker 档包改完直接跑，不开代码轮）
+crates/singlefs-checker-tier/src/bin/crash_library_reader.rs  # 还没改完：只读读库程序，与同目录别的装置二进制一样还没接 preflight（admission: always、run-condition: command python3），接法与它们一批补；它在 crates/ 里，改动要带测试、证红（checker 档包改完直接跑，不开代码轮）
 crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（checker 档包改完直接跑，不开代码轮）
 crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（checker 档包改完直接跑，不开代码轮）
 crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs  # 在虚机的 busybox initramfs 里跑的静态二进制，那里没有 python3，preflight 判不了条件

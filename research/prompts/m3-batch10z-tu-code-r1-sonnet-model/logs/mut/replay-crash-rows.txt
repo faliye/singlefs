@@ -1,6 +1,0 @@
-行3561 批第二十一块 崩溃放量 K4 叫停扫源码只认参数单独占一行的层（签名一行里收叫停的新层漏过，正推 K4-3 第 1 种）: 红 1 条 ['the_stop_request_scan_finds_a_new_layer_whose_stop_parameter_shares_th'] 绿 4
-行3562 量 K4 叫停扫源码只认叫 stop_is_requested 的参数（参数换名的新层漏过，正推 K4-3 第 2 种）: 红 1 条 ['the_stop_request_scan_finds_a_new_layer_whose_stop_parameter_is_rename'] 绿 4
-行3563 4 叫停扫源码改回只数 let stop_request 起头的写法（解构、多空格重绑漏过，正推 K4-3 第 3 种）: 红 1 条 ['the_stop_request_scan_finds_the_remembered_stop_request_rebound_by_a_t'] 绿 4
-行3564 第10z批第二十一块 崩溃放量 K5 数花括号不认原始字符串（原始字符串里的引号与花括号算错层数）: 红 1 条 ['brace_depth_reads_past_raw_strings_block_comments_and_strings_spanning'] 绿 4
-行3565 第10z批第二十一块 崩溃放量 K4 数花括号不认块注释（if false { /* } */ 骗过层数）: 红 1 条 ['brace_depth_reads_past_raw_strings_block_comments_and_strings_spanning'] 绿 4
-行3566  崩溃放量 K4 没编进 gpu 特性那一份 judge_my_blocks_on_gpu 不交错、当判过了（不问叫停）: 红 1 条 ['every_layer_handed_the_stop_request_hands_it_on_or_asks_it'] 绿 4

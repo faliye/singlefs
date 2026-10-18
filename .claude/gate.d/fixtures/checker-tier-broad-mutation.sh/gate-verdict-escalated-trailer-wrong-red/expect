@@ -1,4 +1,4 @@
 exit=1
 want=升档判的抓到复核不过
-want=escalated 那趟的日志末尾没有驱动写的那一行（BROAD_MUTATION_EVIDENCE version=e5ca1a7e000000000000000000000000000000000000000000000000000000f1 sequence=1 step=one-build attempt=escalated limit=3600 exit=253）
-want=gate-verdict：红
+want=escalated 那趟的日志末尾没有驱动写的那一行（BROAD_MUTATION_EVIDENCE key=e5ca1a7e000000000000000000000000000000000000000000000000000000f1 sequence=1 step=one-build attempt=escalated limit=3600 exit=253）
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

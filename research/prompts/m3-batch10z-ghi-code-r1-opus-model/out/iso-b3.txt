@@ -1,3 +1,0 @@
-r=n paired_histories_with_session=13 bing_isolates_more=11 max_extra_isolated_slots=18
-r=o paired_histories_with_session=13 bing_isolates_more=11 max_extra_isolated_slots=34
-r=s paired_histories_with_session=13 bing_isolates_more=11 max_extra_isolated_slots=34

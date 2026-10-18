@@ -6,7 +6,7 @@
 本页的本地臂名与记号写小写（a1、a2、a3、a4 ……）：跑前登记、装置、产物与命令里写作对应的大写，与全局登记的编号同形；kb 正文里改成小写只为与那些编号分开，读产物时按大写对。
 ```
 
-跑前登记 `research/prompts/e176-preregistration.md`（第二段跑完时 sha256 `f7599076bb469dcc483f98cb0f557aca5bc6d79759fe674b4b52f150b8291fa9`，含第十二节「修订」三条：修订 1 补 M3 f = 59 变体的阳性对照与它的公共窗口读法；修订 2 把对拍 bin 从可选特性挪成独立 manifest，见「做了什么」；修订 3 补第二段的三个公共窗口、三个变体的阳性对照与变异 V14–V16，第二段产物之前写）。回答的是岔路单 `research/prompts/m3-3-5-forks.md` 的 M 那一行：inode 树叶容器删到稀疏时怎么回收，C116（叶容器的分裂 / 合并纪律没有会失败的检查） 合并那一半与 C536（inode 树的「左从右借」让容器号条件为假）。
+跑前登记 `e176-preregistration.md`（第二段跑完时 sha256 `f7599076bb469dcc483f98cb0f557aca5bc6d79759fe674b4b52f150b8291fa9`，含第十二节「修订」三条：修订 1 补 M3 f = 59 变体的阳性对照与它的公共窗口读法；修订 2 把对拍 bin 从可选特性挪成独立 manifest，见「做了什么」；修订 3 补第二段的三个公共窗口、三个变体的阳性对照与变异 V14–V16，第二段产物之前写）。回答的是岔路单 `m3-3-5-forks.md` 的 M 那一行：inode 树叶容器删到稀疏时怎么回收，C116（叶容器的分裂 / 合并纪律没有会失败的检查） 合并那一半与 C536（inode 树的「左从右借」让容器号条件为假）。
 
 三个候选：M1 只删空即摘（E176（inode 树叶合并三候选的容量与写代价） 跑的时候 `crates/` 的做法；`crates/` 已是 M3）；M2 只做左吸收右（相邻两片合起来 ≤ 233 条就并）；M3 照 D8（核心索引结构） 已定项 6 原文，左吸收右加左从右借（主取样点下限 f = 117、均分借）。装置是独立手写模型 `scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs`，不与 `crates/` 共用代码；M1 那一臂另由对拍 bin `scripts/experiments/e176_crates_oracle/oracle.rs` 逐步比当时 `crates/singlefs-core/src/inode_tree.rs` 的两个纯函数（`crates/` 已是 M3，这一臂的对拍没重做）。
 
@@ -36,20 +36,20 @@
 ### 复跑
 
 ```
-# 仓根；模型在 research/（不依赖 crates/），线程数读 SINGLEFS_THREAD_CAP（capped.sh 设），只影响挂钟、不影响输出
-cd /home/fy5090/code/singlefs/research
-bash scripts/hosts/capped.sh 8 cargo build --release --manifest-path scripts/experiments/Cargo.toml --bin e176-inode-leaf-merge-capacity-and-rewrites
-bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-capacity-and-rewrites segment-one
-bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-capacity-and-rewrites segment-two
+# 仓根；模型在 scripts/experiments/（不依赖 crates/），线程数读 SINGLEFS_THREAD_CAP（capped.sh 设），只影响挂钟、不影响输出
+cd /home/fy5090/code/singlefs/scripts/experiments
+bash ../hosts/capped.sh 8 cargo build --release --bin e176-inode-leaf-merge-capacity-and-rewrites
+bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-capacity-and-rewrites segment-one
+bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-capacity-and-rewrites segment-two
 # 登记的复跑（scripts/experiments/replay.sh 两行：segment-one、segment-two）
-cd .. && bash scripts/experiments/replay.sh E176
+cd ../.. && bash scripts/experiments/replay.sh E176
 # 对拍（独立 manifest，以路径依赖只读引 crates/；replay.sh 不编它）
-cd research
-bash scripts/hosts/capped.sh 8 cargo build --release --manifest-path scripts/experiments/e176_crates_oracle/Cargo.toml --target-dir target
-bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-crates-oracle
+cd scripts/experiments
+bash ../hosts/capped.sh 8 cargo build --release --manifest-path e176_crates_oracle/Cargo.toml --target-dir target
+bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 ./target/release/e176-inode-leaf-merge-crates-oracle
 # 单测 22 条与变异表 16 条
-bash scripts/hosts/run-with-memory-cap.sh 4G bash scripts/hosts/capped.sh 8 cargo test --release --bin e176-inode-leaf-merge-capacity-and-rewrites
-MUTATE_JOBS=4 MUTATE_CARGO_JOBS=2 MUTATE_MEMORY_MAX=4G bash scripts/mutation/mutate.sh e176-inode-leaf-merge-capacity-and-rewrites scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs mutations/e176_inode_leaf_merge_capacity_and_rewrites.tsv
+bash ../hosts/run-with-memory-cap.sh 4G bash ../hosts/capped.sh 8 cargo test --release --bin e176-inode-leaf-merge-capacity-and-rewrites
+MUTATE_JOBS=4 MUTATE_CARGO_JOBS=2 MUTATE_MEMORY_MAX=4G bash ../mutation/mutate.sh e176-inode-leaf-merge-capacity-and-rewrites e176_inode_leaf_merge_capacity_and_rewrites.rs ../mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv
 ```
 
 第一段约 16 秒（8 个线程）、23 秒（1 个线程）；第二段约 19 秒（8 个线程）、25 秒（1 个线程，都含内存包装）；对拍约 23 秒（8 个线程）。产物：
@@ -58,14 +58,14 @@ MUTATE_JOBS=4 MUTATE_CARGO_JOBS=2 MUTATE_MEMORY_MAX=4G bash scripts/mutation/mut
 |---|---|
 | `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out` | 第一段：config、锚点与阳性对照、22 条序列 × 四个臂变体、总判定、敏感性（991 行，sha256 `fe3a322978d570c3a6db180ac6e10d00a9e744c9b16b403f4e49105ef5f58dc4`；8 个线程与 1 个线程两遍逐字节相同；第二段改过的源码重跑一次，仍逐字节相同） |
 | `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` | 第二段：config、锚点与阳性对照（47 格，登记答案 29 格）、22 条序列 × 六个臂变体 × 三个窗口、总判定、两个旋钮的敏感性（1370 行，sha256 `8906bfd7d87a516abbe61c74c410dfc00d9c967b57fbad916f08f14c21e60737`；8 个线程与 1 个线程两遍逐字节相同） |
-| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-crates-oracle.out` | 第一段的对拍：常量回比、`crates/` 单测三种形态回比、22 条序列逐步比到 M1 被拒（28 行，sha256 `c0a6635e1cab890f1b9dc134df1fb43e53adc2ba2c993f59bbaef981f8c69ae3`；与改 manifest 之前在草稿目录跑的那一次逐字节相同） |
-| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-crates-oracle-2026-10-08.out` | 第二段的对拍（用第二段的源码重编）：与第一段那份逐字节相同（sha256 `c0a6635e1cab890f1b9dc134df1fb43e53adc2ba2c993f59bbaef981f8c69ae3`） |
-| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-oracle-discrimination-v1.out` | 第一段对拍的判别力：模型上打开 V1 之后的对拍输出（草稿目录副本上编的，判决行故意是 false） |
-| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-oracle-discrimination-v1-2026-10-08.out` | 第二段对拍的判别力（第二段的源码上打开 V1）：与第一段那份逐字节相同（sha256 `29e6ab1ed77318939f8d377b7c90728c7a4028a24771d0e8aad080c71f909bb3`） |
-| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests.out` | 第一段的单测输出（14 个） |
-| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests-2026-10-08.out` | 第二段的单测输出（22 个，第二段的源码） |
-| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations.out` | 第一段 `mutate.sh` 整张表（13 条）的输出（stderr 头一行在前） |
-| `research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations-2026-10-08.out` | 第二段 `mutate.sh` 整张表（16 条，第二段的源码与变异表）的输出（stderr 头一行在前） |
+| `e176-inode-leaf-merge-capacity-and-rewrites-crates-oracle.out` | 第一段的对拍：常量回比、`crates/` 单测三种形态回比、22 条序列逐步比到 M1 被拒（28 行，sha256 `c0a6635e1cab890f1b9dc134df1fb43e53adc2ba2c993f59bbaef981f8c69ae3`；与改 manifest 之前在草稿目录跑的那一次逐字节相同） |
+| `e176-inode-leaf-merge-capacity-and-rewrites-crates-oracle-2026-10-08.out` | 第二段的对拍（用第二段的源码重编）：与第一段那份逐字节相同（sha256 `c0a6635e1cab890f1b9dc134df1fb43e53adc2ba2c993f59bbaef981f8c69ae3`） |
+| `e176-inode-leaf-merge-capacity-and-rewrites-oracle-discrimination-v1.out` | 第一段对拍的判别力：模型上打开 V1 之后的对拍输出（草稿目录副本上编的，判决行故意是 false） |
+| `e176-inode-leaf-merge-capacity-and-rewrites-oracle-discrimination-v1-2026-10-08.out` | 第二段对拍的判别力（第二段的源码上打开 V1）：与第一段那份逐字节相同（sha256 `29e6ab1ed77318939f8d377b7c90728c7a4028a24771d0e8aad080c71f909bb3`） |
+| `e176-inode-leaf-merge-capacity-and-rewrites-unit-tests.out` | 第一段的单测输出（14 个） |
+| `e176-inode-leaf-merge-capacity-and-rewrites-unit-tests-2026-10-08.out` | 第二段的单测输出（22 个，第二段的源码） |
+| `e176-inode-leaf-merge-capacity-and-rewrites-mutations.out` | 第一段 `mutate.sh` 整张表（13 条）的输出（stderr 头一行在前） |
+| `e176-inode-leaf-merge-capacity-and-rewrites-mutations-2026-10-08.out` | 第二段 `mutate.sh` 整张表（16 条，第二段的源码与变异表）的输出（stderr 头一行在前） |
 
 ### 判决（整行抄自产物）
 
@@ -556,7 +556,7 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 
 ### 对拍（停机条款，整行抄）
 
-`research/results/e176-inode-leaf-merge-capacity-and-rewrites-crates-oracle.out` 全文：
+`e176-inode-leaf-merge-capacity-and-rewrites-crates-oracle.out` 全文：
 
 ```
 1:E7RESULT name=oracle_constants model_leaf_record_capacity=233 crates_inode_leaf_records=233 model_root_node_leaf_container_capacity=135 crates_leaf_containers_one_root_node_holds=135 equal=true
@@ -589,7 +589,7 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 28:E7RESULT name=done emitted=28
 ```
 
-判别力自证：模型上打开 V1 之后（`research/results/e176-inode-leaf-merge-capacity-and-rewrites-oracle-discrimination-v1.out`），对拍在 7 条序列上报出第一处不同，W-S 主取样点正是第 1233 个操作、`crates/` 的重写清单长 4、模型 0，与登记第九节末写的相同；`crates/` 单测「删空中间一片」那一格也对不上。另 15 条序列（W-R p = 0.75 / 0.95、W-S 降序、W-A 四点）在 M1 被拒之前没有摘过非最右的一片，位置左移那一支在那几条上没被对拍走到。整行抄：
+判别力自证：模型上打开 V1 之后（`e176-inode-leaf-merge-capacity-and-rewrites-oracle-discrimination-v1.out`），对拍在 7 条序列上报出第一处不同，W-S 主取样点正是第 1233 个操作、`crates/` 的重写清单长 4、模型 0，与登记第九节末写的相同；`crates/` 单测「删空中间一片」那一格也对不上。另 15 条序列（W-R p = 0.75 / 0.95、W-S 降序、W-A 四点）在 M1 被拒之前没有摘过非最右的一片，位置左移那一支在那几条上没被对拍走到。整行抄：
 
 ```
 4:E7RESULT name=oracle_crates_unit_test_shape model=position_rewritten=[],dropped=1 crates=position_rewritten=[1],dropped=1 equal=false
@@ -597,13 +597,13 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 27:E7RESULT name=verdict scope=oracle sequences=22 sequences_compared_to_refusal_without_difference=15 constants_equal=true crates_unit_test_shapes_equal=false all_equal=false
 ```
 
-第二段开跑之前，对拍与判别力各用第二段的源码重编重跑一次：`research/results/e176-inode-leaf-merge-capacity-and-rewrites-crates-oracle-2026-10-08.out` 与第一段的对拍产物 `cmp` 逐字节相同（判决行 `all_equal=true`），`research/results/e176-inode-leaf-merge-capacity-and-rewrites-oracle-discrimination-v1-2026-10-08.out` 与第一段的判别力产物 `cmp` 逐字节相同（V1 副本退 1，同样在 W-S 主取样点第 1233 个操作报出不同）。对拍只比 M1，第二段的三个变体不在它的射程里。
+第二段开跑之前，对拍与判别力各用第二段的源码重编重跑一次：`e176-inode-leaf-merge-capacity-and-rewrites-crates-oracle-2026-10-08.out` 与第一段的对拍产物 `cmp` 逐字节相同（判决行 `all_equal=true`），`e176-inode-leaf-merge-capacity-and-rewrites-oracle-discrimination-v1-2026-10-08.out` 与第一段的判别力产物 `cmp` 逐字节相同（V1 副本退 1，同样在 W-S 主取样点第 1233 个操作报出不同）。对拍只比 M1，第二段的三个变体不在它的射程里。
 
 ### 单测与变异
 
-单测 22 个，第二段的源码（`grep -c '^test .* \.\.\. ok$' research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests-2026-10-08.out` 输出 22；同一份文件里 `test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s`）。第一段那 14 个（`research/results/e176-inode-leaf-merge-capacity-and-rewrites-unit-tests.out`）里钉绝对值的有：全部锚点格（26 格登记答案逐字比）、a1 与 a2 的 M1 另写成加法式、SHA-256 三个公开测试向量、四种负载生成器的前几步、丙类断言五种坏形态各自会红、门槛的边界取值、挪门槛自证、按序列分线程与单线程逐字相同、W-R 主取样点上三条臂操作流前缀相同。第二段加的 8 个：第二段的窗口表与三个变体的策略逐个钉死、第二段锚点（登记格 29、总 47）、三片 117 / 117 / 117 上先查右边与先查左边的末态与两种记法（M2、M3 各两条，共四条）、第二段六个臂变体分线程与单线程逐字相同、第二段敏感性行的旋钮与行逐个钉死并核对先查左边那一点取的是 `left_first` 窗口；随机长跑丙类断言那条单测加了 M3_left_first。
+单测 22 个，第二段的源码（`grep -c '^test .* \.\.\. ok$' e176-inode-leaf-merge-capacity-and-rewrites-unit-tests-2026-10-08.out` 输出 22；同一份文件里 `test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s`）。第一段那 14 个（`e176-inode-leaf-merge-capacity-and-rewrites-unit-tests.out`）里钉绝对值的有：全部锚点格（26 格登记答案逐字比）、a1 与 a2 的 M1 另写成加法式、SHA-256 三个公开测试向量、四种负载生成器的前几步、丙类断言五种坏形态各自会红、门槛的边界取值、挪门槛自证、按序列分线程与单线程逐字相同、W-R 主取样点上三条臂操作流前缀相同。第二段加的 8 个：第二段的窗口表与三个变体的策略逐个钉死、第二段锚点（登记格 29、总 47）、三片 117 / 117 / 117 上先查右边与先查左边的末态与两种记法（M2、M3 各两条，共四条）、第二段六个臂变体分线程与单线程逐字相同、第二段敏感性行的旋钮与行逐个钉死并核对先查左边那一点取的是 `left_first` 窗口；随机长跑丙类断言那条单测加了 M3_left_first。
 
-变异表 `scripts/mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv` 16 条（登记第九节 V1–V13，修订 3 补 V14–V16；锚点按第二段的装置源码取，每条恰好命中一次）：抓到 16、无效 0、没红 0；`💥`、`⚠️`、`⏱`、`🧱` 各 0；收尾「计数：内存撞顶 0 条（上限 4G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条、显存不够 0 条」与「已还原，基线仍全绿」（`research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations-2026-10-08.out` 里「计数：」与「已还原，基线仍全绿」两行；第一段那次 13 条全抓在 `research/results/e176-inode-leaf-merge-capacity-and-rewrites-mutations.out`）。V4 改的是序列与锚点格共用的 `live_inodes_at_refusal`；V13 在 W-R 主取样点上让作废断言当场红；V9 由丙类「相邻两片 key 区间不交叠」当场红；V14 由三片 117 / 117 / 117 那两条先查左边的单测抓到，V15 由 a3 借到刚好够下限那一格登记答案抓到，V16 由第二段窗口表那条单测抓到。
+变异表 `scripts/mutation/tables/e176_inode_leaf_merge_capacity_and_rewrites.tsv` 16 条（登记第九节 V1–V13，修订 3 补 V14–V16；锚点按第二段的装置源码取，每条恰好命中一次）：抓到 16、无效 0、没红 0；`💥`、`⚠️`、`⏱`、`🧱` 各 0；收尾「计数：内存撞顶 0 条（上限 4G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条、显存不够 0 条」与「已还原，基线仍全绿」（`e176-inode-leaf-merge-capacity-and-rewrites-mutations-2026-10-08.out` 里「计数：」与「已还原，基线仍全绿」两行；第一段那次 13 条全抓在 `e176-inode-leaf-merge-capacity-and-rewrites-mutations.out`）。V4 改的是序列与锚点格共用的 `live_inodes_at_refusal`；V13 在 W-R 主取样点上让作废断言当场红；V9 由丙类「相邻两片 key 区间不交叠」当场红；V14 由三片 117 / 117 / 117 那两条先查左边的单测抓到，V15 由 a3 借到刚好够下限那一格登记答案抓到，V16 由第二段窗口表那条单测抓到。
 
 16 条全抓只说明写了断言的那几处被变异测过，不说明模型每一行都测过：判定与敏感性的算术（`point_verdict`、`overall_verdict`、`moved_threshold_verdicts`）由单测钉边界，变异表里没有一条动它们；第二段敏感性取哪个窗口（`segment_two_sensitivity_lines` 里按窗口名找下标）由单测核一点，没有变异。
 
@@ -632,7 +632,7 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 |---|---|---|---|---|
 | 1 | 独立手写模型 | 叶容器表只存号；插入末尾分裂、删空即摘、M2 并、M3 借，两种记法按这次发布动过的容器号与第一个摘片位置算。M1 与路径 2 比的是 22 条登记序列上 M1 被拒之前的每一步（枚举点，不是定义域：负载取登记的三族 22 点）；锚点格与路径 3 比 | `scripts/experiments/e176_inode_leaf_merge_capacity_and_rewrites.rs:155 insert`、`:278 remove`、`:321 rewrites_of_this_publish` | 一片 233 条、根扇出 135（本地常量，值抄自 `crates/` 并在路径 2 那边回比）；位置记法的定义（读当时 `crates/singlefs-core/src/inode_tree.rs` 的 `remove_record_from_leaf_containers` 得来）；负载生成器（对拍时两边吃同一个生成器的输出） |
 | 2 | `crates/` 的两个纯函数 | 今天实现的 M1：`write_records_into_leaf_containers` 追加 / 末尾分裂、片数 > 135 拒；`remove_record_from_leaf_containers` 删空摘片、右边各片全进重写清单 | `crates/singlefs-core/src/inode_tree.rs:181 write_records_into_leaf_containers`、`:286 remove_record_from_leaf_containers` | `INODE_LEAF_RECORDS`（`crates/singlefs-format/src/lib.rs`）、`leaf_containers_one_root_node_holds`（`inode_tree.rs`）；对拍时的负载生成器取自路径 1 |
-| 3 | 设计员的独立参照（Python） | 同样的三条臂，只在登记第七节的六个手造场景与空间放大那一格上算 | 无实现：只有抄本，在 `research/prompts/e176-preregistration.md` 第 500 行起的 `anchors.py` 代码块（草稿目录那份不入库） | 233、135；位置记法的同一个定义；它在 X 删空摘掉之后不查新相邻那一对（登记第十三节写明，六个格不受影响） |
+| 3 | 设计员的独立参照（Python） | 同样的三条臂，只在登记第七节的六个手造场景与空间放大那一格上算 | 无实现：只有抄本，在 `e176-preregistration.md` 第 500 行起的 `anchors.py` 代码块（草稿目录那份不入库） | 233、135；位置记法的同一个定义；它在 X 删空摘掉之后不查新相邻那一对（登记第十三节写明，六个格不受影响） |
 
 跨路径的比对断言：路径 1 对路径 2 钉在对拍 bin `scripts/experiments/e176_crates_oracle/oracle.rs` 的 `compare_one_sequence`（逐步比，第一处不同就停）；路径 1 对路径 3 钉在单测 `every_registered_anchor_matches_the_independent_reference`（同一份源码第 2154 行，26 格登记答案逐字比；第二段另有 `segment_two_anchors_judge_a1_for_the_three_variants_and_only_report_the_rest` 比 29 格）。共用项问句：233、135 若错，三条路径一起错，挡不住「kb 与实现一起取错」；位置记法三条路径同出一处读法，若那读法本身不是 `crates/` 想要的，三条一起错；负载生成器只在路径 1 里有一份，对拍证明不了生成器照登记生成（那一半靠单测里四种负载的前几步钉住）。
 
@@ -640,7 +640,7 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D8（核心索引结构） 已定项 6 | 支撑 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D8（核心索引结构） 已定项 6 | 支撑 | 2026-10-17 不受影响：这一轮只同步措辞、产物指针、路径与数，结论、数与产物不变；此前 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
 
 ## 历史版本
 
@@ -652,4 +652,4 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 
 ### 2026-10-08：建页，第一段已跑
 
-跑前登记装置写之前写成（`research/prompts/e176-preregistration.md`）；模型单测跑完之后、产物之前补第十二节修订 1（f = 59 变体的阳性对照与公共窗口读法）；第一次跑变异表撞上可选路径依赖让 `mutate.sh` 的副本编不过，补修订 2（对拍 bin 改成独立 manifest）。第一段跑完，第二段的触发条件成立、待主 agent 点名。
+跑前登记装置写之前写成（`e176-preregistration.md`）；模型单测跑完之后、产物之前补第十二节修订 1（f = 59 变体的阳性对照与公共窗口读法）；第一次跑变异表撞上可选路径依赖让 `mutate.sh` 的副本编不过，补修订 2（对拍 bin 改成独立 manifest）。第一段跑完，第二段的触发条件成立、待主 agent 点名。

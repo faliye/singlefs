@@ -1,2 +1,0 @@
-error[E0425]: cannot find value `newest_root` in this scope
-    --> crates/singlefs-core/src/mount.rs:6086:32

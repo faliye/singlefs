@@ -1,7 +1,0 @@
-command args=-p singlefs-checker --lib -- two_retirement_containers_of_one_record_judged_with_the_knob_two rc=101
-thread 'walk::tests::two_retirement_containers_of_one_record_judged_with_the_knob_two_violate_only_the_full_sentence' panicked at crates/singlefs-checker/src/walk.rs:14099:9:
-failures:
-failures:
-    walk::tests::two_retirement_containers_of_one_record_judged_with_the_knob_two_violate_only_the_full_sentence
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 31 filtered out; 
-row 3845 named-test-red=yes

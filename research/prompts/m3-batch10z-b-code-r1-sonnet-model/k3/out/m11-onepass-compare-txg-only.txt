@@ -1,7 +1,0 @@
-ok ['m11-onepass-compare-txg-only']
-## lib rc=101 :: test result: FAILED. 199 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s 
-   FAILED: test allocator::tests::placements_recorded_for_an_abandoned_root_answer_only_for_the_same_root_not_for_another_root_on_its_ring_slot ... FAILED
-   BUILD: error: test failed, to rerun pass `-p singlefs-core --lib`
-## newfile rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s 
-ok ['m11-onepass-compare-txg-only', 'restore']
-done

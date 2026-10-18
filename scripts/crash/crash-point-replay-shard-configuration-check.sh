@@ -16,6 +16,10 @@
 #       一台连不上不算整份配置坏。双机开着时 stdout 打 --emit-assignments 那几行，另打机器清单（下面「机器清单」）解出来的每一台：
 #       MULTI_HOST_COUNT=<除本机外几台>，以及第 2 台起每台的 MULTI_HOST_<号>_SSH_HOST、MULTI_HOST_<号>_REPOSITORY_DIRECTORY、
 #       MULTI_HOST_<号>_CARGO_BIN_DIRECTORY、MULTI_HOST_<号>_MEMORY_CAP（没写的打空串）、MULTI_HOST_<号>_IS_PEER（这台就是 PEER_SSH_HOST 打 1）。
+#   crash-point-replay-shard-configuration-check.sh --emit-host-weights [<仓根>]
+#       判法同上，同样不连任何一台；只读两台分活的权重键 HOST_JUDGE_WEIGHTS（下面「两台分活的权重」）：双机开着而键写了，stdout 只打 <本机>,<第二台> 一行（例 1,2）、退 0；
+#       双机开着而键没写（或写空串），什么都不打、退 3；写坏了（判法同上，别的键写坏同样）退 1、说出是哪个键。双机关着照 --emit-assignments：打「双机：关」那一句、退 3。
+#       scripts/crash/crash-point-replay-shard-run.sh 经它取值，不自己解析配置；--emit-assignments、--emit-hosts 不打这个键。
 #
 # 两个开关键只在这一份里定义（别处照这里读，不另写一份）：
 #   ENABLE_ACROSS_MACHINES  双机：写 1 才开；没写或写 0 算关（用户 2026-09-28 定：不设参数不主动开）。关着时不连第二台、退 3。
@@ -25,6 +29,12 @@
 # 显卡的两个键（可以不写；用户 2026-10-10 定多机配置合成一份，私有显卡配置并进这一份）：GPU_CARDS_BY_PRIORITY、GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED。
 #   这里只认这两个键名、不判值（值的写法与判法在 scripts/crash/crash-amplification-lib.sh 文件头「配置」与 crates/singlefs-checker-tier/src/gpu_card_configuration.rs），
 #   --emit-assignments、--emit-hosts 不打它们。退役的 GPU_COMPUTATION_CLASSES 写进来照不认得的键判不过（开了 GPU 就三类全走 GPU，不再有正表）。
+#
+# 两台分活的权重（可以不写；用户 2026-10-17 定「gpu任务分配时候 按照gpu的核数、算力来配置」，键的定义只在这一份里）：
+#   HOST_JUDGE_WEIGHTS=<本机>,<第二台>  两个正整数（不带前导 0），逗号隔，没有空格：两台分崩溃状态块的比例，按两台显卡量到的每秒判多少态或算力配
+#                                       （例：本机两张卡每秒 8.8 万态、第二台三张卡每秒 17.5 万态，写 1,2）。写了就由 scripts/crash/crash-point-replay-shard-run.sh 带 --host-weights 交
+#                                       scripts/crash/crash-amplification-two-hosts.sh，录入段与判段同一份权重、两台分着录；没写（或写空串）时那一份照旧排计划量本机速度。
+#                                       写法不对（0、非数字、只有一个数、三个数）判不过（退 1，点名这个键）。
 #
 # 机器清单（可以不写；用户 2026-10-06 定「这样就不用限制多少台机器了」，键的定义只在这一份里）：
 #   HOSTS                        除本机外的每一台的 ssh 别名，空格隔开，按先后编号：本机是第 1 台，HOSTS 里第一个是第 2 台，依次往下。
@@ -55,6 +65,10 @@
 #   MULTI_HOST_CONFIGURATION_BREAK=hosts-reach-refuses  --emit-hosts 也逐台 ssh，清单里有一台连不上就判整份配置坏
 #       scripts/hosts/host-resources.py --selftest 的「hosts-list」「peer-unreachable」「host-timeout」三格（「…只报了 本机」「第二台应当没读到…」「时限 1 秒…」）
 #   这两个开关打开时 crash-point-replay-shard-run.sh 与 multi-host-run.sh 的自证不红（它们的配置里没有 HOSTS，也不用 --emit-hosts）。
+#   MULTI_HOST_CONFIGURATION_BREAK=host-weights-unknown  HOST_JUDGE_WEIGHTS 当不认得的键（加这个键之前的样子）
+#       crash-point-replay-shard-run.sh --selftest 的「host-weights-emitted」「host-weights-bad-refused」「host-weights-unwritten」「host-weights-passed」「host-weights-bad-red」五格
+#         （格只报红不带细节，开关轮的输出行「MULTI_HOST_CONFIGURATION_BREAK=host-weights-unknown 红的格：…」逐格列出）：配置里写了键就判不过（退 1，说的是「不认得」，不是「要写两个正整数」）；
+#         multi-host-run.sh 的自证不红（它的配置里没有这个键）
 #   MULTI_HOST_CONFIGURATION_BREAK=gpu-card-keys-unknown  显卡的两个键当不认得的键（并进多机配置之前的样子）
 #       scripts/crash/crash-amplification-item.sh --selftest 的第 22 格（「多机配置写了显卡的两个键却判不过…」）；crash-point-replay-shard-run.sh 与 multi-host-run.sh 的自证不红（它们的配置里没有这两个键）
 # 只供测试的开关：SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 时不连第二台、不查它的 cargo（crash-point-replay-shard-run.sh --selftest 用，
@@ -71,13 +85,17 @@ CRASH_POINT_REPLAY_SHARD_CONFIGURATION_KEYS=(PEER_SSH_HOST PEER_REPOSITORY_DIREC
   QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND)
 MULTI_HOST_SWITCH_KEYS=(ENABLE_ACROSS_MACHINES ENABLE_GPU)  # 可以不写，不写算 0
 MULTI_HOST_GPU_CARD_KEYS=(GPU_CARDS_BY_PRIORITY GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED)  # 可以不写，这里不判值（文件头「显卡的两个键」）
+MULTI_HOST_JUDGE_WEIGHTS_KEY=HOST_JUDGE_WEIGHTS  # 可以不写，写了判写法（文件头「两台分活的权重」）
+MULTI_HOST_JUDGE_WEIGHTS_PATTERN='^[1-9][0-9]*,[1-9][0-9]*$'  # 与双机驱动 --host-weights 的判法同一个写法
 MULTI_HOST_MACHINE_KEY_PATTERN='^HOST_([1-9][0-9]*)_(REPOSITORY_DIRECTORY|CARGO_BIN_DIRECTORY|MEMORY_CAP)$'  # 机器清单里每台可选配的键（文件头「机器清单」）
 configuration_break="${MULTI_HOST_CONFIGURATION_BREAK:-}"
 
 emit_assignments=0
 emit_hosts=0
+emit_host_weights=0
 if [[ "${1:-}" == --emit-assignments ]]; then emit_assignments=1; shift
-elif [[ "${1:-}" == --emit-hosts ]]; then emit_hosts=1; shift; fi
+elif [[ "${1:-}" == --emit-hosts ]]; then emit_hosts=1; shift
+elif [[ "${1:-}" == --emit-host-weights ]]; then emit_host_weights=1; shift; fi
 repository_root="${1:-$crash_point_replay_shard_check_script_directory/../..}"
 
 refuse() { # refuse <原因>：打原因与出路，退 1
@@ -111,7 +129,8 @@ while IFS= read -r configuration_line || [[ -n "$configuration_line" ]]; do
     for expected_key in "${MULTI_HOST_GPU_CARD_KEYS[@]}"; do [[ "$expected_key" == "$configuration_key" ]] && known_key=1; done
   fi
   if [[ "$configuration_break" != hosts-key-unknown ]] && [[ "$configuration_key" == HOSTS || "$configuration_key" =~ $MULTI_HOST_MACHINE_KEY_PATTERN ]]; then known_key=1; fi
-  (( known_key )) || refuse "$configuration_file 第 $line_number 行的键 $configuration_key 不认得（认的是 ${CRASH_POINT_REPLAY_SHARD_CONFIGURATION_KEYS[*]} ${MULTI_HOST_SWITCH_KEYS[*]} ${MULTI_HOST_GPU_CARD_KEYS[*]}，与机器清单 HOSTS、HOST_<号>_REPOSITORY_DIRECTORY、HOST_<号>_CARGO_BIN_DIRECTORY、HOST_<号>_MEMORY_CAP）"
+  if [[ "$configuration_break" != host-weights-unknown && "$configuration_key" == "$MULTI_HOST_JUDGE_WEIGHTS_KEY" ]]; then known_key=1; fi
+  (( known_key )) || refuse "$configuration_file 第 $line_number 行的键 $configuration_key 不认得（认的是 ${CRASH_POINT_REPLAY_SHARD_CONFIGURATION_KEYS[*]} ${MULTI_HOST_SWITCH_KEYS[*]} ${MULTI_HOST_GPU_CARD_KEYS[*]} $MULTI_HOST_JUDGE_WEIGHTS_KEY，与机器清单 HOSTS、HOST_<号>_REPOSITORY_DIRECTORY、HOST_<号>_CARGO_BIN_DIRECTORY、HOST_<号>_MEMORY_CAP）"
   [[ -z "${configuration[$configuration_key]+set}" ]] || refuse "$configuration_file 里 $configuration_key 写了两遍"
   configuration[$configuration_key]="$configuration_value"
 done < "$configuration_file"
@@ -132,6 +151,12 @@ for command_pair in "QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND" "QUIESC
     refuse "$action_key 与 $check_key 要么都写、要么都空：改了状态的命令跑完要回读一次"
   fi
 done
+
+# 两台分活的权重（文件头「两台分活的权重」）：没写或写空串算没写；写了要是 <本机>,<第二台> 两个正整数
+host_judge_weights="${configuration[$MULTI_HOST_JUDGE_WEIGHTS_KEY]-}"
+if [[ -n "$host_judge_weights" && ! "$host_judge_weights" =~ $MULTI_HOST_JUDGE_WEIGHTS_PATTERN ]]; then
+  refuse "$MULTI_HOST_JUDGE_WEIGHTS_KEY 要写两台分活的权重 <本机>,<第二台>（两个正整数，逗号隔，例 1,2；不带前导 0、不带空格），读到「$host_judge_weights」"
+fi
 
 # 机器清单（文件头「机器清单」）：HOSTS 没写或写空串就只有 PEER_SSH_HOST 一台；每台可选配的键编号要落在清单里
 machine_aliases=()
@@ -175,9 +200,9 @@ if [[ "${configuration[ENABLE_ACROSS_MACHINES]}" != 1 && "$configuration_break" 
 fi
 
 peer_description="第二台 ${configuration[PEER_SSH_HOST]}"
-if (( emit_hosts )); then
-  # 不连任何一台：连不连得上由调用方逐台报（文件头 --emit-hosts）
-  if [[ "$configuration_break" == hosts-reach-refuses ]]; then
+if (( emit_hosts || emit_host_weights )); then
+  # 不连任何一台：连不连得上由调用方逐台报（文件头 --emit-hosts、--emit-host-weights）
+  if (( emit_hosts )) && [[ "$configuration_break" == hosts-reach-refuses ]]; then
     for machine_alias in "${machine_aliases[@]}"; do
       ssh -o BatchMode=yes -o ConnectTimeout=10 "$machine_alias" true </dev/null >/dev/null 2>&1 || refuse "清单里有一台连不上"
     done
@@ -191,7 +216,11 @@ else
     || refuse "第二台上没有 ${configuration[PEER_CARGO_BIN_DIRECTORY]}/cargo（PEER_CARGO_BIN_DIRECTORY 要指到它的 ~/.cargo/bin）"
 fi
 
-if (( emit_assignments || emit_hosts )); then
+if (( emit_host_weights )); then
+  # 键没写：什么都不打、退 3，调用方照没有权重走（文件头 --emit-host-weights）
+  [[ -n "$host_judge_weights" ]] || exit 3
+  echo "$host_judge_weights"
+elif (( emit_assignments || emit_hosts )); then
   for expected_key in "${CRASH_POINT_REPLAY_SHARD_CONFIGURATION_KEYS[@]}" "${MULTI_HOST_SWITCH_KEYS[@]}"; do
     printf '%s=%q\n' "$expected_key" "${configuration[$expected_key]}"
   done

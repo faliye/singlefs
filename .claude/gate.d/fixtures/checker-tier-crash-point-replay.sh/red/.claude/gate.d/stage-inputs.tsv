@@ -1,4 +1,4 @@
-checker-tier-crash-point-replay.sh	crates/ Cargo.toml	command=cargo command=rustc	# 样本：本阶段那一行
-crash-case:two-signatures	crates/ Cargo.toml	test=singlefs-checker-tier:two_signatures:two_signatures_full	# 样本
-crash-case:unfinished	crates/ Cargo.toml	test=singlefs-checker-tier:unfinished:unfinished_full	# 样本
-crash-case:many-signatures	crates/ Cargo.toml	test=singlefs-checker-tier:many_signatures:many_signatures_full	# 样本
+checker-tier-crash-point-replay.sh	tests-of:singlefs-checker-tier	command=cargo command=rustc	# 样本：本阶段那一行（入口是 checker 档包的测试函数）
+crash-case:two-signatures	-	test=singlefs-checker-tier:two_signatures:two_signatures_full	# 样本
+crash-case:unfinished	-	test=singlefs-checker-tier:unfinished:unfinished_full	# 样本
+crash-case:many-signatures	-	test=singlefs-checker-tier:many_signatures:many_signatures_full	# 样本

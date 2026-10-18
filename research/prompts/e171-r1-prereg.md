@@ -2923,7 +2923,7 @@ PY
 run-with-memory-cap: 照 slice singlefs-heavy.slice 已有的总上限 53808726016 字节走（自己按余量 20G 算的是 43071307776 字节，不改 slice 的 MemoryMax）：……
 目标 crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs（包 singlefs-checker-tier，bin e171_three_oracle_collusion_after_the_oracle_fixes）；草稿副本 /home/fy5090/.local/share/singlefs/work/e171-r12-runner/device-draft.rs
 主工作区那份开跑时 sha256 c556d42d8bb28c04111a4e6a5682280bd343e7d9d57cfd4f04d532ebe63699a2；草稿副本 sha256 6aa1bb8240633395f4de6122f5d2d343b7f672d1e18e549b0d8e44226e4f9412
-编译输出：/home/fy5090/.local/share/singlefs/work/e171-r12-runner/compile-then-swap/build-20261013T061531Z-134080.log；编译目录 /home/fy5090/.local/share/singlefs/work/e171-r12-runner/compile-then-swap/target 留着给下一次增量编，收工前 --clean --scratch /home/fy5090/.local/share/singlefs/work/e171-r12-runner
+编译输出：/home/fy5090/.local/share/singlefs/work/e171-r12-runner/compile-then-swap/build-2026-10-13-134080.log；编译目录 /home/fy5090/.local/share/singlefs/work/e171-r12-runner/compile-then-swap/target 留着给下一次增量编，收工前 --clean --scratch /home/fy5090/.local/share/singlefs/work/e171-r12-runner
 ✓ 编过（cargo build 与 cargo test --no-run，-p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes），已整份换进主工作区 crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs，回读 sha256 6aa1bb8240633395f4de6122f5d2d343b7f672d1e18e549b0d8e44226e4f9412
 ```
 
@@ -2980,3 +2980,9 @@ driver_e171_r1_revision_12_stream_constants() {
 ```
 
 整份 `replay.sh` 没跑（重型，归提交时的主 agent）。`E7RESULT` 行数 83 与乙的 `name=done emitted=83` 核过一次。判据一个字没改；产物之后没有发现要改判据的地方。
+
+### 修订 14（tooling-writer，2026-10-15；修订 11 的登记修订；批次 `records/2026-10-13-复用键与全仓改名.md#2026-10-15-批4`；只许追加，写在文件末尾）
+
+**改什么**：修订 11 第一段单元脚本 `scripts/experiments/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_unit_revision_11.sh` 的第 2 步（`unit_step_2`：E170 导出装置 dump，与第 1 步逐文件比，S2）用的比对脚本 `s2_compare.py` 写在仓外的草稿目录里，本机与 git 里都没有（`git log --all --oneline -- '*s2_compare*'` 输出 0 行，草稿目录里那一份 `ls` 报不存在）。这一步改成显式报错退 2，消息写「s2 比对脚本 s2_compare.py 未入库，这一步不能跑」；不起导出装置，不退回别的比法；原来那一行 `S2_COMPARE=<仓外路径>` 删掉。
+
+**判据**：一个字没改。比对脚本入库、这一步改回现跑之前，S2 那一条读数记缺；入库要另写一条登记修订（脚本放进研究目录，写进 H 占位与输入清单）。

@@ -1,9 +1,0 @@
-
-running 1 test
-test probe_sweep ... PROBEJK label=any-o arm=anylin slots=384 k=3 q=Some('b') r=o back=0 faults=cfgq,qlast,racct persist=false actions=nsnosnssonosonsonnssnsossn secs=3.03 selected=7 c_r=52 revived=2 revived_in_c_r=2 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=0 refused_steps=0 first_refused=- r_left_at=19 hit=false first_red=-
-PROBEJK label=any-o arm=anylin slots=384 k=3 q=Some('b') r=o back=0 faults=cfgq,qlast,racct persist=false actions=nonosnsoooonnoonossnnssnn secs=2.74 selected=7 c_r=52 revived=2 revived_in_c_r=2 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=0 refused_steps=0 first_refused=- r_left_at=19 hit=false first_red=-
-PROBEJK_DONE label=any-o arm=anylin histories=2
-ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.79s
-

@@ -1,0 +1,1 @@
+这份文件在：mutation-tables-compile 格的按条判定库（MUTATE_LIBRARY_DIRECTORY）放这一格自己的临时目录，接连判两趟、第二趟读第一趟记的（checker-tier-research-build-and-replay.sh 文件头「样本」那一段）

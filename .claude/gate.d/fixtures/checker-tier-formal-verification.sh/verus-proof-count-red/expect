@@ -1,3 +1,4 @@
 exit=1
-want=verified 2 与登记的 3 不同
+want=各项 verified 之和 2 与登记的 3 不同（少 1 条；成项 2 个：exec fn 2
+want=没成项的 verus! fn（不带 decreases 的 spec fn，静态估 0 条）1 个：within
 want=verus-proof：红（退出 1）

@@ -1,0 +1,8 @@
+18b9cb3a3767f1d65cd6ebf822e18bf5b12379f0b34ce624ff2c9c1bf036ec46  .claude/kb/term-renames.md
+f14babb5b9e671ef843a7873f3a07f3949f38ed7f48771fcf453da7df18c806b  .claude/kb/checks-owed.md
+4029fa744846cb0582fff49a1145d1b993b55fdad50ee7f11610d8e21497ac26  .claude/kb/decisions/03-空间分配.md
+0e9029723d43752aa6d42fdbb271369c3ae3cccbfdbf556bbf4cd53cd15e9a6f  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+7385e0ea681d60fd8e845da5b552d07bcc4ea8e66a832f9ab077ce53581d41f5  crates/singlefs-checker/invariants/05-空间记账.md
+dec136b96e4911a3c8a50c2b1e69f97518edbd5cf25cc7263e028bbe74f08be3  crates/singlefs-checker/invariants/01-块自描述.md
+01cf69c99b4993794b95a74024cc5723f71a00f030c31df3883a862ad9152f75  .claude/kb/decisions/22-单元原子性怎么合成.md
+565620bcead49240809b3788d09345f1e339007874b22207006c45f8b4cc77ef  .claude/kb/decisions/23-journal的角色与格式.md

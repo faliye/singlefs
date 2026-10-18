@@ -1,9 +1,0 @@
-run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同会话两条推论腿各跑各的副本
-ROW slack=0 journal=805306368 S=8 k=8 txg=23 data_off_U=[(0, 4), (1, 4)] I55=Holds red=[]
-ROW slack=0 journal=805306368 S=8 k=9 txg=26 data_off_U=[(0, 4), (1, 4)] I55=Holds red=[]
-ROW slack=0 journal=805306368 S=8 k=10 txg=29 data_off_U=[(0, 0), (1, 0)] I55=Holds red=[]
-ROW slack=0 journal=805306368 S=8 k=11 txg=32 data_off_U=[(0, 0), (1, 0)] I55=Holds red=[]
-ROW slack=1 journal=805306368 S=8 k=8 txg=23 data_off_U=[(0, 4), (1, 4)] I55=Holds red=[]
-ROW slack=1 journal=805306368 S=8 k=9 txg=26 data_off_U=[(0, 0), (1, 0)] I55=Holds red=[]
-ROW slack=1 journal=805306368 S=8 k=10 txg=29 data_off_U=[(0, 0), (1, 0)] I55=Holds red=[]
-ROW slack=1 journal=805306368 S=8 k=11 txg=32 data_off_U=[(0, 0), (1, 0)] I55=Holds red=[]

@@ -1,7 +1,0 @@
-b atk_vw_opus s-k12-b sonnet_k12_push_entry_with_the_two_devices_reversed
-a atk_vw_opus x-a-pre2 atk_k1_ways_out_vs_real_sweep ATK_PRES=2 ATK_FILLS=6,11,16,21 ATK_ACTIONS=none,push-reversed,push-swapped,table-reversed
-a atk_vw_opus x-a-pre4 atk_k1_ways_out_vs_real_sweep ATK_PRES=4 ATK_FILLS=6,11,16,21 ATK_ACTIONS=none,push-reversed,push-swapped,table-reversed
-a atk_vw_opus x-a-pre8 atk_k1_ways_out_vs_real_sweep ATK_PRES=8 ATK_FILLS=6,11,16,21 ATK_ACTIONS=none,push-reversed,push-swapped,table-reversed
-b atk_vw_opus x-b-pre2 atk_k1_ways_out_vs_real_sweep ATK_PRES=2 ATK_FILLS=6,11,16,21 ATK_ACTIONS=none,push-reversed,push-swapped,table-reversed
-b atk_vw_opus x-b-pre4 atk_k1_ways_out_vs_real_sweep ATK_PRES=4 ATK_FILLS=6,11,16,21 ATK_ACTIONS=none,push-reversed,push-swapped,table-reversed
-b atk_vw_opus x-b-pre8 atk_k1_ways_out_vs_real_sweep ATK_PRES=8 ATK_FILLS=6,11,16,21 ATK_ACTIONS=none,push-reversed,push-swapped,table-reversed
