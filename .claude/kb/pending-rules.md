@@ -1,5 +1,7 @@
 # 待议的规矩
 
+**中文** · [English](pending-rules.en.md) · [日本語](pending-rules.ja.md)
+
 做不成会红的检查、因而不进规则的条款，放在 pending-rules.md 里当待议（`.claude/singlefs-ai-sop/rules/sop-first.md`「边界」：变不成检查的先留在 kb 里当待议，别写成规矩）。
 每一条写原文、原来在哪、为什么撤、要变成规则还缺什么。原文照撤出时的文本逐字保存在代码块里。
 

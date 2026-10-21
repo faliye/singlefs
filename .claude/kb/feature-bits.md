@@ -1,5 +1,7 @@
 # feature bit 记账表
 
+**中文** · [English](feature-bits.en.md) · [日本語](feature-bits.ja.md)
+
 三张位图（incompat / compat_ro / compat）各 256 位，住系统配置。每分出去一位就在这里写一行，说清它叫什么、哪个格式版本哪次提交引进来、什么状态、语义是什么。
 
 **位号的唯一登记位不在这个文件里，在 D15（格式冻结政策） 已定项 4 的登记表**（`.claude/kb/decisions/15-格式冻结政策.md`）。「第几位归谁」以那张表为准；两处对不上时改 `.claude/kb/feature-bits.md`，不改那张表。门禁 code-source-discipline 的 feature-bits 格（`.claude/gate.d/code-source-discipline.sh`）逐位比对两处，对不上判红。

@@ -42,11 +42,11 @@ waaagh！
 
 ## 当前状态
 
-当前里程碑是「删除与多次 COW」（[`.claude/kb/milestone/03-third-txn.md`](.claude/kb/milestone/03-third-txn.md)）；上一个「覆盖写、释放、回退与复用」2026-09-29 结束，没做完的转进了它的项五。
+当前里程碑是「共享与回收」（[`.claude/kb/milestone/04-fourth-txn.md`](.claude/kb/milestone/04-fourth-txn.md)）；上一个「删除与多次 COW」（[`.claude/kb/milestone/03-third-txn.md`](.claude/kb/milestone/03-third-txn.md)）主体已完结，还开着的是段 4「优化」（二·6、六·4）。
 
-能做的：两块盘上 mkfs；写一个文件并提交，顺序写满多个数据单元、按偏移读回；一次发布建多个文件（没有目录）；覆盖写、释放、抬过回退下界之后复用落点；关闭再挂载成第二个可写实例；挂着的时候做管理员回退；冷启动读回；按 inode 号删除文件（先发布删除意图，再分批回收它的数据单元）。
+能做的：两块盘上 mkfs；写一个文件并提交，顺序写满多个数据单元、按偏移读回；一次发布建多个文件（没有目录）；覆盖写、释放、抬过回退下界之后复用落点；关闭再挂载成第二个可写实例；挂着的时候做管理员回退；冷启动读回；按 inode 号覆盖写、顺序写与删除文件（删除先发布删除意图，再分批回收它的数据单元）；截断（改小时先发布意图、再分批回收 size 之外的数据单元，改大与等长各一次发布）；建与删只读快照。
 
-不能做的：挂不到系统里（没有 FUSE、没有内核模块），没有目录与 POSIX 接口，没有快照、加密、压缩。**别拿它存任何数据。** 磁盘格式仍是软的，第一个外部用户出现之前随时可能推倒重来（[`.claude/rules/format-evolution.md`](.claude/rules/format-evolution.md)）。
+不能做的：挂不到系统里（没有 FUSE、没有内核模块），没有目录与 POSIX 接口，没有可写快照、加密、压缩；整理（GC）的入口在，批大小条款还没定，产品路径在签整理意图之前就停下。**别拿它存任何数据。** 磁盘格式仍是软的，第一个外部用户出现之前随时可能推倒重来（[`.claude/rules/format-evolution.md`](.claude/rules/format-evolution.md)）。
 
 验证到哪：
 
@@ -54,7 +54,7 @@ waaagh！
 |---|---|---|
 | 崩溃点重放 | 写请求流按每块盘的屏障切段，枚举段内每一种落盘状态，逐个生成镜像、跑恢复加池级 checker | checker-tier-crash-point-replay；全量只在用户要求时跑 |
 | 崩溃放量 | 同一套枚举放到几十亿态：流先录进判定库，再从库读回判，判器在 GPU 上，两台机器分片 | `scripts/crash/crash-amplification.sh`，用户要求时跑 |
-| 池级 checker | 不变量清单（`crates/singlefs-checker/invariants/`）里「已实现」的 92 条，与代码里的清单同数 | 被上两样调用 |
+| 池级 checker | 不变量清单（`crates/singlefs-checker/invariants/`）里「已实现」的 102 条，与代码里的清单同数 | 被上两样调用 |
 | 模型对拍 | 随机操作序列与只住内存的理想模型逐步比 | harness-model-differential-and-scenarios |
 | QEMU 真设备 | 两块 virtio 盘上跑固定负载，设备侧录下的写与 FLUSH 和程序录的流逐项比；没有崩溃注入 | checker-tier-qemu-device-streams |
 | 内存序 | herd7 判 `litmus/` 下每条 Never，各配一条去掉屏障的对照 | checker-tier-lkmm |

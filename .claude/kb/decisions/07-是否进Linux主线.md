@@ -1,5 +1,7 @@
 ## D7 是否进 Linux 主线 —— 已定
 
+**中文** · [English](07-是否进Linux主线.en.md) · [日本語](07-是否进Linux主线.ja.md)
+
 D7（是否进 Linux 主线） 管本工程与 Linux 主线的关系：进不进，以及由这个选择直接定下的两件事——格式的自由度、准入判据从哪来。不管的：准入判据本身长什么样（`.claude/singlefs-ai-sop/rules/show-me-test.md`），也不管内核接口层面的事实与取舍（[prior-art.md](../prior-art.md)）。
 
 ### 已定项

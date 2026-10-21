@@ -1,5 +1,11 @@
 ## E71 记账 key 的条目数与宽度 —— 已跑（2026-09-01，纯算术，12 单测 / 8 条变异全抓）：**先撑爆的是 `树数 × 设备数` 这个乘积，且只在「维度用满」那个读法下撑爆**
 
+**中文** · [English](71-记账key的条目数与宽度.en.md) · [日本語](71-记账key的条目数与宽度.ja.md)
+
+<!-- doc-lint:not-numbers Q3 FC1 FC2 FC3 FC4 FC5 V1 V2 V3 V4 S1 S2 S3 EV1 EV2 EV3 EV4 EV5 EV6 EV7 EV8 EV9 EV10 -->
+
+⚠️ **判据 2 已按「每条根只装一代、只写不删」重跑一次（2026-10-20）**，结果在「第 1 次重跑（2026-10-20）：判据 2 按每条根只装一代、只写不删」一节；本页「判据 2：一次 checkpoint 的记账写字节 vs `T_dirty` 的 1%」那一小节是旧口径（一写一删 × 2）的数。
+
 D5（快照 / 空间记账机制） 已定项 1 把 key 定成 `(统计量, 树 ID, 设备, 代)`。
 E54（记账的「代」要保留几代） 当时给的公式 `key 数 = 统计量数 × K` **少了维度组合那两段**。
 绝对值在之前算不出来，因为统计量个数还没定；D5（快照 / 空间记账机制） 已定项 4（用户定案）
@@ -83,6 +89,8 @@ E54（记账的「代」要保留几代） 当时给的公式 `key 数 = 统计�
 
 #### 判据 2：一次 checkpoint 的记账写字节 vs `T_dirty` 的 1%
 
+⚠️ 这一小节是 2026-09-01 的旧口径（一写一删，写次数系数 2）。D5（快照 / 空间记账机制） 已定项 2 改成每条根只装一代之后的新口径（系数 1）见「第 1 次重跑（2026-10-20）：判据 2 按每条根只装一代、只写不删」一节，两种口径逐格并列在那一节的产物里。
+
 `T_dirty` = 2 GiB（D16（发布语义） 已定项 5）⇒ 预算线 **21 474 836 字节**。
 一次 checkpoint 触及**一代**的全部条目，各写一次各删一次
 （D5（快照 / 空间记账机制） 已定项 2 逐字：写次数从 `统计量数` 变成 `统计量数 × 2`）⇒ K 不进这个式子。
@@ -116,6 +124,93 @@ E54（记账的「代」要保留几代） 当时给的公式 `key 数 = 统计�
 E53（丢一整块盘之后根环还挂不挂得上） 真设备实测的最坏回退是 1 ⇒ 另一个口径 **K = 2**。
 两个口径差 24.5 倍，而 **K 只线性放大总条目数**，不影响判据 2。
 
+### 第 1 次重跑（2026-10-20）：判据 2 按每条根只装一代、只写不删
+
+**状态：已跑（够判）**，纯算术，5 轮逐字节一致。跑前登记 `research/prompts/e71-r1-prereg.md`（问题单 `research/prompts/c693-forks.md` 的 Q3，E71（记账 key 的条目数与宽度） 那一半；欠账 C693（K 代撤回之后要重推的论证））。
+
+**只改一处口径**：一次发布的记账写字节 = 写次数系数 × 一代条目数 × 条目宽，系数从 2（一写一删）改成 1——D5（快照 / 空间记账机制） 已定项 2 定案「每条根的记账树只装这条根那一代的行，不留多代」、射程「每次发布把这一代的行全写一遍」。照原装置不动的：2026-09-01 那张九项统计量表（带设备维 4 项，窄读只有 2 项按树分，宽读九项都按树分）、三档宽度 22 / 30 / 50 字节、t ∈ {1, 8, 64, 1024, 8192}、d ∈ {1, 8, 64}、门槛 21 474 836 字节（D16（发布语义） 已定项 5 的 `T_dirty` = 2 GiB 的 1%，严格大于判过界）。**这一节的数一律是「按 2026-09-01 那张九项表、新行数口径」的数**：今天 D5（快照 / 空间记账机制） 已定项 4 在用十二项，这一次没换表。
+
+产物 `research/results/e71-accounting-keys-single-generation-2026-10-20.out`（302 行，收尾行 `E7RESULT name=done emitted=302`）。每格一行 `name=publish_budget`，四档宽度（原三档加 34 字节）× 15 个 (t, d) × 三条臂 = 180 行，旧口径字节、新口径字节、两种判定与新口径占门槛的千分比并列。
+
+**判决格（上界臂、30 字节、t=1024、d=64）新口径不过界**（产物第 288 行）：
+
+```
+E7RESULT name=judgement_cell arm=upper_bound width=middle trees=1024 devices=64 old_bytes=35389440 old_over=1 new_bytes=17694720 new_over=0 budget=21474836
+```
+
+新口径 17 694 720 字节，占门槛 823‰。登记的失败条款 FC1（D5（快照 / 空间记账机制） 已定项 4 依据里「`1024 × 64` 时……过 `T_dirty` 的 1%」在 E71（记账 key 的条目数与宽度） 这一侧不成立）**触发**。
+
+**每条臂的过界格数**（产物第 289–294 行；`registered_widths` 是原三档 45 格，`current_implementation_width` 是 34 字节那 15 格）：
+
+```
+E7RESULT name=over_budget_count arm=upper_bound widths=registered_widths cells=45 old_over=9 new_over=5 new_over_cells=narrow:8192:64,middle:8192:64,wide:1024:64,wide:8192:8,wide:8192:64
+E7RESULT name=over_budget_count arm=upper_bound widths=current_implementation_width cells=15 old_over=3 new_over=1 new_over_cells=current_implementation:8192:64
+E7RESULT name=over_budget_count arm=per_statistic_narrow widths=registered_widths cells=45 old_over=0 new_over=0 new_over_cells=none
+E7RESULT name=over_budget_count arm=per_statistic_narrow widths=current_implementation_width cells=15 old_over=0 new_over=0 new_over_cells=none
+E7RESULT name=over_budget_count arm=per_statistic_wide widths=registered_widths cells=45 old_over=5 new_over=3 new_over_cells=narrow:8192:64,middle:8192:64,wide:8192:64
+E7RESULT name=over_budget_count arm=per_statistic_wide widths=current_implementation_width cells=15 old_over=1 new_over=1 new_over_cells=current_implementation:8192:64
+```
+
+| 臂 | 原三档 45 格里旧口径过界 | 新口径过界 | 读法 |
+|---|---|---|---|
+| 上界（维度用满） | 9 | 5 | 新口径过界的格都在 t × d 大的一端：30 字节那档只剩 8192 × 64，1024 × 64 与 8192 × 8 两格都是 17 694 720、不过界；50 字节那档 1024 × 64、8192 × 8、8192 × 64 三格过界。FC2（过界格数为 0）不触发。原页「撑爆条件 `t × d ≳ 65536`（30 字节）」在新口径下不成立：30 字节那档的取样点里过界的只有 t × d = 524 288 那一格（65 536 与 524 288 之间没有取样点，翻面点没量到） |
+| 窄读 | 0 | 0 | 两种口径一格都不过。新口径最紧一格是 50 字节、8192 × 64：`new_bytes=832150`、`new_permille_of_budget=38`（产物第 144 行）。FC3 不触发 |
+| 宽读（附带，原判据 2 没有这条臂） | 5 | 3 | 三档宽度各在 8192 × 64 一格过界；30 字节 1024 × 64 那一格新口径 8 017 920（373‰）、不过界。D5（快照 / 空间记账机制） 已定项 4 依据字面「宽读那条臂」在 1024 × 64 那一格没有支撑；FC5（宽读臂过界格数为 0）不触发 |
+
+**几何敏感性**（产物第 295–300 行，上界臂判决格换条目宽与 t × d 邻格）：
+
+```
+E7RESULT name=geometry_sensitivity point=narrower_entry_width registered_label=S1 arm=upper_bound width=narrow entry_bytes=22 trees=1024 devices=64 new_bytes=12976128 new_over=0 same_new_verdict_as_main_point=1
+E7RESULT name=geometry_sensitivity point=main_entry_width registered_label=main arm=upper_bound width=middle entry_bytes=30 trees=1024 devices=64 new_bytes=17694720 new_over=0 same_new_verdict_as_main_point=1
+E7RESULT name=geometry_sensitivity point=current_implementation_entry_width registered_label=S2 arm=upper_bound width=current_implementation entry_bytes=34 trees=1024 devices=64 new_bytes=20054016 new_over=0 same_new_verdict_as_main_point=1
+E7RESULT name=geometry_sensitivity point=wider_entry_width registered_label=S3 arm=upper_bound width=wide entry_bytes=50 trees=1024 devices=64 new_bytes=29491200 new_over=1 same_new_verdict_as_main_point=0
+E7RESULT name=geometry_sensitivity point=neighbor_fewer_devices registered_label=trees_times_devices_neighbor arm=upper_bound width=middle entry_bytes=30 trees=1024 devices=8 new_bytes=2211840 new_over=0 same_new_verdict_as_main_point=1
+E7RESULT name=geometry_sensitivity point=neighbor_more_trees registered_label=trees_times_devices_neighbor arm=upper_bound width=middle entry_bytes=30 trees=8192 devices=64 new_bytes=141557760 new_over=1 same_new_verdict_as_main_point=0
+```
+
+判决格的判定**依赖条目宽**（FC4 触发）：22、30、34 字节不过界（34 字节 20 054 016，占 933‰），50 字节过界，翻面落在 34 与 50 字节之间。判别力自证在单测 `moving_the_budget_across_the_judgement_cell_flips_its_verdict`：门槛取 17 694 720 时判决格不过界、取 17 694 719 时过界。
+
+**阳性对照与作废条款**（产物第 281–287、301 行）：
+
+```
+E7RESULT name=positive_control_write_factor arm=upper_bound cells=60 old_equals_twice_new=60
+E7RESULT name=positive_control_write_factor arm=per_statistic_narrow cells=60 old_equals_twice_new=60
+E7RESULT name=positive_control_write_factor arm=per_statistic_wide cells=60 old_equals_twice_new=60
+E7RESULT name=positive_control_drop_device arm=upper_bound trees=64 devices=8 width=middle with_device_new_bytes=138240 without_device_new_bytes=17280 ratio_x1000=8000 exactly_by_device_count=1 holds=1
+E7RESULT name=positive_control_drop_device arm=per_statistic_narrow trees=64 devices=8 width=middle with_device_new_bytes=4890 without_device_new_bytes=4050 ratio_x1000=1207 exactly_by_device_count=0 holds=1
+E7RESULT name=positive_control_drop_device arm=per_statistic_wide trees=64 devices=8 width=middle with_device_new_bytes=71040 without_device_new_bytes=17280 ratio_x1000=4111 exactly_by_device_count=0 holds=1
+E7RESULT name=arm_ordering groups=60 upper_at_least_wide_at_least_narrow=60
+E7RESULT name=verdict cells=180 positive_control_write_factor_holds=true positive_control_drop_device_holds=true arm_ordering_holds=true
+```
+
+| 作废条款 | 怎么核 | 结果 |
+|---|---|---|
+| V1 旧口径复出原产物 | 新装置照原格式重打的 90 行 `name=ckpt_budget` 与原产物 `e71-accounting-keys-2026-09-01.out`（已归档，`git show 3cff909b0^:research/results/e71-accounting-keys-2026-09-01.out` 取出，sha256 `9826e85e…`）同名行 `diff` | 两边各 90 行，`diff` 0 行不同 |
+| V2 独立锚点 | 跑前登记作者的 `anchors.py` 输出（sha256 `a3d0bd98…`）里 48 行 `e71` 锚点逐行对 `name=publish_budget` | `e71_anchor_rows matched=48 differing=0 missing=0` |
+| V3 阳性对照 | 产物第 281–286 行 | 每臂 60 格旧 = 2 × 新；上界臂去设备维恰好 ÷ 8，窄读、宽读严格下降且不到 8 倍 |
+| V4 确定性 | 同一个二进制跑 5 轮 `cmp` | 5 轮逐字节相同（sha256 `885c238a…`）。确定性模型，轮数只说明没有隐藏状态 |
+
+**单测与变异**：15 个单测全绿；变异表 `scripts/mutation/tables/e71_accounting_keys_single_generation.tsv` 10 条（登记 EV1–EV9，加登记修订补的 EV10「宽读臂丢掉设备维」），抓到 10、无效 0、没红 0；`mutate.sh` 收尾行原样（输出整份在 `research/results/e71-accounting-keys-single-generation-mutations-2026-10-20.log`）：
+
+```
+计数：内存撞顶 0 条（上限 2G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条、显存不够 0 条、锚点失效 0 条、现判 7 条、复用 3 条、拒算 0 条
+已还原，基线仍全绿
+```
+
+**登记修订**（产物之前写进跑前登记「十二、修订」）：宽读臂由「够判后不跑」改为进产物；补变异 EV10；阳性对照甲扩到四档宽度。**够判后未跑**：登记的附带量「撑爆点」（每档宽度下上界臂新口径过界的最小 t × d，对应 D5（快照 / 空间记账机制） 已定项 1，不在 Q3 里）与「今天实现的行集 3 + 6d 行 × 34 字节」（只给量级参照）。
+
+**它答不了的**：纯算术，没有记账树、btree 与 write buffer；统计量是 2026-09-01 那张九项表，不是今天的十二项，也不是今天实现每次发布写的 3 + 6d 行；不建模 inode 号水位的台阶行（随根留着、一次发布至多多写一行）；34 字节只当几何敏感性点；数的是条目字节，不数脏节点（那是 E97（记账与分配记录的条目编码） 判据 10）。
+
+### 路径与结论登记
+
+| # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |
+|---|---|---|---|---|
+| 1 | 新装置两口径算术 | 每格按臂数一代条目数，乘写次数系数（旧 2、新 1）与条目宽，与门槛比；扫遍登记的 180 格（四档宽度 × 15 个 (t, d) × 三臂），不是抽样 | `scripts/experiments/e71_accounting_keys_single_generation.rs:219 publish_write_bytes` | 2026-09-01 那张九项表的维度标记、三档宽度与 34 字节、门槛 21 474 836、两个写次数系数（都抄自跑前登记读法第 1–3 条） |
+| 2 | 独立锚点脚本 | 只按跑前登记读法第 2、3 条的式子现算 48 格（四档宽度 × 四组 (t, d) × 三臂），不读装置与 `crates/` 的代码；48 格是挑的判决格与邻格，不是扫遍 | 无实现：仓里没有这份脚本，它在跑前登记作者的草稿目录 `~/.local/share/singlefs/work/m3-close-w8-c693-reruns/anchors.py`（sha256 `1cef0e2b…`），输出被新装置的单测 `independent_anchor_rows_match_on_every_width_arm_and_cell` 钉成 48 行常量 | 同第 1 行的九项表、宽度、门槛与系数（同一份登记读法） |
+| 3 | 原装置旧口径 | 原装置 `checkpoint_bytes`（2 × 一代条目数 × 条目宽），2026-09-01 那一次产出的 90 格 `name=ckpt_budget` | `scripts/experiments/e71_accounting_keys.rs:128 checkpoint_bytes` | 九项表、三档宽度、门槛；旧系数 2 |
+
+三条路径共用同一张九项表与同一条门槛：表本身若不是要判的那张（今天是十二项），三条会一起错，这一节的数因此只写成「按 2026-09-01 那张九项表」。路径 1 对路径 2 的比对钉在单测里（48 行逐格 `assert_eq!`）；路径 1 对路径 3 只有 3 行钉在单测 `original_format_lines_match_the_original_product_text` 里，90 行全量比对是一条 `diff` 命令、源码里没有断言连起来，还欠这一条。
+
 ### 它答不了的那一半
 
 1. 纯算术模型：没有记账树实现、没有 btree、没有 write buffer，文件操作 0 处。
@@ -143,17 +238,21 @@ E53（丢一整块盘之后根环还挂不挂得上） 真设备实测的最坏�
 - **N=5 轮逐字节一致**（同一个 md5）。**12 个单测，8 条变异逐条命中、0 个盲区**，
   变异表 `scripts/mutation/tables/e71_accounting_keys.tsv`
   （`bash scripts/mutation/mutate.sh e71-accounting-keys scripts/experiments/e71_accounting_keys.rs scripts/mutation/tables/e71_accounting_keys.tsv`）。
+- 第 1 次重跑（2026-10-20）：代码 `scripts/experiments/e71_accounting_keys_single_generation.rs`（bin `e71-accounting-keys-single-generation`，不 `use` 原装置与 `crates/`），
+  原始输出 `research/results/e71-accounting-keys-single-generation-2026-10-20.out`（302 行，收尾行 `emitted=302`），
+  复跑登记是 `scripts/experiments/replay.sh` 里 E71（记账 key 的条目数与宽度） 名下的第二行：驱动 `e71-accounting-keys-single-generation`、产物 `e71-accounting-keys-single-generation-2026-10-20.out`、判法 exact。
+  变异：`cd scripts/experiments && bash ../mutation/mutate.sh e71-accounting-keys-single-generation e71_accounting_keys_single_generation.rs ../mutation/tables/e71_accounting_keys_single_generation.tsv`（上限 `MUTATE_MEMORY_MAX=2G`）。
 
 ### 影响的决策
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D5（快照 / 空间记账机制） 已定项 4 | 支撑 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
-| D5（快照 / 空间记账机制） 已定项 1 | 支撑 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
-| D5（快照 / 空间记账机制） 已定项 2 | 不影响 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
-| D16（发布语义） | 不影响 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
-| D6（快照实现模型） | 不影响 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
-| D22（单元原子性怎么合成） | 不影响 | 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D5（快照 / 空间记账机制） 已定项 4 | 支撑 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 改了：依据句按第 1 次重跑的数改写——条目数比随 `树数 × 设备数` 涨，`1024 × 64` 宽读臂三种宽度新口径都不过界、上界臂只有 50 字节那档过，窄读臂 45 格 0 格过界（`research/prompts/m3-close-c693-r3-main-verification.md` 第二节 T3 一格） |
+| D5（快照 / 空间记账机制） 已定项 1 | 支撑 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：依据里「先撑爆预算的是 `树数 × 设备数` 这个乘积」在新口径下照旧成立——上界臂 5 格过界都在 t × d 大的一端，窄读臂 0 格；变的只是过界门槛点（30 字节那档 1024 × 64 不再过界） |
+| D5（快照 / 空间记账机制） 已定项 2 | 不影响 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：第 1 次重跑把这一项的现行定案（每条根只装一代、每次发布全写一遍）当输入口径用，不量它、不判它 |
+| D16（发布语义） | 不影响 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：门槛仍取已定项 5 的 `T_dirty` = 2 GiB 的 1%，第 1 次重跑没动它 |
+| D6（快照实现模型） | 不影响 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：树数 t 仍是扫出来的取值，第 1 次重跑没加依据 |
+| D22（单元原子性怎么合成） | 不影响 | 2026-10-21 不受影响：正文只把复跑登记那一句改写成带简称的写法，数、结论与产物不变；2026-10-20 不受影响：K 的取值只进总条目数，第 1 次重跑的新口径 K ≡ 1、不用它 |
 
 ## 历史版本
 

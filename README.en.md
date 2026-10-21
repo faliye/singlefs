@@ -42,11 +42,11 @@ Every number comes from an experiment that has been run; read each on its own me
 
 ## Current status
 
-The current milestone is "deletion and repeated COW" ([`.claude/kb/milestone/03-third-txn.md`](.claude/kb/milestone/03-third-txn.md)); the previous one, "overwrite, release, rollback and reuse", ended on 2026-09-29, and what it left unfinished moved into item five of the current one.
+The current milestone is "sharing and reclamation" ([`.claude/kb/milestone/04-fourth-txn.md`](.claude/kb/milestone/04-fourth-txn.md)); the main body of the previous one, "deletion and repeated COW" ([`.claude/kb/milestone/03-third-txn.md`](.claude/kb/milestone/03-third-txn.md)), is complete, and what remains open is segment 4, "optimization" (2·6, 6·4).
 
-What it can do: mkfs on two disks; write a file and commit, filling several data units sequentially and reading back by offset; create several files in one publish (no directories); overwrite, release, and reuse a placement once the rollback floor has been raised past it; close and remount as a second writable instance; perform an administrator rollback while mounted; read back after a cold start; delete a file by inode number (publish the deletion intent first, then reclaim its data units in batches).
+What it can do: mkfs on two disks; write a file and commit, filling several data units sequentially and reading back by offset; create several files in one publish (no directories); overwrite, release, and reuse a placement once the rollback floor has been raised past it; close and remount as a second writable instance; perform an administrator rollback while mounted; read back after a cold start; overwrite, sequentially write and delete a file by inode number (deletion publishes the deletion intent first, then reclaims its data units in batches); truncate (shrinking publishes an intent first and then reclaims the data units beyond the size in batches; growing and keeping the same size each take one publish); create and destroy read-only snapshots.
 
-What it cannot do: it cannot be mounted into the system (no FUSE, no kernel module), has no directories or POSIX interface, and has no snapshots, encryption or compression. **Do not store any data in it.** The disk format is still soft and may be torn down and redone at any time before the first external user appears ([`.claude/rules/format-evolution.md`](.claude/rules/format-evolution.md)).
+What it cannot do: it cannot be mounted into the system (no FUSE, no kernel module), has no directories or POSIX interface, and has no writable snapshots, encryption or compression; the entry point for compaction (GC) exists, but the batch-size clause is not yet decided, so the product path stops before it signs a compaction intent. **Do not store any data in it.** The disk format is still soft and may be torn down and redone at any time before the first external user appears ([`.claude/rules/format-evolution.md`](.claude/rules/format-evolution.md)).
 
 How far verification reaches:
 
@@ -54,7 +54,7 @@ How far verification reaches:
 |---|---|---|
 | Crash-point replay | Cut the write-request stream into segments at each disk's barriers, enumerate every persistence state inside each segment, build an image for each, and run recovery plus the pool-level checker | checker-tier-crash-point-replay; the full run happens only on user request |
 | Crash amplification | The same enumeration scaled to billions of states: streams are first recorded into the verdict library, then read back and judged; the judge runs on GPUs, sharded across two hosts | `scripts/crash/crash-amplification.sh`, run on user request |
-| Pool-level checker | The 92 invariants marked implemented in the invariant list (`crates/singlefs-checker/invariants/`), the same count as the list in the code | Called by the two rows above |
+| Pool-level checker | The 102 invariants marked implemented in the invariant list (`crates/singlefs-checker/invariants/`), the same count as the list in the code | Called by the two rows above |
 | Model differential testing | Random operation sequences compared step by step with an ideal model that lives only in memory | harness-model-differential-and-scenarios |
 | QEMU real device | A fixed workload on two virtio disks; the writes and FLUSHes recorded on the device side are compared item by item with the stream the program recorded; no crash injection | checker-tier-qemu-device-streams |
 | Memory ordering | herd7 judges every Never under `litmus/`, each paired with a control that drops the barrier | checker-tier-lkmm |

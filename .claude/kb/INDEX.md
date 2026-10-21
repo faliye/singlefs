@@ -1,5 +1,7 @@
 # kb 索引
 
+**中文** · [English](INDEX.en.md) · [日本語](INDEX.ja.md)
+
 **规则不进 kb，进 [CLAUDE.md](../../CLAUDE.md)。** kb 只放事实、决策、调研、实测数据。
 
 | 文件 | 内容 |

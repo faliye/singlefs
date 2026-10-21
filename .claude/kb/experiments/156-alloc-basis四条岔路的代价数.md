@@ -1,6 +1,6 @@
-## E156 alloc-basis 四条岔路的代价数 —— 部分已跑（2026-09-26 第 4 次重跑：前提 1 成立（当天的代码上「记录已持久、根槽没持久」的崩溃之后可写挂载仍造得出洞）、前提 2 不成立（两个 F 口径在抬 F 那一串上合成一个）⇒ 岔路单第 3 行失效、不量；前提 3 只有岔路 2 那一族按旧式子定义、Hh 历史碰不到新准入式子；岔路单第 1 行在 38 条排得下的历史 × 「实」「每」两个回收时点上量完、按登记的够判条件够判：12 个取样点上 Q1c-前 都越过 2 槽（h_缺 = 1 时已 10 槽）、Q1d 都随 h_缺 增长，F1 触发；岔路单第 1 行用户 2026-09-27 定留到里程碑三、要考虑重排算法；入库装置，确定性，第 4 次重跑时 17 单测 / 装置的 22 条变异全抓；岔路单第 2、7 行用户已定不量；2026-10-05 第 5 次重跑：core 断言之后 W7 那一格的阳性对照换成 PC-钉门槛、6 个取样点两列全看到；第 4 次读数在新 `crates/` 上规范化之后 294 行不同（F1 仍触发，Q1d 在「实」列 4 个取样点不再随 h_缺 增长，K10 在 34 个观测点不符），归属跑证明不是 31-1 带来的，哪一份承重主 agent 已认定第 5 次产物（`e156-r5-prereg.md` 末尾「主 agent 认定：第 5 次交回与 S11 两边查」第 2 条；第 4 次产物当那棵树的记录留着，不再承重）；2026-10-05 第 6 次重跑：回收门槛照用户 2026-10-05 定乙读（挂载时读回全零的根环槽钉在它可能住过的最旧 txg）之后，38 格 K10、F24 都是 0，副本里去掉 core 的全零钉住时两项都红在推出来的 34 个观测点上；「实」列与第 5 次逐字段相同，「每」列随之与「实」列相同，Q1d 在「每」列 4 个取样点由随 h_缺 增长变成不单调，F1 仍触发、Q1c-前 判定不变；PC-钉门槛 六格两列与第 5 次逐字节相同；单测 19 条与变异 M45–M47 没跑，归提交时）
+## E156 alloc-basis 四条岔路的代价数 —— 部分已跑（2026-09-26 第 4 次重跑：前提 1 成立（当天的代码上「记录已持久、根槽没持久」的崩溃之后可写挂载仍造得出洞）、前提 2 不成立（两个 F 口径在抬 F 那一串上合成一个）⇒ 岔路单第 3 行失效、不量；前提 3 只有岔路 2 那一族按旧式子定义、Hh 历史碰不到新准入式子；岔路单第 1 行在 38 条排得下的历史 × 「实」「每」两个回收时点上量完、按登记的够判条件够判：12 个取样点上 Q1c-前 都越过 2 槽（h_缺 = 1 时已 10 槽）、Q1d 都随 h_缺 增长，F1 触发；岔路单第 1 行用户 2026-09-27 定留到里程碑三、要考虑重排算法；入库装置，确定性，第 4 次重跑时 17 单测 / 装置的 22 条变异全抓；岔路单第 2、7 行用户已定不量；2026-10-05 第 5 次重跑：core 断言之后 W7 那一格的阳性对照换成 PC-钉门槛、6 个取样点两列全看到；第 4 次读数在新 `crates/` 上规范化之后 294 行不同（F1 仍触发，Q1d 在「实」列 4 个取样点不再随 h_缺 增长，K10 在 34 个观测点不符），归属跑证明不是 31-1 带来的，哪一份承重主 agent 已认定第 5 次产物（`e156-r5-prereg.md` 末尾「主 agent 认定：第 5 次交回与 S11 两边查」第 2 条；第 4 次产物当那棵树的记录留着，不再承重）；2026-10-05 第 6 次重跑：回收门槛照用户 2026-10-05 定乙读（挂载时读回全零的根环槽钉在它可能住过的最旧 txg）之后，38 格 K10、F24 都是 0，副本里去掉 core 的全零钉住时两项都红在推出来的 34 个观测点上；「实」列与第 5 次逐字段相同，「每」列随之与「实」列相同，Q1d 在「每」列 4 个取样点由随 h_缺 增长变成不单调，F1 仍触发、Q1c-前 判定不变；PC-钉门槛 六格两列与第 5 次逐字节相同；单测 19 条与变异 M45–M47 没跑，归提交时；2026-10-18 第 7 次重跑（问题单 H1，C566（环上有洞时多扣的槽随洞数无界增长） 那一半）：洞数从 1 档扫到环满一圈再跨圈，读法甲（一圈里排满，S = 8、16 的 8 个单位）与读法乙（跨过一圈，12 个单位）下 Q1a 峰值都判「仍在涨」，上界数全落在最大档（≤ 端点，没量到上界；读法乙最大档 S = 16 为 1810 / 1416 槽），H1 按登记的够判条件够判；Hh-后 8 个单位判「不单调」、F32 触发（登记预推每档相同，推错了）；内联单测 25 条由主 agent 跑过，新加的变异 M50–M54 没跑，归提交时）
 
-<!-- doc-lint:not-numbers K1 K8 S1 S2 S3 S4 S5 S9 V1 V2 V3 V6 V7 V8 V10 V11 V13 F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F16 Q1 Q2 Q3 Q7 R1 R2 R3 R4 R5 R6 R7 R8 G7 G8 G12 G26 G27 G28 H0 HF K9 U5 U7 U8 U11 U13 F23 F24 M32 M34 A10 A14 F26 F27 F28 F29 F30 K10 K15 L1 L3 M35 M44 S11 S13 S14 U14 U19 V18 W7 W14 P7 Q1r5a Q1r5b Q2d R1a R1b R1c R1d R2a R2b R2c K16 L6 M45 M46 M47 U20 F31 F32 F33 F34 F35 V19 V20 S15 S16 S17 S18 M36 M42 -->
+<!-- doc-lint:not-numbers K1 K8 S1 S2 S3 S4 S5 S9 V1 V2 V3 V6 V7 V8 V10 V11 V13 F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F16 Q1 Q2 Q3 Q7 R1 R2 R3 R4 R5 R6 R7 R8 G7 G8 G12 G26 G27 G28 H0 HF K9 U5 U7 U8 U11 U13 F23 F24 M32 M34 A10 A14 F26 F27 F28 F29 F30 K10 K15 L1 L3 M35 M44 S11 S13 S14 U14 U19 V18 W7 W14 P7 Q1r5a Q1r5b Q2d R1a R1b R1c R1d R2a R2b R2c K16 L6 M45 M46 M47 U20 F31 F32 F33 F34 F35 V19 V20 S15 S16 S17 S18 M36 M42 F22 M50 M54 S20 W28 -->
 本文里 K1、锚1/锚2/锚3（对应登记「七」第二类锚点表逐行的本地简写，不写成编号形状——kb 别的登记表已经用同一形状登记过别的含义，这里避开撞号）、K8、K9、S1–S5、S9、V1–V8、V10、V11、V13、F1–F14、F16、R1–R8、Q1a–Q1f、Q2a/Q2b/Q2c、Q3a–Q3e、Q7a–Q7f、U5、U7、U8、G7、G27、G12、甲-T1、F-扣、H0、HR、HK、HK-F0、HF、Hh(k)、HX、HY、β0/β1/β2/βK-w/r/f/l2/β_syn/β_F0、Bd(k)、Bk1/Bk2/Bk3
 这些编号与代号都是 `e156-preregistration.md`／`e156-r2-prereg.md` 跑前登记自己的锚点 / 判据 / 历史族 / 臂名，登记位在那两份文件里，不是 kb 的 D / E / C / I 编号。
 
@@ -16,6 +16,256 @@
 **备料**：给 alloc-basis 四条岔路（`alloc-basis-forks.md`）交用户之前配代价数——判决收口表第 ② 行因此挡着第 5、60、54、43 行；用户 2026-09-21 定「先跑计数实验，量完一次全交」。第二、七行判决标着「无运行时代价」，第二行量的是「删掉 D28（挂载期承诺量） 已定项 1『− defer 待释放』这一项要同步改的清单能不能被一条命令核」，第七行量的是「G27（给 defer 账加的一条检查）分不分得出今天两条检查判不出的差别」。等 D28（挂载期承诺量） 已定项 1 与 D16（发布语义） 已定项 1 按岔路定案时引用 E156（alloc-basis 四条岔路的代价数）。岔路单第 2、7 行用户已定（岔路单那两行的状态列），第 3 行按第 4 次重跑的前提 2 失效、不量；第 1 行用户 2026-09-27 定留到里程碑三、要考虑重排算法（弹窗原话「可以留到里程碑3 但是要考虑重排算法」），记成欠账 C566（环上有洞时多扣的槽随洞数无界增长）。
 
 **问题**：第 4 次重跑登记 `e156-r4-prereg.md`（回答问题单 `e156-r4-questions.md` 的四节）。实一至实五之后，管理员回退改成挂着时的一次向前发布（挂载时回退与截断删了）、每次发布都做挂载内回收、准入不再扣「defer 待释放」；岔路单第 2、7 行用户已定不量，第 1、3 行先答三个前提：前提 1（今天的代码上根环还会不会出洞）、前提 2（两个 F 口径在今天的抬 F 路径上还分不分得开）、前提 3（哪几个量是按旧准入式子定义的）。前提 1 成立才量第 1 行（登记第五节 5.5 的第二段），前提 2 不成立则第 3 行失效、不设量。装置是**入库装置**：`crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs`，只读驱动真实 mkfs、暖机、新池新建文件、覆盖写、空发布、可写挂载、挂着回退、抬 F，不改 `crates/singlefs-core`、`crates/singlefs-checker` 的生产代码。
+
+### 第 7 次重跑（2026-10-18）：洞数从 1 档扫到环满一圈再跨圈，读法甲、读法乙下 Q1a 峰值都判「仍在涨」，上界数全落在最大档（≤ 端点，没量到上界）
+
+重跑登记 `research/prompts/e156-r7-prereg.md`（含执行员在装置写完、产物一次没跑之前写的「修订 1」），问题单 `research/prompts/m3-close-cost-measurement-questions.md` 的 H1 一行，量 C566（环上有洞时多扣的槽随洞数无界增长）与 C380（环上有洞时释放代判不出唯一值）那一半：今天的 `crates/` 上，洞上多扣的槽数随洞数增长是否有上界、上界是多少；够判条件逐字是「洞数至少取三档（含环满一圈），每档报多扣槽数」。H1 的三个候选（甲 可写挂载时补洞、乙 今天的代码上多扣有上界而改写验收并销账、丙 前洞多扣挪出里程碑三）不是登记里的臂（登记 5.1）：这一次只量今天的代码（甲-T1 那一臂，「实」列为准、「每」列并报），哪个候选成立不在这一节判。
+
+**读法写死**（登记 W26、W28）：「环满一圈」两种读法都量、各占一行、判据形状相同——读法甲＝一圈里排满（R7a：前位置 Hh(k, 前)，k = 1 … `k_满(S)`，S = 4 / 8 / 16 时 2 / 4 / 8 档，S = 4 只有 2 档、只报不判）；读法乙＝跨过一圈（R7c：Hh(1, 前) … Hh(`k_满` + 1, 前) 再加 Hc 两档，`k_满` + 3 档）。统计单位 (族类, S, ρ, 时点) 取每档 Q1a 峰值，按档升序：相邻差全 ≥ 0 且最后一个 > 0 判「仍在涨」（没见上界，≤ 端点）；全 ≥ 0 且最后一个 = 0 判「已平」（上界 = 末档峰值）；其余判「不单调」。
+
+**装置与产物**（命令与原样输出是这一次真跑的；单测、挂钟、实现快照三项出自主 agent 的跑产物脚本，标明）：
+
+| 项 | 命令 | 原样输出 |
+|---|---|---|
+| 装置行数 | `wc -l crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` | `7580`（`git show HEAD:<装置> | wc -l` 是 `6291`） |
+| 装置源文件 sha256 | `sha256sum crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` | `bcb356afd4867a27f80c943b10d62962e520cbf74a4d328327722959c6a7cdb3`（与登记「修订 1」记的相同，跑产物前后的主 agent 脚本也记了这一个） |
+| 单测条数 | `grep -c '#\[test\]' <装置>` | `25`（`git show HEAD:<装置> \| grep -c '#\[test\]'` 是 19，新加六条） |
+| 单测读数 | 主 agent 在 release 下跑装置的内联单测（checker 档，重型，执行员没跑；日志不入库） | `test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s` |
+| 产物 | `wc -l research/results/e156-alloc-basis-counts-2026-10-18.out`；`tail -n 1 <产物>` | `16669`；`E7RESULT name=done emitted=16669` |
+| 产物 sha256 | `sha256sum research/results/e156-alloc-basis-counts-2026-10-18.out` | `1663f1ea28e5b3334f21adfc121bbf899bc66e7e429eea782f1f0c562c776c83` |
+| 跑产物的二进制 | 主 agent 的脚本在跑之前记的 `target/release/e156_allocation_basis_counts` | sha256 `eb3903266a015578b10c412a18a7a988eda0dfbf9fc161790658417d142b2d70`；此刻仓根 `target/release/` 下那一份是 `81106e66389b91790a16726e56001648b950cabe720386457a02f9cd65fa05c9`（产物之后又编过，源文件 sha256 不变，产物不是它跑的） |
+| 挂钟 | 主 agent 的脚本量 | `挂钟秒数 241`（release，线程上限 31，内存上限 8G） |
+| 实现快照（S19、S3） | 脚本在跑前、跑后各取一次 `git diff HEAD -- crates/ \| sha256sum`、`git diff HEAD --stat -- crates/ \| tail -1`、`git status --short crates/ \| sha256sum` | 前后都是 `7fd21f75d5e478c1342b53d0d54b123303ac7993b0e4af473d049dceea10d5ca`、` 190 files changed, 73166 insertions(+), 4603 deletions(-)`、`4d180fd57ae7b242a5579beeca267bdf9441fb36f9cc7442a9246cdc71ba33a4`；登记第三节写的 `847e0e54…` 与修订 1 开工时的 `16ba9b79…` 都与它不同（别的会话在改 `crates/`，登记 S19 第 2 项本来就不停，被测对象是跑的那一刻的树） |
+
+**起跑经过**：执行员交的 `run-product.sh` 不带 `gpu` 特性编装置，而多机配置 `ENABLE_GPU=1`，给定状态表的判段交回占位结论（主 agent 的诊断，那一趟没有独立复现），装置在 `verdict` 函数里 panic（`crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 里 `PlaceholderOfATableLeftToAnotherHost`、`PlaceholderOfATableRecordedOnly` 两个分支，消息只点名 `SINGLEFS_CRASH_AMPLIFICATION_STAGE` 与 `SINGLEFS_CRASH_AMPLIFICATION_SHARE` 两个变量）；那一趟的输出被后一趟覆盖，没留存、不是产物。主 agent 改成带 `--features verdict-store,gpu` 编、经 `scripts/crash/gpu-quiesce-run.sh` 起，跑出 `research/results/e156-alloc-basis-counts-2026-10-18.out` 这一份。S3 前后快照相同，说明这一趟里 `crates/` 没被别的会话改动。
+
+**守门、停机与作废条款**（登记第十一节）：
+
+| 登记项 | 读数 | 结论 |
+|---|---|---|
+| S20 装置的 Rust 锚点模型与 Python 锚点脚本逐点比 | `anchor_r7_summary` 58 行、`anchor_r7_dump` 3567 行、`anchor_r7_k0_summary` 3 行、`anchor_r7_k0_dump` 384 行，与改正后脚本（`anchors_e156_r7_hdong_window.py`，sha256 `a33d5f8c…`，k0 包装 `anchors_e156_r7_k0.py` sha256 `c9bc6de0…`）的输出 `cmp` 都无差异；执行员开工前的试跑触发过一次 S20（脚本漏了 h_洞 的窗口左端），处置在登记「修订 1」第 2 条 | 不触发 |
+| S21 真实分配器读数与锚点对不上（含「峰值不低于锚点树表下界」那一条） | `q1_cell_checks` 116 行里 `a15_every_below`、`a15_real_below` 的和 0，`a14_mismatches`、`a11_mismatches`、`a23_lag_mismatches`、`a24_pinned_mismatches` 的和都是 0；另用独立脚本对 110 格 × 两列（实、每）核峰值 ≥ 锚点 `q1a_tt_peak`，220 个全部不低于 | 不触发 |
+| S11 / S12 守门（K10、F24、G-adm） | `verdict stage=second`：`s11_k10_violation_points=0`、`s11_a10_real_mismatch_cells=0`、`s12_g_adm_nonzero=0`；`failure_clauses` 的 `f24_real_every_differ_points=0` | 不触发；PC-c2 对照格 `a14_mismatches=9`、`seen=true` 按设计非 0 |
+| V20 判定函数的阳性对照（PC-档序列） | 五个合成序列 `holds=true`，`r7_verdict` 汇总 `tier_sequence_control_cases_wrong=0` | 不触发 |
+| V21 PC-同槽 看不到下降 | 六个 (S, ρ) 的 Hs(2, 后) 上「每」列峰值由不改时的 344 / 236 / 712 / 476 / 1460 / 960 降到 10，`seen=true`；汇总 `same_slot_controls_run=6 same_slot_controls_without_a_drop=0` | 不触发 |
+| 判别力自证 ② 去掉最后一档重判 | 汇总 `dropping_the_last_tier_changed_units=0_of_24`（R7a、R7c 的 24 个统计单位里没有一个因为去掉最后一档改判；S = 4 的 R7a 4 个单位本来就只有 2 档） | 判定对最后一档不敏感 |
+| 判别力自证 ③ 2 槽 / 1 槽门槛挪到两个观测值之间 | 汇总 `threshold_moved_units_flipping=60_of_60` | 做得出，V5 不触发 |
+| 其余作废条款（V1、V2、V6、V16、V17） | `verdict stage=second` 里对应字段 `v1_over_withheld_controls_void=0`、`v2_a10_every_mismatch_cells=0`、`v6_a11_mismatch_points=0`、`v16_judge_cases_wrong=0`、`v17_a13_every_nonzero_points=0` 都是 0 | 不触发 |
+| 截断 | `truncated_cells=0` | 116 格都跑到登记的终点，没有「未量到」 |
+| 旧失败条款照报（F1、F2、F22、F23） | `failure_clauses`（`:16654`）：`f1_front_above_two_groups` 列了 12 组全部取样点，`f2_no_observable_difference=false`，`f22_front_and_back_differ_groups=none`，`f23_back_at_most_two_groups=none` | 与第 6 次同形（F1 仍触发，岔路单第 1 行的判决用户 2026-09-27 已定，不重下） |
+
+**数量自查**（登记第五节 5.2：每个 ρ 上 S = 4 / 8 / 16 各 14 / 18 / 26 条历史，共 116 条；`q1_cell` = 116 + PC-c2 对照 1 + PC-同槽 6 = 123）：
+
+```
+$ for n in q1_cell q1_cell_reused q1_cell_checks r7_tier_peaks r7_verdict pc_same_slot pc_tier_sequence anchor_r7_summary anchor_r7_dump anchor_r7_k0_summary anchor_r7_k0_dump; do printf "%s %s\n" "$n" "$(grep -c "^E7RESULT name=$n " research/results/e156-alloc-basis-counts-2026-10-18.out)"; done
+q1_cell 123
+q1_cell_reused 2
+q1_cell_checks 116
+r7_tier_peaks 60
+r7_verdict 6
+pc_same_slot 6
+pc_tier_sequence 5
+anchor_r7_summary 58
+anchor_r7_dump 3567
+anchor_r7_k0_summary 3
+anchor_r7_k0_dump 384
+
+$ grep '^E7RESULT name=q1_cell ' research/results/e156-alloc-basis-counts-2026-10-18.out | awk '{print $3, $4, $5}' | sort | uniq -c
+      2 family=Hc s=16 rho=1
+      2 family=Hc s=16 rho=1/4
+      2 family=Hc s=4 rho=1
+      2 family=Hc s=4 rho=1/4
+      2 family=Hc s=8 rho=1
+      2 family=Hc s=8 rho=1/4
+     18 family=Hh s=16 rho=1
+     18 family=Hh s=16 rho=1/4
+      6 family=Hh s=4 rho=1
+      6 family=Hh s=4 rho=1/4
+     10 family=Hh s=8 rho=1
+     10 family=Hh s=8 rho=1/4
+      6 family=Hs s=16 rho=1
+      6 family=Hs s=16 rho=1/4
+      6 family=Hs s=4 rho=1
+      6 family=Hs s=4 rho=1/4
+      6 family=Hs s=8 rho=1
+      6 family=Hs s=8 rho=1/4
+      1 family=PC-c2 s=4 rho=1
+      1 family=PC-same-slot s=16 rho=1
+      1 family=PC-same-slot s=16 rho=1/4
+      1 family=PC-same-slot s=4 rho=1
+      1 family=PC-same-slot s=4 rho=1/4
+      1 family=PC-same-slot s=8 rho=1
+      1 family=PC-same-slot s=8 rho=1/4
+```
+
+每个 ρ 上 S = 4 的 `Hh` 6 + `Hc` 2 + `Hs` 6 = 14，S = 8 为 10 + 2 + 6 = 18，S = 16 为 18 + 2 + 6 = 26，与登记一致；`q1_cell_checks` 116 行（每条历史一行）；`r7_tier_peaks` 60 行 = 5 个量（R7a、R7b、R7c、R7d 前、R7d 后）× 3 个 S × 2 个 ρ × 2 个时点；`q1_cell_reused` 2 行是 S = 4、ρ = 1 的 Hh(1, 前)、Hh(1, 后) 复用第一段的格。`排不下` 的 36 格（`verdict stage=second` 的 `cells_run_without_fitting_the_ring=36`）等于锚点脚本输出里 `fits=False` 的 18 条历史 × 2 个 ρ：
+
+```
+$ grep -c 'fits=False' research/results/e156-alloc-basis-counts-2026-10-18-support/anchors_e156_r7_hdong_window.out
+18
+```
+
+S20 与核对脚本（对应守门表里 S20、S21 两行，原样输出）：
+
+```
+$ sed -n 's/^E7RESULT name=anchor_r7_summary //p' research/results/e156-alloc-basis-counts-2026-10-18.out | cmp - research/results/e156-alloc-basis-counts-2026-10-18-support/anchors_e156_r7_hdong_window.out && echo SUMMARY_SAME
+SUMMARY_SAME
+$ sed -n 's/^E7RESULT name=anchor_r7_dump //p' research/results/e156-alloc-basis-counts-2026-10-18.out | cmp - <(grep '^DUMP ' research/results/e156-alloc-basis-counts-2026-10-18-support/anchors_e156_r7_hdong_window.dump | sed 's/^DUMP //') && echo DUMP_SAME
+DUMP_SAME
+$ sed -n 's/^E7RESULT name=anchor_r7_k0_summary //p' research/results/e156-alloc-basis-counts-2026-10-18.out | cmp - research/results/e156-alloc-basis-counts-2026-10-18-support/anchors_e156_r7_k0.out && echo K0_SUMMARY_SAME
+K0_SUMMARY_SAME
+$ sed -n 's/^E7RESULT name=anchor_r7_k0_dump //p' research/results/e156-alloc-basis-counts-2026-10-18.out | cmp - <(grep '^DUMP ' research/results/e156-alloc-basis-counts-2026-10-18-support/anchors_e156_r7_k0.dump | sed 's/^DUMP //') && echo K0_DUMP_SAME
+K0_DUMP_SAME
+$ sed -n 's/^E7RESULT name=anchor_dump //p' research/results/e156-alloc-basis-counts-2026-10-18.out | wc -l
+1092
+$ sha256sum research/results/e156-alloc-basis-counts-2026-10-18-support/anchors_e156_r7_hdong_window.py research/results/e156-alloc-basis-counts-2026-10-18-support/anchors_e156_r7_k0.py
+a33d5f8ce5bb70585f1372ac8fa8209a0c3dac3282026d7fd77c152f673d2b6e  research/results/e156-alloc-basis-counts-2026-10-18-support/anchors_e156_r7_hdong_window.py
+c9bc6de064be9e6d89da881cd93d25ec04604e3b7206588fb5b078b3b2016397  research/results/e156-alloc-basis-counts-2026-10-18-support/anchors_e156_r7_k0.py
+$ python3 -I research/results/e156-alloc-basis-counts-2026-10-18-support/check_tier_peaks_against_observations.py
+r7_tier_peaks 行 60 条，用原始观测点重算后峰值序列不同的 0 条；有观测点的格 123 个
+$ python3 -I research/results/e156-alloc-basis-counts-2026-10-18-support/check_peaks_against_anchor_lower_bounds.py
+格 × 列 220 个，峰值不低于锚点树表下界的 220 个，低于的 0 个 []
+```
+
+两条核对脚本的输出另存在 `research/results/e156-alloc-basis-counts-2026-10-18-support/check_tier_peaks_against_observations.txt` 与 `research/results/e156-alloc-basis-counts-2026-10-18-support/check_peaks_against_anchor_lower_bounds.txt`，各一行，与这两条命令打出的逐字相同。
+
+**H1 的读数：读法甲（R7a）与读法乙（R7c）并排**（登记第六节；每个统计单位占一行，各报各的判定，不合取）。Q1a 在这些族里等于 Δ（`q1_trajectory` 里 `quantity=q1b_real`、`quantity=q1b_every` 的 `peak` 在 123 格里都是 0，`delta_real` 与 `q1a_real` 的 `peak` 逐格相同，`q1_cell_checks` 116 行的 `a13_real_nonzero`、`a13_every_nonzero` 逐行相加都是 0）；「实」列与「每」列在 Hh、Hc、Hs 的 116 条历史上峰值、为正点数、期末值逐格相同，只有 PC-同槽 对照格按设计不同；`peak` 与 `peak_after_first_ring`（环转过第一个事务那一圈之后的峰值）在 123 格里都相同；`final`（期末值）在 123 格里都是 0（终点取最后一个洞 + 3S + 2，期末为 0 是历史的造法决定的，推的：环转过一圈之后门槛放开；不是「多扣不存在」）。
+
+读法甲：族类 Hh-前，档 = 注入的洞数 k = 1 … `k_满(S)`（整个洞数都落在第一圈 txg < 3S 里）。ρ = 1 与 ρ = 1/4、实与每的峰值序列逐个相同：
+
+| S | 档（k） | 每档 Q1a 峰值 | 相邻差 | W28 判定 | max(P)，是否落在最大档 |
+|---|---|---|---|---|---|
+| 4 | 1、2 | 10、20 | 10 | 档数不足（`fewer_than_three_tiers`），只报不判 | 20，是 |
+| 8 | 1 … 4 | 10、20、28、36 | 10、8、8 | 仍在涨（`still_rising`） | 36，是（≤ 端点） |
+| 16 | 1 … 8 | 10、20、28、36、44、52、60、68 | 10、8、8、8、8、8、8 | 仍在涨 | 68，是（≤ 端点） |
+
+读法甲：`r7_verdict quantity=r7a` 12 个统计单位里判了 8 个（S = 8、16 × 两个 ρ × 两个时点），8 个都是「仍在涨」，0 个已平、0 个不单调；S = 4 的 4 个单位只有 2 档。
+
+读法乙：族类 Hh-前 k = 1 … `k_满` + 1 再加 Hc 两档（注入洞数 n 取 `k_满` + 1 的两倍和三倍）。「实」「每」序列相同；ρ 两档分行：
+
+| S | ρ | 档（注入洞数） | 每档 Q1a 峰值 | 相邻差 | W28 判定 | max(P)（族、txg），是否落在最大档 |
+|---|---|---|---|---|---|---|
+| 4 | 1 | 1、2、3、6、9 | 10、20、146、308、594 | 10、126、162、286 | 仍在涨 | 594（Hc，63），是 |
+| 4 | 1/4 | 1、2、3、6、9 | 10、20、110、244、458 | 10、90、134、214 | 仍在涨 | 458（Hc，63），是 |
+| 8 | 1 | 1 … 5、10、15 | 10、20、28、36、294、608、914 | 10、8、8、258、314、306 | 仍在涨 | 914（Hc，105），是 |
+| 8 | 1/4 | 1 … 5、10、15 | 10、20、28、36、226、476、716 | 10、8、8、190、250、240 | 仍在涨 | 716（Hc，105），是 |
+| 16 | 1 | 1 … 9、18、27 | 10、20、28、36、44、52、60、68、594、1208、1810 | 10、8、8、8、8、8、8、526、614、602 | 仍在涨 | 1810（Hc，201），是 |
+| 16 | 1/4 | 1 … 9、18、27 | 10、20、28、36、44、52、60、68、458、944、1416 | 10、8、8、8、8、8、8、390、486、472 | 仍在涨 | 1416（Hc，201），是 |
+
+读法乙：`r7_verdict quantity=r7c` 12 个统计单位全判，12 个都是「仍在涨」，0 个已平、0 个不单调，12 个取样点一致（只在这 12 个取样点上）。
+
+R7e（上界数）：R7a、R7c 的每个统计单位 max(P) 都落在最大档上，所以写「≤ 端点」，没量到上界；第一次越过 2 槽与 1 槽的最小档都是 1（`first_tier_above_two_slots=1 first_tier_above_one_slot=1`，60 个统计单位全是），即注入一个洞已经多扣 10 槽。读法甲在第一圈里每多一个洞多扣 8 槽（相邻差 8，S = 8、16 上的第 3 档起），读法乙在第一个落进第二圈的洞处跳到 146 / 294 / 594（ρ = 1，S = 4 / 8 / 16）、此后每多 `k_满` + 1 个洞再多 134–614 槽（相邻差，随 S 与 ρ 变）。
+
+F31（不单调）：R7a、R7c 的统计单位没有一个判「不单调」，不触发。F33（两种读法相反）：同一 (S, ρ, 时点) 上 R7a 与 R7c 没有一个是「已平」，不触发；S = 4 的 R7a 没有判定，不参与比较。
+
+**照报的两行：R7b 触发 F32，R7d 不触发**（登记 R7b、R7d，判定不算判据）：
+
+| 量 | 登记预推 | 读数 | 条款 |
+|---|---|---|---|
+| R7b Hh-后（k = 1 … `k_满后`，S = 8、16 判了 8 个单位） | 每档峰值相同（只钉回同一圈里最旧那一条根） | 8 个单位全判「不单调」：S = 16、ρ = 1 的峰值 716、710、702、694、686、678、672、666 随洞数逐档下降；S = 16、ρ = 1/4 的 474、478、470、472、466、468、462、468 上下摆；S = 8、ρ = 1 为 366、360、352、344。量级是几百槽（k = 1 时 S = 4 / 8 / 16 为 174 / 366 / 716），比 Hh-前同 k 的 10 槽大一个数量级 | F32 触发（`r7_verdict quantity=summary` 的 `report_only_units_unlike_the_prediction` 列了这 8 个单位）：登记第四节对这一族的推断（每档相同）错了，正文不许按推的写；登记要求交主 agent |
+| R7d Hs-前、Hs-后（m = 1、2、3，24 个单位） | 同槽叠洞，那条旧根永远不被写掉，多扣随发布线性涨 | 24 个单位全判「仍在涨」，全落在最大档（Hs-前 S = 16、ρ = 1 为 10、758、1518；Hs-后 716、1460、2134） | 与登记预推相符，F32 不因这一行触发；F34（Hs-后 判「已平」与 D16（发布语义） 已定项 1 射程「一块盘持续写不进根时扣住的单元随发布线性涨、没有上界」对不上）不触发 |
+
+R7b 与 Hh-前 的两个量放在一起看：Hh-后 在 k = 1 就已经是几百槽、随洞数不涨反略降，Hh-前 在第一圈里从 10 槽起每洞 +8，跨圈后是几百到上千槽并继续涨——「随洞数是否有上界」这个问法在不同的洞位置上的形状不同，这是两个观测，不是对读法甲、乙的裁决。
+
+**判定整行抄自产物**（`research/results/e156-alloc-basis-counts-2026-10-18.out`）。`verdict stage=second` 一行（`:16656`）与 `r7_verdict` 六行（`:16559`–`:16564`）：
+
+```
+E7RESULT name=r7_verdict quantity=r7a units=12 judged=8 fewer_than_three_tiers_units=[s=4_rho=1_timing=real,s=4_rho=1_timing=every_publish,s=4_rho=1/4_timing=real,s=4_rho=1/4_timing=every_publish] still_rising=8 flat=0 not_monotonic=0 geometry_sensitivity=consistent_on_8_sampling_points_only_on_these per_unit=s=4_rho=1_timing=real:fewer_than_three_tiers,s=4_rho=1_timing=every_publish:fewer_than_three_tiers,s=4_rho=1/4_timing=real:fewer_than_three_tiers,s=4_rho=1/4_timing=every_publish:fewer_than_three_tiers,s=8_rho=1_timing=real:still_rising,s=8_rho=1_timing=every_publish:still_rising,s=8_rho=1/4_timing=real:still_rising,s=8_rho=1/4_timing=every_publish:still_rising,s=16_rho=1_timing=real:still_rising,s=16_rho=1_timing=every_publish:still_rising,s=16_rho=1/4_timing=real:still_rising,s=16_rho=1/4_timing=every_publish:still_rising
+E7RESULT name=r7_verdict quantity=r7b units=12 judged=8 fewer_than_three_tiers_units=[s=4_rho=1_timing=real,s=4_rho=1_timing=every_publish,s=4_rho=1/4_timing=real,s=4_rho=1/4_timing=every_publish] still_rising=0 flat=0 not_monotonic=8 geometry_sensitivity=consistent_on_8_sampling_points_only_on_these per_unit=s=4_rho=1_timing=real:fewer_than_three_tiers,s=4_rho=1_timing=every_publish:fewer_than_three_tiers,s=4_rho=1/4_timing=real:fewer_than_three_tiers,s=4_rho=1/4_timing=every_publish:fewer_than_three_tiers,s=8_rho=1_timing=real:not_monotonic,s=8_rho=1_timing=every_publish:not_monotonic,s=8_rho=1/4_timing=real:not_monotonic,s=8_rho=1/4_timing=every_publish:not_monotonic,s=16_rho=1_timing=real:not_monotonic,s=16_rho=1_timing=every_publish:not_monotonic,s=16_rho=1/4_timing=real:not_monotonic,s=16_rho=1/4_timing=every_publish:not_monotonic
+E7RESULT name=r7_verdict quantity=r7c units=12 judged=12 fewer_than_three_tiers_units=[] still_rising=12 flat=0 not_monotonic=0 geometry_sensitivity=consistent_on_12_sampling_points_only_on_these per_unit=s=4_rho=1_timing=real:still_rising,s=4_rho=1_timing=every_publish:still_rising,s=4_rho=1/4_timing=real:still_rising,s=4_rho=1/4_timing=every_publish:still_rising,s=8_rho=1_timing=real:still_rising,s=8_rho=1_timing=every_publish:still_rising,s=8_rho=1/4_timing=real:still_rising,s=8_rho=1/4_timing=every_publish:still_rising,s=16_rho=1_timing=real:still_rising,s=16_rho=1_timing=every_publish:still_rising,s=16_rho=1/4_timing=real:still_rising,s=16_rho=1/4_timing=every_publish:still_rising
+E7RESULT name=r7_verdict quantity=r7d_front units=12 judged=12 fewer_than_three_tiers_units=[] still_rising=12 flat=0 not_monotonic=0 geometry_sensitivity=consistent_on_12_sampling_points_only_on_these per_unit=s=4_rho=1_timing=real:still_rising,s=4_rho=1_timing=every_publish:still_rising,s=4_rho=1/4_timing=real:still_rising,s=4_rho=1/4_timing=every_publish:still_rising,s=8_rho=1_timing=real:still_rising,s=8_rho=1_timing=every_publish:still_rising,s=8_rho=1/4_timing=real:still_rising,s=8_rho=1/4_timing=every_publish:still_rising,s=16_rho=1_timing=real:still_rising,s=16_rho=1_timing=every_publish:still_rising,s=16_rho=1/4_timing=real:still_rising,s=16_rho=1/4_timing=every_publish:still_rising
+E7RESULT name=r7_verdict quantity=r7d_back units=12 judged=12 fewer_than_three_tiers_units=[] still_rising=12 flat=0 not_monotonic=0 geometry_sensitivity=consistent_on_12_sampling_points_only_on_these per_unit=s=4_rho=1_timing=real:still_rising,s=4_rho=1_timing=every_publish:still_rising,s=4_rho=1/4_timing=real:still_rising,s=4_rho=1/4_timing=every_publish:still_rising,s=8_rho=1_timing=real:still_rising,s=8_rho=1_timing=every_publish:still_rising,s=8_rho=1/4_timing=real:still_rising,s=8_rho=1/4_timing=every_publish:still_rising,s=16_rho=1_timing=real:still_rising,s=16_rho=1_timing=every_publish:still_rising,s=16_rho=1/4_timing=real:still_rising,s=16_rho=1/4_timing=every_publish:still_rising
+E7RESULT name=r7_verdict quantity=summary units=60 criterion_units_not_monotonic=[] report_only_units_unlike_the_prediction=[r7b:s=8_rho=1_timing=real,r7b:s=8_rho=1_timing=every_publish,r7b:s=8_rho=1/4_timing=real,r7b:s=8_rho=1/4_timing=every_publish,r7b:s=16_rho=1_timing=real,r7b:s=16_rho=1_timing=every_publish,r7b:s=16_rho=1/4_timing=real,r7b:s=16_rho=1/4_timing=every_publish] sampling_points_where_the_two_ring_readings_disagree=[] same_slot_back_units_flat_against_the_clause_range=[] dropping_the_last_tier_changed_units=0_of_24 threshold_moved_units_flipping=60_of_60 tier_sequence_control_cases_wrong=0 same_slot_controls_run=6 same_slot_controls_without_a_drop=0
+E7RESULT name=verdict stage=second cells_run=116 cells_run_without_fitting_the_ring=36 truncated_cells=0 v1_over_withheld_controls_void=0 v2_a10_every_mismatch_cells=0 v2_a12_every_nonzero_points=0 v2_a14_mismatch_points=0 v2_a15_every_below_points=0 v2_pc_pinned_floor_seen=true v2_pc_c2_seen=true v6_a11_mismatch_points=0 v6_devices_unequal_points=0 v6_pc_hole_not_seen_cells=0 v16_judge_cases_wrong=0 v17_a13_every_nonzero_points=0 s1_failures=0 s1h_root_ring_missing_points=0 s11_a10_real_mismatch_cells=0 s11_a12_real_nonzero_points=0 s11_a15_real_below_points=0 s11_k10_violation_points=0 s12_g_adm_nonzero=0 k8_mismatches=0 referenced_but_free_points=0 abandoned_or_unknown_root_points=0 anchor_rows_missing=0 anchor_lag_mismatch_points=0 anchor_pinned_slot_mismatch_points=0
+```
+
+读法甲 R7a、「实」列六行（`:16499`、`:16501`、`:16503`、`:16505`、`:16507`、`:16509`；「每」列是各自的下一行，除 `timing=` 与 `maximum_peak_cell=` 里的时点外逐字相同，`grep 'name=r7_tier_peaks' <产物> | sed -E 's/ timing=(real|every_publish)//; s/_timing=(real|every_publish)//' | sort | uniq -c | awk '{print $1}' | sort | uniq -c` 的输出是 `     30 2`，即 60 行配成 30 对）：
+
+```
+E7RESULT name=r7_tier_peaks quantity=r7a class=Hh-front-inside-the-first-ring s=4 rho=1 timing=real tiers=[1,2] families=[Hh,Hh] peaks=[10,20] adjacent_differences=[10] growth=fewer_than_three_tiers maximum_peak=20 maximum_peak_tier=2 maximum_peak_family=Hh maximum_peak_cell=s=4_rho=1_timing=real maximum_peak_txg=16 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=fewer_than_three_tiers dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7a class=Hh-front-inside-the-first-ring s=4 rho=1/4 timing=real tiers=[1,2] families=[Hh,Hh] peaks=[10,20] adjacent_differences=[10] growth=fewer_than_three_tiers maximum_peak=20 maximum_peak_tier=2 maximum_peak_family=Hh maximum_peak_cell=s=4_rho=1/4_timing=real maximum_peak_txg=16 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=fewer_than_three_tiers dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7a class=Hh-front-inside-the-first-ring s=8 rho=1 timing=real tiers=[1,2,3,4] families=[Hh,Hh,Hh,Hh] peaks=[10,20,28,36] adjacent_differences=[10,8,8] growth=still_rising maximum_peak=36 maximum_peak_tier=4 maximum_peak_family=Hh maximum_peak_cell=s=8_rho=1_timing=real maximum_peak_txg=28 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=still_rising dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7a class=Hh-front-inside-the-first-ring s=8 rho=1/4 timing=real tiers=[1,2,3,4] families=[Hh,Hh,Hh,Hh] peaks=[10,20,28,36] adjacent_differences=[10,8,8] growth=still_rising maximum_peak=36 maximum_peak_tier=4 maximum_peak_family=Hh maximum_peak_cell=s=8_rho=1/4_timing=real maximum_peak_txg=28 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=still_rising dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7a class=Hh-front-inside-the-first-ring s=16 rho=1 timing=real tiers=[1,2,3,4,5,6,7,8] families=[Hh,Hh,Hh,Hh,Hh,Hh,Hh,Hh] peaks=[10,20,28,36,44,52,60,68] adjacent_differences=[10,8,8,8,8,8,8] growth=still_rising maximum_peak=68 maximum_peak_tier=8 maximum_peak_family=Hh maximum_peak_cell=s=16_rho=1_timing=real maximum_peak_txg=52 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=still_rising dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7a class=Hh-front-inside-the-first-ring s=16 rho=1/4 timing=real tiers=[1,2,3,4,5,6,7,8] families=[Hh,Hh,Hh,Hh,Hh,Hh,Hh,Hh] peaks=[10,20,28,36,44,52,60,68] adjacent_differences=[10,8,8,8,8,8,8] growth=still_rising maximum_peak=68 maximum_peak_tier=8 maximum_peak_family=Hh maximum_peak_cell=s=16_rho=1/4_timing=real maximum_peak_txg=52 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=still_rising dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+```
+
+读法乙 R7c、「实」列六行（`:16523`、`:16525`、`:16527`、`:16529`、`:16531`、`:16533`）：
+
+```
+E7RESULT name=r7_tier_peaks quantity=r7c class=Hh-front-then-Hc-front s=4 rho=1 timing=real tiers=[1,2,3,6,9] families=[Hh,Hh,Hh,Hc,Hc] peaks=[10,20,146,308,594] adjacent_differences=[10,126,162,286] growth=still_rising maximum_peak=594 maximum_peak_tier=9 maximum_peak_family=Hc maximum_peak_cell=s=4_rho=1_timing=real maximum_peak_txg=63 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=still_rising dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7c class=Hh-front-then-Hc-front s=4 rho=1/4 timing=real tiers=[1,2,3,6,9] families=[Hh,Hh,Hh,Hc,Hc] peaks=[10,20,110,244,458] adjacent_differences=[10,90,134,214] growth=still_rising maximum_peak=458 maximum_peak_tier=9 maximum_peak_family=Hc maximum_peak_cell=s=4_rho=1/4_timing=real maximum_peak_txg=63 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=still_rising dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7c class=Hh-front-then-Hc-front s=8 rho=1 timing=real tiers=[1,2,3,4,5,10,15] families=[Hh,Hh,Hh,Hh,Hh,Hc,Hc] peaks=[10,20,28,36,294,608,914] adjacent_differences=[10,8,8,258,314,306] growth=still_rising maximum_peak=914 maximum_peak_tier=15 maximum_peak_family=Hc maximum_peak_cell=s=8_rho=1_timing=real maximum_peak_txg=105 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=still_rising dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7c class=Hh-front-then-Hc-front s=8 rho=1/4 timing=real tiers=[1,2,3,4,5,10,15] families=[Hh,Hh,Hh,Hh,Hh,Hc,Hc] peaks=[10,20,28,36,226,476,716] adjacent_differences=[10,8,8,190,250,240] growth=still_rising maximum_peak=716 maximum_peak_tier=15 maximum_peak_family=Hc maximum_peak_cell=s=8_rho=1/4_timing=real maximum_peak_txg=105 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=still_rising dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7c class=Hh-front-then-Hc-front s=16 rho=1 timing=real tiers=[1,2,3,4,5,6,7,8,9,18,27] families=[Hh,Hh,Hh,Hh,Hh,Hh,Hh,Hh,Hh,Hc,Hc] peaks=[10,20,28,36,44,52,60,68,594,1208,1810] adjacent_differences=[10,8,8,8,8,8,8,526,614,602] growth=still_rising maximum_peak=1810 maximum_peak_tier=27 maximum_peak_family=Hc maximum_peak_cell=s=16_rho=1_timing=real maximum_peak_txg=201 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=still_rising dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7c class=Hh-front-then-Hc-front s=16 rho=1/4 timing=real tiers=[1,2,3,4,5,6,7,8,9,18,27] families=[Hh,Hh,Hh,Hh,Hh,Hh,Hh,Hh,Hh,Hc,Hc] peaks=[10,20,28,36,44,52,60,68,458,944,1416] adjacent_differences=[10,8,8,8,8,8,8,390,486,472] growth=still_rising maximum_peak=1416 maximum_peak_tier=27 maximum_peak_family=Hc maximum_peak_cell=s=16_rho=1/4_timing=real maximum_peak_txg=201 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=still_rising dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+```
+
+照报的 R7b、「实」列六行（`:16511`、`:16513`、`:16515`、`:16517`、`:16519`、`:16521`）：
+
+```
+E7RESULT name=r7_tier_peaks quantity=r7b class=Hh-back s=4 rho=1 timing=real tiers=[1,2] families=[Hh,Hh] peaks=[174,168] adjacent_differences=[-6] growth=fewer_than_three_tiers maximum_peak=174 maximum_peak_tier=1 maximum_peak_family=Hh maximum_peak_cell=s=4_rho=1_timing=real maximum_peak_txg=27 maximum_peak_is_on_the_largest_tier=false first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=fewer_than_three_tiers dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7b class=Hh-back s=4 rho=1/4 timing=real tiers=[1,2] families=[Hh,Hh] peaks=[114,118] adjacent_differences=[4] growth=fewer_than_three_tiers maximum_peak=118 maximum_peak_tier=2 maximum_peak_family=Hh maximum_peak_cell=s=4_rho=1/4_timing=real maximum_peak_txg=33 maximum_peak_is_on_the_largest_tier=true first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=fewer_than_three_tiers dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7b class=Hh-back s=8 rho=1 timing=real tiers=[1,2,3,4] families=[Hh,Hh,Hh,Hh] peaks=[366,360,352,344] adjacent_differences=[-6,-8,-8] growth=not_monotonic maximum_peak=366 maximum_peak_tier=1 maximum_peak_family=Hh maximum_peak_cell=s=8_rho=1_timing=real maximum_peak_txg=51 maximum_peak_is_on_the_largest_tier=false first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=not_monotonic dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7b class=Hh-back s=8 rho=1/4 timing=real tiers=[1,2,3,4] families=[Hh,Hh,Hh,Hh] peaks=[234,238,230,232] adjacent_differences=[4,-8,2] growth=not_monotonic maximum_peak=238 maximum_peak_tier=2 maximum_peak_family=Hh maximum_peak_cell=s=8_rho=1/4_timing=real maximum_peak_txg=57 maximum_peak_is_on_the_largest_tier=false first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=not_monotonic dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7b class=Hh-back s=16 rho=1 timing=real tiers=[1,2,3,4,5,6,7,8] families=[Hh,Hh,Hh,Hh,Hh,Hh,Hh,Hh] peaks=[716,710,702,694,686,678,672,666] adjacent_differences=[-6,-8,-8,-8,-8,-6,-6] growth=not_monotonic maximum_peak=716 maximum_peak_tier=1 maximum_peak_family=Hh maximum_peak_cell=s=16_rho=1_timing=real maximum_peak_txg=99 maximum_peak_is_on_the_largest_tier=false first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=not_monotonic dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+E7RESULT name=r7_tier_peaks quantity=r7b class=Hh-back s=16 rho=1/4 timing=real tiers=[1,2,3,4,5,6,7,8] families=[Hh,Hh,Hh,Hh,Hh,Hh,Hh,Hh] peaks=[474,478,470,472,466,468,462,468] adjacent_differences=[4,-8,2,-6,2,-6,6] growth=not_monotonic maximum_peak=478 maximum_peak_tier=2 maximum_peak_family=Hh maximum_peak_cell=s=16_rho=1/4_timing=real maximum_peak_txg=105 maximum_peak_is_on_the_largest_tier=false first_tier_above_two_slots=1 first_tier_above_one_slot=1 growth_without_the_last_tier=not_monotonic dropping_the_last_tier_changes_the_judgement=false threshold_moved_flips=true
+```
+
+PC-同槽六行（`:15950`、`:16002`、`:16090`、`:16178`、`:16338`、`:16498`）与 PC-档序列五行（`:5243`–`:5247`）：
+
+```
+E7RESULT name=pc_same_slot s=4 rho=1 k=2 position=back unchanged_q1a_every_peak=344 control_q1a_every_peak=10 control_q1a_real_peak=344 seen=true
+E7RESULT name=pc_same_slot s=4 rho=1/4 k=2 position=back unchanged_q1a_every_peak=236 control_q1a_every_peak=10 control_q1a_real_peak=236 seen=true
+E7RESULT name=pc_same_slot s=8 rho=1 k=2 position=back unchanged_q1a_every_peak=712 control_q1a_every_peak=10 control_q1a_real_peak=712 seen=true
+E7RESULT name=pc_same_slot s=8 rho=1/4 k=2 position=back unchanged_q1a_every_peak=476 control_q1a_every_peak=10 control_q1a_real_peak=476 seen=true
+E7RESULT name=pc_same_slot s=16 rho=1 k=2 position=back unchanged_q1a_every_peak=1460 control_q1a_every_peak=10 control_q1a_real_peak=1460 seen=true
+E7RESULT name=pc_same_slot s=16 rho=1/4 k=2 position=back unchanged_q1a_every_peak=960 control_q1a_every_peak=10 control_q1a_real_peak=960 seen=true
+E7RESULT name=pc_tier_sequence case=rising_one_two_three actual=still_rising expected=still_rising holds=true
+E7RESULT name=pc_tier_sequence case=flat_one_two_two actual=flat_upper_bound_2 expected=flat_upper_bound_2 holds=true
+E7RESULT name=pc_tier_sequence case=not_monotonic_one_three_two actual=not_monotonic expected=not_monotonic holds=true
+E7RESULT name=pc_tier_sequence case=flat_five_five_five actual=flat_upper_bound_5 expected=flat_upper_bound_5 holds=true
+E7RESULT name=pc_tier_sequence case=two_tiers_are_refused actual=fewer_than_three_tiers expected=fewer_than_three_tiers holds=true
+```
+
+**判决行点名**（`grep -n 'name=verdict' <产物>` 共 14 条，`:5232` 与 `:16656`–`:16668`；命令与原样输出）：
+
+```
+$ grep -n 'name=verdict' research/results/e156-alloc-basis-counts-2026-10-18.out | cut -d: -f1 | tr '\n' ' '
+5232 16656 16657 16658 16659 16660 16661 16662 16663 16664 16665 16666 16667 16668 
+
+$ grep 'name=verdict' research/results/e156-alloc-basis-counts-2026-10-18.out | grep -oP '(?<= )[a-z0-9_]+=(false|not_run)(?= |$)' | sort | uniq -c
+
+$ grep 'name=verdict' research/results/e156-alloc-basis-counts-2026-10-18.out | grep -oP '(?<= )[a-z0-9_]+=[1-9][0-9]*(?= |$)' | sort | uniq -c
+      1 cells_run=116
+      1 cells_run_without_fitting_the_ring=36
+      6 rho=1
+      4 s=16
+      4 s=4
+      4 s=8
+
+$ grep 'name=verdict' research/results/e156-alloc-basis-counts-2026-10-18.out | grep -oP '(?<= )[a-z0-9_]+=[a-z_]+(?= |$)' | grep -E 'void|not_|unseen|ambig' | sort | uniq -c
+      1 fork_three=void_not_measured
+      1 premise_two_answer=not_holds
+      8 q1d_growth=not_monotonic
+      1 u13b_flip2_not_applicable=true
+```
+
+没有取值为 `false` 或 `not_run` 的字段；违例、不匹配、歧义、失败类的整数计数都是 0（输出里的 `cells_run=116`、`cells_run_without_fitting_the_ring=36` 是格数，`s=`、`rho=` 是分组名，都不是违例计数）。拿不准、逐个点名的四处：`premise_two_answer=not_holds`、`fork_three=void_not_measured`（`:5232`，前提 2 不成立、岔路单第 3 行失效不量，是第 4 次起的既定结果，这一行与第 6 次产物 `e156-alloc-basis-counts-2026-10-05-r2.out` 的 `:1217` 逐字相同，`diff` 无输出）；`u13b_flip2_not_applicable=true`（同一行，名字含 `not_`，取值是 `true`，不是失败）；`q1d_growth=not_monotonic`（`:16657`–`:16668` 里 8 行，是 Q1d 随 h_缺 的判定值，S = 8 与 16 的 ρ = 1 为 `grows_with_holes`，其余为 `not_monotonic`，与第 6 次的 4 个「实」列取样点结论同形，不是违例）。不在 `name=verdict` 行里、但属于「没过」的一项：`r7_verdict quantity=summary`（`:16564`）的 `report_only_units_unlike_the_prediction` 非空，即 F32 对 R7b 的 8 个单位触发（照报表里 R7b 一行）。
+
+**H1 够不够判**（登记「够判停机」：R7a 的 S = 8、16 取样点、R7c 的 12 个取样点都出了 W28 判定，R7e 出了上界数）：
+
+| 读法 | 已够判 / 还差什么 | 剩下的量能不能让它翻面 | 算出它的命令 |
+|---|---|---|---|
+| 读法甲 R7a（一圈里排满） | 已够判：S = 8、16 的 8 个单位全部「仍在涨」，每档多扣 10、20、28、36 …（S = 8）与 … 68（S = 16），上界数落在最大档、写「≤ 端点」；S = 4 只有 2 档（10、20），登记规定只报不判 | 不能：读法甲的档上限 `k_满(S)` 由几何定死（洞数再大就进了第二圈，那是读法乙），登记里的量都跑完了，没有「够判后未跑」 | `grep -n 'name=r7_tier_peaks quantity=r7a\|name=r7_verdict quantity=r7a' <产物>` |
+| 读法乙 R7c（跨过一圈） | 已够判：12 个单位全部「仍在涨」，最大档（Hc 三倍 `k_满` + 1 个洞）处 914（S = 8、ρ = 1）、1810（S = 16、ρ = 1），上界数落在最大档、写「≤ 端点」，没量到上界 | 没量过：把 Hc 再造到四圈以上、或 S 取更大会不会出现「已平」，这在登记的射程之外（登记第十一节：洞数档到 Hc 三圈为止，「仍在涨」只说到最大档，不外推到「无界」） | `grep -n 'name=r7_tier_peaks quantity=r7c\|name=r7_verdict quantity=r7c' <产物>` |
+| 两种读法并排 | 两种读法在 12 个取样点上结论相同（都「仍在涨」），F33 不触发；认哪一种为准登记 W26 留给主 agent，两种的行都已报 | 不会：它们同向 | `grep -n 'name=r7_verdict quantity=summary' <产物>`，看 `sampling_points_where_the_two_ring_readings_disagree=[]` |
+
+这一节只写读数与够不够判，不判候选甲、乙、丙谁成立：登记第六节 R7a 行写的映射是「已平 往乙，仍在涨 往甲或丙，不单调 不支持任何一边」，这一次两种读法都落在「仍在涨」，「已平」（往乙）在这些取样点上没有读数；候选怎么选属于三方推论与用户定案。
+
+**它答不了的（第 7 次）**：① 候选甲（可写挂载时补洞）做完之后的多扣：`crates/` 里没有根环槽位补洞的写路径（登记 5.1），这里只量今天的代码。② 造洞只有「记录已持久、根槽没持久」一种，读不出、自证不过的槽没造；洞数档到 Hc 三倍 `k_满` + 1 个洞为止，「仍在涨」只说到最大档，不外推到「无界」，也不说明增长的函数形状（相邻差 8 与 126–614 是读数，不是拟合）。③ 只在 4 GiB × 2、S ∈ {4, 8, 16}、ρ ∈ {1, 1/4}：同一读法下上界数随 S 与 ρ 变（Hc 最大档 S = 16 为 1810 / 1416），不是常数。④ 每条历史的终点是最后一个洞 + 3S + 2，`final` 全是 0 由这个造法决定；多扣持续多久（为正的观测点数）只在 `q1_trajectory` 里报了，没进判据。⑤ R7b 的预推错在哪（每档峰值为什么随洞数略降或摆动）没查，只记了 F32 触发。⑥ 内联单测 25 条的读数是主 agent 给的，装置的 5 条新变异 M50–M54 还没跑（待轻型），`replay.sh E156`（alloc-basis 四条岔路的代价数） 的整份复跑也没跑；产物只有这一趟，没有同一个二进制再跑一遍的逐字节比对。⑦ 读法甲、乙谁为准没判。⑧ 登记 5.5 的停机判据（S = 16 的 Hc(27) 单条挂钟超过 10 分钟）没有单独量，整趟 241 秒，按推的不会触发。
+
+**装置下一次要改的**（这一次没改装置）：`crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 的 `verdict` 函数里，给定状态表的判段交回占位结论时 panic，消息（`:758`）只点名 `SINGLEFS_CRASH_AMPLIFICATION_STAGE` 与 `SINGLEFS_CRASH_AMPLIFICATION_SHARE` 两个变量；这一次真撞上的成因是装置二进制没带 `gpu` 特性编、而多机配置 `ENABLE_GPU=1`（主 agent 的诊断，那一趟输出没留存），消息里没有这一种，起跑的人会白查两个变量。下一次要把这一种成因写进那条消息（并点名补救：带 `--features verdict-store,gpu` 编、经 `scripts/crash/gpu-quiesce-run.sh` 起）。
 
 ### 第 6 次重跑（2026-10-05）：回收门槛照定乙读之后 38 格 K10、F24 都是 0，去掉 core 的全零钉住正好红在推出来的 34 点
 
@@ -351,7 +601,7 @@ bash scripts/experiments/replay.sh E156
 cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts
 ```
 
-`scripts/experiments/replay.sh` 里 E156（alloc-basis 四条岔路的代价数） 那一行指 `e156-alloc-basis-counts-2026-10-05-r2.out`（第 6 次重跑的主产物，执行员用 release 二进制跑出来、debug 二进制前 1803 行与它逐字节相同，`replay.sh E156`（alloc-basis 四条岔路的代价数） 没跑，整份 debug 复跑归提交前；判别力对照 `e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out` 与它的 `.patch`、比较 `e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.py` / `.txt`、点集核对 `e156-alloc-basis-counts-2026-10-05-r6-point-sets.py` / `.txt` 与它读的 `e156-alloc-basis-counts-2026-10-05-r6-anchor-pins.txt`、`e156-alloc-basis-counts-2026-10-05-r6-anchor-lowered.txt` 都不进 `replay.sh`）。在那之前指 `e156-alloc-basis-counts-2026-10-05.out`（第 5 次重跑的产物，留着；此前指 `e156-alloc-basis-counts-2026-09-26-r2.out`，这一份与 `e156-alloc-basis-counts-2026-09-26.out` 逐字节相同、都留着；归属跑 `e156-alloc-basis-counts-2026-10-05-attribution-without-31-1.out` 与新产物逐字节相同、不进 `replay.sh`；比对 `e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.py` 与它的输出 `e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt`；变异两行 `e156-alloc-basis-counts-2026-10-05-mutations-append.tsv`、`e156-alloc-basis-counts-2026-10-05-mutations-replacements.tsv`）；2026-10-05 的新产物是执行员用同一个二进制直接跑出来的，`replay.sh E156`（alloc-basis 四条岔路的代价数） 没跑（整轮复跑归提交前）。第 4 次登记的复跑写法（驱动 `driver_e156` 在仓根 `cargo run -q -p singlefs-checker-tier --bin e156_allocation_basis_counts`，经内存包装）；2026-09-27 指向旧产物时复跑那一行判「字节一致」，汇总行原样：
+`scripts/experiments/replay.sh` 里 E156（alloc-basis 四条岔路的代价数） 那一行现在指 `e156-alloc-basis-counts-2026-10-18.out`（第 7 次重跑的主产物，release 二进制，带 `--features verdict-store,gpu`、经 `scripts/crash/gpu-quiesce-run.sh` 起，挂钟约 241 秒；驱动 `driver_e156` 改成 `cargo run -q --release …`，特性与清场经 `CHECKER_TIER_FEATURES`、`CHECKER_TIER_QUIESCE_PREFIX` 带上，`BINDGEN_EXTRA_CLANG_ARGS` 由仓根 `.cargo/config.toml` 给；多机配置 `ENABLE_GPU=1` 时不带 gpu 特性编的装置会在 `verdict` 函数里 panic，所以特性不能省；`replay.sh E156`（alloc-basis 四条岔路的代价数） 没跑，整份复跑是重型，归提交前；核对用的锚点输入与脚本在 `e156-alloc-basis-counts-2026-10-18-support/`，不进 `replay.sh`）。第 7 次之前那一行指 `e156-alloc-basis-counts-2026-10-05-r2.out`（第 6 次重跑的主产物，执行员用 release 二进制跑出来、debug 二进制前 1803 行与它逐字节相同，`replay.sh E156`（alloc-basis 四条岔路的代价数） 没跑，整份 debug 复跑归提交前；判别力对照 `e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out` 与它的 `.patch`、比较 `e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.py` / `.txt`、点集核对 `e156-alloc-basis-counts-2026-10-05-r6-point-sets.py` / `.txt` 与它读的 `e156-alloc-basis-counts-2026-10-05-r6-anchor-pins.txt`、`e156-alloc-basis-counts-2026-10-05-r6-anchor-lowered.txt` 都不进 `replay.sh`）。在那之前指 `e156-alloc-basis-counts-2026-10-05.out`（第 5 次重跑的产物，留着；此前指 `e156-alloc-basis-counts-2026-09-26-r2.out`，这一份与 `e156-alloc-basis-counts-2026-09-26.out` 逐字节相同、都留着；归属跑 `e156-alloc-basis-counts-2026-10-05-attribution-without-31-1.out` 与新产物逐字节相同、不进 `replay.sh`；比对 `e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.py` 与它的输出 `e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt`；变异两行 `e156-alloc-basis-counts-2026-10-05-mutations-append.tsv`、`e156-alloc-basis-counts-2026-10-05-mutations-replacements.tsv`）；2026-10-05 的新产物是执行员用同一个二进制直接跑出来的，`replay.sh E156`（alloc-basis 四条岔路的代价数） 没跑（整轮复跑归提交前）。第 4 次登记的复跑写法（驱动 `driver_e156` 在仓根 `cargo run -q -p singlefs-checker-tier --bin e156_allocation_basis_counts`，经内存包装）；2026-09-27 指向旧产物时复跑那一行判「字节一致」，汇总行原样：
 
 ```
 字节一致 1 ／ 仅计时不同 0 ／ 对不上 0 ／ 跑不了 0 ／ 结论断言不中 0 ／ 产物已归档 0 ／ 输入没变没跑 0
@@ -373,26 +623,26 @@ cargo test -p singlefs-checker-tier --bin e156_allocation_basis_counts
 
 | # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |
 |---|---|---|---|---|
-| 1 | 装置自己那一份引用 | 每个 txg 的那一版的发布输出里全部单元的落点（跨度展开），实例表单元第一次重写之前按根记录的实例表指针补上；零单元那几版按 mkfs 根记录的两条指针 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1490` `facts_of_published_version` | 发布输出（`TransactionOutput.units`、根记录指针）；「两盘同槽」这一前提 |
-| 2 | 盘上仍分配记录 | 同一批环里的根，`recovery::allocation_records_under_root` 读出的未释放记录逐盘展开；没有分配记录树的那几版按根记录两条指针的这块盘那一份 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1535` `referenced_slots_read_from_disk` | 盘上的分配记录树与根记录；跨度的定义 |
-| 3 | 从镜像的根环现读 | 每个观测点读环里全部自证过的根，门槛 = max(F_生效, 环里最旧有效根)；第 6 次起「环里最旧有效根」照定乙并进这次挂载读回全零、还没写掉的槽（挂载时在切段镜像上读，`root_ring_slots_reading_back_all_zero_at_mount`），h_缺、h_洞 按登记字面现数、不并 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1806` `read_hh_state` | 根环落点公式（`target_for_publish`）、`effective_rollback_floor`、实例表判被抛弃、`read_root_ring_slot` 与「每个字节都是 0」的全零判法 |
-| 4 | 锚点模型 | 命令四 `anchors_e156_r4.py` 的逐行移植，门槛那一处照第 6 次登记命令四 `anchors_e156_r6.py` 改（并进挂载时还没写过的槽）：只用脚本头那几句条款算洞、挂载做完的 txg、门槛、h_缺、h_洞、树表下界 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1188` `anchor_model::run_the_anchor_hole_script` | 根环 txg u 落槽 u mod 3S、区域设备 [0, 1, 0]、「每次发布换下树表单元」、暖机规则、c2 之后首 txg 规则 |
-| 5 | 录写切段 | 录下崩溃那次发布的设备写，切在根槽那一次写之前施加到发布之前的镜像上 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:921` `crash_publish_before_its_root_persists` | `FixedGeometry::classify` 认根槽写；同一次发布的输入 |
-| 6 | 发完改回 | 真发一次，再把根槽与每块盘系统配置两槽改回发布之前 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:834` `crash_before_root_persists` | 根槽落点公式；系统配置每盘 2 槽、槽宽 4096（本地常量）；同一次发布的输入 |
-| 7 | 甲-T1「实」与「每」 | 「实」读真实分配器的空闲图；「每」按门槛对记录现算 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1667` `over_withheld_on_device` | 同一份分配器记录、同一个门槛、同一份引用 |
+| 1 | 装置自己那一份引用 | 每个 txg 的那一版的发布输出里全部单元的落点（跨度展开），实例表单元第一次重写之前按根记录的实例表指针补上；零单元那几版按 mkfs 根记录的两条指针 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1778` `facts_of_published_version` | 发布输出（`TransactionOutput.units`、根记录指针）；「两盘同槽」这一前提 |
+| 2 | 盘上仍分配记录 | 同一批环里的根，`recovery::allocation_records_under_root` 读出的未释放记录逐盘展开；没有分配记录树的那几版按根记录两条指针的这块盘那一份 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1823` `referenced_slots_read_from_disk` | 盘上的分配记录树与根记录；跨度的定义 |
+| 3 | 从镜像的根环现读 | 每个观测点读环里全部自证过的根，门槛 = max(F_生效, 环里最旧有效根)；第 6 次起「环里最旧有效根」照定乙并进这次挂载读回全零、还没写掉的槽（挂载时在切段镜像上读，`root_ring_slots_reading_back_all_zero_at_mount`），h_缺、h_洞 按登记字面现数、不并 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:2096` `read_hh_state` | 根环落点公式（`target_for_publish`）、`effective_rollback_floor`、实例表判被抛弃、`read_root_ring_slot` 与「每个字节都是 0」的全零判法 |
+| 4 | 锚点模型 | 命令四 `anchors_e156_r4.py` 的逐行移植，门槛那一处照第 6 次登记命令四 `anchors_e156_r6.py` 改（并进挂载时还没写过的槽）：只用脚本头那几句条款算洞、挂载做完的 txg、门槛、h_缺、h_洞、树表下界 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1356` `anchor_model::run_the_anchor_hole_script` | 根环 txg u 落槽 u mod 3S、区域设备 [0, 1, 0]、「每次发布换下树表单元」、暖机规则、c2 之后首 txg 规则 |
+| 5 | 录写切段 | 录下崩溃那次发布的设备写，切在根槽那一次写之前施加到发布之前的镜像上 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1011` `crash_publish_before_its_root_persists` | `FixedGeometry::classify` 认根槽写；同一次发布的输入 |
+| 6 | 发完改回 | 真发一次，再把根槽与每块盘系统配置两槽改回发布之前 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:924` `crash_before_root_persists` | 根槽落点公式；系统配置每盘 2 槽、槽宽 4096（本地常量）；同一次发布的输入 |
+| 7 | 甲-T1「实」与「每」 | 「实」读真实分配器的空闲图；「每」按门槛对记录现算 | `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs:1955` `over_withheld_on_device` | 同一份分配器记录、同一个门槛、同一份引用 |
 
-路径 1 与 2 在每次挂载交回与每格终点逐根逐盘比（`w9_mismatches`，全部 0）；路径 3 与 4 在每个观测点比（判决行 `v6_a11_mismatch_points=0`、`v2_a14_mismatch_points=0`），路径 4 与 Python 脚本逐行比（「结果」里的 sha256）；路径 5 与 6 逐洞比（`cut_matches_root_and_system_configuration_restored_image`，全部 true）；路径 7 两列逐观测点比（`f24_real_every_differ_points=0`）。三组比对各自共用的前提（发布输出与盘上记录同出一次发布、根环落点公式、同一份记录与门槛）一起错时比不出来；锚点模型只用条款句，是唯一不经 `crates/` 的一条。
+路径 1 与 2 在每次挂载交回与每格终点逐根逐盘比（`w9_mismatches`，全部 0）；路径 3 与 4 在每个观测点比（判决行 `v6_a11_mismatch_points=0`、`v2_a14_mismatch_points=0`），路径 4 与 Python 脚本逐行比（「结果」里的 sha256）；路径 5 与 6 逐洞比（`cut_matches_root_and_system_configuration_restored_image`，全部 true）；路径 7 两列逐观测点比（`f24_real_every_differ_points=0`）。三组比对各自共用的前提（发布输出与盘上记录同出一次发布、根环落点公式、同一份记录与门槛）一起错时比不出来；锚点模型只用条款句，是唯一不经 `crates/` 的一条。第 7 次重跑（2026-10-18）路径 4 另加了新族的洞 txg、`k_满`、终点、`fits` 与 `k_满后`：装置的 Rust 移植与 Python 脚本逐点比（停机 S20，`anchor_r7_summary` 58 行、`anchor_r7_dump` 3567 行、`anchor_r7_k0_summary` 3 行、`anchor_r7_k0_dump` 384 行，与 `e156-alloc-basis-counts-2026-10-18-support/` 下脚本的输出 `cmp` 都无差异，命令在「第 7 次重跑」一节）；这一比对共用的前提是同一份条款句，两边读错同一处时比不出来（开工前试跑里脚本漏了 h_洞 的窗口左端，装置对、脚本错，两边不同才露出来）。
 
 ### 影响的决策
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D28（挂载期承诺量） 已定项 1 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
-| D16（发布语义） 已定项 1 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
-| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
-| D3（空间分配） 已定项 7 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
-| D5（快照 / 空间记账机制） 已定项 4 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
-| D8（核心索引结构） 已定项 14 | 备料 | 2026-10-15 不受影响：整行抄的产物行换成指向产物的指针，数、结论与产物不变 |
+| D28（挂载期承诺量） 已定项 1 | 备料 | 2026-10-21 不受影响：整行抄的产物行照产物现在的键名重抄（值逐字不变），补点名两份核对输出与编号简称，数、结论与产物不变；2026-10-18 不受影响：第 7 次重跑量的是根环上有洞时甲-T1 多扣随洞数的涨法（问题单 H1），没量准入不等式里的项，这一分项的定案与依据不受读数影响 |
+| D16（发布语义） 已定项 1 | 备料 | 2026-10-21 不受影响：整行抄的产物行照产物现在的键名重抄（值逐字不变），补点名两份核对输出与编号简称，数、结论与产物不变；2026-10-18 不受影响：第 7 次读数里 Hs-后（一块盘持续写不进根的形）24 个单位全判「仍在涨」，与这一分项射程「扣住的单元随发布线性涨、没有上界」不矛盾，F34 不触发；这一分项的依据段没引 E156（alloc-basis 四条岔路的代价数），这一格该不该升成支撑交主 agent |
+| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-21 不受影响：整行抄的产物行照产物现在的键名重抄（值逐字不变），补点名两份核对输出与编号简称，数、结论与产物不变；2026-10-18 不受影响：第 7 次重跑量洞上多扣的槽数，不量 journal 重放集合，C380（环上有洞时释放代判不出唯一值） 里释放代判不出唯一值那一半没碰 |
+| D3（空间分配） 已定项 7 | 备料 | 2026-10-21 不受影响：整行抄的产物行照产物现在的键名重抄（值逐字不变），补点名两份核对输出与编号简称，数、结论与产物不变；2026-10-18 不受影响：第 7 次重跑读的是分配器空闲图与回收门槛，没改一条分配记录的落点粒度与 key、value 宽度 |
+| D5（快照 / 空间记账机制） 已定项 4 | 备料 | 2026-10-21 不受影响：整行抄的产物行照产物现在的键名重抄（值逐字不变），补点名两份核对输出与编号简称，数、结论与产物不变；2026-10-18 不受影响：第 7 次重跑没量统计量清单，只量甲-T1 多扣的槽数随洞数的涨法 |
+| D8（核心索引结构） 已定项 14 | 备料 | 2026-10-21 不受影响：整行抄的产物行照产物现在的键名重抄（值逐字不变），补点名两份核对输出与编号简称，数、结论与产物不变；2026-10-18 不受影响：第 7 次重跑没碰 keyspace 与前端的分法，只读分配记录树里的记录算多扣 |
 
 ## 历史版本
 

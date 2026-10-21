@@ -1,5 +1,7 @@
 # 工具与环境事实
 
+**中文** · [English](tooling.en.md) · [日本語](tooling.ja.md)
+
 **tooling.md 放「本工程用到的工具现在是什么状态、用的时候怎么做」**。
 规则不进 tooling.md，进 [CLAUDE.md](../../CLAUDE.md) 或 `.claude/rules/`。
 

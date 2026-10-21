@@ -1,5 +1,7 @@
 # 术语改名对照表
 
+**中文** · [English](term-renames.en.md) · [日本語](term-renames.ja.md)
+
 全仓改过名的概念，旧名与新名的唯一权威对照。**别处一律用新名**——`scripts/kb/sweep-term.py --check` 扫全仓，
 除 `.claude/term-rename-exempt` 登记的几处之外出现旧名就判红。
 

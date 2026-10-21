@@ -1,5 +1,7 @@
 # 删除写出哪些字节（新池新建文件与覆盖写之后新出现的盘上形态）
 
+**中文** · [English](03-third-txn.en.md) · [日本語](03-third-txn.ja.md)
+
 **里程碑「删除与多次 COW」三·6 的登记表**（[03-third-txn.md](../milestone/03-third-txn.md)），2026-10-01 立。新池新建文件的每一段字节在 [layout/01-first-txn.md](01-first-txn.md)，覆盖写、释放、回退与复用新写出的形态在 [layout/02-second-txn.md](02-second-txn.md)；这里只登记删除（单文件 unlink）与管理员回退的谱系记录新写出的形态。同一个字段的宽度与落点以 layout/01-first-txn.md 为准、不另抄。每一行指一条决策分项，指不到分项的写成「格式级空白」。删除已经实装：`crates/singlefs-core/src/transaction.rs` 的 `publish_unlink_intent`（意图）、`publish_unlink_step`（一批）、`walk_the_deletion_queue_until_it_is_empty`（走空），挂载续做在 `crates/singlefs-core/src/mount.rs` 的 `continue_the_deletion_queue_until_it_is_empty`；`crates/singlefs-harness/tests/unlink_single_file_publishes.rs` 钉住意图、一批、最后一批三种发布的重写角色集合。盘上字节由 E172（删除写出的字节的干跑） 照 E142（新池新建文件的干跑） 的形态逐字段核过，核的是退役树加进之前那一版：退役树带来的 tr@0、tr 两格与标签 6 的退役项没核（C775（E172 装置没有退役项））；段序列表里标「推的，待干跑核」的几格照旧是推的。
 
 ## 一、形态

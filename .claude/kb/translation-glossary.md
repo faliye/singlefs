@@ -1,15 +1,15 @@
 # 翻译术语表 / Translation glossary / 翻訳用語集
 
-**仓根 README 与 `briefs/` 的三语版本照这张对照表译。** 登记在 `.claude/trilingual-documents` 的文件，英语是默认版本（`<名>.md`），中文是 `<名>.zh.md`，日语是 `<名>.ja.md`；改一份就要三份一起改。
+**仓根 README、`briefs/` 与 `.claude/kb/` 的三语版本照这张对照表译。** 登记在 `.claude/trilingual-documents` 的文件，中文是默认版本（`<名>.md`），英语是 `<名>.en.md`，日语是 `<名>.ja.md`；改一份就要三份一起改。
 新术语先加进对照表，再在译文里用。门禁 doc-text 的 trilingual-glossary 格判：中文列的串出现在中文那份里，英语列的串（不分大小写）就要出现在英语那份里，日语列的串就要出现在日语那份里。
 说明列可以空；不空就写三段，用 `<br>` 隔开，依次是中文、英语、日语。
 编号的简称照登记位的中文原样写在中文列；英语与日语版里编号后面用半角括号写译名，写成 `E<编号> (<译名>)`，不用全角括号：全角括号会被「编号与简称」那一道当成中文简称去比。
 
-> The trilingual versions of the root README and of `briefs/` are translated with this table. For every file registered in `.claude/trilingual-documents`, English is the default (`<name>.md`), Chinese is `<name>.zh.md` and Japanese is `<name>.ja.md`; a change to one is a change to all three.
+> The trilingual versions of the root README, of `briefs/` and of `.claude/kb/` are translated with this table. For every file registered in `.claude/trilingual-documents`, Chinese is the default (`<name>.md`), English is `<name>.en.md` and Japanese is `<name>.ja.md`; a change to one is a change to all three.
 > Add a new term here first, then use it in the translations. The trilingual-glossary cell of gate doc-text checks that whenever the Chinese string occurs in the Chinese version, the English string (case-insensitive) occurs in the English version and the Japanese string occurs in the Japanese version.
 > In the English and Japanese versions, a numbered item is followed by its translated short name in ASCII parentheses, as in `E<number> (<translated name>)`.
 
-> ルート README と `briefs/` の三言語版はこの対訳表に従って訳す。`.claude/trilingual-documents` に登録されたファイルは英語が既定版（`<名>.md`）、中国語が `<名>.zh.md`、日本語が `<名>.ja.md` で、一つを変えたら三つとも変える。
+> ルート README、`briefs/` と `.claude/kb/` の三言語版はこの対訳表に従って訳す。`.claude/trilingual-documents` に登録されたファイルは中国語が既定版（`<名>.md`）、英語が `<名>.en.md`、日本語が `<名>.ja.md` で、一つを変えたら三つとも変える。
 > 新しい用語はまずここに加え、それから訳文で使う。ゲート doc-text の trilingual-glossary セルは、中国語列の文字列が中国語版に現れたら、英語列の文字列（大文字小文字を区別しない）が英語版に、日本語列の文字列が日本語版に現れることを検査する。
 > 英語版と日本語版では、番号の後ろに訳した略称を半角括弧で `E<番号> (<訳名>)` のように書く。
 
@@ -35,6 +35,7 @@
 | 新池新建文件 | new-pool file creation | 新規プールでのファイル作成 | 里程碑名，也是一条写流<br>a milestone name and a write stream<br>マイルストーン名であり、書き込みストリームの名前でもある |
 | 覆盖写、释放、回退与复用 | overwrite, release, rollback and reuse | 上書き・解放・ロールバック・再利用 | 里程碑名<br>a milestone name<br>マイルストーン名 |
 | 删除与多次 COW | deletion and repeated COW | 削除と複数回の COW | 里程碑名<br>a milestone name<br>マイルストーン名 |
+| 共享与回收 | sharing and reclamation | 共有と回収 | 里程碑名<br>a milestone name<br>マイルストーン名 |
 | 覆盖写 | overwrite | 上書き | |
 | 释放 | release | 解放 | |
 | 回退 | rollback | ロールバック | |
@@ -121,6 +122,23 @@
 | 按里程碑对比六家文件系统的文件性能 | per-milestone file performance against six file systems | マイルストーン別の六ファイルシステムとのファイル性能比較 | E152（按里程碑对比六家文件系统的文件性能） 的简称<br>short name of that experiment<br>その実験の略称 |
 | 恢复重放有界穷举与变异杀伤界 | bounded exhaustive recovery replay and mutation kill bound | リカバリ再生の有界全数探索とミューテーション殺傷限界 | E165（恢复重放有界穷举与变异杀伤界） 的简称<br>short name of that experiment<br>その実験の略称 |
 | 吞写之后可写挂载被拒而模型说该成 | writable mount refused after a swallowed write while the model says it should succeed | 書き込み消失後に書き込み可能マウントが拒否されモデルは成功すべきとする | C600（吞写之后可写挂载被拒而模型说该成） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| fsid 前 8 字节相同时重做 mkfs 实例代号不变式红 | instance generation invariant red when mkfs is redone with the same first 8 bytes of fsid | fsid の先頭 8 バイトが同じまま mkfs をやり直すとインスタンスコード不変条件が赤 | C659（fsid 前 8 字节相同时重做 mkfs 实例代号不变式红） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 钉槽的两类坏实现镜像上判不出 | two kinds of bad slot-pin implementations not judgeable on images | スロット固定の二種の不良実装がイメージ上で判定できない | C863（钉槽的两类坏实现镜像上判不出） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 树表条目未知 flags 位让整张树表读不下去 | unknown flags bits in a tree table entry make the whole tree table unreadable | ツリーテーブルエントリの未知 flags ビットでツリーテーブル全体が読めなくなる | C865（树表条目未知 flags 位让整张树表读不下去） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| F2 退回不分字节丢了与内容拒收 | F2 rollback does not tell lost bytes from rejected content | F2 のロールバックがバイト消失と内容拒否を区別しない | C866（F2 退回不分字节丢了与内容拒收） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 别的自证结构的读错位没人查 | misplaced reads of other self-verifying structures go unchecked | 他の自己検証構造の位置ずれ読み出しを誰も検査していない | C864（别的自证结构的读错位没人查） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 另外六处读者只拒窄于字段表的条目宽 | six other readers reject only entry widths narrower than the field table | 他の六箇所の読者がフィールド表より狭いエントリ幅だけを拒否 | C867（另外六处读者只拒窄于字段表的条目宽） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 系统配置管道身份没有 checker 判定 | system configuration pipeline identity has no checker verdict | システム構成のパイプライン同一性に checker 判定がない | C868（系统配置管道身份没有 checker 判定） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 重放前缀严格连续没有会红的判定 | strictly contiguous replay prefix has no must-red verdict | 再生プレフィックスの厳密な連続性に赤になる判定がない | C869（重放前缀严格连续没有会红的判定） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 提交原子没有崩溃点重放 oracle | commit atomicity has no crash-point replay oracle | コミットの原子性にクラッシュポイント再生の oracle がない | C870（提交原子没有崩溃点重放 oracle） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 记录 inode 号等于 key 没有 checker 判定 | record inode number equal to key has no checker verdict | レコードの inode 番号が key と等しいことに checker 判定がない | C871（记录 inode 号等于 key 没有 checker 判定） 的简称<br>short name of that owed check<br>その未済の検査の略称 |
+| 空间分配 | space allocation | 領域割り当て | D3（空间分配） 的简称<br>short name of that decision<br>その決定の略称 |
+| 核心索引结构 | core index structure | コアインデックス構造 | D8（核心索引结构） 的简称<br>short name of that decision<br>その決定の略称 |
+| 加密 | encryption | 暗号化 | D9（加密） 的简称<br>short name of that decision<br>その決定の略称 |
+| 格式冻结政策 | format freeze policy | フォーマット凍結ポリシー | D15（格式冻结政策） 的简称<br>short name of that decision<br>その決定の略称 |
+| 发布语义 | publish semantics | パブリッシュセマンティクス | D16（发布语义） 的简称<br>short name of that decision<br>その決定の略称 |
+| 块里携带什么信息 | information carried in a block | ブロックに含める情報 | D18（块里携带什么信息） 的简称<br>short name of that decision<br>その決定の略称 |
+| 后台整理与放置回收 | background compaction and placement reclamation | バックグラウンド整理と配置回収 | D26（后台整理与放置回收） 的简称<br>short name of that decision<br>その決定の略称 |
 | 单元键 | unit key | ユニットキー | 判定按它复用：函数单元指纹、工具链、依赖版本<br>the key a verdict is reused by: function-unit fingerprints, toolchain, dependency versions<br>判定の再利用の鍵: 関数ユニットの指紋、ツールチェーン、依存の版 |
 | 函数单元 | function unit | 関数ユニット | |
 | 块键 | block key | ブロックキー | |

@@ -33,7 +33,7 @@
 # 冻结副本（拷 Cargo.toml、Cargo.lock、.cargo、crates 四样；主工作区 crates/ 不动），核清单再放装置
 F=~/.local/share/singlefs/work/e175-frozen-crates-2/repo; R=$PWD/research/results/e175-product-path-inode-watermark-regression-2026-10-08
 (cd $F && sha256sum -c --quiet $R/baseline-frozen-crates.sha)
-cp $R/device-source.rs $F/crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs
+cp $PWD/scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs $F/crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs
 # 每一臂：施加补丁（P 不施加；V1、V2 照 $R/patch-V1.diff、$R/patch-V2.diff）、编、拷出二进制、还原，再核一次清单
 ROOT=$PWD; (cd $F && CARGO_TARGET_DIR=<编译目录> bash $ROOT/scripts/hosts/capped.sh 5 cargo test --release -p singlefs-harness --test e175_product_path_inode_watermark_regression --no-run)
 E175_ARM=P bash scripts/hosts/capped.sh 5 bash scripts/hosts/run-with-memory-cap.sh 8G <测试二进制> --test-threads 5
@@ -53,7 +53,7 @@ bash scripts/experiments/replay.sh E175
 
 | 文件 | 是什么 |
 |---|---|
-| `e175-product-path-inode-watermark-regression-2026-10-08/device-source.rs` | 装置源码原样（sha256 `310c60a51a7a0c5cc015b070006d7d48ae0eb09d8a581ec8acba9d6bfc185fca`，两段同一份） |
+| `scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs` | 装置源码（不在这个产物目录里，搬进了 `scripts/experiments/`；跑两段时 sha256 `310c60a51a7a0c5cc015b070006d7d48ae0eb09d8a581ec8acba9d6bfc185fca`，两段同一份；提交 `6aa74a765`、`f778192d3` 改了里面带的脚本路径，此刻 sha256 `cdb5d7be4de182d713732a1ba26224b4fb344b444686572a43c0321ff5c6f953`） |
 | `e175-product-path-inode-watermark-regression-2026-10-08/baseline-frozen-crates.sha` | 冻结副本放装置之前的清单（340 行，路径相对副本根；sha256 `48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb`，就是 `code_baseline`） |
 | `e175-product-path-inode-watermark-regression-2026-10-08/baseline-frozen-crates.out` | `name=frozen_copy`（拷的日期、批次、HEAD、两行 diff / status 的 sha256、文件数、主工作区拷前拷后清单都与副本相同）、`name=mutation_anchor` 三行、`name=arm_check` 九行、`name=arm_binary` 三行、`name=main_drift_after_copy` 一行 |
 | `e175-product-path-inode-watermark-regression-2026-10-08/patch-V1.diff`、`e175-product-path-inode-watermark-regression-2026-10-08/patch-V2.diff` | V1、V2 两臂施加的补丁 |
@@ -194,10 +194,10 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 
 | # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |
 |---|---|---|---|---|
-| 1 | S3 路 1（实例表） | 最新那条可读根的实例表，按 (实例, txg) 判每条根抛不抛弃；对两段每一步的每一条可读根（扫遍） | `research/results/e175-product-path-inode-watermark-regression-2026-10-08/device-source.rs:713 abandoned_by_the_table`，判法 `crates/singlefs-core/src/recovery.rs:1553 publish_is_abandoned_by_the_instance_table` | `readable_roots` 列出的根、盘上实例表、`crates/` 的抛弃判法 |
-| 2 | S3 路 2（步账） | 每次挂载做成，模型根环里那一步之前最新的那条根当所选根，同一旧实例里 txg 更大的根判抛弃 | `research/results/e175-product-path-inode-watermark-regression-2026-10-08/device-source.rs:723 abandoned_by_the_step_ledger`，所选根取自 `crates/singlefs-harness/src/model.rs:2235 answer_mount_writable` 的择法 | `readable_roots` 列出的根、理想模型的根环、执行器交回的挂载结局 |
-| 3 | S1 账的重发号（Q1） | 按号记出生代与持有它的根，一次发号碰上同号另一个出生代就记事件 | `research/results/e175-product-path-inode-watermark-regression-2026-10-08/device-source.rs:1028 HistoryAccount::observe`，重建 `crates/singlefs-core/src/recovery.rs:5405 rebuild_version` | `readable_roots`、`rebuild_version`、路 1 的抛弃判法 |
-| 4 | S2 checker 的 I-9.29（同号只许一个出生代） | 池级 checker 对每一步的镜像判 | `research/results/e175-product-path-inode-watermark-regression-2026-10-08/device-source.rs:1158 HistoryAccount::judge_with_the_checker`，`crates/singlefs-checker/src/walk.rs:10947 check_pool_image` | 只有镜像本身；与 1–3 不共用解析代码 |
+| 1 | S3 路 1（实例表） | 最新那条可读根的实例表，按 (实例, txg) 判每条根抛不抛弃；对两段每一步的每一条可读根（扫遍） | `scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs:713 abandoned_by_the_table`，判法 `crates/singlefs-core/src/recovery.rs:1553 publish_is_abandoned_by_the_instance_table` | `readable_roots` 列出的根、盘上实例表、`crates/` 的抛弃判法 |
+| 2 | S3 路 2（步账） | 每次挂载做成，模型根环里那一步之前最新的那条根当所选根，同一旧实例里 txg 更大的根判抛弃 | `scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs:723 abandoned_by_the_step_ledger`，所选根取自 `crates/singlefs-harness/src/model.rs:2235 answer_mount_writable` 的择法 | `readable_roots` 列出的根、理想模型的根环、执行器交回的挂载结局 |
+| 3 | S1 账的重发号（Q1） | 按号记出生代与持有它的根，一次发号碰上同号另一个出生代就记事件 | `scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs:1028 HistoryAccount::observe`，重建 `crates/singlefs-core/src/recovery.rs:5405 rebuild_version` | `readable_roots`、`rebuild_version`、路 1 的抛弃判法 |
+| 4 | S2 checker 的 I-9.29（同号只许一个出生代） | 池级 checker 对每一步的镜像判 | `scripts/experiments/e175_product_path_inode_watermark_regression/device-source.rs:1158 HistoryAccount::judge_with_the_checker`，`crates/singlefs-checker/src/walk.rs:10947 check_pool_image` | 只有镜像本身；与 1–3 不共用解析代码 |
 
 路 1 与路 2 判同一个量，逐根比、不一致计数（`device-source.rs` 里的计数 `s3_path_disagreements`），两段二十六份结果文件都是 0 次；两路共用 `readable_roots` 列出的那一组根，它列错了两路会一起错。路 3 与路 4 不是同一个量，登记第十节 F3 把两者对着核（第 1188、1199 行），两段都是 0 次。跨路径的比较是计数、不是 `assert_eq!`，欠一条把两路连起来的断言。
 
@@ -205,8 +205,8 @@ V1、V2 上全部 Q1 事件按 Q9 分类与那一步 I-9.29（同号只许一个
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D8（核心索引结构） 已定项 6 | 备料 | 2026-10-18 不受影响：上一轮的产物归档进版本库（git 历史里取得回），正文引用改成只留文件名，结论、数不变 |
-| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-18 不受影响：上一轮的产物归档进版本库（git 历史里取得回），正文引用改成只留文件名，结论、数不变 |
+| D8（核心索引结构） 已定项 6 | 备料 | 2026-10-18 不受影响：上一轮的产物归档进版本库（git 历史里取得回），正文引用改成只留文件名；装置源码从产物目录搬进 scripts/experiments/，内容没变；结论、数不变 |
+| D23（journal 的角色与格式） 已定项 14 | 备料 | 2026-10-18 不受影响：上一轮的产物归档进版本库（git 历史里取得回），正文引用改成只留文件名；装置源码从产物目录搬进 scripts/experiments/，内容没变；结论、数不变 |
 
 ## 历史版本
 
